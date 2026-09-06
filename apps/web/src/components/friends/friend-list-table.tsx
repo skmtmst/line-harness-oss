@@ -123,9 +123,30 @@ export default function FriendListTable({
               ))}
             </div>
           </details>
-          <select value={pageSize} onChange={(event) => onPageSizeChange(Number(event.target.value))} className="v6-select h-10 min-w-34.5 rounded-control border border-hairline bg-canvas text-sm font-semibold text-ink">
-            {pageSizeOptions.map((size) => <option key={size} value={size}>{size}件表示</option>)}
-          </select>
+          <details className="relative">
+            <summary
+              data-qa-open="LT8RS"
+              className="flex h-10 min-w-34.5 cursor-pointer list-none items-center justify-between gap-4 rounded-control border border-hairline bg-canvas px-3 text-sm font-semibold text-ink"
+            >
+              {pageSize}件表示 <span aria-hidden="true" className="text-ink-faint">⌄</span>
+            </summary>
+            <div className="absolute right-0 z-20 mt-1 w-37.5 rounded-card border border-hairline bg-canvas p-1.5 shadow-lg">
+              {pageSizeOptions.map((size) => (
+                <button
+                  key={size}
+                  type="button"
+                  aria-pressed={size === pageSize}
+                  onClick={(event) => {
+                    onPageSizeChange(size)
+                    event.currentTarget.closest('details')?.removeAttribute('open')
+                  }}
+                  className={`flex w-full items-center justify-between rounded-control px-2.5 py-2 text-left text-xs font-semibold ${size === pageSize ? 'bg-accent-soft text-accent' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
+                >
+                  {size}件表示 {size === pageSize ? <span aria-hidden="true">✓</span> : null}
+                </button>
+              ))}
+            </div>
+          </details>
         </div>
       </div>
 
