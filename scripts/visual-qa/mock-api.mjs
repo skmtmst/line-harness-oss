@@ -51,6 +51,7 @@ import {
   MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
   LIST_STATS, NEN_COLUMN_CREATE, OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
+  RICH_MENU_GROUPS, RICH_MENU_GROUP_DETAILS, RICH_MENU_EXTERNAL, RICH_MENU_TAP_STATS,
   TAGS, TAG_GROUPS, REMINDER_RUNS,
   ACTION_SCORE_RULES,
   SUPPORT_MARKS, SUPPORT_MARK_AUTOMATION_RULES,
@@ -661,8 +662,8 @@ const SHAPES = {
   '/api/dashboard/organization-overview': DASHBOARD_OVERVIEW,
 
   /* リッチメニュー。LINE側にある実物の一覧と、押された回数。 */
-  '/api/rich-menu-groups/external': { currentDefault: null, lineMenus: [] },
-  '/api/rich-menu-groups/tap-stats': { from: FIXED_FROM, to: FIXED_TO, byArea: [], byGroup: [], total: 0 },
+  '/api/rich-menu-groups/external': RICH_MENU_EXTERNAL,
+  '/api/rich-menu-groups/tap-stats': RICH_MENU_TAP_STATS,
 
   /* 友だち追加時配信の公開前確認（PR #597）。契約と同じ形を返す。 */
   '/api/friend-add-routing/draft': FRIEND_ADD_LIFECYCLE_DRAFT,
@@ -675,6 +676,15 @@ const SHAPES = {
  * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
  */
 function visualQaWriteBody(method, pathname) {
+  if (method === 'POST' && /^\/api\/rich-menu-groups\/[^/]+\/preview-targets$/.test(pathname)) {
+    return {
+      matched: { value: 1020, state: 'available', reason: null },
+      overlap: { value: 180, state: 'available', reason: null },
+      effective: { value: 840, state: 'available', reason: null },
+      higherMenus: ['夏キャンペーン'],
+      priority: 2,
+    }
+  }
   if (method === 'POST' && pathname === '/api/friend-add-rules/test') {
     return {
       stateChanged: false, ruleId: FRIEND_ADD_RULE.id, matched: true,
@@ -1218,6 +1228,22 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       ? RICH_MENU_DELETE_IMPACT_EMPTY
       : RICH_MENU_DELETE_IMPACT
     return { success: true, data: impact }
+  }
+  if (pathname === '/api/rich-menu-groups') {
+    return { success: true, data: RICH_MENU_GROUPS }
+  }
+  if (pathname === '/api/rich-menu-groups/external') {
+    return { success: true, data: RICH_MENU_EXTERNAL }
+  }
+  if (pathname === '/api/rich-menu-groups/tap-stats') {
+    return { success: true, data: RICH_MENU_TAP_STATS }
+  }
+  const richMenuGroup = /^\/api\/rich-menu-groups\/([^/]+)$/.exec(pathname)
+  if (richMenuGroup) {
+    const group = RICH_MENU_GROUP_DETAILS[richMenuGroup[1]]
+    return group
+      ? { success: true, data: group }
+      : { success: false, error: 'リッチメニューが見つかりません' }
   }
   if (pathname === '/api/tag-groups') return { success: true, data: TAG_GROUPS }
   if (pathname === '/api/list-stats') return { success: true, data: LIST_STATS }
