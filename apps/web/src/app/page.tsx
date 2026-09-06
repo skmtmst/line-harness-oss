@@ -273,9 +273,7 @@ function SendQuotaCard({
 }) {
   const used = metric === undefined ? delivery?.quotaUsed ?? null : metric.value?.used ?? null
   const limit = metric === undefined ? delivery?.quotaLimit ?? null : metric.value?.limit ?? null
-  const remaining = metric === undefined
-    ? used !== null && limit !== null ? Math.max(0, limit - used) : null
-    : metric.value?.remaining ?? null
+  const remaining = used !== null && limit !== null ? Math.max(0, limit - used) : null
   const remainingRate = remaining !== null && limit ? Math.max(0, Math.min(100, remaining / limit * 100)) : null
   return <Card padding="roomy" className="min-h-[128px]">
     <div className="flex items-start justify-between gap-3">
