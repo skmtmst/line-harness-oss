@@ -86,6 +86,7 @@ shared-button-importer app/rich-menus/page.tsx
 shared-button-importer app/scenarios/detail/scenario-detail-client.tsx
 shared-button-importer app/scenarios/page.tsx
 shared-button-importer app/scenarios/results/page.tsx
+shared-button-importer app/settings/page.tsx
 shared-button-importer app/tags/fields/migrate/page.tsx
 shared-button-importer app/tags/fields/new/page.tsx
 shared-button-importer app/tags/folders/new/page.tsx
