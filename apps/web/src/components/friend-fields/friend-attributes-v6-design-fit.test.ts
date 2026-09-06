@@ -104,11 +104,15 @@ describe('QKx8Q 保存した検索の一覧', () => {
     expect(filterSavedSearches(unknown, '', 'unused')).toHaveLength(1)
   })
 
-  it('設計のツールバー2つを画面に置き、絞った結果を一覧に渡す', () => {
-    const toolbar = between(SAVED_LIST, 'type="search"', '</select>')
+  it('設計の3つの絞り込みと表の列を画面に置き、絞った結果を一覧に渡す', () => {
+    const toolbar = between(SAVED_LIST, 'type="search"', '<span className="flex-1"')
     expect(toolbar).toContain('placeholder="条件名で検索"')
     expect(toolbar).toContain('使用先：すべて')
+    expect(toolbar).toContain('該当人数：すべて')
     expect(toolbar).toContain('setUsageFilter')
+    expect(toolbar).toContain('setMatchFilter')
+    expect(SAVED_LIST).toContain('<Th className="w-[27%] px-3 py-3">条件の要約</Th>')
+    expect(SAVED_LIST).toContain('<Th className="w-[16%] px-3 py-3">使用先</Th>')
     expect(withoutComments(SAVED_LIST)).toContain('{visible.map((search)')
     expect(withoutComments(SAVED_LIST)).not.toContain('{items.map((search)')
   })
