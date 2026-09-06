@@ -5,10 +5,11 @@ const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 const DETAIL = readFileSync(new URL('../detail/scenario-detail-client.tsx', import.meta.url), 'utf8')
 
 describe('V6 5-1-L シナリオ配信結果', () => {
-  it('実Node IDと既存のシナリオ・統計APIを使う', () => {
+  it('実Node IDとシナリオ・統計・開始記録APIを使う', () => {
     expect(PAGE).toContain('data-design-node="M2b2B"')
     expect(PAGE).toContain('api.scenarios.get(id)')
     expect(PAGE).toContain('api.scenarios.stats(id)')
+    expect(PAGE).toContain('api.scenarios.runs(id, selectedAccountId, { limit: 50 })')
     expect(DETAIL).toContain('href={`/scenarios/results?id=${id}`}')
   })
 
@@ -20,10 +21,12 @@ describe('V6 5-1-L シナリオ配信結果', () => {
   })
 
   it('取れない開封・クリック・失敗数を0として作らない', () => {
-    expect(PAGE).toContain('開封率 —・クリック率 —')
+    expect(PAGE).toContain("run?.opened.value ?? '—'")
+    expect(PAGE).toContain("run?.clicked.value ?? '—'")
+    expect(PAGE).toContain('runs?.steps[0]?.failed.reason')
     expect(PAGE).toContain('<div><dt>エラー</dt><dd>—</dd></div>')
-    expect(PAGE).toContain('LINEでは友だち単位の開封を取得できません')
-    expect(PAGE).toContain("result?.reachedCount ?? '—'")
+    expect(PAGE).toContain('LINEでは通ごとの開封・クリック・失敗をすべて取得できません')
+    expect(PAGE).toContain('run?.delivered ?? result?.reachedCount')
     expect(PAGE).not.toContain('result?.reachedCount ?? 0')
     expect(PAGE).not.toContain('82.4%')
     expect(PAGE).not.toContain('46.1%')

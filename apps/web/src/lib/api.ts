@@ -1847,6 +1847,133 @@ export type ScenarioAction = {
   complete?: boolean
 }
 
+/** 機能5 V6の副作用なし試算。開始前の人数と通ごとの予定を同じ計算で返す。 */
+export type ScenarioSimulation = {
+  scenarioId: string
+  lineAccountId: string
+  computedAt: string
+  sideEffects: false
+  audience: {
+    accountTotal: number
+    matched: number
+    alreadySubscribed: number
+    newStartPlanned: number
+    excluded: number
+  }
+  steps: Array<{
+    id: string
+    stepOrder: number
+    scheduledAt: string
+    targetCount: number
+    excludedCount: number
+  }>
+}
+
+export type ScenarioUnavailableMetric = {
+  value: null
+  state: 'unavailable'
+  reason: string
+}
+
+/** 購読・テスト送信・送信枠・通別結果をまとめた機能5 V6の読取結果。 */
+export type ScenarioRuns = {
+  summary: { active: number; paused: number; completed: number; delivering: number }
+  subscriptions: Array<{
+    id: string
+    friendId: string
+    friendName: string
+    status: string
+    currentStepOrder: number
+    startedAt: string
+    nextDeliveryAt: string | null
+    updatedAt: string
+  }>
+  pagination: { total: number; limit: number; cursor: string; nextCursor: string | null }
+  testSends: Array<{
+    id: string
+    friendId: string
+    friendName: string
+    sentAt: string
+    messageCount: number
+  }>
+  quota: {
+    limit: number | null
+    used: number | null
+    remaining: number | null
+    state: 'available' | 'unlimited' | 'unavailable'
+    reason: string | null
+    asOf: string
+  }
+  concurrentBroadcasts: Array<{ id: string; title: string; status: string; scheduledAt: string }>
+  scenarioClickTotal: number
+  steps: Array<{
+    id: string
+    stepOrder: number
+    delivered: number
+    opened: ScenarioUnavailableMetric
+    clicked: ScenarioUnavailableMetric
+    failed: ScenarioUnavailableMetric
+  }>
+}
+
+export type ScenarioDraftActionV6 = {
+  id: string
+  hook: 'step_sent' | 'scenario_completed' | 'choice_selected'
+  stepId: string | null
+  choiceKey: string | null
+  type: string
+  params: Record<string, unknown>
+  condition: unknown
+  onFailure: 'stop' | 'continue'
+  sortOrder: number
+}
+
+export type ScenarioDraftV6 = {
+  scenarioId: string
+  lineAccountId: string
+  version: number
+  afterActions: ScenarioDraftActionV6[]
+  updatedBy: string
+  updatedAt: string
+}
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+/** 撮影用固定データなどが古い成功形を返しても、画面へ壊れた値を渡さない。 */
+function isScenarioSimulation(value: unknown): value is ScenarioSimulation {
+  if (!isObjectRecord(value) || !isObjectRecord(value.audience) || !Array.isArray(value.steps)) return false
+  const audience = value.audience
+  return typeof value.scenarioId === 'string'
+    && typeof value.lineAccountId === 'string'
+    && typeof value.computedAt === 'string'
+    && value.sideEffects === false
+    && ['accountTotal', 'matched', 'alreadySubscribed', 'newStartPlanned', 'excluded']
+      .every((key) => typeof audience[key] === 'number')
+}
+
+function isScenarioRuns(value: unknown): value is ScenarioRuns {
+  if (!isObjectRecord(value) || !isObjectRecord(value.summary)) return false
+  const summary = value.summary
+  return ['active', 'paused', 'completed', 'delivering'].every((key) => typeof summary[key] === 'number')
+    && Array.isArray(value.subscriptions)
+    && Array.isArray(value.testSends)
+    && isObjectRecord(value.quota)
+    && Array.isArray(value.concurrentBroadcasts)
+    && Array.isArray(value.steps)
+}
+
+function isScenarioDraft(value: unknown): value is ScenarioDraftV6 {
+  return isObjectRecord(value)
+    && typeof value.scenarioId === 'string'
+    && typeof value.lineAccountId === 'string'
+    && typeof value.version === 'number'
+    && Array.isArray(value.afterActions)
+    && typeof value.updatedBy === 'string'
+    && typeof value.updatedAt === 'string'
+}
+
 /** 一斉配信の一覧に出す数（設計 `V2 4-2 一斉配信`）。 */
 export type BroadcastStats = {
   thisMonth: number
@@ -3716,6 +3843,47 @@ export const api = {
         paused: number
         steps: Array<{ stepOrder: number; reachedCount: number; reachRate: number }>
       }>>(`/api/scenarios/${id}/stats`),
+    /** 配信は行わず、現在の実データで開始人数と各通の予定を試算する。 */
+    simulate: async (id: string, lineAccountId: string, startAt?: string): Promise<ApiResponse<ScenarioSimulation>> => {
+      const response = await fetchApi<ApiResponse<unknown>>(`/api/scenarios/${id}/simulate`, {
+        method: 'POST',
+        body: JSON.stringify({ lineAccountId, ...(startAt ? { startAt } : {}) }),
+      })
+      if (!response.success) return response
+      return isScenarioSimulation(response.data)
+        ? { success: true, data: response.data }
+        : { success: false, error: '開始前の試算結果を確認できませんでした' }
+    },
+    /** 購読・テスト送信・送信枠・通別結果を1回で読む。 */
+    runs: async (
+      id: string,
+      lineAccountId: string,
+      params?: { status?: string; cursor?: string; limit?: number },
+    ): Promise<ApiResponse<ScenarioRuns>> => {
+      const query = new URLSearchParams({ lineAccountId })
+      if (params?.status) query.set('status', params.status)
+      if (params?.cursor) query.set('cursor', params.cursor)
+      if (params?.limit) query.set('limit', String(params.limit))
+      const response = await fetchApi<ApiResponse<unknown>>(`/api/scenarios/${id}/runs?${query}`)
+      if (!response.success) return response
+      return isScenarioRuns(response.data)
+        ? { success: true, data: response.data }
+        : { success: false, error: '配信記録を確認できませんでした' }
+    },
+    /** V6送信後アクションを楽観ロック付き下書きへまとめて保存する。 */
+    saveDraft: async (
+      id: string,
+      data: { lineAccountId: string; expectedVersion: number; afterActions: ScenarioDraftActionV6[] },
+    ): Promise<ApiResponse<ScenarioDraftV6>> => {
+      const response = await fetchApi<ApiResponse<unknown>>(`/api/scenarios/${id}/draft`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      })
+      if (!response.success) return response
+      return isScenarioDraft(response.data)
+        ? { success: true, data: response.data }
+        : { success: false, error: 'シナリオの下書き保存結果を確認できませんでした' }
+    },
 
     /* ---- アクション（Lステップの「アクション設定」にあたる） ---- */
     actions: {

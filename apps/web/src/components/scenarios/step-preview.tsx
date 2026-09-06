@@ -117,6 +117,13 @@ function rolledToNextDay(
   return at.getDate() !== expected.getDate() || at.getMonth() !== expected.getMonth()
 }
 
+/** 実際の友だち情報を作らず、LINEプレビューだけ安全な例へ置き換える。 */
+export function renderPreviewBody(body: string): string {
+  return body
+    .replaceAll('{{name}}', 'Kenta')
+    .replaceAll('{{お名前}}', 'Kenta')
+}
+
 export default function StepPreview({
   deliveryMode,
   offsetDays,
@@ -155,7 +162,7 @@ export default function StepPreview({
               <span className="text-ink mt-0.5 block text-label font-bold">{templateName}</span>
             </Bubble>
           ) : body.trim() ? (
-            <Bubble>{body}</Bubble>
+            <Bubble>{renderPreviewBody(body)}</Bubble>
           ) : (
             <Placeholder>本文を書くと、ここに出ます</Placeholder>
           )}
@@ -293,7 +300,7 @@ export default function StepPreview({
             <Placeholder>音声のURLを入れると、ここに出ます</Placeholder>
           )
         ) : body.trim() ? (
-          <Bubble>{body}</Bubble>
+          <Bubble>{renderPreviewBody(body)}</Bubble>
         ) : (
           <Placeholder>本文を書くと、ここに出ます</Placeholder>
         )}
@@ -312,15 +319,13 @@ export default function StepPreview({
 
       {/*
         差し込みの注意書き。
-        日付は届く日時が決まっているのでここで実物にできるが、名前や
-        友だち情報は相手ごとに変わるので置き換えられない。混ぜて出すと
-        「置き換わるもの／置き換わらないもの」が分からなくなるため、
-        どちらも書いたまま出して、そのことを書く。
+        実際の友だち情報は使わず、名前だけプレビュー用の例へ置き換える。
+        本番送信では友だちごとの実値へ置き換わることを、その場に書く。
       */}
       {/\{\{[a-z_.+:0-9-]+\}\}/.test(body) && (
         <p className="text-ink-faint mt-2 text-micro leading-relaxed">
-          差し込み（{'{{name}}'} や {'{{date}}'} など）は、送るときに実際の値へ置き換わります。
-          ここでは書いたまま出しています。
+          名前はプレビュー用の「Kenta」に置き換えています。送るときは友だちごとの実際の値になります。
+          そのほかの差し込みは書いたまま表示します。
         </p>
       )}
 
