@@ -44,6 +44,11 @@ export type AuditAction =
   | 'dashboard.preference.default.update'
   | 'conversion.approval.update'
   | 'ec.connector.update'
+  | 'line_notification.definition.create'
+  | 'line_notification.definition.update'
+  | 'line_notification.definition.publish'
+  | 'line_notification.definition.stop'
+  | 'line_notification.delivery.retry'
   | 'webinar.archive'
   | 'webinar.participant.export';
 

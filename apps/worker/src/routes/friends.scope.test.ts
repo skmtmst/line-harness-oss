@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   getFriendById: vi.fn(),
   getFriendTagsByFriendIds: vi.fn(),
   getSavedSearchById: vi.fn(),
+  recordSavedSearchUsage: vi.fn(),
   pushMessage: vi.fn(),
 }));
 
@@ -19,6 +20,7 @@ vi.mock('@line-crm/db', async (importOriginal) => ({
   getFriendById: mocks.getFriendById,
   getFriendTagsByFriendIds: mocks.getFriendTagsByFriendIds,
   getSavedSearchById: mocks.getSavedSearchById,
+  recordSavedSearchUsage: mocks.recordSavedSearchUsage,
 }));
 vi.mock('@line-crm/line-sdk', () => ({
   LineClient: class { pushMessage = mocks.pushMessage; },
@@ -264,6 +266,7 @@ describe('A-8 friends tenant scope', () => {
       created_by: 'another-staff',
       line_account_id: 'own',
       is_shared: 1,
+      revision: 4,
       conditions_json: JSON.stringify({
         all: [{ kind: 'tag', op: 'includes', value: 'vip' }],
         any: [{ kind: 'name', op: 'contains', value: '田中' }],
@@ -277,6 +280,36 @@ describe('A-8 friends tenant scope', () => {
     expect(prepared.some(({ sql, binds }) =>
       sql.includes('friend_tags sft') && sql.includes('f.display_name LIKE ?')
       && binds.includes('vip') && binds.includes('%田中%'))).toBe(true);
+    expect(mocks.recordSavedSearchUsage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        savedSearchId: 'search-1',
+        lineAccountId: 'own',
+        revision: 4,
+        referenceKind: 'friends',
+        usedBy: 'staff',
+      }),
+    );
+  });
+
+  test('利用回数の記録失敗だけでは友だち一覧を失敗させない', async () => {
+    mocks.canAccess.mockResolvedValue(true);
+    mocks.getSavedSearchById.mockResolvedValue({
+      id: 'search-1',
+      scope: 'friends',
+      created_by: 'staff',
+      line_account_id: 'own',
+      is_shared: 0,
+      revision: 2,
+      conditions_json: JSON.stringify({
+        all: [{ kind: 'name', op: 'contains', value: '田中' }],
+      }),
+    });
+    mocks.recordSavedSearchUsage.mockRejectedValueOnce(new Error('D1 unavailable'));
+    const response = await createApp([]).request(
+      '/api/friends?includeTags=false&lineAccountId=own&savedSearchId=search-1',
+    );
+    expect(response.status).toBe(200);
   });
 
   test('private saved search owned by another staff is hidden', async () => {
