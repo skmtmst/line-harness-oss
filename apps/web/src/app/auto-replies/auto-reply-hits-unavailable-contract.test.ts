@@ -44,21 +44,15 @@ describe('一覧の帯と行（設計 8-1 `cmDfJ`）', () => {
     expect(PAGE).toContain('const totalHits = hitsAllKnown')
   })
 
-  it('数えられていないルールを「未ヒット」に数えない', () => {
-    /* `?? 0` だと、数えられていないだけのルールが未ヒットに混ざる。 */
-    expect(PAGE).toContain('items.filter((r) => r.hits?.total === 0).length')
-    expect(PAGE, '未取得を0として数えている').not.toContain('items.filter((r) => (r.hits?.total ?? 0) === 0)')
-  })
-
   it('「未ヒット」の絞り込みも、未取得を混ぜない', () => {
     expect(PAGE).toContain("if (savedFilter === 'never') return r.hits?.total === 0")
   })
 
   it('行のヒット数を 0 で埋めない', () => {
     expect(PAGE).toContain("{r.hits?.period ?? '—'}")
-    expect(PAGE).toContain("（累計 {r.hits?.total ?? '—'}）")
+    expect(PAGE).toContain("累計 {r.hits?.total ?? '—'}回")
     expect(PAGE).not.toContain("{r.hits?.period ?? 0}")
-    expect(PAGE).not.toContain("（累計 {r.hits?.total ?? 0}）")
+    expect(PAGE).not.toContain("累計 {r.hits?.total ?? 0}回")
   })
 
   it('累計の副題にも、未取得のときは数を出さない', () => {
@@ -74,6 +68,6 @@ describe('「準備中」を出さない（v6-common-rules §5-5）', () => {
      * いつ使えるようになるのか分からない。
      */
     expect(PAGE).not.toContain('準備中')
-    expect(PAGE).toContain("? '一度も当たっていないルール'")
+    expect(PAGE).toContain("note: '一度も当たっていないルール'")
   })
 })

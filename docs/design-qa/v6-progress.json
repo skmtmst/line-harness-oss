@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 16,
-  "match": 38,
-  "structureMatchDataPending": 39,
-  "needsFix": 168,
+  "match": 42,
+  "structureMatchDataPending": 43,
+  "needsFix": 160,
   "unjudged": 11,
-  "remaining": 230,
+  "remaining": 226,
   "features": [
     {
       "feature": 1,
@@ -894,11 +894,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 11,
+      "match": 2,
+      "structureMatchDataPending": 1,
+      "needsFix": 8,
       "unjudged": 0,
-      "remaining": 11,
+      "remaining": 9,
       "capturedAt": [
         {
           "pr": 544,
@@ -1236,11 +1236,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 9,
+      "match": 2,
+      "structureMatchDataPending": 3,
+      "needsFix": 4,
       "unjudged": 0,
-      "remaining": 9,
+      "remaining": 7,
       "capturedAt": [
         {
           "pr": 509,

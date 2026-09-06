@@ -209,6 +209,103 @@ describe('GET /api/rich-menu-groups/:groupId', () => {
   });
 });
 
+// ----- POST preview-targets / schedule / GET usages (V6 12-1-B/D/F) -----
+
+describe('V6 targeting preview and publish schedule', () => {
+  test('対象人数と上位メニューとの重複を実データから返す', async () => {
+    dbMocks.getRichMenuGroupById.mockResolvedValue({
+      id: 'g1', account_id: 'acc-1', status: 'draft', size: 'large',
+      targeting_condition: JSON.stringify({ operator: 'AND', rules: [] }),
+      targeting_priority: 2,
+    });
+    let countCall = 0;
+    const db = {
+      prepare: vi.fn((sql: string) => ({
+        bind: vi.fn(() => ({
+          first: vi.fn(async () => {
+            if (!sql.includes('COUNT(*)')) return null;
+            countCall += 1;
+            return { count: countCall === 1 ? 1020 : 180 };
+          }),
+          all: vi.fn(async () => sql.includes('targeting_priority <')
+            ? { results: [{ id: 'higher', name: '夏キャンペーン', targeting_condition: JSON.stringify({ operator: 'AND', rules: [] }) }] }
+            : { results: [] }),
+          run: vi.fn(async () => ({ meta: { changes: 1 } })),
+        })),
+      })),
+    } as unknown as D1Database;
+    const app = setupApp({ db });
+    const res = await app.request('/api/rich-menu-groups/g1/preview-targets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      data: {
+        matched: { value: 1020, state: 'available' },
+        overlap: { value: 180, state: 'available' },
+        effective: { value: 840, state: 'available' },
+        higherMenus: ['夏キャンペーン'],
+        priority: 3,
+      },
+    });
+  });
+
+  test('見えないアカウントの対象人数は404で隠す', async () => {
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups/g1/preview-targets', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    });
+    expect(res.status).toBe(404);
+  });
+
+  test('壊れた保存条件を全員扱いにしない', async () => {
+    dbMocks.getRichMenuGroupById.mockResolvedValue({
+      id: 'g1', account_id: 'acc-1', status: 'draft', size: 'large',
+      targeting_condition: '{broken', targeting_priority: 0,
+    });
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups/g1/preview-targets', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    });
+
+    expect(res.status).toBe(503);
+    expect((await res.json() as { error: string }).error).toContain('対象条件');
+  });
+
+  test('公開予約は実行キーが無ければ保存しない', async () => {
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue({
+      id: 'g1', account_id: 'acc-1', status: 'draft', pages: [],
+    });
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups/g1/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'scheduled', startsAt: '2026-09-10T01:00:00.000Z' }),
+    });
+    expect(res.status).toBe(400);
+    expect((await res.json() as { error: string }).error).toContain('Idempotency-Key');
+  });
+
+  test('一般スタッフは公開予約を作れない', async () => {
+    const app = setupApp({ staff: { id: 'staff-1', role: 'staff' } });
+    const res = await app.request('/api/rich-menu-groups/g1/schedule', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': 'schedule-request-1',
+      },
+      body: JSON.stringify({ mode: 'scheduled', startsAt: '2026-09-10T01:00:00.000Z' }),
+    });
+
+    expect(res.status).toBe(403);
+  });
+});
+
 // ----- POST /api/rich-menu-groups -----
 
 describe('POST /api/rich-menu-groups', () => {
