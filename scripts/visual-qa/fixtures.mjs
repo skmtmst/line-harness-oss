@@ -2971,20 +2971,67 @@ export const ACTION_SCORE_RULES = {
   },
 }
 
-/** 機能10 ウェビナー。Pencil V6の文言と数を固定し、通常状態を再現する。 */
+/**
+ * 機能10 ウェビナーのフォルダ。設計 `ZC13r` の名前と件数。
+ * `count` は全18件を取得しなくても左の絞り込み件数を描ける一覧集計値。
+ */
+export const WEBINAR_FOLDERS = [
+  ['webinar-folder-products', '商品説明', 6],
+  ['webinar-folder-cases', '導入事例', 4],
+  ['webinar-folder-seminars', 'セミナー', 5],
+  ['webinar-folder-archive', 'アーカイブ', 4],
+].map(([id, name, count], index) => ({
+  id, kind: 'webinar', name, parentId: null, displayOrder: index, count,
+  color: null, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-25T02:00:00.000Z',
+}))
+
+export const WEBINAR_FOLDER_SUMMARY = { rows: 5, total: 18 }
+
+/**
+ * 機能10 ウェビナー。Pencil `ZC13r` の5行を一覧契約の値だけで表す。
+ *
+ * `status` に型外の「公開予定」「非公開」を入れない。保存状態は従来の
+ * draft / active / archived、公開の見え方は `publicationState` で分ける。
+ * 申込・視聴の未取得は0で埋めず null にする。
+ */
 export const WEBINARS = [
-  ['webinar-1', 'NEN活用スタートセミナー', 'nen-start', 'active', 2_538, 184],
-  ['webinar-2', '予約機能の使い方', 'booking-guide', 'active', 1_920, 96],
-  ['webinar-3', 'EC連携 実践講座', 'ec-guide', 'draft', 2_160, 63],
-  ['webinar-4', '顧客対応の自動化', 'support-automation', 'draft', 1_800, 0],
-  ['webinar-5', '旧機能説明会', 'legacy-guide', 'draft', 1_500, 85],
-].map(([id, title, slug, status, durationSeconds, registrations]) => ({
-  id, accountId: 'visual-qa-account', title, slug, status,
-  videoPrefix: `webinars/${slug}`, durationSeconds,
+  {
+    id: 'webinar-1', title: 'NEN活用スタートセミナー', slug: 'nen-start', status: 'active',
+    folderId: 'webinar-folder-seminars', folderName: 'セミナー',
+    durationSeconds: 2_538, registrationCount: 184, viewerCount: 142,
+    publicationState: 'period', publicationStartsAt: '2026-08-01T00:00:00+09:00', publicationEndsAt: '2026-08-31T23:59:59+09:00',
+  },
+  {
+    id: 'webinar-2', title: '予約機能の使い方', slug: 'booking-guide', status: 'active',
+    folderId: 'webinar-folder-products', folderName: '商品説明',
+    durationSeconds: 1_920, registrationCount: 96, viewerCount: 71,
+    publicationState: 'always', publicationStartsAt: null, publicationEndsAt: null,
+  },
+  {
+    id: 'webinar-3', title: 'EC連携 実践講座', slug: 'ec-guide', status: 'draft',
+    folderId: 'webinar-folder-cases', folderName: '導入事例',
+    durationSeconds: 2_160, registrationCount: 63, viewerCount: null,
+    publicationState: 'scheduled', publicationStartsAt: '2026-08-28T20:00:00+09:00', publicationEndsAt: null,
+  },
+  {
+    id: 'webinar-4', title: '顧客対応の自動化', slug: 'support-automation', status: 'draft',
+    folderId: 'webinar-folder-seminars', folderName: 'セミナー',
+    durationSeconds: 1_800, registrationCount: 0, viewerCount: null,
+    publicationState: 'unset', publicationStartsAt: null, publicationEndsAt: null,
+  },
+  {
+    id: 'webinar-5', title: '旧機能説明会', slug: 'legacy-guide', status: 'draft',
+    folderId: 'webinar-folder-archive', folderName: 'アーカイブ',
+    durationSeconds: 1_500, registrationCount: 85, viewerCount: 99,
+    publicationState: 'ended', publicationStartsAt: '2026-07-01T00:00:00+09:00', publicationEndsAt: '2026-07-31T23:59:59+09:00',
+  },
+].map((webinar) => ({
+  accountId: 'visual-qa-account', videoPrefix: `webinars/${webinar.slug}`,
   schedule: [{ type: 'daily', time: '20:00' }],
   cta: { label: '個別相談を予約する', url: 'https://example.com/consultation', showAtSeconds: 1_920 },
-  tagOnAttend: '配信済み', tagOnCtaClick: '相談希望', registrations,
+  tagOnAttend: '配信済み', tagOnCtaClick: '相談希望',
   createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-25T02:00:00.000Z',
+  ...webinar,
 }))
 
 export const WEBINAR_OVERVIEW = {
