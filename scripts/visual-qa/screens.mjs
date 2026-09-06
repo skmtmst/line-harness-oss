@@ -138,7 +138,7 @@ const AUTOMATION = { feature: 25, dir: 'automations-v6', mode: 'page' }
 const WEBHOOK = { feature: 26, dir: 'webhooks-v6', route: '/webhooks', mode: 'page' }
 
 /** 予約管理・予約設定。`/booking/bookings` `/booking/menus` `/booking/staff`。 */
-const BOOKING = { feature: 27, dir: 'booking-v6', route: '/booking/bookings', mode: 'page' }
+const BOOKING = { feature: 27, dir: 'booking-v6', route: '/booking/bookings', mode: 'page', clock: '2026-09-03T00:00:00.000Z' }
 
 /** 予約設定。メニュー・担当スタッフはタブ、受付時間は別ルート。 */
 const BOOKING_SET = { feature: 28, dir: 'booking-settings-v6', route: '/booking/menus', mode: 'page' }
@@ -169,9 +169,9 @@ export const SCREENS = [
   // ── 機能1 ダッシュボード ────────────────────────────────
   {
     node: 'vUXKb', feature: 1, name: '1-1 ダッシュボード',
-    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-04 再照合。構造一致・データ未接続。** 2026-09-03の1440/1920px画像と最新コードの差分を確認し、カード構成・文言・横スクロール0は設計どおり。自動変更など取得口のない値は `—` のため最終一致にしない。現在コミットの画像はPlaywrightのOS権限で取得できず、旧画像と差分照合で判定。', verdictSource: 'dashboard-v6/vUXKb.txt + 2026-09-03 1440/1920px screenshots + 2026-09-04 static diff audit',
+    verdict: 'match', verdictNote: '**2026-09-07 再撮影で一致。** #270 のダッシュボード指標APIを接続し、有効友だち398人、今月の送信枠（残り197 / 上限200通）、7日分の友だち推移を設計値で表示した。3102/8789で1440/1920pxを撮影し、両幅とも横はみ出し0。表示中の本文差0を確認した（閉じた追加URL選択肢の運用データ名だけ実装側にある）。', verdictSource: 'dashboard-v6/vUXKb.txt + vUXKb-{1440,1920}.png + 2026-09-07 visual/text comparison',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
-    verdictHead: '145c497d1',
+    verdictHead: 'd9cfe531d',
   },
   {
     node: 'ZN0ov', feature: 1, name: '1-1-1 ダッシュボード編集',
@@ -182,10 +182,10 @@ export const SCREENS = [
   },
   {
     node: 'JN6mQ', feature: 1, name: '1-1-2 友だち追加QR',
-    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-04 再照合。構造一致・データ待ち。** ダイアログ820px、QR枠280px、小300px、PNG/JPG/SVGの順、2行リンク欄、主ボタンとヒント枠を設計に合わせた。文字比較の差は、取得口が返さない `https://lin.ee/nen-official` と、閉じた選択肢の「中/小」のみ。短縮URLを決め打ちせず、データ待ちとする。現在コミットの画像はPlaywrightのOS権限で取得できず、2026-09-03画像と差分照合で判定。', verdictSource: 'dashboard-v6/JN6mQ.txt + 2026-09-03 1440/1920px screenshots + 2026-09-04 static diff audit',
+    verdict: 'match', verdictNote: '**2026-09-07 再撮影で一致。** #270 の公式プロフィールURLを接続して `https://lin.ee/nen-official` を表示し、表示用QRは追加URLから生成するため撮影モックでも壊れない。ダイアログ820px、QR枠280px、サイズ選択、PNG/JPG/SVG、コピー・ダウンロード・印刷、ヒント枠を確認。3102/8789の1440/1920pxで横はみ出し0。表示中の本文差0（閉じた選択肢の運用データ名と中・小サイズだけ実装側にある）。', verdictSource: 'dashboard-v6/JN6mQ.txt + JN6mQ-{1440,1920}.png + 2026-09-07 visual/text comparison',
     dir: 'dashboard-v6', route: '/', mode: 'viewport', height: 1668, clock: DASHBOARD_CLOCK,
     steps: [{ click: 'QRを表示' }],
-    verdictHead: '145c497d1',
+    verdictHead: 'd9cfe531d',
   },
   {
     node: 'NjK9q', feature: 1, name: '1-1-3 対応受信の表示件数を開く',
@@ -2220,20 +2220,16 @@ export const SCREENS = [
   },
 
   // ── 機能23 EC連携 ───────────────────────────────────────
-  /*
-    設計のタブは4本（取り込みの記録／会員のつき合わせ／定期便／つなぎ先）。
-    実装は1枚もので、**取り込みの記録だけ**がある。
-  */
-  { ...EC, node: 'eI3gs', name: '23-1 EC連携', verdict: 'needs_fix', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正。**設計のタブ3本（取り込みの記録2,486／会員のつき合わせ24／定期便186）が無く、実装は1枚もの。**帯・期間・札・注文の行（注文 #12492 ／ ¥12,800 ／ フード 2袋・おやつ 1）と、**返品の行（－¥3,600 ／ 成果を取り消し・マイルを 36 引く）**が無い。実装の「LINE user IDや決済情報は表示しません。」（出さないものを書く）と「定期便イベントは受信準備済みです。Stripe定期便本体の接続後に有効化します。」（未接続の断り）は残す。※ **「準備中」2か所**（マニュアル／連携設定）。**内部語**「EC STEP」「LINE送信完了」。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** P1 結びつかなかった注文が、どこにも出てこない。ECの注文にはLINEの友だちが誰なのか書かれておらず、メールか電話で結びつけて、どちらも一致しなかった注文が「会員のつき合わせ」に並ぶ設計。実装にはそれを集めて見る場所が無い。設計は候補（電話番号が同じ／確からしさ とても高い）と「結びつけると増える売上 ¥312,400（この24件ぶん。分析にも入ります）」まで出す。**いま結びつかなかった注文は、買ってくれた事実がLINE側に何も残らないまま**で、購入後の配信も成果地点もマイルも動かない。P1 つなぎ先を画面から変えられない（page.tsx:174「接続先や突合キーを画面から変える口が無い」） **ルート**：`/ec-commerce`。**取得元**：`ec-v6/eI3gs.txt` ＋ `ec-commerce/page.tsx:174`。**推奨修正**：`ELayY`（会員のつき合わせ）の候補台帳が要る。**いま結びつかなかった注文は、買ってくれた事実がLINE側に何も残らない**ので、配信も成果地点もマイルも動かない。つなぎ先を画面から変える（`oHAN4`）ときは、**署名の秘密値を画面へ出さない**——`M0Gb7`（Webhook）の「設定済／未設定」の見せ方を写す。', verdictSource: 'ec-v6/design-qa.md' , verdictHead: '31293424' },
+  { ...EC, node: 'eI3gs', name: '23-1 EC連携', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #236 / UI HEAD b82dd41bc を3105/8792で再撮影。構造一致・出来事の詳細API待ち。** 4入口、今日の取込・未照合・失敗・最終受信の4指標、照合方針の案内、検索、状態絞り込み、並び順、設計順の6列表をそろえた。未照合の行は会員のつき合わせへ進める。1440・1920pxとも横はみ出し0、壊れ値・外部イベントIDの露出0。残る差は注文金額・商品明細・個別アクション台帳・失敗だけを再試行するAPIで、値や押し口を作らず未取得と明記したため一致にはしない。', verdictSource: 'ec-v6/eI3gs.txt + 2026-09-07 1440/1920px screenshots', verdictHead: 'b82dd41bc' },
   {
     ...EC, node: 'ELayY', name: '23-1-A 会員のつき合わせ',
     route: '/ec-commerce/identity-candidates',
     states: { apis: ['**/api/identity-candidates*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     variants: [{ suffix: '-decide', steps: [{ qaOpen: 'ELayY', after: 700 }] }],
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正。帯（注文18・会員登録6／¥312,400）と札（すべて24／候補あり16／候補なし8）が無い。実装は**メールを `ta***@example.jp` と伏せ字にし**、「結び付けても、元の友だち・注文・LINEアカウントは消えません。」「過去のLINE送信は再送しません。」と**何が起きないかを書いていて正しい**。設計の「LINEに友だちがいません」（候補なしの言い方）と「ECの会員をまとめてください」が無い。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#600 `484c0cd8`（#598 `a13be90c` の上）で新規実装。設計 `ELayY` 23-1-A。** ルート `/ec-commerce/identity-candidates`。1440・1920とも横スクロール0。 **① `InCDe` と同じ候補部品・状態部品・判定窓を使う**（`components/identity`）。外枠だけが違う。 **② 5状態を撮り分けた**：通常・読込・空・失敗・権限不足。失敗と権限不足では候補も注意帯も描かない。 **③ 未取得と実値0を分けている**：影響は 結び付く注文 `24件` ／ 過去のLINE送信（再送しません） `0通`。**設計の帯にある「自動で結びついた」「結びつけると増える売上」は読み口が返さないので、数字を作らず `—（未取得）` と書いた。** **④ 判定窓**（`data-qa-open="ELayY"`）はECなので**再処理の範囲**が出る。既定は「今後の注文だけ結び付ける（過去のLINE送信は再送しません）」で、過去へ副作用を出さない。 **⑤ 版競合**は `expectedVersion` を送り、409 `STALE_CANDIDATE` を「別の人が先に判定しました。最新の状態を読み直してください。」に言い換える（内部の記号は出さない）。 **`undefined`・`NaN`・`Invalid Date`・`API error` は0件。平文のメール・電話・内部IDの露出なし。** 取得元：`ec-v6/ELayY-normal.txt`・`ELayY-forbidden.txt` ＋ `identity-decision-dialog.tsx` ＋ `ec-commerce/identity-candidates/page.tsx`',
-    verdictSource: 'ec-v6/ELayY-normal.txt + identity-decision-dialog.tsx',
-    verdictHead: '31293424',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #236 / UI HEAD b82dd41bc を3105/8792で通常・読込・空・失敗・権限不足・判定窓まで再撮影。構造一致・集計API待ち。** 4入口、未照合・候補あり・自動照合・売上影響の4指標、照合根拠の案内、4絞り込み、並び順、影響列つき一覧を設計順にそろえた。メールと電話は伏せ字のまま、判定窓では過去LINEを再送しない既定を維持。全14枚で横はみ出し0、壊れ値・平文PII・内部IDの露出0。残る差は自動照合数・売上影響・候補なし／重複疑いの集計を返すAPIと撮影固定データで、未取得を0にしていないため一致にはしない。',
+    verdictSource: 'ec-v6/ELayY-{normal,loading,empty,error,forbidden,decide}.txt + 2026-09-07 screenshots',
+    verdictHead: 'b82dd41bc',
   },
   {
     ...EC, node: 'bfB50', name: '23-1-B 定期便',
@@ -2413,11 +2409,10 @@ export const SCREENS = [
 
   // ── 機能27 予約管理 ─────────────────────────────────────
   /*
-    設計は台帳（時間×担当の格子）と、電話の代理予約が4枚。
-    実装は一覧＋詳細で、**「予約を追加」は押せない**
-    （「管理画面から予約を代理で入れる仕組みは準備中です」`bookings/page.tsx:289`）。
+    日・週の台帳は、固定予約を時間×担当／曜日の格子へ並べる。
+    LINE予約は緑、LINE未連携の電話予約は青で同じ格子に載せる。
   */
-  { ...BOOKING, node: 'TV2DI', name: '27-1 予約管理', verdict: 'needs_fix', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正。**予約の固定データが空**で「該当する予約はありません」。台帳の中身は比べられない。枠で見ると、帯（今日12／今週68／今月286／LINEから 9・電話 3／うちLINEから／売上見込み ¥86,400）と、**「今日の予約を、時間と担当で並べた台帳です。LINEからの予約（緑）と電話の予約（青）を同じところに並べます。」**（読み方の説明）が無い。設計の「LINEの友だちと結びついていません。当日の連絡ができません」（困る理由）も無い。実装の「このアカウントには LIFF ID が未設定です。アカウント設定で LIFF ID を登録してください。」は**次の一手を書いていて良い**が、`LIFF ID` は内部語なので言い換えを検討する。※ **「準備中」9か所**（並び替え／表示件数／保存した条件／予約履歴URL ほか）。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** P1 台帳が時間（縦）× 担当（横）の格子になっていない。設計は9:00の行に佐々木・山本・中川の3列があり、どこが空いているかが面で分かる。P1 電話で受けた予約がこの台帳に載らない（「予約を追加」は在るが押せない。bookings/page.tsx:289「管理画面から予約を代理で入れる仕組みは準備中です」）。設計の帯は「今日の予約12件・LINEから9・電話3」で**4件に1件は電話**。載らないので、今日の件数が本当の数にならず、電話とLINEの予約がぶつかっても気づけず、前日・当日のお知らせも送れない **ルート**：`/booking/bookings`。**取得元**：`booking-v6/TV2DI.txt` ＋ `bookings/page.tsx:289`。**推奨修正**：**電話の予約を台帳へ入れられるようにするのが先**（`cpdDi`）。載らないままだと、今日の件数が本当の数にならず、電話とLINEの予約がぶつかっても気づけず、前日・当日のお知らせも送れない。時間×担当の格子はそのあと。', verdictSource: 'booking-v6/design-qa.md' , verdictHead: '31293424' },
+  { ...BOOKING, node: 'TV2DI', name: '27-1 予約管理', verdict: 'match', verdictNote: '**2026-09-06、PR #TBD の実装を1440px・1920pxで撮影し、★V6設計と見比べた。** 時間（縦）×担当（横）の格子、LINE予約（緑）と電話予約（青）の同居、4つの集計、読み方の青帯、注意事項・今日の内訳・関連導線の右欄がそろった。固定データの予約件数と日付は撮影用データに従うが、情報の位置・余白・色・枠・角丸と操作の骨格は一致。両幅とも横はみ出し0。', verdictSource: 'booking-v6/TV2DI.txt', verdictHead: 'ed3e365aa' },
   {
     ...BOOKING, node: 'TnDbq', name: '27-1-A 予約の詳細',
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** P1 予約の詳細の面が設計とそろわない。代理で入れた予約をLINEの予約と同じ扱いにする道（前日・当日のお知らせ、成果地点「予約が入った」を数える）が無い **ルート**：`/booking/bookings`（予約の詳細）。**取得元**：`booking-v6/design-qa.md`（この画面の `.txt` は取れていない）。**推奨修正**：**代理で入れた予約をLINEの予約と同じ扱いにするのが先**（前日・当日のお知らせ、成果地点「予約が入った」を数える）。`GfceK`（代理予約の登録完了）でも同じ要点が確かめられていないので、**同じ束で直す**。', verdictSource: 'booking-v6/design-qa.md',
@@ -2426,7 +2421,10 @@ export const SCREENS = [
       `getByRole('text', …)` は0件になる。表の名前は桁なので `cell` で探す。
       `jwrbf`（16-1-E）と同じ直し。
     */
-    steps: [{ click: '高橋 直人', role: 'cell' }],
+    steps: [
+      { click: '一覧' },
+      { click: '詳細', nth: 0 },
+    ],
     verdictHead: '7b509106',
   },
   /*
@@ -2435,10 +2433,18 @@ export const SCREENS = [
     「LINE未連携の電話客は、顧客台帳の受け皿ができるまで登録できません。」
   */
   { ...BOOKING, node: 'cpdDi', name: '27-1-B 電話の予約を入れる', route: '/booking/bookings/new',
-    verdict: 'needs_fix', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正。設計に在って実装に無いのは「LINEの友だちなら、名前で探して結びつけてください。」、**「お名前（LINEにいない方）」**（LINEにいない人の受け皿）、**「予約を受け付けたことを、いますぐLINEに送る」と LINEプレビュー**、「前回は 7/28。だいたい1か月ごとにお越しです」（前回の来店）。実装の「LINE未連携の電話客は、顧客台帳の受け皿ができるまで登録できません。別の友だちへ推測で結び付けません。」は**できないことと理由を書いていて正しい**ので、受け皿ができるまではこのまま。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** P1 電話の予約を入れる画面なのに、電話番号もお名前も入れられない。設計は「お名前（LINEにいない方）／電話番号／ペットの名前」を持ち、LINE未連携の人をそのまま登録できる。実装はLINEの友だち検索だけで、未連携は登録できないと断っている（断り方は正直で正しい。足りないのは顧客台帳の受け皿）。P1 お客様に何を送るかを選べない（設計は 受付をすぐLINEに送る／前日19:00に思い出してもらう／当日8:00に「本日おまちしています」の3つのチェック。実装は説明が2つ並ぶだけ）。P2 空き確認の緑帯（何分かかり何時まで押さえるか）、LINEプレビュー、この方について（来店回数・前回の申し送り）、つながる先、保存前の注意文が無い **ルート**：`/booking/bookings/new`。**取得元**：`booking-settings-v6/design-qa.md`（この画面の `.txt` は取れていない）。**推奨修正**：**LINEにいない人を受ける顧客台帳が先**（お名前・電話番号・ペットの名前）。実装が「未連携は登録できない」と断っているのは正直で正しく、足りないのは受け皿。お知らせの3つの選択は、リマインダの口（`JCz6J` の予定計算）を使い回せる。',
-    verdictSource: 'booking-v6/cpdDi-1920.png', verdictHead: '31293424',
+    steps: [
+      { fill: 'input[placeholder="名前・電話番号で探す"]', selector: true, text: '菅野', after: 900 },
+      { click: '菅野 亮', after: 500 },
+      { select: '予約メニュー', label: 'トリミング（小型犬）' },
+      { select: '担当者', label: '佐々木' },
+      { fill: '日付', text: '2026-09-03', after: 900 },
+      { select: '空いている時間', label: '10:00〜11:45' },
+    ],
+    verdict: 'needs_fix', verdictNote: '**2026-09-06、PR #TBD の実装を1440px・1920pxで撮影し、★V6設計と見比べた。** 友だち検索、メニュー・担当・日付・空き時間、空き確認の緑帯、要望、送信予定、LINEプレビュー、この方について、関連導線、保存前の注意まで配置した。両幅とも横はみ出し0。**ただし要修正を据え置く。** 現在の予約APIは `friend_id` を必須にしており、設計にある「お名前（LINEにいない方）／電話番号／ペットの名前」でLINE未連携客を保存する口がない。別の友だちへ誤って結び付けず、画面には登録できない理由を明記した。**推奨修正：** 顧客台帳と予約APIへLINE未連携客の名前・電話番号・ペット名を保存する契約を追加し、その後この3入力と電話客向け保存経路を有効にする。',
+    verdictSource: 'booking-v6/cpdDi.txt', verdictHead: 'ed3e365aa',
   },
-  { ...BOOKING, node: 'SbuUI', name: '27-1-C 今週の予約', steps: [{ click: '今週' }], verdict: 'needs_fix', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正。**予約が空**で週の並びが比べられない。枠で見ると、帯（今日12／今週68／今月286／売上見込み ¥486,200）と**「今週の予約を曜日ごとに並べています。空いているところと詰まっているところが1目で分かります。」**（読み方の説明）が無い。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** P1 今週の予約の面が設計とそろわない。時間×担当の格子でないため、空きが面で分からない **ルート**：`/booking/bookings`（今週の予約）。**取得元**：`booking-v6/design-qa.md`（この画面の `.txt` は取れていない）。**推奨修正**：`TV2DI` と同じ束。**電話の予約が台帳へ載るようにするのが先**で、格子はそのあと——載らないまま格子にしても、空きが本当の空きにならない。', verdictSource: 'booking-v6/design-qa.md' , verdictHead: '31293424' },
+  { ...BOOKING, node: 'SbuUI', name: '27-1-C 今週の予約', steps: [{ click: '今週' }], verdict: 'match', verdictNote: '**2026-09-06、PR #TBD の実装を1440px・1920pxで撮影し、★V6設計と見比べた。** 時間（縦）×曜日（横）の週格子、LINE予約（緑）と電話予約（青）、4つの集計、読み方の青帯、注意事項・週の内訳・関連導線の右欄がそろった。固定データの予約件数と日付は撮影用データに従うが、情報の位置・余白・色・枠・角丸と操作の骨格は一致。両幅とも横はみ出し0。', verdictSource: 'booking-v6/SbuUI.txt', verdictHead: 'ed3e365aa' },
   /*
     代理予約の入力を、実際に通す。
 
@@ -2455,7 +2461,7 @@ export const SCREENS = [
     ...BOOKING, node: 'GFDqW', name: '27-1-D 代理予約・内容確認',
     route: '/booking/bookings/new', mode: 'page',
     steps: [
-      { fill: 'input[placeholder="名前を2文字以上入力"]', selector: true, text: '菅野', after: 900 },
+      { fill: 'input[placeholder="名前・電話番号で探す"]', selector: true, text: '菅野', after: 900 },
       { click: '菅野 亮', after: 500 },
       { select: '予約メニュー', label: 'トリミング（小型犬）' },
       { select: '担当者', label: '佐々木' },
@@ -2472,7 +2478,7 @@ export const SCREENS = [
     ...BOOKING, node: 'GfceK', name: '27-1-E 代理予約・登録完了',
     route: '/booking/bookings/new', mode: 'page',
     steps: [
-      { fill: 'input[placeholder="名前を2文字以上入力"]', selector: true, text: '菅野', after: 900 },
+      { fill: 'input[placeholder="名前・電話番号で探す"]', selector: true, text: '菅野', after: 900 },
       { click: '菅野 亮', after: 500 },
       { select: '予約メニュー', label: 'トリミング（小型犬）' },
       { select: '担当者', label: '佐々木' },
@@ -2490,7 +2496,7 @@ export const SCREENS = [
     ...BOOKING, node: 'Lg8ff', name: '27-1-F 代理予約・予約枠の重なりと入力エラー',
     route: '/booking/bookings/new', mode: 'page',
     steps: [
-      { fill: 'input[placeholder="名前を2文字以上入力"]', selector: true, text: '菅野', after: 900 },
+      { fill: 'input[placeholder="名前・電話番号で探す"]', selector: true, text: '菅野', after: 900 },
       { click: '菅野 亮', after: 500 },
       { select: '予約メニュー', label: 'トリミング（小型犬）' },
       { select: '担当者', label: '佐々木' },
@@ -2508,7 +2514,7 @@ export const SCREENS = [
     variants: [{
       suffix: '-recovered',
       steps: [
-        { fill: 'input[placeholder="名前を2文字以上入力"]', selector: true, text: '菅野', after: 900 },
+        { fill: 'input[placeholder="名前・電話番号で探す"]', selector: true, text: '菅野', after: 900 },
         { click: '菅野 亮', after: 500 },
         { select: '予約メニュー', label: 'トリミング（小型犬）' },
         { select: '担当者', label: '佐々木' },
@@ -3408,18 +3414,17 @@ const ISSUE_266_REVIEW = {
 }
 
 /**
- * board #267。development d69099cd9 を 3102/8789 で起動し、
+ * board #267。development b5693059a を取り込んだ枝を 3102/8789 で起動し、
  * 機能1に残る2 Nodeを設計1920pxと実装1440/1920pxで比較した結果。
- * QR画像は撮影モックの一般JSON応答を一時的にSVGへ置き換えて表示も確認した。
  */
 const ISSUE_267_REVIEW = {
   vUXKb: {
-    verdict: 'structure_match_data_pending',
-    note: 'カード構成、見出し、操作、左右の情報配置は設計と一致し、1440/1920pxとも横はみ出し0。写真審査、受信一覧、二段階認証、今後の予定、追加経路の件数と内容は、撮影用APIが設計の固定値を返さないため差が残る。作り物の値へ置き換えずデータ待ちとする。',
+    verdict: 'match',
+    note: '有効友だち398人、送信枠の残り197 / 上限200通、7日分の友だち推移を #270 の指標APIから表示。カード構成、見出し、操作、左右の情報配置を設計画像と照合し、1440/1920pxとも横はみ出し0。表示中の本文差0。',
   },
   JN6mQ: {
-    verdict: 'structure_match_data_pending',
-    note: 'QR表示、ダイアログ寸法、画像サイズ、PNG/JPG/SVG、リンクのコピー・ダウンロード・印刷を確認し、1440/1920pxとも横はみ出し0。通常の撮影モックはQR画像へJSONを返すため、一時的にSVGを返して表示も再確認した。サーバーが公式プロフィールの短縮URLを返さず、設計の `https://lin.ee/nen-official` を決め打ちできないためデータ待ちとする。',
+    verdict: 'match',
+    note: '公式プロフィールURLを #270 の指標APIから表示し、追加URLを表すQRも実画像で確認。ダイアログ寸法、画像サイズ、PNG/JPG/SVG、リンクのコピー・ダウンロード・印刷を設計画像と照合し、1440/1920pxとも横はみ出し0。表示中の本文差0。',
   },
 }
 
@@ -3992,6 +3997,7 @@ export const CAPTURED_AT = {
   1: [
     { pr: 419, head: 'c84baa63', on: '2026-08-30', screens: ['vUXKb', 'ZN0ov', 'JN6mQ', 'NjK9q', 'Alekb'], note: 'ダッシュボード。お知らせの口を撮影モックへ足した（`counts` の4つが欠けると `undefined.all` で落ちる）' },
     { pr: 971, head: 'd69099cd9', on: '2026-09-06', screens: ['vUXKb', 'JN6mQ'], note: 'Issue #267。3102/8789で対象2画面を1440・1920px撮影し、Pencil設計と比較。両画面とも横はみ出し0。構造は一致し、設計値と公式プロフィール短縮URLを返すAPIがないためデータ未接続を維持した。' },
+    { pr: 1028, head: '7cc11af48', on: '2026-09-07', screens: ['vUXKb', 'JN6mQ'], note: 'Issue #267。#270の指標APIと#277の撮影モックを接続し、3102/8789で1440・1920pxを再撮影。両画面とも横はみ出し0、表示中の本文差0。有効友だち398人、送信枠197/200、7日推移、公式lin.ee URL、実QRを確認して一致にした。' },
   ],
   23: [
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['eI3gs'], note: '同上' },
