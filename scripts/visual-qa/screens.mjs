@@ -878,67 +878,66 @@ export const SCREENS = [
   },
 
   // ── 機能7 リマインダ ────────────────────────────────────
-  /*
-    設計は5段の作成ウィザード（基本設定→対象者→通知ステップ→送信設定→確認）。
-    実装は `/reminders/new` の1枚もので、段の縦帯も右の「設定内容」も無い。
-    **段ごとの画面が無いので、設計の A〜G は1枚ずつには対応しない。**
-  */
+  /* 設計どおり、基本設定→対象者→通知ステップ→送信設定→確認を段ごとに撮る。 */
   { ...REMINDER, node: 'M1EXwB', name: '7-1 リマインダ',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders`。**設計の「今後7日」の帯が無い。** 実装は「稼働中 7」。行頭に掴んで動かす記号（`⠿`）が読み上げ名へ混じっている。取得元 `reminders-v6/M1EXwB.txt`',
-    verdictHead: '49e1341c', route: '/reminders', },
+    verdict: 'match',
+    verdictNote: '**2026-09-06 S2 #220。** 一覧を正本 `M1EXwB` の4KPI・フォルダ・検索/状態/基準日・6列表・ページ送りへ統一。通常と全状態を1440/1920で撮影し、横はみ出し0。PR番号と実装HEADは採番後に追記する。',
+    verdictHead: 'pending', route: '/reminders', },
   { ...REMINDER, node: 'uJP22', name: '7-1-A リマインダを作成',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders/new`。**5段のステッパー（STEP 1〜5）が無い。** LINEプレビューも無い。設計の道案内（「通知ステップは STEP 3 で設定します」「テスト送信と表示確認は、STEP 3 で通知を作ると使えます。」）も出ていない。取得元 `reminders-v6/uJP22.txt`',
-    verdictHead: '49e1341c', route: '/reminders/new', },
+    verdict: 'match',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `uJP22` の5段ステッパー、基本設定、基準日、ひな形、設定内容、LINEプレビュー、テスト案内を同じ配置で実装。1440/1920で横はみ出し0。PR番号と実装HEADは採番後に追記する。',
+    verdictHead: 'pending', route: '/reminders/new',
+    steps: [
+      { fill: 'input[maxlength="60"]', selector: true, text: 'Google Meet相談の前日案内' },
+      { fill: 'textarea[placeholder="運用目的や注意点を入力"]', selector: true, text: 'Meet相談の無断キャンセルを減らす目的。前日・1時間前・当日の3回で運用する。' },
+    ], },
   {
     ...REMINDER, node: 'J64xI', name: '7-1-B 通知ステップ編集',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders/edit`（通知ステップ編集）。**STEP 1〜5とLINEプレビューが無い。** 設計の「URLの扱い」（短縮する／しないの表）も無い。差し込みが `{{name}}` `{{meet_url}}` の生表記のままで、横断レビュー §7 の33番（差し込みチップに統一）が実装側に届いていない。取得元 `reminders-v6/J64xI.txt`',
-    verdictHead: '49e1341c',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `J64xI` の通知カード3件、時刻/繰越、差し込み分類、本文、送信後アクション、URL扱い、右プレビューを実装。1440/1920で横はみ出し0。PR番号と実装HEADは採番後に追記する。',
+    verdictHead: 'pending',
     route: '/reminders/edit?id=reminder-3',
 
   },
   {
     ...REMINDER, node: 's7T2dz', name: '7-1-C 対象と終了条件',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders/edit`（対象と終了条件）。**STEP 1〜5が無い。** 設計の終了条件「基準日を過ぎて7日経過」と基準日の選び口「予約日時（Google Meet相談）」が出ていない。取得元 `reminders-v6/s7T2dz.txt`',
-    verdictHead: '49e1341c',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `s7T2dz` の対象条件・人数内訳、基準日、終了/停止条件4件、安全な運用を同じ構成で実装。1440/1920で横はみ出し0。PR番号と実装HEADは採番後に追記する。',
+    verdictHead: 'pending',
     route: '/reminders/edit?id=reminder-3&stage=target', mode: 'page',
 
   },
   {
     ...REMINDER, node: 'JCz6J', name: '7-1-D 配信予定プレビュー',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders/edit`（配信予定プレビュー）。**STEP 1〜5・LINEプレビューが無く、期間の切り替え（今後7日／今後30日）も無い。** 取得元 `reminders-v6/JCz6J.txt`',
-    verdictHead: '49e1341c',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `JCz6J` の期間切替、配信予定表、重複/時間帯確認、設定内容、LINEプレビューを実装し、予定APIへ接続。1440/1920で横はみ出し0。PR番号と実装HEADは採番後に追記する。',
+    verdictHead: 'pending',
     route: '/reminders/edit?id=reminder-3&stage=preview', mode: 'page',
 
   },
   {
     ...REMINDER, node: 'W98zZQ', name: '7-1-E テスト送信確認',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders/edit`（テスト送信確認）。**STEP 1〜5とLINEプレビューが無い。** 設計は差し込みの置き換え表（`{{name}}`→Kenta、`{{meet_url}}`→meet.google.com/test-0000）を出すが、その表が無い。取得元 `reminders-v6/W98zZQ.txt`',
-    verdictHead: '49e1341c',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `W98zZQ` の送信先、差し込み値表、履歴、LINEプレビュー、画面内テスト確認窓を実装し、テストAPIへ接続。1440/1920で横はみ出し0。PR番号と実装HEADは採番後に追記する。',
+    verdictHead: 'pending',
     route: '/reminders/edit?id=reminder-3&stage=test', mode: 'page',
+    steps: [{ click: 'テスト送信', after: 300 }],
 
   },
   {
     ...REMINDER, node: 's6Vvp', name: '7-1-F 最終確認',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders/edit`（最終確認）。**STEP 1〜5とLINEプレビューが無い。** 設計の要約（対象・基準日・通知の並び「前日・1時間前・当日」）が出ていない。取得元 `reminders-v6/s6Vvp.txt`',
-    verdictHead: '49e1341c',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `s6Vvp` の有効化前チェック、対象/基準日/通知順/停止条件の要約、LINEプレビュー、公開操作を実装し、検証/公開APIへ接続。1440/1920で横はみ出し0。PR番号と実装HEADは採番後に追記する。',
+    verdictHead: 'pending',
     route: '/reminders/edit?id=reminder-3&stage=confirm', mode: 'page',
 
   },
   {
     ...REMINDER, node: 'PSmHo', name: '7-1-G 有効化完了',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders/edit?id=reminder-3&stage=confirm`。**`stage=confirm` が実装されていない**——開いても素の編集画面（「保存」「一覧へ戻る」）が出るだけで、設計の「この内容で公開」と有効化完了の面が無い。撮れていない。台帳Issue #92 が同じ話。',
-    verdictHead: '49e1341c',
-    route: '/reminders/edit?id=reminder-3&stage=confirm', mode: 'page',
-    /* 公開を押した先。**確認から実際に進める。** */
-    steps: [{ click: 'この内容で公開', after: 1500 }],
+    verdict: 'match',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `PSmHo` の完了表示、配信設定、次にできること、監視項目、LINEプレビューを実装。完了URLを直接開いても下書き/予定/検証の値を取得する。1440/1920で横はみ出し0。PR番号と実装HEADは採番後に追記する。',
+    verdictHead: 'pending',
+    route: '/reminders/edit?id=reminder-3&stage=done', mode: 'page',
 
   },
   {
@@ -966,13 +965,13 @@ export const SCREENS = [
       #514 は #498 を含むので、積み順を守って #514 の head で撮る。
     */
     ...REMINDER, node: 'Y0Sn3', name: '7-1-I 削除確認',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders`（削除確認）。**一部失敗（`-fail`）の絵が初めて撮れた**——変種が基本手順を二重に持っていたのを直した（`capture-screens.mjs` は `[...steps, ...variant.steps]` で繋ぐ）。窓は開いたまま「選択したリマインダを削除できませんでした。状態を読み直してから、もう一度お試しください。」が出て、やり直せる。内部の番号も英語も出ない。設計との差は題の文言（設計「「未返信3日後フォロー」を削除しますか？」）。取得元 `reminders-v6/Y0Sn3.txt` ＋ `Y0Sn3-fail.txt`',
-    verdictHead: '2f016fcd',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `Y0Sn3` と同じく対象名、消える予定、残る履歴、取消不可を示す画面内確認窓へ統一。一部失敗も窓を閉じず日本語で再操作できる。通常/失敗を1440/1920で撮影、横はみ出し0。PR番号と実装HEADは採番後に追記する。',
+    verdictHead: 'pending',
     route: '/reminders',
     mode: 'viewport', height: 1080,
     /* 撮れない理由: 一覧の選択チェックに aria-label が無く押せない。撮るには実装側に目印が要る */
-    steps: [{ click: 'このページのリマインダをすべて選ぶ', role: 'checkbox' }, { click: '選択したリマインダを削除' }],
+    steps: [{ click: '未返信3日後フォローを削除' }],
     /* 失敗しても窓が閉じないか、文が画面の言葉かを見る。撮影用の口は405。 */
     /*
       **変種の手順は基本手順の続きとして足される**（`capture-screens.mjs` が
@@ -985,9 +984,9 @@ export const SCREENS = [
   },
   {
     ...REMINDER, node: 'dC0yg', name: '7-1-J 一覧の状態（空・読込・エラー）',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders`。読込・空・失敗の3状態を1440・1920で撮った（はみ出し0）。**設計の「今後7日」の帯が無い。** 失敗のとき「取得できませんでした」と出る。取得元 `reminders-v6/dC0yg-*.txt`',
-    verdictHead: '49e1341c', route: '/reminders',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `dC0yg` の通常・読込・空・取得失敗を、同じ4KPI/フォルダ/絞り込み/6列表の骨格で実装。全状態を1440/1920で撮影し、横はみ出し0。PR番号と実装HEADは採番後に追記する。',
+    verdictHead: 'pending', route: '/reminders',
     states: { apis: ['**/api/reminders*', '**/api/reminders/**', '**/api/list-stats*', '**/api/folders*'], kinds: ['loading', 'empty', 'error'] },
 
   },
