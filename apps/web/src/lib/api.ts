@@ -4764,12 +4764,12 @@ export const api = {
       }>>>(`/api/chats/${id}/events`),
     savedViews: {
       list: (accountId: string) => fetchApi<ApiResponse<SavedSearch[]>>(`/api/inbox/saved-views?lineAccountId=${encodeURIComponent(accountId)}`),
-      create: (accountId: string, data: { name: string; conditions: unknown; isShared?: boolean }) =>
+      create: (accountId: string, data: { name: string; conditions: unknown; isShared?: boolean; isFavorite?: boolean }) =>
         fetchApi<ApiResponse<SavedSearch>>(`/api/inbox/saved-views?lineAccountId=${encodeURIComponent(accountId)}`, {
           method: 'POST',
           body: JSON.stringify(data),
         }),
-      update: (id: string, accountId: string, data: { name?: string; conditions?: unknown; isShared?: boolean }) =>
+      update: (id: string, accountId: string, data: { name?: string; conditions?: unknown; isShared?: boolean; isFavorite?: boolean }) =>
         fetchApi<ApiResponse<SavedSearch>>(`/api/inbox/saved-views/${id}?lineAccountId=${encodeURIComponent(accountId)}`, {
           method: 'PATCH',
           body: JSON.stringify(data),
