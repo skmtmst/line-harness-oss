@@ -4444,6 +4444,7 @@ export const CAPTURED_AT = {
     { pr: 0, head: '4af43fb6', on: '2026-09-01', screens: ['festr'], note: 'Claudeが実装して撮った。**doctorが合格になったが、この3本はまだ push していない**' },
   ],
   17: [
+    { pr: 1137, head: '5e1ccd22d', on: '2026-09-07', screens: ['s98Vfw', 'N46cQ', 'qlVLJ', 'MvZm5', 'BmoGY', 'HIU5O', 'vz0Ji', 'k8VCU', 'z3PB2'], note: 'Issue #373。機能17の新しい残高・付与ルール・使い道・履歴契約へ接続し、固定ポート3105/8792で通常と定義済みの全状態を1440/1920px撮影。全画像で横はみ出し0。友だち明細は全体履歴を友だちIDで絞り込んで表示するようにした。残差は画面とAPIに分けて各verdictNoteへ記録。' },
     { pr: 549, head: '0ae3e094', on: '2026-08-29', screens: ['qlVLJ', 'p9CcEB'], note: 'マイルの使い道を交換まで接続。公開版の固定・二重交換の防止・渡せなかったときの決めごとが入っている' },
     { pr: 441, head: '05c5b103', on: '2026-08-28', screens: ['MvZm5', 'BmoGY', 'HIU5O'] },
     { pr: 441, head: 'e953109c', on: '2026-08-28', screens: ['s98Vfw', 'N46cQ', 'k8VCU'] },
