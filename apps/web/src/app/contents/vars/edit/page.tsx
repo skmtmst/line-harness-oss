@@ -1,7 +1,7 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type {
@@ -21,7 +21,6 @@ import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
 import {
   blockingErrors,
-  characterCountText,
   changeSummaryText,
   historicalText,
   isChangeItem,
@@ -139,6 +138,19 @@ function EditCommonVarInner() {
     : []
   const visibleImpactItems = impact ? immediateItems(impact) : []
   const previewUsage = visibleImpactItems[0]
+  const usageGroups = useMemo(() => {
+    if (!impact) return []
+    const groups = new Map<string, { kind: keyof typeof impact.byKind; kindLabel: string; names: string[] }>()
+    for (const usage of immediateItems(impact)) {
+      const current = groups.get(usage.kind)
+      if (current) current.names.push(usage.name)
+      else groups.set(usage.kind, { kind: usage.kind, kindLabel: usage.kindLabel, names: [usage.name] })
+    }
+    return [...groups.values()].map((group) => ({
+      ...group,
+      count: impact.byKind[group.kind] ?? group.names.length,
+    }))
+  }, [impact])
 
   const load = useCallback(async () => {
     if (!id) {
@@ -427,18 +439,20 @@ function EditCommonVarInner() {
                     <p className="font-bold">
                       保存すると、この値を差し込んでいる{impact.total.toLocaleString('ja-JP')}か所が変わります
                     </p>
-                    <p className="mt-1 text-xs">送信済みの文は変わりません。保存前に1件ずつ確認できます。</p>
+                    <p className="mt-1 text-xs">
+                      「{item.value || '（空）'}」→「{value || '（空）'}」。予約中・公開中の設定にも反映されます。
+                    </p>
                   </div>
                 ) : null}
 
                 <div>
                   <p className="text-ink-secondary mb-1 text-sm font-medium">社内向けのメモ（お客さまには出ません）</p>
-                  <textarea
+                  <input
+                    type="text"
                     value={memo}
                     onChange={(event) => setMemo(event.target.value)}
-                    rows={3}
                     maxLength={1000}
-                    className="border-hairline rounded-control w-full resize-y border px-3 py-3 text-sm"
+                    className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
                     placeholder="運用上の注意や、この値の使い方を書きます"
                   />
                 </div>
@@ -547,28 +561,17 @@ function EditCommonVarInner() {
                           <p className="text-ink-faint">{historicalText(impact)}</p>
                         ) : null}
                       </div>
-                      {visibleImpactItems.length > 0 ? (
+                      {usageGroups.length > 0 ? (
                         <ul className="divide-hairline divide-y">
-                          {visibleImpactItems.map((usage) => (
-                            <li key={`${usage.kind}-${usage.href}-${usage.name}`} className="px-4 py-3">
-                              <p className="text-ink-faint text-xs">{usage.kindLabel}・{usage.status}</p>
-                              <Link href={usage.href} className="text-info mt-1 block truncate text-sm font-semibold hover:underline" title={usage.name}>
-                                {usage.name}
-                              </Link>
-                              {isChangeItem(usage) ? (
-                                <div className="mt-2 space-y-1 text-xs">
-                                  <p className="text-ink-secondary break-words">いまの文：{usage.currentPreview}</p>
-                                  <p className="text-ink-secondary break-words">
-                                    保存後の文：{usage.nextPreview ?? (
-                                      <span>{NOT_AVAILABLE}（差し込みの目印を本文から読み取れませんでした。使用先を開いて確かめてください）</span>
-                                    )}
-                                  </p>
-                                  <p className={usage.exceedsCharacterLimit ? 'text-danger font-semibold' : 'text-ink-faint'}>
-                                    文字数：{characterCountText(usage)}
-                                    {usage.exceedsCharacterLimit ? '（上限を超えています。この通は送信のときに落ちます）' : ''}
-                                  </p>
-                                </div>
-                              ) : null}
+                          {usageGroups.map((group) => (
+                            <li key={group.kind} className="px-4 py-3">
+                              <p className="text-ink text-sm font-semibold">
+                                {group.kindLabel} {group.count.toLocaleString('ja-JP')}件
+                              </p>
+                              <p className="text-ink-faint mt-1 truncate text-xs" title={group.names.join(' ／ ')}>
+                                {group.names.join(' ／ ')}
+                                {group.count > group.names.length ? ` ほか${group.count - group.names.length}件` : ''}
+                              </p>
                             </li>
                           ))}
                         </ul>
@@ -582,6 +585,9 @@ function EditCommonVarInner() {
                       ) : null}
                       <p className="text-ink-faint border-hairline border-t px-4 py-3 text-xs">
                         {checkedAtText(impact.checkedAt)} 時点で確認
+                      </p>
+                      <p className="text-ink-faint border-hairline border-t px-4 py-3 text-xs">
+                        1件ずつ確かめるときは「{impact.blockingTotal.toLocaleString('ja-JP')}か所を1件ずつ見る」へ進んでください。
                       </p>
                     </>
                   )}

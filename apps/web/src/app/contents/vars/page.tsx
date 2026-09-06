@@ -911,6 +911,7 @@ function VarsPageInner() {
                         onChange={(event) => void selectReplacement(event.target.value)}
                         aria-label="差し替え先"
                         className="mt-1 w-full"
+                        style={{ width: '100%' }}
                         options={replacementCandidates.length > 0
                           ? replacementCandidates.map((candidate) => ({
                               value: candidate.id,
