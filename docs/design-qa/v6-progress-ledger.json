@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 249,
-  "unimplemented": 0,
+  "compared": 261,
+  "unimplemented": 1,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 23,
-  "match": 82,
-  "structureMatchDataPending": 68,
-  "needsFix": 113,
+  "missing": 10,
+  "match": 81,
+  "structureMatchDataPending": 65,
+  "needsFix": 116,
   "unjudged": 5,
-  "remaining": 186,
+  "remaining": 187,
   "features": [
     {
       "feature": 1,
@@ -172,11 +172,11 @@
       "feature": 3,
       "name": "友だち",
       "total": 12,
-      "compared": 0,
+      "compared": 10,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 12,
+      "missing": 2,
       "match": 8,
       "structureMatchDataPending": 3,
       "needsFix": 0,
@@ -1667,11 +1667,11 @@
       "feature": 15,
       "name": "登録メディア",
       "total": 5,
-      "compared": 4,
+      "compared": 5,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 1,
+      "missing": 0,
       "match": 1,
       "structureMatchDataPending": 2,
       "needsFix": 2,
@@ -1990,11 +1990,11 @@
       "feature": 18,
       "name": "流入と計測",
       "total": 9,
-      "compared": 7,
+      "compared": 9,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 2,
+      "missing": 0,
       "match": 9,
       "structureMatchDataPending": 0,
       "needsFix": 0,
@@ -2437,16 +2437,16 @@
       "feature": 25,
       "name": "オートメーション",
       "total": 8,
-      "compared": 8,
-      "unimplemented": 0,
+      "compared": 7,
+      "unimplemented": 1,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 2,
-      "structureMatchDataPending": 5,
-      "needsFix": 1,
+      "match": 1,
+      "structureMatchDataPending": 2,
+      "needsFix": 4,
       "unjudged": 0,
-      "remaining": 6,
+      "remaining": 7,
       "capturedAt": [
         {
           "pr": 502,
@@ -2876,5 +2876,13 @@
       "capturedAt": null
     }
   ],
-  "gaps": []
+  "gaps": [
+    {
+      "feature": 25,
+      "node": "DkPY0",
+      "name": "25-1-B オートメーションが動いた記録",
+      "gap": "pending",
+      "gapNote": "画面 `/automations/runs` が development に無い。判定は未マージ枝 `75b010fc` で書かれたもの"
+    }
+  ]
 }
