@@ -224,6 +224,22 @@ const DASHBOARD_TREND = [
 }))
 
 /**
+ * 指標カード用の7日推移。設計 `vUXKb` は全日とも有効友だち398人で、
+ * 8/13だけ登録1人・流入元「検索」1人。旧グラフ用の active=4 は流用しない。
+ */
+const DASHBOARD_METRIC_TREND = [
+  ['2026-08-13', 1, 0, 398, [{ name: '検索', count: 1 }]],
+  ['2026-08-14', 0, 0, 398, []],
+  ['2026-08-15', 0, 0, 398, []],
+  ['2026-08-16', 0, 0, 398, []],
+  ['2026-08-17', 0, 0, 398, []],
+  ['2026-08-18', 0, 0, 398, []],
+  ['2026-08-19', 0, 0, 398, []],
+].map(([date, added, blocked, active, sources]) => ({
+  date, added, blocked, active, estimated: false, sources,
+}))
+
+/**
  * 表示するカードと並び。設計 `vUXKb` の右カラムに合わせる。
  * 既定では出ない「友だちの状態」も、設計の絵では出ているので出す。
  */
@@ -288,7 +304,7 @@ const DASHBOARD_OVERVIEW = {
       period: 'this-month',
     },
     friendTrend: {
-      value: DASHBOARD_TREND,
+      value: DASHBOARD_METRIC_TREND,
       state: 'estimated',
       reason: null,
       asOf: `${FIXED_TO}T00:00:00.000Z`,
