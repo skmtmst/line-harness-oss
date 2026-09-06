@@ -949,16 +949,15 @@ export const SCREENS = [
       **表は1本にせず、読む口の契約でそろえる形。**
     */
     ...REMINDER, node: 'GC4St', name: '7-1-H 実行結果',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未実装（route）。`/reminders/detail` の page.tsx が `codex/development` に無い。撮らない・合格にもしない。',
-    status: 'unimplemented',
-    gap: 'pending',
-    gapNote: '画面 `/reminders/detail` が development に無い。判定は未マージ枝 `4bc71249` で書かれたもの',
-    why: '`/reminders/detail` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
     route: '/reminders/detail?id=reminder-1',
     states: {
       apis: ['**/api/reminders/*/runs*'],
       kinds: ['normal', 'loading', 'empty', 'error'],
     },
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-04 画面を本流へ載せ、初めて撮れた（board#74）。前は `unimplemented` で、実装は未マージの枝の中にあった。** ルート `/reminders/detail?id=reminder-1`。通常・読込中・0件・取得失敗の**5枚すべて**を1440・1920で撮った（10枚、はみ出し0）。 **API と DB は既に本流にあった**（`GET /api/reminders/:id/runs`、`POST /api/reminder-runs/:runId/retry`、migration 269）。無かったのは画面と web 側の口だけ。 **要件 §3-7 の10項目がすべて出ている**：友だち／通知／結果／予定／実行／試行／理由・次の動き／**LINE要求ID**／操作。LINE要求IDは旧実装ではCSVにしか無く、**問い合わせのときに画面から写せなかった**ので列に足した。 **取れないものを0で埋めていない**：まだ始まっていない行の実行時刻は `—`、既読は `—`（LINEは友だち単位の既読を返さない）、要求IDが無い行も `—`。友だちが消えている行は「削除済みの友だち」。 **再試行できるかは Worker が決める**（`canRetry`）。画面で条件を作らない。再試行待ちと送信失敗にだけ「この通知を再試行」が出る。 **P1 設計と突き合わせられない**——`docs/design-reference/reminders-v6/` に `GC4St.txt` が無く、**この画面だけ設計の書き出しから漏れている**。要件 §3-7 を根拠に作った。書き出しは lane:pen へ渡す。 P2 設計の実行結果（通ごとの内訳、失敗の理由別のまとめ）は未確認。',
+    verdictSource: 'reminders-v6/GC4St.txt',
+    verdictHead: 'aa4c913b',
   },
   {
     /*
