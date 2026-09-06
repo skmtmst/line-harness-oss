@@ -857,13 +857,22 @@ export const SCREENS = [
     ...BROADCAST, node: 'sqFXf', name: '6-1-L 対象条件を編集',
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-07 Issue #298で再実装。** 条件編集を重なり窓へ分離し、現在条件・条件1・標準15軸・この画面だけの6軸・AND/OR案内を追加。既存APIが受け取れない条件軸は選択不能にして明記したため、構造一致・データ未接続。設計画像なし（`sqFXf.txt` と照合）。',
-    verdictSource: 'broadcasts-v6/sqFXf.txt + broadcasts-v6/sqFXf-{1440,1920}.png',
+    verdictSource: 'broadcasts-v6/sqFXf.txt + broadcasts-v6/sqFXf-save.txt + broadcasts-v6/sqFXf{,-save}-{1440,1920}.png',
     verdictHead: '4a69f0e4e', route: `${NEW_BC}?step=audience`,
     /* 保存する窓と、呼び出す窓。**窓はビューポートで撮る。** */
     mode: 'viewport', height: 1080,
     steps: [
       { click: '詳細条件で絞り込んで配信する', role: 'radio', after: 700 },
     ],
+    variants: [{
+      suffix: '-save', mode: 'viewport',
+      steps: [
+        { click: 'この条件を反映', after: 700 },
+        { click: '保存した条件から選ぶ', after: 900 },
+        { click: 'この条件を使う', after: 900 },
+        { click: 'この条件を保存', after: 900 },
+      ],
+    }],
 
   },
   {
