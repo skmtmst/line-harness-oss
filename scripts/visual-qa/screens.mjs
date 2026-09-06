@@ -2269,25 +2269,25 @@ export const SCREENS = [
     states: {
       apis: ['**/api/ec-commerce/overview**', '**/api/ec-commerce/settings**'],
       kinds: ['normal', 'empty', 'error', 'forbidden'],
-    }, name: '24-1 LINE通知', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #291 head `a9b267bf1` で設計と再比較。** 一覧を設計と同じ1ページ6件に区切り、表示件数とページ送りを同じ段へ追加。4つの集計帯、4条件の絞り込み、行のきっかけ・当日数・状態を維持し、通常・0件・取得失敗・権限不足を1440・1920で再撮影、全10枚で横はみ出し0。個人の開封は正本要件により表示しない。直近30日の種類別数、LINE上で表示された人数、月間枠、種類別の失敗理由を返すAPIが無いため、値は作らず構造一致・データ未接続とする。', verdictSource: 'line-notify-v6/festr.txt + festr-normal-1920.png', verdictHead: 'a9b267bf1' },
+    }, name: '24-1 LINE通知', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #291 head `8e7c374991` で設計と再比較。** 一覧を設計と同じ1ページ6件に区切り、表示件数とページ送りを同じ段へ追加。4つの集計帯、4条件の絞り込み、行のきっかけ・当日数・状態を維持し、通常・0件・取得失敗・権限不足を1440・1920で再撮影、全10枚で横はみ出し0。個人の開封は正本要件により表示しない。直近30日の種類別数、LINE上で表示された人数、月間枠、種類別の失敗理由を返すAPIが無いため、値は作らず構造一致・データ未接続とする。', verdictSource: 'line-notify-v6/festr.txt + festr-normal-1920.png', verdictHead: '8e7c374991' },
   {
     ...LINE_NOTIFY, node: 'Q55bb', name: '24-1-A お知らせの中身を編集する',
-    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #291 head `a9b267bf1` で設計と再比較。** 一覧内の長い折りたたみを、クリック後に「いつ送るか／送るもの／差込項目／ボタン／未達時の決めごと」と右側プレビュー・注意・接続先、下部追従保存を並べる編集専用レイアウトへ変更。1440・1920で横はみ出し0。公開版を直接変えない下書き版・公開版・テスト受信者・取引メール代替のAPIがまだ無いため、存在しない公開操作は作らず、現行設定で安全に扱える範囲だけを表示した。構造一致・データ未接続とする。', verdictSource: 'line-notify-v6/Q55bb.txt + Q55bb-1920.png',
+    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #291 head `8e7c374991` で設計と再比較。** 一覧内の長い折りたたみを、クリック後に「いつ送るか／送るもの／差込項目／ボタン／未達時の決めごと」と右側プレビュー・注意・接続先、下部追従保存を並べる編集専用レイアウトへ変更。1440・1920で横はみ出し0。公開版を直接変えない下書き版・公開版・テスト受信者・取引メール代替のAPIがまだ無いため、存在しない公開操作は作らず、現行設定で安全に扱える範囲だけを表示した。構造一致・データ未接続とする。', verdictSource: 'line-notify-v6/Q55bb.txt + Q55bb-1920.png',
     mode: 'viewport', height: 1136, /*
       **押し口は「内容を編集」。** 「発送した」は行の名前で、押せる役を持っていない
       （`role: 'text'` は ARIA に無く0件になる）。設計の並び順で3番目なので `nth: 2`。
     */
     steps: [{ click: '内容を編集', nth: 2, after: 800 }],
-    verdictHead: 'a9b267bf1',
+    verdictHead: '8e7c374991',
   },
   {
     ...LINE_NOTIFY, node: 'X8JCA5', name: '24-1-B 送れなかったもの',
     route: '/line-notifications?tab=failures', mode: 'page',
     states: { apis: ['**/api/ec-commerce/notification-runs?**'], kinds: ['normal', 'loading', 'empty', 'error'] },
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #291 head `a9b267bf1` で設計と再比較。** 届かなかった／送信対象外／メール結果／未対応の集計帯、検索、状態絞り込み、その日のうちに代替連絡する案内、受信箱導線を確認。通常・読込・空・失敗を1440・1920で撮影し、全10枚で横はみ出し0。現行APIにはメール結果・試行履歴・次回試行・対応者／対応済みが無く、安全な再試行APIも無い。通常行の固定データも無いためS0へ #264 で依頼済み。存在しない値と操作は作らず、構造一致・データ未接続とする。',
+    verdictNote: '**2026-09-07 Issue #291 head `8e7c374991` で設計と再比較。** 届かなかった／送信対象外／メール結果／未対応の集計帯、検索、状態絞り込み、その日のうちに代替連絡する案内、受信箱導線を確認。通常・読込・空・失敗を1440・1920で撮影し、全10枚で横はみ出し0。現行APIにはメール結果・試行履歴・次回試行・対応者／対応済みが無く、安全な再試行APIも無い。通常行の固定データも無いためS0へ #264 で依頼済み。存在しない値と操作は作らず、構造一致・データ未接続とする。',
     verdictSource: 'line-notify-v6/X8JCA5.txt + X8JCA5-normal-1920.png',
-    verdictHead: 'a9b267bf1',
+    verdictHead: '8e7c374991',
   },
   {
     /*
@@ -2299,9 +2299,9 @@ export const SCREENS = [
     route: '/line-notifications?tab=history', mode: 'page',
     states: { apis: ['**/api/ec-commerce/notification-runs?**'], kinds: ['normal', 'loading', 'empty', 'error'] },
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #291 head `a9b267bf1` で設計と再比較。** 記録数／LINE API受付／短縮URLクリック／失敗の集計帯、検索、クリック・失敗の絞り込み、受付日時・理由・受信箱導線を確認。通常・読込・空・失敗を1440・1920で撮影し、全10枚で横はみ出し0。個人の到達・既読は正本要件により表示せず、安全な再送口も無いため出していない。期間集計・CSV出力権限・版・試行履歴のAPIと通常行の固定データが無く、S0へ #264 で依頼済み。構造一致・データ未接続とする。',
+    verdictNote: '**2026-09-07 Issue #291 head `8e7c374991` で設計と再比較。** 記録数／LINE API受付／短縮URLクリック／失敗の集計帯、検索、クリック・失敗の絞り込み、受付日時・理由・受信箱導線を確認。通常・読込・空・失敗を1440・1920で撮影し、全10枚で横はみ出し0。個人の到達・既読は正本要件により表示せず、安全な再送口も無いため出していない。期間集計・CSV出力権限・版・試行履歴のAPIと通常行の固定データが無く、S0へ #264 で依頼済み。構造一致・データ未接続とする。',
     verdictSource: 'line-notify-v6/Se65i.txt + Se65i-normal-1920.png',
-    verdictHead: 'a9b267bf1',
+    verdictHead: '8e7c374991',
   },
   {
     ...LINE_NOTIFY, node: 'DpxOK', name: '24-2 運用者へのお知らせ',
