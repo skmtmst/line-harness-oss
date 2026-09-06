@@ -1724,6 +1724,94 @@ export const AUTO_REPLIES = [
   },
 ]
 
+/** 機能8の公開フロー。設計 g46ja / Yj6CQ / e6iJG と同じ1件を通す。 */
+export const AUTO_REPLY_PUBLISH_DRAFT = {
+  autoReplyId: 'ar-2',
+  versionId: 'ar-2-draft-v3',
+  versionNumber: 3,
+  status: 'draft',
+  lastTestStatus: null,
+  lastTestedAt: null,
+  publishedAt: null,
+  matchedLast28Days: 214,
+  settings: {
+    keyword: '予約',
+    matchType: 'contains',
+    responseType: 'text',
+    responseContent: 'Kentaさん、お問い合わせありがとうございます。\nご予約内容を確認します。',
+    templateId: 'template-booking',
+    lineAccountId: 'visual-qa-account',
+    activeFrom: '08:00',
+    activeUntil: '21:00',
+    cooldownMinutes: 5,
+    skipWhenOperatorActive: true,
+    priority: 1,
+    messageKinds: ['text'],
+    friendConditions: { label: '予約者・未対応' },
+    actions: [
+      { actionType: 'add_tag', config: { tagId: 'tag-booking' } },
+      { actionType: 'notify', config: { notificationDefinitionId: 'notify-operator' } },
+    ],
+    responseWeekdays: [0, 1, 2, 3, 4, 5, 6],
+    responseHolidayRule: 'include',
+    oncePerFriend: true,
+    keywords: [{ keyword: '予約', matchType: 'contains' }],
+    respondToAll: false,
+    name: '予約問い合わせ',
+    keywordMatchMode: 'any',
+    folderId: 'arf-booking',
+  },
+}
+
+export const AUTO_REPLY_PUBLISH_CONFLICTS = [
+  {
+    autoReplyId: 'ar-hours',
+    name: '「営業時間」への一律返信',
+    certainty: 'possible',
+    winnerAutoReplyId: 'ar-2',
+    reason: '時間帯によって同じメッセージに反応します。',
+  },
+  {
+    autoReplyId: 'ar-booking-existing',
+    name: '予約の問い合わせ',
+    certainty: 'certain',
+    winnerAutoReplyId: 'ar-2',
+    reason: '「予約」を含むメッセージに反応します。',
+  },
+]
+
+export const AUTO_REPLY_PUBLISH_TEST = {
+  matched: true,
+  draftWon: true,
+  winner: {
+    autoReplyId: 'ar-2',
+    name: '予約変更のお問い合わせ',
+    responseType: 'text',
+    responseContent: '予約変更を承ります。ご希望の日時をこのトークでお知らせください。\n担当者から改めてご連絡します。',
+  },
+  candidates: [
+    { autoReplyId: 'ar-2', name: '予約変更のお問い合わせ', priority: 1, result: 'won', reasonCodes: [] },
+  ],
+  actions: [{ kind: 'set_support_mark' }],
+  stateChanged: false,
+}
+
+export const AUTO_REPLY_PUBLISH_VALIDATION = {
+  valid: true,
+  errors: [],
+  warnings: ['同じメッセージに反応する自動応答があります。'],
+  conflicts: AUTO_REPLY_PUBLISH_CONFLICTS,
+  lastTestStatus: 'succeeded',
+}
+
+export const AUTO_REPLY_PUBLISH_RESULT = {
+  autoReplyId: 'ar-2',
+  versionId: 'ar-2-published-v3',
+  versionNumber: 3,
+  publishedAt: '2026-09-06T10:00:00.000Z',
+  acknowledgedConflictIds: AUTO_REPLY_PUBLISH_CONFLICTS.map((item) => item.autoReplyId),
+}
+
 /*
   外部連携。設計 `k3WxrO` の「こちらから送る 6／こちらで受け取る 3」そのまま。
 
