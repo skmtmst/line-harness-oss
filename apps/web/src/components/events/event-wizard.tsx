@@ -9,6 +9,7 @@ import { AsideCard, ChoiceCard, Field, FormSection, inputClass } from '@/compone
 import { generateBulkSlots } from './bulk-slot-generator'
 import { formatSlotJp, jstHHMMToUtcIso, splitBand, todayJst } from './jst'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { TextInput } from '@/components/shared/form-controls'
 
 /**
  * イベントを作る（設計 V2 8-3-2 / 8-3-3 / 8-3-4）。
@@ -54,6 +55,37 @@ const DEFAULT_DRAFT: EventDetail = {
   entry_cutoff_hours_before: null,
 }
 
+type FirstSlotDraft = {
+  date: string
+  startTime: string
+  durationMinutes: number
+  capacity: string
+}
+
+const DEFAULT_FIRST_SLOT: FirstSlotDraft = {
+  date: todayJst(),
+  startTime: '14:00',
+  durationMinutes: 90,
+  capacity: '12',
+}
+
+function firstSlotPayload(slot: FirstSlotDraft) {
+  const startsAt = jstHHMMToUtcIso(slot.date, slot.startTime)
+  const capacity = Number(slot.capacity)
+  if (!slot.date || !slot.startTime) throw new Error('開催日と開始時刻を入力してください')
+  if (!Number.isInteger(slot.durationMinutes) || slot.durationMinutes < 15) {
+    throw new Error('開催時間は15分以上で入力してください')
+  }
+  if (!Number.isInteger(capacity) || capacity < 1) {
+    throw new Error('定員は1以上の数で入力してください')
+  }
+  return {
+    starts_at: startsAt,
+    ends_at: new Date(new Date(startsAt).getTime() + slot.durationMinutes * 60_000).toISOString(),
+    capacity,
+  }
+}
+
 export interface EventWizardProps {
   accountId: string
   /** 作成済みイベントのID。①を保存した時点で入る */
@@ -69,6 +101,7 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(Boolean(eventId))
+  const [firstSlot, setFirstSlot] = useState<FirstSlotDraft>(DEFAULT_FIRST_SLOT)
 
   // ②③は①を保存したあとにしか入れない。URL を直接叩かれても①へ戻す。
   useEffect(() => {
@@ -102,6 +135,22 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
         if (cancelled) return
         setDraft(ev)
         setSlots(slotsRes.items)
+        const first = slotsRes.items[0]
+        if (first) {
+          const startsAt = new Date(first.starts_at)
+          const endsAt = new Date(first.ends_at)
+          const parts = new Intl.DateTimeFormat('en-CA', {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Asia/Tokyo',
+          }).formatToParts(startsAt)
+          const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((x) => x.type === type)?.value ?? ''
+          setFirstSlot({
+            date: `${part('year')}-${part('month')}-${part('day')}`,
+            startTime: `${part('hour')}:${part('minute')}`,
+            durationMinutes: Math.max(15, Math.round((endsAt.getTime() - startsAt.getTime()) / 60_000)),
+            capacity: first.capacity == null ? '' : String(first.capacity),
+          })
+        }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e))
       } finally {
@@ -166,6 +215,17 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
       } else {
         const created = await eventsApi.createEvent(accountId, payloadOf(draft))
         id = created.id
+        /*
+          枠の保存だけ失敗しても、次の試行でイベント本体を重複作成しない。
+          URLへ作成済みIDを先に残し、再試行は更新として扱う。
+        */
+        router.replace('/events/new?step=1&id=' + id)
+      }
+      const slotPayload = firstSlotPayload(firstSlot)
+      if (slots[0]) {
+        await eventsApi.updateSlot(accountId, id, slots[0].id, slotPayload)
+      } else {
+        await eventsApi.createSlots(accountId, id, [slotPayload])
       }
       if (goto === null) {
         router.push(`/events?highlight=${id}`)
@@ -214,6 +274,8 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
           draft={draft}
           update={update}
           saving={saving}
+          firstSlot={firstSlot}
+          setFirstSlot={setFirstSlot}
           onDraftSave={() => persist(null)}
           onNext={() => persist(2)}
         />
@@ -322,19 +384,35 @@ function OverviewStep({
   draft,
   update,
   saving,
+  firstSlot,
+  setFirstSlot,
   onDraftSave,
   onNext,
 }: {
   draft: EventDetail
   update: <K extends keyof EventDetail>(k: K, v: EventDetail[K]) => void
   saving: boolean
+  firstSlot: FirstSlotDraft
+  setFirstSlot: (slot: FirstSlotDraft) => void
   onDraftSave: () => void
   onNext: () => void
 }) {
   const descLen = (draft.description ?? '').length
+  const previewCapacity = Number(firstSlot.capacity)
+  const previewDate = firstSlot.date
+    ? new Intl.DateTimeFormat('ja-JP', {
+        month: 'long', day: 'numeric', weekday: 'short', timeZone: 'Asia/Tokyo',
+      }).format(new Date(`${firstSlot.date}T00:00:00+09:00`))
+    : '開催日を入力'
+  const previewEnd = (() => {
+    const [hour, minute] = firstSlot.startTime.split(':').map(Number)
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return '終了時刻未定'
+    const total = hour * 60 + minute + firstSlot.durationMinutes
+    return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+  })()
   return (
-    <div data-design="Body">
-      <div data-design="Left" className="bg-canvas rounded-card border-hairline space-y-5 border p-6">
+    <div data-design="Body" className="flex flex-col gap-4 xl:flex-row">
+      <div data-design="Left" className="bg-canvas rounded-card border-hairline min-w-0 flex-1 space-y-5 border p-6">
       <FormSection step={1} label="イベントの中身" note="友だちの予約ページにそのまま出ます">
         <Field label="イベント名" htmlFor="ev-name" required>
           <input
@@ -404,7 +482,51 @@ function OverviewStep({
         </div>
       </FormSection>
 
-      <FormSection step={2} label="申し込みの上限">
+      <FormSection
+        step={2}
+        label="最初の予約枠"
+        note="イベントの内容と一緒に、最初の開催日時と定員を保存します。追加の回は次の段階で増やせます。"
+      >
+        <div className="grid gap-3 sm:grid-cols-4">
+          <Field label="日付" htmlFor="first-slot-date" required>
+            <TextInput
+              id="first-slot-date"
+              type="date"
+              value={firstSlot.date}
+              onChange={(event) => setFirstSlot({ ...firstSlot, date: event.target.value })}
+            />
+          </Field>
+          <Field label="開始" htmlFor="first-slot-start" required>
+            <TextInput
+              id="first-slot-start"
+              type="time"
+              value={firstSlot.startTime}
+              onChange={(event) => setFirstSlot({ ...firstSlot, startTime: event.target.value })}
+            />
+          </Field>
+          <Field label="かかる時間（分）" htmlFor="first-slot-duration" required>
+            <TextInput
+              id="first-slot-duration"
+              type="number"
+              min={15}
+              step={15}
+              value={firstSlot.durationMinutes}
+              onChange={(event) => setFirstSlot({ ...firstSlot, durationMinutes: Number(event.target.value) })}
+            />
+          </Field>
+          <Field label="定員" htmlFor="first-slot-capacity" required>
+            <TextInput
+              id="first-slot-capacity"
+              type="number"
+              min={1}
+              value={firstSlot.capacity}
+              onChange={(event) => setFirstSlot({ ...firstSlot, capacity: event.target.value })}
+            />
+          </Field>
+        </div>
+      </FormSection>
+
+      <FormSection step={3} label="申し込みの上限">
         <Field
           label="1人あたりの予約回数"
           htmlFor="ev-max"
@@ -430,7 +552,7 @@ function OverviewStep({
         </Field>
       </FormSection>
 
-      <FormSection step={3} label="公開対象">
+      <FormSection step={4} label="公開対象">
         <div className="grid gap-2 sm:grid-cols-2">
           <ChoiceCard
             selected={(draft.target_type ?? 'single') === 'single'}
@@ -453,6 +575,62 @@ function OverviewStep({
         )}
       </FormSection>
 
+      <FormSection
+        step={5}
+        label="満席になったとき"
+        note="満席後も申し込みを受けるかを決めます。"
+      >
+        <label className="text-ink-secondary flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={draft.waitlist_enabled === 1}
+            onChange={(event) => update('waitlist_enabled', event.target.checked ? 1 : 0)}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="text-ink block font-medium">キャンセル待ちを受け付ける</span>
+            <span className="text-ink-faint block text-xs">
+              空きが出たら、申込者一覧で待っている方を順に確認できます。
+            </span>
+          </span>
+        </label>
+      </FormSection>
+
+      <FormSection
+        step={6}
+        label="申し込んだ人にすること"
+        note="受付と前日のお知らせを自動で行います。"
+      >
+        <label className="text-ink-secondary flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={draft.requires_approval === 1}
+            onChange={(event) => update('requires_approval', event.target.checked ? 1 : 0)}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="text-ink block font-medium">承認してから予約を確定する</span>
+            <span className="text-ink-faint block text-xs">
+              申し込み後、申込者一覧で承認するまで確定しません。
+            </span>
+          </span>
+        </label>
+        <label className="text-ink-secondary flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={draft.reminder_day_before_enabled === 1}
+            onChange={(event) => update('reminder_day_before_enabled', event.target.checked ? 1 : 0)}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="text-ink block font-medium">前日に思い出してもらう</span>
+            <span className="text-ink-faint block text-xs">
+              開催前日にLINEで自動のお知らせを送ります。
+            </span>
+          </span>
+        </label>
+      </FormSection>
+
       <div className="border-hairline mt-5 flex flex-wrap justify-between gap-2 border-t pt-4">
         <button
           onClick={onDraftSave}
@@ -470,6 +648,41 @@ function OverviewStep({
         </button>
       </div>
       </div>
+
+      <aside data-design="Right" className="w-full shrink-0 space-y-3 xl:w-96">
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <h2 className="text-ink text-sm font-semibold">お客様のLINEではこう見えます</h2>
+          <div className="border-accent bg-accent-soft/30 mt-3 rounded-card border-8 p-3">
+            <div className="bg-canvas rounded-control border-hairline overflow-hidden border">
+              <div className="bg-canvas-sunken flex h-24 items-center justify-center text-xs text-ink-faint">
+                {draft.image_url ? '設定した画像が表示されます' : 'イベント画像'}
+              </div>
+              <div className="space-y-2 p-4">
+                <p className="text-ink font-semibold">{draft.name.trim() || 'イベント名'}</p>
+                <p className="text-ink-secondary text-xs">{previewDate} {firstSlot.startTime}〜{previewEnd}</p>
+                <p className="text-ink-secondary text-xs">{draft.venue_name || '開催場所を入力'}</p>
+                <p className="text-ink-secondary text-xs">
+                  {Number.isInteger(previewCapacity) && previewCapacity > 0 ? `のこり ${previewCapacity}名` : '定員を入力'}
+                </p>
+                <p className="text-ink-faint line-clamp-3 text-xs">
+                  {draft.description || 'イベントの説明がここに表示されます。'}
+                </p>
+                <span className="bg-accent-deep text-on-accent rounded-control block px-4 py-2 text-center text-sm font-medium">
+                  申し込む
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="bg-warning-bg rounded-card border-warning/30 border p-4">
+          <h2 className="text-warning text-sm font-semibold">保存すると起きること</h2>
+          <ul className="text-ink-secondary mt-2 space-y-2 text-xs">
+            <li>定員を超える申し込みは受け付けません。</li>
+            <li>最初の予約枠も同時に作成します。</li>
+            <li>追加の回やキャンセル待ちは次の段階で設定できます。</li>
+          </ul>
+        </div>
+      </aside>
     </div>
   )
 }
