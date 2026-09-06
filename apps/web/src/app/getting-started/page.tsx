@@ -6,8 +6,6 @@ import type { StaffMember } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ListState from '@/components/shared/list-state'
-import NoteBar from '@/components/shared/note-bar'
-import PageHeader from '@/components/shared/page-header'
 import StatusBadge from '@/components/shared/status-badge'
 import { CareCard, FeatureLinkCard } from '@/components/shared/side-cards'
 import {
@@ -85,22 +83,21 @@ export default function GettingStartedPage() {
 
   return (
     <div className={styles.page}>
-      <PageHeader
-        breadcrumb={[{ label: '設定' }, { label: 'はじめの設定' }]}
-        title="はじめの設定"
-        description="順番はおすすめです。飛ばして進んでもかまいません。終わったかどうかは、画面を開いたかではなく、実際に作られたもので判断します。"
-      />
-
       {status !== 'ready' || !input ? (
         <ListState kind={status === 'error' ? 'error' : 'loading'} />
       ) : (
         <>
-          <NoteBar tone="info">
-            <strong className={styles.headline}>{progressHeadline(steps)}</strong>
+          <div className={styles.progress} role="note">
+            <div>
+              <strong>{progressHeadline(steps)}</strong>
+              <span>
+                順番はおすすめです。飛ばして進んでもかまいません。終わったかどうかは、画面を開いたかではなく、実際に作られたもので判断します。
+              </span>
+            </div>
             <span className={styles.headlineNote}>
               全部終わると、ダッシュボードの帯は出なくなります
             </span>
-          </NoteBar>
+          </div>
 
           <div className={styles.columns}>
             <ol className={styles.steps} aria-label="はじめの設定の順路">
