@@ -15,7 +15,7 @@ describe('V6 対応マーク', () => {
     for (const label of ['マークの種類', '未対応', '対応中', '過去7日の変更']) expect(LIST).toContain(label)
     // 見出しは表の中だけを見る。注釈や他の行に同じ言葉があっても通さない。
     const thead = element(LIST, 'thead')
-    for (const label of ['順番', 'マーク', '使用中', '初期値', '自動変更', '使用先', '操作']) expect(thead).toContain(label)
+    for (const label of ['順番', 'マーク', '使用中', '初期値', '自動変更', '表示先', '操作']) expect(thead).toContain(label)
     expect(LIST).toContain('利用状態：すべて')
     expect(LIST).toContain('api.supportMarks.list(accountId)')
   })
@@ -47,14 +47,15 @@ describe('V6 対応マーク', () => {
     expect(LIST).not.toContain("reason instanceof ApiError ? reason.message : '削除できませんでした'")
   })
 
-  it('友だち以外の使用先も使用中として扱い、確認後に物理削除しない', () => {
+  it('影響確認の版と冪等キーを使い、選んだマークへ置換して保管する', () => {
     expect(LIST).toContain('function isUsed(mark: MarkRow)')
     expect(LIST).toContain('referenceCount(mark) > 0')
-    expect(LIST).toContain('replacementMarkId: defaultMark.id')
-    expect(LIST).toContain('expectedImpact:')
-    expect(LIST).toContain('先にすべての使用先から外してください')
-    expect(LIST).toContain('referenceCount(pendingDelete) === 0')
-    expect(LIST).toContain('変更履歴は残ります')
+    expect(LIST).toContain('api.supportMarks.archiveImpact(mark.id, accountId)')
+    expect(LIST).toContain('impactRevision: archiveImpact.impactRevision')
+    expect(LIST).toContain('expectedVersion: archiveImpact.expectedVersion')
+    expect(LIST).toContain('crypto.randomUUID()')
+    expect(LIST).toContain('value={replacementMarkId}')
+    expect(LIST).toContain('履歴を残します')
     expect(LIST).not.toContain('force: mark.friendCount > 0')
   })
 

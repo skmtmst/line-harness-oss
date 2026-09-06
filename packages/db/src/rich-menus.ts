@@ -177,8 +177,9 @@ export interface RichMenuDeleteImpactNextCandidate {
  * リッチメニューを消す前に、DBで確認できる影響をまとめたもの。
  *
  * LINEは「いま各友だちに何が表示されているか」の台帳を返さないため、
- * currentAudience は作り物の0にせず常に null とする。削除可否は、公開状態、
- * LINE上の実体、DB内の参照をサーバー側で再確認して決める。
+ * currentAudience は自前の割当台帳に記録できた現在値だけを返す。導入前の割当を
+ * 推測で補わず partial と明示する。削除可否は、公開状態、LINE上の実体、DB内の
+ * 参照をサーバー側で再確認して決める。
  */
 export interface RichMenuDeleteImpact {
   group: {
@@ -188,8 +189,9 @@ export interface RichMenuDeleteImpact {
     status: RichMenuGroup['status'];
   };
   currentAudience: {
-    value: number | null;
-    reason: 'assignment_ledger_unavailable';
+    value: number;
+    state: 'partial';
+    reason: 'preexisting_assignments_not_backfilled';
   };
   nextDisplay: {
     guaranteedGroupId: null;
@@ -314,7 +316,7 @@ export async function getRichMenuDeleteImpact(
   const group = await getRichMenuGroupById(db, groupId);
   if (!group) return null;
 
-  const [pagesResult, incomingResult, candidatesResult, referencesResult] = await Promise.all([
+  const [pagesResult, incomingResult, candidatesResult, referencesResult, currentAudience] = await Promise.all([
     db
       .prepare(
         `SELECT id, name, line_richmenu_id
@@ -446,6 +448,7 @@ export async function getRichMenuDeleteImpact(
         owner_id: string;
         owner_name: string;
       }>(),
+    getRichMenuCurrentAudience(db, group.account_id, group.id, group.is_default_for_all === 1),
   ]);
 
   const pages = pagesResult.results ?? [];
@@ -490,8 +493,9 @@ export async function getRichMenuDeleteImpact(
       status: group.status,
     },
     currentAudience: {
-      value: null,
-      reason: 'assignment_ledger_unavailable',
+      value: currentAudience,
+      state: 'partial',
+      reason: 'preexisting_assignments_not_backfilled',
     },
     nextDisplay: {
       guaranteedGroupId: null,
@@ -1050,6 +1054,301 @@ export interface RichMenuTapStats {
   byArea: RichMenuAreaTapCount[];
   byGroup: { groupId: string; taps: number }[];
   total: number;
+}
+
+// =============================================================================
+// 個別割当の現在値・実行履歴（309）
+// =============================================================================
+
+export interface RichMenuAudienceStat {
+  groupId: string;
+  currentAudience: number;
+  monthlyUniqueAudience: number;
+}
+
+export interface RecordRichMenuAssignmentInput {
+  friendId: string;
+  lineAccountId: string;
+  /** null は個別割当を外してアカウント既定へ戻したことを表す。 */
+  lineRichMenuId: string | null;
+  reasonKind: string;
+  reasonEventId?: string | null;
+  idempotencyKey?: string;
+  assignedAt?: string;
+}
+
+/**
+ * LINE の link / unlink が成功した後に呼び、現在値と成功履歴を同じ batch で記録する。
+ * 管理画面外の rich menu が指定された場合は、以前の管理対象割当だけを現在値から
+ * 外す。外部メニューを管理中の group へ推測で結び付けない。
+ */
+export async function recordRichMenuAssignment(
+  db: D1Database,
+  input: RecordRichMenuAssignmentInput,
+): Promise<void> {
+  const target = input.lineRichMenuId
+    ? await db
+      .prepare(
+        `SELECT g.id AS group_id
+           FROM rich_menu_pages p
+           JOIN rich_menu_groups g ON g.id = p.group_id
+          WHERE g.account_id = ? AND p.line_richmenu_id = ?
+          LIMIT 1`,
+      )
+      .bind(input.lineAccountId, input.lineRichMenuId)
+      .first<{ group_id: string }>()
+    : null;
+  const previous = await db
+    .prepare(
+      `SELECT id FROM rich_menu_assignments
+        WHERE line_account_id = ? AND friend_id = ?`,
+    )
+    .bind(input.lineAccountId, input.friendId)
+    .first<{ id: string }>();
+  const now = input.assignedAt ?? jstNow();
+  const idempotencyKey = input.idempotencyKey ?? crypto.randomUUID();
+  const run = db
+    .prepare(
+      `INSERT INTO rich_menu_assignment_runs
+         (id, version_id, friend_id, line_account_id, group_id, source_event_id,
+          idempotency_key, previous_assignment_id, operation, status, attempt_count,
+          next_retry_at, last_error_code, started_at, completed_at)
+       VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, 'succeeded', 1, NULL, NULL, ?, ?)
+       ON CONFLICT(line_account_id, idempotency_key) DO NOTHING`,
+    )
+    .bind(
+      crypto.randomUUID(),
+      input.friendId,
+      input.lineAccountId,
+      target?.group_id ?? null,
+      input.reasonEventId ?? null,
+      idempotencyKey,
+      previous?.id ?? null,
+      input.lineRichMenuId ? 'link' : 'unlink',
+      now,
+      now,
+    );
+
+  const current = target && input.lineRichMenuId
+    ? db
+      .prepare(
+        `INSERT INTO rich_menu_assignments
+           (id, friend_id, line_account_id, group_id, version_id, line_richmenu_id,
+            reason_kind, reason_event_id, assigned_at, updated_at)
+         VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)
+         ON CONFLICT(line_account_id, friend_id) DO UPDATE SET
+           group_id = excluded.group_id,
+           version_id = excluded.version_id,
+           line_richmenu_id = excluded.line_richmenu_id,
+           reason_kind = excluded.reason_kind,
+           reason_event_id = excluded.reason_event_id,
+           assigned_at = excluded.assigned_at,
+           updated_at = excluded.updated_at`,
+      )
+      .bind(
+        previous?.id ?? crypto.randomUUID(),
+        input.friendId,
+        input.lineAccountId,
+        target.group_id,
+        input.lineRichMenuId,
+        input.reasonKind,
+        input.reasonEventId ?? null,
+        now,
+        now,
+      )
+    : db
+      .prepare(
+        `DELETE FROM rich_menu_assignments
+          WHERE line_account_id = ? AND friend_id = ?`,
+      )
+      .bind(input.lineAccountId, input.friendId);
+
+  await db.batch([run, current]);
+}
+
+/** 成功した bulk link の1チャンクを、LINE user id からまとめて台帳へ反映する。 */
+export async function recordRichMenuAssignmentsByLineUserIds(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    groupId: string;
+    lineRichMenuId: string;
+    lineUserIds: string[];
+    reasonKind: string;
+    reasonEventId?: string | null;
+    idempotencyPrefix?: string;
+    assignedAt?: string;
+  },
+): Promise<void> {
+  if (input.lineUserIds.length === 0) return;
+  const now = input.assignedAt ?? jstNow();
+  const prefix = input.idempotencyPrefix ?? crypto.randomUUID();
+  const userIdsJson = JSON.stringify(input.lineUserIds);
+  const run = db
+    .prepare(
+      `INSERT INTO rich_menu_assignment_runs
+         (id, version_id, friend_id, line_account_id, group_id, source_event_id,
+          idempotency_key, previous_assignment_id, operation, status, attempt_count,
+          next_retry_at, last_error_code, started_at, completed_at)
+       SELECT lower(hex(randomblob(16))), NULL, f.id, ?, ?, ?,
+              ? || ':' || f.id, current.id, 'link', 'succeeded', 1,
+              NULL, NULL, ?, ?
+         FROM friends f
+         JOIN json_each(?) requested ON requested.value = f.line_user_id
+         LEFT JOIN rich_menu_assignments current
+           ON current.line_account_id = ? AND current.friend_id = f.id
+        WHERE f.line_account_id = ?
+       ON CONFLICT(line_account_id, idempotency_key) DO NOTHING`,
+    )
+    .bind(
+      input.lineAccountId,
+      input.groupId,
+      input.reasonEventId ?? null,
+      prefix,
+      now,
+      now,
+      userIdsJson,
+      input.lineAccountId,
+      input.lineAccountId,
+    );
+  const current = db
+    .prepare(
+      `INSERT INTO rich_menu_assignments
+         (id, friend_id, line_account_id, group_id, version_id, line_richmenu_id,
+          reason_kind, reason_event_id, assigned_at, updated_at)
+       SELECT COALESCE(existing.id, lower(hex(randomblob(16)))), f.id, ?, ?, NULL, ?, ?, ?, ?, ?
+         FROM friends f
+         JOIN json_each(?) requested ON requested.value = f.line_user_id
+         LEFT JOIN rich_menu_assignments existing
+           ON existing.line_account_id = ? AND existing.friend_id = f.id
+        WHERE f.line_account_id = ?
+       ON CONFLICT(line_account_id, friend_id) DO UPDATE SET
+         group_id = excluded.group_id,
+         version_id = excluded.version_id,
+         line_richmenu_id = excluded.line_richmenu_id,
+         reason_kind = excluded.reason_kind,
+         reason_event_id = excluded.reason_event_id,
+         assigned_at = excluded.assigned_at,
+         updated_at = excluded.updated_at`,
+    )
+    .bind(
+      input.lineAccountId,
+      input.groupId,
+      input.lineRichMenuId,
+      input.reasonKind,
+      input.reasonEventId ?? null,
+      now,
+      now,
+      userIdsJson,
+      input.lineAccountId,
+      input.lineAccountId,
+    );
+  await db.batch([run, current]);
+}
+
+/** LINE 側から group を取り下げた後、表示中ではなくなった現在値を残さない。 */
+export async function clearRichMenuAssignmentsForGroup(
+  db: D1Database,
+  groupId: string,
+): Promise<void> {
+  await db
+    .prepare(`DELETE FROM rich_menu_assignments WHERE group_id = ?`)
+    .bind(groupId)
+    .run();
+}
+
+async function getRichMenuCurrentAudience(
+  db: D1Database,
+  accountId: string,
+  groupId: string,
+  isDefaultForAll: boolean,
+): Promise<number> {
+  const row = isDefaultForAll
+    ? await db
+      .prepare(
+        `SELECT COUNT(*) AS count
+           FROM friends f
+           LEFT JOIN rich_menu_assignments current
+             ON current.line_account_id = ? AND current.friend_id = f.id
+          WHERE f.line_account_id = ?
+            AND f.is_following = 1
+            AND (current.id IS NULL OR current.group_id = ?)`,
+      )
+      .bind(accountId, accountId, groupId)
+      .first<{ count: number }>()
+    : await db
+      .prepare(
+        `SELECT COUNT(*) AS count
+           FROM rich_menu_assignments current
+           JOIN friends f ON f.id = current.friend_id
+          WHERE current.line_account_id = ?
+            AND current.group_id = ?
+            AND f.is_following = 1`,
+      )
+      .bind(accountId, groupId)
+      .first<{ count: number }>();
+  return Number(row?.count ?? 0);
+}
+
+/** 一覧用に、現在表示中の既知人数と今月の割当ユニーク人数をまとめて返す。 */
+export async function getRichMenuAudienceStats(
+  db: D1Database,
+  accountId: string,
+  from: string,
+  to: string,
+  knownGroups?: RichMenuGroup[],
+): Promise<RichMenuAudienceStat[]> {
+  const [groups, rows, currentRows, followerRow] = await Promise.all([
+    knownGroups ?? getRichMenuGroups(db, accountId),
+    db
+      .prepare(
+        `SELECT group_id, COUNT(DISTINCT friend_id) AS unique_audience
+           FROM rich_menu_assignment_runs
+          WHERE line_account_id = ?
+            AND operation = 'link'
+            AND status = 'succeeded'
+            AND completed_at >= ? AND completed_at < ?
+            AND group_id IS NOT NULL
+          GROUP BY group_id`,
+      )
+      .bind(accountId, from, to)
+      .all<{ group_id: string; unique_audience: number }>(),
+    db
+      .prepare(
+        `SELECT current.group_id AS group_id, COUNT(*) AS current_audience
+           FROM rich_menu_assignments current
+           JOIN friends f ON f.id = current.friend_id
+          WHERE current.line_account_id = ? AND f.is_following = 1
+          GROUP BY current.group_id`,
+      )
+      .bind(accountId)
+      .all<{ group_id: string; current_audience: number }>(),
+    db
+      .prepare(
+        `SELECT COUNT(*) AS count FROM friends
+          WHERE line_account_id = ? AND is_following = 1`,
+      )
+      .bind(accountId)
+      .first<{ count: number }>(),
+  ]);
+  const monthlyByGroup = new Map(
+    (rows.results ?? []).map((row) => [row.group_id, Number(row.unique_audience)]),
+  );
+  const currentByGroup = new Map(
+    (currentRows.results ?? []).map((row) => [row.group_id, Number(row.current_audience)]),
+  );
+  const explicitAudience = [...currentByGroup.values()].reduce((sum, value) => sum + value, 0);
+  const followingAudience = Number(followerRow?.count ?? 0);
+  return groups.map((group) => {
+    const explicitForGroup = currentByGroup.get(group.id) ?? 0;
+    return {
+      groupId: group.id,
+      currentAudience: group.is_default_for_all === 1
+        ? Math.max(0, followingAudience - explicitAudience + explicitForGroup)
+        : explicitForGroup,
+      monthlyUniqueAudience: monthlyByGroup.get(group.id) ?? 0,
+    };
+  });
 }
 
 /**

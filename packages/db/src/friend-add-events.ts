@@ -212,18 +212,29 @@ export async function markFriendAddEventRouting(
     routingRuleId?: string | null;
     winningRuleVersionId?: string | null;
     errorCode?: string | null;
+    scenarioEnrollmentId?: string | null;
+    deliveryCount?: number;
   },
 ): Promise<void> {
   await db.prepare(
     `UPDATE friend_add_events
         SET routing_status = ?, routing_rule_id = ?, winning_rule_version_id = ?,
-            error_code = ?, processed_at = ?
+            error_code = ?, scenario_enrollment_id = ?, delivery_count = ?,
+            first_delivery_sent_at = CASE
+              WHEN ? > 0 THEN COALESCE(first_delivery_sent_at, ?)
+              ELSE first_delivery_sent_at
+            END,
+            processed_at = ?
       WHERE id = ? AND line_account_id = ?`,
   ).bind(
     input.status,
     input.routingRuleId ?? null,
     input.winningRuleVersionId ?? null,
     input.errorCode ?? null,
+    input.scenarioEnrollmentId ?? null,
+    Math.max(0, Math.floor(input.deliveryCount ?? 0)),
+    Math.max(0, Math.floor(input.deliveryCount ?? 0)),
+    jstNow(),
     jstNow(),
     input.eventId,
     input.lineAccountId,

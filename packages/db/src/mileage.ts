@@ -292,6 +292,10 @@ export interface PostMileageAdjustmentInput {
   executedByStaffId: string;
   executedByStaffName: string;
   lineAccountId: string;
+  /** Positive adjustments create an expiring grant lot through the existing ledger trigger. */
+  expiresAt?: string | null;
+  /** Included in the idempotency fingerprint so a retry cannot add or remove delivery. */
+  notifyFriend?: boolean;
   occurredAt?: string;
 }
 
@@ -358,14 +362,19 @@ export async function postMileageAdjustment(
   const programId = input.programId ?? DEFAULT_MILEAGE_PROGRAM_ID;
   await ensureBuiltInProgram(db, programId);
 
-  const fingerprint = JSON.stringify({
+  const fingerprintInput: Record<string, unknown> = {
     friendId: input.friendId,
     amount: input.amount,
     reason: input.reason,
     reasonCategory: input.reasonCategory,
     sourceReferenceId: input.sourceReferenceId ?? null,
     lineAccountId: input.lineAccountId,
-  });
+  };
+  // Keep the original six-field shape when neither V6 option is used, so
+  // idempotent retries of adjustments created before this migration still work.
+  if (input.expiresAt) fingerprintInput.expiresAt = input.expiresAt;
+  if (input.notifyFriend) fingerprintInput.notifyFriend = true;
+  const fingerprint = JSON.stringify(fingerprintInput);
   const existing = await db
     .prepare(`SELECT * FROM mileage_ledger WHERE program_id = ? AND idempotency_key = ?`)
     .bind(programId, input.idempotencyKey)
@@ -381,6 +390,7 @@ export async function postMileageAdjustment(
     lineAccountId: input.lineAccountId,
     executedByStaffId: input.executedByStaffId,
     executedByStaffName: input.executedByStaffName,
+    expiresAt: input.expiresAt ?? null,
   });
 
   const write = await db

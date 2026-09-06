@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowDown, ArrowUp, MoreHorizontal, Palette, Pencil, Trash2 } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
-import { api, ApiError, type TagDeleteImpact, type TagDeleteImpactReferences } from '@/lib/api'
+import { api, ApiError, type TagDependencies, type TagDeleteImpactReferences } from '@/lib/api'
 import ActionMenu from '@/components/shared/action-menu'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
@@ -395,9 +395,9 @@ function refSummary(
  */
 function deleteImpactRows(
   tag: Tag,
-  impact: TagDeleteImpact | null,
+  impact: TagDependencies | null,
 ): Array<{ name: string; value: string; result: string }> {
-  const refs = impact?.references
+  const refs = impact?.referenceCounts
   const linked = [
     tag.mileageReward ? `本人+${tag.mileageReward}` : null,
     tag.referralMileageReward ? `紹介者+${tag.referralMileageReward}` : null,
@@ -412,9 +412,9 @@ function deleteImpactRows(
       value: `${(impact?.friendCount ?? tag.friendCount ?? 0).toLocaleString('ja-JP')}人`,
       result: 'タグが外れます',
     },
-    { name: '参照先', value: refs ? refSummary(refs, MANUAL_REFS) : '—', result: '絞り込み条件から外れます' },
-    { name: '参照先（自動）', value: refs ? refSummary(refs, AUTO_REFS) : '—', result: '開始条件が空になります' },
-    { name: '連動の停止', value: linked || 'なし', result: '以後は実行されません' },
+    { name: '参照先', value: refs ? refSummary(refs, MANUAL_REFS) : '—', result: '動いている設定はそのまま。新しくは選べません' },
+    { name: '参照先（自動）', value: refs ? refSummary(refs, AUTO_REFS) : '—', result: '開始条件はそのまま。新しくは選べません' },
+    { name: '連動の停止', value: impact?.mileageImpact.configured ? `本人+${impact.mileageImpact.self}／紹介者+${impact.mileageImpact.referrer}／${impact.mileageImpact.multiplier ? `${impact.mileageImpact.multiplier / 10000}倍` : '倍率なし'}／アクション${impact.linkedActions.length}件` : linked || 'なし', result: '新しく付いたときの連動は動きません' },
     /*
       **数は出さない。口も待たない。**（kenta 判断 2026-08-26）
 
@@ -424,13 +424,12 @@ function deleteImpactRows(
       ように見え、いつまでも埋まらない欄になる。
     */
     { name: '積んだマイル', value: 'そのまま残る', result: '取り消されません' },
+    { name: '使用中の版', value: impact ? impact.linkedActions.map((item) => `${item.state === 'published' ? '公開' : '下書き'} v${item.version}`).join('・') || 'なし' : '—', result: impact?.linkedActions.some((item) => item.state === 'published') ? '公開している版があるので消せません' : '公開版はありません' },
   ]
 }
 
-function DeleteTagDialog({ tag, onCancel, onDeleted }: { tag: Tag; onCancel: () => void; onDeleted: () => void }) {
+function DeleteTagDialog({ tag, accountId, onCancel }: { tag: Tag; accountId: string | null; onCancel: () => void }) {
   const [text, setText] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
   /**
    * 削除して何が失われるか（`GET /api/tags/:id/delete-impact`）。
    *
@@ -438,7 +437,7 @@ function DeleteTagDialog({ tag, onCancel, onDeleted }: { tag: Tag; onCancel: () 
    * 読み込み中と失敗のあいだも押せなくする。失敗を「参照0件」と読み違えて
    * 使用中のタグを消させないため。
    */
-  const [impact, setImpact] = useState<TagDeleteImpact | null>(null)
+  const [impact, setImpact] = useState<TagDependencies | null>(null)
   const [impactStatus, setImpactStatus] = useState<'loading' | 'ready' | 'error'>('loading')
 
   useEffect(() => {
@@ -446,7 +445,8 @@ function DeleteTagDialog({ tag, onCancel, onDeleted }: { tag: Tag; onCancel: () 
     setImpactStatus('loading')
     ;(async () => {
       try {
-        const res = await api.tags.deleteImpact(tag.id)
+        if (!accountId) throw new Error('account required')
+        const res = await api.tags.dependencies(tag.id, accountId)
         if (cancelled) return
         if (!res.success) throw new Error(res.error)
         setImpact(res.data)
@@ -456,35 +456,20 @@ function DeleteTagDialog({ tag, onCancel, onDeleted }: { tag: Tag; onCancel: () 
       }
     })()
     return () => { cancelled = true }
-  }, [tag.id])
+  }, [accountId, tag.id])
 
   /*
     共通の作法に寄せる。Escapeで閉じ、Tabが外へ出ず、**背景がスクロールしない**。
     自前で組むと毎回どれかが抜ける。実際、背景が裏で動いていた。
   */
-  const dialogRef = useOverlayFocus(true, onCancel, saving)
+  const dialogRef = useOverlayFocus(true, onCancel, false)
 
-  const blocked = impactStatus !== 'ready' || impact?.canDelete === false
+  const blocked = true
   const blockedReason = impactStatus === 'loading'
     ? '影響を確認しています'
     : impactStatus === 'error'
       ? '影響を確認できませんでした。時間をおいて開き直してください'
-      : impact && !impact.canDelete
-        ? `使用中のため削除できません（${impact.blockingReferenceCount}件から参照されています）`
-        : ''
-
-  const remove = async () => {
-    if (blocked || text !== tag.name || saving) return
-    setSaving(true)
-    try {
-      const result = await api.tags.delete(tag.id)
-      if (!result.success) throw new Error(result.error)
-      onDeleted()
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '削除に失敗しました')
-      setSaving(false)
-    }
-  }
+      : 'アーカイブの保存口は未接続です。影響確認だけできます'
 
   return (
     <div ref={dialogRef} className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/45 p-4" data-qa-dialog="tag-delete" data-impact={impactStatus}>
@@ -495,8 +480,8 @@ function DeleteTagDialog({ tag, onCancel, onDeleted }: { tag: Tag; onCancel: () 
             <TrashIcon />
           </span>
           <div className="min-w-0">
-            <h2 className="text-xl font-bold text-ink">「{tag.name}」を削除しますか？</h2>
-            <p className="mt-1 text-sm text-ink-secondary">このタグを使っている場所と、外れる友だちを確認してください。</p>
+            <h2 className="text-xl font-bold text-ink">「{tag.name}」をアーカイブしますか？</h2>
+            <p className="mt-1 text-sm text-ink-secondary">アーカイブ後も、いま付いている友だちと過去の履歴はそのまま残ります。</p>
           </div>
         </div>
 
@@ -514,8 +499,8 @@ function DeleteTagDialog({ tag, onCancel, onDeleted }: { tag: Tag; onCancel: () 
         {/* 設計 `WrDxu`。使用中で止まっているときだけ、その理由をここに出す。 */}
         {impactStatus === 'ready' && impact && !impact.canDelete && (
           <div data-qa="tag-delete-blocked-warning" className="mt-4 rounded-control border border-danger/25 bg-danger-bg p-3 text-sm text-danger">
-            <p className="font-bold">使用中のため、このタグは削除できません</p>
-            <p className="mt-1 text-ink-secondary">先に参照している側の設定からこのタグを外してください。削除しても、過去のマイル履歴と配信ログは残ります。</p>
+            <p className="font-bold">有効な公開参照があるタグは、完全に削除できません</p>
+            <p className="mt-1 text-ink-secondary">参照中の設定はそのまま残し、新しく付ける操作だけを止める必要があります。過去のマイル履歴と配信ログは残ります。</p>
           </div>
         )}
 
@@ -524,13 +509,11 @@ function DeleteTagDialog({ tag, onCancel, onDeleted }: { tag: Tag; onCancel: () 
           <span className="mb-1.5 block text-xs font-semibold text-ink-secondary">確認のため、タグ名を入力してください</span>
           <input value={text} onChange={(event) => setText(event.target.value)} placeholder={tag.name} disabled={blocked} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm outline-none focus:border-danger disabled:bg-canvas-sunken" />
         </label>
-        {error && <p className="mt-3 text-sm text-danger" role="alert">{error}</p>}
-
         {/* 設計 `rHKRG`。左が「やめる」、右が「このタグを削除する」。 */}
         <div className="mt-6 flex items-center justify-end gap-3">
           {blockedReason && <p className="min-w-0 flex-1 text-xs text-ink-faint">{blockedReason}</p>}
           <button type="button" onClick={onCancel} className="shrink-0 rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">やめる</button>
-          <button type="button" disabled={blocked || saving || text !== tag.name} onClick={() => void remove()} className="shrink-0 rounded-control bg-danger px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">{saving ? '削除中…' : 'このタグを削除する'}</button>
+          <button type="button" disabled={blocked || text !== tag.name} className="shrink-0 rounded-control bg-danger px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">このタグをアーカイブする</button>
         </div>
       </section>
     </div>
@@ -917,7 +900,7 @@ export default function TagsPageV4({
         ) : null}
       </> : tab === 'fields' ? <FriendFieldList accountId={accountId} /> : tab === 'marks' ? <SupportMarkList accountId={accountId} /> : <SavedSearchList accountId={accountId} />}
       </div>
-      {deleteTarget && <DeleteTagDialog tag={deleteTarget} onCancel={() => setDeleteTarget(null)} onDeleted={() => { setDeleteTarget(null); void load() }} />}
+      {deleteTarget && <DeleteTagDialog tag={deleteTarget} accountId={accountId} onCancel={() => setDeleteTarget(null)} />}
     </div>
   )
 }
