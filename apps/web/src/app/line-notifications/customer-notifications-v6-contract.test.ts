@@ -35,8 +35,8 @@ describe('V6 顧客へのお知らせの寸法', () => {
     expect(CSS).toMatch(/\.action\s*\{[^}]*padding: 0 14px;/)
     expect(CSS).toMatch(/\.action\s*\{[^}]*font-size: var\(--text-label\);/)
     expect(CSS).toMatch(/\.action\s*\{[^}]*font-weight: 700;/)
-    expect(PAGE).toContain('${styles.action} ${styles.actionPrimary}')
-    expect(PAGE).toContain('${styles.action} ${styles.actionSecondary}')
+    expect(PAGE).toContain('<Button variant="primary" onClick={onSave}')
+    expect(PAGE).toContain('<Button onClick={onTestSend}')
     // 直書きの主要ボタンへ戻さない。
     expect(PAGE).not.toContain('bg-accent text-on-accent rounded-control px-5 py-2.5')
   })

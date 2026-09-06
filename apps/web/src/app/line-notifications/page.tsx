@@ -121,13 +121,13 @@ function CustomerNotificationEditor({
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <p className="text-xs font-semibold text-accent">LINE通知　›　お知らせの種類</p>
-        <h1 className="mt-2 text-xl font-bold text-ink">「{setting.title?.trim() || setting.label}」を編集する</h1>
+        <p className="mt-2 text-xl font-bold text-ink">「{setting.title?.trim() || setting.label}」を編集する</p>
         <p className="mt-1 text-xs text-ink-faint">公開中の内容を編集します。保存した内容は次の通知から使われます。</p>
       </div>
-      <button type="button" onClick={onTestSend} disabled={busy} className={`${styles.action} ${styles.actionSecondary}`}>自分にテスト送信</button>
+      <Button onClick={onTestSend} disabled={busy}>自分にテスト送信</Button>
     </div>
 
-    <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
+    <div className="grid min-w-0 gap-4" style={{ gridTemplateColumns: 'minmax(0, 1fr) 390px' }}>
       <div className="min-w-0 space-y-4">
         <section className="rounded-card border border-hairline bg-canvas p-4">
           <h2 className="font-bold text-ink">いつ送りますか</h2>
@@ -182,10 +182,10 @@ function CustomerNotificationEditor({
       </aside>
     </div>
 
-    <div className="fixed bottom-0 left-[var(--sidebar-width,0px)] right-0 z-20 border-t border-hairline bg-canvas/95 px-6 py-3 shadow-lg backdrop-blur">
-      <div className="ml-auto flex max-w-[1584px] flex-wrap items-center justify-between gap-3">
+    <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-hairline bg-canvas px-6 py-3 shadow-lg">
+      <div className="ml-auto flex flex-wrap items-center justify-between gap-3" style={{ maxWidth: 1584 }}>
         <p className="text-xs text-ink-faint">出しています。保存すると、次のお知らせから新しい文面が使われます。</p>
-        <div className="flex gap-2"><button type="button" onClick={onClose} className={`${styles.action} ${styles.actionSecondary}`}>キャンセル</button><button type="button" onClick={onTestSend} disabled={busy} className={`${styles.action} ${styles.actionSecondary}`}>自分にテスト送信</button><button type="button" onClick={onSave} disabled={busy} className={`${styles.action} ${styles.actionPrimary}`}>お知らせを保存</button></div>
+        <div className="flex gap-2"><Button onClick={onClose}>キャンセル</Button><Button onClick={onTestSend} disabled={busy}>自分にテスト送信</Button><Button variant="primary" onClick={onSave} disabled={busy}>お知らせを保存</Button></div>
       </div>
     </div>
   </main>
