@@ -2564,7 +2564,7 @@ export const SCREENS = [
 
   // ── 機能28 予約設定 ─────────────────────────────────────
   /* 設計の4入口を同じ帯へ置き、受付枠・休業日は既存の勤務設定へつないだ。 */
-  { ...BOOKING_SET, node: 'QSLEH', name: '28-1 予約設定', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #241 / PR #1022 / UI HEAD abae52d46 を3105/8792で再撮影。構造一致・店舗共通設定API待ち。** メニュー件数つきの4入口、出している数・最多・受付時間・受付範囲の4指標、設計順の6列表、担当者名、中身を見る・担当を決める・止める／出す、表示件数をそろえた。予約のルールでは全メニューの受付期間・締め切り・キャンセル期限を横並びで確認できる。1440・1920pxとも横はみ出し0。残る差は店舗共通値と営業時間・例外日を返すAPI、設計8件に対して撮影固定データが6件であること。', verdictSource: 'booking-settings-v6/QSLEH.txt + 2026-09-07 1440/1920px screenshots', verdictHead: 'abae52d46' },
+  { ...BOOKING_SET, node: 'QSLEH', name: '28-1 予約設定', clock: '2026-08-26T00:00:00.000Z', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #241 / PR #1022 / UI HEAD abae52d46 を3105/8792で再撮影。構造一致・店舗共通設定API待ち。** メニュー件数つきの4入口、出している数・最多・受付時間・受付範囲の4指標、設計順の6列表、担当者名、中身を見る・担当を決める・止める／出す、表示件数をそろえた。予約のルールでは全メニューの受付期間・締め切り・キャンセル期限を横並びで確認できる。1440・1920pxとも横はみ出し0。残る差は店舗共通値と営業時間・例外日を返すAPI、設計8件に対して撮影固定データが6件であること。', verdictSource: 'booking-settings-v6/QSLEH.txt + 2026-09-07 1440/1920px screenshots', verdictHead: 'abae52d46' },
   { ...BOOKING_SET, node: 'tksPc',
     /*
       スタッフを選ぶまで受付時間が出ない画面。選ばずに撮ると
@@ -2579,7 +2579,8 @@ export const SCREENS = [
   {
     ...BOOKING_SET, node: 'W6465r', name: '28-1-C 一覧の状態（空・読込・エラー）',
     /* `**' + '/api/booking/admin/menus*` は `/menus/:id/staff` に届かない（`*` は `/` をまたがない）。この画面は呼ばないが、呼ぶようになったとき静かに素通りするのを防ぐ。 */
-    states: { apis: ['**/api/booking/admin/menus*', '**/api/booking/admin/menus/**', '**/api/booking/admin/staff*'], kinds: ['loading', 'empty', 'error'] },
+    clock: '2026-08-26T00:00:00.000Z',
+    states: { apis: ['**/api/booking/admin/settings*', '**/api/booking/admin/menus*', '**/api/booking/admin/menus/**', '**/api/booking/admin/staff*'], kinds: ['loading', 'empty', 'error'] },
     verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #241 / PR #1022 / UI HEAD abae52d46 を3105/8792で通常・読込・空・失敗を再撮影。構造一致・店舗設定API待ち。** 4入口とV6の4指標を全状態で同じ位置に保ち、読込・失敗は —、空は数えて0と未取得を分けた。失敗時は作成誘導を出さず再読込を表示する。1440・1920pxとも横はみ出し0、内部語・壊れ値0件。残る差は店舗営業時間・共通受付範囲を返すAPIと、設計見本と同量の固定データ。',
     verdictSource: 'booking-settings-v6/W6465r-{loading,empty,error}.txt + 2026-09-07 screenshots', verdictHead: 'abae52d46',
   },

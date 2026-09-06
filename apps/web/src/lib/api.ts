@@ -6461,6 +6461,33 @@ export interface BookingMenu {
   intake_question?: string | null;
 }
 
+export interface BookingSettings {
+  lineAccountId: string;
+  organizationName: string;
+  timeZone: string;
+  bookingWindowDays: number;
+  cutoffMinutesBefore: number;
+  cancelDeadlineMinutesBefore: number;
+  maxActiveBookingsPerFriend: number;
+  approvalMode: 'automatic' | 'manual';
+  holdMinutes: number;
+  slotGranularityMinutes: number;
+  menuCount: number;
+  activeMenuCount: number;
+  inactiveMenuCount: number;
+  businessHours: Array<{
+    weekday: number;
+    intervals: Array<{ start: string; end: string }>;
+  }>;
+  exceptions: Array<{
+    date: string;
+    kind: 'open' | 'closed' | 'custom_hours';
+    intervals: Array<{ start: string; end: string }>;
+    note: string | null;
+  }>;
+  updatedAt: string;
+}
+
 export interface BookingStaff {
   id: string;
   name: string;
@@ -6562,6 +6589,8 @@ function withAccount(path: string, accountId: string): string {
 }
 
 export const bookingApi = {
+  getSettings: (accountId: string) =>
+    fetchApi<BookingSettings>(withAccount('/api/booking/admin/settings', accountId)),
   // Menus
   listMenus: (accountId: string) =>
     fetchApi<{ menus: BookingMenu[] }>(withAccount('/api/booking/admin/menus', accountId)),
