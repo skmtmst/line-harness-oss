@@ -1164,29 +1164,29 @@ export const SCREENS = [
   // ── 機能9 友だち追加時の配信 ────────────────────────────
   { ...FRIEND_ADD, node: 'uLQQc', name: '9-1 友だち追加時の配信',
     states: { apis: ['**/api/friend-add-rules*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #290・`de8b7c75b` を通常・読込・空・失敗・権限不足で1440/1920px撮影し、Pencilと目視比較。** 4指標・2タブ・フォルダ・検索・6列表・ページ送りを同じ情報順にそろえ、最初に送る内容はメッセージ種別とシナリオ名を併記。全12枚で横はみ出し0。**残るもの**：一覧APIにカーソルと総件数、フォルダ作成APIが無いため、ページ番号とフォルダ追加は実データ未接続。',
-    verdictSource: 'friend-add-v6/uLQQc.png + uLQQc-normal-1920.png + uLQQc*.txt', verdictHead: 'de8b7c75b', },
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #374・UI HEAD `60bb0631c`・固定データ PR #1125（統合 #1128）で一致。** 新しいルール一覧APIの総件数・カーソル・フォルダを接続し、4指標、2タブ、流入の束、検索、6列表、実内容、ページ送りを実値で表示した。通常・読込・空・失敗・権限不足を3102/8789の1440/1920pxで撮影し、全12枚で横はみ出し0。フォルダ追加も専用APIと確認ダイアログへ接続済み。',
+    verdictSource: 'friend-add-v6/uLQQc.png + uLQQc-{normal,loading,empty,error,forbidden}-{1440,1920}.png + Issue #374 visual/text comparison', verdictHead: '60bb0631c', },
   {
     ...FRIEND_ADD, node: 's9gAx', name: '9-1-A 基本設定', route: '/friend-add-settings?view=edit&id=rule-referral&step=basic',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #290・`de8b7c75b` を1440/1920px撮影し、同Nodeの設計本文と文字照合。** 5段表示、設定名、フォルダ、優先順位、判定対象、社内メモ、実際の状態・直近7日・二重送信を含む設定サマリー、LINEプレビュー、追従操作を表示し、横はみ出し0。**残るもの**：フォルダ追加APIが無く、基本設定からのテスト送信は確認段へ集約している。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #374・UI HEAD `60bb0631c`・固定データ PR #1125（統合 #1128）で一致。** 実APIから設定名、フォルダ、優先順位、判定する人、社内メモ、状態、直近7日、二重送信、配信内容、アクションを読み、5段、設定サマリー、LINEプレビュー、追従操作へ表示した。3102/8789の1440/1920pxで横はみ出し0。',
     verdictSource: 'friend-add-v6/s9gAx.txt + s9gAx-1920.png',
-    verdictHead: 'de8b7c75b',
+    verdictHead: '60bb0631c',
   },
   {
     ...FRIEND_ADD, node: 'W1wzCa', name: '9-1-B 流入条件', route: '/friend-add-settings?view=edit&id=rule-referral&step=routes',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #290・`de8b7c75b` を1440/1920px撮影し、同Nodeの設計本文と文字照合。** 流入リンクの複数選択、有効期間、優先判定、判定サマリーを同じ左右構造で表示。取れない過去28日人数を0人にせず未取得とし、未接続項目を案内帯で明示した。横はみ出し0。**残るもの**：曜日・時間帯・友だち条件の保存先と過去28日の該当集計APIが無い。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #374・UI HEAD `60bb0631c`・固定データ PR #1125（統合 #1128）で一致。** 流入リンクの複数選択、曜日、時間帯、有効期間、友だち条件、優先判定を保存済みルールから表示し、競合集計APIの過去28日214人を判定サマリーへ接続した。3102/8789の1440/1920pxで横はみ出し0。',
     verdictSource: 'friend-add-v6/W1wzCa.txt + W1wzCa-1920.png',
-    verdictHead: 'de8b7c75b',
+    verdictHead: '60bb0631c',
   },
   {
     ...FRIEND_ADD, node: 'K0Dbr2', name: '9-1-C 初回案内', route: '/friend-add-settings?view=edit&id=rule-referral&step=message',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #290・`de8b7c75b` を1440/1920px撮影し、同Nodeの設計本文と文字照合。** テキスト・テンプレート・回答フォーム、本文、シナリオ、送信時刻、設定サマリー、LINEプレビュー、追従操作を同じ構造で表示。未接続項目を案内帯で明示し、横はみ出し0。**残るもの**：選択肢、24時間の再送制限、経路不明時の共通案内／担当者通知を保存するAPIが無い。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #374・UI HEAD `60bb0631c`・固定データ PR #1125（統合 #1128）で一致。** テキスト・テンプレート・回答フォーム・シナリオ、初回本文、後続シナリオ、送信時刻、24時間の再送制限、経路不明時の共通案内と担当者通知の接続状態を保存済みルールから表示した。設定サマリー、LINEプレビュー、追従操作を3102/8789の1440/1920pxで確認し、横はみ出し0。',
     verdictSource: 'friend-add-v6/K0Dbr2.txt + K0Dbr2-1920.png',
-    verdictHead: 'de8b7c75b',
+    verdictHead: '60bb0631c',
   },
   { ...FRIEND_ADD, node: 'txMO9', name: '9-1-D アクション追加', route: '/friend-add-settings?view=edit&id=rule-referral&step=actions&dialog=add', mode: 'viewport', height: 1080,
     verdict: 'match',
@@ -1201,20 +1201,20 @@ export const SCREENS = [
   },
   {
     ...FRIEND_ADD, node: 'ec9vg', name: '9-1-F 最終確認',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #222・PR #1010 で再実装・再判定。** UI HEAD `3d6b7e7e8` を3104/8791で通常・読込・空・失敗・権限なしの5状態、各1440/1920pxで撮影（横はみ出し0）。設計本文の5段確認、登録直後から5分以内、LINEプレビュー、二重実行防止、Slack通知欄に構造・文言を合わせ、内部語を画面から除いた。現行APIは流入経路・設定名・初回案内本文・Slack接続状態を返さず、設計参照も本文 `.txt` のみで同寸法のPencil画像が無いためデータ待ち。',
-    verdictSource: 'friend-add-v6/ec9vg.txt + ec9vg-{normal,loading,empty,error,forbidden}-{1440,1920}.png',
-    verdictHead: '3d6b7e7e8',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #374・UI HEAD `a0278d076`・固定データ PR #1130（統合 #1132）で一致。** 検証APIの合格結果、保存済みルールの設定名・流入条件・送信時刻・対象・初回案内・アクション・24時間制限、最後のテスト、対象214人、Slack監視の接続状態を表示した。Pencil画像と通常・読込・空・失敗・権限不足を3102/8789の1440/1920pxで目視比較し、全12枚で横はみ出し0。',
+    verdictSource: 'friend-add-v6/ec9vg.png + ec9vg-{normal,loading,empty,error,forbidden}-{1440,1920}.png + ec9vg*.txt',
+    verdictHead: 'a0278d076',
     route: '/friend-add-settings/publish',
-    states: { apis: ['**/api/friend-add-routing/draft*', '**/api/friend-add-routing/draft/**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    states: { apis: ['**/api/friend-add-rules*', '**/api/friend-add-rules/**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
 
   },
   {
     ...FRIEND_ADD, node: 'quhg6', name: '9-1-G 有効化完了',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #222・PR #1010 で再実装・再判定。** UI HEAD `3d6b7e7e8` を3104/8791で有効化操作後、1440/1920pxで撮影（横はみ出し0）。設計本文の全STEP完了、稼働状態、次の操作、未送信・二重送信・再追加・シナリオ開始失敗の監視欄に構造・文言を合わせ、内部語を画面から除いた。現行の公開結果APIは設定名・流入経路を返さず、Slack監視・停止・複製も未接続で、設計参照も本文 `.txt` のみで同寸法のPencil画像が無いためデータ待ち。',
-    verdictSource: 'friend-add-v6/quhg6.txt + quhg6-{1440,1920}.png',
-    verdictHead: '3d6b7e7e8',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #374・UI HEAD `a0278d076`・固定データ PR #1130（統合 #1132）で一致。** 公開APIの第1版・公開日時、保存済みルールの設定名・流入条件・対象・二重送信防止・対象214人・稼働状態を表示し、全STEP完了、次の操作、未送信・二重送信・再追加・シナリオ開始失敗の監視欄をPencil画像と目視比較した。3102/8789の1440/1920pxで2枚とも横はみ出し0。複製は機能9の契約外なので誤操作を避けて無効表示にしている。',
+    verdictSource: 'friend-add-v6/quhg6.png + quhg6-{1440,1920}.png + quhg6.txt',
+    verdictHead: 'a0278d076',
     route: '/friend-add-settings/publish',
     steps: [{ qaOpen: 'ec9vg', after: 900 }],
 
@@ -1222,11 +1222,11 @@ export const SCREENS = [
   {
     ...FRIEND_ADD, node: 'P2J0Te', name: '9-1-H 実行結果',
     route: '/friend-add-settings/runs', mode: 'page',
-    states: { apis: ['**/api/friend-add-routing/events*', '**/api/friend-add-routing/events/**'], kinds: ['normal', 'loading', 'empty', 'error'] },
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #290・UI HEAD `f13421d869` を固定ポート3105/8792で再実装・再判定。** 正常4件、読込、空、失敗を1440/1920pxで撮影し、Pencilの1920px設計画像と横並び比較（全状態で横はみ出し0）。4指標、コンパクトな友だち追加履歴、流入経路内訳、稼働状況、要テスト、担当者シナリオ開始、CSV、絞り込み、必要時だけのページ送り、下部操作をそろえた。通常URL・公式QRの経路は推測せず未取得と表示する。現行APIが返さない累計配信、シナリオ開始件数、平均送信時間、担当者引き継ぎ集計、実行したルール・版・アクション詳細と一時停止操作は未取得または未接続と明示しているためデータ待ち。',
+    states: { apis: ['**/api/friend-add-runs*', '**/api/friend-add-runs/**'], kinds: ['normal', 'loading', 'empty', 'error'] },
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #374・UI HEAD `60bb0631c`・固定データ PR #1125（統合 #1128）で一致。** 新しい実行結果APIを接続し、直近28日214人、累計1,842通、シナリオ開始198件、エラー3件、平均0.8秒、使用ルール・版、実行アクション、CSV、絞り込み、一時停止を表示した。担当者引き継ぎはAPIが返す「結ぶ記録がない」を未取得理由として表示し、推測値を作っていない。通常・読込・空・失敗を3102/8789の1440/1920pxで撮影し、全10枚で横はみ出し0。',
     verdictSource: 'friend-add-v6/P2J0Te.txt + P2J0Te-{normal,loading,empty,error}-{1440,1920}.png',
-    verdictHead: 'f13421d869',
+    verdictHead: '60bb0631c',
   },
   {
     ...FRIEND_ADD, node: 'Q3qP1r', name: '9-1-I 削除確認',
@@ -1613,9 +1613,9 @@ export const SCREENS = [
     verdictNote: '**2026-09-06 Issue #254 / UI HEAD 19422a3b7で設計1920pxと実装1440px・1920pxを目視比較。** 上部操作、2タブ、4指標、6行の回答表、ページ送りを設計と同じ順で配置し、両幅とも横はみ出し0を確認した。実回答はAPI側ページングし、全回答CSV・詳細・表示中の検索を備える。開いた実人数・回答単位の書き込み結果・日付項目の全件集計は取得口が無いため、0を作らず `—` と理由を表示する。',
     verdictSource: 'forms-v6/v9tYhl.txt + v9tYhl-{1440,1920}.png + v9tYhl-{normal,loading,empty,error}-{1440,1920}.png',
     verdictHead: '19422a3b7',
-    route: '/form-submissions/responses?id=form-visit',
+    route: '/form-submissions/responses?id=form-1',
     states: {
-      apis: ['**/api/forms/form-visit', '**/api/forms/form-visit/submissions*'],
+      apis: ['**/api/forms/form-1', '**/api/forms/form-1/submissions*'],
       kinds: ['normal', 'loading', 'empty', 'error'],
     }, },
   {
@@ -3796,6 +3796,33 @@ const ISSUE_366_REVIEW = {
 }
 
 /**
+ * board #368。統合済みのフォーム固定データと回答集計APIを使い、機能13の
+ * 4 Nodeを3104/8791で再撮影した。Pencil 1920pxとの目視比較結果。
+ */
+const ISSUE_368_REVIEW = {
+  EMBIK: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・一覧契約待ち。固定データから6フォームを読み、検索、公開状態、回答数、更新日、回答・編集・削除の操作を表示した。現行の実APIはフォームのフォルダ所属、全件数、今週回答数、保存先の内訳を一覧応答で返さないため、設計の18件・フォルダ別件数・週次値・保存先内訳を作らず保留した。通常・読込中・0件・取得失敗も同じ一覧骨格で確認した。',
+    source: 'forms-v6/EMBIK.txt + forms-v6/EMBIK-{1440,1920}.png + forms-v6/EMBIK-{normal,loading,empty,error}-{1440,1920}.png',
+  },
+  vCqUj: {
+    verdict: 'match',
+    note: '一致。固定フォーム定義から、共通ヘッダを含む9ブロック、質問ごとの入力種別・選択肢・保存先、顧客プレビュー、公開状態、回答URL、回答数、保存操作を表示した。値は運用データで変わるが、配置・項目・操作は一致する。',
+    source: 'forms-v6/vCqUj.txt + forms-v6/vCqUj-{1440,1920}.png',
+  },
+  cSqvP: {
+    verdict: 'match',
+    note: '一致。固定フォーム定義から回答後の3動作、お礼ページ、前回答の復元、ページ名、ボタン文言、見出し、送信前確認、受付期限、1人1回を読み、保存APIへつながるオプション画面を確認した。値は運用データで変わるが、配置・項目・操作は一致する。',
+    source: 'forms-v6/cSqvP.txt + forms-v6/cSqvP-{1440,1920}.png',
+  },
+  v9tYhl: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・撮影用回答データ待ち。実画面はページ分け回答APIのsummaryから、本人確認済み開始数に対する回答率、情報欄へ書けた件数と失敗数、次回来店日の重複を除いた人数を表示し、各回答にも書き込み成否を出すよう接続した。撮影用mockはフォーム定義だけで回答とsummaryを返さないため、0件の通常状態で未取得理由を表示し、設計の6行と実集計値は作らず保留した。通常・読込中・0件・取得失敗を確認した。',
+    source: 'forms-v6/v9tYhl.txt + forms-v6/v9tYhl-{1440,1920}.png + forms-v6/v9tYhl-{normal,loading,empty,error}-{1440,1920}.png',
+  },
+}
+
+/**
  * board #267。development b5693059a を取り込んだ枝を 3102/8789 で起動し、
  * 機能1に残る2 Nodeを設計1920pxと実装1440/1920pxで比較した結果。
  */
@@ -4055,6 +4082,13 @@ for (const screen of SCREENS) {
     screen.verdictSource = issue366Review.source
     screen.verdictHead = '1d9e8d36c'
     if (issue366Review.route) screen.route = issue366Review.route
+  }
+  const issue368Review = ISSUE_368_REVIEW[screen.node]
+  if (screen.feature === 13 && issue368Review) {
+    screen.verdict = issue368Review.verdict
+    screen.verdictNote = `**2026-09-07 Issue #368 / PR #1134で実API接続後に再判定。** 3104/8791で1440px・1920pxを撮影し、全画像で横はみ出し0。Pencil 1920pxと実装1920pxを目視比較した。${issue368Review.note}`
+    screen.verdictSource = issue368Review.source
+    delete screen.verdictHead
   }
   const issue267Review = ISSUE_267_REVIEW[screen.node]
   if (screen.feature === 1 && issue267Review) {

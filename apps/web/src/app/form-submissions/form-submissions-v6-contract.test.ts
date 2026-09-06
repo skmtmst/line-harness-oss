@@ -123,10 +123,13 @@ describe('V6回答フォームの未実装3画面', () => {
     expect(RESPONSES_PAGE).toContain('<Th')
   })
 
-  it('取得口が無い指標を0件にせずダッシュと理由で出す', () => {
-    expect(RESPONSES_PAGE).toContain('value="—" note="開いた実人数の集計口がありません"')
-    expect(RESPONSES_PAGE).toContain('回答単位の書き込み結果は未取得です')
+  it('開始数・書き込み結果・日付項目の全件集計を実APIから表示する', () => {
+    expect(RESPONSES_PAGE).toContain('responseResult.data.summary ?? null')
+    expect(RESPONSES_PAGE).toContain('completedDestinationWrites(summary)')
+    expect(RESPONSES_PAGE).toContain('nextVisitPeople(summary)')
+    expect(RESPONSES_PAGE).toContain('summary.completionRate.toLocaleString')
+    expect(RESPONSES_PAGE).toContain('destinationWriteText(item.destinationWrite)')
     expect(RESPONSES_PAGE).toContain('回答単位の版は未取得')
-    expect(RESPONSES_PAGE).toContain('回答単位の結果は未取得')
+    expect(RESPONSES_PAGE).toContain('回答後アクションの結果は未取得')
   })
 })

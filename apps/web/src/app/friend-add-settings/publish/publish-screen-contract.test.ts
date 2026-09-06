@@ -34,9 +34,9 @@ describe('友だち追加時配信の公開画面', () => {
     expect(PAGE).toContain('disabled={!ready}')
   })
 
-  it('公開前の対象見込みは validation の値を使う', () => {
+  it('公開前の対象見込みはルールの28日集計を優先し、旧契約にも戻せる', () => {
     // 公開後の返事を先取りしたり、設計の数字を置いたりしない。
-    expect(PAGE).toContain('audienceText(validation?.estimatedAudienceCount)')
+    expect(PAGE).toContain('audienceText(matchedLast28Days ?? validation?.estimatedAudienceCount)')
     expect(PAGE).not.toContain('214人')
   })
 
@@ -80,8 +80,8 @@ describe('友だち追加時配信の公開画面', () => {
   it('設計の最終確認に必要な時刻・プレビュー・監視状態を表示する', () => {
     expect(PAGE).toContain('登録直後から5分以内')
     expect(PAGE).toContain('LINEプレビュー')
-    expect(PAGE).toContain('Slack通知（未接続）')
-    expect(PAGE).toContain('初回案内の本文は、選択したシナリオで確認してください。')
+    expect(PAGE).toContain("ruleDetail?.staffNotification?.status === 'connected'")
+    expect(PAGE).toContain('ruleDetail?.rule.definition.messageText')
   })
 
   it('運用者向けの画面に内部の仕組みの名前を出さない', () => {
@@ -103,7 +103,8 @@ describe('友だち追加時配信の公開画面', () => {
     ]) {
       expect(PAGE).toContain(label)
     }
-    expect(PAGE).toContain('Slack通知はまだ接続されていません')
+    expect(PAGE).toContain('未送信・二重送信・シナリオ開始失敗はSlackへ通知します。')
+    expect(PAGE).toContain('api.friendAddRules.stop(accountId, detail.rule.id, detail.rule.version)')
   })
 
   it('公開中にアカウントを変えられたら、返事を映さない', () => {
