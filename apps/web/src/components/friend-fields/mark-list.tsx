@@ -3,20 +3,24 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { GripVertical, LockKeyhole, Trash2 } from 'lucide-react'
-import type { SupportMark } from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
+import { api, ApiError, type SupportMarkArchiveImpact, type SupportMarkListItem } from '@/lib/api'
 import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ListKpis from '@/components/shared/list-kpis'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import { Th } from '@/components/shared/table'
 
-type MarkRow = SupportMark & { friendCount: number }
+type MarkRow = SupportMarkListItem
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
 function autoRuleLabel(mark: MarkRow): string {
-  return mark.automaticChangeLabel ?? (mark.autoOnInbound ? '受信時' : '—')
+  if (mark.automationRules.length > 0) return mark.automationRules.map((rule) => rule.name).join('・')
+  return mark.autoOnInbound ? '受信時' : '—'
+}
+
+const DISPLAY_TARGET_LABELS: Record<NonNullable<MarkRow['displayTargets']>[number], string> = {
+  inbox: '受信箱', friend_list: '友だち一覧', friend_detail: '友だち詳細', dashboard: 'ダッシュボード', broadcast: '一斉配信', automation: 'オートメーション',
 }
 
 /**
@@ -30,14 +34,15 @@ function autoRuleLabel(mark: MarkRow): string {
  * 言い切ると、消してよいマークだと読めてしまうので `—` を出す。
  */
 function usageLabel(mark: MarkRow): string {
-  if (mark.usedIn === undefined) return '—'
+  const display = mark.displayTargets?.map((target) => DISPLAY_TARGET_LABELS[target]) ?? []
+  const usedIn = mark.usedIn
   const parts: string[] = []
-  if (mark.usedIn.broadcasts) parts.push(`配信${mark.usedIn.broadcasts}件`)
-  if (mark.usedIn.scenarios) parts.push(`シナリオ${mark.usedIn.scenarios}件`)
-  if (mark.usedIn.autoReplies) parts.push(`自動応答${mark.usedIn.autoReplies}件`)
-  if (mark.usedIn.savedSearches) parts.push(`保存検索${mark.usedIn.savedSearches}件`)
-  if (mark.usedIn.automations) parts.push(`自動化${mark.usedIn.automations}件`)
-  return parts.length ? parts.join('・') : 'なし'
+  if (usedIn?.broadcasts) parts.push(`配信${usedIn.broadcasts}件`)
+  if (usedIn?.scenarios) parts.push(`シナリオ${usedIn.scenarios}件`)
+  if (usedIn?.autoReplies) parts.push(`自動応答${usedIn.autoReplies}件`)
+  if (usedIn?.savedSearches) parts.push(`保存検索${usedIn.savedSearches}件`)
+  if (usedIn?.automations) parts.push(`自動化${usedIn.automations}件`)
+  return [...display, ...parts].length ? [...display, ...parts].join('・') : mark.usedIn === undefined ? '—' : 'なし'
 }
 
 function referenceCount(mark: MarkRow): number {
@@ -50,6 +55,47 @@ function referenceCount(mark: MarkRow): number {
 
 function isUsed(mark: MarkRow): boolean {
   return mark.friendCount > 0 || referenceCount(mark) > 0
+}
+
+function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, saving, error, onReplacement, onCancel, onConfirm }: {
+  mark: MarkRow
+  impact: SupportMarkArchiveImpact | null
+  replacementMarkId: string
+  loading: boolean
+  saving: boolean
+  error: string
+  onReplacement: (id: string) => void
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  const dialogRef = useOverlayFocus(true, onCancel, saving)
+  const selected = impact?.replacementOptions.find((option) => option.id === replacementMarkId)
+  return (
+    <div ref={dialogRef} className="fixed inset-0 z-50 flex items-center justify-center bg-ink/45 p-4">
+      <section className="w-full max-w-2xl rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
+        <h2 className="text-xl font-bold text-ink">対応マーク「{mark.name}」を保管しますか？</h2>
+        <p className="mt-2 text-sm leading-6 text-ink-secondary">保管後は新しく選べません。いま付いている友だちは、選んだマークへ置き換えて履歴を残します。</p>
+        {loading ? <p className="mt-5 rounded-control bg-surface-soft p-4 text-sm text-ink-faint">影響を確認しています…</p> : impact ? (
+          <div className="mt-5 space-y-4">
+            <dl className="divide-y divide-hairline overflow-hidden rounded-control border border-hairline text-sm">
+              <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">置き換える友だち</dt><dd className="font-bold">{impact.friendCount}人</dd></div>
+              <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">自動変更ルール</dt><dd className="font-bold">{impact.automationRules.length}件</dd></div>
+              <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">表示先</dt><dd className="max-w-md text-right font-bold">{impact.displayTargets.map((target) => DISPLAY_TARGET_LABELS[target]).join('・')}</dd></div>
+            </dl>
+            <label className="block text-sm font-semibold text-ink">置き換え先
+              <select value={replacementMarkId} onChange={(event) => onReplacement(event.target.value)} className="v6-select mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal">
+                <option value="">選んでください</option>
+                {impact.replacementOptions.map((option) => <option key={option.id} value={option.id}>{option.name}{option.isDefault ? '（初期値）' : ''}</option>)}
+              </select>
+            </label>
+            {selected ? <p className="text-xs text-ink-faint">{impact.friendCount}人を「{selected.name}」へ置き換えます。</p> : null}
+          </div>
+        ) : null}
+        {error ? <p role="alert" className="mt-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
+        <div className="mt-6 flex justify-end gap-2"><Button onClick={onCancel} disabled={saving}>やめる</Button><button type="button" onClick={onConfirm} disabled={loading || saving || !impact?.canArchive || !replacementMarkId} className="rounded-control bg-danger px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">{saving ? '保管中…' : '置き換えて保管する'}</button></div>
+      </section>
+    </div>
+  )
 }
 
 /**
@@ -66,9 +112,11 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
   const [usage, setUsage] = useState<'all' | 'used' | 'unused'>('all')
   const [dragId, setDragId] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<MarkRow | null>(null)
+  const [archiveImpact, setArchiveImpact] = useState<SupportMarkArchiveImpact | null>(null)
+  const [replacementMarkId, setReplacementMarkId] = useState('')
+  const [impactLoading, setImpactLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
-  const defaultMark = items.find((item) => item.isDefault)
 
   const load = useCallback(async () => {
     if (!accountId) {
@@ -130,27 +178,37 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
     }
   }
 
+  const openArchive = async (mark: MarkRow) => {
+    if (!accountId) return
+    setPendingDelete(mark)
+    setArchiveImpact(null)
+    setReplacementMarkId('')
+    setDeleteError('')
+    setImpactLoading(true)
+    try {
+      const res = await api.supportMarks.archiveImpact(mark.id, accountId)
+      if (!res.success) throw new Error(res.error)
+      setArchiveImpact(res.data)
+      setReplacementMarkId(res.data.replacementOptions.find((option) => option.isDefault)?.id ?? res.data.replacementOptions[0]?.id ?? '')
+    } catch {
+      setDeleteError('保管の影響を確認できませんでした。画面を閉じて、もう一度お試しください。')
+    } finally { setImpactLoading(false) }
+  }
+
   const confirmRemove = async (mark: MarkRow) => {
-    if (!accountId || !defaultMark || deleting || referenceCount(mark) > 0) return
+    if (!accountId || !archiveImpact || !replacementMarkId || deleting) return
     setError('')
     setDeleteError('')
     setDeleting(true)
     try {
-      const res = await api.supportMarks.delete(mark.id, accountId, {
-        replacementMarkId: defaultMark.id,
-        expectedImpact: {
-          friendCount: mark.friendCount,
-          usedIn: {
-            broadcasts: mark.usedIn?.broadcasts ?? 0,
-            scenarios: mark.usedIn?.scenarios ?? 0,
-            autoReplies: mark.usedIn?.autoReplies ?? 0,
-            savedSearches: mark.usedIn?.savedSearches ?? 0,
-            automations: mark.usedIn?.automations ?? 0,
-          },
-        },
-      })
+      const res = await api.supportMarks.archive(mark.id, accountId, {
+        replacementMarkId,
+        impactRevision: archiveImpact.impactRevision,
+        expectedVersion: archiveImpact.expectedVersion,
+      }, crypto.randomUUID())
       if (!res.success) throw new Error(res.error)
       setPendingDelete(null)
+      setArchiveImpact(null)
       await load()
     } catch {
       setDeleteError('対応マークを保管できませんでした。状態を読み直してから、もう一度お試しください。')
@@ -235,7 +293,7 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
                   見出しを中身に合わせて「使用先」と書く。
                   「表示先」は口ができてから戻す（引き継ぎメモに記載）。
                 */}
-                <Th className="px-3 py-3">使用先</Th>
+                <Th className="px-3 py-3">表示先</Th>
                 <Th className="w-16 px-3 py-3">操作</Th>
               </tr>
             </thead>
@@ -268,7 +326,7 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
                     {mark.isDefault || mark.isInherited ? (
                       <span title={mark.isDefault ? '初期値のマークは保管できません' : '共有マークは編集後に保管できます'} className="inline-flex text-ink-faint"><LockKeyhole size={18} aria-label={mark.isDefault ? '初期値のため保管できません' : '共有マークのため保管できません'} /></span>
                     ) : (
-                      <button type="button" onClick={() => { setDeleteError(''); setPendingDelete(mark) }} aria-label={`${mark.name}を保管`} className="text-danger hover:opacity-70"><Trash2 size={18} /></button>
+                      <button type="button" onClick={() => void openArchive(mark)} aria-label={`${mark.name}を保管`} className="text-danger hover:opacity-70"><Trash2 size={18} /></button>
                     )}
                   </td>
                 </tr>
@@ -283,21 +341,7 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
         <p className="mt-1 text-xs leading-relaxed text-ink-faint">「受信時に変更」の設定は追加・編集画面で確認できます。保管時は影響人数と置き換え先を表示し、初期値は保管できません。</p>
       </section>
 
-      <ConfirmDialog
-        open={pendingDelete !== null}
-        title={`対応マーク「${pendingDelete?.name ?? ''}」を保管しますか？`}
-        description={pendingDelete && referenceCount(pendingDelete) > 0
-          ? `配信など${referenceCount(pendingDelete)}件で使われているため保管できません。先にすべての使用先から外してください。友だちのマークと設定は変更されません。`
-          : `${pendingDelete?.friendCount ?? 0}人の友だちは「${defaultMark?.name ?? '初期値'}」へ変更されます。マークは今後の選択肢から外れ、変更履歴は残ります。この操作は画面から元に戻せません。`}
-        confirmLabel="保管する"
-        destructive
-        busy={deleting}
-        error={deleteError}
-        onCancel={() => { if (!deleting) setPendingDelete(null) }}
-        onConfirm={defaultMark && pendingDelete && referenceCount(pendingDelete) === 0
-          ? () => { void confirmRemove(pendingDelete) }
-          : undefined}
-      />
+      {pendingDelete ? <ArchiveMarkDialog mark={pendingDelete} impact={archiveImpact} replacementMarkId={replacementMarkId} loading={impactLoading} saving={deleting} error={deleteError} onReplacement={setReplacementMarkId} onCancel={() => { if (!deleting) { setPendingDelete(null); setArchiveImpact(null) } }} onConfirm={() => void confirmRemove(pendingDelete)} /> : null}
     </div>
   )
 }

@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { GripVertical, Trash2 } from 'lucide-react'
 import type { SavedSearch, SavedSearchCondition, Tag } from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
+import { api, ApiError, type SavedSearchSummary } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -58,7 +59,9 @@ const USAGE_KIND_LABELS = {
  * 「この条件を保存」で増える。条件を組む画面を2つ持つと、必ず食い違う。
  */
 export default function SavedSearchList({ accountId }: { accountId: string | null }) {
+  const { selectedAccount } = useAccount()
   const [items, setItems] = useState<SavedSearch[]>([])
+  const [summary, setSummary] = useState<SavedSearchSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [error, setError] = useState('')
@@ -76,12 +79,13 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
     setLoadError('')
     setError('')
     setItems([])
+    setSummary(null)
     setTags([])
     setConditionLabels({})
     try {
       if (!accountId) return
       const [savedSearches, tagResult, markResult, scenarioResult, fieldResult] = await Promise.allSettled([
-        api.savedSearches.list(accountId),
+        api.savedSearches.list(accountId, { limit: 50 }),
         api.tags.list(),
         api.supportMarks.list(accountId),
         api.scenarios.list({ accountId }),
@@ -90,7 +94,8 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
       if (sequence !== loadSequence.current) return
       if (savedSearches.status === 'rejected') throw savedSearches.reason
       if (!savedSearches.value.success) throw new Error('保存した検索を読み込めませんでした')
-      setItems(savedSearches.value.data)
+      setItems(savedSearches.value.items)
+      setSummary(savedSearches.value.summary)
       if (tagResult.status === 'fulfilled' && tagResult.value.success) setTags(tagResult.value.data)
       setConditionLabels({
         marks: markResult.status === 'fulfilled' && markResult.value.success
@@ -132,7 +137,8 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
   }
 
   const ready = Boolean(accountId) && !loading && !loadError
-  const kpis = savedSearchKpiValues(items, ready)
+  const fallbackKpis = savedSearchKpiValues(items, ready)
+  const kpis = summary ?? fallbackKpis
   const visible = filterSavedSearches(items, query, usageFilter).filter((item) => {
     if (matchFilter === 'all' || item.matchCount === null || item.matchCount === undefined) return true
     return matchFilter === 'zero' ? item.matchCount === 0 : item.matchCount > 0
@@ -233,12 +239,12 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
           <table className="w-full table-fixed text-sm">
             <thead className="border-b border-hairline bg-canvas-sunken text-[11px] text-ink-faint">
               <TableHeadRow>
-                <Th className="w-1/6 px-3 py-3">条件名</Th>
+                <Th className="w-1/6 px-3 py-3">条件名 ／ 所有・範囲・参照・版</Th>
                 <Th className="w-1/4 px-3 py-3">条件の要約</Th>
                 <Th className="w-1/12 px-3 py-3">該当</Th>
                 <Th className="w-1/12 px-3 py-3">共有</Th>
                 <Th className="w-1/6 px-3 py-3">使用先</Th>
-                <Th className="w-1/6 px-3 py-3">作成者・日時</Th>
+                <Th className="w-1/6 px-3 py-3">更新者・日時</Th>
                 <Th className="w-1/12 px-3 py-3">操作</Th>
               </TableHeadRow>
             </thead>
@@ -280,6 +286,9 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                     </span>
                   )}
                   </div>
+                  <p className="mt-1 truncate text-[11px] text-ink-faint" title={`${search.isShared ? '全員' : '自分だけ'}・${selectedAccount?.name ?? search.lineAccountId ?? '対象未設定'}・ライブ参照・v${search.revision ?? 1}`}>
+                    {search.isShared ? '全員' : '自分だけ'}・{selectedAccount?.name ?? search.lineAccountId ?? '対象未設定'}・ライブ参照・v{search.revision ?? 1}
+                  </p>
                 </td>
                 <td className="px-3 py-3 align-top text-xs leading-5 text-ink-secondary">
                   {all.length > 0 ? <p title={all.join('・')}>{all.join('・')}・AND</p> : null}
@@ -299,8 +308,8 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                   {search.usedIn === undefined ? '—' : search.usedIn.length === 0 ? '未使用' : search.usedIn.map((usage) => `${USAGE_KIND_LABELS[usage.kind]}「${usage.name}」`).join('・')}
                 </td>
                 <td className="px-3 py-3 align-top text-xs text-ink">
-                  <p>{search.createdBy ?? '—'}</p>
-                  <p className="text-ink-faint">{new Date(search.createdAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                  <p>{search.updatedBy ?? search.createdBy ?? '—'}</p>
+                  <p className="text-ink-faint">{new Date(search.updatedAt ?? search.createdAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                 </td>
                 <td className="px-3 py-3 align-top">
                   <div className="flex items-center gap-2">
@@ -330,7 +339,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
       */}
       <p className="text-ink-faint mt-3 text-xs">
         {ready
-          ? `保存できるのは 50 件までです。${items.length} / 50 件。`
+          ? `保存できるのは 50 件までです。${summary?.total ?? items.length} / 50 件。`
           : '保存できるのは 50 件までです。いまの件数は読み込めていません。'}
       </p>
       <ConfirmDialog

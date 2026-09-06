@@ -47,6 +47,7 @@ export * from './rich-menus';
 export * from './affiliate-links';
 export * from './affiliate-offers';
 export * from './mileage';
+export * from './mileage-admin-v6';
 export * from './mileage-rewards';
 export * from './affiliate-attribution';
 export * from './affiliate-report';
