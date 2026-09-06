@@ -91,6 +91,22 @@ async function consumeOperationStepUp(c: Context<Env>): Promise<boolean> {
   });
 }
 
+async function queueOperationNotifications(
+  c: Context<Env>,
+  input: {
+    incidentId: string;
+    eventKind: 'stopped' | 'restored';
+    payload: Record<string, unknown>;
+  },
+): Promise<unknown> {
+  try {
+    return await enqueueOperationNotifications(c.env.DB, input);
+  } catch (error) {
+    console.error(`operation ${input.eventKind} notification enqueue error:`, error);
+    return { failed: ['line', 'email'] };
+  }
+}
+
 function staleHealth(run: Awaited<ReturnType<typeof getLatestOperationHealthRun>>) {
   const serverNow = new Date();
   const lastCheckedAt = run?.completedAt ?? run?.startedAt ?? null;
@@ -320,7 +336,12 @@ operations.post(
       const incident = await getOperationIncident(c.env.DB, previous.resourceId);
       if (!incident) return c.json({ success: false, error: '以前の実行結果を取得できませんでした' }, 500);
       const control = await getOperationControlSet(c.env.DB, incident.lineAccountId);
-      return c.json({ success: true, duplicate: true, data: { status: 'changed', control, incident } });
+      const notifications = await queueOperationNotifications(c, {
+        incidentId: incident.id,
+        eventKind: 'stopped',
+        payload: { lineAccountId: incident.lineAccountId, capabilities: incident.capabilities, reason: incident.reason, actorId },
+      });
+      return c.json({ success: true, duplicate: true, data: { status: 'changed', control, incident, notifications } });
     }
     if (!await consumeOperationStepUp(c)) {
       return c.json({ success: false, error: '重要操作の再認証が必要です' }, 401);
@@ -345,17 +366,11 @@ operations.post(
       await saveOperationRequestReceipt(c.env.DB, {
         action: 'stop', actorId, idempotencyKey, requestHash, resourceId: result.incident.id,
       });
-      let notifications: unknown;
-      try {
-        notifications = await enqueueOperationNotifications(c.env.DB, {
-          incidentId: result.incident.id,
-          eventKind: 'stopped',
-          payload: { lineAccountId: accountId, capabilities, reason: body.reason.trim(), actorId },
-        });
-      } catch (notificationError) {
-        console.error('operation stop notification enqueue error:', notificationError);
-        notifications = { failed: ['line', 'email'] };
-      }
+      const notifications = await queueOperationNotifications(c, {
+        incidentId: result.incident.id,
+        eventKind: 'stopped',
+        payload: { lineAccountId: accountId, capabilities, reason: body.reason.trim(), actorId },
+      });
       return c.json({ success: true, data: { ...result, notifications } }, 201);
     } catch (error) {
       console.error('POST /api/operations/incidents error:', error);
@@ -405,7 +420,12 @@ operations.post(
         const replayed = await getOperationIncident(c.env.DB, previous.resourceId);
         if (!replayed) return c.json({ success: false, error: '以前の実行結果を取得できませんでした' }, 500);
         const control = await getOperationControlSet(c.env.DB, replayed.lineAccountId);
-        return c.json({ success: true, duplicate: true, data: { status: 'changed', control, incident: replayed } });
+        const notifications = await queueOperationNotifications(c, {
+          incidentId: replayed.id,
+          eventKind: 'restored',
+          payload: { lineAccountId: replayed.lineAccountId, actorId },
+        });
+        return c.json({ success: true, duplicate: true, data: { status: 'changed', control, incident: replayed, notifications } });
       }
       if (!await consumeOperationStepUp(c)) {
         return c.json({ success: false, error: '重要操作の再認証が必要です' }, 401);
@@ -428,17 +448,11 @@ operations.post(
       await saveOperationRequestReceipt(c.env.DB, {
         action, actorId, idempotencyKey, requestHash, resourceId: result.incident.id,
       });
-      let notifications: unknown;
-      try {
-        notifications = await enqueueOperationNotifications(c.env.DB, {
-          incidentId: result.incident.id,
-          eventKind: 'restored',
-          payload: { lineAccountId: result.incident.lineAccountId, actorId },
-        });
-      } catch (notificationError) {
-        console.error('operation restore notification enqueue error:', notificationError);
-        notifications = { failed: ['line', 'email'] };
-      }
+      const notifications = await queueOperationNotifications(c, {
+        incidentId: result.incident.id,
+        eventKind: 'restored',
+        payload: { lineAccountId: result.incident.lineAccountId, actorId },
+      });
       return c.json({ success: true, data: { ...result, notifications } });
     } catch (error) {
       console.error('POST /api/operations/incidents/:id/restore error:', error);
