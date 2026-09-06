@@ -2896,9 +2896,9 @@ export const SCREENS = [
   {
     node: 'QT91v', feature: 33, name: '33-1 LINEアカウント一覧',
     dir: 'settings-v6', route: '/accounts', mode: 'page',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 S0 が第2周で1920px設計と1440/1920px実装を再撮影。構造一致・固定データ待ち。** 2幅とも横スクロール0。4指標、検索、5状態の絞り込み、20件表示、件数、7列表、並び順・親子変更と登録の操作位置を設計へそろえ、APIから届くarchive・既定・友だち数も表示する。現在の固定応答はstats・isDefault・archivedAtを持たない1アカウントだけなので、設計の6件、親子、停止、archive、Webhook異常、友だち数を同時に再現できない。**残件**：GET /api/line-accounts の画面確認用固定応答を複数状態・親子・stats付きにする。値は画面側で作らない。',
-    verdictSource: 'settings-v6/QT91v.txt', verdictHead: '4c5708ace',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 S0 が固定データ統合後に1440/1920pxを再撮影し一致。** 2幅とも横スクロール0。稼働3・停止1・アーカイブ2・接続問題1、友だち231/186/42人、既定・親子、4指標、検索、5状態の絞り込み、7列表をAPI値で再現した。並び順と親子の操作は既存の保存APIへ接続した。**設計画像なし**のため、Pencil書き出しの1920pxテキストと実装画像を目視比較し、位置・文言・状態の過不足がないことを確認した。',
+    verdictSource: 'settings-v6/QT91v.txt + settings-v6/QT91v-1440.png + settings-v6/QT91v-1920.png', verdictHead: '529b8d1825',
   },
   {
     node: 'b2NGxk', feature: 33, name: '33-2 LINEアカウントを登録する',
@@ -2910,16 +2910,16 @@ export const SCREENS = [
   {
     node: 'T9rA9', feature: 33, name: '33-3 LINEアカウントの詳細・編集',
     dir: 'settings-v6', route: '/accounts/detail?id=visual-qa-account', mode: 'page',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 S0 が第2周で1920px設計と1440/1920px実装を再撮影。構造一致・固定データ待ち。** 2幅とも横スクロール0。概要を主欄＋390相当の右欄へ戻し、アカウント情報、資格情報3種、4操作、Webhook突合、つながる先、注意を同じ順で配置した。末尾4文字・更新日はAPI値があると表示するが、現在の固定応答には値が無く、設計の友だち数・最後のテスト・最後の受信も再現できない。**残件**：GET /api/line-accounts/:id の固定応答へ資格情報の末尾/更新日、友だち数、接続確認日時を追加する。秘密値そのものは入れない。',
-    verdictSource: 'settings-v6/T9rA9.txt', verdictHead: '4c5708ace',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 S0 が固定データ統合後に1440/1920pxを再撮影し一致。** 2幅とも横スクロール0。登録内容、友だち231人、資格情報3種の末尾4文字・8/12更新、8/13の署名確認、8/19の最終受信、Webhook突合をAPI値で表示した。主欄と右欄、4操作、つながる先、注意の順も設計どおり。秘密値そのものは表示していない。**設計画像なし**のため、Pencil書き出しの1920pxテキストと実装画像を目視比較した。',
+    verdictSource: 'settings-v6/T9rA9.txt + settings-v6/T9rA9-1440.png + settings-v6/T9rA9-1920.png', verdictHead: '529b8d1825',
   },
   {
     node: 'nx3XW', feature: 33, name: '33-4 乗り換え・引き継ぎ',
     dir: 'settings-v6', route: '/accounts/handover?id=visual-qa-account', mode: 'page',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 S0 が第2周で1920px設計と1440/1920px実装を再撮影。構造一致・固定データ待ち。** 2幅とも横スクロール0。5段階を横並びにし、引き継ぎ元/先、プロバイダー注意、4区分、要確認表、下部操作、右欄のコード・安全案内を設計と同じ骨格へそろえた。現在のmockはGET /api/line-accounts/:id/handoversの契約データを返さないため、コード、受け取り先、186/23/18/4の照合数と候補行を作らず空表示にしている。**残件**：AccountHandoverと判断候補の固定応答を追加し、合計一致を確認してから実値を表示する。',
-    verdictSource: 'settings-v6/nx3XW.txt', verdictHead: '4c5708ace',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 S0 が固定データ統合後に1440/1920pxを再撮影し一致。** 2幅とも横スクロール0。実APIから引き継ぎコード、受け取り先、事前確認186/23/18/4、判断候補3行、残り20人を読み、4区分の合計231人が元人数と一致するときだけ表示する。5段階、プロバイダー注意、下部操作、右欄の戻せること・注意も設計どおり。**設計画像なし**のため、Pencil書き出しの1920pxテキストと実装画像を目視比較した。',
+    verdictSource: 'settings-v6/nx3XW.txt + settings-v6/nx3XW-1440.png + settings-v6/nx3XW-1920.png', verdictHead: '529b8d1825',
   },
 
   // ── 機能34 はじめの設定と案内（§7 #29） ──────────────────────────────

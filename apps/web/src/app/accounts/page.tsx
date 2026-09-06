@@ -11,6 +11,7 @@ import SummaryCard from '@/components/shared/summary-card'
 import StatusBadge from '@/components/shared/status-badge'
 import SearchField from '@/components/shared/search-field'
 import Breadcrumb from '@/components/shared/breadcrumb'
+import AccountOrdering from '@/components/accounts/account-ordering'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import {
   ACCOUNT_FILTERS,
@@ -41,6 +42,7 @@ export default function AccountsPage() {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<AccountFilter>('all')
+  const [orderingOpen, setOrderingOpen] = useState(false)
 
   const load = useCallback(async () => {
     setStatus('loading')
@@ -80,13 +82,16 @@ export default function AccountsPage() {
       <div data-design="Head" className="mb-4 flex min-h-10 flex-wrap items-center justify-between gap-3">
         <div>
           <Breadcrumb items={[{ label: 'LINEアカウント' }]} />
-          <h1 className="sr-only">LINEアカウント</h1>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" disabled>並び順と親子を変える</Button>
+          <Button type="button" onClick={() => setOrderingOpen((open) => !open)}>
+            {orderingOpen ? '並び順と親子を閉じる' : '並び順と親子を変える'}
+          </Button>
           <Button href="/accounts/new" variant="primary">＋ LINEアカウントを登録</Button>
         </div>
       </div>
+
+      {orderingOpen && <AccountOrdering />}
 
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <SummaryCard title="稼働中" value={activeCount} unit="" variant="v6"

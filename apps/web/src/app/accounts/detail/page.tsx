@@ -101,7 +101,6 @@ function AccountDetail() {
     <div data-design-node="T9rA9">
       <div data-design="Head" className="mb-4">
         <Breadcrumb items={[{ label: 'LINEアカウント', href: '/accounts' }, { label: account.name }]} />
-        <h1 className="sr-only">{account.name}</h1>
       </div>
 
       {/* タブは `?tab=` のまま。共有・再読込・戻るに強い（§2-2）。 */}
@@ -168,7 +167,7 @@ function AccountDetail() {
                 <InlineRow
                   label="シークレットの確認"
                   value={account.connection?.lastTestStatus === 'succeeded' && account.connection.lastTestAt
-                    ? `確かめました（${formatMonthDay(account.connection.lastTestAt)}の受信で署名が合いました）`
+                    ? `確かめました（${formatMonthDay(account.connection.lastTestAt)} の受信で署名が合いました）`
                     : '未取得'}
                   tone={account.connection?.lastTestStatus === 'succeeded' ? 'success' : 'muted'}
                 />
@@ -210,7 +209,7 @@ function AccountDetail() {
               <dl className="mt-4 space-y-3">
                 <InlineRow label="LINE側に登録したURL" value={webhook.label === '一致・利用中' ? 'このシステムと一致' : webhook.label} tone={webhook.tone === 'success' ? 'success' : 'muted'} />
                 <InlineRow label="Webhookの利用" value={account.webhook?.active === null || account.webhook?.active === undefined ? '確かめていません' : account.webhook.active ? 'オン' : 'オフ'} tone={account.webhook?.active ? 'success' : 'muted'} />
-                <InlineRow label="最後のテスト" value={account.connection?.lastTestAt ? `${formatMonthDayTime(account.connection.lastTestAt)}に${account.connection.lastTestStatus === 'succeeded' ? '成功' : '失敗'}` : '未取得'} tone={account.connection?.lastTestStatus === 'succeeded' ? 'success' : 'muted'} />
+                <InlineRow label="最後のテスト" value={account.connection?.lastTestAt ? `${formatMonthDayTime(account.connection.lastTestAt)} に${account.connection.lastTestStatus === 'succeeded' ? '成功' : '失敗'}` : '未取得'} tone={account.connection?.lastTestStatus === 'succeeded' ? 'success' : 'muted'} />
                 <InlineRow label="最後の受信" value={account.connection?.lastReceivedAt ? formatMonthDayTime(account.connection.lastReceivedAt) : '未取得'} />
               </dl>
               <p className="text-ink-secondary mt-3 break-all text-xs">{account.webhook?.actualUrl ?? '—'}</p>
@@ -221,11 +220,11 @@ function AccountDetail() {
 
             <section className="bg-canvas rounded-card border-hairline border p-5">
               <p className="text-ink text-sm font-bold">つながる先</p>
-              <ul className="text-ink-secondary mt-3 space-y-2 text-xs">
-                <li><Link className="text-action hover:underline" href="/">ダッシュボード</Link></li>
-                <li><Link className="text-action hover:underline" href="/staff">ログインユーザー</Link></li>
-                <li><Link className="text-action hover:underline" href="/emergency">運用状態</Link></li>
-                <li><Link className="text-action hover:underline" href="/friends">友だち</Link></li>
+              <ul className="text-ink-secondary mt-3 space-y-3 text-xs">
+                <li><Link className="text-action hover:underline" href="/">ダッシュボード</Link><p className="mt-1">友だち追加URLとQRはここに出ます。</p></li>
+                <li><Link className="text-action hover:underline" href="/staff">ログインユーザー</Link><p className="mt-1">人ごとの既定のアカウントはここで決めます。</p></li>
+                <li><Link className="text-action hover:underline" href="/emergency">運用状態</Link><p className="mt-1">接続の異常や停止は、ここで見張ります。</p></li>
+                <li><Link className="text-action hover:underline" href="/friends">友だち</Link><p className="mt-1">このアカウントの友だち{account.stats ? `${account.stats.friendCount.toLocaleString('ja-JP')}人` : 'は未取得'}はここに並びます。</p></li>
               </ul>
             </section>
 
@@ -322,6 +321,44 @@ function Row({ label, value }: { label: string; value: string }) {
   )
 }
 
+function formatMonthDay(value: string): string {
+  return new Intl.DateTimeFormat('ja-JP', {
+    month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo',
+  }).format(new Date(value))
+}
+
+function formatMonthDayTime(value: string): string {
+  return new Intl.DateTimeFormat('ja-JP', {
+    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo',
+  }).format(new Date(value))
+}
+
+function InlineRow({
+  label,
+  value,
+  tone = 'default',
+}: {
+  label: string
+  value: string
+  tone?: 'default' | 'success' | 'muted'
+}) {
+  return (
+    <div
+      className="grid min-w-0 gap-3 rounded-control px-3 py-2 odd:bg-canvas-sunken"
+      style={{ gridTemplateColumns: '9rem minmax(0, 1fr)' }}
+    >
+      <dt className="text-ink-faint text-xs">{label}</dt>
+      <dd className={tone === 'success'
+        ? 'text-success min-w-0 break-words text-sm font-medium'
+        : tone === 'muted'
+          ? 'text-ink-secondary min-w-0 break-words text-sm'
+          : 'text-ink min-w-0 break-words text-sm'}>
+        {value}
+      </dd>
+    </div>
+  )
+}
+
 function CredentialRow({
   label,
   configured,
@@ -333,18 +370,14 @@ function CredentialRow({
   last4: string | null
   updatedAt: string | null
 }) {
-  const date = updatedAt
-    ? new Intl.DateTimeFormat('ja-JP', { dateStyle: 'medium' }).format(new Date(updatedAt))
-    : '更新日は未取得'
-  return (
-    <div className="bg-canvas-sunken rounded-control p-3">
-      <dt className="text-ink-faint text-xs">{label}</dt>
-      <dd className="text-ink mt-1 text-sm font-medium">
-        {configured ? (last4 ? `•••• ${last4}` : credentialLabel(true)) : credentialLabel(false)}
-      </dd>
-      <dd className="text-ink-faint mt-1 text-xs">{date}</dd>
-    </div>
-  )
+  const value = configured
+    ? [
+      last4 || updatedAt ? '入っています' : credentialLabel(true),
+      last4 ? `末尾 ****${last4}` : null,
+      updatedAt ? `${formatMonthDay(updatedAt)} 更新` : '更新日は未取得',
+    ].filter(Boolean).join(' ・ ')
+    : credentialLabel(false)
+  return <InlineRow label={label} value={value} tone={configured ? 'success' : 'muted'} />
 }
 
 export default function AccountDetailPage() {
