@@ -2559,8 +2559,8 @@ export const SCREENS = [
   },
 
   // ── 機能29 イベント予約 ─────────────────────────────────
-  { ...EVENT, node: 'ugP5y', name: '29-1 イベント予約', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-06 Issue #242 / UI HEAD c31b32f90 を3105/8792で最終照合。構造一致・自動繰り上げの口待ち。** 一覧APIの固定データを接続し、状態タブ、4つの判断帯、検索、実働する並び順、イベントごとの中身・申込者導線を設計の位置へそろえた。1440・1920pxとも横スクロール0。自動のキャンセル待ち繰り上げはWorkerが未対応で、設計の青い自動化案内だけは事実として出せないため一致にはしない。', verdictSource: 'events-v6/ugP5y.txt + 2026-09-06 1440/1920px screenshots', verdictHead: 'c31b32f90' },
-  { ...EVENT, node: 'MKrPY', name: '29-1-A イベントをつくる', route: '/events/new', verdict: 'match', verdictNote: '**2026-09-06 Issue #242 / UI HEAD c31b32f90 を3105/8792で最終照合して一致。** 概要と同じ画面で最初の開催日・開始・所要時間・定員を入力し、イベント本体と予約枠を続けて保存する。右側に入力連動のLINEプレビュー、満席時のキャンセル待ち、承認制、前日通知を配置した。保存途中で枠だけ失敗してもイベントを重複作成しない。1440・1920pxとも横スクロール0。', verdictSource: 'events-v6/MKrPY.txt + 2026-09-06 1440/1920px screenshots', verdictHead: 'c31b32f90' },
+  { ...EVENT, node: 'ugP5y', name: '29-1 イベント予約', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-06 Issue #242 / PR #1015 / UI HEAD c31b32f90 を3105/8792で最終照合。構造一致・自動繰り上げの口待ち。** 一覧APIの固定データを接続し、状態タブ、4つの判断帯、検索、実働する並び順、イベントごとの中身・申込者導線を設計の位置へそろえた。1440・1920pxとも横スクロール0。自動のキャンセル待ち繰り上げはWorkerが未対応で、設計の青い自動化案内だけは事実として出せないため一致にはしない。', verdictSource: 'events-v6/ugP5y.txt + 2026-09-06 1440/1920px screenshots', verdictHead: 'c31b32f90' },
+  { ...EVENT, node: 'MKrPY', name: '29-1-A イベントをつくる', route: '/events/new', verdict: 'match', verdictNote: '**2026-09-06 Issue #242 / PR #1015 / UI HEAD c31b32f90 を3105/8792で最終照合して一致。** 概要と同じ画面で最初の開催日・開始・所要時間・定員を入力し、イベント本体と予約枠を続けて保存する。右側に入力連動のLINEプレビュー、満席時のキャンセル待ち、承認制、前日通知を配置した。保存途中で枠だけ失敗してもイベントを重複作成しない。1440・1920pxとも横スクロール0。', verdictSource: 'events-v6/MKrPY.txt + 2026-09-06 1440/1920px screenshots', verdictHead: 'c31b32f90' },
   {
     /*
       **#593 で拒否とキャンセルの窓が入った。**押し口は `data-qa-open` で
@@ -2576,12 +2576,12 @@ export const SCREENS = [
       /* 運営キャンセルは確定の行にしか出ないので、先に札を切り替える。 */
       { suffix: '-cancel', steps: [{ click: '確定', after: 800 }, { qaOpen: 'i5SN2j-cancel', after: 900 }] },
     ],
-    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-06 Issue #242 / UI HEAD c31b32f90 を3105/8792で最終照合。構造一致・一部データ待ち。** イベント名を上部へ反映し、申込者・申込日時・予約枠・ペット・来店情報・状態と操作を1行で比較できる表へ整理した。キャンセル待ち人数も専用APIへ接続し、通常・読込・空・失敗と運営キャンセルを1440・1920pxで確認、横スクロール0。日時欠落は Invalid Date にせず未取得と表示する。実Workerは同伴ペット・初回来店を返さないため一致にはしない。拒否ダイアログは画面側に実装済みだが、Claude所有の撮影固定データに requested 行が無く今回だけ撮影不可。', verdictSource: 'events-v6/i5SN2j-normal.txt + i5SN2j-cancel.txt + 2026-09-06 screenshots', verdictHead: 'c31b32f90',
+    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-06 Issue #242 / PR #1015 / UI HEAD c31b32f90 を3105/8792で最終照合。構造一致・一部データ待ち。** イベント名を上部へ反映し、申込者・申込日時・予約枠・ペット・来店情報・状態と操作を1行で比較できる表へ整理した。キャンセル待ち人数も専用APIへ接続し、通常・読込・空・失敗と運営キャンセルを1440・1920pxで確認、横スクロール0。日時欠落は Invalid Date にせず未取得と表示する。実Workerは同伴ペット・初回来店を返さないため一致にはしない。拒否ダイアログは画面側に実装済みだが、Claude所有の撮影固定データに requested 行が無く今回だけ撮影不可。', verdictSource: 'events-v6/i5SN2j-normal.txt + i5SN2j-cancel.txt + 2026-09-06 screenshots', verdictHead: 'c31b32f90',
   },
   {
     ...EVENT, node: 'k5m5Bc', name: '29-1-C 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/events/admin/events*', '**/api/events/admin/events/**'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'match', verdictNote: '**2026-09-06 Issue #242 / UI HEAD c31b32f90 を3105/8792で最終照合して一致。** 通常・読込・空・失敗を1440・1920pxで撮影し、全状態で横スクロール0。読込・失敗では4つの帯を — にし、空では数えて0と未取得を分けた。失敗時は空の作成誘導を出さず、再読込を案内する。内部語、Invalid Date、API error、Failed to fetchは0件。',
+    verdict: 'match', verdictNote: '**2026-09-06 Issue #242 / PR #1015 / UI HEAD c31b32f90 を3105/8792で最終照合して一致。** 通常・読込・空・失敗を1440・1920pxで撮影し、全状態で横スクロール0。読込・失敗では4つの帯を — にし、空では数えて0と未取得を分けた。失敗時は空の作成誘導を出さず、再読込を案内する。内部語、Invalid Date、API error、Failed to fetchは0件。',
     verdictSource: 'events-v6/k5m5Bc-error.txt + k5m5Bc-empty.txt', verdictHead: 'c31b32f90',
   },
 
