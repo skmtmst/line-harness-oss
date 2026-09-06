@@ -168,6 +168,16 @@ export interface FormEffectInput {
   pushText?: PushText;
 }
 
+export interface FormDestinationWriteStats {
+  attempted: number;
+  succeeded: number;
+  failed: number;
+}
+
+export interface FormEffectResult {
+  destinationWrites: FormDestinationWriteStats;
+}
+
 /**
  * 回答を配る。
  *
@@ -175,17 +185,24 @@ export interface FormEffectInput {
  * 全部落とすのが一番困る（タグは付いたのにシナリオが動かない、が
  * 分からなくなる）。
  */
-export async function applyFormLayoutEffects(input: FormEffectInput): Promise<void> {
+export async function applyFormLayoutEffects(input: FormEffectInput): Promise<FormEffectResult> {
   const { db, layout, friendId, answers } = input;
+  const destinationWrites: FormDestinationWriteStats = { attempted: 0, succeeded: 0, failed: 0 };
 
   for (const block of collectInputs(layout)) {
     const value = answers[block.name];
     if (value === undefined) continue;
 
-    await runSafely('destinations', () => writeDestinations(db, block, value, friendId));
+    await runSafely('destinations', () => writeDestinations(
+      db,
+      block,
+      value,
+      friendId,
+      destinationWrites,
+    ));
 
     if (hasChoices(block)) {
-      await runSafely('choices', () => runChoiceEffects(input, block, value));
+      await runSafely('choices', () => runChoiceEffects(input, block, value, destinationWrites));
     }
 
     if (block.type === 'date' && block.reminder?.reminderId) {
@@ -200,8 +217,10 @@ export async function applyFormLayoutEffects(input: FormEffectInput): Promise<vo
   }
 
   for (const action of layout.options?.afterActions ?? []) {
-    await runSafely('afterAction', () => runFormAction(input, action));
+    await runSafely('afterAction', () => runFormAction(input, action, destinationWrites));
   }
+
+  return { destinationWrites };
 }
 
 async function runSafely(label: string, run: () => Promise<unknown>): Promise<void> {
@@ -223,19 +242,23 @@ async function writeDestinations(
   block: FormInputBlock,
   value: unknown,
   friendId: string,
+  stats: FormDestinationWriteStats,
 ): Promise<void> {
   const dest = block.destinations;
   if (!dest) return;
   const text = toText(value);
 
   for (const fieldId of dest.friendFieldIds ?? []) {
-    const target = await getFriendFieldById(db, fieldId);
-    if (!target || target.ec_is_master === 1) continue;
-    await setFriendFieldValue(db, {
-      friendId,
-      fieldId,
-      value: text === '' ? null : text,
-      updatedBy: 'form',
+    await trackDestinationWrite(stats, 1, async () => {
+      const target = await getFriendFieldById(db, fieldId);
+      if (!target || target.ec_is_master === 1) return false;
+      await setFriendFieldValue(db, {
+        friendId,
+        fieldId,
+        value: text === '' ? null : text,
+        updatedBy: 'form',
+      });
+      return true;
     });
   }
 
@@ -255,10 +278,28 @@ async function writeDestinations(
   }
   if (columns.length === 0 || text === '') return;
 
-  await db
-    .prepare(`UPDATE friends SET ${columns.join(', ')}, updated_at = ? WHERE id = ?`)
-    .bind(...values, jstNow(), friendId)
-    .run();
+  await trackDestinationWrite(stats, columns.length, async () => {
+    await db
+      .prepare(`UPDATE friends SET ${columns.join(', ')}, updated_at = ? WHERE id = ?`)
+      .bind(...values, jstNow(), friendId)
+      .run();
+    return true;
+  });
+}
+
+async function trackDestinationWrite(
+  stats: FormDestinationWriteStats,
+  count: number,
+  write: () => Promise<boolean>,
+): Promise<void> {
+  stats.attempted += count;
+  try {
+    if (await write()) stats.succeeded += count;
+    else stats.failed += count;
+  } catch (error) {
+    stats.failed += count;
+    console.error('form destination write failed:', error);
+  }
 }
 
 /** 選ばれた選択肢の動作を実行する。 */
@@ -266,6 +307,7 @@ async function runChoiceEffects(
   input: FormEffectInput,
   block: FormInputBlock,
   value: unknown,
+  stats: FormDestinationWriteStats,
 ): Promise<void> {
   const selected = toLabels(value);
   if (selected.length === 0) return;
@@ -277,11 +319,11 @@ async function runChoiceEffects(
         await applyChoiceTag(input, choice);
         break;
       case 'friendField':
-        await applyChoiceFriendField(input, block, choice);
+        await applyChoiceFriendField(input, block, choice, stats);
         break;
       case 'action':
         for (const action of choice.actions ?? []) {
-          await runSafely('choiceAction', () => runFormAction(input, action));
+          await runSafely('choiceAction', () => runFormAction(input, action, stats));
         }
         break;
       default:
@@ -307,18 +349,22 @@ async function applyChoiceFriendField(
   input: FormEffectInput,
   block: FormInputBlock,
   choice: FormChoice,
+  stats: FormDestinationWriteStats,
 ): Promise<void> {
   const fieldId = block.choiceFriendFieldId;
   if (!fieldId) return;
-  const target = await getFriendFieldById(input.db, fieldId);
-  if (!target || target.ec_is_master === 1) return;
-  // 値を書いていない選択肢は、ラベルをそのまま入れる
-  const value = choice.value && choice.value !== '' ? choice.value : choice.label;
-  await setFriendFieldValue(input.db, {
-    friendId: input.friendId,
-    fieldId,
-    value,
-    updatedBy: 'form',
+  await trackDestinationWrite(stats, 1, async () => {
+    const target = await getFriendFieldById(input.db, fieldId);
+    if (!target || target.ec_is_master === 1) return false;
+    // 値を書いていない選択肢は、ラベルをそのまま入れる
+    const value = choice.value && choice.value !== '' ? choice.value : choice.label;
+    await setFriendFieldValue(input.db, {
+      friendId: input.friendId,
+      fieldId,
+      value,
+      updatedBy: 'form',
+    });
+    return true;
   });
 }
 
@@ -326,6 +372,7 @@ async function applyChoiceFriendField(
 export async function runFormAction(
   input: FormEffectInput,
   action: FormAction,
+  destinationWrites?: FormDestinationWriteStats,
 ): Promise<void> {
   const { db, friendId } = input;
 
@@ -367,14 +414,19 @@ export async function runFormAction(
 
     case 'friend_field': {
       if (!action.fieldId) return;
-      const target = await getFriendFieldById(db, action.fieldId);
-      if (!target || target.ec_is_master === 1) return;
-      await setFriendFieldValue(db, {
-        friendId,
-        fieldId: action.fieldId,
-        value: action.value ?? '',
-        updatedBy: 'form',
-      });
+      const write = async () => {
+        const target = await getFriendFieldById(db, action.fieldId!);
+        if (!target || target.ec_is_master === 1) return false;
+        await setFriendFieldValue(db, {
+          friendId,
+          fieldId: action.fieldId!,
+          value: action.value ?? '',
+          updatedBy: 'form',
+        });
+        return true;
+      };
+      if (destinationWrites) await trackDestinationWrite(destinationWrites, 1, write);
+      else await write();
       return;
     }
 
