@@ -4,6 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const OVERVIEWS = fs.readFileSync(path.join(__dirname, 'webhook-overviews.tsx'), 'utf8')
 
 /** 注釈を落とす。「なぜ直したか」を書いた文が、直したはずの字面に当たるのを避ける。 */
 function code(src: string): string {
@@ -13,7 +14,7 @@ function code(src: string): string {
     .replace(/^\s*\/\/.*$/gm, '')
 }
 
-const CODE = code(PAGE)
+const CODE = code(`${PAGE}\n${OVERVIEWS}`)
 
 /**
  * 設計 `M0Gb7` は「予約サービス」「アンケートツール」のような**見本を選んで作る道**を持つ。
@@ -52,6 +53,6 @@ describe('外部連携の「どこから来るか」は、見本から選べる'
 
   it('未設定を半角ハイフンで書かない', () => {
     expect(CODE, "'-' のまま出している").not.toContain("wh.sourceType || '-'")
-    expect(CODE).toContain("if (!value) return '—'")
+    expect(CODE).toContain("?? value ?? '送信元未設定'")
   })
 })

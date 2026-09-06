@@ -3,6 +3,7 @@ export { DEFAULT_TENANT_ID } from '@line-crm/shared';
 export * from './credential-crypto';
 export * from './friends';
 export * from './tags';
+export * from './tag-definitions';
 export * from './scenarios';
 export * from './scenario-schedule';
 export * from './scenario-delivery-timestamps';
