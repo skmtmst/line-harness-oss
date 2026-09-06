@@ -2232,7 +2232,7 @@ export const SCREENS = [
     route: '/ec-commerce?tab=subscriptions',
     states: { apis: ['**/api/ec-commerce/subscriptions?**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     verdict: 'unjudged',
-    verdictNote: '**2026-09-06 #258 で実装。設計画像なし。** `nen_ec_member_snapshots` の定期便契約をLINEアカウントで絞って表示し、通常・読込・空・失敗・権限不足を分けた。取得できない月別集計は0件にせず「—／未取得」。支払い確認はECの決済状態だけを根拠にし、将来止めるという予測はしていない。設計画像が無いため、同じ幅の画像比較は未判定。',
+    verdictNote: '**2026-09-06 #258 で実装・撮影。設計画像なし。** `nen_ec_member_snapshots` の定期便契約をLINEアカウントで絞って表示し、通常・読込・空・失敗・権限不足を分けた。取得できない月別集計は0件にせず「—／未取得」。支払い確認はECの決済状態だけを根拠にし、将来止めるという予測はしていない。5状態を1440・1920pxで撮影し、全12枚で横はみ出し0、壊れ値0。設計画像が無いため、同じ幅の画像比較は未判定。',
     verdictSource: 'ec-v6/bfB50.txt + ec-v6/bfB50-normal-1920.png',
   },
   {
@@ -2240,7 +2240,7 @@ export const SCREENS = [
     route: '/ec-commerce?tab=connector',
     states: { apis: ['**/api/ec-commerce/connector?**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     verdict: 'unjudged',
-    verdictNote: '**2026-09-06 #258 で実装。設計画像なし。** LINEアカウントごとにECの種類・ドメイン・取り込む出来事・会員照合ルールを保存できる。鍵は暗号文と末尾4文字だけを保存し、画面へ値を返さない。通常・読込・空・失敗・権限不足を分け、取得できない影響件数は「— 未取得」。設計画像が無いため、同じ幅の画像比較は未判定。',
+    verdictNote: '**2026-09-06 #258 で実装・撮影。設計画像なし。** LINEアカウントごとにECの種類・ドメイン・取り込む出来事・会員照合ルールを保存できる。鍵は暗号文と末尾4文字だけを保存し、画面へ値を返さない。通常・読込・空・失敗・権限不足を分け、取得できない影響件数は「— 未取得」。5状態を1440・1920pxで撮影し、全12枚で横はみ出し0、壊れ値・秘密値露出0。設計画像が無いため、同じ幅の画像比較は未判定。',
     verdictSource: 'ec-v6/oHAN4.txt + ec-v6/oHAN4-normal-1920.png',
   },
 
@@ -3957,6 +3957,7 @@ export const CAPTURED_AT = {
   23: [
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['eI3gs'], note: '同上' },
     { pr: 600, head: '484c0cd8', on: '2026-08-31', screens: ['ELayY'], note: '同じ候補部品・状態部品・判定窓を使うECのほう。再処理の既定は「今後だけ」' },
+    { pr: 0, head: 'f7623915e', on: '2026-09-06', screens: ['bfB50', 'oHAN4'], note: 'Issue #258。定期便とつなぎ先を実APIへ接続し、通常・読込・空・失敗・権限不足の全24枚を1440・1920pxで撮影。全画像で横はみ出し0、壊れ値・秘密値露出0。設計画像なしのため本文照合で未判定。' },
   ],
   9: [
     { pr: 962, head: '9b8f7451', on: '2026-09-06', screens: ['uLQQc', 's9gAx', 'W1wzCa', 'K0Dbr2', 'txMO9', 'U3SI5', 'Q3qP1r'], note: 'Issue #211。割当ポート3104/8791で7画面を1440・1920px再撮影し、設計画像または同Nodeの設計本文と再照合。7画面の要修正判定を具体化し、横はみ出し0を確認' },

@@ -30,7 +30,10 @@ shared-button-importer app/contents/vars/new/page.tsx
 shared-button-importer app/contents/vars/page.tsx
 shared-button-importer app/conversions/page.tsx
 shared-button-importer app/duplicates/page.tsx
+shared-button-importer app/ec-commerce/connector-panel.tsx
 shared-button-importer app/ec-commerce/identity-candidates/page.tsx
+shared-button-importer app/ec-commerce/page.tsx
+shared-button-importer app/ec-commerce/subscriptions-panel.tsx
 shared-button-importer app/events/bookings/page.tsx
 shared-button-importer app/events/page.tsx
 shared-button-importer app/form-submissions/edit/form-design-settings.tsx

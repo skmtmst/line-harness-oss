@@ -1,15 +1,15 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 241,
-  "unimplemented": 6,
+  "compared": 243,
+  "unimplemented": 4,
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 25,
   "match": 66,
   "structureMatchDataPending": 50,
   "needsFix": 143,
-  "unjudged": 3,
+  "unjudged": 5,
   "remaining": 202,
   "features": [
     {
@@ -2240,15 +2240,15 @@
       "feature": 23,
       "name": "EC連携",
       "total": 4,
-      "compared": 2,
-      "unimplemented": 2,
+      "compared": 4,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
       "needsFix": 2,
-      "unjudged": 0,
+      "unjudged": 2,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2268,6 +2268,16 @@
             "ELayY"
           ],
           "note": "同じ候補部品・状態部品・判定窓を使うECのほう。再処理の既定は「今後だけ」"
+        },
+        {
+          "pr": 0,
+          "head": "f7623915e",
+          "on": "2026-09-06",
+          "screens": [
+            "bfB50",
+            "oHAN4"
+          ],
+          "note": "Issue #258。定期便とつなぎ先を実APIへ接続し、通常・読込・空・失敗・権限不足の全24枚を1440・1920pxで撮影。全画像で横はみ出し0、壊れ値・秘密値露出0。設計画像なしのため本文照合で未判定。"
         }
       ]
     },
@@ -2781,20 +2791,6 @@
       "name": "22-1-C 出しているもの",
       "gap": "api",
       "gapNote": "通した写真と掲載先（リッチメニュー・コラム・サイト）を結ぶ記録が要る"
-    },
-    {
-      "feature": 23,
-      "node": "bfB50",
-      "name": "23-1-B 定期便",
-      "gap": "api",
-      "gapNote": "Stripe定期便本体の接続。実装に「接続後に有効化します」と明記"
-    },
-    {
-      "feature": 23,
-      "node": "oHAN4",
-      "name": "23-1-C EC連携のつなぎ先",
-      "gap": "api",
-      "gapNote": "つなぎ先と突合キーを画面から変える口が要る。実装に「口が無い」と明記"
     },
     {
       "feature": 25,
