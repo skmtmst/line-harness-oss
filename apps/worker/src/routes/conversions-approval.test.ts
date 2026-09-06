@@ -24,6 +24,13 @@ const dbMocks = {
   setConversionApproval: vi.fn(),
   getConversionApprovalNotifyInfo: vi.fn(),
   syncAffiliateConversionMileage: vi.fn().mockResolvedValue(undefined),
+  listConversionDefinitions: vi.fn(),
+  getConversionDefinitionDetail: vi.fn(),
+  addConversionDefinitionUsage: vi.fn(),
+  getConversionDefinitionReport: vi.fn(),
+  listConversionDefinitionsForExport: vi.fn(),
+  ConversionDefinitionError: class ConversionDefinitionError extends Error {},
+  CONVERSION_DEFINITION_USAGE_KINDS: [],
 };
 vi.mock('@line-crm/db', () => dbMocks);
 

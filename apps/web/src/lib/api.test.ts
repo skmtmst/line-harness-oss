@@ -137,6 +137,45 @@ describe('api.autoReplies の V6 集計・下書き契約', () => {
   })
 })
 
+describe('api.commonVars の詳細・差し替え契約', () => {
+  it('選択中のアカウント、版、確認時の使用先世代を各APIへ渡す', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: {} }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await api.commonVars.detail('var/1', 'account/a')
+    await api.commonVars.impactPreview('var/1', 'account/a', '新しい値', 3)
+    await api.commonVars.replacementCandidates('var/1', 'account/a')
+    await api.commonVars.replacementImpact('var/1', 'account/a', 'var/2')
+    await api.commonVars.replace('var/1', 'account/a', {
+      replacementId: 'var/2',
+      expectedVersion: 3,
+      expectedRevision: 'revision-1',
+    })
+
+    expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
+      'https://worker.example.com/api/common-vars/var/1?accountId=account%2Fa',
+      'https://worker.example.com/api/common-vars/var/1/impact-preview',
+      'https://worker.example.com/api/common-vars/var/1/replace',
+      'https://worker.example.com/api/common-vars/var/1/replace',
+      'https://worker.example.com/api/common-vars/var/1/replace',
+    ])
+    expect(JSON.parse(String(fetchSpy.mock.calls[1]?.[1]?.body))).toEqual({
+      accountId: 'account/a', nextValue: '新しい値', expectedVersion: 3,
+    })
+    expect(JSON.parse(String(fetchSpy.mock.calls[2]?.[1]?.body))).toEqual({ accountId: 'account/a' })
+    expect(JSON.parse(String(fetchSpy.mock.calls[3]?.[1]?.body))).toEqual({
+      accountId: 'account/a', replacementId: 'var/2',
+    })
+    expect(JSON.parse(String(fetchSpy.mock.calls[4]?.[1]?.body))).toEqual({
+      accountId: 'account/a', replacementId: 'var/2', expectedVersion: 3,
+      expectedRevision: 'revision-1', apply: true,
+    })
+  })
+})
+
 describe('api.nenCampaigns.createColumn', () => {
   it('sends only the selected account query and the public create fields', async () => {
     const fetchSpy = vi.fn(async () => new Response(
@@ -167,6 +206,36 @@ describe('api.nenCampaigns.createColumn', () => {
       articleUrl: 'https://example.com/columns/guide',
       imageUrl: null,
       publishedAt: null,
+    })
+  })
+})
+
+describe('api.nenCampaigns metrics', () => {
+  it('reads every NEN metric from the selected account and sends retry version and reason', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: {} }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await api.nenCampaigns.flowMetrics('account/a')
+    await api.nenCampaigns.columnMetrics('account/a')
+    await api.nenCampaigns.petMetrics('account/a')
+    await api.nenCampaigns.deliveries('account/a', { status: 'failed', cursor: '50' })
+    await api.nenCampaigns.delivery('delivery/a', 'account/a')
+    await api.nenCampaigns.retryDelivery('delivery/a', { lineAccountId: 'account/a', expectedVersion: 3, reason: '送信先を確認済み' })
+
+    expect(fetchSpy.mock.calls.map((call) => call[0])).toEqual([
+      'https://worker.example.com/api/nen-campaigns/metrics/flows?lineAccountId=account%2Fa&days=30',
+      'https://worker.example.com/api/nen-campaigns/metrics/columns?lineAccountId=account%2Fa&days=30',
+      'https://worker.example.com/api/nen-campaigns/metrics/pets?lineAccountId=account%2Fa&days=30',
+      'https://worker.example.com/api/nen-campaigns/deliveries?lineAccountId=account%2Fa&days=30&limit=50&status=failed&cursor=50',
+      'https://worker.example.com/api/nen-campaigns/deliveries/delivery%2Fa?lineAccountId=account%2Fa',
+      'https://worker.example.com/api/nen-campaigns/deliveries/delivery%2Fa/retry',
+    ])
+    expect(fetchSpy.mock.calls[5]?.[1]).toMatchObject({
+      method: 'POST',
+      body: JSON.stringify({ lineAccountId: 'account/a', expectedVersion: 3, reason: '送信先を確認済み' }),
     })
   })
 })

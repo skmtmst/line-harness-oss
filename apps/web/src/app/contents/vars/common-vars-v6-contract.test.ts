@@ -28,6 +28,22 @@ describe('V6共通情報一覧', () => {
     expect(PAGE).not.toContain('api.commonVars.schedules(item.id)')
   })
 
+  it('編集画面は詳細APIからメモ・版・履歴を読み、楽観ロック付きで保存する', () => {
+    expect(EDIT_PAGE).toContain('api.commonVars.detail(id, accountAtRequest)')
+    expect(EDIT_PAGE).toContain('setMemo(found.memo)')
+    expect(EDIT_PAGE).toContain('item.history.slice(0, 5)')
+    expect(EDIT_PAGE).toContain('expectedVersion: item.version')
+    expect(EDIT_PAGE).not.toContain('メモを読み書きするAPIがまだありません')
+    expect(EDIT_PAGE).not.toContain('変更者と変更前後を返す履歴APIがまだありません')
+  })
+
+  it('独立した詳細・フォルダ・予約の読み込みは並列に行う', () => {
+    expect(EDIT_PAGE).toContain('const [detail, folderList, scheduleList] = await Promise.all([')
+    expect(EDIT_PAGE).toContain('api.commonVars.detail(id, accountAtRequest)')
+    expect(EDIT_PAGE).toContain("api.folders.list('common_var')")
+    expect(EDIT_PAGE).toContain('api.commonVars.schedules(id, accountAtRequest)')
+  })
+
   it('一覧は種別を出さず、WuKzUの6列を固定する', () => {
     const headings = [...PAGE.matchAll(/<Th[^>]*>([\s\S]*?)<\/Th>/g)]
       .map((match) => match[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim())
