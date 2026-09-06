@@ -2432,7 +2432,7 @@ export const SCREENS = [
     */
     steps: [
       { click: '一覧' },
-      { click: '高橋 直人', role: 'cell' },
+      { click: '詳細', nth: 0 },
     ],
     verdictHead: '7b509106',
   },
