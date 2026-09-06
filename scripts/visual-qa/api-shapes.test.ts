@@ -15,6 +15,8 @@ import { IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE
 import { MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR } from './fixtures.mjs';
 // @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
 import { DUPLICATE_STATS, USERS_GROUPED } from './fixtures.mjs';
+// @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
+import { AUTOMATIONS, AUTOMATION_TEMPLATES, COMMON_ACTION_DETAIL } from './fixtures.mjs';
 
 describe('画面確認モックの口の形', () => {
   const paths: Set<string> = readArrayGetPaths();
@@ -59,6 +61,21 @@ describe('画面確認モックの口の形', () => {
     // 静かに0件になると、全部の口が `{items:[],total:0}` に落ちて
     // 全画面が真っ白になる。原因はどこにも出ない。
     expect(() => readArrayGetPaths('// api.ts が読めなかった場合')).toThrow(/配列の口/);
+  });
+});
+
+describe('オートメーションの画面確認データ', () => {
+  it('設計と同じ稼働14本・停止4本・見本12件を返す', () => {
+    expect(AUTOMATIONS.filter((item: { isActive: boolean }) => item.isActive)).toHaveLength(14);
+    expect(AUTOMATIONS.filter((item: { isActive: boolean }) => !item.isActive)).toHaveLength(4);
+    expect(AUTOMATION_TEMPLATES).toHaveLength(12);
+  });
+
+  it('共通アクションの公開4版と5つの利用先を同じ契約で返す', () => {
+    expect(COMMON_ACTION_DETAIL.currentPublishedVersionId).toBe('cav-4');
+    expect(COMMON_ACTION_DETAIL.versions).toHaveLength(4);
+    expect(COMMON_ACTION_DETAIL.bindings).toHaveLength(5);
+    expect(COMMON_ACTION_DETAIL.bindings.filter((item: { hasNewerVersion: boolean }) => item.hasNewerVersion)).toHaveLength(1);
   });
 });
 
