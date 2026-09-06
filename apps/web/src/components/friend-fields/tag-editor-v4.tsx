@@ -175,8 +175,7 @@ function ActionDrawer({ accountId, onClose, onAdd, referenceState = false }: { a
     const label = selected[0] === 'テキスト送信' ? message.trim()
       : selected[0] === 'マイル付与' ? `${Math.max(1, Number(amount) || 1)} mile`
         : resourceName ?? selected[0]
-    const id = crypto.randomUUID()
-    onAdd({ id, type: selected[1], label, timing: timing === 'immediate' ? 'すぐに' : `${delay}${delayUnit === 'minutes' ? '分' : delayUnit === 'hours' ? '時間' : '日'}後`, definition: { id, type: definition.actionType, params, onFailure: 'stop' } })
+    onAdd({ id: crypto.randomUUID(), type: selected[1], label, timing: timing === 'immediate' ? 'すぐに' : `${delay}${delayUnit === 'minutes' ? '分' : delayUnit === 'hours' ? '時間' : '日'}後`, definition: { id: crypto.randomUUID(), type: definition.actionType, params, onFailure: 'stop' } })
   }
 
   return (
@@ -241,7 +240,7 @@ function ActionDrawer({ accountId, onClose, onAdd, referenceState = false }: { a
             ) : selected[0] === 'マイル付与' ? (
               <input type="number" min={1} value={amount} onChange={(event) => setAmount(event.target.value)} className={inputClass} aria-label="付与マイル" />
             ) : (
-              <><select value={resourceId} onChange={(event) => setResourceId(event.target.value)} disabled={unavailable || !resources} className={inputClass}><option value="">{unavailable ? 'この種類は接続準備中です' : resources ? `${selected[1]}を選択` : '選択肢を読み込み中…'}</option>{choices.map((choice) => <option key={choice.id} value={choice.id}>{choice.name}</option>)}</select>{referenceState && selected[0] === 'テンプレート送信' && <div className="mt-3 rounded-control bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary"><span className="font-semibold">プレビュー</span><br />選んだテンプレートの公開版を送ります。</div>}</>
+              <><select value={resourceId} onChange={(event) => setResourceId(event.target.value)} disabled={unavailable || !resources} className="w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"><option value="">{unavailable ? 'この種類はまだ選べません' : resources ? `${selected[1]}を選択` : '選択肢を読み込み中…'}</option>{choices.map((choice) => <option key={choice.id} value={choice.id}>{choice.name}</option>)}</select>{referenceState && selected[0] === 'テンプレート送信' && <div className="mt-3 rounded-control bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary"><span className="font-semibold">プレビュー</span><br />選んだテンプレートの公開版を送ります。</div>}</>
             )}
             <div className="mt-3 rounded-control border border-hairline bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary">
               <span className="font-semibold">実行内容の確認：</span> {selected[0]}を{timing === 'immediate' ? 'すぐに' : `${delay}${delayUnit === 'minutes' ? '分' : delayUnit === 'hours' ? '時間' : '日'}後に`}実行します。

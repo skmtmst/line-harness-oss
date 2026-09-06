@@ -52,11 +52,15 @@ export default function EditTagPageV4() {
     if (!tagId || !selectedAccountId) { setLoading(false); return }
     setLoading(true)
     try {
-      const [detail, folders] = await Promise.all([api.tags.definition(tagId, selectedAccountId), api.tagGroups.list()])
+      const [detail, dependencies, folders] = await Promise.all([
+        api.tags.definition(tagId, selectedAccountId),
+        api.tags.dependencies(tagId, selectedAccountId),
+        api.tagGroups.list(),
+      ])
       if (folders.success) setGroups(folders.data)
       if (!detail.success) throw new Error(detail.error)
       setDefinition(detail.data)
-      setTag(detail.data.tag)
+      setTag({ ...detail.data.tag, friendCount: dependencies.success ? dependencies.data.friendCount : detail.data.tag.friendCount })
     } catch {
       setError('読み込みに失敗しました')
     } finally {
