@@ -99,6 +99,13 @@ describe('V6共通アクションAPI', () => {
       });
       expect(response.status).toBe(201);
     }
+    testDb.raw.prepare(
+      `UPDATE common_actions
+          SET updated_at = CASE name
+            WHEN '先に作成' THEN '2026-09-07T00:00:00.000Z'
+            ELSE '2026-09-07T00:01:00.000Z'
+          END`,
+    ).run();
     const page = await adminApp.request('/api/common-actions?account_id=account-1&limit=1&offset=1');
     expect(page.status).toBe(200);
     await expect(page.json()).resolves.toMatchObject({
