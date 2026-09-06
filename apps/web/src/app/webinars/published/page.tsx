@@ -11,6 +11,35 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 
+type PublishedWebinar = Webinar & {
+  publicationState?: 'period' | 'always' | 'scheduled' | 'ended' | 'unset' | null
+  publicationStartsAt?: string | null
+  publicationEndsAt?: string | null
+}
+
+function publicationWindow(webinar: PublishedWebinar): string {
+  if (webinar.publicationState === 'always') return '常時公開'
+  if (webinar.publicationState === 'ended') return '公開終了'
+  if (webinar.publicationState === 'unset') return '未設定'
+  const format = (value: string | null | undefined, withTime = false) => {
+    if (!value) return null
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return null
+    const dateText = date.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' })
+    if (!withTime) return dateText
+    const time = date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Tokyo' })
+    return `${dateText} ${time}`
+  }
+  if (webinar.publicationState === 'scheduled') return format(webinar.publicationStartsAt, true) ?? '—'
+  if (webinar.publicationState === 'period') {
+    const start = format(webinar.publicationStartsAt)
+    const end = format(webinar.publicationEndsAt)
+    if (start && end) return `${start}〜${end}`
+  }
+  const dailyTime = webinar.schedule.find((rule) => rule.type === 'daily')?.time
+  return dailyTime ? `毎日 ${dailyTime}` : '—（公開期間は未接続）'
+}
+
 function PublishedWebinarContent() {
   usePageTitle('ウェビナー・公開完了')
   const id = useSearchParams().get('id')
@@ -74,9 +103,7 @@ function PublishedWebinarContent() {
   const publicUrl = webinarAccount?.liffId
     ? `https://liff.line.me/${encodeURIComponent(webinarAccount.liffId)}/webinar/${encodeURIComponent(webinar.slug)}`
     : null
-  const measured = webinar as Webinar & { registrations?: number; publicPeriod?: string }
-  const dailyTime = webinar.schedule.find((rule) => rule.type === 'daily')?.time
-  const publicPeriod = measured.publicPeriod ?? (dailyTime ? `毎日 ${dailyTime}` : '—（公開期間は未接続）')
+  const publicPeriod = publicationWindow(webinar as PublishedWebinar)
 
   return (
     <main data-design-node="TimXl" className="mx-auto max-w-[1600px] space-y-4 px-6 pb-12 pt-4">

@@ -62,7 +62,32 @@ function durationLabel(seconds: number): string {
   return `${minutes}分${String(rest).padStart(2, '0')}秒`
 }
 
+type WebinarWithPublication = Webinar & {
+  publicationState?: 'period' | 'always' | 'scheduled' | 'ended' | 'unset' | null
+  publicationStartsAt?: string | null
+  publicationEndsAt?: string | null
+}
+
 function deliveryWindow(webinar: Webinar): string {
+  const publication = webinar as WebinarWithPublication
+  const format = (value: string | null | undefined, withTime = false) => {
+    if (!value) return null
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return null
+    const dateText = date.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' })
+    if (!withTime) return dateText
+    const time = date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Tokyo' })
+    return `${dateText} ${time}`
+  }
+  if (publication.publicationState === 'always') return '常時公開'
+  if (publication.publicationState === 'scheduled') return format(publication.publicationStartsAt, true) ?? '—'
+  if (publication.publicationState === 'ended') return '公開終了'
+  if (publication.publicationState === 'unset') return '未設定'
+  if (publication.publicationState === 'period') {
+    const start = format(publication.publicationStartsAt)
+    const end = format(publication.publicationEndsAt)
+    if (start && end) return `${start}〜${end}`
+  }
   const daily = webinar.schedule.find((rule) => rule.type === 'daily' && rule.time)
   const once = webinar.schedule.find((rule) => rule.type === 'once' && rule.at)
   if (once?.at) return fmtSession(Math.floor(new Date(once.at).getTime() / 1000))

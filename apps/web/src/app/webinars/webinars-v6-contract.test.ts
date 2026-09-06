@@ -34,8 +34,11 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(PAGE).toContain('aria-label="ウェビナーのフォルダ"')
     expect(PAGE).toContain('<Button disabled title="フォルダの保存契約を接続後に使えます">フォルダを追加</Button>')
     expect(PAGE).toContain('フォルダ名と件数は一覧APIへの接続後に表示します。')
-    expect(PAGE).toContain("measuredCount(w.registrations)")
-    expect(PAGE).toContain("measuredCount(w.viewers)")
+    expect(PAGE).toContain("api.folders.list('webinar')")
+    expect(PAGE).toContain('measuredFolder?.count')
+    expect(PAGE).toContain('measuredCount(w.registrationCount)')
+    expect(PAGE).toContain('measuredCount(w.viewerCount)')
+    expect(PAGE).toContain('publicationSummary(w)')
   })
 
   it('選択中のLINEアカウントだけを読み、新規作成にも所属を保存する', () => {
