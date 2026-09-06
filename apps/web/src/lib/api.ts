@@ -101,6 +101,78 @@ import type {
   UndoIdentityCandidateRequest,
 } from '@line-crm/shared'
 
+export type CommonVarHistoryItem = {
+  id: string
+  version: number
+  name: string
+  value: string
+  memo: string
+  changeReason: string | null
+  actorId: string | null
+  createdAt: string
+}
+
+export type CommonVarDetail = CommonVar & {
+  memo: string
+  version: number
+  archivedAt: string | null
+  usages: CommonVarDeleteImpact['items']
+  usagePage: {
+    total: number
+    shown: number
+    hasMore: boolean
+    unavailableCount: number
+  }
+  history: CommonVarHistoryItem[]
+}
+
+export type CommonVarChangeImpactDetail = CommonVarChangeImpact & {
+  version: number
+  usageByKind: CommonVarChangeImpact['byKind']
+  scheduledUsageCount: number
+  publishedUsageCount: number
+  usageRevision: string
+}
+
+export type CommonVarReplacementCandidate = {
+  id: string
+  name: string
+  varKey: string
+  type: CommonVar['type']
+  value: string
+  version: number
+}
+
+export type CommonVarReplacementCandidates = {
+  source: Pick<CommonVarReplacementCandidate, 'id' | 'name' | 'type' | 'version'>
+  candidates: CommonVarReplacementCandidate[]
+}
+
+export type CommonVarReplacementImpact = {
+  source: Pick<CommonVarReplacementCandidate, 'id' | 'name' | 'type' | 'version'>
+  replacement: Pick<CommonVarReplacementCandidate, 'id' | 'name' | 'type' | 'version'>
+  usageTotal: number
+  replaceableTotal: number
+  blockedTotal: number
+  historicalTotal: number
+  unscopedFormTotal: number
+  byKind: Record<string, number>
+  canReplace: boolean
+  revision: string
+  checkedAt: string
+}
+
+export type CommonVarReplacementResult = {
+  runId: string
+  replacedUsageCount: number
+  archivedVersion: number
+  sourceId: string
+  replacementId: string
+  remainingUsageCount: number | null
+  verification: 'verified' | 'partial' | 'unavailable'
+  completedAt: string
+}
+
 /**
  * タグを消したときに失われるもの（`GET /api/tags/:id/delete-impact`）。
  *
@@ -3915,6 +3987,10 @@ export const api = {
       fetchApi<ApiResponse<CommonVar[]>>(
         `/api/common-vars?accountId=${encodeURIComponent(accountId)}${params?.folderId ? `&folderId=${encodeURIComponent(params.folderId)}` : ''}`,
       ),
+    detail: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<CommonVarDetail>>(
+        `/api/common-vars/${id}?accountId=${encodeURIComponent(accountId)}`,
+      ),
     create: (data: {
       accountId: string
       name: string
@@ -3928,7 +4004,14 @@ export const api = {
         body: JSON.stringify(data),
       }),
     /** varKey は変えられない（テンプレートの差し込みが空になるため）。 */
-    update: (id: string, accountId: string, data: { name?: string; value?: string; folderId?: string | null }) =>
+    update: (id: string, accountId: string, data: {
+      name?: string
+      value?: string
+      memo?: string
+      folderId?: string | null
+      expectedVersion?: number
+      changeReason?: string
+    }) =>
       fetchApi<ApiResponse<CommonVar>>(`/api/common-vars/${id}?accountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -3939,15 +4022,33 @@ export const api = {
       **`nextValue` を渡して問い合わせるだけで、値は保存されない。**
       口が `POST` なのは長い本文を投げるためで、書き換えではない。
     */
-    impactPreview: (id: string, accountId: string, nextValue: string) =>
-      fetchApi<ApiResponse<CommonVarChangeImpact>>(`/api/common-vars/${id}/impact-preview`, {
+    impactPreview: (id: string, accountId: string, nextValue: string, expectedVersion?: number) =>
+      fetchApi<ApiResponse<CommonVarChangeImpactDetail>>(`/api/common-vars/${id}/impact-preview`, {
         method: 'POST',
-        body: JSON.stringify({ accountId, nextValue }),
+        body: JSON.stringify({ accountId, nextValue, expectedVersion }),
       }),
     deleteImpact: (id: string, accountId: string) =>
       fetchApi<ApiResponse<CommonVarDeleteImpact>>(`/api/common-vars/${id}/delete-impact?accountId=${encodeURIComponent(accountId)}`),
     delete: (id: string, accountId: string) =>
       fetchApi<ApiResponse<null>>(`/api/common-vars/${id}?accountId=${encodeURIComponent(accountId)}`, { method: 'DELETE' }),
+    replacementCandidates: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<CommonVarReplacementCandidates>>(`/api/common-vars/${id}/replace`, {
+        method: 'POST',
+        body: JSON.stringify({ accountId }),
+      }),
+    replacementImpact: (id: string, accountId: string, replacementId: string) =>
+      fetchApi<ApiResponse<CommonVarReplacementImpact>>(`/api/common-vars/${id}/replace`, {
+        method: 'POST',
+        body: JSON.stringify({ accountId, replacementId }),
+      }),
+    replace: (
+      id: string,
+      accountId: string,
+      input: { replacementId: string; expectedVersion: number; expectedRevision: string },
+    ) => fetchApi<ApiResponse<CommonVarReplacementResult>>(`/api/common-vars/${id}/replace`, {
+      method: 'POST',
+      body: JSON.stringify({ accountId, ...input, apply: true }),
+    }),
     schedules: (id: string, accountId: string) =>
       fetchApi<ApiResponse<CommonVarSchedule[]>>(`/api/common-vars/${id}/schedules?accountId=${encodeURIComponent(accountId)}`),
     addSchedule: (id: string, accountId: string, data: { effectiveFrom: string; value: string }) =>

@@ -11,7 +11,7 @@ import type {
   CommonVarSchedule,
   Folder,
 } from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
+import { api, ApiError, type CommonVarDetail } from '@/lib/api'
 import { VAR_TYPE_LABELS, formatStamp } from '@/lib/common-vars'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -57,7 +57,7 @@ function EditCommonVarInner() {
   const params = useSearchParams()
   const id = params.get('id') ?? ''
 
-  const [item, setItem] = useState<CommonVar | null>(null)
+  const [item, setItem] = useState<CommonVarDetail | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
   const [schedules, setSchedules] = useState<CommonVarSchedule[]>([])
   const [loading, setLoading] = useState(true)
@@ -69,6 +69,7 @@ function EditCommonVarInner() {
   const [name, setName] = useState('')
   const [folderId, setFolderId] = useState('')
   const [value, setValue] = useState('')
+  const [memo, setMemo] = useState('')
 
   /** 予約を足す窓。開いていない間は null。 */
   const [draft, setDraft] = useState<{ date: string; time: string; value: string } | null>(null)
@@ -88,12 +89,17 @@ function EditCommonVarInner() {
     変えていないのに保存後の文を問い合わせても、いまの文と同じものが
     返るだけで、読む人には差が見えない。
   */
-  const loadImpact = useCallback(async (varId: string, accountId: string, nextValue?: string) => {
+  const loadImpact = useCallback(async (
+    varId: string,
+    accountId: string,
+    nextValue?: string,
+    expectedVersion?: number,
+  ) => {
     setImpactState('loading')
     try {
       const res = nextValue === undefined
         ? await api.commonVars.deleteImpact(varId, accountId)
-        : await api.commonVars.impactPreview(varId, accountId, nextValue)
+        : await api.commonVars.impactPreview(varId, accountId, nextValue, expectedVersion)
       if (accountId !== latestAccountRef.current) return
       if (!res.success) {
         setImpact(null)
@@ -118,7 +124,7 @@ function EditCommonVarInner() {
     if (!item || !selectedAccountId) return
     const nextValue = value === item.value ? undefined : value
     const timer = setTimeout(() => {
-      void loadImpact(item.id, selectedAccountId, nextValue)
+      void loadImpact(item.id, selectedAccountId, nextValue, item.version)
     }, 400)
     return () => clearTimeout(timer)
   }, [item, selectedAccountId, value, loadImpact])
@@ -150,15 +156,15 @@ function EditCommonVarInner() {
     setLoading(true)
     setError('')
     try {
-      const [vars, folderList, scheduleList] = await Promise.all([
-        api.commonVars.list(accountAtRequest),
+      const [detail, folderList, scheduleList] = await Promise.all([
+        api.commonVars.detail(id, accountAtRequest),
         api.folders.list('common_var'),
         api.commonVars.schedules(id, accountAtRequest),
       ])
       if (accountAtRequest !== latestAccountRef.current) return
       if (folderList.success) setFolders(folderList.data)
       if (scheduleList.success) setSchedules(scheduleList.data)
-      const found = vars.success ? vars.data.find((v) => v.id === id) : undefined
+      const found = detail.success ? detail.data : undefined
       if (!found) {
         setError('この共通情報は見つかりませんでした')
         return
@@ -167,13 +173,13 @@ function EditCommonVarInner() {
       setName(found.name)
       setFolderId(found.folderId ?? '')
       setValue(found.value)
-      void loadImpact(found.id, accountAtRequest)
+      setMemo(found.memo)
     } catch {
       if (accountAtRequest === latestAccountRef.current) setError('読み込みに失敗しました')
     } finally {
       if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
-  }, [accountLoading, id, loadImpact, selectedAccountId])
+  }, [accountLoading, id, selectedAccountId])
 
   useEffect(() => {
     void load()
@@ -193,7 +199,9 @@ function EditCommonVarInner() {
       const res = await api.commonVars.update(item.id, accountAtRequest, {
         name: name.trim(),
         value,
+        memo,
         folderId: folderId || null,
+        expectedVersion: item.version,
       })
       if (accountAtRequest !== latestAccountRef.current) return
       if (!res.success) {
@@ -425,9 +433,14 @@ function EditCommonVarInner() {
 
                 <div>
                   <p className="text-ink-secondary mb-1 text-sm font-medium">社内向けのメモ（お客さまには出ません）</p>
-                  <div className="border-hairline text-ink-faint rounded-control border border-dashed px-3 py-3 text-sm">
-                    {NOT_AVAILABLE}（メモを読み書きするAPIがまだありません）
-                  </div>
+                  <textarea
+                    value={memo}
+                    onChange={(event) => setMemo(event.target.value)}
+                    rows={3}
+                    maxLength={1000}
+                    className="border-hairline rounded-control w-full resize-y border px-3 py-3 text-sm"
+                    placeholder="運用上の注意や、この値の使い方を書きます"
+                  />
                 </div>
 
                 <p className="text-ink-faint text-xs">
@@ -467,9 +480,29 @@ function EditCommonVarInner() {
 
               <section className="bg-canvas rounded-card border-hairline border p-4">
                 <h2 className="text-ink text-sm font-bold">これまでの変更</h2>
-                <p className="text-ink-faint mt-3 text-sm">
-                  {NOT_AVAILABLE}（変更者と変更前後を返す履歴APIがまだありません）
-                </p>
+                {item.history.length > 0 ? (
+                  <ol className="divide-hairline mt-3 divide-y">
+                    {item.history.slice(0, 5).map((entry, index) => {
+                      const previous = item.history[index + 1]
+                      return (
+                        <li key={entry.id} className="py-3 first:pt-0">
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                            <span className="text-ink font-semibold">{formatStamp(entry.createdAt)}</span>
+                            <span className="text-ink-faint">{entry.actorId ? `担当者 ${entry.actorId}` : '担当者未記録'}</span>
+                          </div>
+                          <p className="text-ink-secondary mt-1 text-xs break-words">
+                            {previous
+                              ? `「${previous.value || '（空）'}」→「${entry.value || '（空）'}」`
+                              : 'はじめて登録'}
+                          </p>
+                          {entry.changeReason ? <p className="text-ink-faint mt-1 text-xs">理由：{entry.changeReason}</p> : null}
+                        </li>
+                      )
+                    })}
+                  </ol>
+                ) : (
+                  <p className="text-ink-faint mt-3 text-sm">まだ変更履歴はありません。</p>
+                )}
                 <p className="text-ink-faint mt-2 text-xs">
                   変えた時点より前に送った配信の文面は、そのときの値のままです。あとから遡って変わることはありません。
                 </p>
