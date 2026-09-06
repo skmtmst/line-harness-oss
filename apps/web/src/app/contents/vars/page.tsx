@@ -4,7 +4,12 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { CommonVar, CommonVarDeleteImpact, Folder } from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
+import {
+  api,
+  ApiError,
+  type CommonVarReplacementCandidate,
+  type CommonVarReplacementImpact,
+} from '@/lib/api'
 import FolderPanel from '@/components/shared/folder-panel'
 import { formatStamp } from '@/lib/common-vars'
 import Pagination from '@/components/shared/pagination'
@@ -75,6 +80,10 @@ function VarsPageInner() {
   const [singlePhase, setSinglePhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [singleBusy, setSingleBusy] = useState(false)
   const [singleError, setSingleError] = useState('')
+  const [replacementCandidates, setReplacementCandidates] = useState<CommonVarReplacementCandidate[]>([])
+  const [replacementId, setReplacementId] = useState('')
+  const [replacementImpact, setReplacementImpact] = useState<CommonVarReplacementImpact | null>(null)
+  const [replacementPhase, setReplacementPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   /** 確認のために打ってもらう差し込みキー。 */
   const [typedKey, setTypedKey] = useState('')
   /** いま影響を読んでいるアカウント・対象・世代。遅れて返った別の結果を捨てるために持つ。 */
@@ -135,6 +144,10 @@ function VarsPageInner() {
     setSingleBusy(false)
     setSingleError('')
     setTypedKey('')
+    setReplacementCandidates([])
+    setReplacementId('')
+    setReplacementImpact(null)
+    setReplacementPhase('idle')
     deleteRequestRef.current = {
       accountId: selectedAccountId,
       generation: deleteRequestRef.current.generation + 1,
@@ -214,6 +227,10 @@ function VarsPageInner() {
     setSingleError('')
     setSingleImpact(null)
     setSinglePhase('loading')
+    setReplacementCandidates([])
+    setReplacementId('')
+    setReplacementImpact(null)
+    setReplacementPhase('loading')
     if (!selectedAccountId) {
       setSinglePhase('error')
       return
@@ -233,19 +250,110 @@ function VarsPageInner() {
       singleRequestRef.current.accountId === request.accountId &&
       singleRequestRef.current.itemId === request.itemId &&
       singleRequestRef.current.generation === request.generation
+    const [impactResult, candidatesResult] = await Promise.allSettled([
+      api.commonVars.deleteImpact(request.itemId, request.accountId),
+      api.commonVars.replacementCandidates(request.itemId, request.accountId),
+    ])
+    if (!isCurrentRequest()) return
+    if (impactResult.status === 'rejected' || !impactResult.value.success) {
+      setSinglePhase('error')
+      setReplacementPhase('error')
+      return
+    }
+    setSingleImpact(impactResult.value.data)
+    setSinglePhase('ready')
+    if (candidatesResult.status === 'rejected' || !candidatesResult.value.success) {
+      setReplacementPhase('error')
+      return
+    }
+    setReplacementCandidates(candidatesResult.value.data.candidates)
+    const first = candidatesResult.value.data.candidates[0]
+    if (!first) {
+      setReplacementPhase('ready')
+      return
+    }
+    setReplacementId(first.id)
     try {
-      const res = await api.commonVars.deleteImpact(request.itemId, request.accountId)
+      const preview = await api.commonVars.replacementImpact(request.itemId, request.accountId, first.id)
       if (!isCurrentRequest()) return
-      if (!res.success) throw new Error('impact_failed')
-      setSingleImpact(res.data)
-      setSinglePhase('ready')
+      if (!preview.success) throw new Error('replacement_impact_failed')
+      setReplacementImpact(preview.data)
+      setReplacementPhase('ready')
     } catch {
       if (!isCurrentRequest()) return
-      /*
-        使用先が読めないときは**消させない**。「参照0件」と読み違えて
-        消すと、差し込んでいた文が空欄のまま送られ続ける。
-      */
-      setSinglePhase('error')
+      setReplacementPhase('error')
+    }
+  }
+
+  const selectReplacement = async (nextId: string) => {
+    if (!singleTarget || !selectedAccountId) return
+    setReplacementId(nextId)
+    setReplacementImpact(null)
+    if (!nextId) {
+      setReplacementPhase('ready')
+      return
+    }
+    const request = {
+      accountId: selectedAccountId,
+      itemId: singleTarget.id,
+      generation: singleRequestRef.current.generation + 1,
+    }
+    singleRequestRef.current = request
+    setReplacementPhase('loading')
+    try {
+      const res = await api.commonVars.replacementImpact(request.itemId, request.accountId, nextId)
+      if (singleRequestRef.current.generation !== request.generation) return
+      if (!res.success) throw new Error('replacement_impact_failed')
+      setReplacementImpact(res.data)
+      setReplacementPhase('ready')
+    } catch {
+      if (singleRequestRef.current.generation === request.generation) setReplacementPhase('error')
+    }
+  }
+
+  const confirmReplacement = async () => {
+    if (!singleTarget || !selectedAccountId || !replacementImpact?.canReplace || singleBusy) return
+    const request = {
+      accountId: selectedAccountId,
+      itemId: singleTarget.id,
+      generation: singleRequestRef.current.generation + 1,
+    }
+    singleRequestRef.current = request
+    setSingleBusy(true)
+    setSingleError('')
+    try {
+      const res = await api.commonVars.replace(request.itemId, request.accountId, {
+        replacementId: replacementImpact.replacement.id,
+        expectedVersion: replacementImpact.source.version,
+        expectedRevision: replacementImpact.revision,
+      })
+      if (singleRequestRef.current.generation !== request.generation) return
+      if (!res.success) throw new Error('replace_failed')
+      singleRequestRef.current = {
+        accountId: selectedAccountId,
+        itemId: null,
+        generation: request.generation + 1,
+      }
+      setSingleTarget(null)
+      setSingleImpact(null)
+      setSinglePhase('idle')
+      setSingleBusy(false)
+      setReplacementCandidates([])
+      setReplacementId('')
+      setReplacementImpact(null)
+      setReplacementPhase('idle')
+      await load()
+    } catch (error) {
+      if (singleRequestRef.current.generation !== request.generation) return
+      if (error instanceof ApiError && error.status === 409) {
+        setSingleError('使用先が変わりました。影響をもう一度確認してください。')
+        setSingleBusy(false)
+        await selectReplacement(replacementImpact.replacement.id)
+      } else {
+        setSingleError('差し替えを完了できませんでした。状態を読み直して、もう一度お試しください。')
+      }
+    } finally {
+      if (singleRequestRef.current.generation === request.generation) setSingleBusy(false)
     }
   }
 
@@ -306,6 +414,10 @@ function VarsPageInner() {
     setSinglePhase('idle')
     setSingleError('')
     setTypedKey('')
+    setReplacementCandidates([])
+    setReplacementId('')
+    setReplacementImpact(null)
+    setReplacementPhase('idle')
   }
 
   const prepareRemoveSelected = async () => {
@@ -738,6 +850,16 @@ function VarsPageInner() {
               >
                 キャンセル
               </Button>
+              {singleImpact && !singleImpact.canDelete && replacementImpact?.canReplace ? (
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={() => void confirmReplacement()}
+                  disabled={singleBusy || replacementPhase !== 'ready'}
+                >
+                  {singleBusy ? '差し替え中…' : '差し替えて削除'}
+                </Button>
+              ) : null}
               {singleImpact && !singleImpact.canDelete ? (
                 <Button
                   type="button"
@@ -776,20 +898,39 @@ function VarsPageInner() {
               <div>
                 <h3 className="text-ink text-sm font-bold">どうしますか</h3>
                 <div className="mt-2 space-y-2">
-                  <div className="border-hairline bg-accent-soft rounded-control border p-3" aria-disabled="true">
+                  <div className="border-accent bg-accent-soft rounded-control border p-3">
                     <p className="text-accent text-sm font-bold">別の共通情報に差し替えてから削除する（おすすめ）</p>
                     <p className="text-ink-secondary mt-1 text-xs leading-5">
-                      使用先を別のキーへ置き換えてから削除します。まとめて差し替えるAPIがまだ無いため、現在は選べません。
+                      {singleImpact.blockingTotal.toLocaleString('ja-JP')}か所の差し込みを、選んだ別のキーへ置き換えます。置き換え後は元の共通情報を履歴が残る形で保管します。
                     </p>
                     <label className="text-ink-secondary mt-2 block text-xs font-semibold">
                       差し替え先
                       <SelectField
-                        disabled
+                        value={replacementId}
+                        disabled={singleBusy || replacementCandidates.length === 0}
+                        onChange={(event) => void selectReplacement(event.target.value)}
                         aria-label="差し替え先"
                         className="mt-1 w-full"
-                        options={[{ value: '', label: '候補を取得できません' }]}
+                        style={{ width: '100%' }}
+                        options={replacementCandidates.length > 0
+                          ? replacementCandidates.map((candidate) => ({
+                              value: candidate.id,
+                              label: `${placeholderText(candidate.name)} — ${candidate.value || '（空）'}`,
+                            }))
+                          : [{ value: '', label: replacementPhase === 'loading' ? '候補を読み込んでいます' : '差し替えられる候補がありません' }]}
                       />
                     </label>
+                    {replacementPhase === 'loading' ? (
+                      <p className="text-ink-faint mt-2 text-xs">差し替え後の影響を確認しています…</p>
+                    ) : replacementPhase === 'error' ? (
+                      <p className="text-danger mt-2 text-xs font-semibold">差し替え後の影響を確認できませんでした。</p>
+                    ) : replacementImpact ? (
+                      <p className={replacementImpact.canReplace ? 'text-success mt-2 text-xs font-semibold' : 'text-danger mt-2 text-xs font-semibold'}>
+                        {replacementImpact.canReplace
+                          ? `${replacementImpact.replaceableTotal.toLocaleString('ja-JP')}か所を差し替え、元の共通情報を保管できます。`
+                          : `${replacementImpact.blockedTotal.toLocaleString('ja-JP')}か所は自動で差し替えられません。先に個別に確認してください。`}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="border-hairline rounded-control border p-3" aria-disabled={!singleImpact.canDelete}>
                     <p className="text-ink text-sm font-bold">このまま削除する</p>
@@ -857,8 +998,8 @@ function VarsPageInner() {
               ) : null}
 
               <p className="text-ink-faint text-micro leading-5">
-                {checkedAtText(singleImpact.checkedAt)} 時点で、テンプレート・一斉配信・シナリオ・リマインダ・自動応答・回答フォーム・オートメーション・友だち追加時の8種類を確認しました。
-                まとめて差し替える操作は、まだ用意していません。
+                {checkedAtText(singleImpact.checkedAt)} 時点で、テンプレート・一斉配信・シナリオ・リマインダ・自動応答・回答フォーム・オートメーション・友だち追加時・共通アクションの9種類を確認しました。
+                差し替え前にも使用先の世代を再確認します。
               </p>
             </div>
           ) : null}

@@ -12,6 +12,13 @@ import {
   setConversionApproval,
   getConversionApprovalNotifyInfo,
   syncAffiliateConversionMileage,
+  listConversionDefinitions,
+  getConversionDefinitionDetail,
+  addConversionDefinitionUsage,
+  getConversionDefinitionReport,
+  listConversionDefinitionsForExport,
+  ConversionDefinitionError,
+  CONVERSION_DEFINITION_USAGE_KINDS,
 } from '@line-crm/db';
 import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
 import { notifyAffiliateApproval } from '../services/affiliate-notifier.js';
@@ -21,7 +28,14 @@ import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { listLimit, listOffset } from './list-pagination.js';
 
-import type { ConversionPoint, ConversionMeasureMethod } from '@line-crm/db';
+import type {
+  ConversionPoint,
+  ConversionMeasureMethod,
+  ConversionDefinitionRange,
+  ConversionDefinitionSort,
+  ConversionDefinitionStatus,
+  ConversionDefinitionUsageKind,
+} from '@line-crm/db';
 
 const conversions = new Hono<Env>();
 
@@ -77,10 +91,132 @@ function serializeConversionPoint(p: ConversionPoint) {
     countRepeat: p.count_repeat !== 0,
     attributionDays: p.attribution_days,
     lineAccountId: p.line_account_id,
+    version: p.version,
     status: p.status,
     stoppedAt: p.stopped_at,
     createdAt: p.created_at,
   };
+}
+
+type ConversionPermission = 'view' | 'edit' | 'export';
+
+function conversionPermission(permission: ConversionPermission): MiddlewareHandler<Env> {
+  return async (c, next) => {
+    const staff = c.get('staff');
+    const keys = staff?.permissionKeys ?? [];
+    const hasFeature = keys.includes('/conversions');
+    const allowed = staff && (
+      staff.role === 'owner'
+      || staff.role === 'admin'
+      || (permission === 'view' && hasFeature)
+      || (permission === 'edit' && hasFeature && keys.includes('conversion.definition.edit'))
+      || (permission === 'export' && hasFeature && keys.includes('conversion.report.export'))
+    );
+    if (!allowed) {
+      return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
+    }
+    await next();
+  };
+}
+
+function conversionContractError(c: Context<Env>, error: unknown): Response {
+  if (error instanceof ConversionDefinitionError) {
+    return c.json({ success: false, code: error.code, error: error.message }, error.status);
+  }
+  console.error(JSON.stringify({
+    event: 'conversion_definition_contract_failed',
+    path: c.req.path,
+    reason: error instanceof Error ? error.message : String(error),
+  }));
+  return c.json({ success: false, error: '成果地点の情報を処理できませんでした' }, 500);
+}
+
+function jstDate(date: Date): string {
+  return new Date(date.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function parseDate(value: string | undefined): Date | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const parsed = new Date(`${value}T00:00:00+09:00`);
+  return Number.isNaN(parsed.getTime()) || jstDate(parsed) !== value ? null : parsed;
+}
+
+function conversionRange(c: Context<Env>):
+  | { ok: true; range: ConversionDefinitionRange; previousRange: ConversionDefinitionRange }
+  | { ok: false; response: Response } {
+  const rawTo = c.req.query('to') ?? jstDate(new Date());
+  const toDate = parseDate(rawTo);
+  const rawFrom = c.req.query('from') ?? (toDate
+    ? jstDate(new Date(toDate.getTime() - 29 * 24 * 60 * 60 * 1000))
+    : '');
+  const fromDate = parseDate(rawFrom);
+  if (!fromDate || !toDate || fromDate > toDate) {
+    return {
+      ok: false,
+      response: c.json({ success: false, error: 'from と to は正しい日付順で指定してください' }, 400),
+    };
+  }
+  const inclusiveDays = Math.floor((toDate.getTime() - fromDate.getTime()) / 86_400_000) + 1;
+  if (inclusiveDays > 366) {
+    return {
+      ok: false,
+      response: c.json({ success: false, error: '集計期間は366日以内で指定してください' }, 400),
+    };
+  }
+  const previousTo = new Date(fromDate.getTime() - 24 * 60 * 60 * 1000);
+  const previousFrom = new Date(previousTo.getTime() - (inclusiveDays - 1) * 24 * 60 * 60 * 1000);
+  return {
+    ok: true,
+    range: { from: `${rawFrom} 00:00:00`, to: `${rawTo} 23:59:59`, timeZone: 'Asia/Tokyo' },
+    previousRange: {
+      from: `${jstDate(previousFrom)} 00:00:00`,
+      to: `${jstDate(previousTo)} 23:59:59`,
+      timeZone: 'Asia/Tokyo',
+    },
+  };
+}
+
+const DEFINITION_STATUSES = new Set<ConversionDefinitionStatus>(['active', 'stopped']);
+const DEFINITION_SORTS = new Set<ConversionDefinitionSort>([
+  'count_desc', 'value_desc', 'updated_desc', 'name_asc',
+]);
+
+function definitionFilters(c: Context<Env>) {
+  const status = c.req.query('status');
+  const sort = c.req.query('sort') ?? 'count_desc';
+  if (status && !DEFINITION_STATUSES.has(status as ConversionDefinitionStatus)) {
+    return { ok: false as const, response: c.json({ success: false, error: 'status が正しくありません' }, 400) };
+  }
+  if (!DEFINITION_SORTS.has(sort as ConversionDefinitionSort)) {
+    return { ok: false as const, response: c.json({ success: false, error: 'sort が正しくありません' }, 400) };
+  }
+  return {
+    ok: true as const,
+    value: {
+      lineAccountId: c.req.query('lineAccountId'),
+      query: c.req.query('q'),
+      status: status as ConversionDefinitionStatus | undefined,
+      sourceType: c.req.query('sourceType'),
+      sort: sort as ConversionDefinitionSort,
+    },
+  };
+}
+
+async function conversionDefinitionScope(c: Context<Env>, lineAccountId?: string) {
+  if (lineAccountId && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+    return { ok: false as const, response: c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403) };
+  }
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  return {
+    ok: true as const,
+    value: { allowedAccountIds: scope.allowedAccountIds, includeUnassigned: scope.canSeeUnassigned },
+  };
+}
+
+function csvCell(value: unknown): string {
+  const raw = value === null || value === undefined ? '' : String(value);
+  const safe = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
+  return `"${safe.replaceAll('"', '""')}"`;
 }
 
 interface ConversionPointBody {
@@ -156,6 +292,143 @@ function readMeasureOptions(
 }
 
 // ── Conversion Points ───────────────────────────────────────────────────────
+
+// GET /api/conversions/definitions - V6 list, filters, state counts and metrics
+conversions.get('/api/conversions/definitions', conversionPermission('view'), async (c) => {
+  try {
+    const range = conversionRange(c);
+    if (!range.ok) return range.response;
+    const filters = definitionFilters(c);
+    if (!filters.ok) return filters.response;
+    const scope = await conversionDefinitionScope(c, filters.value.lineAccountId);
+    if (!scope.ok) return scope.response;
+    const cursorRaw = c.req.query('cursor') ?? '0';
+    const cursor = Number(cursorRaw);
+    if (!/^\d+$/.test(cursorRaw) || !Number.isSafeInteger(cursor)) {
+      return c.json({ success: false, error: 'cursor は0以上の整数で指定してください' }, 400);
+    }
+    const data = await listConversionDefinitions(c.env.DB, {
+      scope: scope.value,
+      ...filters.value,
+      range: range.range,
+      cursor,
+      limit: listLimit(c.req.query('limit'), 50),
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return conversionContractError(c, error);
+  }
+});
+
+// GET /api/conversions/definitions/:id - definition, current version and usages
+conversions.get('/api/conversions/definitions/:id', conversionPermission('view'), async (c) => {
+  try {
+    const scope = await conversionDefinitionScope(c);
+    if (!scope.ok) return scope.response;
+    const data = await getConversionDefinitionDetail(c.env.DB, c.req.param('id'), scope.value);
+    if (!data) return c.json({ success: false, error: '成果地点が見つかりません' }, 404);
+    return c.json({ success: true, data });
+  } catch (error) {
+    return conversionContractError(c, error);
+  }
+});
+
+// POST /api/conversions/definitions/:id/usages - bind one published version to a consumer
+conversions.post('/api/conversions/definitions/:id/usages', conversionPermission('edit'), async (c) => {
+  try {
+    const body = await c.req.json<{
+      lineAccountId?: unknown;
+      expectedVersion?: unknown;
+      refKind?: unknown;
+      refId?: unknown;
+      refVersionId?: unknown;
+    }>().catch(() => null);
+    if (!body) return c.json({ success: false, error: 'JSON本文が正しくありません' }, 400);
+    const lineAccountId = typeof body.lineAccountId === 'string' ? body.lineAccountId.trim() : '';
+    const refId = typeof body.refId === 'string' ? body.refId.trim() : '';
+    const expectedVersion = Number(body.expectedVersion);
+    const refKind = body.refKind as ConversionDefinitionUsageKind;
+    const refVersionId = body.refVersionId === null || body.refVersionId === undefined
+      ? null
+      : typeof body.refVersionId === 'string' ? body.refVersionId.trim() : '';
+    if (!lineAccountId || !refId || refId.length > 200
+      || !Number.isInteger(expectedVersion) || expectedVersion < 1
+      || !CONVERSION_DEFINITION_USAGE_KINDS.includes(refKind)
+      || (refVersionId !== null && (!refVersionId || refVersionId.length > 200))) {
+      return c.json({ success: false, error: 'lineAccountId、expectedVersion、refKind、refIdを正しく指定してください' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: '成果地点が見つかりません' }, 404);
+    }
+    const result = await addConversionDefinitionUsage(c.env.DB, {
+      conversionPointId: c.req.param('id'),
+      lineAccountId,
+      expectedVersion,
+      refKind,
+      refId,
+      refVersionId,
+      staffId: c.get('staff')!.id,
+    });
+    auditLog(c, 'conversion.definition.usage.create', {
+      kind: `conversion_definition_usage:${refKind}`,
+      id: c.req.param('id'),
+    });
+    return c.json({ success: true, data: result }, result.created ? 201 : 200);
+  } catch (error) {
+    return conversionContractError(c, error);
+  }
+});
+
+// GET /api/conversions/export - same filters as the list, bounded to 10,000 rows
+conversions.get('/api/conversions/export', conversionPermission('export'), async (c) => {
+  try {
+    const range = conversionRange(c);
+    if (!range.ok) return range.response;
+    const filters = definitionFilters(c);
+    if (!filters.ok) return filters.response;
+    const scope = await conversionDefinitionScope(c, filters.value.lineAccountId);
+    if (!scope.ok) return scope.response;
+    const items = await listConversionDefinitionsForExport(c.env.DB, {
+      scope: scope.value,
+      ...filters.value,
+      range: range.range,
+    });
+    const headers = [
+      '期間開始', '期間終了', 'タイムゾーン', '純額定義', '成果地点ID', '成果地点名',
+      '起点', '状態', '成果件数', '純成果件数', '取消件数', '純金額', '利用先数', '更新日時',
+    ];
+    const rows = items.map((item) => [
+      range.range.from,
+      range.range.to,
+      range.range.timeZone,
+      item.metrics.reversalReason,
+      item.id,
+      item.name,
+      item.sourceType,
+      item.status,
+      item.metrics.recordedCount,
+      item.metrics.netCount,
+      item.metrics.reversedCount,
+      item.metrics.netValue,
+      item.usageCount,
+      item.updatedAt,
+    ]);
+    const csv = `\uFEFF${[headers, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n')}\r\n`;
+    auditLog(c, 'conversion.report.export', {
+      kind: 'conversion_definition_export', id: String(items.length),
+    });
+    return new Response(csv, {
+      status: 200,
+      headers: {
+        'content-type': 'text/csv; charset=utf-8',
+        'content-disposition': `attachment; filename="conversion-definitions-${jstDate(new Date())}.csv"`,
+        'cache-control': 'no-store',
+      },
+    });
+  } catch (error) {
+    return conversionContractError(c, error);
+  }
+});
 
 // GET /api/conversions/points - list all
 conversions.get('/api/conversions/points', async (c) => {
@@ -353,19 +626,32 @@ conversions.get('/api/conversions/events', async (c) => {
   }
 });
 
-// GET /api/conversions/report - aggregated report
-conversions.get('/api/conversions/report', requireRole('owner', 'admin'), async (c) => {
+// GET /api/conversions/report - V6 report; keep the old date-query response for the current screen
+conversions.get('/api/conversions/report', conversionPermission('view'), async (c) => {
   try {
-    const visibleIds = await visibleConversionPointIds(c);
-    const report = (await getConversionReport(c.env.DB, {
-      startDate: c.req.query('startDate'),
-      endDate: c.req.query('endDate'),
-    })).filter((row) => visibleIds.has(row.conversionPointId));
+    if (c.req.query('startDate') !== undefined || c.req.query('endDate') !== undefined) {
+      const visibleIds = await visibleConversionPointIds(c);
+      const report = (await getConversionReport(c.env.DB, {
+        startDate: c.req.query('startDate'),
+        endDate: c.req.query('endDate'),
+      })).filter((row) => visibleIds.has(row.conversionPointId));
+      return c.json({ success: true, data: report });
+    }
 
-    return c.json({ success: true, data: report });
-  } catch (err) {
-    console.error('GET /api/conversions/report error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    const range = conversionRange(c);
+    if (!range.ok) return range.response;
+    const lineAccountId = c.req.query('lineAccountId');
+    const scope = await conversionDefinitionScope(c, lineAccountId);
+    if (!scope.ok) return scope.response;
+    const data = await getConversionDefinitionReport(c.env.DB, {
+      scope: scope.value,
+      lineAccountId,
+      range: range.range,
+      previousRange: range.previousRange,
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return conversionContractError(c, error);
   }
 });
 

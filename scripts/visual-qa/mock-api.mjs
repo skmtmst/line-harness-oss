@@ -85,7 +85,7 @@ import {
   FORM_FOLDERS, FORMS, FORM_DETAIL,
   LINE_ACCOUNTS, LINE_ACCOUNT_DETAIL, LINE_ACCOUNT_VERIFY_CONNECTION, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
   CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
-  OPERATION_CONTROL_PREVIEW, OPERATION_HISTORY,
+  OPERATION_CONTROL_PREVIEW, OPERATION_HEALTH, OPERATION_HISTORY,
   WEBINARS, WEBINAR_FOLDERS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_ANALYTICS,
   FRIEND_ADD_RULE_PUBLISH, FRIEND_ADD_RULE_VALIDATE,
 } from './fixtures.mjs'
@@ -1134,6 +1134,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/operations/control/preview') {
     return { success: true, data: OPERATION_CONTROL_PREVIEW }
   }
+  if (pathname === '/api/operations/health') {
+    return { success: true, data: OPERATION_HEALTH }
+  }
   if (pathname === '/api/operations/history') {
     const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
     const limit = Number.isFinite(requestedLimit) && requestedLimit >= 0
@@ -1743,8 +1746,38 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   */
   if (pathname === '/api/affiliates') return { success: true, data: AFFILIATES }
   if (pathname === '/api/affiliate-offers') return { success: true, data: AFFILIATE_OFFERS }
-  if (pathname === '/api/common-actions') return { success: true, data: COMMON_ACTIONS }
-  if (pathname === '/api/automations') return { success: true, data: AUTOMATIONS }
+  if (pathname === '/api/common-actions') {
+    const status = query.get('status')
+    const search = (query.get('query') ?? '').trim().toLocaleLowerCase('ja')
+    const filtered = COMMON_ACTIONS
+      .filter((item) => status === 'old_version'
+        ? item.oldVersionBindingCount > 0
+        : status === 'unused'
+          ? item.status === 'published' && item.bindingCount === 0
+          : status ? item.status === status : true)
+      .filter((item) => !search || `${item.name} ${item.description ?? ''}`.toLocaleLowerCase('ja').includes(search))
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 500) : null
+    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    return {
+      success: true,
+      data: limit === null ? filtered : filtered.slice(offset, offset + limit),
+      pagination: { total: filtered.length, limit, offset },
+      freshness: 'available',
+    }
+  }
+  if (pathname === '/api/automations') return {
+    success: true,
+    data: AUTOMATIONS,
+    summary: {
+      active: AUTOMATIONS.filter((item) => item.status === 'active').length,
+      stopped: AUTOMATIONS.filter((item) => item.status === 'stopped').length,
+      executionCount30d: AUTOMATIONS.reduce((sum, item) => sum + item.executionCount30d, 0),
+      failureCount30d: AUTOMATIONS.reduce((sum, item) => sum + item.failureCount30d, 0),
+    },
+    freshness: 'available',
+  }
   if (pathname === '/api/automation-runs') return { success: true, data: AUTOMATION_RUNS }
   if (pathname === '/api/automation-templates') return { success: true, data: AUTOMATION_TEMPLATES }
   if (pathname === '/api/ec-commerce/settings') return { success: true, data: EC_NOTIFICATION_SETTINGS }

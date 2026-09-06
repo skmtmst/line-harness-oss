@@ -34,6 +34,13 @@ interface Automation {
   // null = global automation (fires for every account); UUID = bound to that
   // account. Surfaced so the badge + toggle/delete guards can distinguish.
   lineAccountId: string | null
+  triggerConfig: Record<string, unknown>
+  status: 'draft' | 'active' | 'stopped'
+  versionId: string
+  version: number
+  executionCount30d: number
+  failureCount30d: number
+  lastRunAt: string | null
   createdAt: string
   updatedAt: string
 }
@@ -170,12 +177,13 @@ export default function AutomationsPage() {
   const [working, setWorking] = useState(false)
   const [actionError, setActionError] = useState('')
   const [automaticRuns, setAutomaticRuns] = useState<number | null>(null)
+  const [failedRuns, setFailedRuns] = useState<number | null>(null)
   const [estimatedHoursSaved, setEstimatedHoursSaved] = useState<number | null>(null)
   const [templateCount, setTemplateCount] = useState<number | null>(null)
   const [commonActionCount, setCommonActionCount] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'stopped'>('all')
-  const [sortOrder, setSortOrder] = useState<'priority' | 'name'>('priority')
+  const [sortOrder, setSortOrder] = useState<'runs' | 'priority' | 'name'>('runs')
   /** 押したあとにアカウントが変わったか。変わっていたら実行させない。 */
   const accountChanged = pending !== null && pending.accountId !== selectedAccountId
   const loadRequestRef = useRef(0)
@@ -185,11 +193,8 @@ export default function AutomationsPage() {
     setLoadStatus('loading')
     setError('')
     try {
-      const [res, usageResponse, templatesResponse, commonActionsResponse] = await Promise.all([
+      const [res, templatesResponse, commonActionsResponse] = await Promise.all([
         api.automations.list({ accountId: selectedAccountId || undefined }),
-        selectedAccountId
-          ? api.analytics.usageOverview(selectedAccountId).catch(() => null)
-          : Promise.resolve(null),
         selectedAccountId
           ? api.automations.templates(selectedAccountId).catch(() => null)
           : Promise.resolve(null),
@@ -200,14 +205,18 @@ export default function AutomationsPage() {
       if (requestId !== loadRequestRef.current) return
       if (res.success) {
         setAutomations(res.data)
+        const executions = res.summary?.executionCount30d ?? null
+        setAutomaticRuns(executions)
+        setFailedRuns(res.summary?.failureCount30d ?? null)
+        setEstimatedHoursSaved(executions === null ? null : Math.round(executions / 120))
         setLoadStatus('ready')
       } else {
         setAutomations([])
+        setAutomaticRuns(null)
+        setFailedRuns(null)
+        setEstimatedHoursSaved(null)
         setLoadStatus('error')
       }
-      const usage = usageResponse?.success ? usageResponse.data.data.summary : null
-      setAutomaticRuns(usage?.automaticRuns.value ?? null)
-      setEstimatedHoursSaved(usage?.estimatedHoursSaved.value ?? null)
       setTemplateCount(templatesResponse?.success ? templatesResponse.data.length : null)
       setCommonActionCount(commonActionsResponse?.success ? commonActionsResponse.data.length : null)
     } catch {
@@ -215,6 +224,7 @@ export default function AutomationsPage() {
       setAutomations([])
       setLoadStatus('error')
       setAutomaticRuns(null)
+      setFailedRuns(null)
       setEstimatedHoursSaved(null)
       setTemplateCount(null)
       setCommonActionCount(null)
@@ -416,7 +426,10 @@ export default function AutomationsPage() {
       })
       .sort((a, b) => sortOrder === 'name'
         ? a.name.localeCompare(b.name, 'ja')
-        : a.priority - b.priority || a.name.localeCompare(b.name, 'ja'))
+        : sortOrder === 'runs'
+          // Pencilの一覧順は、30日実績の表示値ではなく設定した実行順を保つ。
+          ? b.priority - a.priority || a.name.localeCompare(b.name, 'ja')
+          : b.priority - a.priority || a.name.localeCompare(b.name, 'ja'))
   })()
 
   return (
@@ -453,8 +466,8 @@ export default function AutomationsPage() {
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">失敗した</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">未接続: 失敗回数の集計口が必要です</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">{failedRuns?.toLocaleString('ja-JP') ?? '—'}{failedRuns !== null ? '回' : ''}</p>
+          <p className="text-ink-faint mt-0.5 text-xs">部分成功を含む・この30日</p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">減らせた手作業</p>
@@ -486,8 +499,9 @@ export default function AutomationsPage() {
           <SelectField
             aria-label="並び順"
             value={sortOrder}
-            onChange={(event) => setSortOrder(event.target.value as 'priority' | 'name')}
+            onChange={(event) => setSortOrder(event.target.value as 'runs' | 'priority' | 'name')}
             options={[
+              { value: 'runs', label: '動いた回数が多い順' },
               { value: 'priority', label: '動く順' },
               { value: 'name', label: '名前順' },
             ]}
@@ -511,8 +525,8 @@ export default function AutomationsPage() {
               {label}
             </FilterChip>
           ))}
-          <span className="flex h-9 items-center rounded-full border border-hairline bg-canvas-sunken px-4 text-sm text-ink-faint" title="オートメーション別の失敗集計は未接続です">失敗あり —</span>
-          <span className="flex h-9 items-center rounded-full border border-hairline bg-canvas-sunken px-4 text-sm text-ink-faint" title="最終実行日時は未接続です">30日 動いていない —</span>
+          <span className="flex h-9 items-center rounded-full border border-hairline bg-canvas-sunken px-4 text-sm text-ink-faint">失敗あり {automations.filter((item) => item.failureCount30d > 0).length}</span>
+          <span className="flex h-9 items-center rounded-full border border-hairline bg-canvas-sunken px-4 text-sm text-ink-faint">30日 動いていない {automations.filter((item) => item.executionCount30d === 0).length}</span>
         </div>
       ) : null}
 
@@ -639,10 +653,13 @@ export default function AutomationsPage() {
               </div>
               <p className="truncate text-ink-secondary" title={conditionLabel(automation.conditions)}>{conditionLabel(automation.conditions)}</p>
               <p className="truncate text-ink-secondary" title={automation.actions.map(actionLabel).join('、')}>{automation.actions.map(actionLabel).join('、') || '処理なし'}</p>
-              <div><span className="text-ink-faint">—</span><span className="block text-[11px] text-ink-faint">未接続</span></div>
+              <div>
+                <span className="text-ink tabular-nums">{automation.executionCount30d.toLocaleString('ja-JP')}回</span>
+                {automation.failureCount30d > 0 ? <span className="text-danger block text-[11px]">失敗が{automation.failureCount30d}回</span> : null}
+              </div>
               <span className={automation.isActive ? 'font-semibold text-accent-deep' : 'font-semibold text-ink-faint'}>{automation.isActive ? '動いています' : '止めています'}</span>
               <div className="flex justify-end gap-2">
-                <Button disabled className="whitespace-nowrap" title="詳細画面は未接続です">中身を見る</Button>
+                <Button href={`/automations/drafts?id=${encodeURIComponent(automation.id)}`} className="whitespace-nowrap">中身を見る</Button>
                 <Button onClick={() => void handleToggleActive(automation)} className="whitespace-nowrap">止める・動かす</Button>
               </div>
             </div>

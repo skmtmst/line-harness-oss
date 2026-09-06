@@ -21,6 +21,7 @@ import {
 } from './change-impact'
 
 const EDIT = readFileSync(new URL('./edit/page.tsx', import.meta.url), 'utf8')
+const IMPACT_REVIEW = readFileSync(new URL('./impact-review.tsx', import.meta.url), 'utf8')
 
 /**
  * **ファイル全体を `toContain` で見ない。** 画面のどこかに同じ字が
@@ -191,28 +192,25 @@ describe('共通情報編集（uNBlA）の画面', () => {
 
   it('影響確認の節を必ず出す。読めないときも節ごと消さない', () => {
     expect(IMPACT_SECTION).toContain('影響確認')
-    expect(IMPACT_SECTION).toContain('{NOT_AVAILABLE}')
+    expect(IMPACT_SECTION).toContain(': NOT_AVAILABLE')
     expect(IMPACT_SECTION).toContain('impactStateText(impactState)')
   })
 
-  it('節の中で、変わる場所・送信済み・変更後の文を書き分ける', () => {
+  it('節の中で、変わる場所・送信済み・使用先の種類を書き分ける', () => {
     expect(IMPACT_SECTION).toContain('changeSummaryText(impact)')
     expect(IMPACT_SECTION).toContain('historicalText(impact)')
-    // 保存後の文と文字数（#773 でつながった）。
-    expect(IMPACT_SECTION).toContain('保存後の文：')
-    expect(IMPACT_SECTION).toContain('characterCountText(usage)')
+    expect(IMPACT_SECTION).toContain('usageGroups.map')
+    expect(IMPACT_SECTION).toContain('group.count.toLocaleString')
   })
 
-  it('保存後の文を作れない行を、空文字で埋めない', () => {
+  it('1件ずつ見る画面では、保存後の文を作れない行を空文字で埋めない', () => {
     // 空で出すと「保存すると空になる」と読める。
-    expect(IMPACT_SECTION).toContain('usage.nextPreview ?? (')
-    expect(IMPACT_SECTION).toContain('差し込みの目印を本文から読み取れませんでした')
+    expect(IMPACT_REVIEW).toContain("item.nextPreview ?? '—（未取得）'")
   })
 
-  it('上限を超える行は、いつ落ちるのかまで書く', () => {
-    // 落ちるのは保存の何日もあと。原因がこの操作だと結びつかない。
-    expect(IMPACT_SECTION).toContain('usage.exceedsCharacterLimit')
-    expect(IMPACT_SECTION).toContain('この通は送信のときに落ちます')
+  it('1件ずつ見る画面では、上限を超える行の文字数を強調する', () => {
+    expect(IMPACT_REVIEW).toContain('item.exceedsCharacterLimit')
+    expect(IMPACT_REVIEW).toContain('characterCountText(item)')
   })
 
   it('読み込めなかったときだけ再読み込みを出す', () => {
