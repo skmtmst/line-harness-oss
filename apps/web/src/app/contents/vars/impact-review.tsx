@@ -2,7 +2,9 @@
 
 import type { CommonVarChangeImpact } from '@line-crm/shared'
 import Link from 'next/link'
+import { useState } from 'react'
 import Button from '@/components/shared/button'
+import Pagination from '@/components/shared/pagination'
 import StickyBar from '@/components/shared/sticky-bar'
 import SummaryCard from '@/components/shared/summary-card'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -66,6 +68,9 @@ export default function ImpactReview({
   onSave: () => void
 }) {
   const rows = impact.items.filter((item) => item.changesOnSave)
+  const [page, setPage] = useState(1)
+  const pageCount = Math.max(1, Math.ceil(rows.length / 6))
+  const shownRows = rows.slice((page - 1) * 6, page * 6)
   const urgent = urgentImpactCount(impact)
   const overLimit = overLimitCount(impact)
 
@@ -141,7 +146,7 @@ export default function ImpactReview({
             </TableHeadRow>
           </thead>
           <tbody className="divide-hairline divide-y">
-            {rows.map((item) => (
+            {shownRows.map((item) => (
               <tr key={`${item.kind}-${item.href}-${item.name}`}>
                 <td className="px-3 py-3">
                   <p className="text-ink truncate text-sm font-semibold" title={item.name}>{item.name}</p>
@@ -161,9 +166,12 @@ export default function ImpactReview({
         </table>
       </div>
 
-      <p className="text-ink-faint mt-3 text-xs">
-        {impact.blockingTotal.toLocaleString('ja-JP')}か所中 1〜{Math.min(rows.length, 6).toLocaleString('ja-JP')}件を表示
-      </p>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-ink-faint text-xs">
+          {impact.blockingTotal.toLocaleString('ja-JP')}か所中 {rows.length === 0 ? 0 : (page - 1) * 6 + 1}〜{Math.min(page * 6, rows.length).toLocaleString('ja-JP')}件を表示
+        </p>
+        <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
+      </div>
 
       <StickyBar
         status={overLimit > 0
