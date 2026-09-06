@@ -66,7 +66,9 @@ describe('V6共通アクションの画面契約', () => {
     expect(LIST).toContain('failureCountThisMonth')
     expect(LIST).toContain('api.commonActions.csvUrl(selectedAccountId)')
     expect(LIST).toContain('古い版あり')
-    expect(LIST).toContain('items.slice(0, 6)')
+    expect(LIST).toContain('limit: PAGE_SIZE')
+    expect(LIST).toContain('offset: (page - 1) * PAGE_SIZE')
+    expect(LIST).toContain("aria-label=\"ページ送り\"")
   })
 
   it('閲覧権限と編集権限を画面でも分ける', () => {

@@ -17,6 +17,7 @@ import { useCanManageCommonActions } from '@/components/automations/use-common-a
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 
 type Filter = 'all' | 'published' | 'draft' | 'old_version' | 'unused'
+const PAGE_SIZE = 6
 
 const FILTERS: Array<{ value: Filter; label: string }> = [
   { value: 'all', label: 'すべて' },
@@ -40,6 +41,8 @@ export default function CommonActionsPage() {
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
   const deferredQuery = useDeferredValue(query)
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [automationCounts, setAutomationCounts] = useState<{ active: number; stopped: number } | null>(null)
@@ -49,6 +52,7 @@ export default function CommonActionsPage() {
     if (!selectedAccountId) {
       setItems([])
       setSummaryItems([])
+      setTotal(0)
       setLoading(false)
       return
     }
@@ -57,12 +61,21 @@ export default function CommonActionsPage() {
     try {
       const [summaryResponse, response, automationsResponse, templatesResponse] = await Promise.all([
         api.commonActions.list({ accountId: selectedAccountId }),
-        api.commonActions.list({ accountId: selectedAccountId, status: filter, query: deferredQuery }),
+        api.commonActions.list({
+          accountId: selectedAccountId,
+          status: filter,
+          query: deferredQuery,
+          limit: PAGE_SIZE,
+          offset: (page - 1) * PAGE_SIZE,
+        }),
         api.automations.list({ accountId: selectedAccountId }).catch(() => null),
         api.automations.templates(selectedAccountId).catch(() => null),
       ])
       if (summaryResponse.success) setSummaryItems(summaryResponse.data)
-      if (response.success) setItems(response.data)
+      if (response.success) {
+        setItems(response.data)
+        setTotal(response.pagination?.total ?? response.data.length)
+      }
       else setError(response.error)
       setAutomationCounts(automationsResponse?.success ? {
         active: automationsResponse.data.filter((item) => item.isActive).length,
@@ -74,7 +87,7 @@ export default function CommonActionsPage() {
     } finally {
       setLoading(false)
     }
-  }, [deferredQuery, filter, selectedAccountId])
+  }, [deferredQuery, filter, page, selectedAccountId])
 
   useEffect(() => {
     if (!accountLoading) void load()
@@ -138,8 +151,8 @@ export default function CommonActionsPage() {
         {selectedAccountId ? <Button href={api.commonActions.csvUrl(selectedAccountId)}>CSVで書き出す</Button> : null}
         <SearchField
           value={query}
-          onChange={setQuery}
-          onClear={() => setQuery('')}
+          onChange={(value) => { setQuery(value); setPage(1) }}
+          onClear={() => { setQuery(''); setPage(1) }}
           placeholder="アクション名・中の処理で探す"
           aria-label="共通アクションを検索"
           loading={loading && query !== deferredQuery}
@@ -161,7 +174,7 @@ export default function CommonActionsPage() {
               ? 'bg-success-bg text-success rounded-pill border border-success px-3 py-1.5 text-xs font-semibold'
               : 'border-hairline text-ink-secondary rounded-pill border bg-canvas px-3 py-1.5 text-xs'}
           >
-            <input className="sr-only" type="radio" name="common-action-filter" value={option.value} checked={filter === option.value} onChange={() => setFilter(option.value)} />
+            <input className="sr-only" type="radio" name="common-action-filter" value={option.value} checked={filter === option.value} onChange={() => { setFilter(option.value); setPage(1) }} />
             {option.label} {filterCount(option.value)}
           </label>
         ))}
@@ -191,7 +204,7 @@ export default function CommonActionsPage() {
               </TableHeadRow>
             </thead>
             <tbody>
-              {items.slice(0, 6).map((item) => (
+              {items.map((item) => (
                 <Tr key={item.id}>
                   <NameCell name={<span className="truncate" title={item.name}>{item.name}</span>} sub={<span className="truncate" title={item.description ?? undefined}>{item.description || '説明はありません'}</span>} />
                   <Td>
@@ -236,8 +249,14 @@ export default function CommonActionsPage() {
       )}
       {!loading && !error && items.length > 0 ? (
         <div className="border-hairline flex items-center justify-between border-x border-b bg-canvas px-4 py-3 text-xs text-ink-faint">
-          <span>{items.length}件中 1〜{Math.min(6, items.length)}件</span>
-          <span>前へ　<strong className="text-action">1</strong>　2　3　…　次へ</span>
+          <span>{total}件中 {(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)}件</span>
+          <div className="flex items-center gap-3" aria-label="ページ送り">
+            <button type="button" disabled={page === 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="text-action disabled:text-ink-faint">前へ</button>
+            {Array.from({ length: Math.ceil(total / PAGE_SIZE) }, (_, index) => index + 1).map((pageNumber) => (
+              <button key={pageNumber} type="button" aria-current={pageNumber === page ? 'page' : undefined} onClick={() => setPage(pageNumber)} className={pageNumber === page ? 'text-action font-bold' : 'text-ink-faint'}>{pageNumber}</button>
+            ))}
+            <button type="button" disabled={page * PAGE_SIZE >= total} onClick={() => setPage((value) => value + 1)} className="text-action disabled:text-ink-faint">次へ</button>
+          </div>
         </div>
       ) : null}
     </div>
