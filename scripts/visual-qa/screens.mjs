@@ -3676,8 +3676,6 @@ export const CAPTURED_AT = {
   21: [
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['VLMGH','DEX0k','q4lajm','WeXbL','ymXJK','i9sQP'],
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
-    { pr: 1050, head: '8d3557ce0', on: '2026-09-07', screens: ['VLMGH','DEX0k','q4lajm','WeXbL','ymXJK','i9sQP'],
-      note: 'Issue #234。6 Node・18状態を1440px・1920pxで撮影し、★V6設計の1920px画像と並べて確認。全36枚で横はみ出し0。要修正2画面を構造一致・データ未接続へ更新し、残るAPI・正本契約の差を判定注記へ記録した。' },
   ],
   22: [
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['Qu6Vk'],
@@ -4062,6 +4060,8 @@ export const CAPTURED_AT = {
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['VLMGH', 'q4lajm', 'WeXbL', 'i9sQP'], note: 'development そのもので撮った' },
     { pr: 526, head: '1c91a7bc', on: '2026-08-30', screens: ['HpKyF', 'VLMGH'], note: '誕生日配信の効かない「何日後」を外し、3日前10:00の固定を書いた。Workerの birthdayDeliveryTarget と突き合わせ済み' },
     { pr: 620, head: 'ed5c0932', on: '2026-08-31', screens: ['ymXJK'], note: 'Claudeが実装して撮った。コラムの下書き作成（#618 の作成契約の上）。通常・入力の誤り・重複・権限不足・保存失敗の5状態。**本文エディタは作っていない**——引き継ぎが「本文の入力欄を作らない」と定めており、記事の正本はEC側' },
+    { pr: 1050, head: '8d3557ce0', on: '2026-09-07', screens: ['VLMGH','DEX0k','q4lajm','WeXbL','ymXJK','i9sQP'],
+      note: 'Issue #234。6 Node・18状態を1440px・1920pxで撮影し、★V6設計の1920px画像と並べて確認。全36枚で横はみ出し0。要修正2画面を構造一致・データ未接続へ更新し、残るAPI・正本契約の差を判定注記へ記録した。' },
   ],
   22: [
     { pr: 447, head: '65adbc59', on: '2026-08-28' },
