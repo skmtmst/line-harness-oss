@@ -95,4 +95,5 @@ export * from './dashboard-preferences';
 export * from './booking-customers';
 export * from './operation-audit';
 export * from './operations';
+export * from './operations-health';
 export * from './friend-bulk-runs';

@@ -84,6 +84,21 @@ describe('V6 自動応答一覧の契約', () => {
     expect(EDITOR).toContain("step === 'response'")
   })
 
+  it('4画面を版管理・実行集計・競合集計の実APIへ接続する', () => {
+    expect(LIST).toContain('actionExecutionCount')
+    expect(LIST).toContain('api.autoReplies.summary(selectedAccountId)')
+    expect(LIST).toContain('summaryRes.data.conflictCount')
+    expect(EDIT_PAGE).toContain('api.autoReplies.getDraft(id)')
+    expect(EDIT_PAGE).toContain('api.autoReplies.conflicts(id)')
+    expect(EDIT_PAGE).toContain('toVersionDraft(draftRes.data')
+    for (const field of ['internalMemo', 'replyDelaySeconds', 'unmatchedAction', 'expectedVersion']) {
+      expect(EDITOR).toContain(field)
+    }
+    expect(EDITOR).toContain('api.autoReplies.saveDraft(draft.id')
+    expect(EDITOR).not.toContain('現在のAPIは遅延秒数を保存しません。')
+    expect(EDITOR).not.toContain('現在のAPIは未一致時の別返信を保存しません。')
+  })
+
   it('競合画面は現在のルールを含む優先順位と判定例・監視を同時に示す', () => {
     for (const word of ['arp-priorityList', 'このルール', '判定例', '運用監視', 'ループ防止']) {
       expect(PUBLISH).toContain(word)

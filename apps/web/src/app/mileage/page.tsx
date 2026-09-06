@@ -14,19 +14,15 @@ import Select from '@/components/shared/select'
 import SummaryCard from '@/components/shared/summary-card'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
-import { api, type MileageAdminOverview, type MileageRule } from '@/lib/api'
+import {
+  api,
+  type MileageEarningRuleV6,
+  type MileageEarningRulesV6Overview,
+  type MileageFriendsV6Overview,
+} from '@/lib/api'
 import { formatMileageDate } from './mileage-display'
 import { mileagePaginationTotal } from './mileage-response-state'
-import {
-  RULE_FILTERS,
-  RULE_SORTS,
-  earningRulesCsv,
-  ruleEventLabel,
-  ruleLimitLabel,
-  selectRules,
-  type RuleFilter,
-  type RuleSort,
-} from './earning-rule-view'
+import { ruleEventLabel } from './earning-rule-view'
 import MileageHistoryTab from './mileage-history-tab'
 import ActionScoreTab from './action-score-tab'
 
@@ -46,8 +42,10 @@ const TABS = [
 ] as const
 
 const EVENT_LABELS: Record<string, string> = {
+  friend_added: '友だち登録',
   message_received: 'メッセージ',
   link_clicked: 'リンククリック',
+  broadcast_link_clicked: '配信リンククリック',
   form_submitted: 'フォーム',
   booking_created: '予約',
   affiliate_conversion_approved: '紹介成果',
@@ -59,6 +57,7 @@ const EVENT_LABELS: Record<string, string> = {
   instagram_comment_created: 'Instagramコメント',
   instagram_story_mentioned: 'ストーリーズ',
   instagram_line_returned: 'LINE帰還',
+  inflow_return: 'LINE帰還',
   friend_registered: '友だち登録',
   friend_following_7d: '継続7日',
   friend_following_30d: '継続30日',
@@ -73,21 +72,51 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat('ja-JP').format(value)
 }
 
-function isMileageAdminOverview(value: unknown): value is MileageAdminOverview {
+function rankLabel(rank: string | null) {
+  if (rank === 'gold') return 'ゴールド'
+  if (rank === 'silver') return 'シルバー'
+  if (rank === 'bronze') return 'ブロンズ'
+  return null
+}
+
+function isMileageFriendsV6Overview(value: unknown): value is MileageFriendsV6Overview {
   if (!value || typeof value !== 'object') return false
-  const candidate = value as Partial<MileageAdminOverview>
-  return Array.isArray(candidate.members)
+  const candidate = value as Partial<MileageFriendsV6Overview>
+  return Array.isArray(candidate.items)
     && !!candidate.summary
     && typeof candidate.summary.totalMembers === 'number'
-    && typeof candidate.summary.totalAvailable === 'number'
-    && typeof candidate.summary.activeMembers30d === 'number'
-    && typeof candidate.summary.totalActions === 'number'
-    && typeof candidate.summary.queuedEvents === 'number'
+    && typeof candidate.summary.withBalanceCount === 'number'
+    && typeof candidate.summary.available === 'number'
+    && typeof candidate.summary.pending === 'number'
     && !!candidate.pagination
     && typeof candidate.pagination.total === 'number'
     && typeof candidate.pagination.limit === 'number'
     && typeof candidate.pagination.offset === 'number'
 }
+
+function isMileageEarningRulesV6Overview(value: unknown): value is MileageEarningRulesV6Overview {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<MileageEarningRulesV6Overview>
+  return Array.isArray(candidate.items)
+    && !!candidate.pagination
+    && typeof candidate.pagination.total === 'number'
+    && typeof candidate.unassignedLegacyCount === 'number'
+}
+
+type RuleFilter = 'published' | 'stopped'
+type RuleSort = 'order' | 'name' | 'amount' | 'granted'
+
+const RULE_FILTERS: Array<{ key: RuleFilter; label: string }> = [
+  { key: 'published', label: '動いている' },
+  { key: 'stopped', label: '止めている' },
+]
+
+const RULE_SORTS: Array<{ value: RuleSort; label: string }> = [
+  { value: 'order', label: '決めた並び順' },
+  { value: 'granted', label: '付いた回数が多い順' },
+  { value: 'name', label: '名前順' },
+  { value: 'amount', label: 'マイルが多い順' },
+]
 
 
 function MileagePageInner() {
@@ -95,21 +124,20 @@ function MileagePageInner() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const latestAccountRef = useRef(selectedAccountId)
   latestAccountRef.current = selectedAccountId
-  const [overview, setOverview] = useState<MileageAdminOverview | null>(null)
-  const [rules, setRules] = useState<MileageRule[]>([])
-  const [amounts, setAmounts] = useState<Record<string, string>>({})
+  const [overview, setOverview] = useState<MileageFriendsV6Overview | null>(null)
+  const [ruleOverview, setRuleOverview] = useState<MileageEarningRulesV6Overview | null>(null)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [offset, setOffset] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
-  const [actionError, setActionError] = useState('')
   const [savingRuleId, setSavingRuleId] = useState<string | null>(null)
   const [ruleFilters, setRuleFilters] = useState<RuleFilter[]>([])
-  const [ruleSort, setRuleSort] = useState<RuleSort>('newest')
+  const [ruleSort, setRuleSort] = useState<RuleSort>('order')
   const [tabCounts, setTabCounts] = useState<{ balances: number | null; rules: number | null; rewards: number | null }>({ balances: null, rules: null, rewards: null })
   const [canAdjustMileage, setCanAdjustMileage] = useState(false)
   const overviewTotal = mileagePaginationTotal(overview)
+  const rules = ruleOverview?.items ?? []
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -120,11 +148,16 @@ function MileagePageInner() {
   }, [searchInput])
 
   const loadRules = useCallback(async () => {
-    const res = await api.mileage.rules()
-    if (!res.success || !Array.isArray(res.data)) throw new Error('invalid_mileage_rules')
-    setRules(res.data)
-    setAmounts(Object.fromEntries(res.data.map((rule) => [rule.id, String(rule.amount)])))
-  }, [])
+    const accountAtRequest = selectedAccountId
+    if (!accountAtRequest) {
+      setRuleOverview(null)
+      return
+    }
+    const res = await api.mileage.earningRulesV6({ accountId: accountAtRequest, limit: 100, offset: 0 })
+    if (accountAtRequest !== latestAccountRef.current) return
+    if (!res.success || !isMileageEarningRulesV6Overview(res.data)) throw new Error('invalid_mileage_rules')
+    setRuleOverview(res.data)
+  }, [selectedAccountId])
 
   const loadOverview = useCallback(async () => {
     const accountAtRequest = selectedAccountId
@@ -132,7 +165,7 @@ function MileagePageInner() {
       setOverview(null)
       return
     }
-    const res = await api.mileage.overview({
+    const res = await api.mileage.friendsV6({
       accountId: accountAtRequest,
       search: search || undefined,
       limit: PAGE_SIZE,
@@ -140,7 +173,7 @@ function MileagePageInner() {
     })
     if (accountAtRequest !== latestAccountRef.current) return
     if (!res.success) throw new Error(res.error)
-    if (!isMileageAdminOverview(res.data)) throw new Error('invalid_mileage_overview')
+    if (!isMileageFriendsV6Overview(res.data)) throw new Error('invalid_mileage_overview')
     setOverview(res.data)
   }, [offset, search, selectedAccountId])
 
@@ -161,6 +194,7 @@ function MileagePageInner() {
     if (accountLoading) return
     setOffset(0)
     setOverview(null)
+    setRuleOverview(null)
     void reloadAll()
   }, [accountLoading, reloadAll])
 
@@ -171,8 +205,8 @@ function MileagePageInner() {
       return () => { current = false }
     }
     void Promise.allSettled([
-      api.mileage.overview({ accountId: selectedAccountId, limit: 1, offset: 0 }),
-      api.mileage.rules(),
+      api.mileage.friendsV6({ accountId: selectedAccountId, limit: 1, offset: 0 }),
+      api.mileage.earningRulesV6({ accountId: selectedAccountId, limit: 1, offset: 0 }),
       api.mileage.rewards(selectedAccountId),
     ]).then(([balances, earningRules, rewards]) => {
       if (!current) return
@@ -180,8 +214,8 @@ function MileagePageInner() {
       const ruleResponse = earningRules.status === 'fulfilled' ? earningRules.value : null
       const rewardResponse = rewards.status === 'fulfilled' ? rewards.value : null
       setTabCounts({
-        balances: balanceResponse?.success && isMileageAdminOverview(balanceResponse.data) ? balanceResponse.data.summary.totalMembers : null,
-        rules: ruleResponse?.success && Array.isArray(ruleResponse.data) ? ruleResponse.data.length : null,
+        balances: balanceResponse?.success && isMileageFriendsV6Overview(balanceResponse.data) ? balanceResponse.data.summary.totalMembers : null,
+        rules: ruleResponse?.success && isMileageEarningRulesV6Overview(ruleResponse.data) ? ruleResponse.data.pagination.total : null,
         rewards: rewardResponse?.success && Array.isArray(rewardResponse.data?.rewards) ? rewardResponse.data.rewards.length : null,
       })
     })
@@ -199,43 +233,45 @@ function MileagePageInner() {
     return () => { current = false }
   }, [])
 
-  const updateRule = async (rule: MileageRule, updates: Partial<MileageRule>) => {
+  const toggleRule = async (rule: MileageEarningRuleV6) => {
     setSavingRuleId(rule.id)
-    setActionError('')
     try {
-      const res = await api.mileage.updateRule(rule.id, updates)
+      const res = await api.mileage.updateRule(rule.id, { isActive: rule.published.status !== 'published' })
       if (!res.success) throw new Error(res.error)
-      await Promise.all([loadRules(), loadOverview()])
+      await loadRules()
     } catch {
-      setActionError('たまる決めごとを更新できませんでした。もう一度お試しください。')
+      setLoadError('たまる決めごとを更新できませんでした。もう一度お試しください。')
     } finally {
       setSavingRuleId(null)
     }
   }
 
-  const saveAmount = async (rule: MileageRule) => {
-    const amount = Number(amounts[rule.id])
-    if (!Number.isInteger(amount) || amount <= 0) {
-      setActionError('付与マイルは1以上の整数で入力してください。')
-      return
-    }
-    if (amount === rule.amount) return
-    await updateRule(rule, { amount })
-  }
-
   const totalPages = Math.max(1, Math.ceil((overview?.pagination?.total ?? 0) / PAGE_SIZE))
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1
 
-  const shownRules = useMemo(
-    () => selectRules(rules, { filters: ruleFilters, sort: ruleSort }),
-    [rules, ruleFilters, ruleSort],
-  )
+  const shownRules = useMemo(() => {
+    const filtered = rules.filter((rule) => ruleFilters.length === 0
+      || ruleFilters.includes(rule.published.status))
+    return [...filtered].sort((a, b) => {
+      if (ruleSort === 'granted') return b.metrics30d.granted - a.metrics30d.granted
+      if (ruleSort === 'name') return a.draft.name.localeCompare(b.draft.name, 'ja')
+      if (ruleSort === 'amount') return b.draft.amount - a.draft.amount
+      return a.draft.sortOrder - b.draft.sortOrder
+    })
+  }, [ruleFilters, ruleSort, rules])
 
   const exportRulesCsv = () => {
-    const csv = earningRulesCsv(shownRules, {
-      event: (eventType) => ruleEventLabel(eventType, EVENT_LABELS),
-      date: formatMileageDate,
-    })
+    const rows = shownRules.map((rule) => [
+      rule.draft.name,
+      ruleEventLabel(rule.draft.eventType, EVENT_LABELS),
+      rule.draft.amount,
+      rule.metrics30d.granted,
+      rule.draft.expiresAfterDays ?? '失効なし',
+      rule.published.status === 'published' ? '動いています' : '止めています',
+    ])
+    const csv = [['決めごと', '対象の行動', 'たまるマイル', 'この30日の付与回数', '失効', '状態'], ...rows]
+      .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))
+      .join('\r\n')
     const url = URL.createObjectURL(
       new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }),
     )
@@ -247,7 +283,11 @@ function MileagePageInner() {
   }
 
   const summary = overview?.summary
-  const members = overview?.members ?? []
+  const members = overview?.items ?? []
+  const activeRules = rules.filter((rule) => rule.published.status === 'published')
+  const granted30d = rules.reduce((sum, rule) => sum + rule.metrics30d.granted, 0)
+  const excluded30d = rules.reduce((sum, rule) => sum + rule.metrics30d.excluded, 0)
+  const topRule = [...rules].sort((a, b) => b.metrics30d.granted - a.metrics30d.granted)[0] ?? null
   const displayTabs = useMemo(() => TABS.map((item) => {
     const count = item.key === 'balances' ? tabCounts.balances
       : item.key === 'earning-rules' ? tabCounts.rules
@@ -260,12 +300,13 @@ function MileagePageInner() {
     if (members.length === 0) return
     const rows = members.map((member) => [
       member.displayName,
-      member.accountNames.join(' / '),
+      member.lineAccount.name,
       member.available,
       member.pending,
-      member.lastActivityAt ?? '',
+      member.expiringMiles30d ?? '',
+      member.lastChangedAt ?? '',
     ])
-    const csv = [['友だち', 'LINEアカウント', 'いまの残高', '確定待ち', '最終行動'], ...rows]
+    const csv = [['友だち', 'LINEアカウント', 'いまの残高', '確定待ち', '30日以内に失効', '最終変動'], ...rows]
       .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))
       .join('\n')
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
@@ -292,8 +333,6 @@ function MileagePageInner() {
               : undefined}
         />
       </div>
-
-      {actionError && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{actionError}</div>}
 
       {!selectedAccountId && !accountLoading ? (
         <ListState
@@ -322,17 +361,15 @@ function MileagePageInner() {
 
       {tab === 'balances' && !loading && !loadError && <>
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <SummaryCard variant="v6" title="マイルを持っている友だち" value={summary?.totalMembers ?? null} unit="人" detail="持っていない人の数は未取得" />
-        <SummaryCard variant="v6" title="たまっているマイル" value={summary?.totalAvailable ?? null} unit=" マイル" detail="会社としての「あとで返すぶん」です" />
-        <SummaryCard variant="v6" title="今月 たまった" value={null} unit=" マイル" detail="月別集計が接続されると表示" badge="未取得" badgeTone="neutral" />
+        <SummaryCard variant="v6" title="マイルを持っている友だち" value={summary?.withBalanceCount ?? null} unit="人" detail={summary ? `選択中 ${summary.totalMembers.toLocaleString('ja-JP')}人のうち` : '選択中のLINEアカウント'} />
+        <SummaryCard variant="v6" title="たまっているマイル" value={summary?.available ?? null} unit=" マイル" detail={`確定待ち ${summary?.pending.toLocaleString('ja-JP') ?? '—'} マイル`} />
+        <SummaryCard variant="v6" title="今月の増減" value={null} unit=" マイル" detail="一覧の各友だちでは確認できます" badge="全体未取得" badgeTone="neutral" />
         <SummaryCard
           variant="v6"
           title="もうすぐ消えるマイル"
-          value={null}
+          value={summary?.expiringMiles30d ?? null}
           unit=" マイル"
-          detail="失効ロットが接続されると表示"
-          badge="未取得"
-          badgeTone="neutral"
+          detail={summary?.expiringMiles30d == null ? '期限付きの付与記録はありません' : '30日以内に期限を迎える分'}
         />
       </div>
       <NoteBar className="mb-4">
@@ -358,7 +395,7 @@ function MileagePageInner() {
           </span>
         ))}
         <span className="rounded-full border border-status-warn bg-status-warn-soft px-3 py-2 text-xs font-semibold text-status-warn-deep">
-          消える予定 — 未取得
+          30日以内に消える {summary?.expiringMiles30d == null ? '0' : formatNumber(summary.expiringMiles30d)} マイル
         </span>
         <span className="ml-auto rounded-control border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-ink-secondary">
           残高が多い順
@@ -370,10 +407,10 @@ function MileagePageInner() {
         {/* 設計 N46cQ に本文見出しは無い。画面名はタブが持っているので、
             ここで見出しをもう一度書かない。 */}
         {!loading && !loadError ? <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <SummaryCard variant="v6" title="動いている決めごと" value={rules.filter((rule) => rule.isActive).length} unit="つ" detail={`止めているもの ${rules.filter((rule) => !rule.isActive).length}つ`} />
-          <SummaryCard variant="v6" title="この30日で付いたマイル" value={null} unit=" マイル" detail="期間集計が接続されると表示" badge="未取得" badgeTone="neutral" />
-          <SummaryCard variant="v6" title="いちばん付いている" value={null} unit="" detail="決めごとの利用集計は未接続" badge="未取得" badgeTone="neutral" />
-          <SummaryCard variant="v6" title="1人あたりの平均" value={null} unit=" マイル" detail="保有者別集計が接続されると表示" badge="未取得" badgeTone="neutral" />
+          <SummaryCard variant="v6" title="動いている決めごと" value={activeRules.length} unit="つ" detail={`止めているもの ${rules.length - activeRules.length}つ`} />
+          <SummaryCard variant="v6" title="この30日の付与回数" value={granted30d} unit="回" detail="実際に付与記録になった回数" />
+          <SummaryCard variant="v6" title="いちばん動いた決めごと" value={topRule?.metrics30d.granted ?? null} unit="回" detail={topRule?.draft.name ?? 'まだ付与記録はありません'} />
+          <SummaryCard variant="v6" title="対象外になった行動" value={excluded30d} unit="回" detail="対象候補のうち付与しなかった回数" />
         </div> : null}
         <NoteBar>
           どんなことをしたら何マイル付けるかを決めます。付与数を変えると、変更後に起きた行動から新しい値を使います。
@@ -448,48 +485,47 @@ function MileagePageInner() {
             <thead>
               <TableHeadRow>
                 <Th className="w-[28%]">何をしてくれたら</Th>
-                <Th className="w-[16%]">対象の行動</Th>
-                <Th className="w-[14%]" align="right">たまるマイル</Th>
-                <Th className="w-[15%]">何回まで</Th>
-                <Th className="w-[12%]" align="center">状態</Th>
-                <Th className="w-[15%]" align="center">操作</Th>
+                <Th className="w-[15%]">対象の行動</Th>
+                <Th className="w-[12%]" align="right">たまるマイル</Th>
+                <Th className="w-[16%]">有効期間・失効</Th>
+                <Th className="w-[12%]" align="right">この30日</Th>
+                <Th className="w-[10%]" align="center">状態</Th>
+                <Th className="w-[12%]" align="center">操作</Th>
               </TableHeadRow>
             </thead>
             <tbody className="divide-hairline divide-y">
               {shownRules.map((rule) => (
                 <tr key={rule.id} className="hover:bg-canvas-sunken">
-                  <td className="text-ink px-4 py-3 text-sm font-medium">{rule.name}</td>
+                  <td className="text-ink px-4 py-3 text-sm font-medium">
+                    <p className="truncate" title={rule.draft.name}>{rule.draft.name}</p>
+                    <p className="mt-1 text-xs font-normal text-ink-faint">下書き v{rule.draftVersion}</p>
+                  </td>
                   <td className="text-ink-secondary px-4 py-3 text-sm">
-                    {ruleEventLabel(rule.eventType, EVENT_LABELS)}
+                    {ruleEventLabel(rule.draft.eventType, EVENT_LABELS)}
                   </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <input
-                        type="number"
-                        min={1}
-                        aria-label={`${rule.name}の付与マイル`}
-                        value={amounts[rule.id] ?? rule.amount}
-                        onChange={(event) => setAmounts((current) => ({ ...current, [rule.id]: event.target.value }))}
-                        onBlur={() => void saveAmount(rule)}
-                        onKeyDown={(event) => { if (event.key === 'Enter') void saveAmount(rule) }}
-                        className="border-hairline rounded-control text-ink focus:ring-accent w-24 border px-3 py-2 text-right text-sm font-semibold tabular-nums focus:ring-2 focus:outline-none"
-                      />
-                      <span className="text-ink-faint text-xs">mile</span>
-                    </div>
+                  <td className="px-4 py-3 text-right font-semibold tabular-nums">
+                    {formatNumber(rule.draft.amount)} <span className="text-xs font-normal text-ink-faint">マイル</span>
                   </td>
-                  <td className="text-ink-secondary px-4 py-3 text-sm">{ruleLimitLabel(rule)}</td>
+                  <td className="px-4 py-3 text-xs text-ink-secondary">
+                    <p>{rule.draft.validFrom || rule.draft.validUntil ? `${rule.draft.validFrom ? formatMileageDate(rule.draft.validFrom) : '開始指定なし'} 〜 ${rule.draft.validUntil ? formatMileageDate(rule.draft.validUntil) : '終了指定なし'}` : '期間の指定なし'}</p>
+                    <p className="mt-1 text-ink-faint">{rule.draft.expiresAfterDays == null ? '失効なし' : `付いてから${rule.draft.expiresAfterDays}日`}</p>
+                  </td>
+                  <td className="px-4 py-3 text-right text-sm tabular-nums">
+                    <p className="font-semibold text-ink">{formatNumber(rule.metrics30d.granted)}回</p>
+                    <p className="mt-1 text-xs text-ink-faint">対象外 {formatNumber(rule.metrics30d.excluded)}回</p>
+                  </td>
                   <td className="px-4 py-3 text-center">
-                    {rule.isActive ? <Chip tone="ok">動いています</Chip> : <Chip>止めています</Chip>}
+                    {rule.published.status === 'published' ? <Chip tone="ok">動いています</Chip> : <Chip>止めています</Chip>}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <Button
                       disabled={savingRuleId === rule.id}
-                      onClick={() => void updateRule(rule, { isActive: !rule.isActive })}
-                      aria-label={`${rule.name}を${rule.isActive ? '停止' : '再開'}する`}
+                      onClick={() => void toggleRule(rule)}
+                      aria-label={`${rule.draft.name}を${rule.published.status === 'published' ? '停止' : '再開'}する`}
                     >
                       {savingRuleId === rule.id
                         ? '反映しています'
-                        : rule.isActive ? '決めごとを停止' : '決めごとを再開'}
+                        : rule.published.status === 'published' ? '決めごとを停止' : '決めごとを再開'}
                     </Button>
                   </td>
                 </tr>
@@ -536,24 +572,25 @@ function MileagePageInner() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {members.map((member) => {
+                  const displayRank = rankLabel(member.rank)
                   return (
-                    <tr key={member.identityKey} className="hover:bg-gray-50/70">
+                    <tr key={member.friendId} className="hover:bg-gray-50/70">
                       <td className="px-4 py-3">
                         <p className="truncate text-sm font-semibold text-ink" title={member.displayName}>{member.displayName}</p>
-                        <p className="mt-1 truncate text-xs text-ink-faint" title={member.accountNames.join('・')}>{member.accountNames.join('・') || 'LINEアカウント未取得'}</p>
+                        <p className="mt-1 truncate text-xs text-ink-faint" title={member.lineAccount.name}>{member.lineAccount.name}</p>
                       </td>
-                      <td className="px-4 py-4 text-sm text-ink-faint">—<span className="ml-1 text-xs">未取得</span></td>
+                      <td className="px-4 py-4 text-sm text-ink-secondary" title={member.rankReason}>{displayRank ?? <><span>—</span><span className="ml-1 text-xs text-ink-faint">未設定</span></>}</td>
                       <td className="px-4 py-4 text-right">
                         <p className="font-bold text-accent-hover">{formatNumber(member.available)}</p>
                         {member.pending > 0 && <p className="text-[10px] text-amber-600">保留 {formatNumber(member.pending)}</p>}
                       </td>
-                      <td className="px-4 py-4 text-right text-sm text-ink-faint">—<span className="ml-1 text-xs">未取得</span></td>
-                      <td className="px-4 py-4 text-sm text-ink-faint">—<span className="ml-1 text-xs">未取得</span></td>
-                      <td className="px-4 py-4 text-xs text-ink-secondary">{formatMileageDate(member.lastActivityAt)}</td>
+                      <td className={`px-4 py-4 text-right text-sm font-semibold tabular-nums ${member.monthChange < 0 ? 'text-danger' : 'text-accent-hover'}`}>{member.monthChange > 0 ? '+' : ''}{formatNumber(member.monthChange)}</td>
+                      <td className="px-4 py-4 text-sm text-ink-secondary">{member.expiringMiles30d == null ? 'なし' : `${formatNumber(member.expiringMiles30d)} マイル`}</td>
+                      <td className="px-4 py-4 text-xs text-ink-secondary">{formatMileageDate(member.lastChangedAt)}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-2">
-                          <Button href={`/mileage/friends/detail?id=${encodeURIComponent(member.primaryFriendId)}`}>明細を見る</Button>
-                          {canAdjustMileage ? <Button href={`/mileage/friends/detail?id=${encodeURIComponent(member.primaryFriendId)}&adjust=1`}>増やす・減らす</Button> : null}
+                          <Button href={`/mileage/friends/detail?id=${encodeURIComponent(member.friendId)}`}>明細を見る</Button>
+                          {canAdjustMileage ? <Button href={`/mileage/friends/detail?id=${encodeURIComponent(member.friendId)}&adjust=1`}>増やす・減らす</Button> : null}
                         </div>
                       </td>
                     </tr>

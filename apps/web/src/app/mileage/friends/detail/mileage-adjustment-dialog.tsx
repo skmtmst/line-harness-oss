@@ -56,6 +56,8 @@ export default function MileageAdjustmentDialog({
   const [reasonCategory, setReasonCategory] = useState<ReasonCategory>('customer_support')
   const [reason, setReason] = useState('')
   const [sourceReferenceId, setSourceReferenceId] = useState('')
+  const [notifyFriend, setNotifyFriend] = useState(true)
+  const [expiresOn, setExpiresOn] = useState('')
   const [policy, setPolicy] = useState<MileageAdjustmentPolicy | null>(null)
   const [policyLoading, setPolicyLoading] = useState(false)
   const [policyThresholdText, setPolicyThresholdText] = useState('')
@@ -75,6 +77,8 @@ export default function MileageAdjustmentDialog({
     setReasonCategory('customer_support')
     setReason('')
     setSourceReferenceId('')
+    setNotifyFriend(true)
+    setExpiresOn('')
     setStep('input')
     setError('')
     setBusy(false)
@@ -97,10 +101,12 @@ export default function MileageAdjustmentDialog({
     if (!reason.trim()) return '詳しい理由を入力してください'
     if (reason.trim().length > 500) return '詳しい理由は500文字以内で入力してください'
     if (sourceReferenceId.trim().length > 128) return '調整元IDは128文字以内で入力してください'
+    if (expiresOn && direction !== 'increase') return '有効期限はマイルを増やすときだけ指定できます'
+    if (expiresOn && new Date(`${expiresOn}T23:59:59+09:00`).getTime() <= Date.now()) return '有効期限は明日以降を選んでください'
     if (!policyLoading && !policy?.configured) return '高額調整の承認境界が未設定です。オーナーが先に設定してください。'
-    if (highValue) return `${policy?.approvalThreshold?.toLocaleString('ja-JP')} mile以上は別のオーナー承認が必要です。`
+    if (highValue) return `${policy?.approvalThreshold?.toLocaleString('ja-JP')} マイル以上は別のオーナー承認が必要です。`
     return null
-  }, [amount, currentBalance, direction, highValue, policy, policyLoading, reason, sourceReferenceId])
+  }, [amount, currentBalance, direction, expiresOn, highValue, policy, policyLoading, reason, sourceReferenceId])
 
   const submit = async () => {
     if (step === 'input') {
@@ -113,7 +119,7 @@ export default function MileageAdjustmentDialog({
     setBusy(true)
     setError('')
     try {
-      await api.mileage.adjust({
+      const response = await api.mileage.adjust({
         accountId,
         friendId,
         direction,
@@ -121,7 +127,10 @@ export default function MileageAdjustmentDialog({
         reasonCategory,
         reason: reason.trim(),
         sourceReferenceId: sourceReferenceId.trim() || undefined,
+        expiresAt: expiresOn ? new Date(`${expiresOn}T23:59:59+09:00`).toISOString() : undefined,
+        notifyFriend,
       }, idempotencyKey.current)
+      if (!response.success) throw new Error(response.error)
       await onCompleted()
       onCancel()
     } catch (caught) {
@@ -175,7 +184,7 @@ export default function MileageAdjustmentDialog({
           <section className="rounded-control bg-canvas-sunken p-4">
             <p className="text-xs font-semibold text-ink-faint">だれのマイルを動かしますか</p>
             <p className="mt-2 font-bold text-ink">{friendName}</p>
-            <p className="mt-1 text-sm text-ink-secondary">いまの残高 {currentBalance.toLocaleString('ja-JP')} mile</p>
+            <p className="mt-1 text-sm text-ink-secondary">いまの残高 {currentBalance.toLocaleString('ja-JP')} マイル</p>
           </section>
 
           {step === 'input' ? (
@@ -210,6 +219,24 @@ export default function MileageAdjustmentDialog({
               <Field label="問い合わせ・注文・調整元ID" htmlFor="mileage-adjustment-reference" note="分かる場合だけ入力してください。">
                 <TextInput id="mileage-adjustment-reference" value={sourceReferenceId} onChange={(event) => setSourceReferenceId(event.target.value)} />
               </Field>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="この分の有効期限" htmlFor="mileage-adjustment-expiration" note={direction === 'increase' ? '空欄なら期限なしです。' : '減らすときは指定できません。'}>
+                  <TextInput
+                    id="mileage-adjustment-expiration"
+                    type="date"
+                    value={expiresOn}
+                    disabled={direction === 'decrease'}
+                    onChange={(event) => setExpiresOn(event.target.value)}
+                  />
+                </Field>
+                <label className="flex items-start gap-2 rounded-control border border-hairline p-3 text-sm text-ink-secondary">
+                  <input type="checkbox" checked={notifyFriend} onChange={(event) => setNotifyFriend(event.target.checked)} className="mt-0.5" />
+                  <span>
+                    友だちに知らせる
+                    <span className="mt-1 block text-xs text-ink-faint">増減したマイルと変更後の残高をLINEで知らせます。</span>
+                  </span>
+                </label>
+              </div>
               {!policyLoading && !policy?.configured && canConfigurePolicy ? (
                 <section className="rounded-control border border-warning bg-warning-bg p-3" aria-label="高額調整の承認境界を設定">
                   <p className="text-sm font-bold text-ink">高額調整の承認境界が未設定です</p>
@@ -223,21 +250,23 @@ export default function MileageAdjustmentDialog({
                 </section>
               ) : null}
               <p className="rounded-control bg-info-bg p-3 text-xs leading-5 text-ink-secondary">
-                LINE通知と有効期限の指定は、送信・失効台帳が接続されるまで実行しません。画面だけで「通知済み」「1年後に失効」とは表示しません。
+                通知の成否と有効期限は記録に残ります。自動通知なので、担当者からの個別返信としては扱いません。
               </p>
             </>
           ) : (
             <section aria-label="変更内容の確認" className="space-y-3">
               <h3 className="text-sm font-bold text-ink">この変更で起きること</h3>
               <dl className="overflow-hidden rounded-panel border border-hairline text-sm">
-                <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更前</dt><dd className="font-semibold text-ink">{currentBalance.toLocaleString('ja-JP')} mile</dd></div>
-                <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更量</dt><dd className={delta < 0 ? 'font-bold text-danger' : 'font-bold text-accent'}>{delta > 0 ? '+' : ''}{delta.toLocaleString('ja-JP')} mile</dd></div>
-                <div className="flex justify-between px-4 py-3"><dt className="text-ink-faint">変更後</dt><dd className="font-bold text-ink">{balanceAfter.toLocaleString('ja-JP')} mile</dd></div>
+                <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更前</dt><dd className="font-semibold text-ink">{currentBalance.toLocaleString('ja-JP')} マイル</dd></div>
+                <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更量</dt><dd className={delta < 0 ? 'font-bold text-danger' : 'font-bold text-accent'}>{delta > 0 ? '+' : ''}{delta.toLocaleString('ja-JP')} マイル</dd></div>
+                <div className="flex justify-between px-4 py-3"><dt className="text-ink-faint">変更後</dt><dd className="font-bold text-ink">{balanceAfter.toLocaleString('ja-JP')} マイル</dd></div>
               </dl>
               <dl className="grid gap-2 rounded-control bg-canvas-sunken p-4 text-sm">
                 <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">理由区分</dt><dd className="col-span-2 text-ink">{reasonLabel}</dd></div>
                 <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">詳しい理由</dt><dd className="col-span-2 whitespace-pre-wrap text-ink">{reason.trim()}</dd></div>
                 <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">調整元ID</dt><dd className="col-span-2 break-all text-ink">{sourceReferenceId.trim() || '入力なし'}</dd></div>
+                <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">有効期限</dt><dd className="col-span-2 text-ink">{expiresOn || '期限なし'}</dd></div>
+                <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">LINE通知</dt><dd className="col-span-2 text-ink">{notifyFriend ? '変更後に自動で知らせる' : '知らせない'}</dd></div>
               </dl>
               <div className="rounded-control bg-warning-bg p-3 text-xs leading-5 text-warning">
                 既存の履歴は書き換えず、理由と実行者を持つ新しい調整行を追加します。同じ操作を再送しても二重反映しません。
