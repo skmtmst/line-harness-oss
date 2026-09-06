@@ -10,9 +10,9 @@ describe('共通部品の影響範囲', () => {
   const pagination = join(SRC, 'components', 'shared', 'pagination.tsx')
   const paginationCss = join(SRC, 'components', 'shared', 'pagination.module.css')
 
-  it('共通Buttonを直接importする118ファイルを利用先に数える', () => {
-    // #973: 共通情報の変更影響画面も標準Buttonを直接使うため1ファイル増えた。
-    expect(directImporters(files, button)).toHaveLength(118)
+  it('共通Buttonを直接importする120ファイルを利用先に数える', () => {
+    // 本流119ファイルに、#973 の共通情報変更影響画面を加えた実測値。
+    expect(directImporters(files, button)).toHaveLength(120)
   })
 
   it('import先が実ファイルと一致する場合は検知する', () => {
