@@ -178,6 +178,13 @@ describe('配信対象の言い表し方', () => {
 })
 
 describe('通の編集を設計の段へ分ける', () => {
+  it('通の編集中はシナリオ全体の一覧を隠し、専用画面として表示する', () => {
+    expect(detail).toContain('{editingStepId ? (')
+    expect(detail).toContain('<section data-design-node="xfYLn"')
+    expect(detail).toContain('{renderStepForm()}')
+    expect(detail).toContain("title={editingStepId ? `${stepForm.stepOrder}通目を編集` : 'シナリオ編集'}")
+  })
+
   it('4つの面を、1枚の中で段に分ける', () => {
     expect(stepForm).toContain('node="xfYLn"')
     expect(stepForm).toContain('node="r6Gzsu"')
@@ -274,6 +281,13 @@ describe('g2UNV 一括テスト送信', () => {
 
   it('送り先を選ぶまで送れない', () => {
     expect(testSendBody).toContain('disabled={!selected || sending}')
+  })
+
+  it('送り先を選んだあと、誰へ何通送るかを確認してから実送信する', () => {
+    expect(testSendBody).toContain('const [confirming, setConfirming] = useState(false)')
+    expect(testSendBody).toContain('内容を確認')
+    expect(testSendBody).toContain('selectedFriend?.displayName')
+    expect(testSendBody).toContain('テスト送信を開始')
   })
 
   it('詳細画面から、送る通を渡す', () => {

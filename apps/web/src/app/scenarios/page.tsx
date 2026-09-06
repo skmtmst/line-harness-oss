@@ -22,7 +22,7 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import ScenarioList from '@/components/scenarios/scenario-list'
-import { shouldShowStartChecklist, startChecklist } from './start-checklist'
+import { startChecklist } from './start-checklist'
 
 type ScenarioWithCount = Scenario & {
   stepCount?: number
@@ -33,6 +33,87 @@ type LoadStatus = 'loading' | 'ready' | 'error'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
+
+function StartScenarioDialog({
+  scenario,
+  busy,
+  error,
+  onConfirm,
+  onCancel,
+}: {
+  scenario: ScenarioWithCount
+  busy: boolean
+  error: string
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  const checks = startChecklist(scenario)
+  const triggerLabel: Record<ScenarioTriggerType, string> = {
+    friend_add: '友だち追加時',
+    tag_added: 'タグが付いた時',
+    manual: 'アクションなどから開始',
+  }
+  const modeLabel: Record<DeliveryMode, string> = {
+    absolute_time: '購読開始から指定日後の時刻',
+    elapsed: '購読開始からの経過時間',
+    relative: '前の通からの経過時間',
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-6" role="dialog" aria-modal="true" aria-labelledby="start-scenario-title">
+      <div className="bg-canvas border-hairline max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-card border shadow-xl">
+        <div className="border-hairline flex items-start justify-between gap-4 border-b px-6 py-5">
+          <div>
+            <h2 id="start-scenario-title" className="text-ink text-xl font-bold">
+              この内容で配信を開始しますか？
+            </h2>
+            <p className="text-ink-secondary mt-1 text-sm">開始前に、対象と配信内容を最後に確認してください。</p>
+          </div>
+          <button type="button" onClick={onCancel} disabled={busy} aria-label="閉じる" className="text-ink-faint hover:text-ink text-xl">×</button>
+        </div>
+
+        <div className="grid gap-6 p-6 lg:grid-cols-2">
+          <section className="border-hairline rounded-card border p-5">
+            <p className="text-ink-faint text-xs font-medium">開始するシナリオ</p>
+            <h3 className="text-ink mt-1 text-lg font-bold">{scenario.name}</h3>
+            <dl className="mt-5 space-y-3 text-sm">
+              <div className="flex justify-between gap-4"><dt className="text-ink-faint">開始のきっかけ</dt><dd className="text-ink text-right font-medium">{triggerLabel[scenario.triggerType]}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-ink-faint">配信方式</dt><dd className="text-ink text-right font-medium">{modeLabel[scenario.deliveryMode ?? 'relative']}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-ink-faint">配信内容</dt><dd className="text-ink text-right font-medium">{scenario.stepCount === undefined ? '—通' : `${scenario.stepCount}通`}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-ink-faint">現在の購読中</dt><dd className="text-ink text-right font-medium">{scenario.subscriberCount === undefined ? '—人' : `${scenario.subscriberCount}人`}</dd></div>
+            </dl>
+          </section>
+
+          <section className="border-hairline rounded-card border p-5">
+            <p className="text-ink mb-3 text-sm font-bold">配信前チェック</p>
+            <ul className="space-y-3 text-sm">
+              {checks.map((item) => (
+                <li key={item.label} className="flex items-start gap-3">
+                  <span aria-hidden className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${item.state === 'ok' ? 'bg-success-bg text-success' : item.state === 'warn' ? 'bg-warning-bg text-warning' : 'bg-canvas-sunken text-ink-faint'}`}>
+                    {item.state === 'ok' ? '✓' : item.state === 'warn' ? '!' : '—'}
+                  </span>
+                  <span><span className="text-ink block font-medium">{item.label}</span><span className="text-ink-faint block text-xs">{item.detail}</span></span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+
+        <div className="bg-warning-bg mx-6 mb-5 rounded-card px-5 py-4">
+          <p className="text-warning text-sm font-bold">開始後に起きること</p>
+          <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
+            条件を満たした友だちから配信が始まります。開始後も停止できますが、すでに送信されたメッセージは取り消せません。
+          </p>
+        </div>
+        {error ? <p className="bg-danger-bg text-danger mx-6 mb-4 rounded-card px-4 py-3 text-sm">{error}</p> : null}
+        <div className="border-hairline flex justify-end gap-3 border-t px-6 py-4">
+          <button type="button" onClick={onCancel} disabled={busy} className="border-hairline text-ink-secondary rounded-control border px-5 py-2 text-sm">戻る</button>
+          <button type="button" onClick={onConfirm} disabled={busy} className="bg-accent-deep text-on-accent rounded-control px-5 py-2 text-sm font-bold disabled:opacity-50">{busy ? '開始中…' : 'シナリオを開始'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 /** 作成日時が、運用画面の基準である日本時間の今月か。 */
 function isCreatedThisMonth(createdAt: string, now = new Date()): boolean {
@@ -283,21 +364,18 @@ export default function ScenariosPage() {
 
       {toggleTarget ? (
         <div data-design-node="RUxNf">
+          {toggleTarget.isActive ? (
           <ConfirmDialog
             open
-            title={`「${toggleTarget.name}」を${toggleTarget.isActive ? '停止' : '開始'}しますか？`}
+            title={`「${toggleTarget.name}」を停止しますか？`}
             description={[
               toggleTarget.lineAccountId === null ? '全LINEアカウントに適用されるシナリオです。' : '',
               `現在の購読中は${toggleTarget.subscriberCount === undefined ? '—人（人数を確認できませんでした）' : `${toggleTarget.subscriberCount}人`}です。`,
               `配信内容は${toggleTarget.stepCount === undefined ? '—通（通数を確認できませんでした）' : `${toggleTarget.stepCount}通`}です。`,
-              toggleTarget.isActive
-                ? '停止すると新しい配信を止めます。これまでの配信履歴は残ります。'
-                : toggleTarget.subscriberCount === 0
-                  ? '現在届く人はいません。開始後に登録された友だちから配信対象になります。'
-                  : '開始すると、登録条件に合う友だちへの配信が動き始めます。',
+              '停止すると新しい配信を止めます。これまでの配信履歴は残ります。',
             ].filter(Boolean).join(' ')}
-            confirmLabel={toggleTarget.isActive ? 'シナリオを停止' : 'シナリオを開始'}
-            destructive={toggleTarget.isActive}
+            confirmLabel="シナリオを停止"
+            destructive
             busy={toggleBusy}
             error={toggleError || undefined}
             onConfirm={() => void confirmToggleActive()}
@@ -306,38 +384,20 @@ export default function ScenariosPage() {
               setToggleTarget(null)
               setToggleError('')
             }}
-          >
-            {shouldShowStartChecklist(toggleTarget.isActive) ? (
-              <div className="space-y-2">
-                <p className="text-ink-secondary text-xs font-medium">配信前チェック</p>
-                <ul className="space-y-1.5 text-sm">
-                  {startChecklist(toggleTarget).map((item) => (
-                    <li key={item.label} className="flex items-start gap-2">
-                      <span
-                        aria-hidden="true"
-                        className={
-                          item.state === 'ok'
-                            ? 'text-success'
-                            : item.state === 'warn'
-                              ? 'text-warning'
-                              : 'text-ink-faint'
-                        }
-                      >
-                        {item.state === 'ok' ? '✓' : item.state === 'warn' ? '!' : '—'}
-                      </span>
-                      <span>
-                        <span className="text-ink block">{item.label}</span>
-                        <span className="text-ink-faint block text-xs">{item.detail}</span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="text-ink-faint text-xs">
-                  「—」は、この画面から確かめられない項目です。確認済みとしては扱いません。
-                </p>
-              </div>
-            ) : null}
-          </ConfirmDialog>
+          />
+          ) : (
+            <StartScenarioDialog
+              scenario={toggleTarget}
+              busy={toggleBusy}
+              error={toggleError}
+              onConfirm={() => void confirmToggleActive()}
+              onCancel={() => {
+                if (toggleBusy) return
+                setToggleTarget(null)
+                setToggleError('')
+              }}
+            />
+          )}
         </div>
       ) : null}
 
