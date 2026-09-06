@@ -165,6 +165,28 @@
             "YZaDK"
           ],
           "note": "Claudeが実装して撮った。契約枝のローカルcommit 4b97fab1 の上。**doctorが要確認のため push していない。ローカルcommitのみ**"
+        },
+        {
+          "pr": 1059,
+          "head": "6f9a64684",
+          "on": "2026-09-07",
+          "screens": [
+            "xGLVe",
+            "NfgOs",
+            "H3lAOB",
+            "Xi4x9",
+            "f0zn6",
+            "NWbuF",
+            "B7CER8",
+            "IYjvu",
+            "TUveA",
+            "w72a2",
+            "ASsb3",
+            "ANgda",
+            "tBlkL",
+            "LHjwD"
+          ],
+          "note": "Issue #293。受信箱専用部品と撮影用固定データを設計状態へそろえ、3104/8791で1440・1920pxを撮影。同じ状態のPencilと横並び比較し、要修正14画面をすべて一致へ更新した。"
         }
       ]
     },
