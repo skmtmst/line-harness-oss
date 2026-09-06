@@ -60,7 +60,8 @@
   "app/booking/menus/page.tsx": {
     "arbitrary-value": 2,
     "direct-th": 8,
-    "direct-primary-button": 1
+    "direct-primary-button": 1,
+    "direct-secondary-button": 2
   },
   "app/booking/menus/staff/page.tsx": {
     "direct-secondary-button": 2,

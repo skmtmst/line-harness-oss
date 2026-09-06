@@ -42,7 +42,13 @@ type MatchState =
   | { kind: 'none' }
   | { kind: 'loading' }
   | { kind: 'error' }
-  | { kind: 'ready'; count: number }
+  | {
+      kind: 'ready'
+      matched: number
+      alreadySubscribed: number
+      newStartPlanned: number
+      excluded: number
+    }
 
 export interface TriggerEditorProps {
   scenarioId: string
@@ -78,22 +84,29 @@ export default function TriggerEditor({
    * 間違えたことに配信が届いてから気づくことになる。
    *
    * 数えるのは**シナリオ全体の絞り込みに一致する人**。口は
-   * `POST /api/segments/count`（配信の対象条件と同じもの）。
+   * `POST /api/scenarios/:id/simulate`。本番と同じ対象条件・購読の重なりを
+   * 数えるが、配信や購読は一切行わない。
    */
   const usableCondition = pruneCondition((audienceCondition as SegmentCondition | null) ?? null)
   const conditionKey = JSON.stringify(usableCondition)
 
   const recount = useCallback(async () => {
-    if (!usableCondition) {
+    if (!lineAccountId) {
       setMatch({ kind: 'none' })
       return
     }
     setMatch({ kind: 'loading' })
     try {
-      const res = await api.segments.count(usableCondition, lineAccountId ?? undefined)
+      const res = await api.scenarios.simulate(scenarioId, lineAccountId)
       setMatch(
-        res.success && typeof res.count === 'number'
-          ? { kind: 'ready', count: res.count }
+        res.success
+          ? {
+              kind: 'ready',
+              matched: res.data.audience.matched,
+              alreadySubscribed: res.data.audience.alreadySubscribed,
+              newStartPlanned: res.data.audience.newStartPlanned,
+              excluded: res.data.audience.excluded,
+            }
           : { kind: 'error' },
       )
     } catch {
@@ -101,7 +114,7 @@ export default function TriggerEditor({
     }
     // 条件の中身が変わったときだけ作り直す。参照の同一性では判断しない。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conditionKey, lineAccountId])
+  }, [conditionKey, lineAccountId, scenarioId])
 
   useEffect(() => {
     void recount()
@@ -301,8 +314,8 @@ export default function TriggerEditor({
                   <button
                     type="button"
                     onClick={() => void recount()}
-                    disabled={!usableCondition || match.kind === 'loading'}
-                    title={usableCondition ? undefined : '絞り込みが無いので数えるものがありません'}
+                    disabled={!lineAccountId || match.kind === 'loading'}
+                    title={lineAccountId ? undefined : 'LINE公式アカウントを選んでください'}
                     className="text-accent text-xs hover:underline disabled:opacity-40 disabled:no-underline"
                   >
                     対象を再計算
@@ -314,7 +327,7 @@ export default function TriggerEditor({
                     <dt className="text-ink-faint text-xs">一致</dt>
                     <dd className="text-ink mt-0.5 text-xl font-bold tabular-nums">
                       {match.kind === 'ready' ? (
-                        `${match.count.toLocaleString('ja-JP')}人`
+                        `${match.matched.toLocaleString('ja-JP')}人`
                       ) : match.kind === 'loading' ? (
                         <span className="text-ink-faint text-sm font-normal">読み込んでいます</span>
                       ) : match.kind === 'error' ? (
@@ -327,17 +340,20 @@ export default function TriggerEditor({
                   <div>
                     <dt className="text-ink-faint text-xs">すでに購読中</dt>
                     <dd className="text-warning mt-0.5 text-xl font-bold tabular-nums">
-                      {typeof activeNow === 'number'
-                        ? `${activeNow.toLocaleString('ja-JP')}人`
-                        : <span className="text-ink-faint">—</span>}
+                      {match.kind === 'ready'
+                        ? `${match.alreadySubscribed.toLocaleString('ja-JP')}人`
+                        : typeof activeNow === 'number'
+                          ? `${activeNow.toLocaleString('ja-JP')}人`
+                          : <span className="text-ink-faint">—</span>}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-ink-faint text-xs">新規開始予定</dt>
-                    {/* 一致から購読中を引いた数**ではない**。購読中の人が
-                        いま条件に一致しているとは限らないので、引き算で出すと
-                        画面にだけ在る数になる。重なりを数える口が要る。 */}
-                    <dd className="text-ink-faint mt-0.5 text-xl font-bold">—</dd>
+                    <dd className="text-success mt-0.5 text-xl font-bold tabular-nums">
+                      {match.kind === 'ready'
+                        ? `${match.newStartPlanned.toLocaleString('ja-JP')}人`
+                        : <span className="text-ink-faint">—</span>}
+                    </dd>
                   </div>
                 </dl>
 
@@ -354,8 +370,10 @@ export default function TriggerEditor({
                 <p className="text-ink-faint mt-3 text-xs leading-relaxed">
                   {usableCondition
                     ? '一致は「対象の絞り込み」に当てはまる友だちの数です。'
-                    : '「対象の絞り込み」が空なので、一致は数えていません。'}
-                  新規開始予定はまだ繋がっていません。一致と購読中の重なりを数える取得口が接続されると表示されます。
+                    : '絞り込みが空なので、フォロー中の友だち全員を数えています。'}
+                  {match.kind === 'ready'
+                    ? ` 対象外は${match.excluded.toLocaleString('ja-JP')}人です。試算では配信も購読も始まりません。`
+                    : ' 試算では配信も購読も始まりません。'}
                 </p>
               </div>
             </>
