@@ -4163,6 +4163,9 @@ export const api = {
         usageCount: number;
         /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
         tapCount: number;
+        /** 当月と累計の実送信数。集計不能時は null。 */
+        monthlySendCount: number | null;
+        totalSendCount: number | null;
         createdAt: string;
         updatedAt: string;
       }>>>(
@@ -4179,6 +4182,7 @@ export const api = {
         messageContent: string;
         question: TemplateQuestion | null;
         questionStatus: 'draft' | 'published';
+        folderId: string | null;
         /** 162: 選択肢を押したときの動き。{ パネル番号: { 選択肢番号: [...] } } */
         carouselActions: unknown | null;
         /** 162: 'none'（制限なし）／'once'（全体で1回） */

@@ -38,6 +38,8 @@ interface Template {
   usageCount: number
   /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
   tapCount: number
+  monthlySendCount: number | null
+  totalSendCount: number | null
   createdAt: string
   updatedAt: string
 }
@@ -50,6 +52,7 @@ interface TemplateDetail {
   messageContent: string
   question: TemplateQuestion | null
   questionStatus: 'draft' | 'published'
+  folderId: string | null
   usedBy: {
     autoReplies: Array<{ id: string; keyword: string; matchType: 'exact' | 'contains'; lineAccountId: string | null }>
     automations: Array<{ id: string; name: string; eventType: string }>
@@ -112,6 +115,10 @@ function formatDate(iso: string): string {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function formatCount(value: number): string {
+  return new Intl.NumberFormat('ja-JP').format(value)
 }
 
 export default function TemplatesPage() {
@@ -318,6 +325,7 @@ export default function TemplatesPage() {
       const res = await api.templates.update(template.id, { folderId })
       if (!res.success) throw new Error(res.error ?? '移せませんでした')
       setTemplates((prev) => prev.map((item) => item.id === template.id ? { ...item, folderId } : item))
+      setDrawerData((prev) => prev?.id === template.id ? { ...prev, folderId } : prev)
     } catch (cause) {
       setFolderError(cause instanceof Error ? cause.message : '置き場を変えられませんでした。')
     } finally {
@@ -569,12 +577,9 @@ export default function TemplatesPage() {
       </div>
       <div className="min-w-0 flex-1">
 
-      {/*
-        案内帯（V6 §2-3）。**できないことを「できます」と書かない。**
-        送信数はまだ口が無いので、表では `—` のままになる。
-      */}
+      {/* フォルダは種類とは別の整理軸。V6の説明を一覧上で読めるようにする。 */}
       <div className="bg-info-bg text-info mb-3 rounded-control px-3 py-2 text-xs">
-        一覧からテンプレートの中身と、使われている場所を確認できます。送信数はまだ繋がっていません。テンプレート別の送信集計が接続されると表示されます。
+        フォルダはアカウントで1組です。上のタブは種類の絞り込みで、フォルダは増えません。1つのフォルダにテキストもカルーセルも入れられます。
       </div>
 
       {/* 検索と並び順（設計 `Body` の上）。 */}
@@ -769,7 +774,6 @@ export default function TemplatesPage() {
                 <TableHeadRow>
                   <Th>テンプレート</Th>
                   <Th>中身</Th>
-                  <Th>置き場</Th>
                   <Th>使われている場所</Th>
                   <Th>送信数</Th>
                   <Th>更新</Th>
@@ -788,16 +792,6 @@ export default function TemplatesPage() {
                       <p className="text-[11px] text-ink-faint mt-0.5 truncate max-w-md">
                         {t.messageContent.slice(0, 60)}{t.messageContent.length > 60 ? '...' : ''}
                       </p>
-                    </td>
-                    <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
-                      <SelectField
-                        size="compact"
-                        aria-label={`${t.name} の置き場`}
-                        value={t.folderId ?? ''}
-                        disabled={movingId === t.id}
-                        onChange={(event) => void moveTemplate(t, event.target.value === '' ? null : event.target.value)}
-                        options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
-                      />
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium ${typeBadgeColor[t.question ? 'question' : t.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
@@ -821,12 +815,14 @@ export default function TemplatesPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span
-                        className="text-ink-faint text-sm"
-                        title="まだ繋がっていません。テンプレート別の送信集計が接続されると表示されます。"
-                      >
-                        —
-                      </span>
+                      {typeof t.monthlySendCount === 'number' && typeof t.totalSendCount === 'number' ? (
+                        <div className="whitespace-nowrap text-xs">
+                          <p className="font-medium text-ink">今月 {formatCount(t.monthlySendCount)}通</p>
+                          <p className="mt-0.5 text-ink-faint">累計 {formatCount(t.totalSendCount)}通</p>
+                        </div>
+                      ) : (
+                        <span className="text-ink-faint text-xs">送信数を確認できません</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-xs text-ink-faint">{formatDate(t.updatedAt)}</td>
                     <td className="px-4 py-3 text-right">
@@ -917,6 +913,23 @@ export default function TemplatesPage() {
                   <span className="text-[10px] text-ink-faint">
                     更新: {formatDate(drawerData.updatedAt)}
                   </span>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-[11px] font-medium text-ink-faint" htmlFor="template-folder-select">
+                    置き場
+                  </label>
+                  <SelectField
+                    id="template-folder-select"
+                    aria-label="置き場"
+                    value={drawerData.folderId ?? ''}
+                    disabled={movingId === drawerData.id}
+                    onChange={(event) => void moveTemplate(
+                      drawerData,
+                      event.target.value === '' ? null : event.target.value,
+                    )}
+                    options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
+                  />
                 </div>
 
                 {/* Preview */}

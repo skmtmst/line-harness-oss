@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { getTemplateUsage, getTemplatesWithUsageCount } from '../src/templates.js';
+import { describe, expect, it, vi } from 'vitest';
+import { getTemplateSendCounts, getTemplateUsage, getTemplatesWithUsageCount } from '../src/templates.js';
 
 function usageDb(): D1Database {
   return {
@@ -101,5 +101,39 @@ describe('テンプレートの使用先', () => {
     expect(calls[0]?.sql).toContain('category = ?');
     expect(calls[0]?.sql).toContain('line_account_id IN (?)');
     expect(calls[0]?.values).toEqual(['general', 'account-1']);
+  });
+});
+
+describe('テンプレートの実送信数', () => {
+  it('見えているテンプレートだけを当月・累計でまとめて数える', async () => {
+    const calls: Array<{ sql: string; values: unknown[] }> = [];
+    const db = {
+      prepare: (sql: string) => ({
+        bind: (...values: unknown[]) => ({
+          all: async () => {
+            calls.push({ sql, values });
+            return { results: [{ template_id: 'tpl-1', month_count: 12, total_count: 48 }] };
+          },
+        }),
+      }),
+    } as unknown as D1Database;
+
+    const counts = await getTemplateSendCounts(
+      db,
+      ['tpl-1', 'tpl-2'],
+      '2026-09-06T12:00:00.000+09:00',
+    );
+
+    expect(counts.get('tpl-1')).toEqual({ thisMonth: 12, total: 48 });
+    expect(calls[0]?.sql).toContain("direction = 'outgoing'");
+    expect(calls[0]?.sql).toContain('template_id_at_send IN (?,?)');
+    expect(calls[0]?.values).toEqual(['2026-09', 'tpl-1', 'tpl-2']);
+  });
+
+  it('対象が0件ならDBを読まない', async () => {
+    const prepare = vi.fn();
+    const counts = await getTemplateSendCounts({ prepare } as unknown as D1Database, []);
+    expect(counts.size).toBe(0);
+    expect(prepare).not.toHaveBeenCalled();
   });
 });
