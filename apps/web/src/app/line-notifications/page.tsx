@@ -20,6 +20,13 @@ const customerFilters = [
 ] as const
 type CustomerFilter = typeof customerFilters[number][0]
 type CustomerLoadState = 'loading' | 'ready' | 'error' | 'forbidden'
+const categories = [
+  ['order', '注文'],
+  ['payment', '銀行振込'],
+  ['shipping', '発送'],
+  ['support', 'キャンセル・返金'],
+  ['subscription', '定期便'],
+] as const
 
 /**
  * 見出しの下に、**内部のイベントキーを出さない**。
@@ -27,8 +34,22 @@ type CustomerLoadState = 'loading' | 'ready' | 'error' | 'forbidden'
  * ここは `ec_order.confirmed` のような値をそのまま描き、全文を `title` にも
  * 入れていた。設計 `Q55bb` の言う「運用者に伝わる言葉」ではないし、
  * V6の「内部IDを画面に出さない」にも反する。
- * 区分の言葉は上の絞り込みが既に持っているので、それを使う。
+ * APIが返す区分は、運用者が分かる言葉へ置き換える。
  */
+function categoryLabel(value: EcNotificationSetting['category']): string {
+  return categories.find(([key]) => key === value)?.[1] ?? '区分なし'
+}
+
+/** 「いつ直したか」。取れないときは数を作らず `—`。 */
+function formatUpdatedAt(iso: string | null | undefined): string {
+  if (!iso) return '最終更新 —'
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return '最終更新 —'
+  return `最終更新 ${date.toLocaleString('ja-JP', {
+    timeZone: 'Asia/Tokyo', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+  })}`
+}
+
 function isIncomplete(setting: EcNotificationSetting): boolean {
   return !setting.title?.trim() || !setting.introText.trim() || !setting.outroText.trim()
 }
@@ -212,7 +233,7 @@ export default function LineNotificationsPage() {
     </div>
 
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div className="grid w-full max-w-3xl grid-cols-2 gap-2 lg:grid-cols-4" aria-label="お知らせの絞り込み">
+      <div className="grid w-full max-w-[48rem] grid-cols-2 gap-2 lg:grid-cols-4" aria-label="お知らせの絞り込み">
         {customerFilters.map(([value, label]) => <button key={value} type="button" onClick={() => setFilter(value)} className={`${styles.category} ${filter === value ? styles.categoryCurrent : ''}`}><span>{label}</span><span className={styles.categoryCount}>{loadState === 'ready' ? filterCount(value) : '—'}</span></button>)}
       </div>
       <p className="text-xs text-ink-faint">送った数が多い順</p>
@@ -232,7 +253,11 @@ export default function LineNotificationsPage() {
         </div>
         {visible.map((setting) => <article key={setting.eventType} className="border-b border-hairline last:border-b-0">
           <div className="line-notification-v6-row">
-            <div className="min-w-0"><h2 className="truncate font-bold text-ink" title={setting.title?.trim() || setting.label}>{setting.title?.trim() || setting.label}</h2><p className="mt-0.5 truncate text-xs text-ink-faint" title={triggerLabel(setting)}>{triggerLabel(setting)}</p></div>
+            <div className="min-w-0">
+              <h2 className="truncate font-bold text-ink" title={setting.title?.trim() || setting.label}>{setting.title?.trim() || setting.label}</h2>
+              <p className="mt-0.5 truncate text-xs text-ink-faint" title={triggerLabel(setting)}>{categoryLabel(setting.category)}・{triggerLabel(setting)}</p>
+              <p className="mt-0.5 truncate text-xs text-ink-faint">{formatUpdatedAt(setting.updatedAt)}</p>
+            </div>
             <span className="text-sm text-ink-secondary">{timingLabel(setting)}</span>
             <span className="text-sm tabular-nums text-ink-secondary">{overview?.byType.find((item) => item.eventType === setting.eventType)?.count ?? '—'}通</span>
             <span className="text-sm text-ink-faint">—</span>
