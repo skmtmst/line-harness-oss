@@ -1,10 +1,16 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { MediaDeleteImpact, MediaDeleteImpactReference, MediaItem } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import { ApiError, api, type MediaVersionPreview } from '@/lib/api'
 import Button from './media-button'
 import { checkedAtText, referenceKindText, referenceNameText } from './media-delete-impact'
+import {
+  fileMatchesMediaKind,
+  mediaAcceptForKind,
+  putMediaFile,
+  validateMediaFile,
+} from './media-direct-upload'
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -49,16 +55,25 @@ export default function MediaDetailDialog({
   folderName,
   onClose,
   onOpenReplacement,
+  onVersionCreated,
 }: {
   item: MediaItem | null
   accountId: string | null
   folderName: string
   onClose: () => void
   onOpenReplacement: (item: MediaItem) => void
+  onVersionCreated: (message: string) => void
 }) {
+  const fileInputId = useId()
   const requestRef = useRef(0)
   const [impact, setImpact] = useState<MediaDeleteImpact | null>(null)
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [versionFile, setVersionFile] = useState<File | null>(null)
+  const [versionPhase, setVersionPhase] = useState<'idle' | 'uploading' | 'preview' | 'publishing' | 'error'>('idle')
+  const [versionProgress, setVersionProgress] = useState(0)
+  const [versionPreview, setVersionPreview] = useState<MediaVersionPreview | null>(null)
+  const [changeReason, setChangeReason] = useState('')
+  const [versionError, setVersionError] = useState('')
 
   const loadImpact = useCallback(async () => {
     if (!item || !accountId) {
@@ -87,6 +102,100 @@ export default function MediaDetailDialog({
       requestRef.current += 1
     }
   }, [loadImpact])
+
+  useEffect(() => {
+    setVersionFile(null)
+    setVersionPhase('idle')
+    setVersionProgress(0)
+    setVersionPreview(null)
+    setChangeReason('')
+    setVersionError('')
+  }, [item?.id])
+
+  function chooseVersionFile(file: File | null) {
+    setVersionPreview(null)
+    setVersionProgress(0)
+    setVersionError('')
+    if (!file || !item) {
+      setVersionFile(null)
+      setVersionPhase('idle')
+      return
+    }
+    const validation = validateMediaFile(file)
+    if (validation) {
+      setVersionFile(file)
+      setVersionPhase('error')
+      setVersionError(validation)
+      return
+    }
+    if (!fileMatchesMediaKind(file, item.kind)) {
+      setVersionFile(file)
+      setVersionPhase('error')
+      setVersionError('いまのメディアと同じ種類のファイルを選んでください')
+      return
+    }
+    setVersionFile(file)
+    setVersionPhase('idle')
+  }
+
+  async function prepareVersion() {
+    if (!item || !accountId || !versionFile || versionPhase === 'uploading') return
+    setVersionPhase('uploading')
+    setVersionProgress(0)
+    setVersionError('')
+    setVersionPreview(null)
+    try {
+      const prepared = await api.media.prepareUploads({
+        accountId,
+        files: [{
+          filename: versionFile.name,
+          mimeType: versionFile.type,
+          sizeBytes: versionFile.size,
+          targetMediaId: item.id,
+        }],
+      })
+      const session = prepared.success ? prepared.data.sessions[0] : null
+      if (!session) throw new Error('送信の準備結果を確認できませんでした')
+      const etag = await putMediaFile(session, versionFile, setVersionProgress)
+      const completed = await api.media.completeUpload(session.id, { accountId, etag })
+      if (!completed.success || completed.data.status !== 'verified') {
+        throw new Error('差し替え用ファイルを確認できませんでした')
+      }
+      const previewed = await api.media.previewVersion(item.id, {
+        accountId,
+        uploadSessionId: session.id,
+      })
+      if (!previewed.success) throw new Error(previewed.error)
+      setVersionPreview(previewed.data)
+      setVersionPhase('preview')
+    } catch (caught) {
+      setVersionPhase('error')
+      setVersionError(caught instanceof ApiError || caught instanceof Error
+        ? caught.message
+        : '差し替え内容を確認できませんでした')
+    }
+  }
+
+  async function publishVersion() {
+    if (!item || !accountId || !versionPreview?.canReplace || !changeReason.trim()) return
+    setVersionPhase('publishing')
+    setVersionError('')
+    try {
+      const response = await api.media.createVersion(item.id, {
+        accountId,
+        uploadSessionId: versionPreview.uploadSessionId,
+        previewToken: versionPreview.previewToken,
+        changeReason: changeReason.trim(),
+      })
+      if (!response.success) throw new Error(response.error)
+      onVersionCreated(`「${item.filename}」へ第${response.data.versionNo}版を追加しました。使用先の固定版は変えていません。`)
+    } catch (caught) {
+      setVersionPhase('preview')
+      setVersionError(caught instanceof ApiError || caught instanceof Error
+        ? caught.message
+        : '新しい版を追加できませんでした')
+    }
+  }
 
   if (!item) return null
 
@@ -132,19 +241,52 @@ export default function MediaDetailDialog({
                 <h3 className="text-ink text-sm font-bold">この{item.kind === 'image' ? '画像' : 'メディア'}を差し替える</h3>
                 <p className="text-ink-faint mt-1 text-xs">名前と管理用URLを保ったまま新しい版を追加します。</p>
               </div>
-              <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-1 text-xs font-semibold">版追加API待ち</span>
+              <span className="bg-accent-soft text-accent-deep rounded-pill px-2 py-1 text-xs font-semibold">安全確認して追加</span>
             </div>
-            <div className="border-info text-info rounded-control mt-4 flex min-h-24 items-center justify-center border border-dashed p-4 text-center">
+            <label htmlFor={fileInputId} className="border-info text-info rounded-control mt-4 flex min-h-24 cursor-pointer items-center justify-center border border-dashed p-4 text-center">
               <div>
                 <p className="text-sm font-bold">ここにファイルをドラッグ、または押して選ぶ</p>
-                <p className="text-ink-faint mt-1 text-xs">同じメディアへ版を追加するAPIの接続後に利用できます。</p>
+                <p className="text-ink-faint mt-1 text-xs">いまのメディアと同じ種類を選びます。</p>
+                {versionFile ? <p className="text-ink mt-2 text-xs font-bold">{versionFile.name}</p> : null}
               </div>
-            </div>
+            </label>
+            <input id={fileInputId} type="file" className="sr-only" accept={mediaAcceptForKind(item.kind)} onChange={(event) => chooseVersionFile(event.target.files?.[0] ?? null)} />
+            {versionPhase === 'uploading' ? (
+              <div className="mt-3" aria-live="polite">
+                <div className="flex justify-between text-xs"><span>保存先へ直接送信しています</span><span>{versionProgress}%</span></div>
+                <progress className="mt-1 h-1 w-full" max={100} value={versionProgress} aria-label="差し替えファイルの送信進捗" />
+              </div>
+            ) : null}
+            {versionPreview ? (
+              <div className={versionPreview.canReplace ? 'bg-accent-soft text-accent-deep mt-3 rounded-control p-3 text-xs' : 'bg-danger-bg text-danger mt-3 rounded-control p-3 text-xs'}>
+                {versionPreview.canReplace
+                  ? `現在の第${versionPreview.currentVersionNo}版から第${versionPreview.currentVersionNo + 1}版へ追加できます。`
+                  : 'ファイルの種類が違うため、このメディアへ追加できません。'}
+              </div>
+            ) : null}
+            {versionPreview?.canReplace ? (
+              <div className="mt-3">
+                <label htmlFor={`${fileInputId}-reason`} className="text-ink-secondary block text-xs font-semibold">変更理由</label>
+                <input id={`${fileInputId}-reason`} value={changeReason} onChange={(event) => setChangeReason(event.target.value)} maxLength={500} className="border-hairline rounded-control mt-1 min-h-10 w-full border px-3 text-sm" placeholder="例：秋の写真へ更新" />
+              </div>
+            ) : null}
+            {versionError ? <p className="bg-danger-bg text-danger mt-3 rounded-control p-3 text-xs" role="alert">{versionError}</p> : null}
             {impact && impact.usageCount > 0 ? (
               <p className="bg-warning-bg text-warning rounded-control mt-3 p-3 text-xs font-semibold leading-5">
-                差し替えると、このメディアを使っている{impact.usageCount}か所へ影響します。予約中・固定版・公開中の内訳は版追加APIの接続後に確認できます。
+                新しい版を追加しても、現在このメディアを使っている{impact.usageCount}か所の固定版は変わりません。使う場所ごとに切り替えてください。
               </p>
             ) : null}
+            <div className="mt-4 flex justify-end">
+              {versionPreview?.canReplace ? (
+                <Button type="button" variant="primary" onClick={() => void publishVersion()} disabled={!changeReason.trim() || versionPhase === 'publishing'}>
+                  {versionPhase === 'publishing' ? '追加しています…' : '新しい版を追加する'}
+                </Button>
+              ) : (
+                <Button type="button" variant="primary" onClick={() => void prepareVersion()} disabled={!versionFile || versionPhase === 'uploading' || versionPhase === 'error'}>
+                  差し替え内容を確認
+                </Button>
+              )}
+            </div>
           </section>
         </main>
 
