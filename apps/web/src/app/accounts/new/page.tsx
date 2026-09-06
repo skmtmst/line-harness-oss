@@ -1,17 +1,13 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import PageHeader from '@/components/shared/page-header'
 import StickyBar from '@/components/shared/sticky-bar'
 import StatusBadge from '@/components/shared/status-badge'
-import {
-  AccountFormSections,
-  emptyAccountFormState,
-  type AccountFormState,
-} from '@/components/accounts/account-form-fields'
+import { emptyAccountFormState, type AccountFormState } from '@/components/accounts/account-form-fields'
 import {
   CHECK_STATE_LABEL,
   canSave,
@@ -92,7 +88,77 @@ export default function NewLineAccountPage() {
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="space-y-4">
-          <AccountFormSections state={form} update={update} showMessagingRequired />
+          <SetupSection
+            title="基本情報"
+            description="管理画面で見分ける名前を付けます。登録後も変更できます。"
+          >
+            <Field
+              label="表示名"
+              value={form.name}
+              onChange={(value) => update({ name: value })}
+              placeholder="例：然-NEN- 本店"
+              required
+            />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <ReadOnlyField label="タイムゾーン" value="Asia/Tokyo" />
+              <ReadOnlyField label="国・地域" value="登録後に設定できます" />
+            </div>
+          </SetupSection>
+
+          <SetupSection
+            title="Messaging API"
+            description="LINE公式アカウントからメッセージを送受信するための必須情報です。"
+          >
+            <Field
+              label="チャネルID"
+              value={form.channelId}
+              onChange={(value) => update({ channelId: value })}
+              placeholder="例：123456789"
+              required
+            />
+            <Field
+              label="チャネルシークレット"
+              value={form.channelSecret}
+              onChange={(value) => update({ channelSecret: value })}
+              type="password"
+              required
+            />
+            <Field
+              label="チャネルアクセストークン"
+              value={form.channelAccessToken}
+              onChange={(value) => update({ channelAccessToken: value })}
+              type="password"
+              required
+            />
+            <p className="bg-warning-bg text-warning rounded-control p-3 text-xs leading-relaxed">
+              資格情報は暗号化して保存し、保存後は画面に再表示しません。
+            </p>
+          </SetupSection>
+
+          <SetupSection
+            title="友だち追加・LIFF"
+            description="LINE Login や LIFF を使う場合だけ入力します。あとから追加できます。"
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field
+                label="LoginチャネルID"
+                value={form.loginChannelId}
+                onChange={(value) => update({ loginChannelId: value })}
+              />
+              <Field
+                label="Loginチャネルシークレット"
+                value={form.loginChannelSecret}
+                onChange={(value) => update({ loginChannelSecret: value })}
+                type="password"
+              />
+            </div>
+            <Field
+              label="LIFF ID"
+              value={form.liffId}
+              onChange={(value) => update({ liffId: value })}
+              placeholder="例：2009624792-XXXXXXXX"
+            />
+          </SetupSection>
 
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <p className="text-ink text-sm font-bold">保存する前の接続確認</p>
@@ -163,11 +229,33 @@ export default function NewLineAccountPage() {
               **確かめる前はURLを作らない。** 接続確認の返事に入っている
               URLだけを出す。想像で組み立てると、貼り間違いのもとになる。
             */}
-            <p className="text-ink-faint mt-3 text-xs leading-relaxed">
+            <div className="bg-canvas-sunken rounded-control mt-3 p-3">
+              <p className="text-ink-faint text-[11px] font-medium">Webhook URL</p>
+              <p className="text-ink mt-1 break-all text-xs leading-relaxed">
               {verify?.webhookUrl
                 ? verify.webhookUrl
                 : '「接続を確かめて保存」を押すと、貼り付けるURLがここに出ます。'}
-            </p>
+              </p>
+            </div>
+          </section>
+
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <p className="text-ink text-sm font-bold">つながる先</p>
+            <ul className="text-ink-secondary mt-3 space-y-2 text-xs leading-relaxed">
+              <li>友だち追加URL・QR</li>
+              <li>ログインユーザーの担当範囲</li>
+              <li>運用状態の接続監視</li>
+              <li>友だち一覧</li>
+            </ul>
+          </section>
+
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <p className="text-ink text-sm font-bold">気をつけること</p>
+            <ul className="text-ink-secondary mt-2 space-y-2 text-xs leading-relaxed">
+              <li>・LINE Developers 側で Webhook の利用をオンにしてください。</li>
+              <li>・秘密値は保存後に確認できません。安全な場所にも控えてください。</li>
+              <li>・接続確認がすべて通るまで登録しません。</li>
+            </ul>
           </section>
         </aside>
       </div>
@@ -190,6 +278,65 @@ export default function NewLineAccountPage() {
       />
 
       {error && <p role="alert" className="text-danger mt-3 text-sm">{error}</p>}
+    </div>
+  )
+}
+
+function SetupSection({
+  title,
+  description,
+  children,
+}: {
+  title: string
+  description: string
+  children: ReactNode
+}) {
+  return (
+    <section className="bg-canvas rounded-card border-hairline border p-5">
+      <p className="text-ink text-sm font-bold">{title}</p>
+      <p className="text-ink-secondary mt-1 text-xs leading-relaxed">{description}</p>
+      <div className="mt-4 space-y-3">{children}</div>
+    </section>
+  )
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+  required = false,
+  type = 'text',
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  required?: boolean
+  type?: 'text' | 'password'
+}) {
+  return (
+    <label className="block">
+      <span className="text-ink-secondary mb-1 block text-xs font-medium">
+        {label}{required && <span className="text-danger ml-1">必須</span>}
+      </span>
+      <input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        required={required}
+        className="border-hairline rounded-control text-ink w-full border px-3 py-2 text-sm"
+      />
+    </label>
+  )
+}
+
+function ReadOnlyField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-ink-secondary mb-1 text-xs font-medium">{label}</p>
+      <p className="bg-canvas-sunken rounded-control text-ink px-3 py-2 text-sm">{value}</p>
     </div>
   )
 }

@@ -10,7 +10,6 @@ import ListState from '@/components/shared/list-state'
 import SummaryCard from '@/components/shared/summary-card'
 import StatusBadge from '@/components/shared/status-badge'
 import SearchField from '@/components/shared/search-field'
-import SelectField from '@/components/shared/select-field'
 import PageHeader from '@/components/shared/page-header'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import {
@@ -62,8 +61,9 @@ export default function AccountsPage() {
     人数は数を作らず未取得として出す（`docs/v6-common-rules.md`
     「取れない数字を 0 にしない」）。
   */
-  const activeCount = accounts.filter((a) => a.isActive).length
-  const inactiveCount = accounts.filter((a) => !a.isActive).length
+  const activeCount = accounts.filter((a) => a.isActive && !a.archivedAt).length
+  const inactiveCount = accounts.filter((a) => !a.isActive && !a.archivedAt).length
+  const archivedCount = accounts.filter((a) => Boolean(a.archivedAt)).length
   const problemCount = accounts.filter(hasConnectionProblem).length
 
   if (searchParams.get('tab') === 'migration') return <AccountMigration />
@@ -74,7 +74,12 @@ export default function AccountsPage() {
         breadcrumb={[{ label: '設定' }, { label: 'LINEアカウント' }]}
         title="LINEアカウント"
         description="送受信に使うLINE公式アカウントを登録し、接続の状態を確かめます。"
-        actions={<Button href="/accounts/new" variant="primary">＋ LINEアカウントを登録</Button>}
+        actions={(
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" disabled>並び順と親子を変える</Button>
+            <Button href="/accounts/new" variant="primary">＋ LINEアカウントを登録</Button>
+          </div>
+        )}
       />
 
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
@@ -82,32 +87,40 @@ export default function AccountsPage() {
           detail="送受信できます" />
         <SummaryCard title="停止中" value={inactiveCount} unit="件" variant="v6"
           detail="送受信を止めています" />
-        {/*
-          アーカイブは `archived_at` がまだ無い（台帳 #128 で Codex へ）。
-          **0 と書くと「1件も無い」と読まれる**ので、未取得として `—` を出す。
-        */}
-        <SummaryCard title="アーカイブ" value={null} unit="件" variant="v6"
-          detail="まだ繋がっていません" />
+        <SummaryCard title="アーカイブ" value={archivedCount} unit="件" variant="v6"
+          detail="一覧の通常表示から外れています" />
         <SummaryCard title="接続に問題" value={problemCount} unit="件" variant="v6"
           badge={problemCount > 0 ? '要対応' : undefined} badgeTone="danger"
           detail="Webhookが合っていません" />
       </div>
 
-      <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
-        <SearchField
-          placeholder="アカウント名・チャネルIDで検索"
-          aria-label="アカウント名・チャネルIDで検索"
-          value={query}
-          onChange={setQuery}
-          onClear={() => setQuery('')}
-          className="min-w-0 flex-1"
-        />
-        <SelectField
-          aria-label="表示する状態"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value as AccountFilter)}
-          options={ACCOUNT_FILTERS.map((f) => ({ value: f.value, label: f.label }))}
-        />
+      <div className="bg-canvas rounded-card border-hairline mb-3 border p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchField
+            placeholder="アカウント名・チャネルIDで検索"
+            aria-label="アカウント名・チャネルIDで検索"
+            value={query}
+            onChange={setQuery}
+            onClear={() => setQuery('')}
+            className="min-w-64 flex-1"
+          />
+          <span className="border-hairline rounded-control border px-3 py-2 text-sm text-ink-secondary">
+            20件表示
+          </span>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {ACCOUNT_FILTERS.map((item) => (
+            <Button
+              key={item.value}
+              type="button"
+              variant={filter === item.value ? 'primary' : 'secondary'}
+              onClick={() => setFilter(item.value)}
+            >
+              {item.label}
+            </Button>
+          ))}
+          <span className="text-ink-faint ml-auto text-xs">{shown.length}件を表示</span>
+        </div>
       </div>
 
       {status === 'loading' ? (
@@ -173,7 +186,7 @@ export default function AccountsPage() {
                       {parentName(account, accounts)}
                     </td>
                     <td className="px-4 py-3">
-                      <Link href={`/accounts/${account.id}`} className="text-action text-sm hover:underline">
+                      <Link href={`/accounts/detail?id=${account.id}`} className="text-action text-sm hover:underline">
                         詳細
                       </Link>
                     </td>
@@ -199,8 +212,8 @@ export default function AccountsPage() {
           押し口を置かず、理由を本文で言う（`v6-common-rules.md` §7-10）。
         */}
         <p className="text-ink-faint mt-2 text-xs leading-relaxed">
-          既定アカウントの指定、アーカイブ、並び順と親子の変更は、まだ繋がっていません。
-          保存する口が接続されると使えます。
+          並び順と親子の変更は、保存する画面がまだ繋がっていません。友だち数と既定の表示は、
+          一覧APIから値が届いたときだけ表示します。
         </p>
       </div>
     </div>

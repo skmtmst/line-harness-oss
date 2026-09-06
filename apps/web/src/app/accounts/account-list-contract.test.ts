@@ -70,6 +70,7 @@ describe('V6 33-1 LINEアカウント一覧', () => {
     expect(matchesFilter(account({ isActive: true }), 'active')).toBe(true)
     expect(matchesFilter(account({ isActive: true }), 'inactive')).toBe(false)
     expect(matchesFilter(account({ isActive: false }), 'inactive')).toBe(true)
+    expect(matchesFilter(account({ archivedAt: '2026-09-01T00:00:00Z' }), 'archived')).toBe(true)
     expect(matchesFilter(account(), 'all')).toBe(true)
   })
 
@@ -89,18 +90,18 @@ describe('V6 33-1 LINEアカウント一覧', () => {
     expect(parentName(account(), [])).toBe('—')
   })
 
-  it('取れない数を 0 と書かない', () => {
+  it('APIで取れるアーカイブ件数を数え、取れない友だち数は作らない', () => {
     /*
       友だち数を返す口がこの一覧に無い。アーカイブは `archived_at` が
       まだ無い（台帳 #128）。**0 と書くと「1件も無い」と読まれる。**
     */
-    expect(PAGE).toContain('title="アーカイブ" value={null}')
+    expect(PAGE).toContain('title="アーカイブ" value={archivedCount}')
     expect(PAGE).not.toContain('friendCount')
   })
 
   it('まだ動かない操作は、押し口を置かず理由を書く', () => {
     // `v6-common-rules.md` §7-10「出す＝使える」。
-    expect(PAGE).toContain('既定アカウントの指定、アーカイブ、並び順と親子の変更は、まだ繋がっていません。')
+    expect(PAGE).toContain('並び順と親子の変更は、保存する画面がまだ繋がっていません。')
   })
 
   it('失敗したときに、運用者ができることを置く', () => {

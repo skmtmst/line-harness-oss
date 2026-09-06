@@ -102,61 +102,124 @@ function AccountDetail() {
       />
 
       {tab === 'overview' && (
-        <div className="mt-4 space-y-4">
-          <section className="bg-canvas rounded-card border-hairline border p-5">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-ink text-sm font-bold">登録の内容</p>
-              <Button href={`/accounts/detail?id=${account.id}&tab=credentials`}>編集する</Button>
-            </div>
-            <dl className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2">
-              <Row label="表示名" value={account.name} />
-              <Row label="チャネルID" value={account.channelId} />
-              <Row label="国・地域" value={account.country ?? '未設定'} />
-              <Row label="役割メモ" value={account.role ?? '未設定'} />
-              <Row label="親アカウント" value={parentLabel(account, all)} />
-              <Row label="友だち数の上限" value={capacityLabel(account)} />
-            </dl>
-            <div className="mt-3">
-              <StatusBadge tone={connection.tone}>{connection.label}</StatusBadge>
-            </div>
-          </section>
-
-          <section className="bg-canvas rounded-card border-hairline border p-5">
-            <p className="text-ink text-sm font-bold">このアカウントでできること</p>
-            <div className="mt-3 space-y-3">
-              {accountActions(account).map((action) => (
-                <div key={action.key} className="border-hairline rounded-control border p-3">
-                  <p className="text-ink text-sm font-medium">{action.title}</p>
-                  <p className="text-ink-secondary mt-1 text-xs leading-relaxed">{action.description}</p>
-                  {/*
-                    **押せないものは押し口を置かず、理由を本文で言う。**
-                    押せるのに何も起きない口は「やった」と誤解させる（§7-10）。
-                  */}
-                  {action.blockedReason ? (
-                    <p className="text-ink-faint mt-2 text-xs leading-relaxed">{action.blockedReason}</p>
-                  ) : action.key === 'handover' ? (
-                    <Button href={`/accounts/handover?id=${account.id}`} className="mt-2">
-                      {action.actionLabel}
-                    </Button>
-                  ) : (
-                    <Button type="button" className="mt-2" onClick={() => setStopTarget(account)}>
-                      {action.actionLabel}
-                    </Button>
-                  )}
+        <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
+          <div className="space-y-4">
+            <section className="bg-canvas rounded-card border-hairline border p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-ink text-sm font-bold">アカウント情報</p>
+                  <p className="text-ink-secondary mt-1 text-xs">管理画面で使う表示と所属です。</p>
                 </div>
-              ))}
-            </div>
-            {actionError && <p role="alert" className="text-danger mt-3 text-xs">{actionError}</p>}
-          </section>
+                <Button href={`/accounts/detail?id=${account.id}&tab=credentials`}>編集する</Button>
+              </div>
+              <dl className="mt-4 grid gap-x-8 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
+                <Row label="表示名" value={account.name} />
+                <Row label="チャネルID" value={account.channelId} />
+                <Row label="接続状態" value={connection.label} />
+                <Row label="国・地域" value={account.country ?? '未設定'} />
+                <Row label="役割メモ" value={account.role ?? '未設定'} />
+                <Row label="親アカウント" value={parentLabel(account, all)} />
+                <Row label="友だち数の上限" value={capacityLabel(account)} />
+                <Row label="LINE LoginチャネルID" value={account.loginChannelId ?? '未設定'} />
+                <Row label="LIFF ID" value={account.liffId ?? '未設定'} />
+              </dl>
+            </section>
 
-          <section className="bg-canvas rounded-card border-hairline border p-5">
-            <p className="text-ink text-sm font-bold">気をつけること</p>
-            <ul className="text-ink-secondary mt-2 space-y-1 text-xs leading-relaxed">
-              <li>・送受信を止めても、友だちと履歴は消えません。予約している配信は止まります。</li>
-              <li>・アーカイブすると一覧から外れます。記録は残り、あとから戻せます。</li>
-              <li>・資格情報を差し替えると、古いトークンは使えなくなります。差し替える前に接続を確かめます。</li>
-            </ul>
-          </section>
+            <section className="bg-canvas rounded-card border-hairline border p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-ink text-sm font-bold">資格情報</p>
+                  <p className="text-ink-secondary mt-1 text-xs">秘密値そのものは表示しません。</p>
+                </div>
+                <Button href={`/accounts/detail?id=${account.id}&tab=credentials`}>差し替える</Button>
+              </div>
+              <dl className="mt-4 grid gap-3 sm:grid-cols-3">
+                <CredentialRow
+                  label="アクセストークン"
+                  configured={account.channelAccessTokenConfigured}
+                  last4={account.channelAccessTokenLast4}
+                  updatedAt={account.channelAccessTokenUpdatedAt}
+                />
+                <CredentialRow
+                  label="チャネルシークレット"
+                  configured={account.channelSecretConfigured}
+                  last4={account.channelSecretLast4}
+                  updatedAt={account.channelSecretUpdatedAt}
+                />
+                <CredentialRow
+                  label="Loginシークレット"
+                  configured={account.loginChannelSecretConfigured}
+                  last4={account.loginChannelSecretLast4}
+                  updatedAt={account.loginChannelSecretUpdatedAt}
+                />
+              </dl>
+            </section>
+
+            <section className="bg-canvas rounded-card border-hairline border p-5">
+              <p className="text-ink text-sm font-bold">このアカウントでできること</p>
+              <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                {accountActions(account).map((action) => (
+                  <div key={action.key} className="border-hairline rounded-control border p-3">
+                    <p className="text-ink text-sm font-medium">{action.title}</p>
+                    <p className="text-ink-secondary mt-1 text-xs leading-relaxed">{action.description}</p>
+                    {action.blockedReason ? (
+                      <p className="text-ink-faint mt-2 text-xs leading-relaxed">{action.blockedReason}</p>
+                    ) : action.key === 'handover' ? (
+                      <Button href={`/accounts/handover?id=${account.id}`} className="mt-2">
+                        {action.actionLabel}
+                      </Button>
+                    ) : (
+                      <Button type="button" className="mt-2" onClick={() => setStopTarget(account)}>
+                        {action.actionLabel}
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {actionError && <p role="alert" className="text-danger mt-3 text-xs">{actionError}</p>}
+            </section>
+          </div>
+
+          <aside className="space-y-4">
+            <section className="bg-canvas rounded-card border-hairline border p-5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-ink text-sm font-bold">Webhookの突合</p>
+                <StatusBadge tone={webhook.tone}>{webhook.label}</StatusBadge>
+              </div>
+              <dl className="mt-4 space-y-3">
+                <Row label="LINE側に登録したURL" value={account.webhook?.actualUrl ?? '—'} />
+                <Row label="このシステムが待っているURL" value={account.webhook?.expectedUrl ?? '—'} />
+                <Row
+                  label="Webhookの利用"
+                  value={account.webhook?.active === null || account.webhook?.active === undefined
+                    ? '確かめていません'
+                    : account.webhook.active ? 'オン' : 'オフ'}
+                />
+              </dl>
+              <Button href={`/accounts/detail?id=${account.id}&tab=connection`} className="mt-4">
+                接続を詳しく見る
+              </Button>
+            </section>
+
+            <section className="bg-canvas rounded-card border-hairline border p-5">
+              <p className="text-ink text-sm font-bold">つながる先</p>
+              <ul className="text-ink-secondary mt-3 space-y-2 text-xs">
+                <li><a className="text-action hover:underline" href="/">ダッシュボード</a></li>
+                <li><a className="text-action hover:underline" href="/staff">ログインユーザー</a></li>
+                <li><a className="text-action hover:underline" href="/emergency">運用状態</a></li>
+                <li><a className="text-action hover:underline" href="/friends">友だち</a></li>
+              </ul>
+            </section>
+
+            <section className="bg-canvas rounded-card border-hairline border p-5">
+              <p className="text-ink text-sm font-bold">気をつけること</p>
+              <ul className="text-ink-secondary mt-2 space-y-2 text-xs leading-relaxed">
+                <li>・停止しても、友だちと履歴は消えません。</li>
+                <li>・資格情報を差し替える前に接続を確かめます。</li>
+                <li>・アーカイブした記録はあとから戻せます。</li>
+              </ul>
+            </section>
+          </aside>
         </div>
       )}
 
@@ -237,6 +300,31 @@ function Row({ label, value }: { label: string; value: string }) {
     <div>
       <dt className="text-ink-faint text-xs">{label}</dt>
       <dd className="text-ink mt-0.5 text-sm break-words">{value}</dd>
+    </div>
+  )
+}
+
+function CredentialRow({
+  label,
+  configured,
+  last4,
+  updatedAt,
+}: {
+  label: string
+  configured: boolean | undefined
+  last4: string | null
+  updatedAt: string | null
+}) {
+  const date = updatedAt
+    ? new Intl.DateTimeFormat('ja-JP', { dateStyle: 'medium' }).format(new Date(updatedAt))
+    : '更新日は未取得'
+  return (
+    <div className="bg-canvas-sunken rounded-control p-3">
+      <dt className="text-ink-faint text-xs">{label}</dt>
+      <dd className="text-ink mt-1 text-sm font-medium">
+        {configured ? (last4 ? `•••• ${last4}` : credentialLabel(true)) : credentialLabel(false)}
+      </dd>
+      <dd className="text-ink-faint mt-1 text-xs">{date}</dd>
     </div>
   )
 }
