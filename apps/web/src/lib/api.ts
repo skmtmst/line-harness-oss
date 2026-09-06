@@ -6895,9 +6895,21 @@ export type Webinar = {
   cta: { label: string; url: string; showAtSeconds: number } | null
   tagOnAttend: string | null
   tagOnCtaClick: string | null
+  folderId?: string | null
+  publicationState?: 'period' | 'always' | 'scheduled' | 'ended' | 'unset' | null
+  publicationStartsAt?: string | null
+  publicationEndsAt?: string | null
   createdAt: string
   updatedAt: string
 }
+
+export type WebinarListItem = Webinar & {
+  folderName: string | null
+  registrationCount: number
+  viewerCount: number | null
+}
+
+export type WebinarFolder = Folder & { count: number }
 
 export type WebinarInput = Partial<Omit<Webinar, 'id' | 'createdAt' | 'updatedAt'>>
 
@@ -7037,8 +7049,11 @@ export type WebinarAction = {
 }
 
 export const webinarApi = {
-  list: (accountId?: string) => fetchApi<{ data: Webinar[] }>(
+  list: (accountId?: string) => fetchApi<{ data: WebinarListItem[] }>(
     `/api/webinars${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`,
+  ),
+  folders: (accountId: string) => fetchApi<ApiResponse<WebinarFolder[]>>(
+    `/api/folders?kind=webinar&account_id=${encodeURIComponent(accountId)}`,
   ),
   overview: (accountId: string) => fetchApi<{ data: WebinarOverview }>(
     `/api/webinars/overview?account_id=${encodeURIComponent(accountId)}`,

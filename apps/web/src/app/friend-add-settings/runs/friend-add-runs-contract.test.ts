@@ -12,7 +12,7 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
     expect(PAGE).toContain("usePageTitle('友だち追加時配信・実行結果')")
     expect(PAGE).not.toContain('<Header')
     expect(SETTINGS).toContain('<Button href="/friend-add-settings/runs">実行結果を見る</Button>')
-    expect(PAGE).toContain('<Button href="/friend-add-settings">配信設定へ戻る</Button>')
+    expect(PAGE).toContain('href="/friend-add-settings">← 友だち追加時の配信</Link>')
   })
 
   it('選択中のアカウントと3つの絞り込みだけをAPIへ渡す', () => {
@@ -45,15 +45,30 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
   })
 
   it('4つの処理状態を利用者の言葉で表示する', () => {
-    expect(PAGE).toContain("pending: { label: '処理中です'")
-    expect(PAGE).toContain("completed: { label: '動きました'")
-    expect(PAGE).toContain("failed: { label: '確認が必要です'")
-    expect(PAGE).toContain("suppressed: { label: '配信しませんでした'")
+    expect(PAGE).toContain("pending: { label: 'テスト待ち'")
+    expect(PAGE).toContain("completed: { label: '成功'")
+    expect(PAGE).toContain("failed: { label: 'エラー'")
+    expect(PAGE).toContain("suppressed: { label: '配信なし'")
   })
 
   it('カーソルを積んだページ送りで前後へ移動できる', () => {
     expect(PAGE).toContain('setCursorStack((current) => current.length > 1 ? current.slice(0, -1) : current)')
     expect(PAGE).toContain('setCursorStack((current) => [...current, data.nextCursor])')
     expect(PAGE).toContain('disabled={!data.nextCursor || loading}')
+  })
+
+  it('V6の実行結果をCSV・最近の結果・流入内訳・右欄で確認できる', () => {
+    expect(PAGE).toContain('実行結果をCSVで書き出す')
+    expect(PAGE).toContain('最近の友だち追加')
+    expect(PAGE).toContain('流入経路別の内訳')
+    expect(PAGE).toContain('稼働状況')
+    expect(PAGE).toContain('要テスト')
+    expect(PAGE).toContain('担当者シナリオ開始')
+  })
+
+  it('取得できない集計値を0件で埋めない', () => {
+    expect(PAGE).toContain('<dd className="font-bold">未取得</dd>')
+    expect(PAGE).toContain('担当者への引き継ぎ結果を集計する口は未接続です。')
+    expect(PAGE).toContain('失敗した記録の詳細口は未接続です。')
   })
 })

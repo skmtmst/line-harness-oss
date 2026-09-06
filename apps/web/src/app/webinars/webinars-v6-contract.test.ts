@@ -29,13 +29,14 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(PAGE).not.toContain('保存した条件は準備中です')
   })
 
-  it('フォルダ構造を示し、保存契約が来るまでは操作できるように見せない', () => {
+  it('選択アカウントのフォルダ件数を表示し、保存契約が来るまでは操作できるように見せない', () => {
     expect(PAGE).toContain('const WEBINAR_FOLDERS')
     expect(PAGE).toContain('aria-label="ウェビナーのフォルダ"')
     expect(PAGE).toContain('<Button disabled title="フォルダの保存契約を接続後に使えます">フォルダを追加</Button>')
-    expect(PAGE).toContain('フォルダ名と件数は一覧APIへの接続後に表示します。')
-    expect(PAGE).toContain("api.folders.list('webinar')")
-    expect(PAGE).toContain('measuredFolder?.count')
+    expect(PAGE).toContain('webinarApi.folders(selectedAccountId)')
+    expect(PAGE).toContain("folders.length > 0 ? `${folders.length + 1}件` : '—'")
+    expect(PAGE).toContain("measuredFolder?.count ?? '—'")
+    expect(PAGE).not.toContain('フォルダ名と件数は一覧APIへの接続後に表示します。')
     expect(PAGE).toContain('measuredCount(w.registrationCount)')
     expect(PAGE).toContain('measuredCount(w.viewerCount)')
     expect(PAGE).toContain('publicationSummary(w)')
@@ -45,6 +46,7 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(PAGE).toContain('webinarApi.list(accountId)')
     expect(PAGE).toContain('requestGeneration.current !== generation')
     expect(PAGE).toContain('loadedAccountId === selectedAccountId ? items : []')
+    expect(PAGE).toContain('folderRequestGeneration.current === generation')
     expect(PAGE).toContain('上のバーでLINE公式アカウントを選んでください')
     expect(FORM).toContain("...(!initial ? { accountId: selectedAccountId } : {})")
   })
