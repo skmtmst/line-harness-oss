@@ -240,6 +240,12 @@ export default function ScenariosPage() {
       />
       </div>
 
+      <section className="bg-success-bg text-success mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-card px-4 py-3 text-sm">
+        <span aria-hidden>ⓘ</span>
+        <strong>作成しただけでは配信されません。開始条件を設定すると配信が始まります。</strong>
+        <span className="font-semibold underline underline-offset-2">配信を始める方法</span>
+      </section>
+
       {/* 設計の KPI 4枚。数は /api/list-stats から4画面ぶんまとめて来る。 */}
       <div data-design="KPIs">
       <ListKpis
@@ -451,12 +457,12 @@ export default function ScenariosPage() {
       )}
 
       {loadStatus === 'loading' ? (
-        <ListState kind="loading" title="シナリオを読み込んでいます" />
+        <ListState kind="loading" title="読み込んでいます" />
       ) : loadStatus === 'error' ? (
         <ListState
           kind="error"
-          title="シナリオを表示できませんでした"
-          description="登録したシナリオは消えていません。再読み込みしても直らない場合は、エラー報告へ連絡してください。"
+          title="表示できませんでした"
+          description="登録したシナリオは消えていません。再読み込みしても直らないときは、エラー報告へお知らせください。"
           onRetry={() => void loadScenarios()}
         />
       ) : (
@@ -481,6 +487,7 @@ export default function ScenariosPage() {
           onMoveFolder={handleMoveFolder}
           onToggleActive={(id) => requestToggleActive(id)}
           onDelete={handleDelete}
+          onCreate={() => void handleCreate()}
         />
       )}
         </div>
