@@ -84,6 +84,7 @@ shared-button-importer app/rich-menus/page.tsx
 shared-button-importer app/scenarios/detail/scenario-detail-client.tsx
 shared-button-importer app/scenarios/page.tsx
 shared-button-importer app/scenarios/results/page.tsx
+shared-button-importer app/staff/page.tsx
 shared-button-importer app/tags/fields/migrate/page.tsx
 shared-button-importer app/tags/fields/new/page.tsx
 shared-button-importer app/tags/folders/new/page.tsx
@@ -128,6 +129,7 @@ shared-button-importer components/merged-person/merged-delivery-dialog.tsx
 shared-button-importer components/merged-person/merged-person-detail.tsx
 shared-button-importer components/reminders/reminder-publish-flow.tsx
 shared-button-importer components/scenarios/scenario-list.tsx
+shared-button-importer components/staff/login-audit.tsx
 shared-button-importer components/shared/create-page.tsx
 shared-button-importer components/shared/list-state.tsx
 shared-button-importer components/shared/not-connected.tsx
