@@ -138,13 +138,7 @@ export type TagDeleteImpact = {
   canDelete: boolean
 }
 
-/*
- * 緊急停止の「止める前に何が止まるか」。
- *
- * ここに置いてあるのは**影響を見るぶんだけ**。止める・戻す口は
- * 段階的な本人確認のヘッダを送るが、worker 側の許可一覧にまだ無い
- * （`apps/worker/src/cors-headers.test.ts` が落ちる）。口が入ってから足す。
- */
+/** 緊急停止の対象、影響、停止状態をサーバーと共有する契約。 */
 export type OperationCapability =
   | 'broadcast_dispatch'
   | 'scenario_dispatch'
@@ -182,6 +176,37 @@ export type OperationControl = {
   actorId: string | null
   stoppedAt: string | null
   updatedAt: string | null
+}
+
+export type OperationControlSnapshot = {
+  version: number
+  states: Record<OperationCapability, 'running' | 'stopped'>
+  activeIncidentId: string | null
+  reason: string | null
+  actorId: string | null
+  stoppedAt: string | null
+  capturedAt: string
+}
+
+export type OperationIncident = {
+  id: string
+  scopeKey: string
+  lineAccountId: string | null
+  status: 'preparing' | 'stopped' | 'resolved' | 'failed'
+  capabilities: OperationCapability[]
+  reason: string
+  detail: string | null
+  actorId: string
+  resolvedByActorId: string | null
+  controlVersion: number | null
+  beforeSnapshot: OperationControlSnapshot
+  stoppedSnapshot: OperationControlSnapshot | null
+  restoredSnapshot: OperationControlSnapshot | null
+  errorMessage: string | null
+  stoppedAt: string | null
+  resolvedAt: string | null
+  createdAt: string
+  updatedAt: string
 }
 
 export type FormDeleteImpact = {
@@ -364,6 +389,40 @@ export type AffiliatePaymentSummary = {
   heldConversions: number
   heldReward: number
   holdStatusUnknown: number
+  unsettledConversions: number
+  unsettledReward: number
+  settledConversions: number
+  settledReward: number
+}
+
+export type AffiliateArchiveImpact = {
+  affiliateId: string
+  affiliateName: string
+  lifecycle: 'active' | 'paused' | 'archived'
+  activeLinks: number
+  unsettledConversions: number
+  unsettledReward: number
+  pendingConversions: number
+  checkedAt: string
+}
+
+export type AffiliateSettlementPreview = {
+  affiliateId: string
+  affiliateName: string
+  code: string
+  amount: number
+  conversionCount: number
+  periodFrom: string | null
+  periodTo: string
+  closeDate: string | null
+  paymentDate: string | null
+  bankDestination: string | null
+  breakdown: Array<{
+    offerName: string
+    conversions: number
+    unitReward: number | null
+    subtotal: number
+  }>
 }
 
 /** Broadcast type from API (now camelCase after worker serialization) */
@@ -3974,6 +4033,17 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
+    archiveImpact: (id: string) =>
+      fetchApi<ApiResponse<AffiliateArchiveImpact>>(`/api/affiliates/${id}/archive-impact`),
+    archive: (id: string, data: { mode: 'pause' | 'archive'; confirmationName?: string }) =>
+      fetchApi<ApiResponse<{
+        affiliateId: string
+        lifecycle: 'paused' | 'archived'
+        recordsPreserved: true
+      }>>(`/api/affiliates/${id}/archive`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
     report: (id: string, params?: { startDate?: string; endDate?: string }) =>
       fetchApi<ApiResponse<{ affiliateId: string; affiliateName: string; code: string; commissionRate: number; totalClicks: number; totalConversions: number; totalRevenue: number }>>(
         `/api/affiliates/${id}/report?` + new URLSearchParams(params as Record<string, string>),
@@ -4050,11 +4120,29 @@ export const api = {
         data: AffiliatePaymentSummary[]
         limitations: {
           payoutHistory: false
+          settlementHistory: true
           bankDestination: false
           settlementSchedule: false
         }
         error?: string
       }>(`/api/affiliate-payments?${new URLSearchParams({ lineAccountId })}`),
+    paymentPreview: (id: string, lineAccountId: string) =>
+      fetchApi<ApiResponse<AffiliateSettlementPreview>>(
+        `/api/affiliate-payments/${id}/preview?${new URLSearchParams({ lineAccountId })}`,
+      ),
+    confirmPayment: (
+      id: string,
+      data: { lineAccountId: string; expectedAmount: number; idempotencyKey: string },
+    ) => fetchApi<ApiResponse<{
+      kind: 'created' | 'duplicate'
+      settlementId: string
+      amount: number
+      conversionCount: number
+      closedAt: string
+    }>>(`/api/affiliate-payments/${id}/confirm`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   },
   templates: {
     list: (category?: string, accountId?: string) => {
@@ -6020,7 +6108,7 @@ export const api = {
       }>>(options?.forceRefresh ? '/api/duplicates/stats?refresh=1' : '/api/duplicates/stats'),
   },
   /** 広告連携（設計 V2 6-8）。鍵は伏せた形で返ってくる。 */
-  /** 緊急停止の影響（見るだけ）。止める・戻す口はまだ足していない。 */
+  /** 緊急停止の影響確認、停止・復旧、追記履歴。 */
   operations: {
     preview: (accountId: string | null) => {
       const query = accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''
@@ -6032,6 +6120,32 @@ export const api = {
         calculatedAt: string
       }>>(`/api/operations/control/preview${query}`)
     },
+    history: (limit = 100) =>
+      fetchApi<ApiResponse<OperationIncident[]>>(`/api/operations/history?limit=${limit}`),
+    stop: (input: {
+      lineAccountId: string | null
+      capabilities: OperationCapability[]
+      reason: string
+      detail?: string | null
+      confirmation: '停止'
+      expectedVersion: number
+    }) => fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
+      '/api/operations/incidents',
+      {
+        method: 'POST',
+        headers: { 'X-Confirm-Irreversible': 'operation-stop' },
+        body: JSON.stringify(input),
+      },
+    ),
+    restore: (incidentId: string, input: { confirmation: '復旧'; expectedVersion: number }) =>
+      fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
+        `/api/operations/incidents/${encodeURIComponent(incidentId)}/restore`,
+        {
+          method: 'POST',
+          headers: { 'X-Confirm-Irreversible': 'operation-restore' },
+          body: JSON.stringify(input),
+        },
+      ),
   },
   adPlatforms: {
     list: () =>

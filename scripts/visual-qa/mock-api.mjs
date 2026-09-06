@@ -37,6 +37,7 @@ import {
   MEDIA_REPLACEMENT_IMPACT,
   MEDIA_REPLACEMENT_IMPACT_BLOCKED,
   MEDIA_REPLACEMENT_IMPACT_EMPTY,
+  MEDIA_FOLDERS,
   MEDIA_ITEMS,
   FRIEND_ADD_LIFECYCLE_DRAFT,
   FRIEND_ADD_LIFECYCLE_PUBLISHED,
@@ -552,11 +553,11 @@ const SHAPES = {
   */
   '/api/conversions/approvals': CONVERSION_APPROVALS,
   '/api/affiliate-payments': [
-    { affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka01', holdDays: 30, payoutCycle: '8/31締め・9/30払い', approvedConversions: 9, approvedReward: 84000, heldConversions: 2, heldReward: 18000, holdStatusUnknown: 0 },
-    { affiliateId: 'af-2', affiliateName: '合同会社ノース', code: 'north', holdDays: 30, payoutCycle: '8/31締め・9/30払い', approvedConversions: 8, approvedReward: 72000, heldConversions: 1, heldReward: 12000, holdStatusUnknown: 0 },
-    { affiliateId: 'af-3', affiliateName: '木村 亮', code: 'miyuki', holdDays: 30, payoutCycle: '8/31締め・9/30払い', approvedConversions: 7, approvedReward: 64000, heldConversions: 2, heldReward: 18000, holdStatusUnknown: 0 },
-    { affiliateId: 'af-4', affiliateName: '中村 彩', code: 'aya-n', holdDays: 30, payoutCycle: '8/31締め・9/30払い', approvedConversions: 5, approvedReward: 42000, heldConversions: 1, heldReward: 9000, holdStatusUnknown: 0 },
-    { affiliateId: 'af-5', affiliateName: '山口 商店', code: 'yamaguchi', holdDays: 60, payoutCycle: '8/31締め・9/30払い', approvedConversions: 5, approvedReward: 50000, heldConversions: 2, heldReward: 15000, holdStatusUnknown: 0 },
+    { affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka01', holdDays: 30, payoutCycle: '8/31締め・9/30払い', approvedConversions: 9, approvedReward: 84000, heldConversions: 2, heldReward: 18000, holdStatusUnknown: 0, unsettledConversions: 9, unsettledReward: 84000, settledConversions: 0, settledReward: 0 },
+    { affiliateId: 'af-2', affiliateName: '合同会社ノース', code: 'north', holdDays: 30, payoutCycle: '8/31締め・9/30払い', approvedConversions: 8, approvedReward: 72000, heldConversions: 1, heldReward: 12000, holdStatusUnknown: 0, unsettledConversions: 8, unsettledReward: 72000, settledConversions: 0, settledReward: 0 },
+    { affiliateId: 'af-3', affiliateName: '木村 亮', code: 'miyuki', holdDays: 30, payoutCycle: '8/31締め・9/30払い', approvedConversions: 7, approvedReward: 64000, heldConversions: 2, heldReward: 18000, holdStatusUnknown: 0, unsettledConversions: 7, unsettledReward: 64000, settledConversions: 0, settledReward: 0 },
+    { affiliateId: 'af-4', affiliateName: '中村 彩', code: 'aya-n', holdDays: 30, payoutCycle: '8/31締め・9/30払い', approvedConversions: 5, approvedReward: 42000, heldConversions: 1, heldReward: 9000, holdStatusUnknown: 0, unsettledConversions: 5, unsettledReward: 42000, settledConversions: 0, settledReward: 0 },
+    { affiliateId: 'af-5', affiliateName: '山口 商店', code: 'yamaguchi', holdDays: 60, payoutCycle: '8/31締め・9/30払い', approvedConversions: 5, approvedReward: 50000, heldConversions: 2, heldReward: 15000, holdStatusUnknown: 0, unsettledConversions: 5, unsettledReward: 50000, settledConversions: 0, settledReward: 0 },
   ],
   '/api/action-scores/rules': ACTION_SCORE_RULES,
   '/api/action-scores/friends': {
@@ -1157,6 +1158,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/folders' && query.get('kind') === 'auto_reply') {
     return { success: true, data: AUTO_REPLY_FOLDERS }
   }
+  if (pathname === '/api/folders' && query.get('kind') === 'media') {
+    return { success: true, data: MEDIA_FOLDERS }
+  }
   if (pathname === '/api/auto-replies') return { success: true, data: AUTO_REPLIES }
   if (/^\/api\/auto-replies\/[^/]+\/draft$/.test(pathname)) {
     return { success: true, data: AUTO_REPLY_PUBLISH_DRAFT }
@@ -1425,6 +1429,47 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: EC_EVENTS, pagination: { total: EC_EVENTS.length, limit: 20, offset: 0 } }
   }
   if (pathname === '/api/affiliates-report') return { success: true, data: AFFILIATE_REPORT }
+  const affiliateArchiveImpact = /^\/api\/affiliates\/([^/]+)\/archive-impact$/.exec(pathname)
+  if (affiliateArchiveImpact) {
+    const affiliate = AFFILIATES.find((item) => item.id === affiliateArchiveImpact[1]) ?? AFFILIATES[0]
+    return {
+      success: true,
+      data: {
+        affiliateId: affiliate.id,
+        affiliateName: affiliate.name,
+        lifecycle: affiliate.isActive ? 'active' : 'paused',
+        activeLinks: 3,
+        unsettledConversions: 9,
+        unsettledReward: 24000,
+        pendingConversions: 2,
+        checkedAt: '2026-09-06T00:00:00.000Z',
+      },
+    }
+  }
+  const affiliatePaymentPreview = /^\/api\/affiliate-payments\/([^/]+)\/preview$/.exec(pathname)
+  if (affiliatePaymentPreview) {
+    const affiliate = AFFILIATES.find((item) => item.id === affiliatePaymentPreview[1]) ?? AFFILIATES[1]
+    return {
+      success: true,
+      data: {
+        affiliateId: affiliate.id,
+        affiliateName: affiliate.name,
+        code: affiliate.code,
+        amount: 72000,
+        conversionCount: 18,
+        periodFrom: '2026-08-01T00:00:00+09:00',
+        periodTo: '2026-08-31T23:59:59+09:00',
+        closeDate: null,
+        paymentDate: null,
+        bankDestination: null,
+        breakdown: [
+          { offerName: '定期便のはじめて購入', conversions: 8, unitReward: 5000, subtotal: 40000 },
+          { offerName: '無料体験の申込', conversions: 9, unitReward: 3000, subtotal: 27000 },
+          { offerName: '友だち追加だけ', conversions: 50, unitReward: 100, subtotal: 5000 },
+        ],
+      },
+    }
+  }
   /* 紹介者ひとりぶん。`/api/affiliates/:id/report` と `/links`。器の形が要る。 */
   if (/^\/api\/affiliates\/[^/]+\/report$/.test(pathname)) return { success: true, data: AFFILIATE_REPORT_DETAIL }
   if (/^\/api\/affiliates\/[^/]+\/links$/.test(pathname)) return { success: true, data: AFFILIATE_LINKS }

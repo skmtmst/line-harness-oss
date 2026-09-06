@@ -41,6 +41,7 @@ describe('0件の言い分け', () => {
 })
 
 const PAGE = readFileSync(join(__dirname, 'page.tsx'), 'utf8')
+const TABLE = readFileSync(join(__dirname, '..', '..', 'components', 'friends', 'friend-list-table.tsx'), 'utf8')
 
 describe('URLから来る絞り込み', () => {
   it('画面が点数の帯と配信対象を数に入れている', () => {
@@ -51,7 +52,8 @@ describe('URLから来る絞り込み', () => {
     */
     expect(PAGE).toContain('|| hasScoreRange')
     expect(PAGE).toContain("|| audienceId !== ''")
-    expect(PAGE).toContain('<ListState kind="empty"')
+    expect(PAGE).toContain('<FriendListTable')
+    expect(TABLE).toContain('<ListState kind="empty"')
   })
 
   it('点数の帯や配信対象で開いたときも絞り込みとして数える', () => {
