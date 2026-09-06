@@ -1,6 +1,7 @@
 'use client'
 
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import { api } from '@/lib/api'
@@ -204,10 +205,10 @@ function AccountDetail() {
             <section className="bg-canvas rounded-card border-hairline border p-5">
               <p className="text-ink text-sm font-bold">つながる先</p>
               <ul className="text-ink-secondary mt-3 space-y-2 text-xs">
-                <li><a className="text-action hover:underline" href="/">ダッシュボード</a></li>
-                <li><a className="text-action hover:underline" href="/staff">ログインユーザー</a></li>
-                <li><a className="text-action hover:underline" href="/emergency">運用状態</a></li>
-                <li><a className="text-action hover:underline" href="/friends">友だち</a></li>
+                <li><Link className="text-action hover:underline" href="/">ダッシュボード</Link></li>
+                <li><Link className="text-action hover:underline" href="/staff">ログインユーザー</Link></li>
+                <li><Link className="text-action hover:underline" href="/emergency">運用状態</Link></li>
+                <li><Link className="text-action hover:underline" href="/friends">友だち</Link></li>
               </ul>
             </section>
 
