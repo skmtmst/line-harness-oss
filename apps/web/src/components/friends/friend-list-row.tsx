@@ -135,7 +135,7 @@ export default function FriendListRow({
           {latest ? (
             <>
               <p className="truncate text-xs text-ink" title={latest.content}>
-                {latest.messageType === 'text' ? latest.content : `[${latest.messageType}]`}
+                {latest.messageType === 'text' ? latest.content : messageTypeLabel(latest.messageType)}
               </p>
               <p className="mt-1 text-nano text-ink-faint">{formatDateTime(latest.createdAt)}</p>
             </>
@@ -164,7 +164,18 @@ export default function FriendListRow({
 
 function formatDateTime(iso: string): string {
   const trimmed = iso.replace(/(\.\d+)?(Z|[+\-]\d{2}:?\d{2})?$/, '')
-  return trimmed.replace('T', ' ').slice(0, 16)
+  return trimmed.replace('T', ' ').slice(0, 16).replace(/-/g, '/')
+}
+
+function messageTypeLabel(messageType: string): string {
+  return ({
+    sticker: 'スタンプ',
+    image: '画像',
+    video: '動画',
+    audio: '音声',
+    file: 'ファイル',
+    location: '位置情報',
+  } as Record<string, string>)[messageType] ?? 'メッセージ'
 }
 
 function formatDate(iso: string): string {
