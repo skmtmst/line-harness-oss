@@ -23,7 +23,7 @@ import styles from './reminder-runs.module.css'
 const PAGE_SIZE = 20
 
 const STATUS_VIEW: Record<ReminderDeliveryRunStatus, { label: string; tone: StatusBadgeTone }> = {
-  queued: { label: '配信予定', tone: 'info' },
+  planned: { label: '配信予定', tone: 'info' },
   claimed: { label: '送信処理中', tone: 'info' },
   succeeded: { label: '送信済み', tone: 'success' },
   skipped: { label: '送信なし', tone: 'neutral' },
@@ -101,15 +101,22 @@ function Fact({ label, value }: { label: string; value: string }) {
 export default function ReminderRunsPage() {
   const searchParams = useSearchParams()
   const reminderId = searchParams.get('id') ?? ''
+  const isPlannedView = searchParams.get('status') === 'planned'
   const [data, setData] = useState<ReminderDeliveryRunsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [status, setStatus] = useState<'' | ReminderDeliveryRunStatus>('')
+  const [status, setStatus] = useState<'' | ReminderDeliveryRunStatus>(isPlannedView ? 'planned' : '')
   const [page, setPage] = useState(1)
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [actionMessage, setActionMessage] = useState('')
   const [exporting, setExporting] = useState(false)
-  usePageTitle(data?.reminder.name ? `${data.reminder.name}・実行結果` : null)
+  usePageTitle(data?.reminder.name ? `${data.reminder.name}・${isPlannedView ? '配信予定' : '実行結果'}` : null)
+
+  // 同じpathnameのまま目的を切り替えても、URLと取得条件をずらさない。
+  useEffect(() => {
+    setStatus(isPlannedView ? 'planned' : '')
+    setPage(1)
+  }, [isPlannedView])
 
   const load = useCallback(async () => {
     if (!reminderId) return
@@ -126,11 +133,11 @@ export default function ReminderRunsPage() {
       if (!response.success) throw new Error(response.error)
       setData(response.data)
     } catch {
-      setError('実行結果を読み込めませんでした。時間を置いてもう一度お試しください。')
+      setError(`${isPlannedView ? '配信予定' : '実行結果'}を読み込めませんでした。時間を置いてもう一度お試しください。`)
     } finally {
       setLoading(false)
     }
-  }, [page, reminderId, status])
+  }, [isPlannedView, page, reminderId, status])
 
   useEffect(() => {
     void load()
@@ -142,7 +149,8 @@ export default function ReminderRunsPage() {
   }, [page, pageCount])
 
   const firstStep = data?.steps[0] ?? null
-  const hasErrors = (data?.summary.errors ?? 0) > 0
+  // 過去の失敗を、これから送る予定の警告として混ぜない。
+  const hasErrors = !isPlannedView && (data?.summary.errors ?? 0) > 0
 
   const retry = async (runId: string) => {
     setRetryingId(runId)
@@ -215,7 +223,7 @@ export default function ReminderRunsPage() {
   return (
     <div className={styles.page} data-design-node="GC4St">
       <div className={styles.topActions}>
-        <Breadcrumb items={[{ label: 'リマインダ一覧', href: '/reminders' }, { label: '実行結果' }]} />
+        <Breadcrumb items={[{ label: 'リマインダ一覧', href: '/reminders' }, { label: isPlannedView ? '配信予定' : '実行結果' }]} />
         <Button onClick={() => void exportCsv()} disabled={exporting || loading}>
           {exporting ? 'CSVを準備しています' : 'CSVで書き出す'}
         </Button>
@@ -274,20 +282,24 @@ export default function ReminderRunsPage() {
 
           <Card overflow="hidden" id="recent-runs">
             <CardHeader
-              title="最近の実行"
-              action={status ? <Button onClick={() => { setStatus(''); setPage(1) }}>すべての実行結果</Button> : undefined}
+              title={isPlannedView ? '配信予定' : '最近の実行'}
+              action={isPlannedView
+                ? <Button href={`/reminders/detail?id=${encodeURIComponent(reminderId)}`}>実行履歴を見る</Button>
+                : status
+                  ? <Button onClick={() => { setStatus(''); setPage(1) }}>すべての実行結果</Button>
+                  : <Button href={`/reminders/detail?id=${encodeURIComponent(reminderId)}&status=planned`}>配信予定を見る</Button>}
             />
-            <p className={styles.sectionNote}>対象者ごとの履歴を確認できます。</p>
+            <p className={styles.sectionNote}>{isPlannedView ? 'これから送る予定を友だちごとに確認できます。' : '対象者ごとの履歴を確認できます。'}</p>
 
             {loading ? <ListState kind="loading" /> : null}
             {!loading && error ? (
-              <ListState kind="error" description={error} action={<Button onClick={() => void load()}>実行結果を再読み込み</Button>} />
+              <ListState kind="error" description={error} action={<Button onClick={() => void load()}>{isPlannedView ? '配信予定' : '実行結果'}を再読み込み</Button>} />
             ) : null}
             {!loading && !error && (data?.items.length ?? 0) === 0 ? (
               <ListState
                 kind="empty"
-                title={status ? '送信エラーはありません' : '実行結果がまだありません'}
-                description={status ? 'すべての実行結果へ戻って確認できます。' : '配信予定が作られると、ここに記録されます。'}
+                title={isPlannedView ? '配信予定はありません' : status ? '送信エラーはありません' : '実行結果がまだありません'}
+                description={isPlannedView ? '予約や対象条件が変わると、予定も変わります。' : status ? 'すべての実行結果へ戻って確認できます。' : '配信予定が作られると、ここに記録されます。'}
               />
             ) : null}
             {!loading && !error && (data?.items.length ?? 0) > 0 ? (

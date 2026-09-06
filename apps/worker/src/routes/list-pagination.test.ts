@@ -11,6 +11,11 @@ describe('管理画面一覧のページ指定', () => {
     expect(listLimit('999999', 50)).toBe(200);
   });
 
+  test('呼び出し側が指定した上限で止める', () => {
+    expect(listLimit('999999', 100, 500)).toBe(500);
+    expect(listLimit('999999', 20, 100)).toBe(100);
+  });
+
   test('offsetとpageの不正値を先頭へ戻す', () => {
     expect(listOffset('-1')).toBe(0);
     expect(listOffset('NaN')).toBe(0);

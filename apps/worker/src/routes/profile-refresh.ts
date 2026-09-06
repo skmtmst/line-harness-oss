@@ -5,6 +5,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { resolveLineCredential } from '@line-crm/db';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveLineToken } from '../services/line-token.js';
+import { listLimit } from './list-pagination.js';
 
 const profileRefresh = new Hono<Env>();
 
@@ -56,7 +57,7 @@ async function visibleAccountNames(
  */
 profileRefresh.post('/api/admin/refresh-profiles', requireRole('owner'), async (c) => {
   const offset = Number.parseInt(c.req.query('offset') ?? '0', 10);
-  const limit = Math.min(Number.parseInt(c.req.query('limit') ?? '100', 10), 500);
+  const limit = listLimit(c.req.query('limit'), 100, 500);
   const accountIdFilter = c.req.query('accountId') ?? null;
 
   if (!Number.isFinite(offset) || offset < 0) {
@@ -566,7 +567,7 @@ profileRefresh.get('/api/admin/auto-reply-stats', requireRole('owner'), async (c
  * 直近 N 件の incoming + outgoing messages_log を返す。debug 用。
  */
 profileRefresh.get('/api/admin/recent-messages', requireRole('owner'), async (c) => {
-  const limit = Math.min(Number.parseInt(c.req.query('limit') ?? '20', 10), 100);
+  const limit = listLimit(c.req.query('limit'), 20, 100);
   const db = c.env.DB;
   const adminScope = await adminAccountScope(c, 'COALESCE(ml.line_account_id, f.line_account_id)');
 
