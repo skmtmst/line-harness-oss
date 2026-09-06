@@ -44,6 +44,7 @@ import {
   MEDIA_REPLACEMENT_IMPACT_EMPTY,
   MEDIA_FOLDERS,
   MEDIA_ITEMS,
+  MEDIA_QUOTA,
   FRIEND_ADD_EVENTS,
   FRIEND_ADD_RUNS,
   FRIEND_ADD_LIFECYCLE_DRAFT,
@@ -887,6 +888,7 @@ const SHAPES = {
   '/api/operators': OPERATORS,
   '/api/scenarios': FRIEND_SCENARIOS,
   '/api/media': MEDIA_ITEMS,
+  '/api/media/quota': MEDIA_QUOTA,
 
   /* 予約。`api.ts` を通らない口なので、読む側（`app/page.tsx`）に合わせる。 */
   '/api/booking/admin/requests': { requests: [] },

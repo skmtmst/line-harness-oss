@@ -475,6 +475,11 @@ export default function MediaLibraryPage() {
           setDetailsFor(null)
           setReplacementFor(item)
         }}
+        onVersionCreated={(message) => {
+          setDetailsFor(null)
+          setSuccessMessage(message)
+          void load()
+        }}
       />
     )
   }

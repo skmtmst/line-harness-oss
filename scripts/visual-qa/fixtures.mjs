@@ -1488,6 +1488,15 @@ export const MEDIA_FOLDERS = [
   { id: 'media-video', name: '03_動画', kind: 'media', sortOrder: 2, color: '#7C6BC4', createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
 ]
 
+export const MEDIA_QUOTA = {
+  usageBytes: 2576980378,
+  reservedBytes: 0,
+  limitBytes: 10737418240,
+  remainingBytes: 8160437862,
+  usageRate: 0.24,
+  state: 'normal',
+}
+
 const mediaPreview = (color) => `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="678"><rect width="1040" height="678" fill="${color.replace('#', '%23')}"/></svg>`
 
 export const MEDIA_ITEMS = [

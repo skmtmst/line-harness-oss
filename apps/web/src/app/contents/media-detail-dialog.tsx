@@ -123,13 +123,13 @@ export default function MediaDetailDialog({
     }
     const validation = validateMediaFile(file)
     if (validation) {
-      setVersionFile(file)
+      setVersionFile(null)
       setVersionPhase('error')
       setVersionError(validation)
       return
     }
     if (!fileMatchesMediaKind(file, item.kind)) {
-      setVersionFile(file)
+      setVersionFile(null)
       setVersionPhase('error')
       setVersionError('いまのメディアと同じ種類のファイルを選んでください')
       return
@@ -243,7 +243,15 @@ export default function MediaDetailDialog({
               </div>
               <span className="bg-accent-soft text-accent-deep rounded-pill px-2 py-1 text-xs font-semibold">安全確認して追加</span>
             </div>
-            <label htmlFor={fileInputId} className="border-info text-info rounded-control mt-4 flex min-h-24 cursor-pointer items-center justify-center border border-dashed p-4 text-center">
+            <label
+              htmlFor={fileInputId}
+              className="border-info text-info rounded-control mt-4 flex min-h-24 cursor-pointer items-center justify-center border border-dashed p-4 text-center"
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault()
+                chooseVersionFile(event.dataTransfer.files[0] ?? null)
+              }}
+            >
               <div>
                 <p className="text-sm font-bold">ここにファイルをドラッグ、または押して選ぶ</p>
                 <p className="text-ink-faint mt-1 text-xs">いまのメディアと同じ種類を選びます。</p>
@@ -282,7 +290,7 @@ export default function MediaDetailDialog({
                   {versionPhase === 'publishing' ? '追加しています…' : '新しい版を追加する'}
                 </Button>
               ) : (
-                <Button type="button" variant="primary" onClick={() => void prepareVersion()} disabled={!versionFile || versionPhase === 'uploading' || versionPhase === 'error'}>
+                <Button type="button" variant="primary" onClick={() => void prepareVersion()} disabled={!versionFile || versionPhase === 'uploading'}>
                   差し替え内容を確認
                 </Button>
               )}
