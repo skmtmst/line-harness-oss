@@ -318,7 +318,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
         />
       </div>
 
-      <div className="bg-info-bg text-info mb-4 rounded-control px-4 py-3 text-xs font-semibold">
+      <div data-design="Bar" className="bg-info-bg text-info mb-4 rounded-control px-4 py-3 text-xs font-semibold">
         ⓘ　上から並んだ順に、お客様の画面に出ます。かかる時間を長めにしておくと、あとの予約とぶつかりません。金額を空けておくと「お問い合わせ」と出ます。
       </div>
 
@@ -408,6 +408,8 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex gap-2 text-xs">
+                        {/* QSLEH の行操作は共通Button（高さ36px）より小さいため、
+                            表の行高を設計どおり保つ専用の小ボタンにする。 */}
                         <button onClick={() => setEditing(m)} className="border-hairline rounded-control border px-2 py-1 font-semibold">
                           中身を見る
                         </button>
