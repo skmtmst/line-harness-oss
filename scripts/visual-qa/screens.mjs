@@ -169,9 +169,9 @@ export const SCREENS = [
   // ── 機能1 ダッシュボード ────────────────────────────────
   {
     node: 'vUXKb', feature: 1, name: '1-1 ダッシュボード',
-    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-04 再照合。構造一致・データ未接続。** 2026-09-03の1440/1920px画像と最新コードの差分を確認し、カード構成・文言・横スクロール0は設計どおり。自動変更など取得口のない値は `—` のため最終一致にしない。現在コミットの画像はPlaywrightのOS権限で取得できず、旧画像と差分照合で判定。', verdictSource: 'dashboard-v6/vUXKb.txt + 2026-09-03 1440/1920px screenshots + 2026-09-04 static diff audit',
+    verdict: 'match', verdictNote: '**2026-09-07 再撮影で一致。** #270 のダッシュボード指標APIを接続し、有効友だち398人、今月の送信枠（残り197 / 上限200通）、7日分の友だち推移を設計値で表示した。3102/8789で1440/1920pxを撮影し、両幅とも横はみ出し0。表示中の本文差0を確認した（閉じた追加URL選択肢の運用データ名だけ実装側にある）。', verdictSource: 'dashboard-v6/vUXKb.txt + vUXKb-{1440,1920}.png + 2026-09-07 visual/text comparison',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
-    verdictHead: '145c497d1',
+    verdictHead: 'd9cfe531d',
   },
   {
     node: 'ZN0ov', feature: 1, name: '1-1-1 ダッシュボード編集',
@@ -182,10 +182,10 @@ export const SCREENS = [
   },
   {
     node: 'JN6mQ', feature: 1, name: '1-1-2 友だち追加QR',
-    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-04 再照合。構造一致・データ待ち。** ダイアログ820px、QR枠280px、小300px、PNG/JPG/SVGの順、2行リンク欄、主ボタンとヒント枠を設計に合わせた。文字比較の差は、取得口が返さない `https://lin.ee/nen-official` と、閉じた選択肢の「中/小」のみ。短縮URLを決め打ちせず、データ待ちとする。現在コミットの画像はPlaywrightのOS権限で取得できず、2026-09-03画像と差分照合で判定。', verdictSource: 'dashboard-v6/JN6mQ.txt + 2026-09-03 1440/1920px screenshots + 2026-09-04 static diff audit',
+    verdict: 'match', verdictNote: '**2026-09-07 再撮影で一致。** #270 の公式プロフィールURLを接続して `https://lin.ee/nen-official` を表示し、表示用QRは追加URLから生成するため撮影モックでも壊れない。ダイアログ820px、QR枠280px、サイズ選択、PNG/JPG/SVG、コピー・ダウンロード・印刷、ヒント枠を確認。3102/8789の1440/1920pxで横はみ出し0。表示中の本文差0（閉じた選択肢の運用データ名と中・小サイズだけ実装側にある）。', verdictSource: 'dashboard-v6/JN6mQ.txt + JN6mQ-{1440,1920}.png + 2026-09-07 visual/text comparison',
     dir: 'dashboard-v6', route: '/', mode: 'viewport', height: 1668, clock: DASHBOARD_CLOCK,
     steps: [{ click: 'QRを表示' }],
-    verdictHead: '145c497d1',
+    verdictHead: 'd9cfe531d',
   },
   {
     node: 'NjK9q', feature: 1, name: '1-1-3 対応受信の表示件数を開く',
@@ -3405,18 +3405,17 @@ const ISSUE_266_REVIEW = {
 }
 
 /**
- * board #267。development d69099cd9 を 3102/8789 で起動し、
+ * board #267。development b5693059a を取り込んだ枝を 3102/8789 で起動し、
  * 機能1に残る2 Nodeを設計1920pxと実装1440/1920pxで比較した結果。
- * QR画像は撮影モックの一般JSON応答を一時的にSVGへ置き換えて表示も確認した。
  */
 const ISSUE_267_REVIEW = {
   vUXKb: {
-    verdict: 'structure_match_data_pending',
-    note: 'カード構成、見出し、操作、左右の情報配置は設計と一致し、1440/1920pxとも横はみ出し0。写真審査、受信一覧、二段階認証、今後の予定、追加経路の件数と内容は、撮影用APIが設計の固定値を返さないため差が残る。作り物の値へ置き換えずデータ待ちとする。',
+    verdict: 'match',
+    note: '有効友だち398人、送信枠の残り197 / 上限200通、7日分の友だち推移を #270 の指標APIから表示。カード構成、見出し、操作、左右の情報配置を設計画像と照合し、1440/1920pxとも横はみ出し0。表示中の本文差0。',
   },
   JN6mQ: {
-    verdict: 'structure_match_data_pending',
-    note: 'QR表示、ダイアログ寸法、画像サイズ、PNG/JPG/SVG、リンクのコピー・ダウンロード・印刷を確認し、1440/1920pxとも横はみ出し0。通常の撮影モックはQR画像へJSONを返すため、一時的にSVGを返して表示も再確認した。サーバーが公式プロフィールの短縮URLを返さず、設計の `https://lin.ee/nen-official` を決め打ちできないためデータ待ちとする。',
+    verdict: 'match',
+    note: '公式プロフィールURLを #270 の指標APIから表示し、追加URLを表すQRも実画像で確認。ダイアログ寸法、画像サイズ、PNG/JPG/SVG、リンクのコピー・ダウンロード・印刷を設計画像と照合し、1440/1920pxとも横はみ出し0。表示中の本文差0。',
   },
 }
 
