@@ -41,9 +41,11 @@ describe('V6 予約設定', () => {
 
   it('表示している一覧操作は実際に使える', () => {
     expect(LIST).not.toContain('準備中')
-    expect(LIST).toContain('aria-label="並び順"')
-    expect(LIST).toContain('aria-label="集計期間"')
-    expect(LIST).toContain('onClick={exportCsv}')
+    expect(LIST).toContain('bookingApi.getSettings(selectedAccountId)')
+    expect(LIST).toContain('<Pagination page={page} pageCount={pageCount}')
+    expect(LIST).toContain('止める・出す')
+    expect(LIST).not.toContain('メニュー名で検索')
+    expect(LIST).not.toContain('CSVで書き出す')
   })
 
   it('読込・失敗・空を同じ空状態として扱わない', () => {

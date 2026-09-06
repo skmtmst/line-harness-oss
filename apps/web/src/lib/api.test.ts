@@ -392,6 +392,78 @@ describe('api.actionScores rule contract', () => {
   })
 })
 
+describe('api.scenarios V6 operation contract', () => {
+  it('試算・配信記録・下書きをシナリオ専用APIへ渡す', async () => {
+    const responses = [
+      {
+        success: true,
+        data: {
+          scenarioId: 'scenario-1', lineAccountId: 'account 1', computedAt: '2026-09-07T00:00:00.000Z', sideEffects: false,
+          audience: { accountTotal: 124, matched: 124, alreadySubscribed: 8, newStartPlanned: 116, excluded: 0 },
+          steps: [],
+        },
+      },
+      {
+        success: true,
+        data: {
+          summary: { active: 8, paused: 0, completed: 312, delivering: 0 },
+          subscriptions: [], pagination: { total: 0, limit: 50, cursor: '', nextCursor: null },
+          testSends: [],
+          quota: { limit: 200, used: 80, remaining: 120, state: 'available', reason: null, asOf: '2026-09-07T00:00:00.000Z' },
+          concurrentBroadcasts: [], scenarioClickTotal: 0, steps: [],
+        },
+      },
+      {
+        success: true,
+        data: {
+          scenarioId: 'scenario-1', lineAccountId: 'account 1', version: 1, afterActions: [],
+          updatedBy: 'staff-1', updatedAt: '2026-09-07T00:00:00.000Z',
+        },
+      },
+    ]
+    const spy = vi.fn(async () => new Response(
+      JSON.stringify(responses.shift()),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', spy)
+
+    const simulation = await api.scenarios.simulate('scenario-1', 'account 1')
+    const runs = await api.scenarios.runs('scenario-1', 'account 1', { limit: 50 })
+    const draft = await api.scenarios.saveDraft('scenario-1', {
+      lineAccountId: 'account 1', expectedVersion: 0, afterActions: [],
+    })
+
+    expect(simulation.success && simulation.data.audience.newStartPlanned).toBe(116)
+    expect(runs.success && runs.data.quota.remaining).toBe(120)
+    expect(draft.success && draft.data.version).toBe(1)
+    expect(spy.mock.calls.map(([url]) => url)).toEqual([
+      'https://worker.example.com/api/scenarios/scenario-1/simulate',
+      'https://worker.example.com/api/scenarios/scenario-1/runs?lineAccountId=account+1&limit=50',
+      'https://worker.example.com/api/scenarios/scenario-1/draft',
+    ])
+    expect(spy.mock.calls[0]?.[1]).toMatchObject({
+      method: 'POST', body: JSON.stringify({ lineAccountId: 'account 1' }),
+    })
+    expect(spy.mock.calls[2]?.[1]).toMatchObject({ method: 'PUT' })
+  })
+
+  it('古い固定データの成功形を実データとして扱わない', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: { items: [] } }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    )))
+
+    await expect(api.scenarios.simulate('scenario-1', 'account-1')).resolves.toEqual({
+      success: false,
+      error: '開始前の試算結果を確認できませんでした',
+    })
+    await expect(api.scenarios.runs('scenario-1', 'account-1')).resolves.toEqual({
+      success: false,
+      error: '配信記録を確認できませんでした',
+    })
+  })
+})
+
 afterEach(() => {
   vi.unstubAllGlobals()
 })

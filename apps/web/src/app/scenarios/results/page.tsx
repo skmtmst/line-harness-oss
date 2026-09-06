@@ -4,7 +4,8 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import type { Scenario, ScenarioStats, ScenarioStep } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import { api, type ScenarioRuns } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -46,8 +47,10 @@ function csvCell(value: unknown): string {
 function ResultsInner() {
   const params = useSearchParams()
   const id = params.get('id') ?? ''
+  const { selectedAccountId, loading: accountLoading } = useAccount()
   const [scenario, setScenario] = useState<ScenarioWithSteps | null>(null)
   const [stats, setStats] = useState<ScenarioStats | null>(null)
+  const [runs, setRuns] = useState<ScenarioRuns | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -63,22 +66,29 @@ function ResultsInner() {
     setError('')
     setScenario(null)
     setStats(null)
+    setRuns(null)
     try {
-      const [scenarioResponse, statsResponse] = await Promise.all([
+      const [scenarioResponse, statsResponse, runsResponse] = await Promise.all([
         api.scenarios.get(id),
         api.scenarios.stats(id),
+        selectedAccountId
+          ? api.scenarios.runs(id, selectedAccountId, { limit: 50 }).catch(() => null)
+          : Promise.resolve(null),
       ])
       if (!scenarioResponse.success || !statsResponse.success) throw new Error('load failed')
       setScenario(scenarioResponse.data)
       setStats(statsResponse.data)
+      setRuns(runsResponse?.success ? runsResponse.data : null)
     } catch {
       setError('配信結果を読み込めませんでした。時間を置いてもう一度お試しください。')
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, selectedAccountId])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    if (!accountLoading) void load()
+  }, [accountLoading, load])
 
   const sortedSteps = useMemo(
     () => [...(scenario?.steps ?? [])].sort((a, b) => a.stepOrder - b.stepOrder),
@@ -87,6 +97,10 @@ function ResultsInner() {
   const statsByOrder = useMemo(
     () => new Map((stats?.steps ?? []).map((step) => [step.stepOrder, step])),
     [stats],
+  )
+  const runsByOrder = useMemo(
+    () => new Map((runs?.steps ?? []).map((step) => [step.stepOrder, step])),
+    [runs],
   )
 
   const exportCsv = () => {
@@ -148,20 +162,25 @@ function ResultsInner() {
                 <h2>ステップ別の反応</h2>
                 <p>到達人数と、前の通から減った場所を確認できます。</p>
               </div>
-              <NoteBar tone="info">LINEでは友だち単位の開封を取得できません。クリック率も、この集計にはまだ接続していません。</NoteBar>
+              <NoteBar tone="info">LINEでは通ごとの開封・クリック・失敗をすべて取得できません。取得できない指標は「—」で表示します。</NoteBar>
               {sortedSteps.length === 0 ? (
                 <ListState kind="empty" title="配信内容がまだありません" description="シナリオ編集からメッセージを追加してください。" />
               ) : (
                 <ol className={styles.steps}>
                   {sortedSteps.map((step) => {
                     const result = statsByOrder.get(step.stepOrder)
+                    const run = runsByOrder.get(step.stepOrder)
                     return (
                       <li key={step.id} className={styles.step}>
                         <div className={styles.stepTitle}>
                           <span>ステップ{step.stepOrder}：{scheduleLabel(step)}</span>
-                          <span className={styles.reached}>{result?.reachedCount.toLocaleString('ja-JP') ?? '—'}人到達</span>
+                          <span className={styles.reached}>{(run?.delivered ?? result?.reachedCount)?.toLocaleString('ja-JP') ?? '—'}人到達</span>
                         </div>
-                        <p>到達率 {result ? percentLabel(result.reachedCount, stats.enrolledTotal) : '—'}・開封率 —・クリック率 —</p>
+                        <p>
+                          到達率 {run ? percentLabel(run.delivered, stats.enrolledTotal) : result ? percentLabel(result.reachedCount, stats.enrolledTotal) : '—'}
+                          {'・'}開封率 {run?.opened.value ?? '—'}
+                          {'・'}クリック率 {run?.clicked.value ?? '—'}
+                        </p>
                       </li>
                     )
                   })}
@@ -174,12 +193,14 @@ function ResultsInner() {
             <section className={styles.panel}>
               <div className={styles.panelHead}><h2>設定サマリー</h2><p>現在の参加状況です。</p></div>
               <dl className={styles.summaryList}>
-                <div><dt>参加中</dt><dd>{stats.activeNow.toLocaleString('ja-JP')}人</dd></div>
-                <div><dt>完了</dt><dd>{stats.completed.toLocaleString('ja-JP')}人</dd></div>
-                <div><dt>一時停止</dt><dd>{stats.paused.toLocaleString('ja-JP')}人</dd></div>
+                <div><dt>参加中</dt><dd>{(runs ? runs.summary.active + runs.summary.delivering : stats.activeNow).toLocaleString('ja-JP')}人</dd></div>
+                <div><dt>完了</dt><dd>{(runs?.summary.completed ?? stats.completed).toLocaleString('ja-JP')}人</dd></div>
+                <div><dt>一時停止</dt><dd>{(runs?.summary.paused ?? stats.paused).toLocaleString('ja-JP')}人</dd></div>
                 <div><dt>エラー</dt><dd>—</dd></div>
               </dl>
-              <p className={styles.unavailable}>配信失敗数は、この集計からは取得できません。</p>
+              <p className={styles.unavailable}>
+                {runs?.steps[0]?.failed.reason ?? '配信失敗数は、この集計からは取得できません。'}
+              </p>
             </section>
 
             <section className={styles.panel}>
