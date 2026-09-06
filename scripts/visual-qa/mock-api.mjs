@@ -46,7 +46,7 @@ import {
   AUTO_REPLIES, AUTO_REPLY_FOLDERS,
   AUTO_REPLY_PUBLISH_CONFLICTS, AUTO_REPLY_PUBLISH_DRAFT,
   AUTO_REPLY_PUBLISH_RESULT, AUTO_REPLY_PUBLISH_TEST, AUTO_REPLY_PUBLISH_VALIDATION,
-  BROADCASTS, BROADCAST_FOLDERS, CHATS, FRIEND_FIELDS, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
+  BROADCASTS, BROADCAST_FOLDERS, CHATS, FRIEND_FIELDS, FRIEND_ATTRIBUTE_FIELDS, FRIEND_ATTRIBUTE_SAVED_SEARCHES, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
   TEMPLATES, TEMPLATE_FOLDERS,
   DUPLICATE_STATS, FRIENDS, FRIEND_BULK_RUN, FRIEND_SCENARIOS, FRIEND_STATS,
   IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND,
@@ -1267,7 +1267,10 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/folders' && query.get('kind') === 'reminder') {
     return { success: true, data: REMINDER_FOLDERS }
   }
-  if (pathname === '/api/friend-fields') return { success: true, data: FRIEND_FIELDS }
+  if (pathname === '/api/friend-fields') {
+    // 機能4は利用人数つきの一覧を要求する。他機能の選択肢は従来データを保つ。
+    return { success: true, data: query.get('withUsage') === '1' ? FRIEND_ATTRIBUTE_FIELDS : FRIEND_FIELDS }
+  }
   if (pathname === '/api/folders' && query.get('kind') === 'auto_reply') {
     return { success: true, data: AUTO_REPLY_FOLDERS }
   }
@@ -1365,6 +1368,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/tags') return { success: true, data: TAGS }
   if (pathname === '/api/support-marks') return { success: true, data: SUPPORT_MARKS }
+  if (pathname === '/api/saved-searches' && query.get('format') !== 'segment_v1') {
+    return { success: true, data: FRIEND_ATTRIBUTE_SAVED_SEARCHES }
+  }
   /* 自動変更ルール（設計 `GMvBd` 4-3-A）。マークごとに返す。 */
   if (/^\/api\/support-marks\/[^/]+\/automation-rules$/.test(pathname)) {
     return { success: true, data: SUPPORT_MARK_AUTOMATION_RULES }
@@ -1662,37 +1668,6 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     */
     return { success: true, data: { riskLevel: 'normal', logs: [] } }
   }
-  if (pathname === '/api/support-marks') {
-    /*
-      対応マーク。**「保留」と「対応中」が要る。**
-      設計 `GMvBd`（追加・編集）と `zGZMA`（削除の確認）は、この2つの行を
-      押してから開く。行が無いと押しどころが無く、6+1 状態が撮れなかった。
-
-      `usedIn` も持たせる。**参照数が無いと「削除できるか確認できません」**
-      になり、削除の確認窓（`zGZMA`）まで進めない。「対応中」は使用先を
-      持たせて**消せない側**、「保留」は 0 で**消せる側**にして、
-      両方の見た目を撮れるようにする。
-    */
-    const mark = (id, name, color, order, extra = {}) => ({
-      id, name, color, isDefault: order === 0, autoOnInbound: order === 0,
-      displayOrder: order, createdAt: `${FIXED_TO}T00:00:00.000Z`,
-      friendCount: 0,
-      usedIn: { broadcasts: 0, scenarios: 0, autoReplies: 0, savedSearches: 0, automations: 0 },
-      ...extra,
-    })
-    return {
-      success: true,
-      data: [
-        mark('sm-1', '未対応', '#e5484d', 0, { friendCount: 23 }),
-        mark('sm-2', '対応中', '#f5c56b', 1, {
-          friendCount: 8,
-          usedIn: { broadcasts: 1, scenarios: 0, autoReplies: 2, savedSearches: 0, automations: 0 },
-        }),
-        mark('sm-3', '保留', '#8b8f94', 2, { friendCount: 4 }),
-        mark('sm-4', '対応済み', '#05913e', 3, { friendCount: 186 }),
-      ],
-    }
-  }
   if (pathname === '/api/notifications/center') {
     /*
       ダッシュボードの通知パネル。**器の形が合わないと画面が落ちる。**
@@ -1924,7 +1899,7 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       設計 `HBTk0` と文字を並べて初めて分かった。
       画面側も `undefined` を出さないよう直したが、正しい返事もここに置く。
     */
-    return { success: true, data: { total: 12, inUse: 9, registeredFriends: 1_284, formLinks: 3, updatedThisMonth: 4 } }
+    return { success: true, data: { total: 12, inUse: 9, registeredFriends: 187, formLinks: 6, updatedThisMonth: 3 } }
   }
   if (pathname in SHAPES) {
     return { success: true, data: SHAPES[pathname] }
