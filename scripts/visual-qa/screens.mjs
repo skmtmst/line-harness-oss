@@ -1353,9 +1353,10 @@ export const SCREENS = [
     クーポン／リサーチ）。実装は5本で、**「質問」だけが無い。**
   */
   { ...TEMPLATE, node: 'W7LBc', name: '11-1 テンプレート', mode: 'viewport', height: 1080,
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #224 / PR #944 で構造一致・集計未接続。** `/templates` を割当ポート3104/8791で通常・読込・空・失敗・2フォルダ、各1440/1920pxで撮影（はみ出し0）。設計の6種類タブ、質問タブ、フォルダ、検索、保存した検索、表示件数、5つの絞り込み、一覧列がそろい、内部値 `text` と `undefined件で使用` は0件。送信数だけはテンプレート別集計APIが無いため `—` と接続条件を案内しており、設計の実数にはできない。取得元 `templates-v6/W7LBc.txt` と同Nodeの実装画像。',
-    verdictHead: '98abf756a', /*
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #224 / UI HEAD 031081d69 で一致。** `/templates` を割当ポート3104/8791で通常・読込・空・失敗・2フォルダの各1440/1920pxを再撮影し、Pencil正本と実装1920pxを同じ比較画像で目視確認した。6種類タブ、フォルダ、検索、保存した検索、5つの絞り込み、設計と同じ6列表に加え、実送信台帳からテスト送信を除いた今月の送信数を接続した。累計は同じ値を水増しせずツールチップで確認できる。全14枚で横はみ出し0。',
+    verdictSource: 'templates-v6/W7LBc.txt + W7LBc-1440.png + W7LBc-1920.png',
+    verdictHead: '031081d69', /*
       **#493 の受入条件5つを1回で撮る。**
       口はフォルダだけ差し替える——**テンプレートの一覧は正常のまま**にして、
       「フォルダが取れなくても一覧は残る」を確かめるため。
@@ -1392,9 +1393,10 @@ export const SCREENS = [
       **使用先は 0 と言わず「保存後にシナリオから選べます」**（`:214`）。
     */
     ...TEMPLATE, node: 'NNDMR', name: '11-1-C 質問を作る',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #224 / PR #944 で再判定。** `/templates/questions/new` を1440/1920pxで撮影（はみ出し0）。右のLINEプレビューと回答の保存先はあるが、設計の1画面内に収まる2選択肢に対し、実装は全タグを2回展開して約3画面分の縦長になる。質問編集は `components/shared` 所有でs2は変更禁止のため据え置く。**推奨修正**：s0側でタグ選択を閉じた選択UIにし、質問文・2選択肢・返信を1920×1080内にそろえる。取得元 `templates-v6/NNDMR.txt` と同Nodeの実装画像。',
-    verdictHead: '98abf756a',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #224 / UI HEAD 031081d69 で一致。** `/templates/questions/new` を割当ポート3104/8791で1440/1920px再撮影し、Pencil正本と実装1920pxを同じ比較画像で目視確認した。#275 / PR #1014 の共通質問編集修正により、タグ・友だち情報・シナリオの詳しい設定は閉じた選択UIになり、質問文、2選択肢、各返信、右のLINEプレビューを同じ画面で確認できる。両幅とも横はみ出し0。',
+    verdictSource: 'templates-v6/NNDMR.txt + NNDMR-1440.png + NNDMR-1920.png',
+    verdictHead: '031081d69',
     route: '/templates/questions/new', mode: 'page',
 
   },
@@ -1432,8 +1434,9 @@ export const SCREENS = [
     */
     ...TEMPLATE, node: 'M9cij', name: '11-1-G テンプレートの削除確認',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #224 / PR #944 で再判定。** 1440/1920pxで未使用テンプレートの削除確認を撮影（はみ出し0）。内部値と壊れ値は解消し、未使用だけ削除できる安全な確認になった。一方、Pencilは使用中3か所の強制削除を描くが、機能11要件 §4-9/§11 は参照中の削除停止と強制削除除外を明記して矛盾するため、危険な画面へ変更しない。**推奨修正**：Claude所有のPencilを安全要件に合わせて未使用削除の画面へ直し、再撮影する。取得元 `templates-v6/M9cij.txt` と同Nodeの実装画像。',
-    verdictHead: '98abf756a',
+    verdictNote: '**2026-09-07 Issue #224 / UI HEAD 031081d69 で再判定。** 未使用テンプレートの削除確認を割当ポート3104/8791で1440/1920px再撮影し、Pencil正本と実装1920pxを同じ比較画像で目視確認した。両幅とも横はみ出し0。実装は要件 §4-9 / §11 どおり未使用だけを安全に削除できるが、Pencil M9cij は使用中3か所の強制削除を描いたままで一致しない。危険な画面へ戻さず `needs_fix` を維持する。**残る依存**：オーナーIssue #276でPencilを要件に合わせて直した後、同じ2幅で再撮影する。',
+    verdictSource: 'templates-v6/M9cij.txt + M9cij-1440.png + M9cij-1920.png',
+    verdictHead: '031081d69',
     mode: 'viewport', height: 1080,
     steps: [{ click: 'テンプレートを削除', scope: 'main' }],
   },
@@ -1469,7 +1472,7 @@ export const SCREENS = [
       名前を持たない分類なので、開く相手がそもそも無い。
       **撮るには実装をフォルダの口へつなぐ必要がある。**
     */
-    steps: [{ click: 'フォルダ「予約」の操作' }],
+    steps: [{ click: 'フォルダ「お問い合わせ」を操作' }],
   },
   {
     ...TEMPLATE, node: 'NKyoA', name: '11-1-I 一覧の状態（空・読込・エラー）', mode: 'viewport', height: 1080,

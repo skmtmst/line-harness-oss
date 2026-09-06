@@ -4238,7 +4238,7 @@ export const api = {
         usageCount: number;
         /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
         tapCount: number;
-        /** 当月と累計の実送信数。集計不能時は null。 */
+        /** Monthly and lifetime delivery totals. null when unavailable. */
         monthlySendCount: number | null;
         totalSendCount: number | null;
         createdAt: string;
