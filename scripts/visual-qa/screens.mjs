@@ -3362,6 +3362,22 @@ const ISSUE_266_REVIEW = {
 }
 
 /**
+ * board #267。development d69099cd9 を 3102/8789 で起動し、
+ * 機能1に残る2 Nodeを設計1920pxと実装1440/1920pxで比較した結果。
+ * QR画像は撮影モックの一般JSON応答を一時的にSVGへ置き換えて表示も確認した。
+ */
+const ISSUE_267_REVIEW = {
+  vUXKb: {
+    verdict: 'structure_match_data_pending',
+    note: 'カード構成、見出し、操作、左右の情報配置は設計と一致し、1440/1920pxとも横はみ出し0。写真審査、受信一覧、二段階認証、今後の予定、追加経路の件数と内容は、撮影用APIが設計の固定値を返さないため差が残る。作り物の値へ置き換えずデータ待ちとする。',
+  },
+  JN6mQ: {
+    verdict: 'structure_match_data_pending',
+    note: 'QR表示、ダイアログ寸法、画像サイズ、PNG/JPG/SVG、リンクのコピー・ダウンロード・印刷を確認し、1440/1920pxとも横はみ出し0。通常の撮影モックはQR画像へJSONを返すため、一時的にSVGを返して表示も再確認した。サーバーが公式プロフィールの短縮URLを返さず、設計の `https://lin.ee/nen-official` を決め打ちできないためデータ待ちとする。',
+  },
+}
+
+/**
  * board #212。2026-09-06 に development bf7434ff を 3107/8794 で起動し、
  * 機能14〜32に残っていた未判定11 Nodeを設計1920pxと実装1440/1920pxで比較した。
  * 画面コードは変更せず、見えた差と撮影不能を判定として記録する。
@@ -3451,6 +3467,13 @@ for (const screen of SCREENS) {
     screen.verdictNote = `**2026-09-06 #266で判定。** 設計1920pxと実装1440/1920pxを目視比較。${issue266Review.note}`
     screen.verdictSource = `${screen.dir}/${screen.node}.txt + ${screen.dir}/${screen.node}-{1440,1920}.png`
     screen.verdictHead = 'c03ebf864'
+  }
+  const issue267Review = ISSUE_267_REVIEW[screen.node]
+  if (screen.feature === 1 && issue267Review) {
+    screen.verdict = issue267Review.verdict
+    screen.verdictNote = `**2026-09-06 #267で判定。** 設計1920pxと実装1440/1920pxを目視比較。${issue267Review.note}`
+    screen.verdictSource = `${screen.dir}/${screen.node}.txt + ${screen.dir}/${screen.node}-{1440,1920}.png`
+    screen.verdictHead = 'd69099cd9'
   }
   const issue212Review = ISSUE_212_REVIEW[screen.node]
   if (screen.feature >= 14 && screen.feature <= 32 && issue212Review) {
@@ -3904,6 +3927,7 @@ export const CAPTURED_AT = {
   ],
   1: [
     { pr: 419, head: 'c84baa63', on: '2026-08-30', screens: ['vUXKb', 'ZN0ov', 'JN6mQ', 'NjK9q', 'Alekb'], note: 'ダッシュボード。お知らせの口を撮影モックへ足した（`counts` の4つが欠けると `undefined.all` で落ちる）' },
+    { pr: 971, head: 'd69099cd9', on: '2026-09-06', screens: ['vUXKb', 'JN6mQ'], note: 'Issue #267。3102/8789で対象2画面を1440・1920px撮影し、Pencil設計と比較。両画面とも横はみ出し0。構造は一致し、設計値と公式プロフィール短縮URLを返すAPIがないためデータ未接続を維持した。' },
   ],
   23: [
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['eI3gs'], note: '同上' },
