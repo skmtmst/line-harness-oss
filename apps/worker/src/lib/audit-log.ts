@@ -35,6 +35,8 @@ export type AuditAction =
   | 'affiliate.create'
   | 'affiliate.update'
   | 'affiliate.delete'
+  | 'affiliate.archive'
+  | 'affiliate.settlement.close'
   | 'affiliate.offer.create'
   | 'affiliate.offer.update'
   | 'dashboard.preference.update'
