@@ -8,14 +8,38 @@ import { resolveLineToken } from '../services/line-token.js';
 
 const profileRefresh = new Hono<Env>();
 
-async function adminAccountScope(c: Context<Env>) {
-  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+function accountScopeWhere(
+  scope: { allowedAccountIds: string[]; canSeeUnassigned: boolean },
+  accountColumn: string,
+): string {
   const where = scope.allowedAccountIds.length
-    ? `AND (f.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
+    ? `AND (${accountColumn} IN (SELECT value FROM json_each(?))${scope.canSeeUnassigned ? ` OR ${accountColumn} IS NULL` : ''})`
     : scope.canSeeUnassigned
-      ? 'AND f.line_account_id IS NULL'
+      ? `AND ${accountColumn} IS NULL`
       : 'AND 1 = 0';
+  return where;
+}
+
+function accountScopeBindings(scope: { allowedAccountIds: string[] }): unknown[] {
+  return scope.allowedAccountIds.length ? [JSON.stringify(scope.allowedAccountIds)] : [];
+}
+
+async function adminAccountScope(c: Context<Env>, accountColumn = 'f.line_account_id') {
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  const where = accountScopeWhere(scope, accountColumn);
   return { scope, where };
+}
+
+async function visibleAccountNames(
+  db: D1Database,
+  allowedAccountIds: string[],
+): Promise<Map<string, string>> {
+  if (allowedAccountIds.length === 0) return new Map();
+  const result = await db.prepare(
+    `SELECT id, name FROM line_accounts
+      WHERE id IN (SELECT value FROM json_each(?))`,
+  ).bind(JSON.stringify(allowedAccountIds)).all<{ id: string; name: string }>();
+  return new Map(result.results?.map((account) => [account.id, account.name]) ?? []);
 }
 
 /**
@@ -60,7 +84,7 @@ profileRefresh.post('/api/admin/refresh-profiles', requireRole('owner'), async (
   const stmt = db.prepare(baseQuery);
   const bound = accountIdFilter
     ? stmt.bind(accountIdFilter, limit, offset)
-    : stmt.bind(...(adminScope?.scope.allowedAccountIds ?? []), limit, offset);
+    : stmt.bind(...accountScopeBindings(adminScope!.scope), limit, offset);
 
   const batch = await bound.all<{
     id: string;
@@ -468,9 +492,10 @@ profileRefresh.post('/api/admin/tag-remove-content-dups', requireRole('owner'), 
  * いくら発火したか」を確認する用。directionnal: incoming + outgoing 両方を
  * 同じ friend / 同じ時間帯で見る。
  */
-profileRefresh.get('/api/admin/auto-reply-stats', async (c) => {
+profileRefresh.get('/api/admin/auto-reply-stats', requireRole('owner'), async (c) => {
   const db = c.env.DB;
   const days = Number.parseInt(c.req.query('days') ?? '30', 10);
+  const adminScope = await adminAccountScope(c);
 
   // 1. 各アカウントで「auto_replies の keyword と一致する incoming text」の件数
   //    = 「ユーザーが trigger した回数」
@@ -489,10 +514,11 @@ profileRefresh.get('/api/admin/auto-reply-stats', async (c) => {
         AND ml.message_type = 'text'
         AND ml.created_at >= ?
         AND ml.content IN (SELECT keyword FROM auto_replies WHERE is_active = 1)
+        ${adminScope.where}
       GROUP BY f.line_account_id, ml.content
       ORDER BY incoming_count DESC
     `)
-    .bind(sinceDate)
+    .bind(sinceDate, ...accountScopeBindings(adminScope.scope))
     .all<{ account_id: string | null; keyword: string; incoming_count: number }>();
 
   // 2. 各アカウントで auto_reply / automation source の outgoing 件数
@@ -506,16 +532,14 @@ profileRefresh.get('/api/admin/auto-reply-stats', async (c) => {
       WHERE direction = 'outgoing'
         AND source IN ('auto_reply', 'automation', 'automation_backfill')
         AND created_at >= ?
+        ${accountScopeWhere(adminScope.scope, 'line_account_id')}
       GROUP BY line_account_id, source
     `)
-    .bind(sinceDate)
+    .bind(sinceDate, ...accountScopeBindings(adminScope.scope))
     .all<{ account_id: string | null; source: string; outgoing_count: number }>();
 
   // 3. アカウント名 lookup
-  const accRes = await db
-    .prepare(`SELECT id, name FROM line_accounts`)
-    .all<{ id: string; name: string }>();
-  const accNameById = new Map(accRes.results?.map((a) => [a.id, a.name]) ?? []);
+  const accNameById = await visibleAccountNames(db, adminScope.scope.allowedAccountIds);
 
   return c.json({
     success: true,
@@ -541,9 +565,10 @@ profileRefresh.get('/api/admin/auto-reply-stats', async (c) => {
 /**
  * 直近 N 件の incoming + outgoing messages_log を返す。debug 用。
  */
-profileRefresh.get('/api/admin/recent-messages', async (c) => {
+profileRefresh.get('/api/admin/recent-messages', requireRole('owner'), async (c) => {
   const limit = Math.min(Number.parseInt(c.req.query('limit') ?? '20', 10), 100);
   const db = c.env.DB;
+  const adminScope = await adminAccountScope(c, 'COALESCE(ml.line_account_id, f.line_account_id)');
 
   const res = await db
     .prepare(`
@@ -552,14 +577,15 @@ profileRefresh.get('/api/admin/recent-messages', async (c) => {
              f.display_name, f.id AS friend_id
       FROM messages_log ml
       LEFT JOIN friends f ON f.id = ml.friend_id
+      WHERE 1 = 1
+        ${adminScope.where}
       ORDER BY ml.created_at DESC
       LIMIT ?
     `)
-    .bind(limit)
+    .bind(...accountScopeBindings(adminScope.scope), limit)
     .all();
 
-  const accRes = await db.prepare(`SELECT id, name FROM line_accounts`).all<{ id: string; name: string }>();
-  const accNameById = new Map(accRes.results?.map((a) => [a.id, a.name]) ?? []);
+  const accNameById = await visibleAccountNames(db, adminScope.scope.allowedAccountIds);
 
   return c.json({
     success: true,
@@ -585,13 +611,19 @@ profileRefresh.get('/api/admin/recent-messages', async (c) => {
 /**
  * 全 automation rules を最小限で dump (account 別に何の rule があるか確認用)。
  */
-profileRefresh.get('/api/admin/automations-summary', async (c) => {
+profileRefresh.get('/api/admin/automations-summary', requireRole('owner'), async (c) => {
   const db = c.env.DB;
+  const adminScope = await adminAccountScope(c, 'line_account_id');
   const res = await db
-    .prepare(`SELECT id, name, event_type, line_account_id, is_active, conditions, SUBSTR(actions, 1, 80) AS actions_preview FROM automations ORDER BY line_account_id, event_type`)
+    .prepare(`SELECT id, name, event_type, line_account_id, is_active, conditions,
+                     SUBSTR(actions, 1, 80) AS actions_preview
+                FROM automations
+               WHERE 1 = 1
+                 ${adminScope.where}
+               ORDER BY line_account_id, event_type`)
+    .bind(...accountScopeBindings(adminScope.scope))
     .all();
-  const accRes = await db.prepare(`SELECT id, name FROM line_accounts`).all<{ id: string; name: string }>();
-  const accNameById = new Map(accRes.results?.map((a) => [a.id, a.name]) ?? []);
+  const accNameById = await visibleAccountNames(db, adminScope.scope.allowedAccountIds);
   return c.json({
     success: true,
     data: (res.results ?? []).map((r) => {
@@ -613,15 +645,21 @@ profileRefresh.get('/api/admin/automations-summary', async (c) => {
   });
 });
 
-profileRefresh.get('/api/admin/friend-debug/:id', async (c) => {
+profileRefresh.get('/api/admin/friend-debug/:id', requireRole('owner'), async (c) => {
   const id = c.req.param('id');
   const db = c.env.DB;
+  const adminScope = await adminAccountScope(c);
   const friend = await db
-    .prepare(`SELECT id, display_name, line_user_id, line_account_id, is_following, user_id FROM friends WHERE id = ?`)
-    .bind(id)
+    .prepare(`SELECT id, display_name, line_user_id, line_account_id, is_following, user_id
+                FROM friends f
+               WHERE id = ?
+                 ${adminScope.where}`)
+    .bind(id, ...accountScopeBindings(adminScope.scope))
     .first();
-  const accRes = await db.prepare(`SELECT id, name FROM line_accounts`).all<{ id: string; name: string }>();
-  const accNameById = new Map(accRes.results?.map((a) => [a.id, a.name]) ?? []);
+  if (!friend) {
+    return c.json({ success: false, error: 'Friend not found' }, 404);
+  }
+  const accNameById = await visibleAccountNames(db, adminScope.scope.allowedAccountIds);
   const accId = (friend as Record<string, unknown> | null)?.line_account_id as string | null | undefined;
   return c.json({
     success: true,
