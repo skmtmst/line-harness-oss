@@ -2285,25 +2285,25 @@ export const SCREENS = [
     states: {
       apis: ['**/api/ec-commerce/overview**', '**/api/ec-commerce/settings**'],
       kinds: ['normal', 'empty', 'error', 'forbidden'],
-    }, name: '24-1 LINE通知', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #331 / UI HEAD `864e7ec3c` を3102/8789で再判定。** 統合96の通知定義・30日集計APIを接続し、一覧へ種類別の受付数と「LINE上で表示」を追加した。個人の開封は作らず、LINE集計が取得不能なら「— 未取得」、待ちなら「集計待ち」とする。通常・0件・取得失敗・権限不足を1440/1920で撮影し、全10枚で横はみ出し0。#1077の固定データには新しい通知定義・集計応答が無く、撮影では公開版と集計値を実証できないため、構造一致・データ待ちを維持する。', verdictSource: 'line-notify-v6/festr-{normal,empty,error,forbidden}.txt + festr-normal-1920.png', verdictHead: '864e7ec3c' },
+    }, name: '24-1 LINE通知', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #331 / UI HEAD `c2e140c321` を3102/8789で再判定。** 統合96の通知定義・30日集計APIを接続し、一覧へ種類別の受付数と「LINE上で表示」を追加した。個人の開封は作らず、LINE集計が取得不能なら「— 未取得」、待ちなら「集計待ち」とする。通常・0件・取得失敗・権限不足を1440/1920で撮影し、全10枚で横はみ出し0。#1077の固定データには新しい通知定義・集計応答が無く、撮影では公開版と集計値を実証できないため、構造一致・データ待ちを維持する。', verdictSource: 'line-notify-v6/festr-{normal,empty,error,forbidden}.txt + festr-normal-1920.png', verdictHead: 'c2e140c321' },
   {
     ...LINE_NOTIFY, node: 'Q55bb', name: '24-1-A お知らせの中身を編集する',
-    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #331 / UI HEAD `864e7ec3c` を3102/8789で再判定。** 統合96の通知定義APIへ接続し、公開版番号、編集下書き、楽観ロックつき下書き保存、公開、停止を実装した。公開済み版を直接変更せず、公開前の下書きと分離する。1440/1920の2枚で横はみ出し0。#1077の固定データには新しい通知定義が無いため、撮影では従来設定の編集表示へ安全に戻っており、版操作を画像で実証できない。テスト送信専用の新APIも未実装のため、構造一致・データ待ちを維持する。', verdictSource: 'line-notify-v6/Q55bb.txt + Q55bb-1920.png',
+    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #331 / UI HEAD `c2e140c321` を3102/8789で再判定。** 統合96の通知定義APIへ接続し、公開版番号、編集下書き、楽観ロックつき下書き保存、公開、停止を実装した。公開済み版を直接変更せず、公開前の下書きと分離する。1440/1920の2枚で横はみ出し0。#1077の固定データには新しい通知定義が無いため、撮影では従来設定の編集表示へ安全に戻っており、版操作を画像で実証できない。テスト送信専用の新APIも未実装のため、構造一致・データ待ちを維持する。', verdictSource: 'line-notify-v6/Q55bb.txt + Q55bb-1920.png',
     mode: 'viewport', height: 1136, /*
       **押し口は「内容を編集」。** 「発送した」は行の名前で、押せる役を持っていない
       （`role: 'text'` は ARIA に無く0件になる）。設計の並び順で3番目なので `nth: 2`。
     */
     steps: [{ click: '内容を編集', nth: 2, after: 800 }],
-    verdictHead: '864e7ec3c',
+    verdictHead: 'c2e140c321',
   },
   {
     ...LINE_NOTIFY, node: 'X8JCA5', name: '24-1-B 送れなかったもの',
     route: '/line-notifications?tab=failures', mode: 'page',
     states: { apis: ['**/api/ec-commerce/notification-runs?**'], kinds: ['normal', 'loading', 'empty', 'error'] },
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #331 / UI HEAD `864e7ec3c` を3102/8789で再判定。** 統合96の送信台帳APIへ直結し、試行回数・次回再試行予定を表示する。Workerが一時失敗として `retryAvailable` を返した行だけ、送信記録の版番号を添えて安全に再試行でき、競合時は最新記録の再読込を案内する。通常・読込・空・失敗を1440/1920で撮影し、全10枚で横はみ出し0。#1077の固定行は旧契約で再試行可否・版・試行履歴を持たず、再試行可能行を画像で実証できないため、構造一致・データ待ちを維持する。',
+    verdictNote: '**2026-09-07 Issue #331 / UI HEAD `c2e140c321` を3102/8789で再判定。** 統合96の送信台帳APIへ直結し、試行回数・次回再試行予定を表示する。Workerが一時失敗として `retryAvailable` を返した行だけ、送信記録の版番号を添えて安全に再試行でき、競合時は最新記録の再読込を案内する。通常・読込・空・失敗を1440/1920で撮影し、全10枚で横はみ出し0。#1077の固定行は旧契約で再試行可否・版・試行履歴を持たず、再試行可能行を画像で実証できないため、構造一致・データ待ちを維持する。',
     verdictSource: 'line-notify-v6/X8JCA5-{normal,loading,empty,error}.txt + X8JCA5-normal-1920.png',
-    verdictHead: '864e7ec3c',
+    verdictHead: 'c2e140c321',
   },
   {
     /*
@@ -2315,9 +2315,9 @@ export const SCREENS = [
     route: '/line-notifications?tab=history', mode: 'page',
     states: { apis: ['**/api/ec-commerce/notification-runs?**'], kinds: ['normal', 'loading', 'empty', 'error'] },
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #331 / UI HEAD `864e7ec3c` を3102/8789で再判定。** 統合96の送信台帳からLINE API受付、失敗、送信対象外、試行回数、次回再試行、短縮URLクリック、通知版を読む契約へ更新した。個人の到達・既読は正本要件どおり表示しない。通常・読込・空・失敗を1440/1920で撮影し、全10枚で横はみ出し0。#1077の固定行は旧契約でクリック・通知版・試行履歴が未接続のため、その値を画像で実証できず、構造一致・データ待ちを維持する。',
+    verdictNote: '**2026-09-07 Issue #331 / UI HEAD `c2e140c321` を3102/8789で再判定。** 統合96の送信台帳からLINE API受付、失敗、送信対象外、試行回数、次回再試行、短縮URLクリック、通知版を読む契約へ更新した。個人の到達・既読は正本要件どおり表示しない。通常・読込・空・失敗を1440/1920で撮影し、全10枚で横はみ出し0。#1077の固定行は旧契約でクリック・通知版・試行履歴が未接続のため、その値を画像で実証できず、構造一致・データ待ちを維持する。',
     verdictSource: 'line-notify-v6/Se65i-{normal,loading,empty,error}.txt + Se65i-normal-1920.png',
-    verdictHead: '864e7ec3c',
+    verdictHead: 'c2e140c321',
   },
   {
     ...LINE_NOTIFY, node: 'DpxOK', name: '24-2 運用者へのお知らせ',
