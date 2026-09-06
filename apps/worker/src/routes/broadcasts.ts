@@ -34,12 +34,13 @@ import {
   renderBroadcastMessageContent,
 } from '../services/render-message.js';
 import {
-  countAudience,
   buildWarnings,
   hasRecentSimilarBroadcast,
+  previewAudience,
 } from '../services/broadcast-preflight.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
+import { fetchQuota } from '../services/broadcast-quota-guard.js';
 
 const broadcasts = new Hono<Env>();
 
@@ -88,9 +89,9 @@ function parseJsonArray(s: unknown): string[] | null {
 }
 
 type CreateBroadcastBody = {
-  title: string;
-  messageType: BroadcastMessageType;
-  messageContent: string;
+  title?: string;
+  messageType?: BroadcastMessageType;
+  messageContent?: string;
   messageBubbles?: unknown[];
   targetType: BroadcastTargetType;
   targetTagId?: string | null;
@@ -108,23 +109,107 @@ type CreateBroadcastBody = {
   folderId?: string | null;
   /** 開封数を取るか。既定は取る */
   measureOpens?: boolean;
+  /** 途中の入力を残すだけで、送信可能とは扱わない。 */
+  saveAsDraft?: boolean;
+  draftStep?: 'basic' | 'audience' | 'message' | 'schedule' | 'confirm';
+  internalMemo?: string | null;
+  messageOptions?: unknown;
+  afterActionVersionId?: string | null;
 };
+
+const BROADCAST_DRAFT_STEPS = new Set(['basic', 'audience', 'message', 'schedule', 'confirm']);
+const STANDARD_CONDITION_AXES = [
+  ['name', '名前'], ['private_memo', '個別メモ'], ['status_message', 'ステータスメッセージ'],
+  ['registered_at', '友だち登録日'], ['tag', 'タグ'], ['friend_field', '友だち情報'],
+  ['scenario', 'シナリオ'], ['event_booking', 'イベント予約'], ['calendar_booking', 'カレンダー予約'],
+  ['common_var', '共通情報'], ['reminder', 'リマインダ'], ['form_answered', '回答フォーム'],
+  ['last_reaction_at', '最終反応日'], ['other', 'その他'], ['support_mark', '対応マーク'],
+] as const;
+const BROADCAST_ONLY_CONDITION_AXES = [
+  ['assigned_operator', '担当者'], ['inflow_route', '流入経路'], ['broadcast_status', '配信状況'],
+  ['booking_status', '予約状況'], ['purchase_history', '購入履歴'], ['block_state', 'ブロック状態'],
+] as const;
+
+function parseJsonObject(value: unknown): Record<string, unknown> | null {
+  if (!value) return null;
+  if (typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>;
+  if (typeof value !== 'string') return null;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function validateMessageOptions(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return 'messageOptions must be an object';
+  const options = value as { buttons?: unknown; resources?: unknown };
+  if (options.buttons !== undefined) {
+    if (!Array.isArray(options.buttons) || options.buttons.length > 4) return 'messageOptions.buttons must contain at most 4 items';
+    for (const button of options.buttons) {
+      if (!button || typeof button !== 'object' || Array.isArray(button)) return 'messageOptions.buttons item must be an object';
+      const item = button as Record<string, unknown>;
+      if (typeof item.label !== 'string' || !item.label.trim()) return 'messageOptions button label is required';
+      if (!['url', 'pdf', 'postback'].includes(String(item.type))) return 'messageOptions button type is invalid';
+      if (typeof item.value !== 'string' || !item.value.trim()) return 'messageOptions button value is required';
+      if ((item.type === 'url' || item.type === 'pdf') && !/^https:\/\//i.test(item.value)) {
+        return 'messageOptions URL and PDF values must use https';
+      }
+    }
+  }
+  if (options.resources !== undefined) {
+    if (!Array.isArray(options.resources)) return 'messageOptions.resources must be an array';
+    for (const resource of options.resources) {
+      if (!resource || typeof resource !== 'object' || Array.isArray(resource)) return 'messageOptions.resources item must be an object';
+      const item = resource as Record<string, unknown>;
+      if (!['url', 'pdf'].includes(String(item.kind)) || typeof item.url !== 'string' || !/^https:\/\//i.test(item.url)) {
+        return 'messageOptions resource must be an https URL or PDF';
+      }
+    }
+  }
+  return null;
+}
+
+async function validateAfterActionVersion(
+  db: D1Database,
+  lineAccountId: string | null | undefined,
+  versionId: string | null | undefined,
+): Promise<boolean> {
+  if (!versionId) return true;
+  if (!lineAccountId) return false;
+  const row = await db.prepare(
+    `SELECT cav.id
+       FROM common_action_versions cav
+       JOIN common_actions ca ON ca.id = cav.common_action_id
+      WHERE cav.id = ? AND cav.status = 'published'
+        AND ca.line_account_id = ? AND ca.status = 'published'`,
+  ).bind(versionId, lineAccountId).first<{ id: string }>();
+  return Boolean(row);
+}
 
 function sameCreateRequest(existing: DbBroadcast, body: CreateBroadcastBody): boolean {
   const existingAccountIds = parseJsonArray(existing.account_ids) ?? [];
   const existingPriority = parseJsonArray(existing.dedup_priority) ?? [];
-  return existing.title === body.title
-    && existing.message_type === body.messageType
-    && existing.message_content === body.messageContent
+  return existing.title === (body.title?.trim() || '名称未設定')
+    && existing.message_type === (body.messageType ?? 'text')
+    && existing.message_content === (body.messageContent ?? '')
     && (existing.message_bubbles_json ?? null) === (body.messageBubbles ? JSON.stringify(body.messageBubbles) : null)
-    && existing.target_type === body.targetType
+    && existing.target_type === (body.targetType ?? 'all')
     && existing.target_tag_id === (body.targetTagId ?? null)
     && existing.scheduled_at === (body.scheduledAt ?? null)
     && (existing.line_account_id ?? null) === (body.lineAccountId ?? null)
     && (existing.alt_text ?? null) === (body.altText ?? null)
     && JSON.stringify(existingAccountIds) === JSON.stringify(body.accountIds ?? [])
     && JSON.stringify(existingPriority) === JSON.stringify(body.dedupPriority ?? [])
-    && existing.track_links === (body.trackLinks === false ? 0 : 1);
+    && existing.track_links === (body.trackLinks === false ? 0 : 1)
+    && (existing.internal_memo ?? null) === (body.internalMemo ?? null)
+    && (existing.draft_step ?? null) === (body.draftStep ?? null)
+    && (existing.message_options_json ?? null) === (body.messageOptions == null ? null : JSON.stringify(body.messageOptions))
+    && (existing.after_action_version_id ?? null) === (body.afterActionVersionId ?? null);
 }
 
 function serializeBroadcast(row: DbBroadcast) {
@@ -163,6 +248,12 @@ function serializeBroadcast(row: DbBroadcast) {
     // APIで落としていたため、再読込すると全件が「未分類」に見えていた。
     folderId: (r.folder_id as string | null | undefined) ?? null,
     measureOpens: r.measure_opens === undefined ? true : Number(r.measure_opens) !== 0,
+    internalMemo: (r.internal_memo as string | null | undefined) ?? null,
+    draftStep: (r.draft_step as string | null | undefined) ?? null,
+    draftPayload: parseJsonObject(r.draft_payload_json),
+    messageOptions: parseJsonObject(r.message_options_json),
+    afterActionVersionId: (r.after_action_version_id as string | null | undefined) ?? null,
+    version: Number(r.lock_version ?? 1),
     createdAt: row.created_at,
   };
 }
@@ -171,12 +262,39 @@ function serializeBroadcast(row: DbBroadcast) {
 broadcasts.get('/api/broadcasts', async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId');
-    if (lineAccountId
-      && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (lineAccountId && !scope.allowedAccountIds.includes(lineAccountId)) {
       return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
     }
-    const items = await getBroadcasts(c.env.DB, lineAccountId || undefined);
-    return c.json({ success: true, data: items.map(serializeBroadcast) });
+    const allItems = await getBroadcasts(c.env.DB, lineAccountId || undefined, scope);
+    const status = c.req.query('status');
+    const folderId = c.req.query('folderId');
+    const filtered = allItems.filter((item) =>
+      (!status || item.status === status)
+      && (!folderId || (folderId === 'unfiled' ? !item.folder_id : item.folder_id === folderId)));
+    const cursor = Math.max(0, Number.parseInt(c.req.query('cursor') ?? '0', 10) || 0);
+    const requestedLimit = c.req.query('limit');
+    const limit = requestedLimit ? Math.min(100, Math.max(1, Number.parseInt(requestedLimit, 10) || 20)) : filtered.length;
+    const pageItems = filtered.slice(cursor, cursor + limit);
+    const { getBroadcastStats } = await import('@line-crm/db');
+    const stats = await getBroadcastStats(c.env.DB, lineAccountId || undefined, scope);
+    return c.json({
+      success: true,
+      data: pageItems.map(serializeBroadcast),
+      kpis: {
+        scheduled: stats.scheduled,
+        drafts: allItems.filter((item) => item.status === 'draft').length,
+        thisMonth: stats.thisMonth,
+        delivered: stats.delivered,
+        openRate: stats.openRate,
+      },
+      pagination: {
+        total: filtered.length,
+        limit,
+        cursor,
+        nextCursor: cursor + limit < filtered.length ? String(cursor + limit) : null,
+      },
+    });
   } catch (err) {
     console.error('GET /api/broadcasts error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -191,11 +309,94 @@ broadcasts.get('/api/broadcasts', async (c) => {
  */
 broadcasts.get('/api/broadcasts/stats', async (c) => {
   try {
+    const lineAccountId = c.req.query('lineAccountId');
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (lineAccountId && !scope.allowedAccountIds.includes(lineAccountId)) {
+      return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+    }
     const { getBroadcastStats } = await import('@line-crm/db');
-    return c.json({ success: true as const, data: await getBroadcastStats(c.env.DB) });
+    return c.json({
+      success: true as const,
+      data: await getBroadcastStats(c.env.DB, lineAccountId || undefined, scope),
+    });
   } catch (err) {
     console.error('GET /api/broadcasts/stats error:', err);
     return c.json({ success: false as const, error: '配信の集計を取得できませんでした' }, 500);
+  }
+});
+
+// 保存した検索。動的な :id より前に置き、saved-views を配信IDとして扱わない。
+broadcasts.get('/api/broadcasts/saved-views', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId');
+    if (!lineAccountId) return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+    }
+    const rows = await c.env.DB.prepare(
+      `SELECT id, name, filters_json, sort_key, page_size, created_by, created_at, updated_at, version
+         FROM broadcast_saved_views WHERE line_account_id = ?
+        ORDER BY updated_at DESC, id`,
+    ).bind(lineAccountId).all<Record<string, unknown>>();
+    return c.json({
+      success: true,
+      data: rows.results.map((row) => ({
+        id: row.id,
+        name: row.name,
+        filters: parseJsonObject(row.filters_json) ?? {},
+        sortKey: row.sort_key,
+        pageSize: Number(row.page_size),
+        createdBy: row.created_by,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        version: Number(row.version),
+      })),
+    });
+  } catch (err) {
+    console.error('GET /api/broadcasts/saved-views error:', err);
+    return c.json({ success: false, error: '保存した検索を取得できませんでした' }, 500);
+  }
+});
+
+broadcasts.post('/api/broadcasts/saved-views', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId');
+    if (!lineAccountId) return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+    }
+    const body: { name?: unknown; filters?: unknown; sortKey?: unknown; pageSize?: unknown } = await c.req
+      .json<{ name?: unknown; filters?: unknown; sortKey?: unknown; pageSize?: unknown }>()
+      .catch(() => ({}));
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    if (!name || name.length > 60) return c.json({ success: false, error: '名前は1〜60文字で入力してください' }, 400);
+    if (!body.filters || typeof body.filters !== 'object' || Array.isArray(body.filters)) {
+      return c.json({ success: false, error: 'filters must be an object' }, 400);
+    }
+    const sortKey = typeof body.sortKey === 'string' ? body.sortKey : 'newest';
+    if (!['newest', 'oldest', 'title', 'scheduled'].includes(sortKey)) {
+      return c.json({ success: false, error: 'sortKey is invalid' }, 400);
+    }
+    const pageSize = body.pageSize === undefined ? 20 : Number(body.pageSize);
+    if (![20, 50, 100].includes(pageSize)) return c.json({ success: false, error: 'pageSize is invalid' }, 400);
+    const duplicate = await c.env.DB.prepare(
+      'SELECT id FROM broadcast_saved_views WHERE line_account_id = ? AND name = ?',
+    ).bind(lineAccountId, name).first<{ id: string }>();
+    if (duplicate) return c.json({ success: false, error: '同じ名前の保存した検索があります' }, 409);
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    await c.env.DB.prepare(
+      `INSERT INTO broadcast_saved_views
+         (id, line_account_id, name, filters_json, sort_key, page_size, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(id, lineAccountId, name, JSON.stringify(body.filters), sortKey, pageSize, c.get('staff')!.id, now, now).run();
+    return c.json({
+      success: true,
+      data: { id, name, filters: body.filters, sortKey, pageSize, createdBy: c.get('staff')!.id, createdAt: now, updatedAt: now, version: 1 },
+    }, 201);
+  } catch (err) {
+    console.error('POST /api/broadcasts/saved-views error:', err);
+    return c.json({ success: false, error: '保存した検索を保存できませんでした' }, 500);
   }
 });
 
@@ -429,6 +630,8 @@ broadcasts.post('/api/broadcasts/preflight', requireRole('owner', 'admin'), asyn
       accountIds?: unknown;
       messageContent?: unknown;
       segmentConditions?: unknown;
+      scheduledAt?: unknown;
+      messageCount?: unknown;
     }>();
 
     const targetType = String(body.targetType ?? 'all');
@@ -458,13 +661,14 @@ broadcasts.post('/api/broadcasts/preflight', requireRole('owner', 'admin'), asyn
         );
       }
     }
-    const audience = await countAudience(c.env.DB, {
+    const preview = await previewAudience(c.env.DB, {
       targetType,
       targetTagId: body.targetTagId ? String(body.targetTagId) : null,
       lineAccountId: body.lineAccountId ? String(body.lineAccountId) : null,
       accountIds: Array.isArray(body.accountIds) ? body.accountIds.map(String) : undefined,
       segmentConditions,
     });
+    const audience = { total: preview.sendable, hiddenExcluded: preview.exclusions.hidden };
 
     // 同じ本文の配信が直近にあるかは、本文が渡されたときだけ見る。
     // 下書きの段階では本文が空のこともある。
@@ -472,6 +676,37 @@ broadcasts.post('/api/broadcasts/preflight', requireRole('owner', 'admin'), asyn
     const hasRecentSimilar = content
       ? await hasRecentSimilarBroadcast(c.env.DB, content, new Date().toISOString())
       : false;
+    const accountIds = requestedAccountIds.filter((id): id is string => typeof id === 'string');
+    const quotaParts = await Promise.all(accountIds.map(async (accountId) => {
+      const account = await getLineAccountById(c.env.DB, accountId);
+      if (!account) return { limit: null, used: null };
+      return fetchQuota(account.channel_access_token);
+    }));
+    const quotaKnown = quotaParts.length > 0
+      && quotaParts.every((part) => part.limit !== null && part.used !== null);
+    const quotaLimit = quotaKnown
+      ? quotaParts.reduce((sum, part) => sum + (part.limit ?? 0), 0)
+      : null;
+    const quotaUsed = quotaKnown
+      ? quotaParts.reduce((sum, part) => sum + (part.used ?? 0), 0)
+      : null;
+    const planned = preview.sendable * Math.max(1, Number(body.messageCount) || 1);
+    const remaining = quotaLimit === null || quotaUsed === null ? null : Math.max(0, quotaLimit - quotaUsed);
+    const quotaState = remaining === null ? 'unavailable' : planned > remaining ? 'insufficient' : 'available';
+    const scheduledAt = typeof body.scheduledAt === 'string' && body.scheduledAt ? body.scheduledAt : null;
+    let concurrentBroadcasts: Array<{ id: string; title: string; scheduledAt: string }> = [];
+    if (scheduledAt && accountIds.length > 0) {
+      const placeholders = accountIds.map(() => '?').join(',');
+      const rows = await c.env.DB.prepare(
+        `SELECT id, title, scheduled_at
+           FROM broadcasts
+          WHERE status = 'scheduled' AND scheduled_at IS NOT NULL
+            AND line_account_id IN (${placeholders})
+            AND ABS(strftime('%s', scheduled_at) - strftime('%s', ?)) <= 3600
+          ORDER BY scheduled_at, id LIMIT 10`,
+      ).bind(...accountIds, scheduledAt).all<{ id: string; title: string; scheduled_at: string }>();
+      concurrentBroadcasts = rows.results.map((row) => ({ id: row.id, title: row.title, scheduledAt: row.scheduled_at }));
+    }
 
     return c.json({
       success: true,
@@ -479,6 +714,26 @@ broadcasts.post('/api/broadcasts/preflight', requireRole('owner', 'admin'), asyn
         audienceCount: audience.total,
         hiddenExcluded: audience.hiddenExcluded,
         warnings: buildWarnings(audience, { hasRecentSimilar }),
+        audience: {
+          matched: preview.matched,
+          sendable: preview.sendable,
+          evaluatedAt: preview.evaluatedAt,
+          representatives: preview.representatives,
+        },
+        exclusions: preview.exclusions,
+        quota: {
+          monthlyUsed: quotaUsed,
+          monthlyLimit: quotaLimit,
+          remaining,
+          planned,
+          state: quotaState,
+          reason: quotaState === 'unavailable' ? '送信枠を取得できませんでした' : null,
+        },
+        concurrentBroadcasts,
+        conditionAxes: {
+          standard: STANDARD_CONDITION_AXES.map(([key, label]) => ({ key, label })),
+          broadcastOnly: BROADCAST_ONLY_CONDITION_AXES.map(([key, label]) => ({ key, label })),
+        },
       },
     });
   } catch (err) {
@@ -491,38 +746,50 @@ broadcasts.post('/api/broadcasts', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<CreateBroadcastBody>();
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
+    const saveAsDraft = body.saveAsDraft === true;
+    const title = body.title?.trim() || (saveAsDraft ? '名称未設定' : '');
+    const messageType = body.messageType ?? (saveAsDraft ? 'text' : undefined);
+    const messageContent = body.messageContent ?? (saveAsDraft ? '' : undefined);
+    const targetType = body.targetType ?? (saveAsDraft ? 'all' : undefined);
 
     if (idempotencyKey && !UUID_PATTERN.test(idempotencyKey)) {
       return c.json({ success: false, error: 'Idempotency-Key must be a UUID' }, 400);
     }
 
-    if (!body.title || !body.messageType || !body.messageContent || !body.targetType) {
+    if (!title || !messageType || messageContent === undefined || !targetType) {
       return c.json(
         { success: false, error: 'title, messageType, messageContent, and targetType are required' },
         400,
       );
     }
+    if (body.draftStep !== undefined && !BROADCAST_DRAFT_STEPS.has(body.draftStep)) {
+      return c.json({ success: false, error: 'draftStep is invalid' }, 400);
+    }
+    const messageOptionsError = validateMessageOptions(body.messageOptions);
+    if (messageOptionsError) return c.json({ success: false, error: messageOptionsError }, 400);
 
-    const requestedAccountIds = body.targetType === 'multi-account-dedup'
+    const requestedAccountIds = targetType === 'multi-account-dedup'
       ? (Array.isArray(body.accountIds) ? body.accountIds : [null])
       : [body.lineAccountId ?? null];
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), requestedAccountIds)) {
       return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
     }
 
-    let messageParts;
-    try {
-      messageParts = parseBroadcastMessageParts({
-        messageType: body.messageType,
-        messageContent: body.messageContent,
-        messageBubbles: body.messageBubbles,
-        altText: body.altText,
-      });
-    } catch (messageError) {
-      return c.json({
-        success: false,
-        error: messageError instanceof Error ? messageError.message : `messageBubbles must contain 1 to ${MAX_BROADCAST_MESSAGES} items`,
-      }, 400);
+    let messageParts: ReturnType<typeof parseBroadcastMessageParts> = [];
+    if (!saveAsDraft || body.messageBubbles !== undefined || messageContent) {
+      try {
+        messageParts = parseBroadcastMessageParts({
+          messageType,
+          messageContent,
+          messageBubbles: body.messageBubbles,
+          altText: body.altText,
+        });
+      } catch (messageError) {
+        return c.json({
+          success: false,
+          error: messageError instanceof Error ? messageError.message : `messageBubbles must contain 1 to ${MAX_BROADCAST_MESSAGES} items`,
+        }, 400);
+      }
     }
 
     // 配る時間の指定。長すぎると送りきる前に日をまたぐので上限を置く。
@@ -545,7 +812,7 @@ broadcasts.post('/api/broadcasts', requireRole('owner', 'admin'), async (c) => {
       }, 400);
     }
 
-    if (body.targetType === 'tag' && !body.targetTagId) {
+    if (targetType === 'tag' && !body.targetTagId && !saveAsDraft) {
       return c.json(
         { success: false, error: 'targetTagId is required when targetType is "tag"' },
         400,
@@ -582,14 +849,14 @@ broadcasts.post('/api/broadcasts', requireRole('owner', 'admin'), async (c) => {
       segmentConditions = JSON.stringify(raw);
     }
 
-    if (body.targetType === 'segment' && !segmentConditions) {
+    if (targetType === 'segment' && !segmentConditions && !saveAsDraft) {
       return c.json(
         { success: false, error: 'segmentConditions is required when targetType is "segment"' },
         400,
       );
     }
 
-    if (body.targetType === 'multi-account-dedup') {
+    if (targetType === 'multi-account-dedup') {
       if (!Array.isArray(body.accountIds) || body.accountIds.length < 1) {
         return c.json({ success: false, error: 'accountIds (length >= 1) required for multi-account-dedup' }, 400);
       }
@@ -599,6 +866,14 @@ broadcasts.post('/api/broadcasts', requireRole('owner', 'admin'), async (c) => {
       // Defense in depth: drop priority entries not in accountIds before persisting.
       body.dedupPriority = body.dedupPriority.filter((id: unknown) =>
         typeof id === 'string' && body.accountIds!.includes(id));
+    }
+
+    if (!await validateAfterActionVersion(
+      c.env.DB,
+      body.lineAccountId ?? null,
+      body.afterActionVersionId,
+    )) {
+      return c.json({ success: false, error: '配信後アクションの公開版が見つかりません' }, 400);
     }
 
     if (idempotencyKey) {
@@ -616,12 +891,12 @@ broadcasts.post('/api/broadcasts', requireRole('owner', 'admin'), async (c) => {
     try {
       broadcast = await createBroadcast(c.env.DB, {
         id: idempotencyKey,
-        title: body.title,
+        title,
         stealthSpreadMinutes: body.stealthSpreadMinutes ?? 0,
-        messageType: body.messageType,
-        messageContent: body.messageContent,
+        messageType,
+        messageContent,
         messageBubblesJson: body.messageBubbles ? JSON.stringify(body.messageBubbles) : null,
-        targetType: body.targetType,
+        targetType,
         targetTagId: body.targetTagId ?? null,
         scheduledAt: body.scheduledAt ?? null,
         accountIds: body.accountIds,
@@ -632,6 +907,12 @@ broadcasts.post('/api/broadcasts', requireRole('owner', 'admin'), async (c) => {
         segmentConditions,
         folderId: body.folderId ?? null,
         measureOpens: body.measureOpens,
+        internalMemo: body.internalMemo ?? null,
+        draftStep: body.draftStep ?? null,
+        draftPayloadJson: saveAsDraft ? JSON.stringify(body) : null,
+        messageOptionsJson: body.messageOptions == null ? null : JSON.stringify(body.messageOptions),
+        afterActionVersionId: body.afterActionVersionId ?? null,
+        saveAsDraft,
       });
     } catch (createError) {
       // Concurrent retries may both pass the SELECT above. The primary key makes
@@ -686,7 +967,24 @@ broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) =
       stealthSpreadMinutes?: number;
       lineAccountId?: string | null;
       accountIds?: string[];
+      saveAsDraft?: boolean;
+      draftStep?: 'basic' | 'audience' | 'message' | 'schedule' | 'confirm' | null;
+      internalMemo?: string | null;
+      messageOptions?: unknown;
+      afterActionVersionId?: string | null;
+      expectedVersion?: number;
     }>();
+
+    if (body.expectedVersion !== undefined
+        && (!Number.isInteger(body.expectedVersion) || body.expectedVersion < 1)) {
+      return c.json({ success: false, error: 'expectedVersion must be a positive integer' }, 400);
+    }
+    if (body.draftStep !== undefined && body.draftStep !== null
+        && !BROADCAST_DRAFT_STEPS.has(body.draftStep)) {
+      return c.json({ success: false, error: 'draftStep is invalid' }, 400);
+    }
+    const messageOptionsError = validateMessageOptions(body.messageOptions);
+    if (messageOptionsError) return c.json({ success: false, error: messageOptionsError }, 400);
 
     const existingRaw = existing as unknown as Record<string, unknown>;
     const resultingTargetType = body.targetType ?? existing.target_type;
@@ -697,6 +995,18 @@ broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) =
           : (existingRaw.line_account_id as string | null | undefined) ?? null];
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), requestedAccountIds)) {
       return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+    }
+    const resultingAccountId = resultingTargetType === 'multi-account-dedup'
+      ? null
+      : (body.lineAccountId !== undefined
+          ? body.lineAccountId
+          : (existingRaw.line_account_id as string | null | undefined) ?? null);
+    if (!await validateAfterActionVersion(
+      c.env.DB,
+      resultingAccountId,
+      body.afterActionVersionId,
+    )) {
+      return c.json({ success: false, error: '配信後アクションの公開版が見つかりません' }, 400);
     }
 
     if (body.messageContent !== undefined) {
@@ -755,12 +1065,12 @@ broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) =
     }
 
     // Keep status in sync with scheduledAt changes
-    let statusUpdate: 'draft' | 'scheduled' | undefined;
-    if (body.scheduledAt !== undefined) {
+    let statusUpdate: 'draft' | 'scheduled' | undefined = body.saveAsDraft ? 'draft' : undefined;
+    if (!body.saveAsDraft && body.scheduledAt !== undefined) {
       statusUpdate = body.scheduledAt ? 'scheduled' : 'draft';
     }
 
-    const updated = await updateBroadcast(c.env.DB, id, {
+    const updates: Parameters<typeof updateBroadcast>[2] = {
       title: body.title,
       message_type: body.messageType,
       message_content: body.messageContent,
@@ -778,7 +1088,23 @@ broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) =
       ...(body.folderId !== undefined ? { folder_id: body.folderId } : {}),
       ...(body.measureOpens !== undefined ? { measure_opens: body.measureOpens ? 1 : 0 } : {}),
       ...(statusUpdate !== undefined ? { status: statusUpdate } : {}),
-    });
+      ...(body.internalMemo !== undefined ? { internal_memo: body.internalMemo } : {}),
+      ...(body.draftStep !== undefined ? { draft_step: body.draftStep } : {}),
+      ...(body.saveAsDraft ? { draft_payload_json: JSON.stringify(body) } : {}),
+      ...(body.messageOptions !== undefined
+        ? { message_options_json: body.messageOptions === null ? null : JSON.stringify(body.messageOptions) }
+        : {}),
+      ...(body.afterActionVersionId !== undefined
+        ? { after_action_version_id: body.afterActionVersionId }
+        : {}),
+    };
+    const updated = body.expectedVersion === undefined
+      ? await updateBroadcast(c.env.DB, id, updates)
+      : await updateBroadcast(c.env.DB, id, updates, body.expectedVersion);
+
+    if (!updated && body.expectedVersion !== undefined) {
+      return c.json({ success: false, error: '別の画面で下書きが更新されました', code: 'VERSION_CONFLICT' }, 409);
+    }
 
     // 失敗 partial dedup broadcast を draft に戻して編集 → 再送するケースで、
     // 残っていた resume 用 state を全部クリアして fresh campaign として送り直せる
@@ -1323,23 +1649,62 @@ broadcasts.get('/api/broadcasts/:id/insight', async (c) => {
     const insight = await c.env.DB.prepare(
       'SELECT * FROM broadcast_insights WHERE broadcast_id = ? ORDER BY created_at DESC LIMIT 1'
     ).bind(id).first<Record<string, unknown>>();
+    const linkRows = await c.env.DB.prepare(
+      `SELECT tl.id, btl.label, tl.original_url,
+              COUNT(lc.id) AS click_count,
+              COUNT(DISTINCT lc.friend_id) AS unique_click_count,
+              MAX(lc.clicked_at) AS last_clicked_at
+         FROM broadcast_tracked_links btl
+         JOIN tracked_links tl ON tl.id = btl.tracked_link_id
+         LEFT JOIN link_clicks lc ON lc.tracked_link_id = tl.id
+        WHERE btl.broadcast_id = ?
+        GROUP BY tl.id, btl.label, tl.original_url
+        ORDER BY click_count DESC, tl.id`,
+    ).bind(id).all<{
+      id: string;
+      label: string;
+      original_url: string;
+      click_count: number;
+      unique_click_count: number;
+      last_clicked_at: string | null;
+    }>();
 
-    if (!insight) {
+    if (!insight && linkRows.results.length === 0) {
       return c.json({ success: true, data: null, message: 'Insight not yet available' });
     }
+
+    const delivered = insight?.delivered == null ? null : Number(insight.delivered);
+    const links = linkRows.results.map((row) => ({
+      id: row.id,
+      label: row.label,
+      url: row.original_url,
+      clickCount: Number(row.click_count),
+      uniqueClickCount: Number(row.unique_click_count),
+      clickRate: delivered && delivered > 0 ? Number(row.unique_click_count) / delivered : null,
+      lastClickedAt: row.last_clicked_at,
+    }));
 
     return c.json({
       success: true,
       data: {
-        broadcastId: insight.broadcast_id,
-        delivered: insight.delivered,
-        uniqueImpression: insight.unique_impression,
-        uniqueClick: insight.unique_click,
-        uniqueMediaPlayed: insight.unique_media_played,
-        openRate: insight.open_rate,
-        clickRate: insight.click_rate,
-        status: insight.status,
-        fetchedAt: insight.fetched_at,
+        broadcastId: id,
+        delivered,
+        uniqueImpression: insight?.unique_impression ?? null,
+        uniqueClick: insight?.unique_click ?? null,
+        uniqueMediaPlayed: insight?.unique_media_played ?? null,
+        openRate: insight?.open_rate ?? null,
+        clickRate: insight?.click_rate ?? null,
+        status: insight?.status ?? 'pending',
+        fetchedAt: insight?.fetched_at ?? null,
+        opens: {
+          count: insight?.unique_impression ?? null,
+          denominator: delivered,
+          rate: insight?.open_rate ?? null,
+          asOf: insight?.fetched_at ?? null,
+          state: insight?.status === 'ready' ? 'available' : 'unavailable',
+          reason: insight?.status === 'ready' ? null : 'LINE集計をまだ取得できません',
+        },
+        links,
       },
     });
   } catch (err) {
@@ -1583,6 +1948,7 @@ broadcasts.post('/api/broadcasts/:id/test-send', requireRole('owner', 'admin'), 
       c.env.WORKER_URL,
       accountId,
       broadcast.track_links !== 0,
+      broadcast.id,
     );
 
     const liffId = (account as unknown as { liff_id?: string | null }).liff_id ?? null;

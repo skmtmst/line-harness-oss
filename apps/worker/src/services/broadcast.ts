@@ -241,6 +241,7 @@ export async function processBroadcastSend(
     workerUrl,
     broadcastAccountId,
     broadcast.track_links !== 0,
+    broadcast.id,
   );
   /*
    * 配信全体で決まる差し込みを、ここで置き換える。
@@ -599,6 +600,7 @@ async function processQueuedBroadcastBatches(
     workerUrl,
     (raw.line_account_id as string | null) ?? null,
     broadcast.track_links !== 0,
+    broadcast.id,
   );
   // 旧1通だけは従来どおり追跡後の中身を保存する。複数通は編集用の
   // message_bubbles_json を保ち、各tickで既存の追跡リンクを再利用する。
