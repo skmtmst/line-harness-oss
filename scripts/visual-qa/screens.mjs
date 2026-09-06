@@ -1635,14 +1635,19 @@ export const SCREENS = [
 
   // ── 機能14 共通情報 ─────────────────────────────────────
   {
-    ...COMMON_VAR, node: 'WuKzU', name: '14-1 共通情報', verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #295 / UI HEAD `24313778e`。構造一致・データ未接続。** 設計画像と実装画像を同じ比較入力で見比べ、上部操作、フォルダ、検索・絞り込み、6列一覧、ページ送りの骨格を確認した。1440・1920とも横はみ出し0。**データ未接続**：現行APIは設計の説明文と種類別使用数を返さず、固定データも設計の3フォルダ・6行・空のまま使用中の警告状態を持たないため、内容と件数の一致は未確認。取得できない使用数は偽の0件にせず `—（未取得）` と表示する。',
-    verdictSource: 'common-vars-v6/WuKzU.txt + common-vars-v6/WuKzU-{1440,1920}.png + list-model.test.ts', verdictHead: '24313778e',
+    ...COMMON_VAR, node: 'WuKzU', name: '14-1 共通情報', verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #327 / UI HEAD `bb8a139b3`で再判定し、一致。** PR #1077の固定データで3フォルダ、先頭6件、空のまま使用中1件、行ごとの使用数、更新予約を表示した。上部操作、フォルダ、検索・4絞り込み、6列一覧、ページ送りを、Pencil 1920pxと実装1920pxを1枚に並べて確認。運用データで全件数と更新日時は変わるが、配置・項目・操作は一致する。1440px・1920pxとも横はみ出し0。',
+    verdictSource: 'common-vars-v6/WuKzU.txt + common-vars-v6/WuKzU-1440.png + common-vars-v6/WuKzU-1920.png + 2026-09-07 same-input comparison', verdictHead: 'bb8a139b3',
   },
   {
     ...COMMON_VAR, node: 'gBtaK', name: '14-1-A 共通情報を編集', route: '/contents/vars/edit?id=common-var-delete-target', verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #295 / UI HEAD `24313778e`。構造一致・データ未接続。** 設計画像と、値を変更して保存前の影響が出た実装画像を同じ比較入力で見比べた。入力欄を左、使用先と保存後プレビューを右に置く2カラム構成、期限、履歴、固定保存欄を揃え、1440・1920とも横はみ出し0。**データ未接続**：社内メモと追記型履歴のAPIが無く、固定データも設計と同じ会社名・15使用先を持たないため内容一致は未確認。無い値は偽データで埋めず、未接続理由を表示する。',
-    verdictSource: 'common-vars-v6/gBtaK.txt + common-vars-v6/gBtaK-{1440,1920}.png + change-impact.test.ts', verdictHead: '24313778e',
+    mode: 'viewport', height: 1080,
+    steps: [
+      { fill: '#cv-value', selector: true, text: '株式会社NEN ホールディングス' },
+      { wait: 1200 },
+    ],
+    verdictNote: '**2026-09-07 Issue #327 / UI HEAD `bb8a139b3`で再判定。構造一致・データ未接続。** 「株式会社NEN」から「株式会社NEN ホールディングス」へ変えた同じ状態を3104/8791で撮り、Pencil 1920pxと実装1920pxを1枚に並べて確認した。15使用先、変更前後の文、予約中・公開中・下書き、文字数超過、保存後プレビューが固定データで表示され、1440px・1920pxとも横はみ出し0。社内メモと追記型の変更履歴はAPIが無く、実装は値を作らず未接続理由を表示するため一致にはしない。**推奨修正：メモと変更前後・変更者を返す履歴APIを接続する。**',
+    verdictSource: 'common-vars-v6/gBtaK.txt + common-vars-v6/gBtaK-1440.png + common-vars-v6/gBtaK-1920.png + change-impact.test.ts + 2026-09-07 same-input comparison', verdictHead: 'bb8a139b3',
   },
   {
     /*
@@ -1686,9 +1691,9 @@ export const SCREENS = [
       { suffix: '-deletable', steps: [{ click: 'キャンセル', after: 500 }, { click: '削除', nth: 1, after: 900 }] },
     ],
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #295 / UI HEAD `24313778e`。構造一致・データ未接続。** 設計画像と、使用中・未使用の実装画像を同じ比較入力で見比べた。対象、影響、差し替え案、このまま削除する案、使用先一覧、固定操作欄を揃え、1440・1920とも横はみ出し0。**データ未接続**：設計の差し替え候補を取得して一括置換するAPIが無いため、候補は偽造せず未接続として選べない状態にした。使用中は削除を止め、未使用だけ確認キー入力後に削除できる。',
+    verdictNote: '**2026-09-07 Issue #327 / UI HEAD `bb8a139b3`で再判定。構造一致・データ未接続。** PR #1077の固定データで、会社名が使われる15か所、予約中・公開中・下書きの6使用先、各画面を開く導線を表示し、Pencil 1920pxと実装1920pxを1枚に並べて確認した。使用中と未使用の両状態を1440px・1920pxで撮り、全画像で横はみ出し0。設計の推奨操作である別の共通情報への一括差し替えはAPIが無く、候補を作らず無効表示するため一致にはしない。使用中の物理削除は止め、未使用だけ確認入力後に削除できる。**推奨修正：互換候補の取得・影響確認・一括差し替えAPIを接続する。**',
     verdictSource: 'common-vars-v6/yPkWe.txt + common-vars-v6/yPkWe-{1440,1920}.png + common-vars-v6/yPkWe-deletable-{1440,1920}.png + delete-impact.test.ts',
-    verdictHead: '24313778e',
+    verdictHead: 'bb8a139b3',
 
   },
 
@@ -3018,6 +3023,11 @@ const FEATURE_16_REVIEW = {
     verdictHead: '9a4c4d520',
     variants: [{ suffix: '-detail', steps: [{ click: '見る', nth: 0, after: 500 }] }],
   },
+  njLGA: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07、Issue #307 で通常・読込中・0件・取得失敗を再撮影し、構造一致・データ未接続。** 3102/8789 で4状態を1440px・1920pxの両方で撮り、10枚すべて横はみ出し0。通常は5人の支払い確定前報酬、保留額、支払い条件の覚書と行ごとの確定操作を表示し、0件と取得失敗も混同しない。前回 #212 の「通常と0件が取得失敗になる」は解消した。残る差は、支払結果・締め日・支払日・振込先を返すAPIが無いこと。Pencilの「今年払った合計」「次の締め」「次の支払日」「振込先」「過去の支払い」「振込用CSV」は値を作らず、未接続の理由を表示する。**接続条件:** 支払台帳・締め設定・振込先APIが入ったら、設計の4指標、状態札、6列表、締め・明細・CSV操作を接続して同じ4状態を再撮影する。',
+    verdictSource: 'affiliates-v6/njLGA.txt + njLGA-{normal,loading,empty,error}.txt + njLGA-{normal,loading,empty,error}-{1440,1920}.png',
+  },
   xqT1Z: {
     verdict: 'match',
     verdictNote: '**2026-09-06、Issue #229 / PR #965 / HEAD 9a4c4d520 で入力済み状態を再撮影し、一致。** 1440px・1920pxとも横はみ出し0。主欄を3区画、右欄を成果時動作・関連先・注意へ整理し、友だち候補API、名前・メール・コード、報酬方式、保留・支払サイクル、末尾4桁だけを扱う振込先の接続条件を設計画像と目視比較した。',
@@ -4158,6 +4168,8 @@ export const CAPTURED_AT = {
       { pr: 616, head: '0a11c9e8', on: '2026-08-31', screens: ['szXsT'], note: 'Claude実装。影響4つに加え、409の最新影響と別メニューの遅延応答も再監査で確認した' },
   ],
   14: [
+    { pr: 1099, head: 'bb8a139b3', on: '2026-09-07', screens: ['WuKzU', 'gBtaK', 'yPkWe'],
+      note: 'Issue #327。PR #1077の固定データを使い、3104/8791で一覧・会社名変更後・使用中／未使用の削除確認を1440px・1920px撮影。Pencil 1920pxと同じ比較画像で確認し、全画像で横はみ出し0。一覧を一致へ更新し、編集と削除確認に残るAPI差を記録した。' },
     { pr: 1075, head: '24313778e', on: '2026-09-07', screens: ['WuKzU', 'gBtaK', 'yPkWe'],
       note: 'Issue #295。共通情報3画面を3104/8791で1440・1920px撮影し、★V6設計と同じ比較入力で確認。全画像で横はみ出し0。3画面とも、存在しないAPI値を作らず理由つきの構造一致・データ未接続へ更新した。' },
     { pr: 548, head: 'd4a85ad4', on: '2026-08-29', screens: ['uNBlA', 'gBtaK'], note: '保存前に影響を見る面。値を変えてから保存を押さないと出ない' },
