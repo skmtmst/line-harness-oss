@@ -169,37 +169,37 @@ export const SCREENS = [
   // ── 機能1 ダッシュボード ────────────────────────────────
   {
     node: 'vUXKb', feature: 1, name: '1-1 ダッシュボード',
-    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#23 「5件表示」→「5件」／#24 並び順を「優先度が高い順」に統一／#25 有効友だちを398人にそろえた（接続状態カードと推移表の全行42）／#26 「使用 197 / 上限 200通」＋「残り 3通（1.5%）」／#27 プルダウンの選択肢を共通部品 `Gfsb4` へ／#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）。設計画像は `docs/design-reference/dashboard-v6/` を撮り直した。**実装との突き合わせはこれから。** **#419 `c84baa63` で撮った。** 「今日やること」の札は 対応が必要な受信 **5件**（LINE 1・メール 4／最長 6日7時間50分）／写真審査 **1件**（確認待ち1・ポイント付与あり）／今日の予約 **0件**（次回 09:00）／出荷予定 **0件**（EC通知から算出）。**数えて0のものは `0件`** で出し、空の札には「出荷予定はまだありません。ECから注文や定期便の通知を受け取ると、ここに並びます。」と**次に何が起きれば埋まるか**を書く。壊れ値・内部語は0件、1440・1920とも横スクロール0。**設計との突き合わせは、通知パネルの実データがつながってから**（#419 がその接続。パネルは押して開く形なので、この行では開いていない）', verdictSource: 'dashboard-v6/vUXKb.txt',
+    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-04 再照合。構造一致・データ未接続。** 2026-09-03の1440/1920px画像と最新コードの差分を確認し、カード構成・文言・横スクロール0は設計どおり。自動変更など取得口のない値は `—` のため最終一致にしない。現在コミットの画像はPlaywrightのOS権限で取得できず、旧画像と差分照合で判定。', verdictSource: 'dashboard-v6/vUXKb.txt + 2026-09-03 1440/1920px screenshots + 2026-09-04 static diff audit',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
-    verdictHead: '7b509106',
+    verdictHead: '145c497d1',
   },
   {
     node: 'ZN0ov', feature: 1, name: '1-1-1 ダッシュボード編集',
-    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#23 「5件表示」→「5件」／#24 並び順を「優先度が高い順」に統一／#25 有効友だちを398人にそろえた（接続状態カードと推移表の全行42）／#26 「使用 197 / 上限 200通」＋「残り 3通（1.5%）」／#27 プルダウンの選択肢を共通部品 `Gfsb4` へ／#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）。設計画像は `docs/design-reference/dashboard-v6/` を撮り直した。**実装との突き合わせはこれから。** **#419 `c84baa63` で撮った。** 壊れ値・内部語は0件、1440・1920とも横スクロール0。設計との突き合わせは通知パネルの実データがつながってから', verdictSource: 'dashboard-v6/ZN0ov.txt',
+    verdict: 'match', verdictNote: '**2026-09-04 再照合で一致。** テキスト差0。パネル幅540px、見出しの副文、札型タブ、カードの配置説明、4枠警告、5枚目ON時の自動OFF、「ダッシュボードに反映」まで設計に合わせた。2026-09-03の1440/1920px画像と最新コード差分で確認。現在コミットの画像はPlaywrightのOS権限で取得できず、旧画像と差分照合で判定。', verdictSource: 'dashboard-v6/ZN0ov.txt + 2026-09-03 1440/1920px screenshots + 2026-09-04 static diff audit',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
     steps: [{ click: 'ダッシュボード編集' }],
-    verdictHead: '7b509106',
+    verdictHead: '145c497d1',
   },
   {
     node: 'JN6mQ', feature: 1, name: '1-1-2 友だち追加QR',
-    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#23 「5件表示」→「5件」／#24 並び順を「優先度が高い順」に統一／#25 有効友だちを398人にそろえた（接続状態カードと推移表の全行42）／#26 「使用 197 / 上限 200通」＋「残り 3通（1.5%）」／#27 プルダウンの選択肢を共通部品 `Gfsb4` へ／#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）。設計画像は `docs/design-reference/dashboard-v6/` を撮り直した。**実装との突き合わせはこれから。** **#419 `c84baa63` で撮った。** 壊れ値・内部語は0件、1440・1920とも横スクロール0。設計との突き合わせは通知パネルの実データがつながってから', verdictSource: 'dashboard-v6/JN6mQ.txt',
+    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-04 再照合。構造一致・データ待ち。** ダイアログ820px、QR枠280px、小300px、PNG/JPG/SVGの順、2行リンク欄、主ボタンとヒント枠を設計に合わせた。文字比較の差は、取得口が返さない `https://lin.ee/nen-official` と、閉じた選択肢の「中/小」のみ。短縮URLを決め打ちせず、データ待ちとする。現在コミットの画像はPlaywrightのOS権限で取得できず、2026-09-03画像と差分照合で判定。', verdictSource: 'dashboard-v6/JN6mQ.txt + 2026-09-03 1440/1920px screenshots + 2026-09-04 static diff audit',
     dir: 'dashboard-v6', route: '/', mode: 'viewport', height: 1668, clock: DASHBOARD_CLOCK,
     steps: [{ click: 'QRを表示' }],
-    verdictHead: '7b509106',
+    verdictHead: '145c497d1',
   },
   {
     node: 'NjK9q', feature: 1, name: '1-1-3 対応受信の表示件数を開く',
-    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#23 「5件表示」→「5件」／#24 並び順を「優先度が高い順」に統一／#25 有効友だちを398人にそろえた（接続状態カードと推移表の全行42）／#26 「使用 197 / 上限 200通」＋「残り 3通（1.5%）」／#27 プルダウンの選択肢を共通部品 `Gfsb4` へ／#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）。設計画像は `docs/design-reference/dashboard-v6/` を撮り直した。**実装との突き合わせはこれから。** **#419 `c84baa63` で撮った。** 壊れ値・内部語は0件、1440・1920とも横スクロール0。設計との突き合わせは通知パネルの実データがつながってから', verdictSource: 'dashboard-v6/NjK9q.txt',
+    verdict: 'match', verdictNote: '**2026-09-04 再照合で一致。** 表示件数の選択口、1〜5 / 5件、前へ・1・次へのページ送りを確認。テキスト差0、2026-09-03の1440/1920px画像で横スクロール0。現在コミットの画像はPlaywrightのOS権限で取得できず、旧画像と差分照合で判定。', verdictSource: 'dashboard-v6/NjK9q.txt + 2026-09-03 1440/1920px screenshots + 2026-09-04 static diff audit',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
     steps: [{ click: '表示件数' }],
-    verdictHead: '7b509106',
+    verdictHead: '145c497d1',
   },
   {
     node: 'Alekb', feature: 1, name: '1-1-4 通知パネルを開く',
-    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#23 「5件表示」→「5件」／#24 並び順を「優先度が高い順」に統一／#25 有効友だちを398人にそろえた（接続状態カードと推移表の全行42）／#26 「使用 197 / 上限 200通」＋「残り 3通（1.5%）」／#27 プルダウンの選択肢を共通部品 `Gfsb4` へ／#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）。設計画像は `docs/design-reference/dashboard-v6/` を撮り直した。**実装との突き合わせはこれから。** **#419 `c84baa63` で撮った。** 壊れ値・内部語は0件、1440・1920とも横スクロール0。設計との突き合わせは通知パネルの実データがつながってから', verdictSource: 'dashboard-v6/Alekb.txt',
+    verdict: 'match', verdictNote: '**2026-09-04 再照合で一致。** 通知API接続後のパネル構造・文言を確認し、テキスト差0。2026-09-03の1440/1920px画像で横スクロール0。現在コミットの画像はPlaywrightのOS権限で取得できず、旧画像と差分照合で判定。', verdictSource: 'dashboard-v6/Alekb.txt + 2026-09-03 1440/1920px screenshots + 2026-09-04 static diff audit',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
     steps: [{ click: '通知' }],
-    verdictHead: '7b509106',
+    verdictHead: '145c497d1',
   },
 
   // ── 機能2 受信箱 ────────────────────────────────────────
@@ -949,16 +949,15 @@ export const SCREENS = [
       **表は1本にせず、読む口の契約でそろえる形。**
     */
     ...REMINDER, node: 'GC4St', name: '7-1-H 実行結果',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未実装（route）。`/reminders/detail` の page.tsx が `codex/development` に無い。撮らない・合格にもしない。',
-    status: 'unimplemented',
-    gap: 'pending',
-    gapNote: '画面 `/reminders/detail` が development に無い。判定は未マージ枝 `4bc71249` で書かれたもの',
-    why: '`/reminders/detail` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
     route: '/reminders/detail?id=reminder-1',
     states: {
       apis: ['**/api/reminders/*/runs*'],
       kinds: ['normal', 'loading', 'empty', 'error'],
     },
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-04 画面を本流へ載せ、初めて撮れた（board#74）。前は `unimplemented` で、実装は未マージの枝の中にあった。** ルート `/reminders/detail?id=reminder-1`。通常・読込中・0件・取得失敗の**5枚すべて**を1440・1920で撮った（10枚、はみ出し0）。 **API と DB は既に本流にあった**（`GET /api/reminders/:id/runs`、`POST /api/reminder-runs/:runId/retry`、migration 269）。無かったのは画面と web 側の口だけ。 **要件 §3-7 の10項目がすべて出ている**：友だち／通知／結果／予定／実行／試行／理由・次の動き／**LINE要求ID**／操作。LINE要求IDは旧実装ではCSVにしか無く、**問い合わせのときに画面から写せなかった**ので列に足した。 **取れないものを0で埋めていない**：まだ始まっていない行の実行時刻は `—`、既読は `—`（LINEは友だち単位の既読を返さない）、要求IDが無い行も `—`。友だちが消えている行は「削除済みの友だち」。 **再試行できるかは Worker が決める**（`canRetry`）。画面で条件を作らない。再試行待ちと送信失敗にだけ「この通知を再試行」が出る。 **P1 設計と突き合わせられない**——`docs/design-reference/reminders-v6/` に `GC4St.txt` が無く、**この画面だけ設計の書き出しから漏れている**。要件 §3-7 を根拠に作った。書き出しは lane:pen へ渡す。 P2 設計の実行結果（通ごとの内訳、失敗の理由別のまとめ）は未確認。',
+    verdictSource: 'reminders-v6/GC4St.txt',
+    verdictHead: 'aa4c913b',
   },
   {
     /*
@@ -1811,6 +1810,13 @@ export const SCREENS = [
     route: '/mileage/friends/detail?id=friend-1', mode: 'viewport', height: 1080,
     steps: [{ click: 'マイルを手で増やす・減らす', scope: 'main' }],
     verdictHead: '31293424',
+    /* 第1段の記録を残し、現在の判定だけを後勝ちで更新する。 */
+    ...{
+      verdict: 'structure_match_data_pending',
+      verdictNote: '**2026-09-04 S3 第2段で再照合。** 構造一致・データ未接続。設計本文、現在の2段確認ダイアログ、既存の1440/1920確認記録を突き合わせた。だれの残高を動かすか、増減、マイル数、理由区分、詳しい理由、変更前・変更量・変更後、実行者を残す説明がそろい、残高不足・二重反映・高額調整を安全側で止める。設計にあるLINE通知と有効期限は送信・失効台帳が未接続のため、画面も「実行しません」と明示して値を作っていない。正本要件 §4-7 の問い合わせ・注文・調整元IDは実装済み。**接続条件**：送信台帳と失効ロットが入ったら通知・期限を接続し、同じ2幅で撮り直す。',
+      verdictSource: 'mileage-v6/vz0Ji.txt + apps/web/src/app/mileage/friends/detail/mileage-adjustment-dialog.tsx + docs/v6-requirements/v6-17-mileage-score-requirements-draft.md',
+      verdictHead: 'eb0a4fea8',
+    },
   },
   {
     /*
@@ -1823,6 +1829,13 @@ export const SCREENS = [
     verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#41 完了画面の追従バー／#44 CSV書き出しの置き場／#48 表記統一／#49 工程名の統一。設計画像を撮り直した。**実装との突き合わせはこれから。** #624で「渡すもの」を選ぶ欄から**並べたタイル**へ。それぞれ何が起きるかを添えた。選ぶ欄だと開くまで中身が見えない。**設計の「回答フォームへ」「品もの」は入れていない**——`MileageRewardKind` に無く、勝手に足すと選べるように見えて保存できない（契約待ち）。#549で入った安全策3つ（公開版の固定・二重交換の防止・渡せなかったときの決めごと）は設計に無いがそのまま残す。残る差：「だれが交換できますか」の条件、「交換されたときにすること」の後続処理、右の「使い道のつくりかた」「つながる先」',
     verdictSource: 'Claude実装',
     verdictHead: '5e8f32d3',
+    /* #863 合流後の実装を照合した現在の判定。 */
+    ...{
+      verdict: 'needs_fix',
+      verdictNote: '**2026-09-04 S3 第2段で再照合。** 要修正。#863 合流後の実装には、名前・説明・必要マイル、渡す種類、在庫、1人あたり上限、期間、有効日数、公開版を直接変えない下書き、受け渡し失敗時の再試行・返却、顧客への案内、公開前確認がそろう。今回 `eb0a4fea8` で、既存の副作用なしテストAPIを「自分で交換をテスト」へ接続し、残高と在庫を動かさない結果を表示した。残る差は「だれが交換できるか」の条件、運用者が選べる共通アクション、画像・クーポンの選択、右側の作り方とつながる先。回答フォーム・品ものは保存契約に無いため、選べるふりをさせない。新規実装画像は実行環境の Chromium Mach port 拒否で未取得。**推奨修正**：次は共通条件と共通アクションの選択APIを接続し、1440/1920で撮り直す。',
+      verdictSource: 'mileage-v6/p9CcEB.txt + apps/web/src/app/mileage/rewards/edit/page.tsx + apps/web/src/app/mileage/rewards/edit/reward-form.test.ts + docs/v6-requirements/v6-17-mileage-score-requirements-draft.md',
+      verdictHead: 'eb0a4fea8',
+    },
   },
   {
     ...MILEAGE, node: 'k8VCU', name: '17-1-H たまる決めごと・一覧の状態',
@@ -2759,62 +2772,62 @@ export const SCREENS = [
   */
   {
     node: 'QT91v', feature: 33, name: '33-1 LINEアカウント一覧',
-    dir: 'accounts-v6', route: '/accounts', mode: 'page',
-    status: 'unimplemented', gap: 'build',
-    gapNote: 'LINEアカウントを読む口はもう在る（`/api/line-accounts`）。一覧の画面を作るだけ',
-    why: '`/accounts` は `/hq`（統括コンソール）への転送で、33-1 の画面は無い',
+    dir: 'settings-v6', route: '/accounts', mode: 'page',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S0 が1920px設計と1440/1920px実装を撮って判定。要修正。** 2幅とも横スクロール0。設計にある状態別の絞り込み、表示件数、並び順・親子変更、6件の行と親アカウント関係が実装に無く、実装は1件だけの一覧と1つの選び口に縮んでいる。**推奨修正**：一覧上部の操作と複数行の固定データを設計どおりにそろえ、親子関係とWebhook異常を同じ表で確認できるようにする。',
+    verdictSource: 'settings-v6/QT91v.txt', verdictHead: '4c5708ace',
   },
   {
     node: 'b2NGxk', feature: 33, name: '33-2 LINEアカウントを登録する',
-    dir: 'accounts-v6', route: '/accounts/new', mode: 'page',
-    status: 'unimplemented', gap: 'build',
-    gapNote: '登録の口は在る。**飲食店向けの店舗登録とは別の画面**として作る',
-    why: '`/accounts/new` は `/restaurant-test/stores/new`（飲食店向けのテスト機能）への転送で、33-2 の画面は無い',
+    dir: 'settings-v6', route: '/accounts/new', mode: 'page',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S0 が1920px設計と1440/1920px実装を撮って判定。要修正。** 2幅とも横スクロール0。設計は基本情報・送信用情報・友だち追加/LIFF・接続確認をすべて展開し、右側にWebhook URLと案内を置く。実装は折りたたみ中心で、基本情報、タイムゾーン、国、役割メモ、親アカウント、接続先URLが同じ位置に出ない。**推奨修正**：設計の2列構成と入力順へそろえ、接続確認4段階とURL案内を常時見える形にする。',
+    verdictSource: 'settings-v6/b2NGxk.txt', verdictHead: '4c5708ace',
   },
   {
     node: 'T9rA9', feature: 33, name: '33-3 LINEアカウントの詳細・編集',
-    dir: 'accounts-v6', route: '/accounts/detail?id=visual-qa-account', mode: 'page',
-    status: 'unimplemented', gap: 'build',
-    gapNote: '一覧と登録は在るので、読む口はそろっている。詳細・編集の画面を作るだけ',
-    why: '`/accounts` の詳細・編集にあたるルートが実装に無い（一覧と `/accounts/new` だけ）',
+    dir: 'settings-v6', route: '/accounts/detail?id=visual-qa-account', mode: 'page',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S0 が1920px設計と1440/1920px実装を撮って判定。要修正。** 2幅とも横スクロール0。設計の資格情報、Webhook照合、つながる先の右欄が実装に無く、登録内容と操作が縦長の1列へ変わっている。資格情報の末尾と更新日も確認できない。**推奨修正**：概要を設計の主欄＋右欄へ戻し、資格情報の有無・末尾・更新日とWebhook照合結果を表示する。',
+    verdictSource: 'settings-v6/T9rA9.txt', verdictHead: '4c5708ace',
   },
   {
     node: 'nx3XW', feature: 33, name: '33-4 乗り換え・引き継ぎ',
-    dir: 'accounts-v6', route: '/accounts/handover?id=visual-qa-account', mode: 'page',
-    status: 'unimplemented', gap: 'api',
-    gapNote: '別のチャネルへ友だち・配信・履歴を引き継ぐ口が要る。既存の口では足りない',
-    why: '`/accounts/handover` が実装に無く、引き継ぎの口も無い',
+    dir: 'settings-v6', route: '/accounts/handover?id=visual-qa-account', mode: 'page',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S0 が1920px設計と1440/1920px実装を撮って判定。要修正。** 2幅とも横スクロール0。設計は5段階を横並びで示し、引き継ぎ元/先、引き継ぎコード、照合数、要確認23人の表まで出す。実装は段階が縦並びで、未接続の説明と空の集計だけになっている。**推奨修正**：まず横並びの進捗と左右2列をそろえ、引き継ぎAPI接続後に事前確認の集計と判断表を表示する。',
+    verdictSource: 'settings-v6/nx3XW.txt', verdictHead: '4c5708ace',
   },
 
   // ── 機能34 はじめの設定と案内（§7 #29） ──────────────────────────────
 
   {
     node: 'RAW35', feature: 34, name: '34-1 はじめの設定',
-    dir: 'getting-started-v6', route: '/getting-started', mode: 'page',
-    status: 'unimplemented', gap: 'build',
-    gapNote: '進み具合はいまある口（接続状態・友だち数・配信）から組み立てられる。画面を作るだけ',
-    why: '`/getting-started` が実装に無い',
+    dir: 'settings-v6', route: '/getting-started', mode: 'page',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S0 が1920px設計と1440/1920px実装を撮って判定。要修正。** 2幅とも横スクロール0。5段の大枠と右欄はそろうが、上部の進捗帯の色、各段の余白・操作位置、段3〜5の状態名と次にすることが設計と違う。**推奨修正**：設計の緑の進捗帯、段ごとの状態色、右寄せ操作へそろえ、段3と最終段の案内文を設計どおりにする。',
+    verdictSource: 'settings-v6/RAW35.txt', verdictHead: '4c5708ace',
   },
   {
     node: 'y0P0Qx', feature: 34, name: '34-2 レシピ一覧',
-    dir: 'getting-started-v6', route: '/recipes', mode: 'page',
-    status: 'unimplemented', gap: 'api',
-    gapNote: 'レシピ（ひな形の組み合わせ）を持つ口がまだ無い',
-    why: '`/recipes` が実装に無く、レシピを読む口も無い',
+    dir: 'settings-v6', route: '/recipes', mode: 'page',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 S0 が1920px設計と1440/1920px実装を撮って判定。構造一致・データ未接続。** 2幅とも横スクロール0。3つのレシピ、作られるもの、必要な機能、右側の操作は設計と同じ構造で、文字照合の差は空白だけ。実装は複製API未接続のため「このレシピで作る」を出せず、「まだ作れません」と理由を表示している。**接続条件**：レシピ複製APIが入ったら操作文言を設計へそろえ、同じ2幅で撮り直す。',
+    verdictSource: 'settings-v6/y0P0Qx.txt', verdictHead: '4c5708ace',
   },
   {
     node: 'D5UaX', feature: 34, name: '34-3 レシピを複製する',
-    dir: 'getting-started-v6', route: '/recipes/clone?id=recipe-1', mode: 'page',
-    status: 'unimplemented', gap: 'api',
-    gapNote: 'レシピを複製して各機能へ展開する口が要る。`y0P0Qx` と同じ束',
-    why: '`/recipes` の複製にあたるルートが実装に無い',
+    dir: 'settings-v6', route: '/recipes/clone?id=signup-7day-follow', mode: 'page',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S0 が正しい固定レシピIDへ直し、1920px設計と1440/1920px実装を撮って判定。要修正。** 2幅とも横スクロール0。作られる16件と必要機能はそろうが、設計は名前と作成先を同じ主欄に置き、右欄に必要機能・作ったあと・注意をまとめる。実装は各節が縦に分かれ、未接続の警告が加わっている。**推奨修正**：設計の主欄＋右欄へ再配置し、複製API接続後に作成操作を有効化して撮り直す。',
+    verdictSource: 'settings-v6/D5UaX.txt', verdictHead: '4c5708ace',
   },
   {
     node: 'f9oUm', feature: 34, name: '34-4 マニュアルの正本表',
-    dir: 'getting-started-v6', route: '/settings/manual-links', mode: 'page',
-    status: 'unimplemented', gap: 'build',
-    gapNote: '正本の場所を持つだけの表。新しい口は要らない',
-    why: '`/settings/manual-links` が実装に無い',
+    dir: 'settings-v6', route: '/settings/manual-links', mode: 'page',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S0 が1920px設計と1440/1920px実装を撮って判定。要修正。** 2幅とも横スクロール0。設計は266画面の対応表とURL・確認日・状態・直す操作を出すが、実装は店舗登録向け4件だけで、運用者向けでない作業ID列が増えている。絞り込みの形と上部案内も違う。**推奨修正**：画面ID、画面名、公式記事URL、確認日、状態、操作の6列へ戻し、全画面の正本一覧を読み込む。',
+    verdictSource: 'settings-v6/f9oUm.txt', verdictHead: '4c5708ace',
   },
 ]
 
