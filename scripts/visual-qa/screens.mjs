@@ -2749,7 +2749,7 @@ export const SCREENS = [
   },
   {
     node: 'byqIW', feature: 4, name: '4-1-G 属性フォルダを追加・色編集',
-    dir: 'friend-attributes-v6', route: '/tags/folders/new', mode: 'page',
+    dir: 'friend-attributes-v6', route: '/tags/folders/new?id=g-purchase', mode: 'page',
     verdict: 'needs_fix',
     verdictNote: '**2026-09-06 board#218 で一覧内オーバーレイへ変更した。** ルート `/tags/folders/new`。1440・1920とも横スクロール0。タグ一覧を背景に残し、追加・編集を同じ部品で扱い、編集時は「フォルダを削除」を左端へ出した。色は8色すべてに日本語名と選択中の✓があり、色だけで区別しない。**判定は needs_fix のまま。** Pencil取得元に `byqIW.html` が無く、同じ1920pxの設計画像を生成できないため、厳密な画像比較を完了できない。また、新規時の「作成する場所（タグ／友だち情報欄）」は実在する `friend_fields.folder_id` の操作で、正本要件への追記判断が残る。設計画像が用意され、要件でこの操作の扱いが決まった後に再判定する。',
     verdictSource: 'friend-attributes-v6/byqIW.txt',
@@ -3357,6 +3357,104 @@ const ISSUE_265_REVIEW = {
 }
 
 /**
+ * board #297。2026-09-07 に development c91c1d9cf を 3101/8788 で起動し、
+ * 機能4の21 Nodeを設計1920pxと実装1440/1920pxで比較した結果。
+ * 共通固定データは board #310 に依頼し、画面側で構造を先にそろえた。
+ */
+const ISSUE_297_REVIEW = {
+  hqrOv: {
+    verdict: 'match',
+    note: '一致。4指標、4タブ、フォルダ帯、3絞り込み、5つのよく使う条件、10列の一覧、ページ送りを設計順に表示した。設計の先頭6行と101件の固定データで確認し、1440・1920pxとも横はみ出し0。',
+  },
+  dKlkz: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・データ待ち。削除対象、5行の影響、取り消せない注意、確認入力、取消・削除を設計順に表示した。撮影用tag-0が設計の「NEN会員（定期）」ではないため、名称・人数・使用先・マイル値だけ #310 待ち。2幅とも横はみ出し0。',
+  },
+  H374MR: {
+    verdict: 'match',
+    note: '一致。CSV選択、UTF-8・500件上限、確認してから登録する説明、未分類の扱い、取消・確認を同じダイアログに配置した。専用Playwrightで1440・1920pxを撮影し、横はみ出し0。',
+    source: 'friend-attributes-v6/H374MR.txt + H374MR-{1440,1920}.png',
+  },
+  sfTEW: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・データ待ち。4件数、状態絞り込み、行別の扱いと理由、部分登録の注意、選び直し・登録を設計順に表示した。設計の代表行と同じ解析結果を返す固定CSV応答が無いため、行データだけ未照合。専用Playwrightの2幅で横はみ出し0。',
+    source: 'friend-attributes-v6/sfTEW.txt + sfTEW-{1440,1920}.png',
+  },
+  op1rh: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・データ待ち。登録件数、反映完了、フォルダ別内訳、見送り件数、一覧へ戻る操作を表示した。設計と同じフォルダ内訳を返す固定応答が無いため、内訳だけ未照合。専用Playwrightの2幅で横はみ出し0。',
+    source: 'friend-attributes-v6/op1rh.txt + op1rh-{1440,1920}.png',
+  },
+  QzRsJ: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・データ待ち。成功・失敗件数、失敗行、行ごとの理由、要修正CSV出力、一覧へ戻る操作を表示した。現在の固定応答は全行が同じ失敗理由なので、設計の行別理由だけ未照合。専用Playwrightの2幅で横はみ出し0。',
+    source: 'friend-attributes-v6/QzRsJ.txt + QzRsJ-{1440,1920}.png',
+  },
+  HBTk0: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・データ待ち。4指標、検索・種類絞り込み、項目・差し込み名・種類・入力済み・フォーム・表示先・操作の一覧、安全確認を設計順に表示した。設計4行の利用数とフォーム連携数は #310 待ち。2幅とも横はみ出し0。',
+  },
+  yKEdO: {
+    verdict: 'match',
+    note: '一致。読込中・0件・取得失敗を別々に描き、取得失敗を0件として扱わない。失敗時だけ再読み込み、作成可能な0件時だけ作成導線を表示した。3状態を1440・1920pxで撮影し、全状態で横はみ出し0。',
+    source: 'friend-attributes-v6/yKEdO-{loading,empty,error}.txt + 同名-{1440,1920}.png',
+  },
+  rIhbN: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・データ待ち。4指標、検索・利用状態、順番・マーク・人数・初期値・自動変更・使用先・操作、安全確認を設計順に表示した。設計4行の人数・自動変更・使用先と集計値は #310 待ち。2幅とも横はみ出し0。',
+  },
+  QKx8Q: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・データ待ち。カード表示を設計の一覧表へ戻し、条件名・要約・該当人数・共有・使用先・作成者日時・操作の7列、3絞り込み、保存条件からコピーを表示した。保存検索5件と集計値が #310 待ち。2幅とも横はみ出し0。',
+  },
+  l25rlp: {
+    verdict: 'match',
+    note: '一致。タグの所属・名前・一覧表示、自動付与、マイルと連動の説明、既存友だちへの反映、右側の要約と保存操作を同じ段組みで表示した。保存操作は共通ルールどおり下部の安全な帯に置く。2幅とも横はみ出し0。',
+  },
+  tP0RW: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・入力状態待ち。連動ON、本人・紹介者マイル、倍率、付け直し方針、連動アクション、既存友だちへの反映を設計順に表示した。撮影手順がON切替だけで設計の入力済み数値と3アクションを再現しないため、値だけ未照合。2幅とも横はみ出し0。',
+  },
+  LfrQs: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・入力状態待ち。13種類の連動アクション、実行時期、内容、挿入位置、取消・追加を右ドロワーに表示した。設計はテンプレート選択済み、撮影はテキスト初期状態のため入力値だけ未照合。2幅とも横はみ出し0。',
+  },
+  ee0sk: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・データ待ち。既存タグの4区画、右側要約、マイル・倍率・連動アクション、遡及設定、保存操作を表示した。tag-0の設計同一設定と3アクションが #310 待ち。2幅とも横はみ出し0。',
+  },
+  VjXGX: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・データ待ち。対象人数、本人・紹介者マイル、合計、倍率、アクション、取り消せない注意、確認チェック、2つの保存方法を表示した。設計と同じtag-0の人数・設定が #310 待ち。2幅とも横はみ出し0。',
+  },
+  byqIW: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・データ待ち。撮影ルートを新規から編集状態へ直し、名前、8色、一覧プレビュー、安全説明、削除、取消・保存を設計と同じ編集窓で表示する。設計の「お問い合わせフォロー」フォルダが固定データに無いため名称・色だけ未照合。2幅とも横はみ出し0。',
+  },
+  A1ZYeP: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・API契約待ち。基本情報、値の扱い、変更できない項目、取消・作成を設計順に表示した。正本要件の13種類に対し共有型とWorkerが日時・画像・PDFをまだ受けないため、この3種類と型別既定値は画面だけで確定できない。2幅とも横はみ出し0。',
+  },
+  KoT6c: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・API契約待ち。移行元と移行先、事前確認、使用先、取消・事前確認を表示し、確認前に値を変更しない。日時・画像・PDF型と、変換可能・要確認件数を返す移行preview APIが未接続のため値だけ未照合。2幅とも横はみ出し0。',
+  },
+  GMvBd: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・API契約待ち。基本情報・自動変更ルール・使用先の3列、優先順位、手動変更後の保護時間、通常・読込・0件・失敗・権限不足・競合を表示した。設計画像は作成状態だが、ルールAPIは作成済みmarkId必須のため実装画像は編集状態。同一状態の保存契約が揃うまで値と見出しを未照合とする。全状態2幅で横はみ出し0。',
+    source: 'friend-attributes-v6/GMvBd-{normal,loading,empty,error,forbidden,conflict}.txt + 同名-{1440,1920}.png',
+  },
+  zGZMA: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・データ待ち。対象マーク、影響人数、初期値への置換、履歴保持、取消・保管を確認窓で表示する。設計の「対応中」と人数・使用先を持つ固定行が現在のmockに無く撮影操作が失敗するため #310 待ち。物理削除ではなく要件どおり保管する差は安全側として維持する。',
+  },
+  XBkiQ: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・データ待ち。名前・説明・共有範囲、AND・OR条件、右側の該当人数・使用先・一覧表示、削除・取消・保存を表示する。固定ID ss-1 がmockに無く現在は未検出状態になるため #310 待ち。画面契約テストでAPI保存・削除・人数確認を確認済み。',
+  },
+}
+
+/**
  * board #266。2026-09-06 に latest development（14b61d52）を取り込んだ
  * UI HEAD ff1fbfc37 / capture HEAD c03ebf864 を 3102/8789 で起動し、
  * 機能5の14 Node・全状態を設計1920pxと実装1440/1920pxで比較した結果。
@@ -3520,6 +3618,14 @@ for (const screen of SCREENS) {
     screen.verdict = issue265Review.verdict
     screen.verdictNote = `**2026-09-06 Issue #265で修正・再判定。** ${issue265Review.note}`
     screen.verdictSource = issue265Review.source
+    delete screen.verdictHead
+  }
+  const issue297Review = ISSUE_297_REVIEW[screen.node]
+  if (screen.feature === 4 && issue297Review) {
+    screen.verdict = issue297Review.verdict
+    screen.verdictNote = `**2026-09-07 Issue #297で修正・再判定。** ${issue297Review.note}`
+    screen.verdictSource = issue297Review.source
+      ?? `${screen.dir}/${screen.node}.txt + ${screen.dir}/${screen.node}-{1440,1920}.png`
     delete screen.verdictHead
   }
   const issue266Review = ISSUE_266_REVIEW[screen.node]
