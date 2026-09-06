@@ -320,7 +320,9 @@ function StaffShiftsPageContent() {
                             <div className="flex items-center gap-1 whitespace-nowrap">
                               <input
                                 aria-label={`${day.label}の開始時間`}
-                                type="time"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-2][0-9]:[0-5][0-9]"
                                 value={current.start}
                                 onChange={(event) => setTemplate((previous) => ({ ...previous, [day.key]: { ...current, start: event.target.value } }))}
                                 className="border-hairline rounded-control w-24 border px-2 py-1.5 text-sm tabular-nums"
@@ -328,7 +330,9 @@ function StaffShiftsPageContent() {
                               <span className="text-ink-faint">〜</span>
                               <input
                                 aria-label={`${day.label}の終了時間`}
-                                type="time"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-2][0-9]:[0-5][0-9]"
                                 value={current.end}
                                 onChange={(event) => setTemplate((previous) => ({ ...previous, [day.key]: { ...current, end: event.target.value } }))}
                                 className="border-hairline rounded-control w-24 border px-2 py-1.5 text-sm tabular-nums"
