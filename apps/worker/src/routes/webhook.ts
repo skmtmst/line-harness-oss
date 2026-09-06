@@ -389,9 +389,11 @@ async function handleEvent(
     let routing: Awaited<ReturnType<typeof applyFriendAddRouting>> | null = null;
     try {
       routing = runAccountScenarios
-        ? await applyFriendAddRouting(db, lineAccountId, friend, {
+          ? await applyFriendAddRouting(db, lineAccountId, friend, {
             defaultAccessToken: lineAccessToken,
             workerUrl,
+          }, {
+            entryRouteId: currentAttribution?.entryRouteId ?? referralRoute?.id ?? null,
           })
         : null;
     } catch (err) {
@@ -414,6 +416,8 @@ async function handleEvent(
           eventId: friendAddEventId,
           lineAccountId,
           status: routing?.suppressed ? 'suppressed' : 'completed',
+          routingRuleId: routing?.ruleId ?? null,
+          winningRuleVersionId: routing?.ruleVersionId ?? null,
         });
       } catch (err) {
         logWebhookStepFailure('friend_add_event_mark_complete', err, lineAccountId, event);

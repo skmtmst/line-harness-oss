@@ -205,13 +205,29 @@ export async function captureFriendAddEventAttribution(
 
 export async function markFriendAddEventRouting(
   db: D1Database,
-  input: { eventId: string; lineAccountId: string; status: FriendAddRoutingStatus; routingRuleId?: string | null },
+  input: {
+    eventId: string;
+    lineAccountId: string;
+    status: FriendAddRoutingStatus;
+    routingRuleId?: string | null;
+    winningRuleVersionId?: string | null;
+    errorCode?: string | null;
+  },
 ): Promise<void> {
   await db.prepare(
     `UPDATE friend_add_events
-        SET routing_status = ?, routing_rule_id = ?, processed_at = ?
+        SET routing_status = ?, routing_rule_id = ?, winning_rule_version_id = ?,
+            error_code = ?, processed_at = ?
       WHERE id = ? AND line_account_id = ?`,
-  ).bind(input.status, input.routingRuleId ?? null, jstNow(), input.eventId, input.lineAccountId).run();
+  ).bind(
+    input.status,
+    input.routingRuleId ?? null,
+    input.winningRuleVersionId ?? null,
+    input.errorCode ?? null,
+    jstNow(),
+    input.eventId,
+    input.lineAccountId,
+  ).run();
   // 取得待ちを閉じた直後に届いた候補を、次回の再追加へ持ち越さない。
   await db.prepare(
     `UPDATE friend_add_attribution_candidates

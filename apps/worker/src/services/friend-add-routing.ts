@@ -15,6 +15,8 @@ import {
   resumeFriendScenario,
   postMileageEntry,
   type FriendScenario,
+  type FriendAddRuleDefinition,
+  ensureFriendAddFallbackRules,
 } from '@line-crm/db';
 import {
   FRIEND_ADD_ROUTING_DEFAULT,
@@ -293,6 +295,92 @@ export interface FriendAddRoutingResult {
   timing: FriendAddTiming;
   /** 「配信しない」を選んでいて何も流さなかった場合 true */
   suppressed: boolean;
+  /** V6の複数ルールで選ばれた設定と公開版。旧設定ではどちらもnull。 */
+  ruleId: string | null;
+  ruleVersionId: string | null;
+}
+
+function ruleActions(value: unknown[]): FriendAddAction[] {
+  const actions: FriendAddAction[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object') continue;
+    const action = item as {
+      type?: unknown;
+      targetId?: unknown;
+      tagId?: unknown;
+      amount?: unknown;
+      kind?: unknown;
+      actionType?: unknown;
+      config?: Record<string, unknown>;
+    };
+    // migration 290で旧JSONの共通アクションをそのまま固定した公開版も読める。
+    if (action.kind === 'row' && typeof action.actionType === 'string') {
+      actions.push({ kind: 'row', actionType: action.actionType as FriendAddRowActionType, config: action.config ?? {} });
+      continue;
+    }
+    if (action.kind === 'tag' && typeof action.tagId === 'string' && action.tagId) {
+      actions.push({ kind: 'row', actionType: 'tag', config: { op: 'add', tagIds: [action.tagId] } });
+      continue;
+    }
+    if (action.kind === 'mile' && typeof action.amount === 'number' && action.amount > 0) {
+      actions.push({ kind: 'mile', amount: Math.floor(action.amount) });
+      continue;
+    }
+    const targetId = typeof action.targetId === 'string' ? action.targetId : '';
+    if (action.type === 'add_tag' && targetId) {
+      actions.push({ kind: 'row', actionType: 'tag', config: { op: 'add', tagIds: [targetId] } });
+    } else if (action.type === 'remove_tag' && targetId) {
+      actions.push({ kind: 'row', actionType: 'tag', config: { op: 'remove', tagIds: [targetId] } });
+    } else if (action.type === 'start_scenario' && targetId) {
+      actions.push({ kind: 'row', actionType: 'scenario', config: { op: 'start', scenarioId: targetId, restart: 'from_start' } });
+    }
+  }
+  return actions;
+}
+
+async function loadPublishedFriendAddRule(
+  db: D1Database,
+  input: { accountId: string; kind: FriendKind; entryRouteId: string | null },
+): Promise<{
+  ruleId: string;
+  versionId: string;
+  definition: FriendAddRuleDefinition;
+} | null> {
+  try {
+    const row = await db.prepare(
+      `SELECT r.id AS rule_id, v.id AS version_id, v.definition_snapshot
+         FROM friend_add_rules r
+         JOIN friend_add_rule_versions v ON v.id = r.current_version_id AND v.status = 'published'
+        WHERE r.line_account_id = ? AND r.friend_kind = ?
+          AND r.status = 'published' AND r.archived_at IS NULL
+          AND (
+            (r.is_unknown_route_fallback = 0 AND ? IS NOT NULL AND EXISTS (
+              SELECT 1 FROM json_each(v.definition_snapshot, '$.routeIds') WHERE value = ?
+            ))
+            OR r.is_unknown_route_fallback = 1
+          )
+          AND (json_extract(v.definition_snapshot, '$.activeFrom') IS NULL
+               OR json_extract(v.definition_snapshot, '$.activeFrom') <= strftime('%Y-%m-%dT%H:%M', 'now', '+9 hours'))
+          AND (json_extract(v.definition_snapshot, '$.activeUntil') IS NULL
+               OR json_extract(v.definition_snapshot, '$.activeUntil') >= strftime('%Y-%m-%dT%H:%M', 'now', '+9 hours'))
+        ORDER BY r.is_unknown_route_fallback ASC, r.priority ASC, r.created_at ASC
+        LIMIT 1`,
+    ).bind(input.accountId, input.kind, input.entryRouteId, input.entryRouteId).first<{
+      rule_id: string;
+      version_id: string;
+      definition_snapshot: string;
+    }>();
+    if (!row) return null;
+    return {
+      ruleId: row.rule_id,
+      versionId: row.version_id,
+      definition: JSON.parse(row.definition_snapshot) as FriendAddRuleDefinition,
+    };
+  } catch (error) {
+    // DB更新より先にWorkerだけが切り替わった短い時間は、旧設定へ安全に戻す。
+    if (error instanceof Error && error.message.includes('no such table: friend_add_rules')) return null;
+    throw error;
+  }
 }
 
 /**
@@ -306,6 +394,7 @@ export async function applyFriendAddRouting(
   accountId: string | null,
   friend: FriendAddSubject,
   push?: ImmediatePushContext,
+  routingContext?: { entryRouteId?: string | null },
 ): Promise<FriendAddRoutingResult> {
   const none: FriendAddRoutingResult = {
     routed: false,
@@ -313,23 +402,55 @@ export async function applyFriendAddRouting(
     enrollments: [],
     timing: FRIEND_ADD_ROUTING_DEFAULT.firstTime.timing,
     suppressed: false,
+    ruleId: null,
+    ruleVersionId: null,
   };
   if (!accountId) return none;
 
-  const routing = await loadFriendAddRouting(db, accountId);
+  const kind = classifyFriend(friend, FRIEND_ADD_ROUTING_DEFAULT.criteria.firstTime);
+  await ensureFriendAddFallbackRules(db, accountId);
+  const matchedRule = await loadPublishedFriendAddRule(db, {
+    accountId,
+    kind,
+    entryRouteId: routingContext?.entryRouteId ?? null,
+  });
+  const routing = matchedRule
+    ? {
+        firstTime: {
+          scenarioId: matchedRule.definition.scenarioId,
+          timing: matchedRule.definition.timing,
+          actions: ruleActions(matchedRule.definition.actions),
+        },
+        returning: {
+          scenarioId: matchedRule.definition.scenarioId,
+          mode: matchedRule.definition.returningMode ?? 'other',
+          startPosition: matchedRule.definition.startPosition ?? 'beginning',
+          actions: ruleActions(matchedRule.definition.actions),
+        },
+        criteria: FRIEND_ADD_ROUTING_DEFAULT.criteria,
+      } satisfies FriendAddRouting
+    : await loadFriendAddRouting(db, accountId);
   if (!routing) return none;
 
   const timing = routing.firstTime.timing;
-  const kind = classifyFriend(friend, routing.criteria.firstTime);
+  const classifiedKind = matchedRule ? kind : classifyFriend(friend, routing.criteria.firstTime);
 
   // ② で「配信しない」を選んでいる
-  if (kind === 'returning' && routing.returning.mode === 'none') {
+  if (classifiedKind === 'returning' && routing.returning.mode === 'none') {
     await runActions(db, friend.id, routing.returning.actions, push);
-    return { routed: true, kind, enrollments: [], timing, suppressed: true };
+    return {
+      routed: true,
+      kind: classifiedKind,
+      enrollments: [],
+      timing,
+      suppressed: true,
+      ruleId: matchedRule?.ruleId ?? null,
+      ruleVersionId: matchedRule?.versionId ?? null,
+    };
   }
 
   // ② が「はじめての人と同じもの」なら ① の設定を使う
-  const useFirst = kind === 'first_time' || routing.returning.mode === 'same';
+  const useFirst = classifiedKind === 'first_time' || routing.returning.mode === 'same';
   const branch: FriendAddBranch = useFirst ? routing.firstTime : routing.returning;
 
   /*
@@ -348,13 +469,33 @@ export async function applyFriendAddRouting(
    * 画面側でも保存させないようにしてある。
    */
   if (!branch.scenarioId) {
-    if (kind === 'returning' && routing.returning.mode === 'other') {
+    if (matchedRule) {
+      await runActions(db, friend.id, branch.actions, push);
+      return {
+        routed: true,
+        kind: classifiedKind,
+        enrollments: [],
+        timing,
+        suppressed: true,
+        ruleId: matchedRule.ruleId,
+        ruleVersionId: matchedRule.versionId,
+      };
+    }
+    if (classifiedKind === 'returning' && routing.returning.mode === 'other') {
       console.warn(
         `[friend-add-routing] ②で「別のシナリオ」を選んでシナリオが未設定のため配信しません`
         + `（friend=${friend.id}）。画面の設定を見直してください。`,
       );
       await runActions(db, friend.id, routing.returning.actions, push);
-      return { routed: true, kind, enrollments: [], timing, suppressed: true };
+      return {
+        routed: true,
+        kind: classifiedKind,
+        enrollments: [],
+        timing,
+        suppressed: true,
+        ruleId: null,
+        ruleVersionId: null,
+      };
     }
     return none;
   }
@@ -374,7 +515,7 @@ export async function applyFriendAddRouting(
    * ①（はじめての人）では効かせない。履歴が無いので resume は必ず空振りし、
    * 呼ぶだけ1クエリ増える。
    */
-  const wantResume = kind === 'returning' && routing.returning.startPosition === 'resume';
+  const wantResume = classifiedKind === 'returning' && routing.returning.startPosition === 'resume';
 
   const enrollments: FriendAddEnrollment[] = [];
   let record: FriendScenario | null = null;
@@ -393,7 +534,15 @@ export async function applyFriendAddRouting(
 
   await runActions(db, friend.id, branch.actions, push);
 
-  return { routed: true, kind, enrollments, timing, suppressed: false };
+  return {
+    routed: true,
+    kind: classifiedKind,
+    enrollments,
+    timing,
+    suppressed: false,
+    ruleId: matchedRule?.ruleId ?? null,
+    ruleVersionId: matchedRule?.versionId ?? null,
+  };
 }
 
 /**
