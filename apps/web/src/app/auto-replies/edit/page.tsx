@@ -94,6 +94,7 @@ function AutoReplyEditInner() {
         </div>
       ) : draft ? (
         <EditDialog
+          page
           draft={draft}
           templates={templates}
           onClose={() => router.push('/auto-replies')}

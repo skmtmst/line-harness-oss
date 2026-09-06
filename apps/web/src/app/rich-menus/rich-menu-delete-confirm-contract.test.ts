@@ -36,13 +36,12 @@ describe('V6 リッチメニュー削除確認 szXsT', () => {
   })
 
   it('公開中のメニューもブラウザ標準alertを使わず、取り下げの順番を窓で案内する', () => {
-    expect(PAGE).toContain('setPublishedDeleteTarget(group)')
-    expect(PAGE).toContain('data-qa-open={g.status === \'published\' ? \'szXsT-published\' : \'szXsT\'}')
-    expect(PAGE).toContain('は先にLINEから取り下げてください')
-    expect(PAGE).toContain('いまは削除していません。')
-    expect(PAGE).toContain('「編集」→「危険な操作」→「LINEから取り下げ」')
-    expect(PAGE).toContain('LINE上の表示、管理画面の設定、これまでのタップ記録は変更していません。')
-    expect(PAGE).toContain('cancelLabel="閉じる"')
+    expect(PAGE).toContain("setDeleteTarget({ kind: 'managed', group })")
+    expect(PAGE).toContain('data-qa-open={g.status === \'published\' ? \'szXsT\' : \'szXsT-draft\'}')
+    expect(PAGE).toContain("? await api.richMenuGroups.unpublish(deleteTarget.group.id)")
+    expect(PAGE).toContain("? 'LINEから取り下げる'")
+    expect(PAGE).toContain('取り下げたあと、管理画面から削除できます。')
+    expect(PAGE).toContain('管理画面の設定と、これまでのタップ記録')
     expect(PAGE).not.toContain('「${group.name}」は LINE に登録されています。\\n\\n')
   })
 
