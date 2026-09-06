@@ -81,6 +81,7 @@ import { conversations } from './routes/conversations.js';
 // 旧通知ルールCRUDはインボックスへ置き換え済み。ダッシュボードの通知パネルだけを公開する。
 import { notificationCenter } from './routes/notification-center.js';
 import { notifications } from './routes/notifications.js';
+import { lineNotifications } from './routes/line-notifications.js';
 import { stripe } from './routes/stripe.js';
 import { health } from './routes/health.js';
 import { automations } from './routes/automations.js';
@@ -355,6 +356,7 @@ app.route('/', notificationCenter);
 // 運用者通知ルール(/api/notifications/rules)。2026-08-29 の下書き画面がこの経路を呼ぶが、
 // 2026-05 に外したまま mount されていなかった。
 app.route('/', notifications);
+app.route('/', lineNotifications);
 app.route('/', stripe);
 app.route('/', health);
 app.route('/', automations);
