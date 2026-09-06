@@ -131,13 +131,13 @@ export default function ImpactReview({
           badgeTone={overLimit > 0 ? 'danger' : 'neutral'}
           variant="v6"
         />
-        <div className="bg-canvas border-hairline rounded-card shadow-card flex min-h-[106px] flex-col gap-[5px] border p-4">
-          <p className="text-ink-faint text-xs font-semibold">送信済みの文</p>
-          <p className="text-ink text-[22px] font-bold">変わりません</p>
-          <p className="text-ink-faint text-xs font-medium">
-            過去に送った{impact.historicalTotal.toLocaleString('ja-JP')}件は、そのときの値のままです
-          </p>
-        </div>
+        <SummaryCard
+          title="送信済みの文"
+          value={impact.historicalTotal}
+          unit="件"
+          detail="変わりません。過去に送った文はそのときの値のままです"
+          variant="v6"
+        />
       </div>
 
       <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
