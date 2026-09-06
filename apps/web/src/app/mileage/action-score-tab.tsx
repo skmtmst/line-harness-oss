@@ -45,7 +45,8 @@ function ScoreBand({ band }: { band: ActionScoreBand }) {
   return <span className="rounded-full bg-canvas-sunken px-2.5 py-1 text-xs font-semibold text-ink-secondary">{BAND_LABELS[band]}</span>
 }
 
-function ScoreChange({ value }: { value: number }) {
+function ScoreChange({ value }: { value: number | null | undefined }) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return <span className="font-semibold text-ink-faint">—</span>
   const label = `${value > 0 ? '+' : ''}${formatNumber(value)}`
   if (value > 0) return <span className="font-semibold text-accent-hover">{label}</span>
   if (value < 0) return <span className="font-semibold text-danger">{label}</span>
@@ -84,6 +85,21 @@ function safeReason(reason: string | null) {
   if (labels[source]) return detail || labels[source]
   if (/^[a-z0-9_.-]+$/i.test(reason)) return '反応の記録'
   return reason
+}
+
+function scoreValue(item: ActionScoreOverview['items'][number]) {
+  const legacy = item as typeof item & { score?: number }
+  return typeof item.currentScore === 'number' ? item.currentScore : legacy.score
+}
+
+function scoreChangedAt(item: ActionScoreOverview['items'][number]) {
+  const legacy = item as typeof item & { lastActionAt?: string | null }
+  return item.lastChangedAt ?? legacy.lastActionAt ?? null
+}
+
+function scoreReason(item: ActionScoreOverview['items'][number]) {
+  const legacy = item as typeof item & { lastAction?: string | null }
+  return item.lastReason ?? legacy.lastAction ?? null
 }
 
 export default function ActionScoreTab({ accountId }: { accountId: string }) {
@@ -148,11 +164,11 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
     if (!overview?.items.length) return
     const rows = overview.items.map((item) => [
       item.displayName,
-      item.currentScore,
+      scoreValue(item) ?? '',
       BAND_LABELS[item.band],
       item.change30d,
-      safeReason(item.lastReason),
-      formatMileageDate(item.lastChangedAt),
+      safeReason(scoreReason(item)),
+      formatMileageDate(scoreChangedAt(item)),
     ])
     const csv = [['友だち', 'いまの点数', '帯', '30日間の変化', '最後に点数が変わった理由', '最終変動'], ...rows]
       .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))
@@ -278,14 +294,14 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
                         <span className="truncate text-sm font-semibold text-ink" title={item.displayName}>{item.displayName}</span>
                       </div>
                     </Td>
-                    <Td align="right"><strong>{formatNumber(item.currentScore)}</strong></Td>
+                    <Td align="right"><strong>{formatNumber(scoreValue(item))}</strong></Td>
                     <Td><ScoreBand band={item.band} /></Td>
                     <Td align="right"><ScoreChange value={item.change30d} /></Td>
                     <Td>
-                      <p className="truncate text-xs text-ink-secondary" title={safeReason(item.lastReason)}>{safeReason(item.lastReason)}</p>
-                      <p className="mt-0.5 text-xs text-ink-faint">{formatMileageDate(item.lastChangedAt)}</p>
+                      <p className="truncate text-xs text-ink-secondary" title={safeReason(scoreReason(item))}>{safeReason(scoreReason(item))}</p>
+                      <p className="mt-0.5 text-xs text-ink-faint">{formatMileageDate(scoreChangedAt(item))}</p>
                     </Td>
-                    <ActionCell><Button href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`}>友だちの詳細を見る</Button></ActionCell>
+                    <ActionCell><Button href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`}>この人を見る</Button></ActionCell>
                   </Tr>
                 ))}
               </tbody>

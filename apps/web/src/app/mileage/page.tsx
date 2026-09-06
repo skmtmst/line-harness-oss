@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import MileageRewardsTab from './mileage-rewards-tab'
+import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import FilterChip from '@/components/shared/filter-chip'
@@ -89,16 +90,9 @@ function isMileageAdminOverview(value: unknown): value is MileageAdminOverview {
 }
 
 
-function commitmentLabel(actions: number, miles: number) {
-  if (actions >= 30 || miles >= 200) return { text: 'コミット強', style: 'bg-rose-50 text-rose-700' }
-  if (actions >= 10 || miles >= 80) return { text: '高アクション', style: 'bg-orange-50 text-orange-700' }
-  if (actions > 0) return { text: 'アクティブ', style: 'bg-green-50 text-green-700' }
-  return { text: 'これから', style: 'bg-gray-100 text-gray-500' }
-}
-
 function MileagePageInner() {
   const tab = useMergedTab(TABS, 'tab', 'balances')
-  const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
+  const { selectedAccountId, loading: accountLoading } = useAccount()
   const latestAccountRef = useRef(selectedAccountId)
   latestAccountRef.current = selectedAccountId
   const [overview, setOverview] = useState<MileageAdminOverview | null>(null)
@@ -113,6 +107,7 @@ function MileagePageInner() {
   const [savingRuleId, setSavingRuleId] = useState<string | null>(null)
   const [ruleFilters, setRuleFilters] = useState<RuleFilter[]>([])
   const [ruleSort, setRuleSort] = useState<RuleSort>('newest')
+  const [tabCounts, setTabCounts] = useState<{ balances: number | null; rules: number | null; rewards: number | null }>({ balances: null, rules: null, rewards: null })
   const overviewTotal = mileagePaginationTotal(overview)
 
   useEffect(() => {
@@ -168,6 +163,30 @@ function MileagePageInner() {
     void reloadAll()
   }, [accountLoading, reloadAll])
 
+  useEffect(() => {
+    let current = true
+    if (!selectedAccountId) {
+      setTabCounts({ balances: null, rules: null, rewards: null })
+      return () => { current = false }
+    }
+    void Promise.allSettled([
+      api.mileage.overview({ accountId: selectedAccountId, limit: 1, offset: 0 }),
+      api.mileage.rules(),
+      api.mileage.rewards(selectedAccountId),
+    ]).then(([balances, earningRules, rewards]) => {
+      if (!current) return
+      const balanceResponse = balances.status === 'fulfilled' ? balances.value : null
+      const ruleResponse = earningRules.status === 'fulfilled' ? earningRules.value : null
+      const rewardResponse = rewards.status === 'fulfilled' ? rewards.value : null
+      setTabCounts({
+        balances: balanceResponse?.success && isMileageAdminOverview(balanceResponse.data) ? balanceResponse.data.summary.totalMembers : null,
+        rules: ruleResponse?.success && Array.isArray(ruleResponse.data) ? ruleResponse.data.length : null,
+        rewards: rewardResponse?.success && Array.isArray(rewardResponse.data?.rewards) ? rewardResponse.data.rewards.length : null,
+      })
+    })
+    return () => { current = false }
+  }, [selectedAccountId])
+
   const updateRule = async (rule: MileageRule, updates: Partial<MileageRule>) => {
     setSavingRuleId(rule.id)
     setActionError('')
@@ -217,24 +236,47 @@ function MileagePageInner() {
 
   const summary = overview?.summary
   const members = overview?.members ?? []
-  const accountLabel = useMemo(() => {
-    return accounts.find((account) => account.id === selectedAccountId)?.displayName
-      || accounts.find((account) => account.id === selectedAccountId)?.name
-      || '選択アカウント'
-  }, [accounts, selectedAccountId])
+  const displayTabs = useMemo(() => TABS.map((item) => {
+    const count = item.key === 'balances' ? tabCounts.balances
+      : item.key === 'earning-rules' ? tabCounts.rules
+        : item.key === 'rewards' ? tabCounts.rewards
+          : null
+    return { ...item, label: count === null ? item.label : `${item.label} ${formatNumber(count)}` }
+  }), [tabCounts])
+
+  const exportBalancesCsv = () => {
+    if (members.length === 0) return
+    const rows = members.map((member) => [
+      member.displayName,
+      member.accountNames.join(' / '),
+      member.available,
+      member.pending,
+      member.lastActivityAt ?? '',
+    ])
+    const csv = [['友だち', 'LINEアカウント', 'いまの残高', '確定待ち', '最終行動'], ...rows]
+      .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))
+      .join('\n')
+    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `mileage-balances-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <div data-mileage-design="v6" data-design-node={tab === 'balances' ? 's98Vfw' : tab === 'earning-rules' ? 'N46cQ' : tab === 'rewards' ? 'qlVLJ' : tab === 'history' ? 'MvZm5' : 'z3PB2'}>
+      <Breadcrumb items={[{ label: '成果と分析' }, { label: 'マイル' }, ...(tab === 'balances' ? [] : [{ label: TABS.find((item) => item.key === tab)?.label ?? 'マイル' }])]} className="mb-3" />
       <div data-design="Tabs">
         <MergedTabs
           basePath="/mileage"
-          tabs={TABS}
+          tabs={displayTabs}
           active={tab}
           defaultKey="balances"
-          actions={tab === 'balances'
-            ? <Button onClick={() => void reloadAll()}>残高を再読み込み</Button>
-            : tab === 'earning-rules'
-              ? <Button href="/mileage/earning-rules/new" variant="primary">決めごとを作る</Button>
+          actions={tab === 'score'
+            ? <Button href="/mileage/score-rules" variant="primary">スコアのルールを作る</Button>
+            : tab !== 'rewards'
+              ? <Button href="/mileage?tab=rewards">使い道を先に決める</Button>
               : undefined}
         />
       </div>
@@ -267,44 +309,44 @@ function MileagePageInner() {
       ) : null}
 
       {tab === 'balances' && !loading && !loadError && <>
-      <div className="mb-5 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 p-5 text-white shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-xs font-medium tracking-wider text-indigo-200">HARNESS MILEAGE</p>
-            <h2 className="mt-1 text-xl font-bold">行動が、そのまま顧客との資産になる</h2>
-            <p className="mt-1 text-sm text-slate-300">{accountLabel}の友だちと、本人確認済みの共通マイル残高を表示しています。</p>
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="名前で検索"
-              className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-400 outline-none"
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <SummaryCard variant="v6" title="マイル対象者" value={summary?.totalMembers ?? null} unit="人" detail="選択中のLINEアカウント" />
-        <SummaryCard variant="v6" title="保有マイル合計" value={summary?.totalAvailable ?? null} unit=" mile" detail="利用可能な残高の合計" />
-        <SummaryCard variant="v6" title="30日アクティブ" value={summary?.activeMembers30d ?? null} unit="人" detail="30日以内に行動した友だち" />
-        <SummaryCard variant="v6" title="記録済みアクション" value={summary?.totalActions ?? null} unit="件" detail="マイルの根拠になった行動" />
+      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <SummaryCard variant="v6" title="マイルを持っている友だち" value={summary?.totalMembers ?? null} unit="人" detail="持っていない人の数は未取得" />
+        <SummaryCard variant="v6" title="たまっているマイル" value={summary?.totalAvailable ?? null} unit=" マイル" detail="会社としての「あとで返すぶん」です" />
+        <SummaryCard variant="v6" title="今月 たまった" value={null} unit=" マイル" detail="月別集計が接続されると表示" badge="未取得" badgeTone="neutral" />
         <SummaryCard
           variant="v6"
           title="もうすぐ消えるマイル"
           value={null}
-          unit=" mile"
-          detail="失効ロットを接続後に表示"
+          unit=" マイル"
+          detail="失効ロットが接続されると表示"
           badge="未取得"
           badgeTone="neutral"
         />
+      </div>
+      <div className="mb-4 rounded-control bg-accent-soft px-4 py-3 text-xs text-accent-hover">
+        友だちごとにたまっているマイルです。どうやってたまるかは「たまる決めごと」、何と交換できるかは「使い道」で決めます。
+      </div>
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <input
+          value={searchInput}
+          onChange={(event) => setSearchInput(event.target.value)}
+          placeholder="友だちの名前で検索"
+          className="h-10 min-w-64 rounded-control border border-hairline bg-canvas px-3 text-sm text-ink outline-none focus:border-accent"
+        />
+        <Button onClick={() => void reloadAll()}>残高を再読み込み</Button>
+        <Button onClick={exportBalancesCsv} disabled={members.length === 0} className="ml-auto">残高をCSVで書き出す</Button>
       </div>
       </>}
 
       {tab === 'earning-rules' && <div className="mb-6">
         {/* 設計 N46cQ に本文見出しは無い。画面名はタブが持っているので、
             ここで見出しをもう一度書かない。 */}
+        {!loading && !loadError ? <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <SummaryCard variant="v6" title="動いている決めごと" value={rules.filter((rule) => rule.isActive).length} unit="つ" detail={`止めているもの ${rules.filter((rule) => !rule.isActive).length}つ`} />
+          <SummaryCard variant="v6" title="この30日で付いたマイル" value={null} unit=" マイル" detail="期間集計が接続されると表示" badge="未取得" badgeTone="neutral" />
+          <SummaryCard variant="v6" title="いちばん付いている" value={null} unit="" detail="決めごとの利用集計は未接続" badge="未取得" badgeTone="neutral" />
+          <SummaryCard variant="v6" title="1人あたりの平均" value={null} unit=" マイル" detail="保有者別集計が接続されると表示" badge="未取得" badgeTone="neutral" />
+        </div> : null}
         <NoteBar>
           どんなことをしたら何マイル付けるかを決めます。付与数を変えると、変更後に起きた行動から新しい値を使います。
         </NoteBar>
@@ -331,6 +373,9 @@ function MileagePageInner() {
           />
         ) : (
         <>
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <Button href="/mileage/earning-rules/new" variant="primary">決めごとをつくる</Button>
+        </div>
         <div
           className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
         >
@@ -370,16 +415,16 @@ function MileagePageInner() {
             description="絞り込みの札を外すと表示されます。"
           />
         ) : (
-        <div className="bg-canvas rounded-card border-hairline overflow-x-auto border">
-          <table className="w-full min-w-[880px]">
+        <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
+          <table className="w-full table-fixed">
             <thead>
               <TableHeadRow>
-                <Th>決めごと</Th>
-                <Th>対象の行動</Th>
-                <Th align="right">付与マイル</Th>
-                <Th>上限</Th>
-                <Th align="center">状態</Th>
-                <Th align="center">操作</Th>
+                <Th className="w-[28%]">何をしてくれたら</Th>
+                <Th className="w-[16%]">対象の行動</Th>
+                <Th className="w-[14%]" align="right">たまるマイル</Th>
+                <Th className="w-[15%]">何回まで</Th>
+                <Th className="w-[12%]" align="center">状態</Th>
+                <Th className="w-[15%]" align="center">操作</Th>
               </TableHeadRow>
             </thead>
             <tbody className="divide-hairline divide-y">
@@ -440,11 +485,11 @@ function MileagePageInner() {
       {tab === 'rewards' ? <MileageRewardsTab key={selectedAccountId ?? 'none'} accountId={selectedAccountId} /> : null}
       {tab === 'score' && selectedAccountId ? <ActionScoreTab key={selectedAccountId} accountId={selectedAccountId} /> : null}
 
-      {tab === 'balances' && !loading && !loadError && <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      {tab === 'balances' && !loading && !loadError && <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
         <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
           <div>
-            <h2 className="text-sm font-semibold text-gray-900">マイル・コミットランキング</h2>
-            <p className="mt-1 text-xs text-gray-500">同じ人が複数アカウントにいる場合は1人にまとめています。</p>
+            <h2 className="text-sm font-semibold text-ink">友だちの残高</h2>
+            <p className="mt-1 text-xs text-ink-faint">同じ人が複数アカウントにいる場合は1人にまとめています。</p>
           </div>
           <span className="text-xs text-gray-400">{overviewTotal === null ? '—' : `${formatNumber(overviewTotal)}人`}</span>
         </div>
@@ -456,28 +501,23 @@ function MileagePageInner() {
             description="検索条件を変えると、ほかの友だちを確認できます。"
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1050px]">
+          <div>
+            <table className="w-full table-fixed">
               <thead className="bg-gray-50 text-left text-[11px] uppercase tracking-wide text-gray-500">
                 <tr>
-                  <th className="px-4 py-3">順位</th>
-                  <th className="px-4 py-3">ユーザー</th>
-                  <th className="px-4 py-3">接続アカウント</th>
-                  <th className="px-4 py-3 text-right">保有マイル</th>
-                  <th className="px-4 py-3">コミット</th>
-                  <th className="px-4 py-3">行動内訳</th>
-                  <th className="px-4 py-3">最終行動</th>
+                  <th className="w-1/4 px-4 py-3">友だち</th>
+                  <th className="w-1/12 px-4 py-3">ランク</th>
+                  <th className="w-1/12 px-4 py-3 text-right">いまの残高</th>
+                  <th className="w-1/12 px-4 py-3 text-right">今月の増減</th>
+                  <th className="w-1/12 px-4 py-3">消える予定</th>
+                  <th className="w-1/6 px-4 py-3">最終行動</th>
+                  <th className="w-1/6 px-4 py-3 text-right">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {members.map((member, index) => {
-                  const rank = offset + index + 1
-                  const commitment = commitmentLabel(member.actionCount, member.available)
+                {members.map((member) => {
                   return (
                     <tr key={member.identityKey} className="hover:bg-gray-50/70">
-                      <td className="px-4 py-4 text-center text-sm font-bold text-gray-500">
-                        {rank}
-                      </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-3">
                           {member.pictureUrl ? (
@@ -489,42 +529,19 @@ function MileagePageInner() {
                           )}
                           <div>
                             <p className="max-w-48 truncate text-sm font-medium text-gray-900">{member.displayName}</p>
-                            <p className="text-[11px] text-gray-400">アクション {formatNumber(member.actionCount)}件</p>
+                            <p className="truncate text-[11px] text-gray-400" title={member.accountNames.join('・')}>{member.accountNames.join('・') || 'LINEアカウント未取得'}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-4">
-                        <div className="flex max-w-60 flex-wrap gap-1">
-                          {member.accountNames.slice(0, 3).map((name) => (
-                            <span key={name} className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-600">{name}</span>
-                          ))}
-                          {member.accountCount > 3 && <span className="text-[10px] text-gray-400">+{member.accountCount - 3}</span>}
-                        </div>
-                      </td>
+                      <td className="px-4 py-4 text-sm text-ink-faint">—<span className="ml-1 text-xs">未取得</span></td>
                       <td className="px-4 py-4 text-right">
-                        <p className="text-lg font-bold text-indigo-700">{formatNumber(member.available)}</p>
+                        <p className="font-bold text-accent-hover">{formatNumber(member.available)}</p>
                         {member.pending > 0 && <p className="text-[10px] text-amber-600">保留 {formatNumber(member.pending)}</p>}
                       </td>
-                      <td className="px-4 py-4">
-                        <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${commitment.style}`}>{commitment.text}</span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-600">
-                          {/* 絵文字だと何の数か読み取れない。言葉で書く。 */}
-                          <span>メッセージ {formatNumber(member.messageCount)}</span>
-                          <span>リンク {formatNumber(member.linkClickCount)}</span>
-                          <span>フォーム {formatNumber(member.formCount)}</span>
-                          <span>予約 {formatNumber(member.bookingCount)}</span>
-                          <span>ウェビナー {formatNumber(member.webinarCount)}</span>
-                          <span>Instagram {formatNumber(member.instagramCount)}</span>
-                          <span>継続 {formatNumber(member.followingDays)}日</span>
-                          {member.unfollowCount > 0 && <span>再フォロー {formatNumber(member.unfollowCount)}回</span>}
-                          {member.qualityReferralCount > 0 && (
-                            <span>良質紹介 {formatNumber(member.qualityReferralCount)}人・{formatNumber(member.referralMiles)}mile</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 text-xs text-gray-500">{formatMileageDate(member.lastActivityAt)}</td>
+                      <td className="px-4 py-4 text-right text-sm text-ink-faint">—<span className="ml-1 text-xs">未取得</span></td>
+                      <td className="px-4 py-4 text-sm text-ink-faint">—<span className="ml-1 text-xs">未取得</span></td>
+                      <td className="px-4 py-4 text-xs text-ink-secondary">{formatMileageDate(member.lastActivityAt)}</td>
+                      <td className="px-4 py-4 text-right"><Button href={`/mileage/friends/detail?id=${encodeURIComponent(member.primaryFriendId)}`}>明細を見る</Button></td>
                     </tr>
                   )
                 })}

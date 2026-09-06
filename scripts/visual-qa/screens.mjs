@@ -2857,6 +2857,65 @@ export const SCREENS = [
   },
 ]
 
+// Issue #230（S3 第2段）の再判定。
+// 古い調査メモは経緯として残し、ここで最新の撮影結果だけを上書きする。
+const FEATURE_17_REVIEW = {
+  s98Vfw: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06、Issue #230 / PR #914 / HEAD 48742a352 で再撮影。** 1440・1920とも横スクロール0。4つの指標、CSV、最終行動を追加した。残る差は、ランク・今月の増減・失効予定・ランク別絞り込みを返すAPIが無いこと。取得できない値は `— 未取得` と理由を表示する。',
+    verdictSource: 'mileage-v6/s98Vfw.txt',
+    verdictHead: '48742a352',
+  },
+  N46cQ: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06、Issue #230 / PR #914 / HEAD 48742a352 で再撮影。** 1440・1920とも横スクロール0。指標、説明、検索、並び替え、CSVを設計順にそろえた。残る差は30日間の付与数と利用範囲を返すAPI、並び替え保存API。',
+    verdictSource: 'mileage-v6/N46cQ.txt',
+    verdictHead: '48742a352',
+  },
+  qlVLJ: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06、Issue #230 / PR #914 / HEAD 48742a352 で通常・読込中・0件・取得失敗を再撮影。** 1440・1920とも横スクロール0。ランク3段と行ごとの確認・公開停止操作を追加した。残る差はランク人数・特典名・交換割合を返すAPIと、使い道作成画面 `p9CcEB` の取り込み待ち。',
+    verdictSource: 'mileage-v6/qlVLJ-normal.txt + qlVLJ-error.txt',
+    verdictHead: '48742a352',
+  },
+  MvZm5: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06、Issue #230 / PR #914 / HEAD 48742a352 で再撮影。** 1440・1920とも横スクロール0。4つの指標、CSV、残高、操作者を追加し、撮影データも履歴として表示できる形へ正規化した。残る差は期間別の集計値と操作者を返すAPI。',
+    verdictSource: 'mileage-v6/MvZm5.txt',
+    verdictHead: '48742a352',
+  },
+  BmoGY: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06、Issue #230 / PR #914 / HEAD 48742a352 で再撮影。** 1440・1920とも横スクロール0。設計の2列構成、LINEプレビュー、追従する状態と保存操作をそろえた。残る差は有効期限・予約取消・15軸条件を保存するAPIが無いこと。未接続項目は選べるように見せず明記した。',
+    verdictSource: 'mileage-v6/BmoGY.txt',
+    verdictHead: '48742a352',
+  },
+  HIU5O: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06、Issue #230 / PR #914 / HEAD 48742a352 で再撮影。** 1440・1920とも横スクロール0。英語単位 `mile` を運用者向けの `マイル` に統一した。残る差はランク進捗・失効予定・つながる先・付与理由別集計を返すAPI。',
+    verdictSource: 'mileage-v6/HIU5O.txt',
+    verdictHead: '48742a352',
+  },
+  k8VCU: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06、Issue #230 / PR #914 / HEAD 48742a352 で通常・読込中・0件・取得失敗を再撮影。** 1440・1920とも横スクロール0。各状態を混同せず、未取得と実値0を分けて表示する。残る差は N46cQ と同じ集計・利用範囲・並び替え保存API。',
+    verdictSource: 'mileage-v6/k8VCU.txt + k8VCU-error.txt',
+    verdictHead: '48742a352',
+  },
+  z3PB2: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06、Issue #230 / PR #914 / HEAD 48742a352 で通常・読込中・0件・取得失敗を再撮影。** 1440・1920とも横スクロール0。撮影データの得点と最終行動を正しく読み、スコアルールへの入口を追加した。残る差は帯ごとの理由を返すAPIと設計見本と同量の固定データ。',
+    verdictSource: 'mileage-v6/z3PB2.txt + z3PB2-error.txt',
+    verdictHead: '48742a352',
+  },
+  s6MBc: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06、Issue #230 / PR #914 / HEAD 48742a352 で通常・読込中・0件・取得失敗を再撮影。** 1440・1920とも横スクロール0。パンくず、1人で試す入口、つながる先を追加した。残る差は、設計が読む画面と直す画面を分ける一方、実装は編集表を最初から出すことと、過去の版を返すAPIが無いこと。',
+    verdictSource: 'mileage-v6/s6MBc.txt + s6MBc-error.txt',
+    verdictHead: '48742a352',
+  },
+}
+
 /*
  * board #231 の機能18再監査。
  *
@@ -2922,6 +2981,8 @@ const FEATURE_18_AUDIT = {
 }
 
 for (const screen of SCREENS) {
+  const review = FEATURE_17_REVIEW[screen.node]
+  if (review) Object.assign(screen, review)
   if (screen.feature === 18 && FEATURE_18_AUDIT[screen.node]) {
     Object.assign(screen, FEATURE_18_AUDIT[screen.node])
     delete screen.verdictHead
@@ -3219,6 +3280,9 @@ export const CAPTURED_AT = {
         + '第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。'
         + '**機能17は直前まで4枚とも「画面を表示できませんでした」で1枚も撮れなかった。** 撮影の口と固定データを直して8 Node が撮れた。'
         + '`vz0Ji` は「マイルを手で増やす・減らす」が見つからず撮れていない。' },
+    { pr: 914, head: '48742a352', on: '2026-09-06',
+      screens: ['s98Vfw', 'N46cQ', 'qlVLJ', 'MvZm5', 'BmoGY', 'HIU5O', 'k8VCU', 'z3PB2', 's6MBc'],
+      note: 'Issue #230 のS3第2段。Pencilの実ノードと同じ状態を1440・1920で横に並べて確認した。全対象で横スクロール0。絵は版に残さず `.txt` と判定注記を証拠にする。' },
   ],
   7: [
     { pr: 429, head: '0f612926', on: '2026-08-29', screens: ['uJP22'], note: '**撮り直していない。** 旧head `838116b4` から `reminders/new` の blob が不変（差分は Worker の機能設定だけ）。#429 の受入条件5項目だけをコードで確認した。画面全体は要修正のまま' },

@@ -124,12 +124,12 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
 
   it('一覧を設計の表で出す', () => {
     expect(PAGE).toContain("import { TableHeadRow, Th } from '@/components/shared/table'")
-    expect(PAGE).toContain('<Th>決めごと</Th>')
-    expect(PAGE).toContain('<Th>対象の行動</Th>')
-    expect(PAGE).toContain('<Th align="right">付与マイル</Th>')
-    expect(PAGE).toContain('<Th>上限</Th>')
-    expect(PAGE).toContain('<Th align="center">状態</Th>')
-    expect(PAGE).toContain('<Th align="center">操作</Th>')
+    expect(PAGE).toContain('>何をしてくれたら</Th>')
+    expect(PAGE).toContain('>対象の行動</Th>')
+    expect(PAGE).toContain('align="right">たまるマイル</Th>')
+    expect(PAGE).toContain('>何回まで</Th>')
+    expect(PAGE).toContain('align="center">状態</Th>')
+    expect(PAGE).toContain('align="center">操作</Th>')
     // カード格子に戻していない。
     expect(PAGE).not.toContain('grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4')
   })
