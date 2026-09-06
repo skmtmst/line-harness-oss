@@ -544,6 +544,8 @@ export default function TemplatesPage() {
               label: folder.name,
               count: templates.filter((t) => t.folderId === folder.id).length,
               color: folder.color,
+              // 設計 `CzndJ` と同じ操作メニューを、文言に依存せず撮影する。
+              qaOpen: folder.name === '予約' ? 'CzndJ' : undefined,
               onEdit: () => setEditingFolder(folder),
               // 端の行には口を出さない。押せない矢印を置かない。
               onMoveUp: index > 0 ? () => void moveFolder(index, -1) : undefined,
