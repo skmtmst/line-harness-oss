@@ -113,7 +113,7 @@ type SortKey = 'hits' | 'priority' | 'name' | 'created'
 const SAVED_FILTERS: { key: string; label: string; note: string }[] = [
   { key: 'used', label: 'よく使う', note: '今月1回以上当たったルール' },
   { key: 'inactive', label: '停止中のみ', note: '無効にしてあるルール' },
-  { key: 'timed', label: '時間帯あり', note: '曜日か時間帯を決めているルール' },
+  { key: 'timed', label: '時間帯あり', note: '営業時間外の応答など、曜日か時間帯を決めているルール' },
   { key: 'never', label: '未ヒット', note: '一度も当たっていないルール' },
 ]
 
@@ -644,15 +644,19 @@ export default function AutoRepliesPage() {
         </FolderPanel>
 
         <div data-design="Table" className="bg-canvas rounded-card border border-hairline overflow-hidden">
-          <table className="w-full table-fixed">
+          <table className="min-w-[100%] w-full table-fixed">
             <thead>
               <tr className="bg-canvas-sunken border-b border-hairline">
                 <th className="w-2/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">ルール名</th>
                 <th className="w-20 px-3 py-3 text-left text-xs font-semibold text-ink-faint">状態</th>
                 <th className="w-1/6 px-3 py-3 text-left text-xs font-semibold text-ink-faint">どんなときに動くか</th>
-                <th className="w-1/6 px-3 py-3 text-left text-xs font-semibold text-ink-faint">何を返すか</th>
+                <th title="返信と実行するアクション" className="w-1/6 px-3 py-3 text-left text-xs font-semibold text-ink-faint">何を返すか</th>
                 <th className="w-24 px-3 py-3 text-left text-xs font-semibold text-ink-faint">今月の応答</th>
                 <th className="w-28 px-3 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
+                <th className="hidden">テンプレート</th>
+                <th className="hidden">応答条件</th>
+                <th className="hidden">適用アカウント</th>
+                <th className="hidden">累計</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">

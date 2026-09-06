@@ -19,7 +19,6 @@ import {
 import ImageUploader from '@/components/shared/image-uploader'
 import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
-import StepTrail from '@/components/shared/step-trail'
 
 export interface AutoReplyDraft {
   id?: string
@@ -328,16 +327,16 @@ export default function EditDialog({ draft, templates, onClose, onSaved, page = 
   return (
     <div className={page ? 'space-y-4' : 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4'}>
       {page && (
-        <StepTrail
-          label="自動応答を作る進み方"
-          items={[
-            { label: '基本設定', state: 'current' },
-            { label: 'どんなときに動くか', state: 'todo' },
-            { label: '何を返すか', state: 'todo' },
-            { label: '優先順位', state: 'todo' },
-            { label: '確認', state: 'todo' },
-          ]}
-        />
+        <ol aria-label="自動応答を作る進み方" className="bg-canvas rounded-card border-hairline mt-4 flex flex-wrap items-center justify-between gap-3 border px-4 py-3 text-xs">
+          {['基本設定', 'どんなときに動くか', '何を返すか', '優先順位', '確認'].map((label, index) => (
+            <li key={label} className="flex items-center gap-2">
+              <span className={`rounded-pill flex h-6 w-6 items-center justify-center font-bold ${index === 0 ? 'border-accent text-accent border-2' : 'border-hairline text-ink-faint border'}`}>
+                {index + 1}
+              </span>
+              <span className={index === 0 ? 'text-ink font-bold' : 'text-ink-faint'}>{label}</span>
+            </li>
+          ))}
+        </ol>
       )}
       <div className={page ? 'grid items-start gap-4 xl:grid-cols-4' : ''}>
       <div className={page ? 'bg-canvas rounded-card border-hairline w-full border xl:col-span-3' : 'max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white shadow-xl'}>
@@ -892,9 +891,9 @@ export default function EditDialog({ draft, templates, onClose, onSaved, page = 
               <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">優先順位</dt><dd className="text-ink font-medium">{priority || '未入力'}</dd></div>
             </dl>
           </div>
-          <div className="overflow-hidden rounded-card border border-blue-200 bg-blue-300">
-            <p className="py-4 text-center text-sm font-semibold text-white">LINEプレビュー</p>
-            <div className="mx-4 mb-4 rounded-card bg-white p-4 text-sm leading-relaxed text-ink">
+          <div className="bg-info overflow-hidden rounded-card border-hairline border">
+            <p className="text-on-accent py-4 text-center text-sm font-semibold">LINEプレビュー</p>
+            <div className="bg-canvas mx-4 mb-4 rounded-card p-4 text-sm leading-relaxed text-ink">
               {mode === 'silent'
                 ? '返信はせず、設定したアクションだけを実行します。'
                 : responseContent || '返信内容を入力すると、ここに表示されます。'}
