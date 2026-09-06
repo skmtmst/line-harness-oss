@@ -38,8 +38,58 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { validateTemplateMessage } from '../services/template-message-validation.js';
+import {
+  getScenarioRuns,
+  saveScenarioDraft,
+  ScenarioContractError,
+  simulateScenario,
+} from '../services/scenario-v6-contract.js';
+import { listLimit } from './list-pagination.js';
 
 const scenarios = new Hono<Env>();
+
+function scenarioPermission(
+  permission: 'view' | 'edit',
+) {
+  return async (c: Context<Env>, next: () => Promise<void>) => {
+    const staff = c.get('staff');
+    const allowed = staff && (
+      staff.role === 'owner'
+      || staff.role === 'admin'
+      || (permission === 'view'
+        ? staff.permissionKeys?.some((key) => key === '/scenarios' || key === 'scenario.version.view')
+        : staff.permissionKeys?.includes('scenario.definition.edit'))
+    );
+    if (!allowed) {
+      return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
+    }
+    await next();
+  };
+}
+
+function scenarioContractError(c: Context<Env>, error: unknown): Response {
+  if (error instanceof ScenarioContractError) {
+    return c.json({
+      success: false,
+      code: error.code,
+      error: error.message,
+      ...(error.field ? { field: error.field } : {}),
+    }, error.status);
+  }
+  console.error(JSON.stringify({
+    event: 'scenario_v6_contract_failed',
+    path: c.req.path,
+    reason: error instanceof Error ? error.message : String(error),
+  }));
+  return c.json({ success: false, error: 'シナリオの情報を処理できませんでした' }, 500);
+}
+
+async function requireScenarioAccountScope(c: Context<Env>, lineAccountId: string): Promise<Response | null> {
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+    return c.json({ success: false, error: 'シナリオが見つかりません' }, 404);
+  }
+  return null;
+}
 
 async function requireVisibleScenario(c: Context<Env>, next: () => Promise<void>) {
   const scenario = await getScenarioById(c.env.DB, c.req.param('id')!);
@@ -1114,6 +1164,83 @@ scenarios.get('/api/scenarios/:id/stats', async (c) => {
   } catch (err) {
     console.error('GET /api/scenarios/:id/stats error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// POST /api/scenarios/:id/simulate — 実データを数えるが、送信・購読は行わない。
+scenarios.post('/api/scenarios/:id/simulate', scenarioPermission('view'), async (c) => {
+  const body = await c.req.json<{
+    lineAccountId?: unknown;
+    startAt?: unknown;
+  }>().catch(() => ({} as { lineAccountId?: unknown; startAt?: unknown }));
+  const lineAccountId = typeof body.lineAccountId === 'string' ? body.lineAccountId.trim() : '';
+  if (!lineAccountId) {
+    return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+  }
+  const scopeError = await requireScenarioAccountScope(c, lineAccountId);
+  if (scopeError) return scopeError;
+  try {
+    const data = await simulateScenario(c.env.DB, {
+      scenarioId: c.req.param('id')!,
+      lineAccountId,
+      startAt: typeof body.startAt === 'string' ? body.startAt : undefined,
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return scenarioContractError(c, error);
+  }
+});
+
+// GET /api/scenarios/:id/runs — 購読・テスト送信・送信枠を同じ応答で返す。
+scenarios.get('/api/scenarios/:id/runs', scenarioPermission('view'), async (c) => {
+  const lineAccountId = (c.req.query('lineAccountId') ?? '').trim();
+  if (!lineAccountId) {
+    return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+  }
+  const scopeError = await requireScenarioAccountScope(c, lineAccountId);
+  if (scopeError) return scopeError;
+  try {
+    const data = await getScenarioRuns(c.env.DB, {
+      scenarioId: c.req.param('id')!,
+      lineAccountId,
+      status: c.req.query('status'),
+      cursor: c.req.query('cursor'),
+      limit: listLimit(c.req.query('limit'), 50, 100),
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return scenarioContractError(c, error);
+  }
+});
+
+// PUT /api/scenarios/:id/draft — compare-and-set で送信後アクションを保存する。
+scenarios.put('/api/scenarios/:id/draft', scenarioPermission('edit'), async (c) => {
+  const body = await c.req.json<{
+    lineAccountId?: unknown;
+    expectedVersion?: unknown;
+    afterActions?: unknown;
+  }>().catch(() => ({} as {
+    lineAccountId?: unknown;
+    expectedVersion?: unknown;
+    afterActions?: unknown;
+  }));
+  const lineAccountId = typeof body.lineAccountId === 'string' ? body.lineAccountId.trim() : '';
+  if (!lineAccountId) {
+    return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+  }
+  const scopeError = await requireScenarioAccountScope(c, lineAccountId);
+  if (scopeError) return scopeError;
+  try {
+    const data = await saveScenarioDraft(c.env.DB, {
+      scenarioId: c.req.param('id')!,
+      lineAccountId,
+      expectedVersion: Number(body.expectedVersion),
+      afterActions: body.afterActions,
+      staffId: c.get('staff').id,
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return scenarioContractError(c, error);
   }
 });
 
