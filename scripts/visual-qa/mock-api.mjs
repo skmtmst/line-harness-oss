@@ -51,10 +51,13 @@ import {
   MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
   LIST_STATS, NEN_COLUMN_CREATE, OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
+  RICH_MENU_GROUPS, RICH_MENU_GROUP_DETAILS, RICH_MENU_EXTERNAL, RICH_MENU_TAP_STATS,
   TAGS, TAG_GROUPS, REMINDER_RUNS,
   ACTION_SCORE_RULES,
   SUPPORT_MARKS, SUPPORT_MARK_AUTOMATION_RULES,
-  OUTGOING_WEBHOOKS, INCOMING_WEBHOOKS, ENTRY_ROUTES, STAFF_MEMBERS, LOGIN_AUDIT,
+  OUTGOING_WEBHOOKS, INCOMING_WEBHOOKS, ENTRY_ROUTES, INFLOW_SUMMARY,
+  SITE_TRACKING_SUMMARY, SITE_TRACKING_PAGES, AD_PLATFORMS, AD_CONVERSION_LOGS,
+  STAFF_MEMBERS, LOGIN_AUDIT,
   AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS, MILEAGE_OVERVIEW,
   COMMON_ACTIONS, BOOKING_MENUS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_REQUESTS,
   EC_NOTIFICATION_SETTINGS, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, EC_EVENTS, EC_OVERVIEW, MILEAGE_RULES, CONVERSION_POINTS,
@@ -696,8 +699,8 @@ const SHAPES = {
   '/api/dashboard/organization-overview': DASHBOARD_OVERVIEW,
 
   /* リッチメニュー。LINE側にある実物の一覧と、押された回数。 */
-  '/api/rich-menu-groups/external': { currentDefault: null, lineMenus: [] },
-  '/api/rich-menu-groups/tap-stats': { from: FIXED_FROM, to: FIXED_TO, byArea: [], byGroup: [], total: 0 },
+  '/api/rich-menu-groups/external': RICH_MENU_EXTERNAL,
+  '/api/rich-menu-groups/tap-stats': RICH_MENU_TAP_STATS,
 
   /* 友だち追加時配信の公開前確認（PR #597）。契約と同じ形を返す。 */
   '/api/friend-add-routing/draft': FRIEND_ADD_LIFECYCLE_DRAFT,
@@ -710,6 +713,15 @@ const SHAPES = {
  * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
  */
 function visualQaWriteBody(method, pathname) {
+  if (method === 'POST' && /^\/api\/rich-menu-groups\/[^/]+\/preview-targets$/.test(pathname)) {
+    return {
+      matched: { value: 1020, state: 'available', reason: null },
+      overlap: { value: 180, state: 'available', reason: null },
+      effective: { value: 840, state: 'available', reason: null },
+      higherMenus: ['夏キャンペーン'],
+      priority: 2,
+    }
+  }
   if (method === 'POST' && pathname === '/api/friend-add-rules/test') {
     return {
       stateChanged: false, ruleId: FRIEND_ADD_RULE.id, matched: true,
@@ -1145,6 +1157,16 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/webhooks/outgoing') return { success: true, data: OUTGOING_WEBHOOKS }
   if (pathname === '/api/webhooks/incoming') return { success: true, data: INCOMING_WEBHOOKS }
   if (pathname === '/api/entry-routes') return { success: true, data: ENTRY_ROUTES }
+  if (pathname === '/api/entry-route-genres') {
+    return { success: true, data: ['SNS', '紹介', '店頭', '広告', 'メール', '紙'].map((name, index) => ({ id: `erg-${index + 1}`, name, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z' })) }
+  }
+  if (pathname === '/api/site/summary') return { success: true, data: SITE_TRACKING_SUMMARY }
+  if (pathname === '/api/site/pages') return { success: true, data: SITE_TRACKING_PAGES }
+  if (pathname === '/api/ad-platforms') return { success: true, data: AD_PLATFORMS }
+  const adPlatformLogs = /^\/api\/ad-platforms\/([^/]+)\/logs$/.exec(pathname)
+  if (adPlatformLogs) {
+    return { success: true, data: AD_CONVERSION_LOGS.filter((log) => log.adPlatformId === adPlatformLogs[1]) }
+  }
   /*
     流入元の詳細。可変部分を配列の既定値へ落とすと、1件取得まで `[]` になり、
     `route.createdAt.slice(...)` で詳細画面全体が落ちる。画面確認用の同じ1件から
@@ -1154,7 +1176,7 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (entryRouteFunnel) {
     return {
       success: true,
-      data: { click_count: 486, friend_add_count: 86, form_submission_count: 24, cv_count: 11 },
+      data: { click_count: 1240, friend_add_count: 86, form_submission_count: 36, cv_count: 12 },
     }
   }
   const entryRouteSources = /^\/api\/entry-routes\/([^/]+)\/sources$/.exec(pathname)
@@ -1176,26 +1198,18 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       : { success: false, error: 'Not found' }
   }
   if (pathname === '/api/analytics/ref-summary') {
-    return {
-      success: true,
-      data: {
-        routes: ENTRY_ROUTES.map((entryRoute, index) => ({
-          refCode: entryRoute.refCode,
-          name: entryRoute.name,
-          friendCount: index === 0 ? 86 : 0,
-          clickCount: index === 0 ? 486 : 0,
-          latestAt: index === 0 ? '2026-08-25T14:16:00.000Z' : null,
-        })),
-      },
-    }
+    return { success: true, data: INFLOW_SUMMARY }
   }
   if (/^\/api\/analytics\/ref\/[^/]+$/.test(pathname)) {
     return {
       success: true,
       data: {
         friends: [
-          { id: 'friend-inflow-1', displayName: '木村 亮', trackedAt: '2026-08-25T14:16:00.000Z' },
-          { id: 'friend-inflow-2', displayName: '佐藤 美咲', trackedAt: '2026-08-24T10:32:00.000Z' },
+          { id: 'friend-inflow-1', displayName: '石田 未来', trackedAt: '2026-08-25T09:12:00.000Z', firstPage: '/summer-campaign', currentStatus: 'やりとり中', conversion: 'まだありません', miles: 100 },
+          { id: 'friend-inflow-2', displayName: '新田 遥', trackedAt: '2026-08-24T21:40:00.000Z', firstPage: '/summer-campaign', currentStatus: 'シナリオ2通目', conversion: 'まだありません', miles: 100 },
+          { id: 'friend-inflow-3', displayName: '松本 圭', trackedAt: '2026-08-22T12:05:00.000Z', firstPage: '/profile', currentStatus: '体験を申し込んだ', conversion: '¥3,000 の成果', miles: 600 },
+          { id: 'friend-inflow-4', displayName: '林 里佳', trackedAt: '2026-08-20T18:22:00.000Z', firstPage: '/summer-campaign', currentStatus: 'ブロックされました', conversion: 'まだありません', miles: 100 },
+          { id: 'friend-inflow-5', displayName: '大村 真', trackedAt: '2026-08-18T10:44:00.000Z', firstPage: '/summer-campaign', currentStatus: '読んでいない', conversion: 'まだありません', miles: 100 },
         ],
       },
     }
@@ -1258,6 +1272,22 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       ? RICH_MENU_DELETE_IMPACT_EMPTY
       : RICH_MENU_DELETE_IMPACT
     return { success: true, data: impact }
+  }
+  if (pathname === '/api/rich-menu-groups') {
+    return { success: true, data: RICH_MENU_GROUPS }
+  }
+  if (pathname === '/api/rich-menu-groups/external') {
+    return { success: true, data: RICH_MENU_EXTERNAL }
+  }
+  if (pathname === '/api/rich-menu-groups/tap-stats') {
+    return { success: true, data: RICH_MENU_TAP_STATS }
+  }
+  const richMenuGroup = /^\/api\/rich-menu-groups\/([^/]+)$/.exec(pathname)
+  if (richMenuGroup) {
+    const group = RICH_MENU_GROUP_DETAILS[richMenuGroup[1]]
+    return group
+      ? { success: true, data: group }
+      : { success: false, error: 'リッチメニューが見つかりません' }
   }
   if (pathname === '/api/tag-groups') return { success: true, data: TAG_GROUPS }
   if (pathname === '/api/list-stats') return { success: true, data: LIST_STATS }

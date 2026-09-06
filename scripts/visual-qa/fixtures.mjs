@@ -807,6 +807,154 @@ export const RICH_MENU_DELETE_IMPACT_ERROR = {
 }
 
 /**
+ * 機能12の5画面を実APIと同じ器で確認する固定データ。
+ *
+ * `rmg-1` は3枚を行き来できるが、「予約する」だけ入口へ戻れない。
+ * `rmg-2` は切替ボタンを持たない。設計 `DIUbO` / `NXdDk` の通常状態を
+ * 同じ取得口で描き分けられるようにしている。
+ */
+const richMenuArea = (id, label, targetPageId, boundsX) => ({
+  id,
+  boundsX,
+  boundsY: 0,
+  boundsWidth: 833,
+  boundsHeight: 260,
+  actionType: 'richmenuswitch',
+  actionData: { targetPageId },
+  intent: 'switch',
+  label,
+  tagIds: [],
+  scoreChange: null,
+  templateId: null,
+  formId: null,
+  trackedLinkId: null,
+})
+
+const richMenuPage = (id, orderIndex, name, areas = []) => ({
+  id,
+  orderIndex,
+  name,
+  aliasId: `visual-${id}`,
+  lineRichmenuId: `line-${id}`,
+  imageR2Key: null,
+  imageContentType: null,
+  areas,
+})
+
+const RICH_MENU_BASE = {
+  accountId: 'visual-qa-account',
+  chatBarText: 'メニューを開く',
+  size: 'large',
+  isDefaultForAll: false,
+  status: 'published',
+  publishingAt: null,
+  targetingPriority: 1,
+  targetingEnabled: true,
+  folderId: 'rich-menu-folder-members',
+  displayOrder: 1,
+  thumbnailR2Key: null,
+  createdAt: '2026-08-01T00:00:00.000Z',
+  updatedAt: '2026-08-20T00:00:00.000Z',
+}
+
+export const RICH_MENU_GROUPS = [
+  {
+    ...RICH_MENU_BASE,
+    id: 'rich-menu-target',
+    name: '通常メニュー（会員向け）',
+    isDefaultForAll: true,
+    targetingPriority: 0,
+    targetingEnabled: false,
+    targetingCondition: null,
+    displayOrder: 0,
+  },
+  {
+    ...RICH_MENU_BASE,
+    id: 'rmg-1',
+    name: '会員ランク上位',
+    targetingCondition: JSON.stringify({
+      operator: 'AND',
+      rules: [{ type: 'tag_exists', value: 'tag-0' }],
+    }),
+  },
+  {
+    ...RICH_MENU_BASE,
+    id: 'rmg-2',
+    name: '初回来店ガイド',
+    status: 'draft',
+    targetingPriority: 3,
+    targetingEnabled: false,
+    targetingCondition: null,
+    folderId: 'rich-menu-folder-store',
+    displayOrder: 3,
+  },
+  {
+    ...RICH_MENU_BASE,
+    id: 'rich-menu-safe',
+    name: '未使用の下書き',
+    status: 'draft',
+    targetingPriority: 4,
+    targetingEnabled: false,
+    targetingCondition: null,
+    folderId: null,
+    displayOrder: 4,
+  },
+]
+
+export const RICH_MENU_GROUP_DETAILS = {
+  'rmg-1': {
+    ...RICH_MENU_GROUPS.find((group) => group.id === 'rmg-1'),
+    defaultPageId: 'rmg-1-top',
+    pages: [
+      richMenuPage('rmg-1-top', 0, 'トップ', [
+        richMenuArea('rmg-1-top-product', '商品を見る', 'rmg-1-product', 0),
+        richMenuArea('rmg-1-top-booking', '予約する', 'rmg-1-booking', 833),
+      ]),
+      richMenuPage('rmg-1-product', 1, '商品を見る', [
+        richMenuArea('rmg-1-product-top', 'トップ', 'rmg-1-top', 0),
+        richMenuArea('rmg-1-product-booking', '予約する', 'rmg-1-booking', 1666),
+      ]),
+      richMenuPage('rmg-1-booking', 2, '予約する', [
+        richMenuArea('rmg-1-booking-product', '商品を見る', 'rmg-1-product', 833),
+      ]),
+    ],
+  },
+  'rmg-2': {
+    ...RICH_MENU_GROUPS.find((group) => group.id === 'rmg-2'),
+    defaultPageId: 'rmg-2-top',
+    pages: [richMenuPage('rmg-2-top', 0, 'トップ')],
+  },
+}
+
+export const RICH_MENU_EXTERNAL = {
+  currentDefault: 'line-rich-menu-external',
+  lineMenus: [
+    {
+      richMenuId: 'line-rich-menu-external',
+      name: 'LINE公式マネージャーで作成',
+      chatBarText: 'メニュー',
+      size: { width: 2500, height: 1686 },
+      areasCount: 6,
+      isCurrentDefault: true,
+      adminManaged: false,
+      adminInfo: null,
+    },
+  ],
+}
+
+export const RICH_MENU_TAP_STATS = {
+  from: '2026-08-01',
+  to: '2026-08-31',
+  byArea: [],
+  byGroup: [
+    { groupId: 'rich-menu-target', taps: 12480 },
+    { groupId: 'rmg-1', taps: 3210 },
+    { groupId: 'rmg-2', taps: 0 },
+  ],
+  total: 15690,
+}
+
+/**
  * 受信箱のLINEの会話。設計 `★ V6 2-1 受信箱` `xGLVe` の一覧のうち、LINEの3件。
  *
  * **メールはここに入れない。** 画面は `/api/chats`（LINE）と
@@ -1809,6 +1957,56 @@ export const ENTRY_ROUTES = [
   { id: 'er-4', refCode: 'g-ads-summer', genre: '広告', name: 'Google広告 夏キャンペーン', tagId: null, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: false, isActive: true, createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z' },
   { id: 'er-5', refCode: 'mail-sign', genre: 'メール', name: 'メール署名', tagId: null, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: false, isActive: true, createdAt: '2026-02-14T00:00:00.000Z', updatedAt: '2026-08-10T00:00:00.000Z' },
   { id: 'er-6', refCode: 'flyer-spring', genre: '紙', name: 'チラシ（2026春）', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: false, createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-06-30T00:00:00.000Z' },
+]
+
+/** 機能18。設計画像と同じ通常状態を、実データを使わずに撮るための固定値。 */
+export const INFLOW_SUMMARY = {
+  routes: [
+    { refCode: 'summer-ig', name: '夏のInstagram投稿', friendCount: 86, clickCount: 1240, latestAt: '2026-08-25T09:12:00.000Z' },
+    { refCode: 'tanaka01', name: '紹介リンク 田中 明', friendCount: 58, clickCount: 820, latestAt: '2026-08-24T18:40:00.000Z' },
+    { refCode: 'shop-pop', name: '店頭POPのQRコード', friendCount: 124, clickCount: 640, latestAt: '2026-08-25T11:30:00.000Z' },
+    { refCode: 'g-ads-summer', name: 'Google広告 夏キャンペーン', friendCount: 142, clickCount: 3120, latestAt: '2026-08-25T08:04:00.000Z' },
+    { refCode: 'mail-sign', name: 'メール署名', friendCount: 12, clickCount: 210, latestAt: '2026-08-19T16:02:00.000Z' },
+    { refCode: 'flyer-spring', name: 'チラシ（2026春）', friendCount: 0, clickCount: 12, latestAt: '2026-06-28T14:10:00.000Z' },
+  ],
+  totalFriends: 312,
+  friendsWithRef: 289,
+  friendsWithoutRef: 23,
+  routeTotal: 24,
+  totalClicks: 8420,
+  averageAddRate: 6.4,
+}
+
+export const SITE_TRACKING_SUMMARY = {
+  todayEvents: 24583,
+  todayPageViews: 24583,
+  linkedEvents: 20397,
+  unlinkedEvents: 4186,
+  pathCount: 3,
+  eventTypeCount: 4,
+  lastEventAt: '2026-08-25T11:17:00.000Z',
+}
+
+export const SITE_TRACKING_PAGES = [
+  { path: 'https://example.com/', views: 12480, visitors: 186 },
+  { path: 'https://shop.example.com/', views: 8120, visitors: 94 },
+  { path: 'https://lp.example.com/', views: 2403, visitors: 2 },
+  { path: 'https://unknown-site.net/', views: 620, visitors: 0 },
+]
+
+export const AD_PLATFORMS = [
+  { id: 'ad-meta', name: 'meta', displayName: 'Meta広告', config: { pixel_id: 'PIXEL-8420', monthly_cost: 170000, synced_at: '2026-08-25T11:20:00.000Z', sent_count: 866, pending_count: 12, failed_count: 7, retry_success_count: 23 }, isActive: true, createdAt: '2026-01-10T00:00:00.000Z', updatedAt: '2026-08-25T11:20:00.000Z' },
+  { id: 'ad-google', name: 'google', displayName: 'Google広告', config: { customer_id: '123-456-7890', monthly_cost: 312000, synced_at: '2026-08-25T11:20:00.000Z' }, isActive: true, createdAt: '2026-01-10T00:00:00.000Z', updatedAt: '2026-08-25T11:20:00.000Z' },
+  { id: 'ad-x', name: 'x', displayName: 'X（旧Twitter）', config: { connection_error: '権限が足りません' }, isActive: false, createdAt: '2026-01-10T00:00:00.000Z', updatedAt: '2026-08-22T09:00:00.000Z' },
+]
+
+export const AD_CONVERSION_LOGS = [
+  { id: 'adlog-1', adPlatformId: 'ad-meta', friendId: 'friend-inflow-1', friendName: '木村 亮', eventName: '体験申込フォームの送信', conversionName: 'Lead', clickId: 'fixed-fbclid-1', clickIdType: 'fbclid', status: 'sent', errorMessage: null, createdAt: '2026-08-25T11:32:00.000Z' },
+  { id: 'adlog-2', adPlatformId: 'ad-google', friendId: 'friend-inflow-2', friendName: '中村 さくら', eventName: '初回のご購入', conversionName: 'purchase', clickId: 'fixed-gclid-1', clickIdType: 'gclid', status: 'sent', errorMessage: null, createdAt: '2026-08-25T11:18:00.000Z' },
+  { id: 'adlog-3', adPlatformId: 'ad-meta', friendId: 'friend-inflow-3', friendName: '田口 みなみ', eventName: '予約が入った', conversionName: 'Schedule', clickId: 'fixed-fbclid-2', clickIdType: 'fbclid', status: 'pending', errorMessage: null, createdAt: '2026-08-25T10:54:00.000Z', nextRetryAt: '2026-08-25T11:35:00.000Z' },
+  { id: 'adlog-4', adPlatformId: 'ad-meta', friendId: 'friend-inflow-4', friendName: '佐藤 健', eventName: '体験申込フォームの送信', conversionName: 'Lead', clickId: 'fixed-fbclid-3', clickIdType: 'fbclid', status: 'failed', errorMessage: '接続設定を確認してください', createdAt: '2026-08-25T09:41:00.000Z' },
+  { id: 'adlog-5', adPlatformId: 'ad-google', friendId: 'friend-inflow-5', friendName: '山本 あおい', eventName: '初回のご購入', conversionName: 'purchase', clickId: 'fixed-gclid-2', clickIdType: 'gclid', status: 'failed', errorMessage: '広告アカウントをつなぎ直してください', createdAt: '2026-08-25T08:20:00.000Z', nextRetryAt: 'reconnect' },
+  { id: 'adlog-6', adPlatformId: 'ad-meta', friendId: '', friendName: '', eventName: '定期便のお申し込み', conversionName: '—', clickId: null, clickIdType: null, status: 'skipped', errorMessage: '対応が付いていないため送っていません', createdAt: '2026-08-24T22:05:00.000Z' },
 ]
 
 /*

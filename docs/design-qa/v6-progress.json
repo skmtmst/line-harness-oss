@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 5,
-  "match": 34,
+  "match": 47,
   "structureMatchDataPending": 41,
-  "needsFix": 170,
+  "needsFix": 157,
   "unjudged": 11,
-  "remaining": 234,
+  "remaining": 221,
   "features": [
     {
       "feature": 1,
@@ -894,11 +894,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 11,
+      "match": 2,
+      "structureMatchDataPending": 1,
+      "needsFix": 8,
       "unjudged": 0,
-      "remaining": 11,
+      "remaining": 9,
       "capturedAt": [
         {
           "pr": 544,
@@ -1236,11 +1236,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 9,
+      "match": 2,
+      "structureMatchDataPending": 3,
+      "needsFix": 4,
       "unjudged": 0,
-      "remaining": 9,
+      "remaining": 7,
       "capturedAt": [
         {
           "pr": 509,
@@ -1771,11 +1771,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 4,
-      "needsFix": 5,
+      "match": 9,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
       "unjudged": 0,
-      "remaining": 9,
+      "remaining": 0,
       "capturedAt": [
         {
           "pr": 443,
@@ -1849,6 +1849,23 @@
             "UIaM7"
           ],
           "note": "最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。9 Node すべて撮れた。"
+        },
+        {
+          "pr": 951,
+          "head": "43b3aae50",
+          "on": "2026-09-06",
+          "screens": [
+            "Q4bkTg",
+            "IhSBB",
+            "v0HaI",
+            "TEVk8",
+            "JupxW",
+            "UIaM7",
+            "BMmxU",
+            "BuVDB",
+            "Im2b1"
+          ],
+          "note": "Issue #231。9 Node・30状態を1440pxと1920pxで撮影し、Pencil設計画像と同じ幅で並べて確認した。全画像で横はみ出し0、9画面を一致へ更新。"
         }
       ]
     },

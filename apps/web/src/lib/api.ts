@@ -270,6 +270,21 @@ export type RichMenuDeleteImpact = {
   recommendedAction: 'delete' | 'unpublish' | 'review_references'
 }
 
+export type RichMenuTargetPreview = {
+  matched: { value: number | null; state: 'available' | 'unavailable'; reason: string | null }
+  overlap: { value: number | null; state: 'available' | 'unavailable'; reason: string | null }
+  effective: { value: number | null; state: 'available' | 'unavailable'; reason: string | null }
+  higherMenus: string[]
+  priority: number
+}
+
+export type RichMenuScheduleInput = {
+  mode: 'scheduled' | 'period'
+  startsAt: string
+  endsAt?: string | null
+  restoreGroupId?: string | null
+}
+
 /**
  * 対応マークの自動変更ルール（設計 `GMvBd` 4-3-A）。
  *
@@ -5446,6 +5461,25 @@ export const api = {
           areas: RichMenuAreaResponse[];
         }>;
       }>>(`/api/rich-menu-groups/${groupId}`),
+
+    previewTargets: (groupId: string, conditions?: SegmentCondition | null) =>
+      fetchApi<ApiResponse<RichMenuTargetPreview>>(
+        `/api/rich-menu-groups/${groupId}/preview-targets`,
+        {
+          method: 'POST',
+          body: JSON.stringify(conditions === undefined ? {} : { conditions }),
+        },
+      ),
+
+    schedule: (groupId: string, input: RichMenuScheduleInput, idempotencyKey: string) =>
+      fetchApi<ApiResponse<{ id: string; status: string }>>(
+        `/api/rich-menu-groups/${groupId}/schedule`,
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': idempotencyKey },
+          body: JSON.stringify(input),
+        },
+      ),
 
     create: (input: {
       accountId: string;
