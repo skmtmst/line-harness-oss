@@ -3170,12 +3170,14 @@ const ISSUE_212_REVIEW = {
     source: 'staff-v6/EOTS4.txt + EOTS4-1440.png + EOTS4-1920.png',
   },
   I3ZSrU: {
+    intro: '**2026-09-06 #212で判定。** 実装を1440/1920pxで2回撮影しようとしたが、対象画面へ到達できず未取得。',
     note: 'mock APIが稼働している状態で2回撮り直したが、1440px・1920pxともログイン画面へ遷移し、設計の招待フォームを確認できなかった。**推奨修正**：撮影セッションで `/staff/new` を認証済みのまま開けるようにし、名前・メール・役割・LINEアカウント・担当範囲の全状態を再撮影する。',
-    source: 'design-reference/staff-v6/I3ZSrU.png + capture-screens.mjs撮影結果（実装画像なし）',
+    source: 'capture-screens.mjs撮影結果（2026-09-06、ログイン画面へ遷移・実装画像なし）',
   },
   DkPY0: {
+    intro: '**2026-09-06 #212で判定。** 最新 development のルートと撮影定義を照合し、未実装を確認。',
     note: '最新 development に `/automations/runs` の画面が無く、通常・読込中・0件・取得失敗のどの状態も撮影できない。設計の実行記録、対象、結果、失敗理由、再実行導線を確認できない。**推奨修正**：実行記録画面を本流へ実装し、4状態を1440px・1920pxで撮影して設計と比較する。',
-    source: 'design-reference/automations-v6/DkPY0.png + screens.mjs未実装理由（実装画像なし）',
+    source: 'apps/web/src/app/automations/runs/page.tsx（本流に存在しない） + screens.mjs未実装理由',
   },
 }
 
@@ -3200,7 +3202,7 @@ for (const screen of SCREENS) {
       delete screen.why
     }
     screen.verdict = 'needs_fix'
-    screen.verdictNote = `**2026-09-06 #212で判定。** 設計1920pxと実装1440/1920pxを目視比較。${issue212Review.note}`
+    screen.verdictNote = `${issue212Review.intro ?? '**2026-09-06 #212で判定。** 設計1920pxと実装1440/1920pxを目視比較。'}${issue212Review.note}`
     screen.verdictSource = issue212Review.source
     screen.verdictHead = 'bf7434ff'
     if (issue212Review.states) screen.states = issue212Review.states
