@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { listLimit } from './list-pagination.js';
 
 const conversations = new Hono<Env>();
 
@@ -12,7 +13,7 @@ conversations.get('/api/conversations', async (c) => {
     const minHoursSince = Number(url.searchParams.get('minHoursSince') ?? '0');
     const maxHoursSinceParam = url.searchParams.get('maxHoursSince');
     const maxHoursSince = maxHoursSinceParam !== null ? Number(maxHoursSinceParam) : null;
-    const limit = Math.min(Number(url.searchParams.get('limit') ?? '50'), 200);
+    const limit = listLimit(url.searchParams.get('limit') ?? undefined, 50);
     const offset = Number(url.searchParams.get('offset') ?? '0');
 
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
@@ -194,7 +195,7 @@ conversations.get('/api/conversations/:friendId', async (c) => {
   try {
     const friendId = c.req.param('friendId');
     const url = new URL(c.req.url);
-    const limit = Math.min(Number(url.searchParams.get('limit') ?? '50'), 200);
+    const limit = listLimit(url.searchParams.get('limit') ?? undefined, 50);
     const before = url.searchParams.get('before');
 
     const friend = await c.env.DB.prepare(
