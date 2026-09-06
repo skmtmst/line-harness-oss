@@ -1,4 +1,16 @@
+import { parseCondition } from './segment-query.js';
+
 export type AutomationDraftActionType = 'add_tag' | 'start_scenario' | 'send_message';
+export type AutomationDraftTriggerType =
+  | 'friend_add'
+  | 'tag_change'
+  | 'message_received'
+  | 'form_submitted'
+  | 'link_clicked'
+  | 'calendar_booked'
+  | 'datetime'
+  | 'daily'
+  | 'weekly';
 
 export interface AutomationDraftAction {
   id: string;
@@ -16,7 +28,7 @@ export interface AutomationTemplateSummary {
 }
 
 interface AutomationTemplateDefinition extends AutomationTemplateSummary {
-  triggerType: 'friend_add' | 'tag_change' | 'message_received';
+  triggerType: AutomationDraftTriggerType;
   triggerConfig: Record<string, unknown>;
   actions: AutomationDraftAction[];
 }
@@ -26,7 +38,7 @@ export interface AutomationDraftDetail {
   draftVersionId: string;
   name: string;
   description: string | null;
-  eventType: AutomationTemplateDefinition['triggerType'];
+  eventType: AutomationDraftTriggerType;
   triggerConfig: Record<string, unknown>;
   conditions: Record<string, unknown>;
   actions: AutomationDraftAction[];
@@ -131,6 +143,132 @@ async function requireResource(
   if (!row) throw new AutomationDraftError('resource_not_found', `${label}を選び直してください`, field);
 }
 
+function optionalString(value: unknown, field: string): string | null {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new AutomationDraftError('invalid', '選択内容を確認してください', field);
+  }
+  return value.trim();
+}
+
+async function requireScopedId(
+  db: D1Database,
+  input: { sql: string; binds: unknown[]; field: string; label: string },
+): Promise<void> {
+  const row = await db.prepare(input.sql).bind(...input.binds).first<{ id: string }>();
+  if (!row) throw new AutomationDraftError('resource_not_found', `${input.label}を選び直してください`, input.field);
+}
+
+async function validateTriggerConfig(
+  db: D1Database,
+  eventType: AutomationDraftTriggerType,
+  value: unknown,
+  lineAccountId: string,
+): Promise<Record<string, unknown>> {
+  const config = value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? { ...value as Record<string, unknown> }
+    : {};
+  const allowed: Record<AutomationDraftTriggerType, ReadonlySet<string>> = {
+    friend_add: new Set(),
+    tag_change: new Set(['tagId', 'action']),
+    message_received: new Set(),
+    form_submitted: new Set(['formId']),
+    link_clicked: new Set(['trackedLinkId']),
+    calendar_booked: new Set(['bookingType', 'menuId', 'eventId']),
+    datetime: new Set(['at', 'friendIds']),
+    daily: new Set(['time', 'friendIds']),
+    weekly: new Set(['time', 'weekdays', 'friendIds']),
+  };
+  const unknown = Object.keys(config).find((key) => !allowed[eventType].has(key));
+  if (unknown) throw new AutomationDraftError('trigger_config_invalid', 'きっかけの設定を確認してください', unknown);
+
+  if (eventType === 'tag_change') {
+    const tagId = requiredString(config.tagId, 'triggerTagId', 'きっかけのタグ');
+    await requireResource(db, 'tags', tagId, lineAccountId, 'triggerTagId', 'きっかけのタグ');
+    if (config.action !== 'add' && config.action !== 'remove') {
+      throw new AutomationDraftError('trigger_config_invalid', 'タグを付けたときか外したときを選んでください', 'triggerAction');
+    }
+    return { tagId, action: config.action };
+  }
+  if (eventType === 'form_submitted') {
+    const formId = optionalString(config.formId, 'formId');
+    if (formId) await requireScopedId(db, {
+      sql: `SELECT form_id AS id FROM form_accounts WHERE form_id = ? AND line_account_id = ?`,
+      binds: [formId, lineAccountId], field: 'formId', label: '回答フォーム',
+    });
+    return formId ? { formId } : {};
+  }
+  if (eventType === 'link_clicked') {
+    const trackedLinkId = optionalString(config.trackedLinkId, 'trackedLinkId');
+    if (trackedLinkId) await requireScopedId(db, {
+      sql: `SELECT id FROM tracked_links WHERE id = ? AND line_account_id = ? AND is_active = 1`,
+      binds: [trackedLinkId, lineAccountId], field: 'trackedLinkId', label: '計測リンク',
+    });
+    return trackedLinkId ? { trackedLinkId } : {};
+  }
+  if (eventType === 'calendar_booked') {
+    const bookingType = optionalString(config.bookingType, 'bookingType');
+    if (bookingType && bookingType !== 'salon' && bookingType !== 'event') {
+      throw new AutomationDraftError('trigger_config_invalid', '予約の種類を選び直してください', 'bookingType');
+    }
+    const menuId = optionalString(config.menuId, 'menuId');
+    const eventId = optionalString(config.eventId, 'eventId');
+    if (menuId) await requireScopedId(db, {
+      sql: `SELECT id FROM menus WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`,
+      binds: [menuId, lineAccountId], field: 'menuId', label: '予約メニュー',
+    });
+    if (eventId) await requireScopedId(db, {
+      sql: `SELECT id FROM events WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`,
+      binds: [eventId, lineAccountId], field: 'eventId', label: 'イベント',
+    });
+    if ((bookingType === 'salon' && eventId) || (bookingType === 'event' && menuId)) {
+      throw new AutomationDraftError('trigger_config_invalid', '予約の種類と絞り込み先が一致しません', 'bookingType');
+    }
+    return {
+      ...(bookingType ? { bookingType } : {}),
+      ...(menuId ? { menuId } : {}),
+      ...(eventId ? { eventId } : {}),
+    };
+  }
+  if (eventType === 'datetime' || eventType === 'daily' || eventType === 'weekly') {
+    if (!Array.isArray(config.friendIds) || config.friendIds.length === 0 || config.friendIds.length > 100
+      || config.friendIds.some((id) => typeof id !== 'string' || !id.trim())) {
+      throw new AutomationDraftError('trigger_config_invalid', '対象の友だちは1〜100人で選んでください', 'friendIds');
+    }
+    const friendIds = [...new Set(config.friendIds as string[])];
+    const placeholders = friendIds.map(() => '?').join(', ');
+    const count = await db.prepare(
+      `SELECT COUNT(*) AS count FROM friends WHERE line_account_id = ? AND id IN (${placeholders})`,
+    ).bind(lineAccountId, ...friendIds).first<{ count: number }>();
+    if (Number(count?.count ?? 0) !== friendIds.length) {
+      throw new AutomationDraftError('resource_not_found', '対象の友だちを選び直してください', 'friendIds');
+    }
+    if (eventType === 'datetime') {
+      const at = requiredString(config.at, 'at', '実行日時');
+      if (!/T.*(?:Z|[+-]\d{2}:\d{2})$/.test(at) || !Number.isFinite(Date.parse(at))) {
+        throw new AutomationDraftError('trigger_config_invalid', 'タイムゾーンを含む日時を入力してください', 'at');
+      }
+      if (Date.parse(at) <= Date.now()) {
+        throw new AutomationDraftError('trigger_config_invalid', 'これからの日時を入力してください', 'at');
+      }
+      return { at, friendIds };
+    }
+    const time = requiredString(config.time, 'time', '実行時刻');
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time) || Number(time.slice(3)) % 5 !== 0) {
+      throw new AutomationDraftError('trigger_config_invalid', '時刻は5分単位で入力してください', 'time');
+    }
+    if (eventType === 'weekly') {
+      if (!Array.isArray(config.weekdays) || config.weekdays.length === 0
+        || config.weekdays.some((day) => !Number.isInteger(day) || Number(day) < 0 || Number(day) > 6)) {
+        throw new AutomationDraftError('trigger_config_invalid', '曜日を1つ以上選んでください', 'weekdays');
+      }
+      return { time, weekdays: [...new Set(config.weekdays as number[])], friendIds };
+    }
+    return { time, friendIds };
+  }
+  return {};
+}
+
 export function listAutomationTemplates(): AutomationTemplateSummary[] {
   return TEMPLATES.map(({ key, name, description, triggerLabel, actionLabel }) => ({
     key, name, description, triggerLabel, actionLabel,
@@ -232,6 +370,7 @@ export async function updateAutomationDraft(
     name: unknown;
     eventType: unknown;
     triggerConfig: unknown;
+    conditions?: unknown;
     actions: unknown;
   },
 ): Promise<void> {
@@ -241,21 +380,24 @@ export async function updateAutomationDraft(
     throw new AutomationDraftError('version_conflict', '別の人が下書きを更新しました。再読み込みしてください');
   }
   const name = requiredString(input.name, 'name', 'ルール名');
-  const allowedTriggers = new Set(['friend_add', 'tag_change', 'message_received']);
+  const allowedTriggers = new Set<AutomationDraftTriggerType>([
+    'friend_add', 'tag_change', 'message_received', 'form_submitted', 'link_clicked',
+    'calendar_booked', 'datetime', 'daily', 'weekly',
+  ]);
   const eventType = requiredString(input.eventType, 'eventType', 'きっかけ');
-  if (!allowedTriggers.has(eventType)) {
+  if (!allowedTriggers.has(eventType as AutomationDraftTriggerType)) {
     throw new AutomationDraftError('trigger_unsupported', 'このきっかけはまだ実行まで接続されていません', 'eventType');
   }
-  const triggerConfig = input.triggerConfig !== null
-    && typeof input.triggerConfig === 'object'
-    && !Array.isArray(input.triggerConfig)
-    ? { ...input.triggerConfig as Record<string, unknown> }
-    : {};
-  if (eventType === 'tag_change') {
-    const tagId = requiredString(triggerConfig.tagId, 'triggerTagId', 'きっかけのタグ');
-    await requireResource(db, 'tags', tagId, input.lineAccountId, 'triggerTagId', 'きっかけのタグ');
-    triggerConfig.tagId = tagId;
-    triggerConfig.action = 'add';
+  const triggerConfig = await validateTriggerConfig(
+    db, eventType as AutomationDraftTriggerType, input.triggerConfig, input.lineAccountId,
+  );
+  const conditions = input.conditions === undefined ? current.conditions : input.conditions;
+  if (conditions === null || typeof conditions !== 'object' || Array.isArray(conditions)) {
+    throw new AutomationDraftError('condition_invalid', '対象条件を確認してください', 'conditions');
+  }
+  if (Object.keys(conditions as Record<string, unknown>).length > 0
+    && !parseCondition(JSON.stringify(conditions))) {
+    throw new AutomationDraftError('condition_invalid', '対象条件を確認してください', 'conditions');
   }
 
   if (!Array.isArray(input.actions) || input.actions.length !== 1) {
@@ -290,9 +432,12 @@ export async function updateAutomationDraft(
   const results = await db.batch([
     db.prepare(
       `UPDATE automation_versions
-          SET trigger_type = ?, trigger_config = ?, condition_config = '{}', action_config = ?
+          SET trigger_type = ?, trigger_config = ?, condition_config = ?, action_config = ?
         WHERE id = ? AND automation_id = ? AND status = 'draft'`,
-    ).bind(eventType, JSON.stringify(triggerConfig), JSON.stringify(actions), expected, current.id),
+    ).bind(
+      eventType, JSON.stringify(triggerConfig), JSON.stringify(conditions),
+      JSON.stringify(actions), expected, current.id,
+    ),
     db.prepare(
       `UPDATE automation_definitions SET name = ?, updated_at = ?
         WHERE id = ? AND line_account_id = ? AND status = 'draft'

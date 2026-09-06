@@ -41,6 +41,9 @@ export interface CommonActionSummary {
   actionCount: number;
   bindingCount: number;
   oldVersionBindingCount: number;
+  executionCountThisMonth: number;
+  failureCountThisMonth: number;
+  lastRunAt: string | null;
   updatedAt: string;
 }
 
@@ -450,8 +453,8 @@ async function assertNoCycle(
 
 export async function listCommonActions(
   db: D1Database,
-  input: { lineAccountId: string; status?: string; query?: string },
-): Promise<CommonActionSummary[]> {
+  input: { lineAccountId: string; status?: string; query?: string; limit?: number; offset?: number },
+): Promise<{ items: CommonActionSummary[]; total: number }> {
   const where = [`ca.line_account_id = ?`];
   const binds: unknown[] = [input.lineAccountId];
   if (input.status && input.status !== 'all') {
@@ -472,6 +475,11 @@ export async function listCommonActions(
     const escaped = input.query.trim().replace(/[\\%_]/g, '\\$&');
     binds.push(`%${escaped}%`, `%${escaped}%`);
   }
+  const total = await db.prepare(
+    `SELECT COUNT(*) AS count FROM common_actions ca WHERE ${where.join(' AND ')}`,
+  ).bind(...binds).first<{ count: number }>();
+  const paginationSql = input.limit === undefined ? '' : ' LIMIT ? OFFSET ?';
+  const paginationBinds = input.limit === undefined ? [] : [input.limit, input.offset ?? 0];
   const rows = await db.prepare(
     `SELECT ca.id, ca.name, ca.description, ca.status, ca.updated_at,
             dv.version_number AS draft_version, pv.version_number AS published_version,
@@ -480,19 +488,48 @@ export async function listCommonActions(
             COUNT(DISTINCT CASE
               WHEN ca.current_published_version_id IS NOT NULL
                AND b.common_action_version_id <> ca.current_published_version_id THEN b.id END) AS old_binding_count
+            ,(SELECT COUNT(DISTINCT r.id)
+                FROM automation_run_steps marker
+                JOIN automation_runs r ON r.id = marker.automation_run_id
+                JOIN common_action_versions metric_version
+                  ON metric_version.id = marker.common_action_version_id
+               WHERE metric_version.common_action_id = ca.id
+                 AND marker.action_type = 'common_action_marker'
+                 AND r.is_test = 0
+                 AND strftime('%Y-%m', r.created_at) = strftime('%Y-%m', 'now')) AS execution_count_this_month
+            ,(SELECT COUNT(DISTINCT r.id)
+                FROM automation_run_steps marker
+                JOIN automation_runs r ON r.id = marker.automation_run_id
+                JOIN common_action_versions metric_version
+                  ON metric_version.id = marker.common_action_version_id
+               WHERE metric_version.common_action_id = ca.id
+                 AND marker.action_type = 'common_action_marker'
+                 AND r.is_test = 0
+                 AND r.status IN ('partial', 'failed')
+                 AND strftime('%Y-%m', r.created_at) = strftime('%Y-%m', 'now')) AS failure_count_this_month
+            ,(SELECT MAX(r.created_at)
+                FROM automation_run_steps marker
+                JOIN automation_runs r ON r.id = marker.automation_run_id
+                JOIN common_action_versions metric_version
+                  ON metric_version.id = marker.common_action_version_id
+               WHERE metric_version.common_action_id = ca.id
+                 AND marker.action_type = 'common_action_marker'
+                 AND r.is_test = 0) AS last_run_at
        FROM common_actions ca
        LEFT JOIN common_action_versions dv ON dv.id = ca.current_draft_version_id
        LEFT JOIN common_action_versions pv ON pv.id = ca.current_published_version_id
        LEFT JOIN common_action_bindings b ON b.common_action_id = ca.id
       WHERE ${where.join(' AND ')}
       GROUP BY ca.id
-      ORDER BY ca.updated_at DESC, ca.id DESC`,
-  ).bind(...binds).all<{
+      ORDER BY ca.updated_at DESC, ca.id DESC${paginationSql}`,
+  ).bind(...binds, ...paginationBinds).all<{
     id: string; name: string; description: string | null; status: CommonActionSummary['status'];
     updated_at: string; draft_version: number | null; published_version: number | null;
     action_count: number; binding_count: number; old_binding_count: number;
+    execution_count_this_month: number; failure_count_this_month: number;
+    last_run_at: string | null;
   }>();
-  return (rows.results ?? []).map((row) => ({
+  return { items: (rows.results ?? []).map((row) => ({
     id: row.id,
     name: row.name,
     description: row.description,
@@ -502,8 +539,11 @@ export async function listCommonActions(
     actionCount: Number(row.action_count),
     bindingCount: Number(row.binding_count),
     oldVersionBindingCount: Number(row.old_binding_count),
+    executionCountThisMonth: Number(row.execution_count_this_month),
+    failureCountThisMonth: Number(row.failure_count_this_month),
+    lastRunAt: row.last_run_at,
     updatedAt: row.updated_at,
-  }));
+  })), total: Number(total?.count ?? 0) };
 }
 
 export async function listCommonActionResources(
@@ -882,9 +922,19 @@ export async function getCommonActionDetail(
 
 export async function updateCommonActionBindingVersion(
   db: D1Database,
-  input: { id: string; bindingId: string; lineAccountId: string; versionId: unknown },
+  input: {
+    id: string;
+    bindingId: string;
+    lineAccountId: string;
+    versionId: unknown;
+    expectedVersionId: unknown;
+    actorId?: string | null;
+  },
 ): Promise<void> {
   const versionId = requiredString(input.versionId, 'versionId', '切り替える版');
+  const expectedVersionId = requiredString(
+    input.expectedVersionId, 'expectedVersionId', '現在利用中の版',
+  );
   const version = await db.prepare(
     `SELECT cav.id
        FROM common_action_versions cav
@@ -893,11 +943,36 @@ export async function updateCommonActionBindingVersion(
         AND ca.line_account_id = ?`,
   ).bind(versionId, input.id, input.lineAccountId).first<{ id: string }>();
   if (!version) throw new CommonActionValidationError('version_not_found', '切り替える公開版が見つかりません', 'versionId');
-  const result = await db.prepare(
-    `UPDATE common_action_bindings SET common_action_version_id = ?, updated_at = ?
-      WHERE id = ? AND common_action_id = ? AND line_account_id = ?`,
-  ).bind(version.id, new Date().toISOString(), input.bindingId, input.id, input.lineAccountId).run();
-  if ((result.meta?.changes ?? 0) !== 1) {
-    throw new CommonActionValidationError('binding_not_found', '利用先が見つかりません');
+  const now = new Date().toISOString();
+  const eventId = crypto.randomUUID();
+  const results = await db.batch([
+    db.prepare(
+      `INSERT INTO common_action_binding_migration_events
+         (id, line_account_id, common_action_id, binding_id,
+          from_action_version_id, to_action_version_id, actor_id, created_at)
+       SELECT ?, line_account_id, common_action_id, id,
+              common_action_version_id, ?, ?, ?
+         FROM common_action_bindings
+        WHERE id = ? AND common_action_id = ? AND line_account_id = ?
+          AND common_action_version_id = ?`,
+    ).bind(
+      eventId, version.id, input.actorId ?? null, now,
+      input.bindingId, input.id, input.lineAccountId, expectedVersionId,
+    ),
+    db.prepare(
+      `UPDATE common_action_bindings SET common_action_version_id = ?, updated_at = ?
+        WHERE id = ? AND common_action_id = ? AND line_account_id = ?
+          AND common_action_version_id = ?`,
+    ).bind(
+      version.id, now, input.bindingId, input.id, input.lineAccountId, expectedVersionId,
+    ),
+  ]);
+  if ((results[0].meta?.changes ?? 0) !== 1 || (results[1].meta?.changes ?? 0) !== 1) {
+    const binding = await db.prepare(
+      `SELECT id FROM common_action_bindings
+        WHERE id = ? AND common_action_id = ? AND line_account_id = ?`,
+    ).bind(input.bindingId, input.id, input.lineAccountId).first<{ id: string }>();
+    if (!binding) throw new CommonActionValidationError('binding_not_found', '利用先が見つかりません');
+    throw new CommonActionValidationError('version_conflict', '利用先の固定版が変わりました。再読み込みしてください');
   }
 }

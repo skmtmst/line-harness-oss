@@ -194,11 +194,21 @@ describe('V6共通アクション', () => {
       bindingId: 'binding-1',
       lineAccountId: 'account-1',
       versionId: draft2.draftVersionId,
+      expectedVersionId: created.draftVersionId,
+      actorId: 'staff-1',
     });
     detail = await getCommonActionDetail(testDb.db, {
       id: created.id, lineAccountId: 'account-1',
     });
     expect(detail.bindings[0]).toMatchObject({ versionNumber: 2, hasNewerVersion: false });
+    expect(testDb.raw.prepare(
+      `SELECT from_action_version_id, to_action_version_id, actor_id
+         FROM common_action_binding_migration_events`,
+    ).get()).toEqual({
+      from_action_version_id: created.draftVersionId,
+      to_action_version_id: draft2.draftVersionId,
+      actor_id: 'staff-1',
+    });
   });
 
   it('共通アクション同士の循環を公開できない', async () => {
@@ -269,7 +279,8 @@ describe('V6共通アクション', () => {
     const unusedRows = await listCommonActions(testDb.db, {
       lineAccountId: 'account-1', status: 'unused',
     });
-    expect(unusedRows.map((row) => row.id)).toEqual([unused.id]);
+    expect(unusedRows.items.map((row) => row.id)).toEqual([unused.id]);
+    expect(unusedRows.total).toBe(1);
   });
 
   it('編集画面の選択肢をLINE公式アカウント内に限定する', async () => {
