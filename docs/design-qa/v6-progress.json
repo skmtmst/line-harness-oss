@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 9,
-  "match": 129,
-  "structureMatchDataPending": 117,
+  "match": 131,
+  "structureMatchDataPending": 115,
   "needsFix": 17,
   "unjudged": 5,
-  "remaining": 139,
+  "remaining": 137,
   "features": [
     {
       "feature": 1,
@@ -744,11 +744,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 2,
-      "structureMatchDataPending": 13,
+      "match": 4,
+      "structureMatchDataPending": 11,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 13,
+      "remaining": 11,
       "capturedAt": [
         {
           "pr": 543,
@@ -1569,6 +1569,19 @@
       "unjudged": 0,
       "remaining": 6,
       "capturedAt": [
+        {
+          "pr": 1129,
+          "head": "af74a0bbd",
+          "on": "2026-09-07",
+          "screens": [
+            "GO8RQ",
+            "XtfO3",
+            "UMiJ9",
+            "TL7tp",
+            "szXsT"
+          ],
+          "note": "Issue #367。統合済みの月間人数・外部メニュー面アクション・削除影響人数を画面へ接続し、3104/8791で1440・1920pxを撮影。全10枚で横はみ出し0。共有固定応答に残る不足を理由付きで5画面の判定へ記録した。"
+        },
         {
           "pr": 1007,
           "head": "f2be359e5",

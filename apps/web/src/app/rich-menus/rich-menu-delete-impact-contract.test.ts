@@ -8,10 +8,11 @@ const FIXTURES = readFileSync(
 )
 
 describe('rich menu delete-impact handoff contract', () => {
-  test('reads impact before deletion and keeps unavailable audience separate from zero', () => {
+  test('reads impact before deletion and distinguishes partial, unavailable, and zero', () => {
     expect(API).toContain('export type RichMenuDeleteImpact')
     expect(API).toContain('value: number | null')
-    expect(API).toContain("reason: 'assignment_ledger_unavailable'")
+    expect(API).toContain("state?: 'available' | 'partial' | 'unavailable'")
+    expect(API).toContain("'preexisting_assignments_not_backfilled' | 'assignment_ledger_unavailable' | null")
     expect(API).toContain('deleteImpact: (groupId: string)')
     expect(API).toContain('`/api/rich-menu-groups/${groupId}/delete-impact`')
   })
