@@ -50,9 +50,19 @@ export interface Broadcast {
   measure_opens?: number;
   line_account_id?: string | null;
   alt_text?: string | null;
+  internal_memo?: string | null;
+  draft_step?: 'basic' | 'audience' | 'message' | 'schedule' | 'confirm' | null;
+  draft_payload_json?: string | null;
+  message_options_json?: string | null;
+  after_action_version_id?: string | null;
+  lock_version?: number;
 }
 
-export async function getBroadcasts(db: D1Database, accountId?: string): Promise<Broadcast[]> {
+export async function getBroadcasts(
+  db: D1Database,
+  accountId?: string,
+  scope?: { allowedAccountIds: string[]; canSeeUnassigned: boolean },
+): Promise<Broadcast[]> {
   let sql = `SELECT b.*,
        bi.status as insight_status,
        bi.open_rate, bi.click_rate
@@ -75,6 +85,27 @@ LEFT JOIN broadcast_insights bi ON b.id = bi.broadcast_id
       )
     )`;
     params.push(accountId, accountId);
+  } else if (scope) {
+    const conditions: string[] = [];
+    if (scope.allowedAccountIds.length > 0) {
+      const placeholders = scope.allowedAccountIds.map(() => '?').join(',');
+      conditions.push(`(
+        b.line_account_id IN (${placeholders})
+        OR (
+          b.target_type = 'multi-account-dedup'
+          AND b.account_ids IS NOT NULL
+          AND EXISTS (
+            SELECT 1 FROM json_each(b.account_ids)
+             WHERE value IN (${placeholders})
+          )
+        )
+      )`);
+      params.push(...scope.allowedAccountIds, ...scope.allowedAccountIds);
+    }
+    if (scope.canSeeUnassigned) {
+      conditions.push('(b.line_account_id IS NULL AND b.account_ids IS NULL)');
+    }
+    sql += ` WHERE ${conditions.length > 0 ? conditions.join(' OR ') : '0 = 1'}`;
   }
   sql += ` ORDER BY COALESCE(b.sent_at, b.scheduled_at, b.created_at) DESC`;
   const result = params.length > 0
@@ -136,6 +167,13 @@ export interface CreateBroadcastInput {
    * こないので、そこで切れるようにしてある。
    */
   measureOpens?: boolean;
+  internalMemo?: string | null;
+  draftStep?: 'basic' | 'audience' | 'message' | 'schedule' | 'confirm' | null;
+  draftPayloadJson?: string | null;
+  messageOptionsJson?: string | null;
+  afterActionVersionId?: string | null;
+  /** 予定日時が入力済みでも、途中保存なら実行待ちにしない。 */
+  saveAsDraft?: boolean;
 }
 
 export async function createBroadcast(
@@ -145,13 +183,15 @@ export async function createBroadcast(
   const id = input.id ?? crypto.randomUUID();
   const now = jstNow();
 
-  const initialStatus: BroadcastStatus = input.scheduledAt ? 'scheduled' : 'draft';
+  const initialStatus: BroadcastStatus = input.saveAsDraft
+    ? 'draft'
+    : input.scheduledAt ? 'scheduled' : 'draft';
 
   await db
     .prepare(
       `INSERT INTO broadcasts
-         (id, title, message_type, message_content, message_bubbles_json, target_type, target_tag_id, status, scheduled_at, sent_at, total_count, success_count, account_ids, dedup_priority, track_links, line_account_id, alt_text, stealth_spread_minutes, segment_conditions, folder_id, measure_opens, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, title, message_type, message_content, message_bubbles_json, target_type, target_tag_id, status, scheduled_at, sent_at, total_count, success_count, account_ids, dedup_priority, track_links, line_account_id, alt_text, stealth_spread_minutes, segment_conditions, folder_id, measure_opens, internal_memo, draft_step, draft_payload_json, message_options_json, after_action_version_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -173,6 +213,11 @@ export async function createBroadcast(
       input.segmentConditions ?? null,
       input.folderId ?? null,
       input.measureOpens === false ? 0 : 1,
+      input.internalMemo ?? null,
+      input.draftStep ?? null,
+      input.draftPayloadJson ?? null,
+      input.messageOptionsJson ?? null,
+      input.afterActionVersionId ?? null,
       now,
     )
     .run();
@@ -196,6 +241,11 @@ export type UpdateBroadcastInput = Partial<
     | 'status'
     | 'scheduled_at'
     | 'track_links'
+    | 'internal_memo'
+    | 'draft_step'
+    | 'draft_payload_json'
+    | 'message_options_json'
+    | 'after_action_version_id'
   >
 >;
 
@@ -203,6 +253,7 @@ export async function updateBroadcast(
   db: D1Database,
   id: string,
   updates: UpdateBroadcastInput,
+  expectedVersion?: number,
 ): Promise<Broadcast | null> {
   const fields: string[] = [];
   const values: unknown[] = [];
@@ -259,13 +310,42 @@ export async function updateBroadcast(
     fields.push('track_links = ?');
     values.push(updates.track_links ? 1 : 0);
   }
+  if (updates.internal_memo !== undefined) {
+    fields.push('internal_memo = ?');
+    values.push(updates.internal_memo);
+  }
+  if (updates.draft_step !== undefined) {
+    fields.push('draft_step = ?');
+    values.push(updates.draft_step);
+  }
+  if (updates.draft_payload_json !== undefined) {
+    fields.push('draft_payload_json = ?');
+    values.push(updates.draft_payload_json);
+  }
+  if (updates.message_options_json !== undefined) {
+    fields.push('message_options_json = ?');
+    values.push(updates.message_options_json);
+  }
+  if (updates.after_action_version_id !== undefined) {
+    fields.push('after_action_version_id = ?');
+    values.push(updates.after_action_version_id);
+  }
 
   if (fields.length > 0) {
-    values.push(id);
-    await db
-      .prepare(`UPDATE broadcasts SET ${fields.join(', ')} WHERE id = ?`)
+    fields.push('lock_version = lock_version + 1');
+    if (expectedVersion !== undefined) {
+      values.push(id, expectedVersion);
+    } else {
+      values.push(id);
+    }
+    const result = await db
+      .prepare(`UPDATE broadcasts SET ${fields.join(', ')} WHERE id = ?${expectedVersion !== undefined ? ' AND lock_version = ?' : ''}`)
       .bind(...values)
       .run();
+    if (expectedVersion !== undefined && !result.meta.changes) return null;
+  } else if (expectedVersion !== undefined) {
+    const current = await getBroadcastById(db, id);
+    if (!current || Number(current.lock_version ?? 1) !== expectedVersion) return null;
   }
 
   return getBroadcastById(db, id);

@@ -515,6 +515,67 @@ const spec = {
         responses: { '200': { description: 'Deleted' } },
       },
     },
+    '/api/scenarios/{id}/simulate': {
+      post: {
+        tags: ['Scenarios'],
+        summary: '副作用なしで対象人数と通ごとの予定を試算',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['lineAccountId'],
+          properties: {
+            lineAccountId: { type: 'string' },
+            startAt: { type: 'string', format: 'date-time' },
+          },
+        } } } },
+        responses: {
+          '200': { description: 'Audience counts and planned steps; no side effects' },
+          '403': { description: 'Scenario view permission required' },
+          '404': { description: 'Not found in account scope' },
+        },
+      },
+    },
+    '/api/scenarios/{id}/runs': {
+      get: {
+        tags: ['Scenarios'],
+        summary: '購読状況・テスト送信・送信枠・通別実績を取得',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['active', 'paused', 'completed', 'delivering'] } },
+          { name: 'cursor', in: 'query', schema: { type: 'string' } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100 } },
+        ],
+        responses: {
+          '200': { description: 'Scenario run summary and metrics' },
+          '403': { description: 'Scenario view permission required' },
+          '404': { description: 'Not found in account scope' },
+        },
+      },
+    },
+    '/api/scenarios/{id}/draft': {
+      put: {
+        tags: ['Scenarios'],
+        summary: '送信後アクション第2期までを楽観ロックで保存',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['lineAccountId', 'expectedVersion', 'afterActions'],
+          properties: {
+            lineAccountId: { type: 'string' },
+            expectedVersion: { type: 'integer', minimum: 0 },
+            afterActions: { type: 'array', maxItems: 100, items: { type: 'object' } },
+          },
+        } } } },
+        responses: {
+          '200': { description: 'Draft updated with next version' },
+          '403': { description: 'scenario.definition.edit permission required' },
+          '404': { description: 'Not found in account scope' },
+          '409': { description: 'Version conflict' },
+          '422': { description: 'Invalid action or foreign account resource' },
+        },
+      },
+    },
     '/api/scenarios/{id}/steps': {
       post: {
         tags: ['Scenarios'],

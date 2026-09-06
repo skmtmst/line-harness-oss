@@ -103,4 +103,27 @@ describe('createBroadcast', () => {
     expect(updated?.segment_conditions).toContain('tag_exists');
     expect(sqlite.prepare('SELECT COUNT(*) AS count FROM broadcasts').get()).toEqual({ count: 1 });
   });
+
+  test('stores V6 draft fields and rejects a stale expected version', async () => {
+    const created = await createBroadcast(db, {
+      title: '途中の配信',
+      messageType: 'text',
+      messageContent: '',
+      targetType: 'all',
+      lineAccountId: 'account-1',
+      internalMemo: '社内メモ',
+      draftStep: 'basic',
+      draftPayloadJson: JSON.stringify({ title: '途中の配信' }),
+      messageOptionsJson: JSON.stringify({ buttons: [] }),
+    });
+    expect(created).toMatchObject({ internal_memo: '社内メモ', draft_step: 'basic', lock_version: 1 });
+
+    const updated = await updateBroadcast(db, created.id, { internal_memo: '更新後' }, 1);
+    expect(updated).toMatchObject({ internal_memo: '更新後', lock_version: 2 });
+    await expect(updateBroadcast(db, created.id, { internal_memo: '古い更新' }, 1)).resolves.toBeNull();
+
+    const legacyUpdated = await updateBroadcast(db, created.id, { internal_memo: '互換更新' });
+    expect(legacyUpdated).toMatchObject({ internal_memo: '互換更新', lock_version: 3 });
+    await expect(updateBroadcast(db, created.id, {}, 2)).resolves.toBeNull();
+  });
 });
