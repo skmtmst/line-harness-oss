@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import type { EntryRoute } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import Button from '@/components/shared/button'
+import SelectField from '@/components/shared/select-field'
 
 /**
  * 友だち追加のQRコード（設計 V2 1-1-1）。
@@ -18,15 +20,23 @@ import { api } from '@/lib/api'
 const SIZES = [
   { value: '1200x1200', label: '大（1200px）', note: '印刷向け' },
   { value: '600x600', label: '中（600px）', note: '画面向け' },
-  { value: '240x240', label: '小（240px）', note: '確認用' },
+  { value: '300x300', label: '小（300px）', note: '確認用' },
 ]
 
 /** Worker の /api/qr が受ける形式。順番はよく使うものから。 */
 const FORMATS = [
   { value: 'png', label: 'PNG' },
-  { value: 'svg', label: 'SVG' },
   { value: 'jpg', label: 'JPG' },
+  { value: 'svg', label: 'SVG' },
 ]
+
+function DownloadIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M10 3v9m0 0 3-3m-3 3L7 9M4 14v2h12v-2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
 
 export default function QrDialog({
   open,
@@ -144,7 +154,8 @@ export default function QrDialog({
       onClick={onClose}
     >
       <div
-        className="bg-canvas rounded-panel border-hairline max-h-[90vh] w-full max-w-3xl overflow-y-auto border p-6 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]"
+        className="bg-canvas rounded-panel border-hairline max-h-[90vh] w-full overflow-y-auto border p-6 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]"
+        style={{ maxWidth: 820 }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between gap-3">
@@ -166,14 +177,14 @@ export default function QrDialog({
         <div className="grid gap-5 sm:grid-cols-[auto_1fr]">
           {/* 名前はQRの下。読み取る人が見るのは絵で、名前はその確認に使う。 */}
           <div className="flex flex-col items-center">
-            <div className="bg-canvas-sunken rounded-panel flex h-[240px] w-[240px] items-center justify-center">
+            <div className="bg-canvas-sunken rounded-panel flex h-[280px] w-[280px] items-center justify-center">
               {/* eslint-disable-next-line @next/next/no-img-element -- Worker のQRプロキシ。静的アセットではない */}
               <img
                 src={qrSrc}
                 alt="友だち追加QRコード"
-                width={200}
-                height={200}
-                className="h-[200px] w-[200px]"
+                width={220}
+                height={220}
+                className="h-[220px] w-[220px]"
               />
             </div>
             <p className="text-ink mt-3 text-sm font-medium">{accountName}</p>
@@ -182,7 +193,7 @@ export default function QrDialog({
                 href={profileUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="text-action mt-1 max-w-[240px] truncate text-xs hover:underline"
+                className="text-action mt-1 max-w-[280px] truncate text-xs hover:underline"
               >
                 {profileUrl}
               </a>
@@ -194,19 +205,16 @@ export default function QrDialog({
               <label htmlFor="qr-route" className="text-ink-secondary mb-1 block text-xs font-medium">
                 発行中の追加URL
               </label>
-              <select
+              <SelectField
                 id="qr-route"
                 value={routeId}
                 onChange={(e) => setRouteId(e.target.value)}
-                className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
-              >
-                <option value="">基本の追加URL</option>
-                {routes.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
+                className="w-full"
+                options={[
+                  { value: '', label: '基本の追加URL' },
+                  ...routes.map((r) => ({ value: r.id, label: r.name })),
+                ]}
+              />
               <p className="text-ink-faint mt-1 text-xs">
                 選んだ経路のQRコードとURLが表示されます。
               </p>
@@ -217,22 +225,17 @@ export default function QrDialog({
                 <label htmlFor="qr-size" className="text-ink-secondary mb-1 block text-xs font-medium">
                   画像の大きさ
                 </label>
-                <select
+                <SelectField
                   id="qr-size"
                   value={size}
                   onChange={(e) => setSize(e.target.value)}
-                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
-                >
-                  {SIZES.map((s) => (
-                    <option key={s.value} value={s.value}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
+                  className="w-full"
+                  options={SIZES.map((s) => ({ value: s.value, label: s.label }))}
+                />
               </div>
               <div>
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">
-                  形式
+                  ダウンロード形式
                 </span>
                 <div className="border-hairline rounded-control flex overflow-hidden border" aria-label="画像形式">
                   {FORMATS.map((entry) => (
@@ -257,20 +260,18 @@ export default function QrDialog({
               >
                 友だち追加リンク
               </label>
-              <div className="flex items-stretch gap-2">
-                <input
+              <div className="border-hairline bg-canvas-sunken rounded-control relative flex items-stretch border">
+                <textarea
                   id="qr-link"
                   readOnly
+                  rows={2}
                   value={link}
                   onFocus={(e) => e.currentTarget.select()}
-                  className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control min-w-0 flex-1 truncate border px-3 py-2 font-mono text-xs"
+                  className="text-ink-secondary min-w-0 flex-1 resize-none bg-transparent px-3 py-2 pr-16 font-mono text-xs leading-relaxed focus:outline-none"
                 />
                 <button
                   onClick={copy}
-                  className="text-on-accent rounded-control shrink-0 px-4 text-xs font-medium"
-                  style={{
-                    backgroundColor: copied ? 'var(--color-success)' : 'var(--color-accent)',
-                  }}
+                  className="text-action absolute right-2 top-2 rounded px-1.5 py-1 text-xs font-medium hover:underline"
                 >
                   {copied ? 'コピーしました ✓' : 'コピー'}
                 </button>
@@ -281,12 +282,12 @@ export default function QrDialog({
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <a
+              <Button
                 href={saveHref}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
+                variant="primary"
               >
-                {format.toUpperCase()}をダウンロード
-              </a>
+                <DownloadIcon />画像をダウンロード
+              </Button>
               <button
                 type="button"
                 onClick={printQr}
@@ -298,7 +299,7 @@ export default function QrDialog({
           </div>
         </div>
 
-        <div className="border-hairline mt-5 border-t pt-4">
+        <div className="border-hairline bg-surface-pearl mt-5 rounded-control border p-4">
           <h3 className="text-ink text-sm font-bold">使うときのヒント</h3>
           <ul className="text-ink-faint mt-2 space-y-1 text-xs leading-relaxed">
             <li>・印刷は 1200px 以上を推奨します（小さいと読み取れないことがあります）</li>

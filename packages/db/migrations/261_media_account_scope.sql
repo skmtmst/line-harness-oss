@@ -3,7 +3,8 @@
 ALTER TABLE media
   ADD COLUMN line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE;
 
-WITH usage_accounts AS (
+-- 各複合SELECTを4項以下に分け、最後のUNIONで使用先の重複を除く。
+WITH usage_a(media_id, account_id) AS (
   SELECT DISTINCT u.media_id, t.line_account_id AS account_id
     FROM media_usages u JOIN templates t ON u.ref_kind = 'template' AND t.id = u.ref_id
    WHERE t.line_account_id IS NOT NULL
@@ -22,7 +23,7 @@ WITH usage_accounts AS (
     JOIN rich_menu_pages p ON u.ref_kind = 'rich_menu' AND p.id = u.ref_id
     JOIN rich_menu_groups g ON g.id = p.group_id
    WHERE g.account_id IS NOT NULL
-  UNION
+), usage_b(media_id, account_id) AS (
   SELECT DISTINCT u.media_id, s.line_account_id
     FROM media_usages u JOIN scenario_steps ss
       ON u.ref_kind = 'scenario_step' AND ss.id = u.ref_id
@@ -41,10 +42,16 @@ WITH usage_accounts AS (
     FROM media_usages u
     JOIN events e ON u.ref_kind = 'event' AND e.id = u.ref_id
     JOIN json_each(COALESCE(e.account_ids, '[]')) accounts
-  UNION
+), usage_c(media_id, account_id) AS (
   SELECT DISTINCT u.media_id, w.account_id
     FROM media_usages u JOIN webinars w ON u.ref_kind = 'webinar' AND w.id = u.ref_id
    WHERE w.account_id IS NOT NULL
+), usage_accounts(media_id, account_id) AS (
+  SELECT media_id, account_id FROM usage_a
+  UNION
+  SELECT media_id, account_id FROM usage_b
+  UNION
+  SELECT media_id, account_id FROM usage_c
 )
 UPDATE media
    SET line_account_id = (

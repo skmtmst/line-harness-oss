@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 217,
-  "unimplemented": 27,
+  "compared": 218,
+  "unimplemented": 26,
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 28,
-  "match": 0,
-  "structureMatchDataPending": 29,
+  "match": 3,
+  "structureMatchDataPending": 32,
   "needsFix": 114,
-  "unjudged": 98,
-  "remaining": 268,
+  "unjudged": 93,
+  "remaining": 265,
   "features": [
     {
       "feature": 1,
@@ -21,11 +21,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 0,
+      "match": 3,
+      "structureMatchDataPending": 2,
       "needsFix": 0,
-      "unjudged": 5,
-      "remaining": 5,
+      "unjudged": 0,
+      "remaining": 2,
       "capturedAt": [
         {
           "pr": 419,
@@ -1483,9 +1483,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 2,
+      "structureMatchDataPending": 3,
       "needsFix": 3,
-      "unjudged": 1,
+      "unjudged": 0,
       "remaining": 9,
       "capturedAt": [
         {
@@ -1559,15 +1559,15 @@
       "feature": 17,
       "name": "マイル・行動スコア",
       "total": 11,
-      "compared": 10,
-      "unimplemented": 1,
+      "compared": 11,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 3,
       "needsFix": 6,
-      "unjudged": 1,
+      "unjudged": 2,
       "remaining": 11,
       "capturedAt": [
         {
@@ -2566,13 +2566,6 @@
       "name": "16-1-H 支払いを確定する",
       "gap": "api",
       "gapNote": "同上（締める操作）"
-    },
-    {
-      "feature": 17,
-      "node": "p9CcEB",
-      "name": "17-1-G マイルの使い道をつくる",
-      "gap": "pending",
-      "gapNote": "画面 `/mileage/rewards/edit` が development に無い。判定は未マージ枝 `5e8f32d3` で書かれたもの"
     },
     {
       "feature": 20,
