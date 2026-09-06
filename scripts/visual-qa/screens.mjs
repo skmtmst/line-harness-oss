@@ -75,7 +75,7 @@ const REMINDER = { feature: 7, dir: 'reminders-v6', mode: 'page' }
 /** 自動応答。作る・直すは一覧の上に出る窓（`/auto-replies/edit?id=` でも開ける）。 */
 const AUTO_REPLY = { feature: 8, dir: 'auto-replies-v6', route: '/auto-replies', mode: 'page' }
 
-/** 友だち追加時の配信。実装は**アカウントに1枚**の設定画面。 */
+/** 友だち追加時の配信。一覧と5段編集を別ルートで持つ。 */
 const FRIEND_ADD = { feature: 9, dir: 'friend-add-v6', route: '/friend-add-settings', mode: 'page' }
 
 /** ウェビナー。編集は4つのタブ（いつ見られるようにするか／途中に出すもの／コメント演出／概要・分析）。 */
@@ -1120,52 +1120,38 @@ export const SCREENS = [
   },
 
   // ── 機能9 友だち追加時の配信 ────────────────────────────
-  /*
-    **設計と実装で、持ち物の数が違う。**
-    設計は「流入リンクごとに初回案内を並べる一覧」＋5段のウィザード。
-    実装は**アカウントに1枚**の設定（`FriendAddRouting`）で、
-    ①はじめて追加した人 と ②以前からの友だち の2つに分けるだけ。
-    流入リンクで出し分ける仕組みがそもそも無い。
-  */
   { ...FRIEND_ADD, node: 'uLQQc', name: '9-1 友だち追加時の配信',
+    states: { apis: ['**/api/friend-add-rules*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装はアカウント共通の1枚設定で、設計の設定一覧・4指標・フォルダ・優先順位・行操作が無い。**推奨修正**：機能9の要件に沿って、一覧と設定編集の役割を分ける。取得元 `friend-add-v6/uLQQc.txt` と同Node画像。',
-    verdictHead: '350f9636a', },
+    verdictNote: '**2026-09-06 #250 実装・撮影・照合。** 一覧、4指標、フォルダ、優先順位、行操作を実APIへ接続し、通常・読込・空・失敗・権限不足を1440/1920pxで撮影（24枚中12枚、横はみ出し0）。Pencil画像と比べ、主要な配置と文言はそろった。**残る差**：設計のページ送りがなく、「フォルダを追加」は保存口がないため押せない。行の最初に送る内容も設計より要約されている。',
+    verdictSource: 'friend-add-v6/uLQQc.png + uLQQc-1920.png + uLQQc*.txt', },
   {
-    ...FRIEND_ADD, node: 's9gAx', name: '9-1-A 基本設定',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未実装（drop）。設定はアカウントに1枚で、設計の4画面（9-1-A/B/C/I）は横断レビュー §7 の17番で削除候補。',
-    gap: 'drop',
-    gapNote: '設定はアカウントに1枚。名前もフォルダも優先順位も要らない',
-    status: 'unimplemented',
-    why: '設定名・フォルダ・優先順位が無い。**設定はアカウントに1枚**なので、名前も順番も要らない作りになっている',
+    ...FRIEND_ADD, node: 's9gAx', name: '9-1-A 基本設定', route: '/friend-add-settings?view=edit&id=rule-referral&step=basic',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 #250 実装・撮影・テキスト照合。設計画像なし。** 5段表示、設定名、フォルダ、優先順位、社内メモ、設定サマリーを実APIへ接続し、1440/1920pxで横はみ出し0。**残る差**：設計テキストにあるフォルダ追加、流入条件の要約、直近7日の追加、二重送信、テスト送信がこの段にはない。',
+    verdictSource: 'friend-add-v6/s9gAx.txt',
   },
   {
-    ...FRIEND_ADD, node: 'W1wzCa', name: '9-1-B 流入条件',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未実装（drop）。同上（横断レビュー §7 の17番）。',
-    gap: 'drop',
-    gapNote: '実装に「流入元の記録は友だち追加のたびに必ず走るので、ここでは選びません」と明記',
-    status: 'unimplemented',
-    why: '流入リンクを選ぶ仕組みが無い。画面にも「流入元の記録は友だち追加のたびに必ず走るので、ここでは選びません」と書いてある（`page.tsx:712`）',
+    ...FRIEND_ADD, node: 'W1wzCa', name: '9-1-B 流入条件', route: '/friend-add-settings?view=edit&id=rule-referral&step=routes',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 #250 実装・撮影・テキスト照合。設計画像なし。** 実在する流入リンクの複数選択、有効期間、優先判定を実APIへ接続し、1440/1920pxで横はみ出し0。**残る差**：曜日・時間帯・友だち条件・過去28日の当たり具合は、現在の保存・集計口にないため表示していない。',
+    verdictSource: 'friend-add-v6/W1wzCa.txt',
   },
   {
-    ...FRIEND_ADD, node: 'K0Dbr2', name: '9-1-C 初回案内',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未実装（drop）。同上（横断レビュー §7 の17番）。',
-    gap: 'drop',
-    gapNote: '最初に送る本文はシナリオ側にある。**2か所に持つと必ず食い違う**',
-    status: 'unimplemented',
-    why: '最初に送る文面をここで書く場所が無い。実装は**シナリオを選ぶ**だけで、本文はシナリオ側にある',
+    ...FRIEND_ADD, node: 'K0Dbr2', name: '9-1-C 初回案内', route: '/friend-add-settings?view=edit&id=rule-referral&step=message',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 #250 実装・撮影・テキスト照合。設計画像なし。** テキストとシナリオ、本文、登録直後/シナリオ準拠の送信時刻、LINEプレビューを実APIへ接続し、1440/1920pxで横はみ出し0。**残る差**：設計のテンプレート・回答フォーム・選択肢・24時間の再送制限・経路不明時の選択は未接続。',
+    verdictSource: 'friend-add-v6/K0Dbr2.txt',
   },
-  { ...FRIEND_ADD, node: 'txMO9', name: '9-1-D アクション追加',
+  { ...FRIEND_ADD, node: 'txMO9', name: '9-1-D アクション追加', route: '/friend-add-settings?view=edit&id=rule-referral&step=actions&dialog=add', mode: 'viewport', height: 1080,
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。設計はアクション追加ダイアログだが、実装は設定本体のままで追加操作が開かない。**推奨修正**：配信・タグ・シナリオ等を選ぶ追加ダイアログを設計どおり接続する。取得元 `friend-add-v6/txMO9.txt` と同Node画像。',
-    verdictHead: '350f9636a', },
+    verdictNote: '**2026-09-06 #250 実装・撮影・照合。** 接続済みのタグ追加・タグ解除・シナリオ開始だけを選べる確認ダイアログにし、1440/1920pxで横はみ出し0。Pencil画像と比べ、5段表示、左右構成、確認文、戻る/追加操作はそろった。**残る差**：ダイアログの幅・位置と、背面のLINEプレビュー下の補助操作が設計と異なる。',
+    verdictSource: 'friend-add-v6/txMO9.png + txMO9-1920.png + txMO9.txt', },
   {
-    ...FRIEND_ADD, node: 'U3SI5', name: '9-1-E プレビューとテスト',
+    ...FRIEND_ADD, node: 'U3SI5', name: '9-1-E プレビューとテスト', route: '/friend-add-settings?view=edit&id=rule-referral&step=preview', mode: 'viewport', height: 1080,
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。「テスト実行」は押せるが、設計の5段表示・LINEプレビュー・テスト対象と確認結果の面にならず、設定本体に通知だけが出る。**推奨修正**：プレビューと担当者テストを独立した段として表示する。取得元 `friend-add-v6/U3SI5.txt` と同Node画像。',
-    verdictHead: '350f9636a',
-    mode: 'viewport', height: 1080, steps: [{ click: 'テスト実行' }],
-
+    verdictNote: '**2026-09-06 #250 実装・撮影・照合。** 5段表示、送信先、短縮テスト、実行順、LINEプレビュー、本番影響なしの試験を実APIへ接続し、1440/1920pxで横はみ出し0。Pencil画像と比べ、必要な情報と左右構成はそろった。**残る差**：設計は確認内容を2枚の大きな行で見せるが、実装はメッセージと2アクションを3行に分けている。',
+    verdictSource: 'friend-add-v6/U3SI5.png + U3SI5-1920.png + U3SI5.txt',
   },
   {
     ...FRIEND_ADD, node: 'ec9vg', name: '9-1-F 最終確認',
@@ -1198,10 +1184,10 @@ export const SCREENS = [
   },
   {
     ...FRIEND_ADD, node: 'Q3qP1r', name: '9-1-I 削除確認',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未実装（drop）。設定はアカウントに1枚で消せない。削除という考えがそもそも無い。',
-    gap: 'drop',
-    gapNote: '設定は1枚で消せない。削除という考えがそもそも無い',
-    status: 'unimplemented', why: '設定はアカウントに1枚で消せない。削除という考えがそもそも無い',
+    route: '/friend-add-settings?delete=rule-referral', mode: 'viewport', height: 1080,
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 #250 実装・撮影・テキスト照合。設計画像なし。** 対象名、削除後に経路不明の共通案内が動くこと、履歴を残すこと、取消不可、取消/削除操作を表示し、1440/1920pxで横はみ出し0。**残る差**：設計テキストにある一覧のページ送りが背面にない。',
+    verdictSource: 'friend-add-v6/Q3qP1r.txt',
   },
 
   // ── 機能10 ウェビナー ───────────────────────────────────
@@ -3030,6 +3016,8 @@ export const DESIGN_SIZE = {
   ee0sk: [1920, 1590], VjXGX: [1920, 1590], byqIW: [1920, 1080],
   A1ZYeP: [1920, 1080], KoT6c: [1920, 1080], GMvBd: [1920, 1080],
   zGZMA: [1920, 1080], XBkiQ: [1920, 1136],
+  uLQQc: [1920, 1080], s9gAx: [1920, 1080], W1wzCa: [1920, 1080],
+  K0Dbr2: [1920, 1080], txMO9: [1920, 1080], U3SI5: [1920, 1080], Q3qP1r: [1920, 1080],
 }
 
 /** 撮る幅。V6の設計は1920だが、1440でも横スクロールが出てはいけない。 */
@@ -3037,7 +3025,8 @@ export const WIDTHS = [1440, 1920]
 
 /** その機能の画面。`--feature 1` で引く。 */
 export function screensOf(feature) {
-  return SCREENS.filter((s) => s.feature === Number(feature))
+  const requested = new Set((process.env.VISUAL_QA_NODES ?? '').split(',').map((node) => node.trim()).filter(Boolean))
+  return SCREENS.filter((s) => s.feature === Number(feature) && (requested.size === 0 || requested.has(s.node)))
 }
 
 /**

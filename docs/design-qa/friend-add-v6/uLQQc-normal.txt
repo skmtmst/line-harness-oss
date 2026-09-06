@@ -1,4 +1,4 @@
-# 9-1 友だち追加時の配信
+# 9-1 友だち追加時の配信-normal
 # /friend-add-settings
 
 画

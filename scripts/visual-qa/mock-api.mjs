@@ -114,6 +114,65 @@ const ACCOUNT = {
  */
 const EMPTY_PAGE = { items: [], total: 0, page: 1, limit: 20 }
 
+/** 機能9。設計の一覧・5段編集・削除確認を同じ1組の設定で撮る。 */
+const FRIEND_ADD_RULE = {
+  id: 'rule-referral',
+  accountId: 'visual-qa-account',
+  friendKind: 'first_time',
+  name: '紹介キャンペーンの初回案内',
+  folderName: '紹介',
+  priority: 3,
+  isFallback: false,
+  status: 'published',
+  versionId: 'rule-referral-v1',
+  versionNumber: 1,
+  versionStatus: 'published',
+  lastTestStatus: 'succeeded',
+  lastTestedAt: '2026-01-13T10:00:00+09:00',
+  publishedAt: '2026-01-13T10:01:00+09:00',
+  matchedLast7Days: 9,
+  definition: {
+    routeIds: ['route-referral'],
+    scenarioId: 'scenario-welcome',
+    messageType: 'text',
+    messageText: 'ご登録ありがとうございます。ご希望の内容をお選びください。',
+    timing: 'immediate',
+    actions: [
+      { type: 'add_tag', label: 'タグ「新規友だち」を付ける', targetId: 'tag-new' },
+      { type: 'start_scenario', label: 'シナリオ「新規登録7日間フォロー」を開始する', targetId: 'scenario-welcome' },
+    ],
+    friendCondition: '紹介キャンペーンから来た人へ特典を案内する。',
+    activeFrom: null,
+    activeUntil: null,
+  },
+  routeNames: ['紹介キャンペーン'],
+  scenarioName: '新規登録7日間フォロー',
+}
+
+const FRIEND_ADD_RULE_OPTIONS = {
+  routes: [
+    { id: 'route-shop', name: '店頭QRコード', kind: 'QR' },
+    { id: 'route-instagram', name: 'Instagramプロフィール', kind: '広告' },
+    { id: 'route-referral', name: '紹介キャンペーン', kind: '紹介' },
+  ],
+  scenarios: [
+    { id: 'scenario-welcome', name: '新規登録7日間フォロー' },
+    { id: 'scenario-common', name: '共通のあいさつ' },
+  ],
+  tags: [{ id: 'tag-new', name: '新規友だち' }, { id: 'tag-delivered', name: '配信済み' }],
+}
+
+const FRIEND_ADD_RULES = {
+  items: [
+    { ...FRIEND_ADD_RULE, id: 'rule-shop', name: '店頭QRの初回案内', folderName: '店頭', priority: 1, matchedLast7Days: 41, routeNames: ['店頭QRコード'], definition: { ...FRIEND_ADD_RULE.definition, routeIds: ['route-shop'], messageText: '来店クーポンをご案内します。' } },
+    { ...FRIEND_ADD_RULE, id: 'rule-instagram', name: '広告からの初回案内', folderName: '広告', priority: 2, matchedLast7Days: 24, routeNames: ['Instagramプロフィール'], definition: { ...FRIEND_ADD_RULE.definition, routeIds: ['route-instagram'], messageText: '資料をダウンロードできます。' } },
+    FRIEND_ADD_RULE,
+    { ...FRIEND_ADD_RULE, id: 'rule-fallback', name: '経路が分からなかった人', folderName: null, priority: 999999, isFallback: true, matchedLast7Days: 12, routeNames: [], scenarioName: '共通のあいさつ', definition: { ...FRIEND_ADD_RULE.definition, routeIds: [], scenarioId: 'scenario-common', messageText: '友だち追加ありがとうございます。' } },
+  ],
+  summary: { rules: 4, active: 3, recentAdds: 86, captured: 74, unknownRoute: 12, delivered: 84, failed: 2 },
+  options: FRIEND_ADD_RULE_OPTIONS,
+}
+
 /** 期間の端。**時計を読まない**（読むと画像が毎回変わる）。 */
 const FIXED_FROM = '2026-01-01'
 const FIXED_TO = '2026-01-13'
@@ -613,6 +672,15 @@ const SHAPES = {
  * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
  */
 function visualQaWriteBody(method, pathname) {
+  if (method === 'POST' && pathname === '/api/friend-add-rules/test') {
+    return {
+      stateChanged: false, ruleId: FRIEND_ADD_RULE.id, matched: true,
+      reasons: ['この設定が優先順位どおりに選ばれます。'],
+      scenarioId: FRIEND_ADD_RULE.definition.scenarioId,
+      message: FRIEND_ADD_RULE.definition.messageText,
+      actions: FRIEND_ADD_RULE.definition.actions,
+    }
+  }
   if (method === 'POST' && pathname === '/api/friend-add-routing/validate') {
     return FRIEND_ADD_LIFECYCLE_VALIDATION
   }
@@ -753,6 +821,12 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       設計の「正常」と並べたときに実装の差に見えてしまう。
     */
     return { success: true, data: [{ ...ACCOUNT, webhook: { status: 'matched', checkedAt: `${FIXED_TO}T00:00:00.000Z` } }] }
+  }
+  if (pathname === '/api/friend-add-rules') {
+    return { success: true, data: FRIEND_ADD_RULES }
+  }
+  if (/^\/api\/friend-add-rules\/[^/]+$/.test(pathname)) {
+    return { success: true, data: { rule: FRIEND_ADD_RULE, options: FRIEND_ADD_RULE_OPTIONS } }
   }
   if (pathname === '/api/identity-candidates/detect') {
     return {
