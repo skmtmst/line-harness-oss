@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 242,
-  "unimplemented": 1,
+  "compared": 243,
+  "unimplemented": 0,
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 29,
-  "match": 81,
-  "structureMatchDataPending": 65,
-  "needsFix": 116,
+  "match": 96,
+  "structureMatchDataPending": 72,
+  "needsFix": 95,
   "unjudged": 5,
-  "remaining": 187,
+  "remaining": 172,
   "features": [
     {
       "feature": 1,
@@ -71,11 +71,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 4,
+      "match": 18,
       "structureMatchDataPending": 0,
-      "needsFix": 14,
+      "needsFix": 0,
       "unjudged": 0,
-      "remaining": 14,
+      "remaining": 0,
       "capturedAt": [
         {
           "pr": 513,
@@ -165,6 +165,28 @@
             "YZaDK"
           ],
           "note": "Claudeが実装して撮った。契約枝のローカルcommit 4b97fab1 の上。**doctorが要確認のため push していない。ローカルcommitのみ**"
+        },
+        {
+          "pr": 1059,
+          "head": "6f9a64684",
+          "on": "2026-09-07",
+          "screens": [
+            "xGLVe",
+            "NfgOs",
+            "H3lAOB",
+            "Xi4x9",
+            "f0zn6",
+            "NWbuF",
+            "B7CER8",
+            "IYjvu",
+            "TUveA",
+            "w72a2",
+            "ASsb3",
+            "ANgda",
+            "tBlkL",
+            "LHjwD"
+          ],
+          "note": "Issue #293。受信箱専用部品と撮影用固定データを設計状態へそろえ、3104/8791で1440・1920pxを撮影。同じ状態のPencilと横並び比較し、要修正14画面をすべて一致へ更新した。"
         }
       ]
     },
@@ -2437,16 +2459,16 @@
       "feature": 25,
       "name": "オートメーション",
       "total": 8,
-      "compared": 7,
-      "unimplemented": 1,
+      "compared": 8,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 1,
-      "structureMatchDataPending": 2,
-      "needsFix": 4,
+      "match": 2,
+      "structureMatchDataPending": 5,
+      "needsFix": 1,
       "unjudged": 0,
-      "remaining": 7,
+      "remaining": 6,
       "capturedAt": [
         {
           "pr": 502,
@@ -2514,6 +2536,19 @@
             "syWp4"
           ],
           "note": "Issue #238。撮影用APIへ18本の通常一覧、見本12件、v4〜v1と利用先5件を接続し、通常・読込中・0件・取得失敗を含む全対象を1440・1920pxで再撮影。設計画像と同じ入力で比較し、一致1・構造一致2・要修正4を実態どおり記録した。"
+        },
+        {
+          "pr": 1055,
+          "head": "08369795c",
+          "on": "2026-09-07",
+          "screens": [
+            "gief7",
+            "Rv8Jv",
+            "DkPY0",
+            "WjYAC",
+            "py5CG"
+          ],
+          "note": "Issue #299。5画面をV6の情報順と密度へそろえ、PR #1051 の通常データを含む通常・読込中・0件・取得失敗を固定ポート3105/8792で撮影。全30枚で1440・1920pxの横はみ出し0を確認し、一致1・構造一致4を記録した。"
         }
       ]
     },
@@ -2853,8 +2888,8 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 4,
+      "structureMatchDataPending": 4,
+      "needsFix": 0,
       "unjudged": 0,
       "remaining": 4,
       "capturedAt": null
@@ -2876,13 +2911,5 @@
       "capturedAt": null
     }
   ],
-  "gaps": [
-    {
-      "feature": 25,
-      "node": "DkPY0",
-      "name": "25-1-B オートメーションが動いた記録",
-      "gap": "pending",
-      "gapNote": "画面 `/automations/runs` が development に無い。判定は未マージ枝 `75b010fc` で書かれたもの"
-    }
-  ]
+  "gaps": []
 }

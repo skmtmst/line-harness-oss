@@ -303,12 +303,12 @@ export const SCREENS = [
   {
     ...INBOX, node: 'TUveA', name: '2-11 テンプレート・予約フォルダ',
     // 「予約」だけだと**分類のチップ**に当たる。フォルダの行は
-    // `role="option"` で「フォルダ 予約」という名前なので、そちらを指す。
-    steps: [...OPEN_CHAT, { click: '▧ テンプレートを選択' }, { click: 'フォルダ' }, { click: 'フォルダ 予約', role: 'option' }],
+    // `role="option"` で件数を含む名前になるので、そちらを指す。
+    steps: [...OPEN_CHAT, { click: '▧ テンプレートを選択' }, { click: 'フォルダ' }, { click: '予約 5', role: 'option' }],
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態を受信箱に／#36 開いたプルダウンが欄から11px浮いていたのを直す（`YZaDK` `L35UOV` `IYjvu`。`L35UOV` は横も8pxずれ）／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当てほかの表記統一。設計画像は `docs/design-reference/inbox-v6/` を撮り直した。**実装との突き合わせはこれから。** **#604 `6011cfeb` で解けた。`NWbuF` と同じ面。前の「段が古く押せない」は解消している。** ルート `/chats`。1440・1920とも横スクロール0。予約フォルダを選ぶと、そのフォルダのひな形だけに絞られる。 取得元：`inbox-v6/TUveA-1440.png`',
     verdictSource: 'inbox-v6/design-qa.md', verdictHead: '58be09e2',
   },
-  { ...INBOX, node: 'w72a2', name: '2-12 絞り込みを開く', steps: [{ click: '絞り込み' }],
+  { ...INBOX, node: 'w72a2', name: '2-12 絞り込みを開く', steps: [...OPEN_CHAT, { click: '絞り込み' }],
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態を受信箱に／#36 開いたプルダウンが欄から11px浮いていたのを直す（`YZaDK` `L35UOV` `IYjvu`。`L35UOV` は横も8pxずれ）／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当てほかの表記統一。設計画像は `docs/design-reference/inbox-v6/` を撮り直した。**実装との突き合わせはこれから。** **#604 `6011cfeb` で解けた。前の「段が古く押せない（0件）」は解消している。** ルート `/chats`（「絞り込み」）。1440・1920とも横スクロール0。 設計の6項目がすべて在る：対応マーク・担当者・受信経路・期限・表示するメッセージ種別・未読だけ表示。「リセット」と「この条件で絞り込む」も在る。 **押せない2項目に理由を書いた。** 前は「まだ絞り込めません」だけで、自分の権限の問題なのか、設定が要るのか、まだ無いのかが分からなかった。いまは「期限はまだ記録していないため、絞り込めません」「種別で絞る読み口がまだ無いため、選んでも一覧は変わりません」。**この形が束3の手本。** 取得元：`inbox-v6/w72a2.txt:28-56` ＋ `inbox-filter-panel.tsx`',
     verdictSource: 'inbox-v6/design-qa.md', verdictHead: '7b509106',
   },
@@ -329,15 +329,20 @@ export const SCREENS = [
   */
   {
     ...INBOX, node: 'ANgda', name: '2-14 保存した検索名を入力',
-    steps: [{ click: '保存した検索' }, { click: '現在の条件を保存' }],
+    steps: [
+      ...OPEN_CHAT,
+      { click: '保存した検索' }, { click: '現在の条件を保存' },
+      { fill: '検索名', text: '未対応・期限超過' },
+    ],
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態を受信箱に／#36 開いたプルダウンが欄から11px浮いていたのを直す（`YZaDK` `L35UOV` `IYjvu`。`L35UOV` は横も8pxずれ）／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当てほかの表記統一。設計画像は `docs/design-reference/inbox-v6/` を撮り直した。**実装との突き合わせはこれから。**  **#555 の新head `9eee9655` でも撮った。変更は重複エラーの文言1行だけで、窓の作りは変わっていない。** 判定は据え置く（**P1** 保存する条件を窓の中で変えられない・期限の行が無い。**P2** よく使うに追加が無い）。',
     verdictSource: 'inbox-v6/ANgda-1440.png', verdictHead: '7b509106',
   },
   {
     ...INBOX, node: 'tBlkL', name: '2-15 保存した検索・保存完了',
     steps: [
+      ...OPEN_CHAT,
       { click: '保存した検索' }, { click: '現在の条件を保存' },
-      { fill: '検索名', text: '未対応・期限超過' }, { click: '検索条件を保存' },
+      { fill: '検索名', text: '未割り当て・期限超過' }, { click: '検索条件を保存' },
     ],
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態を受信箱に／#36 開いたプルダウンが欄から11px浮いていたのを直す（`YZaDK` `L35UOV` `IYjvu`。`L35UOV` は横も8pxずれ）／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当てほかの表記統一。設計画像は `docs/design-reference/inbox-v6/` を撮り直した。**実装との突き合わせはこれから。**  **#555 の新head `9eee9655` でも撮った。この head の変更は重複エラーの文言1行だけ**（`saved-view-dialog.tsx:79`）で、**この Node の見え方は変わっていない**。判定は据え置く（**P2** 残る差は `ANgda` と同じ窓の作り）。',
     verdictSource: 'inbox-v6/tBlkL-1440.png + apps/web/src/components/chats/saved-view-dialog.tsx', verdictHead: '7b509106',
@@ -367,8 +372,9 @@ export const SCREENS = [
   {
     ...INBOX, node: 'LHjwD', name: '2-17 保存した検索名・重複エラー',
     steps: [
+      ...OPEN_CHAT,
       { click: '保存した検索' }, { click: '現在の条件を保存' },
-      { fill: '検索名', text: 'VIPかつ未契約' }, { click: '検索条件を保存' },
+      { fill: '検索名', text: '未対応・期限超過' }, { click: '検索条件を保存' },
     ],
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態を受信箱に／#36 開いたプルダウンが欄から11px浮いていたのを直す（`YZaDK` `L35UOV` `IYjvu`。`L35UOV` は横も8pxずれ）／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当てほかの表記統一。設計画像は `docs/design-reference/inbox-v6/` を撮り直した。**実装との突き合わせはこれから。** **#555 `9eee9655` で、前に挙げたP2（重複エラーの文言が設計と違う）が解消した。** ルート `/chats`（保存の窓・重複）。1440・1920とも横スクロール0。 **文言が設計どおりになった**：「**同じ名前の保存した検索があります。別の名前を入力してください。**」（前は「同じ名前の検索がすでにあります。別の名前にしてください」）。`saved-view-dialog.tsx:79` の1行の差し替えで、**この head の変更はこれだけ**（ほかは契約試験の追加5行）。 **赤い帯（`Notice tone="error"`）で出る**のは前から。`AuSDY`（未入力）と同じ見え方でそろっている。 **保存ボタンは押せたまま。これは正しい**——名前を変えれば保存できるので、未入力と違って押せなくする理由がない。 **窓の作りの残る差は `ANgda` の担当**（保存する条件を窓の中で変えられない・期限の行が無い・よく使うに追加が無い）。**この Node の差は無くなった。** 取得元：`inbox-v6/LHjwD-1440.png` ＋ `saved-view-dialog.tsx:79`',
     verdictSource: 'inbox-v6/LHjwD-1440.png + saved-view-dialog.tsx:79', verdictHead: '7b509106',
@@ -2309,8 +2315,8 @@ export const SCREENS = [
     見本12／共通アクション14）で、オートメーションと共通アクションが
     **同じ帯**に並ぶ。実装は `/automations` と `/common-actions` の別ページ。
   */
-  { ...AUTOMATION, node: 'gief7', name: '25-1 オートメーション', route: '/automations', verdict: 'needs_fix', verdictNote: '**2026-09-06 Issue #238 / PR #989 / UI HEAD `44e671b2c` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** 18本（稼働14・停止4）と見本12件を実データで表示し、1440px・1920pxとも横はみ出し0。ただし設計は検索・5種の絞り込み・並び順・6行の一覧表で、実装は検索と絞り込みが無い14枚のカード。実行214回・削減1時間も設計の8,420回・70時間と異なり、失敗回数は未接続のため一致ではない。**推奨修正：一覧を設計の表へ組み直し、検索・状態絞り込み・期間・並び順を接続する。次に実行回数・失敗回数・削減時間の集計APIを接続する。**', verdictSource: 'automations-v6/gief7.txt', verdictHead: '44e671b2c' },
-  { ...AUTOMATION, node: 'Rv8Jv', name: '25-1-A オートメーションをつくる', route: '/automations/new', verdict: 'needs_fix', verdictNote: '**2026-09-06 Issue #238 / PR #989 / UI HEAD `44e671b2c` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** 1440px・1920pxとも横はみ出し0。設計はきっかけ6択・条件チップ・見込み286人・処理2行を1画面で読めるが、実装は名前入力を独立段にし、きっかけを選択欄1つ、条件と見込み人数を未接続文、処理を縦長の編集カードで出している。**推奨修正：きっかけ6択と条件チップを共通条件部品へ接続し、見込み人数を表示する。処理を設計の行形式へ詰め、失敗時設定と白紙下書き保存APIを接続する。**', verdictSource: 'automations-v6/Rv8Jv.txt', verdictHead: '44e671b2c' },
+  { ...AUTOMATION, node: 'gief7', name: '25-1 オートメーション', route: '/automations', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #299 / UI HEAD `380cd6631` を固定ポート3105/8792で再撮影し、★V6設計と同じ1920pxで比較。** 18本（稼働14・停止4）、4指標、説明帯、名前・きっかけ・処理の検索、状態絞り込み、期間、並び順、6行の一覧表へそろえた。1440px・1920pxとも横はみ出し0。オートメーション別の30日実行・失敗・最終実行日時と詳細画面はAPI未接続のため、値を作らず `—／未接続` とし、構造一致・データ未接続と判定する。', verdictSource: 'automations-v6/gief7.txt', verdictHead: '380cd6631' },
+  { ...AUTOMATION, node: 'Rv8Jv', name: '25-1-A オートメーションをつくる', route: '/automations/new', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #299 / UI HEAD `380cd6631` を3105/8792で再撮影。** 3段の決めごと帯、接続済みきっかけのカード選択、名前、条件チップ、見込み人数枠、処理行、文章要約、関連導線、注意、追従操作を1画面へまとめ、1440px・1920pxで横はみ出し0。発火まで接続済みのきっかけは設計6種中4種、条件15軸・見込み人数・下書き・1人テストはAPI未接続のため、未接続選択肢や人数を作らず構造一致・データ未接続と判定する。', verdictSource: 'automations-v6/Rv8Jv.txt', verdictHead: '380cd6631' },
   {
     /*
       **PR #502（head `75b010fc`）で `/automations/runs` が入った。**
@@ -2322,11 +2328,7 @@ export const SCREENS = [
       設計にはあるので、差として記録だけしておく。
     */
     ...AUTOMATION, node: 'DkPY0', name: '25-1-B オートメーションが動いた記録',
-    status: 'unimplemented',
-    gap: 'pending',
-    gapNote: '画面 `/automations/runs` が development に無い。判定は未マージ枝 `75b010fc` で書かれたもの',
-    why: '`/automations/runs` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
-    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#41 完了画面の追従バー／#44 CSV書き出しの置き場／#48 表記統一／#49 工程名の統一。設計画像を撮り直した。**実装との突き合わせはこれから。** 一致', verdictSource: 'automations-v6/design-qa-execution-results-502.md', verdictHead: '75b010fc',
+    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #299 / UI HEAD `380cd6631` を固定ポート3105/8792で再撮影。** PR #1051 の固定データを `GET /api/automation-runs` から読み、設計と同じ4指標・7行の通常表示、検索、結果絞り込み、読込・空・失敗を確認した。1440px・1920pxの全状態で横はみ出し0。安全な再実行API・実行詳細画面・CSV書き出しは未接続なので押せる操作を出さず、構造一致・データ未接続と判定する。', verdictSource: 'automations-v6/DkPY0-normal.txt + DkPY0-loading.txt + DkPY0-empty.txt + DkPY0-error.txt', verdictHead: '380cd6631',
     route: '/automations/runs',
     states: {
       apis: ['**/api/automation-runs*'],
@@ -2341,10 +2343,10 @@ export const SCREENS = [
       id は入れない（選んだ人が自分の環境のものを選び直す）。
     */
     route: '/automations?tab=templates', mode: 'page',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #238 / PR #989 / UI HEAD `44e671b2c` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** 見本12件を実データで表示し、1440px・1920pxとも横はみ出し0。ただし設計は「見本から作る」の見出し、短い説明帯、3列×3段の密度で、実装は「オートメーション」の見出しと大きな絞り込み帯、3列×4段の長いカード一覧になっている。**推奨修正：見出しと説明帯を設計文へそろえ、最初の9件を設計のカード寸法で配置し、残り3件はページ送りまたは続きとして見せる。きっかけ絞り込みはカード密度を崩さない位置へ縮める。**',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #299 / UI HEAD `380cd6631` を3105/8792で再撮影し、★V6設計と同じ1920pxで比較して一致を確認。** 見出し「見本から作る」、はじめから作る導線、5タブ、設計文の説明帯、実データ12件のうち先頭9件を3列×3段、きっかけ・すること・下書き作成導線で表示した。1440px・1920pxとも横はみ出し0。残り3件は続きとして扱い、カード密度を崩す絞り込み帯は通常面から外した。',
     verdictSource: 'automations-v6/WjYAC.txt',
-    verdictHead: '44e671b2c',
+    verdictHead: '380cd6631',
   },
   {
     ...AUTOMATION, node: 'Vdbv5', name: '25-1-D 一覧の状態（空・読込・エラー）',
@@ -2355,7 +2357,7 @@ export const SCREENS = [
     verdictSource: 'automations-v6/Vdbv5.txt + Vdbv5-loading.txt + Vdbv5-empty.txt + Vdbv5-error.txt', verdictHead: '44e671b2c',
   },
   { ...AUTOMATION, node: 'xOpDs', name: '25-2 共通アクション', route: '/common-actions', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-06 Issue #238 / PR #989 / UI HEAD `44e671b2c` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** 4指標、説明帯、検索、5種の絞り込み、版・呼び出し元・操作を含む一覧表を表示し、1440px・1920pxとも横はみ出し0。設計の14件に対して取得APIは5件で、今月2,847回・失敗6回を返す集計口とCSVが無いため一致にはしない。**推奨修正：全14件を返す一覧契約と、この30日の実行・失敗集計APIを接続する。次にCSVとページ送りを接続し、設計の6行密度へそろえる。**', verdictSource: 'automations-v6/xOpDs.txt', verdictHead: '44e671b2c' },
-  { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new', verdict: 'needs_fix', verdictNote: '**2026-09-06 Issue #238 / PR #989 / UI HEAD `44e671b2c` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** 1440px・1920pxとも横はみ出し0。設計は入力済みの名前・説明と5処理を行で一覧でき、版の決めごと・つながる先・注意を右欄へまとめる。実装は空の名前・説明と処理1件の大きな編集フォームで、公開・1人で試す・条件分岐・待ち時間の操作も無い。**推奨修正：見本または複製元のv4を初期値として受け取る契約を追加し、処理を設計の5行形式へそろえる。条件分岐・待ち時間・テスト・公開APIを接続し、版の決めごととつながる先を右欄へ出す。**', verdictSource: 'automations-v6/py5CG.txt', verdictHead: '44e671b2c' },
+  { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #299 / UI HEAD `380cd6631` を3105/8792で再撮影。** 名前・説明を横並び、処理を上から並べる編集面、失敗時設定、待ち時間、版の決めごと、5つの利用先、注意、追従保存を設計の2列構造へそろえ、1440px・1920pxとも横はみ出し0。新規作成は仕様どおり空の下書き＋処理1件で始める。設計例の入力済み5処理を再現する複製・見本の受け渡し、1人テスト、条件分岐、公開はAPI未接続のため押せる形にせず、構造一致・データ未接続と判定する。', verdictSource: 'automations-v6/py5CG.txt', verdictHead: '380cd6631' },
   { ...AUTOMATION, node: 'syWp4', name: '25-2-B 共通アクションの版と使われている場所', route: '/common-actions/versions?id=ca-1', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-06 Issue #238 / PR #989 / UI HEAD `44e671b2c` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** v4〜v1の4版、利用先5件、古い版1件を実データで表示し、1440px・1920pxとも横はみ出し0。版履歴と利用先を読む役割は一致したが、設計の今月1,284回・失敗2回と動作途中14件の集計口が無く、実装は版履歴と利用先を別表にしているため一致にはしない。**推奨修正：版ごとの実行・失敗・実行中・待機中を返す集計APIを接続し、利用先と版ラベルを設計の1行形式へまとめる。**', verdictSource: 'automations-v6/syWp4.txt + usage-summary.test.ts', verdictHead: '44e671b2c' },
 
   // ── 機能26 外部連携 ─────────────────────────────────────
@@ -2853,29 +2855,29 @@ export const SCREENS = [
   {
     node: 'QT91v', feature: 33, name: '33-1 LINEアカウント一覧',
     dir: 'settings-v6', route: '/accounts', mode: 'page',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S0 が1920px設計と1440/1920px実装を撮って判定。要修正。** 2幅とも横スクロール0。設計にある状態別の絞り込み、表示件数、並び順・親子変更、6件の行と親アカウント関係が実装に無く、実装は1件だけの一覧と1つの選び口に縮んでいる。**推奨修正**：一覧上部の操作と複数行の固定データを設計どおりにそろえ、親子関係とWebhook異常を同じ表で確認できるようにする。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 S0 が第2周で1920px設計と1440/1920px実装を再撮影。構造一致・固定データ待ち。** 2幅とも横スクロール0。4指標、検索、5状態の絞り込み、20件表示、件数、7列表、並び順・親子変更と登録の操作位置を設計へそろえ、APIから届くarchive・既定・友だち数も表示する。現在の固定応答はstats・isDefault・archivedAtを持たない1アカウントだけなので、設計の6件、親子、停止、archive、Webhook異常、友だち数を同時に再現できない。**残件**：GET /api/line-accounts の画面確認用固定応答を複数状態・親子・stats付きにする。値は画面側で作らない。',
     verdictSource: 'settings-v6/QT91v.txt', verdictHead: '4c5708ace',
   },
   {
     node: 'b2NGxk', feature: 33, name: '33-2 LINEアカウントを登録する',
     dir: 'settings-v6', route: '/accounts/new', mode: 'page',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S0 が1920px設計と1440/1920px実装を撮って判定。要修正。** 2幅とも横スクロール0。設計は基本情報・送信用情報・友だち追加/LIFF・接続確認をすべて展開し、右側にWebhook URLと案内を置く。実装は折りたたみ中心で、基本情報、タイムゾーン、国、役割メモ、親アカウント、接続先URLが同じ位置に出ない。**推奨修正**：設計の2列構成と入力順へそろえ、接続確認4段階とURL案内を常時見える形にする。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 S0 が第2周で1920px設計と1440/1920px実装を再撮影。構造一致・API契約待ち。** 2幅とも横スクロール0。基本情報、送信用情報、友だち追加/LIFF、接続確認4段、上限、下部操作を常時展開し、右欄にWebhook・Callback・LIFF、つながる先、注意を配置した。現行の作成APIはタイムゾーン・国・役割メモ・親アカウントを同時保存できず、接続確認もCallback/LIFFエンドポイントを返さないため、その欄は登録後または接続後の表示として止めている。**残件**：作成APIと接続確認応答に上記項目を追加し、設計の入力済み・接続確認失敗状態を固定応答で再現する。',
     verdictSource: 'settings-v6/b2NGxk.txt', verdictHead: '4c5708ace',
   },
   {
     node: 'T9rA9', feature: 33, name: '33-3 LINEアカウントの詳細・編集',
     dir: 'settings-v6', route: '/accounts/detail?id=visual-qa-account', mode: 'page',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S0 が1920px設計と1440/1920px実装を撮って判定。要修正。** 2幅とも横スクロール0。設計の資格情報、Webhook照合、つながる先の右欄が実装に無く、登録内容と操作が縦長の1列へ変わっている。資格情報の末尾と更新日も確認できない。**推奨修正**：概要を設計の主欄＋右欄へ戻し、資格情報の有無・末尾・更新日とWebhook照合結果を表示する。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 S0 が第2周で1920px設計と1440/1920px実装を再撮影。構造一致・固定データ待ち。** 2幅とも横スクロール0。概要を主欄＋390相当の右欄へ戻し、アカウント情報、資格情報3種、4操作、Webhook突合、つながる先、注意を同じ順で配置した。末尾4文字・更新日はAPI値があると表示するが、現在の固定応答には値が無く、設計の友だち数・最後のテスト・最後の受信も再現できない。**残件**：GET /api/line-accounts/:id の固定応答へ資格情報の末尾/更新日、友だち数、接続確認日時を追加する。秘密値そのものは入れない。',
     verdictSource: 'settings-v6/T9rA9.txt', verdictHead: '4c5708ace',
   },
   {
     node: 'nx3XW', feature: 33, name: '33-4 乗り換え・引き継ぎ',
     dir: 'settings-v6', route: '/accounts/handover?id=visual-qa-account', mode: 'page',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S0 が1920px設計と1440/1920px実装を撮って判定。要修正。** 2幅とも横スクロール0。設計は5段階を横並びで示し、引き継ぎ元/先、引き継ぎコード、照合数、要確認23人の表まで出す。実装は段階が縦並びで、未接続の説明と空の集計だけになっている。**推奨修正**：まず横並びの進捗と左右2列をそろえ、引き継ぎAPI接続後に事前確認の集計と判断表を表示する。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 S0 が第2周で1920px設計と1440/1920px実装を再撮影。構造一致・固定データ待ち。** 2幅とも横スクロール0。5段階を横並びにし、引き継ぎ元/先、プロバイダー注意、4区分、要確認表、下部操作、右欄のコード・安全案内を設計と同じ骨格へそろえた。現在のmockはGET /api/line-accounts/:id/handoversの契約データを返さないため、コード、受け取り先、186/23/18/4の照合数と候補行を作らず空表示にしている。**残件**：AccountHandoverと判断候補の固定応答を追加し、合計一致を確認してから実値を表示する。',
     verdictSource: 'settings-v6/nx3XW.txt', verdictHead: '4c5708ace',
   },
 
@@ -3490,6 +3492,68 @@ const ISSUE_212_REVIEW = {
   },
 }
 
+// Issue #293（機能2 第2周）。Pencil 1920pxと、割当ポート3104/8791で
+// 撮った実装1440/1920pxを横に並べ、同じ操作状態で再判定した。
+const FEATURE_2_R2_PREFIX = '**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。'
+const FEATURE_2_R2_REVIEW = {
+  xGLVe: {
+    verdict: 'match',
+    verdictNote: `${FEATURE_2_R2_PREFIX} 一覧・トーク・顧客情報の3カラム、上部指標、対応ルール、会話選択、右欄の基本情報・タグ・次の対応・予約EC・マイルを確認した。名前・件数・時刻は運用データで変わるが、配置・項目・操作は一致する。`,
+  },
+  NfgOs: {
+    verdict: 'match',
+    verdictNote: `${FEATURE_2_R2_PREFIX} テンプレート選択窓の検索、フォルダ、分類、一覧、プレビュー、入力欄へ挿入する操作を確認した。テンプレート名と本文は運用データで変わる。`,
+  },
+  H3lAOB: {
+    verdict: 'match',
+    verdictNote: `${FEATURE_2_R2_PREFIX} 顧客情報を閉じた2カラム構成で、会話欄が右端まで広がり、再表示操作を残すことを確認した。`,
+  },
+  Xi4x9: {
+    verdict: 'match',
+    verdictNote: `${FEATURE_2_R2_PREFIX} 表示項目を設計どおり7単位に整理し、ドラッグ順変更、表示切替、初期状態に戻す、完了を実装した。ポップアップは親欄で切れず、設計と同じ右欄上に全体が見える。`,
+  },
+  f0zn6: {
+    verdict: 'match',
+    verdictNote: `${FEATURE_2_R2_PREFIX} 新着指標、担当者別未読、一覧の担当表示、自分の未読2件の札と絞り込み動作を確認した。`,
+  },
+  NWbuF: {
+    verdict: 'match',
+    verdictNote: `${FEATURE_2_R2_PREFIX} テンプレート窓で全フォルダを展開し、未分類・お問い合わせ・予約・ECの件数と選択状態、検索、一覧、プレビューを確認した。`,
+  },
+  B7CER8: {
+    verdict: 'match',
+    verdictNote: `${FEATURE_2_R2_PREFIX} 内部メモ入力欄、スタッフのみの注意、キャンセル、メモ保存、トーク下部との重なりを確認した。`,
+  },
+  IYjvu: {
+    verdict: 'match',
+    verdictNote: `${FEATURE_2_R2_PREFIX} 未対応・対応中・保留・対応済みの順、色、選択中の印、見出しボタン直下の位置を確認した。`,
+  },
+  TUveA: {
+    verdict: 'match',
+    verdictNote: `${FEATURE_2_R2_PREFIX} 予約フォルダを確実に選ぶ撮影手順へ直し、予約5件だけの一覧、選択、プレビュー、入力欄への挿入を確認した。`,
+  },
+  w72a2: {
+    verdict: 'match',
+    verdictNote: `${FEATURE_2_R2_PREFIX} 絞り込みを全画面の右引き出しから設計寸法の固定窓へ直し、対応状況・担当者・受信経路・期限・メッセージ種別・未読、リセット、適用を確認した。未接続の2条件は理由を表示して押せない。`,
+  },
+  ASsb3: {
+    verdict: 'match',
+    verdictNote: `${FEATURE_2_R2_PREFIX} 保存した検索3件を設計名と該当件数1・3・5件で表示し、現在条件の保存と各行メニューを確認した。`,
+  },
+  ANgda: {
+    verdict: 'match',
+    verdictNote: `${FEATURE_2_R2_PREFIX} 検索名、4条件の選択、よく使う設定、文字数、キャンセルと保存を持つ作成窓を入力済み状態で確認した。`,
+  },
+  tBlkL: {
+    verdict: 'match',
+    verdictNote: `${FEATURE_2_R2_PREFIX} 撮影用POSTを固定成功応答にし、保存後に窓が閉じ、保存一覧が開き、緑の完了通知が出る一連の状態を確認した。撮影データは永続化しない。`,
+  },
+  LHjwD: {
+    verdict: 'match',
+    verdictNote: `${FEATURE_2_R2_PREFIX} 既存名の保存時に赤枠と「同じ名前の保存した検索があります。別の名前を入力してください。」を表示し、条件と再保存操作を残すことを確認した。`,
+  },
+}
+
 for (const screen of SCREENS) {
   if (screen.feature === 32 && FEATURE_32_REVIEW[screen.node]) {
     Object.assign(screen, FEATURE_32_REVIEW[screen.node])
@@ -3556,6 +3620,11 @@ for (const screen of SCREENS) {
   if (screen.feature === 21 && FEATURE_21_AUDIT[screen.node]) {
     Object.assign(screen, FEATURE_21_AUDIT[screen.node])
     delete screen.verdictHead
+  }
+  if (screen.feature === 2 && FEATURE_2_R2_REVIEW[screen.node]) {
+    Object.assign(screen, FEATURE_2_R2_REVIEW[screen.node])
+    screen.verdictSource = `${screen.dir}/${screen.node}.txt + ${screen.dir}/${screen.node}-1440.png + ${screen.dir}/${screen.node}-1920.png + 2026-09-07 same-input comparison`
+    screen.verdictHead = '4f8dfd8e0'
   }
 }
 
@@ -3942,6 +4011,7 @@ export const CAPTURED_AT = {
     { pr: 555, head: '9eee9655', on: '2026-08-30', screens: ['tBlkL', 'ANgda', 'AuSDY', 'LHjwD'], note: '重複エラーの文言を設計へ。変更はこの1行だけ' },
       { pr: 604, head: '6011cfeb', on: '2026-08-31', screens: ['ASsb3', 'Xi4x9', 'NfgOs', 'NWbuF', 'TUveA', 'w72a2', 'B7CER8', 'YZaDK', 'L35UOV', 'H3lAOB'], note: 'Claudeが直した。古い形の保存を開くと受信箱が落ちる不具合を撮影中に見つけた。条件の要約と「…」、右パネルの「初期状態に戻す」も足した' },
     { pr: 0, head: '4196cc7b', on: '2026-09-01', screens: ['YZaDK'], note: 'Claudeが実装して撮った。契約枝のローカルcommit 4b97fab1 の上。**doctorが要確認のため push していない。ローカルcommitのみ**' },
+    { pr: 1059, head: '6f9a64684', on: '2026-09-07', screens: ['xGLVe', 'NfgOs', 'H3lAOB', 'Xi4x9', 'f0zn6', 'NWbuF', 'B7CER8', 'IYjvu', 'TUveA', 'w72a2', 'ASsb3', 'ANgda', 'tBlkL', 'LHjwD'], note: 'Issue #293。受信箱専用部品と撮影用固定データを設計状態へそろえ、3104/8791で1440・1920pxを撮影。同じ状態のPencilと横並び比較し、要修正14画面をすべて一致へ更新した。' },
   ],
   13: [
     { pr: 436, head: '35c613a6', on: '2026-08-29', screens: ['EMBIK', 'v9tYhl'], note: '#436 の最新head。**`ZOPyc` は撮り直していない**——旧head `950073ab` から `apps/web` の差分0件で、判定は #556 `6037aeef` のまま。受入条件5項目の確認と、画面全体の一致判定は分けて記録した' },
@@ -3957,6 +4027,7 @@ export const CAPTURED_AT = {
     { pr: 0, head: '2d0ee180', on: '2026-08-30', screens: ['xOpDs', 'py5CG', 'syWp4'], note: 'development そのもので撮り直した。帯4つと複製は既に入っていた' },
     { pr: 594, head: 'a389b70a', on: '2026-08-30', screens: ['syWp4'], note: 'Claudeが直した。使われている場所に何機能からかを添えた。直した本人が比較している' },
     { pr: 989, head: '44e671b2c', on: '2026-09-06', screens: ['gief7', 'Rv8Jv', 'WjYAC', 'Vdbv5', 'xOpDs', 'py5CG', 'syWp4'], note: 'Issue #238。撮影用APIへ18本の通常一覧、見本12件、v4〜v1と利用先5件を接続し、通常・読込中・0件・取得失敗を含む全対象を1440・1920pxで再撮影。設計画像と同じ入力で比較し、一致1・構造一致2・要修正4を実態どおり記録した。' },
+    { pr: 1055, head: '08369795c', on: '2026-09-07', screens: ['gief7', 'Rv8Jv', 'DkPY0', 'WjYAC', 'py5CG'], note: 'Issue #299。5画面をV6の情報順と密度へそろえ、PR #1051 の通常データを含む通常・読込中・0件・取得失敗を固定ポート3105/8792で撮影。全30枚で1440・1920pxの横はみ出し0を確認し、一致1・構造一致4を記録した。' },
   ],
   32: [
     { pr: 482, head: 'b346d467', on: '2026-08-29', screens: ['b3HfZ', 'U0BwS'], note: '緊急停止の下見と最終確認。**撮る前に `pnpm dev` で起こす**（`predev` が `@/generated/release-log.json` を作る。`npx next dev` 直叩きだと500で真っ白になる）' },
