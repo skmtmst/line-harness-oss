@@ -371,4 +371,49 @@ describe('全体', () => {
     expect(delivery.quotaLimit).toBeNull();
     expect(delivery.quotaUsed).toBeNull();
   });
+
+  test('実データの0件と未取得を指標契約で区別する', async () => {
+    const { metrics } = await getDashboardOverview(db, 'today', { allTenants: true });
+
+    expect(metrics.activeFriends).toMatchObject({
+      value: 0, state: 'empty', reason: null, period: 'latest',
+    });
+    expect(metrics.friendTrend).toMatchObject({
+      state: 'estimated', reason: null, period: 'last7-fixed',
+    });
+    expect(metrics.friendTrend.value).toHaveLength(7);
+    expect(metrics.friendTrend.value?.every((point) => point.active === 0 && point.estimated)).toBe(true);
+    expect(metrics.monthlyQuota).toEqual({
+      value: null, state: 'unavailable', reason: 'not_loaded', asOf: null, period: 'this-month',
+    });
+    expect(metrics.officialProfileUrl).toEqual({
+      value: null, state: 'unavailable', reason: 'not_loaded', asOf: null, period: 'latest',
+    });
+  });
+
+  test('友だち集計に失敗した場合は0件に見せずnullを返す', async () => {
+    const healthyDb = asD1(sqlite);
+    const failedFriendsDb = {
+      ...healthyDb,
+      prepare(query: string) {
+        if (query.includes('COUNT(*) AS total') && query.includes('FROM friends')) {
+          return {
+            bind: () => ({ first: async () => { throw new Error('friends unavailable'); } }),
+          };
+        }
+        return healthyDb.prepare(query);
+      },
+    } as D1Database;
+
+    const { metrics, partialFailures } = await getDashboardOverview(
+      failedFriendsDb,
+      'today',
+      { allTenants: true },
+    );
+
+    expect(metrics.activeFriends).toEqual({
+      value: null, state: 'unavailable', reason: 'source_failed', asOf: null, period: 'latest',
+    });
+    expect(partialFailures).toContain('friends');
+  });
 });

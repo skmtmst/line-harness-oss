@@ -93,6 +93,7 @@ shared-button-importer app/users/page.tsx
 shared-button-importer app/webhooks/page.tsx
 shared-button-importer app/webhooks/webhook-interactions.tsx
 shared-button-importer app/webinars/edit/page.tsx
+shared-button-importer app/webinars/new/page.tsx
 shared-button-importer app/webinars/page.tsx
 shared-button-importer app/webinars/published/page.tsx
 shared-button-importer components/auto-replies/edit-dialog.tsx

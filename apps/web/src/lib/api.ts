@@ -6661,6 +6661,13 @@ export interface EventBookingItem {
   slot_ends_at: string;
   friend_display_name: string | null;
   friend_line_user_id: string | null;
+  /** 一覧の旧応答・拡張応答との互換。未接続なら画面は正直に「未取得」と出す。 */
+  friend_name?: string | null;
+  created_at?: string;
+  companion_note?: string | null;
+  companion_count?: number | null;
+  is_first_time?: number | null;
+  line_account_name?: string | null;
 }
 
 export interface EventWaitlistItem {

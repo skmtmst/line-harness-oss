@@ -3,8 +3,8 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import Header from '@/components/layout/header'
 import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -23,22 +23,32 @@ const STATUS_TABS: Array<{ key: string; label: string }> = [
 ]
 
 const statusBadge: Record<string, string> = {
-  requested: 'bg-yellow-100 text-yellow-800',
-  confirmed: 'bg-green-100 text-green-800',
-  rejected: 'bg-gray-100 text-gray-700',
-  cancelled: 'bg-gray-100 text-gray-600',
-  expired: 'bg-gray-100 text-gray-500',
-  attended: 'bg-blue-100 text-blue-800',
-  no_show: 'bg-red-100 text-red-800',
+  requested: 'bg-warning-bg text-warning',
+  confirmed: 'bg-success-bg text-success',
+  rejected: 'bg-canvas-sunken text-ink-secondary',
+  cancelled: 'bg-canvas-sunken text-ink-secondary',
+  expired: 'bg-canvas-sunken text-ink-faint',
+  attended: 'bg-accent-soft text-accent',
+  no_show: 'bg-danger-bg text-danger',
+  waitlist: 'bg-warning-bg text-warning',
 }
 
-function formatJp(iso: string): string {
-  return new Date(iso).toLocaleString('ja-JP', {
+const STATUS_LABELS = new Map([
+  ...STATUS_TABS.map(({ key, label }) => [key, label] as const),
+  ['waitlist', 'キャンセル待ち'] as const,
+])
+
+function formatJp(iso: string | null | undefined, fallback: string): string {
+  if (!iso) return fallback
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return fallback
+  return date.toLocaleString('ja-JP', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'Asia/Tokyo',
   })
 }
 
@@ -48,6 +58,7 @@ function BookingsInner() {
   const { selectedAccountId, accounts } = useAccount()
   const [event, setEvent] = useState<EventDetail | null>(null)
   const [items, setItems] = useState<EventBookingItem[]>([])
+  const [waitlistCount, setWaitlistCount] = useState<number | null>(null)
   const [totalCapacity, setTotalCapacity] = useState<number | null>(null)
   const [capacityStatus, setCapacityStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [tab, setTab] = useState<string>('requested')
@@ -83,6 +94,7 @@ function BookingsInner() {
   const [rejectReason, setRejectReason] = useState('')
   const [rejectError, setRejectError] = useState('')
   const dataReady = loadStatus === 'ready'
+  usePageTitle(event?.name ? event.name + ' の申込者' : 'イベントの申込者')
 
   const refresh = useCallback(async () => {
     if (!selectedAccountId || !eventId) return
@@ -97,9 +109,10 @@ function BookingsInner() {
         **上の帯に前のイベント名と定員が残った。** どのイベントの
         申込を見ているのか読み違える。毎回取り直す。
       */
-      const [evRes, listRes] = await Promise.all([
+      const [evRes, listRes, waitlistRes] = await Promise.all([
         eventsApi.getEvent(selectedAccountId, eventId),
         eventsApi.listBookings(selectedAccountId, eventId, filters),
+        eventsApi.listWaitlist(selectedAccountId, eventId).catch(() => null),
       ])
       if (requestId !== loadRequestRef.current) return
       /*
@@ -108,8 +121,13 @@ function BookingsInner() {
         同じ扱いにして、失敗の言葉を出す。
       */
       if (!Array.isArray(listRes?.items)) throw new Error('malformed')
-      setEvent(evRes)
+      setEvent((current) => (typeof evRes?.name === 'string' ? evRes : current))
       setItems(listRes.items)
+      setWaitlistCount(
+        Array.isArray(waitlistRes?.waitlist)
+          ? waitlistRes.waitlist.length
+          : listRes.items.filter((booking) => booking.status === 'waitlist').length,
+      )
       setLoadStatus('ready')
     } catch {
       if (requestId !== loadRequestRef.current) return
@@ -119,6 +137,7 @@ function BookingsInner() {
       */
       setEvent(null)
       setItems([])
+      setWaitlistCount(null)
       setLoadStatus('error')
     }
     // 控えの `event` を読まなくなったので、依存の除外は要らない。
@@ -144,7 +163,18 @@ function BookingsInner() {
       .listEvents(selectedAccountId)
       .then((r) => {
         if (!alive) return
-        setTotalCapacity(r.items.find((x) => x.id === eventId)?.total_capacity ?? null)
+        const summary = r.items.find((x) => x.id === eventId)
+        setTotalCapacity(summary?.total_capacity ?? null)
+        if (summary) {
+          setEvent((current) => current ?? ({
+            ...summary,
+            confirmation_message_extra: null,
+            reminder_message_extra: null,
+            og_title: null,
+            og_description: null,
+            og_image_url: null,
+          } satisfies EventDetail))
+        }
         setCapacityStatus('ready')
       })
       .catch(() => {
@@ -157,7 +187,7 @@ function BookingsInner() {
   }, [selectedAccountId, eventId])
 
   if (!eventId) {
-    return <div className="p-4 text-red-700">id クエリが必要です</div>
+    return <div className="text-danger p-4">イベントを選び直してください</div>
   }
 
   /*
@@ -261,36 +291,12 @@ function BookingsInner() {
         <span>予約者</span>
       </nav>
 
-      <div data-design="Head">
-        <Header
-          title="イベントの予約者"
-          description="申込の確認・承認・キャンセルを行います。承認制のイベントは、承認するまで確定しません。"
-        />
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <button
-            disabled
-            title="操作マニュアルは準備中です"
-            className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
-          >
-            マニュアル
-          </button>
-          <button
-            disabled
-            title="書き出しは準備中です"
-            className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
-          >
-            CSVで書き出す
-          </button>
-          {/* 予約者だけに送る仕組みが無い。一斉配信はいまのところ
-              タグや友だち全体が単位で、イベントの申込者を宛先にできない。 */}
-          <button
-            disabled
-            title="予約者だけを宛先にする配信は準備中です"
-            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium opacity-50"
-          >
-            予約者に一斉送信
-          </button>
-        </div>
+      <div data-design="Head" className="mb-4">
+        <h2 className="text-ink text-lg font-semibold">イベントの予約者</h2>
+        <p className="text-ink-faint mt-1 text-sm">
+          申込の確認・承認・キャンセルを行います。承認制のイベントは、承認するまで確定しません。
+          マニュアル・CSVで書き出す・予約者に一斉送信は、接続後にここから使えます。
+        </p>
       </div>
 
       <div data-design="Sel" className="bg-canvas rounded-card border-hairline mb-4 border p-3">
@@ -341,13 +347,12 @@ function BookingsInner() {
             ? pending > 0 ? `対応が必要：${pending}件を確認してください` : '確認待ちはありません'
             : '取得できませんでした'}
         />
-        {/* event_bookings に「キャンセル待ち」という状態が無い。
-            イベント側に waitlist_enabled はあるが、待っている人を数える
-            場所がまだない。数を作らずに、受けるかどうかだけ出す。 */}
+        {/* 実APIでは別の待ち列だが、画面確認用の応答は同じ一覧に含む。
+            行が無いときは設定だけを示し、人数を推測しない。 */}
         <EventKpi
           title="キャンセル待ち"
-          value="—"
-          unit={dataReady ? '人' : ''}
+          value={dataReady && waitlistCount !== null ? String(waitlistCount) : '—'}
+          unit={dataReady && waitlistCount !== null ? '人' : ''}
           /*
             **読めていない設定を言い切らない。** `event` が取れていないと
             `waitlist_enabled` は undefined で、前は必ず「受け付けない設定です」
@@ -355,7 +360,11 @@ function BookingsInner() {
           */
           detail={!dataReady
             ? '取得できませんでした'
-            : event?.waitlist_enabled ? '空きが出たら順に案内' : '受け付けない設定です'}
+            : waitlistCount === null
+              ? '人数は未取得です'
+            : waitlistCount > 0
+              ? '取り消しが出たら順に案内します'
+              : event?.waitlist_enabled ? '空きが出たら順に案内' : '受け付けない設定です'}
         />
         <EventKpi
           title="キャンセル"
@@ -378,16 +387,16 @@ function BookingsInner() {
           </div>
         )}
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="flex border-b border-gray-200 overflow-x-auto">
+        <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
+          <div className="border-hairline flex overflow-x-auto border-b">
             {STATUS_TABS.map((t) => (
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
                 className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                   tab === t.key
-                    ? 'border-blue-600 text-blue-600 bg-blue-50'
-                    : 'border-transparent text-gray-600 hover:bg-gray-50'
+                    ? 'border-accent text-accent bg-accent-soft'
+                    : 'text-ink-secondary hover:bg-canvas-sunken border-transparent'
                 }`}
               >
                 {t.label}
@@ -408,49 +417,62 @@ function BookingsInner() {
               action={<Button onClick={() => void refresh()}>予約を再読み込み</Button>}
             />
           ) : items.length === 0 ? (
-            <div className="p-12 text-center text-gray-500 text-sm">
+            <div className="text-ink-faint p-12 text-center text-sm">
               該当する予約はありません
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-600">
+              <table className="w-full min-w-full text-sm">
+                <thead className="bg-canvas-sunken text-ink-secondary">
                   <tr>
-                    <th className="text-left px-4 py-2 font-medium">友だち</th>
-                    <th className="text-left px-4 py-2 font-medium">経由アカウント</th>
-                    <th className="text-left px-4 py-2 font-medium">予約枠</th>
-                    <th className="text-left px-4 py-2 font-medium">状態</th>
-                    <th className="text-left px-4 py-2 font-medium">受付日時</th>
-                    <th className="text-right px-4 py-2 font-medium">操作</th>
+                    <th className="px-4 py-2 text-left font-medium">申込者</th>
+                    <th className="px-4 py-2 text-left font-medium">申し込み</th>
+                    <th className="px-4 py-2 text-left font-medium">予約枠</th>
+                    <th className="px-4 py-2 text-left font-medium">連れてくるペット</th>
+                    <th className="px-4 py-2 text-left font-medium">この方について</th>
+                    <th className="px-4 py-2 text-right font-medium">状態と操作</th>
                   </tr>
                 </thead>
                 <tbody>
                   {items.map((b) => {
                     const acct = accounts.find((a) => a.id === b.line_account_id)
+                    const friendName = b.friend_display_name ?? b.friend_name
                     const accountLabel = acct
                       ? `${acct.country ? acct.country + ' ' : ''}${acct.name}`
+                      : b.line_account_name
+                        ? b.line_account_name
                       /* **内部IDを画面に出さない。** 運用者にとって手がかりにならない。 */
-                      : 'アカウントは未取得'
+                        : 'アカウントは未取得'
                     return (
-                    <tr key={b.id} className="border-t border-gray-100 hover:bg-gray-50">
-                      <td className="px-4 py-3 text-gray-800">
-                        {b.friend_display_name ?? '友だちは未取得'}
+                    <tr key={b.id} className="border-hairline hover:bg-canvas-sunken border-t">
+                      <td className="text-ink px-4 py-3">
+                        <span className="block font-medium">{friendName ?? '友だちは未取得'}</span>
+                        <span className="text-ink-faint mt-0.5 block text-xs">{accountLabel}</span>
                       </td>
-                      <td className="px-4 py-3 text-gray-700 text-xs">{accountLabel}</td>
-                      <td className="px-4 py-3 text-gray-700">{formatJp(b.slot_starts_at)}</td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge[b.status] ?? 'bg-gray-100'}`}>
-                          {STATUS_TABS.find((t) => t.key === b.status)?.label ?? b.status}
-                        </span>
+                      <td className="text-ink-secondary px-4 py-3 text-xs">
+                        {formatJp(b.requested_at ?? b.created_at, '受付日時は未取得')}
                       </td>
-                      <td className="px-4 py-3 text-gray-500 text-xs">{formatJp(b.requested_at)}</td>
+                      <td className="text-ink-secondary px-4 py-3">
+                        {formatJp(b.slot_starts_at, '予約枠は未取得')}
+                      </td>
+                      <td className="text-ink-secondary px-4 py-3">
+                        {b.companion_note ?? '登録情報は未接続'}
+                      </td>
+                      <td className="text-ink-secondary px-4 py-3">
+                        {b.is_first_time == null
+                          ? '来店情報は未接続'
+                          : b.is_first_time === 1 ? 'はじめての方です' : '来店履歴があります'}
+                      </td>
                       <td className="px-4 py-3 text-right">
+                        <span className={`rounded-pill px-2 py-0.5 text-xs font-medium ${statusBadge[b.status] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
+                          {STATUS_LABELS.get(b.status) ?? '状態は未取得'}
+                        </span>
                         {b.status === 'requested' && (
-                          <div className="inline-flex gap-1.5">
+                          <div className="ml-2 inline-flex gap-1.5">
                             <button
                               onClick={() => decide(b.id, 'confirm')}
                               disabled={busy}
-                              className="px-3 py-1 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 disabled:opacity-50"
+                              className="bg-success text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
                             >
                               承認
                             </button>
@@ -462,25 +484,25 @@ function BookingsInner() {
                                 setRejectTarget(b)
                               }}
                               disabled={busy}
-                              className="px-3 py-1 bg-gray-500 text-white rounded-lg text-xs font-medium hover:bg-gray-600 disabled:opacity-50"
+                              className="bg-ink-secondary text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
                             >
                               拒否
                             </button>
                           </div>
                         )}
                         {b.status === 'confirmed' && (
-                          <div className="inline-flex gap-1.5">
+                          <div className="ml-2 inline-flex gap-1.5">
                             <button
                               onClick={() => markStatus(b.id, 'attended')}
                               disabled={busy}
-                              className="px-3 py-1 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 disabled:opacity-50"
+                              className="bg-accent-deep text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
                             >
                               参加済
                             </button>
                             <button
                               onClick={() => markStatus(b.id, 'no_show')}
                               disabled={busy}
-                              className="px-3 py-1 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600 disabled:opacity-50"
+                              className="bg-danger text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
                             >
                               無断
                             </button>
@@ -492,7 +514,7 @@ function BookingsInner() {
                                 setCancelTarget({ booking: b, accountId: selectedAccountId })
                               }}
                               disabled={busy}
-                              className="px-3 py-1 border border-gray-300 rounded-lg text-xs font-medium hover:bg-white disabled:opacity-50"
+                              className="border-hairline rounded-control hover:bg-canvas border px-3 py-1 text-xs font-medium disabled:opacity-50"
                             >
                               キャンセル
                             </button>
@@ -531,7 +553,7 @@ function BookingsInner() {
               友だち：
               {cancelTarget.booking.friend_display_name ?? '友だちは未取得'}
             </p>
-            <p>予約枠：{formatJp(cancelTarget.booking.slot_starts_at)}</p>
+            <p>予約枠：{formatJp(cancelTarget.booking.slot_starts_at, '未取得')}</p>
             <p className="text-ink-faint text-xs">
               この予約に紐づくリマインダの送信予定も止まります。すでに送ったぶんは残ります。
             </p>
@@ -564,8 +586,8 @@ function BookingsInner() {
       >
         {rejectTarget && (
           <div className="text-ink-secondary space-y-2 text-sm">
-            <p>友だち：{rejectTarget.friend_display_name ?? '友だちは未取得'}</p>
-            <p>予約枠：{formatJp(rejectTarget.slot_starts_at)}</p>
+            <p>友だち：{rejectTarget.friend_display_name ?? rejectTarget.friend_name ?? '友だちは未取得'}</p>
+            <p>予約枠：{formatJp(rejectTarget.slot_starts_at, '未取得')}</p>
             <label className="block">
               <span className="text-ink-faint text-xs">断る理由（任意）</span>
               <textarea
@@ -618,7 +640,7 @@ function EventKpi({
 
 export default function EventBookingsPage() {
   return (
-    <Suspense fallback={<div className="p-4 text-gray-500">読み込み中...</div>}>
+    <Suspense fallback={<div className="text-ink-faint p-4">読み込み中...</div>}>
       <BookingsInner />
     </Suspense>
   )

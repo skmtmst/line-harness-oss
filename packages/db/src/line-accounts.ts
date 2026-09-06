@@ -52,6 +52,8 @@ export interface LineAccount {
   og_site_name: string | null;
   og_default_image_url: string | null;
   og_default_description: string | null;
+  /** LINE公式プロフィールで発行した lin.ee の短縮URL。未設定なら null。 */
+  official_profile_url: string | null;
   /** 友だち数の上限。NULL なら上限を管理しない */
   friend_capacity: number | null;
   /** 何人で警告を出すか。NULL なら警告しない */
@@ -120,6 +122,7 @@ export interface CreateLineAccountInput {
   ogSiteName?: string | null;
   ogDefaultImageUrl?: string | null;
   ogDefaultDescription?: string | null;
+  officialProfileUrl?: string | null;
   parentLineAccountId?: string | null;
   tenantId?: string | null;
 }
@@ -154,6 +157,7 @@ export async function createLineAccount(
           login_channel_id, login_channel_secret, liff_id,
           is_active, is_default, display_order,
           og_site_name, og_default_image_url, og_default_description,
+          official_profile_url,
           parent_line_account_id, tenant_id,
           created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1,
@@ -161,7 +165,7 @@ export async function createLineAccount(
            SELECT 1 FROM line_accounts
             WHERE COALESCE(tenant_id, ?) = ? AND archived_at IS NULL
           ) THEN 0 ELSE 1 END,
-          ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -183,6 +187,7 @@ export async function createLineAccount(
       input.ogSiteName ?? null,
       input.ogDefaultImageUrl ?? null,
       input.ogDefaultDescription ?? null,
+      input.officialProfileUrl ?? null,
       input.parentLineAccountId ?? null,
       input.tenantId ?? DEFAULT_TENANT_ID,
       now,
@@ -459,6 +464,7 @@ export type UpdateLineAccountInput = Partial<
     | 'og_site_name'
     | 'og_default_image_url'
     | 'og_default_description'
+    | 'official_profile_url'
     | 'friend_capacity'
     | 'capacity_warn_at'
     | 'icon_url'
@@ -550,6 +556,10 @@ export async function updateLineAccount(
   if (updates.og_default_description !== undefined) {
     fields.push('og_default_description = ?');
     values.push(updates.og_default_description);
+  }
+  if (updates.official_profile_url !== undefined) {
+    fields.push('official_profile_url = ?');
+    values.push(updates.official_profile_url);
   }
 
   if (fields.length === 0) return getLineAccountById(db, id, encryptionKey);
@@ -747,6 +757,8 @@ export interface UpdateLineAccountFieldsInput {
   ogSiteName?: string | null;
   ogDefaultImageUrl?: string | null;
   ogDefaultDescription?: string | null;
+  /** LINE公式プロフィールで発行した lin.ee の短縮URL。null で未設定に戻す。 */
+  officialProfileUrl?: string | null;
   /** 友だち数の上限。null で「上限を管理しない」に戻す */
   friendCapacity?: number | null;
   /** 何人で警告を出すか。null で「警告しない」に戻す */
@@ -805,6 +817,10 @@ export async function updateLineAccountFields(
   if (input.ogDefaultDescription !== undefined) {
     sets.push('og_default_description = ?');
     binds.push(input.ogDefaultDescription);
+  }
+  if (input.officialProfileUrl !== undefined) {
+    sets.push('official_profile_url = ?');
+    binds.push(input.officialProfileUrl);
   }
   if (input.friendCapacity !== undefined) {
     sets.push('friend_capacity = ?');
