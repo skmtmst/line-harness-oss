@@ -1,230 +1,367 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from '@/lib/api'
 import type { AdConversionLog, AdPlatform } from '@/lib/api'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
 
-/**
- * 広告連携（設計 V2 6-8）。
- *
- * できているのは「LINEで起きた成果を広告に返す」ほうだけ。返した記録は
- * ad_conversion_logs に残っているので、そこは本物の数字を出せる。
- *
- * 設計にある**広告費・クリック数・キャンペーン別・売上**は、広告側から
- * 取り込む口が無い。ad_platforms が持っているのは送信用の鍵だけで、
- * 費用や表示回数は一度も取ってきていない。ここを埋めるには Google Ads の
- * レポートAPIを叩く仕組みが要る。数字を作らず「—」を出している。
- */
+type AdView = 'metrics' | 'connections' | 'history'
 
-const PLATFORM_LABEL: Record<string, string> = {
-  google: 'Google広告',
-  meta: 'Meta広告',
-  x: 'X広告',
-  tiktok: 'TikTok広告',
-}
+const PROVIDERS = [
+  { key: 'meta', label: 'Meta広告', clickId: 'fbclid' },
+  { key: 'google', label: 'Google広告', clickId: 'gclid' },
+  { key: 'x', label: 'X（旧Twitter）', clickId: 'twclid' },
+  { key: 'tiktok', label: 'TikTok', clickId: 'ttclid' },
+] as const
 
 const STATUS_LABEL: Record<string, string> = {
-  sent: '送信済み',
-  success: '送信済み',
-  pending: '送信待ち',
-  failed: '失敗',
-  skipped: '送信しない',
+  sent: '送れました',
+  success: '送れました',
+  pending: '待っています',
+  failed: '断られました',
+  skipped: '送っていません',
 }
 
-/** 表示に使う口座番号などを config から拾う。鍵は伏せて返ってくる。 */
+const STATUS_OPTIONS = [
+  { value: 'all', label: 'すべての状態' },
+  { value: 'sent', label: '送れたもの' },
+  { value: 'pending', label: '待っているもの' },
+  { value: 'failed', label: '断られたもの' },
+]
+
+function platformLabel(platform: AdPlatform): string {
+  return PROVIDERS.find((provider) => provider.key === platform.name)?.label
+    ?? platform.displayName
+    ?? platform.name
+}
+
 function accountLabel(platform: AdPlatform): string | null {
-  const c = platform.config
   for (const key of ['customer_id', 'pixel_id', 'pixel_code', 'account_id']) {
-    const v = c[key]
-    if (typeof v === 'string' && v) return v
+    const value = platform.config[key]
+    if (typeof value === 'string' && value) return value
   }
   return null
 }
 
-export default function AdIntegration() {
+function matchesStatus(log: AdConversionLog, status: string): boolean {
+  if (status === 'all') return true
+  if (status === 'sent') return log.status === 'sent' || log.status === 'success'
+  return log.status === status
+}
+
+function safeCsv(logs: AdConversionLog[]): string {
+  const quote = (value: string) => `"${value.replaceAll('"', '""')}"`
+  const rows = logs.map((log) => [
+    log.createdAt,
+    log.eventName,
+    log.clickIdType ?? '経路不明',
+    STATUS_LABEL[log.status] ?? '状態不明',
+  ].map((value) => quote(value)).join(','))
+  return ['"日時","成果","クリックの種類","状態"', ...rows].join('\n')
+}
+
+export default function AdIntegration({ view }: { view: AdView }) {
   const [platforms, setPlatforms] = useState<AdPlatform[]>([])
   const [logs, setLogs] = useState<AdConversionLog[]>([])
   const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState(false)
+  const [query, setQuery] = useState('')
+  const [status, setStatus] = useState('all')
 
-  useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      const res = await api.adPlatforms.list()
-      if (cancelled || !res.success) {
-        if (!cancelled) setLoading(false)
+  const load = async () => {
+    setLoading(true)
+    setFailed(false)
+    try {
+      const response = await api.adPlatforms.list()
+      if (!response.success) {
+        setFailed(true)
         return
       }
-      setPlatforms(res.data)
-      const active = res.data.find((p) => p.isActive) ?? res.data[0]
-      if (active) {
-        const logRes = await api.adPlatforms.logs(active.id, 20)
-        if (!cancelled && logRes.success) setLogs(logRes.data)
-      }
-      if (!cancelled) setLoading(false)
-    })()
-    return () => {
-      cancelled = true
+      setPlatforms(response.data)
+      const logResponses = await Promise.all(
+        response.data.map((platform) => api.adPlatforms.logs(platform.id, 100).catch(() => null)),
+      )
+      setLogs(
+        logResponses
+          .flatMap((result) => result?.success ? result.data : [])
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+      )
+    } catch {
+      setFailed(true)
+    } finally {
+      setLoading(false)
     }
+  }
+
+  useEffect(() => {
+    void load()
   }, [])
 
-  const connected = platforms.filter((p) => p.isActive)
-  const sentCount = logs.filter((l) => l.status === 'sent' || l.status === 'success').length
+  const connected = platforms.filter((platform) => platform.isActive)
+  const sentCount = logs.filter((log) => matchesStatus(log, 'sent')).length
+  const pendingCount = logs.filter((log) => log.status === 'pending').length
+  const failedCount = logs.filter((log) => log.status === 'failed').length
+  const normalizedQuery = query.trim().toLocaleLowerCase('ja')
+  const visibleLogs = useMemo(
+    () => logs.filter((log) => matchesStatus(log, status)).filter((log) => {
+      if (!normalizedQuery) return true
+      return [log.eventName, log.clickIdType ?? '', STATUS_LABEL[log.status] ?? '']
+        .some((value) => value.toLocaleLowerCase('ja').includes(normalizedQuery))
+    }),
+    [logs, normalizedQuery, status],
+  )
+
+  const exportLogs = () => {
+    const blob = new Blob([`\uFEFF${safeCsv(visibleLogs)}`], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `広告への送信履歴_${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
 
   if (loading) {
+    return <ListState kind="loading" title="広告との接続状況を読み込んでいます" />
+  }
+
+  if (failed) {
     return (
-      <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm">
-        読み込み中...
+      <ListState
+        kind="error"
+        title="広告との接続状況を表示できませんでした"
+        description="接続設定は消えていません。状態を読み直して、もう一度お試しください。"
+        action={<Button onClick={() => void load()}>広告の状態を再読み込み</Button>}
+      />
+    )
+  }
+
+  if (view === 'history') {
+    return (
+      <div className="space-y-4" data-design-node="Im2b1">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs text-ink-faint">広告とのつなぎ</p>
+            <h2 className="text-lg font-bold text-ink">広告への送信履歴</h2>
+          </div>
+          <Button href="/inflow-links?tab=connections">広告とのつなぎへ戻る</Button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Metric label="送った件数" value={sentCount} detail={`読み込んだ直近 ${logs.length}件のうち`} />
+          <Metric label="待っている" value={pendingCount} detail="送信処理を待っています" />
+          <Metric label="断られた" value={failedCount} detail="理由を確認してください" tone={failedCount > 0 ? 'danger' : 'default'} />
+        </div>
+
+        <p className="rounded-card bg-info-bg px-4 py-3 text-xs leading-relaxed text-ink-secondary">
+          送るのは、成果と広告のクリックが結びついたものだけです。結びつかないものは送りません。
+        </p>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchField
+            value={query}
+            onChange={setQuery}
+            onClear={() => setQuery('')}
+            placeholder="成果・クリックの種類で探す"
+            aria-label="成果・クリックの種類で探す"
+            className="w-full sm:w-80"
+          />
+          <Select value={status} onChange={setStatus} options={STATUS_OPTIONS} aria-label="送信状態" />
+          <Button onClick={exportLogs} disabled={visibleLogs.length === 0}>CSVで書き出す</Button>
+        </div>
+
+        {visibleLogs.length === 0 ? (
+          <ListState
+            kind="empty"
+            title="条件に合う送信履歴はありません"
+            description="成果と広告のクリックが結びつき、送信処理が始まるとここに並びます。"
+          />
+        ) : (
+          <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
+            <table className="w-full table-fixed text-xs">
+              <thead className="border-b border-hairline bg-canvas-sunken text-ink-faint">
+                <tr>
+                  <th className="w-[24%] px-4 py-3 text-left font-semibold">いつ・何の成果</th>
+                  <th className="w-[18%] px-4 py-3 text-left font-semibold">媒体</th>
+                  <th className="w-[18%] px-4 py-3 text-left font-semibold">クリックの種類</th>
+                  <th className="w-[18%] px-4 py-3 text-left font-semibold">状態</th>
+                  <th className="w-[22%] px-4 py-3 text-left font-semibold">次の予定</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-hairline">
+                {visibleLogs.map((log) => {
+                  const platform = platforms.find((item) => item.id === log.adPlatformId)
+                  return (
+                    <tr key={log.id}>
+                      <td className="px-4 py-3 text-ink">
+                        <span className="block font-semibold">{log.eventName}</span>
+                        <span className="mt-0.5 block text-ink-faint">{log.createdAt.slice(0, 16).replace('T', ' ').replaceAll('-', '/')}</span>
+                      </td>
+                      <td className="px-4 py-3 text-ink-secondary">{platform ? platformLabel(platform) : '取得できません'}</td>
+                      <td className="px-4 py-3 text-ink-secondary">{log.clickIdType ?? '経路不明'}</td>
+                      <td className="px-4 py-3">
+                        <span className={log.status === 'failed' ? 'font-semibold text-status-danger' : 'text-ink-secondary'}>
+                          {STATUS_LABEL[log.status] ?? '状態不明'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-ink-faint">
+                        {log.status === 'failed' ? '再試行の記録APIが接続されると表示されます' : '—'}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </section>
+        )}
+
+        <p className="text-xs leading-relaxed text-ink-faint">
+          試行回数・次回試行日時・まとめてやり直す操作は、再試行の記録APIが接続されたあとに表示します。成功した成果を重ねて送る操作は表示しません。
+        </p>
+      </div>
+    )
+  }
+
+  if (view === 'connections') {
+    return (
+      <div className="space-y-4" data-design-node="BuVDB">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs text-ink-faint">流入と計測</p>
+            <h2 className="text-lg font-bold text-ink">広告とのつなぎ</h2>
+          </div>
+          <Button href="/inflow-links?tab=connections&view=history">送信履歴を見る</Button>
+        </div>
+
+        <p className="rounded-card bg-info-bg px-4 py-3 text-xs leading-relaxed text-ink-secondary">
+          広告をつながなくても流入リンクの計測は使えます。つなぐと、成果を広告側へ安全に返せるようになります。
+        </p>
+
+        <section className="rounded-card border border-hairline bg-canvas p-4">
+          <h3 className="text-sm font-bold text-ink">つないでいる広告</h3>
+          <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {PROVIDERS.map((provider) => {
+              const platform = platforms.find((item) => item.name === provider.key)
+              const active = platform?.isActive === true
+              return (
+                <div key={provider.key} className="rounded-control border border-hairline p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-ink">{provider.label}</p>
+                      <p className="mt-1 text-xs text-ink-faint">クリックの目印 {provider.clickId}</p>
+                      {platform && accountLabel(platform) && (
+                        <p className="mt-1 text-xs text-ink-faint">広告アカウント {accountLabel(platform)}</p>
+                      )}
+                    </div>
+                    <span className={`rounded-pill px-2 py-1 text-xs font-semibold ${active ? 'bg-accent-soft text-accent-deep' : 'bg-canvas-sunken text-ink-faint'}`}>
+                      {active ? 'つながっています' : 'つないでいません'}
+                    </span>
+                  </div>
+                  {!platform && (
+                    <p className="mt-3 text-xs leading-relaxed text-ink-faint">
+                      接続設定APIが接続されると、この媒体をつなぐ操作が表示されます。
+                    </p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </section>
+
+        <section className="rounded-card border border-hairline bg-canvas p-4">
+          <h3 className="text-sm font-bold text-ink">成果地点と、広告に返す名前の対応</h3>
+          <p className="mt-1 text-xs leading-relaxed text-ink-faint">
+            対応が付いていない成果は広告へ返しません。成果対応APIが接続されると、うちの成果地点・媒体ごとの名前・状態・返した件数がここに並びます。
+          </p>
+        </section>
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <section className="rounded-card border border-hairline bg-canvas p-4">
+            <h3 className="text-sm font-bold text-ink">返すしくみ</h3>
+            <ol className="mt-3 space-y-2 text-xs leading-relaxed text-ink-secondary">
+              <li><strong>1. クリックの目印を持ち帰る</strong><br />中継リンクを通った人だけ広告と結びつきます。</li>
+              <li><strong>2. 成果が出たら順に送る</strong><br />待ち行列に入れてから送ります。</li>
+              <li><strong>3. 同じ成果は2回送らない</strong><br />やり直しても同じ目印を使います。</li>
+            </ol>
+          </section>
+          <section className="rounded-card border border-hairline bg-canvas p-4">
+            <h3 className="text-sm font-bold text-ink">気をつけること</h3>
+            <ul className="mt-3 space-y-2 text-xs leading-relaxed text-ink-secondary">
+              <li>中継リンクを通らないと広告と結びつきません。</li>
+              <li>秘密の鍵は画面に表示しません。</li>
+              <li>お客様の名前やメールアドレスは広告へ送りません。</li>
+            </ul>
+          </section>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-4">
-      <p className="text-ink-secondary text-sm leading-relaxed">
-        広告から来た友だちを計測し、LINEで起きた成果を広告側に返します。広告費に対して実際にいくら売れたかを見るには、広告側の費用を取り込む必要があり、そちらはまだできていません。
+    <div className="space-y-4" data-design-node="v0HaI">
+      <p className="rounded-card bg-info-bg px-4 py-3 text-xs leading-relaxed text-ink-secondary">
+        広告の管理画面ではクリック数までを確認できます。広告実績の取込APIが接続されると、広告費・友だち追加・成果までを同じ画面で比較できます。
       </p>
 
-      {/* ---- つながっているか ---- */}
-      <section className="bg-canvas rounded-card border-hairline border p-4">
-        {connected.length === 0 ? (
-          <div>
-            <p className="text-ink text-sm font-bold">まだ広告とつながっていません</p>
-            <p className="text-ink-faint mt-1 text-xs leading-relaxed">
-              広告を使っていない場合は、このままで問題ありません。つなぐと、LINEで起きた成果を広告側に返せるようになります。
-            </p>
-            {/* 接続を作る画面が無い。いまは API を直に叩くしかない。 */}
-            <button
-              disabled
-              title="接続を作る画面は準備中です"
-              className="border-hairline text-ink-faint rounded-control mt-3 border px-3 py-2 text-sm font-medium opacity-50"
-            >
-              連携を設定
-            </button>
-          </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Metric label="つないだ広告" value={connected.length} detail={connected.length > 0 ? connected.map(platformLabel).join('・') : 'まだ接続がありません'} />
+        <Metric label="今月の広告費" value={null} detail="広告実績の取込後に表示します" />
+        <Metric label="友だち1人あたり" value={null} detail="費用と流入人数がそろうと表示します" />
+        <Metric label="成果1件あたり" value={null} detail="費用と成果がそろうと表示します" />
+      </div>
+
+      <section className="rounded-card border border-hairline bg-canvas p-4">
+        <h3 className="text-sm font-bold text-ink">広告アカウント</h3>
+        {platforms.length === 0 ? (
+          <p className="mt-2 text-xs leading-relaxed text-ink-faint">
+            まだ広告アカウントをつないでいません。接続設定APIが接続されると、媒体ごとの接続操作が「広告とのつなぎ」に表示されます。
+          </p>
         ) : (
-          <div className="space-y-3">
-            {connected.map((p) => (
-              <div key={p.id} className="flex flex-wrap items-center justify-between gap-2">
+          <div className="mt-3 divide-y divide-hairline">
+            {platforms.map((platform) => (
+              <div key={platform.id} className="flex flex-wrap items-center justify-between gap-2 py-3 first:pt-0 last:pb-0">
                 <div>
-                  <p className="text-ink text-sm font-bold">
-                    {PLATFORM_LABEL[p.name] ?? p.displayName ?? p.name}とつながっています
-                  </p>
-                  <p className="text-ink-faint mt-0.5 text-xs">
-                    {accountLabel(p) ? `アカウント ${accountLabel(p)} ・ ` : ''}
-                    成果の送信 有効
-                    {/* 同期という考え方が実装に無い。成果が起きたその場で送っている。 */}
-                    {' ・ '}成果が起きたその場で送ります
-                  </p>
+                  <p className="text-sm font-semibold text-ink">{platformLabel(platform)}</p>
+                  <p className="mt-0.5 text-xs text-ink-faint">{platform.isActive ? 'つながっています' : '停止中'}</p>
                 </div>
-                <button
-                  disabled
-                  title="接続設定の画面は準備中です"
-                  className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-                >
-                  接続設定
-                </button>
+                <span className="text-xs text-ink-faint">実績の取込は未接続</span>
               </div>
             ))}
           </div>
         )}
       </section>
 
-      {/* ---- KPI ---- */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">広告側へ返した成果</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {sentCount}
-            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
-          </p>
-          <p className="text-ink-faint mt-0.5 text-xs">直近{logs.length}件のうち</p>
-        </div>
-        {/* 以下4枚は広告側から取り込む数字。取り込む口が無い。 */}
-        {[
-          ['広告経由の友だち', 'クリックIDと友だちの結び付けを集計していません'],
-          ['広告費', '広告側の費用を取り込んでいません'],
-          ['成果1件あたり', '広告費が無いので出せません'],
-          ['売上・ROAS', '広告費が無いので出せません'],
-        ].map(([label, why]) => (
-          <div key={label} className="bg-canvas rounded-card border-hairline border p-4">
-            <p className="text-ink-faint text-xs">{label}</p>
-            <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-            <p className="text-ink-faint mt-0.5 text-xs">{why}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* ---- キャンペーン別 ---- */}
-      <section className="bg-canvas rounded-card border-hairline border">
-        <div className="border-hairline border-b px-4 py-3">
-          <h2 className="text-ink text-sm font-bold">キャンペーン別の成果</h2>
-        </div>
-        <p className="text-ink-faint p-8 text-center text-sm leading-relaxed">
-          キャンペーンごとのクリック・友だち追加・広告費は、広告側から取り込む必要があります。その取り込みがまだありません。
+      <section className="rounded-card border border-hairline bg-canvas p-4">
+        <h3 className="text-sm font-bold text-ink">広告のまとまり</h3>
+        <p className="mt-2 text-xs leading-relaxed text-ink-faint">
+          広告実績の取込APIが接続されると、媒体・キャンペーン・広告グループごとの費用、クリック、友だち追加、成果を通貨別に表示します。取得できていない費用を0円とは表示しません。
         </p>
       </section>
+    </div>
+  )
+}
 
-      {/* ---- 返している成果 ---- */}
-      <section className="bg-canvas rounded-card border-hairline border">
-        <div className="border-hairline border-b px-4 py-3">
-          <h2 className="text-ink text-sm font-bold">広告へ返している成果</h2>
-          <p className="text-ink-faint mt-0.5 text-xs">
-            LINEで起きた成果を、広告のクリックに結びつけて送っています。
-          </p>
-        </div>
-        {logs.length === 0 ? (
-          <p className="text-ink-faint p-8 text-center text-sm">まだ送った記録がありません。</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] text-sm">
-              <thead className="bg-canvas-sunken text-ink-faint text-xs">
-                <tr>
-                  <th className="px-4 py-2 text-left font-medium">日時</th>
-                  <th className="px-4 py-2 text-left font-medium">成果</th>
-                  <th className="px-4 py-2 text-left font-medium">クリックの種類</th>
-                  <th className="px-4 py-2 text-left font-medium">状態</th>
-                </tr>
-              </thead>
-              <tbody className="divide-hairline divide-y">
-                {logs.map((l) => (
-                  <tr key={l.id}>
-                    <td className="text-ink-secondary px-4 py-2 tabular-nums">
-                      {l.createdAt.slice(5, 16).replace('T', ' ').replaceAll('-', '/')}
-                    </td>
-                    <td className="text-ink px-4 py-2">{l.eventName}</td>
-                    <td className="text-ink-faint px-4 py-2">
-                      {l.clickId ? (l.clickIdType ?? 'クリックID') : '経路が不明'}
-                    </td>
-                    <td className="px-4 py-2">
-                      <span
-                        className={
-                          l.status === 'failed' ? 'text-danger text-xs' : 'text-ink-secondary text-xs'
-                        }
-                        title={l.errorMessage ?? undefined}
-                      >
-                        {STATUS_LABEL[l.status] ?? l.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      {/* ---- 注意 ---- */}
-      <section className="bg-canvas-sunken rounded-card border-hairline border p-4">
-        <h2 className="text-ink text-sm font-bold">気をつけること</h2>
-        <ul className="text-ink-faint mt-2 space-y-1 text-xs leading-relaxed">
-          <li>・広告のクリックIDは90日で失効します。それ以降の成果は結びつきません</li>
-          <li>
-            ・お客様の名前やメールアドレスは送っていません。クリックIDと成果の名前だけを送ります
-          </li>
-          <li>・送った記録を残しているので、同じ成果を二重に送ることはありません</li>
-          <li>・広告を使っていない場合、この機能はオフのままで問題ありません</li>
-        </ul>
-      </section>
+function Metric({
+  label,
+  value,
+  detail,
+  tone = 'default',
+}: {
+  label: string
+  value: number | null
+  detail: string
+  tone?: 'default' | 'danger'
+}) {
+  return (
+    <div className="rounded-card border border-hairline bg-canvas p-4">
+      <p className="text-xs text-ink-faint">{label}</p>
+      <p className={`mt-1 text-2xl font-bold tabular-nums ${tone === 'danger' ? 'text-status-danger' : 'text-ink'}`}>
+        {value == null ? '—' : value.toLocaleString('ja-JP')}
+      </p>
+      <p className="mt-1 text-xs leading-relaxed text-ink-faint">{detail}</p>
     </div>
   )
 }

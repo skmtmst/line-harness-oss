@@ -15,13 +15,7 @@ import type {
   TrafficPool,
 } from '@line-crm/shared'
 
-/**
- * 流入経路の詳細（設計 V2 6-2-1）。
- *
- * 左でリンクを選び、右にその内訳を出す。設計が一覧と別画面にしているのは、
- * 「どこから友だちになって、どこまで進んだか」を1本ずつ追う画面だから。
- * 一覧の表に列を足していくと、どの数字がどの段階のものか読めなくなる。
- */
+/** 選んだ流入元の人数、成果、友だち、追加時の動きをまとめて表示する。 */
 
 interface RefRouteStats {
   refCode: string
@@ -36,6 +30,12 @@ interface SourceRow {
   count: number
 }
 
+interface AttributedFriend {
+  id: string
+  displayName: string
+  trackedAt: string | null
+}
+
 function InflowLinkDetailPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -47,6 +47,7 @@ function InflowLinkDetailPageContent() {
   const [route, setRoute] = useState<EntryRoute | null>(null)
   const [funnel, setFunnel] = useState<EntryRouteFunnel | null>(null)
   const [sources, setSources] = useState<SourceRow[]>([])
+  const [friends, setFriends] = useState<AttributedFriend[]>([])
   const [tags, setTags] = useState<Tag[]>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [pools, setPools] = useState<TrafficPool[]>([])
@@ -97,6 +98,7 @@ function InflowLinkDetailPageContent() {
       setRoute(null)
       setFunnel(null)
       setSources([])
+      setFriends([])
       return
     }
     let cancelled = false
@@ -105,10 +107,22 @@ function InflowLinkDetailPageContent() {
       api.entryRoutes.get(selectedId),
       api.entryRoutes.funnel(selectedId),
       api.entryRoutes.sources(selectedId),
-    ]).then(([r, f, s]) => {
+    ]).then(async ([r, f, s]) => {
       if (cancelled) return
-      if (r.status === 'fulfilled' && r.value.success) setRoute(r.value.data)
-      else setError('リンクの取得に失敗しました')
+      if (r.status === 'fulfilled' && r.value.success) {
+        setRoute(r.value.data)
+        try {
+          const result = await fetchApi<{
+            success: boolean
+            data: { friends: AttributedFriend[] }
+          }>(`/api/analytics/ref/${encodeURIComponent(r.value.data.refCode)}`)
+          if (!cancelled && result.success && Array.isArray(result.data?.friends)) {
+            setFriends(result.data.friends)
+          }
+        } catch {
+          if (!cancelled) setFriends([])
+        }
+      } else setError('リンクの取得に失敗しました')
       if (f.status === 'fulfilled' && f.value.success) setFunnel(f.value.data)
       if (s.status === 'fulfilled' && s.value.success) setSources(s.value.data)
     })
@@ -163,7 +177,7 @@ function InflowLinkDetailPageContent() {
   const totalSources = sources.reduce((sum, s) => sum + s.count, 0)
 
   return (
-    <div>
+    <div data-design-node="JupxW">
       <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
         <Link href="/inflow-links" className="hover:underline">
           流入経路
@@ -174,25 +188,12 @@ function InflowLinkDetailPageContent() {
 
       <div data-design="Head">
         <Header
-          title="リンクの詳細"
+          title={route?.name ?? '流入元の詳細'}
           description="選んだリンクの流入とクリックの内訳を表示します。どこから友だちになって、どこまで進んだかを追えます。"
           action={
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={copyUrl}
-                disabled={!url}
-                className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium disabled:opacity-40"
-              >
-                {copied ? 'コピーしました' : 'URLをコピー'}
-              </button>
-              <button
-                disabled
-                title="QRコードの保存は準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-              >
-                QRコードを保存
-              </button>
-            </div>
+            <Button onClick={copyUrl} disabled={!url}>
+              {copied ? 'コピーしました' : 'URLをコピー'}
+            </Button>
           }
         />
       </div>
@@ -213,7 +214,7 @@ function InflowLinkDetailPageContent() {
             <p className="text-ink-faint text-xs">読み込み中…</p>
           ) : routes.length === 0 ? (
             <p className="text-ink-faint text-xs">
-              まだリンクがありません。一覧の「URLを発行」から作ってください。
+              まだリンクがありません。一覧の「流入リンクをつくる」から作ってください。
             </p>
           ) : (
             <ul className="space-y-1">
@@ -303,6 +304,38 @@ function InflowLinkDetailPageContent() {
                   <FunnelView funnel={funnel} />
                 ) : (
                   <p className="text-ink-faint text-xs">読み込み中…</p>
+                )}
+              </section>
+
+              <section className="bg-canvas rounded-card border-hairline border p-5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-ink text-sm font-semibold">この経路から来た友だち</h3>
+                    <p className="mt-0.5 text-xs text-ink-faint">新しい順で表示します。</p>
+                  </div>
+                  <span className="text-xs tabular-nums text-ink-faint">{friends.length.toLocaleString('ja-JP')}人</span>
+                </div>
+                {friends.length === 0 ? (
+                  <p className="mt-3 text-xs text-ink-faint">この経路から来た友だちは、まだ記録されていません。</p>
+                ) : (
+                  <table className="mt-3 w-full table-fixed text-xs">
+                    <thead className="border-b border-hairline text-ink-faint">
+                      <tr>
+                        <th className="w-[45%] py-2 text-left font-semibold">友だち</th>
+                        <th className="w-[35%] py-2 text-left font-semibold">いつ来たか</th>
+                        <th className="w-[20%] py-2 text-right font-semibold">確認</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-hairline">
+                      {friends.slice(0, 20).map((friend) => (
+                        <tr key={friend.id}>
+                          <td className="truncate py-3 pr-3 font-semibold text-ink" title={friend.displayName}>{friend.displayName}</td>
+                          <td className="py-3 text-ink-faint">{friend.trackedAt ? friend.trackedAt.slice(0, 16).replace('T', ' ').replaceAll('-', '/') : '日時不明'}</td>
+                          <td className="py-3 text-right"><Link href={`/friends/detail?id=${encodeURIComponent(friend.id)}`} className="text-accent hover:underline">友だちを見る</Link></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 )}
               </section>
 
