@@ -6,6 +6,7 @@ import { api, type AffiliateOffer, type ConversionApprovalItem } from '@/lib/api
 import type { Tag, Scenario, LineAccount } from '@line-crm/shared'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
+import type { ButtonProps } from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
@@ -198,6 +199,12 @@ function formatYen(n: number): string {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const JOURNEY_PAGE_SIZE = 30
+
+/** 機能16内の操作を共通Buttonへ一本でつなぐ。 */
+function AffiliateButton(props: ButtonProps) {
+  if (props.variant === 'primary') return <Button {...props} variant="primary" />
+  return <Button {...props} />
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Page shell — 3 tabs (affiliators / offers / approvals) with ?tab= persistence
@@ -529,12 +536,12 @@ export function AffiliatorsTab() {
           onChange={(value) => { setPageSize(Number(value)); setPage(1) }}
           size="page-size"
         />
-        <Button onClick={exportAffiliatesCsv} disabled={shownRows.length === 0} className="ml-auto">
+        <AffiliateButton onClick={exportAffiliatesCsv} disabled={shownRows.length === 0} className="ml-auto">
           CSVで書き出す
-        </Button>
-        <Button variant="primary" onClick={() => setCreateOpen(true)}>
+        </AffiliateButton>
+        <AffiliateButton variant="primary" onClick={() => setCreateOpen(true)}>
           アフィリエイターを追加
-        </Button>
+        </AffiliateButton>
       </div>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -593,10 +600,14 @@ export function AffiliatorsTab() {
             <thead>
               <TableHeadRow>
                 <Th>名前・紹介コード</Th>
+                <Th align="center">友だち連携</Th>
                 <Th align="right">紹介リンク</Th>
+                <Th align="right">クリック</Th>
                 <Th align="right">友だち追加</Th>
                 <Th align="right">成果</Th>
+                <Th align="right">売上</Th>
                 <Th align="right">報酬</Th>
+                <Th align="center">状態</Th>
                 <Th align="center">操作</Th>
               </TableHeadRow>
             </thead>
@@ -613,8 +624,14 @@ export function AffiliatorsTab() {
                         <span className="block truncate" title={row.name}>{row.name}</span>
                         <span className="text-action mt-0.5 block font-mono text-xs">{row.code}</span>
                       </td>
+                      <td className="px-4 py-3 text-center">
+                        {row.friendId ? <Chip tone="ok">連携済み</Chip> : <Chip>未連携</Chip>}
+                      </td>
                       <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
                         {row.linkCount.toLocaleString()}本
+                      </td>
+                      <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
+                        {row.totalClicks.toLocaleString()}件
                       </td>
                       <td className="text-action px-4 py-3 text-right text-sm font-semibold tabular-nums">
                         {row.friendAdds.toLocaleString()}人
@@ -622,8 +639,14 @@ export function AffiliatorsTab() {
                       <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
                         {row.totalConversions.toLocaleString()}件
                       </td>
+                      <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
+                        {formatYen(row.totalRevenue)}
+                      </td>
                       <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
                         {formatYen(row.rewardAmount)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {row.isActive ? <Chip tone="ok">計測中</Chip> : <Chip>停止中</Chip>}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className="text-action text-xs font-medium">
@@ -635,7 +658,7 @@ export function AffiliatorsTab() {
                     {/* Detail expansion row */}
                     {isExpanded && (
                       <tr key={`${row.id}-detail`}>
-                        <td colSpan={6} className="bg-canvas-sunken border-hairline border-t px-6 py-5">
+                        <td colSpan={10} className="bg-canvas-sunken border-hairline border-t px-6 py-5">
                           {detailLoading ? (
                             <p className="text-sm text-gray-400">読み込み中...</p>
                           ) : (
@@ -1634,17 +1657,17 @@ export function ApprovalQueue() {
           onChange={(value) => { setPageSize(Number(value)); setPage(1); setSelected(new Set()) }}
           size="page-size"
         />
-        <Button onClick={exportApprovalsCsv} disabled={shownItems.length === 0} className="ml-auto">
+        <AffiliateButton onClick={exportApprovalsCsv} disabled={shownItems.length === 0} className="ml-auto">
           CSVで書き出す
-        </Button>
+        </AffiliateButton>
         {status === 'pending' && (
-          <Button
+          <AffiliateButton
             variant="primary"
             onClick={() => { void handleBulkApprove() }}
             disabled={selected.size === 0 || actioning !== null}
           >
             選んだ{selected.size}件を認める
-          </Button>
+          </AffiliateButton>
         )}
       </div>
 
@@ -1676,7 +1699,7 @@ export function ApprovalQueue() {
 
       {error ? (
         <ListState
-          kind="error"
+          {...{ kind: 'error' as const }}
           title="成果を読み込めませんでした"
           description={error}
           onRetry={() => void loadItems()}
@@ -1774,20 +1797,20 @@ export function ApprovalQueue() {
                   {status === 'pending' && (
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-2">
-                        <Button
+                        <AffiliateButton
                           onClick={() => { void handleApprove(item.eventId) }}
                           disabled={actioning !== null}
                           variant="primary"
                         >
                           認める
-                        </Button>
-                        <Button
+                        </AffiliateButton>
+                        <AffiliateButton
                           onClick={() => { void handleReject(item.eventId) }}
                           disabled={actioning !== null}
                           title="却下理由はまだ保存できません"
                         >
                           却下
-                        </Button>
+                        </AffiliateButton>
                       </div>
                     </td>
                   )}
@@ -2125,9 +2148,9 @@ export function OffersTab() {
           size="page-size"
         />
         {/* 「並び順を保存」は設計にあるが、保存する口が無いので置かない。 */}
-        <Button onClick={exportCsv} disabled={shown.length === 0} className="ml-auto">
+        <AffiliateButton onClick={exportCsv} disabled={shown.length === 0} className="ml-auto">
           CSVで書き出す
-        </Button>
+        </AffiliateButton>
         <Button href="/affiliate-offers/new" variant="primary">
           案件を作る
         </Button>
