@@ -115,6 +115,13 @@ export interface Tag {
   };
   /** このタグが付いた後に動く、マイル以外のアクション数。0件なら省略する。 */
   otherActionCount?: number;
+  /** タグ編集画面で再表示する、保存済みの連動アクション。 */
+  linkedActions?: Array<{
+    id: string;
+    type: string;
+    label: string;
+    timing: string;
+  }>;
   /** タグ管理の整理候補に入る理由。withCounts=1 のときだけ返る。 */
   cleanupReasons?: Array<"unused" | "duplicate_name">;
 }
@@ -218,6 +225,10 @@ export interface FriendField {
   updatedBy?: string | null;
   /** ?withUsage=1 のときだけ付く */
   usageCount?: number;
+  /** この項目へ回答を保存する回答フォーム数。未取得時は省略する。 */
+  formUsageCount?: number;
+  /** 一覧で運用者へ示す表示・利用先。未取得時は省略する。 */
+  displayTargets?: string[];
   /** 選択中アカウント専用でなく、移行前からある共通項目。 */
   isInherited?: boolean;
 }
@@ -267,6 +278,8 @@ export interface SupportMark {
     savedSearches: number;
     automations: number;
   };
+  /** 一覧で示す自動変更の要約。未取得時は autoOnInbound だけで判定する。 */
+  automaticChangeLabel?: string;
 }
 
 /** メディアライブラリの1件 */
@@ -584,6 +597,8 @@ export interface SavedSearch {
   usedIn?: SavedSearchUsage[];
   /** 使用先が無いとサーバーで確認できたときだけ true。 */
   canDelete?: boolean;
+  /** 今月、この保存条件が呼び出された回数。未取得時は省略する。 */
+  callCountThisMonth?: number;
 }
 
 /** 共通の配信対象として保存した条件。友だち検索とJSONの形を混ぜない。 */

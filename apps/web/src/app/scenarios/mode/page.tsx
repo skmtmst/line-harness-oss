@@ -214,21 +214,6 @@ function ScenarioModeContent() {
         />
       </div>
 
-      <div data-design="Notice" className="space-y-2">
-        {scenarioState === 'loading' && (
-          <p className="bg-info-bg text-info rounded-card px-4 py-3 text-sm">
-            シナリオを読み込んでいます。
-          </p>
-        )}
-        {scenarioState === 'ready' && scenario && (
-          <p className="bg-success-bg text-success rounded-card px-4 py-3 text-sm">
-            シナリオ「{scenario.name}」を作成しました。続けて配信方式を選んでください。
-            <span className="text-ink-faint ml-3 text-xs">フォルダ：{selectedFolderName}</span>
-          </p>
-        )}
-        {error && <p className="bg-danger-bg text-danger rounded-card px-4 py-3 text-sm">{error}</p>}
-      </div>
-
       <StepTrail
         label="シナリオ作成の進み方"
         items={[
@@ -237,6 +222,21 @@ function ScenarioModeContent() {
           { label: '1通目を設定', state: 'todo' },
         ]}
       />
+
+      <div data-design="Notice" className="mt-4 space-y-2">
+        {scenarioState === 'loading' && (
+          <p className="bg-info-bg text-info rounded-card px-4 py-3 text-sm">
+            シナリオを読み込んでいます。
+          </p>
+        )}
+        {scenarioState === 'ready' && scenario && (
+          <p className="bg-success-bg text-success rounded-card px-4 py-3 text-sm">
+            「{scenario.name}」の下書きを作成しました。続けて配信方式を選んでください。
+            <span className="text-ink-faint ml-3 text-xs">フォルダ：{selectedFolderName}</span>
+          </p>
+        )}
+        {error && <p className="bg-danger-bg text-danger rounded-card px-4 py-3 text-sm">{error}</p>}
+      </div>
 
       <div data-design="Name" className="bg-canvas rounded-card border-hairline mt-4 mb-4 border p-4">
         <div className="grid max-w-3xl gap-4 md:grid-cols-2">

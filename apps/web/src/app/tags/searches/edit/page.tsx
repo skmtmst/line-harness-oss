@@ -297,7 +297,7 @@ function SavedSearchEditInner() {
       setName(found.name)
       setConditions(normalizeForEdit(found))
       setIsShared(found.isShared)
-      void recount()
+      setPreviewCount(found.matchCount ?? null)
     }).catch(() => {
       if (!cancelled) setError('保存した検索を読み込めませんでした')
     }).finally(() => {

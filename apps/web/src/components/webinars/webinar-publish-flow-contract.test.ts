@@ -36,7 +36,8 @@ describe('V6 ウェビナー公開前確認と公開完了の契約', () => {
     expect(DONE).toContain('data-design-node="TimXl"')
     expect(DONE).toContain("webinarApi.get(id)")
     expect(DONE).toContain("webinar.status !== 'active'")
-    expect(DONE).toContain('{webinar.schedule.length}件')
+    expect(DONE).toContain("const publicPeriod = publicationWindow(webinar as PublishedWebinar)")
+    expect(DONE).toContain("['対象', publicPeriod]")
     expect(DONE).not.toContain('申込 1,284')
     expect(DONE).not.toContain('<Header')
   })
@@ -44,7 +45,7 @@ describe('V6 ウェビナー公開前確認と公開完了の契約', () => {
   it('所属アカウントのLIFFが取れたときだけ公開ページを出す', () => {
     expect(DONE).toContain('accounts.find((account) => account.id === webinar.accountId)')
     expect(DONE).toContain('webinarAccount?.liffId')
-    expect(DONE).toContain('{publicUrl ? (')
+    expect(DONE).toContain('{publicUrl ? <Button')
     expect(DONE).toContain('LIFF IDを確認できないため')
   })
 
