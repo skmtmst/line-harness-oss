@@ -4056,6 +4056,9 @@ export const CAPTURED_AT = {
     { pr: 596, head: 'edb94936', on: '2026-08-30', screens: ['U9hzqH', 'g46ja', 'Yj6CQ', 'e6iJG'], note: 'Claudeが実装した。#595 の契約の上に公開までの4段。実装した本人が比較している' },
   ],
   5: [
+    { pr: 1069, head: '9294bdeeb', on: '2026-09-07',
+      screens: ['TC1b1', 'cCB7r', 'kk8dz', 'bV5Vs', 'xfYLn', 'r6Gzsu', 'hz9ti', 'RUxNf', 'g2UNV'],
+      note: 'Issue #294。3104/8791で9画面を1440・1920px撮影し、正本と同じ状態・同じ横幅で横並び比較した。全18枚で横はみ出し0。2画面は一致、7画面は存在しないAPI値を作らず理由つきの構造一致・データ待ち。' },
     { pr: 954, head: 'c03ebf864', on: '2026-09-06',
       screens: ['TC1b1', 'cCB7r', 'kk8dz', 'bV5Vs', 'xfYLn', 'r6Gzsu', 'hz9ti', 'dqFft', 'EvVO5', 'RUxNf', 'NrBkW', 'g2UNV', 'M2b2B', 'q5G45'],
       note: 'Issue #266。latest developmentを取り込み、1440・1920と全状態を3102/8789で撮影。全画像で横はみ出し0。' },
