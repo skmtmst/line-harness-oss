@@ -30,6 +30,45 @@ function applyMigration(db: Database.Database): void {
 }
 
 describe('261 media account scope', () => {
+  it('counts distinct accounts across all batches, including duplicate and null JSON entries', () => {
+    const db = legacyDb(['a1', 'a2']);
+    try {
+      db.exec(`
+        INSERT INTO media (id, created_at) VALUES
+          ('single', '2026-01-01'), ('shared', '2026-01-01'),
+          ('json-shared', '2026-01-01'), ('unknown', '2026-01-01');
+        INSERT INTO templates VALUES ('t1', 'a1');
+        INSERT INTO broadcasts VALUES ('b1', 'a1', '["a1","a1",null]'),
+          ('b-null', NULL, '[null,null]');
+        INSERT INTO rich_menu_groups VALUES ('g1', 'a1');
+        INSERT INTO rich_menu_pages VALUES ('p1', 'g1');
+        INSERT INTO scenarios VALUES ('s1', 'a1');
+        INSERT INTO scenario_steps VALUES ('ss1', 's1');
+        INSERT INTO nen_columns VALUES ('n1', 'a1');
+        INSERT INTO events VALUES ('e1', 'a1', '["a1","a1",null]'),
+          ('e2', NULL, '["a2",null]');
+        INSERT INTO webinars VALUES ('w1', 'a1'), ('w2', 'a2');
+        INSERT INTO media_usages VALUES
+          ('single', 'template', 't1'), ('single', 'template', 't1'),
+          ('single', 'broadcast', 'b1'), ('single', 'rich_menu', 'p1'),
+          ('single', 'scenario_step', 'ss1'), ('single', 'nen_column', 'n1'),
+          ('single', 'event', 'e1'), ('single', 'webinar', 'w1'),
+          ('shared', 'template', 't1'), ('shared', 'webinar', 'w2'),
+          ('json-shared', 'broadcast', 'b1'), ('json-shared', 'event', 'e2'),
+          ('unknown', 'broadcast', 'b-null');
+      `);
+      applyMigration(db);
+      expect(db.prepare('SELECT id, line_account_id FROM media ORDER BY id').all()).toEqual([
+        { id: 'json-shared', line_account_id: null },
+        { id: 'shared', line_account_id: null },
+        { id: 'single', line_account_id: 'a1' },
+        { id: 'unknown', line_account_id: null },
+      ]);
+    } finally {
+      db.close();
+    }
+  });
+
   it('assigns only a single proven usage account', () => {
     const db = legacyDb(['a1', 'a2']);
     db.exec(`
