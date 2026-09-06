@@ -49,6 +49,7 @@ export type AuditAction =
   | 'line_notification.definition.publish'
   | 'line_notification.definition.stop'
   | 'line_notification.delivery.retry'
+  | 'nen.delivery.retry'
   | 'webinar.archive'
   | 'webinar.participant.export';
 
