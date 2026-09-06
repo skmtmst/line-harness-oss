@@ -39,8 +39,8 @@ export function impactMatchesRequest(
 /**
  * いま表示している人数。
  *
- * `value` が `null` のときは**0人ではない**。誰に出ているかの記録
- * （割り当て台帳）がまだ無いだけなので、理由を添えて未取得と書く。
+ * `value` が `null` のときは**0人ではない**。値があっても `partial` なら、
+ * 割り当て台帳の記録開始前を含まないことを理由として添える。
  */
 export function audienceText(audience: RichMenuDeleteImpact['currentAudience']): string {
   if (audience.value === null) return NOT_AVAILABLE
@@ -48,6 +48,9 @@ export function audienceText(audience: RichMenuDeleteImpact['currentAudience']):
 }
 
 export function audienceReason(audience: RichMenuDeleteImpact['currentAudience']): string | null {
+  if (audience.value !== null && audience.state === 'partial') {
+    return '記録開始後に確認できた人数です。開始前の割り当ては含みません。'
+  }
   if (audience.value !== null) return null
   return '誰に出ているかの記録がまだ無いため、人数は数えられません。'
 }

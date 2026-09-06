@@ -93,15 +93,15 @@ describe('一覧の帯（設計 6-1 `q76C35`）', () => {
     expect([...at].sort((a, b) => a - b), '設計の並びと違う').toEqual(at)
   })
 
-  it('口が返さない「下書き」と「今日」を 0 件と書かない', () => {
+  it('旧集計が返さない「下書き」と「今日」を 0 件と書かない', () => {
     /*
      * `/api/broadcasts/stats` が返すのは 今月の配信・予約中・到達・失敗・
      * 平均開封率 だけ。一覧から数えると**基準が違う**（一覧はLINEアカウントで
      * 絞れるのに集計は絞らない）ので、足しても合わない4枚になる。
      */
     expect(KPIS).toContain("detail: '今日 —（未取得）'")
-    expect(KPIS).toContain("detail: '編集途中 ・ 未取得'")
-    expect(KPIS, '下書きに数を入れている').toMatch(/title: '下書き',\s*\n\s*value: null,/)
+    expect(KPIS).toContain("stats?.drafts == null ? '編集途中 ・ 未取得' : '編集途中'")
+    expect(KPIS, '一覧の新しい集計値を捨てている').toMatch(/title: '下書き',\s*\n\s*value: numberOrNull\(stats\?\.drafts\),/)
   })
 
   it('平均開封率の副題を設計どおり「過去28日」だけにする', () => {
