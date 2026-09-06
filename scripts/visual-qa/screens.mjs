@@ -2870,6 +2870,37 @@ export const SCREENS = [
   },
 ]
 
+// Issue #229（機能16）の実装後監査。
+// ChromiumがMachPort権限で起動できず、実装後の2幅画像は未取得。
+// そのため既存判定は上げず、今回実装した範囲と未接続条件だけを更新する。
+const FEATURE_16_REVIEW = {
+  PouPn: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06、Issue #229で画面を更新したが、新しい画像は未確認。** 今月の成果・承認待ち・承認済み報酬・未払い残高の4帯、成果の流れ、検索・絞り込み・並び順・CSV・ページ送りを追加した。未払い残高は支払台帳が未接続なので `—` と接続条件を表示する。撮影はChromiumのMachPort権限拒否で開始できず、新しい1440/1920画像が無いため判定は上げない。',
+    verdictSource: 'affiliates-v6/PouPn.txt + 実装コード（画像未確認）',
+  },
+  GH8VL: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06、Issue #229で画面を更新したが、新しい画像は未確認。** 帯の見出しを「確定した報酬の合計」、単位を「マイル」に直した。案件ごとの成果数は一覧APIだけでは確定値を網羅できないため未接続のまま。撮影はChromiumのMachPort権限拒否で開始できず、新しい2幅画像が無いため `needs_fix` を維持する。',
+    verdictSource: 'affiliates-v6/GH8VL.txt + 実装コード（画像未確認）',
+  },
+  n5VVTb: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06、Issue #229で画面を更新したが、新しい画像は未確認。** 4帯、検索・並び順・状態札・CSV・ページ送りを追加し、重複の疑いがない成果だけを複数選択してまとめて承認できるようにした。却下理由を保存するAPIが無いため、理由を残せないことを画面に明記した。撮影はChromiumのMachPort権限拒否で開始できず、新しい2幅画像が無いため判定は上げない。',
+    verdictSource: 'affiliates-v6/n5VVTb.txt + 実装コード（画像未確認）',
+  },
+  xqT1Z: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06、Issue #229で画面を更新したが、新しい画像は未確認。** 保留日数・支払サイクル、友だち・振込先・成果時動作の未接続理由、「つながる先」を表示した。銀行口座と友だち連携APIは未接続。撮影はChromiumのMachPort権限拒否で開始できず、新しい2幅画像が無いため `needs_fix` を維持する。',
+    verdictSource: 'affiliates-v6/xqT1Z.txt + 実装コード（画像未確認）',
+  },
+  GPWzq: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06、Issue #229で画面を更新したが、新しい画像は未確認。** 成果地点・紹介とみなす期間・二重計上防止・自動承認を第2段に置き、API未接続のため入力欄ではなく `—` と接続条件を表示した。下書き変更失敗時の再実行で同じ案件を増やさないようにした。撮影はChromiumのMachPort権限拒否で開始できず、新しい2幅画像が無いため `needs_fix` を維持する。',
+    verdictSource: 'affiliates-v6/GPWzq.txt + 実装コード（画像未確認）',
+  },
+}
+
 // Issue #230（S3 第2段）の再判定。
 // 古い調査メモは経緯として残し、ここで最新の撮影結果だけを上書きする。
 const FEATURE_17_REVIEW = {
@@ -2994,6 +3025,10 @@ const FEATURE_18_AUDIT = {
 }
 
 for (const screen of SCREENS) {
+  if (screen.feature === 16 && FEATURE_16_REVIEW[screen.node]) {
+    Object.assign(screen, FEATURE_16_REVIEW[screen.node])
+    delete screen.verdictHead
+  }
   const review = FEATURE_17_REVIEW[screen.node]
   if (review) Object.assign(screen, review)
   if (screen.feature === 18 && FEATURE_18_AUDIT[screen.node]) {
