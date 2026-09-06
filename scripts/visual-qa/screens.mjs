@@ -2897,9 +2897,9 @@ export const SCREENS = [
   {
     node: 'RAW35', feature: 34, name: '34-1 はじめの設定',
     dir: 'settings-v6', route: '/getting-started', mode: 'page',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S0 が1920px設計と1440/1920px実装を撮って判定。要修正。** 2幅とも横スクロール0。5段の大枠と右欄はそろうが、上部の進捗帯の色、各段の余白・操作位置、段3〜5の状態名と次にすることが設計と違う。**推奨修正**：設計の緑の進捗帯、段ごとの状態色、右寄せ操作へそろえ、段3と最終段の案内文を設計どおりにする。',
-    verdictSource: 'settings-v6/RAW35.txt', verdictHead: '4c5708ace',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 S0 が第2周で1920px設計と1440/1920px実装を再撮影。構造一致・順路判定API待ち。** 2幅とも横スクロール0。緑の進捗帯、5段の状態色、右寄せ操作、右欄の理由・つながる先・注意を設計と同じ骨格へそろえた。現在は `GET /api/getting-started` が無く既存APIを合成しているため、固定データでは段4が「止まっています」、最終段が「確かめられません」となり、設計の「まだです」「権限がありません」を再現できない。**残件**：5段の状態・次の行動・権限・最初の1通を返す固定応答を追加して同じ2幅で再判定する。',
+    verdictSource: 'settings-v6/RAW35.txt', verdictHead: 'e13c2e40c6',
   },
   {
     node: 'y0P0Qx', feature: 34, name: '34-2 レシピ一覧',
@@ -2911,16 +2911,16 @@ export const SCREENS = [
   {
     node: 'D5UaX', feature: 34, name: '34-3 レシピを複製する',
     dir: 'settings-v6', route: '/recipes/clone?id=signup-7day-follow', mode: 'page',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S0 が正しい固定レシピIDへ直し、1920px設計と1440/1920px実装を撮って判定。要修正。** 2幅とも横スクロール0。作られる16件と必要機能はそろうが、設計は名前と作成先を同じ主欄に置き、右欄に必要機能・作ったあと・注意をまとめる。実装は各節が縦に分かれ、未接続の警告が加わっている。**推奨修正**：設計の主欄＋右欄へ再配置し、複製API接続後に作成操作を有効化して撮り直す。',
-    verdictSource: 'settings-v6/D5UaX.txt', verdictHead: '4c5708ace',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 S0 が第2周で1920px設計と1440/1920px実装を再撮影。構造一致・複製API待ち。** 2幅とも横スクロール0。名前と作成先を同じ主欄にまとめ、16件の内訳を続け、右390欄へ必要な機能・作ったあと・注意を設計順で配置した。画面名、パンくず、作成先選択、下部操作も設計の骨格へそろえた。**残件**：`POST /api/recipes/{id}/clone` が無いため作成操作は安全のため非活性で、設計の実行可能状態を再現していない。複製APIと成功/失敗固定応答が入ったら操作を接続して再判定する。',
+    verdictSource: 'settings-v6/D5UaX.txt', verdictHead: 'e13c2e40c6',
   },
   {
     node: 'f9oUm', feature: 34, name: '34-4 マニュアルの正本表',
     dir: 'settings-v6', route: '/settings/manual-links', mode: 'page',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S0 が1920px設計と1440/1920px実装を撮って判定。要修正。** 2幅とも横スクロール0。設計は266画面の対応表とURL・確認日・状態・直す操作を出すが、実装は店舗登録向け4件だけで、運用者向けでない作業ID列が増えている。絞り込みの形と上部案内も違う。**推奨修正**：画面ID、画面名、公式記事URL、確認日、状態、操作の6列へ戻し、全画面の正本一覧を読み込む。',
-    verdictSource: 'settings-v6/f9oUm.txt', verdictHead: '4c5708ace',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 S0 が第2周で1920px設計と1440/1920px実装を再撮影。構造一致・正本表API待ち。** 2幅とも横スクロール0。運営向け案内、検索＋状態選択＋全件確認、画面ID・画面名・公式記事URL・確認日・状態・操作の6列へ設計どおり戻した。**残件**：`GET /api/manual-links` が無く、現在は店舗登録用の作業リンク4件しか読めないため、設計の266画面・URL・確認日・開ける/開けない状態は未再現。全画面の固定応答と確認APIが入ったら実値で再判定する。',
+    verdictSource: 'settings-v6/f9oUm.txt', verdictHead: 'e13c2e40c6',
   },
 ]
 
@@ -2933,22 +2933,22 @@ const FEATURE_32_REVIEW = {
     verdictHead: '1121a74eee',
   },
   b3HfZ: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06、PR #1001・`1121a74eee` を通常・読込・失敗の各状態で1440・1920撮影。** 停止前の件数・人数、オートメーションと自動応答を同時に止める対象、サーバー共通の停止状態、権限、版競合を表示・送信する。取得失敗時は0件にせず停止ボタンを無効化。横はみ出し0。**残るもの**：設計の右側にある「止めるとどうなるか／止めたあとにすること」と下部の固定操作帯が無く、ログインユーザーへのLINE・メール通知も未接続。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07、Issue #300・`875d5f74e` を通常・読込・失敗の各状態で1440・1920撮影し、設計と目視比較。** 停止対象ごとの件数・人数、理由とアカウント、補足、復旧、右欄の「止めるとどうなるか／止めたあとにすること／つながる先」、下部の固定操作帯を設計と同じ情報順で表示した。取得失敗時は0件にせず停止ボタンを無効化し、全画像で横はみ出し0。**残るもの**：ログインユーザー全員へのLINE・メール通知と操作専用の段階認証は未接続。',
     verdictSource: 'operations-v6/b3HfZ-normal.txt + operations-v6/b3HfZ-loading.txt + operations-v6/b3HfZ-error.txt',
-    verdictHead: '1121a74eee',
+    verdictHead: '875d5f74e',
   },
   UhC2O: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06、PR #1001・`1121a74eee` を1440・1920で設計と目視比較。** 端末内保存と公開管理鍵の読出しを廃止し、停止・復旧履歴をサーバーから取得。期間、CSV、4つの概要、設計と同じ5列、直近10件のシステム更新を表示し、横はみ出し0。**残るもの**：設計の各行「中身を見る」と右側の監査説明・関連画面への導線が無い。システム更新も反映時間・停止時間まで記録する配備台帳とは未接続。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07、Issue #300・`875d5f74e` を1440・1920撮影し、設計と目視比較。** サーバー保存の停止・復旧履歴、期間、CSV、4つの概要、停止記録と管理画面更新の2表、右欄の監査説明・関連画面・注意事項を設計と同じ構造で表示し、横はみ出し0。**残るもの**：管理画面更新は反映時間・停止時間・移行詳細を持つ配備台帳とは未接続で、停止記録の詳細画面も未接続。',
     verdictSource: 'operations-v6/UhC2O.txt',
-    verdictHead: '1121a74eee',
+    verdictHead: '875d5f74e',
   },
   U0BwS: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06、PR #1001・`1121a74eee` の最終確認を1440・1920で設計と目視比較。** 下見と同じ件数・人数を再計算せず表示し、選ばなかった自動処理・手動返信・予約受付が止まらないこと、LINEへ渡した配信は取り消せないことを明示。「停止」入力と版番号つきサーバー保存で誤操作・同時更新を防ぐ。横はみ出し0。**残るもの**：操作専用の段階認証と、ログインユーザー全員へのLINE・メール通知が未接続。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07、Issue #300・`875d5f74e` の最終確認を1440・1920撮影し、設計と目視比較。** 下見と同じ件数・人数、アカウント、選んだ対象、理由、止まらないもの、取り消せない配信を再計算せず表示し、「停止」入力と版番号つきサーバー保存で誤操作・同時更新を防ぐ。通知予定も窓の下部に明示し、横はみ出し0。**残るもの**：操作専用の段階認証と、ログインユーザー全員へのLINE・メール通知の実送信は未接続。',
     verdictSource: 'operations-v6/U0BwS.txt',
-    verdictHead: '1121a74eee',
+    verdictHead: '875d5f74e',
   },
 }
 
@@ -3792,6 +3792,8 @@ export const CAPTURED_AT = {
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
     { pr: 1001, head: '1121a74eee', on: '2026-09-06', screens: ['UgonK', 'b3HfZ', 'UhC2O', 'U0BwS'],
       note: '#245。サーバー共通の停止・復旧・追記履歴へ接続し、通常・読込・失敗・最終確認を1440/1920で撮影。絵は版に残さず、追跡済みの `.txt` を証拠にする。' },
+    { pr: 1064, head: '875d5f74e', on: '2026-09-07', screens: ['b3HfZ', 'UhC2O', 'U0BwS'],
+      note: 'Issue #300。対象3画面と定義済み状態の12枚を固定ポート3105/8792で1440/1920px撮影。全画像で横はみ出し0。右欄・固定操作帯・履歴2表・最終確認をV6の情報順へそろえ、3画面を構造一致へ更新した。' },
   ],
   4: [
     { pr: 420, head: '87c150ad', on: '2026-08-28', screens: ['HBTk0', 'yKEdO', 'KoT6c', 'A1ZYeP', 'l25rlp', 'rIhbN'] },
