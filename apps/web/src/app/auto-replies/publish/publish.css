@@ -136,6 +136,61 @@
 .arp-conflictList strong { font-size: var(--text-label); }
 .arp-conflictList small { margin-top: 4px; color: var(--color-ink-faint); font-size: var(--text-caption); }
 
+.arp-conflictNotice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  border-radius: var(--radius-control);
+  background: var(--color-status-warn-soft);
+  padding: 12px 14px;
+  color: var(--color-status-warn-deep);
+}
+.arp-conflictNotice svg { width: 18px; height: 18px; flex: 0 0 auto; }
+.arp-conflictNotice strong,
+.arp-conflictNotice small { display: block; }
+.arp-conflictNotice strong { font-size: var(--text-label); }
+.arp-conflictNotice small { margin-top: 2px; font-size: var(--text-caption); }
+
+.arp-priorityList { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.arp-priorityList > li {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
+}
+.arp-priorityList > li > span {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-shell);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 800;
+}
+.arp-priorityList label { display: flex; min-width: 0; align-items: center; gap: 10px; cursor: pointer; }
+.arp-priorityList label input { accent-color: var(--color-accent-deep); }
+.arp-priorityList strong,
+.arp-priorityList small { display: block; }
+.arp-priorityList strong { font-size: var(--text-label); }
+.arp-priorityList small { margin-top: 3px; color: var(--color-ink-faint); font-size: var(--text-caption); }
+.arp-priorityList em { color: var(--color-ink-secondary); font-size: var(--text-caption); font-style: normal; font-weight: 700; }
+.arp-priorityList .arp-priorityWinner { border-color: var(--color-accent); background: var(--color-accent-soft); }
+.arp-priorityList .arp-priorityWinner > span { background: var(--color-accent-deep); color: var(--color-on-accent); }
+.arp-conflictSettings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.arp-conflictSettings > div { display: grid; gap: 7px; }
+.arp-conflictSettings span { color: var(--color-ink-faint); font-size: var(--text-caption); }
+.arp-conflictSettings strong { width: fit-content; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); padding: 9px 12px; font-size: var(--text-caption); }
+.arp-loopList { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.arp-loopList li { display: flex; align-items: center; gap: 9px; color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 650; }
+.arp-loopList svg { width: 18px; height: 18px; color: var(--color-accent-deep); }
+
 .arp-inlineActions,
 .arp-previewActions,
 .arp-doneActions,

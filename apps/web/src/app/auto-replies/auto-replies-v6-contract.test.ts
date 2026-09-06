@@ -73,4 +73,22 @@ describe('V6 自動応答一覧の契約', () => {
     expect(EDITOR).not.toContain('Flex（JSONを直接書く）')
     expect(EDITOR).not.toContain('画像（JSONを直接書く）')
   })
+
+  it('URL編集は基本設定・反応条件・返信を別々の段として開ける', () => {
+    expect(EDIT_PAGE).toContain("requestedStep === 'trigger' || requestedStep === 'response'")
+    expect(EDIT_PAGE).toContain('step={step}')
+    expect(EDIT_PAGE).toContain('onStepChange={(nextStep) =>')
+    for (const node of ['K7vg2', 'nzWIX', 'ivDoe']) expect(EDITOR).toContain(node)
+    expect(EDITOR).toContain("step === 'basic'")
+    expect(EDITOR).toContain("step === 'trigger'")
+    expect(EDITOR).toContain("step === 'response'")
+  })
+
+  it('競合画面は現在のルールを含む優先順位と判定例・監視を同時に示す', () => {
+    for (const word of ['arp-priorityList', 'このルール', '判定例', '運用監視', 'ループ防止']) {
+      expect(PUBLISH).toContain(word)
+    }
+    expect(PUBLISH).toContain('conflicts.map((conflict, index)')
+    expect(PUBLISH).toContain('LINEプレビュー')
+  })
 })

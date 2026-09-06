@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
-import Header from '@/components/layout/header'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import EditDialog, { toDraft, type AutoReplyDraft } from '@/components/auto-replies/edit-dialog'
 
 /**
@@ -17,6 +17,10 @@ function AutoReplyEditInner() {
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id')
+  const requestedStep = params.get('step')
+  const step = requestedStep === 'trigger' || requestedStep === 'response' ? requestedStep : 'basic'
+  const stepLabel = step === 'basic' ? '基本設定' : step === 'trigger' ? 'どんなときに動くか' : '何を返すか'
+  usePageTitle(`自動応答ルールを作成・${stepLabel}`)
 
   const [draft, setDraft] = useState<AutoReplyDraft | null>(null)
   const [templates, setTemplates] = useState<
@@ -69,11 +73,6 @@ function AutoReplyEditInner() {
 
   return (
     <div>
-      <Header
-        title={id ? '自動応答を編集' : '自動応答を作る'}
-        description="決めた言葉が届いたときに、自動で返します。"
-      />
-
       <nav className="text-ink-faint mb-4 text-xs">
         <Link href="/auto-replies" className="hover:underline">
           自動応答
@@ -95,10 +94,17 @@ function AutoReplyEditInner() {
       ) : draft ? (
         <EditDialog
           page
+          step={step}
           draft={draft}
           templates={templates}
           onClose={() => router.push('/auto-replies')}
           onSaved={() => router.push('/auto-replies')}
+          onStepChange={(nextStep) => {
+            const query = new URLSearchParams()
+            if (id) query.set('id', id)
+            query.set('step', nextStep)
+            router.replace(`/auto-replies/edit?${query.toString()}`)
+          }}
         />
       ) : null}
     </div>
