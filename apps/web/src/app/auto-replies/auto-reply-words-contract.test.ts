@@ -254,11 +254,13 @@ describe('一覧の画面が置き換え表を通す', () => {
     expect(PAGE).not.toContain('自動返信ルールがありません')
   })
 
-  it('取得できる指標だけを数え、未接続の指標を 0 と出さない', () => {
+  it('4指標を実APIから数え、未取得を 0 と出さない', () => {
     expect(PAGE).toContain('metricWord(visibleLoadState, items.length)')
     expect(PAGE).toContain('metricWord(visibleLoadState, monthlyHits)')
-    expect(PAGE).toContain('実行結果の集計が接続されると表示します')
-    expect(PAGE).toContain('競合判定が接続されると表示します')
+    expect(PAGE).toContain('const actionExecutionsAllKnown = items.every')
+    expect(PAGE).toContain('api.autoReplies.summary(selectedAccountId)')
+    expect(PAGE).toContain("actionExecutionCount != null ? actionExecutionCount : '—'")
+    expect(PAGE).toContain("conflictCount != null ? conflictCount : '—'")
   })
 
   it('アカウント切替時は、前の取得結果を状態にも画面にも出さない', () => {

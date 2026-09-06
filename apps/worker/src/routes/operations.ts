@@ -2,19 +2,29 @@ import { Hono } from 'hono';
 import type { Context, Next } from 'hono';
 import {
   OPERATION_CAPABILITIES,
+  consumeStepUpGrant,
+  enqueueOperationNotifications,
+  getLatestOperationHealthRun,
   getOperationControlSet,
   getOperationIncident,
+  getOperationRequestReceipt,
+  listOperationDeploymentEvents,
   listOperationIncidents,
+  recordOperationDeploymentEvent,
   recordOperation,
   restoreOperationIncident,
+  saveOperationRequestReceipt,
   stopOperationCapabilities,
   type OperationCapability,
 } from '@line-crm/db';
 
 import type { Env } from '../index.js';
+import { sha256Hex } from '../middleware/auth.js';
 import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { getOperationImpactPreview } from '../services/operation-impact-preview.js';
+import { runOperationHealthChecks } from '../services/operations-health.js';
+import { verifyOperationsEvent } from '../services/operations-signature.js';
 
 export const operations = new Hono<Env>();
 
@@ -63,6 +73,92 @@ function historyLimit(raw: string | undefined): number {
   const value = Number(raw ?? 100);
   return Number.isInteger(value) ? Math.min(Math.max(value, 1), 200) : 100;
 }
+
+const STEP_UP_PURPOSE = 'operations.control';
+
+function requiredIdempotencyKey(c: Context<Env>): string | null {
+  const key = c.req.header('Idempotency-Key')?.trim() ?? '';
+  return key.length >= 8 && key.length <= 200 ? key : null;
+}
+
+async function consumeOperationStepUp(c: Context<Env>): Promise<boolean> {
+  const token = c.req.header('X-Step-Up-Token')?.trim();
+  if (!token) return false;
+  return consumeStepUpGrant(c.env.DB, {
+    tokenHash: await sha256Hex(token),
+    staffId: c.get('staff')!.id,
+    purpose: STEP_UP_PURPOSE,
+  });
+}
+
+async function queueOperationNotifications(
+  c: Context<Env>,
+  input: {
+    incidentId: string;
+    eventKind: 'stopped' | 'restored';
+    payload: Record<string, unknown>;
+  },
+): Promise<unknown> {
+  try {
+    return await enqueueOperationNotifications(c.env.DB, input);
+  } catch (error) {
+    console.error(`operation ${input.eventKind} notification enqueue error:`, error);
+    return { failed: ['line', 'email'] };
+  }
+}
+
+function staleHealth(run: Awaited<ReturnType<typeof getLatestOperationHealthRun>>) {
+  const serverNow = new Date();
+  const lastCheckedAt = run?.completedAt ?? run?.startedAt ?? null;
+  const stale = !lastCheckedAt || serverNow.getTime() - Date.parse(lastCheckedAt) > 10 * 60_000;
+  const nextCheckAt = lastCheckedAt
+    ? new Date(Date.parse(lastCheckedAt) + 5 * 60_000).toISOString()
+    : null;
+  return {
+    latestRun: run,
+    overallStatus: stale ? 'stale' : run?.overallStatus ?? 'unknown',
+    lastCheckedAt,
+    nextCheckAt,
+    serverNow: serverNow.toISOString(),
+  };
+}
+
+operations.get('/api/operations/health', requireRole('owner', 'admin'), async (c) => {
+  const accountId = requestedAccountId(c.req.query('account_id'));
+  if (!accountId) return c.json({ success: false, error: 'LINEアカウントを指定してください' }, 400);
+  if (!await canReadScope(c, accountId)) {
+    return c.json({ success: false, error: 'このアカウントの運用状態を表示する権限がありません' }, 403);
+  }
+  try {
+    return c.json({ success: true, data: staleHealth(await getLatestOperationHealthRun(c.env.DB, accountId)) });
+  } catch (error) {
+    console.error('GET /api/operations/health error:', error);
+    return c.json({ success: false, error: '運用状態を取得できませんでした' }, 500);
+  }
+});
+
+operations.post('/api/operations/health/runs', requireRole('owner', 'admin'), async (c) => {
+  const body = await c.req.json<{ lineAccountId?: unknown }>()
+    .catch(() => ({} as { lineAccountId?: unknown }));
+  if (typeof body.lineAccountId !== 'string' || !body.lineAccountId.trim()) {
+    return c.json({ success: false, error: 'LINEアカウントを指定してください' }, 400);
+  }
+  const accountId = body.lineAccountId.trim();
+  if (!await canReadScope(c, accountId)) {
+    return c.json({ success: false, error: 'このアカウントを確認する権限がありません' }, 403);
+  }
+  try {
+    const checked = await runOperationHealthChecks(c.env.DB, {
+      lineAccountId: accountId,
+      source: 'manual',
+      actorId: c.get('staff')!.id,
+    });
+    return c.json({ success: true, duplicate: checked.duplicate, data: staleHealth(checked.run) }, checked.duplicate ? 200 : 201);
+  } catch (error) {
+    console.error('POST /api/operations/health/runs error:', error);
+    return c.json({ success: false, error: '運用状態を確認できませんでした' }, 500);
+  }
+});
 
 operations.get('/api/operations/control', requireRole('owner', 'admin'), async (c) => {
   const accountId = requestedAccountId(c.req.query('account_id'));
@@ -128,12 +224,42 @@ operations.get('/api/operations/control/preview', requireRole('owner', 'admin'),
 operations.get('/api/operations/history', requireRole('owner', 'admin'), async (c) => {
   try {
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-    const incidents = await listOperationIncidents(c.env.DB, {
-      accountIds: scope.allowedAccountIds,
-      includeGlobal: c.get('staff')?.role === 'owner',
-      limit: historyLimit(c.req.query('limit')),
-    });
-    return c.json({ success: true, data: incidents });
+    const limit = historyLimit(c.req.query('limit'));
+    const [incidents, deployments] = await Promise.all([
+      listOperationIncidents(c.env.DB, {
+        accountIds: scope.allowedAccountIds,
+        includeGlobal: c.get('staff')?.role === 'owner',
+        limit,
+      }),
+      listOperationDeploymentEvents(c.env.DB, limit),
+    ]);
+    const history = [
+      ...incidents.map((incident) => ({ ...incident, historyKind: 'incident', occurredAt: incident.createdAt })),
+      ...deployments.map((deployment) => ({
+        id: `deployment:${deployment.id}`,
+        historyKind: 'deployment',
+        occurredAt: deployment.occurredAt,
+        scopeKey: '*',
+        lineAccountId: null,
+        status: deployment.phase === 'succeeded' ? 'resolved' : deployment.phase === 'failed' ? 'failed' : 'preparing',
+        capabilities: [],
+        reason: deployment.releaseSummary ?? `${deployment.environment}へ更新`,
+        detail: deployment.version,
+        actorId: deployment.actor,
+        resolvedByActorId: null,
+        controlVersion: null,
+        beforeSnapshot: null,
+        stoppedSnapshot: null,
+        restoredSnapshot: null,
+        errorMessage: deployment.phase === 'failed' ? '配備に失敗しました' : null,
+        stoppedAt: null,
+        resolvedAt: deployment.phase === 'succeeded' ? deployment.occurredAt : null,
+        createdAt: deployment.occurredAt,
+        updatedAt: deployment.receivedAt,
+        deployment,
+      })),
+    ].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt)).slice(0, limit);
+    return c.json({ success: true, data: history });
   } catch (error) {
     console.error('GET /api/operations/history error:', error);
     return c.json({ success: false, error: '緊急操作の履歴を取得できませんでした' }, 500);
@@ -193,12 +319,40 @@ operations.post(
       ? body.detail.trim().slice(0, 1_000)
       : null;
 
+    const idempotencyKey = requiredIdempotencyKey(c);
+    if (!idempotencyKey) {
+      return c.json({ success: false, error: '再実行を安全にするキーを指定してください' }, 400);
+    }
+    const actorId = c.get('staff')!.id;
+    const requestHash = await sha256Hex(JSON.stringify({
+      lineAccountId: accountId, capabilities, reason: body.reason.trim(), detail,
+      expectedVersion: Number(body.expectedVersion),
+    }));
+    const previous = await getOperationRequestReceipt(c.env.DB, 'stop', actorId, idempotencyKey);
+    if (previous) {
+      if (previous.requestHash !== requestHash) {
+        return c.json({ success: false, error: '同じ再実行キーが別の内容で使われています' }, 409);
+      }
+      const incident = await getOperationIncident(c.env.DB, previous.resourceId);
+      if (!incident) return c.json({ success: false, error: '以前の実行結果を取得できませんでした' }, 500);
+      const control = await getOperationControlSet(c.env.DB, incident.lineAccountId);
+      const notifications = await queueOperationNotifications(c, {
+        incidentId: incident.id,
+        eventKind: 'stopped',
+        payload: { lineAccountId: incident.lineAccountId, capabilities: incident.capabilities, reason: incident.reason, actorId },
+      });
+      return c.json({ success: true, duplicate: true, data: { status: 'changed', control, incident, notifications } });
+    }
+    if (!await consumeOperationStepUp(c)) {
+      return c.json({ success: false, error: '重要操作の再認証が必要です' }, 401);
+    }
+
     try {
       const result = await stopOperationCapabilities(c.env.DB, {
         lineAccountId: accountId,
         capabilities,
         expectedVersion: Number(body.expectedVersion),
-        actorId: c.get('staff')!.id,
+        actorId,
         reason: body.reason.trim(),
         detail,
       });
@@ -209,7 +363,15 @@ operations.post(
           data: result.control,
         }, 409);
       }
-      return c.json({ success: true, data: result }, 201);
+      await saveOperationRequestReceipt(c.env.DB, {
+        action: 'stop', actorId, idempotencyKey, requestHash, resourceId: result.incident.id,
+      });
+      const notifications = await queueOperationNotifications(c, {
+        incidentId: result.incident.id,
+        eventKind: 'stopped',
+        payload: { lineAccountId: accountId, capabilities, reason: body.reason.trim(), actorId },
+      });
+      return c.json({ success: true, data: { ...result, notifications } }, 201);
     } catch (error) {
       console.error('POST /api/operations/incidents error:', error);
       return c.json({ success: false, error: '緊急停止状態を保存できませんでした' }, 500);
@@ -236,16 +398,42 @@ operations.post(
       return c.json({ success: false, error: '最新の停止状態を読み直してください' }, 400);
     }
 
+    const idempotencyKey = requiredIdempotencyKey(c);
+    if (!idempotencyKey) {
+      return c.json({ success: false, error: '再実行を安全にするキーを指定してください' }, 400);
+    }
+
     try {
       const incident = await getOperationIncident(c.env.DB, c.req.param('id'));
       if (!incident) return c.json({ success: false, error: '緊急操作の記録が見つかりません' }, 404);
       if (!await canControlScope(c, incident.lineAccountId)) {
         return c.json({ success: false, error: 'この範囲を復旧する権限がありません' }, 403);
       }
+      const actorId = c.get('staff')!.id;
+      const action = `restore:${incident.id}`;
+      const requestHash = await sha256Hex(JSON.stringify({ expectedVersion: Number(body.expectedVersion) }));
+      const previous = await getOperationRequestReceipt(c.env.DB, action, actorId, idempotencyKey);
+      if (previous) {
+        if (previous.requestHash !== requestHash) {
+          return c.json({ success: false, error: '同じ再実行キーが別の内容で使われています' }, 409);
+        }
+        const replayed = await getOperationIncident(c.env.DB, previous.resourceId);
+        if (!replayed) return c.json({ success: false, error: '以前の実行結果を取得できませんでした' }, 500);
+        const control = await getOperationControlSet(c.env.DB, replayed.lineAccountId);
+        const notifications = await queueOperationNotifications(c, {
+          incidentId: replayed.id,
+          eventKind: 'restored',
+          payload: { lineAccountId: replayed.lineAccountId, actorId },
+        });
+        return c.json({ success: true, duplicate: true, data: { status: 'changed', control, incident: replayed, notifications } });
+      }
+      if (!await consumeOperationStepUp(c)) {
+        return c.json({ success: false, error: '重要操作の再認証が必要です' }, 401);
+      }
       const result = await restoreOperationIncident(c.env.DB, {
         incidentId: incident.id,
         expectedVersion: Number(body.expectedVersion),
-        actorId: c.get('staff')!.id,
+        actorId,
       });
       if (result.status === 'not_found') {
         return c.json({ success: false, error: '復旧できる緊急停止ではありません' }, 409);
@@ -257,10 +445,71 @@ operations.post(
           data: result.control,
         }, 409);
       }
-      return c.json({ success: true, data: result });
+      await saveOperationRequestReceipt(c.env.DB, {
+        action, actorId, idempotencyKey, requestHash, resourceId: result.incident.id,
+      });
+      const notifications = await queueOperationNotifications(c, {
+        incidentId: result.incident.id,
+        eventKind: 'restored',
+        payload: { lineAccountId: result.incident.lineAccountId, actorId },
+      });
+      return c.json({ success: true, data: { ...result, notifications } });
     } catch (error) {
       console.error('POST /api/operations/incidents/:id/restore error:', error);
       return c.json({ success: false, error: '復旧後の状態を保存できませんでした' }, 500);
     }
   },
 );
+
+operations.post('/api/internal/deployments/events', async (c) => {
+  const secret = c.env.OPERATIONS_DEPLOYMENT_SIGNING_SECRET;
+  if (!secret || secret.length < 32) {
+    return c.json({ success: false, error: 'Deployment event receiver is not configured' }, 503);
+  }
+  const rawBody = await c.req.text();
+  if (!await verifyOperationsEvent(
+    secret,
+    c.req.header('X-Operations-Timestamp'),
+    c.req.header('X-Operations-Signature'),
+    rawBody,
+  )) {
+    return c.json({ success: false, error: 'Invalid signature' }, 401);
+  }
+  let body: Record<string, unknown>;
+  try { body = JSON.parse(rawBody) as Record<string, unknown>; } catch {
+    return c.json({ success: false, error: 'Invalid JSON' }, 400);
+  }
+  const phases = ['queued', 'deploying', 'verifying', 'succeeded', 'failed', 'rolled_back'] as const;
+  if (
+    typeof body.deploymentId !== 'string' || !body.deploymentId.trim()
+    || typeof body.environment !== 'string' || !body.environment.trim()
+    || typeof body.actor !== 'string' || !body.actor.trim()
+    || typeof body.occurredAt !== 'string' || !Number.isFinite(Date.parse(body.occurredAt))
+    || typeof body.phase !== 'string' || !phases.includes(body.phase as typeof phases[number])
+  ) {
+    return c.json({ success: false, error: 'Invalid deployment event' }, 400);
+  }
+  const migrations = Array.isArray(body.migrations)
+    ? body.migrations.filter((value): value is string => typeof value === 'string').slice(0, 100)
+    : [];
+  const saved = await recordOperationDeploymentEvent(c.env.DB, {
+    deploymentId: body.deploymentId.trim().slice(0, 200),
+    phase: body.phase as typeof phases[number],
+    environment: body.environment.trim().slice(0, 100),
+    fromCommit: typeof body.fromCommit === 'string' ? body.fromCommit.slice(0, 100) : null,
+    toCommit: typeof body.toCommit === 'string' ? body.toCommit.slice(0, 100) : null,
+    version: typeof body.version === 'string' ? body.version.slice(0, 100) : null,
+    migrations,
+    rollbackAvailable: body.rollbackAvailable === true,
+    downtimeSeconds: Number.isInteger(body.downtimeSeconds) && Number(body.downtimeSeconds) >= 0
+      ? Number(body.downtimeSeconds) : null,
+    pullRequest: Number.isInteger(body.pullRequest) && Number(body.pullRequest) > 0
+      ? Number(body.pullRequest) : null,
+    releaseSummary: typeof body.releaseSummary === 'string' ? body.releaseSummary.slice(0, 1_000) : null,
+    actor: body.actor.trim().slice(0, 200),
+    smokeCheck: body.smokeCheck && typeof body.smokeCheck === 'object' && !Array.isArray(body.smokeCheck)
+      ? body.smokeCheck as Record<string, unknown> : null,
+    occurredAt: new Date(body.occurredAt).toISOString(),
+  });
+  return c.json({ success: true, duplicate: !saved.created, data: saved.event }, saved.created ? 201 : 200);
+});

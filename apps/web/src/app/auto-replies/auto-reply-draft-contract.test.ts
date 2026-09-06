@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { toDraft } from '@/components/auto-replies/edit-dialog'
+import { toDraft, toVersionDraft } from '@/components/auto-replies/edit-dialog'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
@@ -21,10 +21,11 @@ const DIALOG = read('..', '..', 'components', 'auto-replies', 'edit-dialog.tsx')
  * **窓へ渡す中身は2つ持ったまま**で、そこが食い違っていました。
  */
 describe('自動応答の編集に渡す中身', () => {
-  it('2か所とも同じ作り手を通す', () => {
+  it('一覧と版管理APIのどちらも同じ作り手を通す', () => {
     expect(LIST).toContain('setEditing(toDraft(r))')
-    expect(EDIT).toContain('setDraft(toDraft(res.data))')
+    expect(EDIT).toContain('setDraft(toVersionDraft(draftRes.data')
     expect(DIALOG).toContain('export function toDraft(')
+    expect(DIALOG).toContain('...toDraft({')
   })
 
   it('呼ぶ側が項目を並べ直さない（また食い違うため）', () => {
@@ -53,6 +54,60 @@ describe('自動応答の編集に渡す中身', () => {
       priority: 10,
       folderId: 'folder-1',
     }).folderId).toBe('folder-1')
+  })
+
+  it('版管理APIの追加設定と実測値を編集画面へ渡す', () => {
+    const draft = toVersionDraft({
+      autoReplyId: 'reply-1',
+      versionId: 'version-3',
+      versionNumber: 3,
+      status: 'draft',
+      settings: {
+        keyword: '予約',
+        matchType: 'contains',
+        responseType: 'text',
+        responseContent: '承りました',
+        templateId: null,
+        lineAccountId: 'account-1',
+        activeFrom: null,
+        activeUntil: null,
+        cooldownMinutes: null,
+        skipWhenOperatorActive: false,
+        priority: 2,
+        messageKinds: null,
+        friendConditions: null,
+        actions: null,
+        responseWeekdays: null,
+        responseHolidayRule: null,
+        oncePerFriend: false,
+        keywords: null,
+        respondToAll: false,
+        name: '予約変更',
+        keywordMatchMode: 'any',
+        folderId: null,
+        internalMemo: '一次対応',
+        replyDelaySeconds: 30,
+        unmatchedAction: { type: 'notify_operator' },
+      },
+      lastTestStatus: null,
+      lastTestedAt: null,
+      publishedAt: null,
+      matchedLast28Days: 214,
+    }, {
+      isActive: true,
+      conflictAttentionCount: 2,
+      receiveSourceCounts: [{ source: 'text', count: 5842 }],
+    })
+
+    expect(draft).toMatchObject({
+      id: 'reply-1',
+      versionNumber: 3,
+      internalMemo: '一次対応',
+      replyDelaySeconds: 30,
+      unmatchedAction: { type: 'notify_operator' },
+      matchedLast28Days: 214,
+      conflictAttentionCount: 2,
+    })
   })
 
   it('段の番号が、上から 1・2・3 の順に出る', () => {

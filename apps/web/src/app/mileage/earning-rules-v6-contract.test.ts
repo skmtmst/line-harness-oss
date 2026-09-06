@@ -127,11 +127,20 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     expect(PAGE).toContain('>何をしてくれたら</Th>')
     expect(PAGE).toContain('>対象の行動</Th>')
     expect(PAGE).toContain('align="right">たまるマイル</Th>')
-    expect(PAGE).toContain('>何回まで</Th>')
+    expect(PAGE).toContain('>有効期間・失効</Th>')
+    expect(PAGE).toContain('>この30日</Th>')
     expect(PAGE).toContain('align="center">状態</Th>')
     expect(PAGE).toContain('align="center">操作</Th>')
     // カード格子に戻していない。
     expect(PAGE).not.toContain('grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4')
+  })
+
+  it('V6の30日集計・版・失効条件を表示する', () => {
+    expect(PAGE).toContain('api.mileage.earningRulesV6')
+    expect(PAGE).toContain('rule.metrics30d.granted')
+    expect(PAGE).toContain('rule.metrics30d.excluded')
+    expect(PAGE).toContain('rule.draftVersion')
+    expect(PAGE).toContain('rule.draft.expiresAfterDays')
   })
 
   it('たまる決めごとの節に素のTailwind色を残さない', () => {

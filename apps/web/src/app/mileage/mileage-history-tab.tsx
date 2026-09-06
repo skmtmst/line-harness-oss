@@ -111,6 +111,12 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
   const items = result?.items ?? []
   const total = mileagePaginationTotal(result)
   const pageCount = Math.max(1, Math.ceil((total ?? 0) / PAGE_SIZE))
+  const periodSummary = result?.summary
+  const countByType = (entryType: MileageHistoryItem['entryType']) =>
+    periodSummary?.byType.find((item) => item.entryType === entryType)?.count ?? 0
+  const grantedCount = countByType('grant')
+  const spentCount = countByType('spend')
+  const reversalCount = countByType('reversal')
 
   const exportHistoryCsv = () => {
     if (items.length === 0) return
@@ -136,9 +142,9 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
   return (
     <section aria-label="マイルの履歴" data-design-node="MvZm5" className="space-y-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <SummaryCard variant="v6" title="この30日の記録" value={total} unit="件" detail="付与・使用の内訳は未取得" />
-        <SummaryCard variant="v6" title="手で動かした分" value={null} unit="件" detail="期間別の集計口は未接続" badge="未取得" badgeTone="neutral" />
-        <SummaryCard variant="v6" title="取り消し" value={null} unit="件" detail="期間別の集計口は未接続" badge="未取得" badgeTone="neutral" />
+        <SummaryCard variant="v6" title="この期間の記録" value={total} unit="件" detail={periodSummary ? `付いた ${grantedCount.toLocaleString('ja-JP')}・使った ${spentCount.toLocaleString('ja-JP')}` : '内訳を取得できませんでした'} />
+        <SummaryCard variant="v6" title="手で動かした分" value={periodSummary?.manualCount ?? null} unit="件" detail="担当者が直接増減したもの" />
+        <SummaryCard variant="v6" title="取り消し" value={periodSummary ? reversalCount : null} unit="件" detail="予約取消などに伴うもの" />
         <SummaryCard variant="v6" title="反映を待っている" value={null} unit="件" detail="待機中の集計口は未接続" badge="未取得" badgeTone="neutral" />
       </div>
 

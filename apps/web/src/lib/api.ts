@@ -1387,6 +1387,13 @@ export type MileageAdjustmentResult = {
   amount: number
   balanceAfter: number
   replayed: boolean
+  expiresAt: string | null
+  notification: {
+    id: string | null
+    status: 'pending' | 'sent' | 'failed'
+    attemptCount: number
+    errorCode: string | null
+  } | null
 }
 /*
  * マイルの使い道（`/api/mileage/rewards`）。#772 で口が入った。
@@ -1478,6 +1485,19 @@ export type MileageRewardAdminOverview = {
     mostRedeemedRewardName: string | null
     mostRedeemedRewardCount: number | null
   }
+  reachMetrics: MileageRewardReachMetric[]
+  rankBenefits: MileageRewardReachMetric[]
+  measuredAt: string
+}
+
+export type MileageRewardReachMetric = {
+  rewardId: string
+  rewardName: string
+  rewardKind: MileageRewardKind
+  requiredMiles: number
+  reachableFriendCount: number
+  redeemedFriendCount: number
+  exchangeRate: number | null
 }
 
 export type MileageRule = {
@@ -1556,6 +1576,94 @@ export type MileageAdminHistoryItem = {
 export type MileageAdminHistory = {
   items: MileageAdminHistoryItem[]
   pagination: { total: number; limit: number; offset: number }
+  summary: {
+    from: string | null
+    to: string | null
+    byType: Array<{
+      entryType: MileageHistoryItem['entryType']
+      count: number
+      amount: number
+    }>
+    totalAmount: number
+    manualCount: number
+    measuredAt: string
+  }
+}
+
+export type MileageFriendV6 = {
+  friendId: string
+  displayName: string
+  pictureUrl: string | null
+  rank: string | null
+  rankReason: string
+  monthChange: number
+  available: number
+  pending: number
+  expiringMiles30d: number | null
+  lifetimeEarned: number
+  spent: number
+  lastChangedAt: string | null
+  walletScope: 'verified_user' | 'friend'
+  lineAccount: { id: string; name: string }
+}
+
+export type MileageFriendsV6Overview = {
+  summary: {
+    totalMembers: number
+    withBalanceCount: number
+    available: number
+    pending: number
+    expiringMiles30d: number | null
+  }
+  items: MileageFriendV6[]
+  pagination: { total: number; limit: number; offset: number }
+  measuredAt: string
+}
+
+export type MileageTargetConditionV6 = {
+  operator: 'AND' | 'OR'
+  rules: Array<{ type: string; value: unknown }>
+  groups?: MileageTargetConditionV6[]
+}
+
+export type MileageEarningRuleDraftV6 = {
+  name: string
+  eventType: string
+  source: string | null
+  amount: number
+  initialStatus: 'available' | 'pending'
+  validFrom: string | null
+  validUntil: string | null
+  expiresAfterDays: number | null
+  cancellationEventTypes: string[]
+  targetConditions: MileageTargetConditionV6 | null
+  sortOrder: number
+}
+
+export type MileageEarningRuleV6 = {
+  id: string
+  published: {
+    name: string
+    eventType: string
+    source: string | null
+    amount: number
+    initialStatus: 'available' | 'pending'
+    validFrom: string | null
+    validUntil: string | null
+    status: 'published' | 'stopped'
+    updatedAt: string
+  }
+  draft: MileageEarningRuleDraftV6
+  draftVersion: number
+  draftUpdatedAt: string
+  metrics30d: { eligible: number; granted: number; excluded: number }
+}
+
+export type MileageEarningRulesV6Overview = {
+  items: MileageEarningRuleV6[]
+  pagination: { total: number; limit: number; offset: number }
+  unassignedLegacyCount: number
+  measuredAt: string
 }
 export type AutomationTemplateSummary = {
   key: string
@@ -5028,7 +5136,7 @@ export const api = {
       }),
     getDraft: (id: string) =>
       fetchApi<ApiResponse<AutoReplyDraftVersion>>(`/api/auto-replies/${id}/draft`),
-    saveDraft: (id: string, body: AutoReplyDraftInput) =>
+    saveDraft: (id: string, body: AutoReplyDraftInput & { expectedVersion: number }) =>
       fetchApi<ApiResponse<AutoReplyDraftVersion>>(`/api/auto-replies/${id}/draft`, {
         method: 'PUT',
         body: JSON.stringify(body),
@@ -5039,6 +5147,13 @@ export const api = {
       }),
     conflicts: (id: string) =>
       fetchApi<ApiResponse<{ conflicts: AutoReplyConflict[] }>>(`/api/auto-replies/${id}/conflicts`),
+    summary: (accountId: string) =>
+      fetchApi<ApiResponse<{
+        conflicts: AutoReplyConflict[];
+        conflictCount: number;
+        receiveSourceCounts: Array<{ source: string; count: number }> | null;
+        matchedLast28Days: number | null;
+      }>>(`/api/auto-replies/conflicts?accountId=${encodeURIComponent(accountId)}`),
     testDraft: (id: string, body: {
       friendId: string;
       incomingText: string;
@@ -5090,6 +5205,10 @@ export const api = {
         folderId: string | null;
         /** 152: 当たった回数（今月・累計）。一覧でだけ入る。 */
         hits?: { period: number; total: number };
+        /** 実行台帳で成功を確認できた後続処理の累計。 */
+        actionExecutionCount?: number | null;
+        /** 同じ受信に当たり得る、有効な別ルールの数。 */
+        conflictAttentionCount?: number | null;
         createdAt: string;
         effectiveAccounts?: Array<{
           accountId: string;
@@ -6098,6 +6217,35 @@ export const api = {
       const suffix = query.toString() ? `?${query.toString()}` : ''
       return fetchApi<ApiResponse<MileageAdminOverview>>(`/api/mileage/overview${suffix}`)
     },
+    friendsV6: (params: { accountId: string; search?: string; limit?: number; offset?: number }) => {
+      const query = new URLSearchParams({ accountId: params.accountId })
+      if (params.search) query.set('search', params.search)
+      if (params.limit !== undefined) query.set('limit', String(params.limit))
+      if (params.offset !== undefined) query.set('offset', String(params.offset))
+      return fetchApi<ApiResponse<MileageFriendsV6Overview>>(`/api/mileage/friends?${query.toString()}`)
+    },
+    earningRulesV6: (params: { accountId: string; limit?: number; offset?: number }) => {
+      const query = new URLSearchParams({ accountId: params.accountId })
+      if (params.limit !== undefined) query.set('limit', String(params.limit))
+      if (params.offset !== undefined) query.set('offset', String(params.offset))
+      return fetchApi<ApiResponse<MileageEarningRulesV6Overview>>(
+        `/api/mileage/earning-rules?${query.toString()}`,
+      )
+    },
+    saveEarningRuleDraft: (id: string, data: {
+      accountId: string
+      expectedVersion: number | null
+      draft: MileageEarningRuleDraftV6
+    }) => fetchApi<ApiResponse<{
+      ruleId: string
+      lineAccountId: string
+      version: number
+      draft: MileageEarningRuleDraftV6
+      updatedAt: string
+    }>>(`/api/mileage/earning-rules/${encodeURIComponent(id)}/draft`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
     history: (params: {
       accountId: string
       search?: string
@@ -6137,6 +6285,8 @@ export const api = {
       reasonCategory: 'customer_support' | 'order_correction' | 'grant_correction' | 'campaign' | 'other'
       reason: string
       sourceReferenceId?: string
+      expiresAt?: string
+      notifyFriend?: boolean
     }, idempotencyKey: string) => fetchApi<ApiResponse<MileageAdjustmentResult>>('/api/mileage/adjustments', {
       method: 'POST',
       headers: {
