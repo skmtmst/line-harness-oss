@@ -131,6 +131,7 @@ button-migration-target app/conversions/page.tsx
 button-migration-target app/inflow-links/page.tsx
 button-migration-target app/reminders/page.tsx
 button-migration-target app/templates/page.tsx
+button-migration-target app/webhooks/webhook-interactions.tsx
 button-migration-target components/friend-fields/tags-page-v4.tsx
 
 # 標準の表見出しへ移行済みとして監視する画面本体。
@@ -139,6 +140,7 @@ table-header-migration-target app/conversions/page.tsx
 table-header-migration-target app/inflow-links/page.tsx
 table-header-migration-target app/reminders/page.tsx
 table-header-migration-target app/templates/page.tsx
+table-header-migration-target app/webhooks/webhook-interactions.tsx
 
 # 詳細内テーブルのため、直書きthを残す既知の例外。
 native-table-header-exception app/affiliates/tabs.tsx
