@@ -59,6 +59,7 @@ import {
   IDENTITY_CANDIDATE_LISTS,
   MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
   LIST_STATS, NEN_BIRTHDAY_COUPON, NEN_CAMPAIGN_SETTINGS, NEN_COLUMN_CREATE, NEN_COLUMNS, NEN_JOBS, NEN_PETS,
+  NEN_FLOW_METRICS, NEN_COLUMN_METRICS, NEN_PET_METRICS, NEN_DELIVERIES, NEN_DELIVERY_DETAILS,
   OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_ACTIONS, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   RICH_MENU_GROUPS, RICH_MENU_GROUP_DETAILS, RICH_MENU_EXTERNAL, RICH_MENU_TAP_STATS,
@@ -1094,6 +1095,31 @@ function reminderStepsOf(reminder) {
   }))
 }
 
+const NEN_RANGE_END = Date.parse('2026-08-25T15:00:00.000Z')
+
+function nenRangeFor(query) {
+  const from = query.get('from')
+  const to = query.get('to')
+  if (from && to && Number.isFinite(Date.parse(from)) && Number.isFinite(Date.parse(to))) {
+    return {
+      days: Math.max(1, Math.ceil((Date.parse(to) - Date.parse(from)) / 86_400_000)),
+      from: new Date(from).toISOString(),
+      to: new Date(to).toISOString(),
+    }
+  }
+  const requested = Number.parseInt(query.get('days') ?? '30', 10)
+  const days = Number.isSafeInteger(requested) && requested >= 1 && requested <= 365 ? requested : 30
+  return {
+    days,
+    from: new Date(NEN_RANGE_END - days * 86_400_000).toISOString(),
+    to: new Date(NEN_RANGE_END).toISOString(),
+  }
+}
+
+function nenMetricsBody(data, query) {
+  return { ...data, range: nenRangeFor(query) }
+}
+
 function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/auth/session') {
     return { success: true, data: STAFF, csrfToken: 'visual-qa-csrf' }
@@ -1935,6 +1961,39 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/nen-campaigns/columns') return { success: true, data: NEN_COLUMNS }
   if (pathname === '/api/nen-campaigns/pets') return { success: true, data: NEN_PETS }
   if (pathname === '/api/nen-campaigns/jobs') return { success: true, data: NEN_JOBS }
+  if (pathname === '/api/nen-campaigns/metrics/flows') return { success: true, data: nenMetricsBody(NEN_FLOW_METRICS, query) }
+  if (pathname === '/api/nen-campaigns/metrics/columns') return { success: true, data: nenMetricsBody(NEN_COLUMN_METRICS, query) }
+  if (pathname === '/api/nen-campaigns/metrics/pets') return { success: true, data: nenMetricsBody(NEN_PET_METRICS, query) }
+  if (pathname === '/api/nen-campaigns/deliveries') {
+    const status = query.get('status')
+    const cursor = Math.max(0, Number.parseInt(query.get('cursor') ?? '0', 10) || 0)
+    const limit = Math.min(100, Math.max(1, Number.parseInt(query.get('limit') ?? '20', 10) || 20))
+    const filtered = status
+      ? NEN_DELIVERIES.deliveries.filter((delivery) => delivery.status === status)
+      : NEN_DELIVERIES.deliveries
+    return {
+      success: true,
+      data: {
+        ...nenMetricsBody(NEN_DELIVERIES, query),
+        deliveries: filtered.slice(cursor, cursor + limit),
+        pagination: {
+          total: status ? filtered.length : NEN_DELIVERIES.pagination.total,
+          limit,
+          cursor: String(cursor),
+          nextCursor: cursor + limit < (status ? filtered.length : NEN_DELIVERIES.pagination.total)
+            ? String(cursor + limit)
+            : null,
+        },
+      },
+    }
+  }
+  const nenDeliveryDetail = /^\/api\/nen-campaigns\/deliveries\/([^/]+)$/.exec(pathname)
+  if (nenDeliveryDetail) {
+    const detail = NEN_DELIVERY_DETAILS[decodeURIComponent(nenDeliveryDetail[1])]
+    return detail
+      ? { success: true, data: detail }
+      : { status: 404, body: { success: false, error: '配信記録が見つかりません' } }
+  }
   if (pathname === '/api/nen-campaigns/birthday-coupon') return { success: true, data: NEN_BIRTHDAY_COUPON }
   if (pathname === '/api/nen-campaigns/overview') {
     // `jobs` が入っていないと `overview.jobs.pending` で落ちる。
