@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState, type MouseEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Check } from 'lucide-react'
+import { Check, FolderCheck, Trash2, X } from 'lucide-react'
 import { ApiError, api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -30,7 +30,7 @@ const COLORS: ReadonlyArray<{ value: string; name: string }> = [
   { value: '#06C755', name: '緑' },
   { value: '#3B82F6', name: '青' },
   { value: '#06B6D4', name: '水色' },
-  { value: '#8B5CF6', name: '紫' },
+  { value: '#7C3AED', name: '紫' },
   { value: '#EC4899', name: 'ピンク' },
   { value: '#EF4444', name: '赤' },
   { value: '#F59E0B', name: '黄' },
@@ -180,18 +180,21 @@ function FolderEditor() {
         onMouseDown={closeFromBackdrop}
       >
         <section
-          className="rounded-card border-hairline bg-canvas flex max-h-full w-full max-w-[720px] flex-col overflow-hidden border shadow-2xl"
+          className="rounded-card border-hairline bg-canvas flex max-h-full w-full max-w-[620px] flex-col overflow-hidden border shadow-2xl"
           role="dialog"
           aria-modal="true"
           aria-labelledby="folder-editor-title"
         >
-          <header className="border-hairline border-b px-7 py-5">
+          <header className="border-hairline relative border-b px-5 py-4">
             <h2 id="folder-editor-title" className="text-xl font-bold text-ink">
               {editId ? 'フォルダを編集' : 'フォルダを追加'}
             </h2>
-            <p className="text-ink-secondary mt-1 text-sm">タグや友だち情報欄を、運用目的ごとに整理します。</p>
+            <p className="text-ink-secondary mt-1 text-xs">{editId ? '名前と色を変えられます。削除しても中の項目は未分類に残ります。' : 'タグや友だち情報欄を、運用目的ごとに整理します。'}</p>
+            <button type="button" aria-label="閉じる" disabled={saving} onClick={close} className="text-ink-faint hover:text-ink absolute right-4 top-4 rounded p-1 disabled:opacity-40">
+              <X size={18} aria-hidden="true" />
+            </button>
           </header>
-          <div className="min-h-0 overflow-y-auto px-7 py-6">
+          <div className="min-h-0 overflow-y-auto px-5 py-4">
         {loadState === 'forbidden' ? (
           <p className="text-ink-secondary text-sm">見る権限がありません</p>
         ) : (
@@ -206,7 +209,7 @@ function FolderEditor() {
 
             <label className="block">
               <span className="text-ink mb-1.5 block text-sm font-semibold">
-                フォルダ名 <span className="bg-danger-bg text-danger rounded px-1.5 py-0.5 text-[10px]">必須</span>
+                フォルダ名
               </span>
               {/* 設計 `byqIW` の入力欄は h=44・文字13。 */}
               <input
@@ -220,7 +223,7 @@ function FolderEditor() {
               />
             </label>
 
-            <div className="mt-6">
+            <div className="mt-4">
               <p className="text-ink mb-3 text-sm font-semibold">フォルダの色</p>
               {/*
                 設計 `byqIW` の色見本は **枠38×38（r=10・背景canvas）の中に
@@ -252,14 +255,13 @@ function FolderEditor() {
                   )
                 })}
               </div>
-              <p className="text-ink-faint mt-3 text-xs">選んだ色は、フォルダと中に入れた属性の印に使われます。</p>
             </div>
 
             {/*
               設計 `byqIW` の「一覧での表示」。色だけ選んでも、一覧で
               どう出るかは分からない。**選んだ色のまま名前を並べて見せる。**
             */}
-            <div className="rounded-card border-hairline bg-canvas-sunken mt-6 flex flex-col gap-[7px] border p-[14px]">
+            <div className="rounded-card border-hairline bg-canvas-sunken mt-4 flex flex-col gap-[7px] border p-[14px]">
               <p className="text-nano text-ink-faint font-semibold">一覧での表示</p>
               <div className="flex items-center gap-2">
                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden="true" />
@@ -277,7 +279,7 @@ function FolderEditor() {
               </div>
             )}
 
-            <p className="rounded-control border-hairline bg-canvas-sunken text-ink-secondary mt-7 border p-4 text-xs leading-5">フォルダをあとで削除しても、中に入れたタグや友だち情報欄は削除されず「未分類」に残ります。</p>
+            <p className="text-ink-secondary mt-4 text-xs leading-5">このダイアログは追加のときも編集のときも同じものを使います。</p>
 
             {error && <p className="text-danger mt-4 text-sm">{error}</p>}
             {/* 止まっている理由は本文に出す。押せない見た目だけにしない。 */}
@@ -287,16 +289,16 @@ function FolderEditor() {
             )}
 
             <StickyBar
-              className="mt-6"
+              className="-mx-5 -mb-4 mt-4 rounded-none border-x-0 border-b-0"
               destructive={editId ? (
                 <Button type="button" className="border-danger/30 text-danger" disabled={saving} onClick={() => setDeleteOpen(true)}>
-                  このフォルダを削除
+                  <Trash2 size={16} aria-hidden="true" /> フォルダを削除
                 </Button>
               ) : undefined}
               actions={(
                 <>
                   <button type="button" disabled={saving} onClick={close} className="rounded-control border-hairline bg-canvas text-ink-secondary border px-4 py-2.5 text-sm font-medium disabled:opacity-40">キャンセル</button>
-                  <Button type="button" variant="primary" disabled={saving || blockedReason !== null} onClick={() => void save()}>{saving ? '保存中…' : editId ? '保存する' : 'フォルダを追加'}</Button>
+                  <Button type="button" variant="primary" disabled={saving || blockedReason !== null} onClick={() => void save()}>{saving ? '保存中…' : editId ? <><FolderCheck size={16} aria-hidden="true" /> フォルダを保存</> : 'フォルダを追加'}</Button>
                 </>
               )}
             />

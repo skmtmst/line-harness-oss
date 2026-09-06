@@ -163,10 +163,10 @@ describe('sfTEW CSVで一括登録の確認画面', () => {
     ]) expect(summary).toContain(detail)
   })
 
-  it('押す前に、同じ名前のタグを上書きしないことと、直す場所を書く', () => {
+  it('押す前に、同じ名前のタグを上書きしないことと、直し方を書く', () => {
     expect(warnBar).toContain('同じ名前のタグは上書きしません')
-    expect(warnBar).toContain('タグ一覧から編集してください')
-    expect(warnBar).toContain('入力確認の${preview.summary.invalid}行は登録されません')
+    expect(warnBar).toContain('エラーの行はCSVを直してから')
+    expect(warnBar).toContain('エラーの${preview.summary.invalid}行は登録されません')
   })
 })
 

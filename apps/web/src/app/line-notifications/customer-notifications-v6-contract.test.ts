@@ -5,11 +5,8 @@ import { describe, expect, it } from 'vitest'
 /**
  * 顧客へのお知らせ（★V6 `festr` / `Q55bb`）の寸法の見張り。
  *
- * **`Q55bb`（お知らせの中身を編集する）は、現行設定で安全に出せる範囲だけ描く。**
- * 版を分けて公開する口（下書き版・公開版・テスト受信者）が無いため、
- * 「下書き保存」「公開」は出さない。現行の `updateSetting` で扱える入力と、
- * きっかけ・差込項目・プレビューの確認構造だけを設計へ寄せる。
- * 引き継ぎは `docs/design-qa/v6-photo-notify-automation-handoff.md`。
+ * **`Q55bb`（お知らせの中身を編集する）は、公開版と下書き版を分ける。**
+ * 公開済みの版を直接書き換えず、下書き保存と公開を別操作にする。
  */
 
 const HERE = import.meta.dirname
@@ -35,7 +32,7 @@ describe('V6 顧客へのお知らせの寸法', () => {
     expect(CSS).toMatch(/\.action\s*\{[^}]*padding: 0 14px;/)
     expect(CSS).toMatch(/\.action\s*\{[^}]*font-size: var\(--text-label\);/)
     expect(CSS).toMatch(/\.action\s*\{[^}]*font-weight: 700;/)
-    expect(PAGE).toContain('<Button variant="primary" onClick={onSave}')
+    expect(PAGE).toContain('<Button variant="primary" onClick={onPublish}')
     expect(PAGE).toContain('<Button onClick={onTestSend}')
     // 直書きの主要ボタンへ戻さない。
     expect(PAGE).not.toContain('bg-accent text-on-accent rounded-control px-5 py-2.5')
@@ -69,18 +66,15 @@ describe('V6 顧客へのお知らせの寸法', () => {
     expect(tabs).toContain('height: 44px;')
   })
 
-  it('編集は専用レイアウトへ切り替えるが、版APIが無いうちは公開操作を作らない', () => {
+  it('編集は専用レイアウトへ切り替え、下書き保存と公開を分ける', () => {
     expect(existsSync(join(HERE, 'customer'))).toBe(false)
     expect(PAGE).toContain('function CustomerNotificationEditor')
     expect(PAGE).toContain('data-design-node="Q55bb"')
     expect(PAGE).toContain('いつ送りますか')
     expect(PAGE).toContain('このお知らせで差し込める項目（EC連携から来ます）')
     expect(PAGE).toContain('取引メールと対応済み記録は、送信台帳の接続後に設定できます。')
-    expect(PAGE).not.toContain('公開する')
-    expect(PAGE).not.toContain('下書きを保存')
-    // 引き継ぎが消えたら、作らない理由も消える。
-    const handoff = join(REPO, 'docs', 'design-qa', 'v6-photo-notify-automation-handoff.md')
-    expect(existsSync(handoff)).toBe(true)
-    expect(readFileSync(handoff, 'utf8')).toContain('Q55bb')
+    expect(PAGE).toContain('下書きを保存')
+    expect(PAGE).toContain('顧客へのお知らせを公開')
+    expect(PAGE).toContain('公開中の内容は変わりません')
   })
 })

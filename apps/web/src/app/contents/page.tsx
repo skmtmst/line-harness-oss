@@ -437,6 +437,21 @@ export default function MediaLibraryPage() {
   const removable = filtered.filter(isKnownUnused)
   const allSelected = removable.length > 0 && removable.every((item) => selected.has(item.id))
 
+  if (detailsFor) {
+    return (
+      <MediaDetailDialog
+        item={detailsFor}
+        accountId={selectedAccountId}
+        folderName={detailsFor.folderId ? folders.find((folder) => folder.id === detailsFor.folderId)?.name ?? '—（未取得）' : '未分類'}
+        onClose={() => setDetailsFor(null)}
+        onOpenReplacement={(item) => {
+          setDetailsFor(null)
+          setReplacementFor(item)
+        }}
+      />
+    )
+  }
+
   return (
     <div data-design-node="g89Tc" data-media-design="v6">
 
@@ -958,17 +973,6 @@ export default function MediaLibraryPage() {
         onComplete={() => {
           setSuccessMessage('登録できたメディアを一覧へ反映しました。')
           void load()
-        }}
-      />
-
-      <MediaDetailDialog
-        item={detailsFor}
-        accountId={selectedAccountId}
-        folderName={detailsFor?.folderId ? folders.find((folder) => folder.id === detailsFor.folderId)?.name ?? '—（未取得）' : '未分類'}
-        onClose={() => setDetailsFor(null)}
-        onOpenReplacement={(item) => {
-          setDetailsFor(null)
-          setReplacementFor(item)
         }}
       />
 

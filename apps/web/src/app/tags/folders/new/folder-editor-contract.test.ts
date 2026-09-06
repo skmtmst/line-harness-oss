@@ -17,6 +17,9 @@ describe('フォルダの作成・編集（設計 byqIW）', () => {
     expect(source).toContain('role="dialog"')
     expect(source).toContain("{editId ? 'フォルダを編集' : 'フォルダを追加'}")
     expect(source).toContain('useOverlayFocus(!deleteOpen, close, saving)')
+    expect(source).toContain('max-w-[620px]')
+    expect(source).toContain('名前と色を変えられます。削除しても中の項目は未分類に残ります。')
+    expect(source).toContain('aria-label="閉じる"')
   })
 
   it('色見本は枠38×38の中に20×20の円で、枠ごと塗らない', () => {
@@ -28,6 +31,7 @@ describe('フォルダの作成・編集（設計 byqIW）', () => {
     expect(source).not.toContain('h-9 w-9 rounded-full')
     // 選択中は円の上に16pxのチェック。
     expect(source).toContain('<Check size={16}')
+    expect(source).toContain("{ value: '#7C3AED', name: '紫' }")
   })
 
   it('「一覧での表示」の見本が、選んだ色と入力中の名前で出る', () => {
@@ -88,6 +92,7 @@ describe('フォルダの作成・編集（設計 byqIW）', () => {
     expect(source).toContain('api.tagGroups.delete(editId)')
     expect(source).toContain('このフォルダを削除')
     expect(source).toContain('中にあるタグは削除されず、未分類へ戻ります。')
+    expect(source).toContain('フォルダを保存')
   })
 })
 
