@@ -1467,7 +1467,7 @@ export const SCREENS = [
       名前を持たない分類なので、開く相手がそもそも無い。
       **撮るには実装をフォルダの口へつなぐ必要がある。**
     */
-    steps: [{ click: 'フォルダ「お問い合わせ」を操作' }],
+    steps: [{ click: 'フォルダ「お問い合わせ」の操作' }],
   },
   {
     ...TEMPLATE, node: 'NKyoA', name: '11-1-I 一覧の状態（空・読込・エラー）', mode: 'viewport', height: 1080,
