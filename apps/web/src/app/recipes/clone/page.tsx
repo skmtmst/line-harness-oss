@@ -8,8 +8,7 @@ import { useAccount } from '@/contexts/account-context'
 import { DEFAULT_FEATURES } from '@/lib/feature-settings'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import ListState from '@/components/shared/list-state'
-import NoteBar from '@/components/shared/note-bar'
-import PageHeader from '@/components/shared/page-header'
+import SelectField from '@/components/shared/select-field'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TextField } from '@/components/shared/text-field'
@@ -44,7 +43,7 @@ function RecipeClone() {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [prefix, setPrefix] = useState('')
 
-  usePageTitle(recipe?.name ?? null)
+  usePageTitle(recipe ? `${recipe.name}を作る` : null)
 
   useEffect(() => {
     if (accountLoading) return
@@ -91,18 +90,16 @@ function RecipeClone() {
 
   return (
     <div className={styles.page}>
-      <PageHeader
-        breadcrumb={[{ label: 'レシピ', href: '/recipes' }, { label: recipe.name }]}
-        title={recipe.name}
-        description={recipe.purpose}
-      />
+      <nav className={styles.breadcrumb} aria-label="パンくず">
+        <Link href="/recipes">レシピ</Link>
+        <span aria-hidden>›</span>
+        <span>{recipe.name}</span>
+      </nav>
 
       {status !== 'ready' || !features ? (
         <ListState kind={status === 'error' ? 'error' : 'loading'} />
       ) : (
         <>
-          <NoteBar tone="warn">{CLONE_UNAVAILABLE_NOTE}</NoteBar>
-
           <div className={styles.columns}>
             <div className={styles.main}>
               <section className={styles.block}>
@@ -119,13 +116,19 @@ function RecipeClone() {
                   付けると「{prefixedName(prefix, recipe.name)}
                   」のようになります。同じレシピを何度も使うとき、どれがどれか分かりやすくなります。
                 </p>
-              </section>
-
-              <section className={styles.block}>
-                <h2 className={styles.blockTitle}>どのLINEアカウントに作るか（必須）</h2>
-                <p className={styles.accountName}>
-                  {selectedAccount?.name ?? 'アカウントが選ばれていません'}
-                </p>
+                <label className={styles.accountLabel} htmlFor="recipe-clone-account">
+                  どのLINEアカウントに作るか（必須）
+                </label>
+                <SelectField
+                  id="recipe-clone-account"
+                  className={styles.accountSelect}
+                  value={selectedAccountId ?? ''}
+                  disabled={!selectedAccountId}
+                  options={[{
+                    value: selectedAccountId ?? '',
+                    label: selectedAccount?.name ?? 'アカウントが選ばれていません',
+                  }]}
+                />
                 <p className={styles.hint}>
                   作る先はいま選んでいるアカウントです。変えるときは上のLINEアカウントから選び直します。
                 </p>
@@ -156,9 +159,11 @@ function RecipeClone() {
                 )}
                 {recipe.itemsRest ? <p className={styles.hint}>{recipe.itemsRest}</p> : null}
               </section>
+            </div>
 
-              <section className={styles.block}>
-                <h2 className={styles.blockTitle}>必要な機能</h2>
+            <aside className={styles.side} aria-label="この画面の案内">
+              <section className={styles.sideCard}>
+                <h2 className={styles.sideTitle}>必要な機能</h2>
                 <ul className={styles.features}>
                   {recipe.requirements.map((r) => {
                     const on = requirementIsOn(r, features)
@@ -175,8 +180,8 @@ function RecipeClone() {
                 <p className={styles.hint}>{featureSummary(recipe, features)}</p>
               </section>
 
-              <section className={styles.block}>
-                <h2 className={styles.blockTitle}>作ったあと</h2>
+              <section className={styles.sideCard}>
+                <h2 className={styles.sideTitle}>作ったあと</h2>
                 <ul className={styles.notes}>
                   <li>できたものはすべて下書きです。放っておいても、友だちには何も届きません。</li>
                   <li>
@@ -186,9 +191,6 @@ function RecipeClone() {
                   <li>どのレシピから作ったかは記録に残ります。あとから見返せます。</li>
                 </ul>
               </section>
-            </div>
-
-            <aside className={styles.side} aria-label="この画面の案内">
               <CareCard items={[...CARE_ITEMS]} />
             </aside>
           </div>
