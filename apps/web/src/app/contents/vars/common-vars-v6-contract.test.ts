@@ -75,6 +75,6 @@ describe('V6共通情報一覧', () => {
     expect(API).toContain('accountId=${encodeURIComponent(accountId)}')
     expect(WORKER).toContain("c.req.query('accountId')")
     expect(WORKER).toContain('canAccessAllLineAccounts')
-    expect(WORKER).toContain('getCommonVarUsageCounts')
+    expect(WORKER).toContain('getCommonVarUsageSummaries')
   })
 })

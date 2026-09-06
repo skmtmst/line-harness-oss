@@ -11,12 +11,17 @@ import {
   applyMediaReplacementPlan,
   jstNow,
   getCommonVars,
-  getCommonVarUsageCounts,
+  getCommonVarUsageSummaries,
   getCommonVarById,
   createCommonVar,
   updateCommonVar,
   deleteCommonVar,
   getCommonVarUsageImpact,
+  getCommonVarVersions,
+  getCommonVarReplacementCandidates,
+  getCommonVarReplacementPlan,
+  applyCommonVarReplacementPlan,
+  CommonVarVersionConflictError,
   getCommonVarSchedules,
   createCommonVarSchedule,
   deleteCommonVarSchedule,
@@ -29,6 +34,7 @@ import {
   type CommonVarType,
   type CommonVarUsageImpact,
   type CommonVarUsageItem,
+  type CommonVarReplacementPlan,
 } from '@line-crm/db';
 import type { CommonVarDeleteImpact, CommonVarUsageKind } from '@line-crm/shared';
 import type { Env } from '../index.js';
@@ -577,6 +583,9 @@ function serializeVar(row: CommonVar) {
     varKey: row.var_key,
     type: row.type,
     value: row.value,
+    memo: row.memo ?? '',
+    version: Number(row.version ?? 1),
+    archivedAt: row.archived_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     nextSchedule: row.next_effective_from
@@ -584,6 +593,7 @@ function serializeVar(row: CommonVar) {
       : null,
     pendingScheduleCount: Number(row.pending_schedule_count ?? 0),
     usageCount: Number(row.usage_count ?? 0),
+    usageByKind: row.usage_by_kind ?? null,
   };
 }
 
@@ -777,6 +787,57 @@ function serializeCommonVarChangeImpact(
   };
 }
 
+async function commonVarUsageRevision(
+  variable: CommonVar,
+  impact: CommonVarUsageImpact,
+): Promise<string> {
+  const raw = [
+    `${variable.id}:${variable.version}`,
+    ...impact.items.map((item) => [
+      item.kind, item.source_id, item.source_parent_id ?? '', item.source_status ?? '', item.source_content,
+    ].join(':')).sort(),
+    `unscoped:${impact.unscopedFormTotal}`,
+  ].join('\n');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function commonVarReplacementRevision(plan: CommonVarReplacementPlan): Promise<string> {
+  const raw = [
+    `${plan.source.id}:${plan.source.version}:${plan.replacement.id}:${plan.replacement.version}`,
+    ...plan.targets.map((target) =>
+      `${target.table}:${target.id}:${target.fingerprint}`).sort(),
+    `blocked:${plan.blockedTotal}`,
+  ].join('\n');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function serializeCommonVarReplacementPlan(plan: CommonVarReplacementPlan, revision: string) {
+  const byKind = Object.fromEntries(Object.keys(COMMON_VAR_USAGE_KIND_LABELS).map((kind) => [
+    kind,
+    plan.targets.filter((target) => target.kind === kind).length,
+  ]));
+  return {
+    source: { id: plan.source.id, name: plan.source.name, type: plan.source.type, version: plan.source.version },
+    replacement: {
+      id: plan.replacement.id,
+      name: plan.replacement.name,
+      type: plan.replacement.type,
+      version: plan.replacement.version,
+    },
+    usageTotal: plan.usageTotal,
+    replaceableTotal: plan.replaceableTotal,
+    blockedTotal: plan.blockedTotal,
+    historicalTotal: plan.historicalTotal,
+    unscopedFormTotal: plan.unscopedFormTotal,
+    byKind,
+    canReplace: plan.blockedTotal === 0,
+    revision,
+    checkedAt: jstNow(),
+  };
+}
+
 contents.get('/api/common-vars', async (c) => {
   try {
     const accountId = c.req.query('accountId')?.trim();
@@ -788,16 +849,67 @@ contents.get('/api/common-vars', async (c) => {
       lineAccountId: accountId,
       folderId: c.req.query('folderId') || undefined,
     });
-    const usageCounts = await getCommonVarUsageCounts(
+    const usageSummaries = await getCommonVarUsageSummaries(
       c.env.DB,
       items.map((item) => item.var_key),
       accountId,
     );
-    for (const item of items) item.usage_count = usageCounts.get(item.var_key) ?? 0;
+    for (const item of items) {
+      const summary = usageSummaries.get(item.var_key);
+      item.usage_count = summary?.total ?? 0;
+      item.usage_by_kind = summary?.byKind ?? Object.fromEntries(
+        Object.keys(COMMON_VAR_USAGE_KIND_LABELS).map((kind) => [kind, 0]),
+      ) as CommonVar['usage_by_kind'];
+    }
     return c.json({ success: true, data: items.map(serializeVar) });
   } catch (err) {
     console.error('GET /api/common-vars error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+contents.get('/api/common-vars/:id', async (c) => {
+  try {
+    const accountId = c.req.query('accountId')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const variable = await getCommonVarById(c.env.DB, c.req.param('id'), accountId);
+    if (!variable) return c.json({ success: false, error: 'Not found' }, 404);
+    const [impact, versions] = await Promise.all([
+      getCommonVarUsageImpact(c.env.DB, variable.var_key, accountId),
+      getCommonVarVersions(c.env.DB, variable.id, accountId, 20),
+    ]);
+    const serializedImpact = serializeCommonVarDeleteImpact(variable, impact);
+    variable.usage_count = impact.total;
+    variable.usage_by_kind = impact.byKind;
+    return c.json({
+      success: true,
+      data: {
+        ...serializeVar(variable),
+        usages: serializedImpact.items.slice(0, 15),
+        usagePage: {
+          total: impact.total,
+          shown: Math.min(serializedImpact.items.length, 15),
+          hasMore: impact.total > 15,
+          unavailableCount: impact.unscopedFormTotal,
+        },
+        history: versions.map((version) => ({
+          id: version.id,
+          version: Number(version.version_no),
+          name: version.name,
+          value: version.value,
+          memo: version.memo,
+          changeReason: version.change_reason,
+          actorId: version.actor_id,
+          createdAt: version.created_at,
+        })),
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/common-vars/:id error:', err);
+    return c.json({ success: false, error: '共通情報の詳細を確認できませんでした' }, 503);
   }
 });
 
@@ -827,6 +939,8 @@ contents.post('/api/common-vars', requireRole('owner', 'admin'), async (c) => {
       varKey: String(body.varKey),
       type,
       value: body.value == null ? '' : String(body.value),
+      memo: body.memo == null ? '' : String(body.memo),
+      actorId: c.get('staff').id,
       folderId: body.folderId ? String(body.folderId) : null,
     });
     return c.json({ success: true, data: serializeVar(created) }, 201);
@@ -851,6 +965,12 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
 
     const body = await c.req.json<Record<string, unknown>>();
+    const expectedVersion = body.expectedVersion === undefined
+      ? undefined
+      : Number(body.expectedVersion);
+    if (expectedVersion !== undefined && (!Number.isInteger(expectedVersion) || expectedVersion < 1)) {
+      return c.json({ success: false, error: 'expectedVersion must be a positive integer' }, 400);
+    }
     // 差し込み名は変えられない。変えるとテンプレートの差し込みが黙って空になる。
     if (body.varKey !== undefined && body.varKey !== existing.var_key) {
       return c.json(
@@ -865,10 +985,22 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
     const updated = await updateCommonVar(c.env.DB, id, accountId, {
       name: body.name === undefined ? undefined : String(body.name).trim(),
       value: body.value === undefined ? undefined : String(body.value),
+      memo: body.memo === undefined ? undefined : String(body.memo),
+      expectedVersion,
+      actorId: c.get('staff').id,
+      changeReason: typeof body.changeReason === 'string' ? body.changeReason : undefined,
       ...(('folderId' in body) ? { folderId: body.folderId ? String(body.folderId) : null } : {}),
     });
     return c.json({ success: true, data: serializeVar(updated!) });
   } catch (err) {
+    if (err instanceof CommonVarVersionConflictError) {
+      return c.json({
+        success: false,
+        error: '別の担当者が先に更新しました。最新内容を読み直してください。',
+        code: 'common_var_version_conflict',
+        currentVersion: err.currentVersion,
+      }, 409);
+    }
     console.error('PATCH /api/common-vars/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
@@ -907,10 +1039,33 @@ contents.post('/api/common-vars/:id/impact-preview', requireRole('owner', 'admin
     }
     const existing = await getCommonVarById(c.env.DB, c.req.param('id'), accountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+    if (body.expectedVersion !== undefined) {
+      const expectedVersion = Number(body.expectedVersion);
+      if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+        return c.json({ success: false, error: 'expectedVersion must be a positive integer' }, 400);
+      }
+      if (expectedVersion !== existing.version) {
+        return c.json({
+          success: false,
+          error: '別の担当者が先に更新しました。最新内容を読み直してください。',
+          code: 'common_var_version_conflict',
+          currentVersion: existing.version,
+        }, 409);
+      }
+    }
     const impact = await getCommonVarUsageImpact(c.env.DB, existing.var_key, accountId);
+    const serialized = serializeCommonVarChangeImpact(existing, impact, body.nextValue);
     return c.json({
       success: true,
-      data: serializeCommonVarChangeImpact(existing, impact, body.nextValue),
+      data: {
+        ...serialized,
+        version: existing.version,
+        usageByKind: impact.byKind,
+        scheduledUsageCount: impact.items.filter((item) => item.source_status === 'scheduled').length,
+        publishedUsageCount: impact.items.filter((item) =>
+          item.source_status === 'active' || item.source_status === 'sending').length,
+        usageRevision: await commonVarUsageRevision(existing, impact),
+      },
     });
   } catch (err) {
     if (err instanceof RequestBodyError) {
@@ -921,6 +1076,110 @@ contents.post('/api/common-vars/:id/impact-preview', requireRole('owner', 'admin
       { success: false, error: '影響する場所を確認できませんでした' },
       503,
     );
+  }
+});
+
+contents.post('/api/common-vars/:id/replace', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await readBoundedJson(c.req.raw);
+    const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+    if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const source = await getCommonVarById(c.env.DB, c.req.param('id'), accountId);
+    if (!source) return c.json({ success: false, error: 'Not found' }, 404);
+    const replacementId = typeof body.replacementId === 'string' ? body.replacementId.trim() : '';
+    if (!replacementId) {
+      const candidates = await getCommonVarReplacementCandidates(c.env.DB, source);
+      return c.json({
+        success: true,
+        data: {
+          source: { id: source.id, name: source.name, type: source.type, version: source.version },
+          candidates: candidates.map((candidate) => ({
+            id: candidate.id,
+            name: candidate.name,
+            varKey: candidate.var_key,
+            type: candidate.type,
+            value: candidate.value,
+            version: candidate.version,
+          })),
+        },
+      });
+    }
+    const replacement = await getCommonVarById(c.env.DB, replacementId, accountId);
+    if (!replacement) return c.json({ success: false, error: 'Not found' }, 404);
+    if (source.id === replacement.id || source.type !== replacement.type) {
+      return c.json({ success: false, error: '同じ種類の別の共通情報を選んでください' }, 422);
+    }
+    const plan = await getCommonVarReplacementPlan(c.env.DB, source, replacement);
+    const revision = await commonVarReplacementRevision(plan);
+    const preview = serializeCommonVarReplacementPlan(plan, revision);
+    if (body.apply !== true) return c.json({ success: true, data: preview });
+
+    const expectedVersion = Number(body.expectedVersion);
+    if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+      return c.json({ success: false, error: 'expectedVersion is required' }, 400);
+    }
+    if (expectedVersion !== source.version) {
+      return c.json({
+        success: false,
+        error: '別の担当者が先に更新しました。最新内容を読み直してください。',
+        code: 'common_var_version_conflict',
+        currentVersion: source.version,
+      }, 409);
+    }
+    if (typeof body.expectedRevision !== 'string' || body.expectedRevision !== revision) {
+      return c.json({
+        success: false,
+        error: '使用先が変わりました。影響をもう一度確認してください。',
+        code: 'common_var_usage_changed',
+        data: preview,
+      }, 409);
+    }
+    if (!preview.canReplace) {
+      return c.json({
+        success: false,
+        error: '差し替えられない使用先があります。先に個別に確認してください。',
+        code: 'common_var_replacement_blocked',
+        data: preview,
+      }, 409);
+    }
+    const result = await applyCommonVarReplacementPlan(c.env.DB, plan, c.get('staff').id);
+    let remainingUsageCount: number | null = null;
+    try {
+      const remaining = await getCommonVarUsageImpact(c.env.DB, source.var_key, accountId);
+      remainingUsageCount = remaining.blockingTotal;
+    } catch {
+      // 差し替え自体は完了している。再走査不能を0件と偽らずnullで返す。
+    }
+    return c.json({
+      success: true,
+      data: {
+        ...result,
+        sourceId: source.id,
+        replacementId: replacement.id,
+        remainingUsageCount,
+        verification: remainingUsageCount === null
+          ? 'unavailable'
+          : remainingUsageCount === 0 ? 'verified' : 'partial',
+        completedAt: jstNow(),
+      },
+    });
+  } catch (err) {
+    if (err instanceof RequestBodyError) {
+      return c.json({ success: false, error: err.message }, err.status);
+    }
+    if (err instanceof CommonVarVersionConflictError) {
+      return c.json({
+        success: false,
+        error: '別の担当者が先に更新しました。最新内容を読み直してください。',
+        code: 'common_var_version_conflict',
+        currentVersion: err.currentVersion,
+      }, 409);
+    }
+    console.error('POST /api/common-vars/:id/replace error:', err);
+    return c.json({ success: false, error: '差し替えの影響を確認できませんでした' }, 503);
   }
 });
 
