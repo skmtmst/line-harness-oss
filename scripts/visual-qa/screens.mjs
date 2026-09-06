@@ -110,7 +110,7 @@ const AFFILIATE = { feature: 16, dir: 'affiliates-v6', mode: 'page' }
  */
 const MILEAGE = { feature: 17, dir: 'mileage-v6', route: '/mileage?tab=balances', mode: 'page' }
 
-/** 流入と計測。`/inflow-links?tab=` の3タブ（流入経路／サイトスクリプト／広告連携）。 */
+/** 流入と計測。`/inflow-links?tab=` の4タブ（流入経路／サイトスクリプト／広告連携／広告とのつなぎ）。 */
 const INFLOW = { feature: 18, dir: 'inflow-v6', mode: 'page' }
 
 /** コンバージョン。成果地点とレポートは `/conversions?tab=` の2タブ。 */
@@ -2817,6 +2817,77 @@ export const SCREENS = [
     why: '`/settings/manual-links` が実装に無い',
   },
 ]
+
+/*
+ * board #231 の機能18再監査。
+ *
+ * 画面実装は更新したが、macOS のブラウザ起動制限と利用者側のローカル画面
+ * アクセス拒否により、同じ幅の実装画像を撮れなかった。古い画像を根拠に
+ * 合格へ上げないため、9画面とも未判定に戻す。未接続のAPIも画面ごとに分ける。
+ */
+const FEATURE_18_AUDIT = {
+  Q4bkTg: {
+    route: '/inflow-links?tab=links',
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #231で実装を更新したが、画像未確認。** 4タブ、フォルダ、実際に動く4種の絞り込み、並び順、CSV、ページ送りを実装した。取得できない集計は0にしない。macOSのブラウザ起動制限に加え、アプリ内ブラウザのローカル画面アクセスが利用者側で拒否されたため、1440px・1920pxの実装画像は未取得。設計との差は画像で再確認する必要がある。',
+    verdictSource: 'inflow-v6/Q4bkTg.txt + 実装コード（画像未確認）',
+  },
+  IhSBB: {
+    route: '/inflow-links?tab=script',
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #231で実装を更新したが、画像未確認。** 貼るコード、受信確認、できること、WordPress・Shopify・制作会社向けの貼り方、届いたページの集計を実装し、押せない「準備中」操作を外した。設計のドメイン別許可・停止・不明ドメイン警告はドメイン管理APIが未接続のため表示できず、画面内に接続条件を明記した。1440px・1920pxの実装画像は未取得。',
+    verdictSource: 'inflow-v6/IhSBB.txt + 実装コード（画像未確認）',
+  },
+  v0HaI: {
+    route: '/inflow-links?tab=ads',
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #231で広告実績を独立画面へ分けたが、画像未確認。** 接続済み媒体は既存APIから表示し、広告費・友だち単価・成果単価は広告実績の取込APIが無いため0円を作らず `—` と接続条件を表示する。媒体・キャンペーン・広告グループ別の実績は同API接続後の課題。1440px・1920pxの実装画像は未取得。',
+    verdictSource: 'inflow-v6/v0HaI.txt + 実装コード（画像未確認）',
+  },
+  TEVk8: {
+    route: '/inflow-links/new',
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #231で作成画面を更新したが、画像未確認。** V6作成画面の寸法、流入元名・REF、友だち追加時の動き、追加先、4段階の流れ、注意3点、発行後に詳細へ進む動線を実装した。短いURLとQR画像は発行APIが未対応のため作り物を出さず、接続後に詳細へ出ることを明記した。1440px・1920pxの実装画像は未取得。',
+    verdictSource: 'inflow-v6/TEVk8.txt + 実装コード（画像未確認）',
+  },
+  JupxW: {
+    route: '/inflow-links/detail?ref=summer-ig',
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #231で詳細画面を更新したが、画像未確認。** 既存の流入別友だちAPIを接続し、友だち名・来た日時・友だち詳細への導線を追加した。設計にある最初に見たページ、友だちごとの状態・成果・マイルは現行APIが返さないため表示していない。押せないQR保存操作は外した。1440px・1920pxの実装画像は未取得。',
+    verdictSource: 'inflow-v6/JupxW.txt + 実装コード（画像未確認）',
+  },
+  UIaM7: {
+    route: '/inflow-links/detail?ref=summer-ig',
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #231でも画像未確認。** 対象名、消える設定、残る過去記録、取り消せないこと、失敗時の再試行案内は既存の画面内確認窓で維持した。設計が求める使用先の一覧・別リンクへの差し替え・アーカイブは影響確認APIが無いため未実装。1440px・1920pxの実装画像は未取得。',
+    verdictSource: 'inflow-v6/UIaM7.txt + 実装コード（画像未確認）',
+  },
+  BMmxU: {
+    route: '/inflow-links?tab=links',
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #231で状態の契約を維持したが、画像未確認。** 読込中・0件・取得失敗を別の文と操作で表示し、帯の未取得値を0にしないことは契約テストで確認した。normal/loading/empty/errorの1440px・1920px画像は今回取得できていないため、見た目は未判定。',
+    verdictSource: 'inflow-v6/BMmxU.txt + 契約テスト（画像未確認）',
+  },
+  BuVDB: {
+    route: '/inflow-links?tab=connections',
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #231で「広告とのつなぎ」を広告実績から分離したが、画像未確認。** Meta・Google・X・TikTokのクリック目印、接続状態、成果を返す仕組み、個人情報を送らない注意を表示する。接続設定と成果名の対応付けはAPI未接続のため、操作や架空の行を出さず接続条件を明記した。1440px・1920pxの実装画像は未取得。',
+    verdictSource: 'inflow-v6/BuVDB.txt + 実装コード（画像未確認）',
+  },
+  Im2b1: {
+    route: '/inflow-links?tab=connections&view=history',
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #231で送信履歴を独立表示したが、画像未確認。** 送れた・待っている・断られた件数、検索、状態絞り込み、CSV、履歴表を既存ログAPIから表示する。試行回数・次回試行日時・まとめて再試行は再試行APIが無いため操作を作らず、接続条件を明記した。1440px・1920pxの実装画像は未取得。',
+    verdictSource: 'inflow-v6/Im2b1.txt + 実装コード（画像未確認）',
+  },
+}
+
+for (const screen of SCREENS) {
+  if (screen.feature === 18 && FEATURE_18_AUDIT[screen.node]) {
+    Object.assign(screen, FEATURE_18_AUDIT[screen.node])
+    delete screen.verdictHead
+  }
+}
 
 /** 設計の高さ。`Get(node)` で引いた実寸。`capture-screens.mjs --design` が使う。 */
 export const DESIGN_SIZE = {
