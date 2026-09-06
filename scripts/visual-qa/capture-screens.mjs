@@ -381,7 +381,11 @@ async function requireFreshMock() {
 }
 
 async function captureImpl(feature) {
-  const list = screensOf(feature)
+  const onlyNode = value('node')
+  const list = screensOf(feature).filter((screen) => !onlyNode || screen.node === onlyNode)
+  if (onlyNode && list.length === 0) {
+    throw new Error(`機能${feature}に Node ${onlyNode} はありません`)
+  }
   if (!list.length) { console.error(`機能${feature} の画面が screens.mjs にありません`); process.exit(1) }
   const browser = await chromium.launch()
   let shot = 0
@@ -448,7 +452,11 @@ async function captureImpl(feature) {
       const base = s.steps ?? []
       const includesBase = base.length > 0
         && JSON.stringify(own.slice(0, base.length)) === JSON.stringify(base)
-      shots.push({ label: suffix, steps: includesBase ? own : [...base, ...own], kind: null })
+      shots.push({
+        label: suffix,
+        steps: variant.standalone || includesBase ? own : [...base, ...own],
+        kind: null,
+      })
     }
 
     for (const shotSpec of shots) {

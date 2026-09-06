@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 244,
+  "compared": 247,
   "unimplemented": 12,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 16,
-  "match": 42,
-  "structureMatchDataPending": 43,
-  "needsFix": 160,
+  "missing": 13,
+  "match": 44,
+  "structureMatchDataPending": 46,
+  "needsFix": 155,
   "unjudged": 11,
-  "remaining": 226,
+  "remaining": 224,
   "features": [
     {
       "feature": 1,
@@ -157,11 +157,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 10,
+      "match": 2,
+      "structureMatchDataPending": 3,
+      "needsFix": 5,
       "unjudged": 0,
-      "remaining": 12,
+      "remaining": 10,
       "capturedAt": [
         {
           "pr": 520,
@@ -242,6 +242,24 @@
             "IAf7j"
           ],
           "note": "Claudeが実装して撮った。#606 の契約の上（development 直結）。**ACCOUNT に role が無く、権限で出し分ける画面がすべて権限なし側に倒れていた**のを固定データ側で直した"
+        },
+        {
+          "pr": 0,
+          "head": "9b8f7451",
+          "on": "2026-09-06",
+          "screens": [
+            "PhxG6",
+            "LT8RS",
+            "Igi72",
+            "IAf7j",
+            "I6UAdr",
+            "bzDn6",
+            "YzxU1",
+            "InCDe",
+            "r7eSi",
+            "w8W4Eh"
+          ],
+          "note": "Issue #265。10 Node・68枚を1440/1920pxと全状態で撮影し、全画像で横はみ出し0。一覧と表示件数を一致へ更新し、詳細検索は不足APIを明示して構造一致へ更新。IAf7j-pick の撮影手順二重実行も直して再撮影した。"
         }
       ]
     },
@@ -1466,11 +1484,11 @@
       "feature": 15,
       "name": "登録メディア",
       "total": 5,
-      "compared": 4,
+      "compared": 5,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 1,
+      "missing": 0,
       "match": 0,
       "structureMatchDataPending": 3,
       "needsFix": 2,
@@ -1766,11 +1784,11 @@
       "feature": 18,
       "name": "流入と計測",
       "total": 9,
-      "compared": 7,
+      "compared": 9,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 2,
+      "missing": 0,
       "match": 9,
       "structureMatchDataPending": 0,
       "needsFix": 0,
