@@ -370,6 +370,7 @@ function ConversionsPageInner() {
                 <Th align="right">この30日</Th>
                 <Th align="right">金額</Th>
                 <Th>使われている場所</Th>
+                <Th>状態</Th>
                 <Th align="right">操作</Th>
               </TableHeadRow>
             </thead>
@@ -398,6 +399,11 @@ function ConversionsPageInner() {
                   </td>
                   <td className="text-ink-faint w-[18%] px-4 py-3 text-sm">
                     —<span className="ml-1 text-[11px]">利用先の取得は未接続</span>
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <span className="bg-success-bg text-success rounded-pill px-2 py-0.5 text-[11px] whitespace-nowrap">
+                      計測中
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
@@ -649,7 +655,7 @@ function ReportTab() {
                 const difference = before === null ? null : row.totalCount - before
                 return (
                   <tr key={row.conversionPointId} className="hover:bg-canvas-sunken">
-                    <td className="text-ink w-[34%] px-4 py-3 text-sm font-medium">
+                    <td className="text-ink px-4 py-3 text-sm font-medium">
                       {row.conversionPointName}
                       <p className="text-ink-faint mt-0.5 text-[11px]">
                         {EVENT_TYPE_LABELS[row.eventType] ?? 'その他'}

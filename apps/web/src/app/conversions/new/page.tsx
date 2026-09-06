@@ -184,7 +184,7 @@ export default function NewConversionPointPage() {
             </dl>
           </AsideCard>
 
-          <AsideCard title="この決めごとを過去30日にあてはめると">
+          <AsideCard title="この決めごとをこの30日にあてはめると">
             <p className="text-ink-faint text-xs leading-relaxed">
               保存前の試算口はまだ接続されていません。対象の出来事、重複除外、取消を試算する口が接続されると、件数と金額をここに表示します。試算しても過去の成果は追加しません。
             </p>
