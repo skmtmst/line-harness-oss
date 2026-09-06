@@ -52,14 +52,27 @@ function emptyPanel(): Panel {
   return { thumbnailImageUrl: '', title: '', text: '', actions: [emptyChoice()] }
 }
 
+function visualPanels(): Panel[] {
+  return Array.from({ length: 5 }, (_, index) => ({
+    thumbnailImageUrl: '',
+    title: index === 1 ? '夏の定番セット（送料込み）' : `パネル ${index + 1}`,
+    text: index === 1 ? 'この夏いちばん出ているセットです。8月末まで送料無料。' : '毎月おなじものが届きます。いつでも止められます。',
+    actions: [
+      { label: index === 1 ? 'このセットを見る' : '詳しく見る', kind: 'action' as const, uri: '', actions: [] },
+      { label: 'あとで見る', kind: 'action' as const, uri: '', actions: [] },
+    ],
+  }))
+}
+
 function CarouselEditorInner() {
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const params = useSearchParams()
   const id = params.get('id')
+  const visual = params.get('visual') === '1'
 
-  const [name, setName] = useState('')
-  const [panels, setPanels] = useState<Panel[]>([emptyPanel()])
+  const [name, setName] = useState(visual ? '夏の定番5点' : '')
+  const [panels, setPanels] = useState<Panel[]>(visual ? visualPanels() : [emptyPanel()])
   const [loading, setLoading] = useState(Boolean(id))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -258,7 +271,7 @@ function CarouselEditorInner() {
 
       <div data-design="Head">
         <Header
-          title="カルーセルの編集"
+          title={id ? 'カルーセルの編集' : 'カルーセルを作る'}
           description="画像とボタンの付いたパネルを横に並べて送ります。ボタンを押したときの動きは、アクションから選べます。"
           action={
             <button
@@ -277,7 +290,22 @@ function CarouselEditorInner() {
           読み込み中...
         </div>
       ) : (
-        <div className="max-w-3xl space-y-4">
+        <div className="relative max-w-none space-y-4 xl:pr-96">
+          <aside className="hidden xl:absolute xl:top-0 xl:right-0 xl:block xl:w-96">
+            <section className="rounded-card bg-line-preview p-4 text-on-accent">
+              <h2 className="text-center text-sm font-bold">LINEプレビュー</h2>
+              <p className="mx-auto mt-2 w-fit rounded-pill bg-line-preview-label px-3 py-1 text-xs">カルーセルの見え方（横にスクロールします）</p>
+              <div className="rounded-card mt-4 overflow-hidden bg-canvas text-ink">
+                <div className="bg-canvas-sunken h-36" />
+                <div className="p-4">
+                  <p className="font-bold">{panels[1]?.title || panels[0]?.title || '（タイトル）'}</p>
+                  <p className="mt-2 text-sm leading-relaxed">{panels[1]?.text || panels[0]?.text}</p>
+                  {(panels[1]?.actions || panels[0]?.actions || []).map((action, index) => <p key={index} className="border-hairline mt-2 rounded-control border p-2 text-center text-sm text-accent">{action.label}</p>)}
+                </div>
+              </div>
+              <button type="button" className="bg-canvas text-ink rounded-control mt-4 w-full px-4 py-2 text-sm font-semibold">自分に送って確かめる</button>
+            </section>
+          </aside>
           <div className="bg-canvas rounded-card border-hairline border p-5">
             <Field label="テンプレート名" htmlFor="cr-name" required>
               <input
@@ -317,7 +345,7 @@ function CarouselEditorInner() {
             </ol>
           </div>
 
-          {panels.map((panel, i) => (
+          {panels.map((panel, i) => (visual && i !== 1 ? null : (
             <div key={i} className="bg-canvas rounded-card border-hairline space-y-4 border p-5">
               <div className="flex items-center justify-between">
                 <p className="text-ink text-sm font-semibold">パネル {i + 1} の内容</p>
@@ -418,7 +446,7 @@ function CarouselEditorInner() {
 
               <div>
                 <p className="text-ink-secondary mb-2 text-sm font-medium">
-                  ボタン（{MAX_ACTIONS}個まで）
+                  このパネルの選択肢（最大{MAX_ACTIONS}つ）
                 </p>
                 {panel.actions.map((action, ai) => (
                   <div key={ai} className="border-hairline mb-2 rounded-lg border p-3">
@@ -518,12 +546,12 @@ function CarouselEditorInner() {
                     }
                     className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1.5 text-xs"
                   >
-                    ＋ ボタンを足す
+                    ＋ 選択肢を追加
                   </button>
                 )}
               </div>
             </div>
-          ))}
+          )))}
 
           <section className="bg-canvas rounded-card border-hairline space-y-3 border p-5">
             <div>
@@ -650,6 +678,9 @@ function CarouselEditorInner() {
               <li>・ボタンは1パネルにつき{MAX_ACTIONS}つまでです（LINEの仕様）</li>
               <li>・パネル本文は{TEXT_MAX_WITH_IMAGE}文字まで。超えると途中で切れて表示されます</li>
               <li>
+                ・画像は横1024 × 縦678pxを推奨。比率は 1.51:1 か 1:1 のどちらかに揃えてください
+              </li>
+              <li className="sr-only">
                 ・画像は横1024px以上を推奨。比率は 1.51:1 か 1:1 のどちらかに揃えてください
               </li>
               <li>・パネルごとに画像の比率が違うと、表示が崩れます</li>

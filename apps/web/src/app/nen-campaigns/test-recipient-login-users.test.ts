@@ -5,6 +5,7 @@ import { describe, expect, test } from 'vitest';
 
 const directory = dirname(fileURLToPath(import.meta.url));
 const page = readFileSync(join(directory, 'page.tsx'), 'utf8');
+const overview = readFileSync(join(directory, 'nen-overview.tsx'), 'utf8');
 const editor = readFileSync(join(directory, 'edit/campaign-editor.tsx'), 'utf8');
 const api = readFileSync(join(directory, '../../lib/api.ts'), 'utf8');
 
@@ -31,22 +32,22 @@ describe('NEN配信のテスト送信先', () => {
   });
 
   test('配信履歴では内部の英語状態を運用者向けの日本語へ変える', () => {
-    expect(page).toContain("pending: '配信待ち'");
-    expect(page).toContain("failed: '送信できませんでした'");
-    expect(page).not.toContain('>{job.status}</span>');
+    expect(overview).toContain("pending: 'これから送ります'");
+    expect(overview).toContain("failed: '届きませんでした'");
+    expect(overview).not.toContain('>{job.status}</span>');
   });
 
   test('誕生日クーポンはV6どおり3日前10時と案内する', () => {
-    expect(page).toContain('誕生日の3日前、10:00に自動送信');
-    expect(page).not.toContain('誕生日月の1日に自動送信');
-    expect(page).toContain('formatCampaignTiming(setting)');
+    expect(overview).toContain('誕生日は3日前の10:00に送ります');
+    expect(overview).not.toContain('誕生日月の1日に自動送信');
+    expect(overview).toContain('formatCampaignTiming(setting)');
   });
 
   test('取得済みの失敗・待機件数を表示し、配信日時を日本時間へ変える', () => {
-    expect(page).toContain("overview?.jobs.pending ?? '—'");
-    expect(page).toContain("overview?.jobs.failed ?? '—'");
-    expect(page).toContain('formatNenJobDateTime(job.scheduledAt)');
-    expect(page).not.toContain('予定：{job.scheduledAt}');
+    expect(overview).toContain('overview?.jobs.pending ?? null');
+    expect(overview).toContain('overview?.jobs.failed ?? null');
+    expect(overview).toContain('formatNenJobDateTime(job.sentAt || job.scheduledAt)');
+    expect(overview).not.toContain('予定：{job.scheduledAt}');
   });
 
   test('一覧の読込失敗を0件や空状態として表示しない', () => {

@@ -64,6 +64,8 @@ export function savedViewSummary(
     parts.push(`対応状況：${conditions.statuses.map((s) => STATUS_LABELS[s] ?? s).join('・')}`)
   }
 
+  if (conditions.due === 'overdue') parts.push('期限：超過')
+
   // 設計 `ASsb3` は「未読のみ」。「自分の」は担当者の軸が言っている。
   if (conditions.unread === 'mine') parts.push('未読のみ')
 

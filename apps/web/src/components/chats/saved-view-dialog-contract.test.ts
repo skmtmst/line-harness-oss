@@ -9,7 +9,7 @@ const PAGE = fs.readFileSync(path.join(__dirname, '..', '..', 'app', 'chats', 'p
 describe('受信箱 保存した検索の完了判定', () => {
   it('保存先の成功を確認してからだけ完了表示へ進む', () => {
     expect(DIALOG).toContain('Promise<SavedViewSaveResult>')
-    expect(DIALOG).toContain('const result = await onSave(trimmed)')
+    expect(DIALOG).toContain('const result = await onSave({ name: trimmed, status, due, channel, assignee, favorite })')
     expect(DIALOG).toContain('if (!result.success)')
     expect(DIALOG.indexOf('setDone(true)')).toBeGreaterThan(DIALOG.indexOf('if (!result.success)'))
   })
@@ -23,7 +23,7 @@ describe('受信箱 保存した検索の完了判定', () => {
 
   it('呼び出し元が保存結果をモーダルへ返す', () => {
     expect(PAGE).toContain('Promise<SavedViewSaveResult>')
-    expect(PAGE).toContain('return createSavedView(name)')
+    expect(PAGE).toContain('return createSavedView(draft)')
     expect(PAGE).toContain('return { success: true }')
     expect(PAGE).toContain('return { success: false, error: message }')
   })
@@ -64,6 +64,17 @@ describe('受信箱 保存した検索の完了判定', () => {
     expect(DIALOG).toContain('placeholder="検索名を入力してください"')
     expect(DIALOG).toContain("{saving ? '保存中' : '検索条件を保存'}")
     expect(PAGE).toContain('現在の条件を保存')
+  })
+
+  it('保存する4条件をモーダル内で変更でき、よく使う状態も保存する', () => {
+    expect(DIALOG).toContain('aria-label="保存する対応状況"')
+    expect(DIALOG).toContain('aria-label="保存する期限"')
+    expect(DIALOG).toContain('aria-label="保存する受信経路"')
+    expect(DIALOG).toContain('aria-label="保存する担当者"')
+    expect(DIALOG).toContain('aria-label="よく使うに追加"')
+    expect(PAGE).toContain('conditions: currentSavedViewConditions(draft)')
+    expect(PAGE).toContain('isFavorite: draft?.favorite ?? false')
+    expect(PAGE).toContain("setQuickFilter(conditions.due === 'overdue' ? 'overdue' : 'all')")
   })
 
   it('保存条件ごとの件数が未接続なら0件にせず理由を出す', () => {
