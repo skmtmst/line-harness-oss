@@ -1,7 +1,8 @@
 import { Hono, type Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
 import {
-  getLineAccounts,
+  getLineAccountsByIds,
+  getLineAccountScopeEntries,
   getLineAccountListStats,
   getLineAccountById,
   getLineAccountCredentialHealth,
@@ -16,7 +17,10 @@ import {
   restoreLineAccount,
   LineAccountLifecycleError,
 } from '@line-crm/db';
-import type { LineAccount as DbLineAccount } from '@line-crm/db';
+import type {
+  LineAccount as DbLineAccount,
+  LineAccountScopeEntry,
+} from '@line-crm/db';
 import { CredentialEncryptionKeyError } from '@line-crm/db';
 import { requireRole } from '../middleware/role-guard.js';
 import { fetchBotProfile } from '../lib/bot-profile.js';
@@ -163,7 +167,12 @@ async function mapWithConcurrency<T, R>(
 lineAccounts.get('/api/line-accounts', async (c) => {
   try {
     const db = c.env.DB;
-    const items = (await getVisibleLineAccountScope(c.env.DB, c.get('staff'))).accounts;
+    const visibleScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const items = await getLineAccountsByIds(
+      db,
+      visibleScope.allowedAccountIds,
+      c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+    );
     const statsByAccount = await getLineAccountListStats(db, items.map((item) => item.id));
     const serializeWithStats = (item: DbLineAccount) => ({
       ...serializeLineAccount(item),
@@ -305,6 +314,22 @@ async function verifyConnection(input: {
   return result;
 }
 
+async function getVisibleLineAccountEntry(
+  c: Context<Env>,
+  id: string,
+): Promise<LineAccountScopeEntry | null> {
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  return scope.accounts.find((account) => account.id === id) ?? null;
+}
+
+async function getAuthorizedLineAccount(
+  c: Context<Env>,
+  id: string,
+): Promise<DbLineAccount | null> {
+  if (!await getVisibleLineAccountEntry(c, id)) return null;
+  return getLineAccountById(c.env.DB, id);
+}
+
 // 保存前の接続確認。成功してもDBには一切書き込まない。
 lineAccounts.post(
   '/api/line-accounts/verify-connection',
@@ -335,8 +360,8 @@ lineAccounts.put('/api/line-accounts/default', requireRole('owner'), async (c) =
     if (!body.accountId) {
       return c.json({ success: false, error: 'accountId is required' }, 400);
     }
-    const account = await getLineAccountById(c.env.DB, body.accountId);
-    if (!account || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [account.id])) {
+    const account = await getAuthorizedLineAccount(c, body.accountId);
+    if (!account) {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
     if (account.archived_at) {
@@ -367,8 +392,8 @@ async function archiveAccountResponse(
   defaultReason: string,
 ) {
   const id = c.req.param('id')!;
-  const account = await getLineAccountById(c.env.DB, id);
-  if (!account || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [id])) {
+  const account = await getAuthorizedLineAccount(c, id);
+  if (!account) {
     return c.json({ success: false, error: 'LINE account not found' }, 404);
   }
   if (account.archived_at) {
@@ -410,8 +435,8 @@ lineAccounts.post('/api/line-accounts/:id/archive', requireRole('owner'), async 
 lineAccounts.post('/api/line-accounts/:id/restore', requireRole('owner'), async (c) => {
   try {
     const id = c.req.param('id')!;
-    const account = await getLineAccountById(c.env.DB, id);
-    if (!account || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [id])) {
+    const account = await getAuthorizedLineAccount(c, id);
+    if (!account) {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
     const restored = await restoreLineAccount(c.env.DB, id);
@@ -427,11 +452,8 @@ lineAccounts.post('/api/line-accounts/:id/restore', requireRole('owner'), async 
 // GET /api/line-accounts/:id - get single without persisted secret values
 lineAccounts.get('/api/line-accounts/:id', async (c) => {
   try {
-    const account = await getLineAccountById(c.env.DB, c.req.param('id'));
+    const account = await getAuthorizedLineAccount(c, c.req.param('id'));
     if (!account) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
-    }
-    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [account.id])) {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
     return c.json({ success: true, data: serializeLineAccount(account) });
@@ -447,16 +469,13 @@ lineAccounts.get(
   requireRole('owner'),
   async (c) => {
     try {
-      const account = await getLineAccountById(c.env.DB, c.req.param('id'));
-      if (!account) {
-        return c.json({ success: false, error: 'LINE account not found' }, 404);
-      }
-      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [account.id])) {
+      const id = c.req.param('id');
+      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [id])) {
         return c.json({ success: false, error: 'LINE account not found' }, 404);
       }
       const health = await getLineAccountCredentialHealth(
         c.env.DB,
-        account.id,
+        id,
       );
       if (!health) {
         return c.json({ success: false, error: 'LINE account not found' }, 404);
@@ -479,12 +498,8 @@ lineAccounts.get('/api/line-accounts/:id/follower-insight', async (c) => {
       return c.json({ success: false, error: 'date query is required in yyyyMMdd format' }, 400);
     }
 
-    const account = await getLineAccountById(c.env.DB, c.req.param('id'));
+    const account = await getAuthorizedLineAccount(c, c.req.param('id'));
     if (!account) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
-    }
-
-    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [account.id])) {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
     const client = new LineClient(account.channel_access_token);
@@ -511,12 +526,11 @@ lineAccounts.get('/api/line-accounts/:id/follower-insight', async (c) => {
 // No cron polls LINE: connection/UI performs a one-item capability probe, then
 // operator-approved step requests advance the D1 cursor until completion.
 lineAccounts.get('/api/line-accounts/:id/follower-import', async (c) => {
-  const account = await getLineAccountById(c.env.DB, c.req.param('id')!);
-  if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
-  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [account.id])) {
+  const id = c.req.param('id')!;
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [id])) {
     return c.json({ success: false, error: 'LINE account not found' }, 404);
   }
-  const state = await getFollowerImportState(c.env.DB, account.id);
+  const state = await getFollowerImportState(c.env.DB, id);
   return c.json({ success: true, data: state });
 });
 
@@ -525,11 +539,8 @@ lineAccounts.post(
   requireRole('owner', 'admin'),
   async (c) => {
     try {
-      const account = await getLineAccountById(c.env.DB, c.req.param('id')!);
+      const account = await getAuthorizedLineAccount(c, c.req.param('id')!);
       if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
-      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [account.id])) {
-        return c.json({ success: false, error: 'LINE account not found' }, 404);
-      }
       if (account.archived_at) {
         return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
       }
@@ -552,11 +563,8 @@ lineAccounts.post(
   '/api/line-accounts/:id/follower-import/start',
   requireRole('owner', 'admin'),
   async (c) => {
-    const account = await getLineAccountById(c.env.DB, c.req.param('id')!);
+    const account = await getVisibleLineAccountEntry(c, c.req.param('id')!);
     if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
-    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [account.id])) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
-    }
     if (account.archived_at) {
       return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
     }
@@ -576,11 +584,8 @@ lineAccounts.post(
   '/api/line-accounts/:id/follower-import/step',
   requireRole('owner', 'admin'),
   async (c) => {
-    const account = await getLineAccountById(c.env.DB, c.req.param('id')!);
+    const account = await getAuthorizedLineAccount(c, c.req.param('id')!);
     if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
-    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [account.id])) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
-    }
     if (account.archived_at) {
       return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
     }
@@ -885,8 +890,11 @@ lineAccounts.patch(
         relationships.push({ id: item.id, parentLineAccountId: item.parentLineAccountId });
       }
 
-      const allAccounts = await getLineAccounts(c.env.DB);
       const visible = (await getVisibleLineAccountScope(c.env.DB, c.get('staff'))).accounts;
+      const tenantAccounts = await getLineAccountScopeEntries(
+        c.env.DB,
+        c.get('staff').tenantId ?? DEFAULT_TENANT_ID,
+      );
       const visibleIds = new Set(visible.map((account) => account.id));
       if (
         relationships.some(
@@ -898,15 +906,15 @@ lineAccounts.patch(
         return c.json({ success: false, error: '権限のないLINEアカウントは変更できません' }, 403);
       }
       if (relationships.some((item) => {
-        const target = allAccounts.find((account) => account.id === item.id);
+        const target = visible.find((account) => account.id === item.id);
         const parent = item.parentLineAccountId
-          ? allAccounts.find((account) => account.id === item.parentLineAccountId)
+          ? visible.find((account) => account.id === item.parentLineAccountId)
           : null;
         return Boolean(target?.archived_at || parent?.archived_at);
       })) {
         return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
       }
-      const hierarchyError = validateAccountHierarchy(allAccounts, relationships);
+      const hierarchyError = validateAccountHierarchy(tenantAccounts, relationships);
       if (hierarchyError) return c.json({ success: false, error: hierarchyError }, 400);
 
       await c.env.DB.batch(

@@ -484,6 +484,24 @@ function makeEventDb(state: {
           return null;
         },
         async all<T>() {
+          if (
+            sql.includes('SELECT id, tenant_id, parent_line_account_id') &&
+            sql.includes('WHERE COALESCE(tenant_id, ?) = ?')
+          ) {
+            const [defaultTenantId, tenantId] = bound as [string, string];
+            const results = (state.accounts ?? [])
+              .filter((account) => (account.tenant_id ?? defaultTenantId) === tenantId)
+              .map((account) => ({
+                id: account.id,
+                tenant_id: account.tenant_id ?? null,
+                parent_line_account_id: null,
+                is_active: account.is_active,
+                archived_at: null,
+                login_channel_id: null,
+                liff_id: account.liff_id,
+              }));
+            return { results } as { results: T[] };
+          }
           if (sql.startsWith('SELECT * FROM line_accounts')) {
             return { results: state.accounts ?? [] } as { results: T[] };
           }

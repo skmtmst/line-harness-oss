@@ -107,9 +107,9 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     expect(PAGE).not.toContain('マイル付与ルール')
   })
 
-  it('案内バーを1本置く', () => {
+  it('各タブに案内バーを1本ずつ置く', () => {
     expect(PAGE).toContain("import NoteBar from '@/components/shared/note-bar'")
-    expect(PAGE.match(/<NoteBar/g) ?? []).toHaveLength(1)
+    expect(PAGE.match(/<NoteBar/g) ?? []).toHaveLength(2)
   })
 
   it('絞り込み札と並び順を共通部品でつなぐ', () => {

@@ -5,6 +5,7 @@ import {
   getDashboardPreference,
   getListStats,
   getLineAccountById,
+  getLineAccountsByIds,
   deleteDashboardPreference,
   saveDashboardDefaultPreference,
   saveDashboardPreference,
@@ -201,7 +202,14 @@ dashboard.get('/api/dashboard/organization-overview', requireRole('owner'), asyn
       allowedAccountIds: visibleScope.allowedAccountIds,
       includeUnassigned: false,
     });
-    const quotas = await Promise.all(visibleScope.accounts.map((account) => fetchQuota(account.channel_access_token)));
+    const credentialAccounts = await getLineAccountsByIds(
+      c.env.DB,
+      visibleScope.allowedAccountIds,
+      c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+    );
+    const quotas = await Promise.all(
+      credentialAccounts.map((account) => fetchQuota(account.channel_access_token)),
+    );
     const quotaFailed = quotas.some((quota) => quota.failed);
     if (quotaFailed) {
       overview.partialFailures.push('quota');

@@ -13,6 +13,7 @@ const dbMocks = {
   getAutomationLogs: vi.fn(),
   getAutomationExecutionRuns: vi.fn(),
   getLineAccounts: vi.fn(),
+  getLineAccountScopeEntries: vi.fn(),
   getStaffById: vi.fn(),
   getStaffAccountScopeIds: vi.fn(),
 };
@@ -100,6 +101,8 @@ const rowBase = {
 
 beforeEach(() => {
   for (const fn of Object.values(dbMocks)) fn.mockReset();
+  dbMocks.getLineAccountScopeEntries.mockImplementation(async (...args: unknown[]) =>
+    dbMocks.getLineAccounts(...args));
   dbMocks.getLineAccounts.mockResolvedValue([
     { id: 'acc-1', name: '本店', tenant_id: '00000000-0000-4000-8000-000000000001' },
     { id: 'acc-2', name: '二号店', tenant_id: '00000000-0000-4000-8000-000000000001' },

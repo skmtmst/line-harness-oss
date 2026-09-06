@@ -732,6 +732,22 @@ describe('共通情報の日付切り替え', () => {
     expect(await applyDueCommonVarSchedules(db, '2026-08-16T00:00:00.000')).toBe(2);
     expect((await getCommonVarById(db, v.id, 'account-1'))?.value).toBe('C');
   });
+
+  test('1回の上限まで反映し、残りは次回に古い順で続ける', async () => {
+    const v = await createCommonVar(db, { lineAccountId: 'account-1', name: 'x', varKey: 'x', value: 'A' });
+    for (const [day, value] of [
+      ['2026-08-10T00:00:00.000', 'B'],
+      ['2026-08-11T00:00:00.000', 'C'],
+      ['2026-08-12T00:00:00.000', 'D'],
+    ]) {
+      await createCommonVarSchedule(db, { varId: v.id, effectiveFrom: day, value });
+    }
+
+    expect(await applyDueCommonVarSchedules(db, '2026-08-16T00:00:00.000', 2)).toBe(2);
+    expect((await getCommonVarById(db, v.id, 'account-1'))?.value).toBe('C');
+    expect(await applyDueCommonVarSchedules(db, '2026-08-16T00:00:00.000', 2)).toBe(1);
+    expect((await getCommonVarById(db, v.id, 'account-1'))?.value).toBe('D');
+  });
 });
 
 describe('タグの分類は folders を見る', () => {
