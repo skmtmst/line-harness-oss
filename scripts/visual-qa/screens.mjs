@@ -3191,34 +3191,40 @@ const FEATURE_19_AUDIT = {
 // 更新後の1440px・1920px画像は未取得。一致判定には上げない。
 const FEATURE_21_AUDIT = {
   VLMGH: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #234 / PR #949 / UI HEAD 1b9d5bae9で構造を更新したが、更新後画像は未確認。** KPI4枚、7段の購入後フロー、配信一覧、プレビュー、動作切替、テスト送信を設計順に配置した。この30日の送信・反応・成果は集計APIが無いため、0を作らず接続条件を表示する。ChromiumがMachPort権限で起動できず1440px・1920px画像を取得できなかったため、司令塔の指示どおり判定を上げず `needs_fix` を維持する。',
-    verdictSource: 'nen-v6/VLMGH.txt + apps/web/src/app/nen-campaigns/nen-overview.tsx（更新後画像未確認）',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #234 / PR #採番前 / UI HEAD 8d3557ce0を3102/8789で撮り、★V6設計と1920pxで並べて確認。** KPI4枚、7段の購入後フロー、6配信の名称・時機・中身、プレビュー、動作切替、テスト送信が設計と同じ役割・順序で表示された。通常・読込・空・失敗を1440px・1920pxで撮影し、全8枚で横はみ出し0、失敗を0件に見せないことも確認した。この30日の送信数・反応率・成果、配信別の送信数・開封数は集計APIが無く、実装は値を作らず「集計未接続」と接続条件を示すため一致にはしない。**推奨修正：期間別・配信別の送信、開封、成果集計APIを接続する。**',
+    verdictSource: 'nen-v6/VLMGH.txt + VLMGH-1440.png + VLMGH-1920.png + VLMGH-loading/empty/error screenshots',
+    verdictHead: '8d3557ce0',
   },
   DEX0k: {
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #234 / PR #949 / UI HEAD 1b9d5bae9で構造を更新したが、更新後画像は未確認。** KPI、検索、状態別絞り込み、コラム一覧、配信結果への導線、紹介文編集、予約操作を設計順に配置した。対象人数と読了集計はAPI未接続のため条件を本文に表示する。ChromiumのMachPort権限で2幅画像を取得できず、構造一致・データ未接続を維持する。',
-    verdictSource: 'nen-v6/DEX0k.txt + apps/web/src/app/nen-campaigns/nen-overview.tsx（更新後画像未確認）',
+    verdictNote: '**2026-09-07 Issue #234 / PR #採番前 / UI HEAD 8d3557ce0を3102/8789で撮り、★V6設計と1920pxで並べて確認。** コラム24本、状態内訳、次回予定、検索、状態絞り込み、1ページ6件、ページ送り、本文・配信結果・配信設定の導線を確認した。1440px・1920pxとも横はみ出し0。対象人数、読了率、成果、期間、未読件数はAPIが無く、値を作らず未接続と示しているため構造一致・データ未接続を維持する。**推奨修正：対象人数・読了・成果をコラム単位で返す集計APIと期間・未読条件を接続する。**',
+    verdictSource: 'nen-v6/DEX0k.txt + DEX0k-1440.png + DEX0k-1920.png',
+    verdictHead: '8d3557ce0',
   },
   q4lajm: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #234 / PR #949 / UI HEAD 1b9d5bae9で構造を更新したが、更新後画像は未確認。** 誕生日3日前10:00の設定、ペット一覧、飼い主・誕生日・次の配信、LINEプレビュー、誕生日未登録数を設計と同じ役割で配置した。開封とクーポン利用は集計APIが無いため接続条件を表示する。ChromiumのMachPort権限で2幅画像を取得できず、司令塔の指示どおり判定を上げず `needs_fix` を維持する。',
-    verdictSource: 'nen-v6/q4lajm.txt + apps/web/src/app/nen-campaigns/nen-overview.tsx（更新後画像未確認）',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #234 / PR #採番前 / UI HEAD 8d3557ce0を3102/8789で撮り、★V6設計と1920pxで並べて確認。** 誕生日3日前10:00、割引額・期限・クーポン頭文字、ペット5匹、飼い主・誕生日・次回配信、ももちゃんのLINEプレビュー、誕生日未登録の注意を同じ構成で確認した。1440px・1920pxとも横はみ出し0。品種、これまでの配信回数、友だち全体に対する未登録人数、開封率、利用率はAPIが無く、未取得・未接続と明示しているため一致にはしない。**推奨修正：ペット品種・配信履歴・友だちとの照合・開封・クーポン利用集計APIを接続する。**',
+    verdictSource: 'nen-v6/q4lajm.txt + q4lajm-1440.png + q4lajm-1920.png',
+    verdictHead: '8d3557ce0',
   },
   WeXbL: {
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #234 / PR #949 / UI HEAD 1b9d5bae9で構造を更新したが、更新後画像は未確認。** KPI、検索、状態絞り込み、日時・宛先・配信・状態・きっかけ・反応の表を設計順に配置し、日時は日本時間で表示する。きっかけと反応の記録はAPI未接続。ChromiumのMachPort権限で2幅画像を取得できず、構造一致・データ未接続を維持する。',
-    verdictSource: 'nen-v6/WeXbL.txt + apps/web/src/app/nen-campaigns/nen-overview.tsx（更新後画像未確認）',
+    verdictNote: '**2026-09-07 Issue #234 / PR #採番前 / UI HEAD 8d3557ce0を3102/8789で撮り、★V6設計と1920pxで並べて確認。** 送信済み2,486、予定148、未達6、要再試行1、検索、状態絞り込み、7件の日時・宛先・LINEアカウント・配信・状態・きっかけ・反応を実データで確認した。日時は日本時間で、1440px・1920pxとも横はみ出し0。設計の30日限定集計、ブロック・退会内訳、期間選択、再送・内容表示の操作はAPIが無く未接続のため構造一致・データ未接続を維持する。**推奨修正：期間別履歴、未達理由、再送、配信内容取得APIを接続する。**',
+    verdictSource: 'nen-v6/WeXbL.txt + WeXbL-1440.png + WeXbL-1920.png',
+    verdictHead: '8d3557ce0',
   },
   ymXJK: {
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #234 / PR #949 / UI HEAD 1b9d5bae9で不足を画面内に明示したが、要修正を維持。** 題名・分類・記事リンク・画像・概要・公開日時・届く形のプレビューは実装済み。記事本文は外部サイトを正本とする。配信対象人数・読了後タグ・前のコラムの複製・自分へのテスト送信はAPIが無く、接続条件を本文または無効ボタンの説明に出した。ChromiumのMachPort権限で2幅画像も取得できていない。**接続条件:** 対象人数、読了イベント、タグ付け、複製、テスト送信APIを接続して再撮影する。',
-    verdictSource: 'nen-v6/ymXJK.txt + apps/web/src/app/nen-campaigns/columns/new/page.tsx（更新後画像未確認）',
+    verdictNote: '**2026-09-07 Issue #234 / PR #採番前 / UI HEAD 8d3557ce0。** 題名・分類・記事URL・画像URL・概要・公開日時・届く形のプレビューは実装済みで、記事本文は外部サイトを正本とする契約。入力済み表示も確認した。設計の本文エディタ、配信対象・日時、読了後タグ、複製、テスト送信は保存・実行APIが無く、接続条件を画面に示している。設計との差が画面の主要区画に残るため `needs_fix` を維持する。保存時の入力誤り・重複・権限不足・失敗を含む全状態の2幅撮影は共通撮影基盤 #288 の列車取り込み後に確定する。**推奨修正：対象人数、予約、読了イベント、タグ付け、複製、テスト送信APIを先に接続し、外部記事契約と設計の本文エディタ差を正本で裁定する。**',
+    verdictSource: 'nen-v6/ymXJK.txt + ymXJK-1440.png + ymXJK-1920.png + ymXJK-filled screenshot',
+    verdictHead: '8d3557ce0',
   },
   i9sQP: {
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #234 / PR #949 / UI HEAD 1b9d5bae9で状態構造を確認したが、更新後画像は未確認。** 読込中・0件・取得失敗を `ListState` で分け、取得失敗を0件として表示しない。コラムの固定データと集計APIが未接続で、ChromiumのMachPort権限により2幅画像を取得できないため、構造一致・データ未接続を維持する。',
-    verdictSource: 'nen-v6/i9sQP.txt + apps/web/src/app/nen-campaigns/page.tsx（更新後画像未確認）',
+    verdictNote: '**2026-09-07 Issue #234 / PR #採番前 / UI HEAD 8d3557ce0を3102/8789で撮り、★V6設計と1920pxで並べて確認。** 通常・読込・空・失敗を1440px・1920pxで撮影し、全8枚で横はみ出し0。通常は24本・6件表示・ページ送り、読込は待機表示、空は作成導線、失敗は再読込を出し、失敗を0件として扱わない。通常一覧の対象人数・読了・成果は集計APIが無いため構造一致・データ未接続を維持する。**推奨修正：DEX0kと同じコラム単位の対象人数・読了・成果集計APIを接続する。**',
+    verdictSource: 'nen-v6/i9sQP.txt + i9sQP-1440.png + i9sQP-1920.png + i9sQP-loading/empty/error screenshots',
+    verdictHead: '8d3557ce0',
   },
 }
 
