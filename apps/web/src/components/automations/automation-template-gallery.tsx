@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MessageCircle, Tags, UserPlus } from 'lucide-react'
 import { api, type AutomationTemplateSummary } from '@/lib/api'
@@ -21,6 +21,18 @@ export default function AutomationTemplateGallery({
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [creating, setCreating] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
+  const [triggerFilter, setTriggerFilter] = useState('すべて')
+
+  const triggerFilters = useMemo(
+    () => ['すべて', ...Array.from(new Set(items.map((item) => item.triggerLabel)))],
+    [items],
+  )
+  const visibleItems = useMemo(
+    () => triggerFilter === 'すべて'
+      ? items
+      : items.filter((item) => item.triggerLabel === triggerFilter),
+    [items, triggerFilter],
+  )
 
   const load = useCallback(async () => {
     if (!accountId) {
@@ -98,8 +110,30 @@ export default function AutomationTemplateGallery({
           {actionError}
         </div>
       ) : null}
+      <div className="mb-4 flex flex-wrap gap-2" aria-label="きっかけで絞り込む">
+        {triggerFilters.map((filter) => (
+          <button
+            key={filter}
+            type="button"
+            aria-pressed={triggerFilter === filter}
+            className={triggerFilter === filter
+              ? 'rounded-pill border border-success bg-success-bg px-3 py-1.5 text-xs font-semibold text-success'
+              : 'rounded-pill border border-hairline bg-canvas px-3 py-1.5 text-xs text-ink-secondary'}
+            onClick={() => setTriggerFilter(filter)}
+          >
+            {filter}
+          </button>
+        ))}
+      </div>
+      {visibleItems.length === 0 ? (
+        <ListState
+          kind="empty"
+          title="条件に合う見本はありません"
+          description="きっかけの絞り込みを変えてください。"
+        />
+      ) : null}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-        {items.map((item, index) => {
+        {visibleItems.map((item, index) => {
           const Icon = ICONS[index % ICONS.length]
           return (
             <article key={item.key} className="rounded-v6-card border border-hairline bg-canvas p-5 shadow-v6-card">
