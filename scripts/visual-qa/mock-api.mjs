@@ -740,6 +740,29 @@ const SHAPES = {
       ],
     },
   },
+  /*
+    分析・定期レポート作成。予約が0件でも、選択肢は本物と同じ器で返す。
+    これが無いと保存済み分析と受信者を選べず、設計 `URqOA` を撮れない。
+  */
+  '/api/analytics/report-schedules': {
+    items: [],
+    options: {
+      timeZone: 'Asia/Tokyo',
+      savedAnalyses: [
+        { id: 'saved-route', name: '経路別の成果', kind: 'cross' },
+      ],
+      recipients: [
+        {
+          id: 'staff-owner', name: '佐々木 亮太', role: 'admin',
+          email: 'sasaki@example.com', lineLinked: true,
+        },
+        {
+          id: 'staff-operator', name: '山本 京子', role: 'staff',
+          email: 'yamamoto@example.com', lineLinked: true,
+        },
+      ],
+    },
+  },
   '/api/mileage/rewards': MILEAGE_REWARDS,
   '/api/mileage/history': {
     items: [
