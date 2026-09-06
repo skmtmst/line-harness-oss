@@ -1639,8 +1639,8 @@ export const SCREENS = [
   // ── 機能14 共通情報 ─────────────────────────────────────
   {
     ...COMMON_VAR, node: 'WuKzU', name: '14-1 共通情報', verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #327 / UI HEAD `bb8a139b3`で再判定し、一致。** PR #1077の固定データで3フォルダ、先頭6件、空のまま使用中1件、行ごとの使用数、更新予約を表示した。上部操作、フォルダ、検索・4絞り込み、6列一覧、ページ送りを、Pencil 1920pxと実装1920pxを1枚に並べて確認。運用データで全件数と更新日時は変わるが、配置・項目・操作は一致する。1440px・1920pxとも横はみ出し0。',
-    verdictSource: 'common-vars-v6/WuKzU.txt + common-vars-v6/WuKzU-1440.png + common-vars-v6/WuKzU-1920.png + 2026-09-07 same-input comparison', verdictHead: 'bb8a139b3',
+    verdictNote: '**2026-09-07 Issue #385 / UI HEAD `bc92f54ea`で再判定し、一致。** PR #1131の実APIとPR #1142の固定データを使い、3フォルダ、先頭6件、空のまま使用中1件、行ごとの使用数、更新予約を表示した。上部操作、フォルダ、検索・4絞り込み、6列一覧、ページ送りをPencil 1920pxと実装1920pxで目視比較した。3104/8791で1440px・1920pxを撮り、両方とも横はみ出し0。',
+    verdictSource: 'common-vars-v6/WuKzU.txt + common-vars-v6/WuKzU-1440.png + common-vars-v6/WuKzU-1920.png + common-vars-v6-contract.test.ts', verdictHead: 'bc92f54ea',
   },
   {
     ...COMMON_VAR, node: 'gBtaK', name: '14-1-A 共通情報を編集', route: '/contents/vars/edit?id=common-var-delete-target', verdict: 'structure_match_data_pending',
@@ -1649,8 +1649,8 @@ export const SCREENS = [
       { fill: '#cv-value', selector: true, text: '株式会社NEN ホールディングス' },
       { wait: 1200 },
     ],
-    verdictNote: '**2026-09-07 Issue #327 / UI HEAD `bb8a139b3`で再判定。構造一致・データ未接続。** 「株式会社NEN」から「株式会社NEN ホールディングス」へ変えた同じ状態を3104/8791で撮り、Pencil 1920pxと実装1920pxを1枚に並べて確認した。15使用先、変更前後の文、予約中・公開中・下書き、文字数超過、保存後プレビューが固定データで表示され、1440px・1920pxとも横はみ出し0。社内メモと追記型の変更履歴はAPIが無く、実装は値を作らず未接続理由を表示するため一致にはしない。**推奨修正：メモと変更前後・変更者を返す履歴APIを接続する。**',
-    verdictSource: 'common-vars-v6/gBtaK.txt + common-vars-v6/gBtaK-1440.png + common-vars-v6/gBtaK-1920.png + change-impact.test.ts + 2026-09-07 same-input comparison', verdictHead: 'bb8a139b3',
+    verdictNote: '**2026-09-07 Issue #385 / UI HEAD `bc92f54ea`で再判定。構造一致・担当者名データ待ち。** PR #1131の実APIとPR #1142の固定データへ接続し、社内メモ、変更理由、版番号つき保存、追記型の変更履歴、15使用先、変更前後の文、予約中・公開中・下書き、文字数超過、保存後プレビューを確認した。履歴APIは内部の担当者IDだけを返すため画面へ露出せず「担当者記録あり」と表示する。担当者の表示名が契約に無い一点だけ設計どおりに出せないため一致にはしない。3104/8791で1440px・1920pxを撮り、両方とも横はみ出し0。**残り：履歴APIが担当者の表示名を返す。**',
+    verdictSource: 'common-vars-v6/gBtaK.txt + common-vars-v6/gBtaK-1440.png + common-vars-v6/gBtaK-1920.png + api.test.ts + change-impact.test.ts', verdictHead: 'bc92f54ea',
   },
   {
     /*
@@ -1670,14 +1670,14 @@ export const SCREENS = [
       指定しても一覧の1件目に落ちるだけで、狙った行を撮れない。
     */
     steps: [
-      { fill: '#cv-value', selector: true, text: '9:00〜21:00' },
+      { fill: '#cv-value', selector: true, text: '株式会社NEN ホールディングス' },
       { wait: 1200 },
       { qaOpen: 'uNBlA', after: 900 },
     ],
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 台帳 #227、実装 `cbddd12c7`。構造一致・データ未接続。** 値を変えた後に「Nか所を1件ずつ見る」で専用の影響確認へ進み、4つの集計札、6列の変更前後表、CSV出力、6件ごとのページ送り、固定の保存欄を実装した。1440・1920で設計と並べて目視し、横はみ出し0。文字数超過があれば保存を止める。**データ未接続**：現行APIの状態は「使われています」という大分類なので、予約中・公開中を数える「すぐ効くもの」は偽の0件にせず `—件` と理由を表示する。設計どおりの15件・状態別固定データが無く、数値までの一致は未確認。',
-    verdictSource: 'common-vars-v6/uNBlA-1920.png + common-vars-v6/uNBlA.txt + impact-review.test.ts',
-    verdictHead: '57477f85c',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #385 / UI HEAD `bc92f54ea`で再判定し、一致。** PR #1131の影響確認APIとPR #1142の固定データへ接続し、15か所、すぐ効く4件、文字数超過1件、送信済みは変わらない表示、6列の変更前後表、CSV出力、6件ごとのページ送り、保存停止を確認した。「株式会社NEN」から「株式会社NEN ホールディングス」へ変える同じ入力でPencilと目視比較した。3104/8791で1440px・1920pxを撮り、両方とも横はみ出し0。',
+    verdictSource: 'common-vars-v6/uNBlA-1920.png + common-vars-v6/uNBlA.txt + change-impact.test.ts + impact-review.test.ts',
+    verdictHead: 'bc92f54ea',
   },
   {
     ...COMMON_VAR, node: 'yPkWe', name: '14-1-C 共通情報の削除確認',
@@ -1693,10 +1693,10 @@ export const SCREENS = [
       */
       { suffix: '-deletable', steps: [{ click: 'キャンセル', after: 500 }, { click: '削除', nth: 1, after: 900 }] },
     ],
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #327 / UI HEAD `bb8a139b3`で再判定。構造一致・データ未接続。** PR #1077の固定データで、会社名が使われる15か所、予約中・公開中・下書きの6使用先、各画面を開く導線を表示し、Pencil 1920pxと実装1920pxを1枚に並べて確認した。使用中と未使用の両状態を1440px・1920pxで撮り、全画像で横はみ出し0。設計の推奨操作である別の共通情報への一括差し替えはAPIが無く、候補を作らず無効表示するため一致にはしない。使用中の物理削除は止め、未使用だけ確認入力後に削除できる。**推奨修正：互換候補の取得・影響確認・一括差し替えAPIを接続する。**',
-    verdictSource: 'common-vars-v6/yPkWe.txt + common-vars-v6/yPkWe-{1440,1920}.png + common-vars-v6/yPkWe-deletable-{1440,1920}.png + delete-impact.test.ts',
-    verdictHead: 'bb8a139b3',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #385 / UI HEAD `bc92f54ea`で再判定し、一致。** PR #1131の削除影響・互換候補・差し替え影響・一括差し替えAPIと、PR #1142の固定データへ接続した。会社名が使われる15か所、予約中・公開中・下書きの6使用先、各画面を開く導線、互換候補の選択、差し替え後の15件、版競合時の再読込を確認した。使用中は安全な差し替え後削除だけ実行でき、未使用は確認入力後に削除できる。両状態を3104/8791で1440px・1920px撮影し、全画像で横はみ出し0。',
+    verdictSource: 'common-vars-v6/yPkWe.txt + common-vars-v6/yPkWe-{1440,1920}.png + common-vars-v6/yPkWe-deletable-{1440,1920}.png + api.test.ts + delete-screen-contract.test.ts',
+    verdictHead: 'bc92f54ea',
 
   },
 
