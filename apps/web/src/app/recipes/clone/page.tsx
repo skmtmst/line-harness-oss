@@ -121,7 +121,7 @@ function RecipeClone() {
                 </label>
                 <SelectField
                   id="recipe-clone-account"
-                  className="w-full"
+                  className={styles.accountSelect}
                   value={selectedAccountId ?? ''}
                   disabled={!selectedAccountId}
                   options={[{

@@ -94,6 +94,11 @@
   font-weight: 700; /* fontWeight: 700 */
 }
 
+.accountSelect {
+  width: 100%;
+  max-width: none;
+}
+
 /* --- 作られるもの ------------------------------------------------------ */
 
 .items {
