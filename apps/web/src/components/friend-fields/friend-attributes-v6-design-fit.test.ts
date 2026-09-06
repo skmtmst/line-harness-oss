@@ -50,18 +50,17 @@ describe('rIhbN 対応マーク一覧', () => {
 
   it('使用先の列に、隣の「使用中」と同じ友だちの人数を重ねて出さない', () => {
     expect(usageLabel).not.toContain('友だち')
-    expect(usageLabel).toContain('配信${mark.usedIn.broadcasts}件')
-    expect(usageLabel).toContain('シナリオ${mark.usedIn.scenarios}件')
+    expect(usageLabel).toContain('配信${usedIn.broadcasts}件')
+    expect(usageLabel).toContain('シナリオ${usedIn.scenarios}件')
   })
 
   it('使用先が未取得のときは「なし」ではなく「—」を出す', () => {
-    expect(usageLabel).toContain("if (mark.usedIn === undefined) return '—'")
+    expect(usageLabel).toContain("mark.usedIn === undefined ? '—' : 'なし'")
     expect(usageLabel.indexOf('undefined')).toBeLessThan(usageLabel.indexOf("'なし'"))
   })
 
-  it('見出しは、その列に実際に出しているもの（使用先）に合わせる', () => {
-    expect(thead).toContain('使用先')
-    expect(thead).not.toContain('表示先')
+  it('見出しは、APIが返す画面の表示先に合わせる', () => {
+    expect(thead).toContain('表示先')
     for (const label of ['順番', 'マーク', '使用中', '初期値', '自動変更', '操作']) {
       expect(thead).toContain(label)
     }
@@ -132,8 +131,8 @@ describe('機能4の一覧・編集画面は取得済みの設計値を表示す
     expect(FIELD_LIST).toContain('field.displayTargets')
   })
 
-  it('対応マークはAPIが返す自動変更の要約を優先する', () => {
-    expect(MARK_LIST).toContain('mark.automaticChangeLabel ??')
+  it('対応マークはAPIが返す自動変更ルールを優先する', () => {
+    expect(MARK_LIST).toContain('mark.automationRules.map')
   })
 
   it('タグ編集は保存済みの連動アクションを復元する', () => {
@@ -182,7 +181,7 @@ describe('XBkiQ 保存した検索の編集', () => {
   it('件数を読めていないときは、数を作らずに上限だけ書く', () => {
     expect(shareField).toContain("savedCount === null")
     expect(shareField).toContain("'保存できるのは50件までです。'")
-    expect(withoutComments(EDIT_PAGE)).toContain('setSavedCount(searches.success ? searches.data.length : null)')
+    expect(withoutComments(EDIT_PAGE)).toContain('setSavedCount(searches.success ? searches.summary.total : null)')
   })
 
   it('読込中の言い方を、共通の「読み込んでいます」にそろえる', () => {

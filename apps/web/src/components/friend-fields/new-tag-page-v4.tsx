@@ -2,18 +2,20 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import type { Tag, TagGroup } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import type { TagGroup } from '@line-crm/shared'
+import { api, type TagDefinition } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import TagEditorV4, { type TagEditorValues } from './tag-editor-v4'
+import TagEditorV4, { definitionsForSave, linkedActionFromDefinition, type TagEditorValues } from './tag-editor-v4'
 
 export default function NewTagPageV4() {
   usePageTitle('タグを作る')
   const router = useRouter()
   const params = useSearchParams()
+  const { selectedAccountId } = useAccount()
   const copyId = params.get('copy') ?? ''
   const [groups, setGroups] = useState<TagGroup[]>([])
-  const [copySource, setCopySource] = useState<Tag | null>(null)
+  const [copySource, setCopySource] = useState<TagDefinition | null>(null)
   const [loading, setLoading] = useState(Boolean(copyId))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -24,18 +26,18 @@ export default function NewTagPageV4() {
     setLoading(Boolean(copyId))
     void Promise.all([
       api.tagGroups.list(),
-      copyId ? api.tags.list({ withCounts: true }) : Promise.resolve(null),
-    ]).then(([folders, tags]) => {
+      copyId && selectedAccountId ? api.tags.definition(copyId, selectedAccountId) : Promise.resolve(null),
+    ]).then(([folders, definition]) => {
       if (cancelled) return
       if (folders.success) setGroups(folders.data)
-      if (tags?.success) setCopySource(tags.data.find((item) => item.id === copyId) ?? null)
+      if (definition?.success) setCopySource(definition.data)
     }).catch(() => {
       if (!cancelled) setError('複製元のタグを読み込めませんでした')
     }).finally(() => {
       if (!cancelled) setLoading(false)
     })
     return () => { cancelled = true }
-  }, [copyId])
+  }, [copyId, selectedAccountId])
 
   const save = async (values: TagEditorValues, andAnother: boolean) => {
     if (saving) return
@@ -43,28 +45,30 @@ export default function NewTagPageV4() {
       setError('タグ名を入力してください')
       return
     }
+    if (!selectedAccountId) {
+      setError('LINE公式アカウントを選んでください')
+      return
+    }
     setSaving(true)
     setError('')
     setNotice('')
     try {
-      const created = await api.tags.create({ name: values.name, groupId: values.groupId || null })
+      const created = await api.tags.createDefinition(selectedAccountId, {
+        name: values.name,
+        groupId: values.groupId || null,
+        isStarred: values.isStarred,
+        manualAssignmentAllowed: true,
+        reapplyPolicy: values.reapplyPolicy,
+        linkedEnabled: values.linked,
+        mileage: { self: values.rewardMiles, referrer: values.referralRewardMiles, multiplier: values.multiplierBps, priority: values.multiplierPriority },
+        actions: definitionsForSave(values.actions),
+      })
       if (!created.success) throw new Error(created.error)
-      if (values.isStarred) await api.tags.update(created.data.id, { isStarred: true })
-      if (values.linked) {
-        const mileage = await api.tags.updateMileage(created.data.id, {
-          rewardMiles: values.rewardMiles,
-          referralRewardMiles: values.referralRewardMiles,
-          multiplierBps: values.multiplierBps,
-          multiplierPriority: values.multiplierPriority,
-          applyToExisting: false,
-        })
-        if (!mileage.success) throw new Error(mileage.error)
-      }
       if (andAnother) {
         setNotice('保存しました。続けて新しいタグを作れます。')
         window.location.assign('/tags/new')
       } else {
-        router.push(`/tags?highlight=${created.data.id}`)
+        router.push(`/tags?highlight=${created.data.tag.id}`)
       }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '保存に失敗しました')
@@ -80,18 +84,20 @@ export default function NewTagPageV4() {
       key={copyId || 'new'}
       mode="create"
       groups={groups}
-      initialLinked={params.get('linked') === '1' || Boolean(copySource?.mileageReward || copySource?.referralMileageReward || copySource?.mileageMultiplierBps)}
+      accountId={selectedAccountId}
+      initialLinked={params.get('linked') === '1' || Boolean(copySource?.tag.linkedEnabled)}
       initialValues={copySource ? {
-        name: `${copySource.name} のコピー`,
-        groupId: copySource.groupId ?? '',
-        isStarred: copySource.isStarred ?? false,
-        linked: Boolean(copySource.mileageReward || copySource.referralMileageReward || copySource.mileageMultiplierBps),
-        rewardMiles: copySource.mileageReward ?? 0,
-        referralRewardMiles: copySource.referralMileageReward ?? 0,
-        multiplierBps: copySource.mileageMultiplierBps ?? null,
-        multiplierPriority: copySource.mileageMultiplierPriority ?? 0,
+        name: `${copySource.tag.name} のコピー`,
+        groupId: copySource.tag.groupId ?? '',
+        isStarred: copySource.tag.isStarred ?? false,
+        linked: Boolean(copySource.tag.linkedEnabled),
+        rewardMiles: copySource.tag.mileageReward ?? 0,
+        referralRewardMiles: copySource.tag.referralMileageReward ?? 0,
+        multiplierBps: copySource.tag.mileageMultiplierBps ?? null,
+        multiplierPriority: copySource.tag.mileageMultiplierPriority ?? 0,
         applyToExisting: false,
-        actions: [],
+        reapplyPolicy: copySource.tag.reapplyPolicy ?? 'first_only',
+        actions: (copySource.automation?.actions ?? []).map(linkedActionFromDefinition),
       } : undefined}
       saving={saving}
       error={error}

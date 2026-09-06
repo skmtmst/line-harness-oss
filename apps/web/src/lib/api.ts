@@ -138,6 +138,134 @@ export type TagDeleteImpact = {
   canDelete: boolean
 }
 
+export type TagDefinitionAction = {
+  id: string
+  type: string
+  params: Record<string, unknown>
+  onFailure: 'stop' | 'continue'
+}
+
+export type TagDefinition = {
+  tag: Tag
+  automation: null | {
+    id: string
+    name: string
+    status: 'draft' | 'published' | 'archived'
+    draftVersion: null | { id: string; versionNumber: number; state: 'draft'; actions: TagDefinitionAction[] }
+    publishedVersion: null | { id: string; versionNumber: number; state: 'published'; actions: TagDefinitionAction[] }
+    actions: TagDefinitionAction[]
+  }
+}
+
+export type SaveTagDefinition = {
+  name: string
+  description?: string | null
+  groupId?: string | null
+  isStarred?: boolean
+  manualAssignmentAllowed?: boolean
+  reapplyPolicy: 'first_only' | 'every_time'
+  linkedEnabled: boolean
+  mileage: { self: number; referrer: number; multiplier: number | null; priority: number }
+  actions: TagDefinitionAction[]
+  applyToExisting?: boolean
+}
+
+export type TagDependencies = {
+  tag: { id: string; name: string; version: number; status: 'active' | 'archived' }
+  friendCount: number
+  referenceCounts: TagDeleteImpactReferences
+  references: Array<{
+    kind: string
+    name: string
+    href: string
+    count: number
+    state: 'active'
+    definitionVersion: number | null
+  }>
+  linkedActions: Array<{
+    kind: 'common_action'
+    name: string
+    version: number
+    state: 'published' | 'draft'
+  }>
+  pendingRunCount: number
+  mileageImpact: {
+    configured: boolean
+    self: number
+    referrer: number
+    multiplier: number | null
+    priority: number
+    reapplyPolicy: 'first_only' | 'every_time'
+    historyPreserved: true
+  }
+  blockingReferenceCount: number
+  canArchive: boolean
+  canDelete: boolean
+  checkedAt: string
+  revision: string
+}
+
+export type FriendFieldMigrationPreview = {
+  source: FriendField
+  target?: FriendField
+  summary: { total: number; convertible: number; review: number; invalid: number }
+  rows: Array<{
+    friendId: string
+    sourceValue: string
+    convertedValue: string | null
+    status: 'review' | 'invalid'
+    reason: string | null
+  }>
+  usageTargets: Array<{ fieldId: string; kind: string; id: string; name: string; switchable: boolean }>
+  runId: string | null
+  previewToken: string | null
+  previewExpiresAt: string | null
+}
+
+export type SupportMarkListItem = SupportMark & {
+  friendCount: number
+  automationRules: SupportMarkAutomationRule[]
+}
+
+export type SupportMarkArchiveImpact = {
+  mark: SupportMark
+  friendCount: number
+  usedIn: NonNullable<SupportMark['usedIn']>
+  automationRules: SupportMarkAutomationRule[]
+  displayTargets: NonNullable<SupportMark['displayTargets']>
+  replacementOptions: SupportMark[]
+  canArchive: boolean
+  impactRevision: string
+  checkedAt: string
+  expectedVersion: number
+}
+
+export type SavedSearchSummary = {
+  total: number
+  usedInBroadcasts: number
+  zeroMatches: number
+  callsThisMonth: number
+}
+
+export type SavedSearchListResponse = ApiResponse<SavedSearch[]> & {
+  items: SavedSearch[]
+  summary: SavedSearchSummary
+  pagination: { total: number; limit: number; cursor: string; nextCursor: string | null }
+}
+
+export type SavedSearchMatchPreview = {
+  total: number | null
+  byChannel: { line: number | null; mail: number | null }
+  calculatedAt: string
+  error: string | null
+}
+
+export type SavedSearchDetail = SavedSearch & {
+  accountScope: { type: 'line_account'; id: string }
+  owner: { id: string | null; isCurrentUser: boolean }
+  match: SavedSearchMatchPreview
+}
+
 /** 緊急停止の対象、影響、停止状態をサーバーと共有する契約。 */
 export type OperationCapability =
   | 'broadcast_dispatch'
@@ -806,9 +934,24 @@ export type CommonActionDetail = {
 };
 
 export type CommonActionResources = {
+  trigger?: 'tag.added' | null;
+  actionTypes?: Array<{
+    id: string;
+    label: string;
+    actionType: string;
+    variant?: string;
+    resource?: string;
+    state: 'available' | 'unavailable';
+    reason: string | null;
+    schema: Record<string, unknown>;
+  }>;
   tags: Array<{ id: string; name: string }>;
   scenarios: Array<{ id: string; name: string }>;
   templates: Array<{ id: string; name: string }>;
+  friendFields?: Array<{ id: string; name: string }>;
+  supportMarks?: Array<{ id: string; name: string }>;
+  reminders?: Array<{ id: string; name: string }>;
+  notificationRules?: Array<{ id: string; name: string }>;
   webhooks: Array<{ id: string; name: string }>;
   richMenus: Array<{ id: string; name: string }>;
   commonActions: Array<{ id: string; name: string; version: number }>;
@@ -2511,6 +2654,32 @@ export const api = {
      */
     deleteImpact: (id: string) =>
       fetchApi<ApiResponse<TagDeleteImpact>>(`/api/tags/${id}/delete-impact`),
+    definition: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<TagDefinition>>(
+        `/api/tags/${id}?lineAccountId=${encodeURIComponent(accountId)}&withActions=1`,
+      ),
+    dependencies: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<TagDependencies>>(
+        `/api/tags/${id}/dependencies?lineAccountId=${encodeURIComponent(accountId)}`,
+      ),
+    createDefinition: (accountId: string, data: SaveTagDefinition) =>
+      fetchApi<ApiResponse<TagDefinition>>('/api/tags', {
+        method: 'POST',
+        body: JSON.stringify({
+          lineAccountId: accountId,
+          ...data,
+          automationDraft: { actions: data.actions },
+        }),
+      }),
+    updateDefinition: (
+      id: string,
+      accountId: string,
+      expectedVersion: number,
+      data: SaveTagDefinition & { automationId?: string | null; automationDraftVersion?: string | null },
+    ) => fetchApi<ApiResponse<TagDefinition & { queued: number }>>(`/api/tags/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ lineAccountId: accountId, expectedVersion, ...data }),
+    }),
     // 色は受け取らない。印の色はフォルダ（tagGroups）に付く。
     create: (data: { name: string; groupId?: string | null }) =>
       fetchApi<ApiResponse<Tag>>('/api/tags', {
@@ -2577,17 +2746,7 @@ export const api = {
       ),
     /** 値は変更せず、種類を変えた場合に確認が要る友だちだけを返す。 */
     migrationPreview: (id: string, accountId: string, targetType: FriendFieldType) =>
-      fetchApi<ApiResponse<{
-        source: FriendField
-        summary: { total: number; convertible: number; review: number; invalid: number }
-        rows: Array<{
-          friendId: string
-          sourceValue: string
-          convertedValue: string | null
-          status: 'review' | 'invalid'
-          reason: string | null
-        }>
-      }>>(
+      fetchApi<ApiResponse<FriendFieldMigrationPreview>>(
         `/api/friend-fields/${id}/migration-preview?lineAccountId=${encodeURIComponent(accountId)}`,
         { method: 'POST', body: JSON.stringify({ targetType }) },
       ),
@@ -2651,7 +2810,7 @@ export const api = {
   /** 対応マーク。友だちの対応状況を運用側の言葉で持つ。 */
   supportMarks: {
     list: (accountId: string) =>
-      fetchApi<ApiResponse<Array<SupportMark & { friendCount: number }>>>(
+      fetchApi<ApiResponse<SupportMarkListItem[]>>(
         `/api/support-marks?lineAccountId=${encodeURIComponent(accountId)}`,
       ),
     create: (accountId: string, data: {
@@ -2660,6 +2819,7 @@ export const api = {
       isDefault?: boolean
       autoOnInbound?: boolean
       displayOrder?: number
+      automationRules?: SaveSupportMarkAutomationRule[]
     }) =>
       fetchApi<ApiResponse<SupportMark>>(
         `/api/support-marks?lineAccountId=${encodeURIComponent(accountId)}`,
@@ -2743,13 +2903,56 @@ export const api = {
         `/api/support-mark-rules/${ruleId}?lineAccountId=${encodeURIComponent(accountId)}`,
         { method: 'DELETE', body: JSON.stringify({ expectedVersion }) },
       ),
+    archiveImpact: (markId: string, accountId: string) =>
+      fetchApi<ApiResponse<SupportMarkArchiveImpact>>(
+        `/api/support-marks/${markId}/archive-impact?lineAccountId=${encodeURIComponent(accountId)}`,
+      ),
+    archive: (
+      markId: string,
+      accountId: string,
+      data: { replacementMarkId: string; impactRevision: string; expectedVersion: number },
+      idempotencyKey: string,
+    ) => fetchApi<ApiResponse<{
+      archived: true
+      replacedFriendCount: number
+      replacementMark: SupportMark | null
+    }>>(`/api/support-marks/${markId}/archive?lineAccountId=${encodeURIComponent(accountId)}`, {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(data),
+    }),
   },
   /** 保存した検索。上限50件。 */
   savedSearches: {
-    list: (accountId: string) =>
-      fetchApi<ApiResponse<SavedSearch[]>>(
-        `/api/saved-searches?lineAccountId=${encodeURIComponent(accountId)}`,
+    list: (accountId: string, params?: {
+      owner?: 'all' | 'me'
+      usage?: 'all' | 'used' | 'unused'
+      match?: 'all' | 'matched' | 'zero'
+      query?: string
+      limit?: number
+      cursor?: string
+    }) => {
+      const query = new URLSearchParams({ lineAccountId: accountId })
+      if (params?.owner) query.set('owner', params.owner)
+      if (params?.usage) query.set('usage', params.usage)
+      if (params?.match) query.set('match', params.match)
+      if (params?.query) query.set('query', params.query)
+      if (params?.limit) query.set('limit', String(params.limit))
+      if (params?.cursor) query.set('cursor', params.cursor)
+      return fetchApi<SavedSearchListResponse>(`/api/saved-searches?${query}`)
+    },
+    detail: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<SavedSearchDetail>>(
+        `/api/saved-searches/${id}?lineAccountId=${encodeURIComponent(accountId)}`,
       ),
+    preview: (accountId: string, data: {
+      savedSearchId?: string
+      conditions?: unknown
+      revision?: number
+    }) => fetchApi<ApiResponse<SavedSearchDetail>>('/api/saved-searches/preview', {
+      method: 'POST',
+      body: JSON.stringify({ lineAccountId: accountId, ...data }),
+    }),
     create: (data: {
       name: string
       accountId: string
@@ -2760,7 +2963,7 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ name: data.name, conditions: data.conditions, isShared: data.isShared }),
       }),
-    update: (id: string, accountId: string, data: { name?: string; conditions?: unknown; isShared?: boolean }) =>
+    update: (id: string, accountId: string, data: { name?: string; conditions?: unknown; isShared?: boolean; expectedRevision?: number }) =>
       fetchApi<ApiResponse<SavedSearch>>(`/api/saved-searches/${id}?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -4681,9 +4884,10 @@ export const api = {
     ),
   },
   commonActions: {
-    resources: (accountId: string, excludeId?: string) => {
+    resources: (accountId: string, excludeId?: string, trigger?: 'tag.added') => {
       const query = new URLSearchParams({ account_id: accountId });
       if (excludeId) query.set('exclude_id', excludeId);
+      if (trigger) query.set('trigger', trigger);
       return fetchApi<ApiResponse<CommonActionResources>>(`/api/common-actions/resources?${query}`);
     },
     list: (params: {

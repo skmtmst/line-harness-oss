@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { Tag, TagGroup } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import { api, type TagDefinition } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import TagEditorV4, { type TagEditorValues } from './tag-editor-v4'
+import TagEditorV4, { definitionsForSave, linkedActionFromDefinition, type TagEditorValues } from './tag-editor-v4'
 
 export function DeleteDialog({ tag, onCancel, onDelete, deleting, initialConfirmation = '' }: { tag: Tag; onCancel: () => void; onDelete: () => void; deleting: boolean; initialConfirmation?: string }) {
   const [confirmation, setConfirmation] = useState(initialConfirmation)
@@ -35,8 +36,10 @@ export default function EditTagPageV4() {
   usePageTitle('タグを編集')
   const router = useRouter()
   const params = useSearchParams()
+  const { selectedAccountId } = useAccount()
   const tagId = params.get('id') ?? ''
   const [tag, setTag] = useState<Tag | null>(null)
+  const [definition, setDefinition] = useState<TagDefinition | null>(null)
   const [groups, setGroups] = useState<TagGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -46,42 +49,44 @@ export default function EditTagPageV4() {
   const [notice, setNotice] = useState('')
 
   const load = useCallback(async () => {
-    if (!tagId) { setLoading(false); return }
+    if (!tagId || !selectedAccountId) { setLoading(false); return }
     setLoading(true)
     try {
-      const [tags, folders] = await Promise.all([api.tags.list({ withCounts: true }), api.tagGroups.list()])
+      const [detail, folders] = await Promise.all([api.tags.definition(tagId, selectedAccountId), api.tagGroups.list()])
       if (folders.success) setGroups(folders.data)
-      if (tags.success) setTag(tags.data.find((item) => item.id === tagId) ?? null)
+      if (!detail.success) throw new Error(detail.error)
+      setDefinition(detail.data)
+      setTag(detail.data.tag)
     } catch {
       setError('読み込みに失敗しました')
     } finally {
       setLoading(false)
     }
-  }, [tagId])
+  }, [tagId, selectedAccountId])
 
   useEffect(() => { void load() }, [load])
 
   const save = async (values: TagEditorValues, _andAnother: boolean, applyRetroactive: boolean) => {
-    if (!tag || saving) return
+    if (!tag || !definition || !selectedAccountId || saving) return
     setSaving(true)
     setError('')
     setNotice('')
     try {
-      const update = await api.tags.update(tag.id, { name: values.name, isStarred: values.isStarred })
-      if (!update.success) throw new Error(update.error)
-      if ((tag.groupId ?? '') !== values.groupId) {
-        const group = await api.tags.setGroup(tag.id, values.groupId || null)
-        if (!group.success) throw new Error(group.error)
-      }
-      const mileage = await api.tags.updateMileage(tag.id, {
-        rewardMiles: values.linked ? values.rewardMiles : 0,
-        referralRewardMiles: values.linked ? values.referralRewardMiles : 0,
-        multiplierBps: values.linked ? values.multiplierBps : null,
-        multiplierPriority: values.linked ? values.multiplierPriority : 0,
+      const update = await api.tags.updateDefinition(tag.id, selectedAccountId, tag.version ?? 1, {
+        name: values.name,
+        groupId: values.groupId || null,
+        isStarred: values.isStarred,
+        manualAssignmentAllowed: tag.manualAssignmentAllowed ?? true,
+        reapplyPolicy: values.reapplyPolicy,
+        linkedEnabled: values.linked,
+        mileage: { self: values.rewardMiles, referrer: values.referralRewardMiles, multiplier: values.multiplierBps, priority: values.multiplierPriority },
+        actions: definitionsForSave(values.actions),
         applyToExisting: applyRetroactive && values.applyToExisting,
+        automationId: definition.automation?.id ?? null,
+        automationDraftVersion: definition.automation?.draftVersion?.id ?? null,
       })
-      if (!mileage.success) throw new Error(mileage.error)
-      setNotice(mileage.data.queued > 0 ? `保存しました。${mileage.data.queued}人へ遡及反映を開始しました。` : '保存しました。')
+      if (!update.success) throw new Error(update.error)
+      setNotice(update.data.queued > 0 ? `保存しました。${update.data.queued}人へ遡及反映を開始しました。` : '保存しました。')
       await load()
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '保存に失敗しました')
@@ -106,11 +111,12 @@ export default function EditTagPageV4() {
   }
 
   if (loading) return <p className="p-6 text-sm text-ink-faint">読み込み中…</p>
-  if (!tag) return <div className="rounded-card border border-hairline bg-canvas p-8 text-center text-sm text-ink-faint">タグが見つかりません。<button type="button" onClick={() => router.push('/tags')} className="ml-2 text-action">一覧へ戻る</button></div>
+  if (!selectedAccountId) return <div role="alert" className="rounded-card border border-warning/30 bg-warning-bg p-6 text-sm text-warning">LINE公式アカウントを選んでください。</div>
+  if (!tag || !definition) return <div className="rounded-card border border-hairline bg-canvas p-8 text-center text-sm text-ink-faint">タグが見つかりません。<button type="button" onClick={() => router.push('/tags')} className="ml-2 text-action">一覧へ戻る</button></div>
 
   return (
     <>
-      <TagEditorV4 key={tag.id} mode="edit" groups={groups} tag={tag} saving={saving} error={error} notice={notice} onCancel={() => router.push('/tags')} onSave={save} onDelete={() => setDeleteOpen(true)} />
+      <TagEditorV4 key={`${tag.id}:${tag.version ?? 1}`} mode="edit" groups={groups} tag={tag} accountId={selectedAccountId} initialValues={{ reapplyPolicy: tag.reapplyPolicy ?? 'first_only', actions: (definition.automation?.actions ?? []).map(linkedActionFromDefinition) }} saving={saving} error={error} notice={notice} onCancel={() => router.push('/tags')} onSave={save} onDelete={() => setDeleteOpen(true)} />
       {deleteOpen && <DeleteDialog tag={tag} deleting={deleting} onCancel={() => setDeleteOpen(false)} onDelete={() => void remove()} />}
     </>
   )

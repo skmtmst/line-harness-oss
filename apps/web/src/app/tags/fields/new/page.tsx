@@ -15,6 +15,7 @@ import { FIELD_TYPE_HINTS, FIELD_TYPE_LABELS } from '@/components/friend-fields/
 
 const TYPES = Object.keys(FIELD_TYPE_LABELS) as FriendFieldType[]
 const NEEDS_OPTIONS = new Set<FriendFieldType>(['select', 'multi_select'])
+const FILE_TYPES = new Set<FriendFieldType>(['image', 'pdf'])
 
 function suggestKey(name: string): string {
   const ascii = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
@@ -106,7 +107,7 @@ function NewFriendFieldForm() {
         <div className="space-y-4">
           <section data-design="Value" className="rounded-card border border-hairline bg-canvas p-5 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
             <h2 className="mb-4 text-base font-bold text-ink">値の扱い</h2>
-            <label className="block text-sm font-semibold text-ink">既定値<input value={defaultValue} onChange={(event) => setDefaultValue(event.target.value)} placeholder="未設定" className="mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal" /><span className="mt-1 block text-xs font-normal text-ink-faint">友だち情報が空欄のとき、この値が代わりに送信されます。</span></label>
+            <label className="block text-sm font-semibold text-ink">既定値<input value={FILE_TYPES.has(type) ? '' : defaultValue} onChange={(event) => setDefaultValue(event.target.value)} disabled={FILE_TYPES.has(type)} placeholder={FILE_TYPES.has(type) ? '画像・PDFには設定できません' : '未設定'} className="mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal disabled:bg-surface-soft disabled:text-ink-faint" /><span className="mt-1 block text-xs font-normal text-ink-faint">{FILE_TYPES.has(type) ? '画像・PDFはファイルとして保存し、本文へ文字として差し込みません。' : '友だち情報が空欄のとき、この値が代わりに送信されます。'}</span></label>
             <div className="mt-4 divide-y divide-hairline">
               <Toggle checked={isStarred} onChange={setIsStarred} label="友だち一覧に表示" hint="よく見る項目だけを列に追加" />
               <Toggle checked={isPersonal} onChange={setIsPersonal} label="個人情報として保護" hint="権限制限と閲覧履歴を有効化" />

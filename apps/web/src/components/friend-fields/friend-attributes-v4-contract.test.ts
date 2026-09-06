@@ -30,8 +30,7 @@ describe('友だち属性 V4 contract', () => {
     const markList = read('components/friend-fields/mark-list.tsx')
     expect(editor).toContain("mode === 'edit' ? 'この変更で起きること' : 'この設定で起きること'")
     expect(editor).toContain('取り消せない操作です')
-    expect(markList).toContain('友だちは「${defaultMark?.name')
-    expect(markList).toContain('変更履歴は残ります')
+    expect(markList).toContain('選んだマークへ置き換えて履歴を残します')
     expect(markList).not.toContain('対応マークが未設定へ戻ります')
   })
 
@@ -50,10 +49,10 @@ describe('友だち属性 V4 contract', () => {
   it('タグの複製はリンクだけで終わらず、既存データを作成画面へ引き継ぐ', () => {
     const page = read('components/friend-fields/new-tag-page-v4.tsx')
     expect(page).toContain("const copyId = params.get('copy')")
-    expect(page).toContain('api.tags.list({ withCounts: true })')
-    expect(page).toContain('name: `${copySource.name} のコピー`')
-    expect(page).toContain('rewardMiles: copySource.mileageReward ?? 0')
-    expect(page).toContain('actions: []')
+    expect(page).toContain('api.tags.definition(copyId, selectedAccountId)')
+    expect(page).toContain('name: `${copySource.tag.name} のコピー`')
+    expect(page).toContain('rewardMiles: copySource.tag.mileageReward ?? 0')
+    expect(page).toContain('map(linkedActionFromDefinition)')
   })
 
   it('一覧は20・30・40・50件で切り替え、ページを無限に横並びにしない', () => {
@@ -256,25 +255,25 @@ describe('友だち属性 V4 contract', () => {
 
   it('使用中のタグを、画面が削除させない', () => {
     const source = read('components/friend-fields/tags-page-v4.tsx')
-    // 削除する前に影響を数える口を叩く（PR #381）。
-    expect(source).toContain('api.tags.deleteImpact(tag.id)')
+    // アーカイブ前に実参照と版を返す正本の口を叩く。
+    expect(source).toContain('api.tags.dependencies(tag.id, accountId)')
     /*
       **DELETE 側にはまだ強制停止が入っていない。** 止めるのは画面の役目。
       読込中・失敗・使用中の3つとも押せなくする。
       失敗を「参照0件」と読み違えて消させないため、失敗も止める側に入れる。
     */
-    expect(source).toContain("const blocked = impactStatus !== 'ready' || impact?.canDelete === false")
-    expect(source).toContain('if (blocked || text !== tag.name || saving) return')
-    expect(source).toContain('disabled={blocked || saving || text !== tag.name}')
+    expect(source).toContain('const blocked = true')
+    expect(source).toContain('disabled={blocked || text !== tag.name}')
     // 確認欄も止める。名前を打てば消せる、と思わせない。
     expect(source).toContain('disabled={blocked}')
     // 止まっている理由を必ず出す。押せないだけだと理由が分からない。
     expect(source).toContain('影響を確認しています')
     expect(source).toContain('影響を確認できませんでした')
-    expect(source).toContain('使用中のため削除できません')
+    expect(source).toContain('アーカイブの保存口は未接続です')
     // 消せるタグに赤い警告を出さない。以前は三項演算子の else で
     // 「アフィリエイトのオファーで使用中」と誤表示していた。
     expect(source).toContain("impactStatus === 'ready' && impact && !impact.canDelete && (")
+    expect(source).not.toContain('api.tags.delete(tag.id)')
     expect(source).not.toContain('アフィリエイトのオファーで使用中のタグは削除できません')
   })
 
