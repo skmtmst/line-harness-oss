@@ -14,15 +14,15 @@ import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
 import { Th } from '@/components/shared/table'
 
 export const FIELD_TYPE_HINTS: Record<FriendFieldType, string> = {
-  text: '短いテキスト', textarea: '長い文章', number: '体重など', date: '誕生日など',
+  text: '短いテキスト', textarea: '長い文章', number: '体重など', date: '誕生日など', datetime: '予約日時など',
   select: '決まった選択肢から選ぶ', multi_select: '決まった選択肢から複数選ぶ',
-  checkbox: 'はい / いいえ', url: 'リンク', tel: '電話番号', email: 'メールアドレス',
+  checkbox: 'はい / いいえ', url: 'リンク', tel: '電話番号', email: 'メールアドレス', image: '画像ファイル', pdf: 'PDFファイル',
 }
 
 export const FIELD_TYPE_LABELS: Record<FriendFieldType, string> = {
-  text: '1行テキスト', textarea: '複数行テキスト', number: '数値', date: '日付',
+  text: '1行テキスト', textarea: '複数行テキスト', number: '数値', date: '日付', datetime: '日時',
   select: '単一選択', multi_select: '複数選択', checkbox: '真偽', url: 'URL',
-  tel: '電話番号', email: 'メール',
+  tel: '電話番号', email: 'メール', image: '画像', pdf: 'PDF',
 }
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'

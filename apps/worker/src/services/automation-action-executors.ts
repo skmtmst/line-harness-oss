@@ -4,6 +4,7 @@ import {
   getSupportMarkById,
   jstNow,
   removeTagFromFriend,
+  recordRichMenuAssignment,
   setFriendSupportMark,
 } from '@line-crm/db';
 import { LineClient, type Message } from '@line-crm/line-sdk';
@@ -403,6 +404,14 @@ async function richMenuExecutor(
     } else {
       await client.unlinkRichMenuFromUser(friend.line_user_id);
     }
+    await recordRichMenuAssignment(context.db, {
+      friendId: friend.id,
+      lineAccountId: context.lineAccountId,
+      lineRichMenuId: richMenuId,
+      reasonKind: 'automation',
+      reasonEventId: context.stepExecutionId,
+      idempotencyKey: context.stepExecutionId,
+    });
     await completeLineOperation(context, context.stepExecutionId);
     return { output: { replayed: false } };
   } catch (error) {

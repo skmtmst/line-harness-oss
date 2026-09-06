@@ -11,20 +11,10 @@ import StickyBar from '@/components/shared/sticky-bar'
 import SelectField from '@/components/shared/select-field'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { ApiError, api } from '@/lib/api'
+import type { FriendFieldMigrationPreview } from '@/lib/api'
 import { FIELD_TYPE_HINTS, FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 
 const TYPES = Object.keys(FIELD_TYPE_LABELS) as FriendFieldType[]
-
-type Preview = {
-  summary: { total: number; convertible: number; review: number; invalid: number }
-  rows: Array<{
-    friendId: string
-    sourceValue: string
-    convertedValue: string | null
-    status: 'review' | 'invalid'
-    reason: string | null
-  }>
-}
 
 function FieldSummary({ title, field, kind }: { title: string; field: FriendField; kind: 'source' | 'target' }) {
   return (
@@ -51,7 +41,7 @@ function MigrateFriendField() {
   const [fields, setFields] = useState<FriendField[]>([])
   const [targetName, setTargetName] = useState('')
   const [targetType, setTargetType] = useState<FriendFieldType>('text')
-  const [preview, setPreview] = useState<Preview | null>(null)
+  const [preview, setPreview] = useState<FriendFieldMigrationPreview | null>(null)
   const [loading, setLoading] = useState(true)
   const [checking, setChecking] = useState(false)
   const [error, setError] = useState('')
@@ -88,7 +78,7 @@ function MigrateFriendField() {
     try {
       const res = await api.friendFields.migrationPreview(source.id, selectedAccountId, targetType)
       if (!res.success) throw new Error(res.error)
-      setPreview({ summary: res.data.summary, rows: res.data.rows })
+      setPreview(res.data)
     } catch (reason) {
       setError(reason instanceof ApiError ? reason.message : '事前確認を実行できませんでした')
     } finally { setChecking(false) }
@@ -155,12 +145,13 @@ function MigrateFriendField() {
 
       <section data-design="Usage" className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-sm">
         <h2 className="text-base font-bold text-ink">切り替わる使用先</h2>
-        <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
-          <p className="rounded-control bg-surface-soft p-3">回答フォーム <strong className="float-right">—</strong></p>
-          <p className="rounded-control bg-surface-soft p-3">友だち一覧・詳細 <strong className="float-right">確認中</strong></p>
-          <p className="rounded-control bg-surface-soft p-3">差し込み・自動処理 <strong className="float-right">—</strong></p>
-        </div>
-        <p className="mt-2 text-xs text-ink-faint">使用先の全件集計は未接続です。取れていない数を0件とは表示しません。</p>
+        {preview ? preview.usageTargets.length > 0 ? (
+          <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
+            {preview.usageTargets.map((usage) => <p key={`${usage.kind}:${usage.id}`} className="rounded-control bg-surface-soft p-3"><span className="block truncate font-semibold text-ink" title={usage.name}>{usage.name}</span><span className="mt-1 block text-xs text-ink-faint">{usage.kind} ／ {usage.switchable ? '移行時に切り替え' : '手動確認が必要'}</span></p>)}
+          </div>
+        ) : <p className="mt-3 rounded-control bg-accent-soft p-3 text-sm text-accent">切り替えが必要な使用先はありません。</p>
+          : <p className="mt-3 text-sm text-ink-faint">事前確認すると、回答フォームや自動処理などの使用先を表示します。</p>}
+        {preview?.runId && preview.previewExpiresAt ? <p className="mt-2 text-xs text-ink-faint">確認番号：{preview.runId} ／ 有効期限：{new Date(preview.previewExpiresAt).toLocaleString('ja-JP')}</p> : null}
       </section>
 
       <StickyBar status={preview ? `事前確認済み：${preview.summary.total}人` : 'まだ事前確認していません'} actions={<><Button href="/tags?tab=fields">移行をやめる</Button><Button variant="primary" type="button" onClick={() => void runPreview()} disabled={checking}>{checking ? '確認しています…' : '事前確認する'}</Button></>} />

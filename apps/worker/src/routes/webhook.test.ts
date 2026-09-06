@@ -192,6 +192,7 @@ describe('POST /webhook — V6 friend-add ledger', () => {
     });
     expect(markFriendAddEventRouting).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
       eventId: 'friend-add-event-1', lineAccountId: 'account-main', status: 'completed',
+      scenarioEnrollmentId: null, deliveryCount: 0,
     }));
   });
 });

@@ -101,6 +101,16 @@ export interface Tag {
   displayOrder?: number;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
+  /** 選択中のLINE公式アカウント。V6の定義詳細で返る。 */
+  lineAccountId?: string | null;
+  description?: string | null;
+  manualAssignmentAllowed?: boolean;
+  reapplyPolicy?: "first_only" | "every_time";
+  linkedEnabled?: boolean;
+  status?: "active" | "archived";
+  /** 楽観ロックに使う定義版。 */
+  version?: number;
+  updatedAt?: string;
   /** このタグが付与されている友だち数 (GET /api/tags のみ付与) */
   friendCount?: number;
   /** 自動付与のきっかけ。履歴から断定できない場合は省略する。 */
@@ -186,12 +196,15 @@ export type FriendFieldType =
   | "textarea"
   | "number"
   | "date"
+  | "datetime"
   | "select"
   | "multi_select"
   | "checkbox"
   | "url"
   | "tel"
-  | "email";
+  | "email"
+  | "image"
+  | "pdf";
 
 /**
  * 友だち情報欄の項目。
@@ -220,6 +233,10 @@ export interface FriendField {
   displayOrder: number;
   createdAt: string;
   updatedAt: string;
+  status?: "active" | "read_only" | "archived";
+  version?: number;
+  /** 画像・PDFは本文へ文字として差し込まない。 */
+  canInsertText?: boolean;
   /** GET /api/friends/:id/fields のときだけ付く */
   value?: string | null;
   updatedBy?: string | null;
@@ -268,6 +285,8 @@ export interface SupportMark {
   autoOnInbound: boolean;
   displayOrder: number;
   createdAt: string;
+  updatedAt?: string;
+  version?: number;
   /** 旧環境から共有されているマーク。編集時に選択中アカウントへ複製される。 */
   isInherited?: boolean;
   /** GET /api/support-marks の一覧で返る実参照数。省略は未取得、0は参照なし。 */
@@ -280,6 +299,8 @@ export interface SupportMark {
   };
   /** 一覧で示す自動変更の要約。未取得時は autoOnInbound だけで判定する。 */
   automaticChangeLabel?: string;
+  /** このマークを選べる・確認できる画面。 */
+  displayTargets?: Array<"inbox" | "friend_list" | "friend_detail" | "dashboard" | "broadcast" | "automation">;
 }
 
 /** メディアライブラリの1件 */
@@ -596,6 +617,10 @@ export interface SavedSearch {
   isShared: boolean;
   displayOrder: number;
   createdAt: string;
+  conditionFormat?: "search_v1" | "segment_v1";
+  updatedBy?: string | null;
+  updatedAt?: string;
+  revision?: number;
   /** 現在の保存条件に一致する友だち数。評価不能・未取得は null。 */
   matchCount?: number | null;
   /** matchCount が null のとき、黙って0件にせず理由を返す。 */
@@ -640,6 +665,8 @@ export interface SavedSearchUsage {
   name: string;
   mode: SavedSearchReferenceMode;
   lastUsedAt: string | null;
+  revision?: number | null;
+  callCountThisMonth?: number;
 }
 
 /**

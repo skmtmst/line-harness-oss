@@ -536,6 +536,7 @@ export async function linkRichMenuBulkChunked(
   line: LineRichMenuClient,
   richMenuId: string,
   userIds: string[],
+  onChunkLinked?: (userIds: string[], chunkIndex: number) => Promise<void>,
 ): Promise<{ chunks: number; total: number }> {
   const CHUNK = 500;
   const total = userIds.length;
@@ -544,6 +545,7 @@ export async function linkRichMenuBulkChunked(
   for (let i = 0; i < total; i += CHUNK) {
     const slice = userIds.slice(i, i + CHUNK);
     await line.linkRichMenuBulk(richMenuId, slice);
+    await onChunkLinked?.(slice, chunks);
     chunks++;
   }
   return { chunks, total };

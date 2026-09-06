@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Circle } from 'lucide-react'
-import type { SupportMark } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import { api, type SaveSupportMarkAutomationRule, type SupportMarkAutomationEvent, type SupportMarkListItem } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Card from '@/components/shared/card'
@@ -13,6 +12,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import SupportMarkRulesPanel from './support-mark-rules-panel'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
+import { EVENT_LABELS, eventLabel } from './support-mark-rules-view'
 
 const COLORS = [
   { value: '#EF4B55', name: '赤' },
@@ -23,7 +23,7 @@ const COLORS = [
   { value: '#707981', name: 'グレー' },
 ] as const
 const DESTINATIONS = ['受信箱での絞り込み', '一斉配信の配信対象', 'シナリオ配信の分岐条件', '自動応答の条件', 'オートメーションの条件']
-type MarkRow = SupportMark & { friendCount: number }
+type MarkRow = SupportMarkListItem
 
 export default function SupportMarkEditor({ markId }: { markId?: string }) {
   const router = useRouter()
@@ -37,6 +37,8 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
   const [color, setColor] = useState<string>(COLORS[0].value)
   const [displayOrder, setDisplayOrder] = useState(0)
   const [isDefault, setIsDefault] = useState(false)
+  const [createRule, setCreateRule] = useState(true)
+  const [ruleEvent, setRuleEvent] = useState<SupportMarkAutomationEvent>('staff_assigned')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const selected = useMemo(() => items.find((mark) => mark.id === markId), [items, markId])
@@ -63,7 +65,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
       .then((res) => {
         if (cancelled) return
         if (!res.success) throw new Error(res.error)
-        const rows = res.data as MarkRow[]
+        const rows = res.data
         setItems(rows)
         const current = rows.find((mark) => mark.id === markId)
         if (current) {
@@ -90,7 +92,10 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
     try {
       const result = editing && markId
         ? await api.supportMarks.update(markId, selectedAccountId, { name: name.trim(), color, displayOrder, isDefault, autoOnInbound: selected?.autoOnInbound ?? false })
-        : await api.supportMarks.create(selectedAccountId, { name: name.trim(), color, displayOrder, isDefault, autoOnInbound: false })
+        : await api.supportMarks.create(selectedAccountId, {
+            name: name.trim(), color, displayOrder, isDefault, autoOnInbound: false,
+            automationRules: createRule ? [{ name: `${name.trim()}：${eventLabel(ruleEvent)}`, event: ruleEvent, condition: null, priority: 0, manualProtectionMinutes: 0, isActive: true } satisfies SaveSupportMarkAutomationRule] : [],
+          })
       if (!result.success) throw new Error(result.error)
       router.push('/tags?tab=marks')
     } catch {
@@ -141,8 +146,15 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
           </Card>
         ) : (
           <Card padding="default">
-            <h2 className="mb-2 text-sm font-bold text-ink">自動変更</h2>
-            <p className="text-xs leading-relaxed text-ink-faint">マークを作成すると、担当者の割り当てや期限超過などをきっかけに変更するルールを追加できます。</p>
+            <h2 className="mb-2 text-sm font-bold text-ink">自動変更ルール</h2>
+            <p className="text-xs leading-relaxed text-ink-faint">受信・返信・担当割当・期限超過などをきっかけに、このマークへ自動で変更できます。</p>
+            <label className="mt-4 flex items-center gap-2 text-sm font-semibold text-ink"><input type="checkbox" checked={createRule} onChange={(event) => setCreateRule(event.target.checked)} className="h-4 w-4 accent-accent" />作成と同時にルールを追加</label>
+            <label className="mt-4 block text-xs font-semibold text-ink-secondary">きっかけ
+              <select value={ruleEvent} onChange={(event) => setRuleEvent(event.target.value as SupportMarkAutomationEvent)} disabled={!createRule} className="v6-select mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 text-sm font-normal disabled:bg-surface-soft">
+                {EVENT_LABELS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+              </select>
+            </label>
+            <p className="mt-3 rounded-control bg-surface-soft p-3 text-xs text-ink-secondary">{createRule ? `${eventLabel(ruleEvent)}に「${name || 'このマーク'}」へ変更します。` : 'ルールは後から編集画面で追加できます。'}</p>
           </Card>
         )}
 

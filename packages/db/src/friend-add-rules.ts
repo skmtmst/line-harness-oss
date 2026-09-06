@@ -22,6 +22,18 @@ export interface FriendAddRuleDefinition {
   activeUntil: string | null;
   returningMode?: 'none' | 'same' | 'other';
   startPosition?: 'beginning' | 'resume';
+  deliveryChoices?: {
+    sendWelcomeMessage: boolean;
+    startScenario: boolean;
+    runActions: boolean;
+  };
+  resendSuppressionHours?: number | null;
+  unknownRouteAction?: {
+    sendCommonGuidance: boolean;
+    notifyStaff: boolean;
+  };
+  weekdays?: number[];
+  timeWindows?: Array<{ start: string; end: string }>;
 }
 
 export interface FriendAddRuleRow {
@@ -45,6 +57,7 @@ export interface FriendAddRuleRow {
   last_tested_at: string | null;
   published_at: string | null;
   matched_last_7_days: number | null;
+  lock_version: number;
 }
 
 export const EMPTY_FRIEND_ADD_RULE_DEFINITION: FriendAddRuleDefinition = {
@@ -151,6 +164,78 @@ export async function listFriendAddRules(
   return result.results ?? [];
 }
 
+export interface FriendAddRulePage {
+  items: FriendAddRuleRow[];
+  total: number;
+  nextCursor: string | null;
+}
+
+type FriendAddRuleCursor = { priority: number; createdAt: string; id: string };
+
+function parseRuleCursor(value: string | null | undefined): FriendAddRuleCursor | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(decodeURIComponent(value)) as Partial<FriendAddRuleCursor>;
+    if (!Number.isInteger(parsed.priority) || typeof parsed.createdAt !== 'string' || typeof parsed.id !== 'string') return null;
+    return { priority: parsed.priority!, createdAt: parsed.createdAt, id: parsed.id };
+  } catch {
+    return null;
+  }
+}
+
+function makeRuleCursor(row: FriendAddRuleRow): string {
+  return encodeURIComponent(JSON.stringify({ priority: row.priority, createdAt: row.created_at, id: row.id }));
+}
+
+export async function listFriendAddRulesPage(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    friendKind: FriendAddRuleKind;
+    status?: FriendAddRuleStatus | null;
+    cursor?: string | null;
+    limit?: number;
+  },
+): Promise<FriendAddRulePage> {
+  const limit = Math.max(1, Math.min(input.limit ?? 20, 100));
+  const cursor = parseRuleCursor(input.cursor);
+  if (input.cursor && !cursor) throw new Error('FRIEND_ADD_RULE_CURSOR_INVALID');
+  const clauses = [
+    'r.line_account_id = ?',
+    'r.friend_kind = ?',
+    'r.archived_at IS NULL',
+  ];
+  const bindings: Array<string | number> = [input.lineAccountId, input.friendKind];
+  if (input.status) {
+    clauses.push('r.status = ?');
+    bindings.push(input.status);
+  }
+  const count = await db.prepare(
+    `SELECT COUNT(*) AS total FROM friend_add_rules r WHERE ${clauses.join(' AND ')}`,
+  ).bind(...bindings).first<{ total: number }>();
+  if (cursor) {
+    clauses.push(`(
+      r.priority > ? OR
+      (r.priority = ? AND r.created_at > ?) OR
+      (r.priority = ? AND r.created_at = ? AND r.id > ?)
+    )`);
+    bindings.push(cursor.priority, cursor.priority, cursor.createdAt, cursor.priority, cursor.createdAt, cursor.id);
+  }
+  const result = await db.prepare(
+    `${RULE_SELECT}
+      WHERE ${clauses.join(' AND ')}
+      ORDER BY r.priority ASC, r.created_at ASC, r.id ASC
+      LIMIT ?`,
+  ).bind(...bindings, limit + 1).all<FriendAddRuleRow>();
+  const rows = result.results ?? [];
+  const items = rows.slice(0, limit);
+  return {
+    items,
+    total: count?.total ?? 0,
+    nextCursor: rows.length > limit && items.length > 0 ? makeRuleCursor(items[items.length - 1]) : null,
+  };
+}
+
 export async function getFriendAddRule(
   db: D1Database,
   input: { lineAccountId: string; ruleId: string },
@@ -226,6 +311,7 @@ export async function saveFriendAddRuleDraft(
     priority: number;
     definition: FriendAddRuleDefinition;
     idempotencyKey: string;
+    expectedVersion?: number;
   },
 ): Promise<FriendAddRuleRow> {
   const current = await getFriendAddRule(db, input);
@@ -235,6 +321,8 @@ export async function saveFriendAddRuleDraft(
       WHERE rule_id = ? AND draft_save_idempotency_key = ?`,
   ).bind(input.ruleId, input.idempotencyKey).first<{ id: string }>();
   if (replay) return current;
+  const expectedVersion = input.expectedVersion ?? current.lock_version;
+  if (current.lock_version !== expectedVersion) throw new Error('FRIEND_ADD_RULE_VERSION_CONFLICT');
   const now = jstNow();
   const draftId = current.version_status === 'draft' && current.version_id
     ? current.version_id
@@ -246,8 +334,9 @@ export async function saveFriendAddRuleDraft(
   const statements = [
     db.prepare(
       `UPDATE friend_add_rules
-          SET name = ?, folder_name = ?, priority = ?, status = 'draft', updated_at = ?
-        WHERE id = ? AND line_account_id = ? AND archived_at IS NULL`,
+          SET name = ?, folder_name = ?, priority = ?, status = 'draft', updated_at = ?,
+              lock_version = lock_version + 1
+        WHERE id = ? AND line_account_id = ? AND archived_at IS NULL AND lock_version = ?`,
     ).bind(
       input.name,
       input.folderName ?? null,
@@ -255,6 +344,7 @@ export async function saveFriendAddRuleDraft(
       now,
       input.ruleId,
       input.lineAccountId,
+      expectedVersion,
     ),
   ];
   if (current.version_status === 'draft') {
@@ -272,7 +362,9 @@ export async function saveFriendAddRuleDraft(
        VALUES (?, ?, ?, ?, 'draft', ?, ?, ?)`,
     ).bind(draftId, input.ruleId, nextVersion, JSON.stringify(input.definition), input.idempotencyKey, now, now));
   }
-  await db.batch(statements);
+  const results = await db.batch(statements);
+  const updateResult = await results[0];
+  if ((updateResult?.meta?.changes ?? 0) !== 1) throw new Error('FRIEND_ADD_RULE_VERSION_CONFLICT');
   const saved = await getFriendAddRule(db, input);
   if (!saved) throw new Error('FRIEND_ADD_RULE_NOT_SAVED');
   return saved;
@@ -341,16 +433,35 @@ export async function publishFriendAddRule(
 
 export async function stopFriendAddRule(
   db: D1Database,
-  input: { lineAccountId: string; ruleId: string },
+  input: {
+    lineAccountId: string;
+    ruleId: string;
+    staffId: string;
+    idempotencyKey: string;
+    expectedVersion: number;
+  },
 ): Promise<void> {
+  const replay = await db.prepare(
+    `SELECT id FROM friend_add_rules
+      WHERE id = ? AND line_account_id = ? AND stop_idempotency_key = ?`,
+  ).bind(input.ruleId, input.lineAccountId, input.idempotencyKey).first<{ id: string }>();
+  if (replay) return;
   const now = jstNow();
   const result = await db.prepare(
-    `UPDATE friend_add_rules SET status = 'stopped', updated_at = ?
-      WHERE id = ? AND line_account_id = ? AND status = 'published' AND archived_at IS NULL`,
-  ).bind(now, input.ruleId, input.lineAccountId).run();
+    `UPDATE friend_add_rules
+        SET status = 'stopped', stop_idempotency_key = ?, stopped_at = ?,
+            stopped_by_staff_id = ?, updated_at = ?, lock_version = lock_version + 1
+      WHERE id = ? AND line_account_id = ? AND status = 'published'
+        AND archived_at IS NULL AND lock_version = ?`,
+  ).bind(
+    input.idempotencyKey, now, input.staffId, now,
+    input.ruleId, input.lineAccountId, input.expectedVersion,
+  ).run();
   if ((result.meta?.changes ?? 0) !== 1) {
     const current = await getFriendAddRule(db, input);
-    if (current?.status === 'stopped') return;
+    if (current && current.lock_version !== input.expectedVersion) {
+      throw new Error('FRIEND_ADD_RULE_VERSION_CONFLICT');
+    }
     throw new Error('FRIEND_ADD_RULE_NOT_STOPPED');
   }
 }

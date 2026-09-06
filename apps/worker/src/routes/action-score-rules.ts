@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
   ActionScoreRuleValidationError,
-  getActionScoreBands,
+  getActionScoreBandOverview,
   getActionScoreRuleConfiguration,
   publishActionScoreRuleDraft,
   saveActionScoreRuleDraft,
@@ -60,7 +60,7 @@ actionScoreRules.get('/api/action-scores/rules', requireRole('owner', 'admin', '
 actionScoreRules.get('/api/action-scores/bands', requireRole('owner', 'admin', 'staff'), async (c) => {
   const accountId = await requireAccount(c, c.req.query('accountId'));
   if (typeof accountId !== 'string') return accountId;
-  return endpoint(c, () => getActionScoreBands(c.env.DB, accountId));
+  return endpoint(c, () => getActionScoreBandOverview(c.env.DB, accountId));
 });
 
 actionScoreRules.patch('/api/action-scores/rules/draft', requireRole('owner', 'admin'), async (c) => {
