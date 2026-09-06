@@ -617,7 +617,7 @@ export default function BroadcastForm({
 
   const updateBubble = (index: number, bubble: BroadcastBubble) => setBubbles((items) => items.map((item, i) => i === index ? { ...bubble, id: item.id } : item))
   const moveBubble = (index: number, direction: -1 | 1) => setBubbles((items) => { const next = [...items]; const [item] = next.splice(index, 1); next.splice(index + direction, 0, item); return next })
-  const useTemplate = (template: BroadcastTemplateOption) => {
+  const applyTemplate = (template: BroadcastTemplateOption) => {
     const bubble = messageTemplateToBubble(template)
     if (!bubble) {
       setError('このテンプレートの内容を読み込めませんでした')
@@ -1532,7 +1532,7 @@ export default function BroadcastForm({
       cancelLabel="戻る"
       designNode="p97Tf"
       onCancel={() => setSelectedTemplate(null)}
-      onConfirm={selectedTemplate ? () => useTemplate(selectedTemplate) : undefined}
+      onConfirm={selectedTemplate ? () => applyTemplate(selectedTemplate) : undefined}
     >
       <div className="space-y-3">
         <dl className="rounded-control border border-hairline bg-canvas-sunken p-4 text-sm">
