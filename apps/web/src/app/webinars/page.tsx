@@ -7,6 +7,7 @@ import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { webinarLoadFailure, type WebinarLoadFailure } from './webinar-load-failure'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError, webinarApi, type Webinar, type WebinarOverview } from '@/lib/api'
@@ -70,6 +71,9 @@ export default function WebinarsPage() {
   const [savedFilter, setSavedFilter] = useState<SavedFilter>('')
   const [loading, setLoading] = useState(true)
   const [loadFailure, setLoadFailure] = useState<WebinarLoadFailure | null>(null)
+  const [archiveTarget, setArchiveTarget] = useState<Webinar | null>(null)
+  const [archiving, setArchiving] = useState(false)
+  const [archiveError, setArchiveError] = useState('')
 
   const visibleItems = loadedAccountId === selectedAccountId ? items : []
   const visibleOverview = loadedOverviewAccountId === selectedAccountId ? overview : null
@@ -166,6 +170,23 @@ export default function WebinarsPage() {
   const currentPage = Math.min(page, pageCount)
   const visibleStart = (currentPage - 1) * pageSize
   const visible = filtered.slice(visibleStart, visibleStart + pageSize)
+
+  const archiveSelected = async () => {
+    if (!archiveTarget || archiving) return
+    setArchiving(true)
+    setArchiveError('')
+    try {
+      await webinarApi.archive(archiveTarget.id)
+      setArchiveTarget(null)
+      await Promise.all([refresh(), refreshOverview()])
+    } catch (error) {
+      setArchiveError(error instanceof ApiError && error.status === 409
+        ? '公開中のウェビナーは、先に公開を停止してください。'
+        : 'アーカイブできませんでした。状態を読み直して、もう一度お試しください。')
+    } finally {
+      setArchiving(false)
+    }
+  }
 
   return (
     <>
@@ -314,31 +335,35 @@ export default function WebinarsPage() {
             <p className="text-ink-faint mt-2 text-sm">検索文字か保存した条件を変えてください。</p>
           </div>
         ) : (
-          <div className="grid gap-4 lg:grid-cols-2">
-            {visible.map((w) => (
-              <Link
-                key={w.id}
-                href={`/webinars/edit?id=${w.id}`}
-                className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
-              >
-                <div className="flex items-start gap-4 p-5">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm">
-                    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="2"><path d="M15 10l4.55-2.28A1 1 0 0 1 21 8.62v6.76a1 1 0 0 1-1.45.9L15 14M5 18h8a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2Z" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          <div className="border-hairline bg-canvas overflow-hidden rounded-card border">
+            <div className="bg-canvas-sunken text-ink-faint hidden grid-cols-[minmax(0,2fr)_110px_100px_100px_160px_96px] gap-3 px-4 py-3 text-xs font-semibold md:grid">
+              <span>ウェビナー名</span><span>状態</span><span>申込</span><span>視聴</span><span>公開期間</span><span>操作</span>
+            </div>
+            <div className="divide-hairline divide-y">
+              {visible.map((w) => (
+                <div key={w.id} className="grid gap-3 px-4 py-4 md:grid-cols-[minmax(0,2fr)_110px_100px_100px_160px_96px] md:items-center">
+                  <div className="min-w-0">
+                    <Link href={`/webinars/edit?id=${w.id}`} className="text-accent block truncate text-sm font-bold hover:underline" title={w.title}>{w.title}</Link>
+                    <span className="text-ink-faint mt-1 block truncate font-mono text-[11px]" title={`/${w.slug}`}>/{w.slug}</span>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <h2 className="line-clamp-2 font-bold leading-6 text-slate-900 group-hover:text-blue-700">{w.title}</h2>
-                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${STATUS_BADGE[w.status]}`}>{STATUS_LABEL[w.status]}</span>
-                    </div>
-                    <p className="mt-3 text-sm leading-6 text-slate-600">{scheduleSummary(w)}</p>
-                    <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
-                      <span className="font-mono text-[11px] text-slate-400">/{w.slug}</span>
-                      <span className="text-xs font-semibold text-blue-600">概要・分析を見る →</span>
-                    </div>
+                  <div><span className={`rounded-pill inline-flex px-2.5 py-1 text-[11px] font-semibold ${STATUS_BADGE[w.status]}`}>{STATUS_LABEL[w.status]}</span></div>
+                  <div className="text-ink-secondary text-sm tabular-nums" title="一覧では未取得です。参加者管理で確認できます。"><span className="text-ink-faint md:hidden">申込 </span>—</div>
+                  <div className="text-ink-secondary text-sm tabular-nums" title="一覧では未取得です。参加者管理で確認できます。"><span className="text-ink-faint md:hidden">視聴 </span>—</div>
+                  <div className="text-ink-secondary truncate text-sm" title={scheduleSummary(w)}>{scheduleSummary(w)}</div>
+                  <div className="flex items-center gap-2">
+                    <Link href={`/webinars/edit?id=${w.id}`} className="text-accent text-xs font-semibold">編集</Link>
+                    <button
+                      type="button"
+                      onClick={() => { setArchiveError(''); setArchiveTarget(w) }}
+                      className="text-danger text-xs font-semibold"
+                      aria-label={`${w.title}をアーカイブ`}
+                    >
+                      アーカイブ
+                    </button>
                   </div>
                 </div>
-              </Link>
-            ))}
+              ))}
+            </div>
           </div>
         )}
         {hasListData && filtered.length > 0 && (
@@ -355,6 +380,19 @@ export default function WebinarsPage() {
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={archiveTarget !== null}
+        title="ウェビナーをアーカイブしますか？"
+        description={archiveTarget
+          ? `「${archiveTarget.title}」は一覧から外れ、新しく使えなくなります。申込者・視聴履歴・CTA・分析結果は消えません。`
+          : ''}
+        confirmLabel="アーカイブする"
+        busy={archiving}
+        onCancel={() => { if (!archiving) setArchiveTarget(null) }}
+        onConfirm={() => void archiveSelected()}
+      >
+        {archiveError ? <p className="text-danger text-sm">{archiveError}</p> : null}
+      </ConfirmDialog>
     </>
   )
 }

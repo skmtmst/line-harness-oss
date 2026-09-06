@@ -1194,7 +1194,7 @@ export const SCREENS = [
     まるごと無い**（`grep リマインド|見逃し` が `/webinars` 配下で0件）。
   */
   { ...WEBINAR, node: 'ZC13r', name: '10-1 ウェビナー',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars`。**面が `TypeError: narrowed is not iterable`（`page.tsx:125`）で落ちる。** 原因は**モックの返す形**——Workerは `{ success, data: [...] }` と配列を返す（`webinars.ts:767`）が、モックは `/api/webinars` に固定データが無く空の器 `{items:[],total:0,…}` を返す。画面は `setItems(res.data)` で配列を期待している。**撮影ハーネス側の不足**（`scripts/visual-qa/` は S0 の所有）。',
+    verdictNote: '**2026-09-06 #251。** 実在する一覧APIと4状態へ接続。設計との判定はlaneで行うため未判定。',
     /*
       帯は `GET /api/webinars/overview` を読む。通常・0件・取得失敗・
       権限不足を混ぜないので、口を差し替えて1つずつ撮る。
@@ -1206,7 +1206,7 @@ export const SCREENS = [
         一度も当たらず、素の絵が `-empty` という名前で保存されていた。
         一覧が読むのは `/api/webinars`（`zCQXe` と同じ）。
       */
-      apis: ['**/api/webinars*', '**/api/webinars/**'],
+      apis: ['**/api/webinars?*', '**/api/webinars/overview?*'],
       kinds: ['normal', 'empty', 'error', 'forbidden'],
     }, },
   { ...WEBINAR, node: 'lvaY5', name: '10-1-A ウェビナーを作成',
@@ -1215,34 +1215,35 @@ export const SCREENS = [
     verdictHead: '49e1341c', route: '/webinars/new', },
   {
     ...WEBINAR, node: 'PV1Vh', name: '10-1-B 動画・公開設定',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars/edit`。`ZC13r` と同じ——モックに `/api/webinars` の固定データが無く、`webinar.schedule` が無いまま `.length` を読んで落ちる（`edit/page.tsx:950`）。**撮影ハーネス側の不足。**', route: WEBINAR_EDIT, steps: [{ qaOpen: 'PV1Vh' }],
+    verdictNote: '**2026-09-06 #251。** 動画・公開設定を実在する詳細APIへ接続。設計判定は未判定。', route: WEBINAR_EDIT, steps: [{ qaOpen: 'PV1Vh' }],
 
   },
   {
     ...WEBINAR, node: 'd3rFGD', name: '10-1-C CTA・フォーム',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars/edit`。`PV1Vh` と同じ理由。', route: WEBINAR_EDIT, steps: [{ qaOpen: 'd3rFGD' }],
+    verdictNote: '**2026-09-06 #251。** CTA・フォームを実在するCTA APIへ接続。設計判定は未判定。', route: WEBINAR_EDIT, steps: [{ qaOpen: 'd3rFGD' }],
 
   },
   {
     ...WEBINAR, node: 'Ho8z4', name: '10-1-D 通知・リマインド',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars/edit`。`PV1Vh` と同じ理由。台帳Issue #93 が同じ話。', route: WEBINAR_EDIT,
+    verdictNote: '**2026-09-06 #251。** 通知・リマインドを実在する通知APIへ接続。設計判定は未判定。', route: WEBINAR_EDIT,
     steps: [{ qaOpen: 'Ho8z4' }],
 
   },
   {
     ...WEBINAR, node: 'Xjk8q', name: '10-1-E 視聴後アクション',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars/edit`。`PV1Vh` と同じ理由。', route: WEBINAR_EDIT, steps: [{ qaOpen: 'Ho8z4' }],
+    verdictNote: '**2026-09-06 #251。** 視聴完了・CTAクリック・未視聴の共通アクション版を保存するAPIへ接続。設計判定は未判定。', route: WEBINAR_EDIT, steps: [{ click: '視聴後アクション' }],
 
   },
   {
     ...WEBINAR, node: 'GB0NR', name: '10-1-F 公開ページプレビュー',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars/edit`。`PV1Vh` と同じ理由。', route: WEBINAR_EDIT,
+    verdictNote: '**2026-09-06 #251。** 実データから公開URLと表示内容を組み立てる画面へ接続。設計判定は未判定。', route: WEBINAR_EDIT,
     mode: 'viewport', height: 1080,
+    steps: [{ click: '公開プレビュー' }],
 
   },
   {
     ...WEBINAR, node: 'D6yO7e', name: '10-1-G 公開前確認',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars/edit`。`PV1Vh` と同じ理由。台帳Issue #99 が同じ話。',
+    verdictNote: '**2026-09-06 #251。** 公開前検査を実データから表示。設計判定は未判定。',
     route: '/webinars/edit?id=webinar-1', mode: 'page',
     steps: [{ qaOpen: 'D6yO7e' }],
 
@@ -1263,26 +1264,24 @@ export const SCREENS = [
   },
   {
     ...WEBINAR, node: 'Q8sHa', name: '10-1-I 参加者管理',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars/edit`（参加者）。`PV1Vh` と同じ理由。', route: WEBINAR_EDIT, steps: [{ click: '参加者' }],
+    verdictNote: '**2026-09-06 #251。** 参加者集計と監査付きCSVを実在するAPIへ接続。設計判定は未判定。', route: WEBINAR_EDIT, steps: [{ click: '参加者' }], mode: 'viewport', height: 1080,
 
   },
   {
     ...WEBINAR, node: 'yxyzQ', name: '10-1-J 分析',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars/edit`（分析）。`PV1Vh` と同じ理由。', route: WEBINAR_EDIT, steps: [{ click: '分析' }],
+    verdictNote: '**2026-09-06 #251。** 申込・視聴・離脱・CTA・フォーム分析を実在するAPIへ接続。設計判定は未判定。', route: WEBINAR_EDIT, steps: [{ click: '分析' }], mode: 'viewport', height: 1080,
 
   },
   {
-    ...WEBINAR, node: 'LKuAQ', name: '10-1-K 削除確認',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未実装（api）。視聴履歴の物理削除を禁じる要件（V6詳細 §11・§14）と現行 `deleteWebinar` が噛み合わない。横断レビュー §7 の18番で「アーカイブ確認」へ設計変更する話。',
-    gap: 'drop',
-    gapNote: '物理削除はV6要件の除外対象。公開停止・アーカイブへ置き換え、申込・視聴・分析・監査は保持する。現行 `webinarApi.remove` は視聴履歴を物理削除する一方、申込記録を削除対象に含めず孤児化させるため、画面へそのまま接続しない',
-    status: 'unimplemented',
-    why: 'V6詳細要件 §11・§14 は視聴履歴の物理削除を禁止している。現行 `deleteWebinar` は viewer・funnel・コメント等を物理削除し、`webinar_registrations` は残すため、削除確認を足すだけでは履歴消失と孤児データを発生させる。編集画面の「削除」はCTAの札を1枚外すもので、ウェビナー本体ではない（`edit/page.tsx:764`）',
+    ...WEBINAR, node: 'LKuAQ', name: '10-1-K アーカイブ確認',
+    verdictNote: '**2026-09-06 #251。** 物理削除を廃止し、申込・視聴・CTA・分析を保持するアーカイブ確認へ接続。設計画像なしのためテキスト設計で照合し、判定は未判定。',
+    route: '/webinars', mode: 'viewport', height: 1080,
+    steps: [{ click: 'アーカイブ', nth: 0 }],
   },
   {
     ...WEBINAR, node: 'zCQXe', name: '10-1-L 一覧の状態（空・読込・エラー）',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars`。素の1枚が `ZC13r` と同じ理由で落ちる。読込・空・失敗の3状態だけは撮れたが、**素の絵が無いので比べられない。**',
-    states: { apis: ['**/api/webinars*', '**/api/webinars/**'], kinds: ['loading', 'empty', 'error'] },
+    verdictNote: '**2026-09-06 #251。** 一覧の読込・空・失敗を実在するAPI契約と同じ器で撮影。設計判定は未判定。',
+    states: { apis: ['**/api/webinars?*', '**/api/webinars/overview?*'], kinds: ['loading', 'empty', 'error'] },
 
   },
 
