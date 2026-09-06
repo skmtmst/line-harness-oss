@@ -24,3 +24,10 @@ CREATE TABLE IF NOT EXISTS common_action_binding_migration_events (
 CREATE INDEX IF NOT EXISTS idx_common_action_binding_migrations_binding
   ON common_action_binding_migration_events(binding_id, created_at DESC);
 
+CREATE TRIGGER IF NOT EXISTS trg_common_action_binding_migrations_no_update
+BEFORE UPDATE ON common_action_binding_migration_events
+BEGIN SELECT RAISE(ABORT, 'common action binding migration history is immutable'); END;
+
+CREATE TRIGGER IF NOT EXISTS trg_common_action_binding_migrations_no_delete
+BEFORE DELETE ON common_action_binding_migration_events
+BEGIN SELECT RAISE(ABORT, 'common action binding migration history cannot be deleted'); END;

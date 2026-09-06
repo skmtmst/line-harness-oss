@@ -89,6 +89,39 @@ describe('V6共通アクションAPI', () => {
     ).get()).toEqual({ line_account_id: 'account-1', status: 'draft' });
   });
 
+  it('一覧はページ情報を返し、CSVは担当者の個別権限を再確認する', async () => {
+    const adminApp = setupApp(testDb.db, admin);
+    for (const name of ['先に作成', 'あとに作成']) {
+      const response = await adminApp.request('/api/common-actions?account_id=account-1', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, actions: action }),
+      });
+      expect(response.status).toBe(201);
+    }
+    const page = await adminApp.request('/api/common-actions?account_id=account-1&limit=1&offset=1');
+    expect(page.status).toBe(200);
+    await expect(page.json()).resolves.toMatchObject({
+      success: true,
+      data: [{ name: '先に作成', executionCountThisMonth: 0, failureCountThisMonth: 0, lastRunAt: null }],
+      pagination: { total: 2, limit: 1, offset: 1 },
+      freshness: 'available',
+    });
+
+    const staff: AuthenticatedStaff = {
+      ...admin, id: 'staff-1', name: '担当者', role: 'staff', permissionKeys: [],
+    };
+    const denied = await setupApp(testDb.db, staff)
+      .request('/api/common-actions?account_id=account-1&format=csv');
+    expect(denied.status).toBe(403);
+    const csv = await setupApp(testDb.db, {
+      ...staff, permissionKeys: ['automation.run.export'],
+    }).request('/api/common-actions?account_id=account-1&format=csv');
+    expect(csv.status).toBe(200);
+    expect(csv.headers.get('content-type')).toContain('text/csv');
+    expect(await csv.text()).toContain('今月の実行');
+  });
+
   it('タグ付与の連動ドロワーへ13種類のschemaと範囲内選択肢を返す', async () => {
     testDb.raw.prepare(
       `INSERT INTO tags (id, name, line_account_id) VALUES ('tag-1', '会員', 'account-1')`,

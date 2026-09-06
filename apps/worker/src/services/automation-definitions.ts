@@ -98,6 +98,7 @@ export async function listAutomationDefinitions(
             v.condition_config, v.action_config,
             (SELECT COUNT(*) FROM automation_runs r
               WHERE r.automation_id = d.id AND r.is_test = 0
+                AND r.status IN ('success', 'partial', 'failed')
                 AND datetime(r.created_at) >= datetime('now', '-30 days')) AS execution_count_30d,
             (SELECT COUNT(*) FROM automation_runs r
               WHERE r.automation_id = d.id AND r.is_test = 0
@@ -277,4 +278,3 @@ export async function runAutomationTest(
   }
   return { runId: started.runId, versionId: started.automationVersionId, status };
 }
-

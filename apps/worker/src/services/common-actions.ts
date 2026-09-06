@@ -496,6 +496,7 @@ export async function listCommonActions(
                WHERE metric_version.common_action_id = ca.id
                  AND marker.action_type = 'common_action_marker'
                  AND r.is_test = 0
+                 AND r.line_account_id = ca.line_account_id
                  AND strftime('%Y-%m', r.created_at) = strftime('%Y-%m', 'now')) AS execution_count_this_month
             ,(SELECT COUNT(DISTINCT r.id)
                 FROM automation_run_steps marker
@@ -505,7 +506,14 @@ export async function listCommonActions(
                WHERE metric_version.common_action_id = ca.id
                  AND marker.action_type = 'common_action_marker'
                  AND r.is_test = 0
-                 AND r.status IN ('partial', 'failed')
+                 AND r.line_account_id = ca.line_account_id
+                 AND EXISTS (
+                   SELECT 1 FROM automation_run_steps failed_step
+                    WHERE failed_step.automation_run_id = r.id
+                      AND failed_step.status = 'failed'
+                      AND substr(failed_step.step_key, 1, length(marker.step_key) + 1)
+                          = marker.step_key || '/'
+                 )
                  AND strftime('%Y-%m', r.created_at) = strftime('%Y-%m', 'now')) AS failure_count_this_month
             ,(SELECT MAX(r.created_at)
                 FROM automation_run_steps marker
@@ -514,7 +522,8 @@ export async function listCommonActions(
                   ON metric_version.id = marker.common_action_version_id
                WHERE metric_version.common_action_id = ca.id
                  AND marker.action_type = 'common_action_marker'
-                 AND r.is_test = 0) AS last_run_at
+                 AND r.is_test = 0
+                 AND r.line_account_id = ca.line_account_id) AS last_run_at
        FROM common_actions ca
        LEFT JOIN common_action_versions dv ON dv.id = ca.current_draft_version_id
        LEFT JOIN common_action_versions pv ON pv.id = ca.current_published_version_id

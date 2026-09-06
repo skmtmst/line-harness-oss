@@ -209,6 +209,17 @@ describe('V6共通アクション', () => {
       to_action_version_id: draft2.draftVersionId,
       actor_id: 'staff-1',
     });
+    await expect(updateCommonActionBindingVersion(testDb.db, {
+      id: created.id,
+      bindingId: 'binding-1',
+      lineAccountId: 'account-1',
+      versionId: created.draftVersionId,
+      expectedVersionId: created.draftVersionId,
+      actorId: 'staff-2',
+    })).rejects.toMatchObject({ code: 'version_conflict' });
+    expect(testDb.raw.prepare(
+      `SELECT COUNT(*) AS count FROM common_action_binding_migration_events`,
+    ).get()).toEqual({ count: 1 });
   });
 
   it('共通アクション同士の循環を公開できない', async () => {
@@ -281,6 +292,55 @@ describe('V6共通アクション', () => {
     });
     expect(unusedRows.items.map((row) => row.id)).toEqual([unused.id]);
     expect(unusedRows.total).toBe(1);
+  });
+
+  it('一覧の今月集計は実行台帳を読み、1人テストを混ぜない', async () => {
+    const created = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '集計対象', actions: tagAction('tag-1'),
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: created.id, lineAccountId: 'account-1', draftVersionId: created.draftVersionId,
+    });
+    testDb.raw.prepare(
+      `INSERT INTO automation_definitions
+         (id, line_account_id, name, status, current_published_version_id)
+       VALUES ('automation-metrics', 'account-1', '集計ルール', 'active', 'automation-metrics-v1')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO automation_versions
+         (id, automation_id, version_number, status, trigger_type, action_config)
+       VALUES ('automation-metrics-v1', 'automation-metrics', 1, 'published', 'message_received', '[]')`,
+    ).run();
+    for (const [id, status, isTest] of [
+      ['run-success', 'success', 0],
+      ['run-failed', 'failed', 0],
+      ['run-test', 'failed', 1],
+    ] as const) {
+      testDb.raw.prepare(
+        `INSERT INTO automation_runs
+           (id, line_account_id, automation_id, automation_version_id, source_event_id,
+            idempotency_key, status, is_test, created_at)
+         VALUES (?, 'account-1', 'automation-metrics', 'automation-metrics-v1', ?, ?, ?, ?, datetime('now'))`,
+      ).run(id, `event-${id}`, `key-${id}`, status, isTest);
+      testDb.raw.prepare(
+        `INSERT INTO automation_run_steps
+           (id, automation_run_id, step_key, action_type, common_action_version_id,
+            idempotency_key, status)
+         VALUES (?, ?, 'common', 'common_action_marker', ?, ?, 'success')`,
+      ).run(`step-${id}`, id, created.draftVersionId, `step-${id}`);
+      testDb.raw.prepare(
+        `INSERT INTO automation_run_steps
+           (id, automation_run_id, step_key, action_type, idempotency_key, status)
+         VALUES (?, ?, 'common/tag', 'add_tag', ?, ?)`,
+      ).run(`child-${id}`, id, `child-${id}`, status === 'failed' ? 'failed' : 'success');
+    }
+
+    const result = await listCommonActions(testDb.db, { lineAccountId: 'account-1' });
+    expect(result.items[0]).toMatchObject({
+      executionCountThisMonth: 2,
+      failureCountThisMonth: 1,
+    });
+    expect(result.items[0].lastRunAt).not.toBeNull();
   });
 
   it('編集画面の選択肢をLINE公式アカウント内に限定する', async () => {
