@@ -3464,6 +3464,35 @@ const ISSUE_297_REVIEW = {
 }
 
 /**
+ * board #328。PR #1077 の固定データを取り込んだ development を
+ * 3106/8793 で起動し、CSV取込3状態とフォルダ編集を再撮影した結果。
+ * Pencilの設計画像と実装1920pxを同じ比較入力で照合し、1440pxでも
+ * 横はみ出しと欠けがないことを確認した。
+ */
+const ISSUE_328_REVIEW = {
+  sfTEW: {
+    verdict: 'match',
+    note: '一致。CSV名、4件数、状態絞り込み、代表5行、行別の扱いと理由、部分登録の注意、取消・登録を設計順に表示した。件数はAPI応答で変わるため、固定データの500行・作成404・飛ばす73・エラー23で照合した。1440・1920pxとも横はみ出し0、壊れた値0。',
+    source: 'friend-attributes-v6/sfTEW.png + friend-attributes-v6/sfTEW-{1440,1920}.png',
+  },
+  op1rh: {
+    verdict: 'match',
+    note: '一致。完了の緑帯、登録404件、フォルダ別内訳（VIP120・会員200・未分類84）、飛ばした73件、一覧へ戻る操作を設計順に表示した。1440・1920pxとも横はみ出し0、壊れた値0。',
+    source: 'friend-attributes-v6/op1rh.png + friend-attributes-v6/op1rh-{1440,1920}.png',
+  },
+  QzRsJ: {
+    verdict: 'match',
+    note: '一致。部分失敗の黄帯、登録404件・未登録23件、代表5行の異なる理由、失敗行CSV、一覧へ戻る操作を設計順に表示した。フォルダ名は失敗CSVへ残し、画面表は設計どおり行・タグ名・理由の3列に絞った。1440・1920pxとも横はみ出し0、壊れた値0。',
+    source: 'friend-attributes-v6/QzRsJ.png + friend-attributes-v6/QzRsJ-{1440,1920}.png',
+  },
+  byqIW: {
+    verdict: 'match',
+    note: '一致。「お問い合わせフォロー」の名前、保存済みの紫、8色と選択中表示、一覧プレビュー、追加・編集共用の案内、削除・取消・保存を設計と同じ編集窓に配置した。色はAPIの保存値を表示する可変項目。1440・1920pxとも横はみ出し0、壊れた値0。',
+    source: 'friend-attributes-v6/byqIW.png + friend-attributes-v6/byqIW-{1440,1920}.png',
+  },
+}
+
+/**
  * board #266。2026-09-06 に latest development（14b61d52）を取り込んだ
  * UI HEAD ff1fbfc37 / capture HEAD c03ebf864 を 3102/8789 で起動し、
  * 機能5の14 Node・全状態を設計1920pxと実装1440/1920pxで比較した結果。
@@ -3784,6 +3813,13 @@ for (const screen of SCREENS) {
     screen.verdictNote = `**2026-09-07 Issue #297で修正・再判定。** ${issue297Review.note}`
     screen.verdictSource = issue297Review.source
       ?? `${screen.dir}/${screen.node}.txt + ${screen.dir}/${screen.node}-{1440,1920}.png`
+    delete screen.verdictHead
+  }
+  const issue328Review = ISSUE_328_REVIEW[screen.node]
+  if (screen.feature === 4 && issue328Review) {
+    screen.verdict = issue328Review.verdict
+    screen.verdictNote = `**2026-09-07 Issue #328で修正・再判定。** ${issue328Review.note}`
+    screen.verdictSource = issue328Review.source
     delete screen.verdictHead
   }
   const issue266Review = ISSUE_266_REVIEW[screen.node]

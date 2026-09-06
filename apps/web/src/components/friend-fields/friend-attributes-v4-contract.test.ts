@@ -252,6 +252,11 @@ describe('友だち属性 V4 contract', () => {
     }
     expect(dialog).toContain('入らなかった')
     expect(dialog).toContain('failedTagRowsCsv(result.rows)')
+    for (const label of ['新しく作る', '飛ばす', 'エラー', 'やめる', '一覧へ戻る']) {
+      expect(dialog).toContain(label)
+    }
+    expect(dialog).toContain(".slice(0, 5)")
+    expect(dialog).not.toContain('<Th>フォルダ</Th><Th>入らなかった理由</Th>')
   })
 
   it('使用中のタグを、画面が削除させない', () => {
