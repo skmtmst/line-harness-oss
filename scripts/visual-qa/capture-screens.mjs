@@ -263,11 +263,26 @@ async function runSteps(page, steps = [], node = '') {
  * 上の帯だけ前の数が残ると「読めなかったのに件数は出ている」という
  * 起きない絵になる。`states.apis` に帯の口も並べるのは台帳側の仕事。
  */
-async function applyState(page, screen, kind) {
-  const patterns = screen.states?.apis ?? []
-  if (patterns.length === 0) {
-    throw new Error(`${screen.node}: states.kinds があるのに states.apis が空です`)
+export function shouldApplyStateToMethod(state, method) {
+  return !state.postOnly || method === 'POST'
+}
+
+export function failureResponseForState(state) {
+  if (state.kind === 'error') {
+    return { status: 500, error: state.postOnly ? 'column_create_failed' : '読み込めませんでした' }
   }
+  if (state.kind === 'forbidden') return { status: 403, error: '権限がありません' }
+  if (state.kind === 'invalid') return { status: 400, error: 'article_url_invalid' }
+  if (state.kind === 'conflict') return { status: 409, error: 'column_already_exists' }
+  return null
+}
+
+async function applyState(page, node, state) {
+  const patterns = state?.apis ?? []
+  if (patterns.length === 0) {
+    throw new Error(`${node}: state があるのに apis が空です`)
+  }
+  const kind = state.kind
   /*
     **当たったかを数える。**
     当てはめが実際の口とずれていると、差し替えが一度も起きず、
@@ -278,6 +293,15 @@ async function applyState(page, screen, kind) {
   const hits = { count: 0 }
   for (const pattern of patterns) {
     await page.route(pattern, async (route) => {
+      /*
+        変種の失敗応答は、保存を押したPOSTだけに当てる。
+        GETまで400/409へ替えると、入力画面を描く前に一覧取得が失敗し、
+        本来見たい保存エラーへ到達できない。
+      */
+      if (!shouldApplyStateToMethod(state, route.request().method())) {
+        await route.fallback()
+        return
+      }
       hits.count += 1
       if (kind === 'loading') {
         /*
@@ -292,12 +316,9 @@ async function applyState(page, screen, kind) {
         await new Promise(() => {})
         return
       }
-      if (kind === 'error') {
-        await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ success: false, error: '読み込めませんでした' }) })
-        return
-      }
-      if (kind === 'forbidden') {
-        await route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ success: false, error: '権限がありません' }) })
+      const failure = failureResponseForState(state)
+      if (failure) {
+        await route.fulfill({ status: failure.status, contentType: 'application/json', body: JSON.stringify({ success: false, error: failure.error }) })
         return
       }
       // empty。**器の形を保つ。** 形が違うと画面が落ち、空ではなく壊れた絵になる。
@@ -380,6 +401,36 @@ async function requireFreshMock() {
   }
 }
 
+/**
+ * 1画面から、実際に撮る通常・状態・変種を作る。
+ * 変種は画面ごとのroute/stateを上書きでき、状態差し替えは保存POSTだけに当てる。
+ */
+export function shotSpecsFor(screen) {
+  const shots = [{ label: '', steps: screen.steps, route: screen.route, state: null }]
+  for (const kind of screen.states?.kinds ?? []) {
+    shots.push({
+      label: `-${kind}`,
+      steps: screen.steps,
+      route: screen.route,
+      state: kind === 'normal' ? null : { apis: screen.states.apis, kind, postOnly: false },
+    })
+  }
+  for (const variant of screen.variants ?? []) {
+    const suffix = variant.suffix.startsWith('-') ? variant.suffix : `-${variant.suffix}`
+    const own = variant.steps ?? []
+    const base = screen.steps ?? []
+    const includesBase = base.length > 0
+      && JSON.stringify(own.slice(0, base.length)) === JSON.stringify(base)
+    shots.push({
+      label: suffix,
+      steps: variant.standalone || includesBase ? own : [...base, ...own],
+      route: variant.route ?? screen.route,
+      state: variant.state ? { ...variant.state, postOnly: true } : null,
+    })
+  }
+  return shots
+}
+
 async function captureImpl(feature) {
   const onlyNode = value('node')
   const list = screensOf(feature).filter((screen) => !onlyNode || screen.node === onlyNode)
@@ -424,53 +475,20 @@ async function captureImpl(feature) {
 
       ここで撮るぶんを組み立てる。名札が空なら素の1枚。
     */
-    const shots = [{ label: '', steps: s.steps, kind: null }]
-    for (const kind of s.states?.kinds ?? []) {
-      /*
-        **`normal` も別名で出す。**
-        素の1枚と同じ絵なので飛ばしていたが、`ledger.mjs:83` は
-        `states.kinds` を持つ画面について `<node>-<kind>` だけを数え、
-        素の `<node>` は見ない。飛ばすと `KNG00-normal-1920.png` のような
-        **名指しされている絵が永久に作られない**。
-        差し替えをしない `normal` は、素と同じ撮り方でよい。
-      */
-      shots.push({ label: `-${kind}`, steps: s.steps, kind: kind === 'normal' ? null : kind })
-    }
-    for (const variant of s.variants ?? []) {
-      const suffix = variant.suffix.startsWith('-') ? variant.suffix : `-${variant.suffix}`
-      /*
-        **素の手順を、二重に走らせない。**
-        台帳の変種は2通りの書き方が混ざっている。
-          26件 … 素のあとに続ける手順だけを書く
-           7件 … 素の手順を丸ごと含めて、頭から書く
-        いつも足していたので、後者で同じ操作を2回することになり、
-        `sqFXf-save` が「詳細条件…（見つかった数 1）」で押せずに止まっていた
-        （1回目で選んだあと、開いた面には同じラジオが無い）。
-        頭が一致していれば、変種の手順をそのまま使う。
-      */
-      const own = variant.steps ?? []
-      const base = s.steps ?? []
-      const includesBase = base.length > 0
-        && JSON.stringify(own.slice(0, base.length)) === JSON.stringify(base)
-      shots.push({
-        label: suffix,
-        steps: variant.standalone || includesBase ? own : [...base, ...own],
-        kind: null,
-      })
-    }
+    const shots = shotSpecsFor(s)
 
     for (const shotSpec of shots) {
     for (const width of WIDTHS) {
       const page = await newPage(browser, width, s.mode === 'viewport' ? s.height : 1080, s.clock)
       try {
-        const stateHits = shotSpec.kind ? await applyState(page, s, shotSpec.kind) : null
+        const stateHits = shotSpec.state ? await applyState(page, s.node, shotSpec.state) : null
         /*
           **読み込み中を撮るときは `networkidle` を待たない。**
           待つ口をわざと止めているので、いつまでも静かにならない。
           `domcontentloaded` まで待って、少し置いてから撮る。
         */
-        await page.goto(`${BASE}${s.route}`, {
-          waitUntil: shotSpec.kind === 'loading' ? 'domcontentloaded' : 'networkidle',
+        await page.goto(`${BASE}${shotSpec.route}`, {
+          waitUntil: shotSpec.state?.kind === 'loading' ? 'domcontentloaded' : 'networkidle',
           timeout: 120_000,
         })
         await page.waitForTimeout(1200)
@@ -478,7 +496,7 @@ async function captureImpl(feature) {
         // 行き先を必ず見る。**クエリまで見る**（タブは `?tab=` でしか区別できない）。
         const url = new URL(page.url())
         const landed = url.pathname + url.search
-        if (landed !== s.route) throw new Error(`${s.route} から ${landed} へ飛ばされた`)
+        if (landed !== shotSpec.route) throw new Error(`${shotSpec.route} から ${landed} へ飛ばされた`)
         const body = await page.locator('body').innerText()
         if (body.includes('LINEでログイン')) throw new Error('ログイン画面になっている')
         /*
@@ -492,7 +510,7 @@ async function captureImpl(feature) {
           `error` や `forbidden` を撮るときは「読み込めませんでした」が
           出ているのが正解。ここで止めると、いちばん撮りたい絵が撮れない。
         */
-        if (!shotSpec.kind) {
+        if (!shotSpec.state || shotSpec.state.postOnly) {
           for (const bad of FAILURE_TEXTS) {
             if (body.includes(bad)) throw new Error(`「${bad}」で止まっている`)
           }
@@ -511,11 +529,11 @@ async function captureImpl(feature) {
         */
         const afterUrl = new URL(page.url())
         const afterLanded = afterUrl.pathname + afterUrl.search
-        if (afterLanded !== s.route) {
-          throw new Error(`操作のあと ${s.route} から ${afterLanded} へ飛んだ`)
+        if (afterLanded !== shotSpec.route) {
+          throw new Error(`操作のあと ${shotSpec.route} から ${afterLanded} へ飛んだ`)
         }
         const afterBody = await page.locator('body').innerText()
-        if (!shotSpec.kind) {
+        if (!shotSpec.state || shotSpec.state.postOnly) {
           for (const bad of FAILURE_TEXTS) {
             if (afterBody.includes(bad)) throw new Error(`操作のあと「${bad}」で止まっている`)
           }
@@ -523,8 +541,8 @@ async function captureImpl(feature) {
 
         if (stateHits && stateHits.count === 0) {
           throw new Error(
-            `${s.node}: states.apis ${JSON.stringify(s.states.apis)} が一度も当たりませんでした。`
-            + '当てはめがずれていると、素の絵が「-' + shotSpec.kind + '」という名前で保存されます。',
+            `${s.node}: state.apis ${JSON.stringify(shotSpec.state.apis)} が一度も当たりませんでした。`
+            + '当てはめがずれていると、素の絵が「-' + shotSpec.state.kind + '」という名前で保存されます。',
           )
         }
 
@@ -581,7 +599,7 @@ async function captureImpl(feature) {
           const trimmed = [...shown.split('\n'), ...placeholders]
             .map((line) => line.replace(/\s+$/, ''))
             .join('\n')
-          writeFileSync(join(out, `${s.node}${shotSpec.label}.txt`), `# ${s.name}${shotSpec.label}\n# ${s.route}\n\n${trimmed}\n`)
+          writeFileSync(join(out, `${s.node}${shotSpec.label}.txt`), `# ${s.name}${shotSpec.label}\n# ${shotSpec.route}\n\n${trimmed}\n`)
         }
         console.log(`${s.node}${shotSpec.label}\t${width}px\t撮影OK\tはみ出し=${overflow}`)
         if (overflow >= 2) console.log(`  ⚠ ${s.node}${shotSpec.label} ${width}px に横スクロールが出ている`)
@@ -647,14 +665,17 @@ async function captureDesign(feature, from) {
   console.log(`設計 ${shot}枚`)
 }
 
-if (flag('check')) {
-  check()
-} else if (flag('design')) {
-  await captureDesign(value('feature'), value('from'))
-} else if (flag('impl')) {
-  await requireFreshMock()
-  await captureImpl(value('feature'))
-} else {
-  console.error('--check / --design / --impl のどれかを渡してください')
-  process.exit(1)
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href
+if (isMain) {
+  if (flag('check')) {
+    check()
+  } else if (flag('design')) {
+    await captureDesign(value('feature'), value('from'))
+  } else if (flag('impl')) {
+    await requireFreshMock()
+    await captureImpl(value('feature'))
+  } else {
+    console.error('--check / --design / --impl のどれかを渡してください')
+    process.exit(1)
+  }
 }
