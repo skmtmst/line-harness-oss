@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import type { ChatStatus } from './inbox-dropdown'
+import { Filter, X } from 'lucide-react'
 
 /**
  * 受信箱の絞り込みパネル（設計 Pencil `bXyEA` 受信箱 絞り込みパネル）。
@@ -73,7 +74,7 @@ export default function InboxFilterPanel({
   const set = (patch: Partial<InboxFilterValue>) => onChange({ ...value, ...patch })
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end" role="presentation" onMouseDown={(event) => {
+    <div className="fixed inset-0 z-40" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose()
     }}>
       <div className="bg-ink/20 absolute inset-0" aria-hidden="true" />
@@ -82,23 +83,17 @@ export default function InboxFilterPanel({
         role="dialog"
         aria-modal="true"
         aria-label="絞り込み"
-        className="bg-canvas relative flex h-full w-[420px] max-w-full flex-col shadow-2xl"
+        className="bg-canvas rounded-panel fixed top-[238px] right-[120px] flex max-h-[640px] w-[420px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden shadow-2xl"
       >
-        <header className="border-hairline flex h-16 shrink-0 items-center gap-2 border-b px-5">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
-            strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-ink">
-            <path d="M3 6h18M7 12h10M11 18h2" />
-          </svg>
+        <header className="border-hairline flex h-14 shrink-0 items-center gap-2 border-b px-5">
+          <Filter aria-hidden="true" size={18} className="text-ink" />
           <h2 className="text-ink text-base font-bold">絞り込み</h2>
-          <button type="button" onClick={onClose} aria-label="絞り込みを閉じる" className="text-ink-faint ml-auto">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
-              strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
+          <button type="button" onClick={onClose} aria-label="絞り込みを閉じる" className="text-ink-faint hover:bg-canvas-sunken ml-auto rounded-control p-1">
+            <X aria-hidden="true" size={18} />
           </button>
         </header>
 
-        <div className="flex-1 space-y-5 overflow-y-auto p-5">
+        <div className="flex-1 space-y-4 overflow-y-auto p-5">
           <div>
             <span className={labelClass}>対応状況</span>
             <select
@@ -147,7 +142,7 @@ export default function InboxFilterPanel({
             <select aria-label="期限で絞り込む" className={fieldClass} disabled defaultValue="all">
               <option value="all">すべて</option>
             </select>
-            <p className="text-ink-faint mt-1 text-[11px]">まだ絞り込めません</p>
+            <p className="text-ink-faint mt-1 text-[11px]">期限はまだ記録していないため、絞り込めません</p>
           </div>
 
           <div>
@@ -160,7 +155,7 @@ export default function InboxFilterPanel({
                 </label>
               ))}
             </div>
-            <p className="text-ink-faint mt-1 text-[11px]">まだ絞り込めません</p>
+            <p className="text-ink-faint mt-1 text-[11px]">種別で絞る読み口がまだ無いため、選んでも一覧は変わりません</p>
           </div>
 
           <label className="border-hairline flex h-10 items-center justify-between border-t pt-3 text-sm">

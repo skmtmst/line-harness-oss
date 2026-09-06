@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { api, type MileageHistoryItem, type MileageSummary } from '@/lib/api'
 import Button from '@/components/shared/button'
+import { GripVertical, X } from 'lucide-react'
 
 interface FriendDetail {
   id: string
@@ -53,6 +55,23 @@ const DETAIL_SECTIONS = [
 ] as const
 type DetailSectionKey = (typeof DETAIL_SECTIONS)[number]['key']
 
+/** `Xi4x9` に描かれた、運用者が選ぶ7つの表示単位。 */
+const DETAIL_SETTING_GROUPS: Array<{
+  key: string
+  label: string
+  sections: DetailSectionKey[]
+}> = [
+  { key: 'basic', label: '基本情報', sections: ['profile', 'names'] },
+  { key: 'tags', label: 'タグ', sections: ['tags'] },
+  { key: 'assignment', label: '対応状況・担当者', sections: ['support'] },
+  { key: 'next', label: '次の対応', sections: ['starred'] },
+  { key: 'booking', label: '予約・EC', sections: ['richMenu'] },
+  { key: 'mileage', label: 'マイル', sections: ['mileage'] },
+  { key: 'memo', label: '内部メモ', sections: ['metadata', 'forms'] },
+]
+
+const DEFAULT_SECTION_ORDER = DETAIL_SETTING_GROUPS.flatMap((group) => group.sections)
+
 function formatDate(iso: string | null): string {
   if (!iso) return '-'
   const d = new Date(iso)
@@ -83,7 +102,8 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false)
-  const [sectionOrder, setSectionOrder] = useState<DetailSectionKey[]>(DETAIL_SECTIONS.map((item) => item.key))
+  const [draggedGroupKey, setDraggedGroupKey] = useState<string | null>(null)
+  const [sectionOrder, setSectionOrder] = useState<DetailSectionKey[]>(DEFAULT_SECTION_ORDER)
   const [hiddenSections, setHiddenSections] = useState<DetailSectionKey[]>([])
   const [prefsLoaded, setPrefsLoaded] = useState(false)
   type MileageState =
@@ -122,16 +142,44 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
   const sectionStyle = (key: DetailSectionKey) => ({ order: sectionOrder.indexOf(key) })
   const sectionVisibility = (key: DetailSectionKey) => hiddenSections.includes(key) ? 'hidden' : ''
 
-  const moveSection = (key: DetailSectionKey, delta: -1 | 1) => {
+  const moveGroup = (groupKey: string, delta: -1 | 1) => {
     setSectionOrder((current) => {
-      const index = current.indexOf(key)
+      const groups = [...DETAIL_SETTING_GROUPS].sort((a, b) => {
+        const aIndex = Math.min(...a.sections.map((key) => current.indexOf(key)).filter((index) => index >= 0))
+        const bIndex = Math.min(...b.sections.map((key) => current.indexOf(key)).filter((index) => index >= 0))
+        return aIndex - bIndex
+      })
+      const index = groups.findIndex((group) => group.key === groupKey)
       const nextIndex = index + delta
-      if (index < 0 || nextIndex < 0 || nextIndex >= current.length) return current
-      const next = [...current]
-      ;[next[index], next[nextIndex]] = [next[nextIndex], next[index]]
-      return next
+      if (index < 0 || nextIndex < 0 || nextIndex >= groups.length) return current
+      ;[groups[index], groups[nextIndex]] = [groups[nextIndex], groups[index]]
+      return groups.flatMap((group) => group.sections)
     })
   }
+
+  const moveGroupBefore = (sourceKey: string, targetKey: string) => {
+    if (sourceKey === targetKey) return
+    setSectionOrder((current) => {
+      const groups = [...DETAIL_SETTING_GROUPS].sort((a, b) => {
+        const aIndex = Math.min(...a.sections.map((key) => current.indexOf(key)).filter((index) => index >= 0))
+        const bIndex = Math.min(...b.sections.map((key) => current.indexOf(key)).filter((index) => index >= 0))
+        return aIndex - bIndex
+      })
+      const sourceIndex = groups.findIndex((group) => group.key === sourceKey)
+      if (sourceIndex < 0) return current
+      const [source] = groups.splice(sourceIndex, 1)
+      const targetIndex = groups.findIndex((group) => group.key === targetKey)
+      if (targetIndex < 0) return current
+      groups.splice(targetIndex, 0, source)
+      return groups.flatMap((group) => group.sections)
+    })
+  }
+
+  const orderedSettingGroups = [...DETAIL_SETTING_GROUPS].sort((a, b) => {
+    const aIndex = Math.min(...a.sections.map((key) => sectionOrder.indexOf(key)).filter((index) => index >= 0))
+    const bIndex = Math.min(...b.sections.map((key) => sectionOrder.indexOf(key)).filter((index) => index >= 0))
+    return aIndex - bIndex
+  })
 
   useEffect(() => {
     if (!friendId) {
@@ -224,20 +272,15 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
             表示項目
           </button>
         </div>
-        {showSettings && (
-          /*
-            設計 `Xi4x9`「右パネルの表示項目」。**掴んで動かす形は入れていない。**
-            掴む操作はキーボードだけでは使えないので、代わりに「上へ／下へ」を
-            置いた。出し入れの中身は設計と同じ。
-          */
+        {showSettings && typeof document !== 'undefined' ? createPortal(
           <div
             data-inbox-v6="detail-sections-panel"
-            className="bg-canvas border-hairline rounded-panel shadow-float absolute top-[calc(100%+6px)] right-2 z-30 w-[320px] border p-3"
+            className="bg-canvas border-hairline rounded-panel shadow-float fixed top-[430px] right-14 z-[90] w-[360px] border p-4"
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-ink text-xs font-bold">右パネルの表示項目</p>
-                <p className="text-ink-faint text-micro mt-0.5">スイッチで表示切替・上へ／下へで順番変更</p>
+                <p className="text-ink-faint text-micro mt-0.5">ドラッグで順番変更・スイッチで表示切替</p>
               </div>
               <button
                 type="button"
@@ -245,36 +288,44 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                 aria-label="表示項目を閉じる"
                 className="text-ink-faint hover:bg-canvas-sunken rounded-control -mt-1 -mr-1 flex h-7 w-7 shrink-0 items-center justify-center"
               >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                <X aria-hidden="true" size={16} />
               </button>
             </div>
             <div className="mt-3 space-y-1.5">
-              {sectionOrder.map((key, index) => {
-                const label = DETAIL_SECTIONS.find((item) => item.key === key)?.label ?? key
-                const visible = !hiddenSections.includes(key)
+              {orderedSettingGroups.map((group, index) => {
+                const visible = group.sections.every((key) => !hiddenSections.includes(key))
                 return (
-                  <div key={key} className="border-hairline rounded-control flex items-center gap-2 border px-2 py-1.5">
-                    <span className="flex shrink-0 flex-col">
+                  <div
+                    key={group.key}
+                    draggable
+                    onDragStart={(event) => {
+                      setDraggedGroupKey(group.key)
+                      event.dataTransfer.effectAllowed = 'move'
+                    }}
+                    onDragEnd={() => setDraggedGroupKey(null)}
+                    onDragOver={(event) => {
+                      event.preventDefault()
+                      event.dataTransfer.dropEffect = 'move'
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault()
+                      if (draggedGroupKey) moveGroupBefore(draggedGroupKey, group.key)
+                      setDraggedGroupKey(null)
+                    }}
+                    className="border-hairline rounded-control flex items-center gap-2 border px-2 py-1.5"
+                  >
+                    <span className="flex shrink-0 items-center">
                       <button
                         type="button"
                         disabled={index === 0}
-                        onClick={() => moveSection(key, -1)}
-                        aria-label={`${label}を上へ`}
-                        className="text-ink-faint hover:text-ink text-nano leading-3 disabled:opacity-30"
+                        onClick={() => moveGroup(group.key, -1)}
+                        aria-label={`${group.label}を上へ`}
+                        className="text-ink-faint hover:text-ink rounded-mini disabled:opacity-30"
                       >
-                        ▲
-                      </button>
-                      <button
-                        type="button"
-                        disabled={index === sectionOrder.length - 1}
-                        onClick={() => moveSection(key, 1)}
-                        aria-label={`${label}を下へ`}
-                        className="text-ink-faint hover:text-ink text-nano leading-3 disabled:opacity-30"
-                      >
-                        ▼
+                        <GripVertical aria-hidden="true" size={15} />
                       </button>
                     </span>
-                    <span className="text-ink min-w-0 flex-1 truncate text-xs">{label}</span>
+                    <span className="text-ink min-w-0 flex-1 truncate text-xs">{group.label}</span>
                     {/*
                       素の `<input type="checkbox">` を土台にする。見た目だけの
                       `<button>` にすると、読み上げで「入／切」が伝わらない。
@@ -284,9 +335,11 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                         type="checkbox"
                         role="switch"
                         checked={visible}
-                        aria-label={`${label}を表示`}
+                        aria-label={`${group.label}を表示`}
                         onChange={() => setHiddenSections((current) => (
-                          visible ? [...current, key] : current.filter((item) => item !== key)
+                          visible
+                            ? [...new Set([...current, ...group.sections])]
+                            : current.filter((item) => !group.sections.includes(item))
                         ))}
                         className="peer sr-only"
                       />
@@ -309,7 +362,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
               {/* 設計 `Xi4x9` の2つは h36。共通ボタンと同値なので部品を使う。 */}
               <Button
                 onClick={() => {
-                  setSectionOrder(DETAIL_SECTIONS.map((item) => item.key))
+                  setSectionOrder(DEFAULT_SECTION_ORDER)
                   setHiddenSections([])
                 }}
               >
@@ -320,7 +373,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
               </Button>
             </div>
           </div>
-        )}
+        , document.body) : null}
       </div>
 
       <div className="flex-1 overflow-y-auto">

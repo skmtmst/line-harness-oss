@@ -1393,10 +1393,10 @@ const INBOX_VIEW_CONDITIONS = {
 const LEGACY_VIEW_CONDITIONS = { all: [], any: [] }
 
 export const INBOX_SAVED_VIEWS = [
-  ['未対応・期限超過', true, { statuses: ['unread'], sort: 'waiting_desc' }],
-  ['河野担当の未対応', true, { statuses: ['unread'], assignees: ['operator-kenta'] }],
-  ['LINEからの新着', false, null],
-].map(([name, isShared, patch], index) => ({
+  ['未対応・期限超過', true, { statuses: ['unread'], sort: 'waiting_desc' }, 1],
+  ['Kenta 担当の未対応', true, { statuses: ['unread'], assignees: ['operator-kenta'] }, 3],
+  ['LINEからの新着', false, null, 5],
+].map(([name, isShared, patch, matchCount], index) => ({
   id: `inbox-view-${index}`,
   name: String(name),
   scope: 'chats',
@@ -1404,6 +1404,7 @@ export const INBOX_SAVED_VIEWS = [
   createdBy: 'Kenta',
   lineAccountId: 'visual-qa-account',
   isShared: Boolean(isShared),
+  matchCount: Number(matchCount),
   displayOrder: index,
   createdAt: '2026-08-17T03:00:00.000Z',
 }))

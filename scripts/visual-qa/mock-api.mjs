@@ -376,7 +376,7 @@ const SUPPORT_EMAIL_ITEMS = [
     assignedStaffId: null,
     assignedStaffName: null,
     lastIncomingAt: '2026-08-16T01:30:00.000Z',
-    isUnread: true,
+    isUnread: false,
   },
 ]
 
@@ -904,6 +904,15 @@ const SHAPES = {
  * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
  */
 function visualQaWriteBody(method, pathname) {
+  if (method === 'POST' && pathname === '/api/inbox/saved-views') {
+    return {
+      id: 'inbox-view-preview',
+      name: '未割り当て・期限超過',
+      createdBy: 'Kenta',
+      isShared: false,
+      matchCount: 1,
+    }
+  }
   if (method === 'POST' && pathname === '/api/analytics/cross/query') {
     return { id: 'visual-cross-result-1', state: 'pending' }
   }
