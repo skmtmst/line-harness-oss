@@ -28,6 +28,7 @@ export * from './templates';
 export * from './chats';
 export * from './inbox-reads';
 export * from './notifications';
+export * from './line-notifications';
 export * from './stripe';
 export * from './health';
 export * from './automations';
