@@ -676,7 +676,7 @@ export const SCREENS = [
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-06 Issue #219 / PR #979で再判定。** 送る範囲を正本の3択へ直し、6列表・フォルダ・検索/絞り込みの構造と文言は一致。1440/1920pxで横はみ出し0。撮影用モックの `/api/broadcasts/stats` が詳細ID扱いになり404のため、KPI実値だけ比較できず構造一致・データ未接続。',
     verdictSource: 'broadcasts-v6/q76C35.txt + broadcasts-v6/q76C35-{1440,1920}.png',
-    verdictHead: '9761ea9d7b', route: '/broadcasts',
+    verdictHead: '3c6e4ec948', route: '/broadcasts',
     // ---- 2026-09-02 `df3f4e3b` で撮り直した（#674 マージ後）。**絵を見て確かめた範囲だけ書く。** ----
     // 解決：**列が設計どおりの6列になった**（タイトル・内容／状態／配信条件／配信日時／配信・開封・クリック／操作）。
     //       上の P2「実装は8列」は解消。状態が独立した桁になり、削除が「操作」に入って、1列ずれも消えている。
@@ -694,7 +694,7 @@ export const SCREENS = [
     verdict: 'needs_fix',
     verdictNote: '**2026-09-06 Issue #219 / PR #979で再判定。** STEP 1だけを表示し、右のLINE案内3文と次段への操作を正本どおり追加。1440/1920pxで横はみ出し0。社内メモ・配信方法3択・最近の配信は保存契約が無く、まだ表示できないため要修正。',
     verdictSource: 'broadcasts-v6/zZ9fA.txt + broadcasts-v6/zZ9fA-{1440,1920}.png',
-    verdictHead: '9761ea9d7b', route: NEW_BC,
+    verdictHead: '3c6e4ec948', route: NEW_BC,
 
   },
   {
@@ -702,7 +702,7 @@ export const SCREENS = [
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-06 Issue #219 / PR #979で再判定。** `?step=audience` に対象条件だけを出し、右の設定内容・除外確認を正本配置へ変更。1440/1920pxで横はみ出し0。代表的な友だち3行と除外理由別人数を返す口が無いため、構造一致・データ未接続。',
     verdictSource: 'broadcasts-v6/cPk8A.txt + broadcasts-v6/cPk8A-{1440,1920}.png',
-    verdictHead: '9761ea9d7b', route: `${NEW_BC}?step=audience`,
+    verdictHead: '3c6e4ec948', route: `${NEW_BC}?step=audience`,
     /*
       **「詳細条件で絞り込んで配信する」を選ばないと保存の口が開かない。**
       条件がひとつも無いうちは「この条件を保存」が押せない（押せない理由も
@@ -716,7 +716,7 @@ export const SCREENS = [
     verdict: 'needs_fix',
     verdictNote: '**2026-09-06 Issue #219 / PR #979で再判定。** `?step=message` に編集面とLINEプレビューだけを表示し、1440/1920pxで横はみ出し0。ボタン最大4件・URL/PDF別の扱い・配信後アクションを保存する契約が無く、正本の編集面をまだ作れないため要修正。',
     verdictSource: 'broadcasts-v6/XQfMD.txt + broadcasts-v6/XQfMD-{1440,1920}.png',
-    verdictHead: '9761ea9d7b', route: `${NEW_BC}?step=message&templateId=template-11`,
+    verdictHead: '3c6e4ec948', route: `${NEW_BC}?step=message&templateId=template-11`,
 
   },
   {
@@ -729,7 +729,7 @@ export const SCREENS = [
     verdict: 'needs_fix',
     verdictNote: '**2026-09-06 Issue #219 / PR #979で再判定。** LINEプレビューと但し書きを追加し、実テンプレート一覧を1440/1920pxで撮影（横はみ出し0）。正本は選択内容・確認項目を持つ重なり窓だが、実装は編集面内の一覧のままで構造が違うため要修正。',
     verdictSource: 'broadcasts-v6/p97Tf.txt + broadcasts-v6/p97Tf-{1440,1920}.png',
-    verdictHead: '9761ea9d7b', route: `${NEW_BC}?step=message`,
+    verdictHead: '3c6e4ec948', route: `${NEW_BC}?step=message`,
     mode: 'page', steps: [{ click: 'テンプレートから選ぶ' }],
 
   },
@@ -738,7 +738,7 @@ export const SCREENS = [
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-06 Issue #219 / PR #979で再判定。** `?step=schedule` に日時・分散・集計上限・LINEプレビューを分離表示し、1440/1920pxで横はみ出し0。月間使用数、送信枠、同時刻の他配信を返す口が無く実値を置けないため、構造一致・データ未接続。',
     verdictSource: 'broadcasts-v6/Bw0zt.txt + broadcasts-v6/Bw0zt-{1440,1920}.png',
-    verdictHead: '9761ea9d7b', route: `${NEW_BC}?step=schedule`,
+    verdictHead: '3c6e4ec948', route: `${NEW_BC}?step=schedule`,
     mode: 'viewport', height: 1136, steps: [{ click: '日時を指定して予約' }],
 
   },
@@ -753,7 +753,7 @@ export const SCREENS = [
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-06 Issue #219 / PR #979で再判定。** 送信前に担当者一覧を読み合わせる確認窓、説明、LINEプレビューを実装。1440/1920pxで横はみ出し0。撮影用モックが送信先を配列で返さず登録0件扱いのため、担当者行だけ比較できず構造一致・データ未接続。',
     verdictSource: 'broadcasts-v6/h0kahp.txt + broadcasts-v6/h0kahp-{1440,1920}.png',
-    verdictHead: '9761ea9d7b', route: `${NEW_BC}?step=message&templateId=template-11`,
+    verdictHead: '3c6e4ec948', route: `${NEW_BC}?step=message&templateId=template-11`,
     mode: 'viewport', height: 1080,
     /*
       **本文の入れ物には名札が無い。** `textarea` は `placeholder` だけなので
@@ -772,7 +772,7 @@ export const SCREENS = [
     verdict: 'needs_fix',
     verdictNote: '**2026-09-06 Issue #219 / PR #979で再判定。** `?step=confirm` と「LINEプレビュー確認済み」を追加し、チェック後を1440/1920pxで撮影（横はみ出し0）。正本の対象・日時・送信枠の4行要約に対し、未入力の直リンクではURL確認など別の行が残るため要修正。',
     verdictSource: 'broadcasts-v6/vW4Es.txt + broadcasts-v6/vW4Es-{1440,1920}.png',
-    verdictHead: '9761ea9d7b', route: `${NEW_BC}?step=confirm&templateId=template-11`,
+    verdictHead: '3c6e4ec948', route: `${NEW_BC}?step=confirm&templateId=template-11`,
     /*
       **確かめました（2026-08-28）。実装は在ります。**
       置き文のままだったのは、こちらの口が `POST /api/broadcasts/preflight` を
@@ -798,7 +798,7 @@ export const SCREENS = [
     verdict: 'needs_fix',
     verdictNote: '**2026-09-06 Issue #219 / PR #979で再判定。** 日時・テンプレートを入れたSTEP 5から、対象/除外/日時/内容/集計/未確認とLINEプレビューを持つ最終確認窓を1440/1920pxで撮影（横はみ出し0）。正本の設定要約が画面本体、実装は確認窓に集約されており構造差が残るため要修正。',
     verdictSource: 'broadcasts-v6/FpgxH.txt + broadcasts-v6/FpgxH-{1440,1920}.png',
-    verdictHead: '9761ea9d7b',
+    verdictHead: '3c6e4ec948',
     route: `${NEW_BC}?step=confirm&templateId=template-11&scheduledDate=2026-08-27&scheduledTime=10%3A00`, mode: 'viewport', height: 1080,
     steps: [
       { wait: 1800 },
@@ -828,7 +828,7 @@ export const SCREENS = [
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-06 Issue #219 / PR #979で再判定。** 壊れ値を解消し、CSV、配信設定、LINEプレビューの但し書きを追加。1440/1920pxで横はみ出し0。リンク別クリック・開封の内訳を返す口が無く、説明文と `—` で代替しているため構造一致・データ未接続。',
     verdictSource: 'broadcasts-v6/u6gHt.txt + broadcasts-v6/u6gHt-{1440,1920}.png',
-    verdictHead: '9761ea9d7b', route: '/broadcasts/detail?id=broadcast-2',
+    verdictHead: '3c6e4ec948', route: '/broadcasts/detail?id=broadcast-2',
 
   },
   {
@@ -836,7 +836,7 @@ export const SCREENS = [
     verdict: 'match',
     verdictNote: '**2026-09-06 Issue #219 / PR #979で一致判定。** 配信名だけの見出し、予約取消を含む説明、キャンセル/削除の2操作を正本と一致させた。設計1920pxと実装1440/1920pxを目視比較し、横はみ出し0。',
     verdictSource: 'broadcasts-v6/EGMb1.txt + broadcasts-v6/EGMb1-{1440,1920}.png',
-    verdictHead: '9761ea9d7b', route: '/broadcasts',
+    verdictHead: '3c6e4ec948', route: '/broadcasts',
     mode: 'viewport', height: 1080, steps: [{ click: '削除' }],
 
   },
@@ -845,7 +845,7 @@ export const SCREENS = [
     verdict: 'needs_fix',
     verdictNote: '**2026-09-06 Issue #219 / PR #979で再判定。** `?step=audience` で保存条件の呼出し・再保存を1440/1920px撮影し、横はみ出し0。正本の「条件1」、標準15軸/この画面だけの6軸の区別、AND/OR結合案内が編集本体に無いため要修正。',
     verdictSource: 'broadcasts-v6/sqFXf.txt + broadcasts-v6/sqFXf-save.txt + broadcasts-v6/sqFXf{,-save}-{1440,1920}.png',
-    verdictHead: '9761ea9d7b', route: `${NEW_BC}?step=audience`,
+    verdictHead: '3c6e4ec948', route: `${NEW_BC}?step=audience`,
     /* 保存する窓と、呼び出す窓。**窓はビューポートで撮る。** */
     mode: 'viewport', height: 1080,
     steps: [
@@ -886,7 +886,7 @@ export const SCREENS = [
     verdict: 'match',
     verdictNote: '**2026-09-06 Issue #219 / PR #979で一致判定。** 通常・読込・空・取得失敗・権限不足を1440/1920pxで撮影。KPI未取得を「読み込めていません」、空を「最初の1つを作ると、ここに並びます。」へ統一し、設計との本文差0、横はみ出し0。',
     verdictSource: 'broadcasts-v6/TmHjF*.txt + broadcasts-v6/TmHjF*-{1440,1920}.png',
-    verdictHead: '9761ea9d7b', route: '/broadcasts',
+    verdictHead: '3c6e4ec948', route: '/broadcasts',
     /*
       **末尾が `broadcasts*` だと `/api/broadcasts/stats` に届かない。**
       Playwright の `*` は `/` をまたがない。届かないまま撮ると、一覧が
@@ -3735,7 +3735,7 @@ export const CAPTURED_AT = {
         + '原因は実装ではなく**撮る側**だった——`capture-screens.mjs` の `fill` が必ず `getByLabel` を通しており、'
         + '台帳が `selector: true`（CSS選択子）で書いた10件を1つも拾えていなかった。両方を読むように直して撮れた。'
         + '`cPk8A`・`sqFXf` は「詳細条件で絞り込んで配信する」が見つからず撮れない。' },
-    { pr: 979, head: '9761ea9d7b', on: '2026-09-06',
+    { pr: 979, head: '3c6e4ec948', on: '2026-09-06',
       screens: ['q76C35', 'zZ9fA', 'cPk8A', 'XQfMD', 'p97Tf', 'Bw0zt', 'h0kahp', 'vW4Es', 'FpgxH', 'u6gHt', 'EGMb1', 'sqFXf', 'TmHjF'],
       note: 'Issue #219。作成を正本の5段へ分け、対象13画面と状態別を3104/8791の1440・1920pxで撮影。全画像で横はみ出し0。一致2、構造一致・データ未接続5、要修正6。' },
   ],
