@@ -70,12 +70,45 @@ const rowClass = 'flex w-full items-center gap-2 px-3 py-2 text-left text-xs'
 
 export type OperatorOption = { id: string; name: string }
 
-export function buildOperatorRows(operators: OperatorOption[], allowAll: boolean): OperatorOption[] {
-  return [
-    ...(allowAll ? [{ id: 'all', name: 'すべて' }] : []),
-    { id: 'unassigned', name: '未割り当て' },
-    ...operators,
-  ]
+export function buildOperatorRows(
+  operators: OperatorOption[],
+  allowAll: boolean,
+  currentValue?: string,
+): OperatorOption[] {
+  const ordered = [...operators].sort((a, b) => a.name.localeCompare(b.name, 'ja'))
+
+  if (allowAll) {
+    return [
+      { id: 'all', name: 'すべて' },
+      { id: 'unassigned', name: '未割り当て' },
+      ...ordered,
+    ]
+  }
+
+  /*
+    担当変更では、いまの担当を先頭にしてからほかの担当者を並べる。
+    最後に「未割り当て」を置く。設計 `L35UOV` と同じ順で、現在値を
+    探し直さずに確認できる。
+  */
+  if (currentValue && currentValue !== 'unassigned') {
+    ordered.sort((a, b) => Number(b.id === currentValue) - Number(a.id === currentValue))
+  }
+  return [...ordered, { id: 'unassigned', name: '未割り当て' }]
+}
+
+function OperatorMark({ option }: { option: OperatorOption }) {
+  const mark = option.id === 'unassigned'
+    ? '－'
+    : Array.from(option.name.trim())[0] ?? '—'
+
+  return (
+    <span
+      aria-hidden="true"
+      className="border-hairline bg-canvas-sunken text-ink-secondary inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[10px] font-bold"
+    >
+      {mark}
+    </span>
+  )
 }
 
 export function OperatorDropdown({
@@ -86,6 +119,7 @@ export function OperatorDropdown({
   ariaLabel = '担当者を選ぶ',
   allowAll = true,
   unreadOf,
+  unreadUnavailable = false,
 }: {
   /** `all` すべて / `unassigned` 未割り当て / それ以外は担当者ID */
   value: string
@@ -101,12 +135,14 @@ export function OperatorDropdown({
    * `null` を返したら**未取得**で、`—` を出す。**0とは別。**
    */
   unreadOf?: (value: string) => number | null
+  /** 集計に失敗したとき、0件とは違うことと次の行動を本文で伝える。 */
+  unreadUnavailable?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const ref = useCloseOnOutside(open, () => setOpen(false))
 
-  const rows = buildOperatorRows(operators, allowAll)
+  const rows = buildOperatorRows(operators, allowAll, value)
   // 名前で絞る。**大文字小文字を区別しない。** 「Kenta」と打っても出る。
   const shown = query.trim()
     ? rows.filter((row) => row.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
@@ -158,18 +194,27 @@ export function OperatorDropdown({
                 onClick={() => { onChange(row.id); setOpen(false); setQuery('') }}
                 className={`${rowClass} ${selected ? 'bg-accent-soft text-accent font-medium' : 'text-ink hover:bg-canvas-sunken'}`}
               >
-                <span className={selected ? 'text-accent' : 'text-ink-faint'}>
-                  {selected ? <Check /> : <span className="block h-3.5 w-3.5" />}
-                </span>
+                {row.id === 'all'
+                  ? <span aria-hidden="true" className="block h-6 w-6 shrink-0" />
+                  : <OperatorMark option={row} />}
                 <span className="min-w-0 flex-1 truncate text-left">{row.name}</span>
                 {unread === undefined ? null : (
                   <span className={`shrink-0 tabular-nums ${selected ? 'text-accent' : 'text-ink-faint'}`}>
                     {unread === null ? '—' : unread}
                   </span>
                 )}
+                <span className={`text-accent shrink-0 ${selected ? '' : 'invisible'}`}><Check /></span>
               </button>
             )
           })}
+          {unreadUnavailable ? (
+            <div className="border-status-danger-border bg-status-danger-soft border-t px-3 py-3" role="status">
+              <p className="text-danger text-xs font-bold">未読の数をいま数えられません</p>
+              <p className="text-ink-secondary mt-1 text-[11px] leading-relaxed">
+                担当者は選べます。数だけが取れていないので「—」にしています。0件とは違います。少し待ってからもう一度開いてください。
+              </p>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>
