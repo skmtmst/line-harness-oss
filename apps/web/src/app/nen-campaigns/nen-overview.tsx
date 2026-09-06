@@ -11,7 +11,7 @@ import SummaryCard from '@/components/shared/summary-card'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import type { NenCampaignSetting, NenColumn, NenPetProfile } from '@/lib/api'
-import { formatCampaignTiming, formatNenJobDateTime } from './campaign-display'
+import { formatCampaignContent, formatCampaignTiming, formatNenJobDateTime } from './campaign-display'
 
 export type NenTab = 'flow' | 'columns' | 'pets' | 'history'
 
@@ -289,13 +289,13 @@ function FlowPanel({
 }) {
   const deliverySettings = settings.filter((setting) => setting.category === 'transactional' || setting.category === 'follow_up')
   const flow = [
-    ['注文が確定', 'すぐ', '注文ありがとうございます'],
-    ['発送しました', '当日', 'お荷物の追跡番号'],
-    ['届きました', '到着の翌日', '使い方のご案内'],
-    ['3日目', '3日後', '困っていませんか'],
-    ['7日目', '7日後', '口コミのお願い'],
-    ['30日目', '30日後', 'そろそろ無くなるころ'],
-    ['記念日', '毎年', 'お誕生日クーポン'],
+    ['order_thanks', '注文が確定', 'すぐ', '注文ありがとうございます'],
+    ['shipping_notice', '発送しました', '当日', 'お荷物の追跡番号'],
+    ['arrival_check', '届きました', '到着の翌日', '使い方のご案内'],
+    ['care_check', '3日目', '3日後', '困っていませんか'],
+    ['review_request', '7日目', '7日後', '口コミのお願い'],
+    ['cross_sell', '30日目', '30日後', 'そろそろ無くなるころ'],
+    ['birthday_coupon', '記念日', '毎年', 'お誕生日クーポン'],
   ]
   return (
     <>
@@ -303,8 +303,8 @@ function FlowPanel({
       <section className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card">
         <h2 className="text-base font-bold text-ink">買っていただいてからの流れ</h2>
         <div className="mt-5 grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-7">
-          {flow.map(([title, when, message], index) => {
-            const active = index < settings.filter((setting) => setting.isEnabled).length
+          {flow.map(([campaignKey, title, when, message]) => {
+            const active = settings.find((setting) => setting.campaignKey === campaignKey)?.isEnabled === true
             return (
               <div key={title} className="relative text-center">
                 <span className={active ? 'mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-v6-action text-sm font-bold text-on-accent' : 'mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-surface-muted text-sm font-bold text-ink-faint'}>{active ? '✓' : 'Ⅱ'}</span>
@@ -328,7 +328,7 @@ function FlowPanel({
                   <tr className="border-t border-hairline">
                     <td className="px-3 py-3"><p className="font-bold text-ink">{setting.label}</p><p className="mt-1 text-xs text-ink-faint">{categoryLabel[setting.category]} ／ {formatCampaignTiming(setting)}</p></td>
                     <td className="px-3 py-3 text-ink-secondary">{formatCampaignTiming(setting)}</td>
-                    <td className="px-3 py-3 text-ink-secondary">{setting.buttonLabel ? 'テキスト＋リンク' : 'テキスト'}</td>
+                    <td className="px-3 py-3 text-ink-secondary">{formatCampaignContent(setting)}</td>
                     <td className="px-3 py-3 text-xs text-ink-faint">集計未接続</td>
                     <td className="px-3 py-3"><div className="flex flex-wrap justify-end gap-2"><Button onClick={() => onPreview(previewCampaignKey === setting.campaignKey ? null : setting.campaignKey)}>{previewCampaignKey === setting.campaignKey ? '閉じる' : '中身を見る'}</Button><Button onClick={() => onToggle(setting)} disabled={saving === setting.campaignKey}>{setting.isEnabled ? '止める' : '動かす'}</Button></div></td>
                   </tr>
@@ -402,9 +402,9 @@ function ColumnsPanel({
           <table className="w-full table-fixed border-separate border-spacing-0 text-sm"><thead className="bg-surface-muted text-left text-xs text-ink-faint"><TableHeadRow><Th style={{ width: '34%' }}>コラム</Th><Th style={{ width: '14%' }}>出す日</Th><Th style={{ width: '14%' }}>届く人</Th><Th style={{ width: '14%' }}>読まれた</Th><Th style={{ width: '24%' }}>操作</Th></TableHeadRow></thead><tbody>
             {visible.map((column) => (
               <Fragment key={column.id}>
-                <tr><td className="border-t border-hairline px-3 py-3"><p className="font-bold text-ink">{column.title}</p><p className="mt-1 text-xs text-ink-faint">{column.category || '分類なし'} ／ {column.excerpt || '概要なし'}</p></td><td className="border-t border-hairline px-3 py-3 text-ink-secondary">{columnDeliveryDate(column)}</td><td className="border-t border-hairline px-3 py-3 text-xs text-ink-faint">対象人数未接続</td><td className="border-t border-hairline px-3 py-3 text-xs text-ink-faint">読了集計未接続</td><td className="border-t border-hairline px-3 py-3"><div className="flex flex-wrap justify-end gap-2"><Button onClick={() => onPreview(previewColumnId === column.id ? null : column.id)}>中身を見る</Button><Button onClick={onShowHistory}>配信結果</Button></div></td></tr>
+                <tr><td className="border-t border-hairline px-3 py-3"><p className="font-bold text-ink">{column.title}</p><p className="mt-1 text-xs text-ink-faint">{column.category || '分類なし'} ／ {column.excerpt || '概要なし'}</p></td><td className="border-t border-hairline px-3 py-3 text-ink-secondary">{columnDeliveryDate(column)}</td><td className="border-t border-hairline px-3 py-3 text-xs text-ink-faint">対象人数未接続</td><td className="border-t border-hairline px-3 py-3 text-xs text-ink-faint">読了集計未接続</td><td className="border-t border-hairline px-3 py-3"><div className="flex flex-wrap justify-end gap-2"><Button onClick={() => onPreview(previewColumnId === column.id ? null : column.id)}>中身を見る</Button><Button onClick={onShowHistory}>配信結果</Button><Button onClick={() => onEdit(editingColumnId === column.id ? null : column.id)}>{editingColumnId === column.id ? '設定を閉じる' : '配信を設定'}</Button></div></td></tr>
                 {previewColumnId === column.id ? <tr key={`${column.id}-preview`}><td colSpan={5} className="border-t border-hairline p-3">{renderPreview(column)}</td></tr> : null}
-                <tr key={`${column.id}-controls`}><td colSpan={5} className="border-t border-hairline bg-surface-muted px-3 py-3"><div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-2"><Button onClick={() => onEdit(editingColumnId === column.id ? null : column.id)}>{editingColumnId === column.id ? '編集を閉じる' : '配信文を編集'}</Button><Button onClick={() => onDeliver(column)} variant="primary">今すぐ配信予約</Button><input type="datetime-local" aria-label={`${column.title}の配信日時`} onChange={(event) => event.target.value && onDeliver(column, new Date(event.target.value).toISOString())} className="rounded-v6-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink" /></div><span className="text-xs font-semibold text-ink-secondary">{columnStatusLabel[column.deliveryStatus]}</span></div>{editingColumnId === column.id ? <div className="mt-3"><label className="text-sm font-bold text-ink">カードの前に送る紹介文<textarea value={column.introText} rows={5} maxLength={1500} onChange={(event) => onUpdate(column.id, event.target.value)} className="mt-2 block w-full rounded-v6-control border border-hairline bg-canvas px-3 py-2 text-sm leading-6 text-ink" /></label><div className="mt-2 flex justify-end"><Button variant="primary" disabled={savingColumnId === column.id} onClick={() => onSave(column)}>{savingColumnId === column.id ? '保存中...' : '配信文を保存'}</Button></div></div> : null}</td></tr>
+                {editingColumnId === column.id ? <tr key={`${column.id}-controls`}><td colSpan={5} className="border-t border-hairline bg-surface-muted px-3 py-3"><div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-2"><Button onClick={() => onEdit(null)}>設定を閉じる</Button><Button onClick={() => onDeliver(column)} variant="primary">今すぐ配信予約</Button><input type="datetime-local" aria-label={`${column.title}の配信日時`} onChange={(event) => event.target.value && onDeliver(column, new Date(event.target.value).toISOString())} className="rounded-v6-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink" /></div><span className="text-xs font-semibold text-ink-secondary">{columnStatusLabel[column.deliveryStatus]}</span></div><div className="mt-3"><label className="text-sm font-bold text-ink">カードの前に送る紹介文<textarea value={column.introText} rows={5} maxLength={1500} onChange={(event) => onUpdate(column.id, event.target.value)} className="mt-2 block w-full rounded-v6-control border border-hairline bg-canvas px-3 py-2 text-sm leading-6 text-ink" /></label><div className="mt-2 flex justify-end"><Button variant="primary" disabled={savingColumnId === column.id} onClick={() => onSave(column)}>{savingColumnId === column.id ? '保存中...' : '配信文を保存'}</Button></div></div></td></tr> : null}
               </Fragment>
             ))}
           </tbody></table>
