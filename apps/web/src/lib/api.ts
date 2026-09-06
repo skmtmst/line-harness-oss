@@ -1701,7 +1701,27 @@ export type InboxStats = {
   }>
 }
 
-/** ダッシュボードが1回で読む数（設計 `V2 1-1 ダッシュボード`）。 */
+export type DashboardMetric<T> = {
+  /** 未取得・取得失敗時は0や空配列にせずnull。 */
+  value: T | null
+  state: 'available' | 'empty' | 'unavailable' | 'estimated' | 'partial' | 'stale'
+  reason: 'source_failed' | 'fetch_failed' | 'not_connected' | 'not_loaded' | 'not_applicable' | null
+  asOf: string | null
+  period: 'today' | 'last7' | 'last28' | 'latest' | 'last7-fixed' | 'this-month'
+}
+
+export type DashboardFriendTrendPoint = {
+  date: string
+  added: number
+  blocked: number
+  active: number
+  /** 日次記録が無く、いまの友だちから逆算した日。 */
+  estimated: boolean
+  /** 段階配備中の旧Workerでは未返却。 */
+  sources?: Array<{ name: string; count: number }>
+}
+
+/** ダッシュボードが1回で読む数（設計 `V6 1-1 ダッシュボード`）。 */
 export type DashboardOverview = {
   period: 'today' | 'last7' | 'last28'
   /** 集計した時刻。カードごとの基準がずれていないことの手がかり。 */
@@ -1730,16 +1750,7 @@ export type DashboardOverview = {
     quotaLimit: number | null
     quotaUsed: number | null
   }
-  trend: Array<{
-    date: string
-    added: number
-    blocked: number
-    active: number
-    /** 日次記録が無く、いまの友だちから逆算した日。 */
-    estimated: boolean
-    /** 段階配備中の旧Workerでは未返却。 */
-    sources?: Array<{ name: string; count: number }>
-  }>
+  trend: DashboardFriendTrendPoint[]
   conversions: {
     total: number
     byPoint: Array<{ name: string; count: number }>
@@ -1763,6 +1774,17 @@ export type DashboardOverview = {
       period: 'today' | 'last7' | 'last28' | 'latest' | 'last7-fixed' | 'this-month'
     }
   >
+  /** V6指標。段階配備中の旧Workerでは未返却。 */
+  metrics?: {
+    activeFriends: DashboardMetric<number>
+    monthlyQuota: DashboardMetric<{
+      used: number | null
+      limit: number | null
+      remaining: number | null
+    }>
+    friendTrend: DashboardMetric<DashboardFriendTrendPoint[]>
+    officialProfileUrl: DashboardMetric<string>
+  }
 }
 
 export type DashboardPreferenceResponse = {

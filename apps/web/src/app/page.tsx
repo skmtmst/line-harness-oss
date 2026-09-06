@@ -115,7 +115,7 @@ function TodayTaskCard({
 }
 
 /** 友だち追加リンク。共有URLは計測とUUID紐づけができる正規の流入口を使う。 */
-function FriendAddLinkCard() {
+function FriendAddLinkCard({ officialProfileUrl }: { officialProfileUrl: string | null | undefined }) {
   const { selectedAccount } = useAccount()
   const [copied, setCopied] = useState(false)
   const [showQr, setShowQr] = useState(false)
@@ -194,6 +194,7 @@ function FriendAddLinkCard() {
         open={showQr}
         onClose={() => setShowQr(false)}
         accountName={selectedAccount?.displayName ?? '然-NEN- 公式'}
+        officialProfileUrl={officialProfileUrl}
         accountBasicId={selectedAccount?.basicId ?? null}
         baseLink={baseLink}
         initialRouteId={routeId}
@@ -203,6 +204,8 @@ function FriendAddLinkCard() {
 }
 
 function FriendTrendCard({ data, loading }: { data: DashboardOverview | null; loading: boolean }) {
+  const metric = data?.metrics?.friendTrend
+  const trend = metric === undefined ? data?.trend ?? [] : metric.value ?? []
   return (
     <Card overflow="hidden">
       <CardHeader
@@ -211,7 +214,7 @@ function FriendTrendCard({ data, loading }: { data: DashboardOverview | null; lo
         action={<Link href="/analytics" className="hover:underline">さらに詳しく →</Link>}
         actionTone="info"
       />
-      <FriendTrendTable trend={data?.trend ?? []} loading={loading} />
+      <FriendTrendTable trend={trend} loading={loading} />
     </Card>
   )
 }
@@ -261,10 +264,18 @@ function LiveDataCard({
   )
 }
 
-function SendQuotaCard({ delivery }: { delivery: DashboardOverview['delivery'] | null }) {
-  const used = delivery?.quotaUsed ?? null
-  const limit = delivery?.quotaLimit ?? null
-  const remaining = used !== null && limit !== null ? Math.max(0, limit - used) : null
+function SendQuotaCard({
+  delivery,
+  metric,
+}: {
+  delivery: DashboardOverview['delivery'] | null
+  metric: NonNullable<DashboardOverview['metrics']>['monthlyQuota'] | undefined
+}) {
+  const used = metric === undefined ? delivery?.quotaUsed ?? null : metric.value?.used ?? null
+  const limit = metric === undefined ? delivery?.quotaLimit ?? null : metric.value?.limit ?? null
+  const remaining = metric === undefined
+    ? used !== null && limit !== null ? Math.max(0, limit - used) : null
+    : metric.value?.remaining ?? null
   const remainingRate = remaining !== null && limit ? Math.max(0, Math.min(100, remaining / limit * 100)) : null
   return <Card padding="roomy" className="min-h-[128px]">
     <div className="flex items-start justify-between gap-3">
@@ -609,6 +620,9 @@ export default function DashboardPage() {
   const upcomingBookings = bookings ? activeUpcomingBookings(bookings) : []
   const sectionAvailable = (section: keyof NonNullable<DashboardOverview['sections']>) =>
     data?.sections?.[section]?.status !== 'unavailable'
+  const activeFriends = data?.metrics === undefined
+    ? sectionAvailable('friends') ? data?.friends.active ?? null : null
+    : data.metrics.activeFriends.value
   const pendingTotal = inboxSummary?.total ?? (sectionAvailable('inbox') ? data?.inbox.unanswered : null) ?? null
   const pendingDetail = inboxSummary
     ? `LINE ${inboxSummary.line}・メール ${inboxSummary.email}`
@@ -620,7 +634,9 @@ export default function DashboardPage() {
     if (id === 'friend-trend') return data && !sectionAvailable('trend')
       ? <UnavailableDataCard title="友だち数の推移" onRetry={() => void load()} />
       : <FriendTrendCard data={data} loading={loading} />
-    if (id === 'friend-add') return <FriendAddLinkCard />
+    if (id === 'friend-add') return <FriendAddLinkCard
+      officialProfileUrl={data?.metrics === undefined ? undefined : data.metrics.officialProfileUrl.value}
+    />
     if (id === 'scenario-status') {
       const scenarios = sectionAvailable('operations') ? data?.operations?.scenarios : undefined
       return <LiveDataCard title="シナリオ配信状況" href="/scenarios" linkLabel="シナリオを見る" value={scenarios?.active ?? null} detail={scenarios ? `一時停止 ${scenarios.paused}件` : data ? '取得できません' : '読み込み中'} />
@@ -641,9 +657,12 @@ export default function DashboardPage() {
   }
 
   const renderRightCard = (id: DashboardCardId): ReactNode => {
-    if (id === 'send-quota') return <SendQuotaCard delivery={sectionAvailable('quota') ? data?.delivery ?? null : null} />
+    if (id === 'send-quota') return <SendQuotaCard
+      delivery={sectionAvailable('quota') ? data?.delivery ?? null : null}
+      metric={data?.metrics?.monthlyQuota}
+    />
     if (id === 'operational-alerts') return <OperationalAlertsCard risk={healthRisk} healthIssues={healthIssueCount} oldestWaitMinutes={inboxSummary?.oldestWaitMinutes ?? (sectionAvailable('inbox') ? data?.inbox.oldestUnansweredMinutes : null) ?? null} twoFactor={twoFactorSummary} />
-    if (id === 'connection-status') return <ConnectionStatusCard account={selectedAccount} risk={healthRisk} activeFriends={sectionAvailable('friends') ? data?.friends.active ?? null : null} />
+    if (id === 'connection-status') return <ConnectionStatusCard account={selectedAccount} risk={healthRisk} activeFriends={activeFriends} />
     if (id === 'upcoming') return <UpcomingCard bookings={bookings} loading={supplementLoading} />
     if (id === 'monthly-delivery') return data && !sectionAvailable('delivery')
       ? <UnavailableDataCard title="今月の配信" onRetry={() => void load()} />

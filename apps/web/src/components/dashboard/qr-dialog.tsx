@@ -30,6 +30,16 @@ const FORMATS = [
   { value: 'svg', label: 'SVG' },
 ]
 
+export function resolveOfficialProfileUrl(
+  officialProfileUrl?: string | null,
+  accountBasicId?: string | null,
+): string | null {
+  if (officialProfileUrl !== undefined) return officialProfileUrl
+  if (!accountBasicId) return null
+  const basicId = accountBasicId.startsWith('@') ? accountBasicId : `@${accountBasicId}`
+  return `https://line.me/R/ti/p/${basicId}`
+}
+
 function DownloadIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -42,6 +52,7 @@ export default function QrDialog({
   open,
   onClose,
   accountName,
+  officialProfileUrl,
   accountBasicId,
   baseLink,
   initialRouteId = '',
@@ -49,6 +60,8 @@ export default function QrDialog({
   open: boolean
   onClose: () => void
   accountName: string
+  /** LINE公式プロフィールで発行した lin.ee の短縮URL。 */
+  officialProfileUrl?: string | null
   /** 公式アカウントのID（`@nen` など）。QRの下に出す案内先の組み立てに使う。 */
   accountBasicId?: string | null
   baseLink: string
@@ -99,15 +112,12 @@ export default function QrDialog({
    * 経路を選んでいればその経路のリンク。経路ごとに分けて発行したのに
    * ここが公式アカウントのままだと、どのQRを見ているのか分からない。
    *
-   * 基本のときは公式アカウントのURL。LINE が配る lin.ee の短縮URLは
-   * API から取れないので、公式ID（basicId）から組み立てる。同じ場所に
-   * 着く。ID が無いアカウントでは何も出さない。
+   * 基本のときはAPIが返した公式プロフィール短縮URLを優先する。
+   * 段階配備中の旧Workerでは公式ID（basicId）から同じ行き先を組み立てる。
    */
   const profileUrl = route
     ? link
-    : accountBasicId
-      ? `https://line.me/R/ti/p/${accountBasicId.startsWith('@') ? accountBasicId : `@${accountBasicId}`}`
-      : null
+    : resolveOfficialProfileUrl(officialProfileUrl, accountBasicId)
 
   const copy = async () => {
     try {
