@@ -1483,7 +1483,7 @@ export default function BroadcastForm({
                 ))}
               </dl>
             </section>
-            <section className="broadcast-line-preview rounded-card p-5 text-white">
+            <section className="broadcast-line-preview rounded-card p-5 text-on-accent">
               <h3 className="text-center text-sm font-bold">LINEプレビュー</h3>
               <p className="mx-auto mt-4 w-fit rounded-pill bg-ink/25 px-3 py-1 text-xs font-semibold">配信日時は STEP 4 で設定します</p>
               <div className="mt-4 rounded-control bg-canvas p-4 text-sm leading-relaxed text-ink">
@@ -1781,7 +1781,7 @@ export default function BroadcastForm({
       .broadcast-template-row strong,
       .broadcast-template-row small { display: block; }
       .broadcast-template-row small { margin-top: 3px; color: var(--color-ink-faint); }
-      .broadcast-line-preview { background: #7899c3; min-height: 390px; }
+      .broadcast-line-preview { background: var(--color-avatar-blue); min-height: 390px; }
       .broadcast-url-row { display: grid; grid-template-columns: minmax(0, 1fr) 7rem; }
       @media (min-width: 640px) {
         .broadcast-basic-fields { grid-template-columns: minmax(0, 1fr) 20rem; }

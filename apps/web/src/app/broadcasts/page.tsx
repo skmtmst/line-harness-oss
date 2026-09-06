@@ -15,6 +15,7 @@ import ListState from '@/components/shared/list-state'
 import { audienceSummary, rowExcerpt } from '@/lib/broadcast-summary'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import SelectField from '@/components/shared/select-field'
 
 const statusConfig: Record<
   ApiBroadcast['status'],
@@ -350,9 +351,7 @@ function BroadcastList() {
               className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
             />
             <button type="button" disabled title="保存した検索のAPI契約は未接続です" className="border-hairline rounded-control border px-3 py-2 text-sm font-semibold text-action disabled:opacity-50">保存した検索</button>
-            <select aria-label="表示件数" defaultValue="20" className="rounded-control border border-hairline px-3 py-2 text-sm">
-              <option value="20">20件表示</option>
-            </select>
+            <SelectField aria-label="表示件数" defaultValue="20" size="compact" options={[{ value: '20', label: '20件表示' }]} />
           </div>
 
           <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -376,9 +375,7 @@ function BroadcastList() {
               aria-label="配信日（終了）"
               className="border-hairline rounded-control border px-2 py-2 text-sm"
             />
-            <select aria-label="並び順" defaultValue="newest" className="rounded-control border border-hairline px-3 py-2 text-sm">
-              <option value="newest">配信日が新しい順</option>
-            </select>
+            <SelectField aria-label="並び順" defaultValue="newest" options={[{ value: 'newest', label: '配信日が新しい順' }]} />
             {(dateFrom || dateTo) && <button type="button" className="text-xs font-semibold text-action" onClick={() => { setDateFrom(''); setDateTo('') }}>日付を外す</button>}
           </div>
 
