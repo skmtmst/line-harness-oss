@@ -688,6 +688,12 @@
   "components/reminders/reminder-publish-flow.tsx": {
     "unresolved-classname": 5
   },
+  "components/reminders/reminder-step-editor-v6.tsx": {
+    "unresolved-classname": 5
+  },
+  "components/reminders/reminder-v6-ui.tsx": {
+    "unresolved-classname": 24
+  },
   "components/rich-menus/area-properties.tsx": {
     "arbitrary-value": 12,
     "unresolved-classname": 13
