@@ -62,7 +62,8 @@ import {
   STAFF_MEMBERS, LOGIN_AUDIT,
   AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS, MILEAGE_OVERVIEW,
   COMMON_ACTIONS, BOOKING_MENUS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_REQUESTS,
-  EC_NOTIFICATION_SETTINGS, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, EC_EVENTS, EC_OVERVIEW, MILEAGE_RULES, CONVERSION_POINTS,
+  EC_NOTIFICATION_SETTINGS, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, EC_EVENTS, EC_OVERVIEW, MILEAGE_RULES,
+  CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
   WEBINARS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_ANALYTICS,
 } from './fixtures.mjs'
 
@@ -1031,6 +1032,38 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     */
     return { success: true, data: [{ ...ACCOUNT, webhook: { status: 'matched', checkedAt: `${FIXED_TO}T00:00:00.000Z` } }] }
   }
+  if (pathname === '/api/friends/migrations') {
+    return { success: true, data: [{
+      id: 'visual-uid-run', fromAccountId: ACCOUNT.id, toAccountId: 'visual-qa-account-new',
+      purpose: '友だち情報・タグ・配信停止状態を新アカウントへ引き継ぐ', sourceKind: 'csv',
+      sourceFilename: 'uid-map-2026-09-06.csv', status: 'review', dryRunRevision: 1,
+      counts: { total: 5214, auto: 4982, review: 34, unmatched: 195, conflict: 3, applied: 0, failed: 0 },
+      createdBy: STAFF.id, approvedBy: null, createdAt: '2026-09-06T05:20:00.000Z',
+      reviewedAt: null, executedAt: null, completedAt: null, rolledBackAt: null, failureReason: null,
+    }] }
+  }
+  if (pathname === '/api/friends/migrations/visual-uid-run') {
+    return { success: true, data: {
+      id: 'visual-uid-run', fromAccountId: ACCOUNT.id, toAccountId: 'visual-qa-account-new',
+      purpose: '友だち情報・タグ・配信停止状態を新アカウントへ引き継ぐ', sourceKind: 'csv',
+      sourceFilename: 'uid-map-2026-09-06.csv', status: 'review', dryRunRevision: 1,
+      counts: { total: 5214, auto: 4982, review: 34, unmatched: 195, conflict: 3, applied: 0, failed: 0 },
+      createdBy: STAFF.id, approvedBy: null, createdAt: '2026-09-06T05:20:00.000Z',
+      reviewedAt: null, executedAt: null, completedAt: null, rolledBackAt: null, failureReason: null,
+      items: [
+        { id: 'uid-item-1', oldUid: 'old_uid_00291', newUid: 'new_uid_00291', candidateName: 'Kyohei Yamamoto', evidenceType: 'operator_csv', classification: 'review', conflictReason: '2アカウントに候補があります', decision: 'pending', result: 'pending', errorMessage: null },
+        { id: 'uid-item-2', oldUid: 'old_uid_00412', newUid: 'new_uid_00412', candidateName: '山田 太郎', evidenceType: 'operator_csv', classification: 'conflict', conflictReason: '新旧UIDが別の統合ユーザーに結び付いています', decision: 'pending', result: 'pending', errorMessage: null },
+        { id: 'uid-item-3', oldUid: 'old_uid_01180', newUid: null, candidateName: null, evidenceType: 'operator_csv', classification: 'unmatched', conflictReason: '移行先に一致する友だちがいません', decision: 'pending', result: 'pending', errorMessage: null },
+      ],
+    } }
+  }
+  if (pathname === '/api/friends/migration-jobs') {
+    return { success: true, data: [
+      { id: 'import-1', kind: 'import', line_account_id: ACCOUNT.id, total_count: 231, update_count: 34, conflict_count: 3, status: 'completed', created_by_name: '河野 健太', created_at: '2026-09-03T05:20:00.000Z' },
+      { id: 'import-2', kind: 'import', line_account_id: ACCOUNT.id, total_count: 231, update_count: 34, conflict_count: 3, status: 'previewed', created_by_name: '河野 健太', created_at: '2026-09-03T02:05:00.000Z' },
+      { id: 'export-1', kind: 'export', line_account_id: ACCOUNT.id, row_count: 231, status: 'expired', created_by_name: '坂本 真人', created_at: '2026-09-02T10:40:00.000Z', expires_at: '2026-09-09T10:40:00.000Z' },
+    ] }
+  }
   if (pathname === '/api/friend-add-rules') {
     return { success: true, data: FRIEND_ADD_RULES }
   }
@@ -1392,6 +1425,13 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/mileage/overview') return { success: true, data: MILEAGE_OVERVIEW }
   if (pathname === '/api/mileage/rules') return { success: true, data: MILEAGE_RULES }
   if (pathname === '/api/conversions/points') return { success: true, data: CONVERSION_POINTS }
+  if (pathname === '/api/conversions/report') {
+    const startDate = query.get('startDate') ?? ''
+    const data = startDate >= '2026-08-01'
+      ? CONVERSION_REPORT_CURRENT
+      : CONVERSION_REPORT_PREVIOUS
+    return { success: true, data }
+  }
   if (pathname === '/api/common-vars') return { success: true, data: COMMON_VARS }
   const commonVarDeleteImpact = /^\/api\/common-vars\/([^/]+)\/delete-impact$/.exec(pathname)
   if (commonVarDeleteImpact) {

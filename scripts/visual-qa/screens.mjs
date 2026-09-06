@@ -534,12 +534,10 @@ export const SCREENS = [
   },
   {
     ...FRIENDS, node: 'vtBCu', name: '3-4 UID移行', route: '/accounts?tab=migration',
-    gap: 'api',
-    gapNote: '異なるLINEプロバイダー間のUID自動変換はできない。検証済み対応表の取込、dry-run、競合判断、本移行、照合、切り戻しを持つ `uid_migration_runs/items` とowner・二者確認APIが要る',
-    status: 'unimplemented',
-    why: '`/accounts` の権限を通すだけでは、設計のdry-run・全競合判断・影響確認・切り戻しを実行できない。正式要件 §12・§14 が専用run/itemと実行APIを要求し、LINE APIだけでは対応表を作れないと明記している',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 #246 で一致。** 1920px設計画像と実装の1440・1920pxを横並びで目視比較した。5段、既存データへ影響しない注意、異なるプロバイダーの制約、移行元・先・利用目的・CSV、4区分の実値、競合3行、判断、本移行、履歴が同じ順序で揃い、横はみ出し0。`uid_migration_runs/items` の事前確認・競合判断・owner二者確認・本移行・切り戻しAPIへ接続した。共通shellの上部画面名はルート規則により「LINEアカウント」だが、機能本文のH1は「UID移行」で一致し、共通部品はs0所有のため変更していない。`undefined`・`NaN`・`Invalid Date`・`API error` は0件。',
+    verdictSource: 'friends-v6/vtBCu.txt + docs/design-qa/friends-v6/vtBCu.txt + apps/web/src/app/accounts/migration.tsx + apps/worker/src/routes/friend-migrations.ts',
   },
-
   // ── 機能5 シナリオ配信 ──────────────────────────────────
   { ...SCENARIO, node: 'TC1b1', name: '5-1 シナリオ配信', route: '/scenarios',
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態（`g2UNV` `M2b2B`）／#32 結果画面から作成中の操作を外し「設定サマリー」→「配信した設定」（`M2b2B`）／#40 主ボタンの緑を `$accent-deep` へ／#41 `bV5Vs` の削除欄を「このシナリオを削除」へ、複製枠を「配信を開始」へ。`kk8dz` から削除の押し口を消す／#43 メッセージ種別タブを9種・同じ並びに（`Flex`→リッチメッセージ）／#44 CSV書き出しを副次ボタンに統一（`M2b2B`）／#46 行に「その他操作（…）」／#48 表記統一。設計画像は `docs/design-reference/scenarios-v6/` を撮り直した。**実装との突き合わせはこれから。** **development `2d0ee180` で撮り直した。#427 と #529 の直りが両方入っている。** ルート `/scenarios`。1440・1920とも横スクロール0。 **束6の完了条件を満たす**：読了済 728人 に **「登録合計 1,756人のうち 41%」** と母数が付く（728÷1,756＝41%で合う）。購読中 1,028人 にも「現在配信中・**重複を含む**」と断りが付き、**同じ人を二重に数えている可能性を隠していない**。 **見出しの下に「作成しただけでは配信されません。」** が出る。設計の注意帯そのもので、**作っただけで届くと思わせない**。 帯は シナリオ9件（稼働中8）／購読中1,028人／読了済728人／今週の配信342通（過去7日）。フォルダの縦帯もあり、「フォルダを消しても、入っていたシナリオは未分類として残ります。」と消したときの行き先を書く。 **取り込み順の心配（#427 → #529）は、development に両方入ったことで解消した。** 取得元：`scenarios-v6/TC1b1.txt`',
@@ -2806,9 +2804,9 @@ export const SCREENS = [
     */
     node: 'ux7of', feature: 3, name: '3-4-A UID・顧客データ移行／CSV',
     dir: 'friends-v6', route: '/friends/migrations', mode: 'page',
-    status: 'unimplemented', gap: 'api',
-    gapNote: '取り込みの記録と突き合わせの結果を持つ口が要る。`vtBCu`（3-4 UID移行）と同じ束',
-    why: '`/friends/migrations` が実装に無い。3-4 UID移行そのものが `gap: api` のまま',
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #246 で実装・撮影。設計画像なし。** `docs/design-reference/friends-v6/ux7of.txt` の文言・節・状態と照合し、全件書き出し、CSV数式の無害化、7日期限、追加・更新・変更なし・競合・エラーの事前確認、同一ファイルの二重反映防止、履歴を本物のAPIへ接続した。実装の1440・1920pxは横はみ出し0。`undefined`・`NaN`・`Invalid Date`・`API error` は0件。',
+    verdictSource: 'friends-v6/ux7of.txt + docs/design-qa/friends-v6/ux7of.txt + apps/web/src/app/friends/migrations/page.tsx + apps/worker/src/routes/friend-migrations.ts',
   },
   {
     /*
@@ -3118,23 +3116,26 @@ const FEATURE_18_AUDIT = {
 }
 
 // Issue #232（機能19）の実装後監査。
-// 3画面とも実装は更新したが、ChromiumがMachPort権限で起動できず、
-// 1440px・1920pxの画像比較は未実施。画像を見ずに一致へ上げない。
+// 3107/8794 で1440px・1920pxを撮り、★V6の1920px設計画像と並べて確認した。
+// 実データで埋まった部分と、未接続APIのため残る差を分けて記録する。
 const FEATURE_19_AUDIT = {
   ZrpKn: {
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #232 / PR #936 / UI HEAD 02bce7d37で実装を更新したが、画像未確認。** 一覧を成果地点・起点・この30日の件数・金額・利用先の構成へ直し、30日集計と直前30日の比較を既存APIへ接続した。利用先・詳細・CSVのAPIは未接続のため、0件や押せる操作を作らず接続条件を本文に表示する。ChromiumがMachPort権限で起動できず、1440px・1920px画像を取得できなかったため判定は上げない。',
-    verdictSource: 'conversions-v6/ZrpKn.txt + 実装コード（画像未確認）',
+    verdictNote: '**2026-09-06 Issue #232 / PR #981 / UI HEAD 83be84278を3107/8794で撮り、★V6設計と同じ1920pxで並べて確認。** 30日集計は486件・1,284,000円、直前30日は412件となり、6成果地点の名前・起点・件数・金額も設計の値で表示できた。1440px・1920pxとも横はみ出し0。ただし設計の12件内訳、説明帯、状態絞り込み、期間選択、利用先、詳細、CSVはAPIが無く、実装は6件と未接続の説明を表示しているため一致ではない。**推奨修正：利用先の取得・追加APIを先に接続し、「使う場所を足す」と利用先名を行ごとに出す。次に全件数・状態内訳・詳細・CSVの口を接続する。**',
+    verdictSource: 'conversions-v6/ZrpKn.txt + conversions-v6/ZrpKn-1440.png + conversions-v6/ZrpKn-1920.png',
+    verdictHead: '83be84278',
   },
   GUxsj: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #232 / PR #936 / UI HEAD 02bce7d37で実装を更新したが、画像未確認。** レポートを一覧から分離し、7日・30日・90日の期間選択、直前期間との比較、4指標、成果地点別の増減を既存APIへ接続した。日別・帰属経路・取消・純成果・CSVは集計APIが未接続のため、その条件を画面に明記した。ChromiumがMachPort権限で起動できず2幅画像を取得できず、日別と経路も未接続なので `needs_fix` を維持する。',
-    verdictSource: 'conversions-v6/GUxsj.txt + 実装コード（画像未確認）',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 Issue #232 / PR #981 / UI HEAD 83be84278を3107/8794で撮り、★V6設計と同じ1920pxで並べて確認。** 7日・30日・90日の期間選択、現期間486件・1,284,000円、前期間412件・1,092,000円、単価2,642円、成果地点別の増減を実データで表示した。1440px・1920pxとも横はみ出し0。設計の日別積み上げグラフ、最も多い帰属経路、取消・純成果、CSVは集計APIが無く、未接続条件を本文に表示しているため `match` にはしない。**推奨修正：日付・成果地点別の集計APIを先に追加して日別グラフを埋め、次に帰属経路とCSVを接続する。**',
+    verdictSource: 'conversions-v6/GUxsj.txt + conversions-v6/GUxsj-1440.png + conversions-v6/GUxsj-1920.png',
+    verdictHead: '83be84278',
   },
   GtylA: {
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #232 / PR #936 / UI HEAD 02bce7d37で実装を更新したが、画像未確認。** V6実Nodeと寸法を付け、同名の成果地点を保存前に止め、同種の30日実績、この30日の試算が未接続であること、過去成果は追加しないことを表示した。内部語と「準備中」は画面から外した。8起点・除外条件・期間内1回・取消・利用先・保存前試算のAPIは未接続。ChromiumがMachPort権限で起動できず2幅画像を取得できないため `needs_fix` を維持する。',
-    verdictSource: 'conversions-v6/GtylA.txt + 実装コード（画像未確認）',
+    verdictNote: '**2026-09-06 Issue #232 / PR #981 / UI HEAD 83be84278を3107/8794で撮り、★V6設計と同じ1920pxで並べて確認。** 既存の注文確定を作成画面の「購入」へ読み替え、同種1件・この30日386件・612,400円を実データで表示した。同名保存の防止、過去成果を追加しない説明もある。1440px・1920pxとも横はみ出し0。ただし設計の6起点に対し実装は3分類、同じ人を数える方式は設計3択に対し2択で、除外・取消・利用先・保存前試算もAPIが無い。画面の高さと区切りも設計と大きく異なるため `needs_fix` を維持する。**推奨修正：起点の保存契約と回数条件を拡張し、6起点・30日に1回・除外・取消を先に実装する。その後、利用先と保存前試算APIを接続して設計の4区画へ組み直す。**',
+    verdictSource: 'conversions-v6/GtylA.txt + conversions-v6/GtylA-1440.png + conversions-v6/GtylA-1920.png',
+    verdictHead: '83be84278',
   },
 }
 
@@ -3502,7 +3503,6 @@ for (const screen of SCREENS) {
   }
   if (screen.feature === 19 && FEATURE_19_AUDIT[screen.node]) {
     Object.assign(screen, FEATURE_19_AUDIT[screen.node])
-    delete screen.verdictHead
   }
   if (screen.feature === 21 && FEATURE_21_AUDIT[screen.node]) {
     Object.assign(screen, FEATURE_21_AUDIT[screen.node])
@@ -3605,6 +3605,8 @@ export const CAPTURED_AT = {
   19: [
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['ZrpKn','GUxsj','GtylA'],
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
+    { pr: 981, head: '83be84278', on: '2026-09-06', screens: ['ZrpKn','GUxsj','GtylA'],
+      note: 'Issue #232。3 Nodeを1440px・1920pxで撮影し、★V6設計の1920px画像と並べて確認。全6枚で横はみ出し0。実数表示を接続し、残るAPI・保存契約の差を判定注記へ記録した。' },
   ],
   20: [
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['Zxezb','J6Inc','YBGtm','QQ1SR','f5HsX','C2I7ry','Fh2Qj','dfwD4'],
@@ -3910,6 +3912,7 @@ export const CAPTURED_AT = {
     { pr: 628, head: '846be01f', on: '2026-09-01', screens: ['bzDn6'], note: '**#628 が codex/development へマージされた**（#520 の取り込み後）。私の画面修正が初めて本流に入った1本' },
     { pr: 645, head: '6e9ed4d6', on: '2026-09-01', screens: ['IAf7j'], note: 'Claudeが実装して撮った。#606 の契約の上（development 直結）。**ACCOUNT に role が無く、権限で出し分ける画面がすべて権限なし側に倒れていた**のを固定データ側で直した' },
     { pr: 966, head: 'baa097e99', on: '2026-09-06', screens: ['PhxG6','LT8RS','Igi72','IAf7j','I6UAdr','bzDn6','YzxU1','InCDe','r7eSi','w8W4Eh'], note: 'Issue #265。10 Node・68枚を1440/1920pxと全状態で撮影し、全画像で横はみ出し0。一覧と表示件数を一致へ更新し、詳細検索は不足APIを明示して構造一致へ更新。IAf7j-pick の撮影手順二重実行も直して再撮影した。' },
+    { pr: 975, head: 'bdf6abfa7', on: '2026-09-06', screens: ['vtBCu', 'ux7of'], note: 'Issue #246。UID移行とCSV移行を本物のAPIへ接続し、1440/1920pxで撮影。vtBCuは設計画像と一致、ux7ofは設計画像なしのため本文照合で未判定。両画面とも横はみ出し0、壊れ値0。' },
   ],
   28: [
     { pr: 517, head: '43d3d20e', on: '2026-08-30', screens: ['tksPc'], note: '受付時間。Googleカレンダーとの関係を先に書く' },
