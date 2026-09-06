@@ -81,6 +81,10 @@ images.get('/images/*', async (c) => {
   if (!key || key.includes('..')) {
     return c.json({ success: false, error: 'Invalid image key' }, 400);
   }
+  // 写真審査の原本は公開配信しない。管理画面もreview/public派生画像だけを使う。
+  if (key.startsWith('nen-photo-originals/')) {
+    return c.json({ success: false, error: 'Image not found' }, 404);
+  }
   const object = await c.env.IMAGES.get(key);
 
   if (!object) {

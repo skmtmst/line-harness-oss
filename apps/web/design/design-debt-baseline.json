@@ -134,9 +134,7 @@
     "unresolved-classname": 11
   },
   "app/ec-commerce/page.tsx": {
-    "unresolved-classname": 2,
-    "direct-secondary-button": 4,
-    "arbitrary-value": 3
+    "unresolved-classname": 11
   },
   "app/emergency/page.tsx": {
     "unresolved-classname": 5,
@@ -836,5 +834,11 @@
   },
   "components/webinars/webinar-line-preview.tsx": {
     "unresolved-classname": 7
+  },
+  "app/ec-commerce/connector-panel.tsx": {
+    "unresolved-classname": 36
+  },
+  "app/ec-commerce/subscriptions-panel.tsx": {
+    "unresolved-classname": 16
   }
 }
