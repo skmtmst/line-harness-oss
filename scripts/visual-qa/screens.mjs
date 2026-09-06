@@ -1525,7 +1525,9 @@ export const SCREENS = [
   {
     ...FORM, node: 'ava2n', name: '13-1-B フォームのデザイン設定',
     verdict: 'unjudged',
-    verdictNote: '**#254 実装後の撮影待ち。** 5色の役割・書体・角丸・背景画像・SNS表示をフォーム定義へ保存し、左のプレビューとLINE回答画面へ反映する。**設計画像なし**のため `forms-v6/ava2n.txt` と画面本文を照合する。',
+    verdictNote: '**2026-09-06 Issue #254 / UI HEAD 19422a3b7で1440px・1920pxを撮影し、横はみ出し0を確認。** 5色の役割・書体・角丸・背景画像・SNS表示をフォーム定義へ保存し、左のプレビューとLINE回答画面へ反映した。本文は設計テキストと照合したが、**設計画像なし**のため画像一致は判定できず `unjudged` を維持する。',
+    verdictSource: 'forms-v6/ava2n.txt + ava2n-{1440,1920}.png',
+    verdictHead: '19422a3b7',
     route: `${FORM_EDIT}&tab=design`,
   },
   {
@@ -1537,8 +1539,10 @@ export const SCREENS = [
 
   },
   { ...FORM, node: 'v9tYhl', name: '13-1-D 集まった回答',
-    verdict: 'unjudged',
-    verdictNote: '**#254 実装後の撮影待ち。** 専用ルートで実回答をAPI側ページングし、全回答CSV・詳細・表示中の集計を備える。取得口が無い割合・書き込み結果は0にせず `—` と理由を表示する。取得元 `forms-v6/v9tYhl.txt` と同Node画像。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 Issue #254 / UI HEAD 19422a3b7で設計1920pxと実装1440px・1920pxを目視比較。** 上部操作、2タブ、4指標、6行の回答表、ページ送りを設計と同じ順で配置し、両幅とも横はみ出し0を確認した。実回答はAPI側ページングし、全回答CSV・詳細・表示中の検索を備える。開いた実人数・回答単位の書き込み結果・日付項目の全件集計は取得口が無いため、0を作らず `—` と理由を表示する。',
+    verdictSource: 'forms-v6/v9tYhl.png + v9tYhl-{1440,1920}.png + v9tYhl-{normal,loading,empty,error}-{1440,1920}.png',
+    verdictHead: '19422a3b7',
     route: '/form-submissions/responses?id=form-visit',
     states: {
       apis: ['**/api/forms/form-visit', '**/api/forms/form-visit/submissions*'],
@@ -1547,7 +1551,9 @@ export const SCREENS = [
   {
     ...FORM, node: 'gBp2J', name: '13-1-E フォームの削除確認',
     verdict: 'unjudged',
-    verdictNote: '**#254 実装後の撮影待ち。** 影響確認APIの公開状態・回答数・利用先・開けなくなるURLを表示し、受付停止・アーカイブ・完全削除を条件で分ける。**設計画像なし**のため `forms-v6/gBp2J.txt` と画面本文を照合する。',
+    verdictNote: '**2026-09-06 Issue #254 / UI HEAD 19422a3b7で1440px・1920pxを撮影し、横はみ出し0を確認。** 影響確認APIの公開状態・回答数・利用先・開けなくなるURLを表示し、受付停止・アーカイブ・完全削除を条件で分けた。本文は設計テキストと照合したが、**設計画像なし**のため画像一致は判定できず `unjudged` を維持する。',
+    verdictSource: 'forms-v6/gBp2J.txt + gBp2J-{1440,1920}.png',
+    verdictHead: '19422a3b7',
     steps: [{ click: '来店アンケートを削除' }],
   },
   {
