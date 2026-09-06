@@ -141,7 +141,11 @@ describe('V6 案件一覧（GH8VL）の画面', () => {
 
   it('案内バーを1本置く', () => {
     expect(TABS).toContain("import NoteBar from '@/components/shared/note-bar'")
-    expect(TABS.match(/<NoteBar/g) ?? []).toHaveLength(1)
+    const offersTab = TABS.slice(
+      TABS.indexOf('export function OffersTab() {'),
+      TABS.indexOf('\nfunction SettlementEditor'),
+    )
+    expect(offersTab.match(/<NoteBar/g) ?? []).toHaveLength(1)
   })
 
   it('検索・表示件数・並び順・ページ送りを共通部品でつなぐ', () => {
@@ -203,7 +207,7 @@ describe('V6 アフィリエイターを追加する（xqT1Z）', () => {
 
   it('口の無い項目は押せない入力欄ではなく、—と理由で出す', () => {
     expect(NEW_PAGE).toContain('function Unavailable(')
-    for (const label of ['友だちから選ぶ', '1件あたりの上限', '振込先の登録', '成果時の動き']) {
+    for (const label of ['LINEの友だちと結びつける（任意）', '1件あたりの上限', '振込先の登録', '成果時の動き']) {
       expect(NEW_PAGE).toContain(`label="${label}"`)
     }
     // 押せない入力欄を残していない。
