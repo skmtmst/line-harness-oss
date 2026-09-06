@@ -1,6 +1,11 @@
+import { readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { allFiles, directImporters, routeEntryFiles } from '../../scripts/design-impact.mjs'
+import {
+  parseDesignImpactBaseline,
+  readDesignImpactBaseline,
+} from '../../scripts/design-impact-baseline.mjs'
 import { SRC } from '../../scripts/design-debt.mjs'
 
 describe('共通部品の影響範囲', () => {
@@ -9,10 +14,28 @@ describe('共通部品の影響範囲', () => {
   const buttonCss = join(SRC, 'components', 'shared', 'button.module.css')
   const pagination = join(SRC, 'components', 'shared', 'pagination.tsx')
   const paginationCss = join(SRC, 'components', 'shared', 'pagination.module.css')
+  const baseline = readDesignImpactBaseline()
 
-  it('共通Buttonを直接importする119ファイルを利用先に数える', () => {
-    // 本流の回答フォーム3画面に、UID移行とCSV移行の2画面を加えた実測値。
-    expect(directImporters(files, button)).toHaveLength(119)
+  it('共通Buttonの実利用先が一覧ファイルと一致する', () => {
+    const actual = directImporters(files, button).map((file) => relative(SRC, file)).sort()
+    expect(
+      actual,
+      '件数を書き換えず、design-impact-baseline.txtへ利用先の行を追加・削除してください',
+    ).toEqual(baseline.sharedButtonImporters)
+  })
+
+  it('並行PRが足した2画面を行として同時に保持できる', () => {
+    const parsed = parseDesignImpactBaseline([
+      'shared-button-importer app/example-a/page.tsx',
+      'shared-button-importer app/example-b/page.tsx',
+    ].join('\n'))
+    expect(parsed.sharedButtonImporters).toEqual([
+      'app/example-a/page.tsx',
+      'app/example-b/page.tsx',
+    ])
+
+    const attributes = readFileSync(join(SRC, '..', '..', '..', '.gitattributes'), 'utf8')
+    expect(attributes).toContain('apps/web/design/design-impact-baseline.txt merge=union')
   })
 
   it('import先が実ファイルと一致する場合は検知する', () => {
