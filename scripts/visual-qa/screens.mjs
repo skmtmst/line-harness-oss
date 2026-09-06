@@ -2859,6 +2859,37 @@ export const SCREENS = [
   },
 ]
 
+// Issue #228（機能15）の実装後監査。
+// ChromiumがMachPort権限で起動できず、実装後の2幅画像は未取得。
+// 古い画像で合格にせず、実装した範囲と残る接続条件だけを更新する。
+const FEATURE_15_REVIEW = {
+  g89Tc: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06、Issue #228 / UI HEAD 6cb184af7 で画面を更新したが、新しい画像は未確認。** メディア用フォルダ、未分類、フォルダ作成、種類・未使用・上限付近の表示を追加した。保存容量APIは未接続のため、架空の数やゲージを出さず `—` と接続条件を表示する。撮影はChromiumのMachPort権限拒否で開始できず、1440px・1920px画像が無いため判定は上げない。',
+    verdictSource: 'media-v6/g89Tc.txt + 実装コード（画像未確認）',
+  },
+  voJtX: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06、Issue #228 / UI HEAD 6cb184af7 で画面を更新したが、新しい画像は未確認。** プレビュー、容量・寸法・登録者・フォルダ、名前付き使用先を表示し、既存の同種メディアへ使用先を一括差し替えできるようにした。名前とURLを保つ版追加APIは未接続なので、使えるように見せず理由を表示する。撮影はChromiumのMachPort権限拒否で開始できず、2幅画像が無いため判定は上げない。',
+    verdictSource: 'media-v6/voJtX.txt + 実装コード（画像未確認）',
+  },
+  eXAJP: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06、Issue #228 / UI HEAD 6cb184af7 で画面を更新したが、新しい画像は未確認。** 一覧上の全面ダイアログへ分け、20件までの選択、1件ごとの待機・登録中・完了・失敗、フォルダ選択、形式と公開リンクの注意を表示した。現行アップロードはWorker経由のbase64で、動画90MB・音声30MBまで。要件のR2直接アップロードと200MB対応はAPI未接続。撮影はChromiumのMachPort権限拒否で開始できず、2幅画像が無いため判定は上げない。',
+    verdictSource: 'media-v6/eXAJP.txt + 実装コード（画像未確認）',
+  },
+  YfTfJ: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06、Issue #228 / UI HEAD 6cb184af7 で画面を更新したが、新しい画像は未確認。** 使用中は削除操作を出さず、名前付き使用先を確認して既存の同種メディアへ一括差し替える導線を追加した。差し替え前の版を送り、409では最新影響へ更新する。アカウント切替・閉じる操作後の遅い返事も破棄する。撮影はChromiumのMachPort権限拒否で開始できず、2幅画像が無いため判定は上げない。',
+    verdictSource: 'media-v6/YfTfJ.txt + 実装コード（画像未確認）',
+  },
+  h8pBZr: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06、Issue #228 / UI HEAD 6cb184af7 で状態文言を設計正本へ合わせたが、新しい画像は未確認。** 読込中・0件・取得失敗を別の文と操作で表示し、親一覧にもフォルダ区画を追加した。撮影はChromiumのMachPort権限拒否で開始できず、通常を含む1440px・1920px画像が無いため、画像確認済みにはしない。',
+    verdictSource: 'media-v6/h8pBZr.txt + 契約テスト（画像未確認）',
+  },
+}
+
 // Issue #229（機能16）の実装後監査。
 // ChromiumがMachPort権限で起動できず、実装後の2幅画像は未取得。
 // そのため既存判定は上げず、今回実装した範囲と未接続条件だけを更新する。
@@ -3014,6 +3045,10 @@ const FEATURE_18_AUDIT = {
 }
 
 for (const screen of SCREENS) {
+  if (screen.feature === 15 && FEATURE_15_REVIEW[screen.node]) {
+    Object.assign(screen, FEATURE_15_REVIEW[screen.node])
+    delete screen.verdictHead
+  }
   if (screen.feature === 16 && FEATURE_16_REVIEW[screen.node]) {
     Object.assign(screen, FEATURE_16_REVIEW[screen.node])
     delete screen.verdictHead
