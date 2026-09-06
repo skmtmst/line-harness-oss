@@ -4059,6 +4059,8 @@ export const CAPTURED_AT = {
       { pr: 616, head: '0a11c9e8', on: '2026-08-31', screens: ['szXsT'], note: 'Claude実装。影響4つに加え、409の最新影響と別メニューの遅延応答も再監査で確認した' },
   ],
   14: [
+    { pr: 1075, head: '24313778e', on: '2026-09-07', screens: ['WuKzU', 'gBtaK', 'yPkWe'],
+      note: 'Issue #295。共通情報3画面を3104/8791で1440・1920px撮影し、★V6設計と同じ比較入力で確認。全画像で横はみ出し0。3画面とも、存在しないAPI値を作らず理由つきの構造一致・データ未接続へ更新した。' },
     { pr: 548, head: 'd4a85ad4', on: '2026-08-29', screens: ['uNBlA', 'gBtaK'], note: '保存前に影響を見る面。値を変えてから保存を押さないと出ない' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['WuKzU', 'gBtaK'], note: 'development そのもので撮った' },
       { pr: 619, head: '31b44202', on: '2026-08-31', screens: ['yPkWe'], note: 'Claude実装。#611 の delete-impact で、差し込まれている場所と空欄のまま送られることを削除の窓へ出した。差し替えの口は契約待ち' },
