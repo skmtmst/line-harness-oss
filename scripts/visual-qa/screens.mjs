@@ -2564,7 +2564,7 @@ export const SCREENS = [
 
   // ── 機能28 予約設定 ─────────────────────────────────────
   /* 設計の4入口を同じ帯へ置き、受付枠・休業日は既存の勤務設定へつないだ。 */
-  { ...BOOKING_SET, node: 'QSLEH', name: '28-1 予約設定', clock: '2026-08-26T00:00:00.000Z', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #241 / PR #1022 / UI HEAD abae52d46 を3105/8792で再撮影。構造一致・店舗共通設定API待ち。** メニュー件数つきの4入口、出している数・最多・受付時間・受付範囲の4指標、設計順の6列表、担当者名、中身を見る・担当を決める・止める／出す、表示件数をそろえた。予約のルールでは全メニューの受付期間・締め切り・キャンセル期限を横並びで確認できる。1440・1920pxとも横はみ出し0。残る差は店舗共通値と営業時間・例外日を返すAPI、設計8件に対して撮影固定データが6件であること。', verdictSource: 'booking-settings-v6/QSLEH.txt + 2026-09-07 1440/1920px screenshots', verdictHead: 'abae52d46' },
+  { ...BOOKING_SET, node: 'QSLEH', name: '28-1 予約設定', clock: '2026-08-26T00:00:00.000Z', verdict: 'match', verdictNote: '**2026-09-07 Issue #370 / UI HEAD `34653c2f1` を3107/8794で再撮影し、★V6設計と一致。** PR #1107 の店舗設定と8件のメニューを実API契約で読み、4入口、出している6件・休止2件、最多メニュー、9:00〜19:00の受付時間、60日先までの受付範囲、設計順の6列表、担当者、料金、公開操作、ページ送りをそろえた。1440・1920pxとも横はみ出し0、内部語・壊れ値0件。', verdictSource: 'booking-settings-v6/QSLEH.txt + 2026-09-07 QSLEH 1440/1920px screenshots', verdictHead: '34653c2f1' },
   { ...BOOKING_SET, node: 'tksPc',
     /*
       スタッフを選ぶまで受付時間が出ない画面。選ばずに撮ると
@@ -2581,8 +2581,8 @@ export const SCREENS = [
     /* `**' + '/api/booking/admin/menus*` は `/menus/:id/staff` に届かない（`*` は `/` をまたがない）。この画面は呼ばないが、呼ぶようになったとき静かに素通りするのを防ぐ。 */
     clock: '2026-08-26T00:00:00.000Z',
     states: { apis: ['**/api/booking/admin/settings*', '**/api/booking/admin/menus*', '**/api/booking/admin/menus/**', '**/api/booking/admin/staff*'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #241 / PR #1022 / UI HEAD abae52d46 を3105/8792で通常・読込・空・失敗を再撮影。構造一致・店舗設定API待ち。** 4入口とV6の4指標を全状態で同じ位置に保ち、読込・失敗は —、空は数えて0と未取得を分けた。失敗時は作成誘導を出さず再読込を表示する。1440・1920pxとも横はみ出し0、内部語・壊れ値0件。残る差は店舗営業時間・共通受付範囲を返すAPIと、設計見本と同量の固定データ。',
-    verdictSource: 'booking-settings-v6/W6465r-{loading,empty,error}.txt + 2026-09-07 screenshots', verdictHead: 'abae52d46',
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #370 / UI HEAD `34653c2f1` を3107/8794で通常・読込中・空・失敗まで再撮影し、★V6設計と一致。** 4入口と4指標を同じ位置に保ち、読込中・失敗は未取得の —、空はメニュー0件と設定未取得を言い分けた。空の返事でも画面全体を落とさず作成誘導を出し、失敗時だけ再読込を出す。通常を含む4状態を1440・1920pxで撮影し、全8枚で横はみ出し0、内部語・壊れ値0件。',
+    verdictSource: 'booking-settings-v6/W6465r.txt + W6465r-{loading,empty,error}.txt + 2026-09-07 normal/loading/empty/error 1440/1920px screenshots', verdictHead: '34653c2f1',
   },
 
   // ── 機能29 イベント予約 ─────────────────────────────────
@@ -4459,6 +4459,7 @@ export const CAPTURED_AT = {
     { pr: 983, head: '36e8b070b', on: '2026-09-06', screens: ['IAf7j','I6UAdr','bzDn6','YzxU1','r7eSi'], note: 'Issue #265 続き。残り5画面を設計構造へ直し、3102/8789で定義済み全状態32枚を1440/1920px撮影。5画面を一致へ更新し、全画像で横はみ出し0、壊れ値・内部ID0。' },
   ],
   28: [
+    { pr: 0, head: '34653c2f1', on: '2026-09-07', screens: ['QSLEH', 'W6465r'], note: 'Issue #370。店舗設定と8件のメニューを実API契約へ接続し、通常・読込中・空・失敗を3107/8794で1440/1920px撮影。全10枚で横はみ出し0、2画面を一致へ更新した。' },
     { pr: 1096, head: 'a89279ce7', on: '2026-09-07', screens: ['tksPc'], note: 'Issue #305。3107/8794で通常・読込中・取得失敗を1440/1920px撮影し、全6枚で横はみ出し0。曜日別受付時間と右側プレビューをV6構造へそろえ、未提供APIに依存する値は作らず理由つきの構造一致・データ未接続とした。' },
     { pr: 517, head: '43d3d20e', on: '2026-08-30', screens: ['tksPc'], note: '受付時間。Googleカレンダーとの関係を先に書く' },
     { pr: 532, head: '6cc74968', on: '2026-08-29', screens: ['W6465r'], note: '予約設定の帯を未取得 `—` に。束1と束4' },
