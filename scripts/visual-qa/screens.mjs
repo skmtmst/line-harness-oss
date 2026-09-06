@@ -1563,8 +1563,8 @@ export const SCREENS = [
   */
   { ...FORM, node: 'EMBIK', name: '13-1 回答フォーム',
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 構造一致・データ未接続。ルート `/form-submissions`。1440・1920で撮った（はみ出し0）。**面の作りは設計どおりだが、行が1つも無い**——モックの `/api/forms` が空で、設計の6つのフォーム（来店アンケート・イベント申込ほか）が並ばない。ブロック数と友だち情報欄の要約が出せているかは、行が並んでから見る。取得元 `forms-v6/EMBIK.txt`',
-    verdictHead: '49e1341c', /*
+    verdictNote: '**2026-09-06 Issue #226 / UI HEAD db85cae2b で再照合。** 構造一致・データ待ち。設計画像と実装画像を同じ比較入力で見比べ、上部3操作、左のフォルダ、検索、保存した検索、20件表示、6列の一覧表を設計順へ合わせた。`/api/forms` の画面確認データが0件のため、設計の6行・フォルダ別件数は作らず、空状態で撮影した。通常・読込・空・失敗を1440・1920で撮影し、全画像で横はみ出し0。取得元 `forms-v6/EMBIK*.txt` と同Node画像。',
+    verdictHead: 'db85cae2b', /*
       **#586 の受入条件。**通常・読込・空・失敗を言い分けられるかを見る。
       読む口はフォームの一覧と帯。
     */
@@ -1573,9 +1573,9 @@ export const SCREENS = [
       kinds: ['normal', 'loading', 'empty', 'error'],
     }, },
   { ...FORM, node: 'vCqUj', name: '13-1-A フォームを作る',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/form-submissions/edit`。**「ブロックを追加（12種）」の口が無い。** 作成者の表示と、URLを流入リンクとして発行できる説明も無い。内部語「このアカウントに LIFF を登録すると、配れるURLが出ます。」が出ている。取得元 `forms-v6/vCqUj.txt`',
-    verdictHead: '49e1341c', route: FORM_EDIT, },
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 Issue #226 / UI HEAD db85cae2b で再照合。** 構造一致・画面確認データ待ち。「ブロックを追加（12種）」から実装済み12種類を選べる口、顧客プレビュー、作成元アカウント、保存操作を追加し、未設定URLの説明から内部語 `LIFF` を除いた。画面確認用 `/api/forms/form-1` がフォーム定義を返さず、設計の9ブロックと実値は表示できないため固定値で埋めていない。1440・1920とも横はみ出し0。取得元 `forms-v6/vCqUj.txt` と同Node画像。',
+    verdictHead: 'db85cae2b', route: `${FORM_EDIT}&tab=basic`, },
   {
     ...FORM, node: 'ava2n', name: '13-1-B フォームのデザイン設定',
     verdict: 'unjudged',
@@ -1586,10 +1586,10 @@ export const SCREENS = [
   },
   {
     ...FORM, node: 'cSqvP', name: '13-1-C フォームのオプション設定',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/form-submissions/edit`（オプション設定）。**回答後のアクション（設計「タグ「来店アンケート回答済み」を付ける ／ マイルを 50 付与」）と、お礼ページのURLの欄が無い。** 内部語 `LIFF` も出る。取得元 `forms-v6/cSqvP.txt`',
-    verdictHead: '49e1341c', route: FORM_EDIT,
-    mode: 'viewport', height: 1080, steps: [{ click: 'オプション設定' }],
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 Issue #226 / UI HEAD db85cae2b で再照合。** 構造一致・設定値待ち。専用URLでオプション窓を開き、回答後アクション、お礼ページURLと代替文、1人1回、前回答復元、期限、送信前確認、表示文言を設計順へ寄せ、「保存する」でフォーム保存APIへ接続した。画面確認用フォーム定義と参照データが無いため、設計のタグ・マイル・お礼URLは作らず未設定のまま撮影した。1440・1920とも横はみ出し0。取得元 `forms-v6/cSqvP.txt` と同Node画像。',
+    verdictHead: 'db85cae2b', route: `${FORM_EDIT}&tab=options`,
+    mode: 'viewport', height: 1080,
 
   },
   { ...FORM, node: 'v9tYhl', name: '13-1-D 集まった回答',
@@ -1612,9 +1612,9 @@ export const SCREENS = [
   },
   {
     ...FORM, node: 'ZOPyc', name: '13-1-F 一覧の状態（空・読込・エラー）',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/form-submissions`。読込・空・失敗の3状態を1440・1920で撮った（はみ出し0）。**空のときの誘い文が設計と違う**——設計「フォームがまだ1つも無いときの見え方です。「フォームを作る」から最初の1つを作ると、ここに一覧が並びます。」「最初の1つを作ると、集まった回答もここから見られます。」が出ていない。取得元 `forms-v6/ZOPyc-*.txt`',
-    verdictHead: '49e1341c',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 Issue #226 / UI HEAD db85cae2b で一致。** 設計画像と実装画像を同じ比較入力で見比べ、上部操作、フォルダ、検索・絞り込みを保ったまま、読込・空・取得失敗を同じ一覧枠で表示することを確認した。空状態の2つの案内文、作成ボタン、失敗時の再読込も設計文言へ合わせた。通常・読込・空・失敗を1440・1920で撮影し、全画像で横はみ出し0。取得元 `forms-v6/ZOPyc*.txt` と同Nodeの状態別実装画像。',
+    verdictHead: 'db85cae2b',
     states: { apis: ['**/api/forms*', '**/api/forms/**'], kinds: ['loading', 'empty', 'error'] },
 
   },
