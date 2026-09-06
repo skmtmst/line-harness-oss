@@ -2737,21 +2737,22 @@ export const SCREENS = [
   },
   {
     node: 'tP0RW', feature: 4, name: '4-1-B タグを作る・連動ON',
-    dir: 'friend-attributes-v6', route: '/tags/new', mode: 'page',
-    steps: [{ click: 'タグ連動', role: 'switch' }],
+    dir: 'friend-attributes-v6', route: '/tags/new?copy=tag-0', mode: 'page',
+    steps: [{ fill: 'タグ名', text: 'NEN会員（定期）' }, { click: 'タグ連動', role: 'switch', onlyIfOff: true }],
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **P2 設計との差は並びと文言。** ルート `/tags`。取得元：`friend-attributes-v6/tP0RW.txt`。1440・1920とも横スクロール0。**具体的な差は、設計画像が用意できてから詰める**（この機能は `design-qa-remaining10.md` に画像が無く、文章の記述だけで見ている） **推奨修正**：**残作業**：この機能は `design-qa-remaining10.md` に設計画像が無く、文章の記述だけで見ている。**設計画像が用意できるまで、具体的な差は書けない。** 用意できたら `LfrQs` `VjXGX` `byqIW` `KoT6c` と同時に詰める。',
     verdictSource: 'friend-attributes-v6/tP0RW.txt', verdictHead: '7b509106',
   },
   {
     node: 'LfrQs', feature: 4, name: '4-1-C 連動アクション追加ドロワー',
-    dir: 'friend-attributes-v6', route: '/tags/new', mode: 'viewport', height: 1320,
-    steps: [{ click: 'タグ連動', role: 'switch' }, { click: '＋ アクションを追加' }],
+    dir: 'friend-attributes-v6', route: '/tags/new?copy=tag-0&reference=1', mode: 'viewport', height: 1320,
+    steps: [{ fill: 'タグ名', text: 'NEN会員（定期）' }, { click: 'タグ連動', role: 'switch', onlyIfOff: true }, { click: '＋ アクションを追加' }],
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **P2 設計との差は並びと文言。** ルート `/tags`。取得元：`friend-attributes-v6/LfrQs.txt`。1440・1920とも横スクロール0。具体的な差は設計画像が用意できてから詰める **推奨修正**：`tP0RW` と同じ。**設計画像が用意できるまで具体的な差は書けない。** 4-1 の窓は同じ束なのでまとめて詰める。',
     verdictSource: 'friend-attributes-v6/LfrQs.txt', verdictHead: '7b509106',
   },
   {
     node: 'ee0sk', feature: 4, name: '4-1-D タグを編集・既存設定あり',
     dir: 'friend-attributes-v6', route: '/tags/edit?id=tag-0', mode: 'page',
+    steps: [{ click: '遡及反映', role: 'switch', onlyIfOff: true }],
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **#605 `3b5098a3` で撮り直した。前の判定のうち1つは誤りだったので取り消す。** ルート `/tags/edit?id=tag-0`。1440・1920とも横スクロール0。 **「複製のボタンが無い」は誤り。#422 で「複製して新規作成」が既に入っていた。** development の古い絵をもとに書いた判定だった。 **「OFFに戻すと…すでに積んだマイルは取り消されません」を足した。** OFFにすれば元通りだと読めてしまうため。 P2 連動アクションの種類名が設計と違う（設計は テキスト送信・タグ追加・シナリオ開始、実装は メッセージ・シナリオ）。種類は追加ドロワー（`LfrQs`）の持ち物で、そちらは**設計画像が無いため触れない**。 P2 4枚のカードの補足（このタグを持つ友だち／まだ受け取っていない人／紹介者が登録されている人／さかのぼりません）が足りない。 取得元：`friend-attributes-v6/ee0sk-1440.png` ＋ `tag-editor-v4.tsx:393`',
     verdictSource: 'friend-attributes-v6/ee0sk-1920.png', verdictHead: '7b509106',
   },
@@ -2773,6 +2774,10 @@ export const SCREENS = [
   {
     node: 'A1ZYeP', feature: 4, name: '4-2-A 友だち情報欄の項目を追加',
     dir: 'friend-attributes-v6', route: '/tags/fields/new', mode: 'page',
+    steps: [
+      { fill: 'input[placeholder="例：愛犬のお名前"]', selector: true, text: '愛犬のお名前' },
+      { fill: 'input[placeholder="pet_name"]', selector: true, text: 'pet_name' },
+    ],
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **#578 `a744c582`（#420 を含む）で撮り直した。絵ではなく型を読んで数え直した。** ルート `/tags/fields/new`。1440・1920とも横スクロール0。 P1 種類が設計の12に対し10。`FriendFieldType`（`packages/shared/src/types.ts:177`）は text／textarea／number／date／select／multi_select／checkbox／url／tel／email。**設計にある 日時・画像・PDF が無く、設計に無い 真偽（checkbox）が増えている。** 日時が無いと、予約時刻のような値を1つの欄で持てない（日付と時刻を別々の欄に分けることになり、リマインダの起点に使えない）。 **これは画面だけでは作れない。** 種類を足すには共有の型・Workerの検査・保存先がそろって要る。Codex側。 P2 既定値の決め方が違う——設計は「未設定」「［お名前］を使う」から選ぶ形、実装は自由入力。 取得元：`friend-attributes-v6/A1ZYeP-1440.png` ＋ `packages/shared/src/types.ts:177`。推奨修正：`FriendFieldType` に datetime／image／file を足す（Codex側・P1）',
     verdictSource: 'friend-attributes-v6/A1ZYeP-1920.png', verdictHead: '7b509106',
   },
@@ -2785,6 +2790,7 @@ export const SCREENS = [
     node: 'KoT6c', feature: 4, name: '4-2-B 友だち情報欄・項目移行',
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **#420 `f77de350` で本文が取れた。前の判定（404の絵から書かれていた）を置き換える。** ルート `/tags/fields/migrate?id=field-birthday`。1440・1920とも横スクロール0。**development には無い画面で、#420 の枝にある。** **先に事前確認だけを行う形**：「**まず事前確認だけを行います。友だちの値や既存の項目は変更しません。**確認が必要な値を直してから、移行を実行してください。」——**押しても何も動かないことを先に書く**ので、確かめてから進める。 **いま使っている項目と、新しく作る項目を左右に並べる**：「誕生日 `{{field.birthday}}` 日付 → 新しく作る項目（項目名・種類）」。差し込み名も出るので、**テンプレートのどこが影響するか**が分かる。 **種類は10種類**（1行テキスト・複数行テキスト・数値・日付・単一選択・複数選択・真偽・URL・電話番号・メール）で、**それぞれに例が付く**（「日付 — 誕生日など」「数値 — 体重など」）。**P1 設計の12種類のうち 日時・画像・PDF が無く、真偽が増えている**（`A1ZYeP` と同じ差。移行先の選択肢もそこに引きずられる）。**日時が無いので、予約時刻のような値は移行先を作れない。** **P2 事前確認の結果（何件が移り、何件が直しを要るか）は、押してからでないと出ない。** 設計は移行の前に件数を見せる。**推奨修正**：種類の不足は `A1ZYeP` と同じ直しで一緒に解ける。件数は `uNBlA`（変える前に影響を見る）と同じ形にできる。 **`undefined`・`NaN`・`Invalid Date`・`API error` は0件。** 取得元：`friend-attributes-v6/KoT6c.txt`', verdictSource: 'friend-attributes-v6/KoT6c.txt', verdictHead: '7b509106',
     dir: 'friend-attributes-v6', route: '/tags/fields/migrate?id=field-birthday', mode: 'page',
+    steps: [{ click: '事前確認する' }],
   },
   {
     node: 'GMvBd', feature: 4, name: '4-3-A 対応マークを追加・編集',
@@ -3498,6 +3504,62 @@ const ISSUE_297_REVIEW = {
 }
 
 /**
+ * board #330。統合 #1101 の機能4固定データと、#1078・#1085・#1090・#1092 の
+ * 実API契約へ接続した12 Nodeを、設計1920pxと実装1440/1920pxで再比較した結果。
+ */
+const ISSUE_330_REVIEW = {
+  dKlkz: {
+    verdict: 'structure_match_data_pending',
+    note: '構造・表示データ一致、実行API待ち。固定タグの128人、マイル連動、5件の参照先、版を実APIから表示し、削除前の影響確認を設計順に再現した。タグを保管・削除する更新APIが無いため、事故防止のため確定操作は無効のままにしている。2幅とも横はみ出し0。',
+  },
+  tP0RW: {
+    verdict: 'match',
+    note: '一致。固定タグを複製し、購入フォルダ、NEN会員（定期）、本人10mile、紹介者5mile、1.5倍・優先度3、3件の連動アクションと右側4項目の要約を同じ状態で表示した。2幅とも横はみ出し0。',
+  },
+  LfrQs: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・選択肢データ待ち。右ドロワーで13種類、実行時期、内容、挿入位置、取消・追加を表示し、シナリオ開始・24時間後の状態まで再現した。共通アクション選択肢APIに設計の「定期便スタートガイド」が無く、選択名だけ未照合。2幅とも横はみ出し0。',
+  },
+  ee0sk: {
+    verdict: 'match',
+    note: '一致。既存タグの128人・紹介者34人、本人10mile、紹介者5mile、1.5倍・優先度3、3件の連動アクション、既存友だちへの遡及反映と右側4項目の要約を実APIから同じ状態で表示した。2幅とも横はみ出し0。',
+  },
+  HBTk0: {
+    verdict: 'match',
+    note: '一致。全12件・入力済み187人・回答フォーム6件・表示先3か所の指標と、項目名、差し込み名、種類、入力人数、フォーム、表示先、操作を実APIから表示した。2幅とも横はみ出し0。',
+  },
+  A1ZYeP: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・選択肢データ待ち。基本情報、差し込み名、13種類の項目型、初期値、検索・一覧・フォームでの扱い、取消・作成を表示した。固定フォルダAPIに設計の「ペットプロフィール」が無いため、所属フォルダだけ未照合。2幅とも横はみ出し0。',
+  },
+  KoT6c: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・固定応答待ち。移行元と移行先、変更できる型、事前確認、使用先、取消・確認を実API契約へ接続した。WorkerのPOST移行preview契約は存在するが、共通固定APIが同経路へ405を返すため、変換可能・要確認件数と影響先だけ未照合。#264へ固定応答追加を依頼済み。2幅とも横はみ出し0。',
+  },
+  rIhbN: {
+    verdict: 'match',
+    note: '一致。全4件、初期値、未割り当て人数、使用中ルール数、4行の人数・自動変更・表示先・操作を実APIから表示した。2幅とも横はみ出し0。',
+  },
+  GMvBd: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・同一状態契約待ち。基本情報、自動変更ルール、使用先、優先順位、手動変更後の保護時間を実APIへ接続し、通常・読込・0件・失敗・権限不足・競合を確認した。設計は新規作成、現在のルールAPIは作成済みmarkId必須のため実装画像は編集状態で、同一状態の値だけ未照合。全状態2幅で横はみ出し0。',
+    source: 'friend-attributes-v6/GMvBd-{normal,loading,empty,error,forbidden,conflict}.txt + 同名-{1440,1920}.png',
+  },
+  zGZMA: {
+    verdict: 'structure_match_data_pending',
+    note: '構造・影響データ一致、操作差あり。保留3人、利用ルール、表示先、置換先、履歴保持、取消・保管を実APIから表示した。設計の物理削除に対し、現行要件とAPIは履歴を残す保管なので、安全側の操作差を維持している。2幅とも横はみ出し0。',
+  },
+  QKx8Q: {
+    verdict: 'match',
+    note: '一致。全12件、配信使用中5件、共有2件、今月84回、5行の条件・該当人数・共有・使用先・作成者日時・操作を実APIから表示した。2幅とも横はみ出し0。',
+  },
+  XBkiQ: {
+    verdict: 'match',
+    note: '一致。固定の保存条件を読み、名前・説明・共有範囲、AND・OR条件、該当18人、LINE15人・MAIL3人、3件の使用先、一覧表示、削除・取消・保存を実APIから表示した。2幅とも横はみ出し0。',
+  },
+}
+
+/**
  * board #266。2026-09-06 に latest development（14b61d52）を取り込んだ
  * UI HEAD ff1fbfc37 / capture HEAD c03ebf864 を 3102/8789 で起動し、
  * 機能5の14 Node・全状態を設計1920pxと実装1440/1920pxで比較した結果。
@@ -3832,6 +3894,14 @@ for (const screen of SCREENS) {
     screen.verdictSource = issue297Review.source
       ?? `${screen.dir}/${screen.node}.txt + ${screen.dir}/${screen.node}-{1440,1920}.png`
     delete screen.verdictHead
+  }
+  const issue330Review = ISSUE_330_REVIEW[screen.node]
+  if (screen.feature === 4 && issue330Review) {
+    screen.verdict = issue330Review.verdict
+    screen.verdictNote = `**2026-09-07 Issue #330で実API接続後に再判定。** ${issue330Review.note}`
+    screen.verdictSource = issue330Review.source
+      ?? `${screen.dir}/${screen.node}.txt + ${screen.dir}/${screen.node}-{1440,1920}.png + 2026-09-07同一状態比較`
+    screen.verdictHead = '46649ddb3'
   }
   const issue266Review = ISSUE_266_REVIEW[screen.node]
   if (screen.feature === 5 && issue266Review) {
