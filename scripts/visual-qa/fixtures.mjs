@@ -1534,8 +1534,25 @@ export const BROADCASTS = [
   sentAt: status === 'sent' ? scheduledAt : null,
   totalCount: Number(totalCount),
   successCount: Number(successCount),
-  folderId: null,
+  lineAccountId: 'visual-qa-account',
+  folderId: ['bf-campaign', 'bf-ec', 'bf-campaign', 'bf-ec', null][index] ?? null,
   createdAt: '2026-08-16T00:00:00.000Z',
+}))
+
+/** 一斉配信のフォルダ操作 `xkRDb` を開くための固定データ。 */
+export const BROADCAST_FOLDERS = [
+  ['bf-reserved', '予約配信', '#3B82F6'],
+  ['bf-campaign', 'キャンペーン', '#10B981'],
+  ['bf-ec', 'EC・フォロー', '#F59E0B'],
+].map(([id, name, color], index) => ({
+  id: String(id),
+  kind: 'broadcast',
+  name: String(name),
+  parentId: null,
+  displayOrder: index,
+  color: String(color),
+  createdAt: '2026-08-01T00:00:00.000Z',
+  updatedAt: '2026-08-01T00:00:00.000Z',
 }))
 
 /**
