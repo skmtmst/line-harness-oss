@@ -6,21 +6,24 @@ import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'reac
 import type { ApiResponse, LineAccount } from '@line-crm/shared'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import PageHeader from '@/components/shared/page-header'
-import { api, type DashboardOverview } from '@/lib/api'
+import {
+  api,
+  type DashboardOverview,
+  type OperationCapability,
+  type OperationControl,
+  type OperationImpactPreview,
+  type OperationIncident,
+} from '@/lib/api'
 import { formatOperationDate, monthlyQuotaStatus, type OperationSeverity } from '@/lib/operation-status'
-import ReleaseLogPanel from '@/components/emergency/release-log-panel'
 import { apiCheckDetail } from './api-check-detail'
 import { operationImpactText, type EmergencyStopTarget } from '@/lib/operation-impact'
-import type { OperationImpactPreview } from '@/lib/api'
+import releaseLog from '@/generated/release-log.json'
 
 const TABS = [
   { key: 'health', label: '健全性チェック' },
   { key: 'control', label: '緊急コントロール' },
   { key: 'history', label: '更新履歴' },
 ]
-
-const SNAPSHOT_KEY = 'nen_emergency_snapshot_v1'
-const OPERATION_HISTORY_KEY = 'nen_operation_history_v1'
 
 type StopTarget = 'broadcasts' | 'scenarios' | 'reminders' | 'automations'
 
@@ -37,38 +40,24 @@ const IMPACT_KEY: Record<StopTarget, EmergencyStopTarget> = {
   reminders: 'reminder_dispatch',
   automations: 'automation_actions',
 }
+
+const TARGET_CAPABILITIES: Record<StopTarget, OperationCapability[]> = {
+  broadcasts: ['broadcast_dispatch'],
+  scenarios: ['scenario_dispatch'],
+  reminders: ['reminder_dispatch'],
+  automations: ['automation_actions', 'auto_reply_dispatch'],
+}
+
+const CAPABILITY_LABEL: Record<OperationCapability, string> = {
+  broadcast_dispatch: '予約中の一斉配信',
+  scenario_dispatch: 'シナリオ配信',
+  reminder_dispatch: 'リマインダ',
+  automation_actions: 'オートメーション',
+  auto_reply_dispatch: '自動応答',
+  webhook_outgoing: '外部への通知',
+  ad_postback: '広告への成果通知',
+}
 type ConfirmMode = 'stop' | 'restore' | null
-
-interface EmergencySnapshot {
-  id: string
-  stoppedAt: string
-  accountId: string | null
-  accountName: string
-  reason: string
-  broadcasts: Array<{ id: string; scheduledAt: string | null }>
-  scenarios: string[]
-  reminders: string[]
-  automations: string[]
-}
-
-interface OperationHistoryEntry {
-  id: string
-  occurredAt: string
-  kind: 'stop' | 'restore'
-  title: string
-  detail: string
-  status: 'success' | 'partial' | 'failed'
-}
-
-interface UpdateHistoryRow {
-  id: string
-  started_at: number
-  completed_at: number | null
-  from_version: string
-  to_version: string
-  status: string
-  error: string | null
-}
 
 type HealthCheckId = 'line' | 'quota' | 'api' | 'webhook' | 'delivery' | 'friends'
 
@@ -78,50 +67,32 @@ interface HealthCheckItem {
   detail: string
   severity: OperationSeverity
   icon: string
+  description: string
+  threshold: string
+  href: string
 }
 
-const CHECK_DEFINITIONS: Array<Pick<HealthCheckItem, 'id' | 'label' | 'icon'>> = [
-  { id: 'line', label: 'LINE接続', icon: 'L' },
-  { id: 'quota', label: '月間配信数', icon: '↗' },
-  { id: 'api', label: 'API・外部連携', icon: '↔' },
-  { id: 'webhook', label: 'Webhook', icon: 'W' },
-  { id: 'delivery', label: '配信処理', icon: '▷' },
-  { id: 'friends', label: '友だち変化', icon: '人' },
+type HealthCheckResult = Pick<HealthCheckItem, 'id' | 'label' | 'detail' | 'severity' | 'icon'>
+
+const CHECK_DEFINITIONS: Array<Pick<HealthCheckItem, 'id' | 'label' | 'icon' | 'description' | 'threshold' | 'href'>> = [
+  { id: 'line', label: 'LINE接続', icon: 'L', description: 'LINEのアカウントとつながっているか', threshold: '応答がない状態が5分つづくと「エラー」', href: '/accounts' },
+  { id: 'quota', label: '月間配信数', icon: '↗', description: 'LINEの上限に近づいていないか', threshold: '80%で「注意」・95%で「エラー」', href: '/broadcasts' },
+  { id: 'api', label: 'API・外部連携', icon: '↔', description: '管理画面とEC連携が動いているか', threshold: '応答なし・取り込み0件で「注意」', href: '/ec-commerce' },
+  { id: 'webhook', label: 'Webhook', icon: 'W', description: '合言葉が入り、送信が通っているか', threshold: '合言葉なしが1本でもあれば「注意」', href: '/webhooks' },
+  { id: 'delivery', label: '配信処理', icon: '▷', description: '予約した配信が時刻どおりに出ているか', threshold: '10分の遅れで「注意」・30分で「エラー」', href: '/broadcasts/reserved' },
+  { id: 'friends', label: '友だち変化', icon: '人', description: '急に減っていないか', threshold: '1日で5%以上減ると「注意」', href: '/friends' },
 ]
 
 const severityStyle: Record<OperationSeverity, { label: string; badge: string; panel: string }> = {
-  normal: { label: '正常', badge: 'bg-emerald-100 text-emerald-700', panel: 'border-emerald-200 bg-emerald-50' },
-  warning: { label: '注意', badge: 'bg-amber-100 text-amber-800', panel: 'border-amber-200 bg-amber-50' },
-  danger: { label: 'エラー', badge: 'bg-red-100 text-red-700', panel: 'border-red-200 bg-red-50' },
-  unknown: { label: '未確認', badge: 'bg-gray-100 text-gray-600', panel: 'border-gray-200 bg-gray-50' },
-}
-
-function readSnapshot(): EmergencySnapshot | null {
-  try {
-    const raw = localStorage.getItem(SNAPSHOT_KEY)
-    return raw ? (JSON.parse(raw) as EmergencySnapshot) : null
-  } catch {
-    return null
-  }
-}
-
-function readOperationHistory(): OperationHistoryEntry[] {
-  try {
-    const raw = localStorage.getItem(OPERATION_HISTORY_KEY)
-    return raw ? (JSON.parse(raw) as OperationHistoryEntry[]) : []
-  } catch {
-    return []
-  }
-}
-
-function addOperationHistory(entry: OperationHistoryEntry): void {
-  localStorage.setItem(OPERATION_HISTORY_KEY, JSON.stringify([entry, ...readOperationHistory()].slice(0, 100)))
-  window.dispatchEvent(new Event('nen-operation-history-updated'))
+  normal: { label: '正常', badge: 'bg-success-bg text-success', panel: 'border-success bg-success-bg' },
+  warning: { label: '注意', badge: 'bg-warning-bg text-warning', panel: 'border-warning bg-warning-bg' },
+  danger: { label: 'エラー', badge: 'bg-danger-bg text-danger', panel: 'border-danger bg-danger-bg' },
+  unknown: { label: '未確認', badge: 'bg-canvas-sunken text-ink-faint', panel: 'border-hairline bg-canvas-sunken' },
 }
 
 function StatusPill({ severity }: { severity: OperationSeverity }) {
   const style = severityStyle[severity]
-  return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold ${style.badge}`}>{style.label}</span>
+  return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${style.badge}`}>{style.label}</span>
 }
 
 async function apiData<T>(request: Promise<ApiResponse<T>>): Promise<T> {
@@ -139,10 +110,10 @@ function mostSevere(items: HealthCheckItem[]): OperationSeverity {
 
 function SummaryCard({ label, value, note }: { label: string; value: string; note: string }) {
   return (
-    <div className="border-hairline rounded-card border bg-white p-4">
+    <div className="border-hairline rounded-card border bg-canvas p-4">
       <p className="text-ink-faint text-[11px] font-semibold">{label}</p>
       <p className="text-ink mt-1 text-base font-bold">{value}</p>
-      <p className="text-ink-faint mt-1 text-[10px]">{note}</p>
+      <p className="text-ink-faint mt-1 text-xs">{note}</p>
     </div>
   )
 }
@@ -206,7 +177,7 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
         deliveryRequest,
       ])
 
-    const nextChecks: HealthCheckItem[] = []
+    const nextChecks: HealthCheckResult[] = []
 
     if (lineResult.status === 'fulfilled') {
       const { activeAccounts, health } = lineResult.value
@@ -316,7 +287,10 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
       nextChecks.push({ id: 'delivery', label: '配信処理', icon: '▷', severity: 'unknown', detail: '配信処理の状態を取得できませんでした' })
     }
 
-    setChecks(CHECK_DEFINITIONS.map((definition) => nextChecks.find((item) => item.id === definition.id) ?? { ...definition, detail: '確認できませんでした', severity: 'unknown' }))
+    setChecks(CHECK_DEFINITIONS.map((definition) => ({
+      ...definition,
+      ...(nextChecks.find((item) => item.id === definition.id) ?? { detail: '確認できませんでした', severity: 'unknown' as const }),
+    })))
     setLoading(false)
   }, [])
 
@@ -337,59 +311,83 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
         ? '対応が必要な項目があります。チェック結果を確認してください。'
         : '取得できない項目があります。時間をおいて再確認してください。'
   const statusIcon = isNormal ? '✓' : '!'
-  const statusIconClass = isNormal ? 'text-emerald-700' : displayedSeverity === 'warning' ? 'text-amber-700' : displayedSeverity === 'danger' ? 'text-red-700' : 'text-gray-600'
+  const statusIconClass = isNormal ? 'text-success' : displayedSeverity === 'warning' ? 'text-warning' : displayedSeverity === 'danger' ? 'text-danger' : 'text-ink-faint'
 
   useEffect(() => { onSeverity(displayedSeverity) }, [displayedSeverity, onSeverity])
 
+  const nextCheckedAt = checkedAt
+    ? new Date(Date.parse(checkedAt) + 5 * 60 * 1000).toISOString()
+    : null
+
   return (
     <div className="space-y-4" data-design="V3 Health">
-      <div className={`rounded-card flex flex-wrap items-center gap-3 border px-4 py-3 ${severityStyle[displayedSeverity].panel}`}>
-        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-sm font-bold ${statusIconClass}`}>{statusIcon}</span>
-        <div className="min-w-0 flex-1">
-          <p className="text-base font-bold text-gray-900">{resultTitle}</p>
-          <p className="mt-0.5 text-xs text-gray-600">{loading ? '確認しています…' : resultDescription}</p>
-        </div>
-      </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <SummaryCard label="全体の状態" value={resultTitle} note={loading ? '確認中' : '最新結果'} />
         <SummaryCard label="最後の確認" value={formatOperationDate(checkedAt)} note="5分ごとに自動確認" />
         <SummaryCard label="緊急停止状態" value="通常運用" note="停止なし" />
       </div>
-      <section className="border-hairline rounded-card overflow-hidden border bg-white">
-        <div className="border-hairline flex items-start justify-between gap-3 border-b px-4 py-3"><div><h2 className="text-base font-bold text-gray-900">チェック結果</h2><p className="mt-0.5 text-xs text-gray-500">6項目を常に表示し、確認内容と最新結果を示します</p></div><span className="rounded-pill bg-info-bg text-info px-2 py-1 text-[10px] font-bold">5分ごと</span></div>
-        <div className="divide-y divide-gray-100">
+      <div className="rounded-control bg-info-bg text-info px-4 py-3 text-xs font-semibold">
+        LINEとのつながりや配信の詰まりを、5分ごとに自動で確かめています。赤が出たら「緊急コントロール」で止められます。
+      </div>
+      <div className={`rounded-card flex flex-wrap items-center gap-3 border px-4 py-3 ${severityStyle[displayedSeverity].panel}`}>
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-canvas text-sm font-bold ${statusIconClass}`}>{statusIcon}</span>
+        <div className="min-w-0 flex-1">
+          <p className="text-base font-bold text-ink">{loading ? '確認しています…' : `${resultTitle}。${isNormal ? '6項目のすべてが正常です。' : ''}`}</p>
+          <p className="mt-0.5 text-xs text-ink-faint">
+            {loading ? '最新の状態を読み込んでいます。' : `${resultDescription} 次は${formatOperationDate(nextCheckedAt)}に自動で確かめます。`}
+          </p>
+        </div>
+        <Link href="/emergency?tab=control" className="rounded-control inline-flex min-h-9 items-center bg-danger px-3 text-xs font-bold text-on-accent hover:opacity-90">緊急停止を確認</Link>
+      </div>
+      <section className="border-hairline rounded-card overflow-hidden border bg-canvas">
+        <div className="border-hairline flex items-start justify-between gap-3 border-b px-4 py-3"><div><h2 className="text-base font-bold text-ink">チェック結果</h2><p className="mt-0.5 text-xs text-ink-faint">6項目を常に表示し、確認内容と最新結果を示します</p></div><span className="rounded-pill bg-info-bg text-info px-2 py-1 text-xs font-bold">5分ごと</span></div>
+        <div className="hidden grid-cols-6 gap-3 bg-canvas-sunken px-4 py-3 text-xs font-bold text-ink-faint lg:grid">
+          <span>確認する項目</span><span>結果</span><span>いまの数字</span><span>目安</span><span>最後の確認</span><span>操作</span>
+        </div>
+        <div className="divide-y divide-hairline">
           {checks.map((check) => {
             const style = severityStyle[check.severity]
-            const iconClass = check.severity === 'normal' ? 'bg-emerald-100 text-emerald-700' : check.severity === 'warning' ? 'bg-amber-100 text-amber-800' : check.severity === 'danger' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
+            const iconClass = check.severity === 'normal' ? 'bg-success-bg text-success' : check.severity === 'warning' ? 'bg-warning-bg text-warning' : check.severity === 'danger' ? 'bg-danger-bg text-danger' : 'bg-canvas-sunken text-ink-faint'
             return (
-              <div key={check.id} className={`flex items-center gap-3 px-4 py-4 ${check.severity === 'normal' ? 'bg-emerald-50/50' : style.panel}`}>
-                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${iconClass}`}>{check.icon}</span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-gray-900">{check.label}</p>
-                  <p className="mt-1 text-xs text-gray-600">{check.detail}</p>
+              <div key={check.id} className={`grid gap-3 px-4 py-4 lg:grid-cols-6 lg:items-center ${check.severity === 'normal' ? 'bg-canvas' : style.panel}`}>
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${iconClass}`}>{check.icon}</span>
+                  <div className="min-w-0"><p className="text-sm font-bold text-ink">{check.label}</p><p className="mt-1 text-xs text-ink-faint">{check.description}</p></div>
                 </div>
                 <StatusPill severity={check.severity} />
+                <p className="text-xs leading-relaxed text-ink-secondary">{check.detail}</p>
+                <p className="text-xs leading-relaxed text-ink-faint">{check.threshold}</p>
+                <p className="text-xs text-ink-faint">{formatOperationDate(checkedAt)}</p>
+                <Link href={check.href} className="rounded-control border-hairline inline-flex min-h-9 items-center justify-center border bg-canvas px-3 text-xs font-bold text-ink-secondary hover:bg-canvas-sunken">中身を見る</Link>
               </div>
             )
           })}
         </div>
-        {!isNormal && <div className="border-hairline flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3"><p className="text-xs text-gray-600">配信予定を確認し、必要な場合だけ配信を停止してください。</p><Link href="/emergency?tab=control" className="rounded-control inline-flex min-h-9 items-center bg-red-600 px-3 text-xs font-bold text-white hover:bg-red-700">緊急停止を確認</Link></div>}
       </section>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="判定の見方">
+        {([
+          ['正常', '目安の中に入っています', 'normal'],
+          ['注意', '目安をこえました。見てください', 'warning'],
+          ['エラー', '動いていません。止めるか直してください', 'danger'],
+          ['未確認', '確かめられませんでした', 'unknown'],
+        ] as const).map(([label, note, severity]) => <div key={label} className="border-hairline rounded-control border px-4 py-3"><StatusPill severity={severity} /><p className="text-ink-faint mt-1 text-xs">{note}</p></div>)}
+      </div>
     </div>
   )
 }
 
 function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
   const [targetAccountId, setTargetAccountId] = useState('all')
-  const [targets, setTargets] = useState<Record<StopTarget, boolean>>({ broadcasts: true, scenarios: true, reminders: true, automations: true })
+  const [targets, setTargets] = useState<Record<StopTarget, boolean>>({ broadcasts: true, scenarios: true, reminders: true, automations: false })
   const [reason, setReason] = useState('障害対応')
   const [reasonDetail, setReasonDetail] = useState('')
   const [confirmMode, setConfirmMode] = useState<ConfirmMode>(null)
   const [confirmWord, setConfirmWord] = useState('')
   const [running, setRunning] = useState(false)
   const [message, setMessage] = useState<{ tone: 'success' | 'warning' | 'danger'; text: string } | null>(null)
-  const [snapshot, setSnapshot] = useState<EmergencySnapshot | null>(null)
-  useEffect(() => setSnapshot(readSnapshot()), [])
+  const [control, setControl] = useState<OperationControl | null>(null)
+  const [canControl, setCanControl] = useState(false)
+  const [calculatedAt, setCalculatedAt] = useState<string | null>(null)
 
   /*
     **止める前に、何本止まって何人に関わるかを実測で出す。**
@@ -409,7 +407,12 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
     api.operations.preview(accountId)
       .then((response) => {
         if (cancelled) return
-        if (response.success) setImpact(response.data.impact)
+        if (response.success && response.data?.impact && response.data?.control && response.data?.permissions) {
+          setImpact(response.data.impact)
+          setControl(response.data.control)
+          setCanControl(response.data.permissions.canControl)
+          setCalculatedAt(response.data.calculatedAt)
+        }
         else setImpactFailed(true)
       })
       .catch(() => { if (!cancelled) setImpactFailed(true) })
@@ -417,92 +420,159 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
   }, [targetAccountId])
 
   const selectedTargets = (Object.keys(targets) as StopTarget[]).filter((key) => targets[key])
+  const selectedCapabilities = selectedTargets.flatMap((key) => TARGET_CAPABILITIES[key])
+  const isStopped = Boolean(control?.activeIncidentId)
   const accountName = targetAccountId === 'all' ? 'すべてのアカウント' : accounts.find((account) => account.id === targetAccountId)?.name ?? '選択したアカウント'
   const fullReason = reasonDetail.trim() ? `${reason}: ${reasonDetail.trim()}` : reason
   const targetLabels: Record<StopTarget, { label: string; note: string }> = {
     broadcasts: { label: '予約中の一斉配信', note: '予約を下書きに戻します' },
     scenarios: { label: 'シナリオ配信', note: '稼働中のものを止めます' },
     reminders: { label: 'リマインダ', note: '稼働中のものを止めます' },
-    automations: { label: '自動処理', note: '配信につながる自動処理を止めます' },
+    automations: { label: '自動処理', note: 'オートメーションと自動応答を止めます' },
+  }
+
+  const impactText = (key: StopTarget) => {
+    if (impactFailed) return '影響を確認できません'
+    if (key !== 'automations') return operationImpactText(IMPACT_KEY[key], impact)
+    return `オートメーション ${operationImpactText('automation_actions', impact)}／自動応答 ${operationImpactText('auto_reply_dispatch', impact)}`
   }
 
   const openStopConfirm = () => {
+    if (!control || impactFailed || !impact) { setMessage({ tone: 'warning', text: '停止状態と影響を確認できるまで実行できません。' }); return }
+    if (!canControl) { setMessage({ tone: 'warning', text: '緊急停止を実行する権限がありません。' }); return }
     if (selectedTargets.length === 0) { setMessage({ tone: 'warning', text: '停止する配信を1つ以上選んでください。' }); return }
     setConfirmWord(''); setConfirmMode('stop')
   }
 
   const runStop = async () => {
-    if (confirmWord !== '停止') return
+    if (confirmWord !== '停止' || !control) return
     setRunning(true); setMessage(null)
-    const accountId = targetAccountId === 'all' ? undefined : targetAccountId
-    const nextSnapshot: EmergencySnapshot = { id: crypto.randomUUID(), stoppedAt: new Date().toISOString(), accountId: accountId ?? null, accountName, reason: fullReason, broadcasts: [], scenarios: [], reminders: [], automations: [] }
-    let attempted = 0; let succeeded = 0
-    const apply = async (jobs: Array<Promise<unknown>>) => { attempted += jobs.length; const results = await Promise.allSettled(jobs); succeeded += results.filter((result) => result.status === 'fulfilled').length }
     try {
-      if (targets.broadcasts) { const response = await api.broadcasts.list(accountId ? { accountId } : undefined); if (!response.success) throw new Error(response.error); const active = response.data.filter((item) => item.status === 'scheduled'); nextSnapshot.broadcasts = active.map((item) => ({ id: item.id, scheduledAt: item.scheduledAt })); await apply(active.map((item) => api.broadcasts.update(item.id, { scheduledAt: null }))) }
-      if (targets.scenarios) { const response = await api.scenarios.list(accountId ? { accountId } : undefined); if (!response.success) throw new Error(response.error); const active = response.data.filter((item) => item.isActive); nextSnapshot.scenarios = active.map((item) => item.id); await apply(active.map((item) => api.scenarios.update(item.id, { isActive: false }))) }
-      if (targets.reminders) { const response = await api.reminders.list(accountId ? { accountId } : undefined); if (!response.success) throw new Error(response.error); const active = response.data.filter((item) => item.isActive); nextSnapshot.reminders = active.map((item) => item.id); await apply(active.map((item) => api.reminders.update(item.id, { isActive: false }))) }
-      if (targets.automations) { const response = await api.automations.list(accountId ? { accountId } : undefined); if (!response.success) throw new Error(response.error); const active = response.data.filter((item) => item.isActive); nextSnapshot.automations = active.map((item) => item.id); await apply(active.map((item) => api.automations.update(item.id, { isActive: false }))) }
-      const status = succeeded === attempted ? 'success' : succeeded > 0 ? 'partial' : 'failed'
-      if (succeeded > 0 || attempted === 0) { localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(nextSnapshot)); setSnapshot(nextSnapshot) }
-      addOperationHistory({ id: crypto.randomUUID(), occurredAt: new Date().toISOString(), kind: 'stop', title: '緊急停止', detail: `${accountName} / ${fullReason} / ${succeeded}件停止${attempted !== succeeded ? `（${attempted - succeeded}件失敗）` : ''}`, status })
-      setMessage({ tone: status === 'success' ? 'success' : status === 'partial' ? 'warning' : 'danger', text: attempted === 0 ? '停止対象はありませんでした。' : `${succeeded}/${attempted}件を停止しました。` })
+      const response = await api.operations.stop({
+        lineAccountId: targetAccountId === 'all' ? null : targetAccountId,
+        capabilities: selectedCapabilities,
+        reason,
+        detail: reasonDetail.trim() || null,
+        confirmation: '停止',
+        expectedVersion: control.version,
+      })
+      if (!response.success) throw new Error(response.error)
+      setControl(response.data.control)
+      setMessage({ tone: 'success', text: 'サーバー共通の停止状態を更新しました。別の端末にも同じ状態が表示されます。' })
       setConfirmMode(null); setConfirmWord('')
     } catch {
-      addOperationHistory({ id: crypto.randomUUID(), occurredAt: new Date().toISOString(), kind: 'stop', title: '緊急停止', detail: `${accountName} / ${fullReason} / 読み込みまたは実行に失敗`, status: succeeded > 0 ? 'partial' : 'failed' })
-      setMessage({ tone: succeeded > 0 ? 'warning' : 'danger', text: '一部またはすべての停止に失敗しました。更新履歴を確認してください。' }); setConfirmMode(null)
+      setMessage({ tone: 'danger', text: '緊急停止を保存できませんでした。最新の停止状態を読み直して、もう一度確認してください。' })
     } finally { setRunning(false) }
   }
 
   const runRestore = async () => {
-    if (!snapshot || confirmWord !== '復旧') return
+    if (!control?.activeIncidentId || confirmWord !== '復旧') return
     setRunning(true); setMessage(null)
-    let attempted = 0; let succeeded = 0
-    const apply = async (jobs: Array<Promise<unknown>>) => { attempted += jobs.length; const results = await Promise.allSettled(jobs); succeeded += results.filter((result) => result.status === 'fulfilled').length }
     try {
-      const restorableBroadcasts = snapshot.broadcasts.filter((item) => item.scheduledAt && Date.parse(item.scheduledAt) > Date.now())
-      const expiredBroadcasts = snapshot.broadcasts.length - restorableBroadcasts.length
-      await apply(restorableBroadcasts.map((item) => api.broadcasts.update(item.id, { scheduledAt: item.scheduledAt })))
-      await apply(snapshot.scenarios.map((id) => api.scenarios.update(id, { isActive: true })))
-      await apply(snapshot.reminders.map((id) => api.reminders.update(id, { isActive: true })))
-      await apply(snapshot.automations.map((id) => api.automations.update(id, { isActive: true })))
-      const status = succeeded === attempted ? 'success' : succeeded > 0 ? 'partial' : 'failed'
-      if (status === 'success') { localStorage.removeItem(SNAPSHOT_KEY); setSnapshot(null) }
-      addOperationHistory({ id: crypto.randomUUID(), occurredAt: new Date().toISOString(), kind: 'restore', title: '配信を復旧', detail: `${snapshot.accountName} / ${succeeded}件復旧${expiredBroadcasts > 0 ? ` / 期限を過ぎた予約${expiredBroadcasts}件は下書きのまま` : ''}`, status })
-      setMessage({ tone: status === 'success' ? (expiredBroadcasts > 0 ? 'warning' : 'success') : status === 'partial' ? 'warning' : 'danger', text: `${succeeded}/${attempted}件を復旧しました。${expiredBroadcasts > 0 ? ` 期限を過ぎた予約${expiredBroadcasts}件は安全のため再開していません。` : ''}` }); setConfirmMode(null); setConfirmWord('')
-    } catch { setMessage({ tone: 'danger', text: '復旧に失敗しました。更新履歴を確認してください。' }); setConfirmMode(null) } finally { setRunning(false) }
+      const response = await api.operations.restore(control.activeIncidentId, {
+        confirmation: '復旧',
+        expectedVersion: control.version,
+      })
+      if (!response.success) throw new Error(response.error)
+      setControl(response.data.control)
+      setMessage({ tone: 'success', text: 'サーバー共通の停止状態を復旧しました。期限を過ぎた予約は自動では送りません。' })
+      setConfirmMode(null); setConfirmWord('')
+    } catch {
+      setMessage({ tone: 'danger', text: '復旧できませんでした。最新の停止状態を読み直して、もう一度確認してください。' })
+    } finally { setRunning(false) }
   }
 
   return (
     <div className="space-y-4" data-design="V3 Emergency control">
-      <div className={`rounded-card border px-4 py-3 ${snapshot ? 'border-red-200 bg-red-50' : 'border-emerald-200 bg-emerald-50'}`}><p className={`text-base font-bold ${snapshot ? 'text-red-800' : 'text-emerald-800'}`}>{snapshot ? '緊急停止中' : '通常運用中'}</p><p className="mt-1 text-xs text-gray-600">{snapshot ? `${snapshot.accountName}・${formatOperationDate(snapshot.stoppedAt)}から停止中` : '緊急停止は実行されていません。'}</p></div>
-      {message && <div className={`rounded-control px-4 py-3 text-xs font-bold ${message.tone === 'success' ? 'bg-emerald-50 text-emerald-800' : message.tone === 'warning' ? 'bg-amber-50 text-amber-800' : 'bg-red-50 text-red-800'}`}>{message.text}</div>}
-      <section className={`border-hairline rounded-card border bg-white p-4 ${snapshot ? 'pointer-events-none opacity-50' : ''}`}>
-        <div><h2 className="text-base font-bold text-gray-900">緊急停止</h2><p className="mt-1 text-xs text-gray-500">停止対象を実行直前に取得します。</p></div>
-        <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2"><div><label className="text-xs font-bold text-gray-700" htmlFor="emergency-account">対象アカウント</label><SelectField id="emergency-account" value={targetAccountId} onChange={(event) => setTargetAccountId(event.target.value)} aria-label="緊急停止の対象アカウント" className="border-hairline rounded-control mt-2 min-h-11 w-full border bg-white px-3 text-sm" options={[{ value: 'all', label: 'すべてのアカウント' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} /></div><div><label className="text-xs font-bold text-gray-700" htmlFor="emergency-reason">停止理由</label><SelectField id="emergency-reason" value={reason} onChange={(event) => setReason(event.target.value)} aria-label="緊急停止の理由" className="border-hairline rounded-control mt-2 min-h-11 w-full border bg-white px-3 text-sm" options={['障害対応', '誤配信の防止', 'アカウント異常', 'メンテナンス', 'その他'].map((label) => ({ value: label, label }))} /></div></div>
-        <div className="border-hairline mt-5 overflow-hidden rounded-control border">{(Object.keys(targetLabels) as StopTarget[]).map((key) => <label key={key} className="flex cursor-pointer items-center gap-3 border-b border-gray-100 px-4 py-3 last:border-0 hover:bg-gray-50"><input type="checkbox" checked={targets[key]} onChange={(event) => setTargets((current) => ({ ...current, [key]: event.target.checked }))} className="h-4 w-4 accent-red-600" /><span className="min-w-0 flex-1"><span className="block text-sm font-bold text-gray-900">{targetLabels[key].label}</span><span className="block text-xs text-gray-500">{targetLabels[key].note}</span></span><span className="max-w-sm shrink-0 text-right text-xs font-bold text-ink-secondary">{impactFailed ? '影響を確認できません' : operationImpactText(IMPACT_KEY[key], impact)}</span></label>)}</div>
-        <div className="mt-5"><label className="text-xs font-bold text-gray-700" htmlFor="emergency-detail">補足（任意）</label><textarea id="emergency-detail" value={reasonDetail} onChange={(event) => setReasonDetail(event.target.value)} rows={2} placeholder="発生していることを短く入力" className="border-hairline rounded-control mt-2 w-full border px-3 py-2 text-sm" /></div>
-        <div className="mt-5 flex justify-end"><button onClick={openStopConfirm} disabled={running || Boolean(snapshot)} className="rounded-control min-h-10 bg-red-600 px-4 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50">緊急停止する</button></div>
+      <div className={`rounded-card border px-4 py-3 ${isStopped ? 'border-danger bg-danger-bg' : impactFailed ? 'border-hairline bg-canvas-sunken' : 'border-success bg-success-bg'}`}><p className={`text-base font-bold ${isStopped ? 'text-danger' : impactFailed ? 'text-ink-secondary' : 'text-success'}`}>{isStopped ? '緊急停止中' : impactFailed ? '停止状態を確認できません' : '通常運用中'}</p><p className="mt-1 text-xs text-ink-faint">{isStopped ? `${accountName}・${formatOperationDate(control?.stoppedAt ?? null)}から停止中` : impactFailed ? '取得できない状態では停止・復旧を実行できません。' : `緊急停止は実行されていません。${calculatedAt ? `${formatOperationDate(calculatedAt)}に確認しました。` : ''}`}</p></div>
+      {message && <div className={`rounded-control px-4 py-3 text-xs font-bold ${message.tone === 'success' ? 'bg-success-bg text-success' : message.tone === 'warning' ? 'bg-warning-bg text-warning' : 'bg-danger-bg text-danger'}`}>{message.text}</div>}
+      <section className={`border-hairline rounded-card border bg-canvas p-4 ${isStopped ? 'pointer-events-none opacity-50' : ''}`}>
+        <div><h2 className="text-base font-bold text-ink">緊急停止</h2><p className="mt-1 text-xs text-ink-faint">停止対象を実行直前に取得します。</p></div>
+        <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2"><div><label className="text-xs font-bold text-ink-secondary" htmlFor="emergency-account">対象アカウント</label><SelectField id="emergency-account" value={targetAccountId} onChange={(event) => setTargetAccountId(event.target.value)} aria-label="緊急停止の対象アカウント" className="border-hairline rounded-control mt-2 min-h-11 w-full border bg-canvas px-3 text-sm" options={[{ value: 'all', label: 'すべてのアカウント' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} /></div><div><label className="text-xs font-bold text-ink-secondary" htmlFor="emergency-reason">停止理由</label><SelectField id="emergency-reason" value={reason} onChange={(event) => setReason(event.target.value)} aria-label="緊急停止の理由" className="border-hairline rounded-control mt-2 min-h-11 w-full border bg-canvas px-3 text-sm" options={['障害対応', '誤配信の防止', 'アカウント異常', 'メンテナンス', 'その他'].map((label) => ({ value: label, label }))} /></div></div>
+        <div className="border-hairline mt-5 overflow-hidden rounded-control border">{(Object.keys(targetLabels) as StopTarget[]).map((key) => <label key={key} className="flex cursor-pointer items-center gap-3 border-b border-hairline px-4 py-3 last:border-0 hover:bg-canvas-sunken"><input type="checkbox" checked={targets[key]} onChange={(event) => setTargets((current) => ({ ...current, [key]: event.target.checked }))} className="h-4 w-4 accent-danger" /><span className="min-w-0 flex-1"><span className="block text-sm font-bold text-ink">{targetLabels[key].label}</span><span className="block text-xs text-ink-faint">{targetLabels[key].note}</span></span><span className="max-w-md shrink-0 text-right text-xs font-bold text-ink-secondary">{impactText(key)}</span></label>)}</div>
+        <div className="mt-5"><label className="text-xs font-bold text-ink-secondary" htmlFor="emergency-detail">補足（任意）</label><textarea id="emergency-detail" value={reasonDetail} onChange={(event) => setReasonDetail(event.target.value)} rows={2} placeholder="発生していることを短く入力" className="border-hairline rounded-control mt-2 w-full border px-3 py-2 text-sm" /></div>
+        <div className="mt-5 flex justify-end"><button onClick={openStopConfirm} disabled={running || isStopped || impactFailed || !impact || !control || !canControl} className="rounded-control min-h-10 bg-danger px-4 text-xs font-bold text-on-accent hover:opacity-90 disabled:opacity-50">緊急停止する</button></div>
       </section>
-      {snapshot && <section className="rounded-card border border-blue-200 bg-blue-50 p-4"><div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-base font-bold text-blue-900">復旧</h2><p className="mt-1 text-xs text-blue-800">期限を過ぎた予約配信は安全のため再開しません。</p></div><button onClick={() => { setConfirmWord(''); setConfirmMode('restore') }} disabled={running} className="rounded-control border border-blue-300 bg-white px-4 py-2 text-xs font-bold text-blue-800 hover:bg-blue-100">復旧する</button></div></section>}
-      {confirmMode && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-confirm-title"><div className="rounded-card w-full max-w-lg bg-white p-6 shadow-2xl"><h2 id="emergency-confirm-title" className="text-lg font-bold text-gray-900">{confirmMode === 'stop' ? '緊急停止の最終確認' : '復旧の最終確認'}</h2><div className={`mt-4 rounded-control p-4 text-sm ${confirmMode === 'stop' ? 'bg-red-50 text-red-800' : 'bg-blue-50 text-blue-900'}`}>{confirmMode === 'stop' ? <><p className="font-bold">{accountName}</p><div className="mt-3 space-y-2">{selectedTargets.map((key) => <div key={key} className="flex items-start justify-between gap-3"><span>{targetLabels[key].label}</span><strong className="text-right">{impactFailed ? '影響を確認できません' : operationImpactText(IMPACT_KEY[key], impact)}</strong></div>)}</div><p className="mt-3">理由：{fullReason}</p><p className="mt-2 font-bold">停止前にすでにLINEへ渡したものは取り消せません。</p></> : <><p className="font-bold">{snapshot?.accountName}</p><p className="mt-1">停止前に動いていた配信を再開します。</p></>}</div><label className="mt-4 block text-sm font-bold text-gray-800" htmlFor="emergency-confirm-word">確認のため「{confirmMode === 'stop' ? '停止' : '復旧'}」と入力</label><input id="emergency-confirm-word" value={confirmWord} onChange={(event) => setConfirmWord(event.target.value)} autoFocus className="border-hairline rounded-control mt-2 min-h-11 w-full border px-3 text-sm" /><div className="mt-5 flex justify-end gap-2"><button onClick={() => { setConfirmMode(null); setConfirmWord('') }} disabled={running} className="rounded-control border-hairline min-h-11 border px-4 text-sm font-bold text-gray-700">キャンセル</button><button onClick={() => void (confirmMode === 'stop' ? runStop() : runRestore())} disabled={running || confirmWord !== (confirmMode === 'stop' ? '停止' : '復旧')} className={`rounded-control min-h-11 px-4 text-sm font-bold text-white disabled:opacity-40 ${confirmMode === 'stop' ? 'bg-red-600' : 'bg-blue-700'}`}>{running ? '実行中...' : '実行する'}</button></div></div></div>}
+      {isStopped && <section className="rounded-card border border-info bg-info-bg p-4"><div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-base font-bold text-info">復旧</h2><p className="mt-1 text-xs text-info">停止前に動いていたものだけを戻します。期限を過ぎた予約配信は安全のため再開しません。</p></div><button onClick={() => { setConfirmWord(''); setConfirmMode('restore') }} disabled={running || !canControl} className="rounded-control border border-info bg-canvas px-4 py-2 text-xs font-bold text-info hover:bg-info-bg disabled:opacity-50">復旧する</button></div></section>}
+      {confirmMode && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/50 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-confirm-title"><div className="rounded-card w-full max-w-2xl overflow-hidden bg-canvas shadow-2xl"><div className="border-hairline border-b px-6 py-5"><h2 id="emergency-confirm-title" className="text-lg font-bold text-ink">{confirmMode === 'stop' ? '緊急停止の最終確認' : '復旧の最終確認'}</h2><p className="mt-1 text-xs text-ink-faint">{confirmMode === 'stop' ? 'この内容で止めます。止めた瞬間から、自動で送るものが出なくなります。' : '停止前に動いていたものだけを戻します。'}</p></div><div className="space-y-4 p-6"><div className={`rounded-control border p-4 text-sm ${confirmMode === 'stop' ? 'border-danger bg-danger-bg text-danger' : 'border-info bg-info-bg text-info'}`}>{confirmMode === 'stop' ? <><p className="font-bold">{accountName}</p><div className="mt-3 space-y-2">{selectedTargets.map((key) => <div key={key} className="flex items-start justify-between gap-3"><span>{targetLabels[key].label}</span><strong className="text-right">{impactText(key)}</strong></div>)}</div><p className="mt-3">理由：{fullReason}</p><p className="mt-2 font-bold">停止前にすでにLINEへ渡したものは取り消せません。</p></> : <><p className="font-bold">{accountName}</p><p className="mt-1">期限を過ぎた予約は自動では送りません。</p></>}</div>{confirmMode === 'stop' && <div className="rounded-control bg-success-bg px-4 py-3 text-xs font-bold text-success">{targets.automations ? '受信箱からの手の返信と予約の受付は止まりません。' : '自動処理／受信箱からの手の返信／予約の受付は止まりません。'}</div>}<div className="rounded-control bg-warning-bg px-4 py-3 text-xs font-semibold text-warning">ログインユーザーへのLINE・メール通知は、通知基盤の接続後に有効になります。現在は更新履歴へ記録します。</div><label className="block text-sm font-bold text-ink-secondary" htmlFor="emergency-confirm-word">確認のため「{confirmMode === 'stop' ? '停止' : '復旧'}」と入力</label><input id="emergency-confirm-word" value={confirmWord} onChange={(event) => setConfirmWord(event.target.value)} autoFocus className="border-hairline rounded-control min-h-11 w-full border px-3 text-sm" /></div><div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><button onClick={() => { setConfirmMode(null); setConfirmWord('') }} disabled={running} className="rounded-control min-h-11 px-4 text-sm font-bold text-action hover:bg-action-soft">キャンセル</button><button onClick={() => void (confirmMode === 'stop' ? runStop() : runRestore())} disabled={running || confirmWord !== (confirmMode === 'stop' ? '停止' : '復旧')} className={`rounded-control min-h-11 px-4 text-sm font-bold text-on-accent disabled:opacity-40 ${confirmMode === 'stop' ? 'bg-danger' : 'bg-info'}`}>{running ? '実行中...' : confirmMode === 'stop' ? '配信を緊急停止する' : '復旧を実行する'}</button></div></div></div>}
     </div>
   )
 }
 
 function HistoryPanel() {
-  const [operations, setOperations] = useState<OperationHistoryEntry[]>([])
-  const [updates, setUpdates] = useState<UpdateHistoryRow[]>([])
-  const [updateState, setUpdateState] = useState<'loading' | 'ready' | 'unconfigured' | 'error'>('loading')
-  const [filter, setFilter] = useState<'all' | 'operation' | 'update'>('all')
-  useEffect(() => { const refresh = () => setOperations(readOperationHistory()); refresh(); window.addEventListener('nen-operation-history-updated', refresh); return () => window.removeEventListener('nen-operation-history-updated', refresh) }, [])
+  const [operations, setOperations] = useState<OperationIncident[]>([])
+  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [period, setPeriod] = useState<'year' | '30days'>('year')
+
   useEffect(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL; const adminKey = process.env.NEXT_PUBLIC_ADMIN_API_KEY
-    if (!apiUrl || !adminKey) { setUpdateState('unconfigured'); return }
-    fetch(`${apiUrl}/admin/update/history`, { headers: { 'x-admin-api-key': adminKey } }).then(async (response) => { if (!response.ok) throw new Error(String(response.status)); return response.json() as Promise<{ history: UpdateHistoryRow[] }> }).then((body) => { setUpdates(body.history); setUpdateState('ready') }).catch(() => setUpdateState('error'))
+    let cancelled = false
+    api.operations.history(200)
+      .then((response) => {
+        if (cancelled) return
+        if (response.success && Array.isArray(response.data)) { setOperations(response.data); setState('ready') }
+        else setState('error')
+      })
+      .catch(() => { if (!cancelled) setState('error') })
+    return () => { cancelled = true }
   }, [])
-  const entries = [...operations.map((item) => ({ id: `operation-${item.id}`, occurredAt: item.occurredAt, type: 'operation' as const, title: item.title, detail: item.detail, status: item.status })), ...updates.map((item) => ({ id: `update-${item.id}`, occurredAt: new Date(item.started_at).toISOString(), type: 'update' as const, title: `システム更新 ${item.from_version} → ${item.to_version}`, detail: item.error ? '更新に失敗しました' : 'システム更新の記録', status: item.status }))].filter((item) => filter === 'all' || item.type === filter).sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))
-  return <div className="space-y-4" data-design="V3 Update history"><div className="rounded-card border border-blue-200 bg-blue-50 px-4 py-3 text-xs font-medium text-blue-900">変更内容はリリースごとに記録しています。緊急操作とシステム更新は自動で記録されます。</div><div className="grid grid-cols-1 gap-3 md:grid-cols-3"><SummaryCard label="緊急操作" value={`${operations.length}件`} note="この端末に保存された履歴" /><SummaryCard label="システム更新" value={updateState === 'ready' ? `${updates.length}件` : '—'} note={updateState === 'unconfigured' ? '自動更新は未構成' : '取得できた更新履歴'} /><SummaryCard label="最後の緊急操作" value={formatOperationDate(operations[0]?.occurredAt ?? null)} note={operations[0]?.title ?? 'まだありません'} /></div><ReleaseLogPanel /><div className="border-hairline rounded-card overflow-hidden border bg-white"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3"><h2 className="text-base font-bold text-gray-900">履歴</h2><SelectField value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)} options={[{ value: "all", label: "すべて" }, { value: "operation", label: "緊急操作" }, { value: "update", label: "システム更新" }]} className="border-hairline rounded-control min-h-9 border bg-white px-3 text-xs" /></div>{updateState === 'error' && <p className="bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800">システム更新の履歴を取得できませんでした。</p>}{entries.length === 0 ? <p className="p-8 text-center text-xs text-gray-500">履歴はまだありません。</p> : <div className="divide-y divide-gray-100">{entries.map((entry) => <div key={entry.id} className="grid gap-2 px-4 py-4 md:grid-cols-[150px_120px_1fr_auto] md:items-center"><time className="text-xs text-gray-500">{formatOperationDate(entry.occurredAt)}</time><span className="text-xs font-bold text-gray-600">{entry.type === 'operation' ? '緊急操作' : 'システム更新'}</span><div><p className="text-sm font-bold text-gray-900">{entry.title}</p><p className="mt-1 text-xs text-gray-500">{entry.detail}</p></div><span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${entry.status === 'success' ? 'bg-emerald-100 text-emerald-700' : entry.status === 'failed' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'}`}>{entry.status === 'success' ? '完了' : entry.status === 'failed' ? '失敗' : entry.status === 'partial' ? '一部失敗' : entry.status}</span></div>)}</div>}</div></div>
+
+  const cutoff = Date.now() - (period === '30days' ? 30 : 365) * 24 * 60 * 60 * 1000
+  const entries = operations.filter((item) => Date.parse(item.createdAt) >= cutoff)
+  const longestMinutes = operations.reduce((longest, item) => {
+    if (!item.stoppedAt || !item.resolvedAt) return longest
+    return Math.max(longest, Math.round((Date.parse(item.resolvedAt) - Date.parse(item.stoppedAt)) / 60_000))
+  }, 0)
+  const releases = (releaseLog as { releases?: Array<{
+    version: string
+    released: string | null
+    entries: Array<{ kind: string; text: string; by: string | null; pr: number | null; at: string | null }>
+  }> }).releases ?? []
+  const currentVersion = releases.find((item) => item.released)?.version ?? '—'
+  const updateCount = releases.filter((item) => item.released && Date.parse(item.released) >= Date.now() - 30 * 24 * 60 * 60 * 1000).reduce((sum, item) => sum + item.entries.length, 0)
+  const recentUpdates = releases
+    .flatMap((release) => release.entries.map((entry) => ({ ...entry, version: release.version, released: release.released })))
+    .toSorted((left, right) => Date.parse(right.at ?? right.released ?? '') - Date.parse(left.at ?? left.released ?? ''))
+    .slice(0, 10)
+
+  const downloadCsv = () => {
+    const quote = (value: unknown) => `"${String(value ?? '').replaceAll('"', '""')}"`
+    const rows = entries.map((item) => [
+      item.createdAt,
+      item.actorId,
+      item.capabilities.map((capability) => CAPABILITY_LABEL[capability]).join('・'),
+      item.lineAccountId ?? 'すべてのアカウント',
+      item.reason,
+      item.resolvedAt ?? '',
+    ])
+    const blob = new Blob([`\uFEFF${[['いつ・だれが', '担当者', '止めたもの', '対象', '理由', '戻した'], ...rows].map((row) => row.map(quote).join(',')).join('\n')}`], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url; anchor.download = 'operation-history.csv'; anchor.click(); URL.revokeObjectURL(url)
+  }
+
+  return (
+    <div className="space-y-4" data-design="V3 Update history">
+      <div className="flex flex-wrap justify-end gap-2">
+        <SelectField value={period} onChange={(event) => setPeriod(event.target.value as typeof period)} options={[{ value: 'year', label: 'この1年' }, { value: '30days', label: 'この30日' }]} className="border-hairline rounded-control min-h-9 border bg-canvas px-3 text-xs" />
+        <button type="button" onClick={downloadCsv} className="rounded-control min-h-9 px-3 text-xs font-bold text-action hover:bg-action-soft">CSVで書き出す</button>
+      </div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+        <SummaryCard label="止めた回数" value={state === 'ready' ? `${operations.length}回` : '—'} note="この1年" />
+        <SummaryCard label="いちばん長かった停止" value={longestMinutes > 0 ? `${longestMinutes}分` : '—'} note="サーバーに残る記録" />
+        <SummaryCard label="管理画面の更新" value={`${updateCount}回`} note="この30日" />
+        <SummaryCard label="いまの版" value={currentVersion} note="反映済み" />
+      </div>
+      <div className="rounded-control bg-info-bg text-info px-4 py-3 text-xs font-semibold">止めた・戻した記録です。だれが、いつ、何を止めたかが残ります。通常の管理者は消せません。</div>
+      <section className="border-hairline rounded-card overflow-hidden border bg-canvas">
+        <div className="border-hairline border-b px-4 py-3"><h2 className="text-base font-bold text-ink">止めた・戻した記録</h2><p className="mt-0.5 text-xs text-ink-faint">だれが・いつ・何を・なぜ。サーバーに追記して残します</p></div>
+        {state === 'error' ? <p className="bg-warning-bg px-4 py-4 text-xs font-medium text-warning">緊急操作の履歴を取得できませんでした。履歴なしとは扱いません。</p> : entries.length === 0 ? <p className="p-8 text-center text-xs text-ink-faint">この期間の記録はありません。</p> : <><div className="hidden grid-cols-[190px_1.2fr_1fr_1fr_110px] gap-3 bg-canvas-sunken px-4 py-3 text-[11px] font-bold text-ink-faint md:grid"><span>いつ・だれが</span><span>止めたもの</span><span>対象</span><span>理由</span><span>戻した</span></div><div className="divide-y divide-hairline">{entries.map((entry) => <div key={entry.id} className="grid gap-3 px-4 py-4 md:grid-cols-[190px_1.2fr_1fr_1fr_110px] md:items-center"><div><time className="text-sm font-bold text-ink">{formatOperationDate(entry.createdAt)}</time><p className="mt-1 truncate text-xs text-ink-faint" title={entry.actorId}>{entry.actorId}</p></div><p className="text-xs font-bold text-ink-secondary">{entry.capabilities.map((capability) => CAPABILITY_LABEL[capability]).join('・')}</p><p className="text-xs text-ink-secondary">{entry.lineAccountId ?? 'すべてのアカウント'}</p><div><p className="text-xs font-bold text-ink-secondary">{entry.reason}</p>{entry.detail && <p className="mt-1 text-xs text-ink-faint">{entry.detail}</p>}</div><p className={`text-xs font-bold ${entry.resolvedAt ? 'text-success' : entry.status === 'failed' ? 'text-danger' : 'text-ink-faint'}`}>{entry.resolvedAt ? formatOperationDate(entry.resolvedAt) : entry.status === 'failed' ? '失敗' : '停止中'}</p></div>)}</div></>}
+      </section>
+      <section className="border-hairline rounded-card overflow-hidden border bg-canvas">
+        <div className="border-hairline border-b px-4 py-3"><h2 className="text-base font-bold text-ink">システム更新</h2><p className="mt-0.5 text-xs text-ink-faint">管理画面へ入った変更のうち、新しい10件を表示します</p></div>
+        {recentUpdates.length === 0 ? <p className="p-8 text-center text-xs text-ink-faint">更新の記録はありません。</p> : <div className="divide-y divide-hairline">{recentUpdates.map((entry, index) => <div key={`${entry.version}-${entry.pr ?? index}-${entry.at ?? index}`} className="grid gap-2 px-4 py-3 md:grid-cols-[150px_minmax(0,1fr)_100px] md:items-center"><div><time className="text-xs font-bold text-ink-secondary">{formatOperationDate(entry.at ?? entry.released)}</time><p className="mt-1 text-[11px] text-ink-faint">{entry.version}</p></div><p className="line-clamp-2 text-xs leading-relaxed text-ink-secondary" title={entry.text}>{entry.text}</p><p className="text-xs font-bold text-ink-faint">{entry.by ?? '自動'}{entry.pr ? ` #${entry.pr}` : ''}</p></div>)}</div>}
+      </section>
+    </div>
+  )
 }
 
 function EmergencyPageInner() {
@@ -516,7 +586,7 @@ function EmergencyPageInner() {
       ? '止める配信を選び、理由を入力して緊急停止します。'
       : 'エラー、緊急停止、システム更新、設定変更を時間順に確認できます。'
   const headerAction = tab === 'health'
-    ? <div className="flex flex-wrap gap-2"><button type="button" onClick={() => window.location.reload()} className="rounded-control min-h-9 bg-accent-deep px-3 text-xs font-bold text-white">↻ チェックを今すぐ実行</button><Link href="/emergency?tab=control" className="rounded-control inline-flex min-h-9 items-center bg-red-600 px-3 text-xs font-bold text-white">⊗ 配信をすべて緊急停止</Link></div>
+    ? <button type="button" onClick={() => window.location.reload()} className="rounded-control min-h-9 bg-accent-deep px-3 text-xs font-bold text-on-accent">↻ いますぐ確かめる</button>
     : severity === 'danger' || severity === 'warning' ? <StatusPill severity={severity} /> : undefined
   return <div><OperationPageHeader description={description} action={headerAction} /><MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel onSeverity={setSeverity} />}{tab === 'control' && <EmergencyControlPanel accounts={accounts} />}{tab === 'history' && <HistoryPanel />}</div>
 }
