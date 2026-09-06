@@ -8,7 +8,14 @@ import OperatorNotificationRules from '@/components/line-notifications/operator-
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
-import { ApiError, api, type EcCommerceOverview, type EcNotificationSetting } from '@/lib/api'
+import {
+  ApiError,
+  api,
+  type EcCommerceOverview,
+  type EcNotificationSetting,
+  type LineNotificationDefinition,
+  type LineNotificationMetric,
+} from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { canOpenCustomerNotificationKpi, customerNotificationKpis } from './customer-kpis'
 import styles from './customer-notifications.module.css'
@@ -104,16 +111,20 @@ function CardPreview({ setting }: { setting: EcNotificationSetting }) {
 
 function CustomerNotificationEditor({
   setting,
+  definition,
   busy,
   onChange,
   onClose,
+  onPublish,
   onSave,
   onTestSend,
 }: {
   setting: EcNotificationSetting
+  definition: LineNotificationDefinition | null
   busy: boolean
   onChange: (patch: Partial<EcNotificationSetting>) => void
   onClose: () => void
+  onPublish: () => void
   onSave: () => void
   onTestSend: () => void
 }) {
@@ -122,7 +133,7 @@ function CustomerNotificationEditor({
       <div>
         <p className="text-xs font-semibold text-accent">LINE通知　›　お知らせの種類</p>
         <p className="mt-2 text-xl font-bold text-ink">「{setting.title?.trim() || setting.label}」を編集する</p>
-        <p className="mt-1 text-xs text-ink-faint">公開中の内容を編集します。保存した内容は次の通知から使われます。</p>
+        <p className="mt-1 text-xs text-ink-faint">{definition ? `公開版 ${definition.currentVersionNumber ? `v${definition.currentVersionNumber}` : 'なし'} ／ 編集中の下書き` : '公開中の内容を編集します。保存した内容は次の通知から使われます。'}</p>
       </div>
       <Button onClick={onTestSend} disabled={busy}>自分にテスト送信</Button>
     </div>
@@ -184,8 +195,8 @@ function CustomerNotificationEditor({
 
     <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-hairline bg-canvas px-6 py-3 shadow-lg">
       <div className="ml-auto flex flex-wrap items-center justify-between gap-3" style={{ maxWidth: 1584 }}>
-        <p className="text-xs text-ink-faint">出しています。保存すると、次のお知らせから新しい文面が使われます。</p>
-        <div className="flex gap-2"><Button onClick={onClose}>キャンセル</Button><Button onClick={onTestSend} disabled={busy}>自分にテスト送信</Button><Button variant="primary" onClick={onSave} disabled={busy}>お知らせを保存</Button></div>
+        <p className="text-xs text-ink-faint">{definition ? '下書きの保存だけでは公開中の内容は変わりません。確認後に公開してください。' : '出しています。保存すると、次のお知らせから新しい文面が使われます。'}</p>
+        <div className="flex gap-2"><Button onClick={onClose}>キャンセル</Button><Button onClick={onTestSend} disabled={busy}>自分にテスト送信</Button><Button onClick={onSave} disabled={busy}>{definition ? '下書きを保存' : 'お知らせを保存'}</Button>{definition ? <Button variant="primary" onClick={onPublish} disabled={busy}>顧客へのお知らせを公開</Button> : null}</div>
       </div>
     </div>
   </main>
@@ -197,6 +208,8 @@ export default function LineNotificationsPage() {
   const tab = useMergedTab(TABS, 'tab', 'customer')
   const [settings, setSettings] = useState<EcNotificationSetting[]>([])
   const [overview, setOverview] = useState<EcCommerceOverview | null>(null)
+  const [definitions, setDefinitions] = useState<LineNotificationDefinition[]>([])
+  const [metrics, setMetrics] = useState<LineNotificationMetric[]>([])
   const [filter, setFilter] = useState<CustomerFilter>('all')
   const [customerPage, setCustomerPage] = useState(1)
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -212,16 +225,54 @@ export default function LineNotificationsPage() {
     // アカウント切替中に前のアカウントの件数を残さない。
     setSettings([])
     setOverview(null)
+    setDefinitions([])
+    setMetrics([])
     setNotice(null)
     try {
-      const [settingRes, overviewRes] = await Promise.all([
+      const [settingRes, overviewRes, definitionRes, metricRes] = await Promise.all([
         api.ecCommerce.settings(), api.ecCommerce.overview(selectedAccountId ?? undefined),
+        selectedAccountId
+          ? api.lineNotifications.definitions(selectedAccountId).catch((error: unknown) => {
+              if (error instanceof ApiError && error.status === 403) throw error
+              return null
+            })
+          : Promise.resolve(null),
+        selectedAccountId
+          ? api.lineNotifications.metrics(selectedAccountId).catch((error: unknown) => {
+              if (error instanceof ApiError && error.status === 403) throw error
+              return null
+            })
+          : Promise.resolve(null),
       ])
       if (generation !== loadGeneration.current) return
       if (!settingRes.success || !overviewRes.success) throw new Error('load failed')
-      setSettings(settingRes.data)
+      const loadedDefinitions = definitionRes?.success ? definitionRes.data : []
+      const loadedDefinitionByEvent = new Map(loadedDefinitions.map((definition) => [definition.sourceEventType, definition]))
+      const mergedSettings = settingRes.data.map((setting) => {
+        const definition = loadedDefinitionByEvent.get(setting.eventType)
+        if (!definition) return setting
+        const draftText = (key: string, fallback: string): string => typeof definition.draft[key] === 'string' ? definition.draft[key] as string : fallback
+        const draftFields = Array.isArray(definition.draft.fixedFields)
+          ? definition.draft.fixedFields.filter((value): value is string => typeof value === 'string')
+          : setting.fixedFields
+        return {
+          ...setting,
+          isEnabled: definition.status === 'published',
+          title: draftText('title', definition.name),
+          introText: draftText('introText', setting.introText),
+          outroText: draftText('outroText', setting.outroText),
+          buttonLabel: draftText('buttonLabel', setting.buttonLabel),
+          buttonUrl: draftText('buttonUrl', setting.buttonUrl),
+          imageUrl: draftText('imageUrl', setting.imageUrl),
+          fixedFields: draftFields,
+          updatedAt: definition.updatedAt,
+        }
+      })
+      setSettings(mergedSettings)
       setOverview(overviewRes.data)
-      setExpanded((current) => settingRes.data.some((setting) => setting.eventType === current) ? current : null)
+      setDefinitions(loadedDefinitions)
+      setMetrics(metricRes?.success ? metricRes.data.items : [])
+      setExpanded((current) => mergedSettings.some((setting) => setting.eventType === current) ? current : null)
       setLoadState('ready')
     } catch (error) {
       if (generation === loadGeneration.current) {
@@ -241,6 +292,14 @@ export default function LineNotificationsPage() {
   const customerPageCount = Math.max(1, Math.ceil(visible.length / CUSTOMER_PAGE_SIZE))
   const visiblePage = visible.slice((customerPage - 1) * CUSTOMER_PAGE_SIZE, customerPage * CUSTOMER_PAGE_SIZE)
   const expandedSetting = settings.find((setting) => setting.eventType === expanded) ?? null
+  const definitionByEvent = useMemo(() => new Map(definitions.map((definition) => [definition.sourceEventType, definition])), [definitions])
+  const metricByEvent = useMemo(() => {
+    const definitionById = new Map(definitions.map((definition) => [definition.id, definition.sourceEventType]))
+    return new Map(metrics.flatMap((metric) => {
+      const eventType = definitionById.get(metric.definitionId)
+      return eventType ? [[eventType, metric] as const] : []
+    }))
+  }, [definitions, metrics])
   const filterCount = (value: CustomerFilter): number => {
     if (value === 'enabled') return settings.filter((setting) => setting.isEnabled).length
     if (value === 'stopped') return settings.filter((setting) => !setting.isEnabled).length
@@ -268,13 +327,58 @@ export default function LineNotificationsPage() {
     if (!setting.title?.trim()) { setNotice({ tone: 'error', text: '通知の見出しを入力してください。' }); return }
     setBusy(setting.eventType)
     try {
-      await api.ecCommerce.updateSetting(setting.eventType, {
-        isEnabled: enabled, title: setting.title, introText: setting.introText, outroText: setting.outroText,
-        buttonLabel: setting.buttonLabel, buttonUrl: setting.buttonUrl, imageUrl: setting.imageUrl,
-      })
+      const definition = definitionByEvent.get(setting.eventType)
+      if (definition && enabled === setting.isEnabled) {
+        const result = await api.lineNotifications.updateDraft(definition.id, {
+          lineAccountId: definition.lineAccountId,
+          expectedVersion: definition.version,
+          name: setting.title || setting.label,
+          category: definition.category,
+          sourceEventType: definition.sourceEventType,
+          draft: {
+            ...definition.draft,
+            title: setting.title,
+            introText: setting.introText,
+            outroText: setting.outroText,
+            buttonLabel: setting.buttonLabel,
+            buttonUrl: setting.buttonUrl,
+            imageUrl: setting.imageUrl,
+          },
+        })
+        if (!result.success) throw new Error('save failed')
+        setDefinitions((current) => current.map((item) => item.id === result.data.id ? result.data : item))
+      } else if (definition) {
+        const result = enabled
+          ? await api.lineNotifications.publishDefinition(definition.id, { lineAccountId: definition.lineAccountId, expectedVersion: definition.version })
+          : await api.lineNotifications.stopDefinition(definition.id, { lineAccountId: definition.lineAccountId, expectedVersion: definition.version })
+        if (!result.success) throw new Error('status failed')
+        setDefinitions((current) => current.map((item) => item.id === result.data.id ? result.data : item))
+      } else {
+        await api.ecCommerce.updateSetting(setting.eventType, {
+          isEnabled: enabled, title: setting.title, introText: setting.introText, outroText: setting.outroText,
+          buttonLabel: setting.buttonLabel, buttonUrl: setting.buttonUrl, imageUrl: setting.imageUrl,
+        })
+      }
       update(setting.eventType, { isEnabled: enabled })
-      setNotice({ tone: 'success', text: `${setting.label}を保存しました。` })
+      setNotice({ tone: 'success', text: definition && enabled === setting.isEnabled ? `${setting.label}の下書きを保存しました。` : `${setting.label}を保存しました。` })
     } catch { setNotice({ tone: 'error', text: `${setting.label}を保存できませんでした。` }) }
+    finally { setBusy(null) }
+  }
+
+  const publish = async (setting: EcNotificationSetting) => {
+    const definition = definitionByEvent.get(setting.eventType)
+    if (!definition) return
+    setBusy(setting.eventType)
+    try {
+      const result = await api.lineNotifications.publishDefinition(definition.id, {
+        lineAccountId: definition.lineAccountId,
+        expectedVersion: definition.version,
+      })
+      if (!result.success) throw new Error('publish failed')
+      setDefinitions((current) => current.map((item) => item.id === result.data.id ? result.data : item))
+      update(setting.eventType, { isEnabled: true })
+      setNotice({ tone: 'success', text: `${setting.label}を公開しました。` })
+    } catch { setNotice({ tone: 'error', text: `${setting.label}を公開できませんでした。下書きの内容を確認してください。` }) }
     finally { setBusy(null) }
   }
 
@@ -300,9 +404,11 @@ export default function LineNotificationsPage() {
     {tab === 'operator' ? <OperatorNotificationRules lineAccountId={selectedAccountId} /> : null}
     {tab === 'customer' && expandedSetting ? <CustomerNotificationEditor
       setting={expandedSetting}
+      definition={definitionByEvent.get(expandedSetting.eventType) ?? null}
       busy={busy === expandedSetting.eventType}
       onChange={(patch) => update(expandedSetting.eventType, patch)}
       onClose={() => setExpanded(null)}
+      onPublish={() => void publish(expandedSetting)}
       onSave={() => void save(expandedSetting)}
       onTestSend={() => void testSend(expandedSetting)}
     /> : null}
@@ -352,7 +458,7 @@ export default function LineNotificationsPage() {
         : visible.length === 0 ? <ListState kind="empty" title="条件に合うお知らせはありません" description="絞り込みを変えてください。" />
         : <>
         <div className="line-notification-v6-header">
-          <span>お知らせ</span><span>いつ送るか</span><span>今日</span><span>この30日</span><span>状態</span><span>操作</span>
+          <span>お知らせ</span><span>いつ送るか</span><span>今日</span><span>この30日</span><span>LINE上で表示</span><span>操作</span>
         </div>
         {visiblePage.map((setting) => <article key={setting.eventType} className="border-b border-hairline last:border-b-0">
           <div className="line-notification-v6-row">
@@ -363,9 +469,13 @@ export default function LineNotificationsPage() {
             </div>
             <span className="text-sm text-ink-secondary">{timingLabel(setting)}</span>
             <span className="text-sm tabular-nums text-ink-secondary">{overview?.byType.find((item) => item.eventType === setting.eventType)?.count ?? '—'}通</span>
-            <span className="text-sm text-ink-faint">—</span>
-            <div className="flex items-center gap-2"><Toggle setting={setting} busy={busy === setting.eventType} onToggle={() => void save(setting, !setting.isEnabled)} /><span className={`whitespace-nowrap rounded-pill px-2 py-0.5 text-xs font-semibold ${setting.isEnabled ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}>{setting.isEnabled ? '出している' : '止めている'}</span></div>
-            <button type="button" onClick={() => setExpanded(expanded === setting.eventType ? null : setting.eventType)} className="line-notification-v6-row-action">{expanded === setting.eventType ? '編集を閉じる' : '内容を編集'}</button>
+            <span className="text-sm tabular-nums text-ink-secondary">{metricByEvent.get(setting.eventType)?.accepted.value ?? '—'}通</span>
+            <span className="text-sm text-ink-faint">{(() => {
+              const displayed = metricByEvent.get(setting.eventType)?.displayed
+              if (!displayed || displayed.value === null) return displayed?.state === 'pending' ? '集計待ち' : '— 未取得'
+              return `${displayed.value}人`
+            })()}</span>
+            <div className="flex items-center justify-end gap-2"><Toggle setting={setting} busy={busy === setting.eventType} onToggle={() => void save(setting, !setting.isEnabled)} /><span className={`whitespace-nowrap rounded-pill px-2 py-0.5 text-xs font-semibold ${setting.isEnabled ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}>{setting.isEnabled ? '出している' : '止めている'}</span><button type="button" onClick={() => setExpanded(expanded === setting.eventType ? null : setting.eventType)} className="line-notification-v6-row-action">{expanded === setting.eventType ? '編集を閉じる' : '内容を編集'}</button></div>
           </div>
         </article>)}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-4 py-3">
