@@ -14,10 +14,13 @@ import {
   getSavedSearches,
   getSavedSearchById,
   createSavedSearch,
-  updateSavedSearch,
+  updateSavedSearchWithRevision,
   deleteSavedSearch,
   countSavedSearches,
   getSavedSearchReferences,
+  getSavedSearchUsageCounts,
+  getSavedSearchReferenceUsageCounts,
+  jstNow,
   validateSearchConditions,
   validateSavedSegmentConditions,
   SAVED_SEARCH_LIMIT,
@@ -48,7 +51,9 @@ import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import {
   getSavedSearchMatchInsights,
+  getSavedSearchMatchPreview,
   type SavedSearchMatchInsight,
+  type SavedSearchMatchPreview,
 } from '../services/saved-search-insights.js';
 import {
   archiveSupportMarkAutomationRule,
@@ -149,6 +154,8 @@ function serializeSearch(
   row: SavedSearch,
   insight: SavedSearchMatchInsight = { matchCount: null, matchCountError: null },
   references: SavedSearchReference[] = [],
+  callCountThisMonth = 0,
+  referenceCallCounts: ReadonlyMap<string, number> = new Map(),
 ) {
   return {
     id: row.id,
@@ -161,21 +168,32 @@ function serializeSearch(
     isShared: Boolean(row.is_shared),
     displayOrder: row.display_order,
     createdAt: row.created_at,
+    updatedBy: row.updated_by ?? row.created_by,
+    updatedAt: row.updated_at ?? row.created_at,
+    revision: Number(row.revision ?? 1),
     matchCount: insight.matchCount,
     matchCountError: insight.matchCountError,
+    callCountThisMonth,
     usedIn: references.map((reference) => ({
       kind: reference.reference_kind,
       id: reference.reference_id,
       name: reference.reference_name,
       mode: reference.reference_mode,
+      revision: reference.revision,
       lastUsedAt: reference.last_used_at,
+      callCountThisMonth: referenceCallCounts.get(
+        `${reference.saved_search_id}:${reference.reference_kind}:${reference.reference_id}`,
+      ) ?? 0,
     })),
     canDelete: references.length === 0,
   };
 }
 
-async function savedSearchAccess(c: Context<Env>): Promise<SavedSearchAccess | Response> {
-  const lineAccountId = c.req.query('lineAccountId');
+async function savedSearchAccess(
+  c: Context<Env>,
+  requestedLineAccountId?: string,
+): Promise<SavedSearchAccess | Response> {
+  const lineAccountId = requestedLineAccountId ?? c.req.query('lineAccountId');
   if (!lineAccountId) {
     return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
   }
@@ -189,6 +207,89 @@ async function savedSearchAccess(c: Context<Env>): Promise<SavedSearchAccess | R
     staffId: staff.id,
     canManageAll: staff.role === 'owner' || staff.role === 'admin',
   } satisfies SavedSearchAccess;
+}
+
+function canReadSavedSearch(row: SavedSearch, access: SavedSearchAccess): boolean {
+  return row.scope === 'friends'
+    && (row.condition_format ?? 'search_v1') === 'search_v1'
+    && row.line_account_id === access.lineAccountId
+    && (access.canManageAll || Boolean(row.is_shared) || row.created_by === access.staffId);
+}
+
+function savedSearchReferenceMap(references: SavedSearchReference[]) {
+  const bySearch = new Map<string, SavedSearchReference[]>();
+  for (const reference of references) {
+    const current = bySearch.get(reference.saved_search_id) ?? [];
+    current.push(reference);
+    bySearch.set(reference.saved_search_id, current);
+  }
+  return bySearch;
+}
+
+function savedSearchDetail(
+  row: SavedSearch,
+  match: SavedSearchMatchPreview,
+  references: SavedSearchReference[],
+  callCountThisMonth: number,
+  referenceCallCounts: ReadonlyMap<string, number>,
+  access: SavedSearchAccess,
+) {
+  const serialized = serializeSearch(
+    row,
+    { matchCount: match.total, matchCountError: match.error },
+    references,
+    callCountThisMonth,
+    referenceCallCounts,
+  );
+  return {
+    ...serialized,
+    accountScope: { type: 'line_account' as const, id: access.lineAccountId },
+    owner: {
+      id: row.created_by,
+      isCurrentUser: row.created_by === access.staffId,
+    },
+    match,
+  };
+}
+
+function positiveInteger(raw: string | undefined, fallback: number, max: number): number | null {
+  if (raw === undefined || raw === '') return fallback;
+  const value = Number(raw);
+  return Number.isInteger(value) && value > 0 && value <= max ? value : null;
+}
+
+function nonNegativeInteger(raw: string | undefined, fallback = 0): number | null {
+  if (raw === undefined || raw === '') return fallback;
+  const value = Number(raw);
+  return Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+async function savedSearchMatchForRow(
+  db: D1Database,
+  row: SavedSearch,
+  lineAccountId: string,
+): Promise<SavedSearchMatchPreview> {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(row.conditions_json);
+  } catch {
+    return {
+      total: null,
+      byChannel: { line: null, mail: null },
+      calculatedAt: jstNow(),
+      error: '条件のJSONが壊れています',
+    };
+  }
+  const conditions = validateSearchConditions(raw);
+  if (!conditions.ok) {
+    return {
+      total: null,
+      byChannel: { line: null, mail: null },
+      calculatedAt: jstNow(),
+      error: conditions.error,
+    };
+  }
+  return getSavedSearchMatchPreview(db, conditions.value, lineAccountId);
 }
 
 const MANAGED_CONDITION_FORMATS = ['search_v1', 'segment_v1'] as const;
@@ -777,6 +878,19 @@ friendAttributes.get('/api/saved-searches', requireRole('owner', 'admin', 'staff
   try {
     const format = requestedConditionFormat(c);
     if (format instanceof Response) return format;
+    const owner = c.req.query('owner') ?? 'all';
+    const usage = c.req.query('usage') ?? 'all';
+    const match = c.req.query('match') ?? 'all';
+    if (!['all', 'me'].includes(owner)
+      || !['all', 'used', 'unused'].includes(usage)
+      || !['all', 'matched', 'zero'].includes(match)) {
+      return c.json({ success: false, error: '一覧の絞り込み条件が正しくありません' }, 400);
+    }
+    const limit = positiveInteger(c.req.query('limit'), 20, 50);
+    const offset = nonNegativeInteger(c.req.query('cursor'));
+    if (limit === null || offset === null) {
+      return c.json({ success: false, error: 'ページ位置が正しくありません' }, 400);
+    }
     const access = await savedSearchAccess(c);
     if (access instanceof Response) return access;
     const items = await getSavedSearches(c.env.DB, 'friends', access, format);
@@ -785,31 +899,187 @@ friendAttributes.get('/api/saved-searches', requireRole('owner', 'admin', 'staff
       && (row.line_account_id === access.lineAccountId
         ? access.canManageAll || Boolean(row.is_shared) || row.created_by === access.staffId
         : row.line_account_id === null && row.created_by === access.staffId));
-    const [insights, references] = await Promise.all([
+    const ids = visible.map((row) => row.id);
+    const [insights, references, callCounts, referenceCallCounts] = await Promise.all([
       format === 'search_v1'
         ? getSavedSearchMatchInsights(c.env.DB, visible, access.lineAccountId)
         : Promise.resolve(new Map<string, SavedSearchMatchInsight>()),
-      getSavedSearchReferences(c.env.DB, visible.map((row) => row.id), access.lineAccountId),
+      getSavedSearchReferences(c.env.DB, ids, access.lineAccountId),
+      getSavedSearchUsageCounts(c.env.DB, ids, access.lineAccountId),
+      getSavedSearchReferenceUsageCounts(c.env.DB, ids, access.lineAccountId),
     ]);
-    const referencesBySearch = new Map<string, SavedSearchReference[]>();
-    for (const reference of references) {
-      const current = referencesBySearch.get(reference.saved_search_id) ?? [];
-      current.push(reference);
-      referencesBySearch.set(reference.saved_search_id, current);
-    }
+    const referencesBySearch = savedSearchReferenceMap(references);
+    const serialized = visible.map((row) => serializeSearch(
+      row,
+      insights.get(row.id),
+      referencesBySearch.get(row.id),
+      callCounts.get(row.id) ?? 0,
+      referenceCallCounts,
+    ));
+    const query = (c.req.query('query') ?? '').trim().toLocaleLowerCase('ja-JP');
+    const ownerScoped = serialized.filter(
+      (item) => owner !== 'me' || item.createdBy === access.staffId,
+    );
+    const filtered = ownerScoped.filter((item) => {
+      if (query && ![
+        item.name,
+        ...item.usedIn.map((reference) => reference.name),
+      ].some((value) => value.toLocaleLowerCase('ja-JP').includes(query))) return false;
+      if (usage === 'used' && item.usedIn.length === 0) return false;
+      if (usage === 'unused' && item.usedIn.length > 0) return false;
+      if (match === 'matched' && !(typeof item.matchCount === 'number' && item.matchCount > 0)) return false;
+      if (match === 'zero' && item.matchCount !== 0) return false;
+      return true;
+    });
+    const page = filtered.slice(offset, offset + limit);
+    const summary = {
+      total: ownerScoped.length,
+      usedInBroadcasts: ownerScoped.filter((item) =>
+        item.usedIn.some((reference) => reference.kind === 'broadcast')).length,
+      zeroMatches: ownerScoped.filter((item) => item.matchCount === 0).length,
+      callsThisMonth: ownerScoped.reduce((total, item) => total + item.callCountThisMonth, 0),
+    };
+    const pagination = {
+      total: filtered.length,
+      limit,
+      cursor: String(offset),
+      nextCursor: offset + limit < filtered.length ? String(offset + limit) : null,
+    };
     return c.json({
       success: true,
-      data: visible.map((row) => serializeSearch(
-        row,
-        insights.get(row.id),
-        referencesBySearch.get(row.id),
-      )),
+      // data は既存画面との互換性のため配列のまま維持する。
+      data: page,
+      items: page,
+      summary,
+      pagination,
     });
   } catch (err) {
     console.error('GET /api/saved-searches error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
+
+friendAttributes.get(
+  '/api/saved-searches/:id',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    try {
+      const access = await savedSearchAccess(c);
+      if (access instanceof Response) return access;
+      const row = await getSavedSearchById(c.env.DB, c.req.param('id'), access.lineAccountId);
+      if (!row || !canReadSavedSearch(row, access)) {
+        return c.json({ success: false, error: '保存した検索が見つかりません' }, 404);
+      }
+      const [match, references, callCounts, referenceCallCounts] = await Promise.all([
+        savedSearchMatchForRow(c.env.DB, row, access.lineAccountId),
+        getSavedSearchReferences(c.env.DB, [row.id], access.lineAccountId),
+        getSavedSearchUsageCounts(c.env.DB, [row.id], access.lineAccountId),
+        getSavedSearchReferenceUsageCounts(c.env.DB, [row.id], access.lineAccountId),
+      ]);
+      return c.json({
+        success: true,
+        data: savedSearchDetail(
+          row,
+          match,
+          references,
+          callCounts.get(row.id) ?? 0,
+          referenceCallCounts,
+          access,
+        ),
+      });
+    } catch (err) {
+      console.error('GET /api/saved-searches/:id error:', err);
+      return c.json({ success: false, error: '保存した検索を読み込めませんでした' }, 500);
+    }
+  },
+);
+
+friendAttributes.post(
+  '/api/saved-searches/preview',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    try {
+      const body = await c.req.json<Record<string, unknown>>();
+      const requestedAccount = typeof body.lineAccountId === 'string'
+        ? body.lineAccountId.trim()
+        : undefined;
+      const access = await savedSearchAccess(c, requestedAccount);
+      if (access instanceof Response) return access;
+      const savedSearchId = typeof body.savedSearchId === 'string'
+        ? body.savedSearchId.trim()
+        : '';
+      const row = savedSearchId
+        ? await getSavedSearchById(c.env.DB, savedSearchId, access.lineAccountId)
+        : null;
+      if (savedSearchId && (!row || !canReadSavedSearch(row, access))) {
+        return c.json({ success: false, error: '保存した検索が見つかりません' }, 404);
+      }
+      const currentRevision = row ? Number(row.revision ?? 1) : 0;
+      if (body.revision !== undefined
+        && (!Number.isInteger(Number(body.revision)) || Number(body.revision) < 1)) {
+        return c.json({ success: false, error: '確認する版が正しくありません' }, 400);
+      }
+      if (row && body.revision !== undefined && Number(body.revision) !== currentRevision) {
+        return c.json({
+          success: false,
+          code: 'SAVED_SEARCH_REVISION_CONFLICT',
+          error: 'ほかの担当者が先に変更しました。最新の内容を読み直してください',
+          data: { currentRevision },
+        }, 409);
+      }
+      let rawConditions = body.conditions;
+      if (rawConditions === undefined && row) {
+        try {
+          rawConditions = JSON.parse(row.conditions_json);
+        } catch {
+          return c.json({ success: false, error: '保存した検索の条件が壊れています' }, 422);
+        }
+      }
+      const conditions = validateSearchConditions(rawConditions);
+      if (!conditions.ok) return c.json({ success: false, error: conditions.error }, 422);
+      const [match, references, callCounts, referenceCallCounts] = await Promise.all([
+        getSavedSearchMatchPreview(c.env.DB, conditions.value, access.lineAccountId),
+        row ? getSavedSearchReferences(c.env.DB, [row.id], access.lineAccountId) : Promise.resolve([]),
+        row ? getSavedSearchUsageCounts(c.env.DB, [row.id], access.lineAccountId) : Promise.resolve(new Map<string, number>()),
+        row ? getSavedSearchReferenceUsageCounts(c.env.DB, [row.id], access.lineAccountId) : Promise.resolve(new Map<string, number>()),
+      ]);
+      if (row) {
+        return c.json({
+          success: true,
+          data: {
+            ...savedSearchDetail(
+              { ...row, conditions_json: JSON.stringify(conditions.value) },
+              match,
+              references,
+              callCounts.get(row.id) ?? 0,
+              referenceCallCounts,
+              access,
+            ),
+            conditions: conditions.value,
+          },
+        });
+      }
+      return c.json({
+        success: true,
+        data: {
+          savedSearchId: null,
+          conditions: conditions.value,
+          revision: 0,
+          scope: 'friends',
+          accountScope: { type: 'line_account', id: access.lineAccountId },
+          owner: { id: access.staffId, isCurrentUser: true },
+          match,
+          usedIn: [],
+          canDelete: false,
+          callCountThisMonth: 0,
+        },
+      });
+    } catch (err) {
+      console.error('POST /api/saved-searches/preview error:', err);
+      return c.json({ success: false, error: '該当人数を確認できませんでした' }, 500);
+    }
+  },
+);
 
 friendAttributes.post('/api/saved-searches', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
@@ -891,7 +1161,13 @@ friendAttributes.patch(
       }
 
       const body = await c.req.json<Record<string, unknown>>();
-      const patch: Parameters<typeof updateSavedSearch>[3] = {};
+      const expectedRevision = Number(
+        body.expectedRevision ?? body.revision ?? existing.revision ?? 1,
+      );
+      if (!Number.isInteger(expectedRevision) || expectedRevision < 1) {
+        return c.json({ success: false, error: '最新の版を指定してください' }, 400);
+      }
+      const patch: Parameters<typeof updateSavedSearchWithRevision>[4] = {};
       if (body.name !== undefined) {
         const name = String(body.name).trim();
         if (!name) return c.json({ success: false, error: '名前を入力してください' }, 400);
@@ -910,17 +1186,50 @@ friendAttributes.patch(
       }
       if (body.displayOrder !== undefined) patch.displayOrder = Number(body.displayOrder);
 
-      const saved = await updateSavedSearch(c.env.DB, id, access, patch);
-      if (!saved) return c.json({ success: false, error: '保存した検索が見つかりません' }, 404);
-      const [insights, references] = await Promise.all([
+      const update = await updateSavedSearchWithRevision(
+        c.env.DB,
+        id,
+        access,
+        expectedRevision,
+        patch,
+      );
+      if (update.status === 'not_found') {
+        return c.json({ success: false, error: '保存した検索が見つかりません' }, 404);
+      }
+      if (update.status === 'conflict') {
+        const references = await getSavedSearchReferences(
+          c.env.DB,
+          [update.current.id],
+          access.lineAccountId,
+        );
+        return c.json({
+          success: false,
+          code: 'SAVED_SEARCH_REVISION_CONFLICT',
+          error: 'ほかの担当者が先に変更しました。最新の内容を読み直してください',
+          data: {
+            currentRevision: Number(update.current.revision ?? 1),
+            usedIn: serializeSearch(update.current, undefined, references).usedIn,
+          },
+        }, 409);
+      }
+      const saved = update.search;
+      const [insights, references, callCounts, referenceCallCounts] = await Promise.all([
         format === 'search_v1'
           ? getSavedSearchMatchInsights(c.env.DB, [saved], access.lineAccountId)
           : Promise.resolve(new Map<string, SavedSearchMatchInsight>()),
         getSavedSearchReferences(c.env.DB, [saved.id], access.lineAccountId),
+        getSavedSearchUsageCounts(c.env.DB, [saved.id], access.lineAccountId),
+        getSavedSearchReferenceUsageCounts(c.env.DB, [saved.id], access.lineAccountId),
       ]);
       return c.json({
         success: true,
-        data: serializeSearch(saved, insights.get(saved.id), references),
+        data: serializeSearch(
+          saved,
+          insights.get(saved.id),
+          references,
+          callCounts.get(saved.id) ?? 0,
+          referenceCallCounts,
+        ),
       });
     } catch (err) {
       console.error('PATCH /api/saved-searches/:id error:', err);

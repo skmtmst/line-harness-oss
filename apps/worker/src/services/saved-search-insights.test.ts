@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { SavedSearch } from '@line-crm/db';
-import { getSavedSearchMatchInsights } from './saved-search-insights.js';
+import {
+  getSavedSearchMatchInsights,
+  getSavedSearchMatchPreview,
+} from './saved-search-insights.js';
 
 function row(id: string, conditions: unknown): SavedSearch {
   return {
@@ -65,6 +68,47 @@ describe('保存した検索の該当人数', () => {
     expect(result.get('search-1')).toEqual({
       matchCount: null,
       matchCountError: '該当人数を確認できませんでした',
+    });
+  });
+});
+
+describe('保存した検索の該当プレビュー', () => {
+  it('合計とLINE・メールの内訳を同じ条件SQLで返す', async () => {
+    const statement = {
+      bind: vi.fn(),
+      first: vi.fn(async () => ({ total: 18, line_total: 15, mail_total: 3 })),
+    } as unknown as D1PreparedStatement;
+    (statement.bind as unknown as ReturnType<typeof vi.fn>).mockReturnValue(statement);
+    const db = { prepare: vi.fn(() => statement) } as unknown as D1Database;
+
+    const result = await getSavedSearchMatchPreview(db, {
+      all: [{ kind: 'tag', op: 'includes', value: 'tag-vip' }],
+    }, 'account-1');
+
+    expect(result).toMatchObject({
+      total: 18,
+      byChannel: { line: 15, mail: 3 },
+      error: null,
+    });
+    expect(statement.bind).toHaveBeenCalledWith('account-1', 'tag-vip');
+  });
+
+  it('集計失敗を0人にせず理由付きnullで返す', async () => {
+    const statement = {
+      bind: vi.fn(),
+      first: vi.fn(async () => { throw new Error('D1 unavailable'); }),
+    } as unknown as D1PreparedStatement;
+    (statement.bind as unknown as ReturnType<typeof vi.fn>).mockReturnValue(statement);
+    const db = { prepare: vi.fn(() => statement) } as unknown as D1Database;
+
+    const result = await getSavedSearchMatchPreview(db, {
+      all: [{ kind: 'name', op: 'contains', value: 'VIP' }],
+    }, 'account-1');
+
+    expect(result).toMatchObject({
+      total: null,
+      byChannel: { line: null, mail: null },
+      error: '該当人数を確認できませんでした',
     });
   });
 });
