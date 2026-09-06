@@ -1645,10 +1645,11 @@ export const SCREENS = [
   },
   {
     /*
-      設計の `eXAJP` は一覧と同じ文言。実装も**一覧の上にドロップ枠が
-      常に出ている**ので、同じ絵で突き合わせる。
+      設計の `eXAJP` は一覧から「ファイルを入れる」を押した全面の窓。
+      一覧だけを撮ると窓が写らないため、押してから突き合わせる。
     */
     ...MEDIA, node: 'eXAJP', name: '15-1-B ファイルを入れる',
+    mode: 'viewport', height: 1080, steps: [{ click: 'ファイルを入れる', after: 900 }],
     verdict: 'needs_fix', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正（差は小さい）。文言が1つ違う：設計「LINEで送れる大きさ（超えると入れられません）」、実装「入れられる大きさ（超えると入れられません）」。**「LINEで送れる」が落ちると、何の上限かが読めない。**ほかに「PDF」の1語。それ以外は一致。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一（マトリックス→対応表、ブレイクダウン→内訳）。設計画像を撮り直した。**実装との突き合わせはこれから。** **P2 ファイルを入れる面が一覧と同じ画面にある。** ルート `/media`。設計は入れる面を独立させるが、実装は一覧の頭にドロップ欄を置く。**実務上は困らない**ので P1 から P2 へ下げる。**良い点**：入れる前に上限を全部出す（画像10MB・音声30MB・動画90MB・PDF20MB）、「中身の形式とファイル名の拡張子が食い違うものは保存できません」と断る、「公開リンクが作られるため、個人情報の取り扱いに注意してください」を出す、行ごとに「使用箇所」を持つ。**P1 上限を超えたファイルが一覧に残っている**——「店内のようす.mp4 184.0 MB」は動画90MBの上限を超える。撮影用の固定データが上限を無視して作られているためで、実装の不具合ではないが、**上限を超えた行をどう見せるかは決まっていない**。取得元：`media-v6/eXAJP.txt`。1440・1920とも横スクロール0 **推奨修正**：上限を超えた行の見せ方を決める（撮った絵の「店内のようす.mp4 184.0 MB」は動画90MBの上限を超えるが、これは**固定データが上限を無視して作られているためで実装の不具合ではない**）。入れる面を独立させるのは実務上急がない。', verdictSource: 'media-v6/eXAJP.txt',
     verdictHead: '31293424',
   },
@@ -2858,6 +2859,37 @@ export const SCREENS = [
   },
 ]
 
+// Issue #228（機能15）の実装後監査。
+// ChromiumがMachPort権限で起動できず、実装後の2幅画像は未取得。
+// 古い画像で合格にせず、実装した範囲と残る接続条件だけを更新する。
+const FEATURE_15_REVIEW = {
+  g89Tc: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06、Issue #228 / PR #925 / UI HEAD 6cb184af7 で画面を更新したが、新しい画像は未確認。** メディア用フォルダ、未分類、フォルダ作成、種類・未使用・上限付近の表示を追加した。保存容量APIは未接続のため、架空の数やゲージを出さず `—` と接続条件を表示する。撮影はChromiumのMachPort権限拒否で開始できず、1440px・1920px画像が無いため判定は上げない。',
+    verdictSource: 'media-v6/g89Tc.txt + 実装コード（画像未確認）',
+  },
+  voJtX: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06、Issue #228 / PR #925 / UI HEAD 6cb184af7 で画面を更新したが、新しい画像は未確認。** プレビュー、容量・寸法・登録者・フォルダ、名前付き使用先を表示し、既存の同種メディアへ使用先を一括差し替えできるようにした。名前とURLを保つ版追加APIは未接続なので、使えるように見せず理由を表示する。撮影はChromiumのMachPort権限拒否で開始できず、2幅画像が無いため判定は上げない。',
+    verdictSource: 'media-v6/voJtX.txt + 実装コード（画像未確認）',
+  },
+  eXAJP: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06、Issue #228 / PR #925 / UI HEAD 6cb184af7 で画面を更新したが、新しい画像は未確認。** 一覧上の全面ダイアログへ分け、20件までの選択、1件ごとの待機・登録中・完了・失敗、フォルダ選択、形式と公開リンクの注意を表示した。現行アップロードはWorker経由のbase64で、動画90MB・音声30MBまで。要件のR2直接アップロードと200MB対応はAPI未接続。撮影はChromiumのMachPort権限拒否で開始できず、2幅画像が無いため判定は上げない。',
+    verdictSource: 'media-v6/eXAJP.txt + 実装コード（画像未確認）',
+  },
+  YfTfJ: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06、Issue #228 / PR #925 / UI HEAD 6cb184af7 で画面を更新したが、新しい画像は未確認。** 使用中は削除操作を出さず、名前付き使用先を確認して既存の同種メディアへ一括差し替える導線を追加した。差し替え前の版を送り、409では最新影響へ更新する。アカウント切替・閉じる操作後の遅い返事も破棄する。撮影はChromiumのMachPort権限拒否で開始できず、2幅画像が無いため判定は上げない。',
+    verdictSource: 'media-v6/YfTfJ.txt + 実装コード（画像未確認）',
+  },
+  h8pBZr: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06、Issue #228 / PR #925 / UI HEAD 6cb184af7 で状態文言を設計正本へ合わせたが、新しい画像は未確認。** 読込中・0件・取得失敗を別の文と操作で表示し、親一覧にもフォルダ区画を追加した。撮影はChromiumのMachPort権限拒否で開始できず、通常を含む1440px・1920px画像が無いため、画像確認済みにはしない。',
+    verdictSource: 'media-v6/h8pBZr.txt + 契約テスト（画像未確認）',
+  },
+}
+
 // Issue #229（機能16）の実装後監査。
 // PR #916 相当の画面を1440px・1920pxで撮影し、設計画像と目視比較した。
 // 画面コードは変えず、残る見た目の差と未接続条件を分けて記録する。
@@ -3013,6 +3045,10 @@ const FEATURE_18_AUDIT = {
 }
 
 for (const screen of SCREENS) {
+  if (screen.feature === 15 && FEATURE_15_REVIEW[screen.node]) {
+    Object.assign(screen, FEATURE_15_REVIEW[screen.node])
+    delete screen.verdictHead
+  }
   if (screen.feature === 16 && FEATURE_16_REVIEW[screen.node]) {
     Object.assign(screen, FEATURE_16_REVIEW[screen.node])
     delete screen.verdictHead
