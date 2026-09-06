@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import {
   api,
@@ -10,30 +10,17 @@ import {
 } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import Breadcrumb from '@/components/shared/breadcrumb'
 import Card, { CardHeader } from '@/components/shared/card'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
-import SearchField from '@/components/shared/search-field'
-import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
-import SummaryCard from '@/components/shared/summary-card'
-import { Tabs } from '@/components/shared/tabs'
+import { LinePreview, ReminderFooter } from '@/components/reminders/reminder-v6-ui'
 import styles from './reminder-runs.module.css'
 
-const PAGE_SIZES = [10, 20, 50] as const
-
-const STATUS_OPTIONS: Array<{ value: '' | ReminderDeliveryRunStatus; label: string }> = [
-  { value: '', label: 'すべての結果' },
-  { value: 'queued', label: '配信予定' },
-  { value: 'claimed', label: '送信処理中' },
-  { value: 'succeeded', label: '送信済み' },
-  { value: 'retry_wait', label: '再試行待ち' },
-  { value: 'permanent_failed', label: '送信できなかったもの' },
-  { value: 'skipped', label: '送らなかったもの' },
-  { value: 'cancelled', label: '取り消したもの' },
-]
+const PAGE_SIZE = 20
 
 const STATUS_VIEW: Record<ReminderDeliveryRunStatus, { label: string; tone: StatusBadgeTone }> = {
   queued: { label: '配信予定', tone: 'info' },
@@ -97,6 +84,20 @@ function csvFor(items: ReminderDeliveryRun[]): string {
   return `\uFEFF${rows.map((row) => row.map(csvCell).join(',')).join('\n')}`
 }
 
+function MetricCard({ label, value, tone }: { label: string; value: string; tone: 'success' | 'info' | 'warning' | 'danger' }) {
+  const toneClass = {
+    success: styles.metricSuccess,
+    info: styles.metricInfo,
+    warning: styles.metricWarning,
+    danger: styles.metricDanger,
+  }[tone]
+  return <Card padding="default" className={styles.metric}><p>{label}</p><strong className={toneClass}>{value}</strong></Card>
+}
+
+function Fact({ label, value }: { label: string; value: string }) {
+  return <div className={styles.fact}><dt>{label}</dt><dd>{value}</dd></div>
+}
+
 export default function ReminderRunsPage() {
   const searchParams = useSearchParams()
   const reminderId = searchParams.get('id') ?? ''
@@ -104,9 +105,6 @@ export default function ReminderRunsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [status, setStatus] = useState<'' | ReminderDeliveryRunStatus>('')
-  const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
-  const [pageSize, setPageSize] = useState<(typeof PAGE_SIZES)[number]>(20)
   const [page, setPage] = useState(1)
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [actionMessage, setActionMessage] = useState('')
@@ -122,9 +120,8 @@ export default function ReminderRunsPage() {
     try {
       const response = await api.reminders.runs(reminderId, {
         status: status || undefined,
-        search: search || undefined,
-        limit: pageSize,
-        offset: (page - 1) * pageSize,
+        limit: PAGE_SIZE,
+        offset: (page - 1) * PAGE_SIZE,
       })
       if (!response.success) throw new Error(response.error)
       setData(response.data)
@@ -133,13 +130,13 @@ export default function ReminderRunsPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, pageSize, reminderId, search, status])
+  }, [page, reminderId, status])
 
   useEffect(() => {
     void load()
   }, [load])
 
-  const pageCount = Math.max(1, Math.ceil((data?.pagination.total ?? 0) / pageSize))
+  const pageCount = Math.max(1, Math.ceil((data?.pagination.total ?? 0) / PAGE_SIZE))
   useEffect(() => {
     if (page > pageCount) setPage(pageCount)
   }, [page, pageCount])
@@ -172,7 +169,6 @@ export default function ReminderRunsPage() {
       for (;;) {
         const response = await api.reminders.runs(reminderId, {
           status: status || undefined,
-          search: search || undefined,
           limit: 100,
           offset,
         })
@@ -194,38 +190,42 @@ export default function ReminderRunsPage() {
     }
   }
 
-  const statusOptions = useMemo(
-    () => STATUS_OPTIONS.map((option) => ({ value: option.value, label: option.label })),
-    [],
-  )
+  const pauseReminder = async () => {
+    if (!data?.reminder.isActive) return
+    setActionMessage('')
+    try {
+      const response = await api.reminders.update(reminderId, { isActive: false })
+      if (!response.success) throw new Error(response.error)
+      setData((current) => current ? {
+        ...current,
+        reminder: { ...current.reminder, isActive: false },
+      } : current)
+      setActionMessage('リマインダを一時停止しました。')
+    } catch {
+      setActionMessage('一時停止できませんでした。状態を読み直してからお試しください。')
+    }
+  }
+
+  const showErrors = () => {
+    setStatus('permanent_failed')
+    setPage(1)
+    requestAnimationFrame(() => document.querySelector('#recent-runs')?.scrollIntoView({ behavior: 'smooth' }))
+  }
 
   return (
     <div className={styles.page} data-design-node="GC4St">
-      <Tabs
-        items={[
-          { label: '設定', href: `/reminders/edit?id=${reminderId}` },
-          { label: '実行結果', current: true },
-        ]}
-        actions={(
-          <Button onClick={() => void exportCsv()} disabled={exporting || loading}>
-            {exporting ? 'CSVを準備しています' : 'CSVで書き出す'}
-          </Button>
-        )}
-      />
-
-      <NoteBar tone={error || hasErrors ? 'danger' : 'info'}>
-        {error
-          ? '実行結果を確認できませんでした。再読み込みしてから、操作を続けてください。'
-          : hasErrors
-          ? `${data?.summary.errors ?? 0}件を送れませんでした。理由を確認し、必要なものだけ再試行してください。`
-          : '配信予定・送信済み・送れなかった理由を、友だちごとに確認できます。'}
-      </NoteBar>
+      <div className={styles.topActions}>
+        <Breadcrumb items={[{ label: 'リマインダ一覧', href: '/reminders' }, { label: '実行結果' }]} />
+        <Button onClick={() => void exportCsv()} disabled={exporting || loading}>
+          {exporting ? 'CSVを準備しています' : 'CSVで書き出す'}
+        </Button>
+      </div>
 
       <div className={styles.summary}>
-        <SummaryCard variant="v6" title="送信済み" value={data?.summary.sent ?? null} unit="通" detail="LINEが受け付けたもの" loading={loading} />
-        <SummaryCard variant="v6" title="配信予定" value={data?.summary.scheduled ?? null} unit="通" detail="再試行待ちを含む" loading={loading} />
-        <SummaryCard variant="v6" title="送信なし" value={data?.summary.stopped ?? null} unit="通" detail="取消・ブロックなど" loading={loading} />
-        <SummaryCard variant="v6" title="送信失敗" value={data?.summary.errors ?? null} unit="通" detail="手動確認が必要" loading={loading} badge={hasErrors ? '要確認' : undefined} badgeTone="danger" />
+        <MetricCard label="送信済み" value={data ? `${data.summary.sent.toLocaleString('ja-JP')}通` : '—'} tone="success" />
+        <MetricCard label="送信予定" value={data ? `${data.summary.scheduled.toLocaleString('ja-JP')}通` : '—'} tone="info" />
+        <MetricCard label="停止" value={data ? `${data.summary.stopped.toLocaleString('ja-JP')}人` : '—'} tone="warning" />
+        <MetricCard label="エラー" value={data ? `${data.summary.errors.toLocaleString('ja-JP')}件` : '—'} tone="danger" />
       </div>
 
       {actionMessage ? <NoteBar tone={actionMessage.includes('ません') ? 'danger' : 'info'}>{actionMessage}</NoteBar> : null}
@@ -233,7 +233,8 @@ export default function ReminderRunsPage() {
       <div className={styles.columns}>
         <main className={styles.main}>
           <Card overflow="hidden">
-            <CardHeader title="通知実績" meta={loading || error ? '—通' : `${data?.steps.length ?? 0}通`} />
+            <CardHeader title="通知実績" />
+            <p className={styles.sectionNote}>ステップごとの送信状況を確認できます。</p>
             {loading ? <ListState kind="loading" title="通知実績を読み込んでいます" /> : null}
             {!loading && error ? (
               <ListState kind="error" title="通知実績を表示できませんでした" description="実行結果を再読み込みしてください。" />
@@ -246,7 +247,6 @@ export default function ReminderRunsPage() {
                     <Th>通知</Th>
                     <Th>タイミング</Th>
                     <Th align="right">送信</Th>
-                    <Th align="right">既読</Th>
                     <Th align="right">エラー</Th>
                   </TableHeadRow>
                 </thead>
@@ -259,8 +259,7 @@ export default function ReminderRunsPage() {
                       </Td>
                       <Td>{timingLabel(step.offsetMinutes)}</Td>
                       <Td align="right">{step.sent.toLocaleString('ja-JP')}通</Td>
-                      <Td align="right" title="LINEは友だち単位の既読を返しません">—</Td>
-                      <Td align="right">{step.errors.toLocaleString('ja-JP')}件</Td>
+                      <Td align="right">{step.errors === 0 ? 'なし' : `${step.errors.toLocaleString('ja-JP')}件`}</Td>
                     </Tr>
                   ))}
                 </tbody>
@@ -270,44 +269,15 @@ export default function ReminderRunsPage() {
             {!loading && !error && (data?.steps.length ?? 0) === 0 ? (
               <ListState kind="empty" title="送る内容がありません" description="設定画面で通知を追加してください。" />
             ) : null}
+            {!loading && !error ? <NoteBar className={styles.readNote} tone="warn">LINEでは友だち単位の既読を取得できません</NoteBar> : null}
           </Card>
 
-          <Card overflow="hidden">
-            <CardHeader title="最近の実行" meta={`${data?.pagination.total ?? 0}件`} />
-            <div className={styles.toolbar}>
-              <SearchField
-                className={styles.search}
-                value={searchInput}
-                placeholder="友だち名で検索"
-                aria-label="友だち名で検索"
-                onChange={setSearchInput}
-                onClear={() => {
-                  setSearchInput('')
-                  setSearch('')
-                  setPage(1)
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    setSearch(searchInput.trim())
-                    setPage(1)
-                  }
-                }}
-              />
-              <Button onClick={() => { setSearch(searchInput.trim()); setPage(1) }}>実行結果を検索</Button>
-              <Select
-                aria-label="実行結果で絞り込む"
-                value={status}
-                onChange={(value) => { setStatus(value as '' | ReminderDeliveryRunStatus); setPage(1) }}
-                options={statusOptions}
-              />
-              <Select
-                aria-label="表示件数"
-                size="page-size"
-                value={String(pageSize)}
-                onChange={(value) => { setPageSize(Number(value) as (typeof PAGE_SIZES)[number]); setPage(1) }}
-                options={PAGE_SIZES.map((value) => ({ value: String(value), label: `${value}件表示` }))}
-              />
-            </div>
+          <Card overflow="hidden" id="recent-runs">
+            <CardHeader
+              title="最近の実行"
+              action={status ? <Button onClick={() => { setStatus(''); setPage(1) }}>すべての実行結果</Button> : undefined}
+            />
+            <p className={styles.sectionNote}>対象者ごとの履歴を確認できます。</p>
 
             {loading ? <ListState kind="loading" /> : null}
             {!loading && error ? (
@@ -316,29 +286,19 @@ export default function ReminderRunsPage() {
             {!loading && !error && (data?.items.length ?? 0) === 0 ? (
               <ListState
                 kind="empty"
-                title={search || status ? 'この条件に合う実行結果はありません' : '実行結果がまだありません'}
-                description={search || status ? '条件を変えて確認してください。' : '配信予定が作られると、ここに記録されます。'}
+                title={status ? '送信エラーはありません' : '実行結果がまだありません'}
+                description={status ? 'すべての実行結果へ戻って確認できます。' : '配信予定が作られると、ここに記録されます。'}
               />
             ) : null}
             {!loading && !error && (data?.items.length ?? 0) > 0 ? (
               <div className={styles.tableWrap}>
-                <DataTable className={styles.runsTable}>
+                <DataTable>
                   <thead>
                     <TableHeadRow>
                       <Th>友だち</Th>
                       <Th>通知</Th>
                       <Th>結果</Th>
-                      <Th>予定</Th>
-                      <Th>実行</Th>
-                      <Th>試行</Th>
-                      <Th>理由・次の動き</Th>
-                      {/*
-                        要件 §3-7 は LINE要求ID を実行履歴の項目に挙げている。
-                        **問い合わせるときはこれが要る。** LINE 側へ「この送信が
-                        届いていない」と伝えるとき、日時と名前だけでは特定できない。
-                      */}
-                      <Th>LINE要求ID</Th>
-                      <Th>操作</Th>
+                      <Th>時刻</Th>
                     </TableHeadRow>
                   </thead>
                   <tbody>
@@ -357,27 +317,24 @@ export default function ReminderRunsPage() {
                             <span className={styles.cellMain} title={notificationLabel}>
                               {notificationLabel}
                             </span>
+                            <span className={styles.cellSub}>予定 {formatJst(item.scheduledAt)}</span>
                           </Td>
-                          <Td><StatusBadge tone={view.tone} size="compact">{view.label}</StatusBadge></Td>
-                          <Td>{formatJst(item.scheduledAt)}</Td>
-                          <Td>{formatJst(item.completedAt ?? item.startedAt)}</Td>
-                          <Td align="right">{item.attemptCount}回</Td>
                           <Td>
-                            <span className={styles.cellMain}>{item.lastErrorMessage ?? '—'}</span>
+                            <StatusBadge tone={view.tone} size="compact">{view.label}</StatusBadge>
+                            {item.lastErrorMessage ? <span className={styles.cellSub}>{item.lastErrorMessage}</span> : null}
                             {item.nextRetryAt ? <span className={styles.cellSub}>次回 {formatJst(item.nextRetryAt)}</span> : null}
-                          </Td>
-                          <Td>
-                            {/* まだ送っていない・送れなかったものには無い。**0や空文字で埋めない。** */}
                             {item.lineRequestId
-                              ? <span className={styles.requestId} title={item.lineRequestId}>{item.lineRequestId}</span>
-                              : '—'}
-                          </Td>
-                          <Td>
+                              ? <span className={styles.requestId} title={item.lineRequestId}>LINE要求ID {item.lineRequestId}</span>
+                              : null}
                             {canRetry ? (
                               <Button onClick={() => void retry(item.id)} disabled={retryingId === item.id}>
                                 {retryingId === item.id ? '受付中' : 'この通知を再試行'}
                               </Button>
-                            ) : '—'}
+                            ) : null}
+                          </Td>
+                          <Td>
+                            <span className={styles.cellMain}>{formatJst(item.completedAt ?? item.startedAt)}</span>
+                            <span className={styles.cellSub}>試行 {item.attemptCount}回</span>
                           </Td>
                         </Tr>
                       )
@@ -399,33 +356,39 @@ export default function ReminderRunsPage() {
 
         <aside className={styles.side}>
           <Card overflow="hidden">
-            <CardHeader title="現在の状態" />
+            <CardHeader title="稼働状況" />
             <dl className={styles.sideBody}>
-              <div className={styles.fact}><dt>稼働</dt><dd>{data ? (data.reminder.isActive ? '動いています' : '止めています') : '—'}</dd></div>
-              <div className={styles.fact}><dt>対象</dt><dd>{data ? `${data.summary.targetCount.toLocaleString('ja-JP')}人` : '—'}</dd></div>
-              <div className={styles.fact}><dt>次の配信</dt><dd>{data ? formatJst(data.summary.nextScheduledAt) : '—'}</dd></div>
-              <div className={styles.fact}><dt>予定停止</dt><dd>—</dd></div>
+              <Fact label="状態" value={data ? (data.reminder.isActive ? '稼働中' : '停止中') : '—'} />
+              <Fact label="対象者" value={data ? `${data.summary.targetCount.toLocaleString('ja-JP')}人` : '—'} />
+              <Fact label="次回送信" value={data ? formatJst(data.summary.nextScheduledAt) : '—'} />
+              <Fact label="停止予定" value="—" />
             </dl>
-            <p className={styles.hint}>予定停止は現在の保存形式に無いため、値を作らず「—」で表示します。</p>
           </Card>
 
-          <Card overflow="hidden">
-            <CardHeader title="LINEで届く内容" meta={firstStep ? stepLabel(firstStep) : '—'} />
-            {loading ? <p className={styles.hint}>送る内容を確認しています。</p> : null}
-            {!loading && error ? <p className={styles.hint}>送る内容を表示できませんでした。</p> : null}
-            {!loading && !error && firstStep ? <p className={styles.preview}>{firstStep.messageContent}</p> : null}
-            {!loading && !error && !firstStep ? <p className={styles.hint}>送る内容はまだありません。</p> : null}
-          </Card>
+          {hasErrors ? (
+            <Card overflow="hidden">
+              <CardHeader title="要確認" />
+              <div className={styles.attention}>
+                <p>エラーがある場合だけ表示します。</p>
+                <strong>送信エラー {data?.summary.errors ?? 0}件</strong>
+                <span>送れなかった理由を確認してください</span>
+                <Button onClick={showErrors}>実行結果を確認</Button>
+              </div>
+            </Card>
+          ) : null}
 
-          <Card padding="default">
-            <CardHeader title="操作" />
-            <div className={styles.actions}>
-              <Button href={`/reminders/edit?id=${reminderId}`}>リマインダの設定を編集</Button>
-              <Button href="/reminders">リマインダ一覧へ戻る</Button>
-            </div>
-          </Card>
+          <LinePreview caption={data?.summary.nextScheduledAt ? `次は ${formatJst(data.summary.nextScheduledAt)} に届きます` : '次の送信予定はありません'} empty={!firstStep}>
+            {loading ? '送る内容を確認しています。' : error ? '送る内容を表示できませんでした。' : firstStep ? <>{firstStep.messageContent}<span className={styles.previewAction}>Google Meetに参加</span></> : '送る内容はまだありません。'}
+          </LinePreview>
         </aside>
       </div>
+
+      <ReminderFooter
+        status={loading ? '読み込み中' : error ? '状態を取得できません' : data?.reminder.isActive ? '稼働中' : '停止中'}
+        secondary={data?.reminder.isActive ? { label: 'リマインダを一時停止', onClick: () => void pauseReminder() } : undefined}
+        primary="リマインダの設定を編集"
+        onPrimary={() => { window.location.href = `/reminders/edit?id=${reminderId}` }}
+      />
     </div>
   )
 }

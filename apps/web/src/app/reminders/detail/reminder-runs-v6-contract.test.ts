@@ -9,10 +9,11 @@ const API = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'lib', 'api.t
 describe('V6 7-1-H リマインダ実行結果', () => {
   it('Pencilの実Nodeと共通部品を正本にする', () => {
     expect(PAGE).toContain('data-design-node="GC4St"')
-    expect(PAGE).toContain("@/components/shared/summary-card")
+    expect(PAGE).toContain("@/components/shared/breadcrumb")
+    expect(PAGE).toContain("@/components/shared/card")
     expect(PAGE).toContain("@/components/shared/list-state")
     expect(PAGE).toContain("@/components/shared/pagination")
-    expect(PAGE).toContain("@/components/shared/tabs")
+    expect(PAGE).toContain("@/components/reminders/reminder-v6-ui")
   })
 
   it('本文に画面タイトルと説明を重ねない', () => {
@@ -27,6 +28,8 @@ describe('V6 7-1-H リマインダ実行結果', () => {
     expect(API).toMatch(/runs:\s*\(\s*\n?\s*reminderId: string,/)
     expect(PAGE).not.toContain('1,284')
     expect(PAGE).not.toContain('360人')
+    expect(PAGE).toContain("value={data ? `${data.summary.sent.toLocaleString('ja-JP')}通` : '—'}")
+    expect(PAGE).not.toContain('data?.summary.sent ?? 0')
   })
 
   it('7機能で再利用する9項目と6状態を共通契約にする', () => {
@@ -42,8 +45,8 @@ describe('V6 7-1-H リマインダ実行結果', () => {
   })
 
   it('LINEで取れない友だち単位の既読率を0として作らない', () => {
-    expect(PAGE).toContain('LINEは友だち単位の既読を返しません')
-    expect(PAGE).toContain('<Td align="right" title="LINEは友だち単位の既読を返しません">—</Td>')
+    expect(PAGE).toContain('LINEでは友だち単位の既読を取得できません')
+    expect(PAGE).not.toContain('<Th align="right">既読</Th>')
     expect(PAGE).not.toContain('openRate ?? 0')
   })
 
@@ -69,6 +72,8 @@ describe('V6 7-1-H リマインダ実行結果', () => {
     expect(PAGE).toContain('CSVで書き出す')
     expect(PAGE).toContain('この通知を再試行')
     expect(PAGE).toContain('リマインダの設定を編集')
-    expect(PAGE).toContain('リマインダ一覧へ戻る')
+    expect(PAGE).toContain("{ label: 'リマインダ一覧', href: '/reminders' }")
+    expect(PAGE).toContain('リマインダを一時停止')
+    expect(PAGE).toContain('api.reminders.update(reminderId, { isActive: false })')
   })
 })
