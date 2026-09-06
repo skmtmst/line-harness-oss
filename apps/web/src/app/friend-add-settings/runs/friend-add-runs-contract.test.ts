@@ -56,4 +56,19 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
     expect(PAGE).toContain('setCursorStack((current) => [...current, data.nextCursor])')
     expect(PAGE).toContain('disabled={!data.nextCursor || loading}')
   })
+
+  it('V6の実行結果をCSV・最近の結果・流入内訳・右欄で確認できる', () => {
+    expect(PAGE).toContain('実行結果をCSVで書き出す')
+    expect(PAGE).toContain('最近の友だち追加')
+    expect(PAGE).toContain('流入経路別の内訳')
+    expect(PAGE).toContain('稼働状況')
+    expect(PAGE).toContain('要テスト')
+    expect(PAGE).toContain('担当者シナリオ開始')
+  })
+
+  it('取得できない集計値を0件で埋めない', () => {
+    expect(PAGE).toContain('<dd className="font-bold">未取得</dd>')
+    expect(PAGE).toContain('担当者への引き継ぎ結果を集計する口は未接続です。')
+    expect(PAGE).toContain('失敗した記録の詳細口は未接続です。')
+  })
 })

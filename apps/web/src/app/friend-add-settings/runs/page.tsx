@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   FriendAddEventAttributionStatus,
   FriendAddEventKind,
@@ -17,6 +17,7 @@ import Select from '@/components/shared/select'
 import NoteBar from '@/components/shared/note-bar'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
+import StickyBar from '@/components/shared/sticky-bar'
 import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 
 type KindFilter = 'all' | FriendAddEventKind
@@ -48,6 +49,10 @@ function formatJstDateTime(value: string | null): string {
     minute: '2-digit',
     hour12: false,
   }).format(parsed)
+}
+
+function csvCell(value: string) {
+  return `"${value.replaceAll('"', '""')}"`
 }
 
 export default function FriendAddRunsPage() {
@@ -107,6 +112,42 @@ export default function FriendAddRunsPage() {
 
   const summary = data?.summary ?? null
   const selectedAccountExists = selectedAccountId && accounts.some((account) => account.id === selectedAccountId)
+  const routeBreakdown = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const item of data?.items ?? []) {
+      const route = item.attributionStatus === 'captured'
+        ? item.entryRouteName || item.refCode || '選択した経路'
+        : '経路は取得できません'
+      counts.set(route, (counts.get(route) ?? 0) + 1)
+    }
+    return Array.from(counts.entries()).sort((a, b) => b[1] - a[1])
+  }, [data])
+  const latestProcessedAt = data?.items.find((item) => item.processedAt)?.processedAt ?? null
+
+  const exportCsv = () => {
+    if (!data?.items.length) return
+    const header = ['受信日時', '友だち', '追加の種類', '確定した流入経路', '配信・処理', '処理日時']
+    const rows = data.items.map((item) => {
+      const routeName = item.attributionStatus === 'captured'
+        ? item.entryRouteName || item.refCode || '選択した経路'
+        : '経路は取得できません'
+      return [
+        formatJstDateTime(item.occurredAt),
+        item.displayName || '名前は未取得',
+        item.kind === 'first_time' ? 'はじめて' : '再追加・ブロック解除',
+        routeName,
+        ROUTING_LABELS[item.routingStatus].label,
+        formatJstDateTime(item.processedAt),
+      ]
+    })
+    const csv = `\uFEFF${[header, ...rows].map((row) => row.map(csvCell).join(',')).join('\n')}`
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'friend-add-runs.csv'
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <div data-design-node="P2J0Te" className="space-y-4 pb-8">
@@ -114,7 +155,10 @@ export default function FriendAddRunsPage() {
         <p className="text-sm text-ink-secondary">
           友だち追加を受け付けたあと、どの経路として記録し、配信したかを確認できます。
         </p>
-        <Button href="/friend-add-settings">配信設定へ戻る</Button>
+        <div className="flex gap-2">
+          <Button href="/friend-add-settings">配信設定へ戻る</Button>
+          <Button onClick={exportCsv} disabled={!data?.items.length}>実行結果をCSVで書き出す</Button>
+        </div>
       </div>
 
       <NoteBar>
@@ -122,10 +166,10 @@ export default function FriendAddRunsPage() {
       </NoteBar>
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <SummaryCard variant="v6" title="受け付けた" value={summary?.total ?? null} unit="件" detail="選択中のアカウント" loading={loading} />
-        <SummaryCard variant="v6" title="はじめて" value={summary?.firstTime ?? null} unit="件" detail="初回の友だち追加" loading={loading} />
-        <SummaryCard variant="v6" title="再追加" value={summary?.returning ?? null} unit="件" detail="再追加・ブロック解除" loading={loading} />
-        <SummaryCard variant="v6" title="要確認" value={summary?.failed ?? null} unit="件" detail="処理できなかった記録" loading={loading} badge={summary && summary.failed > 0 ? '要確認' : undefined} badgeTone="danger" />
+        <SummaryCard variant="v6" title="友だち追加" value={summary?.total ?? null} unit="人" detail="取得できる期間の合計" loading={loading} />
+        <SummaryCard variant="v6" title="経路を確定" value={summary?.captured ?? null} unit="人" detail="流入経路を記録できた" loading={loading} />
+        <SummaryCard variant="v6" title="処理中" value={summary?.pending ?? null} unit="件" detail="配信・処理を実行中" loading={loading} />
+        <SummaryCard variant="v6" title="エラー" value={summary?.failed ?? null} unit="件" detail="処理できなかった記録" loading={loading} badge={summary && summary.failed > 0 ? '要確認' : undefined} badgeTone="danger" />
       </div>
 
       {/*
@@ -171,6 +215,8 @@ export default function FriendAddRunsPage() {
         <Button onClick={() => void load()} disabled={loading}>一覧を更新</Button>
       </div>
 
+      <div className="flex flex-col items-start gap-4 xl:flex-row">
+        <main className="min-w-0 flex-1">
       {accountLoading || loading ? (
         <ListState kind="loading" title="実行結果を読み込んでいます" />
       ) : !selectedAccountExists ? (
@@ -193,7 +239,12 @@ export default function FriendAddRunsPage() {
           description="絞り込みを変えるか、次の友だち追加を待ってください。"
         />
       ) : (
-        <>
+        <div className="space-y-4">
+          <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
+            <div className="border-b border-hairline px-4 py-3">
+              <h2 className="font-bold">最近の友だち追加</h2>
+              <p className="mt-1 text-xs text-ink-faint">何をきっかけに、何が実行されたかを確認できます。</p>
+            </div>
           <DataTable>
             <colgroup>
               <col style={{ width: '15%' }} />
@@ -235,6 +286,20 @@ export default function FriendAddRunsPage() {
               })}
             </tbody>
           </DataTable>
+          </section>
+
+          <section className="rounded-card border border-hairline bg-canvas p-4">
+            <h2 className="font-bold">流入経路別の内訳</h2>
+            <p className="mt-1 text-xs text-ink-faint">このページに表示している結果の内訳です。</p>
+            <div className="mt-3 divide-y divide-hairline">
+              {routeBreakdown.map(([route, count]) => (
+                <div key={route} className="flex items-center justify-between gap-3 py-3 text-sm">
+                  <strong className="truncate" title={route}>{route}</strong>
+                  <span className="whitespace-nowrap text-ink-secondary">{count}件・{Math.round((count / data.items.length) * 1000) / 10}%</span>
+                </div>
+              ))}
+            </div>
+          </section>
 
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm text-ink-faint">{cursorStack.length}ページ目・このページは{data.items.length}件</p>
@@ -253,8 +318,43 @@ export default function FriendAddRunsPage() {
               </Button>
             </div>
           </div>
-        </>
+        </div>
       )}
+        </main>
+
+        <aside className="grid w-full shrink-0 gap-4 xl:w-96">
+          <section className="rounded-card border border-hairline bg-canvas p-4">
+            <h2 className="font-bold">稼働状況</h2>
+            <p className="mt-1 text-xs text-ink-faint">現在取得できる初回案内の状態です。</p>
+            <dl className="mt-4 divide-y divide-hairline text-sm">
+              <div className="flex justify-between gap-3 py-3"><dt>状態</dt><dd className="font-bold">{summary && summary.failed > 0 ? '要確認' : '稼働中'}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>二重送信防止</dt><dd className="font-bold">有効</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>最終配信</dt><dd className="font-bold">{formatJstDateTime(latestProcessedAt)}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>平均送信</dt><dd className="font-bold">未取得</dd></div>
+            </dl>
+          </section>
+          <section className="rounded-card border border-hairline bg-canvas p-4">
+            <h2 className="font-bold">要テスト</h2>
+            <p className="mt-1 text-xs text-ink-faint">未処理の問題だけ表示します。</p>
+            <div className="mt-4 rounded-control bg-status-danger-soft p-3 text-sm text-status-danger-deep">
+              <strong>未送信 {summary?.failed ?? '—'}件</strong>
+              <p className="mt-1 text-xs">失敗した記録の詳細口は未接続です。</p>
+            </div>
+            <Button className="mt-3 w-full" href="/friend-add-settings?view=edit&id=rule-referral&step=preview">友だち追加時配信をテスト</Button>
+          </section>
+          <section className="rounded-card border border-hairline bg-canvas p-4">
+            <h2 className="font-bold">担当者シナリオ開始</h2>
+            <p className="mt-1 text-xs text-ink-faint">担当者への引き継ぎ結果を集計する口は未接続です。</p>
+            <dl className="mt-4 divide-y divide-hairline text-sm">
+              <div className="flex justify-between gap-3 py-3"><dt>テスト待ち</dt><dd className="font-bold">{summary?.pending ?? '—'}件</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>対応中</dt><dd className="font-bold">未取得</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>完了</dt><dd className="font-bold">未取得</dd></div>
+            </dl>
+          </section>
+        </aside>
+      </div>
+
+      <StickyBar actions={<Button href="/friend-add-settings?view=edit&id=rule-referral&step=basic" variant="primary">友だち追加時の設定を編集</Button>} />
     </div>
   )
 }

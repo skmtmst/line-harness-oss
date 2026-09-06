@@ -32,6 +32,15 @@ function successRate(delivered: number | null, failed: number | null) {
   return `成功率 ${((delivered / (delivered + failed)) * 100).toFixed(1)}%`
 }
 
+function deliverySummary(rule: FriendAddRule) {
+  const message = rule.definition.messageType === 'template'
+    ? 'テンプレート'
+    : rule.definition.messageType === 'form'
+      ? '回答フォーム'
+      : rule.definition.messageText ? 'テキスト' : null
+  return [message, rule.scenarioName].filter(Boolean).join('＋') || '未取得'
+}
+
 export default function FriendAddSettingsPage() {
   const searchParams = useSearchParams()
   const view = searchParams.get('view')
@@ -176,7 +185,8 @@ function FriendAddSettingsList() {
           {!data || data.items.length === 0 ? (
             <ListState kind="empty" title="友だち追加時の配信がまだありません" description="最初の案内を作ると、ここに表示されます。" action={<Button href="/friend-add-settings?view=new" variant="primary">友だち追加時配信を作る</Button>} />
           ) : (
-            <DataTable>
+            <>
+              <DataTable>
                 <thead><TableHeadRow><Th>設定名</Th><Th>状態</Th><Th>対象の流入リンク</Th><Th>最初に送るもの</Th><Th>直近7日</Th><Th>操作</Th></TableHeadRow></thead>
                 <tbody>
                   {visibleItems.map((rule) => (
@@ -184,7 +194,7 @@ function FriendAddSettingsList() {
                       <NameCell name={<a href={`/friend-add-settings?view=edit&id=${encodeURIComponent(rule.id)}`} className="text-ink block truncate font-bold">{rule.name}</a>} sub={rule.isFallback ? 'いちばん最後に動く・消せない' : `優先順位 ${rule.priority}`} />
                       <Td><StatusBadge tone={rule.status === 'published' || rule.isFallback ? 'success' : 'neutral'} size="compact">{rule.isFallback ? '常に有効' : rule.status === 'published' ? '有効' : rule.status === 'draft' ? '下書き' : rule.status === 'stopped' ? '停止中' : 'アーカイブ'}</StatusBadge></Td>
                       <Td>{rule.isFallback ? '経路が取れなかったとき' : rule.routeNames.join('、') || 'すべての流入経路'}</Td>
-                      <Td>{rule.definition.messageText ? 'テキストメッセージ' : rule.scenarioName || '未取得'}</Td>
+                      <Td>{deliverySummary(rule)}</Td>
                       <Td>{countText(rule.matchedLast7Days, '人')}</Td>
                       <ActionCell>
                         <div className="flex items-center gap-1">
@@ -196,7 +206,13 @@ function FriendAddSettingsList() {
                     </Tr>
                   ))}
                 </tbody>
-            </DataTable>
+              </DataTable>
+              <div className="mt-3 flex items-center justify-end gap-2" aria-label="ページ送り">
+                <Button disabled>前へ</Button>
+                <Button variant="primary" aria-current="page">1</Button>
+                <Button disabled>次へ</Button>
+              </div>
+            </>
           )}
         </section>
       </div>
