@@ -15,7 +15,6 @@ import {
   type OperationIncident,
 } from '@/lib/api'
 import { formatOperationDate, monthlyQuotaStatus, type OperationSeverity } from '@/lib/operation-status'
-import ReleaseLogPanel from '@/components/emergency/release-log-panel'
 import { apiCheckDetail } from './api-check-detail'
 import { operationImpactText, type EmergencyStopTarget } from '@/lib/operation-impact'
 import releaseLog from '@/generated/release-log.json'
@@ -321,7 +320,7 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
     : null
 
   return (
-    <div className="space-y-4" data-design="V3 Health">
+    <div className="space-y-4" data-design="V6 Health">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <SummaryCard label="全体の状態" value={resultTitle} note={loading ? '確認中' : '最新結果'} />
         <SummaryCard label="最後の確認" value={formatOperationDate(checkedAt)} note="5分ごとに自動確認" />
@@ -365,6 +364,14 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
           })}
         </div>
       </section>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="判定の見方">
+        {([
+          ['正常', '目安の中に入っています', 'border-emerald-200 bg-emerald-50 text-emerald-800'],
+          ['注意', '目安をこえました。見てください', 'border-amber-200 bg-amber-50 text-amber-800'],
+          ['エラー', '動いていません。止めるか直してください', 'border-red-200 bg-red-50 text-red-800'],
+          ['未確認', '確かめられませんでした', 'border-gray-200 bg-gray-50 text-gray-700'],
+        ] as const).map(([label, note, className]) => <div key={label} className={`rounded-control border px-4 py-3 ${className}`}><p className="text-xs font-bold">{label}</p><p className="mt-1 text-[11px]">{note}</p></div>)}
+      </div>
     </div>
   )
 }
@@ -515,9 +522,17 @@ function HistoryPanel() {
     if (!item.stoppedAt || !item.resolvedAt) return longest
     return Math.max(longest, Math.round((Date.parse(item.resolvedAt) - Date.parse(item.stoppedAt)) / 60_000))
   }, 0)
-  const releases = (releaseLog as { releases?: Array<{ version: string; released: string | null; entries: unknown[] }> }).releases ?? []
+  const releases = (releaseLog as { releases?: Array<{
+    version: string
+    released: string | null
+    entries: Array<{ kind: string; text: string; by: string | null; pr: number | null; at: string | null }>
+  }> }).releases ?? []
   const currentVersion = releases.find((item) => item.released)?.version ?? '—'
   const updateCount = releases.filter((item) => item.released && Date.parse(item.released) >= Date.now() - 30 * 24 * 60 * 60 * 1000).reduce((sum, item) => sum + item.entries.length, 0)
+  const recentUpdates = releases
+    .flatMap((release) => release.entries.map((entry) => ({ ...entry, version: release.version, released: release.released })))
+    .toSorted((left, right) => Date.parse(right.at ?? right.released ?? '') - Date.parse(left.at ?? left.released ?? ''))
+    .slice(0, 10)
 
   const downloadCsv = () => {
     const quote = (value: unknown) => `"${String(value ?? '').replaceAll('"', '""')}"`
@@ -552,7 +567,10 @@ function HistoryPanel() {
         <div className="border-hairline border-b px-4 py-3"><h2 className="text-base font-bold text-gray-900">止めた・戻した記録</h2><p className="mt-0.5 text-xs text-gray-500">だれが・いつ・何を・なぜ。サーバーに追記して残します</p></div>
         {state === 'error' ? <p className="bg-amber-50 px-4 py-4 text-xs font-medium text-amber-800">緊急操作の履歴を取得できませんでした。履歴なしとは扱いません。</p> : entries.length === 0 ? <p className="p-8 text-center text-xs text-gray-500">この期間の記録はありません。</p> : <><div className="hidden grid-cols-[190px_1.2fr_1fr_1fr_110px] gap-3 bg-gray-50 px-4 py-3 text-[11px] font-bold text-gray-500 md:grid"><span>いつ・だれが</span><span>止めたもの</span><span>対象</span><span>理由</span><span>戻した</span></div><div className="divide-y divide-gray-100">{entries.map((entry) => <div key={entry.id} className="grid gap-3 px-4 py-4 md:grid-cols-[190px_1.2fr_1fr_1fr_110px] md:items-center"><div><time className="text-sm font-bold text-gray-900">{formatOperationDate(entry.createdAt)}</time><p className="mt-1 truncate text-xs text-gray-500" title={entry.actorId}>{entry.actorId}</p></div><p className="text-xs font-bold text-gray-800">{entry.capabilities.map((capability) => CAPABILITY_LABEL[capability]).join('・')}</p><p className="text-xs text-gray-700">{entry.lineAccountId ?? 'すべてのアカウント'}</p><div><p className="text-xs font-bold text-gray-800">{entry.reason}</p>{entry.detail && <p className="mt-1 text-xs text-gray-500">{entry.detail}</p>}</div><p className={`text-xs font-bold ${entry.resolvedAt ? 'text-emerald-700' : entry.status === 'failed' ? 'text-red-700' : 'text-gray-600'}`}>{entry.resolvedAt ? formatOperationDate(entry.resolvedAt) : entry.status === 'failed' ? '失敗' : '停止中'}</p></div>)}</div></>}
       </section>
-      <ReleaseLogPanel />
+      <section className="border-hairline rounded-card overflow-hidden border bg-white">
+        <div className="border-hairline border-b px-4 py-3"><h2 className="text-base font-bold text-gray-900">システム更新</h2><p className="mt-0.5 text-xs text-gray-500">管理画面へ入った変更のうち、新しい10件を表示します</p></div>
+        {recentUpdates.length === 0 ? <p className="p-8 text-center text-xs text-gray-500">更新の記録はありません。</p> : <div className="divide-y divide-gray-100">{recentUpdates.map((entry, index) => <div key={`${entry.version}-${entry.pr ?? index}-${entry.at ?? index}`} className="grid gap-2 px-4 py-3 md:grid-cols-[150px_minmax(0,1fr)_100px] md:items-center"><div><time className="text-xs font-bold text-gray-800">{formatOperationDate(entry.at ?? entry.released)}</time><p className="mt-1 text-[11px] text-gray-500">{entry.version}</p></div><p className="line-clamp-2 text-xs leading-relaxed text-gray-700" title={entry.text}>{entry.text}</p><p className="text-xs font-bold text-gray-600">{entry.by ?? '自動'}{entry.pr ? ` #${entry.pr}` : ''}</p></div>)}</div>}
+      </section>
     </div>
   )
 }
@@ -568,7 +586,7 @@ function EmergencyPageInner() {
       ? '止める配信を選び、理由を入力して緊急停止します。'
       : 'エラー、緊急停止、システム更新、設定変更を時間順に確認できます。'
   const headerAction = tab === 'health'
-    ? <div className="flex flex-wrap gap-2"><button type="button" onClick={() => window.location.reload()} className="rounded-control min-h-9 bg-accent-deep px-3 text-xs font-bold text-white">↻ チェックを今すぐ実行</button><Link href="/emergency?tab=control" className="rounded-control inline-flex min-h-9 items-center bg-red-600 px-3 text-xs font-bold text-white">⊗ 配信をすべて緊急停止</Link></div>
+    ? <button type="button" onClick={() => window.location.reload()} className="border-hairline rounded-control min-h-9 border bg-white px-3 text-xs font-bold text-gray-800">↻ いますぐ確かめる</button>
     : severity === 'danger' || severity === 'warning' ? <StatusPill severity={severity} /> : undefined
   return <div><OperationPageHeader description={description} action={headerAction} /><MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel onSeverity={setSeverity} />}{tab === 'control' && <EmergencyControlPanel accounts={accounts} />}{tab === 'history' && <HistoryPanel />}</div>
 }

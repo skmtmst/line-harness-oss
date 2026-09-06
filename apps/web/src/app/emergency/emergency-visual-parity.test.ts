@@ -55,8 +55,9 @@ describe('V6 機能32 運用状態の表示確認', () => {
       expect(source).toContain(`label="${label}"`)
     }
     expect(source).not.toContain('label="今月の配信残数"')
-    expect(source).toContain('チェックを今すぐ実行')
-    expect(source).toContain('配信をすべて緊急停止')
+    expect(source).toContain('いますぐ確かめる')
+    expect(source).toContain('緊急コントロールへ')
+    expect(source).toContain('aria-label="判定の見方"')
   })
 
   it('5分ごとに実データを再確認する', () => {
