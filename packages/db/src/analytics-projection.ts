@@ -551,6 +551,7 @@ function monthsBefore(now: Date, months: number): string {
 export async function purgeExpiredAnalyticsReadData(
   db: D1Database,
   now: Date,
+  limit = 1_000,
 ): Promise<{
   events: number;
   dailyMetrics: number;
@@ -564,29 +565,92 @@ export async function purgeExpiredAnalyticsReadData(
 }> {
   const eventCutoff = monthsBefore(now, 13);
   const dailyCutoff = monthsBefore(now, 25).slice(0, 10);
-  const results = await db.batch([
-    db.prepare(`DELETE FROM analytics_events WHERE occurred_at < ?`).bind(eventCutoff),
-    db.prepare(`DELETE FROM analytics_daily_metrics WHERE metric_date < ?`).bind(dailyCutoff),
-    db.prepare(`DELETE FROM analytics_reconciliation_runs WHERE completed_at < ?`).bind(eventCutoff),
-    db.prepare(`DELETE FROM analytics_result_audiences WHERE expires_at <= ?`).bind(now.toISOString()),
-    db.prepare(`DELETE FROM analytics_funnel_runs WHERE created_at < ?`).bind(eventCutoff),
-    db.prepare(`DELETE FROM analytics_cross_runs WHERE created_at < ?`).bind(eventCutoff),
-    db.prepare(`DELETE FROM analytics_saved_analysis_snapshots WHERE created_at < ?`).bind(eventCutoff),
-    db.prepare(`DELETE FROM analytics_url_exposures WHERE sent_at < ?`).bind(eventCutoff),
-    db.prepare(
-      `DELETE FROM analytics_url_exposure_queue
-        WHERE created_at < ? AND status IN ('processed','failed')`,
-    ).bind(eventCutoff),
-  ]);
+  let remaining = Number.isFinite(limit)
+    ? Math.max(1, Math.min(Math.trunc(limit), 1_000))
+    : 1_000;
+
+  const deleteChunk = async (sql: string, ...bindings: unknown[]): Promise<number> => {
+    if (remaining === 0) return 0;
+    const result = await db.prepare(sql).bind(...bindings, remaining).run();
+    const deleted = Number(result.meta?.changes ?? 0);
+    remaining -= deleted;
+    return deleted;
+  };
+
+  const events = await deleteChunk(
+    `DELETE FROM analytics_events
+      WHERE rowid IN (
+        SELECT rowid FROM analytics_events WHERE occurred_at < ? ORDER BY occurred_at, rowid LIMIT ?
+      )`,
+    eventCutoff,
+  );
+  const dailyMetrics = await deleteChunk(
+    `DELETE FROM analytics_daily_metrics
+      WHERE rowid IN (
+        SELECT rowid FROM analytics_daily_metrics WHERE metric_date < ? ORDER BY metric_date, rowid LIMIT ?
+      )`,
+    dailyCutoff,
+  );
+  const reconciliationRuns = await deleteChunk(
+    `DELETE FROM analytics_reconciliation_runs
+      WHERE rowid IN (
+        SELECT rowid FROM analytics_reconciliation_runs WHERE completed_at < ? ORDER BY completed_at, rowid LIMIT ?
+      )`,
+    eventCutoff,
+  );
+  const audiences = await deleteChunk(
+    `DELETE FROM analytics_result_audiences
+      WHERE rowid IN (
+        SELECT rowid FROM analytics_result_audiences WHERE expires_at <= ? ORDER BY expires_at, rowid LIMIT ?
+      )`,
+    now.toISOString(),
+  );
+  const funnelRuns = await deleteChunk(
+    `DELETE FROM analytics_funnel_runs
+      WHERE rowid IN (
+        SELECT rowid FROM analytics_funnel_runs WHERE created_at < ? ORDER BY created_at, rowid LIMIT ?
+      )`,
+    eventCutoff,
+  );
+  const crossRuns = await deleteChunk(
+    `DELETE FROM analytics_cross_runs
+      WHERE rowid IN (
+        SELECT rowid FROM analytics_cross_runs WHERE created_at < ? ORDER BY created_at, rowid LIMIT ?
+      )`,
+    eventCutoff,
+  );
+  const savedSnapshots = await deleteChunk(
+    `DELETE FROM analytics_saved_analysis_snapshots
+      WHERE rowid IN (
+        SELECT rowid FROM analytics_saved_analysis_snapshots WHERE created_at < ? ORDER BY created_at, rowid LIMIT ?
+      )`,
+    eventCutoff,
+  );
+  const urlExposures = await deleteChunk(
+    `DELETE FROM analytics_url_exposures
+      WHERE rowid IN (
+        SELECT rowid FROM analytics_url_exposures WHERE sent_at < ? ORDER BY sent_at, rowid LIMIT ?
+      )`,
+    eventCutoff,
+  );
+  const urlExposureQueue = await deleteChunk(
+    `DELETE FROM analytics_url_exposure_queue
+      WHERE rowid IN (
+        SELECT rowid FROM analytics_url_exposure_queue
+         WHERE created_at < ? AND status IN ('processed','failed')
+         ORDER BY created_at, rowid LIMIT ?
+      )`,
+    eventCutoff,
+  );
   return {
-    events: Number(results[0]?.meta?.changes ?? 0),
-    dailyMetrics: Number(results[1]?.meta?.changes ?? 0),
-    reconciliationRuns: Number(results[2]?.meta?.changes ?? 0),
-    audiences: Number(results[3]?.meta?.changes ?? 0),
-    funnelRuns: Number(results[4]?.meta?.changes ?? 0),
-    crossRuns: Number(results[5]?.meta?.changes ?? 0),
-    savedSnapshots: Number(results[6]?.meta?.changes ?? 0),
-    urlExposures: Number(results[7]?.meta?.changes ?? 0),
-    urlExposureQueue: Number(results[8]?.meta?.changes ?? 0),
+    events,
+    dailyMetrics,
+    reconciliationRuns,
+    audiences,
+    funnelRuns,
+    crossRuns,
+    savedSnapshots,
+    urlExposures,
+    urlExposureQueue,
   };
 }
