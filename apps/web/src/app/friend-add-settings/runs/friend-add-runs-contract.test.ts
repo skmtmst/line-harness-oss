@@ -12,7 +12,7 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
     expect(PAGE).toContain("usePageTitle('友だち追加時配信・実行結果')")
     expect(PAGE).not.toContain('<Header')
     expect(SETTINGS).toContain('<Button href="/friend-add-settings/runs">実行結果を見る</Button>')
-    expect(PAGE).toContain('<Button href="/friend-add-settings">配信設定へ戻る</Button>')
+    expect(PAGE).toContain('href="/friend-add-settings">← 友だち追加時の配信</Link>')
   })
 
   it('選択中のアカウントと3つの絞り込みだけをAPIへ渡す', () => {
@@ -45,10 +45,10 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
   })
 
   it('4つの処理状態を利用者の言葉で表示する', () => {
-    expect(PAGE).toContain("pending: { label: '処理中です'")
-    expect(PAGE).toContain("completed: { label: '動きました'")
-    expect(PAGE).toContain("failed: { label: '確認が必要です'")
-    expect(PAGE).toContain("suppressed: { label: '配信しませんでした'")
+    expect(PAGE).toContain("pending: { label: 'テスト待ち'")
+    expect(PAGE).toContain("completed: { label: '成功'")
+    expect(PAGE).toContain("failed: { label: 'エラー'")
+    expect(PAGE).toContain("suppressed: { label: '配信なし'")
   })
 
   it('カーソルを積んだページ送りで前後へ移動できる', () => {

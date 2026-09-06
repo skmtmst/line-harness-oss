@@ -14,21 +14,26 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
-import NoteBar from '@/components/shared/note-bar'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
 import StickyBar from '@/components/shared/sticky-bar'
-import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 
 type KindFilter = 'all' | FriendAddEventKind
 type AttributionFilter = 'all' | FriendAddEventAttributionStatus
 type RoutingFilter = 'all' | FriendAddEventRoutingStatus
 
 const ROUTING_LABELS: Record<FriendAddEventRoutingStatus, { label: string; tone: StatusBadgeTone }> = {
-  pending: { label: '処理中です', tone: 'info' },
-  completed: { label: '動きました', tone: 'success' },
-  failed: { label: '確認が必要です', tone: 'danger' },
-  suppressed: { label: '配信しませんでした', tone: 'neutral' },
+  pending: { label: 'テスト待ち', tone: 'info' },
+  completed: { label: '成功', tone: 'success' },
+  failed: { label: 'エラー', tone: 'danger' },
+  suppressed: { label: '配信なし', tone: 'neutral' },
+}
+
+const ROUTING_ACTIONS: Record<FriendAddEventRoutingStatus, string> = {
+  pending: '配信・処理を確認中',
+  completed: '初回案内を実行',
+  failed: '配信・処理に失敗',
+  suppressed: '配信・処理なし',
 }
 
 /** DBにはJSTの時刻をオフセットなしで保存した古い行がある。UTCへ読み替えず、そのままJSTとして表示する。 */
@@ -49,6 +54,11 @@ function formatJstDateTime(value: string | null): string {
     minute: '2-digit',
     hour12: false,
   }).format(parsed)
+}
+
+function formatJstTime(value: string | null): string {
+  const dateTime = formatJstDateTime(value)
+  return dateTime === '—' ? dateTime : dateTime.slice(-5)
 }
 
 function csvCell(value: string) {
@@ -152,67 +162,58 @@ export default function FriendAddRunsPage() {
   return (
     <div data-design-node="P2J0Te" className="space-y-4 pb-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-ink-secondary">
-          友だち追加を受け付けたあと、どの経路として記録し、配信したかを確認できます。
-        </p>
+        <Link className="text-sm font-bold text-accent hover:underline" href="/friend-add-settings">← 友だち追加時の配信</Link>
         <div className="flex gap-2">
-          <Button href="/friend-add-settings">配信設定へ戻る</Button>
+          <details className="relative">
+            <summary className="cursor-pointer list-none rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-bold">絞り込み</summary>
+            <div className="absolute right-0 z-20 mt-2 flex w-screen max-w-3xl flex-wrap items-end gap-3 rounded-card border border-hairline bg-canvas p-4 shadow-panel">
+              <Select
+                aria-label="追加の種類"
+                label="追加の種類"
+                value={kind}
+                onChange={(value) => setKind(value as KindFilter)}
+                options={[
+                  { value: 'all', label: 'すべての追加' },
+                  { value: 'first_time', label: 'はじめて' },
+                  { value: 'returning', label: '再追加・ブロック解除' },
+                ]}
+              />
+              <Select
+                aria-label="流入経路"
+                label="流入経路"
+                value={attribution}
+                onChange={(value) => setAttribution(value as AttributionFilter)}
+                options={[
+                  { value: 'all', label: 'すべての経路' },
+                  { value: 'captured', label: '経路を取得できた' },
+                  { value: 'unavailable', label: '経路を取得できない' },
+                ]}
+              />
+              <Select
+                aria-label="配信・処理"
+                label="配信・処理"
+                value={routing}
+                onChange={(value) => setRouting(value as RoutingFilter)}
+                options={[
+                  { value: 'all', label: 'すべての結果' },
+                  { value: 'completed', label: '成功' },
+                  { value: 'pending', label: 'テスト待ち' },
+                  { value: 'failed', label: 'エラー' },
+                  { value: 'suppressed', label: '配信なし' },
+                ]}
+              />
+              <Button onClick={() => void load()} disabled={loading}>一覧を更新</Button>
+            </div>
+          </details>
           <Button onClick={exportCsv} disabled={!data?.items.length}>実行結果をCSVで書き出す</Button>
         </div>
       </div>
 
-      <NoteBar>
-        LINE公式アカウントの通常URLや公式QRから追加された場合、正確な流入経路は取得できません。取得できない記録は0件にせず「経路は取得できません」と表示します。
-      </NoteBar>
-
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <SummaryCard variant="v6" title="友だち追加" value={summary?.total ?? null} unit="人" detail="取得できる期間の合計" loading={loading} />
-        <SummaryCard variant="v6" title="経路を確定" value={summary?.captured ?? null} unit="人" detail="流入経路を記録できた" loading={loading} />
-        <SummaryCard variant="v6" title="処理中" value={summary?.pending ?? null} unit="件" detail="配信・処理を実行中" loading={loading} />
+        <SummaryCard variant="v6" title="直近28日の追加" value={summary?.total ?? null} unit="人" detail="友だち追加の合計" loading={loading} />
+        <SummaryCard variant="v6" title="累計配信" value={null} unit="通" detail="集計は未取得" loading={loading} />
+        <SummaryCard variant="v6" title="シナリオ開始" value={null} unit="件" detail="集計は未取得" loading={loading} />
         <SummaryCard variant="v6" title="エラー" value={summary?.failed ?? null} unit="件" detail="処理できなかった記録" loading={loading} badge={summary && summary.failed > 0 ? '要確認' : undefined} badgeTone="danger" />
-      </div>
-
-      {/*
-        絞り込みは共通の `Select`（設計 `rpot9` / `Gfsb4`）。素の選び口は
-        ブラウザごとに見た目が変わり、設計の選び口と別物になる。
-      */}
-      <div className="flex flex-wrap items-end gap-3 rounded-card border border-hairline bg-canvas px-4 py-3">
-        <Select
-          aria-label="追加の種類"
-          label="追加の種類"
-          value={kind}
-          onChange={(value) => setKind(value as KindFilter)}
-          options={[
-            { value: 'all', label: 'すべての追加' },
-            { value: 'first_time', label: 'はじめて' },
-            { value: 'returning', label: '再追加・ブロック解除' },
-          ]}
-        />
-        <Select
-          aria-label="流入経路"
-          label="流入経路"
-          value={attribution}
-          onChange={(value) => setAttribution(value as AttributionFilter)}
-          options={[
-            { value: 'all', label: 'すべての経路' },
-            { value: 'captured', label: '経路を取得できた' },
-            { value: 'unavailable', label: '経路を取得できない' },
-          ]}
-        />
-        <Select
-          aria-label="配信・処理"
-          label="配信・処理"
-          value={routing}
-          onChange={(value) => setRouting(value as RoutingFilter)}
-          options={[
-            { value: 'all', label: 'すべての結果' },
-            { value: 'completed', label: '動きました' },
-            { value: 'pending', label: '処理中です' },
-            { value: 'failed', label: '確認が必要です' },
-            { value: 'suppressed', label: '配信しませんでした' },
-          ]}
-        />
-        <Button onClick={() => void load()} disabled={loading}>一覧を更新</Button>
       </div>
 
       <div className="flex flex-col items-start gap-4 xl:flex-row">
@@ -245,52 +246,34 @@ export default function FriendAddRunsPage() {
               <h2 className="font-bold">最近の友だち追加</h2>
               <p className="mt-1 text-xs text-ink-faint">何をきっかけに、何が実行されたかを確認できます。</p>
             </div>
-          <DataTable>
-            <colgroup>
-              <col style={{ width: '15%' }} />
-              <col style={{ width: '19%' }} />
-              <col style={{ width: '15%' }} />
-              <col style={{ width: '21%' }} />
-              <col style={{ width: '16%' }} />
-              <col style={{ width: '14%' }} />
-            </colgroup>
-            <thead>
-              <TableHeadRow>
-                <Th>受信日時</Th>
-                <Th>友だち</Th>
-                <Th>追加の種類</Th>
-                <Th>確定した流入経路</Th>
-                <Th>配信・処理</Th>
-                <Th>処理日時</Th>
-              </TableHeadRow>
-            </thead>
-            <tbody>
+            <div className="divide-y divide-hairline px-4">
               {data.items.map((item) => {
                 const status = ROUTING_LABELS[item.routingStatus]
                 const routeName = item.attributionStatus === 'captured'
                   ? item.entryRouteName || item.refCode || '選択した経路'
                   : '経路は取得できません'
+                const displayName = item.displayName || '名前は未取得'
                 return (
-                  <Tr key={item.id}>
-                    <Td title={formatJstDateTime(item.occurredAt)}><span className="block truncate">{formatJstDateTime(item.occurredAt)}</span></Td>
-                    <NameCell
-                      name={<Link className="text-accent hover:underline" href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`}>{item.displayName || '名前は未取得'}</Link>}
-                      sub={item.displayName ? undefined : '友だち情報を開いて確認'}
-                    />
-                    <Td>{item.kind === 'first_time' ? 'はじめて' : '再追加・ブロック解除'}</Td>
-                    <Td title={routeName}><span className="block truncate">{routeName}</span></Td>
-                    <Td><StatusBadge tone={status.tone} size="compact">{status.label}</StatusBadge></Td>
-                    <Td title={formatJstDateTime(item.processedAt)}><span className="block truncate">{formatJstDateTime(item.processedAt)}</span></Td>
-                  </Tr>
+                  <div key={item.id} className="flex min-w-0 items-center gap-3 py-3">
+                    <span className="grid size-9 shrink-0 place-items-center rounded-full bg-status-success-soft text-xs font-bold text-status-success-deep" aria-hidden="true">
+                      {displayName.slice(0, 1)}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <Link className="block truncate text-sm font-bold hover:underline" href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`} title={displayName}>{displayName}</Link>
+                      <p className="truncate text-xs text-ink-faint" title={`流入：${routeName}`}>流入：{routeName}</p>
+                    </div>
+                    <div className="hidden min-w-0 flex-1 text-right text-sm font-bold lg:block">{ROUTING_ACTIONS[item.routingStatus]}</div>
+                    <StatusBadge tone={status.tone} size="compact">{status.label}</StatusBadge>
+                    <time className="w-12 shrink-0 text-right text-xs text-ink-secondary" dateTime={item.occurredAt} title={formatJstDateTime(item.occurredAt)}>{formatJstTime(item.occurredAt)}</time>
+                  </div>
                 )
               })}
-            </tbody>
-          </DataTable>
+            </div>
           </section>
 
           <section className="rounded-card border border-hairline bg-canvas p-4">
             <h2 className="font-bold">流入経路別の内訳</h2>
-            <p className="mt-1 text-xs text-ink-faint">このページに表示している結果の内訳です。</p>
+            <p className="mt-1 text-xs text-ink-faint">一覧を開かずに効果を確認できます。</p>
             <div className="mt-3 divide-y divide-hairline">
               {routeBreakdown.map(([route, count]) => (
                 <div key={route} className="flex items-center justify-between gap-3 py-3 text-sm">
@@ -299,9 +282,10 @@ export default function FriendAddRunsPage() {
                 </div>
               ))}
             </div>
+            <p className="mt-3 text-xs text-ink-faint">通常URLや公式QRから追加された記録は0件にせず「経路は取得できません」と表示します。</p>
           </section>
 
-          <div className="flex items-center justify-between gap-3">
+          {(cursorStack.length > 1 || Boolean(data.nextCursor)) && <div className="flex items-center justify-between gap-3">
             <p className="text-sm text-ink-faint">{cursorStack.length}ページ目・このページは{data.items.length}件</p>
             <div className="flex gap-2">
               <Button
@@ -317,7 +301,7 @@ export default function FriendAddRunsPage() {
                 次へ
               </Button>
             </div>
-          </div>
+          </div>}
         </div>
       )}
         </main>
@@ -329,7 +313,7 @@ export default function FriendAddRunsPage() {
             <dl className="mt-4 divide-y divide-hairline text-sm">
               <div className="flex justify-between gap-3 py-3"><dt>状態</dt><dd className="font-bold">{summary && summary.failed > 0 ? '要確認' : '稼働中'}</dd></div>
               <div className="flex justify-between gap-3 py-3"><dt>二重送信防止</dt><dd className="font-bold">有効</dd></div>
-              <div className="flex justify-between gap-3 py-3"><dt>最終配信</dt><dd className="font-bold">{formatJstDateTime(latestProcessedAt)}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>最終配信</dt><dd className="font-bold">{formatJstTime(latestProcessedAt)}</dd></div>
               <div className="flex justify-between gap-3 py-3"><dt>平均送信</dt><dd className="font-bold">未取得</dd></div>
             </dl>
           </section>
@@ -354,7 +338,7 @@ export default function FriendAddRunsPage() {
         </aside>
       </div>
 
-      <StickyBar actions={<Button href="/friend-add-settings?view=edit&id=rule-referral&step=basic" variant="primary">友だち追加時の設定を編集</Button>} />
+      <StickyBar actions={<><Button disabled title="一時停止の操作口は未接続です">配信を一時停止</Button><Button href="/friend-add-settings?view=edit&id=rule-referral&step=basic" variant="primary">友だち追加時の設定を編集</Button></>} />
     </div>
   )
 }
