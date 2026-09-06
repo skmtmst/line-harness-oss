@@ -15,10 +15,15 @@ import {
   setDefaultLineAccount,
   archiveLineAccount,
   restoreLineAccount,
+  getLineAccountConnectionChecksByIdempotencyKey,
+  saveLineAccountConnectionChecks,
+  LineAccountRevisionConflictError,
+  jstNow,
   LineAccountLifecycleError,
 } from '@line-crm/db';
 import type {
   LineAccount as DbLineAccount,
+  LineAccountConnectionCheck,
   LineAccountScopeEntry,
 } from '@line-crm/db';
 import { CredentialEncryptionKeyError } from '@line-crm/db';
@@ -96,6 +101,8 @@ function serializeLineAccount(row: DbLineAccount) {
     archivedAt: row.archived_at ?? null,
     country: row.country,
     role: row.role,
+    timezone: row.timezone ?? 'Asia/Tokyo',
+    revision: row.revision ?? 1,
     displayOrder: row.display_order,
     // login_channel_id and liff_id are non-secret identifiers (visible in
     // LINE Developers console, embedded in public LIFF URLs). Safe to expose
@@ -255,6 +262,145 @@ type ConnectionVerification = {
   errors: string[];
 };
 
+type ConnectionCheckDraft = {
+  kind: 'bot_info' | 'webhook_endpoint' | 'webhook_test' | 'liff_config';
+  result: 'matched' | 'mismatched' | 'unconfigured' | 'unknown' | 'ok' | 'failed';
+  expectedUrl?: string | null;
+  registeredUrl?: string | null;
+  webhookActive?: boolean | null;
+  httpStatus?: number | null;
+};
+
+function publicAccountUrls(c: Context<Env>, liffId: string | null) {
+  const base = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
+  return {
+    webhook: `${base}/webhook`,
+    callback: `${base}/auth/callback`,
+    liffEndpoint: liffId ? `${base}?liffId=${encodeURIComponent(liffId)}` : null,
+  };
+}
+
+function serializeConnectionCheck(row: LineAccountConnectionCheck) {
+  return {
+    kind: row.check_kind,
+    result: row.result,
+    expectedUrl: row.expected_url,
+    registeredUrl: row.registered_url,
+    webhookActive: row.webhook_active == null ? null : Boolean(row.webhook_active),
+    httpStatus: row.http_status,
+  };
+}
+
+function connectionCheckResponse(
+  account: DbLineAccount,
+  rows: LineAccountConnectionCheck[],
+  urls: ReturnType<typeof publicAccountUrls>,
+) {
+  const first = rows[0];
+  return {
+    accountId: account.id,
+    revision: first?.account_revision ?? account.revision ?? 1,
+    checkedAt: first?.checked_at ?? null,
+    correlationId: first?.correlation_id ?? null,
+    expectedUrls: urls,
+    checks: rows.map(serializeConnectionCheck),
+  };
+}
+
+async function collectConnectionChecks(
+  account: DbLineAccount,
+  expectedWebhookUrl: string,
+  expectedLiffEndpointUrl: string | null,
+): Promise<ConnectionCheckDraft[]> {
+  const checks: ConnectionCheckDraft[] = [];
+  const headers = { Authorization: `Bearer ${account.channel_access_token}` };
+  let botOk = false;
+  try {
+    const response = await fetch('https://api.line.me/v2/bot/info', { headers });
+    botOk = response.ok;
+    checks.push({ kind: 'bot_info', result: response.ok ? 'ok' : 'failed', httpStatus: response.status });
+  } catch {
+    checks.push({ kind: 'bot_info', result: 'failed', httpStatus: null });
+  }
+
+  let endpointResult: ConnectionCheckDraft = {
+    kind: 'webhook_endpoint',
+    result: 'unknown',
+    expectedUrl: expectedWebhookUrl,
+    registeredUrl: null,
+    webhookActive: null,
+    httpStatus: null,
+  };
+  let mayTestWebhook = false;
+  if (botOk) {
+    try {
+      const response = await fetch('https://api.line.me/v2/bot/channel/webhook/endpoint', { headers });
+      if (response.ok) {
+        const payload = await response.json<{ endpoint?: string; active?: boolean }>();
+        const registeredUrl = payload.endpoint?.trim() || null;
+        const active = payload.active === true;
+        endpointResult = {
+          kind: 'webhook_endpoint',
+          result: !registeredUrl
+            ? 'unconfigured'
+            : registeredUrl === expectedWebhookUrl && active
+              ? 'matched'
+              : 'mismatched',
+          expectedUrl: expectedWebhookUrl,
+          registeredUrl,
+          webhookActive: payload.active == null ? null : active,
+          httpStatus: response.status,
+        };
+        mayTestWebhook = endpointResult.result === 'matched';
+      } else {
+        endpointResult.httpStatus = response.status;
+      }
+    } catch {
+      // The canonical unknown state intentionally stores null for unavailable values.
+    }
+  }
+  checks.push(endpointResult);
+
+  if (mayTestWebhook) {
+    try {
+      const response = await fetch('https://api.line.me/v2/bot/channel/webhook/test', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      const payload = response.ok ? await response.json<{ success?: boolean }>() : null;
+      checks.push({
+        kind: 'webhook_test',
+        result: response.ok && payload?.success === true ? 'ok' : 'failed',
+        expectedUrl: expectedWebhookUrl,
+        httpStatus: response.status,
+      });
+    } catch {
+      checks.push({ kind: 'webhook_test', result: 'unknown', expectedUrl: expectedWebhookUrl });
+    }
+  } else {
+    checks.push({ kind: 'webhook_test', result: 'unknown', expectedUrl: expectedWebhookUrl });
+  }
+
+  const loginMatchesLiff = Boolean(
+    account.login_channel_id &&
+    account.login_channel_secret &&
+    account.liff_id &&
+    /^\d+$/.test(account.login_channel_id) &&
+    /^\d+-[A-Za-z0-9]+$/.test(account.liff_id) &&
+    account.liff_id.startsWith(`${account.login_channel_id}-`),
+  );
+  checks.push({
+    kind: 'liff_config',
+    // LINE has no public API for reading the registered endpoint URL. A valid
+    // local pairing is therefore still unknown, never falsely reported as matched.
+    result: loginMatchesLiff ? 'unknown' : 'failed',
+    expectedUrl: expectedLiffEndpointUrl,
+    registeredUrl: null,
+  });
+  return checks;
+}
+
 async function verifyConnection(input: {
   channelAccessToken: string;
   loginChannelId: string;
@@ -333,7 +479,7 @@ async function getAuthorizedLineAccount(
 // 保存前の接続確認。成功してもDBには一切書き込まない。
 lineAccounts.post(
   '/api/line-accounts/verify-connection',
-  requireRole('owner', 'admin'),
+  requireRole('owner'),
   async (c) => {
     const body = await c.req.json<{
       channelAccessToken?: string;
@@ -350,6 +496,62 @@ lineAccounts.post(
       expectedWebhookUrl: `${base}/webhook`,
     });
     return c.json({ success: true, data });
+  },
+);
+
+// Persisted re-check for the account list, detail, and operations dashboard.
+lineAccounts.post(
+  '/api/line-accounts/:id/connection-checks',
+  requireRole('owner'),
+  async (c) => {
+    try {
+      const id = c.req.param('id')!;
+      const account = await getAuthorizedLineAccount(c, id);
+      if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
+      if (account.archived_at) return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
+
+      const idempotencyKey = c.req.header('Idempotency-Key')?.trim() ?? '';
+      if (idempotencyKey.length < 8 || idempotencyKey.length > 128) {
+        return c.json({ success: false, error: 'Idempotency-Key is required' }, 422);
+      }
+      let body: { expectedRevision?: unknown };
+      try {
+        body = await c.req.json();
+      } catch {
+        return c.json({ success: false, error: 'request body must be valid JSON' }, 422);
+      }
+      if (!Number.isInteger(body.expectedRevision) || Number(body.expectedRevision) < 1) {
+        return c.json({ success: false, error: 'expectedRevision must be a positive integer' }, 422);
+      }
+
+      const urls = publicAccountUrls(c, account.liff_id);
+      const existing = await getLineAccountConnectionChecksByIdempotencyKey(c.env.DB, id, idempotencyKey);
+      if (existing.length > 0) {
+        return c.json({ success: true, data: connectionCheckResponse(account, existing, urls) });
+      }
+      const currentRevision = account.revision ?? 1;
+      if (currentRevision !== body.expectedRevision) {
+        return c.json({ success: false, error: 'REVISION_CONFLICT', currentRevision }, 409);
+      }
+
+      const checks = await collectConnectionChecks(account, urls.webhook, urls.liffEndpoint);
+      const rows = await saveLineAccountConnectionChecks(c.env.DB, {
+        lineAccountId: id,
+        expectedRevision: Number(body.expectedRevision),
+        checkedBy: c.get('staff').id,
+        checkedAt: jstNow(),
+        correlationId: c.req.header('X-Correlation-ID')?.trim() || crypto.randomUUID(),
+        idempotencyKey,
+        checks,
+      });
+      return c.json({ success: true, data: connectionCheckResponse(account, rows, urls) });
+    } catch (error) {
+      if (error instanceof LineAccountRevisionConflictError) {
+        return c.json({ success: false, error: 'REVISION_CONFLICT' }, 409);
+      }
+      console.error('POST /api/line-accounts/:id/connection-checks error:', error);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
   },
 );
 
@@ -720,9 +922,9 @@ async function checkUniqueLoginAndLiff(
 }
 
 // POST /api/line-accounts - create
-lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), async (c) => {
+lineAccounts.post('/api/line-accounts', requireRole('owner'), async (c) => {
   try {
-    const body = await c.req.json<{
+    let body: {
       channelId: string;
       name: string;
       channelAccessToken: string;
@@ -734,15 +936,54 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), async (c)
       ogDefaultImageUrl?: string | null;
       ogDefaultDescription?: string | null;
       officialProfileUrl?: string | null;
+      timezone?: string;
+      country?: string | null;
+      role?: string | null;
+      parentLineAccountId?: string | null;
       copyFromAccountId?: string | null;
       copyItems?: unknown;
-    }>();
+    };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: 'request body must be valid JSON' }, 422);
+    }
 
     if (!body.channelId || !body.name || !body.channelAccessToken || !body.channelSecret) {
       return c.json(
         { success: false, error: 'channelId, name, channelAccessToken, and channelSecret are required' },
         400,
       );
+    }
+    if (
+      typeof body.channelId !== 'string' ||
+      typeof body.name !== 'string' ||
+      typeof body.channelAccessToken !== 'string' ||
+      typeof body.channelSecret !== 'string' ||
+      (body.timezone !== undefined && typeof body.timezone !== 'string') ||
+      (body.country !== undefined && body.country !== null && typeof body.country !== 'string') ||
+      (body.role !== undefined && body.role !== null && typeof body.role !== 'string') ||
+      (body.parentLineAccountId !== undefined &&
+        body.parentLineAccountId !== null &&
+        typeof body.parentLineAccountId !== 'string')
+    ) {
+      return c.json({ success: false, error: 'request fields have invalid types' }, 422);
+    }
+    const name = body.name.trim();
+    if (name.length === 0 || name.length > 40 || !/^\d+$/.test(body.channelId.trim())) {
+      return c.json({ success: false, error: 'name or channelId is invalid' }, 422);
+    }
+    const timezone = body.timezone?.trim() || 'Asia/Tokyo';
+    try {
+      new Intl.DateTimeFormat('ja-JP', { timeZone: timezone }).format();
+    } catch {
+      return c.json({ success: false, error: 'timezone must be a valid IANA time zone' }, 422);
+    }
+    const country = normalizeOptionalString(body.country) ?? null;
+    const role = normalizeOptionalString(body.role) ?? null;
+    const parentLineAccountId = normalizeOptionalString(body.parentLineAccountId) ?? null;
+    if ((country?.length ?? 0) > 80 || (role?.length ?? 0) > 200) {
+      return c.json({ success: false, error: 'country or role is too long' }, 422);
     }
 
     // Optional fields: empty string from UI = "not provided" → store NULL.
@@ -778,6 +1019,13 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), async (c)
     ) {
       return c.json({ success: false, error: '他アカウント権限がないため追加できません' }, 403);
     }
+    if (parentLineAccountId) {
+      const parent = visibleAccounts.find((item) => item.id === parentLineAccountId);
+      if (!parent) return c.json({ success: false, error: 'parent LINE account not found' }, 404);
+      if (parent.archived_at) {
+        return c.json({ success: false, error: 'archived account cannot be selected as parent' }, 409);
+      }
+    }
     if (copyFromAccountId) {
       const source = visibleAccounts.find((item) => item.id === copyFromAccountId);
       if (!source) return c.json({ success: false, error: 'コピー元を選択できません' }, 404);
@@ -804,8 +1052,8 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), async (c)
     }
 
     const account = await createLineAccount(c.env.DB, {
-      channelId: body.channelId,
-      name: body.name,
+      channelId: body.channelId.trim(),
+      name,
       channelAccessToken: body.channelAccessToken,
       channelSecret: body.channelSecret,
       loginChannelId,
@@ -815,6 +1063,10 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), async (c)
       ogDefaultImageUrl: normalizeOptionalString(body.ogDefaultImageUrl) ?? null,
       ogDefaultDescription: normalizeOptionalString(body.ogDefaultDescription) ?? null,
       officialProfileUrl: officialProfileUrl.value ?? null,
+      timezone,
+      country,
+      role,
+      parentLineAccountId,
       tenantId: currentStaff.tenantId ?? DEFAULT_TENANT_ID,
     }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
 
