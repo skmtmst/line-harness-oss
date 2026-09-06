@@ -3,10 +3,12 @@ import {
   collectInputs,
   emptyLayout,
   fieldsToLayout,
+  formThemeButtonText,
   layoutToFields,
   newBlockId,
   nextSectionIndex,
   normalizeLayout,
+  normalizeFormTheme,
   parseLayout,
   validateAnswer,
   validateAnswers,
@@ -318,5 +320,41 @@ describe("選択肢による分岐", () => {
   test("最後のページからは、ページ数を超えた番号が返る（＝送信）", () => {
     const layout = branching();
     expect(nextSectionIndex(layout, 2, {})).toBe(3);
+  });
+});
+
+describe("フォームのデザイン設定", () => {
+  test("5色と許可した見た目だけを正規化する", () => {
+    expect(normalizeFormTheme({
+      main: "#06C755",
+      sub: "#E8F8EE",
+      accent: "#175CD3",
+      error: "#E5484D",
+      text: "#1D1D1F",
+      fontFamily: "serif",
+      cornerRadius: "round",
+      backgroundImageUrl: "https://example.com/form.jpg",
+      css: "body { display: none }",
+    })).toEqual({
+      main: "#06c755",
+      sub: "#e8f8ee",
+      accent: "#175cd3",
+      error: "#e5484d",
+      text: "#1d1d1f",
+      fontFamily: "serif",
+      cornerRadius: "round",
+      backgroundImageUrl: "https://example.com/form.jpg",
+    });
+  });
+
+  test("危険な画像URLと不正な色を既定値へ戻す", () => {
+    const theme = normalizeFormTheme({ main: "red", backgroundImageUrl: "javascript:alert(1)" });
+    expect(theme.main).toBe("#008f3d");
+    expect(theme.backgroundImageUrl).toBeNull();
+  });
+
+  test("薄い緑には白文字を置かない", () => {
+    const theme = normalizeFormTheme({ main: "#06c755", text: "#1d1d1f" });
+    expect(formThemeButtonText(theme)).toBe("#1d1d1f");
   });
 });

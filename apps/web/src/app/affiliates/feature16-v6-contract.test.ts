@@ -14,7 +14,7 @@ function section(source: string, start: string, end: string): string {
 }
 
 describe('機能16 V6の一覧', () => {
-  const affiliates = section(TABS, 'export function AffiliatorsTab() {', '\nfunction formatDateTime')
+  const affiliates = section(TABS, 'export function AffiliatorsTab(', '\nfunction formatDateTime')
   const approvals = section(TABS, 'export function ApprovalQueue() {', '\n// ── Offers list')
 
   it('紹介者一覧は実Node・帯・検索・絞り込み・CSV・ページ送りを持つ', () => {
@@ -22,7 +22,7 @@ describe('機能16 V6の一覧', () => {
     for (const word of [
       '今月の成果',
       '承認待ち',
-      '承認済み報酬の合計',
+      '確定した報酬',
       '未払い残高',
       '今月の成果の流れ',
       '名前・紹介コードで検索',
@@ -32,14 +32,15 @@ describe('機能16 V6の一覧', () => {
     ]) {
       expect(affiliates).toContain(word)
     }
-    expect(affiliates).toContain('支払い台帳が接続されると表示されます')
+    expect(affiliates).toContain('api.affiliates.paymentSummaries(accountId)')
   })
 
   it('成果承認は全状態を読み、確認不要だけをまとめて承認する', () => {
     expect(approvals).toContain('data-design-node="n5VVTb"')
     expect(approvals).toContain("(['pending', 'approved', 'rejected'] as const)")
     expect(approvals).toContain('!item.duplicateFlag')
-    expect(approvals).toContain('選んだ{selected.size}件を認める')
+    expect(approvals).toContain('選んだ{selected.size}件をまとめて認める')
+    expect(approvals).toContain('まとめて却下する')
     expect(approvals).toContain('確認が必要な成果はまとめて承認できません')
   })
 
@@ -63,7 +64,7 @@ describe('機能16 V6の作成画面', () => {
       '支払いサイクル',
       '確定までの保留期間',
       '振込先の登録',
-      '友だち検索が接続されると表示されます',
+      'api.friends.list',
       'つながる先',
     ]) {
       expect(NEW_AFFILIATE).toContain(word)

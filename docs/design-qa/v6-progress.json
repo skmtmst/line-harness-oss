@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 255,
-  "unimplemented": 12,
+  "compared": 257,
+  "unimplemented": 10,
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 5,
-  "match": 52,
-  "structureMatchDataPending": 47,
-  "needsFix": 157,
-  "unjudged": 0,
-  "remaining": 216,
+  "match": 57,
+  "structureMatchDataPending": 46,
+  "needsFix": 153,
+  "unjudged": 2,
+  "remaining": 211,
   "features": [
     {
       "feature": 1,
@@ -1430,15 +1430,15 @@
       "feature": 13,
       "name": "回答フォーム",
       "total": 7,
-      "compared": 5,
-      "unimplemented": 2,
+      "compared": 7,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 1,
-      "needsFix": 4,
-      "unjudged": 0,
+      "structureMatchDataPending": 2,
+      "needsFix": 3,
+      "unjudged": 2,
       "remaining": 7,
       "capturedAt": [
         {
@@ -1621,11 +1621,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 3,
-      "needsFix": 4,
+      "match": 5,
+      "structureMatchDataPending": 1,
+      "needsFix": 1,
       "unjudged": 0,
-      "remaining": 9,
+      "remaining": 4,
       "capturedAt": [
         {
           "pr": 558,
@@ -2685,20 +2685,6 @@
       "name": "3-4 UID移行",
       "gap": "api",
       "gapNote": "異なるLINEプロバイダー間のUID自動変換はできない。検証済み対応表の取込、dry-run、競合判断、本移行、照合、切り戻しを持つ `uid_migration_runs/items` とowner・二者確認APIが要る"
-    },
-    {
-      "feature": 13,
-      "node": "ava2n",
-      "name": "13-1-B フォームのデザイン設定",
-      "gap": "drop",
-      "gapNote": "**作らない決めが実装に明記**。「見た目をこのアプリのデザインにそろえる方針にしたため、色やフォントを選ぶ画面は作っていない」"
-    },
-    {
-      "feature": 13,
-      "node": "gBp2J",
-      "name": "13-1-E フォームの削除確認",
-      "gap": "api",
-      "gapNote": "確認窓だけでは作れない。削除前にフォーム名・公開状態・回答数・利用中の場所・開けなくなるURLを返す影響確認が要る。公開中・回答あり・利用中は物理削除せず、停止・保管へ移す契約と `status` / `deleted_at` が必要"
     },
     {
       "feature": 16,
