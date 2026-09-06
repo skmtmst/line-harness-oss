@@ -49,7 +49,8 @@ const DESIGN_ROWS = [
   ['未契約', '', 37, 0, 0, null, true, '2026-01-13T00:00:00.000Z', 'manual', { savedSearches: 2 }, 0],
   ['誕生日クーポン対象', 'g-vip', 0, 20, 0, null, false, '2026-01-13T00:00:00.000Z', 'birthday', { broadcasts: 1 }, 2],
 ].map(([name, groupId, friendCount, mileageReward, referralMileageReward, mileageMultiplierBps, isStarred, createdAt, assignSource, usedIn, otherActionCount], index) => ({
-  id: `tag-${index}`,
+  // `tag-0` は編集画面の既存設定に使うため、一覧先頭の行とは分ける。
+  id: index === 0 ? 'tag-ec-customer' : `tag-${index}`,
   name: String(name),
   color: '#8b938d',
   groupId: String(groupId),
@@ -70,6 +71,29 @@ const DESIGN_ROWS = [
   ...(Object.keys(usedIn).length ? { usedIn } : {}),
   ...(otherActionCount ? { otherActionCount: Number(otherActionCount) } : {}),
 }))
+
+/** 設計 `ee0sk` / `VjXGX` の、保存済み「NEN会員（定期）」設定。 */
+export const TAG_EDITOR_NEN_SUBSCRIPTION = {
+  id: 'tag-0',
+  name: 'NEN会員（定期）',
+  color: '#8b938d',
+  groupId: 'g-purchase',
+  friendCount: 128,
+  mileageReward: 10,
+  referralMileageReward: 5,
+  mileageMultiplierBps: 15000,
+  mileageMultiplierPriority: 3,
+  isStarred: false,
+  assignSource: 'manual',
+  usedIn: { broadcasts: 4 },
+  otherActionCount: 3,
+  linkedActions: [
+    { id: 'tag-action-message', type: 'メッセージ', label: '「ご登録ありがとうございます。定期便の特典は…」を送信', timing: 'すぐに' },
+    { id: 'tag-action-add', type: 'タグ', label: '「定期便・稼働中」を追加', timing: 'すぐに' },
+    { id: 'tag-action-scenario', type: 'シナリオ', label: '「定期便オンボーディング」を開始', timing: '24時間後' },
+  ],
+  createdAt: '2026-01-13T00:00:00.000Z',
+}
 
 /**
  * タグ101件。設計の「1〜20 / 101件」に合わせる。
@@ -113,6 +137,18 @@ export const TAGS = (() => {
       n += 1
     }
   }
+
+  /*
+    編集用の `tag-0` は購入フォルダの埋め草1件と差し替える。
+    101件・フォルダ件数・先頭6行を変えず、`/tags/edit?id=tag-0` も
+    設計どおり保存済みの状態で開ける。
+  */
+  const editorRow = rows.find((row, index) => index >= DESIGN_ROWS.length && row.groupId === 'g-purchase')
+  if (editorRow) Object.assign(editorRow, TAG_EDITOR_NEN_SUBSCRIPTION, { displayOrder: editorRow.displayOrder })
+  const vipRow = rows.find((row, index) => index >= DESIGN_ROWS.length && row.groupId === 'g-vip')
+  if (vipRow) Object.assign(vipRow, { id: 'tag-vip', name: 'VIP' })
+  const purchaseRow = rows.find((row, index) => index >= DESIGN_ROWS.length && row.groupId === 'g-purchase' && row.id !== 'tag-0')
+  if (purchaseRow) Object.assign(purchaseRow, { id: 'tag-purchase', name: '購入者' })
   /*
     整理候補の理由を付ける。**設計の絵に合わせて 未使用24・整理候補26。**
 
@@ -152,8 +188,8 @@ export const TAGS = (() => {
  */
 export const LIST_STATS = {
   tags: { total: 101, unused: 24, taggedFriends: 186, assignedThisMonth: 214 },
-  marks: { total: 0, inUse: 0, unanswered: 0, inProgress: 0, resolved: 0, changedLast7: 0 },
-  searches: { total: 0, limit: 5 },
+  marks: { total: 4, inUse: 4, unanswered: 23, inProgress: 19, resolved: 186, changedLast7: 74 },
+  searches: { total: 5, limit: 50 },
   templates: { total: 0, inUse: 0, sentThisMonth: 0, unused90d: 0, clickRate: null },
   // 設計 `TC1b1` の帯: シナリオ9件（稼働中8）/ 購読中1,028人 / 読了済728人 / 今週342通
   scenarios: { total: 9, active: 8, subscribers: 1028, completed: 728, sentThisWeek: 342 },
@@ -1393,10 +1429,10 @@ const INBOX_VIEW_CONDITIONS = {
 const LEGACY_VIEW_CONDITIONS = { all: [], any: [] }
 
 export const INBOX_SAVED_VIEWS = [
-  ['未対応・期限超過', true, { statuses: ['unread'], sort: 'waiting_desc' }],
-  ['河野担当の未対応', true, { statuses: ['unread'], assignees: ['operator-kenta'] }],
-  ['LINEからの新着', false, null],
-].map(([name, isShared, patch], index) => ({
+  ['未対応・期限超過', true, { statuses: ['unread'], sort: 'waiting_desc' }, 1],
+  ['Kenta 担当の未対応', true, { statuses: ['unread'], assignees: ['operator-kenta'] }, 3],
+  ['LINEからの新着', false, null, 5],
+].map(([name, isShared, patch, matchCount], index) => ({
   id: `inbox-view-${index}`,
   name: String(name),
   scope: 'chats',
@@ -1404,9 +1440,77 @@ export const INBOX_SAVED_VIEWS = [
   createdBy: 'Kenta',
   lineAccountId: 'visual-qa-account',
   isShared: Boolean(isShared),
+  matchCount: Number(matchCount),
   displayOrder: index,
   createdAt: '2026-08-17T03:00:00.000Z',
 }))
+
+/**
+ * 機能4「保存した検索」。設計 `QKx8Q` の先頭5行と、編集画面 `XBkiQ` の
+ * `ss-1` を同じデータで開く。使用先と該当人数を省かず、0件と未取得を混ぜない。
+ */
+export const FRIEND_ATTRIBUTE_SAVED_SEARCHES = [
+  {
+    id: 'ss-1', name: 'VIPかつ未契約', scope: 'friends',
+    conditions: {
+      all: [
+        { kind: 'tag', op: 'includes', value: 'tag-vip' },
+        { kind: 'tag', op: 'includes', value: 'tag-4' },
+      ],
+      any: [], visibility: 'visible_only',
+      description: 'VIPだが契約していない人への案内用',
+      list: { columns: ['名前', 'タグ', '担当者'], sort: 'recent', limit: 20 },
+    },
+    createdBy: 'Kenta', lineAccountId: 'visual-qa-account', isShared: true,
+    displayOrder: 0, createdAt: '2026-08-20T19:20:00+09:00', matchCount: 18,
+    usedIn: [
+      { kind: 'broadcast', id: 'broadcast-vip', name: 'VIP未契約案内', mode: 'live', lastUsedAt: '2026-08-20T19:20:00+09:00' },
+      { kind: 'automation', id: 'automation-follow', name: '3日後フォロー', mode: 'live', lastUsedAt: '2026-08-20T19:20:00+09:00' },
+    ],
+    canDelete: false, callCountThisMonth: 31,
+  },
+  {
+    id: 'ss-2', name: '誕生日30日前', scope: 'friends',
+    conditions: { all: [{ kind: 'field', key: 'birthday', op: 'eq', value: '今日から30日以内' }], any: [], visibility: 'visible_only' },
+    createdBy: 'Kenta', lineAccountId: 'visual-qa-account', isShared: false,
+    displayOrder: 1, createdAt: '2026-08-20T18:10:00+09:00', matchCount: 12,
+    usedIn: [{ kind: 'other', id: 'reminder-birthday', name: '誕生日のお知らせ', mode: 'live', lastUsedAt: '2026-08-20T18:10:00+09:00' }],
+    canDelete: false, callCountThisMonth: 18,
+  },
+  {
+    id: 'ss-3', name: '未対応・担当なし', scope: 'friends',
+    conditions: { all: [{ kind: 'mark', op: 'eq', value: 'mark-default' }], any: [], visibility: 'visible_only' },
+    createdBy: 'Kenta', lineAccountId: 'visual-qa-account', isShared: true,
+    displayOrder: 2, createdAt: '2026-08-19T20:05:00+09:00', matchCount: 11,
+    usedIn: [{ kind: 'other', id: 'inbox-unassigned', name: '受信箱', mode: 'live', lastUsedAt: '2026-08-19T20:05:00+09:00' }],
+    canDelete: false, callCountThisMonth: 14,
+  },
+  {
+    id: 'ss-4', name: '購入者または予約者', scope: 'friends',
+    conditions: { all: [], any: [{ kind: 'tag', op: 'includes', value: 'tag-purchase' }], visibility: 'visible_only' },
+    createdBy: 'Masato', lineAccountId: 'visual-qa-account', isShared: true,
+    displayOrder: 3, createdAt: '2026-08-18T14:30:00+09:00', matchCount: 42,
+    usedIn: [
+      { kind: 'broadcast', id: 'broadcast-purchase-1', name: '購入者へのご案内', mode: 'fixed', lastUsedAt: '2026-08-18T14:30:00+09:00' },
+      { kind: 'broadcast', id: 'broadcast-purchase-2', name: '予約者へのご案内', mode: 'fixed', lastUsedAt: '2026-08-18T14:30:00+09:00' },
+      { kind: 'broadcast', id: 'broadcast-purchase-3', name: '来店前のお知らせ', mode: 'fixed', lastUsedAt: '2026-08-18T14:30:00+09:00' },
+    ],
+    canDelete: false, callCountThisMonth: 12,
+  },
+  {
+    id: 'ss-5', name: '離脱注意', scope: 'friends',
+    conditions: {
+      all: [
+        { kind: 'created_at', op: 'between', value: { to: '2026-06-18' } },
+        { kind: 'following', op: 'eq', value: true },
+      ],
+      any: [], visibility: 'visible_only',
+    },
+    createdBy: 'Kenta', lineAccountId: 'visual-qa-account', isShared: false,
+    displayOrder: 4, createdAt: '2026-08-17T11:22:00+09:00', matchCount: 0,
+    usedIn: [], canDelete: true, callCountThisMonth: 9,
+  },
+]
 
 /*
   対応マーク（設計 `rIhbN` 4-3、`GMvBd` 4-3-A）。
@@ -1419,17 +1523,26 @@ export const SUPPORT_MARKS = [
   {
     id: 'mark-default', name: '未対応', color: '#F59E0B', isDefault: true,
     autoOnInbound: true, displayOrder: 0, createdAt: '2026-01-01T00:00:00.000Z',
-    isInherited: false, friendCount: 8,
+    isInherited: false, friendCount: 23, automaticChangeLabel: '受信時・期限超過',
+    usedIn: { broadcasts: 1, scenarios: 0, autoReplies: 1, savedSearches: 1, automations: 1 },
+  },
+  {
+    id: 'mark-in-progress', name: '対応中', color: '#3B82F6', isDefault: false,
+    autoOnInbound: false, displayOrder: 1, createdAt: '2026-01-02T00:00:00.000Z',
+    isInherited: false, friendCount: 19, automaticChangeLabel: '担当者割当時',
+    usedIn: { broadcasts: 0, scenarios: 0, autoReplies: 0, savedSearches: 0, automations: 1 },
+  },
+  {
+    id: 'mark-resolved', name: '対応済み', color: '#10B981', isDefault: false,
+    autoOnInbound: false, displayOrder: 2, createdAt: '2026-01-03T00:00:00.000Z',
+    isInherited: false, friendCount: 186, automaticChangeLabel: '手動・返信完了時',
+    usedIn: { broadcasts: 1, scenarios: 0, autoReplies: 0, savedSearches: 0, automations: 0 },
   },
   {
     id: 'mark-hold', name: '保留', color: '#94A3B8', isDefault: false,
-    autoOnInbound: false, displayOrder: 1, createdAt: '2026-01-02T00:00:00.000Z',
-    isInherited: false, friendCount: 3,
-  },
-  {
-    id: 'mark-unused', name: '確認待ち', color: '#3B82F6', isDefault: false,
-    autoOnInbound: false, displayOrder: 2, createdAt: '2026-01-03T00:00:00.000Z',
-    isInherited: false, friendCount: 0,
+    autoOnInbound: false, displayOrder: 3, createdAt: '2026-01-04T00:00:00.000Z',
+    isInherited: false, friendCount: 3, automaticChangeLabel: '条件一致時',
+    usedIn: { broadcasts: 0, scenarios: 0, autoReplies: 0, savedSearches: 0, automations: 0 },
   },
 ]
 
@@ -1985,6 +2098,45 @@ export const FRIEND_FIELDS = [
 ]
 
 /**
+ * 機能4「友だち情報欄」。設計 `HBTk0` に見えている4行。
+ * リマインダ等が使う `FRIEND_FIELDS` とは分け、`withUsage=1` の一覧だけで返す。
+ */
+export const FRIEND_ATTRIBUTE_FIELDS = [
+  {
+    id: 'field-dog-name', folderId: null, name: '愛犬のお名前', fieldKey: 'dog_name',
+    type: 'text', options: null, defaultValue: null, source: 'form',
+    ecFieldPath: null, ecIsMaster: false, isPersonal: false, isStarred: false,
+    displayOrder: 1, usageCount: 187, formUsageCount: 3,
+    displayTargets: ['友だち詳細', 'テンプレート差し込み'],
+    createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z',
+  },
+  {
+    id: 'field-prefecture', folderId: null, name: 'お住まい', fieldKey: 'prefecture',
+    type: 'select', options: ['北海道', '東京都', '大阪府', '福岡県'], defaultValue: null, source: 'form',
+    ecFieldPath: null, ecIsMaster: false, isPersonal: true, isStarred: false,
+    displayOrder: 2, usageCount: 164, formUsageCount: 2,
+    displayTargets: ['友だち詳細', '配信の絞り込み'],
+    createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-08-19T00:00:00.000Z',
+  },
+  {
+    id: 'field-birthday', folderId: null, name: '生年月日', fieldKey: 'birthday',
+    type: 'date', options: null, defaultValue: null, source: 'form',
+    ecFieldPath: null, ecIsMaster: false, isPersonal: true, isStarred: false,
+    displayOrder: 3, usageCount: 141, formUsageCount: 1,
+    displayTargets: ['友だち詳細', '誕生日配信'],
+    createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-08-18T00:00:00.000Z',
+  },
+  {
+    id: 'field-delivery-status', folderId: null, name: '便の状態', fieldKey: 'delivery_status',
+    type: 'select', options: ['準備中', '配送中', 'お届け済み'], defaultValue: null, source: 'automation',
+    ecFieldPath: null, ecIsMaster: false, isPersonal: false, isStarred: false,
+    displayOrder: 4, usageCount: 72, formUsageCount: 2,
+    displayTargets: ['友だち詳細', 'オートメーション'],
+    createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-08-17T00:00:00.000Z',
+  },
+]
+
+/**
  * 機能8 自動応答。設計 `cmDfJ` の5行。
  *
  * **画面が読む形に合わせる。** `packages/shared` の `AutoReply` は
@@ -2509,6 +2661,66 @@ export const AUTOMATIONS = [
   ...Array.from({ length: 4 }, (_, index) => ({ id: `au-${index + 15}`, name: `停止中の案内 ${index + 1}`, description: '設定を残して停止中', eventType: 'tag_change', conditions: {}, actions: [{ type: 'add_tag', params: { tagId: `tag-old-${index + 1}` } }], isActive: false, priority: 10 - index, lineAccountId: 'visual-qa-account', createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' })),
 ]
 
+/**
+ * 機能25「動いた記録」（設計 `DkPY0`）。
+ *
+ * 成功・条件外・失敗を混ぜ、通常状態で3つの結果表示を確かめられるようにする。
+ * `detail` は顧客本文ではなく、実行した処理の固定ラベルだけを持つ。
+ */
+const automationRun = ({
+  id, occurredAt, subject, accountLabel, triggerLabel, status, detail, durationMs,
+  automationId, automationName, domainStatus, successfulActions = [], failedAction = null,
+  failureReason = null,
+}) => ({
+  id,
+  ownerKind: 'automation',
+  ownerId: automationId,
+  lineAccountId: 'visual-qa-account',
+  occurredAt,
+  subject,
+  accountLabel,
+  triggerLabel,
+  reference: null,
+  status,
+  detail,
+  durationMs,
+  canRetry: false,
+  automationId,
+  automationName,
+  automationVersionId: `${automationId}-version-3`,
+  friendId: `friend-${id}`,
+  friendName: subject,
+  sourceEventId: `event-${id}`,
+  domainStatus,
+  startedAt: occurredAt,
+  completedAt: durationMs === null ? null : occurredAt,
+  successfulActions,
+  skippedActions: [],
+  failedAction,
+  failureReason,
+})
+
+export const AUTOMATION_RUNS = {
+  summary: {
+    total: 9660,
+    executed: 8420,
+    skipped: 1240,
+    failed: 6,
+    mostRunName: '「予約」と送られたとき',
+    mostRunCount: 486,
+  },
+  items: [
+    automationRun({ id: 'run-1', occurredAt: '2026-08-25T11:42:00+09:00', subject: '石田 未来', accountLabel: 'LINE 二号店', triggerLabel: '注文が確定したとき', status: 'succeeded', detail: '外部連携（Slack）／マイル 1,000', durationMs: 1200, automationId: 'au-order', automationName: '初回注文をSlackへ知らせる', domainStatus: 'success', successfulActions: ['外部連携（Slack）', 'マイル 1,000'] }),
+    automationRun({ id: 'run-2', occurredAt: '2026-08-25T10:31:00+09:00', subject: '新田 遥', accountLabel: 'LINE 本店', triggerLabel: 'タグ「体験申込」が付いたとき', status: 'succeeded', detail: 'シナリオ開始／担当者 佐々木', durationMs: 800, automationId: 'au-trial', automationName: '体験申込のフォローを始める', domainStatus: 'success', successfulActions: ['シナリオ開始', '担当者 佐々木'] }),
+    automationRun({ id: 'run-3', occurredAt: '2026-08-25T09:12:00+09:00', subject: '松本 圭', accountLabel: 'LINE 本店', triggerLabel: 'タグ「体験申込」が付いたとき', status: 'skipped', detail: '対象条件に当てはまりませんでした', durationMs: null, automationId: 'au-trial', automationName: '体験申込のフォローを始める', domainStatus: 'skipped_condition' }),
+    automationRun({ id: 'run-4', occurredAt: '2026-08-24T18:40:00+09:00', subject: '木村 亮', accountLabel: 'LINE 二号店', triggerLabel: '注文が確定したとき', status: 'permanent_failed', detail: 'マイル 1,000 は付きました', durationMs: 30000, automationId: 'au-order', automationName: '初回注文をSlackへ知らせる', domainStatus: 'partial', successfulActions: ['マイル 1,000'], failedAction: '外部連携（Slack）', failureReason: '外部連携先が応答しませんでした' }),
+    automationRun({ id: 'run-5', occurredAt: '2026-08-24T14:02:00+09:00', subject: '佐藤 千尋', accountLabel: 'LINE 本店', triggerLabel: '「予約」と送られたとき', status: 'succeeded', detail: 'メニュー切替／回答フォーム送信', durationMs: 400, automationId: 'au-reserve', automationName: '「予約」で予約画面を出す', domainStatus: 'success', successfulActions: ['メニュー切替', '回答フォーム送信'] }),
+    automationRun({ id: 'run-6', occurredAt: '2026-08-24T09:05:00+09:00', subject: '高橋 直人', accountLabel: 'LINE 本店', triggerLabel: '7日 反応がないとき', status: 'succeeded', detail: '対応マーク「気にかける」', durationMs: 300, automationId: 'au-inactive', automationName: '反応がない人を気にかける', domainStatus: 'success', successfulActions: ['対応マーク「気にかける」'] }),
+    automationRun({ id: 'run-7', occurredAt: '2026-08-23T20:00:00+09:00', subject: '前田 さくら', accountLabel: 'LINE 本店', triggerLabel: '友だちが追加されたとき', status: 'skipped', detail: '対象条件に当てはまりませんでした', durationMs: null, automationId: 'au-welcome', automationName: '友だち追加から案内を始める', domainStatus: 'skipped_condition' }),
+  ],
+  pagination: { total: 9660, limit: 20, offset: 0 },
+}
+
 /** 設計 `WjYAC` と同じ12件。選択後に利用者の実データを選び直す見本。 */
 export const AUTOMATION_TEMPLATES = [
   { key: 'welcome', name: 'はじめての人にあいさつする', description: '追加された友だちへ案内を始めます', triggerLabel: '友だちが追加されたとき', actionLabel: 'シナリオ「はじめての方へ」を始める' },
@@ -2910,6 +3122,104 @@ export const ACTION_SCORE_RULES = {
     createdAt: '2026-08-20T10:00:00.000Z', publishedAt: '2026-08-21T02:00:00.000Z',
   },
 }
+
+/** 機能32 緊急コントロール。設計 `b3HfZ` の通常運用と影響数。 */
+const OPERATION_RUNNING_STATES = {
+  broadcast_dispatch: 'running',
+  scenario_dispatch: 'running',
+  reminder_dispatch: 'running',
+  automation_actions: 'running',
+  auto_reply_dispatch: 'running',
+  webhook_outgoing: 'running',
+  ad_postback: 'running',
+}
+
+export const OPERATION_CONTROL_PREVIEW = {
+  control: {
+    scopeKey: 'all', lineAccountId: null, version: 8,
+    states: OPERATION_RUNNING_STATES, activeIncidentId: null,
+    reason: null, actorId: null, stoppedAt: null,
+    updatedAt: '2026-08-25T06:00:00+09:00',
+  },
+  counts: {
+    broadcast_dispatch: 1, scenario_dispatch: 4, reminder_dispatch: 10,
+    automation_actions: 14, auto_reply_dispatch: 10,
+    webhook_outgoing: 0, ad_postback: 0,
+  },
+  impact: {
+    broadcast_dispatch: {
+      itemCount: 1, friendCount: 8_486, pendingCount: 1,
+      nearestScheduledAt: '2026-08-28T20:00:00+09:00',
+    },
+    scenario_dispatch: { itemCount: 4, friendCount: 486 },
+    reminder_dispatch: { itemCount: 10, friendCount: 12 },
+    automation_actions: { itemCount: 14, friendCount: 320, pendingCount: 50 },
+    auto_reply_dispatch: { itemCount: 10, friendCount: null },
+  },
+  permissions: { canControl: true },
+  calculatedAt: '2026-08-25T06:00:00+09:00',
+}
+
+function operationControlSnapshot({ version, activeIncidentId, reason, actorId, stoppedAt, capturedAt, stoppedCapabilities = [] }) {
+  return {
+    version,
+    states: Object.fromEntries(Object.entries(OPERATION_RUNNING_STATES).map(([capability, state]) => [
+      capability,
+      stoppedCapabilities.includes(capability) ? 'stopped' : state,
+    ])),
+    activeIncidentId, reason, actorId, stoppedAt, capturedAt,
+  }
+}
+
+/** 機能32 更新履歴。設計 `UhC2O` の停止→復旧済み3件。 */
+export const OPERATION_HISTORY = [
+  {
+    id: 'operation-incident-20260824', scopeKey: 'all', lineAccountId: null,
+    status: 'resolved', capabilities: ['webhook_outgoing'],
+    reason: 'その他', detail: '外部連携の応答遅延を確認するため停止',
+    actorId: '佐々木 亮太（管理者・東京）', resolvedByActorId: '佐々木 亮太（管理者・東京）',
+    controlVersion: 8,
+    stoppedAt: '2026-08-24T18:20:00+09:00', resolvedAt: '2026-08-24T18:52:00+09:00',
+    createdAt: '2026-08-24T18:20:00+09:00', updatedAt: '2026-08-24T18:52:00+09:00',
+    errorMessage: null,
+  },
+  {
+    id: 'operation-incident-20260612', scopeKey: 'all', lineAccountId: null,
+    status: 'resolved',
+    capabilities: ['broadcast_dispatch', 'scenario_dispatch', 'reminder_dispatch', 'automation_actions', 'auto_reply_dispatch'],
+    reason: '誤配信の防止', detail: '配信条件を確認してから復旧',
+    actorId: '山本 京子（管理者・大阪）', resolvedByActorId: '山本 京子（管理者・大阪）',
+    controlVersion: 6,
+    stoppedAt: '2026-06-12T09:05:00+09:00', resolvedAt: '2026-06-12T09:40:00+09:00',
+    createdAt: '2026-06-12T09:05:00+09:00', updatedAt: '2026-06-12T09:40:00+09:00',
+    errorMessage: null,
+  },
+  {
+    id: 'operation-incident-20260302', scopeKey: 'line-account-main', lineAccountId: '本店アカウント',
+    status: 'resolved', capabilities: ['broadcast_dispatch', 'scenario_dispatch', 'reminder_dispatch'],
+    reason: '障害対応', detail: 'LINE側の障害が解消したことを確認して復旧',
+    actorId: '佐々木 亮太（管理者・東京）', resolvedByActorId: '佐々木 亮太（管理者・東京）',
+    controlVersion: 4,
+    stoppedAt: '2026-03-02T14:00:00+09:00', resolvedAt: '2026-03-02T15:10:00+09:00',
+    createdAt: '2026-03-02T14:00:00+09:00', updatedAt: '2026-03-02T15:10:00+09:00',
+    errorMessage: null,
+  },
+].map((incident) => ({
+  ...incident,
+  beforeSnapshot: operationControlSnapshot({
+    version: incident.controlVersion - 2, activeIncidentId: null, reason: null,
+    actorId: null, stoppedAt: null, capturedAt: incident.createdAt,
+  }),
+  stoppedSnapshot: operationControlSnapshot({
+    version: incident.controlVersion - 1, activeIncidentId: incident.id,
+    reason: incident.reason, actorId: incident.actorId, stoppedAt: incident.stoppedAt,
+    capturedAt: incident.stoppedAt, stoppedCapabilities: incident.capabilities,
+  }),
+  restoredSnapshot: operationControlSnapshot({
+    version: incident.controlVersion, activeIncidentId: null, reason: null,
+    actorId: incident.resolvedByActorId, stoppedAt: null, capturedAt: incident.resolvedAt,
+  }),
+}))
 
 /** 機能10 ウェビナー。Pencil V6の文言と数を固定し、通常状態を再現する。 */
 export const WEBINARS = [
