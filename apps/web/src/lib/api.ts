@@ -1421,12 +1421,11 @@ export type ListStats = {
 /**
  * リマインダの実行結果（設計 `GC4St` 7-1-H、要件 §3-7）。
  *
- * **状態の名前は Worker と同じにする。** 画面で言い換えると、
- * 絞り込みに送る値が合わなくなる（`packages/db` の
- * `ReminderDeliveryRunStatus` が正）。見せる言葉は画面側で当てる。
+ * **状態の名前は公開 API と同じにする。** DB内部の `queued` は Worker が
+ * `planned` に変換するため、画面へ漏らさない。見せる言葉は画面側で当てる。
  */
 export type ReminderDeliveryRunStatus =
-  | 'queued'
+  | 'planned'
   | 'claimed'
   | 'succeeded'
   | 'skipped'
@@ -1436,7 +1435,7 @@ export type ReminderDeliveryRunStatus =
 
 /**
  * 7機能で共有する実行台帳の状態。**機能ごとの状態名とは別。**
- * リマインダの `queued` `claimed` `retry_wait` は、共通では `pending` に寄せる。
+ * リマインダの `planned` `claimed` `retry_wait` は、共通では `pending` に寄せる。
  */
 export type RunRecordStatus =
   | 'succeeded'
