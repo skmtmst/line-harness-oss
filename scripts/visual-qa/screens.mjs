@@ -2859,33 +2859,33 @@ export const SCREENS = [
 ]
 
 // Issue #228（機能15）の実装後監査。
-// ChromiumがMachPort権限で起動できず、実装後の2幅画像は未取得。
-// 古い画像で合格にせず、実装した範囲と残る接続条件だけを更新する。
+// PR #925 相当の画面を1440px・1920pxと定義済みの全状態で撮影し、
+// 設計画像と目視比較した。画面コードは変えず、差と未接続条件を記録する。
 const FEATURE_15_REVIEW = {
   g89Tc: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06、Issue #228 / PR #925 / UI HEAD 6cb184af7 で画面を更新したが、新しい画像は未確認。** メディア用フォルダ、未分類、フォルダ作成、種類・未使用・上限付近の表示を追加した。保存容量APIは未接続のため、架空の数やゲージを出さず `—` と接続条件を表示する。撮影はChromiumのMachPort権限拒否で開始できず、1440px・1920px画像が無いため判定は上げない。',
-    verdictSource: 'media-v6/g89Tc.txt + 実装コード（画像未確認）',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06、Issue #228 / PR #925相当 / HEAD bf7434ff6 で再撮影し、構造一致・データ未接続。** 1440px・1920pxとも横はみ出し0。フォルダ、検索、種類・未使用・上限付近の絞り込み、表示切替、並び順、表示件数、カード一覧と一括削除が設計と同じ役割で並ぶ。撮影データは3件・1フォルダのため設計の10件・4フォルダと同量ではなく、保存容量APIも無いため `—` と接続条件を表示する。**接続条件:** 容量集計APIを接続し、使用量・上限・上限付近を実値で出し、設計と同量のデータで再撮影する。',
+    verdictSource: 'media-v6/g89Tc.txt + g89Tc-1440.png + g89Tc-1920.png',
   },
   voJtX: {
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06、Issue #228 / PR #925 / UI HEAD 6cb184af7 で画面を更新したが、新しい画像は未確認。** プレビュー、容量・寸法・登録者・フォルダ、名前付き使用先を表示し、既存の同種メディアへ使用先を一括差し替えできるようにした。名前とURLを保つ版追加APIは未接続なので、使えるように見せず理由を表示する。撮影はChromiumのMachPort権限拒否で開始できず、2幅画像が無いため判定は上げない。',
-    verdictSource: 'media-v6/voJtX.txt + 実装コード（画像未確認）',
+    verdictNote: '**2026-09-06、Issue #228 / PR #925相当 / HEAD bf7434ff6 で再撮影し、要修正。** 1440px・1920pxとも横はみ出し0。プレビュー、容量・寸法・登録者・フォルダ、名前付き使用先、ダウンロード、一括差し替えは表示できる。ただし設計は大きなプレビューと右欄を持つ詳細ページで、実装は一覧上の小さな確認窓となり、位置・寸法・情報量が一致しない。名前とURLを保つ版追加APIも未接続。**推奨修正:** 設計の詳細ページ構成へそろえ、版追加API接続後に「差し替える」の選択済み・失敗状態も再撮影する。',
+    verdictSource: 'media-v6/voJtX.txt + voJtX-1440.png + voJtX-1920.png',
   },
   eXAJP: {
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06、Issue #228 / PR #925 / UI HEAD 6cb184af7 で画面を更新したが、新しい画像は未確認。** 一覧上の全面ダイアログへ分け、20件までの選択、1件ごとの待機・登録中・完了・失敗、フォルダ選択、形式と公開リンクの注意を表示した。現行アップロードはWorker経由のbase64で、動画90MB・音声30MBまで。要件のR2直接アップロードと200MB対応はAPI未接続。撮影はChromiumのMachPort権限拒否で開始できず、2幅画像が無いため判定は上げない。',
-    verdictSource: 'media-v6/eXAJP.txt + 実装コード（画像未確認）',
+    verdictNote: '**2026-09-06、Issue #228 / PR #925相当 / HEAD bf7434ff6 で再撮影し、要修正。** 1440px・1920pxとも横はみ出し0。20件までの選択、形式・容量・公開リンクの注意、フォルダ選択、登録件数と閉じる操作は設計と同じ役割で出る。ただし設計は完了2件・上限超過1件の進捗状態を示す一方、撮影手順は未選択の初期状態だけで、1件ごとの待機・登録中・完了・失敗を画像で確認できない。現行はWorker経由のbase64で動画90MBまで、設計の200MBとR2直接アップロードも未接続。**推奨修正:** 撮影用ファイル選択状態を追加し、全進捗状態と200MB上限を同じ2幅で再撮影する。',
+    verdictSource: 'media-v6/eXAJP.txt + eXAJP-1440.png + eXAJP-1920.png',
   },
   YfTfJ: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06、Issue #228 / PR #925 / UI HEAD 6cb184af7 で画面を更新したが、新しい画像は未確認。** 使用中は削除操作を出さず、名前付き使用先を確認して既存の同種メディアへ一括差し替える導線を追加した。差し替え前の版を送り、409では最新影響へ更新する。アカウント切替・閉じる操作後の遅い返事も破棄する。撮影はChromiumのMachPort権限拒否で開始できず、2幅画像が無いため判定は上げない。',
-    verdictSource: 'media-v6/YfTfJ.txt + 実装コード（画像未確認）',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06、Issue #228 / PR #925相当 / HEAD bf7434ff6 で使用中・削除可能を再撮影し、構造一致・データ未接続。** 両状態の1440px・1920pxで横はみ出し0。対象名、取り消せない説明、使用先の名前・導線、使用中は削除させない案内、別メディアへの一括差し替え、閉じる操作は設計と同じ役割で並ぶ。撮影データは使用先2件で設計の3件と異なり、名前とURLを保つ版追加APIは未接続。**接続条件:** 版追加APIと実際の使用先を接続し、3件以上の影響・409再取得・差し替え失敗も再撮影する。',
+    verdictSource: 'media-v6/YfTfJ.txt + YfTfJ-1440.png + YfTfJ-1920.png + YfTfJ-deletable.txt + YfTfJ-deletable-1440.png + YfTfJ-deletable-1920.png',
   },
   h8pBZr: {
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06、Issue #228 / PR #925 / UI HEAD 6cb184af7 で状態文言を設計正本へ合わせたが、新しい画像は未確認。** 読込中・0件・取得失敗を別の文と操作で表示し、親一覧にもフォルダ区画を追加した。撮影はChromiumのMachPort権限拒否で開始できず、通常を含む1440px・1920px画像が無いため、画像確認済みにはしない。',
-    verdictSource: 'media-v6/h8pBZr.txt + 契約テスト（画像未確認）',
+    verdictNote: '**2026-09-06、Issue #228 / PR #925相当 / HEAD bf7434ff6 で通常・読込中・0件・取得失敗を再撮影し、構造一致・データ未接続。** 全4状態の1440px・1920pxで横はみ出し0。フォルダと操作枠を残したまま、読込中は待機、0件は登録導線、失敗は再読込を混同せず表示する。設計の状態見本と役割は一致するが、保存容量は親一覧と同じAPI未接続のため `—` のまま。**接続条件:** 容量集計API接続後も4状態を再撮影し、通常時との共通枠が崩れないことを確認する。',
+    verdictSource: 'media-v6/h8pBZr.txt + h8pBZr-loading.txt + h8pBZr-empty.txt + h8pBZr-error.txt + h8pBZr-error-1440.png + h8pBZr-error-1920.png',
   },
 }
 
