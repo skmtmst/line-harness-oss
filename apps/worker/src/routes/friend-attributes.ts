@@ -29,6 +29,7 @@ import {
   updateFolder,
   deleteFolder,
   isFolderKind,
+  getWebinarFolderCounts,
   type SupportMark,
   type SupportMarkWithUsage,
   type SupportMarkScope,
@@ -205,7 +206,7 @@ function validateConditionsForFormat(
   return parsed;
 }
 
-function serializeFolder(row: Folder) {
+function serializeFolder(row: Folder, count?: number) {
   return {
     id: row.id,
     kind: row.kind,
@@ -215,6 +216,7 @@ function serializeFolder(row: Folder) {
     color: row.color ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    ...(count === undefined ? {} : { count }),
   };
 }
 
@@ -894,7 +896,23 @@ friendAttributes.get('/api/folders', async (c) => {
       return c.json({ success: false, error: '知らないフォルダの種類です' }, 400);
     }
     const items = await getFolders(c.env.DB, raw && isFolderKind(raw) ? raw : undefined);
-    return c.json({ success: true, data: items.map(serializeFolder) });
+    if (raw !== 'webinar') {
+      return c.json({ success: true, data: items.map((row) => serializeFolder(row)) });
+    }
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const requestedAccountId = c.req.query('account_id');
+    if (requestedAccountId && !scope.allowedAccountIds.includes(requestedAccountId)) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const counts = await getWebinarFolderCounts(c.env.DB, {
+      allowedAccountIds: scope.allowedAccountIds,
+      canSeeUnassigned: scope.canSeeUnassigned,
+      accountId: requestedAccountId || undefined,
+    });
+    return c.json({
+      success: true,
+      data: items.map((row) => serializeFolder(row, counts[row.id] ?? 0)),
+    });
   } catch (err) {
     console.error('GET /api/folders error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);

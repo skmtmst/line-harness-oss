@@ -61,8 +61,9 @@ const folders = {
   createFolder: vi.fn(),
   updateFolder: vi.fn(),
   deleteFolder: vi.fn(),
+  getWebinarFolderCounts: vi.fn(),
   isFolderKind: (v: unknown) =>
-    typeof v === 'string' && ['tag', 'template', 'media'].includes(v),
+    typeof v === 'string' && ['tag', 'template', 'media', 'webinar'].includes(v),
 };
 vi.mock('@line-crm/db', () => ({ ...marks, ...searches, ...folders }));
 vi.mock('../services/account-access.js', () => accountAccess);
@@ -179,6 +180,7 @@ beforeEach(() => {
   folders.getFolderById.mockResolvedValue(FOLDER);
   folders.createFolder.mockResolvedValue(FOLDER);
   folders.updateFolder.mockResolvedValue(FOLDER);
+  folders.getWebinarFolderCounts.mockResolvedValue({ 'fo-webinar': 2 });
 });
 
 describe('対応マーク', () => {
@@ -779,6 +781,26 @@ describe('フォルダ', () => {
   it('種類で絞れる', async () => {
     await req('/api/folders?kind=template', 'GET');
     expect(folders.getFolders).toHaveBeenCalledWith(env.DB, 'template');
+  });
+
+  it('ウェビナーフォルダは閲覧可能なアカウント内の件数を返す', async () => {
+    folders.getFolders.mockResolvedValue([{ ...FOLDER, id: 'fo-webinar', kind: 'webinar' }]);
+
+    const res = await req('/api/folders?kind=webinar&account_id=account-1', 'GET');
+
+    expect(res.status).toBe(200);
+    expect(folders.getWebinarFolderCounts).toHaveBeenCalledWith(env.DB, {
+      allowedAccountIds: ['account-1'],
+      canSeeUnassigned: false,
+      accountId: 'account-1',
+    });
+    expect(await res.json()).toMatchObject({ data: [{ id: 'fo-webinar', count: 2 }] });
+  });
+
+  it('ウェビナーフォルダ件数は見えないアカウントを404にする', async () => {
+    const res = await req('/api/folders?kind=webinar&account_id=account-other', 'GET');
+    expect(res.status).toBe(404);
+    expect(folders.getWebinarFolderCounts).not.toHaveBeenCalled();
   });
 
   it('知らない種類での絞り込みは弾く', async () => {
