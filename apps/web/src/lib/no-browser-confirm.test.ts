@@ -100,7 +100,6 @@ describe('ブラウザの確認・知らせの窓を使わない', () => {
    */
   const PROMPT_NOT_YET = [
     'app/booking/bookings/page.tsx',
-    'app/booking/menus/page.tsx',
     'app/form-submissions/edit/page.tsx',
     'app/inflow-links/detail/page.tsx',
     'components/events/event-form.tsx',

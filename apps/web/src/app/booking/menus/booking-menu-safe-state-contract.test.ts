@@ -6,8 +6,8 @@ const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 describe('V6 予約メニューの取得状態', () => {
   it('一覧と付随する件数を未取得と実値0に分ける', () => {
     expect(PAGE).toContain("type SupportingLoadState = 'loading' | 'ready' | 'error'")
-    expect(PAGE).toContain("supportingLoadState === 'ready' ? String(staff.length) : '—'")
-    expect(PAGE).toContain("supportingLoadState === 'ready' ? String(kpi.inThis) : '—'")
+    expect(PAGE).toContain("if (supportingLoadState !== 'ready' || items.length === 0) return null")
+    expect(PAGE).toContain("value={favorite?.name ?? '—'}")
     expect(PAGE).toContain("supportingLoadState === 'ready' ? `${bookingCounts.get(m.name) ?? 0} 件` : '—'")
   })
 

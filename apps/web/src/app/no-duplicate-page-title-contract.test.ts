@@ -78,7 +78,7 @@ const ALLOWED_H1: Record<string, string> = {
 
 describe('画面名を本文とトップバーで2回出さない', () => {
   it('全ページを読めている', () => {
-    expect(PAGES.length).toBe(146)  // 2026-09-06: UID・顧客データ移行画面を加えた実測値。
+    expect(PAGES.length).toBe(147)  // 2026-09-06: 定期レポート作成画面を加えた実測値。
   })
 
   it('page.tsx が h1 を直接持たない', () => {

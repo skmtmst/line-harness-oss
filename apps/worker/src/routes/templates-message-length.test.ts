@@ -4,6 +4,7 @@ import type { Env } from '../index.js';
 
 const mocks = vi.hoisted(() => ({
   getTemplatesWithUsageCount: vi.fn(),
+  getTemplateSendCounts: vi.fn(),
   getTemplateById: vi.fn(),
   getTemplateUsage: vi.fn(),
   createTemplate: vi.fn(),
@@ -56,6 +57,7 @@ function storedTemplate(messageContent: string) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getCarouselTapTotals.mockResolvedValue(new Map());
+  mocks.getTemplateSendCounts.mockResolvedValue(new Map());
   accountAccess.canAccessAllLineAccounts.mockResolvedValue(true);
   accountAccess.getVisibleLineAccountScope.mockResolvedValue({
     allowedAccountIds: ['account-1'],

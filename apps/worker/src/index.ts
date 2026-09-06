@@ -1204,6 +1204,16 @@ async function runFrequentHeavyJobs(
         }
       },
     },
+    {
+      name: 'analytics scheduled reports',
+      run: async () => {
+        const { processDueAnalyticsReports } = await import('./services/analytics-reports.js');
+        const result = await processDueAnalyticsReports(env, new Date(event.scheduledTime));
+        if (result.processed + result.failed + result.purged > 0) {
+          console.log(JSON.stringify({ event: 'analytics_report_tick', ...result }));
+        }
+      },
+    },
     { name: 'account health', run: async () => { await checkAccountHealth(env.DB); } },
     {
       name: 'broadcast insights',

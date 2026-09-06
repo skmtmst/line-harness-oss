@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import {
   getTemplatesWithUsageCount,
+  getTemplateSendCounts,
   getTemplateById,
   getTemplateUsage,
   createTemplate,
@@ -139,6 +140,13 @@ templates.get('/api/templates', async (c) => {
       // 数が出ないだけ。一覧そのものは出す。
       console.error('GET /api/templates — failed to count carousel taps', err);
     }
+    let sends = new Map<string, { thisMonth: number; total: number }>();
+    try {
+      sends = await getTemplateSendCounts(c.env.DB, items.map((item) => item.id));
+    } catch (err) {
+      // 集計だけ取れないときも、テンプレートそのものは操作できるようにする。
+      console.error('GET /api/templates — failed to count template sends', err);
+    }
     return c.json({
       success: true,
       data: items.map((t) => ({
@@ -154,6 +162,8 @@ templates.get('/api/templates', async (c) => {
         usageCount: t.usage_count,
         /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
         tapCount: taps.get(t.id) ?? 0,
+        monthlySendCount: sends.get(t.id)?.thisMonth ?? null,
+        totalSendCount: sends.get(t.id)?.total ?? null,
         createdAt: t.created_at,
         updatedAt: t.updated_at,
       })),
@@ -183,6 +193,7 @@ templates.get('/api/templates/:id', async (c) => {
         messageContent: item.message_content,
         question: questionValue(item.question_json),
         questionStatus: item.question_status,
+        folderId: item.folder_id ?? null,
         carouselActions: item.carousel_actions_json
           ? JSON.parse(item.carousel_actions_json)
           : null,
