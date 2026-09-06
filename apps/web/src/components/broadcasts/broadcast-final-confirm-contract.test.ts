@@ -36,6 +36,12 @@ describe('一斉配信の最終確認', () => {
     expect(FORM).toContain('const audienceCount = preflight?.audienceCount ?? null')
   })
 
+  it('事前確認が数え終えた人数を対象画面の要約にも使う', () => {
+    expect(FORM).toContain('const audienceDisplayCount = audienceCount ?? targetCount')
+    expect(FORM).toContain("audienceDisplayCount?.toLocaleString('ja-JP') ?? '—'")
+    expect(FORM).toContain("audienceDisplayCount === null ? '—' : `${audienceDisplayCount.toLocaleString('ja-JP')}人`")
+  })
+
   it('数えられていないときは送らせない', () => {
     expect(FORM).toContain('const canConfirm = audienceCount !== null && audienceCount > 0')
     // `onConfirm` を渡さないと、確認のボタンごと出ない（`Dialog` の作り）。
