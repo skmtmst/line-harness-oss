@@ -138,13 +138,7 @@ export type TagDeleteImpact = {
   canDelete: boolean
 }
 
-/*
- * 緊急停止の「止める前に何が止まるか」。
- *
- * ここに置いてあるのは**影響を見るぶんだけ**。止める・戻す口は
- * 段階的な本人確認のヘッダを送るが、worker 側の許可一覧にまだ無い
- * （`apps/worker/src/cors-headers.test.ts` が落ちる）。口が入ってから足す。
- */
+/** 緊急停止の対象、影響、停止状態をサーバーと共有する契約。 */
 export type OperationCapability =
   | 'broadcast_dispatch'
   | 'scenario_dispatch'
@@ -5942,7 +5936,7 @@ export const api = {
       }>>(options?.forceRefresh ? '/api/duplicates/stats?refresh=1' : '/api/duplicates/stats'),
   },
   /** 広告連携（設計 V2 6-8）。鍵は伏せた形で返ってくる。 */
-  /** 緊急停止の影響（見るだけ）。止める・戻す口はまだ足していない。 */
+  /** 緊急停止の影響確認、停止・復旧、追記履歴。 */
   operations: {
     preview: (accountId: string | null) => {
       const query = accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''
