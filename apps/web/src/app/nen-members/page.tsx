@@ -13,7 +13,7 @@ import { PhotoReviewDetail } from './photo-review-detail'
 import { PhotoPublications } from './photo-publications'
 import styles from './photo-review.module.css'
 
-type PhotoStatus = 'all' | 'pending' | 'adopted' | 'rejected'
+type PhotoStatus = 'pending' | 'adopted' | 'rejected'
 type ReviewReasonCode = 'quality' | 'privacy' | 'unrelated' | 'duplicate' | 'other'
 const REVIEW_REASONS: Array<{ value: ReviewReasonCode; label: string }> = [
   { value: 'quality', label: '写真が暗い・ぼやけている' },
@@ -23,10 +23,9 @@ const REVIEW_REASONS: Array<{ value: ReviewReasonCode; label: string }> = [
   { value: 'other', label: 'そのほか' },
 ]
 const STATUS_TABS: ReadonlyArray<[PhotoStatus, string]> = [
-  ['pending', '審査待ち'],
+  ['pending', '見ていないもの'],
   ['adopted', '通したもの'],
   ['rejected', '戻したもの'],
-  ['all', 'すべて'],
 ]
 const text = (value: unknown) => String(value ?? '')
 
@@ -41,6 +40,8 @@ export default function PhotoReviewsPage() {
   const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  const [loadForbidden, setLoadForbidden] = useState(false)
+  const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([])
   const [reviewing, setReviewing] = useState<string | null>(null)
   const [rejectingPhotoId, setRejectingPhotoId] = useState<string | null>(null)
   const [reasonCode, setReasonCode] = useState<ReviewReasonCode>('quality')
@@ -58,15 +59,18 @@ export default function PhotoReviewsPage() {
     }
     setLoading(true)
     setLoadError('')
+    setLoadForbidden(false)
     try {
       const response = await api.nenMembers.photos(selectedAccountId)
       if (sequence !== loadSequence.current) return
       if (!response.success) throw new Error('load_failed')
       setPhotos(response.data)
-    } catch {
+    } catch (error) {
       if (sequence === loadSequence.current) {
         setPhotos([])
-        setLoadError('写真を読み込めませんでした。')
+        const forbidden = error instanceof ApiError && error.status === 403
+        setLoadForbidden(forbidden)
+        setLoadError(forbidden ? '写真を見る権限がありません。' : '写真を読み込めませんでした。')
       }
     } finally {
       if (sequence === loadSequence.current) setLoading(false)
@@ -81,6 +85,7 @@ export default function PhotoReviewsPage() {
     setReasonError('')
     setView('list')
     setDetailPhoto(null)
+    setSelectedPhotoIds([])
   }, [selectedAccountId])
 
   const counts = useMemo(() => ({
@@ -89,8 +94,18 @@ export default function PhotoReviewsPage() {
     adopted: photos.filter((photo) => text(photo.status) === 'adopted').length,
     rejected: photos.filter((photo) => text(photo.status) === 'rejected').length,
   }), [photos])
-  const visiblePhotos = useMemo(() => status === 'all' ? photos : photos.filter((photo) => text(photo.status) === status), [photos, status])
+  const visiblePhotos = useMemo(() => photos.filter((photo) => text(photo.status) === status), [photos, status])
+  const reviewedIn30Days = useMemo(() => {
+    const threshold = Date.now() - 30 * 24 * 60 * 60 * 1000
+    return photos.filter((photo) => {
+      const reviewedAt = Date.parse(text(photo.reviewed_at))
+      return text(photo.status) !== 'pending' && Number.isFinite(reviewedAt) && reviewedAt >= threshold
+    }).length
+  }, [photos])
   const countsReady = Boolean(selectedAccountId) && !loading && !loadError
+  const reviewedStatsReady = countsReady && photos
+    .filter((photo) => text(photo.status) !== 'pending')
+    .every((photo) => Number.isFinite(Date.parse(text(photo.reviewed_at))))
   /*
    * 戻した理由の内訳。いま読み込んでいる写真から数える。取れない数を
    * 0で埋めないよう、読み込み前・失敗時は `countsReady` 側で `—` にする。
@@ -211,42 +226,14 @@ export default function PhotoReviewsPage() {
     }
   }
 
+  const togglePhotoSelection = (id: string) => {
+    setSelectedPhotoIds((current) => current.includes(id)
+      ? current.filter((photoId) => photoId !== id)
+      : [...current, id])
+  }
+
   return <>
-    <div data-design="KPIs" className="mx-auto mb-4 grid max-w-7xl grid-cols-1 gap-4 px-4 sm:grid-cols-2 sm:px-6 xl:grid-cols-4">
-      <div className="bg-canvas rounded-card border-hairline border p-4">
-        <p className="text-ink-faint text-xs">未審査</p>
-        <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-          {countsReady ? counts.pending : '—'}
-          <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
-        </p>
-        <p className="text-ink-faint mt-0.5 text-xs">確認をお待ちしています</p>
-      </div>
-      <div className="bg-canvas rounded-card border-hairline border p-4">
-        <p className="text-ink-faint text-xs">通したもの</p>
-        <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-          {countsReady ? counts.adopted : '—'}
-          <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
-        </p>
-        <p className="text-ink-faint mt-0.5 text-xs">公開してよいと判断したもの</p>
-      </div>
-      <div className="bg-canvas rounded-card border-hairline border p-4">
-        <p className="text-ink-faint text-xs">戻したもの</p>
-        <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-          {countsReady ? counts.rejected : '—'}
-          <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
-        </p>
-        <p className="text-ink-faint mt-0.5 text-xs">公開しないと判断したもの</p>
-      </div>
-      <div className="bg-canvas rounded-card border-hairline border p-4">
-        <p className="text-ink-faint text-xs">投稿の合計</p>
-        <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-          {countsReady ? counts.all : '—'}
-          <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
-        </p>
-        <p className="text-ink-faint mt-0.5 text-xs">これまでに届いた数</p>
-      </div>
-    </div>
-    <main className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
+    <main className="mx-auto flex max-w-full flex-col gap-4 p-4 sm:p-6">
       {notice && <div className="rounded-control border border-accent-border bg-accent-soft px-4 py-3 text-sm text-accent-hover">{notice}</div>}
 
       {/*
@@ -265,30 +252,88 @@ export default function PhotoReviewsPage() {
         ]}
       />
 
+      <div data-design="KPIs" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-card border border-hairline bg-canvas p-4">
+          <p className="text-xs font-semibold text-ink-secondary">見ていない写真</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-ink">
+            {countsReady ? counts.pending : '—'}
+            <span className="ml-0.5 text-xs font-normal text-ink-faint">枚</span>
+          </p>
+          <p className="mt-0.5 text-xs text-ink-faint">{countsReady && counts.pending > 0 ? '古いものから確認してください' : '新しい写真をお待ちしています'}</p>
+        </div>
+        <div className="rounded-card border border-hairline bg-canvas p-4">
+          <p className="text-xs font-semibold text-ink-secondary">この30日に見た</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-ink">
+            {reviewedStatsReady ? reviewedIn30Days : '—'}
+            <span className="ml-0.5 text-xs font-normal text-ink-faint">枚</span>
+          </p>
+          <p className="mt-0.5 text-xs text-ink-faint">読み込んだ写真の審査日時から集計</p>
+        </div>
+        <div className="rounded-card border border-hairline bg-canvas p-4">
+          <p className="text-xs font-semibold text-ink-secondary">1枚にかかる時間</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-ink">—</p>
+          <p className="mt-0.5 text-xs text-ink-faint">審査時間の集計API待ち</p>
+        </div>
+        <div className="rounded-card border border-hairline bg-canvas p-4">
+          <p className="text-xs font-semibold text-ink-secondary">気をつけたい写真</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-ink">—</p>
+          <p className="mt-0.5 text-xs text-ink-faint">一覧向け注意候補API待ち</p>
+        </div>
+      </div>
+
+      <div className="rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-accent">
+        通す・戻すを押した時点で、投稿者へお礼や直してほしい点が届きます。戻すときは理由を選び、送る文章を確認できます。
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-control bg-accent-soft px-3 py-2 text-sm font-semibold text-accent">{selectedPhotoIds.length}枚を選択中</span>
+          <Button variant="primary" disabled title="一括審査APIがつながると使えます">まとめて通す</Button>
+          <Button variant="secondary" disabled title="一括審査APIがつながると使えます">まとめて戻す</Button>
+          <span className="text-xs text-ink-faint">一括審査はAPI接続待ちです</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" disabled>▦ 並べて見る</Button>
+          <Button
+            data-qa-open="hHrz8"
+            variant="secondary"
+            disabled={!visiblePhotos.length}
+            onClick={() => { const first = visiblePhotos[0]; if (first) void openDetail(text(first.id)) }}
+          >
+            ⛶ 1枚ずつ大きく見る
+          </Button>
+        </div>
+      </div>
+
       <div className={styles.body}>
       <div className="min-w-0 space-y-6">
-      {!selectedAccountId ? <ListState kind="empty" title="LINEアカウントを選んでください" description="上のバーから、写真審査を行うLINEアカウントを選びます。" /> : loading ? <ListState kind="loading" title="写真を読み込んでいます" /> : loadError ? <ListState kind="error" title="写真を読み込めませんでした" description="通信状態を確認して、もう一度読み込んでください。" onRetry={() => void load()} /> : visiblePhotos.length === 0 ? <ListState kind="empty" title="この状態の写真はありません" description="別の状態を選ぶか、新しい写真が届くまでお待ちください。" /> : <section className="grid gap-4 sm:grid-cols-2">
-        {visiblePhotos.map((photo) => <article key={text(photo.id)} className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
-          <img src={text(photo.image_url)} alt={`${text(photo.pet_name)}ちゃんの投稿写真`} className="aspect-square w-full object-cover" />
+      {!selectedAccountId ? <ListState kind="empty" title="LINEアカウントを選んでください" description="上のバーから、写真審査を行うLINEアカウントを選びます。" /> : loading ? <ListState kind="loading" title="写真を読み込んでいます" /> : loadForbidden ? <ListState kind="forbidden" title="写真を見る権限がありません" description="管理者へ写真審査の閲覧権限を確認してください。" /> : loadError ? <ListState kind="error" title="写真を読み込めませんでした" description="通信状態を確認して、もう一度読み込んでください。" onRetry={() => void load()} /> : visiblePhotos.length === 0 ? <ListState kind="empty" title="この状態の写真はありません" description="別の状態を選ぶか、新しい写真が届くまでお待ちください。" /> : <section className="grid grid-cols-1 gap-2.5 md:grid-cols-2 2xl:grid-cols-4">
+        {visiblePhotos.map((photo) => {
+          const photoId = text(photo.id)
+          const selected = selectedPhotoIds.includes(photoId)
+          return <article key={photoId} className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card" style={selected ? { borderColor: 'var(--color-accent)', boxShadow: '0 0 0 1px var(--color-accent)' } : undefined}>
+          <div className="relative h-40 overflow-hidden bg-canvas-sunken">
+            <img src={text(photo.image_url)} alt={`${text(photo.pet_name)}ちゃんの投稿写真`} className="h-full w-full object-cover" />
+            <label className="absolute left-2 top-2 flex cursor-pointer items-center gap-1.5 rounded-control border border-hairline bg-canvas px-2 py-1 text-xs font-semibold text-ink-secondary"><input type="checkbox" checked={selected} onChange={() => togglePhotoSelection(photoId)} className="accent-accent" /><span>選ぶ</span></label>
+          </div>
           <div className="p-4">
             <div className="flex items-start justify-between gap-3"><div><p className="font-bold text-ink">{text(photo.pet_name)}ちゃん</p><p className="mt-1 text-xs text-ink-faint">{text(photo.owner_name) || '名前未取得'}・{formatPhotoReceivedAt(photo.created_at)}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${photo.status === 'pending' ? 'bg-status-warn-soft text-status-warn-deep' : photo.status === 'adopted' ? 'bg-accent-soft text-accent-hover' : 'bg-canvas-sunken text-ink-faint'}`}>{photo.status === 'pending' ? '審査待ち' : photo.status === 'adopted' ? '通しました' : '戻しました'}</span></div>
-            <p className="mt-3 min-h-10 text-sm leading-5 text-ink-secondary">{text(photo.caption) || 'コメントなし'}</p>
-            {photo.status === 'pending' && <Button data-qa-open="hHrz8" className="mt-3 w-full" onClick={() => void openDetail(text(photo.id))}>1枚ずつ見る</Button>}
+            <p className="mt-2 min-h-5 truncate text-sm text-ink-secondary" title={text(photo.caption) || 'コメントなし'}>{text(photo.caption) || 'コメントなし'}</p>
             {photo.status === 'adopted' && <p className="mt-3 rounded-control bg-accent-soft px-3 py-2 text-xs font-semibold text-accent-hover">5ポイント付与済み・{photo.publication_consent_at && !photo.publication_withdrawn_at ? '公開中' : '公開は未同意'}</p>}
             {photo.status === 'rejected' && <div className="mt-3 rounded-control bg-surface-pearl px-3 py-2 text-xs text-ink-secondary"><span className="font-semibold">見送った理由：</span>{REVIEW_REASONS.find((reason) => reason.value === photo.review_reason_code)?.label ?? '理由未記録'}{text(photo.review_reason_note) && <p className="mt-1 text-ink-faint">{text(photo.review_reason_note)}</p>}</div>}
             {photo.review_notification_status === 'failed' && <div className="mt-2 flex items-center justify-between gap-3 rounded-control bg-status-warn-soft px-3 py-2 text-xs font-semibold text-status-warn-deep"><span>投稿者へのLINE通知を送れませんでした</span><Button variant="secondary" disabled={reviewing === photo.id} onClick={() => void retryNotification(text(photo.id))} className="shrink-0">{reviewing === photo.id ? '再送中...' : 'LINE通知を再送'}</Button></div>}
-            {photo.status === 'pending' && <div className="mt-4 grid grid-cols-2 gap-2"><Button variant="secondary" disabled={reviewing === photo.id} onClick={() => { setRejectingPhotoId(text(photo.id)); setReasonCode('quality'); setReasonNote(''); setReasonError('') }}>理由を選んで戻す</Button><Button variant="primary" disabled={reviewing === photo.id} onClick={() => void review(text(photo.id), 'adopted')}>{reviewing === photo.id ? '処理中...' : '通して5pt付与'}</Button></div>}
+            {photo.status === 'pending' && <div className="mt-3 grid grid-cols-2 gap-2"><Button variant="primary" disabled={reviewing === photo.id} onClick={() => void review(text(photo.id), 'adopted')}>{reviewing === photo.id ? '処理中...' : '通す'}</Button><Button variant="secondary" disabled={reviewing === photo.id} onClick={() => { setRejectingPhotoId(text(photo.id)); setReasonCode('quality'); setReasonNote(''); setReasonError('') }}>戻す</Button></div>}
           </div>
-        </article>)}
+        </article>})}
       </section>}
       </div>
 
       <div data-design="Right" className={styles.stack}>
         <section className={styles.sideCard}>
-          <h2 className={styles.sideTitle}>自動で戻す条件</h2>
+          <h2 className={styles.sideTitle}>確認順を決める条件</h2>
           <p className={styles.sideMissingValue}>—</p>
           <p className={styles.sideNote}>
-            まだ繋がっていません。自動審査の口が接続されると表示されます。公開するかどうかは、いまも人が決めます。
+            注意候補APIがつながると、確認を急ぐ写真を先に並べます。通す・戻す・公開する判断は、必ず人が行います。
           </p>
         </section>
 
@@ -315,9 +360,11 @@ export default function PhotoReviewsPage() {
 
         <FeatureLinkCard
           items={[
-            { label: 'NEN配信', note: '通した写真はここで配信します', href: '/nen-campaigns' },
-            { label: 'LINE通知', note: '審査結果の連絡はここから届きます', href: '/line-notifications' },
+            { label: '受信箱', note: '写真が届いたやりとり', href: '/chats' },
+            { label: '友だち', note: 'この人の過去の投稿', href: '/friends' },
             { label: 'EC連携', note: 'ポイントの付与先です', href: '/ec-commerce' },
+            { label: '登録メディア', note: '通した写真の置き場', href: '/contents' },
+            { label: 'テンプレート', note: 'お礼とお願いの文章', href: '/templates' },
           ]}
         />
       </div>

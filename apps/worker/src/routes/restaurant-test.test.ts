@@ -29,6 +29,7 @@ vi.mock('@line-crm/db', async () => {
     getStaffByApiKey: authMocks.getStaffByApiKey,
     getStaffByAdminSession: authMocks.getStaffByAdminSession,
     getLineAccounts: vi.fn(async () => authMocks.lineAccounts),
+    getLineAccountScopeEntries: vi.fn(async () => authMocks.lineAccounts),
   };
 });
 

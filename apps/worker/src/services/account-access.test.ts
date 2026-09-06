@@ -8,11 +8,19 @@ import {
   validateAccountHierarchy,
 } from './account-access.js';
 
+const dbMocks = vi.hoisted(() => ({
+  getLineAccountScopeEntries: vi.fn(),
+  getLineAccounts: vi.fn(),
+  decryptLineAccountCredentials: vi.fn(),
+}));
+
 vi.mock('@line-crm/db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@line-crm/db')>();
   return {
     ...actual,
-    getLineAccounts: vi.fn(async () => accounts),
+    getLineAccountScopeEntries: dbMocks.getLineAccountScopeEntries,
+    getLineAccounts: dbMocks.getLineAccounts,
+    decryptLineAccountCredentials: dbMocks.decryptLineAccountCredentials,
     getStaffById: vi.fn(async (_db: D1Database, id: string) => staffRows.get(id) ?? null),
     getStaffAccountScopeIds: vi.fn(async (_db: D1Database, id: string) => scopeIds.get(id) ?? []),
   };
@@ -55,9 +63,14 @@ const staff = (tenantId: string | null = DEFAULT_TENANT_ID) => ({
 
 describe('filterVisibleLineAccounts', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     accounts = [...defaultAccounts, tenantBAccount];
     staffRows = new Map([['s', { account_scope: 'all' }]]);
     scopeIds = new Map();
+    dbMocks.getLineAccountScopeEntries.mockImplementation(async (_db, tenantId) =>
+      accounts.filter(
+        (item) => (item.tenant_id ?? DEFAULT_TENANT_ID) === tenantId,
+      ));
   });
   it('既定統括のスタッフには既定統括の3アカウントだけを返す', () => {
     expect(filterVisibleLineAccounts(accounts, staff()).map((item) => item.id))
@@ -108,6 +121,12 @@ describe('filterVisibleLineAccounts', () => {
       ids: ['parent', 'child', 'grandchild'],
       canSeeUnassigned: true,
     });
+    expect(dbMocks.getLineAccountScopeEntries).toHaveBeenCalledWith(
+      expect.anything(),
+      DEFAULT_TENANT_ID,
+    );
+    expect(dbMocks.getLineAccounts).not.toHaveBeenCalled();
+    expect(dbMocks.decryptLineAccountCredentials).not.toHaveBeenCalled();
   });
 
   it('既定統括以外は自分のアカウントだけを閲覧し、未割当行を閲覧できない', async () => {
@@ -115,6 +134,10 @@ describe('filterVisibleLineAccounts', () => {
       allowedAccountIds: ['tenant-b-account'],
       canSeeUnassigned: false,
     });
+    expect(dbMocks.getLineAccountScopeEntries).toHaveBeenCalledWith(
+      expect.anything(),
+      'tenant-B',
+    );
   });
 
   it('アカウントが0件の統括には空の一覧を返す', async () => {

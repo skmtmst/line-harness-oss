@@ -5,6 +5,8 @@ import type { Env } from '../index.js';
 const dbMocks = vi.hoisted(() => ({
   getDashboardOverview: vi.fn(),
   getLineAccounts: vi.fn(),
+  getLineAccountScopeEntries: vi.fn(),
+  getLineAccountsByIds: vi.fn(),
   getLineAccountById: vi.fn(),
   getDashboardPreference: vi.fn(),
   getDashboardDefaultPreference: vi.fn(),
@@ -75,6 +77,12 @@ describe('dashboard organization account policy', () => {
     vi.clearAllMocks();
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({})));
     dbMocks.getLineAccounts.mockResolvedValue([account('account-1'), account('account-2')]);
+    dbMocks.getLineAccountScopeEntries.mockImplementation(async () =>
+      dbMocks.getLineAccounts());
+    dbMocks.getLineAccountsByIds.mockImplementation(async (_db, ids: string[]) => {
+      const rows = await dbMocks.getLineAccounts();
+      return rows.filter((row: { id: string }) => ids.includes(row.id));
+    });
     dbMocks.getStaffById.mockResolvedValue({ account_scope: 'all' });
     dbMocks.getStaffAccountScopeIds.mockResolvedValue([]);
     dbMocks.getLineAccountById.mockImplementation(async (_db: unknown, id: string) => account(id));
