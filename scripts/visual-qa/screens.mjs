@@ -4157,7 +4157,7 @@ export const CAPTURED_AT = {
     { pr: 927, head: 'eb41ad0d', on: '2026-09-06', screens: ['M1EXwB', 'uJP22', 'J64xI', 's7T2dz', 'JCz6J', 'W98zZQ', 's6Vvp', 'PSmHo', 'Y0Sn3', 'dC0yg'], note: '★V6の対象10画面を1440・1920と全状態で比較。横はみ出し0。' },
   ],
   8: [
-    { pr: 0, head: '209fd042f', on: '2026-09-07', screens: ['K7vg2', 'nzWIX', 'ivDoe', 'U9hzqH', 't7UtYQ'], note: 'Issue #292。編集3段を画面ごとに分割し、競合と実行結果を固定データへ接続。3106/8793で1440・1920と全状態を比較し、横はみ出し0。' },
+    { pr: 1082, head: 'c1355bb54', on: '2026-09-07', screens: ['K7vg2', 'nzWIX', 'ivDoe', 'U9hzqH', 't7UtYQ'], note: 'Issue #292。編集3段を画面ごとに分割し、競合と実行結果を固定データへ接続。3106/8793で1440・1920と全状態を比較し、横はみ出し0。' },
     { pr: 955, head: '564c91d0fe', on: '2026-09-06', screens: ['g46ja', 'Yj6CQ', 'e6iJG'], note: '競合確認、実在する友だちでのdry-run、最終確認、冪等な有効化を通し、1440・1920pxで設計と目視比較。横はみ出し0。' },
     { pr: 544, head: '6053c271', on: '2026-08-29', screens: ['Gy9OK', 'cmDfJ', 'K7vg2', 'nzWIX', 'ivDoe'], note: '削除確認の窓。**#544 は #491 を含む**' },
     { pr: 501, head: '93edbe17', on: '2026-08-28', screens: ['t7UtYQ'], note: '#501 は #500 を含む' },
