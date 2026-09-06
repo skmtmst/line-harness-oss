@@ -1611,9 +1611,9 @@ export const SCREENS = [
     verdictNote: '**2026-09-06 Issue #254 / UI HEAD 19422a3b7で設計1920pxと実装1440px・1920pxを目視比較。** 上部操作、2タブ、4指標、6行の回答表、ページ送りを設計と同じ順で配置し、両幅とも横はみ出し0を確認した。実回答はAPI側ページングし、全回答CSV・詳細・表示中の検索を備える。開いた実人数・回答単位の書き込み結果・日付項目の全件集計は取得口が無いため、0を作らず `—` と理由を表示する。',
     verdictSource: 'forms-v6/v9tYhl.txt + v9tYhl-{1440,1920}.png + v9tYhl-{normal,loading,empty,error}-{1440,1920}.png',
     verdictHead: '19422a3b7',
-    route: '/form-submissions/responses?id=form-visit',
+    route: '/form-submissions/responses?id=form-1',
     states: {
-      apis: ['**/api/forms/form-visit', '**/api/forms/form-visit/submissions*'],
+      apis: ['**/api/forms/form-1', '**/api/forms/form-1/submissions*'],
       kinds: ['normal', 'loading', 'empty', 'error'],
     }, },
   {
@@ -3794,6 +3794,33 @@ const ISSUE_366_REVIEW = {
 }
 
 /**
+ * board #368。統合済みのフォーム固定データと回答集計APIを使い、機能13の
+ * 4 Nodeを3104/8791で再撮影した。Pencil 1920pxとの目視比較結果。
+ */
+const ISSUE_368_REVIEW = {
+  EMBIK: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・一覧契約待ち。固定データから6フォームを読み、検索、公開状態、回答数、更新日、回答・編集・削除の操作を表示した。現行の実APIはフォームのフォルダ所属、全件数、今週回答数、保存先の内訳を一覧応答で返さないため、設計の18件・フォルダ別件数・週次値・保存先内訳を作らず保留した。通常・読込中・0件・取得失敗も同じ一覧骨格で確認した。',
+    source: 'forms-v6/EMBIK.txt + forms-v6/EMBIK-{1440,1920}.png + forms-v6/EMBIK-{normal,loading,empty,error}-{1440,1920}.png',
+  },
+  vCqUj: {
+    verdict: 'match',
+    note: '一致。固定フォーム定義から、共通ヘッダを含む9ブロック、質問ごとの入力種別・選択肢・保存先、顧客プレビュー、公開状態、回答URL、回答数、保存操作を表示した。値は運用データで変わるが、配置・項目・操作は一致する。',
+    source: 'forms-v6/vCqUj.txt + forms-v6/vCqUj-{1440,1920}.png',
+  },
+  cSqvP: {
+    verdict: 'match',
+    note: '一致。固定フォーム定義から回答後の3動作、お礼ページ、前回答の復元、ページ名、ボタン文言、見出し、送信前確認、受付期限、1人1回を読み、保存APIへつながるオプション画面を確認した。値は運用データで変わるが、配置・項目・操作は一致する。',
+    source: 'forms-v6/cSqvP.txt + forms-v6/cSqvP-{1440,1920}.png',
+  },
+  v9tYhl: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・撮影用回答データ待ち。実画面はページ分け回答APIのsummaryから、本人確認済み開始数に対する回答率、情報欄へ書けた件数と失敗数、次回来店日の重複を除いた人数を表示し、各回答にも書き込み成否を出すよう接続した。撮影用mockはフォーム定義だけで回答とsummaryを返さないため、0件の通常状態で未取得理由を表示し、設計の6行と実集計値は作らず保留した。通常・読込中・0件・取得失敗を確認した。',
+    source: 'forms-v6/v9tYhl.txt + forms-v6/v9tYhl-{1440,1920}.png + forms-v6/v9tYhl-{normal,loading,empty,error}-{1440,1920}.png',
+  },
+}
+
+/**
  * board #267。development b5693059a を取り込んだ枝を 3102/8789 で起動し、
  * 機能1に残る2 Nodeを設計1920pxと実装1440/1920pxで比較した結果。
  */
@@ -4021,6 +4048,13 @@ for (const screen of SCREENS) {
     screen.verdictSource = issue366Review.source
     screen.verdictHead = '1d9e8d36c'
     if (issue366Review.route) screen.route = issue366Review.route
+  }
+  const issue368Review = ISSUE_368_REVIEW[screen.node]
+  if (screen.feature === 13 && issue368Review) {
+    screen.verdict = issue368Review.verdict
+    screen.verdictNote = `**2026-09-07 Issue #368で実API接続後に再判定。** 3104/8791で1440px・1920pxを撮影し、全画像で横はみ出し0。Pencil 1920pxと実装1920pxを目視比較した。${issue368Review.note}`
+    screen.verdictSource = issue368Review.source
+    delete screen.verdictHead
   }
   const issue267Review = ISSUE_267_REVIEW[screen.node]
   if (screen.feature === 1 && issue267Review) {
