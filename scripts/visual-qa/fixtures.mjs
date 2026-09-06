@@ -171,6 +171,96 @@ export const TAG_EDITOR_NEN_SUBSCRIPTION = {
   createdAt: '2026-01-13T00:00:00.000Z',
 }
 
+/** 統合96の GET /api/tags/:id?withActions=1 と同じ、タグ定義の器。 */
+const TAG_DEFINITION_ACTIONS = [
+  { id: 'tag-action-message', type: 'send_message', params: { content: 'ご登録ありがとうございます。定期便の特典をご案内します。' }, onFailure: 'stop' },
+  { id: 'tag-action-add', type: 'add_tag', params: { tagId: 'tag-subscription-active' }, onFailure: 'stop' },
+  { id: 'tag-action-scenario', type: 'start_scenario', params: { scenarioId: 'scenario-subscription-onboarding' }, onFailure: 'continue' },
+]
+
+const TAG_DEFINITION_TAG = {
+  ...TAG_EDITOR_NEN_SUBSCRIPTION,
+  lineAccountId: 'visual-qa-account',
+  description: '定期便を利用しているNEN会員',
+  manualAssignmentAllowed: true,
+  reapplyPolicy: 'every_time',
+  linkedEnabled: true,
+  status: 'active',
+  version: 3,
+  updatedAt: '2026-08-20T19:20:00+09:00',
+}
+
+export const TAG_DEFINITION_NEN_SUBSCRIPTION = {
+  ...TAG_DEFINITION_TAG,
+  tag: TAG_DEFINITION_TAG,
+  automation: {
+    id: 'common-action-tag-0',
+    name: 'NEN会員（定期）が付いたとき',
+    status: 'published',
+    publishedVersion: {
+      id: 'common-action-tag-0-v4', versionNumber: 4, state: 'published', actions: TAG_DEFINITION_ACTIONS,
+    },
+    draftVersion: {
+      id: 'common-action-tag-0-v5', versionNumber: 5, state: 'draft', actions: TAG_DEFINITION_ACTIONS,
+    },
+    actions: TAG_DEFINITION_ACTIONS,
+  },
+}
+
+/** 統合96の GET /api/tags/:id/dependencies と同じ、保管前の影響確認。 */
+const TAG_REFERENCE_COUNTS = {
+  broadcasts: 3,
+  forms: 1,
+  scenarios: 2,
+  autoReplies: 1,
+  savedSearches: 1,
+  automations: 0,
+  commonActions: 0,
+  richMenus: 0,
+  templates: 0,
+  webinars: 0,
+  reminders: 0,
+  entryRoutes: 0,
+  trackedLinks: 0,
+  bookingMenus: 0,
+  affiliateOffers: 0,
+  events: 0,
+  analyticsFunnels: 0,
+  friendAddSettings: 0,
+}
+
+export const TAG_DEPENDENCIES_NEN_SUBSCRIPTION = {
+  tag: { id: 'tag-0', name: 'NEN会員（定期）', version: 3, status: 'active' },
+  friendCount: 128,
+  referenceCounts: TAG_REFERENCE_COUNTS,
+  references: [
+    { kind: 'broadcast', name: '一斉配信', href: '/broadcasts', count: 3, state: 'active', definitionVersion: null },
+    { kind: 'form', name: '回答フォーム', href: '/form-submissions', count: 1, state: 'active', definitionVersion: null },
+    { kind: 'scenario', name: 'シナリオ', href: '/scenarios', count: 2, state: 'active', definitionVersion: 4 },
+    { kind: 'auto_reply', name: '自動応答', href: '/auto-replies', count: 1, state: 'active', definitionVersion: 4 },
+    { kind: 'saved_search', name: '保存した検索', href: '/tags?tab=searches', count: 1, state: 'active', definitionVersion: 3 },
+  ],
+  linkedActions: [
+    { kind: 'common_action', name: 'NEN会員（定期）が付いたとき', version: 4, state: 'published' },
+    { kind: 'common_action', name: 'NEN会員（定期）が付いたとき', version: 5, state: 'draft' },
+  ],
+  pendingRunCount: 0,
+  mileageImpact: {
+    configured: true,
+    self: 10,
+    referrer: 5,
+    multiplier: 15000,
+    priority: 3,
+    reapplyPolicy: 'every_time',
+    historyPreserved: true,
+  },
+  blockingReferenceCount: 8,
+  canArchive: true,
+  canDelete: false,
+  checkedAt: '2026-09-07T04:48:00+09:00',
+  revision: 'tag:tag-0:v3:2026-08-20T19:20:00+09:00',
+}
+
 /**
  * タグ101件。設計の「1〜20 / 101件」に合わせる。
  *
@@ -1717,7 +1807,40 @@ export const FRIEND_ATTRIBUTE_SAVED_SEARCHES = [
     displayOrder: 4, createdAt: '2026-08-17T11:22:00+09:00', matchCount: 0,
     usedIn: [], canDelete: true, callCountThisMonth: 9,
   },
-]
+].map((search, index) => ({
+  ...search,
+  conditionFormat: 'search_v1',
+  updatedBy: search.createdBy,
+  updatedAt: search.createdAt,
+  revision: [3, 1, 2, 5, 1][index],
+  matchCountError: null,
+  usedIn: search.usedIn.map((reference, referenceIndex) => ({
+    ...reference,
+    revision: [3, 1, 2, 5, 1][index],
+    callCountThisMonth: Math.max(1, 3 - referenceIndex),
+  })),
+}))
+
+/** 一覧・詳細・事前確認を、統合96の保存検索契約と同じ階層で返す。 */
+export const FRIEND_ATTRIBUTE_SAVED_SEARCH_RESPONSE = {
+  success: true,
+  data: FRIEND_ATTRIBUTE_SAVED_SEARCHES,
+  items: FRIEND_ATTRIBUTE_SAVED_SEARCHES,
+  summary: { total: 12, usedInBroadcasts: 5, zeroMatches: 2, callsThisMonth: 84 },
+  pagination: { total: 12, limit: 20, cursor: '0', nextCursor: null },
+}
+
+export const FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL = {
+  ...FRIEND_ATTRIBUTE_SAVED_SEARCHES[0],
+  accountScope: { type: 'line_account', id: 'visual-qa-account' },
+  owner: { id: 'visual-qa-owner', isCurrentUser: true },
+  match: {
+    total: 18,
+    byChannel: { line: 15, mail: 3 },
+    calculatedAt: '2026-09-07T04:48:00+09:00',
+    error: null,
+  },
+}
 
 /*
   対応マーク（設計 `rIhbN` 4-3、`GMvBd` 4-3-A）。
@@ -1726,7 +1849,7 @@ export const FRIEND_ATTRIBUTE_SAVED_SEARCHES = [
   行が無いと押しどころが描かれず、4-3-A が1枚も撮れない
   （kentavndng/line-harness-board#105 に挙げていた欠け）。
 */
-export const SUPPORT_MARKS = [
+const SUPPORT_MARK_BASE = [
   {
     id: 'mark-default', name: '未対応', color: '#F59E0B', isDefault: true,
     autoOnInbound: true, displayOrder: 0, createdAt: '2026-01-01T00:00:00.000Z',
@@ -1786,6 +1909,36 @@ export const SUPPORT_MARK_AUTOMATION_RULES = [
     updatedAt: '2026-08-30T15:00:00+09:00',
   },
 ]
+
+export const SUPPORT_MARKS = SUPPORT_MARK_BASE.map((mark) => ({
+  ...mark,
+  updatedAt: mark.createdAt,
+  version: 1,
+  automationRules: SUPPORT_MARK_AUTOMATION_RULES.filter((rule) => rule.markId === mark.id),
+  displayTargets: ['inbox', 'friend_list', 'friend_detail'],
+}))
+
+/** 統合96の GET /api/support-marks/:id/archive-impact と同じ器。 */
+export const SUPPORT_MARK_ARCHIVE_IMPACT = {
+  mark: {
+    ...SUPPORT_MARKS.find((mark) => mark.id === 'mark-hold'),
+    updatedAt: '2026-08-31T10:00:00+09:00',
+    version: 1,
+    automationRules: SUPPORT_MARK_AUTOMATION_RULES,
+    displayTargets: ['inbox', 'friend_list', 'friend_detail'],
+  },
+  friendCount: 3,
+  usedIn: { broadcasts: 0, scenarios: 0, autoReplies: 0, savedSearches: 0, automations: 0 },
+  automationRules: SUPPORT_MARK_AUTOMATION_RULES,
+  displayTargets: ['inbox', 'friend_list', 'friend_detail'],
+  replacementOptions: SUPPORT_MARKS
+    .filter((mark) => mark.id !== 'mark-hold' && !mark.isInherited)
+    .map((mark) => ({ ...mark, updatedAt: mark.createdAt, version: 1, automationRules: [], displayTargets: ['inbox', 'friend_list', 'friend_detail'] })),
+  canArchive: true,
+  impactRevision: 'mark-hold:1:3:0:0:0:0:0',
+  checkedAt: '2026-09-07T04:48:00+09:00',
+  expectedVersion: 1,
+}
 
 /*
   リマインダの実行結果（設計 `GC4St` 7-1-H、要件 §3-7）。
