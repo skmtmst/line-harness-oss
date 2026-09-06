@@ -58,6 +58,7 @@ import {
   AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS, MILEAGE_OVERVIEW,
   COMMON_ACTIONS, BOOKING_MENUS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_REQUESTS,
   EC_NOTIFICATION_SETTINGS, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, EC_EVENTS, EC_OVERVIEW, MILEAGE_RULES, CONVERSION_POINTS,
+  WEBINARS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_ANALYTICS,
 } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
@@ -1287,6 +1288,13 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       ],
     }
   }
+  if (pathname === '/api/webinars') return { success: true, data: WEBINARS }
+  if (pathname === '/api/webinars/overview') return { success: true, data: WEBINAR_OVERVIEW }
+  if (/^\/api\/webinars\/[^/]+\/notifications$/.test(pathname)) return { success: true, data: WEBINAR_NOTIFICATIONS }
+  if (/^\/api\/webinars\/[^/]+\/ctas$/.test(pathname)) return { success: true, data: WEBINAR_CTAS }
+  if (/^\/api\/webinars\/[^/]+\/actions$/.test(pathname)) return { success: true, data: WEBINAR_ACTIONS }
+  if (/^\/api\/webinars\/[^/]+\/user-comments$/.test(pathname)) return { success: true, data: [] }
+  if (/^\/api\/webinars\/[^/]+\/analytics$/.test(pathname)) return { success: true, data: WEBINAR_ANALYTICS }
   if (/^\/api\/webinars\/[^/]+$/.test(pathname)) {
     /*
       ウェビナー1件。**器を通さない**（`fetchApi<{ data: Webinar }>`）。
@@ -1295,28 +1303,7 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     */
     return {
       data: {
-        id: pathname.split('/').pop(), accountId: 'visual-qa-account',
-        title: '定期便のはじめ方', slug: 'subscription-start', status: 'active',
-        videoPrefix: 'nen/subscription-start', durationSeconds: 2_580,
-        schedule: [], cta: { label: '詳しく見る', url: 'https://example.com/subscription', showAtSeconds: 900 },
-        tagOnAttend: null, tagOnCtaClick: null,
-        createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-25T02:00:00.000Z',
-      },
-    }
-  }
-  if (/^\/api\/webinars\/[^/]+\/analytics$/.test(pathname)) {
-    // 一覧の器だと `participants` `daily` `formFunnel` が無く、画面が落ちる。
-    return {
-      data: {
-        summary: {
-          reservations: 128, viewers: 96, registeredAndJoined: 74, watched5m: 88,
-          watched15m: 61, completed: 34, avgWatchedSeconds: 1_140, ctaClicks: 41, formSubmissions: 18,
-        },
-        daily: [], participants: [], sessions: [], dropoff: [],
-        formFunnel: {
-          ctaImpressions: 96, ctaClicks: 41, formOpens: 33, formStarts: 27,
-          submitAttempts: 21, submitSuccesses: 18, submitErrors: 3, fieldCompletions: [],
-        },
+        ...WEBINARS[0], id: pathname.split('/').pop(),
       },
     }
   }

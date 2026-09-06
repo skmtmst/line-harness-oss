@@ -4,6 +4,8 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const EDIT = fs.readFileSync(path.join(__dirname, 'edit/page.tsx'), 'utf8')
+const API = fs.readFileSync(path.join(__dirname, '../../lib/api.ts'), 'utf8')
 const FORM = fs.readFileSync(path.join(__dirname, '../../components/webinars/webinar-form.tsx'), 'utf8')
 /** 読み込めなかった理由の文言は、試験しやすいよう別ファイルへ出した。 */
 const FAILURE = fs.readFileSync(path.join(__dirname, 'webinar-load-failure.ts'), 'utf8')
@@ -60,5 +62,24 @@ describe('V6 ウェビナー一覧の契約', () => {
     /* 失敗の1枚と、空の1枚が別であること。 */
     expect(PAGE).toContain(') : loadFailure ? (')
     expect(PAGE).toContain(') : visibleItems.length === 0 ? (')
+  })
+
+  it('物理削除ではなく履歴を残すアーカイブ確認を使う', () => {
+    expect(PAGE).toContain('ウェビナーをアーカイブしますか？')
+    expect(PAGE).toContain('申込者・視聴履歴・CTA・分析結果は消えません')
+    expect(PAGE).toContain('webinarApi.archive(archiveTarget.id)')
+    expect(API).toContain("method: 'POST'")
+    expect(API).not.toContain('webinarApi.remove')
+  })
+
+  it('視聴後アクション・参加者・分析・公開プレビューを別の面で開ける', () => {
+    for (const label of ['視聴後アクション', '公開プレビュー', '参加者', '分析']) {
+      expect(EDIT).toContain(`'${label}'`)
+    }
+    expect(EDIT).toContain('webinarApi.saveActions(webinarId, actions)')
+    expect(EDIT).toContain('webinarApi.participantsCsvUrl(webinarId)')
+    expect(EDIT).toContain('data-design-node="Xjk8q"')
+    expect(EDIT).toContain('data-design-node="Q8sHa"')
+    expect(EDIT).toContain('data-design-node="yxyzQ"')
   })
 })
