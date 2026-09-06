@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Scenario, ScenarioTriggerType, DeliveryMode } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import { api, type ScenarioRuns, type ScenarioSimulation } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 
 function scenarioCompletionDetail(active: number, completed: number): string {
@@ -47,7 +47,69 @@ function StartScenarioDialog({
   onConfirm: () => void
   onCancel: () => void
 }) {
-  const checks = startChecklist(scenario)
+  const { selectedAccountId } = useAccount()
+  const lineAccountId = scenario.lineAccountId ?? selectedAccountId
+  const [simulation, setSimulation] = useState<ScenarioSimulation | null>(null)
+  const [runs, setRuns] = useState<ScenarioRuns | null>(null)
+  const [preflightLoading, setPreflightLoading] = useState(true)
+
+  useEffect(() => {
+    if (!lineAccountId) {
+      setPreflightLoading(false)
+      return
+    }
+    let cancelled = false
+    setPreflightLoading(true)
+    void Promise.all([
+      api.scenarios.simulate(scenario.id, lineAccountId).catch(() => null),
+      api.scenarios.runs(scenario.id, lineAccountId, { limit: 1 }).catch(() => null),
+    ]).then(([simulationResponse, runsResponse]) => {
+      if (cancelled) return
+      setSimulation(simulationResponse?.success ? simulationResponse.data : null)
+      setRuns(runsResponse?.success ? runsResponse.data : null)
+      setPreflightLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [lineAccountId, scenario.id])
+
+  const checks = startChecklist(scenario).map((item, index) => {
+    if (index === 1 && simulation) {
+      const complete = simulation.steps.length === (scenario.stepCount ?? simulation.steps.length)
+      return {
+        ...item,
+        state: complete ? 'ok' as const : 'warn' as const,
+        detail: complete
+          ? `${simulation.steps.length}通すべての配信日時を試算しました`
+          : '配信日時を試算できない通があります',
+      }
+    }
+    if (index === 2 && runs) {
+      return {
+        ...item,
+        state: runs.testSends.length > 0 ? 'ok' as const : 'warn' as const,
+        detail: runs.testSends.length > 0
+          ? `最新のテスト送信は${runs.testSends[0].messageCount}通です`
+          : 'テスト送信の記録がありません',
+      }
+    }
+    if (index === 3 && runs) {
+      const enough = runs.quota.remaining === null
+        ? runs.quota.state === 'unlimited'
+        : runs.quota.remaining >= (simulation?.audience.newStartPlanned ?? 0)
+      return {
+        ...item,
+        state: enough ? 'ok' as const : 'warn' as const,
+        detail: runs.quota.state === 'unlimited'
+          ? '送信数の上限はありません'
+          : runs.quota.remaining === null
+            ? runs.quota.reason ?? '送信枠を取得できませんでした'
+            : `残り${runs.quota.remaining.toLocaleString('ja-JP')}通です`,
+      }
+    }
+    return item
+  })
   const triggerLabel: Record<ScenarioTriggerType, string> = {
     friend_add: '友だち追加時',
     tag_added: 'タグが付いた時',
@@ -78,6 +140,7 @@ function StartScenarioDialog({
             <h3 className="text-ink mt-1 text-lg font-bold">{scenario.name}</h3>
             <dl className="mt-5 space-y-3 text-sm">
               <div className="flex justify-between gap-4"><dt className="text-ink-faint">開始のきっかけ</dt><dd className="text-ink text-right font-medium">{triggerLabel[scenario.triggerType]}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-ink-faint">開始対象</dt><dd className="text-ink text-right font-medium">{simulation ? `新規開始予定 ${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人` : preflightLoading ? '—（試算中）' : '—（取得できません）'}</dd></div>
               <div className="flex justify-between gap-4"><dt className="text-ink-faint">配信方式</dt><dd className="text-ink text-right font-medium">{modeLabel[scenario.deliveryMode ?? 'relative']}</dd></div>
               <div className="flex justify-between gap-4"><dt className="text-ink-faint">配信内容</dt><dd className="text-ink text-right font-medium">{scenario.stepCount === undefined ? '—通' : `${scenario.stepCount}通`}</dd></div>
               <div className="flex justify-between gap-4"><dt className="text-ink-faint">現在の購読中</dt><dd className="text-ink text-right font-medium">{scenario.subscriberCount === undefined ? '—人' : `${scenario.subscriberCount}人`}</dd></div>
@@ -87,6 +150,7 @@ function StartScenarioDialog({
           <section className="border-hairline rounded-card border p-5">
             <p className="text-ink mb-3 text-sm font-bold">配信前チェック</p>
             <ul className="space-y-3 text-sm">
+              {preflightLoading ? <li className="text-ink-faint text-xs">開始前の実データを確認しています…</li> : null}
               {checks.map((item) => (
                 <li key={item.label} className="flex items-start gap-3">
                   <span aria-hidden className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${item.state === 'ok' ? 'bg-success-bg text-success' : item.state === 'warn' ? 'bg-warning-bg text-warning' : 'bg-canvas-sunken text-ink-faint'}`}>
@@ -102,7 +166,10 @@ function StartScenarioDialog({
         <div className="bg-warning-bg mx-6 mb-5 rounded-card px-5 py-4">
           <p className="text-warning text-sm font-bold">開始後に起きること</p>
           <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
-            条件を満たした友だちから配信が始まります。開始後も停止できますが、すでに送信されたメッセージは取り消せません。
+            {simulation
+              ? `条件に一致した${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人が購読を開始します。`
+              : '条件を満たした友だちから配信が始まります。'}
+            開始後も停止できますが、すでに送信されたメッセージは取り消せません。
           </p>
         </div>
         {error ? <p className="bg-danger-bg text-danger mx-6 mb-4 rounded-card px-4 py-3 text-sm">{error}</p> : null}

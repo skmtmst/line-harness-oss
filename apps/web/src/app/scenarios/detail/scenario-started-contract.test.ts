@@ -13,11 +13,14 @@ describe('V6 シナリオ開始完了', () => {
     expect(DETAIL).toContain('data-design-node="NrBkW"')
   })
 
-  it('完了画面は作り物の対象人数を出さず、開始後の結果へ進める', () => {
-    expect(DETAIL).toContain('配信を開始しました。条件を満たした友だちから順に配信します。')
+  it('完了画面は試算と開始記録の実値を使い、開始後の結果へ進める', () => {
+    expect(DETAIL).toContain('api.scenarios.simulate(id, lineAccountId)')
+    expect(DETAIL).toContain('api.scenarios.runs(id, lineAccountId, { limit: 50 })')
+    expect(DETAIL).toContain('simulation.audience.newStartPlanned.toLocaleString')
     expect(DETAIL).toContain('開始履歴を確認')
     expect(DETAIL).toContain("showStarted ? '配信中'")
-    expect(DETAIL).toContain('開始日時はこの画面では取得できません')
+    expect(DETAIL).toContain('runs?.subscriptions[0]?.startedAt')
+    expect(DETAIL).toContain('開始日時を取得できませんでした')
     expect(DETAIL).toContain('/scenarios/results?id=')
     expect(DETAIL).not.toContain('開始予定116人')
   })

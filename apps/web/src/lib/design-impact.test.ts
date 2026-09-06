@@ -43,7 +43,7 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする25ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする26ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
@@ -53,6 +53,8 @@ describe('共通部品の影響範囲', () => {
       'app/affiliates/tabs.tsx',
       // 2026-09-04: 自動応答の実行結果が入った。表の下にページ送りがある。
       'app/auto-replies/runs/page.tsx',
+      // #370: 予約メニュー8件を設計どおり1ページ6件に区切る。
+      'app/booking/menus/page.tsx',
       'app/contents/page.tsx',
       // #973: 共通情報の変更影響を1件ずつ確認する一覧にページ送りを追加した。
       'app/contents/vars/impact-review.tsx',

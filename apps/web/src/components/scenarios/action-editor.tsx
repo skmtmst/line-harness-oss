@@ -19,8 +19,8 @@
  *   - 共通設定の「アクション名」「フォルダ」… `scenario_actions` に名前も
  *     フォルダも無く、読む口も書く口も無い。空欄だけ置くと、書いたものが
  *     消えたように見える。引き継ぎは `docs/design-qa/v6-scenario-action-editor-handoff.md`
- *   - 8つの動作 … 実装が持つ種別は `ScenarioActionType` の5つ。押しても
- *     作れない札を3つ増やしても、できることは増えない
+ *   - 8つの動作 … 現行の編集口が持つ種別は `ScenarioActionType` の5つ。
+ *     変更時は、安全に変換できる設定をV6下書きAPIへ同時保存する
  *   - 「発動2回目以降も各動作を実行」をセクションに1つ … `repeatOnRefire` は
  *     動作1件ごとの列。1つにまとめると、動作ごとに違う値を持てなくなり、
  *     既にある設定を黙って上書きすることになる
@@ -30,7 +30,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { Flag, Tag, User, Variable, Workflow } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import styles from './action-editor.module.css'
-import { api, type ScenarioAction, type ScenarioActionHook, type ScenarioActionType } from '@/lib/api'
+import {
+  api,
+  type ScenarioAction,
+  type ScenarioActionHook,
+  type ScenarioActionType,
+  type ScenarioDraftActionV6,
+} from '@/lib/api'
 import ConditionBuilder, {
   pruneCondition,
   type SegmentCondition,
@@ -74,6 +80,66 @@ const KIND_LABEL: Record<ScenarioActionType, string> = {
   common_var: '共通情報操作',
 }
 
+/** 既存5種を、機能5 V6の下書き契約へ安全に写せる形だけ変換する。 */
+function toDraftActions(actions: ScenarioAction[]): ScenarioDraftActionV6[] {
+  return actions.flatMap<ScenarioDraftActionV6>((action, actionIndex) => {
+    const config = (action.config ?? {}) as Record<string, unknown>
+    const common = {
+      hook: action.hook,
+      stepId: action.stepId,
+      choiceKey: action.choiceIndex === null ? null : String(action.choiceIndex),
+      condition: action.condition,
+      onFailure: 'stop' as const,
+    }
+    if (action.actionType === 'tag') {
+      const ids = Array.isArray(config.tagIds)
+        ? config.tagIds.filter((id): id is string => typeof id === 'string' && id.length > 0)
+        : []
+      return ids.map((tagId, index) => ({
+        ...common,
+        id: `${action.id}-${index}`,
+        type: config.op === 'remove' ? 'remove_tag' : 'add_tag',
+        params: { tagId },
+        sortOrder: actionIndex * 10 + index,
+      }))
+    }
+    if (action.actionType === 'support_mark' && typeof config.markId === 'string' && config.markId) {
+      return [{
+        ...common,
+        id: action.id,
+        type: 'set_support_mark',
+        params: { supportMarkId: config.markId },
+        sortOrder: actionIndex * 10,
+      }]
+    }
+    if (action.actionType === 'scenario' && typeof config.scenarioId === 'string' && config.scenarioId) {
+      const type = config.op === 'stop' ? 'stop_scenario' : 'start_scenario'
+      return [{
+        ...common,
+        id: action.id,
+        type,
+        params: { scenarioId: config.scenarioId },
+        sortOrder: actionIndex * 10,
+      }]
+    }
+    if (
+      action.actionType === 'friend_field'
+      && typeof config.fieldId === 'string'
+      && config.fieldId
+      && config.op === 'set'
+    ) {
+      return [{
+        ...common,
+        id: action.id,
+        type: 'set_metadata',
+        params: { values: { [config.fieldId]: config.value ?? '' } },
+        sortOrder: actionIndex * 10,
+      }]
+    }
+    return []
+  })
+}
+
 interface Option {
   id: string
   name: string
@@ -105,6 +171,8 @@ export default function ActionEditor({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [conditionFor, setConditionFor] = useState<string | null>(null)
+  const [draftVersion, setDraftVersion] = useState(0)
+  const [draftSaving, setDraftSaving] = useState(false)
 
   const [tags, setTags] = useState<Option[]>([])
   const [fields, setFields] = useState<Option[]>([])
@@ -112,23 +180,51 @@ export default function ActionEditor({
   const [scenarioOpts, setScenarioOpts] = useState<Option[]>([])
   const [vars, setVars] = useState<{ varKey: string; name: string }[]>([])
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<ScenarioAction[]> => {
     setLoading(true)
     const res = await api.scenarios.actions.list(scenarioId)
     if (res.success) {
-      setActions(
-        res.data.filter(
+      const next = res.data.filter(
           (a) =>
             a.hook === hook &&
             (a.stepId ?? null) === (stepId ?? null) &&
             (a.choiceIndex ?? null) === (choiceIndex ?? null),
-        ),
-      )
+        )
+      setActions(next)
+      setLoading(false)
+      return next
     } else {
       setError(res.error)
     }
     setLoading(false)
+    return []
   }, [scenarioId, hook, stepId, choiceIndex])
+
+  const saveDraftSnapshot = async (next: ScenarioAction[]) => {
+    if (!selectedAccountId) {
+      setError('LINE公式アカウントを選んでください')
+      return false
+    }
+    setDraftSaving(true)
+    try {
+      const response = await api.scenarios.saveDraft(scenarioId, {
+        lineAccountId: selectedAccountId,
+        expectedVersion: draftVersion,
+        afterActions: toDraftActions(next),
+      })
+      if (!response.success) {
+        setError(response.error)
+        return false
+      }
+      setDraftVersion(response.data.version)
+      return true
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'V6下書きを保存できませんでした')
+      return false
+    } finally {
+      setDraftSaving(false)
+    }
+  }
 
   useEffect(() => {
     void load()
@@ -172,7 +268,8 @@ export default function ActionEditor({
       setError(res.error)
       return
     }
-    await load()
+    const next = await load()
+    await saveDraftSnapshot(next)
     onChanged?.()
   }
 
@@ -188,7 +285,8 @@ export default function ActionEditor({
       setError(res.error)
       return
     }
-    await load()
+    const next = await load()
+    await saveDraftSnapshot(next)
     onChanged?.()
   }
 
@@ -199,7 +297,8 @@ export default function ActionEditor({
       setError(res.error)
       return
     }
-    await load()
+    const next = await load()
+    await saveDraftSnapshot(next)
     onChanged?.()
   }
 
@@ -210,7 +309,8 @@ export default function ActionEditor({
     const current = actions[index]
     await api.scenarios.actions.update(scenarioId, current.id, { sortOrder: target.sortOrder })
     await api.scenarios.actions.update(scenarioId, target.id, { sortOrder: current.sortOrder })
-    await load()
+    const next = await load()
+    await saveDraftSnapshot(next)
     onChanged?.()
   }
 
@@ -294,6 +394,11 @@ export default function ActionEditor({
                       )
                     })}
                   </div>
+                  <p className="text-ink-faint mt-2 text-xs">
+                    {draftSaving
+                      ? 'V6下書きへ保存しています…'
+                      : `変更時にV6下書きへ保存${draftVersion > 0 ? `・版${draftVersion}` : ''}`}
+                  </p>
                 </section>
 
                 {/* ④ 実行する動作。並び順がそのまま実行順。 */}
