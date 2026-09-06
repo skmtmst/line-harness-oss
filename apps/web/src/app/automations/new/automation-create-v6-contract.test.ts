@@ -75,7 +75,7 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
   it('保存・キャンセルは下部追従バーにしか置かない', () => {
     expect(PAGE).toContain("import StickyBar from '@/components/shared/sticky-bar'")
     const bar = PAGE.slice(PAGE.indexOf('<StickyBar'))
-    for (const label of ['キャンセル', '保存して続けて作る']) {
+    for (const label of ['キャンセル', '有効にして続けて作る', '作成して有効にする']) {
       expect(bar, `${label} が追従バーの外にあります`).toContain(label)
     }
     // 追従バーより前に保存の押し口を置かない。
@@ -129,6 +129,11 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
     expect(PAGE).toContain('data-design="Right"')
     expect(PAGE).toContain("import { CareCard, FeatureLinkCard } from '@/components/shared/side-cards'")
     expect(PAGE).toContain('当てはまりそうな人数')
+    expect(PAGE).toContain('いまの決めごとを文章にすると')
+    expect(PAGE).toContain('この文章のとおりに動きます。')
+    expect(PAGE).toContain('同じきっかけのルールは両方動きます')
+    expect(PAGE).toContain('条件を足す（15の軸から選べます）')
+    expect(PAGE).toContain('失敗したとき: 現在はここで止まります。')
   })
 
   it('取れない数は未接続の言葉で出し、0件と書かない', () => {

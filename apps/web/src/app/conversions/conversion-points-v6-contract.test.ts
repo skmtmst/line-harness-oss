@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const NEW_PAGE = readFileSync(new URL('./new/page.tsx', import.meta.url), 'utf8')
 const STRUCTURE = readFileSync(new URL('../../lib/design-structure.json', import.meta.url), 'utf8')
 
 /**
@@ -38,11 +39,11 @@ describe('V6 成果地点一覧の契約', () => {
   it('集計を取得できないときは成果数を0件にしない', () => {
     expect(PAGE).toContain('const [reportAvailable, setReportAvailable] = useState(false)')
     expect(PAGE).toContain('setReportAvailable(false)')
-    expect(PAGE).toContain("reportAvailable ? (countByPoint.get(point.id) ?? 0) : '—'")
+    expect(PAGE).toContain("reportAvailable ? `${(countByPoint.get(point.id) ?? 0).toLocaleString()}件` : '—'")
   })
 
-  it('一覧でない返事を成功扱いせず、前のKPIも残さない', () => {
-    for (const reset of ['setPoints([])', 'setPending([])', 'setApproved([])', 'setOpenOffers(0)']) {
+  it('一覧でない返事を成功扱いせず、前の集計も残さない', () => {
+    for (const reset of ['setPoints([])', 'setReport([])', 'setPreviousReport([])']) {
       expect(PAGE).toContain(reset)
     }
     expect(PAGE.match(/Array\.isArray\(/g)?.length).toBeGreaterThanOrEqual(5)
@@ -63,12 +64,33 @@ describe('V6 成果地点一覧の契約', () => {
     expect(PAGE).not.toContain('ページの切り替えは準備中です')
   })
 
-  it('口の無い期間と書き出しは、押せない形にして理由を本文に出す', () => {
-    expect(PAGE).toContain('まだ繋がっていません。期間で絞る仕組みが接続されると表示されます。')
+  it('期間は実際の集計口へつなぎ、口の無い書き出しは理由を本文に出す', () => {
+    expect(PAGE).toContain('api.conversions.report(reportRange(30))')
+    expect(PAGE).toContain('api.conversions.report(reportRange(periodDays))')
+    expect(PAGE).toContain("{ value: '30', label: 'この30日' }")
     expect(PAGE).toContain('書き出しはまだ繋がっていません。')
-    // 押せない札として残さない。
-    expect(PAGE).not.toContain('期間の切り替えは準備中です')
-    expect(PAGE).not.toContain('書き出しは準備中です')
-    expect(PAGE).not.toContain('CSVで書き出す')
+    expect(PAGE).toContain('CSVの書き出し口は未接続です。')
+    expect(PAGE).not.toContain('準備中')
+  })
+
+  it('一覧とレポートを別の運用目的で表示する', () => {
+    for (const text of ['何が起きたら数えるか', '使われている場所', '利用先の取得は未接続']) {
+      expect(PAGE).toContain(text)
+    }
+    for (const text of ['日ごとの成果', '前の期間', '増減', 'いちばん多い経路']) {
+      expect(PAGE).toContain(text)
+    }
+    expect(PAGE).toContain('日別の集計口はまだ接続されていません。')
+    expect(PAGE).toContain('帰属根拠の集計は未接続')
+  })
+
+  it('作成画面で重複を止め、試算口の未接続を隠さない', () => {
+    expect(NEW_PAGE).toContain('designNode="GtylA"')
+    expect(NEW_PAGE).toContain('variant="v6"')
+    expect(NEW_PAGE).toContain('const duplicateName = useMemo')
+    expect(NEW_PAGE).toContain('同じ意味の成果地点を2つ作らないでください')
+    expect(NEW_PAGE).toContain('保存前の試算口はまだ接続されていません。')
+    expect(NEW_PAGE).not.toContain('準備中')
+    expect(NEW_PAGE).not.toContain('Webhookで受け取った')
   })
 })

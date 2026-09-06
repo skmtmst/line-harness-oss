@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 251,
-  "unimplemented": 17,
+  "compared": 249,
+  "unimplemented": 16,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 4,
-  "match": 21,
+  "missing": 7,
+  "match": 22,
   "structureMatchDataPending": 44,
-  "needsFix": 164,
-  "unjudged": 22,
-  "remaining": 247,
+  "needsFix": 175,
+  "unjudged": 11,
+  "remaining": 246,
   "features": [
     {
       "feature": 1,
@@ -1449,11 +1449,11 @@
       "feature": 15,
       "name": "登録メディア",
       "total": 5,
-      "compared": 5,
+      "compared": 4,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0,
+      "missing": 1,
       "match": 0,
       "structureMatchDataPending": 3,
       "needsFix": 2,
@@ -1514,14 +1514,14 @@
       "feature": 16,
       "name": "成果とアフィリエイト",
       "total": 9,
-      "compared": 6,
-      "unimplemented": 3,
+      "compared": 7,
+      "unimplemented": 2,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 3,
-      "needsFix": 3,
+      "needsFix": 4,
       "unjudged": 0,
       "remaining": 9,
       "capturedAt": [
@@ -1749,11 +1749,11 @@
       "feature": 18,
       "name": "流入と計測",
       "total": 9,
-      "compared": 9,
+      "compared": 7,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0,
+      "missing": 2,
       "match": 0,
       "structureMatchDataPending": 4,
       "needsFix": 5,
@@ -1846,8 +1846,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 1,
-      "needsFix": 2,
-      "unjudged": 1,
+      "needsFix": 3,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
         {
@@ -1958,8 +1958,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 3,
-      "needsFix": 3,
-      "unjudged": 1,
+      "needsFix": 4,
+      "unjudged": 0,
       "remaining": 7,
       "capturedAt": [
         {
@@ -2029,8 +2029,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 1,
-      "needsFix": 0,
-      "unjudged": 1,
+      "needsFix": 1,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2096,8 +2096,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 1,
-      "needsFix": 4,
-      "unjudged": 1,
+      "needsFix": 5,
+      "unjudged": 0,
       "remaining": 6,
       "capturedAt": [
         {
@@ -2151,11 +2151,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
+      "match": 1,
       "structureMatchDataPending": 5,
-      "needsFix": 2,
+      "needsFix": 1,
       "unjudged": 0,
-      "remaining": 8,
+      "remaining": 7,
       "capturedAt": [
         {
           "pr": 502,
@@ -2276,8 +2276,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 3,
-      "unjudged": 4,
+      "needsFix": 7,
+      "unjudged": 0,
       "remaining": 7,
       "capturedAt": [
         {
@@ -2335,8 +2335,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 2,
-      "needsFix": 1,
-      "unjudged": 1,
+      "needsFix": 2,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2445,8 +2445,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 1,
-      "needsFix": 1,
-      "unjudged": 2,
+      "needsFix": 3,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2608,13 +2608,6 @@
       "name": "13-1-E フォームの削除確認",
       "gap": "api",
       "gapNote": "確認窓だけでは作れない。削除前にフォーム名・公開状態・回答数・利用中の場所・開けなくなるURLを返す影響確認が要る。公開中・回答あり・利用中は物理削除せず、停止・保管へ移す契約と `status` / `deleted_at` が必要"
-    },
-    {
-      "feature": 16,
-      "node": "njLGA",
-      "name": "16-1-C 支払い",
-      "gap": "build",
-      "gapNote": "締め（あと何日で金額が固定されるか）・支払予定日・振込用CSV・振込先・人ごとの金額を出す画面。口は `/api/affiliate-payments` が既に在るので、画面を作れば足りる"
     },
     {
       "feature": 16,
