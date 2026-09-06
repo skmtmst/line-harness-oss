@@ -57,6 +57,13 @@ describe('機能設定とサイドメニューが同じ一覧を見る', () => {
     ])
   })
 
+  it('飲食店向けテストは機能設定でだけ表示を選べる', () => {
+    expect(visibleFeatureGroups({ specializedFeatureKeys: [] })
+      .some((group) => group.id === 'restaurant-test')).toBe(false)
+    expect(visibleFeatureGroups({ specializedFeatureKeys: [], includeRestaurantTest: true })
+      .some((group) => group.id === 'restaurant-test')).toBe(true)
+  })
+
   it('サイドメニューにある切り替え可能な項目には、必ずキーがある', () => {
     // キーが無い項目はオフにできない。「機能設定に並んでいるのに切り替わらない」
     // という形で表に出るので、ここで気づけるようにする。

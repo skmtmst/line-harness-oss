@@ -252,6 +252,23 @@ describe('友だち数の推移', () => {
     const { trend } = await getDashboardOverview(db, 'today', { allTenants: true });
     expect(trend.find((d) => d.date === jstDate(0))?.active).toBe(2);
   });
+
+  test('日次記録は1回の上限まで進め、未記録の残りを次回に続ける', async () => {
+    for (const id of ['account-a', 'account-b', 'account-c']) insertAccount(id);
+
+    await recordFriendSnapshot(db, null, jstDate(0), 2);
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM friend_daily_snapshots`).get())
+      .toEqual({ count: 2 });
+
+    await recordFriendSnapshot(db, null, jstDate(0), 2);
+    expect(sqlite.prepare(`SELECT line_account_id FROM friend_daily_snapshots ORDER BY line_account_id`).all())
+      .toEqual([
+        { line_account_id: '__unassigned__' },
+        { line_account_id: 'account-a' },
+        { line_account_id: 'account-b' },
+        { line_account_id: 'account-c' },
+      ]);
+  });
 });
 
 describe('受信箱の状態', () => {
