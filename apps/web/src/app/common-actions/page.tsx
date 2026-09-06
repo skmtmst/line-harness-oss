@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { ExternalLink, RefreshCw } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { api, type CommonActionSummary } from '@/lib/api'
@@ -33,7 +33,6 @@ const STATUS_LABEL: Record<CommonActionSummary['status'], string> = {
 }
 
 export default function CommonActionsPage() {
-  const router = useRouter()
   const canManage = useCanManageCommonActions()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [items, setItems] = useState<CommonActionSummary[]>([])
@@ -43,7 +42,6 @@ export default function CommonActionsPage() {
   const deferredQuery = useDeferredValue(query)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [duplicating, setDuplicating] = useState('')
   const [automationCounts, setAutomationCounts] = useState<{ active: number; stopped: number } | null>(null)
   const [templateCount, setTemplateCount] = useState<number | null>(null)
 
@@ -82,21 +80,6 @@ export default function CommonActionsPage() {
     if (!accountLoading) void load()
   }, [accountLoading, load])
 
-  const duplicate = async (id: string) => {
-    if (!selectedAccountId || duplicating) return
-    setDuplicating(id)
-    setError('')
-    try {
-      const response = await api.commonActions.duplicate(id, selectedAccountId)
-      if (!response.success) throw new Error(response.error)
-      router.push(`/common-actions/edit?id=${encodeURIComponent(response.data.id)}`)
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '共通アクションを複製できませんでした')
-    } finally {
-      setDuplicating('')
-    }
-  }
-
   const totals = useMemo(() => ({
     actions: summaryItems.reduce((sum, item) => sum + item.actionCount, 0),
     bindings: summaryItems.reduce((sum, item) => sum + item.bindingCount, 0),
@@ -110,7 +93,7 @@ export default function CommonActionsPage() {
   const filterCount = (value: Filter): number => {
     if (value === 'all') return summaryItems.length
     if (value === 'old_version') return totals.outdatedItems
-    if (value === 'unused') return summaryItems.filter((item) => item.bindingCount === 0).length
+    if (value === 'unused') return summaryItems.filter((item) => item.status === 'published' && item.bindingCount === 0).length
     return summaryItems.filter((item) => item.status === value).length
   }
 
@@ -157,7 +140,7 @@ export default function CommonActionsPage() {
           value={query}
           onChange={setQuery}
           onClear={() => setQuery('')}
-          placeholder="名前や説明で検索"
+          placeholder="アクション名・中の処理で探す"
           aria-label="共通アクションを検索"
           loading={loading && query !== deferredQuery}
           className="min-w-72 flex-1"
@@ -228,16 +211,21 @@ export default function CommonActionsPage() {
                   </Td>
                   <ActionCell>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <a
+                    <Link
                       href={`/common-actions/versions?id=${encodeURIComponent(item.id)}`}
                       className="text-action inline-flex items-center gap-1 whitespace-nowrap font-medium hover:underline"
                     >
                       中身を見る <ExternalLink size={14} aria-hidden />
-                    </a>
+                    </Link>
                     {canManage ? (
-                      <button type="button" disabled={Boolean(duplicating)} onClick={() => void duplicate(item.id)} className="text-action whitespace-nowrap text-xs font-medium hover:underline disabled:opacity-40">
-                        {duplicating === item.id ? '複製中' : '複製して下書きを作る'}
-                      </button>
+                      <Link
+                        href={item.status === 'draft'
+                          ? `/common-actions/edit?id=${encodeURIComponent(item.id)}`
+                          : `/common-actions/versions?id=${encodeURIComponent(item.id)}`}
+                        className="text-action whitespace-nowrap text-xs font-medium hover:underline"
+                      >
+                        {item.status === 'draft' ? '公開する' : '使われている場所'}
+                      </Link>
                     ) : null}
                     </div>
                   </ActionCell>

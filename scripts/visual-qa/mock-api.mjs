@@ -1747,7 +1747,7 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       .filter((item) => status === 'old_version'
         ? item.oldVersionBindingCount > 0
         : status === 'unused'
-          ? item.bindingCount === 0
+          ? item.status === 'published' && item.bindingCount === 0
           : status ? item.status === status : true)
       .filter((item) => !search || `${item.name} ${item.description ?? ''}`.toLocaleLowerCase('ja').includes(search))
     const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)

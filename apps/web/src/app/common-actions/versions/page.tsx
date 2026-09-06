@@ -22,6 +22,14 @@ const ACTION_LABELS: Record<string, string> = {
   remove_rich_menu: 'リッチメニューを外す', wait: '待つ', common_action: '別の共通アクションを呼ぶ',
 }
 
+const CONSUMER_LABELS: Record<string, string> = {
+  scenario: 'シナリオ配信',
+  form: '回答フォーム',
+  auto_reply: '自動応答',
+  rich_menu: 'リッチメニュー',
+  automation: 'オートメーション',
+}
+
 function versionChangeSummary(version: CommonActionVersion, versions: CommonActionVersion[]): string {
   const previous = versions
     .filter((item) => item.versionNumber < version.versionNumber)
@@ -175,6 +183,54 @@ function CommonActionVersionsInner() {
       {error ? <p className="text-danger my-4 text-sm" role="alert">{error}</p> : null}
 
       <section className="mt-4">
+        <h2 className="text-ink font-semibold">どこから呼ばれているか</h2>
+        <p className="text-ink-faint mt-1 text-sm">公開しても、呼び出し元は自動で変わりません。使う場所ごとに新しい版へ更新します。</p>
+        {detail.bindings.length === 0 ? (
+          <div className="border-hairline rounded-card mt-3 border bg-canvas p-8 text-center text-sm text-ink-faint">まだどこからも呼ばれていません。</div>
+        ) : (
+          <DataTable className="mt-3">
+              <thead>
+                <TableHeadRow>
+                  <Th style={{ width: '35%' }}>利用先</Th>
+                  <Th style={{ width: '15%' }}>固定中の版</Th>
+                  <Th style={{ width: '14%' }}>実行中</Th>
+                  <Th style={{ width: '14%' }}>待機中</Th>
+                  <Th style={{ width: '22%' }}>操作</Th>
+                </TableHeadRow>
+              </thead>
+              <tbody>
+                {detail.bindings.map((binding) => (
+                  <Tr key={binding.id}>
+                    <NameCell
+                      name={<span className="truncate" title={binding.consumerId}>{CONSUMER_LABELS[binding.consumerType] ?? binding.consumerType}</span>}
+                      sub={<span className="truncate" title={binding.consumerPath}>{binding.consumerPath || '全体'}</span>}
+                    />
+                    <Td>
+                      <span className="text-ink-secondary">v{binding.versionNumber}</span>
+                      {binding.hasNewerVersion ? <StatusBadge tone="warning" size="compact" className="ml-2">新版あり</StatusBadge> : null}
+                    </Td>
+                    <Td className="text-ink-secondary" title={binding.runningCount === null ? '未取得' : undefined}>{binding.runningCount ?? '—'}</Td>
+                    <Td className="text-ink-secondary" title={binding.waitingCount === null ? '未取得' : undefined}>{binding.waitingCount ?? '—'}</Td>
+                    <ActionCell>
+                      {canManage && binding.hasNewerVersion && published ? (
+                        <button
+                          type="button"
+                          disabled={Boolean(working)}
+                          className="text-action font-semibold hover:underline disabled:opacity-40"
+                          onClick={() => setPendingBindingId(binding.id)}
+                        >
+                          v{published.versionNumber}への変更内容を確認
+                        </button>
+                      ) : <span className="text-ink-faint">{binding.hasNewerVersion ? '編集権限が必要' : '最新版を使用中'}</span>}
+                    </ActionCell>
+                  </Tr>
+                ))}
+              </tbody>
+          </DataTable>
+        )}
+      </section>
+
+      <section className="mt-4">
         <div className="mb-3 flex items-center justify-between">
           <div>
             <h2 className="text-ink font-semibold">版の履歴</h2>
@@ -257,54 +313,6 @@ function CommonActionVersionsInner() {
           unit="件"
           detail="設定した待ち時間の途中です"
         />
-      </section>
-
-      <section className="mt-6">
-        <h2 className="text-ink font-semibold">使われている場所</h2>
-        <p className="text-ink-faint mt-1 text-sm">実行中・待機中の処理は、切り替えても開始時の版のまま完了します。</p>
-        {detail.bindings.length === 0 ? (
-          <div className="border-hairline rounded-card mt-3 border bg-canvas p-8 text-center text-sm text-ink-faint">まだどこからも呼ばれていません。</div>
-        ) : (
-          <DataTable className="mt-3">
-              <thead>
-                <TableHeadRow>
-                  <Th style={{ width: '35%' }}>利用先</Th>
-                  <Th style={{ width: '15%' }}>固定中の版</Th>
-                  <Th style={{ width: '14%' }}>実行中</Th>
-                  <Th style={{ width: '14%' }}>待機中</Th>
-                  <Th style={{ width: '22%' }}>操作</Th>
-                </TableHeadRow>
-              </thead>
-              <tbody>
-                {detail.bindings.map((binding) => (
-                  <Tr key={binding.id}>
-                    <NameCell
-                      name={<span className="truncate" title={binding.consumerId}>{binding.consumerType}</span>}
-                      sub={<span className="truncate" title={binding.consumerPath}>{binding.consumerPath || '全体'}</span>}
-                    />
-                    <Td>
-                      <span className="text-ink-secondary">v{binding.versionNumber}</span>
-                      {binding.hasNewerVersion ? <StatusBadge tone="warning" size="compact" className="ml-2">新版あり</StatusBadge> : null}
-                    </Td>
-                    <Td className="text-ink-secondary" title={binding.runningCount === null ? '未取得' : undefined}>{binding.runningCount ?? '—'}</Td>
-                    <Td className="text-ink-secondary" title={binding.waitingCount === null ? '未取得' : undefined}>{binding.waitingCount ?? '—'}</Td>
-                    <ActionCell>
-                      {canManage && binding.hasNewerVersion && published ? (
-                        <button
-                          type="button"
-                          disabled={Boolean(working)}
-                          className="text-action font-semibold hover:underline disabled:opacity-40"
-                          onClick={() => setPendingBindingId(binding.id)}
-                        >
-                          v{published.versionNumber}への変更内容を確認
-                        </button>
-                      ) : <span className="text-ink-faint">{binding.hasNewerVersion ? '編集権限が必要' : '最新版を使用中'}</span>}
-                    </ActionCell>
-                  </Tr>
-                ))}
-              </tbody>
-          </DataTable>
-        )}
       </section>
 
       <Dialog
