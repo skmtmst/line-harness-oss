@@ -104,7 +104,7 @@ export default function MileageAdjustmentDialog({
     if (expiresOn && direction !== 'increase') return '有効期限はマイルを増やすときだけ指定できます'
     if (expiresOn && new Date(`${expiresOn}T23:59:59+09:00`).getTime() <= Date.now()) return '有効期限は明日以降を選んでください'
     if (!policyLoading && !policy?.configured) return '高額調整の承認境界が未設定です。オーナーが先に設定してください。'
-    if (highValue) return `${policy?.approvalThreshold?.toLocaleString('ja-JP')} mile以上は別のオーナー承認が必要です。`
+    if (highValue) return `${policy?.approvalThreshold?.toLocaleString('ja-JP')} マイル以上は別のオーナー承認が必要です。`
     return null
   }, [amount, currentBalance, direction, expiresOn, highValue, policy, policyLoading, reason, sourceReferenceId])
 
@@ -184,7 +184,7 @@ export default function MileageAdjustmentDialog({
           <section className="rounded-control bg-canvas-sunken p-4">
             <p className="text-xs font-semibold text-ink-faint">だれのマイルを動かしますか</p>
             <p className="mt-2 font-bold text-ink">{friendName}</p>
-            <p className="mt-1 text-sm text-ink-secondary">いまの残高 {currentBalance.toLocaleString('ja-JP')} mile</p>
+            <p className="mt-1 text-sm text-ink-secondary">いまの残高 {currentBalance.toLocaleString('ja-JP')} マイル</p>
           </section>
 
           {step === 'input' ? (
@@ -257,9 +257,9 @@ export default function MileageAdjustmentDialog({
             <section aria-label="変更内容の確認" className="space-y-3">
               <h3 className="text-sm font-bold text-ink">この変更で起きること</h3>
               <dl className="overflow-hidden rounded-panel border border-hairline text-sm">
-                <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更前</dt><dd className="font-semibold text-ink">{currentBalance.toLocaleString('ja-JP')} mile</dd></div>
-                <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更量</dt><dd className={delta < 0 ? 'font-bold text-danger' : 'font-bold text-accent'}>{delta > 0 ? '+' : ''}{delta.toLocaleString('ja-JP')} mile</dd></div>
-                <div className="flex justify-between px-4 py-3"><dt className="text-ink-faint">変更後</dt><dd className="font-bold text-ink">{balanceAfter.toLocaleString('ja-JP')} mile</dd></div>
+                <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更前</dt><dd className="font-semibold text-ink">{currentBalance.toLocaleString('ja-JP')} マイル</dd></div>
+                <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更量</dt><dd className={delta < 0 ? 'font-bold text-danger' : 'font-bold text-accent'}>{delta > 0 ? '+' : ''}{delta.toLocaleString('ja-JP')} マイル</dd></div>
+                <div className="flex justify-between px-4 py-3"><dt className="text-ink-faint">変更後</dt><dd className="font-bold text-ink">{balanceAfter.toLocaleString('ja-JP')} マイル</dd></div>
               </dl>
               <dl className="grid gap-2 rounded-control bg-canvas-sunken p-4 text-sm">
                 <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">理由区分</dt><dd className="col-span-2 text-ink">{reasonLabel}</dd></div>

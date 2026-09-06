@@ -173,6 +173,70 @@ describe('api.mileage reward draft contract', () => {
   })
 })
 
+describe('api.mileage V6 admin contract', () => {
+  it('残高・付与ルールを選択中アカウントで読み、下書きを版付きで保存する', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: {} }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+    const draft = {
+      name: '予約で300マイル',
+      eventType: 'booking_created',
+      source: 'booking',
+      amount: 300,
+      initialStatus: 'available' as const,
+      validFrom: null,
+      validUntil: null,
+      expiresAfterDays: 365,
+      cancellationEventTypes: ['booking_cancelled'],
+      targetConditions: null,
+      sortOrder: 1,
+    }
+
+    await api.mileage.friendsV6({ accountId: 'account/1', search: '高橋', limit: 20, offset: 20 })
+    await api.mileage.earningRulesV6({ accountId: 'account/1', limit: 20, offset: 0 })
+    await api.mileage.saveEarningRuleDraft('rule/1', {
+      accountId: 'account/1', expectedVersion: 2, draft,
+    })
+
+    expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
+      'https://worker.example.com/api/mileage/friends?accountId=account%2F1&search=%E9%AB%98%E6%A9%8B&limit=20&offset=20',
+      'https://worker.example.com/api/mileage/earning-rules?accountId=account%2F1&limit=20&offset=0',
+      'https://worker.example.com/api/mileage/earning-rules/rule%2F1/draft',
+    ])
+    expect(fetchSpy.mock.calls[2]?.[1]).toMatchObject({
+      method: 'PATCH',
+      body: JSON.stringify({ accountId: 'account/1', expectedVersion: 2, draft }),
+    })
+  })
+
+  it('手動増減へ期限と自動通知の指定を渡す', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: {} }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await api.mileage.adjust({
+      accountId: 'account-1', friendId: 'friend-1', direction: 'increase', amount: 300,
+      reasonCategory: 'campaign', reason: '来店キャンペーン',
+      expiresAt: '2099-12-31T14:59:59.000Z', notifyFriend: true,
+    }, 'mileage-adjustment-test-1')
+
+    expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({
+      method: 'POST',
+      headers: expect.objectContaining({
+        'Idempotency-Key': 'mileage-adjustment-test-1',
+        'X-Confirm-Irreversible': 'mileage-adjustment',
+      }),
+    })
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body))).toMatchObject({
+      expiresAt: '2099-12-31T14:59:59.000Z', notifyFriend: true,
+    })
+  })
+})
+
 describe('eventsApi.createSlots', () => {
   const slots = Array.from({ length: 900 }, (_, index) => ({
     starts_at: new Date(Date.UTC(2099, 0, 1, 0, index)).toISOString(),
