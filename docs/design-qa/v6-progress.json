@@ -7,8 +7,8 @@
   "elsewhere": 0,
   "missing": 13,
   "match": 60,
-  "structureMatchDataPending": 54,
-  "needsFix": 145,
+  "structureMatchDataPending": 51,
+  "needsFix": 148,
   "unjudged": 3,
   "remaining": 208,
   "features": [
@@ -2312,8 +2312,8 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 1,
-      "structureMatchDataPending": 5,
-      "needsFix": 1,
+      "structureMatchDataPending": 2,
+      "needsFix": 4,
       "unjudged": 0,
       "remaining": 7,
       "capturedAt": [
@@ -2368,6 +2368,21 @@
             "syWp4"
           ],
           "note": "Claudeが直した。使われている場所に何機能からかを添えた。直した本人が比較している"
+        },
+        {
+          "pr": 989,
+          "head": "44e671b2c",
+          "on": "2026-09-06",
+          "screens": [
+            "gief7",
+            "Rv8Jv",
+            "WjYAC",
+            "Vdbv5",
+            "xOpDs",
+            "py5CG",
+            "syWp4"
+          ],
+          "note": "Issue #238。撮影用APIへ18本の通常一覧、見本12件、v4〜v1と利用先5件を接続し、通常・読込中・0件・取得失敗を含む全対象を1440・1920pxで再撮影。設計画像と同じ入力で比較し、一致1・構造一致2・要修正4を実態どおり記録した。"
         }
       ]
     },
