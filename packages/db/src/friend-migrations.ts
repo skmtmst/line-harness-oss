@@ -144,8 +144,7 @@ export async function createUidMigrationRun(
     conflict: items.filter((item) => item.classification === 'conflict').length,
   };
   const status = counts.review + counts.conflict > 0 ? 'review' : 'ready';
-  await db.batch([
-    db.prepare(`INSERT INTO uid_migration_runs (
+  await db.prepare(`INSERT INTO uid_migration_runs (
       id, from_account_id, to_account_id, purpose, source_kind, source_filename,
       source_checksum, status, total_count, auto_count, review_count,
       unmatched_count, conflict_count, created_by, created_at, reviewed_at
@@ -154,8 +153,8 @@ export async function createUidMigrationRun(
       input.sourceFilename ?? null, input.sourceChecksum ?? null, status, items.length,
       counts.auto, counts.review, counts.unmatched, counts.conflict, input.createdBy,
       now, status === 'ready' ? now : null,
-    ),
-    ...items.map((item) => db.prepare(`INSERT INTO uid_migration_items (
+    ).run();
+  const itemStatements = items.map((item) => db.prepare(`INSERT INTO uid_migration_items (
       id, run_id, old_uid, new_uid, old_friend_id, new_friend_id, candidate_name,
       evidence_type, evidence_json, classification, conflict_reason, decision,
       created_at, updated_at
@@ -165,8 +164,17 @@ export async function createUidMigrationRun(
       item.newFriend?.display_name ?? null, item.input.evidenceType,
       JSON.stringify(item.input.evidence ?? {}), item.classification, item.reason,
       item.classification === 'auto' ? 'link' : 'pending', now, now,
-    )),
-  ]);
+    ));
+  try {
+    for (let index = 0; index < itemStatements.length; index += 75) {
+      await db.batch(itemStatements.slice(index, index + 75));
+    }
+  } catch (error) {
+    await db.prepare(`UPDATE uid_migration_runs
+      SET status = 'failed', failure_reason = ? WHERE id = ?`)
+      .bind('対応表を保存できませんでした', runId).run();
+    throw error;
+  }
   return (await getUidMigrationRun(db, runId))!;
 }
 

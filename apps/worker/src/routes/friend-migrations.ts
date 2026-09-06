@@ -295,6 +295,9 @@ friendMigrations.post('/api/friends/exports', requireRole('owner', 'admin'), asy
     if (!accountId || columns.some((column) => !EXPORT_COLUMNS.includes(column))) {
       return c.json({ success: false, error: '対象アカウントと書き出す項目を選んでください' }, 400);
     }
+    if (body.encoding === 'shift_jis') {
+      return c.json({ success: false, error: 'Shift_JIS書き出しはまだ接続されていません。UTF-8を選んでください' }, 422);
+    }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
@@ -324,14 +327,31 @@ friendMigrations.get('/api/friends/exports/:id/download', requireRole('owner', '
     return c.json({ success: false, error: 'Not found' }, 404);
   }
   if (job.expires_at <= new Date().toISOString()) return c.json({ success: false, error: 'ダウンロード期限が切れています' }, 410);
-  const rows = await c.env.DB.prepare(`SELECT line_user_id, display_name, real_name, system_display_name, created_at
-    FROM friends WHERE line_account_id = ? ORDER BY created_at DESC`).bind(job.line_account_id)
-    .all<{ line_user_id: string; display_name: string | null; real_name: string | null; system_display_name: string | null; created_at: string }>();
-  const csv = [
-    ['LINEユーザーID', 'LINE表示名', '本名', 'システム表示名', '登録日'],
-    ...rows.results.map((row) => [row.line_user_id, row.display_name, row.real_name, row.system_display_name, row.created_at]),
-  ].map((row) => row.map((cell) => protectCsvCell(cell)).join(',')).join('\r\n');
-  return new Response(`\uFEFF${csv}`, {
+  type ExportRow = { line_user_id: string; display_name: string | null; real_name: string | null; system_display_name: string | null; created_at: string };
+  const encoder = new TextEncoder();
+  let offset = 0;
+  let started = false;
+  const body = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      if (!started) {
+        controller.enqueue(encoder.encode('\uFEFFLINEユーザーID,LINE表示名,本名,システム表示名,登録日\r\n'));
+        started = true;
+      }
+      const page = await c.env.DB.prepare(`SELECT line_user_id, display_name, real_name, system_display_name, created_at
+        FROM friends WHERE line_account_id = ? ORDER BY created_at DESC, id ASC LIMIT 500 OFFSET ?`)
+        .bind(job.line_account_id, offset).all<ExportRow>();
+      if (page.results.length === 0) {
+        controller.close();
+        return;
+      }
+      const csv = page.results.map((row) => [row.line_user_id, row.display_name, row.real_name, row.system_display_name, row.created_at]
+        .map((cell) => protectCsvCell(cell)).join(',')).join('\r\n') + '\r\n';
+      controller.enqueue(encoder.encode(csv));
+      offset += page.results.length;
+      if (page.results.length < 500) controller.close();
+    },
+  });
+  return new Response(body, {
     headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="friends-${c.req.param('id')}.csv"` },
   });
 });

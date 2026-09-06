@@ -11,25 +11,12 @@ import SelectField from '@/components/shared/select-field'
 import StatusBadge from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import { parseFriendCsv, type FriendImportRow } from './friend-csv'
 
-type ImportRow = { lineUid: string; displayName: string | null; realName: string | null; systemDisplayName: string | null }
 type ImportSummary = { add: number; update: number; unchanged: number; conflict: number; error: number }
 
-export function parseFriendCsv(text: string): ImportRow[] {
-  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.trim())
-  if (lines.length < 2) return []
-  const headers = lines[0].split(',').map((value) => value.trim().replace(/^"|"$/g, ''))
-  const index = (...names: string[]) => headers.findIndex((value) => names.includes(value))
-  const uid = index('LINEユーザーID', 'line_user_id', 'lineUid')
-  if (uid < 0) return []
-  const display = index('LINE表示名', 'display_name', 'displayName')
-  const real = index('本名', 'real_name', 'realName')
-  const system = index('システム表示名', 'system_display_name', 'systemDisplayName')
-  const value = (cells: string[], position: number) => position < 0 ? null : cells[position]?.trim().replace(/^"|"$/g, '') || null
-  return lines.slice(1).map((line) => {
-    const cells = line.split(',')
-    return { lineUid: value(cells, uid) ?? '', displayName: value(cells, display), realName: value(cells, real), systemDisplayName: value(cells, system) }
-  }).filter((row) => row.lineUid)
+const JOB_STATUS_LABELS: Record<string, string> = {
+  completed: '反映ずみ', previewed: '確認まで', expired: '期限切れ', failed: '失敗',
 }
 
 export default function FriendMigrationsPage() {
@@ -41,7 +28,7 @@ export default function FriendMigrationsPage() {
   const [encoding, setEncoding] = useState<'utf-8' | 'shift_jis'>('utf-8')
   const [exportResult, setExportResult] = useState<{ rowCount: number | null; downloadUrl: string } | null>(null)
   const [file, setFile] = useState<File | null>(null)
-  const [rows, setRows] = useState<ImportRow[]>([])
+  const [rows, setRows] = useState<FriendImportRow[]>([])
   const [importId, setImportId] = useState<string | null>(null)
   const [summary, setSummary] = useState<ImportSummary | null>(null)
   const [busy, setBusy] = useState(false)
@@ -131,6 +118,6 @@ export default function FriendMigrationsPage() {
     </div>
     {message && <p role="status" className="bg-action-soft text-action mt-4 rounded-control px-4 py-3 text-sm">{message}</p>}
 
-    <section className="bg-canvas rounded-card border-hairline mt-4 overflow-hidden border"><div className="border-hairline border-b px-4 py-3"><h2 className="text-ink text-sm font-bold">書き出し・取り込みの履歴</h2></div>{jobs.length === 0 ? <ListState kind="empty" title="履歴はまだありません" description="書き出しまたは取り込みを実行すると、ここに残ります。" /> : <table className="w-full"><thead><TableHeadRow><Th>日時</Th><Th>種類</Th><Th>対象</Th><Th>件数</Th><Th>実行した人</Th><Th>状態</Th></TableHeadRow></thead><tbody>{jobs.map((job) => <tr key={`${job.kind}-${job.id}`} className="border-hairline border-t"><td className="px-4 py-3 text-sm">{new Date(job.created_at).toLocaleString('ja-JP')}</td><td className="px-4 py-3 text-sm">{job.kind === 'export' ? '書き出し' : '取り込み'}</td><td className="px-4 py-3 text-sm">{accounts.find((account) => account.id === job.line_account_id)?.name ?? '—'}</td><td className="px-4 py-3 text-sm">{job.row_count ?? job.total_count ?? '—'}件</td><td className="px-4 py-3 text-sm">{job.created_by_name}</td><td className="px-4 py-3"><StatusBadge tone={job.status === 'completed' ? 'success' : 'neutral'}>{job.status === 'completed' ? '反映ずみ' : job.status === 'previewed' ? '確認まで' : job.status}</StatusBadge></td></tr>)}</tbody></table>}</section>
+    <section className="bg-canvas rounded-card border-hairline mt-4 overflow-hidden border"><div className="border-hairline border-b px-4 py-3"><h2 className="text-ink text-sm font-bold">書き出し・取り込みの履歴</h2></div>{jobs.length === 0 ? <ListState kind="empty" title="履歴はまだありません" description="書き出しまたは取り込みを実行すると、ここに残ります。" /> : <table className="w-full"><thead><TableHeadRow><Th>日時</Th><Th>種類</Th><Th>対象</Th><Th>件数</Th><Th>実行した人</Th><Th>状態</Th></TableHeadRow></thead><tbody>{jobs.map((job) => <tr key={`${job.kind}-${job.id}`} className="border-hairline border-t"><td className="px-4 py-3 text-sm">{new Date(job.created_at).toLocaleString('ja-JP')}</td><td className="px-4 py-3 text-sm">{job.kind === 'export' ? '書き出し' : '取り込み'}</td><td className="px-4 py-3 text-sm">{accounts.find((account) => account.id === job.line_account_id)?.name ?? '—'}</td><td className="px-4 py-3 text-sm">{job.row_count ?? job.total_count ?? '—'}件</td><td className="px-4 py-3 text-sm">{job.created_by_name}</td><td className="px-4 py-3"><StatusBadge tone={job.status === 'completed' ? 'success' : 'neutral'}>{JOB_STATUS_LABELS[job.status] ?? '確認中'}</StatusBadge></td></tr>)}</tbody></table>}</section>
   </div>
 }

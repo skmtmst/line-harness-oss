@@ -60,12 +60,13 @@ CREATE TABLE IF NOT EXISTS uid_migration_items (
   after_json TEXT CHECK (after_json IS NULL OR json_valid(after_json)),
   error_message TEXT,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  UNIQUE(run_id, old_uid)
+  updated_at TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_uid_migration_items_run
   ON uid_migration_items(run_id, classification, decision);
+CREATE INDEX IF NOT EXISTS idx_uid_migration_items_old_uid
+  ON uid_migration_items(run_id, old_uid);
 
 CREATE TABLE IF NOT EXISTS friend_export_jobs (
   id TEXT PRIMARY KEY,

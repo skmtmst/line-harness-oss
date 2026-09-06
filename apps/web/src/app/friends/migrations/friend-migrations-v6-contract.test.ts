@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { parseFriendCsv } from './page'
+import { parseFriendCsv } from './friend-csv'
 import { parseUidCsv } from '../../accounts/migration'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -19,6 +19,12 @@ describe('V6 機能3 UID・CSV移行', () => {
   it('Harnessの書き出しCSVを取り込める', () => {
     expect(parseFriendCsv('LINEユーザーID,LINE表示名,本名,システム表示名\nU1,山田,山田 太郎,たろう')).toEqual([
       { lineUid: 'U1', displayName: '山田', realName: '山田 太郎', systemDisplayName: 'たろう' },
+    ])
+  })
+
+  it('引用符内のカンマと二重引用符を保ったまま取り込める', () => {
+    expect(parseFriendCsv('LINEユーザーID,LINE表示名,本名,システム表示名\nU1,"山田,太郎","山田 ""T"" 太郎",たろう')).toEqual([
+      { lineUid: 'U1', displayName: '山田,太郎', realName: '山田 "T" 太郎', systemDisplayName: 'たろう' },
     ])
   })
 
