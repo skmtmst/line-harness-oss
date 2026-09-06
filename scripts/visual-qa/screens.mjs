@@ -2919,9 +2919,9 @@ export const SCREENS = [
       { fill: '警告を出す友だち数', text: '45000' },
       { click: '接続を確かめて保存' },
     ],
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 S0 が第2周で1920px設計と1440/1920px実装を再撮影。構造一致・API契約待ち。** 2幅とも横スクロール0。基本情報、送信用情報、友だち追加/LIFF、接続確認4段、上限、下部操作を常時展開し、右欄にWebhook・Callback・LIFF、つながる先、注意を配置した。現行の作成APIはタイムゾーン・国・役割メモ・親アカウントを同時保存できず、接続確認もCallback/LIFFエンドポイントを返さないため、その欄は登録後または接続後の表示として止めている。**残件**：作成APIと接続確認応答に上記項目を追加し、設計の入力済み・接続確認失敗状態を固定応答で再現する。',
-    verdictSource: 'settings-v6/b2NGxk.txt', verdictHead: '4c5708ace',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 S0 が実API契約へ接続し、1920px設計と1440/1920px実装を再撮影して一致。** タイムゾーン・国・役割メモ・親アカウントを登録内容として送信し、入力済み値と保存前の接続確認失敗を固定応答で再現した。接続確認は設計どおり1・2が「通りました」、3が「直してください」、4が「確かめていません」で止まり、保存しない。右欄にWebhook・Callback・LIFFのURLとコピー操作を表示する。2幅とも横スクロール0、壊れ値0、秘密値の平文表示0。',
+    verdictSource: 'settings-v6/b2NGxk.txt + settings-v6/b2NGxk-{1440,1920}.png', verdictHead: 'b21f830bd',
   },
   {
     node: 'T9rA9', feature: 33, name: '33-3 LINEアカウントの詳細・編集',
