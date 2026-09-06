@@ -68,6 +68,12 @@ export default function RemindersPage() {
   }, [selectedAccountId])
   useEffect(() => { void loadReminders(); void loadFolders() }, [loadReminders, loadFolders])
 
+  /** 一覧の行操作からフォルダを付け替える受け口。 */
+  const handleMoveFolder = async (id: string, folderId: string) => {
+    const response = await api.reminders.update(id, { folderId: folderId || null })
+    if (response.success) await loadReminders()
+  }
+
   const handleDeleteSelected = async () => {
     if (selected.size === 0 || deleting) return
     const targets = [...selected]
