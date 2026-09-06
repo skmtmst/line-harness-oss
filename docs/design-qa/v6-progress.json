@@ -971,6 +971,21 @@
       "remaining": 10,
       "capturedAt": [
         {
+          "pr": 962,
+          "head": "9b8f7451",
+          "on": "2026-09-06",
+          "screens": [
+            "uLQQc",
+            "s9gAx",
+            "W1wzCa",
+            "K0Dbr2",
+            "txMO9",
+            "U3SI5",
+            "Q3qP1r"
+          ],
+          "note": "Issue #211。割当ポート3104/8791で7画面を1440・1920px再撮影し、設計画像または同Nodeの設計本文と再照合。7画面の要修正判定を具体化し、横はみ出し0を確認"
+        },
+        {
           "pr": 431,
           "head": "2ab18c88",
           "on": "2026-08-30",
@@ -1017,6 +1032,25 @@
       "unjudged": 0,
       "remaining": 13,
       "capturedAt": [
+        {
+          "pr": 962,
+          "head": "9b8f7451",
+          "on": "2026-09-06",
+          "screens": [
+            "ZC13r",
+            "PV1Vh",
+            "d3rFGD",
+            "Ho8z4",
+            "Xjk8q",
+            "GB0NR",
+            "D6yO7e",
+            "Q8sHa",
+            "yxyzQ",
+            "LKuAQ",
+            "zCQXe"
+          ],
+          "note": "Issue #211。割当ポート3104/8791で11画面を1440・1920px撮影し、設計画像または同Nodeの設計本文と照合。11画面を要修正と判定し、横はみ出し0を確認"
+        },
         {
           "pr": 917,
           "head": "c5e1095e",
