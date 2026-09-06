@@ -2,14 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
+  Folder,
   MediaDeleteImpact,
   MediaDeleteImpactReference,
   MediaItem,
-  MediaUsage,
 } from '@line-crm/shared'
 import { LayoutGrid, List as ListIcon } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
-import Button from '@/components/shared/button'
+import Button from './media-button'
 import Dialog from '@/components/shared/dialog'
 import {
   blockedReason,
@@ -20,14 +20,17 @@ import {
   referenceNameText,
   usageText,
 } from './media-delete-impact'
-import { mediaUsageKindText } from './media-usage-display'
 import Pagination from '@/components/shared/pagination'
 import FilterChip from '@/components/shared/filter-chip'
+import FolderPanel from '@/components/shared/folder-panel'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import { useAccount } from '@/contexts/account-context'
+import MediaDetailDialog from './media-detail-dialog'
+import MediaReplacementDialog from './media-replacement-dialog'
+import MediaUploadDialog from './media-upload-dialog'
 
 /**
  * 登録メディア一覧。
@@ -42,6 +45,7 @@ import { useAccount } from '@/contexts/account-context'
  */
 
 type MediaSort = 'newest' | 'oldest' | 'name' | 'size' | 'usage'
+const UNGROUPED = '__ungrouped__'
 
 const SORT_OPTIONS: Array<{ value: MediaSort; label: string }> = [
   { value: 'newest', label: '入れた日が新しい順' },
@@ -66,22 +70,6 @@ const KINDS: Array<{ key: MediaItem['kind']; label: string }> = [
   { key: 'audio', label: '音声' },
   { key: 'video', label: '動画' },
   { key: 'file', label: 'PDF' },
-]
-
-/**
- * 受け付ける形式と上限。
- *
- * 数字は実装の実際の制限（worker の ALLOWED）に合わせる。設計は動画200MB・
- * PDF10MBだが、いまの実装は90MB・20MB。設計の数字を書くと、通らない
- * ファイルを「通る」と言うことになる。
- */
-const LIMITS: Array<{ label: string; note: string }> = [
-  { label: '画像', note: '10MBまで、jpg・png・gif・webp画像のみ可' },
-  { label: '音声', note: '30MBまで、mp3・m4a音声のみ可' },
-  { label: '動画', note: '90MBまで、mp4動画のみ可' },
-  // 設計 `eXAJP` は PDF に「LINEでは直接送れないので、リンクとして使います」と
-  // 添えている。これが無いと、PDFを入れたのに配信で選べない理由が分からない。
-  { label: 'PDF', note: '20MBまで。LINEでは直接送れないので、リンクとして使います' },
 ]
 
 function formatSize(bytes: number): string {
@@ -119,8 +107,13 @@ export default function MediaLibraryPage() {
   const [loading, setLoading] = useState(true)
   const [loadFailed, setLoadFailed] = useState(false)
   const [error, setError] = useState('')
-  const [uploading, setUploading] = useState(false)
-  const [dragOver, setDragOver] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
+  const [folders, setFolders] = useState<Folder[]>([])
+  const [folderFilter, setFolderFilter] = useState('')
+  const [addingFolder, setAddingFolder] = useState(false)
+  const [folderName, setFolderName] = useState('')
+  const [savingFolder, setSavingFolder] = useState(false)
+  const [uploadOpen, setUploadOpen] = useState(false)
 
   const [kinds, setKinds] = useState<Set<MediaItem['kind']>>(
     () => new Set(KINDS.map((k) => k.key)),
@@ -134,7 +127,8 @@ export default function MediaLibraryPage() {
 
   /** 名前を直している札。null なら誰も直していない。 */
   const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null)
-  const [usagesFor, setUsagesFor] = useState<{ id: string; items: MediaUsage[] } | null>(null)
+  const [detailsFor, setDetailsFor] = useState<MediaItem | null>(null)
+  const [replacementFor, setReplacementFor] = useState<MediaItem | null>(null)
   /*
     1件ずつの削除確認（設計 `YfTfJ`）。**窓を開けてから読む。**
     一覧を出すたびに全件ぶん読むと、消さない人にも7種類の走査が走る。
@@ -163,8 +157,6 @@ export default function MediaLibraryPage() {
   const [bulkBusy, setBulkBusy] = useState(false)
   /** 大きく出している札。押した札の中身を原寸で見せる。 */
   const [preview, setPreview] = useState<MediaItem | null>(null)
-
-  const fileInput = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     /*
@@ -198,9 +190,13 @@ export default function MediaLibraryPage() {
     setLoadFailed(false)
     setError('')
     try {
-      const res = await api.media.list(accountAtRequest)
+      const [res, folderResponse] = await Promise.all([
+        api.media.list(accountAtRequest),
+        api.folders.list('media'),
+      ])
       if (accountAtRequest !== latestAccountRef.current) return
       if (res.success) setItems(res.data)
+      if (folderResponse.success) setFolders(folderResponse.data)
     } catch {
       if (accountAtRequest === latestAccountRef.current) setLoadFailed(true)
     } finally {
@@ -211,48 +207,12 @@ export default function MediaLibraryPage() {
   useEffect(() => {
     if (accountLoading) return
     setSelected(new Set())
-    setUsagesFor(null)
+    setDetailsFor(null)
+    setReplacementFor(null)
     setPreview(null)
     setPage(1)
     void load()
   }, [accountLoading, load])
-
-  const upload = async (files: File[]) => {
-    if (files.length === 0 || !selectedAccountId) return
-    const accountAtRequest = selectedAccountId
-    setUploading(true)
-    setError('')
-    try {
-      for (const file of files) {
-        // FileReader の結果は data: URL。サーバー側がその形も受け付ける。
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader()
-          reader.onload = () => resolve(String(reader.result))
-          reader.onerror = () => reject(new Error('読み取りに失敗しました'))
-          reader.readAsDataURL(file)
-        })
-        const res = await api.media.upload({
-          accountId: accountAtRequest,
-          filename: file.name,
-          mimeType: file.type,
-          data: dataUrl,
-        })
-        if (accountAtRequest !== latestAccountRef.current) return
-        if (!res.success) {
-          // 1枚でも弾かれたら、そこで止めて理由を出す。残りを黙って
-          // 上げ続けると、どれが通ってどれが落ちたか分からなくなる。
-          setError(`${file.name}: ${res.error}`)
-          break
-        }
-      }
-      void load()
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'アップロードに失敗しました')
-    } finally {
-      setUploading(false)
-      if (fileInput.current) fileInput.current.value = ''
-    }
-  }
 
   const rename = async () => {
     if (!renaming || !selectedAccountId) return
@@ -274,20 +234,22 @@ export default function MediaLibraryPage() {
     }
   }
 
-  const showUsages = async (item: MediaItem) => {
-    if (!selectedAccountId) return
-    const accountAtRequest = selectedAccountId
+  async function addFolder() {
+    const name = folderName.trim()
+    if (!name || savingFolder) return
+    setSavingFolder(true)
     setError('')
-    if (usagesFor?.id === item.id) {
-      setUsagesFor(null)
-      return
-    }
     try {
-      const res = await api.media.usages(item.id, accountAtRequest)
-      if (accountAtRequest !== latestAccountRef.current) return
-      if (res.success) setUsagesFor({ id: item.id, items: res.data })
-    } catch {
-      setError('使用箇所の読み込みに失敗しました')
+      const response = await api.folders.create({ kind: 'media', name })
+      if (!response.success) throw new Error(response.error)
+      setFolders((current) => [...current, response.data])
+      setFolderFilter(response.data.id)
+      setFolderName('')
+      setAddingFolder(false)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'フォルダを追加できませんでした')
+    } finally {
+      setSavingFolder(false)
     }
   }
 
@@ -445,6 +407,7 @@ export default function MediaLibraryPage() {
     const next = items.filter(
       (item) =>
         kinds.has(item.kind) &&
+        (!folderFilter || (folderFilter === UNGROUPED ? item.folderId === null : item.folderId === folderFilter)) &&
         (!showUnusedOnly || item.usageCount === 0) &&
         (!needle || item.filename.toLowerCase().includes(needle)),
     )
@@ -459,7 +422,7 @@ export default function MediaLibraryPage() {
       }
       return right.createdAt.localeCompare(left.createdAt)
     })
-  }, [items, kinds, query, showUnusedOnly, sort])
+  }, [folderFilter, items, kinds, query, showUnusedOnly, sort])
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
   const current = useMemo(
@@ -484,84 +447,68 @@ export default function MediaLibraryPage() {
       {error && (
         <Notice tone="error" message={error} onClose={() => setError('')} className="mb-4" />
       )}
+      {successMessage && (
+        <Notice tone="success" message={successMessage} onClose={() => setSuccessMessage('')} className="mb-4" />
+      )}
 
-      {/* ドロップ枠と、受け付ける形式の表。Lステップと同じく左右に並べる。 */}
-      <div
-        onDragOver={(e) => {
-          e.preventDefault()
-          setDragOver(true)
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => {
-          e.preventDefault()
-          setDragOver(false)
-          void upload([...e.dataTransfer.files])
-        }}
-        className={`rounded-card mb-4 grid gap-6 border border-dashed p-6 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] ${
-          dragOver ? 'border-accent bg-accent-soft' : 'border-hairline bg-canvas'
-        }`}
-      >
-        <div className="flex flex-col items-center justify-center gap-2 text-center">
-          <p className="text-ink text-sm font-semibold">ここにファイルをドロップ</p>
-          <p className="text-ink-faint text-xs">または</p>
-          <input
-            ref={fileInput}
-            type="file"
-            multiple
-            accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,audio/mpeg,audio/mp4,application/pdf"
-            onChange={(e) => void upload([...(e.target.files ?? [])])}
-            className="hidden"
-            id="media-upload"
-          />
-          {/* 設計 `g89Tc` の「アップロード」: 高さ40・角丸8・左右14・13px/700。 */}
-          <label
-            htmlFor="media-upload"
-            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control inline-flex h-10 cursor-pointer items-center px-3.5 text-label font-bold transition-colors"
-          >
-            {uploading ? 'アップロード中...' : 'ファイルを選択する'}
-          </label>
-          <p className="text-danger text-xs leading-relaxed">
-            ※ 公開リンクが作られるため、個人情報の取り扱いに注意してください
-          </p>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" onClick={() => setAddingFolder(true)}>フォルダを追加</Button>
+          <Button type="button" variant="primary" onClick={() => setUploadOpen(true)}>ファイルを入れる</Button>
+        </div>
+        <div className="text-right">
+          <p className="text-ink-secondary text-nano font-semibold">使っている容量 <span className="text-ink ml-1">—</span></p>
+          <p className="text-ink-faint text-xs">容量集計APIが接続されると、使用量と上限を表示します。</p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+        <div className="lg:w-[16rem]">
+        <FolderPanel
+          total={`${folders.length + 1}`}
+          activeId={folderFilter}
+          onSelect={(id) => {
+            setFolderFilter(id)
+            setPage(1)
+          }}
+          rows={[
+            { id: '', label: 'すべて', count: items.length },
+            ...folders.map((folder) => ({
+              id: folder.id,
+              label: folder.name,
+              count: items.filter((item) => item.folderId === folder.id).length,
+              color: folder.color,
+            })),
+            { id: UNGROUPED, label: '未分類', count: items.filter((item) => item.folderId === null).length },
+          ]}
+        >
+          {addingFolder ? (
+            <div className="space-y-2">
+              <input
+                type="text"
+                autoFocus
+                value={folderName}
+                onChange={(event) => setFolderName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') void addFolder()
+                  if (event.key === 'Escape') setAddingFolder(false)
+                }}
+                placeholder="フォルダ名を入力"
+                aria-label="フォルダ名"
+                className="border-hairline rounded-control focus:ring-accent w-full border px-2 py-1.5 text-sm focus:ring-2 focus:outline-none"
+              />
+              <div className="flex justify-end gap-2">
+                <Button type="button" onClick={() => setAddingFolder(false)}>キャンセル</Button>
+                <Button type="button" variant="primary" onClick={() => void addFolder()} disabled={!folderName.trim() || savingFolder}>追加する</Button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-ink-faint text-xs leading-5">フォルダを消しても、中のメディアは未分類に残ります。</p>
+          )}
+        </FolderPanel>
         </div>
 
-        {/*
-          **上限には見出しを付ける。**
-          設計 `eXAJP` は「LINEで送れる大きさ（超えると入れられません）」と書く。
-          数字だけ並んでいると、目安なのか超えたら弾かれるのかが読めない。
-          ただし言い方は設計そのままにしない。ここの数字は LINE の上限ではなく
-          **この仕組みの上限**なので（上の注釈のとおり）、「LINEで送れる」は嘘になる。
-        */}
-        <h4 className="text-ink mt-4 mb-1 text-xs font-bold">入れられる大きさ（超えると入れられません）</h4>
-        <dl className="text-xs">
-          {LIMITS.map((limit) => (
-            <div key={limit.label} className="flex gap-4 py-1">
-              <dt className="text-ink-secondary w-24 shrink-0 font-medium">{limit.label}</dt>
-              <dd className="text-ink-faint">{limit.note}</dd>
-            </div>
-          ))}
-          <div className="flex gap-4 py-1">
-            <dt className="text-ink-secondary w-24 shrink-0 font-medium">形式の確認</dt>
-            <dd className="text-ink-faint">
-              中身の形式とファイル名の拡張子が食い違うものは保存できません
-            </dd>
-          </div>
-        </dl>
-      </div>
-
-      {/*
-        **容量バーは作らない。**
-        設計には使用量のバー（220×5）と実績（53×5）が描いてあるが、
-        いまの `/api/media` はアカウントごとの保存容量も上限も返さない。
-        作り物の帯を出すと、空いているように見えてしまう。
-      */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="text-ink-secondary text-nano font-semibold">保存容量</span>
-        <span className="text-ink-faint text-caption font-bold tabular-nums">—</span>
-        <span className="text-ink-faint text-caption">
-          まだ繋がっていません。保存容量が接続されると表示されます。
-        </span>
-      </div>
+        <div className="min-w-0">
 
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <SearchField
@@ -626,50 +573,60 @@ export default function MediaLibraryPage() {
 
       {/* 種別と使用状態。選ぶと必ず1ページ目へ戻る。 */}
       <div className="mb-3 flex flex-wrap items-center gap-3">
+        <FilterChip
+          selected={kinds.size === KINDS.length && !showUnusedOnly}
+          onChange={() => {
+            setKinds(new Set(KINDS.map((kind) => kind.key)))
+            setShowUnusedOnly(false)
+            setPage(1)
+          }}
+        >
+          すべて
+        </FilterChip>
         {KINDS.map((kind) => (
-          <label key={kind.key} className="text-ink-secondary flex items-center gap-1.5 text-sm">
-            <input
-              type="checkbox"
-              checked={kinds.has(kind.key)}
-              onChange={() => {
-                setPage(1)
-                setKinds((prev) => {
-                  const next = new Set(prev)
-                  if (next.has(kind.key)) next.delete(kind.key)
-                  else next.add(kind.key)
-                  return next
-                })
-              }}
-              className="accent-green-500"
-            />
+          <FilterChip
+            key={kind.key}
+            selected={kinds.size === 1 && kinds.has(kind.key)}
+            onChange={() => {
+              setKinds(new Set([kind.key]))
+              setShowUnusedOnly(false)
+              setPage(1)
+            }}
+          >
             {kind.label}
-          </label>
+          </FilterChip>
         ))}
         <FilterChip
           selected={showUnusedOnly}
           onChange={(selectedValue) => {
             setShowUnusedOnly(selectedValue)
+            if (selectedValue) setKinds(new Set(KINDS.map((kind) => kind.key)))
             setPage(1)
           }}
         >
           使っていない
         </FilterChip>
+        <span className="text-ink-faint text-xs" title="容量集計APIが未接続のため絞り込めません">
+          上限に近い：—（容量未接続）
+        </span>
       </div>
 
+      <div data-design-node="h8pBZr">
       {loading ? (
-        <ListState kind="loading" title="メディアを読み込んでいます" />
+        <ListState kind="loading" title="読み込んでいます" description="このまま少しお待ちください。" />
       ) : loadFailed ? (
         <ListState
           kind="error"
-          title="メディアを表示できませんでした"
-          description="再読み込みしても直らない場合は、エラー報告へ連絡してください。"
-          action={<Button variant="secondary" onClick={() => void load()}>登録メディアを再読み込み</Button>}
+          title="表示できませんでした"
+          description="再読み込みしても直らないときは、エラー報告へお知らせください。"
+          action={<Button variant="secondary" onClick={() => void load()}>もう一度読み込む</Button>}
         />
       ) : current.length === 0 ? (
         <ListState
           kind="empty"
-          title={items.length === 0 ? '登録メディアはまだありません' : '条件に合うメディアはありません'}
-          description={items.length === 0 ? '上の枠へファイルを入れると、配信や公開画面で使えます。' : '種類または検索条件を変えてください。'}
+          title={items.length === 0 ? 'まだメディアがありません' : '条件に合うメディアはありません'}
+          description={items.length === 0 ? '配信で使う画像・動画・音声・ファイルの置き場です。' : '種類、フォルダ、または検索条件を変えてください。'}
+          action={items.length === 0 ? <Button variant="primary" onClick={() => setUploadOpen(true)}>メディアを登録</Button> : undefined}
         />
       ) : (
         <div
@@ -790,7 +747,7 @@ export default function MediaLibraryPage() {
 
                 <div className="mt-auto flex items-center justify-end gap-1 pt-1">
                   <button
-                    onClick={() => void showUsages(item)}
+                    onClick={() => setDetailsFor(item)}
                     title="使用箇所を見る"
                     aria-label={`${item.filename}の使用箇所`}
                     className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-[11px]"
@@ -812,7 +769,7 @@ export default function MediaLibraryPage() {
                     aria-label={`${item.filename}をダウンロード`}
                     className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-[11px]"
                   >
-                    保存
+                    ダウンロード
                   </a>
                   <Button
                     type="button"
@@ -824,30 +781,12 @@ export default function MediaLibraryPage() {
                   </Button>
                 </div>
 
-                {usagesFor?.id === item.id && (
-                  <div className="border-hairline mt-1 border-t pt-1">
-                    {usagesFor.items.length === 0 ? (
-                      <p className="text-ink-faint text-micro">
-                        どこでも使われていません。
-                        <br />
-                        （本文の走査が済んだ時点の情報です）
-                      </p>
-                    ) : (
-                      <ul className="space-y-0.5">
-                        {usagesFor.items.map((u) => (
-                          <li key={`${u.refKind}-${u.refId}`} className="text-ink-secondary text-[11px]">
-                            {mediaUsageKindText(u.refKind)}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
           ))}
         </div>
       )}
+      </div>
 
       {/*
         1件ずつの削除確認（設計 `YfTfJ`）。**消せないときは「削除しますか？」と
@@ -873,6 +812,20 @@ export default function MediaLibraryPage() {
               <Button type="button" onClick={closeDeleteDialog} disabled={deleteBusy}>
                 閉じる
               </Button>
+              {deleting && impact && impact.usageCount > 0 ? (
+                <Button
+                  type="button"
+                  variant="primary"
+                  disabled={deleteBusy}
+                  onClick={() => {
+                    const source = deleting
+                    closeDeleteDialog()
+                    setReplacementFor(source)
+                  }}
+                >
+                  別のメディアに差し替える
+                </Button>
+              ) : null}
               {/* 消せないときは押し口ごと出さない。押せるように見えて何も起きない形にしない。 */}
               {canDeleteMedia({ impact, busy: deleteBusy }) ? (
                 <Button type="button" variant="primary" onClick={() => void confirmDeleteOne()}>
@@ -922,12 +875,8 @@ export default function MediaLibraryPage() {
               </div>
             ) : null}
 
-            {/*
-              設計は「別の画像に差し替える」も出すが、**差し替える口がまだ無い。**
-              押しても何も起きない操作は置かず、いまできることだけを書く。
-            */}
             <p className="text-ink-faint text-micro leading-5">
-              使われている場所から外すと削除できます。まとめて差し替える操作は、まだ用意していません。
+              使われている場所から外すと削除できます。別のメディアを選ぶと、使用先をまとめて差し替えられます。
               <br />
               {checkedAtText(impact.checkedAt)} 時点で、テンプレート・一斉配信・リッチメニュー・シナリオ・コラム・イベント・ウェビナーの7種類を確認しました。
             </p>
@@ -997,6 +946,43 @@ export default function MediaLibraryPage() {
           </button>
         </div>
       </div>
+        </div>
+      </div>
+
+      <MediaUploadDialog
+        open={uploadOpen}
+        accountId={selectedAccountId}
+        folders={folders}
+        initialFolderId={folderFilter}
+        onClose={() => setUploadOpen(false)}
+        onComplete={() => {
+          setSuccessMessage('登録できたメディアを一覧へ反映しました。')
+          void load()
+        }}
+      />
+
+      <MediaDetailDialog
+        item={detailsFor}
+        accountId={selectedAccountId}
+        folderName={detailsFor?.folderId ? folders.find((folder) => folder.id === detailsFor.folderId)?.name ?? '—（未取得）' : '未分類'}
+        onClose={() => setDetailsFor(null)}
+        onOpenReplacement={(item) => {
+          setDetailsFor(null)
+          setReplacementFor(item)
+        }}
+      />
+
+      <MediaReplacementDialog
+        source={replacementFor}
+        items={items}
+        accountId={selectedAccountId}
+        onClose={() => setReplacementFor(null)}
+        onComplete={(message) => {
+          setReplacementFor(null)
+          setSuccessMessage(message)
+          void load()
+        }}
+      />
 
       {preview && (
         <div

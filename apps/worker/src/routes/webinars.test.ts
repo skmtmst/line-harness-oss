@@ -8,7 +8,9 @@ const dbMocks = {
   getWebinarBySlug: vi.fn(),
   createWebinar: vi.fn(),
   updateWebinar: vi.fn(),
-  deleteWebinar: vi.fn(),
+  archiveWebinar: vi.fn(),
+  getWebinarActions: vi.fn(),
+  replaceWebinarActions: vi.fn(),
   getWebinarComments: vi.fn(),
   getWebinarCtas: vi.fn(),
   replaceWebinarCtas: vi.fn(),
@@ -133,6 +135,8 @@ beforeEach(() => {
   dbMocks.getWebinarOverview.mockResolvedValue({
     state: 'partial', registrationMode: 'people', metrics: {},
   });
+  dbMocks.getWebinarActions.mockResolvedValue([]);
+  dbMocks.replaceWebinarActions.mockResolvedValue([]);
   dbMocks.getWebinarComments.mockResolvedValue([
     { id: 'c1', webinar_id: 'w1', at_seconds: 10, author_name: '田中', body: '楽しみ!', created_at: 'x' },
   ]);
@@ -222,6 +226,7 @@ describe('admin webinar tenant scope', () => {
     env.DB = originalDb;
     expect(res.status).toBe(200);
     expect(String(prepare.mock.calls[0]?.[0])).toContain('account_id IN (?)');
+    expect(String(prepare.mock.calls[0]?.[0])).toContain("status <> 'archived'");
     expect(bind).toHaveBeenCalledWith('account-a');
     expect((await res.json() as { data: unknown[] }).data).toHaveLength(1);
   });
@@ -259,6 +264,10 @@ describe('admin webinar tenant scope', () => {
     ['GET', '/api/webinars/w-other/notifications'],
     ['PUT', '/api/webinars/w-other/notifications'],
     ['POST', '/api/webinars/w-other/notifications/test'],
+    ['GET', '/api/webinars/w-other/actions'],
+    ['PUT', '/api/webinars/w-other/actions'],
+    ['POST', '/api/webinars/w-other/archive'],
+    ['GET', '/api/webinars/w-other/participants.csv'],
   ])('%s %s は別統括のウェビナーを404にする', async (method, path) => {
     dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ id: 'w-other', account_id: 'account-b' }));
     accountAccessMock.canAccessAllLineAccounts.mockResolvedValue(false);
@@ -1231,11 +1240,83 @@ describe('admin CRUD', () => {
     });
   });
 
-  test('DELETE /api/webinars/:id', async () => {
-    dbMocks.getWebinarById.mockResolvedValue(makeWebinar());
+  test('POST /api/webinars/:id/archive は履歴を消さずアーカイブする', async () => {
+    const archived = makeWebinar({ status: 'archived' });
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ status: 'draft' }));
+    dbMocks.archiveWebinar.mockResolvedValue(archived);
+    const res = await adminReq('/api/webinars/w1/archive', { method: 'POST' });
+    expect(res.status).toBe(200);
+    expect(dbMocks.archiveWebinar).toHaveBeenCalledWith(expect.anything(), 'w1');
+    await expect(res.json()).resolves.toMatchObject({ data: { status: 'archived' } });
+  });
+
+  test('公開中は停止前にアーカイブできない', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ status: 'active' }));
+    const res = await adminReq('/api/webinars/w1/archive', { method: 'POST' });
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ error: 'webinar_pause_required' });
+    expect(dbMocks.archiveWebinar).not.toHaveBeenCalled();
+  });
+
+  test('旧DELETE経路も物理削除せずアーカイブする', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ status: 'draft' }));
+    dbMocks.archiveWebinar.mockResolvedValue(makeWebinar({ status: 'archived' }));
     const res = await adminReq('/api/webinars/w1', { method: 'DELETE' });
     expect(res.status).toBe(200);
-    expect(dbMocks.deleteWebinar).toHaveBeenCalledWith(expect.anything(), 'w1');
+    expect(dbMocks.archiveWebinar).toHaveBeenCalledWith(expect.anything(), 'w1');
+  });
+
+  test('視聴後アクションを共通アクション名で保存する', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ status: 'draft' }));
+    dbMocks.replaceWebinarActions.mockResolvedValue([{
+      id: 'action-1', webinar_id: 'w1', trigger: 'completed', action_type: 'add_tag',
+      config_json: '{"tagId":"tag-1"}', position: 0, version: 2, enabled: 1,
+      created_at: 'x', updated_at: 'x',
+    }]);
+    const res = await adminReq('/api/webinars/w1/actions', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actions: [{ trigger: 'completed', actionType: 'add_tag', config: { tagId: 'tag-1' } }] }),
+    });
+    expect(res.status).toBe(200);
+    expect(dbMocks.replaceWebinarActions).toHaveBeenCalledWith(expect.anything(), 'w1', [{
+      trigger: 'completed', actionType: 'add_tag', config: { tagId: 'tag-1' },
+    }]);
+    await expect(res.json()).resolves.toMatchObject({ data: [{ actionType: 'add_tag', version: 2 }] });
+  });
+
+  test('未知の視聴後アクションは保存しない', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ status: 'draft' }));
+    const res = await adminReq('/api/webinars/w1/actions', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actions: [{ trigger: 'completed', actionType: 'run_sql', config: {} }] }),
+    });
+    expect(res.status).toBe(400);
+    expect(dbMocks.replaceWebinarActions).not.toHaveBeenCalled();
+  });
+
+  test('視聴後アクションは参照先IDが空の設定を拒否する', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ status: 'draft' }));
+    const res = await adminReq('/api/webinars/w1/actions', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        actions: [{ trigger: 'completed', actionType: 'add_tag', config: { tagId: '  ' } }],
+      }),
+    });
+    expect(res.status).toBe(400);
+    expect(dbMocks.replaceWebinarActions).not.toHaveBeenCalled();
+  });
+
+  test('参加者CSVは個人データを式として実行させず書き出す', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar());
+    dbMocks.getWebinarParticipantStats.mockResolvedValue([{
+      friend_id: 'friend-1', friend_name: '=HYPERLINK("https://bad.example")', picture_url: null,
+      sessions: 1, first_joined_at: '2026-09-06T10:00:00+09:00', latest_joined_at: '2026-09-06T10:30:00+09:00',
+      max_watched_seconds: 1800, cta_clicked_at: null, registered: 1, form_submitted_at: null,
+    }]);
+    const res = await adminReq('/api/webinars/w1/participants.csv');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toContain('text/csv');
+    expect(await res.text()).toContain("'=HYPERLINK")
   });
 
   test('PUT /api/webinars/:id — 空 title は 400 で updateWebinar が呼ばれない', async () => {

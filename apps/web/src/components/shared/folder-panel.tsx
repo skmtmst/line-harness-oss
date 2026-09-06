@@ -1,6 +1,6 @@
 'use client'
 
-import { type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 
 /**
  * 一覧の左に置くフォルダの縦パネル。
@@ -47,6 +47,8 @@ export interface FolderPanelRow {
    * ここで「テンプレート」と書くと、ほかの画面で嘘になる。
    */
   deleteNote?: string
+  /** 画像確認で、この行の操作メニューを開くための実Node。 */
+  qaOpen?: string
 }
 
 export default function FolderPanel({
@@ -64,104 +66,124 @@ export default function FolderPanel({
   /** 下に足すもの（分類の追加など）。 */
   children?: ReactNode
 }) {
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const runAction = (action: (() => void) | undefined) => {
+    setOpenMenuId(null)
+    action?.()
+  }
+
   return (
     // **読み上げ名を持つ。** 帯が何の分類かを、見出しの外からも辿れるように。
-    <aside aria-label="フォルダ" className="bg-canvas rounded-card border-hairline h-fit overflow-hidden border">
+    <aside aria-label="フォルダ" className="bg-canvas rounded-card border-hairline h-fit overflow-visible border">
       <div className="border-hairline flex items-center justify-between border-b px-4 py-3">
         <p className="text-ink text-sm font-semibold">フォルダ</p>
         <span className="text-ink-faint text-xs tabular-nums">{total}</span>
       </div>
       <nav className="p-2">
-        {rows.map((row) => (
-          <div key={row.id} className="group flex items-center">
-            <button
-              onClick={() => onSelect(row.id)}
-              className={`rounded-control flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
-                activeId === row.id
-                  ? 'bg-accent-soft text-accent font-medium'
-                  : 'text-ink-secondary hover:bg-canvas-sunken'
-              }`}
-            >
-              {/* 色が付いているフォルダは丸で出す。フォルダの形を塗ると、
-                  色が面で乗って名前より目立ってしまう。 */}
-              {row.color ? (
-                <span
-                  className="rounded-pill h-3 w-3 shrink-0"
-                  style={{ backgroundColor: row.color }}
-                  aria-hidden="true"
-                />
-              ) : (
-                <svg
-                  className="h-4 w-4 shrink-0"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.8}
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"
+        {rows.map((row) => {
+          const hasActions = Boolean(row.onEdit || row.onMoveUp || row.onMoveDown || row.onDelete)
+
+          return (
+            <div key={row.id} className="group relative flex items-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenMenuId(null)
+                  onSelect(row.id)
+                }}
+                className={`rounded-control flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                  activeId === row.id
+                    ? 'bg-accent-soft text-accent font-medium'
+                    : 'text-ink-secondary hover:bg-canvas-sunken'
+                }`}
+              >
+                {/* 色が付いているフォルダは丸で出す。フォルダの形を塗ると、
+                    色が面で乗って名前より目立ってしまう。 */}
+                {row.color ? (
+                  <span
+                    className="rounded-pill h-3 w-3 shrink-0"
+                    style={{ backgroundColor: row.color }}
+                    aria-hidden="true"
                   />
-                </svg>
+                ) : (
+                  <svg
+                    className="h-4 w-4 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.8}
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"
+                    />
+                  </svg>
+                )}
+                <span className="min-w-0 flex-1 truncate">{row.label}</span>
+                <span className="text-ink-faint shrink-0 text-xs tabular-nums">{row.count}</span>
+              </button>
+              {/* 操作は設計どおり1つの「…」へまとめる。行に5個の小さな口を
+                  並べると、選択との押し間違いが増え、短い名前も狭くなる。 */}
+              {hasActions && (
+                <div
+                  className="relative shrink-0"
+                  onBlur={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget)) setOpenMenuId(null)
+                  }}
+                >
+                  <button
+                    type="button"
+                    data-qa-open={row.qaOpen}
+                    onClick={() => setOpenMenuId((current) => (current === row.id ? null : row.id))}
+                    aria-label={`フォルダ「${row.label}」の操作`}
+                    aria-haspopup="menu"
+                    aria-expanded={openMenuId === row.id}
+                    title={`フォルダ「${row.label}」の操作`}
+                    className="text-ink-faint hover:bg-canvas-sunken hover:text-accent rounded-control min-h-8 min-w-8 text-lg leading-none opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+                  >
+                    …
+                  </button>
+                  {openMenuId === row.id && (
+                    <div
+                      role="menu"
+                      aria-label={`フォルダ「${row.label}」の操作`}
+                      className="bg-canvas border-hairline rounded-card absolute top-full right-0 z-30 mt-1 w-52 border p-1.5 shadow-lg"
+                    >
+                      {row.onEdit && (
+                        <>
+                          <button type="button" role="menuitem" onClick={() => runAction(row.onEdit)} className="text-ink-secondary hover:bg-canvas-sunken rounded-control block w-full px-3 py-2 text-left text-sm">
+                            名前を変更
+                          </button>
+                          <button type="button" role="menuitem" onClick={() => runAction(row.onEdit)} className="text-ink-secondary hover:bg-canvas-sunken rounded-control block w-full px-3 py-2 text-left text-sm">
+                            色を変える
+                          </button>
+                        </>
+                      )}
+                      {/* 端の行にはコールバックが渡らないため、押せない項目も出ない。 */}
+                      {row.onMoveUp && (
+                        <button type="button" role="menuitem" onClick={() => runAction(row.onMoveUp)} className="text-ink-secondary hover:bg-canvas-sunken rounded-control block w-full px-3 py-2 text-left text-sm">
+                          並び順を上へ
+                        </button>
+                      )}
+                      {row.onMoveDown && (
+                        <button type="button" role="menuitem" onClick={() => runAction(row.onMoveDown)} className="text-ink-secondary hover:bg-canvas-sunken rounded-control block w-full px-3 py-2 text-left text-sm">
+                          並び順を下へ
+                        </button>
+                      )}
+                      {row.onDelete && (
+                        <button type="button" role="menuitem" onClick={() => runAction(row.onDelete)} title={row.deleteNote ?? 'フォルダを削除'} className="text-danger hover:bg-danger-bg rounded-control block w-full px-3 py-2 text-left text-sm">
+                          フォルダを削除
+                        </button>
+                      )}
+                      {row.deleteNote && <p className="text-ink-faint border-hairline mt-1 border-t px-3 pt-2 text-xs leading-relaxed">{row.deleteNote}</p>}
+                    </div>
+                  )}
+                </div>
               )}
-              <span className="min-w-0 flex-1 truncate">{row.label}</span>
-              <span className="text-ink-faint shrink-0 text-xs tabular-nums">{row.count}</span>
-            </button>
-            {/* 直す入口は行にカーソルを置いたときだけ。常に出していると、
-                選ぶつもりで押し間違える。 */}
-            {row.onEdit && (
-              <button
-                onClick={row.onEdit}
-                aria-label={`フォルダ「${row.label}」を編集`}
-                title={`フォルダ「${row.label}」の名前と色を変える`}
-                className="text-ink-faint hover:text-accent px-1.5 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
-              >
-                編集
-              </button>
-            )}
-            {/*
-              並び順。**端の行には口を出さない。** 押せない矢印を置くと、
-              押せるのか壊れているのか分からない（`onMoveUp` を渡さない側で
-              決める）。
-            */}
-            {row.onMoveUp && (
-              <button
-                onClick={row.onMoveUp}
-                aria-label={`フォルダ「${row.label}」を上へ`}
-                title="並び順を上へ"
-                className="text-ink-faint hover:text-accent px-1 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
-              >
-                ↑
-              </button>
-            )}
-            {row.onMoveDown && (
-              <button
-                onClick={row.onMoveDown}
-                aria-label={`フォルダ「${row.label}」を下へ`}
-                title="並び順を下へ"
-                className="text-ink-faint hover:text-accent px-1 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
-              >
-                ↓
-              </button>
-            )}
-            {row.onDelete && (
-              <button
-                onClick={row.onDelete}
-                aria-label={`フォルダ「${row.label}」を削除`}
-                /*
-                  **消したあとどうなるかを、押す前に読ませる。**
-                  吹き出しだけでは読み落とすので、呼ぶ側は確認窓にも同じ
-                  言葉を出す（`deleteNote` を渡す）。
-                */
-                title={row.deleteNote ?? 'フォルダを削除'}
-                className="text-ink-faint hover:text-danger px-1.5 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
-              >
-                削除
-              </button>
-            )}
-          </div>
-        ))}
+            </div>
+          )
+        })}
       </nav>
       {children && <div className="border-hairline space-y-2 border-t p-3">{children}</div>}
     </aside>

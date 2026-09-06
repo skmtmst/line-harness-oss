@@ -265,7 +265,7 @@ export const SCREENS = [
       通常「未割り当て 2 / Kenta 3 / Masato 0」・0件「すべて 0」・
       失敗「すべて —」がそのまま絵に残る。
     */
-    steps: [{ click: '担当者で絞り込む' }],
+    steps: [...OPEN_CHAT, { click: '担当者で絞り込む' }],
     variants: [
       {
         /*
@@ -277,18 +277,22 @@ export const SCREENS = [
         steps: [{ click: 'Kenta 3', role: 'option' }],
       },
     ],
-    verdict: 'needs_fix',
+    verdict: 'match',
     verdictNote: '**2026-09-04 担当者ごとの未読数を実装して撮り直した（board#33）。** ルート `/chats`（「担当者で絞り込む」を開いた形）。通常・0件・失敗・選択中の4状態を1440・1920で撮った（8枚、はみ出し0）。 数は `GET /api/chats/stats` の `assigneeUnread` から引く。**画面に見えている行から数えない**——一覧はページ送りされるので2ページ目の未読が落ちる。 **実値0と未取得を別の文字にした**：通常「未割り当て 2／Masato 0／Kenta 3」、0件「すべて 0」、失敗「すべて —」。**集計が失敗しても担当者一覧は消さない**（担当者は `/api/operators` の別の口）。 **P1 設計 `YZaDK` には未読数が描かれていない。** 開いた一覧は「すべて／河野／菅野／未割り当て」で数が無い。要件書 02 は「担当者別未読」を求めているので実装したが、**設計が先という決めごとに反するので Pencil へ回した**（board#106）。設計が入るまで一致にはしない。 **P2 並びが設計と違う**：設計は すべて→河野→菅野→**未割り当て（最後）**、実装は すべて→**未割り当て（2番目）**→Masato→Kenta。第2段でそろえる。 **P2 設計には各行に人の絵の印があるが実装に無い。**',
-    verdictSource: 'inbox-v6/YZaDK.txt',
-    verdictHead: 'bc36d471',
+    // #217 の最新判定。上の文はそれまでの判定履歴として残す。
+    ...{ verdictNote: '**2026-09-06 #217で一致。** `/chats` で会話を開いた同じ状態を1440・1920pxで撮影し、はみ出し0。「すべて→未割り当て→Kenta→Masato」の順、頭文字アイコン、未読数2/3/0、0件・集計失敗・Kenta選択後の全状態を設計画像と目視比較した。' },
+    verdictSource: 'inbox-v6/YZaDK.txt + inbox-v6/YZaDK-1440.png + inbox-v6/YZaDK-1920.png',
+    verdictHead: '70fac89c4',
   },
   {
     ...INBOX, node: 'L35UOV', name: '2-9 担当者変更を開く',
     steps: [...OPEN_CHAT, { click: '担当者を変える' }],
-    verdict: 'structure_match_data_pending',
+    verdict: 'match',
     verdictNote: '**2026-09-04 担当変更から絞り込み専用の「すべて」を外して撮り直した（board#66）。** ルート `/chats`（トーク見出しの「担当：」）。1440・1920とも横スクロール0。 **「すべて」は一覧を絞るための行で、担当者ではない。** 担当を変える口に出したままだと、押せば「すべて」という人へ割り当てようとする。設計 `L35UOV` も 河野・菅野・未割り当て の3つだけで「すべて」を置いていない。 実際に開いて確かめた：**担当を変える → 未割り当て／Masato／Kenta**、**一覧を絞る → すべて／未割り当て／Masato／Kenta**。絞り込み側の「すべて」は残っている。 P2 設計は名前と顔を並べた選び口。実装は名前だけで顔が出ない（第2段）。',
-    verdictSource: 'inbox-v6/L35UOV.txt',
-    verdictHead: 'b8359655',
+    // #217 の最新判定。上の文はそれまでの判定履歴として残す。
+    ...{ verdictNote: '**2026-09-06 #217で一致。** `/chats` で会話を開き「担当者を変える」を1440・1920pxで撮影し、はみ出し0。Kenta→Masato→未割り当ての順、頭文字アイコン、選択色とチェック、検索欄を設計画像と目視比較した。' },
+    verdictSource: 'inbox-v6/L35UOV.txt + inbox-v6/L35UOV-1440.png + inbox-v6/L35UOV-1920.png',
+    verdictHead: '70fac89c4',
   },
   {
     ...INBOX, node: 'IYjvu', name: '2-10 対応状況変更を開く',
@@ -308,22 +312,15 @@ export const SCREENS = [
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態を受信箱に／#36 開いたプルダウンが欄から11px浮いていたのを直す（`YZaDK` `L35UOV` `IYjvu`。`L35UOV` は横も8pxずれ）／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当てほかの表記統一。設計画像は `docs/design-reference/inbox-v6/` を撮り直した。**実装との突き合わせはこれから。** **#604 `6011cfeb` で解けた。前の「段が古く押せない（0件）」は解消している。** ルート `/chats`（「絞り込み」）。1440・1920とも横スクロール0。 設計の6項目がすべて在る：対応マーク・担当者・受信経路・期限・表示するメッセージ種別・未読だけ表示。「リセット」と「この条件で絞り込む」も在る。 **押せない2項目に理由を書いた。** 前は「まだ絞り込めません」だけで、自分の権限の問題なのか、設定が要るのか、まだ無いのかが分からなかった。いまは「期限はまだ記録していないため、絞り込めません」「種別で絞る読み口がまだ無いため、選んでも一覧は変わりません」。**この形が束3の手本。** 取得元：`inbox-v6/w72a2.txt:28-56` ＋ `inbox-filter-panel.tsx`',
     verdictSource: 'inbox-v6/design-qa.md', verdictHead: '7b509106',
   },
-  { ...INBOX, node: 'ASsb3', name: '2-13 保存した検索を開く', steps: [{ click: '保存した検索' }],
-    /*
-      **行の「…」はまだ実装に無いので、変種を宣言しない。**
-
-      前はここに `-menu`（`qaOpen: 'ASsb3'`）を書いていたが、押しどころが
-      実装に無く毎回「撮れず」になっていた。**撮れないものを宣言に残すと、
-      撮り漏れと「実装が無い」の区別がつかなくなる。** 赤字の「削除」を
-      「…」へ畳む話は第2段で扱い、そのときにこの変種を戻す。
-
-      なお変種の手順は基本の手順の後ろに足される。戻すときは
-      「保存した検索」を押し直さない（押すと閉じる）。
-    */
+  { ...INBOX, node: 'ASsb3', name: '2-13 保存した検索を開く', steps: [...OPEN_CHAT, { click: '保存した検索' }],
+    /* 行の「…」から削除操作を開いた形も、同じ実装として撮る。 */
+    variants: [{ suffix: 'menu', steps: [{ qaOpen: 'ASsb3-menu' }] }],
     verdict: 'needs_fix',
     verdictNote: '**2026-09-04 古い形の保存条件で落ちるのを直して撮り直した（board#43）。** ルート `/chats`（「保存した検索」）。1440・1920とも横スクロール0。 **受信箱より前に作られた行を開くと受信箱ごと落ちていた。** 古い行は友だち側と同じ `{ all: [], any: [] }` の形で入っているのに、画面は `conditions.statuses.length` をそのまま読んでいた。`normalizeSavedViewConditions()` で知っている軸だけ拾い、分からない形は「何も絞っていない」として扱う。**落とさずに開けることを、絞れることより優先する。** 実際に開いて確かめた：「未対応・期限超過（共有）／対応状況：未対応／待ち時間が長い順」「河野担当の未対応（共有）／担当者：Kenta／対応状況：未対応」「LINEからの新着／**絞り込みなし**」——**古い形の行を押しても画面は落ちない**（例外0件）。 撮影の固定データは3件とも新しい形になっていて古い道を通っていなかったので、**1件だけ古い形に戻した。** **残る差（P2）**：設計は1件ごとに**該当件数**（「1件」「3件」）を出すが実装は出さない——いまの読み口では一覧を丸ごと数え直さないと出せないので、数を作らないほうを選んだ。`QKx8Q`（4-4）と同じ口が要る。保存ボタンが設計「現在の条件を保存」／実装「この条件を保存」。赤字の「削除」が名前の隣に並んだままで、押し間違えやすい（第2段）。',
-    verdictSource: 'inbox-v6/ASsb3.txt',
-    verdictHead: '9208177f',
+    // #217 の最新判定。上の文はそれまでの判定履歴として残す。
+    ...{ verdictNote: '**2026-09-06 #217で再撮影し、要修正のまま。** `/chats` の同じ状態を1440・1920pxで撮影し、はみ出し0。保存ボタンの文言はそろえ、削除は「…」メニューに移した。**残る差:** 設計の該当件数1/3/5件を返す集計口が無い。仮の数値は出さず「—件」と未取得理由を表示しているため、口の接続後に再判定が必要。' },
+    verdictSource: 'inbox-v6/ASsb3.txt + inbox-v6/ASsb3-1440.png + inbox-v6/ASsb3-1920.png',
+    verdictHead: '70fac89c4',
   },
   /*
     2-14 → 2-15 → 2-16 → 2-17 は一続きの流れ。
@@ -332,15 +329,15 @@ export const SCREENS = [
   */
   {
     ...INBOX, node: 'ANgda', name: '2-14 保存した検索名を入力',
-    steps: [{ click: '保存した検索' }, { click: 'この条件を保存' }],
+    steps: [{ click: '保存した検索' }, { click: '現在の条件を保存' }],
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態を受信箱に／#36 開いたプルダウンが欄から11px浮いていたのを直す（`YZaDK` `L35UOV` `IYjvu`。`L35UOV` は横も8pxずれ）／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当てほかの表記統一。設計画像は `docs/design-reference/inbox-v6/` を撮り直した。**実装との突き合わせはこれから。**  **#555 の新head `9eee9655` でも撮った。変更は重複エラーの文言1行だけで、窓の作りは変わっていない。** 判定は据え置く（**P1** 保存する条件を窓の中で変えられない・期限の行が無い。**P2** よく使うに追加が無い）。',
     verdictSource: 'inbox-v6/ANgda-1440.png', verdictHead: '7b509106',
   },
   {
     ...INBOX, node: 'tBlkL', name: '2-15 保存した検索・保存完了',
     steps: [
-      { click: '保存した検索' }, { click: 'この条件を保存' },
-      { fill: '検索名', text: '未対応・期限超過' }, { click: 'この条件を保存', nth: 1 },
+      { click: '保存した検索' }, { click: '現在の条件を保存' },
+      { fill: '検索名', text: '未対応・期限超過' }, { click: '検索条件を保存' },
     ],
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態を受信箱に／#36 開いたプルダウンが欄から11px浮いていたのを直す（`YZaDK` `L35UOV` `IYjvu`。`L35UOV` は横も8pxずれ）／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当てほかの表記統一。設計画像は `docs/design-reference/inbox-v6/` を撮り直した。**実装との突き合わせはこれから。**  **#555 の新head `9eee9655` でも撮った。この head の変更は重複エラーの文言1行だけ**（`saved-view-dialog.tsx:79`）で、**この Node の見え方は変わっていない**。判定は据え置く（**P2** 残る差は `ANgda` と同じ窓の作り）。',
     verdictSource: 'inbox-v6/tBlkL-1440.png + apps/web/src/components/chats/saved-view-dialog.tsx', verdictHead: '7b509106',
@@ -353,17 +350,19 @@ export const SCREENS = [
       「撮れず」になる）。窓を開いたところまでで撮る。空のときの案内
       「検索名を入力してください。」は、開いた時点で出ている。
     */
-    steps: [{ click: '保存した検索' }, { click: 'この条件を保存' }],
+    steps: [...OPEN_CHAT, { click: '保存した検索' }, { click: '現在の条件を保存' }],
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-04 未入力の断りを共通の赤い帯に寄せて撮り直した（board#57）。** ルート `/chats`（「保存した検索」→「この条件を保存」）。1440・1920とも横スクロール0。 **設計 `AuSDY`（2-16）と合った**：入力欄の枠が赤い／⚠つきの赤い帯で「検索名を入力してください。」／保存ボタンは灰色で押せない／「0 / 40文字」。**押してから断るのではなく、開いた時点で直しどころが分かる。** 前は小さな灰色の字だったので、**赤い枠だけ見えて理由が読まれない**形だった。共通部品 `Notice`（tone=error）に寄せて、自前の赤字をやめた。 **空のときと押して断られたときで同じ見た目にした。** 片方だけ帯にすると、同じ「入力してください」が2通りの見え方をして、別のことを言われたように読める。 **残る差（P2、第2段）**：設計の入力欄の初期表示は「検索名を入力してください」、実装は「例：未対応・期限超過」。設計の「保存する条件」は**その場で変えられる選び口**（対応マーク・期限・受信経路・担当者）、実装は読むだけ。設計にある「よく使うに追加」の切り替えが無い。ボタンが設計「検索条件を保存」／実装「この条件を保存」。',
-    verdictSource: 'inbox-v6/AuSDY.txt',
-    verdictHead: '2f016fcd5',
+    // #217 の最新判定。上の文はそれまでの判定履歴として残す。
+    ...{ verdictNote: '**2026-09-06 #217で再撮影し、構造一致・データ未接続のまま。** `/chats` の同じ状態を1440・1920pxで撮影し、はみ出し0。検索名の初期文言、赤枠と説明帯、0/40文字、保存ボタンを設計にそろえた。**残る差:** 期限と「よく使う」状態の保存口が無く、条件もその場で変更できないため、接続後に再判定が必要。' },
+    verdictSource: 'inbox-v6/AuSDY.txt + inbox-v6/AuSDY-1440.png + inbox-v6/AuSDY-1920.png',
+    verdictHead: '70fac89c4',
   },
   {
     ...INBOX, node: 'LHjwD', name: '2-17 保存した検索名・重複エラー',
     steps: [
-      { click: '保存した検索' }, { click: 'この条件を保存' },
-      { fill: '検索名', text: 'VIPかつ未契約' }, { click: 'この条件を保存', nth: 1 },
+      { click: '保存した検索' }, { click: '現在の条件を保存' },
+      { fill: '検索名', text: 'VIPかつ未契約' }, { click: '検索条件を保存' },
     ],
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態を受信箱に／#36 開いたプルダウンが欄から11px浮いていたのを直す（`YZaDK` `L35UOV` `IYjvu`。`L35UOV` は横も8pxずれ）／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当てほかの表記統一。設計画像は `docs/design-reference/inbox-v6/` を撮り直した。**実装との突き合わせはこれから。** **#555 `9eee9655` で、前に挙げたP2（重複エラーの文言が設計と違う）が解消した。** ルート `/chats`（保存の窓・重複）。1440・1920とも横スクロール0。 **文言が設計どおりになった**：「**同じ名前の保存した検索があります。別の名前を入力してください。**」（前は「同じ名前の検索がすでにあります。別の名前にしてください」）。`saved-view-dialog.tsx:79` の1行の差し替えで、**この head の変更はこれだけ**（ほかは契約試験の追加5行）。 **赤い帯（`Notice tone="error"`）で出る**のは前から。`AuSDY`（未入力）と同じ見え方でそろっている。 **保存ボタンは押せたまま。これは正しい**——名前を変えれば保存できるので、未入力と違って押せなくする理由がない。 **窓の作りの残る差は `ANgda` の担当**（保存する条件を窓の中で変えられない・期限の行が無い・よく使うに追加が無い）。**この Node の差は無くなった。** 取得元：`inbox-v6/LHjwD-1440.png` ＋ `saved-view-dialog.tsx:79`',
     verdictSource: 'inbox-v6/LHjwD-1440.png + saved-view-dialog.tsx:79', verdictHead: '7b509106',
@@ -800,8 +799,8 @@ export const SCREENS = [
     */
     ...BROADCAST, node: 'bPF0s', name: '6-1-I 一斉配信・予約完了',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装は「選択中のアカウントの配信ではありません」で止まり、設計の5段表示・予約内容・Slack通知・次の操作が出ない。取消ボタンも無く確認状態を撮れない。**推奨修正**：撮影アカウントと予約データを一致させ、設計の完了要約と取消導線を出す。取得元 `broadcasts-v6/bPF0s.txt` と同Node画像。',
-    verdictHead: '350f9636a',
+    verdictNote: '**2026-09-06 S0 再判定（#215）。** 要修正。固定配信を `visual-qa-account` に所属させ、詳細APIと人数確認の固定結果を追加した。予約完了と取消確認を1440・1920で撮影でき、別画面・権限不足・横はみ出しは0。**撮影不能は解消。** 残る設計差は、Pencilの5段完了表示・管理名/配信対象/送信予定/状態の要約・Slack通知・右側「次にできること」に対し、実装は完了カード・KPI3枚・予約内容・中央の3操作という構造であること。取得元 `broadcasts-v6/bPF0s.txt`、`bPF0s-cancel.txt` と同Node画像。',
+    verdictHead: 'fc3cb9aede',
     route: '/broadcasts/reserved?id=broadcast-0', mode: 'page',
     /* 押した先の確認窓。**窓はビューポートで撮る**（`fullPage` だと下へ流れる）。 */
     variants: [{
@@ -827,8 +826,8 @@ export const SCREENS = [
   {
     ...BROADCAST, node: 'sqFXf', name: '6-1-L 対象条件を編集',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/broadcasts/new`（対象条件を編集）。**撮影の手順を2つ直した**——ラジオの役割（`text`→`radio`）と、変種が基本手順を二重に持っていた点（`capture-screens.mjs` は `[...steps, ...variant.steps]` で繋ぐ）。設計の「条件 1」の見出し、「標準互換（15軸）」「この画面だけの軸（6軸）」の区別、「複数条件は「すべて一致（AND）」または「いずれか一致（OR）」で結合できます。」が無い。**`-save`（保存する窓）は撮れていない**——モックに保存済み条件が無く（`/api/segment-presets` が空の器）「この条件を使う」に届かない。取得元 `broadcasts-v6/sqFXf.txt`',
-    verdictHead: '49e1341c', route: NEW_BC,
+    verdictNote: '**2026-09-06 S0 再判定（#215）。** 要修正。現行 `segment_v1` 形式の保存済み条件を2件返し、呼出し後の「この条件を保存」まで1440・1920で撮影できた。別画面・画面エラー・横はみ出しは0。**`-save` の撮影不能は解消。** 残る設計差は、Pencilの対象条件編集が「条件1」と15軸/6軸の区別、AND/OR結合の案内を持つ一方、実装の呼出し窓は未接続KPI3枚を置き、編集本体も軸の区別を持たないこと。取得元 `broadcasts-v6/sqFXf.txt`、`sqFXf-save.txt` と同Node画像。',
+    verdictHead: 'fc3cb9aede', route: NEW_BC,
     /* 保存する窓と、呼び出す窓。**窓はビューポートで撮る。** */
     mode: 'viewport', height: 1080,
     steps: [
@@ -858,8 +857,8 @@ export const SCREENS = [
   {
     ...BROADCAST, node: 'xkRDb', name: '6-1-M フォルダ操作',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920とも `data-qa-open="xkRDb"` が0件で、設計のフォルダ操作メニューを開けない。「フォルダを追加」だけは表示される。**推奨修正**：各フォルダへ「…」の操作口を戻し、名称変更・移動・削除を設計どおり確認できるようにする。取得元 `broadcasts-v6/xkRDb.txt` と撮影失敗ログ。', route: '/broadcasts',
-    verdictHead: '350f9636a',
+    verdictNote: '**2026-09-06 S0 再判定（#215）。** 要修正。共通フォルダ行の「…」から、名前変更・色変更・上下移動・削除・削除後の注意をすべて表示できる。`data-qa-open="xkRDb"` で1440・1920を撮影し、メニュー切れ・別画面・横はみ出しは0。**操作メニューの撮影不能は解消。** ただし画面全体は、PencilのKPI値・検索/絞り込み・一覧情報量・ページ送りと実装に既存差が残るため要修正のまま。取得元 `broadcasts-v6/xkRDb.txt` と同Node画像。', route: '/broadcasts',
+    verdictHead: 'fc3cb9aede',
     mode: 'viewport', height: 1080, steps: [{ qaOpen: 'xkRDb', after: 700 }],
     variants: [{ suffix: '-add', steps: [{ click: 'フォルダを追加', after: 700 }] }],
 
@@ -1197,9 +1196,7 @@ export const SCREENS = [
     まるごと無い**（`grep リマインド|見逃し` が `/webinars` 配下で0件）。
   */
   { ...WEBINAR, node: 'ZC13r', name: '10-1 ウェビナー',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。通常・空・失敗・権限不足を1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装の通常状態は一覧が空で、設計の6件・申込428人等の指標、フォルダ、6行の状態を確認できない。**推奨修正**：正常データを表示し、設計の指標・フォルダ・一覧配置へ合わせる。取得元 `webinars-v6/ZC13r*.txt` と同Node画像。',
-    verdictHead: '350f9636a',
+    verdictNote: '**2026-09-06 #251。** 実在する一覧APIと4状態へ接続。設計との判定はlaneで行うため未判定。',
     /*
       帯は `GET /api/webinars/overview` を読む。通常・0件・取得失敗・
       権限不足を混ぜないので、口を差し替えて1つずつ撮る。
@@ -1211,7 +1208,7 @@ export const SCREENS = [
         一度も当たらず、素の絵が `-empty` という名前で保存されていた。
         一覧が読むのは `/api/webinars`（`zCQXe` と同じ）。
       */
-      apis: ['**/api/webinars*', '**/api/webinars/**'],
+      apis: ['**/api/webinars?*', '**/api/webinars/overview?*'],
       kinds: ['normal', 'empty', 'error', 'forbidden'],
     }, },
   { ...WEBINAR, node: 'lvaY5', name: '10-1-A ウェビナーを作成',
@@ -1220,41 +1217,35 @@ export const SCREENS = [
     verdictHead: '49e1341c', route: '/webinars/new', },
   {
     ...WEBINAR, node: 'PV1Vh', name: '10-1-B 動画・公開設定',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。設計は縦の5段と右側要約だが、実装は横タブで入力項目・プレビュー・下部操作の配置が異なる。**推奨修正**：動画と公開設定をSTEP 2の構成へ合わせる。取得元 `webinars-v6/PV1Vh.txt` と同Node画像。', verdictHead: '350f9636a', route: WEBINAR_EDIT, steps: [{ qaOpen: 'PV1Vh' }],
+    verdictNote: '**2026-09-06 #251。** 動画・公開設定を実在する詳細APIへ接続。設計判定は未判定。', route: WEBINAR_EDIT, steps: [{ qaOpen: 'PV1Vh' }],
 
   },
   {
     ...WEBINAR, node: 'd3rFGD', name: '10-1-C CTA・フォーム',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装はCTAが未設定の空欄中心で、設計のCTA・申込フォーム選択、右側要約、LINEプレビューが無い。**推奨修正**：STEP 3の選択状態とプレビューを設計どおり出す。取得元 `webinars-v6/d3rFGD.txt` と同Node画像。', verdictHead: '350f9636a', route: WEBINAR_EDIT, steps: [{ qaOpen: 'd3rFGD' }],
+    verdictNote: '**2026-09-06 #251。** CTA・フォームを実在するCTA APIへ接続。設計判定は未判定。', route: WEBINAR_EDIT, steps: [{ qaOpen: 'd3rFGD' }],
 
   },
   {
     ...WEBINAR, node: 'Ho8z4', name: '10-1-D 通知・リマインド',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装は「通知の設定を表示できません」で止まり、設計の申込完了・前日・1時間前・見逃し配信を選べない。**推奨修正**：通知設定の正常データとLINEプレビューを接続する。取得元 `webinars-v6/Ho8z4.txt` と同Node画像。', verdictHead: '350f9636a', route: WEBINAR_EDIT,
+    verdictNote: '**2026-09-06 #251。** 通知・リマインドを実在する通知APIへ接続。設計判定は未判定。', route: WEBINAR_EDIT,
     steps: [{ qaOpen: 'Ho8z4' }],
 
   },
   {
     ...WEBINAR, node: 'Xjk8q', name: '10-1-E 視聴後アクション',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。設計の完視聴・途中離脱・未視聴ごとのアクションが無く、通知取得失敗の面が出る。**推奨修正**：視聴後アクションを独立区画として実装し、設定要約へ反映する。取得元 `webinars-v6/Xjk8q.txt` と同Node画像。', verdictHead: '350f9636a', route: WEBINAR_EDIT, steps: [{ qaOpen: 'Ho8z4' }],
+    verdictNote: '**2026-09-06 #251。** 視聴完了・CTAクリック・未視聴の共通アクション版を保存するAPIへ接続。設計判定は未判定。', route: WEBINAR_EDIT, steps: [{ click: '視聴後アクション' }],
 
   },
   {
     ...WEBINAR, node: 'GB0NR', name: '10-1-F 公開ページプレビュー',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装は基本設定の入力欄で、設計の公開URL・案内内容・申込/再生ページのプレビューになっていない。**推奨修正**：公開ページ確認を独立状態として表示する。取得元 `webinars-v6/GB0NR.txt` と同Node画像。', verdictHead: '350f9636a', route: WEBINAR_EDIT,
+    verdictNote: '**2026-09-06 #251。** 実データから公開URLと表示内容を組み立てる画面へ接続。設計判定は未判定。', route: WEBINAR_EDIT,
     mode: 'viewport', height: 1080,
+    steps: [{ click: '公開プレビュー' }],
 
   },
   {
     ...WEBINAR, node: 'D6yO7e', name: '10-1-G 公開前確認',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装の確認欄は設計より情報が少なく、LINEプレビュー・公開前チェック・設定要約の配置も異なる。**推奨修正**：STEP 5で不足項目と公開可否を一括確認できる構成へ合わせる。取得元 `webinars-v6/D6yO7e.txt` と同Node画像。',
-    verdictHead: '350f9636a',
+    verdictNote: '**2026-09-06 #251。** 公開前検査を実データから表示。設計判定は未判定。',
     route: '/webinars/edit?id=webinar-1', mode: 'page',
     steps: [{ qaOpen: 'D6yO7e' }],
 
@@ -1274,29 +1265,24 @@ export const SCREENS = [
   },
   {
     ...WEBINAR, node: 'Q8sHa', name: '10-1-I 参加者管理',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920とも「参加者」タブが0件で、設計の参加者一覧・状態・CSV出力へ到達できない。**推奨修正**：編集画面に参加者管理の導線を追加し、設計の一覧状態を表示する。取得元 `webinars-v6/Q8sHa.txt` と撮影失敗ログ。', verdictHead: '350f9636a', route: WEBINAR_EDIT, steps: [{ click: '参加者' }],
+    verdictNote: '**2026-09-06 #251。** 参加者集計と監査付きCSVを実在するAPIへ接続。設計判定は未判定。', route: WEBINAR_EDIT, steps: [{ click: '参加者' }], mode: 'viewport', height: 1080,
 
   },
   {
     ...WEBINAR, node: 'yxyzQ', name: '10-1-J 分析',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装は多指標の分析ダッシュボードだが、設計の視聴維持率・離脱箇所・CTA反応・LINEプレビュー・CSV配置と構造が異なる。**推奨修正**：必要指標を残しつつ設計の区画と名称へ合わせる。取得元 `webinars-v6/yxyzQ.txt` と同Node画像。', verdictHead: '350f9636a', route: WEBINAR_EDIT, steps: [{ click: '分析' }],
+    verdictNote: '**2026-09-06 #251。** 申込・視聴・離脱・CTA・フォーム分析を実在するAPIへ接続。設計判定は未判定。', route: WEBINAR_EDIT, steps: [{ click: '分析' }], mode: 'viewport', height: 1080,
 
   },
   {
-    ...WEBINAR, node: 'LKuAQ', name: '10-1-K 削除確認',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未実装（api）。視聴履歴の物理削除を禁じる要件（V6詳細 §11・§14）と現行 `deleteWebinar` が噛み合わない。横断レビュー §7 の18番で「アーカイブ確認」へ設計変更する話。',
-    gap: 'drop',
-    gapNote: '物理削除はV6要件の除外対象。公開停止・アーカイブへ置き換え、申込・視聴・分析・監査は保持する。現行 `webinarApi.remove` は視聴履歴を物理削除する一方、申込記録を削除対象に含めず孤児化させるため、画面へそのまま接続しない',
-    status: 'unimplemented',
-    why: 'V6詳細要件 §11・§14 は視聴履歴の物理削除を禁止している。現行 `deleteWebinar` は viewer・funnel・コメント等を物理削除し、`webinar_registrations` は残すため、削除確認を足すだけでは履歴消失と孤児データを発生させる。編集画面の「削除」はCTAの札を1枚外すもので、ウェビナー本体ではない（`edit/page.tsx:764`）',
+    ...WEBINAR, node: 'LKuAQ', name: '10-1-K アーカイブ確認',
+    verdictNote: '**2026-09-06 #251。** 物理削除を廃止し、申込・視聴・CTA・分析を保持するアーカイブ確認へ接続。設計画像なしのためテキスト設計で照合し、判定は未判定。',
+    route: '/webinars', mode: 'viewport', height: 1080,
+    steps: [{ click: 'アーカイブ', nth: 0 }],
   },
   {
     ...WEBINAR, node: 'zCQXe', name: '10-1-L 一覧の状態（空・読込・エラー）',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。通常・読込・空・失敗を1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装は通常状態も空で、設計の状態別一覧とページ送りの配置が再現されない。**推奨修正**：通常データを出したうえで、空・読込・失敗を同じ一覧骨格にそろえる。取得元 `webinars-v6/zCQXe*.txt` と同Node画像。', verdictHead: '350f9636a',
-    states: { apis: ['**/api/webinars*', '**/api/webinars/**'], kinds: ['loading', 'empty', 'error'] },
+    verdictNote: '**2026-09-06 #251。** 一覧の読込・空・失敗を実在するAPI契約と同じ器で撮影。設計判定は未判定。',
+    states: { apis: ['**/api/webinars?*', '**/api/webinars/overview?*'], kinds: ['loading', 'empty', 'error'] },
 
   },
 
@@ -1645,10 +1631,11 @@ export const SCREENS = [
   },
   {
     /*
-      設計の `eXAJP` は一覧と同じ文言。実装も**一覧の上にドロップ枠が
-      常に出ている**ので、同じ絵で突き合わせる。
+      設計の `eXAJP` は一覧から「ファイルを入れる」を押した全面の窓。
+      一覧だけを撮ると窓が写らないため、押してから突き合わせる。
     */
     ...MEDIA, node: 'eXAJP', name: '15-1-B ファイルを入れる',
+    mode: 'viewport', height: 1080, steps: [{ click: 'ファイルを入れる', after: 900 }],
     verdict: 'needs_fix', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正（差は小さい）。文言が1つ違う：設計「LINEで送れる大きさ（超えると入れられません）」、実装「入れられる大きさ（超えると入れられません）」。**「LINEで送れる」が落ちると、何の上限かが読めない。**ほかに「PDF」の1語。それ以外は一致。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一（マトリックス→対応表、ブレイクダウン→内訳）。設計画像を撮り直した。**実装との突き合わせはこれから。** **P2 ファイルを入れる面が一覧と同じ画面にある。** ルート `/media`。設計は入れる面を独立させるが、実装は一覧の頭にドロップ欄を置く。**実務上は困らない**ので P1 から P2 へ下げる。**良い点**：入れる前に上限を全部出す（画像10MB・音声30MB・動画90MB・PDF20MB）、「中身の形式とファイル名の拡張子が食い違うものは保存できません」と断る、「公開リンクが作られるため、個人情報の取り扱いに注意してください」を出す、行ごとに「使用箇所」を持つ。**P1 上限を超えたファイルが一覧に残っている**——「店内のようす.mp4 184.0 MB」は動画90MBの上限を超える。撮影用の固定データが上限を無視して作られているためで、実装の不具合ではないが、**上限を超えた行をどう見せるかは決まっていない**。取得元：`media-v6/eXAJP.txt`。1440・1920とも横スクロール0 **推奨修正**：上限を超えた行の見せ方を決める（撮った絵の「店内のようす.mp4 184.0 MB」は動画90MBの上限を超えるが、これは**固定データが上限を無視して作られているためで実装の不具合ではない**）。入れる面を独立させるのは実務上急がない。', verdictSource: 'media-v6/eXAJP.txt',
     verdictHead: '31293424',
   },
@@ -2776,11 +2763,13 @@ export const SCREENS = [
       `YZaDK` の `-error` と同じ面だが、設計が別ノードを持つので別行で撮る。
     */
     ...INBOX, node: 'ohj8J', name: '2-8-A 担当者の未読が数えられないとき',
-    steps: [{ click: '担当者で絞り込む' }],
+    steps: [...OPEN_CHAT, { click: '担当者で絞り込む' }],
     states: { apis: ['**/api/chats/stats**'], kinds: ['error'] },
-    verdict: 'structure_match_data_pending',
+    verdict: 'match',
     verdictNote: '**2026-09-04 台帳へ登録して初めて撮った（board#18 の pen からの申し送り）。** ルート `/chats`（「担当者で絞り込む」を開いた形）。通常と集計失敗の2状態を1440・1920で撮った（4枚、はみ出し0）。 **実装はもう在った**——skmtmst/line-harness-oss#741 で、集計が読めないときは**数だけ `—` にして担当者一覧そのものは残す**形にしてある。担当者は `/api/operators` の別の口なので、集計が落ちても消さない。 **実値0と未取得を別の文字にしている**（0件なら「Kenta 0」、読めないなら「Kenta —」）。 P2 設計 `ohj8J` の文字がまだ書き出されていないので、文言の突き合わせは書き出し後。',
-    verdictSource: 'inbox-v6/ohj8J-error.txt', verdictHead: 'f3946713',
+    // #217 の最新判定。上の文はそれまでの判定履歴として残す。
+    ...{ verdictNote: '**2026-09-06 #217で一致。** `/chats` で会話を開き、未読集計API失敗状態を1440・1920pxで撮影し、はみ出し0。担当者一覧は残し、数だけを「—」にし、「0件とは違う」ことと次の行動を黄色の警告帯で表示。設計の配置・色・文言と目視比較した。' },
+    verdictSource: 'inbox-v6/ohj8J-error.txt + inbox-v6/ohj8J-error-1440.png + inbox-v6/ohj8J-error-1920.png', verdictHead: '70fac89c4',
   },
 
   // ── 機能33 LINEアカウント設定（§7 #28） ──────────────────────────────
@@ -2855,6 +2844,68 @@ export const SCREENS = [
     verdictSource: 'settings-v6/f9oUm.txt', verdictHead: '4c5708ace',
   },
 ]
+
+// Issue #228（機能15）の実装後監査。
+// ChromiumがMachPort権限で起動できず、実装後の2幅画像は未取得。
+// 古い画像で合格にせず、実装した範囲と残る接続条件だけを更新する。
+const FEATURE_15_REVIEW = {
+  g89Tc: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06、Issue #228 / PR #925 / UI HEAD 6cb184af7 で画面を更新したが、新しい画像は未確認。** メディア用フォルダ、未分類、フォルダ作成、種類・未使用・上限付近の表示を追加した。保存容量APIは未接続のため、架空の数やゲージを出さず `—` と接続条件を表示する。撮影はChromiumのMachPort権限拒否で開始できず、1440px・1920px画像が無いため判定は上げない。',
+    verdictSource: 'media-v6/g89Tc.txt + 実装コード（画像未確認）',
+  },
+  voJtX: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06、Issue #228 / PR #925 / UI HEAD 6cb184af7 で画面を更新したが、新しい画像は未確認。** プレビュー、容量・寸法・登録者・フォルダ、名前付き使用先を表示し、既存の同種メディアへ使用先を一括差し替えできるようにした。名前とURLを保つ版追加APIは未接続なので、使えるように見せず理由を表示する。撮影はChromiumのMachPort権限拒否で開始できず、2幅画像が無いため判定は上げない。',
+    verdictSource: 'media-v6/voJtX.txt + 実装コード（画像未確認）',
+  },
+  eXAJP: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06、Issue #228 / PR #925 / UI HEAD 6cb184af7 で画面を更新したが、新しい画像は未確認。** 一覧上の全面ダイアログへ分け、20件までの選択、1件ごとの待機・登録中・完了・失敗、フォルダ選択、形式と公開リンクの注意を表示した。現行アップロードはWorker経由のbase64で、動画90MB・音声30MBまで。要件のR2直接アップロードと200MB対応はAPI未接続。撮影はChromiumのMachPort権限拒否で開始できず、2幅画像が無いため判定は上げない。',
+    verdictSource: 'media-v6/eXAJP.txt + 実装コード（画像未確認）',
+  },
+  YfTfJ: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06、Issue #228 / PR #925 / UI HEAD 6cb184af7 で画面を更新したが、新しい画像は未確認。** 使用中は削除操作を出さず、名前付き使用先を確認して既存の同種メディアへ一括差し替える導線を追加した。差し替え前の版を送り、409では最新影響へ更新する。アカウント切替・閉じる操作後の遅い返事も破棄する。撮影はChromiumのMachPort権限拒否で開始できず、2幅画像が無いため判定は上げない。',
+    verdictSource: 'media-v6/YfTfJ.txt + 実装コード（画像未確認）',
+  },
+  h8pBZr: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06、Issue #228 / PR #925 / UI HEAD 6cb184af7 で状態文言を設計正本へ合わせたが、新しい画像は未確認。** 読込中・0件・取得失敗を別の文と操作で表示し、親一覧にもフォルダ区画を追加した。撮影はChromiumのMachPort権限拒否で開始できず、通常を含む1440px・1920px画像が無いため、画像確認済みにはしない。',
+    verdictSource: 'media-v6/h8pBZr.txt + 契約テスト（画像未確認）',
+  },
+}
+
+// Issue #229（機能16）の実装後監査。
+// ChromiumがMachPort権限で起動できず、実装後の2幅画像は未取得。
+// そのため既存判定は上げず、今回実装した範囲と未接続条件だけを更新する。
+const FEATURE_16_REVIEW = {
+  PouPn: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06、Issue #229 / PR #916 / UI HEAD 98f8b8ce3 で画面を更新したが、新しい画像は未確認。** 今月の成果・承認待ち・承認済み報酬・未払い残高の4帯、成果の流れ、検索・絞り込み・並び順・CSV・ページ送りを追加した。未払い残高は支払台帳が未接続なので `—` と接続条件を表示する。撮影はChromiumのMachPort権限拒否で開始できず、新しい1440/1920画像が無いため判定は上げない。',
+    verdictSource: 'affiliates-v6/PouPn.txt + 実装コード（画像未確認）',
+  },
+  GH8VL: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06、Issue #229 / PR #916 / UI HEAD 98f8b8ce3 で画面を更新したが、新しい画像は未確認。** 帯の見出しを「確定した報酬の合計」、単位を「マイル」に直した。案件ごとの成果数は一覧APIだけでは確定値を網羅できないため未接続のまま。撮影はChromiumのMachPort権限拒否で開始できず、新しい2幅画像が無いため `needs_fix` を維持する。',
+    verdictSource: 'affiliates-v6/GH8VL.txt + 実装コード（画像未確認）',
+  },
+  n5VVTb: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06、Issue #229 / PR #916 / UI HEAD 98f8b8ce3 で画面を更新したが、新しい画像は未確認。** 4帯、検索・並び順・状態札・CSV・ページ送りを追加し、重複の疑いがない成果だけを複数選択してまとめて承認できるようにした。却下理由を保存するAPIが無いため、理由を残せないことを画面に明記した。撮影はChromiumのMachPort権限拒否で開始できず、新しい2幅画像が無いため判定は上げない。',
+    verdictSource: 'affiliates-v6/n5VVTb.txt + 実装コード（画像未確認）',
+  },
+  xqT1Z: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06、Issue #229 / PR #916 / UI HEAD 98f8b8ce3 で画面を更新したが、新しい画像は未確認。** 保留日数・支払サイクル、友だち・振込先・成果時動作の未接続理由、「つながる先」を表示した。銀行口座と友だち連携APIは未接続。撮影はChromiumのMachPort権限拒否で開始できず、新しい2幅画像が無いため `needs_fix` を維持する。',
+    verdictSource: 'affiliates-v6/xqT1Z.txt + 実装コード（画像未確認）',
+  },
+  GPWzq: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06、Issue #229 / PR #916 / UI HEAD 98f8b8ce3 で画面を更新したが、新しい画像は未確認。** 成果地点・紹介とみなす期間・二重計上防止・自動承認を第2段に置き、API未接続のため入力欄ではなく `—` と接続条件を表示した。下書き変更失敗時の再実行で同じ案件を増やさないようにした。撮影はChromiumのMachPort権限拒否で開始できず、新しい2幅画像が無いため `needs_fix` を維持する。',
+    verdictSource: 'affiliates-v6/GPWzq.txt + 実装コード（画像未確認）',
+  },
+}
 
 // Issue #230（S3 第2段）の再判定。
 // 古い調査メモは経緯として残し、ここで最新の撮影結果だけを上書きする。
@@ -2980,6 +3031,14 @@ const FEATURE_18_AUDIT = {
 }
 
 for (const screen of SCREENS) {
+  if (screen.feature === 15 && FEATURE_15_REVIEW[screen.node]) {
+    Object.assign(screen, FEATURE_15_REVIEW[screen.node])
+    delete screen.verdictHead
+  }
+  if (screen.feature === 16 && FEATURE_16_REVIEW[screen.node]) {
+    Object.assign(screen, FEATURE_16_REVIEW[screen.node])
+    delete screen.verdictHead
+  }
   const review = FEATURE_17_REVIEW[screen.node]
   if (review) Object.assign(screen, review)
   if (screen.feature === 18 && FEATURE_18_AUDIT[screen.node]) {
@@ -3148,6 +3207,7 @@ export const CAPTURED_AT = {
         + '`GMvBd`（「保留」）と `zGZMA`（「対応中を保管」）は、固定データにその行やボタンが出ず撮れていない。' },
   ],
   10: [
+    { pr: 917, head: 'c5e1095e', on: '2026-09-06', screens: ['ZC13r', 'PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'GB0NR', 'D6yO7e', 'Q8sHa', 'yxyzQ', 'LKuAQ', 'zCQXe'], note: '#251 の11画面を実データへ接続して1440・1920pxで撮影。最終判定はlane確認待ちのため未判定のまま' },
     { pr: 508, head: '61eeb3c7', on: '2026-08-29', screens: ['TimXl', 'GB0NR'], note: '公開完了と公開ページの導線。**#508 は #507 を含む**' },
     { pr: 546, head: 'de0848b9', on: '2026-08-29', screens: ['Ho8z4'], note: '通知とリマインド。既存の申込と5分ごとの仕掛けを使う' },
     { pr: 623, head: '988cc37a', on: '2026-08-31', screens: ['PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'D6yO7e', 'Q8sHa', 'yxyzQ'], note: 'Claudeが実装して撮った。編集画面を設計の段（STEP 1〜5）へ。#546 の上（#546 は #524 → #508 → #507 を含む）。**`Xjk8q` はそれまで「いつ見られるようにするか」タブを撮っていて、視聴後の話が写っていなかった**' },
