@@ -228,6 +228,7 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
             open
             title="アクションを追加"
             description={`選択した${definition.actions.length + 1}件のアクションを配信フローへ追加します。`}
+            titleIcon={<Check size={18} />}
             cancelLabel="初回案内へ戻る"
             confirmLabel="アクションを追加"
             confirmIcon={<Plus size={16} />}
