@@ -3154,6 +3154,7 @@ const ISSUE_212_REVIEW = {
   d8d3Mz: {
     note: '2幅とも横はみ出し0。設計は使用先ごとの停止影響と「開く」、停止・差し替え・削除の3択を出すが、実装は小さな確認窓に対象の内部名と削除だけを出す。**推奨修正**：使用先ごとの影響と移動導線を表示し、安全な3つの選択肢を設計順に並べる。',
     source: 'conversions-v6/d8d3Mz.txt + d8d3Mz-1440.png + d8d3Mz-1920.png',
+    head: '4a5f0ec3',
   },
   HpKyF: {
     note: '通常・誕生日の2状態を2幅で撮影し、横はみ出し0。どちらも「この配信が見つかりませんでした」の空表示で、設計の配信条件、本文編集、LINEプレビュー、送信後の動作が出ない。**推奨修正**：撮影用設定へ対象キーを接続し、編集内容とプレビューを表示して全状態を撮り直す。',
@@ -3200,6 +3201,7 @@ const ISSUE_212_REVIEW = {
     intro: '**2026-09-06 #212で判定。** 最新 development のルートと撮影定義を照合し、未実装を確認。',
     note: '最新 development に `/automations/runs` の画面が無く、通常・読込中・0件・取得失敗のどの状態も撮影できない。設計の実行記録、対象、結果、失敗理由、再実行導線を確認できない。**推奨修正**：実行記録画面を本流へ実装し、4状態を1440px・1920pxで撮影して設計と比較する。',
     source: 'apps/web/src/app/automations/runs/page.tsx（本流に存在しない） + screens.mjs未実装理由',
+    head: '4a5f0ec3',
   },
 }
 
@@ -3226,7 +3228,7 @@ for (const screen of SCREENS) {
     screen.verdict = 'needs_fix'
     screen.verdictNote = `${issue212Review.intro ?? '**2026-09-06 #212で判定。** 設計1920pxと実装1440/1920pxを目視比較。'}${issue212Review.note}`
     screen.verdictSource = issue212Review.source
-    screen.verdictHead = 'bf7434ff'
+    screen.verdictHead = issue212Review.head ?? 'bf7434ff'
     if (issue212Review.states) screen.states = issue212Review.states
   }
   if (screen.feature === 16 && FEATURE_16_REVIEW[screen.node]) {
