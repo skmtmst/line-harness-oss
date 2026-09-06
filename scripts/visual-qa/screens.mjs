@@ -3639,7 +3639,7 @@ for (const screen of SCREENS) {
   if (screen.feature === 2 && FEATURE_2_R2_REVIEW[screen.node]) {
     Object.assign(screen, FEATURE_2_R2_REVIEW[screen.node])
     screen.verdictSource = `${screen.dir}/${screen.node}.txt + ${screen.dir}/${screen.node}-1440.png + ${screen.dir}/${screen.node}-1920.png + 2026-09-07 same-input comparison`
-    screen.verdictHead = '1389d42ec'
+    screen.verdictHead = '4f8dfd8e0'
   }
 }
 
