@@ -219,6 +219,10 @@ export type Env = {
     ADMIN_API_KEY?: string;
     CF_API_TOKEN?: string;
     CF_ACCOUNT_ID?: string;
+    /** R2 S3 API credentials are Worker secrets. Bucket name is a non-secret deployment var. */
+    MEDIA_R2_ACCESS_KEY_ID?: string;
+    MEDIA_R2_SECRET_ACCESS_KEY?: string;
+    MEDIA_R2_BUCKET_NAME?: string;
     WORKER_NAME?: string;
     ADMIN_PAGES_PROJECT?: string;
     LIFF_PAGES_PROJECT?: string;
