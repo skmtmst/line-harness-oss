@@ -21,6 +21,8 @@ import { AUTOMATIONS, AUTOMATION_TEMPLATES, COMMON_ACTION_DETAIL } from './fixtu
 import { CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS } from './fixtures.mjs';
 // @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
 import { MEDIA_DELETE_IMPACT, MEDIA_FOLDERS, MEDIA_ITEMS } from './fixtures.mjs';
+// @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
+import { TEMPLATES } from './fixtures.mjs';
 
 describe('画面確認モックの口の形', () => {
   const paths: Set<string> = readArrayGetPaths();
@@ -80,6 +82,17 @@ describe('オートメーションの画面確認データ', () => {
     expect(COMMON_ACTION_DETAIL.versions).toHaveLength(4);
     expect(COMMON_ACTION_DETAIL.bindings).toHaveLength(5);
     expect(COMMON_ACTION_DETAIL.bindings.filter((item: { hasNewerVersion: boolean }) => item.hasNewerVersion)).toHaveLength(1);
+  });
+});
+
+describe('テンプレートの画面確認データ', () => {
+  it('全行に今月と累計の送信数があり、設計の先頭行を再現する', () => {
+    expect(TEMPLATES).toHaveLength(20);
+    expect(TEMPLATES[0]).toMatchObject({ monthlySendCount: 1240, totalSendCount: 18300 });
+    for (const template of TEMPLATES) {
+      expect(template.monthlySendCount).toBeGreaterThanOrEqual(0);
+      expect(template.totalSendCount).toBeGreaterThanOrEqual(template.monthlySendCount);
+    }
   });
 });
 

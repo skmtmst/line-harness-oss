@@ -1199,6 +1199,14 @@ export const TEMPLATE_FOLDERS = [
  */
 export const TEMPLATES = (() => {
   const rows = []
+  // 設計 `W7LBc` の送信数。先頭6件は一覧に描かれた値をそのまま使う。
+  // 残りも 0 や未取得にせず、並び替えと表示を確かめられる固定値にする。
+  const sendCounts = [
+    [1240, 18300], [1860, 31400], [480, 9720], [210, 3040], [640, 5880],
+    [320, 7600], [980, 14200], [160, 2280], [740, 11900], [90, 1640],
+    [560, 8210], [430, 6940], [120, 2130], [350, 5360], [270, 4280],
+    [80, 980], [190, 2760], [150, 2410], [60, 720], [40, 510],
+  ]
   const plan = [
     [null, '未分類', 3],
     ['tf-inquiry', 'お問い合わせ', 8],
@@ -1215,6 +1223,8 @@ export const TEMPLATES = (() => {
         messageType: 'text',
         messageContent: `${label}のご連絡です。内容をご確認ください。`,
         folderId,
+        monthlySendCount: sendCounts[n][0],
+        totalSendCount: sendCounts[n][1],
         createdAt: '2026-01-13T00:00:00.000Z',
         updatedAt: '2026-01-13T00:00:00.000Z',
       })
