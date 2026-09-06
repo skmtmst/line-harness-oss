@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense, useState, useEffect, useCallback } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import type { Folder, Tag } from '@line-crm/shared'
 import { ApiError, api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
