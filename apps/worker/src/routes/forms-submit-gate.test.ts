@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   getFriendByLineUserIdForAccount: vi.fn(),
   getFriendById: vi.fn(),
   createFormSubmission: vi.fn(),
+  updateFormSubmissionDestinationWriteResult: vi.fn(),
   verifyCallerLineIdentity: vi.fn(),
   countFormSubmissionsByFriend: vi.fn(),
   countChoiceUsage: vi.fn(),
@@ -42,8 +43,10 @@ vi.mock('@line-crm/db', () => ({
   deleteForm: vi.fn(),
   getFormSubmissions: vi.fn(),
   getFormSubmissionsPage: vi.fn(),
+  getFormSubmissionAnalytics: vi.fn(),
   getLatestFormSubmission: vi.fn(),
   createFormSubmission: mocks.createFormSubmission,
+  updateFormSubmissionDestinationWriteResult: mocks.updateFormSubmissionDestinationWriteResult,
   getFriendByLineUserIdForAccount: mocks.getFriendByLineUserIdForAccount,
   getFriendById: mocks.getFriendById,
   getTrackedLinkById: vi.fn(),
@@ -191,6 +194,7 @@ beforeEach(() => {
     data: input.data,
     created_at: '2026-08-20T12:00:00+09:00',
   }));
+  mocks.updateFormSubmissionDestinationWriteResult.mockResolvedValue('not_requested');
 });
 
 describe('送信の入口が、レイアウトの判定につながっている', () => {
@@ -285,6 +289,11 @@ describe('送信の入口が、レイアウトの判定につながっている'
 
     expect(res.status).toBe(201);
     expect(mocks.createFormSubmission).toHaveBeenCalledTimes(1);
+    expect(mocks.updateFormSubmissionDestinationWriteResult).toHaveBeenCalledWith(
+      expect.anything(),
+      'submission-1',
+      { attempted: 0, succeeded: 0, failed: 0 },
+    );
 
     // 選んだほうだけが付く
     const attached = mocks.attachTag.mock.calls.map((call) => call[2]);
