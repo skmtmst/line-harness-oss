@@ -40,6 +40,7 @@ shared-button-importer app/friend-add-settings/friend-add-rule-editor.tsx
 shared-button-importer app/friend-add-settings/page.tsx
 shared-button-importer app/friend-add-settings/publish/page.tsx
 shared-button-importer app/friend-add-settings/runs/page.tsx
+shared-button-importer app/friends/detail/page.tsx
 shared-button-importer app/friends/identity-candidates/page.tsx
 shared-button-importer app/friends/migrations/page.tsx
 shared-button-importer app/friends/page.tsx
@@ -80,6 +81,7 @@ shared-button-importer app/tags/searches/edit/page.tsx
 shared-button-importer app/templates/page.tsx
 shared-button-importer app/templates/questions/new/page.tsx
 shared-button-importer app/templates/template-button.ts
+shared-button-importer app/users/page.tsx
 shared-button-importer app/webhooks/page.tsx
 shared-button-importer app/webhooks/webhook-interactions.tsx
 shared-button-importer app/webinars/edit/page.tsx
