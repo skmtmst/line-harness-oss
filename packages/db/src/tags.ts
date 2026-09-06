@@ -4,6 +4,17 @@ export interface Tag {
   id: string;
   name: string;
   color: string;
+  line_account_id: string | null;
+  description: string | null;
+  normalized_name: string | null;
+  manual_assignment_allowed: number;
+  reapply_policy: 'first_only' | 'every_time';
+  linked_enabled: number;
+  status: 'active' | 'archived';
+  version: number;
+  created_by: string | null;
+  updated_by: string | null;
+  updated_at: string | null;
   /**
    * @deprecated 099 で folders へ移送済み。folder_id を見ること。
    * 追加のみポリシーで列を落とせないため残っているだけで、読み書きしない。

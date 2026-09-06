@@ -19,7 +19,7 @@ import {
 const commonActions = new Hono<Env>();
 
 function accountId(c: Context<Env>): string | null {
-  return c.req.query('account_id') || null;
+  return c.req.query('account_id') || c.req.query('lineAccountId') || null;
 }
 
 async function requireAccount(c: Context<Env>): Promise<string | Response> {
@@ -99,9 +99,18 @@ commonActions.post('/api/common-actions', requireRole('owner', 'admin'), async (
 commonActions.get('/api/common-actions/resources', requireRole('owner', 'admin'), async (c) => {
   const id = await requireAccount(c);
   if (typeof id !== 'string') return id;
+  const trigger = c.req.query('trigger');
+  if (trigger && trigger !== 'tag.added') {
+    return c.json({
+      success: false,
+      code: 'trigger_invalid',
+      error: '対応していないきっかけです',
+    }, 422);
+  }
   return endpoint(c, () => listCommonActionResources(c.env.DB, {
     lineAccountId: id,
     excludeCommonActionId: c.req.query('exclude_id'),
+    trigger: trigger === 'tag.added' ? trigger : undefined,
   }));
 });
 

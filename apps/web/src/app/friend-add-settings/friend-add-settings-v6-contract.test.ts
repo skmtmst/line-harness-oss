@@ -73,4 +73,24 @@ describe('V6 友だち追加時配信の運用者向け表示', () => {
     expect(screens).not.toContain('definition_snapshot')
     expect(screens).not.toMatch(/マイグレーション\s*\d+/)
   })
+
+  it('一覧の配信内容とページ送りを設計と同じ位置で確認できる', () => {
+    expect(LIST_PAGE).toContain('function deliverySummary')
+    expect(LIST_PAGE).toContain('aria-label="ページ送り"')
+    expect(LIST_PAGE).toContain('前へ')
+    expect(LIST_PAGE).toContain('次へ')
+  })
+
+  it('保存先がない条件を作り物で埋めず、未接続と明記する', () => {
+    expect(EDITOR).toContain('曜日・時間帯・友だち条件')
+    expect(EDITOR).toContain('過去28日の追加人数は未取得')
+    expect(EDITOR).toContain('再追加時の制限・経路不明時の動作')
+    expect(EDITOR).toContain('24時間の再送制限')
+  })
+
+  it('確認画面は案内と後続処理の2段にまとめる', () => {
+    expect(EDITOR).toContain('<strong>登録直後のご案内</strong>')
+    expect(EDITOR).toContain('<strong>あわせて行うこと</strong>')
+    expect(EDITOR).toContain("definition.actions.map((action) => action.label).join('／')")
+  })
 })
