@@ -13,6 +13,7 @@ import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
+import ReminderStepEditorV6 from '@/components/reminders/reminder-step-editor-v6'
 
 /**
  * リマインダの編集。
@@ -65,7 +66,10 @@ function ReminderEditInner() {
     }
     return <ReminderPublishFlow reminderId={id} stage={rawStage as ReminderPublishStage} />
   }
-  return <LegacyReminderEditInner />
+  if (!id) {
+    return <p className="text-danger p-6 text-sm">リマインダが指定されていません。</p>
+  }
+  return <ReminderStepEditorV6 reminderId={id} />
 }
 
 function LegacyReminderEditInner() {
