@@ -3538,7 +3538,7 @@ const ISSUE_330_REVIEW = {
   },
   KoT6c: {
     verdict: 'structure_match_data_pending',
-    note: '構造一致・固定応答待ち。移行元と移行先、変更できる型、事前確認、使用先、取消・確認を実API契約へ接続した。WorkerのPOST移行preview契約は存在するが、共通固定APIが同経路へ405を返すため、変換可能・要確認件数と影響先だけ未照合。#264へ固定応答追加を依頼済み。2幅とも横はみ出し0。',
+    note: '構造一致・設計状態の固定データ待ち。移行元と移行先、13種類の型、事前確認、変換可能137人・要確認3人・空欄1人、確認行、使用先3件、取消・再確認をPOST移行preview APIから表示した。固定契約は「生年月日141人」、設計画像は「電話番号78人」なので、同一の入力値だけ未照合。2幅とも横はみ出し0。',
   },
   rIhbN: {
     verdict: 'match',
@@ -3934,7 +3934,7 @@ for (const screen of SCREENS) {
     screen.verdictNote = `**2026-09-07 Issue #330で実API接続後に再判定。** ${issue330Review.note}`
     screen.verdictSource = issue330Review.source
       ?? `${screen.dir}/${screen.node}.txt + ${screen.dir}/${screen.node}-{1440,1920}.png + 2026-09-07同一状態比較`
-    screen.verdictHead = '46649ddb3'
+    screen.verdictHead = '5959c1756'
   }
   const issue328Review = ISSUE_328_REVIEW[screen.node]
   if (screen.feature === 4 && issue328Review) {
