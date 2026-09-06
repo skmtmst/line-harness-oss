@@ -3169,6 +3169,70 @@ const ISSUE_210_REVIEW = {
 }
 
 /**
+ * board #266。2026-09-06 に latest development（14b61d52）を取り込んだ
+ * UI HEAD ff1fbfc37 / capture HEAD c03ebf864 を 3102/8789 で起動し、
+ * 機能5の14 Node・全状態を設計1920pxと実装1440/1920pxで比較した結果。
+ */
+const ISSUE_266_REVIEW = {
+  TC1b1: {
+    verdict: 'needs_fix',
+    note: '案内帯、4指標、フォルダ、一覧、作成導線は出ており、2幅とも横はみ出し0。ただし設計より一覧の列・行密度・絞り込み・各行の操作が少なく、同じ情報量で比較できない。**推奨修正**：設計の固定データと列構成を接続し、一覧密度と操作位置をそろえる。',
+  },
+  cCB7r: {
+    verdict: 'needs_fix',
+    note: '配信方式を2択する流れと次へ進む操作はあり、2幅とも横はみ出し0。ただし設計の見出し、説明、カード寸法、選択状態、ウィザード上部の構成と一致しない。**推奨修正**：2カードの寸法と説明、現在地、下部操作を設計順にそろえる。',
+  },
+  kk8dz: {
+    verdict: 'needs_fix',
+    note: '3段の現在地、LINEプレビュー、配信の流れ、設定サマリーを追加し、2幅とも横はみ出し0。ただし設計の入力例、本文・日時・配信後操作の配置と右欄の寸法に差が残る。**推奨修正**：作り物の本文は入れず、撮影用固定データを接続して設計と同じ入力済み状態で再比較する。',
+  },
+  bV5Vs: {
+    verdict: 'needs_fix',
+    note: '状態、開始条件、終了条件、ステップ一覧、開始操作は確認でき、2幅とも横はみ出し0。ただし設計の表の列・行密度・各ステップ操作・設定カードの配置が異なる。**推奨修正**：設計のステップ表を正本に、列と行操作を同じ位置へそろえる。',
+  },
+  xfYLn: {
+    verdict: 'needs_fix',
+    note: '対象ステップの本文・日時・対象・送信後設定は編集でき、2幅とも横はみ出し0。ただし設計の種別タブ順、編集欄とLINEプレビューの幅、保存操作、設定サマリーが一致しない。**推奨修正**：個別ステップだけの編集構成を設計の左右配置へそろえる。',
+  },
+  r6Gzsu: {
+    verdict: 'needs_fix',
+    note: '配信対象の条件窓は開き、2幅とも横はみ出し0。ただし設計のAND/OR条件行、15軸の候補、現在の条件、対象人数、除外条件に対し、実装は小さな汎用絞り込み窓に留まる。**推奨修正**：条件契約と人数APIを接続し、設計の条件編集構造へそろえる。',
+  },
+  hz9ti: {
+    verdict: 'needs_fix',
+    note: '送信後アクション窓は開き、2幅とも横はみ出し0。ただし設計の8種類と設定済みの連鎖に対し、実装契約は5種類で固定データも空。**接続条件**：テキスト・テンプレート・リマインド・イベント等の不足アクションをWorker/APIへ追加し、複数アクションの順序と条件を表示する。',
+  },
+  dqFft: {
+    verdict: 'match',
+    note: '対象ステップの編集背景上で削除確認が開き、削除対象、配信対象とアクションも消える影響、履歴が残ること、取り消せないこと、戻る・削除の操作が設計と一致。1440/1920pxとも横はみ出し0。',
+  },
+  EvVO5: {
+    verdict: 'structure_match_data_pending',
+    note: '安定した撮影入口から開始条件のオーバーレイを開け、6種類のきっかけ、開始する友だちの条件、初回のみ/毎回、不足機能の無効理由を確認。2幅とも横はみ出し0。予約確定・手動開始・API/Webhookと、新規開始予定人数を返すAPIが未接続のためデータ待ち。',
+  },
+  RUxNf: {
+    verdict: 'needs_fix',
+    note: '開始確認窓は開き、対象シナリオと取り消せない注意を確認でき、2幅とも横はみ出し0。ただし設計の開始条件・終了条件・配信概要を左右で確認する構成と操作順が不足する。**推奨修正**：開始前に影響を判断できる要約を設計順にそろえる。',
+  },
+  NrBkW: {
+    verdict: 'structure_match_data_pending',
+    note: '開始成功の案内、配信中の状態、停止・変更、開始履歴への次の行動を表示し、2幅とも横はみ出し0。開始日時と新規開始予定人数は現在のAPIが返さないため、作り物を出さず取得できない旨を表示してデータ待ち。',
+  },
+  g2UNV: {
+    verdict: 'needs_fix',
+    note: 'テスト送信の宛先を選ぶ窓は開き、2幅とも横はみ出し0。ただし設計の送信内容確認と最終確認を中心にした小窓に対し、実装は宛先一覧を中心にした大きな窓。**推奨修正**：宛先選択の次に、誰へ何を送るか確認する設計状態を追加する。',
+  },
+  M2b2B: {
+    verdict: 'structure_match_data_pending',
+    note: '通常・読込中・取得失敗を両幅で撮影し、指標、ステップ別反応、プレビュー、配信した設定の2列構成を確認。全状態で横はみ出し0。開封・クリック・失敗の集計APIが未接続で値を「—」としているためデータ待ち。',
+  },
+  q5G45: {
+    verdict: 'match',
+    note: '通常・読込中・0件・取得失敗を両幅で撮影。読込中を0件と誤表示せず、0件は作成導線、取得失敗は再試行を出し、案内帯と4指標も同じ面に残る。全状態で横はみ出し0。',
+  },
+}
+
+/**
  * board #212。2026-09-06 に development bf7434ff を 3107/8794 で起動し、
  * 機能14〜32に残っていた未判定11 Nodeを設計1920pxと実装1440/1920pxで比較した。
  * 画面コードは変更せず、見えた差と撮影不能を判定として記録する。
@@ -3244,6 +3308,13 @@ for (const screen of SCREENS) {
     screen.verdictNote = `**2026-09-06 #210で判定。** 設計1920pxと実装1440/1920pxを目視比較。${issue210Note}`
     screen.verdictSource = `${screen.dir}/${screen.node}.txt + ${screen.dir}/${screen.node}-{1440,1920}.png`
     screen.verdictHead = 'f4296e63'
+  }
+  const issue266Review = ISSUE_266_REVIEW[screen.node]
+  if (screen.feature === 5 && issue266Review) {
+    screen.verdict = issue266Review.verdict
+    screen.verdictNote = `**2026-09-06 #266で判定。** 設計1920pxと実装1440/1920pxを目視比較。${issue266Review.note}`
+    screen.verdictSource = `${screen.dir}/${screen.node}.txt + ${screen.dir}/${screen.node}-{1440,1920}.png`
+    screen.verdictHead = 'c03ebf864'
   }
   const issue212Review = ISSUE_212_REVIEW[screen.node]
   if (screen.feature >= 14 && screen.feature <= 32 && issue212Review) {
@@ -3600,6 +3671,9 @@ export const CAPTURED_AT = {
     { pr: 596, head: 'edb94936', on: '2026-08-30', screens: ['U9hzqH', 'g46ja', 'Yj6CQ', 'e6iJG'], note: 'Claudeが実装した。#595 の契約の上に公開までの4段。実装した本人が比較している' },
   ],
   5: [
+    { pr: 0, head: 'c03ebf864', on: '2026-09-06',
+      screens: ['TC1b1', 'cCB7r', 'kk8dz', 'bV5Vs', 'xfYLn', 'r6Gzsu', 'hz9ti', 'dqFft', 'EvVO5', 'RUxNf', 'NrBkW', 'g2UNV', 'M2b2B', 'q5G45'],
+      note: 'Issue #266。latest developmentを取り込み、1440・1920と全状態を3102/8789で撮影。全画像で横はみ出し0。' },
     { pr: 534, head: '0158ba8e', on: '2026-08-29', screens: ['bV5Vs'], note: '到達率の `NaN%` を消す。束4' },
     { pr: 519, head: 'a8e00234', on: '2026-08-29', screens: ['q5G45'], note: 'シナリオの失敗を未登録と分ける。束1と束4' },
     { pr: 553, head: '2fdded68', on: '2026-08-29', screens: ['dqFft'], note: '通の削除を画面内の確認窓へ。シナリオごと削除はまだ標準の confirm' },
