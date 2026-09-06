@@ -6,16 +6,20 @@ import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import NotificationRunList from '@/components/line-notifications/notification-run-list'
 import OperatorNotificationRules from '@/components/line-notifications/operator-notification-rules'
 import Button from '@/components/shared/button'
-import { api, type EcCommerceOverview, type EcNotificationSetting } from '@/lib/api'
+import ListState from '@/components/shared/list-state'
+import { ApiError, api, type EcCommerceOverview, type EcNotificationSetting } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { canOpenCustomerNotificationKpi, customerNotificationKpis } from './customer-kpis'
 import styles from './customer-notifications.module.css'
 
-const categories = [
-  ['all', 'すべて'], ['order', '注文'], ['payment', '銀行振込'],
-  ['shipping', '発送'], ['support', 'キャンセル・返金'], ['subscription', '定期便'],
+const customerFilters = [
+  ['all', 'すべて'],
+  ['enabled', '出している'],
+  ['stopped', '止めている'],
+  ['incomplete', '文面が未設定'],
 ] as const
-type Category = typeof categories[number][0]
+type CustomerFilter = typeof customerFilters[number][0]
+type CustomerLoadState = 'loading' | 'ready' | 'error' | 'forbidden'
 
 /**
  * 見出しの下に、**内部のイベントキーを出さない**。
@@ -25,18 +29,17 @@ type Category = typeof categories[number][0]
  * V6の「内部IDを画面に出さない」にも反する。
  * 区分の言葉は上の絞り込みが既に持っているので、それを使う。
  */
-function categoryLabel(value: EcNotificationSetting['category']): string {
-  return categories.find(([key]) => key === value)?.[1] ?? '区分なし'
+function isIncomplete(setting: EcNotificationSetting): boolean {
+  return !setting.title?.trim() || !setting.introText.trim() || !setting.outroText.trim()
 }
 
-/** 「いつ直したか」。取れないときは数を作らず `—`。 */
-function formatUpdatedAt(iso: string | null | undefined): string {
-  if (!iso) return '最終更新 —'
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '最終更新 —'
-  return `最終更新 ${date.toLocaleString('ja-JP', {
-    timeZone: 'Asia/Tokyo', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
-  })}`
+function triggerLabel(setting: EcNotificationSetting): string {
+  return `${setting.label}とき ／ EC連携から`
+}
+
+function timingLabel(setting: EcNotificationSetting): string {
+  if (setting.category === 'subscription') return '設定した日時'
+  return `${setting.label}らすぐ`
 }
 
 const TABS = [
@@ -82,9 +85,9 @@ export default function LineNotificationsPage() {
   const tab = useMergedTab(TABS, 'tab', 'customer')
   const [settings, setSettings] = useState<EcNotificationSetting[]>([])
   const [overview, setOverview] = useState<EcCommerceOverview | null>(null)
-  const [category, setCategory] = useState<Category>('all')
+  const [filter, setFilter] = useState<CustomerFilter>('all')
   const [expanded, setExpanded] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loadState, setLoadState] = useState<CustomerLoadState>('loading')
   const [busy, setBusy] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
   const loadGeneration = useRef(0)
@@ -92,11 +95,7 @@ export default function LineNotificationsPage() {
   const load = useCallback(async () => {
     const generation = loadGeneration.current + 1
     loadGeneration.current = generation
-    if (tab !== 'customer') {
-      setLoading(false)
-      return
-    }
-    setLoading(true)
+    setLoadState('loading')
     // アカウント切替中に前のアカウントの件数を残さない。
     setSettings([])
     setOverview(null)
@@ -109,24 +108,43 @@ export default function LineNotificationsPage() {
       if (!settingRes.success || !overviewRes.success) throw new Error('load failed')
       setSettings(settingRes.data)
       setOverview(overviewRes.data)
-      setExpanded((current) => current ?? settingRes.data[0]?.eventType ?? null)
-    } catch {
+      setExpanded((current) => settingRes.data.some((setting) => setting.eventType === current) ? current : null)
+      setLoadState('ready')
+    } catch (error) {
       if (generation === loadGeneration.current) {
+        setLoadState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
         setNotice({ tone: 'error', text: 'LINE通知の設定を読み込めませんでした。' })
       }
-    } finally {
-      if (generation === loadGeneration.current) setLoading(false)
     }
-  }, [selectedAccountId, tab])
+  }, [selectedAccountId])
   useEffect(() => { void load() }, [load])
 
-  const visible = useMemo(() => category === 'all' ? settings : settings.filter((setting) => setting.category === category), [category, settings])
+  const visible = useMemo(() => settings.filter((setting) => {
+    if (filter === 'enabled') return setting.isEnabled
+    if (filter === 'stopped') return !setting.isEnabled
+    if (filter === 'incomplete') return isIncomplete(setting)
+    return true
+  }), [filter, settings])
+  const filterCount = (value: CustomerFilter): number => {
+    if (value === 'enabled') return settings.filter((setting) => setting.isEnabled).length
+    if (value === 'stopped') return settings.filter((setting) => !setting.isEnabled).length
+    if (value === 'incomplete') return settings.filter(isIncomplete).length
+    return settings.length
+  }
+  const sentBreakdown = overview?.byType.slice(0, 3).map((item) => `${item.label} ${item.count}`).join('・') ?? ''
   const kpis = customerNotificationKpis({
-    ready: !loading && overview !== null,
+    ready: loadState === 'ready' && overview !== null,
     settingsCount: settings.length,
     enabledCount: settings.filter((setting) => setting.isEnabled).length,
-    processed: overview?.processed ?? null,
+    sentToday: overview?.last24h ?? null,
+    sentBreakdown,
     failed: overview?.failed ?? null,
+  })
+  const tabsWithCounts = TABS.map((item) => {
+    if (item.key === 'customer') return { ...item, label: `${item.label} ${loadState === 'ready' ? settings.length : '—'}` }
+    if (item.key === 'operator') return { ...item, label: `${item.label} —` }
+    if (item.key === 'failures') return { ...item, label: `${item.label} ${overview?.failed ?? '—'}` }
+    return item
   })
   const update = (eventType: string, patch: Partial<EcNotificationSetting>) => setSettings((current) => current.map((setting) => setting.eventType === eventType ? { ...setting, ...patch } : setting))
 
@@ -160,19 +178,23 @@ export default function LineNotificationsPage() {
   }
 
   return <>
-    <MergedTabs basePath="/line-notifications" tabs={TABS} active={tab} defaultKey="customer" />
+    <MergedTabs basePath="/line-notifications" tabs={tabsWithCounts} active={tab} defaultKey="customer" />
     {tab === 'failures' ? <NotificationRunList lineAccountId={selectedAccountId} mode="failures" /> : null}
     {tab === 'history' ? <NotificationRunList lineAccountId={selectedAccountId} mode="history" /> : null}
     {tab === 'operator' ? <OperatorNotificationRules lineAccountId={selectedAccountId} /> : null}
-    {tab === 'customer' ? <>
-    <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    {tab === 'customer' ? <main
+      data-design-node="festr"
+      data-list-state={loadState === 'ready' && settings.length === 0 ? 'empty' : loadState}
+      className={styles.root}
+    >
+    <div data-design="KPIs" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {kpis.map((kpi) => {
-        const { label, value, note, href } = kpi
+        const { label, value, unit, note, href } = kpi
         const body = <>
           <p className="text-ink-faint text-xs">{label}</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
             {value === null ? '—' : value}
-            {value === null ? null : <span className="text-ink-faint ml-1 text-xs font-normal">件</span>}
+            {value === null ? null : <span className="text-ink-faint ml-1 text-xs font-normal">{unit}</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">{note}</p>
         </>
@@ -185,18 +207,37 @@ export default function LineNotificationsPage() {
         </div>
       })}
     </div>
-    <main className="grid min-w-0 gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
-      <aside className="bg-canvas rounded-card border-hairline h-fit border p-2 lg:sticky lg:top-4">
-        <p className="text-ink-faint px-3 pb-2 pt-3 text-xs font-bold">通知の種類</p>
-        {categories.map(([value, label]) => <button key={value} type="button" onClick={() => setCategory(value)} className={`${styles.category} ${category === value ? styles.categoryCurrent : ''}`}><span>{label}</span><span className={styles.categoryCount}>{value === 'all' ? settings.length : settings.filter((x) => x.category === value).length}</span></button>)}
-        <div className="border-hairline mt-3 border-t p-3 text-xs leading-5 text-ink-faint">通知のON/OFFを切り替えても、ECから受け取った履歴は残ります。</div>
-      </aside>
-      <section className="min-w-0 space-y-3">
-        {notice && <div className={`rounded-control border px-4 py-3 text-sm ${notice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{notice.text}</div>}
-        {loading ? <div className="bg-canvas rounded-card border-hairline border p-12 text-center text-sm text-ink-faint">読み込み中...</div> : visible.map((setting) => <article key={setting.eventType} className="bg-canvas rounded-card border-hairline overflow-hidden border">
-          <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-center gap-3"><Toggle setting={setting} busy={busy === setting.eventType} onToggle={() => void save(setting, !setting.isEnabled)} /><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold text-ink">{setting.label}</h2><span className={`rounded-pill px-2 py-0.5 text-xs font-semibold ${setting.isEnabled ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}>{setting.isEnabled ? '通知ON' : '通知OFF'}</span></div><p className="mt-0.5 truncate text-xs text-ink-faint">{categoryLabel(setting.category)}・{formatUpdatedAt(setting.updatedAt)}</p></div></div>
-            <button type="button" onClick={() => setExpanded(expanded === setting.eventType ? null : setting.eventType)} className={styles.rowAction}>{expanded === setting.eventType ? '編集を閉じる' : '内容を編集'}</button>
+    <div className="border-info bg-info-bg text-info rounded-control border px-4 py-3 text-sm leading-6">
+      これは「お知らせ」であって「売り込みの配信」ではありません。顧客が配信を止めていても、取引に必要な連絡は届きます。
+    </div>
+
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="grid w-full max-w-3xl grid-cols-2 gap-2 lg:grid-cols-4" aria-label="お知らせの絞り込み">
+        {customerFilters.map(([value, label]) => <button key={value} type="button" onClick={() => setFilter(value)} className={`${styles.category} ${filter === value ? styles.categoryCurrent : ''}`}><span>{label}</span><span className={styles.categoryCount}>{loadState === 'ready' ? filterCount(value) : '—'}</span></button>)}
+      </div>
+      <p className="text-xs text-ink-faint">送った数が多い順</p>
+    </div>
+
+    {notice && <div className={`rounded-control border px-4 py-3 text-sm ${notice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{notice.text}</div>}
+
+    <section className="min-w-0 overflow-hidden rounded-card border border-hairline bg-canvas">
+      {loadState === 'loading' ? <ListState kind="loading" title="顧客へのお知らせを読み込んでいます" />
+        : loadState === 'forbidden' ? <ListState kind="forbidden" />
+        : loadState === 'error' ? <ListState kind="error" title="顧客へのお知らせを表示できませんでした" onRetry={() => void load()} />
+        : settings.length === 0 ? <ListState kind="empty" title="顧客へのお知らせはまだありません" description="EC連携の取引イベントを接続すると、ここで種類ごとに管理できます。" />
+        : visible.length === 0 ? <ListState kind="empty" title="条件に合うお知らせはありません" description="絞り込みを変えてください。" />
+        : <>
+        <div className="line-notification-v6-header">
+          <span>お知らせ</span><span>いつ送るか</span><span>今日</span><span>この30日</span><span>状態</span><span>操作</span>
+        </div>
+        {visible.map((setting) => <article key={setting.eventType} className="border-b border-hairline last:border-b-0">
+          <div className="line-notification-v6-row">
+            <div className="min-w-0"><h2 className="truncate font-bold text-ink" title={setting.title?.trim() || setting.label}>{setting.title?.trim() || setting.label}</h2><p className="mt-0.5 truncate text-xs text-ink-faint" title={triggerLabel(setting)}>{triggerLabel(setting)}</p></div>
+            <span className="text-sm text-ink-secondary">{timingLabel(setting)}</span>
+            <span className="text-sm tabular-nums text-ink-secondary">{overview?.byType.find((item) => item.eventType === setting.eventType)?.count ?? '—'}通</span>
+            <span className="text-sm text-ink-faint">—</span>
+            <div className="flex items-center gap-2"><Toggle setting={setting} busy={busy === setting.eventType} onToggle={() => void save(setting, !setting.isEnabled)} /><span className={`whitespace-nowrap rounded-pill px-2 py-0.5 text-xs font-semibold ${setting.isEnabled ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}>{setting.isEnabled ? '出している' : '止めている'}</span></div>
+            <button type="button" onClick={() => setExpanded(expanded === setting.eventType ? null : setting.eventType)} className="line-notification-v6-row-action">{expanded === setting.eventType ? '編集を閉じる' : '内容を編集'}</button>
           </div>
           {expanded === setting.eventType && <div className="border-hairline bg-canvas-sunken/60 grid gap-5 border-t p-4 xl:grid-cols-[minmax(0,1fr)_380px]">
             <div className="min-w-0 space-y-4">
@@ -211,8 +252,10 @@ export default function LineNotificationsPage() {
             <div className="min-w-0"><p className="mb-2 text-xs font-semibold text-ink-faint">LINEプレビュー</p><CardPreview setting={setting} /></div>
           </div>}
         </article>)}
-      </section>
-    </main>
-    </> : null}
+        <p className="border-t border-hairline px-4 py-3 text-xs text-ink-faint">お知らせの種類 {settings.length}つのうち {visible.length}つを表示
+        </p>
+        </>}
+    </section>
+    </main> : null}
   </>
 }
