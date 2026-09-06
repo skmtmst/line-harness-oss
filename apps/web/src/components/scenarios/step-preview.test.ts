@@ -7,7 +7,7 @@
  * ときの繰り上がりを見る。
  */
 import { describe, it, expect } from 'vitest'
-import { computeDeliveryAt } from './step-preview'
+import { computeDeliveryAt, renderPreviewBody } from './step-preview'
 
 /** JSTの日時をローカルのDateとして組み立てる（画面側と同じ扱い）。 */
 function at(y: number, m: number, d: number, hh: number, mm = 0): Date {
@@ -61,5 +61,14 @@ describe('経過時間で指定', () => {
     const out = computeDeliveryAt(at(2026, 8, 19, 22, 0), 'elapsed', 0, '10:00', 5)
     expect(out.getDate()).toBe(20)
     expect(out.getHours()).toBe(3)
+  })
+})
+
+describe('メッセージ本文のプレビュー', () => {
+  it('名前だけを安全な例へ置き換え、そのほかの差し込みは残す', () => {
+    expect(renderPreviewBody('{{name}}さん、{{date}}にお届けします')).toBe(
+      'Kentaさん、{{date}}にお届けします',
+    )
+    expect(renderPreviewBody('{{お名前}}さん')).toBe('Kentaさん')
   })
 })

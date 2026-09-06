@@ -233,8 +233,8 @@ describe('EvVO5 開始条件', () => {
     )
   })
 
-  it('押す前に一致人数を出す。数える口は segments.count', () => {
-    expect(triggerEditor).toContain('await api.segments.count(usableCondition, lineAccountId ?? undefined)')
+  it('押す前に一致人数を出す。購読の重なりも分かる試算APIを使う', () => {
+    expect(triggerEditor).toContain('await api.scenarios.simulate(scenarioId, lineAccountId)')
     expect(matchBlock).toContain('一致')
     expect(matchBlock).toContain('すでに購読中')
     expect(matchBlock).toContain('新規開始予定')
@@ -243,11 +243,9 @@ describe('EvVO5 開始条件', () => {
 
   it('新規開始予定を引き算で作らない', () => {
     const planned = slice(matchBlock, '<dt className="text-ink-faint text-xs">新規開始予定</dt>', '</dd>')
-    expect(planned).toContain('>—</dd>')
-    expect(planned).not.toMatch(/activeNow|match\.count/)
-    expect(triggerEditor).toContain(
-      '新規開始予定はまだ繋がっていません。一致と購読中の重なりを数える取得口が接続されると表示されます。',
-    )
+    expect(planned).toContain('match.newStartPlanned')
+    expect(planned).not.toMatch(/activeNow|match\.matched\s*-/)
+    expect(triggerEditor).toContain('試算では配信も購読も始まりません。')
   })
 
   it('読込中・取得失敗の言葉を決まりどおりにそろえる', () => {

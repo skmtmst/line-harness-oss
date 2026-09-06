@@ -7,7 +7,7 @@
  * 「どこを直すと何が変わるか」が追えなくなる。
  */
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
@@ -106,6 +106,17 @@ export function ConditionDialog({
         </>
       }
     >
+      <section className="bg-canvas-sunken rounded-panel mb-4 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-ink-faint text-xs">現在の条件</p>
+            <p className="text-ink mt-1 text-sm font-bold">{describeCondition(draft)}</p>
+          </div>
+          <Button onClick={() => setDraft(null)}>
+            条件を初期化
+          </Button>
+        </div>
+      </section>
       <ConditionBuilder value={draft} onChange={setDraft} />
     </Shell>
   )
@@ -297,6 +308,26 @@ export function TestSendDialog({
   const [confirming, setConfirming] = useState(false)
   const [sending, setSending] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [lastTest, setLastTest] = useState<{ sentAt: string; messageCount: number } | null>(null)
+  const resolvedAccountId = lineAccountId ?? selectedAccountId ?? null
+
+  const loadTestHistory = useCallback(async () => {
+    if (!resolvedAccountId) {
+      setLastTest(null)
+      return
+    }
+    try {
+      const response = await api.scenarios.runs(scenarioId, resolvedAccountId, { limit: 1 })
+      const latest = response.success ? response.data.testSends[0] : null
+      setLastTest(latest ? { sentAt: latest.sentAt, messageCount: latest.messageCount } : null)
+    } catch {
+      setLastTest(null)
+    }
+  }, [resolvedAccountId, scenarioId])
+
+  useEffect(() => {
+    void loadTestHistory()
+  }, [loadTestHistory])
 
   useEffect(() => {
     let cancelled = false
@@ -346,6 +377,7 @@ export function TestSendDialog({
           ? { ok: true, message: `${res.data.sent} 通を送りました。` }
           : { ok: false, message: res.error },
       )
+      if (res.success) await loadTestHistory()
     } catch (sendError) {
       setResult({
         ok: false,
@@ -425,6 +457,18 @@ export function TestSendDialog({
               ))}
             </ul>
           ) : null}
+          <div className="border-hairline rounded-panel border px-4 py-3">
+            <p className="text-ink text-xs font-bold">確認した内容</p>
+            <ul className="text-ink-secondary mt-2 space-y-1 text-xs">
+              <li>✓ 対象人数：この友だち1人</li>
+              <li>✓ メッセージ表示：全{steps.length}通</li>
+              <li>✓ 配信日時：テスト用に待機時間を短縮</li>
+            </ul>
+          </div>
+          <div className="bg-info-bg rounded-panel px-4 py-3">
+            <p className="text-ink text-xs font-bold">メッセージプレビュー</p>
+            <p className="text-ink-secondary mt-2 text-sm">［テスト］{steps[0]?.kind ?? stepLabel}</p>
+          </div>
           <p className="text-ink-faint text-xs">本番の登録は増えません。配信予定も作りません。</p>
         </div>
       ) : (
@@ -440,6 +484,12 @@ export function TestSendDialog({
           本番の登録は増えません。配信予定も作りません。
         </span>
       </p>
+
+      {lastTest ? (
+        <p className="bg-info-bg text-ink-secondary rounded-panel mb-4 px-4 py-3 text-xs">
+          前回のテスト送信：{new Date(lastTest.sentAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}・{lastTest.messageCount}通
+        </p>
+      ) : null}
 
       {/* 送る内容。押す前に何通いくのかが読めないと、確かめようがない。 */}
       {steps.length > 0 && (
