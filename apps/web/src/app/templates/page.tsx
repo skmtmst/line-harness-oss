@@ -816,10 +816,12 @@ export default function TemplatesPage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       {typeof t.monthlySendCount === 'number' && typeof t.totalSendCount === 'number' ? (
-                        <div className="whitespace-nowrap text-xs">
-                          <p className="font-medium text-ink">今月 {formatCount(t.monthlySendCount)}通</p>
-                          <p className="mt-0.5 text-ink-faint">累計 {formatCount(t.totalSendCount)}通</p>
-                        </div>
+                        <span
+                          className="whitespace-nowrap text-xs font-medium text-ink"
+                          title={`累計 ${formatCount(t.totalSendCount)}通`}
+                        >
+                          今月 {formatCount(t.monthlySendCount)}通
+                        </span>
                       ) : (
                         <span className="text-ink-faint text-xs">送信数を確認できません</span>
                       )}

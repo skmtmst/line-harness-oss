@@ -126,6 +126,7 @@ describe('テンプレートの実送信数', () => {
 
     expect(counts.get('tpl-1')).toEqual({ thisMonth: 12, total: 48 });
     expect(calls[0]?.sql).toContain("direction = 'outgoing'");
+    expect(calls[0]?.sql).toContain("COALESCE(delivery_type, '') != 'test'");
     expect(calls[0]?.sql).toContain('template_id_at_send IN (?,?)');
     expect(calls[0]?.values).toEqual(['2026-09', 'tpl-1', 'tpl-2']);
   });

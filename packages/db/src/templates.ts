@@ -332,8 +332,9 @@ export async function getTemplateSendCounts(
     `SELECT template_id_at_send AS template_id,
             COUNT(*) AS total_count,
             SUM(CASE WHEN substr(created_at, 1, 7) = ? THEN 1 ELSE 0 END) AS month_count
-       FROM messages_log
+      FROM messages_log
       WHERE direction = 'outgoing'
+        AND COALESCE(delivery_type, '') != 'test'
         AND template_id_at_send IN (${placeholders})
       GROUP BY template_id_at_send`,
   ).bind(month, ...templateIds).all<{
