@@ -2368,9 +2368,9 @@ export const SCREENS = [
   {
     ...WEBHOOK, node: 'k3WxrO', name: '26-1 外部連携',
     route: '/webhooks?tab=outgoing',
-    verdict: 'needs_fix', verdictNote: '**2026-09-06 Issue #239 / PR #TBD / UI HEAD `CAPTURED_AT` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** 4タブの名称・件数と送り先6本はそろい、1440px・1920pxとも横はみ出し0。ただし設計の4指標、説明帯、状態・期間の絞り込み、送信回数・直近結果・中身を見る導線が一覧に無く、URL・シークレット・作成日を中心にした管理用の表のまま。**推奨修正：やり取りAPIの集計を一覧へ接続し、送信回数・直近結果・再送導線を設計の列へまとめる。**', verdictSource: 'webhooks-v6/k3WxrO-1920.png', verdictHead: 'CAPTURED_AT',
+    verdict: 'needs_fix', verdictNote: '**2026-09-06 Issue #239 / PR #1005 / UI HEAD `5421d62fd` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** 4タブの名称・件数と送り先6本はそろい、1440px・1920pxとも横はみ出し0。ただし設計の4指標、説明帯、状態・期間の絞り込み、送信回数・直近結果・中身を見る導線が一覧に無く、URL・シークレット・作成日を中心にした管理用の表のまま。**推奨修正：やり取りAPIの集計を一覧へ接続し、送信回数・直近結果・再送導線を設計の列へまとめる。**', verdictSource: 'webhooks-v6/k3WxrO-1920.png', verdictHead: '5421d62fd',
   },
-  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', verdict: 'needs_fix', verdictNote: '**2026-09-06 Issue #239 / PR #TBD / UI HEAD `CAPTURED_AT` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** 4タブと受け取り口3件、日本語だけの見出し、安全なシークレット状態はそろい、横はみ出し0。ただし設計は選択した受け取り口のURL・合言葉・対応付け・届いたデータの見本・差し込み項目・注意を1画面で確認する詳細面。実装は3件の一覧だけで、受信サンプルを返すAPIも無い。**推奨修正：受け取り口詳細と、本文をマスクした最新受信サンプルのAPIを用意し、一覧行から詳細へ進めるようにする。**', verdictSource: 'webhooks-v6/M0Gb7-1920.png', verdictHead: 'CAPTURED_AT' },
+  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', verdict: 'needs_fix', verdictNote: '**2026-09-06 Issue #239 / PR #1005 / UI HEAD `5421d62fd` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** 4タブと受け取り口3件、日本語だけの見出し、安全なシークレット状態はそろい、横はみ出し0。ただし設計は選択した受け取り口のURL・合言葉・対応付け・届いたデータの見本・差し込み項目・注意を1画面で確認する詳細面。実装は3件の一覧だけで、受信サンプルを返すAPIも無い。**推奨修正：受け取り口詳細と、本文をマスクした最新受信サンプルのAPIを用意し、一覧行から詳細へ進めるようにする。**', verdictSource: 'webhooks-v6/M0Gb7-1920.png', verdictHead: '5421d62fd' },
     // ---- 2026-09-02 `a0bb3f44` で実装を読み直した ----
     // **「タブの言葉に内部の語が残る（受信 (Incoming)／送信 (Outgoing)）」は古い。**
     //   `webhook-operator-words-contract.test.ts:13-14` が `Incoming)` `Outgoing)` を
@@ -2391,15 +2391,15 @@ export const SCREENS = [
     route: '/webhooks?tab=interactions', mode: 'page',
     states: { apis: ['**/api/webhooks/interactions?**', '**/api/webhooks/interactions'], kinds: ['normal', 'loading', 'empty', 'error'] },
     verdict: 'match',
-    verdictNote: '**2026-09-06 Issue #239 / PR #TBD / UI HEAD `CAPTURED_AT` を3107/8794で通常・読込中・0件・取得失敗まで再撮影し、★V6設計と同じ1920pxで並べて一致を確認。** 4指標、失敗先、最長10秒、安全な送受信要約、7行の密度、絞り込み、再送、ページ送りがそろった。本文・URL・シークレットは設計の意図を保って一覧には出さない。全10枚で1440px・1920pxとも横はみ出し0。',
+    verdictNote: '**2026-09-06 Issue #239 / PR #1005 / UI HEAD `5421d62fd` を3107/8794で通常・読込中・0件・取得失敗まで再撮影し、★V6設計と同じ1920pxで並べて一致を確認。** 4指標、失敗先、最長10秒、安全な送受信要約、7行の密度、絞り込み、再送、ページ送りがそろった。本文・URL・シークレットは設計の意図を保って一覧には出さない。全10枚で1440px・1920pxとも横はみ出し0。',
     verdictSource: 'webhooks-v6/KNG00-normal-1920.png + KNG00-loading.txt + KNG00-empty.txt + KNG00-error.txt',
-    verdictHead: 'CAPTURED_AT',
+    verdictHead: '5421d62fd',
   },
   {
     ...WEBHOOK, node: 'f8SBSh', name: '26-1-C 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/webhooks/**'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: '**2026-09-06 Issue #239 / PR #TBD / UI HEAD `CAPTURED_AT` を3107/8794で通常・読込中・0件・取得失敗まで再撮影し、★V6設計と同じ1920pxで並べて確認。** 3状態は分かれ、取得失敗で登録内容が消えていない説明と再読込を出し、全8枚で横はみ出し0。ただし設計は4指標・説明帯・絞り込み・ページ送りを残した同じ一覧枠の中で各状態を見せる。実装は状態部分だけになり、一覧の文脈が消える。**推奨修正：k3WxrOの集計・絞り込み・ページ送りを先に接続し、その共通枠の表領域だけを3状態へ差し替える。**',
-    verdictSource: 'webhooks-v6/f8SBSh-loading.txt + f8SBSh-empty.txt + f8SBSh-error.txt', verdictHead: 'CAPTURED_AT',
+    verdict: 'needs_fix', verdictNote: '**2026-09-06 Issue #239 / PR #1005 / UI HEAD `5421d62fd` を3107/8794で通常・読込中・0件・取得失敗まで再撮影し、★V6設計と同じ1920pxで並べて確認。** 3状態は分かれ、取得失敗で登録内容が消えていない説明と再読込を出し、全8枚で横はみ出し0。ただし設計は4指標・説明帯・絞り込み・ページ送りを残した同じ一覧枠の中で各状態を見せる。実装は状態部分だけになり、一覧の文脈が消える。**推奨修正：k3WxrOの集計・絞り込み・ページ送りを先に接続し、その共通枠の表領域だけを3状態へ差し替える。**',
+    verdictSource: 'webhooks-v6/f8SBSh-loading.txt + f8SBSh-empty.txt + f8SBSh-error.txt', verdictHead: '5421d62fd',
   },
 
   // ── 機能27 予約管理 ─────────────────────────────────────
