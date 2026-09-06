@@ -3138,6 +3138,37 @@ export const BOOKING_AVAILABILITY = {
 }
 
 /*
+  受付枠画面 `tksPc` が読む、担当者ごとの通常応答。
+  現行APIが持つのは1曜日1区間と特別営業で、休けい・店舗上限・
+  明示休業はまだ返せない。その項目は画面側で作らず「—」にする。
+*/
+export const BOOKING_AVAILABILITY_RULES = [
+  { id: 'bar-1', weekday: 1, start_time: '09:00', end_time: '19:00' },
+  { id: 'bar-2', weekday: 2, start_time: '09:00', end_time: '19:00' },
+  { id: 'bar-3', weekday: 4, start_time: '09:00', end_time: '19:00' },
+  { id: 'bar-4', weekday: 5, start_time: '09:00', end_time: '20:00' },
+  { id: 'bar-5', weekday: 6, start_time: '09:00', end_time: '18:00' },
+  { id: 'bar-6', weekday: 0, start_time: '10:00', end_time: '17:00' },
+]
+
+export const BOOKING_STAFF_SHIFTS = [
+  { id: 'bss-1', work_date: '2026-09-23', start_time: '10:00', end_time: '17:00' },
+  { id: 'bss-2', work_date: '2026-12-29', start_time: '10:00', end_time: '15:00' },
+]
+
+export const BOOKING_GOOGLE_CALENDAR = {
+  connection: {
+    id: 'bgc-1', calendar_id: 'visual-qa-calendar@example.invalid',
+    auth_type: 'service_account', is_active: 1,
+    last_verified_at: '2026-09-02T00:00:00.000Z', last_error: null,
+  },
+  service_account: {
+    configured: true,
+    email: 'visual-qa-calendar@example.invalid',
+  },
+}
+
+/*
   予約。設計 `TV2DI`（予約管理）の台帳そのまま。
 
   **LINEからと電話からを混ぜる。** 設計は「LINEから 9・電話 3」を色で分けて
