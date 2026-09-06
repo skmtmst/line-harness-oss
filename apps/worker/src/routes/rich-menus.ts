@@ -1,6 +1,6 @@
 import { Hono, type Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
-import { getFriendById, getLineAccountById } from '@line-crm/db';
+import { getFriendById, getLineAccountById, recordRichMenuAssignment } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { resolveLineToken } from '../services/line-token.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -111,6 +111,14 @@ richMenus.post('/api/friends/:friendId/rich-menu', requireRole('owner', 'admin')
     });
     const lineClient = new LineClient(accessToken);
     await lineClient.linkRichMenuToUser(friend.line_user_id, body.richMenuId);
+    if (friendAccountId) {
+      await recordRichMenuAssignment(db, {
+        friendId,
+        lineAccountId: friendAccountId,
+        lineRichMenuId: body.richMenuId,
+        reasonKind: 'manual_friend_link',
+      });
+    }
 
     return c.json({ success: true, data: null });
   } catch (err) {
@@ -145,6 +153,14 @@ richMenus.delete('/api/friends/:friendId/rich-menu', requireRole('owner', 'admin
     });
     const lineClient = new LineClient(accessToken);
     await lineClient.unlinkRichMenuFromUser(friend.line_user_id);
+    if (friendAccId) {
+      await recordRichMenuAssignment(db, {
+        friendId,
+        lineAccountId: friendAccId,
+        lineRichMenuId: null,
+        reasonKind: 'manual_friend_unlink',
+      });
+    }
 
     return c.json({ success: true, data: null });
   } catch (err) {

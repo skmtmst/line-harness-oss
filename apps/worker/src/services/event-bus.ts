@@ -20,6 +20,7 @@ import {
   jstNow,
   getFriendScore,
   recordAnalyticsEvent,
+  recordRichMenuAssignment,
   createWebhookInteraction,
   finishWebhookInteraction,
   type WebhookInteractionFailureReason,
@@ -529,6 +530,18 @@ async function executeAction(
       if (!friend) break;
       const lineClient = new LineClient(lineAccessToken);
       await lineClient.linkRichMenuToUser(friend.line_user_id, action.params.richMenuId);
+      if (lineAccountId) {
+        await recordRichMenuAssignment(db, {
+          friendId,
+          lineAccountId,
+          lineRichMenuId: action.params.richMenuId,
+          reasonKind: 'legacy_automation',
+          reasonEventId: payload.sourceEventId ?? null,
+          idempotencyKey: payload.sourceEventId
+            ? `${payload.sourceEventId}:switch_rich_menu:${friendId}`
+            : undefined,
+        });
+      }
       break;
     }
 
@@ -541,6 +554,18 @@ async function executeAction(
       if (!friend) break;
       const lineClient = new LineClient(lineAccessToken);
       await lineClient.unlinkRichMenuFromUser(friend.line_user_id);
+      if (lineAccountId) {
+        await recordRichMenuAssignment(db, {
+          friendId,
+          lineAccountId,
+          lineRichMenuId: null,
+          reasonKind: 'legacy_automation',
+          reasonEventId: payload.sourceEventId ?? null,
+          idempotencyKey: payload.sourceEventId
+            ? `${payload.sourceEventId}:remove_rich_menu:${friendId}`
+            : undefined,
+        });
+      }
       break;
     }
 

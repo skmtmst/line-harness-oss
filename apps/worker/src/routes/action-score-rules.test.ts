@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 
 const dbMocks = {
   getStaffByApiKey: vi.fn().mockResolvedValue(null),
-  getActionScoreBands: vi.fn(),
+  getActionScoreBandOverview: vi.fn(),
   getActionScoreRuleConfiguration: vi.fn(),
   publishActionScoreRuleDraft: vi.fn(),
   saveActionScoreRuleDraft: vi.fn(),
@@ -64,7 +64,9 @@ beforeEach(() => {
     configured: false, status: 'not_configured', currentDraftVersionId: null,
     editableVersion: { ...configuration, id: null, versionNumber: 1 }, publishedVersion: null,
   });
-  dbMocks.getActionScoreBands.mockResolvedValue(configuration.bands);
+  dbMocks.getActionScoreBandOverview.mockResolvedValue({
+    ...configuration.bands, bandSummaries: [], measuredAt: '2026-09-07T00:00:00.000Z',
+  });
   dbMocks.saveActionScoreRuleDraft.mockResolvedValue({ currentDraftVersionId: 'draft-1' });
   dbMocks.publishActionScoreRuleDraft.mockResolvedValue({ status: 'published' });
   dbMocks.stopActionScoreRules.mockResolvedValue({ status: 'stopped' });
@@ -85,12 +87,15 @@ describe('V6 action score rule API', () => {
   it('returns score bands only for the selected authorized account', async () => {
     const hidden = await call('/api/action-scores/bands?accountId=hidden');
     expect(hidden.status).toBe(404);
-    expect(dbMocks.getActionScoreBands).not.toHaveBeenCalled();
+    expect(dbMocks.getActionScoreBandOverview).not.toHaveBeenCalled();
 
     const response = await call('/api/action-scores/bands?accountId=account-1');
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ success: true, data: configuration.bands });
-    expect(dbMocks.getActionScoreBands).toHaveBeenCalledWith(env.DB, 'account-1');
+    expect(await response.json()).toMatchObject({
+      success: true,
+      data: { ...configuration.bands, bandSummaries: [] },
+    });
+    expect(dbMocks.getActionScoreBandOverview).toHaveBeenCalledWith(env.DB, 'account-1');
   });
 
   it('lets mileage staff view rules but not change them', async () => {

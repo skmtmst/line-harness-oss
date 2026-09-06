@@ -7,6 +7,11 @@ const dbMocks = {
   getRichMenuGroupById: vi.fn(),
   getRichMenuGroupWithPages: vi.fn(),
   getRichMenuDeleteImpact: vi.fn(),
+  getRichMenuAudienceStats: vi.fn(),
+  getRichMenuTapStats: vi.fn(),
+  recordRichMenuAssignmentsByLineUserIds: vi.fn(),
+  clearRichMenuAssignmentsForGroup: vi.fn(),
+  jstNow: vi.fn(),
   createRichMenuGroup: vi.fn(),
   updateRichMenuGroupMeta: vi.fn(),
   replaceRichMenuPages: vi.fn(),
@@ -98,7 +103,9 @@ beforeEach(() => {
   });
   dbMocks.getRichMenuDeleteImpact.mockResolvedValue({
     group: { id: 'g1', accountId: 'acc-1', name: 'メニュー', status: 'draft' },
-    currentAudience: { value: null, reason: 'assignment_ledger_unavailable' },
+    currentAudience: {
+      value: 0, state: 'partial', reason: 'preexisting_assignments_not_backfilled',
+    },
     nextDisplay: { guaranteedGroupId: null, reason: 'friend_specific_rules', candidates: [] },
     incomingSwitches: [],
     operationalReferences: [],
@@ -109,6 +116,11 @@ beforeEach(() => {
     canDelete: true,
     recommendedAction: 'delete',
   });
+  dbMocks.getRichMenuAudienceStats.mockResolvedValue([]);
+  dbMocks.getRichMenuTapStats.mockResolvedValue({ from: '', to: '', byArea: [], byGroup: [], total: 0 });
+  dbMocks.recordRichMenuAssignmentsByLineUserIds.mockResolvedValue(undefined);
+  dbMocks.clearRichMenuAssignmentsForGroup.mockResolvedValue(undefined);
+  dbMocks.jstNow.mockReturnValue('2026-09-07T12:00:00.000');
 });
 
 // ----- GET /api/rich-menu-groups -----
@@ -155,6 +167,46 @@ describe('GET /api/rich-menu-groups', () => {
       id: 'g1', accountId: 'acc-1', chatBarText: 'メニュー',
       isDefaultForAll: true, status: 'published',
     });
+  });
+
+  test('今月のタップ数とユニーク割当人数をメニューごとに返す', async () => {
+    dbMocks.getRichMenuGroups.mockResolvedValue([
+      {
+        id: 'g1', account_id: 'acc-1', name: 'メイン', chat_bar_text: 'メニュー',
+        size: 'large', default_page_id: 'p1', is_default_for_all: 0,
+        status: 'published', publishing_at: null, targeting_condition: null,
+        targeting_priority: 0, targeting_enabled: 1, folder_id: null, display_order: 0,
+        created_at: '2026-09-01T00:00:00.000', updated_at: '2026-09-01T00:00:00.000',
+      },
+    ]);
+    dbMocks.getRichMenuAudienceStats.mockResolvedValue([
+      { groupId: 'g1', currentAudience: 8140, monthlyUniqueAudience: 1020 },
+    ]);
+    dbMocks.getRichMenuTapStats.mockResolvedValue({
+      from: '2026-09-01T00:00:00.000', to: '2026-10-01T00:00:00.000',
+      byArea: [], byGroup: [{ groupId: 'g1', taps: 3210 }], total: 3210,
+    });
+
+    const res = await setupApp().request('/api/rich-menu-groups?accountId=acc-1');
+
+    expect(res.status).toBe(200);
+    expect((await res.json() as { data: any[] }).data[0].monthlyStats).toMatchObject({
+      taps: 3210,
+      uniqueAudience: {
+        value: 1020,
+        state: 'partial',
+        reason: 'preexisting_assignments_not_backfilled',
+      },
+    });
+  });
+
+  test('集計DBを読めない場合は503にして0件と偽らない', async () => {
+    dbMocks.getRichMenuGroups.mockResolvedValue([{ id: 'g1' }]);
+    dbMocks.getRichMenuAudienceStats.mockRejectedValue(new Error('db unavailable'));
+
+    const res = await setupApp().request('/api/rich-menu-groups?accountId=acc-1');
+
+    expect(res.status).toBe(503);
   });
 });
 
@@ -212,6 +264,29 @@ describe('GET /api/rich-menu-groups/:groupId', () => {
 // ----- POST preview-targets / schedule / GET usages (V6 12-1-B/D/F) -----
 
 describe('V6 targeting preview and publish schedule', () => {
+  test('削除確認へ割当台帳の現在表示人数を返す', async () => {
+    dbMocks.getRichMenuDeleteImpact.mockResolvedValue({
+      group: { id: 'g1', accountId: 'acc-1', name: 'メニュー', status: 'published' },
+      currentAudience: {
+        value: 8140, state: 'partial', reason: 'preexisting_assignments_not_backfilled',
+      },
+      nextDisplay: { guaranteedGroupId: null, reason: 'friend_specific_rules', candidates: [] },
+      incomingSwitches: [],
+      operationalReferences: [],
+    });
+
+    const res = await setupApp().request('/api/rich-menu-groups/g1/usages');
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: {
+        currentAudience: {
+          value: 8140, state: 'partial', reason: 'preexisting_assignments_not_backfilled',
+        },
+      },
+    });
+  });
+
   test('対象人数と上位メニューとの重複を実データから返す', async () => {
     dbMocks.getRichMenuGroupById.mockResolvedValue({
       id: 'g1', account_id: 'acc-1', status: 'draft', size: 'large',
@@ -303,6 +378,33 @@ describe('V6 targeting preview and publish schedule', () => {
     });
 
     expect(res.status).toBe(403);
+  });
+});
+
+describe('GET /api/rich-menu-groups/:groupId/usages', () => {
+  test('使用中0件を取得失敗と混ぜずに返す', async () => {
+    const res = await setupApp().request('/api/rich-menu-groups/g1/usages');
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: { currentAudience: { value: 0, state: 'partial' }, incomingSwitches: [] },
+    });
+  });
+
+  test('見えないLINEアカウントの使用先は404で隠す', async () => {
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
+
+    const res = await setupApp().request('/api/rich-menu-groups/g1/usages');
+
+    expect(res.status).toBe(404);
+  });
+
+  test('DB取得失敗は503にして0件と偽らない', async () => {
+    dbMocks.getRichMenuDeleteImpact.mockRejectedValue(new Error('db unavailable'));
+
+    const res = await setupApp().request('/api/rich-menu-groups/g1/usages');
+
+    expect(res.status).toBe(503);
   });
 });
 
@@ -513,17 +615,22 @@ describe('PATCH /api/rich-menu-groups/:groupId', () => {
 // ----- GET /api/rich-menu-groups/:groupId/delete-impact -----
 
 describe('GET /api/rich-menu-groups/:groupId/delete-impact', () => {
-  test('returns the impact contract without inventing an audience count', async () => {
+  test('割当台帳で確認できた現在人数と不完全理由を返す', async () => {
     const app = setupApp();
     const res = await app.request('/api/rich-menu-groups/g1/delete-impact');
     expect(res.status).toBe(200);
     const body = await res.json() as {
       success: boolean;
-      data: { currentAudience: { value: number | null }; canDelete: boolean };
+      data: { currentAudience: { value: number; state: string; reason: string }; canDelete: boolean };
     };
     expect(body).toMatchObject({
       success: true,
-      data: { currentAudience: { value: null }, canDelete: true },
+      data: {
+        currentAudience: {
+          value: 0, state: 'partial', reason: 'preexisting_assignments_not_backfilled',
+        },
+        canDelete: true,
+      },
     });
   });
 
@@ -721,6 +828,79 @@ describe('GET /api/rich-menu-images/:key', () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get('Content-Type')).toBe('image/png');
+  });
+});
+
+describe('GET /api/rich-menu-groups/external', () => {
+  test('LINEの面ごとのURLと送信文を返す', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue({ channel_access_token: 'line-token' });
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/richmenu/list')) {
+        return new Response(JSON.stringify({
+          richmenus: [{
+            richMenuId: 'external-1', name: '外部メニュー', chatBarText: 'メニュー',
+            selected: true, size: { width: 2500, height: 1686 },
+            areas: [
+              { bounds: { x: 0, y: 0, width: 100, height: 100 }, action: { type: 'uri', uri: 'https://example.com/menu' } },
+              { bounds: { x: 100, y: 0, width: 100, height: 100 }, action: { type: 'message', text: '予約したい' } },
+              { bounds: { x: 200, y: 0, width: 100, height: 100 }, action: { type: 'camera' } },
+            ],
+          }],
+        }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ richMenuId: 'external-1' }), { status: 200 });
+    });
+
+    const res = await setupApp().request('/api/rich-menu-groups/external?accountId=acc-1');
+    const body = await res.json() as { data: { lineMenus: any[] } };
+
+    expect(res.status).toBe(200);
+    expect(body.data.lineMenus[0]).toMatchObject({
+      richMenuId: 'external-1', isCurrentDefault: true, areasCount: 3,
+      areas: [
+        { action: { type: 'uri', url: 'https://example.com/menu', supported: true } },
+        { action: { type: 'message', text: '予約したい', supported: true } },
+        { action: { type: 'camera', supported: false, unsupportedReason: 'unsupported_or_incomplete_action' } },
+      ],
+    });
+    fetchSpy.mockRestore();
+  });
+
+  test('LINEにメニューが無ければ空一覧を返す', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue({ channel_access_token: 'line-token' });
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({ richmenus: [] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response('', { status: 404 }));
+
+    const res = await setupApp().request('/api/rich-menu-groups/external?accountId=acc-1');
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ data: { currentDefault: null, lineMenus: [] } });
+    fetchSpy.mockRestore();
+  });
+
+  test('LINE一覧の取得失敗は500で返す', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue({ channel_access_token: 'line-token' });
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('', { status: 503 }))
+      .mockResolvedValueOnce(new Response('', { status: 404 }));
+
+    const res = await setupApp().request('/api/rich-menu-groups/external?accountId=acc-1');
+
+    expect(res.status).toBe(500);
+    fetchSpy.mockRestore();
+  });
+
+  test('見えないLINEアカウントではLINEへ問い合わせない', async () => {
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    const res = await setupApp().request('/api/rich-menu-groups/external?accountId=other-account');
+
+    expect(res.status).toBe(404);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
   });
 });
 
