@@ -57,6 +57,36 @@ describe('api.nenCampaigns.createColumn', () => {
   })
 })
 
+describe('api.nenCampaigns metrics', () => {
+  it('reads every NEN metric from the selected account and sends retry version and reason', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: {} }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await api.nenCampaigns.flowMetrics('account/a')
+    await api.nenCampaigns.columnMetrics('account/a')
+    await api.nenCampaigns.petMetrics('account/a')
+    await api.nenCampaigns.deliveries('account/a', { status: 'failed', cursor: '50' })
+    await api.nenCampaigns.delivery('delivery/a', 'account/a')
+    await api.nenCampaigns.retryDelivery('delivery/a', { lineAccountId: 'account/a', expectedVersion: 3, reason: '送信先を確認済み' })
+
+    expect(fetchSpy.mock.calls.map((call) => call[0])).toEqual([
+      'https://worker.example.com/api/nen-campaigns/metrics/flows?lineAccountId=account%2Fa&days=30',
+      'https://worker.example.com/api/nen-campaigns/metrics/columns?lineAccountId=account%2Fa&days=30',
+      'https://worker.example.com/api/nen-campaigns/metrics/pets?lineAccountId=account%2Fa&days=30',
+      'https://worker.example.com/api/nen-campaigns/deliveries?lineAccountId=account%2Fa&days=30&limit=50&status=failed&cursor=50',
+      'https://worker.example.com/api/nen-campaigns/deliveries/delivery%2Fa?lineAccountId=account%2Fa',
+      'https://worker.example.com/api/nen-campaigns/deliveries/delivery%2Fa/retry',
+    ])
+    expect(fetchSpy.mock.calls[5]?.[1]).toMatchObject({
+      method: 'POST',
+      body: JSON.stringify({ lineAccountId: 'account/a', expectedVersion: 3, reason: '送信先を確認済み' }),
+    })
+  })
+})
+
 describe('webinarApi notifications', () => {
   it('設定保存とテスト送信を専用APIへ渡す', async () => {
     const fetchSpy = vi.fn(async () => new Response(

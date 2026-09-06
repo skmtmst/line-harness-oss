@@ -2205,7 +2205,7 @@ export const SCREENS = [
   {
     ...NEN, node: 'i9sQP', name: '21-1-F NENコラム・一覧の状態', route: '/nen-campaigns?tab=columns',
     verdict: 'structure_match_data_pending', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 構造一致・データ未接続。`DEX0k` と同じ差。状態は撮れている。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **development `c275749d` で撮った。** 読込・空・失敗が分かれ、**失敗のとき0件と言わない**（P0解決済み）。残るのは実データの接続', verdictSource: 'nen-v6/i9sQP.txt + nen-v6/design-qa.md',
-    states: { apis: ['**/api/nen-campaigns/columns*', '**/api/nen-campaigns/overview*'], kinds: ['loading', 'empty', 'error'] },
+    states: { apis: ['**/api/nen-campaigns/columns?*', '**/api/nen-campaigns/metrics/columns?*'], kinds: ['loading', 'empty', 'error'] },
     verdictHead: '31293424',
   },
 
