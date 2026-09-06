@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 246,
+  "compared": 251,
   "unimplemented": 17,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 9,
-  "match": 16,
-  "structureMatchDataPending": 42,
-  "needsFix": 119,
-  "unjudged": 74,
-  "remaining": 252,
+  "missing": 4,
+  "match": 21,
+  "structureMatchDataPending": 44,
+  "needsFix": 164,
+  "unjudged": 22,
+  "remaining": 247,
   "features": [
     {
       "feature": 1,
@@ -53,8 +53,8 @@
       "missing": 0,
       "match": 3,
       "structureMatchDataPending": 1,
-      "needsFix": 1,
-      "unjudged": 13,
+      "needsFix": 14,
+      "unjudged": 0,
       "remaining": 15,
       "capturedAt": [
         {
@@ -159,8 +159,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 10,
+      "needsFix": 10,
+      "unjudged": 0,
       "remaining": 12,
       "capturedAt": [
         {
@@ -256,8 +256,8 @@
       "missing": 4,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 2,
-      "unjudged": 15,
+      "needsFix": 17,
+      "unjudged": 0,
       "remaining": 17,
       "capturedAt": [
         {
@@ -417,8 +417,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 14,
+      "needsFix": 14,
+      "unjudged": 0,
       "remaining": 14,
       "capturedAt": [
         {
@@ -1514,11 +1514,11 @@
       "feature": 16,
       "name": "成果とアフィリエイト",
       "total": 9,
-      "compared": 1,
+      "compared": 6,
       "unimplemented": 3,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 5,
+      "missing": 0,
       "match": 0,
       "structureMatchDataPending": 3,
       "needsFix": 3,
@@ -1877,11 +1877,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 1,
-      "needsFix": 7,
+      "match": 5,
+      "structureMatchDataPending": 3,
+      "needsFix": 0,
       "unjudged": 0,
-      "remaining": 9,
+      "remaining": 4,
       "capturedAt": [
         {
           "pr": 445,
@@ -1928,6 +1928,22 @@
             "dfwD4"
           ],
           "note": "#676・#677 が入った木で撮り直した。**それまで機能20は9枚とも「画面を表示できませんでした」で1枚も撮れていなかった。**原因は実装ではなく撮影側で、`/api/analytics/friends`・`reactions`・`routes`・`usage` の口がモックに無く、既定の器 `{items,total,page,limit}` が返って `overview.metrics` で投げていた。契約どおりの形を返すようにして7 Node が撮れた。`Fh2Qj`（ファネル）はまだ撮れない。"
+        },
+        {
+          "pr": 924,
+          "head": "bd8f0482",
+          "on": "2026-09-06",
+          "screens": [
+            "Zxezb",
+            "J6Inc",
+            "YBGtm",
+            "QQ1SR",
+            "f5HsX",
+            "C2I7ry",
+            "Fh2Qj",
+            "dfwD4"
+          ],
+          "note": "台帳 #233。PR headの同じ実装を1440px・1920pxで撮影し、22枚すべて横スクロール0。設計との比較は一致5枚、構造一致・データ未接続3枚。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。"
         }
       ]
     },
