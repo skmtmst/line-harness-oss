@@ -2062,6 +2062,54 @@ export interface AccountHandoverDecision {
   decided_at: string
 }
 
+export type UidMigrationStatus = 'dry_run' | 'review' | 'ready' | 'executing' | 'completed' | 'failed' | 'rolled_back'
+export interface UidMigrationItem {
+  id: string
+  oldUid: string
+  newUid: string | null
+  candidateName: string | null
+  evidenceType: 'same_provider' | 'line_login' | 'signed_customer_id' | 'verified_contact' | 'operator_csv' | 'manual'
+  classification: 'auto' | 'review' | 'unmatched' | 'conflict'
+  conflictReason: string | null
+  decision: 'pending' | 'link' | 'create' | 'exclude'
+  result: 'pending' | 'applied' | 'skipped' | 'failed' | 'rolled_back'
+  errorMessage: string | null
+}
+export interface UidMigrationRun {
+  id: string
+  fromAccountId: string
+  toAccountId: string
+  purpose: string
+  sourceKind: 'csv' | 'verified_api' | 'manual'
+  sourceFilename: string | null
+  status: UidMigrationStatus
+  dryRunRevision: number
+  counts: { total: number; auto: number; review: number; unmatched: number; conflict: number; applied: number; failed: number }
+  createdBy: string
+  approvedBy: string | null
+  createdAt: string
+  reviewedAt: string | null
+  executedAt: string | null
+  completedAt: string | null
+  rolledBackAt: string | null
+  failureReason: string | null
+  items?: UidMigrationItem[]
+}
+
+export interface FriendMigrationJob {
+  id: string
+  kind: 'export' | 'import'
+  line_account_id: string
+  row_count?: number | null
+  total_count?: number | null
+  update_count?: number | null
+  conflict_count?: number | null
+  status: string
+  created_by_name: string
+  created_at: string
+  expires_at?: string | null
+}
+
 export type FriendAddRuleKind = 'first_time' | 'returning'
 export type FriendAddRuleStatus = 'draft' | 'published' | 'stopped' | 'archived'
 export type FriendAddRuleAction = {
@@ -3712,6 +3760,46 @@ export const api = {
       fetchApi<ApiResponse<AccountHandover>>(`/api/account-handovers/${id}/cancel`, {
         method: 'POST',
       }),
+  },
+  friendMigrations: {
+    list: () => fetchApi<ApiResponse<UidMigrationRun[]>>('/api/friends/migrations'),
+    get: (id: string) => fetchApi<ApiResponse<UidMigrationRun>>(`/api/friends/migrations/${id}`),
+    dryRun: (input: {
+      fromAccountId: string
+      toAccountId: string
+      purpose: string
+      sourceFilename: string
+      sourceChecksum: string
+      mappings: Array<{ oldUid: string; newUid: string | null; evidenceType: UidMigrationItem['evidenceType'] }>
+    }) => fetchApi<ApiResponse<UidMigrationRun>>('/api/friends/migrations', {
+      method: 'POST', body: JSON.stringify({ ...input, sourceKind: 'csv' }),
+    }),
+    decide: (runId: string, itemId: string, decision: 'link' | 'create' | 'exclude') =>
+      fetchApi<ApiResponse<UidMigrationRun & { unresolved: number | null }>>(
+        `/api/friends/migrations/${runId}/items/${itemId}`,
+        { method: 'PATCH', body: JSON.stringify({ decision }) },
+      ),
+    execute: (id: string) => fetchApi<ApiResponse<UidMigrationRun>>(`/api/friends/migrations/${id}/execute`, { method: 'POST' }),
+    rollback: (id: string) => fetchApi<ApiResponse<UidMigrationRun>>(`/api/friends/migrations/${id}/rollback`, { method: 'POST' }),
+    createExport: (input: { accountId: string; columns: Array<'basic' | 'tags_fields' | 'support'>; encoding: 'utf-8' | 'shift_jis' }) =>
+      fetchApi<ApiResponse<{ id: string; rowCount: number | null; status: string; downloadUrl: string }>>('/api/friends/exports', {
+        method: 'POST', body: JSON.stringify(input),
+      }),
+    previewImport: (input: {
+      accountId: string
+      sourceFilename: string
+      sourceChecksum: string
+      rows: Array<{ lineUid: string; displayName: string | null; realName: string | null; systemDisplayName: string | null }>
+    }) => fetchApi<ApiResponse<{
+      id: string
+      status: string
+      duplicate: boolean
+      result: { summary: { add: number; update: number; unchanged: number; conflict: number; error: number }; rows: unknown[] }
+    }>>('/api/friends/imports', { method: 'POST', body: JSON.stringify(input) }),
+    executeImport: (id: string) => fetchApi<ApiResponse<{ id: string; status: string; applied?: number; duplicate: boolean }>>(
+      `/api/friends/imports/${id}/execute`, { method: 'POST' },
+    ),
+    jobs: () => fetchApi<ApiResponse<FriendMigrationJob[]>>('/api/friends/migration-jobs'),
   },
   lineAccounts: {
     list: (live = false) =>
