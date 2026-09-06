@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 
 const mocks = vi.hoisted(() => ({
+  getBroadcasts: vi.fn(),
   getBroadcastById: vi.fn(),
   createBroadcast: vi.fn(),
   updateBroadcast: vi.fn(),
@@ -11,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@line-crm/db', () => ({
-  getBroadcasts: vi.fn(),
+  getBroadcasts: mocks.getBroadcasts,
   getBroadcastById: mocks.getBroadcastById,
   createBroadcast: mocks.createBroadcast,
   updateBroadcast: mocks.updateBroadcast,
@@ -41,6 +42,7 @@ const ownBroadcast = {
   scheduled_at: null, sent_at: null, total_count: 0, success_count: 0,
   created_at: '2026-08-25T00:00:00+09:00', account_ids: null, dedup_priority: null,
   failed_account_ids: null, track_links: 1, line_account_id: 'own-account',
+  folder_id: 'folder-1', measure_opens: 0,
 };
 
 function app() {
@@ -115,6 +117,15 @@ describe('broadcast tenant scope', () => {
     mocks.getBroadcastById.mockResolvedValue(ownBroadcast);
     const response = await app().request('/api/broadcasts/broadcast-1');
     expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      data: { folderId: 'folder-1', measureOpens: false },
+    });
+  });
+
+  test('rejects a list query for an account outside the visible scope', async () => {
+    const response = await app().request('/api/broadcasts?lineAccountId=other-account');
+    expect(response.status).toBe(403);
+    expect(mocks.getBroadcasts).not.toHaveBeenCalled();
   });
 
   test('treats an unassigned body account according to canSeeUnassigned', async () => {

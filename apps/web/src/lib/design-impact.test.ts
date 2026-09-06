@@ -1,6 +1,11 @@
+import { readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { allFiles, directImporters, routeEntryFiles } from '../../scripts/design-impact.mjs'
+import {
+  parseDesignImpactBaseline,
+  readDesignImpactBaseline,
+} from '../../scripts/design-impact-baseline.mjs'
 import { SRC } from '../../scripts/design-debt.mjs'
 
 describe('共通部品の影響範囲', () => {
@@ -9,11 +14,28 @@ describe('共通部品の影響範囲', () => {
   const buttonCss = join(SRC, 'components', 'shared', 'button.module.css')
   const pagination = join(SRC, 'components', 'shared', 'pagination.tsx')
   const paginationCss = join(SRC, 'components', 'shared', 'pagination.module.css')
+  const baseline = readDesignImpactBaseline()
 
-  it('共通Buttonを直接importする121ファイルを利用先に数える', () => {
-    // 本流の回答フォーム3画面に、UID移行とCSV移行の2画面を加えた実測値。
-    // 2026-09-06: 友だち詳細と統合ユーザー一覧の操作も共通Buttonへ寄せた。
-    expect(directImporters(files, button)).toHaveLength(121)
+  it('共通Buttonの実利用先が一覧ファイルと一致する', () => {
+    const actual = directImporters(files, button).map((file) => relative(SRC, file)).sort()
+    expect(
+      actual,
+      '件数を書き換えず、design-impact-baseline.txtへ利用先の行を追加・削除してください',
+    ).toEqual(baseline.sharedButtonImporters)
+  })
+
+  it('並行PRが足した2画面を行として同時に保持できる', () => {
+    const parsed = parseDesignImpactBaseline([
+      'shared-button-importer app/example-a/page.tsx',
+      'shared-button-importer app/example-b/page.tsx',
+    ].join('\n'))
+    expect(parsed.sharedButtonImporters).toEqual([
+      'app/example-a/page.tsx',
+      'app/example-b/page.tsx',
+    ])
+
+    const attributes = readFileSync(join(SRC, '..', '..', '..', '.gitattributes'), 'utf8')
+    expect(attributes).toContain('apps/web/design/design-impact-baseline.txt merge=union')
   })
 
   it('import先が実ファイルと一致する場合は検知する', () => {
@@ -21,7 +43,7 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする20ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする24ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
@@ -32,6 +54,8 @@ describe('共通部品の影響範囲', () => {
       // 2026-09-04: 自動応答の実行結果が入った。表の下にページ送りがある。
       'app/auto-replies/runs/page.tsx',
       'app/contents/page.tsx',
+      // #973: 共通情報の変更影響を1件ずつ確認する一覧にページ送りを追加した。
+      'app/contents/vars/impact-review.tsx',
       'app/contents/vars/page.tsx',
       'app/conversions/page.tsx',
       // 2026-09-04: イベント一覧も自前のページ送りをやめて共通へ寄せた。
