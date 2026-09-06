@@ -2375,14 +2375,15 @@ export const SCREENS = [
   // ── 機能26 外部連携 ─────────────────────────────────────
   /*
     設計のタブは4本（こちらから送る6／こちらで受け取る3／やり取りの記録／見本14）。
-    実装は2本（受信 (Incoming)／送信 (Outgoing)）で、記録も見本も無い。
+    4タブと通常・空・読込・エラーの共通枠は接続済み。
+    接続別集計と受信本文の安全な見本は契約待ちのため、作り物を表示しない。
   */
   {
     ...WEBHOOK, node: 'k3WxrO', name: '26-1 外部連携',
     route: '/webhooks?tab=outgoing',
-    verdict: 'needs_fix', verdictNote: '**2026-09-06 Issue #239 / PR #1005 / UI HEAD `eb86ea2df1` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** 4タブの名称・件数と送り先6本はそろい、1440px・1920pxとも横はみ出し0。ただし設計の4指標、説明帯、状態・期間の絞り込み、送信回数・直近結果・中身を見る導線が一覧に無く、URL・シークレット・作成日を中心にした管理用の表のまま。**推奨修正：やり取りAPIの集計を一覧へ接続し、送信回数・直近結果・再送導線を設計の列へまとめる。**', verdictSource: 'webhooks-v6/k3WxrO.txt', verdictHead: 'eb86ea2df1',
+    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #303 / UI HEAD `d9eff7d7d` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** 4指標、説明帯、検索、状態・並び順、6列の一覧、ページ送りを同じ順に置き、送信先6本・受信口3本・この30日1,486回・失敗6回・受信486回を実応答から表示した。1440px・1920pxとも横はみ出し0。接続別の回数・直近結果・再送対象を返すAPIは無いため、各行は「接続別集計待ち」とし、架空の回数や成功を出していない。**推奨修正：接続別集計APIに送信回数・直近結果・再送可否を足し、「中身を見る」「1回試してみる」へ接続する。**', verdictSource: 'webhooks-v6/k3WxrO.txt', verdictHead: 'd9eff7d7d',
   },
-  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', verdict: 'needs_fix', verdictNote: '**2026-09-06 Issue #239 / PR #1005 / UI HEAD `eb86ea2df1` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** 4タブと受け取り口3件、日本語だけの見出し、安全なシークレット状態はそろい、横はみ出し0。ただし設計は選択した受け取り口のURL・合言葉・対応付け・届いたデータの見本・差し込み項目・注意を1画面で確認する詳細面。実装は3件の一覧だけで、受信サンプルを返すAPIも無い。**推奨修正：受け取り口詳細と、本文をマスクした最新受信サンプルのAPIを用意し、一覧行から詳細へ進めるようにする。**', verdictSource: 'webhooks-v6/M0Gb7.txt', verdictHead: 'eb86ea2df1' },
+  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', route: '/webhooks?tab=incoming', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #303 / UI HEAD `d9eff7d7d` を3107/8794で受信タブとして撮影し、★V6設計と同じ1920pxで並べて確認。** 選んだ受け取り口のURL、合言葉、届いたらすること、届いたデータの見かた、ほか2件、用語・関連先・注意の右欄を設計と同じ2列構造へそろえた。1440px・1920pxとも横はみ出し0。人の照合方法・見つからない場合・実行処理・本文をマスクした最新受信サンプルを返す詳細APIが無いため、その4箇所はAPI待ちと明示し、架空のタグ・配信・本文は出していない。**推奨修正：受け取り口詳細APIに照合設定・実行処理・マスク済み最新受信・差し込み項目を追加して接続する。**', verdictSource: 'webhooks-v6/M0Gb7.txt', verdictHead: 'd9eff7d7d' },
     // ---- 2026-09-02 `a0bb3f44` で実装を読み直した ----
     // **「タブの言葉に内部の語が残る（受信 (Incoming)／送信 (Outgoing)）」は古い。**
     //   `webhook-operator-words-contract.test.ts:13-14` が `Incoming)` `Outgoing)` を
@@ -2410,8 +2411,8 @@ export const SCREENS = [
   {
     ...WEBHOOK, node: 'f8SBSh', name: '26-1-C 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/webhooks/**'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: '**2026-09-06 Issue #239 / PR #1005 / UI HEAD `eb86ea2df1` を3107/8794で通常・読込中・0件・取得失敗まで再撮影し、★V6設計と同じ1920pxで並べて確認。** 3状態は分かれ、取得失敗で登録内容が消えていない説明と再読込を出し、全8枚で横はみ出し0。ただし設計は4指標・説明帯・絞り込み・ページ送りを残した同じ一覧枠の中で各状態を見せる。実装は状態部分だけになり、一覧の文脈が消える。**推奨修正：k3WxrOの集計・絞り込み・ページ送りを先に接続し、その共通枠の表領域だけを3状態へ差し替える。**',
-    verdictSource: 'webhooks-v6/f8SBSh-loading.txt + f8SBSh-empty.txt + f8SBSh-error.txt', verdictHead: 'eb86ea2df1',
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #303 / UI HEAD `d9eff7d7d` を3107/8794で通常・読込中・0件・取得失敗まで再撮影し、★V6設計と同じ1920pxで並べて一致を確認。** 4指標、説明帯、検索・絞り込み・並び順、ページ位置を共通枠に残し、表領域だけを各状態へ差し替えた。0件は作成導線、取得失敗は「登録内容は消えていない」説明と再読込を表示する。全8枚で1440px・1920pxとも横はみ出し0。',
+    verdictSource: 'webhooks-v6/f8SBSh-loading.txt + f8SBSh-empty.txt + f8SBSh-error.txt', verdictHead: 'd9eff7d7d',
   },
 
   // ── 機能27 予約管理 ─────────────────────────────────────
@@ -3931,6 +3932,8 @@ export const CAPTURED_AT = {
   26: [
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['k3WxrO','M0Gb7','KNG00','f8SBSh'],
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
+    { pr: 0, head: 'd9eff7d7d', on: '2026-09-07', screens: ['k3WxrO','M0Gb7','f8SBSh'],
+      note: 'Issue #303 第2周。送信一覧と受信詳細の骨格、通常・読込中・0件・取得失敗を3107/8794で撮り直した。**絵は版に残さない**ので、証拠は `.txt` と判定の注記。' },
   ],
   27: [
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['TV2DI','cpdDi','SbuUI'],
