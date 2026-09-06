@@ -20,12 +20,15 @@ export const FRIEND_FIELD_TYPES = [
   'textarea',
   'number',
   'date',
+  'datetime',
   'select',
   'multi_select',
   'checkbox',
   'url',
   'tel',
   'email',
+  'image',
+  'pdf',
 ] as const;
 
 export type FriendFieldType = (typeof FRIEND_FIELD_TYPES)[number];
@@ -36,6 +39,7 @@ export interface FriendField {
   name: string;
   field_key: string;
   type: string;
+  type_v6?: string | null;
   options_json: string | null;
   default_value: string | null;
   source: string;
@@ -46,6 +50,8 @@ export interface FriendField {
   display_order: number;
   created_at: string;
   updated_at: string;
+  status?: 'active' | 'read_only' | 'archived';
+  version?: number;
 }
 
 export interface ScopedFriendField extends FriendField {
@@ -59,8 +65,7 @@ export interface FriendFieldListSummary {
   inUse: number;
   registeredFriends: number;
   updatedThisMonth: number;
-  /** forms 自体にアカウント所属が無いため、誤った全体件数を返さない。 */
-  formLinks: null;
+  formLinks: number;
 }
 
 const SCOPED_FIELD_SELECT = `
@@ -82,6 +87,22 @@ export interface FriendFieldValue {
 export interface FriendFieldMigrationSourceValue {
   friend_id: string;
   value: string;
+}
+
+export interface FriendFieldUsageTarget {
+  kind: 'form' | 'reminder' | 'saved_search';
+  fieldId: string;
+  id: string;
+  name: string;
+  switchable: boolean;
+}
+
+function normalizeFriendField<T extends FriendField>(row: T): T {
+  return { ...row, type: row.type_v6 ?? row.type };
+}
+
+function legacyStoredType(type: FriendFieldType): string {
+  return type === 'datetime' || type === 'image' || type === 'pdf' ? 'text' : type;
 }
 
 /**
@@ -132,34 +153,36 @@ export async function getFriendFields(
       )
       .bind(opts.folderId)
       .all<FriendField>();
-    return result.results;
+    return result.results.map(normalizeFriendField);
   }
   const result = await db
     .prepare(`SELECT * FROM friend_fields ORDER BY display_order ASC, name ASC`)
     .all<FriendField>();
-  return result.results;
+  return result.results.map(normalizeFriendField);
 }
 
 /** 選択中のLINE公式アカウントから見える項目だけを返す。 */
 export async function getFriendFieldsForScope(
   db: D1Database,
   scope: FriendFieldScope,
-  opts: { folderId?: string } = {},
+  opts: { folderId?: string; status?: 'active' | 'read_only' | 'archived' } = {},
 ): Promise<ScopedFriendField[]> {
   const folder = opts.folderId ? ' AND ff.folder_id = ?' : '';
+  const status = opts.status ? ' AND ff.status = ?' : '';
   const binds: unknown[] = [LEGACY_TENANT_ID, scope.tenantId, scope.lineAccountId];
   if (opts.folderId) binds.push(opts.folderId);
+  if (opts.status) binds.push(opts.status);
   const result = await db
     .prepare(
       `${SCOPED_FIELD_SELECT}
         WHERE COALESCE(ffs.tenant_id, ?) = ?
-          AND (ffs.line_account_id = ? OR ffs.line_account_id IS NULL)${folder}
+          AND (ffs.line_account_id = ? OR ffs.line_account_id IS NULL)${folder}${status}
         ORDER BY CASE WHEN ffs.line_account_id = ? THEN 0 ELSE 1 END,
                  ff.display_order ASC, ff.name ASC`,
     )
     .bind(...binds, scope.lineAccountId)
     .all<ScopedFriendField>();
-  return result.results;
+  return result.results.map(normalizeFriendField);
 }
 
 /** ID直指定でも、担当外アカウントの項目を返さない。 */
@@ -168,7 +191,7 @@ export async function getFriendFieldByIdForScope(
   id: string,
   scope: FriendFieldScope,
 ): Promise<ScopedFriendField | null> {
-  return db
+  const row = await db
     .prepare(
       `${SCOPED_FIELD_SELECT}
         WHERE ff.id = ?
@@ -177,13 +200,15 @@ export async function getFriendFieldByIdForScope(
     )
     .bind(id, LEGACY_TENANT_ID, scope.tenantId, scope.lineAccountId)
     .first<ScopedFriendField>();
+  return row ? normalizeFriendField(row) : null;
 }
 
 export async function getFriendFieldById(
   db: D1Database,
   id: string,
 ): Promise<FriendField | null> {
-  return db.prepare(`SELECT * FROM friend_fields WHERE id = ?`).bind(id).first<FriendField>();
+  const row = await db.prepare(`SELECT * FROM friend_fields WHERE id = ?`).bind(id).first<FriendField>();
+  return row ? normalizeFriendField(row) : null;
 }
 
 export interface CreateFriendFieldInput {
@@ -212,15 +237,15 @@ export async function createFriendField(
       `INSERT INTO friend_fields
          (id, folder_id, name, field_key, type, options_json, default_value,
           source, ec_field_path, ec_is_master, is_personal, is_starred,
-          display_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          display_order, type_v6, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
       input.folderId ?? null,
       input.name,
       input.fieldKey,
-      input.type,
+      legacyStoredType(input.type),
       input.optionsJson ?? null,
       input.defaultValue ?? null,
       input.source ?? 'manual',
@@ -229,6 +254,7 @@ export async function createFriendField(
       input.isPersonal ? 1 : 0,
       input.isStarred ? 1 : 0,
       input.displayOrder ?? 0,
+      input.type,
       now,
       now,
     )
@@ -250,15 +276,15 @@ export async function createFriendFieldForScope(
         `INSERT INTO friend_fields
            (id, folder_id, name, field_key, type, options_json, default_value,
             source, ec_field_path, ec_is_master, is_personal, is_starred,
-            display_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            display_order, type_v6, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         id,
         input.folderId ?? null,
         input.name,
         input.fieldKey,
-        input.type,
+        legacyStoredType(input.type),
         input.optionsJson ?? null,
         input.defaultValue ?? null,
         input.source ?? 'manual',
@@ -267,6 +293,7 @@ export async function createFriendFieldForScope(
         input.isPersonal ? 1 : 0,
         input.isStarred ? 1 : 0,
         input.displayOrder ?? 0,
+        input.type,
         now,
         now,
       ),
@@ -282,6 +309,7 @@ export async function createFriendFieldForScope(
 }
 
 export interface UpdateFriendFieldInput {
+  expectedVersion?: number;
   name?: string;
   folderId?: string | null;
   optionsJson?: string | null;
@@ -321,12 +349,16 @@ export async function updateFriendField(
   if (input.isStarred !== undefined) put('is_starred', input.isStarred ? 1 : 0);
   if (input.displayOrder !== undefined) put('display_order', input.displayOrder);
   if (sets.length > 0) {
+    sets.push('version = version + 1');
     sets.push('updated_at = ?');
     values.push(jstNow(), id);
-    await db
-      .prepare(`UPDATE friend_fields SET ${sets.join(', ')} WHERE id = ?`)
+    const versionClause = input.expectedVersion === undefined ? '' : ' AND version = ?';
+    if (input.expectedVersion !== undefined) values.push(input.expectedVersion);
+    const result = await db
+      .prepare(`UPDATE friend_fields SET ${sets.join(', ')} WHERE id = ?${versionClause}`)
       .bind(...values)
       .run();
+    if (input.expectedVersion !== undefined && Number(result.meta.changes ?? 0) === 0) return null;
   }
   return getFriendFieldById(db, id);
 }
@@ -390,7 +422,7 @@ export async function getFriendFieldListSummary(
   const monthStart = `${jstNow().slice(0, 7)}-01`;
   const fields = await getFriendFieldsForScope(db, scope);
   if (fields.length === 0) {
-    return { total: 0, inUse: 0, registeredFriends: 0, updatedThisMonth: 0, formLinks: null };
+    return { total: 0, inUse: 0, registeredFriends: 0, updatedThisMonth: 0, formLinks: 0 };
   }
   const ids = fields.map((field) => field.id);
   const placeholders = ids.map(() => '?').join(',');
@@ -406,13 +438,51 @@ export async function getFriendFieldListSummary(
     )
     .bind(monthStart, scope.lineAccountId, ...ids)
     .first<{ in_use: number; friends: number; updated_this_month: number }>();
+  const usages = await getFriendFieldUsageForScope(db, ids, scope);
   return {
     total: fields.length,
     inUse: Number(row?.in_use ?? 0),
     registeredFriends: Number(row?.friends ?? 0),
     updatedThisMonth: Number(row?.updated_this_month ?? 0),
-    formLinks: null,
+    formLinks: new Set(usages.filter((usage) => usage.kind === 'form').map((usage) => usage.id)).size,
   };
+}
+
+/** 回答フォーム・リマインダ・保存検索から、現在の実参照をアカウント範囲内で探す。 */
+export async function getFriendFieldUsageForScope(
+  db: D1Database,
+  fieldIds: string[],
+  scope: FriendFieldScope,
+): Promise<FriendFieldUsageTarget[]> {
+  if (fieldIds.length === 0) return [];
+  const idsJson = JSON.stringify(fieldIds);
+  const forms = await db.prepare(
+    `SELECT DISTINCT f.id, f.name, CAST(j.value AS TEXT) AS field_id
+       FROM forms f
+       JOIN form_accounts fa ON fa.form_id = f.id
+       JOIN json_tree(COALESCE(f.fields, '[]')) j ON j.key = 'friendFieldId'
+      WHERE fa.line_account_id = ? AND f.status = 'active'
+        AND CAST(j.value AS TEXT) IN (SELECT CAST(value AS TEXT) FROM json_each(?))
+      ORDER BY f.name ASC`,
+  ).bind(scope.lineAccountId, idsJson).all<{ id: string; name: string; field_id: string }>();
+  const reminders = await db.prepare(
+    `SELECT DISTINCT id, name, trigger_field_id AS field_id FROM reminders
+      WHERE line_account_id = ? AND trigger_field_id IN (SELECT CAST(value AS TEXT) FROM json_each(?))
+      ORDER BY name ASC`,
+  ).bind(scope.lineAccountId, idsJson).all<{ id: string; name: string; field_id: string }>();
+  const searches = await db.prepare(
+    `SELECT DISTINCT s.id, s.name, CAST(j.value AS TEXT) AS field_id
+       FROM saved_searches s
+       JOIN json_tree(s.conditions_json) j
+      WHERE s.line_account_id = ?
+        AND CAST(j.value AS TEXT) IN (SELECT CAST(value AS TEXT) FROM json_each(?))
+      ORDER BY s.name ASC`,
+  ).bind(scope.lineAccountId, idsJson).all<{ id: string; name: string; field_id: string }>();
+  return [
+    ...forms.results.map((row) => ({ kind: 'form' as const, id: row.id, name: row.name, fieldId: row.field_id, switchable: true })),
+    ...reminders.results.map((row) => ({ kind: 'reminder' as const, id: row.id, name: row.name, fieldId: row.field_id, switchable: true })),
+    ...searches.results.map((row) => ({ kind: 'saved_search' as const, id: row.id, name: row.name, fieldId: row.field_id, switchable: false })),
+  ];
 }
 
 export async function deleteFriendField(db: D1Database, id: string): Promise<void> {
@@ -439,7 +509,7 @@ export async function getFriendFieldsWithValues(
     )
     .bind(friendId)
     .all<FriendField & { value: string | null; updated_by: string | null }>();
-  return result.results;
+  return result.results.map(normalizeFriendField);
 }
 
 /**
@@ -484,16 +554,35 @@ export async function getFriendFieldMap(
 ): Promise<Record<string, string>> {
   const result = await db
     .prepare(
-      `SELECT f.field_key, COALESCE(v.value, f.default_value) AS value
+      `SELECT f.field_key, COALESCE(f.type_v6, f.type) AS field_type, f.options_json,
+              COALESCE(v.value, f.default_value) AS value
          FROM friend_fields f
          LEFT JOIN friend_field_values v
            ON v.field_id = f.id AND v.friend_id = ?`,
     )
     .bind(friendId)
-    .all<{ field_key: string; value: string | null }>();
+    .all<{ field_key: string; field_type: string; options_json: string | null; value: string | null }>();
   const out: Record<string, string> = {};
   for (const row of result.results) {
-    if (row.value != null) out[row.field_key] = row.value;
+    if (row.value == null || row.field_type === 'image' || row.field_type === 'pdf') continue;
+    if (row.field_type === 'select' || row.field_type === 'multi_select') {
+      try {
+        const options = JSON.parse(row.options_json ?? '[]') as Array<string | { id?: string; label?: string }>;
+        const labels = new Map(options.map((option) => typeof option === 'string'
+          ? [option, option]
+          : [String(option.id ?? option.label ?? ''), String(option.label ?? '')]));
+        if (row.field_type === 'multi_select') {
+          const ids = JSON.parse(row.value) as unknown;
+          if (Array.isArray(ids)) out[row.field_key] = ids.map((id) => labels.get(String(id)) ?? String(id)).join('、');
+        } else {
+          out[row.field_key] = labels.get(row.value) ?? row.value;
+        }
+      } catch {
+        out[row.field_key] = row.value;
+      }
+      continue;
+    }
+    out[row.field_key] = row.value;
   }
   return out;
 }

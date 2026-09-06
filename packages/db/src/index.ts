@@ -67,6 +67,7 @@ export * from './recipes';
 export * from './account-handovers';
 export * from './friend-migrations';
 export * from './friend-fields';
+export * from './field-migrations';
 export * from './support-marks';
 export * from './saved-searches';
 export * from './media';
