@@ -31,6 +31,18 @@ describe('V6 21 NEN配信の画面契約', () => {
     }
   })
 
+  it('コラムは6件ずつ表示し、配信履歴は取得できた説明を使う', () => {
+    expect(OVERVIEW).toContain('const pageSize = 6')
+    expect(OVERVIEW).toContain('aria-label="コラムのページ送り"')
+    expect(OVERVIEW).toContain("job.lineAccountName || '選択中のLINEアカウント'")
+    expect(OVERVIEW).toContain("job.triggerLabel || 'きっかけ記録未接続'")
+    expect(OVERVIEW).toContain("job.reactionLabel || '反応集計未接続'")
+  })
+
+  it('誕生日配信の実行時刻をプレビューにも表示する', () => {
+    expect(OVERVIEW).toContain('誕生日の3日前 10:00 に届きます')
+  })
+
   it('取得できない数字を0や見本値として表示しない', () => {
     expect(OVERVIEW).toContain('集計が接続されると表示します')
     expect(OVERVIEW).toContain('対象人数未接続')

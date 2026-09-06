@@ -25,6 +25,9 @@ export type NenJob = {
   attempts: number
   lastError: string | null
   sentAt: string | null
+  triggerLabel?: string | null
+  reactionLabel?: string | null
+  lineAccountName?: string | null
 }
 
 export type NenCoupon = {
@@ -284,6 +287,7 @@ function FlowPanel({
   onTestSend: (setting: NenCampaignSetting) => void
   renderPreview: (setting: NenCampaignSetting) => ReactNode
 }) {
+  const deliverySettings = settings.filter((setting) => setting.category === 'transactional' || setting.category === 'follow_up')
   const flow = [
     ['注文が確定', 'すぐ', '注文ありがとうございます'],
     ['発送しました', '当日', 'お荷物の追跡番号'],
@@ -313,13 +317,13 @@ function FlowPanel({
         </div>
       </section>
       <section className="overflow-hidden rounded-v6-card border border-hairline bg-canvas shadow-v6-card">
-        {settings.length === 0 ? (
+        {deliverySettings.length === 0 ? (
           <ListState kind="empty" title="配信フローはまだありません" description="EC連携から注文の流れを接続すると、ここに配信が並びます。" />
         ) : (
           <table className="w-full table-fixed border-separate border-spacing-0 text-sm">
             <thead className="bg-surface-muted text-left text-xs text-ink-faint"><TableHeadRow><Th style={{ width: '31%' }}>配信</Th><Th style={{ width: '21%' }}>いつ送るか</Th><Th style={{ width: '18%' }}>中身</Th><Th style={{ width: '12%' }}>この30日</Th><Th style={{ width: '18%' }}>操作</Th></TableHeadRow></thead>
             <tbody>
-              {settings.map((setting) => (
+              {deliverySettings.map((setting) => (
                 <Fragment key={setting.campaignKey}>
                   <tr className="border-t border-hairline">
                     <td className="px-3 py-3"><p className="font-bold text-ink">{setting.label}</p><p className="mt-1 text-xs text-ink-faint">{categoryLabel[setting.category]} ／ {formatCampaignTiming(setting)}</p></td>
@@ -372,24 +376,31 @@ function ColumnsPanel({
 }) {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<'all' | NenColumn['deliveryStatus']>('all')
+  const [page, setPage] = useState(1)
   const shown = columns.filter((column) => {
     const matchesSearch = `${column.title} ${column.excerpt} ${column.category ?? ''}`.toLowerCase().includes(search.toLowerCase())
     return matchesSearch && (status === 'all' || column.deliveryStatus === status)
   })
   const count = (value: NenColumn['deliveryStatus']) => columns.filter((column) => column.deliveryStatus === value).length
+  const pageSize = 6
+  const pageCount = Math.max(1, Math.ceil(shown.length / pageSize))
+  const currentPage = Math.min(page, pageCount)
+  const visible = shown.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const first = shown.length === 0 ? 0 : (currentPage - 1) * pageSize + 1
+  const last = Math.min(currentPage * pageSize, shown.length)
   return (
     <>
       <NoteBar>コラムは売り込みをしない配信です。記事の正本は外部サイトで管理し、ここではLINEへ出す内容と日時を決めます。</NoteBar>
-      <div className="flex flex-wrap items-center justify-between gap-3"><div className="w-full" style={{ maxWidth: 460 }}><SearchField value={search} onChange={setSearch} onClear={() => setSearch('')} placeholder="コラムの題名・概要で検索" /></div><Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button></div>
+      <div className="flex flex-wrap items-center justify-between gap-3"><div className="w-full" style={{ maxWidth: 460 }}><SearchField value={search} onChange={(value) => { setSearch(value); setPage(1) }} onClear={() => { setSearch(''); setPage(1) }} placeholder="コラムの題名・概要で検索" /></div><Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button></div>
       <div className="flex flex-wrap gap-2">{[
         ['all', `すべて ${columns.length}`], ['sent', `出したもの ${count('sent')}`], ['draft', `下書き ${count('draft')}`], ['scheduled', `予約ずみ ${count('scheduled')}`],
-      ].map(([value, label]) => <FilterChip key={value} selected={status === value} onChange={(selected) => setStatus(selected ? value as typeof status : 'all')}>{label}</FilterChip>)}</div>
+      ].map(([value, label]) => <FilterChip key={value} selected={status === value} onChange={(selected) => { setStatus(selected ? value as typeof status : 'all'); setPage(1) }}>{label}</FilterChip>)}</div>
       {shown.length === 0 ? (
         <ListState kind="empty" title={columns.length === 0 ? 'まだコラムがありません' : '条件に合うコラムはありません'} description="外部サイトの記事へつなぐ下書きを作ると、ここに並びます。" action={<Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button>} />
       ) : (
         <section className="overflow-hidden rounded-v6-card border border-hairline bg-canvas shadow-v6-card">
           <table className="w-full table-fixed border-separate border-spacing-0 text-sm"><thead className="bg-surface-muted text-left text-xs text-ink-faint"><TableHeadRow><Th style={{ width: '34%' }}>コラム</Th><Th style={{ width: '14%' }}>出す日</Th><Th style={{ width: '14%' }}>届く人</Th><Th style={{ width: '14%' }}>読まれた</Th><Th style={{ width: '24%' }}>操作</Th></TableHeadRow></thead><tbody>
-            {shown.map((column) => (
+            {visible.map((column) => (
               <Fragment key={column.id}>
                 <tr><td className="border-t border-hairline px-3 py-3"><p className="font-bold text-ink">{column.title}</p><p className="mt-1 text-xs text-ink-faint">{column.category || '分類なし'} ／ {column.excerpt || '概要なし'}</p></td><td className="border-t border-hairline px-3 py-3 text-ink-secondary">{columnDeliveryDate(column)}</td><td className="border-t border-hairline px-3 py-3 text-xs text-ink-faint">対象人数未接続</td><td className="border-t border-hairline px-3 py-3 text-xs text-ink-faint">読了集計未接続</td><td className="border-t border-hairline px-3 py-3"><div className="flex flex-wrap justify-end gap-2"><Button onClick={() => onPreview(previewColumnId === column.id ? null : column.id)}>中身を見る</Button><Button onClick={onShowHistory}>配信結果</Button></div></td></tr>
                 {previewColumnId === column.id ? <tr key={`${column.id}-preview`}><td colSpan={5} className="border-t border-hairline p-3">{renderPreview(column)}</td></tr> : null}
@@ -399,7 +410,18 @@ function ColumnsPanel({
           </tbody></table>
         </section>
       )}
-      <p className="text-xs text-ink-faint">コラム {columns.length}本中 {shown.length === 0 ? 0 : 1}〜{shown.length}本を表示</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-ink-faint">コラム {columns.length}本中 {first}〜{last}本を表示</p>
+        {pageCount > 1 ? (
+          <div className="flex items-center gap-2" aria-label="コラムのページ送り">
+            <Button disabled={currentPage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>前へ</Button>
+            {Array.from({ length: pageCount }, (_, index) => index + 1).map((value) => (
+              <Button key={value} variant={value === currentPage ? 'primary' : 'secondary'} onClick={() => setPage(value)}>{value}</Button>
+            ))}
+            <Button disabled={currentPage === pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>次へ</Button>
+          </div>
+        ) : null}
+      </div>
     </>
   )
 }
@@ -423,7 +445,7 @@ function PetsPanel({ pets, coupon, friends, petDraft, onPetDraftChange, onAddPet
       <section className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card"><h2 className="text-base font-bold text-ink">誕生日クーポンの決めごと</h2><div className="mt-4 grid gap-3 md:grid-cols-5"><ReadOnlyField label="いつ送るか" value="誕生日の3日前" /><ReadOnlyField label="時刻" value="10:00" /><NumberField label="割引の額（円）" value={coupon.discountAmount} onChange={(value) => onCouponChange({ ...coupon, discountAmount: value })} /><NumberField label="使える日数" value={coupon.validityDays} onChange={(value) => onCouponChange({ ...coupon, validityDays: value })} /><label className="text-xs font-bold text-ink">クーポンの頭の文字<input value={coupon.codePrefix} onChange={(event) => onCouponChange({ ...coupon, codePrefix: event.target.value.toUpperCase() })} className="mt-2 block w-full rounded-v6-control border border-hairline px-3 py-2 text-sm" /></label></div><div className="mt-3 flex justify-end"><Button variant="primary" onClick={onSaveCoupon}>設定を保存</Button></div></section>
       <div className="grid gap-4 xl:grid-cols-3">
         <section className="overflow-hidden rounded-v6-card border border-hairline bg-canvas shadow-v6-card xl:col-span-2"><div className="flex flex-wrap items-end justify-between gap-3 border-b border-hairline p-4"><div><h2 className="text-base font-bold text-ink">登録してもらったペット</h2><p className="mt-1 text-xs text-ink-faint">名前は配信に差し込まれます。まちがいがあると、そのまま届きます。</p></div><details><summary className="cursor-pointer text-sm font-bold text-v6-action">ペット情報を登録</summary><div className="mt-3 grid gap-2 sm:grid-cols-2"><SelectField value={petDraft.friendId} onChange={(event) => onPetDraftChange({ ...petDraft, friendId: event.target.value })} aria-label="ペット情報を登録するLINEユーザー" options={[{ value: '', label: 'LINEユーザーを選択' }, ...friends.map((friend) => ({ value: friend.id, label: friend.displayName || '名前未取得' }))]} /><input aria-label="ペットの名前" placeholder="ペットの名前" value={petDraft.name} onChange={(event) => onPetDraftChange({ ...petDraft, name: event.target.value })} className="rounded-v6-control border border-hairline px-3 py-2 text-sm" /><input aria-label="ペットの誕生日" type="date" value={petDraft.birthday} onChange={(event) => onPetDraftChange({ ...petDraft, birthday: event.target.value })} className="rounded-v6-control border border-hairline px-3 py-2 text-sm" /><Button variant="primary" onClick={onAddPet}>登録する</Button></div></details></div>{pets.length === 0 ? <ListState kind="empty" title="ペットはまだ登録されていません" description="聞きとりフォームか、この画面から登録してください。" /> : <table className="w-full table-fixed text-sm"><thead className="bg-surface-muted text-left text-xs text-ink-faint"><TableHeadRow><Th style={{ width: '26%' }}>ペット</Th><Th style={{ width: '20%' }}>飼い主</Th><Th style={{ width: '14%' }}>誕生日</Th><Th style={{ width: '25%' }}>次の配信</Th><Th style={{ width: '15%' }}>操作</Th></TableHeadRow></thead><tbody>{pets.map((pet) => <tr key={pet.id}><td className="border-t border-hairline px-3 py-3"><p className="font-bold text-ink">{pet.name}</p><p className="text-xs text-ink-faint">{petTypeLabel(pet.animalType)}{petAge(pet.birthday)}</p></td><td className="border-t border-hairline px-3 py-3 text-ink-secondary">{pet.ownerName || '名前未取得'}</td><td className="border-t border-hairline px-3 py-3 font-semibold text-ink">{petBirthdayLabel(pet.birthday)}</td><td className="border-t border-hairline px-3 py-3 text-ink-secondary">{nextBirthdayLabel(pet.birthday)}</td><td className="border-t border-hairline px-3 py-3"><Button onClick={() => onDeletePet(pet)}>登録を外す</Button></td></tr>)}</tbody></table>}</section>
-        <aside className="flex flex-col gap-4"><section className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card"><h2 className="text-sm font-bold text-ink">{previewPet ? `${previewPet.name}にはこう届きます` : 'LINEプレビュー'}</h2><div className="mt-3 rounded-v6-card bg-info-bg p-4"><p className="text-center text-xs font-bold text-ink-secondary">LINEプレビュー</p><div className="mt-3 rounded-v6-control bg-canvas p-4"><p className="text-sm font-bold leading-6 text-ink">{previewPet ? `${previewPet.name}、もうすぐお誕生日ですね。おめでとうございます。` : 'ペットを登録すると文面を確認できます。'}</p><p className="mt-2 text-sm leading-6 text-ink-secondary">お祝いに{coupon.discountAmount.toLocaleString('ja-JP')}円ぶんのクーポンをお送りします。{coupon.validityDays}日間お使いいただけます。</p><p className="mt-3 rounded-v6-control bg-v6-action py-2 text-center text-sm font-bold text-on-accent">クーポンを受け取る</p></div></div></section><section className="rounded-v6-card border border-warning bg-warning-bg p-4"><h2 className="text-sm font-bold text-warning">手を入れたほうがよいところ</h2><p className="mt-3 text-sm font-bold text-warning">誕生日が入っていない子が {missingBirthday}匹</p><p className="mt-1 text-xs leading-5 text-ink-secondary">名前だけ登録されています。もう一度お願いを出せます。</p></section></aside>
+        <aside className="flex flex-col gap-4"><section className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card"><h2 className="text-sm font-bold text-ink">{previewPet ? `${previewPet.name}にはこう届きます` : 'LINEプレビュー'}</h2><div className="mt-3 rounded-v6-card bg-info-bg p-4"><p className="text-center text-xs font-bold text-ink-secondary">LINEプレビュー</p><p className="mt-3 text-center text-xs font-bold text-ink-secondary">誕生日の3日前 10:00 に届きます</p><div className="mt-3 rounded-v6-control bg-canvas p-4"><p className="text-sm font-bold leading-6 text-ink">{previewPet ? `${previewPet.name}、もうすぐお誕生日ですね。おめでとうございます。` : 'ペットを登録すると文面を確認できます。'}</p><p className="mt-2 text-sm leading-6 text-ink-secondary">お祝いに{coupon.discountAmount.toLocaleString('ja-JP')}円ぶんのクーポンをお送りします。{coupon.validityDays}日間お使いいただけます。</p><p className="mt-3 rounded-v6-control bg-v6-action py-2 text-center text-sm font-bold text-on-accent">クーポンを受け取る</p></div></div></section><section className="rounded-v6-card border border-warning bg-warning-bg p-4"><h2 className="text-sm font-bold text-warning">手を入れたほうがよいところ</h2><p className="mt-3 text-sm font-bold text-warning">誕生日が入っていない子が {missingBirthday}匹</p><p className="mt-1 text-xs leading-5 text-ink-secondary">名前だけ登録されています。もう一度お願いを出せます。</p><p className="mt-3 text-sm font-bold text-warning">まだ登録していない人は未取得</p><p className="mt-1 text-xs leading-5 text-ink-secondary">友だち全体との照合が接続されると表示します。</p></section></aside>
       </div>
     </>
   )
@@ -443,7 +465,7 @@ function HistoryPanel({ jobs }: { jobs: NenJob[] }) {
       <NoteBar>いつ・だれに・何を送ったかの記録です。届かなかったものもここで分かります。</NoteBar>
       <div className="w-full" style={{ maxWidth: 460 }}><SearchField value={search} onChange={setSearch} onClear={() => setSearch('')} placeholder="友だちの名前・配信の名前で検索" /></div>
       <div className="flex flex-wrap gap-2">{[['all', `すべて ${jobs.length}`], ['sent', `送りました ${count('sent')}`], ['pending', `これから ${count('pending')}`], ['failed', `届きませんでした ${count('failed')}`]].map(([value, label]) => <FilterChip key={value} selected={filter === value} onChange={(selected) => setFilter(selected ? value as typeof filter : 'all')}>{label}</FilterChip>)}</div>
-      {shown.length === 0 ? <ListState kind="empty" title="配信履歴はまだありません" description="配信が予約されると、送信前からここに記録が並びます。" /> : <section className="overflow-hidden rounded-v6-card border border-hairline bg-canvas shadow-v6-card"><table className="w-full table-fixed text-sm"><thead className="bg-surface-muted text-left text-xs text-ink-faint"><TableHeadRow><Th style={{ width: '28%' }}>いつ・だれに</Th><Th style={{ width: '22%' }}>配信</Th><Th style={{ width: '17%' }}>状態</Th><Th style={{ width: '18%' }}>きっかけ</Th><Th style={{ width: '15%' }}>反応</Th></TableHeadRow></thead><tbody>{shown.map((job) => <tr key={job.id}><td className="border-t border-hairline px-3 py-3"><p className="font-bold text-ink">{formatNenJobDateTime(job.sentAt || job.scheduledAt)} ／ {job.friendName || '名前未取得'}</p><p className="mt-1 text-xs text-ink-faint">選択中のLINEアカウント</p></td><td className="border-t border-hairline px-3 py-3 text-ink">{job.label}</td><td className="border-t border-hairline px-3 py-3 font-semibold text-ink">{statusLabel[job.status] ?? '状態を確認できません'}</td><td className="border-t border-hairline px-3 py-3 text-xs text-ink-faint">きっかけ記録未接続</td><td className="border-t border-hairline px-3 py-3 text-xs text-ink-faint">反応集計未接続</td></tr>)}</tbody></table></section>}
+      {shown.length === 0 ? <ListState kind="empty" title="配信履歴はまだありません" description="配信が予約されると、送信前からここに記録が並びます。" /> : <section className="overflow-hidden rounded-v6-card border border-hairline bg-canvas shadow-v6-card"><table className="w-full table-fixed text-sm"><thead className="bg-surface-muted text-left text-xs text-ink-faint"><TableHeadRow><Th style={{ width: '28%' }}>いつ・だれに</Th><Th style={{ width: '22%' }}>配信</Th><Th style={{ width: '17%' }}>状態</Th><Th style={{ width: '18%' }}>きっかけ</Th><Th style={{ width: '15%' }}>反応</Th></TableHeadRow></thead><tbody>{shown.map((job) => <tr key={job.id}><td className="border-t border-hairline px-3 py-3"><p className="font-bold text-ink">{formatNenJobDateTime(job.sentAt || job.scheduledAt)} ／ {job.friendName || '名前未取得'}</p><p className="mt-1 text-xs text-ink-faint">{job.lineAccountName || '選択中のLINEアカウント'}</p></td><td className="border-t border-hairline px-3 py-3 text-ink">{job.label}</td><td className="border-t border-hairline px-3 py-3 font-semibold text-ink">{statusLabel[job.status] ?? '状態を確認できません'}</td><td className="border-t border-hairline px-3 py-3 text-xs text-ink-faint">{job.triggerLabel || 'きっかけ記録未接続'}</td><td className="border-t border-hairline px-3 py-3 text-xs text-ink-faint">{job.reactionLabel || '反応集計未接続'}</td></tr>)}</tbody></table></section>}
       <p className="text-xs text-ink-faint">記録 {jobs.length}件中 {shown.length === 0 ? 0 : 1}〜{shown.length}件を表示</p>
     </>
   )
