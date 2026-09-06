@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 250,
+  "compared": 241,
   "unimplemented": 18,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 4,
-  "match": 3,
-  "structureMatchDataPending": 34,
-  "needsFix": 150,
-  "unjudged": 63,
-  "remaining": 265,
+  "missing": 13,
+  "match": 8,
+  "structureMatchDataPending": 40,
+  "needsFix": 130,
+  "unjudged": 72,
+  "remaining": 260,
   "features": [
     {
       "feature": 1,
@@ -1565,8 +1565,8 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 4,
-      "needsFix": 7,
+      "structureMatchDataPending": 8,
+      "needsFix": 3,
       "unjudged": 0,
       "remaining": 11,
       "capturedAt": [
@@ -1688,6 +1688,23 @@
             "BmoGY"
           ],
           "note": "最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。**機能17は直前まで4枚とも「画面を表示できませんでした」で1枚も撮れなかった。** 撮影の口と固定データを直して8 Node が撮れた。`vz0Ji` は「マイルを手で増やす・減らす」が見つからず撮れていない。"
+        },
+        {
+          "pr": 914,
+          "head": "48742a352",
+          "on": "2026-09-06",
+          "screens": [
+            "s98Vfw",
+            "N46cQ",
+            "qlVLJ",
+            "MvZm5",
+            "BmoGY",
+            "HIU5O",
+            "k8VCU",
+            "z3PB2",
+            "s6MBc"
+          ],
+          "note": "Issue #230 のS3第2段。Pencilの実ノードと同じ状態を1440・1920で横に並べて確認した。全対象で横スクロール0。絵は版に残さず `.txt` と判定注記を証拠にする。"
         }
       ]
     },
@@ -1695,15 +1712,15 @@
       "feature": 18,
       "name": "流入と計測",
       "total": 9,
-      "compared": 9,
+      "compared": 0,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0,
+      "missing": 9,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 9,
-      "unjudged": 0,
+      "needsFix": 0,
+      "unjudged": 9,
       "remaining": 9,
       "capturedAt": [
         {
@@ -1823,11 +1840,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 1,
-      "needsFix": 7,
+      "match": 5,
+      "structureMatchDataPending": 3,
+      "needsFix": 0,
       "unjudged": 0,
-      "remaining": 9,
+      "remaining": 4,
       "capturedAt": [
         {
           "pr": 445,
