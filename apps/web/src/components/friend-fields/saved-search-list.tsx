@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { GripVertical, Trash2 } from 'lucide-react'
 import type { SavedSearch, SavedSearchCondition, Tag } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import SummaryCard from '@/components/shared/summary-card'
+import { TableHeadRow, Th } from '@/components/shared/table'
 import { describeSavedCondition, type SavedSearchConditionLabels } from '@/components/friends/saved-search-utils'
 import {
   filterSavedSearches,
@@ -65,6 +67,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
   const [pendingDelete, setPendingDelete] = useState<SavedSearch | null>(null)
   const [query, setQuery] = useState('')
   const [usageFilter, setUsageFilter] = useState<SavedSearchUsageFilter>('all')
+  const [matchFilter, setMatchFilter] = useState<'all' | 'matched' | 'zero'>('all')
   const loadSequence = useRef(0)
 
   const load = useCallback(async () => {
@@ -130,7 +133,10 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
 
   const ready = Boolean(accountId) && !loading && !loadError
   const kpis = savedSearchKpiValues(items, ready)
-  const visible = filterSavedSearches(items, query, usageFilter)
+  const visible = filterSavedSearches(items, query, usageFilter).filter((item) => {
+    if (matchFilter === 'all' || item.matchCount === null || item.matchCount === undefined) return true
+    return matchFilter === 'zero' ? item.matchCount === 0 : item.matchCount > 0
+  })
 
   return (
     <div data-design-node="QKx8Q">
@@ -138,12 +144,11 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
         <SummaryCard title="保存した条件" value={kpis.total} unit="件" detail="上限50件" loading={loading} variant="v6" />
         <SummaryCard title="配信で使用中" value={kpis.usedInBroadcasts} unit="件" detail="変更時は影響確認" loading={loading} variant="v6" />
         <SummaryCard title="該当者0人" value={kpis.zeroMatches} unit="件" detail="条件の見直し候補" loading={loading} variant="v6" />
-        <SummaryCard title="今月の呼び出し" value={kpis.callsThisMonth} unit="回" detail="呼び出し記録は未接続" loading={loading} variant="v6" />
+        <SummaryCard title="今月の呼び出し" value={kpis.callsThisMonth} unit="回" detail={kpis.callsThisMonth === null ? '呼び出し記録は未接続' : '配信・自動処理'} loading={loading} variant="v6" />
       </div>
 
       <p className="border-hairline text-ink-secondary mb-4 rounded-control border bg-canvas px-3 py-2 text-sm">
-        友だち一覧で組んだ絞り込みを保存したものです。ここでは名前の確認と削除ができます。
-        新しく保存するときは、友だち一覧の絞り込みから「この条件を保存」を押してください。
+        AND群とOR群、友だち情報の10演算子を組み合わせ、保存した条件からコピーして再利用します。軸は呼び出し元で変わります（友だち一覧14軸・配信15軸）。
       </p>
 
       {!accountId && (
@@ -181,7 +186,18 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
           <option value="used">使用中</option>
           <option value="unused">未使用</option>
         </select>
+        <select
+          value={matchFilter}
+          onChange={(event) => setMatchFilter(event.target.value as typeof matchFilter)}
+          aria-label="該当人数"
+          className="v6-select h-9 w-36 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"
+        >
+          <option value="all">該当人数：すべて</option>
+          <option value="matched">1人以上</option>
+          <option value="zero">0人</option>
+        </select>
         <span className="flex-1" />
+        <Button href="/friends" variant="primary">保存条件からコピー</Button>
         {ready ? (
           <span className="text-caption tabular-nums text-ink-faint">
             {visible.length === items.length
@@ -191,11 +207,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
         ) : null}
       </div>
 
-      {/*
-        設計は1件ずつを札にして、「すべて満たす」と「いずれか1つ以上」を
-        左右に並べる。表で「すべて満たす 2 件」とだけ出していた頃は、
-        開かないと中身が読めなかった。条件は読めてこそ直せる。
-      */}
+      {/* 設計 `QKx8Q` の7列。一覧だけで条件・人数・使用先を判断できる。 */}
       {loading ? (
         <ListState kind="loading" />
       ) : !accountId ? null
@@ -217,7 +229,20 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
           条件に合う保存した検索はありません。条件名か使用先を変えてください。
         </p>
       ) : (
-        <div className="space-y-3">
+        <div className="overflow-hidden rounded-card border border-hairline bg-canvas [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
+          <table className="w-full table-fixed text-sm">
+            <thead className="border-b border-hairline bg-canvas-sunken text-[11px] text-ink-faint">
+              <TableHeadRow>
+                <Th className="w-1/6 px-3 py-3">条件名</Th>
+                <Th className="w-1/4 px-3 py-3">条件の要約</Th>
+                <Th className="w-1/12 px-3 py-3">該当</Th>
+                <Th className="w-1/12 px-3 py-3">共有</Th>
+                <Th className="w-1/6 px-3 py-3">使用先</Th>
+                <Th className="w-1/6 px-3 py-3">作成者・日時</Th>
+                <Th className="w-1/12 px-3 py-3">操作</Th>
+              </TableHeadRow>
+            </thead>
+            <tbody className="divide-y divide-hairline">
           {visible.map((search) => {
             const { all, any, note } = splitConditions(search.conditions, tags, conditionLabels)
             const deleteDisabled = !search.lineAccountId || search.canDelete !== true
@@ -231,119 +256,71 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                 ? '保存した検索を削除'
                 : '削除できるか確認できません'
             return (
-              <section
+              <tr
                 key={search.id}
-                className="bg-canvas rounded-card border-hairline border p-4 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]"
+                className="hover:bg-canvas-sunken"
               >
-                <div className="mb-3 flex flex-wrap items-center gap-2">
+                <td className="px-3 py-3 align-top">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <GripVertical aria-hidden="true" size={15} className="shrink-0 text-ink-faint" />
                   {search.lineAccountId ? (
                     <Link
-                      href={`/friends?savedSearch=${search.id}`}
-                      className="text-ink text-sm font-bold hover:underline"
+                      href={`/tags/searches/edit?id=${encodeURIComponent(search.id)}`}
+                      className="truncate font-bold text-action hover:underline"
+                      title="条件を確認・編集"
                     >
                       {search.name}
                     </Link>
                   ) : (
-                    <span className="text-ink text-sm font-bold">{search.name}</span>
+                    <span className="truncate font-bold text-ink" title={search.name}>{search.name}</span>
                   )}
-                  <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-[11px]">
-                    {search.isShared ? '全員' : '自分だけ'}
-                  </span>
                   {!search.lineAccountId && (
-                    <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-xs">
+                    <span className="rounded-pill bg-warning-bg px-2 py-0.5 text-[10px] text-warning">
                       対象アカウント未割り当て
                     </span>
                   )}
-                  {note && (
-                    <span className="bg-info-bg text-info rounded-pill px-2 py-0.5 text-[11px]">
-                      {note}
-                    </span>
-                  )}
-                  <span className="text-ink-faint ml-auto text-xs">
-                    {new Date(search.createdAt).toLocaleDateString('ja-JP')}
+                  </div>
+                </td>
+                <td className="px-3 py-3 align-top text-xs leading-5 text-ink-secondary">
+                  {all.length > 0 ? <p title={all.join('・')}>{all.join('・')}・AND</p> : null}
+                  {any.length > 0 ? <p title={any.join('・')}><span className="font-semibold">いずれか1つ以上：</span>{any.join('・')}・OR</p> : null}
+                  {all.length === 0 && any.length === 0 ? <p>指定なし</p> : null}
+                  {note ? <p className="text-ink-faint">{note}</p> : null}
+                </td>
+                <td className="px-3 py-3 align-top tabular-nums text-ink" title={search.matchCountError ?? undefined}>
+                  {search.matchCount === null || search.matchCount === undefined ? '—' : `${search.matchCount.toLocaleString('ja-JP')}人`}
+                </td>
+                <td className="px-3 py-3 align-top">
+                  <span className={`rounded-pill px-2 py-0.5 text-[11px] ${search.isShared ? 'bg-action-soft text-action' : 'bg-canvas-sunken text-ink-secondary'}`}>
+                    {search.isShared ? '全員' : '自分だけ'}
                   </span>
-                  <span
-                    className="rounded-pill bg-canvas-sunken px-2 py-0.5 text-caption font-semibold text-ink-secondary"
-                    title={search.matchCountError ?? undefined}
-                  >
-                    該当 {search.matchCount === null || search.matchCount === undefined ? '—' : `${search.matchCount.toLocaleString('ja-JP')}人`}
-                  </span>
-                  <span className="rounded-pill bg-canvas-sunken px-2 py-0.5 text-caption font-semibold text-ink-secondary">
-                    使用先 {search.usedIn === undefined
-                      ? '—'
-                      : search.usedIn.length === 0
-                        ? 'なし'
-                        : `${search.usedIn.length}件`}
-                  </span>
-                  {search.lineAccountId ? (
-                    <Link
-                      href={`/tags/searches/edit?id=${encodeURIComponent(search.id)}`}
-                      className="text-action rounded-md px-2.5 py-1 text-xs font-semibold hover:bg-action-soft"
-                    >
-                      条件を確認・編集
-                    </Link>
-                  ) : null}
+                </td>
+                <td className="px-3 py-3 align-top text-xs text-ink">
+                  {search.usedIn === undefined ? '—' : search.usedIn.length === 0 ? '未使用' : search.usedIn.map((usage) => `${USAGE_KIND_LABELS[usage.kind]}「${usage.name}」`).join('・')}
+                </td>
+                <td className="px-3 py-3 align-top text-xs text-ink">
+                  <p>{search.createdBy ?? '—'}</p>
+                  <p className="text-ink-faint">{new Date(search.createdAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                </td>
+                <td className="px-3 py-3 align-top">
+                  <div className="flex items-center gap-2">
+                    {search.lineAccountId ? <Link href={`/friends?savedSearch=${search.id}`} className="whitespace-nowrap text-xs font-semibold text-action hover:underline">友だち一覧へ</Link> : null}
                   <button
                     onClick={() => remove(search)}
                     disabled={deleteDisabled}
+                    aria-label={`${search.name}を削除`}
                     title={deleteTitle}
-                    className="hover:bg-danger-bg text-danger rounded-md px-2.5 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40"
+                    className="rounded-md p-1 text-danger hover:bg-danger-bg disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    削除
+                    <Trash2 aria-hidden="true" size={16} />
                   </button>
-                </div>
-
-                {search.usedIn && search.usedIn.length > 0 ? (
-                  <div className="mb-3 flex flex-wrap gap-2 rounded-control border border-warning/20 bg-warning-bg p-2 text-xs text-warning">
-                    <span className="font-bold">使用中</span>
-                    {search.usedIn.map((usage) => (
-                      <span key={`${usage.kind}:${usage.id}`}>
-                        {USAGE_KIND_LABELS[usage.kind]}「{usage.name}」
-                        （{usage.mode === 'live' ? '条件を自動反映' : '固定した条件'}）
-                      </span>
-                    ))}
                   </div>
-                ) : null}
-
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="bg-canvas-sunken rounded-card p-3">
-                    <p className="mb-2">
-                      <span className="bg-accent-soft text-accent rounded-pill px-2 py-0.5 text-[11px] font-medium">
-                        すべて満たす
-                      </span>
-                      <span className="text-ink-faint ml-1.5 text-[11px]">AND</span>
-                    </p>
-                    {all.length === 0 ? (
-                      <p className="text-ink-faint text-xs">指定なし</p>
-                    ) : (
-                      <ul className="text-ink-secondary space-y-1 text-xs leading-relaxed">
-                        {all.map((line, i) => (
-                          <li key={i}>・{line}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                  <div className="bg-canvas-sunken rounded-card p-3">
-                    <p className="mb-2">
-                      <span className="bg-info-bg text-info rounded-pill px-2 py-0.5 text-[11px] font-medium">
-                        いずれか1つ以上
-                      </span>
-                      <span className="text-ink-faint ml-1.5 text-[11px]">OR</span>
-                    </p>
-                    {any.length === 0 ? (
-                      <p className="text-ink-faint text-xs">指定なし</p>
-                    ) : (
-                      <ul className="text-ink-secondary space-y-1 text-xs leading-relaxed">
-                        {any.map((line, i) => (
-                          <li key={i}>・{line}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </div>
-              </section>
+                </td>
+              </tr>
             )
           })}
+            </tbody>
+          </table>
         </div>
       )}
 

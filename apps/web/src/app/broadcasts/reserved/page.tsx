@@ -41,6 +41,21 @@ function formatJst(value: string | null): string {
   }).format(date)
 }
 
+function formatJstSentence(value: string | null): string {
+  if (!value) return '日時未設定'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '日時未設定'
+  return new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date)
+}
+
 function belongsToAccount(broadcast: ApiBroadcast, selectedAccountId: string | null): boolean {
   if (!selectedAccountId) return true
   if (broadcast.targetType === 'multi-account-dedup') {
@@ -172,6 +187,7 @@ function ReservedBroadcastContent() {
   const audienceCount = estimate?.audienceCount ?? null
   const audienceLabel = `${TARGET_LABELS[broadcast.targetType]}${audienceCount === null ? '' : ` ${audienceCount.toLocaleString('ja-JP')}人`}`
   const scheduledLabel = formatJst(broadcast.scheduledAt)
+  const scheduledSentenceLabel = formatJstSentence(broadcast.scheduledAt)
 
   const testSend = async () => {
     if (actionBusy) return
@@ -242,8 +258,8 @@ function ReservedBroadcastContent() {
           <h2 className="text-ink mt-5 text-xl font-bold">一斉配信を予約しました</h2>
           <p className="text-ink-secondary mt-3 text-sm font-semibold">
             {audienceCount === null
-              ? `${scheduledLabel}に配信します。対象人数は現在確認できません。`
-              : `${scheduledLabel}に、${audienceCount.toLocaleString('ja-JP')}人へ配信します。`}
+              ? `${scheduledSentenceLabel}に配信します。対象人数は現在確認できません。`
+              : `${scheduledSentenceLabel}に、${audienceCount.toLocaleString('ja-JP')}人へ配信します。`}
           </p>
 
           <dl className="bg-canvas-sunken border-hairline mx-auto mt-5 max-w-3xl rounded-card border px-5 text-sm">
@@ -353,6 +369,15 @@ function ReservedBroadcastContent() {
           </div>
         </dl>
       </ConfirmDialog>
+      <style jsx global>{`
+        [data-design-node='bPF0s'] > nav[aria-label='配信作成の進み'] {
+          margin-bottom: 1.5rem;
+          border: 0;
+          border-radius: 0;
+          background: transparent;
+          padding: 0;
+        }
+      `}</style>
     </div>
   )
 }

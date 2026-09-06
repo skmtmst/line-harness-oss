@@ -9,14 +9,14 @@ const LIST = fs.readFileSync(path.join(__dirname, 'saved-search-list.tsx'), 'utf
 describe('保存した検索の上部指標', () => {
   it('取得できた実値だけをタグ単位で数える', () => {
     expect(savedSearchKpiValues([
-      { matchCount: 0, usedIn: [{ kind: 'broadcast', id: 'b-1', name: '配信1', mode: 'live' }] },
-      { matchCount: 12, usedIn: [{ kind: 'broadcast', id: 'b-2', name: '配信2', mode: 'fixed' }, { kind: 'scenario', id: 's-1', name: 'シナリオ1', mode: 'live' }] },
-      { matchCount: 0, usedIn: [] },
+      { matchCount: 0, usedIn: [{ kind: 'broadcast', id: 'b-1', name: '配信1', mode: 'live' }], callCountThisMonth: 31 },
+      { matchCount: 12, usedIn: [{ kind: 'broadcast', id: 'b-2', name: '配信2', mode: 'fixed' }, { kind: 'scenario', id: 's-1', name: 'シナリオ1', mode: 'live' }], callCountThisMonth: 18 },
+      { matchCount: 0, usedIn: [], callCountThisMonth: 9 },
     ], true)).toEqual({
       total: 3,
       usedInBroadcasts: 2,
       zeroMatches: 2,
-      callsThisMonth: null,
+      callsThisMonth: 58,
     })
   })
 
@@ -31,8 +31,8 @@ describe('保存した検索の上部指標', () => {
 
   it('使用先か該当人数が1件でも未取得なら少ない合計を出さない', () => {
     expect(savedSearchKpiValues([
-      { matchCount: 0, usedIn: [] },
-      { matchCount: null, usedIn: undefined },
+      { matchCount: 0, usedIn: [], callCountThisMonth: 1 },
+      { matchCount: null, usedIn: undefined, callCountThisMonth: undefined },
     ], true)).toEqual({
       total: 2,
       usedInBroadcasts: null,
@@ -41,13 +41,13 @@ describe('保存した検索の上部指標', () => {
     })
   })
 
-  it('V6の4指標を共通カードで出し、未接続の84回を固定値にしない', () => {
+  it('V6の4指標を共通カードで出し、呼び出し回数はAPIの実値だけを合計する', () => {
     expect(LIST).toContain('data-design-node="QKx8Q"')
     expect(LIST).toContain('title="保存した条件"')
     expect(LIST).toContain('title="配信で使用中"')
     expect(LIST).toContain('title="該当者0人"')
     expect(LIST).toContain('title="今月の呼び出し"')
-    expect(LIST).toContain('detail="呼び出し記録は未接続"')
+    expect(LIST).toContain('kpis.callsThisMonth')
     expect(LIST).toContain('api.friendFields.list(accountId)')
     expect(LIST).not.toContain('value={84}')
   })
