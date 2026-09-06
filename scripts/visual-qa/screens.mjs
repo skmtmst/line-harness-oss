@@ -1003,41 +1003,41 @@ export const SCREENS = [
   // ── 機能8 自動応答 ──────────────────────────────────────
   /*
     設計は5段のウィザード（基本設定→どんなときに動くか→何を返すか→優先順位→確認）。
-    実装は一覧の上に出る**1枚の窓**で、段も右の「設定内容」も無い。
+    #221 で5段と右サマリーを足した。各段の入力分割は次の修正点として残る。
   */
   { ...AUTO_REPLY, node: 'cmDfJ', name: '8-1 自動応答',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/auto-replies`。**行の副題（設計「部分一致 3語 ／ テンプレート＋対応マーク」のような一致方法と応答の要約）が無い。** 絞り込みに「準備中」が1件残っている——「一度も当たっていないルール（30日以上の絞り込みは準備中）」（`page.tsx:515`）。取得元 `auto-replies-v6/cmDfJ.txt`',
-    verdictHead: '49e1341c', },
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 Issue #221 で構造一致・集計未接続。** `/auto-replies` を割当ポート3104/8791で1440/1920px撮影（はみ出し0）。設計の4指標、フォルダ、検索、保存した条件、6列表を同Node画像と比較し、行に「部分一致 3語 / テンプレート＋対応マーク」形式の副題を追加。「準備中」は0件。アクション実行数と競合要確認数は一覧APIに集計が無いため `—` と接続条件を表示しており、設計の実数にはできない。取得元 `auto-replies-v6/cmDfJ.txt`。',
+    verdictHead: 'cd24d30b1', },
   {
     ...AUTO_REPLY, node: 'K7vg2', name: '8-1-A 自動応答ルール編集',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/auto-replies`（ルール編集）。**STEP 1〜5とLINEプレビューが無い。** 内部語が2件出ている——「Flex（JSONを直接書く）」「画像（JSONを直接書く）」。取得元 `auto-replies-v6/K7vg2.txt`',
-    verdictHead: '49e1341c',
+    verdictNote: '**2026-09-06 Issue #221 で再判定。** 5段表示、右の設定内容、LINEプレビューを追加し、内部語「JSON」「Flex」は画面から除いた。1440/1920pxとも横はみ出し0。ただし設計は基本設定だけを1画面に収めるのに対し、実装は条件・返信・後続処理まで同じ長い面に並ぶため要修正を維持する。取得元 `auto-replies-v6/K7vg2.txt` と同Node画像。',
+    verdictHead: 'cd24d30b1',
     route: '/auto-replies/edit?id=ar-2',
 
   },
   {
     ...AUTO_REPLY, node: 'nzWIX', name: '8-1-B 反応条件',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/auto-replies`（反応条件）。**STEP 1〜5が無い。** 設計の「複数のキーワードは、下の「必須／OR」でつなぎ方を決めます」「過去28日の受信に、この条件をあてはめた結果です。これから来る受信の件数ではありません。」と、軸の区別（標準互換15軸／この画面だけの6軸）が無い。取得元 `auto-replies-v6/nzWIX.txt`',
-    verdictHead: '49e1341c',
+    verdictNote: '**2026-09-06 Issue #221 で再判定。** 5段表示、複数キーワードの接続説明、過去28日の注意、標準互換15軸／この画面だけの6軸を追加し、1440/1920pxとも横はみ出し0。ただし設計の条件専用段ではなく全入力が1枚に続くため要修正を維持する。取得元 `auto-replies-v6/nzWIX.txt` と同Node画像。',
+    verdictHead: 'cd24d30b1',
     route: '/auto-replies/edit?id=ar-2',
 
   },
   {
     ...AUTO_REPLY, node: 'ivDoe', name: '8-1-C 応答とアクション',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/auto-replies`（応答とアクション）。**STEP 1〜5とLINEプレビューが無い。** 内部語「Flex（JSONを直接書く）」「画像（JSONを直接書く）」が出ている。取得元 `auto-replies-v6/ivDoe.txt`',
-    verdictHead: '49e1341c',
+    verdictNote: '**2026-09-06 Issue #221 で再判定。** 5段表示とLINEプレビューを追加し、内部語「JSON」「Flex」は画面から除いた。返信と後続処理は保存契約へ接続済みで、1440/1920pxとも横はみ出し0。ただし設計の返信専用段ではなく全入力が1枚に続くため要修正を維持する。取得元 `auto-replies-v6/ivDoe.txt` と同Node画像。',
+    verdictHead: 'cd24d30b1',
     route: '/auto-replies/edit?id=ar-2',
 
   },
   {
     ...AUTO_REPLY, node: 'U9hzqH', name: '8-1-D 競合と優先順位',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/auto-replies/publish`。**画面が入ったので未実装ではなくなった。** 通常・読込・空・失敗・権限不足の5状態を1440・1920で撮った（はみ出し0、壊れ値0件）。`draft.settings` の形を確かめる前に読んで白い画面になっていたのも直した。設計との突き合わせは、モックに `/api/auto-replies/:id/conflicts` の固定データが入ってから。',
-    verdictHead: '2f016fcd',
+    verdictNote: '**2026-09-06 Issue #221 で再判定。** 読込・失敗・権限不足は3104/8791で1440/1920px撮影し、横はみ出し0。通常状態は撮影用モックに下書きと競合の固定データが無く「下書きを表示できませんでした」になるため、設計の競合順位・勝者・判定例と比較できず要修正を維持する。`scripts/visual-qa/mock-api.mjs` はClaude所有なので変更していない。取得元 `auto-replies-v6/U9hzqH*.txt`。',
+    verdictHead: 'cd24d30b1',
     route: '/auto-replies/publish?id=ar-2', mode: 'page',
     /* 重なりの確認。最初に開く段 */
     /*
@@ -1106,18 +1106,18 @@ export const SCREENS = [
       #544 は #491 を含むので、積み順を守って #544 の head で撮る。
     */
     ...AUTO_REPLY, node: 'Gy9OK', name: '8-1-I 削除確認',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/auto-replies`（削除確認）。**行の副題（一致方法と応答の要約）が無いのは `cmDfJ` と同じ。** 「準備中」1件も同じ面に残る。取得元 `auto-replies-v6/Gy9OK.txt`',
-    verdictHead: '49e1341c',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 Issue #221 で一致。** `/auto-replies` の行から削除確認を開き、1440/1920pxで撮影（はみ出し0）。対象名、止まる自動返信と後続処理、残る過去履歴、元に戻せないこと、赤い削除操作を同Node画像と比較した。背面の一覧にも行副題を追加し、「準備中」は0件。取得元 `auto-replies-v6/Gy9OK.txt`。',
+    verdictHead: 'cd24d30b1',
     mode: 'viewport', height: 1080,
     steps: [{ click: '削除' }],
 
   },
   {
     ...AUTO_REPLY, node: 'q8wSqO', name: '8-1-J 一覧の状態（空・読込・エラー）',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/auto-replies`。読込・空・失敗の3状態を1440・1920で撮った（はみ出し0）。**空のときも絞り込みの「準備中」が出たまま。** 壊れ値は0件。取得元 `auto-replies-v6/q8wSqO-*.txt`',
-    verdictHead: '49e1341c',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 Issue #221 で一致。** `/auto-replies` の通常・読込・空・取得失敗を割当ポート3104/8791で各1440/1920px撮影（はみ出し0）。4指標、絞り込み、フォルダ、6列表の骨格を全状態で維持し、空は0件、読めない数は `—`、失敗は再読込を表示。「準備中」と壊れ値は0件。取得元 `auto-replies-v6/q8wSqO*.txt` と同Node画像。',
+    verdictHead: 'cd24d30b1',
     /* **通常も撮る。** 内部の言葉は行の上に出るので、行が無い3状態だけでは見えない。 */
     states: { apis: ['**/api/auto-replies*', '**/api/auto-replies/**', '**/api/folders*'], kinds: ['normal', 'loading', 'empty', 'error'] },
 
