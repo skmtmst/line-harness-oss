@@ -2,6 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 
+class MockCommonVarVersionConflictError extends Error {
+  constructor(readonly currentVersion: number) {
+    super('conflict');
+  }
+}
+
 const mocks = {
   getMedia: vi.fn(),
   getMediaById: vi.fn(),
@@ -15,12 +21,17 @@ const mocks = {
   applyMediaReplacementPlan: vi.fn(),
   jstNow: vi.fn(() => '2026-08-31T10:00:00.000+09:00'),
   getCommonVars: vi.fn(),
-  getCommonVarUsageCounts: vi.fn(),
+  getCommonVarUsageSummaries: vi.fn(),
   getCommonVarById: vi.fn(),
   createCommonVar: vi.fn(),
   updateCommonVar: vi.fn(),
   deleteCommonVar: vi.fn(),
   getCommonVarUsageImpact: vi.fn(),
+  getCommonVarVersions: vi.fn(),
+  getCommonVarReplacementCandidates: vi.fn(),
+  getCommonVarReplacementPlan: vi.fn(),
+  applyCommonVarReplacementPlan: vi.fn(),
+  CommonVarVersionConflictError: MockCommonVarVersionConflictError,
   getCommonVarSchedules: vi.fn(),
   createCommonVarSchedule: vi.fn(),
   deleteCommonVarSchedule: vi.fn(),
@@ -140,6 +151,11 @@ const VAR = {
   var_key: 'shop_hours',
   type: 'text',
   value: '10-19',
+  memo: '店舗共通の営業時間',
+  version: 3,
+  updated_by: 'u-1',
+  archived_at: null,
+  replacement_run_id: null,
   created_at: '2026-08-16',
   updated_at: '2026-08-16',
 };
@@ -157,6 +173,8 @@ const EMPTY_COMMON_VAR_IMPACT = {
     auto_reply: 0,
     form: 0,
     automation: 0,
+    friend_add: 0,
+    common_action: 0,
   },
   items: [],
 };
@@ -180,11 +198,41 @@ beforeEach(() => {
   mocks.getMediaReplacementPlan.mockResolvedValue(REPLACEMENT_PLAN);
   mocks.applyMediaReplacementPlan.mockResolvedValue(1);
   mocks.getCommonVars.mockResolvedValue([VAR]);
-  mocks.getCommonVarUsageCounts.mockResolvedValue(new Map([['shop_hours', 3]]));
-  mocks.getCommonVarById.mockResolvedValue(VAR);
+  mocks.getCommonVarUsageSummaries.mockResolvedValue(new Map([['shop_hours', {
+    total: 3,
+    byKind: { ...EMPTY_COMMON_VAR_IMPACT.byKind, template: 2, broadcast: 1 },
+  }]]));
+  mocks.getCommonVarById.mockImplementation(async (_db: D1Database, id: string) =>
+    id === 'cv-2'
+      ? { ...VAR, id: 'cv-2', name: '新営業時間', var_key: 'new_hours', value: '11-20', version: 1 }
+      : VAR);
   mocks.createCommonVar.mockResolvedValue(VAR);
   mocks.updateCommonVar.mockResolvedValue(VAR);
   mocks.getCommonVarUsageImpact.mockResolvedValue(EMPTY_COMMON_VAR_IMPACT);
+  mocks.getCommonVarVersions.mockResolvedValue([{
+    id: 'cv-1-v3', common_var_id: 'cv-1', version_no: 3,
+    name: '営業時間', value: '10-19', memo: '店舗共通の営業時間',
+    change_reason: '営業時間を更新', actor_id: 'u-1', created_at: '2026-08-16',
+  }]);
+  mocks.getCommonVarReplacementCandidates.mockResolvedValue([{
+    ...VAR, id: 'cv-2', name: '新営業時間', var_key: 'new_hours', value: '11-20', version: 1,
+  }]);
+  mocks.getCommonVarReplacementPlan.mockResolvedValue({
+    source: VAR,
+    replacement: { ...VAR, id: 'cv-2', name: '新営業時間', var_key: 'new_hours', version: 1 },
+    targets: [{
+      table: 'templates', id: 'template-1', kind: 'template',
+      columns: { message_content: '{{var.new_hours}}' }, fingerprint: '{{var.shop_hours}}',
+    }],
+    usageTotal: 1,
+    replaceableTotal: 1,
+    blockedTotal: 0,
+    historicalTotal: 0,
+    unscopedFormTotal: 0,
+  });
+  mocks.applyCommonVarReplacementPlan.mockResolvedValue({
+    runId: 'replace-1', replacedUsageCount: 1, archivedVersion: 4,
+  });
   mocks.createCommonVarSchedule.mockResolvedValue({
     id: 'sc-1',
     var_id: 'cv-1',
@@ -519,19 +567,61 @@ describe('共通情報', () => {
       lineAccountId: 'account-1',
       folderId: undefined,
     });
-    expect(mocks.getCommonVarUsageCounts).toHaveBeenCalledWith(
+    expect(mocks.getCommonVarUsageSummaries).toHaveBeenCalledWith(
       env.DB,
       ['shop_hours'],
       'account-1',
     );
-    const body = (await res.json()) as { data: Array<{ usageCount: number }> };
+    const body = (await res.json()) as { data: Array<{ usageCount: number; usageByKind: { template: number } }> };
     expect(body.data[0]?.usageCount).toBe(3);
+    expect(body.data[0]?.usageByKind.template).toBe(2);
   });
 
   it('使用先件数を確認できないときは0件と見せず一覧取得を止める', async () => {
-    mocks.getCommonVarUsageCounts.mockRejectedValueOnce(new Error('D1 unavailable'));
+    mocks.getCommonVarUsageSummaries.mockRejectedValueOnce(new Error('D1 unavailable'));
     const res = await req('/api/common-vars?accountId=account-1', 'GET');
     expect(res.status).toBe(500);
+  });
+
+  it('詳細は社内メモ・版・使用先先頭15件・変更履歴を実データで返す', async () => {
+    mocks.getCommonVarUsageImpact.mockResolvedValue({
+      ...EMPTY_COMMON_VAR_IMPACT,
+      total: 1,
+      blockingTotal: 1,
+      byKind: { ...EMPTY_COMMON_VAR_IMPACT.byKind, template: 1 },
+      items: [{
+        kind: 'template', source_id: 'template-1', source_parent_id: null,
+        source_name: '予約案内', source_status: 'active',
+        source_content: '営業時間は{{var.shop_hours}}です', is_historical: 0,
+      }],
+    });
+    const res = await req('/api/common-vars/cv-1?accountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: {
+        id: 'cv-1', memo: '店舗共通の営業時間', version: 3,
+        usageCount: 1, usageByKind: { template: 1 },
+        usages: [{ name: '予約案内', currentPreview: '営業時間は10-19です' }],
+        usagePage: { total: 1, shown: 1, hasMore: false, unavailableCount: 0 },
+        history: [{ version: 3, changeReason: '営業時間を更新' }],
+      },
+    });
+  });
+
+  it('詳細の使用先が空なら0件と空配列を区別して返す', async () => {
+    mocks.getCommonVarVersions.mockResolvedValue([]);
+    const res = await req('/api/common-vars/cv-1?accountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: { usageCount: 0, usages: [], history: [], usagePage: { total: 0, hasMore: false } },
+    });
+  });
+
+  it('詳細の所属外は404、走査失敗は0件にせず503', async () => {
+    accessMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
+    expect((await req('/api/common-vars/cv-1?accountId=other', 'GET')).status).toBe(404);
+    mocks.getCommonVarUsageImpact.mockRejectedValueOnce(new Error('D1 unavailable'));
+    expect((await req('/api/common-vars/cv-1?accountId=account-1', 'GET')).status).toBe(503);
   });
 
   it('差し込み名の形が違えば422', async () => {
@@ -780,6 +870,43 @@ describe('共通情報', () => {
     expect(mocks.getCommonVarUsageImpact).not.toHaveBeenCalled();
   });
 
+  it('変更影響は予約中・公開中・種類別件数とrevisionを返す', async () => {
+    mocks.getCommonVarUsageImpact.mockResolvedValue({
+      ...EMPTY_COMMON_VAR_IMPACT,
+      total: 2,
+      blockingTotal: 2,
+      byKind: { ...EMPTY_COMMON_VAR_IMPACT.byKind, broadcast: 1, form: 1 },
+      items: [
+        { kind: 'broadcast', source_id: 'b-1', source_parent_id: null, source_name: '予約配信', source_status: 'scheduled', source_content: '{{var.shop_hours}}', is_historical: 0 },
+        { kind: 'form', source_id: 'f-1', source_parent_id: null, source_name: '予約フォーム', source_status: 'active', source_content: '{{var.shop_hours}}', is_historical: 0 },
+      ],
+    });
+    const res = await req('/api/common-vars/cv-1/impact-preview', 'POST', {
+      accountId: 'account-1', nextValue: '11-20', expectedVersion: 3,
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: {
+        version: 3,
+        usageByKind: { broadcast: 1, form: 1 },
+        scheduledUsageCount: 1,
+        publishedUsageCount: 1,
+        usageRevision: expect.any(String),
+      },
+    });
+  });
+
+  it('変更影響の古い版は409で再読込を求める', async () => {
+    const res = await req('/api/common-vars/cv-1/impact-preview', 'POST', {
+      accountId: 'account-1', nextValue: '11-20', expectedVersion: 2,
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      code: 'common_var_version_conflict', currentVersion: 3,
+    });
+    expect(mocks.getCommonVarUsageImpact).not.toHaveBeenCalled();
+  });
+
   it('スタッフ権限では変更影響の本文を返さない', async () => {
     const res = await req('/api/common-vars/cv-1/impact-preview', 'POST', {
       accountId: 'account-1', nextValue: '11-20',
@@ -826,6 +953,57 @@ describe('共通情報', () => {
     const res = await req('/api/common-vars/cv-1?accountId=account-1', 'DELETE');
     expect(res.status).toBe(200);
     expect(mocks.deleteCommonVar).toHaveBeenCalledWith(env.DB, 'cv-1', 'account-1');
+  });
+
+  it('差し替え候補は専用APIから取得できる', async () => {
+    const res = await req('/api/common-vars/cv-1/replace', 'POST', { accountId: 'account-1' });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: {
+        source: { id: 'cv-1', version: 3 },
+        candidates: [{ id: 'cv-2', varKey: 'new_hours', version: 1 }],
+      },
+    });
+  });
+
+  it('差し替えはプレビューrevisionを再照合してから実行する', async () => {
+    const previewResponse = await req('/api/common-vars/cv-1/replace', 'POST', {
+      accountId: 'account-1', replacementId: 'cv-2',
+    });
+    const preview = (await previewResponse.json()) as { data: { revision: string } };
+    expect(previewResponse.status).toBe(200);
+    expect(preview.data).toMatchObject({ replaceableTotal: 1, blockedTotal: 0, canReplace: true });
+
+    const stale = await req('/api/common-vars/cv-1/replace', 'POST', {
+      accountId: 'account-1', replacementId: 'cv-2', apply: true,
+      expectedVersion: 3, expectedRevision: 'old-revision',
+    });
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toMatchObject({ code: 'common_var_usage_changed' });
+    expect(mocks.applyCommonVarReplacementPlan).not.toHaveBeenCalled();
+
+    const applied = await req('/api/common-vars/cv-1/replace', 'POST', {
+      accountId: 'account-1', replacementId: 'cv-2', apply: true,
+      expectedVersion: 3, expectedRevision: preview.data.revision,
+    });
+    expect(applied.status).toBe(200);
+    expect(await applied.json()).toMatchObject({
+      data: {
+        runId: 'replace-1', sourceId: 'cv-1', replacementId: 'cv-2',
+        replacedUsageCount: 1, remainingUsageCount: 0, verification: 'verified',
+      },
+    });
+  });
+
+  it('差し替えはスタッフ権限と所属外アカウントをサーバで止める', async () => {
+    expect((await req('/api/common-vars/cv-1/replace', 'POST', {
+      accountId: 'account-1', replacementId: 'cv-2',
+    }, 'staff')).status).toBe(403);
+    accessMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
+    expect((await req('/api/common-vars/cv-1/replace', 'POST', {
+      accountId: 'other', replacementId: 'cv-2',
+    })).status).toBe(404);
+    expect(mocks.getCommonVarReplacementPlan).not.toHaveBeenCalled();
   });
 
   it('送信済み配信だけなら履歴を残したまま削除できる', async () => {
