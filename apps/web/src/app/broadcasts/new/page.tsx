@@ -1,11 +1,9 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useState } from 'react'
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { Tag } from '@line-crm/shared'
 import { api } from '@/lib/api'
-import Header from '@/components/layout/header'
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import type { BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
@@ -67,16 +65,6 @@ function NewBroadcastPageContent() {
 
   return (
     <div>
-      <Header title="配信を作成" description="友だちへまとめて送るメッセージを作ります。" />
-
-      <nav className="text-ink-faint mb-4 text-xs">
-        <Link href="/broadcasts" className="hover:underline">
-          一斉配信
-        </Link>
-        <span className="mx-1.5">›</span>
-        <span>作成</span>
-      </nav>
-
       {loading ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           読み込み中...

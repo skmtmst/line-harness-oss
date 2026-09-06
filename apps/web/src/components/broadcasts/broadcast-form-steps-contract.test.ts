@@ -83,7 +83,7 @@ describe('作成画面の5段の帯（設計 LMiL2）', () => {
 describe('配信名の字数（設計 zZ9fA）', () => {
   it('入力欄のそばに「n / 60文字」を出す', () => {
     const label = FORM.slice(
-      FORM.indexOf('<span className="text-ink text-sm font-bold">管理用タイトル</span>'),
+      FORM.indexOf('<span className="text-ink text-sm font-bold">配信名'),
       FORM.indexOf('placeholder="例：8月キャンペーンのお知らせ"'),
     )
     expect(label).toContain('{title.trim().length} / {TITLE_MAX}文字')
