@@ -569,7 +569,79 @@ export type ApiBroadcast = Omit<Broadcast, 'targetType'> & {
   folderId?: string | null;
   /** 開封数を取るか。 */
   measureOpens?: boolean;
+  /** 友だちには見せない運用メモ。 */
+  internalMemo?: string | null;
+  /** 途中保存した編集段。 */
+  draftStep?: 'basic' | 'audience' | 'message' | 'schedule' | 'confirm' | null;
+  /** 途中保存した入力一式。 */
+  draftPayload?: Record<string, unknown> | null;
+  /** ボタンなど、本文以外のメッセージ設定。 */
+  messageOptions?: BroadcastMessageOptions | null;
+  /** 公開済みの共通アクション版。 */
+  afterActionVersionId?: string | null;
+  /** 楽観ロックに使う版。 */
+  version?: number;
 };
+
+export type BroadcastMessageButton = {
+  label: string
+  type: 'url' | 'pdf'
+  value: string
+}
+
+export type BroadcastMessageOptions = {
+  buttons?: BroadcastMessageButton[]
+}
+
+export type BroadcastPreflight = {
+  audienceCount: number
+  hiddenExcluded: number
+  warnings: Array<{ level: 'info' | 'warning'; message: string }>
+  audience?: {
+    matched: number
+    sendable: number
+    evaluatedAt: string
+    representatives: Array<{
+      friendId: string
+      displayName: string | null
+      pictureUrl: string | null
+      summary: string
+    }>
+  }
+  exclusions?: {
+    blocked: number
+    hidden: number
+    missingDestination: number
+    duplicate: number
+    paused: number | null
+    total: number
+  }
+  quota?: {
+    monthlyUsed: number | null
+    monthlyLimit: number | null
+    remaining: number | null
+    planned: number
+    state: 'available' | 'insufficient' | 'unavailable'
+    reason: string | null
+  }
+  concurrentBroadcasts?: Array<{ id: string; title: string; scheduledAt: string }>
+  conditionAxes?: {
+    standard: Array<{ key: string; label: string }>
+    broadcastOnly: Array<{ key: string; label: string }>
+  }
+}
+
+export type BroadcastSavedView = {
+  id: string
+  name: string
+  filters: Record<string, unknown>
+  sortKey: 'newest' | 'oldest' | 'title' | 'scheduled'
+  pageSize: 20 | 50 | 100
+  createdBy: string
+  createdAt: string
+  updatedAt: string
+  version: number
+}
 
 export type BroadcastBubbleType = 'text' | 'sticker' | 'image' | 'flex' | 'location' | 'audio' | 'carousel' | 'rich_message' | 'rich_video' | 'video' | 'card_message' | 'coupon' | 'research';
 export type BroadcastBubble = { id: string; type: BroadcastBubbleType; content: Record<string, unknown> };
@@ -967,6 +1039,21 @@ export type BroadcastInsight = {
   clickRate: number | null
   status?: string
   fetchedAt?: string | null
+  opens?: {
+    count: number | null
+    denominator: number | null
+    rate: number | null
+    state: 'available' | 'pending' | 'unavailable' | 'insufficient'
+  }
+  links?: Array<{
+    id: string
+    label: string
+    url: string
+    clickCount: number
+    uniqueClickCount: number
+    clickRate: number | null
+    lastClickedAt?: string | null
+  }>
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
@@ -1851,11 +1938,19 @@ export type ScenarioAction = {
 export type BroadcastStats = {
   thisMonth: number
   scheduled: number
+  /** 一覧の集計契約だけが返す。旧 stats 契約では未取得。 */
+  drafts?: number
   delivered: number
   failed: number
   /** 過去28日の平均開封率（%）。20人未満の配信は平均から外している。 */
   openRate: number | null
 }
+
+/** LINEアカウントで絞った一斉配信一覧と同じ母集団の集計。 */
+export type BroadcastListKpis = Pick<
+  BroadcastStats,
+  'thisMonth' | 'scheduled' | 'delivered' | 'openRate'
+> & { drafts: number }
 
 /** 友だち画面の上部に出す数（設計 `V2 2-2 友だち`）。 */
 export type FriendStats = {
@@ -3788,7 +3883,10 @@ export const api = {
       }),
     list: (params?: { accountId?: string }) => {
       const query = params?.accountId ? '?lineAccountId=' + params.accountId : ''
-      return fetchApi<ApiResponse<ApiBroadcast[]>>('/api/broadcasts' + query)
+      return fetchApi<ApiResponse<ApiBroadcast[]> & {
+        kpis?: BroadcastListKpis
+        pagination?: { total: number; limit: number; cursor: number; nextCursor: string | null }
+      }>('/api/broadcasts' + query)
     },
     get: (id: string) =>
       fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}`),
@@ -3820,6 +3918,11 @@ export const api = {
       segmentConditions?: SegmentCondition
       folderId?: string | null
       measureOpens?: boolean
+      saveAsDraft?: boolean
+      draftStep?: ApiBroadcast['draftStep']
+      internalMemo?: string | null
+      messageOptions?: BroadcastMessageOptions | null
+      afterActionVersionId?: string | null
     }, options?: { idempotencyKey?: string }) =>
       fetchApi<ApiResponse<ApiBroadcast>>('/api/broadcasts', {
         method: 'POST',
@@ -3840,14 +3943,10 @@ export const api = {
       messageContent?: string
       /** 詳細条件。渡さないと条件を無視した人数（＝全員）が返る。 */
       segmentConditions?: SegmentCondition | null
+      scheduledAt?: string | null
+      messageCount?: number
     }) =>
-      fetchApi<
-        ApiResponse<{
-          audienceCount: number
-          hiddenExcluded: number
-          warnings: Array<{ level: 'info' | 'warning'; message: string }>
-        }>
-      >('/api/broadcasts/preflight', {
+      fetchApi<ApiResponse<BroadcastPreflight>>('/api/broadcasts/preflight', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
@@ -3867,6 +3966,12 @@ export const api = {
         measureOpens?: boolean
         stealthSpreadMinutes?: number
         lineAccountId?: string | null
+        saveAsDraft?: boolean
+        draftStep?: ApiBroadcast['draftStep']
+        internalMemo?: string | null
+        messageOptions?: BroadcastMessageOptions | null
+        afterActionVersionId?: string | null
+        expectedVersion?: number
       }
     ) =>
       fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}`, {
@@ -3939,6 +4044,21 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(input),
       }),
+    savedViews: {
+      list: (lineAccountId: string) =>
+        fetchApi<ApiResponse<BroadcastSavedView[]>>(
+          `/api/broadcasts/saved-views?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        ),
+      create: (lineAccountId: string, data: {
+        name: string
+        filters: Record<string, unknown>
+        sortKey: BroadcastSavedView['sortKey']
+        pageSize: BroadcastSavedView['pageSize']
+      }) => fetchApi<ApiResponse<BroadcastSavedView>>(
+        `/api/broadcasts/saved-views?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+    },
   },
 
   broadcastMessageAssets: {

@@ -717,14 +717,14 @@ export const SCREENS = [
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-06 Issue #219 / PR #979で再判定。** `?step=audience` に対象条件だけを出し、右の設定内容・除外確認を正本配置へ変更。1440/1920pxで横はみ出し0。代表的な友だち3行と除外理由別人数を返す口が無いため、構造一致・データ未接続。',
     verdictSource: 'broadcasts-v6/cPk8A.txt + broadcasts-v6/cPk8A-{1440,1920}.png',
-    verdictHead: '3c6e4ec948', route: `${NEW_BC}?step=audience`,
+    verdictHead: '3c6e4ec948', route: `${NEW_BC}?step=audience&scoreMin=20&scoreMax=80`,
     /*
       **「詳細条件で絞り込んで配信する」を選ばないと保存の口が開かない。**
       条件がひとつも無いうちは「この条件を保存」が押せない（押せない理由も
       吹き出しに書いてある）。設計の見どころは**保存と呼び出しの2つの口**
       なので、そこまで進めてから撮る。
     */
-    steps: [{ click: '詳細条件で絞り込んで配信する', role: 'radio', after: 700 }],
+    steps: [{ wait: 1200 }],
 
   },
   { ...BROADCAST, node: 'XQfMD', name: '6-1-C メッセージ編集',
@@ -732,6 +732,14 @@ export const SCREENS = [
     verdictNote: '**2026-09-07 Issue #298で再実装。** 9種の送信形式、差し込み、文字数、ボタン・URL・PDFの設定面、メッセージ追加、配信後アクション、LINEプレビューを正本配置へ追加。現在の配信保存APIはボタンと配信後アクションを受け取らないため、誤って保存できる表示にはせず構造一致・データ未接続。設計画像なし（`XQfMD.txt` と照合）。',
     verdictSource: 'broadcasts-v6/XQfMD.txt + broadcasts-v6/XQfMD-{1440,1920}.png',
     verdictHead: '4a69f0e4e', route: `${NEW_BC}?step=message&templateId=template-11`,
+    steps: [
+      { wait: 1800 },
+      { fill: 'textarea[placeholder="テキストを入力"]', selector: true, text: '{{name}}さんへ\n新商品が本日発売になりました。\nhttps://nen.example/aug' },
+      { click: '＋ ボタンを追加' },
+      { fill: 'ボタン1のラベル', text: 'キャンペーンを見る' },
+      { fill: 'ボタン1のURL', text: 'https://nen.example/aug' },
+      { select: '配信後のアクション', label: '来店後のご案内（第3版）' },
+    ],
 
   },
   {
@@ -747,7 +755,7 @@ export const SCREENS = [
     verdictHead: '4a69f0e4e', route: `${NEW_BC}?step=message`,
     mode: 'viewport', height: 1080, steps: [
       { click: 'テンプレートから選ぶ' },
-      { click: '未分類のひな形 1', after: 700 },
+      { click: '予約確認', after: 700 },
     ],
 
   },
@@ -756,8 +764,8 @@ export const SCREENS = [
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-06 Issue #219 / PR #979で再判定。** `?step=schedule` に日時・分散・集計上限・LINEプレビューを分離表示し、1440/1920pxで横はみ出し0。月間使用数、送信枠、同時刻の他配信を返す口が無く実値を置けないため、構造一致・データ未接続。',
     verdictSource: 'broadcasts-v6/Bw0zt.txt + broadcasts-v6/Bw0zt-{1440,1920}.png',
-    verdictHead: '3c6e4ec948', route: `${NEW_BC}?step=schedule`,
-    mode: 'viewport', height: 1136, steps: [{ click: '日時を指定して予約' }],
+    verdictHead: '3c6e4ec948', route: `${NEW_BC}?step=schedule&templateId=template-11&scheduledDate=2026-08-24&scheduledTime=10%3A00`,
+    mode: 'viewport', height: 1136, steps: [{ wait: 1800 }],
 
   },
   {
@@ -790,7 +798,7 @@ export const SCREENS = [
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-07 Issue #298で再実装。** 対象・日時・テスト送信・送信枠・LINEプレビューの確認面と、実APIの事前確認を読む重なり窓を追加。月間送信枠の残数はAPIが返さないため、固定値を作らず構造一致・データ未接続。設計画像なし（`vW4Es.txt` と照合）。',
     verdictSource: 'broadcasts-v6/vW4Es.txt + broadcasts-v6/vW4Es-{1440,1920}.png',
-    verdictHead: '4a69f0e4e', route: `${NEW_BC}?step=confirm&templateId=template-11`,
+    verdictHead: '4a69f0e4e', route: `${NEW_BC}?step=confirm&templateId=template-11&scheduledDate=2026-08-24&scheduledTime=10%3A00`,
     /*
       **確かめました（2026-08-28）。実装は在ります。**
       置き文のままだったのは、こちらの口が `POST /api/broadcasts/preflight` を
@@ -864,12 +872,10 @@ export const SCREENS = [
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-07 Issue #298で再実装。** 条件編集を重なり窓へ分離し、現在条件・条件1・標準15軸・この画面だけの6軸・AND/OR案内を追加。既存APIが受け取れない条件軸は選択不能にして明記したため、構造一致・データ未接続。設計画像なし（`sqFXf.txt` と照合）。',
     verdictSource: 'broadcasts-v6/sqFXf.txt + broadcasts-v6/sqFXf-save.txt + broadcasts-v6/sqFXf{,-save}-{1440,1920}.png',
-    verdictHead: '4a69f0e4e', route: `${NEW_BC}?step=audience`,
+    verdictHead: '4a69f0e4e', route: `${NEW_BC}?step=audience&scoreMin=20&scoreMax=80`,
     /* 保存する窓と、呼び出す窓。**窓はビューポートで撮る。** */
     mode: 'viewport', height: 1080,
-    steps: [
-      { click: '詳細条件で絞り込んで配信する', role: 'radio', after: 700 },
-    ],
+    steps: [{ click: '条件を編集', after: 700 }],
     variants: [{
       suffix: '-save', mode: 'viewport',
       steps: [

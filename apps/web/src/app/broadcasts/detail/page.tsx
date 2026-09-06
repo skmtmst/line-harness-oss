@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { ApiError, api, type ApiBroadcast } from '@/lib/api'
+import { ApiError, api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
 import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 import { useAccount } from '@/contexts/account-context'
@@ -25,12 +25,7 @@ function BroadcastDetailInner() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const id = params.get('id') ?? ''
   const [broadcast, setBroadcast] = useState<ApiBroadcast | null>(null)
-  const [insight, setInsight] = useState<{
-    delivered: number | null
-    uniqueImpression: number | null
-    uniqueClick: number | null
-    suppressedByAudienceSize: boolean
-  } | null>(null)
+  const [insight, setInsight] = useState<(BroadcastInsight & { suppressedByAudienceSize: boolean }) | null>(null)
   // 集計は配信本体とは別に取る。取れていないのか、取りに行って失敗したのかを
   // 「—」に混ぜると、待てば出るのか操作が要るのかを運用者が判断できない。
   const [insightState, setInsightState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -91,9 +86,7 @@ function BroadcastDetailInner() {
           if (!active) return
           if (stats.success && stats.data) {
             setInsight({
-              delivered: stats.data.delivered,
-              uniqueImpression: stats.data.uniqueImpression,
-              uniqueClick: stats.data.uniqueClick,
+              ...stats.data,
               suppressedByAudienceSize:
                 stats.data.uniqueImpression == null
                 && (stats.data.delivered ?? 0) > 0
@@ -151,7 +144,7 @@ function BroadcastDetailInner() {
 
       <div data-design="Head">
         <Header
-          title={broadcast?.title ?? '配信の詳細'}
+          title={broadcast ? `配信結果：${broadcast.title}` : '配信の詳細'}
           description={
             broadcast?.sentAt
               ? `${formatBroadcastDateTime(broadcast.sentAt)} に送信`
@@ -161,23 +154,9 @@ function BroadcastDetailInner() {
           }
           action={
             <div className="flex flex-wrap gap-2">
-              <Button
-                onClick={() => contentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                disabled={!broadcast}
-              >
-                配信内容を見る
-              </Button>
               <Button onClick={exportCsv} disabled={!broadcast}>
                 CSVで書き出す
               </Button>
-              {/* 既存の配信を種にして作り直す口が無い。作成は空から始まる。 */}
-              <button
-                disabled
-                title="複製は準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-              >
-                複製して作る
-              </button>
             </div>
           }
         />
@@ -199,6 +178,8 @@ function BroadcastDetailInner() {
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           このLINEアカウントで確認できる配信は見つかりませんでした。
         </p>
+      ) : String(broadcast.status) === 'sent' ? (
+        <SentResult broadcast={broadcast} insight={insight} insightState={insightState} contentRef={contentRef} />
       ) : (
         <div className="max-w-3xl space-y-4">
           <section className="bg-canvas rounded-card border-hairline border p-5">
@@ -407,6 +388,107 @@ function BroadcastDetailInner() {
           </Link>
         </div>
       )}
+    </div>
+  )
+}
+
+function rateText(rate: number | null | undefined): string {
+  if (rate == null || !Number.isFinite(rate)) return '—'
+  return `${((rate <= 1 ? rate * 100 : rate)).toFixed(1)}%`
+}
+
+function SentResult({
+  broadcast,
+  insight,
+  insightState,
+  contentRef,
+}: {
+  broadcast: ApiBroadcast
+  insight: (BroadcastInsight & { suppressedByAudienceSize: boolean }) | null
+  insightState: 'loading' | 'ready' | 'error'
+  contentRef: { current: HTMLElement | null }
+}) {
+  const delivered = insight?.delivered ?? broadcast.successCount
+  const opened = insight?.opens?.count ?? insight?.uniqueImpression ?? null
+  const openRate = insight?.opens?.rate ?? insight?.openRate ?? null
+  const failed = Math.max(0, broadcast.totalCount - broadcast.successCount)
+
+  return (
+    <div className="space-y-4">
+      <nav aria-label="配信結果の表示" className="bg-canvas-sunken rounded-card grid grid-cols-5 p-1 text-center text-sm font-semibold">
+        {['概要', 'クリック', '友だち', 'エラー', '配信内容'].map((label, index) => (
+          <span key={label} className={index === 0 ? 'bg-canvas text-accent rounded-control px-3 py-2' : 'text-ink-secondary px-3 py-2'}>{label}</span>
+        ))}
+      </nav>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <div className="space-y-4 xl:col-span-2">
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <h2 className="text-ink text-base font-bold">配信結果</h2>
+            <p className="text-ink-faint mt-1 text-xs">送信・開封・クリック・ブロックを確認します。</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="border-hairline rounded-control border p-3">
+                <p className="text-ink-faint text-xs font-semibold">送信成功</p>
+                <p className="text-ink mt-2 text-sm font-bold">{broadcast.totalCount > 0 ? rateText(delivered / broadcast.totalCount) : '—'}</p>
+                <p className="text-ink mt-1 text-lg font-bold">{delivered.toLocaleString('ja-JP')}人</p>
+                <p className="text-ink-faint text-xs">届いた人</p>
+              </div>
+              <div className="border-hairline rounded-control border p-3">
+                <p className="text-ink-faint text-xs font-semibold">開封</p>
+                <p className="text-ink mt-2 text-sm font-bold">{insightState === 'loading' ? '読込中' : rateText(openRate)}</p>
+                <p className="text-ink mt-1 text-lg font-bold">{opened == null ? '—' : `${opened.toLocaleString('ja-JP')}人`}</p>
+                <p className="text-ink-faint text-xs">開いた人</p>
+              </div>
+            </div>
+          </section>
+
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <h2 className="text-ink text-base font-bold">反応</h2>
+            <p className="text-ink-faint mt-1 text-xs">ボタンとリンクごとの結果です。</p>
+            {insight?.links?.length ? (
+              <div className="mt-3 space-y-2">
+                {insight.links.map((link) => (
+                  <div key={link.id} className="bg-canvas-sunken rounded-control flex items-center justify-between gap-4 p-3">
+                    <div className="min-w-0"><p className="text-ink truncate text-sm font-bold" title={link.label}>{link.label}</p><p className="text-ink-faint truncate text-xs" title={link.url}>{link.url}</p></div>
+                    <p className="text-ink-secondary shrink-0 text-xs">クリック {link.uniqueClickCount.toLocaleString('ja-JP')}人（{rateText(link.clickRate)}）</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-ink-faint bg-canvas-sunken mt-3 rounded-control p-3 text-xs">計測したボタン・リンクはありません。</p>
+            )}
+            <div className="bg-canvas-sunken mt-3 rounded-control p-3">
+              <p className="text-ink text-sm font-bold">エラー</p>
+              <p className="text-ink-faint mt-1 text-xs">送信失敗 {failed.toLocaleString('ja-JP')}人</p>
+            </div>
+          </section>
+        </div>
+
+        <div className="space-y-4">
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <h2 className="text-ink text-base font-bold">配信した設定</h2>
+            <p className="text-ink-faint mt-1 text-xs">この配信で使った対象と送信方法です。</p>
+            <dl className="mt-4 space-y-3 text-sm">
+              <Row label="配信済み" value={`${delivered.toLocaleString('ja-JP')}人`} />
+              <Row label="開封率" value={rateText(openRate)} />
+              <Row label="クリック率" value={rateText(insight?.clickRate)} />
+            </dl>
+          </section>
+
+          <section ref={contentRef} id="broadcast-content" className="bg-canvas rounded-card border-hairline border p-5">
+            <h2 className="text-ink text-base font-bold">メッセージプレビュー</h2>
+            <p className="text-ink-faint mt-1 text-xs">実際のLINE表示に近い確認用プレビューです。</p>
+            <div className="bg-info mt-3 min-h-48 rounded-card p-4">
+              <p className="text-ink bg-canvas rounded-control px-4 py-3 text-sm leading-6 whitespace-pre-wrap">{broadcast.messageContent}</p>
+              {broadcast.messageOptions?.buttons?.map((button) => (
+                <p key={`${button.label}-${button.value}`} className="text-action bg-canvas mt-2 truncate rounded-control px-3 py-2 text-center text-xs font-bold" title={button.value}>{button.label}</p>
+              ))}
+            </div>
+          </section>
+        </div>
+      </div>
+
+      {insightState === 'error' && <p role="alert" className="text-danger text-xs">開封・クリックを読み込めませんでした。</p>}
     </div>
   )
 }

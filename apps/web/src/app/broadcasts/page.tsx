@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Trash2 } from 'lucide-react'
 import type { Folder, Tag } from '@line-crm/shared'
-import { ApiError, api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
+import { ApiError, api, type ApiBroadcast, type BroadcastInsight, type BroadcastListKpis, type BroadcastSavedView } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import BroadcastKpis from '@/components/broadcasts/broadcast-kpis'
@@ -16,6 +16,7 @@ import { audienceSummary, rowExcerpt } from '@/lib/broadcast-summary'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import SelectField from '@/components/shared/select-field'
+import Button from '@/components/shared/button'
 
 const statusConfig: Record<
   ApiBroadcast['status'],
@@ -64,6 +65,7 @@ function BroadcastList() {
   usePageTitle('一斉配信')
   const { selectedAccountId } = useAccount()
   const [broadcasts, setBroadcasts] = useState<ApiBroadcast[]>([])
+  const [listKpis, setListKpis] = useState<BroadcastListKpis | null | undefined>(undefined)
   const [tags, setTags] = useState<Tag[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -105,6 +107,11 @@ function BroadcastList() {
   const [deleteTarget, setDeleteTarget] = useState<ApiBroadcast | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [savedViews, setSavedViews] = useState<BroadcastSavedView[]>([])
+  const [savedViewName, setSavedViewName] = useState('')
+  const [savedViewOpen, setSavedViewOpen] = useState(false)
+  const [savedViewBusy, setSavedViewBusy] = useState(false)
+  const [savedViewError, setSavedViewError] = useState('')
 
   const loadInsight = async (id: string) => {
     try {
@@ -188,7 +195,10 @@ function BroadcastList() {
         api.broadcasts.list({ accountId: selectedAccountId || undefined }),
         api.tags.list(),
       ])
-      if (broadcastsRes.success) setBroadcasts(broadcastsRes.data)
+      if (broadcastsRes.success) {
+        setBroadcasts(broadcastsRes.data)
+        setListKpis(broadcastsRes.kpis)
+      }
       else setError(broadcastsRes.error)
       if (tagsRes.success) setTags(tagsRes.data)
     } catch (err) {
@@ -201,6 +211,53 @@ function BroadcastList() {
   }, [selectedAccountId])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    if (!selectedAccountId) {
+      setSavedViews([])
+      return
+    }
+    let cancelled = false
+    api.broadcasts.savedViews.list(selectedAccountId).then((res) => {
+      if (!cancelled && res.success) setSavedViews(res.data)
+    }).catch(() => {
+      if (!cancelled) setSavedViewError('保存した検索を読み込めませんでした。')
+    })
+    return () => { cancelled = true }
+  }, [selectedAccountId])
+
+  const applySavedView = (id: string) => {
+    const view = savedViews.find((item) => item.id === id)
+    if (!view) return
+    const filters = view.filters
+    setTitleQuery(typeof filters.titleQuery === 'string' ? filters.titleQuery : '')
+    setStatusFilter(filters.statusFilter === 'scheduled' || filters.statusFilter === 'draft' ? filters.statusFilter : 'all')
+    setDateFrom(typeof filters.dateFrom === 'string' ? filters.dateFrom : '')
+    setDateTo(typeof filters.dateTo === 'string' ? filters.dateTo : '')
+    setFolderFilter(typeof filters.folderFilter === 'string' ? filters.folderFilter : '')
+  }
+
+  const saveCurrentView = async () => {
+    if (!selectedAccountId || !savedViewName.trim() || savedViewBusy) return
+    setSavedViewBusy(true)
+    setSavedViewError('')
+    try {
+      const res = await api.broadcasts.savedViews.create(selectedAccountId, {
+        name: savedViewName.trim(),
+        filters: { titleQuery, statusFilter, dateFrom, dateTo, folderFilter },
+        sortKey: 'scheduled',
+        pageSize: 20,
+      })
+      if (!res.success) throw new Error(res.error)
+      setSavedViews((current) => [...current, res.data])
+      setSavedViewName('')
+      setSavedViewOpen(false)
+    } catch {
+      setSavedViewError('この検索条件を保存できませんでした。')
+    } finally {
+      setSavedViewBusy(false)
+    }
+  }
 
   // 送信済みbroadcastのinsightを読み込み
   useEffect(() => {
@@ -282,7 +339,10 @@ function BroadcastList() {
       )}
 
       <div data-design="KPIs">
-      <BroadcastKpis unavailable={loading || Boolean(error) || forbidden || (!loading && broadcasts.length === 0)} />
+      <BroadcastKpis
+        unavailable={loading || Boolean(error) || forbidden || (!loading && broadcasts.length === 0)}
+        listKpis={loading ? undefined : listKpis}
+      />
       </div>
 
       <div data-design="Head" className="mb-4 flex flex-wrap items-center gap-2">
@@ -350,9 +410,32 @@ function BroadcastList() {
               onChange={(e) => setTitleQuery(e.target.value)}
               className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
             />
-            <button type="button" disabled title="保存した検索のAPI契約は未接続です" className="border-hairline rounded-control border px-3 py-2 text-sm font-semibold text-action disabled:opacity-50">保存した検索</button>
+            <select
+              aria-label="保存した検索"
+              defaultValue=""
+              onChange={(event) => applySavedView(event.target.value)}
+              className="border-hairline rounded-control border px-3 py-2 text-sm font-semibold text-action"
+            >
+              <option value="">保存した検索</option>
+              {savedViews.map((view) => <option key={view.id} value={view.id}>{view.name}</option>)}
+            </select>
+            <Button type="button" onClick={() => setSavedViewOpen((open) => !open)}>この条件を保存</Button>
             <SelectField aria-label="表示件数" defaultValue="20" size="compact" options={[{ value: '20', label: '20件表示' }]} />
           </div>
+          {savedViewOpen && (
+            <div className="border-hairline bg-canvas mb-3 flex flex-wrap items-center gap-2 rounded-control border p-3">
+              <input
+                aria-label="保存する検索の名前"
+                placeholder="検索条件の名前"
+                value={savedViewName}
+                onChange={(event) => setSavedViewName(event.target.value)}
+                className="border-hairline rounded-control min-w-64 border px-3 py-2 text-sm"
+              />
+              <Button type="button" variant="primary" disabled={!savedViewName.trim() || savedViewBusy} onClick={() => void saveCurrentView()}>{savedViewBusy ? '保存中…' : '保存'}</Button>
+              <Button type="button" onClick={() => setSavedViewOpen(false)}>閉じる</Button>
+            </div>
+          )}
+          {savedViewError && <p role="alert" className="text-danger mb-3 text-xs">{savedViewError}</p>}
 
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <button type="button" className="broadcast-filter-chip" data-active={statusFilter === 'scheduled' || undefined} onClick={() => setStatusFilter(statusFilter === 'scheduled' ? 'all' : 'scheduled')}>✓ 予約中のみ</button>
