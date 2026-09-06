@@ -14,7 +14,7 @@ import CreatePage, {
 import { useAccount } from '@/contexts/account-context'
 
 /**
- * 成果地点（CV）を作る（設計 V2 6-1-1）。
+ * 成果地点を作る（設計 V6 19-1-B）。
  *
  * 設計は「何を成果として数えるか → どうやって数えるか → 金額の扱い」の順に
  * 聞く。数え方を決めないと、作っただけで1件も増えないので、そこを2番目に
@@ -42,7 +42,7 @@ const MEASURE_METHODS = [
   {
     value: 'webhook' as const,
     label: 'EC・外部システムからの通知で数える',
-    note: 'Webhookで受け取ったできごとを使います',
+    note: '接続したシステムから成果の通知を受け取ります',
   },
   {
     value: 'manual' as const,
@@ -56,6 +56,14 @@ interface ReportRow {
   eventType: string
   totalCount: number
   totalValue: number
+}
+
+function past30DaysRange(): { startDate: string; endDate: string } {
+  const end = new Date()
+  end.setHours(23, 59, 59, 999)
+  const start = new Date(end.getTime() - 29 * 24 * 60 * 60 * 1000)
+  start.setHours(0, 0, 0, 0)
+  return { startDate: start.toISOString(), endDate: end.toISOString() }
 }
 
 export default function NewConversionPointPage() {
@@ -74,7 +82,7 @@ export default function NewConversionPointPage() {
   // 右の「同種の成果地点」に要る。作る前に、似たものが既にあるか分かるように。
   useEffect(() => {
     let cancelled = false
-    void Promise.allSettled([api.conversions.points(), api.conversions.report()]).then(
+    void Promise.allSettled([api.conversions.points(), api.conversions.report(past30DaysRange())]).then(
       ([p, r]) => {
         if (cancelled) return
         if (p.status === 'fulfilled' && p.value.success) setPoints(p.value.data)
@@ -96,16 +104,28 @@ export default function NewConversionPointPage() {
     }
   }, [points, report, eventType])
 
+  const duplicateName = useMemo(() => {
+    const normalized = name.trim().normalize('NFKC').toLocaleLowerCase('ja')
+    if (!normalized) return null
+    return points.find(
+      (point) => point.name.trim().normalize('NFKC').toLocaleLowerCase('ja') === normalized,
+    ) ?? null
+  }, [name, points])
+
   const yen = value ? Number(value) : null
 
   return (
     <CreatePage
-      title="成果地点（CV）を作る"
+      title="成果地点をつくる"
       description="「申込」「購入」など、成果として数えたい行動を登録します。"
-      parent={['成果とアフィリエイト', '/conversions']}
-      saveLabel="成果地点を作成"
+      parent={['コンバージョン', '/conversions?tab=points']}
+      successHref={(id) => `/conversions?tab=points${id ? `&highlight=${encodeURIComponent(id)}` : ''}`}
+      saveLabel="つくって数えはじめる"
+      designNode="GtylA"
+      variant="v6"
       validate={() => {
-        if (!name.trim()) return '成果地点（CV）名を入力してください'
+        if (!name.trim()) return '成果地点の名前を入力してください'
+        if (duplicateName) return `「${duplicateName.name}」と同じ名前の成果地点がすでにあります`
         if (measureMethod === 'url_reach' && !targetUrl.trim()) {
           return '指定ページへの到達で数えるときは、対象のURLが要ります'
         }
@@ -156,7 +176,7 @@ export default function NewConversionPointPage() {
                 <dd className="text-ink tabular-nums">{sameKind.points} 件が計測中</dd>
               </div>
               <div className="flex justify-between gap-2">
-                <dt className="text-ink-faint">今月のCV（同種）</dt>
+                <dt className="text-ink-faint">この30日の成果</dt>
                 <dd className="text-ink tabular-nums">
                   {sameKind.count} 件 ・ ¥{sameKind.yen.toLocaleString()}
                 </dd>
@@ -164,18 +184,29 @@ export default function NewConversionPointPage() {
             </dl>
           </AsideCard>
 
-          <AsideCard title="数え方の目安">
+          <AsideCard title="この決めごとを過去30日にあてはめると">
+            <p className="text-ink-faint text-xs leading-relaxed">
+              保存前の試算口はまだ接続されていません。対象の出来事、重複除外、取消を試算する口が接続されると、件数と金額をここに表示します。試算しても過去の成果は追加しません。
+            </p>
+          </AsideCard>
+
+          <AsideCard title="気をつけること">
             <ul className="text-ink-faint space-y-1.5 text-xs leading-relaxed">
-              <li>・同じ人が同じ日に2回到達しても、1回として数えます</li>
-              <li>・広告やリファラルリンク経由の成果は、経路ごとに集計されます</li>
-              <li>・金額を入れると、一覧に合計金額が表示されます</li>
+              <li>・同じ意味の成果地点を2つ作ると、分析の数字が二重になります</li>
+              <li>・似たものがないか、右上の「同種の成果地点」を確認してください</li>
+              <li>・過去にさかのぼっては数えません。作った後の成果から記録します</li>
             </ul>
           </AsideCard>
         </>
       }
     >
       <FormSection step={1} label="何を成果として数えるか">
-        <Field label="成果地点（CV）名" htmlFor="cv-name" required>
+        <Field
+          label="成果地点の名前"
+          htmlFor="cv-name"
+          required
+          note="一覧・案件・分析にこの名前で並びます。"
+        >
           <input
             id="cv-name"
             type="text"
@@ -184,6 +215,11 @@ export default function NewConversionPointPage() {
             placeholder="例：定期便の申込"
             className={inputClass}
           />
+          {duplicateName && (
+            <p className="text-danger mt-1 text-xs" role="alert">
+              同じ名前の「{duplicateName.name}」があります。同じ意味の成果地点を2つ作らないでください。
+            </p>
+          )}
         </Field>
 
         <Field label="種別">
@@ -241,7 +277,7 @@ export default function NewConversionPointPage() {
         {/* 設計は「毎回同じ金額」以外の決め方（率など）も見据えた作りだが、
             持っているのは1件あたりの固定額だけ。選べる形にすると、
             選べないものが選べるように見える。 */}
-        <Field label="金額の決め方" note="率での指定は準備中です。">
+        <Field label="金額の決め方" note="現在の保存口は、1件ごとの決まった金額に対応しています。">
           <p className="bg-canvas-sunken text-ink-faint rounded-control px-3 py-2 text-sm">
             毎回同じ金額
           </p>

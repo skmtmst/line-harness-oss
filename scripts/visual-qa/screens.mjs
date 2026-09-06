@@ -3012,6 +3012,27 @@ const FEATURE_18_AUDIT = {
   },
 }
 
+// Issue #232（機能19）の実装後監査。
+// 3画面とも実装は更新したが、ChromiumがMachPort権限で起動できず、
+// 1440px・1920pxの画像比較は未実施。画像を見ずに一致へ上げない。
+const FEATURE_19_AUDIT = {
+  ZrpKn: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 Issue #232で実装を更新したが、画像未確認。** 一覧を成果地点・起点・この30日の件数・金額・利用先の構成へ直し、30日集計と直前30日の比較を既存APIへ接続した。利用先・詳細・CSVのAPIは未接続のため、0件や押せる操作を作らず接続条件を本文に表示する。ChromiumがMachPort権限で起動できず、1440px・1920px画像を取得できなかったため判定は上げない。',
+    verdictSource: 'conversions-v6/ZrpKn.txt + 実装コード（画像未確認）',
+  },
+  GUxsj: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 Issue #232で実装を更新したが、画像未確認。** レポートを一覧から分離し、7日・30日・90日の期間選択、直前期間との比較、4指標、成果地点別の増減を既存APIへ接続した。日別・帰属経路・取消・純成果・CSVは集計APIが未接続のため、その条件を画面に明記した。ChromiumがMachPort権限で起動できず2幅画像を取得できず、日別と経路も未接続なので `needs_fix` を維持する。',
+    verdictSource: 'conversions-v6/GUxsj.txt + 実装コード（画像未確認）',
+  },
+  GtylA: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 Issue #232で実装を更新したが、画像未確認。** V6実Nodeと寸法を付け、同名の成果地点を保存前に止め、同種の30日実績、過去30日の試算が未接続であること、過去成果は追加しないことを表示した。内部語と「準備中」は画面から外した。8起点・除外条件・期間内1回・取消・利用先・保存前試算のAPIは未接続。ChromiumがMachPort権限で起動できず2幅画像を取得できないため `needs_fix` を維持する。',
+    verdictSource: 'conversions-v6/GtylA.txt + 実装コード（画像未確認）',
+  },
+}
+
 for (const screen of SCREENS) {
   if (screen.feature === 16 && FEATURE_16_REVIEW[screen.node]) {
     Object.assign(screen, FEATURE_16_REVIEW[screen.node])
@@ -3021,6 +3042,10 @@ for (const screen of SCREENS) {
   if (review) Object.assign(screen, review)
   if (screen.feature === 18 && FEATURE_18_AUDIT[screen.node]) {
     Object.assign(screen, FEATURE_18_AUDIT[screen.node])
+    delete screen.verdictHead
+  }
+  if (screen.feature === 19 && FEATURE_19_AUDIT[screen.node]) {
+    Object.assign(screen, FEATURE_19_AUDIT[screen.node])
     delete screen.verdictHead
   }
 }
