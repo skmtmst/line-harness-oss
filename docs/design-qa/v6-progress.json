@@ -7,8 +7,8 @@
   "elsewhere": 0,
   "missing": 11,
   "match": 104,
-  "structureMatchDataPending": 119,
-  "needsFix": 40,
+  "structureMatchDataPending": 125,
+  "needsFix": 34,
   "unjudged": 5,
   "remaining": 164,
   "features": [
@@ -1675,11 +1675,22 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 1,
-      "needsFix": 3,
+      "structureMatchDataPending": 4,
+      "needsFix": 0,
       "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
+        {
+          "pr": 1075,
+          "head": "24313778e",
+          "on": "2026-09-07",
+          "screens": [
+            "WuKzU",
+            "gBtaK",
+            "yPkWe"
+          ],
+          "note": "Issue #295。共通情報3画面を3104/8791で1440・1920px撮影し、★V6設計と同じ比較入力で確認。全画像で横はみ出し0。3画面とも、存在しないAPI値を作らず理由つきの構造一致・データ未接続へ更新した。"
+        },
         {
           "pr": 548,
           "head": "d4a85ad4",
@@ -2445,11 +2456,23 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 2,
-      "needsFix": 4,
+      "structureMatchDataPending": 5,
+      "needsFix": 1,
       "unjudged": 0,
       "remaining": 6,
       "capturedAt": [
+        {
+          "pr": 1076,
+          "head": "8e7c374991",
+          "on": "2026-09-07",
+          "screens": [
+            "festr",
+            "Q55bb",
+            "X8JCA5",
+            "Se65i"
+          ],
+          "note": "Issue #291。固定ポート3102/8789で通常・読込・空・失敗の全状態を1440/1920px撮影し、全画像で横はみ出し0。4画面の構造をV6へそろえた。通知実行の通常fixtureと配信・開封・再試行・版管理のAPI契約が未提供のため、理由つきの構造一致・データ未接続とした。"
+        },
         {
           "pr": 504,
           "head": "806ed169",

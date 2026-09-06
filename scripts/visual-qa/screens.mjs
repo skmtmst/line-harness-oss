@@ -1631,14 +1631,14 @@ export const SCREENS = [
 
   // ── 機能14 共通情報 ─────────────────────────────────────
   {
-    ...COMMON_VAR, node: 'WuKzU', name: '14-1 共通情報', verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 台帳 #227、実装 `cbddd12c7`。** 空のまま・期限つき・未使用の絞り込み、使用数順、20/50/100件表示、検索、CSV出力、空のまま使用中の警告、6列（共通情報／差し込みキー／中身／使われている場所／更新・次の変更／操作）を実装した。差し込みキーは内部表記を出さず `{営業時間}` 形式、使用数未取得は0件にせず `—（未取得）`。Playwrightで1440・1920を撮影し横はみ出し0。**要修正を維持**：現行APIに設計の説明文と種類別使用数が無く、固定データに空のまま使用中の行も無いため警告状態を画像比較できない。フォルダ行の「…」は共通 `FolderPanel` が未対応でS0所有のため触っていない。',
-    verdictSource: 'common-vars-v6/WuKzU.txt + list-model.test.ts', verdictHead: '57477f85c',
+    ...COMMON_VAR, node: 'WuKzU', name: '14-1 共通情報', verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #295 / UI HEAD `24313778e`。構造一致・データ未接続。** 設計画像と実装画像を同じ比較入力で見比べ、上部操作、フォルダ、検索・絞り込み、6列一覧、ページ送りの骨格を確認した。1440・1920とも横はみ出し0。**データ未接続**：現行APIは設計の説明文と種類別使用数を返さず、固定データも設計の3フォルダ・6行・空のまま使用中の警告状態を持たないため、内容と件数の一致は未確認。取得できない使用数は偽の0件にせず `—（未取得）` と表示する。',
+    verdictSource: 'common-vars-v6/WuKzU.txt + common-vars-v6/WuKzU-{1440,1920}.png + list-model.test.ts', verdictHead: '24313778e',
   },
   {
-    ...COMMON_VAR, node: 'gBtaK', name: '14-1-A 共通情報を編集', route: '/contents/vars/edit?id=common-var-delete-target', verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 台帳 #227、実装 `cbddd12c7`。** 差し込みキーを内部表記から `{営業時間}` 形式へ変更し、使用数・送信済み件数・使用先・現在文を保存前から表示する状態を1440・1920で撮影した。横はみ出し0。**要修正を維持**：設計の2カラム構成、社内メモ、期限、追記型の変更履歴、右側の使用先一覧と変更後プレビューは、現行の詳細・版・期限APIが返さない。偽データでは埋めない。',
-    verdictSource: 'common-vars-v6/gBtaK.txt + common-vars-v6-contract.test.ts', verdictHead: '57477f85c',
+    ...COMMON_VAR, node: 'gBtaK', name: '14-1-A 共通情報を編集', route: '/contents/vars/edit?id=common-var-delete-target', verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #295 / UI HEAD `24313778e`。構造一致・データ未接続。** 設計画像と、値を変更して保存前の影響が出た実装画像を同じ比較入力で見比べた。入力欄を左、使用先と保存後プレビューを右に置く2カラム構成、期限、履歴、固定保存欄を揃え、1440・1920とも横はみ出し0。**データ未接続**：社内メモと追記型履歴のAPIが無く、固定データも設計と同じ会社名・15使用先を持たないため内容一致は未確認。無い値は偽データで埋めず、未接続理由を表示する。',
+    verdictSource: 'common-vars-v6/gBtaK.txt + common-vars-v6/gBtaK-{1440,1920}.png + change-impact.test.ts', verdictHead: '24313778e',
   },
   {
     /*
@@ -1681,10 +1681,10 @@ export const SCREENS = [
       */
       { suffix: '-deletable', steps: [{ click: 'キャンセル', after: 500 }, { click: '削除', nth: 1, after: 900 }] },
     ],
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 台帳 #227、実装 `cbddd12c7`。** 対象の差し込みキーを `{営業時間}` 形式で示し、使用中は影響先を見せて削除を止め、未使用なら確認キーを入力して削除できる安全側の2状態を1440・1920で撮影した。横はみ出し0。**要修正を維持**：設計の「別の共通情報に差し替えてから削除する」は、まとめて差し替えるAPIが未提供。押しても働かない操作や偽の候補は置かず、現行は物理削除を止める。',
-    verdictSource: 'common-vars-v6/yPkWe-1440.png + common-vars-v6/yPkWe.txt + delete-impact.test.ts',
-    verdictHead: '57477f85c',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #295 / UI HEAD `24313778e`。構造一致・データ未接続。** 設計画像と、使用中・未使用の実装画像を同じ比較入力で見比べた。対象、影響、差し替え案、このまま削除する案、使用先一覧、固定操作欄を揃え、1440・1920とも横はみ出し0。**データ未接続**：設計の差し替え候補を取得して一括置換するAPIが無いため、候補は偽造せず未接続として選べない状態にした。使用中は削除を止め、未使用だけ確認キー入力後に削除できる。',
+    verdictSource: 'common-vars-v6/yPkWe.txt + common-vars-v6/yPkWe-{1440,1920}.png + common-vars-v6/yPkWe-deletable-{1440,1920}.png + delete-impact.test.ts',
+    verdictHead: '24313778e',
 
   },
 
@@ -2269,25 +2269,25 @@ export const SCREENS = [
     states: {
       apis: ['**/api/ec-commerce/overview**', '**/api/ec-commerce/settings**'],
       kinds: ['normal', 'empty', 'error', 'forbidden'],
-    }, name: '24-1 LINE通知', verdict: 'needs_fix', verdictNote: '**2026-09-06 PR #958（Issue #237）head `1a0a71ba` で設計と再比較。** タブの件数、4つの集計帯、すべて／出している／止めている／文面未設定の絞り込み、行のきっかけ・当日数・状態、表示件数を復元。「通知ON/OFF」を「出している／止めている」へ直した。通常・0件・取得失敗・権限不足を1440・1920で撮影し、全10枚で横はみ出し0。残る差はこの30日の種類別数・LINE集計の表示人数と、種類ごとの直近失敗理由で、現行APIに集計口が無いため要修正を維持。', verdictSource: 'line-notify-v6/festr-normal.txt', verdictHead: '1a0a71ba' },
+    }, name: '24-1 LINE通知', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #291 head `8e7c374991` で設計と再比較。** 一覧を設計と同じ1ページ6件に区切り、表示件数とページ送りを同じ段へ追加。4つの集計帯、4条件の絞り込み、行のきっかけ・当日数・状態を維持し、通常・0件・取得失敗・権限不足を1440・1920で再撮影、全10枚で横はみ出し0。個人の開封は正本要件により表示しない。直近30日の種類別数、LINE上で表示された人数、月間枠、種類別の失敗理由を返すAPIが無いため、値は作らず構造一致・データ未接続とする。', verdictSource: 'line-notify-v6/festr.txt + festr-normal-1920.png', verdictHead: '8e7c374991' },
   {
     ...LINE_NOTIFY, node: 'Q55bb', name: '24-1-A お知らせの中身を編集する',
-    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#504 `806ed169` で撮った。** 内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の通知テンプレート編集は、差し込みの一覧と送信前の見え方を並べて確かめる。実装との差は送信処理がつながってから見る **ルート**：`/line-notifications`（お知らせの中身を編集）。**取得元**：`line-notify-v6/Q55bb.txt`。**推奨修正**：差し込みの一覧と送信前の見え方を並べる。**`vCqUj`（フォーム）と `NNDMR`（質問）が差し込みの選び口を既に持っている**ので写す。送信処理がつながってから細かな差を見る。', verdictSource: 'line-notify-v6/Q55bb.txt',
+    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #291 head `8e7c374991` で設計と再比較。** 一覧内の長い折りたたみを、クリック後に「いつ送るか／送るもの／差込項目／ボタン／未達時の決めごと」と右側プレビュー・注意・接続先、下部追従保存を並べる編集専用レイアウトへ変更。1440・1920で横はみ出し0。公開版を直接変えない下書き版・公開版・テスト受信者・取引メール代替のAPIがまだ無いため、存在しない公開操作は作らず、現行設定で安全に扱える範囲だけを表示した。構造一致・データ未接続とする。', verdictSource: 'line-notify-v6/Q55bb.txt + Q55bb-1920.png',
     mode: 'viewport', height: 1136, /*
       **押し口は「内容を編集」。** 「発送した」は行の名前で、押せる役を持っていない
       （`role: 'text'` は ARIA に無く0件になる）。設計の並び順で3番目なので `nth: 2`。
     */
     steps: [{ click: '内容を編集', nth: 2, after: 800 }],
-    verdictHead: '7b509106',
+    verdictHead: '8e7c374991',
   },
   {
     ...LINE_NOTIFY, node: 'X8JCA5', name: '24-1-B 送れなかったもの',
     route: '/line-notifications?tab=failures', mode: 'page',
     states: { apis: ['**/api/ec-commerce/notification-runs?**'], kinds: ['normal', 'loading', 'empty', 'error'] },
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 PR #958（Issue #237）head `1a0a71ba` で設計と再比較。** 届かなかった／送信対象外／メールで届いた／まだ連絡できていないの帯、名前・注文番号検索、状態絞り込み、その日のうちに代替連絡する案内を追加。再試行は安全なAPIが無いため出さず、理由も維持。1440・1920の通常・読込・空・失敗で横はみ出し0。メール結果・対応済みを返す口と撮影用の通常データが無く、設計の通常行を比較できないため要修正を維持。',
-    verdictSource: 'line-notify-v6/X8JCA5-normal.txt',
-    verdictHead: '1a0a71ba',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #291 head `8e7c374991` で設計と再比較。** 届かなかった／送信対象外／メール結果／未対応の集計帯、検索、状態絞り込み、その日のうちに代替連絡する案内、受信箱導線を確認。通常・読込・空・失敗を1440・1920で撮影し、全10枚で横はみ出し0。現行APIにはメール結果・試行履歴・次回試行・対応者／対応済みが無く、安全な再試行APIも無い。通常行の固定データも無いためS0へ #264 で依頼済み。存在しない値と操作は作らず、構造一致・データ未接続とする。',
+    verdictSource: 'line-notify-v6/X8JCA5.txt + X8JCA5-normal-1920.png',
+    verdictHead: '8e7c374991',
   },
   {
     /*
@@ -2298,10 +2298,10 @@ export const SCREENS = [
     ...LINE_NOTIFY, node: 'Se65i', name: '24-1-C お知らせの記録',
     route: '/line-notifications?tab=history', mode: 'page',
     states: { apis: ['**/api/ec-commerce/notification-runs?**'], kinds: ['normal', 'loading', 'empty', 'error'] },
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 PR #958（Issue #237）head `1a0a71ba` で設計と再比較。** 記録数／LINE API受付／押された／送れなかったの帯、名前・注文番号検索、すべて／クリック記録あり／送れなかったの絞り込みを追加。過去の所属不明行と個人既読は出さず、押下は自社短縮URLだけと明記。data-list-state で通常・読込・空・失敗・絞込0件を区別し、1440・1920で横はみ出し0。期間集計・CSV出力権限の口と撮影用の通常データが無いため、要修正を維持。',
-    verdictSource: 'line-notify-v6/Se65i-normal.txt',
-    verdictHead: '1a0a71ba',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #291 head `8e7c374991` で設計と再比較。** 記録数／LINE API受付／短縮URLクリック／失敗の集計帯、検索、クリック・失敗の絞り込み、受付日時・理由・受信箱導線を確認。通常・読込・空・失敗を1440・1920で撮影し、全10枚で横はみ出し0。個人の到達・既読は正本要件により表示せず、安全な再送口も無いため出していない。期間集計・CSV出力権限・版・試行履歴のAPIと通常行の固定データが無く、S0へ #264 で依頼済み。構造一致・データ未接続とする。',
+    verdictSource: 'line-notify-v6/Se65i.txt + Se65i-normal-1920.png',
+    verdictHead: '8e7c374991',
   },
   {
     ...LINE_NOTIFY, node: 'DpxOK', name: '24-2 運用者へのお知らせ',
@@ -4062,6 +4062,8 @@ export const CAPTURED_AT = {
       { pr: 616, head: '0a11c9e8', on: '2026-08-31', screens: ['szXsT'], note: 'Claude実装。影響4つに加え、409の最新影響と別メニューの遅延応答も再監査で確認した' },
   ],
   14: [
+    { pr: 1075, head: '24313778e', on: '2026-09-07', screens: ['WuKzU', 'gBtaK', 'yPkWe'],
+      note: 'Issue #295。共通情報3画面を3104/8791で1440・1920px撮影し、★V6設計と同じ比較入力で確認。全画像で横はみ出し0。3画面とも、存在しないAPI値を作らず理由つきの構造一致・データ未接続へ更新した。' },
     { pr: 548, head: 'd4a85ad4', on: '2026-08-29', screens: ['uNBlA', 'gBtaK'], note: '保存前に影響を見る面。値を変えてから保存を押さないと出ない' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['WuKzU', 'gBtaK'], note: 'development そのもので撮った' },
       { pr: 619, head: '31b44202', on: '2026-08-31', screens: ['yPkWe'], note: 'Claude実装。#611 の delete-impact で、差し込まれている場所と空欄のまま送られることを削除の窓へ出した。差し替えの口は契約待ち' },
@@ -4111,6 +4113,7 @@ export const CAPTURED_AT = {
     { pr: 587, head: '425a6b1a', on: '2026-08-30', screens: ['GFDqW', 'GfceK', 'Lg8ff'], note: '確認直前の空き再取得、完了画面のリマインダ時刻と台帳の事実。撮影データの slots[].date を要件どおりに直した' },
   ],
   24: [
+    { pr: 1076, head: '8e7c374991', on: '2026-09-07', screens: ['festr', 'Q55bb', 'X8JCA5', 'Se65i'], note: 'Issue #291。固定ポート3102/8789で通常・読込・空・失敗の全状態を1440/1920px撮影し、全画像で横はみ出し0。4画面の構造をV6へそろえた。通知実行の通常fixtureと配信・開封・再試行・版管理のAPI契約が未提供のため、理由つきの構造一致・データ未接続とした。' },
     { pr: 504, head: '806ed169', on: '2026-08-30', screens: ['festr', 'Q55bb'], note: '顧客通知の一覧とテンプレート。**`DpxOK` はここでは撮らない**——#504 に運用者タブは無く、撮ると #564 の絵を巻き戻す（実際に一度やって git から戻した）' },
     { pr: 545, head: 'c9bb193d', on: '2026-08-30', screens: ['X8JCA5', 'Se65i', 'DpxOK', 'N2gAza'], note: '顧客通知の記録と失敗、運用者通知の一覧と作成。**#545 は #504 を含む**。個人の既読は作っていない。**head が `03022681` → `c9bb193d` へ動いたが撮り直していない**——`notification-run-list.tsx`・`operator/new/page.tsx`・`operator-notification-rules.tsx` の blob がいずれも同一（差分は development の取り込み）' },
     { pr: 564, head: 'ad59fde6', on: '2026-08-29', screens: ['DpxOK'], note: '絞り込みチップを状態で言い分ける。失敗・権限不足は `—`' },
