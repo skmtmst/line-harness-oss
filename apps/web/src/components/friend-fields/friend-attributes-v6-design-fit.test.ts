@@ -22,6 +22,8 @@ const readWeb = (relative: string) =>
 
 const MARK_LIST = read('mark-list.tsx')
 const SAVED_LIST = read('saved-search-list.tsx')
+const FIELD_LIST = read('field-list.tsx')
+const TAG_EDITOR = read('tag-editor-v4.tsx')
 const CSV_DIALOG = read('tag-csv-import-dialog.tsx')
 const EDIT_PAGE = readWeb('src/app/tags/searches/edit/page.tsx')
 
@@ -121,6 +123,25 @@ describe('QKx8Q 保存した検索の一覧', () => {
     const limitNote = between(SAVED_LIST, '{ready\n', '</p>')
     expect(limitNote).toContain('ready')
     expect(limitNote).toContain('いまの件数は読み込めていません')
+  })
+})
+
+describe('機能4の一覧・編集画面は取得済みの設計値を表示する', () => {
+  it('友だち情報欄はフォーム使用数と表示先をAPI応答から読む', () => {
+    expect(FIELD_LIST).toContain('field.formUsageCount')
+    expect(FIELD_LIST).toContain('field.displayTargets')
+  })
+
+  it('対応マークはAPIが返す自動変更の要約を優先する', () => {
+    expect(MARK_LIST).toContain('mark.automaticChangeLabel ??')
+  })
+
+  it('タグ編集は保存済みの連動アクションを復元する', () => {
+    expect(TAG_EDITOR).toContain('tag?.linkedActions ?? []')
+  })
+
+  it('保存検索の該当人数は一覧で取得済みの値を初期表示に使う', () => {
+    expect(EDIT_PAGE).toContain('setPreviewCount(found.matchCount ?? null)')
   })
 })
 
