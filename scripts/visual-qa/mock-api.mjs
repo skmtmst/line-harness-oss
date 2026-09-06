@@ -43,6 +43,8 @@ import {
   FRIEND_ADD_LIFECYCLE_TEST_RESULT,
   FRIEND_ADD_LIFECYCLE_VALIDATION,
   AUTO_REPLIES, AUTO_REPLY_FOLDERS,
+  AUTO_REPLY_PUBLISH_CONFLICTS, AUTO_REPLY_PUBLISH_DRAFT,
+  AUTO_REPLY_PUBLISH_RESULT, AUTO_REPLY_PUBLISH_TEST, AUTO_REPLY_PUBLISH_VALIDATION,
   BROADCASTS, BROADCAST_FOLDERS, CHATS, FRIEND_FIELDS, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
   TEMPLATES, TEMPLATE_FOLDERS,
   DUPLICATE_STATS, FRIENDS, FRIEND_BULK_RUN, FRIEND_SCENARIOS, FRIEND_STATS,
@@ -676,6 +678,15 @@ const SHAPES = {
  * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
  */
 function visualQaWriteBody(method, pathname) {
+  if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/test$/.test(pathname)) {
+    return AUTO_REPLY_PUBLISH_TEST
+  }
+  if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/validate$/.test(pathname)) {
+    return AUTO_REPLY_PUBLISH_VALIDATION
+  }
+  if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/publish$/.test(pathname)) {
+    return AUTO_REPLY_PUBLISH_RESULT
+  }
   if (method === 'POST' && /^\/api\/rich-menu-groups\/[^/]+\/preview-targets$/.test(pathname)) {
     return {
       matched: { value: 1020, state: 'available', reason: null },
@@ -934,6 +945,12 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: AUTO_REPLY_FOLDERS }
   }
   if (pathname === '/api/auto-replies') return { success: true, data: AUTO_REPLIES }
+  if (/^\/api\/auto-replies\/[^/]+\/draft$/.test(pathname)) {
+    return { success: true, data: AUTO_REPLY_PUBLISH_DRAFT }
+  }
+  if (/^\/api\/auto-replies\/[^/]+\/conflicts$/.test(pathname)) {
+    return { success: true, data: { conflicts: AUTO_REPLY_PUBLISH_CONFLICTS } }
+  }
   const autoReplyOne = /^\/api\/auto-replies\/([^/]+)$/.exec(pathname)
   if (autoReplyOne) {
     const found = AUTO_REPLIES.find((item) => item.id === autoReplyOne[1])

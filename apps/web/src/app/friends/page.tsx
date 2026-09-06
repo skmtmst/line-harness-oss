@@ -456,7 +456,18 @@ function FriendsPageInner({
         />
       )}
 
-      <AdvancedSearchDialog open={advancedOpen} accountId={selectedAccountId} tags={allTags} fieldNames={[]} onClose={() => setAdvancedOpen(false)} onApply={(result) => { setAdvanced(result); setAdvancedOpen(false); setPage(1) }} />
+      <AdvancedSearchDialog
+        open={advancedOpen}
+        accountId={selectedAccountId}
+        tags={allTags}
+        fieldNames={[]}
+        onClose={() => setAdvancedOpen(false)}
+        onLoadSaved={() => {
+          setAdvancedOpen(false)
+          setSavedOpen(true)
+        }}
+        onApply={(result) => { setAdvanced(result); setAdvancedOpen(false); setPage(1) }}
+      />
       {savedOpen ? (
         <SavedSearchDialog
           accountId={selectedAccountId}

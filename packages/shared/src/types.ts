@@ -1941,6 +1941,8 @@ export interface AutoReplyDraftVersion {
   lastTestStatus: "succeeded" | "failed" | null;
   lastTestedAt: string | null;
   publishedAt: string | null;
+  /** 過去28日の実測一致数。集計できなかったときは null。 */
+  matchedLast28Days?: number | null;
 }
 
 export type AutoReplyTestReasonCode =

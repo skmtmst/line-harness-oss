@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 247,
+  "compared": 234,
   "unimplemented": 12,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 13,
-  "match": 44,
-  "structureMatchDataPending": 46,
-  "needsFix": 155,
-  "unjudged": 11,
-  "remaining": 224,
+  "missing": 26,
+  "match": 49,
+  "structureMatchDataPending": 50,
+  "needsFix": 157,
+  "unjudged": 0,
+  "remaining": 219,
   "features": [
     {
       "feature": 1,
@@ -152,16 +152,16 @@
       "feature": 3,
       "name": "友だち",
       "total": 12,
-      "compared": 10,
+      "compared": 0,
       "unimplemented": 2,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 10,
+      "missing": 10,
+      "match": 2,
+      "structureMatchDataPending": 3,
+      "needsFix": 5,
       "unjudged": 0,
-      "remaining": 12,
+      "remaining": 10,
       "capturedAt": [
         {
           "pr": 520,
@@ -242,6 +242,24 @@
             "IAf7j"
           ],
           "note": "Claudeが実装して撮った。#606 の契約の上（development 直結）。**ACCOUNT に role が無く、権限で出し分ける画面がすべて権限なし側に倒れていた**のを固定データ側で直した"
+        },
+        {
+          "pr": 966,
+          "head": "baa097e99",
+          "on": "2026-09-06",
+          "screens": [
+            "PhxG6",
+            "LT8RS",
+            "Igi72",
+            "IAf7j",
+            "I6UAdr",
+            "bzDn6",
+            "YzxU1",
+            "InCDe",
+            "r7eSi",
+            "w8W4Eh"
+          ],
+          "note": "Issue #265。10 Node・68枚を1440/1920pxと全状態で撮影し、全画像で横はみ出し0。一覧と表示件数を一致へ更新し、詳細検索は不足APIを明示して構造一致へ更新。IAf7j-pick の撮影手順二重実行も直して再撮影した。"
         }
       ]
     },
@@ -916,12 +934,23 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 2,
+      "match": 5,
       "structureMatchDataPending": 1,
-      "needsFix": 8,
+      "needsFix": 5,
       "unjudged": 0,
-      "remaining": 9,
+      "remaining": 6,
       "capturedAt": [
+        {
+          "pr": 955,
+          "head": "564c91d0fe",
+          "on": "2026-09-06",
+          "screens": [
+            "g46ja",
+            "Yj6CQ",
+            "e6iJG"
+          ],
+          "note": "競合確認、実在する友だちでのdry-run、最終確認、冪等な有効化を通し、1440・1920pxで設計と目視比較。横はみ出し0。"
+        },
         {
           "pr": 544,
           "head": "6053c271",
@@ -993,6 +1022,21 @@
       "remaining": 10,
       "capturedAt": [
         {
+          "pr": 962,
+          "head": "9b8f7451",
+          "on": "2026-09-06",
+          "screens": [
+            "uLQQc",
+            "s9gAx",
+            "W1wzCa",
+            "K0Dbr2",
+            "txMO9",
+            "U3SI5",
+            "Q3qP1r"
+          ],
+          "note": "Issue #211。割当ポート3104/8791で7画面を1440・1920px再撮影し、設計画像または同Nodeの設計本文と再照合。7画面の要修正判定を具体化し、横はみ出し0を確認"
+        },
+        {
           "pr": 431,
           "head": "2ab18c88",
           "on": "2026-08-30",
@@ -1035,10 +1079,29 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 2,
-      "unjudged": 11,
+      "needsFix": 13,
+      "unjudged": 0,
       "remaining": 13,
       "capturedAt": [
+        {
+          "pr": 962,
+          "head": "9b8f7451",
+          "on": "2026-09-06",
+          "screens": [
+            "ZC13r",
+            "PV1Vh",
+            "d3rFGD",
+            "Ho8z4",
+            "Xjk8q",
+            "GB0NR",
+            "D6yO7e",
+            "Q8sHa",
+            "yxyzQ",
+            "LKuAQ",
+            "zCQXe"
+          ],
+          "note": "Issue #211。割当ポート3104/8791で11画面を1440・1920px撮影し、設計画像または同Nodeの設計本文と照合。11画面を要修正と判定し、横はみ出し0を確認"
+        },
         {
           "pr": 917,
           "head": "c5e1095e",
@@ -1488,11 +1551,11 @@
       "feature": 15,
       "name": "登録メディア",
       "total": 5,
-      "compared": 5,
+      "compared": 4,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0,
+      "missing": 1,
       "match": 0,
       "structureMatchDataPending": 3,
       "needsFix": 2,
@@ -1788,11 +1851,11 @@
       "feature": 18,
       "name": "流入と計測",
       "total": 9,
-      "compared": 9,
+      "compared": 7,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0,
+      "missing": 2,
       "match": 9,
       "structureMatchDataPending": 0,
       "needsFix": 0,
@@ -2151,8 +2214,8 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 1,
-      "needsFix": 5,
+      "structureMatchDataPending": 2,
+      "needsFix": 4,
       "unjudged": 0,
       "remaining": 6,
       "capturedAt": [

@@ -83,9 +83,16 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
   const recipientCount = rules.filter((rule) => Boolean(conditionsOf(rule).recipientLabel)).length
   const missingRecipientCount = rules.length - recipientCount
   const filterCountsAvailable = Boolean(lineAccountId) && state === 'ready'
+  const listState = !lineAccountId
+    ? 'account-required'
+    : state === 'ready' && rules.length === 0
+      ? 'empty'
+      : state === 'ready' && visible.length === 0
+        ? 'filtered-empty'
+        : state
 
   return (
-    <section data-design-node="DpxOK" className="space-y-4">
+    <section data-design-node="DpxOK" data-list-state={listState} className="space-y-4">
       <NoteBar>
         この画面の宛先はお店の人だけです。お客様へ送るものは「顧客へのお知らせ」で設定します。
       </NoteBar>

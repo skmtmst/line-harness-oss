@@ -29,6 +29,7 @@ describe('V6 LINE notification history contract', () => {
     expect(LIST).toContain('kind="error"')
     expect(LIST).toContain("value={summary?.failed ?? null}")
     expect(LIST).toContain("items.length === 0")
+    expect(LIST).toContain('data-list-state={listState}')
   })
 
   it('does not claim delivery or individual reads from a LINE API acceptance', () => {
