@@ -32,6 +32,7 @@ const mocks = {
   verifyMediaUploadSession: vi.fn(),
   completeNewMediaUpload: vi.fn(),
   createMediaVersionFromUpload: vi.fn(),
+  getCurrentMediaVersionNo: vi.fn(),
   MediaVersionConflictError: MockMediaVersionConflictError,
   jstNow: vi.fn(() => '2026-08-31T10:00:00.000+09:00'),
   getCommonVars: vi.fn(),
@@ -279,6 +280,7 @@ beforeEach(() => {
     mime_type: 'image/png', size_bytes: 8, change_reason: 'ロゴを更新',
     created_at: '2026-09-07T00:00:00.000Z',
   });
+  mocks.getCurrentMediaVersionNo.mockResolvedValue(1);
   signingMocks.createR2PresignedPutUrl.mockResolvedValue({
     url: 'https://r2.example.com/upload?signature=hidden',
     headers: {
@@ -498,7 +500,7 @@ describe('メディアの容量・直接アップロード・版', () => {
       files: [{ filename: 'a.png', mimeType: 'image/png', sizeBytes: 8 }],
     }, null)).status).toBe(403);
     expect((await req('/api/media/md-1/versions', 'POST', {
-      accountId: 'account-1', uploadSessionId: 'upload-1', expectedVersionNo: 1,
+      accountId: 'account-1', uploadSessionId: 'upload-1', previewToken: 'preview-1',
       changeReason: '更新',
     }, null)).status).toBe(403);
   });
@@ -553,8 +555,18 @@ describe('メディアの容量・直接アップロード・版', () => {
     });
     expect(mocks.completeNewMediaUpload).not.toHaveBeenCalled();
 
+    mocks.getMediaUploadSession.mockResolvedValue({
+      ...UPLOAD_SESSION, target_media_id: 'md-1', status: 'verified', etag: 'etag-1',
+    });
+    const previewResponse = await req('/api/media/md-1/replacement-preview', 'POST', {
+      accountId: 'account-1', uploadSessionId: 'upload-1',
+    });
+    const preview = (await previewResponse.json()) as { data: { previewToken: string } };
+    expect(previewResponse.status).toBe(200);
+    expect(preview.data.previewToken).toMatch(/^[0-9a-f]{64}$/);
+
     const version = await req('/api/media/md-1/versions', 'POST', {
-      accountId: 'account-1', uploadSessionId: 'upload-1', expectedVersionNo: 1,
+      accountId: 'account-1', uploadSessionId: 'upload-1', previewToken: preview.data.previewToken,
       changeReason: 'ロゴを更新',
     });
     expect(version.status).toBe(201);
@@ -562,9 +574,16 @@ describe('メディアの容量・直接アップロード・版', () => {
   });
 
   it('版が先に進んでいれば現在版を添えて409にする', async () => {
+    mocks.getMediaUploadSession.mockResolvedValue({
+      ...UPLOAD_SESSION, target_media_id: 'md-1', status: 'verified', etag: 'etag-1',
+    });
+    const previewResponse = await req('/api/media/md-1/replacement-preview', 'POST', {
+      accountId: 'account-1', uploadSessionId: 'upload-1',
+    });
+    const preview = (await previewResponse.json()) as { data: { previewToken: string } };
     mocks.createMediaVersionFromUpload.mockRejectedValueOnce(new MockMediaVersionConflictError(3));
     const res = await req('/api/media/md-1/versions', 'POST', {
-      accountId: 'account-1', uploadSessionId: 'upload-1', expectedVersionNo: 1,
+      accountId: 'account-1', uploadSessionId: 'upload-1', previewToken: preview.data.previewToken,
       changeReason: 'ロゴを更新',
     });
     expect(res.status).toBe(409);

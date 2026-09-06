@@ -16,6 +16,7 @@ import {
   verifyMediaUploadSession,
   completeNewMediaUpload,
   createMediaVersionFromUpload,
+  getCurrentMediaVersionNo,
   MediaVersionConflictError,
   jstNow,
   getCommonVars,
@@ -237,6 +238,41 @@ function directUploadConfig(env: Env['Bindings']) {
 
 function normalizedEtag(value: string): string {
   return value.trim().replace(/^"|"$/g, '');
+}
+
+async function mediaVersionPreview(
+  c: Context<Env>,
+  mediaId: string,
+  uploadSessionId: string,
+  accountId: string,
+) {
+  const [media, session, currentVersionNo] = await Promise.all([
+    getMediaById(c.env.DB, mediaId, accountId),
+    getMediaUploadSession(c.env.DB, uploadSessionId, accountId),
+    getCurrentMediaVersionNo(c.env.DB, mediaId, accountId),
+  ]);
+  if (!media || !session || currentVersionNo === null || session.target_media_id !== mediaId) {
+    return null;
+  }
+  const blockers = session.status === 'verified'
+    ? (session.kind === media.kind ? [] : ['different_kind'])
+    : ['upload_not_verified'];
+  const raw = [
+    media.id, media.r2_key, String(currentVersionNo), session.id, session.r2_key,
+    session.etag ?? '', session.kind, session.expected_mime, String(session.expected_size),
+    ...blockers,
+  ].join('\n');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+  const previewToken = [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  return {
+    media,
+    session,
+    currentVersionNo,
+    previewToken,
+    blockers,
+    canReplace: blockers.length === 0,
+  };
 }
 
 // 容量は現行ファイルだけでなく旧版と期限内アップロード予約も含める。
@@ -467,30 +503,55 @@ contents.post('/api/media/:id/versions', requireRole('owner', 'admin', 'staff'),
     const body = await c.req.json<{
       accountId?: unknown;
       uploadSessionId?: unknown;
-      expectedVersionNo?: unknown;
+      previewToken?: unknown;
       changeReason?: unknown;
     }>().catch(() => null);
     const accountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
     const uploadSessionId = typeof body?.uploadSessionId === 'string'
       ? body.uploadSessionId.trim()
       : '';
-    const expectedVersionNo = Number(body?.expectedVersionNo);
+    const previewToken = typeof body?.previewToken === 'string' ? body.previewToken.trim() : '';
     const changeReason = typeof body?.changeReason === 'string' ? body.changeReason.trim() : '';
-    if (!accountId || !uploadSessionId || !Number.isInteger(expectedVersionNo)
-      || expectedVersionNo < 1 || !changeReason || changeReason.length > 500) {
+    if (!accountId || !uploadSessionId || !previewToken
+      || !changeReason || changeReason.length > 500) {
       return c.json({
         success: false,
-        error: 'accountId、確認済みuploadSessionId、expectedVersionNo、変更理由が必要です',
+        error: 'accountId、確認済みuploadSessionId、previewToken、変更理由が必要です',
       }, 400);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
+    const preview = await mediaVersionPreview(
+      c, c.req.param('id'), uploadSessionId, accountId,
+    );
+    if (!preview) return c.json({ success: false, error: 'Not found' }, 404);
+    if (preview.previewToken !== previewToken) {
+      return c.json({
+        success: false,
+        code: 'media_replacement_changed',
+        error: 'ファイルまたは現在版が変わりました。差し替え内容を確認し直してください。',
+        data: {
+          previewToken: preview.previewToken,
+          currentVersionNo: preview.currentVersionNo,
+          blockers: preview.blockers,
+          canReplace: preview.canReplace,
+        },
+      }, 409);
+    }
+    if (!preview.canReplace) {
+      return c.json({
+        success: false,
+        code: 'media_replacement_blocked',
+        error: 'このファイルは現在のメディアと互換性がありません',
+        data: { blockers: preview.blockers },
+      }, 409);
+    }
     const version = await createMediaVersionFromUpload(c.env.DB, {
       mediaId: c.req.param('id'),
       lineAccountId: accountId,
       uploadSessionId,
-      expectedVersionNo,
+      expectedVersionNo: preview.currentVersionNo,
       changeReason,
       uploadedBy: c.get('staff')?.id ?? null,
     });
@@ -529,6 +590,43 @@ contents.post('/api/media/:id/versions', requireRole('owner', 'admin', 'staff'),
     return c.json({ success: false, error: '新しい版を追加できませんでした' }, 500);
   }
 });
+
+contents.post(
+  '/api/media/:id/replacement-preview',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    try {
+      const body = await c.req.json<{ accountId?: unknown; uploadSessionId?: unknown }>()
+        .catch(() => null);
+      const accountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
+      const uploadSessionId = typeof body?.uploadSessionId === 'string'
+        ? body.uploadSessionId.trim()
+        : '';
+      if (!accountId || !uploadSessionId) {
+        return c.json({ success: false, error: 'accountId と uploadSessionId が必要です' }, 400);
+      }
+      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+        return c.json({ success: false, error: 'Not found' }, 404);
+      }
+      const preview = await mediaVersionPreview(c, c.req.param('id'), uploadSessionId, accountId);
+      if (!preview) return c.json({ success: false, error: 'Not found' }, 404);
+      return c.json({
+        success: true,
+        data: {
+          mediaId: preview.media.id,
+          uploadSessionId: preview.session.id,
+          currentVersionNo: preview.currentVersionNo,
+          previewToken: preview.previewToken,
+          blockers: preview.blockers,
+          canReplace: preview.canReplace,
+        },
+      });
+    } catch (err) {
+      console.error('POST /api/media/:id/replacement-preview error:', err);
+      return c.json({ success: false, error: '差し替え内容を確認できませんでした' }, 503);
+    }
+  },
+);
 
 contents.get('/api/media', async (c) => {
   try {
@@ -749,7 +847,10 @@ contents.get('/api/media/:id/replacement-impact', requireRole('owner', 'admin'),
     }
     const current = await replacementImpact(c, c.req.param('id'), replacementId, accountId);
     if (!current) return c.json({ success: false, error: 'Not found' }, 404);
-    return c.json({ success: true, data: current.impact });
+    return c.json({
+      success: true,
+      data: { ...current.impact, previewToken: current.impact.revision },
+    });
   } catch (err) {
     console.error('GET /api/media/:id/replacement-impact error:', err);
     return c.json({ success: false, error: '差し替えたときの影響を確認できませんでした' }, 503);
@@ -768,9 +869,9 @@ contents.post('/api/media/:id/replace-usages', requireRole('owner', 'admin'), as
     const replacementId = typeof body.replacementMediaId === 'string'
       ? body.replacementMediaId.trim()
       : '';
-    const expectedRevision = typeof body.expectedRevision === 'string'
-      ? body.expectedRevision.trim()
-      : '';
+    const expectedRevision = typeof body.previewToken === 'string'
+      ? body.previewToken.trim()
+      : (typeof body.expectedRevision === 'string' ? body.expectedRevision.trim() : '');
     if (!replacementId || !expectedRevision) {
       return c.json({ success: false, error: '差し替え先と、確認した版が必要です' }, 400);
     }
