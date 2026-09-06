@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 9,
-  "match": 6,
-  "structureMatchDataPending": 40,
-  "needsFix": 131,
+  "match": 16,
+  "structureMatchDataPending": 42,
+  "needsFix": 119,
   "unjudged": 74,
-  "remaining": 262,
+  "remaining": 252,
   "features": [
     {
       "feature": 1,
@@ -766,11 +766,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
+      "match": 10,
       "structureMatchDataPending": 0,
-      "needsFix": 11,
+      "needsFix": 1,
       "unjudged": 0,
-      "remaining": 11,
+      "remaining": 1,
       "capturedAt": [
         {
           "pr": 429,
@@ -864,6 +864,24 @@
             "GC4St"
           ],
           "note": "Claudeが #551 の head で9枚を撮り直した。4枚が一致。文言の直しは dC0yg のみ"
+        },
+        {
+          "pr": 927,
+          "head": "eb41ad0d",
+          "on": "2026-09-06",
+          "screens": [
+            "M1EXwB",
+            "uJP22",
+            "J64xI",
+            "s7T2dz",
+            "JCz6J",
+            "W98zZQ",
+            "s6Vvp",
+            "PSmHo",
+            "Y0Sn3",
+            "dC0yg"
+          ],
+          "note": "★V6の対象10画面を1440・1920と全状態で比較。横はみ出し0。"
         }
       ]
     },
@@ -1437,8 +1455,8 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 1,
-      "needsFix": 4,
+      "structureMatchDataPending": 3,
+      "needsFix": 2,
       "unjudged": 0,
       "remaining": 5,
       "capturedAt": [
