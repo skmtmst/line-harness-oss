@@ -78,7 +78,7 @@ const ALLOWED_H1: Record<string, string> = {
 
 describe('画面名を本文とトップバーで2回出さない', () => {
   it('全ページを読めている', () => {
-    expect(PAGES.length).toBe(144)  // 2026-09-04: マイルの使い道とリマインダ実行結果を加えた実測値。
+    expect(PAGES.length).toBe(145)  // 2026-09-06: 回答フォームの回答専用画面を加えた実測値。
   })
 
   it('page.tsx が h1 を直接持たない', () => {
