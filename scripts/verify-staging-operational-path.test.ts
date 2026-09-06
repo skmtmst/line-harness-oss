@@ -117,6 +117,20 @@ describe('staging operational verification safety', () => {
     expect(queryMock.mock.calls.some(([sql]) => sql.includes('notification_rules'))).toBe(false);
   });
 
+  test('names the cleanup table when an individual leftover count fails', async () => {
+    const query = async <T>(sql: string): Promise<T[]> => {
+      if (sql.includes('FROM friends ')) throw new Error('provider failure');
+      return [{ count: 0 }] as T[];
+    };
+
+    await expect(countVerificationLeftovers(query, {
+      sessionHash: 'hash',
+      scenarioId: 'verify-b88-scenario-run',
+      lineUserIdPattern: 'verify-b88-line-%',
+      notificationRuleId: null,
+    })).rejects.toThrow('friends: provider failure');
+  });
+
   test('inserts 41 delivery rows in bounded batches instead of one request per row', async () => {
     const calls: Array<{ sql: string; params: unknown[] }> = [];
     const query = async <T>(sql: string, params: unknown[] = []): Promise<T[]> => {

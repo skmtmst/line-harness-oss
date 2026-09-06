@@ -15,6 +15,7 @@ const CONFIG_PATH = 'apps/worker/wrangler.staging.toml';
 const SESSION_TTL_MINUTES = 15;
 const D1_MAX_ATTEMPTS = 3;
 const DEFAULT_TENANT_ID = '00000000-0000-4000-8000-000000000001';
+// D1 rejects LIKE/GLOB patterns longer than 50 bytes. Keep the run UUID out.
 const SYNTHETIC_FRIEND_PATTERN = 'verify-b88-line-%';
 
 type D1Envelope<T> = {
@@ -111,8 +112,13 @@ export async function countVerificationLeftovers(
   }
   const counts: Record<string, number> = {};
   for (const check of checks) {
-    const rows = await query<{ count: number }>(check.sql, [check.value]);
-    counts[check.name] = Number(rows[0]?.count ?? 0);
+    try {
+      const rows = await query<{ count: number }>(check.sql, [check.value]);
+      counts[check.name] = Number(rows[0]?.count ?? 0);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'unknown count failure';
+      throw new Error(`${check.name}: ${reason}`);
+    }
   }
   return {
     total: Object.values(counts).reduce((sum, count) => sum + count, 0),
