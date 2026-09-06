@@ -54,9 +54,8 @@ export function toSteps(result: VerifyResult | null): CheckStep[] {
     result.lineLogin && result.liff,
     result.messagingApi,
     result.webhook,
-    // 4 段目は 3 段目が通って初めて意味を持つ。口はまだ返さないので
-    // 通ったとは書かない。
-    false,
+    // webhook=true はURL一致・利用設定・LINEの接続テストまで通った結果。
+    result.webhook,
   ]
   const steps: CheckStep[] = []
   let stopped = false
@@ -67,11 +66,6 @@ export function toSteps(result: VerifyResult | null): CheckStep[] {
     }
     if (passes[i]) {
       steps.push({ order: i + 1, label, state: 'passed' })
-      return
-    }
-    // 4 段目は「まだ確かめる口が無い」ので、止まったとは言わない。
-    if (i === 3) {
-      steps.push({ order: i + 1, label, state: 'skipped' })
       return
     }
     steps.push({ order: i + 1, label, state: 'failed' })
@@ -85,9 +79,9 @@ export function stoppedAt(steps: CheckStep[]): CheckStep | null {
   return steps.find((s) => s.state === 'failed') ?? null
 }
 
-/** 保存してよいか。**4 段目は口が無いので、3 段目まで通れば保存できる。** */
+/** 保存してよいか。4段すべて通ったときだけ保存する。 */
 export function canSave(steps: CheckStep[]): boolean {
-  return steps.slice(0, 3).every((s) => s.state === 'passed')
+  return steps.every((s) => s.state === 'passed')
 }
 
 /**
