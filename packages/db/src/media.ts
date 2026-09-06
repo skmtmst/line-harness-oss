@@ -122,8 +122,9 @@ export async function createMedia(
   },
 ): Promise<Media> {
   const id = crypto.randomUUID();
-  await db
-    .prepare(
+  const now = jstNow();
+  await db.batch([
+    db.prepare(
       `INSERT INTO media
          (id, line_account_id, folder_id, kind, filename, mime_type, size_bytes, width, height,
           duration_ms, r2_key, public_url, uploaded_by, created_at)
@@ -143,9 +144,19 @@ export async function createMedia(
       input.r2Key,
       input.publicUrl ?? null,
       input.uploadedBy ?? null,
-      jstNow(),
-    )
-    .run();
+      now,
+    ),
+    db.prepare(
+      `INSERT INTO media_versions
+         (id, media_id, version_no, r2_key, mime_type, size_bytes, width, height, duration_ms,
+          scan_status, scanned_at, uploaded_by, created_at, published_at)
+       VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, 'verified', ?, ?, ?, ?)`,
+    ).bind(
+      crypto.randomUUID(), id, input.r2Key, input.mimeType, input.sizeBytes,
+      input.width ?? null, input.height ?? null, input.durationMs ?? null,
+      now, input.uploadedBy ?? null, now, now,
+    ),
+  ]);
   return (await getMediaById(db, id, input.lineAccountId))!;
 }
 
