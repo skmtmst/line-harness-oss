@@ -66,17 +66,6 @@ const SOURCE_PRESETS = [
 /** 見本に無い「その他」を選んだときだけ、自由入力に切り替える印。 */
 const SOURCE_OTHER = '__other__'
 
-/**
- * 保存してある値を、画面の言葉に戻す。
- *
- * 未設定を `-`（半角ハイフン）で書いていた。V6の決めごとは `—`。
- * 半角は数や記号に見えて、「無い」と読み取れない。
- */
-function sourceLabel(value: string | null | undefined): string {
-  if (!value) return '—'
-  return SOURCE_PRESETS.find((preset) => preset.value === value)?.label ?? value
-}
-
 function WebhooksPageInner({ tab }: { tab: Tab }) {
   const { selectedAccountId } = useAccount()
   const selectedAccountIdRef = useRef(selectedAccountId)

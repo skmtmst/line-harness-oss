@@ -430,20 +430,20 @@ export function IncomingOverview({
             <h2 className="text-ink mb-2 text-base font-bold">そのほかの受け取り口</h2>
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
               {items.filter((item) => item.id !== selected.id).map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setSelectedId(item.id)}
-                  className="bg-canvas border-hairline rounded-card flex items-center justify-between gap-3 border p-4 text-left"
-                >
-                  <span>
+                <div key={item.id} className="bg-canvas border-hairline rounded-card flex items-center justify-between gap-3 border p-4">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedId(item.id)}
+                    className="min-w-0 flex-1 text-left"
+                    aria-label={`受け取り口「${item.name}」を見る`}
+                  >
                     <strong className="text-ink block text-sm">{item.name}</strong>
                     <span className="text-ink-faint mt-1 block text-xs">{sourceName(item.sourceType)}</span>
-                  </span>
+                  </button>
                   <StatusBadge tone={item.isActive ? 'success' : 'neutral'} size="compact">
                     {item.isActive ? '動いています' : '止めています'}
                   </StatusBadge>
-                </button>
+                </div>
               ))}
             </div>
           </section>

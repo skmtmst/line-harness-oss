@@ -72,6 +72,7 @@ describe('共通部品の影響範囲', () => {
       'app/reminders/page.tsx',
       'app/rich-menus/page.tsx',
       'app/webhooks/webhook-interactions.tsx',
+      'app/webhooks/webhook-overviews.tsx',
       'app/webinars/page.tsx',
       'components/friend-attributes-v2/tag-list-v2.tsx',
       'components/friend-fields/tags-page-v4.tsx',
