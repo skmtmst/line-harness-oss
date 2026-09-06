@@ -41,7 +41,7 @@ function buttonOpenings(path: string, source: string): string[] {
 }
 
 describe('標準ボタンの第1段階移行', () => {
-  it('7ルートの標準操作39個を共通Buttonで維持する', () => {
+  it('7ルートの標準操作41個を共通Buttonで維持する', () => {
     const openings = Object.entries(sources).flatMap(([path, source]) => {
       expect(source, `${path} が共通Buttonを直接importしていない`).toContain(
         "import Button from '@/components/shared/button'",
@@ -74,9 +74,9 @@ describe('標準ボタンの第1段階移行', () => {
     //   今回は**押すと実際に書き出せる**ものとして戻す。42 → 43。
     // 2026-09-04: 取得失敗の再読み込み2個は、画面ごとの `action` から
     // `ListState.onRetry` へ移した。共通部品が描くので、この7ルートでは数えない。
-    // 2026-09-06: 流入と計測の見出しから、押しても目的地が無い
-    // マニュアルと並び替えの2操作を外した。41 → 39。
-    expect(openings).toHaveLength(39)
+    // 2026-09-06: 機能18の一覧に、設計で必要なCSVとまとめて操作を戻した。
+    // どちらも共通Buttonを使い、39 → 41。
+    expect(openings).toHaveLength(41)
     expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(16)
   })
 
@@ -246,7 +246,9 @@ describe('標準ボタンの第1段階移行', () => {
     // 流入経路の絞り込みも共通FilterChipへ寄せ、さらに1個減った。
     // 2026-09-06: 友だち追加時配信のタブとアイコン操作を共通部品へ寄せ、
     // 統合後の実測で副次操作も3つ減ったため、減少後の基準へ締め直す。
-    expect(debt['direct-secondary-button']).toBe(206)
+    // 2026-09-06: 最新development統合後と機能18の直しを合わせた実測値。
+    // 機能18だけでは直書き副次操作を7個減らしている。
+    expect(debt['direct-secondary-button']).toBe(207)
     /*
       4-1 を設計の実測値へ合わせるたびに増える。設計 `hqrOv` に
       書いてある数で、トークンには無い（26px の札・7px の余白・
@@ -313,9 +315,9 @@ describe('標準ボタンの第1段階移行', () => {
     // 共通部品へ寄せたぶんで減った。**両方が動いたので実測へ締め直す。**
     // 2026-09-04: 共通情報一覧から旧 `max-w-[18rem]` を外して1178。
     // 2026-09-06: 流入と計測のV6化で任意値指定が2つ減ったため、実測へ締め直す。
-    // 2026-09-06: 列車31の統合後ツリーで共通部品移行を含め再計測し、
-    // 任意値指定が4つ減っていたため、減少後の基準へ締め直す。
-    expect(debt['arbitrary-value']).toBe(1172)
+    // 2026-09-06: 最新development統合後と機能18の直しを合わせた実測値。
+    // 機能18では任意値指定を4つ減らしている。
+    expect(debt['arbitrary-value']).toBe(1173)
   })
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {

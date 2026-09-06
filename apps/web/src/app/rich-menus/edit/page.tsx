@@ -1,6 +1,7 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
+import Button from '@/components/shared/button'
 import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -8,7 +9,7 @@ import Header from '@/components/layout/header'
 import { api } from '@/lib/api'
 import { CanvasEditor, type Area } from '@/components/rich-menus/canvas-editor'
 import { AreaProperties, intentOf } from '@/components/rich-menus/area-properties'
-import type { RichMenuAreaTapCount } from '@/lib/api'
+import type { RichMenuAreaTapCount, RichMenuTargetPreview, RichMenuScheduleInput } from '@/lib/api'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -87,6 +88,8 @@ function RichMenuEditPageInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const groupId = searchParams.get('id') ?? ''
+  const editorStep = searchParams.get('step')
+  usePageTitle(editorStep === 'targeting' ? '誰に出すか' : editorStep === 'publish' ? '公開のしかた' : 'リッチメニュー編集')
 
   if (!groupId) {
     return (
@@ -98,14 +101,16 @@ function RichMenuEditPageInner() {
       </main>
     )
   }
-  return <Editor groupId={groupId} router={router} />
+  return <Editor groupId={groupId} editorStep={editorStep} router={router} />
 }
 
 function Editor({
   groupId,
+  editorStep,
   router,
 }: {
   groupId: string
+  editorStep: string | null
   router: ReturnType<typeof useRouter>
 }) {
   const [group, setGroup] = useState<Group | null>(null)
@@ -168,6 +173,9 @@ function Editor({
    * 画面に残せば、区画を押しながら設定と見比べられる。
    */
   const [previewMessage, setPreviewMessage] = useState('')
+  const [targetPreview, setTargetPreview] = useState<RichMenuTargetPreview | null>(null)
+  const [targetPreviewLoading, setTargetPreviewLoading] = useState(false)
+  const [targetPreviewError, setTargetPreviewError] = useState('')
 
   const closeConfirm = () => {
     if (publishing || unpublishing) return
@@ -218,6 +226,31 @@ function Editor({
   useEffect(() => {
     reload()
   }, [reload])
+
+  const reloadTargetPreview = useCallback(async () => {
+    if (!group) return
+    setTargetPreviewLoading(true)
+    setTargetPreviewError('')
+    try {
+      const response = await api.richMenuGroups.previewTargets(
+        group.id,
+        targetingEnabled ? targetingCondition : null,
+      )
+      if (!response.success) throw new Error(response.error)
+      setTargetPreview(response.data)
+    } catch {
+      setTargetPreview(null)
+      setTargetPreviewError('対象人数を確認できませんでした。条件は保存できます。')
+    } finally {
+      setTargetPreviewLoading(false)
+    }
+  }, [group, targetingCondition, targetingEnabled])
+
+  useEffect(() => {
+    if (editorStep !== 'targeting' && editorStep !== 'publish') return
+    const timer = window.setTimeout(() => void reloadTargetPreview(), 250)
+    return () => window.clearTimeout(timer)
+  }, [editorStep, reloadTargetPreview])
 
   // 選択肢は片方が落ちても残りを出す。1つ取れなくても編集自体は続けられる。
   useEffect(() => {
@@ -543,6 +576,60 @@ function Editor({
   const imageUrl = activePage?.imageR2Key
     ? `${api.richMenuGroups.imageUrl(activePage.imageR2Key)}?v=${imageVersion}`
     : null
+
+  if (editorStep === 'targeting') {
+    return (
+      <TargetingStep
+        group={group}
+        targetingEnabled={targetingEnabled}
+        targetingPriority={targetingPriority}
+        targetingCondition={targetingCondition}
+        tags={tags}
+        preview={targetPreview}
+        previewLoading={targetPreviewLoading}
+        previewError={targetPreviewError}
+        saving={saving}
+        onTargetingEnabled={setTargetingEnabled}
+        onTargetingPriority={setTargetingPriority}
+        onTargetingCondition={setTargetingCondition}
+        onRefresh={() => void reloadTargetPreview()}
+        onSave={() => void handleSave()}
+      />
+    )
+  }
+
+  if (editorStep === 'publish') {
+    return (
+      <PublishStep
+        group={group}
+        pages={pages}
+        preview={targetPreview}
+        saving={saving}
+        publishing={publishing}
+        onSave={() => void handleSave()}
+        onPublishNow={() => void handlePublish()}
+        onSchedule={async (input) => {
+          setSaving(true)
+          setNotice('')
+          setError(null)
+          try {
+            await persistDraft()
+            const response = await api.richMenuGroups.schedule(
+              group.id,
+              input,
+              crypto.randomUUID(),
+            )
+            if (!response.success) throw new Error(response.error)
+            setNotice('公開予約を保存しました。予約時点の内容で公開します。')
+          } catch {
+            setError('公開予約を保存できませんでした。入力と通信状態を確認して、もう一度お試しください。')
+          } finally {
+            setSaving(false)
+          }
+        }}
+      />
+    )
+  }
 
   return (
     <main className="p-6 max-w-7xl mx-auto">
@@ -1113,6 +1200,233 @@ function Editor({
           <li>・戻せます: もう一度「LINEに登録」すれば、また出せます。</li>
         </ul>
       </ConfirmDialog>
+    </main>
+  )
+}
+
+function StepHeader({ active, groupId }: { active: 2 | 3; groupId: string }) {
+  const steps = [
+    { number: 1, label: '形とボタン', href: `/rich-menus/edit?id=${groupId}` },
+    { number: 2, label: '誰に出すか', href: `/rich-menus/edit?id=${groupId}&step=targeting` },
+    { number: 3, label: '公開のしかた', href: `/rich-menus/edit?id=${groupId}&step=publish` },
+  ]
+  return (
+    <div className="border-hairline bg-canvas mb-6 grid grid-cols-3 overflow-hidden rounded-card border">
+      {steps.map((step) => (
+        <Link
+          key={step.number}
+          href={step.href}
+          className={`flex min-w-0 items-center justify-center gap-3 border-r px-4 py-4 last:border-r-0 ${
+            step.number === active ? 'bg-accent/5 text-accent' : 'text-ink-secondary'
+          }`}
+        >
+          <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+            step.number === active ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-faint'
+          }`}>{step.number}</span>
+          <span className="min-w-0">
+            <span className="block text-xs font-bold tracking-wider">STEP {step.number}</span>
+            <span className="block truncate text-sm font-semibold">{step.label}</span>
+          </span>
+        </Link>
+      ))}
+    </div>
+  )
+}
+
+function MetricValue({ metric }: { metric: RichMenuTargetPreview['matched'] | undefined }) {
+  if (!metric || metric.state === 'unavailable' || metric.value === null) {
+    return <span title={metric?.reason ?? '未取得'}>— <small className="text-ink-faint text-xs">（未取得）</small></span>
+  }
+  return <>{metric.value.toLocaleString('ja-JP')}人</>
+}
+
+function TargetingStep({
+  group,
+  targetingEnabled,
+  targetingPriority,
+  targetingCondition,
+  tags,
+  preview,
+  previewLoading,
+  previewError,
+  saving,
+  onTargetingEnabled,
+  onTargetingPriority,
+  onTargetingCondition,
+  onRefresh,
+  onSave,
+}: {
+  group: Group
+  targetingEnabled: boolean
+  targetingPriority: number
+  targetingCondition: SegmentCondition | null
+  tags: PickerOption[]
+  preview: RichMenuTargetPreview | null
+  previewLoading: boolean
+  previewError: string
+  saving: boolean
+  onTargetingEnabled: (value: boolean) => void
+  onTargetingPriority: (value: number) => void
+  onTargetingCondition: (value: SegmentCondition | null) => void
+  onRefresh: () => void
+  onSave: () => void
+}) {
+  const [conditionEditorOpen, setConditionEditorOpen] = useState(false)
+  const firstRule = targetingCondition?.rules[0]
+  const selectedTagName = firstRule?.type.startsWith('tag_')
+    ? tags.find((tag) => tag.id === firstRule.value)?.name
+    : null
+  return (
+    <main data-design-node="kQ1bs" className="mx-auto max-w-7xl p-6 pb-24">
+      <nav className="text-ink-faint mb-2 text-xs"><Link href="/rich-menus">リッチメニュー</Link><span className="mx-1.5">/</span>{group.name}</nav>
+      <Header description="条件と優先順位を決め、友だちごとに表示するメニューを1つ選びます。" />
+      <StepHeader active={2} groupId={group.id} />
+
+      <div className="grid gap-5 xl:grid-cols-3">
+        <section className="border-hairline bg-canvas rounded-card border p-6 shadow-sm xl:col-span-2">
+          <h2 className="text-ink text-base font-bold">このメニューを出す相手</h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <label className={`rounded-card cursor-pointer border p-4 ${!targetingEnabled ? 'border-accent bg-accent/5' : 'border-hairline'}`}>
+              <span className="flex items-center gap-2 text-sm font-semibold"><input type="radio" name="audience" checked={!targetingEnabled} onChange={() => onTargetingEnabled(false)} />すべての友だち</span>
+              <span className="text-ink-faint mt-2 block text-xs leading-5">ほかのメニューに当てはまらなかった人に出る、いちばん下の受け皿になります</span>
+            </label>
+            <label className={`rounded-card cursor-pointer border p-4 ${targetingEnabled ? 'border-accent bg-accent/5' : 'border-hairline'}`}>
+              <span className="flex items-center gap-2 text-sm font-semibold"><input type="radio" name="audience" checked={targetingEnabled} onChange={() => onTargetingEnabled(true)} />条件に当てはまる友だちだけ</span>
+              <span className="text-ink-faint mt-2 block text-xs leading-5">当てはまらない人には、これより下のメニューが出ます</span>
+            </label>
+          </div>
+
+          {targetingEnabled ? (
+            <div className="border-hairline mt-5 rounded-card border p-4">
+              <div className="flex items-center justify-between gap-3"><div><p className="text-ink text-sm font-bold">条件</p><p className="text-ink-secondary mt-1 text-xs">{selectedTagName ? `タグ「${selectedTagName}」を含む` : targetingCondition ? `保存済み条件 ${targetingCondition.rules.length}件` : '条件がまだありません'}</p></div><Button type="button" onClick={() => setConditionEditorOpen((open) => !open)}>{conditionEditorOpen ? '編集を閉じる' : '条件を編集'}</Button></div>
+              {conditionEditorOpen ? <div className="mt-4"><ConditionBuilder value={targetingCondition} onChange={onTargetingCondition} label="条件" /></div> : null}
+            </div>
+          ) : null}
+
+          <div className="border-hairline mt-5 grid gap-4 border-t pt-5 sm:grid-cols-3">
+            <div><p className="text-ink-faint text-xs">いま当てはまる人</p><p className="text-ink mt-1 text-2xl font-bold">{previewLoading ? '確認中…' : <MetricValue metric={preview?.matched} />}</p></div>
+            <div>
+              <label className="text-ink-faint text-xs" htmlFor="targeting-priority">出す順番</label>
+              <div className="mt-1 flex items-center gap-2"><input id="targeting-priority" aria-label="出す順番" type="number" min={1} value={targetingPriority + 1} onChange={(event) => onTargetingPriority(Math.max(0, Number(event.target.value) - 1))} className="border-hairline rounded-control w-20 border px-3 py-2 text-lg font-bold" /><span className="text-ink-secondary text-sm">番目</span></div>
+            </div>
+            <div><p className="text-ink-faint text-xs">実際にこのメニューが出る人</p><p className="text-accent mt-1 text-2xl font-bold"><MetricValue metric={preview?.effective} /></p></div>
+          </div>
+          {preview?.overlap.value ? <p className="bg-warning-bg text-warning mt-4 rounded-control px-3 py-2 text-xs">このうち {preview.overlap.value.toLocaleString('ja-JP')}人 は上の「{preview.higherMenus[0] ?? '優先メニュー'}」にも当てはまるため、そちらが出ます。</p> : null}
+          {previewError ? <p className="text-danger mt-3 text-xs" role="alert">{previewError}</p> : null}
+          <Button type="button" onClick={onRefresh} className="mt-3">人数をもう一度確認</Button>
+        </section>
+
+        <aside className="space-y-4">
+          <section className="border-hairline bg-canvas rounded-card border p-5">
+            <h2 className="text-ink text-sm font-bold">利用できる条件軸</h2>
+            <p className="text-ink-faint mt-1 text-xs">友だち一覧の詳細検索と同じ条件を使います</p>
+            <p className="text-ink-secondary mt-4 text-xs font-bold">標準互換（15軸）</p>
+            <div className="text-ink-secondary mt-2 flex flex-wrap gap-1.5 text-xs">{['名前','個別メモ','ステータスメッセージ','友だち登録日','タグ','友だち情報','シナリオ','イベント予約','カレンダー予約','共通情報','リマインダ','回答フォーム','最終反応日','その他','対応マーク'].map((label) => <span key={label} className="bg-canvas-sunken rounded px-2 py-1">{label}</span>)}</div>
+            <p className="text-ink-secondary mt-4 text-xs font-bold">この画面だけの軸（6軸）</p>
+            <div className="text-ink-secondary mt-2 flex flex-wrap gap-1.5 text-xs">{['担当者','流入経路','配信状況','予約状況','購入履歴','ブロック状態'].map((label) => <span key={label} className="bg-canvas-sunken rounded px-2 py-1">{label}</span>)}</div>
+          </section>
+          <section className="bg-status-info-soft text-status-info rounded-card p-4 text-xs leading-5"><strong className="block">条件はここだけの話ではありません</strong>一度作った条件は保存した検索として、配信や自動応答でも呼び出せます。</section>
+        </aside>
+      </div>
+
+      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><span className="text-ink-faint text-xs">{group.status === 'published' ? 'LINE登録済み' : '下書き（まだ誰にも出ていません）'}</span><div className="flex gap-2"><Button href={`/rich-menus/edit?id=${group.id}`}>前へ：形とボタン</Button><Button onClick={onSave} disabled={saving}>{saving ? '保存中…' : '下書きに保存'}</Button><Button variant="primary" href={`/rich-menus/edit?id=${group.id}&step=publish`}>次へ：公開のしかた</Button></div></div>} />
+    </main>
+  )
+}
+
+function PublishStep({
+  group,
+  pages,
+  preview,
+  saving,
+  publishing,
+  onSave,
+  onPublishNow,
+  onSchedule,
+}: {
+  group: Group
+  pages: Page[]
+  preview: RichMenuTargetPreview | null
+  saving: boolean
+  publishing: boolean
+  onSave: () => void
+  onPublishNow: () => void
+  onSchedule: (input: RichMenuScheduleInput) => Promise<void>
+}) {
+  const [mode, setMode] = useState<'now' | 'scheduled' | 'period'>('now')
+  const [startsAt, setStartsAt] = useState('')
+  const [endsAt, setEndsAt] = useState('')
+  const [restoreGroupId, setRestoreGroupId] = useState('')
+  const [restoreMenus, setRestoreMenus] = useState<Array<{ id: string; name: string }>>([])
+
+  useEffect(() => {
+    void api.richMenuGroups.list(group.accountId).then((response) => {
+      if (!response.success) return
+      setRestoreMenus(response.data.filter((item) => item.id !== group.id && item.status === 'published').map((item) => ({ id: item.id, name: item.name })))
+    })
+  }, [group.accountId, group.id])
+
+  const unconfiguredAreas = pages.reduce((count, page) => count + page.areas.filter((area) => !area.label).length, 0)
+  const imageReady = pages.length > 0 && pages.every((page) => page.imageR2Key)
+  const submit = () => {
+    if (mode === 'now') {
+      onPublishNow()
+      return
+    }
+    if (!startsAt || (mode === 'period' && !endsAt)) return
+    void onSchedule({
+      mode,
+      startsAt: new Date(startsAt).toISOString(),
+      endsAt: mode === 'period' ? new Date(endsAt).toISOString() : null,
+      restoreGroupId: mode === 'period' ? restoreGroupId || null : null,
+    })
+  }
+
+  return (
+    <main data-design-node="UMiJ9" className="mx-auto max-w-7xl p-6 pb-24">
+      <nav className="text-ink-faint mb-2 text-xs"><Link href="/rich-menus">リッチメニュー</Link><span className="mx-1.5">/</span>{group.name}</nav>
+      <Header description="いつ公開し、期間終了後にどのメニューへ戻すかを決めます。" />
+      <StepHeader active={3} groupId={group.id} />
+      <div className="grid gap-5 xl:grid-cols-3">
+        <section className="border-hairline bg-canvas rounded-card border p-6 shadow-sm xl:col-span-2">
+          <h2 className="text-ink text-base font-bold">いつ出すか</h2>
+          <div className="mt-4 space-y-3">
+            {[
+              ['now', 'いますぐ出す', '保存したらすぐ、条件に当てはまる人のトーク画面に出ます'],
+              ['scheduled', '日時を決めて出す', 'その時刻になったら自動で出ます。それまでは今のメニューのままです'],
+              ['period', '期間を決める', '終わったら自動で元に戻します。キャンペーンはこれが安全です'],
+            ].map(([value, label, note]) => (
+              <label key={value} className={`rounded-card flex cursor-pointer gap-3 border p-4 ${mode === value ? 'border-accent bg-accent/5' : 'border-hairline'}`}>
+                <input type="radio" name="publish-mode" checked={mode === value} onChange={() => setMode(value as typeof mode)} />
+                <span><strong className="text-ink block text-sm">{label}</strong><span className="text-ink-faint mt-1 block text-xs">{note}</span></span>
+              </label>
+            ))}
+          </div>
+          {mode !== 'now' ? (
+            <div className="border-hairline mt-5 grid gap-4 border-t pt-5 sm:grid-cols-2">
+              <label className="text-ink-secondary text-xs font-semibold">出しはじめ<input aria-label="出しはじめ" type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} className="border-hairline rounded-control text-ink mt-1 block w-full border px-3 py-2 text-sm" /></label>
+              {mode === 'period' ? <label className="text-ink-secondary text-xs font-semibold">出しおわり<input aria-label="出しおわり" type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} className="border-hairline rounded-control text-ink mt-1 block w-full border px-3 py-2 text-sm" /></label> : null}
+              {mode === 'period' ? <label className="text-ink-secondary text-xs font-semibold sm:col-span-2">終わったらどうする<SelectField aria-label="終わったらどうする" value={restoreGroupId} onChange={(event) => setRestoreGroupId(event.target.value)} options={[{ value: '', label: '前のメニューに戻す' }, ...restoreMenus.map((item) => ({ value: item.id, label: item.name }))]} className="mt-1" /></label> : null}
+            </div>
+          ) : null}
+
+          <div className="border-hairline mt-6 border-t pt-5">
+            <h2 className="text-ink text-sm font-bold">公開前チェック</h2>
+            <ul className="mt-3 space-y-2 text-sm">
+              <li className="text-success">✓ 誰に出すかが決まっています（<MetricValue metric={preview?.matched} />）</li>
+              <li className={imageReady ? 'text-success' : 'text-danger'}>{imageReady ? '✓' : '⚠'} 画像が登録されています{imageReady ? '' : '（未設定のページがあります）'}</li>
+              <li className={unconfiguredAreas === 0 ? 'text-success' : 'text-danger'}>{unconfiguredAreas === 0 ? '✓ すべてのボタン名が設定されています' : `⚠ ボタン名が未設定の場所が ${unconfiguredAreas}件 あります`}</li>
+              {preview?.overlap.value ? <li className="text-warning">⚠ 上の「{preview.higherMenus[0] ?? '優先メニュー'}」と {preview.overlap.value.toLocaleString('ja-JP')}人 が重なっています</li> : null}
+            </ul>
+          </div>
+        </section>
+
+        <aside className="space-y-4">
+          <section className="border-hairline bg-canvas rounded-card border p-5"><h2 className="text-ink text-sm font-bold">このメニューの設定</h2><dl className="mt-4 space-y-3 text-xs"><div><dt className="text-ink-faint">誰に出るか</dt><dd className="text-ink mt-1 font-semibold"><MetricValue metric={preview?.effective} /></dd></div><div><dt className="text-ink-faint">形</dt><dd className="text-ink mt-1 font-semibold">{group.size === 'large' ? '大' : '小'}・切替あり {pages.length}枚</dd></div><div><dt className="text-ink-faint">終わったら</dt><dd className="text-ink mt-1 font-semibold">{mode === 'period' ? restoreMenus.find((item) => item.id === restoreGroupId)?.name ?? '前のメニューに戻す' : '指定なし'}</dd></div></dl></section>
+          <section className="bg-status-info-soft text-status-info rounded-card p-5 text-xs leading-5"><h2 className="text-sm font-bold">公開すると何が変わるか</h2><p className="mt-2"><MetricValue metric={preview?.effective} /> のトーク画面のメニューが入れ替わります。</p><p className="mt-2">LINEへの反映は数分かかることがあります。</p></section>
+        </aside>
+      </div>
+      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><Button href={`/rich-menus/edit?id=${group.id}&step=targeting`}>前へ：誰に出すか</Button><div className="flex gap-2"><Button onClick={onSave} disabled={saving || publishing}>下書きに保存</Button><Button variant="primary" onClick={submit} disabled={saving || publishing || (mode !== 'now' && !startsAt) || (mode === 'period' && !endsAt)}>{publishing ? '公開中…' : mode === 'now' ? 'この内容で公開する' : 'この内容で予約する'}</Button></div></div>} />
     </main>
   )
 }

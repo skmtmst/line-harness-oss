@@ -35,6 +35,11 @@ import { validateRichMenuImage } from '../lib/image-validator.js';
 import { resolveTrackedLinkBaseUrl } from '../lib/link-base-url.js';
 import { currentMonthRange } from '../lib/jst-range.js';
 import {
+  buildSegmentWhere,
+  parseCondition,
+  type SegmentCondition,
+} from '../services/segment-query.js';
+import {
   publishRichMenuGroup,
   unpublishRichMenuGroup,
   linkRichMenuBulkChunked,
@@ -809,6 +814,220 @@ richMenuGroups.get(
         503,
       );
     }
+  },
+);
+
+/**
+ * 「誰に出すか」の件数。取得できない値を0へ丸めず、state/reasonを返す。
+ * 上位条件のどれかにも一致する人を重複として1回だけ数える。
+ */
+richMenuGroups.post('/api/rich-menu-groups/:groupId/preview-targets', async (c) => {
+  const group = await getRichMenuGroupById(c.env.DB, c.req.param('groupId'));
+  if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
+    return c.json({ success: false, error: 'not found' }, 404);
+  }
+
+  let body: { conditions?: unknown } = {};
+  try {
+    body = await c.req.json<{ conditions?: unknown }>();
+  } catch {
+    // 本文を省いたときは保存済み条件を使う。
+  }
+  const supplied = body.conditions;
+  const condition = supplied === undefined
+    ? parseCondition(group.targeting_condition)
+    : supplied as SegmentCondition;
+  if (supplied === undefined && group.targeting_condition && !condition) {
+    return c.json({ success: false, error: '保存済みの対象条件を読み取れませんでした' }, 503);
+  }
+  if (
+    condition
+    && (typeof condition !== 'object'
+      || (condition.operator !== 'AND' && condition.operator !== 'OR')
+      || !Array.isArray(condition.rules))
+  ) {
+    return c.json({ success: false, error: 'conditions are invalid' }, 400);
+  }
+
+  try {
+    const targetWhere = condition ? buildSegmentWhere(condition) : { sql: '1=1', bindings: [] };
+    const matched = await c.env.DB
+      .prepare(
+        `SELECT COUNT(*) AS count
+           FROM friends f
+          WHERE f.line_account_id = ?
+            AND f.is_following = 1
+            AND (${targetWhere.sql})`,
+      )
+      .bind(group.account_id, ...targetWhere.bindings)
+      .first<{ count: number }>();
+
+    const higher = await c.env.DB
+      .prepare(
+        `SELECT id, name, targeting_condition
+           FROM rich_menu_groups
+          WHERE account_id = ?
+            AND id <> ?
+            AND status = 'published'
+            AND targeting_enabled = 1
+            AND targeting_priority < ?
+          ORDER BY targeting_priority ASC, created_at ASC`,
+      )
+      .bind(group.account_id, group.id, group.targeting_priority)
+      .all<{ id: string; name: string; targeting_condition: string | null }>();
+
+    const higherParts: Array<{ sql: string; bindings: unknown[] }> = [];
+    const higherNames: string[] = [];
+    let unreadableHigherCondition = false;
+    for (const row of higher.results ?? []) {
+      higherNames.push(row.name);
+      const parsed = parseCondition(row.targeting_condition);
+      if (!parsed) {
+        unreadableHigherCondition = true;
+        continue;
+      }
+      higherParts.push(buildSegmentWhere(parsed));
+    }
+
+    let overlap: number | null = 0;
+    let overlapReason: string | null = null;
+    if (unreadableHigherCondition) {
+      overlap = null;
+      overlapReason = 'higher_condition_unreadable';
+    } else if (higherParts.length > 0) {
+      const higherSql = higherParts.map((part) => `(${part.sql})`).join(' OR ');
+      const higherBindings = higherParts.flatMap((part) => part.bindings);
+      const result = await c.env.DB
+        .prepare(
+          `SELECT COUNT(*) AS count
+             FROM friends f
+            WHERE f.line_account_id = ?
+              AND f.is_following = 1
+              AND (${targetWhere.sql})
+              AND (${higherSql})`,
+        )
+        .bind(group.account_id, ...targetWhere.bindings, ...higherBindings)
+        .first<{ count: number }>();
+      overlap = result?.count ?? 0;
+    }
+
+    const matchedValue = matched?.count ?? 0;
+    return c.json({
+      success: true,
+      data: {
+        matched: { value: matchedValue, state: 'available', reason: null },
+        overlap: overlap === null
+          ? { value: null, state: 'unavailable', reason: overlapReason }
+          : { value: overlap, state: 'available', reason: null },
+        effective: overlap === null
+          ? { value: null, state: 'unavailable', reason: overlapReason }
+          : { value: Math.max(0, matchedValue - overlap), state: 'available', reason: null },
+        higherMenus: higherNames,
+        priority: group.targeting_priority + 1,
+      },
+    });
+  } catch (error) {
+    console.error('POST /api/rich-menu-groups/:groupId/preview-targets error:', error);
+    return c.json({ success: false, error: '対象人数を確認できませんでした' }, 503);
+  }
+});
+
+/** 削除確認と外部の参照一覧で同じ正本を使う。 */
+richMenuGroups.get('/api/rich-menu-groups/:groupId/usages', async (c) => {
+  try {
+    const impact = await getRichMenuDeleteImpact(c.env.DB, c.req.param('groupId'));
+    if (!impact || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [impact.group.accountId])) {
+      return c.json({ success: false, error: 'not found' }, 404);
+    }
+    return c.json({
+      success: true,
+      data: {
+        currentAudience: impact.currentAudience,
+        nextDisplay: impact.nextDisplay,
+        incomingSwitches: impact.incomingSwitches,
+        operationalReferences: impact.operationalReferences,
+      },
+    });
+  } catch (error) {
+    console.error('GET /api/rich-menu-groups/:groupId/usages error:', error);
+    return c.json({ success: false, error: '使用先を確認できませんでした' }, 503);
+  }
+});
+
+/** 公開予約。予約時点のメニュー定義を固定して保存する。 */
+richMenuGroups.post(
+  '/api/rich-menu-groups/:groupId/schedule',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const group = await getRichMenuGroupWithPages(c.env.DB, c.req.param('groupId'));
+    if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
+      return c.json({ success: false, error: 'not found' }, 404);
+    }
+    const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
+    if (!idempotencyKey) {
+      return c.json({ success: false, error: 'Idempotency-Key header required' }, 400);
+    }
+
+    let body: { mode?: unknown; startsAt?: unknown; endsAt?: unknown; restoreGroupId?: unknown };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: 'invalid JSON body' }, 400);
+    }
+    if (body.mode !== 'scheduled' && body.mode !== 'period') {
+      return c.json({ success: false, error: 'mode must be scheduled or period' }, 400);
+    }
+    if (typeof body.startsAt !== 'string' || !Number.isFinite(Date.parse(body.startsAt))) {
+      return c.json({ success: false, error: 'startsAt must be ISO 8601' }, 400);
+    }
+    const endsAt = typeof body.endsAt === 'string' && body.endsAt.length > 0 ? body.endsAt : null;
+    if (body.mode === 'period') {
+      if (!endsAt || !Number.isFinite(Date.parse(endsAt)) || Date.parse(endsAt) <= Date.parse(body.startsAt)) {
+        return c.json({ success: false, error: 'endsAt must be later than startsAt' }, 400);
+      }
+    }
+    const restoreGroupId = typeof body.restoreGroupId === 'string' && body.restoreGroupId.length > 0
+      ? body.restoreGroupId
+      : null;
+    if (restoreGroupId) {
+      const restore = await getRichMenuGroupById(c.env.DB, restoreGroupId);
+      if (!restore || restore.account_id !== group.account_id || restore.status !== 'published') {
+        return c.json({ success: false, error: 'restoreGroupId must be a published menu in the same account' }, 400);
+      }
+    }
+
+    const existing = await c.env.DB
+      .prepare('SELECT id, status FROM rich_menu_schedules WHERE account_id = ? AND idempotency_key = ?')
+      .bind(group.account_id, idempotencyKey)
+      .first<{ id: string; status: string }>();
+    if (existing) return c.json({ success: true, data: existing });
+
+    const now = jstNow();
+    const id = crypto.randomUUID();
+    await c.env.DB
+      .prepare(
+        `INSERT INTO rich_menu_schedules
+           (id, group_id, account_id, mode, starts_at, ends_at, restore_group_id,
+            definition_snapshot, status, idempotency_key, requested_by_staff_id,
+            created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', ?, ?, ?, ?)`,
+      )
+      .bind(
+        id,
+        group.id,
+        group.account_id,
+        body.mode,
+        body.startsAt,
+        endsAt,
+        restoreGroupId,
+        JSON.stringify(serializeGroupWithPages(group)),
+        idempotencyKey,
+        c.get('staff').id,
+        now,
+        now,
+      )
+      .run();
+    return c.json({ success: true, data: { id, status: 'scheduled' } }, 201);
   },
 );
 
