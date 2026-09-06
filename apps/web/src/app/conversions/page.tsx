@@ -714,7 +714,7 @@ function ConversionsPageHost() {
         actions={tab === 'points' ? <Button href="/conversions/new" variant="primary">成果地点を追加</Button> : undefined}
       />
       {tab === 'points' && <ConversionsPageInner />}
-      {tab === 'affiliates' && <AffiliatorsTab />}
+      {tab === 'affiliates' && <AffiliatorsTab accountId={selectedAccountId} />}
       {tab === 'offers' && <OffersTab />}
       {tab === 'approvals' && <ApprovalQueue />}
       {tab === 'report' && <ReportTab />}

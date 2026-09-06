@@ -99,7 +99,6 @@ const REMAINING: Record<string, number> = {
   'app/ec-commerce/page.tsx': 2,
   'app/events/bookings/page.tsx': 3,
   'app/events/page.tsx': 6,
-  'app/form-submissions/edit/page.tsx': 1,
   'app/friends/detail/page.tsx': 1,
   'app/restaurant-test/stores/new/page.tsx': 1,
   'app/scenarios/detail/scenario-detail-client.tsx': 1,
@@ -121,7 +120,7 @@ describe('画面に「準備中」を置かない', () => {
     // 数え漏れ（読む場所を間違えて 0 件になる）だけを見張る。
     // ちょうどの枚数は画面が増えるたびに動くので、下限をゆるく取る。
     expect(FILES.length).toBeGreaterThan(300)
-    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(144)  // 2026-09-04: マイルの使い道とリマインダ実行結果を加えた実測値。
+    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(145)  // 2026-09-06: 回答フォームの回答専用画面を加えた実測値。
   })
 
   it('共通部品に「準備中」が1つも無い', () => {

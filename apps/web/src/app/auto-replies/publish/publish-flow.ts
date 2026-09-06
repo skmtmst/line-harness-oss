@@ -31,19 +31,27 @@ export function publishGates(
 
   return [
     {
-      label: '競合をすべて確認しました',
-      state: validation === null ? 'unknown' : unacknowledged.length === 0 ? 'ok' : 'blocked',
+      label: '動くきっかけが決まっています',
+      state: validation === null ? 'unknown' : validation.errors.length === 0 ? 'ok' : 'blocked',
       detail:
         validation === null
-          ? '—（未取得）競合を読み込めていません'
-          : conflicts.length === 0
-            ? '重なる自動応答はありません'
-            : unacknowledged.length === 0
-              ? `${conflicts.length}件を確認しました`
-              : `${unacknowledged.length}件が未確認です`,
+          ? '—（未取得）確認できていません'
+          : validation.errors.length === 0
+            ? '反応する言葉・時間・対象が決まっています'
+            : validation.errors.join(' / '),
     },
     {
-      label: '試験でこの下書きが返しました',
+      label: '返す内容とアクションが決まっています',
+      state: validation === null ? 'unknown' : validation.errors.length === 0 ? 'ok' : 'blocked',
+      detail:
+        validation === null
+          ? '—（未取得）確認できていません'
+          : validation.errors.length === 0
+            ? '返信と、そのあとにすることが決まっています'
+            : validation.errors.join(' / '),
+    },
+    {
+      label: 'テストが完了しています',
       state: dryRun === null ? 'unknown' : dryRun.draftWon ? 'ok' : 'blocked',
       detail:
         dryRun === null
@@ -53,14 +61,16 @@ export function publishGates(
             : `いまは「${dryRun.winner?.name ?? '別の自動応答'}」が先に返します`,
     },
     {
-      label: '入力に不足がありません',
-      state: validation === null ? 'unknown' : validation.errors.length === 0 ? 'ok' : 'blocked',
+      label: '競合とループ防止を確認しました',
+      state: validation === null ? 'unknown' : unacknowledged.length === 0 ? 'ok' : 'blocked',
       detail:
         validation === null
-          ? '—（未取得）確認できていません'
-          : validation.errors.length === 0
-            ? '足りない項目はありません'
-            : validation.errors.join(' / '),
+          ? '—（未取得）競合を読み込めていません'
+          : conflicts.length === 0
+            ? '重なる自動応答はありません'
+            : unacknowledged.length === 0
+              ? `${conflicts.length}件を確認しました`
+              : `${unacknowledged.length}件が未確認です`,
     },
   ]
 }

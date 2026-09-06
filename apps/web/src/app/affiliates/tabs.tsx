@@ -2,7 +2,7 @@
 
 import { Fragment, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import KpiCard from '@/components/dashboard/kpi-card'
-import { api, type AffiliateOffer, type ConversionApprovalItem } from '@/lib/api'
+import { api, type AffiliateOffer, type AffiliatePaymentSummary, type ConversionApprovalItem } from '@/lib/api'
 import type { Tag, Scenario, LineAccount } from '@line-crm/shared'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
@@ -42,20 +42,6 @@ import {
   type OfferFilter,
   type OfferSort,
 } from './offer-list-view'
-
-/**
- * 案件一覧のKPIの注記（設計 `GH8VL`）。
- *
- * 設計の字は「確定した件数」だが、**それだけでは0の意味が読めない。**
- * 承認待ちが8件並んでいる横で「今月の成果0件」を見た運用者は、成果が
- * 無いと受け取る。数え方は正しいので、数を変えず、何を数えていないかを
- * 書き足す。
- */
-const CONFIRMED_DETAIL = {
-  count: '確定した件数（承認待ちは含みません）',
-  yen: '確定した報酬の合計（承認待ちは含みません）',
-  miles: '報酬をマイルで払う分（承認待ちは含みません）',
-} as const
 
 const WORKER_BASE = process.env.NEXT_PUBLIC_API_URL
 if (!WORKER_BASE) {
@@ -226,13 +212,15 @@ export function parseTab(raw: string | null): PageTab {
 // Affiliators tab — list + inline detail panel
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function AffiliatorsTab() {
+export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
   // ── list ───────────────────────────────────────────────────────────────────
   const [rows, setRows] = useState<AffiliateListRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [approvalItems, setApprovalItems] = useState<ConversionApprovalItem[]>([])
   const [approvalState, setApprovalState] = useState<ConfirmedState>('loading')
+  const [paymentItems, setPaymentItems] = useState<AffiliatePaymentSummary[]>([])
+  const [paymentState, setPaymentState] = useState<ConfirmedState>('loading')
   const [query, setQuery] = useState('')
   const [filters, setFilters] = useState<Array<'active' | 'inactive' | 'reward'>>([])
   const [sort, setSort] = useState<'newest' | 'name' | 'reward'>('newest')
@@ -318,6 +306,28 @@ export function AffiliatorsTab() {
     })
     return () => { cancelled = true }
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!accountId) {
+      setPaymentItems([])
+      setPaymentState('error')
+      return () => { cancelled = true }
+    }
+    setPaymentState('loading')
+    void api.affiliates.paymentSummaries(accountId).then((result) => {
+      if (cancelled) return
+      if (!result.success || !Array.isArray(result.data)) {
+        setPaymentState('error')
+        return
+      }
+      setPaymentItems(result.data)
+      setPaymentState('ready')
+    }).catch(() => {
+      if (!cancelled) setPaymentState('error')
+    })
+    return () => { cancelled = true }
+  }, [accountId])
 
   // ── load detail (report v2 + links) ────────────────────────────────────────
   const loadDetail = useCallback(async (id: string) => {
@@ -416,6 +426,9 @@ export function AffiliatorsTab() {
   const approvedTotals = confirmedTotals(approvedThisMonth)
   const pendingItems = approvalItems.filter((item) => item.approvalStatus === 'pending')
   const pendingYen = pendingItems.reduce((sum, item) => sum + (item.value ?? 0), 0)
+  const paymentTotal = paymentItems.reduce((sum, item) => sum + item.approvedReward, 0)
+  const heldTotal = paymentItems.reduce((sum, item) => sum + item.heldReward, 0)
+  const payoutCycle = paymentItems.find((item) => item.payoutCycle?.trim())?.payoutCycle ?? null
   const funnel = {
     clicks: rows.reduce((sum, row) => sum + row.totalClicks, 0),
     friends: rows.reduce((sum, row) => sum + row.friendAdds, 0),
@@ -472,31 +485,32 @@ export function AffiliatorsTab() {
           loading={approvalState === 'loading'}
         />
         <KpiCard
-          title="承認済み報酬の合計"
-          value={confirmedValue(approvalState, approvedTotals.yen)}
-          unit={confirmedUnit(approvalState, '円')}
-          detail={confirmedDetail(approvalState, '今月に承認した分。支払い済みかは含みません')}
-          loading={approvalState === 'loading'}
+          title="確定した報酬"
+          value={confirmedValue(paymentState, paymentTotal)}
+          unit={confirmedUnit(paymentState, '円')}
+          detail={confirmedDetail(paymentState, payoutCycle ? `${payoutCycle}・支払日は未接続` : '締め日・支払日は未接続')}
+          loading={paymentState === 'loading'}
         />
         <KpiCard
           title="未払い残高"
           value={null}
           unit=""
-          detail="支払い台帳が接続されると表示されます"
+          detail="支払済み台帳が接続されると表示されます"
+          loading={paymentState === 'loading'}
         />
       </div>
 
       <section className="bg-canvas rounded-card border-hairline mb-4 border p-4" aria-label="今月の成果の流れ">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h3 className="text-ink text-sm font-semibold">今月の成果の流れ</h3>
-          <span className="text-ink-faint text-xs">全期間の計測値と今月の承認数</span>
+          <span className="text-ink-faint text-xs">どこで人が減っているかを1本で見る</span>
         </div>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
           {[
             ['クリック', funnel.clicks],
             ['友だち追加', funnel.friends],
             ['成果', funnel.conversions],
-            ['今月承認', funnel.approved],
+            ['認めた・承認', funnel.approved],
           ].map(([label, value]) => (
             <div key={label} className="bg-canvas-sunken rounded-control px-3 py-2">
               <p className="text-ink-faint text-xs">{label}</p>
@@ -505,6 +519,11 @@ export function AffiliatorsTab() {
               </p>
             </div>
           ))}
+          <div className="bg-accent-soft rounded-control px-3 py-2">
+            <p className="text-ink-faint text-xs">報酬</p>
+            <p className="text-ink mt-1 text-lg font-semibold tabular-nums">{formatYen(paymentTotal)}</p>
+            <p className="text-ink-faint mt-0.5 text-xs">保留中 {formatYen(heldTotal)} を含む</p>
+          </div>
         </div>
       </section>
 
@@ -599,15 +618,11 @@ export function AffiliatorsTab() {
           <table className="w-full min-w-[720px]">
             <thead>
               <TableHeadRow>
-                <Th>名前・紹介コード</Th>
-                <Th align="center">友だち連携</Th>
+                <Th>アフィリエイター</Th>
                 <Th align="right">紹介リンク</Th>
-                <Th align="right">クリック</Th>
                 <Th align="right">友だち追加</Th>
                 <Th align="right">成果</Th>
-                <Th align="right">売上</Th>
                 <Th align="right">報酬</Th>
-                <Th align="center">状態</Th>
                 <Th align="center">操作</Th>
               </TableHeadRow>
             </thead>
@@ -624,14 +639,8 @@ export function AffiliatorsTab() {
                         <span className="block truncate" title={row.name}>{row.name}</span>
                         <span className="text-action mt-0.5 block font-mono text-xs">{row.code}</span>
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        {row.friendId ? <Chip tone="ok">連携済み</Chip> : <Chip>未連携</Chip>}
-                      </td>
                       <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
                         {row.linkCount.toLocaleString()}本
-                      </td>
-                      <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
-                        {row.totalClicks.toLocaleString()}件
                       </td>
                       <td className="text-action px-4 py-3 text-right text-sm font-semibold tabular-nums">
                         {row.friendAdds.toLocaleString()}人
@@ -639,26 +648,19 @@ export function AffiliatorsTab() {
                       <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
                         {row.totalConversions.toLocaleString()}件
                       </td>
-                      <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
-                        {formatYen(row.totalRevenue)}
-                      </td>
                       <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
                         {formatYen(row.rewardAmount)}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        {row.isActive ? <Chip tone="ok">計測中</Chip> : <Chip>停止中</Chip>}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="text-action text-xs font-medium">
-                          {isExpanded ? '閉じる' : '成果を見る'}
-                        </span>
+                        <span className="text-action text-xs font-medium">{isExpanded ? '閉じる' : '成果を見る'}</span>
+                        <span className="text-ink-faint ml-2 text-xs">{row.isActive ? '計測中' : '停止中'}</span>
                       </td>
                     </tr>
 
                     {/* Detail expansion row */}
                     {isExpanded && (
                       <tr key={`${row.id}-detail`}>
-                        <td colSpan={10} className="bg-canvas-sunken border-hairline border-t px-6 py-5">
+                        <td colSpan={6} className="bg-canvas-sunken border-hairline border-t px-6 py-5">
                           {detailLoading ? (
                             <p className="text-sm text-gray-400">読み込み中...</p>
                           ) : (
@@ -1449,6 +1451,7 @@ export function ApprovalQueue() {
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
+  const [detailItem, setDetailItem] = useState<ConversionApprovalItem | null>(null)
 
   const loadItems = useCallback(async () => {
     setLoading(true)
@@ -1566,6 +1569,23 @@ export function ApprovalQueue() {
     }
   }, [actioning, loadItems, selected])
 
+  const handleBulkReject = useCallback(async () => {
+    const eventIds = [...selected]
+    if (actioning || eventIds.length === 0) return
+    setActioning('bulk-reject')
+    setError(null)
+    try {
+      const results = await Promise.all(eventIds.map((eventId) => api.conversionApprovals.reject(eventId)))
+      const failed = results.filter((result) => !result.success).length
+      await loadItems()
+      if (failed > 0) setError(`${failed}件を却下できませんでした。一覧を確認してください。`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'まとめて却下できませんでした')
+    } finally {
+      setActioning(null)
+    }
+  }, [actioning, loadItems, selected])
+
   const exportApprovalsCsv = () => {
     const header = ['日時', '友だち', 'アフィリエイター', '案件', '成果地点', '金額', '確認状態']
     const lines = shownItems.map((item) => [
@@ -1661,13 +1681,21 @@ export function ApprovalQueue() {
           CSVで書き出す
         </AffiliateButton>
         {status === 'pending' && (
-          <AffiliateButton
-            variant="primary"
-            onClick={() => { void handleBulkApprove() }}
-            disabled={selected.size === 0 || actioning !== null}
-          >
-            選んだ{selected.size}件を認める
-          </AffiliateButton>
+          <>
+            <AffiliateButton
+              variant="primary"
+              onClick={() => { void handleBulkApprove() }}
+              disabled={selected.size === 0 || actioning !== null}
+            >
+              選んだ{selected.size}件をまとめて認める
+            </AffiliateButton>
+            <AffiliateButton
+              onClick={() => { void handleBulkReject() }}
+              disabled={selected.size === 0 || actioning !== null}
+            >
+              まとめて却下する
+            </AffiliateButton>
+          </>
         )}
       </div>
 
@@ -1717,43 +1745,46 @@ export function ApprovalQueue() {
           <table className="w-full min-w-[820px]">
             <thead>
               <TableHeadRow>
-                {status === 'pending' && (
-                  <Th align="center">
-                    <input
-                      type="checkbox"
-                      aria-label="このページの確認不要な成果をすべて選ぶ"
-                      checked={allSafeSelected}
-                      onChange={(event) => {
-                        setSelected((current) => {
-                          const next = new Set(current)
-                          for (const eventId of safePendingIds) {
-                            if (event.target.checked) next.add(eventId)
-                            else next.delete(eventId)
-                          }
-                          return next
-                        })
-                      }}
-                    />
-                  </Th>
-                )}
-                <Th>日時</Th>
-                <Th>友だち・紹介者</Th>
-                <Th>案件</Th>
-                <Th>成果地点</Th>
-                <Th align="right">金額</Th>
+                <Th>
+                  <span className="flex items-center gap-2">
+                    {status === 'pending' && (
+                      <input
+                        type="checkbox"
+                        aria-label="このページの確認不要な成果をすべて選ぶ"
+                        checked={allSafeSelected}
+                        onChange={(event) => {
+                          setSelected((current) => {
+                            const next = new Set(current)
+                            for (const eventId of safePendingIds) {
+                              if (event.target.checked) next.add(eventId)
+                              else next.delete(eventId)
+                            }
+                            return next
+                          })
+                        }}
+                      />
+                    )}
+                    友だちと、成果が出た時刻
+                  </span>
+                </Th>
+                <Th>紹介した人</Th>
+                <Th>案件と成果地点</Th>
+                <Th align="right">報酬</Th>
                 <Th align="center">確認</Th>
                 {status === 'pending' && (
-                  <Th align="center">操作</Th>
+                  <Th align="center">決める</Th>
                 )}
               </TableHeadRow>
             </thead>
             <tbody className="divide-hairline divide-y">
               {pagedItems.map((item) => (
                 <tr key={item.eventId} className={item.duplicateFlag ? 'bg-warning-bg' : 'hover:bg-canvas-sunken'}>
-                  {status === 'pending' && (
-                    <td className="px-4 py-3 text-center">
+                  <td className="text-ink px-4 py-3 text-sm">
+                    <div className="flex items-start gap-2">
+                    {status === 'pending' && (
                       <input
                         type="checkbox"
+                        className="mt-1"
                         aria-label={`${personNameText(item.friendName)}の成果を選ぶ`}
                         checked={selected.has(item.eventId)}
                         disabled={item.duplicateFlag}
@@ -1767,22 +1798,19 @@ export function ApprovalQueue() {
                           })
                         }}
                       />
-                    </td>
-                  )}
-                  <td className="text-ink-faint whitespace-nowrap px-4 py-3 text-xs">
-                    {formatDateTime(item.createdAt)}
-                  </td>
-                  <td className="text-ink px-4 py-3 text-sm">
-                    <span className="block font-medium">{personNameText(item.friendName)}</span>
-                    <span className="text-ink-faint mt-0.5 block text-xs">
-                      紹介者：{item.affiliateName ?? '名前を取得できませんでした'}
+                    )}
+                    <span>
+                      <span className="block font-medium">{personNameText(item.friendName)}</span>
+                      <span className="text-ink-faint mt-0.5 block whitespace-nowrap text-xs">{formatDateTime(item.createdAt)} に成果</span>
                     </span>
+                    </div>
+                  </td>
+                  <td className="text-ink px-4 py-3 text-sm font-medium">
+                    {item.affiliateName ?? '名前を取得できませんでした'}
                   </td>
                   <td className="text-ink-secondary px-4 py-3 text-sm">
-                    {item.offerName ?? '未設定'}
-                  </td>
-                  <td className="text-ink-secondary px-4 py-3 text-sm">
-                    {item.conversionPointName ?? '未設定'}
+                    <span className="text-ink block font-medium">{item.offerName ?? '未設定'}</span>
+                    <span className="text-ink-faint mt-0.5 block text-xs">{item.conversionPointName ?? '成果地点は未設定'}</span>
                   </td>
                   <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
                     {formatYenNullable(item.value)}
@@ -1811,6 +1839,7 @@ export function ApprovalQueue() {
                         >
                           却下
                         </AffiliateButton>
+                        <AffiliateButton onClick={() => setDetailItem(item)}>見る</AffiliateButton>
                       </div>
                     </td>
                   )}
@@ -1818,6 +1847,21 @@ export function ApprovalQueue() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {detailItem && (
+        <div className="bg-canvas rounded-card border-hairline mt-3 border p-4" role="dialog" aria-label="成果の詳細">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-ink text-sm font-semibold">成果の詳細</h3>
+              <p className="text-ink-secondary mt-2 text-sm">
+                {personNameText(detailItem.friendName)}／{detailItem.affiliateName ?? '紹介者名を取得できませんでした'}／{detailItem.offerName ?? '案件未設定'}
+              </p>
+              <p className="text-ink-faint mt-1 text-xs">{formatDateTime(detailItem.createdAt)}・{detailItem.conversionPointName ?? '成果地点未設定'}・{formatYenNullable(detailItem.value)}</p>
+            </div>
+            <AffiliateButton onClick={() => setDetailItem(null)}>閉じる</AffiliateButton>
+          </div>
         </div>
       )}
 
@@ -1833,9 +1877,7 @@ export function ApprovalQueue() {
         </div>
       )}
 
-      <p className="text-ink-faint mt-3 text-xs">
-        却下理由を保存するAPIはまだ接続されていません。現在は却下の状態だけが保存されます。
-      </p>
+      <p className="text-ink-faint mt-3 text-xs">却下理由の記録は未接続です。却下状態はまとめて保存できます。</p>
     </div>
   )
 }
@@ -1844,9 +1886,9 @@ export function ApprovalQueue() {
 
 function OffersList({
   offers,
-  accountMap,
   tagMap,
   scenarioMap,
+  offerStats,
   loading,
   error,
   filtered,
@@ -1854,9 +1896,9 @@ function OffersList({
   onRefresh,
 }: {
   offers: AffiliateOffer[]
-  accountMap: Map<string, string>
   tagMap: Map<string, string>
   scenarioMap: Map<string, string>
+  offerStats: Map<string, { introducers: number; conversions: number; reward: number }>
   loading: boolean
   error: string | null
   /** 案件はあるが、絞り込みに合う行が無い。 */
@@ -1898,52 +1940,45 @@ function OffersList({
 
   return (
     <div data-design="Table" className="bg-canvas rounded-card border-hairline overflow-x-auto border">
-      <table className="w-full min-w-[800px]">
+      <table className="w-full min-w-[760px]">
         <thead>
           <TableHeadRow>
-            <Th>案件名</Th>
-            <Th>説明</Th>
+            <Th>案件</Th>
             <Th align="right">報酬</Th>
-            <Th align="right">マイル</Th>
-            <Th>対象アカウント</Th>
-            <Th>成果時のタグ</Th>
-            <Th>開始するシナリオ</Th>
-            <Th align="center">状態</Th>
+            <Th>成果が出たときの動き</Th>
+            <Th align="right">紹介している人</Th>
+            <Th align="right">成果</Th>
             <Th align="center">操作</Th>
           </TableHeadRow>
         </thead>
         <tbody className="divide-hairline divide-y">
           {offers.map((offer) => (
             <tr key={offer.id} className="hover:bg-canvas-sunken">
-              <td className="text-ink px-4 py-3 text-sm font-medium">{offer.name}</td>
-              <td className="text-ink-faint max-w-[200px] truncate px-4 py-3 text-sm">
-                {offer.description ?? '—'}
+              <td className="text-ink px-4 py-3 text-sm font-medium">
+                <span className="block">{offer.name}</span>
+                <span className="text-ink-faint mt-0.5 block max-w-[300px] truncate text-xs">{offer.description ?? '説明はありません'}</span>
               </td>
               <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
                 {formatYenNullable(offer.rewardAmount)}
-              </td>
-              <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
-                {offer.rewardMiles.toLocaleString()} mile
-              </td>
-              <td className="text-ink-secondary px-4 py-3 text-sm">
-                {offer.lineAccountId
-                  ? accountMap.get(offer.lineAccountId) ?? '—（名前を確認できません）'
-                  : '（なし）'}
+                {offer.rewardMiles > 0 && <span className="text-ink-faint block text-xs">＋{offer.rewardMiles.toLocaleString()}マイル</span>}
               </td>
               <td className="text-ink-secondary px-4 py-3 text-sm">
                 {offer.tagId ? (
-                  <Chip tone="info">{tagMap.get(offer.tagId) ?? '—（名前を確認できません）'}</Chip>
+                  <>タグ「{tagMap.get(offer.tagId) ?? '名前を確認できません'}」を付ける</>
+                ) : offer.scenarioId ? (
+                  <>シナリオ「{scenarioMap.get(offer.scenarioId) ?? '名前を確認できません'}」を始める</>
+                ) : offer.rewardMiles > 0 ? (
+                  <>{offer.rewardMiles.toLocaleString()}マイルを付ける</>
                 ) : (
-                  '（なし）'
+                  <span className="text-warning">何も設定されていません</span>
                 )}
               </td>
-              <td className="text-ink-secondary px-4 py-3 text-sm">
-                {offer.scenarioId ? scenarioMap.get(offer.scenarioId) ?? '—（名前を確認できません）' : '（なし）'}
+              <td className="text-ink px-4 py-3 text-right text-sm tabular-nums">
+                {(offerStats.get(offer.id)?.introducers ?? 0).toLocaleString()}人
               </td>
-              <td className="px-4 py-3 text-center">
-                {/* 「有効 / 無効」だと何が有効なのか読めない。設計は
-                    アフィリエイターが紹介できる状態かどうかを書いている。 */}
-                {offer.isActive ? <Chip tone="ok">公開中</Chip> : <Chip>下書き</Chip>}
+              <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
+                {(offerStats.get(offer.id)?.conversions ?? 0).toLocaleString()}件
+                <span className="text-ink-faint block text-xs">確定 {formatYen(offerStats.get(offer.id)?.reward ?? 0)}</span>
               </td>
               <td className="px-4 py-3 text-center">
                 <button
@@ -1952,6 +1987,7 @@ function OffersList({
                 >
                   編集
                 </button>
+                <span className="text-ink-faint ml-2 text-xs">{offer.isActive ? '公開中' : '停止・終了'}</span>
               </td>
             </tr>
           ))}
@@ -2017,7 +2053,7 @@ export function OffersTab() {
   // 今月に発生し、承認まで済んだ成果。KPIの「今月の成果」「支払い予定」に要る。
   // **状態を別に持つ。** 取れなかったときに0を出すと、承認待ちが並んでいるのに
   // 「今月の成果0件」と読めて、運用者が成果そのものが無いと誤解する。
-  const [approvedThisMonth, setApprovedThisMonth] = useState<ConversionApprovalItem[]>([])
+  const [offerApprovalItems, setOfferApprovalItems] = useState<ConversionApprovalItem[]>([])
   const [confirmedState, setConfirmedState] = useState<ConfirmedState>('loading')
 
   useEffect(() => {
@@ -2028,15 +2064,16 @@ export function OffersTab() {
   useEffect(() => {
     let cancelled = false
     setConfirmedState('loading')
-    void api.conversionApprovals
-      .list({ status: 'approved', limit: 200 })
-      .then((res) => {
+    void Promise.all((['pending', 'approved', 'rejected'] as const).map((status) =>
+      api.conversionApprovals.list({ status, limit: 200 }),
+    )).then((results) => {
         if (cancelled) return
-        if (!res.success || !Array.isArray(res.data)) {
+        if (results.some((result) => !result.success || !Array.isArray(result.data))) {
           setConfirmedState('error')
           return
         }
-        setApprovedThisMonth(confirmedThisMonth(res.data))
+        const all = results.flatMap((result) => result.data)
+        setOfferApprovalItems(all)
         setConfirmedState('ready')
       })
       .catch(() => {
@@ -2070,7 +2107,28 @@ export function OffersTab() {
   // 設計のKPI。案件そのものと、そこから出た成果の両方を見る。
   const openCount = offers.filter((o) => o.isActive).length
   // 案件に結びつかない成果（ref から案件を辿れないもの）はマイルが付かない。
-  const confirmed = confirmedTotals(approvedThisMonth)
+  const offerStats = useMemo(() => {
+    const result = new Map<string, { introducerIds: Set<string>; conversions: number; reward: number }>()
+    for (const item of offerApprovalItems) {
+      if (!item.offerId || item.approvalStatus === 'rejected') continue
+      const current = result.get(item.offerId) ?? { introducerIds: new Set<string>(), conversions: 0, reward: 0 }
+      current.introducerIds.add(item.affiliateId)
+      current.conversions += 1
+      if (item.approvalStatus === 'approved') current.reward += item.value ?? 0
+      result.set(item.offerId, current)
+    }
+    return new Map([...result].map(([id, value]) => [id, {
+      introducers: value.introducerIds.size,
+      conversions: value.conversions,
+      reward: value.reward,
+    }]))
+  }, [offerApprovalItems])
+  const topOffer = offers.toSorted((a, b) =>
+    (offerStats.get(b.id)?.conversions ?? 0) - (offerStats.get(a.id)?.conversions ?? 0),
+  )[0]
+  const rewardValues = offers.map((offer) => offer.rewardAmount ?? 0).filter((value) => value > 0)
+  const averageReward = rewardValues.length === 0 ? 0 : Math.round(rewardValues.reduce((sum, value) => sum + value, 0) / rewardValues.length)
+  const unsetActionCount = offers.filter((offer) => !offer.tagId && !offer.scenarioId && offer.rewardMiles === 0).length
 
   const exportCsv = () => {
     const csv = offersCsv(shown, {
@@ -2096,27 +2154,27 @@ export function OffersTab() {
       </NoteBar>
 
       <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard title="公開中の案件" value={openCount} unit="件" detail="紹介できる案件の数" />
+        <KpiCard title="紹介できる案件" value={openCount} unit="件" detail={`公開中。停止・終了 ${offers.length - openCount}件`} />
         <KpiCard
-          title="今月の成果"
-          value={confirmedValue(confirmedState, confirmed.count)}
-          unit={confirmedUnit(confirmedState, '件')}
+          title="いちばん成果が出た案件"
+          value={confirmedState === 'ready' && topOffer ? (offerStats.get(topOffer.id)?.conversions ?? 0) : null}
+          unit={confirmedState === 'ready' && topOffer ? '件' : ''}
           loading={confirmedState === 'loading'}
-          detail={confirmedDetail(confirmedState, CONFIRMED_DETAIL.count)}
+          detail={confirmedDetail(confirmedState, topOffer ? `${topOffer.name}・確定 ${formatYen(offerStats.get(topOffer.id)?.reward ?? 0)}` : '成果はまだありません')}
         />
         <KpiCard
-          title="確定した報酬の合計"
-          value={confirmedValue(confirmedState, confirmed.yen)}
-          unit={confirmedUnit(confirmedState, '円')}
-          loading={confirmedState === 'loading'}
-          detail={confirmedDetail(confirmedState, CONFIRMED_DETAIL.yen)}
+          title="1件あたりの平均報酬"
+          value={averageReward}
+          unit="円"
+          detail={`いちばん高い案件 ${formatYen(Math.max(0, ...rewardValues))}`}
         />
         <KpiCard
-          title="付与予定マイル"
-          value={confirmedValue(confirmedState, confirmed.miles)}
-          unit={confirmedUnit(confirmedState, 'マイル')}
-          loading={confirmedState === 'loading'}
-          detail={confirmedDetail(confirmedState, CONFIRMED_DETAIL.miles)}
+          title="動きが未設定の案件"
+          value={unsetActionCount}
+          unit="件"
+          detail="成果が出ても何も起きません"
+          badge={unsetActionCount > 0 ? '確認' : undefined}
+          badgeTone={unsetActionCount > 0 ? 'neutral' : undefined}
         />
       </div>
 
@@ -2175,9 +2233,9 @@ export function OffersTab() {
 
       <OffersList
         offers={paged}
-        accountMap={accountMap}
         tagMap={tagMap}
         scenarioMap={scenarioMap}
+        offerStats={offerStats}
         loading={offersLoading}
         error={offersError}
         filtered={offers.length > 0 && shown.length === 0}
