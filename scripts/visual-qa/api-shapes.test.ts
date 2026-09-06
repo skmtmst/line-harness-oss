@@ -15,6 +15,12 @@ import { IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE
 import { MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR } from './fixtures.mjs';
 // @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
 import { DUPLICATE_STATS, USERS_GROUPED } from './fixtures.mjs';
+// @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
+import { AUTOMATIONS, AUTOMATION_TEMPLATES, COMMON_ACTION_DETAIL } from './fixtures.mjs';
+// @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
+import { CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS } from './fixtures.mjs';
+// @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
+import { MEDIA_DELETE_IMPACT, MEDIA_FOLDERS, MEDIA_ITEMS } from './fixtures.mjs';
 
 describe('画面確認モックの口の形', () => {
   const paths: Set<string> = readArrayGetPaths();
@@ -59,6 +65,72 @@ describe('画面確認モックの口の形', () => {
     // 静かに0件になると、全部の口が `{items:[],total:0}` に落ちて
     // 全画面が真っ白になる。原因はどこにも出ない。
     expect(() => readArrayGetPaths('// api.ts が読めなかった場合')).toThrow(/配列の口/);
+  });
+});
+
+describe('オートメーションの画面確認データ', () => {
+  it('設計と同じ稼働14本・停止4本・見本12件を返す', () => {
+    expect(AUTOMATIONS.filter((item: { isActive: boolean }) => item.isActive)).toHaveLength(14);
+    expect(AUTOMATIONS.filter((item: { isActive: boolean }) => !item.isActive)).toHaveLength(4);
+    expect(AUTOMATION_TEMPLATES).toHaveLength(12);
+  });
+
+  it('共通アクションの公開4版と5つの利用先を同じ契約で返す', () => {
+    expect(COMMON_ACTION_DETAIL.currentPublishedVersionId).toBe('cav-4');
+    expect(COMMON_ACTION_DETAIL.versions).toHaveLength(4);
+    expect(COMMON_ACTION_DETAIL.bindings).toHaveLength(5);
+    expect(COMMON_ACTION_DETAIL.bindings.filter((item: { hasNewerVersion: boolean }) => item.hasNewerVersion)).toHaveLength(1);
+  });
+});
+
+describe('成果地点の画面確認データ', () => {
+  it('一覧と現期間・前期間の集計が同じ成果地点を使う', () => {
+    const pointIds = CONVERSION_POINTS.map((point: { id: string }) => point.id);
+    expect(CONVERSION_REPORT_CURRENT.map((row: { conversionPointId: string }) => row.conversionPointId)).toEqual(pointIds);
+    expect(CONVERSION_REPORT_PREVIOUS.map((row: { conversionPointId: string }) => row.conversionPointId)).toEqual(pointIds);
+  });
+
+  it('設計比較に使う件数と金額を固定する', () => {
+    const total = (rows: Array<{ totalCount: number; totalValue: number }>) => rows.reduce(
+      (sum, row) => ({ count: sum.count + row.totalCount, value: sum.value + row.totalValue }),
+      { count: 0, value: 0 },
+    );
+    expect(total(CONVERSION_REPORT_CURRENT)).toEqual({ count: 486, value: 1284000 });
+    expect(total(CONVERSION_REPORT_PREVIOUS)).toEqual({ count: 412, value: 1092000 });
+  });
+
+  it('新規作成の購入欄に、注文確定の既存実績を表示できる', () => {
+    const purchase = CONVERSION_POINTS.find((point: { eventType: string }) => (
+      point.eventType === 'ec_order_confirmed'
+    ));
+    const report = CONVERSION_REPORT_CURRENT.find((row: { conversionPointId: string }) => (
+      row.conversionPointId === purchase?.id
+    ));
+    expect(report).toMatchObject({ totalCount: 386, totalValue: 612400 });
+  });
+});
+
+describe('登録メディアの画面確認データ', () => {
+  it('設計比較に必要なフォルダ・通常一覧・使用先を空にしない', () => {
+    expect(MEDIA_FOLDERS.map((folder: { name: string }) => folder.name)).toEqual([
+      '01_商品写真', '02_バナー', '03_動画',
+    ]);
+    expect(MEDIA_ITEMS).toHaveLength(10);
+    expect(MEDIA_ITEMS.filter((item: { kind: string }) => item.kind === 'file')).toHaveLength(2);
+    expect(MEDIA_DELETE_IMPACT).toMatchObject({ usageCount: 3, canDelete: false });
+    expect(MEDIA_DELETE_IMPACT.references).toHaveLength(3);
+  });
+
+  it('撮影データでも実装の登録上限を超えない', () => {
+    const limits: Record<string, number> = {
+      image: 10 * 1024 * 1024,
+      audio: 30 * 1024 * 1024,
+      video: 90 * 1024 * 1024,
+      file: 20 * 1024 * 1024,
+    };
+    for (const item of MEDIA_ITEMS as Array<{ filename: string; kind: string; sizeBytes: number }>) {
+      expect(item.sizeBytes, item.filename).toBeLessThanOrEqual(limits[item.kind]);
+    }
   });
 });
 

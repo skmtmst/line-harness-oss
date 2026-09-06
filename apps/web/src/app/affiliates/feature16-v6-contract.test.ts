@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 const TABS = readFileSync(new URL('./tabs.tsx', import.meta.url), 'utf8')
 const NEW_AFFILIATE = readFileSync(new URL('./new/page.tsx', import.meta.url), 'utf8')
 const NEW_OFFER = readFileSync(new URL('../affiliate-offers/new/page.tsx', import.meta.url), 'utf8')
+const ACTION_DIALOGS = readFileSync(new URL('./action-dialogs.tsx', import.meta.url), 'utf8')
 
 function section(source: string, start: string, end: string): string {
   const from = source.indexOf(start)
@@ -14,7 +15,7 @@ function section(source: string, start: string, end: string): string {
 }
 
 describe('機能16 V6の一覧', () => {
-  const affiliates = section(TABS, 'export function AffiliatorsTab() {', '\nfunction formatDateTime')
+  const affiliates = section(TABS, 'export function AffiliatorsTab(', '\nfunction formatDateTime')
   const approvals = section(TABS, 'export function ApprovalQueue() {', '\n// ── Offers list')
 
   it('紹介者一覧は実Node・帯・検索・絞り込み・CSV・ページ送りを持つ', () => {
@@ -22,7 +23,7 @@ describe('機能16 V6の一覧', () => {
     for (const word of [
       '今月の成果',
       '承認待ち',
-      '承認済み報酬の合計',
+      '確定した報酬',
       '未払い残高',
       '今月の成果の流れ',
       '名前・紹介コードで検索',
@@ -32,14 +33,15 @@ describe('機能16 V6の一覧', () => {
     ]) {
       expect(affiliates).toContain(word)
     }
-    expect(affiliates).toContain('支払い台帳が接続されると表示されます')
+    expect(affiliates).toContain('api.affiliates.paymentSummaries(accountId)')
   })
 
   it('成果承認は全状態を読み、確認不要だけをまとめて承認する', () => {
     expect(approvals).toContain('data-design-node="n5VVTb"')
     expect(approvals).toContain("(['pending', 'approved', 'rejected'] as const)")
     expect(approvals).toContain('!item.duplicateFlag')
-    expect(approvals).toContain('選んだ{selected.size}件を認める')
+    expect(approvals).toContain('選んだ{selected.size}件をまとめて認める')
+    expect(approvals).toContain('まとめて却下する')
     expect(approvals).toContain('確認が必要な成果はまとめて承認できません')
   })
 
@@ -56,6 +58,25 @@ describe('機能16 V6の一覧', () => {
   })
 })
 
+describe('機能16 V6の確認画面', () => {
+  it('紹介者の停止・アーカイブは影響を読んで記録を残す', () => {
+    expect(TABS).toContain('<AffiliateArchiveDialog')
+    expect(ACTION_DIALOGS).toContain('designNode="QX70l"')
+    expect(ACTION_DIALOGS).toContain('api.affiliates.archiveImpact')
+    expect(ACTION_DIALOGS).toContain('api.affiliates.archive')
+    expect(ACTION_DIALOGS).toContain('過去の成果・報酬・支払いの記録は消えません')
+    expect(ACTION_DIALOGS).toContain('確認のため「{target?.name}」と打ってください')
+  })
+
+  it('影響確認は読込・通常・空・失敗を分ける', () => {
+    expect(ACTION_DIALOGS).toContain('使われている場所を確認しています')
+    expect(ACTION_DIALOGS).toContain('使われている場所を確認できませんでした')
+    expect(ACTION_DIALOGS).toContain('確認できる情報がありません')
+    expect(ACTION_DIALOGS).toContain("phase === 'loading'")
+    expect(ACTION_DIALOGS).toContain("phase === 'error'")
+  })
+})
+
 describe('機能16 V6の作成画面', () => {
   it('紹介者登録は支払い条件と未接続の振込先を正直に示す', () => {
     expect(NEW_AFFILIATE).toContain('designNode="xqT1Z"')
@@ -63,7 +84,7 @@ describe('機能16 V6の作成画面', () => {
       '支払いサイクル',
       '確定までの保留期間',
       '振込先の登録',
-      '友だち検索が接続されると表示されます',
+      'api.friends.list',
       'つながる先',
     ]) {
       expect(NEW_AFFILIATE).toContain(word)

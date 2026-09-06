@@ -24,6 +24,13 @@ import {
 } from './delete-impact'
 import ListState from '@/components/shared/list-state'
 import { useAccount } from '@/contexts/account-context'
+import SelectField from '@/components/shared/select-field'
+import {
+  commonVarsCsv,
+  filterAndSortCommonVars,
+  type CommonVarFilter,
+  type CommonVarOrder,
+} from './list-model'
 
 /**
  * 共通情報の一覧。
@@ -36,9 +43,6 @@ import { useAccount } from '@/contexts/account-context'
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
-
-/** 1ページに出す件数。Lステップと同じく、下にページ番号を並べる。 */
-const PER_PAGE = 20
 
 /** 一覧の更新日は、次回変更と同じセルに収まる短い形で出す。 */
 function formatListDate(value: string): string {
@@ -60,6 +64,9 @@ function VarsPageInner() {
 
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const [stateFilter, setStateFilter] = useState<CommonVarFilter>('all')
+  const [order, setOrder] = useState<CommonVarOrder>('usage_desc')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [deleteTargets, setDeleteTargets] = useState<CommonVar[]>([])
   /** 1件ずつの削除確認（設計 `yPkWe`）。 */
@@ -138,29 +145,43 @@ function VarsPageInner() {
     setDeleteError('')
   }, [selectedAccountId])
 
-  const filtered = useMemo(() => {
-    const needle = query.trim().toLowerCase()
-    return items.filter((item) => {
-      if (folderFilter === UNGROUPED && item.folderId !== null) return false
-      if (folderFilter && folderFilter !== UNGROUPED && item.folderId !== folderFilter) return false
-      if (!needle) return true
-      return (
-        item.name.toLowerCase().includes(needle) ||
-        item.varKey.toLowerCase().includes(needle) ||
-        item.value.toLowerCase().includes(needle)
-      )
-    })
-  }, [items, folderFilter, query])
+  const filtered = useMemo(
+    () => filterAndSortCommonVars(items, {
+      query,
+      folderId: folderFilter,
+      ungroupedValue: UNGROUPED,
+      filter: stateFilter,
+      order,
+    }),
+    [folderFilter, items, order, query, stateFilter],
+  )
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PER_PAGE))
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
   const current = useMemo(
-    () => filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE),
-    [filtered, page],
+    () => filtered.slice((page - 1) * pageSize, page * pageSize),
+    [filtered, page, pageSize],
+  )
+
+  const emptyInUseCount = useMemo(
+    () => items.filter((item) => item.value === '' && typeof item.usageCount === 'number' && item.usageCount > 0).length,
+    [items],
   )
 
   useEffect(() => {
     if (page > pageCount) setPage(pageCount)
   }, [page, pageCount])
+
+  const exportVisibleCsv = () => {
+    if (filtered.length === 0) return
+    const url = URL.createObjectURL(
+      new Blob([`\uFEFF${commonVarsCsv(filtered)}`], { type: 'text/csv;charset=utf-8' }),
+    )
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'common-information.csv'
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
 
   const addFolder = async () => {
     const name = folderName.trim()
@@ -396,15 +417,24 @@ function VarsPageInner() {
         </div>
       )}
 
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" onClick={() => setAddingFolder(true)}>フォルダを追加</Button>
+          <Button href="/contents/vars/new" variant="primary">＋ 共通情報を作る</Button>
+        </div>
+        <Button type="button" onClick={exportVisibleCsv} disabled={filtered.length === 0}>
+          CSVで書き出す
+        </Button>
+      </div>
+
+      {emptyInUseCount > 0 ? (
+        <div className="bg-status-warning-soft text-status-warning mb-4 rounded-control px-4 py-3 text-sm font-semibold" role="status">
+          中身が空のまま使われているものが {emptyInUseCount.toLocaleString('ja-JP')}件あります。差し込んだところが空欄のまま送られます。
+        </div>
+      ) : null}
+
       <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
         <div className="space-y-3">
-          <button
-            onClick={() => setAddingFolder(true)}
-            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control w-full border px-3 py-2 text-sm font-medium"
-          >
-            ＋ 新しいフォルダ
-          </button>
-
           <FolderPanel
             total={`${items.length} 件`}
             activeId={folderFilter}
@@ -467,21 +497,62 @@ function VarsPageInner() {
         </div>
 
         <div>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <Button href="/contents/vars/new" variant="primary">共通情報を作る</Button>
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                type="search"
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value)
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value)
+                setPage(1)
+              }}
+              placeholder="名前・差し込みキー・中身で検索"
+              aria-label="共通情報を検索"
+              className="border-hairline rounded-control focus:ring-accent min-w-64 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+            />
+            <SelectField
+              size="compact"
+              value={String(pageSize)}
+              onChange={(event) => {
+                setPageSize(Number(event.target.value))
+                setPage(1)
+              }}
+              aria-label="表示件数"
+              options={[20, 50, 100].map((value) => ({ value: String(value), label: `${value}件表示` }))}
+            />
+          </div>
+
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            {([
+              ['all', 'すべて'],
+              ['empty', '空のまま'],
+              ['scheduled', '期限つき'],
+              ['unused', '使われていない'],
+            ] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={stateFilter === value}
+                onClick={() => {
+                  setStateFilter(value)
                   setPage(1)
                 }}
-                placeholder="検索"
-                aria-label="共通情報を検索"
-                className="border-hairline rounded-control focus:ring-accent w-48 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-              />
-            </div>
+                className={stateFilter === value
+                  ? 'border-accent bg-accent-soft text-accent rounded-pill border px-3 py-1.5 text-xs font-semibold'
+                  : 'border-hairline bg-canvas text-ink-secondary rounded-pill border px-3 py-1.5 text-xs font-semibold'}
+              >
+                {label}
+              </button>
+            ))}
+            <SelectField
+              value={order}
+              onChange={(event) => setOrder(event.target.value as CommonVarOrder)}
+              aria-label="並び順"
+              options={[
+                { value: 'usage_desc', label: '使われている数が多い順' },
+                { value: 'updated_desc', label: '更新が新しい順' },
+                { value: 'name_asc', label: '名前順' },
+              ]}
+            />
           </div>
 
           <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
@@ -574,17 +645,19 @@ function VarsPageInner() {
                             {/* 差し込みの書き方を独立した列に出す。名前と混ぜず、
                                 テンプレートを書くときに横へ追って確認できる。 */}
                             <code
-                              title={`{{var.${item.varKey}}}`}
+                              title={placeholderText(item.name)}
                               className="text-ink-faint block truncate whitespace-nowrap text-xs"
-                            >{`{{var.${item.varKey}}}`}</code>
+                            >{placeholderText(item.name)}</code>
                           </td>
                           <td title={item.value || '（空）'} className="text-ink truncate px-4 py-3 text-sm">
                             {item.value || <span className="text-ink-faint">（空）</span>}
                           </td>
                           <td className="text-ink-secondary whitespace-nowrap px-4 py-3 text-xs">
-                            {item.usageCount === 0
-                              ? '使われていません'
-                              : `${(item.usageCount ?? 0).toLocaleString('ja-JP')}か所`}
+                            {item.usageCount === undefined
+                              ? '—（未取得）'
+                              : item.usageCount === 0
+                                ? '使われていません'
+                                : `${item.usageCount.toLocaleString('ja-JP')}か所`}
                           </td>
                           <td className="text-ink-secondary px-4 py-3 text-xs">
                             <span className="whitespace-nowrap">{formatListDate(item.updatedAt)}</span>
@@ -735,7 +808,7 @@ function VarsPageInner() {
                   <input
                     value={typedKey}
                     onChange={(e) => setTypedKey(e.target.value)}
-                    placeholder={placeholderText(singleImpact.variable.varKey)}
+                    placeholder={placeholderText(singleImpact.variable.name)}
                     className="border-hairline rounded-control bg-canvas text-ink mt-1 w-full border px-3 py-2 text-sm"
                   />
                 </label>

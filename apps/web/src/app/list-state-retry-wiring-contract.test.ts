@@ -49,7 +49,8 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
       }
     }
 
-    expect(errorCount).toBe(22)
+    // 友だち一覧の状態表示を FriendListTable へ集約した後の実測値。
+    expect(errorCount).toBe(21)
   })
 
   it('URLだけでは対象を特定できない状態に、直らない再読み込みを出さない', () => {

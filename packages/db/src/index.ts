@@ -49,6 +49,7 @@ export * from './mileage-rewards';
 export * from './affiliate-attribution';
 export * from './affiliate-report';
 export * from './affiliate-payments';
+export * from './affiliate-settlements';
 export * from './account-settings';
 export * from './webinars';
 
@@ -64,6 +65,7 @@ export * from './getting-started';
 export * from './manual-links';
 export * from './recipes';
 export * from './account-handovers';
+export * from './friend-migrations';
 export * from './friend-fields';
 export * from './support-marks';
 export * from './saved-searches';

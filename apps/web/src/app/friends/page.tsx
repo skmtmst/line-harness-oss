@@ -17,7 +17,6 @@ import MergedUsersPage from '@/app/users/page'
 import { EmbeddedPageProvider } from '@/components/layout/embedded-page-context'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
-import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import { emptyMessageOf } from './friend-list-empty'
@@ -416,32 +415,19 @@ function FriendsPageInner({
       <BulkRunDialog
         open={bulkOpen}
         friendIds={selectedFriendIds}
+        selectedFriends={friends.filter((friend) => selectedIds.has(friend.id))}
         tags={allTags}
         accountId={selectedAccountId}
         onClose={() => setBulkOpen(false)}
         onDone={() => void loadFriends()}
       />
 
-      {loadStatus === 'loading' ? (
-        <ListState kind="loading" title="友だちを読み込んでいます" />
-      ) : loadStatus === 'error' ? (
-        <ListState
-          kind="error"
-          title="友だちを表示できませんでした"
-          description="登録した友だちは消えていません。再読み込みしても直らない場合は、エラー報告へ連絡してください。"
-          onRetry={() => void loadFriends()}
-        />
-      ) : friends.length === 0 ? (
-        /*
-          **絞り込んで0件と、そもそも1人もいないのは別のこと。**
-          以前はどちらも「検索条件を外すか」と言っていたので、まだ誰も
-          友だちになっていないアカウントで、外すべき条件が無いのに
-          条件を外せと言われた。共通部品を通して、状態を名前で言えるようにする。
-        */
-        <ListState kind="empty" title={emptyMessage.title} description={emptyMessage.description} />
-      ) : (
-        <FriendListTable
+      <FriendListTable
           friends={friends}
+          status={loadStatus}
+          emptyTitle={emptyMessage.title}
+          emptyDescription={emptyMessage.description}
+          onRetry={() => void loadFriends()}
           total={total}
           selectedIds={selectedIds}
           onToggleSelect={toggleSelect}
@@ -453,10 +439,20 @@ function FriendsPageInner({
           onPageChange={setPage}
           onPageSizeChange={(size) => resetPageWith(() => setPageSize(size as (typeof PAGE_SIZE_OPTIONS)[number]))}
           onToggleAttention={toggleAttention}
-        />
-      )}
+      />
 
-      <AdvancedSearchDialog open={advancedOpen} accountId={selectedAccountId} tags={allTags} fieldNames={[]} onClose={() => setAdvancedOpen(false)} onApply={(result) => { setAdvanced(result); setAdvancedOpen(false); setPage(1) }} />
+      <AdvancedSearchDialog
+        open={advancedOpen}
+        accountId={selectedAccountId}
+        tags={allTags}
+        fieldNames={[]}
+        onClose={() => setAdvancedOpen(false)}
+        onLoadSaved={() => {
+          setAdvancedOpen(false)
+          setSavedOpen(true)
+        }}
+        onApply={(result) => { setAdvanced(result); setAdvancedOpen(false); setPage(1) }}
+      />
       {savedOpen ? (
         <SavedSearchDialog
           accountId={selectedAccountId}

@@ -138,13 +138,7 @@ export type TagDeleteImpact = {
   canDelete: boolean
 }
 
-/*
- * 緊急停止の「止める前に何が止まるか」。
- *
- * ここに置いてあるのは**影響を見るぶんだけ**。止める・戻す口は
- * 段階的な本人確認のヘッダを送るが、worker 側の許可一覧にまだ無い
- * （`apps/worker/src/cors-headers.test.ts` が落ちる）。口が入ってから足す。
- */
+/** 緊急停止の対象、影響、停止状態をサーバーと共有する契約。 */
 export type OperationCapability =
   | 'broadcast_dispatch'
   | 'scenario_dispatch'
@@ -182,6 +176,37 @@ export type OperationControl = {
   actorId: string | null
   stoppedAt: string | null
   updatedAt: string | null
+}
+
+export type OperationControlSnapshot = {
+  version: number
+  states: Record<OperationCapability, 'running' | 'stopped'>
+  activeIncidentId: string | null
+  reason: string | null
+  actorId: string | null
+  stoppedAt: string | null
+  capturedAt: string
+}
+
+export type OperationIncident = {
+  id: string
+  scopeKey: string
+  lineAccountId: string | null
+  status: 'preparing' | 'stopped' | 'resolved' | 'failed'
+  capabilities: OperationCapability[]
+  reason: string
+  detail: string | null
+  actorId: string
+  resolvedByActorId: string | null
+  controlVersion: number | null
+  beforeSnapshot: OperationControlSnapshot
+  stoppedSnapshot: OperationControlSnapshot | null
+  restoredSnapshot: OperationControlSnapshot | null
+  errorMessage: string | null
+  stoppedAt: string | null
+  resolvedAt: string | null
+  createdAt: string
+  updatedAt: string
 }
 
 export type FormDeleteImpact = {
@@ -270,6 +295,21 @@ export type RichMenuDeleteImpact = {
   recommendedAction: 'delete' | 'unpublish' | 'review_references'
 }
 
+export type RichMenuTargetPreview = {
+  matched: { value: number | null; state: 'available' | 'unavailable'; reason: string | null }
+  overlap: { value: number | null; state: 'available' | 'unavailable'; reason: string | null }
+  effective: { value: number | null; state: 'available' | 'unavailable'; reason: string | null }
+  higherMenus: string[]
+  priority: number
+}
+
+export type RichMenuScheduleInput = {
+  mode: 'scheduled' | 'period'
+  startsAt: string
+  endsAt?: string | null
+  restoreGroupId?: string | null
+}
+
 /**
  * 対応マークの自動変更ルール（設計 `GMvBd` 4-3-A）。
  *
@@ -349,6 +389,40 @@ export type AffiliatePaymentSummary = {
   heldConversions: number
   heldReward: number
   holdStatusUnknown: number
+  unsettledConversions: number
+  unsettledReward: number
+  settledConversions: number
+  settledReward: number
+}
+
+export type AffiliateArchiveImpact = {
+  affiliateId: string
+  affiliateName: string
+  lifecycle: 'active' | 'paused' | 'archived'
+  activeLinks: number
+  unsettledConversions: number
+  unsettledReward: number
+  pendingConversions: number
+  checkedAt: string
+}
+
+export type AffiliateSettlementPreview = {
+  affiliateId: string
+  affiliateName: string
+  code: string
+  amount: number
+  conversionCount: number
+  periodFrom: string | null
+  periodTo: string
+  closeDate: string | null
+  paymentDate: string | null
+  bankDestination: string | null
+  breakdown: Array<{
+    offerName: string
+    conversions: number
+    unitReward: number | null
+    subtotal: number
+  }>
 }
 
 /** Broadcast type from API (now camelCase after worker serialization) */
@@ -2022,6 +2096,54 @@ export interface AccountHandoverDecision {
   decided_at: string
 }
 
+export type UidMigrationStatus = 'dry_run' | 'review' | 'ready' | 'executing' | 'completed' | 'failed' | 'rolled_back'
+export interface UidMigrationItem {
+  id: string
+  oldUid: string
+  newUid: string | null
+  candidateName: string | null
+  evidenceType: 'same_provider' | 'line_login' | 'signed_customer_id' | 'verified_contact' | 'operator_csv' | 'manual'
+  classification: 'auto' | 'review' | 'unmatched' | 'conflict'
+  conflictReason: string | null
+  decision: 'pending' | 'link' | 'create' | 'exclude'
+  result: 'pending' | 'applied' | 'skipped' | 'failed' | 'rolled_back'
+  errorMessage: string | null
+}
+export interface UidMigrationRun {
+  id: string
+  fromAccountId: string
+  toAccountId: string
+  purpose: string
+  sourceKind: 'csv' | 'verified_api' | 'manual'
+  sourceFilename: string | null
+  status: UidMigrationStatus
+  dryRunRevision: number
+  counts: { total: number; auto: number; review: number; unmatched: number; conflict: number; applied: number; failed: number }
+  createdBy: string
+  approvedBy: string | null
+  createdAt: string
+  reviewedAt: string | null
+  executedAt: string | null
+  completedAt: string | null
+  rolledBackAt: string | null
+  failureReason: string | null
+  items?: UidMigrationItem[]
+}
+
+export interface FriendMigrationJob {
+  id: string
+  kind: 'export' | 'import'
+  line_account_id: string
+  row_count?: number | null
+  total_count?: number | null
+  update_count?: number | null
+  conflict_count?: number | null
+  status: string
+  created_by_name: string
+  created_at: string
+  expires_at?: string | null
+}
+
 export type FriendAddRuleKind = 'first_time' | 'returning'
 export type FriendAddRuleStatus = 'draft' | 'published' | 'stopped' | 'archived'
 export type FriendAddRuleAction = {
@@ -2796,6 +2918,9 @@ export const api = {
           onSubmitMessageContent: string | null
           isActive: boolean
           submitCount: number
+          ogTitle: string | null
+          ogDescription: string | null
+          ogImageUrl: string | null
         }>
       >(`/api/forms/${id}?account_id=${encodeURIComponent(accountId)}`),
     create: (
@@ -2824,6 +2949,9 @@ export const api = {
         onSubmitMessageType?: string | null
         onSubmitMessageContent?: string | null
         isActive?: boolean
+        ogTitle?: string | null
+        ogDescription?: string | null
+        ogImageUrl?: string | null
       },
     ) =>
       fetchApi<ApiResponse<{ id: string }>>(`/api/forms/${id}?account_id=${encodeURIComponent(accountId)}`, {
@@ -3667,6 +3795,46 @@ export const api = {
         method: 'POST',
       }),
   },
+  friendMigrations: {
+    list: () => fetchApi<ApiResponse<UidMigrationRun[]>>('/api/friends/migrations'),
+    get: (id: string) => fetchApi<ApiResponse<UidMigrationRun>>(`/api/friends/migrations/${id}`),
+    dryRun: (input: {
+      fromAccountId: string
+      toAccountId: string
+      purpose: string
+      sourceFilename: string
+      sourceChecksum: string
+      mappings: Array<{ oldUid: string; newUid: string | null; evidenceType: UidMigrationItem['evidenceType'] }>
+    }) => fetchApi<ApiResponse<UidMigrationRun>>('/api/friends/migrations', {
+      method: 'POST', body: JSON.stringify({ ...input, sourceKind: 'csv' }),
+    }),
+    decide: (runId: string, itemId: string, decision: 'link' | 'create' | 'exclude') =>
+      fetchApi<ApiResponse<UidMigrationRun & { unresolved: number | null }>>(
+        `/api/friends/migrations/${runId}/items/${itemId}`,
+        { method: 'PATCH', body: JSON.stringify({ decision }) },
+      ),
+    execute: (id: string) => fetchApi<ApiResponse<UidMigrationRun>>(`/api/friends/migrations/${id}/execute`, { method: 'POST' }),
+    rollback: (id: string) => fetchApi<ApiResponse<UidMigrationRun>>(`/api/friends/migrations/${id}/rollback`, { method: 'POST' }),
+    createExport: (input: { accountId: string; columns: Array<'basic' | 'tags_fields' | 'support'>; encoding: 'utf-8' | 'shift_jis' }) =>
+      fetchApi<ApiResponse<{ id: string; rowCount: number | null; status: string; downloadUrl: string }>>('/api/friends/exports', {
+        method: 'POST', body: JSON.stringify(input),
+      }),
+    previewImport: (input: {
+      accountId: string
+      sourceFilename: string
+      sourceChecksum: string
+      rows: Array<{ lineUid: string; displayName: string | null; realName: string | null; systemDisplayName: string | null }>
+    }) => fetchApi<ApiResponse<{
+      id: string
+      status: string
+      duplicate: boolean
+      result: { summary: { add: number; update: number; unchanged: number; conflict: number; error: number }; rows: unknown[] }
+    }>>('/api/friends/imports', { method: 'POST', body: JSON.stringify(input) }),
+    executeImport: (id: string) => fetchApi<ApiResponse<{ id: string; status: string; applied?: number; duplicate: boolean }>>(
+      `/api/friends/imports/${id}/execute`, { method: 'POST' },
+    ),
+    jobs: () => fetchApi<ApiResponse<FriendMigrationJob[]>>('/api/friends/migration-jobs'),
+  },
   lineAccounts: {
     list: (live = false) =>
       fetchApi<ApiResponse<LineAccount[]>>(`/api/line-accounts${live ? '?live=1' : ''}`),
@@ -3865,6 +4033,17 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
+    archiveImpact: (id: string) =>
+      fetchApi<ApiResponse<AffiliateArchiveImpact>>(`/api/affiliates/${id}/archive-impact`),
+    archive: (id: string, data: { mode: 'pause' | 'archive'; confirmationName?: string }) =>
+      fetchApi<ApiResponse<{
+        affiliateId: string
+        lifecycle: 'paused' | 'archived'
+        recordsPreserved: true
+      }>>(`/api/affiliates/${id}/archive`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
     report: (id: string, params?: { startDate?: string; endDate?: string }) =>
       fetchApi<ApiResponse<{ affiliateId: string; affiliateName: string; code: string; commissionRate: number; totalClicks: number; totalConversions: number; totalRevenue: number }>>(
         `/api/affiliates/${id}/report?` + new URLSearchParams(params as Record<string, string>),
@@ -3941,11 +4120,29 @@ export const api = {
         data: AffiliatePaymentSummary[]
         limitations: {
           payoutHistory: false
+          settlementHistory: true
           bankDestination: false
           settlementSchedule: false
         }
         error?: string
       }>(`/api/affiliate-payments?${new URLSearchParams({ lineAccountId })}`),
+    paymentPreview: (id: string, lineAccountId: string) =>
+      fetchApi<ApiResponse<AffiliateSettlementPreview>>(
+        `/api/affiliate-payments/${id}/preview?${new URLSearchParams({ lineAccountId })}`,
+      ),
+    confirmPayment: (
+      id: string,
+      data: { lineAccountId: string; expectedAmount: number; idempotencyKey: string },
+    ) => fetchApi<ApiResponse<{
+      kind: 'created' | 'duplicate'
+      settlementId: string
+      amount: number
+      conversionCount: number
+      closedAt: string
+    }>>(`/api/affiliate-payments/${id}/confirm`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   },
   templates: {
     list: (category?: string, accountId?: string) => {
@@ -4749,12 +4946,12 @@ export const api = {
       }>>>(`/api/chats/${id}/events`),
     savedViews: {
       list: (accountId: string) => fetchApi<ApiResponse<SavedSearch[]>>(`/api/inbox/saved-views?lineAccountId=${encodeURIComponent(accountId)}`),
-      create: (accountId: string, data: { name: string; conditions: unknown; isShared?: boolean }) =>
+      create: (accountId: string, data: { name: string; conditions: unknown; isShared?: boolean; isFavorite?: boolean }) =>
         fetchApi<ApiResponse<SavedSearch>>(`/api/inbox/saved-views?lineAccountId=${encodeURIComponent(accountId)}`, {
           method: 'POST',
           body: JSON.stringify(data),
         }),
-      update: (id: string, accountId: string, data: { name?: string; conditions?: unknown; isShared?: boolean }) =>
+      update: (id: string, accountId: string, data: { name?: string; conditions?: unknown; isShared?: boolean; isFavorite?: boolean }) =>
         fetchApi<ApiResponse<SavedSearch>>(`/api/inbox/saved-views/${id}?lineAccountId=${encodeURIComponent(accountId)}`, {
           method: 'PATCH',
           body: JSON.stringify(data),
@@ -5447,6 +5644,25 @@ export const api = {
         }>;
       }>>(`/api/rich-menu-groups/${groupId}`),
 
+    previewTargets: (groupId: string, conditions?: SegmentCondition | null) =>
+      fetchApi<ApiResponse<RichMenuTargetPreview>>(
+        `/api/rich-menu-groups/${groupId}/preview-targets`,
+        {
+          method: 'POST',
+          body: JSON.stringify(conditions === undefined ? {} : { conditions }),
+        },
+      ),
+
+    schedule: (groupId: string, input: RichMenuScheduleInput, idempotencyKey: string) =>
+      fetchApi<ApiResponse<{ id: string; status: string }>>(
+        `/api/rich-menu-groups/${groupId}/schedule`,
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': idempotencyKey },
+          body: JSON.stringify(input),
+        },
+      ),
+
     create: (input: {
       accountId: string;
       name: string;
@@ -5871,7 +6087,7 @@ export const api = {
       }>>(options?.forceRefresh ? '/api/duplicates/stats?refresh=1' : '/api/duplicates/stats'),
   },
   /** 広告連携（設計 V2 6-8）。鍵は伏せた形で返ってくる。 */
-  /** 緊急停止の影響（見るだけ）。止める・戻す口はまだ足していない。 */
+  /** 緊急停止の影響確認、停止・復旧、追記履歴。 */
   operations: {
     preview: (accountId: string | null) => {
       const query = accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''
@@ -5883,6 +6099,32 @@ export const api = {
         calculatedAt: string
       }>>(`/api/operations/control/preview${query}`)
     },
+    history: (limit = 100) =>
+      fetchApi<ApiResponse<OperationIncident[]>>(`/api/operations/history?limit=${limit}`),
+    stop: (input: {
+      lineAccountId: string | null
+      capabilities: OperationCapability[]
+      reason: string
+      detail?: string | null
+      confirmation: '停止'
+      expectedVersion: number
+    }) => fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
+      '/api/operations/incidents',
+      {
+        method: 'POST',
+        headers: { 'X-Confirm-Irreversible': 'operation-stop' },
+        body: JSON.stringify(input),
+      },
+    ),
+    restore: (incidentId: string, input: { confirmation: '復旧'; expectedVersion: number }) =>
+      fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
+        `/api/operations/incidents/${encodeURIComponent(incidentId)}/restore`,
+        {
+          method: 'POST',
+          headers: { 'X-Confirm-Irreversible': 'operation-restore' },
+          body: JSON.stringify(input),
+        },
+      ),
   },
   adPlatforms: {
     list: () =>

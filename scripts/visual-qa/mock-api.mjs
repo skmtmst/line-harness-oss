@@ -37,12 +37,15 @@ import {
   MEDIA_REPLACEMENT_IMPACT,
   MEDIA_REPLACEMENT_IMPACT_BLOCKED,
   MEDIA_REPLACEMENT_IMPACT_EMPTY,
+  MEDIA_FOLDERS,
   MEDIA_ITEMS,
   FRIEND_ADD_LIFECYCLE_DRAFT,
   FRIEND_ADD_LIFECYCLE_PUBLISHED,
   FRIEND_ADD_LIFECYCLE_TEST_RESULT,
   FRIEND_ADD_LIFECYCLE_VALIDATION,
   AUTO_REPLIES, AUTO_REPLY_FOLDERS,
+  AUTO_REPLY_PUBLISH_CONFLICTS, AUTO_REPLY_PUBLISH_DRAFT,
+  AUTO_REPLY_PUBLISH_RESULT, AUTO_REPLY_PUBLISH_TEST, AUTO_REPLY_PUBLISH_VALIDATION,
   BROADCASTS, BROADCAST_FOLDERS, CHATS, FRIEND_FIELDS, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
   TEMPLATES, TEMPLATE_FOLDERS,
   DUPLICATE_STATS, FRIENDS, FRIEND_BULK_RUN, FRIEND_SCENARIOS, FRIEND_STATS,
@@ -51,13 +54,18 @@ import {
   MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
   LIST_STATS, NEN_COLUMN_CREATE, OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
+  RICH_MENU_GROUPS, RICH_MENU_GROUP_DETAILS, RICH_MENU_EXTERNAL, RICH_MENU_TAP_STATS,
   TAGS, TAG_GROUPS, REMINDER_RUNS,
   ACTION_SCORE_RULES,
   SUPPORT_MARKS, SUPPORT_MARK_AUTOMATION_RULES,
-  OUTGOING_WEBHOOKS, INCOMING_WEBHOOKS, ENTRY_ROUTES, STAFF_MEMBERS, LOGIN_AUDIT,
+  OUTGOING_WEBHOOKS, INCOMING_WEBHOOKS, ENTRY_ROUTES, INFLOW_SUMMARY,
+  SITE_TRACKING_SUMMARY, SITE_TRACKING_PAGES, AD_PLATFORMS, AD_CONVERSION_LOGS,
+  STAFF_MEMBERS, LOGIN_AUDIT,
   AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS, MILEAGE_OVERVIEW,
-  COMMON_ACTIONS, BOOKING_MENUS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_REQUESTS,
-  EC_NOTIFICATION_SETTINGS, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, EC_EVENTS, EC_OVERVIEW, MILEAGE_RULES, CONVERSION_POINTS,
+  COMMON_ACTIONS, COMMON_ACTION_DETAIL, AUTOMATIONS, AUTOMATION_TEMPLATES,
+  BOOKING_MENUS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_REQUESTS,
+  EC_NOTIFICATION_SETTINGS, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, EC_EVENTS, EC_OVERVIEW, MILEAGE_RULES,
+  CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
   WEBINARS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_ANALYTICS,
 } from './fixtures.mjs'
 
@@ -375,6 +383,149 @@ const FEATURES = Object.fromEntries(FEATURE_KEYS.map((k) => [k, true]))
 /** 分析の指標1つ。`state` と `reason` を持つのが契約。 */
 const METRIC = (value, state = 'available', reason = null) => ({ value, state, reason })
 
+/*
+  分析の後半3画面。空の器だけでは、行列・時系列ファネル・保存履歴を
+  設計画像と比較できない。固定時刻と架空の集計結果だけを返し、保存や
+  再集計そのものは行わない。
+*/
+const ANALYTICS_CROSS_RESULT = {
+  lineAccountId: 'visual-qa-account',
+  timeZone: 'Asia/Tokyo',
+  rowValues: [
+    { key: 'instagram', label: 'Instagram' },
+    { key: 'store-qr', label: '店頭のQR' },
+    { key: 'referral', label: '紹介リンク' },
+    { key: 'meta', label: '広告（Meta）' },
+    { key: 'unknown', label: '分からない' },
+  ],
+  columnValues: [
+    { key: 'tagged', label: '付いている' },
+    { key: 'untagged', label: '付いていない' },
+  ],
+  cells: [
+    ['instagram', 'Instagram', 'tagged', '付いている', 86, 79],
+    ['instagram', 'Instagram', 'untagged', '付いていない', 318, 306],
+    ['store-qr', '店頭のQR', 'tagged', '付いている', 142, 104],
+    ['store-qr', '店頭のQR', 'untagged', '付いていない', 96, 91],
+    ['referral', '紹介リンク', 'tagged', '付いている', 54, 49],
+    ['referral', '紹介リンク', 'untagged', '付いていない', 171, 168],
+    ['meta', '広告（Meta）', 'tagged', '付いている', 31, 26],
+    ['meta', '広告（Meta）', 'untagged', '付いていない', 208, 201],
+    ['unknown', '分からない', 'tagged', '付いている', 12, 9],
+    ['unknown', '分からない', 'untagged', '付いていない', 286, 277],
+  ].map(([rowKey, rowLabel, columnKey, columnLabel, value, previousValue]) => ({
+    rowKey, rowLabel, columnKey, columnLabel, value, uniqueFriends: value,
+    totalRatio: value / 1404, previousValue, difference: value - previousValue,
+  })),
+  totalValue: 1404,
+  totalFriends: 1404,
+  previousTotalValue: 1310,
+  periodFrom: '2026-06-06T00:00:00.000Z',
+  periodTo: '2026-09-03T00:00:00.000Z',
+  previousPeriodFrom: '2026-03-08T00:00:00.000Z',
+  previousPeriodTo: '2026-06-05T23:59:59.999Z',
+  dataCutoffAt: '2026-09-03T02:40:00.000Z',
+  state: 'available',
+  stateReason: null,
+}
+
+const ANALYTICS_FUNNEL_RUN = {
+  runId: 'visual-funnel-run-1',
+  funnelId: 'visual-funnel-1',
+  versionId: 'visual-funnel-version-1',
+  versionNumber: 3,
+  lineAccountId: 'visual-qa-account',
+  cohortFrom: '2026-06-06T00:00:00.000Z',
+  cohortTo: '2026-09-03T00:00:00.000Z',
+  timeZone: 'Asia/Tokyo',
+  dataCutoffAt: '2026-09-03T02:40:00.000Z',
+  state: 'available',
+  stateReason: null,
+  groups: [{
+    key: 'all', label: 'すべての経路', entrants: 1404, completed: 96,
+    steps: [
+      { stepOrder: 1, label: '友だちになった', reached: 1404, conversionFromPrevious: null, droppedAfter: 0, inProgressAfter: 0, averageSecondsFromPrevious: null, medianSecondsFromPrevious: null },
+      { stepOrder: 2, label: '1回でも反応した', reached: 886, conversionFromPrevious: 0.631, droppedAfter: 518, inProgressAfter: 0, averageSecondsFromPrevious: 86400, medianSecondsFromPrevious: 72000 },
+      { stepOrder: 3, label: 'フォームに答えた', reached: 412, conversionFromPrevious: 0.465, droppedAfter: 474, inProgressAfter: 0, averageSecondsFromPrevious: 172800, medianSecondsFromPrevious: 151200 },
+      { stepOrder: 4, label: '予約か購入をした', reached: 238, conversionFromPrevious: 0.578, droppedAfter: 174, inProgressAfter: 0, averageSecondsFromPrevious: 259200, medianSecondsFromPrevious: 216000 },
+      { stepOrder: 5, label: 'くり返し買った', reached: 96, conversionFromPrevious: 0.403, droppedAfter: 142, inProgressAfter: 0, averageSecondsFromPrevious: 604800, medianSecondsFromPrevious: 518400 },
+    ],
+  }],
+}
+
+const ANALYTICS_SAVED = [
+  ['saved-1', '経路 × 体験申込', 'cross', '佐々木', 12, '2026-08-25T11:20:00+09:00'],
+  ['saved-2', '友だちになってからの5段', 'funnel', '佐々木', 9, '2026-08-25T09:40:00+09:00'],
+  ['saved-3', '広告ごとの費用対効果', 'cross', '田中', 6, '2026-08-24T18:05:00+09:00'],
+  ['saved-4', 'コラムの読まれ方', 'cross', '山口', 4, '2026-08-23T14:30:00+09:00'],
+  ['saved-5', 'タグ × 予約', 'cross', '田中', 21, '2026-08-12T10:15:00+09:00'],
+  ['saved-6', '旧・流入の内訳', 'cross', '佐々木', 3, '2026-07-28T16:40:00+09:00'],
+].map(([id, name, kind, createdByName, snapshotCount, updatedAt], index) => ({
+  id, name, kind, status: 'active', currentVersionNumber: index === 5 ? 1 : 2,
+  createdBy: `visual-owner-${index + 1}`, createdByName,
+  createdAt: '2026-06-01T09:00:00+09:00', updatedAt, snapshotCount,
+  latestSnapshot: {
+    id: `${id}-snapshot-latest`, state: index === 5 ? 'unavailable' : 'available',
+    periodFrom: '2026-08-05T00:00:00+09:00', periodTo: '2026-09-03T00:00:00+09:00',
+    dataCutoffAt: '2026-09-03T02:40:00.000Z', createdAt: updatedAt,
+  },
+}))
+
+const PENDING_APPROVALS = [
+  ['木村 亮', '合同会社ノース', 'ao-2', '定期便のお申し込み', 'ECの定期が確定したとき', 5000, true],
+  ['大西 健一', '合同会社ノース', 'ao-4', '資料請求', '資料請求', 1500, true],
+  ['岡本 遥', '旧パートナーA（停止中）', 'ao-1', '体験の申し込み', '体験の申し込み', 3000, true],
+  ['高橋 直人', '田中 明', 'ao-2', '定期便のお申し込み', 'ECの定期が確定したとき', 5000, false],
+  ['藤井 理沙', '中村 彩', 'ao-1', '体験の申し込み', '体験の申し込み', 3000, false],
+  ['前田 さくら', '木村 亮', 'ao-1', '体験の申し込み', '体験の申し込み', 3000, false],
+  ['松本 圭', '山口 商店', 'ao-3', '友だち追加', '友だち追加', 100, false],
+  ['石田 未来', '田中 明', 'ao-4', '資料請求', '資料請求', 6000, false],
+].map(([friendName, affiliateName, offerId, offerName, conversionPointName, value, duplicateFlag], index) => ({
+  eventId: `cv-p-${index + 1}`,
+  createdAt: `2026-09-0${Math.min(index + 1, 6)}T${String(8 + index).padStart(2, '0')}:12:00+09:00`,
+  friendId: `friend-${index + 1}`,
+  friendName,
+  affiliateId: `af-${(index % 6) + 1}`,
+  affiliateName,
+  offerId,
+  offerName,
+  offerRewardMiles: 0,
+  conversionPointName,
+  value,
+  approvalStatus: 'pending',
+  duplicateFlag,
+}))
+
+const APPROVED_APPROVALS = Array.from({ length: 34 }, (_, index) => {
+  const offerIndex = index < 18 ? 1 : index < 26 ? 2 : index < 31 ? 3 : 4
+  const rewards = [0, 3000, 5000, 100, 1500]
+  const names = ['', '体験の申し込み', '定期便のお申し込み', '友だち追加', '資料請求']
+  return {
+    eventId: `cv-a-${index + 1}`,
+    createdAt: `2026-09-0${(index % 6) + 1}T10:00:00+09:00`,
+    friendId: `approved-friend-${index + 1}`,
+    friendName: `承認済みの友だち ${index + 1}`,
+    affiliateId: `af-${(index % 6) + 1}`,
+    affiliateName: AFFILIATES[index % AFFILIATES.length].name,
+    offerId: `ao-${offerIndex}`,
+    offerName: names[offerIndex],
+    offerRewardMiles: 0,
+    conversionPointName: names[offerIndex],
+    value: rewards[offerIndex],
+    approvalStatus: 'approved',
+    duplicateFlag: false,
+  }
+})
+
+const REJECTED_APPROVALS = Array.from({ length: 8 }, (_, index) => ({
+  ...PENDING_APPROVALS[index],
+  eventId: `cv-r-${index + 1}`,
+  approvalStatus: 'rejected',
+  duplicateFlag: false,
+}))
+
+const CONVERSION_APPROVALS = [...PENDING_APPROVALS, ...APPROVED_APPROVALS, ...REJECTED_APPROVALS]
+
 const SHAPES = {
   '/api/public/brand': { name: '画面確認アカウント', iconUrl: null },
   /*
@@ -399,31 +550,13 @@ const SHAPES = {
     行が無いと「表に無い種別が内部の記号のまま出ていないか」も見られないので、
     承認待ち・承認済み・重複ありの3行を置く。
   */
-  '/api/conversions/approvals': [
-    {
-      eventId: 'cv-1', createdAt: '2026-08-24T20:53:00+09:00',
-      friendId: 'friend-1', friendName: 'さかもとまさと',
-      affiliateId: 'af-1', affiliateName: 'Masato.S',
-      offerId: 'of-1', offerName: '夏の紹介キャンペーン', offerRewardMiles: 50,
-      conversionPointName: '購入完了', value: 12000,
-      approvalStatus: 'pending', duplicateFlag: false,
-    },
-    {
-      eventId: 'cv-2', createdAt: '2026-08-19T09:12:00+09:00',
-      friendId: 'friend-2', friendName: 'Kyohei Yamamoto',
-      affiliateId: 'af-1', affiliateName: 'Masato.S',
-      offerId: null, offerName: null, offerRewardMiles: null,
-      conversionPointName: '資料請求', value: null,
-      approvalStatus: 'approved', duplicateFlag: false,
-    },
-    {
-      eventId: 'cv-3', createdAt: '2026-08-13T20:52:00+09:00',
-      friendId: 'friend-3', friendName: null,
-      affiliateId: 'af-2', affiliateName: null,
-      offerId: 'of-1', offerName: '夏の紹介キャンペーン', offerRewardMiles: 50,
-      conversionPointName: '購入完了', value: 8000,
-      approvalStatus: 'pending', duplicateFlag: true,
-    },
+  '/api/conversions/approvals': CONVERSION_APPROVALS,
+  '/api/affiliate-payments': [
+    { affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka01', holdDays: 30, payoutCycle: '8/31締め・9/30払い', approvedConversions: 9, approvedReward: 84000, heldConversions: 2, heldReward: 18000, holdStatusUnknown: 0, unsettledConversions: 9, unsettledReward: 84000, settledConversions: 0, settledReward: 0 },
+    { affiliateId: 'af-2', affiliateName: '合同会社ノース', code: 'north', holdDays: 30, payoutCycle: '8/31締め・9/30払い', approvedConversions: 8, approvedReward: 72000, heldConversions: 1, heldReward: 12000, holdStatusUnknown: 0, unsettledConversions: 8, unsettledReward: 72000, settledConversions: 0, settledReward: 0 },
+    { affiliateId: 'af-3', affiliateName: '木村 亮', code: 'miyuki', holdDays: 30, payoutCycle: '8/31締め・9/30払い', approvedConversions: 7, approvedReward: 64000, heldConversions: 2, heldReward: 18000, holdStatusUnknown: 0, unsettledConversions: 7, unsettledReward: 64000, settledConversions: 0, settledReward: 0 },
+    { affiliateId: 'af-4', affiliateName: '中村 彩', code: 'aya-n', holdDays: 30, payoutCycle: '8/31締め・9/30払い', approvedConversions: 5, approvedReward: 42000, heldConversions: 1, heldReward: 9000, holdStatusUnknown: 0, unsettledConversions: 5, unsettledReward: 42000, settledConversions: 0, settledReward: 0 },
+    { affiliateId: 'af-5', affiliateName: '山口 商店', code: 'yamaguchi', holdDays: 60, payoutCycle: '8/31締め・9/30払い', approvedConversions: 5, approvedReward: 50000, heldConversions: 2, heldReward: 15000, holdStatusUnknown: 0, unsettledConversions: 5, unsettledReward: 50000, settledConversions: 0, settledReward: 0 },
   ],
   '/api/action-scores/rules': ACTION_SCORE_RULES,
   '/api/action-scores/friends': {
@@ -659,8 +792,8 @@ const SHAPES = {
   '/api/dashboard/organization-overview': DASHBOARD_OVERVIEW,
 
   /* リッチメニュー。LINE側にある実物の一覧と、押された回数。 */
-  '/api/rich-menu-groups/external': { currentDefault: null, lineMenus: [] },
-  '/api/rich-menu-groups/tap-stats': { from: FIXED_FROM, to: FIXED_TO, byArea: [], byGroup: [], total: 0 },
+  '/api/rich-menu-groups/external': RICH_MENU_EXTERNAL,
+  '/api/rich-menu-groups/tap-stats': RICH_MENU_TAP_STATS,
 
   /* 友だち追加時配信の公開前確認（PR #597）。契約と同じ形を返す。 */
   '/api/friend-add-routing/draft': FRIEND_ADD_LIFECYCLE_DRAFT,
@@ -673,6 +806,27 @@ const SHAPES = {
  * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
  */
 function visualQaWriteBody(method, pathname) {
+  if (method === 'POST' && pathname === '/api/analytics/cross/query') {
+    return { id: 'visual-cross-result-1', state: 'pending' }
+  }
+  if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/test$/.test(pathname)) {
+    return AUTO_REPLY_PUBLISH_TEST
+  }
+  if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/validate$/.test(pathname)) {
+    return AUTO_REPLY_PUBLISH_VALIDATION
+  }
+  if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/publish$/.test(pathname)) {
+    return AUTO_REPLY_PUBLISH_RESULT
+  }
+  if (method === 'POST' && /^\/api\/rich-menu-groups\/[^/]+\/preview-targets$/.test(pathname)) {
+    return {
+      matched: { value: 1020, state: 'available', reason: null },
+      overlap: { value: 180, state: 'available', reason: null },
+      effective: { value: 840, state: 'available', reason: null },
+      higherMenus: ['夏キャンペーン'],
+      priority: 2,
+    }
+  }
   if (method === 'POST' && pathname === '/api/friend-add-rules/test') {
     return {
       stateChanged: false, ruleId: FRIEND_ADD_RULE.id, matched: true,
@@ -801,6 +955,56 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/auth/session') {
     return { success: true, data: STAFF, csrfToken: 'visual-qa-csrf' }
   }
+  if (pathname === '/api/analytics/cross/results/visual-cross-result-1') {
+    return {
+      success: true,
+      data: {
+        id: 'visual-cross-result-1', state: 'available', errorCode: null,
+        result: ANALYTICS_CROSS_RESULT, createdAt: '2026-09-03T02:40:00.000Z',
+      },
+    }
+  }
+  if (pathname === '/api/analytics/funnels') {
+    return {
+      success: true,
+      data: [{
+        id: 'visual-funnel-1', name: '友だちになってからの5段', windowDays: 30,
+        createdAt: '2026-06-01T09:00:00+09:00',
+        currentVersion: { id: 'visual-funnel-version-1', versionNumber: 3, createdAt: '2026-08-20T09:00:00+09:00' },
+        migrationState: 'ready',
+      }],
+    }
+  }
+  if (pathname === '/api/analytics/funnels/visual-funnel-1/runs/latest') {
+    return { success: true, data: ANALYTICS_FUNNEL_RUN }
+  }
+  if (pathname === '/api/analytics/saved') {
+    return { success: true, data: ANALYTICS_SAVED }
+  }
+  const savedSnapshots = /^\/api\/analytics\/saved\/([^/]+)\/snapshots$/.exec(pathname)
+  if (savedSnapshots) {
+    const saved = ANALYTICS_SAVED.find((item) => item.id === savedSnapshots[1])
+    return {
+      success: true,
+      data: saved ? [0, 1, 2].map((offset) => ({
+        id: `${saved.id}-snapshot-${offset + 1}`, savedAnalysisId: saved.id,
+        analysisVersionId: `${saved.id}-version-${saved.currentVersionNumber}`,
+        sourceKind: saved.kind, sourceResultId: `visual-result-${offset + 1}`,
+        periodFrom: `2026-0${Math.max(6, 8 - offset)}-05T00:00:00+09:00`,
+        periodTo: `2026-0${Math.max(7, 9 - offset)}-03T00:00:00+09:00`,
+        timeZone: 'Asia/Tokyo', dataCutoffAt: '2026-09-03T02:40:00.000Z',
+        state: offset === 2 ? 'partial' : 'available', result: {},
+        createdBy: saved.createdBy, createdAt: saved.updatedAt,
+      })) : [],
+    }
+  }
+  if (pathname === '/api/conversions/approvals') {
+    const status = query.get('status')
+    return {
+      success: true,
+      data: status ? CONVERSION_APPROVALS.filter((item) => item.approvalStatus === status) : CONVERSION_APPROVALS,
+    }
+  }
   if (pathname.startsWith('/api/line-accounts/') && pathname.split('/').length === 4) {
     /*
       1件を返す口。**詳細（★V6 33-3）が読む。**
@@ -829,6 +1033,38 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       設計の「正常」と並べたときに実装の差に見えてしまう。
     */
     return { success: true, data: [{ ...ACCOUNT, webhook: { status: 'matched', checkedAt: `${FIXED_TO}T00:00:00.000Z` } }] }
+  }
+  if (pathname === '/api/friends/migrations') {
+    return { success: true, data: [{
+      id: 'visual-uid-run', fromAccountId: ACCOUNT.id, toAccountId: 'visual-qa-account-new',
+      purpose: '友だち情報・タグ・配信停止状態を新アカウントへ引き継ぐ', sourceKind: 'csv',
+      sourceFilename: 'uid-map-2026-09-06.csv', status: 'review', dryRunRevision: 1,
+      counts: { total: 5214, auto: 4982, review: 34, unmatched: 195, conflict: 3, applied: 0, failed: 0 },
+      createdBy: STAFF.id, approvedBy: null, createdAt: '2026-09-06T05:20:00.000Z',
+      reviewedAt: null, executedAt: null, completedAt: null, rolledBackAt: null, failureReason: null,
+    }] }
+  }
+  if (pathname === '/api/friends/migrations/visual-uid-run') {
+    return { success: true, data: {
+      id: 'visual-uid-run', fromAccountId: ACCOUNT.id, toAccountId: 'visual-qa-account-new',
+      purpose: '友だち情報・タグ・配信停止状態を新アカウントへ引き継ぐ', sourceKind: 'csv',
+      sourceFilename: 'uid-map-2026-09-06.csv', status: 'review', dryRunRevision: 1,
+      counts: { total: 5214, auto: 4982, review: 34, unmatched: 195, conflict: 3, applied: 0, failed: 0 },
+      createdBy: STAFF.id, approvedBy: null, createdAt: '2026-09-06T05:20:00.000Z',
+      reviewedAt: null, executedAt: null, completedAt: null, rolledBackAt: null, failureReason: null,
+      items: [
+        { id: 'uid-item-1', oldUid: 'old_uid_00291', newUid: 'new_uid_00291', candidateName: 'Kyohei Yamamoto', evidenceType: 'operator_csv', classification: 'review', conflictReason: '2アカウントに候補があります', decision: 'pending', result: 'pending', errorMessage: null },
+        { id: 'uid-item-2', oldUid: 'old_uid_00412', newUid: 'new_uid_00412', candidateName: '山田 太郎', evidenceType: 'operator_csv', classification: 'conflict', conflictReason: '新旧UIDが別の統合ユーザーに結び付いています', decision: 'pending', result: 'pending', errorMessage: null },
+        { id: 'uid-item-3', oldUid: 'old_uid_01180', newUid: null, candidateName: null, evidenceType: 'operator_csv', classification: 'unmatched', conflictReason: '移行先に一致する友だちがいません', decision: 'pending', result: 'pending', errorMessage: null },
+      ],
+    } }
+  }
+  if (pathname === '/api/friends/migration-jobs') {
+    return { success: true, data: [
+      { id: 'import-1', kind: 'import', line_account_id: ACCOUNT.id, total_count: 231, update_count: 34, conflict_count: 3, status: 'completed', created_by_name: '河野 健太', created_at: '2026-09-03T05:20:00.000Z' },
+      { id: 'import-2', kind: 'import', line_account_id: ACCOUNT.id, total_count: 231, update_count: 34, conflict_count: 3, status: 'previewed', created_by_name: '河野 健太', created_at: '2026-09-03T02:05:00.000Z' },
+      { id: 'export-1', kind: 'export', line_account_id: ACCOUNT.id, row_count: 231, status: 'expired', created_by_name: '坂本 真人', created_at: '2026-09-02T10:40:00.000Z', expires_at: '2026-09-09T10:40:00.000Z' },
+    ] }
   }
   if (pathname === '/api/friend-add-rules') {
     return { success: true, data: FRIEND_ADD_RULES }
@@ -921,7 +1157,16 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/folders' && query.get('kind') === 'auto_reply') {
     return { success: true, data: AUTO_REPLY_FOLDERS }
   }
+  if (pathname === '/api/folders' && query.get('kind') === 'media') {
+    return { success: true, data: MEDIA_FOLDERS }
+  }
   if (pathname === '/api/auto-replies') return { success: true, data: AUTO_REPLIES }
+  if (/^\/api\/auto-replies\/[^/]+\/draft$/.test(pathname)) {
+    return { success: true, data: AUTO_REPLY_PUBLISH_DRAFT }
+  }
+  if (/^\/api\/auto-replies\/[^/]+\/conflicts$/.test(pathname)) {
+    return { success: true, data: { conflicts: AUTO_REPLY_PUBLISH_CONFLICTS } }
+  }
   const autoReplyOne = /^\/api\/auto-replies\/([^/]+)$/.exec(pathname)
   if (autoReplyOne) {
     const found = AUTO_REPLIES.find((item) => item.id === autoReplyOne[1])
@@ -1101,6 +1346,16 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/webhooks/outgoing') return { success: true, data: OUTGOING_WEBHOOKS }
   if (pathname === '/api/webhooks/incoming') return { success: true, data: INCOMING_WEBHOOKS }
   if (pathname === '/api/entry-routes') return { success: true, data: ENTRY_ROUTES }
+  if (pathname === '/api/entry-route-genres') {
+    return { success: true, data: ['SNS', '紹介', '店頭', '広告', 'メール', '紙'].map((name, index) => ({ id: `erg-${index + 1}`, name, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z' })) }
+  }
+  if (pathname === '/api/site/summary') return { success: true, data: SITE_TRACKING_SUMMARY }
+  if (pathname === '/api/site/pages') return { success: true, data: SITE_TRACKING_PAGES }
+  if (pathname === '/api/ad-platforms') return { success: true, data: AD_PLATFORMS }
+  const adPlatformLogs = /^\/api\/ad-platforms\/([^/]+)\/logs$/.exec(pathname)
+  if (adPlatformLogs) {
+    return { success: true, data: AD_CONVERSION_LOGS.filter((log) => log.adPlatformId === adPlatformLogs[1]) }
+  }
   /*
     流入元の詳細。可変部分を配列の既定値へ落とすと、1件取得まで `[]` になり、
     `route.createdAt.slice(...)` で詳細画面全体が落ちる。画面確認用の同じ1件から
@@ -1110,7 +1365,7 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (entryRouteFunnel) {
     return {
       success: true,
-      data: { click_count: 486, friend_add_count: 86, form_submission_count: 24, cv_count: 11 },
+      data: { click_count: 1240, friend_add_count: 86, form_submission_count: 36, cv_count: 12 },
     }
   }
   const entryRouteSources = /^\/api\/entry-routes\/([^/]+)\/sources$/.exec(pathname)
@@ -1132,26 +1387,18 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       : { success: false, error: 'Not found' }
   }
   if (pathname === '/api/analytics/ref-summary') {
-    return {
-      success: true,
-      data: {
-        routes: ENTRY_ROUTES.map((entryRoute, index) => ({
-          refCode: entryRoute.refCode,
-          name: entryRoute.name,
-          friendCount: index === 0 ? 86 : 0,
-          clickCount: index === 0 ? 486 : 0,
-          latestAt: index === 0 ? '2026-08-25T14:16:00.000Z' : null,
-        })),
-      },
-    }
+    return { success: true, data: INFLOW_SUMMARY }
   }
   if (/^\/api\/analytics\/ref\/[^/]+$/.test(pathname)) {
     return {
       success: true,
       data: {
         friends: [
-          { id: 'friend-inflow-1', displayName: '木村 亮', trackedAt: '2026-08-25T14:16:00.000Z' },
-          { id: 'friend-inflow-2', displayName: '佐藤 美咲', trackedAt: '2026-08-24T10:32:00.000Z' },
+          { id: 'friend-inflow-1', displayName: '石田 未来', trackedAt: '2026-08-25T09:12:00.000Z', firstPage: '/summer-campaign', currentStatus: 'やりとり中', conversion: 'まだありません', miles: 100 },
+          { id: 'friend-inflow-2', displayName: '新田 遥', trackedAt: '2026-08-24T21:40:00.000Z', firstPage: '/summer-campaign', currentStatus: 'シナリオ2通目', conversion: 'まだありません', miles: 100 },
+          { id: 'friend-inflow-3', displayName: '松本 圭', trackedAt: '2026-08-22T12:05:00.000Z', firstPage: '/profile', currentStatus: '体験を申し込んだ', conversion: '¥3,000 の成果', miles: 600 },
+          { id: 'friend-inflow-4', displayName: '林 里佳', trackedAt: '2026-08-20T18:22:00.000Z', firstPage: '/summer-campaign', currentStatus: 'ブロックされました', conversion: 'まだありません', miles: 100 },
+          { id: 'friend-inflow-5', displayName: '大村 真', trackedAt: '2026-08-18T10:44:00.000Z', firstPage: '/summer-campaign', currentStatus: '読んでいない', conversion: 'まだありません', miles: 100 },
         ],
       },
     }
@@ -1169,6 +1416,8 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/affiliates') return { success: true, data: AFFILIATES }
   if (pathname === '/api/affiliate-offers') return { success: true, data: AFFILIATE_OFFERS }
   if (pathname === '/api/common-actions') return { success: true, data: COMMON_ACTIONS }
+  if (pathname === '/api/automations') return { success: true, data: AUTOMATIONS }
+  if (pathname === '/api/automation-templates') return { success: true, data: AUTOMATION_TEMPLATES }
   if (pathname === '/api/ec-commerce/settings') return { success: true, data: EC_NOTIFICATION_SETTINGS }
   if (pathname === '/api/nen-members/photos') return { success: true, data: NEN_PHOTOS }
   if (pathname === '/api/ec-commerce/overview') return { success: true, data: EC_OVERVIEW }
@@ -1177,12 +1426,60 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: EC_EVENTS, pagination: { total: EC_EVENTS.length, limit: 20, offset: 0 } }
   }
   if (pathname === '/api/affiliates-report') return { success: true, data: AFFILIATE_REPORT }
+  const affiliateArchiveImpact = /^\/api\/affiliates\/([^/]+)\/archive-impact$/.exec(pathname)
+  if (affiliateArchiveImpact) {
+    const affiliate = AFFILIATES.find((item) => item.id === affiliateArchiveImpact[1]) ?? AFFILIATES[0]
+    return {
+      success: true,
+      data: {
+        affiliateId: affiliate.id,
+        affiliateName: affiliate.name,
+        lifecycle: affiliate.isActive ? 'active' : 'paused',
+        activeLinks: 3,
+        unsettledConversions: 9,
+        unsettledReward: 24000,
+        pendingConversions: 2,
+        checkedAt: '2026-09-06T00:00:00.000Z',
+      },
+    }
+  }
+  const affiliatePaymentPreview = /^\/api\/affiliate-payments\/([^/]+)\/preview$/.exec(pathname)
+  if (affiliatePaymentPreview) {
+    const affiliate = AFFILIATES.find((item) => item.id === affiliatePaymentPreview[1]) ?? AFFILIATES[1]
+    return {
+      success: true,
+      data: {
+        affiliateId: affiliate.id,
+        affiliateName: affiliate.name,
+        code: affiliate.code,
+        amount: 72000,
+        conversionCount: 18,
+        periodFrom: '2026-08-01T00:00:00+09:00',
+        periodTo: '2026-08-31T23:59:59+09:00',
+        closeDate: null,
+        paymentDate: null,
+        bankDestination: null,
+        breakdown: [
+          { offerName: '定期便のはじめて購入', conversions: 8, unitReward: 5000, subtotal: 40000 },
+          { offerName: '無料体験の申込', conversions: 9, unitReward: 3000, subtotal: 27000 },
+          { offerName: '友だち追加だけ', conversions: 50, unitReward: 100, subtotal: 5000 },
+        ],
+      },
+    }
+  }
   /* 紹介者ひとりぶん。`/api/affiliates/:id/report` と `/links`。器の形が要る。 */
   if (/^\/api\/affiliates\/[^/]+\/report$/.test(pathname)) return { success: true, data: AFFILIATE_REPORT_DETAIL }
   if (/^\/api\/affiliates\/[^/]+\/links$/.test(pathname)) return { success: true, data: AFFILIATE_LINKS }
   if (pathname === '/api/mileage/overview') return { success: true, data: MILEAGE_OVERVIEW }
   if (pathname === '/api/mileage/rules') return { success: true, data: MILEAGE_RULES }
   if (pathname === '/api/conversions/points') return { success: true, data: CONVERSION_POINTS }
+  if (pathname === '/api/conversions/report') {
+    const startDate = query.get('startDate') ?? ''
+    const data = startDate >= '2026-08-01'
+      ? CONVERSION_REPORT_CURRENT
+      : CONVERSION_REPORT_PREVIOUS
+    return { success: true, data }
+  }
   if (pathname === '/api/common-vars') return { success: true, data: COMMON_VARS }
   const commonVarDeleteImpact = /^\/api\/common-vars\/([^/]+)\/delete-impact$/.exec(pathname)
   if (commonVarDeleteImpact) {
@@ -1214,6 +1511,22 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       ? RICH_MENU_DELETE_IMPACT_EMPTY
       : RICH_MENU_DELETE_IMPACT
     return { success: true, data: impact }
+  }
+  if (pathname === '/api/rich-menu-groups') {
+    return { success: true, data: RICH_MENU_GROUPS }
+  }
+  if (pathname === '/api/rich-menu-groups/external') {
+    return { success: true, data: RICH_MENU_EXTERNAL }
+  }
+  if (pathname === '/api/rich-menu-groups/tap-stats') {
+    return { success: true, data: RICH_MENU_TAP_STATS }
+  }
+  const richMenuGroup = /^\/api\/rich-menu-groups\/([^/]+)$/.exec(pathname)
+  if (richMenuGroup) {
+    const group = RICH_MENU_GROUP_DETAILS[richMenuGroup[1]]
+    return group
+      ? { success: true, data: group }
+      : { success: false, error: 'リッチメニューが見つかりません' }
   }
   if (pathname === '/api/tag-groups') return { success: true, data: TAG_GROUPS }
   if (pathname === '/api/list-stats') return { success: true, data: LIST_STATS }
@@ -1371,6 +1684,34 @@ function bodyFor(pathname, query = new URLSearchParams()) {
             attemptCount: 1, durationMs: 180, failureReason: null, canRetry: false,
             startedAt: '2026-08-24T01:05:00.000Z', completedAt: '2026-08-24T01:05:00.180Z', retryOfId: null,
           },
+          {
+            id: 'wi-4', direction: 'outgoing', webhookName: 'Google スプレッドシート ／ 注文一覧',
+            eventType: '注文が確定したとき', triggerSummary: '注文 #12491・¥8,400・佐藤 陽子',
+            status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
+            attemptCount: 1, durationMs: 520, failureReason: null, canRetry: false,
+            startedAt: '2026-08-23T09:30:00.000Z', completedAt: '2026-08-23T09:30:00.520Z', retryOfId: null,
+          },
+          {
+            id: 'wi-5', direction: 'outgoing', webhookName: 'kintone ／ 顧客管理',
+            eventType: '友だちが追加されたとき', triggerSummary: '友だち U9a81…・流入 QRコード',
+            status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
+            attemptCount: 1, durationMs: 260, failureReason: null, canRetry: false,
+            startedAt: '2026-08-22T07:15:00.000Z', completedAt: '2026-08-22T07:15:00.260Z', retryOfId: null,
+          },
+          {
+            id: 'wi-6', direction: 'incoming', webhookName: 'アンケートツール',
+            eventType: 'アンケートに回答されたとき', triggerSummary: '回答 #A-1842・満足度 5',
+            status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
+            attemptCount: 1, durationMs: 140, failureReason: null, canRetry: false,
+            startedAt: '2026-08-21T03:20:00.000Z', completedAt: '2026-08-21T03:20:00.140Z', retryOfId: null,
+          },
+          {
+            id: 'wi-7', direction: 'outgoing', webhookName: 'Chatwork ／ 発送連絡',
+            eventType: '発送が完了したとき', triggerSummary: '注文 #12480・追跡 1234…',
+            status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
+            attemptCount: 1, durationMs: 390, failureReason: null, canRetry: false,
+            startedAt: '2026-08-20T11:05:00.000Z', completedAt: '2026-08-20T11:05:00.390Z', retryOfId: null,
+          },
         ],
       },
     }
@@ -1403,7 +1744,7 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   if (pathname.startsWith('/api/common-actions/') && !pathname.includes('/resources')) {
     // `versions` `bindings` が入っていないと `.find` で落ちる。
-    return { success: true, data: { id: pathname.split('/').pop(), name: '来店後のご案内', versions: [], bindings: [], currentPublishedVersionId: null, currentDraftVersionId: null } }
+    return { success: true, data: COMMON_ACTION_DETAIL }
   }
   if (pathname === '/api/saved-searches' && query.get('format') === 'segment_v1') {
     /*

@@ -28,7 +28,19 @@ function orSection(): string {
 }
 
 /** OR節が並べようとしている軸の名前。 */
-const OR_LABELS = ['対応状況', 'シナリオ', 'イベント予約', '回答フォーム', '最終反応日']
+const OR_LABELS = [
+  '対応状況',
+  'シナリオ',
+  'イベント予約',
+  'カレンダー予約',
+  '回答フォーム',
+  '最終反応日',
+  'リマインダ',
+  '個別メモ',
+  'ステータスメッセージ',
+  '友だち登録日',
+  'その他',
+]
 
 describe('詳細条件のORの軸は、黙って消えない', () => {
   it('並べようとしている軸が、すべて NOT_YET にある', () => {
@@ -47,5 +59,14 @@ describe('詳細条件のORの軸は、黙って消えない', () => {
     expect(section, 'OR節が見つからない').not.toBe('')
     expect(section, '理由を title に隠している').not.toContain('title={item.why}')
     expect(section, '理由を本文に出していない').toContain('{item.why}')
+  })
+
+  it('表示する友だちと保存済み条件の入口を省かない', () => {
+    expect(DIALOG).toContain('表示する友だち')
+    expect(DIALOG).toContain('表示中')
+    expect(DIALOG).toContain('非表示')
+    expect(DIALOG).toContain('ブロックした人')
+    expect(DIALOG).toContain('友だちの状態')
+    expect(DIALOG).toContain('保存した検索から読み込む')
   })
 })

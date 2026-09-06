@@ -621,42 +621,94 @@ export const COMMON_VAR_DELETE_IMPACT_ERROR = {
  * 使用先の名前はすべて作り物。内部IDは画面に出さず、hrefの中だけで使う。
  * 通常・0件・失敗を同じ契約から撮れるよう、形を分けて固定してある。
  */
+export const MEDIA_FOLDERS = [
+  { id: 'media-product', name: '01_商品写真', kind: 'media', sortOrder: 0, color: '#2563EB', createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
+  { id: 'media-banner', name: '02_バナー', kind: 'media', sortOrder: 1, color: '#F3C66B', createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
+  { id: 'media-video', name: '03_動画', kind: 'media', sortOrder: 2, color: '#7C6BC4', createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
+]
+
+const mediaPreview = (color) => `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="678"><rect width="1040" height="678" fill="${color.replace('#', '%23')}"/></svg>`
+
 export const MEDIA_ITEMS = [
   {
-    id: 'media-delete-target', lineAccountId: 'visual-qa-account', folderId: null,
-    kind: 'image', filename: '来店後のご案内.png', mimeType: 'image/png',
-    sizeBytes: 245760, width: 1040, height: 1040, durationMs: null,
-    url: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="1040"><rect width="1040" height="1040" fill="%23e7f7ef"/></svg>',
-    uploadedBy: 'visual-qa-owner', createdAt: '2026-08-31T09:00:00.000Z', usageCount: 2,
+    id: 'media-delete-target', lineAccountId: 'visual-qa-account', folderId: 'media-product',
+    kind: 'image', filename: '夏の定番セット.jpg', mimeType: 'image/jpeg',
+    sizeBytes: 348160, width: 1024, height: 678, durationMs: null,
+    url: mediaPreview('#e7f7ef'), uploadedBy: '川野 健太', createdAt: '2026-08-18T09:00:00.000Z', usageCount: 3,
+  },
+  {
+    id: 'media-banner', lineAccountId: 'visual-qa-account', folderId: 'media-banner',
+    kind: 'image', filename: '会員証バナー.png', mimeType: 'image/png',
+    sizeBytes: 839680, width: 2500, height: 1686, durationMs: null,
+    url: mediaPreview('#d9efe3'), uploadedBy: '川野 健太', createdAt: '2026-08-17T09:00:00.000Z', usageCount: 2,
+  },
+  {
+    id: 'media-store-video', lineAccountId: 'visual-qa-account', folderId: 'media-video',
+    kind: 'video', filename: '店内のようす.mp4', mimeType: 'video/mp4',
+    sizeBytes: 88080384, width: null, height: null, durationMs: 164000,
+    url: mediaPreview('#eef0f2'), uploadedBy: '佐々木', createdAt: '2026-08-16T09:00:00.000Z', usageCount: 1,
+  },
+  {
+    id: 'media-coupon', lineAccountId: 'visual-qa-account', folderId: 'media-banner',
+    kind: 'image', filename: '誕生月クーポン.png', mimeType: 'image/png',
+    sizeBytes: 215040, width: 1029, height: 1029, durationMs: null,
+    url: mediaPreview('#f3ece1'), uploadedBy: '田中', createdAt: '2026-08-15T09:00:00.000Z', usageCount: 1,
   },
   {
     id: 'media-delete-safe', lineAccountId: 'visual-qa-account', folderId: null,
-    kind: 'image', filename: '未使用の案内.png', mimeType: 'image/png',
-    sizeBytes: 102400, width: 1040, height: 1040, durationMs: null,
-    url: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="1040"><rect width="1040" height="1040" fill="%23f4f5f4"/></svg>',
-    uploadedBy: 'visual-qa-owner', createdAt: '2026-08-30T09:00:00.000Z', usageCount: 0,
+    kind: 'file', filename: 'メニュー表.pdf', mimeType: 'application/pdf',
+    sizeBytes: 1258291, width: null, height: null, durationMs: null,
+    url: 'data:application/pdf;base64,JVBERi0xLjQ=', uploadedBy: '田中', createdAt: '2026-08-14T09:00:00.000Z', usageCount: 0,
   },
   {
-    id: 'media-replacement', lineAccountId: 'visual-qa-account', folderId: null,
-    kind: 'image', filename: '新しい来店案内.png', mimeType: 'image/png',
-    sizeBytes: 204800, width: 1040, height: 1040, durationMs: null,
-    url: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="1040"><rect width="1040" height="1040" fill="%23d9efe3"/></svg>',
-    uploadedBy: 'visual-qa-owner', createdAt: '2026-08-31T08:00:00.000Z', usageCount: 0,
+    id: 'media-pamphlet', lineAccountId: 'visual-qa-account', folderId: 'media-product',
+    kind: 'image', filename: '定期便パンフ.jpg', mimeType: 'image/jpeg',
+    sizeBytes: 491520, width: 1024, height: 678, durationMs: null,
+    url: mediaPreview('#e4eee8'), uploadedBy: '佐々木', createdAt: '2026-08-13T09:00:00.000Z', usageCount: 5,
+  },
+  {
+    id: 'media-staff', lineAccountId: 'visual-qa-account', folderId: 'media-product',
+    kind: 'image', filename: 'スタッフ紹介.jpg', mimeType: 'image/jpeg',
+    sizeBytes: 399360, width: 1024, height: 678, durationMs: null,
+    url: mediaPreview('#efe5dc'), uploadedBy: '佐々木', createdAt: '2026-08-12T09:00:00.000Z', usageCount: 0,
+  },
+  {
+    id: 'media-guide-video', lineAccountId: 'visual-qa-account', folderId: 'media-video',
+    kind: 'video', filename: '使い方ガイド.mp4', mimeType: 'video/mp4',
+    sizeBytes: 20761804, width: null, height: null, durationMs: 215000,
+    url: mediaPreview('#e8ebef'), uploadedBy: '川野 健太', createdAt: '2026-08-11T09:00:00.000Z', usageCount: 2,
+  },
+  {
+    id: 'media-replacement', lineAccountId: 'visual-qa-account', folderId: 'media-banner',
+    kind: 'image', filename: '休業のお知らせ.png', mimeType: 'image/png',
+    sizeBytes: 122880, width: 1024, height: 678, durationMs: null,
+    url: mediaPreview('#f1e8e8'), uploadedBy: '田中', createdAt: '2026-08-10T09:00:00.000Z', usageCount: 0,
+  },
+  {
+    id: 'media-price-list', lineAccountId: 'visual-qa-account', folderId: null,
+    kind: 'file', filename: '価格表_2026.pdf', mimeType: 'application/pdf',
+    sizeBytes: 655360, width: null, height: null, durationMs: null,
+    url: 'data:application/pdf;base64,JVBERi0xLjQ=', uploadedBy: '川野 健太', createdAt: '2026-08-09T09:00:00.000Z', usageCount: 1,
   },
 ]
 
 export const MEDIA_DELETE_IMPACT = {
-  media: { id: 'media-delete-target', filename: '来店後のご案内.png', kind: 'image' },
-  usageCount: 2,
+  media: { id: 'media-delete-target', filename: '夏の定番セット.jpg', kind: 'image' },
+  usageCount: 3,
   references: [
     {
-      kind: 'broadcast', name: '8月のお知らせ',
+      kind: 'template', name: '夏の定番5点',
+      href: '/templates', state: 'available',
+      scannedAt: '2026-08-31T10:00:00.000Z',
+    },
+    {
+      kind: 'broadcast', name: '夏のご案内',
       href: '/broadcasts/detail?id=broadcast-visual', state: 'available',
       scannedAt: '2026-08-31T10:00:00.000Z',
     },
     {
-      kind: 'scenario_step', name: '来店後シナリオ・1通目',
-      href: '/scenarios/detail?id=scenario-visual', state: 'available',
+      kind: 'rich_menu', name: '夏キャンペーン',
+      href: '/rich-menus', state: 'available',
       scannedAt: '2026-08-31T10:00:00.000Z',
     },
   ],
@@ -667,7 +719,7 @@ export const MEDIA_DELETE_IMPACT = {
 }
 
 export const MEDIA_DELETE_IMPACT_EMPTY = {
-  media: { id: 'media-delete-safe', filename: '未使用の案内.png', kind: 'image' },
+  media: { id: 'media-delete-safe', filename: 'メニュー表.pdf', kind: 'file' },
   usageCount: 0,
   references: [],
   checkedAt: '2026-08-31T10:00:00.000Z',
@@ -682,10 +734,10 @@ export const MEDIA_DELETE_IMPACT_ERROR = {
 }
 
 export const MEDIA_REPLACEMENT_IMPACT = {
-  source: { id: 'media-delete-target', filename: '来店後のご案内.png', kind: 'image' },
-  replacement: { id: 'media-replacement', filename: '新しい来店案内.png', kind: 'image' },
-  usageCount: 2,
-  replaceableCount: 2,
+  source: { id: 'media-delete-target', filename: '夏の定番セット.jpg', kind: 'image' },
+  replacement: { id: 'media-replacement', filename: '休業のお知らせ.png', kind: 'image' },
+  usageCount: 3,
+  replaceableCount: 3,
   references: MEDIA_DELETE_IMPACT.references.map((reference) => ({
     ...reference, replaceable: true, blocker: null, reason: null,
   })),
@@ -697,7 +749,7 @@ export const MEDIA_REPLACEMENT_IMPACT = {
 
 export const MEDIA_REPLACEMENT_IMPACT_EMPTY = {
   ...MEDIA_REPLACEMENT_IMPACT,
-  source: { id: 'media-delete-safe', filename: '未使用の案内.png', kind: 'image' },
+  source: { id: 'media-delete-safe', filename: 'メニュー表.pdf', kind: 'file' },
   usageCount: 0,
   replaceableCount: 0,
   references: [],
@@ -804,6 +856,154 @@ export const RICH_MENU_DELETE_IMPACT_EMPTY = {
 export const RICH_MENU_DELETE_IMPACT_ERROR = {
   success: false,
   error: '削除したときの影響を確認できませんでした',
+}
+
+/**
+ * 機能12の5画面を実APIと同じ器で確認する固定データ。
+ *
+ * `rmg-1` は3枚を行き来できるが、「予約する」だけ入口へ戻れない。
+ * `rmg-2` は切替ボタンを持たない。設計 `DIUbO` / `NXdDk` の通常状態を
+ * 同じ取得口で描き分けられるようにしている。
+ */
+const richMenuArea = (id, label, targetPageId, boundsX) => ({
+  id,
+  boundsX,
+  boundsY: 0,
+  boundsWidth: 833,
+  boundsHeight: 260,
+  actionType: 'richmenuswitch',
+  actionData: { targetPageId },
+  intent: 'switch',
+  label,
+  tagIds: [],
+  scoreChange: null,
+  templateId: null,
+  formId: null,
+  trackedLinkId: null,
+})
+
+const richMenuPage = (id, orderIndex, name, areas = []) => ({
+  id,
+  orderIndex,
+  name,
+  aliasId: `visual-${id}`,
+  lineRichmenuId: `line-${id}`,
+  imageR2Key: null,
+  imageContentType: null,
+  areas,
+})
+
+const RICH_MENU_BASE = {
+  accountId: 'visual-qa-account',
+  chatBarText: 'メニューを開く',
+  size: 'large',
+  isDefaultForAll: false,
+  status: 'published',
+  publishingAt: null,
+  targetingPriority: 1,
+  targetingEnabled: true,
+  folderId: 'rich-menu-folder-members',
+  displayOrder: 1,
+  thumbnailR2Key: null,
+  createdAt: '2026-08-01T00:00:00.000Z',
+  updatedAt: '2026-08-20T00:00:00.000Z',
+}
+
+export const RICH_MENU_GROUPS = [
+  {
+    ...RICH_MENU_BASE,
+    id: 'rich-menu-target',
+    name: '通常メニュー（会員向け）',
+    isDefaultForAll: true,
+    targetingPriority: 0,
+    targetingEnabled: false,
+    targetingCondition: null,
+    displayOrder: 0,
+  },
+  {
+    ...RICH_MENU_BASE,
+    id: 'rmg-1',
+    name: '会員ランク上位',
+    targetingCondition: JSON.stringify({
+      operator: 'AND',
+      rules: [{ type: 'tag_exists', value: 'tag-0' }],
+    }),
+  },
+  {
+    ...RICH_MENU_BASE,
+    id: 'rmg-2',
+    name: '初回来店ガイド',
+    status: 'draft',
+    targetingPriority: 3,
+    targetingEnabled: false,
+    targetingCondition: null,
+    folderId: 'rich-menu-folder-store',
+    displayOrder: 3,
+  },
+  {
+    ...RICH_MENU_BASE,
+    id: 'rich-menu-safe',
+    name: '未使用の下書き',
+    status: 'draft',
+    targetingPriority: 4,
+    targetingEnabled: false,
+    targetingCondition: null,
+    folderId: null,
+    displayOrder: 4,
+  },
+]
+
+export const RICH_MENU_GROUP_DETAILS = {
+  'rmg-1': {
+    ...RICH_MENU_GROUPS.find((group) => group.id === 'rmg-1'),
+    defaultPageId: 'rmg-1-top',
+    pages: [
+      richMenuPage('rmg-1-top', 0, 'トップ', [
+        richMenuArea('rmg-1-top-product', '商品を見る', 'rmg-1-product', 0),
+        richMenuArea('rmg-1-top-booking', '予約する', 'rmg-1-booking', 833),
+      ]),
+      richMenuPage('rmg-1-product', 1, '商品を見る', [
+        richMenuArea('rmg-1-product-top', 'トップ', 'rmg-1-top', 0),
+        richMenuArea('rmg-1-product-booking', '予約する', 'rmg-1-booking', 1666),
+      ]),
+      richMenuPage('rmg-1-booking', 2, '予約する', [
+        richMenuArea('rmg-1-booking-product', '商品を見る', 'rmg-1-product', 833),
+      ]),
+    ],
+  },
+  'rmg-2': {
+    ...RICH_MENU_GROUPS.find((group) => group.id === 'rmg-2'),
+    defaultPageId: 'rmg-2-top',
+    pages: [richMenuPage('rmg-2-top', 0, 'トップ')],
+  },
+}
+
+export const RICH_MENU_EXTERNAL = {
+  currentDefault: 'line-rich-menu-external',
+  lineMenus: [
+    {
+      richMenuId: 'line-rich-menu-external',
+      name: 'LINE公式マネージャーで作成',
+      chatBarText: 'メニュー',
+      size: { width: 2500, height: 1686 },
+      areasCount: 6,
+      isCurrentDefault: true,
+      adminManaged: false,
+      adminInfo: null,
+    },
+  ],
+}
+
+export const RICH_MENU_TAP_STATS = {
+  from: '2026-08-01',
+  to: '2026-08-31',
+  byArea: [],
+  byGroup: [
+    { groupId: 'rich-menu-target', taps: 12480 },
+    { groupId: 'rmg-1', taps: 3210 },
+    { groupId: 'rmg-2', taps: 0 },
+  ],
+  total: 15690,
 }
 
 /**
@@ -1724,6 +1924,94 @@ export const AUTO_REPLIES = [
   },
 ]
 
+/** 機能8の公開フロー。設計 g46ja / Yj6CQ / e6iJG と同じ1件を通す。 */
+export const AUTO_REPLY_PUBLISH_DRAFT = {
+  autoReplyId: 'ar-2',
+  versionId: 'ar-2-draft-v3',
+  versionNumber: 3,
+  status: 'draft',
+  lastTestStatus: null,
+  lastTestedAt: null,
+  publishedAt: null,
+  matchedLast28Days: 214,
+  settings: {
+    keyword: '予約',
+    matchType: 'contains',
+    responseType: 'text',
+    responseContent: 'Kentaさん、お問い合わせありがとうございます。\nご予約内容を確認します。',
+    templateId: 'template-booking',
+    lineAccountId: 'visual-qa-account',
+    activeFrom: '08:00',
+    activeUntil: '21:00',
+    cooldownMinutes: 5,
+    skipWhenOperatorActive: true,
+    priority: 1,
+    messageKinds: ['text'],
+    friendConditions: { label: '予約者・未対応' },
+    actions: [
+      { actionType: 'add_tag', config: { tagId: 'tag-booking' } },
+      { actionType: 'notify', config: { notificationDefinitionId: 'notify-operator' } },
+    ],
+    responseWeekdays: [0, 1, 2, 3, 4, 5, 6],
+    responseHolidayRule: 'include',
+    oncePerFriend: true,
+    keywords: [{ keyword: '予約', matchType: 'contains' }],
+    respondToAll: false,
+    name: '予約問い合わせ',
+    keywordMatchMode: 'any',
+    folderId: 'arf-booking',
+  },
+}
+
+export const AUTO_REPLY_PUBLISH_CONFLICTS = [
+  {
+    autoReplyId: 'ar-hours',
+    name: '「営業時間」への一律返信',
+    certainty: 'possible',
+    winnerAutoReplyId: 'ar-2',
+    reason: '時間帯によって同じメッセージに反応します。',
+  },
+  {
+    autoReplyId: 'ar-booking-existing',
+    name: '予約の問い合わせ',
+    certainty: 'certain',
+    winnerAutoReplyId: 'ar-2',
+    reason: '「予約」を含むメッセージに反応します。',
+  },
+]
+
+export const AUTO_REPLY_PUBLISH_TEST = {
+  matched: true,
+  draftWon: true,
+  winner: {
+    autoReplyId: 'ar-2',
+    name: '予約変更のお問い合わせ',
+    responseType: 'text',
+    responseContent: '予約変更を承ります。ご希望の日時をこのトークでお知らせください。\n担当者から改めてご連絡します。',
+  },
+  candidates: [
+    { autoReplyId: 'ar-2', name: '予約変更のお問い合わせ', priority: 1, result: 'won', reasonCodes: [] },
+  ],
+  actions: [{ kind: 'set_support_mark' }],
+  stateChanged: false,
+}
+
+export const AUTO_REPLY_PUBLISH_VALIDATION = {
+  valid: true,
+  errors: [],
+  warnings: ['同じメッセージに反応する自動応答があります。'],
+  conflicts: AUTO_REPLY_PUBLISH_CONFLICTS,
+  lastTestStatus: 'succeeded',
+}
+
+export const AUTO_REPLY_PUBLISH_RESULT = {
+  autoReplyId: 'ar-2',
+  versionId: 'ar-2-published-v3',
+  versionNumber: 3,
+  publishedAt: '2026-09-06T10:00:00.000Z',
+  acknowledgedConflictIds: AUTO_REPLY_PUBLISH_CONFLICTS.map((item) => item.autoReplyId),
+}
+
 /*
   外部連携。設計 `k3WxrO` の「こちらから送る 6／こちらで受け取る 3」そのまま。
 
@@ -1811,6 +2099,56 @@ export const ENTRY_ROUTES = [
   { id: 'er-6', refCode: 'flyer-spring', genre: '紙', name: 'チラシ（2026春）', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: false, createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-06-30T00:00:00.000Z' },
 ]
 
+/** 機能18。設計画像と同じ通常状態を、実データを使わずに撮るための固定値。 */
+export const INFLOW_SUMMARY = {
+  routes: [
+    { refCode: 'summer-ig', name: '夏のInstagram投稿', friendCount: 86, clickCount: 1240, latestAt: '2026-08-25T09:12:00.000Z' },
+    { refCode: 'tanaka01', name: '紹介リンク 田中 明', friendCount: 58, clickCount: 820, latestAt: '2026-08-24T18:40:00.000Z' },
+    { refCode: 'shop-pop', name: '店頭POPのQRコード', friendCount: 124, clickCount: 640, latestAt: '2026-08-25T11:30:00.000Z' },
+    { refCode: 'g-ads-summer', name: 'Google広告 夏キャンペーン', friendCount: 142, clickCount: 3120, latestAt: '2026-08-25T08:04:00.000Z' },
+    { refCode: 'mail-sign', name: 'メール署名', friendCount: 12, clickCount: 210, latestAt: '2026-08-19T16:02:00.000Z' },
+    { refCode: 'flyer-spring', name: 'チラシ（2026春）', friendCount: 0, clickCount: 12, latestAt: '2026-06-28T14:10:00.000Z' },
+  ],
+  totalFriends: 312,
+  friendsWithRef: 289,
+  friendsWithoutRef: 23,
+  routeTotal: 24,
+  totalClicks: 8420,
+  averageAddRate: 6.4,
+}
+
+export const SITE_TRACKING_SUMMARY = {
+  todayEvents: 24583,
+  todayPageViews: 24583,
+  linkedEvents: 20397,
+  unlinkedEvents: 4186,
+  pathCount: 3,
+  eventTypeCount: 4,
+  lastEventAt: '2026-08-25T11:17:00.000Z',
+}
+
+export const SITE_TRACKING_PAGES = [
+  { path: 'https://example.com/', views: 12480, visitors: 186 },
+  { path: 'https://shop.example.com/', views: 8120, visitors: 94 },
+  { path: 'https://lp.example.com/', views: 2403, visitors: 2 },
+  { path: 'https://unknown-site.net/', views: 620, visitors: 0 },
+]
+
+export const AD_PLATFORMS = [
+  { id: 'ad-meta', name: 'meta', displayName: 'Meta広告', config: { pixel_id: 'PIXEL-8420', monthly_cost: 170000, synced_at: '2026-08-25T11:20:00.000Z', sent_count: 866, pending_count: 12, failed_count: 7, retry_success_count: 23 }, isActive: true, createdAt: '2026-01-10T00:00:00.000Z', updatedAt: '2026-08-25T11:20:00.000Z' },
+  { id: 'ad-google', name: 'google', displayName: 'Google広告', config: { customer_id: '123-456-7890', monthly_cost: 312000, synced_at: '2026-08-25T11:20:00.000Z' }, isActive: true, createdAt: '2026-01-10T00:00:00.000Z', updatedAt: '2026-08-25T11:20:00.000Z' },
+  { id: 'ad-x', name: 'x', displayName: 'X（旧Twitter）', config: { connection_error: '権限が足りません' }, isActive: false, createdAt: '2026-01-10T00:00:00.000Z', updatedAt: '2026-08-22T09:00:00.000Z' },
+]
+
+export const AD_CONVERSION_LOGS = [
+  { id: 'adlog-1', adPlatformId: 'ad-meta', friendId: 'friend-inflow-1', friendName: '木村 亮', eventName: '体験申込フォームの送信', conversionName: 'Lead', clickId: 'fixed-fbclid-1', clickIdType: 'fbclid', status: 'sent', errorMessage: null, createdAt: '2026-08-25T11:32:00.000Z' },
+  { id: 'adlog-2', adPlatformId: 'ad-google', friendId: 'friend-inflow-2', friendName: '中村 さくら', eventName: '初回のご購入', conversionName: 'purchase', clickId: 'fixed-gclid-1', clickIdType: 'gclid', status: 'sent', errorMessage: null, createdAt: '2026-08-25T11:18:00.000Z' },
+  { id: 'adlog-3', adPlatformId: 'ad-meta', friendId: 'friend-inflow-3', friendName: '田口 みなみ', eventName: '予約が入った', conversionName: 'Schedule', clickId: 'fixed-fbclid-2', clickIdType: 'fbclid', status: 'pending', errorMessage: null, createdAt: '2026-08-25T10:54:00.000Z', nextRetryAt: '2026-08-25T11:35:00.000Z' },
+  { id: 'adlog-4', adPlatformId: 'ad-meta', friendId: 'friend-inflow-4', friendName: '佐藤 健', eventName: '体験申込フォームの送信', conversionName: 'Lead', clickId: 'fixed-fbclid-3', clickIdType: 'fbclid', status: 'failed', errorMessage: '接続設定を確認してください', createdAt: '2026-08-25T09:41:00.000Z' },
+  { id: 'adlog-5', adPlatformId: 'ad-google', friendId: 'friend-inflow-5', friendName: '山本 あおい', eventName: '初回のご購入', conversionName: 'purchase', clickId: 'fixed-gclid-2', clickIdType: 'gclid', status: 'failed', errorMessage: '広告アカウントをつなぎ直してください', createdAt: '2026-08-25T08:20:00.000Z', nextRetryAt: 'reconnect' },
+  { id: 'adlog-6', adPlatformId: 'ad-meta', friendId: '', friendName: '', eventName: '定期便のお申し込み', conversionName: '—', clickId: null, clickIdType: null, status: 'skipped', errorMessage: '対応が付いていないため送っていません', createdAt: '2026-08-24T22:05:00.000Z' },
+]
+
 /*
   ログインユーザー。設計 `e3jz3` の並びそのまま。
 
@@ -1858,10 +2196,10 @@ export const AFFILIATES = [
 
 /** 案件。設計 `GH8VL` の「案件 5」。金額は設計の ¥3,000／¥5,000／¥100／¥1,500／¥8,000。 */
 export const AFFILIATE_OFFERS = [
-  { id: 'ao-1', name: '体験の申し込み', description: 'はじめての方の体験予約', rewardAmount: 3000, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: 'tag-trial', scenarioId: 'scenario-0', isActive: true, createdAt: '2026-02-01T00:00:00.000Z' },
-  { id: 'ao-2', name: '定期便のお申し込み', description: '定期便の初回', rewardAmount: 5000, rewardMiles: 500, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: true, createdAt: '2026-02-10T00:00:00.000Z' },
-  { id: 'ao-3', name: '友だち追加', description: null, rewardAmount: 100, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: true, createdAt: '2026-03-01T00:00:00.000Z' },
-  { id: 'ao-4', name: '資料請求', description: null, rewardAmount: 1500, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: true, createdAt: '2026-03-15T00:00:00.000Z' },
+  { id: 'ao-1', name: '体験の申し込み', description: 'はじめての方の体験予約', rewardAmount: 3000, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: 'tag-0', scenarioId: null, isActive: true, createdAt: '2026-02-01T00:00:00.000Z' },
+  { id: 'ao-2', name: '定期便のお申し込み', description: '定期便の初回', rewardAmount: 5000, rewardMiles: 500, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: 'tag-1', scenarioId: null, isActive: true, createdAt: '2026-02-10T00:00:00.000Z' },
+  { id: 'ao-3', name: '友だち追加', description: null, rewardAmount: 100, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: 'tag-2', scenarioId: null, isActive: true, createdAt: '2026-03-01T00:00:00.000Z' },
+  { id: 'ao-4', name: '資料請求', description: null, rewardAmount: 1500, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: 'scenario-0', isActive: true, createdAt: '2026-03-15T00:00:00.000Z' },
   { /* 設計の「停止・終了 1」。 */ id: 'ao-5', name: '春の紹介キャンペーン', description: '2026春で終了', rewardAmount: 8000, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: false, createdAt: '2026-01-05T00:00:00.000Z' },
 ]
 
@@ -1937,12 +2275,34 @@ export const MILEAGE_RULES = [
   どこからも使われていない 2」の内訳が撮れる6件。
 */
 export const CONVERSION_POINTS = [
-  { id: 'cp-1', name: 'ECの注文が確定したとき', eventType: 'ec_order_confirmed', value: 12800, measureMethod: 'webhook', targetUrl: null, countRepeat: true, attributionDays: 90, lineAccountId: null, isActive: true, createdAt: '2026-01-10T00:00:00.000Z' },
-  { id: 'cp-2', name: 'ECの定期が確定したとき', eventType: 'ec_subscription_confirmed', value: 24000, measureMethod: 'webhook', targetUrl: null, countRepeat: false, attributionDays: 90, lineAccountId: null, isActive: true, createdAt: '2026-01-10T00:00:00.000Z' },
-  { id: 'cp-3', name: 'サイトの /download を見たとき', eventType: 'url_reach', value: null, measureMethod: 'url_reach', targetUrl: 'https://example.com/download', countRepeat: false, attributionDays: 90, lineAccountId: null, isActive: true, createdAt: '2026-02-01T00:00:00.000Z' },
-  { id: 'cp-4', name: '体験の申し込み', eventType: 'form_submitted', value: 3000, measureMethod: 'manual', targetUrl: null, countRepeat: false, attributionDays: 30, lineAccountId: null, isActive: true, createdAt: '2026-02-20T00:00:00.000Z' },
-  { /* どこからも使われていない1件。 */ id: 'cp-5', name: '資料請求', eventType: 'form_submitted', value: 1500, measureMethod: 'manual', targetUrl: null, countRepeat: false, attributionDays: 30, lineAccountId: null, isActive: true, createdAt: '2026-03-05T00:00:00.000Z' },
-  { /* 止めている1件。 */ id: 'cp-6', name: '春の来店（終了）', eventType: 'manual', value: 800, measureMethod: 'manual', targetUrl: null, countRepeat: false, attributionDays: null, lineAccountId: null, isActive: false, createdAt: '2025-12-01T00:00:00.000Z' },
+  { id: 'cp-1', name: '商品を買った', eventType: 'ec_order_confirmed', value: 1587, measureMethod: 'webhook', targetUrl: null, countRepeat: true, attributionDays: 90, lineAccountId: null, isActive: true, createdAt: '2026-01-10T00:00:00.000Z' },
+  { id: 'cp-2', name: '体験申込フォームの送信', eventType: 'form_submitted', value: 12000, measureMethod: 'webhook', targetUrl: null, countRepeat: false, attributionDays: 90, lineAccountId: null, isActive: true, createdAt: '2026-01-10T00:00:00.000Z' },
+  { id: 'cp-3', name: '予約が入った', eventType: 'reservation_confirmed', value: 1816, measureMethod: 'webhook', targetUrl: null, countRepeat: true, attributionDays: 90, lineAccountId: null, isActive: true, createdAt: '2026-02-01T00:00:00.000Z' },
+  { id: 'cp-4', name: '初回の定期便が確定', eventType: 'ec_subscription_confirmed', value: 8217, measureMethod: 'webhook', targetUrl: null, countRepeat: false, attributionDays: 30, lineAccountId: null, isActive: true, createdAt: '2026-02-20T00:00:00.000Z' },
+  { id: 'cp-5', name: 'ウェビナーを最後まで見た', eventType: 'webinar_completed', value: null, measureMethod: 'webhook', targetUrl: null, countRepeat: false, attributionDays: 30, lineAccountId: null, isActive: true, createdAt: '2026-03-05T00:00:00.000Z' },
+  { /* どこからも使われていない1件。 */ id: 'cp-6', name: '資料をダウンロードした', eventType: 'url_reach', value: null, measureMethod: 'url_reach', targetUrl: 'https://example.com/download', countRepeat: false, attributionDays: 90, lineAccountId: null, isActive: false, createdAt: '2025-12-01T00:00:00.000Z' },
+]
+
+/*
+  成果地点レポート。現期間486件・1,284,000円、直前期間412件・
+  1,092,000円を固定し、一覧・レポート・作成前の同種集計が同じ数字を読む。
+*/
+export const CONVERSION_REPORT_CURRENT = [
+  { conversionPointId: 'cp-1', conversionPointName: '商品を買った', eventType: 'ec_order_confirmed', totalCount: 386, totalValue: 612400 },
+  { conversionPointId: 'cp-2', conversionPointName: '体験申込フォームの送信', eventType: 'form_submitted', totalCount: 42, totalValue: 504000 },
+  { conversionPointId: 'cp-3', conversionPointName: '予約が入った', eventType: 'reservation_confirmed', totalCount: 38, totalValue: 69000 },
+  { conversionPointId: 'cp-4', conversionPointName: '初回の定期便が確定', eventType: 'ec_subscription_confirmed', totalCount: 12, totalValue: 98600 },
+  { conversionPointId: 'cp-5', conversionPointName: 'ウェビナーを最後まで見た', eventType: 'webinar_completed', totalCount: 8, totalValue: 0 },
+  { conversionPointId: 'cp-6', conversionPointName: '資料をダウンロードした', eventType: 'url_reach', totalCount: 0, totalValue: 0 },
+]
+
+export const CONVERSION_REPORT_PREVIOUS = [
+  { conversionPointId: 'cp-1', conversionPointName: '商品を買った', eventType: 'ec_order_confirmed', totalCount: 341, totalValue: 630000 },
+  { conversionPointId: 'cp-2', conversionPointName: '体験申込フォームの送信', eventType: 'form_submitted', totalCount: 26, totalValue: 312000 },
+  { conversionPointId: 'cp-3', conversionPointName: '予約が入った', eventType: 'reservation_confirmed', totalCount: 33, totalValue: 60000 },
+  { conversionPointId: 'cp-4', conversionPointName: '初回の定期便が確定', eventType: 'ec_subscription_confirmed', totalCount: 12, totalValue: 90000 },
+  { conversionPointId: 'cp-5', conversionPointName: 'ウェビナーを最後まで見た', eventType: 'webinar_completed', totalCount: 0, totalValue: 0 },
+  { conversionPointId: 'cp-6', conversionPointName: '資料をダウンロードした', eventType: 'url_reach', totalCount: 0, totalValue: 0 },
 ]
 
 /*
@@ -2001,12 +2361,59 @@ export const AFFILIATE_LINKS = [
   版が見えないと「直してよいか」が判断できない、というのが設計の言いたいこと。
 */
 export const COMMON_ACTIONS = [
-  { id: 'ca-1', name: '来店後のご案内', description: 'タグ・シナリオ・担当の3つ', status: 'published', draftVersion: null, publishedVersion: 4, actionCount: 3, bindingCount: 5, oldVersionBindingCount: 0, updatedAt: '2026-08-25T01:00:00.000Z' },
+  { id: 'ca-1', name: '体験申込を受けたとき', description: 'タグ・シナリオ・担当の3つ', status: 'published', draftVersion: null, publishedVersion: 4, actionCount: 5, bindingCount: 5, oldVersionBindingCount: 1, updatedAt: '2026-08-25T01:00:00.000Z' },
   { id: 'ca-2', name: '定期便のご案内', description: 'メッセージ ほか2つ', status: 'published', draftVersion: 8, publishedVersion: 7, actionCount: 3, bindingCount: 3, oldVersionBindingCount: 2, updatedAt: '2026-08-24T10:00:00.000Z' },
   { id: 'ca-3', name: '予約のリマインド', description: 'リマインダ ほか1つ', status: 'published', draftVersion: null, publishedVersion: 2, actionCount: 2, bindingCount: 1, oldVersionBindingCount: 0, updatedAt: '2026-08-20T09:00:00.000Z' },
   { /* 設計の「呼ばれていない 1」。 */ id: 'ca-4', name: '休業のお知らせ', description: 'メッセージ ほか1つ', status: 'published', draftVersion: null, publishedVersion: 3, actionCount: 2, bindingCount: 0, oldVersionBindingCount: 0, updatedAt: '2026-07-30T09:00:00.000Z' },
   { /* 設計の「下書き 3」のうち1本。 */ id: 'ca-5', name: '口コミのお願い（下書き）', description: null, status: 'draft', draftVersion: 1, publishedVersion: null, actionCount: 1, bindingCount: 0, oldVersionBindingCount: 0, updatedAt: '2026-08-22T09:00:00.000Z' },
 ]
+
+/** 機能25の一覧。14本稼働・4本停止を同じAPI契約で返す。 */
+export const AUTOMATIONS = [
+  { id: 'au-1', name: '友だち追加から案内を始める', description: '流入リンクを通っていない人に、はじめての方へをご案内', eventType: 'friend_add', conditions: { inflow: 'none' }, actions: [{ type: 'start_scenario', params: { scenarioId: 'scenario-0' } }], isActive: true, priority: 100, lineAccountId: 'visual-qa-account', createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z' },
+  { id: 'au-2', name: '「予約」で予約画面を出す', description: 'すべての友だちに予約用メニューを表示', eventType: 'message_received', conditions: { keyword: '予約' }, actions: [{ type: 'switch_rich_menu', params: { richMenuId: 'rmg-1' } }], isActive: true, priority: 90, lineAccountId: 'visual-qa-account', createdAt: '2026-07-02T00:00:00.000Z', updatedAt: '2026-08-24T00:00:00.000Z' },
+  { id: 'au-3', name: '体験申込のフォローを始める', description: '30日買っていない人に体験前フォローを開始', eventType: 'tag_change', conditions: { tagId: 'tag-trial', purchaseDays: 30 }, actions: [{ type: 'start_scenario', params: { scenarioId: 'scenario-trial' } }], isActive: true, priority: 80, lineAccountId: 'visual-qa-account', createdAt: '2026-07-03T00:00:00.000Z', updatedAt: '2026-08-23T00:00:00.000Z' },
+  { id: 'au-4', name: '初回注文をSlackへ知らせる', description: '定期便を初めて買った人を外部連携へ通知', eventType: 'ec.order.confirmed', conditions: { firstSubscription: true }, actions: [{ type: 'send_webhook', params: { webhookId: 'wh-1' } }], isActive: true, priority: 70, lineAccountId: 'visual-qa-account', createdAt: '2026-07-04T00:00:00.000Z', updatedAt: '2026-08-22T00:00:00.000Z' },
+  { id: 'au-5', name: '反応がない人を気にかける', description: '最終接触から7日たった人に対応タグを付ける', eventType: 'tag_change', conditions: { inactiveDays: 7 }, actions: [{ type: 'add_tag', params: { tagId: 'tag-care' } }], isActive: true, priority: 60, lineAccountId: 'visual-qa-account', createdAt: '2026-07-05T00:00:00.000Z', updatedAt: '2026-08-21T00:00:00.000Z' },
+  { id: 'au-6', name: '問い合わせを担当へ知らせる', description: 'メッセージを受けたら担当用タグを付ける', eventType: 'message_received', conditions: {}, actions: [{ type: 'add_tag', params: { tagId: 'tag-support' } }], isActive: true, priority: 50, lineAccountId: null, createdAt: '2026-07-06T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z' },
+  ...Array.from({ length: 8 }, (_, index) => ({ id: `au-${index + 7}`, name: `定期フォロー ${index + 1}`, description: '条件に合う友だちへ順番に案内', eventType: 'tag_change', conditions: { group: index + 1 }, actions: [{ type: 'add_tag', params: { tagId: `tag-${index + 1}` } }], isActive: true, priority: 40 - index, lineAccountId: 'visual-qa-account', createdAt: '2026-07-10T00:00:00.000Z', updatedAt: '2026-08-19T00:00:00.000Z' })),
+  ...Array.from({ length: 4 }, (_, index) => ({ id: `au-${index + 15}`, name: `停止中の案内 ${index + 1}`, description: '設定を残して停止中', eventType: 'tag_change', conditions: {}, actions: [{ type: 'add_tag', params: { tagId: `tag-old-${index + 1}` } }], isActive: false, priority: 10 - index, lineAccountId: 'visual-qa-account', createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' })),
+]
+
+/** 設計 `WjYAC` と同じ12件。選択後に利用者の実データを選び直す見本。 */
+export const AUTOMATION_TEMPLATES = [
+  { key: 'welcome', name: 'はじめての人にあいさつする', description: '追加された友だちへ案内を始めます', triggerLabel: '友だちが追加されたとき', actionLabel: 'シナリオ「はじめての方へ」を始める' },
+  { key: 'reservation', name: '「予約」と送られたら予約画面を出す', description: '予約したい人を迷わせません', triggerLabel: 'メッセージに「予約」が入ったとき', actionLabel: 'リッチメニューを切り替える＋回答フォームを送る' },
+  { key: 'inactive', name: '7日 反応がない人に声をかける', description: '対応漏れを見つけます', triggerLabel: '最終接触から7日たったとき', actionLabel: '対応マーク「気にかける」を付ける' },
+  { key: 'first-order', name: 'はじめて買った人にお礼を送る', description: '初回購入のお礼を自動化します', triggerLabel: '注文が確定したとき（はじめての人だけ）', actionLabel: 'テンプレート「はじめてのご注文ありがとうございます」を送る' },
+  { key: 'tag-scenario', name: 'タグが付いたらシナリオを始める', description: '自由に組み替えられる見本です', triggerLabel: 'タグが付いたとき', actionLabel: '選んだシナリオを始める' },
+  { key: 'birthday', name: '誕生月にクーポンを送る', description: '誕生日に合わせて特典を届けます', triggerLabel: '誕生日の◯日前になったとき', actionLabel: 'クーポンを送る＋マイルを付ける' },
+  { key: 'review', name: '口コミを書いてくれた人にマイル', description: '回答後のお礼を自動化します', triggerLabel: '回答フォームが送られたとき', actionLabel: 'マイルを付ける＋タグを付ける' },
+  { key: 'winback', name: '買っていない人を掘り起こす', description: '休眠した友だちへ定期的に案内します', triggerLabel: '90日 買っていない人（毎週 月曜に見る）', actionLabel: '一斉配信「おひさしぶりです」に入れる' },
+  { key: 'block', name: 'ブロックされたら記録する', description: '解除後の対応に備えます', triggerLabel: 'ブロックされたとき', actionLabel: 'タグ「ブロック」を付ける＋外部連携に知らせる' },
+  { key: 'booking', name: '予約前日に確認を送る', description: '来店忘れを減らします', triggerLabel: '予約日の前日になったとき', actionLabel: '確認メッセージを送る' },
+  { key: 'score', name: '関心が高まった人を担当へ知らせる', description: '対応の優先順位を揃えます', triggerLabel: '行動スコアが80になったとき', actionLabel: '担当者タグを付ける＋外部連携に知らせる' },
+  { key: 'cancel', name: '解約相談を受けたら案内する', description: '相談窓口をすぐ案内します', triggerLabel: '「解約」と送られたとき', actionLabel: '相談予約フォームを送る' },
+]
+
+const caStep = (id, type, params = {}, onFailure = 'stop') => ({ id, type, params, onFailure })
+export const COMMON_ACTION_DETAIL = {
+  id: 'ca-1', name: '体験申込を受けたとき', description: 'タグ・シナリオ・担当の3つ', status: 'published',
+  currentDraftVersionId: null, currentPublishedVersionId: 'cav-4',
+  versions: [
+    { id: 'cav-4', versionNumber: 4, status: 'published', actions: [caStep('s41', 'add_tag', { tagId: 'tag-trial' }), caStep('s42', 'wait', { minutes: 30 }), caStep('s43', 'send_message', { templateId: 'template-usage-1', templateName: '体験のご案内', templateVersion: 4 }, 'continue'), caStep('s44', 'start_scenario', { scenarioId: 'scenario-0' }), caStep('s45', 'set_metadata', { assignee: '佐々木' }, 'continue')], createdBy: '佐々木', createdAt: '2026-08-20T05:02:00.000Z', publishedAt: '2026-08-20T05:02:00.000Z' },
+    { id: 'cav-3', versionNumber: 3, status: 'published', actions: [caStep('s31', 'add_tag'), caStep('s32', 'wait', { minutes: 30 }), caStep('s33', 'send_message'), caStep('s34', 'start_scenario')], createdBy: '田中', createdAt: '2026-08-12T00:40:00.000Z', publishedAt: '2026-08-12T00:40:00.000Z' },
+    { id: 'cav-2', versionNumber: 2, status: 'published', actions: [caStep('s21', 'add_tag'), caStep('s22', 'wait', { minutes: 10 }), caStep('s23', 'start_scenario')], createdBy: '佐々木', createdAt: '2026-08-04T08:20:00.000Z', publishedAt: '2026-08-04T08:20:00.000Z' },
+    { id: 'cav-1', versionNumber: 1, status: 'published', actions: [caStep('s11', 'add_tag'), caStep('s12', 'send_message')], createdBy: '佐々木', createdAt: '2026-07-28T02:15:00.000Z', publishedAt: '2026-07-28T02:15:00.000Z' },
+  ],
+  bindings: [
+    { id: 'cab-1', consumerType: 'scenario', consumerId: 'scenario-0', consumerPath: '体験前フォロー・1通目のあと', versionId: 'cav-4', versionNumber: 4, latestVersionNumber: 4, hasNewerVersion: false, runningCount: 8, waitingCount: 2, updatedAt: '2026-08-25T00:00:00.000Z' },
+    { id: 'cab-2', consumerType: 'form', consumerId: 'form-1', consumerPath: '体験のお申し込み・送信後', versionId: 'cav-3', versionNumber: 3, latestVersionNumber: 4, hasNewerVersion: true, runningCount: 4, waitingCount: 1, updatedAt: '2026-08-24T00:00:00.000Z' },
+    { id: 'cab-3', consumerType: 'auto_reply', consumerId: 'ar-1', consumerPath: '「体験」と送られたとき', versionId: 'cav-4', versionNumber: 4, latestVersionNumber: 4, hasNewerVersion: false, runningCount: 2, waitingCount: 1, updatedAt: '2026-08-23T00:00:00.000Z' },
+    { id: 'cab-4', consumerType: 'rich_menu', consumerId: 'rm-1', consumerPath: '体験を申し込む を押したとき', versionId: 'cav-4', versionNumber: 4, latestVersionNumber: 4, hasNewerVersion: false, runningCount: 2, waitingCount: 1, updatedAt: '2026-08-22T00:00:00.000Z' },
+    { id: 'cab-5', consumerType: 'automation', consumerId: 'au-3', consumerPath: 'タグ「体験申込」が付いたとき', versionId: 'cav-4', versionNumber: 4, latestVersionNumber: 4, hasNewerVersion: false, runningCount: 2, waitingCount: 1, updatedAt: '2026-08-21T00:00:00.000Z' },
+  ],
+}
 
 /*
   予約メニュー。設計 `QSLEH` の「メニュー 8／止めているもの 2つ」。

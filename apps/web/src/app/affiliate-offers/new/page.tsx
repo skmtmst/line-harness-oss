@@ -170,6 +170,7 @@ export default function NewAffiliateOfferPage() {
       }
     >
       <FormSection step={1} label="どんな案件か">
+        <div className="grid gap-3 lg:grid-cols-2">
         <Field label="案件名" htmlFor="of-name" required>
           <input
             id="of-name"
@@ -180,20 +181,6 @@ export default function NewAffiliateOfferPage() {
             className={inputClass}
           />
         </Field>
-
-        <Field
-          label="対象アカウント"
-          htmlFor="of-account"
-          note="1つに絞ると、そのアカウントで起きた成果だけを数えます。"
-        >
-          <SelectField
-            id="of-account"
-            value={lineAccountId}
-            onChange={(e) => setLineAccountId(e.target.value)}
-            options={[{ value: '', label: 'すべてのアカウント' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
-          />
-        </Field>
-
         <Field label="説明" htmlFor="of-desc" note="紹介する人に見せる説明です。">
           <textarea
             id="of-desc"
@@ -204,6 +191,7 @@ export default function NewAffiliateOfferPage() {
             className={`${inputClass} resize-y`}
           />
         </Field>
+        </div>
       </FormSection>
 
       <FormSection
@@ -211,24 +199,18 @@ export default function NewAffiliateOfferPage() {
         label="何をもって成果とするか"
         note="成果地点はコンバージョンで作成・管理します。"
       >
-        <Unavailable
-          label="成果地点"
-          reason="まだ繋がっていません。案件と成果地点の紐づけAPIが接続されると選べます。"
-        />
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 lg:grid-cols-2">
+          <Unavailable
+            label="成果地点"
+            reason="まだ繋がっていません。案件と成果地点の紐づけAPIが接続されると選べます。"
+          />
           <Unavailable
             label="紹介とみなす期間"
-            reason="まだ繋がっていません。成果を数える期間が接続されると表示されます。"
+            reason="まだ繋がっていません。成果を数える期間が接続されると表示されます（例：友だち追加から30日以内）。"
           />
-          <Unavailable
-            label="同じ友だちを数える回数"
-            reason="まだ繋がっていません。二重計上を防ぐ設定が接続されると表示されます。"
-          />
+          <Unavailable label="同じ友だちを数える回数" reason="まだ繋がっていません。二重計上を防ぐ設定が接続されると表示されます。" />
+          <Unavailable label="成果の自動承認" reason="まだ繋がっていません。確認不要の条件が接続されると表示されます。" />
         </div>
-        <Unavailable
-          label="成果の自動承認"
-          reason="まだ繋がっていません。低額・回数上限・確認不要の条件が接続されると選べます。"
-        />
       </FormSection>
 
       <FormSection step={3} label="いくら払うか" note="現金とマイルは併用できます。">
@@ -267,6 +249,15 @@ export default function NewAffiliateOfferPage() {
             標準プログラム
           </p>
         </Field>
+
+        <Field label="誘導するLINEアカウント" htmlFor="of-account" note="紹介リンクを開いた方を、このアカウントへ案内します。">
+          <SelectField
+            id="of-account"
+            value={lineAccountId}
+            onChange={(e) => setLineAccountId(e.target.value)}
+            options={[{ value: '', label: 'すべてのアカウント' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
+          />
+        </Field>
       </FormSection>
 
       <FormSection
@@ -274,6 +265,7 @@ export default function NewAffiliateOfferPage() {
         label="成果を認めたときにすること"
         note="成果が確定したタイミングで実行されます。"
       >
+        <div className="grid gap-3 lg:grid-cols-2">
         <Field label="付けるタグ" htmlFor="of-tag" note="あとで配信の絞り込みに使えます。">
           <SelectField
             id="of-tag"
@@ -295,6 +287,7 @@ export default function NewAffiliateOfferPage() {
             options={[{ value: '', label: '（なし）' }, ...scenarios.map((s) => ({ value: s.id, label: s.name }))]}
           />
         </Field>
+        </div>
 
         <label className="text-ink-secondary flex items-start gap-2 text-sm">
           <input

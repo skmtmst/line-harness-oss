@@ -4,12 +4,17 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Star } from 'lucide-react'
 import type { FriendListItem } from '@/lib/api'
 import Pagination from '@/components/shared/pagination'
+import ListState from '@/components/shared/list-state'
 import FriendListRow from './friend-list-row'
 
 export type FriendListColumn = 'support' | 'scenario' | 'latest' | 'tags' | 'last'
 
 interface Props {
   friends: FriendListItem[]
+  status?: 'loading' | 'ready' | 'error'
+  emptyTitle?: string
+  emptyDescription?: string
+  onRetry?: () => void
   selectedIds?: Set<string>
   onToggleSelect?: (id: string) => void
   onToggleAll?: (select: boolean) => void
@@ -33,6 +38,10 @@ const COLUMN_LABELS: Array<{ key: FriendListColumn; label: string }> = [
 
 export default function FriendListTable({
   friends,
+  status = 'ready',
+  emptyTitle = '条件に合う友だちが見つかりません',
+  emptyDescription = '検索条件を外すか、別のキーワードでお試しください。',
+  onRetry,
   selectedIds,
   onToggleSelect,
   onToggleAll,
@@ -123,9 +132,30 @@ export default function FriendListTable({
               ))}
             </div>
           </details>
-          <select value={pageSize} onChange={(event) => onPageSizeChange(Number(event.target.value))} className="v6-select h-10 min-w-34.5 rounded-control border border-hairline bg-canvas text-sm font-semibold text-ink">
-            {pageSizeOptions.map((size) => <option key={size} value={size}>{size}件表示</option>)}
-          </select>
+          <details className="relative">
+            <summary
+              data-qa-open="LT8RS"
+              className="flex h-10 min-w-34.5 cursor-pointer list-none items-center justify-between gap-4 rounded-control border border-hairline bg-canvas px-3 text-sm font-semibold text-ink"
+            >
+              {pageSize}件表示 <span aria-hidden="true" className="text-ink-faint">⌄</span>
+            </summary>
+            <div className="absolute right-0 z-20 mt-1 w-37.5 rounded-card border border-hairline bg-canvas p-1.5 shadow-lg">
+              {pageSizeOptions.map((size) => (
+                <button
+                  key={size}
+                  type="button"
+                  aria-pressed={size === pageSize}
+                  onClick={(event) => {
+                    onPageSizeChange(size)
+                    event.currentTarget.closest('details')?.removeAttribute('open')
+                  }}
+                  className={`flex w-full items-center justify-between rounded-control px-2.5 py-2 text-left text-xs font-semibold ${size === pageSize ? 'bg-accent-soft text-accent' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
+                >
+                  {size}件表示 {size === pageSize ? <span aria-hidden="true">✓</span> : null}
+                </button>
+              ))}
+            </div>
+          </details>
         </div>
       </div>
 
@@ -150,10 +180,22 @@ export default function FriendListTable({
       </div>
 
       <div className="min-h-0 flex-1">
-        {friends.length === 0 ? (
-          <div className="flex h-full min-h-77.5 flex-col items-center justify-center px-6 text-center">
-            <p className="text-sm font-semibold text-ink-secondary">条件に合う友だちが見つかりません</p>
-            <p className="mt-1 text-xs text-ink-faint">検索条件を外すか、別のキーワードでお試しください。</p>
+        {status === 'loading' ? (
+          <div className="flex h-full min-h-77.5 items-center justify-center bg-canvas-sunken/30 px-6">
+            <ListState kind="loading" title="読み込んでいます" description="このまま少しお待ちください。" />
+          </div>
+        ) : status === 'error' ? (
+          <div className="flex h-full min-h-77.5 items-center justify-center bg-canvas-sunken/30 px-6">
+            <ListState
+              kind="error"
+              title="表示できませんでした"
+              description="再読み込みしても直らないときは、エラー報告へお知らせください。"
+              onRetry={onRetry}
+            />
+          </div>
+        ) : friends.length === 0 ? (
+          <div className="flex h-full min-h-77.5 items-center justify-center bg-canvas-sunken/30 px-6">
+            <ListState kind="empty" title={emptyTitle} description={emptyDescription} />
           </div>
         ) : friends.map((friend) => (
           <FriendListRow
@@ -170,7 +212,7 @@ export default function FriendListTable({
 
       <div className="flex h-12 shrink-0 items-center justify-between border-t border-hairline px-4">
         <span className="text-xs text-ink-faint">{rangeStart}〜{rangeEnd}件 / 全{total.toLocaleString('ja-JP')}件</span>
-        <Pagination page={page} pageCount={pageCount} onPageChange={onPageChange} ariaLabel="友だち一覧のページ" />
+        <Pagination page={page} pageCount={pageCount} onPageChange={onPageChange} disabled={status !== 'ready'} ariaLabel="友だち一覧のページ" />
       </div>
     </section>
   )

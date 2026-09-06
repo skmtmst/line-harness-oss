@@ -74,6 +74,7 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(PAGE).toContain('setUploadOpen(true)')
     expect(UPLOAD).toContain('designNode="eXAJP"')
     expect(UPLOAD).toContain('ここにファイルをドラッグ、または押して選ぶ')
+    expect(UPLOAD).toContain('LINEで送れる大きさ（超えると入れられません）')
     // 検索: 幅420まで。表示切替: 枠40・各44。
     expect(PAGE).toContain('min-w-64 max-w-[420px] flex-1')
     expect(PAGE).toContain('rounded-control flex h-10 items-center overflow-hidden border')

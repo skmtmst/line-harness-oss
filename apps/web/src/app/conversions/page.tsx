@@ -39,6 +39,11 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   keyword_sent: 'キーワード',
   liff_view: 'LIFF閲覧',
   custom: 'その他',
+  ec_order_confirmed: '購入',
+  ec_subscription_confirmed: '購入',
+  form_submitted: '申込・登録',
+  reservation_confirmed: '来店・参加',
+  webinar_completed: 'その他',
 }
 
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
@@ -86,9 +91,11 @@ function sourceTriggerLabel(point: ConversionPoint): string {
     return point.targetUrl ? `サイトの「${point.targetUrl}」に到達` : '指定したページに到達'
   }
   if (point.measureMethod === 'webhook') {
-    if (point.eventType === 'purchase') return 'EC連携から注文確定の通知を受信'
-    if (point.eventType === 'form_submit') return '回答フォームから送信完了の通知を受信'
-    if (point.eventType === 'visit') return '予約・来店システムから確定の通知を受信'
+    if (point.eventType === 'purchase' || point.eventType === 'ec_order_confirmed') return 'EC連携から注文確定の通知を受信'
+    if (point.eventType === 'ec_subscription_confirmed') return 'EC連携から定期便確定の通知を受信'
+    if (point.eventType === 'form_submit' || point.eventType === 'form_submitted') return '回答フォームから送信完了の通知を受信'
+    if (point.eventType === 'visit' || point.eventType === 'reservation_confirmed') return '予約管理から予約確定の通知を受信'
+    if (point.eventType === 'webinar_completed') return 'ウェビナーから視聴完了の通知を受信'
     return '接続したシステムから成果の通知を受信'
   }
   return '管理画面から担当者が記録'
@@ -714,7 +721,7 @@ function ConversionsPageHost() {
         actions={tab === 'points' ? <Button href="/conversions/new" variant="primary">成果地点を追加</Button> : undefined}
       />
       {tab === 'points' && <ConversionsPageInner />}
-      {tab === 'affiliates' && <AffiliatorsTab />}
+      {tab === 'affiliates' && <AffiliatorsTab accountId={selectedAccountId} />}
       {tab === 'offers' && <OffersTab />}
       {tab === 'approvals' && <ApprovalQueue />}
       {tab === 'report' && <ReportTab />}

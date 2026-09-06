@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 250,
-  "unimplemented": 12,
+  "compared": 241,
+  "unimplemented": 6,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 10,
-  "match": 28,
-  "structureMatchDataPending": 44,
-  "needsFix": 173,
-  "unjudged": 11,
-  "remaining": 240,
+  "missing": 25,
+  "match": 69,
+  "structureMatchDataPending": 55,
+  "needsFix": 135,
+  "unjudged": 3,
+  "remaining": 199,
   "features": [
     {
       "feature": 1,
@@ -39,6 +39,16 @@
             "Alekb"
           ],
           "note": "ダッシュボード。お知らせの口を撮影モックへ足した（`counts` の4つが欠けると `undefined.all` で落ちる）"
+        },
+        {
+          "pr": 971,
+          "head": "d69099cd9",
+          "on": "2026-09-06",
+          "screens": [
+            "vUXKb",
+            "JN6mQ"
+          ],
+          "note": "Issue #267。3102/8789で対象2画面を1440・1920px撮影し、Pencil設計と比較。両画面とも横はみ出し0。構造は一致し、設計値と公式プロフィール短縮URLを返すAPIがないためデータ未接続を維持した。"
         }
       ]
     },
@@ -51,11 +61,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 3,
-      "structureMatchDataPending": 1,
+      "match": 4,
+      "structureMatchDataPending": 0,
       "needsFix": 14,
       "unjudged": 0,
-      "remaining": 15,
+      "remaining": 14,
       "capturedAt": [
         {
           "pr": 513,
@@ -152,16 +162,16 @@
       "feature": 3,
       "name": "友だち",
       "total": 12,
-      "compared": 10,
-      "unimplemented": 2,
+      "compared": 0,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 10,
-      "unjudged": 0,
-      "remaining": 12,
+      "missing": 12,
+      "match": 8,
+      "structureMatchDataPending": 3,
+      "needsFix": 0,
+      "unjudged": 1,
+      "remaining": 4,
       "capturedAt": [
         {
           "pr": 520,
@@ -242,6 +252,47 @@
             "IAf7j"
           ],
           "note": "Claudeが実装して撮った。#606 の契約の上（development 直結）。**ACCOUNT に role が無く、権限で出し分ける画面がすべて権限なし側に倒れていた**のを固定データ側で直した"
+        },
+        {
+          "pr": 966,
+          "head": "baa097e99",
+          "on": "2026-09-06",
+          "screens": [
+            "PhxG6",
+            "LT8RS",
+            "Igi72",
+            "IAf7j",
+            "I6UAdr",
+            "bzDn6",
+            "YzxU1",
+            "InCDe",
+            "r7eSi",
+            "w8W4Eh"
+          ],
+          "note": "Issue #265。10 Node・68枚を1440/1920pxと全状態で撮影し、全画像で横はみ出し0。一覧と表示件数を一致へ更新し、詳細検索は不足APIを明示して構造一致へ更新。IAf7j-pick の撮影手順二重実行も直して再撮影した。"
+        },
+        {
+          "pr": 975,
+          "head": "bdf6abfa7",
+          "on": "2026-09-06",
+          "screens": [
+            "vtBCu",
+            "ux7of"
+          ],
+          "note": "Issue #246。UID移行とCSV移行を本物のAPIへ接続し、1440/1920pxで撮影。vtBCuは設計画像と一致、ux7ofは設計画像なしのため本文照合で未判定。両画面とも横はみ出し0、壊れ値0。"
+        },
+        {
+          "pr": 983,
+          "head": "36e8b070b",
+          "on": "2026-09-06",
+          "screens": [
+            "IAf7j",
+            "I6UAdr",
+            "bzDn6",
+            "YzxU1",
+            "r7eSi"
+          ],
+          "note": "Issue #265 続き。残り5画面を設計構造へ直し、3102/8789で定義済み全状態32枚を1440/1920px撮影。5画面を一致へ更新し、全画像で横はみ出し0、壊れ値・内部ID0。"
         }
       ]
     },
@@ -415,12 +466,34 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 14,
+      "match": 2,
+      "structureMatchDataPending": 3,
+      "needsFix": 9,
       "unjudged": 0,
-      "remaining": 14,
+      "remaining": 12,
       "capturedAt": [
+        {
+          "pr": 954,
+          "head": "c03ebf864",
+          "on": "2026-09-06",
+          "screens": [
+            "TC1b1",
+            "cCB7r",
+            "kk8dz",
+            "bV5Vs",
+            "xfYLn",
+            "r6Gzsu",
+            "hz9ti",
+            "dqFft",
+            "EvVO5",
+            "RUxNf",
+            "NrBkW",
+            "g2UNV",
+            "M2b2B",
+            "q5G45"
+          ],
+          "note": "Issue #266。latest developmentを取り込み、1440・1920と全状態を3102/8789で撮影。全画像で横はみ出し0。"
+        },
         {
           "pr": 534,
           "head": "0158ba8e",
@@ -591,11 +664,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 1,
-      "needsFix": 14,
+      "match": 2,
+      "structureMatchDataPending": 5,
+      "needsFix": 8,
       "unjudged": 0,
-      "remaining": 15,
+      "remaining": 13,
       "capturedAt": [
         {
           "pr": 543,
@@ -754,6 +827,27 @@
             "TmHjF"
           ],
           "note": "最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。`TmHjF`（一覧の状態）が今回は撮れた。**24枚（12 Node）撮れた。** はじめ `h0kahp`・`vW4Es`・`FpgxH` が `locator.fill` の時間切れで撮れなかったが、原因は実装ではなく**撮る側**だった——`capture-screens.mjs` の `fill` が必ず `getByLabel` を通しており、台帳が `selector: true`（CSS選択子）で書いた10件を1つも拾えていなかった。両方を読むように直して撮れた。`cPk8A`・`sqFXf` は「詳細条件で絞り込んで配信する」が見つからず撮れない。"
+        },
+        {
+          "pr": 979,
+          "head": "3c6e4ec948",
+          "on": "2026-09-06",
+          "screens": [
+            "q76C35",
+            "zZ9fA",
+            "cPk8A",
+            "XQfMD",
+            "p97Tf",
+            "Bw0zt",
+            "h0kahp",
+            "vW4Es",
+            "FpgxH",
+            "u6gHt",
+            "EGMb1",
+            "sqFXf",
+            "TmHjF"
+          ],
+          "note": "Issue #219。作成を正本の5段へ分け、対象13画面と状態別を3104/8791の1440・1920pxで撮影。全画像で横はみ出し0。一致2、構造一致・データ未接続5、要修正6。"
         }
       ]
     },
@@ -894,12 +988,23 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 11,
+      "match": 5,
+      "structureMatchDataPending": 1,
+      "needsFix": 5,
       "unjudged": 0,
-      "remaining": 11,
+      "remaining": 6,
       "capturedAt": [
+        {
+          "pr": 955,
+          "head": "564c91d0fe",
+          "on": "2026-09-06",
+          "screens": [
+            "g46ja",
+            "Yj6CQ",
+            "e6iJG"
+          ],
+          "note": "競合確認、実在する友だちでのdry-run、最終確認、冪等な有効化を通し、1440・1920pxで設計と目視比較。横はみ出し0。"
+        },
         {
           "pr": 544,
           "head": "6053c271",
@@ -971,6 +1076,21 @@
       "remaining": 10,
       "capturedAt": [
         {
+          "pr": 962,
+          "head": "9b8f7451",
+          "on": "2026-09-06",
+          "screens": [
+            "uLQQc",
+            "s9gAx",
+            "W1wzCa",
+            "K0Dbr2",
+            "txMO9",
+            "U3SI5",
+            "Q3qP1r"
+          ],
+          "note": "Issue #211。割当ポート3104/8791で7画面を1440・1920px再撮影し、設計画像または同Nodeの設計本文と再照合。7画面の要修正判定を具体化し、横はみ出し0を確認"
+        },
+        {
           "pr": 431,
           "head": "2ab18c88",
           "on": "2026-08-30",
@@ -1013,10 +1133,29 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 2,
-      "unjudged": 11,
+      "needsFix": 13,
+      "unjudged": 0,
       "remaining": 13,
       "capturedAt": [
+        {
+          "pr": 962,
+          "head": "9b8f7451",
+          "on": "2026-09-06",
+          "screens": [
+            "ZC13r",
+            "PV1Vh",
+            "d3rFGD",
+            "Ho8z4",
+            "Xjk8q",
+            "GB0NR",
+            "D6yO7e",
+            "Q8sHa",
+            "yxyzQ",
+            "LKuAQ",
+            "zCQXe"
+          ],
+          "note": "Issue #211。割当ポート3104/8791で11画面を1440・1920px撮影し、設計画像または同Nodeの設計本文と照合。11画面を要修正と判定し、横はみ出し0を確認"
+        },
         {
           "pr": 917,
           "head": "c5e1095e",
@@ -1236,12 +1375,24 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 9,
+      "match": 3,
+      "structureMatchDataPending": 6,
+      "needsFix": 0,
       "unjudged": 0,
-      "remaining": 9,
+      "remaining": 6,
       "capturedAt": [
+        {
+          "pr": 1007,
+          "head": "f2be359e5",
+          "on": "2026-09-06",
+          "screens": [
+            "GO8RQ",
+            "XtfO3",
+            "TL7tp",
+            "RW5Tb"
+          ],
+          "note": "Issue #225。3102/8789で1440・1920と一覧4状態を撮影し、全画像で横スクロール0。要修正4枚を、一致1・構造一致／不足API待ち3へ更新した。"
+        },
         {
           "pr": 509,
           "head": "e148615c",
@@ -1345,16 +1496,16 @@
       "feature": 13,
       "name": "回答フォーム",
       "total": 7,
-      "compared": 5,
-      "unimplemented": 2,
+      "compared": 7,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 1,
-      "needsFix": 4,
-      "unjudged": 0,
-      "remaining": 7,
+      "match": 1,
+      "structureMatchDataPending": 4,
+      "needsFix": 0,
+      "unjudged": 2,
+      "remaining": 6,
       "capturedAt": [
         {
           "pr": 436,
@@ -1415,8 +1566,8 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 4,
+      "structureMatchDataPending": 1,
+      "needsFix": 3,
       "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
@@ -1471,12 +1622,25 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 1,
-      "match": 0,
-      "structureMatchDataPending": 3,
+      "match": 1,
+      "structureMatchDataPending": 2,
       "needsFix": 2,
       "unjudged": 0,
-      "remaining": 5,
+      "remaining": 4,
       "capturedAt": [
+        {
+          "pr": 997,
+          "head": "3eae16770",
+          "on": "2026-09-06",
+          "screens": [
+            "g89Tc",
+            "voJtX",
+            "eXAJP",
+            "YfTfJ",
+            "h8pBZr"
+          ],
+          "note": "Issue #228。10件・3フォルダ・使用先3件の固定データで、通常・詳細・登録・削除2状態・一覧4状態を1440pxと1920pxで再撮影。18枚すべて横はみ出し0。"
+        },
         {
           "pr": 559,
           "head": "7922c002",
@@ -1531,16 +1695,16 @@
       "feature": 16,
       "name": "成果とアフィリエイト",
       "total": 9,
-      "compared": 7,
-      "unimplemented": 2,
+      "compared": 9,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
+      "match": 5,
       "structureMatchDataPending": 3,
-      "needsFix": 4,
+      "needsFix": 1,
       "unjudged": 0,
-      "remaining": 9,
+      "remaining": 4,
       "capturedAt": [
         {
           "pr": 558,
@@ -1771,11 +1935,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 2,
-      "match": 0,
-      "structureMatchDataPending": 4,
-      "needsFix": 5,
+      "match": 9,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
       "unjudged": 0,
-      "remaining": 9,
+      "remaining": 0,
       "capturedAt": [
         {
           "pr": 443,
@@ -1849,6 +2013,23 @@
             "UIaM7"
           ],
           "note": "最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。9 Node すべて撮れた。"
+        },
+        {
+          "pr": 951,
+          "head": "43b3aae50",
+          "on": "2026-09-06",
+          "screens": [
+            "Q4bkTg",
+            "IhSBB",
+            "v0HaI",
+            "TEVk8",
+            "JupxW",
+            "UIaM7",
+            "BMmxU",
+            "BuVDB",
+            "Im2b1"
+          ],
+          "note": "Issue #231。9 Node・30状態を1440pxと1920pxで撮影し、Pencil設計画像と同じ幅で並べて確認した。全画像で横はみ出し0、9画面を一致へ更新。"
         }
       ]
     },
@@ -1856,14 +2037,14 @@
       "feature": 19,
       "name": "コンバージョン",
       "total": 4,
-      "compared": 1,
+      "compared": 4,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 3,
+      "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 1,
-      "needsFix": 3,
+      "structureMatchDataPending": 2,
+      "needsFix": 2,
       "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
@@ -1894,11 +2075,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 5,
-      "structureMatchDataPending": 3,
+      "match": 8,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 4,
+      "remaining": 1,
       "capturedAt": [
         {
           "pr": 445,
@@ -1968,11 +2149,11 @@
       "feature": 21,
       "name": "NEN配信",
       "total": 7,
-      "compared": 7,
+      "compared": 1,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0,
+      "missing": 6,
       "match": 0,
       "structureMatchDataPending": 3,
       "needsFix": 4,
@@ -2112,8 +2293,8 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 1,
-      "needsFix": 5,
+      "structureMatchDataPending": 2,
+      "needsFix": 4,
       "unjudged": 0,
       "remaining": 6,
       "capturedAt": [
@@ -2169,8 +2350,8 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 1,
-      "structureMatchDataPending": 5,
-      "needsFix": 1,
+      "structureMatchDataPending": 2,
+      "needsFix": 4,
       "unjudged": 0,
       "remaining": 7,
       "capturedAt": [
@@ -2225,6 +2406,21 @@
             "syWp4"
           ],
           "note": "Claudeが直した。使われている場所に何機能からかを添えた。直した本人が比較している"
+        },
+        {
+          "pr": 989,
+          "head": "44e671b2c",
+          "on": "2026-09-06",
+          "screens": [
+            "gief7",
+            "Rv8Jv",
+            "WjYAC",
+            "Vdbv5",
+            "xOpDs",
+            "py5CG",
+            "syWp4"
+          ],
+          "note": "Issue #238。撮影用APIへ18本の通常一覧、見本12件、v4〜v1と利用先5件を接続し、通常・読込中・0件・取得失敗を含む全対象を1440・1920pxで再撮影。設計画像と同じ入力で比較し、一致1・構造一致2・要修正4を実態どおり記録した。"
         }
       ]
     },
@@ -2237,11 +2433,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 1,
+      "match": 1,
+      "structureMatchDataPending": 0,
       "needsFix": 3,
       "unjudged": 0,
-      "remaining": 4,
+      "remaining": 3,
       "capturedAt": [
         {
           "pr": 547,
@@ -2516,8 +2712,8 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 4,
+      "structureMatchDataPending": 1,
+      "needsFix": 3,
       "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
@@ -2578,41 +2774,6 @@
   ],
   "gaps": [
     {
-      "feature": 3,
-      "node": "vtBCu",
-      "name": "3-4 UID移行",
-      "gap": "api",
-      "gapNote": "異なるLINEプロバイダー間のUID自動変換はできない。検証済み対応表の取込、dry-run、競合判断、本移行、照合、切り戻しを持つ `uid_migration_runs/items` とowner・二者確認APIが要る"
-    },
-    {
-      "feature": 13,
-      "node": "ava2n",
-      "name": "13-1-B フォームのデザイン設定",
-      "gap": "drop",
-      "gapNote": "**作らない決めが実装に明記**。「見た目をこのアプリのデザインにそろえる方針にしたため、色やフォントを選ぶ画面は作っていない」"
-    },
-    {
-      "feature": 13,
-      "node": "gBp2J",
-      "name": "13-1-E フォームの削除確認",
-      "gap": "api",
-      "gapNote": "確認窓だけでは作れない。削除前にフォーム名・公開状態・回答数・利用中の場所・開けなくなるURLを返す影響確認が要る。公開中・回答あり・利用中は物理削除せず、停止・保管へ移す契約と `status` / `deleted_at` が必要"
-    },
-    {
-      "feature": 16,
-      "node": "QX70l",
-      "name": "16-1-G アフィリエイターを削除する確認",
-      "gap": "drop",
-      "gapNote": "物理削除確認はV6から除外する。紹介者は停止・アーカイブし、過去成果・承認・未払い・支払い記録を保持する。個人情報削除は識別情報の匿名化として別要件にする"
-    },
-    {
-      "feature": 16,
-      "node": "GqFTV",
-      "name": "16-1-H 支払いを確定する",
-      "gap": "api",
-      "gapNote": "同上（締める操作）"
-    },
-    {
       "feature": 20,
       "node": "URqOA",
       "name": "20-1-D 定期レポートをつくる",
@@ -2653,13 +2814,6 @@
       "name": "25-1-B オートメーションが動いた記録",
       "gap": "pending",
       "gapNote": "画面 `/automations/runs` が development に無い。判定は未マージ枝 `75b010fc` で書かれたもの"
-    },
-    {
-      "feature": 3,
-      "node": "ux7of",
-      "name": "3-4-A UID・顧客データ移行／CSV",
-      "gap": "api",
-      "gapNote": "取り込みの記録と突き合わせの結果を持つ口が要る。`vtBCu`（3-4 UID移行）と同じ束"
     }
   ]
 }

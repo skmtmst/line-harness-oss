@@ -8,6 +8,9 @@ import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
 import type { SegmentCondition } from '@/lib/segment-condition'
+import type { BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
+
+const BROADCAST_STEPS = new Set<BroadcastStepKey>(['basic', 'audience', 'message', 'schedule', 'confirm'])
 
 function scoreRangeCondition(params: URLSearchParams): SegmentCondition | null {
   const parse = (key: 'scoreMin' | 'scoreMax') => {
@@ -35,6 +38,19 @@ function NewBroadcastPageContent() {
   const [tags, setTags] = useState<Tag[]>([])
   const [loading, setLoading] = useState(true)
   const initialCondition = scoreRangeCondition(new URLSearchParams(searchParams.toString()))
+  const requestedStep = searchParams.get('step') as BroadcastStepKey | null
+  const currentStep: BroadcastStepKey = requestedStep && BROADCAST_STEPS.has(requestedStep) ? requestedStep : 'basic'
+  const scheduledDateParam = searchParams.get('scheduledDate') ?? ''
+  const scheduledTimeParam = searchParams.get('scheduledTime') ?? '10:00'
+  const initialScheduledDate = /^\d{4}-\d{2}-\d{2}$/.test(scheduledDateParam) ? scheduledDateParam : ''
+  const initialScheduledTime = /^\d{2}:\d{2}$/.test(scheduledTimeParam) ? scheduledTimeParam : '10:00'
+
+  const changeStep = (step: BroadcastStepKey) => {
+    const next = new URLSearchParams(searchParams.toString())
+    if (step === 'basic') next.delete('step')
+    else next.set('step', step)
+    router.replace(`/broadcasts/new${next.size ? `?${next.toString()}` : ''}`, { scroll: false })
+  }
 
   const load = useCallback(async () => {
     try {
@@ -78,6 +94,10 @@ function NewBroadcastPageContent() {
           initialTemplateId={searchParams.get('templateId')}
           initialContentTemplateId={searchParams.get('contentTemplateId')}
           initialCondition={initialCondition}
+          initialScheduledDate={initialScheduledDate}
+          initialScheduledTime={initialScheduledTime}
+          currentStep={currentStep}
+          onStepChange={changeStep}
         />
       )}
     </div>

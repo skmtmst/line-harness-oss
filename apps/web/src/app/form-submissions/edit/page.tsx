@@ -25,6 +25,7 @@ import {
   type FormLayout,
   type FormOptions,
   type FormSection,
+  type FormTheme,
 } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -32,11 +33,13 @@ import Header from '@/components/layout/header'
 import { Field, inputClass } from '@/components/shared/form-controls'
 import BlockEditor, { BLOCK_MENU } from '@/components/forms/block-editor'
 import FormPreview from '@/components/forms/form-preview'
+import FormDesignSettings from './form-design-settings'
 import OptionsDialog from '@/components/forms/options-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 import { EMPTY_REFS, type FormRefs } from '@/components/forms/form-refs'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import Button from '@/components/shared/button'
 
 /** 共通ヘッダを指す番号。セクションの添字と混ぜないために -1 を使う。 */
 const HEADER_TAB = -1
@@ -97,6 +100,11 @@ function jumpsInto(layout: FormLayout, sectionId: string): number {
 function FormEditInner() {
   const params = useSearchParams()
   const id = params.get('id') ?? ''
+  const editorTab = params.get('tab') === 'design'
+    ? 'design'
+    : params.get('tab') === 'options'
+      ? 'options'
+      : 'basic'
   const { selectedAccount, selectedAccountId } = useAccount()
 
   /**
@@ -114,16 +122,23 @@ function FormEditInner() {
   const [isActive, setIsActive] = useState(true)
   const [submitCount, setSubmitCount] = useState(0)
   const [onSubmitTagId, setOnSubmitTagId] = useState('')
+  const [ogTitle, setOgTitle] = useState('')
+  const [ogDescription, setOgDescription] = useState('')
+  const [ogImageUrl, setOgImageUrl] = useState('')
   const [layout, setLayoutState] = useState<FormLayout>(emptyLayout)
   const [tab, setTab] = useState(0)
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [refs, setRefs] = useState<FormRefs>(EMPTY_REFS)
-  const [showOptions, setShowOptions] = useState(false)
+  const [showOptions, setShowOptions] = useState(editorTab === 'options')
   const [showAddMenu, setShowAddMenu] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+
+  useEffect(() => {
+    if (editorTab === 'options') setShowOptions(true)
+  }, [editorTab])
 
   // 元に戻す / やり直す。並べ替えは失敗しても取り返せるようにする。
   const undoStack = useRef<FormLayout[]>([])
@@ -190,6 +205,9 @@ function FormEditInner() {
           setIsActive(res.data.isActive)
           setSubmitCount(res.data.submitCount ?? 0)
           setOnSubmitTagId(res.data.onSubmitTagId ?? '')
+          setOgTitle(res.data.ogTitle ?? '')
+          setOgDescription(res.data.ogDescription ?? '')
+          setOgImageUrl(res.data.ogImageUrl ?? '')
           // layout はサーバ側が必ず作って返す（古いフォームは fields から）
           setLayoutState(res.data.layout ?? emptyLayout())
         }
@@ -350,21 +368,21 @@ function FormEditInner() {
     setRemoveSectionIndex(index)
   }
 
-  const save = async () => {
+  const save = async (): Promise<boolean> => {
     if (!selectedAccountId) {
       setError('LINE公式アカウントを選んでください')
-      return
+      return false
     }
     if (!name.trim()) {
       setError('フォーム名を入力してください')
-      return
+      return false
     }
     const unnamed = layout.header
       .concat(layout.sections.flatMap((s) => s.blocks))
       .find((b) => b.kind === 'input' && !b.label.trim())
     if (unnamed) {
       setError('タイトルが空のブロックがあります')
-      return
+      return false
     }
 
     setSaving(true)
@@ -377,14 +395,19 @@ function FormEditInner() {
         layout,
         onSubmitTagId: onSubmitTagId || null,
         isActive,
+        ogTitle: ogTitle.trim() || null,
+        ogDescription: ogDescription.trim() || null,
+        ogImageUrl: ogImageUrl.trim() || null,
       })
       if (!res.success) {
         setError(res.error)
-        return
+        return false
       }
       setNotice('保存しました')
+      return true
     } catch (e) {
       setError(e instanceof Error ? e.message : '保存に失敗しました')
+      return false
     } finally {
       setSaving(false)
     }
@@ -420,26 +443,26 @@ function FormEditInner() {
           description="ブロックを積んでフォームを作ります。選択肢ごとにタグを付けたり、答えを友だち情報へ入れたりできます。"
           action={
             <div className="flex flex-wrap gap-2">
-              {/* 設計にあるが、まだ作っていないもの。並びから消すと「この画面には
-                  その機能が無い」ように見えるので、押せない状態で置いておく。
-                  デザイン設定は、フォームの見た目をこのアプリのデザインに
-                  そろえる方針にしたため、色やフォントを選ぶ画面は作っていない。 */}
-              {['マニュアル', '下書き保存', 'デザイン設定'].map((label) => (
-                <button
-                  key={label}
-                  disabled
-                  title="準備中です"
-                  className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-                >
-                  {label}
-                </button>
-              ))}
-              <button
-                onClick={() => setShowOptions(true)}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
+              <Button href="/support">マニュアル</Button>
+              <Button onClick={() => void save()} disabled={saving}>下書き保存</Button>
+              <Button
+                href={`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=basic`}
+                variant={editorTab === 'basic' ? 'primary' : 'secondary'}
+              >
+                フォーム編集
+              </Button>
+              <Button
+                href={`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=design`}
+                variant={editorTab === 'design' ? 'primary' : 'secondary'}
+              >
+                デザイン設定
+              </Button>
+              <Button
+                href={`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=options`}
+                variant={editorTab === 'options' ? 'primary' : 'secondary'}
               >
                 オプション設定
-              </button>
+              </Button>
             </div>
           }
         />
@@ -487,7 +510,7 @@ function FormEditInner() {
               note={
                 answerUrl
                   ? '友だちに配るURLです。LINEの中で開きます。'
-                  : 'このアカウントに LIFF を登録すると、配れるURLが出ます。'
+                  : '回答用URLを発行する設定がまだありません。LINEアカウント設定を確認してください。'
               }
             >
               {answerUrl ? (
@@ -529,11 +552,30 @@ function FormEditInner() {
           <div className="grid gap-4 xl:grid-cols-[minmax(320px,26rem)_minmax(0,1fr)]">
             {/* ---- 出来上がり ---- */}
             <section data-design="Preview" className="xl:sticky xl:top-4 xl:self-start">
-              <h2 className="text-ink-secondary mb-2 text-xs font-medium">出来上がり</h2>
+              <h2 className="text-ink-secondary mb-1 text-xs font-medium">お客さまに見える形</h2>
+              <p className="mb-2 text-xs text-ink-faint">実際にお客さまが見る画面です</p>
               <FormPreview layout={layout} sectionIndex={tab === HEADER_TAB ? 0 : tab} />
+              <p className="mt-2 text-center text-xs text-ink-faint">
+                このフォームは {selectedAccount?.name ?? '選択中のLINE公式アカウント'} が作成しています
+              </p>
             </section>
 
             {/* ---- 設定 ---- */}
+            {editorTab === 'design' ? (
+              <FormDesignSettings
+                value={layout.options.theme}
+                ogTitle={ogTitle}
+                ogDescription={ogDescription}
+                ogImageUrl={ogImageUrl}
+                onChange={(theme: FormTheme) => setLayout((prev) => ({
+                  ...prev,
+                  options: { ...prev.options, theme },
+                }))}
+                onOgTitleChange={setOgTitle}
+                onOgDescriptionChange={setOgDescription}
+                onOgImageUrlChange={setOgImageUrl}
+              />
+            ) : (
             <section className="min-w-0">
               {/* タブ */}
               <div className="border-hairline flex flex-wrap items-center gap-1 border-b pb-2">
@@ -647,7 +689,7 @@ function FormEditInner() {
                       onClick={() => setShowAddMenu((v) => !v)}
                       className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-3 py-1.5 text-xs font-medium"
                     >
-                      ＋ ブロックを追加
+                      ＋ ブロックを追加（12種）
                     </button>
                     {showAddMenu && (
                       <>
@@ -723,6 +765,7 @@ function FormEditInner() {
                 {notice && <p className="text-success text-sm">{notice}</p>}
               </div>
             </section>
+            )}
           </div>
         </>
       )}
@@ -734,7 +777,7 @@ function FormEditInner() {
             disabled={saving}
             className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
           >
-            {saving ? '保存中...' : 'フォームを保存'}
+            {saving ? '保存中...' : editorTab === 'design' ? 'デザインを保存' : 'フォームを保存'}
           </button>
         )}
       />
@@ -780,6 +823,10 @@ function FormEditInner() {
           refs={refs}
           onChange={(options: FormOptions) => setLayout((prev) => ({ ...prev, options }))}
           onClose={() => setShowOptions(false)}
+          onSave={async () => {
+            const saved = await save()
+            if (saved) setShowOptions(false)
+          }}
         />
       )}
     </div>

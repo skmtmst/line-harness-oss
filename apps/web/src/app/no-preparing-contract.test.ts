@@ -88,7 +88,6 @@ const DESIGN_WORDS: Record<string, number> = {
  *   絞り込みの「30日以上の絞り込みは準備中」と、行き先の決まっていない「マニュアル」。
  */
 const REMAINING: Record<string, number> = {
-  'app/accounts/migration.tsx': 2,
   'app/booking/bookings/detail/page.tsx': 4,
   'app/booking/bookings/page.tsx': 5,
   'app/booking/menus/staff/page.tsx': 1,
@@ -99,7 +98,6 @@ const REMAINING: Record<string, number> = {
   'app/ec-commerce/page.tsx': 2,
   'app/events/bookings/page.tsx': 3,
   'app/events/page.tsx': 6,
-  'app/form-submissions/edit/page.tsx': 1,
   'app/friends/detail/page.tsx': 1,
   'app/restaurant-test/stores/new/page.tsx': 1,
   'app/scenarios/detail/scenario-detail-client.tsx': 1,
@@ -112,7 +110,6 @@ const REMAINING: Record<string, number> = {
   'app/webinars/page.tsx': 1,
   'components/broadcasts/broadcast-form.tsx': 7,
   'components/events/event-wizard.tsx': 2,
-  'components/friends/bulk-run-dialog.tsx': 1,
   'components/friends/friend-timeline.tsx': 1,
 }
 
@@ -121,7 +118,7 @@ describe('画面に「準備中」を置かない', () => {
     // 数え漏れ（読む場所を間違えて 0 件になる）だけを見張る。
     // ちょうどの枚数は画面が増えるたびに動くので、下限をゆるく取る。
     expect(FILES.length).toBeGreaterThan(300)
-    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(144)  // 2026-09-04: マイルの使い道とリマインダ実行結果を加えた実測値。
+    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(146)  // 2026-09-06: UID・顧客データ移行画面を加えた実測値。
   })
 
   it('共通部品に「準備中」が1つも無い', () => {
