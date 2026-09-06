@@ -3497,22 +3497,22 @@ const ISSUE_328_REVIEW = {
   sfTEW: {
     verdict: 'match',
     note: '一致。CSV名、4件数、状態絞り込み、代表5行、行別の扱いと理由、部分登録の注意、取消・登録を設計順に表示した。件数はAPI応答で変わるため、固定データの500行・作成404・飛ばす73・エラー23で照合した。1440・1920pxとも横はみ出し0、壊れた値0。',
-    source: 'friend-attributes-v6/sfTEW.png + friend-attributes-v6/sfTEW-{1440,1920}.png',
+    source: 'friend-attributes-v6/sfTEW.txt + friend-attributes-v6/sfTEW-{1440,1920}.png',
   },
   op1rh: {
     verdict: 'match',
     note: '一致。完了の緑帯、登録404件、フォルダ別内訳（VIP120・会員200・未分類84）、飛ばした73件、一覧へ戻る操作を設計順に表示した。1440・1920pxとも横はみ出し0、壊れた値0。',
-    source: 'friend-attributes-v6/op1rh.png + friend-attributes-v6/op1rh-{1440,1920}.png',
+    source: 'friend-attributes-v6/op1rh.txt + friend-attributes-v6/op1rh-{1440,1920}.png',
   },
   QzRsJ: {
     verdict: 'match',
     note: '一致。部分失敗の黄帯、登録404件・未登録23件、代表5行の異なる理由、失敗行CSV、一覧へ戻る操作を設計順に表示した。フォルダ名は失敗CSVへ残し、画面表は設計どおり行・タグ名・理由の3列に絞った。1440・1920pxとも横はみ出し0、壊れた値0。',
-    source: 'friend-attributes-v6/QzRsJ.png + friend-attributes-v6/QzRsJ-{1440,1920}.png',
+    source: 'friend-attributes-v6/QzRsJ.txt + friend-attributes-v6/QzRsJ-{1440,1920}.png',
   },
   byqIW: {
     verdict: 'match',
     note: '一致。「お問い合わせフォロー」の名前、保存済みの紫、8色と選択中表示、一覧プレビュー、追加・編集共用の案内、削除・取消・保存を設計と同じ編集窓に配置した。色はAPIの保存値を表示する可変項目。1440・1920pxとも横はみ出し0、壊れた値0。',
-    source: 'friend-attributes-v6/byqIW.png + friend-attributes-v6/byqIW-{1440,1920}.png',
+    source: 'friend-attributes-v6/byqIW.txt + friend-attributes-v6/byqIW-{1440,1920}.png',
   },
 }
 
