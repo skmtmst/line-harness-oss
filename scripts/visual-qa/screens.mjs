@@ -808,8 +808,9 @@ export const SCREENS = [
     */
     ...BROADCAST, node: 'bPF0s', name: '6-1-I 一斉配信・予約完了',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S0 再判定（#215）。** 要修正。固定配信を `visual-qa-account` に所属させ、詳細APIと人数確認の固定結果を追加した。予約完了と取消確認を1440・1920で撮影でき、別画面・権限不足・横はみ出しは0。**撮影不能は解消。** 残る設計差は、Pencilの5段完了表示・管理名/配信対象/送信予定/状態の要約・Slack通知・右側「次にできること」に対し、実装は完了カード・KPI3枚・予約内容・中央の3操作という構造であること。取得元 `broadcasts-v6/bPF0s.txt`、`bPF0s-cancel.txt` と同Node画像。',
-    verdictHead: 'fc3cb9aede',
+    verdictNote: '**2026-09-06 #247 再判定。** 5段の完了表示、管理名・配信対象・送信予定・状態の要約、右側の「次にできること」を実装した。予約内容の確認、予約中のテスト送信、設定を保った複製、確認窓を経た取消はいずれも実APIへ接続した。通常・取消確認を1440・1920で撮影し、別画面・画面エラー・横はみ出しは0。**残る設計差**：共通STEP帯は外枠付きで、設計のSlack通知は送信口が無いため表示していない。また設計の「配信内容を編集」は専用操作ではなく「予約内容を確認」から扱う。このため要修正のまま。',
+    verdictSource: 'broadcasts-v6/bPF0s.txt + broadcasts-v6/bPF0s-1440.png + broadcasts-v6/bPF0s-1920.png + broadcasts-v6/bPF0s-cancel-1440.png + broadcasts-v6/bPF0s-cancel-1920.png',
+    verdictHead: 'e9180c24a',
     route: '/broadcasts/reserved?id=broadcast-0', mode: 'page',
     /* 押した先の確認窓。**窓はビューポートで撮る**（`fullPage` だと下へ流れる）。 */
     variants: [{
@@ -866,8 +867,9 @@ export const SCREENS = [
   {
     ...BROADCAST, node: 'xkRDb', name: '6-1-M フォルダ操作',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S0 再判定（#215）。** 要修正。共通フォルダ行の「…」から、名前変更・色変更・上下移動・削除・削除後の注意をすべて表示できる。`data-qa-open="xkRDb"` で1440・1920を撮影し、メニュー切れ・別画面・横はみ出しは0。**操作メニューの撮影不能は解消。** ただし画面全体は、PencilのKPI値・検索/絞り込み・一覧情報量・ページ送りと実装に既存差が残るため要修正のまま。取得元 `broadcasts-v6/xkRDb.txt` と同Node画像。', route: '/broadcasts',
-    verdictHead: 'fc3cb9aede',
+    verdictNote: '**2026-09-06 #247 再判定。** フォルダ追加と「…」内の名前変更・色変更・上下移動・削除を実APIへ接続し、一覧APIがフォルダ所属と開封計測設定を返すようにした。別LINEアカウントを指定した一覧取得は403で拒否する。画面は重複見出しを外し、KPI→作成操作→フォルダ・一覧の順へ合わせた。通常・追加窓・操作メニューを1440・1920で撮影し、メニュー切れ・画面エラー・横はみ出しは0。**残る設計差**：撮影用モックではKPIが未取得表示となる。設計に無いテンプレート操作が一覧上部にあり、絞り込み・ページ送り・一覧情報量にも差がある。このため要修正のまま。', route: '/broadcasts',
+    verdictSource: 'broadcasts-v6/xkRDb.txt + broadcasts-v6/xkRDb-1440.png + broadcasts-v6/xkRDb-1920.png + broadcasts-v6/xkRDb-add-1440.png + broadcasts-v6/xkRDb-add-1920.png',
+    verdictHead: 'e9180c24a',
     mode: 'viewport', height: 1080, steps: [{ qaOpen: 'xkRDb', after: 700 }],
     variants: [{ suffix: '-add', steps: [{ click: 'フォルダを追加', after: 700 }] }],
 
