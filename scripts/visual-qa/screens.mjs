@@ -1241,6 +1241,8 @@ export const SCREENS = [
       kinds: ['normal', 'empty', 'error', 'forbidden'],
     }, },
   { ...WEBINAR, node: 'lvaY5', name: '10-1-A ウェビナーを作成',
+    mode: 'viewport', height: 1080,
+    steps: [{ fill: 'ウェビナー名', text: 'NEN活用スタートセミナー' }],
     verdict: 'needs_fix',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/webinars/new`。1440・1920で撮った（はみ出し0）。**5段のステッパー（STEP 1〜5、うち STEP 3 は「CTA・フォーム」）とLINEプレビューが無い。** 実装だけにある行が2つ（「URL・動画ファイルの詳細設定」「従来CTAボタンの設定」）。取得元 `webinars-v6/lvaY5.txt`',
     verdictHead: '49e1341c', route: '/webinars/new', },
