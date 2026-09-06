@@ -14,22 +14,31 @@ describe('V6回答フォーム削除確認 gBp2J', () => {
     expect(PAGE).toContain('回答フォームを削除')
   })
 
-  it('消えるもの・残るもの・元に戻せないことを明記する', () => {
-    expect(PAGE).toContain('フォームの質問・公開設定・集まった回答を削除します。')
-    expect(PAGE).toContain('回答から友だち情報欄やタグへ反映済みの内容は残ります。')
-    expect(PAGE).toContain('この操作は元に戻せません。')
+  it('影響確認を先に読み、公開中・回答あり・利用中はアーカイブへ分ける', () => {
+    expect(PAGE).toContain('api.forms.deleteImpact(form.id, selectedAccountId)')
+    expect(PAGE).toContain('公開状態・回答数・利用中の場所を確認しています。')
+    expect(PAGE).toContain('deleteImpact.submissionCount')
+    expect(PAGE).toContain('deleteImpact.referenceCount')
+    expect(PAGE).toContain('開けなくなる公開URL')
+    expect(PAGE).toContain("await api.forms.archive(targetId, selectedAccountId, deleteImpact.revision)")
   })
 
   it('実行中の二重押しとダイアログを閉じる操作を止める', () => {
-    expect(PAGE).toContain('if (!deleteTarget || deleting || !selectedAccountId) return')
-    expect(PAGE).toContain('busy={deleting}')
-    expect(PAGE).toContain('if (deleting) return')
+    expect(PAGE).toContain('if (!deleteTarget || !deleteImpact || deleting || stopping || !selectedAccountId) return')
+    expect(PAGE).toContain('busy={deleting || stopping || deleteImpactLoading}')
+    expect(PAGE).toContain('if (deleting || stopping) return')
   })
 
   it('APIが失敗したときは成功扱いせず安全な日本語をダイアログ内に出す', () => {
     expect(PAGE).toContain('if (!result.success) throw new Error')
-    expect(PAGE).toContain('この回答フォームを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    expect(PAGE).toContain('この回答フォームをアーカイブできませんでした。状態を読み直してから、もう一度お試しください。')
     expect(PAGE).toContain('error={deleteError}')
+  })
+
+  it('受付だけ止めるときは回答と一覧を残す', () => {
+    expect(PAGE).toContain('受付だけ止める（おすすめ）')
+    expect(PAGE).toContain("api.forms.update(deleteTarget.id, selectedAccountId, { isActive: false })")
+    expect(PAGE).toContain("form.id === deleteTarget.id ? { ...form, isActive: false } : form")
   })
 
   it('成功時は削除したカードを外し、開いていた回答も閉じる', () => {

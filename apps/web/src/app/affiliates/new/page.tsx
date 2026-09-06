@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { LineAccount } from '@line-crm/shared'
+import type { Friend } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import CreatePage, {
   AsideCard,
@@ -10,6 +10,7 @@ import CreatePage, {
   FormSection,
 } from '@/components/shared/create-page'
 import { TextInput } from '@/components/shared/form-controls'
+import SelectField from '@/components/shared/select-field'
 
 /**
  * 入力欄の幅。
@@ -70,7 +71,8 @@ export default function NewAffiliatePage() {
   const [payoutCycle, setPayoutCycle] = useState('')
   const [notifyOnConversion, setNotifyOnConversion] = useState(true)
   const [startTracking, setStartTracking] = useState(true)
-  const [accounts, setAccounts] = useState<LineAccount[]>([])
+  const [friends, setFriends] = useState<Friend[]>([])
+  const [friendId, setFriendId] = useState('')
   const [copied, setCopied] = useState(false)
   // 作成後の追加情報保存だけが失敗した場合、再押下で同じ紹介者を増やさず
   // 追加情報の保存だけをやり直す。
@@ -78,11 +80,14 @@ export default function NewAffiliatePage() {
 
   useEffect(() => {
     let cancelled = false
-    void api.lineAccounts
-      .list()
-      .then((res) => {
-        if (!cancelled && res.success) setAccounts(res.data as unknown as LineAccount[])
-      })
+    void Promise.allSettled([
+      api.friends.list({ limit: 20, includeTags: false }),
+    ]).then(([friendResult]) => {
+      if (cancelled) return
+      if (friendResult.status === 'fulfilled' && friendResult.value.success) {
+        setFriends(friendResult.value.data.items as unknown as Friend[])
+      }
+    })
       .catch(() => {
         // アカウントが引けなくても、登録はできる。
       })
@@ -96,7 +101,7 @@ export default function NewAffiliatePage() {
 
   return (
     <CreatePage
-      title="アフィリエイターを追加する"
+      title="アフィリエイターを登録する"
       description="紹介してくれる方に専用のリンクを渡し、成果と報酬を記録します。"
       parent={['成果とアフィリエイト', '/conversions?tab=affiliates']}
       saveLabel="登録して、紹介リンクを発行する"
@@ -133,6 +138,7 @@ export default function NewAffiliatePage() {
         setCommissionRate('')
         setHoldDays('30')
         setPayoutCycle('')
+        setFriendId('')
         setNotifyOnConversion(true)
         setStartTracking(true)
         setCopied(false)
@@ -147,6 +153,7 @@ export default function NewAffiliatePage() {
               code: code.trim() || undefined,
               commissionRate:
                 payoutKind === 'rate' && commissionRate.trim() ? Number(commissionRate) : undefined,
+              friendId: friendId || undefined,
               issueInitialLink: true,
             })
             if (!res.success) throw new Error('create_failed')
@@ -174,12 +181,16 @@ export default function NewAffiliatePage() {
       }}
       aside={
         <>
-          <AsideCard title="渡し方の例">
-            <ul className="text-ink-faint space-y-1.5 text-xs leading-relaxed">
-              <li>・ブログ記事や紹介ページに設置</li>
-              <li>・SNSのプロフィール欄に掲載</li>
-              <li>・メールマガジンの本文に記載</li>
-            </ul>
+          <AsideCard title="成果が出たときにすること">
+            <label className="border-hairline flex items-start gap-2 rounded-control border p-3 text-sm">
+              <input type="checkbox" className="mt-0.5" checked={notifyOnConversion} onChange={(e) => setNotifyOnConversion(e.target.checked)} />
+              <span><strong className="text-ink block">本人へメールで知らせる</strong><span className="text-ink-faint text-xs">報酬が確定したタイミングで届きます</span></span>
+            </label>
+            <label className="border-hairline mt-2 flex items-start gap-2 rounded-control border p-3 text-sm">
+              <input type="checkbox" className="mt-0.5" checked={startTracking} onChange={(e) => setStartTracking(e.target.checked)} />
+              <span><strong className="text-ink block">すぐに計測を始める</strong><span className="text-ink-faint text-xs">オフでもリンクは発行されます</span></span>
+            </label>
+            <Unavailable label="成果時の動き" reason="まだ繋がっていません。紹介者ごとの成果時の動きが接続されると表示されます。" />
           </AsideCard>
 
           <AsideCard title="つながる先">
@@ -203,6 +214,7 @@ export default function NewAffiliatePage() {
       }
     >
       <FormSection step={1} label="だれを登録するか">
+        <div className="grid gap-3 lg:grid-cols-3">
         <Field label="名前・屋号" htmlFor="af-name" required>
           <TextInput
             id="af-name"
@@ -239,12 +251,21 @@ export default function NewAffiliatePage() {
             className={W_CODE}
           />
         </Field>
+        </div>
 
-        {/* 設計 xqT1Z にある「友だち検索」。作成のAPIが友だちIDを受けない。 */}
-        <Unavailable
-          label="LINEの友だちと結びつける（任意）"
-          reason="まだ繋がっていません。友だち検索が接続されると表示されます。"
-        />
+        <Field label="LINEの友だちと結びつける（任意）" htmlFor="af-friend" note="結びつけると、成果が出たときに本人へ知らせられます。">
+          <SelectField
+            id="af-friend"
+            aria-label="LINEの友だちと結びつける"
+            value={friendId}
+            onChange={(event) => setFriendId(event.target.value)}
+            className="w-full max-w-lg"
+            options={[
+              { value: '', label: '友だちの名前で探す' },
+              ...friends.map((friend) => ({ value: friend.id, label: friend.displayName })),
+            ]}
+          />
+        </Field>
       </FormSection>
 
       <FormSection step={2} label="いくら払い、いつ締めるか">
@@ -288,20 +309,14 @@ export default function NewAffiliatePage() {
           </Field>
         )}
 
-        {/* 何をもって成果とするかは案件（offer）側で決まる。ここに置くと、
-            同じことを2か所で決められるように見える。 */}
-        <Unavailable
-          label="成果として数えるもの"
-          reason="何を成果として数えるかは案件ごとに決めます。ここでは決められません。"
-        />
-
-        {/* 設計 xqT1Z にある「1件あたりの上限」。回数を持つ列が無い。 */}
-        <Unavailable
-          label="1件あたりの上限"
-          reason="まだ繋がっていません。上限の回数が接続されると表示されます。"
-        />
-
         <div className="grid gap-3 sm:grid-cols-2">
+          <Unavailable label="成果として数えるもの" reason="案件ごとに決めます。" />
+          <Unavailable label="1件あたりの上限" reason="まだ繋がっていません。上限回数が接続されると表示されます。" />
+        </div>
+      </FormSection>
+
+      <FormSection step={3} label="いつ締めて、いつ払うか">
+        <div className="grid gap-3 lg:grid-cols-4">
           <Field
             label="確定までの保留期間"
             htmlFor="af-hold"
@@ -332,64 +347,9 @@ export default function NewAffiliatePage() {
               className={W_EMAIL}
             />
           </Field>
-        </div>
-
-        {/* アフィリエイターにアカウントを紐づける列が無い。案件側にはある。 */}
-        <Unavailable
-          label="対象アカウント"
-          reason={`対象は案件ごとに決めます（登録済み ${accounts.length}件）。ここでは決められません。`}
-        />
-
-        {/* 設計 xqT1Z にある「振込先の登録」。口座を持つ列が無い。 */}
-        <Unavailable
-          label="振込先の登録"
-          reason="まだ繋がっていません。振込先が接続されると表示されます。"
-        />
-      </FormSection>
-
-      <FormSection step={3} label="そのほか">
-        <label className="text-ink-secondary flex items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="mt-0.5"
-            checked={notifyOnConversion}
-            onChange={(e) => setNotifyOnConversion(e.target.checked)}
-          />
-          <span>
-            成果が出たらメールで知らせる
-            <span className="text-ink-faint block text-xs">
-              報酬が確定したタイミングで本人に届きます。
-            </span>
-          </span>
-        </label>
-
-        <label className="text-ink-secondary flex items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="mt-0.5"
-            checked={startTracking}
-            onChange={(e) => setStartTracking(e.target.checked)}
-          />
-          <span>
-            追加したらすぐ計測を始める
-            <span className="text-ink-faint block text-xs">
-              オフにするとリンクは発行されますが計測しません。
-            </span>
-          </span>
-        </label>
-
-        {/* 設計 xqT1Z にある「成果時の動き」。タグ付けとシナリオ開始は案件側にある。 */}
-        <Unavailable
-          label="成果時の動き"
-          reason="まだ繋がっていません。紹介者ごとの成果時の動きが接続されると表示されます。"
-        />
-      </FormSection>
-
-      <FormSection step={4} label="この方に渡すURL" note="保存すると確定します。">
-        {/* コードを空欄にすると worker が自動で作るので、保存前はURLが決まらない。
-            決まっていないものを「コピー」させると、届かないURLを配れてしまう。
-            入力したコードがあるときだけ押せる形にして、無いときは理由を出す。 */}
-        <div className="border-hairline rounded-control border px-3 py-2">
+          <Unavailable label="振込先の登録" reason="まだ繋がっていません。銀行・支店・種別・末尾4桁が接続されると表示されます。" />
+          <div className="border-hairline rounded-control border px-3 py-2">
+          <p className="text-ink-secondary text-xs font-semibold">この方に渡すURL</p>
           <div className="flex items-center gap-2">
             <code className="text-ink-secondary min-w-0 flex-1 truncate text-xs">
               {previewUrl ?? '—'}
@@ -416,6 +376,7 @@ export default function NewAffiliatePage() {
                 : '保存すると、このURLで確定します。'
               : '紹介コードを空欄のままにすると、保存したときに自動で決まります。決まる前のURLはコピーできません。'}
           </p>
+        </div>
         </div>
       </FormSection>
     </CreatePage>

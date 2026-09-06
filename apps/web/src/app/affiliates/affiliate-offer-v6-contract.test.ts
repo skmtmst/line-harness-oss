@@ -176,7 +176,7 @@ describe('V6 案件一覧（GH8VL）の画面', () => {
     expect(TABS).not.toContain('?? offer.lineAccountId')
     expect(TABS).not.toContain('?? offer.tagId')
     expect(TABS).not.toContain('?? offer.scenarioId')
-    expect(TABS).toContain("'—（名前を確認できません）'")
+    expect(TABS).toContain("'名前を確認できません'")
   })
 })
 
@@ -207,9 +207,11 @@ describe('V6 アフィリエイターを追加する（xqT1Z）', () => {
 
   it('口の無い項目は押せない入力欄ではなく、—と理由で出す', () => {
     expect(NEW_PAGE).toContain('function Unavailable(')
-    for (const label of ['LINEの友だちと結びつける（任意）', '1件あたりの上限', '振込先の登録', '成果時の動き']) {
+    for (const label of ['1件あたりの上限', '振込先の登録', '成果時の動き']) {
       expect(NEW_PAGE).toContain(`label="${label}"`)
     }
+    expect(NEW_PAGE).toContain('api.friends.list({ limit: 20, includeTags: false })')
+    expect(NEW_PAGE).toContain('friendId: friendId || undefined')
     // 押せない入力欄を残していない。
     expect(NEW_PAGE).not.toMatch(/<TextInput\s+disabled/)
     expect(NEW_PAGE).not.toContain('<select id="af-account" disabled')
@@ -217,7 +219,7 @@ describe('V6 アフィリエイターを追加する（xqT1Z）', () => {
 
   it('未接続の言い方をそろえる', () => {
     const notWired = NEW_PAGE.match(/まだ繋がっていません。[^"]*が接続されると表示されます。/g) ?? []
-    expect(notWired).toHaveLength(4)
+    expect(notWired).toHaveLength(3)
   })
 
   it('URLのコピーは、コードが決まっているときだけ押せる', () => {
