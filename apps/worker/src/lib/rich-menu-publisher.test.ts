@@ -730,6 +730,18 @@ describe('linkRichMenuBulkChunked', () => {
     expect(line.calls).toEqual(['link-bulk-500', 'link-bulk-500', 'link-bulk-100']);
   });
 
+  it('成功したチャンクだけを順番に台帳コールバックへ渡す', async () => {
+    const line = makeMockLineClient();
+    const ids = Array.from({ length: 501 }, (_, i) => `U${i}`);
+    const recorded: Array<{ size: number; index: number }> = [];
+
+    await linkRichMenuBulkChunked(line, 'lm-1', ids, async (chunk, index) => {
+      recorded.push({ size: chunk.length, index });
+    });
+
+    expect(recorded).toEqual([{ size: 500, index: 0 }, { size: 1, index: 1 }]);
+  });
+
   it('空配列は no-op', async () => {
     const line = makeMockLineClient();
     const result = await linkRichMenuBulkChunked(line, 'lm-1', []);
