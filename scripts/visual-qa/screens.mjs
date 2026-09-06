@@ -3213,11 +3213,13 @@ const ISSUE_296_REVIEW = {
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-07 Issue #296で修正・再判定。** 6つの起点、名前、対象商品、同じ人を数える3択、金額・取消、利用先、保存前試算を設計と同じ4区画＋右欄へ組み直した。3104/8791で入力済み状態を1440px・1920px撮影し、Pencil 1920pxと同じ比較画像で確認。両幅とも横はみ出し0。注文・フォーム・予約・ページ到達は既存契約へ接続したが、動画・タグ、30日に1回、取消処理、利用先、入力内容だけの試算は保存・取得APIが無く、値を作らず無効表示または接続条件を示すため一致にはしない。**推奨修正：起点と回数条件の保存契約を拡張し、次に取消・利用先・保存前試算APIを接続する。**',
     verdictSource: 'conversions-v6/GtylA.txt + conversions-v6/GtylA-1440.png + conversions-v6/GtylA-1920.png + 2026-09-07 same-input comparison',
+    verdictHead: 'bfff7afa0',
   },
   d8d3Mz: {
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-07 Issue #296で修正・再判定。** 計測停止・別地点への差し替え・物理削除の3択、過去記録を残す説明、利用先の影響欄を設計順に表示した。3104/8791で同じ成果地点の確認状態を1440px・1920px撮影し、Pencil 1920pxと同じ比較画像で確認。両幅とも横はみ出し0。既定操作の「数えるのをやめる」は既存の停止契約へ接続したが、利用先一覧、差し替え、物理削除の可否判定・実行APIが無く、件数を0と作らず未接続と明示して操作を無効にしているため一致にはしない。**推奨修正：利用先と停止影響を返すAPIを先に接続し、その後に差し替えと未使用時だけの物理削除契約を追加する。**',
     verdictSource: 'conversions-v6/d8d3Mz.txt + conversions-v6/d8d3Mz-1440.png + conversions-v6/d8d3Mz-1920.png + 2026-09-07 same-input comparison',
+    verdictHead: 'bfff7afa0',
   },
 }
 
@@ -3865,7 +3867,6 @@ for (const screen of SCREENS) {
   }
   if (screen.feature === 19 && ISSUE_296_REVIEW[screen.node]) {
     Object.assign(screen, ISSUE_296_REVIEW[screen.node])
-    delete screen.verdictHead
   }
   if (screen.feature === 21 && FEATURE_21_AUDIT[screen.node]) {
     Object.assign(screen, FEATURE_21_AUDIT[screen.node])
@@ -3976,6 +3977,8 @@ export const CAPTURED_AT = {
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
     { pr: 981, head: '83be84278', on: '2026-09-06', screens: ['ZrpKn','GUxsj','GtylA'],
       note: 'Issue #232。3 Nodeを1440px・1920pxで撮影し、★V6設計の1920px画像と並べて確認。全6枚で横はみ出し0。実数表示を接続し、残るAPI・保存契約の差を判定注記へ記録した。' },
+    { pr: 1093, head: 'bfff7afa0', on: '2026-09-07', screens: ['GtylA','d8d3Mz'],
+      note: 'Issue #296。入力済みの作成画面と停止確認を3104/8791で1440px・1920px撮影し、★V6設計1920pxと1枚に並べて確認。両幅とも横はみ出し0。既存契約で扱える操作を接続し、残るAPI差を理由付き構造一致として記録した。' },
   ],
   20: [
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['Zxezb','J6Inc','YBGtm','QQ1SR','f5HsX','C2I7ry','Fh2Qj','dfwD4'],
