@@ -3986,6 +3986,7 @@ export const CAPTURED_AT = {
   1: [
     { pr: 419, head: 'c84baa63', on: '2026-08-30', screens: ['vUXKb', 'ZN0ov', 'JN6mQ', 'NjK9q', 'Alekb'], note: 'ダッシュボード。お知らせの口を撮影モックへ足した（`counts` の4つが欠けると `undefined.all` で落ちる）' },
     { pr: 971, head: 'd69099cd9', on: '2026-09-06', screens: ['vUXKb', 'JN6mQ'], note: 'Issue #267。3102/8789で対象2画面を1440・1920px撮影し、Pencil設計と比較。両画面とも横はみ出し0。構造は一致し、設計値と公式プロフィール短縮URLを返すAPIがないためデータ未接続を維持した。' },
+    { pr: 1028, head: '7cc11af48', on: '2026-09-07', screens: ['vUXKb', 'JN6mQ'], note: 'Issue #267。#270の指標APIと#277の撮影モックを接続し、3102/8789で1440・1920pxを再撮影。両画面とも横はみ出し0、表示中の本文差0。有効友だち398人、送信枠197/200、7日推移、公式lin.ee URL、実QRを確認して一致にした。' },
   ],
   23: [
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['eI3gs'], note: '同上' },
