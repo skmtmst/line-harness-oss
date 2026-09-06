@@ -59,4 +59,21 @@ describe('受信箱 保存した検索の完了判定', () => {
     // 自前の小さな赤字へ戻さない（共通部品を通す）。
     expect(DIALOG).not.toContain('className="text-danger mt-1.5 text-xs" role="alert"')
   })
+
+  it('設計と同じ入力案内と保存ボタン名を使う', () => {
+    expect(DIALOG).toContain('placeholder="検索名を入力してください"')
+    expect(DIALOG).toContain("{saving ? '保存中' : '検索条件を保存'}")
+    expect(PAGE).toContain('現在の条件を保存')
+  })
+
+  it('保存条件ごとの件数が未接続なら0件にせず理由を出す', () => {
+    expect(PAGE).toContain("typeof view.matchCount === 'number' ? `${view.matchCount}件` : '—件'")
+    expect(PAGE).toContain('「—件」は0件ではありません。')
+  })
+
+  it('削除は名前の隣へ常設せず、その他操作へ畳む', () => {
+    expect(PAGE).toContain("import { MoreAction } from '@/components/shared/row-actions'")
+    expect(PAGE).toContain('label={`${view.name}の操作`}')
+    expect(PAGE).toContain('保存した検索を削除')
+  })
 })
