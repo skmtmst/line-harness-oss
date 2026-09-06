@@ -21,6 +21,20 @@ import {
   readBoundedJsonObject,
   validateNenColumnCreateBody,
 } from '../services/nen-column-contract.js';
+import {
+  getNenColumnMetrics,
+  getNenDeliveryDetail,
+  getNenFlowMetrics,
+  getNenPetMetrics,
+  listNenDeliveries,
+  nenDeliveryRange,
+  NenCampaignMetricsError,
+  nenMetricsRange,
+  normalizeDeliveryStatus,
+  retryNenDelivery,
+} from '../services/nen-campaign-metrics.js';
+import { auditLog } from '../lib/audit-log.js';
+import { listLimit } from './list-pagination.js';
 
 const nenCampaigns = new Hono<Env>();
 const CAMPAIGN_KEYS = new Set([
@@ -36,6 +50,31 @@ async function requireAccount(c: Context<Env>): Promise<string | Response> {
     return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
   }
   return accountId;
+}
+
+function metricsError(c: Context<Env>, error: unknown): Response {
+  if (error instanceof NenCampaignMetricsError) {
+    return c.json({
+      success: false,
+      code: error.code,
+      error: error.message,
+      ...(error.field ? { field: error.field } : {}),
+    }, error.status);
+  }
+  console.error(JSON.stringify({
+    event: 'nen_campaign_metrics_failed',
+    path: c.req.path,
+    reason: error instanceof Error ? error.message : String(error),
+  }));
+  return c.json({ success: false, error: 'NEN配信の情報を取得できませんでした' }, 500);
+}
+
+function cursorOffset(value: string | undefined): number {
+  if (!value) return 0;
+  if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value))) {
+    throw new NenCampaignMetricsError('cursor_invalid', '続きの位置が正しくありません', 400, 'cursor');
+  }
+  return Number(value);
 }
 
 function isUrl(value: string): boolean {
@@ -206,6 +245,93 @@ nenCampaigns.get('/api/nen-campaigns/jobs', async (c) => {
     scheduledAt: row.scheduled_at, status: row.status, attempts: row.attempts,
     lastError: row.last_error, sentAt: row.sent_at,
   })) });
+});
+
+nenCampaigns.get('/api/nen-campaigns/metrics/flows', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const accountId = await requireAccount(c);
+  if (typeof accountId !== 'string') return accountId;
+  try {
+    const data = await getNenFlowMetrics(c.env.DB, accountId, nenMetricsRange(c.req.query('days')));
+    return c.json({ success: true, data });
+  } catch (error) {
+    return metricsError(c, error);
+  }
+});
+
+nenCampaigns.get('/api/nen-campaigns/metrics/columns', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const accountId = await requireAccount(c);
+  if (typeof accountId !== 'string') return accountId;
+  try {
+    const data = await getNenColumnMetrics(c.env.DB, accountId, nenMetricsRange(c.req.query('days')));
+    return c.json({ success: true, data });
+  } catch (error) {
+    return metricsError(c, error);
+  }
+});
+
+nenCampaigns.get('/api/nen-campaigns/metrics/pets', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const accountId = await requireAccount(c);
+  if (typeof accountId !== 'string') return accountId;
+  try {
+    const data = await getNenPetMetrics(c.env.DB, accountId, nenMetricsRange(c.req.query('days')));
+    return c.json({ success: true, data });
+  } catch (error) {
+    return metricsError(c, error);
+  }
+});
+
+nenCampaigns.get('/api/nen-campaigns/deliveries', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const accountId = await requireAccount(c);
+  if (typeof accountId !== 'string') return accountId;
+  try {
+    const data = await listNenDeliveries(c.env.DB, {
+      lineAccountId: accountId,
+      range: nenDeliveryRange({
+        from: c.req.query('from'),
+        to: c.req.query('to'),
+        days: c.req.query('days'),
+      }),
+      status: normalizeDeliveryStatus(c.req.query('status')),
+      cursor: cursorOffset(c.req.query('cursor')),
+      limit: listLimit(c.req.query('limit'), 50, 100),
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return metricsError(c, error);
+  }
+});
+
+nenCampaigns.get('/api/nen-campaigns/deliveries/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const accountId = await requireAccount(c);
+  if (typeof accountId !== 'string') return accountId;
+  try {
+    const data = await getNenDeliveryDetail(c.env.DB, c.req.param('id'), accountId);
+    return c.json({ success: true, data });
+  } catch (error) {
+    return metricsError(c, error);
+  }
+});
+
+nenCampaigns.post('/api/nen-campaigns/deliveries/:id/retry', requireRole('owner', 'admin'), async (c) => {
+  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  const accountId = typeof body?.lineAccountId === 'string' ? body.lineAccountId.trim() : '';
+  if (!accountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+  }
+  try {
+    const data = await retryNenDelivery(c.env.DB, {
+      id: c.req.param('id'),
+      lineAccountId: accountId,
+      expectedVersion: Number(body?.expectedVersion),
+      reason: typeof body?.reason === 'string' ? body.reason : '',
+      staffId: c.get('staff').id,
+    });
+    auditLog(c, 'nen.delivery.retry', { kind: 'nen_delivery', id: data.id });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return metricsError(c, error);
+  }
 });
 
 nenCampaigns.get('/api/nen-campaigns/columns', async (c) => {

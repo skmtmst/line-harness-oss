@@ -146,6 +146,10 @@ interface SerializedAutoReply {
   folderId: string | null;
   /** 152: 当たった回数。一覧でだけ入る。 */
   hits?: { period: number; total: number };
+  /** 実行台帳で成功を確認できた後続処理の累計。 */
+  actionExecutionCount?: number | null;
+  /** 同じ受信に当たり得る、有効な別ルールの数。 */
+  conflictAttentionCount?: number | null;
   createdAt: string;
   effectiveAccounts?: EffectiveAccount[];
 }
@@ -178,6 +182,9 @@ interface AutoReplyDraftInput {
   name: string | null;
   keywordMatchMode: 'any' | 'all';
   folderId: string | null;
+  internalMemo: string | null;
+  replyDelaySeconds: number | null;
+  unmatchedAction: Record<string, unknown> | null;
 }
 
 interface AutoReplyDraftVersion {
@@ -197,6 +204,14 @@ interface AutoReplyConflict {
   name: string;
   certainty: 'certain' | 'possible';
   winnerAutoReplyId: string;
+  reason: string;
+}
+
+interface AutoReplyConflictPair {
+  leftAutoReplyId: string;
+  rightAutoReplyId: string;
+  winnerAutoReplyId: string;
+  certainty: 'certain' | 'possible';
   reason: string;
 }
 
@@ -242,6 +257,9 @@ function readExtras(body: Record<string, unknown>):
       name?: string | null;
       keywordMatchMode?: 'any' | 'all';
       folderId?: string | null;
+      internalMemo?: string | null;
+      replyDelaySeconds?: number | null;
+      unmatchedAction?: Record<string, unknown> | null;
     } }
   | { ok: false; error: string } {
   const value: Record<string, unknown> = {};
@@ -309,6 +327,38 @@ function readExtras(body: Record<string, unknown>):
       return { ok: false, error: 'name must be 250 characters or fewer' };
     } else {
       value.name = body.name;
+    }
+  }
+  if ('internalMemo' in body) {
+    if (body.internalMemo === null || body.internalMemo === '') {
+      value.internalMemo = null;
+    } else if (typeof body.internalMemo !== 'string') {
+      return { ok: false, error: 'internalMemo must be a string' };
+    } else if ([...body.internalMemo].length > 1_000) {
+      return { ok: false, error: 'internalMemo must be 1000 characters or fewer' };
+    } else {
+      value.internalMemo = body.internalMemo;
+    }
+  }
+  if ('replyDelaySeconds' in body) {
+    if (body.replyDelaySeconds === null || body.replyDelaySeconds === 0) {
+      value.replyDelaySeconds = null;
+    } else if (!Number.isInteger(body.replyDelaySeconds)
+      || Number(body.replyDelaySeconds) < 0
+      || Number(body.replyDelaySeconds) > 86_400) {
+      return { ok: false, error: 'replyDelaySeconds must be an integer from 0 to 86400' };
+    } else {
+      value.replyDelaySeconds = Number(body.replyDelaySeconds);
+    }
+  }
+  if ('unmatchedAction' in body) {
+    if (body.unmatchedAction === null) {
+      value.unmatchedAction = null;
+    } else if (!body.unmatchedAction || typeof body.unmatchedAction !== 'object'
+      || Array.isArray(body.unmatchedAction)) {
+      return { ok: false, error: 'unmatchedAction must be an object' };
+    } else {
+      value.unmatchedAction = body.unmatchedAction as Record<string, unknown>;
     }
   }
 
@@ -421,6 +471,9 @@ function draftInputFromSettings(settings: AutoReplyDraftSettings): AutoReplyDraf
     name: settings.name,
     keywordMatchMode: settings.keywordMatchMode === 'all' ? 'all' : 'any',
     folderId: settings.folderId,
+    internalMemo: settings.internalMemo ?? null,
+    replyDelaySeconds: settings.replyDelaySeconds ?? null,
+    unmatchedAction: readJson<Record<string, unknown>>(settings.unmatchedAction),
   };
 }
 
@@ -518,6 +571,9 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
       name: extras.value.name ?? null,
       keywordMatchMode: extras.value.keywordMatchMode ?? 'any',
       folderId: extras.value.folderId ?? null,
+      internalMemo: extras.value.internalMemo ?? null,
+      replyDelaySeconds: extras.value.replyDelaySeconds ?? null,
+      unmatchedAction: jsonText(extras.value.unmatchedAction),
     },
   };
 }
@@ -609,6 +665,85 @@ async function conflictsForDraft(
     .filter((item) => item.id !== autoReplyId)
     .map((item) => conflictBetween(draft, item))
     .filter((item): item is AutoReplyConflict => item !== null);
+}
+
+function conflictPairs(rules: DbAutoReply[]): AutoReplyConflictPair[] {
+  const pairs: AutoReplyConflictPair[] = [];
+  for (let leftIndex = 0; leftIndex < rules.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < rules.length; rightIndex += 1) {
+      const left = rules[leftIndex]!;
+      const right = rules[rightIndex]!;
+      const conflict = conflictBetween(left, right);
+      if (!conflict) continue;
+      pairs.push({
+        leftAutoReplyId: left.id,
+        rightAutoReplyId: right.id,
+        winnerAutoReplyId: conflict.winnerAutoReplyId,
+        certainty: conflict.certainty,
+        reason: conflict.reason,
+      });
+    }
+  }
+  return pairs;
+}
+
+function conflictCounts(pairs: AutoReplyConflictPair[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const pair of pairs) {
+    counts.set(pair.leftAutoReplyId, (counts.get(pair.leftAutoReplyId) ?? 0) + 1);
+    counts.set(pair.rightAutoReplyId, (counts.get(pair.rightAutoReplyId) ?? 0) + 1);
+  }
+  return counts;
+}
+
+async function actionExecutionCounts(
+  db: D1Database,
+  accountId: string | null,
+): Promise<Map<string, number>> {
+  const result = await db.prepare(
+    `SELECT e.winning_auto_reply_id AS auto_reply_id, COUNT(*) AS action_count
+       FROM auto_reply_action_runs action_run
+       JOIN auto_reply_evaluations e ON e.id = action_run.evaluation_id
+      WHERE action_run.status = 'succeeded'
+        AND e.winning_auto_reply_id IS NOT NULL
+        AND (? IS NULL OR e.line_account_id = ?)
+      GROUP BY e.winning_auto_reply_id`,
+  ).bind(accountId, accountId).all<{ auto_reply_id: string; action_count: number }>();
+  return new Map((result.results ?? [])
+    .filter((row) => typeof row.auto_reply_id === 'string')
+    .map((row) => [row.auto_reply_id, Number(row.action_count)]));
+}
+
+async function autoReplyReceiveSummary(
+  db: D1Database,
+  accountId: string,
+  since: string,
+): Promise<{
+    receiveSourceCounts: Array<{ source: string; count: number }>;
+    matchedLast28Days: number;
+  }> {
+  const [sources, matched] = await Promise.all([
+    db.prepare(
+      `SELECT message_kind AS source, COUNT(*) AS count
+         FROM auto_reply_evaluations
+        WHERE line_account_id = ? AND evaluated_at >= ?
+        GROUP BY message_kind
+        ORDER BY count DESC, message_kind ASC`,
+    ).bind(accountId, since).all<{ source: string; count: number }>(),
+    db.prepare(
+      `SELECT COUNT(*) AS count
+         FROM auto_reply_evaluations
+        WHERE line_account_id = ? AND evaluated_at >= ?
+          AND winning_auto_reply_id IS NOT NULL`,
+    ).bind(accountId, since).first<{ count: number }>(),
+  ]);
+  return {
+    receiveSourceCounts: (sources.results ?? []).map((row) => ({
+      source: row.source,
+      count: Number(row.count),
+    })),
+    matchedLast28Days: Number(matched?.count ?? 0),
+  };
 }
 
 async function validateDraft(
@@ -737,6 +872,8 @@ autoReplies.get('/api/auto-replies', async (c) => {
   try {
     const accountId = c.req.query('accountId');
     const items = await getAutoReplies(c.env.DB, accountId || undefined);
+    const activeItems = items.filter((item) => item.is_active === 1);
+    const conflictsById = conflictCounts(conflictPairs(activeItems));
 
     // active LINE accounts を取得 + automations の keyword -> accounts インデックスを構築
     const accRes = await c.env.DB
@@ -761,9 +898,21 @@ autoReplies.get('/api/auto-replies', async (c) => {
       console.error('GET /api/auto-replies — failed to count hits', err);
     }
 
+    let actionsById: Map<string, number> | null = null;
+    try {
+      actionsById = await actionExecutionCounts(c.env.DB, accountId || null);
+    } catch (err) {
+      console.error('GET /api/auto-replies — failed to count action executions', err);
+    }
+
     const data: SerializedAutoReply[] = await Promise.all(
       items.map(async (row) => {
-        const base = { ...serializeAutoReply(row), hits: hitsById.get(row.id) ?? { period: 0, total: 0 } };
+        const base: SerializedAutoReply = {
+          ...serializeAutoReply(row),
+          hits: hitsById.get(row.id) ?? { period: 0, total: 0 },
+          actionExecutionCount: actionsById?.get(row.id) ?? (actionsById ? 0 : null),
+          conflictAttentionCount: row.is_active === 1 ? conflictsById.get(row.id) ?? 0 : 0,
+        };
         base.effectiveAccounts = await computeEffectiveAccounts(c.env.DB, row, activeAccounts, automationIdx);
         return base;
       }),
@@ -773,6 +922,44 @@ autoReplies.get('/api/auto-replies', async (c) => {
   } catch (err) {
     console.error('GET /api/auto-replies error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/** V6一覧・競合画面用。公開中ルール同士と、直近28日の実測だけを返す。 */
+autoReplies.get('/api/auto-replies/conflicts', async (c) => {
+  try {
+    const accountId = c.req.query('accountId') ?? c.req.query('account_id');
+    if (!accountId) {
+      return c.json({ success: false, error: 'accountId を指定してください' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: '自動応答を確認できません' }, 404);
+    }
+    const rules = (await getAutoReplies(c.env.DB, accountId))
+      .filter((item) => item.is_active === 1);
+    const conflicts = conflictPairs(rules);
+    const since = new Date(Date.now() - 28 * 24 * 60 * 60 * 1_000).toISOString();
+    let receiveSourceCounts: Array<{ source: string; count: number }> | null = null;
+    let matchedLast28Days: number | null = null;
+    try {
+      const summary = await autoReplyReceiveSummary(c.env.DB, accountId, since);
+      receiveSourceCounts = summary.receiveSourceCounts;
+      matchedLast28Days = summary.matchedLast28Days;
+    } catch (err) {
+      console.error('GET /api/auto-replies/conflicts — failed to load receive summary', err);
+    }
+    return c.json({
+      success: true,
+      data: {
+        conflicts,
+        conflictCount: conflicts.length,
+        receiveSourceCounts,
+        matchedLast28Days,
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/auto-replies/conflicts error:', err);
+    return c.json({ success: false, error: '競合する自動応答を確認できませんでした' }, 500);
   }
 });
 
@@ -837,7 +1024,22 @@ autoReplies.get('/api/auto-replies/:id/draft', async (c) => {
 
 autoReplies.put('/api/auto-replies/:id/draft', requireRole('owner', 'admin'), async (c) => {
   try {
-    const parsed = await readDraftSettings(c.env.DB, await c.req.json());
+    const body = await c.req.json<Record<string, unknown>>();
+    if (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 1) {
+      return c.json({ success: false, error: 'expectedVersion を指定してください' }, 400);
+    }
+    const current = await getAutoReplyDraftVersion(c.env.DB, c.req.param('id'))
+      ?? await getAutoReplyPublishedVersion(c.env.DB, c.req.param('id'));
+    if (!current) return c.json({ success: false, error: '自動応答が見つかりません' }, 404);
+    if (Number(current.version_number) !== Number(body.expectedVersion)) {
+      return c.json({
+        success: false,
+        code: 'VERSION_CONFLICT',
+        error: 'ほかの変更が先に保存されました。最新の状態を読み直してください',
+        data: { currentVersion: Number(current.version_number) },
+      }, 409);
+    }
+    const parsed = await readDraftSettings(c.env.DB, body);
     if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [parsed.value.lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);

@@ -28,13 +28,14 @@ const campaign = {
   image_url: null,
 };
 
-function createDb(lineAccountId = 'account-a') {
+function createDb(lineAccountId = 'account-a', retryGeneration = 0) {
   const updates: Array<{ sql: string; values: unknown[] }> = [];
   const job = {
     id: 'job-1', campaign_key: 'arrival_check', friend_id: 'friend-1',
     line_account_id: lineAccountId, source_key: 'order:1',
     payload: JSON.stringify({}),
     campaign_snapshot: JSON.stringify({ ...campaign, title: '予約時の見出し' }),
+    retry_generation: retryGeneration,
   };
   const db = {
     prepare(sql: string) {
@@ -100,5 +101,22 @@ describe('processNenDeliveries account and snapshot safety', () => {
       'job-1', undefined,
     );
     expect(JSON.stringify(pushViaHarnessProxy.mock.calls[0]?.[3])).not.toContain('現在の見出し');
+  });
+
+  it('uses a new idempotency key for each manual retry generation', async () => {
+    const { db } = createDb('account-a', 2);
+    dbMocks.getFriendById.mockResolvedValue({
+      id: 'friend-1', line_user_id: 'U1', line_account_id: 'account-a', is_following: 1,
+    });
+    dbMocks.getLineAccountById.mockResolvedValue({ id: 'account-a', channel_access_token: 'account-token' });
+
+    await processNenDeliveries(db, {
+      proxyBaseUrl: 'https://proxy.example.com', defaultAccessToken: 'must-not-be-used',
+    });
+
+    expect(pushViaHarnessProxy).toHaveBeenCalledWith(
+      'https://proxy.example.com', 'account-token', 'U1', expect.any(Array),
+      'job-1:manual:2', undefined,
+    );
   });
 });

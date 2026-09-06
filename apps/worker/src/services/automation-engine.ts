@@ -63,6 +63,8 @@ interface StepRow {
 export interface AutomationRunStartInput {
   lineAccountId: string;
   automationId: string;
+  /** 1人テストだけが指定する。定義の稼働状態を変えず、この版を固定する。 */
+  automationVersionId?: string;
   sourceEventId: string;
   idempotencyKey: string;
   friendId?: string | null;
@@ -331,14 +333,25 @@ export async function startAutomationRun(
 ): Promise<AutomationRunStartResult> {
   const now = nowIso(input.now);
   const published = await db.prepare(
-    `SELECT d.id AS automation_id, d.current_published_version_id AS version_id,
+    `SELECT d.id AS automation_id, v.id AS version_id,
             v.action_config
        FROM automation_definitions d
        JOIN automation_versions v
-         ON v.id = d.current_published_version_id AND v.automation_id = d.id
-        AND v.status = 'published'
-      WHERE d.id = ? AND d.line_account_id = ? AND d.status = 'active'`,
-  ).bind(input.automationId, input.lineAccountId).first<{
+         ON v.id = CASE WHEN ? = 1 THEN ? ELSE d.current_published_version_id END
+        AND v.automation_id = d.id
+        AND (? = 1 OR v.status = 'published')
+      WHERE d.id = ? AND d.line_account_id = ?
+        AND (? = 1 OR d.status = 'active')
+        AND (? = 0 OR v.id IN (d.current_draft_version_id, d.current_published_version_id))`,
+  ).bind(
+    input.isTest ? 1 : 0,
+    input.automationVersionId ?? null,
+    input.isTest ? 1 : 0,
+    input.automationId,
+    input.lineAccountId,
+    input.isTest ? 1 : 0,
+    input.isTest ? 1 : 0,
+  ).first<{
     automation_id: string;
     version_id: string;
     action_config: string;
