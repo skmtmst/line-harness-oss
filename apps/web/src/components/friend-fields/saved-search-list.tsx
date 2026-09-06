@@ -148,7 +148,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
       </div>
 
       <p className="border-hairline text-ink-secondary mb-4 rounded-control border bg-canvas px-3 py-2 text-sm">
-        AND群とOR群、友だち情報の10演算子を組み合わせ、保存した条件からコピーして再利用します。軸は呼び出し元で変わります。
+        AND群とOR群、友だち情報の10演算子を組み合わせ、保存した条件からコピーして再利用します。軸は呼び出し元で変わります（友だち一覧14軸・配信15軸）。
       </p>
 
       {!accountId && (
@@ -233,13 +233,13 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
           <table className="w-full table-fixed text-sm">
             <thead className="border-b border-hairline bg-canvas-sunken text-[11px] text-ink-faint">
               <TableHeadRow>
-                <Th className="w-[16%] px-3 py-3">条件名</Th>
-                <Th className="w-[27%] px-3 py-3">条件の要約</Th>
-                <Th className="w-[8%] px-3 py-3">該当</Th>
-                <Th className="w-[8%] px-3 py-3">共有</Th>
-                <Th className="w-[16%] px-3 py-3">使用先</Th>
-                <Th className="w-[15%] px-3 py-3">作成者・日時</Th>
-                <Th className="w-[10%] px-3 py-3">操作</Th>
+                <Th className="w-1/6 px-3 py-3">条件名</Th>
+                <Th className="w-1/4 px-3 py-3">条件の要約</Th>
+                <Th className="w-1/12 px-3 py-3">該当</Th>
+                <Th className="w-1/12 px-3 py-3">共有</Th>
+                <Th className="w-1/6 px-3 py-3">使用先</Th>
+                <Th className="w-1/6 px-3 py-3">作成者・日時</Th>
+                <Th className="w-1/12 px-3 py-3">操作</Th>
               </TableHeadRow>
             </thead>
             <tbody className="divide-y divide-hairline">
@@ -283,7 +283,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                 </td>
                 <td className="px-3 py-3 align-top text-xs leading-5 text-ink-secondary">
                   {all.length > 0 ? <p title={all.join('・')}>{all.join('・')}・AND</p> : null}
-                  {any.length > 0 ? <p title={any.join('・')}>{any.join('・')}・OR</p> : null}
+                  {any.length > 0 ? <p title={any.join('・')}><span className="font-semibold">いずれか1つ以上：</span>{any.join('・')}・OR</p> : null}
                   {all.length === 0 && any.length === 0 ? <p>指定なし</p> : null}
                   {note ? <p className="text-ink-faint">{note}</p> : null}
                 </td>
