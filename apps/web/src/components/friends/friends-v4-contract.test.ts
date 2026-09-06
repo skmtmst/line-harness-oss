@@ -91,7 +91,7 @@ describe('友だちV6の画面契約', () => {
     expect(PAGE).toContain('名前・LINE名・タグ・メモで検索')
     expect(PAGE).toContain('詳細条件')
     expect(PAGE).toContain('SavedSearchDialog')
-    expect(PAGE).toContain('api.savedSearches.list')
+    expect(PAGE).toContain('api.friendSavedViews.list')
     expect(PAGE).toContain('savedSearchId')
     expect(ADVANCED).toContain('この条件で表示')
     expect(PAGE).toContain('友だち追加の新しい順')

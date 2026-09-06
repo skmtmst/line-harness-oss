@@ -36,6 +36,8 @@ export default function FriendIdentityCandidatesPage() {
   }, [review.state, first?.id])
 
   const detail = review.detail
+  const profileCandidates = detail && 'profileCandidates' in detail ? detail.profileCandidates : []
+  const tagCandidates = detail && 'tagCandidates' in detail ? detail.tagCandidates : []
 
   return (
     <div className={styles.screen}>
@@ -73,6 +75,41 @@ export default function FriendIdentityCandidatesPage() {
             <IdentitySubjectCard side="候補A" subject={detail.left} />
             <IdentitySubjectCard side="候補B" subject={detail.right} />
           </div>
+
+          {profileCandidates.length > 0 ? (
+            <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
+              <h2 className="text-sm font-bold text-ink">統合プロフィールに採用する値</h2>
+              <p className="mt-1 text-xs text-ink-faint">項目ごとに採用元を選び、判定と同じ履歴へ残します。</p>
+              <div className="mt-3 overflow-hidden rounded-control border border-hairline">
+                <table className="w-full table-fixed text-left text-xs">
+                  <thead className="bg-canvas-sunken text-ink-secondary">
+                    <tr><th className="p-2">項目</th><th className="p-2">候補A</th><th className="p-2">候補B</th><th className="p-2">採用する値</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-hairline">
+                    {profileCandidates.map((field) => {
+                      const left = field.options.find((option) => option.sourceFriendId === detail.left.id)
+                      const right = field.options.find((option) => option.sourceFriendId === detail.right.id)
+                      return (
+                        <tr key={field.fieldKey}>
+                          <td className="p-2 font-semibold text-ink">{field.fieldLabel}</td>
+                          <td className="p-2 text-ink-secondary">{left?.valuePreview ?? '—'}</td>
+                          <td className="p-2 text-ink-secondary">{right?.valuePreview ?? '—'}</td>
+                          <td className="p-2 text-ink-secondary">判定時に選択</td>
+                        </tr>
+                      )
+                    })}
+                    {tagCandidates.length > 0 ? (
+                      <tr>
+                        <td className="p-2 font-semibold text-ink">タグ</td>
+                        <td className="p-2 text-ink-secondary" colSpan={2}>{tagCandidates.map((tag) => tag.name).join('・')}</td>
+                        <td className="p-2 text-ink-secondary">元の友だちに保持</td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
 
           <IdentityHistoryList history={detail.history} />
 

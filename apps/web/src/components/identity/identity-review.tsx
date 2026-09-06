@@ -2,13 +2,14 @@
 
 import React, { useCallback, useEffect, useState } from 'react'
 import type {
+  DecideIdentityCandidateRequest,
   IdentityCandidateDecision,
   IdentityCandidateDetail,
   IdentityCandidateKind,
   IdentityCandidateListItem,
   IdentityReprocessMode,
 } from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
+import { api, ApiError, type IdentityCandidateWithProfiles } from '@/lib/api'
 import type { IdentityViewState } from './identity-state'
 import { failureOf, type IdentityFailure } from './identity-view'
 
@@ -22,7 +23,7 @@ import { failureOf, type IdentityFailure } from './identity-view'
 export type IdentityReview = {
   state: IdentityViewState
   items: IdentityCandidateListItem[]
-  detail: IdentityCandidateDetail | null
+  detail: (IdentityCandidateDetail | IdentityCandidateWithProfiles) | null
   /** 一覧・詳細が出せないときの言い換え。候補の中身は入らない。 */
   failure: IdentityFailure | null
   /** 判定窓の中だけに出す言い換え（版競合など）。 */
@@ -40,6 +41,7 @@ export type IdentityReview = {
     decision: IdentityCandidateDecision
     reason: string
     reprocess?: { mode: IdentityReprocessMode; from: null; to: null }
+    profileSelections?: DecideIdentityCandidateRequest['profileSelections']
   }) => void
 }
 
@@ -54,7 +56,7 @@ export function useIdentityReview(kind: IdentityCandidateKind): IdentityReview {
   const [failure, setFailure] = useState<IdentityFailure | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [detail, setDetail] = useState<IdentityCandidateDetail | null>(null)
+  const [detail, setDetail] = useState<IdentityCandidateDetail | IdentityCandidateWithProfiles | null>(null)
   const [decideError, setDecideError] = useState('')
   const [deciding, setDeciding] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
@@ -98,8 +100,10 @@ export function useIdentityReview(kind: IdentityCandidateKind): IdentityReview {
     }
     let alive = true
     setDecideError('')
-    api.identityCandidates
-      .get(selectedId)
+    const request = kind === 'friend_duplicate'
+      ? api.identityCandidates.getFriendDuplicate(selectedId)
+      : api.identityCandidates.get(selectedId)
+    request
       .then((res) => {
         if (!alive) return
         if (!res.success) {
@@ -115,19 +119,22 @@ export function useIdentityReview(kind: IdentityCandidateKind): IdentityReview {
     return () => {
       alive = false
     }
-  }, [selectedId])
+  }, [kind, selectedId])
 
   const decide = useCallback(
     (input: {
       decision: IdentityCandidateDecision
       reason: string
       reprocess?: { mode: IdentityReprocessMode; from: null; to: null }
+      profileSelections?: DecideIdentityCandidateRequest['profileSelections']
     }) => {
       if (!detail) return
       setDeciding(true)
       setDecideError('')
-      api.identityCandidates
-        .decide(detail.id, { expectedVersion: detail.version, ...input })
+      const request = kind === 'friend_duplicate'
+        ? api.identityCandidates.decideFriendDuplicate(detail.id, { expectedVersion: detail.version, ...input })
+        : api.identityCandidates.decide(detail.id, { expectedVersion: detail.version, ...input })
+      request
         .then((res) => {
           if (!res.success) {
             setDecideError(failureOf(null).description)
@@ -143,7 +150,7 @@ export function useIdentityReview(kind: IdentityCandidateKind): IdentityReview {
         })
         .finally(() => setDeciding(false))
     },
-    [detail],
+    [detail, kind],
   )
 
   return {

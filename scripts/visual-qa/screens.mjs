@@ -481,7 +481,10 @@ export const SCREENS = [
   {
     ...FRIENDS, node: 'InCDe', name: '3-2-A 重複候補詳細・統合前確認',
     route: '/friends/identity-candidates',
-    states: { apis: ['**/api/identity-candidates*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    states: {
+      apis: ['**/api/identity-candidates*', '**/api/friends/duplicates/**'],
+      kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'],
+    },
     variants: [{ suffix: '-decide', steps: [{ qaOpen: 'InCDe', after: 700 }] }],
     verdict: 'unjudged',
     verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#22 トップバーに人名が入っていたのを画面名へ（`I6UAdr`「友だち詳細」／`w8W4Eh`「統合ユーザー」）／#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#42 青の主ボタンを緑へ（`r7eSi` の「詳細を見る」4件、`w8W4Eh` の「プロフィールを編集」ほか）／#47 `[sticker]`→スタンプ／#48 表記の統一。設計画像は `docs/design-reference/friends-v6/` を撮り直した。**実装との突き合わせはこれから。** **#600 `484c0cd8`（#598 `a13be90c` の上）で新規実装。設計 `InCDe` 3-2-A。** ルート `/friends/identity-candidates`。1440・1920とも横スクロール0。 **① 5状態を撮り分けた**：通常・読込・空・失敗・権限不足。**失敗と権限不足では候補を1件も描かない**（`page.tsx` は `review.state === \'ready\'` の中でだけ中身を組む）ので、見てよい人が決まっている名前・マスク値が断片で漏れない。 **② 未取得と実値0を分けている**：影響は 重複配信 `3通` ／ 注文（取得元を接続後に表示） `—（未取得）`。`impact.value === null` を `—（未取得）`、`0` を `0通` にする判断は `identity-view.ts:impactText`。 **③ 根拠に強さと確認済みの札**：確認済みのメールアドレスが同じ〈決め手になる／確認済み〉、表示名が似ている〈参考／未確認〉。「表示名やプロフィール画像だけの一致は、決め手にはしません。」も出る。 **④ 判定窓**（`data-qa-open="InCDe"`）は3つの判定と理由入力を持ち、**理由が空のうちは送りのボタンが押せない**。「別人として記録する」には「根拠が変わるまで候補へ戻しません。」が付く。友だち同士なので再処理の欄は出さない（Workerが422を返すため）。 **⑤ 消えないことと取り消しの効き方**を判定前と判定窓の両方に出す。 設計の「統合プロフィールに採用する値」表は、**項目ごとの採用値を保存する口が契約に無い**ため作っていない（`DecideIdentityCandidateRequest` は `decision` と `reason` だけ）。押しても何も起きない操作を置かなかった。 **`undefined`・`NaN`・`Invalid Date`・`API error` は0件。平文のメール・電話・内部IDの露出なし。** 取得元：`friends-v6/InCDe-normal.txt`・`InCDe-forbidden.txt` ＋ `identity-view.ts` ＋ `friends/identity-candidates/page.tsx`',
@@ -520,6 +523,13 @@ export const SCREENS = [
         steps: [
           { qaOpen: 'w8W4Eh', after: 900 },
           { click: '優先順位を変更', after: 700 },
+        ],
+      },
+      {
+        suffix: '-unlink',
+        steps: [
+          { qaOpen: 'w8W4Eh', after: 900 },
+          { qaOpen: 'w8W4Eh-unlink', after: 700 },
         ],
       },
       {
