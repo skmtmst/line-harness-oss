@@ -1201,20 +1201,20 @@ export const SCREENS = [
   },
   {
     ...FRIEND_ADD, node: 'ec9vg', name: '9-1-F 最終確認',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #222・PR #1010 で再実装・再判定。** UI HEAD `3d6b7e7e8` を3104/8791で通常・読込・空・失敗・権限なしの5状態、各1440/1920pxで撮影（横はみ出し0）。設計本文の5段確認、登録直後から5分以内、LINEプレビュー、二重実行防止、Slack通知欄に構造・文言を合わせ、内部語を画面から除いた。現行APIは流入経路・設定名・初回案内本文・Slack接続状態を返さず、設計参照も本文 `.txt` のみで同寸法のPencil画像が無いためデータ待ち。',
-    verdictSource: 'friend-add-v6/ec9vg.txt + ec9vg-{normal,loading,empty,error,forbidden}-{1440,1920}.png',
-    verdictHead: '3d6b7e7e8',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #374・UI HEAD `a0278d076`・固定データ PR #1130（統合 #1132）で一致。** 検証APIの合格結果、保存済みルールの設定名・流入条件・送信時刻・対象・初回案内・アクション・24時間制限、最後のテスト、対象214人、Slack監視の接続状態を表示した。Pencil画像と通常・読込・空・失敗・権限不足を3102/8789の1440/1920pxで目視比較し、全12枚で横はみ出し0。',
+    verdictSource: 'friend-add-v6/ec9vg.png + ec9vg-{normal,loading,empty,error,forbidden}-{1440,1920}.png + ec9vg*.txt',
+    verdictHead: 'a0278d076',
     route: '/friend-add-settings/publish',
     states: { apis: ['**/api/friend-add-rules*', '**/api/friend-add-rules/**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
 
   },
   {
     ...FRIEND_ADD, node: 'quhg6', name: '9-1-G 有効化完了',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #222・PR #1010 で再実装・再判定。** UI HEAD `3d6b7e7e8` を3104/8791で有効化操作後、1440/1920pxで撮影（横はみ出し0）。設計本文の全STEP完了、稼働状態、次の操作、未送信・二重送信・再追加・シナリオ開始失敗の監視欄に構造・文言を合わせ、内部語を画面から除いた。現行の公開結果APIは設定名・流入経路を返さず、Slack監視・停止・複製も未接続で、設計参照も本文 `.txt` のみで同寸法のPencil画像が無いためデータ待ち。',
-    verdictSource: 'friend-add-v6/quhg6.txt + quhg6-{1440,1920}.png',
-    verdictHead: '3d6b7e7e8',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #374・UI HEAD `a0278d076`・固定データ PR #1130（統合 #1132）で一致。** 公開APIの第1版・公開日時、保存済みルールの設定名・流入条件・対象・二重送信防止・対象214人・稼働状態を表示し、全STEP完了、次の操作、未送信・二重送信・再追加・シナリオ開始失敗の監視欄をPencil画像と目視比較した。3102/8789の1440/1920pxで2枚とも横はみ出し0。複製は機能9の契約外なので誤操作を避けて無効表示にしている。',
+    verdictSource: 'friend-add-v6/quhg6.png + quhg6-{1440,1920}.png + quhg6.txt',
+    verdictHead: 'a0278d076',
     route: '/friend-add-settings/publish',
     steps: [{ qaOpen: 'ec9vg', after: 900 }],
 
