@@ -7,8 +7,8 @@
   "elsewhere": 0,
   "missing": 42,
   "match": 113,
-  "structureMatchDataPending": 129,
-  "needsFix": 21,
+  "structureMatchDataPending": 132,
+  "needsFix": 18,
   "unjudged": 5,
   "remaining": 155,
   "features": [
@@ -2236,8 +2236,8 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 2,
-      "needsFix": 2,
+      "structureMatchDataPending": 4,
+      "needsFix": 0,
       "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
@@ -2798,11 +2798,20 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 3,
-      "needsFix": 1,
+      "structureMatchDataPending": 4,
+      "needsFix": 0,
       "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
+        {
+          "pr": 1096,
+          "head": "a89279ce7",
+          "on": "2026-09-07",
+          "screens": [
+            "tksPc"
+          ],
+          "note": "Issue #305。3107/8794で通常・読込中・取得失敗を1440/1920px撮影し、全6枚で横はみ出し0。曜日別受付時間と右側プレビューをV6構造へそろえ、未提供APIに依存する値は作らず理由つきの構造一致・データ未接続とした。"
+        },
         {
           "pr": 517,
           "head": "43d3d20e",

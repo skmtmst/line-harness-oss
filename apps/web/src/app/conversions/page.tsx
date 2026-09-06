@@ -165,9 +165,9 @@ function ConversionsPageInner() {
    * はアカウントで絞らない）ので、押した時点のアカウントを窓に固定する必要は
    * ない。
    */
-  const [deleteTarget, setDeleteTarget] = useState<ConversionPoint | null>(null)
-  const [deleting, setDeleting] = useState(false)
-  const [deleteError, setDeleteError] = useState('')
+  const [stopTarget, setStopTarget] = useState<ConversionPoint | null>(null)
+  const [stopping, setStopping] = useState(false)
+  const [stopError, setStopError] = useState('')
 
   const load = async () => {
     setLoading(true)
@@ -210,19 +210,20 @@ function ConversionsPageInner() {
    * 「消せませんでした」と出る。消えているのに失敗に見える）。
    * 失敗は握りつぶさず、窓の中に運用者の言葉で出す。
    */
-  const runDelete = async () => {
-    if (!deleteTarget || deleting) return
-    setDeleting(true)
-    setDeleteError('')
+  const runStop = async () => {
+    if (!stopTarget || stopping) return
+    setStopping(true)
+    setStopError('')
     try {
-      const res = await api.conversions.deletePoint(deleteTarget.id)
+      // APIのDELETEは物理削除ではなく、計測停止として履歴を残す契約。
+      const res = await api.conversions.deletePoint(stopTarget.id)
       if (!res.success) throw new Error(res.error)
-      setDeleteTarget(null)
+      setStopTarget(null)
       await load()
     } catch {
-      setDeleteError('この成果地点を削除できませんでした。状態を読み直してから、もう一度お試しください。')
+      setStopError('この成果地点の計測を止められませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
-      setDeleting(false)
+      setStopping(false)
     }
   }
 
@@ -415,12 +416,12 @@ function ConversionsPageInner() {
                   <td className="px-4 py-3 text-right">
                     <button
                       onClick={() => {
-                        setDeleteError('')
-                        setDeleteTarget(point)
+                        setStopError('')
+                        setStopTarget(point)
                       }}
                       className="text-danger text-sm hover:underline"
                     >
-                      削除
+                      停止・削除
                     </button>
                   </td>
                 </tr>
@@ -446,44 +447,71 @@ function ConversionsPageInner() {
       </div>
 
       <ConfirmDialog
-        open={deleteTarget !== null}
+        open={stopTarget !== null}
         designNode="d8d3Mz"
-        title={deleteTarget ? `「${deleteTarget.name}」を削除しますか？` : ''}
-        description="この成果地点で記録した成果も一緒に消えます。承認済み・承認待ちの成果もまとめて消え、集計から外れます。この操作は取り消せません。"
-        confirmLabel="削除する"
-        destructive
-        busy={deleting}
-        error={deleteError}
-        onConfirm={() => void runDelete()}
+        title={stopTarget ? `「${stopTarget.name}」を削除しますか？` : ''}
+        description="使っている場所と、止めたあとに残る記録を確認してから操作を選びます。"
+        confirmLabel="数えるのをやめる"
+        busy={stopping}
+        error={stopError}
+        onConfirm={() => void runStop()}
         onCancel={() => {
-          if (deleting) return
-          setDeleteTarget(null)
-          setDeleteError('')
+          if (stopping) return
+          setStopTarget(null)
+          setStopError('')
         }}
       >
-        {deleteTarget && (
-          <div className="text-ink-secondary space-y-2 text-sm">
-            <p>
-              種別：{EVENT_TYPE_LABELS[deleteTarget.eventType] ?? deleteTarget.eventType} ／ 計測方法：
-              {measureLabel(deleteTarget.measureMethod)}
-            </p>
-            <p>
-              記録した成果：
-              {reportAvailable ? (
-                <span className="tabular-nums">{(countByPoint.get(deleteTarget.id) ?? 0).toLocaleString('ja-JP')}件</span>
-              ) : (
-                <>— 読み込めませんでした。件数が分からないまま消すことになります。</>
-              )}
-            </p>
-            {/*
-              **取れない数を作らない。**
-              オートメーション（CV発火）やアフィリエイト案件がこの成果地点を
-              指していても、それを数える口が無い。「0件」と書くと、参照が
-              無いのか数えていないのか区別が付かなくなる。
-            */}
-            <p className="text-ink-faint text-xs">
-              オートメーション・アフィリエイト案件からの参照は数えられていません。消したあとに参照が切れることがあります。
-            </p>
+        {stopTarget && (
+          <div className="space-y-4">
+            <section className="border-danger bg-danger-bg rounded-control border p-4">
+              <h3 className="text-danger text-sm font-bold">いま、この成果地点を使っている場所</h3>
+              <div className="border-danger/20 mt-3 rounded-control border bg-canvas px-3 py-3">
+                <p className="text-ink text-sm font-semibold">— 利用先の取得は未接続</p>
+                <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+                  案件・自動応答・分析などの利用先を数えるAPIがないため、0件とは扱いません。接続後は場所ごとの停止影響と「開く」をここに表示します。
+                </p>
+              </div>
+            </section>
+
+            <section className="bg-canvas-sunken rounded-control px-4 py-3">
+              <p className="text-ink-secondary text-sm">
+                これまでに数えた{' '}
+                <strong className="text-ink tabular-nums">
+                  {reportAvailable ? `${(countByPoint.get(stopTarget.id) ?? 0).toLocaleString('ja-JP')}件` : '—件'}
+                </strong>
+                の記録と金額は、そのまま残ります。
+              </p>
+              {!reportAvailable && <p className="text-warning mt-1 text-xs">成果件数を読み込めていません。0件とは扱いません。</p>}
+            </section>
+
+            <section>
+              <h3 className="text-ink text-sm font-bold">どうしますか？</h3>
+              <div className="mt-2 space-y-2">
+                <div className="border-accent bg-accent-soft rounded-control flex items-start gap-3 border p-3">
+                  <span className="border-accent bg-canvas mt-0.5 h-4 w-4 shrink-0 rounded-full border-4" aria-hidden />
+                  <div>
+                    <p className="text-ink text-sm font-semibold">数えるのをやめる（おすすめ）</p>
+                    <p className="text-ink-faint mt-0.5 text-xs">これから先は数えません。過去の記録と分析は残します。</p>
+                  </div>
+                </div>
+                <div className="border-hairline rounded-control flex items-start gap-3 border p-3 opacity-60">
+                  <span className="border-hairline mt-0.5 h-4 w-4 shrink-0 rounded-full border" aria-hidden />
+                  <div>
+                    <p className="text-ink text-sm font-semibold">別の成果地点に差し替えてから削除する</p>
+                    <p className="text-ink-faint mt-0.5 text-xs">利用先の取得・差し替えAPIが接続されると選べます。</p>
+                  </div>
+                </div>
+                <div className="border-hairline rounded-control flex items-start gap-3 border p-3 opacity-60">
+                  <span className="border-hairline mt-0.5 h-4 w-4 shrink-0 rounded-full border" aria-hidden />
+                  <div>
+                    <p className="text-ink text-sm font-semibold">このまま削除する</p>
+                    <p className="text-ink-faint mt-0.5 text-xs">未使用・成果0件を確認するAPIがないため、物理削除は選べません。</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <p className="text-ink-faint text-xs">「数えるのをやめる」を選ぶと停止として記録され、過去の成果は削除されません。</p>
           </div>
         )}
       </ConfirmDialog>
