@@ -68,6 +68,7 @@ import {
   EC_NOTIFICATION_SETTINGS, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, NEN_PHOTO_DETAIL,
   NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, MILEAGE_RULES,
   CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
+  OPERATION_CONTROL_PREVIEW, OPERATION_HISTORY,
   WEBINARS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_ANALYTICS,
 } from './fixtures.mjs'
 
@@ -376,7 +377,7 @@ const SUPPORT_EMAIL_ITEMS = [
     assignedStaffId: null,
     assignedStaffName: null,
     lastIncomingAt: '2026-08-16T01:30:00.000Z',
-    isUnread: true,
+    isUnread: false,
   },
 ]
 
@@ -909,6 +910,15 @@ const SHAPES = {
  * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
  */
 function visualQaWriteBody(method, pathname) {
+  if (method === 'POST' && pathname === '/api/inbox/saved-views') {
+    return {
+      id: 'inbox-view-preview',
+      name: '未割り当て・期限超過',
+      createdBy: 'Kenta',
+      isShared: false,
+      matchCount: 1,
+    }
+  }
   if (method === 'POST' && pathname === '/api/analytics/cross/query') {
     return { id: 'visual-cross-result-1', state: 'pending' }
   }
@@ -1057,6 +1067,16 @@ function reminderStepsOf(reminder) {
 function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/auth/session') {
     return { success: true, data: STAFF, csrfToken: 'visual-qa-csrf' }
+  }
+  if (pathname === '/api/operations/control/preview') {
+    return { success: true, data: OPERATION_CONTROL_PREVIEW }
+  }
+  if (pathname === '/api/operations/history') {
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const limit = Number.isFinite(requestedLimit) && requestedLimit >= 0
+      ? requestedLimit
+      : OPERATION_HISTORY.length
+    return { success: true, data: OPERATION_HISTORY.slice(0, limit) }
   }
   if (pathname === '/api/analytics/cross/results/visual-cross-result-1') {
     return {
