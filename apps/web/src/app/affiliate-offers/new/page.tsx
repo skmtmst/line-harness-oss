@@ -12,12 +12,22 @@ import CreatePage, {
 } from '@/components/shared/create-page'
 
 /**
- * 案件を作る（設計 V2 6-1-3）。
+ * 案件を作る（設計 V6 `GPWzq`）。
  *
  * 設計は「どの案件か → いくら払うか → 自動で行うこと」の順。
  * タグとシナリオは**成果が確定したときに実行するもの**で、成果の条件ではない。
  * ここを取り違えると、紹介の成果がいつまでも確定しない設定ができてしまう。
  */
+function Unavailable({ label, reason }: { label: string; reason: string }) {
+  return (
+    <div className="border-hairline rounded-control bg-canvas-sunken border px-3 py-2">
+      <p className="text-ink-secondary text-label font-semibold">{label}</p>
+      <p className="text-ink text-label">—</p>
+      <p className="text-ink-faint text-micro mt-0.5">{reason}</p>
+    </div>
+  )
+}
+
 export default function NewAffiliateOfferPage() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -27,6 +37,7 @@ export default function NewAffiliateOfferPage() {
   const [tagId, setTagId] = useState('')
   const [scenarioId, setScenarioId] = useState('')
   const [publishNow, setPublishNow] = useState(true)
+  const [createdId, setCreatedId] = useState<string | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [accounts, setAccounts] = useState<LineAccount[]>([])
@@ -58,33 +69,56 @@ export default function NewAffiliateOfferPage() {
       title="案件を作る"
       description="何を成果として数え、いくら払うかを決めます。"
       parent={['案件', '/conversions?tab=offers']}
-      saveLabel="案件を作成"
+      saveLabel={publishNow ? '公開する' : '下書きに保存'}
+      variant="v6"
+      designNode="GPWzq"
       validate={() => {
         if (!name.trim()) return '案件名を入力してください'
         if (!rewardAmount && !rewardMiles) return '報酬（円かマイル）のどちらかを入れてください'
+        if (rewardAmount && (!Number.isFinite(Number(rewardAmount)) || Number(rewardAmount) < 0)) {
+          return '報酬額は0円以上で入力してください'
+        }
+        if (rewardMiles && (!Number.isFinite(Number(rewardMiles)) || Number(rewardMiles) < 0)) {
+          return '報酬マイルは0以上で入力してください'
+        }
         return null
       }}
       onReset={() => {
         setName('')
         setDescription('')
+        setRewardAmount('')
+        setRewardMiles('')
+        setLineAccountId('')
+        setTagId('')
+        setScenarioId('')
+        setPublishNow(true)
+        setCreatedId(null)
       }}
       onSave={async () => {
-        const res = await api.affiliateOffers.create({
-          name: name.trim(),
-          description: description.trim() || null,
-          rewardAmount: rewardAmount ? Number(rewardAmount) : undefined,
-          rewardMiles: rewardMiles ? Number(rewardMiles) : undefined,
-          lineAccountId: lineAccountId || null,
-          tagId: tagId || null,
-          scenarioId: scenarioId || null,
-        })
-        if (!res.success) throw new Error('案件を作成できませんでした')
+        let offerId = createdId
+        if (!offerId) {
+          const res = await api.affiliateOffers.create({
+            name: name.trim(),
+            description: description.trim() || null,
+            rewardAmount: rewardAmount ? Number(rewardAmount) : undefined,
+            rewardMiles: rewardMiles ? Number(rewardMiles) : undefined,
+            lineAccountId: lineAccountId || null,
+            tagId: tagId || null,
+            scenarioId: scenarioId || null,
+          })
+          if (!res.success) throw new Error('案件を作成できませんでした')
+          offerId = res.data.id
+          setCreatedId(offerId)
+        }
         // 作成は必ず公開中で入る（DB の INSERT が is_active=1 固定）。
         // 下書きにしたいときだけ、続けて閉じる。
         if (!publishNow) {
-          await api.affiliateOffers.update(res.data.id, { isActive: false })
+          const update = await api.affiliateOffers.update(offerId, { isActive: false })
+          if (!update.success) {
+            throw new Error('案件は作成済みですが、下書きにできませんでした。もう一度押すと下書きへの変更だけをやり直します。')
+          }
         }
-        return res.data.id
+        return offerId
       }}
       aside={
         <>
@@ -102,10 +136,27 @@ export default function NewAffiliateOfferPage() {
                   </span>
                 )}
               </p>
+              <p className="text-ink-faint mt-2 truncate text-xs">
+                紹介リンクは公開後に発行されます
+              </p>
+              {miles > 0 && (
+                <p className="text-ink-faint mt-1 text-xs">
+                  成果が認められると {miles.toLocaleString()} マイルも付与します
+                </p>
+              )}
               <p className="bg-accent-deep text-on-accent rounded-control mt-3 px-3 py-2 text-center text-xs font-medium">
                 この案件を紹介する
               </p>
             </div>
+          </AsideCard>
+
+          <AsideCard title="つながる先">
+            <ul className="text-ink-faint space-y-1.5 text-xs leading-relaxed">
+              <li>・コンバージョン：何を成果として数えるか</li>
+              <li>・マイル：成果で付けるマイル</li>
+              <li>・流入と計測：経路ごとの成果</li>
+              <li>・分析：案件ごとの成果と報酬</li>
+            </ul>
           </AsideCard>
 
           <AsideCard title="気をつけること">
@@ -118,7 +169,7 @@ export default function NewAffiliateOfferPage() {
         </>
       }
     >
-      <FormSection step={1} label="どの案件か">
+      <FormSection step={1} label="どんな案件か">
         <Field label="案件名" htmlFor="of-name" required>
           <input
             id="of-name"
@@ -155,7 +206,32 @@ export default function NewAffiliateOfferPage() {
         </Field>
       </FormSection>
 
-      <FormSection step={2} label="いくら払うか" note="現金とマイルは併用できます。">
+      <FormSection
+        step={2}
+        label="何をもって成果とするか"
+        note="成果地点はコンバージョンで作成・管理します。"
+      >
+        <Unavailable
+          label="成果地点"
+          reason="まだ繋がっていません。案件と成果地点の紐づけAPIが接続されると選べます。"
+        />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Unavailable
+            label="紹介とみなす期間"
+            reason="まだ繋がっていません。成果を数える期間が接続されると表示されます。"
+          />
+          <Unavailable
+            label="同じ友だちを数える回数"
+            reason="まだ繋がっていません。二重計上を防ぐ設定が接続されると表示されます。"
+          />
+        </div>
+        <Unavailable
+          label="成果の自動承認"
+          reason="まだ繋がっていません。低額・回数上限・確認不要の条件が接続されると選べます。"
+        />
+      </FormSection>
+
+      <FormSection step={3} label="いくら払うか" note="現金とマイルは併用できます。">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="報酬額（円）" htmlFor="of-amount">
             <input
@@ -194,8 +270,8 @@ export default function NewAffiliateOfferPage() {
       </FormSection>
 
       <FormSection
-        step={3}
-        label="自動で行うこと"
+        step={4}
+        label="成果を認めたときにすること"
         note="成果が確定したタイミングで実行されます。"
       >
         <Field label="付けるタグ" htmlFor="of-tag" note="あとで配信の絞り込みに使えます。">

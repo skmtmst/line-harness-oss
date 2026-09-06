@@ -151,7 +151,7 @@ describe('取れた0と、取れていないものを混ぜない', () => {
 
 describe('V6 案件一覧（GH8VL）のKPIの帯', () => {
   it('3枚とも状態つきの値・単位・注記を通す。素の数を直接置かない', () => {
-    for (const title of ['今月の成果', '支払い予定', '付与予定マイル']) {
+    for (const title of ['今月の成果', '確定した報酬の合計', '付与予定マイル']) {
       expect(KPI_BAND).toContain(`title="${title}"`)
     }
     expect(KPI_BAND.match(/confirmedValue\(confirmedState,/g) ?? []).toHaveLength(3)

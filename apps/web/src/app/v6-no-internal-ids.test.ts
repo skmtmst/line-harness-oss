@@ -123,7 +123,7 @@ describe('V6の画面に内部IDとDBの語を出さない', () => {
 describe('成果承認 n5VVTb の友だち列', () => {
   const CELL = between(
     read('affiliates/tabs.tsx'),
-    '{items.map((item) => (',
+    '{pagedItems.map((item) => (',
     '{item.affiliateName',
   )
 
