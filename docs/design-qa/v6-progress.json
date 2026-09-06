@@ -1,29 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-<<<<<<< HEAD
   "compared": 242,
-  "unimplemented": 10,
-  "unconfirmed": 0,
-  "elsewhere": 0,
-  "missing": 20,
-  "match": 54,
-  "structureMatchDataPending": 50,
-  "needsFix": 152,
-  "unjudged": 2,
-  "remaining": 214,
-=======
-  "compared": 236,
   "unimplemented": 8,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 28,
+  "missing": 22,
   "match": 58,
-  "structureMatchDataPending": 46,
-  "needsFix": 153,
+  "structureMatchDataPending": 47,
+  "needsFix": 152,
   "unjudged": 3,
   "remaining": 210,
->>>>>>> origin/codex/development
   "features": [
     {
       "feature": 1,
