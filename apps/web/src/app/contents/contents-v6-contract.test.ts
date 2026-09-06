@@ -72,7 +72,7 @@ describe('V6 登録メディア一覧の契約', () => {
   it('設計の実測どおりの高さと文字にする', () => {
     // アップロードは一覧へ常設せず、全面のモーダルで開く。
     expect(PAGE).toContain('setUploadOpen(true)')
-    expect(UPLOAD).toContain('designNode="eXAJP"')
+    expect(UPLOAD).toContain('data-design-node="eXAJP"')
     expect(UPLOAD).toContain('ここにファイルをドラッグ、または押して選ぶ')
     expect(UPLOAD).toContain('LINEで送れる大きさ（超えると入れられません）')
     // 検索: 幅420まで。表示切替: 枠40・各44。
@@ -95,9 +95,29 @@ describe('V6 登録メディア一覧の契約', () => {
 
   it('詳細では取得済みメタデータと使用先を表示し、無い版APIを利用不可と明記する', () => {
     expect(PAGE).toContain('<MediaDetailDialog')
-    expect(DETAIL).toContain('designNode="voJtX"')
+    expect(DETAIL).toContain('data-design-node="voJtX"')
     expect(DETAIL).toContain('api.media.deleteImpact')
-    expect(DETAIL).toContain('名前を保ったまま新しい版を追加するAPIは、まだ接続されていません。')
+    expect(DETAIL).toContain('名前と管理用URLを保ったまま新しい版を追加します。')
+    expect(DETAIL).toContain('版追加API待ち')
+  })
+
+  it('詳細を一覧上の小窓ではなく、設計の全面詳細として描く', () => {
+    expect(PAGE).toContain('if (detailsFor)')
+    expect(PAGE).toContain('<MediaDetailDialog')
+    expect(DETAIL).not.toContain("import Dialog from '@/components/shared/dialog'")
+    expect(DETAIL).toContain('xl:grid-cols-3')
+    expect(DETAIL).toContain('xl:col-span-2')
+    expect(DETAIL).toContain('この{item.kind === \'image\' ? \'画像\' : \'メディア\'}を差し替える')
+    expect(DETAIL).toContain('使われているあいだは削除できません')
+  })
+
+  it('LINEの上限と現行の登録上限を混ぜず、個別進捗と再試行を持つ', () => {
+    expect(UPLOAD).toContain('LINEは200MBまで（この画面からは30MBまで）')
+    expect(UPLOAD).toContain('LINEは200MBまで（この画面からは90MBまで）')
+    expect(UPLOAD).toContain('R2へ直接送る登録経路の接続が必要です。')
+    expect(UPLOAD).toContain('aria-live="polite"')
+    expect(UPLOAD).toContain('この1件を再試行')
+    expect(UPLOAD).toContain("entry.state === 'uploading'")
   })
 
   it('既存メディアへの一括差し替えは影響確認後の版を渡して実行する', () => {

@@ -1942,34 +1942,69 @@ export type EcConnectorOverview = {
 
 export type EcNotificationRun = {
   id: string
-  recipientType: 'customer'
+  recipientType: 'customer' | 'operator'
   notificationName: string
-  source: 'EC連携'
+  source: string
   sourceEventId: string
-  friendId: string
+  friendId: string | null
   friendName: string | null
   orderNumber: string | null
-  channel: 'line'
+  channel: 'line' | 'email'
   status: 'pending' | 'accepted' | 'excluded' | 'failed'
   reason: string | null
   receivedAt: string
   acceptedAt: string | null
-  attemptCount: number | null
+  attemptCount: number
   nextRetryAt: string | null
   clickedAt: string | null
   version: number | null
-  executionMode: 'automatic'
-  retryAvailable: false
+  executionMode: 'automatic' | 'manual'
+  retryAvailable: boolean
+  recordVersion: number
+  providerStatus: string | null
 }
 
 export type EcNotificationRunList = {
   items: EcNotificationRun[]
   summary: { accepted: number; failed: number; excluded: number; pending: number }
   coverage: {
-    source: 'current_ec_events'
+    source: 'notification_delivery_ledger'
     unassignedHistoricalRowsExcluded: true
-    attemptHistoryAvailable: false
-    retryAvailable: false
+    attemptHistoryAvailable: true
+    retryAvailable: true
+  }
+}
+
+export type LineNotificationDefinition = {
+  id: string
+  lineAccountId: string
+  key: string
+  name: string
+  category: string
+  sourceEventType: string
+  status: 'draft' | 'published' | 'stopped'
+  draft: Record<string, unknown>
+  currentVersionId: string | null
+  currentVersionNumber: number | null
+  transactionalOnly: true
+  version: number
+  updatedAt: string
+}
+
+export type LineNotificationMetric = {
+  definitionId: string
+  notificationName: string
+  accepted: { value: number }
+  displayed: { state: 'available' | 'unavailable' | 'pending'; value: number | null; reason: string | null }
+  clicked: { value: number }
+}
+
+export type LineNotificationMetrics = {
+  items: LineNotificationMetric[]
+  coverage: {
+    individualOpenAvailable: false
+    lineAggregateOnly: true
+    unavailableIsNull: true
   }
 }
 
@@ -4787,6 +4822,53 @@ export const api = {
         { method: 'DELETE' },
       ),
     },
+  },
+  lineNotifications: {
+    definitions: (lineAccountId: string) => fetchApi<ApiResponse<LineNotificationDefinition[]>>(
+      `/api/line-notifications/customer-definitions?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+    ),
+    updateDraft: (id: string, data: {
+      lineAccountId: string
+      expectedVersion: number
+      name: string
+      category: string
+      sourceEventType: string
+      draft: Record<string, unknown>
+    }) => fetchApi<ApiResponse<LineNotificationDefinition>>(
+      `/api/line-notifications/customer-definitions/${encodeURIComponent(id)}/draft`,
+      { method: 'PATCH', body: JSON.stringify(data) },
+    ),
+    publishDefinition: (id: string, data: { lineAccountId: string; expectedVersion: number }) =>
+      fetchApi<ApiResponse<LineNotificationDefinition>>(
+        `/api/line-notifications/customer-definitions/${encodeURIComponent(id)}/publish`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+    stopDefinition: (id: string, data: { lineAccountId: string; expectedVersion: number }) =>
+      fetchApi<ApiResponse<LineNotificationDefinition>>(
+        `/api/line-notifications/customer-definitions/${encodeURIComponent(id)}/stop`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+    deliveries: (params: { lineAccountId: string; view?: 'all' | 'failures'; limit?: number; offset?: number }) => {
+      const query = new URLSearchParams({ lineAccountId: params.lineAccountId })
+      if (params.view) query.set('view', params.view)
+      if (params.limit !== undefined) query.set('limit', String(params.limit))
+      if (params.offset !== undefined) query.set('offset', String(params.offset))
+      return fetchApi<ApiResponse<EcNotificationRunList> & { pagination: { total: number; limit: number; offset: number } }>(
+        `/api/line-notifications/deliveries?${query}`,
+      )
+    },
+    metrics: (lineAccountId: string) => fetchApi<ApiResponse<LineNotificationMetrics>>(
+      `/api/line-notifications/metrics?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+    ),
+    retryDelivery: (id: string, data: { lineAccountId: string; expectedVersion: number }) => fetchApi<ApiResponse<{
+      id: string
+      status: 'accepted'
+      attemptCount: number
+      version: number
+    }>>(`/api/line-notifications/deliveries/${encodeURIComponent(id)}/retry`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   },
   ecCommerce: {
     overview: (lineAccountId?: string) =>

@@ -65,6 +65,8 @@ export default function NotificationRunList({
   const [total, setTotal] = useState(0)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<RunFilter>('all')
+  const [retryingId, setRetryingId] = useState<string | null>(null)
+  const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
   const requestRef = useRef(0)
 
   useEffect(() => setPage(1), [lineAccountId, mode])
@@ -79,12 +81,21 @@ export default function NotificationRunList({
     }
     setState('loading')
     try {
-      const response = await api.ecCommerce.notificationRuns({
+      const params = {
         lineAccountId,
-        view: mode === 'failures' ? 'failures' : 'all',
+        view: mode === 'failures' ? 'failures' as const : 'all' as const,
         limit: PAGE_SIZE,
         offset: (page - 1) * PAGE_SIZE,
+      }
+      const primary = await api.lineNotifications.deliveries(params).catch((error: unknown) => {
+        // 古い検証用モックと段階移行中の環境だけ、互換口へ戻す。
+        if (error instanceof ApiError && error.status === 404) return api.ecCommerce.notificationRuns(params)
+        throw error
       })
+      if (!primary.success) throw new Error('load failed')
+      const response = !primary.pagination || primary.data.coverage?.source !== 'notification_delivery_ledger'
+        ? await api.ecCommerce.notificationRuns(params)
+        : primary
       if (request !== requestRef.current) return
       if (!response.success) throw new Error('load failed')
       setResult(response.data)
@@ -99,6 +110,27 @@ export default function NotificationRunList({
   }, [lineAccountId, mode, page])
 
   useEffect(() => { void load() }, [load])
+
+  const retry = async (item: EcNotificationRun) => {
+    if (!lineAccountId || !item.retryAvailable) return
+    setRetryingId(item.id)
+    setNotice(null)
+    try {
+      await api.lineNotifications.retryDelivery(item.id, {
+        lineAccountId,
+        expectedVersion: item.recordVersion,
+      })
+      setNotice({ tone: 'success', text: '同じ通知の送信を安全に再試行しました。' })
+      await load()
+    } catch (error) {
+      const text = error instanceof ApiError && error.status === 409
+        ? 'ほかの担当者が先に再試行しました。最新の記録を読み直してください。'
+        : '送信を再試行できませんでした。時間をおいて読み直してください。'
+      setNotice({ tone: 'error', text })
+    } finally {
+      setRetryingId(null)
+    }
+  }
 
   const title = mode === 'failures' ? '送れなかったもの' : 'お知らせの記録'
   const nodeId = mode === 'failures' ? 'X8JCA5' : 'Se65i'
@@ -147,8 +179,10 @@ export default function NotificationRunList({
         {mode === 'failures'
           ? '発送や返金のお知らせが届いていない場合は、その日のうちに受信箱など別の手だてで連絡してください。メール結果と対応済みの記録は、送信台帳の接続後に表示します。'
           : '選択中のLINEアカウントと結び付きを確認できたEC通知だけを表示します。個人の既読は取得せず、押されたかどうかは自社の短縮URLだけで数えます。'}
-        <span className="mt-1 block text-xs">試行回数・自動再試行・個人の既読は、現在の記録からは取得できません。</span>
+        <span className="mt-1 block text-xs">個人の既読は取得できません。試行回数と次の再試行予定は送信台帳の記録を表示します。</span>
       </div>
+
+      {notice ? <div className={`rounded-control border px-4 py-3 text-sm ${notice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{notice.text}</div> : null}
 
       <div className="flex flex-wrap items-center gap-2">
         <label className="min-w-64 flex-1">
@@ -212,8 +246,9 @@ export default function NotificationRunList({
                     <span className="mt-1 block whitespace-nowrap text-xs text-ink-faint">LINE受付 {formatJst(item.acceptedAt)}</span>
                   </Td>
                   <Td>
-                    <span className="block text-sm">試行 {item.attemptCount === null ? '—' : `${item.attemptCount}回`}</span>
+                    <span className="block text-sm">試行 {item.attemptCount == null ? '—' : `${item.attemptCount}回`}</span>
                     <span className="mt-1 block text-xs text-ink-faint">クリック {formatJst(item.clickedAt)}</span>
+                    {item.nextRetryAt ? <span className="mt-1 block text-xs text-warning">次回 {formatJst(item.nextRetryAt)}</span> : null}
                   </Td>
                   <Td>
                     <span className="block text-sm leading-5 text-ink-secondary">{item.reason || '—'}</span>
@@ -221,6 +256,11 @@ export default function NotificationRunList({
                       <Link href={`/chats?friend=${encodeURIComponent(item.friendId)}`} className="mt-1 inline-block whitespace-nowrap text-xs font-semibold text-accent hover:underline">
                         受信箱で連絡
                       </Link>
+                    ) : null}
+                    {mode === 'failures' && item.retryAvailable ? (
+                      <Button className="mt-2" disabled={retryingId === item.id} onClick={() => void retry(item)}>
+                        {retryingId === item.id ? '再試行中' : '送信を再試行'}
+                      </Button>
                     ) : null}
                   </Td>
                 </Tr>

@@ -1701,7 +1701,9 @@ export const SCREENS = [
   { ...MEDIA, node: 'g89Tc', name: '15-1 登録メディア', verdict: 'needs_fix', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正。文字の差は「PDF」1語だけだが、**絵で見ると左の「フォルダ」区画が丸ごと無い**（設計はすべて186／01_商品写真84／02_バナー46／03_動画12／未分類44）。「使っている容量 2.4GB / 10GB」のゲージも無い——ただし実装は「保存容量 — まだ繋がっていません。保存容量が接続されると表示されます。」と**未取得の出し方としては正しい**ので、口が付くまではこのまま。種類の絞り込みは設計が札6つ（…／上限に近い）、実装はチェックボックス4つ＋「使っていない」で**「上限に近い」が無い**。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一（マトリックス→対応表、ブレイクダウン→内訳）。設計画像を撮り直した。**実装との突き合わせはこれから。** **#438 → #559 `7922c002` → #560 `7c1acd0f` で、設計との差がほぼ埋まった。** 使用先は3つに出し分ける（「3か所で使用中」／「どこでも使っていない」／「使用先を確認できません」）。**一括削除の穴も塞がった**——画面を動かして確かめた：未取得のチェック欄は `disabled` で `title="使用先を確認できないため選べません"`、使用中は `title="使用先から外すまで削除できません"`、「全てのメディアを選択」でボタンが「選択したメディアを削除（2）」になり、送られたのは `DELETE /api/media/media-3` と `media-5` の2本だけ。未取得の `media-6` は送られない。選択が古くても `removeSelected()` が送信前に外して断りを出す（`page.tsx:210`）。**#560 で寸法・並び順・表示件数が入った**：`JPG ／ 1024×678 ／ 340 KB`、`入れた日が新しい順`、`20件表示`、`前へ 1 次へ`。**寸法を持たないPDFは `PDF ／ 1.2 MB` と欄ごと出さない**（0×0にしない）。1440・1920とも横スクロール0。P2 残るのはフォルダの扱いと、設計の帯（合計容量・今月の追加） **ルート**：`/contents`（登録メディア）。**取得元**：`media-v6/g89Tc.txt` ＋ 画面を動かして送られた要求を確かめた。**推奨修正**：**未取得のチェック欄を押せなくして理由を `title` に書く形を、ほかの一括操作へ写す**（`YfTfJ` のメディア削除、`sfTEW` のCSV取り込み）。', verdictSource: 'media-v6/g89Tc-1440.png + media-v6/g89Tc-selection-559.md' , verdictHead: '31293424' },
   {
     ...MEDIA, node: 'voJtX', name: '15-1-A メディアの詳細と差し替え',
-    verdict: 'needs_fix', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正。**押し口の読み上げ名を「使用箇所」に直して撮れるようになった**（前は入れ替え前の固定データの名前を指していた）。設計に在って実装に無いのは **「差し替える」**（名前とURLは変わりません）、使用先の内訳（カルーセル「夏の定番5点」／パネル2の画像／面Aの画像）、「使われているあいだは削除できません。先にこの3か所から外してください。」**差し替えが無いと、商品写真を1枚新しくするだけでURLが変わり、使っている先が全部切れる。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一（マトリックス→対応表、ブレイクダウン→内訳）。設計画像を撮り直した。**実装との突き合わせはこれから。** P1 差し替えができない（grep 差し替え が /contents 配下で0件）。設計の詳細は「差し替える」が主役で、名前とURLは変わらず、使っている3か所すべてが新しい画像に変わり、予約中の配信にも効く。実装で同じことをするには消して入れ直すことになるが、**URLが変わるので使っている先が全部切れる**。商品写真を1枚だけ新しくするのは日常の作業。P1 使用中でも消せる（409が返ると「それでも削除しますか？」で消せる。page.tsx:183）。設計は「使われているあいだは削除できません。先にこの3か所から外してください。」。どちらが正しいかは決めごとだが、**いまは消したあとに何が壊れたかを知る場所が無い** **ルート**：`/contents`（メディアの詳細）。**取得元**：`media-v6/design-qa.md` ＋ `contents/page.tsx:183`（「差し替え」を数えて0件）。**推奨修正**：**差し替えを先に作る**。いまは消して入れ直すことになるが、**URLが変わるので使っている先が全部切れる**。商品写真を1枚だけ新しくするのは日常の作業。使用中でも `?force` で消せる点は、**消したあとに何が壊れたかを知る場所が無い**ので、`uNBlA` の影響確認と対にする。', verdictSource: 'media-v6/design-qa.md',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #306 / PR #1102 / UI HEAD `979ca1b63`。構造一致・データ未接続。** 設計 `voJtX` と固定ポート web 3105・mock 8792 の実装を1440・1920で目視比較し、横はみ出し0。大きなプレビュー、ファイル情報、3件の使用先、版を差し替える領域、影響の注意を揃え、使用中は削除させない。**データ未接続**：現行APIは使用先の場所・版・予約状態と同じメディアへ新版を追加する口を返さないため、偽の値や押しても動かない操作は置かず「未取得」「版追加API待ち」と表示する。既存の「使用先を差し替える」は別メディアへの使用先一括変更として残す。',
+    verdictSource: 'media-v6/voJtX-{1440,1920}.png + media-v6/voJtX.txt + contents-v6-contract.test.ts + media-detail-dialog.tsx',
     /*
       **押し口の読み上げ名は「使用箇所」だけ。** ファイル名は付かない
       （札の中の別の行に出ている）。`夏の定番セット.jpg` は固定データを
@@ -1709,7 +1711,7 @@ export const SCREENS = [
       `未使用の案内.png` の2枚。名前で探していたので0件になり撮れていなかった。
     */
     mode: 'viewport', height: 1080, steps: [{ click: '使用箇所' }],
-    verdictHead: '31293424',
+    verdictHead: '979ca1b63',
   },
   {
     /*
@@ -1718,8 +1720,10 @@ export const SCREENS = [
     */
     ...MEDIA, node: 'eXAJP', name: '15-1-B ファイルを入れる',
     mode: 'viewport', height: 1080, steps: [{ click: 'ファイルを入れる', after: 900 }],
-    verdict: 'needs_fix', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正（差は小さい）。文言が1つ違う：設計「LINEで送れる大きさ（超えると入れられません）」、実装「入れられる大きさ（超えると入れられません）」。**「LINEで送れる」が落ちると、何の上限かが読めない。**ほかに「PDF」の1語。それ以外は一致。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一（マトリックス→対応表、ブレイクダウン→内訳）。設計画像を撮り直した。**実装との突き合わせはこれから。** **P2 ファイルを入れる面が一覧と同じ画面にある。** ルート `/media`。設計は入れる面を独立させるが、実装は一覧の頭にドロップ欄を置く。**実務上は困らない**ので P1 から P2 へ下げる。**良い点**：入れる前に上限を全部出す（画像10MB・音声30MB・動画90MB・PDF20MB）、「中身の形式とファイル名の拡張子が食い違うものは保存できません」と断る、「公開リンクが作られるため、個人情報の取り扱いに注意してください」を出す、行ごとに「使用箇所」を持つ。**P1 上限を超えたファイルが一覧に残っている**——「店内のようす.mp4 184.0 MB」は動画90MBの上限を超える。撮影用の固定データが上限を無視して作られているためで、実装の不具合ではないが、**上限を超えた行をどう見せるかは決まっていない**。取得元：`media-v6/eXAJP.txt`。1440・1920とも横スクロール0 **推奨修正**：上限を超えた行の見せ方を決める（撮った絵の「店内のようす.mp4 184.0 MB」は動画90MBの上限を超えるが、これは**固定データが上限を無視して作られているためで実装の不具合ではない**）。入れる面を独立させるのは実務上急がない。', verdictSource: 'media-v6/eXAJP.txt',
-    verdictHead: '31293424',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #306 / PR #1102 / UI HEAD `979ca1b63`。構造一致・データ未接続。** 設計 `eXAJP` と固定ポート web 3105・mock 8792 の実装を1440・1920で目視比較し、横はみ出し0。20件選択、LINE上限、保存先、選択件数、固定操作欄を設計と同じ窓に揃えた。コードと契約テストではファイル別の検査・進捗・完了・失敗・再試行も確認した。**データ未接続**：撮影器は実ファイル投入状態を作れず、R2へ直接送る登録経路も未接続。LINE上限は音声・動画200MBと示す一方、現在の画面から安全に送れる30MB・90MBを別記し、200MBを送れるように偽装していない。',
+    verdictSource: 'media-v6/eXAJP-{1440,1920}.png + media-v6/eXAJP.txt + contents-v6-contract.test.ts + media-upload-dialog.tsx',
+    verdictHead: '979ca1b63',
   },
   {
     ...MEDIA, node: 'YfTfJ', name: '15-1-C メディアの削除確認',
@@ -2278,32 +2282,32 @@ export const SCREENS = [
   // ── 機能24 LINE通知 ─────────────────────────────────────
   /*
     設計のタブは4本（顧客へのお知らせ9／運用者へのお知らせ11／
-    送れなかったもの4／記録）。実装は**1枚もの**で、顧客へのお知らせだけ。
+    送れなかったもの4／記録）。顧客一覧・編集・失敗対応・記録を同じ機能内で管理する。
   */
   { ...LINE_NOTIFY, node: 'festr',
     /* 通常・0件・取得失敗・権限不足を分けて撮る。 */
     states: {
       apis: ['**/api/ec-commerce/overview**', '**/api/ec-commerce/settings**'],
       kinds: ['normal', 'empty', 'error', 'forbidden'],
-    }, name: '24-1 LINE通知', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #291 head `8e7c374991` で設計と再比較。** 一覧を設計と同じ1ページ6件に区切り、表示件数とページ送りを同じ段へ追加。4つの集計帯、4条件の絞り込み、行のきっかけ・当日数・状態を維持し、通常・0件・取得失敗・権限不足を1440・1920で再撮影、全10枚で横はみ出し0。個人の開封は正本要件により表示しない。直近30日の種類別数、LINE上で表示された人数、月間枠、種類別の失敗理由を返すAPIが無いため、値は作らず構造一致・データ未接続とする。', verdictSource: 'line-notify-v6/festr.txt + festr-normal-1920.png', verdictHead: '8e7c374991' },
+    }, name: '24-1 LINE通知', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #331 / UI HEAD `c2e140c321` を3102/8789で再判定。** 統合96の通知定義・30日集計APIを接続し、一覧へ種類別の受付数と「LINE上で表示」を追加した。個人の開封は作らず、LINE集計が取得不能なら「— 未取得」、待ちなら「集計待ち」とする。通常・0件・取得失敗・権限不足を1440/1920で撮影し、全10枚で横はみ出し0。#1077の固定データには新しい通知定義・集計応答が無く、撮影では公開版と集計値を実証できないため、構造一致・データ待ちを維持する。', verdictSource: 'line-notify-v6/festr-{normal,empty,error,forbidden}.txt + festr-normal-1920.png', verdictHead: 'c2e140c321' },
   {
     ...LINE_NOTIFY, node: 'Q55bb', name: '24-1-A お知らせの中身を編集する',
-    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #291 head `8e7c374991` で設計と再比較。** 一覧内の長い折りたたみを、クリック後に「いつ送るか／送るもの／差込項目／ボタン／未達時の決めごと」と右側プレビュー・注意・接続先、下部追従保存を並べる編集専用レイアウトへ変更。1440・1920で横はみ出し0。公開版を直接変えない下書き版・公開版・テスト受信者・取引メール代替のAPIがまだ無いため、存在しない公開操作は作らず、現行設定で安全に扱える範囲だけを表示した。構造一致・データ未接続とする。', verdictSource: 'line-notify-v6/Q55bb.txt + Q55bb-1920.png',
+    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #331 / UI HEAD `c2e140c321` を3102/8789で再判定。** 統合96の通知定義APIへ接続し、公開版番号、編集下書き、楽観ロックつき下書き保存、公開、停止を実装した。公開済み版を直接変更せず、公開前の下書きと分離する。1440/1920の2枚で横はみ出し0。#1077の固定データには新しい通知定義が無いため、撮影では従来設定の編集表示へ安全に戻っており、版操作を画像で実証できない。テスト送信専用の新APIも未実装のため、構造一致・データ待ちを維持する。', verdictSource: 'line-notify-v6/Q55bb.txt + Q55bb-1920.png',
     mode: 'viewport', height: 1136, /*
       **押し口は「内容を編集」。** 「発送した」は行の名前で、押せる役を持っていない
       （`role: 'text'` は ARIA に無く0件になる）。設計の並び順で3番目なので `nth: 2`。
     */
     steps: [{ click: '内容を編集', nth: 2, after: 800 }],
-    verdictHead: '8e7c374991',
+    verdictHead: 'c2e140c321',
   },
   {
     ...LINE_NOTIFY, node: 'X8JCA5', name: '24-1-B 送れなかったもの',
     route: '/line-notifications?tab=failures', mode: 'page',
     states: { apis: ['**/api/ec-commerce/notification-runs?**'], kinds: ['normal', 'loading', 'empty', 'error'] },
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #291 head `8e7c374991` で設計と再比較。** 届かなかった／送信対象外／メール結果／未対応の集計帯、検索、状態絞り込み、その日のうちに代替連絡する案内、受信箱導線を確認。通常・読込・空・失敗を1440・1920で撮影し、全10枚で横はみ出し0。現行APIにはメール結果・試行履歴・次回試行・対応者／対応済みが無く、安全な再試行APIも無い。通常行の固定データも無いためS0へ #264 で依頼済み。存在しない値と操作は作らず、構造一致・データ未接続とする。',
-    verdictSource: 'line-notify-v6/X8JCA5.txt + X8JCA5-normal-1920.png',
-    verdictHead: '8e7c374991',
+    verdictNote: '**2026-09-07 Issue #331 / UI HEAD `c2e140c321` を3102/8789で再判定。** 統合96の送信台帳APIへ直結し、試行回数・次回再試行予定を表示する。Workerが一時失敗として `retryAvailable` を返した行だけ、送信記録の版番号を添えて安全に再試行でき、競合時は最新記録の再読込を案内する。通常・読込・空・失敗を1440/1920で撮影し、全10枚で横はみ出し0。#1077の固定行は旧契約で再試行可否・版・試行履歴を持たず、再試行可能行を画像で実証できないため、構造一致・データ待ちを維持する。',
+    verdictSource: 'line-notify-v6/X8JCA5-{normal,loading,empty,error}.txt + X8JCA5-normal-1920.png',
+    verdictHead: 'c2e140c321',
   },
   {
     /*
@@ -2315,9 +2319,9 @@ export const SCREENS = [
     route: '/line-notifications?tab=history', mode: 'page',
     states: { apis: ['**/api/ec-commerce/notification-runs?**'], kinds: ['normal', 'loading', 'empty', 'error'] },
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #291 head `8e7c374991` で設計と再比較。** 記録数／LINE API受付／短縮URLクリック／失敗の集計帯、検索、クリック・失敗の絞り込み、受付日時・理由・受信箱導線を確認。通常・読込・空・失敗を1440・1920で撮影し、全10枚で横はみ出し0。個人の到達・既読は正本要件により表示せず、安全な再送口も無いため出していない。期間集計・CSV出力権限・版・試行履歴のAPIと通常行の固定データが無く、S0へ #264 で依頼済み。構造一致・データ未接続とする。',
-    verdictSource: 'line-notify-v6/Se65i.txt + Se65i-normal-1920.png',
-    verdictHead: '8e7c374991',
+    verdictNote: '**2026-09-07 Issue #331 / UI HEAD `c2e140c321` を3102/8789で再判定。** 統合96の送信台帳からLINE API受付、失敗、送信対象外、試行回数、次回再試行、短縮URLクリック、通知版を読む契約へ更新した。個人の到達・既読は正本要件どおり表示しない。通常・読込・空・失敗を1440/1920で撮影し、全10枚で横はみ出し0。#1077の固定行は旧契約でクリック・通知版・試行履歴が未接続のため、その値を画像で実証できず、構造一致・データ待ちを維持する。',
+    verdictSource: 'line-notify-v6/Se65i-{normal,loading,empty,error}.txt + Se65i-normal-1920.png',
+    verdictHead: 'c2e140c321',
   },
   {
     ...LINE_NOTIFY, node: 'DpxOK', name: '24-2 運用者へのお知らせ',
@@ -3498,6 +3502,35 @@ const ISSUE_297_REVIEW = {
 }
 
 /**
+ * board #328。PR #1077 の固定データを取り込んだ development を
+ * 3106/8793 で起動し、CSV取込3状態とフォルダ編集を再撮影した結果。
+ * Pencilの設計画像と実装1920pxを同じ比較入力で照合し、1440pxでも
+ * 横はみ出しと欠けがないことを確認した。
+ */
+const ISSUE_328_REVIEW = {
+  sfTEW: {
+    verdict: 'match',
+    note: '一致。CSV名、4件数、状態絞り込み、代表5行、行別の扱いと理由、部分登録の注意、取消・登録を設計順に表示した。件数はAPI応答で変わるため、固定データの500行・作成404・飛ばす73・エラー23で照合した。1440・1920pxとも横はみ出し0、壊れた値0。',
+    source: 'friend-attributes-v6/sfTEW.txt + friend-attributes-v6/sfTEW-{1440,1920}.png',
+  },
+  op1rh: {
+    verdict: 'match',
+    note: '一致。完了の緑帯、登録404件、フォルダ別内訳（VIP120・会員200・未分類84）、飛ばした73件、一覧へ戻る操作を設計順に表示した。1440・1920pxとも横はみ出し0、壊れた値0。',
+    source: 'friend-attributes-v6/op1rh.txt + friend-attributes-v6/op1rh-{1440,1920}.png',
+  },
+  QzRsJ: {
+    verdict: 'match',
+    note: '一致。部分失敗の黄帯、登録404件・未登録23件、代表5行の異なる理由、失敗行CSV、一覧へ戻る操作を設計順に表示した。フォルダ名は失敗CSVへ残し、画面表は設計どおり行・タグ名・理由の3列に絞った。1440・1920pxとも横はみ出し0、壊れた値0。',
+    source: 'friend-attributes-v6/QzRsJ.txt + friend-attributes-v6/QzRsJ-{1440,1920}.png',
+  },
+  byqIW: {
+    verdict: 'match',
+    note: '一致。「お問い合わせフォロー」の名前、保存済みの紫、8色と選択中表示、一覧プレビュー、追加・編集共用の案内、削除・取消・保存を設計と同じ編集窓に配置した。色はAPIの保存値を表示する可変項目。1440・1920pxとも横はみ出し0、壊れた値0。',
+    source: 'friend-attributes-v6/byqIW.txt + friend-attributes-v6/byqIW-{1440,1920}.png',
+  },
+}
+
+/**
  * board #266。2026-09-06 に latest development（14b61d52）を取り込んだ
  * UI HEAD ff1fbfc37 / capture HEAD c03ebf864 を 3102/8789 で起動し、
  * 機能5の14 Node・全状態を設計1920pxと実装1440/1920pxで比較した結果。
@@ -3831,6 +3864,13 @@ for (const screen of SCREENS) {
     screen.verdictNote = `**2026-09-07 Issue #297で修正・再判定。** ${issue297Review.note}`
     screen.verdictSource = issue297Review.source
       ?? `${screen.dir}/${screen.node}.txt + ${screen.dir}/${screen.node}-{1440,1920}.png`
+    delete screen.verdictHead
+  }
+  const issue328Review = ISSUE_328_REVIEW[screen.node]
+  if (screen.feature === 4 && issue328Review) {
+    screen.verdict = issue328Review.verdict
+    screen.verdictNote = `**2026-09-07 Issue #328で修正・再判定。** ${issue328Review.note}`
+    screen.verdictSource = issue328Review.source
     delete screen.verdictHead
   }
   const issue266Review = ISSUE_266_REVIEW[screen.node]
