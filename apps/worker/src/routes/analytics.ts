@@ -30,11 +30,21 @@ import {
   createSavedAnalyticsFromResult,
   getSavedAnalytics,
   getSavedAnalyticsSnapshots,
+  ANALYTICS_REPORT_SECTIONS,
+  createAnalyticsReportSchedule,
+  getAnalyticsReportSchedules,
+  getStaffMembers,
+  getStaffAccountScopeIds,
   getLineAccountById,
+  DEFAULT_TENANT_ID,
   FUNNEL_STEP_KINDS,
   type Funnel,
   type FunnelStepKind,
   type AnalyticsOverviewContext,
+  type AnalyticsReportAlertRule,
+  type AnalyticsReportChannel,
+  type AnalyticsReportRecipient,
+  type AnalyticsReportSection,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -151,6 +161,102 @@ function zonedDateStart(value: string, timeZone: string): string {
     guess = target - zoneOffsetMs(new Date(guess), timeZone);
   }
   return new Date(guess).toISOString();
+}
+
+function nextReportRun(input: {
+  cadence: 'weekly' | 'monthly'; weekday: number | null; monthDay: number | null;
+  sendTime: string; timeZone: string; now: Date;
+}): string {
+  const currentDate = dateInZone(input.now, input.timeZone);
+  const [hour, minute] = input.sendTime.split(':').map(Number);
+  const candidateDate = new Date(`${currentDate}T00:00:00.000Z`);
+  if (input.cadence === 'weekly') {
+    const currentWeekday = new Date(`${currentDate}T12:00:00.000Z`).getUTCDay();
+    candidateDate.setUTCDate(candidateDate.getUTCDate() + ((input.weekday! - currentWeekday + 7) % 7));
+  } else {
+    candidateDate.setUTCDate(input.monthDay!);
+    if (candidateDate.toISOString().slice(0, 10) < currentDate) candidateDate.setUTCMonth(candidateDate.getUTCMonth() + 1);
+  }
+  const asDate = candidateDate.toISOString().slice(0, 10);
+  let instant = Date.parse(zonedDateStart(asDate, input.timeZone)) + hour * 3_600_000 + minute * 60_000;
+  if (instant <= input.now.getTime()) {
+    if (input.cadence === 'weekly') instant += 7 * 86_400_000;
+    else {
+      candidateDate.setUTCMonth(candidateDate.getUTCMonth() + 1);
+      instant = Date.parse(zonedDateStart(candidateDate.toISOString().slice(0, 10), input.timeZone))
+        + hour * 3_600_000 + minute * 60_000;
+    }
+  }
+  return new Date(instant).toISOString();
+}
+
+function isEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 254;
+}
+
+function parseReportBody(raw: unknown): { ok: true; value: {
+  name: string; sections: AnalyticsReportSection[]; savedAnalysisIds: string[];
+  cadence: 'weekly' | 'monthly'; weekday: number | null; monthDay: number | null;
+  sendTime: string; timeZone: string; periodDays: number;
+  recipients: AnalyticsReportRecipient[]; channels: AnalyticsReportChannel[];
+  alertRules: AnalyticsReportAlertRule[];
+} } | { ok: false; error: string } {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ok: false, error: '入力内容が正しくありません' };
+  const body = raw as Record<string, unknown>;
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  if (!name || name.length > 120) return { ok: false, error: 'レポート名は1〜120文字で入力してください' };
+  const sections = Array.isArray(body.sections)
+    ? [...new Set(body.sections.filter((item): item is AnalyticsReportSection =>
+      typeof item === 'string' && (ANALYTICS_REPORT_SECTIONS as readonly string[]).includes(item)))]
+    : [];
+  const savedAnalysisIds = Array.isArray(body.savedAnalysisIds)
+    ? [...new Set(body.savedAnalysisIds.filter((item): item is string => typeof item === 'string' && Boolean(item.trim())).map((item) => item.trim()))]
+    : [];
+  if (!sections.length && !savedAnalysisIds.length) return { ok: false, error: 'レポートに入れる項目を選んでください' };
+  const cadence = body.cadence === 'monthly' ? 'monthly' : body.cadence === 'weekly' ? 'weekly' : null;
+  const weekday = Number.isInteger(body.weekday) ? Number(body.weekday) : null;
+  const monthDay = Number.isInteger(body.monthDay) ? Number(body.monthDay) : null;
+  if (!cadence || (cadence === 'weekly' && (weekday === null || weekday < 0 || weekday > 6))
+    || (cadence === 'monthly' && (monthDay === null || monthDay < 1 || monthDay > 28))) {
+    return { ok: false, error: '送信間隔と日を確認してください' };
+  }
+  const sendTime = typeof body.sendTime === 'string' ? body.sendTime : '';
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(sendTime)) return { ok: false, error: '送信時刻を確認してください' };
+  const timeZone = typeof body.timeZone === 'string' ? body.timeZone.trim() : '';
+  try { new Intl.DateTimeFormat('ja-JP', { timeZone }).format(new Date()); } catch { return { ok: false, error: 'タイムゾーンが正しくありません' }; }
+  const periodDays = Number(body.periodDays);
+  if (!Number.isInteger(periodDays) || periodDays < 1 || periodDays > 397) return { ok: false, error: '集計期間は1〜397日で指定してください' };
+  const channels = Array.isArray(body.channels)
+    ? [...new Set(body.channels.filter((item): item is AnalyticsReportChannel => item === 'dashboard' || item === 'email' || item === 'line'))]
+    : [];
+  if (!channels.length) return { ok: false, error: '通知方法を選んでください' };
+  const recipients: AnalyticsReportRecipient[] = [];
+  for (const item of Array.isArray(body.recipients) ? body.recipients : []) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const value = item as Record<string, unknown>;
+    const label = typeof value.label === 'string' ? value.label.trim().slice(0, 120) : '';
+    if (value.kind === 'staff' && typeof value.staffId === 'string' && value.staffId.trim()) {
+      recipients.push({ kind: 'staff', staffId: value.staffId.trim(), label: label || 'ログインユーザー' });
+    } else if (value.kind === 'email' && typeof value.email === 'string' && isEmail(value.email.trim())) {
+      recipients.push({ kind: 'email', email: value.email.trim().toLowerCase(), label: label || value.email.trim() });
+    }
+  }
+  if (!recipients.length) return { ok: false, error: '受け取る人を選んでください' };
+  const alertRules = Array.isArray(body.alertRules) ? body.alertRules.flatMap((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+    const value = item as Record<string, unknown>;
+    const metric = value.metric;
+    const operator = value.operator;
+    const threshold = Number(value.threshold);
+    const minimumSample = Number(value.minimumSample);
+    if ((metric !== 'block_rate' && metric !== 'friend_adds' && metric !== 'conversions')
+      || (operator !== 'greater_than' && operator !== 'decrease_percent' && operator !== 'zero_streak_days')
+      || !Number.isFinite(threshold) || threshold < 0
+      || !Number.isInteger(minimumSample) || minimumSample < 1) return [];
+    return [{ metric, operator, threshold, minimumSample } as AnalyticsReportAlertRule];
+  }) : [];
+  return { ok: true, value: { name, sections, savedAnalysisIds, cadence, weekday: cadence === 'weekly' ? weekday : null,
+    monthDay: cadence === 'monthly' ? monthDay : null, sendTime, timeZone, periodDays, recipients, channels, alertRules } };
 }
 
 export function readAnalyticsOverviewRange(
@@ -474,6 +580,111 @@ analytics.get('/api/analytics/saved/:id/snapshots', async (c) => {
     return c.json({ success: true, data: items });
   } catch (error) {
     console.error('GET /api/analytics/saved/:id/snapshots error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// ── 定期レポート ────────────────────────────────────────────
+
+async function reportRecipientOptions(c: Context<Env>, accountId: string) {
+  const signedIn = c.get('staff');
+  const members = await getStaffMembers(c.env.DB, signedIn.tenantId ?? DEFAULT_TENANT_ID);
+  const visible = [];
+  for (const member of members) {
+    if (!member.is_active || member.invite_status !== 'active') continue;
+    if (member.account_scope === 'accounts') {
+      const scope = await getStaffAccountScopeIds(c.env.DB, member.id);
+      if (!scope.includes(accountId)) continue;
+    }
+    visible.push({
+      id: member.id, name: member.name, role: member.role,
+      email: member.email, lineLinked: Boolean(member.line_user_id),
+    });
+  }
+  return visible;
+}
+
+analytics.get('/api/analytics/report-schedules', async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const selected = await getLineAccountById(c.env.DB, account.accountId);
+    if (!selected) return c.json({ success: false, error: 'Not found' }, 404);
+    const [items, savedAnalyses, recipients] = await Promise.all([
+      getAnalyticsReportSchedules(c.env.DB, account.accountId),
+      getSavedAnalytics(c.env.DB, account.accountId),
+      reportRecipientOptions(c, account.accountId),
+    ]);
+    return c.json({
+      success: true,
+      data: {
+        items,
+        options: {
+          timeZone: selected.timezone || 'Asia/Tokyo',
+          savedAnalyses: savedAnalyses.map((item) => ({ id: item.id, name: item.name, kind: item.kind })),
+          recipients,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('GET /api/analytics/report-schedules error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+analytics.post('/api/analytics/report-schedules', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const rawBody = await c.req.json<unknown>();
+    const parsed = parseReportBody(rawBody);
+    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 422);
+    const selected = await getLineAccountById(c.env.DB, account.accountId);
+    if (!selected) return c.json({ success: false, error: 'Not found' }, 404);
+    if ((selected.timezone || 'Asia/Tokyo') !== parsed.value.timeZone) {
+      return c.json({ success: false, error: '選択中のLINEアカウントとタイムゾーンが一致しません' }, 422);
+    }
+    const [saved, recipientOptions] = await Promise.all([
+      getSavedAnalytics(c.env.DB, account.accountId),
+      reportRecipientOptions(c, account.accountId),
+    ]);
+    const visibleSavedIds = new Set(saved.map((item) => item.id));
+    if (!parsed.value.savedAnalysisIds.every((id) => visibleSavedIds.has(id))) {
+      return c.json({ success: false, error: '選べない保存済み分析が含まれています' }, 422);
+    }
+    const staffById = new Map(recipientOptions.map((item) => [item.id, item]));
+    if (!parsed.value.recipients.every((recipient) => recipient.kind === 'email'
+      || Boolean(recipient.staffId && staffById.has(recipient.staffId)))) {
+      return c.json({ success: false, error: 'このLINEアカウントを見られない宛先が含まれています' }, 422);
+    }
+    if (parsed.value.channels.includes('email')) {
+      const hasEmail = parsed.value.recipients.some((recipient) => recipient.kind === 'email'
+        || Boolean(recipient.staffId && staffById.get(recipient.staffId)?.email));
+      if (!hasEmail) return c.json({ success: false, error: 'メールを受け取れる宛先がありません' }, 422);
+    }
+    if (parsed.value.channels.includes('line')) {
+      const hasLine = parsed.value.recipients.some((recipient) => recipient.kind === 'staff'
+        && Boolean(recipient.staffId && staffById.get(recipient.staffId)?.lineLinked));
+      if (!hasLine) return c.json({ success: false, error: 'LINE連携済みの宛先がありません' }, 422);
+    }
+    const now = new Date();
+    const sendOnce = Boolean(rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody)
+      && (rawBody as Record<string, unknown>).sendOnce === true);
+    const item = await createAnalyticsReportSchedule(c.env.DB, {
+      lineAccountId: account.accountId,
+      ...parsed.value,
+      nextRunAt: sendOnce ? now.toISOString() : nextReportRun({
+        cadence: parsed.value.cadence, weekday: parsed.value.weekday,
+        monthDay: parsed.value.monthDay, sendTime: parsed.value.sendTime,
+        timeZone: parsed.value.timeZone, now,
+      }),
+      createdBy: c.get('staff').id,
+      now: now.toISOString(),
+      isOneTime: sendOnce,
+    });
+    return c.json({ success: true, data: item }, 201);
+  } catch (error) {
+    console.error('POST /api/analytics/report-schedules error:', error);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
