@@ -29,12 +29,11 @@ describe('V6 一斉配信の予約完了', () => {
   it('予約人数を保存値や固定値で作らず現在の見込みとして表示する', () => {
     /*
       **保存した数を出さない。** 予約してから配信までに友だちが増減するので、
-      いま数え直した見込みを出す。数の出し方は共通の `SummaryCard` に寄せた
-      （画面ごとに `—` の書き方が変わらないように）。
+      いま数え直した見込みを出す。
     */
     expect(PAGE).toContain('api.broadcasts.preflight')
-    expect(PAGE).toContain('value={estimate?.audienceCount ?? null}')
-    expect(PAGE).toContain('送信を始める直前に同じ条件でもう一度数えます')
+    expect(PAGE).toContain('const audienceCount = estimate?.audienceCount ?? null')
+    expect(PAGE).toContain('配信対象は送信開始直前に再集計します')
     expect(PAGE).not.toContain('totalCount')
   })
 
@@ -43,8 +42,8 @@ describe('V6 一斉配信の予約完了', () => {
       **人数だけ取れなくても、予約そのものは出す。** 数は `SummaryCard` が
       `—` にし、理由を副文で言う。0人（本当に誰にも届かない）とは別物。
     */
-    expect(PAGE).toContain("detail={estimate ? 'いま同じ条件で数えた人数' : '現在の人数を確認できませんでした'}")
-    expect(PAGE).toContain("detail={estimate ? 'ブロック・非表示などを除外' : '現在の除外人数を確認できませんでした'}")
+    expect(PAGE).toContain('対象人数は現在確認できません。')
+    expect(PAGE).toContain('estimate.hiddenExcluded.toLocaleString')
   })
 
   it('選択中アカウントと所属先が違う配信を表示しない', () => {
@@ -61,15 +60,33 @@ describe('V6 一斉配信の予約完了', () => {
   })
 
   it('送信時に再集計することを明記する', () => {
-    expect(PAGE).toContain('送信を始める直前に同じ条件でもう一度数えます')
+    expect(PAGE).toContain('配信対象は送信開始直前に再集計します')
     expect(PAGE).toContain('現在の見込み')
   })
 
   it('予約した内容を実値で読み合わせる', () => {
     /* 設計 `bPF0s` の面。**固定値を混ぜず、予約したものそのものを出す。** */
     expect(PAGE).toContain('data-design-node="bPF0s"')
-    expect(PAGE).toContain('予約した内容')
-    expect(PAGE).toContain('{formatJst(broadcast.scheduledAt)}')
+    expect(PAGE).toContain('一斉配信を予約しました')
+    expect(PAGE).toContain('const scheduledLabel = formatJst(broadcast.scheduledAt)')
+  })
+
+  it('設計の5段と予約要約を表示する', () => {
+    expect(PAGE).toContain('<BroadcastStepRail')
+    for (const label of ['基本設定', '対象者', 'メッセージ', '送信設定', '確認']) {
+      expect(PAGE).toContain(`label: '${label}'`)
+    }
+    for (const label of ['管理名', '配信対象', '送信予定', '状態']) {
+      expect(PAGE).toContain(`['${label}'`)
+    }
+  })
+
+  it('予約後の操作は本物のAPIまたは実在する画面へつなぐ', () => {
+    expect(PAGE).toContain('api.broadcasts.testSend(broadcast.id)')
+    expect(PAGE).toContain('api.broadcasts.create({')
+    expect(PAGE).toContain("duplicateKey.current ??= crypto.randomUUID()")
+    expect(PAGE).toContain('予約の内容を見る')
+    expect(PAGE).not.toContain('準備中')
   })
 
   it('予約取消は確認後に専用の競合防止APIへ渡す', () => {

@@ -159,6 +159,10 @@ function serializeBroadcast(row: DbBroadcast) {
     segmentConditions: r.segment_conditions
       ? (() => { try { return JSON.parse(String(r.segment_conditions)) as unknown } catch { return null } })()
       : null,
+    // 一覧のフォルダ分類と予約完了の設定表示に使う。DBには保存されていたが、
+    // APIで落としていたため、再読込すると全件が「未分類」に見えていた。
+    folderId: (r.folder_id as string | null | undefined) ?? null,
+    measureOpens: r.measure_opens === undefined ? true : Number(r.measure_opens) !== 0,
     createdAt: row.created_at,
   };
 }
@@ -167,6 +171,10 @@ function serializeBroadcast(row: DbBroadcast) {
 broadcasts.get('/api/broadcasts', async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId');
+    if (lineAccountId
+      && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+    }
     const items = await getBroadcasts(c.env.DB, lineAccountId || undefined);
     return c.json({ success: true, data: items.map(serializeBroadcast) });
   } catch (err) {
@@ -1529,8 +1537,8 @@ broadcasts.post('/api/broadcasts/:id/test-send', requireRole('owner', 'admin'), 
     if (!await canAccessBroadcast(c.env.DB, c.get('staff'), broadcast)) {
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
     }
-    if (broadcast.status !== 'draft') {
-      return c.json({ success: false, error: 'Only draft broadcasts can be test-sent' }, 400);
+    if (broadcast.status !== 'draft' && broadcast.status !== 'scheduled') {
+      return c.json({ success: false, error: 'Only draft or scheduled broadcasts can be test-sent' }, 400);
     }
 
     const raw = broadcast as unknown as Record<string, unknown>;

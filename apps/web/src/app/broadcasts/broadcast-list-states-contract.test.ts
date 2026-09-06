@@ -59,6 +59,23 @@ describe('一覧の状態（設計 6-1-N `TmHjF`）', () => {
   })
 })
 
+describe('フォルダ操作（設計 6-1-M `xkRDb`）', () => {
+  it('画面名は上部バーだけに出し、設計順にKPIと操作を置く', () => {
+    expect(PAGE).toContain("usePageTitle('一斉配信')")
+    expect(PAGE).not.toContain('<Header')
+    expect(PAGE).not.toContain('<h1')
+    expect(PAGE.indexOf('<BroadcastKpis')).toBeLessThan(PAGE.indexOf('フォルダを追加'))
+    expect(PAGE.indexOf('フォルダを追加')).toBeLessThan(PAGE.indexOf('data-design="Body"'))
+  })
+
+  it('追加と配信作成は実際の処理へつなぐ', () => {
+    expect(PAGE).toContain("import Button from '@/components/shared/button'")
+    expect(PAGE).toContain('<Button onClick={() => setFolderDialogOpen(true)}>フォルダを追加</Button>')
+    expect(PAGE).toContain('onClick={() => setShowCreate(true)}')
+    expect(PAGE).toContain('配信を作成')
+  })
+})
+
 /**
  * 帯の4枚（設計 `q76C35`）。
  *
