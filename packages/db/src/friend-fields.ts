@@ -65,7 +65,8 @@ export interface FriendFieldListSummary {
   inUse: number;
   registeredFriends: number;
   updatedThisMonth: number;
-  formLinks: number;
+  formLinks: number | null;
+  formLinksUnavailableReason?: string;
 }
 
 const SCOPED_FIELD_SELECT = `
@@ -438,14 +439,26 @@ export async function getFriendFieldListSummary(
     )
     .bind(monthStart, scope.lineAccountId, ...ids)
     .first<{ in_use: number; friends: number; updated_this_month: number }>();
-  const usages = await getFriendFieldUsageForScope(db, ids, scope);
-  return {
+  const base = {
     total: fields.length,
     inUse: Number(row?.in_use ?? 0),
     registeredFriends: Number(row?.friends ?? 0),
     updatedThisMonth: Number(row?.updated_this_month ?? 0),
-    formLinks: new Set(usages.filter((usage) => usage.kind === 'form').map((usage) => usage.id)).size,
   };
+  try {
+    const usages = await getFriendFieldUsageForScope(db, ids, scope);
+    return {
+      ...base,
+      formLinks: new Set(usages.filter((usage) => usage.kind === 'form').map((usage) => usage.id)).size,
+    };
+  } catch (error) {
+    console.error('friend field form usage unavailable:', error);
+    return {
+      ...base,
+      formLinks: null,
+      formLinksUnavailableReason: '回答フォームの使用数を確認できませんでした。再読み込みしてください。',
+    };
+  }
 }
 
 /** 回答フォーム・リマインダ・保存検索から、現在の実参照をアカウント範囲内で探す。 */
