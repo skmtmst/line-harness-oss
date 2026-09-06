@@ -3893,7 +3893,7 @@ export const CAPTURED_AT = {
   ],
   1: [
     { pr: 419, head: 'c84baa63', on: '2026-08-30', screens: ['vUXKb', 'ZN0ov', 'JN6mQ', 'NjK9q', 'Alekb'], note: 'ダッシュボード。お知らせの口を撮影モックへ足した（`counts` の4つが欠けると `undefined.all` で落ちる）' },
-    { pr: 0, head: 'd69099cd9', on: '2026-09-06', screens: ['vUXKb', 'JN6mQ'], note: 'Issue #267。3102/8789で対象2画面を1440・1920px撮影し、Pencil設計と比較。両画面とも横はみ出し0。構造は一致し、設計値と公式プロフィール短縮URLを返すAPIがないためデータ未接続を維持した。' },
+    { pr: 971, head: 'd69099cd9', on: '2026-09-06', screens: ['vUXKb', 'JN6mQ'], note: 'Issue #267。3102/8789で対象2画面を1440・1920px撮影し、Pencil設計と比較。両画面とも横はみ出し0。構造は一致し、設計値と公式プロフィール短縮URLを返すAPIがないためデータ未接続を維持した。' },
   ],
   23: [
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['eI3gs'], note: '同上' },
