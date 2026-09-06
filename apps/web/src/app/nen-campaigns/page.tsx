@@ -20,12 +20,12 @@ type Overview = {
 
 function ColumnLinePreview({ column, onClose }: { column: NenColumn; onClose: () => void }) {
   return (
-    <section id={`column-preview-${column.id}`} className="overflow-hidden rounded-v6-card border border-hairline bg-canvas">
-      <div className="flex items-center justify-between gap-3 bg-[#3f3f3f] px-4 py-3 text-white">
+    <section id={`column-preview-${column.id}`} className="overflow-hidden rounded-v6-card border border-hairline bg-canvas lg:max-w-[920px]">
+      <div className="flex min-h-[52px] items-center justify-between gap-3 bg-[#3f3f3f] px-4 py-3 text-white">
         <div><p className="text-sm font-bold">LINEプレビュー</p><p className="mt-0.5 text-xs text-gray-300">実際のトーク画面に近い見え方です</p></div>
         <Button onClick={onClose}>プレビューを隠す</Button>
       </div>
-      <div className="bg-[#8facd8] p-5"><div className="mx-auto max-w-md rounded-v6-card bg-white p-4 shadow-v6-card"><p className="whitespace-pre-wrap text-sm leading-6 text-ink">{column.introText}</p><div className="mt-3 border-t border-hairline pt-3"><h4 className="font-bold text-ink">{column.title}</h4><p className="mt-2 text-sm leading-6 text-ink-secondary">{column.excerpt}</p><p className="mt-3 rounded-v6-control bg-v6-action py-2 text-center text-sm font-bold text-white">コラムを読む</p></div></div></div>
+      <div className="min-h-[220px] bg-[#8facd8] p-5"><div className="mx-auto max-w-[480px] rounded-v6-card rounded-tl-[4px] bg-white p-4 shadow-v6-card"><p className="whitespace-pre-wrap text-sm leading-[1.65] text-ink">{column.introText}</p><div className="mt-3 border-t border-hairline pt-3"><h4 className="font-bold tracking-[0.01em] text-ink">{column.title}</h4><p className="mt-2 text-sm leading-6 text-ink-secondary">{column.excerpt}</p><p className="mt-3 min-h-[36px] rounded-v6-control bg-v6-action py-2 text-center text-sm font-bold text-white">コラムを読む</p></div></div></div>
     </section>
   )
 }
@@ -34,9 +34,9 @@ function CampaignLinePreview({ setting, onClose }: { setting: NenCampaignSetting
   const samples: Record<string, string> = { '{{pet_name}}': 'ココ', '{{coupon_code}}': 'NENBDAY-1234', '{{coupon_expiry}}': '2026-09-30' }
   const replaceSample = (value: string) => Object.entries(samples).reduce((result, [from, to]) => result.replaceAll(from, to), value)
   return (
-    <section id={`campaign-preview-${setting.campaignKey}`} className="overflow-hidden rounded-v6-card border border-hairline bg-canvas">
-      <div className="flex items-center justify-between gap-3 bg-[#3f3f3f] px-4 py-3 text-white"><div><p className="text-sm font-bold">{setting.label}のLINEプレビュー</p><p className="mt-0.5 text-xs text-gray-300">お客様ごとの情報は見本に置き換えています</p></div><Button onClick={onClose}>プレビューを隠す</Button></div>
-      <div className="bg-[#8facd8] p-5"><div className="mx-auto max-w-md rounded-v6-card bg-white p-4 shadow-v6-card"><h4 className="font-bold leading-6 text-ink">{replaceSample(setting.title)}</h4><p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-ink-secondary">{replaceSample(setting.bodyText)}</p>{setting.buttonLabel ? <p className="mt-3 rounded-v6-control bg-v6-action py-2 text-center text-sm font-bold text-white">{setting.buttonLabel}</p> : null}</div></div>
+    <section id={`campaign-preview-${setting.campaignKey}`} className="overflow-hidden rounded-v6-card border border-hairline bg-canvas lg:max-w-[920px]">
+      <div className="flex min-h-[52px] items-center justify-between gap-3 bg-[#3f3f3f] px-4 py-3 text-white"><div><p className="text-sm font-bold">{setting.label}のLINEプレビュー</p><p className="mt-0.5 text-xs text-gray-300">お客様ごとの情報は見本に置き換えています</p></div><Button onClick={onClose}>プレビューを隠す</Button></div>
+      <div className="min-h-[220px] bg-[#8facd8] p-5"><div className="mx-auto min-h-[240px] max-w-[480px] rounded-v6-card rounded-tl-[4px] bg-white p-4 shadow-v6-card"><h4 className="font-bold leading-6 tracking-[0.01em] text-ink">{replaceSample(setting.title)}</h4><p className="mt-3 whitespace-pre-wrap text-sm leading-[1.65] text-ink-secondary">{replaceSample(setting.bodyText)}</p>{setting.buttonLabel ? <p className="mt-3 min-h-[36px] rounded-v6-control bg-v6-action py-2 text-center text-sm font-bold text-white">{setting.buttonLabel}</p> : null}</div></div>
     </section>
   )
 }
@@ -147,7 +147,7 @@ export default function NenCampaignsPage() {
   if (loadError) return <><Header title="NEN配信" /><main className="p-6"><ListState kind="error" description={loadError} action={<Button variant="primary" onClick={() => void load()}>フォロー配信を再読み込み</Button>} /></main></>
 
   const headerAction = tab === 'columns' ? <Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button>
-    : tab === 'pets' ? <Button href="/forms" variant="primary">聞きとりフォームを開く</Button>
+    : tab === 'pets' ? <Button href="/form-submissions" variant="primary">聞きとりフォームを開く</Button>
       : tab === 'history' ? <Button disabled title="一括送信APIが接続されると使えます">待っているものを今すぐ送る</Button>
         : <Button onClick={() => document.getElementById('nen-test-send')?.scrollIntoView({ behavior: 'smooth' })}>テスト送信</Button>
 

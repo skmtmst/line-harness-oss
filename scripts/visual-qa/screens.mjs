@@ -3059,6 +3059,42 @@ const FEATURE_19_AUDIT = {
   },
 }
 
+// Issue #234（機能21）の実装後監査。
+// 設計画像と実装構造は照合したが、ChromiumがMachPort権限で起動できず、
+// 更新後の1440px・1920px画像は未取得。一致判定には上げない。
+const FEATURE_21_AUDIT = {
+  VLMGH: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 Issue #234 / UI HEAD 1b9d5bae9で構造を更新したが、更新後画像は未確認。** KPI4枚、7段の購入後フロー、配信一覧、プレビュー、動作切替、テスト送信を設計順に配置した。この30日の送信・反応・成果は集計APIが無いため、0を作らず接続条件を表示する。ChromiumがMachPort権限で起動できず1440px・1920px画像を取得できなかったため、司令塔の指示どおり判定を上げず `needs_fix` を維持する。',
+    verdictSource: 'nen-v6/VLMGH.txt + apps/web/src/app/nen-campaigns/nen-overview.tsx（更新後画像未確認）',
+  },
+  DEX0k: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 Issue #234 / UI HEAD 1b9d5bae9で構造を更新したが、更新後画像は未確認。** KPI、検索、状態別絞り込み、コラム一覧、配信結果への導線、紹介文編集、予約操作を設計順に配置した。対象人数と読了集計はAPI未接続のため条件を本文に表示する。ChromiumのMachPort権限で2幅画像を取得できず、構造一致・データ未接続を維持する。',
+    verdictSource: 'nen-v6/DEX0k.txt + apps/web/src/app/nen-campaigns/nen-overview.tsx（更新後画像未確認）',
+  },
+  q4lajm: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 Issue #234 / UI HEAD 1b9d5bae9で構造を更新したが、更新後画像は未確認。** 誕生日3日前10:00の設定、ペット一覧、飼い主・誕生日・次の配信、LINEプレビュー、誕生日未登録数を設計と同じ役割で配置した。開封とクーポン利用は集計APIが無いため接続条件を表示する。ChromiumのMachPort権限で2幅画像を取得できず、司令塔の指示どおり判定を上げず `needs_fix` を維持する。',
+    verdictSource: 'nen-v6/q4lajm.txt + apps/web/src/app/nen-campaigns/nen-overview.tsx（更新後画像未確認）',
+  },
+  WeXbL: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 Issue #234 / UI HEAD 1b9d5bae9で構造を更新したが、更新後画像は未確認。** KPI、検索、状態絞り込み、日時・宛先・配信・状態・きっかけ・反応の表を設計順に配置し、日時は日本時間で表示する。きっかけと反応の記録はAPI未接続。ChromiumのMachPort権限で2幅画像を取得できず、構造一致・データ未接続を維持する。',
+    verdictSource: 'nen-v6/WeXbL.txt + apps/web/src/app/nen-campaigns/nen-overview.tsx（更新後画像未確認）',
+  },
+  ymXJK: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 Issue #234 / UI HEAD 1b9d5bae9で不足を画面内に明示したが、要修正を維持。** 題名・分類・記事リンク・画像・概要・公開日時・届く形のプレビューは実装済み。記事本文は外部サイトを正本とする。配信対象人数・読了後タグ・前のコラムの複製・自分へのテスト送信はAPIが無く、接続条件を本文または無効ボタンの説明に出した。ChromiumのMachPort権限で2幅画像も取得できていない。**接続条件:** 対象人数、読了イベント、タグ付け、複製、テスト送信APIを接続して再撮影する。',
+    verdictSource: 'nen-v6/ymXJK.txt + apps/web/src/app/nen-campaigns/columns/new/page.tsx（更新後画像未確認）',
+  },
+  i9sQP: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 Issue #234 / UI HEAD 1b9d5bae9で状態構造を確認したが、更新後画像は未確認。** 読込中・0件・取得失敗を `ListState` で分け、取得失敗を0件として表示しない。コラムの固定データと集計APIが未接続で、ChromiumのMachPort権限により2幅画像を取得できないため、構造一致・データ未接続を維持する。',
+    verdictSource: 'nen-v6/i9sQP.txt + apps/web/src/app/nen-campaigns/page.tsx（更新後画像未確認）',
+  },
+}
+
 /**
  * board #210。2026-09-06 に latest development（f4296e63）を 8792/3103 で起動し、
  * 機能2〜5の未判定56 Nodeを設計1920pxと実装1440/1920pxで見比べた結果。
@@ -3229,6 +3265,10 @@ for (const screen of SCREENS) {
   }
   if (screen.feature === 19 && FEATURE_19_AUDIT[screen.node]) {
     Object.assign(screen, FEATURE_19_AUDIT[screen.node])
+    delete screen.verdictHead
+  }
+  if (screen.feature === 21 && FEATURE_21_AUDIT[screen.node]) {
+    Object.assign(screen, FEATURE_21_AUDIT[screen.node])
     delete screen.verdictHead
   }
 }
