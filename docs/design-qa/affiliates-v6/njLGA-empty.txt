@@ -1,4 +1,4 @@
-# 16-1-C 支払い-normal
+# 16-1-C 支払い-empty
 # /conversions?tab=payment
 
 画

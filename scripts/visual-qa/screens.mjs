@@ -3118,6 +3118,67 @@ const ISSUE_210_REVIEW = {
   q5G45: '読込・空・失敗は撮れたが、設計の同一面にある案内・再試行・作成導線と一致しない。**推奨修正**：状態ごとの文言と次の操作を設計へそろえる。',
 }
 
+/**
+ * board #212。2026-09-06 に development bf7434ff を 3107/8794 で起動し、
+ * 機能14〜32に残っていた未判定11 Nodeを設計1920pxと実装1440/1920pxで比較した。
+ * 画面コードは変更せず、見えた差と撮影不能を判定として記録する。
+ */
+const ISSUE_212_REVIEW = {
+  njLGA: {
+    note: '通常・読込中・0件・取得失敗を2幅で撮影し、横はみ出し0。読込中だけは分かれるが、通常と0件がどちらも取得失敗表示になり、設計の4指標、支払対象の行、締め・振込操作を確認できない。**推奨修正**：撮影用の通常・0件応答を支払い画面の契約へ合わせ、4状態を別々に描き、実データの行と操作を設計位置へそろえる。',
+    source: 'affiliates-v6/njLGA-{normal,loading,empty,error}.txt + njLGA-{normal,loading,empty,error}-{1440,1920}.png',
+    states: { apis: ['**/api/affiliate-payments*'], kinds: ['normal', 'loading', 'empty', 'error'] },
+  },
+  d8d3Mz: {
+    note: '2幅とも横はみ出し0。設計は使用先ごとの停止影響と「開く」、停止・差し替え・削除の3択を出すが、実装は小さな確認窓に対象の内部名と削除だけを出す。**推奨修正**：使用先ごとの影響と移動導線を表示し、安全な3つの選択肢を設計順に並べる。',
+    source: 'conversions-v6/d8d3Mz.txt + d8d3Mz-1440.png + d8d3Mz-1920.png',
+  },
+  HpKyF: {
+    note: '通常・誕生日の2状態を2幅で撮影し、横はみ出し0。どちらも「この配信が見つかりませんでした」の空表示で、設計の配信条件、本文編集、LINEプレビュー、送信後の動作が出ない。**推奨修正**：撮影用設定へ対象キーを接続し、編集内容とプレビューを表示して全状態を撮り直す。',
+    source: 'nen-v6/HpKyF.txt + HpKyF-birthday.txt + HpKyF-{1440,1920}.png + HpKyF-birthday-{1440,1920}.png',
+  },
+  N2J629: {
+    note: '2幅とも横はみ出し0。見送り理由を選ぶ流れはあるが、設計より窓が縦長で、写真・投稿者の要約、理由の名前と選択状態、補足、投稿者へ届く案内、操作位置が一致しない。**推奨修正**：写真と投稿者を含むコンパクトな確認窓へ戻し、理由・補足・通知内容を設計順にそろえる。',
+    source: 'photos-v6/N2J629.txt + N2J629-1440.png + N2J629-1920.png',
+  },
+  Q55bb: {
+    note: '2幅とも横はみ出し0。設計は配信条件、本文編集、差し込み項目、ボタン、LINEプレビュー、送信後の流れを1画面で示すが、実装は一覧内の編集領域へスクロールし、配置と情報量が大きく異なる。**推奨修正**：設計の主欄＋右プレビューへ再配置し、差し込み項目と送信後の流れを同じ位置に出す。',
+    source: 'line-notify-v6/Q55bb.txt + Q55bb-1440.png + Q55bb-1920.png',
+  },
+  TnDbq: {
+    note: '1440pxは予約一覧のままで、1920pxは対象行の操作後に会話画面へ遷移して撮影できなかった。設計の予約内容、顧客・ペット、来店履歴、売上、マイル、通知の詳細へ到達できない。**推奨修正**：顧客名とは別に予約詳細を開く安定した操作を用意し、設計の詳細画面を2幅で再撮影する。',
+    source: 'booking-v6/TnDbq.txt + TnDbq-1440.png + capture-screens.mjs撮影結果',
+  },
+  GFDqW: {
+    note: '2幅とも横はみ出し0。確認画面は出るが、設計の顧客・LINE連携、予約枠の長さ、通知時刻、右側LINEプレビュー、注意事項が不足し、縦1列の簡略表示になっている。**推奨修正**：確認内容を設計の主欄＋右プレビューへ戻し、登録前に誰へ何がいつ届くかを表示する。',
+    source: 'booking-v6/GFDqW.txt + GFDqW-1440.png + GFDqW-1920.png',
+  },
+  GfceK: {
+    note: '2幅とも登録完了へ進まず「予約を登録できませんでした」となり、設計の完了案内、送信済みLINEプレビュー、次の操作が出ない。**推奨修正**：固定応答で登録成功まで通し、完了内容・送信結果・次の行動を設計どおりに表示して再撮影する。',
+    source: 'booking-v6/GfceK.txt + GfceK-1440.png + GfceK-1920.png',
+  },
+  Lg8ff: {
+    note: '2幅とも一般的な登録失敗表示となり、設計の重複した時間、未連携顧客の連絡先、入力エラー要約、空き時間の候補が出ない。回復状態は「空いている時間を選び直す」が0件で撮影不能。**推奨修正**：409の固定応答を競合画面へ接続し、選び直しから登録まで同じ2幅で通す。',
+    source: 'booking-v6/Lg8ff.txt + Lg8ff-1440.png + Lg8ff-1920.png + capture-screens.mjs撮影結果',
+  },
+  tksPc: {
+    note: '通常・読込中・取得失敗を2幅で撮影し、横はみ出し0。読込中だけは分かれるが、通常も「受付時間と休業日を取得できませんでした」になり、設計の曜日別受付時間、休業日、予約枠ルール、顧客向けカレンダープレビューを確認できない。**推奨修正**：通常応答を設定画面へ接続し、編集可能な通常状態と顧客向けプレビューを表示する。',
+    source: 'booking-settings-v6/tksPc-{normal,loading,error}.txt + tksPc-{normal,loading,error}-{1440,1920}.png',
+  },
+  EOTS4: {
+    note: '2幅とも横はみ出し0。設計は役割3種と機能ごとの権限を表で比較する全画面だが、実装は1ユーザーの基本情報・通知設定を含む縦長の編集窓で、比較表になっていない。**推奨修正**：役割ごとの閲覧・操作範囲を設計の表へ戻し、個人通知の設定とは画面を分ける。',
+    source: 'staff-v6/EOTS4.txt + EOTS4-1440.png + EOTS4-1920.png',
+  },
+  I3ZSrU: {
+    note: 'mock APIが稼働している状態で2回撮り直したが、1440px・1920pxともログイン画面へ遷移し、設計の招待フォームを確認できなかった。**推奨修正**：撮影セッションで `/staff/new` を認証済みのまま開けるようにし、名前・メール・役割・LINEアカウント・担当範囲の全状態を再撮影する。',
+    source: 'design-reference/staff-v6/I3ZSrU.png + capture-screens.mjs撮影結果（実装画像なし）',
+  },
+  DkPY0: {
+    note: '最新 development に `/automations/runs` の画面が無く、通常・読込中・0件・取得失敗のどの状態も撮影できない。設計の実行記録、対象、結果、失敗理由、再実行導線を確認できない。**推奨修正**：実行記録画面を本流へ実装し、4状態を1440px・1920pxで撮影して設計と比較する。',
+    source: 'design-reference/automations-v6/DkPY0.png + screens.mjs未実装理由（実装画像なし）',
+  },
+}
+
 for (const screen of SCREENS) {
   if (screen.feature === 15 && FEATURE_15_REVIEW[screen.node]) {
     Object.assign(screen, FEATURE_15_REVIEW[screen.node])
@@ -3129,6 +3190,20 @@ for (const screen of SCREENS) {
     screen.verdictNote = `**2026-09-06 #210で判定。** 設計1920pxと実装1440/1920pxを目視比較。${issue210Note}`
     screen.verdictSource = `${screen.dir}/${screen.node}.txt + ${screen.dir}/${screen.node}-{1440,1920}.png`
     screen.verdictHead = 'f4296e63'
+  }
+  const issue212Review = ISSUE_212_REVIEW[screen.node]
+  if (screen.feature >= 14 && screen.feature <= 32 && issue212Review) {
+    if (screen.node === 'njLGA') {
+      delete screen.status
+      delete screen.gap
+      delete screen.gapNote
+      delete screen.why
+    }
+    screen.verdict = 'needs_fix'
+    screen.verdictNote = `**2026-09-06 #212で判定。** 設計1920pxと実装1440/1920pxを目視比較。${issue212Review.note}`
+    screen.verdictSource = issue212Review.source
+    screen.verdictHead = 'bf7434ff'
+    if (issue212Review.states) screen.states = issue212Review.states
   }
   if (screen.feature === 16 && FEATURE_16_REVIEW[screen.node]) {
     Object.assign(screen, FEATURE_16_REVIEW[screen.node])
