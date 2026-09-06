@@ -36,18 +36,22 @@ describe('V6 LINE notification history contract', () => {
     expect(LIST).toContain('LINE API受付済み')
     expect(LIST).not.toContain('届きました')
     expect(LIST).not.toContain('開きました')
-    expect(LIST).toContain('個人の既読は、現在の記録からは取得できません')
+    expect(LIST).toContain('個人の既読は取得できません')
   })
 
-  it('does not show an unsafe retry control before an idempotent retry API exists', () => {
-    expect(LIST).not.toContain('送信を再試行')
-    expect(API).toContain('retryAvailable: false')
+  it('shows retry only when the ledger marks the row retryable and sends its record version', () => {
+    expect(LIST).toContain("item.retryAvailable ?")
+    expect(LIST).toContain('expectedVersion: item.recordVersion')
+    expect(LIST).toContain('送信を再試行')
+    expect(API).toContain('retryAvailable: boolean')
+    expect(API).toContain('/api/line-notifications/deliveries/${encodeURIComponent(id)}/retry')
     expect(LIST).toContain('受信箱で連絡')
   })
 
-  it('keeps unconnected attempt, click, and version data nullable', () => {
-    expect(API).toContain('attemptCount: number | null')
+  it('uses ledger attempts while keeping click and definition version nullable', () => {
+    expect(API).toContain('attemptCount: number')
     expect(API).toContain('clickedAt: string | null')
     expect(API).toContain('version: number | null')
+    expect(API).toContain('recordVersion: number')
   })
 })
