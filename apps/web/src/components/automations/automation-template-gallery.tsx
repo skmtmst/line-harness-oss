@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { MessageCircle, Tags, UserPlus } from 'lucide-react'
 import { api, type AutomationTemplateSummary } from '@/lib/api'
 import Button from '@/components/shared/button'
+import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 
 const ICONS = [UserPlus, MessageCircle, Tags] as const
@@ -112,17 +113,13 @@ export default function AutomationTemplateGallery({
       ) : null}
       <div className="mb-4 flex flex-wrap gap-2" aria-label="きっかけで絞り込む">
         {triggerFilters.map((filter) => (
-          <button
+          <FilterChip
             key={filter}
-            type="button"
-            aria-pressed={triggerFilter === filter}
-            className={triggerFilter === filter
-              ? 'rounded-pill border border-success bg-success-bg px-3 py-1.5 text-xs font-semibold text-success'
-              : 'rounded-pill border border-hairline bg-canvas px-3 py-1.5 text-xs text-ink-secondary'}
-            onClick={() => setTriggerFilter(filter)}
+            selected={triggerFilter === filter}
+            onChange={(selected) => setTriggerFilter(selected ? filter : 'すべて')}
           >
             {filter}
-          </button>
+          </FilterChip>
         ))}
       </div>
       {visibleItems.length === 0 ? (

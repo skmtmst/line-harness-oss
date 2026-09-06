@@ -301,7 +301,7 @@ export default function NewAutomationPage() {
                 </div>
               </div>
             ) : null}
-            <p className={styles.connectionNote}>
+            <p>
               条件を足す（15の軸から選べます）: 共通の条件編集を接続後に利用できます。現在は上の条件だけで動きます。
             </p>
           </Step>
@@ -385,7 +385,7 @@ export default function NewAutomationPage() {
                       </div>
                     </div>
                   )}
-                  <p className={styles.connectionNote}>
+                  <p>
                     失敗したとき: 現在はここで止まります。「次の処理へ進む」は実行基盤の接続後に選べます。
                   </p>
                 </div>
@@ -419,20 +419,14 @@ export default function NewAutomationPage() {
         <div data-design="Right" className={styles.stack}>
           <section className={styles.sideCard}>
             <h2 className={styles.sideTitle}>いまの決めごとを文章にすると</h2>
-            <p className={styles.ruleSummary}>
+            <p>
               {selectedEvent.label}、{targetSummary}{actionSummary || '処理を実行します'}。
             </p>
             <p className={styles.sideMissingNote}>
+              「こうなったら、こうする」を決めておくと、あとは自動で動きます。<br />
               この文章のとおりに動きます。おかしいと感じたら、上の3つを見直してください。
             </p>
           </section>
-
-          {hasSameTrigger ? (
-            <section className={styles.warningCard}>
-              <h2 className={styles.sideTitle}>同じきっかけのルールは両方動きます</h2>
-              <p className={styles.sideMissingNote}>同じきっかけのルールが他にもあります。一覧で確かめてください。</p>
-            </section>
-          ) : null}
 
           <section className={styles.sideCard}>
             <h2 className={styles.sideTitle}>当てはまりそうな人数</h2>
@@ -458,7 +452,9 @@ export default function NewAutomationPage() {
               },
               {
                 head: '同じきっかけのルールは両方動きます',
-                note: '一覧で、同じきっかけのルールが他にないか確かめてください。',
+                note: hasSameTrigger
+                  ? '同じきっかけのルールが他にもあります。一覧で確かめてください。'
+                  : '一覧で、同じきっかけのルールが他にないか確かめてください。',
               },
               {
                 head: '作る前に起きたことにはさかのぼりません',

@@ -367,7 +367,7 @@ export default function AutomationsPage() {
             <div className="flex flex-wrap gap-2">
               <Button href="/common-actions">共通アクションを見る</Button>
               <Button href="/automations?tab=templates">見本から作る</Button>
-              <Button href="/automations/new" variant="primary">オートメーションをつくる</Button>
+              <Button href="/automations/new" variant="primary">ルールを作成</Button>
               <Button href="/support">マニュアル</Button>
             </div>
           }
@@ -381,12 +381,10 @@ export default function AutomationsPage() {
             {activeCount ?? '—'}
             {activeCount !== null ? <span className="text-ink-faint ml-0.5 text-xs font-normal">本</span> : null}
           </p>
-          <p className="text-ink-faint mt-0.5 text-xs">
-            止めているもの {stoppedCount ?? '—'}本
-          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">稼働中 {activeCount ?? '—'}本・止めているもの {stoppedCount ?? '—'}本</p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">この30日に動いた</p>
+          <p className="text-ink-faint text-xs">今月の実行（この30日）</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">{automaticRuns?.toLocaleString('ja-JP') ?? '—'}{automaticRuns !== null ? '回' : ''}</p>
           <p className="text-ink-faint mt-0.5 text-xs">分析の「使われ方」と同じ集計</p>
         </div>
@@ -396,7 +394,7 @@ export default function AutomationsPage() {
           <p className="text-ink-faint mt-0.5 text-xs">未接続: 失敗回数の集計口が必要です</p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">減らせた手作業</p>
+          <p className="text-ink-faint text-xs">手動実行・減らせた手作業</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">{estimatedHoursSaved !== null ? `およそ ${estimatedHoursSaved.toLocaleString('ja-JP')}時間` : '—'}</p>
           <p className="text-ink-faint mt-0.5 text-xs">1回30秒として計算しています</p>
         </div>
