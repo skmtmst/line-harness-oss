@@ -1429,10 +1429,10 @@ const INBOX_VIEW_CONDITIONS = {
 const LEGACY_VIEW_CONDITIONS = { all: [], any: [] }
 
 export const INBOX_SAVED_VIEWS = [
-  ['未対応・期限超過', true, { statuses: ['unread'], sort: 'waiting_desc' }],
-  ['河野担当の未対応', true, { statuses: ['unread'], assignees: ['operator-kenta'] }],
-  ['LINEからの新着', false, null],
-].map(([name, isShared, patch], index) => ({
+  ['未対応・期限超過', true, { statuses: ['unread'], sort: 'waiting_desc' }, 1],
+  ['Kenta 担当の未対応', true, { statuses: ['unread'], assignees: ['operator-kenta'] }, 3],
+  ['LINEからの新着', false, null, 5],
+].map(([name, isShared, patch, matchCount], index) => ({
   id: `inbox-view-${index}`,
   name: String(name),
   scope: 'chats',
@@ -1440,6 +1440,7 @@ export const INBOX_SAVED_VIEWS = [
   createdBy: 'Kenta',
   lineAccountId: 'visual-qa-account',
   isShared: Boolean(isShared),
+  matchCount: Number(matchCount),
   displayOrder: index,
   createdAt: '2026-08-17T03:00:00.000Z',
 }))
@@ -3121,6 +3122,104 @@ export const ACTION_SCORE_RULES = {
     createdAt: '2026-08-20T10:00:00.000Z', publishedAt: '2026-08-21T02:00:00.000Z',
   },
 }
+
+/** 機能32 緊急コントロール。設計 `b3HfZ` の通常運用と影響数。 */
+const OPERATION_RUNNING_STATES = {
+  broadcast_dispatch: 'running',
+  scenario_dispatch: 'running',
+  reminder_dispatch: 'running',
+  automation_actions: 'running',
+  auto_reply_dispatch: 'running',
+  webhook_outgoing: 'running',
+  ad_postback: 'running',
+}
+
+export const OPERATION_CONTROL_PREVIEW = {
+  control: {
+    scopeKey: 'all', lineAccountId: null, version: 8,
+    states: OPERATION_RUNNING_STATES, activeIncidentId: null,
+    reason: null, actorId: null, stoppedAt: null,
+    updatedAt: '2026-08-25T06:00:00+09:00',
+  },
+  counts: {
+    broadcast_dispatch: 1, scenario_dispatch: 4, reminder_dispatch: 10,
+    automation_actions: 14, auto_reply_dispatch: 10,
+    webhook_outgoing: 0, ad_postback: 0,
+  },
+  impact: {
+    broadcast_dispatch: {
+      itemCount: 1, friendCount: 8_486, pendingCount: 1,
+      nearestScheduledAt: '2026-08-28T20:00:00+09:00',
+    },
+    scenario_dispatch: { itemCount: 4, friendCount: 486 },
+    reminder_dispatch: { itemCount: 10, friendCount: 12 },
+    automation_actions: { itemCount: 14, friendCount: 320, pendingCount: 50 },
+    auto_reply_dispatch: { itemCount: 10, friendCount: null },
+  },
+  permissions: { canControl: true },
+  calculatedAt: '2026-08-25T06:00:00+09:00',
+}
+
+function operationControlSnapshot({ version, activeIncidentId, reason, actorId, stoppedAt, capturedAt, stoppedCapabilities = [] }) {
+  return {
+    version,
+    states: Object.fromEntries(Object.entries(OPERATION_RUNNING_STATES).map(([capability, state]) => [
+      capability,
+      stoppedCapabilities.includes(capability) ? 'stopped' : state,
+    ])),
+    activeIncidentId, reason, actorId, stoppedAt, capturedAt,
+  }
+}
+
+/** 機能32 更新履歴。設計 `UhC2O` の停止→復旧済み3件。 */
+export const OPERATION_HISTORY = [
+  {
+    id: 'operation-incident-20260824', scopeKey: 'all', lineAccountId: null,
+    status: 'resolved', capabilities: ['webhook_outgoing'],
+    reason: 'その他', detail: '外部連携の応答遅延を確認するため停止',
+    actorId: '佐々木 亮太（管理者・東京）', resolvedByActorId: '佐々木 亮太（管理者・東京）',
+    controlVersion: 8,
+    stoppedAt: '2026-08-24T18:20:00+09:00', resolvedAt: '2026-08-24T18:52:00+09:00',
+    createdAt: '2026-08-24T18:20:00+09:00', updatedAt: '2026-08-24T18:52:00+09:00',
+    errorMessage: null,
+  },
+  {
+    id: 'operation-incident-20260612', scopeKey: 'all', lineAccountId: null,
+    status: 'resolved',
+    capabilities: ['broadcast_dispatch', 'scenario_dispatch', 'reminder_dispatch', 'automation_actions', 'auto_reply_dispatch'],
+    reason: '誤配信の防止', detail: '配信条件を確認してから復旧',
+    actorId: '山本 京子（管理者・大阪）', resolvedByActorId: '山本 京子（管理者・大阪）',
+    controlVersion: 6,
+    stoppedAt: '2026-06-12T09:05:00+09:00', resolvedAt: '2026-06-12T09:40:00+09:00',
+    createdAt: '2026-06-12T09:05:00+09:00', updatedAt: '2026-06-12T09:40:00+09:00',
+    errorMessage: null,
+  },
+  {
+    id: 'operation-incident-20260302', scopeKey: 'line-account-main', lineAccountId: '本店アカウント',
+    status: 'resolved', capabilities: ['broadcast_dispatch', 'scenario_dispatch', 'reminder_dispatch'],
+    reason: '障害対応', detail: 'LINE側の障害が解消したことを確認して復旧',
+    actorId: '佐々木 亮太（管理者・東京）', resolvedByActorId: '佐々木 亮太（管理者・東京）',
+    controlVersion: 4,
+    stoppedAt: '2026-03-02T14:00:00+09:00', resolvedAt: '2026-03-02T15:10:00+09:00',
+    createdAt: '2026-03-02T14:00:00+09:00', updatedAt: '2026-03-02T15:10:00+09:00',
+    errorMessage: null,
+  },
+].map((incident) => ({
+  ...incident,
+  beforeSnapshot: operationControlSnapshot({
+    version: incident.controlVersion - 2, activeIncidentId: null, reason: null,
+    actorId: null, stoppedAt: null, capturedAt: incident.createdAt,
+  }),
+  stoppedSnapshot: operationControlSnapshot({
+    version: incident.controlVersion - 1, activeIncidentId: incident.id,
+    reason: incident.reason, actorId: incident.actorId, stoppedAt: incident.stoppedAt,
+    capturedAt: incident.stoppedAt, stoppedCapabilities: incident.capabilities,
+  }),
+  restoredSnapshot: operationControlSnapshot({
+    version: incident.controlVersion, activeIncidentId: null, reason: null,
+    actorId: incident.resolvedByActorId, stoppedAt: null, capturedAt: incident.resolvedAt,
+  }),
+}))
 
 /** 機能10 ウェビナー。Pencil V6の文言と数を固定し、通常状態を再現する。 */
 export const WEBINARS = [
