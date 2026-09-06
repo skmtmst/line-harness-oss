@@ -4,6 +4,7 @@ shared-button-importer app/accounts/handover/page.tsx
 shared-button-importer app/accounts/migration.tsx
 shared-button-importer app/accounts/new/page.tsx
 shared-button-importer app/accounts/page.tsx
+shared-button-importer app/affiliates/action-dialogs.tsx
 shared-button-importer app/affiliates/payment-tab.tsx
 shared-button-importer app/affiliates/tabs.tsx
 shared-button-importer app/analytics/page.tsx

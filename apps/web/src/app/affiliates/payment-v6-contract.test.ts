@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const PAYMENT = readFileSync(new URL('./payment-tab.tsx', import.meta.url), 'utf8')
+const DIALOGS = readFileSync(new URL('./action-dialogs.tsx', import.meta.url), 'utf8')
 const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 const WORKER = readFileSync(new URL('../../../../worker/src/routes/affiliates.ts', import.meta.url), 'utf8')
 
@@ -20,18 +21,31 @@ describe('V6 支払いの読み取り専用契約', () => {
   })
 
   it('支払済み台帳が無い金額を未払いとは断定しない', () => {
-    expect(PAYMENT).toContain('title="承認済み報酬の合計"')
-    expect(PAYMENT).toContain('支払済みの記録がまだ無いため')
-    expect(PAYMENT).toContain('data-payment-ledger="not-connected"')
+    expect(PAYMENT).toContain('title="支払い確定前の報酬"')
+    expect(PAYMENT).toContain('支払結果の記録がまだ無いため')
+    expect(PAYMENT).toContain('data-payment-ledger="settlement-connected"')
     expect(PAYMENT).not.toContain('title="未払い残高"')
   })
 
-  it('振込先・締め日・支払い確定を作り物で補わない', () => {
+  it('振込先・締め日を作り物で補わず、承認済み報酬だけを確定する', () => {
     expect(WORKER).toContain('bankDestination: false')
     expect(WORKER).toContain('settlementSchedule: false')
-    expect(PAYMENT).toContain('振込先と締め処理は未接続です')
-    expect(PAYMENT).not.toContain('この人を確定')
+    expect(PAYMENT).toContain('振込先・締め日・振込用CSVは未接続です')
+    expect(PAYMENT).toContain('この人を確定')
+    expect(DIALOGS).toContain('designNode="GqFTV"')
+    expect(DIALOGS).toContain('振込先　—')
+    expect(DIALOGS).toContain('設定は未接続')
+    expect(DIALOGS).toContain('api.affiliates.paymentPreview')
+    expect(DIALOGS).toContain('api.affiliates.confirmPayment')
     expect(PAYMENT).not.toContain('振込用CSVを書き出す')
+  })
+
+  it('確定画面は読込・通常・空・失敗を分ける', () => {
+    expect(DIALOGS).toContain('kind="loading"')
+    expect(DIALOGS).toContain('kind="error"')
+    expect(DIALOGS).toContain('kind="empty"')
+    expect(DIALOGS).toContain("phase === 'ready'")
+    expect(DIALOGS).toContain('金額を0とは扱いません')
   })
 
   it('読込・空・失敗を言い分け、失敗を0円にしない', () => {

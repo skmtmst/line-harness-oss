@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 239,
-  "unimplemented": 8,
+  "compared": 241,
+  "unimplemented": 6,
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 25,
-  "match": 65,
-  "structureMatchDataPending": 49,
+  "match": 66,
+  "structureMatchDataPending": 50,
   "needsFix": 143,
   "unjudged": 3,
-  "remaining": 203,
+  "remaining": 202,
   "features": [
     {
       "feature": 1,
@@ -1610,12 +1610,25 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 1,
-      "match": 0,
-      "structureMatchDataPending": 3,
+      "match": 1,
+      "structureMatchDataPending": 2,
       "needsFix": 2,
       "unjudged": 0,
-      "remaining": 5,
+      "remaining": 4,
       "capturedAt": [
+        {
+          "pr": 997,
+          "head": "3eae16770",
+          "on": "2026-09-06",
+          "screens": [
+            "g89Tc",
+            "voJtX",
+            "eXAJP",
+            "YfTfJ",
+            "h8pBZr"
+          ],
+          "note": "Issue #228。10件・3フォルダ・使用先3件の固定データで、通常・詳細・登録・削除2状態・一覧4状態を1440pxと1920pxで再撮影。18枚すべて横はみ出し0。"
+        },
         {
           "pr": 559,
           "head": "7922c002",
@@ -1670,13 +1683,13 @@
       "feature": 16,
       "name": "成果とアフィリエイト",
       "total": 9,
-      "compared": 7,
-      "unimplemented": 2,
+      "compared": 9,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 5,
-      "structureMatchDataPending": 1,
+      "structureMatchDataPending": 3,
       "needsFix": 1,
       "unjudged": 0,
       "remaining": 4,
@@ -2748,20 +2761,6 @@
     }
   ],
   "gaps": [
-    {
-      "feature": 16,
-      "node": "QX70l",
-      "name": "16-1-G アフィリエイターを削除する確認",
-      "gap": "drop",
-      "gapNote": "物理削除確認はV6から除外する。紹介者は停止・アーカイブし、過去成果・承認・未払い・支払い記録を保持する。個人情報削除は識別情報の匿名化として別要件にする"
-    },
-    {
-      "feature": 16,
-      "node": "GqFTV",
-      "name": "16-1-H 支払いを確定する",
-      "gap": "api",
-      "gapNote": "同上（締める操作）"
-    },
     {
       "feature": 20,
       "node": "URqOA",

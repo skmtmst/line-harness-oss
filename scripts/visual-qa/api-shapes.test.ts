@@ -19,6 +19,8 @@ import { DUPLICATE_STATS, USERS_GROUPED } from './fixtures.mjs';
 import { AUTOMATIONS, AUTOMATION_TEMPLATES, COMMON_ACTION_DETAIL } from './fixtures.mjs';
 // @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
 import { CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS } from './fixtures.mjs';
+// @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
+import { MEDIA_DELETE_IMPACT, MEDIA_FOLDERS, MEDIA_ITEMS } from './fixtures.mjs';
 
 describe('画面確認モックの口の形', () => {
   const paths: Set<string> = readArrayGetPaths();
@@ -105,6 +107,30 @@ describe('成果地点の画面確認データ', () => {
       row.conversionPointId === purchase?.id
     ));
     expect(report).toMatchObject({ totalCount: 386, totalValue: 612400 });
+  });
+});
+
+describe('登録メディアの画面確認データ', () => {
+  it('設計比較に必要なフォルダ・通常一覧・使用先を空にしない', () => {
+    expect(MEDIA_FOLDERS.map((folder: { name: string }) => folder.name)).toEqual([
+      '01_商品写真', '02_バナー', '03_動画',
+    ]);
+    expect(MEDIA_ITEMS).toHaveLength(10);
+    expect(MEDIA_ITEMS.filter((item: { kind: string }) => item.kind === 'file')).toHaveLength(2);
+    expect(MEDIA_DELETE_IMPACT).toMatchObject({ usageCount: 3, canDelete: false });
+    expect(MEDIA_DELETE_IMPACT.references).toHaveLength(3);
+  });
+
+  it('撮影データでも実装の登録上限を超えない', () => {
+    const limits: Record<string, number> = {
+      image: 10 * 1024 * 1024,
+      audio: 30 * 1024 * 1024,
+      video: 90 * 1024 * 1024,
+      file: 20 * 1024 * 1024,
+    };
+    for (const item of MEDIA_ITEMS as Array<{ filename: string; kind: string; sizeBytes: number }>) {
+      expect(item.sizeBytes, item.filename).toBeLessThanOrEqual(limits[item.kind]);
+    }
   });
 });
 
