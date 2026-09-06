@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 32,
-  "match": 121,
-  "structureMatchDataPending": 117,
-  "needsFix": 25,
+  "match": 122,
+  "structureMatchDataPending": 124,
+  "needsFix": 17,
   "unjudged": 5,
-  "remaining": 147,
+  "remaining": 146,
   "features": [
     {
       "feature": 1,
@@ -498,15 +498,15 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 6,
-      "structureMatchDataPending": 0,
-      "needsFix": 8,
+      "match": 7,
+      "structureMatchDataPending": 7,
+      "needsFix": 0,
       "unjudged": 0,
-      "remaining": 8,
+      "remaining": 7,
       "capturedAt": [
         {
           "pr": 1121,
-          "head": "9889bca8bf",
+          "head": "1d9e8d36c",
           "on": "2026-09-07",
           "screens": [
             "kk8dz",
@@ -518,7 +518,7 @@
             "NrBkW",
             "M2b2B"
           ],
-          "note": "Issue #366 / PR #1121。統合 #1110 後の機能5を3104/8791で1440・1920px撮影し、★V6 1920pxと目視比較。全16枚で横はみ出し0。開始条件・下書き・開始記録の新APIが画面から未接続など、残る差を8 Nodeすべて理由付き要修正として記録した。"
+          "note": "Issue #366 / PR #1121 の差し戻し対応。機能5の8画面を試算・開始記録・V6下書きAPIへ接続し、3104/8791で1440・1920pxと結果画面3状態を撮影。全22枚で横はみ出し0。1画面を一致、契約が返さない値だけを理由付き構造一致・データ待ちとして記録した。"
         },
         {
           "pr": 1084,

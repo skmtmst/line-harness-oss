@@ -3749,44 +3749,44 @@ const ISSUE_325_REVIEW = {
  */
 const ISSUE_366_REVIEW = {
   kk8dz: {
-    verdict: 'needs_fix',
-    note: '固定データで名前差し込みの例は入ったが、LINEプレビューは `{{name}}` のまま表示される。設計と比べてメッセージ種別の並び・名称、下部操作にも差がある。**推奨修正：** 差し込み後のプレビュー、9種類の並びと名称、下部操作を設計状態へそろえる。',
+    verdict: 'match',
+    note: '一致。固定データの1通目を読み、編集値は `{{name}}` のまま保ちながらLINEプレビューだけを「Kentaさん」に差し込み表示した。3段の現在地、9種類のメッセージ、配信の流れ、設定サマリーまで設計と同じ役割・順序で確認した。',
     source: 'scenarios-v6/kk8dz.txt + scenarios-v6/kk8dz-1440.png + scenarios-v6/kk8dz-1920.png',
   },
   r6Gzsu: {
-    verdict: 'needs_fix',
-    note: '実装は小さな汎用条件窓で、設計の「タグ初回案内 AND 対応マーク未対応」という現在条件、15軸に加えたシナリオ専用6軸、詳細な条件行が出ない。**推奨修正：** 現在条件と対象人数を返す契約を接続し、設計の条件編集面へそろえる。',
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・APIデータ待ち。幅広の条件面、AND/OR、実装済み14軸、現在条件、戻る・保存を表示した。撮影対象の固定ステップは条件が空で、対象人数を返す契約と設計のシナリオ専用軸も無いため、選択済み条件と人数は作らず保留した。',
     source: 'scenarios-v6/r6Gzsu.txt + scenarios-v6/r6Gzsu-1440.png + scenarios-v6/r6Gzsu-1920.png',
   },
   hz9ti: {
-    verdict: 'needs_fix',
-    note: '画面は旧契約の5種類を中心に表示し、設計の8種類、設定済み3動作の順序・条件・繰り返し制御を再現できていない。統合済みの下書きAPIも画面から未接続。**推奨修正：** 新しい下書き契約へ接続し、8種類と保存済み動作を設計順に表示する。',
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・API契約待ち。固定データの3動作を順番・条件・繰り返し制御付きで表示し、追加・変更・削除・並べ替え時はV6下書きAPIへ保存するよう接続した。下書きを読み返す口がなく、契約が保存できるのも5種類までのため、設計の8種類すべては作らず保留した。',
     source: 'scenarios-v6/hz9ti.txt + scenarios-v6/hz9ti-1440.png + scenarios-v6/hz9ti-1920.png',
   },
   EvVO5: {
-    verdict: 'needs_fix',
-    note: '6種類の開始条件名は出るが4種類が無効で、開始対象の条件、初回のみ・毎回の選択、設計の124人・8人・116人を確認できない。試算APIは統合済みだが画面から未接続で、表示は `— / 116 / —`。**推奨修正：** 試算APIと開始条件の下書きを接続し、条件と人数内訳を実値で表示する。',
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・APIデータ待ち。6種類の開始条件、現在条件、初回のみ/毎回、人数内訳の段を表示し、一致・購読中・新規開始予定・除外を試算APIから読むよう接続した。撮影用固定応答は試算を返さず、4種類の開始条件を保存する契約も無いため、値と無効な選択肢は作らず保留した。',
     source: 'scenarios-v6/EvVO5.txt + scenarios-v6/EvVO5-1440.png + scenarios-v6/EvVO5-1920.png',
   },
   RUxNf: {
-    verdict: 'needs_fix',
-    note: '撮影入口では設計対象の「新規登録7日間フォロー」ではなく、停止中の「休眠ユーザー復帰」が開く。開始記録APIも画面から未接続で、配信時刻・テスト送信・送信枠・新規開始予定人数を確認できない。**推奨修正：** 対象シナリオを安定して開き、開始記録と試算を接続して4項目を実値で判定する。',
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・APIデータ待ち。対象・開始のきっかけ・配信方式・通数・購読中、4項目の配信前チェック、開始後の影響を設計順に表示し、試算と開始記録を並列で読むよう接続した。固定応答で再開できる対象が設計対象と異なり、試算・開始記録・送信枠も返らないため、未取得項目を確認済みにせず保留した。',
     source: 'scenarios-v6/RUxNf.txt + scenarios-v6/RUxNf-1440.png + scenarios-v6/RUxNf-1920.png',
   },
   g2UNV: {
-    verdict: 'needs_fix',
-    note: '固定データの宛先「ケンタ」と4通、本番状態を変えない説明は確認できた。一方、実装は宛先一覧中心の大きな窓で、設計のLINEプレビュー、3つの確認項目、通ごとの送信結果がない。**推奨修正：** 宛先選択後に専用確認面を置き、プレビュー・確認項目・通別結果を接続する。',
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・API結果待ち。宛先選択後の確認面に、送信先、固定データの全4通、3つの確認項目、LINEプレビュー、本番状態を変えない説明、戻る・開始を表示し、開始記録から直近のテスト送信も読むよう接続した。現行APIは合計送信数だけで通ごとの成否を返さないため、通別結果は作らず保留した。',
     source: 'scenarios-v6/g2UNV.txt + scenarios-v6/g2UNV-1440.png + scenarios-v6/g2UNV-1920.png',
   },
   NrBkW: {
-    verdict: 'needs_fix',
-    note: '開始成功の案内、配信中状態、開始履歴への導線は確認できたが、開始日時、新規開始予定116人、開始条件の詳細が出ない。開始記録・試算APIは統合済みだが画面から未接続。**推奨修正：** 開始結果と試算を接続し、開始時点の日時・人数・条件を実値で表示する。',
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・APIデータ待ち。開始成功の案内、配信中状態、4通の一覧、開始履歴への導線を表示し、試算の新規開始予定人数と開始記録の開始日時を読むよう接続した。撮影用固定応答は両APIを返さないため、取得できない日時と人数を作らず明記して保留した。',
     source: 'scenarios-v6/NrBkW.txt + scenarios-v6/NrBkW-1440.png + scenarios-v6/NrBkW-1920.png',
   },
   M2b2B: {
     route: '/scenarios/results?id=scenario-0',
-    verdict: 'needs_fix',
-    note: '参加428人、完了312人、通ごとの到達数は実値で表示されるが、撮影入口が別シナリオを指していたため設計対象へ修正した。開始記録APIは画面から未接続で、LINEが取得できない開封・クリック・失敗は `—` のまま。**推奨修正：** 開始記録の集計を接続し、取得不能な指標はPencilと要件も実契約に合わせて再判定する。',
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・API指標待ち。設計対象へ入口を直し、参加428人、完了312人、全4通の到達数、プレビュー、配信した設定を実値で表示した。開始記録を接続して集計値と取得不能理由も読むが、現行APIはLINEの通別開封・クリック・失敗を返せないため「—」と理由を表示して保留した。通常・読込中・取得失敗でも同じ指標構成を保った。',
     source: 'scenarios-v6/M2b2B.txt + scenarios-v6/M2b2B-{normal,loading,error}.txt + scenarios-v6/M2b2B-{normal,loading,error}-{1440,1920}.png',
   },
 }
@@ -4017,7 +4017,7 @@ for (const screen of SCREENS) {
     screen.verdict = issue366Review.verdict
     screen.verdictNote = `**2026-09-07 Issue #366で再撮影・再判定。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを目視比較した。${issue366Review.note}`
     screen.verdictSource = issue366Review.source
-    screen.verdictHead = '9889bca8bf'
+    screen.verdictHead = '1d9e8d36c'
     if (issue366Review.route) screen.route = issue366Review.route
   }
   const issue267Review = ISSUE_267_REVIEW[screen.node]
@@ -4439,9 +4439,9 @@ export const CAPTURED_AT = {
     { pr: 596, head: 'edb94936', on: '2026-08-30', screens: ['U9hzqH', 'g46ja', 'Yj6CQ', 'e6iJG'], note: 'Claudeが実装した。#595 の契約の上に公開までの4段。実装した本人が比較している' },
   ],
   5: [
-    { pr: 1121, head: '9889bca8bf', on: '2026-09-07',
+    { pr: 1121, head: '1d9e8d36c', on: '2026-09-07',
       screens: ['kk8dz', 'r6Gzsu', 'hz9ti', 'EvVO5', 'RUxNf', 'g2UNV', 'NrBkW', 'M2b2B'],
-      note: 'Issue #366 / PR #1121。統合 #1110 後の機能5を3104/8791で1440・1920px撮影し、★V6 1920pxと目視比較。全16枚で横はみ出し0。開始条件・下書き・開始記録の新APIが画面から未接続など、残る差を8 Nodeすべて理由付き要修正として記録した。' },
+      note: 'Issue #366 / PR #1121 の差し戻し対応。機能5の8画面を試算・開始記録・V6下書きAPIへ接続し、3104/8791で1440・1920pxと結果画面3状態を撮影。全22枚で横はみ出し0。1画面を一致、契約が返さない値だけを理由付き構造一致・データ待ちとして記録した。' },
     { pr: 1084, head: '31c2fddcc', on: '2026-09-07',
       screens: ['TC1b1', 'kk8dz', 'bV5Vs', 'r6Gzsu', 'hz9ti', 'RUxNf', 'g2UNV'],
       note: 'Issue #325。#1073の固定データを含む木を3104/8791で1440・1920px撮影し、設計1920pxと同じ状態で横並び比較した。全14枚で横はみ出し0。固定データで差が解消した2画面を一致へ更新し、残る5画面は不足する固定値またはAPI契約を理由に残した。' },
