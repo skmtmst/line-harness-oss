@@ -738,6 +738,15 @@ function VarsPageInner() {
               >
                 キャンセル
               </Button>
+              {singleImpact && !singleImpact.canDelete ? (
+                <Button
+                  type="button"
+                  disabled
+                  title="使用中の共通情報は削除できません"
+                >
+                  このまま削除
+                </Button>
+              ) : null}
               {/* 消せないときは押し口ごと出さない。押せるように見えて何も起きない形にしない。 */}
               {canDeleteVar({ impact: singleImpact, typedKey, busy: singleBusy }) ? (
                 <Button type="button" variant="primary" onClick={() => void confirmSingleDelete()}>
@@ -763,6 +772,36 @@ function VarsPageInner() {
               {consequenceText(singleImpact) ? (
                 <p className="text-ink-secondary text-xs leading-5">{consequenceText(singleImpact)}</p>
               ) : null}
+
+              <div>
+                <h3 className="text-ink text-sm font-bold">どうしますか</h3>
+                <div className="mt-2 space-y-2">
+                  <div className="border-hairline bg-accent-soft rounded-control border p-3" aria-disabled="true">
+                    <p className="text-accent text-sm font-bold">別の共通情報に差し替えてから削除する（おすすめ）</p>
+                    <p className="text-ink-secondary mt-1 text-xs leading-5">
+                      使用先を別のキーへ置き換えてから削除します。まとめて差し替えるAPIがまだ無いため、現在は選べません。
+                    </p>
+                    <label className="text-ink-secondary mt-2 block text-xs font-semibold">
+                      差し替え先
+                      <select
+                        disabled
+                        aria-label="差し替え先"
+                        className="border-hairline bg-canvas text-ink-faint rounded-control mt-1 w-full border px-3 py-2"
+                      >
+                        <option>候補を取得できません</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div className="border-hairline rounded-control border p-3" aria-disabled={!singleImpact.canDelete}>
+                    <p className="text-ink text-sm font-bold">このまま削除する</p>
+                    <p className="text-ink-secondary mt-1 text-xs leading-5">
+                      {singleImpact.canDelete
+                        ? '使われている場所が無いことを確認してから削除します。'
+                        : `${singleImpact.blockingTotal.toLocaleString('ja-JP')}か所が空欄になるため、先に使用先を直してください。`}
+                    </p>
+                  </div>
+                </div>
+              </div>
 
               {splitItems(singleImpact.items).blocking.length > 0 ? (
                 <div>
