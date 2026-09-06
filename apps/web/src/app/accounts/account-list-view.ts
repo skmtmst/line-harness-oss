@@ -38,12 +38,13 @@ export function webhookLabel(
 }
 
 /** 絞り込みの区分。設計のタブと同じ並び。 */
-export type AccountFilter = 'all' | 'active' | 'inactive' | 'problem'
+export type AccountFilter = 'all' | 'active' | 'inactive' | 'archived' | 'problem'
 
 export const ACCOUNT_FILTERS: ReadonlyArray<{ value: AccountFilter; label: string }> = [
   { value: 'all', label: 'すべて' },
   { value: 'active', label: '稼働中' },
   { value: 'inactive', label: '停止中' },
+  { value: 'archived', label: 'アーカイブ' },
   { value: 'problem', label: '接続に問題' },
 ]
 
@@ -54,8 +55,9 @@ export function hasConnectionProblem(account: LineAccount): boolean {
 
 export function matchesFilter(account: LineAccount, filter: AccountFilter): boolean {
   if (filter === 'all') return true
-  if (filter === 'active') return account.isActive
-  if (filter === 'inactive') return !account.isActive
+  if (filter === 'active') return account.isActive && !account.archivedAt
+  if (filter === 'inactive') return !account.isActive && !account.archivedAt
+  if (filter === 'archived') return Boolean(account.archivedAt)
   return hasConnectionProblem(account)
 }
 
