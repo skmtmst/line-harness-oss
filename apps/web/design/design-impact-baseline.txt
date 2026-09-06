@@ -24,6 +24,7 @@ shared-button-importer app/common-actions/page.tsx
 shared-button-importer app/common-actions/versions/page.tsx
 shared-button-importer app/contents/media-button.tsx
 shared-button-importer app/contents/vars/edit/page.tsx
+shared-button-importer app/contents/vars/impact-review.tsx
 shared-button-importer app/contents/vars/new/page.tsx
 shared-button-importer app/contents/vars/page.tsx
 shared-button-importer app/conversions/page.tsx

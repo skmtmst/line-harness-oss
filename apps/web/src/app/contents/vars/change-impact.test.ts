@@ -122,7 +122,7 @@ describe('影響確認は、変わる場所と変わらない場所を分ける'
 
   it('保存すると何か所が変わるかを、差し込み名つきで言う', () => {
     const text = changeSummaryText(impact({ total: 15, blockingTotal: 15 }))
-    expect(text).toContain('{{var.shop_hours}}')
+    expect(text).toContain('{営業時間}')
     expect(text).toContain('15か所')
     expect(text).toContain('すぐ変わります')
   })

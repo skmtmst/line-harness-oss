@@ -62,7 +62,8 @@ import {
   STAFF_MEMBERS, LOGIN_AUDIT,
   AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS, MILEAGE_OVERVIEW,
   COMMON_ACTIONS, BOOKING_MENUS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_REQUESTS,
-  EC_NOTIFICATION_SETTINGS, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, EC_EVENTS, EC_OVERVIEW, MILEAGE_RULES, CONVERSION_POINTS,
+  EC_NOTIFICATION_SETTINGS, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, EC_EVENTS, EC_OVERVIEW, MILEAGE_RULES,
+  CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
   WEBINARS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_ANALYTICS,
 } from './fixtures.mjs'
 
@@ -1424,6 +1425,13 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/mileage/overview') return { success: true, data: MILEAGE_OVERVIEW }
   if (pathname === '/api/mileage/rules') return { success: true, data: MILEAGE_RULES }
   if (pathname === '/api/conversions/points') return { success: true, data: CONVERSION_POINTS }
+  if (pathname === '/api/conversions/report') {
+    const startDate = query.get('startDate') ?? ''
+    const data = startDate >= '2026-08-01'
+      ? CONVERSION_REPORT_CURRENT
+      : CONVERSION_REPORT_PREVIOUS
+    return { success: true, data }
+  }
   if (pathname === '/api/common-vars') return { success: true, data: COMMON_VARS }
   const commonVarDeleteImpact = /^\/api\/common-vars\/([^/]+)\/delete-impact$/.exec(pathname)
   if (commonVarDeleteImpact) {
