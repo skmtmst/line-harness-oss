@@ -11,7 +11,13 @@
 // scheduled_at / decided_at / expires_at) are written from the Worker.
 
 import { Hono, type Context } from 'hono';
-import { getLineAccounts, resolveLineCredential } from '@line-crm/db';
+import {
+  createBookingCustomer,
+  getBookingCustomer,
+  getLineAccounts,
+  resolveLineCredential,
+  searchBookingCustomers,
+} from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { enrollByTrigger } from '../services/reminder-trigger.js';
@@ -604,6 +610,80 @@ booking.get('/api/liff/booking/me', async (c) => {
 // All endpoints require ?account_id= query.
 // ================================================================
 
+// ---- Booking customers (LINE未連携の電話客) ----
+
+booking.get('/api/booking/admin/customers', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  try {
+    const customers = await searchBookingCustomers(c.env.DB, {
+      lineAccountId: accountId,
+      query: c.req.query('q'),
+      encryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+    });
+    return c.json({ customers });
+  } catch (error) {
+    console.error('GET /api/booking/admin/customers error:', error instanceof Error ? error.name : 'unknown');
+    return c.json({ error: 'customer_data_unavailable' }, 503);
+  }
+});
+
+booking.get('/api/booking/admin/customers/:id', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  try {
+    const customer = await getBookingCustomer(
+      c.env.DB,
+      c.req.param('id'),
+      accountId,
+      c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+    );
+    return customer
+      ? c.json({ customer })
+      : c.json({ error: 'booking_customer_not_found' }, 404);
+  } catch (error) {
+    console.error('GET /api/booking/admin/customers/:id error:', error instanceof Error ? error.name : 'unknown');
+    return c.json({ error: 'customer_data_unavailable' }, 503);
+  }
+});
+
+booking.post(
+  '/api/booking/admin/customers',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const accountId = await resolveAccountIdAdmin(c);
+    if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+    const body = await c.req.json<{
+      display_name?: string;
+      phone?: string;
+      pet_name?: string | null;
+      email?: string | null;
+    }>();
+    if (!body.display_name || !body.phone) {
+      return c.json({ error: 'missing_customer_fields' }, 400);
+    }
+    try {
+      const customer = await createBookingCustomer(c.env.DB, {
+        id: crypto.randomUUID(),
+        lineAccountId: accountId,
+        displayName: body.display_name,
+        phone: body.phone,
+        petName: body.pet_name,
+        email: body.email,
+        encryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+      });
+      return c.json({ customer }, 201);
+    } catch (error) {
+      const code = error instanceof Error ? error.message : '';
+      if (code.startsWith('booking_customer_') && code.endsWith('_invalid')) {
+        return c.json({ error: code }, 422);
+      }
+      console.error('POST /api/booking/admin/customers error:', error instanceof Error ? error.name : 'unknown');
+      return c.json({ error: 'customer_data_unavailable' }, 503);
+    }
+  },
+);
+
 // ---- Menus CRUD ----
 
 /** 受付条件として画面から送られてくる項目。 */
@@ -904,27 +984,65 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
   const idemKey = c.req.header('Idempotency-Key')?.trim();
   if (!idemKey) return c.json({ error: 'missing_idempotency_key' }, 400);
   const body = await c.req.json<{
-    friend_id: string;
+    friend_id?: string;
+    booking_customer_id?: string;
     menu_id: string;
     staff_id: string;
     starts_at: string; // UTC ISO8601
     customer_note?: string;
+    send_line_confirmation?: boolean;
   }>();
-  if (!body.friend_id || !body.menu_id || !body.staff_id || !body.starts_at) {
+  const friendInput = body.friend_id?.trim() || null;
+  const customerInput = body.booking_customer_id?.trim() || null;
+  if (
+    (!friendInput && !customerInput)
+    || (friendInput && customerInput)
+    || !body.menu_id
+    || !body.staff_id
+    || !body.starts_at
+  ) {
     return c.json({ error: 'missing_params' }, 400);
   }
 
-  const friend = await c.env.DB
-    .prepare(`SELECT id, is_following FROM friends WHERE id = ? AND line_account_id = ?`)
-    .bind(body.friend_id, accountId)
-    .first<{ id: string; is_following: number }>();
-  if (!friend) return c.json({ error: 'friend_not_found' }, 404);
-  if (friend.is_following === 0) return c.json({ error: 'cannot_book' }, 403);
+  let friendId: string | null = null;
+  let bookingCustomerId: string | null = null;
+  if (friendInput) {
+    const friend = await c.env.DB
+      .prepare(`SELECT id, is_following FROM friends WHERE id = ? AND line_account_id = ?`)
+      .bind(friendInput, accountId)
+      .first<{ id: string; is_following: number }>();
+    if (!friend) return c.json({ error: 'friend_not_found' }, 404);
+    if (friend.is_following === 0) return c.json({ error: 'cannot_book' }, 403);
+    friendId = friend.id;
+  } else {
+    const customer = await c.env.DB
+      .prepare(
+        `SELECT id, friend_id FROM booking_customers
+          WHERE id = ? AND line_account_id = ?`,
+      )
+      .bind(customerInput, accountId)
+      .first<{ id: string; friend_id: string | null }>();
+    if (!customer) return c.json({ error: 'booking_customer_not_found' }, 404);
+    bookingCustomerId = customer.id;
+    friendId = customer.friend_id;
+    if (friendId) {
+      const friend = await c.env.DB
+        .prepare(`SELECT is_following FROM friends WHERE id = ? AND line_account_id = ?`)
+        .bind(friendId, accountId)
+        .first<{ is_following: number }>();
+      if (!friend || friend.is_following === 0) return c.json({ error: 'cannot_book' }, 403);
+    }
+  }
+  if (!friendId && body.send_line_confirmation === true) {
+    return c.json({ error: 'line_notification_unavailable' }, 422);
+  }
+  const sendLineConfirmation = Boolean(friendId) && body.send_line_confirmation !== false;
+  const idempotencySubject = friendId ?? `booking-customer:${bookingCustomerId}`;
 
   const cached = await findIdempotencyResponse(c.env.DB, {
     key: idemKey,
     lineAccountId: accountId,
-    friendId: body.friend_id,
+    friendId: idempotencySubject,
     now: new Date(),
   });
   if (cached) {
@@ -939,15 +1057,26 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
       const created = await c.env.DB
         .prepare(
           `SELECT id, status, external_event_id FROM bookings
-            WHERE id = ? AND line_account_id = ? AND friend_id = ?`,
+            WHERE id = ? AND line_account_id = ?
+              AND ((? IS NOT NULL AND friend_id = ?)
+                OR (? IS NOT NULL AND booking_customer_id = ?))`,
         )
-        .bind(pendingBookingId, accountId, body.friend_id)
+        .bind(
+          pendingBookingId,
+          accountId,
+          friendId,
+          friendId,
+          bookingCustomerId,
+          bookingCustomerId,
+        )
         .first<{ id: string; status: string; external_event_id: string | null }>();
       if (created) {
         return c.json({
           booking_id: created.id,
+          booking_customer_id: bookingCustomerId,
           status: created.status,
           calendar_sync: created.external_event_id ? 'synced' : 'pending',
+          line_notification: sendLineConfirmation ? 'scheduled' : 'not_applicable',
           replayed: true,
         }, 201);
       }
@@ -1011,7 +1140,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
   const reserved = await reserveIdempotencyResponse(c.env.DB, {
     key: idemKey,
     lineAccountId: accountId,
-    friendId: body.friend_id,
+    friendId: idempotencySubject,
     body: { error: 'request_in_progress', booking_id: bookingId },
     ttlMinutes: IDEMPOTENCY_TTL_MINUTES,
     now: new Date(),
@@ -1020,7 +1149,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     const raced = await findIdempotencyResponse(c.env.DB, {
       key: idemKey,
       lineAccountId: accountId,
-      friendId: body.friend_id,
+      friendId: idempotencySubject,
       now: new Date(),
     });
     if (raced && raced.status !== 202) {
@@ -1032,13 +1161,19 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     return c.json({ error: raced ? 'request_in_progress' : 'idempotency_key_conflict' }, 409);
   }
   const nowIso = new Date().toISOString();
+  const notificationPolicy = JSON.stringify({
+    send_line_confirmation: sendLineConfirmation,
+    day_before: sendLineConfirmation,
+    hours_before: sendLineConfirmation,
+  });
   const insertResult = await c.env.DB
     .prepare(
       `INSERT INTO bookings
-        (id, line_account_id, friend_id, staff_id, menu_id,
+        (id, line_account_id, friend_id, booking_customer_id, staff_id, menu_id,
          starts_at, ends_at, block_ends_at, status,
-         customer_note, price_at_booking, requested_at, decided_at)
-       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?
+         customer_note, price_at_booking, requested_at, decided_at,
+         source, created_by_staff_id, notification_policy_snapshot)
+       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
         WHERE NOT EXISTS (
           -- 別メニューの予約は、定員に関係なく1件でも塞ぐ。
           -- 1対1の施術とグループを同じ時間に入れることはできない。
@@ -1062,7 +1197,8 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     .bind(
       bookingId,
       accountId,
-      body.friend_id,
+      friendId,
+      bookingCustomerId,
       body.staff_id,
       body.menu_id,
       startsAt.toISOString(),
@@ -1073,6 +1209,9 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
       menuRow.price,
       nowIso,
       nowIso,
+      bookingCustomerId ? 'phone' : 'operator',
+      c.get('staff').id,
+      notificationPolicy,
       // 別メニューの重なりを見る副問い合わせ
       body.staff_id,
       blockEndsAt.toISOString(),
@@ -1091,25 +1230,27 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     await completeIdempotencyResponse(c.env.DB, {
       key: idemKey,
       lineAccountId: accountId,
-      friendId: body.friend_id,
+      friendId: idempotencySubject,
       status: 409,
       body: response,
     });
     return c.json(response, 409);
   }
 
-  await insertConfirmationReminders(c.env.DB, {
-    bookingId,
-    startsAt,
-    now: new Date(),
-  });
-  c.executionCtx.waitUntil(
-    enrollByTrigger(c.env.DB, {
-      triggerType: 'booking',
-      friendId: body.friend_id,
-      startsAtIso: startsAt.toISOString(),
-    }).catch((err) => console.error('reminder enroll (proxy-create) failed:', err)),
-  );
+  if (sendLineConfirmation && friendId) {
+    await insertConfirmationReminders(c.env.DB, {
+      bookingId,
+      startsAt,
+      now: new Date(),
+    });
+    c.executionCtx.waitUntil(
+      enrollByTrigger(c.env.DB, {
+        triggerType: 'booking',
+        friendId,
+        startsAtIso: startsAt.toISOString(),
+      }).catch((err) => console.error('reminder enroll (proxy-create) failed:', err)),
+    );
+  }
   let calendarSync: 'not_configured' | 'synced' | 'failed' = 'not_configured';
   try {
     const synced = await syncConfirmedBookingToGoogle(
@@ -1122,28 +1263,38 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     calendarSync = 'failed';
     console.error('Google Calendar sync (proxy-create) failed:', error);
   }
-  c.executionCtx.waitUntil(
-    notifyForBooking(c.env.DB, bookingId, 'approved').catch((err) =>
-      console.error('booking notify (proxy-create) failed:', err),
-    ),
-  );
-  c.executionCtx.waitUntil(
-    dispatchAutomationEventWithLogging(c.env.DB, {
-      lineAccountId: accountId,
-      eventType: 'calendar_booked',
-      sourceEventId: bookingId,
-      friendId: body.friend_id,
-      eventData: {
-        bookingType: 'salon', bookingId, menuId: body.menu_id, staffId: body.staff_id,
-      },
-    })
-      .catch((error) => console.error('booking automation event failed:', error)),
-  );
-  const response = { booking_id: bookingId, status: 'confirmed', calendar_sync: calendarSync };
+  if (friendId) {
+    if (sendLineConfirmation) {
+      c.executionCtx.waitUntil(
+        notifyForBooking(c.env.DB, bookingId, 'approved').catch((err) =>
+          console.error('booking notify (proxy-create) failed:', err),
+        ),
+      );
+    }
+    c.executionCtx.waitUntil(
+      dispatchAutomationEventWithLogging(c.env.DB, {
+        lineAccountId: accountId,
+        eventType: 'calendar_booked',
+        sourceEventId: bookingId,
+        friendId,
+        eventData: {
+          bookingType: 'salon', bookingId, menuId: body.menu_id, staffId: body.staff_id,
+        },
+      })
+        .catch((error) => console.error('booking automation event failed:', error)),
+    );
+  }
+  const response = {
+    booking_id: bookingId,
+    booking_customer_id: bookingCustomerId,
+    status: 'confirmed',
+    calendar_sync: calendarSync,
+    line_notification: sendLineConfirmation ? 'scheduled' : 'not_applicable',
+  };
   await completeIdempotencyResponse(c.env.DB, {
     key: idemKey,
     lineAccountId: accountId,
-    friendId: body.friend_id,
+    friendId: idempotencySubject,
     status: 201,
     body: response,
   });
@@ -1605,22 +1756,30 @@ booking.get('/api/booking/admin/requests', async (c) => {
     ? `SELECT b.*,
               m.name AS menu_name,
               s.display_name AS staff_name,
-              f.display_name AS friend_name
+              COALESCE(f.display_name, bc.display_name) AS friend_name,
+              bc.phone_last4 AS customer_phone_last4,
+              bc.pet_name AS customer_pet_name,
+              CASE WHEN f.id IS NULL THEN 0 ELSE 1 END AS is_line_linked
          FROM bookings b
          INNER JOIN menus m ON m.id = b.menu_id
          INNER JOIN staff s ON s.id = b.staff_id
          LEFT JOIN friends f ON f.id = b.friend_id
+         LEFT JOIN booking_customers bc ON bc.id = b.booking_customer_id
         WHERE b.line_account_id = ?
         ORDER BY b.starts_at ASC
         LIMIT 200`
     : `SELECT b.*,
               m.name AS menu_name,
               s.display_name AS staff_name,
-              f.display_name AS friend_name
+              COALESCE(f.display_name, bc.display_name) AS friend_name,
+              bc.phone_last4 AS customer_phone_last4,
+              bc.pet_name AS customer_pet_name,
+              CASE WHEN f.id IS NULL THEN 0 ELSE 1 END AS is_line_linked
          FROM bookings b
          INNER JOIN menus m ON m.id = b.menu_id
          INNER JOIN staff s ON s.id = b.staff_id
          LEFT JOIN friends f ON f.id = b.friend_id
+         LEFT JOIN booking_customers bc ON bc.id = b.booking_customer_id
         WHERE b.line_account_id = ? AND b.status = ?
         ORDER BY b.starts_at ASC
         LIMIT 200`;

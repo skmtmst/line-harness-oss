@@ -63,7 +63,7 @@ import {
   SITE_TRACKING_SUMMARY, SITE_TRACKING_PAGES, AD_PLATFORMS, AD_CONVERSION_LOGS,
   STAFF_MEMBERS, LOGIN_AUDIT,
   AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS, MILEAGE_OVERVIEW,
-  COMMON_ACTIONS, COMMON_ACTION_DETAIL, AUTOMATIONS, AUTOMATION_TEMPLATES,
+  COMMON_ACTIONS, COMMON_ACTION_DETAIL, AUTOMATIONS, AUTOMATION_RUNS, AUTOMATION_TEMPLATES,
   BOOKING_MENUS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_REQUESTS,
   EC_NOTIFICATION_SETTINGS, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, NEN_PHOTO_DETAIL,
   NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, MILEAGE_RULES,
@@ -1520,6 +1520,7 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/affiliate-offers') return { success: true, data: AFFILIATE_OFFERS }
   if (pathname === '/api/common-actions') return { success: true, data: COMMON_ACTIONS }
   if (pathname === '/api/automations') return { success: true, data: AUTOMATIONS }
+  if (pathname === '/api/automation-runs') return { success: true, data: AUTOMATION_RUNS }
   if (pathname === '/api/automation-templates') return { success: true, data: AUTOMATION_TEMPLATES }
   if (pathname === '/api/ec-commerce/settings') return { success: true, data: EC_NOTIFICATION_SETTINGS }
   if (pathname === '/api/nen-members/photos') return { success: true, data: NEN_PHOTOS }
