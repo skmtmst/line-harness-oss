@@ -91,7 +91,9 @@ function parseRule(row: RuleRow): SupportMarkAutomationRule | null {
   };
 }
 
-function validateInput(input: SaveSupportMarkAutomationRule): void {
+export function validateSupportMarkAutomationRuleInput(
+  input: SaveSupportMarkAutomationRule,
+): void {
   if (!input.name.trim()) throw new Error('rule_name_required');
   if (!SUPPORT_MARK_RULE_EVENTS.includes(input.event)) throw new Error('rule_event_invalid');
   if (!Number.isInteger(input.priority) || input.priority < -1000 || input.priority > 1000) {
@@ -148,6 +150,15 @@ export async function listSupportMarkAutomationRules(
     .filter((item): item is SupportMarkAutomationRule => !!item && item.markId === markId);
 }
 
+export async function listSupportMarkAutomationRulesForAccount(
+  db: D1Database,
+  scope: SupportMarkScope,
+): Promise<SupportMarkAutomationRule[]> {
+  return (await rowsForAccount(db, scope.lineAccountId))
+    .map(parseRule)
+    .filter((item): item is SupportMarkAutomationRule => Boolean(item));
+}
+
 export async function createSupportMarkAutomationRule(
   db: D1Database,
   scope: SupportMarkScope,
@@ -155,7 +166,7 @@ export async function createSupportMarkAutomationRule(
   actorId: string,
   input: SaveSupportMarkAutomationRule,
 ): Promise<SupportMarkAutomationRule | null> {
-  validateInput(input);
+  validateSupportMarkAutomationRuleInput(input);
   if (!await getSupportMarkById(db, markId, scope)) return null;
   const id = crypto.randomUUID();
   const versionId = crypto.randomUUID();
@@ -215,7 +226,7 @@ export async function updateSupportMarkAutomationRule(
   expectedVersion: number,
   input: SaveSupportMarkAutomationRule,
 ): Promise<'not_found' | 'conflict' | SupportMarkAutomationRule> {
-  validateInput(input);
+  validateSupportMarkAutomationRuleInput(input);
   const current = await currentRule(db, scope, ruleId);
   if (!current) return 'not_found';
   if (current.version !== expectedVersion) return 'conflict';
