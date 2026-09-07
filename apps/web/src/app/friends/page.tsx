@@ -450,20 +450,32 @@ function FriendsPageInner({
           onToggleAttention={toggleAttention}
       />
 
-      <AdvancedSearchDialog
-        open={advancedOpen}
-        accountId={selectedAccountId}
-        tags={allTags}
-        fieldNames={[]}
-        marks={marks}
-        scenarios={scenarios}
-        onClose={() => setAdvancedOpen(false)}
-        onLoadSaved={() => {
-          setAdvancedOpen(false)
-          setSavedOpen(true)
-        }}
-        onApply={(result) => { setAdvanced(result); setAdvancedOpen(false); setPage(1) }}
-      />
+      {advancedOpen ? (
+        <style>{`
+          [data-friends-advanced-search] > div {
+            background-color: rgb(16 24 40 / 33%) !important;
+          }
+          [data-friends-advanced-search] > div > div {
+            max-height: min(944px, calc(100vh - 32px)) !important;
+          }
+        `}</style>
+      ) : null}
+      <div data-friends-advanced-search>
+        <AdvancedSearchDialog
+          open={advancedOpen}
+          accountId={selectedAccountId}
+          tags={allTags}
+          fieldNames={[]}
+          marks={marks}
+          scenarios={scenarios}
+          onClose={() => setAdvancedOpen(false)}
+          onLoadSaved={() => {
+            setAdvancedOpen(false)
+            setSavedOpen(true)
+          }}
+          onApply={(result) => { setAdvanced(result); setAdvancedOpen(false); setPage(1) }}
+        />
+      </div>
       {savedOpen ? (
         <SavedSearchDialog
           accountId={selectedAccountId}
