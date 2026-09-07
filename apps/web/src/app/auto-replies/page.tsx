@@ -647,15 +647,15 @@ export default function AutoRepliesPage() {
             <thead>
               <tr className="bg-canvas-sunken border-b border-hairline">
                 <th className="w-2/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">ルール名</th>
-                <th className="w-20 px-3 py-3 text-left text-xs font-semibold text-ink-faint">状態</th>
-                <th className="w-1/6 px-3 py-3 text-left text-xs font-semibold text-ink-faint">どんなときに動くか</th>
-                <th title="返信と実行するアクション" className="w-1/6 px-3 py-3 text-left text-xs font-semibold text-ink-faint">何を返すか</th>
-                <th className="w-24 px-3 py-3 text-left text-xs font-semibold text-ink-faint">今月の応答</th>
-                <th className="w-28 px-3 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
-                <th className="hidden">テンプレート</th>
-                <th className="hidden">応答条件</th>
-                <th className="hidden">適用アカウント</th>
-                <th className="hidden">累計</th>
+                <th className="w-20 px-4 py-3 text-left text-xs font-semibold text-ink-faint">状態</th>
+                <th className="w-1/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">どんなときに動くか</th>
+                <th title="返信と実行するアクション" className="w-1/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">何を返すか</th>
+                <th className="w-24 px-4 py-3 text-left text-xs font-semibold text-ink-faint">今月の応答</th>
+                <th className="w-28 px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
+                <th className="hidden px-4 py-3">テンプレート</th>
+                <th className="hidden px-4 py-3">応答条件</th>
+                <th className="hidden px-4 py-3">適用アカウント</th>
+                <th className="hidden px-4 py-3">累計</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">

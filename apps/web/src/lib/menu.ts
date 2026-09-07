@@ -63,14 +63,9 @@ export const HQ_MENU_SECTIONS: MenuSection[] = [
 
 export const MENU_SECTIONS: MenuSection[] = [
   {
-    /*
-     * 見出しを付けない。毎日開くものが、ここに見出し無しでひとかたまりに
-     * なっている。以前は「対応」「友だち属性」と2つ見出しを挟んでいたが、
-     * 項目が1〜2個の区分に見出しを付けると、行数のわりに縦が伸びる。
-     */
     id: 'basic',
-    label: null,
-    title: '基本',
+    label: 'メイン',
+    title: 'メイン',
     items: [
       { href: '/', label: 'ダッシュボード', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' , id: 'dashboard', note: '数字と、今日やることのまとめ', required: true },
       { href: '/chats', label: '受信箱', icon: 'M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5', badge: 'unanswered' , id: 'inbox', note: 'LINEとメールの問い合わせをまとめて扱います', required: true },

@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Bookmark, Circle, SlidersHorizontal, Star } from 'lucide-react'
+import { Bookmark, Check, Circle, SlidersHorizontal, Star } from 'lucide-react'
 import type { Scenario, Tag } from '@line-crm/shared'
 import { api, type FriendListItem, type FriendSavedView, type SupportMarkListItem } from '@/lib/api'
 import FriendKpis from '@/components/friends/friend-kpis'
@@ -377,11 +377,17 @@ function FriendsPageInner({
               options={[{ value: '', label: 'すべて' }, ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))]}
             />
           </div>
-          <button type="button" aria-pressed={responseFilter === 'unhandled'} onClick={() => resetPageWith(() => setResponseFilter(responseFilter === 'unhandled' ? 'all' : 'unhandled'))} className={`inline-flex h-10.5 shrink-0 items-center gap-2 rounded-full px-4 text-xs font-bold text-danger ${responseFilter === 'unhandled' ? 'bg-status-danger-selected ring-2 ring-status-danger/30' : 'bg-status-danger-soft'}`}>
-            <Circle aria-hidden="true" className="h-2.5 w-2.5 fill-current" />未対応
+          <button type="button" data-filter-chip="unhandled" aria-pressed={responseFilter === 'unhandled'} onClick={() => resetPageWith(() => setResponseFilter(responseFilter === 'unhandled' ? 'all' : 'unhandled'))} className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-bold transition-colors ${responseFilter === 'unhandled' ? 'border-status-danger-border bg-status-danger-selected text-danger shadow-sm' : 'border-transparent bg-status-danger-soft text-danger hover:bg-status-danger-selected'}`}>
+            {responseFilter === 'unhandled'
+              ? <Check aria-hidden="true" className="h-3.5 w-3.5" />
+              : <Circle aria-hidden="true" className="h-2.5 w-2.5 fill-current" />}
+            未対応
           </button>
-          <button type="button" aria-pressed={attentionOnly} onClick={() => resetPageWith(() => setAttentionOnly(!attentionOnly))} className={`inline-flex h-10.5 shrink-0 items-center gap-2 rounded-full bg-status-warn-soft px-4 text-xs font-bold ${attentionOnly ? 'ring-2 ring-status-warn-deep/30' : ''} text-status-warn-deep`}>
-            <Star aria-hidden="true" className="h-3.5 w-3.5" />注目のみ
+          <button type="button" data-filter-chip="attention" aria-pressed={attentionOnly} onClick={() => resetPageWith(() => setAttentionOnly(!attentionOnly))} className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border bg-status-warn-soft px-3 text-xs font-bold text-status-warn-deep transition-colors ${attentionOnly ? 'border-status-warn-deep shadow-sm' : 'border-transparent hover:brightness-95'}`}>
+            {attentionOnly
+              ? <Check aria-hidden="true" className="h-3.5 w-3.5" />
+              : <Star aria-hidden="true" className="h-3.5 w-3.5" />}
+            注目のみ
           </button>
           <span className="shrink-0 whitespace-nowrap text-xs text-ink-faint">{loadStatus === 'ready' ? `${total.toLocaleString('ja-JP')}件` : '—'}</span>
         </div>
