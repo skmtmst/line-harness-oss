@@ -2255,11 +2255,24 @@ export const SCREENS = [
   },
 
   // ── 機能23 EC連携 ───────────────────────────────────────
-  { ...EC, node: 'eI3gs', name: '23-1 EC連携', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #236 / UI HEAD b82dd41bc を3105/8792で再撮影。構造一致・出来事の詳細API待ち。** 4入口、今日の取込・未照合・失敗・最終受信の4指標、照合方針の案内、検索、状態絞り込み、並び順、設計順の6列表をそろえた。未照合の行は会員のつき合わせへ進める。1440・1920pxとも横はみ出し0、壊れ値・外部イベントIDの露出0。残る差は注文金額・商品明細・個別アクション台帳・失敗だけを再試行するAPIで、値や押し口を作らず未取得と明記したため一致にはしない。', verdictSource: 'ec-v6/eI3gs.txt + 2026-09-07 1440/1920px screenshots', verdictHead: 'b82dd41bc' },
+  {
+    ...EC, node: 'eI3gs', name: '23-1 EC連携',
+    states: {
+      apis: ['**/api/ec-commerce/overview**', '**/api/ec-commerce/orders?**', '**/api/ec-commerce/action-executions?**'],
+      kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'],
+    },
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #236 / UI HEAD b82dd41bc を3105/8792で再撮影。構造一致・出来事の詳細API待ち。** 4入口、今日の取込・未照合・失敗・最終受信の4指標、照合方針の案内、検索、状態絞り込み、並び順、設計順の6列表をそろえた。未照合の行は会員のつき合わせへ進める。1440・1920pxとも横はみ出し0、壊れ値・外部イベントIDの露出0。残る差は注文金額・商品明細・個別アクション台帳・失敗だけを再試行するAPIで、値や押し口を作らず未取得と明記したため一致にはしない。',
+    verdictSource: 'ec-v6/eI3gs.txt + 2026-09-07 1440/1920px screenshots',
+    verdictHead: 'b82dd41bc',
+  },
   {
     ...EC, node: 'ELayY', name: '23-1-A 会員のつき合わせ',
     route: '/ec-commerce/identity-candidates',
-    states: { apis: ['**/api/identity-candidates*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    states: {
+      apis: ['**/api/identity-candidates*', '**/api/ec-commerce/identity-candidates?**'],
+      kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'],
+    },
     variants: [{ suffix: '-decide', steps: [{ qaOpen: 'ELayY', after: 700 }] }],
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-07 Issue #236 / UI HEAD b82dd41bc を3105/8792で通常・読込・空・失敗・権限不足・判定窓まで再撮影。構造一致・集計API待ち。** 4入口、未照合・候補あり・自動照合・売上影響の4指標、照合根拠の案内、4絞り込み、並び順、影響列つき一覧を設計順にそろえた。メールと電話は伏せ字のまま、判定窓では過去LINEを再送しない既定を維持。全14枚で横はみ出し0、壊れ値・平文PII・内部IDの露出0。残る差は自動照合数・売上影響・候補なし／重複疑いの集計を返すAPIと撮影固定データで、未取得を0にしていないため一致にはしない。',

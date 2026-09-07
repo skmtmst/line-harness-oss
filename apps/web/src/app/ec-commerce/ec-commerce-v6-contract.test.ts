@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const page = readFileSync(join(import.meta.dirname, 'page.tsx'), 'utf8')
 const tabs = readFileSync(join(import.meta.dirname, 'ec-tabs.ts'), 'utf8')
+const tabsView = readFileSync(join(import.meta.dirname, 'ec-tabs-view.tsx'), 'utf8')
 const identity = readFileSync(join(import.meta.dirname, 'identity-candidates', 'page.tsx'), 'utf8')
 const subscriptions = readFileSync(join(import.meta.dirname, 'subscriptions-panel.tsx'), 'utf8')
 const connector = readFileSync(join(import.meta.dirname, 'connector-panel.tsx'), 'utf8')
@@ -17,6 +18,16 @@ describe('V6 EC integration screens', () => {
     expect(tabs).toContain("{ key: 'connector', label: 'つなぎ先' }")
     expect(page).not.toContain('準備中')
     expect(page).not.toContain('<Header')
+  })
+
+  it('shows API-counted totals on the EC entry tabs without inventing failed counts', () => {
+    expect(tabsView).toContain('Promise.allSettled')
+    expect(tabsView).toContain('api.ecCommerce.overview(accountId)')
+    expect(tabsView).toContain('api.ecCommerce.operationIdentityCandidates')
+    expect(tabsView).toContain('api.ecCommerce.subscriptions')
+    expect(tabsView).toContain("overview.status === 'fulfilled' && overview.value.success")
+    expect(tabsView).toContain("identities.status === 'fulfilled' && identities.value.success")
+    expect(tabsView).toContain("subscriptions.status === 'fulfilled' && subscriptions.value.success")
   })
 
   it('shows the V6 decision information without inventing unavailable values', () => {
