@@ -3795,7 +3795,7 @@
   "pixelDiff": {
     "thresholdPercent": 10,
     "heightDiffThresholdPx": 24,
-    "generatedAt": "2026-09-07T12:43:04.745Z",
+    "generatedAt": "2026-09-07T12:48:23.059Z",
     "comparedCount": 250,
     "unavailableCount": 22,
     "pixelAboveThresholdCount": 32,
@@ -5020,7 +5020,7 @@
         "comparisons": [],
         "pixelDiffPercent": null,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:41:12.465Z"
+        "retainedFrom": "2026-09-07T12:43:04.745Z"
       }
     },
     {

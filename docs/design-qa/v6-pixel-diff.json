@@ -1,6 +1,6 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
-  "generatedAt": "2026-09-07T12:43:04.745Z",
+  "generatedAt": "2026-09-07T12:48:23.059Z",
   "thresholdPercent": 10,
   "heightDiffThresholdPx": 24,
   "screenCount": 272,
@@ -1046,7 +1046,7 @@
       "comparisons": [],
       "pixelDiffPercent": null,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T12:41:12.465Z"
+      "retainedFrom": "2026-09-07T12:43:04.745Z"
     },
     {
       "feature": 3,
