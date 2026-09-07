@@ -169,7 +169,7 @@ const issue455InboxReview = (node) => ({
   verdict: 'match',
   verdictNote: '**2026-09-07 Issue #455 で Pencil と実装を更新し、再撮影で一致。** 上部の集計帯を外して対応ルールだけを絞り込み行へ残し、設計に無い「自分の未読」を削除。顧客情報を開いた状態では左一覧を先に縮め、中央列を560px以上に保ち、担当・対応状況・顧客情報の操作を40pxかつ1行にした。改行案内は入力欄の下へ移した。3107/8794で全状態を1440/1920px撮影し、両幅とも横はみ出し0。',
   verdictSource: `inbox-v6/${node}.txt + inbox-v6/${node}.png（Pencil） + inbox-v6/${node}-{1440,1920}.png（実装） + Issue #455`,
-  verdictHead: '1c5e06533',
+  verdictHead: '470afcedc',
 })
 
 export const SCREENS = [
