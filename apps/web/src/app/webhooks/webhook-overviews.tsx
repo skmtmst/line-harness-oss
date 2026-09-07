@@ -165,6 +165,7 @@ export function OutgoingOverview({
   const [filter, setFilter] = useState<OutgoingFilter>('all')
   const [sort, setSort] = useState<OutgoingSort>('volume')
   const [page, setPage] = useState(1)
+  const [settingsId, setSettingsId] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
     const rows = items.filter((item) => matchesOutgoing(item, filter, query))
@@ -294,11 +295,16 @@ export function OutgoingOverview({
                       <Button variant="secondary" href="/webhooks?tab=interactions">
                         {item.deliverySummary.canRetry ? '失敗をやり直す' : '中身を見る'}
                       </Button>
-                      <details className="relative">
-                        <summary className="border-hairline bg-canvas text-ink-secondary rounded-control cursor-pointer list-none border px-3 py-2 text-sm font-semibold">
+                      <div className="relative">
+                        <Button
+                          variant="secondary"
+                          aria-expanded={settingsId === item.id}
+                          onClick={() => setSettingsId((current) => current === item.id ? null : item.id)}
+                        >
                           設定
-                        </summary>
-                        <div className="bg-canvas border-hairline rounded-card absolute right-0 z-10 mt-2 flex min-w-max gap-2 border p-2 shadow-lg">
+                        </Button>
+                        {settingsId === item.id ? (
+                          <div className="bg-canvas border-hairline rounded-card absolute right-0 z-10 mt-2 flex min-w-max gap-2 border p-2 shadow-lg">
                           <Button
                             variant="secondary"
                             onClick={() => onToggle(item.id, item.isActive)}
@@ -309,8 +315,9 @@ export function OutgoingOverview({
                           </Button>
                           <Button variant="secondary" onClick={() => onRotate(item)}>合言葉</Button>
                           <Button variant="secondary" onClick={() => onDelete(item)}>削除</Button>
-                        </div>
-                      </details>
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
                   </ActionCell>
                 </Tr>

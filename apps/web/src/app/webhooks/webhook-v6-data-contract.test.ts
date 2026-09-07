@@ -28,7 +28,7 @@ describe('V6 外部連携の接続別集計と受信口詳細', () => {
   it('APIにないテスト送信を動くように見せない', () => {
     expect(OVERVIEWS).not.toContain('1回 試してみる')
     expect(OVERVIEWS).toContain("item.deliverySummary.canRetry ? '失敗をやり直す' : '中身を見る'")
-    expect(OVERVIEWS).toContain('<summary className="border-hairline')
+    expect(OVERVIEWS).toContain('aria-expanded={settingsId === item.id}')
   })
 
   it('選んだ受け取り口の詳細をアカウント付きで取得する', () => {
