@@ -102,6 +102,50 @@ import type {
   UndoIdentityCandidateRequest,
 } from '@line-crm/shared'
 
+export type OutgoingWebhookOverview = OutgoingWebhook & {
+  deliverySummary: {
+    periodDays: number
+    total: number
+    succeeded: number
+    failed: number
+    pending: number
+    successRate: number | null
+    lastResult: {
+      status: string
+      responseStatus: number | null
+      completedAt: string | null
+      failureReason: string | null
+    } | null
+    canRetry: boolean
+  }
+}
+
+export type IncomingWebhookDetail = IncomingWebhook & {
+  version: number
+  identityMatching: {
+    methods: Array<{
+      kind: 'harness_friend_id' | 'external_customer_id' | 'verified_email' | 'verified_phone'
+      path: string
+    }>
+    onNotFound: 'do_nothing' | 'unmatched_box' | 'create_candidate'
+  }
+  actions: Array<{
+    refKind: string
+    refId: string
+    refVersionId: string | null
+  }>
+  actionExecution: {
+    state: 'not_connected' | 'not_configured'
+    reason: string | null
+  }
+  latestSample: {
+    receivedAt: string
+    fields: Array<{ path: string; type: string; maskedValue: string }>
+    truncated: boolean
+  } | null
+  templateFields: Array<{ path: string; type: string; token: string }>
+}
+
 export type AccessUserStatus = 'active' | 'invited' | 'expired' | 'suspended'
 export type AccessRoleBundle = 'administrator' | 'operations' | 'reception' | 'view_only' | 'custom'
 
@@ -7469,6 +7513,10 @@ export const api = {
         fetchApi<ApiResponse<IncomingWebhook[]>>(
           `/api/webhooks/incoming?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
+      detail: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<IncomingWebhookDetail>>(
+          `/api/webhooks/incoming/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        ),
       create: (data: { lineAccountId: string; name: string; sourceType?: string; secret: string }) =>
         fetchApi<ApiResponse<IncomingWebhookCreated>>('/api/webhooks/incoming', {
           method: 'POST',
@@ -7487,7 +7535,7 @@ export const api = {
     },
     outgoing: {
       list: (lineAccountId: string) =>
-        fetchApi<ApiResponse<OutgoingWebhook[]>>(
+        fetchApi<ApiResponse<OutgoingWebhookOverview[]>>(
           `/api/webhooks/outgoing?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
       create: (data: { lineAccountId: string; name: string; url: string; eventTypes: string[]; secret: string; maxRetries?: number }) =>
