@@ -1,9 +1,9 @@
 # 8-1-A 自動応答ルール編集
 # /auto-replies/edit?id=ar-2&step=basic
 
-株
+然
 株式会社 然
-Ver. 0.0.0-dev
+Ver. 2.6.4
 
 メイン
 

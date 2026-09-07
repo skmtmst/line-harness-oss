@@ -1,9 +1,9 @@
 # 7-1-E テスト送信確認
 # /reminders/edit?id=reminder-3&stage=test
 
-株
+然
 株式会社 然
-Ver. 0.0.0-dev
+Ver. 2.6.4
 
 メイン
 

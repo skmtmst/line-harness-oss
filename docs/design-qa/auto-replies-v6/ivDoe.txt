@@ -1,9 +1,9 @@
 # 8-1-C 応答とアクション
 # /auto-replies/edit?id=ar-2&step=response
 
-株
+然
 株式会社 然
-Ver. 0.0.0-dev
+Ver. 2.6.4
 
 メイン
 

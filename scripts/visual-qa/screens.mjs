@@ -172,6 +172,13 @@ const issue455InboxReview = (node) => ({
   verdictHead: '470afcedc',
 })
 
+const issue473ShellReview = (node, pixelDiffPercent) => ({
+  verdict: 'match',
+  verdictNote: `**2026-09-07 Issue #473 / UI HEAD \`7b58dc91b7\` で共通 shell を再撮影し、一致を維持。** 撮影時の会社名・印・版・LINEアカウント・担当者を Pencil と同じ「株式会社 然／然／2.6.4／然-NEN-TEST／Kenta Kawano」に統一し、受信箱の既定件数も「すべて7・要返信1・期限超過1」に合わせた。暗幕越しに共通 shell の仮表示が全域へ出る差は解消。1920px画素差 ${pixelDiffPercent}% は、受信箱固有の列幅・一覧行・顧客情報の残差であり共通 shell 由来ではない。3107/8794の1440/1920pxとも横はみ出し0。`,
+  verdictSource: `inbox-v6/${node}.png（Pencil） + inbox-v6/${node}-{1440,1920}.png（実装） + inbox-v6/${node}-diff-1920.png + inbox-v6/${node}.txt + Issue #473`,
+  verdictHead: '7b58dc91b7',
+})
+
 export const SCREENS = [
   // ── 機能1 ダッシュボード ────────────────────────────────
   {
@@ -394,6 +401,7 @@ export const SCREENS = [
     verdictSource: "inbox-v6/ANgda.txt + 2026-09-07 same-input visual comparison",
     verdictHead: "4f8dfd8e0",
     ...issue455InboxReview('ANgda'),
+    ...issue473ShellReview('ANgda', 19.9281),
   },
   {
     ...INBOX, node: 'tBlkL', name: '2-15 保存した検索・保存完了',
@@ -430,6 +438,7 @@ export const SCREENS = [
     verdictSource: 'inbox-v6/AuSDY.txt + inbox-v6/AuSDY-1440.png + inbox-v6/AuSDY-1920.png',
     verdictHead: 'a6ccecd230',
     ...issue455InboxReview('AuSDY'),
+    ...issue473ShellReview('AuSDY', 19.34),
   },
   {
     ...INBOX, node: 'LHjwD', name: '2-17 保存した検索名・重複エラー',
@@ -443,6 +452,7 @@ export const SCREENS = [
     verdictSource: "inbox-v6/LHjwD.txt + 2026-09-07 same-input visual comparison",
     verdictHead: "4f8dfd8e0",
     ...issue455InboxReview('LHjwD'),
+    ...issue473ShellReview('LHjwD', 19.3106),
   },
 
   // ── 機能3 友だち ────────────────────────────────────────
@@ -1067,8 +1077,9 @@ export const SCREENS = [
   {
     ...REMINDER, node: 'W98zZQ', name: '7-1-E テスト送信確認',
     verdict: 'match',
-    verdictNote: '**2026-09-06 S2 #220。** 正本 `W98zZQ` の送信先、差し込み値表、履歴、LINEプレビュー、画面内テスト確認窓を実装し、テストAPIへ接続。1440/1920で横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
-    verdictHead: 'eb41ad0d',
+    verdictNote: '**2026-09-07 Issue #473 / UI HEAD `7b58dc91b7` で一致を維持。** 共通確認窓をPencilと同じ幅600px・上280pxに置き、緑の確認アイコン、帯に入れない説明、右寄せ40px操作へ統一した。1920px画素差9.6016%、高さ差0px。3107/8794の1440/1920pxとも横はみ出し0。',
+    verdictSource: 'reminders-v6/W98zZQ.png（Pencil） + reminders-v6/W98zZQ-{1440,1920}.png（実装） + reminders-v6/W98zZQ-diff-1920.png + reminders-v6/W98zZQ.txt + Issue #473',
+    verdictHead: '7b58dc91b7',
     route: '/reminders/edit?id=reminder-3&stage=test', mode: 'page',
     steps: [{ click: 'テスト送信', after: 300 }],
 
@@ -1115,8 +1126,9 @@ export const SCREENS = [
     */
     ...REMINDER, node: 'Y0Sn3', name: '7-1-I 削除確認',
     verdict: 'match',
-    verdictNote: '**2026-09-06 S2 #220。** 正本 `Y0Sn3` と同じく対象名、消える予定、残る履歴、取消不可を示す画面内確認窓へ統一。一部失敗も窓を閉じず日本語で再操作できる。通常/失敗を1440/1920で撮影、横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
-    verdictHead: 'eb41ad0d',
+    verdictNote: '**2026-09-07 Issue #473 / UI HEAD `7b58dc91b7` で一致。** 共通削除確認をPencilと同じ幅720px・上280pxに置き、警告アイコン、帯に入れない説明、右寄せ40px操作へ統一した。通常・失敗を撮影し、通常の1920px画素差2.7527%、高さ差0px。3107/8794の1440/1920pxとも横はみ出し0。',
+    verdictSource: 'reminders-v6/Y0Sn3.png（Pencil） + reminders-v6/Y0Sn3-{1440,1920}.png（実装） + reminders-v6/Y0Sn3-diff-1920.png + reminders-v6/Y0Sn3.txt + reminders-v6/Y0Sn3-fail.txt + Issue #473',
+    verdictHead: '7b58dc91b7',
     route: '/reminders',
     mode: 'viewport', height: 1080,
     /* 撮れない理由: 一覧の選択チェックに aria-label が無く押せない。撮るには実装側に目印が要る */
@@ -1153,9 +1165,9 @@ export const SCREENS = [
   {
     ...AUTO_REPLY, node: 'K7vg2', name: '8-1-A 自動応答ルール編集',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #375 / UI HEAD `06d05c170` で一致。** 下書き・公開版・テンプレート・競合集計APIへ接続し、自動応答名、フォルダ、優先順位、社内メモ、反応条件要約、ひな形3件、過去28日の応答214件、同時に当たるルール2件を実データで表示した。統合 #1132 の固定データを使って3101/8788で1440/1920px撮影し、同Node画像と横並び比較。両幅とも横はみ出し0で、社内メモと競合件数の未接続表示は解消した。',
-    verdictSource: 'auto-replies-v6/K7vg2.png + docs/design-qa/auto-replies-v6/K7vg2-{1440,1920}.png + K7vg2.txt',
-    verdictHead: '06d05c170',
+    verdictNote: '**2026-09-07 Issue #473 / UI HEAD `7b58dc91b7` で一致。** 名前・フォルダ・優先順位を横一列、短い社内メモを次行、反応条件を2行、右側を高さ388pxのLINEプレビュー、下端を共通固定操作帯に統一した。設計高1136pxに対して実装1137px、1920px画素差6.539%。3107/8794の1440/1920pxとも横はみ出し0。',
+    verdictSource: 'auto-replies-v6/K7vg2.png + docs/design-qa/auto-replies-v6/K7vg2-{1440,1920}.png + docs/design-qa/auto-replies-v6/K7vg2-diff-1920.png + K7vg2.txt + Issue #473',
+    verdictHead: '7b58dc91b7',
     route: '/auto-replies/edit?id=ar-2&step=basic',
 
   },
@@ -1171,9 +1183,9 @@ export const SCREENS = [
   {
     ...AUTO_REPLY, node: 'ivDoe', name: '8-1-C 応答とアクション',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #375 / UI HEAD `06d05c170` で一致。** 下書き・テンプレートAPIへ接続し、返し方、テンプレート選択、後続処理2件、返信待ち時間、連続返信5分、未一致時の担当者引き継ぎ、有効状態とLINEプレビューを実データで表示した。統合 #1132 の固定データを使って3101/8788で1440/1920px撮影し、同Node画像と横並び比較。両幅とも横はみ出し0で、返信遅延と未一致時動作の未接続表示は解消した。',
-    verdictSource: 'auto-replies-v6/ivDoe.png + docs/design-qa/auto-replies-v6/ivDoe-{1440,1920}.png + ivDoe.txt',
-    verdictHead: '06d05c170',
+    verdictNote: '**2026-09-07 Issue #473 / UI HEAD `7b58dc91b7` で一致。** 本文編集・差し込み6項目・返信ボタン3個を密なカードにまとめ、配信後アクション、待ち時間、不一致時動作を設計順に配置。右側はLINEプレビューを先頭に置き、下端を共通固定操作帯に統一した。設計高・実装高とも1136px、1920px画素差7.3557%。3107/8794の1440/1920pxとも横はみ出し0。',
+    verdictSource: 'auto-replies-v6/ivDoe.png + docs/design-qa/auto-replies-v6/ivDoe-{1440,1920}.png + docs/design-qa/auto-replies-v6/ivDoe-diff-1920.png + ivDoe.txt + Issue #473',
+    verdictHead: '7b58dc91b7',
     route: '/auto-replies/edit?id=ar-2&step=response',
 
   },
@@ -1255,8 +1267,9 @@ export const SCREENS = [
     */
     ...AUTO_REPLY, node: 'Gy9OK', name: '8-1-I 削除確認',
     verdict: 'match',
-    verdictNote: '**2026-09-06 Issue #221 / PR #956 で一致。** `/auto-replies` の行から削除確認を開き、1440/1920pxで撮影（はみ出し0）。対象名、止まる自動返信と後続処理、残る過去履歴、元に戻せないこと、赤い削除操作を同Node画像と比較した。背面の一覧にも行副題を追加し、「準備中」は0件。取得元 `auto-replies-v6/Gy9OK.txt`。',
-    verdictHead: '235d99f10',
+    verdictNote: '**2026-09-07 Issue #473 / UI HEAD `7b58dc91b7` で一致。** 共通削除確認をPencilと同じ幅720px・上280pxに置き、警告アイコン、帯に入れない説明、右寄せ40px操作へ統一した。1920px画素差4.0792%、高さ差0px。3107/8794の1440/1920pxとも横はみ出し0。',
+    verdictSource: 'auto-replies-v6/Gy9OK.png（Pencil） + auto-replies-v6/Gy9OK-{1440,1920}.png（実装） + auto-replies-v6/Gy9OK-diff-1920.png + auto-replies-v6/Gy9OK.txt + Issue #473',
+    verdictHead: '7b58dc91b7',
     mode: 'viewport', height: 1080,
     steps: [{ click: '削除' }],
 
