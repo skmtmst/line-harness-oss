@@ -52,6 +52,7 @@ export type AuditAction =
   | 'conversion.definition.usage.create'
   | 'conversion.report.export'
   | 'ec.connector.update'
+  | 'ec.action.retry'
   | 'line_notification.definition.create'
   | 'line_notification.definition.update'
   | 'line_notification.definition.publish'
