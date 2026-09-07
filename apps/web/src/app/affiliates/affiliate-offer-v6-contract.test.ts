@@ -106,6 +106,16 @@ describe('V6 案件一覧（GH8VL）の見せ方', () => {
     expect(csvCell(0)).toBe('0')
   })
 
+  it('CSVは数式として実行されない。=+-@始まりに引用符を付ける', () => {
+    expect(csvCell('=1+1')).toBe("'=1+1")
+    expect(csvCell('+cmd')).toBe("'+cmd")
+    expect(csvCell('-2')).toBe("'-2")
+    expect(csvCell('@sum')).toBe("'@sum")
+    expect(csvCell('田中')).toBe('田中')
+    // 引用符が必要な文字と組み合わさっても守る
+    expect(csvCell('=あ,い')).toBe("\"'=あ,い\"")
+  })
+
   it('CSVは画面に出ている行だけを、設計の見出しで書き出す', () => {
     const shown = selectOffers(OFFERS, { filters: ['draft'], query: '', sort: 'newest' })
     const csv = offersCsv(shown, {
