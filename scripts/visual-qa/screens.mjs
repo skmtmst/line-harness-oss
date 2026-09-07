@@ -3071,10 +3071,23 @@ const FEATURE_16_REVIEW = {
     variants: [{ suffix: '-detail', steps: [{ click: '見る', nth: 0, after: 500 }] }],
   },
   njLGA: {
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07、Issue #307 で通常・読込中・0件・取得失敗を再撮影し、構造一致・データ未接続。** 3102/8789 で4状態を1440px・1920pxの両方で撮り、10枚すべて横はみ出し0。通常は5人の支払い確定前報酬、保留額、支払い条件の覚書と行ごとの確定操作を表示し、0件と取得失敗も混同しない。前回 #212 の「通常と0件が取得失敗になる」は解消した。残る差は、支払結果・締め日・支払日・振込先を返すAPIが無いこと。Pencilの「今年払った合計」「次の締め」「次の支払日」「振込先」「過去の支払い」「振込用CSV」は値を作らず、未接続の理由を表示する。**接続条件:** 支払台帳・締め設定・振込先APIが入ったら、設計の4指標、状態札、6列表、締め・明細・CSV操作を接続して同じ4状態を再撮影する。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07、Issue #394 / HEAD `3721857fb` で締め台帳の固定データを接続して再撮影し、一致。** 3102/8789で通常・読込中・0件・取得失敗を1440px・1920px撮影し、10枚すべて横はみ出し0。通常は締め前の3人、金額・成果件数・締め日・振込先登録状態・確定操作を実API契約から表示する。0件と取得失敗を混同せず、未提供の支払日・支払履歴は値を作らず `—` と理由を表示する。',
     verdictSource: 'affiliates-v6/njLGA.txt + njLGA-{normal,loading,empty,error}.txt + njLGA-{normal,loading,empty,error}-{1440,1920}.png',
+    verdictHead: '3721857fb',
     states: { apis: ['**/api/affiliate-settlements/preview*'], kinds: ['normal', 'loading', 'empty', 'error'] },
+  },
+  jwrbf: {
+    verdict: 'match',
+    verdictNote: '**2026-09-07、Issue #394 / HEAD `3721857fb` で支払台帳の固定データを接続して再撮影し、一致。** 3102/8789の1440px・1920pxはいずれも横はみ出し0。田中 明の行を開き、今回の金額・成果件数・締め日・振込先登録状態を実API契約から表示した。設計との差として検出される金額・件数・日付は固定データの値で、画面構造の差ではない。',
+    verdictSource: 'affiliates-v6/jwrbf.txt + jwrbf-{1440,1920}.png',
+    verdictHead: '3721857fb',
+  },
+  GqFTV: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07、Issue #394 / HEAD `3721857fb` で締めプレビューを接続して再撮影し、構造一致・設計画像待ち。** 3102/8789の1440px・1920pxはいずれも横はみ出し0。確定額・成果件数・案件別内訳・締め日・振込先登録状態を実API契約から表示し、確定後は締め台帳・振込データ・明細を順に作る。正本の本文とは照合できたが、このNodeだけ1920pxの設計PNGが保管されていないため、画像一致とは判定しない。支払日は未提供なので `—` と理由を表示する。**接続条件:** Pencil実Node `GqFTV` の1920px設計画像を保管して同じ幅で目視比較する。',
+    verdictSource: 'affiliates-v6/GqFTV.txt + GqFTV-{1440,1920}.png + design-reference/affiliates-v6/GqFTV.txt',
+    verdictHead: '3721857fb',
   },
   xqT1Z: {
     verdict: 'match',
