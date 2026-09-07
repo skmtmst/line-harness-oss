@@ -1936,6 +1936,16 @@ export const SCREENS = [
       { fill: '詳しい理由', text: '電話でご紹介いただいたぶん' },
       { click: '変更内容を確認', role: 'button', after: 300 },
     ],
+    variants: [{
+      suffix: 'high-value',
+      standalone: true,
+      steps: [
+        { click: 'マイルを手で増やす・減らす', scope: 'main' },
+        { fill: 'マイル数', text: '10000' },
+        { fill: '詳しい理由', text: '高額調整の承認境界を確認' },
+        { click: '変更内容を確認', role: 'button', after: 300 },
+      ],
+    }],
     verdictHead: '31293424',
     /* 第1段の記録を残し、現在の判定だけを後勝ちで更新する。 */
     ...{
