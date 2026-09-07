@@ -58,6 +58,12 @@ const EVENTS: ReadonlyArray<{ value: Automation['eventType']; label: string; not
     label: 'メニューやボタンが押されたとき',
     note: 'リッチメニューや選択肢を押したとき。含まれる言葉で絞れます。',
   },
+  { value: 'form_submitted', label: 'フォームに回答したとき', note: '回答が保存されたとき。フォームを指定できます。' },
+  { value: 'link_clicked', label: 'リンクが押されたとき', note: '計測リンクが押されたとき。リンクを指定できます。' },
+  { value: 'calendar_booked', label: '予約が確定したとき', note: '予約が確定したとき。予約の種類やメニューを絞れます。' },
+  { value: 'datetime', label: '指定日時になったとき', note: '選んだ友だちへ、指定した日時に一度だけ動きます。' },
+  { value: 'daily', label: '毎日決まった時刻', note: '選んだ友だちへ、毎日5分刻みの時刻に動きます。' },
+  { value: 'weekly', label: '毎週決まった曜日・時刻', note: '選んだ友だちへ、選んだ曜日と時刻に動きます。' },
 ]
 
 /** 言葉で絞れるきっかけ。ほかは本文を持たないので条件欄を出さない。 */
@@ -112,6 +118,7 @@ export default function NewAutomationPage() {
   const [keyword, setKeyword] = useState('')
   const [conditionType, setConditionType] = useState<(typeof CONDITION_AXES)[number][0] | ''>('')
   const [conditionValue, setConditionValue] = useState('')
+  const [triggerConfig, setTriggerConfig] = useState<Record<string, unknown>>({})
   const [actions, setActions] = useState<ActionDraft[]>([newActionDraft()])
   const [tags, setTags] = useState<Tag[]>([])
   const [tagsLoading, setTagsLoading] = useState(true)
@@ -171,6 +178,22 @@ export default function NewAutomationPage() {
     return row.message.trim() ? '入力したメッセージを送る' : 'メッセージを送る'
   }).join('、')
 
+  useEffect(() => {
+    setTriggerConfig({})
+  }, [eventType])
+
+  const triggerConfigSummary = eventType === 'datetime'
+    ? String(triggerConfig.at ?? '日時を指定')
+    : eventType === 'daily' || eventType === 'weekly'
+      ? String(triggerConfig.time ?? '時刻を指定')
+      : eventType === 'form_submitted'
+        ? String(triggerConfig.formId ?? 'すべてのフォーム')
+        : eventType === 'link_clicked'
+          ? String(triggerConfig.trackedLinkId ?? 'すべての計測リンク')
+          : eventType === 'calendar_booked'
+            ? String(triggerConfig.bookingType ?? 'すべての予約')
+            : ''
+
   const updateAction = (key: number, patch: Partial<ActionDraft>) =>
     setActions((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)))
 
@@ -212,6 +235,7 @@ export default function NewAutomationPage() {
         name: name.trim(),
         eventType: selectedEvent.value,
         conditions: {
+          triggerConfig,
           ...(usesKeyword && keyword.trim() ? { keyword: keyword.trim() } : {}),
           ...(conditionType && conditionValue.trim() ? { operator: 'AND', rules: [{ type: conditionType, value: conditionType === 'is_following' || conditionType === 'is_hidden' ? conditionValue.trim() === 'true' : conditionValue.trim() }] } : {}),
         },
@@ -299,6 +323,21 @@ export default function NewAutomationPage() {
                 />
               </div>
             </div>
+
+            {eventType !== 'friend_add' && eventType !== 'tag_change' && eventType !== 'message_received' && eventType !== 'postback_received' ? (
+              <div className="mt-4 rounded-control border border-hairline bg-canvas-sunken p-3">
+                <p className="text-xs font-semibold text-ink-secondary">きっかけの詳しい設定</p>
+                <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                  {eventType === 'form_submitted' ? <TextField aria-label="回答フォーム" placeholder="フォームID（空欄ならすべて）" value={String(triggerConfig.formId ?? '')} onChange={(e) => setTriggerConfig({ formId: e.target.value })} /> : null}
+                  {eventType === 'link_clicked' ? <TextField aria-label="計測リンク" placeholder="計測リンクID（空欄ならすべて）" value={String(triggerConfig.trackedLinkId ?? '')} onChange={(e) => setTriggerConfig({ trackedLinkId: e.target.value })} /> : null}
+                  {eventType === 'calendar_booked' ? <SelectField aria-label="予約の種類" value={String(triggerConfig.bookingType ?? '')} onChange={(e) => setTriggerConfig({ bookingType: e.target.value })} options={[{ value: '', label: 'すべての予約' }, { value: 'salon', label: '通常予約' }, { value: 'event', label: 'イベント予約' }]} className={styles.select} /> : null}
+                  {eventType === 'datetime' ? <TextField aria-label="実行日時" type="datetime-local" value={String(triggerConfig.at ?? '')} onChange={(e) => setTriggerConfig({ at: e.target.value })} /> : null}
+                  {(eventType === 'daily' || eventType === 'weekly') ? <TextField aria-label="実行時刻" type="time" step={300} value={String(triggerConfig.time ?? '')} onChange={(e) => setTriggerConfig({ time: e.target.value })} /> : null}
+                  {eventType === 'weekly' ? <TextField aria-label="曜日" placeholder="曜日（例: 月,水）" value={String(triggerConfig.weekdays ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, weekdays: e.target.value })} /> : null}
+                </div>
+                <p className="mt-2 text-xs text-ink-faint">{triggerConfigSummary}。保存後も設定を確認できます。</p>
+              </div>
+            ) : null}
           </Step>
 
           <Step

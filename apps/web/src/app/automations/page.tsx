@@ -15,7 +15,7 @@ import FilterChip from '@/components/shared/filter-chip'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
-type AutomationEventType = "friend_add" | "tag_change" | "score_threshold" | "cv_fire" | "message_received" | "postback_received" | "calendar_booked" | "ec.order.confirmed" | "ec.order.shipped" | "ec.subscription.upcoming" | "ec.subscription.payment_failed" | "ec.subscription.cancelled"
+type AutomationEventType = "friend_add" | "tag_change" | "score_threshold" | "cv_fire" | "message_received" | "postback_received" | "calendar_booked" | "form_submitted" | "link_clicked" | "datetime" | "daily" | "weekly" | "ec.order.confirmed" | "ec.order.shipped" | "ec.subscription.upcoming" | "ec.subscription.payment_failed" | "ec.subscription.cancelled"
 
 interface AutomationAction {
   type: "add_tag" | "remove_tag" | "start_scenario" | "send_message" | "send_webhook" | "switch_rich_menu"
@@ -53,6 +53,11 @@ const eventTypeOptions: { value: AutomationEventType; label: string }[] = [
   { value: 'message_received', label: 'メッセージ受信' },
   { value: 'postback_received', label: 'ポストバック受信（リッチメニュー等）' },
   { value: 'calendar_booked', label: 'カレンダー予約' },
+  { value: 'form_submitted', label: 'フォームに回答' },
+  { value: 'link_clicked', label: 'リンクが押された' },
+  { value: 'datetime', label: '指定日時になった' },
+  { value: 'daily', label: '毎日決まった時刻' },
+  { value: 'weekly', label: '毎週決まった曜日・時刻' },
   { value: 'ec.order.confirmed', label: 'EC：注文確定' },
   { value: 'ec.order.shipped', label: 'EC：発送完了' },
   { value: 'ec.subscription.upcoming', label: 'EC：定期便の次回予定' },
@@ -68,6 +73,11 @@ const eventTypeLabelMap: Record<AutomationEventType, string> = {
   message_received: 'メッセージ受信',
   postback_received: 'ポストバック受信',
   calendar_booked: 'カレンダー予約',
+  form_submitted: 'フォームに回答',
+  link_clicked: 'リンクが押された',
+  datetime: '指定日時になった',
+  daily: '毎日決まった時刻',
+  weekly: '毎週決まった曜日・時刻',
   'ec.order.confirmed': 'EC注文確定',
   'ec.order.shipped': 'EC発送完了',
   'ec.subscription.upcoming': '定期便予定',
@@ -83,6 +93,11 @@ const eventTypeBadgeColor: Record<AutomationEventType, string> = {
   message_received: 'bg-purple-100 text-purple-700',
   postback_received: 'bg-pink-100 text-pink-700',
   calendar_booked: 'bg-indigo-100 text-indigo-700',
+  form_submitted: 'bg-violet-100 text-violet-700',
+  link_clicked: 'bg-fuchsia-100 text-fuchsia-700',
+  datetime: 'bg-lime-100 text-lime-700',
+  daily: 'bg-amber-100 text-amber-700',
+  weekly: 'bg-sky-100 text-sky-700',
   'ec.order.confirmed': 'bg-emerald-100 text-emerald-700',
   'ec.order.shipped': 'bg-cyan-100 text-cyan-700',
   'ec.subscription.upcoming': 'bg-teal-100 text-teal-700',

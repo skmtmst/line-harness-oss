@@ -824,6 +824,8 @@ function BookingDetailPanel({
             <ActionButtons status={b.status} onAction={onAction} />
             <Link
               href={`/booking/bookings/detail?id=${encodeURIComponent(b.id)}`}
+              data-qa-open="TnDbq"
+              aria-label={`${b.friend_name ?? 'この予約'}の予約の詳細ページを開く`}
               className="text-ink-secondary mt-3 inline-block text-xs underline"
             >
               予約の詳細ページを開く

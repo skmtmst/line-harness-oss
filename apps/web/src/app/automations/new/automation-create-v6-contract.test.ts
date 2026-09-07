@@ -58,6 +58,12 @@ function firedEventTypes(): Set<string> {
     if (entry.name.endsWith('.test.ts')) continue
     const source = readFileSync(join(entry.parentPath ?? root, entry.name), 'utf8')
     for (const m of source.matchAll(/fireEvent\([^,]*, '([^']+)'/g)) fired.add(m[1])
+    // フォーム・リンク・予約はルートがイベントバスへ渡し、日時系は
+    // trigger_type としてCronが拾う。直接 fireEvent の形だけに限定しない。
+    for (const m of source.matchAll(/(?:eventType|triggerType): '(form_submitted|link_clicked|calendar_booked|datetime|daily|weekly)'/g)) fired.add(m[1])
+    for (const m of source.matchAll(/trigger_type IN \('datetime', 'daily', 'weekly'\)/g)) {
+      for (const type of ['datetime', 'daily', 'weekly']) fired.add(type)
+    }
   }
   return fired
 }
@@ -179,7 +185,7 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
   })
 
   it('一度も動かない旧きっかけを戻さない', () => {
-    for (const dead of ['friend_added', 'tag_added', 'form_submitted', 'link_clicked']) {
+    for (const dead of ['friend_added', 'tag_added']) {
       expect(PAGE, `${dead} は発火しません`).not.toContain(`'${dead}'`)
     }
     expect(PAGE_CODE).not.toContain('準備中')
