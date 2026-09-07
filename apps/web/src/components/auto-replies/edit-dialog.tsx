@@ -471,7 +471,7 @@ export default function EditDialog({
       data-design-node={page ? step === 'basic' ? 'K7vg2' : step === 'trigger' ? 'nzWIX' : 'ivDoe' : undefined}
     >
       {page && (
-        <ol aria-label="自動応答を作る進み方" className="mt-4 flex min-h-[55px] flex-wrap items-center justify-between gap-3 text-xs">
+        <ol aria-label="自動応答を作る進み方" style={{ minHeight: 55 }} className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs">
           {['基本設定', 'どんなときに動くか', '何を返すか', '優先順位', '確認'].map((label, index) => (
             <li key={label} className="flex items-center gap-2" aria-current={index === currentStep ? 'step' : undefined}>
               <span className={`rounded-pill flex h-6 w-6 items-center justify-center font-bold ${index < currentStep ? 'bg-accent-deep text-on-accent' : index === currentStep ? 'border-accent text-accent border-2' : 'border-hairline text-ink-faint border'}`}>
@@ -1312,7 +1312,7 @@ export default function EditDialog({
       </div>
       {page && (
         <aside className="flex flex-col gap-3 xl:sticky xl:top-4">
-          <div className={`bg-canvas rounded-card border-hairline border p-4 ${step === 'basic' ? 'min-h-[298px]' : ''} ${step === 'response' ? 'order-2' : 'order-1'}`}>
+          <div style={step === 'basic' ? { minHeight: 298 } : undefined} className={`bg-canvas rounded-card border-hairline border p-4 ${step === 'response' ? 'order-2' : 'order-1'}`}>
             <h3 className="text-ink text-sm font-semibold">
               {step === 'trigger' ? 'この条件の判定' : step === 'response' ? '返信の設定' : '設定内容'}
             </h3>
@@ -1345,7 +1345,7 @@ export default function EditDialog({
             </dl>
           </div>
           {step !== 'trigger' && (
-            <div className={`bg-line-preview min-h-[388px] overflow-hidden rounded-card border-hairline border ${step === 'response' ? 'order-1' : 'order-2'}`}>
+            <div style={{ minHeight: 388 }} className={`bg-line-preview overflow-hidden rounded-card border-hairline border ${step === 'response' ? 'order-1' : 'order-2'}`}>
               <p className="text-on-accent py-4 text-center text-sm font-semibold">LINEプレビュー</p>
               <div className="bg-canvas mx-4 mb-4 rounded-card p-4 text-sm leading-relaxed text-ink">
                 {mode === 'silent'
