@@ -232,7 +232,7 @@ export default function StaffShiftsPage() {
             <section data-design="Week" className="bg-canvas border-hairline overflow-hidden rounded-card border">
               <div className="border-hairline border-b px-4 py-4">
                 <h2 className="text-ink font-semibold">曜日ごとの受付時間</h2>
-                <p className="text-ink-faint mt-1 text-xs">閉めた曜日は、お客様の画面にそもそも出ません。</p>
+                <p className="text-ink-faint mt-1 text-xs">閉めた曜日は、お客様の画面に出ません。</p>
               </div>
               <DataTable className="rounded-none border-0">
                 <thead>
