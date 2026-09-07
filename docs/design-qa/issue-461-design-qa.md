@@ -3,7 +3,7 @@
 - 対象: 自動応答、運用状態、たまる決めごとの新規作成、ウェビナー編集
 - UI HEAD: `84039ceca`
 - 撮影環境: Web 3106 / Mock API 8793、1440px・1920px、1x
-- 比較元: `docs/design-reference/auto-replies-v6/cmDfJ.png`、`docs/design-reference/mileage-v6/BmoGY.png`、`docs/design-reference/webinars-v6/Q8sHa.png`、`docs/design-reference/webinars-v6/yxyzQ.png`
+- 比較元: `docs/design-reference/auto-replies-v6/cmDfJ.png`、`docs/design-reference/mileage-v6/BmoGY.txt`（ローカル設計画像と併用）、`docs/design-reference/webinars-v6/Q8sHa.png`、`docs/design-reference/webinars-v6/yxyzQ.png`
 - 実装画像: 各機能の `docs/design-qa/*-v6/*-{1440,1920}.png`
 - 設計画像なし: `/health`、`/webinars/edit?id=webinar-1&pane=comments`
 
