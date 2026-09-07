@@ -4899,7 +4899,7 @@ export const api = {
       fetchApi<ApiResponse<{ items: ManualLink[]; total: number; brokenCount: number }>>(
         '/api/manual-links',
       ),
-    update: (key: string, data: { name?: string; url?: string | null; keyKind?: 'screen' | 'task' }) =>
+    update: (key: string, data: { name?: string; url?: string | null; keyKind?: 'screen' | 'task'; expectedVersion: number }) =>
       fetchApi<ApiResponse<ManualLink>>(`/api/manual-links/${encodeURIComponent(key)}`, {
         method: 'PUT',
         body: JSON.stringify(data),

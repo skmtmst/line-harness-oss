@@ -929,6 +929,10 @@ const SHAPES = {
  * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
  */
 function visualQaWriteBody(method, pathname) {
+  if (method === 'PUT' && /^\/api\/manual-links\/[^/]+$/.test(pathname)) {
+    const key = decodeURIComponent(pathname.split('/').pop() ?? '')
+    return MANUAL_LINKS.items.find((item) => item.key === key) ?? null
+  }
   if (method === 'POST' && /^\/api\/recipes\/[^/]+\/clone$/.test(pathname)) {
     return { runId: 'visual-recipe-clone-run', status: 'succeeded', createdCount: 16, items: [] }
   }
@@ -2246,7 +2250,7 @@ const server = createServer((req, res) => {
     'Access-Control-Allow-Headers',
     'Content-Type, X-CSRF-Token, X-Admin-Session, Idempotency-Key, X-Confirm-Irreversible',
   )
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS')
 
   if (method === 'OPTIONS') {
     res.writeHead(204).end()

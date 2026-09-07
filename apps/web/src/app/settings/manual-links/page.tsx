@@ -39,6 +39,9 @@ export default function ManualLinksPage() {
   const [total, setTotal] = useState(0)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [checking, setChecking] = useState(false)
+  const [editingKey, setEditingKey] = useState<string | null>(null)
+  const [editingUrl, setEditingUrl] = useState('')
+  const [saving, setSaving] = useState(false)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<StatusFilter>('all')
 
@@ -82,6 +85,32 @@ export default function ManualLinksPage() {
       }
     } finally {
       setChecking(false)
+    }
+  }
+
+  const startEdit = (key: string) => {
+    const link = links.find((item) => item.key === key)
+    if (!link) return
+    setEditingKey(key)
+    setEditingUrl(link.url ?? '')
+  }
+
+  const saveEdit = async () => {
+    if (!editingKey || saving) return
+    const current = links.find((item) => item.key === editingKey)
+    if (!current) return
+    setSaving(true)
+    try {
+      const result = await api.manualLinks.update(editingKey, {
+        url: editingUrl.trim() || null,
+        expectedVersion: current.version,
+      })
+      if (result.success) {
+        setLinks((items) => items.map((item) => item.key === editingKey ? result.data : item))
+        setEditingKey(null)
+      }
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -137,26 +166,38 @@ export default function ManualLinksPage() {
         <DataTable>
           <thead>
             <TableHeadRow>
-              <Th>画面ID</Th>
-              <Th>画面名</Th>
-              <Th>公式記事のURL</Th>
-              <Th>最後に確かめた日</Th>
-              <Th>リンクの状態</Th>
-              <Th>操作</Th>
+              <Th className={styles.idCell}>画面ID</Th>
+              <Th className={styles.nameCell}>画面名</Th>
+              <Th className={styles.urlCell}>公式記事のURL</Th>
+              <Th className={styles.checkedCell}>最後に確かめた日</Th>
+              <Th className={styles.statusCell}>リンクの状態</Th>
+              <Th className={styles.actionCell}>操作</Th>
             </TableHeadRow>
           </thead>
           <tbody>
-            {shown.map((row) => (
-              <Tr key={row.taskId ?? row.screenId}>
-                <Td>{row.screenId}</Td>
-                <Td>{row.name}</Td>
-                <Td>
-                  <span className={row.url ? styles.url : styles.urlEmpty}>
-                    {urlLabel(row.url)}
-                  </span>
+            {shown.map((row) => {
+              const key = row.taskId ?? row.screenId
+              const editing = editingKey === key
+              return (
+              <Tr key={key}>
+                <Td className={styles.idCell}>{row.screenId}</Td>
+                <Td className={styles.nameCell}>{row.name}</Td>
+                <Td className={styles.urlCell}>
+                  {editing ? (
+                    <input
+                      className={styles.urlInput}
+                      aria-label={`${row.name}の公式記事URL`}
+                      value={editingUrl}
+                      onChange={(event) => setEditingUrl(event.target.value)}
+                    />
+                  ) : (
+                    <span className={row.url ? styles.url : styles.urlEmpty} title={row.url || undefined}>
+                      {urlLabel(row.url)}
+                    </span>
+                  )}
                 </Td>
-                <Td>{checkedLabel(row.checkedAt)}</Td>
-                <Td>
+                <Td className={styles.checkedCell}>{checkedLabel(row.checkedAt)}</Td>
+                <Td className={styles.statusCell}>
                   <StatusBadge
                     tone={row.status === 'ok' ? 'success' : row.status === 'broken' ? 'danger' : 'neutral'}
                     size="compact"
@@ -164,9 +205,19 @@ export default function ManualLinksPage() {
                     {LINK_STATUS_LABEL[row.status]}
                   </StatusBadge>
                 </Td>
-                <Td><button type="button" className={styles.action}>直す</button></Td>
+                <Td className={styles.actionCell}>
+                  {editing ? (
+                    <span className={styles.editActions}>
+                      <button type="button" className={styles.action} disabled={saving} onClick={() => void saveEdit()}>保存</button>
+                      <button type="button" className={styles.action} disabled={saving} onClick={() => setEditingKey(null)}>やめる</button>
+                    </span>
+                  ) : (
+                    <button type="button" className={styles.action} onClick={() => startEdit(key)}>直す</button>
+                  )}
+                </Td>
               </Tr>
-            ))}
+              )
+            })}
           </tbody>
         </DataTable>
       )}

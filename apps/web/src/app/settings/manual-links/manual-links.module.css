@@ -51,7 +51,10 @@
 .url {
   color: var(--color-ink); /* fill: $ink */
   font-size: var(--text-label); /* fontSize: $size-label */
-  word-break: break-all;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 決めていない URL を URL の形に見せない。 */
@@ -84,6 +87,28 @@
 .action:disabled {
   cursor: wait;
   opacity: 0.65;
+}
+
+.idCell { width: 9%; }
+.nameCell { width: 18%; }
+.urlCell { width: 34%; }
+.checkedCell { width: 16%; }
+.statusCell { width: 14%; }
+.actionCell { width: 9%; }
+
+.urlInput {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--radius-control);
+  color: var(--color-ink);
+  font: inherit;
+}
+
+.editActions {
+  display: flex;
+  gap: 6px;
 }
 
 .footNote {
