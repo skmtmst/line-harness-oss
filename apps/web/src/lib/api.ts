@@ -4418,6 +4418,8 @@ export const api = {
         sidebarItemOrder: Record<string, string[]> | null
         parentChildMode: boolean
         specializedFeatureKeys: string[]
+        /** 保存時に送り返す版。一括保存の競合検出に使う。 */
+        version: number
       }>>(
         `/api/settings/features?account_id=${encodeURIComponent(accountId)}`,
       ),
@@ -4425,8 +4427,10 @@ export const api = {
       features?: Record<string, boolean>
       sidebarOrder?: string[]
       sidebarItemOrder?: Record<string, string[]>
+      /** GET で受けた版。付けると1行でまとめて保存し、古ければ409で返す。 */
+      expectedVersion?: number
     }) =>
-      fetchApi<ApiResponse<null>>(
+      fetchApi<ApiResponse<{ version: number } | null>>(
         `/api/settings/features?account_id=${encodeURIComponent(accountId)}`,
         { method: 'PUT', body: JSON.stringify(data) },
       ),

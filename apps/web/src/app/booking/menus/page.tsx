@@ -12,6 +12,7 @@ import {
   api,
   ApiError,
   bookingApi,
+  fetchApi,
   type BookingMenu,
   type BookingRequest,
   type BookingSettings,
@@ -97,6 +98,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   // 直近にコピーした行だけ「コピー済」が出る。
   const [visibilityTarget, setVisibilityTarget] = useState<BookingMenu | null>(null)
   const [updatingVisibility, setUpdatingVisibility] = useState(false)
+  const [visibilityError, setVisibilityError] = useState<string | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const [, setStaff] = useState<BookingStaff[]>([])
   /** メニューID → 担当できるスタッフの表示名。 */
@@ -226,13 +228,39 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
    * 公開状態を変える前に、**何が止まり何が残るかを本文で読ませる。**
    * 既存予約を残したまま新規受付だけを止めるため、確認窓を挟む。
    */
+  /**
+   * 公開切替だけを版付きで送る(PATCH)。PUT は送らなかった項目まで
+   * 既定値で上書きしてしまうため、ここでは使わない。
+   */
+  async function patchMenuVisibility(menu: BookingMenu, nextActive: boolean, expectedVersion: number) {
+    return fetchApi<{ success: boolean; data: { id: string; version: number } }>(
+      `/api/booking/admin/menus/${menu.id}?account_id=${encodeURIComponent(selectedAccountId!)}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ is_active: nextActive, expectedVersion }),
+      },
+    )
+  }
+
   async function toggleVisibility(menu: BookingMenu) {
     if (!selectedAccountId) return
     setUpdatingVisibility(true)
+    setVisibilityError(null)
     try {
-      await bookingApi.updateMenu(selectedAccountId, menu.id, { is_active: menu.is_active ? 0 : 1 })
+      const version = menu.version
+      if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
+        // 版が無ければ最新を読み直してからやり直してもらう。
+        await load()
+        setVisibilityError('最新の状態を読み直しました。もう一度お試しください。')
+        return
+      }
+      await patchMenuVisibility(menu, !menu.is_active, version)
       setVisibilityTarget(null)
+      setVisibilityError(null)
       await load()
+    } catch (error) {
+      // 失敗しても窓は開けたままにし、理由を窓の中で伝える。
+      setVisibilityError(bookingErrorMessage(error, '保存'))
     } finally {
       setUpdatingVisibility(false)
     }
@@ -443,7 +471,8 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
         confirmLabel={visibilityTarget?.is_active ? '新しい予約を止める' : 'お客様の画面へ出す'}
         destructive={Boolean(visibilityTarget?.is_active)}
         busy={updatingVisibility}
-        onCancel={() => setVisibilityTarget(null)}
+        error={visibilityError ?? undefined}
+        onCancel={() => { setVisibilityTarget(null); setVisibilityError(null) }}
         onConfirm={() => { if (visibilityTarget) void toggleVisibility(visibilityTarget) }}
       />
     </div>
