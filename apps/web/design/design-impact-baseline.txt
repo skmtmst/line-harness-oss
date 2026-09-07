@@ -61,6 +61,7 @@ shared-button-importer app/inflow-links/ad-integration.tsx
 shared-button-importer app/inflow-links/detail/page.tsx
 shared-button-importer app/inflow-links/page.tsx
 shared-button-importer app/line-notifications/operator/new/page.tsx
+shared-button-importer app/line-notifications/operator-notification-rules.tsx
 shared-button-importer app/line-notifications/page.tsx
 shared-button-importer app/mileage/action-score-tab.tsx
 shared-button-importer app/mileage/friends/detail/mileage-adjustment-dialog.tsx
