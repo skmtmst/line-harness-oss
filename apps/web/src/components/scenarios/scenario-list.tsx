@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ListPlus } from 'lucide-react'
 import type { Scenario, DeliveryMode, Folder } from '@line-crm/shared'
@@ -67,6 +67,15 @@ export default function ScenarioList({
 }: ScenarioListProps) {
   /** いま掴んでいるシナリオ。落とした先と入れ替える。 */
   const [dragId, setDragId] = useState<string | null>(null)
+  const [showSecondaryColumns, setShowSecondaryColumns] = useState(false)
+
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 1536px)')
+    const syncColumns = () => setShowSecondaryColumns(media.matches)
+    syncColumns()
+    media.addEventListener('change', syncColumns)
+    return () => media.removeEventListener('change', syncColumns)
+  }, [])
 
   /*
    * **ブラウザの `confirm()` を使わない。**
@@ -199,21 +208,28 @@ export default function ScenarioList({
   return (
     <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[900px]">
+        <table className="w-full min-w-[720px] table-fixed">
+          {/*
+            名前列だけが残り幅を受け取り、短い値の列は幅を固定する。
+            名前列に `w-full` を付けると自動レイアウト時に見出しが潰れ、
+            1440px で「シナリオ名」と「配信方式」が重なっていた。
+          */}
+          <colgroup>
+            <col className="w-10" />
+            <col />
+            <col className="w-28" />
+            <col className="w-44" />
+            <col className="w-24" />
+            <col hidden={!showSecondaryColumns} className="w-24" />
+            <col hidden={!showSecondaryColumns} className="w-16" />
+            <col hidden={!showSecondaryColumns} className="w-28" />
+            <col className="w-24" />
+            <col className="w-36" />
+          </colgroup>
           <thead>
             <TableHeadRow>
               <Th className="w-10 px-2" aria-label="並び替え" />
-              {/*
-                名前の桁だけ「余ったぶんを全部取る」形にする。
-                `w-full max-w-0` は表の桁でよく使う組み合わせで、
-                他の桁が中身ぶんの幅を取ったあと、残りをここが受け取る。
-                max-w-0 が無いと、中身の長さで桁が広がって表が横に伸びる。
-
-                以前は 22rem で固定していたが、それだと広い画面でも
-                説明が途中で切れ、狭い画面では他の桁が潰れて
-                「配信方 / 式」「読了 / 済」と縦になっていた。
-              */}
-              <Th className="w-full max-w-0">
+              <Th>
                 シナリオ名
               </Th>
               <Th>
@@ -225,15 +241,15 @@ export default function ScenarioList({
               <Th>
                 購読中
               </Th>
-              <Th>
+              <Th hidden={!showSecondaryColumns}>
                 読了済
               </Th>
-              <Th>
+              <Th hidden={!showSecondaryColumns}>
                 通数
               </Th>
               {/* 配り終えた人をどうするか。一覧で見えないと、シナリオを
                   つないだつもりが繋がっていないことに気づけない。 */}
-              <Th>
+              <Th hidden={!showSecondaryColumns}>
                 終了後
               </Th>
               <Th>
@@ -262,7 +278,7 @@ export default function ScenarioList({
                   桁の幅に上限を付けて、はみ出すぶんは畳む。上限を付けずに
                   line-clamp だけ当てても、桁は中身に合わせて広がる。
                 */}
-                <td className="w-full max-w-0 px-4 py-3">
+                <td className="px-4 py-3">
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-2">
                       <Link
@@ -299,7 +315,7 @@ export default function ScenarioList({
                     onChange={(event) => onMoveFolder?.(s.id, event.target.value)}
                     aria-label={`${s.name}のフォルダ`}
                     disabled={!onMoveFolder}
-                    className="v6-select h-9 w-36 rounded-control border border-hairline bg-canvas text-xs font-semibold text-ink"
+                    className="v6-select h-9 w-36 rounded-control border border-hairline bg-canvas pl-3 text-xs font-semibold text-ink"
                   >
                     <option value="">未分類</option>
                     {folders.map((folder) => (
@@ -325,17 +341,17 @@ export default function ScenarioList({
                     </Link>
                   )}
                 </td>
-                <td className="text-ink px-4 py-3 text-sm tabular-nums whitespace-nowrap">
+                <td hidden={!showSecondaryColumns} className="text-ink px-4 py-3 text-sm tabular-nums whitespace-nowrap">
                   {(s.completedCount ?? 0).toLocaleString('ja-JP')}
                   <span className="text-ink-faint ml-0.5 text-xs">人</span>
                 </td>
-                <td className="text-ink-secondary px-4 py-3 text-sm tabular-nums whitespace-nowrap">
+                <td hidden={!showSecondaryColumns} className="text-ink-secondary px-4 py-3 text-sm tabular-nums whitespace-nowrap">
                   {s.stepCount ?? '—'}
                   {s.stepCount !== undefined && (
                     <span className="text-ink-faint ml-0.5 text-xs">通</span>
                   )}
                 </td>
-                <td className="text-ink-secondary px-4 py-3 text-sm whitespace-nowrap">
+                <td hidden={!showSecondaryColumns} className="text-ink-secondary px-4 py-3 text-sm whitespace-nowrap">
                   {ON_COMPLETE_LABELS[s.onCompleteMode ?? 'pause']}
                 </td>
                 {/* 列が狭いと「配信可」が「配信 / 可」の2行になる。

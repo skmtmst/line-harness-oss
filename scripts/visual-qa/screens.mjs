@@ -602,8 +602,8 @@ export const SCREENS = [
   // ── 機能5 シナリオ配信 ──────────────────────────────────
   { ...SCENARIO, node: 'TC1b1', name: '5-1 シナリオ配信', route: '/scenarios',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #448でオーナー指摘を修正し再判定。** Pencil 1920pxと実装1920pxを上端から並べて照合し、実装1440pxも確認。一致。本文上端に残っていた旧Headerの題・説明・操作枠を外し、トップバー直下を一行の開始案内、「配信を始める方法」、4指標の順にそろえた。フォルダ、検索・絞り込み、5行の一覧、状態と行操作も維持し、1440/1920pxとも横はみ出し0。",
-    verdictSource: "design-reference/scenarios-v6/TC1b1.txt + design-qa/scenarios-v6/TC1b1-{1440,1920}.png + design-qa/scenarios-v6/TC1b1.txt + apps/web/src/app/scenarios/page.tsx",
+    verdictNote: "**2026-09-07 Issue #459でオーナーの検証環境指摘3点を修正し再判定。** Pencil 1920pxと実装1920pxを上端から並べ、実装1440pxも確認。一致。Pencilに無い「並び替えは ⠿ を掴む」の押し口は置かず、行の⠿の説明だけを維持。名前列を残り幅、配信方式・フォルダなどを固定幅にして見出しの重なりを解消し、1440pxでは低優先の読了済・通数・終了後を畳んで主要情報と操作を1画面内に収めた。フォルダ選択の左内側余白は12px。両幅とも横はみ出し0。",
+    verdictSource: "design-reference/scenarios-v6/TC1b1.{png,txt} + design-qa/scenarios-v6/TC1b1-{1440,1920}.png + design-qa/scenarios-v6/TC1b1.txt + apps/web/src/components/scenarios/scenario-list.tsx",
     verdictHead: "8be88c690",
   },
   { ...SCENARIO, node: 'cCB7r', name: '5-1-A シナリオ作成・配信方式', route: '/scenarios/mode?id=scenario-0',
