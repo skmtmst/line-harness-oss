@@ -558,6 +558,24 @@ export type SavedSearchDetail = SavedSearch & {
   match: SavedSearchMatchPreview
 }
 
+/**
+ * 会話詳細のメッセージ1件（`GET /api/chats/:id` の実応答）。
+ * `messages_log` の行をそのまま写す。送信向きは `direction: 'outgoing'` で
+ * 見分け、`senderType` という名の項目は口に存在しない。
+ */
+export interface ChatDetailMessage {
+  id: string
+  direction: 'incoming' | 'outgoing'
+  messageType: string
+  content: string
+  source: string | null
+  originKind: string | null
+  sentByStaffId: string | null
+  sentByStaffName: string | null
+  scenarioName: string | null
+  createdAt: string
+}
+
 /** 緊急停止の対象、影響、停止状態をサーバーと共有する契約。 */
 export type OperationCapability =
   | 'broadcast_dispatch'
@@ -7487,7 +7505,7 @@ export const api = {
       if (params?.beforeId) query.set('beforeId', params.beforeId)
       const qs = query.toString()
       return fetchApi<ApiResponse<Chat & {
-        messages?: { id: string; content: string; senderType: string; createdAt: string }[]
+        messages?: ChatDetailMessage[]
         /** 古い履歴が残っているか。画面は「前のメッセージ」で遡る。 */
         hasMoreMessages?: boolean
       }>>(

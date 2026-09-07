@@ -4793,15 +4793,32 @@ const BOOKING_MENU_ASSIGNED_STAFF = [
   { id: 'bs-1', display_name: '佐々木' },
   { id: 'bs-3', display_name: '高田' },
 ]
+/**
+ * 本番の `GET /api/booking/admin/menus` と同じ器。
+ * `price_mode`・`version`・`effectiveBookingRules` が無いと、
+ * これを根拠に実装した画面で項目漏れになる。
+ * 店舗共通の初期値は BOOKING_SETTINGS(受付60日・締切1440分・取消1440分)。
+ */
+const BOOKING_MENU_STORE_RULES = { bookingWindowDays: 60, cutoffMinutesBefore: 1440, cancelDeadlineMinutesBefore: 1440 }
+const bookingMenuRules = (windowDays, cutoffHours) => ({
+  bookingWindowDays: windowDays ?? BOOKING_MENU_STORE_RULES.bookingWindowDays,
+  cutoffMinutesBefore: cutoffHours == null ? BOOKING_MENU_STORE_RULES.cutoffMinutesBefore : cutoffHours * 60,
+  cancelDeadlineMinutesBefore: BOOKING_MENU_STORE_RULES.cancelDeadlineMinutesBefore,
+  source: {
+    bookingWindowDays: windowDays == null ? 'store' : 'menu',
+    cutoffMinutesBefore: cutoffHours == null ? 'store' : 'menu',
+    cancelDeadlineMinutesBefore: 'store',
+  },
+})
 export const BOOKING_MENUS = [
-  { id: 'bm-1', name: 'トリミング（小型犬）', category_label: 'トリミング', description: 'シャンプー・カット・爪切り', duration_minutes: 105, buffer_after_minutes: 15, base_price: 8400, sort_order: 1, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 24, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 3 },
-  { id: 'bm-2', name: 'トリミング（中型犬）', category_label: 'トリミング', description: 'シャンプー・カット・爪切り', duration_minutes: 150, buffer_after_minutes: 15, base_price: 12600, sort_order: 2, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 24, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 0 },
-  { id: 'bm-3', name: 'シャンプーのみ', category_label: 'トリミング', description: null, duration_minutes: 60, buffer_after_minutes: 10, base_price: 4200, sort_order: 3, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 60, cutoff_hours_before: 12, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 1 },
-  { id: 'bm-4', name: '爪切り', category_label: 'お手入れ', description: null, duration_minutes: 15, buffer_after_minutes: 5, base_price: 1200, sort_order: 4, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 30, cutoff_hours_before: 2, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 0 },
-  { id: 'bm-5', name: '初回相談', category_label: '相談', description: 'はじめての方向け', duration_minutes: 30, buffer_after_minutes: 0, base_price: 0, sort_order: 5, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 12, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 0 },
-  { id: 'bm-6', name: '歯みがき教室', category_label: 'お手入れ', description: null, duration_minutes: 60, buffer_after_minutes: 5, base_price: 2800, sort_order: 6, is_active: 0, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 30, cutoff_hours_before: 6, assigned_staff: [], booking_count_30_days: 0 },
-  { id: 'bm-7', name: '足裏ケア', category_label: 'お手入れ', description: null, duration_minutes: 20, buffer_after_minutes: 5, base_price: 1800, sort_order: 7, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 30, cutoff_hours_before: 2, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 0 },
-  { id: 'bm-8', name: '夏の毛刈り（終了）', category_label: '季節', description: null, duration_minutes: 60, buffer_after_minutes: 10, base_price: 6000, sort_order: 8, is_active: 0, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: null, cutoff_hours_before: null, assigned_staff: [], booking_count_30_days: 0 },
+  { id: 'bm-1', name: 'トリミング（小型犬）', category_label: 'トリミング', description: 'シャンプー・カット・爪切り', duration_minutes: 105, buffer_after_minutes: 15, base_price: 8400, price_mode: 'fixed', version: 1, sort_order: 1, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 24, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 3, effectiveBookingRules: bookingMenuRules(60, 24) },
+  { id: 'bm-2', name: 'トリミング（中型犬）', category_label: 'トリミング', description: 'シャンプー・カット・爪切り', duration_minutes: 150, buffer_after_minutes: 15, base_price: 12600, price_mode: 'fixed', version: 1, sort_order: 2, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 24, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 0, effectiveBookingRules: bookingMenuRules(60, 24) },
+  { id: 'bm-3', name: 'シャンプーのみ', category_label: 'トリミング', description: null, duration_minutes: 60, buffer_after_minutes: 10, base_price: 4200, price_mode: 'fixed', version: 1, sort_order: 3, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 60, cutoff_hours_before: 12, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 1, effectiveBookingRules: bookingMenuRules(60, 12) },
+  { id: 'bm-4', name: '爪切り', category_label: 'お手入れ', description: null, duration_minutes: 15, buffer_after_minutes: 5, base_price: 1200, price_mode: 'fixed', version: 1, sort_order: 4, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 30, cutoff_hours_before: 2, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 0, effectiveBookingRules: bookingMenuRules(30, 2) },
+  { id: 'bm-5', name: '初回相談', category_label: '相談', description: 'はじめての方向け', duration_minutes: 30, buffer_after_minutes: 0, base_price: 0, price_mode: 'free', version: 1, sort_order: 5, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 12, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 0, effectiveBookingRules: bookingMenuRules(60, 12) },
+  { id: 'bm-6', name: '歯みがき教室', category_label: 'お手入れ', description: null, duration_minutes: 60, buffer_after_minutes: 5, base_price: 2800, price_mode: 'fixed', version: 1, sort_order: 6, is_active: 0, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 30, cutoff_hours_before: 6, cancel_deadline_hours_before: null, assigned_staff: [], booking_count_30_days: 0, effectiveBookingRules: bookingMenuRules(30, 6) },
+  { id: 'bm-7', name: '足裏ケア', category_label: 'お手入れ', description: null, duration_minutes: 20, buffer_after_minutes: 5, base_price: 1800, price_mode: 'fixed', version: 1, sort_order: 7, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 30, cutoff_hours_before: 2, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 0, effectiveBookingRules: bookingMenuRules(30, 2) },
+  { id: 'bm-8', name: '夏の毛刈り（終了）', category_label: '季節', description: null, duration_minutes: 60, buffer_after_minutes: 10, base_price: 6000, price_mode: 'fixed', version: 1, sort_order: 8, is_active: 0, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: null, cutoff_hours_before: null, cancel_deadline_hours_before: null, assigned_staff: [], booking_count_30_days: 0, effectiveBookingRules: bookingMenuRules(null, null) },
 ]
 
 /** 予約の店舗共通設定。設計 `W6465r` の受付期間・承認・営業時間。 */
