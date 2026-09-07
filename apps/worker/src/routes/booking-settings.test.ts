@@ -396,7 +396,7 @@ describe('店舗共通の予約設定API', () => {
 
   test('シフト自動生成は12週を上限にし、日付と時刻を検証する', async () => {
     const { app, env } = makeApp(db);
-    const request = (body: unknown) => app.request(
+    const request = async (body: unknown): Promise<Response> => app.request(
       '/api/booking/admin/staff/staff-a/shifts/generate?account_id=account-a',
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
       env,
