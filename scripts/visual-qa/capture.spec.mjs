@@ -344,7 +344,7 @@ for (const width of WIDTHS) {
     }))
     await openCsvImport(page, width, rows)
     await page.getByRole('button', { name: '取り込む内容を確認' }).click()
-    await page.getByRole('button', { name: '登録できる412件を登録' }).click()
+    await page.getByRole('button', { name: '412件を登録する' }).click()
     await expect(page.locator('[data-design-node="op1rh"]')).toBeVisible()
     await expectCsvDialogFitsViewport(page, 'op1rh')
     await expect(page).toHaveScreenshot(`tags-csv-success-${width}.png`, {
@@ -375,7 +375,7 @@ for (const width of WIDTHS) {
     }))
     await openCsvImport(page, width, rows)
     await page.getByRole('button', { name: '取り込む内容を確認' }).click()
-    await page.getByRole('button', { name: '登録できる412件を登録' }).click()
+    await page.getByRole('button', { name: '412件を登録する' }).click()
     await expect(page.locator('[data-design-node="QzRsJ"]')).toBeVisible()
     await expectCsvDialogFitsViewport(page, 'QzRsJ')
     await expect(page).toHaveScreenshot(`tags-csv-partial-${width}.png`, {

@@ -2187,6 +2187,7 @@ export const SCREENS = [
     */
     ...INFLOW, node: 'UIaM7', name: '18-1-E 流入リンクの削除確認',
     route: '/inflow-links/detail?ref=summer-ig', mode: 'page',
+    steps: [{ click: '夏のInstagram投稿の削除を確認' }],
     gap: 'api',
     gapNote: '使用先の一覧・別リンクへの差し替え・アーカイブを返す口がまだ無い。段1（窓）だけでは要件 §4-6 を満たさない',
     variants: [
