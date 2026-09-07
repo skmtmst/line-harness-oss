@@ -36,6 +36,15 @@ const BLOCK_LABEL: Record<Block['kind'], string> = {
   chat_status: '対応状況',
 }
 
+const BLOCK_HELP: Record<Block['kind'], string> = {
+  name: 'LINE登録名・本名・システム表示名',
+  tag: '含む／含まない',
+  field: '項目と値',
+  status_message: 'ひとことに含む文字',
+  created_at: '期間を指定',
+  chat_status: '固定の4状態',
+}
+
 /** 新契約が受け取る OR 条件。選択肢が必要な軸だけ、取得前は無効にする。 */
 const OR_AXES: Array<{
   label: string
@@ -282,115 +291,115 @@ export default function AdvancedSearchDialog({
           </div>
 
           {blocks.map((b, i) => (
-            <section key={`${b.kind}-${i}`} className="mb-2 rounded-[9px] bg-[#F6F6F8] p-3 last:mb-0">
-              <div className="mb-2 flex items-center justify-between">
+            <section
+              key={`${b.kind}-${i}`}
+              className="mb-2 grid items-center gap-3 rounded-[9px] bg-[#F6F6F8] p-3 last:mb-0 sm:grid-cols-12"
+            >
+              <div className="sm:col-span-3">
                 <h3 className="text-ink text-sm font-bold">{BLOCK_LABEL[b.kind]}</h3>
-                <button
-                  type="button"
-                  onClick={() => drop(i)}
-                  aria-label={`${BLOCK_LABEL[b.kind]}の条件を外す`}
-                  className="text-danger text-xs hover:underline"
-                >
-                  外す
-                </button>
+                <p className="text-ink-faint mt-0.5 text-nano">{BLOCK_HELP[b.kind]}</p>
               </div>
 
-              {b.kind === 'name' && (
-                <>
+              <div className="min-w-0 sm:col-span-8">
+                {b.kind === 'name' && (
                   <input
                     value={b.keyword}
                     onChange={(e) => patch(i, { ...b, keyword: e.target.value })}
                     placeholder="キーワードを入力"
                     className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
                   />
-                  {/* 設計は LINE登録名 / 本名 / システム表示名 を選べる。
-                      いま持っているのは display_name だけ。 */}
-                  <p className="text-ink-faint mt-1 text-xs">
-                    LINE登録名から探します。本名とシステム表示名は、まだ検索の対象にできません。
-                  </p>
-                </>
-              )}
+                )}
 
-              {b.kind === 'tag' && (
-                <TagPicker
-                  tags={tags}
-                  include={b.include}
-                  exclude={b.exclude}
-                  onChange={(include, exclude) => patch(i, { ...b, include, exclude })}
-                />
-              )}
-
-              {b.kind === 'field' && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    list="friend-field-names"
-                    value={b.key}
-                    onChange={(e) => patch(i, { ...b, key: e.target.value })}
-                    placeholder="友だち情報欄名を入力"
-                    className="border-hairline rounded-control bg-canvas text-ink min-w-0 flex-1 border px-3 py-2 text-sm"
+                {b.kind === 'tag' && (
+                  <TagPicker
+                    tags={tags}
+                    include={b.include}
+                    exclude={b.exclude}
+                    onChange={(include, exclude) => patch(i, { ...b, include, exclude })}
                   />
-                  <datalist id="friend-field-names">
-                    {fieldNames.map((n) => (
-                      <option key={n} value={n} />
-                    ))}
-                  </datalist>
+                )}
+
+                {b.kind === 'field' && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      list="friend-field-names"
+                      value={b.key}
+                      onChange={(e) => patch(i, { ...b, key: e.target.value })}
+                      placeholder="友だち情報欄名を入力"
+                      className="border-hairline rounded-control bg-canvas text-ink min-w-0 flex-1 border px-3 py-2 text-sm"
+                    />
+                    <datalist id="friend-field-names">
+                      {fieldNames.map((n) => (
+                        <option key={n} value={n} />
+                      ))}
+                    </datalist>
+                    <select
+                      value={b.op}
+                      onChange={(e) => patch(i, { ...b, op: e.target.value as 'eq' | 'ne' })}
+                      className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
+                    >
+                      <option value="eq">等しい</option>
+                      <option value="ne">等しくない</option>
+                    </select>
+                    <input
+                      value={b.value}
+                      onChange={(e) => patch(i, { ...b, value: e.target.value })}
+                      placeholder="値を入力"
+                      className="border-hairline rounded-control bg-canvas text-ink min-w-0 flex-1 border px-3 py-2 text-sm"
+                    />
+                  </div>
+                )}
+
+                {b.kind === 'status_message' && (
+                  <input
+                    value={b.keyword}
+                    onChange={(e) => patch(i, { ...b, keyword: e.target.value })}
+                    placeholder="ひとことに含む文字"
+                    className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
+                  />
+                )}
+
+                {b.kind === 'created_at' && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="date"
+                      value={b.from}
+                      onChange={(e) => patch(i, { ...b, from: e.target.value })}
+                      className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
+                    />
+                    <span className="text-ink-secondary text-sm">〜</span>
+                    <input
+                      type="date"
+                      value={b.to}
+                      onChange={(e) => patch(i, { ...b, to: e.target.value })}
+                      className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
+                    />
+                  </div>
+                )}
+
+                {b.kind === 'chat_status' && (
                   <select
-                    value={b.op}
-                    onChange={(e) => patch(i, { ...b, op: e.target.value as 'eq' | 'ne' })}
+                    value={b.value}
+                    onChange={(e) =>
+                      patch(i, { ...b, value: e.target.value as 'unread' | 'in_progress' | 'resolved' })
+                    }
                     className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
                   >
-                    <option value="eq">等しい</option>
-                    <option value="ne">等しくない</option>
+                    <option value="unread">未対応</option>
+                    <option value="in_progress">対応中</option>
+                    <option value="resolved">対応済み</option>
                   </select>
-                  <input
-                    value={b.value}
-                    onChange={(e) => patch(i, { ...b, value: e.target.value })}
-                    placeholder="値を入力"
-                    className="border-hairline rounded-control bg-canvas text-ink min-w-0 flex-1 border px-3 py-2 text-sm"
-                  />
-                </div>
-              )}
+                )}
+              </div>
 
-              {b.kind === 'status_message' && (
-                <input
-                  value={b.keyword}
-                  onChange={(e) => patch(i, { ...b, keyword: e.target.value })}
-                  placeholder="ひとことに含む文字"
-                  className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
-                />
-              )}
-
-              {b.kind === 'created_at' && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    type="date"
-                    value={b.from}
-                    onChange={(e) => patch(i, { ...b, from: e.target.value })}
-                    className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
-                  />
-                  <span className="text-ink-secondary text-sm">〜</span>
-                  <input
-                    type="date"
-                    value={b.to}
-                    onChange={(e) => patch(i, { ...b, to: e.target.value })}
-                    className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
-                  />
-                </div>
-              )}
-
-              {b.kind === 'chat_status' && (
-                <select
-                  value={b.value}
-                  onChange={(e) =>
-                    patch(i, { ...b, value: e.target.value as 'unread' | 'in_progress' | 'resolved' })
-                  }
-                  className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
-                >
-                  <option value="unread">未対応</option>
-                  <option value="in_progress">対応中</option>
-                  <option value="resolved">対応済み</option>
-                </select>
-              )}
+              <button
+                type="button"
+                onClick={() => drop(i)}
+                aria-label={`${BLOCK_LABEL[b.kind]}の条件を外す`}
+                className="text-danger text-xs hover:underline"
+              >
+                外す
+              </button>
             </section>
           ))}
 
@@ -578,6 +587,7 @@ function TagPicker({
     <div>
       <div className="flex flex-wrap items-center gap-2">
         <select
+          aria-label="タグ名を選ぶ"
           value={pick}
           onChange={(e) => {
             const id = e.target.value
