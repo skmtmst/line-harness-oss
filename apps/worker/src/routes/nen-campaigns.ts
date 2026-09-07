@@ -182,8 +182,9 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireRole('owner'
   const buttonLabel = typeof body.buttonLabel === 'string' ? body.buttonLabel.trim() : '';
   const buttonUrl = typeof body.buttonUrl === 'string' ? body.buttonUrl.trim() : '';
   const imageUrl = typeof body.imageUrl === 'string' ? body.imageUrl.trim() : '';
-  const afterActions = parseNenCampaignAfterActions(body.afterActions);
-  if (!Array.isArray(body.afterActions) || afterActions.length !== body.afterActions.length) {
+  const afterActions = body.afterActions === undefined ? [] : parseNenCampaignAfterActions(body.afterActions);
+  if (body.afterActions !== undefined
+      && (!Array.isArray(body.afterActions) || afterActions.length !== body.afterActions.length)) {
     return c.json({ success: false, error: 'Invalid campaign actions' }, 400);
   }
   if (!body.title.trim() || body.title.trim().length > 120 || body.bodyText.length > 1500
