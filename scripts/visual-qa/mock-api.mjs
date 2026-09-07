@@ -46,12 +46,7 @@ import {
   MEDIA_FOLDERS,
   MEDIA_ITEMS,
   MEDIA_QUOTA,
-  FRIEND_ADD_EVENTS,
   FRIEND_ADD_RUNS,
-  FRIEND_ADD_LIFECYCLE_DRAFT,
-  FRIEND_ADD_LIFECYCLE_PUBLISHED,
-  FRIEND_ADD_LIFECYCLE_TEST_RESULT,
-  FRIEND_ADD_LIFECYCLE_VALIDATION,
   AUTO_REPLIES, AUTO_REPLY_FOLDERS, AUTO_REPLY_RUNS, AUTO_REPLY_CONFLICT_SUMMARY,
   AUTO_REPLY_PUBLISH_CONFLICTS, AUTO_REPLY_PUBLISH_DRAFT,
   AUTO_REPLY_PUBLISH_RESULT, AUTO_REPLY_PUBLISH_TEST, AUTO_REPLY_PUBLISH_VALIDATION,
@@ -965,10 +960,6 @@ const SHAPES = {
   '/api/rich-menu-groups/external': RICH_MENU_EXTERNAL,
   '/api/rich-menu-groups/tap-stats': RICH_MENU_TAP_STATS,
 
-  /* 友だち追加時配信の公開前確認（PR #597）。契約と同じ形を返す。 */
-  '/api/friend-add-routing/draft': FRIEND_ADD_LIFECYCLE_DRAFT,
-  '/api/friend-add-routing/conflicts': { conflicts: [] },
-
 }
 
 /**
@@ -1075,15 +1066,6 @@ function visualQaWriteBody(method, pathname) {
   }
   if (method === 'POST' && /^\/api\/webhooks\/outgoing\/[^/]+\/test$/.test(pathname)) {
     return OUTGOING_WEBHOOK_TEST_RESULT
-  }
-  if (method === 'POST' && pathname === '/api/friend-add-routing/validate') {
-    return FRIEND_ADD_LIFECYCLE_VALIDATION
-  }
-  if (method === 'POST' && pathname === '/api/friend-add-routing/draft/test') {
-    return FRIEND_ADD_LIFECYCLE_TEST_RESULT
-  }
-  if (method === 'POST' && pathname === '/api/friend-add-routing/publish') {
-    return FRIEND_ADD_LIFECYCLE_PUBLISHED
   }
   if (method === 'POST' && pathname === '/api/saved-searches/preview') {
     return FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL
@@ -1801,21 +1783,6 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const reminder = REMINDERS.find((item) => item.id === reminderSteps[1])
     return { success: true, data: reminder ? reminderStepsOf(reminder) : [] }
   }
-  if (pathname === '/api/friend-add-routing/events') {
-    const kind = query.get('kind')
-    const attributionStatus = query.get('attribution_status')
-    const routingStatus = query.get('routing_status')
-    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
-    const limit = Number.isFinite(requestedLimit) && requestedLimit >= 0
-      ? requestedLimit
-      : FRIEND_ADD_EVENTS.items.length
-    const items = FRIEND_ADD_EVENTS.items
-      .filter((item) => !kind || item.kind === kind)
-      .filter((item) => !attributionStatus || item.attributionStatus === attributionStatus)
-      .filter((item) => !routingStatus || item.routingStatus === routingStatus)
-      .slice(0, limit)
-    return { success: true, data: { ...FRIEND_ADD_EVENTS, items } }
-  }
   if (pathname === '/api/friend-add-runs') {
     const status = query.get('status')
     const ruleId = query.get('rule_id')
@@ -1962,43 +1929,6 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     いま入っている人。34-1「はじめの設定」の最終確認が役割で言い分けるので、
     一覧の形（items/total）ではなく 1 人ぶんを返す。
   */
-  /*
-    友だち追加時の振り分け。34-1 の段3・段4 がこれを読む。
-    下書きはあるが公開していない——設計 `RAW35` が「止まっています」で
-    描いている状態を、そのまま固定データにする。
-  */
-  if (pathname === '/api/friend-add-routing')
-    return {
-      success: true,
-      data: {
-        configured: true,
-        routing: {
-          firstTime: { scenarioId: 'visual-qa-scenario', actions: [], timing: 'immediate' },
-          returning: { scenarioId: null, actions: [], mode: 'none', startPosition: 'start' },
-          criteria: { firstTime: 'never_added' },
-        },
-        scenarios: [{ id: 'visual-qa-scenario', name: '新規登録 7日間フォロー' }],
-        tags: [],
-      },
-    }
-  if (pathname === '/api/friend-add-routing/draft')
-    return {
-      success: true,
-      data: {
-        accountId: 'visual-qa-account',
-        versionId: 'visual-qa-draft',
-        versionNumber: 1,
-        status: 'draft',
-        routing: {
-          firstTime: { scenarioId: 'visual-qa-scenario', actions: [], timing: 'immediate' },
-          returning: { scenarioId: null, actions: [], mode: 'none', startPosition: 'start' },
-          criteria: { firstTime: 'never_added' },
-        },
-        lastTestStatus: null,
-        lastTestedAt: null,
-        publishedAt: null,
-      },
-    }
   if (pathname === '/api/staff/me')
     return {
       success: true,
