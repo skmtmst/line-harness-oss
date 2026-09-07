@@ -3,10 +3,11 @@ export type BookingMenuBaseDraft = {
   durationMinutes: unknown
   bufferAfterMinutes?: unknown
   sortOrder?: unknown
+  assignedStaffCount: unknown
 }
 
-/** Worker と同じ基準で、保存前に直せる入力不備を画面内へ出す。 */
-export function bookingMenuBaseError(draft: BookingMenuBaseDraft): string | null {
+/** 作成画面と編集窓で同じ基準を使い、保存前に直せる入力不備を出す。 */
+export function bookingMenuError(draft: BookingMenuBaseDraft): string | null {
   if (typeof draft.name !== 'string' || !draft.name.trim()) {
     return 'メニュー名を入力してください'
   }
@@ -24,6 +25,10 @@ export function bookingMenuBaseError(draft: BookingMenuBaseDraft): string | null
   const sortOrder = draft.sortOrder === undefined ? 0 : Number(draft.sortOrder)
   if (!Number.isInteger(sortOrder) || sortOrder < 0 || sortOrder > 1_000_000) {
     return '並び順は0〜1000000の整数で入力してください'
+  }
+  const assignedStaffCount = Number(draft.assignedStaffCount)
+  if (!Number.isInteger(assignedStaffCount) || assignedStaffCount < 1) {
+    return '担当できる人を1人以上選んでください。0人だと予約画面に枠が出ません'
   }
   return null
 }
