@@ -2612,6 +2612,7 @@ export const SCREENS = [
     verdict: 'match',
     verdictNote: '**2026-09-07 Issue #403 で実APIの自動繰上げ取り込み後に再撮影し、一致。** #351 / PR #1168 の席解放・案内期限切れを再試行台帳へ積む処理と、定期処理から先頭のキャンセル待ちへ期限付き案内する処理を確認した。これにより、前回唯一出せなかった青い自動化案内を設計と同じ位置・文言で表示した。3102/8789 の1440px・1920pxはいずれも横はみ出し0。一覧、4つの判断帯、検索、並び順、絞り込み、行操作に後退なし。設計との差分として検出される人数・日付・店舗名は撮影用固定データの値で、画面構造の差ではない。',
     verdictSource: 'events-v6/ugP5y.txt + ugP5y-{1440,1920}.png + apps/worker/src/services/event-waitlist.ts',
+    verdictHead: 'ea4284f42',
   },
   { ...EVENT, node: 'MKrPY', name: '29-1-A イベントをつくる', route: '/events/new', verdict: 'match', verdictNote: '**2026-09-06 Issue #242 / PR #1015 / UI HEAD c31b32f90 を3105/8792で最終照合して一致。** 概要と同じ画面で最初の開催日・開始・所要時間・定員を入力し、イベント本体と予約枠を続けて保存する。右側に入力連動のLINEプレビュー、満席時のキャンセル待ち、承認制、前日通知を配置した。保存途中で枠だけ失敗してもイベントを重複作成しない。1440・1920pxとも横スクロール0。', verdictSource: 'events-v6/MKrPY.txt + 2026-09-06 1440/1920px screenshots', verdictHead: 'c31b32f90' },
   {
