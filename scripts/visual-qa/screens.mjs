@@ -2228,7 +2228,15 @@ export const SCREENS = [
   // ── 機能22 写真審査 ─────────────────────────────────────
   {
     ...PHOTO, node: 'Qu6Vk', name: '22-1 写真審査',
-    states: { apis: ['**/api/nen-members/photos?*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    states: { apis: ['**/api/nen-members/photos?*', '**/api/nen-members/photos/review-metrics?*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    variants: [{
+      suffix: '-selected',
+      steps: [
+        { click: '選ぶ', role: 'checkbox', nth: 0, after: 100 },
+        { click: '選ぶ', role: 'checkbox', nth: 1, after: 100 },
+        { click: '選ぶ', role: 'checkbox', nth: 2, after: 100 },
+      ],
+    }],
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-07 Issue #235 / PR #1044 / UI HEAD 98588d0275 を3105/8792で撮影・目視判定。構造一致・データ待ち。** 実運用の写真一覧と審査用派生画像は接続済み。設計順の4タブ、4指標、説明帯、選択と一括操作、並べる／一枚表示、4列カード、390pxの右欄をそろえた。通常・読込・空・失敗・権限不足の全12枚を1440/1920pxで確認し、横はみ出し0。残る差は審査時間集計・一覧向け注意候補・一括審査APIで、取れない値を0や作り値にせず `—` と接続条件を表示する。AIは確認順の補助に限定し、通す・戻す・公開は必ず人が決めるため、旧設計の自動公開表現には戻さない。',
     verdictSource: 'photos-v6/Qu6Vk-1920.png + photos-v6/Qu6Vk-{normal,loading,empty,error,forbidden}.txt + Pencil node Qu6Vk',
@@ -2255,7 +2263,7 @@ export const SCREENS = [
     mode: 'viewport', height: 1080,
     /* 名前が三度変わった。#535 で「見送る」→「理由を選んで戻す」。
        設計の言葉に寄せたもので、実装の不具合ではない。 */
-    steps: [{ click: '理由を選んで戻す', scope: 'main' }],
+    steps: [{ qaOpen: 'N2J629' }],
     verdictHead: '31293424',
   },
   {
