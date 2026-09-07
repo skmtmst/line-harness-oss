@@ -6,6 +6,7 @@ import { ArrowDown, ArrowUp, Palette, Pencil, Trash2 } from 'lucide-react'
 import TagEditorV4 from '@/components/friend-fields/tag-editor-v4'
 import TagsPageV4, { FRIEND_ATTRIBUTES_QA_GROUPS, FRIEND_ATTRIBUTES_QA_TAGS } from '@/components/friend-fields/tags-page-v4'
 import { DeleteDialog } from '@/components/friend-fields/edit-tag-page-v4'
+import type { TagDependencies } from '@/lib/api'
 import FolderEditor from '@/app/tags/folders/new/page'
 import { TextArea, TextInput } from '@/components/shared/form-controls'
 import SearchField from '@/components/shared/search-field'
@@ -27,6 +28,34 @@ const EXISTING_TAG = {
   mileageMultiplierBps: 15000,
   mileageMultiplierPriority: 3,
   isStarred: false,
+}
+
+/*
+ * 削除確認の `delete` 状態に出す参照件数の固定表示。実画面では
+ * `api.tags.dependencies` の実値を渡す。絵がぶれないよう、
+ * 変更前の固定表示と同じ数(参照3件・自動1件・128人)にしている。
+ */
+const QA_TAG_DEPENDENCIES: TagDependencies = {
+  tag: { id: 'qa-existing', name: 'NEN会員（定期）', version: 1, status: 'active' },
+  friendCount: 128,
+  referenceCounts: {
+    broadcasts: 2, forms: 1, scenarios: 1, autoReplies: 0, savedSearches: 0,
+    automations: 0, commonActions: 0, richMenus: 0, templates: 0, webinars: 0,
+    reminders: 0, entryRoutes: 0, trackedLinks: 0, bookingMenus: 0,
+    affiliateOffers: 0, events: 0, analyticsFunnels: 0, friendAddSettings: 0,
+  },
+  references: [],
+  linkedActions: [],
+  pendingRunCount: 0,
+  mileageImpact: {
+    configured: false, self: 0, referrer: 0, multiplier: null,
+    priority: 3, reapplyPolicy: 'first_only', historyPreserved: true,
+  },
+  blockingReferenceCount: 0,
+  canArchive: true,
+  canDelete: true,
+  checkedAt: '2026-09-07T00:00:00.000Z',
+  revision: 'qa',
 }
 
 const LINKED_ACTIONS = [
@@ -119,7 +148,7 @@ function VisualQaPageInner() {
   if (state.startsWith('overlays-')) return <OverlaysVisualQa state={state} />
   if (state === 'list') return <TagsPageV4 fixture={{ items: FRIEND_ATTRIBUTES_QA_TAGS, groups: FRIEND_ATTRIBUTES_QA_GROUPS }} />
   if (state === 'folder') return <FolderEditor />
-  if (state === 'delete') return <><TagsPageV4 fixture={{ items: FRIEND_ATTRIBUTES_QA_TAGS, groups: FRIEND_ATTRIBUTES_QA_GROUPS }} /><DeleteDialog tag={EXISTING_TAG} deleting={false} initialConfirmation={EXISTING_TAG.name} onCancel={() => {}} onDelete={() => {}} /></>
+  if (state === 'delete') return <><TagsPageV4 fixture={{ items: FRIEND_ATTRIBUTES_QA_TAGS, groups: FRIEND_ATTRIBUTES_QA_GROUPS }} /><DeleteDialog tag={EXISTING_TAG} dependencies={QA_TAG_DEPENDENCIES} dependenciesStatus="ready" deleting={false} initialConfirmation={EXISTING_TAG.name} onCancel={() => {}} onDelete={() => {}} /></>
 
   const edit = state === 'edit' || state === 'retroactive'
   const linked = state === 'linked' || state === 'drawer' || edit

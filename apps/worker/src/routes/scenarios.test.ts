@@ -4,6 +4,7 @@ import type { Env } from '../index.js';
 
 const accountAccessMocks = vi.hoisted(() => ({
   canAccessAllLineAccounts: vi.fn(),
+  getVisibleLineAccountScope: vi.fn(),
 }));
 
 vi.mock('../services/account-access.js', () => accountAccessMocks);
@@ -56,11 +57,11 @@ function makeScenarioDb(rows: ScenarioRow[]) {
         },
         async all<_T>() {
           calls.push({ sql, binds: bound });
-          if (/FROM scenarios s\b/i.test(sql) && /line_account_id IS NULL/i.test(sql)) {
+          if (/FROM scenarios s\b/i.test(sql)) {
             const [lineAccountId] = bound as [string];
-            const filtered = rows.filter(
-              (r) => r.line_account_id == null || r.line_account_id === lineAccountId,
-            );
+            const includeGlobal = /line_account_id IS NULL/i.test(sql);
+            const filtered = rows.filter((r) =>
+              r.line_account_id === lineAccountId || (includeGlobal && r.line_account_id == null));
             return { results: filtered };
           }
           return { results: [] };
@@ -72,17 +73,21 @@ function makeScenarioDb(rows: ScenarioRow[]) {
   return { db, calls };
 }
 
-function setupApp(db: D1Database) {
+function setupApp(
+  db: D1Database,
+  permissionKeys: string[] = ['/scenarios'],
+  role: 'owner' | 'admin' | 'staff' = 'owner',
+) {
   const app = new Hono<Env>();
   app.use('*', async (c, next) => {
     c.env = { DB: db } as Env['Bindings'];
     c.set('staff', {
       id: 'owner-1',
       name: '管理者',
-      role: 'owner',
+      role,
       readOnly: false,
       tenantId: 'tenant-1',
-      permissionKeys: ['/scenarios'],
+      permissionKeys,
       assignedLineAccountId: null,
       canAccessDescendantAccounts: true,
     });
@@ -106,6 +111,10 @@ const rowBase = {
 beforeEach(() => {
   for (const fn of Object.values(dbMocks)) fn.mockReset();
   accountAccessMocks.canAccessAllLineAccounts.mockReset().mockResolvedValue(true);
+  accountAccessMocks.getVisibleLineAccountScope.mockReset().mockResolvedValue({
+    allowedAccountIds: ['acc-1'],
+    canSeeUnassigned: true,
+  });
 });
 
 describe('GET /api/scenarios?lineAccountId=X', () => {
@@ -167,6 +176,32 @@ describe('GET /api/scenarios?lineAccountId=X', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { success: boolean; data: unknown[] };
     expect(body.data).toEqual([]);
+  });
+
+  test('担当外アカウントの一覧は存在を隠す', async () => {
+    const { db } = makeScenarioDb([]);
+    const res = await setupApp(db).request('/api/scenarios?lineAccountId=acc-other');
+    expect(res.status).toBe(404);
+  });
+
+  test('アカウント限定担当には全店共通シナリオを返さない', async () => {
+    accountAccessMocks.getVisibleLineAccountScope.mockResolvedValue({
+      allowedAccountIds: ['acc-1'], canSeeUnassigned: false,
+    });
+    const { db } = makeScenarioDb([
+      { id: 's-global', name: 'global', line_account_id: null, ...rowBase },
+      { id: 's-acc1', name: 'acc1', line_account_id: 'acc-1', ...rowBase },
+    ]);
+    const res = await setupApp(db).request('/api/scenarios?lineAccountId=acc-1');
+    const body = await res.json() as { data: Array<{ id: string }> };
+    expect(body.data.map((item) => item.id)).toEqual(['s-acc1']);
+  });
+
+  test('閲覧権限がない利用者には一覧を返さない', async () => {
+    const { db } = makeScenarioDb([]);
+    const res = await setupApp(db, [], 'staff').request('/api/scenarios');
+    expect(res.status).toBe(403);
+    expect(dbMocks.getScenarios).not.toHaveBeenCalled();
   });
 });
 
