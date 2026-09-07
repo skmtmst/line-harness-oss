@@ -161,12 +161,20 @@ export function OperatorDropdown({
         onClick={() => setOpen((now) => !now)}
         className={`border-hairline rounded-control bg-canvas text-ink flex h-10 w-full items-center gap-1.5 whitespace-nowrap border px-2.5 text-xs ${open ? 'border-accent' : ''}`}
       >
-        {compact && current && current.id !== 'all'
-          ? <OperatorMark option={current} />
-          : <span className="text-ink-faint">{label}：</span>}
-        <span className="truncate font-medium">
-          {compact ? label : current?.name ?? (allowAll ? 'すべて' : '未割り当て')}
-        </span>
+        {compact ? (
+          <>
+            {current && current.id !== 'all' ? <span className="2xl:hidden"><OperatorMark option={current} /></span> : null}
+            <span className="font-medium 2xl:hidden">{label}</span>
+            <span className="hidden truncate font-medium 2xl:inline">
+              {label}：{current?.name ?? (allowAll ? 'すべて' : '未割り当て')}
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="text-ink-faint">{label}：</span>
+            <span className="truncate font-medium">{current?.name ?? (allowAll ? 'すべて' : '未割り当て')}</span>
+          </>
+        )}
         <span className="text-ink-faint ml-auto"><Chevron open={open} /></span>
       </button>
       {open ? (
