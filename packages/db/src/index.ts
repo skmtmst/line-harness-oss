@@ -83,6 +83,7 @@ export * from './common-vars';
 export * from './site-tracking';
 export * from './funnels';
 export * from './login-audit';
+export * from './access-audit';
 export * from './analytics';
 export * from './analytics-events';
 export * from './analytics-event-types';

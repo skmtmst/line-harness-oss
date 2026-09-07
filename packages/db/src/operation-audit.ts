@@ -1,3 +1,5 @@
+import { recordAuditEvent } from './access-audit.js';
+
 /**
  * 操作の記録。
  *
@@ -41,6 +43,7 @@ export async function recordOperation(
   db: D1Database,
   input: RecordOperationInput,
 ): Promise<void> {
+  const id = crypto.randomUUID();
   try {
     await db
       .prepare(
@@ -49,7 +52,7 @@ export async function recordOperation(
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
-        crypto.randomUUID(),
+        id,
         input.targetKind,
         input.targetId ?? null,
         input.action,
@@ -60,6 +63,36 @@ export async function recordOperation(
       .run();
   } catch (err) {
     console.error('recordOperation error:', err);
+  }
+  try {
+    const actor = input.actorId
+      ? await db.prepare(
+        `SELECT tenant_id, role, access_level FROM staff_members WHERE id = ?`,
+      ).bind(input.actorId).first<{
+        tenant_id: string | null;
+        role: string;
+        access_level: string;
+      }>()
+      : null;
+    await recordAuditEvent(db, {
+      sourceKind: 'operation_audit',
+      sourceId: id,
+      tenantId: actor?.tenant_id,
+      category: 'business',
+      actorPrincipalId: input.actorId,
+      actorRole: actor?.access_level === 'read_only'
+        ? 'view_only'
+        : actor?.role === 'owner' || actor?.role === 'admin' ? 'administrator'
+          : actor?.role === 'staff' ? 'operations' : null,
+      action: `operation.${input.targetKind}.${input.action}`,
+      targetKind: input.targetKind,
+      targetId: input.targetId,
+      result: 'success',
+      // detail は旧用途で個人情報を含み得るため、共通台帳へは移さない。
+      retentionClass: input.friendId ? 'personal_data' : 'general',
+    });
+  } catch (err) {
+    console.error('audit_events operation insert failed:', err instanceof Error ? err.name : 'unknown');
   }
 }
 
