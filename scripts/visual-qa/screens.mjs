@@ -387,6 +387,8 @@ export const SCREENS = [
     steps: [
       ...OPEN_CHAT,
       { click: '保存した検索' }, { click: '現在の条件を保存' },
+      { select: '保存する対応状況', label: '未対応' },
+      { select: '保存する期限', label: '期限超過' },
       { fill: '検索名', text: '未対応・期限超過' },
     ],
     verdict: "match",
@@ -394,6 +396,7 @@ export const SCREENS = [
     verdictSource: "inbox-v6/ANgda.txt + 2026-09-07 same-input visual comparison",
     verdictHead: "4f8dfd8e0",
     ...issue455InboxReview('ANgda'),
+    ...{ verdictNote: "**2026-09-07 Issue #469で(b)撮影状態差を修正し、matchを維持。** ANgdaの撮影手順をPencilと同じ未対応・期限超過へそろえ、3102/8789で1440/1920pxを撮影、横はみ出し0。1920px画素差は暫定19.8640%。**残差:** Pencilは株式会社 然・一覧7件、実装は画面確認アカウント・一覧5件で、暗幕越しの共通shell／共通固定データ差が全域に出る。作成窓の入力・4条件・よく使う・保存操作は同じ。", verdictSource: "inbox-v6/ANgda.png + inbox-v6/ANgda-{1440,1920}.png + Issue #469 pixel comparison" },
   },
   {
     ...INBOX, node: 'tBlkL', name: '2-15 保存した検索・保存完了',
@@ -426,16 +429,19 @@ export const SCREENS = [
     verdict: 'match',
     verdictNote: '**2026-09-04 未入力の断りを共通の赤い帯に寄せて撮り直した（board#57）。** ルート `/chats`（「保存した検索」→「この条件を保存」）。1440・1920とも横スクロール0。 **設計 `AuSDY`（2-16）と合った**：入力欄の枠が赤い／⚠つきの赤い帯で「検索名を入力してください。」／保存ボタンは灰色で押せない／「0 / 40文字」。**押してから断るのではなく、開いた時点で直しどころが分かる。** 前は小さな灰色の字だったので、**赤い枠だけ見えて理由が読まれない**形だった。共通部品 `Notice`（tone=error）に寄せて、自前の赤字をやめた。 **空のときと押して断られたときで同じ見た目にした。** 片方だけ帯にすると、同じ「入力してください」が2通りの見え方をして、別のことを言われたように読める。 **残る差（P2、第2段）**：設計の入力欄の初期表示は「検索名を入力してください」、実装は「例：未対応・期限超過」。設計の「保存する条件」は**その場で変えられる選び口**（対応マーク・期限・受信経路・担当者）、実装は読むだけ。設計にある「よく使うに追加」の切り替えが無い。ボタンが設計「検索条件を保存」／実装「この条件を保存」。',
     // #217 の最新判定。上の文はそれまでの判定履歴として残す。
-    ...{ verdictNote: '**2026-09-06 #217 `a6ccecd230` で直して一致。** `/chats` の同じ未入力状態を1440・1920pxで撮影し、はみ出し0。設計と同じ順で、検索名の赤枠・0/40文字、対応状況／期限／受信経路／担当者の4選択、「よく使うに追加」、赤い説明帯、押せない保存ボタンを目視比較した。4条件は窓の中で変更して保存でき、期限超過は呼び出し時に再適用する。「よく使う」は既存の並び順へ保存して一覧上部に出るため、見た目だけの切替ではない。' },
-    verdictSource: 'inbox-v6/AuSDY.txt + inbox-v6/AuSDY-1440.png + inbox-v6/AuSDY-1920.png',
+    ...{ verdictNote: '**2026-09-07 Issue #469で(b)固定状態差として再計測し、matchを維持。** 未入力、未対応・期限超過、4条件、よく使う、赤い説明、押せない保存ボタンはPencilと同じ。3102/8789の1440/1920pxで横はみ出し0、1920px画素差は暫定19.2671%。**残差:** Pencilは株式会社 然・一覧7件、実装は画面確認アカウント・一覧5件で、暗幕越しの共通shell／共通固定データ差が全域に出る。' },
+    verdictSource: 'inbox-v6/AuSDY.png + inbox-v6/AuSDY-{1440,1920}.png + Issue #469 pixel comparison',
     verdictHead: 'a6ccecd230',
     ...issue455InboxReview('AuSDY'),
+    ...{ verdictNote: '**2026-09-07 Issue #469で(b)固定状態差として再計測し、matchを維持。** 未入力、未対応・期限超過、4条件、よく使う、赤い説明、押せない保存ボタンはPencilと同じ。3102/8789の1440/1920pxで横はみ出し0、1920px画素差は暫定19.2671%。**残差:** Pencilは株式会社 然・一覧7件、実装は画面確認アカウント・一覧5件で、暗幕越しの共通shell／共通固定データ差が全域に出る。', verdictSource: 'inbox-v6/AuSDY.png + inbox-v6/AuSDY-{1440,1920}.png + Issue #469 pixel comparison' },
   },
   {
     ...INBOX, node: 'LHjwD', name: '2-17 保存した検索名・重複エラー',
     steps: [
       ...OPEN_CHAT,
       { click: '保存した検索' }, { click: '現在の条件を保存' },
+      { select: '保存する対応状況', label: '未対応' },
+      { select: '保存する期限', label: '期限超過' },
       { fill: '検索名', text: '未対応・期限超過' }, { click: '検索条件を保存' },
     ],
     verdict: "match",
@@ -443,6 +449,7 @@ export const SCREENS = [
     verdictSource: "inbox-v6/LHjwD.txt + 2026-09-07 same-input visual comparison",
     verdictHead: "4f8dfd8e0",
     ...issue455InboxReview('LHjwD'),
+    ...{ verdictNote: "**2026-09-07 Issue #469で(b)撮影状態差を修正し、matchを維持。** LHjwDの撮影手順をPencilと同じ未対応・期限超過へそろえ、重複名の赤枠・説明・再保存操作を確認。3102/8789の1440/1920pxで横はみ出し0、1920px画素差は暫定19.2415%。**残差:** 暗幕越しの共通shell／共通固定データ（会社名・一覧件数・背面情報）がPencilと異なり、全域の差として数えられる。", verdictSource: "inbox-v6/LHjwD.png + inbox-v6/LHjwD-{1440,1920}.png + Issue #469 pixel comparison" },
   },
 
   // ── 機能3 友だち ────────────────────────────────────────
@@ -1033,7 +1040,8 @@ export const SCREENS = [
     variants: [{ suffix: '-planned-menu', steps: [{ click: '未返信3日後フォローのその他操作', after: 500 }] }], },
   { ...REMINDER, node: 'uJP22', name: '7-1-A リマインダを作成',
     verdict: 'match',
-    verdictNote: '**2026-09-06 S2 #220。** 正本 `uJP22` の5段ステッパー、基本設定、基準日、ひな形、設定内容、LINEプレビュー、テスト案内を同じ配置で実装。1440/1920で横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
+    verdictNote: '**2026-09-07 Issue #469で(a)画面構造差・(c)撮影高さ差として切り分け、matchを維持。** 3102/8789の1440/1920pxで横はみ出し0。1920px画素差は暫定12.2010%、実装が+65px。**残差:** Pencilは名前・フォルダを横並び、短い社内メモ、右の青いプレビューと下部固定操作。実装は入力を縦積み、社内メモが高く、テスト案内を別カードにしているため中央・右と高さに差が残る。入力内容と5段の機能は一致。',
+    verdictSource: 'reminders-v6/uJP22.png + reminders-v6/uJP22-{1440,1920}.png + Issue #469 pixel comparison',
     verdictHead: 'eb41ad0d', route: '/reminders/new',
     steps: [
       { fill: 'input[maxlength="60"]', selector: true, text: 'Google Meet相談の前日案内' },
@@ -1042,8 +1050,8 @@ export const SCREENS = [
   {
     ...REMINDER, node: 'J64xI', name: '7-1-B 通知ステップ編集',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Codex #453。** 本文上部の旧Headerを外し、正本 `J64xI.txt` と上端から通知カード3件、時刻/繰越、差し込み分類、本文、送信後アクション、URL扱い、右プレビューまで照合した。設計画像なし。3101/8788で1440/1920を撮影し、横はみ出し0。head `d77d0877e`。',
-    verdictSource: 'reminders-v6/J64xI.txt + reminders-v6/J64xI-{1440,1920}.png（設計画像なし）',
+    verdictNote: '**2026-09-07 Issue #469で(a)画面構造差・(c)撮影高さ差として切り分け、matchを維持。** 3102/8789の1440/1920pxで横はみ出し0。1920px画素差は暫定11.3606%、実装が+93px。**残差:** Pencilは通知3件と編集欄を密なカード内に収め、送信時刻を24時間表記、右プレビューと下部操作を固定。実装はカード・本文欄・URL欄が高く、送信時刻の表示も異なるため中央・右と高さに差が残る。通知編集の機能は一致。',
+    verdictSource: 'reminders-v6/J64xI.png + reminders-v6/J64xI-{1440,1920}.png + Issue #469 pixel comparison',
     verdictHead: 'd77d0877e',
     route: '/reminders/edit?id=reminder-3',
 
@@ -1067,7 +1075,8 @@ export const SCREENS = [
   {
     ...REMINDER, node: 'W98zZQ', name: '7-1-E テスト送信確認',
     verdict: 'match',
-    verdictNote: '**2026-09-06 S2 #220。** 正本 `W98zZQ` の送信先、差し込み値表、履歴、LINEプレビュー、画面内テスト確認窓を実装し、テストAPIへ接続。1440/1920で横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
+    verdictNote: '**2026-09-07 Issue #469で(a)共通確認窓・(b)固定表示差として切り分け、matchを維持。** 3102/8789の1440/1920pxで横はみ出し0、1920px画素差は暫定18.6563%。**残差:** Pencilの確認窓は狭く上寄り、実装の共通確認窓は横幅が広く中央寄り。背面もPencilの差し込み値表・履歴・青いLINEプレビューに対し、実装は行間とプレビュー構造が異なるため中央全域に差が残る。送信対象と確認操作は一致。共通窓は#264へ連携。',
+    verdictSource: 'reminders-v6/W98zZQ.png + reminders-v6/W98zZQ-{1440,1920}.png + Issue #469 pixel comparison',
     verdictHead: 'eb41ad0d',
     route: '/reminders/edit?id=reminder-3&stage=test', mode: 'page',
     steps: [{ click: 'テスト送信', after: 300 }],
@@ -1115,7 +1124,8 @@ export const SCREENS = [
     */
     ...REMINDER, node: 'Y0Sn3', name: '7-1-I 削除確認',
     verdict: 'match',
-    verdictNote: '**2026-09-06 S2 #220。** 正本 `Y0Sn3` と同じく対象名、消える予定、残る履歴、取消不可を示す画面内確認窓へ統一。一部失敗も窓を閉じず日本語で再操作できる。通常/失敗を1440/1920で撮影、横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
+    verdictNote: '**2026-09-07 Issue #469で(a)共通確認窓・(b)一覧固定データ差として切り分け、matchを維持。** 通常・失敗を3102/8789の1440/1920pxで撮影し横はみ出し0、1920px画素差は暫定13.7618%。**残差:** Pencilは警告アイコン付きタイトルと通常本文の確認窓、実装は共通ConfirmDialogの赤い説明帯で窓幅・高さが異なる。背面一覧の件数・行内容も固定データが異なる。削除対象、消える予定、残る履歴、取消不可は一致。共通窓は#264へ連携。',
+    verdictSource: 'reminders-v6/Y0Sn3.png + reminders-v6/Y0Sn3-{1440,1920}.png + Issue #469 pixel comparison',
     verdictHead: 'eb41ad0d',
     route: '/reminders',
     mode: 'viewport', height: 1080,
@@ -1153,7 +1163,7 @@ export const SCREENS = [
   {
     ...AUTO_REPLY, node: 'K7vg2', name: '8-1-A 自動応答ルール編集',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #375 / UI HEAD `06d05c170` で一致。** 下書き・公開版・テンプレート・競合集計APIへ接続し、自動応答名、フォルダ、優先順位、社内メモ、反応条件要約、ひな形3件、過去28日の応答214件、同時に当たるルール2件を実データで表示した。統合 #1132 の固定データを使って3101/8788で1440/1920px撮影し、同Node画像と横並び比較。両幅とも横はみ出し0で、社内メモと競合件数の未接続表示は解消した。',
+    verdictNote: '**2026-09-07 Issue #469で(a)編集画面構造差・(c)撮影高さ差として切り分け、matchを維持。** 3102/8789の1440/1920pxで横はみ出し0。1920px画素差は暫定10.9163%、実装が+36px。**残差:** Pencilは基本項目を横並びにし、反応条件を2行、右に大きなLINEプレビューを置く。実装は共通EditDialogの縦積みと小さいプレビュー、別の確認カードを使うため中央・右と高さに差が残る。保存値と操作は一致。',
     verdictSource: 'auto-replies-v6/K7vg2.png + docs/design-qa/auto-replies-v6/K7vg2-{1440,1920}.png + K7vg2.txt',
     verdictHead: '06d05c170',
     route: '/auto-replies/edit?id=ar-2&step=basic',
@@ -1171,7 +1181,7 @@ export const SCREENS = [
   {
     ...AUTO_REPLY, node: 'ivDoe', name: '8-1-C 応答とアクション',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #375 / UI HEAD `06d05c170` で一致。** 下書き・テンプレートAPIへ接続し、返し方、テンプレート選択、後続処理2件、返信待ち時間、連続返信5分、未一致時の担当者引き継ぎ、有効状態とLINEプレビューを実データで表示した。統合 #1132 の固定データを使って3101/8788で1440/1920px撮影し、同Node画像と横並び比較。両幅とも横はみ出し0で、返信遅延と未一致時動作の未接続表示は解消した。',
+    verdictNote: '**2026-09-07 Issue #469で(a)編集画面構造差・(c)撮影高さ差として切り分け、matchを維持。** 3102/8789の1440/1920pxで横はみ出し0。1920px画素差は暫定11.4415%、実装が-56px。**残差:** Pencilは本文編集・差し込み・3ボタン・配信後アクションを見せる。実装は共通EditDialogの返信方法タブ、テンプレート選択、内部アクション行を見せる別構造で、右プレビューの色・高さも異なる。保存済みの返し方と後続処理は一致。',
     verdictSource: 'auto-replies-v6/ivDoe.png + docs/design-qa/auto-replies-v6/ivDoe-{1440,1920}.png + ivDoe.txt',
     verdictHead: '06d05c170',
     route: '/auto-replies/edit?id=ar-2&step=response',
@@ -1255,7 +1265,8 @@ export const SCREENS = [
     */
     ...AUTO_REPLY, node: 'Gy9OK', name: '8-1-I 削除確認',
     verdict: 'match',
-    verdictNote: '**2026-09-06 Issue #221 / PR #956 で一致。** `/auto-replies` の行から削除確認を開き、1440/1920pxで撮影（はみ出し0）。対象名、止まる自動返信と後続処理、残る過去履歴、元に戻せないこと、赤い削除操作を同Node画像と比較した。背面の一覧にも行副題を追加し、「準備中」は0件。取得元 `auto-replies-v6/Gy9OK.txt`。',
+    verdictNote: '**2026-09-07 Issue #469で(a)共通確認窓・(b)一覧固定データ差として切り分け、matchを維持。** 3102/8789の1440/1920pxで横はみ出し0、1920px画素差は暫定14.6388%。**残差:** Pencilは警告アイコン付きタイトルと通常本文の確認窓、実装は共通ConfirmDialogの赤い説明帯で窓幅・高さが異なる。背面一覧の件数・絞り込み・行内容も固定データが異なる。止まる処理、残る履歴、取消不可は一致。共通窓は#264へ連携。',
+    verdictSource: 'auto-replies-v6/Gy9OK.png + auto-replies-v6/Gy9OK-{1440,1920}.png + Issue #469 pixel comparison',
     verdictHead: '235d99f10',
     mode: 'viewport', height: 1080,
     steps: [{ click: '削除' }],
