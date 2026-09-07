@@ -1155,7 +1155,7 @@ export default function TemplatesPage() {
         )}
       >
         <div className="space-y-4">
-          <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-red-600">
+          <div className="rounded-lg border border-danger bg-danger-bg px-4 py-3 text-danger">
             <p className="flex items-start gap-2 text-sm font-bold">
               <TriangleAlert size={17} className="mt-0.5 shrink-0" aria-hidden="true" />
               このテンプレートは{blockedDelete?.usageCount ?? 0}か所で使われています。先に差し替えると、配信や返信を止めずに整理できます。
@@ -1178,9 +1178,9 @@ export default function TemplatesPage() {
           </div>
           <div>
             <p className="mb-2 text-sm font-bold text-ink">どうしますか</p>
-            <div className="rounded-lg border border-green-100 bg-green-50 px-4 py-3 text-green-900">
+            <div className="rounded-lg border border-accent-soft bg-accent-soft px-4 py-3 text-accent-deep">
               <p className="text-sm font-bold">{blockedDelete?.usageCount ?? 0}か所の差し替え画面を開きます</p>
-              <p className="mt-1 text-xs text-green-800">差し替えが終わるまで、このテンプレートは一覧に残ります。</p>
+              <p className="mt-1 text-xs text-accent-deep">差し替えが終わるまで、このテンプレートは一覧に残ります。</p>
             </div>
           </div>
         </div>
