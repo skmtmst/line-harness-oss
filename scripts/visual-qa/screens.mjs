@@ -540,7 +540,7 @@ export const SCREENS = [
       {
         /* 保存だけ 409 にして、押した先の版競合を撮る。読み込みは素通し。 */
         suffix: '-conflict',
-        state: { apis: ['**/api/friends/people/**'], kind: 'conflict' },
+        state: { apis: ['**/api/friends/people/**'], kind: 'conflict', method: 'PATCH' },
         steps: [
           { qaOpen: 'w8W4Eh', after: 900 },
           { click: '優先順位を変更', after: 700 },
@@ -3439,6 +3439,28 @@ const ISSUE_265_REVIEW = {
 }
 
 /**
+ * board #381。#1123 の実API契約と #1156 の固定データを取り込み、
+ * 2026-09-07 に 3102/8789 で対象3 Node・全状態を1440/1920px撮影した。
+ */
+const ISSUE_381_REVIEW = {
+  Igi72: {
+    verdict: 'match',
+    note: '一致。AND条件、ORの11軸、表示する友だち、対象・並び順・表示件数、保存済み条件の読込・保存、該当人数と実行操作を設計順に表示し、検索条件とsaved-viewsの実APIへ接続した。設計と固定データで人数・タグ名は異なるが、値を作らずAPI応答を表示している。1440/1920pxを撮影し、横はみ出し0、壊れ値・内部ID0件。',
+    source: 'friends-v6/Igi72.txt + Igi72-{1440,1920}.png',
+  },
+  InCDe: {
+    verdict: 'match',
+    note: '一致。判定根拠、結び付け後の影響、候補2件、項目ごとの採用値、タグ、判断履歴、別人・保留・結び付けの3判断、理由必須、利用目的と規約の確認を設計順に表示し、候補取得と判定保存の実APIへ接続した。連絡先は安全のためマスク済み値だけを表示する。通常・読込中・0件・取得失敗・権限不足・判定窓の全14枚で横はみ出し0、壊れ値・内部ID0件。',
+    source: 'friends-v6/InCDe-{normal,loading,empty,error,forbidden,decide}.txt + 同名-{1440,1920}.png',
+  },
+  w8W4Eh: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・安全な更新契約待ち。上段3カード、結び付く友だち、統合属性、タグ、横断履歴、配信元の優先順、解除、409の再読込を表示し、取得・配信優先順・解除の実APIへ接続した。プロフィール候補APIはマスク済み表示値だけを返す一方、更新APIは生値を要求するため、マスク文字列を保存して連絡先を壊さないよう「統合プロフィールを編集」だけ未接続。通常・読込中・0件・取得失敗・権限不足・編集・解除・版競合の全18枚で横はみ出し0、壊れ値・内部ID0件。',
+    source: 'friends-v6/w8W4Eh-{normal,loading,empty,error,forbidden,edit,unlink,conflict}.txt + 同名-{1440,1920}.png',
+  },
+}
+
+/**
  * board #297。2026-09-07 に development 14b51dc8c を 3101/8788 で起動し、
  * 機能4の21 Nodeを設計1920pxと実装1440/1920pxで比較した結果。
  * board #310・PR #1056 の共通固定データを取り込み、画面側の構造と実値を照合した。
@@ -4054,6 +4076,13 @@ for (const screen of SCREENS) {
     screen.verdict = issue265Review.verdict
     screen.verdictNote = `**2026-09-06 Issue #265で修正・再判定。** ${issue265Review.note}`
     screen.verdictSource = issue265Review.source
+    delete screen.verdictHead
+  }
+  const issue381Review = ISSUE_381_REVIEW[screen.node]
+  if (screen.feature === 3 && issue381Review) {
+    screen.verdict = issue381Review.verdict
+    screen.verdictNote = `**2026-09-07 Issue #381で実API接続後に再判定。** ${issue381Review.note}`
+    screen.verdictSource = issue381Review.source
     delete screen.verdictHead
   }
   const issue297Review = ISSUE_297_REVIEW[screen.node]
