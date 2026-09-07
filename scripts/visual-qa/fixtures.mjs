@@ -1488,6 +1488,15 @@ export const MEDIA_FOLDERS = [
   { id: 'media-video', name: '03_動画', kind: 'media', sortOrder: 2, color: '#7C6BC4', createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
 ]
 
+export const MEDIA_QUOTA = {
+  usageBytes: 2576980378,
+  reservedBytes: 0,
+  limitBytes: 10737418240,
+  remainingBytes: 8160437862,
+  usageRate: 0.24,
+  state: 'normal',
+}
+
 const mediaPreview = (color) => `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="678"><rect width="1040" height="678" fill="${color.replace('#', '%23')}"/></svg>`
 
 export const MEDIA_ITEMS = [
@@ -2557,6 +2566,44 @@ export const IDENTITY_CANDIDATE_FRIEND = {
   id: 'identity-friend-1', kind: 'friend_duplicate', status: 'pending', version: 1,
   confidence: IDENTITY_CONFIDENCE, left: IDENTITY_FRIEND_LEFT, right: IDENTITY_FRIEND_RIGHT,
   evidence: IDENTITY_EVIDENCE,
+  profileCandidates: [
+    {
+      fieldKey: 'display_name', fieldLabel: 'LINE表示名',
+      options: [
+        {
+          sourceFriendId: 'friend-identity-left', sourceLabel: '田中 はなこ',
+          valuePreview: '田中 はなこ', verified: false,
+        },
+        {
+          sourceFriendId: 'friend-identity-right', sourceLabel: '田中 花子',
+          valuePreview: '田中 花子', verified: false,
+        },
+      ],
+    },
+    {
+      fieldKey: 'metadata.email', fieldLabel: 'メールアドレス',
+      options: [
+        {
+          sourceFriendId: 'friend-identity-left', sourceLabel: '田中 はなこ',
+          valuePreview: 'ta***@example.jp', verified: false,
+        },
+        {
+          sourceFriendId: 'friend-identity-right', sourceLabel: '田中 花子',
+          valuePreview: 'ta***@example.jp', verified: false,
+        },
+      ],
+    },
+  ],
+  tagCandidates: [
+    {
+      id: 'tag-nen-member', name: 'NEN会員', color: '#2f855a',
+      sourceFriendIds: ['friend-identity-left', 'friend-identity-right'],
+    },
+    {
+      id: 'tag-follow-up', name: '要フォロー', color: '#d97706',
+      sourceFriendIds: ['friend-identity-left'],
+    },
+  ],
   impact: [
     { key: 'duplicate_deliveries', label: '重複配信', value: 3, unit: '通', note: null },
     { key: 'orders', label: '注文', value: null, unit: '件', note: '取得元を接続後に表示' },
@@ -2636,6 +2683,8 @@ export const MERGED_PERSON_DETAIL = {
       selectedAt: '2026-08-28T10:12:00.000Z', updateMode: 'auto',
     },
   ],
+  profileCandidates: IDENTITY_CANDIDATE_FRIEND.profileCandidates,
+  tagCandidates: IDENTITY_CANDIDATE_FRIEND.tagCandidates,
   deliveryPriorities: [
     {
       purpose: 'broadcast', friendId: 'friend-identity-right',
@@ -2669,12 +2718,41 @@ export const MERGED_PERSON_EMPTY = {
   revision: 1,
   linkedFriends: [MERGED_PERSON_DETAIL.linkedFriends[0]],
   profileValues: [],
+  profileCandidates: [],
+  tagCandidates: [],
   deliveryPriorities: [],
   history: [],
 }
 
 export const MERGED_PERSON_ERROR = {
   success: false, error: '統合ユーザーを読み込めませんでした', code: 'VISUAL_QA_ERROR',
+}
+
+/** 機能3の保存した検索。入力値と一致人数を同じ契約で読み直せる1件。 */
+export const FRIEND_SAVED_VIEWS = {
+  items: [
+    {
+      id: 'friend-saved-view-1', name: 'NEN会員・要フォロー',
+      conditions: {
+        all: [{ kind: 'tag', op: 'includes', value: 'tag-nen-member' }],
+        any: [
+          { kind: 'memo', op: 'contains', value: '折り返し' },
+          { kind: 'reminder', op: 'exists', value: 'reminder-1' },
+        ],
+        visibility: 'visible_only',
+        description: 'NEN会員のうち、次の対応を確認する友だち',
+        list: { columns: ['名前', 'タグ', '最終反応日'], sort: 'recent', limit: 20 },
+      },
+      revision: 1, isShared: true, ownerId: 'staff-visual-qa',
+      lineAccountId: 'visual-qa-account', displayOrder: 1,
+      match: {
+        total: 126, byChannel: { line: 124, mail: 2 },
+        calculatedAt: '2026-09-07T00:00:00.000Z', error: null,
+      },
+      createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-07T00:00:00.000Z',
+    },
+  ],
+  total: 1,
 }
 
 export const IDENTITY_CANDIDATE_DETECTION = {

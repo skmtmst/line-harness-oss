@@ -8,8 +8,26 @@ export interface IncomingWebhookRow {
   secret: string | null;
   is_active: number;
   line_account_id: string | null;
+  version: number;
+  identity_match_json: string;
+  action_refs_json: string;
+  latest_masked_sample_json: string | null;
+  latest_received_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface OutgoingWebhookDeliverySummaryRow {
+  webhook_id: string;
+  total: number;
+  succeeded: number;
+  failed: number;
+  pending: number;
+  last_status: WebhookInteractionStatus | null;
+  last_response_status: number | null;
+  last_completed_at: string | null;
+  last_failure_reason: WebhookInteractionFailureReason | null;
+  can_retry: number;
 }
 
 export interface OutgoingWebhookRow {
@@ -264,6 +282,55 @@ export async function listFailedWebhookInteractionsForRetry(
   return result.results ?? [];
 }
 
+export async function getOutgoingWebhookDeliverySummaries(
+  db: D1Database,
+  lineAccountId: string,
+  periodDays = 30,
+): Promise<OutgoingWebhookDeliverySummaryRow[]> {
+  const days = Math.min(365, Math.max(1, Math.floor(periodDays)));
+  const cutoff = toJstString(new Date(Date.now() - days * 86_400_000));
+  const result = await db.prepare(`
+    WITH recent AS (
+      SELECT *
+        FROM webhook_interaction_logs
+       WHERE line_account_id = ? AND direction = 'outgoing'
+         AND created_at >= ? AND status != 'retried'
+    ), totals AS (
+      SELECT webhook_id,
+             COUNT(*) AS total,
+             SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END) AS succeeded,
+             SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed,
+             SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending
+        FROM recent
+       WHERE webhook_id IS NOT NULL
+       GROUP BY webhook_id
+    ), latest AS (
+      SELECT *, ROW_NUMBER() OVER (
+        PARTITION BY webhook_id ORDER BY created_at DESC, id DESC
+      ) AS row_number
+        FROM recent
+       WHERE webhook_id IS NOT NULL
+    )
+    SELECT ow.id AS webhook_id,
+           COALESCE(t.total, 0) AS total,
+           COALESCE(t.succeeded, 0) AS succeeded,
+           COALESCE(t.failed, 0) AS failed,
+           COALESCE(t.pending, 0) AS pending,
+           l.status AS last_status,
+           l.response_status AS last_response_status,
+           l.completed_at AS last_completed_at,
+           l.failure_reason AS last_failure_reason,
+           CASE WHEN ow.is_active = 1 AND l.status = 'failed'
+                  AND l.request_body_json IS NOT NULL THEN 1 ELSE 0 END AS can_retry
+      FROM outgoing_webhooks ow
+ LEFT JOIN totals t ON t.webhook_id = ow.id
+ LEFT JOIN latest l ON l.webhook_id = ow.id AND l.row_number = 1
+     WHERE ow.line_account_id = ?
+     ORDER BY ow.created_at DESC, ow.id ASC
+  `).bind(lineAccountId, cutoff, lineAccountId).all<OutgoingWebhookDeliverySummaryRow>();
+  return result.results ?? [];
+}
+
 // --- 受信Webhook ---
 
 export async function getIncomingWebhooks(
@@ -289,6 +356,72 @@ export async function getIncomingWebhookById(
     .prepare(`SELECT * FROM incoming_webhooks WHERE id = ? AND line_account_id = ?`)
     .bind(id, lineAccountId)
     .first<IncomingWebhookRow>();
+}
+
+export type IncomingWebhookIdentityMatch = {
+  methods: Array<{
+    kind: 'harness_friend_id' | 'external_customer_id' | 'verified_email' | 'verified_phone';
+    path: string;
+  }>;
+  onNotFound: 'do_nothing' | 'unmatched_box' | 'create_candidate';
+};
+
+export type IncomingWebhookActionRef = {
+  refKind: string;
+  refId: string;
+  refVersionId: string | null;
+};
+
+export async function updateIncomingWebhookConfig(
+  db: D1Database,
+  input: {
+    id: string;
+    lineAccountId: string;
+    expectedVersion: number;
+    identityMatching: IncomingWebhookIdentityMatch;
+    actions: IncomingWebhookActionRef[];
+  },
+): Promise<
+  | { status: 'updated'; item: IncomingWebhookRow }
+  | { status: 'conflict'; currentVersion: number }
+  | { status: 'not_found' }
+> {
+  const result = await db.prepare(`UPDATE incoming_webhooks
+    SET identity_match_json = ?, action_refs_json = ?, version = version + 1, updated_at = ?
+    WHERE id = ? AND line_account_id = ? AND version = ?`)
+    .bind(
+      JSON.stringify(input.identityMatching),
+      JSON.stringify(input.actions),
+      jstNow(),
+      input.id,
+      input.lineAccountId,
+      input.expectedVersion,
+    )
+    .run();
+  if ((result.meta.changes ?? 0) > 0) {
+    return {
+      status: 'updated',
+      item: (await getIncomingWebhookById(db, input.id, input.lineAccountId))!,
+    };
+  }
+  const current = await getIncomingWebhookById(db, input.id, input.lineAccountId);
+  return current
+    ? { status: 'conflict', currentVersion: Number(current.version) }
+    : { status: 'not_found' };
+}
+
+export async function updateIncomingWebhookMaskedSample(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+  maskedSample: unknown,
+  receivedAt = jstNow(),
+): Promise<void> {
+  await db.prepare(`UPDATE incoming_webhooks
+    SET latest_masked_sample_json = ?, latest_received_at = ?
+    WHERE id = ? AND line_account_id = ?`)
+    .bind(JSON.stringify(maskedSample), receivedAt, id, lineAccountId)
+    .run();
 }
 
 export async function createIncomingWebhook(
