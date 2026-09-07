@@ -2165,7 +2165,9 @@ export type ExecutionRunStatus =
   | "partial"
   | "skipped"
   | "pending"
-  | "cancelled";
+  | "cancelled"
+  | "claimed"
+  | "permanent_failed";
 
 /** リマインダの書込台帳だけが持つ詳細状態。共通状態へ潰さず保存する。 */
 export type ReminderDeliveryRunStatus =

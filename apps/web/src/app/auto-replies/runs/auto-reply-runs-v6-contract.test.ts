@@ -8,6 +8,7 @@ const page = readFileSync(join(here, 'page.tsx'), 'utf8')
 const css = readFileSync(join(here, 'auto-reply-runs.module.css'), 'utf8')
 const worker = readFileSync(join(here, '../../../../../worker/src/routes/auto-reply-runs.ts'), 'utf8')
 const service = readFileSync(join(here, '../../../../../worker/src/services/auto-reply.ts'), 'utf8')
+const sharedTypes = readFileSync(join(here, '../../../../../../packages/shared/src/types.ts'), 'utf8')
 
 describe('V6 自動応答・実行結果 t7UtYQ', () => {
   it('Pencilの実Nodeと共通部品を正本にする', () => {
@@ -49,6 +50,25 @@ describe('V6 自動応答・実行結果 t7UtYQ', () => {
     )
     expect(service).toContain('if (!reservation.created)')
     expect(service).toContain('recordAutoReplyHit')
+  })
+
+  it('口が返す処理中と失敗を共有型と状態表に入れる', () => {
+    /*
+     * 口は claimed（処理中）と permanent_failed（失敗）を返すのに、
+     * 共有型と画面の表に無く、STATUS[item.status] が undefined になって
+     * 実行結果の画面が白画面になっていた。
+     */
+    const statusType = sharedTypes.match(/export type ExecutionRunStatus =[\s\S]*?;/)?.[0] ?? ''
+    expect(statusType).toContain('| "claimed"')
+    expect(statusType).toContain('| "permanent_failed"')
+    expect(page).toContain("claimed: { label: '処理中'")
+    expect(page).toContain("permanent_failed: { label: '失敗'")
+  })
+
+  it('知らない状態が来ても白い画面にしない', () => {
+    expect(page).toContain('function statusView(')
+    expect(page).toContain("label: '確認中'")
+    expect(page).not.toContain('STATUS[item.status]')
   })
 
   it('1440pxで右390pxを残しても一覧を横へはみ出させない', () => {
