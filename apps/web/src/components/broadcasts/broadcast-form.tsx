@@ -981,7 +981,7 @@ export default function BroadcastForm({
       </div>
     )}
     <BroadcastStepRail steps={steps} />
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
       <div className={`space-y-5 ${testDialogOpen ? 'broadcast-test-page-open' : ''} ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
         {testDialogOpen ? (
           <section className="broadcast-test-page space-y-4">
@@ -2009,7 +2009,7 @@ export default function BroadcastForm({
       .broadcast-template-row strong,
       .broadcast-template-row small { display: block; }
       .broadcast-template-row small { margin-top: 3px; color: var(--color-ink-faint); }
-      .broadcast-line-preview { background: var(--color-avatar-blue); min-height: 390px; }
+      .broadcast-line-preview { background: var(--color-line-preview); min-height: 390px; }
        .broadcast-url-row { display: grid; grid-template-columns: minmax(0, 1fr) 7rem; }
        .broadcast-test-page-open > :not(.broadcast-test-page),
        .broadcast-preflight-page-open > :not(.broadcast-preflight-page) { display: none; }
@@ -2025,8 +2025,8 @@ export default function BroadcastForm({
         max-height: calc(100vh - 40px);
         overflow-y: auto;
        }
-       [data-design-node='p97Tf'],
-       [data-design-node='vW4Es'] {
+       [data-design-node='p97Tf'][role='presentation'],
+       [data-design-node='vW4Es'][role='presentation'] {
          align-items: flex-start;
          padding-top: 265px;
        }
