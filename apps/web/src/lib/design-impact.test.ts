@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { allFiles, directImporters, routeEntryFiles } from '../../scripts/design-impact.mjs'
+import {
+  allFiles,
+  createImportIndex,
+  directImporters,
+  routeEntryFiles,
+} from '../../scripts/design-impact.mjs'
 import {
   parseDesignImpactBaseline,
   readDesignImpactBaseline,
@@ -10,6 +15,8 @@ import { SRC } from '../../scripts/design-debt.mjs'
 
 describe('共通部品の影響範囲', () => {
   const files = allFiles()
+  // 全ファイルの構文解析は1回だけ。各検査は同じ解決済み索引を共有する。
+  const importIndex = createImportIndex(files)
   const button = join(SRC, 'components', 'shared', 'button.tsx')
   const buttonCss = join(SRC, 'components', 'shared', 'button.module.css')
   const pagination = join(SRC, 'components', 'shared', 'pagination.tsx')
@@ -17,7 +24,7 @@ describe('共通部品の影響範囲', () => {
   const baseline = readDesignImpactBaseline()
 
   it('共通Buttonの実利用先が一覧ファイルと一致する', () => {
-    const actual = directImporters(files, button).map((file) => relative(SRC, file)).sort()
+    const actual = directImporters(files, button, importIndex).map((file) => relative(SRC, file)).sort()
     expect(
       actual,
       '件数を書き換えず、design-impact-baseline.txtへ利用先の行を追加・削除してください',
@@ -39,15 +46,15 @@ describe('共通部品の影響範囲', () => {
   })
 
   it('import先が実ファイルと一致する場合は検知する', () => {
-    expect(directImporters(files, buttonCss)).toEqual([button])
-    expect(directImporters(files, paginationCss)).toEqual([pagination])
+    expect(directImporters(files, buttonCss, importIndex)).toEqual([button])
+    expect(directImporters(files, paginationCss, importIndex)).toEqual([pagination])
   })
 
   it('共通Paginationを直接importする25ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
-    expect(directImporters(files, pagination).map((file) => relative(SRC, file))).toEqual([
+    expect(directImporters(files, pagination, importIndex).map((file) => relative(SRC, file))).toEqual([
       // 2026-09-02: 案件一覧が自前のページ送りを持たないまま全件を出していた。
       // 設計 `GH8VL` は表の下にページ送りがある。共通へ寄せた。
       'app/affiliates/tabs.tsx',
