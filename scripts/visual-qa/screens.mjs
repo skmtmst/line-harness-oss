@@ -2324,10 +2324,10 @@ export const SCREENS = [
     */
     variants: [{ suffix: '-birthday', route: '/nen-campaigns/edit?key=birthday_coupon' }],
     route: '/nen-campaigns/edit?key=review_request',
-    verdict: "needs_fix",
-    verdictNote: "**2026-09-07 Issue #439 / UI HEAD 082be35e7を3102/8789で再撮影・判定。** `review_request` と `birthday_coupon` の機能専用固定応答を接続し、通常・誕生日の2状態を1440/1920pxで表示できた。横はみ出し0。以前の「配信が見つかりません」は解消したが、実装は4区画の汎用フォームで、設計の吹き出し編集（あと2つまで）、差し込み項目、LINEプレビュー、回答フォームを開く・マイル200付与の送信後アクションが無い。**推奨修正：設計の本文エディタと送信後アクションを画面コードへ実装する。**",
+    verdict: "match",
+    verdictNote: "**2026-09-07 Issue #442 / UI HEAD c1c44ae3dを3102/8789で再撮影・判定。** Pencil V6どおり、配信時刻と重複防止、差し込み対応の本文エディタ、吹き出し追加、回答フォーム「口コミ」を開く・回答後200マイル付与、LINEプレビュー、つながる先、注意、追従保存を実装した。送信後アクションはアカウント別設定へ保存し、回答フォームは選択中アカウントのLIFF URLへ接続する。通常・誕生日を1440/1920pxで確認し、横はみ出し0。",
     verdictSource: "nen-v6/HpKyF.txt + HpKyF-birthday.txt + HpKyF-{1440,1920}.png + HpKyF-birthday-{1440,1920}.png",
-    verdictHead: "082be35e7",
+    verdictHead: "c1c44ae3d",
   },
   {
     ...NEN, node: 'ymXJK', name: '21-1-E コラムを書く',
