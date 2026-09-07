@@ -3,6 +3,7 @@
 import React, { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import type { Tag } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
 import { Field as FormField } from '@/components/shared/form-controls'
@@ -10,7 +11,7 @@ import ListState from '@/components/shared/list-state'
 import PageHeader from '@/components/shared/page-header'
 import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
-import { api, ApiError, type Tag } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import {
   CATEGORY_MAX,
