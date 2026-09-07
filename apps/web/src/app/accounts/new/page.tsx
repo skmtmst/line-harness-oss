@@ -97,7 +97,7 @@ export default function NewLineAccountPage() {
         parentLineAccountId: parentLineAccountId || null,
       })
       if (!created.success) { setError(created.error); return }
-      router.push(`/accounts/${created.data.id}`)
+      router.push(`/accounts/detail?id=${created.data.id}`)
     } catch {
       setError('登録できませんでした。しばらくおいてから、もう一度お試しください。')
     } finally {
