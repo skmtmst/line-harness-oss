@@ -3482,6 +3482,12 @@ const ISSUE_265_REVIEW = {
  * board #381。#1123 の実API契約と #1156 の固定データを取り込み、
  * 2026-09-07 に 3102/8789 で対象3 Node・全状態を1440/1920px撮影した。
  */
+const ISSUE_400_REVIEW = {
+  Qu6Vk: { verdict: 'match', note: 'Issue #400 / 固定データ #410（PR #1181）を接続し、通常・読込・空・失敗・権限不足・選択状態を3104/8791で再撮影。1440/1920pxとも横はみ出し0。', source: 'photos-v6/Qu6Vk.txt + Issue #400 + PR #1181' },
+  hHrz8: { verdict: 'structure_match_data_pending', note: 'Issue #400で個別写真の5状態を再撮影し横はみ出し0。原本取得は再認証が必要なため未接続を記録。', source: 'photos-v6/hHrz8.txt + Issue #400 + PR #1181' },
+  N2J629: { verdict: 'structure_match_data_pending', note: 'Issue #400で確認窓を固定データ撮影し横はみ出し0。理由・補足・通知内容の細部は設計差分が残るため未判定。', source: 'photos-v6/N2J629.txt + Issue #400 + PR #1181' },
+}
+
 const ISSUE_381_REVIEW = {
   Igi72: {
     verdict: 'match',
@@ -4226,6 +4232,13 @@ for (const screen of SCREENS) {
     screen.verdictNote = `**2026-09-07 Issue #367で実API接続後に再判定。** 設計1920pxと実装1440/1920pxを目視比較。${issue367Review.note}`
     screen.verdictSource = issue367Review.source
     delete screen.verdictHead
+  }
+  const issue400Review = ISSUE_400_REVIEW[screen.node]
+  if (screen.feature === 22 && issue400Review) {
+    screen.verdict = issue400Review.verdict
+    screen.verdictNote = `**2026-09-07 Issue #400で再撮影・再判定。** 3104/8791で確認。${issue400Review.note}`
+    screen.verdictSource = issue400Review.source
+    screen.verdictHead = 'codex/kenta-r2-s2-b400'
   }
   if (screen.feature === 16 && FEATURE_16_REVIEW[screen.node]) {
     Object.assign(screen, FEATURE_16_REVIEW[screen.node])
