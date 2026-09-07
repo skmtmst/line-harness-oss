@@ -84,7 +84,7 @@ export default function NewReminderPage() {
       </div>}>
         <div data-design="Left" className="grid gap-3">
         <ReminderPanel title="基本設定" note="管理名とフォルダを設定します。">
-          <div className={`${styles.basicFields} grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]`}>
+          <div className={`${styles.basicFields} ${styles.basicFieldsGrid}`}>
             <Field label="リマインダ名　必須" note={`${name.length} / 60文字`}><TextInput value={name} maxLength={60} placeholder="例：Google Meet相談の前日案内" onChange={(event) => setName(event.target.value)} className={inputClass} /></Field>
             <Field label="フォルダ"><div className="flex items-center gap-2"><SelectField value={folderId} onChange={(event) => setFolderId(event.target.value)} disabled={foldersLoadState !== 'ready'} aria-label="リマインダのフォルダ" className={inputClass} options={[{ value: '', label: foldersLoadState === 'loading' ? 'フォルダを読み込み中' : foldersLoadState === 'error' ? 'フォルダを読み込めませんでした' : '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />{foldersLoadState === 'error' ? <Button onClick={() => setFoldersReloadToken((value) => value + 1)}>フォルダを再読み込み</Button> : <Button>＋ フォルダを追加</Button>}</div>{foldersLoadState === 'ready' && folders.length === 0 ? <small>フォルダはまだありません。一覧から追加できます。</small> : null}</Field>
             <div className="md:col-span-2"><Field label="社内メモ　任意" note="友だちには表示されません"><TextArea rows={2} value={description} placeholder="運用目的や注意点を入力" onChange={(event) => setDescription(event.target.value)} className={inputClass} /></Field></div>

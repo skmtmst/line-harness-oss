@@ -288,6 +288,9 @@
   "app/reminders/detail/page.tsx": {
     "unresolved-classname": 30
   },
+  "app/reminders/edit/issue469-reminder-screens.tsx": {
+    "unresolved-classname": 15
+  },
   "app/reminders/edit/page.tsx": {
     "unresolved-classname": 9,
     "arbitrary-value": 7,

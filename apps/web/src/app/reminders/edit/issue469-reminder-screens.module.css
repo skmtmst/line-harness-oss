@@ -81,8 +81,17 @@
   padding: 16px 12px;
 }
 
+.timingFields {
+  display: grid;
+  gap: 12px;
+}
+
 @media (min-width: 1280px) {
   .screen > div:nth-child(2) {
     grid-template-columns: minmax(0, 1fr) 390px;
+  }
+
+  .timingFields {
+    grid-template-columns: 1.1fr 0.85fr 0.7fr 1.3fr;
   }
 }

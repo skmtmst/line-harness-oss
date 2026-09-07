@@ -481,7 +481,9 @@ export default function AutoRepliesPage() {
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">ルール数</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {metricWord(visibleLoadState, visualTotal)}
+            {visualSummary
+              ? metricWord(visibleLoadState, visualTotal)
+              : metricWord(visibleLoadState, items.length)}
             {ready && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
@@ -493,7 +495,9 @@ export default function AutoRepliesPage() {
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">今月の応答</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {metricWord(visibleLoadState, visualMonthly)}
+            {visualSummary
+              ? metricWord(visibleLoadState, visualMonthly)
+              : metricWord(visibleLoadState, monthlyHits)}
             {ready && <span className="text-ink-faint ml-0.5 text-xs font-normal">回</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">

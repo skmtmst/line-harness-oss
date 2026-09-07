@@ -73,7 +73,7 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
       </ReminderPanel>
       <ReminderPanel title="1通目・前日のお知らせ" note="送るタイミングと文面を決めます。" action={<div className="flex gap-2"><Button>この通知を複製</Button><Button>この通知を削除</Button></div>}>
         <div className="grid gap-3">
-          <div className="grid gap-3 md:grid-cols-[1.1fr_.85fr_.7fr_1.3fr]">
+          <div className={styles.timingFields}>
             <Field label="起点"><TextInput className={inputClass} value="基準日（予約日時）" readOnly /></Field>
             <Field label="ずらす"><TextInput className={inputClass} value="1日前" readOnly /></Field>
             <Field label="送信時刻"><TextInput className={inputClass} value="18:00" readOnly /></Field>
