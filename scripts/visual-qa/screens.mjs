@@ -1408,7 +1408,7 @@ export const SCREENS = [
     verdict: 'match',
     verdictNote: '**2026-09-07 Issue #417 / UI HEAD `527f120ec` で一致。** 視聴完了メッセージと結果未取得時の方針を版付き保存へ接続し、実行時点、保存済みアクション、要約、LINEプレビューを設計画像と照合した。3101/8788の2幅で横はみ出し0。',
     verdictSource: 'webinars-v6/Xjk8q.png + Xjk8q-1920.png + Xjk8q.txt',
-    verdictHead: '527f120ec', route: `${WEBINAR_EDIT}&pane=actions`,
+    verdictHead: '527f120ec', route: `${WEBINAR_EDIT}&pane=actions`, mode: 'viewport', height: 1080,
 
   },
   {
@@ -1426,7 +1426,7 @@ export const SCREENS = [
     verdictNote: '**2026-09-07 Issue #417 / UI HEAD `527f120ec` で一致。** 公開前検査APIの動画・フォーム・CTA・通知テスト・公開ページテスト・通知重複・アクション参照を表示し、最終確認と公開操作を設計画像と照合した。3101/8788の2幅で横はみ出し0。',
     verdictSource: 'webinars-v6/D6yO7e.png + D6yO7e-1920.png + D6yO7e.txt',
     verdictHead: '527f120ec',
-    route: '/webinars/edit?id=webinar-1&pane=review', mode: 'page',
+    route: '/webinars/edit?id=webinar-1&pane=review', mode: 'viewport', height: 1136,
 
   },
   {
