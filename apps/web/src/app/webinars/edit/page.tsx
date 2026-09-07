@@ -259,10 +259,10 @@ function CommentsTab({ webinarId }: { webinarId: string }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-200 text-left text-gray-500">
-            <th className="w-24 py-1 font-medium">秒数</th>
-            <th className="w-40 font-medium">名前</th>
-            <th className="font-medium">本文</th>
-            <th className="w-12"></th>
+            <th className="w-24 px-4 py-3 font-medium">秒数</th>
+            <th className="w-40 px-4 py-3 font-medium">名前</th>
+            <th className="px-4 py-3 font-medium">本文</th>
+            <th className="w-12 px-4 py-3"></th>
           </tr>
         </thead>
         <tbody>
@@ -750,11 +750,11 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics' }: { webi
               <table className="w-full min-w-[760px] text-sm">
                 <thead>
                   <tr className="bg-slate-50/80 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    <th className="px-5 py-3">参加者</th>
+                    <th className="px-4 py-3">参加者</th>
                     <th className="px-4 py-3">最終参加</th>
                     <th className="px-4 py-3">視聴</th>
                     <th className="px-4 py-3">アクション</th>
-                    <th className="px-5 py-3 text-right">詳細</th>
+                    <th className="px-4 py-3 text-right">詳細</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -848,7 +848,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics' }: { webi
             <div className="max-h-80 overflow-auto rounded-xl border border-slate-200">
               <table className="w-full min-w-[520px] text-xs">
                 <thead className="sticky top-0 bg-slate-50 text-left text-slate-500">
-                  <tr><th className="px-3 py-2 font-medium">開始</th><th className="font-medium">参加</th><th className="font-medium">平均視聴</th><th className="font-medium">CTA</th></tr>
+                  <tr><th className="px-4 py-3 font-medium">開始</th><th className="px-4 py-3 font-medium">参加</th><th className="px-4 py-3 font-medium">平均視聴</th><th className="px-4 py-3 font-medium">CTA</th></tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {analytics.sessions.slice(0, 30).map((s) => (

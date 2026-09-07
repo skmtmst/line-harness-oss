@@ -92,11 +92,12 @@ import {
   NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, EC_ORDERS, EC_ACTION_EXECUTIONS, EC_IDENTITY_CANDIDATES, MILEAGE_RULES,
   FORM_FOLDERS, FORMS, FORM_LIST, FORM_DETAIL, FORM_SUBMISSIONS,
   LINE_ACCOUNTS, LINE_ACCOUNT_DETAIL, LINE_ACCOUNT_VERIFY_CONNECTION, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
+  ACCOUNT_HEALTH_LOGS,
   CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
   CONVERSION_DEFINITIONS, CONVERSION_DEFINITION_REPORT, CONVERSION_EXPORT_CSV,
   CONVERSION_DEFINITION_PREVIEW, CONVERSION_DEFINITION_DELETE_IMPACT,
   OPERATION_CONTROL_PREVIEW, OPERATION_HEALTH, OPERATION_HISTORY,
-  WEBINARS, WEBINAR_FOLDERS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_ANALYTICS,
+  WEBINARS, WEBINAR_FOLDERS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_COMMENTS, WEBINAR_ANALYTICS,
   WEBINAR_EDITOR, WEBINAR_PUBLISH_VALIDATION, WEBINAR_PARTICIPANTS,
   FRIEND_ADD_RULE_PUBLISH, FRIEND_ADD_RULE_VALIDATE,
   ACCESS_USERS, ACCESS_ROLES, ACCESS_AUDIT_EVENTS,
@@ -2263,7 +2264,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       当たらないと「状態確認中」のままになり、設計の「正常稼働」と
       並べたときに**実装の差に見えてしまう**（実際はこちらの返事が違うだけ）。
     */
-    return { success: true, data: { riskLevel: 'normal', logs: [] } }
+    const accountId = pathname.split('/')[3]
+    const logs = ACCOUNT_HEALTH_LOGS[accountId] ?? []
+    return { success: true, data: { riskLevel: logs[0]?.riskLevel ?? 'normal', logs } }
   }
   if (pathname === '/api/notifications/center') {
     /*
@@ -2523,6 +2526,7 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (/^\/api\/webinars\/[^/]+\/notifications$/.test(pathname)) return { success: true, data: WEBINAR_NOTIFICATIONS }
   if (/^\/api\/webinars\/[^/]+\/ctas$/.test(pathname)) return { success: true, data: WEBINAR_CTAS }
   if (/^\/api\/webinars\/[^/]+\/actions$/.test(pathname)) return { success: true, data: WEBINAR_ACTIONS }
+  if (/^\/api\/webinars\/[^/]+\/comments$/.test(pathname)) return { success: true, data: WEBINAR_COMMENTS }
   if (/^\/api\/webinars\/[^/]+\/user-comments$/.test(pathname)) return { success: true, data: [] }
   if (/^\/api\/webinars\/[^/]+\/analytics$/.test(pathname)) return { success: true, data: WEBINAR_ANALYTICS }
   if (/^\/api\/webinars\/[^/]+$/.test(pathname)) {
