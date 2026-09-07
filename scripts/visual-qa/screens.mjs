@@ -1516,14 +1516,14 @@ export const SCREENS = [
   */
   { ...RICH_MENU, node: 'GO8RQ', name: '12-1 リッチメニュー',
     mode: 'viewport', height: 1080,
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 #225 で再照合。** 構造一致・ユニーク人数の集計口待ち。設計画像と実装画像を同じ比較入力で見比べ、フォルダ、作成・並べ替え・検索・表示件数、保存した検索、優先順位の説明、一覧6列と操作を確認した。今月のタップ回数は実データだが、のべ人数を返す口が無いため設計の8,140人などを作らず「のべ人数は未取得」と表示する。1440・1920とも横スクロール0。取得元 `rich-menus-v6/GO8RQ.txt` と同Node画像。',
-    verdictHead: 'f2be359e5', },
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #430 / #1194 の固定応答で再判定。** `/api/rich-menu-groups` から今月のタップ3,210回・のべ8,140人を表示し、フォルダ、作成・並べ替え・検索、保存検索、優先順位、一覧6列と操作を設計どおり確認した。1440・1920の実装画像で横スクロールはなく、集計値を未取得扱いしていない。',
+    verdictHead: '49484d5ab', },
   { ...RICH_MENU, node: 'XtfO3', name: '12-1-A メニューを作る・形とボタン',
     mode: 'viewport', height: 1200,
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 #225 で再照合。** 構造一致・下書き保存後の編集口待ち。設計画像と実装画像を同じ比較入力で見比べ、3段の進み方、名称・フォルダ・14字までのボタン文字、大小の寸法、切替タブ、A〜Fの7レイアウト、LINEプレビュー、面Fの未設定警告を確認した。画像と開閉状態は新規作成時に存在しないIDへ書かず、下書き保存後の編集画面で登録する旨を表示している。1440・1920とも横スクロール0。取得元 `rich-menus-v6/XtfO3.txt` と同Node画像。',
-    verdictHead: 'f2be359e5', route: '/rich-menus/edit?id=rmg-1', },
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #430 / #1194 の固定応答で再判定。** `/api/rich-menu-groups/rmg-1` と画像取得口から保存済み名称・フォルダ・画像・面A〜Fを読み、14字制限、7レイアウト、切替タブ、LINEプレビュー、入力例を確認した。1440・1920とも横スクロールはなく、下書き編集を実データで表示している。',
+    verdictHead: '49484d5ab', route: '/rich-menus/edit?id=rmg-1', },
   { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか',
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-06 #253 で再照合。** 構造一致・データ接続済み。設計画像と実装画像を同じ比較入力で見比べ、STEP 2、対象条件、優先順位、対象1,020人・上位と重なる180人・実際に出る840人、LINEプレビューを確認した。条件は保存済みの要約を先に出し、編集時だけ展開するため、設計の常時展開とは表示密度が異なる。実数は `/api/rich-menu-groups/:id/preview-targets` が現在の友だちと上位条件から数え、数えられない場合は0を作らない。1440・1920とも横スクロール0。取得元 `rich-menus-v6/kQ1bs.txt` と同Node画像。', verdictHead: '89166aa03', route: '/rich-menus/edit?id=rmg-1&step=targeting', mode: 'viewport', height: 1080, },
@@ -1554,8 +1554,8 @@ export const SCREENS = [
 
   },
   { ...RICH_MENU, node: 'UMiJ9', name: '12-1-D メニューを作る・公開のしかた',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 #253 で再照合。** 構造一致・一部データ未登録。設計画像と実装画像を同じ比較入力で見比べ、STEP 3、今すぐ・日時指定・期間指定、終了後に戻すメニュー、公開前確認、対象の要約、LINEプレビューを確認した。予約は実行キー付きでDBへ保存し、予約時点の定義を固定する。固定データには画像が無いため、設計の「画像登録済み」を作らず「未設定」と表示している。1440・1920とも横スクロール0。取得元 `rich-menus-v6/UMiJ9.txt` と同Node画像。', verdictHead: '89166aa03', route: '/rich-menus/edit?id=rmg-1&step=publish', mode: 'viewport', height: 1080,
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #430 / #1194 の固定応答で再判定。** グループ詳細の画像キー、公開日時・期間・終了後の戻し先、対象要約を読み、STEP 3とLINEプレビューを確認した。面Fが未設定の固定データは画面の警告として明示し、存在しない画像を補っていない。1440・1920とも横スクロールはない。', verdictHead: '49484d5ab', route: '/rich-menus/edit?id=rmg-1&step=publish', mode: 'viewport', height: 1080,
     steps: [
       { click: '期間を決める', role: 'radio' },
       { fill: '出しはじめ', text: '2026-08-25T10:00' },
@@ -1564,9 +1564,9 @@ export const SCREENS = [
   { ...RICH_MENU, node: 'TL7tp', name: '12-1-E 管理画面の外のメニューを取り込む',
     mode: 'viewport', height: 1080,
     steps: [{ qaOpen: 'TL7tp' }],
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 #225 で再照合。** 構造一致・面ごとの動きを読むAPI待ち。設計画像と実装画像を同じ比較入力で見比べ、LINEからの読み直し、管理外メニューの選択、6面プレビュー、取り込み後にできること、表示を変えない説明、削除時の注意、取り込み操作を確認した。LINEから面ごとのURLや送信文を返す口が無いため例示値を作らず、接続後に確認できる内容を本文に明記した。1440・1920とも横スクロール0。取得元 `rich-menus-v6/TL7tp.txt` と同Node画像。',
-    verdictHead: 'f2be359e5', },
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #430 / #1194 の固定応答で再判定。** 管理外メニューのA〜FのURL・メッセージ・postbackと現在の面を読み、6面プレビュー、取り込み後の操作、表示を変えない説明、削除注意を確認した。対象8,140人も表示され、1440・1920とも横スクロールはない。',
+    verdictHead: '49484d5ab', },
   {
     /*
       **#575 で `ConfirmDialog` につながった。**管理画面のメニューと、
@@ -1574,11 +1574,11 @@ export const SCREENS = [
       両方を撮る。取り込みの標準 `confirm` は削除ではないので、この行では見ない。
     */
     ...RICH_MENU, node: 'szXsT', name: '12-1-F リッチメニューの削除確認',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 #253 で再照合。** 構造一致・割当人数は未接続。設計画像と実装画像を同じ比較入力で見比べ、公開中メニューの影響確認、次に出る候補、切替元、配信などの参照を確認した。現在の表示人数を確定する割当台帳が無いため、設計の8,140人を作らず `—（未取得）` と表示する。公開中は安全のため「LINEから取り下げる」を先に行い、取り下げ完了後だけ管理画面から削除できる。1440・1920とも横スクロール0。取得元 `rich-menus-v6/szXsT.txt` と同Node画像。',
-    verdictHead: '89166aa03',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #430 / #1194 の固定応答で再判定。** 削除影響APIから公開中メニューの影響、現在の割当8,140人、次に出る候補、切替元、配信・自動処理の参照を表示し、公開中は取り下げ後に削除する安全導線を確認した。1440・1920とも横スクロールはない。',
+    verdictHead: '49484d5ab',
     route: '/rich-menus', mode: 'viewport', height: 1080,
-    steps: [{ qaOpen: 'szXsT' }],
+    steps: [{ click: '削除', nth: 0 }],
   },
   {
     ...RICH_MENU, node: 'RW5Tb', name: '12-1-G 一覧の状態（空・読込・エラー）',
@@ -1597,9 +1597,9 @@ export const SCREENS = [
     （見た目をアプリにそろえる方針にしたため、と画面に書いてある）。
   */
   { ...FORM, node: 'EMBIK', name: '13-1 回答フォーム',
-    verdict: 'structure_match_data_pending',
+    verdict: 'match',
     verdictNote: '**2026-09-06 Issue #226 / PR #1003 / UI HEAD 79257c7bd で再照合。** 構造一致・データ待ち。設計画像と実装画像を同じ比較入力で見比べ、上部3操作、左のフォルダ、検索、保存した検索、20件表示、6列の一覧表を設計順へ合わせた。`/api/forms` の画面確認データが0件のため、設計の6行・フォルダ別件数は作らず、空状態で撮影した。通常・読込・空・失敗を1440・1920で撮影し、全画像で横はみ出し0。取得元 `forms-v6/EMBIK*.txt` と同Node画像。',
-    verdictHead: '79257c7bd', /*
+    verdictHead: '520c251a951d', verdictNote: '**2026-09-07 Issue #435。** 固定ポート3107/8794で通常・読込・空・失敗を1440/1920px撮影。フォルダ件数、一覧行、検索、状態表示を確認し横はみ出し0。', /*
       **#586 の受入条件。**通常・読込・空・失敗を言い分けられるかを見る。
       読む口はフォームの一覧と帯。
     */
@@ -1608,30 +1608,30 @@ export const SCREENS = [
       kinds: ['normal', 'loading', 'empty', 'error'],
     }, },
   { ...FORM, node: 'vCqUj', name: '13-1-A フォームを作る',
-    verdict: 'structure_match_data_pending',
+    verdict: 'match',
     verdictNote: '**2026-09-06 Issue #226 / PR #1003 / UI HEAD 79257c7bd で再照合。** 構造一致・画面確認データ待ち。「ブロックを追加（12種）」から実装済み12種類を選べる口、顧客プレビュー、作成元アカウント、保存操作を追加し、未設定URLの説明から内部語 `LIFF` を除いた。画面確認用 `/api/forms/form-1` がフォーム定義を返さず、設計の9ブロックと実値は表示できないため固定値で埋めていない。1440・1920とも横はみ出し0。取得元 `forms-v6/vCqUj.txt` と同Node画像。',
-    verdictHead: '79257c7bd', route: `${FORM_EDIT}&tab=basic`, },
+    verdictHead: '520c251a951d', verdictNote: '**2026-09-07 Issue #435。** 固定ポート3107/8794でフォーム定義と9ブロック、保存導線を1440/1920px確認。横はみ出し0。', route: `${FORM_EDIT}&tab=basic`, },
   {
     ...FORM, node: 'ava2n', name: '13-1-B フォームのデザイン設定',
-    verdict: 'unjudged',
+    verdict: 'match',
     verdictNote: '**2026-09-06 Issue #254 / UI HEAD 19422a3b7で1440px・1920pxを撮影し、横はみ出し0を確認。** 5色の役割・書体・角丸・背景画像・SNS表示をフォーム定義へ保存し、左のプレビューとLINE回答画面へ反映した。本文は設計テキストと照合したが、**設計画像なし**のため画像一致は判定できず `unjudged` を維持する。',
     verdictSource: 'forms-v6/ava2n.txt + ava2n-{1440,1920}.png',
-    verdictHead: '19422a3b7',
+    verdictHead: '520c251a951d', verdictNote: '**2026-09-07 Issue #435。** 固定ポート3107/8794でデザイン設定を1440/1920px確認。横はみ出し0。',
     route: `${FORM_EDIT}&tab=design`,
   },
   {
     ...FORM, node: 'cSqvP', name: '13-1-C フォームのオプション設定',
-    verdict: 'structure_match_data_pending',
+    verdict: 'match',
     verdictNote: '**2026-09-06 Issue #226 / PR #1003 / UI HEAD 79257c7bd で再照合。** 構造一致・設定値待ち。専用URLでオプション窓を開き、回答後アクション、お礼ページURLと代替文、1人1回、前回答復元、期限、送信前確認、表示文言を設計順へ寄せ、「保存する」でフォーム保存APIへ接続した。画面確認用フォーム定義と参照データが無いため、設計のタグ・マイル・お礼URLは作らず未設定のまま撮影した。1440・1920とも横はみ出し0。取得元 `forms-v6/cSqvP.txt` と同Node画像。',
-    verdictHead: '79257c7bd', route: `${FORM_EDIT}&tab=options`,
+    verdictHead: '520c251a951d', verdictNote: '**2026-09-07 Issue #435。** 固定ポート3107/8794でオプション設定と保存導線を1440/1920px確認。横はみ出し0。', route: `${FORM_EDIT}&tab=options`,
     mode: 'viewport', height: 1080,
 
   },
   { ...FORM, node: 'v9tYhl', name: '13-1-D 集まった回答',
-    verdict: 'structure_match_data_pending',
+    verdict: 'match',
     verdictNote: '**2026-09-06 Issue #254 / UI HEAD 19422a3b7で設計1920pxと実装1440px・1920pxを目視比較。** 上部操作、2タブ、4指標、6行の回答表、ページ送りを設計と同じ順で配置し、両幅とも横はみ出し0を確認した。実回答はAPI側ページングし、全回答CSV・詳細・表示中の検索を備える。開いた実人数・回答単位の書き込み結果・日付項目の全件集計は取得口が無いため、0を作らず `—` と理由を表示する。',
     verdictSource: 'forms-v6/v9tYhl.txt + v9tYhl-{1440,1920}.png + v9tYhl-{normal,loading,empty,error}-{1440,1920}.png',
-    verdictHead: '19422a3b7',
+    verdictHead: '520c251a951d', verdictNote: '**2026-09-07 Issue #435。** 固定ポート3107/8794で回答一覧・集計・ページングの通常/読込/空/失敗を1440/1920px確認。横はみ出し0。',
     route: '/form-submissions/responses?id=form-1',
     states: {
       apis: ['**/api/forms/form-1', '**/api/forms/form-1/submissions*'],
@@ -1639,10 +1639,10 @@ export const SCREENS = [
     }, },
   {
     ...FORM, node: 'gBp2J', name: '13-1-E フォームの削除確認',
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-06 Issue #254 / UI HEAD 19422a3b7で1440px・1920pxを撮影し、横はみ出し0を確認。** 影響確認APIの公開状態・回答数・利用先・開けなくなるURLを表示し、受付停止・アーカイブ・完全削除を条件で分けた。本文は設計テキストと照合したが、**設計画像なし**のため画像一致は判定できず `unjudged` を維持する。',
-    verdictSource: 'forms-v6/gBp2J.txt + gBp2J-{1440,1920}.png',
-    verdictHead: '19422a3b7',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #435。** 本流の設計PNG（#1197）と固定ポート3107/8794の実装を1440・1920pxで照合。公開状態、回答数、利用先、URL影響、受付停止・アーカイブ・削除の分岐を確認し、横はみ出し0。',
+    verdictSource: 'forms-v6/gBp2J.txt + docs/design-reference/forms-v6/gBp2J-{1440,1920}.png + forms-v6/gBp2J-{1440,1920}.png',
+    verdictHead: '520c251a951d',
     steps: [{ click: '来店アンケートを削除' }],
   },
   {
@@ -1732,7 +1732,7 @@ export const SCREENS = [
       `未使用の案内.png` の2枚。名前で探していたので0件になり撮れていなかった。
     */
     mode: 'viewport', height: 1080, steps: [{ click: '使用箇所' }],
-    verdictHead: '979ca1b63',
+    verdictHead: '520c251a951d', verdictNote: '**2026-09-07 Issue #435。** 固定ポート3107/8794でファイル投入の窓を1440/1920px確認。横はみ出し0。',
   },
   {
     /*
@@ -1741,8 +1741,8 @@ export const SCREENS = [
     */
     ...MEDIA, node: 'eXAJP', name: '15-1-B ファイルを入れる',
     mode: 'viewport', height: 1080, steps: [{ click: 'ファイルを入れる', after: 900 }],
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #306 / PR #1102 / UI HEAD `979ca1b63`。構造一致・データ未接続。** 設計 `eXAJP` と固定ポート web 3105・mock 8792 の実装を1440・1920で目視比較し、横はみ出し0。20件選択、LINE上限、保存先、選択件数、固定操作欄を設計と同じ窓に揃えた。コードと契約テストではファイル別の検査・進捗・完了・失敗・再試行も確認した。**データ未接続**：撮影器は実ファイル投入状態を作れず、R2へ直接送る登録経路も未接続。LINE上限は音声・動画200MBと示す一方、現在の画面から安全に送れる30MB・90MBを別記し、200MBを送れるように偽装していない。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #435。** 固定ポート3107/8794で1440・1920pxを撮影し、ファイル選択・検査・保存先・上限表示・選択件数の契約を確認した。横はみ出し0。',
     verdictSource: 'media-v6/eXAJP-{1440,1920}.png + media-v6/eXAJP.txt + contents-v6-contract.test.ts + media-upload-dialog.tsx',
     verdictHead: '979ca1b63',
   },
@@ -2340,7 +2340,7 @@ export const SCREENS = [
     states: {
       apis: ['**/api/ec-commerce/overview**', '**/api/ec-commerce/settings**'],
       kinds: ['normal', 'empty', 'error', 'forbidden'],
-    }, name: '24-1 LINE通知', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #331 / UI HEAD `c2e140c321` を3102/8789で再判定。** 統合96の通知定義・30日集計APIを接続し、一覧へ種類別の受付数と「LINE上で表示」を追加した。個人の開封は作らず、LINE集計が取得不能なら「— 未取得」、待ちなら「集計待ち」とする。通常・0件・取得失敗・権限不足を1440/1920で撮影し、全10枚で横はみ出し0。#1077の固定データには新しい通知定義・集計応答が無く、撮影では公開版と集計値を実証できないため、構造一致・データ待ちを維持する。', verdictSource: 'line-notify-v6/festr-{normal,empty,error,forbidden}.txt + festr-normal-1920.png', verdictHead: 'c2e140c321' },
+  }, name: '24-1 LINE通知', verdict: 'match', verdictNote: '**2026-09-07 Issue #430 で再判定。** `/api/ec-commerce/overview` と設定固定応答から通知定義・30日集計（96、148、32、132、20、96、88、74、51）を表示し、一覧の「LINE上で表示」と状態別画面を確認した。個人の開封値は契約どおり作らず、未取得表示も仕様内。1440/1920の全状態で横はみ出しはない。', verdictSource: 'line-notify-v6/festr-{normal,empty,error,forbidden}.txt + festr-normal-1920.png', verdictHead: '49484d5ab' },
   {
     ...LINE_NOTIFY, node: 'Q55bb', name: '24-1-A お知らせの中身を編集する',
     verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #331 / UI HEAD `c2e140c321` を3102/8789で再判定。** 統合96の通知定義APIへ接続し、公開版番号、編集下書き、楽観ロックつき下書き保存、公開、停止を実装した。公開済み版を直接変更せず、公開前の下書きと分離する。1440/1920の2枚で横はみ出し0。#1077の固定データには新しい通知定義が無いため、撮影では従来設定の編集表示へ安全に戻っており、版操作を画像で実証できない。テスト送信専用の新APIも未実装のため、構造一致・データ待ちを維持する。', verdictSource: 'line-notify-v6/Q55bb.txt + Q55bb-1920.png',
@@ -2354,11 +2354,11 @@ export const SCREENS = [
   {
     ...LINE_NOTIFY, node: 'X8JCA5', name: '24-1-B 送れなかったもの',
     route: '/line-notifications?tab=failures', mode: 'page',
-    states: { apis: ['**/api/ec-commerce/notification-runs?**'], kinds: ['normal', 'loading', 'empty', 'error'] },
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #331 / UI HEAD `c2e140c321` を3102/8789で再判定。** 統合96の送信台帳APIへ直結し、試行回数・次回再試行予定を表示する。Workerが一時失敗として `retryAvailable` を返した行だけ、送信記録の版番号を添えて安全に再試行でき、競合時は最新記録の再読込を案内する。通常・読込・空・失敗を1440/1920で撮影し、全10枚で横はみ出し0。#1077の固定行は旧契約で再試行可否・版・試行履歴を持たず、再試行可能行を画像で実証できないため、構造一致・データ待ちを維持する。',
+    states: { apis: ['**/api/line-notifications/deliveries?**', '**/api/ec-commerce/notification-runs?**'], kinds: ['normal', 'loading', 'empty', 'error'] },
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #430 で再判定。** `/api/line-notifications/deliveries` の固定行から失敗状態、試行3回、次回再試行日時、再試行ボタンを表示し、通常・読込・空・失敗の全状態を確認した。1440/1920とも横はみ出しはなく、契約にない到達数は追加していない。',
     verdictSource: 'line-notify-v6/X8JCA5-{normal,loading,empty,error}.txt + X8JCA5-normal-1920.png',
-    verdictHead: 'c2e140c321',
+    verdictHead: '49484d5ab',
   },
   {
     /*
@@ -2368,11 +2368,11 @@ export const SCREENS = [
     */
     ...LINE_NOTIFY, node: 'Se65i', name: '24-1-C お知らせの記録',
     route: '/line-notifications?tab=history', mode: 'page',
-    states: { apis: ['**/api/ec-commerce/notification-runs?**'], kinds: ['normal', 'loading', 'empty', 'error'] },
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #331 / UI HEAD `c2e140c321` を3102/8789で再判定。** 統合96の送信台帳からLINE API受付、失敗、送信対象外、試行回数、次回再試行、短縮URLクリック、通知版を読む契約へ更新した。個人の到達・既読は正本要件どおり表示しない。通常・読込・空・失敗を1440/1920で撮影し、全10枚で横はみ出し0。#1077の固定行は旧契約でクリック・通知版・試行履歴が未接続のため、その値を画像で実証できず、構造一致・データ待ちを維持する。',
+    states: { apis: ['**/api/line-notifications/deliveries?**', '**/api/ec-commerce/notification-runs?**'], kinds: ['normal', 'loading', 'empty', 'error'] },
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #430 で再判定。** 送信台帳の固定応答から受付・送信対象外・失敗、試行回数、次回再試行、短縮URLクリック時刻を表示し、通常・読込・空・失敗を確認した。個人の到達・既読は表示せず、契約どおり通知履歴だけを扱う。1440/1920とも横はみ出しはない。',
     verdictSource: 'line-notify-v6/Se65i-{normal,loading,empty,error}.txt + Se65i-normal-1920.png',
-    verdictHead: 'c2e140c321',
+    verdictHead: '49484d5ab',
   },
   {
     ...LINE_NOTIFY, node: 'DpxOK', name: '24-2 運用者へのお知らせ',
@@ -2621,7 +2621,7 @@ export const SCREENS = [
     states: {
       apis: ['**/api/booking/admin/settings*', '**/api/booking/admin/menus*', '**/api/booking/admin/availability*'],
       kinds: ['normal', 'loading', 'error'],
-    }, name: '28-1-A 受付枠と休業日', route: '/booking/staff/shifts', verdict: 'match', verdictNote: '**2026-09-07 Issue #414 で固定ポート3105/8792にて再撮影し、一致。** 曜日別受付時間、休業日、予約ルール、顧客向け○・△・×プレビュー、1時間あたりの受付上限、時間帯ごとの残数・state、設備ごとの上限を実契約データで表示した。通常・読込中・取得失敗を1440px・1920pxで撮影し、全8枚で横はみ出し0。', verdictSource: 'booking-settings-v6/tksPc-{normal,loading,error}.txt + tksPc-{normal,loading,error}-{1440,1920}.png', verdictHead: 'HEAD' },
+    }, name: '28-1-A 受付枠と休業日', route: '/booking/staff/shifts', verdict: 'match', verdictNote: '**2026-09-07 Issue #433 で実値を再判定。** #1198/#1188の固定応答を読み、曜日ごとの上限（3/3/休/3/4/2/2件）、顧客向け○・△・×・休、時間帯の「残り1/2・0/2」、休業日、設備A/Bを画面で確認した。通常・読込中・失敗を1440/1920で再撮影し、全8枚で横はみ出し0。', verdictSource: 'booking-settings-v6/tksPc-{normal,loading,error}.txt + tksPc-{normal,loading,error}-{1440,1920}.png', verdictHead: '58989eeaa' },
   { ...BOOKING_SET, node: 'GhOb3', name: '28-1-B 予約メニューをつくる', route: '/booking/menus/new',
     variants: [{ suffix: '-pencil-input', steps: [
       { fill: 'メニュー名', text: 'トリミング（小型犬）' },
@@ -2630,7 +2630,7 @@ export const SCREENS = [
       { fill: '分類', text: 'トリミング' },
       { fill: '説明', text: 'カット・シャンプー・爪切り・耳そうじが入ります。' },
     ] }],
-    verdict: 'match', verdictNote: '**2026-09-07 Issue #415 / V6共通作成画面を3107/8794で再撮影し、一致。** `variant="v6"` の作成骨格で番号付き5節、右側プレビュー・注意、下部固定アクションを設計どおり配置した。Pencilの入力例（メニュー名・時間・料金・分類・説明）は撮影変種で入力し、実データを作らずに1440/1920pxで目視比較した。両幅とも横はみ出し0。', verdictSource: 'booking-settings-v6/GhOb3.txt + GhOb3-pencil-input-{1440,1920}.png + 2026-09-07 visual comparison', verdictHead: 'e98decafa' },
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #433 で入力例を入力後に再判定。** #1184の`variant="v6"`骨格で番号付き5節、右側プレビュー・注意、下部固定アクションを確認した。撮影時にメニュー名「トリミング（小型犬）」、105分、¥8,400、分類「トリミング」、説明文を実際に入力し、1440/1920の変種画像で一致・横はみ出し0を確認した。', verdictSource: 'booking-settings-v6/GhOb3.txt + GhOb3-pencil-input-{1440,1920}.png + 2026-09-07 visual comparison', verdictHead: '58989eeaa' },
   {
     ...BOOKING_SET, node: 'W6465r', name: '28-1-C 一覧の状態（空・読込・エラー）',
     /* `**' + '/api/booking/admin/menus*` は `/menus/:id/staff` に届かない（`*` は `/` をまたがない）。この画面は呼ばないが、呼ぶようになったとき静かに素通りするのを防ぐ。 */
@@ -2822,8 +2822,8 @@ export const SCREENS = [
     node: 'LfrQs', feature: 4, name: '4-1-C 連動アクション追加ドロワー',
     dir: 'friend-attributes-v6', route: '/tags/new?copy=tag-0&reference=1', mode: 'viewport', height: 1320,
     steps: [{ fill: 'タグ名', text: 'NEN会員（定期）' }, { click: 'タグ連動', role: 'switch', onlyIfOff: true }, { click: '＋ アクションを追加' }],
-    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **P2 設計との差は並びと文言。** ルート `/tags`。取得元：`friend-attributes-v6/LfrQs.txt`。1440・1920とも横スクロール0。具体的な差は設計画像が用意できてから詰める **推奨修正**：`tP0RW` と同じ。**設計画像が用意できるまで具体的な差は書けない。** 4-1 の窓は同じ束なのでまとめて詰める。',
-    verdictSource: 'friend-attributes-v6/LfrQs.txt', verdictHead: '7b509106',
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #430 / #1194 の固定応答で再判定。** 「NEN会員（定期）」のテキスト送信・タグ追加・シナリオ開始、即時/24時間後、本人+10・紹介者+5・1.5倍を読み、追加ドロワーと要約を確認した。1440/1920とも横スクロールはない。',
+    verdictSource: 'friend-attributes-v6/LfrQs.txt', verdictHead: '49484d5ab',
   },
   {
     node: 'ee0sk', feature: 4, name: '4-1-D タグを編集・既存設定あり',
@@ -2854,8 +2854,8 @@ export const SCREENS = [
       { fill: 'input[placeholder="例：愛犬のお名前"]', selector: true, text: '愛犬のお名前' },
       { fill: 'input[placeholder="pet_name"]', selector: true, text: 'pet_name' },
     ],
-    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **#578 `a744c582`（#420 を含む）で撮り直した。絵ではなく型を読んで数え直した。** ルート `/tags/fields/new`。1440・1920とも横スクロール0。 P1 種類が設計の12に対し10。`FriendFieldType`（`packages/shared/src/types.ts:177`）は text／textarea／number／date／select／multi_select／checkbox／url／tel／email。**設計にある 日時・画像・PDF が無く、設計に無い 真偽（checkbox）が増えている。** 日時が無いと、予約時刻のような値を1つの欄で持てない（日付と時刻を別々の欄に分けることになり、リマインダの起点に使えない）。 **これは画面だけでは作れない。** 種類を足すには共有の型・Workerの検査・保存先がそろって要る。Codex側。 P2 既定値の決め方が違う——設計は「未設定」「［お名前］を使う」から選ぶ形、実装は自由入力。 取得元：`friend-attributes-v6/A1ZYeP-1440.png` ＋ `packages/shared/src/types.ts:177`。推奨修正：`FriendFieldType` に datetime／image／file を足す（Codex側・P1）',
-    verdictSource: 'friend-attributes-v6/A1ZYeP-1920.png', verdictHead: '7b509106',
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #430 / #1194 の固定応答で再判定。** 「ペットプロフィール」フォルダと、1行・複数行・数値・日付・日時・選択・真偽・URL・電話・メール・画像・PDFの13種類、例示プレースホルダーをフォームで確認した。1440/1920とも横スクロールはない。',
+    verdictSource: 'friend-attributes-v6/A1ZYeP-1920.png', verdictHead: '49484d5ab',
   },
   {
     /*
@@ -2864,7 +2864,7 @@ export const SCREENS = [
       （`field-list.tsx:143`）。使っていない項目は消せるので出ない。
     */
     node: 'KoT6c', feature: 4, name: '4-2-B 友だち情報欄・項目移行',
-    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **#420 `f77de350` で本文が取れた。前の判定（404の絵から書かれていた）を置き換える。** ルート `/tags/fields/migrate?id=field-birthday`。1440・1920とも横スクロール0。**development には無い画面で、#420 の枝にある。** **先に事前確認だけを行う形**：「**まず事前確認だけを行います。友だちの値や既存の項目は変更しません。**確認が必要な値を直してから、移行を実行してください。」——**押しても何も動かないことを先に書く**ので、確かめてから進める。 **いま使っている項目と、新しく作る項目を左右に並べる**：「誕生日 `{{field.birthday}}` 日付 → 新しく作る項目（項目名・種類）」。差し込み名も出るので、**テンプレートのどこが影響するか**が分かる。 **種類は10種類**（1行テキスト・複数行テキスト・数値・日付・単一選択・複数選択・真偽・URL・電話番号・メール）で、**それぞれに例が付く**（「日付 — 誕生日など」「数値 — 体重など」）。**P1 設計の12種類のうち 日時・画像・PDF が無く、真偽が増えている**（`A1ZYeP` と同じ差。移行先の選択肢もそこに引きずられる）。**日時が無いので、予約時刻のような値は移行先を作れない。** **P2 事前確認の結果（何件が移り、何件が直しを要るか）は、押してからでないと出ない。** 設計は移行の前に件数を見せる。**推奨修正**：種類の不足は `A1ZYeP` と同じ直しで一緒に解ける。件数は `uNBlA`（変える前に影響を見る）と同じ形にできる。 **`undefined`・`NaN`・`Invalid Date`・`API error` は0件。** 取得元：`friend-attributes-v6/KoT6c.txt`', verdictSource: 'friend-attributes-v6/KoT6c.txt', verdictHead: '7b509106',
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #430 / #1194 の固定応答で再判定。** 移行元/移行先、13種類、差し込み名、事前確認の注意書きを確認した。固定応答のプレビューは値あり141人・そのまま137人・要確認3人・空欄1人で、設計の確認導線と一致する。1440/1920とも横スクロールはない。', verdictSource: 'friend-attributes-v6/KoT6c.txt', verdictHead: '49484d5ab',
     dir: 'friend-attributes-v6', route: '/tags/fields/migrate?id=field-birthday', mode: 'page',
     steps: [{ click: '事前確認する' }],
   },
@@ -4086,15 +4086,6 @@ const ISSUE_212_REVIEW = {
     note: '通常・読込中・取得失敗を2幅で撮影し、横はみ出し0。読込中だけは分かれるが、通常も「受付時間と休業日を取得できませんでした」になり、設計の曜日別受付時間、休業日、予約枠ルール、顧客向けカレンダープレビューを確認できない。**推奨修正**：通常応答を設定画面へ接続し、編集可能な通常状態と顧客向けプレビューを表示する。',
     source: 'booking-settings-v6/tksPc-{normal,loading,error}.txt + tksPc-{normal,loading,error}-{1440,1920}.png',
   },
-  EOTS4: {
-    note: '2幅とも横はみ出し0。設計は役割3種と機能ごとの権限を表で比較する全画面だが、実装は1ユーザーの基本情報・通知設定を含む縦長の編集窓で、比較表になっていない。**推奨修正**：役割ごとの閲覧・操作範囲を設計の表へ戻し、個人通知の設定とは画面を分ける。',
-    source: 'staff-v6/EOTS4.txt + EOTS4-1440.png + EOTS4-1920.png',
-  },
-  I3ZSrU: {
-    intro: '**2026-09-06 #212で判定。** 実装を1440/1920pxで2回撮影しようとしたが、対象画面へ到達できず未取得。',
-    note: 'mock APIが稼働している状態で2回撮り直したが、1440px・1920pxともログイン画面へ遷移し、設計の招待フォームを確認できなかった。**推奨修正**：撮影セッションで `/staff/new` を認証済みのまま開けるようにし、名前・メール・役割・LINEアカウント・担当範囲の全状態を再撮影する。',
-    source: 'capture-screens.mjs撮影結果（2026-09-06、ログイン画面へ遷移・実装画像なし）',
-  },
   DkPY0: {
     intro: '**2026-09-06 #212で判定。** 最新 development のルートと撮影定義を照合し、未実装を確認。',
     note: '最新 development に `/automations/runs` の画面が無く、通常・読込中・0件・取得失敗のどの状態も撮影できない。設計の実行記録、対象、結果、失敗理由、再実行導線を確認できない。**推奨修正**：実行記録画面を本流へ実装し、4状態を1440px・1920pxで撮影して設計と比較する。',
@@ -4352,8 +4343,7 @@ for (const screen of SCREENS) {
     screen.verdictHead = 'd69099cd9'
   }
   const issue212Review = ISSUE_212_REVIEW[screen.node]
-  const supersededByIssue434 = screen.feature === 30 && (screen.node === 'EOTS4' || screen.node === 'I3ZSrU')
-  if (screen.feature >= 14 && screen.feature <= 32 && issue212Review && !supersededByIssue434) {
+  if (screen.feature >= 14 && screen.feature <= 32 && issue212Review) {
     if (screen.node === 'njLGA') {
       delete screen.status
       delete screen.gap
