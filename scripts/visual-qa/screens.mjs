@@ -178,9 +178,9 @@ export const SCREENS = [
     node: 'vUXKb', feature: 1, name: '1-1 ダッシュボード',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
     verdict: "match",
-    verdictNote: "**2026-09-07 #454 再撮影で一致。** 設計画像と実装画像を上端から並べ、今日やること4枚の値と補足の間を8px、右カードの見出しと本文の間を10pxへ戻した。今月の送信枠は22px・1行（残り197 / 上限200通）、友だち追加リンクは発行中選択の外側にあった二重枠を除去。3104/8791で1440/1920pxを撮影し、両幅とも横はみ出し0。",
-    verdictSource: "dashboard-v6/vUXKb.txt + vUXKb-{1440,1920}.png + 2026-09-07 #454 top-aligned visual/dimension comparison",
-    verdictHead: "088cea8a8",
+    verdictNote: "**2026-09-07 Issue #458で再撮影し、一致を維持。** 左メニュー先頭に区分見出し「メイン」を追加し、ダッシュボード・受信箱・友だち・友だち属性をその下へ配置。選択中の緑枠とアカウント下の区切り線が重ならないことを、Pencilと実装の上端比較で確認した。3107/8794の1440/1920pxで横はみ出し0。",
+    verdictSource: "dashboard-v6/vUXKb.txt + dashboard-v6/vUXKb.png（Pencil） + dashboard-v6/vUXKb-{1440,1920}.png（実装） + Issue #458",
+    verdictHead: "f088f93bf",
   },
   {
     node: 'ZN0ov', feature: 1, name: '1-1-1 ダッシュボード編集',
@@ -220,6 +220,9 @@ export const SCREENS = [
     verdictSource: "inbox-v6/xGLVe.txt + 2026-09-07 same-input visual comparison",
     verdictHead: "4f8dfd8e0",
     ...issue455InboxReview('xGLVe'),
+    verdictNote: "**2026-09-07 Issue #458で再撮影し、一致を維持。** 左メニュー先頭に区分見出し「メイン」を追加し、ダッシュボード・受信箱・友だち・友だち属性をその下へ配置。選択中の緑枠とアカウント下の区切り線が重ならないことを、Pencilと実装の上端比較で確認した。Issue #455取り込み後の受信箱を3107/8794で1440/1920px撮影し、横はみ出し0。",
+    verdictSource: "inbox-v6/xGLVe.txt + inbox-v6/xGLVe.png（Pencil） + inbox-v6/xGLVe-{1440,1920}.png（実装） + Issue #458",
+    verdictHead: "f088f93bf",
   },
   {
     ...INBOX, node: 'NfgOs', name: '2-2 テンプレート選択',
@@ -444,9 +447,9 @@ export const SCREENS = [
       { suffix: 'attention', steps: [{ click: '注目のみ' }] },
     ],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #457で修正・再判定。** 一致。表の下の余分な空白をなくし、未対応・注目のみを設計と同じ小さい押し口へそろえた。選択中は色・枠・チェックで状態が分かり、実際に押して絞り込みが反映されることを確認。通常・未対応・注目のみを1440/1920pxで撮影し、横はみ出し0。",
-    verdictSource: "friends-v6/PhxG6{,-unhandled,-attention}.txt + 同名-{1440,1920}.png",
-    verdictHead: "07b5835cf5",
+    verdictNote: "**2026-09-07 Issue #458で再撮影し、一致を維持。** 左メニュー先頭の「メイン」見出しと、その下の4項目をPencilと同じ順・間隔にした。選択中の緑枠は上の区切り線と重ならない。通常・未対応・注目のみを3107/8794で1440/1920px撮影し、横はみ出し0。",
+    verdictSource: "friends-v6/PhxG6.txt + friends-v6/PhxG6.png（Pencil） + friends-v6/PhxG6{,-unhandled,-attention}-{1440,1920}.png（実装） + Issue #458",
+    verdictHead: "f088f93bf",
   },
   {
     /*
@@ -3005,8 +3008,9 @@ export const SCREENS = [
   */
   { node: 'hqrOv', feature: 4, name: '4-1 友だち属性・タグ', dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #297で修正・再判定。** 一致。4指標、4タブ、フォルダ帯、3絞り込み、5つのよく使う条件、10列の一覧、ページ送りを設計順に表示した。設計の先頭6行と101件の固定データで確認し、1440・1920pxとも横はみ出し0。",
-    verdictSource: "friend-attributes-v6/hqrOv.txt + friend-attributes-v6/hqrOv-{1440,1920}.png",
+    verdictNote: "**2026-09-07 Issue #458で再撮影し、一致を維持。** 左メニュー先頭の「メイン」見出しと、その下の4項目をPencilと同じ順・間隔にした。友だち属性の緑枠は上の区切り線から十分離れ、3107/8794の1440/1920pxで横はみ出し0。",
+    verdictSource: "friend-attributes-v6/hqrOv.txt + friend-attributes-v6/hqrOv.png（Pencil） + friend-attributes-v6/hqrOv-{1440,1920}.png（実装） + Issue #458",
+    verdictHead: "f088f93bf",
   },
   {
     node: 'dKlkz', feature: 4, name: '4-1-F タグ削除の確認ダイアログ',
