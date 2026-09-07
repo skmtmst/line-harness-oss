@@ -4490,7 +4490,7 @@ const automationRun = ({
   status,
   detail,
   durationMs,
-  canRetry: false,
+  canRetry: status === 'permanent_failed' && failedAction !== null,
   automationId,
   automationName,
   automationVersionId: `${automationId}-version-3`,
@@ -4976,6 +4976,35 @@ export const LINE_NOTIFICATION_DELIVERIES = {
   summary: EC_NOTIFICATION_RUNS.summary,
   coverage: { source: 'notification_delivery_ledger', unassignedHistoricalRowsExcluded: true, attemptHistoryAvailable: true, retryAvailable: true },
 }
+
+/** 機能24 DpxOK / N2gAza。運用者向けの宛先と当日実行を同じ固定結果で再現する。 */
+export const OPERATOR_NOTIFICATION_RECIPIENTS = {
+  items: [
+    { id: 'staff-owner', name: '高橋 直人', lineLinked: true, emailVerified: true, channels: { line: true, email: false, dashboard: true }, canReceive: true },
+    { id: 'staff-support', name: '佐々木 花', lineLinked: true, emailVerified: false, channels: { line: true, email: false, dashboard: true }, canReceive: true },
+    { id: 'staff-store', name: '中川 誠', lineLinked: false, emailVerified: true, channels: { line: false, email: false, dashboard: true }, canReceive: true },
+  ],
+  summary: { staff: 3, canReceive: 3, line: 2, email: 0, dashboard: 3, unavailable: 0 },
+}
+
+const operatorRule = (id, name, eventType, recipientLabel, occurredToday, status = 'published', recipientIds = ['staff-owner', 'staff-support']) => ({
+  id, name, eventType,
+  conditions: { importance: 'important', recipientIds, recipientLabel, scheduleLabel: 'いつでも', dedupeMinutes: 10 },
+  channels: ['dashboard', 'line'], isActive: status === 'published', status,
+  recipientCount: recipientIds.length, lineRecipientCount: recipientIds.filter((value) => value !== 'staff-store').length,
+  occurredToday, acceptedToday: occurredToday * 2, excludedToday: 0,
+  lastOccurredAt: occurredToday ? '2026-09-07T11:20:00+09:00' : null,
+  createdAt: '2026-09-01T09:00:00+09:00', updatedAt: '2026-09-07T10:00:00+09:00',
+})
+
+export const OPERATOR_NOTIFICATION_RULES = [
+  operatorRule('operator-rule-1', '新しい予約が入りました', 'message_received', '予約チーム 3人', 18, 'published', ['staff-owner', 'staff-support', 'staff-store']),
+  operatorRule('operator-rule-2', '審査を待っている写真があります', 'cv_fire', '審査チーム 2人', 4),
+  operatorRule('operator-rule-3', '配信が失敗しました', 'incoming_webhook.custom', '運用チーム 2人', 2),
+  operatorRule('operator-rule-4', '外部連携でエラーが出ました', 'incoming_webhook.custom', '運用チーム 2人', 0),
+  operatorRule('operator-rule-5', '緊急の受信があります', 'message_received', '店長 1人', 1, 'published', ['staff-owner']),
+  operatorRule('operator-rule-6', '月の配信数が上限に近づきました', 'friend_add', '受け取る人がいません', 0, 'draft', []),
+]
 
 /*
   イベント。設計 `ugP5y`（29-1 イベント予約）の

@@ -1574,10 +1574,10 @@ export const SCREENS = [
     verdictHead: "49484d5ab",
   },
   { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか', route: '/rich-menus/edit?id=rmg-1&step=targeting', mode: 'viewport', height: 1080,
-    verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。STEP 2、条件、対象人数、優先順位、標準15軸・追加6軸、保存導線を確認した。重複人数と実配布人数は固定入力不足のため構造一致・データ待ち。",
-    verdictSource: "rich-menus-v6/kQ1bs.txt",
-    verdictHead: "e98decafa",
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #440 で再判定。** `/api/rich-menu-groups/rmg-1/preview-targets` の固定応答から、対象1,020人・上位メニューとの重複180人・実際に出る840人・優先順位2を表示した。STEP 2、保存済み条件、標準15軸・追加6軸、保存導線を設計画像と照合し、1440・1920とも横はみ出し0。取得できない人数を0人に置き換えない契約も維持している。',
+    verdictSource: 'rich-menus-v6/kQ1bs.txt + rich-menus-v6/kQ1bs-1920.png',
+    verdictHead: '3ddca80cc4',
   },
   {
     /*
@@ -2306,9 +2306,9 @@ export const SCREENS = [
     variants: [{ suffix: '-birthday', route: '/nen-campaigns/edit?key=birthday_coupon' }],
     route: '/nen-campaigns/edit?key=review_request',
     verdict: "needs_fix",
-    verdictNote: "**2026-09-06 #212で判定。** 設計1920pxと実装1440/1920pxを目視比較。通常・誕生日の2状態を2幅で撮影し、横はみ出し0。どちらも「この配信が見つかりませんでした」の空表示で、設計の配信条件、本文編集、LINEプレビュー、送信後の動作が出ない。**推奨修正**：撮影用設定へ対象キーを接続し、編集内容とプレビューを表示して全状態を撮り直す。",
+    verdictNote: "**2026-09-07 Issue #439 / UI HEAD 082be35e7を3102/8789で再撮影・判定。** `review_request` と `birthday_coupon` の機能専用固定応答を接続し、通常・誕生日の2状態を1440/1920pxで表示できた。横はみ出し0。以前の「配信が見つかりません」は解消したが、実装は4区画の汎用フォームで、設計の吹き出し編集（あと2つまで）、差し込み項目、LINEプレビュー、回答フォームを開く・マイル200付与の送信後アクションが無い。**推奨修正：設計の本文エディタと送信後アクションを画面コードへ実装する。**",
     verdictSource: "nen-v6/HpKyF.txt + HpKyF-birthday.txt + HpKyF-{1440,1920}.png + HpKyF-birthday-{1440,1920}.png",
-    verdictHead: "bf7434ff",
+    verdictHead: "082be35e7",
   },
   {
     ...NEN, node: 'ymXJK', name: '21-1-E コラムを書く',
@@ -2468,19 +2468,19 @@ export const SCREENS = [
     ...EC, node: 'bfB50', name: '23-1-B 定期便',
     route: '/ec-commerce?tab=subscriptions',
     states: { apis: ['**/api/ec-commerce/subscriptions?**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
-    verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07 Issue #413 / UI `88673e254` を3101/8788で再撮影。** bfB50の通常・読込・空・異常・権限不足を1440/1920pxで確認し、月別集計の件数・金額を返す `monthlyStats` と開始・停止件数をAPIへ追加した。現モックは新しい集計値を返さないため、設計の月別集計表示はデータ待ちとして記録。全画像で横はみ出し0。",
-    verdictSource: "ec-v6/bfB50.txt + ec-v6/bfB50-normal-1920.png",
-    verdictHead: "88673e254",
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #440 で再判定。** `/api/ec-commerce/subscriptions` の固定応答から、月別3か月の件数・金額、今月開始12件・停止3件・最多取消理由、継続172件と決済確認14人を表示した。通常・読込・空・失敗・権限不足を1440・1920で撮影し、全状態で横はみ出し0。予測値は作らず、ECの決済状態を根拠にしている。',
+    verdictSource: 'ec-v6/bfB50.txt + ec-v6/bfB50-normal-1920.png',
+    verdictHead: '3ddca80cc4',
   },
   {
     ...EC, node: 'oHAN4', name: '23-1-C EC連携のつなぎ先',
     route: '/ec-commerce?tab=connector',
     states: { apis: ['**/api/ec-commerce/connector?**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
-    verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07 Issue #413 / UI `88673e254` を3101/8788で再撮影。** oHAN4の通常・読込・空・異常・権限不足を1440/1920pxで確認し、NEN配信・成果・マイル・友だち属性・分析の影響件数をAPIから返すようにした。現モックは新しい件数を返さないため、設計の影響件数はデータ待ちとして記録。全画像で横はみ出し0、秘密値露出0。",
-    verdictSource: "ec-v6/oHAN4.txt + ec-v6/oHAN4-normal-1920.png",
-    verdictHead: "88673e254",
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #440 で再判定。** `/api/ec-commerce/connector` の固定応答から、NEN配信3件・コンバージョン18件・マイル2件・友だち属性7件・分析5件と、再試行は3回まで・10分間隔を表示した。通常・読込・空・失敗・権限不足を1440・1920で撮影し、全状態で横はみ出し0、鍵は末尾4文字以外を露出していない。',
+    verdictSource: 'ec-v6/oHAN4.txt + ec-v6/oHAN4-normal-1920.png',
+    verdictHead: '3ddca80cc4',
   },
 
   // ── 機能24 LINE通知 ─────────────────────────────────────
@@ -2501,10 +2501,11 @@ export const SCREENS = [
       （`role: 'text'` は ARIA に無く0件になる）。設計の並び順で3番目なので `nth: 2`。
     */
     steps: [{ click: '内容を編集', nth: 2, after: 800 }],
-    verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。編集欄、差し込み項目、ボタン、LINEプレビュー、公開版と下書きの分離を確認した。新しい通知定義・送信テストAPIが固定データに無いため構造一致・データ待ち。",
-    verdictSource: "line-notify-v6/Q55bb.txt",
-    verdictHead: "e98decafa",
+    variants: [{ suffix: '-test-sent', steps: [{ click: '自分にテスト送信', after: 800 }] }],
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #440 で再判定。** `/api/line-notifications/customer-definitions` の固定応答から「発送した」の公開版v2と編集下書きを読み、見出し・本文・差し込み項目・ボタン・プレビュー・保存と公開を表示した。`/api/ec-commerce/test-send` の固定応答でテスト送信後の成功表示も撮影した。1440・1920とも横はみ出し0で、公開中の版を下書き保存だけで変えない。',
+    verdictSource: 'line-notify-v6/Q55bb.txt + line-notify-v6/Q55bb-1920.png + line-notify-v6/Q55bb-test-sent-1920.png',
+    verdictHead: '3ddca80cc4',
   },
   {
     ...LINE_NOTIFY, node: 'X8JCA5', name: '24-1-B 送れなかったもの',
@@ -2532,19 +2533,19 @@ export const SCREENS = [
   {
     ...LINE_NOTIFY, node: 'DpxOK', name: '24-2 運用者へのお知らせ',
     route: '/line-notifications?tab=operator', mode: 'page',
-    states: { apis: ['**/api/notifications/rules?**', '**/api/notifications/rules'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 PR #958（Issue #237）head `1a0a71ba` で設計と再比較。** 帯・作成導線・検索・絞り込み・表・CSV未接続の断りを維持。読込・通常・空・失敗・権限不足・絞込0件を data-list-state で名前付きにし、取得不能な数を0にしない。1440・1920の5状態、全12枚で横はみ出し0。送信処理と実行記録が未接続のため、構造一致・データ未接続を維持。',
-    verdictSource: 'line-notify-v6/DpxOK-forbidden.txt + DpxOK-normal.txt',
-    verdictHead: '1a0a71ba',
+    states: { apis: ['**/api/notifications/operator-rules?**', '**/api/notifications/operator-rules'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #439 / UI HEAD 082be35e7を3102/8789で再撮影・判定。** アカウントと統括で分離した実行記録APIを接続し、公開・停止・本人テスト、重複防止、当日集計、理由付きCSV出力を実装した。設計どおりの4集計、検索、4絞り込み、並び順、6行と操作を固定応答で確認。通常・読込・空・失敗・権限不足を1440/1920pxの全12枚で撮影し、横はみ出し0。',
+    verdictSource: 'line-notify-v6/DpxOK-{normal,loading,empty,error,forbidden}.txt + DpxOK-normal-{1440,1920}.png',
+    verdictHead: '082be35e7',
   },
   {
     ...LINE_NOTIFY, node: 'N2gAza', name: '24-2-A 運用者へのお知らせをつくる',
     route: '/line-notifications/operator/new', mode: 'page',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 PR #958（Issue #237）head `1a0a71ba` で設計と再比較。** 「LINEログインを済ませた人にだけ届く」「担当が未設定だと届かない」「LINEにログインしていない人はメールへ切り替える」を先に明記。宛先・きっかけ・重要度・重複防止・注意・関連導線と、下書きだけ保存する安全な動きを1440・1920で確認し、横はみ出し0。スタッフ人数と送信プレビューは送信処理接続後のため、構造一致・データ未接続へ更新。',
-    verdictSource: 'line-notify-v6/N2gAza.txt',
-    verdictHead: '1a0a71ba',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #439 / UI HEAD 082be35e7を3102/8789で再撮影・判定。** 実在スタッフの受信可否と人数を専用APIから表示し、きっかけ・件数・重要度・宛先・時間・重複防止を下書きへ保存して、本人テスト後に公開できる。LINE未ログイン時の確認済みメール代替も送信処理と実行記録へ接続した。設計の主欄・右プレビュー・注意・関連導線・追従操作を1440/1920pxで確認し、横はみ出し0。',
+    verdictSource: 'line-notify-v6/N2gAza.txt + N2gAza-{1440,1920}.png',
+    verdictHead: '082be35e7',
   },
 
   // ── 機能25 オートメーション ─────────────────────────────
@@ -2554,7 +2555,21 @@ export const SCREENS = [
     **同じ帯**に並ぶ。実装は `/automations` と `/common-actions` の別ページ。
   */
   { ...AUTOMATION, node: 'gief7', name: '25-1 オートメーション', route: '/automations', verdict: 'match', verdictNote: '**2026-09-07 Issue #377 / UI HEAD `bd900c36d` を3107/8794で再撮影し、★V6設計と同じ1920pxで比較。** 実API契約から18本（稼働14・停止4）、この30日8,420回・失敗6回・未実行3本、設計先頭6行の実行数と失敗表示、詳細導線を表示した。1440px・1920pxとも横はみ出し0で一致。', verdictSource: 'automations-v6/gief7.txt + automation-load-state-contract.test.ts', verdictHead: 'bd900c36d' },
-  { ...AUTOMATION, node: 'Rv8Jv', name: '25-1-A オートメーションをつくる', route: '/automations/new', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #421 で固定ポート3105/8792にて再撮影。** 名前・処理・15軸の条件入力・要約・注意・追従操作は1440px・1920pxで横はみ出し0。条件保存と見込み人数・1人テストのAPIは実装済みだが作成画面への接続は次段で、設計6種のきっかけとプレビュー値は未接続のため構造一致・データ未接続と判定する。', verdictSource: 'automations-v6/Rv8Jv.txt + automation-create-v6-contract.test.ts', verdictHead: 'd2ea91a4b' },
+  {
+    ...AUTOMATION, node: 'Rv8Jv', name: '25-1-A オートメーションをつくる', route: '/automations/new',
+    steps: [
+      { click: 'タグが付いた・外れたとき' },
+      { select: 'きっかけのタグ', label: '体験申込' },
+      { select: '付いたとき・外れたとき', label: '付いたとき' },
+      { fill: '#au-name', selector: true, text: '体験申込がついたらフォローを始める' },
+      { select: '条件の軸', label: 'タグを持っていない' },
+      { fill: '条件の値', text: '会員' },
+      { select: '自動化で付けるタグ', label: '体験申込' },
+      { click: '下書きに保存', after: 1000 },
+      { fill: '1人テストの友だちID', text: 'friend-visual-1' },
+    ],
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #438 / UI HEAD `e20d921b8` を固定ポート3105/8792で再撮影し、★V6設計と同じ1920pxで比較して一致を確認。** 6種のきっかけ、タグの付け外し、15軸の条件、処理、下書き保存、見込み人数286人、対象友だちを指定する1人テストを実API契約へ接続した。1440px・1920pxとも横はみ出し0。', verdictSource: 'automations-v6/Rv8Jv.txt + automation-create-v6-contract.test.ts', verdictHead: 'e20d921b8',
+  },
   {
     /*
       **PR #502（head `75b010fc`）で `/automations/runs` が入った。**
@@ -2571,10 +2586,10 @@ export const SCREENS = [
       apis: ['**/api/automation-runs*'],
       kinds: ['normal', 'loading', 'empty', 'error'],
     },
-    verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07 Issue #299 / UI HEAD `380cd6631` を固定ポート3105/8792で再撮影。** PR #1051 の固定データを `GET /api/automation-runs` から読み、設計と同じ4指標・7行の通常表示、検索、結果絞り込み、読込・空・失敗を確認した。1440px・1920pxの全状態で横はみ出し0。安全な再実行API・実行詳細画面・CSV書き出しは未接続なので押せる操作を出さず、構造一致・データ未接続と判定する。",
-    verdictSource: "automations-v6/DkPY0-normal.txt + DkPY0-loading.txt + DkPY0-empty.txt + DkPY0-error.txt",
-    verdictHead: "380cd6631",
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #438 / UI HEAD `e20d921b8` を固定ポート3105/8792で再撮影し、★V6設計と同じ1920pxで比較して一致を確認。** 4指標・7行の実行記録、対象、結果、失敗理由、実行詳細を実APIから表示する。失敗した処理だけを待機へ戻し、成功済み処理を二重実行しない安全な再実行を接続した。通常・読込中・0件・取得失敗の全10枚で横はみ出し0。',
+    verdictSource: 'automations-v6/DkPY0-normal.txt + DkPY0-loading.txt + DkPY0-empty.txt + DkPY0-error.txt + automation-runs-v6-contract.test.ts',
+    verdictHead: 'e20d921b8',
   },
   {
     ...AUTOMATION, node: 'WjYAC', name: '25-1-C 見本から作る',
@@ -2598,7 +2613,7 @@ export const SCREENS = [
     verdictSource: 'automations-v6/Vdbv5.txt + Vdbv5-loading.txt + Vdbv5-empty.txt + Vdbv5-error.txt', verdictHead: '44e671b2c',
   },
   { ...AUTOMATION, node: 'xOpDs', name: '25-2 共通アクション', route: '/common-actions', verdict: 'match', verdictNote: '**2026-09-07 Issue #377 / UI HEAD `bd900c36d` を3107/8794で再撮影し、★V6設計と同じ1920pxで比較。** 実API契約から14件（公開11・下書き3）、呼び出し元38、今月2,847回・失敗6回、古い版2件・3か所を表示。5種の絞り込み、CSV、6行単位のAPIページ送りも接続し、1440px・1920pxとも横はみ出し0で一致。', verdictSource: 'automations-v6/xOpDs.txt + common-actions-v6-contract.test.ts', verdictHead: 'bd900c36d' },
-  { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #377 / UI HEAD `bd900c36d` を3107/8794で再撮影。** 名前・説明、処理順、失敗時設定、待ち時間、版の決めごと、利用先、注意、追従保存は1440px・1920pxで横はみ出し0。新規作成は仕様どおり空の下書き＋処理1件で始める。設計例を再現する複製・見本の受け渡し、1人テスト、条件分岐を返すAPI契約が無いため、押せる形や値を作らず理由付き構造一致・データ未接続を維持する。', verdictSource: 'automations-v6/py5CG.txt + common-actions-v6-contract.test.ts', verdictHead: 'bd900c36d' },
+  { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #438 / UI HEAD `e20d921b8` を固定ポート3105/8792で再撮影。** 名前・説明、処理順、失敗時設定、待ち時間、公開版を呼ぶ受け渡し、版の注意、下書き保存は1440px・1920pxで横はみ出し0。一覧の「複製して下書きを作る」も実APIへ接続した。正本 §4-7 は作成画面の操作を下書き保存だけと定め、条件分岐は接続契約で第2期（案）のまま、1人テストは保存後の公開版を03の一括操作から呼ぶ契約のため、設計例の押せるボタンを作らず構造一致・データ未接続とする。', verdictSource: 'automations-v6/py5CG.txt + common-actions-v6-contract.test.ts + v6-25-automation-requirements-draft.md §4-7', verdictHead: 'e20d921b8' },
   { ...AUTOMATION, node: 'syWp4', name: '25-2-B 共通アクションの版と使われている場所', route: '/common-actions/versions?id=ca-1', verdict: 'match', verdictNote: '**2026-09-07 Issue #377 / UI HEAD `bd900c36d` を3107/8794で再撮影し、★V6設計と同じ1920pxで比較。** 実API契約からv4〜v1、利用先5件・古い版1件、今月1,284回・失敗2回、実行中18件・待機中6件を表示。利用先を版履歴より先に置き、機能名・固定版・進行中件数を1行で読める形へそろえた。1440px・1920pxとも横はみ出し0で一致。', verdictSource: 'automations-v6/syWp4.txt + usage-summary.test.ts + common-actions-v6-contract.test.ts', verdictHead: 'bd900c36d' },
 
   // ── 機能26 外部連携 ─────────────────────────────────────
@@ -2662,9 +2677,9 @@ export const SCREENS = [
       { click: '詳細', nth: 0 },
     ],
     verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07 Issue #304 / PR #1095 / UI HEAD `ff26e0f1f` を3105/8792で再撮影。構造一致・顧客カルテ連携データ待ち。** 狭い引き出しを全面詳細へ広げ、予約内容、現在の履歴、予約で動いたこと、顧客・ペット、当日の注意、関連先、状態操作を設計位置へ配置した。1440px・1920pxとも横はみ出し0。予約一覧APIはペット・電話・タグ・マイル・過去予約・通知開封・前回申し送りを返さないため、推測せず「友だち情報で確認」と表示し一致扱いにしない。",
+    verdictNote: "**2026-09-07 Issue #438 / UI HEAD `e20d921b8` を固定ポート3105/8792で再撮影。構造一致・予約詳細契約の項目待ち。** 一覧の専用「詳細」操作から安定して予約詳細へ進み、予約内容、現在の履歴、予約で動いたこと、顧客・ペット、当日の注意、関連先、状態操作を2幅で確認した。予約一覧・詳細APIは電話、ペット、タグ、マイル、過去予約、通知開封、前回申し送りを返さないため推測せず、1440px・1920pxとも横はみ出し0の構造一致・データ未接続とする。",
     verdictSource: "booking-v6/TnDbq.txt + TnDbq-{1440,1920}.png",
-    verdictHead: "ff26e0f1f",
+    verdictHead: "e20d921b8",
   },
   /*
     **判定を改めた（PR #459 head `ba0bf62d`）。** 代理予約の画面ができた
@@ -2709,9 +2724,9 @@ export const SCREENS = [
       { click: '予約内容を確認する', after: 700 },
     ],
     verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07 Issue #421 で固定ポート3105/8792にて再撮影。** LINE友だち・電話客の顧客情報、予約内容、要望、通知予定、LINEプレビュー、注意、関連先、空き再確認を配置し、10:00〜11:45の枠で確認まで進めた。1440px・1920pxとも横はみ出し0。通知実績と顧客カルテの詳細は別APIのため構造一致・データ未接続と判定する。",
+    verdictNote: "**2026-09-07 Issue #438 / UI HEAD `e20d921b8` を固定ポート3105/8792で再撮影。** 顧客情報、予約内容、要望、通知予定、右側LINEプレビュー、注意、関連先、登録直前の空き再確認を配置し、10:00〜11:45の枠で確認まで進めた。確認APIは電話・ペットと予約後のリマインド時刻を返さないため作り物を出さず、1440px・1920pxとも横はみ出し0の構造一致・データ未接続とする。",
     verdictSource: "booking-v6/GFDqW.txt + GFDqW-{1440,1920}.png",
-    verdictHead: "ff26e0f1f",
+    verdictHead: "e20d921b8",
   },
   {
     ...BOOKING, node: 'GfceK', name: '27-1-E 代理予約・登録完了',
@@ -2727,9 +2742,9 @@ export const SCREENS = [
       { click: 'この内容で予約を入れる', after: 1200 },
     ],
     verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07 Issue #304 / PR #1095 / UI HEAD `ff26e0f1f` を3105/8792で再撮影。構造一致・通知実績データ待ち。** PR #1088の固定応答で実際に登録完了まで進み、返された予約ID・カレンダー状態、お客様・日時・メニュー・担当・受付方法、LINE処理開始、同じ予約台帳への記録、次の操作、LINEプレビューと関連先を表示した。1440px・1920pxとも横はみ出し0。登録結果APIは送信・開封実績、登録者、予定通知の実行結果、成果計上結果を返さないため、送信済みと作らず一致扱いにしない。",
+    verdictNote: "**2026-09-07 Issue #438 / UI HEAD `e20d921b8` を固定ポート3105/8792で再撮影。構造一致・登録結果契約の項目待ち。** 実際に登録成功まで進み、予約ID・カレンダー状態、お客様・日時・メニュー・担当・受付方法、LINE処理開始、予約台帳への記録、次の操作、LINEプレビューを表示した。登録結果APIは送信・開封実績、登録者、予定通知の実行結果、成果計上結果を返さないため送信済みと作らず、1440px・1920pxとも横はみ出し0の構造一致・データ未接続とする。",
     verdictSource: "booking-v6/GfceK.txt + GfceK-{1440,1920}.png",
-    verdictHead: "ff26e0f1f",
+    verdictHead: "e20d921b8",
   },
   {
     ...BOOKING, node: 'Lg8ff', name: '27-1-F 代理予約・予約枠の重なりと入力エラー',
@@ -2768,9 +2783,9 @@ export const SCREENS = [
       ],
     }],
     verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07 Issue #304 / PR #1095 / UI HEAD `ff26e0f1f` を3105/8792で再撮影。構造一致・重複詳細データ待ち。** 実際のHTTP 409から赤い要約、保持した入力、選択日だけの空き候補、別担当の確認案内、注意、関連先を表示し、選び直した後は登録完了まで到達した。競合・回復を各1440px・1920pxで撮影し、全4枚とも横はみ出し0。エラーAPIは機械コードだけで、重複時間の範囲・件数・別担当の候補を返さないため、入力へ戻って確認と表示し一致扱いにしない。",
+    verdictNote: "**2026-09-07 Issue #438 / UI HEAD `e20d921b8` を固定ポート3105/8792で再撮影。構造一致・409詳細契約の項目待ち。** 実際のHTTP 409から赤い要約、保持した入力、選択日だけの空き候補、別担当の確認案内を表示し、選び直した後は登録完了まで到達した。409応答は機械コードだけで、重複時間の範囲・件数・別担当の空き候補を返さないため推測せず、競合・回復の全4枚で横はみ出し0の構造一致・データ未接続とする。",
     verdictSource: "booking-v6/Lg8ff.txt + Lg8ff-recovered.txt + Lg8ff-{1440,1920}.png + Lg8ff-recovered-{1440,1920}.png",
-    verdictHead: "ff26e0f1f",
+    verdictHead: "e20d921b8",
   },
 
   // ── 機能28 予約設定 ─────────────────────────────────────
@@ -2883,10 +2898,10 @@ export const SCREENS = [
 
   // ── 機能31 機能設定 ─────────────────────────────────────
   { ...FEATURE_SET, node: 'c4R6F', name: '31-1 機能設定',
-    verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。説明、必須表示、切替、並び替え、初期値復元、利用中/作成数を確認した。一部利用数が未取得のため構造一致・データ待ち。",
-    verdictSource: "settings-v6/c4R6F.txt",
-    verdictHead: "e98decafa",
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #440 で再判定。** `/api/settings/features` と `/api/analytics/usage` を並行取得し、友だち属性22/101、シナリオ11/11、テンプレート0/0、リッチメニュー2/4、回答フォーム5/8、流入・成果9/16、オートメーション3/7の利用中／作成数を表示した。取得できない共通情報・登録メディアは0にせず「利用数は未取得」と明示する。説明、必須表示、切替、並び替え、初期値復元を設計画像と照合し、1440・1920とも横はみ出し0。',
+    verdictSource: 'settings-v6/c4R6F.txt + settings-v6/c4R6F-1920.png',
+    verdictHead: '3ddca80cc4',
   },
 
   // ── 機能32 運用状態 ─────────────────────────────────────
@@ -3346,6 +3361,7 @@ export const CAPTURED_AT = {
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
   ],
   21: [
+    { pr: 1225, head: '731226e42', on: '2026-09-07', screens: ['HpKyF'], note: 'Issue #439 / PR #1225。撮影用の配信キーと固定応答を接続し、通常・誕生日を3102/8789の1440・1920pxで撮影。固定データ不足は解消し、残る本文エディタと送信後アクションの差を記録した。' },
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['VLMGH','DEX0k','q4lajm','WeXbL','ymXJK','i9sQP'],
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
   ],
@@ -3358,6 +3374,7 @@ export const CAPTURED_AT = {
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
   ],
   24: [
+    { pr: 1225, head: '731226e42', on: '2026-09-07', screens: ['DpxOK','N2gAza'], note: 'Issue #439 / PR #1225。運用者向け送信・実行記録・理由付きCSVを接続し、一覧の全状態と作成画面を3102/8789の1440・1920pxで撮影。横はみ出し0で一致と判定した。' },
     { pr: 1191, head: 'e98decafa', on: '2026-09-07', screens: ['Q55bb'], note: 'Issue #422 / PR #1191。通知編集画面を3102/8789で1440・1920px撮影し、横はみ出し0。固定入力不足はデータ待ちとして記録した。' },
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['festr','X8JCA5','Se65i','DpxOK','N2gAza'],
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
@@ -3494,6 +3511,7 @@ export const CAPTURED_AT = {
       note: 'Issue #219。作成を正本の5段へ分け、対象13画面と状態別を3104/8791の1440・1920pxで撮影。全画像で横はみ出し0。一致2、構造一致・データ未接続5、要修正6。' },
   ],
   12: [
+    { pr: 1224, head: '3ddca80cc4', on: '2026-09-07', screens: ['kQ1bs'], note: 'Issue #440 / PR #1224。取り込み済みの固定データを表示した対象条件画面を3104/8791で1440・1920px撮影し、横はみ出し0で一致へ更新した。' },
     { pr: 1191, head: 'e98decafa', on: '2026-09-07', screens: ['kQ1bs'], note: 'Issue #422 / PR #1191。対象条件画面を3102/8789で1440・1920px再撮影し、横はみ出し0。条件軸・対象人数・優先順位を確認し、固定入力不足は構造一致・データ待ちで記録した。' },
     { pr: 1129, head: 'af74a0bbd', on: '2026-09-07', screens: ['GO8RQ', 'XtfO3', 'UMiJ9', 'TL7tp', 'szXsT'], note: 'Issue #367。統合済みの月間人数・外部メニュー面アクション・削除影響人数を画面へ接続し、3104/8791で1440・1920pxを撮影。全10枚で横はみ出し0。共有固定応答に残る不足を理由付きで5画面の判定へ記録した。' },
     { pr: 1007, head: 'f2be359e5', on: '2026-09-06', screens: ['GO8RQ', 'XtfO3', 'TL7tp', 'RW5Tb'], note: 'Issue #225。3102/8789で1440・1920と一覧4状態を撮影し、全画像で横スクロール0。要修正4枚を、一致1・構造一致／不足API待ち3へ更新した。' },
@@ -3560,12 +3578,14 @@ export const CAPTURED_AT = {
         + '`jwrbf`（成果内訳）は「田中 明」が見つからず撮れていない。' },
   ],
   27: [
+    { pr: 0, head: 'e20d921b8', on: '2026-09-07', screens: ['TnDbq', 'GFDqW', 'GfceK', 'Lg8ff'], note: 'Issue #438。予約詳細の安定した操作、代理予約の確認・完了・409回復を3105/8792で1440/1920px撮影。全画像で横はみ出し0。APIが返さない顧客カルテ、通知実績、競合詳細は各画面の判定注記へ記録した。' },
     { pr: 459, head: 'ba0bf62d', on: '2026-08-29', screens: ['GFDqW', 'GfceK', 'Lg8ff'], note: '代理予約の入力→確認→完了→競合を実際に操作して撮った。競合だけ回復画面に届かない' },
     { pr: 562, head: '45789965', on: '2026-08-29', screens: ['Lg8ff'], note: '重なりから選び直して登録まで通した。`ApiError.code` を足して、機械コードと人へ見せる文を別の契約に分けている' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['TV2DI', 'TnDbq', 'SbuUI'], note: 'development そのもので撮った' },
     { pr: 587, head: '425a6b1a', on: '2026-08-30', screens: ['GFDqW', 'GfceK', 'Lg8ff'], note: '確認直前の空き再取得、完了画面のリマインダ時刻と台帳の事実。撮影データの slots[].date を要件どおりに直した' },
   ],
   24: [
+    { pr: 1224, head: '3ddca80cc4', on: '2026-09-07', screens: ['Q55bb'], note: 'Issue #440 / PR #1224。公開版・下書きとテスト送信結果を実API応答へ接続し、3104/8791で1440・1920px撮影。横はみ出し0で一致へ更新した。' },
     { pr: 1076, head: '8e7c374991', on: '2026-09-07', screens: ['festr', 'Q55bb', 'X8JCA5', 'Se65i'], note: 'Issue #291。固定ポート3102/8789で通常・読込・空・失敗の全状態を1440/1920px撮影し、全画像で横はみ出し0。4画面の構造をV6へそろえた。通知実行の通常fixtureと配信・開封・再試行・版管理のAPI契約が未提供のため、理由つきの構造一致・データ未接続とした。' },
     { pr: 504, head: '806ed169', on: '2026-08-30', screens: ['festr', 'Q55bb'], note: '顧客通知の一覧とテンプレート。**`DpxOK` はここでは撮らない**——#504 に運用者タブは無く、撮ると #564 の絵を巻き戻す（実際に一度やって git から戻した）' },
     { pr: 545, head: 'c9bb193d', on: '2026-08-30', screens: ['X8JCA5', 'Se65i', 'DpxOK', 'N2gAza'], note: '顧客通知の記録と失敗、運用者通知の一覧と作成。**#545 は #504 を含む**。個人の既読は作っていない。**head が `03022681` → `c9bb193d` へ動いたが撮り直していない**——`notification-run-list.tsx`・`operator/new/page.tsx`・`operator-notification-rules.tsx` の blob がいずれも同一（差分は development の取り込み）' },
@@ -3676,6 +3696,7 @@ export const CAPTURED_AT = {
     { pr: 586, head: '7428a314', on: '2026-08-30', screens: ['EMBIK'], note: '回答の保存先をフォーム定義から数える。重複は Set で除く。固定データにわざと重複を入れて確かめた' },
   ],
   25: [
+    { pr: 0, head: 'e20d921b8', on: '2026-09-07', screens: ['Rv8Jv', 'DkPY0', 'py5CG'], note: 'Issue #438。6種のきっかけ、下書き保存・見込み人数・1人テスト、実行詳細と失敗処理だけの安全な再実行、共通アクション複製を接続し、3105/8792で1440/1920pxを撮影。全画像で横はみ出し0。' },
     { pr: 502, head: '75b010fc', on: '2026-08-28', screens: ['DkPY0'], note: '#502 は #500 を含む。新しい表は作らず既存の automation_runs を読む' },
     { pr: 552, head: '6ce43563', on: '2026-08-29', screens: ['gief7', 'Rv8Jv', 'WjYAC', 'Vdbv5'], note: 'タブ帯5本と見本から下書きを作る道。**`DkPY0` は撮り直していない**（#502 `75b010fc` のまま）' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['xOpDs', 'py5CG', 'syWp4'], note: 'development そのもので撮った' },
@@ -3724,6 +3745,7 @@ export const CAPTURED_AT = {
     { pr: 1182, head: '04057fb9da53', on: '2026-09-07', screens: ['e3jz3', 'EOTS4', 'jwVlo', 'I3ZSrU'], note: 'Issue #405。アクセスユーザー・権限bundle・共通監査の読み取り契約へ接続し、4画面を3101/8788で撮影・判定した。' },
   ],
   31: [
+    { pr: 1224, head: '3ddca80cc4', on: '2026-09-07', screens: ['c4R6F'], note: 'Issue #440 / PR #1224。機能別の利用中・作成数を実API応答へ接続し、3104/8791で1440・1920px撮影。横はみ出し0で一致へ更新した。' },
     { pr: 478, head: '66883866', on: '2026-08-30', screens: ['c4R6F'], note: '機能設定。オフにしても消えないことを先に書く' },
   ],
   1: [
@@ -3732,6 +3754,7 @@ export const CAPTURED_AT = {
     { pr: 1028, head: '7cc11af48', on: '2026-09-07', screens: ['vUXKb', 'JN6mQ'], note: 'Issue #267。#270の指標APIと#277の撮影モックを接続し、3102/8789で1440・1920pxを再撮影。両画面とも横はみ出し0、表示中の本文差0。有効友だち398人、送信枠197/200、7日推移、公式lin.ee URL、実QRを確認して一致にした。' },
   ],
   23: [
+    { pr: 1224, head: '3ddca80cc4', on: '2026-09-07', screens: ['bfB50', 'oHAN4'], note: 'Issue #440 / PR #1224。月別集計、下流影響件数、再試行方針を実API応答へ接続し、3104/8791で通常・読込・空・失敗・権限不足を1440・1920px撮影。全状態で横はみ出し0、一致へ更新した。' },
     { pr: 1190, head: '88673e254', on: '2026-09-07', screens: ['bfB50', 'oHAN4'], note: 'Issue #413。月別集計と下流影響件数のAPIを追加し、bfB50・oHAN4を3101/8788で通常・読込・空・異常・権限不足の各状態まで撮影。横はみ出し0。' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['eI3gs'], note: '同上' },
     { pr: 600, head: '484c0cd8', on: '2026-08-31', screens: ['ELayY'], note: '同じ候補部品・状態部品・判定窓を使うECのほう。再処理の既定は「今後だけ」' },
