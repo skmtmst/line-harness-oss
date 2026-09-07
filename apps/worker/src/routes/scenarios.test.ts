@@ -1,6 +1,7 @@
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
+import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js';
 
 const accountAccessMocks = vi.hoisted(() => ({
   canAccessAllLineAccounts: vi.fn(),
@@ -244,6 +245,27 @@ describe('GET /api/scenarios?lineAccountId=X', () => {
     expect(listCall?.sql).toMatch(/s\.created_at >= \?/);
     expect(listCall?.sql).toMatch(/s\.folder_id = \?/);
     expect(listCall?.binds).toEqual(['acc-1', '%夏%', '2026-09-01', 'folder-1', 50, 0]);
+  });
+
+  test('購読数は選択中のLINEアカウントだけを実DBで集計する', async () => {
+    const { db, raw } = createTestD1();
+    raw.prepare(`INSERT INTO scenarios
+      (id, name, trigger_type, is_active, delivery_mode, line_account_id, created_at, updated_at)
+      VALUES ('s-global', '全店シナリオ', 'friend_add', 1, 'relative', NULL, '2026-09-01', '2026-09-01')`).run();
+    insertFriend(raw, 'friend-a', { line_account_id: 'acc-1' });
+    insertFriend(raw, 'friend-b', { line_account_id: 'acc-2' });
+    raw.prepare(`INSERT INTO friend_scenarios (id, friend_id, scenario_id, status)
+      VALUES ('run-a', 'friend-a', 's-global', 'active'), ('run-b', 'friend-b', 's-global', 'active')`).run();
+
+    const res = await setupApp(db).request('/api/scenarios?lineAccountId=acc-1&limit=1&page=1');
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      data: { items: Array<{ id: string; subscriberCount: number }>; total: number; limit: number };
+    };
+    expect(body.data).toMatchObject({ total: 1, limit: 1 });
+    expect(body.data.items).toEqual([
+      expect.objectContaining({ id: 's-global', subscriberCount: 1 }),
+    ]);
   });
 
   test('閲覧権限がない利用者には一覧を返さない', async () => {
