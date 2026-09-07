@@ -162,6 +162,7 @@ import {
   type CodexMentionQueueMessage,
 } from './services/codex-cloud-monitor.js';
 import { isQrDataAllowed, normalizeQrSize, qrResponseHeaders, normalizeQrFormat } from './lib/qr-response.js';
+import { safeRedirectTarget } from './lib/safe-redirect.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
 import { buildOgHtml } from './lib/og-html.js';
 import { restaurantTestEnabled } from './lib/environment-features.js';
@@ -504,6 +505,13 @@ app.get('/r/:ref', async (c) => {
   // drop-off (clicks that never reach OAuth) is therefore not visible in the
   // funnel; that limitation is intentional pending a dedicated click table.
   const route = await getEntryRouteByRefCode(c.env.DB, ref);
+  // 転送先が設定された経路はそちらへ送る（#514 重大4）。保存はするのに
+  // 読まないままだった。危険な形式は safe-redirect が弾き、そのときは
+  // 従来どおり友だち追加の着地画面へ進む。
+  if (route?.redirect_url) {
+    const target = safeRedirectTarget(route.redirect_url);
+    if (target) return c.redirect(target, 302);
+  }
   if (route?.pool_id) {
     const candidate = await getTrafficPoolById(c.env.DB, route.pool_id);
     if (candidate?.is_active) pool = candidate;
