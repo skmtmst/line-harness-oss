@@ -440,6 +440,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     `null` は「まだ読めていない」。**実値0とは別。**
   */
   const [assigneeUnread, setAssigneeUnread] = useState<InboxStats['assigneeUnread'] | null>(null)
+  const [inboxStats, setInboxStats] = useState<InboxStats | null>(null)
   const [assigneeUnreadStatus, setAssigneeUnreadStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   /*
    * 友だち詳細を出すか。既定は閉じる。
@@ -1090,6 +1091,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       読み終わるまで残すと、別のアカウントの未読数を見たまま担当者を選ぶ。
     */
     setAssigneeUnread(null)
+    setInboxStats(null)
     setAssigneeUnreadStatus('loading')
     ;(async () => {
       try {
@@ -1102,6 +1104,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         if (cancelled) return
         /* 失敗の返事を成功として読まない。`—` のままにする。 */
         if (!res.success) throw new Error('failed')
+        setInboxStats(res.data)
         setAssigneeUnread(res.data.assigneeUnread)
         setAssigneeUnreadStatus('ready')
       } catch {
@@ -1192,10 +1195,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const visibleLineItems = channel === 'email' ? [] : chats
   const quickCounts = {
     all: visibleMailItems.length + visibleLineItems.length,
-    reply:
+    reply: inboxStats ? inboxStats.waiting :
       visibleMailItems.filter((item) => item.status === 'unread').length
       + visibleLineItems.filter((chat) => chat.status === 'unread').length,
-    overdue:
+    overdue: inboxStats ? inboxStats.waitingOverAnHour :
       visibleMailItems.filter((item) => item.status === 'unread' && isOlderThanOneHour(item.lastIncomingAt)).length
       + visibleLineItems.filter((chat) => chat.status === 'unread' && isOlderThanOneHour(chat.lastMessageAt)).length,
   }

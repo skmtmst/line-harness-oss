@@ -35,6 +35,8 @@ interface Reminder {
   createdAt: string; updatedAt: string
 }
 
+type VisualFolder = Folder & { itemCount?: number; listTotal?: number }
+
 const UNFILED = '__unfiled__'
 const PER_PAGE = 20
 function rowView(reminder: Reminder) {
@@ -114,6 +116,7 @@ export default function RemindersPage() {
   const current = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE)
 
   const selectedName = reminders.find((item) => selected.has(item.id))?.name ?? ''
+  const listTotal = (folders[0] as VisualFolder | undefined)?.listTotal ?? reminders.length
   return <div data-design-node="M1EXwB" data-design="Head">
     {folderDialogOpen ? <FolderAddDialog kind="reminder" note="リマインダを整理するフォルダです。" placeholder="例：予約" onClose={() => setFolderDialogOpen(false)} onAdded={() => void loadFolders()} /> : null}
     <div data-design="KPIs"><ListKpis variant="v6" accountId={selectedAccountId} titles={['リマインダ数','送信予定','今月の送信','失敗']} build={(stats) => {
@@ -124,10 +127,10 @@ export default function RemindersPage() {
     {error ? <div className="bg-danger-bg text-danger mb-3 rounded-lg p-3 text-sm">{error}</div> : null}
     <div data-design="Body" className="grid gap-4 lg:grid-cols-[13rem_minmax(0,1fr)]">
       <aside className="bg-canvas rounded-card border-hairline overflow-hidden border self-start">
-        <div className="border-hairline flex items-center justify-between border-b px-3 py-2"><b className="text-xs">フォルダ</b><span className="text-ink-faint text-micro">{loading || error ? '—' : `${reminders.length}件`}</span></div>
+        <div className="border-hairline flex items-center justify-between border-b px-3 py-2"><b className="text-xs">フォルダ</b><span className="text-ink-faint text-micro">{loading || error ? '—' : `${listTotal}件`}</span></div>
         <div className="p-2">{[
-          { id: '', label: 'すべて', count: reminders.length },
-          ...folders.map((folder) => ({ id: folder.id, label: folder.name, count: reminders.filter((item) => item.folderId === folder.id).length })),
+          { id: '', label: 'すべて', count: listTotal },
+          ...folders.map((folder) => ({ id: folder.id, label: folder.name, count: (folder as VisualFolder).itemCount ?? reminders.filter((item) => item.folderId === folder.id).length })),
           { id: UNFILED, label: '未分類', count: reminders.filter((item) => !item.folderId).length },
         ].map((row) => <button key={row.id || 'all'} type="button" onClick={() => { setFolderFilter(row.id); setPage(1) }} className={`flex w-full items-center justify-between rounded px-2 py-2 text-xs ${folderFilter === row.id ? 'bg-accent-soft text-accent-deep font-bold' : 'text-ink-secondary'}`}><span>{row.label}</span><span>{loading || error ? '—' : row.count}</span></button>)}</div>
       </aside>
