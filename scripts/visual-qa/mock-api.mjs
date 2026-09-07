@@ -489,15 +489,20 @@ const ARRAY_PREFIXES = [
   '/api/users/',
 ]
 
-/** 機能のオン／オフ。全部オンにして、どの画面も出るようにする。 */
-const FEATURE_KEYS = [
-  'scenarios', 'broadcasts', 'templates', 'reminders', 'auto_replies',
-  'rich_menus', 'webinars', 'inflow_tracking', 'forms', 'mileage',
-  'affiliates', 'analytics', 'media', 'events', 'booking', 'automations',
-  'external_integrations', 'friend_add_routing', 'nen_campaigns',
-  'photo_review', 'ec_commerce', 'line_notifications', 'restaurant_test',
-]
-const FEATURES = Object.fromEntries(FEATURE_KEYS.map((k) => [k, true]))
+/** 機能31の固定応答。本物と同じ全ID・既定値・版を返す。 */
+const FEATURES = {
+  scenarios: true, broadcasts: true, templates: true, reminders: true,
+  auto_replies: true, rich_menus: true, inflow_tracking: true, forms: true,
+  photo_review: true, automations: true, external_integrations: true,
+  friend_add_routing: true, multi_store_hierarchy: false,
+  multi_store_bulk_updates: false, reservation_ledger: false,
+  external_reservations: false, google_business_profile: false,
+  friend_fields: true, support_marks: true, saved_searches: true,
+  media: true, common_vars: true, analytics: true, site_tracking: true,
+  webinars: false, events: true, booking: true, affiliates: false, mileage: true,
+  ec_commerce: true, line_notifications: true, nen_campaigns: true,
+  restaurant_test: true,
+}
 
 /** 設計 `bfB50` / `oHAN4` を確認するための固定ECデータ。秘密値そのものは置かない。 */
 const EC_SUBSCRIPTIONS = {
