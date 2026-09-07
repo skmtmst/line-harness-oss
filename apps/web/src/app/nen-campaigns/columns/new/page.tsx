@@ -5,8 +5,10 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
+import { Field as FormField } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
 import PageHeader from '@/components/shared/page-header'
+import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import { api, ApiError, type Tag } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -194,17 +196,52 @@ function NewNenColumnInner() {
               空のままなら公開日時は入りません。日本時間で保存します。
             </p>
             <h3>いつ・だれに出しますか</h3>
-            <div className={styles.row}>
-              <label className={styles.field}><span className={styles.fieldLabel}>配信対象</span><select value={draft.targetMode} onChange={(event) => setDraft((value) => ({ ...value, targetMode: event.target.value as 'all' | 'tag' }))} className={styles.input}><option value="all">友だち全員</option><option value="tag">タグで絞る</option></select></label>
-              {draft.targetMode === 'tag' ? <label className={styles.field}><span className={styles.fieldLabel}>対象タグ</span><select value={draft.targetTagId} onChange={(event) => setDraft((value) => ({ ...value, targetTagId: event.target.value }))} className={styles.input}><option value="">タグを選択</option>{tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}</select>{errorFor('targetTagId') ? <span className={styles.fieldError}>{errorFor('targetTagId')}</span> : null}</label> : null}
-            </div>
+            <FormField label="配信対象">
+              <Select
+                aria-label="配信対象"
+                size="full"
+                value={draft.targetMode}
+                options={[
+                  { value: 'all', label: '友だち全員' },
+                  { value: 'tag', label: 'タグで絞る' },
+                ]}
+                onChange={(value) => setDraft((current) => ({
+                  ...current,
+                  targetMode: value as 'all' | 'tag',
+                }))}
+              />
+            </FormField>
+            {draft.targetMode === 'tag' ? (
+              <FormField label="対象タグ">
+                <Select
+                  aria-label="対象タグ"
+                  size="full"
+                  value={draft.targetTagId}
+                  error={errorFor('targetTagId')}
+                  options={[
+                    { value: '', label: 'タグを選択' },
+                    ...tags.map((tag) => ({ value: tag.id, label: tag.name })),
+                  ]}
+                  onChange={(value) => setDraft((current) => ({ ...current, targetTagId: value }))}
+                />
+              </FormField>
+            ) : null}
             <p className={styles.note}>この条件では {audienceCount == null ? '—' : audienceCount.toLocaleString('ja-JP')}人に届きます。</p>
             <Field label="配信日時（日本時間）" type="datetime-local" value={draft.scheduledAt} error={errorFor('scheduledAt')} onChange={(v) => setDraft((d) => ({ ...d, scheduledAt: v }))} />
             <h3>読んだ人にすること</h3>
-            <div className={styles.row}>
-              <Field label="読了イベント名" value={draft.completionEventName} placeholder="例: 秋の食事コラムを読了" onChange={(v) => setDraft((d) => ({ ...d, completionEventName: v }))} />
-              <label className={styles.field}><span className={styles.fieldLabel}>読了後に付けるタグ</span><select value={draft.completionTagId} onChange={(event) => setDraft((value) => ({ ...value, completionTagId: event.target.value }))} className={styles.input}><option value="">付けない</option>{tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}</select></label>
-            </div>
+            <Field label="読了イベント名" value={draft.completionEventName} placeholder="例: 秋の食事コラムを読了" onChange={(v) => setDraft((d) => ({ ...d, completionEventName: v }))} />
+            <FormField label="読了後に付けるタグ">
+              <Select
+                aria-label="読了後に付けるタグ"
+                size="full"
+                value={draft.completionTagId}
+                options={[
+                  { value: '', label: '付けない' },
+                  ...tags.map((tag) => ({ value: tag.id, label: tag.name })),
+                ]}
+                onChange={(value) => setDraft((current) => ({ ...current, completionTagId: value }))}
+              />
+            </FormField>
           </Card>
         </div>
 
