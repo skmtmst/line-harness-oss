@@ -26,8 +26,10 @@ describe('V6 EC integration screens', () => {
     for (const wording of ['候補が見つかった', '自動で結びついた', '結びつけると増える売上', '同じ人が2人いる疑い']) {
       expect(identity).toContain(wording)
     }
-    expect(page).toContain('商品明細は未取得')
-    expect(identity).toContain('value={null}')
+    expect(page).toContain('order.orderLines.map')
+    expect(page).toContain('order.totalAmount.toLocaleString')
+    expect(identity).toContain('operations?.summary.linked')
+    expect(identity).toContain('operations?.summary.potentialRevenue')
     expect(identity).toContain('過去のLINE送信は再送しません')
   })
 
@@ -49,5 +51,16 @@ describe('V6 EC integration screens', () => {
     expect(connector).toContain('type="password"')
     expect(connector).toContain('鍵そのものは表示しません')
     expect(connector).not.toContain('inbound_secret_encrypted')
+  })
+
+  it('reads the normalized order/action mouths and retries only retryable failures', () => {
+    expect(api).toContain('/api/ec-commerce/orders?')
+    expect(api).toContain('/api/ec-commerce/action-executions?')
+    expect(api).toContain('/api/ec-commerce/identity-candidates?')
+    expect(api).toContain('/api/ec-commerce/action-executions/${encodeURIComponent(id)}/retry')
+    expect(page).toContain('action.retryAvailable ?')
+    expect(page).toContain('expectedVersion: action.version')
+    expect(page).toContain('crypto.randomUUID()')
+    expect(page).not.toContain('失敗だけを再試行する受け口は未接続')
   })
 })

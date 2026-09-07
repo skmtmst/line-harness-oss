@@ -2475,6 +2475,107 @@ export type EcCommerceEvent = {
   processedAt: string | null
 }
 
+export type EcOrderLine = {
+  id: string
+  productId: string | null
+  productName: string
+  quantity: number
+  unitAmount: number | null
+  lineAmount: number | null
+  productUrl: string | null
+}
+
+export type EcOrder = {
+  id: string
+  lineAccountId: string
+  externalOrderId: string
+  orderNumber: string
+  customerId: string | null
+  friendId: string | null
+  customerName: string | null
+  status: 'current' | 'refunded' | 'cancelled'
+  providerStatus: string
+  currency: string
+  totalAmount: number | null
+  refundedAmount: number | null
+  orderedAt: string
+  detailUrl: string | null
+  version: number
+  orderLines: EcOrderLine[]
+}
+
+export type EcOrderList = {
+  items: EcOrder[]
+  total: number
+  summary: {
+    total: number
+    current: number
+    refunded: number
+    cancelled: number
+    totalAmount: number
+  }
+}
+
+export type EcActionExecutionStatus =
+  | 'pending'
+  | 'processing'
+  | 'succeeded'
+  | 'skipped'
+  | 'retryable_failed'
+  | 'permanent_failed'
+
+export type EcActionExecution = {
+  id: string
+  eventId: string
+  eventType: string
+  actionType: string
+  ruleVersion: string
+  status: EcActionExecutionStatus
+  attemptCount: number
+  maxAttempts: number
+  errorCode: string | null
+  errorMessage: string | null
+  lastAttemptedAt: string | null
+  nextRetryAt: string | null
+  version: number
+  receivedAt: string
+  orderNumber: string | null
+  customerName: string | null
+  retryAvailable: boolean
+}
+
+export type EcActionExecutionList = {
+  items: EcActionExecution[]
+  total: number
+  summary: Record<EcActionExecutionStatus, number>
+}
+
+export type EcIdentityCandidateSummary = {
+  unmatched: number
+  candidates: number
+  candidateExternalCustomers: number
+  duplicateSuspicions: number
+  linked: number
+  potentialRevenue: number | null
+}
+
+export type EcIdentityCandidateOperationsList = {
+  items: Array<{
+    id: string
+    status: string
+    version: number
+    confidenceScore: number
+    left: unknown
+    right: unknown
+    evidence: unknown
+    impact: unknown
+    detectedAt: string
+    reviewedAt: string | null
+  }>
+  total: number
+  summary: EcIdentityCandidateSummary
+}
+
 export type EcSubscription = {
   id: string
   friendId: string
@@ -5895,6 +5996,47 @@ export const api = {
       const suffix = query.size ? `?${query}` : ''
       return fetchApi<ApiResponse<EcCommerceEvent[]> & { pagination: { total: number; limit: number; offset: number } }>(
         `/api/ec-commerce/events${suffix}`,
+      )
+    },
+    orders: (params: { lineAccountId: string; status?: EcOrder['status']; query?: string; limit?: number; offset?: number }) => {
+      const query = new URLSearchParams({ lineAccountId: params.lineAccountId })
+      if (params.status) query.set('status', params.status)
+      if (params.query) query.set('query', params.query)
+      if (params.limit !== undefined) query.set('limit', String(params.limit))
+      if (params.offset !== undefined) query.set('offset', String(params.offset))
+      return fetchApi<ApiResponse<EcOrderList> & { pagination: { total: number; limit: number; offset: number } }>(
+        `/api/ec-commerce/orders?${query}`,
+      )
+    },
+    actionExecutions: (params: { lineAccountId: string; eventId?: string; status?: EcActionExecutionStatus; limit?: number; offset?: number }) => {
+      const query = new URLSearchParams({ lineAccountId: params.lineAccountId })
+      if (params.eventId) query.set('eventId', params.eventId)
+      if (params.status) query.set('status', params.status)
+      if (params.limit !== undefined) query.set('limit', String(params.limit))
+      if (params.offset !== undefined) query.set('offset', String(params.offset))
+      return fetchApi<ApiResponse<EcActionExecutionList> & { pagination: { total: number; limit: number; offset: number } }>(
+        `/api/ec-commerce/action-executions?${query}`,
+      )
+    },
+    retryActionExecution: (
+      id: string,
+      data: { lineAccountId: string; expectedVersion: number },
+      idempotencyKey: string,
+    ) => fetchApi<ApiResponse<EcActionExecution>>(
+      `/api/ec-commerce/action-executions/${encodeURIComponent(id)}/retry`,
+      {
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify(data),
+      },
+    ),
+    operationIdentityCandidates: (params: { lineAccountId: string; status?: string; limit?: number; offset?: number }) => {
+      const query = new URLSearchParams({ lineAccountId: params.lineAccountId })
+      if (params.status) query.set('status', params.status)
+      if (params.limit !== undefined) query.set('limit', String(params.limit))
+      if (params.offset !== undefined) query.set('offset', String(params.offset))
+      return fetchApi<ApiResponse<EcIdentityCandidateOperationsList> & { pagination: { total: number; limit: number; offset: number } }>(
+        `/api/ec-commerce/identity-candidates?${query}`,
       )
     },
     subscriptions: (params: { lineAccountId: string; status?: string; limit?: number; offset?: number }) => {
