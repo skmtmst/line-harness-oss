@@ -312,7 +312,15 @@ export const TAGS = (() => {
     設計どおり保存済みの状態で開ける。
   */
   const editorRow = rows.find((row, index) => index >= DESIGN_ROWS.length && row.groupId === 'g-purchase')
-  if (editorRow) Object.assign(editorRow, TAG_EDITOR_NEN_SUBSCRIPTION, { displayOrder: editorRow.displayOrder })
+  if (editorRow) {
+    Object.assign(editorRow, TAG_EDITOR_NEN_SUBSCRIPTION, { displayOrder: editorRow.displayOrder })
+    /*
+      削除確認は検索で一覧を1件にせず、設計どおり20件表示の背面で開く。
+      先頭6行はPencilの固定行なので、その直後へ編集用タグを移す。
+    */
+    rows.splice(rows.indexOf(editorRow), 1)
+    rows.splice(DESIGN_ROWS.length, 0, editorRow)
+  }
   const vipRow = rows.find((row, index) => index >= DESIGN_ROWS.length && row.groupId === 'g-vip')
   if (vipRow) Object.assign(vipRow, { id: 'tag-vip', name: 'VIP' })
   const purchaseRow = rows.find((row, index) => index >= DESIGN_ROWS.length && row.groupId === 'g-purchase' && row.id !== 'tag-0')

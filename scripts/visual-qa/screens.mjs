@@ -3023,7 +3023,6 @@ export const SCREENS = [
     node: 'dKlkz', feature: 4, name: '4-1-F タグ削除の確認ダイアログ',
     dir: 'friend-attributes-v6', route: '/tags', mode: 'viewport', height: 1080,
     steps: [
-      { fill: 'input[placeholder="タグ名・用途で検索"]', selector: true, scope: 'main', text: 'NEN会員（定期）' },
       { click: 'NEN会員（定期） を削除', scope: 'main' },
       { fill: '確認のため、タグ名を入力してください', text: 'NEN会員（定期）' },
     ],
@@ -3134,12 +3133,8 @@ export const SCREENS = [
   },
   {
     node: 'VjXGX', feature: 4, name: '4-1-E 遡及反映の確認ダイアログ',
-    dir: 'friend-attributes-v6', route: '/tags/edit?id=tag-0', mode: 'viewport', height: 1590,
-    steps: [
-      { click: '遡及反映', role: 'switch', onlyIfOff: true },
-      { click: 'タグを保存' },
-      { click: '内容を確認し、既存の友だちへ反映することを了承しました', role: 'checkbox' },
-    ],
+    dir: 'friend-attributes-v6', route: '/tags/edit?id=tag-0&visualQa=retroactive', mode: 'viewport', height: 1590,
+    steps: [{ wait: 1500 }],
     verdict: "match",
     verdictNote: "**2026-09-07 Issue #470 / PR #1279、UI HEAD `52d194d19b` で再計測。** 連動アイコン、新規作成時の注記、取消不能警告を設計へ揃えた。残差18.1358%は背面フォームのスクロール位置と現行の編集説明差。高さ差0px、1440/1920px・横はみ出し0で一致。",
     verdictSource: "friend-attributes-v6/VjXGX.txt + friend-attributes-v6/VjXGX-{1440,1920}.png",

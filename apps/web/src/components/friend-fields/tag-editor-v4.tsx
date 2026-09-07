@@ -263,7 +263,7 @@ function RetroactiveDialog({ values, count, onCancel, onSave, referenceState = f
   const rewardTotal = count * values.rewardMiles
   const referralTotal = referralTargets * values.referralRewardMiles
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/45 p-4">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/35 p-4">
       <section className="w-full max-w-[670px] -translate-y-7 rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
         <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-warning-bg text-warning" aria-hidden="true">
           <Coins size={21} strokeWidth={2} />
@@ -272,19 +272,18 @@ function RetroactiveDialog({ values, count, onCancel, onSave, referenceState = f
         <p className="mt-2 text-sm leading-6 text-ink-secondary">「NEN会員（定期）」の変更を、いまこのタグが付いている人にも適用します。</p>
         <div className="mt-4 overflow-hidden rounded-control border border-hairline">
           <dl className="divide-y divide-hairline text-sm">
-            <div className="grid grid-cols-[1fr_165px_130px] bg-canvas-sunken px-4 py-2 text-xs font-semibold text-ink-faint"><dt>対象</dt><dd>計算</dd><dd className="text-right">付与予定</dd></div>
-            <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2"><dt>本人マイル</dt><dd>+{values.rewardMiles} mile × {count}人</dd><dd className="text-right font-semibold text-success">+{rewardTotal.toLocaleString()} mile</dd></div>
-            <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2"><dt>紹介者マイル</dt><dd>+{values.referralRewardMiles} mile × {referralTargets}人</dd><dd className="text-right font-semibold text-success">+{referralTotal.toLocaleString()} mile</dd></div>
-            <div className="grid grid-cols-[1fr_165px_130px] bg-success-bg/40 px-4 py-2 font-bold"><dt>合計</dt><dd>{count + referralTargets}人が対象</dd><dd className="text-right text-success">+{(rewardTotal + referralTotal).toLocaleString()} mile</dd></div>
-            <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2"><dt>倍率 {values.multiplierBps ? `${values.multiplierBps / 10000}倍` : 'なし'}</dt><dd>さかのぼりません</dd><dd className="text-right">次回付与から</dd></div>
-            <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2"><dt>連動アクションの送信</dt><dd>さかのぼって送りません</dd><dd className="text-right">送信0件</dd></div>
+            <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2.5"><dt>本人マイル</dt><dd>+{values.rewardMiles} mile × {count}人</dd><dd className="text-right font-semibold text-success">+{rewardTotal.toLocaleString()} mile</dd></div>
+            <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2.5"><dt>紹介者マイル</dt><dd>+{values.referralRewardMiles} mile × {referralTargets}人</dd><dd className="text-right font-semibold text-success">+{referralTotal.toLocaleString()} mile</dd></div>
+            <div className="grid grid-cols-[1fr_165px_130px] bg-success-bg/40 px-4 py-2.5 font-bold"><dt>合計</dt><dd>{count + referralTargets}人が対象</dd><dd className="text-right text-success">+{(rewardTotal + referralTotal).toLocaleString()} mile</dd></div>
+            <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2.5"><dt>倍率 {values.multiplierBps ? `${values.multiplierBps / 10000}倍` : 'なし'}</dt><dd>さかのぼりません</dd><dd className="text-right">次回付与から</dd></div>
+            <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2.5"><dt>連動アクションの送信</dt><dd>さかのぼって送りません</dd><dd className="text-right">送信0件</dd></div>
           </dl>
         </div>
-        <div className="mt-3 rounded-control border border-danger/25 bg-danger-bg p-2 text-sm leading-5 text-danger">
+        <div className="mt-3 rounded-control border border-danger/25 bg-danger-bg p-3 text-xs leading-5 text-danger">
           <p className="font-bold">この操作は取り消せません</p>
           <p>さかのぼって積んだマイルは自動では戻せません。取り消すにはマイル画面から手動で調整が必要です。</p>
         </div>
-        <label className="mt-3 flex items-start gap-3 text-sm text-ink-secondary"><input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} className="mt-1 accent-accent" />内容を確認し、既存の友だちへ反映することを了承しました</label>
+        <label className="mt-3 flex items-start gap-2 text-sm font-semibold text-ink"><input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} className="mt-1 accent-accent" />人数と合計マイルを確認しました</label>
         <div className="mt-4 flex justify-end gap-2">
           <button type="button" onClick={onCancel} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">反映しないで保存</button>
           <button type="button" disabled={!accepted} onClick={onSave} className="rounded-control bg-accent-deep px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">さかのぼって反映して保存</button>
