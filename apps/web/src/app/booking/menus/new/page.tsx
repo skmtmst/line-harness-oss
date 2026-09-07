@@ -11,6 +11,7 @@ import CreatePage, {
   inputClass,
 } from '@/components/shared/create-page'
 import Button from '@/components/shared/button'
+import { bookingMenuBaseError } from '../menu-validation'
 
 /**
  * メニューを追加する（設計 V6 28-1-B / node GhOb3）。
@@ -38,6 +39,7 @@ export default function NewBookingMenuPage() {
   const [staff, setStaff] = useState<BookingStaff[]>([])
   const [storeSettings, setStoreSettings] = useState<BookingSettings | null>(null)
   const [bookingMileage, setBookingMileage] = useState<number | null>(null)
+  const [createdMenuNeedingStaff, setCreatedMenuNeedingStaff] = useState<string | null>(null)
   /** チェックした担当。保存後に staff_menus へ流し込む。 */
   const [assigned, setAssigned] = useState<Set<string>>(new Set())
 
@@ -115,8 +117,13 @@ export default function NewBookingMenuPage() {
       statusLabel={isActive ? 'まだ出していません' : '下書きとして保存'}
       validate={() => {
         if (!selectedAccountId) return '先に上部でLINEアカウントを選んでください'
-        if (!name.trim()) return 'メニュー名を入力してください'
-        if (Number(durationMinutes) < 1) return '所要時間は1分以上にしてください'
+        const baseError = bookingMenuBaseError({
+          name,
+          durationMinutes,
+          bufferAfterMinutes,
+          sortOrder: 0,
+        })
+        if (baseError) return baseError
         if (assigned.size === 0)
           return '担当できる人を1人以上選んでください。0人だと予約画面に枠が出ません'
         return null
@@ -125,6 +132,7 @@ export default function NewBookingMenuPage() {
         setName('')
         setDescription('')
         setAssigned(new Set())
+        setCreatedMenuNeedingStaff(null)
       }}
       onSave={async () => {
         const res = await bookingApi.createMenu(selectedAccountId!, {
@@ -146,21 +154,26 @@ export default function NewBookingMenuPage() {
         })
         // 担当の割り当ては staff 側の表に入るので、作ったあとに1人ずつ足す。
         // ここで失敗しても、メニュー自体は作れている。
-        await Promise.all(
-          [...assigned].map(async (staffId) => {
-            const { matrix } = await bookingApi.getStaffMenus(selectedAccountId!, staffId)
-            await bookingApi.putStaffMenus(
-              selectedAccountId!,
-              staffId,
-              matrix.map((row) => ({
-                menu_id: row.menu_id,
-                is_offered: row.menu_id === res.id ? true : Boolean(row.is_offered),
-                override_duration_minutes: row.override_duration_minutes ?? null,
-                override_price: row.override_price ?? null,
-              })),
-            )
-          }),
-        )
+        try {
+          await Promise.all(
+            [...assigned].map(async (staffId) => {
+              const { matrix } = await bookingApi.getStaffMenus(selectedAccountId!, staffId)
+              await bookingApi.putStaffMenus(
+                selectedAccountId!,
+                staffId,
+                matrix.map((row) => ({
+                  menu_id: row.menu_id,
+                  is_offered: row.menu_id === res.id ? true : Boolean(row.is_offered),
+                  override_duration_minutes: row.override_duration_minutes ?? null,
+                  override_price: row.override_price ?? null,
+                })),
+              )
+            }),
+          )
+        } catch {
+          setCreatedMenuNeedingStaff(res.id)
+          throw new Error('メニューは作成されましたが、担当スタッフを保存できませんでした。下のボタンから担当を設定してください。')
+        }
         return res.id
       }}
       aside={
@@ -193,6 +206,16 @@ export default function NewBookingMenuPage() {
         </>
       }
     >
+      {createdMenuNeedingStaff && (
+        <div className="border-warning bg-warning-bg text-warning rounded-control border p-3 text-sm">
+          <p>作成済みのメニューに担当スタッフを設定してください。</p>
+          <div className="mt-2">
+            <Button href={`/booking/menus?tab=staff&menu=${encodeURIComponent(createdMenuNeedingStaff)}`}>
+              担当スタッフを設定する
+            </Button>
+          </div>
+        </div>
+      )}
       <FormSection step={1} label="お客様に見える情報">
         <Field label="メニュー名" htmlFor="bm-name" required>
           <input

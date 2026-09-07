@@ -532,6 +532,36 @@ describe('api.mileage reward draft contract', () => {
   })
 })
 
+describe('api.mileage rules contract(#532/#521)', () => {
+  it('旧マイルールの作成は選択中のLINEアカウントIDを送る', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: { id: 'rule-1' } }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await api.mileage.createRule({
+      name: '予約してくれたら 300 マイル',
+      eventType: 'booking_created',
+      source: null,
+      amount: 300,
+      initialStatus: 'available',
+      conditions: {},
+      validFrom: null,
+      validUntil: null,
+      lineAccountId: 'account/1',
+    })
+
+    expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
+      'https://worker.example.com/api/mileage/rules',
+    ])
+    expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({ method: 'POST' })
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body))).toMatchObject({
+      lineAccountId: 'account/1',
+    })
+  })
+})
+
 describe('api.mileage V6 admin contract', () => {
   it('残高・付与ルールを選択中アカウントで読み、下書きを版付きで保存する', async () => {
     const fetchSpy = vi.fn(async () => new Response(

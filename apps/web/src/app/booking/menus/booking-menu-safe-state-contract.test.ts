@@ -8,7 +8,7 @@ describe('V6 予約メニューの取得状態', () => {
     expect(PAGE).toContain("type SupportingLoadState = 'loading' | 'ready' | 'error'")
     expect(PAGE).toContain("if (supportingLoadState !== 'ready' || items.length === 0) return null")
     expect(PAGE).toContain("value={favorite?.name ?? '—'}")
-    expect(PAGE).toContain("supportingLoadState === 'ready' ? `${bookingCounts.get(m.name) ?? 0} 件` : '—'")
+    expect(PAGE).toContain("supportingLoadState === 'ready' ? `${bookingCounts.get(m.id) ?? 0} 件` : '—'")
   })
 
   it('APIの内部エラーを利用者へそのまま出さない', () => {
@@ -18,10 +18,15 @@ describe('V6 予約メニューの取得状態', () => {
   })
 
   it('アカウント切替時に前の件数と割り当てを残さない', () => {
-    expect(PAGE).toContain('setStaff([])')
-    expect(PAGE).toContain('setBookings([])')
     expect(PAGE).toContain('setMenuStaff(new Map())')
     expect(PAGE).toContain('setItems([])')
+  })
+
+  it('担当と30日件数はメニュー一覧の集計だけを使い、予約明細を運ばない', () => {
+    expect(PAGE).toContain('menu.assigned_staff ?? []')
+    expect(PAGE).toContain('menu.booking_count_30_days ?? 0')
+    expect(PAGE).not.toContain('bookingApi.listMenuStaff')
+    expect(PAGE).not.toContain("bookingApi.listRequests(selectedAccountId, 'all')")
   })
 
   it('切替前のアカウントから遅れて届いた一覧を表示しない', () => {

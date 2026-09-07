@@ -34,6 +34,14 @@ describe('機能設定の添付デザイン', () => {
     expect(source).toContain('sidebarItemOrder: currentOrder')
   })
 
+  it('取得した版で一括保存し、409では最新を読み直して編集中身を残す', () => {
+    expect(source).toContain('setSettingsVersion(response.data.version ?? 0)')
+    expect(source).toContain('expectedVersion: settingsVersion')
+    expect(source).toContain('error instanceof ApiError && error.status === 409')
+    expect(source).toContain('const latest = await api.featureSettings.get(selectedAccountId)')
+    expect(source).toContain('最新の状態を読み直したので、内容を確認してもう一度保存してください。')
+  })
+
   it('クリックできる操作は指、無効な操作は禁止カーソルで統一する', () => {
     expect(source).toContain("total === 0 ? 'cursor-default' : 'cursor-pointer'")
     expect(source).toContain('h-7 w-7 cursor-pointer')
