@@ -58,6 +58,9 @@ describe('V6 支払いの追記台帳契約', () => {
     expect(DIALOGS).toContain('api.affiliates.confirmPayment')
     expect(DIALOGS).toContain('periodTo ?? preview.closeDate')
     expect(DIALOGS).toContain('settlement?.bankProfileRegistered')
+    expect(DIALOGS).toContain('api.affiliates.createStatement')
+    expect(DIALOGS).toContain('支払明細のPDFを作り、この方のLINEへ知らせる')
+    expect(DIALOGS).toContain('支払いは確定しましたが、支払明細とLINE通知を作れませんでした')
   })
 
   it('読込・通常・空・失敗を分け、失敗を0円にしない', () => {

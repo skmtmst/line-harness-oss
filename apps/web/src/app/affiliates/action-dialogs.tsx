@@ -195,6 +195,8 @@ export function AffiliatePaymentConfirmDialog({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [idempotencyKey, setIdempotencyKey] = useState('')
+  const [issueStatement, setIssueStatement] = useState(false)
+  const [statementKey, setStatementKey] = useState('')
 
   const load = useCallback(async () => {
     if (!target) return
@@ -214,6 +216,8 @@ export function AffiliatePaymentConfirmDialog({
   useEffect(() => {
     if (!target) return
     setIdempotencyKey(crypto.randomUUID())
+    setStatementKey(crypto.randomUUID())
+    setIssueStatement(false)
     void load()
   }, [load, target])
 
@@ -230,6 +234,21 @@ export function AffiliatePaymentConfirmDialog({
       if (!response.success) {
         setError(response.error)
         return
+      }
+      if (issueStatement) {
+        try {
+          const statement = await api.affiliates.createStatement({
+            lineAccountId: accountId,
+            settlementId: response.data.settlementId,
+            affiliateId: target.id,
+            expectedVersion: 1,
+          }, statementKey)
+          if (!statement.success) throw new Error(statement.error)
+        } catch {
+          onConfirmed()
+          setError('支払いは確定しましたが、支払明細とLINE通知を作れませんでした。同じ画面でもう一度お試しください。')
+          return
+        }
       }
       onConfirmed()
       onClose()
@@ -307,7 +326,10 @@ export function AffiliatePaymentConfirmDialog({
           <p className="text-ink-secondary text-xs leading-5">
             確定したあとに成果を却下しても、この支払いからは外れません。次の未確定期間へマイナス調整として残します。
           </p>
-          <p className="text-ink-secondary text-xs">期間を締めたあとに支払明細を発行すると、PDFを作り、この方のLINEへ通知します。</p>
+          <label className="text-ink-secondary flex items-start gap-2 text-xs">
+            <input type="checkbox" checked={issueStatement} onChange={(event) => setIssueStatement(event.target.checked)} />
+            <span>支払明細のPDFを作り、この方のLINEへ知らせる</span>
+          </label>
         </div>
       ) : null}
     </Dialog>

@@ -3074,6 +3074,7 @@ const FEATURE_16_REVIEW = {
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-07、Issue #307 で通常・読込中・0件・取得失敗を再撮影し、構造一致・データ未接続。** 3102/8789 で4状態を1440px・1920pxの両方で撮り、10枚すべて横はみ出し0。通常は5人の支払い確定前報酬、保留額、支払い条件の覚書と行ごとの確定操作を表示し、0件と取得失敗も混同しない。前回 #212 の「通常と0件が取得失敗になる」は解消した。残る差は、支払結果・締め日・支払日・振込先を返すAPIが無いこと。Pencilの「今年払った合計」「次の締め」「次の支払日」「振込先」「過去の支払い」「振込用CSV」は値を作らず、未接続の理由を表示する。**接続条件:** 支払台帳・締め設定・振込先APIが入ったら、設計の4指標、状態札、6列表、締め・明細・CSV操作を接続して同じ4状態を再撮影する。',
     verdictSource: 'affiliates-v6/njLGA.txt + njLGA-{normal,loading,empty,error}.txt + njLGA-{normal,loading,empty,error}-{1440,1920}.png',
+    states: { apis: ['**/api/affiliate-settlements/preview*'], kinds: ['normal', 'loading', 'empty', 'error'] },
   },
   xqT1Z: {
     verdict: 'match',
