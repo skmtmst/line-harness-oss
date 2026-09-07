@@ -53,7 +53,7 @@ describe('テンプレート一覧のV6画面構造', () => {
 
   it('参照中は強制削除せず、使用先を確認させる', () => {
     expect(page).toContain('使用先を見る')
-    expect(page).toContain('使用先を差し替えてから削除してください。')
+    expect(page).toContain('使用中は削除できません。差し替え後にもう一度この画面から操作してください。')
     expect(page).not.toContain('削除すると参照がクリアされます')
     for (const usage of ['scenarioSteps', 'reminderSteps', 'richMenuAreas', 'trackedLinks']) {
       expect(page).toContain(usage)

@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 266,
+  "compared": 264,
   "unimplemented": 0,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 6,
-  "match": 182,
-  "structureMatchDataPending": 70,
-  "needsFix": 12,
+  "missing": 8,
+  "match": 187,
+  "structureMatchDataPending": 66,
+  "needsFix": 11,
   "unjudged": 4,
-  "remaining": 86,
+  "remaining": 81,
   "features": [
     {
       "feature": 1,
@@ -1455,12 +1455,21 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 9,
+      "match": 10,
       "structureMatchDataPending": 0,
-      "needsFix": 1,
+      "needsFix": 0,
       "unjudged": 0,
-      "remaining": 1,
+      "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1208,
+          "head": "68d536652",
+          "on": "2026-09-07",
+          "screens": [
+            "M9cij"
+          ],
+          "note": "Issue #426。PR #1197で修正されたPencil正本を取り込み、使用中3か所の削除不可・使用先一覧・差し替え導線を実装。3102/8789で1440/1920pxを再撮影し、両幅とも横はみ出し0、一致へ更新した。"
+        },
         {
           "pr": 1024,
           "head": "031081d69",
@@ -2348,12 +2357,22 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 4,
+      "match": 2,
+      "structureMatchDataPending": 2,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 4,
+      "remaining": 2,
       "capturedAt": [
+        {
+          "pr": 1207,
+          "head": "46a869f74",
+          "on": "2026-09-07",
+          "screens": [
+            "ZrpKn",
+            "GUxsj"
+          ],
+          "note": "Issue #432。利用先名・30日推移・成果地点別経路・取消未提供理由を固定API応答から表示し、3104/8791で1440・1920pxを撮影。横はみ出し0で2画面を一致へ更新した。"
+        },
         {
           "pr": 444,
           "head": "ccbd0975",
@@ -2550,17 +2569,27 @@
       "feature": 22,
       "name": "写真審査",
       "total": 4,
-      "compared": 4,
+      "compared": 2,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0,
-      "match": 2,
-      "structureMatchDataPending": 2,
+      "missing": 2,
+      "match": 4,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 2,
+      "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1207,
+          "head": "46a869f74",
+          "on": "2026-09-07",
+          "screens": [
+            "hHrz8",
+            "N2J629"
+          ],
+          "note": "Issue #432。原本保存の再認証4状態と、戻す理由・補足・通知本文を3104/8791で撮影。1440・1920pxとも横はみ出し0で2画面を一致へ更新した。"
+        },
         {
           "pr": 447,
           "head": "65adbc59",

@@ -65,7 +65,7 @@ import {
   FRIEND_SAVED_VIEWS, MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
   LIST_STATS, NEN_BIRTHDAY_COUPON, NEN_CAMPAIGN_SETTINGS, NEN_COLUMN_CREATE, NEN_COLUMNS, NEN_JOBS, NEN_PETS,
   NEN_FLOW_METRICS, NEN_COLUMN_METRICS, NEN_PET_METRICS, NEN_DELIVERIES, NEN_DELIVERY_DETAILS,
-  OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_ACTIONS, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED,
+  OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_ACTIONS, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, SCENARIO_SIMULATION, SCENARIO_RUNS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   RICH_MENU_GROUPS, RICH_MENU_GROUP_DETAILS, RICH_MENU_EXTERNAL, RICH_MENU_TAP_STATS,
   TAGS, TAG_GROUPS, TAG_DEFINITION_NEN_SUBSCRIPTION, TAG_DEPENDENCIES_NEN_SUBSCRIPTION,
@@ -478,7 +478,9 @@ const EC_SUBSCRIPTIONS = {
     { id: 'sub-4', friendId: 'friend-4', ownerName: '中村 彩', petName: 'ぷりんちゃん', contractNumber: 'SUB-12528', status: 'paused', statusLabel: '休止中です', riskReason: null, nextShippingAt: null, cycle: 'おやつ定期便（毎月）', items: '鹿肉クッキー × 2', amount: 3600, continuedCount: 4, startedAt: '2026-05-01', cancelledAt: null, cancellationReason: null, syncedAt: '2026-09-06T09:58:00+09:00' },
     { id: 'sub-5', friendId: 'friend-5', ownerName: '大西 健一', petName: 'レオくん', contractNumber: 'SUB-12532', status: 'cancelled', statusLabel: '止まりました', riskReason: null, nextShippingAt: null, cycle: 'フード定期便（毎月）', items: '鹿肉フード × 1', amount: 9800, continuedCount: 3, startedAt: '2026-05-01', cancelledAt: '2026-09-01', cancellationReason: '使いきれない', syncedAt: '2026-09-06T09:58:00+09:00' },
   ],
-  summary: { total: 186, active: 172, paused: 5, atRisk: 14, cancelled: 8, monthlyAmount: 1482000, startedThisMonth: null, cancelledThisMonth: null, cancellationTopReason: null },
+  summary: { total: 186, active: 172, paused: 5, atRisk: 14, cancelled: 8, monthlyAmount: 1482000, startedThisMonth: 12, cancelledThisMonth: 3, cancellationTopReason: '使いきれない', monthlyStats: [
+    { month: '2026-06', count: 158, amount: 1248000 }, { month: '2026-07', count: 169, amount: 1324000 }, { month: '2026-08', count: 172, amount: 1482000 },
+  ] },
   risk: { source: 'payment_status', ruleVersion: 'subscription-payment-status-v1', calculatedAt: '2026-09-06T09:58:00+09:00', predictiveScoreAvailable: false },
 }
 
@@ -934,6 +936,9 @@ const SHAPES = {
  * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
  */
 function visualQaWriteBody(method, pathname) {
+  if (method === 'POST' && /^\/api\/scenarios\/[^/]+\/test-send$/.test(pathname)) return { sent: 1 }
+  if (method === 'POST' && /^\/api\/scenarios\/[^/]+\/steps\/[^/]+\/test-send$/.test(pathname)) return { sent: 1 }
+  if (method === 'POST' && pathname === '/api/ec-commerce/test-send') return { sent: 1 }
   if (method === 'PUT' && /^\/api\/manual-links\/[^/]+$/.test(pathname)) {
     const key = decodeURIComponent(pathname.split('/').pop() ?? '')
     return MANUAL_LINKS.items.find((item) => item.key === key) ?? null
@@ -1504,6 +1509,21 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   // テンプレート選択（設計 `NfgOs` / `NWbuF`）。空だと選ぶものが1つも出ない。
   if (pathname === '/api/templates') return { success: true, data: TEMPLATES }
+  const templateDetail = /^\/api\/templates\/(template-\d+)$/.exec(pathname)
+  if (templateDetail) {
+    const template = TEMPLATES.find((item) => item.id === templateDetail[1])
+    if (template) {
+      const usedBy = template.id === 'template-9' ? {
+        scenarioSteps: [{ scenarioId: 'scenario-welcome', scenarioName: '新規登録7日間フォロー', stepId: 'step-1', stepOrder: 1 }],
+        autoReplies: [{ id: 'auto-reply-document', keyword: '資料請求', matchType: 'exact', lineAccountId: 'visual-qa-account' }],
+        automations: [{ id: 'automation-inbox-favorite', name: '受信箱の「よく使う」（担当3人が登録）', eventType: 'inbox_favorite' }],
+        reminderSteps: [], richMenuAreas: [], trackedLinks: [],
+      } : {
+        autoReplies: [], automations: [], scenarioSteps: [], reminderSteps: [], richMenuAreas: [], trackedLinks: [],
+      }
+      return { success: true, data: { ...template, accountId: 'visual-qa-account', question: null, questionStatus: 'draft', usedBy } }
+    }
+  }
   if (pathname === '/api/account-settings/test-recipients') {
     return { success: true, data: TEMPLATE_TEST_RECIPIENTS }
   }
@@ -1635,6 +1655,8 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: { ...FRIEND_ADD_RUNS, items } }
   }
   if (/^\/api\/scenarios\/[^/]+\/stats$/.test(pathname)) return { success: true, data: SCENARIO_STATS }
+  if (/^\/api\/scenarios\/[^/]+\/simulate$/.test(pathname)) return { success: true, data: SCENARIO_SIMULATION }
+  if (/^\/api\/scenarios\/[^/]+\/runs$/.test(pathname)) return { success: true, data: SCENARIO_RUNS }
   const scenarioActions = pathname.match(/^\/api\/scenarios\/([^/]+)\/actions$/)
   if (scenarioActions) {
     return {
@@ -2467,6 +2489,14 @@ const server = createServer((req, res) => {
     return
   }
 
+  if (method === 'GET' && url.pathname === '/api/nen-members/photos/original-download/visual-qa-once') {
+    const jpeg = Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2Q==', 'base64')
+    res.setHeader('Content-Type', 'image/jpeg')
+    res.setHeader('Cache-Control', 'no-store')
+    res.writeHead(200).end(jpeg)
+    return
+  }
+
   if (method === 'GET' && url.pathname.startsWith('/api/rich-menu-images/')) {
     const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
     res.setHeader('Content-Type', 'image/png')
@@ -2653,6 +2683,47 @@ const server = createServer((req, res) => {
     if (method === 'POST' && url.pathname === '/api/nen-members/photos/decisions/bulk') {
       res.writeHead(201).end(JSON.stringify({
         success: true, duplicate: false, data: NEN_PHOTO_BULK_DECISION_RESULT,
+      }))
+      return
+    }
+    /*
+      機能22の原本保存。実物や秘密値は返さず、再認証と一回限りURLの
+      画面遷移だけを固定応答で確認する。000000 は失敗確認専用。
+    */
+    if (method === 'POST' && url.pathname === '/api/auth/step-up') {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        if (body.purpose !== 'photo.original.download' || body.code === '000000') {
+          res.writeHead(400).end(JSON.stringify({ success: false, error: '再認証コードを確認してください。' }))
+          return
+        }
+        res.writeHead(201).end(JSON.stringify({
+          success: true,
+          data: {
+            token: 'visual-qa-photo-original-step-up',
+            purpose: 'photo.original.download',
+            expiresAt: '2026-09-07T03:10:00.000Z',
+          },
+        }))
+      })
+      return
+    }
+    const photoOriginalIssue = /^\/api\/nen-members\/photos\/([^/]+)\/original-download$/.exec(url.pathname)
+    if (method === 'POST' && photoOriginalIssue) {
+      if (req.headers['x-step-up-token'] !== 'visual-qa-photo-original-step-up') {
+        res.writeHead(428).end(JSON.stringify({ success: false, error: '原本の保存には再認証が必要です。' }))
+        return
+      }
+      res.writeHead(201).end(JSON.stringify({
+        success: true,
+        data: {
+          downloadUrl: '/api/nen-members/photos/original-download/visual-qa-once',
+          expiresAt: '2026-09-07T03:05:00.000Z',
+          oneTime: true,
+        },
       }))
       return
     }
