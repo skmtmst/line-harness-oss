@@ -55,7 +55,8 @@ describe('送る形', () => {
     // body / slug / externalId / lineAccountId を含めると400になる。
     const sent = toCreateInput(draft({ category: '食事', excerpt: 'ご紹介します。' }))
     expect(Object.keys(sent).sort()).toEqual(
-      ['articleUrl', 'category', 'excerpt', 'imageUrl', 'publishedAt', 'title'],
+      ['articleUrl', 'category', 'completionEventName', 'completionTagId', 'excerpt', 'imageUrl',
+        'publishedAt', 'scheduledAt', 'targetMode', 'targetTagId', 'title'],
     )
   })
 

@@ -101,26 +101,26 @@ function Kpis({
         { title: '動いている配信', value: flowMetrics?.summary.active ?? null, unit: 'つ', detail: `止めているもの ${flowMetrics?.summary.paused ?? '—'}つ` },
         { title: 'この30日に送った', value: flowMetrics?.summary.sent ?? null, unit: '通', detail: `予定 ${flowMetrics?.summary.planned ?? '—'}通` },
         { title: '押された割合', value: null, unit: '%', detail: flowMetrics?.flows[0]?.openRate.reason ?? 'LINEから個人開封を取得できません' },
-        { title: 'この配信からの成果', value: flowMetrics?.summary.associatedConversions ?? null, unit: '件', detail: '送信後7日以内の関連成果' },
+        { title: 'この配信からの成果', value: flowMetrics?.summary.associatedConversionAmount ?? null, unit: '円', detail: `送信後7日以内 ${flowMetrics?.summary.associatedConversions ?? '—'}件` },
       ]
     : tab === 'columns'
       ? [
           { title: '出したコラム', value: columnMetrics?.summary.sent ?? null, unit: '本', detail: `下書き ${columnMetrics?.summary.drafts ?? '—'}本` },
           { title: '次に出すもの', value: columnMetrics?.summary.scheduled ?? null, unit: '本', detail: nextColumn ? `${columnMetricDate(nextColumn.deliveryAt)} ／ ${nextColumn.title}` : '予約ずみのコラムはありません' },
           { title: 'いちばん読まれた', value: topColumn?.articleOpened.value ?? null, unit: '人', detail: topColumn?.title ?? '計測できる記事がありません' },
-          { title: 'コラムからの成果', value: columnMetrics?.summary.associatedConversions ?? null, unit: '件', detail: '送信後7日以内の関連成果' },
+          { title: 'コラムからの成果', value: columnMetrics?.summary.associatedConversionAmount ?? null, unit: '円', detail: `送信後7日以内 ${columnMetrics?.summary.associatedConversions ?? '—'}件` },
         ]
       : tab === 'pets'
         ? [
             { title: 'ペットの登録', value: petMetrics?.summary.pets ?? null, unit: '匹', detail: `友だち ${petMetrics?.summary.friends ?? '—'}人のうち ${petRegistrationRate ?? '—'}%` },
             { title: '今月 誕生日の子', value: petMetrics?.summary.birthdayThisMonth ?? null, unit: '匹', detail: `誕生日未登録 ${petMetrics?.summary.birthdayMissing ?? '—'}匹` },
-            { title: '誕生日配信の開封', value: null, unit: '%', detail: petMetrics?.summary.birthdayOpenRate.reason ?? 'LINEから個人開封を取得できません' },
+            { title: '誕生日配信の到達', value: typeof petMetrics?.summary.birthdayReachRate === 'number' ? Math.round(petMetrics.summary.birthdayReachRate * 1000) / 10 : null, unit: '%', detail: `クリック ${typeof petMetrics?.summary.birthdayClickRate === 'number' ? Math.round(petMetrics.summary.birthdayClickRate * 1000) / 10 : '—'}%（個人開封はLINE非提供）` },
             { title: '誕生日クーポンの利用', value: petMetrics ? Math.round(petMetrics.summary.coupons.usageRate * 1000) / 10 : null, unit: '%', detail: `${petMetrics?.summary.coupons.used ?? '—'} / ${petMetrics?.summary.coupons.issued ?? '—'}件` },
           ]
         : [
             { title: '送りました', value: deliveryList?.summary.sent ?? null, unit: '通', detail: deliveryList ? `1日あたり ${Math.round((deliveryList.summary.sent / deliveryList.range.days) * 10) / 10}通` : 'この30日の合計' },
             { title: 'これから送る', value: deliveryList ? deliveryList.summary.pending + deliveryList.summary.processing : null, unit: '通', detail: nextDelivery ? `いちばん近いのは ${formatNenJobDateTime(nextDelivery.scheduledAt)}` : '送信待ちはありません' },
-            { title: '届かなかった', value: deliveryList ? deliveryList.summary.failed + deliveryList.summary.skipped : null, unit: '通', detail: `送信失敗 ${deliveryList?.summary.failed ?? '—'}・対象外 ${deliveryList?.summary.skipped ?? '—'}` },
+            { title: '届かなかった', value: deliveryList ? deliveryList.summary.failed + deliveryList.summary.skipped : null, unit: '通', detail: `ブロック ${deliveryList?.summary.unmetReasons?.blocked ?? 0}・退会 ${deliveryList?.summary.unmetReasons?.unfollowed ?? 0}・その他 ${deliveryList?.summary.unmetReasons?.other ?? 0}` },
             { title: 'やり直しが必要', value: deliveryList?.summary.retryRequired ?? null, unit: '通', detail: '最大回数まで失敗した記録' },
           ]
 
@@ -160,6 +160,8 @@ export function NenOverview({
   onUpdateColumn,
   onSaveColumn,
   onDeliverColumn,
+  onDuplicateColumn,
+  onTestColumn,
   onToggleSetting,
   onTestSend,
   onPetDraftChange,
@@ -201,6 +203,8 @@ export function NenOverview({
   onUpdateColumn: (id: string, text: string) => void
   onSaveColumn: (column: NenColumn) => void
   onDeliverColumn: (column: NenColumn, scheduledAt?: string) => void
+  onDuplicateColumn: (column: NenColumn) => void
+  onTestColumn: (column: NenColumn) => void
   onToggleSetting: (setting: NenCampaignSetting) => void
   onTestSend: (setting: NenCampaignSetting) => void
   onPetDraftChange: (draft: { friendId: string; name: string; animalType: string; gender: string; birthday: string }) => void
@@ -253,6 +257,8 @@ export function NenOverview({
           onUpdate={onUpdateColumn}
           onSave={onSaveColumn}
           onDeliver={onDeliverColumn}
+          onDuplicate={onDuplicateColumn}
+          onTest={onTestColumn}
           onShowHistory={() => onTabChange('history')}
           renderPreview={renderColumnPreview}
           metrics={columnMetrics}
@@ -354,7 +360,7 @@ function FlowPanel({
                     <td className="px-3 py-3 text-ink-secondary">{formatCampaignTiming(setting)}</td>
                     <td className="px-3 py-3 text-ink-secondary">{formatCampaignContent(setting)}</td>
                     <td className="px-3 py-3 text-ink-secondary"><p className="font-semibold text-ink">{metric?.sent.toLocaleString('ja-JP') ?? '—'}通</p><p className="mt-1 text-xs text-ink-faint">予定 {metric?.planned.toLocaleString('ja-JP') ?? '—'}通</p></td>
-                    <td className="px-3 py-3 text-ink-secondary"><p className="font-semibold text-ink" title={metric?.openRate.reason}>開封率は取得不可</p><p className="mt-1 text-xs text-ink-faint">関連成果 {metric?.associatedConversions.toLocaleString('ja-JP') ?? '—'}件</p></td>
+                    <td className="px-3 py-3 text-ink-secondary"><p className="font-semibold text-ink" title={metric?.openRate.reason}>到達・クリックはLINE集計で確認</p><p className="mt-1 text-xs text-ink-faint">関連成果 {metric?.associatedConversions.toLocaleString('ja-JP') ?? '—'}件 ／ {metric?.associatedConversionAmount?.toLocaleString('ja-JP') ?? '—'}円</p></td>
                     <td className="px-3 py-3"><div className="flex flex-wrap justify-end gap-2"><Button onClick={() => onPreview(previewCampaignKey === setting.campaignKey ? null : setting.campaignKey)}>{previewCampaignKey === setting.campaignKey ? '閉じる' : '中身を見る'}</Button><Button onClick={() => onToggle(setting)} disabled={saving === setting.campaignKey}>{setting.isEnabled ? '止める' : '動かす'}</Button></div></td>
                   </tr>
                   {previewCampaignKey === setting.campaignKey ? <tr key={`${setting.campaignKey}-preview`}><td colSpan={6} className="border-t border-hairline p-3">{renderPreview(setting)}</td></tr> : null}
@@ -385,6 +391,8 @@ function ColumnsPanel({
   onUpdate,
   onSave,
   onDeliver,
+  onDuplicate,
+  onTest,
   onShowHistory,
   renderPreview,
 }: {
@@ -398,6 +406,8 @@ function ColumnsPanel({
   onUpdate: (id: string, text: string) => void
   onSave: (column: NenColumn) => void
   onDeliver: (column: NenColumn, scheduledAt?: string) => void
+  onDuplicate: (column: NenColumn) => void
+  onTest: (column: NenColumn) => void
   onShowHistory: () => void
   renderPreview: (column: NenColumn) => ReactNode
 }) {
@@ -435,7 +445,7 @@ function ColumnsPanel({
             {visible.map((column) => {
               const metric = metrics?.columns.find((candidate) => candidate.id === column.id)
               return <Fragment key={column.id}>
-                <tr><td className="border-t border-hairline px-3 py-3"><p className="font-bold text-ink">{column.title}</p><p className="mt-1 text-xs text-ink-faint">{column.category || '分類なし'} ／ {column.excerpt || '概要なし'}</p></td><td className="border-t border-hairline px-3 py-3 text-ink-secondary">{columnDeliveryDate(column)}</td><td className="border-t border-hairline px-3 py-3 text-ink-secondary"><p className="font-semibold text-ink">{metric?.targeted.toLocaleString('ja-JP') ?? '—'}人</p><p className="mt-1 text-xs text-ink-faint">送信 {metric?.sent.toLocaleString('ja-JP') ?? '—'}人</p></td><td className="border-t border-hairline px-3 py-3 text-ink-secondary" title={metric?.articleOpened.reason ?? undefined}><p className="font-semibold text-ink">{metric?.articleOpened.value?.toLocaleString('ja-JP') ?? '—'}人</p><p className="mt-1 text-xs text-ink-faint">{metric?.articleOpened.rate === null || metric?.articleOpened.rate === undefined ? metric?.articleOpened.reason ?? '取得できません' : `${Math.round(metric.articleOpened.rate * 1000) / 10}%`}</p></td><td className="border-t border-hairline px-3 py-3 text-ink-secondary"><p className="font-semibold text-ink">{metric?.associatedConversions.toLocaleString('ja-JP') ?? '—'}件</p><p className="mt-1 text-xs text-ink-faint">金額は取得不可</p></td><td className="border-t border-hairline px-3 py-3"><div className="flex flex-wrap justify-end gap-2"><Button onClick={() => onPreview(previewColumnId === column.id ? null : column.id)}>中身を見る</Button><Button disabled title="コラム複製APIの接続後に使えます">同じ形で書く</Button><Button onClick={onShowHistory}>配信結果</Button><Button onClick={() => onEdit(editingColumnId === column.id ? null : column.id)}>{editingColumnId === column.id ? '設定を閉じる' : '配信を設定'}</Button></div></td></tr>
+                <tr><td className="border-t border-hairline px-3 py-3"><p className="font-bold text-ink">{column.title}</p><p className="mt-1 text-xs text-ink-faint">{column.category || '分類なし'} ／ {column.excerpt || '概要なし'}</p></td><td className="border-t border-hairline px-3 py-3 text-ink-secondary">{columnDeliveryDate(column)}</td><td className="border-t border-hairline px-3 py-3 text-ink-secondary"><p className="font-semibold text-ink">{metric?.targeted.toLocaleString('ja-JP') ?? '—'}人</p><p className="mt-1 text-xs text-ink-faint">送信 {metric?.sent.toLocaleString('ja-JP') ?? '—'}人</p></td><td className="border-t border-hairline px-3 py-3 text-ink-secondary" title={metric?.articleOpened.reason ?? undefined}><p className="font-semibold text-ink">{metric?.articleOpened.value?.toLocaleString('ja-JP') ?? '—'}人</p><p className="mt-1 text-xs text-ink-faint">読了 {metric?.completionRate.value?.toLocaleString('ja-JP') ?? '—'}人</p></td><td className="border-t border-hairline px-3 py-3 text-ink-secondary"><p className="font-semibold text-ink">{metric?.associatedConversions.toLocaleString('ja-JP') ?? '—'}件</p><p className="mt-1 text-xs text-ink-faint">{typeof metric?.associatedConversionAmount === 'number' ? `${metric.associatedConversionAmount.toLocaleString('ja-JP')}円` : '—'}</p></td><td className="border-t border-hairline px-3 py-3"><div className="flex flex-wrap justify-end gap-2"><Button onClick={() => onPreview(previewColumnId === column.id ? null : column.id)}>中身を見る</Button><Button onClick={() => onDuplicate(column)}>同じ形で書く</Button><Button onClick={() => onTest(column)}>テスト送信</Button><Button onClick={onShowHistory}>配信結果</Button><Button onClick={() => onEdit(editingColumnId === column.id ? null : column.id)}>{editingColumnId === column.id ? '設定を閉じる' : '配信を設定'}</Button></div></td></tr>
                 {previewColumnId === column.id ? <tr key={`${column.id}-preview`}><td colSpan={6} className="border-t border-hairline p-3">{renderPreview(column)}</td></tr> : null}
                 {editingColumnId === column.id ? <tr key={`${column.id}-controls`}><td colSpan={6} className="border-t border-hairline bg-surface-muted px-3 py-3"><div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-2"><Button onClick={() => onEdit(null)}>設定を閉じる</Button><Button onClick={() => onDeliver(column)} variant="primary">今すぐ配信予約</Button><input type="datetime-local" aria-label={`${column.title}の配信日時`} onChange={(event) => event.target.value && onDeliver(column, new Date(event.target.value).toISOString())} className="rounded-v6-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink" /></div><span className="text-xs font-semibold text-ink-secondary">{columnStatusLabel[column.deliveryStatus]}</span></div><div className="mt-3"><label className="text-sm font-bold text-ink">カードの前に送る紹介文<textarea value={column.introText} rows={5} maxLength={1500} onChange={(event) => onUpdate(column.id, event.target.value)} className="mt-2 block w-full rounded-v6-control border border-hairline bg-canvas px-3 py-2 text-sm leading-6 text-ink" /></label><div className="mt-2 flex justify-end"><Button variant="primary" disabled={savingColumnId === column.id} onClick={() => onSave(column)}>{savingColumnId === column.id ? '保存中...' : '配信文を保存'}</Button></div></div></td></tr> : null}
               </Fragment>

@@ -85,7 +85,7 @@ type FlowAggregateRow = {
   skipped: number;
 };
 
-type ConversionAggregateRow = { campaign_key: string; total: number };
+type ConversionAggregateRow = { campaign_key: string; total: number; amount: number };
 
 export async function getNenFlowMetrics(
   db: D1Database,
@@ -110,18 +110,25 @@ export async function getNenFlowMetrics(
       GROUP BY campaign_key`,
   ).bind(lineAccountId, range.fromSql, range.toSql).all<FlowAggregateRow>();
   const conversions = await db.prepare(
-    `SELECT j.campaign_key, COUNT(DISTINCT ce.id) AS total
-       FROM nen_delivery_jobs j
-       JOIN conversion_events ce ON ce.friend_id = j.friend_id
-        AND datetime(ce.created_at) >= datetime(j.sent_at)
-        AND datetime(ce.created_at) < datetime(j.sent_at, '+7 days')
-       JOIN conversion_points cp ON cp.id = ce.conversion_point_id AND cp.line_account_id = ?
-      WHERE j.line_account_id = ? AND j.status = 'sent' AND j.sent_at IS NOT NULL
-        AND datetime(j.sent_at) >= datetime(?) AND datetime(j.sent_at) < datetime(?)
-      GROUP BY j.campaign_key`,
+    `WITH attributed AS (
+       SELECT j.campaign_key, ce.id AS conversion_id,
+              MAX(COALESCE(ce.value_snapshot, 0)) AS amount
+         FROM nen_delivery_jobs j
+         JOIN conversion_events ce ON ce.friend_id = j.friend_id
+          AND datetime(ce.created_at) >= datetime(j.sent_at)
+          AND datetime(ce.created_at) < datetime(j.sent_at, '+7 days')
+         JOIN conversion_points cp ON cp.id = ce.conversion_point_id AND cp.line_account_id = ?
+        WHERE j.line_account_id = ? AND j.status = 'sent' AND j.sent_at IS NOT NULL
+          AND datetime(j.sent_at) >= datetime(?) AND datetime(j.sent_at) < datetime(?)
+        GROUP BY j.campaign_key, ce.id
+     )
+     SELECT campaign_key, COUNT(*) AS total, COALESCE(SUM(amount), 0) AS amount
+       FROM attributed GROUP BY campaign_key`,
   ).bind(lineAccountId, lineAccountId, range.fromSql, range.toSql).all<ConversionAggregateRow>();
   const byKey = new Map((aggregates.results ?? []).map((row) => [row.campaign_key, row]));
-  const conversionsByKey = new Map((conversions.results ?? []).map((row) => [row.campaign_key, Number(row.total ?? 0)]));
+  const conversionsByKey = new Map((conversions.results ?? []).map((row) => [row.campaign_key, {
+    count: Number(row.total ?? 0), amount: Number(row.amount ?? 0),
+  }]));
   const flows = campaigns.map((campaign) => {
     const aggregate = byKey.get(campaign.campaign_key);
     return {
@@ -134,7 +141,8 @@ export async function getNenFlowMetrics(
       failed: Number(aggregate?.failed ?? 0),
       skipped: Number(aggregate?.skipped ?? 0),
       openRate: unavailable('LINEはNEN配信の個人開封を提供していません'),
-      associatedConversions: conversionsByKey.get(campaign.campaign_key) ?? 0,
+      associatedConversions: conversionsByKey.get(campaign.campaign_key)?.count ?? 0,
+      associatedConversionAmount: conversionsByKey.get(campaign.campaign_key)?.amount ?? 0,
       attribution: '送信後7日以内の関連成果であり、配信が原因とは断定しません',
     };
   });
@@ -146,6 +154,7 @@ export async function getNenFlowMetrics(
       planned: flows.reduce((sum, flow) => sum + flow.planned, 0),
       sent: flows.reduce((sum, flow) => sum + flow.sent, 0),
       associatedConversions: flows.reduce((sum, flow) => sum + flow.associatedConversions, 0),
+      associatedConversionAmount: flows.reduce((sum, flow) => sum + flow.associatedConversionAmount, 0),
     },
     flows,
   };
@@ -167,6 +176,8 @@ type ColumnMetricRow = {
   last_sent_at: string | null;
   tracking_links: number;
   opened: number;
+  read_opened: number;
+  read_completed: number;
 };
 
 export async function getNenColumnMetrics(
@@ -184,7 +195,15 @@ export async function getNenColumnMetrics(
             MIN(j.scheduled_at) AS first_scheduled_at,
             MAX(j.sent_at) AS last_sent_at,
             COUNT(DISTINCT tl.id) AS tracking_links,
-            COUNT(DISTINCT CASE WHEN lc.friend_id = j.friend_id THEN lc.friend_id END) AS opened
+            COUNT(DISTINCT CASE WHEN lc.friend_id = j.friend_id THEN lc.friend_id END) AS opened,
+            (SELECT COUNT(DISTINCT re.friend_id) FROM nen_column_read_events re
+              WHERE re.line_account_id = c.line_account_id AND re.column_id = c.id
+                AND re.event_kind = 'opened' AND datetime(re.occurred_at) >= datetime(?)
+                AND datetime(re.occurred_at) < datetime(?)) AS read_opened,
+            (SELECT COUNT(DISTINCT re.friend_id) FROM nen_column_read_events re
+              WHERE re.line_account_id = c.line_account_id AND re.column_id = c.id
+                AND re.event_kind = 'completed' AND datetime(re.occurred_at) >= datetime(?)
+                AND datetime(re.occurred_at) < datetime(?)) AS read_completed
        FROM nen_columns c
        LEFT JOIN nen_delivery_jobs j ON j.line_account_id = c.line_account_id
         AND j.source_key = 'column:' || c.id
@@ -197,29 +216,39 @@ export async function getNenColumnMetrics(
       GROUP BY c.id
       ORDER BY COALESCE(c.published_at, c.created_at) DESC, c.id DESC`,
   ).bind(
+    range.fromSql, range.toSql, range.fromSql, range.toSql,
     range.fromSql, range.toSql, range.fromSql, range.toSql, lineAccountId,
   ).all<ColumnMetricRow>();
   const conversions = await db.prepare(
-    `SELECT substr(j.source_key, 8) AS column_id, COUNT(DISTINCT ce.id) AS total
-       FROM nen_delivery_jobs j
-       JOIN conversion_events ce ON ce.friend_id = j.friend_id
-        AND datetime(ce.created_at) >= datetime(j.sent_at)
-        AND datetime(ce.created_at) < datetime(j.sent_at, '+7 days')
-       JOIN conversion_points cp ON cp.id = ce.conversion_point_id AND cp.line_account_id = ?
-      WHERE j.line_account_id = ? AND j.campaign_key = 'column' AND j.status = 'sent'
-        AND j.source_key LIKE 'column:%'
-        AND datetime(j.sent_at) >= datetime(?) AND datetime(j.sent_at) < datetime(?)
-      GROUP BY substr(j.source_key, 8)`,
+    `WITH attributed AS (
+       SELECT substr(j.source_key, 8) AS column_id, ce.id AS conversion_id,
+              MAX(COALESCE(ce.value_snapshot, 0)) AS amount
+         FROM nen_delivery_jobs j
+         JOIN conversion_events ce ON ce.friend_id = j.friend_id
+          AND datetime(ce.created_at) >= datetime(j.sent_at)
+          AND datetime(ce.created_at) < datetime(j.sent_at, '+7 days')
+         JOIN conversion_points cp ON cp.id = ce.conversion_point_id AND cp.line_account_id = ?
+        WHERE j.line_account_id = ? AND j.campaign_key = 'column' AND j.status = 'sent'
+          AND j.source_key LIKE 'column:%'
+          AND datetime(j.sent_at) >= datetime(?) AND datetime(j.sent_at) < datetime(?)
+        GROUP BY substr(j.source_key, 8), ce.id
+     )
+     SELECT column_id, COUNT(*) AS total, COALESCE(SUM(amount), 0) AS amount
+       FROM attributed GROUP BY column_id`,
   ).bind(lineAccountId, lineAccountId, range.fromSql, range.toSql)
-    .all<{ column_id: string; total: number }>();
+    .all<{ column_id: string; total: number; amount: number }>();
   const conversionByColumn = new Map(
-    (conversions.results ?? []).map((row) => [row.column_id, Number(row.total ?? 0)]),
+    (conversions.results ?? []).map((row) => [row.column_id, {
+      count: Number(row.total ?? 0), amount: Number(row.amount ?? 0),
+    }]),
   );
   const columns = (rows.results ?? []).map((row) => {
     const targeted = Number(row.targeted ?? 0);
     const sent = Number(row.sent ?? 0);
     const opened = Number(row.opened ?? 0);
     const trackingAvailable = Number(row.tracking_links ?? 0) > 0;
+    const readOpened = Number(row.read_opened ?? 0);
+    const readCompleted = Number(row.read_completed ?? 0);
     return {
       id: row.id,
       title: row.title,
@@ -236,8 +265,14 @@ export async function getNenColumnMetrics(
         ? { value: opened, rate: sent > 0 ? opened / sent : 0, state: 'available' as const, reason: null }
         : { value: null, rate: null, state: 'unavailable' as const, reason: 'この記事URLの計測台帳がありません' },
       unread: trackingAvailable ? Math.max(sent - opened, 0) : null,
-      completionRate: unavailable('記事のスクロール読了eventをまだ記録していません'),
-      associatedConversions: conversionByColumn.get(row.id) ?? 0,
+      completionRate: {
+        value: readCompleted,
+        rate: readOpened > 0 ? readCompleted / readOpened : 0,
+        state: 'available' as const,
+        reason: null,
+      },
+      associatedConversions: conversionByColumn.get(row.id)?.count ?? 0,
+      associatedConversionAmount: conversionByColumn.get(row.id)?.amount ?? 0,
       attribution: '送信後7日以内の関連成果',
     };
   });
@@ -252,6 +287,7 @@ export async function getNenColumnMetrics(
         ? columns.reduce((sum, column) => sum + (column.unread ?? 0), 0)
         : null,
       associatedConversions: columns.reduce((sum, column) => sum + column.associatedConversions, 0),
+      associatedConversionAmount: columns.reduce((sum, column) => sum + column.associatedConversionAmount, 0),
     },
     columns,
   };
@@ -276,7 +312,7 @@ export async function getNenPetMetrics(
   lineAccountId: string,
   range: NenMetricsRange,
 ) {
-  const [friendCounts, petCounts, couponCounts, breeds, rows] = await Promise.all([
+  const [friendCounts, petCounts, couponCounts, breeds, rows, birthdayEngagement] = await Promise.all([
     db.prepare(
       `SELECT COUNT(DISTINCT f.id) AS total,
               COUNT(DISTINCT CASE WHEN p.id IS NULL THEN f.id END) AS unregistered
@@ -323,6 +359,17 @@ export async function getNenPetMetrics(
          LEFT JOIN nen_coupon_issues ci ON ci.pet_id = p.id
         GROUP BY p.id ORDER BY p.updated_at DESC, p.id DESC LIMIT 200`,
     ).bind(lineAccountId, lineAccountId, range.fromSql, range.toSql).all<PetMetricRow>(),
+    db.prepare(
+      `SELECT COUNT(DISTINCT j.id) AS targeted,
+              COUNT(DISTINCT CASE WHEN j.status = 'sent' THEN j.id END) AS reached,
+              COUNT(DISTINCT lc.friend_id) AS clicked
+         FROM nen_delivery_jobs j
+         LEFT JOIN tracked_links tl ON tl.line_account_id = j.line_account_id
+          AND tl.original_url = json_extract(j.campaign_snapshot, '$.button_url')
+         LEFT JOIN link_clicks lc ON lc.tracked_link_id = tl.id AND lc.friend_id = j.friend_id
+        WHERE j.line_account_id = ? AND j.campaign_key = 'birthday_coupon'
+          AND datetime(j.scheduled_at) >= datetime(?) AND datetime(j.scheduled_at) < datetime(?)`,
+    ).bind(lineAccountId, range.fromSql, range.toSql).first<{ targeted: number; reached: number; clicked: number }>(),
   ]);
   const pets = (rows.results ?? []).map((row) => ({
     id: row.id,
@@ -352,6 +399,10 @@ export async function getNenPetMetrics(
       friends: Number(friendCounts?.total ?? 0),
       friendsWithoutPet: Number(friendCounts?.unregistered ?? 0),
       birthdayOpenRate: unavailable('LINEは誕生日配信の個人開封を提供していません'),
+      birthdayReachRate: Number(birthdayEngagement?.targeted ?? 0) > 0
+        ? Number(birthdayEngagement?.reached ?? 0) / Number(birthdayEngagement?.targeted ?? 0) : 0,
+      birthdayClickRate: Number(birthdayEngagement?.reached ?? 0) > 0
+        ? Number(birthdayEngagement?.clicked ?? 0) / Number(birthdayEngagement?.reached ?? 0) : 0,
       coupons: {
         ...coupons,
         usageRate: coupons.issued > 0 ? coupons.used / coupons.issued : 0,
@@ -423,6 +474,19 @@ export async function listNenDeliveries(
       GROUP BY j.status`,
   ).bind(input.lineAccountId, input.range.fromSql, input.range.toSql)
     .all<{ status: string; total: number }>();
+  const unmetRows = await db.prepare(
+    `SELECT CASE
+              WHEN lower(COALESCE(last_error, '')) LIKE '%block%' THEN 'blocked'
+              WHEN lower(COALESCE(last_error, '')) LIKE '%unfollow%'
+                OR lower(COALESCE(last_error, '')) LIKE '%unsubscribe%' THEN 'unfollowed'
+              ELSE 'other'
+            END AS reason, COUNT(*) AS total
+       FROM nen_delivery_jobs
+      WHERE line_account_id = ? AND status IN ('failed', 'skipped')
+        AND datetime(scheduled_at) >= datetime(?) AND datetime(scheduled_at) < datetime(?)
+      GROUP BY reason`,
+  ).bind(input.lineAccountId, input.range.fromSql, input.range.toSql)
+    .all<{ reason: 'blocked' | 'unfollowed' | 'other'; total: number }>();
   const totalRow = await db.prepare(
     `SELECT COUNT(*) AS total FROM nen_delivery_jobs j
       WHERE j.line_account_id = ?
@@ -453,6 +517,7 @@ export async function listNenDeliveries(
     summary: {
       ...summary,
       retryRequired: await countRetryRequired(db, input.lineAccountId, input.range),
+      unmetReasons: Object.fromEntries((unmetRows.results ?? []).map((row) => [row.reason, Number(row.total ?? 0)])),
     },
     deliveries: (rows.results ?? []).map((row) => ({
       id: row.id,

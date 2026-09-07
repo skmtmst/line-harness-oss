@@ -14,7 +14,7 @@ import {
   reserveMileageAdjustmentNotification,
   saveMileageEarningRuleDraft,
 } from '../src/mileage-admin-v6.js';
-import { postMileageAdjustment } from '../src/mileage.js';
+import { getMileageAdminHistory, postMileageAdjustment } from '../src/mileage.js';
 import { asD1 } from './d1-test-helper.js';
 
 const ROOT = join(import.meta.dirname, '..');
@@ -54,6 +54,10 @@ describe('V6 mileage admin read models', () => {
       cancellationEventTypes: ['message_deleted'],
       targetConditions: { operator: 'AND', rules: [{ type: 'tag_exists', value: '会員' }] },
       sortOrder: 2,
+      notification: {
+        enabled: true,
+        messageTemplate: '{awardedMiles}マイル付きました。残高は{balance}マイルです。',
+      },
     } as const;
     const first = await saveMileageEarningRuleDraft(db, {
       ruleId: 'builtin-message-received', lineAccountId: 'account-1', expectedVersion: 0,
@@ -80,6 +84,11 @@ describe('V6 mileage admin read models', () => {
       ruleId: 'builtin-link-clicked', lineAccountId: 'account-1', expectedVersion: 0,
       draft: { ...draft, targetConditions: { operator: 'OR', rules: tooMany } },
     })).rejects.toMatchObject<MileageV6Error>({ code: 'target_conditions_too_many' });
+
+    await expect(saveMileageEarningRuleDraft(db, {
+      ruleId: 'builtin-link-clicked', lineAccountId: 'account-1', expectedVersion: 0,
+      draft: { ...draft, notification: { enabled: true, messageTemplate: '' } },
+    })).rejects.toMatchObject<MileageV6Error>({ code: 'notification_message_required' });
   });
 
   it('returns real balances, expiration, period totals, score reasons, and reward reach', async () => {
@@ -95,24 +104,30 @@ describe('V6 mileage admin read models', () => {
       VALUES ('score-1', 'friend-1', 10, 'メッセージ返信', datetime('now'));
       INSERT INTO mileage_rewards
         (id, line_account_id, name, reward_kind, status, sort_order)
-      VALUES ('reward-1', 'account-1', 'ゴールド特典', 'rank', 'draft', 1);
-      INSERT INTO mileage_reward_versions (id, reward_id, version_number, required_miles)
-      VALUES ('reward-version-1', 'reward-1', 1, 300);
-      UPDATE mileage_rewards SET current_draft_version_id = 'reward-version-1' WHERE id = 'reward-1';
+      VALUES ('reward-1', 'account-1', 'ゴールド', 'rank', 'published', 1);
+      INSERT INTO mileage_reward_versions (id, reward_id, version_number, required_miles, status)
+      VALUES ('reward-version-1', 'reward-1', 1, 300, 'published');
+      UPDATE mileage_rewards SET current_published_version_id = 'reward-version-1' WHERE id = 'reward-1';
     `);
 
     const friends = await getMileageFriendsV6(db, {
       lineAccountId: 'account-1', visibleAccountIds: ['account-1'], search: '', limit: 20, offset: 0,
     });
-    expect(friends.summary).toMatchObject({ totalMembers: 1, available: 400 });
+    expect(friends.summary).toMatchObject({
+      totalMembers: 1, available: 400, monthChange: 400,
+      rankCounts: [{ rewardId: 'reward-1', rankName: 'ゴールド', requiredMiles: 300, friendCount: 1 }],
+    });
     expect(friends.items[0]).toMatchObject({
-      friendId: 'friend-1', available: 400, monthChange: 400, rank: null,
+      friendId: 'friend-1', available: 400, monthChange: 400, rank: 'ゴールド',
+      rankThreshold: 300, nextRank: null, milesToNextRank: null,
     });
     expect(friends.items[0].expiringMiles30d).toBe(400);
 
     const history = await getMileageHistoryPeriodSummary(db, { lineAccountId: 'account-1' });
-    expect(history).toMatchObject({ totalAmount: 400, manualCount: 1 });
+    expect(history).toMatchObject({ totalAmount: 400, manualCount: 1, pendingCount: 0 });
     expect(history.byType).toContainEqual({ entryType: 'adjustment', count: 1, amount: 400 });
+    const adminHistory = await getMileageAdminHistory(db, { accountId: 'account-1' });
+    expect(adminHistory.items[0]).toMatchObject({ lineAccountName: '公式A', balanceAfter: 400 });
 
     const bands = await getActionScoreBandOverview(db, 'account-1');
     expect(bands.bandSummaries).toContainEqual({
@@ -122,7 +137,7 @@ describe('V6 mileage admin read models', () => {
 
     const reach = await getMileageRewardReachMetrics(db, 'account-1');
     expect(reach[0]).toMatchObject({
-      rewardName: 'ゴールド特典', rewardKind: 'rank', requiredMiles: 300,
+      rewardName: 'ゴールド', rewardKind: 'rank', requiredMiles: 300,
       reachableFriendCount: 1, redeemedFriendCount: 0, exchangeRate: 0,
     });
     expect(adjustment.entry.id).toBeTruthy();

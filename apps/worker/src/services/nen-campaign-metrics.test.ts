@@ -92,14 +92,15 @@ describe('NEN campaign metrics', () => {
 
   it('実データだけでフロー・コラム・ペット集計を返し、未取得値をnullにする', async () => {
     insertJob(testDb.raw, { id: 'flow-a', accountId: 'account-a', friendId: 'friend-a' });
+    insertJob(testDb.raw, { id: 'flow-a-repeat', accountId: 'account-a', friendId: 'friend-a' });
     insertJob(testDb.raw, { id: 'foreign-flow', accountId: 'account-b', friendId: 'friend-b' });
     testDb.raw.prepare(
       `INSERT INTO conversion_points (id, name, event_type, created_at, line_account_id)
        VALUES ('point-a', '購入', 'purchase', '2026-01-01', 'account-a')`,
     ).run();
     testDb.raw.prepare(
-      `INSERT INTO conversion_events (id, conversion_point_id, friend_id, created_at)
-       VALUES ('conversion-a', 'point-a', 'friend-a', '2026-09-02 10:00:00')`,
+      `INSERT INTO conversion_events (id, conversion_point_id, friend_id, value_snapshot, created_at)
+       VALUES ('conversion-a', 'point-a', 'friend-a', 1200, '2026-09-02 10:00:00')`,
     ).run();
     testDb.raw.prepare(
       `INSERT INTO nen_columns
@@ -141,20 +142,22 @@ describe('NEN campaign metrics', () => {
     ]);
 
     const arrival = flows.flows.find((flow) => flow.campaignKey === 'arrival_check');
-    expect(arrival).toMatchObject({ planned: 1, sent: 1, associatedConversions: 1 });
+    expect(arrival).toMatchObject({ planned: 2, sent: 2, associatedConversions: 1, associatedConversionAmount: 1200 });
     expect(arrival?.openRate).toMatchObject({ value: null, state: 'unavailable' });
-    expect(flows.summary.sent).toBe(2);
+    expect(flows.summary.sent).toBe(3);
     expect(columns.columns[0]).toMatchObject({
       id: 'column-a', targeted: 1, sent: 1, unread: 0,
       articleOpened: { value: 1, rate: 1, state: 'available' },
-      completionRate: { value: null, state: 'unavailable' },
+      completionRate: { value: 0, rate: 0, state: 'available' },
+      associatedConversions: 1,
+      associatedConversionAmount: 1200,
     });
     expect(pets.summary).toMatchObject({
       pets: 1, birthdayRegistered: 1, friends: 1, friendsWithoutPet: 0,
       coupons: { issued: 1, used: 1, usageRate: 1 },
     });
     expect(pets.pets[0]).toMatchObject({
-      id: 'pet-a', breed: '柴犬', ownerDeliveryHistory: { count: 2 },
+      id: 'pet-a', breed: '柴犬', ownerDeliveryHistory: { count: 3 },
     });
   });
 

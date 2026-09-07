@@ -56,7 +56,9 @@ describe('V6 21 NEN配信の画面契約', () => {
     expect(OVERVIEW).toContain('metric?.targeted.toLocaleString')
     expect(OVERVIEW).toContain('metric?.articleOpened.value?.toLocaleString')
     expect(OVERVIEW).toContain('openRate.reason')
-    expect(OVERVIEW).toContain('birthdayOpenRate.reason')
+    expect(OVERVIEW).toContain('birthdayReachRate')
+    expect(OVERVIEW).toContain('birthdayClickRate')
+    expect(OVERVIEW).toContain('個人開封はLINE非提供')
     expect(OVERVIEW).not.toContain('12pt')
   })
 
@@ -69,11 +71,12 @@ describe('V6 21 NEN配信の画面契約', () => {
     expect(OVERVIEW).toContain('売らない配信です。ここで信用がたまると、売る配信が届きやすくなります。')
   })
 
-  it('コラム作成では未接続の工程を明示し、実行できる操作だけを有効にする', () => {
+  it('コラム作成で対象・予約・読了後の操作を実APIへ接続する', () => {
     expect(NEW_COLUMN).toContain('data-design-node="ymXJK"')
     expect(NEW_COLUMN).toContain('前のコラムを下敷きにする')
-    expect(NEW_COLUMN).toContain('コラム複製の接続後に使えます')
-    expect(NEW_COLUMN).toContain('対象人数を確認してから配信予約できます')
-    expect(NEW_COLUMN).toContain('読了イベントとタグ付けが接続されると設定できます')
+    expect(NEW_COLUMN).toContain('columnAudience')
+    expect(NEW_COLUMN).toContain('配信日時（日本時間）')
+    expect(NEW_COLUMN).toContain('読了イベント名')
+    expect(NEW_COLUMN).toContain('読了後に付けるタグ')
   })
 })
