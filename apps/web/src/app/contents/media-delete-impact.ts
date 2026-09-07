@@ -1,4 +1,5 @@
 import type { MediaDeleteImpact, MediaDeleteImpactReference } from '@line-crm/shared'
+import { mediaUsageKindText } from './media-usage-display'
 
 /**
  * メディアを消したときの影響（設計 `YfTfJ` 15-1-C／契約 #610）。
@@ -12,19 +13,14 @@ import type { MediaDeleteImpact, MediaDeleteImpactReference } from '@line-crm/sh
 /** 取得元が無い値。実値の0とは別。 */
 export const NOT_AVAILABLE = '—（未取得）'
 
-const KIND_LABEL: Record<MediaDeleteImpactReference['kind'], string> = {
-  template: 'テンプレート',
-  broadcast: '一斉配信',
-  rich_menu: 'リッチメニュー',
-  scenario_step: 'シナリオの通',
-  nen_column: 'コラム',
-  event: 'イベント',
-  webinar: 'ウェビナー',
-}
-
-/** 使用先の種類。**内部の記号をそのまま出さない。** */
+/**
+ * 使用先の種類。**内部の記号をそのまま出さない。**
+ *
+ * 言い方の表は `media-usage-display.ts` の1つだけにする。ここに2つ目の
+ * 表を置くと、片方だけ直して「シナリオの通」のような食い違いが再発する。
+ */
 export function referenceKindText(kind: MediaDeleteImpactReference['kind']): string {
-  return KIND_LABEL[kind]
+  return mediaUsageKindText(kind)
 }
 
 /**
@@ -85,4 +81,22 @@ export function canDelete(input: {
 }): boolean {
   if (!input.impact || input.busy) return false
   return input.impact.canDelete && input.impact.usageCount === 0
+}
+
+/**
+ * まとめて削除の結果文。
+ *
+ * **成功数と失敗した名前を1つの文にまとめる。** 件ごとに上書きすると
+ * 最後の1件しか残らず、消す操作なのに結果が曖昧になる。
+ */
+export function summarizeBulkDeleteResult(deletedCount: number, failedNames: string[]): {
+  tone: 'success' | 'error'
+  message: string
+} {
+  if (failedNames.length === 0) return { tone: 'success', message: `削除しました（${deletedCount}件）` }
+  if (deletedCount === 0) return { tone: 'error', message: `削除できませんでした（${failedNames.join('、')}）` }
+  return {
+    tone: 'error',
+    message: `削除しました${deletedCount}件、失敗${failedNames.length}件（${failedNames.join('、')}）`,
+  }
 }

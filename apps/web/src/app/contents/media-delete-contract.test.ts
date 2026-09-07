@@ -83,3 +83,32 @@ describe('メディアの削除確認', () => {
     expect(PAGE).toContain('if (!isCurrentDelete()) return')
   })
 })
+
+/** まとめて削除（点検 #498 の M2・M3／票 #550）。 */
+describe('まとめて削除の途中交代と結果', () => {
+  const bulkDelete = PAGE.slice(
+    PAGE.indexOf('async function runBulkDelete'),
+    PAGE.indexOf('async function openDelete'),
+  )
+
+  it('#550 M2 アカウントが変わったら処理中の窓を閉じて抜ける', () => {
+    // 戻さずに抜けると「処理中…」のまま窓が閉じなくなる。
+    expect(bulkDelete).toContain('if (accountAtRequest !== latestAccountRef.current) {')
+    expect(bulkDelete).toContain('setBulkBusy(false)')
+    expect(bulkDelete).toContain('setBulkConfirm(null)')
+    expect(bulkDelete).toContain('setBulkProgress(null)')
+  })
+
+  it('#550 M2 何件目かを出し、件数が多くても止まって見せない', () => {
+    expect(bulkDelete).toContain('setBulkProgress({ done:')
+    expect(PAGE).toContain('処理中…（')
+    expect(PAGE).toContain('aria-live="polite"')
+  })
+
+  it('#550 M3 成功数と失敗した名前を1つの文にまとめる', () => {
+    // 件ごとに上書きすると最後の1件しか残らない。
+    expect(bulkDelete).toContain('summarizeBulkDeleteResult(deleted, failedNames)')
+    expect(bulkDelete).toContain('failedNames.push(name)')
+    expect(bulkDelete).not.toContain("setError('削除に失敗しました')")
+  })
+})
