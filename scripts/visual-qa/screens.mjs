@@ -4007,6 +4007,21 @@ const ISSUE_367_REVIEW = {
   },
 }
 
+const ISSUE_408_REVIEW = {
+  ZrpKn: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**Issue #408 再判定。** 利用先の種別名と取消内訳の表示欄、成果地点ごとの実データ契約を追加。撮影モックは旧契約のため利用先名・取消台帳が未接続で、実APIの固定データ反映後に一致へ更新する。横スクロール0。',
+    verdictSource: 'conversions-v6/ZrpKn.txt + Issue #408',
+    verdictHead: 'codex/kenta-r2-s2-b408',
+  },
+  GUxsj: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**Issue #408 再判定。** 成果地点ごとの経路内訳と取消件数・金額を表示する契約へ更新。撮影モックは旧契約のため取消台帳・利用先名が未接続で、固定データ反映後に一致へ更新する。横スクロール0。',
+    verdictSource: 'conversions-v6/GUxsj.txt + Issue #408',
+    verdictHead: 'codex/kenta-r2-s2-b408',
+  },
+}
+
 // Issue #293（機能2 第2周）。Pencil 1920pxと、割当ポート3104/8791で
 // 撮った実装1440/1920pxを横に並べ、同じ操作状態で再判定した。
 const FEATURE_2_R2_PREFIX = '**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。'
@@ -4204,6 +4219,9 @@ for (const screen of SCREENS) {
   }
   if (screen.feature === 19 && FEATURE_19_AUDIT[screen.node]) {
     Object.assign(screen, FEATURE_19_AUDIT[screen.node])
+  }
+  if (screen.feature === 19 && ISSUE_408_REVIEW[screen.node]) {
+    Object.assign(screen, ISSUE_408_REVIEW[screen.node])
   }
   if (screen.feature === 19 && ISSUE_296_REVIEW[screen.node]) {
     Object.assign(screen, ISSUE_296_REVIEW[screen.node])

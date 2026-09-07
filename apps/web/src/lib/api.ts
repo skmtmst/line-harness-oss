@@ -694,13 +694,16 @@ export type ConversionDefinitionListItem = {
   status: ConversionDefinitionStatus
   version: number
   usageCount: number
+  usageNames: string[]
   metrics: {
     recordedCount: number
     netCount: number
     reversedCount: number | null
     netValue: number
-    reversalState: 'unavailable'
+    reversalState: 'available' | 'unavailable'
     reversalReason: string
+    cancellationCount: number | null
+    cancellationValue: number | null
   }
   stoppedAt: string | null
   createdAt: string
@@ -732,7 +735,7 @@ export type ConversionDefinitionReport = {
     previousNetCount: number
     previousNetValue: number
     countChangeRate: number | null
-    reversalState: 'unavailable'
+    reversalState: 'available' | 'unavailable'
     reversalReason: string
     fastestGrowing: {
       conversionPointId: string
@@ -744,6 +747,8 @@ export type ConversionDefinitionReport = {
       previousNetValue: number
       countChange: number
     } | null
+    cancellationCount: number | null
+    cancellationValue: number | null
   }
   daily: Array<{
     day: string
@@ -761,6 +766,17 @@ export type ConversionDefinitionReport = {
     previousNetCount: number
     previousNetValue: number
     countChange: number
+    cancellationCount: number | null
+    cancellationValue: number | null
+    routes: Array<{
+      routeKey: string
+      label: string
+      attributionState: 'attributed' | 'unattributed'
+      netCount: number
+      netValue: number
+      audience: number | null
+      conversionRate: number | null
+    }>
   }>
   byRoute: Array<{
     routeKey: string
