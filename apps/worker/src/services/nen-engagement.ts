@@ -363,15 +363,19 @@ export async function queueColumnDelivery(
   scheduledAt: string,
 ): Promise<number> {
   const column = await db.prepare(
-    `SELECT id, title, excerpt, article_url, image_url, intro_text
+    `SELECT id, title, excerpt, article_url, image_url, intro_text, target_mode, target_tag_id
        FROM nen_columns WHERE id = ? AND line_account_id = ?`,
   ).bind(columnId, lineAccountId).first<Record<string, unknown>>();
   if (!column) throw new Error('Column not found');
   const campaign = await getNenCampaign(db, 'column', lineAccountId);
   if (!campaign || campaign.is_enabled !== 1) throw new Error('Column campaign is disabled');
   const friends = await db.prepare(
-    `SELECT id FROM friends WHERE line_account_id = ? AND is_following = 1`,
-  ).bind(lineAccountId).all<{ id: string }>();
+    `SELECT f.id FROM friends f
+      WHERE f.line_account_id = ? AND f.is_following = 1
+        AND (? != 'tag' OR EXISTS (
+          SELECT 1 FROM friend_tags ft WHERE ft.friend_id = f.id AND ft.tag_id = ?
+        ))`,
+  ).bind(lineAccountId, column.target_mode, column.target_tag_id).all<{ id: string }>();
   const now = jstNow();
   let queued = 0;
   for (const friend of friends.results) {

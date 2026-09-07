@@ -284,6 +284,17 @@ export async function getMileageFriendsV6(
   db: D1Database,
   input: { lineAccountId: string; visibleAccountIds: string[]; search: string; limit: number; offset: number },
 ) {
+  const rankRows = await db.prepare(
+    `SELECT r.id, r.name, v.required_miles
+       FROM mileage_rewards r
+       JOIN mileage_reward_versions v ON v.id = r.current_published_version_id
+      WHERE r.line_account_id = ? AND r.reward_kind = 'rank'
+        AND r.status = 'published' AND v.status = 'published'
+      ORDER BY v.required_miles, r.sort_order, r.id`,
+  ).bind(input.lineAccountId).all<{ id: string; name: string; required_miles: number }>();
+  const ranks = rankRows.results.map((row) => ({
+    id: row.id, name: row.name, threshold: Number(row.required_miles),
+  }));
   const visible = [...new Set([input.lineAccountId, ...input.visibleAccountIds])];
   const placeholders = visible.map(() => '?').join(',');
   const ctes = `WITH selected AS (
@@ -338,21 +349,44 @@ export async function getMileageFriendsV6(
        FROM selected s LEFT JOIN ledger l ON l.beneficiary_key = s.beneficiary_key
        LEFT JOIN expiring e ON e.beneficiary_key = s.beneficiary_key`,
   ).bind(...binds).first<Record<string, unknown>>();
+  const rankPopulation = await db.prepare(
+    `${ctes}
+     SELECT s.friend_id, COALESCE(l.available, 0) AS available,
+            COALESCE(l.month_change, 0) AS month_change
+       FROM selected s LEFT JOIN ledger l ON l.beneficiary_key = s.beneficiary_key`,
+  ).bind(...binds).all<{ friend_id: string; available: number; month_change: number }>();
+  const rankFor = (available: number) => [...ranks].reverse().find((rank) => available >= rank.threshold) ?? null;
+  const rankCounts = ranks.map((rank) => ({
+    rewardId: rank.id,
+    rankName: rank.name,
+    requiredMiles: rank.threshold,
+    friendCount: rankPopulation.results.filter((friend) => rankFor(Number(friend.available))?.id === rank.id).length,
+  }));
   return {
     summary: {
       totalMembers: Number(summary?.total_members ?? 0),
       withBalanceCount: Number(summary?.with_balance_count ?? 0),
       available: Number(summary?.available ?? 0),
       pending: Number(summary?.pending ?? 0),
+      monthChange: rankPopulation.results.reduce((sum, row) => sum + Number(row.month_change ?? 0), 0),
+      rankCounts,
       expiringMiles30d: Number(summary?.expiring_lot_count ?? 0) > 0
         ? Number(summary?.expiring_amount ?? 0) : null,
     },
-    items: rows.results.map((row) => ({
+    items: rows.results.map((row) => {
+      const available = Number(row.available ?? 0);
+      const rank = rankFor(available);
+      const nextRank = ranks.find((candidate) => candidate.threshold > available) ?? null;
+      return ({
       friendId: row.friend_id,
       displayName: row.display_name || '名前未設定',
       pictureUrl: row.picture_url ?? null,
-      rank: null,
-      rankReason: 'ランクの付与元が未設定です',
+      rank: rank?.name ?? null,
+      rankReason: ranks.length === 0 ? '公開中のランクがありません' : rank ? `${rank.threshold.toLocaleString('ja-JP')}マイル以上` : '最初のランクに届いていません',
+      rankThreshold: rank?.threshold ?? null,
+      nextRank: nextRank?.name ?? null,
+      nextRankThreshold: nextRank?.threshold ?? null,
+      milesToNextRank: nextRank ? Math.max(0, nextRank.threshold - available) : null,
       monthChange: Number(row.month_change ?? 0),
       available: Number(row.available ?? 0),
       pending: Number(row.pending ?? 0),
@@ -362,7 +396,7 @@ export async function getMileageFriendsV6(
       lastChangedAt: row.last_changed_at ?? null,
       walletScope: row.user_id ? 'verified_user' : 'friend',
       lineAccount: { id: row.line_account_id, name: row.line_account_name },
-    })),
+    })}),
     pagination: {
       total: Number(rows.results[0]?.filtered_count ?? 0), limit: input.limit, offset: input.offset,
     },
@@ -384,10 +418,11 @@ export async function getMileageHistoryPeriodSummary(
   if (input.to) { where.push("date(ml.occurred_at, '+9 hours') <= date(?)"); binds.push(input.to); }
   const rows = await db.prepare(
     `SELECT ml.entry_type, COUNT(*) AS count, COALESCE(SUM(ml.amount), 0) AS amount,
+            SUM(CASE WHEN ml.status = 'pending' THEN 1 ELSE 0 END) AS pending_count,
             SUM(CASE WHEN ml.entry_type = 'adjustment' OR ml.source IN ('manual','admin_adjustment') THEN 1 ELSE 0 END) AS manual_count
        FROM mileage_ledger ml LEFT JOIN friends f ON f.id = ml.beneficiary_friend_id
       WHERE ${where.join(' AND ')} GROUP BY ml.entry_type ORDER BY ml.entry_type`,
-  ).bind(...binds).all<{ entry_type: string; count: number; amount: number; manual_count: number }>();
+  ).bind(...binds).all<{ entry_type: string; count: number; amount: number; pending_count: number; manual_count: number }>();
   return {
     from: input.from ?? null,
     to: input.to ?? null,
@@ -396,6 +431,7 @@ export async function getMileageHistoryPeriodSummary(
     })),
     totalAmount: rows.results.reduce((sum, row) => sum + Number(row.amount), 0),
     manualCount: rows.results.reduce((sum, row) => sum + Number(row.manual_count), 0),
+    pendingCount: rows.results.reduce((sum, row) => sum + Number(row.pending_count), 0),
     measuredAt: new Date().toISOString(),
   };
 }

@@ -22,6 +22,13 @@ import {
   validateNenColumnCreateBody,
 } from '../services/nen-column-contract.js';
 import {
+  duplicateNenColumn,
+  NenColumnOperationError,
+  previewNenColumnAudience,
+  recordNenColumnReadEvent,
+  sendPendingNenDeliveriesNow,
+} from '../services/nen-column-operations.js';
+import {
   getNenColumnMetrics,
   getNenDeliveryDetail,
   getNenFlowMetrics,
@@ -67,6 +74,14 @@ function metricsError(c: Context<Env>, error: unknown): Response {
     reason: error instanceof Error ? error.message : String(error),
   }));
   return c.json({ success: false, error: 'NEN配信の情報を取得できませんでした' }, 500);
+}
+
+function columnOperationError(c: Context<Env>, error: unknown): Response {
+  if (error instanceof NenColumnOperationError) {
+    return c.json({ success: false, code: error.code, error: error.message }, error.status);
+  }
+  console.error('NEN column operation failed:', error);
+  return c.json({ success: false, error: 'NENコラムを操作できませんでした' }, 500);
 }
 
 function cursorOffset(value: string | undefined): number {
@@ -348,7 +363,24 @@ nenCampaigns.get('/api/nen-campaigns/columns', async (c) => {
     articleUrl: row.article_url, imageUrl: row.image_url,
     publishedAt: row.published_at, deliveryStatus: row.delivery_status, deliveryAt: row.delivery_at,
     lineAccountId: row.line_account_id, updatedAt: row.updated_at,
+    targetMode: row.target_mode === 'tag' ? 'tag' : 'all', targetTagId: row.target_tag_id ?? null,
+    completionEventName: row.completion_event_name ?? null, completionTagId: row.completion_tag_id ?? null,
+    sourceColumnId: row.source_column_id ?? null,
   })) });
+});
+
+nenCampaigns.get('/api/nen-campaigns/columns-preview', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const accountId = await requireAccount(c);
+  if (typeof accountId !== 'string') return accountId;
+  try {
+    const targetMode = c.req.query('targetMode') === 'tag' ? 'tag' : 'all';
+    const data = await previewNenColumnAudience(c.env.DB, {
+      lineAccountId: accountId, targetMode, targetTagId: c.req.query('targetTagId')?.trim() || null,
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return columnOperationError(c, error);
+  }
 });
 
 nenCampaigns.post('/api/nen-campaigns/columns', requireRole('owner', 'admin'), async (c) => {
@@ -361,6 +393,12 @@ nenCampaigns.post('/api/nen-campaigns/columns', requireRole('owner', 'admin'), a
   if (!validated.ok) return c.json({ success: false, error: validated.error }, 400);
 
   const input = validated.value;
+  if (input.targetTagId) {
+    const tag = await c.env.DB.prepare(
+      `SELECT id FROM tags WHERE id = ? AND line_account_id = ?`,
+    ).bind(input.targetTagId, accountId).first<{ id: string }>();
+    if (!tag) return c.json({ success: false, error: 'target_invalid' }, 400);
+  }
   const existing = await c.env.DB.prepare(
     `SELECT id FROM nen_columns WHERE slug = ?`,
   ).bind(input.slug).first<{ id: string }>();
@@ -373,11 +411,13 @@ nenCampaigns.post('/api/nen-campaigns/columns', requireRole('owner', 'admin'), a
     await c.env.DB.prepare(
       `INSERT INTO nen_columns
         (id, external_id, slug, title, category, excerpt, intro_text, article_url, image_url,
-         published_at, delivery_status, line_account_id, created_at, updated_at)
-       VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)`,
+         published_at, delivery_status, line_account_id, target_mode, target_tag_id,
+         completion_event_name, completion_tag_id, source_column_id, created_at, updated_at)
+       VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       id, input.slug, fields.title, fields.category, fields.excerpt, fields.introText,
-      fields.articleUrl, fields.imageUrl, fields.publishedAt, accountId, now, now,
+      fields.articleUrl, fields.imageUrl, fields.publishedAt, accountId, input.targetMode,
+      input.targetTagId, input.completionEventName, input.completionTagId, input.sourceColumnId, now, now,
     ).run();
   } catch (error) {
     if (isNenColumnSlugConflict(error)) {
@@ -389,7 +429,93 @@ nenCampaigns.post('/api/nen-campaigns/columns', requireRole('owner', 'admin'), a
     }));
     return c.json({ success: false, error: 'column_create_failed' }, 500);
   }
-  return c.json({ success: true, data: { id } }, 201);
+  const queued = input.scheduledAt ? await queueColumnDelivery(
+    c.env.DB, id, accountId, input.scheduledAt.slice(0, 19).replace('T', ' '),
+  ) : 0;
+  return c.json({ success: true, data: { id, queued } }, 201);
+});
+
+nenCampaigns.post('/api/nen-campaigns/columns/:id/duplicate', requireRole('owner', 'admin'), async (c) => {
+  const body = await c.req.json<{ accountId?: string }>().catch(() => null);
+  if (!body?.accountId || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
+    return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+  }
+  try {
+    const data = await duplicateNenColumn(c.env.DB, { id: c.req.param('id'), lineAccountId: body.accountId });
+    auditLog(c, 'nen.column.duplicate', { kind: 'nen_column', id: data.id });
+    return c.json({ success: true, data }, 201);
+  } catch (error) {
+    return columnOperationError(c, error);
+  }
+});
+
+nenCampaigns.post('/api/nen-campaigns/columns/:id/test-send', requireRole('owner', 'admin'), async (c) => {
+  const body = await c.req.json<{ accountId?: string; friendId?: string }>().catch(() => null);
+  if (!body?.accountId || !body.friendId) {
+    return c.json({ success: false, error: 'accountId and friendId are required' }, 400);
+  }
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
+    return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+  }
+  const [campaign, account, friend, column] = await Promise.all([
+    getNenCampaign(c.env.DB, 'column', body.accountId),
+    getLineAccountById(c.env.DB, body.accountId),
+    c.env.DB.prepare(
+      `SELECT id, line_user_id FROM friends WHERE id = ? AND line_account_id = ? AND is_following = 1`,
+    ).bind(body.friendId, body.accountId).first<{ id: string; line_user_id: string }>(),
+    c.env.DB.prepare(
+      `SELECT title, excerpt, article_url, image_url, intro_text FROM nen_columns
+        WHERE id = ? AND line_account_id = ?`,
+    ).bind(c.req.param('id'), body.accountId).first<Record<string, unknown>>(),
+  ]);
+  if (!campaign || !account || !friend || !column) {
+    return c.json({ success: false, error: 'Test target not found' }, 404);
+  }
+  const { pushViaHarnessProxy } = await import('../services/line-proxy-send.js');
+  const { dispatchLineProxyLocally } = await import('../services/local-line-proxy.js');
+  await pushViaHarnessProxy(
+    c.env.WORKER_PUBLIC_URL || new URL(c.req.url).origin,
+    account.channel_access_token,
+    friend.line_user_id,
+    buildNenDeliveryMessages(campaign, { article: column }),
+    crypto.randomUUID(),
+    (request) => dispatchLineProxyLocally(request, c.env),
+  );
+  return c.json({ success: true });
+});
+
+nenCampaigns.post('/api/nen-campaigns/columns/:id/read-events', async (c) => {
+  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  if (!body || typeof body.lineAccountId !== 'string' || typeof body.friendId !== 'string'
+    || (body.eventKind !== 'opened' && body.eventKind !== 'completed') || typeof body.idempotencyKey !== 'string') {
+    return c.json({ success: false, error: 'Invalid body' }, 400);
+  }
+  try {
+    const data = await recordNenColumnReadEvent(c.env.DB, {
+      lineAccountId: body.lineAccountId, columnId: c.req.param('id'), friendId: body.friendId,
+      eventKind: body.eventKind, idempotencyKey: body.idempotencyKey,
+      occurredAt: typeof body.occurredAt === 'string' ? body.occurredAt : undefined,
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return columnOperationError(c, error);
+  }
+});
+
+nenCampaigns.post('/api/nen-campaigns/deliveries/pending-now', requireRole('owner', 'admin'), async (c) => {
+  const body = await c.req.json<{ accountId?: string; expectedCount?: number }>().catch(() => null);
+  if (!body?.accountId || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
+    return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+  }
+  try {
+    const data = await sendPendingNenDeliveriesNow(c.env.DB, {
+      lineAccountId: body.accountId, expectedCount: Number(body.expectedCount),
+    });
+    auditLog(c, 'nen.delivery.pending_now', { kind: 'line_account', id: body.accountId });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return columnOperationError(c, error);
+  }
 });
 
 nenCampaigns.post('/api/nen-campaigns/columns/:id/deliver', requireRole('owner', 'admin'), async (c) => {

@@ -35,6 +35,7 @@ type HistoryRow = Partial<{
   primaryFriendId: string
   displayName: string
   occurredAt: string
+  lineAccountName: string
 }>
 
 function historyView(item: MileageAdminHistoryItem) {
@@ -145,7 +146,7 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
         <SummaryCard variant="v6" title="この期間の記録" value={total} unit="件" detail={periodSummary ? `付いた ${grantedCount.toLocaleString('ja-JP')}・使った ${spentCount.toLocaleString('ja-JP')}` : '内訳を取得できませんでした'} />
         <SummaryCard variant="v6" title="手で動かした分" value={periodSummary?.manualCount ?? null} unit="件" detail="担当者が直接増減したもの" />
         <SummaryCard variant="v6" title="取り消し" value={periodSummary ? reversalCount : null} unit="件" detail="予約取消などに伴うもの" />
-        <SummaryCard variant="v6" title="反映を待っている" value={null} unit="件" detail="待機中の集計口は未接続" badge="未取得" badgeTone="neutral" />
+        <SummaryCard variant="v6" title="反映を待っている" value={periodSummary?.pendingCount ?? null} unit="件" detail="確定条件を待っている記録" />
       </div>
 
       <NoteBar>マイルが増えた・減った記録です。手で増やしたものは理由と担当者が残り、あとから辿れます。</NoteBar>
@@ -233,7 +234,7 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
                 return <Tr key={item.id}>
                   <NameCell
                     name={<><time dateTime={item.occurredAt}>{formatMileageDate(item.occurredAt)}</time><span className="mx-1">／</span><Link href={`/mileage/friends/detail?id=${encodeURIComponent(item.primaryFriendId)}`} className="font-semibold text-accent hover:underline">{item.displayName}</Link></>}
-                    sub="LINEアカウントは未取得"
+                    sub={item.lineAccountName || 'LINEアカウント名を確認できません'}
                   />
                   <Td align="right"><span className={item.amount < 0 ? 'font-bold text-danger' : 'font-bold text-accent'}>{formatMileageChange(item.amount)}</span></Td>
                   <Td>

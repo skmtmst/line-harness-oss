@@ -51,6 +51,7 @@ function friendHistoryItem(item: MileageAdminHistoryItem): MileageHistoryItem {
     ruleName: item.ruleName,
     mode: item.mode,
     executedByStaffName: item.executedByStaffName,
+    balanceAfter: item.balanceAfter,
     occurredAt: item.occurredAt,
   }
 }
@@ -164,6 +165,11 @@ function FriendMileageInner() {
   const rewardedActions = mileageRewardedActions(mileage.insights)
   const connectedAccounts = mileageConnectedAccounts(mileage.connections)
   const displayedHistory = v6History ?? mileage.history
+  const reasonSummary = displayedHistory.reduce<Array<{ reason: string; count: number; amount: number }>>((items, item) => {
+    const found = items.find((candidate) => candidate.reason === item.reason)
+    if (found) { found.count += 1; found.amount += item.amount } else items.push({ reason: item.reason, count: 1, amount: item.amount })
+    return items
+  }, []).sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))
   return (
     <div data-design-node="HIU5O" className="space-y-4">
       <Breadcrumb items={[{ label: 'マイル', href: '/mileage' }, { label: `${displayName}のマイル明細` }]} />
@@ -204,19 +210,41 @@ function FriendMileageInner() {
         </div>
       </Card>
 
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader title="ランクの進み" meta={v6Friend?.rank ?? 'ランクなし'} />
+          <div className="p-4">
+            <p className="text-sm font-bold text-ink">{v6Friend?.nextRank ? `次は「${v6Friend.nextRank}」` : 'いちばん上のランクです'}</p>
+            <p className="mt-1 text-xs text-ink-faint">{v6Friend?.milesToNextRank == null ? v6Friend?.rankReason ?? 'ランク情報を確認できません' : `あと ${v6Friend.milesToNextRank.toLocaleString('ja-JP')} マイル`}</p>
+          </div>
+        </Card>
+        <Card>
+          <CardHeader title="何でたまったか" meta={`${reasonSummary.length}種類`} />
+          <div className="divide-y divide-hairline">
+            {reasonSummary.length === 0 ? <p className="p-4 text-sm text-ink-faint">付与理由の記録はありません</p> : reasonSummary.slice(0, 5).map((reason) => (
+              <div key={reason.reason} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                <span className="truncate text-ink" title={reason.reason}>{reason.reason}</span>
+                <span className="shrink-0 font-semibold tabular-nums text-ink-secondary">{reason.count}回 ／ {formatMileageChange(reason.amount)} マイル</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+
       <Card overflow="hidden">
         <CardHeader title="付与・使用・失効・調整の履歴" meta={`最新${displayedHistory.length.toLocaleString('ja-JP')}件`} />
         {displayedHistory.length === 0 ? (
           <ListState kind="empty" title="マイルの履歴はありません" description="付与や使用が記録されると、ここに理由と日時が表示されます。" />
         ) : (
           <DataTable>
-            <thead><tr><Th>発生日時</Th><Th>種類・状態</Th><Th align="right">増減</Th><Th>理由</Th><Th>発生元</Th><Th>ルール・実行者</Th></tr></thead>
+            <thead><tr><Th>発生日時</Th><Th>種類・状態</Th><Th align="right">増減</Th><Th align="right">変更後残高</Th><Th>理由</Th><Th>発生元</Th><Th>ルール・実行者</Th></tr></thead>
             <tbody>
               {displayedHistory.map((item) => (
                 <Tr key={item.id}>
                   <Td><time dateTime={item.occurredAt}>{formatMileageDate(item.occurredAt)}</time></Td>
                   <Td><p className="font-semibold text-ink">{mileageEntryTypeLabel(item.entryType)}</p><p className="mt-1 text-xs text-ink-faint">{mileageStatusLabel(item.status)}</p></Td>
                   <Td align="right"><span className={item.amount < 0 ? 'font-bold text-danger' : 'font-bold text-accent'}>{formatMileageChange(item.amount)} マイル</span></Td>
+                  <Td align="right" className="tabular-nums">{'balanceAfter' in item && typeof item.balanceAfter === 'number' ? `${item.balanceAfter.toLocaleString('ja-JP')} マイル` : '—'}</Td>
                   <Td><p className="max-w-56 truncate font-medium text-ink" title={item.reason}>{item.reason}</p></Td>
                   <Td>
                     <p>{mileageSourceLabel(item.source)}</p>

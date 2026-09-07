@@ -363,7 +363,7 @@ function MileagePageInner() {
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <SummaryCard variant="v6" title="マイルを持っている友だち" value={summary?.withBalanceCount ?? null} unit="人" detail={summary ? `選択中 ${summary.totalMembers.toLocaleString('ja-JP')}人のうち` : '選択中のLINEアカウント'} />
         <SummaryCard variant="v6" title="たまっているマイル" value={summary?.available ?? null} unit=" マイル" detail={`確定待ち ${summary?.pending.toLocaleString('ja-JP') ?? '—'} マイル`} />
-        <SummaryCard variant="v6" title="今月の増減" value={null} unit=" マイル" detail="一覧の各友だちでは確認できます" badge="全体未取得" badgeTone="neutral" />
+        <SummaryCard variant="v6" title="今月の増減" value={summary?.monthChange ?? null} unit=" マイル" detail="選択中の友だち全体" />
         <SummaryCard
           variant="v6"
           title="もうすぐ消えるマイル"
@@ -389,11 +389,12 @@ function MileagePageInner() {
         <span className="rounded-full border border-accent bg-accent-soft px-3 py-2 text-xs font-semibold text-accent-hover">
           すべて {overviewTotal === null ? '—' : formatNumber(overviewTotal)}
         </span>
-        {['ゴールド', 'シルバー', 'ブロンズ'].map((label) => (
-          <span key={label} className="rounded-full border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-ink-faint">
-            {label} — 未取得
+        {(summary?.rankCounts ?? []).map((rank) => (
+          <span key={rank.rewardId} className="rounded-full border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-ink-secondary">
+            {rank.rankName} {formatNumber(rank.friendCount)}人
           </span>
         ))}
+        {summary && summary.rankCounts.length === 0 ? <span className="rounded-full border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-ink-faint">公開中のランクなし</span> : null}
         <span className="rounded-full border border-status-warn bg-status-warn-soft px-3 py-2 text-xs font-semibold text-status-warn-deep">
           30日以内に消える {summary?.expiringMiles30d == null ? '0' : formatNumber(summary.expiringMiles30d)} マイル
         </span>

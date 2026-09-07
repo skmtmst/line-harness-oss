@@ -147,7 +147,7 @@ describe('NEN campaign metrics', () => {
     expect(columns.columns[0]).toMatchObject({
       id: 'column-a', targeted: 1, sent: 1, unread: 0,
       articleOpened: { value: 1, rate: 1, state: 'available' },
-      completionRate: { value: null, state: 'unavailable' },
+      completionRate: { value: 0, rate: 0, state: 'available' },
     });
     expect(pets.summary).toMatchObject({
       pets: 1, birthdayRegistered: 1, friends: 1, friendsWithoutPet: 0,
