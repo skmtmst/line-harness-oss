@@ -12,6 +12,7 @@ import {
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import { breakHours, openHours, shortDate } from '../../lib/format-time'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 type PreviewMark = '○' | '×' | '休'
@@ -38,27 +39,6 @@ function previewDates(): Array<{ date: string; day: number }> {
     date.setUTCDate(start.getUTCDate() + index)
     return { date: isoDate(date), day: date.getUTCDate() }
   })
-}
-
-function shortTime(value: string): string {
-  return value.replace(/^0/, '')
-}
-
-function openHours(intervals: Array<{ start: string; end: string }>): string {
-  if (intervals.length === 0) return '—'
-  return `${shortTime(intervals[0].start)} 〜 ${shortTime(intervals[intervals.length - 1].end)}`
-}
-
-function breakHours(intervals: Array<{ start: string; end: string }>): string {
-  if (intervals.length < 2) return intervals.length === 0 ? '—' : 'なし'
-  return intervals.slice(0, -1).map((interval, index) => (
-    `${shortTime(interval.end)} 〜 ${shortTime(intervals[index + 1].start)}`
-  )).join(' / ')
-}
-
-function shortDate(value: string): string {
-  const match = /^\d{4}-(\d{2})-(\d{2})$/.exec(value)
-  return match ? `${Number(match[1])}/${Number(match[2])}` : value
 }
 
 export default function StaffShiftsPage() {

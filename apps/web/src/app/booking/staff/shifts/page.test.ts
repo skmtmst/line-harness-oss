@@ -50,4 +50,11 @@ describe('受付枠と休業日のV6契約', () => {
     expect(PAGE).toContain("kind: 'closed'")
     expect(PAGE).toContain('exceptions: [...current.exceptions, response.data]')
   })
+
+  it('日時の表示は予約設定内の共通整形を使う', () => {
+    expect(PAGE).toContain("from '../../lib/format-time'")
+    expect(PAGE).not.toContain('function openHours(')
+    expect(PAGE).not.toContain('function breakHours(')
+    expect(PAGE).not.toContain('function shortDate(')
+  })
 })
