@@ -2636,7 +2636,7 @@ export const SCREENS = [
       { click: '下書きに保存', after: 1000 },
       { fill: '1人テストの友だちID', text: 'friend-visual-1' },
     ],
-    verdict: 'match', verdictNote: '**2026-09-07 Issue #485・撮影HEAD `2df5f5539` で再判定し一致。** #1287の規約どおり設計高1080pxを初期viewportにして再撮影し、旧+169pxの差を0pxへ解消した。1920px画素差6.0491%、1440/1920pxとも横はみ出し0。', verdictSource: 'automations-v6/Rv8Jv.png + Rv8Jv-{1440,1920}.png + Rv8Jv-diff-1920.png + Issue #485', verdictHead: '2df5f5539',
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #485・撮影HEAD `833383f6e` で再判定し一致。** #1287の規約どおり設計高1080pxを初期viewportにして再撮影し、旧+169pxの差を0pxへ解消した。1920px画素差6.0491%、1440/1920pxとも横はみ出し0。', verdictSource: 'automations-v6/Rv8Jv.png + Rv8Jv-{1440,1920}.png + Rv8Jv-diff-1920.png + Issue #485', verdictHead: '833383f6e',
   },
   {
     /*
@@ -2681,8 +2681,8 @@ export const SCREENS = [
     verdictSource: 'automations-v6/Vdbv5.txt + Vdbv5-loading.txt + Vdbv5-empty.txt + Vdbv5-error.txt', verdictHead: '44e671b2c',
   },
   { ...AUTOMATION, node: 'xOpDs', name: '25-2 共通アクション', route: '/common-actions', verdict: 'match', verdictNote: '**2026-09-07 Issue #377 / UI HEAD `bd900c36d` を3107/8794で再撮影し、★V6設計と同じ1920pxで比較。** 実API契約から14件（公開11・下書き3）、呼び出し元38、今月2,847回・失敗6回、古い版2件・3か所を表示。5種の絞り込み、CSV、6行単位のAPIページ送りも接続し、1440px・1920pxとも横はみ出し0で一致。', verdictSource: 'automations-v6/xOpDs.txt + common-actions-v6-contract.test.ts', verdictHead: 'bd900c36d' },
-  { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new', steps: [{ click: '条件で分ける', after: 500 }], verdict: 'match', verdictNote: '**2026-09-07 Issue #485・撮影HEAD `2df5f5539` で再判定し一致。** #1287の規約どおり設計高1080pxで再撮影し、旧+85pxの差を0pxへ解消した。1920px画素差4.2826%、1440/1920pxとも横はみ出し0。', verdictSource: 'automations-v6/py5CG.png + py5CG-{1440,1920}.png + py5CG-diff-1920.png + Issue #485', verdictHead: '2df5f5539' },
-  { ...AUTOMATION, node: 'syWp4', name: '25-2-B 共通アクションの版と使われている場所', route: '/common-actions/versions?id=ca-1', verdict: 'match', verdictNote: '**2026-09-07 Issue #485・撮影HEAD `2df5f5539` で再判定し一致。** #1287の規約どおり設計高1080pxで再撮影し、旧+220pxの差を0pxへ解消した。1920px画素差4.7846%、1440/1920pxとも横はみ出し0。', verdictSource: 'automations-v6/syWp4.png + syWp4-{1440,1920}.png + syWp4-diff-1920.png + Issue #485', verdictHead: '2df5f5539' },
+  { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new', steps: [{ click: '条件で分ける', after: 500 }], verdict: 'match', verdictNote: '**2026-09-07 Issue #485・撮影HEAD `833383f6e` で再判定し一致。** #1287の規約どおり設計高1080pxで再撮影し、旧+85pxの差を0pxへ解消した。1920px画素差4.2829%、1440/1920pxとも横はみ出し0。', verdictSource: 'automations-v6/py5CG.png + py5CG-{1440,1920}.png + py5CG-diff-1920.png + Issue #485', verdictHead: '833383f6e' },
+  { ...AUTOMATION, node: 'syWp4', name: '25-2-B 共通アクションの版と使われている場所', route: '/common-actions/versions?id=ca-1', verdict: 'match', verdictNote: '**2026-09-07 Issue #485・撮影HEAD `833383f6e` で再判定し一致。** #1287の規約どおり設計高1080pxで再撮影し、旧+220pxの差を0pxへ解消した。1920px画素差4.7846%、1440/1920pxとも横はみ出し0。', verdictSource: 'automations-v6/syWp4.png + syWp4-{1440,1920}.png + syWp4-diff-1920.png + Issue #485', verdictHead: '833383f6e' },
 
   // ── 機能26 外部連携 ─────────────────────────────────────
   /*
@@ -2732,7 +2732,7 @@ export const SCREENS = [
     日・週の台帳は、固定予約を時間×担当／曜日の格子へ並べる。
     LINE予約は緑、LINE未連携の電話予約は青で同じ格子に載せる。
   */
-  { ...BOOKING, node: 'TV2DI', name: '27-1 予約管理', verdict: 'match', verdictNote: '**2026-09-07 Issue #485・撮影HEAD `2df5f5539` で再判定し一致。** 設計高1144pxを初期viewportにして本文全体を再撮影し、旧-64pxの差を0pxへ解消した。1920px画素差4.4690%、1440/1920pxとも横はみ出し0。', verdictSource: 'booking-v6/TV2DI.png + TV2DI-{1440,1920}.png + TV2DI-diff-1920.png + Issue #485', verdictHead: '2df5f5539' },
+  { ...BOOKING, node: 'TV2DI', name: '27-1 予約管理', verdict: 'match', verdictNote: '**2026-09-07 Issue #485・撮影HEAD `833383f6e` で再判定し一致。** 設計高1144pxを初期viewportにして本文全体を再撮影し、旧-64pxの差を0pxへ解消した。1920px画素差4.4690%、1440/1920pxとも横はみ出し0。', verdictSource: 'booking-v6/TV2DI.png + TV2DI-{1440,1920}.png + TV2DI-diff-1920.png + Issue #485', verdictHead: '833383f6e' },
   {
     ...BOOKING, node: 'TnDbq', name: '27-1-A 予約の詳細',
     mode: 'viewport', height: 1136, /*
@@ -2764,8 +2764,8 @@ export const SCREENS = [
       { fill: '日付', text: '2026-09-03', after: 900 },
       { select: '空いている時間', label: '10:00〜11:45' },
     ],
-    verdict: 'match', verdictNote: '**2026-09-07 Issue #485・撮影HEAD `2df5f5539` で再判定し一致。** #1287の規約どおり設計高1080pxで再撮影し、旧+227pxの差を0pxへ解消した。1920px画素差6.8421%、1440/1920pxとも横はみ出し0。',
-    verdictSource: 'booking-v6/cpdDi.png + cpdDi-{1440,1920}.png + cpdDi-diff-1920.png + Issue #485', verdictHead: '2df5f5539',
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #485・撮影HEAD `833383f6e` で再判定し一致。** #1287の規約どおり設計高1080pxで再撮影し、旧+227pxの差を0pxへ解消した。1920px画素差6.8421%、1440/1920pxとも横はみ出し0。',
+    verdictSource: 'booking-v6/cpdDi.png + cpdDi-{1440,1920}.png + cpdDi-diff-1920.png + Issue #485', verdictHead: '833383f6e',
   },
   { ...BOOKING, node: 'SbuUI', name: '27-1-C 今週の予約', steps: [{ click: '今週' }], verdict: 'match', verdictNote: '**2026-09-06、PR #TBD の実装を1440px・1920pxで撮影し、★V6設計と見比べた。** 時間（縦）×曜日（横）の週格子、LINE予約（緑）と電話予約（青）、4つの集計、読み方の青帯、注意事項・週の内訳・関連導線の右欄がそろった。固定データの予約件数と日付は撮影用データに従うが、情報の位置・余白・色・枠・角丸と操作の骨格は一致。両幅とも横はみ出し0。', verdictSource: 'booking-v6/SbuUI.txt', verdictHead: 'ed3e365aa' },
   /*
@@ -2811,9 +2811,9 @@ export const SCREENS = [
       { click: 'この内容で予約を入れる', after: 1200 },
     ],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #485・撮影HEAD `2df5f5539` で再判定し一致。** #1287の規約どおり設計高1080pxで再撮影し、旧+26pxの差を0pxへ解消した。1920px画素差6.9745%、1440/1920pxとも横はみ出し0。",
+    verdictNote: "**2026-09-07 Issue #485・撮影HEAD `833383f6e` で再判定し一致。** #1287の規約どおり設計高1080pxで再撮影し、旧+26pxの差を0pxへ解消した。1920px画素差6.9745%、1440/1920pxとも横はみ出し0。",
     verdictSource: "booking-v6/GfceK.png + GfceK-{1440,1920}.png + GfceK-diff-1920.png + Issue #485",
-    verdictHead: "2df5f5539",
+    verdictHead: "833383f6e",
   },
   {
     ...BOOKING, node: 'Lg8ff', name: '27-1-F 代理予約・予約枠の重なりと入力エラー',
@@ -2867,9 +2867,9 @@ export const SCREENS = [
       kinds: ['normal', 'loading', 'error'],
     }, name: '28-1-A 受付枠と休業日', route: '/booking/staff/shifts',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #485・UI HEAD `2df5f5539` で再判定し一致。** 曜日表と予約ルールをPencilの行高へそろえ、設計にない設備上限・空き枠内訳は必要時だけ開く形にした。旧+171pxの差を0pxへ解消し、1920px画素差5.6416%、1440/1920pxとも横はみ出し0。",
+    verdictNote: "**2026-09-07 Issue #485・撮影HEAD `833383f6e` で再判定し一致。** 曜日表と予約ルールをPencilの行高へそろえ、設計にない設備上限・空き枠内訳は必要時だけ開く形にした。旧+171pxの差を0pxへ解消し、1920px画素差5.6416%、1440/1920pxとも横はみ出し0。",
     verdictSource: "booking-settings-v6/tksPc.png + tksPc-{1440,1920}.png + tksPc-diff-1920.png + Issue #485",
-    verdictHead: "2df5f5539",
+    verdictHead: "833383f6e",
   },
   { ...BOOKING_SET, node: 'GhOb3', name: '28-1-B 予約メニューをつくる', route: '/booking/menus/new',
     variants: [{ suffix: '-pencil-input', steps: [
@@ -2880,9 +2880,9 @@ export const SCREENS = [
       { fill: '説明', text: 'カット・シャンプー・爪切り・耳そうじが入ります。' },
     ] }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #485・撮影HEAD `2df5f5539` で再判定し一致。** #1287の規約どおり設計高1080pxで再撮影し、旧+658pxの差を0pxへ解消した。1920px画素差6.8295%、1440/1920pxとも横はみ出し0。",
+    verdictNote: "**2026-09-07 Issue #485・撮影HEAD `833383f6e` で再判定し一致。** #1287の規約どおり設計高1080pxで再撮影し、旧+658pxの差を0pxへ解消した。1920px画素差6.8295%、1440/1920pxとも横はみ出し0。",
     verdictSource: "booking-settings-v6/GhOb3.png + GhOb3-{1440,1920}.png + GhOb3-diff-1920.png + Issue #485",
-    verdictHead: "2df5f5539",
+    verdictHead: "833383f6e",
   },
   {
     ...BOOKING_SET, node: 'W6465r', name: '28-1-C 一覧の状態（空・読込・エラー）',
@@ -2903,7 +2903,7 @@ export const SCREENS = [
     verdictSource: 'events-v6/ugP5y.txt + ugP5y-{1440,1920}.png + apps/worker/src/services/event-waitlist.ts',
     verdictHead: 'ea4284f42',
   },
-  { ...EVENT, node: 'MKrPY', name: '29-1-A イベントをつくる', route: '/events/new', variants: [{ suffix: '-edit', route: '/events/edit?id=ev-1', standalone: true }], verdict: 'match', verdictNote: '**2026-09-07 Issue #485・UI HEAD `2df5f5539` で再判定し一致。** 設計にない画像設定を折りたたみ、説明欄と6つの入力節をPencilの横配置へ圧縮した。旧+642pxの差を0pxへ解消し、1920px画素差6.3535%、1440/1920pxとも横はみ出し0。', verdictSource: 'events-v6/MKrPY.png + MKrPY-{1440,1920}.png + MKrPY-diff-1920.png + Issue #485', verdictHead: '2df5f5539' },
+  { ...EVENT, node: 'MKrPY', name: '29-1-A イベントをつくる', route: '/events/new', variants: [{ suffix: '-edit', route: '/events/edit?id=ev-1', standalone: true }], verdict: 'match', verdictNote: '**2026-09-07 Issue #485・撮影HEAD `833383f6e` で再判定し一致。** 設計にない画像設定を折りたたみ、説明欄と6つの入力節をPencilの横配置へ圧縮した。旧+642pxの差を0pxへ解消し、1920px画素差6.3529%、1440/1920pxとも横はみ出し0。', verdictSource: 'events-v6/MKrPY.png + MKrPY-{1440,1920}.png + MKrPY-diff-1920.png + Issue #485', verdictHead: '833383f6e' },
   {
     /*
       **#593 で拒否とキャンセルの窓が入った。**押し口は `data-qa-open` で
@@ -2933,9 +2933,9 @@ export const SCREENS = [
     ...STAFF, node: 'e3jz3', name: '30-1 ログインユーザー',
     states: { apis: ['**/api/access/users*', '**/api/access/roles*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #485・撮影HEAD `2df5f5539` で再判定し一致。** #1287の規約どおり設計高1080pxで再撮影し、旧+194pxの差を0pxへ解消した。1920px画素差4.4622%、1440/1920pxとも横はみ出し0。",
+    verdictNote: "**2026-09-07 Issue #485・撮影HEAD `833383f6e` で再判定し一致。** #1287の規約どおり設計高1080pxで再撮影し、旧+194pxの差を0pxへ解消した。1920px画素差4.4622%、1440/1920pxとも横はみ出し0。",
     verdictSource: "staff-v6/e3jz3.png + e3jz3-{1440,1920}.png + e3jz3-diff-1920.png + Issue #485",
-    verdictHead: "2df5f5539",
+    verdictHead: "833383f6e",
   },
   {
     ...STAFF, node: 'EOTS4', name: '30-1-A 見せる範囲を決める',
