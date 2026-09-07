@@ -1476,7 +1476,7 @@ export const SCREENS = [
     verdictSource: 'webinars-v6/LKuAQ.png（Pencil HTML） + webinars-v6/LKuAQ.txt + LKuAQ-1920.png（実装） + Issue #474',
     verdictHead: 'd3bcf1f75',
     route: '/webinars', mode: 'viewport', height: 1080,
-    steps: [{ click: 'アーカイブ', nth: 4 }],
+    steps: [{ qaOpen: 'LKuAQ' }],
   },
   {
     ...WEBINAR, node: 'zCQXe', name: '10-1-L 一覧の状態（空・読込・エラー）',
