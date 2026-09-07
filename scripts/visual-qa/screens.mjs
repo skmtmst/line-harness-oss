@@ -3664,6 +3664,9 @@ export const CAPTURED_AT = {
     { pr: 596, head: 'edb94936', on: '2026-08-30', screens: ['U9hzqH', 'g46ja', 'Yj6CQ', 'e6iJG'], note: 'Claudeが実装した。#595 の契約の上に公開までの4段。実装した本人が比較している' },
   ],
   5: [
+    { pr: 1244, head: 'fa2d7bf8e', on: '2026-09-07',
+      screens: ['TC1b1', 'cCB7r', 'kk8dz'],
+      note: 'Issue #448。機能5の旧Headerを3画面から外し、3104/8791で1440・1920pxを撮影。Pencil 1920pxと上端から並べ、画面名、パンくず・案内、主要内容の開始位置を照合した。3画面とも一致、横はみ出し0。' },
     { pr: 1218, head: '52cdb3fa6', on: '2026-09-07',
       screens: ['r6Gzsu', 'hz9ti', 'EvVO5', 'RUxNf', 'NrBkW', 'g2UNV', 'M2b2B'],
       note: 'Issue #436。#1199 のAPI契約と #1204 の固定データを使い、7画面を3104/8791で1440・1920px撮影した。試算、開始記録、V6下書き、通別結果を実API経由で表示し、7画面すべて一致。全画像で横はみ出し0。' },
