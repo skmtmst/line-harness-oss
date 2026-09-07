@@ -55,7 +55,7 @@ import {
   AUTO_REPLY_PUBLISH_CONFLICTS, AUTO_REPLY_PUBLISH_DRAFT,
   AUTO_REPLY_PUBLISH_RESULT, AUTO_REPLY_PUBLISH_TEST, AUTO_REPLY_PUBLISH_VALIDATION,
   BROADCASTS, BROADCAST_FOLDERS, BROADCAST_INSIGHTS, BROADCAST_LIST_META,
-  BROADCAST_PREFLIGHT, BROADCAST_SAVED_VIEWS, CHATS, FRIEND_FIELDS, FRIEND_ATTRIBUTE_FIELDS,
+  BROADCAST_PREFLIGHT, BROADCAST_SAVED_VIEWS, CHATS, FRIEND_FIELDS, FRIEND_ATTRIBUTE_FIELDS, FRIEND_FIELD_FOLDERS,
   FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL, FRIEND_ATTRIBUTE_SAVED_SEARCH_RESPONSE, FRIEND_FIELD_MIGRATION_PREVIEW,
   INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
   TEMPLATES, TEMPLATE_FOLDERS, TEMPLATE_TEST_RECIPIENTS,
@@ -82,7 +82,7 @@ import {
   BOOKING_MENUS, BOOKING_SETTINGS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY,
   BOOKING_AVAILABILITY_RULES, BOOKING_STAFF_SHIFTS, BOOKING_GOOGLE_CALENDAR,
   BOOKING_PROXY_CREATE, BOOKING_REQUESTS,
-  EC_NOTIFICATION_SETTINGS, EC_NOTIFICATION_RUNS, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, NEN_PHOTO_DETAIL,
+  EC_NOTIFICATION_SETTINGS, EC_NOTIFICATION_RUNS, LINE_NOTIFICATION_DEFINITIONS, LINE_NOTIFICATION_METRICS, LINE_NOTIFICATION_DELIVERIES, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, NEN_PHOTO_DETAIL,
   NEN_PHOTO_REVIEW_METRICS, NEN_PHOTO_ASSET_STATUS, NEN_PHOTO_DERIVATIVES,
   NEN_PHOTO_ASSET_PROCESS_RESULT, NEN_PHOTO_BULK_DECISION_RESULT,
   NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, EC_ORDERS, EC_ACTION_EXECUTIONS, EC_IDENTITY_CANDIDATES, MILEAGE_RULES,
@@ -1523,6 +1523,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/folders' && query.get('kind') === 'reminder') {
     return { success: true, data: REMINDER_FOLDERS }
   }
+  if (pathname === '/api/folders' && query.get('kind') === 'friend_field') {
+    return { success: true, data: FRIEND_FIELD_FOLDERS }
+  }
   if (pathname === '/api/friend-fields') {
     // 機能4は利用人数つきの一覧を要求する。他機能の選択肢は従来データを保つ。
     return { success: true, data: query.get('withUsage') === '1' ? FRIEND_ATTRIBUTE_FIELDS : FRIEND_FIELDS }
@@ -1942,6 +1945,22 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/automation-runs') return { success: true, data: AUTOMATION_RUNS }
   if (pathname === '/api/automation-templates') return { success: true, data: AUTOMATION_TEMPLATES }
   if (pathname === '/api/ec-commerce/settings') return { success: true, data: EC_NOTIFICATION_SETTINGS }
+  if (pathname === '/api/line-notifications/customer-definitions') {
+    return { success: true, data: LINE_NOTIFICATION_DEFINITIONS }
+  }
+  if (pathname === '/api/line-notifications/metrics') {
+    return { success: true, data: LINE_NOTIFICATION_METRICS }
+  }
+  if (pathname === '/api/line-notifications/deliveries') {
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 100) : 20
+    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    const items = query.get('view') === 'failures'
+      ? LINE_NOTIFICATION_DELIVERIES.items.filter((item) => item.status === 'failed')
+      : LINE_NOTIFICATION_DELIVERIES.items
+    return { success: true, data: { ...LINE_NOTIFICATION_DELIVERIES, items: items.slice(offset, offset + limit) }, pagination: { total: items.length, limit, offset } }
+  }
   if (pathname === '/api/ec-commerce/notification-runs') {
     const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
     const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
@@ -2311,7 +2330,10 @@ function bodyFor(pathname, query = new URLSearchParams()) {
         templates: [{ id: 'template-usage-1', name: '来店後のご案内' }],
         webhooks: [{ id: 'wh-1', name: '予約サービスへ知らせる' }],
         richMenus: [{ id: 'rmg-1', name: '通常メニュー' }],
-        commonActions: [{ id: 'ca-1', name: '来店後のご案内', version: 3 }],
+        commonActions: [
+          { id: 'ca-1', name: '来店後のご案内', version: 3 },
+          { id: 'ca-subscription-guide', name: '定期便スタートガイド', version: 1 },
+        ],
       },
     }
   }
@@ -2425,6 +2447,14 @@ const server = createServer((req, res) => {
     res.setHeader('Content-Disposition', 'attachment; filename="conversion-definitions-2026-08-25.csv"')
     res.setHeader('Cache-Control', 'no-store')
     res.writeHead(200).end(CONVERSION_EXPORT_CSV)
+    return
+  }
+
+  if (method === 'GET' && url.pathname.startsWith('/api/rich-menu-images/')) {
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
+    res.setHeader('Content-Type', 'image/png')
+    res.setHeader('Cache-Control', 'no-store')
+    res.writeHead(200).end(png)
     return
   }
 
