@@ -7,7 +7,6 @@ let extractApiErrorCode: typeof import('./api').extractApiErrorCode
 let extractApiErrorData: typeof import('./api').extractApiErrorData
 let eventsApi: typeof import('./api').eventsApi
 let webinarApi: typeof import('./api').webinarApi
-let bookingApi: typeof import('./api').bookingApi
 let api: typeof import('./api').api
 
 beforeAll(async () => {
@@ -20,44 +19,75 @@ beforeAll(async () => {
     extractApiErrorData,
     eventsApi,
     webinarApi,
-    bookingApi,
     api,
   } = await import('./api'))
 })
 
-describe('bookingApi の店舗設定・休業日契約', () => {
-  it('選択中アカウントで店舗設定を読み、休業日を同じアカウントへ保存する', async () => {
+describe('api.nenMembers の写真審査運用契約', () => {
+  it('集計・派生画像・一括審査を選択中アカウントと冪等キー付きで呼ぶ', async () => {
     const fetchSpy = vi.fn(async () => new Response(
-      JSON.stringify({ success: true, data: {} }),
+      JSON.stringify({ success: true, data: { items: [], jobs: [], knownUrls: [] } }),
       { status: 200, headers: { 'content-type': 'application/json' } },
     ))
     vi.stubGlobal('fetch', fetchSpy)
 
-    await bookingApi.getSettings('account/a')
-    await bookingApi.createException('account/a', {
-      scopeKind: 'store',
-      dateFrom: '2026-12-29',
-      dateTo: '2027-01-03',
-      kind: 'closed',
-      intervals: [],
-      reason: '年末年始',
-    })
+    await api.nenMembers.photoReviewMetrics('account/1')
+    await api.nenMembers.photoAssetStatus('photo/1', 'account/1')
+    await api.nenMembers.photoDerivatives('photo/1', 'account/1')
+    await api.nenMembers.processPhotoAssets('photo/1', {
+      lineAccountId: 'account/1', expectedVersion: 3, operation: 'review',
+    }, 'asset-key-123')
+    await api.nenMembers.bulkReviewPhotos({
+      lineAccountId: 'account/1',
+      decisions: [{
+        photoId: 'photo/1', decision: 'approve', expectedVersion: 3,
+        reasonCode: null, reasonNote: null,
+      }],
+    }, 'bulk-key-123')
 
     expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
-      'https://worker.example.com/api/booking/admin/settings?account_id=account%2Fa',
-      'https://worker.example.com/api/booking/admin/exceptions?account_id=account%2Fa',
+      'https://worker.example.com/api/nen-members/photos/review-metrics?accountId=account%2F1',
+      'https://worker.example.com/api/nen-members/photos/photo%2F1/assets/status?accountId=account%2F1',
+      'https://worker.example.com/api/nen-members/photos/photo%2F1/assets/derivatives?accountId=account%2F1',
+      'https://worker.example.com/api/nen-members/photos/photo%2F1/assets/process',
+      'https://worker.example.com/api/nen-members/photos/decisions/bulk',
     ])
+    expect(fetchSpy.mock.calls[3]?.[1]).toMatchObject({
+      method: 'POST', headers: { 'Idempotency-Key': 'asset-key-123' },
+    })
+    expect(fetchSpy.mock.calls[4]?.[1]).toMatchObject({
+      method: 'POST', headers: { 'Idempotency-Key': 'bulk-key-123' },
+    })
+  })
+
+  it('原本は写真専用の再認証後に一回用URLを取得してblobとして読む', async () => {
+    const fetchSpy = vi.fn(async (url: string | URL | Request) => {
+      if (String(url).includes('/original-download/token')) {
+        return new Response('image-bytes', { status: 200, headers: { 'content-type': 'image/jpeg' } })
+      }
+      return new Response(JSON.stringify({
+        success: true,
+        data: String(url).endsWith('/api/auth/step-up')
+          ? { token: 'step-token', purpose: 'photo.original.download', expiresAt: '2026-09-07T02:00:00Z' }
+          : { downloadUrl: '/api/nen-members/photos/original-download/token?accountId=account-1', expiresAt: '2026-09-07T02:00:00Z', oneTime: true },
+      }), { status: 200, headers: { 'content-type': 'application/json' } })
+    })
+    vi.stubGlobal('fetch', fetchSpy)
+
+    const grant = await api.nenMembers.photoOriginalStepUp('123456')
+    const issued = await api.nenMembers.issuePhotoOriginalDownload(
+      'photo-1', { lineAccountId: 'account-1', expectedVersion: 2 }, grant.data.token, 'original-key-123',
+    )
+    const image = await api.nenMembers.downloadPhotoOriginal(issued.data.downloadUrl)
+
+    expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({
+      method: 'POST', body: JSON.stringify({ code: '123456', purpose: 'photo.original.download' }),
+    })
     expect(fetchSpy.mock.calls[1]?.[1]).toMatchObject({
       method: 'POST',
-      body: JSON.stringify({
-        scopeKind: 'store',
-        dateFrom: '2026-12-29',
-        dateTo: '2027-01-03',
-        kind: 'closed',
-        intervals: [],
-        reason: '年末年始',
-      }),
+      headers: { 'X-Step-Up-Token': 'step-token', 'Idempotency-Key': 'original-key-123' },
     })
+    expect(await image.text()).toBe('image-bytes')
   })
 })
 
@@ -128,16 +158,36 @@ describe('api.friends のV6検索・本人照合契約', () => {
       reason: '本人確認済み',
       profileSelections: [{ fieldKey: 'display_name', sourceFriendId: 'friend-1', updateMode: 'fixed' }],
     })
+    await api.mergedPeople.updateProfileValues('person/1', {
+      expectedRevision: 4,
+      selections: [{
+        fieldKey: 'display_name',
+        candidateId: `pc_${'a'.repeat(64)}`,
+        updateMode: 'fixed',
+      }],
+    })
     await api.mergedPeople.unlink('person/1', 'friend/1', { expectedRevision: 4, reason: '別人と確認' })
 
     expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
       'https://worker.example.com/api/friends/saved-views?lineAccountId=account%2F1',
       'https://worker.example.com/api/friends/duplicates/candidate%2F1',
       'https://worker.example.com/api/friends/duplicates/candidate%2F1',
+      'https://worker.example.com/api/friends/people/person%2F1/profile-values',
       'https://worker.example.com/api/friends/people/person%2F1/links/friend%2F1',
     ])
     expect(fetchSpy.mock.calls[2]?.[1]).toMatchObject({ method: 'PATCH' })
     expect(fetchSpy.mock.calls[3]?.[1]).toMatchObject({
+      method: 'PATCH',
+      body: JSON.stringify({
+        expectedRevision: 4,
+        selections: [{
+          fieldKey: 'display_name',
+          candidateId: `pc_${'a'.repeat(64)}`,
+          updateMode: 'fixed',
+        }],
+      }),
+    })
+    expect(fetchSpy.mock.calls[4]?.[1]).toMatchObject({
       method: 'DELETE',
       body: JSON.stringify({ expectedRevision: 4, reason: '別人と確認' }),
     })
