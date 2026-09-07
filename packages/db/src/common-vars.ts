@@ -873,15 +873,56 @@ export async function applyDueCommonVarSchedules(
     .all<CommonVarSchedule>();
   let applied = 0;
   for (const row of due.results) {
-    await db
-      .prepare(`UPDATE common_vars SET value = ?, updated_at = ? WHERE id = ?`)
-      .bind(row.value, jstNow(), row.var_id)
-      .run();
-    await db
-      .prepare(`UPDATE common_var_schedules SET applied_at = ? WHERE id = ?`)
-      .bind(jstNow(), row.id)
-      .run();
-    applied++;
+    // 適用のたびに版を1つ進め、履歴に1行残す。値・版・履歴・適用済み印を
+    // 同じ batch にして、途中で落ちたら「値だけ変わって記録なし」にしない。
+    // 版の一致を条件に入れるので、利用者の同時編集とぶつかった回は
+    // 何も書かず、次回の Cron で当て直す。
+    const current = await db
+      .prepare(
+        `SELECT name, value, memo, version FROM common_vars
+          WHERE id = ? AND archived_at IS NULL`,
+      )
+      .bind(row.var_id)
+      .first<{ name: string; value: string; memo: string | null; version: number }>();
+    const stamp = jstNow();
+    if (!current) {
+      // 変数自体が無い(削除済み等)の予約は、繰り返し拾わないよう印だけ打つ。
+      await db
+        .prepare(`UPDATE common_var_schedules SET applied_at = ? WHERE id = ?`)
+        .bind(stamp, row.id)
+        .run();
+      applied++;
+      continue;
+    }
+    const nextVersion = current.version + 1;
+    const results = await db.batch([
+      db.prepare(
+        `UPDATE common_vars SET value = ?, version = ?, updated_by = NULL, updated_at = ?
+          WHERE id = ? AND version = ? AND archived_at IS NULL`,
+      ).bind(row.value, nextVersion, stamp, row.var_id, current.version),
+      db.prepare(
+        `INSERT INTO common_var_versions
+           (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+          WHERE EXISTS (
+            SELECT 1 FROM common_vars
+             WHERE id = ? AND version = ? AND archived_at IS NULL
+          )`,
+      ).bind(
+        crypto.randomUUID(), row.var_id, nextVersion,
+        current.name, row.value, current.memo ?? '',
+        '予約適用', null, stamp,
+        row.var_id, nextVersion,
+      ),
+      db.prepare(
+        `UPDATE common_var_schedules SET applied_at = ?
+          WHERE id = ? AND applied_at IS NULL AND EXISTS (
+            SELECT 1 FROM common_vars
+             WHERE id = ? AND version = ? AND archived_at IS NULL
+          )`,
+      ).bind(stamp, row.id, row.var_id, nextVersion),
+    ]);
+    if ((results[0].meta?.changes ?? 0) > 0) applied++;
   }
   return applied;
 }

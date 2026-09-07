@@ -1146,6 +1146,14 @@ booking.get('/api/booking/admin/menus', async (c) => {
   }
 });
 
+/**
+ * 公開フラグの正規化。画面は 1/0 の数値、他は true/false で送る。
+ * どちらも「止める = 0」に倒す。書いていなければ出す(1)側に倒す。
+ */
+function toMenuActiveFlag(value: unknown): number {
+  return value === false || value === 0 ? 0 : 1;
+}
+
 booking.post('/api/booking/admin/menus', requireRole('owner', 'admin'), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
@@ -1159,6 +1167,7 @@ booking.post('/api/booking/admin/menus', requireRole('owner', 'admin'), async (c
     price_mode?: BookingPriceMode;
     sort_order?: number;
     auto_tag_id?: string | null;
+    is_active?: boolean | number;
   } & MenuBookingRuleBody>();
   const rules = readMenuBookingRules(b);
   if (!rules.ok) return c.json({ error: rules.error }, 400);
@@ -1183,10 +1192,10 @@ booking.post('/api/booking/admin/menus', requireRole('owner', 'admin'), async (c
       // （従来と同じ動き）が入る。
       `INSERT INTO menus
         (id, line_account_id, name, category_label, description,
-         duration_minutes, buffer_after_minutes, base_price, price_mode, sort_order, auto_tag_id${
+         duration_minutes, buffer_after_minutes, base_price, price_mode, sort_order, auto_tag_id, is_active${
            ruleColumns.map((col) => `, ${col}`).join('')
          })
-       VALUES (?,?,?,?,?,?,?,?,?,?,?${ruleColumns.map(() => ',?').join('')})`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?${ruleColumns.map(() => ',?').join('')})`,
     )
     .bind(
       id,
@@ -1200,6 +1209,7 @@ booking.post('/api/booking/admin/menus', requireRole('owner', 'admin'), async (c
       price.priceMode,
       b.sort_order ?? 0,
       autoTagId,
+      toMenuActiveFlag(b.is_active),
       ...ruleColumns.map((col) => rules.value[col]),
     )
     .run();
@@ -1219,7 +1229,7 @@ booking.put('/api/booking/admin/menus/:id', requireRole('owner', 'admin'), async
     base_price: number;
     price_mode?: BookingPriceMode;
     sort_order?: number;
-    is_active?: boolean;
+    is_active?: boolean | number;
     auto_tag_id?: string | null;
   } & MenuBookingRuleBody>();
 
@@ -1265,7 +1275,7 @@ booking.put('/api/booking/admin/menus/:id', requireRole('owner', 'admin'), async
     b.buffer_after_minutes ?? 0,
     price.basePrice,
     b.sort_order ?? 0,
-    b.is_active === false ? 0 : 1,
+    toMenuActiveFlag(b.is_active),
   ];
   if (hasPriceMode) {
     sets.push('price_mode = ?');
@@ -1322,12 +1332,24 @@ booking.patch('/api/booking/admin/menus/:id', requireRole('owner', 'admin'), asy
     }
     const rules = readMenuBookingRules(body);
     if (!rules.ok) return c.json({ success: false, error: rules.error }, 400);
+    // 公開切替だけの更新(一覧の「止める・出す」)も版付きで受ける。
+    // 数値 1/0 と真偽値のどちらも受け、止める側(0/false)に倒す。
+    let isActive: boolean | undefined;
+    if (Object.prototype.hasOwnProperty.call(body, 'is_active')) {
+      const rawActive = body.is_active;
+      if (rawActive === true || rawActive === 1) isActive = true;
+      else if (rawActive === false || rawActive === 0) isActive = false;
+      else {
+        return c.json({ success: false, error: 'is_active は true/false または 1/0 で指定してください' }, 400);
+      }
+    }
     const result = await updateBookingMenuSettings(c.env.DB, {
       id: c.req.param('id'),
       lineAccountId: accountId,
       expectedVersion,
       priceMode,
       basePrice,
+      isActive,
       bookingWindowDays: rules.value.booking_window_days as number | null | undefined,
       cutoffHoursBefore: rules.value.cutoff_hours_before as number | null | undefined,
       cancelDeadlineHoursBefore: rules.value.cancel_deadline_hours_before as number | null | undefined,
