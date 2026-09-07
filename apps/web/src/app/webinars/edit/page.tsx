@@ -413,7 +413,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics' }: { webi
                 : operational?.staffIntegrationStatus === 'completed' || rate >= 90
                   ? '成功'
                   : '分析待ち'
-              return <div key={participant.friendId} className="grid gap-3 px-4 py-3 text-sm md:grid-cols-[minmax(150px,1.2fr)_minmax(130px,1fr)_minmax(170px,1.3fr)_90px_70px] md:items-center"><div className="flex min-w-0 items-center gap-3"><ParticipantAvatar name={name} pictureUrl={participant.pictureUrl} /><span className="truncate font-semibold">{name}</span></div><span className="text-ink-secondary">{state}</span><span className="text-ink-secondary" title={operational?.errorDetail ?? undefined}>{action}</span><span className={`rounded-pill w-fit px-2 py-1 text-[11px] font-semibold ${status === '成功' ? 'bg-success-bg text-success' : status === 'エラー' ? 'bg-danger-bg text-danger' : 'bg-warning-bg text-warning'}`}>{status}</span><time className="text-ink-faint text-xs">{participant.latestJoinedAt ? compactDateTime(participant.latestJoinedAt).split(' ').at(-1) : '未視聴'}</time></div>
+              return <div key={participant.friendId} className="grid gap-3 px-4 py-3 text-sm md:grid-cols-5 md:items-center"><div className="flex min-w-0 items-center gap-3"><ParticipantAvatar name={name} pictureUrl={participant.pictureUrl} /><span className="truncate font-semibold">{name}</span></div><span className="text-ink-secondary">{state}</span><span className="text-ink-secondary" title={operational?.errorDetail ?? undefined}>{action}</span><span className={`rounded-pill w-fit px-2 py-1 text-[11px] font-semibold ${status === '成功' ? 'bg-success-bg text-success' : status === 'エラー' ? 'bg-danger-bg text-danger' : 'bg-warning-bg text-warning'}`}>{status}</span><time className="text-ink-faint text-xs">{participant.latestJoinedAt ? compactDateTime(participant.latestJoinedAt).split(' ').at(-1) : '未視聴'}</time></div>
             })}</div>
           </section>
           <aside className="space-y-3">
@@ -928,14 +928,21 @@ function VideoDesignStep({ webinar, editor, registrations }: { webinar: Webinar;
   )
 }
 
-function NotificationDesignStep({ webinarId, editor, registrations }: { webinarId: string; editor: WebinarEditor; registrations: number | null }) {
+function NotificationDesignStep({ webinarId, registrations }: { webinarId: string; registrations: number | null }) {
   const [settings, setSettings] = useState<Awaited<ReturnType<typeof webinarApi.notifications>>['data']['settings'] | null>(null)
+  const [editor, setEditor] = useState<WebinarEditor | null>(null)
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
-    webinarApi.notifications(webinarId)
-      .then((response) => setSettings(response.data.settings))
-      .catch(() => setSettings(null))
+    Promise.all([webinarApi.notifications(webinarId), webinarApi.editor(webinarId)])
+      .then(([notificationResponse, editorResponse]) => {
+        setSettings(notificationResponse.data.settings)
+        setEditor(editorResponse.data)
+      })
+      .catch(() => {
+        setSettings(null)
+        setEditor(null)
+      })
       .finally(() => setLoaded(true))
   }, [webinarId])
 
@@ -966,8 +973,8 @@ function NotificationDesignStep({ webinarId, editor, registrations }: { webinarI
         ['申込完了', enabled(settings?.registrationEnabled)],
         ['リマインド', settings?.dayBeforeEnabled || settings?.hourBeforeEnabled ? 'リマインド中' : loaded ? '未設定' : '—（確認中）'],
         ['対象', registrations === null ? '—（未取得）' : `${registrations.toLocaleString('ja-JP')}人`],
-      ]} previewBody={editor.notificationMessages.registration || notificationPreview(null).empty}>
-        <div className="flex gap-2"><Button disabled={editor.notificationTest?.status === 'passed'}>{editor.notificationTest?.status === 'passed' ? 'テスト送信済み' : 'テスト送信'}</Button><Button disabled={!editor.publicPage.url}>公開ページを見る</Button></div>
+      ]} previewBody={editor?.notificationMessages.registration || notificationPreview(null).empty}>
+        <div className="flex gap-2"><Button disabled={editor?.notificationTest?.status === 'passed'}>{editor?.notificationTest?.status === 'passed' ? 'テスト送信済み' : 'テスト送信'}</Button><Button disabled={!editor?.publicPage.url}>公開ページを見る</Button></div>
       </SummaryAside>
     </div>
   )
@@ -1162,7 +1169,7 @@ function CtaDesignStep({ webinarId, accountId, editor, registrations }: { webina
     <div className="flex flex-col gap-4 xl:flex-row" data-design-node="d3rFGD">
       <div className="min-w-0 flex-1 space-y-3">
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-base font-bold">CTA設定</h2><p className="text-ink-faint mt-1 text-xs">動画内に表示するボタンとタイミングを設定します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">表示タイミング</dt><dd className="text-ink text-sm font-bold">{primary ? `動画の${Math.floor(primary.atSeconds / 60)}分${String(primary.atSeconds % 60).padStart(2, '0')}秒` : '—（未設定）'}</dd></div><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">ボタン文言</dt><dd className="text-ink text-sm font-bold">{primary?.buttonLabel || '—（未設定）'}</dd></div></dl></section>
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-base font-bold">申込フォーム</h2><p className="text-ink-faint mt-1 text-xs">申込情報の保存先と完了アクションを設定します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">入力項目</dt><dd className="text-ink max-w-[70%] text-right text-sm font-bold">{editor.publicPage.form?.fields.join('・') || selectedForm?.name || '—（未設定）'}</dd></div><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">完了アクション</dt><dd className="text-ink max-w-[70%] text-right text-sm font-bold">{editor.publicPage.form?.completionActions.join('・') || '設定なし'}</dd></div></dl></section>
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-base font-bold">申込フォーム</h2><p className="text-ink-faint mt-1 text-xs">申込情報の保存先と完了アクションを設定します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">入力項目</dt><dd className="text-ink max-w-2xl text-right text-sm font-bold">{editor.publicPage.form?.fields.join('・') || selectedForm?.name || '—（未設定）'}</dd></div><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">完了アクション</dt><dd className="text-ink max-w-2xl text-right text-sm font-bold">{editor.publicPage.form?.completionActions.join('・') || '設定なし'}</dd></div></dl></section>
         <EditorDetails label="CTAカードとフォームの詳細を編集する"><CtasTab webinarId={webinarId} accountId={accountId} /></EditorDetails>
       </div>
       <SummaryAside rows={[
@@ -1355,7 +1362,7 @@ function PublicPreviewStep({
   return (
     <div className="flex flex-col gap-4 xl:flex-row" data-design-node="GB0NR">
       <div className="min-w-0 flex-1 space-y-3">
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-base font-bold">公開ページ</h2><p className="text-ink-faint mt-1 text-xs">タイトル・説明・申込フォームを最終確認します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">ページタイトル</dt><dd className="text-ink text-sm font-bold">{webinar.title}</dd></div><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">公開URL</dt><dd className="text-ink max-w-[70%] truncate text-sm font-bold" title={publicUrl ?? undefined}>{publicUrl ?? '—（LIFF ID未設定）'}</dd></div><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">説明</dt><dd className="text-ink max-w-[70%] text-right text-sm font-bold">{editor.publicDescription || '—（未設定）'}</dd></div></dl></section>
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-base font-bold">公開ページ</h2><p className="text-ink-faint mt-1 text-xs">タイトル・説明・申込フォームを最終確認します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">ページタイトル</dt><dd className="text-ink text-sm font-bold">{webinar.title}</dd></div><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">公開URL</dt><dd className="text-ink max-w-2xl truncate text-sm font-bold" title={publicUrl ?? undefined}>{publicUrl ?? '—（LIFF ID未設定）'}</dd></div><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">説明</dt><dd className="text-ink max-w-2xl text-right text-sm font-bold">{editor.publicDescription || '—（未設定）'}</dd></div></dl></section>
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-base font-bold">表示内容</h2><p className="text-ink-faint mt-1 text-xs">PC・スマートフォンの表示を確認します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">メイン動画</dt><dd className="text-ink text-sm font-bold">16:9・自動再生なし</dd></div><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">申込フォーム</dt><dd className="text-ink text-sm font-bold">{editor.publicPage.form ? `${editor.publicPage.form.name}（${editor.publicPage.form.fields.length}項目）` : '—（未設定）'}</dd></div></dl></section>
       </div>
       <SummaryAside rows={[
@@ -1632,7 +1639,7 @@ function EditWebinarInner() {
       {pane === 'basic' && <WebinarForm initial={webinar} />}
       {pane === 'video' && <VideoDesignStep webinar={webinar} editor={editor} registrations={registrations} />}
       {pane === 'cta' && <CtaDesignStep webinarId={webinar.id} accountId={webinar.accountId} editor={editor} registrations={registrations} />}
-      {pane === 'notifications' && <NotificationDesignStep webinarId={webinar.id} editor={editor} registrations={registrations} />}
+      {pane === 'notifications' && <NotificationDesignStep webinarId={webinar.id} registrations={registrations} />}
       {pane === 'review' && <ReviewStep webinar={webinar} editor={editor} registrations={registrations} onBack={setPane} />}
       {pane === 'comments' && <CommentsTab webinarId={webinar.id} />}
       {pane === 'actions' && <WebinarActionsTab webinarId={webinar.id} editor={editor} onEditorChange={setEditor} />}

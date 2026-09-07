@@ -1274,7 +1274,7 @@ webinarRoutes.post('/api/webinars/:id/publish', requireRole('owner', 'admin'), a
     const published = await publishWebinarEditorVersion(c.env.DB, id, Number(body.expectedVersion));
     if (!published) return c.json({ success: false, error: 'version_conflict' }, 409);
     const updated = await updateWebinar(c.env.DB, id, { status: 'active' });
-    auditLog(c, 'webinar.publish', { kind: 'webinar', id, version: published.version });
+    auditLog(c, 'webinar.publish', { kind: 'webinar', id });
     return c.json({ success: true, data: { webinar: serializeWebinar(updated!), validation } });
   } catch (err) {
     console.error('POST /api/webinars/:id/publish error:', err);
@@ -1293,7 +1293,7 @@ webinarRoutes.post('/api/webinars/:id/pause', requireRole('owner', 'admin'), asy
       return c.json({ success: false, error: 'version_conflict' }, 409);
     }
     const updated = await updateWebinar(c.env.DB, id, { status: 'draft' });
-    auditLog(c, 'webinar.pause', { kind: 'webinar', id, version: settings.version });
+    auditLog(c, 'webinar.pause', { kind: 'webinar', id });
     return c.json({ success: true, data: serializeWebinar(updated!) });
   } catch (err) {
     console.error('POST /api/webinars/:id/pause error:', err);
@@ -1336,7 +1336,7 @@ webinarRoutes.post('/api/webinars/:id/duplicate', requireRole('owner', 'admin'),
       actionTemplateBody: settings.action_template_body,
       missingResultPolicy: settings.missing_result_policy,
     });
-    auditLog(c, 'webinar.duplicate', { kind: 'webinar', id, duplicateId: duplicate.id });
+    auditLog(c, 'webinar.duplicate', { kind: 'webinar', id });
     return c.json({ success: true, data: serializeWebinar(duplicate) }, 201);
   } catch (err) {
     console.error('POST /api/webinars/:id/duplicate error:', err);

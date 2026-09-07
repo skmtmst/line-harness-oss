@@ -31,7 +31,7 @@ export default function NewWebinarPage() {
       return
     }
     webinarApi.folders(selectedAccountId)
-      .then((response) => setFolders(Array.isArray(response.data) ? response.data : []))
+      .then((response) => setFolders(response.success && Array.isArray(response.data) ? response.data : []))
       .catch(() => setFolders([]))
   }, [selectedAccountId])
 

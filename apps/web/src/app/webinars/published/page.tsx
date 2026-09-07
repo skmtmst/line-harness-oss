@@ -9,6 +9,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
+import { useAccount } from '@/contexts/account-context'
 
 type PublishedWebinar = Webinar & {
   publicationState?: 'period' | 'always' | 'scheduled' | 'ended' | 'unset' | null
@@ -42,6 +43,7 @@ function publicationWindow(webinar: PublishedWebinar): string {
 function PublishedWebinarContent() {
   usePageTitle('ウェビナー・公開完了')
   const id = useSearchParams().get('id')
+  const { accounts, loading: accountsLoading } = useAccount()
   const [webinar, setWebinar] = useState<Webinar | null>(null)
   const [editor, setEditor] = useState<WebinarEditor | null>(null)
   const [loading, setLoading] = useState(true)
@@ -99,7 +101,11 @@ function PublishedWebinarContent() {
     )
   }
 
-  const publicUrl = editor.publicPage.url
+  const webinarAccount = accounts.find((account) => account.id === webinar.accountId)
+  const publicUrl = webinarAccount?.liffId ? editor.publicPage.url : null
+  const publicPageUnavailable = accountsLoading
+    ? 'LINE公式アカウントを確認しています。'
+    : 'LIFF IDを確認できないため、公開ページを表示できません。'
   const publicPeriod = publicationWindow(webinar as PublishedWebinar)
   const run = async (action: 'pause' | 'test' | 'duplicate') => {
     if (!id || busy) return
@@ -133,7 +139,7 @@ function PublishedWebinarContent() {
           <dl className="border-hairline divide-hairline mx-auto mt-6 max-w-3xl divide-y rounded-control border">{[
             ['ウェビナー名', webinar.title], ['動画・公開', editor.viewingCondition.label], ['対象', publicPeriod], ['公開URL', publicUrl ?? '—（LIFF ID未設定）'], ['状態', '稼働中'],
           ].map(([label, value]) => <div key={label} className="flex flex-wrap items-baseline justify-between gap-3 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">{label}</dt><dd className="text-ink max-w-[70%] truncate text-sm font-bold" title={value}>{value}</dd></div>)}</dl>
-          <div className="mx-auto mt-4 max-w-3xl space-y-3"><NoteBar>申込通知・動画配信・リマインド・相談予約の失敗は、運用者通知と要対応で確認できます。</NoteBar>{!publicUrl ? <NoteBar>{editor.publicPage.unavailableReason ?? '公開URLを確認できません。'}</NoteBar> : null}{notice ? <NoteBar>{notice}</NoteBar> : null}</div>
+          <div className="mx-auto mt-4 max-w-3xl space-y-3"><NoteBar>申込通知・動画配信・リマインド・相談予約の失敗は、運用者通知と要対応で確認できます。</NoteBar>{!publicUrl ? <NoteBar>{editor.publicPage.unavailableReason ?? publicPageUnavailable}</NoteBar> : null}{notice ? <NoteBar>{notice}</NoteBar> : null}</div>
           <div className="mt-5 flex flex-wrap justify-center gap-3"><Button href="/webinars">ウェビナー一覧へ</Button><Button variant="primary" href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}&pane=participants`}>参加状況を確認</Button>{publicUrl ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : null}</div>
         </section>
         <aside className="space-y-4">
