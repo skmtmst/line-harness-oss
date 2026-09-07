@@ -3864,6 +3864,157 @@ export const CONVERSION_REPORT_PREVIOUS = [
 ]
 
 /*
+  機能19のV6一覧契約。代表6件は旧画面と同じ成果地点を使い、設計にある
+  全体件数（12件／動作中10件／停止2件）と利用先・期間集計を一緒に返す。
+  取消イベント台帳はまだ無いため、本番契約と同じく純件数は記録件数と同値。
+*/
+const CONVERSION_RANGE = {
+  from: '2026-07-27 00:00:00',
+  to: '2026-08-25 23:59:59',
+  timeZone: 'Asia/Tokyo',
+}
+
+const CONVERSION_PREVIOUS_RANGE = {
+  from: '2026-06-27 00:00:00',
+  to: '2026-07-26 23:59:59',
+  timeZone: 'Asia/Tokyo',
+}
+
+const CONVERSION_USAGE_COUNTS = new Map([
+  ['cp-1', 2], ['cp-2', 3], ['cp-3', 2], ['cp-4', 2], ['cp-5', 2], ['cp-6', 0],
+])
+
+const CONVERSION_CURRENT_BY_ID = new Map(CONVERSION_REPORT_CURRENT.map((row) => [row.conversionPointId, row]))
+const CONVERSION_PREVIOUS_BY_ID = new Map(CONVERSION_REPORT_PREVIOUS.map((row) => [row.conversionPointId, row]))
+
+export const CONVERSION_DEFINITIONS = {
+  items: CONVERSION_POINTS.map((point) => {
+    const current = CONVERSION_CURRENT_BY_ID.get(point.id)
+    return {
+      id: point.id,
+      name: point.name,
+      sourceType: point.eventType,
+      value: point.value,
+      measureMethod: point.measureMethod,
+      targetUrl: point.targetUrl,
+      countRepeat: point.countRepeat,
+      attributionDays: point.attributionDays,
+      lineAccountId: point.lineAccountId,
+      status: point.isActive ? 'active' : 'stopped',
+      version: 1,
+      usageCount: CONVERSION_USAGE_COUNTS.get(point.id) ?? 0,
+      metrics: {
+        recordedCount: current?.totalCount ?? 0,
+        netCount: current?.totalCount ?? 0,
+        reversedCount: null,
+        netValue: current?.totalValue ?? 0,
+        reversalState: 'unavailable',
+        reversalReason: '取消イベント台帳はまだ接続されていません',
+      },
+      stoppedAt: point.isActive ? null : '2026-08-20T09:00:00.000Z',
+      createdAt: point.createdAt,
+      updatedAt: point.isActive ? '2026-08-25T09:00:00.000Z' : '2026-08-20T09:00:00.000Z',
+    }
+  }),
+  stateCounts: { active: 10, draft: 0, stopped: 2, invalid: 0, sourceStopped: 0 },
+  range: CONVERSION_RANGE,
+  pagination: { total: 12, limit: 20, cursor: '0', nextCursor: null },
+}
+
+/*
+  設計の積み上げグラフ用。8日分にまとめているが、地点別の合計は一覧KPIの
+  486件と一致する（商品386、申込42、予約38、定期12、視聴8）。
+*/
+const CONVERSION_DAILY_COUNTS = [
+  ['2026-07-27', 60, 6, 5, 2, 1],
+  ['2026-08-01', 63, 7, 6, 2, 1],
+  ['2026-08-06', 62, 6, 5, 2, 1],
+  ['2026-08-11', 58, 5, 5, 1, 1],
+  ['2026-08-13', 75, 10, 7, 2, 2],
+  ['2026-08-16', 35, 4, 4, 1, 1],
+  ['2026-08-21', 20, 3, 3, 1, 1],
+  ['2026-08-25', 13, 1, 3, 1, 0],
+]
+
+const CONVERSION_DAILY_VALUES = [1587, 12000, 1816, 8217, 0]
+const CONVERSION_DAILY_FINAL_ADJUSTMENTS = [182, 0, 8, 4, 0]
+
+export const CONVERSION_DEFINITION_REPORT = {
+  range: CONVERSION_RANGE,
+  previousRange: CONVERSION_PREVIOUS_RANGE,
+  kpis: {
+    recordedCount: 486,
+    reversedCount: null,
+    netCount: 486,
+    netValue: 1_284_000,
+    averageNetValue: 2641.98,
+    previousNetCount: 412,
+    previousNetValue: 1_092_000,
+    countChangeRate: 17.96,
+    reversalState: 'unavailable',
+    reversalReason: '取消イベント台帳はまだ接続されていません',
+    fastestGrowing: {
+      conversionPointId: 'cp-1',
+      conversionPointName: '商品を買った',
+      sourceType: 'ec_order_confirmed',
+      netCount: 386,
+      netValue: 612_400,
+      previousNetCount: 341,
+      previousNetValue: 630_000,
+      countChange: 45,
+    },
+  },
+  daily: CONVERSION_DAILY_COUNTS.flatMap(([day, ...counts]) => counts.map((netCount, index) => ({
+    day,
+    conversionPointId: CONVERSION_REPORT_CURRENT[index].conversionPointId,
+    conversionPointName: CONVERSION_REPORT_CURRENT[index].conversionPointName,
+    netCount,
+    netValue: netCount * CONVERSION_DAILY_VALUES[index]
+      - (day === '2026-08-25' ? CONVERSION_DAILY_FINAL_ADJUSTMENTS[index] : 0),
+  }))),
+  byDefinition: CONVERSION_REPORT_CURRENT.map((current) => {
+    const previous = CONVERSION_PREVIOUS_BY_ID.get(current.conversionPointId)
+    return {
+      conversionPointId: current.conversionPointId,
+      conversionPointName: current.conversionPointName,
+      sourceType: current.eventType,
+      netCount: current.totalCount,
+      netValue: current.totalValue,
+      previousNetCount: previous?.totalCount ?? 0,
+      previousNetValue: previous?.totalValue ?? 0,
+      countChange: current.totalCount - (previous?.totalCount ?? 0),
+    }
+  }),
+  byRoute: [
+    { routeKey: 'nen-regular', label: 'NEN配信「定期便のご案内」', attributionState: 'attributed', netCount: 200, netValue: 520_000, audience: null, conversionRate: null },
+    { routeKey: 'google-summer', label: 'Google広告 夏キャンペーン', attributionState: 'attributed', netCount: 110, netValue: 336_000, audience: null, conversionRate: null },
+    { routeKey: 'rich-menu-booking', label: 'リッチメニュー「予約する」', attributionState: 'attributed', netCount: 80, netValue: 158_000, audience: null, conversionRate: null },
+    { routeKey: 'affiliate-north', label: '紹介リンク 合同会社ノース', attributionState: 'attributed', netCount: 60, netValue: 180_000, audience: null, conversionRate: null },
+    { routeKey: 'unattributed', label: '未帰属', attributionState: 'unattributed', netCount: 36, netValue: 90_000, audience: null, conversionRate: null },
+  ],
+}
+
+export const CONVERSION_EXPORT_CSV = `\uFEFF${[
+  ['期間開始', '期間終了', 'タイムゾーン', '純額定義', '成果地点ID', '成果地点名', '起点', '状態', '成果件数', '純成果件数', '取消件数', '純金額', '利用先数', '更新日時'],
+  ...CONVERSION_DEFINITIONS.items.map((item) => [
+    CONVERSION_RANGE.from,
+    CONVERSION_RANGE.to,
+    CONVERSION_RANGE.timeZone,
+    item.metrics.reversalReason,
+    item.id,
+    item.name,
+    item.sourceType,
+    item.status,
+    item.metrics.recordedCount,
+    item.metrics.netCount,
+    '',
+    item.metrics.netValue,
+    item.usageCount,
+    item.updatedAt,
+  ]),
+].map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(',')).join('\r\n')}\r\n`
+
+/*
   紹介者ごとの集計。設計 `jwrbf`（成果内訳）が読む。
 
   **紹介者の一覧に居る人は、ここにも全員入れる。** 片方に居て片方に居ないと、

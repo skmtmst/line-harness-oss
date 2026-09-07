@@ -21,8 +21,8 @@ describe('V6 保存した検索の画面契約', () => {
   })
 
   it('保存と呼び出しをブラウザ1台だけのlocalStorageへ戻さない', () => {
-    expect(advanced).toContain('api.savedSearches.create')
-    expect(friendsPage).toContain('api.savedSearches.list')
+    expect(advanced).toContain('api.friendSavedViews.create')
+    expect(friendsPage).toContain('api.friendSavedViews.list')
     expect(advanced + friendsPage).not.toContain("localStorage.setItem('friends.savedSearch'")
     expect(advanced + friendsPage).not.toContain("localStorage.getItem('friends.savedSearch'")
   })
