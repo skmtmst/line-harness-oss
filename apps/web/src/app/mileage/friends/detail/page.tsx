@@ -160,7 +160,21 @@ function FriendMileageInner() {
     )
   }
 
-  const displayName = friend.displayName || '名前未設定'
+  const displayName = v6Friend?.displayName || friend.displayName || '名前未設定'
+  const rankLabel = v6Friend?.rank === 'gold'
+    ? 'ゴールド'
+    : v6Friend?.rank === 'silver'
+      ? 'シルバー'
+      : v6Friend?.rank === 'bronze'
+        ? 'ブロンズ'
+        : v6Friend?.rank ?? 'ランクなし'
+  const nextRankLabel = v6Friend?.nextRank === 'gold'
+    ? 'ゴールド'
+    : v6Friend?.nextRank === 'silver'
+      ? 'シルバー'
+      : v6Friend?.nextRank === 'bronze'
+        ? 'ブロンズ'
+        : v6Friend?.nextRank
   const available = v6Friend?.available ?? mileage.summary.available
   const rewardedActions = mileageRewardedActions(mileage.insights)
   const connectedAccounts = mileageConnectedAccounts(mileage.connections)
@@ -212,9 +226,9 @@ function FriendMileageInner() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader title="ランクの進み" meta={v6Friend?.rank ?? 'ランクなし'} />
+          <CardHeader title="ランクの進み" meta={rankLabel} />
           <div className="p-4">
-            <p className="text-sm font-bold text-ink">{v6Friend?.nextRank ? `次は「${v6Friend.nextRank}」` : 'いちばん上のランクです'}</p>
+            <p className="text-sm font-bold text-ink">{nextRankLabel ? `次は「${nextRankLabel}」` : 'いちばん上のランクです'}</p>
             <p className="mt-1 text-xs text-ink-faint">{v6Friend?.milesToNextRank == null ? v6Friend?.rankReason ?? 'ランク情報を確認できません' : `あと ${v6Friend.milesToNextRank.toLocaleString('ja-JP')} マイル`}</p>
           </div>
         </Card>
