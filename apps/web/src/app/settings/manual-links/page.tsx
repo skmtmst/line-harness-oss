@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { api, type ManualLink } from '@/lib/api'
+import { ApiError, api, type ManualLink } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -35,7 +35,7 @@ export default function ManualLinksPage() {
     メニューの「機能設定」が出てしまう。設計 `f9oUm` は「マニュアル」。
   */
   usePageTitle('マニュアルの正本表')
-  const [role, setRole] = useState<string | null>(null)
+  const [staff, setStaff] = useState<{ id: string; role: string | null; permissionKeys: string[] } | null>(null)
   const [links, setLinks] = useState<ManualLink[]>([])
   const [total, setTotal] = useState(0)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -45,17 +45,23 @@ export default function ManualLinksPage() {
   const [saving, setSaving] = useState(false)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<StatusFilter>('all')
+  /** 「確かめる」「保存」の失敗。無言にせず、やり直しの手がかりと一緒に残す。 */
+  const [actionError, setActionError] = useState('')
 
   useEffect(() => {
     let alive = true
     void Promise.all([api.staff.me(), api.manualLinks.list()])
-      .then(([staff, manualLinks]) => {
+      .then(([staffResponse, manualLinks]) => {
         if (!alive) return
-        if (!staff.success || !manualLinks.success) {
+        if (!staffResponse.success || !manualLinks.success) {
           setStatus('error')
           return
         }
-        setRole(staff.data?.role ?? null)
+        setStaff({
+          id: staffResponse.data?.id ?? '',
+          role: staffResponse.data?.role ?? null,
+          permissionKeys: staffResponse.data?.permissionKeys ?? [],
+        })
         setLinks(manualLinks.data.items)
         setTotal(manualLinks.data.total)
         setStatus('ready')
@@ -75,15 +81,22 @@ export default function ManualLinksPage() {
   const checkAll = async () => {
     if (checking) return
     setChecking(true)
+    setActionError('')
     try {
       const result = await api.manualLinks.check()
-      if (result.success) {
-        const refreshed = await api.manualLinks.list()
-        if (refreshed.success) {
-          setLinks(refreshed.data.items)
-          setTotal(refreshed.data.total)
-        }
+      if (!result.success) {
+        setActionError(result.error)
+        return
       }
+      const refreshed = await api.manualLinks.list()
+      if (refreshed.success) {
+        setLinks(refreshed.data.items)
+        setTotal(refreshed.data.total)
+      } else {
+        setActionError(refreshed.error)
+      }
+    } catch {
+      setActionError('確かめられませんでした。通信状態を確認して、もう一度お試しください。')
     } finally {
       setChecking(false)
     }
@@ -101,15 +114,38 @@ export default function ManualLinksPage() {
     const current = links.find((item) => item.key === editingKey)
     if (!current) return
     setSaving(true)
+    setActionError('')
     try {
       const result = await api.manualLinks.update(editingKey, {
         url: editingUrl.trim() || null,
         expectedVersion: current.version,
       })
-      if (result.success) {
-        setLinks((items) => items.map((item) => item.key === editingKey ? result.data : item))
-        setEditingKey(null)
+      if (!result.success) {
+        setActionError(result.error)
+        return
       }
+      setLinks((items) => items.map((item) => item.key === editingKey ? result.data : item))
+      setEditingKey(null)
+    } catch (error) {
+      // ほかの人が先に変えたときは編集中身を残し、最新を読み直す。
+      if (error instanceof ApiError && error.status === 409) {
+        setActionError('ほかの人が先に変更しました。最新の内容を読み直したので、確認してもう一度保存してください。')
+        try {
+          const refreshed = await api.manualLinks.list()
+          if (refreshed.success) {
+            setLinks(refreshed.data.items)
+            setTotal(refreshed.data.total)
+          }
+        } catch {
+          // 読み直しに失敗しても編集中身は残す。
+        }
+        return
+      }
+      if (error instanceof ApiError && error.status === 403) {
+        setActionError('この表を直す権限がありません。運営に依頼してください。')
+        return
+      }
+      setActionError('保存できませんでした。通信状態を確認して、もう一度お試しください。')
     } finally {
       setSaving(false)
     }
@@ -119,7 +155,7 @@ export default function ManualLinksPage() {
     return <ListState kind={status === 'error' ? 'error' : 'loading'} />
   }
 
-  if (!canEditTable(role)) {
+  if (!canEditTable(staff)) {
     return (
       <ListState
         kind="forbidden"
@@ -151,6 +187,12 @@ export default function ManualLinksPage() {
           {checking ? '確かめています…' : 'いま全部を確かめる'}
         </Button>
       </ListToolbar>
+
+      {actionError && (
+        <p role="alert" className={styles.actionError}>
+          {actionError}
+        </p>
+      )}
 
       <div data-manual-table-title>
         <strong>画面とマニュアルの対応 {total}件</strong>

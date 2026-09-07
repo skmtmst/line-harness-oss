@@ -41,13 +41,10 @@ describe('V6回答フォーム削除確認 gBp2J', () => {
     expect(PAGE).toContain("form.id === deleteTarget.id ? { ...form, isActive: false } : form")
   })
 
-  it('成功時は削除したカードを外し、開いていた回答も閉じる', () => {
+  it('成功時は削除したカードを外す（回答の閲覧は専用ルートが担うため一覧に戻さない）', () => {
     expect(PAGE).toContain('current.filter((form) => form.id !== targetId)')
-    expect(PAGE).toContain('if (selectedFormId === targetId)')
-    expect(PAGE).toContain('submissionRequest.current += 1')
-    expect(PAGE).toContain('setSelectedFormId(null)')
-    expect(PAGE).toContain('setSubmissions([])')
-    expect(PAGE).toContain('setSubmissionTotal(0)')
-    expect(PAGE).toContain('setDetailSubmission(null)')
+    expect(PAGE).toContain('setDeleteTarget(null)')
+    expect(PAGE).not.toContain('selectedFormId')
+    expect(PAGE).not.toContain('setSubmissions')
   })
 })

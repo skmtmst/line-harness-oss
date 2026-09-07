@@ -14,6 +14,12 @@ class MockMediaVersionConflictError extends Error {
   }
 }
 
+class MockCommonVarFolderError extends Error {
+  constructor() {
+    super('folder');
+  }
+}
+
 const mocks = {
   getMedia: vi.fn(),
   countMedia: vi.fn(),
@@ -37,6 +43,9 @@ const mocks = {
   MediaVersionConflictError: MockMediaVersionConflictError,
   jstNow: vi.fn(() => '2026-08-31T10:00:00.000+09:00'),
   getCommonVars: vi.fn(),
+  countCommonVars: vi.fn(),
+  COMMON_VARS_LIST_LIMIT: 200,
+  CommonVarFolderError: MockCommonVarFolderError,
   getCommonVarUsageSummaries: vi.fn(),
   getCommonVarById: vi.fn(),
   createCommonVar: vi.fn(),
@@ -293,6 +302,7 @@ beforeEach(() => {
     expiresAt: '2099-01-01T00:00:00.000Z',
   });
   mocks.getCommonVars.mockResolvedValue([VAR]);
+  mocks.countCommonVars.mockResolvedValue(1);
   mocks.getCommonVarUsageSummaries.mockResolvedValue(new Map([['shop_hours', {
     total: 3,
     byKind: { ...EMPTY_COMMON_VAR_IMPACT.byKind, template: 2, broadcast: 1 },
@@ -811,15 +821,22 @@ describe('共通情報', () => {
     expect(mocks.getCommonVars).toHaveBeenCalledWith(env.DB, {
       lineAccountId: 'account-1',
       folderId: undefined,
+      limit: 200,
     });
     expect(mocks.getCommonVarUsageSummaries).toHaveBeenCalledWith(
       env.DB,
       ['shop_hours'],
       'account-1',
     );
-    const body = (await res.json()) as { data: Array<{ usageCount: number; usageByKind: { template: number } }> };
+    const body = (await res.json()) as {
+      data: Array<{ usageCount: number; usageByKind: { template: number } }>;
+      meta: { total: number; limited: boolean; limit: number };
+    };
     expect(body.data[0]?.usageCount).toBe(3);
     expect(body.data[0]?.usageByKind.template).toBe(2);
+    expect(body).toMatchObject({
+      meta: { total: 1, limited: false, limit: 200 },
+    });
   });
 
   it('使用先件数を確認できないときは0件と見せず一覧取得を止める', async () => {
@@ -896,6 +913,65 @@ describe('共通情報', () => {
   it('値だけの変更は通る', async () => {
     const res = await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { value: '11-20' });
     expect(res.status).toBe(200);
+  });
+
+  it('#544 N2 上限を超える指定は200件に丸め、切ったら総件数を返す', async () => {
+    mocks.countCommonVars.mockResolvedValueOnce(250);
+    const res = await req('/api/common-vars?accountId=account-1&limit=500', 'GET');
+    expect(res.status).toBe(200);
+    expect(mocks.getCommonVars).toHaveBeenCalledWith(env.DB, {
+      lineAccountId: 'account-1',
+      folderId: undefined,
+      limit: 200,
+    });
+    expect(await res.json()).toMatchObject({
+      meta: { total: 250, limited: true, limit: 200 },
+    });
+  });
+
+  it('#544 N4 長すぎる名前・値・メモは登録も更新も止める', async () => {
+    const longValue = 'あ'.repeat(201);
+    const longMemo = 'あ'.repeat(1001);
+    expect((await req('/api/common-vars', 'POST', {
+      accountId: 'account-1', name: 'x', varKey: 'ok_key', value: longValue,
+    })).status).toBe(400);
+    expect((await req('/api/common-vars', 'POST', {
+      accountId: 'account-1', name: 'x', varKey: 'ok_key', memo: longMemo,
+    })).status).toBe(400);
+    expect((await req('/api/common-vars', 'POST', {
+      accountId: 'account-1', name: 'あ'.repeat(201), varKey: 'ok_key',
+    })).status).toBe(400);
+    expect(mocks.createCommonVar).not.toHaveBeenCalled();
+    expect((await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { value: longValue })).status).toBe(400);
+    expect((await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { memo: longMemo })).status).toBe(400);
+    expect(mocks.updateCommonVar).not.toHaveBeenCalled();
+  });
+
+  it('#544 N5 空の名前は更新でも止め、不正な種別は登録で止める', async () => {
+    expect((await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { name: '  ' })).status).toBe(400);
+    expect(mocks.updateCommonVar).not.toHaveBeenCalled();
+    expect((await req('/api/common-vars', 'POST', {
+      accountId: 'account-1', name: 'x', varKey: 'ok_key', type: 'bogus',
+    })).status).toBe(400);
+    expect(mocks.createCommonVar).not.toHaveBeenCalled();
+  });
+
+  it('#544 N5 版番号なしの上書きは許す(衝突検出は版番号つきのみ)', async () => {
+    const res = await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { value: '11-20' });
+    expect(res.status).toBe(200);
+    expect(mocks.updateCommonVar).toHaveBeenCalledWith(env.DB, 'cv-1', 'account-1', expect.objectContaining({
+      expectedVersion: undefined,
+    }));
+  });
+
+  it('#544 N6 存在しない・別種別のフォルダは登録も更新も止める', async () => {
+    mocks.createCommonVar.mockRejectedValueOnce(new MockCommonVarFolderError());
+    expect((await req('/api/common-vars', 'POST', {
+      accountId: 'account-1', name: 'x', varKey: 'ok_key', folderId: 'other-folder',
+    })).status).toBe(400);
+    mocks.updateCommonVar.mockRejectedValueOnce(new MockCommonVarFolderError());
+    expect((await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { folderId: 'other-folder' })).status)
+      .toBe(400);
   });
 
   it('削除影響は運用者向けの名前と導線を返し、内部IDの専用項目を作らない', async () => {

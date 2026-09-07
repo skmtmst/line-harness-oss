@@ -149,7 +149,22 @@ export const VERIFY_UNAVAILABLE_NOTE =
 export const VERIFY_SCHEDULE_NOTE =
   '確かめるのは毎日 04:00 と、この画面の「いま全部を確かめる」を押したときです。'
 
-/** この表を触れる人。設計「この表を直せるのは運営だけです」。 */
-export function canEditTable(role: string | null): boolean {
-  return role === 'owner'
+/**
+ * この表を触れる人。サーバー（`manual-links.ts` の `canOperate`）を広めに写す。
+ *
+ * 運営の代表（`env-owner`）か、マニュアルの編集権限
+ * （`manual.link.edit`）を持つ人は必ず出す。代表者（owner）も出す。
+ * 以前は代表者だけを見ていたため、権限を持つ人でも表が出なかった。
+ * 最終の可否はサーバーが決める。権限が足りない操作は 403 として
+ * 理由と依頼先を画面に出す。
+ */
+export function canEditTable(staff: {
+  id?: string | null
+  role?: string | null
+  permissionKeys?: string[] | null
+} | null): boolean {
+  if (!staff) return false
+  if (staff.id === 'env-owner') return true
+  if ((staff.permissionKeys ?? []).includes('manual.link.edit')) return true
+  return staff.role === 'owner'
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import type { FormLayout } from '@line-crm/shared'
@@ -100,12 +100,16 @@ function FormResponsesInner() {
   const [selected, setSelected] = useState<Submission | null>(null)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
+  const [exportProgress, setExportProgress] = useState('')
+  // ページ送りを速く押すと遅い応答が後勝ちする。最新の要求だけを描く。
+  const loadRequest = useRef(0)
 
   const load = useCallback(async (nextPage = 1, nextLimit = 20) => {
     if (!selectedAccountId || !formId) {
       setLoading(false)
       return
     }
+    const request = ++loadRequest.current
     setLoading(true)
     setError('')
     try {
@@ -117,6 +121,7 @@ function FormResponsesInner() {
         ),
       ])
       if (!formResult.success || !responseResult.success) throw new Error('load_failed')
+      if (request !== loadRequest.current) return
       setForm(formResult.data)
       setItems(responseResult.data.items.map(normalizedSubmission))
       setSummary(responseResult.data.summary ?? null)
@@ -125,12 +130,13 @@ function FormResponsesInner() {
       setPageSize(responseResult.data.limit)
       setSelected(null)
     } catch {
+      if (request !== loadRequest.current) return
       setError('集まった回答を読み込めませんでした。')
       setItems([])
       setSummary(null)
       setTotal(null)
     } finally {
-      setLoading(false)
+      if (request === loadRequest.current) setLoading(false)
     }
   }, [formId, selectedAccountId])
 
@@ -171,30 +177,47 @@ function FormResponsesInner() {
     return { key, values: [...counts.entries()].sort((left, right) => right[1] - left[1]) }
   }), [fieldKeys, shown])
 
+  // 一度に書き出す上限。超えたら止めて件数を言う（黙って欠けさせない）。
+  const MAX_EXPORT_ROWS = 5000
+  // 口の1回あたり上限(200件)いっぱいで取り、要求の回数を減らす。
+  const EXPORT_PAGE_LIMIT = 200
+
   const exportAll = async () => {
     if (!selectedAccountId || !form || exporting) return
+    if (total !== null && total > MAX_EXPORT_ROWS) {
+      setExportError(`回答が${total.toLocaleString('ja-JP')}件あり、一度に書き出せる上限（${MAX_EXPORT_ROWS.toLocaleString('ja-JP')}件）を超えています。`)
+      return
+    }
     setExporting(true)
     setExportError('')
+    setExportProgress('')
     try {
       const all: Submission[] = []
       let currentPage = 1
       let expected = 0
       do {
         const result = await fetchApi<{ success: boolean; data: SubmissionPage }>(
-          `/api/forms/${formId}/submissions?page=${currentPage}&limit=50&account_id=${encodeURIComponent(selectedAccountId)}`,
+          `/api/forms/${formId}/submissions?page=${currentPage}&limit=${EXPORT_PAGE_LIMIT}&account_id=${encodeURIComponent(selectedAccountId)}`,
         )
         if (!result.success) throw new Error('export_failed')
         expected = result.data.total
+        if (expected > MAX_EXPORT_ROWS) throw new Error('export_too_many')
         all.push(...result.data.items.map(normalizedSubmission))
+        setExportProgress(`${Math.min(all.length, expected).toLocaleString('ja-JP')} / ${expected.toLocaleString('ja-JP')}件を取得中`)
         currentPage += 1
       } while (all.length < expected && currentPage <= 1001)
       if (all.length < expected) throw new Error('export_incomplete')
       const keys = [...new Set([...fieldKeys, ...all.flatMap((item) => Object.keys(item.data as Record<string, unknown>))])]
       saveCsv(`${form.name}-回答.csv`, all, keys, labels)
-    } catch {
-      setExportError('CSVを書き出せませんでした。もう一度お試しください。')
+    } catch (error) {
+      setExportError(
+        error instanceof Error && error.message === 'export_too_many'
+          ? `回答が一度に書き出せる上限（${MAX_EXPORT_ROWS.toLocaleString('ja-JP')}件）を超えています。`
+          : 'CSVを書き出せませんでした。もう一度お試しください。',
+      )
     } finally {
       setExporting(false)
+      setExportProgress('')
     }
   }
 
@@ -223,7 +246,7 @@ function FormResponsesInner() {
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => document.getElementById('form-response-filter')?.focus()}>絞り込む</Button>
           <Button onClick={() => void exportAll()} disabled={exporting || total === 0}>
-            {exporting ? 'CSVを準備しています' : 'CSVで書き出す'}
+            {exporting ? (exportProgress || 'CSVを準備しています') : 'CSVで書き出す'}
           </Button>
           <Button href={`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`} variant="primary">フォームを編集</Button>
         </div>
@@ -258,6 +281,9 @@ function FormResponsesInner() {
         <input id="form-response-filter" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・回答内容で検索" className="border-hairline bg-canvas text-ink rounded-control w-full border px-3 py-2 text-sm sm:w-72" />
       </div>
       {exportError && <p className="text-danger mb-3 text-sm">{exportError}</p>}
+      {exporting && exportProgress && (
+        <p className="text-ink-secondary mb-3 text-sm" role="status">{exportProgress}</p>
+      )}
 
       {total === 0 ? (
         <ListState kind="empty" title="まだ回答がありません" description="フォームが回答されると、ここに1件ずつ並びます。" />

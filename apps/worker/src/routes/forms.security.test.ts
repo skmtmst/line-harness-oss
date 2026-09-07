@@ -108,11 +108,11 @@ function env() {
   };
 }
 
-function app(asAdmin = false) {
+function app(asAdmin = false, role: 'owner' | 'staff' = 'owner') {
   const a = new Hono<Env>();
   if (asAdmin) {
     a.use('/api/forms/*', async (c, next) => {
-      c.set('staff', { id: 'owner-1', name: 'Owner', role: 'owner', readOnly: false });
+      c.set('staff', { id: role === 'staff' ? 'staff-1' : 'owner-1', name: role === 'staff' ? 'Staff' : 'Owner', role, readOnly: false });
       return next();
     });
   }
@@ -270,6 +270,30 @@ describe('submission pagination compatibility', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ success: true, data: [] });
     expect(mocks.getFormSubmissions).toHaveBeenCalledWith(bindings.DB, 'form-1');
+    expect(mocks.getFormSubmissionsPage).not.toHaveBeenCalled();
+  });
+
+  test('caps the legacy non-paginated shape at 500 with a migration warning', async () => {
+    mocks.getFormSubmissions.mockResolvedValue(
+      Array.from({ length: 600 }, (_, index) => ({
+        id: `submission-${index}`,
+        form_id: 'form-1',
+        friend_id: null,
+        friend_name: null,
+        data: '{}',
+        created_at: '2026-08-04T12:00:00+09:00',
+      })),
+    );
+    const { bindings } = env();
+    const res = await app(true).request(
+      '/api/forms/form-1/submissions?account_id=account-a',
+      {},
+      bindings,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: unknown[] };
+    expect(body.data).toHaveLength(500);
+    expect(res.headers.get('warning')).toContain('page/limit');
     expect(mocks.getFormSubmissionsPage).not.toHaveBeenCalled();
   });
 
@@ -617,6 +641,19 @@ describe('public form representation', () => {
     expect(body.data.onSubmitTagId).toBe('tag-secret-id');
     expect(body.data.onSubmitScenarioId).toBe('scenario-secret-id');
   });
+
+  test('hides webhook secrets from the staff role but keeps the presence flag', async () => {
+    const { bindings } = env();
+    const res = await app(true, 'staff').request('/api/forms/form-1?account_id=account-a', {}, bindings);
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as { data: Record<string, unknown> };
+    expect(body.data.onSubmitWebhookUrl).toBeNull();
+    expect(body.data.onSubmitWebhookHeaders).toBeNull();
+    expect(body.data.hasSubmitWebhook).toBe(true);
+    expect(body.data.onSubmitTagId).toBe('tag-secret-id');
+    expect(JSON.stringify(body.data)).not.toContain('Bearer [REDACTED]');
+  });
 });
 
 describe('LIFF identity enforcement', () => {
@@ -703,7 +740,7 @@ describe('LIFF identity enforcement', () => {
         Authorization: 'Bearer valid-line-id-token',
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ friendId: 'victim-friend', data: { score: 42 } }),
+      body: JSON.stringify({ friendId: 'victim-friend', data: { x_username: 'alice' } }),
     }, bindings);
 
     expect(res.status).toBe(200);
@@ -713,7 +750,75 @@ describe('LIFF identity enforcement', () => {
       'account-a',
     );
     expect(bind).toHaveBeenCalledWith(
-      JSON.stringify({ existing: true, score: 42 }),
+      JSON.stringify({ existing: true, x_username: 'alice' }),
+      '2026-08-04T12:00:00+09:00',
+      'friend-real',
+    );
+  });
+
+  test('drops partial keys that are not part of the form definition', async () => {
+    mocks.verifyCallerLineIdentity.mockResolvedValue({ lineUserId: 'line-real', lineAccountId: 'account-a' });
+    mocks.getFriendByLineUserIdForAccount.mockResolvedValue({
+      id: 'friend-real',
+      metadata: JSON.stringify({ existing: true }),
+    });
+    const { bindings, bind } = env();
+
+    const res = await app().request('/api/forms/form-1/partial', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ data: { x_username: 'alice', score: 42, admin_flag: true } }),
+    }, bindings);
+
+    expect(res.status).toBe(200);
+    expect(bind).toHaveBeenCalledWith(
+      JSON.stringify({ existing: true, x_username: 'alice' }),
+      '2026-08-04T12:00:00+09:00',
+      'friend-real',
+    );
+  });
+
+  test('rejects oversized partial writes instead of growing the row', async () => {
+    mocks.verifyCallerLineIdentity.mockResolvedValue({ lineUserId: 'line-real', lineAccountId: 'account-a' });
+    mocks.getFriendByLineUserIdForAccount.mockResolvedValue({
+      id: 'friend-real',
+      metadata: '{}',
+    });
+    const { bindings, prepare } = env();
+
+    const res = await app().request('/api/forms/form-1/partial', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ data: { x_username: 'a'.repeat(40_000) } }),
+    }, bindings);
+
+    expect(res.status).toBe(413);
+    expect(prepare).not.toHaveBeenCalled();
+  });
+
+  test('treats corrupt existing metadata as empty instead of failing', async () => {
+    mocks.verifyCallerLineIdentity.mockResolvedValue({ lineUserId: 'line-real', lineAccountId: 'account-a' });
+    mocks.getFriendByLineUserIdForAccount.mockResolvedValue({
+      id: 'friend-real',
+      metadata: 'not-json{{{',
+    });
+    const { bindings, bind } = env();
+
+    const res = await app().request('/api/forms/form-1/partial', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ data: { x_username: 'bob' } }),
+    }, bindings);
+
+    expect(res.status).toBe(200);
+    expect(bind).toHaveBeenCalledWith(
+      JSON.stringify({ x_username: 'bob' }),
       '2026-08-04T12:00:00+09:00',
       'friend-real',
     );

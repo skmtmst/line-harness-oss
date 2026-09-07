@@ -340,10 +340,31 @@ export interface CommonVarSchedule {
   applied_at: string | null;
 }
 
-export async function getCommonVars(
+/**
+ * 一覧の総件数。件数上限で切ったときに「絞り込み誘導」を出すために使う。
+ *
+ * 未取得を0件と見せない規則と同じく、切ったことを黙らない。
+ */
+export async function countCommonVars(
   db: D1Database,
   opts: { folderId?: string; lineAccountId: string },
+): Promise<number> {
+  const row = opts.folderId
+    ? await db.prepare(`SELECT COUNT(*) AS total FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL AND folder_id = ?`)
+      .bind(opts.lineAccountId, opts.folderId).first<{ total: number }>()
+    : await db.prepare(`SELECT COUNT(*) AS total FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL`)
+      .bind(opts.lineAccountId).first<{ total: number }>();
+  return Number(row?.total ?? 0);
+}
+
+/** 一覧の1回の上限。件数に比例して使用先の走査が重くなるため、上限と絞り込み誘導で守る。 */
+export const COMMON_VARS_LIST_LIMIT = 200;
+
+export async function getCommonVars(
+  db: D1Database,
+  opts: { folderId?: string; lineAccountId: string; limit?: number },
 ): Promise<CommonVar[]> {
+  const limit = Math.max(1, Math.min(Math.floor(opts.limit ?? COMMON_VARS_LIST_LIMIT), COMMON_VARS_LIST_LIMIT));
   const overview = `,
     (SELECT s.effective_from FROM common_var_schedules s
       WHERE s.var_id = common_vars.id AND s.applied_at IS NULL
@@ -355,14 +376,14 @@ export async function getCommonVars(
       WHERE s.var_id = common_vars.id AND s.applied_at IS NULL) AS pending_schedule_count`;
   if (opts.folderId) {
     const result = await db
-      .prepare(`SELECT common_vars.* ${overview} FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL AND folder_id = ? ORDER BY name ASC`)
-      .bind(opts.lineAccountId, opts.folderId)
+      .prepare(`SELECT common_vars.* ${overview} FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL AND folder_id = ? ORDER BY name ASC LIMIT ?`)
+      .bind(opts.lineAccountId, opts.folderId, limit)
       .all<CommonVar>();
     return result.results;
   }
   const result = await db
-    .prepare(`SELECT common_vars.* ${overview} FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL ORDER BY name ASC`)
-    .bind(opts.lineAccountId)
+    .prepare(`SELECT common_vars.* ${overview} FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL ORDER BY name ASC LIMIT ?`)
+    .bind(opts.lineAccountId, limit)
     .all<CommonVar>();
   return result.results;
 }
@@ -434,6 +455,24 @@ export class CommonVarVersionConflictError extends Error {
   }
 }
 
+export class CommonVarFolderError extends Error {
+  constructor() {
+    super('Common variable folder not found or wrong kind');
+  }
+}
+
+/**
+ * フォルダの存在と種別を確認する。
+ *
+ * 違う画面のフォルダIDを指定されると、絞り込み表示が想定外になる。
+ * 共通情報以外のフォルダ・存在しないフォルダは受け付けない。
+ */
+async function assertCommonVarFolder(db: D1Database, folderId: string): Promise<void> {
+  const row = await db.prepare(`SELECT id FROM folders WHERE id = ? AND kind = 'common_var'`)
+    .bind(folderId).first<{ id: string }>();
+  if (!row) throw new CommonVarFolderError();
+}
+
 export async function createCommonVar(
   db: D1Database,
   input: {
@@ -451,6 +490,7 @@ export async function createCommonVar(
   const now = jstNow();
   const memo = input.memo ?? '';
   const value = input.value ?? '';
+  if (input.folderId) await assertCommonVarFolder(db, input.folderId);
   await db.batch([
     db.prepare(
       `INSERT INTO common_vars
@@ -506,6 +546,7 @@ export async function updateCommonVar(
     values.push(input.memo);
   }
   if ('folderId' in input) {
+    if (input.folderId) await assertCommonVarFolder(db, input.folderId);
     sets.push('folder_id = ?');
     values.push(input.folderId ?? null);
   }
