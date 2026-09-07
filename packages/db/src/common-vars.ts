@@ -449,6 +449,16 @@ export async function getCommonVarById(
     .bind(id, lineAccountId).first<CommonVar>();
 }
 
+/** 履歴表示専用。更新・削除の判定には使わず、アーカイブ済みも参照できる。 */
+export async function getCommonVarByIdIncludingArchived(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+): Promise<CommonVar | null> {
+  return db.prepare(`SELECT * FROM common_vars WHERE id = ? AND line_account_id = ?`)
+    .bind(id, lineAccountId).first<CommonVar>();
+}
+
 export class CommonVarVersionConflictError extends Error {
   constructor(readonly currentVersion: number) {
     super('Common variable version conflict');
@@ -458,6 +468,12 @@ export class CommonVarVersionConflictError extends Error {
 export class CommonVarFolderError extends Error {
   constructor() {
     super('Common variable folder not found or wrong kind');
+  }
+}
+
+export class CommonVarKeyConflictError extends Error {
+  constructor() {
+    super('Common variable key already exists in this account');
   }
 }
 
@@ -491,24 +507,38 @@ export async function createCommonVar(
   const memo = input.memo ?? '';
   const value = input.value ?? '';
   if (input.folderId) await assertCommonVarFolder(db, input.folderId);
-  await db.batch([
-    db.prepare(
-      `INSERT INTO common_vars
-         (id, line_account_id, folder_id, name, var_key, type, value, memo, version,
-          updated_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
-    ).bind(
-      id, input.lineAccountId, input.folderId ?? null, input.name, input.varKey,
-      input.type ?? 'text', value, memo, input.actorId ?? null, now, now,
-    ),
-    db.prepare(
-      `INSERT INTO common_var_versions
-         (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
-       VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?)`,
-    ).bind(
-      crypto.randomUUID(), id, input.name, value, memo, '作成', input.actorId ?? null, now,
-    ),
-  ]);
+  const duplicate = await db.prepare(
+    `SELECT id FROM common_vars
+      WHERE line_account_id = ? AND var_key = ?
+      LIMIT 1`,
+  ).bind(input.lineAccountId, input.varKey).first<{ id: string }>();
+  if (duplicate) throw new CommonVarKeyConflictError();
+  try {
+    await db.batch([
+      db.prepare(
+        `INSERT INTO common_vars
+           (id, line_account_id, folder_id, name, var_key, type, value, memo, version,
+            updated_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+      ).bind(
+        id, input.lineAccountId, input.folderId ?? null, input.name, input.varKey,
+        input.type ?? 'text', value, memo, input.actorId ?? null, now, now,
+      ),
+      db.prepare(
+        `INSERT INTO common_var_versions
+           (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
+         VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        crypto.randomUUID(), id, input.name, value, memo, '作成', input.actorId ?? null, now,
+      ),
+    ]);
+  } catch (error) {
+    if (error instanceof Error
+      && error.message.includes('UNIQUE constraint failed: common_vars.line_account_id, common_vars.var_key')) {
+      throw new CommonVarKeyConflictError();
+    }
+    throw error;
+  }
   return (await getCommonVarById(db, id, input.lineAccountId))!;
 }
 
@@ -601,8 +631,42 @@ export async function getCommonVarVersions(
   return result.results;
 }
 
-export async function deleteCommonVar(db: D1Database, id: string, lineAccountId: string): Promise<void> {
-  await db.prepare(`DELETE FROM common_vars WHERE id = ? AND line_account_id = ?`).bind(id, lineAccountId).run();
+export async function deleteCommonVar(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+  actorId: string | null,
+  changeReason = '未使用のため削除（アーカイブ）',
+): Promise<void> {
+  const existing = await getCommonVarById(db, id, lineAccountId);
+  if (!existing) return;
+  const now = jstNow();
+  const nextVersion = existing.version + 1;
+  const results = await db.batch([
+    db.prepare(
+      `UPDATE common_vars
+          SET archived_at = ?, version = ?, updated_by = ?, updated_at = ?
+        WHERE id = ? AND line_account_id = ? AND version = ? AND archived_at IS NULL`,
+    ).bind(now, nextVersion, actorId, now, id, lineAccountId, existing.version),
+    db.prepare(
+      `INSERT INTO common_var_versions
+         (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+        WHERE EXISTS (
+          SELECT 1 FROM common_vars
+           WHERE id = ? AND line_account_id = ? AND version = ? AND archived_at = ?
+        )`,
+    ).bind(
+      crypto.randomUUID(), id, nextVersion, existing.name, existing.value, existing.memo,
+      changeReason.trim() || '削除（アーカイブ）', actorId, now,
+      id, lineAccountId, nextVersion, now,
+    ),
+  ]);
+  if (Number(results[0]?.meta.changes ?? 0) === 0) {
+    throw new CommonVarVersionConflictError(
+      (await getCommonVarByIdIncludingArchived(db, id, lineAccountId))?.version ?? existing.version,
+    );
+  }
 }
 
 export interface CommonVarReplacementTarget {

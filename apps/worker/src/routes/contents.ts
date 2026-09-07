@@ -26,9 +26,11 @@ import {
   COMMON_VARS_LIST_LIMIT,
   getCommonVarUsageSummaries,
   getCommonVarById,
+  getCommonVarByIdIncludingArchived,
   createCommonVar,
   updateCommonVar,
   CommonVarFolderError,
+  CommonVarKeyConflictError,
   deleteCommonVar,
   getCommonVarUsageImpact,
   getCommonVarVersions,
@@ -1084,6 +1086,19 @@ const COMMON_VAR_USAGE_KIND_LABELS: Record<CommonVarUsageKind, string> = {
   common_action: '共通アクション',
 };
 
+function emptyCommonVarUsageImpact(): CommonVarUsageImpact {
+  return {
+    total: 0,
+    blockingTotal: 0,
+    historicalTotal: 0,
+    unscopedFormTotal: 0,
+    byKind: Object.fromEntries(
+      Object.keys(COMMON_VAR_USAGE_KIND_LABELS).map((kind) => [kind, 0]),
+    ) as Record<CommonVarUsageKind, number>,
+    items: [],
+  };
+}
+
 function collectReadableStrings(value: unknown, token: string, out: string[]): void {
   if (typeof value === 'string') {
     if (value.includes(token)) out.push(value);
@@ -1349,10 +1364,12 @@ contents.get('/api/common-vars/:id', async (c) => {
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
-    const variable = await getCommonVarById(c.env.DB, c.req.param('id'), accountId);
+    const variable = await getCommonVarByIdIncludingArchived(c.env.DB, c.req.param('id'), accountId);
     if (!variable) return c.json({ success: false, error: 'Not found' }, 404);
     const [impact, versions] = await Promise.all([
-      getCommonVarUsageImpact(c.env.DB, variable.var_key, accountId),
+      variable.archived_at
+        ? Promise.resolve(emptyCommonVarUsageImpact())
+        : getCommonVarUsageImpact(c.env.DB, variable.var_key, accountId),
       getCommonVarVersions(c.env.DB, variable.id, accountId, 20),
     ]);
     const serializedImpact = serializeCommonVarDeleteImpact(variable, impact);
@@ -1440,7 +1457,7 @@ contents.post('/api/common-vars', requireRole('owner', 'admin'), async (c) => {
     if (err instanceof CommonVarFolderError) {
       return c.json({ success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400);
     }
-    if (err instanceof Error && err.message.includes('UNIQUE constraint')) {
+    if (err instanceof CommonVarKeyConflictError) {
       return c.json({ success: false, error: 'その差し込み名は既に使われています' }, 409);
     }
     console.error('POST /api/common-vars error:', err);
@@ -1720,7 +1737,7 @@ contents.delete('/api/common-vars/:id', requireRole('owner', 'admin'), async (c)
         409,
       );
     }
-    await deleteCommonVar(c.env.DB, existing.id, accountId);
+    await deleteCommonVar(c.env.DB, existing.id, accountId, c.get('staff').id);
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/common-vars/:id error:', err);
