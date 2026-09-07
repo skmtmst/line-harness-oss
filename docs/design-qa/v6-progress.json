@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 241,
+  "compared": 240,
   "unimplemented": 0,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 31,
-  "match": 192,
-  "structureMatchDataPending": 63,
-  "needsFix": 11,
-  "unjudged": 2,
-  "remaining": 76,
+  "missing": 32,
+  "match": 202,
+  "structureMatchDataPending": 58,
+  "needsFix": 7,
+  "unjudged": 1,
+  "remaining": 66,
   "features": [
     {
       "feature": 1,
@@ -493,17 +493,32 @@
       "feature": 5,
       "name": "シナリオ配信",
       "total": 14,
-      "compared": 14,
+      "compared": 13,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0,
-      "match": 7,
-      "structureMatchDataPending": 7,
+      "missing": 1,
+      "match": 14,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 7,
+      "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1218,
+          "head": "52cdb3fa6",
+          "on": "2026-09-07",
+          "screens": [
+            "r6Gzsu",
+            "hz9ti",
+            "EvVO5",
+            "RUxNf",
+            "NrBkW",
+            "g2UNV",
+            "M2b2B"
+          ],
+          "note": "Issue #436。#1199 のAPI契約と #1204 の固定データを使い、7画面を3104/8791で1440・1920px撮影した。試算、開始記録、V6下書き、通別結果を実API経由で表示し、7画面すべて一致。全画像で横はみ出し0。"
+        },
         {
           "pr": 1121,
           "head": "1d9e8d36c",
@@ -2070,12 +2085,24 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 1,
-      "structureMatchDataPending": 7,
-      "needsFix": 2,
-      "unjudged": 1,
-      "remaining": 10,
+      "match": 2,
+      "structureMatchDataPending": 9,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 9,
       "capturedAt": [
+        {
+          "pr": 1215,
+          "head": "65390c132",
+          "on": "2026-09-07",
+          "screens": [
+            "N46cQ",
+            "BmoGY",
+            "p9CcEB",
+            "k8VCU"
+          ],
+          "note": "Issue #429 / PR #1215。決めごとの並び順・公開版・15軸条件と、使い道の共通アクション選択を実装し、3102/8789で1440/1920pxを撮影。全画像で横はみ出し0。k8VCUは一致、残るAPI契約は3画面の判定注記へ記録した。"
+        },
         {
           "pr": 1137,
           "head": "5e1ccd22d",
@@ -3145,11 +3172,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 2,
+      "match": 4,
       "structureMatchDataPending": 0,
-      "needsFix": 2,
+      "needsFix": 0,
       "unjudged": 0,
-      "remaining": 2,
+      "remaining": 0,
       "capturedAt": [
         {
           "pr": 475,
