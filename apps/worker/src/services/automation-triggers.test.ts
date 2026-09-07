@@ -100,6 +100,22 @@ describe('V6オートメーションのきっかけ接続', () => {
       .toEqual({ count: 1 });
   });
 
+  it('メッセージの含まれる言葉が一致する公開版だけを開始する', async () => {
+    addAutomation(testDb.raw, {
+      id: 'message-match', triggerType: 'message_received', triggerConfig: { keyword: '予約' },
+    });
+    const missed = await dispatchAutomationEvent(testDb.db, {
+      lineAccountId: 'account-1', eventType: 'message_received', sourceEventId: 'message-1',
+      friendId: 'friend-1', eventData: { text: 'こんにちは' },
+    }, { now: NOW, executors });
+    expect(missed).toEqual([]);
+    const matched = await dispatchAutomationEvent(testDb.db, {
+      lineAccountId: 'account-1', eventType: 'message_received', sourceEventId: 'message-2',
+      friendId: 'friend-1', eventData: { text: '予約をお願いします' },
+    }, { now: NOW, executors });
+    expect(matched).toMatchObject([{ automationId: 'message-match', status: 'success' }]);
+  });
+
   it('友だち条件は既存の共通条件部品で判定し、条件外も履歴へ残す', async () => {
     testDb.raw.prepare(`INSERT INTO tags (id, name) VALUES ('vip', 'VIP')`).run();
     addAutomation(testDb.raw, {

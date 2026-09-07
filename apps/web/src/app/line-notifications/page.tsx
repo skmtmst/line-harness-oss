@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import NotificationRunList from '@/components/line-notifications/notification-run-list'
-import OperatorNotificationRules from '@/components/line-notifications/operator-notification-rules'
+import OperatorNotificationRules from './operator-notification-rules'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
@@ -118,6 +118,7 @@ function CustomerNotificationEditor({
   onPublish,
   onSave,
   onTestSend,
+  notice,
 }: {
   setting: EcNotificationSetting
   definition: LineNotificationDefinition | null
@@ -127,6 +128,7 @@ function CustomerNotificationEditor({
   onPublish: () => void
   onSave: () => void
   onTestSend: () => void
+  notice: { tone: 'success' | 'error'; text: string } | null
 }) {
   return <main data-design-node="Q55bb" className="space-y-4 pb-24">
     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -137,6 +139,7 @@ function CustomerNotificationEditor({
       </div>
       <Button onClick={onTestSend} disabled={busy}>自分にテスト送信</Button>
     </div>
+    {notice && <div className={`rounded-control border px-4 py-3 text-sm ${notice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{notice.text}</div>}
 
     <div className="grid min-w-0 gap-4" style={{ gridTemplateColumns: 'minmax(0, 1fr) 390px' }}>
       <div className="min-w-0 space-y-4">
@@ -411,6 +414,7 @@ export default function LineNotificationsPage() {
       onPublish={() => void publish(expandedSetting)}
       onSave={() => void save(expandedSetting)}
       onTestSend={() => void testSend(expandedSetting)}
+      notice={notice}
     /> : null}
     {tab === 'customer' && !expandedSetting ? <main
       data-design-node="festr"

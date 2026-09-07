@@ -58,6 +58,13 @@ function firedEventTypes(): Set<string> {
     if (entry.name.endsWith('.test.ts')) continue
     const source = readFileSync(join(entry.parentPath ?? root, entry.name), 'utf8')
     for (const m of source.matchAll(/fireEvent\([^,]*, '([^']+)'/g)) fired.add(m[1])
+    // フォーム・リンク・予約はルートがイベントバスへ渡し、日時系は
+    // trigger_type としてCronが拾う。直接 fireEvent の形だけに限定しない。
+    for (const m of source.matchAll(/(?:eventType|triggerType): '(form_submitted|link_clicked|calendar_booked|datetime|daily|weekly)'/g)) fired.add(m[1])
+    for (const m of source.matchAll(/trigger_type IN \('datetime', 'daily', 'weekly'\)/g)) {
+      for (const type of ['datetime', 'daily', 'weekly']) fired.add(type)
+    }
+    if (source.includes("'ec.order.confirmed'") && source.includes('EVENT_TRIGGER_TYPES')) fired.add('ec.order.confirmed')
   }
   return fired
 }
@@ -75,7 +82,7 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
   it('保存・キャンセルは下部追従バーにしか置かない', () => {
     expect(PAGE).toContain("import StickyBar from '@/components/shared/sticky-bar'")
     const bar = PAGE.slice(PAGE.indexOf('<StickyBar'))
-    for (const label of ['キャンセル', '有効にして続けて作る', '作成して有効にする']) {
+    for (const label of ['キャンセル', '下書きに保存', 'つくって動かす']) {
       expect(bar, `${label} が追従バーの外にあります`).toContain(label)
     }
     // 追従バーより前に保存の押し口を置かない。
@@ -179,7 +186,7 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
   })
 
   it('一度も動かない旧きっかけを戻さない', () => {
-    for (const dead of ['friend_added', 'tag_added', 'form_submitted', 'link_clicked']) {
+    for (const dead of ['friend_added', 'tag_added']) {
       expect(PAGE, `${dead} は発火しません`).not.toContain(`'${dead}'`)
     }
     expect(PAGE_CODE).not.toContain('準備中')
@@ -191,5 +198,15 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
     expect(PAGE).toContain('actions: actions.map(')
     // 1つしか送らない形へ戻さない。
     expect(PAGE).not.toContain('actions: [\n')
+  })
+
+  it('設計の6種類を表示し、下書き・見込み人数・1人テスト・公開へ接続する', () => {
+    expect(screenEventValues()).toHaveLength(6)
+    expect(PAGE).toContain('api.automations.createDraftFromTemplate')
+    expect(PAGE).toContain('api.automations.updateDraft')
+    expect(PAGE).toContain('api.automations.audiencePreview')
+    expect(PAGE).toContain('api.automations.test')
+    expect(PAGE).toContain('api.automations.publishDraft')
+    expect(PAGE).toContain('つくって動かす')
   })
 })

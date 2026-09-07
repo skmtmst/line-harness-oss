@@ -125,7 +125,7 @@ describe('オートメーションの見本と下書き', () => {
       eventType: 'message_received',
       triggerConfig: {},
       actions: [{ id: 'step-1', type: 'add_tag', params: { tagId: 'tag-2' }, onFailure: 'stop' }],
-    })).rejects.toMatchObject({ code: 'resource_not_found', field: 'actionTagId' });
+    })).rejects.toMatchObject({ code: 'resource_not_found', field: 'actions.0.tagId' });
     await expect(updateAutomationDraft(testDb.db, {
       id: created.id,
       lineAccountId: 'account-1',
@@ -139,7 +139,7 @@ describe('オートメーションの見本と下書き', () => {
         params: { scenarioId: 'scenario-stopped' },
         onFailure: 'stop',
       }],
-    })).rejects.toMatchObject({ code: 'resource_not_found', field: 'actionScenarioId' });
+    })).rejects.toMatchObject({ code: 'resource_not_found', field: 'actions.0.scenarioId' });
     await expect(updateAutomationDraft(testDb.db, {
       id: created.id,
       lineAccountId: 'account-1',

@@ -15,6 +15,7 @@ const EVENT_TRIGGER_TYPES = new Set([
   'form_submitted',
   'link_clicked',
   'calendar_booked',
+  'ec.order.confirmed',
   'score_threshold_crossed',
   'score_band_changed',
   'manual_reply_sent',
@@ -32,10 +33,11 @@ const SCHEDULE_TRIGGER_TYPES = new Set(['datetime', 'daily', 'weekly']);
 const EVENT_FILTER_KEYS: Record<string, ReadonlySet<string>> = {
   friend_add: new Set(),
   tag_change: new Set(['tagId', 'action']),
-  message_received: new Set(),
+  message_received: new Set(['keyword']),
   form_submitted: new Set(['formId']),
   link_clicked: new Set(['trackedLinkId']),
   calendar_booked: new Set(['bookingType', 'menuId', 'eventId']),
+  'ec.order.confirmed': new Set(),
   score_threshold_crossed: new Set([
     'ruleId', 'ruleVersionId', 'scoreBefore', 'currentScore',
     'previousBand', 'currentBand', 'thresholdBand',
@@ -132,6 +134,11 @@ function matchesEventTrigger(candidate: AutomationCandidate, input: AutomationEv
   if (!allowed) return false;
   for (const [key, expected] of Object.entries(config)) {
     if (!allowed.has(key)) throw new Error(`trigger_config_unknown:${key}`);
+    if (key === 'keyword') {
+      const text = typeof input.eventData?.text === 'string' ? input.eventData.text : '';
+      if (typeof expected !== 'string' || !text.includes(expected)) return false;
+      continue;
+    }
     if (!equalFilter(input.eventData?.[key], expected)) return false;
   }
   return true;

@@ -18,6 +18,7 @@ import {
   getAutomationDraft,
   listAutomationDraftResources,
   listAutomationTemplates,
+  publishAutomationDraft,
   updateAutomationDraft,
 } from '../services/automation-drafts.js';
 import {
@@ -26,6 +27,12 @@ import {
   previewAutomationAudience,
   runAutomationTest,
 } from '../services/automation-definitions.js';
+import {
+  AutomationRunRetryError,
+  processAutomationRun,
+  retryAutomationRun,
+} from '../services/automation-engine.js';
+import { createAutomationActionExecutors } from '../services/automation-action-executors.js';
 import { listLimit } from './list-pagination.js';
 
 const automations = new Hono<Env>();
@@ -43,6 +50,15 @@ async function requireAutomationTestPermission(c: Context<Env>, next: () => Prom
   if (!staff || (staff.role === 'staff'
     && !staff.permissionKeys?.includes('automation.definition.test'))) {
     return c.json({ success: false, error: '1人テストを実行する権限がありません' }, 403);
+  }
+  await next();
+}
+
+async function requireAutomationRetryPermission(c: Context<Env>, next: () => Promise<void>) {
+  const staff = c.get('staff');
+  if (!staff || (staff.role === 'staff'
+    && !staff.permissionKeys?.includes('automation.run.retry'))) {
+    return c.json({ success: false, error: '失敗した処理を再実行する権限がありません' }, 403);
   }
   await next();
 }
@@ -135,7 +151,7 @@ interface AutomationExecutionRun {
   status: ExecutionRunStatus;
   detail: string | null;
   durationMs: number | null;
-  canRetry: false;
+  canRetry: boolean;
   automationId: string;
   automationName: string;
   automationVersionId: string;
@@ -335,6 +351,24 @@ automations.put(
   },
 );
 
+automations.post(
+  '/api/automation-drafts/:id/publish',
+  requireAutomationPermission,
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const accountId = await requireDraftAccount(c);
+    if (typeof accountId !== 'string') return accountId;
+    const body = await c.req.json<{ expectedDraftVersionId?: unknown; activate?: unknown }>()
+      .catch((): { expectedDraftVersionId?: unknown; activate?: unknown } => ({}));
+    return draftEndpoint(c, () => publishAutomationDraft(c.env.DB, {
+      id: c.req.param('id'),
+      lineAccountId: accountId,
+      expectedDraftVersionId: body.expectedDraftVersionId,
+      activate: body.activate,
+    }));
+  },
+);
+
 automations.get(
   '/api/automations',
   requireAutomationPermission,
@@ -462,8 +496,8 @@ automations.get('/api/automation-runs', async (c) => {
         status: statusLabel,
         detail,
         durationMs: row.duration_ms,
-        // 部分成功した処理を二重実行しない安全な再実行APIが無いため、表示しない。
-        canRetry: false,
+        // 失敗 step だけを戻すため、成功済みの処理は二重に動かさない。
+        canRetry: (row.status === 'failed' || row.status === 'partial') && failedAction !== null,
         automationId: row.automation_id,
         automationName: row.automation_name,
         automationVersionId: row.automation_version_id,
@@ -501,6 +535,39 @@ automations.get('/api/automation-runs', async (c) => {
     return c.json({ success: false, error: '実行記録を読み込めませんでした' }, 500);
   }
 });
+
+automations.post(
+  '/api/automation-runs/:id/retry',
+  requireAutomationPermission,
+  requireAutomationRetryPermission,
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    try {
+      const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      const prepared = await retryAutomationRun(c.env.DB, {
+        runId: c.req.param('id'),
+        allowedAccountIds: scope.allowedAccountIds,
+      });
+      const status = await processAutomationRun(c.env.DB, prepared.runId, {
+        executors: createAutomationActionExecutors({
+          credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+        }),
+      });
+      return c.json({ success: true, data: { ...prepared, status } }, 202);
+    } catch (error) {
+      if (error instanceof AutomationRunRetryError) {
+        const status = error.code === 'not_found' ? 404 : 409;
+        return c.json({ success: false, error: error.message, code: error.code }, status);
+      }
+      console.error(JSON.stringify({
+        event: 'automation_run_retry_failed',
+        path: c.req.path,
+        reason: error instanceof Error ? error.message : String(error),
+      }));
+      return c.json({ success: false, error: '失敗した処理を再実行できませんでした' }, 500);
+    }
+  },
+);
 
 automations.use('/api/automations/:id', requireVisibleAutomation);
 automations.use('/api/automations/:id/*', requireVisibleAutomation);
