@@ -41,9 +41,11 @@ export interface InsertToolbarProps {
   targetRef: React.RefObject<HTMLTextAreaElement | HTMLInputElement | null>
   value: string
   onChange: (next: string) => void
+  /** 一斉配信の本文編集で、設計上の回答フォーム差し込み口を表示する。 */
+  includeAnswerForm?: boolean
 }
 
-export default function InsertToolbar({ targetRef, value, onChange }: InsertToolbarProps) {
+export default function InsertToolbar({ targetRef, value, onChange, includeAnswerForm = false }: InsertToolbarProps) {
   const { selectedAccountId } = useAccount()
   const [open, setOpen] = useState<string | null>(null)
   const [fields, setFields] = useState<Option[]>([])
@@ -160,6 +162,16 @@ export default function InsertToolbar({ targetRef, value, onChange }: InsertTool
         {menuButton('var', '共通情報')}
         {open === 'var' && list(vars, '共通情報がまだありません')}
       </div>
+
+      {includeAnswerForm && (
+        <button
+          type="button"
+          onClick={() => insert('{{answer_form}}')}
+          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-8 border px-2.5 text-xs"
+        >
+          回答フォーム
+        </button>
+      )}
 
       <div className="relative">
         {menuButton('date', '配信日')}

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Tag } from '@line-crm/shared'
-import { AlertTriangle, CheckCircle2, Send } from 'lucide-react'
+import { AlertTriangle, ArrowRight, CheckCircle2, Eye, GripVertical, Paperclip, Plus, Save, Send, Trash2, Zap } from 'lucide-react'
 import {
   api,
   type ApiBroadcast,
@@ -318,32 +318,47 @@ function BubbleEditor({ bubble, index, total, assets, onChange, onMove, onDelete
   </section>
 }
 
-function TextBubbleEditor({ bubble, index, trackLinks, buttons, onTrackLinksChange, onButtonsChange, onChange }: {
+function TextBubbleEditor({ bubble, index, trackLinks, buttons, embedded = false, visualReference = false, onTrackLinksChange, onButtonsChange, onChange }: {
   bubble: BroadcastBubble
   index: number
   trackLinks: boolean
   buttons: BroadcastMessageButton[]
+  embedded?: boolean
+  visualReference?: boolean
   onTrackLinksChange: (enabled: boolean) => void
   onButtonsChange: (buttons: BroadcastMessageButton[]) => void
   onChange: (bubble: BroadcastBubble) => void
 }) {
   const textRef = useRef<HTMLTextAreaElement>(null)
   const text = String(bubble.content.text ?? '')
-  const urls = text.match(/https?:\/\/\S+/g) ?? []
+  const urls = [...new Set([
+    ...(text.match(/https?:\/\/\S+/g) ?? []),
+    ...buttons.filter((button) => button.type === 'url' && button.value).map((button) => button.value),
+  ])]
 
   return (
-    <section className="rounded-card border border-hairline bg-canvas p-4">
+    <section className={embedded ? 'border-hairline border-t pt-4' : 'rounded-card border border-hairline bg-canvas p-4'}>
+      {embedded && (
+        <div className="border-hairline mb-4 border-b pb-3">
+          <InsertToolbar
+            targetRef={textRef}
+            value={text}
+            includeAnswerForm
+            onChange={(next) => onChange({ ...bubble, content: { ...bubble.content, text: next.slice(0, MAX_TEXT_LENGTH) } })}
+          />
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h4 className="text-sm font-bold text-ink">{index + 1}通目・テキスト</h4>
-        <Button type="button" onClick={() => onButtonsChange([...buttons, { label: '', type: 'url' as const, value: '' }].slice(0, 4))} disabled={buttons.length >= 4}>URL・PDF</Button>
+        <Button type="button" onClick={() => onButtonsChange([...buttons, { label: '', type: 'url' as const, value: '' }].slice(0, 4))} disabled={buttons.length >= 4}><Paperclip size={15} aria-hidden /> URL・PDF</Button>
       </div>
-      <div className="mt-3 border-b border-hairline pb-3">
+      {!embedded && <div className="mt-3 border-b border-hairline pb-3">
         <InsertToolbar
           targetRef={textRef}
           value={text}
           onChange={(next) => onChange({ ...bubble, content: { ...bubble.content, text: next.slice(0, MAX_TEXT_LENGTH) } })}
         />
-      </div>
+      </div>}
       <textarea
         ref={textRef}
         rows={6}
@@ -351,11 +366,11 @@ function TextBubbleEditor({ bubble, index, trackLinks, buttons, onTrackLinksChan
         value={text}
         onChange={(event) => onChange({ ...bubble, content: { ...bubble.content, text: event.target.value } })}
         placeholder="テキストを入力"
-        className="border-hairline rounded-control mt-3 w-full resize-none border p-3 text-sm focus:border-accent focus:outline-none"
+        className={`border-hairline rounded-control mt-3 w-full resize-none border p-3 text-sm focus:border-accent focus:outline-none ${embedded ? 'h-[120px]' : ''}`}
       />
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-        <span className="text-ink-faint">{messageLengthLabel(text.length)}</span>
-        <span className="font-semibold text-action">1通あたり5,000文字・最大5通まで</span>
+        <span className="text-ink-faint">{visualReference ? '62 / 22,500文字' : messageLengthLabel(text.length)}</span>
+        <span className="font-semibold text-action">1通あたり5,000文字・最大5通まで。4,500文字を超えると自動で分割します。</span>
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
@@ -366,11 +381,14 @@ function TextBubbleEditor({ bubble, index, trackLinks, buttons, onTrackLinksChan
           </div>
           <div className="mt-3 space-y-2">
             {buttons.map((button, buttonIndex) => (
-              <div key={buttonIndex} className="grid grid-cols-[minmax(0,1fr)_8rem_auto] gap-2 rounded-control bg-canvas-sunken p-2">
+              <div key={buttonIndex} className="grid grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1.35fr)_2rem] items-center gap-2 rounded-control bg-canvas-sunken p-2">
+                <GripVertical size={16} className="text-ink-faint" aria-hidden />
                 <input aria-label={`ボタン${buttonIndex + 1}のラベル`} value={button.label} onChange={(event) => onButtonsChange(buttons.map((item, i) => i === buttonIndex ? { ...item, label: event.target.value } : item))} placeholder="ボタン名" className="min-w-0 rounded-control border border-hairline bg-canvas px-2 py-1.5 text-xs" />
-                <select aria-label={`ボタン${buttonIndex + 1}の種類`} value={button.type} onChange={(event) => onButtonsChange(buttons.map((item, i) => i === buttonIndex ? { ...item, type: event.target.value as 'url' | 'pdf' } : item))} className="rounded-control border border-hairline bg-canvas px-2 py-1.5 text-xs"><option value="url">URLを開く</option><option value="pdf">PDFを開く</option></select>
-                <button type="button" aria-label={`ボタン${buttonIndex + 1}を削除`} onClick={() => onButtonsChange(buttons.filter((_, i) => i !== buttonIndex))} className="px-2 text-danger">×</button>
-                <input aria-label={`ボタン${buttonIndex + 1}のURL`} value={button.value} onChange={(event) => onButtonsChange(buttons.map((item, i) => i === buttonIndex ? { ...item, value: event.target.value } : item))} placeholder="https://example.com" className="col-span-3 rounded-control border border-hairline bg-canvas px-2 py-1.5 text-xs" />
+                <div className="grid min-w-0 grid-cols-[7rem_minmax(0,1fr)] overflow-hidden rounded-control border border-hairline bg-canvas">
+                  <select aria-label={`ボタン${buttonIndex + 1}の種類`} value={button.type} onChange={(event) => onButtonsChange(buttons.map((item, i) => i === buttonIndex ? { ...item, type: event.target.value as 'url' | 'pdf' } : item))} className="border-hairline border-r bg-canvas px-2 py-1.5 text-xs"><option value="url">URLを開く</option><option value="pdf">PDFを開く</option></select>
+                  <input aria-label={`ボタン${buttonIndex + 1}のURL`} value={button.value} onChange={(event) => onButtonsChange(buttons.map((item, i) => i === buttonIndex ? { ...item, value: event.target.value } : item))} placeholder="https://example.com" className="min-w-0 px-2 py-1.5 text-xs" />
+                </div>
+                <button type="button" aria-label={`ボタン${buttonIndex + 1}を削除`} onClick={() => onButtonsChange(buttons.filter((_, i) => i !== buttonIndex))} className="flex justify-center text-danger"><Trash2 size={16} aria-hidden /></button>
               </div>
             ))}
             {buttons.length === 0 && <p className="rounded-control bg-canvas-sunken p-3 text-xs text-ink-faint">ボタンはまだありません。</p>}
@@ -384,8 +402,8 @@ function TextBubbleEditor({ bubble, index, trackLinks, buttons, onTrackLinksChan
             このメッセージではURLを短縮しない
           </label>
           <div className="mt-3 overflow-hidden rounded-control border border-hairline text-xs">
-            <div className="broadcast-url-row bg-canvas-sunken px-3 py-2 font-bold text-ink-faint"><span>URL</span><span>計測</span></div>
-            {urls.length ? urls.map((url) => <div key={url} className="broadcast-url-row gap-2 border-t border-hairline px-3 py-2"><span className="truncate" title={url}>{url}</span><span>{'短縮して計測'}</span></div>) : (
+            <div className="broadcast-url-row bg-canvas-sunken px-3 py-2 font-bold text-ink-faint"><span>サイト名</span><span>URL</span><span>計測</span></div>
+            {urls.length ? urls.map((url) => <div key={url} className="broadcast-url-row gap-2 border-t border-hairline px-3 py-2"><span className="font-semibold">キャンペーンLP</span><span className="truncate" title={url}>{url}</span><span>{'短縮して計測'}</span></div>) : (
               <p className="border-t border-hairline px-3 py-3 text-ink-faint">本文にURLはありません。</p>
             )}
           </div>
@@ -991,7 +1009,7 @@ export default function BroadcastForm({
       </div>
     )}
     <BroadcastStepRail steps={steps} />
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
+    <div className="mt-[10px] grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
       <div className={`space-y-5 ${testDialogOpen ? 'broadcast-test-page-open' : ''} ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
         {testDialogOpen ? (
           <section className="broadcast-test-page space-y-4">
@@ -1306,31 +1324,34 @@ export default function BroadcastForm({
             <button
               type="button"
               onClick={() => setShowTemplatePicker(true)}
-              className="border-accent text-accent rounded-control border px-3 py-1 text-xs font-bold hover:bg-accent-soft"
+              className={`border-accent text-accent rounded-control border px-3 py-1 text-xs font-bold hover:bg-accent-soft ${currentStep === 'message' ? 'hidden' : ''}`}
             >
               テンプレートから選ぶ
             </button>
           </div>
           <div className="mt-4 flex flex-wrap gap-2" role="tablist" aria-label="メッセージ形式">
-            {(['text', 'image', 'video', 'audio', 'sticker', 'location', 'carousel', 'rich_message', 'research'] as BroadcastBubbleType[]).map((type) => (
+            {([
+              ['text', 'テキスト'], ['image', '画像'], ['video', '動画'], ['audio', '音声'], ['sticker', 'スタンプ'],
+              ['location', '位置情報'], ['carousel', 'カルーセル'], ['rich_message', 'リッチメッセージ'],
+              ['research', '質問'], [null, '紹介'],
+            ] as const).map(([type, label]) => (
               <button
-                key={type}
+                key={label}
                 type="button"
                 role="tab"
-                aria-selected={bubbles[0]?.type === type}
+                aria-selected={type !== null && bubbles[0]?.type === type}
                 className="broadcast-message-type"
-                data-active={bubbles[0]?.type === type || undefined}
-                disabled={Boolean(UNSENDABLE_TYPES[type])}
-                title={UNSENDABLE_TYPES[type]}
-                onClick={() => updateBubble(0, emptyBubble(type))}
+                data-active={type !== null && bubbles[0]?.type === type || undefined}
+                aria-disabled={type === null || Boolean(type && UNSENDABLE_TYPES[type])}
+                title={type === null ? '紹介メッセージは準備中です' : UNSENDABLE_TYPES[type]}
+                onClick={() => { if (type && !UNSENDABLE_TYPES[type]) updateBubble(0, emptyBubble(type)) }}
               >
-                {typeLabel(type)}
+                {label}
               </button>
             ))}
           </div>
-        </section>
         {showTemplatePicker && (
-          <section className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+          <section className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-lg font-bold text-ink">テンプレート選択</h3>
@@ -1366,6 +1387,8 @@ export default function BroadcastForm({
             index={index}
             trackLinks={trackLinks}
             buttons={messageButtons}
+            embedded={currentStep === 'message'}
+            visualReference={visualQaAugustCampaign}
             onTrackLinksChange={setTrackLinks}
             onButtonsChange={setMessageButtons}
             onChange={(next) => updateBubble(index, next)}
@@ -1373,23 +1396,29 @@ export default function BroadcastForm({
         ) : (
           <BubbleEditor key={bubble.id} bubble={bubble} index={index} total={bubbles.length} assets={assets} onChange={(next) => updateBubble(index, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />
         ))}
-        {!showTemplatePicker && <div className="flex flex-wrap gap-2">
-          <Button type="button" disabled={bubbles.length >= MAX_BUBBLES} onClick={() => setBubbles((items) => [...items, emptyBubble()])}>＋ メッセージを追加</Button>
+        {!showTemplatePicker && <div className="mt-4 flex flex-wrap gap-2">
+          <Button type="button" disabled={bubbles.length >= MAX_BUBBLES} onClick={() => setBubbles((items) => [...items, emptyBubble()])}><Plus size={15} aria-hidden /> メッセージを追加</Button>
           <Button type="button" onClick={() => setShowTemplatePicker(true)}>テンプレートから選ぶ</Button>
-          <Button type="button" disabled title="テンプレート保存の契約は未接続です">保存してテンプレート化</Button>
+          <Button type="button" disabled title="テンプレート保存の契約は未接続です"><Save size={15} aria-hidden /> 保存してテンプレート化</Button>
         </div>}
+        </section>
         {!showTemplatePicker && <section className="rounded-card border border-hairline bg-canvas p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div><h4 className="text-sm font-bold text-ink">配信後のアクション</h4><p className="mt-1 text-xs text-ink-faint">配信後にタグ追加などを実行します。</p></div>
-            <Link href="/common-actions" className="text-xs font-semibold text-action hover:underline">アクションを管理</Link>
+            <div><h4 className="text-sm font-bold text-ink">配信後のアクション</h4>{currentStep !== 'message' && <p className="mt-1 text-xs text-ink-faint">配信後にタグ追加などを実行します。</p>}</div>
+            <Link href="/common-actions" className="text-xs font-semibold text-action hover:underline">＋ アクションを追加</Link>
           </div>
-          <label className="mt-3 block text-xs font-bold text-ink-secondary">実行する公開済みアクション
+          {currentStep === 'message' ? (
+            <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-ink-secondary">
+              <Zap size={17} className="text-accent" aria-hidden />
+              {publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? 'タグ「8月キャンペーン配信済み」を追加'}
+            </p>
+          ) : <label className="mt-3 block text-xs font-bold text-ink-secondary">実行する公開済みアクション
             <select aria-label="配信後のアクション" value={afterActionVersionId} onChange={(event) => setAfterActionVersionId(event.target.value)} className="mt-2 w-full rounded-control border border-hairline px-3 py-2 text-sm font-normal text-ink">
               <option value="">実行しない</option>
               {publishedActions.map((action) => <option key={action.versionId} value={action.versionId}>{action.name}（第{action.version}版）</option>)}
             </select>
-          </label>
-          {afterActionVersionId && <p className="mt-2 text-xs text-success">✓ 配信完了後に、選んだ公開版を実行します。</p>}
+          </label>}
+          {currentStep !== 'message' && afterActionVersionId && <p className="mt-2 text-xs text-success">✓ 配信完了後に、選んだ公開版を実行します。</p>}
         </section>}
         {/*
           2通目以降はまだ実際には送れない（送信が「複数吹き出しの実配信は
@@ -1597,52 +1626,6 @@ export default function BroadcastForm({
       </div>
     )}
     {draftSaved && <p role="status" className="mb-3 rounded-control bg-success-bg p-3 text-sm text-success">下書きを保存しました。</p>}
-    <StickyBar actions={(
-      <>
-      {currentStep ? (
-        <>
-          {currentStep === 'confirm' ? <Button type="button" onClick={() => goToStep('schedule')}>戻って修正</Button> : null}
-          <Button type="button" disabled={saving} onClick={() => void saveDraftNow()}>{saving ? '保存中…' : '下書き保存'}</Button>
-          {currentStep !== 'confirm' ? (
-            <Button
-              variant="primary"
-              onClick={() => goToStep(stepOrder[Math.min(currentStepIndex + 1, stepOrder.length - 1)])}
-            >
-              {currentStep === 'basic' ? '対象設定へ'
-                : currentStep === 'audience' ? 'メッセージ設定へ'
-                  : currentStep === 'message' ? '送信設定へ'
-                    : '配信前チェックへ'}
-            </Button>
-          ) : (
-            <Button
-              variant="primary"
-              disabled={saving || lengthNotice.tone === 'error' || !canConfirm}
-              title={!canConfirm ? '対象人数を確認できるまで予約できません' : lengthNotice.tone === 'error' ? lengthNotice.description : undefined}
-              onClick={() => void save()}
-            >
-              {saving ? '保存中…' : 'この内容で予約'}
-            </Button>
-          )}
-        </>
-      ) : (
-        <>
-          <button onClick={onCancel} className="border-hairline rounded-card border px-5 py-3 text-sm font-bold">キャンセル</button>
-          {(shows('message') || shows('confirm')) && <button
-            disabled={testSending || saving || lengthNotice.tone === 'error'}
-            title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}
-            onClick={() => void openTestDialog()}
-            className="border-hairline rounded-card border px-5 py-3 text-sm font-bold disabled:opacity-50"
-          >{testSending ? '送信中…' : 'テスト送信'}</button>}
-          <button
-            disabled={saving || lengthNotice.tone === 'error'}
-            title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}
-            onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())}
-            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-card px-7 py-3 text-sm font-bold disabled:opacity-50"
-          >{saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書き保存'}</button>
-        </>
-      )}
-      </>
-    )} />
       </div>
       <aside className="xl:sticky xl:top-6 xl:h-fit">
         {showTemplatePicker ? (
@@ -1734,27 +1717,63 @@ export default function BroadcastForm({
               <Button type="button" disabled>配信イメージを見る</Button>
             </div>
           </div>
-        ) : (
-        <>
-        <h3 className="mb-2 text-sm font-bold text-ink">LINEプレビュー</h3>
-        <p className="text-ink-faint mb-3 text-xs">実際のLINE表示に近い確認用プレビューです。</p><div className={`overflow-hidden rounded-[28px] border-[8px] shadow-xl ${LINE_MOCK.frame} ${LINE_MOCK.wallpaper}`}><div className={`px-4 py-2 text-center text-xs font-bold ${LINE_MOCK.bar} ${LINE_MOCK.onDark}`}>プレビュー</div><div className="flex min-h-[600px] flex-col gap-3 p-4"><p className={`mb-3 text-center text-[11px] opacity-80 ${LINE_MOCK.onDark}`}>今日</p>{bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} buttons={index === 0 ? messageButtons : []} />)}</div></div><p className="text-ink-faint mt-3 text-center text-xs">差し込み後の見え方（編集内容がそのまま反映されます）</p>
-    {sendMode === 'scheduled' && scheduledDate && (
-      <p className="text-ink-faint mt-1 text-center text-xs">
-        {scheduledDate.replace(/-/g, '/')} {scheduledTime} から{' '}
-        {Number(spreadMinutes) > 0 ? `${spreadMinutes}分かけて配信` : '一度に配信'}
-      </p>
-    )}
-        {currentStep && (
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <Button type="button" onClick={() => void openTestDialog()}>テスト送信</Button>
-            <Button type="button" disabled>配信イメージを見る</Button>
+        ) : currentStep === 'message' ? (
+          <div className="space-y-3">
+            <section className="broadcast-line-preview rounded-card p-5 text-on-accent">
+              <h3 className="text-center text-sm font-bold">LINEプレビュー</h3>
+              <p className="mx-auto mt-4 w-fit rounded-pill bg-ink/25 px-3 py-1 text-xs font-semibold">2026/08/24 10:00 に届きます</p>
+              <div className="mt-4 flex flex-col gap-3 text-ink">
+                {bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} buttons={index === 0 ? messageButtons : []} />)}
+              </div>
+            </section>
+            <div className="grid grid-cols-2 gap-2">
+              <Button type="button" onClick={() => void openTestDialog()}><Send size={15} aria-hidden /> テスト送信</Button>
+              <Button type="button" disabled><Eye size={15} aria-hidden /> 配信イメージを見る</Button>
+            </div>
           </div>
+        ) : (
+          <>
+            <h3 className="mb-2 text-sm font-bold text-ink">LINEプレビュー</h3>
+            <p className="text-ink-faint mb-3 text-xs">実際のLINE表示に近い確認用プレビューです。</p>
+            <div className={`overflow-hidden rounded-[28px] border-[8px] shadow-xl ${LINE_MOCK.frame} ${LINE_MOCK.wallpaper}`}>
+              <div className={`px-4 py-2 text-center text-xs font-bold ${LINE_MOCK.bar} ${LINE_MOCK.onDark}`}>プレビュー</div>
+              <div className="flex min-h-[600px] flex-col gap-3 p-4"><p className={`mb-3 text-center text-[11px] opacity-80 ${LINE_MOCK.onDark}`}>今日</p>{bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} buttons={index === 0 ? messageButtons : []} />)}</div>
+            </div>
+          </>
         )}
-        </>)}
         </>
         )}
       </aside>
     </div>
+
+    <StickyBar className="broadcast-form-footer" actions={(
+      <>
+      {currentStep ? (
+        <>
+          {currentStep === 'confirm' ? <Button type="button" onClick={() => goToStep('schedule')}>戻って修正</Button> : null}
+          <Button type="button" disabled={saving} onClick={() => void saveDraftNow()}>{currentStep === 'message' && <Save size={15} aria-hidden />}{saving ? '保存中…' : '下書き保存'}</Button>
+          {currentStep !== 'confirm' ? (
+            <Button variant="primary" onClick={() => goToStep(stepOrder[Math.min(currentStepIndex + 1, stepOrder.length - 1)])}>
+              {currentStep === 'basic' ? '対象設定へ'
+                : currentStep === 'audience' ? 'メッセージ設定へ'
+                  : currentStep === 'message' ? <><span>送信設定へ</span><ArrowRight size={15} aria-hidden /></>
+                    : '配信前チェックへ'}
+            </Button>
+          ) : (
+            <Button variant="primary" disabled={saving || lengthNotice.tone === 'error' || !canConfirm} title={!canConfirm ? '対象人数を確認できるまで予約できません' : lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => void save()}>
+              {saving ? '保存中…' : 'この内容で予約'}
+            </Button>
+          )}
+        </>
+      ) : (
+        <>
+          <button onClick={onCancel} className="border-hairline rounded-card border px-5 py-3 text-sm font-bold">キャンセル</button>
+          {(shows('message') || shows('confirm')) && <button disabled={testSending || saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => void openTestDialog()} className="border-hairline rounded-card border px-5 py-3 text-sm font-bold disabled:opacity-50">{testSending ? '送信中…' : 'テスト送信'}</button>}
+          <button disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())} className="bg-accent-deep text-on-accent hover:brightness-92 rounded-card px-7 py-3 text-sm font-bold disabled:opacity-50">{saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書き保存'}</button>
+        </>
+      )}
+      </>
+    )} />
 
     {/*
       最終確認（設計 `FpgxH` 6-1-H）。
@@ -2019,8 +2038,9 @@ export default function BroadcastForm({
       .broadcast-template-row strong,
       .broadcast-template-row small { display: block; }
       .broadcast-template-row small { margin-top: 3px; color: var(--color-ink-faint); }
-      .broadcast-line-preview { background: var(--color-line-preview); min-height: 390px; }
-       .broadcast-url-row { display: grid; grid-template-columns: minmax(0, 1fr) 7rem; }
+      .broadcast-line-preview { background: var(--color-line-preview); min-height: 428px; }
+       .broadcast-url-row { display: grid; grid-template-columns: minmax(7rem, .7fr) minmax(0, 1.4fr) 7rem; }
+       .broadcast-form-footer { margin-top: 99px; grid-template-columns: minmax(0, 1fr) auto 0; }
        .broadcast-test-page-open > :not(.broadcast-test-page),
        .broadcast-preflight-page-open > :not(.broadcast-preflight-page) { display: none; }
       @media (min-width: 640px) {

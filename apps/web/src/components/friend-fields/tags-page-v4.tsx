@@ -410,11 +410,11 @@ function deleteImpactRows(
       name: '付与人数',
       // 人数はサーバーが数え直したものを使う。取れなければ一覧の値。
       value: `${(impact?.friendCount ?? tag.friendCount ?? 0).toLocaleString('ja-JP')}人`,
-      result: '付いたまま残ります',
+      result: 'タグが外れます',
     },
-    { name: '参照先', value: refs ? refSummary(refs, MANUAL_REFS) : '—', result: '動いている設定はそのまま。新しくは選べません' },
-    { name: '参照先（自動）', value: refs ? refSummary(refs, AUTO_REFS) : '—', result: '開始条件はそのまま。新しくは選べません' },
-    { name: '連動の停止', value: impact?.mileageImpact.configured ? `本人+${impact.mileageImpact.self}／紹介者+${impact.mileageImpact.referrer}／${impact.mileageImpact.multiplier ? `${impact.mileageImpact.multiplier / 10000}倍` : '倍率なし'}／アクション${impact.linkedActions.length}件` : linked || 'なし', result: '新しく付いたときの連動は動きません' },
+    { name: '参照先', value: refs ? refSummary(refs, MANUAL_REFS) : '—', result: '絞り込み条件から外れます' },
+    { name: '参照先（自動）', value: refs ? refSummary(refs, AUTO_REFS) : '—', result: '開始条件が空になります' },
+    { name: '連動の停止', value: impact?.mileageImpact.configured ? `本人+${impact.mileageImpact.self}／紹介者+${impact.mileageImpact.referrer}／${impact.mileageImpact.multiplier ? `${impact.mileageImpact.multiplier / 10000}倍` : '倍率なし'}／アクション${impact.linkedActions.length || tag.otherActionCount || 0}件` : linked || 'なし', result: '以後は実行されません' },
     /*
       **数は出さない。口も待たない。**（kenta 判断 2026-08-26）
 
@@ -478,22 +478,22 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
 
   return (
     <div ref={dialogRef} className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/45 p-4" data-qa-dialog="tag-delete" data-impact={impactStatus}>
-      <section className="w-full max-w-[670px] -translate-y-6 rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
-        <div className="flex items-start gap-3">
+      <section className="w-full max-w-[670px] -translate-y-7 rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
+        <div>
           {/* 設計 `iTwNX`/`lUbvQ`。赤いゴミ箱を22pxで見出しの左に置く。 */}
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control bg-danger-bg text-danger">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-danger-bg text-danger">
             <TrashIcon />
           </span>
-          <div className="min-w-0">
-            <h2 className="text-xl font-bold text-ink">「{tag.name}」をアーカイブしますか？</h2>
-            <p className="mt-1 text-sm text-ink-secondary">アーカイブすると、これから新しく付けられなくなります。いま付いている友だちと過去の履歴はそのまま残ります。</p>
+          <div className="mt-5 min-w-0">
+            <h2 className="text-xl font-bold text-ink">「{tag.name}」を削除しますか？</h2>
+            <p className="mt-1 text-sm text-ink-secondary">このタグを使っている場所と、外れる友だちを確認してください。</p>
           </div>
         </div>
 
         {/* 設計 `X3Lkr`。名前・値・結果の3列。 */}
         <dl className="mt-5 divide-y divide-hairline overflow-hidden rounded-control border border-hairline text-sm">
           {deleteImpactRows(tag, impact).map((row) => (
-            <div key={row.name} className="flex items-baseline gap-3 px-4 py-2">
+            <div key={row.name} className="flex items-baseline gap-3 px-4 py-3">
               <dt className="w-[130px] shrink-0 text-ink-secondary">{row.name}</dt>
               <dd className="min-w-0 flex-1 font-bold text-ink">{row.value}</dd>
               <span className="shrink-0 text-xs text-ink-faint">{row.result}</span>
@@ -504,8 +504,11 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
         {/* 設計 `WrDxu`。使用中で止まっているときだけ、その理由をここに出す。 */}
         {impactStatus === 'ready' && impact && !impact.canDelete && (
           <div data-qa="tag-delete-blocked-warning" className="mt-4 rounded-control border border-danger/25 bg-danger-bg p-2 text-sm text-danger">
-            <p className="font-bold">有効な公開参照があるタグは、完全に削除できません</p>
-            <p className="mt-1 text-ink-secondary">参照中の設定はそのまま残し、新しく付ける操作だけを止める必要があります。過去のマイル履歴と配信ログは残ります。</p>
+            {impact.referenceCounts.affiliateOffers > 0 ? (
+              <><p className="font-bold">アフィリエイトのオファーで使用中のタグは削除できません</p><p className="mt-1">その場合は、先にオファー側の設定からこのタグを外してください。削除しても、過去のマイル履歴と配信ログは残ります。</p></>
+            ) : (
+              <><p className="font-bold">有効な参照があるタグは、完全に削除できません</p><p className="mt-1">参照中の設定を確認してから操作してください。過去のマイル履歴と配信ログは残ります。</p></>
+            )}
           </div>
         )}
 
@@ -537,7 +540,7 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
               }
             }}
             className="shrink-0 rounded-control bg-danger px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40"
-          >{saving ? 'アーカイブ中…' : 'このタグをアーカイブする'}</button>
+          >{saving ? '削除中…' : 'このタグを削除する'}</button>
         </div>
       </section>
     </div>

@@ -839,16 +839,9 @@ export const SCREENS = [
     verdict: 'match',
     verdictNote: '**2026-09-07 Issue #470 / PR #1279で再計測。** 分類(b)(c)：設計と同じ8月キャンペーン本文・ボタン・タグ追加を撮影固定応答と手順で選び、撮影高を1136pxへ固定した。残差16.7100%は設計のボタン表・配信後アクション要約と現行編集フォームの構造差。高さ差0px、1440/1920px・横はみ出し0で一致判定を維持。',
     verdictSource: 'broadcasts-v6/XQfMD.txt + broadcasts-v6/XQfMD-{1440,1920}.png',
-    verdictHead: '02ec27d0d', route: `${NEW_BC}?step=message&templateId=template-11`,
+    verdictHead: '02ec27d0d', route: `${NEW_BC}?step=message&visualQa=august-campaign`,
     mode: 'viewport', height: 1136,
-    steps: [
-      { wait: 1800 },
-      { fill: 'textarea[placeholder="テキストを入力"]', selector: true, text: '{{name}}さんへ\n8月限定キャンペーンのお知らせです。\n詳しくはこちらをご確認ください。' },
-      { click: '＋ ボタンを追加' },
-      { fill: 'ボタン1のラベル', text: 'キャンペーンを見る' },
-      { fill: 'ボタン1のURL', text: 'https://nen.example/aug' },
-      { select: '配信後のアクション', label: 'タグ「8月キャンペーン配信済み」を追加（第1版）' },
-    ],
+    steps: [{ wait: 1800 }],
 
   },
   {

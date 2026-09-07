@@ -223,7 +223,7 @@ const TAG_REFERENCE_COUNTS = {
   entryRoutes: 0,
   trackedLinks: 0,
   bookingMenus: 0,
-  affiliateOffers: 0,
+  affiliateOffers: 1,
   events: 0,
   analyticsFunnels: 0,
   friendAddSettings: 0,
