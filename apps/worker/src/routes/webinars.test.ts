@@ -153,7 +153,7 @@ beforeEach(() => {
     state: 'partial', registrationMode: 'people', metrics: {},
   });
   dbMocks.getWebinarList.mockResolvedValue([]);
-  dbMocks.getFolderById.mockResolvedValue({ id: 'folder-1', kind: 'webinar' });
+  dbMocks.getFolderById.mockResolvedValue({ id: 'folder-1', kind: 'webinar', account_id: 'account-a' });
   dbMocks.getWebinarActions.mockResolvedValue([]);
   dbMocks.replaceWebinarActions.mockResolvedValue([]);
   dbMocks.getWebinarComments.mockResolvedValue([
@@ -1190,6 +1190,22 @@ describe('admin CRUD', () => {
 
     expect(invalidFolder.status).toBe(400);
     expect(invalidPeriod.status).toBe(400);
+    expect(dbMocks.createWebinar).not.toHaveBeenCalled();
+  });
+
+  test('POST — 別アカウントのウェビナーフォルダへの付け替えを拒否する', async () => {
+    dbMocks.getWebinarBySlug.mockResolvedValue(null);
+    dbMocks.getFolderById.mockResolvedValue({
+      id: 'folder-other', kind: 'webinar', account_id: 'account-other',
+    });
+    const res = await adminReq('/api/webinars', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accountId: 'account-a', title: '不正', slug: 'wrong-account-folder', folderId: 'folder-other',
+      }),
+    });
+
+    expect(res.status).toBe(400);
     expect(dbMocks.createWebinar).not.toHaveBeenCalled();
   });
 

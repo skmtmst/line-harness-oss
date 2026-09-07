@@ -386,7 +386,7 @@ function SavedSearchEditInner() {
   if (!original) return <p className="rounded-card border border-hairline bg-canvas p-5 text-sm text-danger">{error || '保存した検索が見つかりません'}</p>
 
   return (
-    <div data-design-node="XBkiQ" className="pb-24">
+    <div data-design-node="XBkiQ">
       <div className="mb-4 flex items-center justify-between gap-4">
         <Breadcrumb items={[{ label: '保存した検索', href: '/tags?tab=searches' }, { label: original.name }]} />
         <Button href="/tags?tab=searches">保存した検索へ</Button>

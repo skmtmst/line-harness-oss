@@ -57,6 +57,53 @@ type SavedFilter = '' | 'active' | 'draft'
 
 const UNFILED = '__unfiled__'
 
+function WebinarFolderDialog({
+  folder,
+  busy,
+  error,
+  onCancel,
+  onSave,
+}: {
+  folder: WebinarFolder | null
+  busy: boolean
+  error: string
+  onCancel: () => void
+  onSave: (name: string) => void
+}) {
+  const [name, setName] = useState(folder?.name ?? '')
+
+  return (
+    <div className="bg-ink/35 fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="webinar-folder-title">
+      <section className="bg-canvas rounded-card w-full max-w-md border border-hairline p-5 shadow-card">
+        <h2 id="webinar-folder-title" className="text-ink text-lg font-bold">
+          {folder ? 'フォルダ名を変更' : 'フォルダを追加'}
+        </h2>
+        <p className="text-ink-secondary mt-2 text-sm">ウェビナーを整理する名前を入力してください。</p>
+        <label className="text-ink mt-4 block text-sm font-semibold" htmlFor="webinar-folder-name">フォルダ名</label>
+        <input
+          id="webinar-folder-name"
+          autoFocus
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && name.trim() && !busy) onSave(name.trim())
+            if (event.key === 'Escape' && !busy) onCancel()
+          }}
+          className="border-hairline rounded-control focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+          placeholder="例: 商品説明"
+        />
+        {error ? <p className="text-danger mt-2 text-sm">{error}</p> : null}
+        <div className="mt-5 flex justify-end gap-2">
+          <Button onClick={onCancel} disabled={busy}>キャンセル</Button>
+          <Button variant="primary" onClick={() => onSave(name.trim())} disabled={!name.trim() || busy}>
+            {busy ? '保存中…' : '保存する'}
+          </Button>
+        </div>
+      </section>
+    </div>
+  )
+}
+
 function measuredCount(value: number | null | undefined): string {
   return typeof value === 'number' && Number.isFinite(value)
     ? `${value.toLocaleString('ja-JP')}人`
@@ -115,6 +162,11 @@ export default function WebinarsPage() {
   const [archiveError, setArchiveError] = useState('')
   const [folders, setFolders] = useState<WebinarFolder[]>([])
   const [selectedFolder, setSelectedFolder] = useState('')
+  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
+  const [editingFolder, setEditingFolder] = useState<WebinarFolder | null>(null)
+  const [deletingFolder, setDeletingFolder] = useState<WebinarFolder | null>(null)
+  const [folderBusy, setFolderBusy] = useState(false)
+  const [folderError, setFolderError] = useState('')
 
   const visibleItems = loadedAccountId === selectedAccountId ? items : []
   const visibleOverview = loadedOverviewAccountId === selectedAccountId ? overview : null
@@ -184,21 +236,81 @@ export default function WebinarsPage() {
     void refreshOverview()
   }, [refreshOverview])
 
-  useEffect(() => {
+  const refreshFolders = useCallback(async () => {
     const generation = ++folderRequestGeneration.current
     setFolders([])
-    setSelectedFolder('')
     if (!selectedAccountId) return
-    webinarApi.folders(selectedAccountId)
-      .then((response) => {
-        if (folderRequestGeneration.current === generation) {
-          setFolders(response.success ? response.data : [])
-        }
-      })
-      .catch(() => {
-        if (folderRequestGeneration.current === generation) setFolders([])
-      })
+    try {
+      const response = await webinarApi.folders(selectedAccountId)
+      if (folderRequestGeneration.current === generation) {
+        setFolders(response.success ? response.data : [])
+      }
+    } catch {
+      if (folderRequestGeneration.current === generation) setFolders([])
+    }
   }, [selectedAccountId])
+
+  useEffect(() => {
+    setSelectedFolder('')
+    void refreshFolders()
+  }, [refreshFolders])
+
+  const saveFolder = async (name: string) => {
+    if (!selectedAccountId || folderBusy) return
+    setFolderBusy(true)
+    setFolderError('')
+    try {
+      if (editingFolder) {
+        await webinarApi.updateFolder(selectedAccountId, editingFolder.id, { name })
+      } else {
+        await webinarApi.createFolder(selectedAccountId, { name })
+      }
+      setEditingFolder(null)
+      setFolderDialogOpen(false)
+      await refreshFolders()
+    } catch {
+      setFolderError('フォルダを保存できませんでした。もう一度お試しください。')
+    } finally {
+      setFolderBusy(false)
+    }
+  }
+
+  const moveFolder = async (index: number, direction: -1 | 1) => {
+    if (!selectedAccountId || folderBusy) return
+    const otherIndex = index + direction
+    const current = folders[index]
+    const other = folders[otherIndex]
+    if (!current || !other) return
+    setFolderBusy(true)
+    setFolderError('')
+    try {
+      await Promise.all([
+        webinarApi.updateFolder(selectedAccountId, current.id, { displayOrder: other.displayOrder }),
+        webinarApi.updateFolder(selectedAccountId, other.id, { displayOrder: current.displayOrder }),
+      ])
+      await refreshFolders()
+    } catch {
+      setFolderError('並び順を保存できませんでした。もう一度お試しください。')
+    } finally {
+      setFolderBusy(false)
+    }
+  }
+
+  const removeFolder = async () => {
+    if (!selectedAccountId || !deletingFolder || folderBusy) return
+    setFolderBusy(true)
+    setFolderError('')
+    try {
+      await webinarApi.deleteFolder(selectedAccountId, deletingFolder.id)
+      if (selectedFolder === deletingFolder.id) setSelectedFolder('')
+      setDeletingFolder(null)
+      await Promise.all([refresh(), refreshFolders()])
+    } catch {
+      setFolderError('フォルダを削除できませんでした。もう一度お試しください。')
+    } finally {
+      setFolderBusy(false)
+    }
+  }
 
   /** 数を出してよいのは、読めたときだけ。 */
   const hasListData = !accountLoading && !loading && loadFailure === null && Boolean(selectedAccountId)
@@ -285,7 +397,7 @@ export default function WebinarsPage() {
       )}
       <div data-design-node="ZC13r" className="mx-auto max-w-[1600px] px-6 pb-10">
         <div data-design="Head" className="mb-4 flex flex-wrap gap-2">
-          <Button disabled title="フォルダの保存契約を接続後に使えます">フォルダを追加</Button>
+          <Button onClick={() => { setFolderError(''); setFolderDialogOpen(true) }} disabled={!selectedAccountId}>フォルダを追加</Button>
           <Button variant="primary" href="/webinars/new">ウェビナーを作成</Button>
         </div>
 
@@ -296,11 +408,16 @@ export default function WebinarsPage() {
             onSelect={setSelectedFolder}
             rows={[
               { id: '', label: 'すべて', count: visibleItems.length },
-              ...folders.map((folder) => ({
+              ...folders.map((folder, index) => ({
                 id: folder.id,
                 label: folder.name,
-                count: visibleItems.filter((item) => item.folderId === folder.id).length,
+                count: folder.count,
                 color: folder.color,
+                onEdit: () => { setFolderError(''); setEditingFolder(folder) },
+                onMoveUp: index > 0 ? () => void moveFolder(index, -1) : undefined,
+                onMoveDown: index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
+                onDelete: () => { setFolderError(''); setDeletingFolder(folder) },
+                deleteNote: '削除しても、中のウェビナーは未分類に残ります。',
               })),
               { id: UNFILED, label: '未分類', count: visibleItems.filter((item) => !item.folderId).length },
             ]}
@@ -360,6 +477,7 @@ export default function WebinarsPage() {
           </section>
         </div>
       </div>
+      {archiveTarget ? <ArchiveReviewBackdrop target={archiveTarget} /> : null}
       <ConfirmDialog
         open={archiveTarget !== null}
         title="ウェビナーをアーカイブしますか？"
@@ -371,29 +489,66 @@ export default function WebinarsPage() {
         onCancel={() => { if (!archiving) setArchiveTarget(null) }}
         onConfirm={() => void archiveSelected()}
       >
-        {archiveTarget ? (
-          <div className="space-y-3" data-design-node="LKuAQ">
-            <section className="border-hairline rounded-control border p-3"><p className="text-ink-faint text-xs">アーカイブする対象</p><p className="text-ink mt-1 font-bold">{archiveTarget.title}</p><p className="text-ink-secondary mt-1 text-xs">申込者 {measuredCount(archiveTarget.registrationCount)}</p></section>
-            <section className="border-hairline rounded-control border p-3"><p className="text-ink text-sm font-bold">アーカイブしたあと</p><dl className="divide-hairline mt-2 divide-y text-xs"><div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">公開ページ</dt><dd className="text-ink text-right">公開URLが無効になります</dd></div><div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">分析結果</dt><dd className="text-ink text-right">視聴履歴とCTAの結果は消えません</dd></div><div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">復元</dt><dd className="text-ink text-right">あとから戻せます</dd></div></dl></section>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <section className="border-hairline rounded-control border p-3">
-                <p className="text-ink text-sm font-bold">設定サマリー</p>
-                <dl className="divide-hairline mt-2 divide-y text-xs">
-                  <div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">状態</dt><dd className="text-ink font-semibold">{STATUS_LABEL[archiveTarget.status]}</dd></div>
-                  <div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">申込</dt><dd className="text-ink font-semibold">{measuredCount(archiveTarget.registrationCount)}</dd></div>
-                  <div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">視聴</dt><dd className="text-ink font-semibold">{measuredCount(archiveTarget.viewerCount)}</dd></div>
-                </dl>
-              </section>
-              <section className="bg-accent-soft rounded-control p-3">
-                <p className="text-accent text-xs font-bold">LINEプレビュー</p>
-                <div className="bg-canvas text-ink mt-3 rounded-control p-3 text-xs shadow-card">このウェビナーは{archiveTarget.status === 'active' ? '公開中' : '非公開'}です。</div>
-                <div className="mt-3 flex gap-2"><Button disabled>テスト送信</Button><Button disabled>公開ページを見る</Button></div>
-              </section>
-            </div>
-          </div>
-        ) : null}
+        {archiveTarget ? <p className="rounded-control border border-danger bg-danger-bg p-3 text-xs font-semibold text-danger">申込者・視聴履歴・分析結果は消えません。ウェビナーの一覧には出なくなります。</p> : null}
         {archiveError ? <p className="text-danger text-sm">{archiveError}</p> : null}
       </ConfirmDialog>
+      {(folderDialogOpen || editingFolder) ? (
+        <WebinarFolderDialog
+          folder={editingFolder}
+          busy={folderBusy}
+          error={folderError}
+          onCancel={() => {
+            if (folderBusy) return
+            setFolderDialogOpen(false)
+            setEditingFolder(null)
+            setFolderError('')
+          }}
+          onSave={(name) => void saveFolder(name)}
+        />
+      ) : null}
+      <ConfirmDialog
+        open={deletingFolder !== null}
+        title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
+        description={`削除しても、中のウェビナーは未分類に残ります。いまこのフォルダに入っているのは${deletingFolder?.count ?? 0}件です。`}
+        confirmLabel="削除する"
+        destructive
+        busy={folderBusy}
+        error={folderError || undefined}
+        onCancel={() => {
+          if (folderBusy) return
+          setDeletingFolder(null)
+          setFolderError('')
+        }}
+        onConfirm={() => void removeFolder()}
+      />
     </>
+  )
+}
+
+function ArchiveReviewBackdrop({ target }: { target: WebinarListItem }) {
+  return (
+    <div className="bg-canvas-sunken fixed inset-y-14 left-64 right-0 z-10 overflow-hidden px-10 py-5" data-design-node="LKuAQ">
+      <div className="mx-auto max-w-screen-2xl">
+        <p className="text-accent text-xs font-bold">← ウェビナー一覧</p>
+        <div className="mt-5 grid gap-4 xl:grid-cols-4">
+          <main className="space-y-4 xl:col-span-3">
+            <section className="rounded-card border border-hairline bg-canvas p-5">
+              <h2 className="text-base font-bold text-ink">アーカイブする対象</h2>
+              <p className="mt-1 text-xs text-ink-secondary">アーカイブするウェビナーを確認します。</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2"><div><p className="text-xs font-bold text-ink-faint">ウェビナー</p><p className="mt-2 rounded-control border border-hairline px-3 py-2 text-sm font-semibold text-ink">{target.title}</p></div><div><p className="text-xs font-bold text-ink-faint">申込者</p><p className="mt-2 rounded-control border border-hairline px-3 py-2 text-sm font-semibold text-ink">{measuredCount(target.registrationCount)}</p></div></div>
+            </section>
+            <section className="rounded-card border border-hairline bg-canvas p-5">
+              <h2 className="text-base font-bold text-ink">アーカイブしたあと</h2>
+              <p className="mt-1 text-xs text-ink-secondary">アーカイブすると、一覧から外れて新しく使えなくなります。記録は残ります。</p>
+              <div className="mt-4 space-y-3"><div className="rounded-control border border-hairline p-4"><strong className="text-sm text-ink">公開ページ</strong><p className="mt-1 text-xs text-ink-secondary">公開URLが無効になります</p></div><div className="rounded-control border border-hairline p-4"><strong className="text-sm text-ink">分析結果</strong><p className="mt-1 text-xs text-ink-secondary">視聴履歴とCTAの結果は消えません</p></div></div>
+            </section>
+          </main>
+          <aside className="space-y-4">
+            <section className="rounded-card border border-hairline bg-canvas p-5"><h2 className="text-sm font-bold text-ink">設定サマリー</h2><dl className="mt-4 divide-y divide-hairline text-xs"><div className="flex justify-between py-3"><dt className="text-ink-faint">状態</dt><dd className="font-semibold text-ink">{STATUS_LABEL[target.status]}</dd></div><div className="flex justify-between py-3"><dt className="text-ink-faint">申込</dt><dd className="font-semibold text-ink">{measuredCount(target.registrationCount)}</dd></div><div className="flex justify-between py-3"><dt className="text-ink-faint">視聴</dt><dd className="font-semibold text-ink">{measuredCount(target.viewerCount)}</dd></div></dl></section>
+            <section className="min-h-96 rounded-card bg-line-preview p-5"><p className="text-center text-xs font-bold text-on-accent">LINEプレビュー</p><div className="mt-12 rounded-control bg-canvas p-4 text-xs text-ink">このウェビナーは{target.status === 'active' ? '公開中' : '非公開'}です。</div></section>
+          </aside>
+        </div>
+      </div>
+    </div>
   )
 }

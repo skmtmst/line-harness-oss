@@ -128,14 +128,14 @@ export function AffiliateArchiveDialog({
         />
       ) : impact ? (
         <div className="space-y-4">
-          <section className="rounded-control border border-warning bg-warning-bg p-4">
-            <h3 className="text-warning text-sm font-bold">アーカイブすると、次の3つが変わります</h3>
-            <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
-              <div><dt className="text-ink-faint text-xs">発行ずみの紹介リンク</dt><dd className="text-ink mt-1 font-bold">{impact.activeLinks.toLocaleString('ja-JP')}本</dd></div>
-              <div><dt className="text-ink-faint text-xs">支払いを確定していない報酬</dt><dd className="text-ink mt-1 font-bold">{yen(impact.unsettledReward)}</dd></div>
-              <div><dt className="text-ink-faint text-xs">認めるのを待っている成果</dt><dd className="text-ink mt-1 font-bold">{impact.pendingConversions.toLocaleString('ja-JP')}件</dd></div>
+          <section className="rounded-control border border-danger bg-danger-bg p-4">
+            <h3 className="text-danger text-sm font-bold">アーカイブすると、次の3つが変わります</h3>
+            <dl className="mt-2 divide-y divide-danger/20 text-sm">
+              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">発行ずみの紹介リンク</dt><dd className="text-ink mt-0.5 font-bold">{impact.activeLinks.toLocaleString('ja-JP')}本</dd></div><a className="rounded-control border border-danger bg-canvas px-3 py-1.5 text-xs font-semibold text-danger" href="/affiliate-offers">ここを開く</a></div>
+              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">支払いを確定していない報酬</dt><dd className="text-ink mt-0.5 font-bold">{yen(impact.unsettledReward)}</dd></div><a className="rounded-control border border-danger bg-canvas px-3 py-1.5 text-xs font-semibold text-danger" href="/conversions?tab=payment">ここを開く</a></div>
+              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">認めるのを待っている成果</dt><dd className="text-ink mt-0.5 font-bold">{impact.pendingConversions.toLocaleString('ja-JP')}件</dd></div><a className="rounded-control border border-danger bg-canvas px-3 py-1.5 text-xs font-semibold text-danger" href="/conversions">ここを開く</a></div>
             </dl>
-            <p className="text-warning mt-3 text-xs leading-5">
+            <p className="text-danger mt-2 text-xs leading-5">
               紹介リンクは開けなくなります。過去の成果・報酬・支払いの記録は消えません。
             </p>
           </section>
@@ -156,8 +156,7 @@ export function AffiliateArchiveDialog({
             ))}
           </fieldset>
 
-          {choice === 'archive' ? (
-            <label className="text-ink block text-sm font-semibold">
+          <label className="text-ink block text-sm font-semibold">
               確認のため「{target?.name}」と打ってください
               <input
                 type="text"
@@ -166,8 +165,7 @@ export function AffiliateArchiveDialog({
                 className="border-hairline rounded-control mt-2 w-full border px-3 py-2 font-normal"
                 autoComplete="off"
               />
-            </label>
-          ) : null}
+          </label>
         </div>
       ) : (
         <ListState kind="empty" title="確認できる情報がありません" />

@@ -534,7 +534,7 @@ function HistoryPanel() {
   }))
   const recentUpdates = [...deploymentUpdates, ...releaseUpdates]
     .toSorted((left, right) => Date.parse(right.at ?? right.released ?? '') - Date.parse(left.at ?? left.released ?? ''))
-    .slice(0, 10)
+    .slice(0, 4)
 
   const downloadCsv = () => {
     const quote = (value: unknown) => `"${String(value ?? '').replaceAll('"', '""')}"`
@@ -612,7 +612,7 @@ function EmergencyPageInner() {
   const headerAction = tab === 'health'
     ? <button type="button" onClick={() => setManualRunRequest((current) => current + 1)} disabled={!selectedAccountId} className="rounded-control min-h-9 bg-accent-deep px-3 text-xs font-bold text-on-accent disabled:opacity-50">↻ いますぐ確かめる</button>
     : severity === 'danger' || severity === 'warning' ? <StatusPill severity={severity} /> : undefined
-  return <div><OperationPageHeader description={description} action={headerAction} /><MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel accountId={selectedAccountId} manualRunRequest={manualRunRequest} onSeverity={setSeverity} />}{tab === 'control' && <EmergencyControlPanel accounts={accounts} />}{tab === 'history' && <HistoryPanel />}</div>
+  return <div><OperationPageHeader description={tab === 'history' ? '' : description} action={headerAction} /><MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel accountId={selectedAccountId} manualRunRequest={manualRunRequest} onSeverity={setSeverity} />}{tab === 'control' && <EmergencyControlPanel accounts={accounts} />}{tab === 'history' && <HistoryPanel />}</div>
 }
 
 export default function EmergencyPage() {

@@ -202,6 +202,7 @@ export default function NewInflowLinkPage() {
         <p className="rounded-control bg-canvas-sunken px-3 py-2 text-xs text-ink-secondary">
           動きを追加する（あいさつの差し替え・対応マーク・通知・外部連携）内容は、下の項目で選びます。
         </p>
+        <div className="grid gap-3 lg:grid-cols-3">
         <Field
           label="タグを自動で付ける"
           htmlFor="ir-tag"
@@ -260,44 +261,24 @@ export default function NewInflowLinkPage() {
             ]}
           />
         </Field>
+        </div>
 
-        {/* 有効期限を持つ列が無い。入れられるように見せると、期限が来ても
-            止まらないリンクができる。 */}
-        <Field label="有効期限" note="期限での自動停止は、まだ保存する場所がありません。">
-          <p className="bg-canvas-sunken text-ink-faint rounded-control px-3 py-2 text-sm">
-            期限なし
-          </p>
-        </Field>
-
-        <Field
-          label="転送先"
-          htmlFor="ir-redirect"
-          note="友だち追加のかわりに、指定したページへ送ります。空欄なら友だち追加へ進みます。"
-        >
-          <input
-            id="ir-redirect"
-            type="url"
-            value={redirectUrl}
-            onChange={(e) => setRedirectUrl(e.target.value)}
-            placeholder="https://example.com/lp"
-            className={inputClass}
-          />
-        </Field>
-
-        <label className="text-ink-secondary flex items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="mt-0.5"
-            checked={isActive}
-            onChange={(e) => setIsActive(e.target.checked)}
-          />
-          <span>
-            発行したらすぐ使えるようにする
-            <span className="text-ink-faint block text-xs">
-              オフにすると、URLを開いても友だち追加できません。
-            </span>
-          </span>
-        </label>
+        <details className="rounded-control border border-hairline px-3 py-2">
+          <summary className="cursor-pointer text-xs font-semibold text-action">転送・公開の詳細設定</summary>
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            {/* 有効期限を持つ列が無いので、期限なしであることだけを示す。 */}
+            <Field label="有効期限" note="期限での自動停止は、まだ保存する場所がありません。">
+              <p className="rounded-control bg-canvas-sunken px-3 py-2 text-sm text-ink-faint">期限なし</p>
+            </Field>
+            <Field label="転送先" htmlFor="ir-redirect" note="空欄なら友だち追加へ進みます。">
+              <input id="ir-redirect" type="url" value={redirectUrl} onChange={(e) => setRedirectUrl(e.target.value)} placeholder="https://example.com/lp" className={inputClass} />
+            </Field>
+          </div>
+          <label className="mt-3 flex items-start gap-2 text-sm text-ink-secondary">
+            <input type="checkbox" className="mt-0.5" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
+            <span>発行したらすぐ使えるようにする<span className="block text-xs text-ink-faint">オフにすると、URLを開いても友だち追加できません。</span></span>
+          </label>
+        </details>
       </FormSection>
 
       <FormSection step={4} label="どのLINEアカウントに入れるか">

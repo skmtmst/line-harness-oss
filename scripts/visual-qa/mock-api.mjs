@@ -112,6 +112,9 @@ if (process.env.NODE_ENV === 'production') {
 const PORT = Number(process.env.PORT ?? 8788)
 const HOST = '127.0.0.1'
 
+// 機能10専用。フォルダ操作後の再取得でも、同じプロセス内では保存結果を返す。
+let webinarFolders = WEBINAR_FOLDERS.map((folder) => ({ ...folder }))
+
 /** 画面を見るだけなので、いちばん権限のある人で固定する。実在しない名前。 */
 const STAFF = {
   id: 'visual-qa-owner',
@@ -1621,6 +1624,19 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   const detail = pathname.match(/^\/api\/friends\/([^/]+)$/)
   if (detail && FRIEND_DETAILS[detail[1]]) return { success: true, data: FRIEND_DETAILS[detail[1]] }
   if (/^\/api\/friends\/[^/]+\/mileage$/.test(pathname)) return { success: true, data: FRIEND_MILEAGE }
+  if (pathname === '/api/friends/friend-1/fields') {
+    const values = ['1988-04-12', '2026-12-31', '2026-09-15', 'プレミアム']
+    return {
+      success: true,
+      data: {
+        items: FRIEND_FIELDS.map((field, index) => ({ ...field, value: values[index] })),
+        hiddenPersonalCount: 0,
+      },
+    }
+  }
+  if (pathname === '/api/friends/friend-1/rich-menu') {
+    return { success: true, data: { id: 'rich-menu-main', name: '通常メニュー・予約', isDefault: false } }
+  }
   const messages = pathname.match(/^\/api\/friends\/([^/]+)\/messages$/)
   if (messages) {
     // 設計 `xGLVe` のトーク欄。載っていない友だちは空で返す（実際に空の人もいる）。
@@ -1691,7 +1707,11 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: MEDIA_FOLDERS }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'webinar') {
-    return { success: true, data: WEBINAR_FOLDERS }
+    const accountId = query.get('account_id')
+    return {
+      success: true,
+      data: webinarFolders.filter((folder) => !accountId || folder.accountId === accountId),
+    }
   }
   if (pathname === '/api/booking/admin/settings') {
     return { success: true, data: BOOKING_SETTINGS }
@@ -2696,6 +2716,74 @@ const server = createServer((req, res) => {
   // ただし画面側のエラー報告だけは 204 で受ける。405 を返すと、
   // 報告が失敗したこと自体が新しいエラーになって際限なく増える。
   if (method !== 'GET') {
+    if (method === 'POST' && url.pathname === '/api/folders') {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        if (body.kind !== 'webinar') {
+          res.writeHead(405).end(JSON.stringify({ success: false, error: '画面確認用のため、更新はできません' }))
+          return
+        }
+        if (body.accountId !== 'visual-qa-account' || !String(body.name ?? '').trim()) {
+          res.writeHead(400).end(JSON.stringify({ success: false, error: 'フォルダの内容を確認してください' }))
+          return
+        }
+        const folder = {
+          id: `webinar-folder-${webinarFolders.length + 1}`,
+          kind: 'webinar',
+          accountId: body.accountId,
+          name: String(body.name).trim(),
+          parentId: null,
+          displayOrder: webinarFolders.length,
+          count: 0,
+          color: body.color ?? null,
+          createdAt: '2026-09-07T15:00:00.000Z',
+          updatedAt: '2026-09-07T15:00:00.000Z',
+        }
+        webinarFolders = [...webinarFolders, folder]
+        res.writeHead(201).end(JSON.stringify({ success: true, data: folder }))
+      })
+      return
+    }
+    const webinarFolderPath = /^\/api\/folders\/([^/]+)$/.exec(url.pathname)
+    if (method === 'PATCH' && webinarFolderPath) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        const id = decodeURIComponent(webinarFolderPath[1])
+        const index = webinarFolders.findIndex((folder) => folder.id === id && folder.accountId === body.accountId)
+        if (index < 0) {
+          res.writeHead(404).end(JSON.stringify({ success: false, error: 'Not found' }))
+          return
+        }
+        const folder = {
+          ...webinarFolders[index],
+          ...(typeof body.name === 'string' ? { name: body.name.trim() } : {}),
+          ...(Number.isFinite(body.displayOrder) ? { displayOrder: body.displayOrder } : {}),
+          updatedAt: '2026-09-07T15:01:00.000Z',
+        }
+        webinarFolders = webinarFolders.map((item, itemIndex) => itemIndex === index ? folder : item)
+        webinarFolders.sort((a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name, 'ja'))
+        res.writeHead(200).end(JSON.stringify({ success: true, data: folder }))
+      })
+      return
+    }
+    if (method === 'DELETE' && webinarFolderPath) {
+      const id = decodeURIComponent(webinarFolderPath[1])
+      const accountId = url.searchParams.get('account_id')
+      const folder = webinarFolders.find((item) => item.id === id && item.accountId === accountId)
+      if (!folder) {
+        res.writeHead(404).end(JSON.stringify({ success: false, error: 'Not found' }))
+        return
+      }
+      webinarFolders = webinarFolders.filter((item) => item.id !== id)
+      res.writeHead(200).end(JSON.stringify({ success: true, data: null }))
+      return
+    }
     if (method === 'POST' && url.pathname === '/api/conversions/definitions/preview') {
       res.writeHead(200).end(JSON.stringify({ success: true, data: CONVERSION_DEFINITION_PREVIEW }))
       return
