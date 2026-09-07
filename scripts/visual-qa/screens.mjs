@@ -178,9 +178,9 @@ export const SCREENS = [
     node: 'vUXKb', feature: 1, name: '1-1 ダッシュボード',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #458で再撮影し、一致を維持。** 左メニュー先頭に区分見出し「メイン」を追加し、ダッシュボード・受信箱・友だち・友だち属性をその下へ配置。選択中の緑枠とアカウント下の区切り線が重ならないことを、Pencilと実装の上端比較で確認した。3107/8794の1440/1920pxで横はみ出し0。",
-    verdictSource: "dashboard-v6/vUXKb.txt + dashboard-v6/vUXKb.png（Pencil） + dashboard-v6/vUXKb-{1440,1920}.png（実装） + Issue #458",
-    verdictHead: "f088f93bf",
+    verdictNote: "**2026-09-07 Issue #456で共通操作の規定値を再確認し、一致を維持。** 通常ボタン36px、入力用の押し口40px、共通の検索・選択42pxというPencilの役割別寸法と白背景を確認した。3107/8794の1440/1920pxで横はみ出し0。",
+    verdictSource: "dashboard-v6/vUXKb.txt + dashboard-v6/vUXKb.png（Pencil） + dashboard-v6/vUXKb-{1440,1920}.png（実装） + Issue #456",
+    verdictHead: "526490a86",
   },
   {
     node: 'ZN0ov', feature: 1, name: '1-1-1 ダッシュボード編集',
@@ -220,9 +220,9 @@ export const SCREENS = [
     verdictSource: "inbox-v6/xGLVe.txt + 2026-09-07 same-input visual comparison",
     verdictHead: "4f8dfd8e0",
     ...issue455InboxReview('xGLVe'),
-    verdictNote: "**2026-09-07 Issue #458で再撮影し、一致を維持。** 左メニュー先頭に区分見出し「メイン」を追加し、ダッシュボード・受信箱・友だち・友だち属性をその下へ配置。選択中の緑枠とアカウント下の区切り線が重ならないことを、Pencilと実装の上端比較で確認した。Issue #455取り込み後の受信箱を3107/8794で1440/1920px撮影し、横はみ出し0。",
-    verdictSource: "inbox-v6/xGLVe.txt + inbox-v6/xGLVe.png（Pencil） + inbox-v6/xGLVe-{1440,1920}.png（実装） + Issue #458",
-    verdictHead: "f088f93bf",
+    verdictNote: "**2026-09-07 Issue #456で共通操作の規定値を再確認し、一致を維持。** 担当者・担当・対応状況・顧客情報の押し口が40pxで1行を保ち、入力欄と選択欄の白背景も維持した。3107/8794の1440/1920pxで横はみ出し0。",
+    verdictSource: "inbox-v6/xGLVe.txt + inbox-v6/xGLVe.png（Pencil） + inbox-v6/xGLVe-{1440,1920}.png（実装） + Issue #456",
+    verdictHead: "526490a86",
   },
   {
     ...INBOX, node: 'NfgOs', name: '2-2 テンプレート選択',
@@ -232,6 +232,9 @@ export const SCREENS = [
     verdictSource: "inbox-v6/NfgOs.txt + 2026-09-07 same-input visual comparison",
     verdictHead: "4f8dfd8e0",
     ...issue455InboxReview('NfgOs'),
+    verdictNote: "**2026-09-07 Issue #456で再撮影し、一致を維持。** テンプレート選択窓の「すべてのフォルダ」を入力用の押し口と同じ40pxにし、検索欄の白背景と高さも確認した。3107/8794の1440/1920pxで横はみ出し0。",
+    verdictSource: "inbox-v6/NfgOs.txt + inbox-v6/NfgOs.png（Pencil） + inbox-v6/NfgOs-{1440,1920}.png（実装） + Issue #456",
+    verdictHead: "526490a86",
   },
   {
     ...INBOX, node: 'H3lAOB', name: '2-3 顧客情報パネル非表示',
@@ -575,9 +578,9 @@ export const SCREENS = [
       kinds: ['normal', 'loading', 'empty', 'error'],
     },
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #452・#457で修正・再判定。** 一致。本文上部の旧題ブロックを外し、友だち機能タブから始まるPencil V6の上端構造へ統一。作成・検索・複数アカウント・UID・所属・CSV・再計算の操作面から内側の二重枠を外し、全操作の高さをそろえた。通常・読込・空・失敗を3102/8789の1440/1920pxで撮影し、横はみ出し0。",
-    verdictSource: "friends-v6/r7eSi-{normal,loading,empty,error}.txt + 同名-{1440,1920}.png",
-    verdictHead: "07b5835cf5",
+    verdictNote: "**2026-09-07 Issue #456で再撮影し、一致を維持。** 検索・複数アカウント・UID・所属を40pxにそろえ、UIDと所属の矢印を右端から12px内側へ置いた。通常・読込・空・失敗を3107/8794の1440/1920pxで確認し、横はみ出し0。",
+    verdictSource: "friends-v6/r7eSi-{normal,loading,empty,error}.txt + 同名-{1440,1920}.png + Issue #456",
+    verdictHead: "526490a86",
   },
   {
     ...FRIENDS, node: 'w8W4Eh', name: '3-3-A 統合ユーザー詳細',
@@ -635,9 +638,9 @@ export const SCREENS = [
   // ── 機能5 シナリオ配信 ──────────────────────────────────
   { ...SCENARIO, node: 'TC1b1', name: '5-1 シナリオ配信', route: '/scenarios',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #459でオーナーの検証環境指摘3点を修正し再判定。** Pencil 1920pxと実装1920pxを上端から並べ、実装1440pxも確認。一致。Pencilに無い「並び替えは ⠿ を掴む」の押し口は置かず、行の⠿の説明だけを維持。名前列を残り幅、配信方式・フォルダなどを固定幅にして見出しの重なりを解消し、1440pxでは低優先の読了済・通数・終了後を畳んで主要情報と操作を1画面内に収めた。フォルダ選択の左内側余白は12px。両幅とも横はみ出し0。",
+    verdictNote: "**2026-09-07 Issue #456で共通操作の規定値を再確認し、一致を維持。** フォルダ選択の高さと左右余白、検索・選択の白背景をPencilと上端から比較した。3107/8794の1440/1920pxで横はみ出し0。",
     verdictSource: "design-reference/scenarios-v6/TC1b1.{png,txt} + design-qa/scenarios-v6/TC1b1-{1440,1920}.png + design-qa/scenarios-v6/TC1b1.txt + apps/web/src/components/scenarios/scenario-list.tsx",
-    verdictHead: "8be88c690",
+    verdictHead: "526490a86",
   },
   { ...SCENARIO, node: 'cCB7r', name: '5-1-A シナリオ作成・配信方式', route: '/scenarios/mode?id=scenario-0',
     verdict: "match",
@@ -786,9 +789,9 @@ export const SCREENS = [
   // ── 機能6 一斉配信 ──────────────────────────────────────
   { ...BROADCAST, node: 'q76C35', name: '6-1 一斉配信',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #384で一致判定。** 一覧KPI・保存した検索・ページ情報を実API契約の固定データで表示。共通固定データ #388 / PR #1142 の統合後に平均開封率69.4%を確認し、画面側の推測補正は行っていない。1440/1920pxで横はみ出し0。',
-    verdictSource: 'broadcasts-v6/q76C35.txt + broadcasts-v6/q76C35-{1440,1920}.png',
-    verdictHead: 'a19b5d73aa', route: '/broadcasts',
+    verdictNote: '**2026-09-07 Issue #456で再撮影し、一致を維持。** 「タイトル・内容で検索」の背景をPencilどおり白に戻し、高さ40px、選択欄の白背景と内側の矢印を確認した。3107/8794の1440/1920pxで横はみ出し0。',
+    verdictSource: 'broadcasts-v6/q76C35.txt + broadcasts-v6/q76C35-{1440,1920}.png + Issue #456',
+    verdictHead: '526490a86', route: '/broadcasts',
     // ---- 2026-09-02 `df3f4e3b` で撮り直した（#674 マージ後）。**絵を見て確かめた範囲だけ書く。** ----
     // 解決：**列が設計どおりの6列になった**（タイトル・内容／状態／配信条件／配信日時／配信・開封・クリック／操作）。
     //       上の P2「実装は8列」は解消。状態が独立した桁になり、削除が「操作」に入って、1列ずれも消えている。
@@ -3010,9 +3013,9 @@ export const SCREENS = [
   */
   { node: 'hqrOv', feature: 4, name: '4-1 友だち属性・タグ', dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #458で再撮影し、一致を維持。** 左メニュー先頭の「メイン」見出しと、その下の4項目をPencilと同じ順・間隔にした。友だち属性の緑枠は上の区切り線から十分離れ、3107/8794の1440/1920pxで横はみ出し0。",
-    verdictSource: "friend-attributes-v6/hqrOv.txt + friend-attributes-v6/hqrOv.png（Pencil） + friend-attributes-v6/hqrOv-{1440,1920}.png（実装） + Issue #458",
-    verdictHead: "f088f93bf",
+    verdictNote: "**2026-09-07 Issue #456でPencilと実装を更新し、一致を維持。** 検索欄は残り幅を使い、使用状態・付与元・表示件数は最長文字と矢印余白を確保した。全欄40px・白背景、矢印は右端から12px内側。3107/8794の1440/1920pxで文字切れと横はみ出し0。",
+    verdictSource: "friend-attributes-v6/hqrOv.txt + friend-attributes-v6/hqrOv.png（Pencil） + friend-attributes-v6/hqrOv-{1440,1920}.png（実装） + Issue #456",
+    verdictHead: "526490a86",
   },
   {
     node: 'dKlkz', feature: 4, name: '4-1-F タグ削除の確認ダイアログ',

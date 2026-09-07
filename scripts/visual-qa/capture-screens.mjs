@@ -6,6 +6,7 @@
  *
  * 使い方
  *   node scripts/visual-qa/capture-screens.mjs --feature 1 --impl
+ *   node scripts/visual-qa/capture-screens.mjs --feature 1 --impl --primary --width 1920
  *   node scripts/visual-qa/capture-screens.mjs --feature 1 --design --from <書き出したhtmlの置き場>
  *   node scripts/visual-qa/capture-screens.mjs --check
  *
@@ -449,6 +450,11 @@ export function shotSpecsFor(screen) {
 
 async function captureImpl(feature) {
   const onlyNode = value('node')
+  const requestedWidth = value('width') ? Number(value('width')) : null
+  if (requestedWidth !== null && !WIDTHS.includes(requestedWidth)) {
+    throw new Error(`--width は ${WIDTHS.join(' / ')} のどれかを指定してください`)
+  }
+  const captureWidths = requestedWidth === null ? WIDTHS : [requestedWidth]
   const list = screensOf(feature).filter((screen) => !onlyNode || screen.node === onlyNode)
   if (onlyNode && list.length === 0) {
     throw new Error(`機能${feature}に Node ${onlyNode} はありません`)
@@ -491,10 +497,10 @@ async function captureImpl(feature) {
 
       ここで撮るぶんを組み立てる。名札が空なら素の1枚。
     */
-    const shots = shotSpecsFor(s)
+    const shots = flag('primary') ? shotSpecsFor(s).slice(0, 1) : shotSpecsFor(s)
 
     for (const shotSpec of shots) {
-    for (const width of WIDTHS) {
+    for (const width of captureWidths) {
       const page = await newPage(browser, width, s.mode === 'viewport' ? s.height : 1080, s.clock)
       try {
         const stateHits = shotSpec.state ? await applyState(page, s.node, shotSpec.state) : null
@@ -593,7 +599,7 @@ async function captureImpl(feature) {
           文字があれば `compare-text.mjs` が語の食い違いを機械で出せる。
           幅で中身は変わらないので、広いほうだけ残す。
         */
-        if (width === WIDTHS[WIDTHS.length - 1]) {
+        if (width === captureWidths[captureWidths.length - 1]) {
           /*
             **`body` を使い回さない。** あれは `runSteps` の前に読んだもので、
             プルダウンやダイアログを開く前の姿しか写っていない。
