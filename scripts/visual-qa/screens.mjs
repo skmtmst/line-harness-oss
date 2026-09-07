@@ -2325,9 +2325,9 @@ export const SCREENS = [
     variants: [{ suffix: '-birthday', route: '/nen-campaigns/edit?key=birthday_coupon' }],
     route: '/nen-campaigns/edit?key=review_request',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #442 / UI HEAD c1c44ae3dを3102/8789で再撮影・判定。** Pencil V6どおり、配信時刻と重複防止、差し込み対応の本文エディタ、吹き出し追加、回答フォーム「口コミ」を開く・回答後200マイル付与、LINEプレビュー、つながる先、注意、追従保存を実装した。送信後アクションはアカウント別設定へ保存し、回答フォームは選択中アカウントのLIFF URLへ接続する。通常・誕生日を1440/1920pxで確認し、横はみ出し0。",
+    verdictNote: "**2026-09-07 Issue #442 / UI HEAD 3b560eb0fを3102/8789で再撮影・判定。** Pencil V6どおり、配信時刻と重複防止、差し込み対応の本文エディタ、吹き出し追加、回答フォーム「口コミ」を開く・回答後200マイル付与、LINEプレビュー、つながる先、注意、追従保存を実装した。送信後アクションはアカウント別設定へ保存し、回答フォームは選択中アカウントのLIFF URLへ接続する。通常・誕生日を1440/1920pxで確認し、横はみ出し0。",
     verdictSource: "nen-v6/HpKyF.txt + HpKyF-birthday.txt + HpKyF-{1440,1920}.png + HpKyF-birthday-{1440,1920}.png",
-    verdictHead: "c1c44ae3d",
+    verdictHead: "3b560eb0f",
   },
   {
     ...NEN, node: 'ymXJK', name: '21-1-E コラムを書く',
