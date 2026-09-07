@@ -9,6 +9,7 @@
  *   node scripts/visual-qa/pixel-diff.mjs
  *   node scripts/visual-qa/pixel-diff.mjs --feature 7
  *   node scripts/visual-qa/pixel-diff.mjs --node J64xI
+ *   node scripts/visual-qa/pixel-diff.mjs --fresh
  *   node scripts/visual-qa/pixel-diff.mjs --markdown
  */
 import {
@@ -24,6 +25,7 @@ import { SCREENS } from './screens.mjs'
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 export const DEFAULT_PIXEL_DIFF_THRESHOLD_PERCENT = 10
+export const DEFAULT_HEIGHT_DIFF_THRESHOLD_PX = 24
 export const DEFAULT_REPORT = join(ROOT, 'docs', 'design-qa', 'v6-pixel-diff.json')
 
 const REGION_ROWS = ['上部', '中央', '下部']
@@ -180,13 +182,15 @@ function implementationSource(path, root = ROOT) {
 export function compareScreen(screen, options = {}) {
   const root = options.root ?? ROOT
   const thresholdPercent = options.thresholdPercent ?? DEFAULT_PIXEL_DIFF_THRESHOLD_PERCENT
+  const heightDiffThresholdPx = options.heightDiffThresholdPx ?? DEFAULT_HEIGHT_DIFF_THRESHOLD_PX
   const designs = designImages(screen, root)
   if (designs.length === 0) {
     return {
       feature: screen.feature, node: screen.node, name: screen.name, dir: screen.dir,
       declaredVerdict: screen.verdict ?? null,
       status: 'unavailable', reason: '設計画像なし', comparisons: [],
-      pixelDiffPercent: null, aboveThreshold: false,
+      pixelDiffPercent: null, pixelAboveThreshold: false,
+      heightAboveThreshold: false, aboveThreshold: false,
     }
   }
 
@@ -223,51 +227,105 @@ export function compareScreen(screen, options = {}) {
       feature: screen.feature, node: screen.node, name: screen.name, dir: screen.dir,
       declaredVerdict: screen.verdict ?? null,
       status: 'unavailable', reason: `実装画像なし（${missingWidths.join('/')}px）`, comparisons: [],
-      pixelDiffPercent: null, aboveThreshold: false,
+      pixelDiffPercent: null, pixelAboveThreshold: false,
+      heightAboveThreshold: false, aboveThreshold: false,
     }
   }
 
-  const worst = comparisons.reduce((a, b) => (b.pixelDiffPercent > a.pixelDiffPercent ? b : a))
+  const worstPixel = comparisons.reduce((a, b) => (b.pixelDiffPercent > a.pixelDiffPercent ? b : a))
+  const worstHeight = comparisons.reduce((a, b) => (
+    Math.abs(b.heightDifferencePx) > Math.abs(a.heightDifferencePx) ? b : a
+  ))
+  const pixelAboveThreshold = comparisons.some(
+    (comparison) => comparison.pixelDiffPercent > thresholdPercent,
+  )
+  const heightAboveThreshold = comparisons.some(
+    (comparison) => Math.abs(comparison.heightDifferencePx) > heightDiffThresholdPx,
+  )
   return {
     feature: screen.feature, node: screen.node, name: screen.name, dir: screen.dir,
     declaredVerdict: screen.verdict ?? null,
     status: 'compared', reason: missingWidths.length ? `${missingWidths.join('/')}pxの実装画像なし` : null,
     comparisons,
-    pixelDiffPercent: worst.pixelDiffPercent,
-    heightDifferencePx: worst.heightDifferencePx,
-    dominantRegion: worst.dominantRegion,
-    implementationSource: worst.implementationSource,
-    diffPath: worst.diffPath,
-    aboveThreshold: worst.pixelDiffPercent > thresholdPercent,
+    pixelDiffPercent: worstPixel.pixelDiffPercent,
+    heightDifferencePx: worstHeight.heightDifferencePx,
+    dominantRegion: worstPixel.dominantRegion,
+    implementationSource: worstPixel.implementationSource,
+    diffPath: worstPixel.diffPath,
+    pixelAboveThreshold,
+    heightAboveThreshold,
+    aboveThreshold: pixelAboveThreshold || heightAboveThreshold,
   }
 }
 
 export function buildPixelDiffReport(screens = SCREENS, options = {}) {
   const thresholdPercent = options.thresholdPercent ?? DEFAULT_PIXEL_DIFF_THRESHOLD_PERCENT
-  const entries = screens.map((screen) => compareScreen(screen, { ...options, thresholdPercent }))
+  const heightDiffThresholdPx = options.heightDiffThresholdPx ?? DEFAULT_HEIGHT_DIFF_THRESHOLD_PX
+  const allScreens = options.allScreens ?? screens
+  const previousReport = options.previousReport ?? null
+  const previousByNode = new Map((previousReport?.entries ?? []).map((entry) => [entry.node, entry]))
+  const scopedNodes = new Set(screens.map((screen) => screen.node))
+  const previousGeneratedAt = previousReport?.generatedAt ?? null
+  const entries = allScreens.map((screen) => {
+    const previous = previousByNode.get(screen.node)
+    if (!scopedNodes.has(screen.node)) {
+      if (previous && !options.fresh) return { ...previous, retainedFrom: previousGeneratedAt }
+      return {
+        feature: screen.feature, node: screen.node, name: screen.name, dir: screen.dir,
+        declaredVerdict: screen.verdict ?? null,
+        status: 'unavailable', reason: '指定範囲外（前回結果なし）', comparisons: [],
+        pixelDiffPercent: null, pixelAboveThreshold: false,
+        heightAboveThreshold: false, aboveThreshold: false,
+      }
+    }
+
+    const compared = compareScreen(screen, { ...options, thresholdPercent })
+    const implementationMissing = compared.status === 'unavailable'
+      && compared.reason?.startsWith('実装画像なし')
+    if (implementationMissing && previous && !options.fresh) {
+      return { ...previous, retainedFrom: previousGeneratedAt }
+    }
+    return compared
+  })
+  const pixelAbove = (entry) => entry.pixelAboveThreshold
+    ?? entry.pixelDiffPercent > thresholdPercent
+  const heightAbove = (entry) => entry.heightAboveThreshold
+    ?? Math.abs(entry.heightDifferencePx ?? 0) > heightDiffThresholdPx
   return {
     generatedFrom: 'scripts/visual-qa/screens.mjs',
-    generatedAt: new Date().toISOString(),
+    generatedAt: options.generatedAt ?? new Date().toISOString(),
     thresholdPercent,
-    screenCount: screens.length,
+    heightDiffThresholdPx,
+    screenCount: allScreens.length,
     comparedCount: entries.filter((entry) => entry.status === 'compared').length,
     unavailableCount: entries.filter((entry) => entry.status === 'unavailable').length,
-    aboveThresholdCount: entries.filter((entry) => entry.aboveThreshold).length,
+    pixelAboveThresholdCount: entries.filter(pixelAbove).length,
+    heightAboveThresholdCount: entries.filter(heightAbove).length,
+    aboveThresholdCount: entries.filter((entry) => pixelAbove(entry) || heightAbove(entry)).length,
     entries,
   }
 }
 
 export function thresholdMarkdown(report) {
+  const heightDiffThresholdPx = report.heightDiffThresholdPx ?? DEFAULT_HEIGHT_DIFF_THRESHOLD_PX
+  const pixelAbove = (entry) => entry.pixelAboveThreshold
+    ?? entry.pixelDiffPercent > report.thresholdPercent
+  const heightAbove = (entry) => entry.heightAboveThreshold
+    ?? Math.abs(entry.heightDifferencePx ?? 0) > heightDiffThresholdPx
+  const reason = (entry) => [
+    pixelAbove(entry) ? '画素差' : null,
+    heightAbove(entry) ? '高さ差' : null,
+  ].filter(Boolean).join('・')
   const rows = report.entries
-    .filter((entry) => entry.aboveThreshold)
+    .filter((entry) => pixelAbove(entry) || heightAbove(entry))
     .sort((a, b) => b.pixelDiffPercent - a.pixelDiffPercent)
   const unavailable = report.entries.filter((entry) => entry.status === 'unavailable')
   const lines = [
-    `画素比較: ${report.comparedCount}/${report.screenCount}画面。閾値 ${report.thresholdPercent}% 超は ${rows.length}画面、比較不能は ${unavailable.length}画面です。`,
+    `画素比較: ${report.comparedCount}/${report.screenCount}画面。注意条件（画素差 ${report.thresholdPercent}% 超、または高さ差 ${heightDiffThresholdPx}px 超）は ${rows.length}画面、比較不能は ${unavailable.length}画面です。`,
     '',
-    '| 機能 | Node | 差分率 | 高さ差 | 主な差の場所 |',
-    '|---:|---|---:|---:|---|',
-    ...rows.map((entry) => `| ${entry.feature} | \`${entry.node}\` | ${entry.pixelDiffPercent.toFixed(4)}% | ${entry.heightDifferencePx >= 0 ? '+' : ''}${entry.heightDifferencePx}px | ${entry.dominantRegion} |`),
+    '| 機能 | Node | 差分率 | 高さ差 | 注意理由 | 主な差の場所 |',
+    '|---:|---|---:|---:|---|---|',
+    ...rows.map((entry) => `| ${entry.feature} | \`${entry.node}\` | ${entry.pixelDiffPercent.toFixed(4)}% | ${entry.heightDifferencePx >= 0 ? '+' : ''}${entry.heightDifferencePx}px | ${reason(entry)} | ${entry.dominantRegion} |`),
   ]
   if (unavailable.length) {
     lines.push('', '比較不能:', unavailable.map((entry) => `\`${entry.node}\`（${entry.reason}）`).join('、'))
@@ -295,15 +353,33 @@ function runCli() {
     && (node === null || screen.node === node)
   ))
   if (screens.length === 0) throw new Error('対象画面がありません')
+  const fresh = process.argv.includes('--fresh')
+  if (fresh && (feature !== null || node !== null)) {
+    throw new Error('--fresh は全画面の完全再撮影時だけ使えます。--feature / --node とは併用できません')
+  }
 
+  const reportPath = resolve(valueAfter('--report') ?? DEFAULT_REPORT)
+  const previousReport = !fresh && existsSync(reportPath)
+    ? JSON.parse(readFileSync(reportPath, 'utf8'))
+    : null
   const report = buildPixelDiffReport(screens, {
+    allScreens: SCREENS,
+    previousReport,
+    fresh,
     thresholdPercent,
     writeDiffImages: !process.argv.includes('--no-diff-images'),
   })
-  const reportPath = resolve(valueAfter('--report') ?? DEFAULT_REPORT)
+  if (fresh) {
+    const missing = report.entries.filter((entry) => (
+      entry.status === 'unavailable' && entry.reason?.startsWith('実装画像なし')
+    ))
+    if (missing.length) {
+      throw new Error(`--fresh を中止しました。実装画像が無い画面: ${missing.map((entry) => entry.node).join(', ')}`)
+    }
+  }
   writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`)
   if (process.argv.includes('--markdown')) console.log(thresholdMarkdown(report))
-  else console.log(`画素比較 ${report.comparedCount}/${report.screenCount} ／ ${thresholdPercent}%超 ${report.aboveThresholdCount} ／ 比較不能 ${report.unavailableCount}`)
+  else console.log(`画素比較 ${report.comparedCount}/${report.screenCount} ／ 注意 ${report.aboveThresholdCount}（画素差 ${report.pixelAboveThresholdCount}・高さ差 ${report.heightAboveThresholdCount}）／ 比較不能 ${report.unavailableCount}`)
 }
 
 if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) runCli()
