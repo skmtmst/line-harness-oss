@@ -21,6 +21,7 @@ import {
   updateSavedSearch,
   deleteSavedSearch,
   validateInboxSavedViewConditions,
+  type InboxSavedViewConditions,
   type SavedSearch,
   type SavedSearchAccess,
   jstNow,
@@ -47,7 +48,9 @@ import { fireEvent } from '../services/event-bus.js';
 
 const chats = new Hono<Env>();
 
-async function inboxSavedViewAccess(c: Context<Env>): Promise<SavedSearchAccess | Response> {
+type InboxSavedViewAccess = SavedSearchAccess & { canSeeUnassigned: boolean };
+
+async function inboxSavedViewAccess(c: Context<Env>): Promise<InboxSavedViewAccess | Response> {
   const lineAccountId = c.req.query('lineAccountId');
   if (!lineAccountId) {
     return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
@@ -61,6 +64,7 @@ async function inboxSavedViewAccess(c: Context<Env>): Promise<SavedSearchAccess 
     lineAccountId,
     staffId: staff.id,
     canManageAll: staff.role === 'owner' || staff.role === 'admin',
+    canSeeUnassigned: scope.canSeeUnassigned,
   };
 }
 
@@ -129,7 +133,10 @@ type ChatLike = {
   revision: number;
 };
 
-function serializeInboxSavedView(row: SavedSearch) {
+function serializeInboxSavedView(
+  row: SavedSearch,
+  count?: { matchCount: number; matchCountCapped: boolean },
+) {
   return {
     id: row.id,
     name: row.name,
@@ -141,8 +148,180 @@ function serializeInboxSavedView(row: SavedSearch) {
     displayOrder: row.display_order,
     isFavorite: row.display_order < 0,
     createdAt: row.created_at,
+    matchCount: count?.matchCount ?? null,
+    matchCountCapped: count?.matchCountCapped ?? false,
   };
 }
+
+async function countInboxSavedViewMatches(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    staffId: string;
+    canSeeUnassigned: boolean;
+    conditions: InboxSavedViewConditions;
+  },
+): Promise<{ matchCount: number; matchCountCapped: boolean }> {
+  const where: string[] = [
+    'f.line_account_id = ?',
+    `(c.id IS NOT NULL OR EXISTS (
+      SELECT 1 FROM messages_log existing
+       WHERE existing.friend_id = f.id
+         AND (existing.delivery_type IS NULL OR existing.delivery_type != 'test')
+    ))`,
+  ];
+  const bindings: unknown[] = [input.lineAccountId];
+  const conditions = input.conditions;
+
+  if (conditions.statuses.length < 4) {
+    where.push(`COALESCE(c.status, 'resolved') IN (${conditions.statuses.map(() => '?').join(', ')})`);
+    bindings.push(...conditions.statuses);
+  }
+  if (conditions.assignees.length > 0) {
+    const named = conditions.assignees.filter((id) => id !== 'unassigned');
+    const clauses: string[] = [];
+    if (conditions.assignees.includes('unassigned')) clauses.push('c.operator_id IS NULL');
+    if (named.length > 0) {
+      clauses.push(`c.operator_id IN (${named.map(() => '?').join(', ')})`);
+      bindings.push(...named);
+    }
+    where.push(`(${clauses.join(' OR ')})`);
+  }
+  if (conditions.query) {
+    where.push(`(f.display_name LIKE ? OR EXISTS (
+      SELECT 1 FROM messages_log searched
+       WHERE searched.friend_id = f.id
+         AND (searched.delivery_type IS NULL OR searched.delivery_type != 'test')
+         AND searched.content LIKE ?
+    ))`);
+    const like = `%${conditions.query}%`;
+    bindings.push(like, like);
+  }
+  if (conditions.unread === 'mine') {
+    where.push(`EXISTS (
+      SELECT 1 FROM messages_log incoming
+       WHERE incoming.friend_id = f.id AND incoming.direction = 'incoming'
+         AND (incoming.delivery_type IS NULL OR incoming.delivery_type != 'test')
+         AND (sr.last_read_at IS NULL OR incoming.created_at > sr.last_read_at)
+    )`);
+  }
+  if (conditions.messageTypes.length > 0) {
+    where.push(`(
+      SELECT latest.message_type FROM messages_log latest
+       WHERE latest.friend_id = f.id
+         AND (latest.delivery_type IS NULL OR latest.delivery_type != 'test')
+       ORDER BY latest.created_at DESC LIMIT 1
+    ) IN (${conditions.messageTypes.map(() => '?').join(', ')})`);
+    bindings.push(...conditions.messageTypes);
+  }
+  if (conditions.receivedFrom) {
+    where.push(`EXISTS (
+      SELECT 1 FROM messages_log received
+       WHERE received.friend_id = f.id AND received.direction = 'incoming'
+         AND received.created_at >= ?
+         AND (received.delivery_type IS NULL OR received.delivery_type != 'test')
+    )`);
+    bindings.push(conditions.receivedFrom);
+  }
+  if (conditions.receivedTo) {
+    where.push(`EXISTS (
+      SELECT 1 FROM messages_log received
+       WHERE received.friend_id = f.id AND received.direction = 'incoming'
+         AND received.created_at <= ?
+         AND (received.delivery_type IS NULL OR received.delivery_type != 'test')
+    )`);
+    bindings.push(conditions.receivedTo);
+  }
+  if (conditions.due === 'overdue') {
+    where.push(`COALESCE(c.status, 'resolved') = 'unread'`);
+    where.push(`COALESCE(c.last_customer_message_at, c.last_message_at) < datetime('now', '-1 hour')`);
+  }
+
+  const lineRow = input.conditions.channels.includes('line') ? await db.prepare(
+    `SELECT COUNT(*) AS count FROM (
+       SELECT f.id
+         FROM friends f
+         LEFT JOIN chats c ON c.id = (
+           SELECT id FROM chats WHERE friend_id = f.id ORDER BY created_at DESC LIMIT 1
+         )
+         LEFT JOIN inbox_staff_reads sr
+           ON sr.channel = 'line' AND sr.conversation_id = f.id AND sr.staff_id = ?
+        WHERE ${where.join(' AND ')}
+        LIMIT 1001
+     )`,
+  ).bind(input.staffId, ...bindings).first<{ count: number }>() : null;
+
+  const emailWhere: string[] = [];
+  const emailBindings: unknown[] = [];
+  if (conditions.statuses.length < 4) {
+    emailWhere.push(`t.status IN (${conditions.statuses.map(() => '?').join(', ')})`);
+    emailBindings.push(...conditions.statuses);
+  }
+  if (conditions.assignees.length > 0) {
+    const named = conditions.assignees.filter((id) => id !== 'unassigned');
+    const clauses: string[] = [];
+    if (conditions.assignees.includes('unassigned')) clauses.push('t.assigned_staff_id IS NULL');
+    if (named.length > 0) {
+      clauses.push(`t.assigned_staff_id IN (${named.map(() => '?').join(', ')})`);
+      emailBindings.push(...named);
+    }
+    emailWhere.push(`(${clauses.join(' OR ')})`);
+  }
+  if (conditions.query) {
+    emailWhere.push(`(t.customer_email LIKE ? OR t.customer_name LIKE ? OR t.subject LIKE ? OR EXISTS (
+      SELECT 1 FROM support_email_messages searched
+       WHERE searched.thread_id = t.id AND searched.body_text LIKE ?
+    ))`);
+    const like = `%${conditions.query}%`;
+    emailBindings.push(like, like, like, like);
+  }
+  if (conditions.unread === 'mine') {
+    emailWhere.push('(sr.last_read_at IS NULL OR t.last_incoming_at > sr.last_read_at)');
+  }
+  if (conditions.messageTypes.length > 0 && !conditions.messageTypes.includes('text')) {
+    emailWhere.push('0=1');
+  }
+  if (conditions.receivedFrom) {
+    emailWhere.push('t.last_incoming_at >= ?');
+    emailBindings.push(conditions.receivedFrom);
+  }
+  if (conditions.receivedTo) {
+    emailWhere.push('t.last_incoming_at <= ?');
+    emailBindings.push(conditions.receivedTo);
+  }
+  if (conditions.due === 'overdue') {
+    emailWhere.push(`t.status = 'unread'`);
+    emailWhere.push(`t.last_incoming_at < datetime('now', '-1 hour')`);
+  }
+  const emailRow = input.conditions.channels.includes('email') && input.canSeeUnassigned
+    ? await db.prepare(
+      `SELECT COUNT(*) AS count FROM (
+         SELECT t.id
+           FROM support_email_threads t
+           LEFT JOIN inbox_staff_reads sr
+             ON sr.channel = 'email' AND sr.conversation_id = t.id AND sr.staff_id = ?
+          ${emailWhere.length > 0 ? `WHERE ${emailWhere.join(' AND ')}` : ''}
+          LIMIT 1001
+       )`,
+    ).bind(input.staffId, ...emailBindings).first<{ count: number }>()
+    : null;
+  const rawCount = Number(lineRow?.count ?? 0) + Number(emailRow?.count ?? 0);
+  return { matchCount: Math.min(rawCount, 1000), matchCountCapped: rawCount > 1000 };
+}
+
+const EMPTY_INBOX_SAVED_VIEW_CONDITIONS: InboxSavedViewConditions = {
+  version: 1,
+  query: '',
+  channels: ['line', 'email'],
+  statuses: ['unread', 'in_progress', 'on_hold', 'resolved'],
+  assignees: [],
+  unread: 'all',
+  messageTypes: [],
+  receivedFrom: null,
+  receivedTo: null,
+  sort: 'newest',
+  due: 'all',
+};
 
 // id は chats.id もしくは friend.id のどちらか。friend.id のときは chats 行を遅延作成する。
 // push / broadcast / scenario 配信だけを受けた友だちもチャット画面に現れるため、ここで lazy create が必要。
@@ -817,14 +996,23 @@ chats.get('/api/inbox/saved-views', requireRole('owner', 'admin', 'staff'), asyn
   const access = await inboxSavedViewAccess(c);
   if (access instanceof Response) return access;
   const rows = await getSavedSearches(c.env.DB, 'chats', access);
+  const visibleRows = rows.filter((row) => row.scope === 'chats'
+    && (row.line_account_id === access.lineAccountId
+      ? access.canManageAll || Boolean(row.is_shared) || row.created_by === access.staffId
+      : row.line_account_id === null && row.created_by === access.staffId));
+  const counts = await Promise.all(visibleRows.map(async (row) => {
+    const parsed = validateInboxSavedViewConditions(JSON.parse(row.conditions_json) as unknown);
+    return countInboxSavedViewMatches(c.env.DB, {
+      lineAccountId: access.lineAccountId,
+      staffId: access.staffId,
+      canSeeUnassigned: access.canSeeUnassigned,
+      // 受信箱より前の `{ all, any }` 行は、画面と同じく「絞りなし」へ倒す。
+      conditions: parsed.ok ? parsed.value : EMPTY_INBOX_SAVED_VIEW_CONDITIONS,
+    });
+  }));
   return c.json({
     success: true,
-    data: rows
-      .filter((row) => row.scope === 'chats'
-        && (row.line_account_id === access.lineAccountId
-          ? access.canManageAll || Boolean(row.is_shared) || row.created_by === access.staffId
-          : row.line_account_id === null && row.created_by === access.staffId))
-      .map(serializeInboxSavedView),
+    data: visibleRows.map((row, index) => serializeInboxSavedView(row, counts[index])),
   });
 });
 

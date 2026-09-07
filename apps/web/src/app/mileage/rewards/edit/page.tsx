@@ -180,14 +180,12 @@ function MileageRewardEditorInner() {
     }
     let cancelled = false
     setCommonActionsFailed(false)
-    void api.commonActions.resources(selectedAccountId).then(async (response) => {
+    void api.commonActions.resources(selectedAccountId).then((response) => {
       if (!response.success) throw new Error(response.error)
-      const details = await Promise.all(response.data.commonActions.map(async (item) => {
-        const detail = await api.commonActions.get(item.id, selectedAccountId)
-        if (!detail.success || !detail.data.currentPublishedVersionId) return null
-        return { id: detail.data.currentPublishedVersionId, label: `${item.name}（公開版 v${item.version}）` }
-      }))
-      if (!cancelled) setCommonActions(details.filter((item): item is CommonActionOption => item !== null))
+      if (!cancelled) setCommonActions(response.data.commonActions.map((item) => ({
+        id: item.currentPublishedVersionId,
+        label: `${item.name}（公開版 v${item.version}）`,
+      })))
     }).catch(() => {
       if (!cancelled) setCommonActionsFailed(true)
     })

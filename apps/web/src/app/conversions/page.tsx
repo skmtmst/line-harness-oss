@@ -149,6 +149,8 @@ const PAGE_SIZE = 6
 function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [definitions, setDefinitions] = useState<ConversionDefinitionList | null>(null)
   const [summaryReport, setSummaryReport] = useState<ConversionDefinitionReport | null>(null)
+  // 5000 件の安全弁で止まったときだけ KPI に注記を出す。通常は false。
+  const [listTruncated, setListTruncated] = useState(false)
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<PointSort>('cv-desc')
@@ -182,14 +184,29 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
     setLoadFailed(false)
     setDefinitions(null)
     setSummaryReport(null)
+    setListTruncated(false)
     const range = definitionRange(30)
     const [listResult, reportResult] = await Promise.allSettled([
-      api.conversions.definitions({ ...range, lineAccountId: accountId ?? undefined, limit: 100 }),
+      (async () => {
+        // 成果地点が 100 件を超えても数え落とさないよう、cursor を辿って
+        // 全件取る（#505 重大2）。安全弁として 50 頁（5000 件）で止める。
+        const first = await api.conversions.definitions({ ...range, lineAccountId: accountId ?? undefined, limit: 100 })
+        if (!first.success || !Array.isArray(first.data.items)) throw new Error('definitions fetch failed')
+        const items = [...first.data.items]
+        let cursor = first.data.pagination.nextCursor
+        for (let page = 0; page < 49 && cursor; page += 1) {
+          const next = await api.conversions.definitions({ ...range, lineAccountId: accountId ?? undefined, limit: 100, cursor })
+          if (!next.success || !Array.isArray(next.data.items)) throw new Error('definitions fetch failed')
+          items.push(...next.data.items)
+          cursor = next.data.pagination.nextCursor
+        }
+        return { data: { ...first.data, items }, truncated: Boolean(cursor) }
+      })(),
       api.conversions.definitionReport({ ...range, lineAccountId: accountId ?? undefined }),
     ])
-    if (listResult.status === 'fulfilled' && listResult.value.success
-      && Array.isArray(listResult.value.data.items)) {
+    if (listResult.status === 'fulfilled' && Array.isArray(listResult.value.data.items)) {
       setDefinitions(listResult.value.data)
+      setListTruncated(listResult.value.truncated)
     } else {
       setLoadFailed(true)
     }
@@ -351,7 +368,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           title="金額がついた成果"
           value={summaryReport ? kpi.currentValue : null}
           unit="円"
-          detail={`${points.filter((point) => point.value !== null).length}個の成果地点で金額を記録`}
+          detail={`${points.filter((point) => point.value !== null).length}個の成果地点で金額を記録${listTruncated ? '（直近5000件まで）' : ''}`}
           loading={loading}
         />
         <KpiCard
@@ -360,7 +377,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           unit="個"
           badge={kpi.unusedCount > 0 ? '確認' : undefined}
           badgeTone={kpi.unusedCount > 0 ? 'neutral' : 'accent'}
-          detail="決めたのに使われていません"
+          detail={listTruncated ? '決めたのに使われていません（直近5000件まで）' : '決めたのに使われていません'}
           loading={loading}
         />
       </div>

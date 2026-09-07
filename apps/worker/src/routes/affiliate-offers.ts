@@ -126,7 +126,9 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), asy
     const lineAccountId = body.lineAccountId
       ?? (scope.allowedAccountIds.length === 1 ? scope.allowedAccountIds[0] : null);
     if (!lineAccountId) {
-      return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+      // そのまま画面へ出す文言にする。複数アカウントのとき空欄で押すと
+      // ここに来る（#505 重大1）。画面側でも押す前に選ばせている。
+      return c.json({ success: false, error: 'LINEアカウントを選んでください' }, 400);
     }
     if (!scope.allowedAccountIds.includes(lineAccountId)) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);

@@ -1629,7 +1629,12 @@ export type CommonActionResources = {
   notificationRules?: Array<{ id: string; name: string }>;
   webhooks: Array<{ id: string; name: string }>;
   richMenus: Array<{ id: string; name: string }>;
-  commonActions: Array<{ id: string; name: string; version: number }>;
+  commonActions: Array<{
+    id: string;
+    name: string;
+    version: number;
+    currentPublishedVersionId: string;
+  }>;
 };
 
 export type BroadcastInsight = {
@@ -8270,6 +8275,8 @@ export const api = {
       name: string;
       chatBarText: string;
       size: 'large' | 'compact';
+      /** #502中: 作成直後のフォルダ付け2口目をなくすため作成口で決める。 */
+      folderId?: string | null;
       pages: Array<{
         id?: string;
         name: string;
@@ -8280,6 +8287,13 @@ export const api = {
       fetchApi<ApiResponse<{ id: string; pages: Array<{ id: string }> }>>('/api/rich-menu-groups', {
         method: 'POST',
         body: JSON.stringify(input),
+      }),
+
+    /** #502中: 優先順の入替を1口でそろえる。全件PATCHの並列投げの置き換え。 */
+    reorderPriorities: (accountId: string, orderedIds: string[]) =>
+      fetchApi<ApiResponse<{ updated: number }>>('/api/rich-menu-groups/reorder-priorities', {
+        method: 'POST',
+        body: JSON.stringify({ accountId, orderedIds }),
       }),
 
     update: (groupId: string, input: {
@@ -8398,11 +8412,14 @@ export const api = {
       params:
         | { mode: 'bulk-link'; tagId: string | null }
         | { mode: 'set-default' },
+      /** #502中: 一括適用のやり直しで二重記録にしないための鍵。 */
+      idempotencyKey?: string,
     ) =>
       fetchApi<
-        ApiResponse<{ chunks: number; total: number; message?: string; mode?: string }>
+        ApiResponse<{ chunks: number; total: number; runId?: string; message?: string; mode?: string }>
       >(`/api/rich-menu-groups/${groupId}/apply-to-tag`, {
         method: 'POST',
+        headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
         body: JSON.stringify(params),
       }),
 

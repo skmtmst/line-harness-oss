@@ -95,4 +95,12 @@ describe('V6 photo review contract', () => {
     expect(page).toContain('formatPhotoReceivedAt(photo.created_at)');
     expect(page).not.toContain("text(photo.created_at).replace('T', ' ').slice(0, 16)");
   });
+
+  it('does not claim bulk-reviewed photos were notified immediately (#500)', () => {
+    // 一括審査の口は `{updatedCount, items}` を返し、通知は pending で積む
+    // だけ。その場で送っていないのに「送信しました」と書かない。
+    expect(page).toContain('（通知は順次送信）');
+    expect(page).not.toContain('notificationFailures');
+    expect(page).not.toContain('LINE通知も送信しました');
+  });
 });
