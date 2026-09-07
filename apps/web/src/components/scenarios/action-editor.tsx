@@ -247,8 +247,20 @@ export default function ActionEditor({
   }
 
   useEffect(() => {
-    void load()
-  }, [load])
+    let cancelled = false
+    void Promise.all([
+      load(),
+      selectedAccountId
+        ? api.scenarios.getDraft(scenarioId, selectedAccountId).catch(() => null)
+        : Promise.resolve(null),
+    ]).then(([, draftResponse]) => {
+      if (cancelled) return
+      setDraftVersion(draftResponse?.success && draftResponse.data ? draftResponse.data.version : 0)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [load, scenarioId, selectedAccountId])
 
   useEffect(() => {
     if (!selectedAccountId) {

@@ -117,4 +117,17 @@ describe('V6 17-1-G の配線', () => {
     // 強調の記号は画面にそのまま出るので書かない。
     expect(PAGE).not.toMatch(/\*\*[^*\n]+\*\*[^\n]*<\/NoteBar>/)
   })
+
+  it('1件取得の形が壊れていても一覧から同じIDを探し、画面全体を落とさない', () => {
+    expect(PAGE).toContain('isMileageRewardSummary(detail.data)')
+    expect(PAGE).toContain('overview.data.rewards.find((item) => item.id === rewardId)')
+    expect(PAGE).toContain('const [detail, overview] = await Promise.all([')
+  })
+
+  it('共通アクションの公開版を選択肢から保存する', () => {
+    expect(PAGE).toContain('api.commonActions.resources(selectedAccountId)')
+    expect(PAGE).toContain('detail.data.currentPublishedVersionId')
+    expect(PAGE).toContain('公開中の共通アクションを選ぶ')
+    expect(PAGE).not.toContain('placeholder="共通アクションの版"')
+  })
 })
