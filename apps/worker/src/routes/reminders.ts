@@ -548,12 +548,22 @@ reminders.post('/api/reminders/:id/preview', async (c) => {
     const draft = await getReminderDraftVersion(c.env.DB, c.req.param('id'));
     if (!draft) return c.json({ success: false, error: '下書きが見つかりません' }, 404);
     const body = await c.req.json<{ targetDate?: unknown }>();
-    if (typeof body.targetDate !== 'string') {
-      return c.json({ success: false, error: '基準日を指定してください' }, 400);
-    }
-    const targetDate = new Date(body.targetDate);
-    if (Number.isNaN(targetDate.getTime())) {
-      return c.json({ success: false, error: '基準日が正しくありません' }, 400);
+    /*
+     * 目標日が無くても予定は返す。公開フローの画面は目標日を持たずに呼ぶ。
+     * 無いときは1週間後を仮の基準日にする（仮の日付は結果の targetDate に入る）。
+     * 文字列で来たのに日時として読めないものだけ 400 で止める。
+     */
+    let targetDate: Date;
+    if (body.targetDate === undefined || body.targetDate === null) {
+      targetDate = new Date(Date.now() + 7 * 86_400_000);
+    } else {
+      if (typeof body.targetDate !== 'string') {
+        return c.json({ success: false, error: '基準日を指定してください' }, 400);
+      }
+      targetDate = new Date(body.targetDate);
+      if (Number.isNaN(targetDate.getTime())) {
+        return c.json({ success: false, error: '基準日が正しくありません' }, 400);
+      }
     }
     const settings = parseReminderVersionSettings(draft);
     return c.json({ success: true, data: await previewReminderDraft(c.env.DB, settings, targetDate) });

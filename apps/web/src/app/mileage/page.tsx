@@ -21,6 +21,7 @@ import {
   type MileageEarningRulesV6Overview,
   type MileageFriendsV6Overview,
 } from '@/lib/api'
+import { csvCell } from '@/lib/presentation'
 import { formatMileageDate } from './mileage-display'
 import { mileagePaginationTotal } from './mileage-response-state'
 import { ruleEventLabel } from './earning-rule-view'
@@ -363,7 +364,7 @@ function MileagePageInner() {
       rule.published.status === 'published' ? '動いています' : '止めています',
     ])
     const csv = [['決めごと', '対象の行動', 'たまるマイル', 'この30日の付与回数', '失効', '状態'], ...rows]
-      .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))
+      .map((row) => row.map((value) => csvCell(value)).join(','))
       .join('\r\n')
     const url = URL.createObjectURL(
       new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }),
@@ -398,7 +399,7 @@ function MileagePageInner() {
       member.lastChangedAt ?? '',
     ])
     const csv = [['友だち', 'LINEアカウント', 'いまの残高', '確定待ち', '30日以内に失効', '最終変動'], ...rows]
-      .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))
+      .map((row) => row.map((value) => csvCell(value)).join(','))
       .join('\n')
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
@@ -474,7 +475,7 @@ function MileagePageInner() {
           className="h-10 min-w-64 rounded-control border border-hairline bg-canvas px-3 text-sm text-ink outline-none focus:border-accent"
         />
         <Button onClick={() => void reloadAll()}>残高を再読み込み</Button>
-        <Button onClick={exportBalancesCsv} disabled={members.length === 0} className="ml-auto">残高をCSVで書き出す</Button>
+        <Button onClick={exportBalancesCsv} disabled={members.length === 0} className="ml-auto">この頁の残高をCSVで書き出す</Button>
       </div>
       <div className="mb-4 flex flex-wrap items-center gap-2" aria-label="残高の絞り込み状況">
         <span className="rounded-full border border-accent bg-accent-soft px-3 py-2 text-xs font-semibold text-accent-hover">
@@ -660,7 +661,7 @@ function MileagePageInner() {
         <div className="mt-3 flex items-center justify-between gap-3">
           <p className="text-xs font-semibold tabular-nums text-ink-faint">
             {shownRules.length === rules.length
-              ? `決めごと ${rules.length}件のうち ${Math.min((rulePage - 1) * RULE_PAGE_SIZE + 1, shownRules.length)}〜${Math.min(rulePage * RULE_PAGE_SIZE, shownRules.length)}件を表示`
+              ? `決めごと ${rules.length}件のうち ${Math.min((rulePage - 1) * RULE_PAGE_SIZE + 1, shownRules.length)}〜${Math.min(rulePage * RULE_PAGE_SIZE, shownRules.length)}件を表示${rules.length >= 100 ? '(100件までしか読み込んでいないため、古いものは出ません)' : ''}`
               : `${shownRules.length}件 / 全 ${rules.length}件`}
           </p>
           {rulePageCount > 1 ? (

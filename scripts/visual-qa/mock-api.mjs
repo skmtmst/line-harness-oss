@@ -1512,7 +1512,26 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     ] }
   }
   if (pathname === '/api/friend-add-rules') {
-    return { success: true, data: FRIEND_ADD_RULES }
+    // 検索とフォルダ絞りはサーバ側で全件に効かせる (本物と同じ契約)。
+    const q = (query.get('q') ?? '').trim().toLocaleLowerCase('ja-JP')
+    const folder = query.get('folder') ?? ''
+    const items = FRIEND_ADD_RULES.items
+      .filter((item) => !q || item.name.toLocaleLowerCase('ja-JP').includes(q))
+      .filter((item) => !folder
+        || (folder === '__uncategorized' ? item.folderName == null : item.folderName === folder))
+    const counts = new Map()
+    for (const item of FRIEND_ADD_RULES.items) {
+      counts.set(item.folderName ?? null, (counts.get(item.folderName ?? null) ?? 0) + 1)
+    }
+    return {
+      success: true,
+      data: {
+        ...FRIEND_ADD_RULES,
+        items,
+        total: items.length,
+        folderCounts: Array.from(counts.entries()).map(([name, count]) => ({ name, count })),
+      },
+    }
   }
   if (pathname === '/api/friend-add-rules/conflicts') {
     return {
@@ -1775,6 +1794,8 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/friend-add-runs') {
     const status = query.get('status')
     const ruleId = query.get('rule_id')
+    const kind = query.get('kind')
+    const attribution = query.get('attribution')
     const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
     const limit = Number.isInteger(requestedLimit) && requestedLimit > 0
       ? Math.min(requestedLimit, 100)
@@ -1782,6 +1803,8 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const items = FRIEND_ADD_RUNS.items
       .filter((item) => !status || item.status === status)
       .filter((item) => !ruleId || item.rule?.id === ruleId)
+      .filter((item) => !kind || item.friendKind === kind)
+      .filter((item) => !attribution || item.attribution?.status === attribution)
       .slice(0, limit)
     return { success: true, data: { ...FRIEND_ADD_RUNS, items } }
   }

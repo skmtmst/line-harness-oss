@@ -20,6 +20,13 @@ function formatDateTime(value: string | null | undefined): string {
   return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(date)
 }
 
+function formatDate(value: string | null | undefined): string {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date)
+}
+
 function countLabel(value: number | null, unit: string): string {
   return value == null ? `—${unit}` : `${value.toLocaleString('ja-JP')}${unit}`
 }
@@ -100,9 +107,9 @@ export default function ReminderPublishFlow({ reminderId, stage }: { reminderId:
 function TargetStage({ settings, onChange, onNext, busy }: { settings: ReminderDraftSettings; onChange: (value: ReminderDraftSettings) => void; onNext: () => void; busy: boolean }) {
   const stop = settings.stopConditions
   return <div data-design-node="s7T2dz"><ReminderWorkspace aside={<><SummaryCard rows={[["基準日", '予約日時（Google Meet相談）'], ['対象者', '398人'], ['通知ステップ', '3件'], ['停止条件', '4件']]} /><ReminderPanel title="安全な運用" note="誤送信を防ぐための設定です。"><ul className="text-ink-secondary space-y-2 text-xs"><li>● 基準日が空欄なら開始しない</li><li>● 過去日時の通知は送らない</li><li>● 同じ時刻の重複送信をまとめる</li></ul></ReminderPanel></>}>
-    <ReminderPanel title="対象者の条件" note="どの友だちにリマインダを開始するか設定します。" action={<Button>条件を編集</Button>}><div className="rounded-lg border border-hairline p-3 text-xs"><b>予約ステータス「確定」かつ 担当者「河野」</b><div className="mt-3 grid grid-cols-3 gap-2"><Metric label="条件一致" value="426人" /><Metric label="開始予定" value="398人" success /><Metric label="除外" value="28人" warning /></div><p className="text-info mt-3">基準日が登録・変更された時点で対象を自動再判定します。</p></div></ReminderPanel>
+    <ReminderPanel title="対象者の条件" note="どの友だちにリマインダを開始するか設定します。"><div className="rounded-lg border border-hairline p-3 text-xs"><b>予約ステータス「確定」かつ 担当者「河野」</b><div className="mt-3 grid grid-cols-3 gap-2"><Metric label="条件一致" value="426人" /><Metric label="開始予定" value="398人" success /><Metric label="除外" value="28人" warning /></div><p className="text-info mt-3">基準日が登録・変更された時点で対象を自動再判定します。</p></div></ReminderPanel>
     <ReminderPanel title="終了・停止条件" note="不要になった通知を自動で止めます。"><div className="divide-y divide-hairline">{[["bookingCancelled",'予約がキャンセルされた','即時停止'],['supportMarkCompleted','対応マークが「完了」になった','残りを停止'],['daysAfterTarget','基準日を過ぎて7日経過','自動終了'],['friendBlocked','友だちがブロックした','即時停止']].map(([key,label,result]) => <label key={key} className="flex items-center gap-3 py-3 text-xs"><input type="checkbox" checked={key === 'daysAfterTarget' ? stop.daysAfterTarget != null : Boolean(stop[key as keyof typeof stop])} onChange={(event) => onChange({ ...settings, stopConditions: { ...stop, [key]: key === 'daysAfterTarget' ? event.target.checked ? 7 : null : event.target.checked } })} /><span className="flex-1 font-medium">{label}</span><Pill tone="success">{result}</Pill></label>)}</div></ReminderPanel>
-    <ReminderPanel title="完了後のアクション" action={<Button>＋ アクションを追加</Button>}><p className="text-xs">対応マークを「フォロー済み」に変更</p></ReminderPanel>
+    <ReminderPanel title="完了後のアクション"><p className="text-xs">対応マークを「フォロー済み」に変更</p></ReminderPanel>
     <ReminderFooter primary={busy ? '保存中…' : '配信予定へ'} primaryDisabled={busy} onPrimary={onNext} />
   </ReminderWorkspace></div>
 }
@@ -110,7 +117,7 @@ function TargetStage({ settings, onChange, onNext, busy }: { settings: ReminderD
 function PreviewStage({ settings, preview, onNext }: { settings: ReminderDraftSettings; preview: ReminderPreviewResult | null; onNext: () => void }) {
   const rows = preview?.items ?? []
   return <div data-design-node="JCz6J"><ReminderWorkspace aside={<><SummaryCard title="予定数" rows={[["対象者", preview ? countLabel(preview.summary.audience,'人') : '—人'], ['今後7日', preview ? countLabel(preview.summary.next7Days,'通') : '—通'], ['今後30日', preview ? countLabel(preview.summary.next30Days,'通') : '—通'], ['重複調整', preview ? countLabel(preview.summary.duplicateCount,'通') : '—通']]} /><ReminderPanel title="担当者通知" note="運用上の問題をSlackへ知らせます。"><ul className="text-xs leading-6"><li>基準日未設定</li><li>通知失敗</li><li>重複・時間外</li><li>対象人数の急増</li></ul></ReminderPanel><LinePreview caption="次は 8/24（月）09:00 に届きます">Kentaさん、明日のGoogle Meet相談のご案内です。{`\n`}日時：8/25（火）10:00{`\n`}参加URL：meet.google.com/xxx-xxxx-xxx{`\n\n`}Google Meetに参加</LinePreview></>}>
-    <ReminderPanel title="配信予定プレビュー" note="現在の基準日と通知ステップから、次の送信予定を確認します。"><div className="mb-3 flex gap-2"><Button variant="primary">今後7日</Button><Button>今後30日</Button><Button>競合のみ</Button></div>{!preview ? <ListState kind="loading" title="配信予定を確認しています" /> : <div className="overflow-hidden rounded-lg border border-hairline"><table className="w-full text-left text-xs"><thead className="bg-canvas-sunken"><TableHeadRow><Th>送信日時</Th><Th>通知</Th><Th>対象</Th><Th>状態</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{rows.map((item) => <tr key={item.stableStepId}><td className="p-2">{formatDateTime(item.scheduledAt)}</td><td><b>{item.label}</b><small className="block text-ink-faint">Google Meet相談 ／ {item.stepNumber}通目</small></td><td>{item.state === 'duplicate' ? '71人' : '82人'}</td><td><Pill tone={item.state === 'duplicate' ? 'warning' : 'success'}>{item.state === 'duplicate' ? '2人が重複' : '予定どおり'}</Pill></td></tr>)}</tbody></table></div>}</ReminderPanel>
+    <ReminderPanel title="配信予定プレビュー" note={preview ? `基準日を ${formatDate(preview.targetDate)} とした場合の送信予定です。` : '配信予定を確認しています。'}><div className="mb-3 flex gap-2"><Button variant="primary">今後7日</Button><Button>今後30日</Button><Button>競合のみ</Button></div>{!preview ? <ListState kind="loading" title="配信予定を確認しています" /> : <div className="overflow-hidden rounded-lg border border-hairline"><table className="w-full text-left text-xs"><thead className="bg-canvas-sunken"><TableHeadRow><Th>送信日時</Th><Th>通知</Th><Th>対象</Th><Th>状態</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{rows.map((item) => <tr key={item.stableStepId}><td className="p-2">{formatDateTime(item.scheduledAt)}</td><td><b>{item.label}</b><small className="block text-ink-faint">Google Meet相談 ／ {item.stepNumber}通目</small></td><td>{item.state === 'duplicate' ? '71人' : '82人'}</td><td><Pill tone={item.state === 'duplicate' ? 'warning' : 'success'}>{item.state === 'duplicate' ? '2人が重複' : '予定どおり'}</Pill></td></tr>)}</tbody></table></div>}</ReminderPanel>
     <ReminderPanel title="重複・時間帯の確認" note="送信前に問題になりそうな予定を自動検知します。"><div className="bg-warning-bg text-warning rounded-lg p-3 text-xs"><b>8/26 09:00に2人が重複</b><p>同じ友だちへの同時刻通知を1通にまとめます。</p></div><dl className="mt-3 grid grid-cols-3 gap-2 text-xs"><Metric label="送信可能時間" value="08:00〜21:00" /><Metric label="時間外の扱い" value="翌朝に繰り越す" /><Metric label="通知ステップ" value={`${settings.steps.length}件`} /></dl></ReminderPanel>
     <ReminderFooter primary="テスト送信へ" onPrimary={onNext} />
   </ReminderWorkspace></div>

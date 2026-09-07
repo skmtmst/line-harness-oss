@@ -214,4 +214,176 @@ describe('V6 friend-add rule data contracts', () => {
     ));
     expect(stop.status).toBe(409);
   });
+
+  it('実行結果の種類・経路の絞り込みをサーバ側で行い、不正な値は400にする', async () => {
+    seedRuleAndRun(testDb);
+    insertFriend(testDb.raw, 'friend-2', { line_account_id: 'account-1', display_name: '佐藤 花子' });
+    testDb.raw.prepare(
+      `INSERT INTO friend_add_events
+        (id, line_account_id, friend_id, webhook_event_id, friend_kind, attribution_status,
+         ref_code, entry_route_id, routing_rule_id, routing_status, occurred_at, processed_at,
+         winning_rule_version_id, scenario_enrollment_id, delivery_count, first_delivery_sent_at)
+       VALUES ('run-2', 'account-1', 'friend-2', 'webhook-2', 'returning', 'unavailable',
+               'REF002', 'route-1', 'rule-1', 'completed',
+               '2026-09-07T11:00:00.000', '2026-09-07T11:00:02.000', 'version-1',
+               NULL, 0, NULL)`,
+    ).run();
+
+    const returning = await app(testDb.db).request('/api/friend-add-runs?account_id=account-1&kind=returning');
+    expect(returning.status).toBe(200);
+    await expect(returning.json()).resolves.toMatchObject({
+      data: { items: [{ id: 'run-2' }], total: 1 },
+    });
+
+    const firstTime = await app(testDb.db).request('/api/friend-add-runs?account_id=account-1&kind=first_time');
+    expect(firstTime.status).toBe(200);
+    await expect(firstTime.json()).resolves.toMatchObject({
+      data: { items: [{ id: 'run-1' }], total: 1 },
+    });
+
+    const unavailable = await app(testDb.db).request('/api/friend-add-runs?account_id=account-1&attribution=unavailable');
+    expect(unavailable.status).toBe(200);
+    await expect(unavailable.json()).resolves.toMatchObject({
+      data: { items: [{ id: 'run-2' }], total: 1 },
+    });
+
+    const bogusKind = await app(testDb.db).request('/api/friend-add-runs?account_id=account-1&kind=bogus');
+    expect(bogusKind.status).toBe(400);
+    const bogusAttribution = await app(testDb.db).request('/api/friend-add-runs?account_id=account-1&attribution=bogus');
+    expect(bogusAttribution.status).toBe(400);
+  });
+
+  it('テストの失敗も成功時と同じ器で理由を返し、別アカウントは存在を隠す', async () => {
+    seedRuleAndRun(testDb);
+    const brokenDefinition = JSON.stringify({
+      routeIds: [], scenarioId: null, messageType: 'text', messageText: '',
+      timing: 'immediate', actions: [], friendCondition: '',
+      activeFrom: null, activeUntil: null, weekdays: [], timeWindows: [],
+    });
+    testDb.raw.prepare(
+      `INSERT INTO friend_add_rules
+        (id, line_account_id, friend_kind, name, priority, status, current_version_id, created_at, updated_at)
+       VALUES ('rule-3', 'account-1', 'first_time', '下書き案', 5, 'draft', NULL,
+               '2026-09-07T09:00:00.000', '2026-09-07T09:00:00.000')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO friend_add_rule_versions
+        (id, rule_id, version_number, definition_snapshot, status)
+       VALUES ('version-3', 'rule-3', 1, ?, 'draft')`,
+    ).run(brokenDefinition);
+
+    const failed = await app(testDb.db).request('/api/friend-add-rules/test', json(
+      'POST', { accountId: 'account-1', ruleId: 'rule-3' },
+    ));
+    // 400 にすると管理画面の共通取得部が本文を捨てるため、200 で理由を返す。
+    expect(failed.status).toBe(200);
+    await expect(failed.json()).resolves.toMatchObject({
+      success: false,
+      data: { matched: false, reasons: ['実際に配信するシナリオを決めてください。'] },
+    });
+
+    const succeeded = await app(testDb.db).request('/api/friend-add-rules/test', json(
+      'POST', { accountId: 'account-1', ruleId: 'rule-1' },
+    ));
+    expect(succeeded.status).toBe(200);
+    await expect(succeeded.json()).resolves.toMatchObject({
+      success: true,
+      data: { matched: true },
+    });
+
+    const hidden = await app(testDb.db).request('/api/friend-add-rules/test', json(
+      'POST', { accountId: 'account-2', ruleId: 'rule-1' },
+    ));
+    expect(hidden.status).toBe(404);
+  });
+
+  it('再追加の「何も配信しない」はシナリオなしで保存でき、それ以外は必須のまま', async () => {
+    seedRuleAndRun(testDb);
+    const base = {
+      accountId: 'account-1', friendKind: 'returning', name: '再追加なし', priority: 5,
+      definition: {
+        routeIds: [], scenarioId: null, returningMode: 'none', messageType: 'text', messageText: '',
+        timing: 'immediate', actions: [], friendCondition: '',
+        activeFrom: null, activeUntil: null, weekdays: [], timeWindows: [],
+      },
+    };
+    const noneOk = await app(testDb.db).request('/api/friend-add-rules/drafts', json(
+      'POST', base, 'friend-add-none-00001',
+    ));
+    expect(noneOk.status).toBe(201);
+
+    const missing = await app(testDb.db).request('/api/friend-add-rules/drafts', json(
+      'POST', { ...base, name: '再追加あり', definition: { ...base.definition, returningMode: undefined } },
+      'friend-add-none-00002',
+    ));
+    expect(missing.status).toBe(400);
+    await expect(missing.json()).resolves.toMatchObject({
+      success: false, error: '実際に配信するシナリオを決めてください。',
+    });
+  });
+
+  it('公開前の確認は鍵付きで返し、説明文はサーバ値をそのまま載せる', async () => {
+    seedRuleAndRun(testDb);
+    const validate = await app(testDb.db).request('/api/friend-add-rules/rule-1/validate?account_id=account-1', {
+      method: 'POST',
+    });
+    expect(validate.status).toBe(200);
+    await expect(validate.json()).resolves.toMatchObject({
+      data: {
+        checks: [
+          {
+            key: 'first_time', status: 'passed',
+            label: '配信内容と参照先を確認できました。',
+            detail: '保存済みのルールと参照先を確認できました。',
+          },
+          {
+            key: 'duplicate_prevention', status: 'passed',
+            label: '二重送信防止',
+            detail: '同じ友だち追加通知は1回だけ処理します。',
+          },
+        ],
+      },
+    });
+  });
+
+  it('一覧の検索とフォルダ絞りをサーバ側で行い、フォルダ件数は全ページの合計を返す', async () => {
+    seedRuleAndRun(testDb);
+    testDb.raw.prepare("UPDATE friend_add_rules SET folder_name = '紹介' WHERE id = 'rule-1'").run();
+
+    const searched = await app(testDb.db).request(
+      '/api/friend-add-rules?account_id=account-1&kind=first_time&q=' + encodeURIComponent('キャンペーン'),
+    );
+    expect(searched.status).toBe(200);
+    await expect(searched.json()).resolves.toMatchObject({
+      data: { items: [{ id: 'rule-2' }], total: 1 },
+    });
+
+    const foldered = await app(testDb.db).request(
+      '/api/friend-add-rules?account_id=account-1&kind=first_time&folder=' + encodeURIComponent('紹介'),
+    );
+    expect(foldered.status).toBe(200);
+    await expect(foldered.json()).resolves.toMatchObject({
+      data: { items: [{ id: 'rule-1' }], total: 1 },
+    });
+
+    const uncategorized = await app(testDb.db).request(
+      '/api/friend-add-rules?account_id=account-1&kind=first_time&folder=__uncategorized',
+    );
+    expect(uncategorized.status).toBe(200);
+    await expect(uncategorized.json()).resolves.toMatchObject({
+      // rule-2 と受け皿 (first_time) の2件。rule-1 は「紹介」へ移した。
+      data: { total: 2 },
+    });
+
+    const listed = await app(testDb.db).request('/api/friend-add-rules?account_id=account-1&kind=first_time');
+    expect(listed.status).toBe(200);
+    await expect(listed.json()).resolves.toMatchObject({
+      data: {
+        folderCounts: expect.arrayContaining([
+          expect.objectContaining({ name: '紹介', count: 1 }),
+          expect.objectContaining({ name: null, count: 2 }),
+        ]),
+      },
+    });
+  });
 });

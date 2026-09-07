@@ -37,6 +37,14 @@ import { getVisibleLineAccountScope } from '../services/account-access.js';
  *
  * 置き場は `account_settings`。`feature-settings.ts` と同じ判断で、
  * 新しいテーブルは作っていない。
+ *
+ * 旧互換の印 (#542 点検 #501 の二重実装): 設定の正本は新契約
+ * (`friend-add-rules.ts` + `friendAddRules`)。この旧口は webhook の実行経路
+ * (`routes/webhook.ts` → `services/friend-add-routing.ts`) が現役で使って
+ * いるため残す。設定画面からの参照は 0 件。新旧の対応:
+ * - 振り分け設定 GET/PUT/draft/validate/conflicts/test/publish → 新 rules 系
+ * - 実行履歴 events → 新 runs 系 (`GET /api/friend-add-runs`)
+ * 削除は本番の実行経路に触れるため、司令塔の判断待ち。
  */
 const friendAddRouting = new Hono<Env>();
 

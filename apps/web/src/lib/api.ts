@@ -3815,6 +3815,8 @@ export type FriendAddRuleListData = {
   items: FriendAddRule[]
   total: number
   nextCursor: string | null
+  /** フォルダ欄の件数。全ページの合計で、検索・絞りの影響を受けない。 */
+  folderCounts: Array<{ name: string | null; count: number }>
   summary: {
     rules: number
     active: number
@@ -7062,6 +7064,10 @@ export const api = {
    *
    * `configured: false` は「まだ決めていない」。このときは従来どおり
    * 有効な friend_add シナリオが全部流れている。
+   *
+   * @deprecated 旧互換。新契約は `friendAddRules` が正本。設定画面からの
+   * 参照は 0 件 (契約テストで保証)。Worker 側の旧口は webhook の実行経路が
+   * 使っているため残す。削除は司令塔の判断待ち (#542)。
    */
   friendAddRouting: {
     get: (accountId: string) =>
@@ -7140,11 +7146,17 @@ export const api = {
       status?: FriendAddRuleStatus
       cursor?: string
       limit?: number
+      /** 設定名の部分一致。サーバ側で全ページに効かせる。 */
+      q?: string
+      /** フォルダ名での絞り込み。未分類は '__uncategorized'。 */
+      folder?: string
     }) => {
       const query = new URLSearchParams({ account_id: accountId, kind })
       if (params?.status) query.set('status', params.status)
       if (params?.cursor) query.set('cursor', params.cursor)
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
+      if (params?.q) query.set('q', params.q)
+      if (params?.folder) query.set('folder', params.folder)
       return fetchApi<ApiResponse<FriendAddRuleListData>>(`/api/friend-add-rules?${query}`)
     },
     get: (accountId: string, ruleId: string) =>
@@ -7174,12 +7186,18 @@ export const api = {
     runs: (accountId: string, params?: {
       status?: FriendAddEventRoutingStatus
       ruleId?: string
+      /** 追加の種類での絞り込み。サーバ側で全ページに効かせる。 */
+      kind?: FriendAddEventKind
+      /** 流入経路の取得状態での絞り込み。サーバ側で全ページに効かせる。 */
+      attribution?: FriendAddEventAttributionStatus
       cursor?: string
       limit?: number
     }) => {
       const query = new URLSearchParams({ account_id: accountId })
       if (params?.status) query.set('status', params.status)
       if (params?.ruleId) query.set('rule_id', params.ruleId)
+      if (params?.kind) query.set('kind', params.kind)
+      if (params?.attribution) query.set('attribution', params.attribution)
       if (params?.cursor) query.set('cursor', params.cursor)
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
       return fetchApi<ApiResponse<FriendAddRunList>>(`/api/friend-add-runs?${query}`)
@@ -7198,7 +7216,13 @@ export const api = {
     validate: (accountId: string, ruleId: string) =>
       fetchApi<ApiResponse<{
         canPublish: boolean
-        checks: Array<{ status: 'passed' | 'failed'; label: string }>
+        /** 鍵付きの確認。画面は鍵で突き合わせ、順番に意味を持たせない。 */
+        checks: Array<{
+          key: 'first_time' | 'returning' | 'actions' | 'duplicate_prevention'
+          status: 'passed' | 'failed'
+          label: string
+          detail: string
+        }>
       }>>(`/api/friend-add-rules/${encodeURIComponent(ruleId)}/validate?account_id=${encodeURIComponent(accountId)}`, {
         method: 'POST',
       }),
@@ -7211,7 +7235,20 @@ export const api = {
         scenarioId: string | null
         message: string | null
         actions: FriendAddRuleAction[]
-      }>>('/api/friend-add-rules/test', {
+      }> | {
+        success: false
+        error: string
+        /** 失敗時も理由を返す (成功時と同じ器・HTTP 200)。 */
+        data: {
+          stateChanged: false
+          ruleId: string
+          matched: false
+          reasons: string[]
+          scenarioId: string | null
+          message: string | null
+          actions: FriendAddRuleAction[]
+        }
+      }>('/api/friend-add-rules/test', {
         method: 'POST',
         body: JSON.stringify({ accountId, ruleId }),
       }),
