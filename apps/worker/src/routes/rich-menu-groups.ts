@@ -339,6 +339,10 @@ function parseCreateBody(raw: unknown): Parsed<CreateRichMenuGroupInput> {
   if (typeof r.size !== 'string' || !VALID_SIZES.has(r.size)) return { ok: false, error: 'size must be large or compact' };
   const pages = parsePages(r.pages);
   if (!pages.ok) return pages;
+  // #502中: 作成直後のフォルダ付けupdate握りつぶしをなくすため、作成口で直接受け付ける。
+  if (r.folderId !== undefined && r.folderId !== null && typeof r.folderId !== 'string') {
+    return { ok: false, error: 'folderId must be a string or null' };
+  }
   return {
     ok: true,
     value: {
@@ -347,6 +351,7 @@ function parseCreateBody(raw: unknown): Parsed<CreateRichMenuGroupInput> {
       chatBarText: r.chatBarText,
       size: r.size as 'large' | 'compact',
       pages: pages.value,
+      folderId: (r.folderId as string | null | undefined) ?? null,
     },
   };
 }
@@ -435,12 +440,18 @@ richMenuGroups.get('/api/rich-menu-groups/external/:richMenuId/image', async (c)
   const account = await getLineAccountById(c.env.DB, accountId);
   if (!account) return c.json({ success: false, error: 'line account not found' }, 404);
   const res = await fetch(
-    `https://api-data.line.me/v2/bot/richmenu/${richMenuId}/content`,
+    `https://api-data.line.me/v2/bot/richmenu/${encodeURIComponent(richMenuId)}/content`,
     { headers: { Authorization: `Bearer ${account.channel_access_token}` } },
   );
   if (!res.ok) {
+    // #502中: 不正なIDでURLが化けないよう符号化し、外部の応答本文は利用者に出さない。
     return c.json(
-      { success: false, error: `LINE image fetch failed: ${res.status}` },
+      {
+        success: false,
+        error: res.status === 404
+          ? 'LINE上に画像が見つかりませんでした'
+          : 'LINEから画像を取得できませんでした',
+      },
       res.status === 404 ? 404 : 500,
     );
   }
@@ -487,13 +498,19 @@ richMenuGroups.post('/api/rich-menu-groups/import', requireRole('owner', 'admin'
   const auth = `Bearer ${account.channel_access_token}`;
 
   // 1. LINE から rich menu 詳細を取得
-  const detailRes = await fetch(`https://api.line.me/v2/bot/richmenu/${richMenuId}`, {
+  const detailRes = await fetch(`https://api.line.me/v2/bot/richmenu/${encodeURIComponent(richMenuId)}`, {
     headers: { Authorization: auth },
   });
   if (!detailRes.ok) {
+    // #502中: 外部の応答本文をそのまま利用者に返さない。固定の日本語に置き換える。
     return c.json(
-      { success: false, error: `LINE 詳細取得失敗: ${detailRes.status} ${await detailRes.text()}` },
-      500,
+      {
+        success: false,
+        error: detailRes.status === 404
+          ? 'LINE上にメニューが見つかりませんでした'
+          : 'LINEからメニューを取得できませんでした',
+      },
+      detailRes.status === 404 ? 404 : 500,
     );
   }
   type LineArea = {
@@ -762,13 +779,14 @@ richMenuGroups.delete('/api/rich-menu-groups/external/:richMenuId', requireRole(
   }
 
   const auth = `Bearer ${account.channel_access_token}`;
-  const res = await fetch(`https://api.line.me/v2/bot/richmenu/${richMenuId}`, {
+  const res = await fetch(`https://api.line.me/v2/bot/richmenu/${encodeURIComponent(richMenuId)}`, {
     method: 'DELETE',
     headers: { Authorization: auth },
   });
   if (!res.ok && res.status !== 404) {
+    // #502中: 外部の応答本文をそのまま利用者に返さない。固定の日本語に置き換える。
     return c.json(
-      { success: false, error: `LINE delete failed: ${res.status} ${await res.text()}` },
+      { success: false, error: 'LINE上のメニューを削除できませんでした' },
       500,
     );
   }
@@ -889,11 +907,25 @@ richMenuGroups.get(
   },
 );
 
+/** 条件の複雑さの上限 (#502中)。重い条件の連打でDB負荷になるため入り口で断る。 */
+const PREVIEW_MAX_RULES = 50;
+const PREVIEW_MAX_DEPTH = 5;
+
+function countPreviewRules(condition: SegmentCondition, depth: number): number {
+  if (depth > PREVIEW_MAX_DEPTH) return Number.POSITIVE_INFINITY;
+  let count = Array.isArray(condition.rules) ? condition.rules.length : 0;
+  for (const nested of condition.groups ?? []) {
+    count += countPreviewRules(nested, depth + 1);
+  }
+  return count;
+}
+
 /**
  * 「誰に出すか」の件数。取得できない値を0へ丸めず、state/reasonを返す。
  * 上位条件のどれかにも一致する人を重複として1回だけ数える。
+ * 保存(PATCH)と同じく owner/admin のみ。人数の列挙を権限の弱い職員に開かない。
  */
-richMenuGroups.post('/api/rich-menu-groups/:groupId/preview-targets', async (c) => {
+richMenuGroups.post('/api/rich-menu-groups/:groupId/preview-targets', requireRole('owner', 'admin'), async (c) => {
   const group = await getRichMenuGroupById(c.env.DB, c.req.param('groupId'));
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
     return c.json({ success: false, error: 'not found' }, 404);
@@ -919,6 +951,9 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/preview-targets', async (c) 
       || !Array.isArray(condition.rules))
   ) {
     return c.json({ success: false, error: 'conditions are invalid' }, 400);
+  }
+  if (condition && countPreviewRules(condition, 1) > PREVIEW_MAX_RULES) {
+    return c.json({ success: false, error: '条件が複雑すぎます。条件を減らしてください' }, 400);
   }
 
   try {
@@ -1154,6 +1189,63 @@ richMenuGroups.patch('/api/rich-menu-groups/:groupId', requireRole('owner', 'adm
   if (!refreshed) return c.json({ success: false, error: 'group disappeared after update' }, 500);
   return c.json({ success: true, data: serializeGroupWithPages(refreshed) });
 });
+
+/**
+ * 優先順と自分で決めた並び順の一括更新 (#502中)。
+ * 全件ぶん PATCH を並列に投げると台数比例で増え、途中失敗で順番が
+ * 中途半端に残る。id 配列を1回で受け、1 batch で 0,1,2…へそろえる。
+ * 全部入りでなければ 400 (隠れているメニューの優先関係を壊さない)。
+ */
+richMenuGroups.post(
+  '/api/rich-menu-groups/reorder-priorities',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: 'invalid JSON body' }, 400);
+    }
+    const r = (body ?? {}) as { accountId?: unknown; orderedIds?: unknown };
+    if (typeof r.accountId !== 'string' || r.accountId.length === 0) {
+      return c.json({ success: false, error: 'accountId required' }, 400);
+    }
+    if (!Array.isArray(r.orderedIds) || r.orderedIds.some((id) => typeof id !== 'string')) {
+      return c.json({ success: false, error: 'orderedIds must be string array' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [r.accountId])) {
+      return c.json({ success: false, error: 'line account not found' }, 404);
+    }
+    const current = await getRichMenuGroups(c.env.DB, r.accountId);
+    const currentIds = new Set(current.map((g) => g.id));
+    const seen = new Set<string>();
+    const hasAll = r.orderedIds.length === current.length
+      && r.orderedIds.every((id) => {
+        if (seen.has(id) || !currentIds.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
+    if (!hasAll) {
+      return c.json(
+        { success: false, error: 'orderedIds must contain every group of the account exactly once' },
+        400,
+      );
+    }
+    const now = jstNow();
+    await c.env.DB.batch(
+      r.orderedIds.map((id, index) =>
+        c.env.DB
+          .prepare(
+            `UPDATE rich_menu_groups
+                SET targeting_priority = ?, display_order = ?, updated_at = ?
+              WHERE id = ? AND account_id = ?`,
+          )
+          .bind(index, index, now, id, r.accountId),
+      ),
+    );
+    return c.json({ success: true, data: { updated: r.orderedIds.length } });
+  },
+);
 
 richMenuGroups.delete('/api/rich-menu-groups/:groupId', requireRole('owner', 'admin'), async (c) => {
   const groupId = c.req.param('groupId');
@@ -1607,6 +1699,13 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/apply-to-tag', requireRole('
   }
 
   // ---- mode: bulk-link (タグ or 全 follower に link) ----
+  // #502中: 予約口と同じく Idempotency-Key を必須にする。同じ鍵での
+  // やり直しは同じ runId になり、台帳への記録は ON CONFLICT で重複しない。
+  // LINE への link 自体は同じメニューの付け直しで無害。
+  const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
+  if (!idempotencyKey) {
+    return c.json({ success: false, error: 'Idempotency-Key header required' }, 400);
+  }
   const userIds = await getFollowingLineUserIdsByTag(
     c.env.DB,
     group.account_id,
@@ -1615,13 +1714,13 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/apply-to-tag', requireRole('
   if (userIds.length === 0) {
     return c.json({
       success: true,
-      data: { chunks: 0, total: 0, message: 'no matching followers' },
+      data: { chunks: 0, total: 0, runId: idempotencyKey, message: 'no matching followers' },
     });
   }
 
+  let completedChunks = 0;
   try {
     const line = createLineClient(account.channel_access_token);
-    const assignmentRunId = crypto.randomUUID();
     const result = await linkRichMenuBulkChunked(
       line,
       targetPage.line_richmenu_id,
@@ -1633,14 +1732,20 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/apply-to-tag', requireRole('
           lineRichMenuId: targetPage.line_richmenu_id!,
           lineUserIds: linkedUserIds,
           reasonKind: tagId ? 'tag_bulk_apply' : 'all_followers_bulk_apply',
-          reasonEventId: assignmentRunId,
-          idempotencyPrefix: `${assignmentRunId}:${chunkIndex}`,
+          reasonEventId: idempotencyKey,
+          idempotencyPrefix: `${idempotencyKey}:${chunkIndex}`,
         });
+        completedChunks = chunkIndex + 1;
       },
     );
-    return c.json({ success: true, data: result });
+    return c.json({ success: true, data: { ...result, runId: idempotencyKey } });
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    return c.json({ success: false, error: message }, 500);
+    // どこまで届いたか分からないままにしない。同じ鍵でやり直せるよう
+    // runId と済んだ chunk 数を返す (途中からの再開には未対応)。
+    return c.json({
+      success: false,
+      error: '一括適用の途中で失敗しました。同じ操作でやり直せます',
+      data: { runId: idempotencyKey, completedChunks, total: userIds.length },
+    }, 500);
   }
 });

@@ -120,7 +120,12 @@ export interface CommonActionResources {
   notificationRules: Array<{ id: string; name: string }>;
   webhooks: Array<{ id: string; name: string }>;
   richMenus: Array<{ id: string; name: string }>;
-  commonActions: Array<{ id: string; name: string; version: number }>;
+  commonActions: Array<{
+    id: string;
+    name: string;
+    version: number;
+    currentPublishedVersionId: string;
+  }>;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -671,7 +676,8 @@ export async function listCommonActionResources(
         ORDER BY g.name ASC, p.order_index ASC`,
     ).bind(input.lineAccountId).all<{ id: string; name: string }>(),
     db.prepare(
-      `SELECT ca.id, ca.name, cav.version_number AS version
+      `SELECT ca.id, ca.name, cav.version_number AS version,
+              ca.current_published_version_id
          FROM common_actions ca
          JOIN common_action_versions cav
            ON cav.id = ca.current_published_version_id AND cav.common_action_id = ca.id
@@ -683,7 +689,12 @@ export async function listCommonActionResources(
       input.lineAccountId,
       input.excludeCommonActionId ?? '',
       input.excludeCommonActionId ?? '',
-    ).all<{ id: string; name: string; version: number }>(),
+    ).all<{
+      id: string;
+      name: string;
+      version: number;
+      current_published_version_id: string;
+    }>(),
   ]);
   const objectSchema = (
     required: string[],
@@ -721,7 +732,12 @@ export async function listCommonActionResources(
     notificationRules: notificationRules.results ?? [],
     webhooks: webhooks.results ?? [],
     richMenus: richMenus.results ?? [],
-    commonActions: commonActionRows.results ?? [],
+    commonActions: (commonActionRows.results ?? []).map((row) => ({
+      id: row.id,
+      name: row.name,
+      version: row.version,
+      currentPublishedVersionId: row.current_published_version_id,
+    })),
   };
 }
 

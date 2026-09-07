@@ -20,6 +20,12 @@ class MockCommonVarFolderError extends Error {
   }
 }
 
+class MockCommonVarKeyConflictError extends Error {
+  constructor() {
+    super('key conflict');
+  }
+}
+
 const mocks = {
   getMedia: vi.fn(),
   countMedia: vi.fn(),
@@ -47,8 +53,10 @@ const mocks = {
   countCommonVars: vi.fn(),
   COMMON_VARS_LIST_LIMIT: 200,
   CommonVarFolderError: MockCommonVarFolderError,
+  CommonVarKeyConflictError: MockCommonVarKeyConflictError,
   getCommonVarUsageSummaries: vi.fn(),
   getCommonVarById: vi.fn(),
+  getCommonVarByIdIncludingArchived: vi.fn(),
   createCommonVar: vi.fn(),
   updateCommonVar: vi.fn(),
   deleteCommonVar: vi.fn(),
@@ -313,6 +321,9 @@ beforeEach(() => {
     id === 'cv-2'
       ? { ...VAR, id: 'cv-2', name: '新営業時間', var_key: 'new_hours', value: '11-20', version: 1 }
       : VAR);
+  mocks.getCommonVarByIdIncludingArchived.mockImplementation(
+    async (_db: D1Database, id: string) => id === 'missing' ? null : VAR,
+  );
   mocks.createCommonVar.mockResolvedValue(VAR);
   mocks.updateCommonVar.mockResolvedValue(VAR);
   mocks.getCommonVarUsageImpact.mockResolvedValue(EMPTY_COMMON_VAR_IMPACT);
@@ -938,6 +949,22 @@ describe('共通情報', () => {
     });
   });
 
+  it('アーカイブ済みの詳細は履歴を返し、同じ差し込み名の使用先を再走査しない', async () => {
+    mocks.getCommonVarByIdIncludingArchived.mockResolvedValue({
+      ...VAR, archived_at: '2026-09-08T10:00:00.000+09:00', version: 4,
+    });
+    const res = await req('/api/common-vars/cv-1?accountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: {
+        id: 'cv-1', archivedAt: '2026-09-08T10:00:00.000+09:00',
+        usageCount: 0, usages: [], history: [{ version: 3 }],
+      },
+    });
+    expect(mocks.getCommonVarUsageImpact).not.toHaveBeenCalled();
+    expect(mocks.getCommonVarVersions).toHaveBeenCalledWith(env.DB, 'cv-1', 'account-1', 20);
+  });
+
   it('詳細の所属外は404、走査失敗は0件にせず503', async () => {
     accessMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
     expect((await req('/api/common-vars/cv-1?accountId=other', 'GET')).status).toBe(404);
@@ -958,9 +985,18 @@ describe('共通情報', () => {
   });
 
   it('重複したら409', async () => {
-    mocks.createCommonVar.mockRejectedValue(new Error('UNIQUE constraint failed'));
+    mocks.createCommonVar.mockRejectedValue(new MockCommonVarKeyConflictError());
     const res = await req('/api/common-vars', 'POST', { accountId: 'account-1', name: 'x', varKey: 'dup' });
     expect(res.status).toBe(409);
+  });
+
+  it('所属外アカウントの重複有無を調べず404にする', async () => {
+    accessMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
+    const res = await req('/api/common-vars', 'POST', {
+      accountId: 'other-account', name: 'x', varKey: 'dup',
+    });
+    expect(res.status).toBe(404);
+    expect(mocks.createCommonVar).not.toHaveBeenCalled();
   });
 
   it('差し込み名は変えられない', async () => {
@@ -1332,7 +1368,7 @@ describe('共通情報', () => {
   it('未使用なら影響確認後に削除できる', async () => {
     const res = await req('/api/common-vars/cv-1?accountId=account-1', 'DELETE');
     expect(res.status).toBe(200);
-    expect(mocks.deleteCommonVar).toHaveBeenCalledWith(env.DB, 'cv-1', 'account-1');
+    expect(mocks.deleteCommonVar).toHaveBeenCalledWith(env.DB, 'cv-1', 'account-1', 'u-1');
   });
 
   it('差し替え候補は専用APIから取得できる', async () => {

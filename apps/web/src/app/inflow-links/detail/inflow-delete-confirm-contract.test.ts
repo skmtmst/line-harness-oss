@@ -25,4 +25,11 @@ describe('V6 流入リンクの削除確認 UIaM7', () => {
     )
     expect(PAGE).toContain('if (!route || deleting) return')
   })
+
+  it('転送先は利用者に選ばせ、先頭の自動採用をしない (#514 重大4)', () => {
+    expect(PAGE).toContain('inflow-redirect-target')
+    expect(PAGE).toContain('転送先のリンクを選んでください')
+    expect(PAGE).toContain('redirectTargetId')
+    expect(PAGE).not.toContain('routes.find((candidate) => candidate.id !== route.id)')
+  })
 })
