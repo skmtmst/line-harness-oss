@@ -1629,7 +1629,12 @@ export type CommonActionResources = {
   notificationRules?: Array<{ id: string; name: string }>;
   webhooks: Array<{ id: string; name: string }>;
   richMenus: Array<{ id: string; name: string }>;
-  commonActions: Array<{ id: string; name: string; version: number }>;
+  commonActions: Array<{
+    id: string;
+    name: string;
+    version: number;
+    currentPublishedVersionId: string | null;
+  }>;
 };
 
 export type BroadcastInsight = {
@@ -2767,10 +2772,10 @@ export type ScenarioSimulation = {
   }>
 }
 
-export type ScenarioUnavailableMetric = {
-  value: null
-  state: 'unavailable'
-  reason: string
+export type ScenarioMeasuredMetric = {
+  value: number | null
+  state: 'available' | 'unavailable'
+  reason?: string
 }
 
 /** 購読・テスト送信・送信枠・通別結果をまとめた機能5 V6の読取結果。 */
@@ -2808,9 +2813,9 @@ export type ScenarioRuns = {
     id: string
     stepOrder: number
     delivered: number
-    opened: ScenarioUnavailableMetric
-    clicked: ScenarioUnavailableMetric
-    failed: ScenarioUnavailableMetric
+    opened: ScenarioMeasuredMetric
+    clicked: ScenarioMeasuredMetric
+    failed: ScenarioMeasuredMetric
   }>
 }
 
@@ -5200,19 +5205,54 @@ export const api = {
       fetchApi<ApiResponse<null>>(`/api/tag-groups/${id}`, { method: 'DELETE' }),
   },
   scenarios: {
-    list: (params?: { accountId?: string }) => {
-      const query = params?.accountId ? '?lineAccountId=' + params.accountId : ''
+    listPage: (params?: {
+      accountId?: string
+      page?: number
+      limit?: number
+      query?: string
+      active?: 0 | 1
+      createdFrom?: string
+      folderId?: string
+    }, signal?: AbortSignal) => {
+      const query = new URLSearchParams()
+      if (params?.accountId) query.set('lineAccountId', params.accountId)
+      if (params?.page !== undefined) query.set('page', String(params.page))
+      if (params?.limit !== undefined) query.set('limit', String(params.limit))
+      if (params?.query) query.set('query', params.query)
+      if (params?.active !== undefined) query.set('active', String(params.active))
+      if (params?.createdFrom) query.set('createdFrom', params.createdFrom)
+      if (params?.folderId) query.set('folderId', params.folderId)
       return fetchApi<
         ApiResponse<
-          (Scenario & {
-            stepCount?: number
-            /** いま流れている人 */
-            subscriberCount?: number
-            /** 最後まで届いた人 */
-            completedCount?: number
-          })[]
+          {
+            items: (Scenario & {
+              stepCount?: number
+              /** いま流れている人 */
+              subscriberCount?: number
+              /** 最後まで届いた人 */
+              completedCount?: number
+            })[]
+            total: number
+            limit: number
+            sort: Array<{ field: string; direction: 'asc' | 'desc' }>
+          }
         >
-      >('/api/scenarios' + query)
+      >(`/api/scenarios${query.size ? `?${query}` : ''}`, { signal })
+    },
+    /** 選択肢など既存の全件利用は配列のまま読み替える。新しい一覧画面は listPage を使う。 */
+    list: async (params?: { accountId?: string; limit?: number }) => {
+      const query = new URLSearchParams()
+      if (params?.accountId) query.set('lineAccountId', params.accountId)
+      query.set('limit', String(params?.limit ?? 200))
+      const response = await fetchApi<ApiResponse<{
+        items: (Scenario & { stepCount?: number; subscriberCount?: number; completedCount?: number })[]
+        total: number
+        limit: number
+        sort: Array<{ field: string; direction: 'asc' | 'desc' }>
+      }>>(`/api/scenarios?${query}`)
+      return response.success
+        ? { success: true as const, data: response.data.items }
+        : response
     },
     get: (id: string) =>
       fetchApi<ApiResponse<Scenario & { steps: ScenarioStep[] }>>(`/api/scenarios/${id}`),
@@ -5568,7 +5608,19 @@ export const api = {
     testSend: (id: string) =>
       fetchApi<{ success: boolean; sent?: number; failed?: number; error?: string }>(`/api/broadcasts/${id}/test-send`, { method: 'POST' }),
     getProgress: (id: string) =>
-      fetchApi<{ success: boolean; data?: { status: string; totalCount: number; successCount: number; batchOffset: number } }>(`/api/broadcasts/${id}/progress`),
+      fetchApi<{ success: boolean; data?: {
+        status: string
+        totalCount: number
+        successCount: number
+        batchOffset: number
+        perAccountStats: Array<{
+          accountId: string
+          accountName: string
+          sent: number
+          uniqueImpression: number | null
+          uniqueClick: number | null
+        }>
+      } }>(`/api/broadcasts/${id}/progress`),
     previewCount: (id: string) =>
       fetchApi<{
         success: boolean;

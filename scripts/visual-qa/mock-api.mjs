@@ -1783,6 +1783,16 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       || left.id.localeCompare(right.id)
     ))
     const offset = (page - 1) * limit
+    const nameQuery = (query.get('query') ?? '').trim().toLocaleLowerCase('ja-JP')
+    const active = query.get('active')
+    const createdFrom = query.get('createdFrom')
+    const folderId = query.get('folderId')
+    const filtered = FRIEND_SCENARIOS
+      .filter((item) => !nameQuery || item.name.toLocaleLowerCase('ja-JP').includes(nameQuery))
+      .filter((item) => active !== '0' || !item.isActive)
+      .filter((item) => !createdFrom || item.createdAt >= createdFrom)
+      .filter((item) => !folderId
+        || (folderId === '__unfiled__' ? !item.folderId : item.folderId === folderId))
     return {
       success: true,
       data: {
@@ -1837,6 +1847,25 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       .filter((item) => !attribution || item.attribution?.status === attribution)
       .slice(0, limit)
     return { success: true, data: { ...FRIEND_ADD_RUNS, items } }
+  }
+  if (pathname === '/api/scenarios') {
+    const requestedPage = Number.parseInt(query.get('page') ?? '', 10)
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 200) : 50
+    const offset = (page - 1) * limit
+    return {
+      success: true,
+      data: {
+        items: filtered.slice(offset, offset + limit),
+        total: filtered.length,
+        limit,
+        sort: [
+          { field: 'createdAt', direction: 'desc' },
+          { field: 'id', direction: 'desc' },
+        ],
+      },
+    }
   }
   if (/^\/api\/scenarios\/[^/]+\/stats$/.test(pathname)) return { success: true, data: SCENARIO_STATS }
   if (/^\/api\/scenarios\/[^/]+\/simulate$/.test(pathname)) return { success: true, data: SCENARIO_SIMULATION }

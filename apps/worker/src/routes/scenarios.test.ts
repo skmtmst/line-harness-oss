@@ -57,14 +57,26 @@ function makeScenarioDb(rows: ScenarioRow[]) {
         },
         async all<_T>() {
           calls.push({ sql, binds: bound });
-          if (/FROM scenarios s\b/i.test(sql)) {
-            const [lineAccountId] = bound as [string];
+          if (/SELECT s\.\*, COUNT\(ss\.id\)/i.test(sql)) {
+            const [lineAccountId, limit, offset] = bound as [string, number, number];
             const includeGlobal = /line_account_id IS NULL/i.test(sql);
             const filtered = rows.filter((r) =>
               r.line_account_id === lineAccountId || (includeGlobal && r.line_account_id == null));
-            return { results: filtered };
+            return { results: filtered.slice(offset, offset + limit) };
           }
           return { results: [] };
+        },
+        async first<_T>() {
+          calls.push({ sql, binds: bound });
+          if (/COUNT\(\*\) AS total FROM scenarios/i.test(sql)) {
+            const [lineAccountId] = bound as [string];
+            const includeGlobal = /line_account_id IS NULL/i.test(sql);
+            return {
+              total: rows.filter((r) =>
+                r.line_account_id === lineAccountId || (includeGlobal && r.line_account_id == null)).length,
+            } as _T;
+          }
+          return null;
         },
       };
       return stmt;
@@ -128,42 +140,46 @@ describe('GET /api/scenarios?lineAccountId=X', () => {
 
     const res = await setupApp(db).request('/api/scenarios?lineAccountId=acc-1');
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { success: boolean; data: { id: string; lineAccountId: string | null }[] };
+    const body = (await res.json()) as { success: boolean; data: { items: { id: string; lineAccountId: string | null }[]; total: number; limit: number } };
     expect(body.success).toBe(true);
     // webhook.ts:211 / liff.ts:878 trigger scenarios where line_account_id is
     // NULL (global) OR matches the active account. The list endpoint must
     // mirror that so the UI does not hide records the engine will fire.
-    const ids = body.data.map((d) => d.id).sort();
+    const ids = body.data.items.map((d) => d.id).sort();
     expect(ids).toEqual(['s-acc1', 's-global']);
     // Serializer surfaces the binding so the UI can distinguish 全アカ共通 from
     // an account-specific scenario.
-    const globalRow = body.data.find((d) => d.id === 's-global');
+    const globalRow = body.data.items.find((d) => d.id === 's-global');
     expect(globalRow?.lineAccountId).toBeNull();
     // 一覧を引くクエリは1本だけ。人数の集計は別に1本走るので、
     // 本数ではなく「一覧を引くもの」を選んで見る。
-    const listCalls = calls.filter((c) => /FROM scenarios s\b/i.test(c.sql));
+    const listCalls = calls.filter((c) => /SELECT s\.\*, COUNT\(ss\.id\)/i.test(c.sql));
     expect(listCalls).toHaveLength(1);
     expect(listCalls[0].sql).toMatch(/line_account_id IS NULL/);
     expect(listCalls[0].sql).toMatch(/s\.line_account_id = \?/);
-    expect(listCalls[0].binds).toEqual(['acc-1']);
+    expect(listCalls[0].binds).toEqual(['acc-1', 50, 0]);
 
     // 購読中と読了済は、シナリオごとに引かず1回でまとめて数える。
     // 件数ぶん往復すると、シナリオが増えるほど一覧が遅くなる。
     const countCalls = calls.filter((c) => /FROM friend_scenarios/i.test(c.sql));
     expect(countCalls).toHaveLength(1);
+    expect(countCalls[0].sql).toMatch(/f\.line_account_id IN/);
+    expect(countCalls[0].binds).toEqual(expect.arrayContaining(['acc-1']));
   });
 
-  test('falls back to getScenarios helper when no lineAccountId is provided', async () => {
-    dbMocks.getScenarios.mockResolvedValue([
-      { id: 's-x', name: 'x', line_account_id: null, ...rowBase },
+  test('lineAccountId が無くても可視範囲をDB側で絞ってページ化する', async () => {
+    const { db, calls } = makeScenarioDb([
+      { id: 's-x', name: 'x', line_account_id: 'acc-1', ...rowBase },
+      { id: 's-hidden', name: 'hidden', line_account_id: 'acc-2', ...rowBase },
     ]);
-    const { db } = makeScenarioDb([]);
 
     const res = await setupApp(db).request('/api/scenarios');
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { success: boolean; data: { id: string }[] };
-    expect(body.data.map((d) => d.id)).toEqual(['s-x']);
-    expect(dbMocks.getScenarios).toHaveBeenCalledTimes(1);
+    const body = (await res.json()) as { success: boolean; data: { items: { id: string }[] } };
+    expect(body.data.items.map((d) => d.id)).toEqual(['s-x']);
+    const listCall = calls.find((call) => /SELECT s\.\*, COUNT\(ss\.id\)/i.test(call.sql));
+    expect(listCall?.sql).toMatch(/s\.line_account_id IN/);
+    expect(listCall?.binds).toEqual(['acc-1', 50, 0]);
   });
 
   test('returns empty array when filter matches nothing and no globals exist', async () => {
@@ -174,8 +190,9 @@ describe('GET /api/scenarios?lineAccountId=X', () => {
 
     const res = await setupApp(db).request('/api/scenarios?lineAccountId=acc-1');
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { success: boolean; data: unknown[] };
-    expect(body.data).toEqual([]);
+    const body = (await res.json()) as { success: boolean; data: { items: unknown[]; total: number } };
+    expect(body.data.items).toEqual([]);
+    expect(body.data.total).toBe(0);
   });
 
   test('担当外アカウントの一覧は存在を隠す', async () => {
@@ -193,15 +210,47 @@ describe('GET /api/scenarios?lineAccountId=X', () => {
       { id: 's-acc1', name: 'acc1', line_account_id: 'acc-1', ...rowBase },
     ]);
     const res = await setupApp(db).request('/api/scenarios?lineAccountId=acc-1');
-    const body = await res.json() as { data: Array<{ id: string }> };
-    expect(body.data.map((item) => item.id)).toEqual(['s-acc1']);
+    const body = await res.json() as { data: { items: Array<{ id: string }> } };
+    expect(body.data.items.map((item) => item.id)).toEqual(['s-acc1']);
+  });
+
+  test('limit は200へ丸め、page から offset を計算する', async () => {
+    const { db, calls } = makeScenarioDb([
+      { id: 's-1', name: 'one', line_account_id: 'acc-1', ...rowBase },
+    ]);
+    const res = await setupApp(db).request('/api/scenarios?lineAccountId=acc-1&limit=999&page=3');
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: { limit: number; sort: unknown[] } };
+    expect(body.data.limit).toBe(200);
+    expect(body.data.sort).toEqual([
+      { field: 'createdAt', direction: 'desc' },
+      { field: 'id', direction: 'desc' },
+    ]);
+    const listCall = calls.find((call) => /SELECT s\.\*, COUNT\(ss\.id\)/i.test(call.sql));
+    expect(listCall?.binds).toEqual(['acc-1', 200, 400]);
+  });
+
+  test('検索と状態とフォルダをページ分割より先にDBで絞る', async () => {
+    const { db, calls } = makeScenarioDb([
+      { id: 's-1', name: '夏のお知らせ', line_account_id: 'acc-1', ...rowBase },
+    ]);
+    const res = await setupApp(db).request(
+      '/api/scenarios?lineAccountId=acc-1&query=%E5%A4%8F&active=0&createdFrom=2026-09-01&folderId=folder-1',
+    );
+    expect(res.status).toBe(200);
+    const listCall = calls.find((call) => /SELECT s\.\*, COUNT\(ss\.id\)/i.test(call.sql));
+    expect(listCall?.sql).toMatch(/s\.name LIKE \? ESCAPE/);
+    expect(listCall?.sql).toMatch(/s\.is_active = 0/);
+    expect(listCall?.sql).toMatch(/s\.created_at >= \?/);
+    expect(listCall?.sql).toMatch(/s\.folder_id = \?/);
+    expect(listCall?.binds).toEqual(['acc-1', '%夏%', '2026-09-01', 'folder-1', 50, 0]);
   });
 
   test('閲覧権限がない利用者には一覧を返さない', async () => {
     const { db } = makeScenarioDb([]);
     const res = await setupApp(db, [], 'staff').request('/api/scenarios');
     expect(res.status).toBe(403);
-    expect(dbMocks.getScenarios).not.toHaveBeenCalled();
+    expect(dbMocks.getScenarioById).not.toHaveBeenCalled();
   });
 });
 
