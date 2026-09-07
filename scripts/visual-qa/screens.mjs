@@ -1376,56 +1376,56 @@ export const SCREENS = [
     mode: 'viewport', height: 1080,
     steps: [{ fill: 'ウェビナー名', text: 'NEN活用スタートセミナー' }],
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #417 / UI HEAD `527f120ec` で一致。** 作成APIへフォルダと開催形式を接続し、5段、基本設定、設定サマリー、LINEプレビュー、保存後の次段導線を設計画像と照合した。3101/8788の1440/1920pxで横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #471 / UI HEAD `c85f9e523` で再計測し一致。** LINEプレビューをPencil V6と同じ既存色トークンへそろえ、3105/8792の1440/1920pxで横はみ出し0。正式比較は7.4946%、高さ差0px。',
     verdictSource: 'webinars-v6/lvaY5.png + lvaY5-{1440,1920}.png + lvaY5.txt',
-    verdictHead: '527f120ec', route: '/webinars/new', },
+    verdictHead: 'c85f9e523', route: '/webinars/new', },
   {
     ...WEBINAR, node: 'PV1Vh', name: '10-1-B 動画・公開設定',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #417 / UI HEAD `527f120ec` で一致。** 編集APIの視聴条件を接続し、動画、再生時間、公開期間、申込済みの友だち向け条件、要約を設計画像と照合した。3101/8788の2幅で横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #471 / UI HEAD `c85f9e523` で再計測し一致。** LINEプレビューをPencil V6と同じ既存色トークンへそろえ、3105/8792の1440/1920pxで横はみ出し0。正式比較は7.4022%、高さ差0px。',
     verdictSource: 'webinars-v6/PV1Vh.png + PV1Vh-1920.png + PV1Vh.txt',
-    verdictHead: '527f120ec', route: `${WEBINAR_EDIT}&pane=video`,
+    verdictHead: 'c85f9e523', route: `${WEBINAR_EDIT}&pane=video`,
 
   },
   {
     ...WEBINAR, node: 'd3rFGD', name: '10-1-C CTA・フォーム',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #417 / UI HEAD `527f120ec` で一致。** 選択した回答フォームの入力項目と完了アクションを編集APIから表示し、CTA時刻・文言・要約・LINEプレビューを設計画像と照合した。3101/8788の2幅で横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #471 / UI HEAD `c85f9e523` で再計測し一致。** LINEプレビューをPencil V6と同じ既存色トークンへそろえ、3105/8792の1440/1920pxで横はみ出し0。正式比較は7.4595%、高さ差0px。',
     verdictSource: 'webinars-v6/d3rFGD.png + d3rFGD-1920.png + d3rFGD.txt',
-    verdictHead: '527f120ec', route: `${WEBINAR_EDIT}&pane=cta`,
+    verdictHead: 'c85f9e523', route: `${WEBINAR_EDIT}&pane=cta`,
 
   },
   {
     ...WEBINAR, node: 'Ho8z4', name: '10-1-D 通知・リマインド',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #417 / UI HEAD `527f120ec` で一致。** 通知本文とテスト送信結果を編集APIへ接続し、申込直後・前日・1時間前・開始時・見逃し案内とLINEプレビューを設計画像と照合した。3101/8788の2幅で横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #471 / UI HEAD `c85f9e523` で再計測し一致。** LINEプレビューをPencil V6と同じ既存色トークンへそろえ、3105/8792の1440/1920pxで横はみ出し0。正式比較は7.8397%、高さ差0px。',
     verdictSource: 'webinars-v6/Ho8z4.png + Ho8z4-1920.png + Ho8z4.txt',
-    verdictHead: '527f120ec', route: `${WEBINAR_EDIT}&pane=notifications`,
+    verdictHead: 'c85f9e523', route: `${WEBINAR_EDIT}&pane=notifications`,
 
   },
   {
     ...WEBINAR, node: 'Xjk8q', name: '10-1-E 視聴後アクション',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #417 / UI HEAD `527f120ec` で一致。** 視聴完了メッセージと結果未取得時の方針を版付き保存へ接続し、実行時点、保存済みアクション、要約、LINEプレビューを設計画像と照合した。3101/8788の2幅で横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #471 / UI HEAD `c85f9e523` で再計測し一致。** LINEプレビューをPencil V6色へそろえ、右列を設計どおりプレビューから並べ、撮影範囲を1080pxに固定。3105/8792の2幅で横はみ出し0、正式比較は8.2076%、高さ差0px。',
     verdictSource: 'webinars-v6/Xjk8q.png + Xjk8q-1920.png + Xjk8q.txt',
-    verdictHead: '527f120ec', route: `${WEBINAR_EDIT}&pane=actions`, mode: 'viewport', height: 1080,
+    verdictHead: 'c85f9e523', route: `${WEBINAR_EDIT}&pane=actions`, mode: 'viewport', height: 1080,
 
   },
   {
     ...WEBINAR, node: 'GB0NR', name: '10-1-F 公開ページプレビュー',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #417 / UI HEAD `527f120ec` で一致。** 所属アカウントのLIFF URL、説明、申込フォーム詳細、ページ検査結果を編集APIへ接続し、公開ページと要約を設計画像と照合した。3101/8788の2幅で横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #471 / UI HEAD `c85f9e523` で再計測し一致。** LINEプレビューをPencil V6と同じ既存色トークンへそろえ、3105/8792の1440/1920pxで横はみ出し0。正式比較は7.3288%、高さ差0px。',
     verdictSource: 'webinars-v6/GB0NR.png + GB0NR-1920.png + GB0NR.txt',
-    verdictHead: '527f120ec', route: `${WEBINAR_EDIT}&pane=preview`,
+    verdictHead: 'c85f9e523', route: `${WEBINAR_EDIT}&pane=preview`,
     mode: 'viewport', height: 1080,
 
   },
   {
     ...WEBINAR, node: 'D6yO7e', name: '10-1-G 公開前確認',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #417 / UI HEAD `527f120ec` で一致。** 公開前検査APIの動画・フォーム・CTA・通知テスト・公開ページテスト・通知重複・アクション参照を表示し、最終確認と公開操作を設計画像と照合した。3101/8788の2幅で横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #471 / UI HEAD `c85f9e523` で再計測し一致。** LINEプレビューをPencil V6色へそろえ、右列を設計どおりプレビューから並べ、撮影範囲を1136pxに固定。3105/8792の2幅で横はみ出し0、正式比較は7.3385%、高さ差0px。',
     verdictSource: 'webinars-v6/D6yO7e.png + D6yO7e-1920.png + D6yO7e.txt',
-    verdictHead: '527f120ec',
+    verdictHead: 'c85f9e523',
     route: '/webinars/edit?id=webinar-1&pane=review', mode: 'viewport', height: 1136,
 
   },
@@ -1445,7 +1445,7 @@ export const SCREENS = [
   {
     ...WEBINAR, node: 'Q8sHa', name: '10-1-I 参加者管理',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #461 / UI HEAD `84039ceca` で再撮影・一致。** 表の見出しを `px-4 py-3` に統一し、縦余白と高さをPencil V6にそろえた。3106/8793の1440/1920pxとも横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #471 / UI HEAD `c85f9e523` で再計測し一致。** LINEプレビューをPencil V6と同じ既存色トークンへそろえ、3105/8792の1440/1920pxで横はみ出し0。正式比較は7.7084%、高さ差0px。',
     verdictSource: 'webinars-v6/Q8sHa.png + Q8sHa-1920.png + Q8sHa.txt',
     verdictHead: '84039ceca', route: `${WEBINAR_EDIT}&pane=participants`, mode: 'viewport', height: 1080,
 
@@ -1455,7 +1455,7 @@ export const SCREENS = [
     verdict: 'match',
     verdictNote: '**2026-09-07 Issue #461 / UI HEAD `84039ceca` で再撮影・一致。** 表の見出しを `px-4 py-3` に統一し、縦余白と高さをPencil V6にそろえた。3106/8793の1440/1920pxとも横はみ出し0。',
     verdictSource: 'webinars-v6/yxyzQ.png + yxyzQ-1920.png + yxyzQ.txt',
-    verdictHead: '84039ceca', route: `${WEBINAR_EDIT}&pane=analytics`, mode: 'viewport', height: 1080,
+    verdictHead: 'c85f9e523', route: `${WEBINAR_EDIT}&pane=analytics`, mode: 'viewport', height: 1080,
 
   },
   {
