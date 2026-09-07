@@ -2683,7 +2683,7 @@ export const SCREENS = [
     日・週の台帳は、固定予約を時間×担当／曜日の格子へ並べる。
     LINE予約は緑、LINE未連携の電話予約は青で同じ格子に載せる。
   */
-  { ...BOOKING, node: 'TV2DI', name: '27-1 予約管理', verdict: 'match', verdictNote: '**2026-09-06、PR #TBD の実装を1440px・1920pxで撮影し、★V6設計と見比べた。** 時間（縦）×担当（横）の格子、LINE予約（緑）と電話予約（青）の同居、4つの集計、読み方の青帯、注意事項・今日の内訳・関連導線の右欄がそろった。固定データの予約件数と日付は撮影用データに従うが、情報の位置・余白・色・枠・角丸と操作の骨格は一致。両幅とも横はみ出し0。', verdictSource: 'booking-v6/TV2DI.txt', verdictHead: 'ed3e365aa' },
+  { ...BOOKING, node: 'TV2DI', name: '27-1 予約管理', verdict: 'match', verdictNote: '**2026-09-07 Issue #450 / UI HEAD `cded0de47` を固定ポート3105/8792で再撮影し、★V6設計と上端から照合して一致。** 本文に重複していた「予約管理」と説明文を外し、パンくず・電話予約・今日/今週/今月/一覧の切替・4指標の順で開始する。時間×担当の格子、LINE予約と電話予約、注意事項・今日の内訳・関連導線を維持し、1440/1920pxとも横はみ出し0。', verdictSource: 'booking-v6/TV2DI.txt + TV2DI-{1440,1920}.png', verdictHead: 'cded0de47' },
   {
     ...BOOKING, node: 'TnDbq', name: '27-1-A 予約の詳細',
     mode: 'viewport', height: 1136, /*
@@ -2695,10 +2695,11 @@ export const SCREENS = [
       { click: '一覧' },
       { click: '詳細', nth: 0 },
     ],
+    variants: [{ suffix: '-detail-route', route: '/booking/bookings/detail?id=bk-1', standalone: true }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #444 / UI HEAD `522f8babf` を固定ポート3105/8792で再撮影し一致。** 詳細APIから電話、ペット、タグ、マイル、過去予約、前回申し送り、予約確認LINEの送信・開封、リマインダ実績を読み、予約内容・顧客カルテ・操作履歴・関連先を同じ画面へ表示した。1440px・1920pxとも横はみ出し0。",
-    verdictSource: "booking-v6/TnDbq.txt + TnDbq-{1440,1920}.png",
-    verdictHead: "522f8babf",
+    verdictNote: "**2026-09-07 Issue #450 / UI HEAD `cded0de47` を固定ポート3105/8792で再撮影し、★V6設計と上端から照合して一致。** `/booking/bookings/detail` 本文の重複した題・説明・無効な保存帯を外し、パンくずの直後から予約状態と内容を表示する。既存の一覧内詳細も含め、予約内容・顧客カルテ・操作履歴・関連先を維持し、1440/1920pxとも横はみ出し0。",
+    verdictSource: "booking-v6/TnDbq.txt + TnDbq-{1440,1920}.png + TnDbq-detail-route-{1440,1920}.png",
+    verdictHead: "cded0de47",
   },
   /*
     **判定を改めた（PR #459 head `ba0bf62d`）。** 代理予約の画面ができた
@@ -2809,7 +2810,7 @@ export const SCREENS = [
 
   // ── 機能28 予約設定 ─────────────────────────────────────
   /* 設計の4入口を同じ帯へ置き、受付枠・休業日は既存の勤務設定へつないだ。 */
-  { ...BOOKING_SET, node: 'QSLEH', name: '28-1 予約設定', clock: '2026-08-26T00:00:00.000Z', verdict: 'match', verdictNote: '**2026-09-07 Issue #370 / UI HEAD `e1126c5c9` を3107/8794で再撮影し、★V6設計と一致。** PR #1107 の店舗設定と8件のメニューを実API契約で読み、4入口、出している6件・休止2件、最多メニュー、9:00〜19:00の受付時間、60日先までの受付範囲、設計順の6列表、担当者、料金、公開操作、ページ送りをそろえた。1440・1920pxとも横はみ出し0、内部語・壊れ値0件。', verdictSource: 'booking-settings-v6/QSLEH.txt + 2026-09-07 QSLEH 1440/1920px screenshots', verdictHead: 'e1126c5c9' },
+  { ...BOOKING_SET, node: 'QSLEH', name: '28-1 予約設定', clock: '2026-08-26T00:00:00.000Z', variants: [{ suffix: '-menu-staff', route: '/booking/menus/staff', standalone: true }, { suffix: '-booking-staff', route: '/booking/staff', standalone: true }], verdict: 'match', verdictNote: '**2026-09-07 Issue #450 / UI HEAD `cded0de47` を固定ポート3105/8792で再撮影し、★V6設計と上端から照合して一致。** V6で予約設定へ統合されたメニュー担当・予約スタッフの独立画面から旧題と説明を外し、パンくず・操作・指標/一覧から開始する形に統一した。店舗設定、メニュー一覧、担当割当、スタッフ一覧の機能を維持し、全画面で1440/1920pxとも横はみ出し0。', verdictSource: 'booking-settings-v6/QSLEH.txt + QSLEH-{1440,1920}.png + QSLEH-menu-staff-{1440,1920}.png + QSLEH-booking-staff-{1440,1920}.png', verdictHead: 'cded0de47' },
   { ...BOOKING_SET, node: 'tksPc',
     clock: '2026-09-07T00:00:00.000Z',
     states: {
@@ -2853,7 +2854,7 @@ export const SCREENS = [
     verdictSource: 'events-v6/ugP5y.txt + ugP5y-{1440,1920}.png + apps/worker/src/services/event-waitlist.ts',
     verdictHead: 'ea4284f42',
   },
-  { ...EVENT, node: 'MKrPY', name: '29-1-A イベントをつくる', route: '/events/new', verdict: 'match', verdictNote: '**2026-09-06 Issue #242 / PR #1015 / UI HEAD c31b32f90 を3105/8792で最終照合して一致。** 概要と同じ画面で最初の開催日・開始・所要時間・定員を入力し、イベント本体と予約枠を続けて保存する。右側に入力連動のLINEプレビュー、満席時のキャンセル待ち、承認制、前日通知を配置した。保存途中で枠だけ失敗してもイベントを重複作成しない。1440・1920pxとも横スクロール0。', verdictSource: 'events-v6/MKrPY.txt + 2026-09-06 1440/1920px screenshots', verdictHead: 'c31b32f90' },
+  { ...EVENT, node: 'MKrPY', name: '29-1-A イベントをつくる', route: '/events/new', variants: [{ suffix: '-edit', route: '/events/edit?id=ev-1', standalone: true }], verdict: 'match', verdictNote: '**2026-09-07 Issue #450 / UI HEAD `cded0de47` を固定ポート3105/8792で再撮影し、★V6設計と上端から照合して一致。** 同じ入力骨組みを使う編集画面から重複した題と説明を外し、パンくずと申込一覧の操作に続いて予約状態・入力節が始まる形へ統一した。作成・編集とも開催内容、申込ルール、LINEプレビュー、注意事項を維持し、1440/1920pxとも横はみ出し0。', verdictSource: 'events-v6/MKrPY.txt + MKrPY-{1440,1920}.png + MKrPY-edit-{1440,1920}.png', verdictHead: 'cded0de47' },
   {
     /*
       **#593 で拒否とキャンセルの窓が入った。**押し口は `data-qa-open` で

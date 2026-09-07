@@ -4738,6 +4738,20 @@ export const BOOKING_STAFF = [
   { id: 'bs-3', name: '高田 誠', display_name: '高田', role: 'トリマー', profile_image_url: null, bio: null, sort_order: 3, is_designation_optional: 0, is_active: 1 },
 ]
 
+/** 機能28のメニュー×担当表。スタッフごとの動的URLへ同じ形で返す。 */
+export const BOOKING_STAFF_MENUS = Object.fromEntries(
+  BOOKING_STAFF.map((staff, staffIndex) => [
+    staff.id,
+    BOOKING_MENUS.map((menu, menuIndex) => ({
+      menu_id: menu.id,
+      name: menu.name,
+      is_offered: staffIndex === 0 ? Number(menuIndex < 5) : Number(menuIndex % 3 === staffIndex - 1),
+      override_duration_minutes: staffIndex === 1 && menuIndex === 2 ? 50 : null,
+      override_price: staffIndex === 1 && menuIndex === 2 ? 4000 : null,
+    })),
+  ]),
+)
+
 /*
   メニューに就ける担当。設計 `GFDqW`（代理予約・内容確認）が読む。
 
@@ -5205,6 +5219,51 @@ export const ADMIN_EVENTS = [
   adminEvent('ev-3', '爪切り体験', '2026-10-02T06:00:00.000Z', 10, 1, 0),
   /* 設計の「受付前 2」。公開していないので、埋まり具合の分母にも入らない。 */
   adminEvent('ev-4', '冬のしつけ教室', '2026-12-05T05:00:00.000Z', 12, 0, 0, 0),
+]
+
+/** 機能29の編集画面。詳細・枠・待ち列はID入りの動的URLから読む。 */
+export const EVENT_DETAIL = {
+  id: 'ev-1',
+  name: '秋のしつけ教室（第1回）',
+  venue_name: '店内スペース（2階）',
+  venue_url: null,
+  image_url: null,
+  description: 'はじめての方向けに、おうちでできるしつけのコツを90分でお伝えします。',
+  description_centered: 0,
+  max_bookings_per_friend: 1,
+  requires_approval: 1,
+  cancel_deadline_hours_before: 24,
+  reminder_day_before_enabled: 1,
+  reminder_hours_before: 24,
+  is_published: 1,
+  sort_order: 1,
+  confirmation_message_extra: null,
+  reminder_message_extra: null,
+  og_title: null,
+  og_description: null,
+  og_image_url: null,
+  visible_tag_id: null,
+  waitlist_enabled: 1,
+  entry_cutoff_hours_before: 20,
+  target_type: 'single',
+  account_ids: null,
+  line_account_id: 'visual-qa-account',
+}
+
+export const EVENT_SLOTS = [{
+  id: 'event-slot-1',
+  event_id: 'ev-1',
+  starts_at: '2026-09-25T05:00:00.000Z',
+  ends_at: '2026-09-25T06:30:00.000Z',
+  capacity: 12,
+  is_active: 1,
+  sort_order: 1,
+  active_count: 9,
+}]
+
+export const EVENT_WAITLIST = [
+  { id: 'ew-1', slot_id: 'event-slot-1', friend_id: 'friend-4', status: 'waiting', notified_at: null, created_at: '2026-09-02T01:00:00.000Z', slot_starts_at: '2026-09-25T05:00:00.000Z', friend_name: '中村 彩' },
+  { id: 'ew-2', slot_id: 'event-slot-1', friend_id: 'friend-5', status: 'waiting', notified_at: null, created_at: '2026-09-02T02:00:00.000Z', slot_starts_at: '2026-09-25T05:00:00.000Z', friend_name: '石田 未来' },
 ]
 
 /*
