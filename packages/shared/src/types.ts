@@ -1964,6 +1964,8 @@ export interface AutoReplyDraftInput {
   skipWhenOperatorActive: boolean;
   priority: number;
   messageKinds: string[] | null;
+  /** 受信経路。空は許さず、既存版は LINE として読む。 */
+  receiveSources: Array<"line" | "email">;
   friendConditions: Record<string, unknown> | null;
   actions: unknown[] | null;
   responseWeekdays: number[] | null;

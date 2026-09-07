@@ -46,6 +46,7 @@ function settings(overrides: Record<string, unknown> = {}) {
     cooldownMinutes: null,
     skipWhenOperatorActive: false,
     priority: 1,
+    receiveSources: ['line'],
     messageKinds: ['text'],
     friendConditions: null,
     actions: null,
@@ -209,6 +210,7 @@ describe('V6 自動応答の一覧・競合・下書き保存口', () => {
       '/api/auto-replies/rule-1/draft',
       request('PUT', {
         ...settings(),
+        receiveSources: ['line', 'email'],
         expectedVersion: 2,
         internalMemo: '担当者だけが読むメモ',
         replyDelaySeconds: 30,
@@ -221,6 +223,7 @@ describe('V6 自動応答の一覧・競合・下書き保存口', () => {
       data: {
         versionNumber: 2,
         settings: {
+          receiveSources: ['line', 'email'],
           internalMemo: '担当者だけが読むメモ',
           replyDelaySeconds: 30,
           unmatchedAction: { type: 'notify_operator' },

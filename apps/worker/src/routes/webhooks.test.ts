@@ -34,6 +34,16 @@ vi.mock('../services/event-bus.js', () => ({
   fireEvent: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('../services/incoming-webhook-actions.js', () => ({
+  executeIncomingWebhookActions: vi.fn().mockResolvedValue({
+    matchedFriendId: null, executed: 0, failed: 0,
+  }),
+}));
+
+vi.mock('../services/outgoing-webhook-delivery.js', () => ({
+  deliverWebhook: vi.fn().mockResolvedValue({ ok: true, attempts: 1, lastStatus: 204 }),
+}));
+
 vi.mock('../services/account-access.js', () => ({
   canAccessAllLineAccounts: vi.fn().mockResolvedValue(true),
 }));
@@ -61,6 +71,8 @@ import {
 import { retryWebhookInteraction } from '../services/webhook-interactions.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { fireEvent } from '../services/event-bus.js';
+import { executeIncomingWebhookActions } from '../services/incoming-webhook-actions.js';
+import { deliverWebhook } from '../services/outgoing-webhook-delivery.js';
 import type { Env } from '../index.js';
 import { webhooks } from './webhooks.js';
 
@@ -137,6 +149,10 @@ beforeEach(() => {
   vi.mocked(listFailedWebhookInteractionsForRetry).mockResolvedValue([]);
   vi.mocked(getOutgoingWebhookDeliverySummaries).mockResolvedValue([]);
   vi.mocked(updateIncomingWebhookMaskedSample).mockResolvedValue(undefined);
+  vi.mocked(executeIncomingWebhookActions).mockResolvedValue({
+    matchedFriendId: null, executed: 0, failed: 0,
+  });
+  vi.mocked(deliverWebhook).mockResolvedValue({ ok: true, attempts: 1, lastStatus: 204 });
   vi.mocked(getIncomingWebhookById).mockResolvedValue(incomingWebhookRow());
   vi.mocked(getOutgoingWebhookById).mockResolvedValue({
     id: 'wh-1', name: 'test', url: 'https://example.com/hook', event_types: '["*"]',
@@ -760,7 +776,7 @@ describe('受け取り口の詳細と設定', () => {
         onNotFound: 'unmatched_box',
       },
       actions: [{ refKind: 'tag', refId: 'tag-a', refVersionId: null }],
-      actionExecution: { state: 'not_connected' },
+      actionExecution: { state: 'connected' },
       latestSample: {
         receivedAt: '2026-09-07T09:00:00.000+09:00',
         fields: [{ path: '$.customer.email', type: 'string', maskedValue: '••••' }],
@@ -994,6 +1010,43 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
     expect(JSON.stringify(vi.mocked(updateIncomingWebhookMaskedSample).mock.calls)).not.toContain('true');
   });
 
+  test('照合設定と実行参照を受信後の実行器へ渡す', async () => {
+    vi.mocked(getIncomingWebhookById).mockResolvedValue(incomingWebhookRow({
+      identity_match_json: '{"methods":[{"kind":"harness_friend_id","path":"$.friendId"}],"onNotFound":"do_nothing"}',
+      action_refs_json: '[{"refKind":"tag","refId":"tag-a","refVersionId":null}]',
+    }));
+    vi.mocked(executeIncomingWebhookActions).mockResolvedValue({
+      matchedFriendId: 'friend-a', executed: 1, failed: 0,
+    });
+    const body = JSON.stringify({ friendId: 'friend-a' });
+    const res = await setupApp().request(
+      '/api/webhooks/incoming/iwh-1/receive',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Webhook-Signature': await webhookSignature(body),
+        },
+        body,
+      },
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(executeIncomingWebhookActions).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
+      lineAccountId: ACCOUNT_ID,
+      webhookId: 'iwh-1',
+      payload: { friendId: 'friend-a' },
+      actions: [{ refKind: 'tag', refId: 'tag-a', refVersionId: null }],
+    }));
+    expect(fireEvent).toHaveBeenCalledWith(
+      baseEnv.DB,
+      'incoming_webhook.custom',
+      expect.objectContaining({ friendId: 'friend-a' }),
+      undefined,
+      ACCOUNT_ID,
+    );
+  });
+
   test('最新項目の保存が失敗しても署名済みの受信処理は止めない', async () => {
     vi.mocked(updateIncomingWebhookMaskedSample).mockRejectedValue(new Error('D1 unavailable'));
     const body = JSON.stringify({ customer: { email: 'private@example.com' } });
@@ -1011,6 +1064,26 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
     );
     expect(res.status).toBe(200);
     expect(fireEvent).toHaveBeenCalledOnce();
+  });
+});
+
+describe('POST /api/webhooks/outgoing/:id/test', () => {
+  test('アカウント内の有効な送り先へ1回試し送信して記録する', async () => {
+    const res = await setupApp().request(
+      `/api/webhooks/outgoing/wh-1/test?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'POST' },
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(deliverWebhook).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'wh-1' }),
+      expect.stringContaining('webhook.test'),
+      { idempotencyKey: 'interaction-1' },
+    );
+    expect(finishWebhookInteraction).toHaveBeenCalledWith(
+      baseEnv.DB, 'interaction-1', ACCOUNT_ID,
+      expect.objectContaining({ status: 'succeeded', responseStatus: 204 }),
+    );
   });
 });
 

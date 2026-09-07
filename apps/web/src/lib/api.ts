@@ -133,9 +133,10 @@ export type IncomingWebhookDetail = IncomingWebhook & {
     refKind: string
     refId: string
     refVersionId: string | null
+    displayName: string
   }>
   actionExecution: {
-    state: 'not_connected' | 'not_configured'
+    state: 'connected' | 'not_configured'
     reason: string | null
   }
   latestSample: {
@@ -289,6 +290,7 @@ export type CommonVarHistoryItem = {
   memo: string
   changeReason: string | null
   actorId: string | null
+  actorName: string | null
   createdAt: string
 }
 
@@ -3934,6 +3936,18 @@ export const api = {
       }),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/tags/${id}`, { method: 'DELETE' }),
+    archive: (id: string, accountId: string, data: {
+      expectedVersion: number
+      impactRevision: string
+      replacementTagId?: string | null
+    }, idempotencyKey: string) => fetchApi<ApiResponse<{
+      archived: true
+      replacedFriendCount: number
+    }>>(`/api/tags/${id}/archive?lineAccountId=${encodeURIComponent(accountId)}`, {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(data),
+    }),
   },
   /**
    * タグの親分類。経路が /api/tag-groups なのは /api/tags/:id と
@@ -5138,6 +5152,16 @@ export const api = {
       ),
   },
   broadcasts: {
+    notificationSettings: (lineAccountId: string) =>
+      fetchApi<ApiResponse<{ version: number; started: boolean; completed: boolean; failed: boolean; displayText: string }>>(
+        `/api/broadcasts/notification-settings?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+      ),
+    saveNotificationSettings: (lineAccountId: string, data: {
+      expectedVersion: number; started: boolean; completed: boolean; failed: boolean
+    }) => fetchApi<ApiResponse<{ version: number; started: boolean; completed: boolean; failed: boolean; displayText: string }>>(
+      `/api/broadcasts/notification-settings?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+      { method: 'PUT', body: JSON.stringify(data) },
+    ),
     /** 予約中の配信だけを、内容を残した下書きへ安全に戻す。 */
     cancelReservation: (id: string) =>
       fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}/cancel`, {
@@ -6208,6 +6232,7 @@ export const api = {
         skipWhenOperatorActive: boolean;
         priority: number;
         messageKinds: string[] | null;
+        receiveSources: Array<'line' | 'email'>;
         actions: unknown[] | null;
         responseWeekdays: number[] | null;
         responseHolidayRule: string | null;
@@ -6253,6 +6278,7 @@ export const api = {
         skipWhenOperatorActive: boolean;
         priority: number;
         messageKinds: string[] | null;
+        receiveSources: Array<'line' | 'email'>;
         actions: unknown[] | null;
         responseWeekdays: number[] | null;
         responseHolidayRule: string | null;
@@ -6284,6 +6310,7 @@ export const api = {
       priority?: number;
       /** 対象にするメッセージ種別。null で全部 */
       messageKinds?: string[] | null;
+      receiveSources?: Array<'line' | 'email'>;
       /** 151: 応答したときに順に実行すること。 */
       actions?: unknown[] | null;
       /** 151: 応答する曜日（0=日 … 6=土）。null で曜日を問わない */
@@ -6323,6 +6350,7 @@ export const api = {
       skipWhenOperatorActive?: boolean;
       priority?: number;
       messageKinds?: string[] | null;
+      receiveSources?: Array<'line' | 'email'>;
       /** 151: 応答したときに順に実行すること。 */
       actions?: unknown[] | null;
       /** 151: 応答する曜日（0=日 … 6=土）。null で曜日を問わない */
@@ -7574,6 +7602,11 @@ export const api = {
         fetchApi<ApiResponse<null>>(
           `/api/webhooks/outgoing/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'DELETE' },
+        ),
+      test: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<{ delivered: boolean; responseStatus: number | null }>>(
+          `/api/webhooks/outgoing/${encodeURIComponent(id)}/test?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'POST' },
         ),
     },
     interactions: {

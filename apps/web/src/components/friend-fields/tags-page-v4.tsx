@@ -410,7 +410,7 @@ function deleteImpactRows(
       name: '付与人数',
       // 人数はサーバーが数え直したものを使う。取れなければ一覧の値。
       value: `${(impact?.friendCount ?? tag.friendCount ?? 0).toLocaleString('ja-JP')}人`,
-      result: 'タグが外れます',
+      result: '付いたまま残ります',
     },
     { name: '参照先', value: refs ? refSummary(refs, MANUAL_REFS) : '—', result: '動いている設定はそのまま。新しくは選べません' },
     { name: '参照先（自動）', value: refs ? refSummary(refs, AUTO_REFS) : '—', result: '開始条件はそのまま。新しくは選べません' },
@@ -428,8 +428,10 @@ function deleteImpactRows(
   ]
 }
 
-function DeleteTagDialog({ tag, accountId, onCancel }: { tag: Tag; accountId: string | null; onCancel: () => void }) {
+function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; accountId: string | null; onCancel: () => void; onArchived: () => void }) {
   const [text, setText] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
   /**
    * 削除して何が失われるか（`GET /api/tags/:id/delete-impact`）。
    *
@@ -464,12 +466,12 @@ function DeleteTagDialog({ tag, accountId, onCancel }: { tag: Tag; accountId: st
   */
   const dialogRef = useOverlayFocus(true, onCancel, false)
 
-  const blocked = true
+  const blocked = impactStatus !== 'ready' || !impact || !accountId || saving
   const blockedReason = impactStatus === 'loading'
     ? '影響を確認しています'
     : impactStatus === 'error'
       ? '影響を確認できませんでした。時間をおいて開き直してください'
-      : 'アーカイブの保存口は未接続です。影響確認だけできます'
+      : ''
 
   return (
     <div ref={dialogRef} className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/45 p-4" data-qa-dialog="tag-delete" data-impact={impactStatus}>
@@ -513,7 +515,26 @@ function DeleteTagDialog({ tag, accountId, onCancel }: { tag: Tag; accountId: st
         <div className="mt-6 flex items-center justify-end gap-3">
           {blockedReason && <p className="min-w-0 flex-1 text-xs text-ink-faint">{blockedReason}</p>}
           <button type="button" onClick={onCancel} className="shrink-0 rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">やめる</button>
-          <button type="button" disabled={blocked || text !== tag.name} className="shrink-0 rounded-control bg-danger px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">このタグをアーカイブする</button>
+          {saveError ? <p role="alert" className="min-w-0 flex-1 text-xs text-danger">{saveError}</p> : null}
+          <button
+            type="button"
+            disabled={blocked || text !== tag.name}
+            onClick={async () => {
+              if (!impact || !accountId) return
+              setSaving(true); setSaveError('')
+              try {
+                await api.tags.archive(tag.id, accountId, {
+                  expectedVersion: impact.tag.version,
+                  impactRevision: impact.revision,
+                }, crypto.randomUUID())
+                onArchived()
+              } catch {
+                setSaveError('アーカイブできませんでした。影響を読み直して、もう一度お試しください。')
+                setSaving(false)
+              }
+            }}
+            className="shrink-0 rounded-control bg-danger px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40"
+          >{saving ? 'アーカイブ中…' : 'このタグをアーカイブする'}</button>
         </div>
       </section>
     </div>
@@ -900,7 +921,7 @@ export default function TagsPageV4({
         ) : null}
       </> : tab === 'fields' ? <FriendFieldList accountId={accountId} /> : tab === 'marks' ? <SupportMarkList accountId={accountId} /> : <SavedSearchList accountId={accountId} />}
       </div>
-      {deleteTarget && <DeleteTagDialog tag={deleteTarget} accountId={accountId} onCancel={() => setDeleteTarget(null)} />}
+      {deleteTarget && <DeleteTagDialog tag={deleteTarget} accountId={accountId} onCancel={() => setDeleteTarget(null)} onArchived={() => { setDeleteTarget(null); void load() }} />}
     </div>
   )
 }
