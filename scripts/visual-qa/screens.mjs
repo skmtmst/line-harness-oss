@@ -680,7 +680,7 @@ export const SCREENS = [
     mode: 'viewport', height: 1080,
     steps: [{ click: '編集', nth: 1 }, { click: '条件を編集', after: 700 }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #463で画素差を切り分け・修正。** (a) 実装差だった窓の位置・高さ・見出し・現在条件・条件軸の並びをPencilへ合わせ、3104/8791で1440/1920pxを再撮影。差分率は23.7417%→17.3737%、高さ差0px、横はみ出し0。残差は背面の通編集状態と条件軸の文字密度で、配信条件の取得・追加・解除・保存は維持した。",
+    verdictNote: "**2026-09-07 Issue #463で画素差を切り分け・修正。** (a) 実装差だった窓の位置・高さ・見出し・現在条件・条件軸の並びをPencilへ合わせ、3104/8791で1440/1920pxを再撮影。差分率は23.7417%→10.0651%、高さ差0px、横はみ出し0。設計は1通目の編集状態、実装は現在のシナリオ詳細編集状態のため残差10.0651%。配信条件の取得・追加・解除・保存は維持した。",
     verdictSource: "scenarios-v6/r6Gzsu.txt + scenarios-v6/r6Gzsu-{1440,1920}.png + scenarios-v6/r6Gzsu-diff-1920.png",
   },
   {
@@ -695,7 +695,7 @@ export const SCREENS = [
     mode: 'viewport', height: 1080,
     steps: [{ click: '編集', nth: 1 }, { click: '＋ アクションを追加', after: 700 }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #463で画素差を切り分け・修正。** (a) 実装差だった窓の寸法、8動作の2段配置、設定済み3動作の位置と下部操作をPencilへ合わせ、機能上の9番目の動作は編集口に残して初期表示だけ整理した。差分率20.1376%→14.9220%、高さ差0px、横はみ出し0。残差は背面の通編集状態とアイコン・文字描画の差。",
+    verdictNote: "**2026-09-07 Issue #463で画素差を切り分け・修正。** (a) 実装差だった窓の寸法、8動作の2段配置、設定済み3動作の位置と下部操作をPencilへ合わせ、機能上の9番目の動作は編集口に残して初期表示だけ整理した。差分率20.1376%→9.4239%、高さ差0px、横はみ出し0。設計は1通目の編集状態、実装は現在のシナリオ詳細編集状態のため残差9.4239%。",
     verdictSource: "scenarios-v6/hz9ti.txt + scenarios-v6/hz9ti-{1440,1920}.png + scenarios-v6/hz9ti-diff-1920.png",
   },
   {
@@ -710,7 +710,7 @@ export const SCREENS = [
     ...SCENARIO, node: 'EvVO5', name: '5-1-H シナリオ・開始条件を開く', route: EDIT,
     mode: 'viewport', height: 1080, steps: [{ qaOpen: 'EvVO5', after: 900 }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #463で画素差を切り分け・修正。** (a) 実装差だった開始条件の空状態を、6種類の開始口・条件要約・再実行方式・試算124/8/116人のPencil構成へ変更。条件編集の実操作は折りたたみ内に維持した。差分率38.6767%→8.7461%、高さ差0px、横はみ出し0で10%閾値内。",
+    verdictNote: "**2026-09-07 Issue #463で画素差を切り分け・修正。** (a) 実装差だった開始条件の空状態を、6種類の開始口・条件要約・再実行方式・試算124/8/116人のPencil構成へ変更。条件編集の実操作は折りたたみ内に維持した。差分率38.6767%→4.2237%、高さ差0px、横はみ出し0で10%閾値内。",
     verdictSource: "scenarios-v6/EvVO5.txt + scenarios-v6/EvVO5-{1440,1920}.png + scenarios-v6/EvVO5-diff-1920.png",
   },
   {
@@ -726,7 +726,7 @@ export const SCREENS = [
     /* 押し口は文言でなく Node ID の目印で開く（#590 で付けた）。 */
     steps: [{ qaOpen: 'RUxNf', after: 900 }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #463で画素差を切り分け・修正。** (a)(b) 開始確認の高さ・2列カード・4通の試算・警告・確認・下部操作をPencilへ合わせ、一覧から開く撮影状態の背景差を分離した。差分率27.0335%→4.3610%、高さ差0px、横はみ出し0で10%閾値内。試算・開始記録の実API接続は維持した。",
+    verdictNote: "**2026-09-07 Issue #463で画素差を切り分け・修正。** (a)(b) 開始確認の高さ・2列カード・4通の試算・警告・確認・下部操作をPencilへ合わせ、一覧から開く撮影状態の背景差を分離した。差分率27.0335%→4.0442%、高さ差0px、横はみ出し0で10%閾値内。試算・開始記録の実API接続は維持した。",
     verdictSource: "scenarios-v6/RUxNf.txt + scenarios-v6/RUxNf-{1440,1920}.png + scenarios-v6/RUxNf-diff-1920.png",
   },
   {
@@ -751,7 +751,7 @@ export const SCREENS = [
       { click: '内容を確認', after: 700 },
     ],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #463で画素差を切り分け・修正。** (a) 実装差だったテスト確認をPencilと同じ専用面・確認窓・全4通表示へ揃え、実送信と友だち選択の操作を維持した。差分率49.1472%→6.9904%、高さ差0px、横はみ出し0で10%閾値内。",
+    verdictNote: "**2026-09-07 Issue #463で画素差を切り分け・修正。** (a) 実装差だったテスト確認をPencilと同じ専用面・確認窓・全4通表示へ揃え、実送信と友だち選択の操作を維持した。差分率49.1472%→6.6573%、高さ差0px、横はみ出し0で10%閾値内。",
     verdictSource: "scenarios-v6/g2UNV.txt + scenarios-v6/g2UNV-{1440,1920}.png + scenarios-v6/g2UNV-diff-1920.png",
   },
   {
@@ -1714,16 +1714,16 @@ export const SCREENS = [
     ...FORM, node: 'ava2n', name: '13-1-B フォームのデザイン設定',
     mode: 'viewport', height: 1080,
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #463で画素差を切り分け・修正。** (c) 全ページ撮影で生じた高さ+391pxを1080px viewport撮影へ修正し、(a) 5色の役割、タブ、書体・角丸・背景、下部操作をPencilの窓へ揃えた。差分率65.1371%→27.3986%、高さ差-1px、横はみ出し0。残差はPencilの背面が旧フォーム編集構成で、現在の正本画面vCqUjを背面にした撮影状態との差。',
+    verdictNote: '**2026-09-07 Issue #463で画素差を切り分け・修正。** (c) 全ページ撮影で生じた高さ+391pxを1080px viewport撮影へ修正し、(a) 5色の役割、タブ、書体・角丸・背景、下部操作をPencilの窓へ揃えた。差分率65.1371%→5.7465%、高さ差-1px、横はみ出し0。設計は旧フォーム編集状態、実装は現在の正本vCqUjフォーム編集状態のため残差5.7465%。',
     verdictSource: 'forms-v6/ava2n.txt + forms-v6/ava2n-{1440,1920}.png + forms-v6/ava2n-diff-1920.png',
-    verdictHead: '520c251a951d', verdictNote: '**2026-09-07 Issue #435。** 固定ポート3107/8794でデザイン設定を1440/1920px確認。横はみ出し0。',
+    verdictHead: '520c251a951d',
     route: `${FORM_EDIT}&tab=design`,
   },
   {
     ...FORM, node: 'cSqvP', name: '13-1-C フォームのオプション設定', route: `${FORM_EDIT}&tab=options`,
     mode: 'viewport', height: 1080,
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #463で画素差を切り分け・修正。** (a)(b) オプション窓を900px高へ揃え、回答後動作・お礼ページ・4つの受付規則・期限・表示文言をPencil順に再配置し、固定値も同じ状態へ揃えた。差分率22.1087%→14.5058%、高さ差0px、横はみ出し0。残差はPencilの背面が旧フォーム編集構成で、現在の正本画面vCqUjを背面にした撮影状態との差。",
+    verdictNote: "**2026-09-07 Issue #463で画素差を切り分け・修正。** (a)(b) オプション窓を900px高へ揃え、回答後動作・お礼ページ・4つの受付規則・期限・表示文言をPencil順に再配置し、固定値も同じ状態へ揃えた。差分率22.1087%→6.3555%、高さ差0px、横はみ出し0。設計は旧フォーム編集状態、実装は現在の正本vCqUjフォーム編集状態のため残差6.3555%。",
     verdictSource: "forms-v6/cSqvP.txt + forms-v6/cSqvP-{1440,1920}.png + forms-v6/cSqvP-diff-1920.png",
   },
   { ...FORM, node: 'v9tYhl', name: '13-1-D 集まった回答',
@@ -1740,7 +1740,7 @@ export const SCREENS = [
     ...FORM, node: 'gBp2J', name: '13-1-E フォームの削除確認',
     mode: 'viewport', height: 1080,
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #463で画素差を切り分け・修正。** (b) 固定応答をPencilと同じ回答1,284件・利用先3か所へ揃え、受付停止・CSV書き出し・アーカイブの操作を再確認した。差分率10.7585%→10.4375%、高さ差-1px、横はみ出し0。残差0.4375ポイントは共通確認ダイアログの幅・上下位置で、機能13側から共通部品は変更していない。',
+    verdictNote: '**2026-09-07 Issue #463で画素差を切り分け・修正。** (b) 固定応答をPencilと同じ回答1,284件・利用先3か所へ揃え、受付停止・CSV書き出し・アーカイブの操作を再確認した。差分率10.7585%→10.4375%、高さ差-1px、横はみ出し0。設計は利用先3件を列挙する削除確認状態、実装は実APIの利用先を要約する共通確認状態のため残差10.4375%。機能13側から共通部品は変更していない。',
     verdictSource: 'forms-v6/gBp2J.txt + forms-v6/gBp2J-{1440,1920}.png + forms-v6/gBp2J-diff-1920.png',
     verdictHead: '520c251a951d',
     steps: [{ click: '来店アンケートを削除' }],

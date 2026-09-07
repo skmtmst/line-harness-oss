@@ -33,8 +33,8 @@ function Shell({
   wide?: boolean
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
-      <div className={`rounded-panel flex w-full flex-col bg-white shadow-lg ${wide ? 'my-[68px] h-[912px] max-w-[1120px]' : 'max-w-3xl'}`}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4" style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}>
+      <div className="rounded-panel flex w-full flex-col shadow-lg" style={wide ? { marginBlock: 68, height: 912, maxWidth: 1120, background: 'var(--color-canvas)' } : { maxWidth: '48rem', background: 'var(--color-canvas)' }}>
         <div className={`border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6 ${wide ? 'py-5' : 'py-4'}`}>
           <div className="min-w-0">
             <h2 className="text-ink text-lg font-bold">{title}</h2>
@@ -124,7 +124,7 @@ export function ConditionDialog({
           <p className="text-ink text-sm font-bold">条件 1</p>
           <button type="button" onClick={() => setDraft(null)} className="text-danger text-xs">削除</button>
         </div>
-        <div className="mt-3 grid grid-cols-[1fr_1.25fr_1fr_0.8fr] gap-2">
+        <div className="mt-3 grid gap-2" style={{ gridTemplateColumns: '1fr 1.25fr 1fr 0.8fr' }}>
           <div className="border-hairline rounded-control border px-3 py-2 text-sm">タグ</div>
           <div className="border-hairline rounded-control border px-3 py-2 text-sm">初回案内</div>
           <div className="border-hairline rounded-control border px-3 py-2 text-sm">含む</div>
@@ -418,11 +418,11 @@ export function TestSendDialog({
 
   if (confirming) {
     return (
-      <div className="fixed inset-y-0 left-[255px] right-0 z-50 overflow-y-auto bg-canvas" data-design-node="g2UNV">
-        <div className="border-hairline flex h-[76px] items-center justify-between border-b bg-white px-6"><h1 className="text-ink text-2xl font-bold">シナリオをテスト送信</h1><Button onClick={onClose}>シナリオ編集へ戻る</Button></div>
+      <div className="fixed inset-y-0 right-0 z-50 overflow-y-auto bg-canvas" style={{ left: 255 }} data-design-node="g2UNV">
+        <div className="border-hairline flex items-center justify-between border-b px-6" style={{ height: 76, background: 'var(--color-canvas)' }}><h1 className="text-ink text-2xl font-bold">シナリオをテスト送信</h1><Button onClick={onClose}>シナリオ編集へ戻る</Button></div>
         <main className="ml-6 mr-10 p-8">
           <p className="text-accent text-sm">シナリオ編集へ戻る</p>
-          <div className="mt-5 grid grid-cols-[1.5fr_0.8fr] gap-6">
+          <div className="mt-5 grid gap-6" style={{ gridTemplateColumns: '1.5fr 0.8fr' }}>
             <section><h2 className="text-ink text-xl font-bold">テストを開始</h2><p className="text-ink-secondary mt-1 text-sm">実際の配信を開始せず、自分のLINEで確認します。</p>
               <div className="border-hairline mt-5 rounded-panel border p-5"><h3 className="font-bold">テスト対象</h3><dl className="mt-4 space-y-4 text-sm"><div className="flex justify-between"><dt className="text-ink-faint">送信先</dt><dd className="font-medium">{selectedFriend?.displayName || 'Kenta Kawano'}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">開始ステップ</dt><dd className="font-medium">ステップ1から</dd></div></dl></div>
               <div className="border-hairline mt-4 rounded-panel border p-5"><h3 className="font-bold">テスト内容</h3><p className="text-ink-secondary mt-2 text-sm">待機時間を短縮し、全ステップを順番に送信します。</p><p className="mt-4 text-sm font-bold">全{testStepCount}ステップ</p><p className="text-ink-faint mt-2 text-xs">待機時間はテスト用に10秒へ短縮</p><p className="text-ink-faint mt-2 text-xs">アクション　タグ・情報欄の変更は実行しない</p></div>
@@ -430,8 +430,8 @@ export function TestSendDialog({
             <aside className="space-y-4"><div className="border-hairline rounded-panel border p-5"><h3 className="font-bold">設定サマリー</h3><p className="text-ink-faint mt-1 text-xs">テスト送信の内容を確認します。本番の友だちへは届きません。</p><dl className="mt-4 space-y-3 text-sm"><div className="flex justify-between"><dt>送信先</dt><dd>{selectedFriend?.displayName || 'Kenta Kawano'}</dd></div><div className="flex justify-between"><dt>所要時間</dt><dd>約2分</dd></div><div className="flex justify-between"><dt>本番影響</dt><dd>なし</dd></div></dl></div><div className="border-hairline rounded-panel border p-5"><h3 className="font-bold">メッセージプレビュー</h3><p className="text-ink-faint mt-1 text-xs">実際のLINE表示に近い確認用プレビューです。</p><div className="bg-info-bg mt-4 rounded-panel p-4 text-sm">［テスト］ご登録ありがとうございます。</div></div></aside>
           </div>
         </main>
-        <div className="fixed inset-0 z-10 flex items-start justify-center bg-black/35 px-6 pt-[265px]">
-          <div className="w-full max-w-[672px] rounded-panel bg-white shadow-xl"><div className="border-hairline border-b px-6 py-5"><h2 className="text-lg font-bold">テスト送信を開始しますか？</h2><p className="text-ink-secondary mt-1 text-sm">自分のLINEへ{testStepCount}ステップをテスト送信します。本番の友だちデータは変更されません。</p></div><div className="space-y-3 px-6 py-5 text-sm"><label className="flex items-center gap-2"><input type="checkbox" defaultChecked />対象人数を確認しました</label><label className="flex items-center gap-2"><input type="checkbox" defaultChecked />メッセージ表示を確認しました</label><label className="flex items-center gap-2"><input type="checkbox" defaultChecked />配信日時を確認しました</label></div><div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><Button onClick={() => setConfirming(false)}>戻る</Button><Button variant="primary" disabled={!selected || sending} onClick={() => void sendTest()}>{sending ? '送信中…' : 'テストを開始'}</Button></div></div>
+        <div className="fixed inset-0 z-10 flex items-start justify-center px-6" style={{ paddingTop: 265, background: 'color-mix(in srgb, var(--color-ink) 35%, transparent)' }}>
+          <div className="w-full rounded-panel shadow-xl" style={{ maxWidth: 672, background: 'var(--color-canvas)' }}><div className="border-hairline border-b px-6 py-5"><h2 className="text-lg font-bold">テスト送信を開始しますか？</h2><p className="text-ink-secondary mt-1 text-sm">自分のLINEへ{testStepCount}ステップをテスト送信します。本番の友だちデータは変更されません。</p></div><div className="space-y-3 px-6 py-5 text-sm"><label className="flex items-center gap-2"><input type="checkbox" defaultChecked />対象人数を確認しました</label><label className="flex items-center gap-2"><input type="checkbox" defaultChecked />メッセージ表示を確認しました</label><label className="flex items-center gap-2"><input type="checkbox" defaultChecked />配信日時を確認しました</label></div><div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><Button onClick={() => setConfirming(false)}>戻る</Button><Button variant="primary" disabled={!selected || sending} onClick={() => void sendTest()}>{sending ? '送信中…' : 'テストを開始'}</Button></div></div>
         </div>
       </div>
     )

@@ -32,12 +32,13 @@ export default function OptionsDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4"
+      style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}
       role="dialog"
       aria-modal="true"
       aria-label="オプション設定"
     >
-      <div className="bg-canvas rounded-panel my-[74px] h-[900px] w-full max-w-[880px] overflow-hidden shadow-lg">
+      <div className="bg-canvas w-full overflow-hidden rounded-panel shadow-lg" style={{ marginBlock: 74, height: 900, maxWidth: 880 }}>
         <div className="border-hairline flex items-center justify-between border-b px-5 py-3">
           <div>
             <h2 className="text-ink text-base font-bold">オプション設定</h2>
@@ -48,7 +49,7 @@ export default function OptionsDialog({
           </button>
         </div>
 
-        <div className="max-h-[760px] overflow-y-auto px-6 py-4">
+        <div className="overflow-y-auto px-6 py-4" style={{ maxHeight: 760 }}>
           <section>
             <h3 className="text-ink text-sm font-bold">答え終わったあと</h3>
             <div className="bg-canvas-sunken mt-3 rounded-control p-4">
@@ -56,7 +57,7 @@ export default function OptionsDialog({
                 <p className="text-ink text-xs font-bold">実行すること</p>
                 <details className="group">
                   <summary className="border-accent text-accent rounded-control cursor-pointer list-none border px-3 py-2 text-xs font-medium">アクションを設定</summary>
-                  <div className="mt-3 min-w-[680px] bg-white p-3 shadow-lg">
+                  <div className="mt-3 p-3 shadow-lg" style={{ minWidth: 680, background: 'var(--color-canvas)' }}>
                     <ActionEditor value={value.afterActions ?? []} onChange={(afterActions: FormAction[]) => patch({ afterActions })} refs={refs} />
                   </div>
                 </details>
@@ -105,7 +106,8 @@ export default function OptionsDialog({
                 value={value.submitLabel ?? ''}
                 onChange={(e) => patch({ submitLabel: e.target.value })}
                 placeholder="送信"
-                className={`${fieldInput} max-w-[10rem]`}
+                className={fieldInput}
+                style={{ maxWidth: '10rem' }}
                 aria-label="送信ボタンの文字"
               />
             </div>

@@ -30,6 +30,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Bell, Calendar, FileText, Flag, MessageSquare, Tag, User, Variable, Workflow } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import styles from './action-editor.module.css'
+import Button from '@/components/shared/button'
 import {
   api,
   type ScenarioAction,
@@ -349,10 +350,10 @@ export default function ActionEditor({
   const editing = actions.find((a) => a.id === conditionFor) ?? null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
-      <div data-design-node="hz9ti" className={`${styles.dialog} my-[44px] flex h-[958px] w-full flex-col overflow-hidden rounded-card bg-white shadow-lg`}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4" style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}>
+      <div data-design-node="hz9ti" className={`${styles.dialog} flex w-full flex-col overflow-hidden rounded-card shadow-lg`}>
         {/* ① 見出しと説明。設計は見出し20/700・説明13。 */}
-        <div className="border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6 py-[18px]">
+        <div className="border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6" style={{ paddingBlock: 18 }}>
           <div className="min-w-0">
             <h2 className="text-ink text-title font-bold">送信後のアクションを設定</h2>
             <p className="text-ink-secondary mt-1 text-label leading-relaxed">
@@ -405,7 +406,7 @@ export default function ActionEditor({
                   <div className="flex items-center justify-between"><p className="text-ink text-sm font-bold">現在の送信後アクション</p><button type="button" className="text-accent text-xs font-medium">保存済みセットを呼び出す</button></div>
                   <p className="text-ink-secondary mt-2 text-sm">① タグ追加 → ② 対応マーク変更 → ③ 担当者へ通知</p>
                 </section>
-                <section className="grid grid-cols-[1fr_300px] gap-3">
+                <section className="grid gap-3" style={{ gridTemplateColumns: '1fr 300px' }}>
                   <label className="text-ink text-xs font-medium">保存するアクション名<input className="border-hairline mt-1 h-10 w-full rounded-control border px-3 text-sm" defaultValue="初回案内完了処理" /></label>
                   <label className="text-ink text-xs font-medium">フォルダ<select className="border-hairline mt-1 h-10 w-full rounded-control border px-3 text-sm" defaultValue="common"><option value="common">シナリオ共通</option></select></label>
                 </section>
@@ -463,7 +464,7 @@ export default function ActionEditor({
                             {/* 埋まっていないアクションは配信で実行されない。
                                 黙って何もしないと、効いていないことに気づけない。 */}
                             {action.complete === false && (
-                              <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-[10px] font-medium">
+                              <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 font-medium" style={{ fontSize: 10 }}>
                                 未完成 — 配信では実行されません
                               </span>
                             )}
@@ -480,7 +481,7 @@ export default function ActionEditor({
                             >
                               {action.condition ? '条件ON' : '条件OFF'}
                             </button>
-                            <details><summary className="text-accent cursor-pointer list-none text-xs">内容を編集</summary><div className="absolute right-20 z-10 mt-2 w-[640px] rounded-card bg-white p-4 shadow-lg"><ActionConfigEditor action={action} tags={tags} fields={fields} marks={marks} scenarios={scenarioOpts} vars={vars} onChange={(config) => void save(action, { config })} /><label className="mt-3 flex items-center gap-2 text-xs"><input type="checkbox" checked={action.repeatOnRefire} onChange={(e) => void save(action, { repeatOnRefire: e.target.checked })} />発動2回目以降も実行する</label><div className="mt-3 flex gap-2"><button type="button" onClick={() => void move(index, -1)} disabled={index === 0}>上へ</button><button type="button" onClick={() => void move(index, 1)} disabled={index === actions.length - 1}>下へ</button><button type="button" onClick={() => void remove(action)} className="text-danger">削除</button></div></div></details>
+                            <details><summary className="text-accent cursor-pointer list-none text-xs">内容を編集</summary><div className="absolute right-20 z-10 mt-2 rounded-card p-4 shadow-lg" style={{ width: 640, background: 'var(--color-canvas)' }}><ActionConfigEditor action={action} tags={tags} fields={fields} marks={marks} scenarios={scenarioOpts} vars={vars} onChange={(config) => void save(action, { config })} /><label className="mt-3 flex items-center gap-2 text-xs"><input type="checkbox" checked={action.repeatOnRefire} onChange={(e) => void save(action, { repeatOnRefire: e.target.checked })} />発動2回目以降も実行する</label><div className="mt-3 flex gap-2"><button type="button" onClick={() => void move(index, -1)} disabled={index === 0}>上へ</button><button type="button" onClick={() => void move(index, 1)} disabled={index === actions.length - 1}>下へ</button><button type="button" onClick={() => void remove(action)} className="text-danger">削除</button></div></div></details>
                           </div>
                         </div>
                       </div>
@@ -497,7 +498,7 @@ export default function ActionEditor({
             )}
           </div>
         )}
-        {!editing && <div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><button type="button" onClick={onClose} className="border-hairline rounded-control border px-4 py-2 text-sm">キャンセル</button><button type="button" onClick={onClose} className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm">このアクションを反映</button></div>}
+        {!editing && <div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><Button onClick={onClose}>キャンセル</Button><Button variant="primary" onClick={onClose}>このアクションを反映</Button></div>}
       </div>
     </div>
   )

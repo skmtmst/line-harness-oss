@@ -52,8 +52,8 @@ export default function FormDesignSettings({
   const close = () => router.replace('/form-submissions/edit?id=form-1&tab=basic')
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4" role="dialog" aria-modal="true" aria-label="デザイン設定">
-      <section data-design-node="ava2n" className="my-[94px] w-full max-w-[820px] overflow-hidden rounded-panel bg-white shadow-lg">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4" style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }} role="dialog" aria-modal="true" aria-label="デザイン設定">
+      <section data-design-node="ava2n" className="w-full overflow-hidden rounded-panel shadow-lg" style={{ marginBlock: 94, maxWidth: 820, background: 'var(--color-canvas)' }}>
         <header className="border-hairline flex items-start justify-between border-b px-6 py-4">
           <div>
             <h2 className="text-ink text-lg font-bold">デザイン設定</h2>

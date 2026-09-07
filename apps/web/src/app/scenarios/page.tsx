@@ -110,8 +110,8 @@ function StartScenarioDialog({
     return item
   })
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-6" role="dialog" aria-modal="true" aria-labelledby="start-scenario-title">
-      <div className="border-hairline flex h-[860px] w-full max-w-[1040px] flex-col overflow-y-auto rounded-card border bg-white shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'color-mix(in srgb, var(--color-ink) 35%, transparent)' }} role="dialog" aria-modal="true" aria-labelledby="start-scenario-title">
+      <div className="border-hairline flex w-full flex-col overflow-y-auto rounded-card border shadow-xl" style={{ height: 860, maxWidth: 1040, background: 'var(--color-canvas)' }}>
         <div className="border-hairline flex items-start justify-between gap-4 border-b px-6 py-5">
           <div>
             <h2 id="start-scenario-title" className="text-ink text-xl font-bold">
@@ -123,7 +123,7 @@ function StartScenarioDialog({
         </div>
 
         <div className="grid gap-6 px-6 pb-4 lg:grid-cols-2">
-          <section className="border-hairline min-h-[510px] rounded-card border p-5">
+          <section className="border-hairline rounded-card border p-5" style={{ minHeight: 510 }}>
             <p className="text-ink mb-4 text-sm font-bold">開始するシナリオ</p>
             <dl className="space-y-3 text-sm">
               <div className="flex justify-between gap-4"><dt className="text-ink-faint">開始対象</dt><dd className="text-ink text-right font-medium">{simulation ? `新規開始予定 ${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人` : preflightLoading ? '—（試算中）' : '—（取得できません）'}</dd></div>
@@ -133,7 +133,7 @@ function StartScenarioDialog({
             </dl>
           </section>
 
-          <section className="border-hairline min-h-[510px] rounded-card border p-5">
+          <section className="border-hairline rounded-card border p-5" style={{ minHeight: 510 }}>
             <p className="text-ink mb-3 text-sm font-bold">配信前チェック</p>
             <ul className="space-y-3 text-sm">
               {preflightLoading ? <li className="text-ink-faint text-xs">開始前の実データを確認しています…</li> : null}

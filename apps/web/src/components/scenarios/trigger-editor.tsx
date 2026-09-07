@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, type ScenarioTriggerItem } from '@/lib/api'
 import { pruneCondition, type SegmentCondition } from '@/lib/segment-condition'
+import Button from '@/components/shared/button'
 
 interface TagOption {
   id: string
@@ -171,8 +172,8 @@ export default function TriggerEditor({
   const tagName = (id: string | null) => tags.find((t) => t.id === id)?.name ?? '（消されたタグ）'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
-      <div className="my-[58px] min-h-[932px] w-full max-w-[1160px] overflow-hidden rounded-card bg-white shadow-lg">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4" style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}>
+      <div className="w-full overflow-hidden rounded-card shadow-lg" style={{ marginBlock: 58, minHeight: 932, maxWidth: 1160, background: 'var(--color-canvas)' }}>
         <div className="border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6 py-4">
           <div className="min-w-0">
             <h2 className="text-ink text-lg font-bold">シナリオの開始条件</h2>
@@ -227,16 +228,15 @@ export default function TriggerEditor({
               </div>
               <details className="relative shrink-0">
                 <summary className="border-accent text-accent rounded-control cursor-pointer list-none border px-3 py-2 text-xs font-medium">条件を編集</summary>
-                <div className="border-hairline absolute right-0 z-10 mt-2 w-[560px] rounded-card border bg-white p-4 shadow-lg">
-                  <button
-                    type="button"
+                <div className="border-hairline absolute right-0 z-10 mt-2 rounded-card border p-4 shadow-lg" style={{ width: 560, background: 'var(--color-canvas)' }}>
+                  <Button
+                    size="field"
                     onClick={() => void add('friend_add')}
                     disabled={hasFriendAdd}
                     title={hasFriendAdd ? 'すでに足してあります' : undefined}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-4 text-sm disabled:opacity-40"
                   >
                     友だち追加時を追加
-                  </button>
+                  </Button>
                   <div className="mt-3 flex items-center gap-2">
                     <select
                       value={addingTagId}
@@ -425,7 +425,7 @@ export default function TriggerEditor({
             </>
           )}
         </div>
-        <div className="border-hairline mt-auto flex justify-end gap-2 border-t px-6 py-4"><button type="button" onClick={onClose} className="border-hairline rounded-control border px-4 py-2 text-sm">キャンセル</button><button type="button" onClick={onClose} className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm">開始条件を保存</button></div>
+        <div className="border-hairline mt-auto flex justify-end gap-2 border-t px-6 py-4"><Button onClick={onClose}>キャンセル</Button><Button variant="primary" onClick={onClose}>開始条件を保存</Button></div>
       </div>
     </div>
   )
