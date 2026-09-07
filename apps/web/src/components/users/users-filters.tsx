@@ -42,7 +42,7 @@ export default function UsersFilters({
       <select
         value={uid}
         onChange={(e) => onChange({ uid: e.target.value })}
-        className="v6-select h-10 min-w-[176px] rounded-control border border-hairline bg-canvas pl-3 text-sm text-ink"
+        className="v6-select h-10 min-w-44 rounded-control border border-hairline bg-canvas pl-3 text-sm text-ink"
       >
         <option value="">UID：すべて</option>
         <option value="linked">UID：連携済み</option>
@@ -51,7 +51,7 @@ export default function UsersFilters({
       <select
         value={account}
         onChange={(e) => onChange({ account: e.target.value })}
-        className="v6-select h-10 min-w-[176px] rounded-control border border-hairline bg-canvas pl-3 text-sm text-ink"
+        className="v6-select h-10 min-w-44 rounded-control border border-hairline bg-canvas pl-3 text-sm text-ink"
       >
         <option value="">所属：すべて</option>
         {accountOptions.map((a) => (

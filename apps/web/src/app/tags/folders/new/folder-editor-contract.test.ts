@@ -114,9 +114,9 @@ describe('友だち属性の一覧（設計 hqrOv）', () => {
     // Issue #456 で Pencil `XchZz` も更新。検索は余白を使い、選択欄は
     // 最長文字＋矢印余白を確保する。すべて h=40 で文字を切らない。
     expect(source).toContain('mb-[10px] flex flex-wrap items-center gap-2')
-    expect(source).toContain('h-10 min-w-[180px] flex-1 rounded-control')
-    expect(source).toContain('h-10 min-w-[176px] rounded-control')
-    expect(source).toContain('h-10 min-w-[152px] rounded-control')
+    expect(source).toContain('h-10 min-w-45 flex-1 rounded-control')
+    expect(source).toContain('h-10 min-w-44 rounded-control')
+    expect(source).toContain('h-10 min-w-38 rounded-control')
     // 設計 `DgeL8` はフォルダ 240 固定。
     expect(source).toContain('xl:grid-cols-[240px_minmax(0,1fr)]')
   })
