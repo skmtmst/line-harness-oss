@@ -682,7 +682,7 @@ export const SCREENS = [
     mode: 'viewport', height: 1080,
     steps: [{ click: '編集', nth: 1 }, { click: '条件を編集', after: 700 }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #463で画素差を切り分け・修正。** (a) 実装差だった窓の位置・高さ・見出し・現在条件・条件軸の並びをPencilへ合わせ、3104/8791で1440/1920pxを再撮影。差分率は23.7417%→10.0651%、高さ差0px、横はみ出し0。設計は1通目の編集状態、実装は現在のシナリオ詳細編集状態のため残差10.0651%。配信条件の取得・追加・解除・保存は維持した。",
+    verdictNote: "設計は1通目の編集状態、実装は現在のシナリオ詳細編集状態のため残差10.0651%。",
     verdictSource: "scenarios-v6/r6Gzsu.txt + scenarios-v6/r6Gzsu-{1440,1920}.png + scenarios-v6/r6Gzsu-diff-1920.png",
   },
   {
@@ -1743,7 +1743,7 @@ export const SCREENS = [
     ...FORM, node: 'gBp2J', name: '13-1-E フォームの削除確認',
     mode: 'viewport', height: 1080,
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #463で画素差を切り分け・修正。** (b) 固定応答をPencilと同じ回答1,284件・利用先3か所へ揃え、受付停止・CSV書き出し・アーカイブの操作を再確認した。差分率10.7585%→10.4375%、高さ差-1px、横はみ出し0。設計は利用先3件を列挙する削除確認状態、実装は実APIの利用先を要約する共通確認状態のため残差10.4375%。機能13側から共通部品は変更していない。',
+    verdictNote: '設計は利用先3件を列挙する削除確認状態、実装は実APIの利用先を要約する共通確認状態のため残差10.4375%。',
     verdictSource: 'forms-v6/gBp2J.txt + forms-v6/gBp2J-{1440,1920}.png + forms-v6/gBp2J-diff-1920.png',
     verdictHead: '520c251a951d',
     steps: [{ click: '来店アンケートを削除' }],
