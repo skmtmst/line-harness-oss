@@ -7715,6 +7715,23 @@ export interface BookingMenu {
   };
 }
 
+export interface BookingException {
+  id: string;
+  lineAccountId: string;
+  scopeKind: 'store' | 'staff' | 'resource';
+  scopeId: string | null;
+  date: string | null;
+  dateFrom: string;
+  dateTo: string;
+  kind: 'open' | 'closed' | 'custom_hours';
+  intervals: Array<{ start: string; end: string }>;
+  reason: string | null;
+  note: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface BookingSettings {
   id: string | null;
   lineAccountId: string;
@@ -7735,22 +7752,7 @@ export interface BookingSettings {
     weekday: number;
     intervals: Array<{ start: string; end: string }>;
   }>;
-  exceptions: Array<{
-    id: string;
-    lineAccountId: string;
-    scopeKind: 'store' | 'staff' | 'resource';
-    scopeId: string | null;
-    date: string | null;
-    dateFrom: string;
-    dateTo: string;
-    kind: 'open' | 'closed' | 'custom_hours';
-    intervals: Array<{ start: string; end: string }>;
-    reason: string | null;
-    note: string | null;
-    version: number;
-    createdAt: string;
-    updatedAt: string;
-  }>;
+  exceptions: BookingException[];
   updatedAt: string;
 }
 
@@ -7857,6 +7859,21 @@ function withAccount(path: string, accountId: string): string {
 export const bookingApi = {
   getSettings: (accountId: string) =>
     fetchApi<ApiResponse<BookingSettings>>(withAccount('/api/booking/admin/settings', accountId)),
+  createException: (
+    accountId: string,
+    body: {
+      scopeKind: 'store' | 'staff' | 'resource';
+      scopeId?: string | null;
+      dateFrom: string;
+      dateTo: string;
+      kind: 'open' | 'closed' | 'custom_hours';
+      intervals: Array<{ start: string; end: string }>;
+      reason: string | null;
+    },
+  ) => fetchApi<ApiResponse<BookingException>>(
+    withAccount('/api/booking/admin/exceptions', accountId),
+    { method: 'POST', body: JSON.stringify(body) },
+  ),
   // Menus
   listMenus: (accountId: string) =>
     fetchApi<{ menus: BookingMenu[] }>(withAccount('/api/booking/admin/menus', accountId)),
