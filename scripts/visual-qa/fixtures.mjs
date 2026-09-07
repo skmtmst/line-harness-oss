@@ -4150,7 +4150,9 @@ export const MILEAGE_FRIENDS = {
  */
 const mileageRule = (id, name, eventType, amount, conditions, isActive = true) => ({
   id, name, eventType, source: null, amount,
-  initialStatus: 'available', conditions, isActive,
+  initialStatus: 'available', conditions,
+  /* #532(#521): 旧口も帰属アカウントを持つ。新規は必須。 */
+  lineAccountId: 'visual-qa-account', isActive,
   validFrom: null, validUntil: null,
   createdAt: '2026-02-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z',
 })
