@@ -53,8 +53,12 @@ describe('V6 photo review contract', () => {
     for (const code of ['quality', 'privacy', 'unrelated', 'other']) {
       expect(page).toContain(`value: '${code}'`);
     }
-    expect(page).toContain('投稿者へ：今回は「{reason.label}」のため、掲載を見送らせていただきました。');
+    expect(page).toContain('うしろに他のお客様が写っているようです。もう一度お願いできますか。');
+    expect(page).toContain('商品の名前が入っていない写真をいただけますか。');
+    expect(page).toContain('明るいところで、もう一度お願いできますか。');
     expect(page).toContain('お客様に届く補足（直せます）');
+    expect(page).toContain('お客様にはこう届きます（直せます）');
+    expect(page).toContain('戻しても、この方のマイルは減りません。');
   });
 
   it('uses one set of operator words for reviewed states', () => {
