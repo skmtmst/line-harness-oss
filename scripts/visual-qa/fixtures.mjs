@@ -1399,6 +1399,12 @@ export const COMMON_VARS = [
     createdAt: '2026-06-10T10:00:00.000+09:00', updatedAt: '2026-06-10T10:00:00.000+09:00',
     nextSchedule: null, pendingScheduleCount: 0, usageCount: 2,
   },
+  {
+    id: 'common-var-delete-safe', lineAccountId: 'visual-qa-account', folderId: 'cvf-guides',
+    name: '臨時のお知らせ', varKey: 'temporary_notice', type: 'text', value: '本日は17時まで営業します',
+    createdAt: '2026-09-01T10:00:00.000+09:00', updatedAt: '2026-09-01T10:00:00.000+09:00',
+    nextSchedule: null, pendingScheduleCount: 0, usageCount: 0,
+  },
 ]
 
 export const COMMON_VAR_DELETE_IMPACT = {
@@ -1628,6 +1634,22 @@ export const MEDIA_ITEMS = [
     sizeBytes: 655360, width: null, height: null, durationMs: null,
     url: 'data:application/pdf;base64,JVBERi0xLjQ=', uploadedBy: '川野 健太', createdAt: '2026-08-09T09:00:00.000Z', usageCount: 1,
   },
+  ...Array.from({ length: 176 }, (_, index) => ({
+    id: `media-archive-${index + 1}`,
+    lineAccountId: 'visual-qa-account',
+    folderId: index < 81 ? 'media-product' : index < 124 ? 'media-banner' : index < 134 ? 'media-video' : null,
+    kind: 'image',
+    filename: `保管画像_${String(index + 1).padStart(3, '0')}.jpg`,
+    mimeType: 'image/jpeg',
+    sizeBytes: 204800,
+    width: 1024,
+    height: 678,
+    durationMs: null,
+    url: mediaPreview('#eef0f2'),
+    uploadedBy: '川野 健太',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    usageCount: 0,
+  })),
 ]
 
 export const MEDIA_DELETE_IMPACT = {

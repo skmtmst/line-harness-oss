@@ -546,7 +546,7 @@ export default function PhotoReviewsPage() {
       </dl>
       <p className="mt-3 text-xs text-ink-faint">写真を通しても自動公開しません。本人の公開同意を確認したあと、出しているもの画面で公開先を選びます。</p>
     </Dialog>
-    {rejectingPhoto && <Dialog open title="この写真を戻しますか？" description="理由をえらぶと、お客様への文章が自動でつくられます。" busy={Boolean(reviewing)} error={reasonError} confirmLabel="戻して、この文章を送る" cancelLabel="やめる" onCancel={() => { setRejectingPhotoId(null); setRejectingPhotoDetail(null); setReasonError('') }} onConfirm={() => {
+    {rejectingPhoto && <Dialog open designNode="N2J629" title="この写真を戻しますか？" description="理由をえらぶと、お客様への文章が自動でつくられます。" busy={Boolean(reviewing)} error={reasonError} confirmLabel="戻して、この文章を送る" cancelLabel="やめる" onCancel={() => { setRejectingPhotoId(null); setRejectingPhotoDetail(null); setReasonError('') }} onConfirm={() => {
       if (reasonCode === 'other' && !reasonNote.trim()) { setReasonError('そのほかの理由を入力してください'); return }
       void review(text(rejectingPhoto.id), 'rejected', { reasonCode, reasonNote: reasonNote.trim() })
     }}>
@@ -569,8 +569,8 @@ export default function PhotoReviewsPage() {
             </fieldset>
             <label className="block text-sm font-semibold text-ink">お客様に届く補足（直せます）<textarea value={reasonNote} onChange={(event) => { setReasonNote(event.target.value.slice(0, 500)); setReasonError('') }} rows={2} placeholder={reasonCode === 'other' ? 'お客様に送る文章を書いてください' : '必要な場合だけ補足します'} className="mt-2 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></label>
             <div className="rounded-control border border-accent-border bg-accent-soft p-3 text-sm text-ink-secondary"><p className="font-semibold text-ink">お客様にはこう届きます（直せます）</p><p className="mt-1 whitespace-pre-line">{photoPetName(rejectingPhoto)}の写真をありがとうございます。{reasonCode === 'other' ? reasonNote || 'お客様に送る文章を入力してください。' : selectedReasonMessage}{reasonNote && reasonCode !== 'other' ? `\n${reasonNote}` : ''}{`\n`}お手数をおかけします。</p></div>
-            <label className="flex items-start gap-2 text-sm text-ink-secondary"><input type="checkbox" disabled className="mt-0.5" /><span><span className="font-semibold text-ink">もう一度 送ってもらえるようお願いする</span><span className="block text-xs text-ink-faint">写真を送るボタンの保存先はまだ接続されていません。</span></span></label>
-            <label className="flex items-start gap-2 text-sm text-ink-secondary"><input type="checkbox" disabled className="mt-0.5" /><span><span className="font-semibold text-ink">この人の次の投稿は、必ず人が見る</span><span className="block text-xs text-ink-faint">要注意投稿者の保存先はまだ接続されていません。</span></span></label>
+            <label className="flex items-start gap-2 text-sm text-ink-secondary"><input type="checkbox" checked readOnly disabled className="mt-0.5 opacity-100" /><span><span className="font-semibold text-ink">もう一度 送ってもらえるようお願いする</span><span className="block text-xs text-ink-faint">写真を送るボタンの保存先はまだ接続されていません。</span></span></label>
+            <label className="flex items-start gap-2 text-sm text-ink-secondary"><input type="checkbox" readOnly disabled className="mt-0.5 opacity-100" /><span><span className="font-semibold text-ink">この人の次の投稿は、必ず人が見る</span><span className="block text-xs text-ink-faint">要注意投稿者の保存先はまだ接続されていません。</span></span></label>
             <p className="text-xs font-semibold text-ink-faint">戻しても、この方のマイルは減りません。</p>
         </div>
     </Dialog>}

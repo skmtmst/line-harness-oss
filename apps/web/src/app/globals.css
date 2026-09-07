@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+[data-design-node="yPkWe"] [data-design-part="dialog"] { width: min(720px, calc(100% - 32px)); }
+[data-design-node="YfTfJ"] [data-design-part="dialog"] { width: min(680px, calc(100% - 32px)); }
+[data-design-node="N2J629"] [data-design-part="dialog"] { width: min(720px, calc(100% - 32px)); }
+
 /**
  * デザイントークン。
  *
