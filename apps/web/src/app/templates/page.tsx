@@ -1122,9 +1122,9 @@ export default function TemplatesPage() {
         </>
       )}
       {blockedDelete !== null ? (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#101828]/40 p-4" data-design-node="M9cij">
-          <section className="flex w-full max-w-[720px] flex-col overflow-hidden rounded-[16px] border border-hairline bg-canvas shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="blocked-template-title">
-            <header className="flex items-center justify-between border-b border-hairline px-6 py-[18px]">
+        <div className="fixed inset-0 flex items-center justify-center bg-ink/40 p-4" style={{ zIndex: 90 }} data-design-node="M9cij">
+          <section className="flex w-full flex-col overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-2xl" style={{ maxWidth: 720 }} role="dialog" aria-modal="true" aria-labelledby="blocked-template-title">
+            <header className="flex items-center justify-between border-b border-hairline px-6 py-4.5">
               <h2 id="blocked-template-title" className="text-lead font-bold text-ink">使用中のテンプレートは削除できません</h2>
               <button
                 type="button"

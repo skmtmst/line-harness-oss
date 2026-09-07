@@ -268,11 +268,11 @@ export function AffiliatePaymentConfirmDialog({
   if (!target) return null
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center overflow-y-auto bg-[#101828]/40 p-4" data-design-node="GqFTV">
-      <section className="flex w-full max-w-[800px] flex-col overflow-hidden rounded-[16px] border border-hairline bg-canvas shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="affiliate-payment-title">
-        <header className="flex items-center justify-between border-b border-hairline px-6 py-[18px]">
+    <div className="fixed inset-0 flex items-center justify-center overflow-y-auto bg-ink/40 p-4" style={{ zIndex: 90 }} data-design-node="GqFTV">
+      <section className="flex w-full flex-col overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-2xl" style={{ maxWidth: 800 }} role="dialog" aria-modal="true" aria-labelledby="affiliate-payment-title">
+        <header className="flex items-center justify-between border-b border-hairline px-6 py-4.5">
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FFF4D6] text-[#A65B00]" aria-hidden="true"><Landmark size={20} /></span>
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-warning-bg text-warning" aria-hidden="true"><Landmark size={20} /></span>
             <div>
               <h2 id="affiliate-payment-title" className="text-lead font-bold text-ink">{title}</h2>
               <p className="mt-0.5 text-xs text-ink-faint">確定すると金額が固定され、振込用のデータに入ります。</p>
@@ -334,12 +334,12 @@ export function AffiliatePaymentConfirmDialog({
           <div className="space-y-2">
             <label className="flex items-start gap-3 text-xs text-ink-secondary">
               <input type="checkbox" className="sr-only" checked={issueStatement} onChange={(event) => setIssueStatement(event.target.checked)} />
-              <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px] border border-accent bg-accent text-white"><Check size={12} /></span>
+              <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center border border-accent-deep bg-accent-deep text-on-accent" style={{ borderRadius: 3 }}><Check size={12} /></span>
               <span><strong className="block text-sm text-ink">確定したことを、この方のLINEに知らせる</strong>「{dateLabel(preview.paymentDate)} に {yen(preview.amount)} をお振込みします」と届きます。</span>
             </label>
             <label className="flex items-start gap-3 text-xs text-ink-secondary">
               <input type="checkbox" className="sr-only" checked={issueStatement} onChange={(event) => setIssueStatement(event.target.checked)} />
-              <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px] border border-accent bg-accent text-white"><Check size={12} /></span>
+              <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center border border-accent-deep bg-accent-deep text-on-accent" style={{ borderRadius: 3 }}><Check size={12} /></span>
               <span><strong className="block text-sm text-ink">支払明細のPDFを作る</strong>内訳が入った明細を作ります。メールでも送れます。</span>
             </label>
           </div>

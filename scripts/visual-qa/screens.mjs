@@ -1562,7 +1562,7 @@ export const SCREENS = [
     */
     ...TEMPLATE, node: 'M9cij', name: '11-1-G テンプレートの削除確認',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #464で(a)画面固有ダイアログの差として修正し、一致。** Pencilと同じ720px幅、見出し区切り、閉じる操作、本文・下部操作の区画へそろえた。使用中3か所の削除停止と差し替え導線を保ち、3102/8789で1440/1920pxを再撮影。横はみ出し0、1920px画素差5.3496%。',
+    verdictNote: '**2026-09-07 Issue #464で(a)画面固有ダイアログの差として修正し、一致。** Pencilと同じ720px幅、見出し区切り、閉じる操作、本文・下部操作の区画へそろえた。使用中3か所の削除停止と差し替え導線を保ち、3102/8789で1440/1920pxを再撮影。横はみ出し0、1920px画素差5.1187%。',
     verdictSource: 'templates-v6/M9cij.txt + M9cij-1440.png + M9cij-1920.png',
     verdictHead: '68d536652',
     mode: 'viewport', height: 1080,
@@ -1978,7 +1978,7 @@ export const SCREENS = [
     route: '/conversions?tab=payment', mode: 'viewport', height: 1080,
     steps: [{ click: '合同会社ノースの支払いを確定する', role: 'button' }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #464で(a)画面固有ダイアログの差として修正し、一致。** 800px幅、見出しと閉じる操作、4指標、却下行を含む内訳、振込先、警告、LINE通知とPDFの2選択、下部注意と操作をPencil順へそろえた。口座番号は安全のため末尾だけを扱う。3102/8789で1440/1920pxを再撮影し、横はみ出し0、1920px画素差8.8713%。",
+    verdictNote: "**2026-09-07 Issue #464で(a)画面固有ダイアログの差として修正し、一致。** 800px幅、見出しと閉じる操作、4指標、却下行を含む内訳、振込先、警告、LINE通知とPDFの2選択、下部注意と操作をPencil順へそろえた。口座番号は安全のため末尾だけを扱う。3102/8789で1440/1920pxを再撮影し、横はみ出し0、1920px画素差7.9215%。",
     verdictSource: "affiliates-v6/GqFTV.txt + GqFTV-1440.png + GqFTV-1920.png",
     verdictHead: "e98decafa",
   },
