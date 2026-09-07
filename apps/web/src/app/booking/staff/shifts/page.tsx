@@ -12,7 +12,6 @@ import {
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 type PreviewMark = '○' | '×' | '休'
@@ -241,32 +240,23 @@ export default function StaffShiftsPage() {
                 <h2 className="text-ink font-semibold">曜日ごとの受付時間</h2>
                 <p className="text-ink-faint mt-1 text-xs">閉めた曜日は、お客様の画面に出ません。</p>
               </div>
-              <DataTable className="rounded-none border-0">
-                <thead>
-                  <TableHeadRow>
-                    <Th>曜日</Th>
-                    <Th>受け付ける</Th>
-                    <Th>開ける時間</Th>
-                    <Th>休けい</Th>
-                    <Th>1時間に受けられる数</Th>
-                  </TableHeadRow>
-                </thead>
-                <tbody>
-                  {DAYS.map((day) => {
-                    const intervals = settings.businessHours.find((item) => item.weekday === day.weekday)?.intervals ?? []
-                    const accepts = intervals.length > 0
-                    return (
-                      <Tr key={day.weekday}>
-                        <Td className="whitespace-nowrap font-medium">{day.label}</Td>
-                        <Td className="whitespace-nowrap">{accepts ? 'はい' : 'いいえ（定休日）'}</Td>
-                        <Td className="whitespace-nowrap tabular-nums">{openHours(intervals)}</Td>
-                        <Td className="whitespace-nowrap tabular-nums">{breakHours(intervals)}</Td>
-                        <Td className="whitespace-nowrap">{intervals[0]?.capacity ?? '—'}件</Td>
-                      </Tr>
-                    )
-                  })}
-                </tbody>
-              </DataTable>
+              <div className="divide-hairline divide-y">
+                {DAYS.map((day) => {
+                  const intervals = settings.businessHours.find((item) => item.weekday === day.weekday)?.intervals ?? []
+                  const accepts = intervals.length > 0
+                  return (
+                    <div className="flex min-h-10 items-center gap-3 px-4 py-2 text-sm" key={day.weekday}>
+                      <strong className="w-24 shrink-0 whitespace-nowrap">{day.label}</strong>
+                      <span className="text-ink-secondary flex flex-wrap gap-x-4 gap-y-1">
+                        <span>{accepts ? '受け付ける' : '休み（定休日）'}</span>
+                        {accepts ? <span className="tabular-nums">{openHours(intervals)}</span> : null}
+                        {accepts ? <span className="tabular-nums">休けい {breakHours(intervals)}</span> : null}
+                        {accepts ? <span>{intervals[0]?.capacity ?? '—'}件／時</span> : null}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
             </section>
 
             <section id="special" data-design="Special" className="bg-canvas border-hairline rounded-card border p-4">
@@ -313,24 +303,23 @@ export default function StaffShiftsPage() {
 
             <section id="rules" data-design="Rules" className="bg-canvas border-hairline rounded-card border p-4">
               <h2 className="text-ink font-semibold">予約のルール</h2>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                 {[
                   ['何日先まで取れるか', settings.bookingWindowDays, '日'],
                   ['何時間前まで取れるか', settings.cutoffMinutesBefore / 60, '時間'],
                   ['何時間前まで取り消せるか', settings.cancelDeadlineMinutesBefore / 60, '時間'],
                   ['同じ人が同時に持てる予約', settings.maxActiveBookingsPerFriend, '件まで'],
                 ].map(([label, value, unit]) => (
-                  <div key={label} className="border-hairline rounded-control border p-3">
+                  <div key={label} className="border-hairline rounded-control border p-2.5">
                     <p className="text-ink-secondary text-xs font-medium">{label}</p>
-                    <p className="text-ink mt-2 text-lg font-semibold tabular-nums">{value}</p>
-                    <p className="text-ink-faint mt-1 text-xs">{unit}</p>
+                    <p className="text-ink mt-1 text-sm font-semibold tabular-nums">{value} <span className="text-ink-faint text-xs font-normal">{unit}</span></p>
                   </div>
                 ))}
               </div>
             </section>
           </div>
 
-          <aside className="space-y-4 xl:w-96 xl:flex-none">
+          <aside className="space-y-3 xl:w-96 xl:flex-none">
             <section data-design="Preview" className="bg-canvas border-hairline rounded-card border p-4">
               <h2 className="text-ink-secondary text-sm font-semibold">お客様のLINEではこう見えます</h2>
               <div className="bg-info mt-3 rounded-card p-3">
@@ -339,7 +328,7 @@ export default function StaffShiftsPage() {
                   <div className="text-ink-faint mt-3 grid grid-cols-7 gap-1 text-center text-xs">
                     {['月', '火', '水', '木', '金', '土', '日'].map((day) => <span key={day} className="font-medium">{day}</span>)}
                     {preview.map((item) => (
-                      <span key={item.date} className="bg-canvas-sunken rounded-control py-2" title={item.date}>
+                      <span key={item.date} className="bg-canvas-sunken rounded-control py-1" title={item.date}>
                         <span className="block tabular-nums">{item.day}</span>
                         <span className={item.mark === '○' ? 'text-success' : item.mark === '休' ? 'text-ink-faint' : 'text-danger'}>{item.mark}</span>
                       </span>
@@ -352,19 +341,24 @@ export default function StaffShiftsPage() {
                     <div className="flex gap-2"><dt className="font-semibold">休</dt><dd>お休み</dd></div>
                   </dl>
                   <p className="text-ink-faint mt-3 text-xs">○・△・×は受付上限に対する残数を反映しています。</p>
-                  <div className="mt-3 space-y-1 text-xs">
-                    {slots.slice(0, 6).map((slot) => <div key={`${slot.date}-${slot.start}`} className="flex justify-between"><span>{shortDate(slot.date)} {slot.start}</span><span>残り{slot.remaining}/{slot.capacity}</span></div>)}
-                  </div>
+                  {slots.length > 0 ? (
+                    <details className="mt-3 text-xs">
+                      <summary className="text-accent cursor-pointer">空き枠の内訳を見る</summary>
+                      <div className="mt-2 space-y-1">
+                        {slots.slice(0, 6).map((slot) => <div key={`${slot.date}-${slot.start}`} className="flex justify-between"><span>{shortDate(slot.date)} {slot.start}</span><span>残り{slot.remaining}/{slot.capacity}</span></div>)}
+                      </div>
+                    </details>
+                  ) : null}
                 </div>
               </div>
             </section>
 
-            <section className="bg-canvas border-hairline rounded-card border p-4">
-              <h2 className="text-ink font-semibold">設備ごとの受付上限</h2>
+            <details className="bg-canvas border-hairline rounded-card border p-3">
+              <summary className="text-accent cursor-pointer text-sm font-semibold">設備ごとの受付上限を見る</summary>
               <div className="mt-3 space-y-2 text-sm">
                 {resources.length === 0 ? <p className="text-ink-faint">設備は登録されていません</p> : resources.map((resource) => <div key={resource.id} className="flex justify-between"><span>{resource.name}</span><span>{resource.isActive ? `${resource.capacity}枠` : '停止中'}</span></div>)}
               </div>
-            </section>
+            </details>
 
             <section data-design="Trouble" className="bg-warning-bg text-warning rounded-card p-4">
               <h2 className="font-semibold">よくある困りごと</h2>
