@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { LineClient } from '@line-crm/line-sdk';
 import {
   getNotificationRules,
   getNotificationRuleById,
@@ -14,6 +15,194 @@ import { canAccessAllLineAccounts } from '../services/account-access.js';
 const notifications = new Hono<Env>();
 
 const OPERATOR_NOTIFICATION_CHANNELS = new Set(['dashboard', 'email', 'line']);
+
+type OperatorRecipient = {
+  id: string;
+  name: string;
+  email: string | null;
+  email_verified_at: string | null;
+  line_user_id: string | null;
+  notification_preferences: string;
+};
+
+type OperatorRuleConditions = {
+  importance?: string;
+  recipientIds?: string[];
+  recipientLabel?: string;
+  message?: string;
+  actionUrl?: string;
+  dedupeMinutes?: number;
+};
+
+function jsonRecord(value: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function ruleConditions(rule: { conditions: string }): OperatorRuleConditions {
+  return jsonRecord(rule.conditions) as OperatorRuleConditions;
+}
+
+function ruleChannels(rule: { channels: string }): string[] {
+  try {
+    const parsed = JSON.parse(rule.channels) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((value): value is string => typeof value === 'string' && OPERATOR_NOTIFICATION_CHANNELS.has(value))
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+async function operatorRecipients(
+  db: D1Database,
+  lineAccountId: string,
+  recipientIds?: string[],
+): Promise<OperatorRecipient[]> {
+  const result = await db.prepare(`
+    SELECT sm.id, sm.name, sm.email, sm.email_verified_at, sm.line_user_id,
+           sm.notification_preferences
+      FROM staff_members sm
+      JOIN line_accounts la ON la.id = ?
+     WHERE sm.is_active = 1
+       AND COALESCE(sm.tenant_id, 'default') = COALESCE(la.tenant_id, 'default')
+       AND (COALESCE(sm.account_scope, 'all') = 'all' OR sm.assigned_line_account_id = ?)
+     ORDER BY sm.name, sm.id
+  `).bind(lineAccountId, lineAccountId).all<OperatorRecipient>();
+  const requested = recipientIds?.length ? new Set(recipientIds) : null;
+  return (result.results ?? []).filter((recipient) => !requested || requested.has(recipient.id));
+}
+
+function recipientPreview(recipient: OperatorRecipient, channels: string[]) {
+  const preferences = jsonRecord(recipient.notification_preferences);
+  const operator = preferences.operator && typeof preferences.operator === 'object'
+    ? preferences.operator as Record<string, unknown>
+    : {};
+  const line = channels.includes('line') && Boolean(recipient.line_user_id) && operator.line !== false;
+  const email = channels.includes('email') && Boolean(recipient.email && recipient.email_verified_at) && operator.email !== false;
+  const dashboard = channels.includes('dashboard');
+  return {
+    id: recipient.id,
+    name: recipient.name,
+    lineLinked: Boolean(recipient.line_user_id),
+    emailVerified: Boolean(recipient.email && recipient.email_verified_at),
+    channels: { line, email, dashboard },
+    canReceive: line || email || dashboard,
+  };
+}
+
+async function accountToken(db: D1Database, lineAccountId: string): Promise<string | null> {
+  const row = await db.prepare(
+    `SELECT channel_access_token FROM line_accounts WHERE id = ? AND is_active = 1`,
+  ).bind(lineAccountId).first<{ channel_access_token: string | null }>();
+  return row?.channel_access_token?.trim() || null;
+}
+
+function operatorMessage(rule: { name: string; event_type: string; conditions: string }, override?: string): string {
+  const conditions = ruleConditions(rule);
+  return override?.trim() || conditions.message?.trim()
+    || `【運用者へのお知らせ】${rule.name}\n管理画面で内容を確認してください。`;
+}
+
+async function ensureOperatorInstance(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    ruleId: string;
+    sourceEventType: string;
+    sourceEventId: string;
+  },
+): Promise<string> {
+  const instanceId = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const dedupeKey = `${input.ruleId}:${input.sourceEventId}`;
+  try {
+    await db.prepare(`
+      INSERT INTO notification_instances
+        (id, line_account_id, audience_type, definition_id, source_event_type,
+         source_event_id, dedupe_key, status, created_at, updated_at)
+      VALUES (?, ?, 'operator', ?, ?, ?, ?, 'pending', ?, ?)
+    `).bind(
+      instanceId, input.lineAccountId, input.ruleId, input.sourceEventType,
+      input.sourceEventId, dedupeKey, now, now,
+    ).run();
+    return instanceId;
+  } catch (error) {
+    if (error instanceof Error && /UNIQUE/i.test(error.message)) {
+      const existing = await db.prepare(`
+        SELECT id FROM notification_instances WHERE line_account_id = ? AND dedupe_key = ?
+      `).bind(input.lineAccountId, dedupeKey).first<{ id: string }>();
+      if (existing) return existing.id;
+    }
+    throw error;
+  }
+}
+
+async function claimOperatorDelivery(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    instanceId: string;
+    ruleId: string;
+    sourceEventId: string;
+    recipientId: string;
+    channel: 'line' | 'email' | 'in_app';
+    executionMode: 'automatic' | 'test';
+  },
+): Promise<{ id: string; retryKey: string } | null> {
+  const id = crypto.randomUUID();
+  const retryKey = `${input.ruleId}:${input.sourceEventId}:${input.recipientId}:${input.channel}`;
+  const now = new Date().toISOString();
+  try {
+    await db.prepare(`
+      INSERT INTO notification_deliveries
+        (id, line_account_id, instance_id, audience_type, recipient_type, recipient_id,
+         channel, idempotency_key, status, retryable, attempts, queued_at,
+         execution_mode, updated_at)
+      VALUES (?, ?, ?, 'operator', 'staff', ?, ?, ?, 'pending', 0, 0, ?, ?, ?)
+    `).bind(
+      id, input.lineAccountId, input.instanceId, input.recipientId, input.channel,
+      retryKey, now, input.executionMode, now,
+    ).run();
+    return { id, retryKey };
+  } catch (error) {
+    if (error instanceof Error && /UNIQUE/i.test(error.message)) return null;
+    throw error;
+  }
+}
+
+async function finishOperatorDelivery(
+  db: D1Database,
+  input: {
+    id: string;
+    lineAccountId: string;
+    status: 'provider_accepted' | 'excluded' | 'failed';
+    providerRequestId?: string | null;
+    errorCode?: string | null;
+    errorMessage?: string | null;
+  },
+): Promise<void> {
+  const now = new Date().toISOString();
+  await db.prepare(`
+    UPDATE notification_deliveries
+       SET status = ?, attempts = 1, provider_request_id = ?, provider_status = ?,
+           error_code = ?, error_message_safe = ?,
+           accepted_at = CASE WHEN ? = 'provider_accepted' THEN ? ELSE NULL END,
+           failed_at = CASE WHEN ? = 'failed' THEN ? ELSE NULL END,
+           updated_at = ?
+     WHERE id = ? AND line_account_id = ? AND status = 'pending'
+  `).bind(
+    input.status, input.providerRequestId ?? null, input.status,
+    input.errorCode ?? null, input.errorMessage ?? null,
+    input.status, now, input.status, now, now, input.id, input.lineAccountId,
+  ).run();
+}
 
 function serializeRule(item: Awaited<ReturnType<typeof getNotificationRuleById>> extends infer T
   ? Exclude<T, null>
