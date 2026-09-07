@@ -375,7 +375,7 @@ export default function TagEditorV4({
   }
 
   return (
-    <div className="pb-24">
+    <div>
       <div className="mb-5">
         <Breadcrumb items={[{ label: '友だち属性', href: '/tags' }, { label: mode === 'create' ? 'タグを作る' : 'タグを編集' }]} />
       </div>
