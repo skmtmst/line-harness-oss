@@ -45,11 +45,14 @@ describe('V6 シナリオ編集の契約', () => {
     expect(LIST).not.toContain('title="準備中です"\n          className="border-hairline text-ink-faint rounded-control border px-4')
   })
 
-  it('並び替えは既に使える行のつまみを案内し、マニュアルを最後に置く', () => {
-    expect(LIST).toContain('⇅ 並び替えは ⠿ を掴む')
-    expect(LIST).not.toContain('>\n              並び替え\n            </button>')
-    expect(LIST.indexOf('⇅ 並び替えは ⠿ を掴む')).toBeLessThan(
-      LIST.indexOf('マニュアル\n            </button>'),
+  it('一覧本文は題ブロックを置かず、開始案内からKPIへ続く', () => {
+    expect(LIST).not.toContain("import Header from '@/components/layout/header'")
+    expect(LIST).not.toContain('<Header')
+    expect(LIST).not.toContain('配信のタイミングを指定して複数のメッセージを順に送ります。')
+    expect(LIST).toContain('作成しただけでは配信されません。開始条件を設定すると配信が始まります。')
+    expect(LIST).toContain('配信を始める方法')
+    expect(LIST.indexOf('作成しただけでは配信されません。')).toBeLessThan(
+      LIST.indexOf('<ListKpis'),
     )
   })
 

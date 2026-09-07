@@ -13,7 +13,6 @@ function scenarioCompletionDetail(active: number, completed: number): string {
   return `登録合計 ${enrolled.toLocaleString('ja-JP')}人のうち ${rate}%`
 }
 import type { Folder } from '@line-crm/shared'
-import Header from '@/components/layout/header'
 import ListKpis from '@/components/shared/list-kpis'
 import ListToolbar from '@/components/shared/list-toolbar'
 import FolderPanel from '@/components/shared/folder-panel'
@@ -364,30 +363,6 @@ export default function ScenariosPage() {
 
   return (
     <div>
-      <div data-design="Head">
-      <Header
-        title="シナリオ配信"
-        description="配信のタイミングを指定して複数のメッセージを順に送ります。友だちの反応に応じて分岐もできます。作成しただけでは配信されません。"
-        action={
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control border px-3 py-2 text-sm font-medium"
-              title="表の左端の ⠿ を掴むと並べ替えられます"
-            >
-              ⇅ 並び替えは ⠿ を掴む
-            </span>
-            <button
-              disabled
-              title="マニュアルは準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-            >
-              マニュアル
-            </button>
-          </div>
-        }
-      />
-      </div>
-
       <section className="bg-success-bg text-success mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-card px-4 py-3 text-sm">
         <span aria-hidden>ⓘ</span>
         <strong>作成しただけでは配信されません。開始条件を設定すると配信が始まります。</strong>
