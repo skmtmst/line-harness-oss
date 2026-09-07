@@ -10,12 +10,12 @@
 
 | 判定 | 数 |
 |---|---|
-| 一致 | **187** |
-| 構造一致・データ未接続 | 66 |
+| 一致 | **192** |
+| 構造一致・データ未接続 | 63 |
 | 要修正 | 11 |
 | 未実装 | 0 |
-| 未判定 | 4 |
-| **完了まで残り** | **81** |
+| 未判定 | 2 |
+| **完了まで残り** | **76** |
 
 「完了まで残り」＝ 構造一致・データ未接続 ＋ 要修正 ＋ 未実装 ＋ 未判定。
 
@@ -33,7 +33,7 @@
 | 10 | ウェビナー | 13 | 13 | 3 | 10 | 0 | 0 | 0 | 0 | 0 | 0 | #1081 `a55f719b9b` 2026-09-07（ZC13r・PV1Vh・d3rFGD・Ho8z4・Xjk8q・GB0NR・D6yO7e・TimXl・Q8sHa・yxyzQ・zCQXe）<br>#1070 `a325ab485` 2026-09-07（ZC13r・PV1Vh・d3rFGD・Ho8z4・Xjk8q・GB0NR・D6yO7e・TimXl・Q8sHa・yxyzQ・LKuAQ・zCQXe）<br>#1011 `98e104b7c` 2026-09-06（lvaY5）<br>#962 `9b8f7451` 2026-09-06（ZC13r・PV1Vh・d3rFGD・Ho8z4・Xjk8q・GB0NR・D6yO7e・Q8sHa・yxyzQ・LKuAQ・zCQXe）<br>#917 `c5e1095e` 2026-09-06（ZC13r・PV1Vh・d3rFGD・Ho8z4・Xjk8q・GB0NR・D6yO7e・Q8sHa・yxyzQ・LKuAQ・zCQXe）<br>#508 `61eeb3c7` 2026-08-29（TimXl・GB0NR）<br>#546 `de0848b9` 2026-08-29（Ho8z4）<br>#623 `988cc37a` 2026-08-31（PV1Vh・d3rFGD・Ho8z4・Xjk8q・D6yO7e・Q8sHa・yxyzQ）<br>#524 `a6c35ee0` 2026-08-29（zCQXe）<br>#0 `c275749d` 2026-08-30（ZC13r・lvaY5・PV1Vh・d3rFGD・Xjk8q・Q8sHa・yxyzQ）<br>#0 `f4c3f012` 2026-09-01（ZC13r・Ho8z4）<br>#0 `96ed41b6` 2026-09-01（PV1Vh・d3rFGD・Ho8z4・Q8sHa） |
 | 11 | テンプレート | 10 | 10 | 10 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | #1208 `68d536652` 2026-09-07（M9cij）<br>#1024 `031081d69` 2026-09-07（W7LBc・NNDMR・M9cij）<br>#944 `98abf756a` 2026-09-06（W7LBc・GFlD7・FRkls・NNDMR・j9ixI・hsBtl・J3GxEZ・M9cij・NKyoA）<br>#433 `51020a97` 2026-08-28（M9cij）<br>#493 `62ddaebe` 2026-08-28（CzndJ・M9cij）<br>#572 `e4ab641f` 2026-08-29（NNDMR）<br>#528 `1b95452d` 2026-08-29（NKyoA）<br>#0 `c275749d` 2026-08-30（W7LBc・GFlD7・FRkls・j9ixI・hsBtl・J3GxEZ）<br>#493 `cdbfe42c` 2026-08-30（W7LBc）<br>#626 `d0af5581` 2026-08-31（CzndJ・M9cij・GFlD7・FRkls・j9ixI・hsBtl・J3GxEZ・NKyoA） |
 | 12 | リッチメニュー | 9 | 9 | 3 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | #1191 `e98decafa` 2026-09-07（kQ1bs）<br>#1129 `af74a0bbd` 2026-09-07（GO8RQ・XtfO3・UMiJ9・TL7tp・szXsT）<br>#1007 `f2be359e5` 2026-09-06（GO8RQ・XtfO3・TL7tp・RW5Tb）<br>#509 `e148615c` 2026-08-29（DIUbO・NXdDk）<br>#523 `47e7846e` 2026-08-29（RW5Tb）<br>#0 `c275749d` 2026-08-30（GO8RQ・XtfO3・kQ1bs・UMiJ9・TL7tp）<br>#583 `0218ef61` 2026-08-30（GO8RQ）<br>#509 `4cf82bd9` 2026-08-30（DIUbO・NXdDk）<br>#575 `ab5750ec` 2026-08-30（szXsT）<br>#577 `7b8df2f4` 2026-08-30（RW5Tb）<br>#583 `bb1e4dfd` 2026-08-30（kQ1bs・XtfO3）<br>#592 `84f35a0b` 2026-08-30（XtfO3）<br>#616 `0a11c9e8` 2026-08-31（szXsT） |
-| 13 | 回答フォーム | 7 | 7 | 3 | 2 | 0 | 0 | 2 | 0 | 0 | 0 | #436 `35c613a6` 2026-08-29（EMBIK・v9tYhl）<br>#436 `950073ab` 2026-08-29（ZOPyc）<br>#556 `1c1546cb` 2026-08-30（ZOPyc）<br>#0 `c275749d` 2026-08-30（vCqUj・cSqvP）<br>#586 `7428a314` 2026-08-30（EMBIK） |
+| 13 | 回答フォーム | 7 | 7 | 5 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | #436 `35c613a6` 2026-08-29（EMBIK・v9tYhl）<br>#436 `950073ab` 2026-08-29（ZOPyc）<br>#556 `1c1546cb` 2026-08-30（ZOPyc）<br>#0 `c275749d` 2026-08-30（vCqUj・cSqvP）<br>#586 `7428a314` 2026-08-30（EMBIK） |
 | 14 | 共通情報 | 4 | 4 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | #1150 `bc92f54ea` 2026-09-07（WuKzU・gBtaK・uNBlA・yPkWe）<br>#1099 `bb8a139b3` 2026-09-07（WuKzU・gBtaK・yPkWe）<br>#1075 `24313778e` 2026-09-07（WuKzU・gBtaK・yPkWe）<br>#548 `d4a85ad4` 2026-08-29（uNBlA・gBtaK）<br>#0 `c275749d` 2026-08-30（WuKzU・gBtaK）<br>#619 `31b44202` 2026-08-31（yPkWe）<br>#668 `7d830282` 2026-09-02（gBtaK・yPkWe・WuKzU） |
 | 15 | 登録メディア | 5 | 4 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | #1157 `0cc67ed91d` 2026-09-07（g89Tc・voJtX・eXAJP・YfTfJ）<br>#997 `3eae16770` 2026-09-06（g89Tc・voJtX・eXAJP・YfTfJ・h8pBZr）<br>#559 `7922c002` 2026-08-29（g89Tc）<br>#560 `7c1acd0f` 2026-08-29（g89Tc）<br>#0 `c275749d` 2026-08-30（eXAJP）<br>#617 `b7e58a51` 2026-08-31（YfTfJ）<br>#667 `7d830282` 2026-09-02（g89Tc・eXAJP・YfTfJ・h8pBZr） |
 | 16 | 成果とアフィリエイト | 9 | 7 | 8 | 1 | 0 | 0 | 0 | 0 | 0 | 2 | #1180 `3721857fb` 2026-09-07（jwrbf・GqFTV・njLGA）<br>#558 `ef7b5773` 2026-08-29（PouPn・xqT1Z・jwrbf）<br>#563 `64798425` 2026-08-29（jwrbf）<br>#0 `c275749d` 2026-08-30（PouPn・GH8VL・n5VVTb・xqT1Z・GPWzq）<br>#585 `75d6eb9a` 2026-08-30（njLGA）<br>#585 `3857365b` 2026-08-30（njLGA）<br>#667 `7d830282` 2026-09-02（n5VVTb・PouPn・GH8VL・njLGA・GPWzq・xqT1Z） |
@@ -44,7 +44,7 @@
 | 21 | NEN配信 | 7 | 1 | 1 | 4 | 2 | 0 | 0 | 0 | 0 | 6 | #446 `4307088d` 2026-08-28<br>#525 `deff5ffb` 2026-08-29（DEX0k）<br>#526 `dfcc9a53` 2026-08-29（HpKyF）<br>#0 `c275749d` 2026-08-30（VLMGH・q4lajm・WeXbL・i9sQP）<br>#526 `1c91a7bc` 2026-08-30（HpKyF・VLMGH）<br>#620 `ed5c0932` 2026-08-31（ymXJK）<br>#1050 `8d3557ce0` 2026-09-07（VLMGH・DEX0k・q4lajm・WeXbL・ymXJK・i9sQP） |
 | 22 | 写真審査 | 4 | 2 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | #1207 `46a869f74` 2026-09-07（hHrz8・N2J629）<br>#447 `65adbc59` 2026-08-28<br>#0 `c275749d` 2026-08-30（Qu6Vk・N2J629）<br>#1044 `98588d0275` 2026-09-07（Qu6Vk）<br>#1185 `c992fbd82` 2026-09-07（Qu6Vk・hHrz8・N2J629） |
 | 23 | EC連携 | 4 | 4 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | #1190 `88673e254` 2026-09-07（bfB50・oHAN4）<br>#0 `c275749d` 2026-08-30（eI3gs）<br>#600 `484c0cd8` 2026-08-31（ELayY）<br>#1006 `f7623915e` 2026-09-06（bfB50・oHAN4） |
-| 24 | LINE通知 | 6 | 6 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | #1076 `8e7c374991` 2026-09-07（festr・Q55bb・X8JCA5・Se65i）<br>#504 `806ed169` 2026-08-30（festr・Q55bb）<br>#545 `c9bb193d` 2026-08-30（X8JCA5・Se65i・DpxOK・N2gAza）<br>#564 `ad59fde6` 2026-08-29（DpxOK）<br>#0 `4af43fb6` 2026-09-01（festr） |
+| 24 | LINE通知 | 6 | 6 | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | #1076 `8e7c374991` 2026-09-07（festr・Q55bb・X8JCA5・Se65i）<br>#504 `806ed169` 2026-08-30（festr・Q55bb）<br>#545 `c9bb193d` 2026-08-30（X8JCA5・Se65i・DpxOK・N2gAza）<br>#564 `ad59fde6` 2026-08-29（DpxOK）<br>#0 `4af43fb6` 2026-09-01（festr） |
 | 25 | オートメーション | 8 | 8 | 5 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | #502 `75b010fc` 2026-08-28（DkPY0）<br>#552 `6ce43563` 2026-08-29（gief7・Rv8Jv・WjYAC・Vdbv5）<br>#0 `c275749d` 2026-08-30（xOpDs・py5CG・syWp4）<br>#0 `2d0ee180` 2026-08-30（xOpDs・py5CG・syWp4）<br>#594 `a389b70a` 2026-08-30（syWp4）<br>#989 `44e671b2c` 2026-09-06（gief7・Rv8Jv・WjYAC・Vdbv5・xOpDs・py5CG・syWp4）<br>#1055 `08369795c` 2026-09-07（gief7・Rv8Jv・DkPY0・WjYAC・py5CG）<br>#1151 `bd900c36d` 2026-09-07（gief7・Rv8Jv・DkPY0・WjYAC・Vdbv5・xOpDs・py5CG・syWp4） |
 | 26 | 外部連携 | 4 | 4 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | #547 `48715569` 2026-08-29（KNG00）<br>#515 `09054b78` 2026-08-29（f8SBSh）<br>#527 `c6fd4388` 2026-08-29（k3WxrO・f8SBSh）<br>#0 `c275749d` 2026-08-30（M0Gb7） |
 | 27 | 予約管理 | 7 | 7 | 2 | 1 | 4 | 0 | 0 | 0 | 0 | 0 | #459 `ba0bf62d` 2026-08-29（GFDqW・GfceK・Lg8ff）<br>#562 `45789965` 2026-08-29（Lg8ff）<br>#0 `c275749d` 2026-08-30（TV2DI・TnDbq・SbuUI）<br>#587 `425a6b1a` 2026-08-30（GFDqW・GfceK・Lg8ff） |
@@ -55,6 +55,6 @@
 | 32 | 運用状態 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | #482 `b346d467` 2026-08-29（b3HfZ・U0BwS）<br>#0 `c275749d` 2026-08-30（UgonK・UhC2O） |
 | 33 | LINEアカウント設定 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |  |
 | 34 | はじめの設定と案内 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |  |
-| | **合計** | **272** | **241** | **187** | **66** | **11** | **0** | **4** | **0** | **0** | **31** | |
+| | **合計** | **272** | **241** | **192** | **63** | **11** | **0** | **2** | **0** | **0** | **31** | |
 
 **「撮った先」が空**の機能は、まだ実装PRのheadで撮り直していません（自分の枝で撮ったものです）。**空欄を確認済みと読まないでください。**
