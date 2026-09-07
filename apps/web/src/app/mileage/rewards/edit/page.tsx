@@ -23,6 +23,8 @@ import {
   type MileageRewardTestResult,
 } from '@/lib/api'
 
+type CommonActionOption = { id: string; label: string }
+
 /**
  * マイルの使い道をつくる・編集する（設計 `p9CcEB` 17-1-G）。
  *
@@ -91,6 +93,16 @@ function formOf(reward: MileageRewardSummary): FormState {
   }
 }
 
+function isMileageRewardSummary(value: unknown): value is MileageRewardSummary {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<MileageRewardSummary>
+  return typeof candidate.id === 'string'
+    && typeof candidate.name === 'string'
+    && typeof candidate.rewardKind === 'string'
+    && typeof candidate.status === 'string'
+    && (candidate.currentVersion === null || typeof candidate.currentVersion === 'object')
+}
+
 /** 空文字は `null`（限りなし・決めない）。**0 を null に潰さない。** */
 function numberOrNull(value: string): number | null {
   const trimmed = value.trim()
@@ -129,6 +141,8 @@ function MileageRewardEditorInner() {
   const [testResult, setTestResult] = useState<MileageRewardTestResult | null>(null)
   const [publishOpen, setPublishOpen] = useState(false)
   const [failure, setFailure] = useState('')
+  const [commonActions, setCommonActions] = useState<CommonActionOption[]>([])
+  const [commonActionsFailed, setCommonActionsFailed] = useState(false)
   const [touched, setTouched] = useState(false)
   usePageTitle(editing ? '使い道を編集' : '使い道をつくる')
 
@@ -136,16 +150,44 @@ function MileageRewardEditorInner() {
     if (!rewardId || !selectedAccountId) return
     setState('loading')
     try {
-      const res = await api.mileage.reward(rewardId, selectedAccountId)
-      if (!res.success) throw new Error('failed')
-      setReward(res.data)
-      setForm(formOf(res.data))
+      const [detail, overview] = await Promise.all([
+        api.mileage.reward(rewardId, selectedAccountId).catch(() => null),
+        api.mileage.rewards(selectedAccountId).catch(() => null),
+      ])
+      const fallback = overview?.success
+        ? overview.data.rewards.find((item) => item.id === rewardId)
+        : undefined
+      const found = detail?.success && isMileageRewardSummary(detail.data) ? detail.data : fallback
+      if (!found) throw new Error('failed')
+      setReward(found)
+      setForm(formOf(found))
       setState('ready')
     } catch (err) {
       /* 権限不足は取得失敗と別。次にすることが違う。 */
       setState(err instanceof ApiError && err.status === 403 ? 'forbidden' : 'error')
     }
   }, [rewardId, selectedAccountId])
+
+  useEffect(() => {
+    if (!selectedAccountId) {
+      setCommonActions([])
+      return
+    }
+    let cancelled = false
+    setCommonActionsFailed(false)
+    void api.commonActions.resources(selectedAccountId).then(async (response) => {
+      if (!response.success) throw new Error(response.error)
+      const details = await Promise.all(response.data.commonActions.map(async (item) => {
+        const detail = await api.commonActions.get(item.id, selectedAccountId)
+        if (!detail.success || !detail.data.currentPublishedVersionId) return null
+        return { id: detail.data.currentPublishedVersionId, label: `${item.name}（公開版 v${item.version}）` }
+      }))
+      if (!cancelled) setCommonActions(details.filter((item): item is CommonActionOption => item !== null))
+    }).catch(() => {
+      if (!cancelled) setCommonActionsFailed(true)
+    })
+    return () => { cancelled = true }
+  }, [selectedAccountId])
 
   useEffect(() => {
     if (!editing) { setState('ready'); return }
@@ -335,7 +377,19 @@ function MileageRewardEditorInner() {
                 : '共通アクションの版を指定します'}
               error={touched && errors.includes('交換後に渡すものを選んでください') ? '交換後に渡すものを選んでください' : undefined}
             >
-              <TextInput id="reward-action" value={form.commonActionVersionId} onChange={(e) => set('commonActionVersionId', e.target.value)} placeholder="共通アクションの版" />
+              <Select
+                id="reward-action"
+                value={form.commonActionVersionId}
+                onChange={(value) => set('commonActionVersionId', value)}
+                options={[
+                  { value: '', label: commonActionsFailed ? '公開版を読み込めませんでした' : '公開中の共通アクションを選ぶ' },
+                  ...(form.commonActionVersionId && !commonActions.some((item) => item.id === form.commonActionVersionId)
+                    ? [{ value: form.commonActionVersionId, label: '現在選択中の公開版' }]
+                    : []),
+                  ...commonActions.map((item) => ({ value: item.id, label: item.label })),
+                ]}
+                disabled={commonActionsFailed}
+              />
             </Field>
           </div>
         </Card>

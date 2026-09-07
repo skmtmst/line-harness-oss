@@ -2053,6 +2053,13 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/mileage/friends') return { success: true, data: MILEAGE_FRIENDS }
   if (pathname === '/api/mileage/earning-rules') return { success: true, data: MILEAGE_EARNING_RULES }
   if (pathname === '/api/mileage/rules') return { success: true, data: MILEAGE_RULES }
+  if (/^\/api\/mileage\/rewards\/[^/]+$/.test(pathname)) {
+    const rewardId = pathname.split('/').pop()
+    const reward = MILEAGE_REWARDS.rewards.find((item) => item.id === rewardId)
+    return reward
+      ? { success: true, data: reward }
+      : { success: false, error: '使い道が見つかりません' }
+  }
   if (pathname === '/api/conversions/definitions') return { success: true, data: CONVERSION_DEFINITIONS }
   if (pathname === '/api/conversions/points') return { success: true, data: CONVERSION_POINTS }
   if (pathname === '/api/conversions/report') {
@@ -2468,6 +2475,27 @@ const server = createServer((req, res) => {
   // ただし画面側のエラー報告だけは 204 で受ける。405 を返すと、
   // 報告が失敗したこと自体が新しいエラーになって際限なく増える。
   if (method !== 'GET') {
+    if (method === 'PATCH' && /^\/api\/mileage\/earning-rules\/[^/]+\/draft$/.test(url.pathname)) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        const ruleId = url.pathname.split('/')[4]
+        const version = Number.isInteger(body.expectedVersion) ? body.expectedVersion + 1 : 1
+        res.writeHead(200).end(JSON.stringify({
+          success: true,
+          data: {
+            ruleId,
+            lineAccountId: body.accountId ?? 'visual-qa-account',
+            version,
+            draft: body.draft ?? {},
+            updatedAt: '2026-09-07T03:31:00.000Z',
+          },
+        }))
+      })
+      return
+    }
     if (url.pathname === '/api/client-errors') {
       res.writeHead(204).end()
       return
