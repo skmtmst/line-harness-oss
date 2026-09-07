@@ -69,6 +69,14 @@ describe('V6 30 ログインユーザーの画面契約', () => {
       expect(auditSource).toContain(word)
     }
     expect(auditSource).toContain('colSpan={5}')
-    expect(auditSource).toContain('—（未取得）')
+    expect(auditSource).toContain('row.actor.name')
+    expect(auditSource).toContain('targetLabel(row)')
+    expect(auditSource).toContain('locationLabel(row)')
+  })
+
+  it('一覧と権限はアクセス契約の読み取り口を使う', () => {
+    expect(staffSource).toContain('api.access.users')
+    expect(staffSource).toContain('api.access.roles')
+    expect(auditSource).toContain('api.audit.events')
   })
 })

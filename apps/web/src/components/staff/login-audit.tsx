@@ -126,24 +126,37 @@ export default function LoginAudit({ userId }: { userId?: string }) {
       const from = periodFilter === 'all'
         ? undefined
         : new Date(Date.now() - Number(periodFilter) * 24 * 60 * 60 * 1000).toISOString()
-      const result = await api.audit.events({
+      const category = actionFilter === 'login' ? 'auth' as const : undefined
+      const resultFilter = actionFilter === 'attention' ? 'failed' as const : undefined
+      const action = actionFilter === 'deleted'
+        ? 'delete'
+        : actionFilter === 'sent'
+          ? 'send'
+          : actionFilter === 'settings'
+            ? 'update'
+            : undefined
+      const auditResult = await api.audit.events({
         lineAccountId: selectedAccountId ?? undefined,
         actorId: userId,
         query: query.trim() || undefined,
         from,
-        limit: 200,
+        category,
+        result: resultFilter,
+        action,
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
       })
-      if (result.success) {
-        setRows(result.data.items)
-        setSummary(result.data.summary)
-        setTotal(result.data.pagination.total)
+      if (auditResult.success) {
+        setRows(auditResult.data.items)
+        setSummary(auditResult.data.summary)
+        setTotal(auditResult.data.pagination.total)
       }
     } catch {
       setError('入った記録を読み込めませんでした。時間をおいて、もう一度お試しください。')
     } finally {
       setLoading(false)
     }
-  }, [periodFilter, query, selectedAccountId, userId])
+  }, [actionFilter, page, pageSize, periodFilter, query, selectedAccountId, userId])
 
   useEffect(() => { void load() }, [load])
 
@@ -163,7 +176,7 @@ export default function LoginAudit({ userId }: { userId?: string }) {
   useEffect(() => { setPage(1) }, [actionFilter, pageSize, periodFilter, query, sort])
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
   const currentPage = Math.min(page, pageCount)
-  const visible = shown.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const visible = shown
   const first = total === 0 ? 0 : (currentPage - 1) * pageSize + 1
   const last = visible.length === 0 ? 0 : Math.min(first + visible.length - 1, total)
 
