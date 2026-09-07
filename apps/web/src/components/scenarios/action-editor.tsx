@@ -745,13 +745,13 @@ export function ActionConfigEditor({
       )
 
     case 'send_message':
-      return <textarea value={String(c.content ?? '')} onChange={(e) => onChange({ ...c, content: e.target.value })} className={`${inputClass} min-h-20`} placeholder="送信する本文" />
+      return <textarea value={String(c.content ?? '')} onChange={(e) => onChange({ ...c, content: e.target.value })} placeholder="送信する本文" />
     case 'send_template':
-      return <input value={String(c.templateId ?? '')} onChange={(e) => onChange({ ...c, templateId: e.target.value })} className={inputClass} placeholder="テンプレートID" />
+      return <input value={String(c.templateId ?? '')} onChange={(e) => onChange({ ...c, templateId: e.target.value })} placeholder="テンプレートID" />
     case 'reminder':
-      return <input value={String(c.reminderId ?? '')} onChange={(e) => onChange({ ...c, reminderId: e.target.value })} className={inputClass} placeholder="リマインダID" />
+      return <input value={String(c.reminderId ?? '')} onChange={(e) => onChange({ ...c, reminderId: e.target.value })} placeholder="リマインダID" />
     case 'event_booking':
-      return <input value={String(c.eventId ?? '')} onChange={(e) => onChange({ ...c, eventId: e.target.value })} className={inputClass} placeholder="イベント予約ID" />
+      return <input value={String(c.eventId ?? '')} onChange={(e) => onChange({ ...c, eventId: e.target.value })} placeholder="イベント予約ID" />
 
     default:
       return null
