@@ -359,7 +359,7 @@ export default function StaffShiftsPage() {
               </div>
             </section>
 
-            <section data-design="Resources" className="bg-canvas border-hairline rounded-card border p-4">
+            <section className="bg-canvas border-hairline rounded-card border p-4">
               <h2 className="text-ink font-semibold">設備ごとの受付上限</h2>
               <div className="mt-3 space-y-2 text-sm">
                 {resources.length === 0 ? <p className="text-ink-faint">設備は登録されていません</p> : resources.map((resource) => <div key={resource.id} className="flex justify-between"><span>{resource.name}</span><span>{resource.isActive ? `${resource.capacity}枠` : '停止中'}</span></div>)}
