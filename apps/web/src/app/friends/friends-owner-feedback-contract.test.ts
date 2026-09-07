@@ -37,9 +37,9 @@ describe('友だち画面のオーナー指摘契約', () => {
   })
 
   it('統合ユーザーの操作行を一重の枠と同じ高さにそろえる', () => {
-    expect(USERS).toContain('data-design="V6UsersActions"')
+    expect(USERS).toContain('data-users-actions="true"')
     expect(USERS).toContain('items-center gap-2')
-    expect(USERS).toContain('className="h-9 rounded-control border border-hairline')
+    expect(USERS).toContain('<Button\n          type="button"\n          onClick={() => setPendingForceRefresh(true)}')
     expect(USER_FILTERS).toContain('flex min-w-0 flex-1 flex-nowrap items-center gap-2')
     expect(USER_FILTERS).toContain('h-9 min-w-0 flex-1')
     expect(USER_FILTERS).not.toContain('rounded-[14px] border')
