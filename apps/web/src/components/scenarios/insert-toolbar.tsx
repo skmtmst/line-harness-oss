@@ -107,10 +107,10 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
     })
   }
 
-  const menuButton = (key: string, label: string) => (
+  const menuButton = (key: string, label: string, token?: string) => (
     <button
       type="button"
-      onClick={() => setOpen(open === key ? null : key)}
+      onClick={() => token ? insert(token) : setOpen(open === key ? null : key)}
       aria-expanded={open === key}
       className={`border-hairline rounded-control h-8 border px-2.5 text-xs transition-colors ${
         open === key ? 'bg-accent-soft text-accent border-accent' : 'text-ink-secondary hover:bg-canvas-sunken'
@@ -163,15 +163,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
         {open === 'var' && list(vars, '共通情報がまだありません')}
       </div>
 
-      {includeAnswerForm && (
-        <button
-          type="button"
-          onClick={() => insert('{{answer_form}}')}
-          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-8 border px-2.5 text-xs"
-        >
-          回答フォーム
-        </button>
-      )}
+      {includeAnswerForm && menuButton('answer-form', '回答フォーム', '{{answer_form}}')}
 
       <div className="relative">
         {menuButton('date', '配信日')}

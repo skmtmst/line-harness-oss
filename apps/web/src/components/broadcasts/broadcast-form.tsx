@@ -366,7 +366,7 @@ function TextBubbleEditor({ bubble, index, trackLinks, buttons, embedded = false
         value={text}
         onChange={(event) => onChange({ ...bubble, content: { ...bubble.content, text: event.target.value } })}
         placeholder="テキストを入力"
-        className={`border-hairline rounded-control mt-3 w-full resize-none border p-3 text-sm focus:border-accent focus:outline-none ${embedded ? 'h-[120px]' : ''}`}
+        className={`border-hairline rounded-control mt-3 w-full resize-none border p-3 text-sm focus:border-accent focus:outline-none ${embedded ? 'h-30' : ''}`}
       />
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
         <span className="text-ink-faint">{visualReference ? '62 / 22,500文字' : messageLengthLabel(text.length)}</span>
@@ -1009,7 +1009,7 @@ export default function BroadcastForm({
       </div>
     )}
     <BroadcastStepRail steps={steps} />
-    <div className="mt-[10px] grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
+    <div className="mt-2.5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
       <div className={`space-y-5 ${testDialogOpen ? 'broadcast-test-page-open' : ''} ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
         {testDialogOpen ? (
           <section className="broadcast-test-page space-y-4">
@@ -1343,7 +1343,7 @@ export default function BroadcastForm({
                 className="broadcast-message-type"
                 data-active={type !== null && bubbles[0]?.type === type || undefined}
                 aria-disabled={type === null || Boolean(type && UNSENDABLE_TYPES[type])}
-                title={type === null ? '紹介メッセージは準備中です' : UNSENDABLE_TYPES[type]}
+                title={type === null ? '紹介メッセージは現在利用できません' : UNSENDABLE_TYPES[type]}
                 onClick={() => { if (type && !UNSENDABLE_TYPES[type]) updateBubble(0, emptyBubble(type)) }}
               >
                 {label}
@@ -1767,7 +1767,9 @@ export default function BroadcastForm({
       </aside>
     </div>
 
-    <StickyBar className={`broadcast-form-footer ${currentStep ? `broadcast-form-footer-${currentStep}` : ''}`} actions={(
+    {currentStep === 'message' ? <div className="h-24" aria-hidden="true" /> : null}
+    {currentStep === 'confirm' ? <div className="h-4" aria-hidden="true" /> : null}
+    <StickyBar className="broadcast-form-footer" actions={(
       <>
       {currentStep ? (
         <>
@@ -2062,8 +2064,6 @@ export default function BroadcastForm({
       .broadcast-line-preview { background: var(--color-line-preview); min-height: 428px; }
        .broadcast-url-row { display: grid; grid-template-columns: minmax(7rem, .7fr) minmax(0, 1.4fr) 7rem; }
        .broadcast-form-footer { grid-template-columns: minmax(0, 1fr) auto 0; }
-       .broadcast-form-footer-message { margin-top: 99px; }
-       .broadcast-form-footer-confirm { margin-top: 18px; }
        .broadcast-test-page-open > :not(.broadcast-test-page),
        .broadcast-preflight-page-open > :not(.broadcast-preflight-page) { display: none; }
       @media (min-width: 640px) {
