@@ -33,7 +33,7 @@ describe('V6 対応マーク', () => {
   it('基本情報・自動変更・使用先を同じ段で確認できる', () => {
     expect(EDITOR).toContain('xl:grid-cols-3')
     expect(EDITOR).toContain('<SupportMarkRulesPanel')
-    for (const label of ['受信箱での絞り込み', '一斉配信の配信対象', 'シナリオ配信の分岐条件', '自動応答の条件', 'オートメーションの条件']) {
+    for (const label of ['受信箱の絞り込み', '友だち一覧の列と絞り込み', 'ダッシュボードの絞り込み', '配信の絞り込み条件', 'オートメーションの動作']) {
       expect(EDITOR).toContain(label)
     }
     expect(EDITOR).not.toContain('メッセージ受信時にこのマークへ変更')

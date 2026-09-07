@@ -305,7 +305,7 @@ beforeEach(() => {
   mocks.getCommonVarVersions.mockResolvedValue([{
     id: 'cv-1-v3', common_var_id: 'cv-1', version_no: 3,
     name: '営業時間', value: '10-19', memo: '店舗共通の営業時間',
-    change_reason: '営業時間を更新', actor_id: 'u-1', created_at: '2026-08-16',
+    change_reason: '営業時間を更新', actor_id: 'u-1', actor_name: '川野 健太', created_at: '2026-08-16',
   }]);
   mocks.getCommonVarReplacementCandidates.mockResolvedValue([{
     ...VAR, id: 'cv-2', name: '新営業時間', var_key: 'new_hours', value: '11-20', version: 1,
@@ -838,7 +838,7 @@ describe('共通情報', () => {
         usageCount: 1, usageByKind: { template: 1 },
         usages: [{ name: '予約案内', currentPreview: '営業時間は10-19です' }],
         usagePage: { total: 1, shown: 1, hasMore: false, unavailableCount: 0 },
-        history: [{ version: 3, changeReason: '営業時間を更新' }],
+        history: [{ version: 3, changeReason: '営業時間を更新', actorName: '川野 健太' }],
       },
     });
   });

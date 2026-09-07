@@ -905,10 +905,10 @@ export const SCREENS = [
       固定データの `broadcast-0` が予約済みなので、そこを見る。
     */
     ...BROADCAST, node: 'bPF0s', name: '6-1-I 一斉配信・予約完了',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #384で再撮影。** 予約済み固定データから5段の完了帯、予約日時・対象人数・4項目の要約、次にできる操作、取消確認を1440/1920pxで表示し、横はみ出し0。設計画像と照合したが、開始・完了・エラーをSlackへ通知するAPIがないため、その1文は虚偽表示せず構造一致・データ未接続のまま。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #419 / UI HEAD `a16927af23` で再撮影・一致。** 予約日時・対象人数・4項目の要約と次の操作を実APIへ接続し、開始・完了・エラーをSlackの同じスレッドへ通知する設定も取得して案内帯へ表示した。予約取消の確認を含む1440/1920pxで横はみ出し0。',
     verdictSource: 'broadcasts-v6/bPF0s.txt + broadcasts-v6/bPF0s-1440.png + broadcasts-v6/bPF0s-1920.png + broadcasts-v6/bPF0s-cancel-1440.png + broadcasts-v6/bPF0s-cancel-1920.png',
-    verdictHead: '55b3531ecb',
+    verdictHead: 'a16927af23',
     route: '/broadcasts/reserved?id=broadcast-0', mode: 'page',
     /* 押した先の確認窓。**窓はビューポートで撮る**（`fullPage` だと下へ流れる）。 */
     variants: [{
@@ -1118,10 +1118,10 @@ export const SCREENS = [
   },
   {
     ...AUTO_REPLY, node: 'nzWIX', name: '8-1-B 反応条件',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #375 / UI HEAD `06d05c170` で構造一致・契約データ待ち。** 下書きと集計APIへ接続し、キーワード、一致方法、曜日・時間帯、友だち条件、28日間の一致214件、実測受信5,842件と種別内訳（テキスト5,740・画像76・スタンプ26）を表示した。統合 #1132 の固定データを使って3101/8788で1440/1920px撮影し、同Node画像と横並び比較、両幅とも横はみ出し0。現行契約は受信メッセージ種別の集計を返すが、設計の「受信元 LINE・メール」の保存値を返さないため、その1項目だけ作り物にせず未表示とした。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #419 / UI HEAD `a16927af23` で再撮影・一致。** 下書きAPIが返す保存済みの受信元 `LINE・メール` を画面へ接続した。キーワード、一致方法、曜日・時間帯、友だち条件、28日間の一致214件、実測受信5,842件と種別内訳も実API値で表示し、1440/1920pxとも横はみ出し0。',
     verdictSource: 'auto-replies-v6/nzWIX.png + docs/design-qa/auto-replies-v6/nzWIX-{1440,1920}.png + nzWIX.txt',
-    verdictHead: '06d05c170',
+    verdictHead: 'a16927af23',
     route: '/auto-replies/edit?id=ar-2&step=trigger',
 
   },
@@ -1332,56 +1332,57 @@ export const SCREENS = [
   { ...WEBINAR, node: 'lvaY5', name: '10-1-A ウェビナーを作成',
     mode: 'viewport', height: 1080,
     steps: [{ fill: 'ウェビナー名', text: 'NEN活用スタートセミナー' }],
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #223 で再照合。** 構造一致・フォルダと開催形式の保存口待ち。設計画像と実装画像を同じ比較入力で見比べ、基本設定→動画→CTA・フォーム→通知→確認の5段、ウェビナー名、開催形式、設定サマリー、LINEプレビュー、テスト送信・公開ページ、下書き保存と次段への操作を確認した。現行APIにフォルダと開催形式の項目が無いため作り物を保存せず、下書き保存後に設定する旨を画面に明記した。1440・1920とも横スクロール0。取得元 `webinars-v6/lvaY5.txt` と同Node画像。',
-    verdictHead: '98e104b7c', route: '/webinars/new', },
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #417 / UI HEAD `527f120ec` で一致。** 作成APIへフォルダと開催形式を接続し、5段、基本設定、設定サマリー、LINEプレビュー、保存後の次段導線を設計画像と照合した。3101/8788の1440/1920pxで横はみ出し0。',
+    verdictSource: 'webinars-v6/lvaY5.png + lvaY5-{1440,1920}.png + lvaY5.txt',
+    verdictHead: '527f120ec', route: '/webinars/new', },
   {
     ...WEBINAR, node: 'PV1Vh', name: '10-1-B 動画・公開設定',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #324 / UI HEAD a55f719b9b で再判定。** 一覧API PR #1071 の公開状態・公開期間を接続し、5段、動画名・再生時間、公開設定、設定サマリー、LINEプレビュー、固定操作帯を3102/8789の1440/1920pxで確認（横はみ出し0）。APIには設計の「視聴条件」を表す項目が無いため、そこだけ理由付きの構造一致・データ未接続。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #417 / UI HEAD `527f120ec` で一致。** 編集APIの視聴条件を接続し、動画、再生時間、公開期間、申込済みの友だち向け条件、要約を設計画像と照合した。3101/8788の2幅で横はみ出し0。',
     verdictSource: 'webinars-v6/PV1Vh.png + PV1Vh-1920.png + PV1Vh.txt',
-    verdictHead: 'a55f719b9b', route: `${WEBINAR_EDIT}&pane=video`,
+    verdictHead: '527f120ec', route: `${WEBINAR_EDIT}&pane=video`,
 
   },
   {
     ...WEBINAR, node: 'd3rFGD', name: '10-1-C CTA・フォーム',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #324 / UI HEAD a55f719b9b で再判定。** CTAの表示時刻・文言、申込フォーム、完了アクション、設定サマリー、LINEプレビューを3102/8789の1440/1920pxで確認（横はみ出し0）。一覧API PR #1071 はこの画面の回答フォーム入力項目と完了アクション詳細を返さないため、取得済み値だけで要約した理由付きの構造一致・データ未接続。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #417 / UI HEAD `527f120ec` で一致。** 選択した回答フォームの入力項目と完了アクションを編集APIから表示し、CTA時刻・文言・要約・LINEプレビューを設計画像と照合した。3101/8788の2幅で横はみ出し0。',
     verdictSource: 'webinars-v6/d3rFGD.png + d3rFGD-1920.png + d3rFGD.txt',
-    verdictHead: 'a55f719b9b', route: `${WEBINAR_EDIT}&pane=cta`,
+    verdictHead: '527f120ec', route: `${WEBINAR_EDIT}&pane=cta`,
 
   },
   {
     ...WEBINAR, node: 'Ho8z4', name: '10-1-D 通知・リマインド',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #324 / UI HEAD a55f719b9b で再判定。** 通知設定APIの申込直後・前日・開始前・開始時・見逃し後、2カード、設定サマリー、LINEプレビュー、固定操作帯を3102/8789の2幅で確認（横はみ出し0）。通知本文とテスト送信結果を返すAPI契約は引き続き無いため、理由付きの構造一致・データ未接続。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #417 / UI HEAD `527f120ec` で一致。** 通知本文とテスト送信結果を編集APIへ接続し、申込直後・前日・1時間前・開始時・見逃し案内とLINEプレビューを設計画像と照合した。3101/8788の2幅で横はみ出し0。',
     verdictSource: 'webinars-v6/Ho8z4.png + Ho8z4-1920.png + Ho8z4.txt',
-    verdictHead: 'a55f719b9b', route: `${WEBINAR_EDIT}&pane=notifications`,
+    verdictHead: '527f120ec', route: `${WEBINAR_EDIT}&pane=notifications`,
 
   },
   {
     ...WEBINAR, node: 'Xjk8q', name: '10-1-E 視聴後アクション',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #324 / UI HEAD a55f719b9b で再判定。** 完了メッセージ、実行時点、1回だけ、保存済み通知・アクション、結果未取得時の選択、設定サマリー、LINEプレビューを3102/8789の2幅で確認（横はみ出し0）。送信テンプレート本文と結果再取得方針の保存契約は一覧API PR #1071 に含まれないため、理由付きの構造一致・データ未接続。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #417 / UI HEAD `527f120ec` で一致。** 視聴完了メッセージと結果未取得時の方針を版付き保存へ接続し、実行時点、保存済みアクション、要約、LINEプレビューを設計画像と照合した。3101/8788の2幅で横はみ出し0。',
     verdictSource: 'webinars-v6/Xjk8q.png + Xjk8q-1920.png + Xjk8q.txt',
-    verdictHead: 'a55f719b9b', route: `${WEBINAR_EDIT}&pane=actions`,
+    verdictHead: '527f120ec', route: `${WEBINAR_EDIT}&pane=actions`,
 
   },
   {
     ...WEBINAR, node: 'GB0NR', name: '10-1-F 公開ページプレビュー',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #324 / UI HEAD a55f719b9b で再判定。** 一覧API PR #1071 の公開状態・公開期間と、公開ページ、表示内容、対象の設定サマリー、LINEプレビューを3102/8789の2幅で確認（横はみ出し0）。撮影アカウントのLIFF IDと申込フォーム詳細を返す口は無いため、理由付きの構造一致・データ未接続。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #417 / UI HEAD `527f120ec` で一致。** 所属アカウントのLIFF URL、説明、申込フォーム詳細、ページ検査結果を編集APIへ接続し、公開ページと要約を設計画像と照合した。3101/8788の2幅で横はみ出し0。',
     verdictSource: 'webinars-v6/GB0NR.png + GB0NR-1920.png + GB0NR.txt',
-    verdictHead: 'a55f719b9b', route: `${WEBINAR_EDIT}&pane=preview`,
+    verdictHead: '527f120ec', route: `${WEBINAR_EDIT}&pane=preview`,
     mode: 'viewport', height: 1080,
 
   },
   {
     ...WEBINAR, node: 'D6yO7e', name: '10-1-G 公開前確認',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #324 / UI HEAD a55f719b9b で再判定。** 一覧API PR #1071 の公開期間と、公開前4チェック、ウェビナー名・対象・CTA/フォーム・アクション、設定サマリー、LINEプレビューを3102/8789の2幅で確認（横はみ出し0）。公開ページ・通知テスト結果と通知重複の検査APIは未提供のため、その項目を明示した理由付きの構造一致・データ未接続。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #417 / UI HEAD `527f120ec` で一致。** 公開前検査APIの動画・フォーム・CTA・通知テスト・公開ページテスト・通知重複・アクション参照を表示し、最終確認と公開操作を設計画像と照合した。3101/8788の2幅で横はみ出し0。',
     verdictSource: 'webinars-v6/D6yO7e.png + D6yO7e-1920.png + D6yO7e.txt',
-    verdictHead: 'a55f719b9b',
+    verdictHead: '527f120ec',
     route: '/webinars/edit?id=webinar-1&pane=review', mode: 'page',
 
   },
@@ -1393,25 +1394,25 @@ export const SCREENS = [
     */
     ...WEBINAR, node: 'TimXl', name: '10-1-H 公開完了',
     route: '/webinars/published?id=webinar-1', mode: 'page',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #324 / UI HEAD a55f719b9b で再判定。** 一覧API PR #1071 の公開状態・公開期間と、5段完了、公開結果、設定要約、運用者通知、参加状況、次にできること、監視中を3102/8789の2幅で確認（横はみ出し0）。停止・通知テスト・複製・監視結果とLIFF IDの契約は未提供のため、理由付きの構造一致・データ未接続。',
-    verdictSource: 'webinars-v6/TimXl.txt',
-    verdictHead: 'a55f719b9b',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #417 / UI HEAD `527f120ec` で一致。** 公開版、LIFF URL、停止・通知テスト・複製、4種の監視件数を実APIへ接続し、5段完了、公開結果、次の操作を設計画像と照合した。3101/8788の2幅で横はみ出し0。',
+    verdictSource: 'webinars-v6/TimXl.png + TimXl-{1440,1920}.png + TimXl.txt',
+    verdictHead: '527f120ec',
   },
   {
     ...WEBINAR, node: 'Q8sHa', name: '10-1-I 参加者管理',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #324 / UI HEAD a55f719b9b で再判定。** 分析APIの4人、4指標、参加者ごとの視聴・実行結果・状態・時刻、参加状況内訳、稼働状況、要分析、担当者視聴完了を3102/8789の2幅で確認（横はみ出し0）。担当者連携状態と実行エラー詳細を返す契約は一覧API PR #1071 に含まれないため、理由付きの構造一致・データ未接続。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #417 / UI HEAD `527f120ec` で一致。** 参加者APIの実行エラーと担当者連携状態を表示し、4指標、友だち別の視聴・実行結果・状態・時刻、参加内訳、要分析を設計画像と照合した。3101/8788の2幅で横はみ出し0。',
     verdictSource: 'webinars-v6/Q8sHa.png + Q8sHa-1920.png + Q8sHa.txt',
-    verdictHead: 'a55f719b9b', route: `${WEBINAR_EDIT}&pane=participants`, mode: 'viewport', height: 1080,
+    verdictHead: '527f120ec', route: `${WEBINAR_EDIT}&pane=participants`, mode: 'viewport', height: 1080,
 
   },
   {
     ...WEBINAR, node: 'yxyzQ', name: '10-1-J 分析',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #324 / UI HEAD a55f719b9b で再判定。** 申込・再生・完了・CTAの実値、概要・視聴・離脱・CTA・申込、視聴結果、視聴行動、設定サマリー、LINEプレビュー、CSVを3102/8789の2幅で確認（横はみ出し0）。分析APIの視聴区間配列が空で、最大離脱と最も視聴された区間を出せないため、理由付きの構造一致・データ未接続。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #417 / UI HEAD `527f120ec` で一致。** ハートビートから記録した実視聴区間を分析APIへ接続し、申込・再生・完了・CTA、平均視聴、最大離脱18:20、要約、LINEプレビューを設計画像と照合した。3101/8788の2幅で横はみ出し0。',
     verdictSource: 'webinars-v6/yxyzQ.png + yxyzQ-1920.png + yxyzQ.txt',
-    verdictHead: 'a55f719b9b', route: `${WEBINAR_EDIT}&pane=analytics`, mode: 'viewport', height: 1080,
+    verdictHead: '527f120ec', route: `${WEBINAR_EDIT}&pane=analytics`, mode: 'viewport', height: 1080,
 
   },
   {
@@ -1717,14 +1718,14 @@ export const SCREENS = [
     verdictSource: 'common-vars-v6/WuKzU.txt + common-vars-v6/WuKzU-1440.png + common-vars-v6/WuKzU-1920.png + common-vars-v6-contract.test.ts', verdictHead: 'bc92f54ea',
   },
   {
-    ...COMMON_VAR, node: 'gBtaK', name: '14-1-A 共通情報を編集', route: '/contents/vars/edit?id=common-var-delete-target', verdict: 'structure_match_data_pending',
+    ...COMMON_VAR, node: 'gBtaK', name: '14-1-A 共通情報を編集', route: '/contents/vars/edit?id=common-var-delete-target', verdict: 'match',
     mode: 'viewport', height: 1080,
     steps: [
       { fill: '#cv-value', selector: true, text: '株式会社NEN ホールディングス' },
       { wait: 1200 },
     ],
-    verdictNote: '**2026-09-07 Issue #385 / UI HEAD `bc92f54ea`で再判定。構造一致・担当者名データ待ち。** PR #1131の実APIとPR #1142の固定データへ接続し、社内メモ、変更理由、版番号つき保存、追記型の変更履歴、15使用先、変更前後の文、予約中・公開中・下書き、文字数超過、保存後プレビューを確認した。履歴APIは内部の担当者IDだけを返すため画面へ露出せず「担当者記録あり」と表示する。担当者の表示名が契約に無い一点だけ設計どおりに出せないため一致にはしない。3104/8791で1440px・1920pxを撮り、両方とも横はみ出し0。**残り：履歴APIが担当者の表示名を返す。**',
-    verdictSource: 'common-vars-v6/gBtaK.txt + common-vars-v6/gBtaK-1440.png + common-vars-v6/gBtaK-1920.png + api.test.ts + change-impact.test.ts', verdictHead: 'bc92f54ea',
+    verdictNote: '**2026-09-07 Issue #419 / UI HEAD `a16927af23` で再撮影・一致。** 履歴APIが担当者の表示名を返し、変更日時・変更前後・理由と並べて表示した。社内メモ、版番号つき保存、15使用先、予約中・公開中・下書き、保存後プレビューも実APIへ接続し、1440/1920pxとも横はみ出し0。',
+    verdictSource: 'common-vars-v6/gBtaK.txt + common-vars-v6/gBtaK-1440.png + common-vars-v6/gBtaK-1920.png + api.test.ts + change-impact.test.ts', verdictHead: 'a16927af23',
   },
   {
     /*
@@ -2645,9 +2646,9 @@ export const SCREENS = [
   {
     ...WEBHOOK, node: 'k3WxrO', name: '26-1 外部連携',
     route: '/webhooks?tab=outgoing',
-    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #397 / UI HEAD `1010c7f11` を3106/8793で正式撮影し、設計 `k3WxrO` と同じ1920pxで横並び比較。** 4指標、説明帯、検索、状態・並び順、6列の一覧、ページ送りを同じ順に置き、送信先6本・受信口3本・この30日1,486回・失敗6回・受信486回を実APIから表示した。各接続も486・312・42・34・0回、直近結果、再送可否を実APIへ接続し、失敗したSlackだけ「失敗をやり直す」、ほかは「中身を見る」を出す。全URLは途中を伏せ、内部ID・合言葉・秘密値は表示しない。1440px・1920pxとも横はみ出し0。**残るデータ依存：設計の「1回試してみる」に対応するテスト送信APIが無いため、動く操作に見せず構造一致・データ未接続を維持する。**', verdictSource: 'webhooks-v6/k3WxrO.txt + webhooks-v6/k3WxrO-1920.png', verdictHead: '1010c7f11',
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #419 / UI HEAD `a16927af23` で再撮影・一致。** 送信先6本、30日1,486回、失敗6回、直近結果と再送可否を実APIへ接続し、各行の「1回試してみる」をテスト送信APIへ接続した。URLは途中を伏せ、1440/1920pxとも横はみ出し0。', verdictSource: 'webhooks-v6/k3WxrO.txt + webhooks-v6/k3WxrO-{1440,1920}.png', verdictHead: 'a16927af23',
   },
-  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', route: '/webhooks?tab=incoming', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #397 / UI HEAD `1010c7f11` を3106/8793で正式撮影し、設計 `M0Gb7` と同じ1920pxで横並び比較。** 選んだ受け取り口のURL、照合方法、見つからない場合、合言葉の状態、届いたらすること、マスク済み最新受信、差し込み項目、ほか2件、用語・関連先・注意を実APIへ接続した。最新受信の値はすべて `••••`、合言葉は「設定済み（再表示しません）」とし、内部の参照IDや秘密値は画面へ出さない。1440px・1920pxとも横はみ出し0。**残るデータ依存：APIが処理名を返さず、受信後のアクション実行器も `not_connected` のため、設計例のタグ名・テンプレート名を作らず「保存済みの設定」と未接続警告を表示する。**', verdictSource: 'webhooks-v6/M0Gb7.txt + webhooks-v6/M0Gb7-1920.png', verdictHead: '1010c7f11' },
+  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', route: '/webhooks?tab=incoming', verdict: 'match', verdictNote: '**2026-09-07 Issue #419 / UI HEAD `a16927af23` で再撮影・一致。** 受け取り口のURL、照合方法、合言葉、最新受信、差し込み項目に加え、APIが返すタグ名・テンプレート名を「届いたらすること」へ表示した。受信後の処理は同じ保存契約の実行器へ接続し、秘密値は再表示しない。1440/1920pxとも横はみ出し0。', verdictSource: 'webhooks-v6/M0Gb7.txt + webhooks-v6/M0Gb7-{1440,1920}.png', verdictHead: 'a16927af23' },
     // ---- 2026-09-02 `a0bb3f44` で実装を読み直した ----
     // **「タブの言葉に内部の語が残る（受信 (Incoming)／送信 (Outgoing)）」は古い。**
     //   `webhook-operator-words-contract.test.ts:13-14` が `Incoming)` `Outgoing)` を
@@ -2976,11 +2977,15 @@ export const SCREENS = [
   {
     node: 'dKlkz', feature: 4, name: '4-1-F タグ削除の確認ダイアログ',
     dir: 'friend-attributes-v6', route: '/tags', mode: 'viewport', height: 1080,
-    steps: [{ click: 'NEN会員 を削除', scope: 'main' }],
-    verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07 Issue #330で実API接続後に再判定。** 構造・表示データ一致、実行API待ち。固定タグの128人、マイル連動、5件の参照先、版を実APIから表示し、削除前の影響確認を設計順に再現した。タグを保管・削除する更新APIが無いため、事故防止のため確定操作は無効のままにしている。2幅とも横はみ出し0。",
+    steps: [
+      { fill: 'input[placeholder="タグ名・用途で検索"]', selector: true, scope: 'main', text: 'NEN会員（定期）' },
+      { click: 'NEN会員（定期） を削除', scope: 'main' },
+      { fill: '確認のため、タグ名を入力してください', text: 'NEN会員（定期）' },
+    ],
+    verdict: "match",
+    verdictNote: "**2026-09-07 Issue #419 / UI HEAD `a16927af23` で再撮影・一致。** タグ名で対象を絞り、128人、マイル連動、参照先、公開・下書きの版を実APIから表示した。確認名を入力したときだけ履歴を残すアーカイブAPIを実行できる。1440/1920pxとも横はみ出し0。",
     verdictSource: "friend-attributes-v6/dKlkz.txt + friend-attributes-v6/dKlkz-{1440,1920}.png + 2026-09-07同一状態比較",
-    verdictHead: "5959c1756",
+    verdictHead: "a16927af23",
   },
   {
     node: 'H374MR', feature: 4, name: '4-1-H タグCSV一括登録',
@@ -3132,41 +3137,25 @@ export const SCREENS = [
       直接そこを開く。押して辿ると、一覧の固定データ次第で撮れなくなる。
       設計は名前・色・並び順・初期値と自動変更ルールを同じ面で扱う。
     */
-    dir: 'friend-attributes-v6', route: '/tags/marks/edit?id=mark-hold', mode: 'page',
-    states: {
-      apis: ['**/api/support-marks/*/automation-rules**'],
-      kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'],
-    },
-    variants: [
-      {
-        // 版競合。**押して初めて出る失敗**なので、読み込みは素通しにする。
-        suffix: 'conflict',
-        state: { apis: ['**/api/support-marks/**/automation-rules**', '**/api/support-mark-rules/**'], kind: 'conflict' },
-        steps: [
-          { qaOpen: 'GMvBd' },
-          { fill: 'ルールの名前', text: '期限を過ぎたら確認待ちへ' },
-          { qaOpen: 'GMvBd-save' },
-        ],
-      },
-    ],
-    verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07 Issue #330で実API接続後に再判定。** 構造一致・同一状態契約待ち。基本情報、自動変更ルール、使用先、優先順位、手動変更後の保護時間を実APIへ接続し、通常・読込・0件・失敗・権限不足・競合を確認した。設計は新規作成、現在のルールAPIは作成済みmarkId必須のため実装画像は編集状態で、同一状態の値だけ未照合。全状態2幅で横はみ出し0。",
-    verdictSource: "friend-attributes-v6/GMvBd-{normal,loading,empty,error,forbidden,conflict}.txt + 同名-{1440,1920}.png",
-    verdictHead: "5959c1756",
+    dir: 'friend-attributes-v6', route: '/tags/marks/edit', mode: 'page',
+    verdict: "match",
+    verdictNote: "**2026-09-07 Issue #419 / UI HEAD `a16927af23` で再撮影・一致。** markIdのない新規作成状態で、要確認・赤・並び順4・初期値OFFと、担当者割当をきっかけにこのマークへ変更するルールを同じ面に表示した。保存時はマーク作成APIへルールも渡す。1440/1920pxとも横はみ出し0。",
+    verdictSource: "friend-attributes-v6/GMvBd.txt + friend-attributes-v6/GMvBd-{1440,1920}.png",
+    verdictHead: "a16927af23",
   },
   {
     node: 'zGZMA', feature: 4, name: '4-3-B 対応マーク削除の確認ダイアログ',
     dir: 'friend-attributes-v6', route: '/tags?tab=marks', mode: 'viewport', height: 1080,
     /*
-      **設計は「削除」、実装は「保管」。** 設計 `zGZMA` は
+      **設計は「削除」、現行要件と実装は「保管」。** 設計 `zGZMA` は
       「対応マーク削除の確認ダイアログ」だが、実装の行の操作は
       「対応中を保管」で、消さずにしまう作りになっている。
-      撮るために実装の言葉へ合わせたが、**どちらが正しいかは
-      決着していない**（消すのか、しまうのか）。要判断として残す。
+      撮るために実装の言葉へ合わせた。履歴を残す保管が正本であり、
+      Pencil側の物理削除表現はオーナー票での修正待ちとして残す。
     */
     steps: [{ click: '保留を保管', scope: 'main' }],
     verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07 Issue #330で実API接続後に再判定。** 構造・影響データ一致、操作差あり。保留3人、利用ルール、表示先、置換先、履歴保持、取消・保管を実APIから表示した。設計の物理削除に対し、現行要件とAPIは履歴を残す保管なので、安全側の操作差を維持している。2幅とも横はみ出し0。",
+    verdictNote: "**2026-09-07 Issue #419 / UI HEAD `a16927af23` で理由付き保留。** 保留3人、利用ルール、表示先、置換先、履歴保持、取消・保管を実APIから表示した。現行要件とAPIは履歴を残す保管で確定しているが、Pencil画像だけが物理削除の表現なので、設計修正までは一致にしない。1440/1920pxとも横はみ出し0。",
     verdictSource: "friend-attributes-v6/zGZMA.txt + friend-attributes-v6/zGZMA-{1440,1920}.png + 2026-09-07同一状態比較",
     verdictHead: "5959c1756",
   },
@@ -3484,6 +3473,7 @@ export const CAPTURED_AT = {
         + '`GMvBd`（「保留」）と `zGZMA`（「対応中を保管」）は、固定データにその行やボタンが出ず撮れていない。' },
   ],
   10: [
+    { pr: 1231, head: '8577adf01', on: '2026-09-07', screens: ['lvaY5', 'PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'GB0NR', 'D6yO7e', 'TimXl', 'Q8sHa', 'yxyzQ'], note: 'Issue #417。作成・編集・公開・参加者・分析を実APIと機能10専用固定応答へ接続し、3101/8788で対象10画面を1440・1920px撮影。全画像で横はみ出し0、設計画像と照合して10画面を一致へ更新した。' },
     { pr: 1081, head: 'a55f719b9b', on: '2026-09-07', screens: ['ZC13r', 'PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'GB0NR', 'D6yO7e', 'TimXl', 'Q8sHa', 'yxyzQ', 'zCQXe'], note: 'Issue #324。一覧API PR #1071 と固定データを列車92まで取り込んだ枝で、対象11画面を3102/8789・1440/1920pxで再撮影し、全画像で横はみ出し0。一覧2画面を一致へ更新し、残る9画面は未提供APIを判定注記へ個別に残した。' },
     { pr: 1070, head: 'a325ab485', on: '2026-09-07', screens: ['ZC13r', 'PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'GB0NR', 'D6yO7e', 'TimXl', 'Q8sHa', 'yxyzQ', 'LKuAQ', 'zCQXe'], note: 'Issue #289。UI HEAD a571acc25 と固定データ PR #1060 を含む統合 #1067 を3102/8789で通常・全状態、1440/1920pxの対象38枚に最終撮影。全画像で横はみ出し0。一致1、構造一致・データ未接続11。' },
     { pr: 1011, head: '98e104b7c', on: '2026-09-06', screens: ['lvaY5'], note: 'Issue #223。3102/8789で1440・1920を撮影し、両方とも横スクロール0。5段・設定サマリー・LINEプレビューへ整え、構造一致／保存API待ちへ更新した。' },

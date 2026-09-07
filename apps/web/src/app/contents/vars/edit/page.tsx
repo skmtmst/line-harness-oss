@@ -502,7 +502,7 @@ function EditCommonVarInner() {
                         <li key={entry.id} className="py-3 first:pt-0">
                           <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                             <span className="text-ink font-semibold">{formatStamp(entry.createdAt)}</span>
-                            <span className="text-ink-faint">{entry.actorId ? '担当者記録あり' : '担当者未記録'}</span>
+                            <span className="text-ink-faint">{entry.actorName ?? (entry.actorId ? '担当者名を確認できません' : '担当者未記録')}</span>
                           </div>
                           <p className="text-ink-secondary mt-1 text-xs break-words">
                             {previous

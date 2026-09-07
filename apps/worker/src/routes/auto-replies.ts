@@ -124,6 +124,7 @@ interface SerializedAutoReply {
   skipWhenOperatorActive: boolean;
   priority: number;
   messageKinds: string[] | null;
+  receiveSources: Array<'line' | 'email'>;
   /** 151: 応答したときに順に実行すること。 */
   actions: unknown[] | null;
   /** 151: 応答する曜日（0=日 … 6=土）。null なら曜日を問わない。 */
@@ -167,6 +168,7 @@ interface AutoReplyDraftInput {
   skipWhenOperatorActive: boolean;
   priority: number;
   messageKinds: string[] | null;
+  receiveSources: Array<'line' | 'email'>;
   friendConditions: Record<string, unknown> | null;
   actions: unknown[] | null;
   responseWeekdays: number[] | null;
@@ -461,6 +463,7 @@ function draftInputFromSettings(settings: AutoReplyDraftSettings): AutoReplyDraf
     skipWhenOperatorActive: settings.skipWhenOperatorActive,
     priority: settings.priority,
     messageKinds: readJson<string[]>(settings.messageKinds),
+    receiveSources: settings.receiveSources,
     friendConditions: readJson<Record<string, unknown>>(settings.friendConditions),
     actions: readJson<unknown[]>(settings.actions),
     responseWeekdays: readJson<number[]>(settings.responseWeekdays),
@@ -522,6 +525,13 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
   if (!priority.ok) return { ok: false, error: '優先順位が正しくありません' };
   const messageKinds = readMessageKinds(body.messageKinds);
   if (!messageKinds.ok) return { ok: false, error: '対象にするメッセージの種類が正しくありません' };
+  const receiveSources = Array.isArray(body.receiveSources)
+    ? [...new Set(body.receiveSources)]
+    : ['line'];
+  if (receiveSources.length === 0
+    || receiveSources.some((source) => source !== 'line' && source !== 'email')) {
+    return { ok: false, error: '受信元はLINEまたはメールを1つ以上選んでください' };
+  }
   const extras = readExtras(body);
   if (!extras.ok) return { ok: false, error: extras.error };
   const folderError = await validateAutoReplyFolder(db, extras.value.folderId);
@@ -561,6 +571,7 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
       skipWhenOperatorActive: body.skipWhenOperatorActive === true,
       priority: priority.value,
       messageKinds: jsonText(messageKinds.value),
+      receiveSources: receiveSources as Array<'line' | 'email'>,
       friendConditions: jsonText(extras.value.friendConditions),
       actions: jsonText(extras.value.actions),
       responseWeekdays: jsonText(extras.value.responseWeekdays),
@@ -794,6 +805,7 @@ function serializeAutoReply(row: DbAutoReply): SerializedAutoReply {
     messageKinds: row.message_kinds_json
       ? (JSON.parse(row.message_kinds_json) as string[])
       : null,
+    receiveSources: ['line'],
     actions: readJson<unknown[]>(row.actions_json),
     responseWeekdays: readJson<number[]>(row.response_weekdays_json),
     responseHolidayRule: row.response_holiday_rule,

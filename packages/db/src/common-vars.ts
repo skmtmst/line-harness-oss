@@ -44,6 +44,7 @@ export interface CommonVarVersion {
   memo: string;
   change_reason: string;
   actor_id: string | null;
+  actor_name: string | null;
   created_at: string;
 }
 
@@ -548,9 +549,10 @@ export async function getCommonVarVersions(
   limit = 20,
 ): Promise<CommonVarVersion[]> {
   const result = await db.prepare(
-    `SELECT v.*
+    `SELECT v.*, sm.name AS actor_name
        FROM common_var_versions v
        JOIN common_vars cv ON cv.id = v.common_var_id
+       LEFT JOIN staff_members sm ON sm.id = v.actor_id
       WHERE v.common_var_id = ? AND cv.line_account_id = ?
       ORDER BY v.version_no DESC
       LIMIT ?`,

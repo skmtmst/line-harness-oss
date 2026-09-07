@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 const EDIT = fs.readFileSync(path.join(__dirname, 'edit/page.tsx'), 'utf8')
+const PUBLISHED = fs.readFileSync(path.join(__dirname, 'published/page.tsx'), 'utf8')
 const API = fs.readFileSync(path.join(__dirname, '../../lib/api.ts'), 'utf8')
 const FORM = fs.readFileSync(path.join(__dirname, '../../components/webinars/webinar-form.tsx'), 'utf8')
 /** 読み込めなかった理由の文言は、試験しやすいよう別ファイルへ出した。 */
@@ -101,5 +102,21 @@ describe('V6 ウェビナー一覧の契約', () => {
     for (const pane of ['video', 'cta', 'notifications', 'actions', 'preview', 'review', 'participants', 'analytics']) {
       expect(EDIT).toContain(`pane === '${pane}'`)
     }
+  })
+
+  it('編集・公開前検査・運用・参加者・分析を実APIへ接続する', () => {
+    for (const call of [
+      'webinarApi.editor(id)',
+      'webinarApi.publishValidation(webinar.id)',
+      'webinarApi.participants(webinarId)',
+      'webinarApi.testPublicPage(webinar.id, editor.version)',
+    ]) expect(EDIT).toContain(call)
+    for (const call of [
+      'webinarApi.pause(id, editor.version)',
+      'webinarApi.testNotifications(id)',
+      'webinarApi.duplicate(id, editor.version)',
+    ]) expect(PUBLISHED).toContain(call)
+    expect(EDIT).toContain('analytics.viewSegments')
+    expect(PUBLISHED).toContain('editor.monitoring.notificationFailures')
   })
 })

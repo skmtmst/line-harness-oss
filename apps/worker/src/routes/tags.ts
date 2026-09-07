@@ -21,6 +21,8 @@ import {
   getTagDefinition,
   TagDefinitionError,
   updateTagDefinition,
+  archiveTag,
+  TagArchiveError,
 } from '@line-crm/db';
 import type { Tag as DbTag, TagGroup as DbTagGroup, TagWithUsage } from '@line-crm/db';
 import type {
@@ -975,6 +977,41 @@ tags.delete('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
     }
     console.error('DELETE /api/tags/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+tags.post('/api/tags/:id/archive', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await c.req.json<Record<string, unknown>>();
+    const lineAccountId = requestedLineAccountId(c, body);
+    if (!lineAccountId) return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+    const denied = await requireVisibleLineAccount(c, lineAccountId);
+    if (denied) return denied;
+    const idempotencyKey = c.req.header('Idempotency-Key')?.trim() ?? '';
+    if (!idempotencyKey || idempotencyKey.length > 128) {
+      return c.json({ success: false, error: 'Idempotency-Key is required' }, 400);
+    }
+    const expectedVersion = Number(body.expectedVersion);
+    const impactRevision = typeof body.impactRevision === 'string' ? body.impactRevision.trim() : '';
+    if (!Number.isInteger(expectedVersion) || expectedVersion < 1 || !impactRevision) {
+      return c.json({ success: false, error: 'expectedVersion and impactRevision are required' }, 400);
+    }
+    const result = await archiveTag(c.env.DB, {
+      tagId: c.req.param('id'),
+      lineAccountId,
+      expectedVersion,
+      impactRevision,
+      replacementTagId: typeof body.replacementTagId === 'string' && body.replacementTagId
+        ? body.replacementTagId : null,
+      actorId: c.get('staff')?.id ?? null,
+    });
+    return c.json({ success: true, data: result });
+  } catch (err) {
+    if (err instanceof TagArchiveError) {
+      return c.json({ success: false, code: err.code, error: err.message }, err.code === 'not_found' ? 404 : 409);
+    }
+    console.error('POST /api/tags/:id/archive error:', err);
+    return c.json({ success: false, error: 'タグをアーカイブできませんでした' }, 500);
   }
 });
 

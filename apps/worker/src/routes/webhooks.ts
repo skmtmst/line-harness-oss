@@ -30,6 +30,8 @@ import {
   webhookFailureLabel,
   webhookResponseLabel,
 } from '../services/webhook-interactions.js';
+import { deliverWebhook } from '../services/outgoing-webhook-delivery.js';
+import { executeIncomingWebhookActions } from '../services/incoming-webhook-actions.js';
 
 const webhooks = new Hono<Env>();
 
@@ -48,6 +50,21 @@ function safeJson<T>(raw: string | null | undefined, fallback: T): T {
     return raw ? JSON.parse(raw) as T : fallback;
   } catch {
     return fallback;
+  }
+}
+
+async function incomingActionDisplayName(db: D1Database, action: IncomingWebhookActionRef): Promise<string> {
+  const table = ({
+    common_action: 'common_actions', tag: 'tags', friend_field: 'friend_fields',
+    support_mark: 'support_marks', template: 'templates', scenario: 'scenarios',
+    reminder: 'reminders', conversion: 'conversion_definitions', outgoing_webhook: 'outgoing_webhooks',
+  } as Record<string, string>)[action.refKind];
+  if (!table) return '保存済みの設定';
+  try {
+    const row = await db.prepare(`SELECT name FROM ${table} WHERE id = ?`).bind(action.refId).first<{ name: string }>();
+    return row?.name?.trim() || '保存済みの設定';
+  } catch {
+    return '保存済みの設定';
   }
 }
 
@@ -249,6 +266,10 @@ webhooks.get('/api/webhooks/incoming/:id', requireRole('owner', 'admin', 'staff'
       methods: [], onNotFound: 'do_nothing',
     });
     const actions = safeJson<IncomingWebhookActionRef[]>(item.action_refs_json, []);
+    const namedActions = await Promise.all(actions.map(async (action) => ({
+      ...action,
+      displayName: await incomingActionDisplayName(c.env.DB, action),
+    })));
     const sample = safeJson<{ fields: Array<{ path: string; type: string; maskedValue: string }>; truncated: boolean } | null>(
       item.latest_masked_sample_json, null,
     );
@@ -262,10 +283,10 @@ webhooks.get('/api/webhooks/incoming/:id', requireRole('owner', 'admin', 'staff'
         isActive: Boolean(item.is_active),
         version: Number(item.version ?? 1),
         identityMatching,
-        actions,
+        actions: namedActions,
         actionExecution: {
-          state: actions.length > 0 ? 'not_connected' : 'not_configured',
-          reason: actions.length > 0 ? '受信後の構造化アクション実行器はまだ接続されていません' : null,
+          state: actions.length > 0 ? 'connected' : 'not_configured',
+          reason: null,
         },
         latestSample: sample && item.latest_received_at
           ? { receivedAt: item.latest_received_at, ...sample }
@@ -649,6 +670,41 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
   }
 });
 
+webhooks.post('/api/webhooks/outgoing/:id/test', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+    }
+    const webhook = await getOutgoingWebhookById(c.env.DB, c.req.param('id'), lineAccountId);
+    if (!webhook) return c.json({ success: false, error: 'Not found' }, 404);
+    if (!webhook.is_active) return c.json({ success: false, error: '止めている送り先は試せません' }, 409);
+    const body = JSON.stringify({
+      event: 'webhook.test',
+      timestamp: new Date().toISOString(),
+      data: { test: true, source: 'line-harness-admin' },
+    });
+    const interaction = await createWebhookInteraction(c.env.DB, {
+      lineAccountId, direction: 'outgoing', webhookId: webhook.id, webhookName: webhook.name,
+      eventType: 'webhook.test', triggerSummary: '管理画面から1回試した', requestBodyJson: body,
+    });
+    const started = Date.now();
+    const result = await deliverWebhook(webhook, body, { idempotencyKey: interaction.id });
+    await finishWebhookInteraction(c.env.DB, interaction.id, lineAccountId, {
+      status: result.ok ? 'succeeded' : 'failed',
+      responseStatus: result.lastStatus ?? null,
+      attemptCount: result.attempts,
+      durationMs: Date.now() - started,
+      failureReason: result.ok ? null : 'processing_failed',
+    });
+    return c.json({ success: true, data: { delivered: result.ok, responseStatus: result.lastStatus ?? null } });
+  } catch (err) {
+    console.error('POST /api/webhooks/outgoing/:id/test error:', err);
+    return c.json({ success: false, error: '試し送信に失敗しました' }, 502);
+  }
+});
+
 webhooks.delete('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
   try {
     const id = c.req.param('id');
@@ -849,9 +905,26 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
       }
     }
     try {
+      const identityMatching = safeJson<IncomingWebhookIdentityMatch>(wh.identity_match_json, {
+        methods: [], onNotFound: 'do_nothing',
+      });
+      const configuredActions = safeJson<IncomingWebhookActionRef[]>(wh.action_refs_json, []);
+      const actionResult = wh.line_account_id
+        ? await executeIncomingWebhookActions(c.env.DB, {
+          lineAccountId: wh.line_account_id,
+          webhookId: wh.id,
+          sourceEventId: interaction?.id ?? crypto.randomUUID(),
+          payload,
+          identityMatching,
+          actions: configuredActions,
+          dependencies: { credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY },
+        })
+        : { matchedFriendId: null, executed: 0, failed: 0 };
       await fireEvent(c.env.DB, eventType, {
-        eventData: { webhookId: wh.id, source: wh.source_type, payload },
+        friendId: actionResult.matchedFriendId ?? undefined,
+        eventData: { webhookId: wh.id, source: wh.source_type, payload, actionResult },
       }, undefined, wh.line_account_id ?? null);
+      if (actionResult.failed > 0) throw new Error('受信Webhookの処理に失敗しました');
     } catch (eventError) {
       if (interaction && wh.line_account_id) {
         try {

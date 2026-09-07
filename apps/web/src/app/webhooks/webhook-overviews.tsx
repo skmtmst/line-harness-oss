@@ -145,6 +145,7 @@ export function OutgoingOverview({
   summary,
   summaryStatus,
   incomingCount,
+  lineAccountId,
   onReload,
   onToggle,
   onRotate,
@@ -156,6 +157,7 @@ export function OutgoingOverview({
   summary: WebhookInteractionSummary | null
   summaryStatus: LoadStatus
   incomingCount: number
+  lineAccountId: string | null
   onReload: () => void
   onToggle: (id: string, active: boolean) => void
   onRotate: (item: OutgoingWebhookOverview) => void
@@ -166,6 +168,7 @@ export function OutgoingOverview({
   const [sort, setSort] = useState<OutgoingSort>('volume')
   const [page, setPage] = useState(1)
   const [settingsId, setSettingsId] = useState<string | null>(null)
+  const [testingId, setTestingId] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
     const rows = items.filter((item) => matchesOutgoing(item, filter, query))
@@ -295,6 +298,15 @@ export function OutgoingOverview({
                       <Button variant="secondary" href="/webhooks?tab=interactions">
                         {item.deliverySummary.canRetry ? '失敗をやり直す' : '中身を見る'}
                       </Button>
+                      <Button
+                        variant="secondary"
+                        disabled={!lineAccountId || testingId !== null || !item.isActive}
+                        onClick={async () => {
+                          if (!lineAccountId) return
+                          setTestingId(item.id)
+                          try { await api.webhooks.outgoing.test(item.id, lineAccountId) } finally { setTestingId(null) }
+                        }}
+                      >{testingId === item.id ? '試しています…' : '1回 試してみる'}</Button>
                       <div className="relative">
                         <Button
                           variant="secondary"
@@ -492,14 +504,9 @@ export function IncomingOverview({
                 {detail.actions.map((action, index) => (
                   <div key={`${action.refKind}-${index}`} className="bg-canvas-sunken rounded-control px-4 py-3">
                     <strong className="text-ink block text-sm">{incomingActionLabel(action.refKind)}</strong>
-                    <span className="text-ink-secondary mt-1 block text-xs">保存済みの設定を使います</span>
+                    <span className="text-ink-secondary mt-1 block text-xs">{action.displayName}</span>
                   </div>
                 ))}
-                {detail.actionExecution.state === 'not_connected' ? (
-                  <p className="bg-warning-bg text-warning rounded-control px-4 py-3 text-sm leading-6">
-                    設定は保存されていますが、届いた後の処理はまだ実行されません。接続が完了するまで受信記録だけが残ります。
-                  </p>
-                ) : null}
               </div>
             ) : (
               <p className="text-ink-secondary text-sm">届いた後に動かす処理は、まだ設定されていません。</p>

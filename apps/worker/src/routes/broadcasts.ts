@@ -5,6 +5,8 @@ import {
   createBroadcast,
   updateBroadcast,
   deleteBroadcast,
+  getVersionedAccountSetting,
+  saveVersionedAccountSetting,
 } from '@line-crm/db';
 import type { Broadcast as DbBroadcast, BroadcastMessageType, BroadcastTargetType } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
@@ -46,6 +48,18 @@ const broadcasts = new Hono<Env>();
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ACCOUNT_ACCESS_ERROR = 'このLINEアカウントを操作する権限がありません';
+const BROADCAST_NOTIFICATION_KEY = 'broadcast_slack_notifications';
+type BroadcastNotificationSettings = { started: boolean; completed: boolean; failed: boolean };
+const DEFAULT_BROADCAST_NOTIFICATIONS: BroadcastNotificationSettings = {
+  started: true, completed: true, failed: true,
+};
+
+function notificationSentence(settings: BroadcastNotificationSettings): string {
+  const labels = [settings.started && '開始', settings.completed && '完了', settings.failed && 'エラー'].filter(Boolean);
+  return labels.length > 0
+    ? `配信${labels.join('・')}はSlackの同じスレッドへ通知します。`
+    : 'この配信のSlack通知はありません。';
+}
 
 function broadcastAccountIds(broadcast: DbBroadcast): Array<string | null> {
   const raw = broadcast as unknown as Record<string, unknown>;
@@ -323,6 +337,45 @@ broadcasts.get('/api/broadcasts/stats', async (c) => {
     console.error('GET /api/broadcasts/stats error:', err);
     return c.json({ success: false as const, error: '配信の集計を取得できませんでした' }, 500);
   }
+});
+
+broadcasts.get('/api/broadcasts/notification-settings', async (c) => {
+  const lineAccountId = c.req.query('lineAccountId')?.trim();
+  if (!lineAccountId) return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+    return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+  }
+  const stored = await getVersionedAccountSetting<BroadcastNotificationSettings>(
+    c.env.DB, lineAccountId, BROADCAST_NOTIFICATION_KEY,
+  );
+  const settings = stored?.data ?? DEFAULT_BROADCAST_NOTIFICATIONS;
+  return c.json({ success: true, data: { version: stored?.version ?? 0, ...settings, displayText: notificationSentence(settings) } });
+});
+
+broadcasts.put('/api/broadcasts/notification-settings', requireRole('owner', 'admin'), async (c) => {
+  const lineAccountId = c.req.query('lineAccountId')?.trim();
+  if (!lineAccountId) return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+    return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+  }
+  const body: Record<string, unknown> = await c.req
+    .json<Record<string, unknown>>()
+    .catch(() => ({} as Record<string, unknown>));
+  const expectedVersion = Number(body.expectedVersion);
+  if (!Number.isInteger(expectedVersion) || expectedVersion < 0
+    || ['started', 'completed', 'failed'].some((key) => typeof body[key] !== 'boolean')) {
+    return c.json({ success: false, error: '通知設定と現在の版を確認してください' }, 400);
+  }
+  const data: BroadcastNotificationSettings = {
+    started: body.started === true, completed: body.completed === true, failed: body.failed === true,
+  };
+  const result = await saveVersionedAccountSetting(c.env.DB, {
+    accountId: lineAccountId, key: BROADCAST_NOTIFICATION_KEY, expectedVersion, data,
+  });
+  if (result.status === 'conflict') {
+    return c.json({ success: false, code: 'version_conflict', error: '通知設定が更新されています。読み直してください' }, 409);
+  }
+  return c.json({ success: true, data: { version: result.setting.version, ...data, displayText: notificationSentence(data) } });
 });
 
 // 保存した検索。動的な :id より前に置き、saved-views を配信IDとして扱わない。
