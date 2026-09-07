@@ -1,6 +1,7 @@
 import { Hono, type Context } from 'hono';
 import {
   getMedia,
+  countMedia,
   getMediaById,
   createMedia,
   updateMedia,
@@ -639,13 +640,30 @@ contents.get('/api/media', async (c) => {
     const kind = kindRaw && ['image', 'video', 'audio', 'file'].includes(kindRaw)
       ? (kindRaw as MediaKind)
       : undefined;
-    const items = await getMedia(c.env.DB, {
+    const limit = Math.min(100, Math.max(1, Number.parseInt(c.req.query('limit') || '20', 10) || 20));
+    const offset = Math.max(0, Number.parseInt(c.req.query('offset') || '0', 10) || 0);
+    const sortRaw = c.req.query('sort');
+    const sort = sortRaw && ['newest', 'oldest', 'name', 'size', 'usage'].includes(sortRaw)
+      ? sortRaw as 'newest' | 'oldest' | 'name' | 'size' | 'usage'
+      : 'newest';
+    const filters = {
       lineAccountId: accountId,
       kind,
       folderId: c.req.query('folderId') || undefined,
-    });
+      excludeId: c.req.query('excludeId') || undefined,
+      query: c.req.query('query')?.trim() || undefined,
+      unusedOnly: c.req.query('unusedOnly') === '1',
+      nearLimitOnly: c.req.query('nearLimitOnly') === '1',
+    };
+    const [items, total] = await Promise.all([
+      getMedia(c.env.DB, { ...filters, sort, limit, offset }),
+      countMedia(c.env.DB, filters),
+    ]);
     const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
-    return c.json({ success: true, data: items.map((m) => serializeMedia(m, workerUrl)) });
+    return c.json({
+      success: true,
+      data: { items: items.map((m) => serializeMedia(m, workerUrl)), total, limit, offset },
+    });
   } catch (err) {
     console.error('GET /api/media error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);

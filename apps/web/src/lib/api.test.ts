@@ -5,6 +5,8 @@ let ApiError: typeof import('./api').ApiError
 let extractApiErrorMessage: typeof import('./api').extractApiErrorMessage
 let extractApiErrorCode: typeof import('./api').extractApiErrorCode
 let extractApiErrorData: typeof import('./api').extractApiErrorData
+let extractFeatureDisabledDetail: typeof import('./api').extractFeatureDisabledDetail
+let shouldAnnounceFeatureDisabled: typeof import('./api').shouldAnnounceFeatureDisabled
 let eventsApi: typeof import('./api').eventsApi
 let webinarApi: typeof import('./api').webinarApi
 let api: typeof import('./api').api
@@ -17,6 +19,8 @@ beforeAll(async () => {
     extractApiErrorMessage,
     extractApiErrorCode,
     extractApiErrorData,
+    extractFeatureDisabledDetail,
+    shouldAnnounceFeatureDisabled,
     eventsApi,
     webinarApi,
     api,
@@ -993,6 +997,73 @@ describe('extractApiErrorCode', () => {
     expect(extractApiErrorCode(JSON.stringify({ code: 'Failed to fetch friend rich menu: boom' }))).toBeUndefined()
     expect(extractApiErrorCode('<html>proxy error</html>')).toBeUndefined()
     expect(extractApiErrorCode(JSON.stringify({ error: { code: 'slot_conflict' } }))).toBeUndefined()
+  })
+
+  it('機能停止契約の固定コードだけは大文字でも受け取る', () => {
+    expect(extractApiErrorCode(JSON.stringify({ code: 'FEATURE_DISABLED' }))).toBe('FEATURE_DISABLED')
+    expect(extractApiErrorCode(JSON.stringify({ code: 'FORBIDDEN' }))).toBe('FORBIDDEN')
+  })
+})
+
+describe('機能オフの403契約', () => {
+  function stubBrowser(target: EventTarget) {
+    const storage = {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    }
+    vi.stubGlobal('window', target)
+    vi.stubGlobal('sessionStorage', storage)
+    vi.stubGlobal('localStorage', storage)
+  }
+
+  it('FEATURE_DISABLED だけを専用案内へ送り、通常の403は権限案内に残す', () => {
+    expect(shouldAnnounceFeatureDisabled(403, 'FEATURE_DISABLED')).toBe(true)
+    expect(shouldAnnounceFeatureDisabled(403, undefined)).toBe(false)
+    expect(shouldAnnounceFeatureDisabled(403, 'forbidden')).toBe(false)
+    expect(shouldAnnounceFeatureDisabled(409, 'FEATURE_DISABLED')).toBe(false)
+  })
+
+  it('案内には公開された機能IDだけを渡す', () => {
+    expect(extractFeatureDisabledDetail(JSON.stringify({ featureId: 'webinars' })))
+      .toEqual({ featureId: 'webinars' })
+    expect(extractFeatureDisabledDetail(JSON.stringify({ featureId: '../secret' }))).toEqual({})
+    expect(extractFeatureDisabledDetail('<html>error</html>')).toEqual({})
+  })
+
+  it('API応答から専用案内の合図を出し、ApiErrorにも固定コードを残す', async () => {
+    const target = new EventTarget()
+    let detail: unknown
+    target.addEventListener('lh-feature-disabled', (event) => {
+      detail = (event as CustomEvent).detail
+    })
+    stubBrowser(target)
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      success: false,
+      error: 'この機能は設定でオフになっています',
+      code: 'FEATURE_DISABLED',
+      featureId: 'webinars',
+    }), { status: 403 })))
+
+    await expect(fetchApi('/api/webinars')).rejects.toMatchObject({
+      status: 403,
+      code: 'FEATURE_DISABLED',
+    })
+    expect(detail).toEqual({ featureId: 'webinars' })
+  })
+
+  it('通常の403では専用案内の合図を出さない', async () => {
+    const target = new EventTarget()
+    const listener = vi.fn()
+    target.addEventListener('lh-feature-disabled', listener)
+    stubBrowser(target)
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      success: false,
+      code: 'FORBIDDEN',
+    }), { status: 403 })))
+
+    await expect(fetchApi('/api/webinars')).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' })
+    expect(listener).not.toHaveBeenCalled()
   })
 })
 

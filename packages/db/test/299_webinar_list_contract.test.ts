@@ -24,8 +24,9 @@ describe('299 ウェビナー一覧契約', () => {
       VALUES ('friend-a1','Ua1','account-a',1,0),
              ('friend-a2','Ua2','account-a',1,0),
              ('friend-b1','Ub1','account-b',1,0);
-      INSERT INTO folders (id, kind, name, display_order)
-      VALUES ('folder-sales','webinar','販売',0), ('folder-other','webinar','その他',1);
+      INSERT INTO folders (id, kind, name, display_order, account_id)
+      VALUES ('folder-sales','webinar','販売',0,'account-a'),
+             ('folder-other','webinar','その他',1,'account-b');
       INSERT INTO webinars
         (id, account_id, title, slug, status, duration_seconds, schedule_json, folder_id,
          publication_starts_at, publication_ends_at, created_at, updated_at)

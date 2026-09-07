@@ -923,11 +923,11 @@ const SHAPES = {
   '/api/duplicates/stats': DUPLICATE_STATS,
   '/api/operators': OPERATORS,
   '/api/scenarios': FRIEND_SCENARIOS,
-  '/api/media': MEDIA_ITEMS,
+  '/api/media': { items: MEDIA_ITEMS, total: MEDIA_ITEMS.length, limit: 20, offset: 0 },
   '/api/media/quota': MEDIA_QUOTA,
 
   /* 予約。`api.ts` を通らない口なので、読む側（`app/page.tsx`）に合わせる。 */
-  '/api/booking/admin/requests': { requests: [] },
+  '/api/booking/admin/requests': { requests: [], total: 0, limit: 50, offset: 0 },
 
   /* EC の出荷予定（`EcShipmentList`）。`soon`/`later` は配列で要る。 */
   '/api/ec-commerce/shipments': {
@@ -1099,7 +1099,21 @@ const RAW = {
   '/api/booking/admin/alternatives': BOOKING_CONFLICT_ALTERNATIVES,
   '/api/events/admin/events': { items: ADMIN_EVENTS },
   // 予約メニューの帯は `requests` から件数を出す。包むと `.filter` で落ちる。
-  '/api/booking/admin/requests': { requests: BOOKING_REQUESTS },
+  '/api/booking/admin/requests': { requests: BOOKING_REQUESTS, total: BOOKING_REQUESTS.length, limit: 50, offset: 0 },
+  '/api/booking/admin/requests-summary': {
+    total: BOOKING_REQUESTS.length,
+    requested: BOOKING_REQUESTS.filter((item) => item.status === 'requested').length,
+    monthTotal: BOOKING_REQUESTS.length,
+    monthConfirmed: BOOKING_REQUESTS.filter((item) => item.status === 'confirmed').length,
+    monthCancelled: BOOKING_REQUESTS.filter((item) => ['cancelled', 'rejected', 'no_show'].includes(item.status)).length,
+    lastMonthTotal: 0,
+    todayTotal: BOOKING_REQUESTS.length,
+    weekTotal: BOOKING_REQUESTS.length,
+    byMenu: BOOKING_MENUS.map((menu) => ({
+      name: menu.name,
+      total: BOOKING_REQUESTS.filter((item) => item.menu_name === menu.name).length,
+    })),
+  },
 }
 
 /**
@@ -2682,6 +2696,56 @@ const server = createServer((req, res) => {
   */
   if (url.pathname === '/__mock-fingerprint') {
     res.writeHead(200).end(JSON.stringify({ fingerprint: FINGERPRINT }))
+    return
+  }
+
+  if (method === 'GET' && url.pathname === '/api/media') {
+    const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || 20)))
+    const offset = Math.max(0, Number(url.searchParams.get('offset') || 0))
+    const kind = url.searchParams.get('kind')
+    const query = (url.searchParams.get('query') || '').toLowerCase()
+    const folderId = url.searchParams.get('folderId')
+    const excludeId = url.searchParams.get('excludeId')
+    const sort = url.searchParams.get('sort') || 'newest'
+    const filtered = MEDIA_ITEMS.filter((item) =>
+      (!kind || item.kind === kind)
+      && (!excludeId || item.id !== excludeId)
+      && (!query || item.filename.toLowerCase().includes(query))
+      && (!folderId || (folderId === '__ungrouped__' ? item.folderId == null : item.folderId === folderId))
+      && (url.searchParams.get('unusedOnly') !== '1' || item.usageCount === 0)
+      && (url.searchParams.get('nearLimitOnly') !== '1' || item.sizeBytes >= (item.kind === 'image' ? 8 : item.kind === 'file' ? 16 : 160) * 1024 * 1024),
+    ).toSorted((left, right) => {
+      if (sort === 'oldest') return left.createdAt.localeCompare(right.createdAt)
+      if (sort === 'name') return left.filename.localeCompare(right.filename, 'ja')
+      if (sort === 'size') return right.sizeBytes - left.sizeBytes
+      if (sort === 'usage') return (right.usageCount ?? -1) - (left.usageCount ?? -1)
+      return right.createdAt.localeCompare(left.createdAt)
+    })
+    res.writeHead(200).end(JSON.stringify({
+      success: true,
+      data: { items: filtered.slice(offset, offset + limit), total: filtered.length, limit, offset },
+    }))
+    return
+  }
+
+  if (method === 'GET' && url.pathname === '/api/booking/admin/requests') {
+    const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || 50)))
+    const offset = Math.max(0, Number(url.searchParams.get('offset') || 0))
+    const status = url.searchParams.get('status') || 'requested'
+    const query = url.searchParams.get('query') || ''
+    const menuName = url.searchParams.get('menu_name')
+    const from = url.searchParams.get('from')
+    const to = url.searchParams.get('to')
+    const filtered = BOOKING_REQUESTS.filter((item) =>
+      (status === 'all' || item.status === status)
+      && (!query || (item.friend_name || '').includes(query))
+      && (!menuName || item.menu_name === menuName)
+      && (!from || item.starts_at >= from)
+      && (!to || item.starts_at < to),
+    )
+    res.writeHead(200).end(JSON.stringify({
+      requests: filtered.slice(offset, offset + limit), total: filtered.length, limit, offset,
+    }))
     return
   }
 

@@ -7,6 +7,7 @@ import { AccountProvider } from '@/contexts/account-context'
 import SessionLostNotice from './session-lost-notice'
 import RootLandingGate from './root-landing-gate'
 import StoreSelectionGate from './store-selection-gate'
+import FeatureDisabledGate from './feature-disabled-gate'
 import AppTopBar from './shell/app-top-bar'
 import { PageChromeProvider, usePageChrome } from './shell/page-chrome'
 import styles from './app-shell.module.css'
@@ -51,7 +52,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div className={`${styles.workspace} ${isFriendAttributesV2 ? 'friend-attributes-v2-shell' : ''}`}>
               <Sidebar friendAttributesV2Mode={isFriendAttributesV2} />
               <Workspace>
-                <RootLandingGate><StoreSelectionGate>{children}</StoreSelectionGate></RootLandingGate>
+                <RootLandingGate><StoreSelectionGate><FeatureDisabledGate>{children}</FeatureDisabledGate></StoreSelectionGate></RootLandingGate>
               </Workspace>
             </div>
           </div>

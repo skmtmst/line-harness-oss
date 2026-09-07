@@ -1836,8 +1836,9 @@ export const SCREENS = [
   // ── 機能15 登録メディア ─────────────────────────────────
   { ...MEDIA, node: 'g89Tc', name: '15-1 登録メディア',
     verdict: "match",
-    verdictNote: "**2026-09-07、Issue #392 / PR #1157 / HEAD `0cc67ed91d` を固定ポート web 3105・mock 8792 で1440px・1920px再撮影し、一致。** 2幅とも横はみ出し0。容量APIの実値から2.4GB / 10GB・残り7.6GB・24%帯を表示し、「上限に近い」もファイル種別ごとのLINE上限80%以上だけを絞る。3フォルダ＋未分類、検索、6つの絞り込み、格子/一覧、並び順、表示件数、カード、一括削除を設計画像と目視比較した。固定データは代表10件のため、設計の186件は作り物で埋めない。",
+    verdictNote: "**2026-09-08、Issue #538 を固定ポート web 3105・mock 8792 で1440px・1920px再撮影し、一致。** 2幅とも横はみ出し0、1920px画素差4.0422%。一覧は総件数と表示範囲を示し、200件を超えてもサーバー側ページ送りで全件を確認できる。検索・種別・フォルダ・使用状態・並び順もページの外まで含めて絞り込む。",
     verdictSource: "media-v6/g89Tc.txt + g89Tc-1440.png + g89Tc-1920.png",
+    verdictHead: "748c8b810",
   },
   {
     ...MEDIA, node: 'voJtX', name: '15-1-A メディアの詳細と差し替え',
@@ -2739,7 +2740,7 @@ export const SCREENS = [
     日・週の台帳は、固定予約を時間×担当／曜日の格子へ並べる。
     LINE予約は緑、LINE未連携の電話予約は青で同じ格子に載せる。
   */
-  { ...BOOKING, node: 'TV2DI', name: '27-1 予約管理', verdict: 'match', verdictNote: '**2026-09-07 Issue #485・撮影HEAD `833383f6e` で再判定し一致。** 設計高1144pxを初期viewportにして本文全体を再撮影し、旧-64pxの差を0pxへ解消した。1920px画素差4.4690%、1440/1920pxとも横はみ出し0。', verdictSource: 'booking-v6/TV2DI.png + TV2DI-{1440,1920}.png + TV2DI-diff-1920.png + Issue #485', verdictHead: '833383f6e' },
+  { ...BOOKING, node: 'TV2DI', name: '27-1 予約管理', verdict: 'match', verdictNote: '**2026-09-08 Issue #538 を固定ポート3105/8792で再撮影し、一致を維持。** 一覧は全件取得をやめ、集計と表示ページを別々に取得する。201件目以降もページ移動で取得でき、検索・メニュー・日付もサーバー側で絞り込む。1920px画素差4.764%、1440/1920pxとも横はみ出し0。本流の更新案内帯が表示されたため全体高は設計より37px長いが、予約管理本文の配置は維持。', verdictSource: 'booking-v6/TV2DI.png + TV2DI-{1440,1920}.png + TV2DI-diff-1920.png + Issue #538', verdictHead: '748c8b810' },
   {
     ...BOOKING, node: 'TnDbq', name: '27-1-A 予約の詳細',
     mode: 'viewport', height: 1136, /*
@@ -2753,9 +2754,9 @@ export const SCREENS = [
     ],
     variants: [{ suffix: '-detail-route', route: '/booking/bookings/detail?id=bk-1', standalone: true }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #450 / UI HEAD `cded0de47` を固定ポート3105/8792で再撮影し、★V6設計と上端から照合して一致。** `/booking/bookings/detail` 本文の重複した題・説明・無効な保存帯を外し、パンくずの直後から予約状態と内容を表示する。既存の一覧内詳細も含め、予約内容・顧客カルテ・操作履歴・関連先を維持し、1440/1920pxとも横はみ出し0。",
+    verdictNote: "**2026-09-08 Issue #538 を固定ポート3105/8792で再撮影し、一致を維持。** 詳細ページは一覧全件から探さず単票APIを使い、LINE未連携の電話予約は顧客IDで履歴を取得して無効な友だち・トークリンクを出さない。1920px画素差5.5954%、1440/1920pxとも横はみ出し0。",
     verdictSource: "booking-v6/TnDbq.txt + TnDbq-{1440,1920}.png + TnDbq-detail-route-{1440,1920}.png",
-    verdictHead: "cded0de47",
+    verdictHead: "748c8b810",
   },
   /*
     **判定を改めた（PR #459 head `ba0bf62d`）。** 代理予約の画面ができた

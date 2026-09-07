@@ -6,7 +6,11 @@ import {
   saveVersionedAccountSetting,
   setAccountSetting,
 } from '@line-crm/db';
-import { DEFAULT_TENANT_ID } from '@line-crm/shared';
+import {
+  DEFAULT_TENANT_ID,
+  FEATURE_CATALOG,
+  type FeatureId,
+} from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -31,6 +35,8 @@ const featureSettings = new Hono<Env>();
  * V2 10-3 でオフと定義された機能だけ既定を無効にし、それ以外は有効。
  * 保存済みの値がある場合は、そちらを優先する。
  */
+// web の既存静的契約テストがこの配列をソースから読むため、共有カタログの
+// 互換ミラーを残す。feature-settings.test.ts で FEATURE_IDS との完全一致を固定する。
 export const TOGGLEABLE_FEATURES = [
   'scenarios',
   'broadcasts',
@@ -41,8 +47,6 @@ export const TOGGLEABLE_FEATURES = [
   'inflow_tracking',
   'forms',
   'photo_review',
-  // サイドメニューにあってオン／オフの受け口が無かったもの。
-  // 受け口が無いと、機能設定に並べてもスイッチが保存されない。
   'automations',
   'external_integrations',
   'friend_add_routing',
@@ -66,11 +70,10 @@ export const TOGGLEABLE_FEATURES = [
   'ec_commerce',
   'line_notifications',
   'nen_campaigns',
-  // 飲食店向けテスト領域は1つのスイッチでまとめて表示を切り替える。
   'restaurant_test',
-] as const;
+] as const satisfies readonly FeatureId[];
 
-export type ToggleableFeature = (typeof TOGGLEABLE_FEATURES)[number];
+export type ToggleableFeature = FeatureId;
 
 const SETTING_PREFIX = 'feature.';
 const SIDEBAR_ORDER_KEY = 'sidebar.order';
@@ -95,15 +98,9 @@ type FeatureSettingsData = {
 type FeatureSettingsState = FeatureSettingsData & { version: number };
 
 /** V2 10-3 の初期表示。記録が無い契約ではこの状態から始める。 */
-export const DEFAULT_DISABLED_FEATURES = new Set<ToggleableFeature>([
-  'webinars',
-  'affiliates',
-  'multi_store_hierarchy',
-  'multi_store_bulk_updates',
-  'reservation_ledger',
-  'external_reservations',
-  'google_business_profile',
-]);
+export const DEFAULT_DISABLED_FEATURES = new Set<ToggleableFeature>(
+  FEATURE_CATALOG.filter(({ defaultEnabled }) => !defaultEnabled).map(({ featureId }) => featureId),
+);
 
 /**
  * このリポジトリで専門設計済みの然向け機能。

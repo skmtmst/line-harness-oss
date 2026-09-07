@@ -87,7 +87,7 @@
 | 2 | `tBlkL` | 2-15 保存した検索・保存完了 | 7.8207%（前回値） | 0px | 上部・中央 | docs | [差分画像](inbox-v6/tBlkL-diff-1920.png) | **一致** |
 | 2 | `AuSDY` | 2-16 保存した検索名・未入力エラー | 6.8958% | 0px | 上部・右 | docs | [差分画像](inbox-v6/AuSDY-diff-1920.png) | **一致** |
 | 2 | `LHjwD` | 2-17 保存した検索名・重複エラー | 6.8701% | 0px | 上部・右 | docs | [差分画像](inbox-v6/LHjwD-diff-1920.png) | **一致** |
-| 3 | `PhxG6` | 3-1 友だち | 3.4617% | 0px | 上部・右 | docs | [差分画像](friends-v6/PhxG6-diff-1920.png) | **一致** |
+| 3 | `PhxG6` | 3-1 友だち | 4.9766% | 0px | 上部・右 | docs | [差分画像](friends-v6/PhxG6-diff-1920.png) | **一致** |
 | 3 | `LT8RS` | 3-1-A 友だち（表示件数を開く） | 5.0010%（前回値） | 0px | 中央・左 | docs | [差分画像](friends-v6/LT8RS-diff-1920.png) | **一致** |
 | 3 | `Igi72` | 3-1-B 友だち（詳細検索・14軸） | 4.7296% | 0px | 下部・中央 | docs | [差分画像](friends-v6/Igi72-diff-1920.png) | **一致** |
 | 3 | `IAf7j` | 3-1-C 友だち（一括操作） | 2.7187% | -27px | 中央・右 | docs | [差分画像](friends-v6/IAf7j-diff-1920.png) | **一致** |
@@ -99,10 +99,10 @@
 | 3 | `w8W4Eh` | 3-3-A 統合ユーザー詳細 | 4.8487% | 0px | 中央・中央 | docs | [差分画像](friends-v6/w8W4Eh-diff-1920.png) | **一致** |
 | 3 | `vtBCu` | 3-4 UID移行 | 6.5918% | -16px | 中央・中央 | docs | [差分画像](friends-v6/vtBCu-diff-1920.png) | **一致** |
 | 5 | `TC1b1` | 5-1 シナリオ配信 | 3.7948% | 0px | 中央・中央 | docs | [差分画像](scenarios-v6/TC1b1-diff-1920.png) | **一致** |
-| 5 | `cCB7r` | 5-1-A シナリオ作成・配信方式 | 5.4828%（前回値） | 0px | 中央・中央 | docs | [差分画像](scenarios-v6/cCB7r-diff-1920.png) | **一致** |
+| 5 | `cCB7r` | 5-1-A シナリオ作成・配信方式 | 5.4828% | 0px | 中央・中央 | docs | [差分画像](scenarios-v6/cCB7r-diff-1920.png) | **一致** |
 | 5 | `kk8dz` | 5-1-B シナリオ作成・1通目設定 | 6.2051% | +10px | 中央・右 | docs | [差分画像](scenarios-v6/kk8dz-diff-1920.png) | **一致** |
 | 5 | `bV5Vs` | 5-1-C シナリオ編集 | 5.4237% | 0px | 上部・右 | docs | [差分画像](scenarios-v6/bV5Vs-diff-1920.png) | **一致** |
-| 5 | `xfYLn` | 5-1-D シナリオ・ステップ編集 | 7.9981%（前回値） | 0px | 上部・右 | docs | [差分画像](scenarios-v6/xfYLn-diff-1920.png) | **一致** |
+| 5 | `xfYLn` | 5-1-D シナリオ・ステップ編集 | 7.9981% | 0px | 上部・右 | docs | [差分画像](scenarios-v6/xfYLn-diff-1920.png) | **一致** |
 | 5 | `r6Gzsu` | 5-1-E シナリオ・配信条件を開く | 8.0033% | 0px | 上部・右 | docs | [差分画像](scenarios-v6/r6Gzsu-diff-1920.png) | **一致** |
 | 5 | `hz9ti` | 5-1-F シナリオ・送信後アクションを開く | 9.4239% | 0px | 上部・右 | docs | [差分画像](scenarios-v6/hz9ti-diff-1920.png) | **一致** |
 | 5 | `dqFft` | 5-1-G シナリオ・ステップ削除確認 | 9.8357%（前回値） | 0px | 上部・右 | docs | [差分画像](scenarios-v6/dqFft-diff-1920.png) | **一致** |
@@ -128,8 +128,8 @@
 | 6 | `xkRDb` | 6-1-M フォルダ操作 | 3.2987% | 0px | 中央・左 | docs | [差分画像](broadcasts-v6/xkRDb-diff-1920.png) | **一致** |
 | 6 | `TmHjF` | 6-1-N 一覧の状態（空・読込・エラー） | 2.8644% | 0px | 中央・中央 | docs | [差分画像](broadcasts-v6/TmHjF-diff-1920.png) | **一致** |
 | 7 | `M1EXwB` | 7-1 リマインダ | 3.2432% | 0px | 中央・左 | docs | [差分画像](reminders-v6/M1EXwB-diff-1920.png) | **一致** |
-| 7 | `uJP22` | 7-1-A リマインダを作成 | 11.8442% ⚠（前回値） | 0px | 中央・右 | docs | [差分画像](reminders-v6/uJP22-diff-1920.png) | **一致** |
-| 7 | `J64xI` | 7-1-B 通知ステップ編集 | 11.1271% ⚠（前回値） | +2px | 中央・右 | docs | [差分画像](reminders-v6/J64xI-diff-1920.png) | **一致** |
+| 7 | `uJP22` | 7-1-A リマインダを作成 | 11.8442% ⚠ | 0px | 中央・右 | docs | [差分画像](reminders-v6/uJP22-diff-1920.png) | **一致** |
+| 7 | `J64xI` | 7-1-B 通知ステップ編集 | 11.1271% ⚠ | +2px | 中央・右 | docs | [差分画像](reminders-v6/J64xI-diff-1920.png) | **一致** |
 | 7 | `s7T2dz` | 7-1-C 対象と終了条件 | 4.3427% | 0px | 中央・左 | docs | [差分画像](reminders-v6/s7T2dz-diff-1920.png) | **一致** |
 | 7 | `JCz6J` | 7-1-D 配信予定プレビュー | 8.7620% | 0px | 下部・右 | docs | [差分画像](reminders-v6/JCz6J-diff-1920.png) | **一致** |
 | 7 | `W98zZQ` | 7-1-E テスト送信確認 | 9.7266% | 0px | 中央・右 | docs | [差分画像](reminders-v6/W98zZQ-diff-1920.png) | **一致** |
@@ -139,7 +139,7 @@
 | 7 | `Y0Sn3` | 7-1-I 削除確認 | 3.5141% | 0px | 上部・左 | docs | [差分画像](reminders-v6/Y0Sn3-diff-1920.png) | **一致** |
 | 7 | `dC0yg` | 7-1-J 一覧の状態（空・読込・エラー） | 2.9622% | 0px | 中央・中央 | docs | [差分画像](reminders-v6/dC0yg-diff-1920.png) | **一致** |
 | 8 | `cmDfJ` | 8-1 自動応答 | 3.7387%（前回値） | 0px | 中央・左 | docs | [差分画像](auto-replies-v6/cmDfJ-diff-1920.png) | **一致** |
-| 8 | `K7vg2` | 8-1-A 自動応答ルール編集 | 6.3126%（前回値） | +1px | 中央・右 | docs | [差分画像](auto-replies-v6/K7vg2-diff-1920.png) | **一致** |
+| 8 | `K7vg2` | 8-1-A 自動応答ルール編集 | 6.3126% | +1px | 中央・右 | docs | [差分画像](auto-replies-v6/K7vg2-diff-1920.png) | **一致** |
 | 8 | `nzWIX` | 8-1-B 反応条件 | 5.2352% | 0px | 中央・左 | docs | [差分画像](auto-replies-v6/nzWIX-diff-1920.png) | **一致** |
 | 8 | `ivDoe` | 8-1-C 応答とアクション | 7.1376% | 0px | 上部・右 | docs | [差分画像](auto-replies-v6/ivDoe-diff-1920.png) | **一致** |
 | 8 | `U9hzqH` | 8-1-D 競合と優先順位 | 5.0830% | +23px | 中央・左 | docs | [差分画像](auto-replies-v6/U9hzqH-diff-1920.png) | **一致** |
@@ -327,7 +327,7 @@
 | 4 | `GMvBd` | 4-3-A 対応マークを追加・編集 | 2.9869%（前回値） | 0px | 上部・左 | docs | [差分画像](friend-attributes-v6/GMvBd-diff-1920.png) | **一致** |
 | 4 | `zGZMA` | 4-3-B 対応マーク削除の確認ダイアログ | 9.2834% | 0px | 中央・中央 | docs | [差分画像](friend-attributes-v6/zGZMA-diff-1920.png) | **一致** |
 | 4 | `XBkiQ` | 4-4-A 保存した検索の条件確認・編集 | 4.8267%（前回値） | 0px | 中央・左 | docs | [差分画像](friend-attributes-v6/XBkiQ-diff-1920.png) | **一致** |
-| 3 | `ux7of` | 3-4-A UID・顧客データ移行／CSV | 4.5661% | 0px | 中央・左 | docs | [差分画像](friends-v6/ux7of-diff-1920.png) | **一致** |
+| 3 | `ux7of` | 3-4-A UID・顧客データ移行／CSV | 5.0832% | 0px | 中央・左 | docs | [差分画像](friends-v6/ux7of-diff-1920.png) | **一致** |
 | 2 | `ohj8J` | 2-8-A 担当者の未読が数えられないとき | 6.8228% | 0px | 上部・中央 | docs | [差分画像](inbox-v6/ohj8J-diff-1920.png) | **一致** |
 | 33 | `QT91v` | 33-1 LINEアカウント一覧 | 4.2249% | 0px | 上部・左 | docs | [差分画像](settings-v6/QT91v-diff-1920.png) | **一致** |
 | 33 | `b2NGxk` | 33-2 LINEアカウントを登録する | 5.0496% | -17px | 中央・左 | docs | [差分画像](settings-v6/b2NGxk-diff-1920.png) | **一致** |
