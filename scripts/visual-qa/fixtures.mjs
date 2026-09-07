@@ -3953,8 +3953,13 @@ export const LOGIN_AUDIT = [
 ]
 
 /** 機能30。ログインユーザーの一覧・役割・監査を実API契約で撮る固定値。 */
+/*
+ * access表は本番では staff_members と同じ表が元なので、同じ人は
+ * STAFF_MEMBERS とID・メールを一致させる(#530)。違うID・メールの
+ * ままでは画面の名寄せが「要確認」になり、EOTS4の撮影が回らない。
+ */
 const accessUser = (id, name, roleBundle, status, options = {}) => ({
-  id, name, email: `${id}@example.invalid`, jobTitle: options.jobTitle ?? null,
+  id, name, email: options.email ?? `${id}@example.invalid`, jobTitle: options.jobTitle ?? null,
   roleBundle, featureCount: roleBundle === 'administrator' ? null : (options.featureCount ?? 8),
   hasFieldMasks: null,
   accountScope: options.accountScope ?? {
@@ -3971,23 +3976,27 @@ const accessUser = (id, name, roleBundle, status, options = {}) => ({
 
 export const ACCESS_USERS = {
   items: [
-    accessUser('access-user-1', '佐々木 亮太', 'administrator', 'active', {
+    accessUser('stf-1', '佐々木 亮太', 'administrator', 'active', {
+      email: 'sasaki@example.com',
       mfaEnabled: true, policyVersion: 4, jobTitle: '統括責任者',
       accountScope: { type: 'all', assignedLineAccountId: null, lineAccountIds: [], includesDescendants: true },
     }),
-    accessUser('access-user-2', '山本 京子', 'administrator', 'active', {
+    accessUser('stf-2', '山本 京子', 'administrator', 'active', {
+      email: 'yamamoto@example.com',
       mfaEnabled: true, policyVersion: 3, jobTitle: '管理責任者',
       accountScope: { type: 'all', assignedLineAccountId: null, lineAccountIds: [], includesDescendants: true },
       lastLoginAt: '2026-09-06T22:40:00.000Z', lastActionAt: '2026-09-06T23:41:00.000Z',
     }),
-    accessUser('access-user-3', '中川 由美', 'operations', 'active', { mfaEnabled: true, policyVersion: 2, featureCount: 14, jobTitle: '運用担当' }),
-    accessUser('access-user-4', '高田 誠', 'operations', 'active', { mfaEnabled: true, policyVersion: 2, featureCount: 12, jobTitle: '配信担当' }),
-    accessUser('access-user-5', '森 涼太', 'reception', 'active', { mfaEnabled: true, policyVersion: 2, featureCount: 6, jobTitle: '受付担当' }),
-    accessUser('access-user-6', '新井 千夏', 'reception', 'active', { mfaEnabled: true, policyVersion: 2, featureCount: 6, jobTitle: '予約担当' }),
-    accessUser('access-user-7', '外部デザイン', 'view_only', 'active', {
+    accessUser('stf-3', '中川 由美', 'operations', 'active', { email: 'nakagawa@example.com', mfaEnabled: true, policyVersion: 2, featureCount: 14, jobTitle: '運用担当' }),
+    accessUser('stf-4', '高田 誠', 'operations', 'active', { email: 'takada@example.com', mfaEnabled: true, policyVersion: 2, featureCount: 12, jobTitle: '配信担当' }),
+    accessUser('stf-8', '森 涼太', 'reception', 'active', { email: 'mori@example.com', mfaEnabled: true, policyVersion: 2, featureCount: 6, jobTitle: '受付担当' }),
+    accessUser('stf-7', '新井 千夏', 'reception', 'active', { email: 'arai@example.com', mfaEnabled: true, policyVersion: 2, featureCount: 6, jobTitle: '予約担当' }),
+    accessUser('stf-5', '外部デザイン', 'view_only', 'active', {
+      email: 'design@partner.example.com',
       featureCount: 5, jobTitle: '確認担当', lastLoginAt: '2026-09-01T03:20:00.000Z', lastActionAt: null,
     }),
-    accessUser('access-user-8', '佐野 直人', 'view_only', 'active', {
+    accessUser('stf-6', '佐野 直人', 'view_only', 'active', {
+      email: 'sano@example.com',
       featureCount: 4, jobTitle: '閲覧担当', lastLoginAt: '2026-05-20T01:00:00.000Z', lastActionAt: null,
     }),
     accessUser('access-user-9', '招待中 運用担当', 'operations', 'invited', {
@@ -4019,13 +4028,13 @@ export const ACCESS_ROLES = {
 
 export const ACCESS_AUDIT_EVENTS = {
   items: [
-    { id: 'audit-access-1', category: 'auth', lineAccountId: 'visual-qa-account', actor: { id: 'access-user-1', name: '佐々木 亮太', role: 'admin' }, action: 'auth.login', target: null, result: 'success', before: null, after: null, reason: null, requestTraceId: null, ipPrefix: '203.0.113.***', regionLabel: '東京', deviceFamily: 'mac', riskLevel: 'normal', retentionClass: 'security', createdAt: '2026-09-07T00:02:00.000Z' },
-    { id: 'audit-access-2', category: 'business', lineAccountId: 'visual-qa-account', actor: { id: 'access-user-2', name: '山本 京子', role: 'admin' }, action: 'broadcast.send', target: { kind: 'broadcast', id: 'broadcast-september' }, result: 'success', before: null, after: { status: 'sent', count: 1842 }, reason: null, requestTraceId: null, ipPrefix: '203.0.113.***', deviceFamily: 'windows', riskLevel: 'normal', retentionClass: 'general', createdAt: '2026-09-06T23:41:00.000Z' },
-    { id: 'audit-access-3', category: 'business', lineAccountId: 'visual-qa-account', actor: { id: 'access-user-3', name: '中川 由美', role: 'staff' }, action: 'booking.update', target: { kind: 'booking', id: 'booking-1008' }, result: 'success', before: { status: 'pending' }, after: { status: 'confirmed' }, reason: null, requestTraceId: null, ipPrefix: '203.0.113.***', deviceFamily: 'mobile', riskLevel: 'normal', retentionClass: 'general', createdAt: '2026-09-06T10:05:00.000Z' },
-    { id: 'audit-access-4', category: 'business', lineAccountId: 'visual-qa-account', actor: { id: 'access-user-4', name: '高田 誠', role: 'staff' }, action: 'template.delete', target: { kind: 'template', id: 'template-old' }, result: 'success', before: { status: 'draft' }, after: null, reason: '不要になったため', requestTraceId: null, ipPrefix: '203.0.113.***', deviceFamily: 'mac', riskLevel: 'normal', retentionClass: 'general', createdAt: '2026-09-06T08:20:00.000Z' },
+    { id: 'audit-access-1', category: 'auth', lineAccountId: 'visual-qa-account', actor: { id: 'stf-1', name: '佐々木 亮太', role: 'admin' }, action: 'auth.login', target: null, result: 'success', before: null, after: null, reason: null, requestTraceId: null, ipPrefix: '203.0.113.***', regionLabel: '東京', deviceFamily: 'mac', riskLevel: 'normal', retentionClass: 'security', createdAt: '2026-09-07T00:02:00.000Z' },
+    { id: 'audit-access-2', category: 'business', lineAccountId: 'visual-qa-account', actor: { id: 'stf-2', name: '山本 京子', role: 'admin' }, action: 'broadcast.send', target: { kind: 'broadcast', id: 'broadcast-september' }, result: 'success', before: null, after: { status: 'sent', count: 1842 }, reason: null, requestTraceId: null, ipPrefix: '203.0.113.***', deviceFamily: 'windows', riskLevel: 'normal', retentionClass: 'general', createdAt: '2026-09-06T23:41:00.000Z' },
+    { id: 'audit-access-3', category: 'business', lineAccountId: 'visual-qa-account', actor: { id: 'stf-3', name: '中川 由美', role: 'staff' }, action: 'booking.update', target: { kind: 'booking', id: 'booking-1008' }, result: 'success', before: { status: 'pending' }, after: { status: 'confirmed' }, reason: null, requestTraceId: null, ipPrefix: '203.0.113.***', deviceFamily: 'mobile', riskLevel: 'normal', retentionClass: 'general', createdAt: '2026-09-06T10:05:00.000Z' },
+    { id: 'audit-access-4', category: 'business', lineAccountId: 'visual-qa-account', actor: { id: 'stf-4', name: '高田 誠', role: 'staff' }, action: 'template.delete', target: { kind: 'template', id: 'template-old' }, result: 'success', before: { status: 'draft' }, after: null, reason: '不要になったため', requestTraceId: null, ipPrefix: '203.0.113.***', deviceFamily: 'mac', riskLevel: 'normal', retentionClass: 'general', createdAt: '2026-09-06T08:20:00.000Z' },
     { id: 'audit-access-5', category: 'auth', lineAccountId: 'visual-qa-account', actor: { id: null, name: null, role: null }, action: 'auth.login', target: null, result: 'failed', before: null, after: null, reason: '本人確認に失敗しました', requestTraceId: null, ipPrefix: '198.51.100.***', regionLabel: '大阪', deviceFamily: 'other', riskLevel: 'suspicious', retentionClass: 'security', createdAt: '2026-09-05T19:44:00.000Z' },
-    { id: 'audit-access-6', category: 'business', lineAccountId: 'visual-qa-account', actor: { id: 'access-user-1', name: '佐々木 亮太', role: 'admin' }, action: 'access.user.change', target: { kind: 'staff_member', id: 'access-user-7' }, result: 'success', before: { roleBundle: 'custom' }, after: { roleBundle: 'view_only' }, reason: '閲覧だけに変更', requestTraceId: null, ipPrefix: '203.0.113.***', deviceFamily: 'mac', riskLevel: 'normal', retentionClass: 'security', createdAt: '2026-09-05T04:10:00.000Z' },
-    { id: 'audit-access-7', category: 'business', lineAccountId: 'visual-qa-account', actor: { id: 'access-user-2', name: '山本 京子', role: 'admin' }, action: 'webhook.send', target: { kind: 'outgoing_webhook', id: 'owh-slack-order' }, result: 'denied', before: null, after: null, reason: '相手が応答しませんでした', requestTraceId: null, ipPrefix: '203.0.113.***', deviceFamily: 'windows', riskLevel: 'high', retentionClass: 'general', createdAt: '2026-09-04T05:12:00.000Z' },
+    { id: 'audit-access-6', category: 'business', lineAccountId: 'visual-qa-account', actor: { id: 'stf-1', name: '佐々木 亮太', role: 'admin' }, action: 'access.user.change', target: { kind: 'staff_member', id: 'stf-5' }, result: 'success', before: { roleBundle: 'custom' }, after: { roleBundle: 'view_only' }, reason: '閲覧だけに変更', requestTraceId: null, ipPrefix: '203.0.113.***', deviceFamily: 'mac', riskLevel: 'normal', retentionClass: 'security', createdAt: '2026-09-05T04:10:00.000Z' },
+    { id: 'audit-access-7', category: 'business', lineAccountId: 'visual-qa-account', actor: { id: 'stf-2', name: '山本 京子', role: 'admin' }, action: 'webhook.send', target: { kind: 'outgoing_webhook', id: 'owh-slack-order' }, result: 'denied', before: null, after: null, reason: '相手が応答しませんでした', requestTraceId: null, ipPrefix: '203.0.113.***', deviceFamily: 'windows', riskLevel: 'high', retentionClass: 'general', createdAt: '2026-09-04T05:12:00.000Z' },
   ],
   summary: { periodDays: 30, total: 4286, deleted: 12, sent: 18, changed: 46, logins: 286, suspiciousLogins: 1 },
   pagination: { total: 4286, limit: 20, offset: 0 },
