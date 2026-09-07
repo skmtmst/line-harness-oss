@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   Folder,
   MediaDeleteImpact,
@@ -83,16 +83,6 @@ function formatStorage(bytes: number): string {
   return `${(bytes / 1024 / 1024 / 1024).toFixed(1)}GB`
 }
 
-function mediaSizeLimit(item: MediaItem): number {
-  if (item.kind === 'image') return 10 * 1024 * 1024
-  if (item.kind === 'file') return 20 * 1024 * 1024
-  return 200 * 1024 * 1024
-}
-
-function isNearLimit(item: MediaItem): boolean {
-  return item.sizeBytes >= mediaSizeLimit(item) * 0.8
-}
-
 function formatMediaDetails(item: MediaItem): string {
   const format = item.mimeType.split('/').at(-1)?.replace('jpeg', 'jpg').toUpperCase() ?? ''
   const details = [format]
@@ -119,6 +109,7 @@ export default function MediaLibraryPage() {
   const latestAccountRef = useRef(selectedAccountId)
   latestAccountRef.current = selectedAccountId
   const [items, setItems] = useState<MediaItem[]>([])
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadFailed, setLoadFailed] = useState(false)
   const [quota, setQuota] = useState<MediaQuota | null>(null)
@@ -211,12 +202,24 @@ export default function MediaLibraryPage() {
     setError('')
     try {
       const [res, folderResponse, quotaResponse] = await Promise.all([
-        api.media.list(accountAtRequest),
+        api.media.list(accountAtRequest, {
+          kind: kinds.size === 1 ? [...kinds][0] : undefined,
+          folderId: folderFilter || undefined,
+          query: query.trim() || undefined,
+          unusedOnly: showUnusedOnly,
+          nearLimitOnly: showNearLimitOnly,
+          sort,
+          limit: pageSize,
+          offset: (page - 1) * pageSize,
+        }),
         api.folders.list('media'),
         api.media.quota(accountAtRequest).catch(() => null),
       ])
       if (accountAtRequest !== latestAccountRef.current) return
-      if (res.success) setItems(res.data)
+      if (res.success) {
+        setItems(res.data.items)
+        setTotal(res.data.total)
+      }
       if (folderResponse.success) setFolders(folderResponse.data)
       if (quotaResponse?.success) setQuota(quotaResponse.data)
       else {
@@ -228,7 +231,7 @@ export default function MediaLibraryPage() {
     } finally {
       if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
-  }, [selectedAccountId])
+  }, [folderFilter, kinds, page, pageSize, query, selectedAccountId, showNearLimitOnly, showUnusedOnly, sort])
 
   useEffect(() => {
     if (accountLoading) return
@@ -237,7 +240,10 @@ export default function MediaLibraryPage() {
     setReplacementFor(null)
     setPreview(null)
     setPage(1)
-    void load()
+  }, [accountLoading, selectedAccountId])
+
+  useEffect(() => {
+    if (!accountLoading) void load()
   }, [accountLoading, load])
 
   const rename = async () => {
@@ -290,7 +296,6 @@ export default function MediaLibraryPage() {
       setError('使用先を確認できないメディアは削除できません。状態を読み直して確認してください。')
       return
     }
-    const accountAtRequest = selectedAccountId
     /*
       **ブラウザ標準の確認を使わない。** 何件消えるかは出るが、
       戻せないことも、どこにも使われていないと確かめた結果も出ない。
@@ -428,40 +433,14 @@ export default function MediaLibraryPage() {
     setDeleteError('')
   }
 
-  const filtered = useMemo(() => {
-    const needle = query.trim().toLowerCase()
-    const next = items.filter(
-      (item) =>
-        kinds.has(item.kind) &&
-        (!folderFilter || (folderFilter === UNGROUPED ? item.folderId === null : item.folderId === folderFilter)) &&
-        (!showUnusedOnly || item.usageCount === 0) &&
-        (!showNearLimitOnly || isNearLimit(item)) &&
-        (!needle || item.filename.toLowerCase().includes(needle)),
-    )
-    return next.toSorted((left, right) => {
-      if (sort === 'oldest') return left.createdAt.localeCompare(right.createdAt)
-      if (sort === 'name') return left.filename.localeCompare(right.filename, 'ja')
-      if (sort === 'size') return right.sizeBytes - left.sizeBytes
-      if (sort === 'usage') {
-        if (left.usageCount == null) return right.usageCount == null ? 0 : 1
-        if (right.usageCount == null) return -1
-        return right.usageCount - left.usageCount
-      }
-      return right.createdAt.localeCompare(left.createdAt)
-    })
-  }, [folderFilter, items, kinds, query, showNearLimitOnly, showUnusedOnly, sort])
-
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
-  const current = useMemo(
-    () => filtered.slice((page - 1) * pageSize, page * pageSize),
-    [filtered, page, pageSize],
-  )
+  const pageCount = Math.max(1, Math.ceil(total / pageSize))
+  const current = items
 
   useEffect(() => {
     if (page > pageCount) setPage(pageCount)
   }, [page, pageCount])
 
-  const removable = filtered.filter(isKnownUnused)
+  const removable = items.filter(isKnownUnused)
   const allSelected = removable.length > 0 && removable.every((item) => selected.has(item.id))
 
   if (detailsFor) {
@@ -530,7 +509,7 @@ export default function MediaLibraryPage() {
             setPage(1)
           }}
           rows={[
-            { id: '', label: 'すべて', count: items.length },
+            { id: '', label: 'すべて', count: total },
             ...folders.map((folder) => ({
               id: folder.id,
               label: folder.name,
@@ -681,6 +660,9 @@ export default function MediaLibraryPage() {
       </div>
 
       <div data-design-node="h8pBZr">
+      {total > 200 ? (
+        <p className="text-ink-faint mb-3 text-xs">200件を超えるメディアも、ページを移動してすべて確認できます。</p>
+      ) : null}
       {loading ? (
         <ListState kind="loading" title="読み込んでいます" description="このまま少しお待ちください。" />
       ) : loadFailed ? (
@@ -693,9 +675,9 @@ export default function MediaLibraryPage() {
       ) : current.length === 0 ? (
         <ListState
           kind="empty"
-          title={items.length === 0 ? 'まだメディアがありません' : '条件に合うメディアはありません'}
-          description={items.length === 0 ? '配信で使う画像・動画・音声・ファイルの置き場です。' : '種類、フォルダ、または検索条件を変えてください。'}
-          action={items.length === 0 ? <Button variant="primary" onClick={() => setUploadOpen(true)}>メディアを登録</Button> : undefined}
+          title={total === 0 && !query && !folderFilter ? 'まだメディアがありません' : '条件に合うメディアはありません'}
+          description={total === 0 && !query && !folderFilter ? '配信で使う画像・動画・音声・ファイルの置き場です。' : '種類、フォルダ、または検索条件を変えてください。'}
+          action={total === 0 && !query && !folderFilter ? <Button variant="primary" onClick={() => setUploadOpen(true)}>メディアを登録</Button> : undefined}
         />
       ) : (
         <div
@@ -987,7 +969,12 @@ export default function MediaLibraryPage() {
       </Dialog>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-ink-faint text-xs">
+            全{total}件中 {total === 0 ? 0 : (page - 1) * pageSize + 1}〜{Math.min(page * pageSize, total)}件
+          </span>
+          <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
+        </div>
 
         <div className="flex flex-wrap items-center gap-3">
           <label className="text-ink-secondary flex items-center gap-1.5 text-sm">
@@ -1033,7 +1020,6 @@ export default function MediaLibraryPage() {
 
       <MediaReplacementDialog
         source={replacementFor}
-        items={items}
         accountId={selectedAccountId}
         onClose={() => setReplacementFor(null)}
         onComplete={(message) => {

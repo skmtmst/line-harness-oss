@@ -1678,6 +1678,13 @@ export const CSRF_STORAGE_KEY = 'lh_csrf'
  */
 export const SESSION_LOST_EVENT = 'lh-session-lost'
 
+/** 機能設定でオフになっている API を開いたとき、共通 shell へ知らせる合図。 */
+export const FEATURE_DISABLED_EVENT = 'lh-feature-disabled'
+
+export type FeatureDisabledEventDetail = {
+  featureId?: string
+}
+
 export function getCsrfToken(): string {
   if (typeof window === 'undefined') return ''
   return localStorage.getItem(CSRF_STORAGE_KEY) || ''
@@ -1777,6 +1784,30 @@ export function extractApiErrorCode(raw: string): string | undefined {
   return undefined
 }
 
+/** FEATURE_DISABLED の公開情報だけを共通 shell へ渡す。 */
+export function extractFeatureDisabledDetail(raw: string): FeatureDisabledEventDetail {
+  if (!raw) return {}
+  try {
+    const body = JSON.parse(raw) as { featureId?: unknown }
+    return typeof body.featureId === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(body.featureId)
+      ? { featureId: body.featureId }
+      : {}
+  } catch {
+    return {}
+  }
+}
+
+export function shouldAnnounceFeatureDisabled(status: number, code: string | undefined): boolean {
+  return status === 403 && code === 'FEATURE_DISABLED'
+}
+
+function announceFeatureDisabled(status: number, code: string | undefined, raw: string): void {
+  if (typeof window === 'undefined' || !shouldAnnounceFeatureDisabled(status, code)) return
+  window.dispatchEvent(new CustomEvent<FeatureDisabledEventDetail>(FEATURE_DISABLED_EVENT, {
+    detail: extractFeatureDisabledDetail(raw),
+  }))
+}
+
 /** エラー本文の `data` だけを機械処理用に保持する。本文の文言は表示契約と分ける。 */
 export function extractApiErrorData(raw: string): unknown {
   if (!raw) return undefined
@@ -1845,10 +1876,12 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
   if (res.status >= 500) reportServerFailure(path, res.status)
   if (!res.ok) {
     const raw = await res.text()
+    const code = extractApiErrorCode(raw)
+    announceFeatureDisabled(res.status, code, raw)
     throw new ApiError(
       res.status,
       extractApiErrorMessage(raw, res.status),
-      extractApiErrorCode(raw),
+      code,
       // 最新状態は409のときだけ保持する。500等の内部データは画面へ渡さない。
       res.status === 409 ? extractApiErrorData(raw) : undefined,
     )
@@ -1868,10 +1901,12 @@ async function fetchApiBlob(path: string): Promise<Blob> {
   if (res.status >= 500) reportServerFailure(path, res.status)
   if (!res.ok) {
     const raw = await res.text()
+    const code = extractApiErrorCode(raw)
+    announceFeatureDisabled(res.status, code, raw)
     throw new ApiError(
       res.status,
       extractApiErrorMessage(raw, res.status),
-      extractApiErrorCode(raw),
+      code,
     )
   }
   return res.blob()
@@ -4924,13 +4959,32 @@ export const api = {
   },
   /** メディアライブラリ。1か所に置いて使い回す。 */
   media: {
-    list: (accountId: string, params?: { kind?: string; folderId?: string }) => {
+    list: (accountId: string, params?: {
+      kind?: string
+      folderId?: string
+      excludeId?: string
+      query?: string
+      unusedOnly?: boolean
+      nearLimitOnly?: boolean
+      sort?: 'newest' | 'oldest' | 'name' | 'size' | 'usage'
+      limit?: number
+      offset?: number
+    }) => {
       const q = new URLSearchParams()
       q.set('accountId', accountId)
       if (params?.kind) q.set('kind', params.kind)
       if (params?.folderId) q.set('folderId', params.folderId)
+      if (params?.excludeId) q.set('excludeId', params.excludeId)
+      if (params?.query) q.set('query', params.query)
+      if (params?.unusedOnly) q.set('unusedOnly', '1')
+      if (params?.nearLimitOnly) q.set('nearLimitOnly', '1')
+      if (params?.sort) q.set('sort', params.sort)
+      if (params?.limit) q.set('limit', String(params.limit))
+      if (params?.offset) q.set('offset', String(params.offset))
       const query = q.toString()
-      return fetchApi<ApiResponse<MediaItem[]>>(`/api/media${query ? `?${query}` : ''}`)
+      return fetchApi<ApiResponse<{ items: MediaItem[]; total: number; limit: number; offset: number }>>(
+        `/api/media${query ? `?${query}` : ''}`,
+      )
     },
     /** data は base64。data: URL 形式でも受け付ける。 */
     upload: (data: {
@@ -8915,7 +8969,8 @@ export interface StaffMenuMatrix {
 
 export interface BookingRequest {
   id: string;
-  friend_id: string;
+  friend_id: string | null;
+  booking_customer_id: string | null;
   starts_at: string;
   ends_at: string;
   status: string;
@@ -9318,10 +9373,49 @@ export const bookingApi = {
       { method: 'DELETE' },
     ),
   // Requests
-  listRequests: (accountId: string, status: string = 'requested') =>
-    fetchApi<{ requests: BookingRequest[] }>(
-      withAccount(`/api/booking/admin/requests?status=${status}`, accountId),
-    ),
+  listRequests: (accountId: string, status: string = 'requested', params?: {
+    limit?: number
+    offset?: number
+    query?: string
+    menuName?: string
+    from?: string
+    to?: string
+  }) => {
+    const query = new URLSearchParams({ status })
+    if (params?.limit) query.set('limit', String(params.limit))
+    if (params?.offset) query.set('offset', String(params.offset))
+    if (params?.query) query.set('query', params.query)
+    if (params?.menuName) query.set('menu_name', params.menuName)
+    if (params?.from) query.set('from', params.from)
+    if (params?.to) query.set('to', params.to)
+    return fetchApi<{ requests: BookingRequest[]; total: number }>(
+      withAccount(`/api/booking/admin/requests?${query.toString()}`, accountId),
+    )
+  },
+  requestsSummary: (accountId: string, params: {
+    month: string
+    lastMonth: string
+    today: string
+    weekTo: string
+  }) => {
+    const query = new URLSearchParams({
+      month: params.month,
+      last_month: params.lastMonth,
+      today: params.today,
+      week_to: params.weekTo,
+    })
+    return fetchApi<{
+      total: number
+      requested: number
+      monthTotal: number
+      monthConfirmed: number
+      monthCancelled: number
+      lastMonthTotal: number
+      todayTotal: number
+      weekTotal: number
+      byMenu: Array<{ name: string; total: number }>
+    }>(withAccount(`/api/booking/admin/requests-summary?${query.toString()}`, accountId))
+  },
   decideRequest: (
     accountId: string,
     id: string,

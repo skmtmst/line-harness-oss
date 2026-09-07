@@ -49,6 +49,7 @@ import type { AuthenticatedStaff } from './middleware/auth.js';
 import { tenantScopeMiddleware } from './middleware/tenant-scope.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { businessAuditMiddleware } from './middleware/business-audit.js';
+import { featureEnforcementMiddleware } from './middleware/feature-enforcement.js';
 import { webhook } from './routes/webhook.js';
 import { friends } from './routes/friends.js';
 import { friendBulkRuns } from './routes/friend-bulk-runs.js';
@@ -288,7 +289,7 @@ export type Env = {
   };
 };
 
-const app = new Hono<Env>();
+export const app = new Hono<Env>();
 
 /**
  * 管理画面から送られてくるヘッダ。
@@ -338,6 +339,10 @@ app.use('*', tenantScopeMiddleware);
 
 // 認証済み管理APIの変更を共通監査へ残す。route固有の監査がある場合は重複させない。
 app.use('/api/*', businessAuditMiddleware);
+
+// 機能設定は認証・tenant scope の後、各 route handler の前で強制する。
+// manifest と実 route の全件照合を必須テストにした上で、未分類も fail closed にする。
+app.use('/api/*', featureEnforcementMiddleware);
 
 // Mount route groups — MVP & Round 2
 app.route('/', webhook);

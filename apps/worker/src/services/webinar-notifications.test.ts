@@ -167,6 +167,39 @@ describe('webinar notification jobs', () => {
       .toEqual({ status: 'succeeded' });
   });
 
+  test('機能オフ中は予約をclaimせず、再開可能なまま監査だけを残す', async () => {
+    const { db, raw } = createTestD1();
+    seedBase(raw);
+    await saveWebinarNotificationSettings(db, 'webinar-1', SETTINGS, NOW);
+    await registerWebinarSession(db, 'webinar-1', 'friend-1', SESSION, NOW);
+    const job = raw.prepare(
+      `SELECT id FROM webinar_notification_jobs WHERE kind='day_before'`,
+    ).get() as { id: string };
+    raw.prepare(
+      `UPDATE webinar_notification_jobs SET scheduled_at=?, next_retry_at=? WHERE id=?`,
+    ).run(Math.floor(NOW.getTime() / 1000), Math.floor(NOW.getTime() / 1000), job.id);
+    raw.prepare(
+      `UPDATE account_settings SET value='{"enabled":false}'
+        WHERE line_account_id='account-1' AND key='feature.webinars'`,
+    ).run();
+    const dispatch = vi.fn(async () => new Response('{}', { status: 200 }));
+
+    expect(await processWebinarNotificationJobs(db, {
+      now: NOW,
+      proxyBaseUrl: 'https://worker.example.com',
+      defaultAccessToken: 'fallback',
+      defaultLiffId: null,
+      proxyDispatch: dispatch,
+    })).toEqual({ sent: 0, failed: 0, skipped: 1 });
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(raw.prepare(
+      `SELECT status, attempt_count FROM webinar_notification_jobs WHERE id=?`,
+    ).get(job.id)).toEqual({ status: 'queued', attempt_count: 0 });
+    expect(raw.prepare(
+      `SELECT action, target_id FROM audit_events WHERE action='feature.execution.skipped'`,
+    ).get()).toEqual({ action: 'feature.execution.skipped', target_id: 'webinar-notifications' });
+  });
+
   test('見ている人への見逃し案内は送らず、理由のない0件にしない', async () => {
     const { db, raw } = createTestD1();
     seedBase(raw);

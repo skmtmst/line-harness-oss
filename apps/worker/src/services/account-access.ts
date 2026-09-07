@@ -64,12 +64,18 @@ export async function getVisibleLineAccountScope(
     await getLineAccountScopeEntries(db, staffTenant),
     staff,
   );
+  const featureScope = staff.featureEnabledLineAccountIds
+    ? new Set(staff.featureEnabledLineAccountIds)
+    : null;
+  const featureScopedAccounts = featureScope
+    ? tenantAccounts.filter((account) => featureScope.has(account.id))
+    : tenantAccounts;
   if (staff?.id === 'env-owner') {
-    const allowedAccountIds = tenantAccounts.map((account) => account.id);
+    const allowedAccountIds = featureScopedAccounts.map((account) => account.id);
     return {
-      accounts: tenantAccounts,
+      accounts: featureScopedAccounts,
       allowedAccountIds,
-      canSeeUnassigned: true,
+      canSeeUnassigned: !featureScope,
       ids: allowedAccountIds,
       isAccountScoped: false,
     };
@@ -82,13 +88,13 @@ export async function getVisibleLineAccountScope(
     : null;
   // The tenant wall is applied first. An empty assigned scope deliberately stays empty.
   const accounts = scopedIds
-    ? tenantAccounts.filter((account) => scopedIds.has(account.id))
-    : tenantAccounts;
+    ? featureScopedAccounts.filter((account) => scopedIds.has(account.id))
+    : featureScopedAccounts;
   const allowedAccountIds = accounts.map((account) => account.id);
   return {
     accounts,
     allowedAccountIds,
-    canSeeUnassigned: !isAccountScoped && staffTenant === DEFAULT_TENANT_ID,
+    canSeeUnassigned: !featureScope && !isAccountScoped && staffTenant === DEFAULT_TENANT_ID,
     ids: allowedAccountIds,
     isAccountScoped,
   };

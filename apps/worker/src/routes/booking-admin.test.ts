@@ -623,6 +623,27 @@ describe('POST /api/booking/admin/bookings', () => {
           is_line_linked: 0,
         })],
       });
+      sqlite.exec(`
+        WITH RECURSIVE seq(n) AS (VALUES(1) UNION ALL SELECT n + 1 FROM seq WHERE n < 200)
+        INSERT INTO bookings (
+          id, line_account_id, booking_customer_id, staff_id, menu_id,
+          starts_at, ends_at, block_ends_at, status, price_at_booking, requested_at, source
+        )
+        SELECT printf('bulk-%03d', n), 'acc1', 'customer-1', 's1', 'm1',
+               strftime('%Y-%m-%dT%H:%M:%fZ', '2099-01-01T00:00:00Z', '+' || n || ' minutes'),
+               strftime('%Y-%m-%dT%H:%M:%fZ', '2099-01-01T01:00:00Z', '+' || n || ' minutes'),
+               strftime('%Y-%m-%dT%H:%M:%fZ', '2099-01-01T01:10:00Z', '+' || n || ' minutes'),
+               'confirmed', 8000, '2098-12-01T00:00:00.000Z', 'phone'
+          FROM seq;
+      `);
+      const afterTwoHundred = await app.request(
+        '/api/booking/admin/requests?account_id=acc1&status=all&limit=1&offset=200', {}, env,
+      );
+      expect(afterTwoHundred.status).toBe(200);
+      await expect(afterTwoHundred.json()).resolves.toMatchObject({
+        total: 201,
+        requests: [expect.objectContaining({ id: 'bulk-200', friend_id: null })],
+      });
       expect(sqlite.prepare('SELECT COUNT(*) AS count FROM booking_reminders').get())
         .toEqual({ count: 0 });
     } finally {
