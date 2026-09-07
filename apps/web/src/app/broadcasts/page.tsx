@@ -300,8 +300,24 @@ function BroadcastList() {
     const view = savedViews.find((item) => item.id === id)
     if (!view) return
     const filters = view.filters
+    /*
+     * 旧形式（`statuses: ['scheduled']` など）で保存された行は、新形式に
+     * 読み替える。読み替えないと、選んでも何も変わらず復元不良になる
+     * （点検 #490 中5）。`openRateMax` は口も画面も未接続のため、
+     * ここでは絞りに使わず無視する。
+     */
+    const legacyStatuses = Array.isArray(filters.statuses) ? filters.statuses : []
+    const legacyStatus = legacyStatuses.includes('scheduled')
+      ? 'scheduled'
+      : legacyStatuses.includes('draft')
+        ? 'draft'
+        : null
     setTitleQuery(typeof filters.titleQuery === 'string' ? filters.titleQuery : '')
-    setStatusFilter(filters.statusFilter === 'scheduled' || filters.statusFilter === 'draft' ? filters.statusFilter : 'all')
+    setStatusFilter(
+      filters.statusFilter === 'scheduled' || filters.statusFilter === 'draft'
+        ? filters.statusFilter
+        : legacyStatus ?? 'all',
+    )
     setDateFrom(typeof filters.dateFrom === 'string' ? filters.dateFrom : '')
     setDateTo(typeof filters.dateTo === 'string' ? filters.dateTo : '')
     setFolderFilter(typeof filters.folderFilter === 'string' ? filters.folderFilter : '')
