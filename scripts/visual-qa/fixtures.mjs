@@ -1794,6 +1794,10 @@ export const RICH_MENU_GROUPS = [
     ...RICH_MENU_BASE,
     id: 'rmg-1',
     name: '会員ランク上位',
+    monthlyStats: {
+      from: '2026-08-01', to: '2026-08-31', taps: 3210,
+      uniqueAudience: { value: 8140, state: 'available', reason: null },
+    },
     targetingCondition: JSON.stringify({
       operator: 'AND',
       rules: [{ type: 'tag_exists', value: 'tag-0' }],
@@ -1838,7 +1842,7 @@ export const RICH_MENU_GROUP_DETAILS = {
       ], 'visual-qa/rich-menus/rmg-1-product.png'),
       richMenuPage('rmg-1-booking', 2, '予約する', [
         richMenuArea('rmg-1-booking-product', '商品を見る', 'rmg-1-product', 833),
-      ], 'visual-qa/rich-menus/rmg-1-booking.png'),
+      ], null),
     ],
   },
   'rmg-2': {
@@ -1857,6 +1861,14 @@ export const RICH_MENU_EXTERNAL = {
       chatBarText: 'メニュー',
       size: { width: 2500, height: 1686 },
       areasCount: 6,
+      areas: [
+        { bounds: { x: 0, y: 0, width: 833, height: 843 }, action: { type: 'uri', label: '商品を見る', url: 'https://example.com/products', text: null, displayText: null, richMenuAliasId: null, supported: true, unsupportedReason: null } },
+        { bounds: { x: 833, y: 0, width: 834, height: 843 }, action: { type: 'message', label: '予約する', url: null, text: '予約', displayText: null, richMenuAliasId: null, supported: true, unsupportedReason: null } },
+        { bounds: { x: 1667, y: 0, width: 833, height: 843 }, action: { type: 'postback', label: 'クーポン', url: null, text: null, displayText: 'クーポンを確認', richMenuAliasId: null, supported: true, unsupportedReason: null } },
+        { bounds: { x: 0, y: 843, width: 833, height: 843 }, action: { type: 'uri', label: 'お知らせ', url: 'https://example.com/news', text: null, displayText: null, richMenuAliasId: null, supported: true, unsupportedReason: null } },
+        { bounds: { x: 833, y: 843, width: 834, height: 843 }, action: { type: 'richmenuswitch', label: '会員メニュー', url: null, text: null, displayText: null, richMenuAliasId: 'visual-rmg-1-top', supported: true, unsupportedReason: null } },
+        { bounds: { x: 1667, y: 843, width: 833, height: 843 }, action: { type: 'message', label: 'お問い合わせ', url: null, text: '問い合わせ', displayText: null, richMenuAliasId: null, supported: true, unsupportedReason: null } },
+      ],
       isCurrentDefault: true,
       adminManaged: false,
       adminInfo: null,
@@ -3179,6 +3191,18 @@ export const FRIEND_ATTRIBUTE_FIELDS = [
     displayTargets: ['友だち詳細', 'オートメーション'],
     createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-08-17T00:00:00.000Z',
   },
+  {
+    id: 'field-phone', folderId: null, name: '電話番号', fieldKey: 'phone_number',
+    type: 'text', options: null, defaultValue: null, source: 'manual',
+    ecFieldPath: null, ecIsMaster: false, isPersonal: true, isStarred: false,
+    displayOrder: 5, usageCount: 78, formUsageCount: 1,
+    displayTargets: ['友だち詳細', '配信の絞り込み'],
+    createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-08-16T00:00:00.000Z',
+  },
+]
+
+export const FRIEND_FIELD_FOLDERS = [
+  { id: 'friend-field-folder-pets', kind: 'friend_field', name: 'ペットプロフィール', displayOrder: 1 },
 ]
 
 /**
@@ -4785,6 +4809,33 @@ export const EC_NOTIFICATION_SETTINGS = [
   { ...ecNotification('ec_order.backordered', '入荷待ちになった', 'order', 9, false), title: null, introText: '', outroText: '' },
 ]
 
+export const LINE_NOTIFICATION_DEFINITIONS = EC_NOTIFICATION_SETTINGS.map((setting, index) => ({
+  id: `line-notification-${index + 1}`,
+  lineAccountId: 'visual-qa-account',
+  key: setting.eventType,
+  name: setting.label,
+  category: setting.category,
+  sourceEventType: setting.eventType,
+  status: setting.isEnabled ? 'published' : 'stopped',
+  draft: { title: setting.title, introText: setting.introText, outroText: setting.outroText, buttonLabel: setting.buttonLabel, buttonUrl: setting.buttonUrl, fixedFields: setting.fixedFields },
+  currentVersionId: setting.isEnabled ? `line-notification-${index + 1}-v2` : null,
+  currentVersionNumber: setting.isEnabled ? 2 : null,
+  transactionalOnly: true,
+  version: setting.isEnabled ? 2 : 1,
+  updatedAt: setting.updatedAt,
+}))
+
+export const LINE_NOTIFICATION_METRICS = {
+  items: LINE_NOTIFICATION_DEFINITIONS.map((definition, index) => ({
+    definitionId: definition.id,
+    notificationName: definition.name,
+    accepted: { value: [148, 132, 96, 88, 74, 51, 23, 3, 0][index] },
+    displayed: { state: 'unavailable', value: null, reason: 'LINE側の個人開封は取得できません' },
+    clicked: { value: [42, 31, 18, 16, 12, 9, 4, 0, 0][index] },
+  })),
+  coverage: { individualOpenAvailable: false, lineAggregateOnly: true, unavailableIsNull: true },
+}
+
 /** 機能24。LINE受付までの事実だけを持ち、届いた・既読は作らない。 */
 export const EC_NOTIFICATION_RUNS = {
   items: [
@@ -4828,6 +4879,20 @@ export const EC_NOTIFICATION_RUNS = {
     attemptHistoryAvailable: false,
     retryAvailable: false,
   },
+}
+
+export const LINE_NOTIFICATION_DELIVERIES = {
+  items: EC_NOTIFICATION_RUNS.items.map((run) => ({
+    ...run,
+    attemptCount: run.status === 'failed' ? 3 : 1,
+    nextRetryAt: run.status === 'failed' ? '2026-08-25T11:14:00+09:00' : null,
+    clickedAt: run.status === 'accepted' ? '2026-08-25T10:45:00+09:00' : null,
+    version: 2,
+    retryAvailable: run.status === 'failed',
+    attemptHistory: [{ attempt: 1, status: run.status === 'failed' ? 'failed' : run.status, occurredAt: run.receivedAt }],
+  })),
+  summary: EC_NOTIFICATION_RUNS.summary,
+  coverage: { source: 'notification_delivery_ledger', unassignedHistoricalRowsExcluded: true, attemptHistoryAvailable: true, retryAvailable: true },
 }
 
 /*

@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 29,
-  "match": 179,
-  "structureMatchDataPending": 67,
-  "needsFix": 19,
-  "unjudged": 3,
-  "remaining": 89,
+  "match": 180,
+  "structureMatchDataPending": 69,
+  "needsFix": 15,
+  "unjudged": 4,
+  "remaining": 88,
   "features": [
     {
       "feature": 1,
@@ -1582,6 +1582,15 @@
       "remaining": 6,
       "capturedAt": [
         {
+          "pr": 1191,
+          "head": "e98decafa",
+          "on": "2026-09-07",
+          "screens": [
+            "kQ1bs"
+          ],
+          "note": "Issue #422 / PR #1191。対象条件画面を3102/8789で1440・1920px再撮影し、横はみ出し0。条件軸・対象人数・優先順位を確認し、固定入力不足は構造一致・データ待ちで記録した。"
+        },
+        {
           "pr": 1129,
           "head": "af74a0bbd",
           "on": "2026-09-07",
@@ -1959,11 +1968,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 2,
-      "match": 7,
-      "structureMatchDataPending": 2,
+      "match": 8,
+      "structureMatchDataPending": 1,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 2,
+      "remaining": 1,
       "capturedAt": [
         {
           "pr": 1180,
@@ -2053,9 +2062,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 1,
-      "structureMatchDataPending": 6,
-      "needsFix": 4,
-      "unjudged": 0,
+      "structureMatchDataPending": 7,
+      "needsFix": 2,
+      "unjudged": 1,
       "remaining": 10,
       "capturedAt": [
         {
@@ -2654,8 +2663,8 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 5,
-      "needsFix": 1,
+      "structureMatchDataPending": 6,
+      "needsFix": 0,
       "unjudged": 0,
       "remaining": 6,
       "capturedAt": [
@@ -3149,8 +3158,8 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 1,
+      "structureMatchDataPending": 1,
+      "needsFix": 0,
       "unjudged": 0,
       "remaining": 1,
       "capturedAt": [
