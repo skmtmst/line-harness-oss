@@ -16,6 +16,7 @@ import {
   type ActionScoreOverview,
   type ActionScoreSort,
 } from '@/lib/api'
+import { csvCell } from '@/lib/presentation'
 import { formatMileageDate } from './mileage-display'
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100] as const
@@ -171,7 +172,7 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
       formatMileageDate(scoreChangedAt(item)),
     ])
     const csv = [['友だち', 'いまの点数', '帯', '30日間の変化', '最後に点数が変わった理由', '最終変動'], ...rows]
-      .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))
+      .map((row) => row.map((value) => csvCell(value)).join(','))
       .join('\n')
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
@@ -209,7 +210,7 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
           {filter === 'decreased' ? <span className="text-xs text-ink-faint">下がっている人は、この一覧で理由を確認できます。</span> : null}
         </div>
         <Button onClick={exportCurrentPage} disabled={!overview?.items.length}>
-          <Download className="h-4 w-4" aria-hidden="true" />行動スコアをCSVで書き出す
+          <Download className="h-4 w-4" aria-hidden="true" />この頁の行動スコアをCSVで書き出す
         </Button>
       </div>
 
