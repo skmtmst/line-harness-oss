@@ -90,6 +90,13 @@ describe('V6共通アクションの機能契約', () => {
     }
   })
 
+  it('一覧の複製操作を下書き作成APIへ接続する', () => {
+    expect(LIST).toContain('api.commonActions.duplicate(item.id, selectedAccountId)')
+    expect(LIST).toContain('複製して下書きを作る')
+    expect(LIST).toContain('共通アクションを複製できませんでした')
+    expect(LIST).toContain('/common-actions/edit?id=')
+  })
+
   it('公開版を直接変更せず、実行開始時の計画へ展開する', () => {
     expect(FOUNDATION).toContain('trg_common_action_published_version_immutable')
     expect(WORKER).toContain('common_action_cycle')

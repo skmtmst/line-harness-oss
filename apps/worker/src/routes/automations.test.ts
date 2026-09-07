@@ -89,7 +89,7 @@ describe('GET /api/automation-runs', () => {
     expect(body.data.items[0]).toMatchObject({
       ownerKind: 'automation', status: 'permanent_failed', subject: '田中さん', accountLabel: '本店',
       triggerLabel: 'メッセージが届いたとき', detail: 'メッセージを送信。外部連携先が応答しませんでした',
-      durationMs: 1200, canRetry: false,
+      durationMs: 1200, canRetry: true,
     });
     expect(body.data.items[1]).toMatchObject({
       status: 'skipped', subject: null, detail: '条件に合わなかったため、何もしていません', durationMs: null,

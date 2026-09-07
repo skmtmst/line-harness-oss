@@ -10,7 +10,8 @@ export type AutomationDraftTriggerType =
   | 'calendar_booked'
   | 'datetime'
   | 'daily'
-  | 'weekly';
+  | 'weekly'
+  | 'ec.order.confirmed';
 
 export interface AutomationDraftAction {
   id: string;
@@ -171,13 +172,14 @@ async function validateTriggerConfig(
   const allowed: Record<AutomationDraftTriggerType, ReadonlySet<string>> = {
     friend_add: new Set(),
     tag_change: new Set(['tagId', 'action']),
-    message_received: new Set(),
+    message_received: new Set(['keyword']),
     form_submitted: new Set(['formId']),
     link_clicked: new Set(['trackedLinkId']),
     calendar_booked: new Set(['bookingType', 'menuId', 'eventId']),
     datetime: new Set(['at', 'friendIds']),
     daily: new Set(['time', 'friendIds']),
     weekly: new Set(['time', 'weekdays', 'friendIds']),
+    'ec.order.confirmed': new Set(),
   };
   const unknown = Object.keys(config).find((key) => !allowed[eventType].has(key));
   if (unknown) throw new AutomationDraftError('trigger_config_invalid', 'きっかけの設定を確認してください', unknown);
@@ -189,6 +191,10 @@ async function validateTriggerConfig(
       throw new AutomationDraftError('trigger_config_invalid', 'タグを付けたときか外したときを選んでください', 'triggerAction');
     }
     return { tagId, action: config.action };
+  }
+  if (eventType === 'message_received') {
+    const keyword = optionalString(config.keyword, 'keyword');
+    return keyword ? { keyword } : {};
   }
   if (eventType === 'form_submitted') {
     const formId = optionalString(config.formId, 'formId');
@@ -382,7 +388,7 @@ export async function updateAutomationDraft(
   const name = requiredString(input.name, 'name', 'ルール名');
   const allowedTriggers = new Set<AutomationDraftTriggerType>([
     'friend_add', 'tag_change', 'message_received', 'form_submitted', 'link_clicked',
-    'calendar_booked', 'datetime', 'daily', 'weekly',
+    'calendar_booked', 'datetime', 'daily', 'weekly', 'ec.order.confirmed',
   ]);
   const eventType = requiredString(input.eventType, 'eventType', 'きっかけ');
   if (!allowedTriggers.has(eventType as AutomationDraftTriggerType)) {
@@ -400,34 +406,36 @@ export async function updateAutomationDraft(
     throw new AutomationDraftError('condition_invalid', '対象条件を確認してください', 'conditions');
   }
 
-  if (!Array.isArray(input.actions) || input.actions.length !== 1) {
-    throw new AutomationDraftError('actions_invalid', 'することを1つ選んでください', 'actions');
+  if (!Array.isArray(input.actions) || input.actions.length === 0 || input.actions.length > 20) {
+    throw new AutomationDraftError('actions_invalid', 'することは1〜20個で選んでください', 'actions');
   }
-  const raw = input.actions[0] as Partial<AutomationDraftAction>;
-  if (!raw || !new Set(['add_tag', 'start_scenario', 'send_message']).has(String(raw.type))) {
-    throw new AutomationDraftError('action_unsupported', 'この処理はまだ実行まで接続されていません', 'actions');
+  const actions: AutomationDraftAction[] = [];
+  const ids = new Set<string>();
+  for (const [index, candidate] of input.actions.entries()) {
+    const raw = candidate as Partial<AutomationDraftAction>;
+    if (!raw || !new Set(['add_tag', 'start_scenario', 'send_message']).has(String(raw.type))) {
+      throw new AutomationDraftError('action_unsupported', 'この処理はまだ実行まで接続されていません', `actions.${index}`);
+    }
+    const params = raw.params && typeof raw.params === 'object' && !Array.isArray(raw.params)
+      ? { ...raw.params }
+      : {};
+    if (raw.type === 'add_tag') {
+      const tagId = requiredString(params.tagId, `actions.${index}.tagId`, '付けるタグ');
+      await requireResource(db, 'tags', tagId, input.lineAccountId, `actions.${index}.tagId`, '付けるタグ');
+      params.tagId = tagId;
+    } else if (raw.type === 'start_scenario') {
+      const scenarioId = requiredString(params.scenarioId, `actions.${index}.scenarioId`, '始めるシナリオ');
+      await requireResource(db, 'scenarios', scenarioId, input.lineAccountId, `actions.${index}.scenarioId`, '始めるシナリオ');
+      params.scenarioId = scenarioId;
+    } else {
+      params.messageType = 'text';
+      params.content = requiredString(params.content, `actions.${index}.content`, '送る文面');
+    }
+    const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : `step-${index + 1}`;
+    if (ids.has(id)) throw new AutomationDraftError('action_id_duplicate', '処理の番号が重複しています', `actions.${index}.id`);
+    ids.add(id);
+    actions.push({ id, type: raw.type as AutomationDraftActionType, params, onFailure: 'stop' });
   }
-  const params = raw.params && typeof raw.params === 'object' && !Array.isArray(raw.params)
-    ? { ...raw.params }
-    : {};
-  if (raw.type === 'add_tag') {
-    const tagId = requiredString(params.tagId, 'actionTagId', '付けるタグ');
-    await requireResource(db, 'tags', tagId, input.lineAccountId, 'actionTagId', '付けるタグ');
-    params.tagId = tagId;
-  } else if (raw.type === 'start_scenario') {
-    const scenarioId = requiredString(params.scenarioId, 'actionScenarioId', '始めるシナリオ');
-    await requireResource(db, 'scenarios', scenarioId, input.lineAccountId, 'actionScenarioId', '始めるシナリオ');
-    params.scenarioId = scenarioId;
-  } else {
-    params.messageType = 'text';
-    params.content = requiredString(params.content, 'actionMessage', '送る文面');
-  }
-  const actions: AutomationDraftAction[] = [{
-    id: typeof raw.id === 'string' && raw.id ? raw.id : 'step-1',
-    type: raw.type as AutomationDraftActionType,
-    params,
-    onFailure: 'stop',
-  }];
   const now = new Date().toISOString();
   const results = await db.batch([
     db.prepare(
@@ -447,4 +455,38 @@ export async function updateAutomationDraft(
   if ((results[0].meta?.changes ?? 0) !== 1 || (results[1].meta?.changes ?? 0) !== 1) {
     throw new AutomationDraftError('version_conflict', '編集中の下書きが変わりました。再読み込みしてください');
   }
+}
+
+export async function publishAutomationDraft(
+  db: D1Database,
+  input: { id: string; lineAccountId: string; expectedDraftVersionId: unknown; activate: unknown },
+): Promise<{ id: string; versionId: string; versionNumber: number; status: 'active' | 'stopped' }> {
+  const current = await getAutomationDraft(db, { id: input.id, lineAccountId: input.lineAccountId });
+  const expected = requiredString(input.expectedDraftVersionId, 'expectedDraftVersionId', '公開する版');
+  if (current.draftVersionId !== expected) {
+    throw new AutomationDraftError('version_conflict', '別の人が下書きを更新しました。再読み込みしてください');
+  }
+  const version = await db.prepare(
+    `SELECT version_number FROM automation_versions
+      WHERE id = ? AND automation_id = ? AND status = 'draft'`,
+  ).bind(expected, current.id).first<{ version_number: number }>();
+  if (!version) throw new AutomationDraftError('not_found', '公開する下書きが見つかりません');
+  const status = input.activate === false ? 'stopped' : 'active';
+  const now = new Date().toISOString();
+  const results = await db.batch([
+    db.prepare(
+      `UPDATE automation_versions SET status = 'published', published_at = ?
+        WHERE id = ? AND automation_id = ? AND status = 'draft'`,
+    ).bind(now, expected, current.id),
+    db.prepare(
+      `UPDATE automation_definitions
+          SET status = ?, current_published_version_id = ?, current_draft_version_id = NULL, updated_at = ?
+        WHERE id = ? AND line_account_id = ? AND status = 'draft'
+          AND current_draft_version_id = ?`,
+    ).bind(status, expected, now, current.id, input.lineAccountId, expected),
+  ]);
+  if ((results[0].meta?.changes ?? 0) !== 1 || (results[1].meta?.changes ?? 0) !== 1) {
+    throw new AutomationDraftError('version_conflict', '公開する前に下書きが変わりました。再読み込みしてください');
+  }
+  return { id: current.id, versionId: expected, versionNumber: Number(version.version_number), status };
 }

@@ -173,7 +173,12 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
           </section>
           <section className={styles.card}>
             <h2 className={styles.cardTitle}>つながる先</h2>
-            <p className={styles.cardNote}>いま影響件数を数える口は未接続です。0件とは限りません。</p>
+            <p className={styles.cardNote}>
+              {Object.values(data?.impact ?? {}).every((value) => typeof value === 'number')
+                ? 'このつなぎ先を止めると影響する設定・集計です。'
+                : '取得できない影響件数は「未取得」と表示します。0件とは限りません。'}
+              {data?.retryPolicy ? <><br />やり直しの決めごと：{data.retryPolicy}</> : null}
+            </p>
             {[['NEN配信', data?.impact.nenCampaigns], ['コンバージョン', data?.impact.conversions], ['マイル', data?.impact.mileageRules], ['友だち属性', data?.impact.friendFields], ['分析', data?.impact.analytics]].map(([label, value]) => <div className={styles.impactRow} key={String(label)}><span>{label}</span><strong>{typeof value === 'number' ? `${value}件` : '— 未取得'}</strong></div>)}
           </section>
         </aside>

@@ -14,6 +14,7 @@ import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
 import { TextField } from '@/components/shared/text-field'
+import SelectField from '@/components/shared/select-field'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
 const EMPTY_RESOURCES: CommonActionResources = {
@@ -82,6 +83,11 @@ export default function NewCommonActionPage() {
     }
   }
 
+  const addExample = (id: string) => {
+    if (!id) return
+    setActions((current) => [...current, { ...newCommonActionStep('common_action'), params: { commonActionId: id } }])
+  }
+
   if (canManage === null) return <div className="text-ink-faint p-6 text-sm">権限を確認しています</div>
   if (!canManage) return (
     <div className="border-hairline rounded-card border bg-canvas p-6">
@@ -101,8 +107,8 @@ export default function NewCommonActionPage() {
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <p className="text-sm text-ink-faint">オートメーション ＞ 共通アクション ＞ つくる</p>
         <div className="text-right">
-          <Button disabled>1人で試す</Button>
-          <p className="mt-1 text-xs text-ink-faint">テスト実行は未接続</p>
+          <Button disabled title="保存後に公開版を選ぶと、対象の友だちを指定して試せます">1人で試す</Button>
+          <p className="mt-1 text-xs text-ink-faint">保存後の公開版から対象を選んで試します</p>
         </div>
       </div>
 
@@ -133,8 +139,14 @@ export default function NewCommonActionPage() {
               <div className="compact-common-action-editor"><CommonActionEditor value={actions} resources={resources} onChange={setActions} /></div>
             )}
             <div className="mt-3 flex flex-wrap gap-2">
-              <Button disabled title="条件分岐の保存・実行は未接続です">条件で分ける</Button>
+              <Button disabled title="条件分岐は共通アクションの契約へ接続中です">条件で分ける（契約接続中）</Button>
               <Button onClick={() => setActions((current) => [...current, newCommonActionStep('wait')])}>待ち時間を入れる</Button>
+              {resources.commonActions.length > 0 ? (
+                <label className="text-ink-secondary flex items-center gap-2 text-sm">
+                  <span>見本から受け渡す</span>
+                  <SelectField className="min-w-48" defaultValue="" onChange={(event) => addExample(event.target.value)} options={[{ value: '', label: '選ぶ' }, ...resources.commonActions.map((item) => ({ value: item.id, label: `${item.name} v${item.version}` }))]} />
+                </label>
+              ) : null}
             </div>
           </section>
         </div>

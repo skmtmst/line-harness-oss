@@ -4,17 +4,19 @@ import SelectField from '@/components/shared/select-field'
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import type { Automation, AutomationAction, Tag } from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
+import type { Automation } from '@line-crm/shared'
+import { api, ApiError, type AutomationDraftDetail } from '@/lib/api'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { CareCard, FeatureLinkCard } from '@/components/shared/side-cards'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAccount } from '@/contexts/account-context'
 // APIの owner/admin 制約は共通アクションと同じ（`requireRole('owner','admin')`）。
 // 同じ判定を2つ持つと、片方だけ直したときに画面ごとに食い違う。
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
 import styles from './new-automation.module.css'
+import Button from '@/components/shared/button'
 
 /**
  * ルールを作る。Pencil ★V6 `Rv8Jv`（25-1-A つくる）。
@@ -53,15 +55,13 @@ const EVENTS: ReadonlyArray<{ value: Automation['eventType']; label: string; not
     label: 'タグが付いた・外れたとき',
     note: '付け外しのどちらでも動きます。付いたときだけに限る条件は、まだ選べません。',
   },
-  {
-    value: 'postback_received',
-    label: 'メニューやボタンが押されたとき',
-    note: 'リッチメニューや選択肢を押したとき。含まれる言葉で絞れます。',
-  },
+  { value: 'form_submitted', label: 'フォームに回答したとき', note: '回答が保存されたとき。フォームを指定できます。' },
+  { value: 'ec.order.confirmed', label: '注文が確定したとき', note: 'EC連携で注文確定が記録された人に動きます。' },
+  { value: 'datetime', label: '決めた時刻になったとき', note: '一度だけ・毎日・毎週から選び、5分刻みで動きます。' },
 ]
 
 /** 言葉で絞れるきっかけ。ほかは本文を持たないので条件欄を出さない。 */
-const KEYWORD_EVENTS: ReadonlyArray<string> = ['message_received', 'postback_received']
+const KEYWORD_EVENTS: ReadonlyArray<string> = ['message_received']
 
 const CONDITION_AXES = [
   ['tag_exists', 'タグを持っている'], ['tag_not_exists', 'タグを持っていない'],
@@ -106,14 +106,20 @@ const newActionDraft = (): ActionDraft => ({
 export default function NewAutomationPage() {
   usePageTitle('ルールを作る')
   const router = useRouter()
+  const { selectedAccountId } = useAccount()
   const canManage = useCanManageCommonActions()
   const [name, setName] = useState('')
   const [eventType, setEventType] = useState<string>(EVENTS[0].value)
   const [keyword, setKeyword] = useState('')
   const [conditionType, setConditionType] = useState<(typeof CONDITION_AXES)[number][0] | ''>('')
   const [conditionValue, setConditionValue] = useState('')
+  const [triggerConfig, setTriggerConfig] = useState<Record<string, unknown>>({})
+  const [scheduleType, setScheduleType] = useState<'datetime' | 'daily' | 'weekly'>('datetime')
+  const [savedDraft, setSavedDraft] = useState<{ id: string; draftVersionId: string } | null>(null)
+  const [previewCount, setPreviewCount] = useState<number | null>(null)
+  const [testFriendId, setTestFriendId] = useState('')
   const [actions, setActions] = useState<ActionDraft[]>([newActionDraft()])
-  const [tags, setTags] = useState<Tag[]>([])
+  const [tags, setTags] = useState<Array<{ id: string; name: string }>>([])
   const [tagsLoading, setTagsLoading] = useState(true)
   const [tagsFailed, setTagsFailed] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -125,11 +131,16 @@ export default function NewAutomationPage() {
     let cancelled = false
     setTagsLoading(true)
     setTagsFailed(false)
-    api.tags
-      .list()
+    if (!selectedAccountId) {
+      setTags([])
+      setTagsLoading(false)
+      return
+    }
+    api.automations
+      .draftResources(selectedAccountId)
       .then((res) => {
         if (cancelled) return
-        if (res.success) setTags(res.data)
+        if (res.success) setTags(res.data.tags)
         else setTagsFailed(true)
       })
       .catch(() => {
@@ -141,7 +152,7 @@ export default function NewAutomationPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [selectedAccountId])
 
   useEffect(() => {
     let cancelled = false
@@ -171,6 +182,43 @@ export default function NewAutomationPage() {
     return row.message.trim() ? '入力したメッセージを送る' : 'メッセージを送る'
   }).join('、')
 
+  useEffect(() => {
+    setTriggerConfig({})
+  }, [eventType])
+
+  const triggerConfigSummary = eventType === 'datetime'
+    ? String(triggerConfig.at ?? '日時を指定')
+    : eventType === 'daily' || eventType === 'weekly'
+      ? String(triggerConfig.time ?? '時刻を指定')
+      : eventType === 'form_submitted'
+        ? String(triggerConfig.formId ?? 'すべてのフォーム')
+        : eventType === 'link_clicked'
+          ? String(triggerConfig.trackedLinkId ?? 'すべての計測リンク')
+          : eventType === 'calendar_booked'
+            ? String(triggerConfig.bookingType ?? 'すべての予約')
+            : ''
+
+  const draftEventType: AutomationDraftDetail['eventType'] = eventType === 'datetime'
+    ? scheduleType
+    : selectedEvent.value as AutomationDraftDetail['eventType']
+  const normalizedTriggerConfig = () => {
+    if (draftEventType === 'message_received') return keyword.trim() ? { keyword: keyword.trim() } : {}
+    if (draftEventType === 'tag_change') return {
+      tagId: String(triggerConfig.tagId ?? ''),
+      action: triggerConfig.action === 'remove' ? 'remove' : 'add',
+    }
+    if (draftEventType === 'datetime') {
+      const local = String(triggerConfig.at ?? '')
+      return { at: local ? new Date(`${local}:00+09:00`).toISOString() : '', friendIds: String(triggerConfig.friendIds ?? '').split(',').map((id) => id.trim()).filter(Boolean) }
+    }
+    if (draftEventType === 'daily' || draftEventType === 'weekly') return {
+      time: String(triggerConfig.time ?? ''),
+      friendIds: String(triggerConfig.friendIds ?? '').split(',').map((id) => id.trim()).filter(Boolean),
+      ...(draftEventType === 'weekly' ? { weekdays: String(triggerConfig.weekdays ?? '').split(',').map(Number).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6) } : {}),
+    }
+    return triggerConfig
+  }
+
   const updateAction = (key: number, patch: Partial<ActionDraft>) =>
     setActions((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)))
 
@@ -196,7 +244,7 @@ export default function NewAutomationPage() {
     return null
   }, [canManage])
 
-  const save = async (andAnother: boolean) => {
+  const save = async (activate: boolean) => {
     if (saving || blockedReason) return
     const invalid = validate()
     if (invalid) {
@@ -208,41 +256,71 @@ export default function NewAutomationPage() {
     setError('')
     setNotice('')
     try {
-      const res = await api.automations.create({
+      if (!selectedAccountId) throw new Error('LINE公式アカウントを選んでください')
+      let draft = savedDraft
+      if (!draft) {
+        const created = await api.automations.createDraftFromTemplate('received-message-tag', selectedAccountId)
+        if (!created.success) throw new Error(created.error)
+        draft = created.data
+      }
+      const conditions = {
+        ...(conditionType && conditionValue.trim() ? { operator: 'AND' as const, rules: [{ type: conditionType, value: conditionType === 'is_following' || conditionType === 'is_hidden' ? conditionValue.trim() === 'true' : conditionValue.trim() }] } : {}),
+      }
+      const res = await api.automations.updateDraft(draft.id, selectedAccountId, {
+        expectedDraftVersionId: draft.draftVersionId,
         name: name.trim(),
-        eventType: selectedEvent.value,
-        conditions: {
-          ...(usesKeyword && keyword.trim() ? { keyword: keyword.trim() } : {}),
-          ...(conditionType && conditionValue.trim() ? { operator: 'AND', rules: [{ type: conditionType, value: conditionType === 'is_following' || conditionType === 'is_hidden' ? conditionValue.trim() === 'true' : conditionValue.trim() }] } : {}),
-        },
+        eventType: draftEventType,
+        triggerConfig: normalizedTriggerConfig(),
+        conditions,
         // すること（アクション）は { type, params } の形で持つ。
         // params の中身は type ごとに違う。
         actions: actions.map(
-          (row): AutomationAction =>
+          (row, index) =>
             row.type === 'add_tag'
-              ? { type: 'add_tag', params: { tagId: row.tagId } }
+              ? { id: `step-${index + 1}`, type: 'add_tag', params: { tagId: row.tagId }, onFailure: 'stop' as const }
               : {
+                  id: `step-${index + 1}`,
                   type: 'send_message',
-                  params: { messageType: 'text', messageContent: row.message.trim() },
+                  params: { messageType: 'text', content: row.message.trim() },
+                  onFailure: 'stop' as const,
                 },
         ),
       })
       if (!res.success) throw new Error(res.error)
-      if (andAnother) {
-        setName('')
-        setKeyword('')
-        setActions([newActionDraft()])
-        setNotice('保存しました。続けて作れます。')
+      setSavedDraft(draft)
+      const preview = await api.automations.audiencePreview(draft.id, selectedAccountId, draft.draftVersionId)
+      if (preview.success) setPreviewCount(preview.data.matched)
+      if (!activate) {
+        setNotice('下書きに保存しました。見込み人数を確認して、1人で試せます。')
         return
       }
-      // 作った行を一覧で目立たせる。どこに増えたのか探させない。
-      router.push(`/automations?highlight=${res.data.id}`)
+      const published = await api.automations.publishDraft(draft.id, selectedAccountId, draft.draftVersionId, true)
+      if (!published.success) throw new Error(published.error)
+      router.push(`/automations?highlight=${draft.id}`)
     } catch (caught) {
       setError(
         caught instanceof ApiError || caught instanceof Error
           ? caught.message
           : '保存できませんでした',
       )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const runOnePersonTest = async () => {
+    if (!savedDraft || !selectedAccountId || !testFriendId.trim()) {
+      setError('下書きを保存して、試す友だちのIDを入力してください')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      const result = await api.automations.test(savedDraft.id, selectedAccountId, testFriendId.trim(), savedDraft.draftVersionId)
+      if (!result.success) throw new Error(result.error)
+      setNotice(`1人テストを受け付けました（状態: ${result.data.status}）`)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '1人テストを実行できませんでした')
     } finally {
       setSaving(false)
     }
@@ -270,7 +348,7 @@ export default function NewAutomationPage() {
             title="どんなときに動かしますか"
             note="何が起きたら動かすか。ここで選んだ出来事が起きた人だけが対象になります。"
           >
-            <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 xl:grid-cols-6">
               {EVENTS.map((event) => (
                 <button
                   key={event.value}
@@ -299,6 +377,23 @@ export default function NewAutomationPage() {
                 />
               </div>
             </div>
+
+            {eventType === 'tag_change' || eventType === 'form_submitted' || eventType === 'datetime' ? (
+              <div className="mt-4 rounded-control border border-hairline bg-canvas-sunken p-3">
+                <p className="text-xs font-semibold text-ink-secondary">きっかけの詳しい設定</p>
+                <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                  {eventType === 'tag_change' ? <SelectField aria-label="きっかけのタグ" value={String(triggerConfig.tagId ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, tagId: e.target.value })} options={[{ value: '', label: 'どのタグか選ぶ' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]} className={styles.select} /> : null}
+                  {eventType === 'tag_change' ? <SelectField aria-label="付いたとき・外れたとき" value={String(triggerConfig.action ?? 'add')} onChange={(e) => setTriggerConfig({ ...triggerConfig, action: e.target.value })} options={[{ value: 'add', label: '付いたとき' }, { value: 'remove', label: '外れたとき' }]} className={styles.select} /> : null}
+                  {eventType === 'form_submitted' ? <TextField aria-label="回答フォーム" placeholder="フォームID（空欄ならすべて）" value={String(triggerConfig.formId ?? '')} onChange={(e) => setTriggerConfig({ formId: e.target.value })} /> : null}
+                  {eventType === 'datetime' ? <SelectField aria-label="時刻の繰り返し" value={scheduleType} onChange={(e) => setScheduleType(e.target.value as typeof scheduleType)} options={[{ value: 'datetime', label: '一度だけ' }, { value: 'daily', label: '毎日' }, { value: 'weekly', label: '毎週' }]} className={styles.select} /> : null}
+                  {eventType === 'datetime' && scheduleType === 'datetime' ? <TextField aria-label="実行日時" type="datetime-local" value={String(triggerConfig.at ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, at: e.target.value })} /> : null}
+                  {eventType === 'datetime' && scheduleType !== 'datetime' ? <TextField aria-label="実行時刻" type="time" step={300} value={String(triggerConfig.time ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, time: e.target.value })} /> : null}
+                  {eventType === 'datetime' && scheduleType === 'weekly' ? <TextField aria-label="曜日" placeholder="曜日番号（例: 1,3 は月・水）" value={String(triggerConfig.weekdays ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, weekdays: e.target.value })} /> : null}
+                  {eventType === 'datetime' ? <TextField aria-label="対象の友だち" placeholder="友だちID（複数はカンマ区切り、最大100人）" value={String(triggerConfig.friendIds ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, friendIds: e.target.value })} /> : null}
+                </div>
+                <p className="mt-2 text-xs text-ink-faint">{triggerConfigSummary}。保存後も設定を確認できます。</p>
+              </div>
+            ) : null}
           </Step>
 
           <Step
@@ -461,10 +556,14 @@ export default function NewAutomationPage() {
 
           <section className={styles.sideCard}>
             <h2 className={styles.sideTitle}>当てはまりそうな人数</h2>
-            <p className={styles.sideMissingValue}>—</p>
+            <p className={styles.sideMissingValue}>{previewCount === null ? '—' : `${previewCount.toLocaleString('ja-JP')}人`}</p>
             <p className={styles.sideMissingNote}>
-              まだ繋がっていません。見込み人数を数える口が接続されると表示されます。
+              {previewCount === null ? '下書きを保存すると、いまの条件で数えます。' : '保存した条件を、選択中のLINEアカウントで数えた結果です。'}
             </p>
+            <div className="mt-3 space-y-2">
+              <TextField aria-label="1人テストの友だちID" value={testFriendId} onChange={(event) => setTestFriendId(event.target.value)} placeholder="試す友だちID" />
+              <Button onClick={() => void runOnePersonTest()} disabled={saving || !savedDraft || !testFriendId.trim()}>1人で試す</Button>
+            </div>
           </section>
 
           <FeatureLinkCard
@@ -478,8 +577,8 @@ export default function NewAutomationPage() {
           <CareCard
             items={[
               {
-                head: 'この画面から作ると有効になります',
-                note: '下書き保存の口は未接続です。作成前に文面とタグを確かめてください。',
+                head: '下書きで確認してから動かせます',
+                note: '下書きを保存すると、見込み人数と1人テストを確認できます。',
               },
               {
                 head: '同じきっかけのルールは両方動きます',
@@ -512,17 +611,17 @@ export default function NewAutomationPage() {
               type="button"
               className={`${styles.action} ${styles.actionSecondary}`}
               disabled={saving || Boolean(blockedReason)}
-              onClick={() => void save(true)}
+              onClick={() => void save(false)}
             >
-              有効にして続けて作る
+              下書きに保存
             </button>
             <button
               type="button"
               className={`${styles.action} ${styles.actionPrimary}`}
               disabled={saving || Boolean(blockedReason)}
-              onClick={() => void save(false)}
+              onClick={() => void save(true)}
             >
-              {saving ? '作成中...' : '作成して有効にする'}
+              {saving ? '作成中...' : 'つくって動かす'}
             </button>
           </>
         }

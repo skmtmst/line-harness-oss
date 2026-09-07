@@ -64,6 +64,13 @@ describe('V6 EC integration screens', () => {
     expect(connector).not.toContain('inbound_secret_encrypted')
   })
 
+  it('shows connector impact and retry policy from the API contract', () => {
+    expect(connector).toContain('Object.values(data?.impact ?? {})')
+    expect(connector).toContain('このつなぎ先を止めると影響する設定・集計です。')
+    expect(connector).toContain('data?.retryPolicy')
+    expect(connector).not.toContain('いま影響件数を数える口は未接続です')
+  })
+
   it('reads the normalized order/action mouths and retries only retryable failures', () => {
     expect(api).toContain('/api/ec-commerce/orders?')
     expect(api).toContain('/api/ec-commerce/action-executions?')

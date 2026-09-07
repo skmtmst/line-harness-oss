@@ -11,7 +11,7 @@ type OutboxRow = {
 
 type RecipientRow = { email: string | null; line_user_id: string | null };
 
-async function sendEmail(
+export async function sendOperationEmail(
   env: Env['Bindings'],
   input: { to: string; subject: string; body: string },
 ): Promise<void> {
@@ -70,7 +70,7 @@ export async function processOperationNotificationOutbox(
         }
       } else {
         for (const recipient of recipients.results ?? []) {
-          if (recipient.email) await sendEmail(env, { to: recipient.email, subject: '【然-NEN-】運用状態の重要なお知らせ', body: text });
+          if (recipient.email) await sendOperationEmail(env, { to: recipient.email, subject: '【然-NEN-】運用状態の重要なお知らせ', body: text });
         }
       }
       await env.DB.prepare(

@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 261,
+  "compared": 262,
   "unimplemented": 1,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 10,
-  "match": 219,
-  "structureMatchDataPending": 45,
+  "missing": 9,
+  "match": 228,
+  "structureMatchDataPending": 36,
   "needsFix": 2,
   "unjudged": 1,
-  "remaining": 49,
+  "remaining": 40,
   "features": [
     {
       "feature": 1,
@@ -332,11 +332,11 @@
       "feature": 4,
       "name": "友だち属性",
       "total": 21,
-      "compared": 15,
+      "compared": 16,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 6,
+      "missing": 5,
       "match": 14,
       "structureMatchDataPending": 3,
       "needsFix": 0,
@@ -1599,12 +1599,21 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 8,
-      "structureMatchDataPending": 1,
+      "match": 9,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 1,
+      "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1224,
+          "head": "3ddca80cc4",
+          "on": "2026-09-07",
+          "screens": [
+            "kQ1bs"
+          ],
+          "note": "Issue #440 / PR #1224。取り込み済みの固定データを表示した対象条件画面を3104/8791で1440・1920px撮影し、横はみ出し0で一致へ更新した。"
+        },
         {
           "pr": 1191,
           "head": "e98decafa",
@@ -2691,12 +2700,22 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 2,
-      "structureMatchDataPending": 2,
+      "match": 4,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 2,
+      "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1224,
+          "head": "3ddca80cc4",
+          "on": "2026-09-07",
+          "screens": [
+            "bfB50",
+            "oHAN4"
+          ],
+          "note": "Issue #440 / PR #1224。月別集計、下流影響件数、再試行方針を実API応答へ接続し、3104/8791で通常・読込・空・失敗・権限不足を1440・1920px撮影。全状態で横はみ出し0、一致へ更新した。"
+        },
         {
           "pr": 1190,
           "head": "88673e254",
@@ -2746,12 +2765,21 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 3,
-      "structureMatchDataPending": 3,
+      "match": 6,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 3,
+      "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1224,
+          "head": "3ddca80cc4",
+          "on": "2026-09-07",
+          "screens": [
+            "Q55bb"
+          ],
+          "note": "Issue #440 / PR #1224。公開版・下書きとテスト送信結果を実API応答へ接続し、3104/8791で1440・1920px撮影。横はみ出し0で一致へ更新した。"
+        },
         {
           "pr": 1076,
           "head": "8e7c374991",
@@ -2815,12 +2843,23 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 5,
-      "structureMatchDataPending": 3,
+      "match": 7,
+      "structureMatchDataPending": 1,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 3,
+      "remaining": 1,
       "capturedAt": [
+        {
+          "pr": 0,
+          "head": "e20d921b8",
+          "on": "2026-09-07",
+          "screens": [
+            "Rv8Jv",
+            "DkPY0",
+            "py5CG"
+          ],
+          "note": "Issue #438。6種のきっかけ、下書き保存・見込み人数・1人テスト、実行詳細と失敗処理だけの安全な再実行、共通アクション複製を接続し、3105/8792で1440/1920pxを撮影。全画像で横はみ出し0。"
+        },
         {
           "pr": 502,
           "head": "75b010fc",
@@ -2988,6 +3027,18 @@
       "unjudged": 0,
       "remaining": 5,
       "capturedAt": [
+        {
+          "pr": 0,
+          "head": "e20d921b8",
+          "on": "2026-09-07",
+          "screens": [
+            "TnDbq",
+            "GFDqW",
+            "GfceK",
+            "Lg8ff"
+          ],
+          "note": "Issue #438。予約詳細の安定した操作、代理予約の確認・完了・409回復を3105/8792で1440/1920px撮影。全画像で横はみ出し0。APIが返さない顧客カルテ、通知実績、競合詳細は各画面の判定注記へ記録した。"
+        },
         {
           "pr": 459,
           "head": "ba0bf62d",
@@ -3241,12 +3292,21 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 1,
+      "match": 1,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 1,
+      "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1224,
+          "head": "3ddca80cc4",
+          "on": "2026-09-07",
+          "screens": [
+            "c4R6F"
+          ],
+          "note": "Issue #440 / PR #1224。機能別の利用中・作成数を実API応答へ接続し、3104/8791で1440・1920px撮影。横はみ出し0で一致へ更新した。"
+        },
         {
           "pr": 478,
           "head": "66883866",
