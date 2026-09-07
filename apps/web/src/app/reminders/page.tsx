@@ -1,11 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { CalendarClock, History, MoreHorizontal, Trash2 } from 'lucide-react'
-import type { Folder, ReminderTriggerType } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import type { ApiResponse, Folder, ReminderTriggerType } from '@line-crm/shared'
+import { api, fetchApi } from '@/lib/api'
+import { useOffsetServerList, type ServerListResponse } from '@/lib/use-server-list'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import ListKpis from '@/components/shared/list-kpis'
@@ -53,15 +54,12 @@ export default function RemindersPage() {
   usePageTitle('リマインダ')
   const router = useRouter()
   const { selectedAccountId } = useAccount()
-  const [reminders, setReminders] = useState<Reminder[]>([])
   const [folders, setFolders] = useState<Folder[]>([])
   const [nameQuery, setNameQuery] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const deferredNameQuery = useDeferredValue(nameQuery.trim())
   const [folderFilter, setFolderFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
-  const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -77,13 +75,33 @@ export default function RemindersPage() {
       else setFoldersError(true)
     } catch { setFoldersError(true) }
   }, [])
-  const loadReminders = useCallback(async () => {
-    setLoading(true); setError('')
-    try { const res = await api.reminders.list({ accountId: selectedAccountId || undefined }); if (res.success) setReminders(res.data as unknown as Reminder[]); else setError(res.error) }
-    catch { setError(`${LIST_STATE_PRESETS.error.title}。${LIST_STATE_PRESETS.error.description}`) }
-    finally { setLoading(false) }
-  }, [selectedAccountId])
-  useEffect(() => { void loadReminders(); void loadFolders() }, [loadReminders, loadFolders])
+  const loadReminderPage = useCallback(async (
+    request: { page: number; limit: number },
+    signal: AbortSignal,
+  ): Promise<ServerListResponse<Reminder>> => {
+    const query = new URLSearchParams({
+      page: String(request.page),
+      limit: String(request.limit),
+    })
+    if (selectedAccountId) query.set('lineAccountId', selectedAccountId)
+    if (deferredNameQuery) query.set('q', deferredNameQuery)
+    if (folderFilter) query.set('folderId', folderFilter)
+    if (statusFilter) {
+      query.set('status', statusFilter === '有効' ? 'active' : statusFilter === '下書き' ? 'draft' : statusFilter === '停止中' ? 'stopped' : 'failed')
+    }
+    const response = await fetchApi<ApiResponse<ServerListResponse<Reminder>>>(`/api/reminders?${query}`, { signal })
+    if (!response.success) throw new Error(response.error)
+    return response.data
+  }, [deferredNameQuery, folderFilter, selectedAccountId, statusFilter])
+  const reminderList = useOffsetServerList({
+    requestKey: JSON.stringify([selectedAccountId, deferredNameQuery, folderFilter, statusFilter]),
+    load: loadReminderPage,
+    initialLimit: PER_PAGE,
+  })
+  const reminders = reminderList.items
+  const loading = reminderList.loading
+  const error = reminderList.error
+  useEffect(() => { void loadFolders() }, [loadFolders])
 
   const [moveError, setMoveError] = useState('')
   /** 一覧の行操作からフォルダを付け替える受け口。失敗は黙らせず文面で知らせる。 */
@@ -92,7 +110,7 @@ export default function RemindersPage() {
     try {
       const response = await api.reminders.update(id, { folderId: folderId || null })
       if (!response.success) throw new Error(response.error)
-      await loadReminders()
+      reminderList.retry()
     } catch {
       setMoveError('フォルダを変えられませんでした。読み直してお試しください。')
     }
@@ -111,28 +129,17 @@ export default function RemindersPage() {
       if (failed.length > 0) {
         setSelected(new Set(failed))
         setDeleteError(failed.length === targets.length ? '選択したリマインダを削除できませんでした。状態を読み直してから、もう一度お試しください。' : `${failed.length}件のリマインダを削除できませんでした。削除できなかったものだけを残しています。`)
-        await loadReminders()
+        reminderList.retry()
         return
       }
       setConfirmOpen(false)
       setSelected(new Set())
-      await loadReminders()
+      reminderList.retry()
     } finally { setDeleting(false) }
   }
 
-  const filtered = useMemo(() => reminders.filter((reminder) => {
-    if (folderFilter === UNFILED && reminder.folderId) return false
-    if (folderFilter && folderFilter !== UNFILED && reminder.folderId !== folderFilter) return false
-    const view = rowView(reminder)
-    if (statusFilter === '失敗あり' && !reminder.hasFailure) return false
-    if (statusFilter && statusFilter !== '失敗あり' && view.status !== statusFilter) return false
-    return !nameQuery.trim() || `${reminder.name} ${reminder.description ?? ''}`.toLowerCase().includes(nameQuery.trim().toLowerCase())
-  }), [reminders, folderFilter, statusFilter, nameQuery])
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PER_PAGE))
-  const current = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE)
-
   const selectedName = reminders.find((item) => selected.has(item.id))?.name ?? ''
-  const listTotal = (folders[0] as VisualFolder | undefined)?.listTotal ?? reminders.length
+  const listTotal = (folders[0] as VisualFolder | undefined)?.listTotal ?? reminderList.total
   return <div data-design-node="M1EXwB" data-design="Head">
     {folderDialogOpen ? <FolderAddDialog kind="reminder" note="リマインダを整理するフォルダです。" placeholder="例：予約" onClose={() => setFolderDialogOpen(false)} onAdded={() => void loadFolders()} /> : null}
     <div data-design="KPIs"><ListKpis variant="v6" accountId={selectedAccountId} titles={['リマインダ数','送信予定','今月の送信','失敗']} build={(stats) => {
@@ -140,14 +147,14 @@ export default function RemindersPage() {
       return [{ title: 'リマインダ数', value: reminderStats.total, unit: '件', detail: `有効 ${reminderStats.active}件` }, { title: '送信予定', value: reminderStats.waiting, unit: '通', detail: '今後7日' }, { title: '今月の送信', value: reminderStats.sentThisMonth, unit: '通', detail: '正常送信' }, { title: '失敗', value: reminderStats.failed ?? null, unit: '通', detail: '要確認' }]
     }} /></div>
     <div className="mb-3 flex gap-2"><Button onClick={() => setFolderDialogOpen(true)}>フォルダを追加</Button><Button href="/reminders/new" variant="primary">リマインダを作成</Button></div>
-    {error ? <div className="bg-danger-bg text-danger mb-3 rounded-lg p-3 text-sm">{error}</div> : null}
+    {error ? <div className="bg-danger-bg text-danger mb-3 rounded-lg p-3 text-sm">{LIST_STATE_PRESETS.error.title}。{LIST_STATE_PRESETS.error.description}</div> : null}
     {moveError ? <div className="bg-danger-bg text-danger mb-3 rounded-lg p-3 text-sm">{moveError}</div> : null}
     <div data-design="Body" className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
       {foldersError ? <div className="bg-danger-bg text-danger rounded-lg p-3 text-sm lg:col-span-2">フォルダを読み込めませんでした。<Button className="ml-2" onClick={() => void loadFolders()}>フォルダを再読み込み</Button></div> : null}
       <FolderPanel
         total={loading || error ? '—' : `${listTotal}件`}
         activeId={folderFilter}
-        onSelect={(id) => { setFolderFilter(id); setPage(1) }}
+        onSelect={setFolderFilter}
         rows={[
           { id: '', label: 'すべて', count: listTotal },
           ...folders.map((folder) => ({
@@ -166,10 +173,10 @@ export default function RemindersPage() {
         </div>
         <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
           <table className="w-full table-fixed text-left text-xs"><thead className="bg-canvas-sunken text-ink-faint"><TableHeadRow><Th className="w-[31%]">リマインダ名</Th><Th className="w-1/12">状態</Th><Th className="w-1/5">基準日</Th><Th className="w-1/12">予定</Th><Th className="w-1/6">最終送信</Th><Th className="w-1/12" align="center">操作</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">
-            {loading ? <tr><td colSpan={6} className="px-4 py-14 text-center"><b className="block text-ink">読み込んでいます</b><span className="text-ink-faint mt-1 block">このまま少しお待ちください。</span></td></tr> : current.length === 0 ? <tr><td colSpan={6} className="px-4 py-14 text-center">{error ? <><b className="block text-ink">表示できませんでした</b><span className="text-ink-faint mt-1 block">再読み込みしても直らないときは、エラー報告へお知らせください。</span><Button className="mt-3" onClick={() => void loadReminders()}>もう一度読み込む</Button><span hidden>上の案内をご覧ください</span></> : reminders.length === 0 ? <><b className="block text-ink">まだリマインダがありません</b><span className="text-ink-faint mt-1 block">日付を決めておくと、その前と後に自動で送れます。上の「リマインダを作成」から始められます。</span><span hidden>リマインダがありません。「＋ 新しいリマインダ」から作成してください。</span></> : 'この条件に合うリマインダはありません。'}</td></tr> : current.map((reminder) => { const view = rowView(reminder); return <tr key={reminder.id} className="hover:bg-canvas-sunken"><td className="px-3 py-3"><Link href={`/reminders/edit?id=${reminder.id}`} className="text-action block truncate font-bold" title={reminder.name}>{reminder.name}</Link><span className="text-ink-faint text-micro mt-1 block truncate" title={view.subtitle}>{view.subtitle}</span></td><td><Pill tone={view.status === '有効' ? 'success' : view.status === '下書き' ? 'warning' : 'neutral'}>{view.status}</Pill></td><td className="truncate pr-2" title={view.base}>{view.base}</td><td>{view.planned}</td><td>{view.last}</td><td className="text-center"><div className="relative inline-flex items-center justify-center"><IconButton aria-label={`${reminder.name}を削除`} title={`${reminder.name}を削除`} className="text-danger" onClick={() => { setSelected(new Set([reminder.id])); setDeleteError(''); setConfirmOpen(true) }}><Trash2 /></IconButton><IconButton aria-label={`${reminder.name}のその他操作`} title={`${reminder.name}のその他操作`} onClick={() => setOpenMenuId((currentId) => currentId === reminder.id ? null : reminder.id)}><MoreHorizontal /></IconButton><ActionMenu open={openMenuId === reminder.id} ariaLabel={`${reminder.name}の操作`} onClose={() => setOpenMenuId(null)} items={[{ id: 'planned', label: '配信予定を確認', icon: <CalendarClock />, onSelect: () => router.push(`/reminders/detail?id=${encodeURIComponent(reminder.id)}&status=planned`) }, { id: 'history', label: '実行履歴を見る', icon: <History />, onSelect: () => router.push(`/reminders/detail?id=${encodeURIComponent(reminder.id)}`) }]} /></div></td></tr> })}
+            {loading ? <tr><td colSpan={6} className="px-4 py-14 text-center"><b className="block text-ink">読み込んでいます</b><span className="text-ink-faint mt-1 block">このまま少しお待ちください。</span></td></tr> : reminders.length === 0 ? <tr><td colSpan={6} className="px-4 py-14 text-center">{error ? <><b className="block text-ink">表示できませんでした</b><span className="text-ink-faint mt-1 block">再読み込みしても直らないときは、エラー報告へお知らせください。</span><Button className="mt-3" onClick={reminderList.retry}>もう一度読み込む</Button><span hidden>上の案内をご覧ください</span></> : nameQuery.trim() || folderFilter || statusFilter ? 'この条件に合うリマインダはありません。' : <><b className="block text-ink">まだリマインダがありません</b><span className="text-ink-faint mt-1 block">日付を決めておくと、その前と後に自動で送れます。上の「リマインダを作成」から始められます。</span><span hidden>リマインダがありません。「リマインダを作成」から作成してください。</span></>}</td></tr> : reminders.map((reminder) => { const view = rowView(reminder); return <tr key={reminder.id} className="hover:bg-canvas-sunken"><td className="px-3 py-3"><Link href={`/reminders/edit?id=${reminder.id}`} className="text-action block truncate font-bold" title={reminder.name}>{reminder.name}</Link><span className="text-ink-faint text-micro mt-1 block truncate" title={view.subtitle}>{view.subtitle}</span></td><td><Pill tone={view.status === '有効' ? 'success' : view.status === '下書き' ? 'warning' : 'neutral'}>{view.status}</Pill></td><td className="truncate pr-2" title={view.base}>{view.base}</td><td>{view.planned}</td><td>{view.last}</td><td className="text-center"><div className="relative inline-flex items-center justify-center"><IconButton aria-label={`${reminder.name}を削除`} title={`${reminder.name}を削除`} className="text-danger" onClick={() => { setSelected(new Set([reminder.id])); setDeleteError(''); setConfirmOpen(true) }}><Trash2 /></IconButton><IconButton aria-label={`${reminder.name}のその他操作`} title={`${reminder.name}のその他操作`} onClick={() => setOpenMenuId((currentId) => currentId === reminder.id ? null : reminder.id)}><MoreHorizontal /></IconButton><ActionMenu open={openMenuId === reminder.id} ariaLabel={`${reminder.name}の操作`} onClose={() => setOpenMenuId(null)} items={[{ id: 'planned', label: '配信予定を確認', icon: <CalendarClock />, onSelect: () => router.push(`/reminders/detail?id=${encodeURIComponent(reminder.id)}&status=planned`) }, { id: 'history', label: '実行履歴を見る', icon: <History />, onSelect: () => router.push(`/reminders/detail?id=${encodeURIComponent(reminder.id)}`) }]} /></div></td></tr> })}
           </tbody></table>
         </div>
-        <div className="mt-3"><Pagination page={page} pageCount={pageCount} onPageChange={setPage} /></div>
+        <div className="mt-3"><Pagination page={reminderList.page} pageCount={reminderList.pageCount} onPageChange={reminderList.setPage} disabled={loading} /></div>
       </div>
     </div>
     <ConfirmDialog open={confirmOpen} title={`「${selectedName}」を削除しますか？`} description="削除すると未送信の通知予定はすべて取り消されます。送信済みの履歴は監査記録として残り、この操作は取り消せません。" confirmLabel="削除する" destructive busy={deleting} error={deleteError} onConfirm={() => void handleDeleteSelected()} onCancel={() => { if (!deleting) { setConfirmOpen(false); setDeleteError('') } }} />

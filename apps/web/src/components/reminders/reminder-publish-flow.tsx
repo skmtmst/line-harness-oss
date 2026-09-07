@@ -13,6 +13,16 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 
 export type ReminderPublishStage = 'target' | 'preview' | 'test' | 'confirm' | 'done'
 
+export function reminderAudienceCounts(validation: ReminderValidationResult | null) {
+  const matched = validation?.audience.matched ?? null
+  const excluded = validation?.audience.excluded ?? null
+  return {
+    matched,
+    excluded,
+    total: matched == null || excluded == null ? null : matched + excluded,
+  }
+}
+
 function formatDateTime(value: string | null | undefined): string {
   if (!value) return '—'
   const date = new Date(value)
@@ -43,6 +53,7 @@ export default function ReminderPublishFlow({ reminderId, stage }: { reminderId:
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [testConfirm, setTestConfirm] = useState(false)
+  const [testRecipientName, setTestRecipientName] = useState<string | null>(null)
 
   const go = useCallback((next: ReminderPublishStage) => router.push(`/reminders/edit?id=${encodeURIComponent(reminderId)}&stage=${next}`), [reminderId, router])
   const loadDraft = useCallback(async () => {
@@ -60,7 +71,7 @@ export default function ReminderPublishFlow({ reminderId, stage }: { reminderId:
     void api.reminders.previewDraft(reminderId).then((response) => { if (response.success) setPreview(response.data); else setError(response.error) }).catch(() => setError('配信予定を確認できませんでした。'))
   }, [reminderId, settings, stage])
   useEffect(() => {
-    if (!settings || (stage !== 'confirm' && stage !== 'done')) return
+    if (!settings || (stage !== 'target' && stage !== 'confirm' && stage !== 'done')) return
     void api.reminders.validateDraft(reminderId).then((response) => { if (response.success) setValidation(response.data); else setError(response.error) }).catch(() => setError('有効化前チェックを実行できませんでした。'))
   }, [reminderId, settings, stage])
 
@@ -76,6 +87,7 @@ export default function ReminderPublishFlow({ reminderId, stage }: { reminderId:
       const response = await api.reminders.testDraft(reminderId, crypto.randomUUID())
       if (!response.success) throw new Error(response.error)
       setDraft((current) => current ? { ...current, lastTestStatus: 'succeeded', lastTestedAt: response.data.testedAt } : current)
+      setTestRecipientName(response.data.recipientName)
       setTestConfirm(false)
     } catch { setError('テスト送信に失敗しました。LINE連携と通知内容を確認してください。') } finally { setBusy(false) }
   }
@@ -94,20 +106,22 @@ export default function ReminderPublishFlow({ reminderId, stage }: { reminderId:
     <div data-reminder-publish-stage={stage}>
       <ReminderWizard current={current} />
       {error ? <p className="bg-danger-bg text-danger mb-3 rounded-lg p-3 text-sm">{error}</p> : null}
-      {stage === 'target' ? <TargetStage settings={settings} onChange={setSettings} onNext={() => void saveTarget()} busy={busy} /> : null}
+      {stage === 'target' ? <TargetStage settings={settings} validation={validation} onChange={setSettings} onNext={() => void saveTarget()} busy={busy} /> : null}
       {stage === 'preview' ? <PreviewStage settings={settings} preview={preview} onNext={() => go('test')} /> : null}
-      {stage === 'test' ? <TestStage draft={draft} onConfirm={() => setTestConfirm(true)} onNext={() => go('confirm')} /> : null}
+      {stage === 'test' ? <TestStage draft={draft} recipientName={testRecipientName} onConfirm={() => setTestConfirm(true)} onNext={() => go('confirm')} /> : null}
       {stage === 'confirm' ? <ConfirmStage draft={draft} settings={settings} validation={validation} onPublish={() => void publishDraft()} busy={busy} /> : null}
       {stage === 'done' ? <DoneStage draft={draft} published={published} preview={preview} validation={validation} /> : null}
-      <ConfirmDialog open={testConfirm} title="テスト送信しますか？" description="Kenta Kawanoさんへ確認用メッセージを1通送信します。" confirmLabel="テスト送信" cancelLabel="配信予定へ戻る" busy={busy} onConfirm={() => void sendTest()} onCancel={() => setTestConfirm(false)} />
+      <ConfirmDialog open={testConfirm} title="テスト送信しますか？" description="自分のLINEへ確認用メッセージを1通送信します。" confirmLabel="テスト送信" cancelLabel="配信予定へ戻る" busy={busy} onConfirm={() => void sendTest()} onCancel={() => setTestConfirm(false)} />
     </div>
   )
 }
 
-function TargetStage({ settings, onChange, onNext, busy }: { settings: ReminderDraftSettings; onChange: (value: ReminderDraftSettings) => void; onNext: () => void; busy: boolean }) {
+export function TargetStage({ settings, validation, onChange, onNext, busy }: { settings: ReminderDraftSettings; validation: ReminderValidationResult | null; onChange: (value: ReminderDraftSettings) => void; onNext: () => void; busy: boolean }) {
   const stop = settings.stopConditions
-  return <div data-design-node="s7T2dz"><ReminderWorkspace aside={<><SummaryCard rows={[["基準日", '予約日時（Google Meet相談）'], ['対象者', '398人'], ['通知ステップ', '3件'], ['停止条件', '4件']]} /><ReminderPanel title="安全な運用" note="誤送信を防ぐための設定です。"><ul className="text-ink-secondary space-y-2 text-xs"><li>● 基準日が空欄なら開始しない</li><li>● 過去日時の通知は送らない</li><li>● 同じ時刻の重複送信をまとめる</li></ul></ReminderPanel></>}>
-    <ReminderPanel title="対象者の条件" note="どの友だちにリマインダを開始するか設定します。"><div className="rounded-lg border border-hairline p-3 text-xs"><b>予約ステータス「確定」かつ 担当者「河野」</b><div className="mt-3 grid grid-cols-3 gap-2"><Metric label="条件一致" value="426人" /><Metric label="開始予定" value="398人" success /><Metric label="除外" value="28人" warning /></div><p className="text-info mt-3">基準日が登録・変更された時点で対象を自動再判定します。</p></div></ReminderPanel>
+  const audience = reminderAudienceCounts(validation)
+  const stopCount = Object.values(stop).filter((value) => value === true || typeof value === 'number').length
+  return <div data-design-node="s7T2dz"><ReminderWorkspace aside={<><SummaryCard rows={[["基準日", '予約日時（Google Meet相談）'], ['対象者', countLabel(audience.matched, '人')], ['通知ステップ', `${settings.steps.length}件`], ['停止条件', `${stopCount}件`]]} /><ReminderPanel title="安全な運用" note="誤送信を防ぐための設定です。"><ul className="text-ink-secondary space-y-2 text-xs"><li>● 基準日が空欄なら開始しない</li><li>● 過去日時の通知は送らない</li><li>● 同じ時刻の重複送信をまとめる</li></ul></ReminderPanel></>}>
+    <ReminderPanel title="対象者の条件" note="どの友だちにリマインダを開始するか設定します。"><div className="rounded-lg border border-hairline p-3 text-xs"><b>下書きに保存した対象条件</b><div className="mt-3 grid grid-cols-3 gap-2"><Metric label="条件一致" value={countLabel(audience.total, '人')} /><Metric label="開始予定" value={countLabel(audience.matched, '人')} success /><Metric label="除外" value={countLabel(audience.excluded, '人')} warning /></div><p className="text-info mt-3">{validation ? '公開前チェックの最新結果です。' : '公開前チェックを実行しています。'} 基準日が登録・変更された時点で対象を自動再判定します。</p></div></ReminderPanel>
     <ReminderPanel title="終了・停止条件" note="不要になった通知を自動で止めます。"><div className="divide-y divide-hairline">{[["bookingCancelled",'予約がキャンセルされた','即時停止'],['supportMarkCompleted','対応マークが「完了」になった','残りを停止'],['daysAfterTarget','基準日を過ぎて7日経過','自動終了'],['friendBlocked','友だちがブロックした','即時停止']].map(([key,label,result]) => <label key={key} className="flex items-center gap-3 py-3 text-xs"><input type="checkbox" checked={key === 'daysAfterTarget' ? stop.daysAfterTarget != null : Boolean(stop[key as keyof typeof stop])} onChange={(event) => onChange({ ...settings, stopConditions: { ...stop, [key]: key === 'daysAfterTarget' ? event.target.checked ? 7 : null : event.target.checked } })} /><span className="flex-1 font-medium">{label}</span><Pill tone="success">{result}</Pill></label>)}</div></ReminderPanel>
     <ReminderPanel title="完了後のアクション"><p className="text-xs">対応マークを「フォロー済み」に変更</p></ReminderPanel>
     <ReminderFooter primary={busy ? '保存中…' : '配信予定へ'} primaryDisabled={busy} onPrimary={onNext} />
@@ -123,11 +137,13 @@ function PreviewStage({ settings, preview, onNext }: { settings: ReminderDraftSe
   </ReminderWorkspace></div>
 }
 
-function TestStage({ draft, onConfirm, onNext }: { draft: ReminderDraftVersion; onConfirm: () => void; onNext: () => void }) {
-  return <div data-design-node="W98zZQ"><ReminderWorkspace aside={<><SummaryCard rows={[["本番への影響", 'なし'], ['送信数', '1通'], ['送信先', 'Kenta Kawano'], ['送信方法', 'LINE公式']]} /><LinePreview caption="［テスト］いますぐ届きます">［テスト］Kentaさん、明日のGoogle Meet相談のご案内です。{`\n`}日時：8/24（月）18:00{`\n`}参加URL：meet.google.com/test-0000{`\n\n`}Google Meetに参加</LinePreview></>}>
-    <ReminderPanel title="テスト対象" note="自分のLINEへ確認用メッセージを送ります。"><dl className="grid grid-cols-2 gap-3 text-xs"><Metric label="送信先" value="Kenta Kawano" /><Metric label="テスト日時" value="8/23 01:30" /></dl></ReminderPanel>
-    <ReminderPanel title="差し込み値の確認" note="テストで使う値と、本番でどこから取るかを並べて確認します。"><table className="w-full text-left text-xs"><thead><TableHeadRow><Th>変数</Th><Th>テストで使う値</Th><Th>本番での取得元</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline"><tr><td className="py-2">名前</td><td>Kenta</td><td>友だちのLINE表示名</td></tr><tr><td className="py-2">相談の日時</td><td>8/24（月）18:00</td><td>予約管理の予約日時</td></tr><tr><td className="py-2">参加URL</td><td>meet.google.com/test-0000</td><td>予約ごとに発行されるMeet URL</td></tr></tbody></table></ReminderPanel>
-    <ReminderPanel title="テスト送信の履歴" note="有効化するには、直近のテストが成功している必要があります。" action={<Pill tone="success">直近のテストは成功</Pill>}><table className="w-full text-left text-xs"><thead><TableHeadRow><Th>送信日時</Th><Th>送信した通知・宛先</Th><Th>結果</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline"><tr><td className="py-2">8/23 01:30</td><td>1通目・前日のお知らせ ／ Kenta Kawano</td><td><Pill tone="success">送信できました</Pill></td></tr><tr><td className="py-2">8/22 22:10</td><td>2通目・1時間前のお知らせ ／ Kenta Kawano</td><td><Pill tone="success">送信できました</Pill></td></tr><tr><td className="py-2">8/22 21:45</td><td>1通目・前日のお知らせ ／ Kenta Kawano</td><td><Pill tone="warning">変数が空でした</Pill></td></tr></tbody></table></ReminderPanel>
+export function TestStage({ draft, recipientName, onConfirm, onNext }: { draft: ReminderDraftVersion; recipientName: string | null; onConfirm: () => void; onNext: () => void }) {
+  const testedAt = formatDateTime(draft.lastTestedAt)
+  const recipient = recipientName ?? 'テスト送信後に表示'
+  return <div data-design-node="W98zZQ"><ReminderWorkspace aside={<><SummaryCard rows={[["本番への影響", 'なし'], ['送信数', '1通'], ['送信先', recipient], ['送信方法', 'LINE公式']]} /><LinePreview caption="［テスト］表示例">［テスト］名前さん、明日のGoogle Meet相談のご案内です。{`\n`}日時：相談の日時{`\n`}参加URL：参加URL{`\n\n`}Google Meetに参加</LinePreview></>}>
+    <ReminderPanel title="テスト対象" note="自分のLINEへ確認用メッセージを送ります。"><dl className="grid grid-cols-2 gap-3 text-xs"><Metric label="送信先" value={recipient} /><Metric label="最終テスト日時" value={testedAt} /></dl></ReminderPanel>
+    <ReminderPanel title="差し込み値の確認" note="口に保存されていない値は表示例です。本番でどこから取るかを並べて確認します。"><table className="w-full text-left text-xs"><thead><TableHeadRow><Th>変数</Th><Th>テストで使う値（表示例）</Th><Th>本番での取得元</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline"><tr><td className="py-2">名前</td><td>Kenta</td><td>友だちのLINE表示名</td></tr><tr><td className="py-2">相談の日時</td><td>8/24（月）18:00</td><td>予約管理の予約日時</td></tr><tr><td className="py-2">参加URL</td><td>meet.google.com/test-0000</td><td>予約ごとに発行されるMeet URL</td></tr></tbody></table></ReminderPanel>
+    <ReminderPanel title="テスト送信の履歴" note="下書きに記録された直近のテストだけを表示します。" action={draft.lastTestStatus === 'succeeded' ? <Pill tone="success">直近のテストは成功</Pill> : undefined}><table className="w-full text-left text-xs"><thead><TableHeadRow><Th>送信日時</Th><Th>送信した通知・宛先</Th><Th>結果</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline"><tr><td className="py-2">{testedAt}</td><td>下書きの通知 ／ {recipient}</td><td><Pill tone={draft.lastTestStatus === 'succeeded' ? 'success' : 'warning'}>{draft.lastTestStatus === 'succeeded' ? '送信できました' : '成功記録なし'}</Pill></td></tr></tbody></table></ReminderPanel>
     <ReminderFooter status={draft.lastTestStatus === 'succeeded' ? `テスト済み ${formatDateTime(draft.lastTestedAt)}` : '下書き保存'} secondary={{ label: 'テスト送信', onClick: onConfirm }} primary="最終確認へ" primaryDisabled={draft.lastTestStatus !== 'succeeded'} onPrimary={onNext} />
   </ReminderWorkspace></div>
 }

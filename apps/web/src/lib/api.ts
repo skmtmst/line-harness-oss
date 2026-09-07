@@ -14,12 +14,6 @@ import type {
   AutoReplyPublishResult,
   AutoReplyValidationResult,
   Friend,
-  FriendAddRouting,
-  FriendAddRoutingDraftTestResult,
-  FriendAddRoutingPublishResult,
-  FriendAddRoutingValidation,
-  FriendAddRoutingVersion,
-  FriendAddEventList,
   FriendAddEventKind,
   FriendAddEventAttributionStatus,
   FriendAddEventRoutingStatus,
@@ -7078,87 +7072,9 @@ export const api = {
     },
   },
   /**
-   * 友だち追加時の配信の振り分け（設計 V2 4-6）。
-   *
-   * `configured: false` は「まだ決めていない」。このときは従来どおり
-   * 有効な friend_add シナリオが全部流れている。
-   *
-   * @deprecated 旧互換。新契約は `friendAddRules` が正本。設定画面からの
-   * 参照は 0 件 (契約テストで保証)。Worker 側の旧口は webhook の実行経路が
-   * 使っているため残す。削除は司令塔の判断待ち (#542)。
+   * @deprecated 旧互換の `friendAddRouting` client は #560 で削除済み。
+   * 以後はこの V6 rules/runs 契約だけを使う。
    */
-  friendAddRouting: {
-    get: (accountId: string) =>
-      fetchApi<ApiResponse<{
-        configured: boolean
-        routing: FriendAddRouting
-        scenarios: { id: string; name: string }[]
-        tags: { id: string; name: string }[]
-      }>>(`/api/friend-add-routing?account_id=${encodeURIComponent(accountId)}`),
-    save: (accountId: string, routing: FriendAddRouting) =>
-      fetchApi<ApiResponse<{ routing: FriendAddRouting }>>(
-        `/api/friend-add-routing?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'PUT', body: JSON.stringify({ routing }) },
-      ),
-    getDraft: (accountId: string) =>
-      fetchApi<ApiResponse<FriendAddRoutingVersion>>(
-        `/api/friend-add-routing/draft?account_id=${encodeURIComponent(accountId)}`,
-      ),
-    saveDraft: (accountId: string, routing: FriendAddRouting) =>
-      fetchApi<ApiResponse<FriendAddRoutingVersion>>(
-        `/api/friend-add-routing/draft?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'PUT', body: JSON.stringify({ routing }) },
-      ),
-    validateDraft: (accountId: string) =>
-      fetchApi<ApiResponse<FriendAddRoutingValidation>>(
-        `/api/friend-add-routing/validate?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'POST' },
-      ),
-    conflicts: (accountId: string) =>
-      fetchApi<ApiResponse<{ conflicts: FriendAddRoutingValidation['conflicts'] }>>(
-        `/api/friend-add-routing/conflicts?account_id=${encodeURIComponent(accountId)}`,
-      ),
-    testDraft: (accountId: string, friendId: string) =>
-      fetchApi<ApiResponse<FriendAddRoutingDraftTestResult>>(
-        `/api/friend-add-routing/draft/test?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'POST', body: JSON.stringify({ friendId }) },
-      ),
-    publish: (accountId: string, idempotencyKey: string) =>
-      fetchApi<ApiResponse<FriendAddRoutingPublishResult>>(
-        `/api/friend-add-routing/publish?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
-      ),
-    /** テスト実行。登録も配信もしない。振り分け先だけを返す。 */
-    test: (accountId: string, friendId: string) =>
-      fetchApi<ApiResponse<{
-        configured: boolean
-        kind: 'first_time' | 'returning'
-        scenarioId: string | null
-        suppressed: boolean
-        displayName: string | null
-        unfollowCount: number
-        firstFollowedAt: string | null
-      }>>(`/api/friend-add-routing/test?account_id=${encodeURIComponent(accountId)}`, {
-        method: 'POST',
-        body: JSON.stringify({ friendId }),
-      }),
-    /** V6履歴。Pencil共通デザイン側はこの返り値から各表示状態を組み立てる。 */
-    events: (accountId: string, params?: {
-      limit?: number
-      cursor?: string
-      kind?: FriendAddEventKind
-      attributionStatus?: FriendAddEventAttributionStatus
-      routingStatus?: FriendAddEventRoutingStatus
-    }) => {
-      const query = new URLSearchParams({ account_id: accountId })
-      if (params?.limit !== undefined) query.set('limit', String(params.limit))
-      if (params?.cursor) query.set('cursor', params.cursor)
-      if (params?.kind) query.set('kind', params.kind)
-      if (params?.attributionStatus) query.set('attribution_status', params.attributionStatus)
-      if (params?.routingStatus) query.set('routing_status', params.routingStatus)
-      return fetchApi<ApiResponse<FriendAddEventList>>(`/api/friend-add-routing/events?${query}`)
-    },
-  },
   friendAddRules: {
     list: (accountId: string, kind: FriendAddRuleKind, params?: {
       status?: FriendAddRuleStatus
@@ -7244,6 +7160,7 @@ export const api = {
       }>>(`/api/friend-add-rules/${encodeURIComponent(ruleId)}/validate?account_id=${encodeURIComponent(accountId)}`, {
         method: 'POST',
       }),
+    /** 新しい rules 契約でテスト実行し、本番データは変更しない。 */
     test: (accountId: string, ruleId: string) =>
       fetchApi<ApiResponse<{
         stateChanged: false

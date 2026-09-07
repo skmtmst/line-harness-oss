@@ -301,7 +301,7 @@
 | 30 | `EOTS4` | 30-1-A 見せる範囲を決める | 5.4909% | 0px | 上部・左 | docs | [差分画像](staff-v6/EOTS4-diff-1920.png) | **一致** |
 | 30 | `jwVlo` | 30-1-B 入った記録 | 5.0852% | 0px | 中央・左 | docs | [差分画像](staff-v6/jwVlo-diff-1920.png) | **一致** |
 | 30 | `I3ZSrU` | 30-1-C 人を招待する | 4.8181%（前回値） | -16px | 中央・左 | docs | [差分画像](staff-v6/I3ZSrU-diff-1920.png) | **一致** |
-| 31 | `c4R6F` | 31-1 機能設定 | 7.4636% | +1px | 中央・右 | docs | [差分画像](settings-v6/c4R6F-diff-1920.png) | **一致** |
+| 31 | `c4R6F` | 31-1 機能設定 | 8.0831% | 0px | 中央・右 | docs | [差分画像](settings-v6/c4R6F-diff-1920.png) | **一致** |
 | 32 | `UgonK` | 32-1 運用状態・健全性チェック | 5.1575%（前回値） | 0px | 中央・左 | docs | [差分画像](operations-v6/UgonK-diff-1920.png) | **一致** |
 | 32 | `b3HfZ` | 32-1-A 緊急コントロール | 5.1955%（前回値） | 0px | 中央・右 | docs | [差分画像](operations-v6/b3HfZ-diff-1920.png) | **一致** |
 | 32 | `UhC2O` | 32-1-B 更新履歴 | 5.0121%（前回値） | +7px | 中央・左 | docs | [差分画像](operations-v6/UhC2O-diff-1920.png) | **一致** |
