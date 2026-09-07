@@ -78,4 +78,24 @@ describe('台帳の「無い」という主張', () => {
       expect(row, `${entry.node} の画素比較行がありません`).toContain('（前回値）');
     }
   });
+
+  it('高さ差24px超は台帳の高さ欄で注意表示する', () => {
+    const report = JSON.parse(readFileSync(join(ROOT, 'docs/design-qa/v6-pixel-diff.json'), 'utf8'));
+    const heightWarnings = report.entries.filter((entry: { heightAboveThreshold?: boolean }) => entry.heightAboveThreshold);
+    const markdown = readFileSync(join(ROOT, 'docs/design-qa/v6-progress-ledger.md'), 'utf8');
+    const progress = JSON.parse(readFileSync(join(ROOT, 'docs/design-qa/v6-progress.json'), 'utf8'));
+    const html = readFileSync(join(ROOT, 'docs/design-qa/v6-progress.html'), 'utf8');
+    expect(heightWarnings.length).toBeGreaterThan(0);
+    expect(progress.pixelDiff.heightDiffThresholdPx).toBe(24);
+    expect(progress.pixelDiff.heightAboveThresholdCount).toBe(heightWarnings.length);
+    for (const entry of heightWarnings) {
+      const row = markdown.split('\n').find((line) => line.includes(`| \`${entry.node}\` |`));
+      const height = `${entry.heightDifferencePx > 0 ? '+' : ''}${entry.heightDifferencePx}px ⚠`;
+      expect(row, `${entry.node} の高さ差行がありません`).toContain(height);
+      const htmlRow = html.split('\n').find((line) => line.includes(`<code>${entry.node}</code>`));
+      expect(htmlRow, `${entry.node} のHTML高さ差行がありません`).toContain(`class="n bad">${height}</td>`);
+      const jsonRow = progress.screens.find((screen: { node: string }) => screen.node === entry.node);
+      expect(jsonRow?.pixelDiff.heightAboveThreshold, `${entry.node} のJSON高さ差が未反映です`).toBe(true);
+    }
+  });
 });
