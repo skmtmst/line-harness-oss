@@ -10,6 +10,7 @@ import {
   canEditTable,
   checkedLabel,
   localRows,
+  manualLinkRow,
   matchesQuery,
   matchesStatus,
   statusOf,
@@ -86,6 +87,16 @@ describe('出せないものを出せるように見せない', () => {
 })
 
 describe('いま出せる行', () => {
+  it('APIの画面ID・状態・確認日時を一覧の行へ変える', () => {
+    const row = manualLinkRow({
+      key: '2-1', keyKind: 'screen', name: '受信箱', url: 'https://example.com/inbox',
+      status: 'ok', lastCheckedAt: '2026-08-27T19:00:00.000Z', lastHttpStatus: 200,
+      lastError: null, version: 2,
+    })
+    expect(row).toMatchObject({ screenId: '2-1', taskId: null, status: 'ok' })
+    expect(checkedLabel(row.checkedAt)).toBe('8/28 04:00')
+  })
+
   it('手元にあるのは作業ID 4件だけで、どれも未設定', () => {
     const rows = localRows()
     expect(rows).toHaveLength(4)

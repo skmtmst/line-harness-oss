@@ -6,6 +6,7 @@ import {
   STEP_STATE_LABEL,
   type GettingStartedInput,
   buildSteps,
+  buildStepsFromApi,
   doneCount,
   allDone,
   progressHeadline,
@@ -211,6 +212,20 @@ describe('最終確認 最初の1通', () => {
 })
 
 describe('見出しと止まっている理由', () => {
+  it('サーバ判定の状態・権限・行き先を画面で再計算しない', () => {
+    const steps = buildStepsFromApi([
+      { key: 'accounts', state: 'done', href: '/accounts', reason: null },
+      { key: 'attributes', state: 'done', href: '/tags?tab=tags', reason: null },
+      { key: 'friendAdd', state: 'stalled', href: '/friend-add-settings', reason: '下書きが1本あります' },
+      { key: 'scenario', state: 'todo', href: '/scenarios', reason: null },
+      { key: 'firstMessage', state: 'forbidden', href: null, reason: '管理者に頼んでください' },
+    ])
+    expect(steps.map((step) => step.state)).toEqual(['done', 'done', 'stalled', 'todo', 'forbidden'])
+    expect(steps[2].next).toBe('下書きが1本あります')
+    expect(steps[3].action).toEqual({ label: 'レシピから作る', href: '/recipes' })
+    expect(steps[4].action).toBeNull()
+  })
+
   it('数に単位を付け、次の段の題を出す', () => {
     const steps = buildSteps({ ...EMPTY, accounts: [account()], tagCount: 1 })
     expect(progressHeadline(steps)).toBe(

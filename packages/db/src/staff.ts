@@ -24,6 +24,7 @@ export interface StaffMember {
   assigned_line_account_id?: string | null;
   can_access_descendant_accounts?: number;
   account_scope?: 'all' | 'accounts';
+  policy_version?: number;
   tenant_id: string | null;
   created_at: string;
   updated_at: string;
@@ -173,7 +174,7 @@ export async function updateStaffMember(
   input: UpdateStaffInput,
 ): Promise<StaffMember | null> {
   const now = jstNow();
-  const sets: string[] = ['updated_at = ?'];
+  const sets: string[] = ['updated_at = ?', 'policy_version = policy_version + 1'];
   const values: (string | number | null)[] = [now];
 
   if (input.name !== undefined) { sets.push('name = ?'); values.push(input.name); }
