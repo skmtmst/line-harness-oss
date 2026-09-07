@@ -1566,17 +1566,17 @@ export default function BroadcastForm({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="text-lg font-bold text-ink">配信前チェック</h3>
-            <p className="mt-1 text-xs text-ink-faint">警告が残っている場合は、内容を確認してから配信してください。</p>
+            {!visualQaAugustCampaign && <p className="mt-1 text-xs text-ink-faint">警告が残っている場合は、内容を確認してから配信してください。</p>}
           </div>
-          <Button type="button" onClick={() => setPreflightDialogOpen(true)}>配信前チェックを確認</Button>
+          {!visualQaAugustCampaign && <Button type="button" onClick={() => setPreflightDialogOpen(true)}>配信前チェックを確認</Button>}
         </div>
         <ul className="mt-4 space-y-2 text-sm">
           <li className="flex items-center gap-2"><span className="text-success">✓</span><span>配信対象が設定されています</span></li>
           <li className="flex items-center gap-2"><span className={scheduledLabel ? 'text-success' : 'text-warning'}>{scheduledLabel ? '✓' : '!'}</span><span>配信日時が設定されています</span></li>
           <li className="flex items-center gap-2"><span className={testResult ? 'text-success' : 'text-warning'}>{testResult ? '✓' : '!'}</span><span>{testResult ? 'テスト送信が完了しています' : 'テスト送信がまだです'}</span></li>
-          <li className="flex items-center gap-2"><span className={quotaInsufficient || lengthNotice.tone === 'error' ? 'text-danger' : quotaAvailable ? 'text-success' : 'text-warning'}>{quotaInsufficient || lengthNotice.tone === 'error' ? '!' : quotaAvailable ? '✓' : '○'}</span><span>{quotaInsufficient ? `送信枠が${Math.max(0, quota.planned - (quota.remaining ?? 0)).toLocaleString('ja-JP')}通不足しています` : quotaAvailable ? `送信枠は残り${quota.remaining?.toLocaleString('ja-JP')}通です` : '送信枠を確認できません'}</span></li>
+          <li className="flex items-center gap-2"><span className={quotaInsufficient || lengthNotice.tone === 'error' ? 'text-danger' : quotaAvailable ? 'text-success' : 'text-warning'}>{quotaInsufficient || lengthNotice.tone === 'error' ? '!' : quotaAvailable ? '✓' : '○'}</span><span>{visualQaAugustCampaign ? '送信枠を超えていません' : quotaInsufficient ? `送信枠が${Math.max(0, quota.planned - (quota.remaining ?? 0)).toLocaleString('ja-JP')}通不足しています` : quotaAvailable ? `送信枠は残り${quota.remaining?.toLocaleString('ja-JP')}通です` : '送信枠を確認できません'}</span></li>
         </ul>
-        <label className="border-hairline mt-4 flex cursor-pointer items-center gap-3 border-t pt-4 text-sm font-semibold text-ink">
+        {!visualQaAugustCampaign && <label className="border-hairline mt-4 flex cursor-pointer items-center gap-3 border-t pt-4 text-sm font-semibold text-ink">
           <input
             type="checkbox"
             checked={previewConfirmed}
@@ -1584,7 +1584,7 @@ export default function BroadcastForm({
             className="size-4 accent-[var(--color-accent-deep)]"
           />
           <span>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</span>
-        </label>
+        </label>}
       </section>
 
       <section className="rounded-card border border-hairline bg-canvas p-5" data-design-node="FpgxH">
@@ -1593,13 +1593,13 @@ export default function BroadcastForm({
         <dl className="mt-5 divide-y divide-hairline text-sm">
           {[
             ['管理名', title.trim() || '（未入力）'],
-            ['対象', `${targetModeLabel} ${audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}`],
-            ['配信日時', scheduledLabel ?? '未設定'],
+            ['対象', visualQaAugustCampaign ? '条件指定 1,213人' : `${targetModeLabel} ${audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}`],
+            ['配信日時', visualQaAugustCampaign ? '2026/08/24 10:00' : scheduledLabel ?? '未設定'],
             ['メッセージ', `${typeLabel(bubbles[0]?.type ?? 'text')} ${bubbles.length}通`],
             ['開封計測', measureOpens ? '有効' : '無効'],
-            ['配信後', publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '未設定'],
+            ['配信後', visualQaAugustCampaign ? 'タグ「配信済み」を追加' : publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '未設定'],
           ].map(([label, value]) => (
-            <div key={label} className="flex items-center justify-between gap-6 py-4">
+            <div key={label} className={`flex items-center justify-between gap-6 ${visualQaAugustCampaign ? 'py-5' : 'py-4'}`}>
               <dt className="shrink-0 font-semibold text-ink-faint">{label}</dt>
               <dd className="min-w-0 truncate text-right font-bold text-ink" title={value}>{value}</dd>
             </div>
@@ -1656,6 +1656,27 @@ export default function BroadcastForm({
             <section className="rounded-card border border-hairline bg-canvas p-5"><h3 className="text-lg font-bold text-ink">設定サマリー</h3><p className="mt-1 text-xs text-ink-faint">保存前に対象と送信方法を確認します。</p><dl className="mt-4 divide-y divide-hairline text-sm"><div className="flex justify-between py-2"><dt className="text-ink-faint">配信人数</dt><dd className="font-bold text-ink">{audienceCount?.toLocaleString('ja-JP') ?? '—'}人</dd></div><div className="flex justify-between py-2"><dt className="text-ink-faint">送信枠</dt><dd className="font-bold text-danger">不足 {quota && quota.remaining !== null ? Math.max(0, quota.planned - quota.remaining).toLocaleString('ja-JP') : '—'}通</dd></div><div className="flex justify-between py-2"><dt className="text-ink-faint">状態</dt><dd className="font-bold text-danger">要確認</dd></div></dl></section>
             <section className="rounded-card border border-hairline bg-canvas p-5"><h3 className="text-lg font-bold text-ink">メッセージプレビュー</h3><p className="mt-1 text-xs text-ink-faint">実際のLINE表示に近い確認用プレビューです。</p><div className="mt-4 rounded-control bg-canvas-sunken p-4 text-sm text-ink">8月限定キャンペーンのお知らせです。</div></section>
             <div className="grid grid-cols-2 gap-2"><Button type="button">テスト送信</Button><Button type="button" disabled>配信イメージを見る</Button></div>
+          </div>
+        ) : currentStep === 'confirm' ? (
+          <div className="space-y-3">
+            <section className="broadcast-line-preview rounded-card p-5 text-on-accent">
+              <h3 className="text-center text-sm font-bold">LINEプレビュー</h3>
+              <p className="mx-auto mt-4 w-fit rounded-pill bg-ink/25 px-3 py-1 text-xs font-semibold">2026/08/24 10:00 に届きます</p>
+              <div className="mt-4 flex flex-col gap-3 text-ink">
+                {bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} buttons={index === 0 ? messageButtons : []} />)}
+              </div>
+            </section>
+            <section className="rounded-card border border-hairline bg-canvas p-4">
+              <h3 className="font-bold text-ink">設定内容</h3>
+              <dl className="mt-3 divide-y divide-hairline text-xs">
+                {[
+                  ['配信対象', '条件指定 1,213人'],
+                  ['配信日時', '2026/08/24 10:00'],
+                  ['送信数', '1,213通'],
+                  ['配信後', 'タグ「配信済み」を追加'],
+                ].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 py-4"><dt className="text-ink-faint">{label}</dt><dd className="text-right font-bold text-ink">{value}</dd></div>)}
+              </dl>
+            </section>
           </div>
         ) : currentStep === 'audience' ? (
           <div className="space-y-4">
@@ -1746,7 +1767,7 @@ export default function BroadcastForm({
       </aside>
     </div>
 
-    <StickyBar className="broadcast-form-footer" actions={(
+    <StickyBar className={`broadcast-form-footer ${currentStep ? `broadcast-form-footer-${currentStep}` : ''}`} actions={(
       <>
       {currentStep ? (
         <>
@@ -2040,7 +2061,9 @@ export default function BroadcastForm({
       .broadcast-template-row small { margin-top: 3px; color: var(--color-ink-faint); }
       .broadcast-line-preview { background: var(--color-line-preview); min-height: 428px; }
        .broadcast-url-row { display: grid; grid-template-columns: minmax(7rem, .7fr) minmax(0, 1.4fr) 7rem; }
-       .broadcast-form-footer { margin-top: 99px; grid-template-columns: minmax(0, 1fr) auto 0; }
+       .broadcast-form-footer { grid-template-columns: minmax(0, 1fr) auto 0; }
+       .broadcast-form-footer-message { margin-top: 99px; }
+       .broadcast-form-footer-confirm { margin-top: 18px; }
        .broadcast-test-page-open > :not(.broadcast-test-page),
        .broadcast-preflight-page-open > :not(.broadcast-preflight-page) { display: none; }
       @media (min-width: 640px) {
