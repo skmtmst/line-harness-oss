@@ -17,6 +17,10 @@ const migration = readFileSync(
   join(import.meta.dirname, '..', 'migrations', '323_booking_store_settings.sql'),
   'utf8',
 );
+const capacityMigration = readFileSync(
+  join(import.meta.dirname, '..', 'migrations', '326_booking_capacity_and_menu_resources.sql'),
+  'utf8',
+);
 
 describe('migration 323 店舗共通の予約設定', () => {
   let sqlite: Database.Database;
@@ -63,6 +67,7 @@ describe('migration 323 店舗共通の予約設定', () => {
         ('menu-b', 'account-b', '別店舗', 5000, NULL, NULL, NULL, 1, '2026-09-01', '2026-09-01');
     `);
     sqlite.exec(migration);
+    sqlite.exec(capacityMigration);
     sqlite.exec(`
       INSERT INTO booking_business_hours
         (id, booking_settings_id, weekday, start_time, end_time)
@@ -120,7 +125,10 @@ describe('migration 323 店舗共通の予約設定', () => {
       inactiveMenuCount: 1,
       businessHours: expect.arrayContaining([{
         weekday: 1,
-        intervals: [{ start: '09:00', end: '12:00' }, { start: '13:00', end: '19:00' }],
+        intervals: [
+          { start: '09:00', end: '12:00', capacity: 1 },
+          { start: '13:00', end: '19:00', capacity: 1 },
+        ],
       }]),
       exceptions: [expect.objectContaining({
         date: '2026-12-30', kind: 'closed', intervals: [], reason: '年末休業',
