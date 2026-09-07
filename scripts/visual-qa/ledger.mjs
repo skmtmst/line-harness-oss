@@ -175,6 +175,10 @@ function pixelPercent(entry) {
     : `—（${entry.reason}）`
 }
 
+function implementationSourceLabel(entry) {
+  return { snapshot: 'snapshot', docs: 'docs' }[entry.implementationSource] ?? '—'
+}
+
 function verdictLabel(screen) {
   const key = {
     match: 'vMatch',
@@ -188,7 +192,7 @@ function pixelRowsMarkdown() {
   return SCREENS.map((screen) => {
     const pixel = pixelOf(screen)
     const diff = pixel.diffPath ? `[差分画像](${pixel.diffPath.replace(/^docs\/design-qa\//, '')})` : '—'
-    return `| ${screen.feature} | \`${screen.node}\` | ${screen.name} | ${pixelPercent(pixel)} | ${signed(pixel.heightDifferencePx)} | ${pixel.dominantRegion ?? '—'} | ${diff} | **${verdictLabel(screen)}** |`
+    return `| ${screen.feature} | \`${screen.node}\` | ${screen.name} | ${pixelPercent(pixel)} | ${signed(pixel.heightDifferencePx)} | ${pixel.dominantRegion ?? '—'} | ${implementationSourceLabel(pixel)} | ${diff} | **${verdictLabel(screen)}** |`
   }).join('\n')
 }
 
@@ -211,7 +215,7 @@ if (process.argv.includes('--html')) {
     const diff = pixel.diffPath
       ? `<a href="${esc(pixel.diffPath.replace(/^docs\/design-qa\//, ''))}">差分画像</a>`
       : '—'
-    return `      <tr><td>${screen.feature}</td><td><code>${esc(screen.node)}</code></td><td>${esc(screen.name)}</td><td class="n ${pixel.aboveThreshold ? 'bad' : ''}">${esc(pixelPercent(pixel))}</td><td class="n">${signed(pixel.heightDifferencePx)}</td><td>${esc(pixel.dominantRegion ?? '—')}</td><td>${diff}</td><td>${esc(verdictLabel(screen))}</td></tr>`
+    return `      <tr><td>${screen.feature}</td><td><code>${esc(screen.node)}</code></td><td>${esc(screen.name)}</td><td class="n ${pixel.aboveThreshold ? 'bad' : ''}">${esc(pixelPercent(pixel))}</td><td class="n">${signed(pixel.heightDifferencePx)}</td><td>${esc(pixel.dominantRegion ?? '—')}</td><td>${implementationSourceLabel(pixel)}</td><td>${diff}</td><td>${esc(verdictLabel(screen))}</td></tr>`
   }).join('\n')
   console.log(`<!-- scripts/visual-qa/ledger.mjs --html が作ります。手で直さないでください。 -->
 <!-- 文字の指定を落とすと、ローカルで開いたときに日本語が全部化けます。 -->
@@ -322,7 +326,7 @@ ${bars}
   <h2>画面ごとの画素差</h2>
   <div class="wrap">
     <table>
-      <thead><tr><th>機能</th><th>Node</th><th>画面</th><th class="n">差分率</th><th class="n">高さ差</th><th>差分の中心</th><th>証拠</th><th>判定</th></tr></thead>
+      <thead><tr><th>機能</th><th>Node</th><th>画面</th><th class="n">差分率</th><th class="n">高さ差</th><th>差分の中心</th><th>実装画像</th><th>証拠</th><th>判定</th></tr></thead>
       <tbody>
 ${pixelDetails}
       </tbody>
@@ -426,8 +430,8 @@ ${pixelDetails}
   }
   console.log(`| | **合計** | **${SCREENS.length}** | **${all.compared}** | **${all.match}** | **${all.structureMatchDataPending}** | **${all.needsFix}** | **${all.unimplemented}** | **${all.unjudged}** | **${all.pixelCompared}** | **${all.pixelAboveThreshold}** | **${all.pixelUnavailable}** | **${all.unconfirmed}** | **${all.elsewhere}** | **${all.missing}** | |`)
   console.log('\n## 画面ごとの画素差\n')
-  console.log('| 機能 | Node | 画面 | 差分率 | 高さ差 | 差分の中心 | 証拠 | 判定 |')
-  console.log('|---|---|---|---:|---:|---|---|---|')
+  console.log('| 機能 | Node | 画面 | 差分率 | 高さ差 | 差分の中心 | 実装画像 | 証拠 | 判定 |')
+  console.log('|---|---|---|---:|---:|---|---|---|---|')
   console.log(pixelRowsMarkdown())
   console.log('\n**「撮った先」が空**の機能は、まだ実装PRのheadで撮り直していません（自分の枝で撮ったものです）。**空欄を確認済みと読まないでください。**')
 }

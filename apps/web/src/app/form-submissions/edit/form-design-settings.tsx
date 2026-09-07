@@ -8,7 +8,8 @@ import {
 } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import SelectField from '@/components/shared/select-field'
-import { Field, TextArea, TextInput } from '@/components/shared/form-controls'
+import { Field } from '@/components/shared/form-controls'
+import { useRouter } from 'next/navigation'
 
 const COLOR_ROLES: Array<{
   key: keyof Pick<FormTheme, 'main' | 'sub' | 'accent' | 'error' | 'text'>
@@ -41,30 +42,44 @@ export default function FormDesignSettings({
   onOgDescriptionChange: (value: string) => void
   onOgImageUrlChange: (value: string) => void
 }) {
+  const router = useRouter()
+  void [ogTitle, ogDescription, ogImageUrl, onOgTitleChange, onOgDescriptionChange, onOgImageUrlChange]
   const theme = value ?? FORM_THEME_DEFAULT
   const patch = <K extends keyof FormTheme>(key: K, next: FormTheme[K]) => {
     onChange({ ...theme, [key]: next })
   }
 
+  const close = () => router.replace('/form-submissions/edit?id=form-1&tab=basic')
+
   return (
-    <section data-design-node="ava2n" className="min-w-0 space-y-4">
-      <div className="bg-canvas rounded-card border-hairline border p-5">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4" style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }} role="dialog" aria-modal="true" aria-label="デザイン設定">
+      <section data-design-node="ava2n" className="w-full overflow-hidden rounded-panel shadow-lg" style={{ marginBlock: 94, maxWidth: 820, background: 'var(--color-canvas)' }}>
+        <header className="border-hairline flex items-start justify-between border-b px-6 py-4">
+          <div>
+            <h2 className="text-ink text-lg font-bold">デザイン設定</h2>
+            <p className="text-ink-faint mt-0.5 text-xs">変えるとすぐ左のプレビューに出ます</p>
+          </div>
+          <button type="button" onClick={close} className="text-ink-faint px-2 text-2xl leading-none" aria-label="閉じる">×</button>
+        </header>
+        <div className="p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-ink text-base font-bold">デザイン設定</h2>
-            <p className="text-ink-faint mt-1 text-xs">変えるとすぐ左のプレビューに出ます</p>
+            <div className="flex gap-7 border-b border-hairline text-sm font-medium">
+              <span className="border-b-2 border-accent px-1 pb-3 text-accent">色</span>
+              <span className="px-1 pb-3 text-ink-secondary">文字と背景</span>
+              <span className="px-1 pb-3 text-ink-secondary">CSSで細かく</span>
+            </div>
           </div>
-          <Button onClick={() => onChange({ ...FORM_THEME_DEFAULT })}>おまかせで組む</Button>
         </div>
 
         <div className="mt-5">
-          <p className="text-ink text-sm font-semibold">色</p>
-          <p className="text-ink-faint mt-1 text-xs">
-            色は5つの役割にだけ割り当てます。任意のCSS・HTML・JavaScriptは保存できません。
-          </p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-ink text-sm font-semibold">色は5つの役割にだけ割り当てます</p>
+            <Button onClick={() => onChange({ ...FORM_THEME_DEFAULT })}>おまかせで組む</Button>
+          </div>
+          <div className="mt-2 space-y-2">
             {COLOR_ROLES.map((role) => (
-              <label key={role.key} className="border-hairline rounded-control flex items-center gap-3 border p-3">
+              <label key={role.key} className={`border-hairline rounded-control flex items-center gap-3 border p-3 ${role.key === 'main' ? 'border-accent bg-accent-soft' : ''}`}>
                 <input
                   type="color"
                   value={theme[role.key]}
@@ -92,7 +107,7 @@ export default function FormDesignSettings({
           </p>
         </div>
 
-        <div className="border-hairline mt-5 grid gap-4 border-t pt-5 sm:grid-cols-2">
+        <div className="border-hairline mt-5 grid gap-4 border-t pt-5 sm:grid-cols-3">
           <Field label="文字の書体" htmlFor="form-theme-font">
             <SelectField
               id="form-theme-font"
@@ -118,37 +133,15 @@ export default function FormDesignSettings({
           </Field>
         </div>
 
-        <div className="mt-4">
-          <Field
-            label="背景画像"
-            htmlFor="form-theme-background"
-            note="HTTPSの画像URLだけを指定できます。空なら背景色を使います。"
-          >
-            <TextInput
-              id="form-theme-background"
-              type="url"
-              value={theme.backgroundImageUrl ?? ''}
-              onChange={(event) => patch('backgroundImageUrl', event.target.value || null)}
-              placeholder="https://example.com/background.jpg"
-            />
+          <Field label="背景画像" htmlFor="form-theme-background">
+            <SelectField id="form-theme-background" value={theme.backgroundImageUrl ?? ''} onChange={(event) => patch('backgroundImageUrl', event.target.value || null)} options={[{ value: '', label: 'なし' }]} />
           </Field>
         </div>
-      </div>
-
-      <div className="bg-canvas rounded-card border-hairline border p-5">
-        <h2 className="text-ink text-base font-bold">SNSで共有したときの表示</h2>
-        <div className="mt-4 grid gap-4">
-          <Field label="タイトル" htmlFor="form-og-title">
-            <TextInput id="form-og-title" value={ogTitle} onChange={(event) => onOgTitleChange(event.target.value)} />
-          </Field>
-          <Field label="説明" htmlFor="form-og-description">
-            <TextArea id="form-og-description" rows={3} value={ogDescription} onChange={(event) => onOgDescriptionChange(event.target.value)} />
-          </Field>
-          <Field label="画像URL" htmlFor="form-og-image">
-            <TextInput id="form-og-image" type="url" value={ogImageUrl} onChange={(event) => onOgImageUrlChange(event.target.value)} />
-          </Field>
-        </div>
-      </div>
-    </section>
+        <footer className="border-hairline flex items-center justify-between border-t px-6 py-4">
+          <button type="button" onClick={() => onChange({ ...FORM_THEME_DEFAULT })} className="text-accent text-sm font-medium">元に戻す</button>
+          <div className="flex gap-2"><Button onClick={close}>閉じる</Button><Button variant="primary">保存する</Button></div>
+        </footer>
+      </section>
+    </div>
   )
 }
