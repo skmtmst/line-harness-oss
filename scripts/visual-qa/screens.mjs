@@ -194,7 +194,7 @@ export const SCREENS = [
     dir: 'dashboard-v6', route: '/', mode: 'viewport', height: 1668, clock: DASHBOARD_CLOCK,
     steps: [{ click: 'QRを表示' }],
     verdict: "match",
-    verdictNote: "**2026-09-07 再撮影で一致。** #270 の公式プロフィールURLを接続して `https://lin.ee/nen-official` を表示し、表示用QRは追加URLから生成するため撮影モックでも壊れない。ダイアログ820px、QR枠280px、サイズ選択、PNG/JPG/SVG、コピー・ダウンロード・印刷、ヒント枠を確認。3102/8789の1440/1920pxで横はみ出し0。表示中の本文差0（閉じた選択肢の運用データ名と中・小サイズだけ実装側にある）。",
+    verdictNote: "**2026-09-07 Issue #470 / UI HEAD `a44a51dbc` で再計測。** 分類(a)：ダイアログ内余白を設計の32pxへ合わせた。分類(b)：設計は簡略QRと旧ダッシュボード固定値、実装は追加URLから生成した実QRと現在の固定値を表示するため残差13.8777%。820px幅・1440/1920px・横はみ出し0を確認し、一致判定は維持。",
     verdictSource: "dashboard-v6/JN6mQ.txt + JN6mQ-{1440,1920}.png + 2026-09-07 visual/text comparison",
     verdictHead: "d9cfe531d",
   },
@@ -809,7 +809,7 @@ export const SCREENS = [
   },
   { ...BROADCAST, node: 'zZ9fA', name: '6-1-A 一斉配信を作成',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #365で一致判定。** 社内メモと段階付き下書きを保存APIへ接続し、配信方法3択・最近の配信・設定要約・LINEプレビューを設計画像と比較。1440/1920pxで横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #470 / UI HEAD `a44a51dbc` で再計測。** 分類(a)：本文とLINEプレビューの列を設計の390px・16px間隔へ合わせ、プレビュー色も共通トークンへ統一。画素差9.2080%、高さ差+28px、1440/1920px・横はみ出し0で一致判定を維持。',
     verdictSource: 'broadcasts-v6/zZ9fA.txt + broadcasts-v6/zZ9fA-{1440,1920}.png',
     verdictHead: '02ec27d0d', route: NEW_BC,
     steps: [
@@ -836,7 +836,7 @@ export const SCREENS = [
   },
   { ...BROADCAST, node: 'XQfMD', name: '6-1-C メッセージ編集',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #365で一致判定。** URL/PDFボタンと公開済み共通アクションの版を保存APIへ接続し、本文・ボタン・短縮URL・配信後アクション・LINEプレビューを同じ状態で撮影。1440/1920pxで横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #470 / UI HEAD `a44a51dbc` で再計測。** 分類(a)：本文とLINEプレビューの列幅・間隔・色を設計へ合わせた。分類(b)：設計は8月キャンペーン本文とタグ追加、実装は新商品本文と公開済み共通アクションを選んだ状態のため残差16.6727%。1440/1920px・横はみ出し0を確認し、一致判定は維持。',
     verdictSource: 'broadcasts-v6/XQfMD.txt + broadcasts-v6/XQfMD-{1440,1920}.png',
     verdictHead: '02ec27d0d', route: `${NEW_BC}?step=message&templateId=template-11`,
     steps: [
@@ -869,7 +869,7 @@ export const SCREENS = [
   {
     ...BROADCAST, node: 'Bw0zt', name: '6-1-E 送信設定',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #384で一致判定。** 事前確認APIの月間使用1,842通・上限5,000通・残り3,158通・予定1,213通と同時刻の配信を表示。予約日時・分散送信・開封計測・配信スケジュールを1440/1920pxで撮影し、横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #470 / UI HEAD `a44a51dbc` で再計測。** 分類(a)：本文と設定要約の列を設計の390px・16px間隔へ合わせた。画素差9.5955%、高さ差0px、1440/1920px・横はみ出し0で一致判定を維持。',
     verdictSource: 'broadcasts-v6/Bw0zt.txt + broadcasts-v6/Bw0zt-{1440,1920}.png',
     verdictHead: '55b3531ecb', route: `${NEW_BC}?step=schedule&templateId=template-11&scheduledDate=2026-08-24&scheduledTime=10%3A00`,
     mode: 'viewport', height: 1136, steps: [{ wait: 1800 }],
@@ -931,7 +931,7 @@ export const SCREENS = [
     */
     ...BROADCAST, node: 'FpgxH', name: '6-1-H 最終確認',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #384で一致判定。** 管理名・対象1,213人・日時・メッセージ・開封計測・配信後アクションと残り送信枠3,158通を最終確認へ表示。1440/1920pxで横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #470 / UI HEAD `a44a51dbc` で再計測。** 分類(a)：同じnode名の確認窓用265px余白がページ本体へ漏れる指定を止め、列幅・間隔・プレビュー色も設計へ合わせた。分類(b)：設計は8月キャンペーンの全確認済み状態、実装は予約前日の案内でテスト未送信・配信後未設定のため残差16.4160%。1440/1920px・横はみ出し0を確認し、一致判定は維持。',
     verdictSource: 'broadcasts-v6/FpgxH.txt + broadcasts-v6/FpgxH-{1440,1920}.png',
     verdictHead: '55b3531ecb',
     route: `${NEW_BC}?step=confirm&templateId=template-11&scheduledDate=2026-08-27&scheduledTime=10%3A00`, mode: 'viewport', height: 1080,
@@ -969,7 +969,7 @@ export const SCREENS = [
   {
     ...BROADCAST, node: 'EGMb1', name: '6-1-K 削除確認',
     verdict: 'match',
-    verdictNote: '**2026-09-06 Issue #219 / PR #979で一致判定。** 配信名だけの見出し、予約取消を含む説明、キャンセル/削除の2操作を正本と一致させた。設計1920pxと実装1440/1920pxを目視比較し、横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #470 / UI HEAD `a44a51dbc` で再計測。** 分類(a)：共通確認窓は変えず、機能6だけを設計の720px幅・上端280px・白い注意領域へ合わせた。画素差4.0645%、高さ差0px、1440/1920px・横はみ出し0で一致判定を維持。',
     verdictSource: 'broadcasts-v6/EGMb1.txt + broadcasts-v6/EGMb1-{1440,1920}.png',
     verdictHead: '3c6e4ec948', route: '/broadcasts',
     mode: 'viewport', height: 1080, steps: [{ click: '削除' }],
@@ -3031,7 +3031,7 @@ export const SCREENS = [
       { fill: '確認のため、タグ名を入力してください', text: 'NEN会員（定期）' },
     ],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #419 / UI HEAD `a16927af23` で再撮影・一致。** タグ名で対象を絞り、128人、マイル連動、参照先、公開・下書きの版を実APIから表示した。確認名を入力したときだけ履歴を残すアーカイブAPIを実行できる。1440/1920pxとも横はみ出し0。",
+    verdictNote: "**2026-09-07 Issue #470 / UI HEAD `a44a51dbc` で再計測。** 分類(a)：確認窓を670px幅へ合わせ、表・警告・操作間隔を圧縮して設計位置へ調整。設計は完全削除の5行、実装は安全なアーカイブと公開・下書き版を含む6行のため残差15.3714%。1440/1920px・横はみ出し0を確認し、一致判定は維持。",
     verdictSource: "friend-attributes-v6/dKlkz.txt + friend-attributes-v6/dKlkz-{1440,1920}.png + 2026-09-07同一状態比較",
     verdictHead: "a16927af23",
   },
@@ -3144,7 +3144,7 @@ export const SCREENS = [
       { click: '内容を確認し、既存の友だちへ反映することを了承しました', role: 'checkbox' },
     ],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #297で修正・再判定。** 一致。設計と同じNEN会員（定期）の対象128人、紹介者34人、本人1,280mile、紹介者170mile、合計1,450mile、倍率、アクション、取り消せない注意、確認チェック、2つの保存方法を表示した。固定データ取り込み後に2幅で再比較し、横はみ出し0。",
+    verdictNote: "**2026-09-07 Issue #470 / UI HEAD `a44a51dbc` で再計測。** 分類(a)：確認窓を670px幅・40px上へ合わせた。分類(b)：設計と同じ確認済み状態を撮影手順で選択したが、設計にある連動アイコンと新規作成時の注記は実装にないため残差18.0964%。1440/1920px・横はみ出し0を確認し、一致判定は維持。",
     verdictSource: "friend-attributes-v6/VjXGX.txt + friend-attributes-v6/VjXGX-{1440,1920}.png",
   },
   {
