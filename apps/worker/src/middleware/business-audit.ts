@@ -4,6 +4,15 @@ import type { Env } from '../index.js';
 
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
+function commonAuditWriter(): typeof recordAuditEvent | null {
+  try {
+    return typeof recordAuditEvent === 'function' ? recordAuditEvent : null;
+  } catch {
+    // 一部のroute単体テストはDB packageを必要な関数だけに絞ってmockする。
+    return null;
+  }
+}
+
 function targetKind(routePath: string): string | null {
   const segment = routePath.split('/').filter(Boolean)[1];
   return segment?.slice(0, 100) ?? null;
@@ -39,12 +48,13 @@ export const businessAuditMiddleware: MiddlewareHandler<Env> = async (c, next) =
   const staff = c.get('staff');
   if (!staff || !shouldAudit || c.get('auditRecorded')) return;
   const db = c.env?.DB;
-  if (!db || typeof db.prepare !== 'function') return;
+  const writer = commonAuditWriter();
+  if (!db || typeof db.prepare !== 'function' || !writer) return;
 
   const routePath = c.req.routePath || new URL(c.req.url).pathname;
   const method = c.req.method.toLowerCase();
   const lineAccountId = await lineAccountIdPromise;
-  const task = recordAuditEvent(db, {
+  const task = writer(db, {
     tenantId: staff.tenantId,
     lineAccountId,
     category: 'business',

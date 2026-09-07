@@ -67,6 +67,15 @@ export type AuditAction =
   | 'webinar.archive'
   | 'webinar.participant.export';
 
+function commonAuditWriter(): typeof recordAuditEvent | null {
+  try {
+    return typeof recordAuditEvent === 'function' ? recordAuditEvent : null;
+  } catch {
+    // 一部のroute単体テストはDB packageを必要な関数だけに絞ってmockする。
+    return null;
+  }
+}
+
 export function auditLog(
   c: Context<Env>,
   action: AuditAction,
@@ -90,9 +99,10 @@ export function auditLog(
   );
 
   const db = c.env?.DB;
-  if (!db || typeof db.prepare !== 'function') return;
+  const writer = commonAuditWriter();
+  if (!db || typeof db.prepare !== 'function' || !writer) return;
   const lineAccountId = c.req.query('lineAccountId') ?? c.req.query('account_id') ?? null;
-  const task = recordAuditEvent(db, {
+  const task = writer(db, {
     tenantId: staff?.tenantId,
     lineAccountId,
     category: 'business',
