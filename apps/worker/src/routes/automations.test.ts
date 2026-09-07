@@ -21,7 +21,7 @@ vi.mock('@line-crm/db', () => dbMocks);
 
 const { automations } = await import('./automations.js');
 
-function setupApp(db: D1Database) {
+function setupApp(db: D1Database, staff?: Partial<AuthenticatedStaff>) {
   const app = new Hono<{
     Bindings: { DB: D1Database };
     Variables: { staff: AuthenticatedStaff };
@@ -37,12 +37,16 @@ function setupApp(db: D1Database) {
       assignedLineAccountId: null,
       canAccessDescendantAccounts: false,
       tenantId: '00000000-0000-4000-8000-000000000001',
+      ...staff,
     });
     await next();
   });
   app.route('/', automations);
   return app;
 }
+
+const STAFF_WITHOUT_KEY = { role: 'staff', permissionKeys: [] } as Partial<AuthenticatedStaff>;
+const STAFF_WITH_KEY = { role: 'staff', permissionKeys: ['/automations'] } as Partial<AuthenticatedStaff>;
 
 beforeEach(() => {
   for (const fn of Object.values(dbMocks)) fn.mockReset();
@@ -149,5 +153,60 @@ describe('GET /api/automations/:id/logs', () => {
       'automation-1',
       expected,
     );
+  });
+});
+
+describe('旧作成口の削除（#554 点検#519中6）', () => {
+  test('POST /api/automations は404を返し、何も作らない', async () => {
+    const res = await setupApp({} as D1Database).request('/api/automations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'x', eventType: 'message_received', actions: [] }),
+    });
+    expect(res.status).toBe(404);
+    expect(dbMocks.createAutomation).not.toHaveBeenCalled();
+  });
+});
+
+describe('権限キー検査（#554 点検#519中4・中5）', () => {
+  test('実行記録の一覧は権限キーのないstaffに403を返す', async () => {
+    const res = await setupApp({} as D1Database, STAFF_WITHOUT_KEY)
+      .request('/api/automation-runs?lineAccountId=acc-1');
+    expect(res.status).toBe(403);
+    expect(dbMocks.getAutomationExecutionRuns).not.toHaveBeenCalled();
+  });
+
+  test('実行記録の一覧は権限キーを持つstaffに200を返す', async () => {
+    dbMocks.getAutomationExecutionRuns.mockResolvedValue({
+      rows: [],
+      total: 0,
+      summary: { total: 0, executed: 0, skipped: 0, failed: 0, most_run_name: null, most_run_count: null },
+    });
+    const res = await setupApp({} as D1Database, STAFF_WITH_KEY)
+      .request('/api/automation-runs?lineAccountId=acc-1');
+    expect(res.status).toBe(200);
+  });
+
+  test('詳細は権限キーのないstaffに403を返す（アカウント範囲内でも）', async () => {
+    dbMocks.getAutomationById.mockResolvedValue({ id: 'automation-1', line_account_id: 'acc-1' });
+    const res = await setupApp({} as D1Database, STAFF_WITHOUT_KEY)
+      .request('/api/automations/automation-1');
+    expect(res.status).toBe(403);
+  });
+
+  test('ログは権限キーのないstaffに403を返す', async () => {
+    dbMocks.getAutomationById.mockResolvedValue({ id: 'automation-1', line_account_id: 'acc-1' });
+    const res = await setupApp({} as D1Database, STAFF_WITHOUT_KEY)
+      .request('/api/automations/automation-1/logs');
+    expect(res.status).toBe(403);
+    expect(dbMocks.getAutomationLogs).not.toHaveBeenCalled();
+  });
+
+  test('ログは権限キーを持つstaffに200を返す', async () => {
+    dbMocks.getAutomationById.mockResolvedValue({ id: 'automation-1', line_account_id: 'acc-1' });
+    dbMocks.getAutomationLogs.mockResolvedValue([]);
+    const res = await setupApp({} as D1Database, STAFF_WITH_KEY)
+      .request('/api/automations/automation-1/logs');
+    expect(res.status).toBe(200);
   });
 });
