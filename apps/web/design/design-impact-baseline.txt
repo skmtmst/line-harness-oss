@@ -73,6 +73,7 @@ shared-button-importer app/mileage/page.tsx
 shared-button-importer app/mileage/rewards/edit/page.tsx
 shared-button-importer app/mileage/score-rules/page.tsx
 shared-button-importer app/nen-campaigns/columns/new/page.tsx
+shared-button-importer app/nen-campaigns/edit/campaign-editor.tsx
 shared-button-importer app/nen-campaigns/nen-overview.tsx
 shared-button-importer app/nen-campaigns/page.tsx
 shared-button-importer app/nen-members/page.tsx
