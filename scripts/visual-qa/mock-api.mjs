@@ -86,7 +86,7 @@ import {
   NEN_PHOTO_REVIEW_METRICS, NEN_PHOTO_ASSET_STATUS, NEN_PHOTO_DERIVATIVES,
   NEN_PHOTO_ASSET_PROCESS_RESULT, NEN_PHOTO_BULK_DECISION_RESULT,
   NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, EC_ORDERS, EC_ACTION_EXECUTIONS, EC_IDENTITY_CANDIDATES, MILEAGE_RULES,
-  FORM_FOLDERS, FORMS, FORM_DETAIL,
+  FORM_FOLDERS, FORMS, FORM_DETAIL, FORM_SUBMISSIONS,
   LINE_ACCOUNTS, LINE_ACCOUNT_DETAIL, LINE_ACCOUNT_VERIFY_CONNECTION, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
   CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
   CONVERSION_DEFINITIONS, CONVERSION_DEFINITION_REPORT, CONVERSION_EXPORT_CSV,
@@ -1509,6 +1509,15 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/forms') return { success: true, data: FORMS }
   if (pathname === `/api/forms/${FORM_DETAIL.id}`) return { success: true, data: FORM_DETAIL }
+  const formSubmissions = new RegExp(`^/api/forms/${FORM_DETAIL.id}/submissions$`).test(pathname)
+  if (formSubmissions) {
+    const page = Number.parseInt(query.get('page') ?? '1', 10)
+    const limit = Number.parseInt(query.get('limit') ?? '20', 10)
+    const safePage = Number.isInteger(page) && page > 0 ? page : 1
+    const safeLimit = Number.isInteger(limit) && limit > 0 ? Math.min(limit, 50) : 20
+    const start = (safePage - 1) * safeLimit
+    return { success: true, data: { ...FORM_SUBMISSIONS, items: FORM_SUBMISSIONS.items.slice(start, start + safeLimit), page: safePage, limit: safeLimit } }
+  }
   if (pathname === '/api/folders' && query.get('kind') === 'form') {
     return { success: true, data: FORM_FOLDERS }
   }
@@ -2476,6 +2485,36 @@ const server = createServer((req, res) => {
   // ただし画面側のエラー報告だけは 204 で受ける。405 を返すと、
   // 報告が失敗したこと自体が新しいエラーになって際限なく増える。
   if (method !== 'GET') {
+    if (method === 'POST' && url.pathname === '/api/media/upload-sessions') {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        const files = Array.isArray(body.files) ? body.files : []
+        const sessions = files.map((file, index) => ({
+          id: `visual-upload-${index + 1}`,
+          filename: String(file.filename ?? `upload-${index + 1}`),
+          sizeBytes: Number(file.sizeBytes ?? 1),
+          targetMediaId: file.targetMediaId ?? null,
+          method: 'PUT',
+          uploadUrl: `http://${HOST}:${PORT}/api/media/upload-sessions/visual-upload-${index + 1}/blob`,
+          requiredHeaders: { 'Content-Type': String(file.mimeType ?? 'application/octet-stream') },
+          expiresAt: '2026-09-07T15:15:00.000Z',
+        }))
+        res.writeHead(201).end(JSON.stringify({ success: true, data: { sessions } }))
+      })
+      return
+    }
+    if (method === 'PUT' && /^\/api\/media\/upload-sessions\/[^/]+\/blob$/.test(url.pathname)) {
+      res.setHeader('ETag', '"visual-qa-etag"')
+      res.writeHead(200).end()
+      return
+    }
+    if (method === 'POST' && /^\/api\/media\/upload-sessions\/[^/]+\/complete$/.test(url.pathname)) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: { uploadSessionId: url.pathname.split('/')[4], status: 'completed', mediaId: 'media-uploaded-1', targetMediaId: null } }))
+      return
+    }
     if (url.pathname === '/api/client-errors') {
       res.writeHead(204).end()
       return

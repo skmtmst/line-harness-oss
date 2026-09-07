@@ -5,7 +5,7 @@ import {
   normalizeScenarioDeliveryTimestamp,
   SCENARIO_DELIVERY_BATCH_LIMIT,
 } from './scenario-delivery-timestamps.js';
-export type ScenarioTriggerType = 'friend_add' | 'tag_added' | 'manual';
+export type ScenarioTriggerType = 'friend_add' | 'tag_added' | 'form_answer' | 'booking_confirmed' | 'manual';
 export type MessageType = 'text' | 'image' | 'flex' | 'location' | 'video' | 'audio' | 'sticker' | 'carousel';
 export type FriendScenarioStatus = 'active' | 'paused' | 'completed' | 'delivering';
 export type DeliveryMode = 'relative' | 'elapsed' | 'absolute_time';

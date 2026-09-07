@@ -1280,7 +1280,7 @@ scenarios.post('/api/scenarios/:id/enroll/:friendId', requireRole('owner', 'admi
 // ============================================================
 
 const VALID_ACTION_HOOKS = ['step_sent', 'scenario_completed', 'choice_selected'] as const;
-const VALID_ACTION_TYPES = ['tag', 'friend_field', 'support_mark', 'scenario', 'common_var'] as const;
+const VALID_ACTION_TYPES = ['tag', 'friend_field', 'support_mark', 'scenario', 'common_var', 'send_message', 'send_template', 'reminder', 'event_booking'] as const;
 
 interface ActionBody {
   hook?: string;
@@ -1368,6 +1368,18 @@ function validateActionConfig(
       if (c.op !== undefined && c.op !== 'add' && c.op !== 'sub') {
         return { ok: false, error: '共通情報の操作は加算か減算です。' };
       }
+      return { ok: true };
+    case 'send_message':
+      if (c.content !== undefined && typeof c.content !== 'string') return { ok: false, error: '本文が不正です。' };
+      return { ok: true };
+    case 'send_template':
+      if (c.templateId !== undefined && typeof c.templateId !== 'string') return { ok: false, error: 'テンプレートの指定が不正です。' };
+      return { ok: true };
+    case 'reminder':
+      if (c.reminderId !== undefined && typeof c.reminderId !== 'string') return { ok: false, error: 'リマインダの指定が不正です。' };
+      return { ok: true };
+    case 'event_booking':
+      if (c.eventId !== undefined && typeof c.eventId !== 'string') return { ok: false, error: 'イベント予約の指定が不正です。' };
       return { ok: true };
     default:
       return { ok: false, error: `知らないアクション種別です: ${actionType}` };
@@ -1675,7 +1687,7 @@ scenarios.post('/api/scenarios/:id/triggers', requireRole('owner', 'admin'), asy
     const scenarioId = c.req.param('id');
     const body = await c.req.json<{ kind?: string; tagId?: string | null }>();
     const kind = String(body.kind ?? '');
-    if (kind !== 'friend_add' && kind !== 'tag_added') {
+    if (!['friend_add', 'tag_added', 'form_answer', 'booking_confirmed'].includes(kind)) {
       return c.json({ success: false, error: 'きっかけの種類が不正です。' }, 400);
     }
     if (kind === 'tag_added' && !body.tagId) {
@@ -1694,7 +1706,7 @@ scenarios.post('/api/scenarios/:id/triggers', requireRole('owner', 'admin'), asy
       if (!tag) return c.json({ success: false, error: 'タグが見つかりません。' }, 400);
     }
 
-    await addScenarioTrigger(c.env.DB, scenarioId, kind, body.tagId ?? null);
+    await addScenarioTrigger(c.env.DB, scenarioId, kind as 'friend_add' | 'tag_added' | 'form_answer' | 'booking_confirmed', body.tagId ?? null);
     const rows = await getScenarioTriggers(c.env.DB, scenarioId);
     return c.json({
       success: true,
@@ -1704,6 +1716,23 @@ scenarios.post('/api/scenarios/:id/triggers', requireRole('owner', 'admin'), asy
     console.error('POST /api/scenarios/:id/triggers error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
+});
+
+// GET /api/scenarios/:id/draft — 編集画面を開いたときの下書き読み返し。
+scenarios.get('/api/scenarios/:id/draft', scenarioPermission('view'), async (c) => {
+  const lineAccountId = (c.req.query('lineAccountId') ?? '').trim();
+  if (!lineAccountId) return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+  const scopeError = await requireScenarioAccountScope(c, lineAccountId);
+  if (scopeError) return scopeError;
+  const row = await c.env.DB.prepare(
+    `SELECT scenario_id, line_account_id, version, after_actions_json, updated_by, updated_at
+       FROM scenario_drafts WHERE scenario_id = ? AND line_account_id = ?`,
+  ).bind(c.req.param('id'), lineAccountId).first<{ scenario_id: string; line_account_id: string; version: number; after_actions_json: string; updated_by: string; updated_at: string }>();
+  if (!row) return c.json({ success: true, data: null });
+  return c.json({ success: true, data: {
+    scenarioId: row.scenario_id, lineAccountId: row.line_account_id, version: row.version,
+    afterActions: parseJson(row.after_actions_json), updatedBy: row.updated_by, updatedAt: row.updated_at,
+  }});
 });
 
 scenarios.delete(
