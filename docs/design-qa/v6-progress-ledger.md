@@ -94,7 +94,7 @@
 | 3 | `I6UAdr` | 3-1-D 友だち詳細 | 4.0050%（前回値） | 0px | 中央・中央 | docs | [差分画像](friends-v6/I6UAdr-diff-1920.png) | **一致** |
 | 3 | `bzDn6` | 3-1-E 友だち一覧の状態（空・読込・エラー） | 4.2564%（前回値） | 0px | 上部・右 | docs | [差分画像](friends-v6/bzDn6-diff-1920.png) | **一致** |
 | 3 | `YzxU1` | 3-2 重複検出 | 5.0436%（前回値） | +1px | 中央・右 | docs | [差分画像](friends-v6/YzxU1-diff-1920.png) | **一致** |
-| 3 | `InCDe` | 3-2-A 重複候補詳細・統合前確認 | 4.9524%（前回値） | 0px | 中央・左 | docs | [差分画像](friends-v6/InCDe-diff-1920.png) | **一致** |
+| 3 | `InCDe` | 3-2-A 重複候補詳細・統合前確認 | 5.0101%（前回値） | 0px | 中央・左 | docs | [差分画像](friends-v6/InCDe-diff-1920.png) | **一致** |
 | 3 | `r7eSi` | 3-3 統合ユーザー | 3.8002%（前回値） | 0px | 中央・右 | docs | [差分画像](friends-v6/r7eSi-diff-1920.png) | **一致** |
 | 3 | `w8W4Eh` | 3-3-A 統合ユーザー詳細 | 4.8487%（前回値） | 0px | 中央・中央 | docs | [差分画像](friends-v6/w8W4Eh-diff-1920.png) | **一致** |
 | 3 | `vtBCu` | 3-4 UID移行 | 5.9972%（前回値） | 0px | 中央・中央 | docs | [差分画像](friends-v6/vtBCu-diff-1920.png) | **一致** |
@@ -140,9 +140,9 @@
 | 7 | `dC0yg` | 7-1-J 一覧の状態（空・読込・エラー） | 2.9622%（前回値） | 0px | 中央・中央 | docs | [差分画像](reminders-v6/dC0yg-diff-1920.png) | **一致** |
 | 8 | `cmDfJ` | 8-1 自動応答 | 3.7387%（前回値） | 0px | 中央・左 | docs | [差分画像](auto-replies-v6/cmDfJ-diff-1920.png) | **一致** |
 | 8 | `K7vg2` | 8-1-A 自動応答ルール編集 | 10.7442% ⚠（前回値） | +36px ⚠ | 中央・右 | docs | [差分画像](auto-replies-v6/K7vg2-diff-1920.png) | **一致** |
-| 8 | `nzWIX` | 8-1-B 反応条件 | 5.2352%（前回値） | 0px | 中央・左 | docs | [差分画像](auto-replies-v6/nzWIX-diff-1920.png) | **一致** |
+| 8 | `nzWIX` | 8-1-B 反応条件 | 5.2352% | 0px | 中央・左 | docs | [差分画像](auto-replies-v6/nzWIX-diff-1920.png) | **一致** |
 | 8 | `ivDoe` | 8-1-C 応答とアクション | 10.9790% ⚠（前回値） | 0px | 中央・右 | docs | [差分画像](auto-replies-v6/ivDoe-diff-1920.png) | **一致** |
-| 8 | `U9hzqH` | 8-1-D 競合と優先順位 | 5.0830% | +23px | 中央・左 | docs | [差分画像](auto-replies-v6/U9hzqH-diff-1920.png) | **一致** |
+| 8 | `U9hzqH` | 8-1-D 競合と優先順位 | 5.0830%（前回値） | +23px | 中央・左 | docs | [差分画像](auto-replies-v6/U9hzqH-diff-1920.png) | **一致** |
 | 8 | `g46ja` | 8-1-E 自動応答テスト | 5.9914%（前回値） | 0px | 中央・右 | docs | [差分画像](auto-replies-v6/g46ja-diff-1920.png) | **一致** |
 | 8 | `Yj6CQ` | 8-1-F 最終確認 | 5.6140%（前回値） | 0px | 下部・中央 | docs | [差分画像](auto-replies-v6/Yj6CQ-diff-1920.png) | **一致** |
 | 8 | `e6iJG` | 8-1-G 有効化完了 | 4.5472%（前回値） | +23px | 下部・右 | docs | [差分画像](auto-replies-v6/e6iJG-diff-1920.png) | **一致** |

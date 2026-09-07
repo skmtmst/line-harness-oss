@@ -231,7 +231,7 @@ export default function DuplicatesPage() {
 
           <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
             <h2 className="text-sm font-bold text-[#1D1D1F]">アカウント別ブレイクダウン</h2>
-            <p className="mt-1 text-xs text-[#8B938D]">どのアカウントに重複が偏っているかを見ます。</p>
+            <p className="mt-1 text-xs text-ink-faint">どのアカウントに重複が偏っているかを見ます。</p>
             {data.perAccount.length === 0 ? (
               <p className="mt-3 text-sm text-[#8B938D]">アカウントが登録されていません。</p>
             ) : (

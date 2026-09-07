@@ -17,6 +17,7 @@ import {
 import { IdentityStateBlock } from '@/components/identity/identity-state'
 import { useIdentityReview } from '@/components/identity/identity-review'
 import styles from '@/components/identity/identity-review.module.css'
+import './issue481-height.css'
 
 /**
  * 設計 `InCDe` 3-2-A「重複候補の確認」。
@@ -43,10 +44,7 @@ export default function FriendIdentityCandidatesPage() {
   const tagCandidates = detail && 'tagCandidates' in detail ? detail.tagCandidates : []
 
   return (
-    <div
-      className={`${styles.screen} [&_[data-identity-part=assurance]>p:last-child]:hidden [&_[data-identity-part=assurance]]:py-3`}
-      style={{ gap: 14 }}
-    >
+    <div className={styles.screen} data-issue481-identity style={{ gap: 14 }}>
       <div className="flex min-h-10 items-center justify-between gap-3">
         <Breadcrumb items={[{ label: '重複検出', href: '/friends?tab=duplicates' }, { label: '候補 #D-018' }]} />
         <Button href="/friends?tab=duplicates">重複検出へ</Button>

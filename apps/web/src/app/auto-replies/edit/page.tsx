@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import EditDialog, { toVersionDraft, type AutoReplyDraft } from '@/components/auto-replies/edit-dialog'
-import heightStyles from './issue481-height.module.css'
+import './issue481-height.css'
 
 /**
  * 自動応答の編集を、URL で開けるようにする。
@@ -90,7 +90,7 @@ function AutoReplyEditInner() {
   }, [id])
 
   return (
-    <div className={heightStyles.screen}>
+    <div data-issue481-height>
       <nav className="text-ink-faint mb-4 text-xs">
         <Link href="/auto-replies" className="hover:underline">
           自動応答
