@@ -177,6 +177,7 @@ export type AuditEventSummary = {
 }
 
 export type FriendProfileCandidateOption = {
+  candidateId: string
   sourceFriendId: string
   sourceLabel: string
   valuePreview: string | null
@@ -204,6 +205,15 @@ export type IdentityCandidateWithProfiles = IdentityCandidateDetail & {
 export type MergedPersonWithCandidates = MergedPersonDetail & {
   profileCandidates: FriendProfileCandidate[]
   tagCandidates: FriendTagCandidate[]
+}
+
+export type UpdateMergedProfileCandidatesRequest = {
+  expectedRevision: number
+  selections: Array<{
+    fieldKey: string
+    candidateId: string
+    updateMode: 'auto' | 'fixed'
+  }>
 }
 
 export type FriendSavedView = {
@@ -3210,6 +3220,56 @@ export type NenFriendOverview = {
   photos: Array<Record<string, unknown>>
   pointLedger: Array<Record<string, unknown>>
   ecEvents: Array<Record<string, unknown>>
+}
+
+export type PhotoReviewMetrics = {
+  pendingCount: number
+  reviewedCount: number
+  averageReviewMinutes: number | null
+  oldestPendingAt: string | null
+  attentionCount: number
+}
+
+export type PhotoAssetRun = {
+  id: string
+  photoId: string
+  lineAccountId: string
+  requestedVersion: number
+  status: 'queued' | 'processing' | 'completed' | 'failed'
+  requestedBy: string
+  createdAt: string
+  startedAt: string | null
+  completedAt: string | null
+  errorMessage: string | null
+  operation?: 'review' | 'public' | 'thumbnail' | 'all'
+}
+
+export type PhotoAssetStatus = {
+  reviewVersion: number
+  jobs: PhotoAssetRun[]
+}
+
+export type PhotoDerivatives = {
+  reviewVersion: number
+  items: Array<{
+    kind: string
+    sourceVersion: number
+    objectKey: string
+    contentType: string
+    byteSize: number | null
+    width: number | null
+    height: number | null
+    createdAt: string
+  }>
+  knownUrls: Array<{ kind: string; url: string; sourceVersion: number }>
+}
+
+export type PhotoBulkDecision = {
+  photoId: string
+  decision: 'approve' | 'return' | 'reject'
+  expectedVersion: number
+  reasonCode: 'quality' | 'privacy' | 'unrelated' | 'duplicate' | 'other' | null
+  reasonNote: string | null
 }
 
 export type AdPlatform = {
@@ -6849,9 +6909,54 @@ export const api = {
     careFlags: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/care-flags'),
     updateCareFlag: (id: string, data: { status: 'active' | 'resolved'; adviceReady: boolean }) => fetchApi<{ success: boolean }>(`/api/nen-members/care-flags/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
     photos: (accountId: string) => fetchApi<ApiResponse<Array<Record<string, unknown>>>>(`/api/nen-members/photos?accountId=${encodeURIComponent(accountId)}`),
+    photoReviewMetrics: (accountId: string) => fetchApi<ApiResponse<PhotoReviewMetrics>>(
+      `/api/nen-members/photos/review-metrics?accountId=${encodeURIComponent(accountId)}`,
+    ),
     photo: (id: string, accountId: string) => fetchApi<ApiResponse<Record<string, unknown>>>(
       `/api/nen-members/photos/${encodeURIComponent(id)}?accountId=${encodeURIComponent(accountId)}`,
     ),
+    photoAssetStatus: (id: string, accountId: string) => fetchApi<ApiResponse<PhotoAssetStatus>>(
+      `/api/nen-members/photos/${encodeURIComponent(id)}/assets/status?accountId=${encodeURIComponent(accountId)}`,
+    ),
+    photoDerivatives: (id: string, accountId: string) => fetchApi<ApiResponse<PhotoDerivatives>>(
+      `/api/nen-members/photos/${encodeURIComponent(id)}/assets/derivatives?accountId=${encodeURIComponent(accountId)}`,
+    ),
+    processPhotoAssets: (
+      id: string,
+      data: { lineAccountId: string; expectedVersion: number; operation: 'review' | 'public' | 'thumbnail' | 'all' },
+      idempotencyKey: string,
+    ) => fetchApi<ApiResponse<PhotoAssetRun>>(
+      `/api/nen-members/photos/${encodeURIComponent(id)}/assets/process`,
+      { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(data) },
+    ),
+    bulkReviewPhotos: (
+      data: { lineAccountId: string; decisions: PhotoBulkDecision[] },
+      idempotencyKey: string,
+    ) => fetchApi<ApiResponse<{ updatedCount: number; awardedPoints: number; notificationFailures: number }>>(
+      '/api/nen-members/photos/decisions/bulk',
+      { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(data) },
+    ),
+    photoOriginalStepUp: (code: string) => fetchApi<ApiResponse<{
+      token: string
+      purpose: 'photo.original.download'
+      expiresAt: string
+    }>>('/api/auth/step-up', {
+      method: 'POST', body: JSON.stringify({ code, purpose: 'photo.original.download' }),
+    }),
+    issuePhotoOriginalDownload: (
+      id: string,
+      data: { lineAccountId: string; expectedVersion: number },
+      stepUpToken: string,
+      idempotencyKey: string,
+    ) => fetchApi<ApiResponse<{ downloadUrl: string; expiresAt: string; oneTime: true }>>(
+      `/api/nen-members/photos/${encodeURIComponent(id)}/original-download`,
+      {
+        method: 'POST',
+        headers: { 'X-Step-Up-Token': stepUpToken, 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify(data),
+      },
+    ),
+    downloadPhotoOriginal: (downloadUrl: string) => fetchApiBlob(downloadUrl),
     photoPublications: (accountId: string) => fetchApi<ApiResponse<{
       summary: { publishedCount: number; placementCount: number; topPhoto: Record<string, unknown> | null; consentedCount: number }
       items: Array<Record<string, unknown>>
@@ -8117,9 +8222,14 @@ export const api = {
       fetchApi<ApiResponse<MergedPersonWithCandidates>>(
         `/api/friends/people/${encodeURIComponent(id)}`,
       ),
-    update: (id: string, body: UpdateMergedPersonRequest) =>
+    update: (id: string, body: Omit<UpdateMergedPersonRequest, 'profileSelections'>) =>
       fetchApi<ApiResponse<MergedPersonDetail>>(
         `/api/friends/people/${encodeURIComponent(id)}`,
+        { method: 'PATCH', body: JSON.stringify(body) },
+      ),
+    updateProfileValues: (id: string, body: UpdateMergedProfileCandidatesRequest) =>
+      fetchApi<ApiResponse<MergedPersonWithCandidates>>(
+        `/api/friends/people/${encodeURIComponent(id)}/profile-values`,
         { method: 'PATCH', body: JSON.stringify(body) },
       ),
     updateDeliveryPriorities: (

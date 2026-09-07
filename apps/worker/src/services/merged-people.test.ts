@@ -9,6 +9,10 @@ import {
   updateMergedPerson,
   updateMergedPersonDeliveryPriorities,
 } from './merged-people.js';
+import {
+  getFriendProfileCandidates,
+  resolveProfileCandidateSelections,
+} from './friend-profile-candidates.js';
 
 const actor = { id: 'owner-a', name: '担当者', tenantId: DEFAULT_TENANT_ID };
 
@@ -95,6 +99,28 @@ function seed() {
 }
 
 describe('merged person detail contract', () => {
+  it('adopts a masked candidate by a value-bound candidate id and rejects a changed source', async () => {
+    const { db, raw } = seed();
+    const candidates = await getFriendProfileCandidates(db, ['friend-a', 'friend-b']);
+    const displayName = candidates.profileCandidates.find((field) => field.fieldKey === 'display_name');
+    const option = displayName?.options.find((item) => item.sourceFriendId === 'friend-b');
+    expect(option?.candidateId).toMatch(/^pc_[0-9a-f]{64}$/);
+    expect(JSON.stringify(candidates)).not.toContain('090-1234-5678');
+
+    const resolved = await resolveProfileCandidateSelections(db, ['friend-a', 'friend-b'], [{
+      fieldKey: 'display_name', candidateId: option!.candidateId, updateMode: 'fixed',
+    }]);
+    expect(resolved).toMatchObject([{
+      fieldKey: 'display_name', value: '田中 はなこ', sourceFriendId: 'friend-b',
+      valuePreview: '田中 はなこ', updateMode: 'fixed',
+    }]);
+
+    raw.prepare('UPDATE friends SET display_name = ? WHERE id = ?').run('変更後の名前', 'friend-b');
+    await expect(resolveProfileCandidateSelections(db, ['friend-a', 'friend-b'], [{
+      fieldKey: 'display_name', candidateId: option!.candidateId, updateMode: 'fixed',
+    }])).rejects.toThrow('PROFILE_CANDIDATE_STALE');
+  });
+
   it('returns links, safe adopted values, priorities, and link history without raw PII', async () => {
     const { db } = seed();
     const detail = await getMergedPerson(db, DEFAULT_TENANT_ID, 'user-a');

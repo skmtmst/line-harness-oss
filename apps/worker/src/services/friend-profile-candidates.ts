@@ -21,6 +21,7 @@ type TagRow = {
 };
 
 export type FriendProfileCandidateOption = {
+  candidateId: string;
   sourceFriendId: string;
   sourceLabel: string;
   valuePreview: string | null;
@@ -43,6 +44,12 @@ export type FriendTagCandidate = {
 type SelectionReference = {
   fieldKey: string;
   sourceFriendId: string;
+  updateMode: MergedPersonProfileUpdateMode;
+};
+
+export type ProfileCandidateSelectionReference = {
+  fieldKey: string;
+  candidateId: string;
   updateMode: MergedPersonProfileUpdateMode;
 };
 
@@ -89,6 +96,17 @@ function sourceValue(row: FriendValueRow, fieldKey: string): MergedPersonJsonVal
   return undefined;
 }
 
+/** 候補を見た時点の値へ結び付ける。元データが変われば同じIDでは採用できない。 */
+async function profileCandidateId(
+  fieldKey: string,
+  sourceFriendId: string,
+  value: MergedPersonJsonValue,
+): Promise<string> {
+  const input = new TextEncoder().encode(JSON.stringify([fieldKey, sourceFriendId, value]));
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', input));
+  return `pc_${[...digest].map((byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+}
+
 async function friendRows(db: D1Database, friendIds: string[]): Promise<FriendValueRow[]> {
   const ids = [...new Set(friendIds.filter(Boolean))];
   if (ids.length === 0) return [];
@@ -117,6 +135,7 @@ export async function getFriendProfileCandidates(
       if (value === undefined || value === null || value === '') continue;
       const candidate = fields.get(fieldKey) ?? { fieldKey, fieldLabel, options: [] };
       candidate.options.push({
+        candidateId: await profileCandidateId(fieldKey, row.id, value),
         sourceFriendId: row.id,
         sourceLabel: row.display_name || '名前は未取得',
         valuePreview: maskPreview(value),
@@ -147,6 +166,46 @@ export async function getFriendProfileCandidates(
     profileCandidates: [...fields.values()],
     tagCandidates: [...tagMap.values()],
   };
+}
+
+export async function resolveProfileCandidateSelections(
+  db: D1Database,
+  friendIds: string[],
+  selections: ProfileCandidateSelectionReference[],
+): Promise<MergedPersonProfileSelectionInput[]> {
+  const rows = await friendRows(db, friendIds);
+  const fields = new Set<string>();
+  const resolved: MergedPersonProfileSelectionInput[] = [];
+  for (const selection of selections) {
+    if (fields.has(selection.fieldKey)) throw new Error('PROFILE_SELECTION_DUPLICATE');
+    fields.add(selection.fieldKey);
+    let selectedRow: FriendValueRow | null = null;
+    let selectedValue: MergedPersonJsonValue | undefined;
+    for (const row of rows) {
+      const value = sourceValue(row, selection.fieldKey);
+      if (value === undefined || value === null || value === '') continue;
+      if (await profileCandidateId(selection.fieldKey, row.id, value) === selection.candidateId) {
+        selectedRow = row;
+        selectedValue = value;
+        break;
+      }
+    }
+    if (!selectedRow || selectedValue === undefined) throw new Error('PROFILE_CANDIDATE_STALE');
+    resolved.push({
+      fieldKey: selection.fieldKey,
+      fieldLabel: FIELD_LABELS[selection.fieldKey]
+        ?? selection.fieldKey.replace(/^metadata\./, ''),
+      value: selectedValue,
+      valuePreview: maskPreview(selectedValue),
+      sourceType: selection.fieldKey.startsWith('metadata.') ? 'friend_field' : 'friend',
+      sourceId: selectedRow.id,
+      sourceLabel: selectedRow.display_name || '名前は未取得',
+      sourceFriendId: selectedRow.id,
+      verifiedAt: null,
+      updateMode: selection.updateMode,
+    });
+  }
+  return resolved;
 }
 
 export async function resolveFriendProfileSelections(
