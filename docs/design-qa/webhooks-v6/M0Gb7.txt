@@ -4,9 +4,6 @@
 画
 画面確認アカウント
 Ver. 0.0.0-dev
-
-メイン
-
 ダッシュボード
 受信箱
 友だち
@@ -64,9 +61,7 @@ LINEアカウント
 ログインユーザー
 機能設定
 運用状態
-1
-1 件
-こちらで受け取る
+外部連携
 LINEアカウント
 然
 然-NEN- TEST
@@ -79,13 +74,16 @@ LINEアカウント
 統括
 画面確認
 ログアウト
-自動化›外部連携
-見本から作る
-受け取り口を追加
 こちらから送る 6
 こちらで受け取る 3
 やり取りの記録
 見本 14
+こちらで受け取る
+
+相手のサービスで起きたことを、うちに取り込みます。
+
+見本から作る
+受け取り口を追加
 
 相手のサービスで起きたことを、うちに取り込みます。下のURLを相手に貼ってもらってください。合言葉は人に見せないでください。
 
@@ -94,7 +92,7 @@ LINEアカウント
 相手のサービスの「Webhook URL」に、下のURLを貼ってください。
 
 動いています
-http://localhost:3107/api/webhooks/incoming/iwh-booking/receive
+http://127.0.0.1:3106/api/webhooks/incoming/iwh-booking/receive
 コピー
 だれの出来事か（人の見分けかた）
 メールアドレスで探す
@@ -129,11 +127,11 @@ http://localhost:3107/api/webhooks/incoming/iwh-booking/receive
 そのほかの受け取り口
 アンケートツールから
 アンケートツール
-http://localhost:3107/api/webhooks/incoming/iwh-survey/rece•••
+http://127.0.0.1:3106/api/webhooks/incoming/iwh-survey/rece•••
 動いています
 会計ソフトから
 決済サービス
-http://localhost:3107/api/webhooks/incoming/iwh-accounting/rece•••
+http://127.0.0.1:3106/api/webhooks/incoming/iwh-accounting/rece•••
 止めています
 むずかしい言葉の言いかえ
 Webhook（ウェブフック）
