@@ -1,4 +1,4 @@
-# 23-1 EC連携
+# 23-1 EC連携-normal
 # /ec-commerce
 
 画

@@ -2278,32 +2278,47 @@ export const SCREENS = [
   },
 
   // ── 機能23 EC連携 ───────────────────────────────────────
-  { ...EC, node: 'eI3gs', name: '23-1 EC連携', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #236 / UI HEAD b82dd41bc を3105/8792で再撮影。構造一致・出来事の詳細API待ち。** 4入口、今日の取込・未照合・失敗・最終受信の4指標、照合方針の案内、検索、状態絞り込み、並び順、設計順の6列表をそろえた。未照合の行は会員のつき合わせへ進める。1440・1920pxとも横はみ出し0、壊れ値・外部イベントIDの露出0。残る差は注文金額・商品明細・個別アクション台帳・失敗だけを再試行するAPIで、値や押し口を作らず未取得と明記したため一致にはしない。', verdictSource: 'ec-v6/eI3gs.txt + 2026-09-07 1440/1920px screenshots', verdictHead: 'b82dd41bc' },
+  {
+    ...EC, node: 'eI3gs', name: '23-1 EC連携',
+    states: {
+      apis: ['**/api/ec-commerce/overview**', '**/api/ec-commerce/orders?**', '**/api/ec-commerce/action-executions?**'],
+      kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'],
+    },
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #396 / UI `3d4feb8c1`・固定データ統合 #1175 を3106/8793で再撮影し一致判定。設計画像なし。** `.txt` 正本と実装画像を照合し、4入口、4指標、照合方針、検索、5状態絞り込み、並び順、6列表を同じ順で確認した。注文金額・商品明細・個別処理の結果を実API契約から表示し、失敗行だけ再試行できる。通常・読込・空・失敗・権限不足の全12枚を1440/1920pxで撮影し、横はみ出し0、壊れ値・外部イベントID・秘密値の露出0。',
+    verdictSource: 'ec-v6/eI3gs.txt + ec-v6/eI3gs-normal-1920.png',
+    verdictHead: '3eb150971',
+  },
   {
     ...EC, node: 'ELayY', name: '23-1-A 会員のつき合わせ',
     route: '/ec-commerce/identity-candidates',
-    states: { apis: ['**/api/identity-candidates*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    states: {
+      apis: ['**/api/identity-candidates*', '**/api/ec-commerce/identity-candidates?**'],
+      kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'],
+    },
     variants: [{ suffix: '-decide', steps: [{ qaOpen: 'ELayY', after: 700 }] }],
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #236 / UI HEAD b82dd41bc を3105/8792で通常・読込・空・失敗・権限不足・判定窓まで再撮影。構造一致・集計API待ち。** 4入口、未照合・候補あり・自動照合・売上影響の4指標、照合根拠の案内、4絞り込み、並び順、影響列つき一覧を設計順にそろえた。メールと電話は伏せ字のまま、判定窓では過去LINEを再送しない既定を維持。全14枚で横はみ出し0、壊れ値・平文PII・内部IDの露出0。残る差は自動照合数・売上影響・候補なし／重複疑いの集計を返すAPIと撮影固定データで、未取得を0にしていないため一致にはしない。',
-    verdictSource: 'ec-v6/ELayY-{normal,loading,empty,error,forbidden,decide}.txt + 2026-09-07 screenshots',
-    verdictHead: 'b82dd41bc',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #396 / UI `3d4feb8c1`・固定データ統合 #1175 を3106/8793で再撮影し一致判定。設計画像なし。** `.txt` 正本と実装画像を照合し、4入口、未照合・候補あり・自動照合・売上影響の4指標、照合根拠、4絞り込み、並び順、影響列つき一覧を確認した。候補の根拠と確からしさを実API契約から読み、メール・電話は伏せ字のまま、判定窓は過去LINEを再送しない。通常・読込・空・失敗・権限不足・判定窓の全14枚を1440/1920pxで撮影し、横はみ出し0、壊れ値・平文PII・内部IDの露出0。',
+    verdictSource: 'ec-v6/ELayY.txt + ec-v6/ELayY-normal-1920.png + ec-v6/ELayY-decide-1920.png',
+    verdictHead: '3eb150971',
   },
   {
     ...EC, node: 'bfB50', name: '23-1-B 定期便',
     route: '/ec-commerce?tab=subscriptions',
     states: { apis: ['**/api/ec-commerce/subscriptions?**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-06 #258 で実装・撮影。設計画像なし。** `nen_ec_member_snapshots` の定期便契約をLINEアカウントで絞って表示し、通常・読込・空・失敗・権限不足を分けた。取得できない月別集計は0件にせず「—／未取得」。支払い確認はECの決済状態だけを根拠にし、将来止めるという予測はしていない。5状態を1440・1920pxで撮影し、全12枚で横はみ出し0、壊れ値0。設計画像が無いため、同じ幅の画像比較は未判定。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #396 / 固定データ統合 #1175 を3106/8793で再撮影し、構造一致・月別集計API待ちと判定。設計画像なし。** `.txt` 正本と実装画像を照合し、4入口、4指標、説明帯、検索、5状態絞り込み、6列の定期便一覧を確認した。実APIが返す継続・休止・決済確認・停止を表示し、取得できない開始数・停止数は0件にせず「—／未取得」。根拠のない離脱予測はせず、ECの決済状態だけを表示する。通常・読込・空・失敗・権限不足の全12枚を1440/1920pxで撮影し、横はみ出し0、壊れ値0。残る差は月別の開始・停止集計と離脱兆候を返す契約。',
     verdictSource: 'ec-v6/bfB50.txt + ec-v6/bfB50-normal-1920.png',
+    verdictHead: '3eb150971',
   },
   {
     ...EC, node: 'oHAN4', name: '23-1-C EC連携のつなぎ先',
     route: '/ec-commerce?tab=connector',
     states: { apis: ['**/api/ec-commerce/connector?**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-06 #258 で実装・撮影。設計画像なし。** LINEアカウントごとにECの種類・ドメイン・取り込む出来事・会員照合ルールを保存できる。鍵は暗号文と末尾4文字だけを保存し、画面へ値を返さない。通常・読込・空・失敗・権限不足を分け、取得できない影響件数は「— 未取得」。5状態を1440・1920pxで撮影し、全12枚で横はみ出し0、壊れ値・秘密値露出0。設計画像が無いため、同じ幅の画像比較は未判定。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #396 / 固定データ統合 #1175 を3106/8793で再撮影し、構造一致・影響件数API待ちと判定。設計画像なし。** `.txt` 正本と実装画像を照合し、4入口、接続状態、ショップ情報、取込対象6種、照合順3段、取込状況、つながる先を確認した。鍵は保存後に読み戻さず末尾4文字だけ表示する。通常・読込・空・失敗・権限不足の全12枚を1440/1920pxで撮影し、横はみ出し0、壊れ値・秘密値露出0。残る差はNEN配信・成果・マイル・友だち属性・分析への影響件数を数える契約で、未取得を0件にしていない。',
     verdictSource: 'ec-v6/oHAN4.txt + ec-v6/oHAN4-normal-1920.png',
+    verdictHead: '3eb150971',
   },
 
   // ── 機能24 LINE通知 ─────────────────────────────────────
@@ -2593,13 +2608,9 @@ export const SCREENS = [
   /* 設計の4入口を同じ帯へ置き、受付枠・休業日は既存の勤務設定へつないだ。 */
   { ...BOOKING_SET, node: 'QSLEH', name: '28-1 予約設定', clock: '2026-08-26T00:00:00.000Z', verdict: 'match', verdictNote: '**2026-09-07 Issue #370 / UI HEAD `e1126c5c9` を3107/8794で再撮影し、★V6設計と一致。** PR #1107 の店舗設定と8件のメニューを実API契約で読み、4入口、出している6件・休止2件、最多メニュー、9:00〜19:00の受付時間、60日先までの受付範囲、設計順の6列表、担当者、料金、公開操作、ページ送りをそろえた。1440・1920pxとも横はみ出し0、内部語・壊れ値0件。', verdictSource: 'booking-settings-v6/QSLEH.txt + 2026-09-07 QSLEH 1440/1920px screenshots', verdictHead: 'e1126c5c9' },
   { ...BOOKING_SET, node: 'tksPc',
-    /*
-      スタッフを選ぶまで受付時間が出ない画面。選ばずに撮ると
-      「選んでください」の1枚しか残らない。
-    */
-    steps: [{ click: '佐々木' }],
+    clock: '2026-09-07T00:00:00.000Z',
     states: {
-      apis: ['**/api/booking/admin/staff/**'],
+      apis: ['**/api/booking/admin/settings*', '**/api/booking/admin/menus*', '**/api/booking/admin/availability*'],
       kinds: ['normal', 'loading', 'error'],
     }, name: '28-1-A 受付枠と休業日', route: '/booking/staff/shifts', verdict: 'unjudged', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** **撮れていないので判定しない。** スタッフの固定データが空で、押し口（設計の見本では「佐々木」）が0件。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** head `595c8359` で**受付時間を曜日×時間の格子**にした。1行ずつだと「何曜の何時なら受け付けるか」を見比べられない。受け付ける時間が入っている幅だけを出す。**特別な日を「休業」と決めつけない**——見出しは「特別な休み・営業」で、どちらかは口が言っていないので件数だけ示して一覧へ渡す。通常・読込中・取得失敗の3状態を撮った。**`getDay()` が閲覧側の時計で曜日を出す不具合を直した**（開発機がUTC+7で月曜が日曜に化けた）。残る差：設計はGoogleカレンダーの予定も格子に重ねる（予定を返す口が要る）', verdictSource: 'Claude実装' , verdictHead: '31293424' },
   { ...BOOKING_SET, node: 'GhOb3', name: '28-1-B 予約メニューをつくる', route: '/booking/menus/new', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #241 / PR #1022 / UI HEAD abae52d46 を3105/8792で再撮影。構造一致・価格種別と共通設定API待ち。** 予約後の受付通知、前日・開始前リマインダ、実際の「予約してくれた」マイルルール300を同じ画面で確認でき、予約画面プレビュー・担当・質問・公開状態まで設計順に表示した。1440・1920pxとも横はみ出し0。残る差は固定額・無料・お問い合わせを区別して保存する価格種別と、店舗共通値を継承／上書きするAPI。値を作らず現在の保存契約に合わせているため一致にはしない。', verdictSource: 'booking-settings-v6/GhOb3.txt + 2026-09-07 1440/1920px screenshots', verdictHead: 'abae52d46' },
@@ -2613,7 +2624,15 @@ export const SCREENS = [
   },
 
   // ── 機能29 イベント予約 ─────────────────────────────────
-  { ...EVENT, node: 'ugP5y', name: '29-1 イベント予約', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-06 Issue #242 / PR #1015 / UI HEAD c31b32f90 を3105/8792で最終照合。構造一致・自動繰り上げの口待ち。** 一覧APIの固定データを接続し、状態タブ、4つの判断帯、検索、実働する並び順、イベントごとの中身・申込者導線を設計の位置へそろえた。1440・1920pxとも横スクロール0。自動のキャンセル待ち繰り上げはWorkerが未対応で、設計の青い自動化案内だけは事実として出せないため一致にはしない。', verdictSource: 'events-v6/ugP5y.txt + 2026-09-06 1440/1920px screenshots', verdictHead: 'c31b32f90' },
+  {
+    ...EVENT,
+    node: 'ugP5y',
+    name: '29-1 イベント予約',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #403 / PR #1176 で実APIの自動繰上げ取り込み後に再撮影し、一致。** #351 / PR #1168 の席解放・案内期限切れを再試行台帳へ積む処理と、定期処理から先頭のキャンセル待ちへ期限付き案内する処理を確認した。これにより、前回唯一出せなかった青い自動化案内を設計と同じ位置・文言で表示した。3102/8789 の1440px・1920pxはいずれも横はみ出し0。一覧、4つの判断帯、検索、並び順、絞り込み、行操作に後退なし。設計との差分として検出される人数・日付・店舗名は撮影用固定データの値で、画面構造の差ではない。',
+    verdictSource: 'events-v6/ugP5y.txt + ugP5y-{1440,1920}.png + apps/worker/src/services/event-waitlist.ts',
+    verdictHead: 'ea4284f42',
+  },
   { ...EVENT, node: 'MKrPY', name: '29-1-A イベントをつくる', route: '/events/new', verdict: 'match', verdictNote: '**2026-09-06 Issue #242 / PR #1015 / UI HEAD c31b32f90 を3105/8792で最終照合して一致。** 概要と同じ画面で最初の開催日・開始・所要時間・定員を入力し、イベント本体と予約枠を続けて保存する。右側に入力連動のLINEプレビュー、満席時のキャンセル待ち、承認制、前日通知を配置した。保存途中で枠だけ失敗してもイベントを重複作成しない。1440・1920pxとも横スクロール0。', verdictSource: 'events-v6/MKrPY.txt + 2026-09-06 1440/1920px screenshots', verdictHead: 'c31b32f90' },
   {
     /*
@@ -2642,7 +2661,7 @@ export const SCREENS = [
   // ── 機能30 ログインユーザー ─────────────────────────────
   {
     ...STAFF, node: 'e3jz3', name: '30-1 ログインユーザー',
-    states: { apis: ['**/api/staff', '**/api/login-audit*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    states: { apis: ['**/api/access/users*', '**/api/access/roles*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-07 Issue #243 / PR #1039 / UI HEAD 1b4774050 を3105/8792で再撮影。構造一致・集計データ待ち。** いまいる人・招待中・入った記録・権限のかたまりの4タブ、4指標、見せる範囲の案内、役割の札、並び順、設計順の6列をそろえた。二段階認証の未設定は上の注意で残し、役割・表示機能・LINE連携・通知・利用状態の編集も維持した。1440・1920pxとも横はみ出し0。残る差は90日未使用の正確な集計、一覧全員の最終ログイン、役割bundle総数を返すAPIで、現在の監査200件から推測せず未取得と明記したため一致にはしない。',
     verdictSource: 'staff-v6/e3jz3-1920.png + staff-v6/e3jz3-{normal,loading,empty,error,forbidden}.txt + Pencil node e3jz3', verdictHead: '1b4774050',
@@ -2659,7 +2678,7 @@ export const SCREENS = [
     verdictHead: '7b509106',
   },
   { ...STAFF, node: 'jwVlo', name: '30-1-B 入った記録', route: '/staff?tab=audit',
-    states: { apis: ['**/api/login-audit*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    states: { apis: ['**/api/audit/events*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #243 / PR #1039 / UI HEAD 1b4774050 を3105/8792で再撮影。構造一致・共通監査API待ち。** 4指標、説明帯、検索、期間・表示件数、6つの絞り込み札、並び順、設計順の5列、CSV書き出し、取得範囲内のページ送りをそろえた。失敗・拒否は赤く表示し、通常・読込・空・失敗・権限不足を分ける。1440・1920pxとも横はみ出し0。残る差は全業務操作、総件数、対象詳細、変更前後、場所のrisk判定を返す共通監査APIで、現在のログイン監査5種類だけでは埋められない。未取得を作り値にしないため一致にはしない。',
     verdictSource: 'staff-v6/jwVlo-1920.png + staff-v6/jwVlo-{normal,loading,empty,error,forbidden}.txt + Pencil node jwVlo', verdictHead: '1b4774050',
   },
@@ -3977,9 +3996,17 @@ const ISSUE_212_REVIEW = {
 const ISSUE_305_REVIEW = {
   tksPc: {
     verdict: 'structure_match_data_pending',
-    note: '曜日別の受付時間、担当者の切替、特別な休み・営業、予約ルール、顧客向けカレンダープレビュー、困りごと、関連画面、Googleカレンダー連携を設計順へそろえた。通常・読込中・取得失敗を1440/1920pxで撮影し、全6枚で横はみ出し0。残る差は、店舗共通の営業時間と複数休憩、休業理由つき例外日、店舗・設備単位の同時受付数、顧客向け○△×休プレビューを返すAPIがないこと。存在しない値を作らず、現在取得できる担当者別時間・特別営業時間・メニュー別ルール・Google連携だけを表示しているため一致にはしない。',
+    prefix: '**2026-09-07 Issue #401で再判定。** ',
+    note: '店舗の曜日別営業時間、休業日3件、予約ルール、顧客向け○×休プレビュー、困りごと、関連画面を実契約データで表示した。通常・読込中・取得失敗を1440/1920pxで撮影し、全8枚で横はみ出し0。残る差は、店舗・設備単位の1時間受付上限と顧客向け残数による△を返すAPIがないこと。存在しない値を作らず、△は区別しない理由を画面に明記しているため一致にはしない。',
     source: 'booking-settings-v6/tksPc-{normal,loading,error}.txt + 2026-09-07 1440/1920px screenshots',
-    head: 'a89279ce7',
+    head: '7ebf0d654',
+  },
+  GhOb3: {
+    verdict: 'structure_match_data_pending',
+    prefix: '**2026-09-07 Issue #401で再判定。** ',
+    note: '価格種別、店舗共通の受付期間・締め切り・キャンセル期限、担当者、予約後通知・リマインダ・マイルを実契約へ接続し、1440/1920pxで横はみ出し0を確認した。残る差は、Pencilの入力例データと横並びの見た目に対して、未入力の新規作成状態と既存の共通作成画面構造を表示していること。入力例を実データとして作らず、現在の作成契約に合わせているため一致にはしない。',
+    source: 'booking-settings-v6/GhOb3.txt + 2026-09-07 1440/1920px screenshots',
+    head: '7ebf0d654',
   },
 }
 
@@ -4189,7 +4216,7 @@ for (const screen of SCREENS) {
   const issue305Review = ISSUE_305_REVIEW[screen.node]
   if (screen.feature === 28 && issue305Review) {
     screen.verdict = issue305Review.verdict
-    screen.verdictNote = `**2026-09-07 Issue #305で修正・再判定。** ${issue305Review.note}`
+    screen.verdictNote = `${issue305Review.prefix ?? '**2026-09-07 Issue #305で修正・再判定。** '}${issue305Review.note}`
     screen.verdictSource = issue305Review.source
     screen.verdictHead = issue305Review.head
   }
@@ -4680,6 +4707,7 @@ export const CAPTURED_AT = {
     { pr: 983, head: '36e8b070b', on: '2026-09-06', screens: ['IAf7j','I6UAdr','bzDn6','YzxU1','r7eSi'], note: 'Issue #265 続き。残り5画面を設計構造へ直し、3102/8789で定義済み全状態32枚を1440/1920px撮影。5画面を一致へ更新し、全画像で横はみ出し0、壊れ値・内部ID0。' },
   ],
   28: [
+    { pr: 1177, head: '7ebf0d654', on: '2026-09-07', screens: ['tksPc', 'GhOb3'], note: 'Issue #401。店舗営業時間・休業日・予約ルール・空きプレビュー、価格種別・店舗共通ルール継承を実契約へ接続。3105/8792で1440/1920pxを撮影し、全10枚で横はみ出し0。未提供APIとPencil入力例の差は理由付き構造一致・データ未接続とした。' },
     { pr: 1126, head: 'e1126c5c9', on: '2026-09-07', screens: ['QSLEH', 'W6465r'], note: 'Issue #370。店舗設定と8件のメニューを実API契約へ接続し、通常・読込中・空・失敗を3107/8794で1440/1920px撮影。全10枚で横はみ出し0、2画面を一致へ更新した。' },
     { pr: 1096, head: 'a89279ce7', on: '2026-09-07', screens: ['tksPc'], note: 'Issue #305。3107/8794で通常・読込中・取得失敗を1440/1920px撮影し、全6枚で横はみ出し0。曜日別受付時間と右側プレビューをV6構造へそろえ、未提供APIに依存する値は作らず理由つきの構造一致・データ未接続とした。' },
     { pr: 517, head: '43d3d20e', on: '2026-08-30', screens: ['tksPc'], note: '受付時間。Googleカレンダーとの関係を先に書く' },
@@ -4689,6 +4717,7 @@ export const CAPTURED_AT = {
     { pr: 1022, head: 'abae52d46', on: '2026-09-07', screens: ['QSLEH', 'GhOb3', 'W6465r'], note: 'Issue #241。予約設定の一覧・作成・一覧状態をV6構造へ直し、3105/8792で通常・読込・空・失敗を含む20枚を1440/1920px撮影。全画像で横はみ出し0。残るAPI差は各画面の判定注記へ記録した。' },
   ],
   29: [
+    { pr: 1176, head: 'ea4284f42', on: '2026-09-07', screens: ['ugP5y'], note: 'Issue #403。キャンセル待ちの自動繰上げ処理を確認し、案内を設計どおり表示。3102/8789で1440/1920pxを撮影し、横はみ出し0で一致へ更新した。' },
     { pr: 533, head: 'd1070487', on: '2026-08-29', screens: ['k5m5Bc'], note: 'イベント予約の帯を未取得 `—` に。**#533 は #518 を含む**' },
     { pr: 467, head: '6bb950f3', on: '2026-08-30', screens: ['MKrPY', 'i5SN2j', 'ugP5y'], note: 'イベント予約の作成・予約者・一覧。キャンセル待ちの口を撮影モックへ足した（無いと `waitlist.length` で落ちる）' },
     { pr: 533, head: 'c9d33d95', on: '2026-08-30', screens: ['ugP5y', 'k5m5Bc'], note: '帯が「次に何をするか」になった。あと少しで満席・申し込みが少ない。未取得と実値0も言い分ける' },

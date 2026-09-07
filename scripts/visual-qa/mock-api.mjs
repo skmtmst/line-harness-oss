@@ -72,17 +72,20 @@ import {
   TAG_IMPORT_SAMPLE_ROWS, tagImportPreview, tagImportResult, REMINDER_RUNS,
   ACTION_SCORE_RULES,
   SUPPORT_MARKS, SUPPORT_MARK_ARCHIVE_IMPACT, SUPPORT_MARK_AUTOMATION_RULES,
-  OUTGOING_WEBHOOKS, INCOMING_WEBHOOKS, ENTRY_ROUTES, INFLOW_SUMMARY,
+  OUTGOING_WEBHOOKS, INCOMING_WEBHOOKS, INCOMING_WEBHOOK_DETAILS, ENTRY_ROUTES, INFLOW_SUMMARY,
   SITE_TRACKING_SUMMARY, SITE_TRACKING_PAGES, AD_PLATFORMS, AD_CONVERSION_LOGS,
   STAFF_MEMBERS, LOGIN_AUDIT,
   AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS,
+  AFFILIATE_SETTLEMENT_PREVIEW, AFFILIATE_SETTLEMENT_CREATED, AFFILIATE_PAYOUT_BATCH, AFFILIATE_STATEMENT,
   MILEAGE_EARNING_RULES, MILEAGE_FRIENDS, MILEAGE_HISTORY, MILEAGE_OVERVIEW,
   COMMON_ACTIONS, COMMON_ACTION_DETAIL, AUTOMATIONS, AUTOMATION_RUNS, AUTOMATION_TEMPLATES,
   BOOKING_MENUS, BOOKING_SETTINGS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY,
   BOOKING_AVAILABILITY_RULES, BOOKING_STAFF_SHIFTS, BOOKING_GOOGLE_CALENDAR,
   BOOKING_PROXY_CREATE, BOOKING_REQUESTS,
   EC_NOTIFICATION_SETTINGS, EC_NOTIFICATION_RUNS, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, NEN_PHOTO_DETAIL,
-  NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, MILEAGE_RULES,
+  NEN_PHOTO_REVIEW_METRICS, NEN_PHOTO_ASSET_STATUS, NEN_PHOTO_DERIVATIVES,
+  NEN_PHOTO_ASSET_PROCESS_RESULT, NEN_PHOTO_BULK_DECISION_RESULT,
+  NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, EC_ORDERS, EC_ACTION_EXECUTIONS, EC_IDENTITY_CANDIDATES, MILEAGE_RULES,
   FORM_FOLDERS, FORMS, FORM_DETAIL,
   LINE_ACCOUNTS, LINE_ACCOUNT_DETAIL, LINE_ACCOUNT_VERIFY_CONNECTION, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
   CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
@@ -90,6 +93,7 @@ import {
   OPERATION_CONTROL_PREVIEW, OPERATION_HEALTH, OPERATION_HISTORY,
   WEBINARS, WEBINAR_FOLDERS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_ANALYTICS,
   FRIEND_ADD_RULE_PUBLISH, FRIEND_ADD_RULE_VALIDATE,
+  ACCESS_USERS, ACCESS_ROLES, ACCESS_AUDIT_EVENTS,
   GETTING_STARTED, RECIPES, MANUAL_LINKS,
 } from './fixtures.mjs'
 
@@ -1145,6 +1149,120 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/auth/session') {
     return { success: true, data: STAFF, csrfToken: 'visual-qa-csrf' }
   }
+  if (pathname === '/api/affiliate-settlements/preview') {
+    return { success: true, data: AFFILIATE_SETTLEMENT_PREVIEW }
+  }
+  if (pathname === '/api/ec-commerce/orders') {
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 100) : 20
+    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    const status = query.get('status')
+    const search = (query.get('query') ?? '').trim().toLocaleLowerCase('ja')
+    const filtered = EC_ORDERS.items.filter((order) => {
+      if (status && order.status !== status) return false
+      if (!search) return true
+      return order.orderNumber.toLocaleLowerCase('ja').includes(search)
+        || (order.customerName ?? '').toLocaleLowerCase('ja').includes(search)
+    })
+    const total = status || search ? filtered.length : EC_ORDERS.total
+    return {
+      success: true,
+      data: { ...EC_ORDERS, items: filtered.slice(offset, offset + limit), total },
+      pagination: { total, limit, offset },
+    }
+  }
+  if (pathname === '/api/ec-commerce/action-executions') {
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 100) : 20
+    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    const status = query.get('status')
+    const eventId = query.get('eventId')
+    const filtered = EC_ACTION_EXECUTIONS.items.filter((execution) => (
+      (!status || execution.status === status) && (!eventId || execution.eventId === eventId)
+    ))
+    const total = status || eventId ? filtered.length : EC_ACTION_EXECUTIONS.total
+    return {
+      success: true,
+      data: { ...EC_ACTION_EXECUTIONS, items: filtered.slice(offset, offset + limit), total },
+      pagination: { total, limit, offset },
+    }
+  }
+  if (pathname === '/api/ec-commerce/identity-candidates') {
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 100) : 20
+    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    const status = query.get('status') ?? 'pending'
+    const filtered = EC_IDENTITY_CANDIDATES.items.filter((candidate) => candidate.status === status)
+    const total = status === 'pending' ? EC_IDENTITY_CANDIDATES.total : filtered.length
+    return {
+      success: true,
+      data: { ...EC_IDENTITY_CANDIDATES, items: filtered.slice(offset, offset + limit), total },
+      pagination: { total, limit, offset },
+    }
+  }
+  if (pathname === '/api/access/users') {
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 200) : 50
+    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    const status = query.get('status')
+    const roleBundle = query.get('roleBundle')
+    const search = (query.get('query') ?? '').trim().toLocaleLowerCase('ja')
+    const filtered = ACCESS_USERS.items.filter((user) => {
+      if (status && user.status !== status) return false
+      if (roleBundle && user.roleBundle !== roleBundle) return false
+      if (!search) return true
+      return user.name.toLocaleLowerCase('ja').includes(search)
+        || (user.email ?? '').toLocaleLowerCase('ja').includes(search)
+    })
+    return {
+      success: true,
+      data: {
+        ...ACCESS_USERS,
+        items: filtered.slice(offset, offset + limit),
+        pagination: { total: filtered.length, limit, offset },
+      },
+    }
+  }
+  if (pathname === '/api/access/roles') return { success: true, data: ACCESS_ROLES }
+  if (pathname === '/api/audit/events') {
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 200) : 20
+    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    const category = query.get('category')
+    const result = query.get('result')
+    const actorId = query.get('actorId')
+    const action = query.get('action')
+    const search = (query.get('query') ?? '').trim().toLocaleLowerCase('ja')
+    const from = query.get('from') ? Date.parse(query.get('from')) : null
+    const to = query.get('to') ? Date.parse(query.get('to')) : null
+    const filtered = ACCESS_AUDIT_EVENTS.items.filter((event) => {
+      if (category && event.category !== category) return false
+      if (result && event.result !== result) return false
+      if (actorId && event.actor.id !== actorId) return false
+      if (action && event.action !== action) return false
+      const createdAt = Date.parse(event.createdAt)
+      if (Number.isFinite(from) && createdAt < from) return false
+      if (Number.isFinite(to) && createdAt > to) return false
+      if (!search) return true
+      return [event.actor.name, event.action, event.target?.kind, event.target?.id, event.reason]
+        .some((value) => String(value ?? '').toLocaleLowerCase('ja').includes(search))
+    })
+    const hasFilter = Boolean(category || result || actorId || action || search || Number.isFinite(from) || Number.isFinite(to))
+    const total = hasFilter ? filtered.length : ACCESS_AUDIT_EVENTS.pagination.total
+    return {
+      success: true,
+      data: {
+        ...ACCESS_AUDIT_EVENTS,
+        items: filtered.slice(offset, offset + limit),
+        pagination: { total, limit, offset },
+      },
+    }
+  }
   if (pathname === '/api/getting-started') return { success: true, data: GETTING_STARTED }
   if (pathname === '/api/recipes') return { success: true, data: RECIPES }
   const recipeDetail = /^\/api\/recipes\/([^/]+)$/.exec(pathname)
@@ -1711,6 +1829,13 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: { id: STAFF.id, name: STAFF.name, role: STAFF.role, email: null } }
   }
   if (pathname === '/api/webhooks/outgoing') return { success: true, data: OUTGOING_WEBHOOKS }
+  const incomingWebhookDetail = /^\/api\/webhooks\/incoming\/([^/]+)$/.exec(pathname)
+  if (incomingWebhookDetail) {
+    const detail = INCOMING_WEBHOOK_DETAILS[incomingWebhookDetail[1]]
+    return detail
+      ? { success: true, data: detail }
+      : { success: false, error: 'Not found' }
+  }
   if (pathname === '/api/webhooks/incoming') return { success: true, data: INCOMING_WEBHOOKS }
   if (pathname === '/api/entry-routes') return { success: true, data: ENTRY_ROUTES }
   if (pathname === '/api/entry-route-genres') {
@@ -1832,7 +1957,23 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname === '/api/nen-members/photos') return { success: true, data: NEN_PHOTOS }
+  if (pathname === '/api/nen-members/photos/review-metrics') {
+    return { success: true, data: NEN_PHOTO_REVIEW_METRICS }
+  }
   if (pathname === '/api/nen-members/photos/publications') return { success: true, data: NEN_PHOTO_PUBLICATIONS }
+  const photoAssetStatus = /^\/api\/nen-members\/photos\/([^/]+)\/assets\/status$/.exec(pathname)
+  if (photoAssetStatus) {
+    return {
+      success: true,
+      data: {
+        ...NEN_PHOTO_ASSET_STATUS,
+        jobs: NEN_PHOTO_ASSET_STATUS.jobs.map((job) => ({ ...job, photoId: photoAssetStatus[1] })),
+      },
+    }
+  }
+  if (/^\/api\/nen-members\/photos\/[^/]+\/assets\/derivatives$/.test(pathname)) {
+    return { success: true, data: NEN_PHOTO_DERIVATIVES }
+  }
   if (/^\/api\/nen-members\/photos\/[^/]+$/.test(pathname)) return { success: true, data: NEN_PHOTO_DETAIL }
   if (pathname === '/api/ec-commerce/overview') return { success: true, data: EC_OVERVIEW }
   /* 取り込みの記録。ページ送りの数を器の外に持つ口。 */
@@ -2387,6 +2528,43 @@ const server = createServer((req, res) => {
             : BOOKING_PROXY_CREATE.unavailable
         res.writeHead(fixed.status).end(JSON.stringify(fixed.body))
       })
+      return
+    }
+    /*
+      成果の締め・振込データ・明細（機能16）。本番と同じHTTP状態と器を返すが、
+      DB更新、ファイル生成、紹介者への通知は一切行わない。
+    */
+    if (method === 'POST' && url.pathname === '/api/affiliate-settlements') {
+      res.writeHead(201).end(JSON.stringify({ success: true, data: AFFILIATE_SETTLEMENT_CREATED }))
+      return
+    }
+    if (method === 'POST' && url.pathname === '/api/affiliate-payout-batches') {
+      res.writeHead(201).end(JSON.stringify({ success: true, data: AFFILIATE_PAYOUT_BATCH }))
+      return
+    }
+    if (method === 'POST' && url.pathname === '/api/affiliate-statements') {
+      res.writeHead(201).end(JSON.stringify({
+        success: true, data: AFFILIATE_STATEMENT, notificationAttempted: true,
+      }))
+      return
+    }
+    /*
+      写真審査の一括判断と派生画像処理。撮影用に本番と同じ受付結果を返すだけで、
+      審査・ポイント付与・画像生成・通知は一切実行しない。
+    */
+    if (method === 'POST' && url.pathname === '/api/nen-members/photos/decisions/bulk') {
+      res.writeHead(201).end(JSON.stringify({
+        success: true, duplicate: false, data: NEN_PHOTO_BULK_DECISION_RESULT,
+      }))
+      return
+    }
+    const photoAssetProcess = /^\/api\/nen-members\/photos\/([^/]+)\/assets\/process$/.exec(url.pathname)
+    if (method === 'POST' && photoAssetProcess) {
+      res.writeHead(202).end(JSON.stringify({
+        success: true,
+        duplicate: false,
+        data: { ...NEN_PHOTO_ASSET_PROCESS_RESULT, photoId: photoAssetProcess[1] },
+      }))
       return
     }
     // 機能3の保存した検索。DBへは書かず、本番契約と同じ201と保存済みの器を返す。
