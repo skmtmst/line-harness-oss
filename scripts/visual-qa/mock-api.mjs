@@ -89,6 +89,7 @@ import {
   OPERATION_CONTROL_PREVIEW, OPERATION_HEALTH, OPERATION_HISTORY,
   WEBINARS, WEBINAR_FOLDERS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_ANALYTICS,
   FRIEND_ADD_RULE_PUBLISH, FRIEND_ADD_RULE_VALIDATE,
+  GETTING_STARTED, RECIPES, MANUAL_LINKS,
 } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
@@ -928,6 +929,12 @@ const SHAPES = {
  * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
  */
 function visualQaWriteBody(method, pathname) {
+  if (method === 'POST' && /^\/api\/recipes\/[^/]+\/clone$/.test(pathname)) {
+    return { runId: 'visual-recipe-clone-run', status: 'succeeded', createdCount: 16, items: [] }
+  }
+  if (method === 'POST' && pathname === '/api/manual-links/check') {
+    return { checked: 265, ok: 263, broken: 2, unset: 1 }
+  }
   if (method === 'POST' && /^\/api\/friend-add-rules\/[^/]+\/validate$/.test(pathname)) {
     return FRIEND_ADD_RULE_VALIDATE
   }
@@ -1130,6 +1137,13 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/auth/session') {
     return { success: true, data: STAFF, csrfToken: 'visual-qa-csrf' }
   }
+  if (pathname === '/api/getting-started') return { success: true, data: GETTING_STARTED }
+  if (pathname === '/api/recipes') return { success: true, data: RECIPES }
+  const recipeDetail = /^\/api\/recipes\/([^/]+)$/.exec(pathname)
+  if (recipeDetail) {
+    return { success: true, data: RECIPES.find((recipe) => recipe.id === recipeDetail[1]) ?? null }
+  }
+  if (pathname === '/api/manual-links') return { success: true, data: MANUAL_LINKS }
   if (pathname === '/api/operations/control/preview') {
     return { success: true, data: OPERATION_CONTROL_PREVIEW }
   }

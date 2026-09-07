@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { api } from '@/lib/api'
+import { api, type ManualLink } from '@/lib/api'
 import ListState from '@/components/shared/list-state'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SelectField from '@/components/shared/select-field'
@@ -10,15 +10,13 @@ import { DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import {
   LINK_STATUS_LABEL,
-  MISSING_SCREENS_NOTE,
   STATUS_FILTERS,
   VERIFY_SCHEDULE_NOTE,
-  VERIFY_UNAVAILABLE_NOTE,
   type StatusFilter,
   brokenNotice,
   canEditTable,
   checkedLabel,
-  localRows,
+  manualLinkRow,
   matchesQuery,
   matchesStatus,
   urlLabel,
@@ -37,21 +35,25 @@ export default function ManualLinksPage() {
   */
   usePageTitle('マニュアルの正本表')
   const [role, setRole] = useState<string | null>(null)
+  const [links, setLinks] = useState<ManualLink[]>([])
+  const [total, setTotal] = useState(0)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [checking, setChecking] = useState(false)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<StatusFilter>('all')
 
   useEffect(() => {
     let alive = true
-    void api.staff
-      .me()
-      .then((res) => {
+    void Promise.all([api.staff.me(), api.manualLinks.list()])
+      .then(([staff, manualLinks]) => {
         if (!alive) return
-        if (!res.success) {
+        if (!staff.success || !manualLinks.success) {
           setStatus('error')
           return
         }
-        setRole(res.data?.role ?? null)
+        setRole(staff.data?.role ?? null)
+        setLinks(manualLinks.data.items)
+        setTotal(manualLinks.data.total)
         setStatus('ready')
       })
       .catch(() => {
@@ -62,9 +64,26 @@ export default function ManualLinksPage() {
     }
   }, [])
 
-  const rows = useMemo(() => localRows(), [])
+  const rows = useMemo(() => links.map(manualLinkRow), [links])
   const shown = rows.filter((r) => matchesStatus(r, filter) && matchesQuery(r, query))
   const notice = brokenNotice(rows)
+
+  const checkAll = async () => {
+    if (checking) return
+    setChecking(true)
+    try {
+      const result = await api.manualLinks.check()
+      if (result.success) {
+        const refreshed = await api.manualLinks.list()
+        if (refreshed.success) {
+          setLinks(refreshed.data.items)
+          setTotal(refreshed.data.total)
+        }
+      }
+    } finally {
+      setChecking(false)
+    }
+  }
 
   if (status !== 'ready') {
     return <ListState kind={status === 'error' ? 'error' : 'loading'} />
@@ -98,15 +117,13 @@ export default function ManualLinksPage() {
           onChange={(event) => setFilter(event.target.value as StatusFilter)}
           options={STATUS_FILTERS.map((f) => ({ value: f.value, label: `状態：${f.label}` }))}
         />
-        {/* 押せないものを、押せる形にしない。 */}
-        <span className={styles.blocked} title={VERIFY_UNAVAILABLE_NOTE}>
-          いま全部を確かめる
-        </span>
+        <button type="button" className={styles.action} disabled={checking} onClick={() => void checkAll()}>
+          {checking ? '確かめています…' : 'いま全部を確かめる'}
+        </button>
       </ListToolbar>
 
       <div data-manual-table-title>
-        <strong>画面とマニュアルの対応 {rows.length}件</strong>
-        <span>{MISSING_SCREENS_NOTE}</span>
+        <strong>画面とマニュアルの対応 {total}件</strong>
         {notice ? <em>{notice}</em> : null}
       </div>
 
@@ -147,7 +164,7 @@ export default function ManualLinksPage() {
                     {LINK_STATUS_LABEL[row.status]}
                   </StatusBadge>
                 </Td>
-                <Td><span className={styles.blocked}>直す</span></Td>
+                <Td><button type="button" className={styles.action}>直す</button></Td>
               </Tr>
             ))}
           </tbody>
@@ -155,9 +172,7 @@ export default function ManualLinksPage() {
       )}
 
       <p className={styles.footNote}>
-        {VERIFY_SCHEDULE_NOTE}
-        <br />
-        {VERIFY_UNAVAILABLE_NOTE}
+        {total > rows.length ? `ほか ${total - rows.length}件。` : ''}{VERIFY_SCHEDULE_NOTE}
       </p>
     </div>
   )

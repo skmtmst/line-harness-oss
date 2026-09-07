@@ -2868,6 +2868,8 @@ function rangeQuery(params?: { from?: string; to?: string; accountId?: string })
 export interface GettingStartedStep {
   key: 'accounts' | 'attributes' | 'friendAdd' | 'scenario' | 'firstMessage'
   state: 'done' | 'stalled' | 'todo' | 'forbidden' | 'unknown'
+  href: string | null
+  reason: string | null
   /** 段1だけ。Webhook をアカウントごとに確かめた結果。 */
   webhook?: Array<{ id: string; status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown' }>
 }
@@ -2897,7 +2899,9 @@ export interface ManualLink {
   /** **確かめていない URL は `ok` にならない。** */
   status: 'ok' | 'broken' | 'unset'
   lastCheckedAt: string | null
+  lastHttpStatus: number | null
   lastError: string | null
+  version: number
 }
 
 /** 事前確認の4区分。設計 ★V6 33-4 の言葉と1対1。 */
@@ -4858,10 +4862,10 @@ export const api = {
      * 複製する。**冪等キーが要る。** 同じキーで2回呼んでも2回作らない。
      * 途中失敗は全部戻る（部分的に作らない）。
      */
-    clone: (id: string, input: { accountId: string; namePrefix?: string | null }, idempotencyKey: string) =>
+    clone: (id: string, input: { accountId: string; namePrefix?: string | null; expectedVersion: number }, idempotencyKey: string) =>
       fetchApi<ApiResponse<{
         runId: string
-        status: 'running' | 'succeeded' | 'failed'
+        status: 'queued' | 'succeeded' | 'failed' | 'rolled_back'
         createdCount: number
         items?: Array<{ kind: string; target_id: string; name: string }>
       }>>(`/api/recipes/${id}/clone`, {
@@ -4872,7 +4876,7 @@ export const api = {
     run: (runId: string) =>
       fetchApi<ApiResponse<{
         runId: string
-        status: 'running' | 'succeeded' | 'failed'
+        status: 'queued' | 'succeeded' | 'failed' | 'rolled_back'
         createdCount: number
         failureReason: string | null
         items: Array<{ kind: string; target_id: string; name: string }>
