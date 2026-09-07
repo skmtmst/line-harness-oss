@@ -237,8 +237,8 @@ export default function StaffShiftsPage() {
           <div className="min-w-0 flex-1 space-y-4">
             <section data-design="Week" className="bg-canvas border-hairline overflow-hidden rounded-card border">
               <div className="border-hairline border-b px-4 py-4">
-                <h2 className="text-ink font-semibold">曜日ごとの受付時間</h2>
-                <p className="text-ink-faint mt-1 text-xs">閉めた曜日は、お客様の画面に出ません。</p>
+                <h2 className="text-ink font-semibold">開ける時間</h2>
+                <p className="text-ink-faint mt-1 text-xs">曜日ごとの受付時間と1時間に受けられる数を決めます。閉めた曜日は、お客様の画面に出ません。</p>
               </div>
               <div className="divide-hairline divide-y">
                 {DAYS.map((day) => {
