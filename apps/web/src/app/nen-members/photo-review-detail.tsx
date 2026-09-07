@@ -51,7 +51,7 @@ export function PhotoReviewDetail({
   const reviewDerivative = derivatives?.items.find((item) => item.kind === 'review') ?? null
   const reviewUrl = derivatives?.knownUrls.find((item) => item.kind === 'review')?.url || text(photo.image_url)
   const latestAssetJob = assetStatus?.jobs[0] ?? null
-  return <main className="mx-auto max-w-screen-2xl p-6" data-photo-view="detail">
+  return <main className="mx-auto max-w-[1660px] p-6" data-photo-view="detail">
     {notice && <div className="mb-4 rounded-control border border-accent-border bg-accent-soft px-4 py-3 text-sm text-accent-hover">{notice}</div>}
     <div className="flex items-center justify-between gap-2 max-md:flex-col max-md:items-start">
       <div>
@@ -68,9 +68,9 @@ export function PhotoReviewDetail({
 
     {hasFaceRisk && <div className="mt-4"><NoteBar tone="warn">うしろに人の顔が写っている可能性があります（自動で見つけました）</NoteBar></div>}
 
-    <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-4">
-      <Card className="xl:col-span-3" overflow="hidden">
-        <div className="grid h-96 place-items-center overflow-hidden bg-ink lg:h-screen lg:max-h-screen">
+    <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
+      <Card overflow="hidden">
+        <div className="grid h-96 place-items-center overflow-hidden bg-ink lg:h-[760px]">
           {reviewUrl ? <img
             src={reviewUrl}
             alt={`${text(photo.pet_name)}の審査用写真`}
@@ -86,8 +86,7 @@ export function PhotoReviewDetail({
           <Button disabled={assetProcessing} onClick={onProcessReviewAsset}>{assetProcessing ? '作成中...' : '審査用画像を作り直す'}</Button>
           <Button onClick={() => { setDownloadOpen(true); setDownloadCode(''); setDownloadError('') }}>もとの画像を保存</Button>
         </div>
-        <p className="px-4 pb-1 pt-1 text-xs text-ink-faint">{numberOrDash(reviewDerivative?.width ?? photo.image_width)} × {numberOrDash(reviewDerivative?.height ?? photo.image_height)} ／ {(reviewDerivative?.byteSize ?? photo.image_byte_size) == null ? '—（未取得）' : `${(Number(reviewDerivative?.byteSize ?? photo.image_byte_size) / 1024 / 1024).toFixed(1)}MB`} ／ {text(photo.captured_device) || '—（未取得）'}</p>
-        <p className="px-4 pb-4 text-xs text-ink-faint">派生画像：{reviewDerivative ? `審査用 v${reviewDerivative.sourceVersion}` : latestAssetJob ? `${assetStatusLabel(latestAssetJob.status)}（v${latestAssetJob.requestedVersion}）` : '未取得'}</p>
+        <p className="px-4 pb-4 pt-1 text-xs text-ink-faint">{numberOrDash(reviewDerivative?.width ?? photo.image_width)} × {numberOrDash(reviewDerivative?.height ?? photo.image_height)} ／ {(reviewDerivative?.byteSize ?? photo.image_byte_size) == null ? '—（未取得）' : `${(Number(reviewDerivative?.byteSize ?? photo.image_byte_size) / 1024 / 1024).toFixed(1)}MB`} ／ {text(photo.captured_device) || '—（未取得）'}　派生画像：{reviewDerivative ? `審査用 v${reviewDerivative.sourceVersion}` : latestAssetJob ? `${assetStatusLabel(latestAssetJob.status)}（v${latestAssetJob.requestedVersion}）` : '未取得'}</p>
       </Card>
 
       <aside className="flex flex-col gap-3">

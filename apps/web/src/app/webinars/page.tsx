@@ -357,6 +357,7 @@ export default function WebinarsPage() {
           </section>
         </div>
       </div>
+      {archiveTarget ? <ArchiveReviewBackdrop target={archiveTarget} /> : null}
       <ConfirmDialog
         open={archiveTarget !== null}
         title="ウェビナーをアーカイブしますか？"
@@ -368,29 +369,37 @@ export default function WebinarsPage() {
         onCancel={() => { if (!archiving) setArchiveTarget(null) }}
         onConfirm={() => void archiveSelected()}
       >
-        {archiveTarget ? (
-          <div className="space-y-3" data-design-node="LKuAQ">
-            <section className="border-hairline rounded-control border p-3"><p className="text-ink-faint text-xs">アーカイブする対象</p><p className="text-ink mt-1 font-bold">{archiveTarget.title}</p><p className="text-ink-secondary mt-1 text-xs">申込者 {measuredCount(archiveTarget.registrationCount)}</p></section>
-            <section className="border-hairline rounded-control border p-3"><p className="text-ink text-sm font-bold">アーカイブしたあと</p><dl className="divide-hairline mt-2 divide-y text-xs"><div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">公開ページ</dt><dd className="text-ink text-right">公開URLが無効になります</dd></div><div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">分析結果</dt><dd className="text-ink text-right">視聴履歴とCTAの結果は消えません</dd></div><div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">復元</dt><dd className="text-ink text-right">あとから戻せます</dd></div></dl></section>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <section className="border-hairline rounded-control border p-3">
-                <p className="text-ink text-sm font-bold">設定サマリー</p>
-                <dl className="divide-hairline mt-2 divide-y text-xs">
-                  <div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">状態</dt><dd className="text-ink font-semibold">{STATUS_LABEL[archiveTarget.status]}</dd></div>
-                  <div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">申込</dt><dd className="text-ink font-semibold">{measuredCount(archiveTarget.registrationCount)}</dd></div>
-                  <div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">視聴</dt><dd className="text-ink font-semibold">{measuredCount(archiveTarget.viewerCount)}</dd></div>
-                </dl>
-              </section>
-              <section className="bg-accent-soft rounded-control p-3">
-                <p className="text-accent text-xs font-bold">LINEプレビュー</p>
-                <div className="bg-canvas text-ink mt-3 rounded-control p-3 text-xs shadow-card">このウェビナーは{archiveTarget.status === 'active' ? '公開中' : '非公開'}です。</div>
-                <div className="mt-3 flex gap-2"><Button disabled>テスト送信</Button><Button disabled>公開ページを見る</Button></div>
-              </section>
-            </div>
-          </div>
-        ) : null}
+        {archiveTarget ? <p className="rounded-control border border-danger bg-danger-soft p-3 text-xs font-semibold text-danger">申込者・視聴履歴・分析結果は消えません。ウェビナーの一覧には出なくなります。</p> : null}
         {archiveError ? <p className="text-danger text-sm">{archiveError}</p> : null}
       </ConfirmDialog>
     </>
+  )
+}
+
+function ArchiveReviewBackdrop({ target }: { target: WebinarListItem }) {
+  return (
+    <div className="bg-canvas-sunken fixed inset-y-[58px] left-[255px] right-0 z-[1] overflow-hidden px-10 py-5" data-design-node="LKuAQ">
+      <div className="mx-auto max-w-[1584px]">
+        <p className="text-accent text-xs font-bold">← ウェビナー一覧</p>
+        <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
+          <main className="space-y-4">
+            <section className="rounded-card border border-hairline bg-canvas p-5">
+              <h2 className="text-base font-bold text-ink">アーカイブする対象</h2>
+              <p className="mt-1 text-xs text-ink-secondary">アーカイブするウェビナーを確認します。</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2"><div><p className="text-xs font-bold text-ink-faint">ウェビナー</p><p className="mt-2 rounded-control border border-hairline px-3 py-2 text-sm font-semibold text-ink">{target.title}</p></div><div><p className="text-xs font-bold text-ink-faint">申込者</p><p className="mt-2 rounded-control border border-hairline px-3 py-2 text-sm font-semibold text-ink">{measuredCount(target.registrationCount)}</p></div></div>
+            </section>
+            <section className="rounded-card border border-hairline bg-canvas p-5">
+              <h2 className="text-base font-bold text-ink">アーカイブしたあと</h2>
+              <p className="mt-1 text-xs text-ink-secondary">アーカイブすると、一覧から外れて新しく使えなくなります。記録は残ります。</p>
+              <div className="mt-4 space-y-3"><div className="rounded-control border border-hairline p-4"><strong className="text-sm text-ink">公開ページ</strong><p className="mt-1 text-xs text-ink-secondary">公開URLが無効になります</p></div><div className="rounded-control border border-hairline p-4"><strong className="text-sm text-ink">分析結果</strong><p className="mt-1 text-xs text-ink-secondary">視聴履歴とCTAの結果は消えません</p></div></div>
+            </section>
+          </main>
+          <aside className="space-y-4">
+            <section className="rounded-card border border-hairline bg-canvas p-5"><h2 className="text-sm font-bold text-ink">設定サマリー</h2><dl className="mt-4 divide-y divide-hairline text-xs"><div className="flex justify-between py-3"><dt className="text-ink-faint">状態</dt><dd className="font-semibold text-ink">{STATUS_LABEL[target.status]}</dd></div><div className="flex justify-between py-3"><dt className="text-ink-faint">申込</dt><dd className="font-semibold text-ink">{measuredCount(target.registrationCount)}</dd></div><div className="flex justify-between py-3"><dt className="text-ink-faint">視聴</dt><dd className="font-semibold text-ink">{measuredCount(target.viewerCount)}</dd></div></dl></section>
+            <section className="min-h-[365px] rounded-card bg-[#7399c4] p-5"><p className="text-center text-xs font-bold text-white">LINEプレビュー</p><div className="mt-12 rounded-control bg-canvas p-4 text-xs text-ink">このウェビナーは{target.status === 'active' ? '公開中' : '非公開'}です。</div></section>
+          </aside>
+        </div>
+      </div>
+    </div>
   )
 }
