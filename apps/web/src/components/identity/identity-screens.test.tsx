@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { IdentityCandidateDetail } from '@line-crm/shared'
+import type { IdentityCandidateWithProfiles } from '@/lib/api'
 import IdentityDecisionDialog from './identity-decision-dialog'
 import {
   IdentityAssurance,
@@ -60,6 +61,19 @@ const CANDIDATE: IdentityCandidateDetail = {
   canDecide: true,
   canUndo: false,
   undoNote: '判定を取り消すと、根拠を確認する候補へ戻ります。',
+}
+
+const CANDIDATE_WITH_PROFILES: IdentityCandidateWithProfiles = {
+  ...CANDIDATE,
+  profileCandidates: [{
+    fieldKey: 'display_name',
+    fieldLabel: 'LINE表示名',
+    options: [
+      { sourceFriendId: CANDIDATE.left.id, sourceLabel: '候補A', valuePreview: '田中 はなこ', verified: false },
+      { sourceFriendId: CANDIDATE.right.id, sourceLabel: '候補B', valuePreview: '田中 花子', verified: false },
+    ],
+  }],
+  tagCandidates: [{ id: 'tag-vip', name: 'VIP', color: null, sourceFriendIds: [CANDIDATE.left.id] }],
 }
 
 describe('本人照合の候補部品', () => {
@@ -150,6 +164,15 @@ describe('本人照合の状態部品', () => {
 })
 
 describe('判定窓', () => {
+  it('採用値と利用目的の3確認を判定前に出す', () => {
+    const html = renderToStaticMarkup(
+      <IdentityDecisionDialog open candidate={CANDIDATE_WITH_PROFILES} busy={false} onCancel={() => {}} onSubmit={() => {}} />,
+    )
+    expect(html).toContain('統合プロフィールに採用する値')
+    expect(html).toContain('候補A：田中 はなこ')
+    expect(html).toContain('利用目的と同意・規約の確認')
+    expect(html.match(/type="checkbox"/g)).toHaveLength(3)
+  })
   it('3つの判定と理由入力を出し、理由が空なら送れない', () => {
     const html = renderToStaticMarkup(
       <IdentityDecisionDialog

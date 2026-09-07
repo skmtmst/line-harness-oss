@@ -209,6 +209,8 @@ describe('画面のつなぎ', () => {
 
   it('保存に読み込んだ版を付ける', () => {
     expect(detail).toContain('expectedRevision: person.revision')
+    expect(detail).toContain('api.mergedPeople.unlink')
+    expect(detail).toContain('元の友だちと過去の履歴は消さず')
   })
 
   it('同じ画面を二重に作らず、一覧の面を差し替える', () => {

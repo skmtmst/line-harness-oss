@@ -4,9 +4,13 @@
 
 import { purgeExpiredEventIdempotency } from './event-booking-idempotency.js';
 import { REQUESTED_EXPIRE_HOURS } from './event-booking-types.js';
+import { enqueueEventWaitlistPromotion } from './event-waitlist.js';
 
 interface StaleRow {
   id: string;
+  line_account_id: string;
+  event_id: string;
+  slot_id: string;
 }
 
 export interface RunEventBookingExpirerParams {
@@ -22,7 +26,7 @@ export async function runEventBookingExpirer(
   ).toISOString();
   const stale = await db
     .prepare(
-      `SELECT id FROM event_bookings
+      `SELECT id, line_account_id, event_id, slot_id FROM event_bookings
         WHERE status = 'requested' AND requested_at < ?
         LIMIT 200`,
     )
@@ -49,6 +53,13 @@ export async function runEventBookingExpirer(
       )
       .bind(row.id)
       .run();
+    await enqueueEventWaitlistPromotion(db, {
+      lineAccountId: row.line_account_id,
+      eventId: row.event_id,
+      occurrenceId: row.slot_id,
+      sourceKey: `booking:${row.id}:expired`,
+      now: params.now,
+    });
     expired++;
   }
 
