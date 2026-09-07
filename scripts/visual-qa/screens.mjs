@@ -1525,8 +1525,9 @@ export const SCREENS = [
     verdictNote: '**2026-09-07 Issue #430 / #1194 の固定応答で再判定。** `/api/rich-menu-groups/rmg-1` と画像取得口から保存済み名称・フォルダ・画像・面A〜Fを読み、14字制限、7レイアウト、切替タブ、LINEプレビュー、入力例を確認した。1440・1920とも横スクロールはなく、下書き編集を実データで表示している。',
     verdictHead: '49484d5ab', route: '/rich-menus/edit?id=rmg-1', },
   { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 #253 で再照合。** 構造一致・データ接続済み。設計画像と実装画像を同じ比較入力で見比べ、STEP 2、対象条件、優先順位、対象1,020人・上位と重なる180人・実際に出る840人、LINEプレビューを確認した。条件は保存済みの要約を先に出し、編集時だけ展開するため、設計の常時展開とは表示密度が異なる。実数は `/api/rich-menu-groups/:id/preview-targets` が現在の友だちと上位条件から数え、数えられない場合は0を作らない。1440・1920とも横スクロール0。取得元 `rich-menus-v6/kQ1bs.txt` と同Node画像。', verdictHead: '89166aa03', route: '/rich-menus/edit?id=rmg-1&step=targeting', mode: 'viewport', height: 1080, },
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #440 で再判定。** `/api/rich-menu-groups/rmg-1/preview-targets` の固定応答から、対象1,020人・上位メニューとの重複180人・実際に出る840人・優先順位2を表示した。STEP 2、保存済み条件、標準15軸・追加6軸、保存導線を設計画像と照合し、1440・1920とも横はみ出し0。取得できない人数を0人に置き換えない契約も維持している。',
+    verdictSource: 'rich-menus-v6/kQ1bs.txt + rich-menus-v6/kQ1bs-1920.png', verdictHead: '3ddca80cc4', route: '/rich-menus/edit?id=rmg-1&step=targeting', mode: 'viewport', height: 1080, },
   {
     /*
       **#509 で `/rich-menus/connections?id=` が入った。**
@@ -2316,18 +2317,18 @@ export const SCREENS = [
     route: '/ec-commerce?tab=subscriptions',
     states: { apis: ['**/api/ec-commerce/subscriptions?**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #431。** 定期便の月別件数・金額と開始／停止集計を固定応答へ追加し、契約値を表示できる状態にした。',
+    verdictNote: '**2026-09-07 Issue #440 で再判定。** `/api/ec-commerce/subscriptions` の固定応答から、月別3か月の件数・金額、今月開始12件・停止3件・最多取消理由、継続172件と決済確認14人を表示した。通常・読込・空・失敗・権限不足を1440・1920で撮影し、全状態で横はみ出し0。予測値は作らず、ECの決済状態を根拠にしている。',
     verdictSource: 'ec-v6/bfB50.txt + ec-v6/bfB50-normal-1920.png',
-    verdictHead: '3eb150971',
+    verdictHead: '3ddca80cc4',
   },
   {
     ...EC, node: 'oHAN4', name: '23-1-C EC連携のつなぎ先',
     route: '/ec-commerce?tab=connector',
     states: { apis: ['**/api/ec-commerce/connector?**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #431。** EC連携の下流影響件数を固定応答へ追加し、契約値を表示できる状態にした。',
+    verdictNote: '**2026-09-07 Issue #440 で再判定。** `/api/ec-commerce/connector` の固定応答から、NEN配信3件・コンバージョン18件・マイル2件・友だち属性7件・分析5件と、再試行は3回まで・10分間隔を表示した。通常・読込・空・失敗・権限不足を1440・1920で撮影し、全状態で横はみ出し0、鍵は末尾4文字以外を露出していない。',
     verdictSource: 'ec-v6/oHAN4.txt + ec-v6/oHAN4-normal-1920.png',
-    verdictHead: '3eb150971',
+    verdictHead: '3ddca80cc4',
   },
 
   // ── 機能24 LINE通知 ─────────────────────────────────────
@@ -2343,13 +2344,14 @@ export const SCREENS = [
   }, name: '24-1 LINE通知', verdict: 'match', verdictNote: '**2026-09-07 Issue #430 で再判定。** `/api/ec-commerce/overview` と設定固定応答から通知定義・30日集計（96、148、32、132、20、96、88、74、51）を表示し、一覧の「LINE上で表示」と状態別画面を確認した。個人の開封値は契約どおり作らず、未取得表示も仕様内。1440/1920の全状態で横はみ出しはない。', verdictSource: 'line-notify-v6/festr-{normal,empty,error,forbidden}.txt + festr-normal-1920.png', verdictHead: '49484d5ab' },
   {
     ...LINE_NOTIFY, node: 'Q55bb', name: '24-1-A お知らせの中身を編集する',
-    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #331 / UI HEAD `c2e140c321` を3102/8789で再判定。** 統合96の通知定義APIへ接続し、公開版番号、編集下書き、楽観ロックつき下書き保存、公開、停止を実装した。公開済み版を直接変更せず、公開前の下書きと分離する。1440/1920の2枚で横はみ出し0。#1077の固定データには新しい通知定義が無いため、撮影では従来設定の編集表示へ安全に戻っており、版操作を画像で実証できない。テスト送信専用の新APIも未実装のため、構造一致・データ待ちを維持する。', verdictSource: 'line-notify-v6/Q55bb.txt + Q55bb-1920.png',
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #440 で再判定。** `/api/line-notifications/customer-definitions` の固定応答から「発送した」の公開版v2と編集下書きを読み、見出し・本文・差し込み項目・ボタン・プレビュー・保存と公開を表示した。`/api/ec-commerce/test-send` の固定応答でテスト送信後の成功表示も撮影した。1440・1920とも横はみ出し0で、公開中の版を下書き保存だけで変えない。', verdictSource: 'line-notify-v6/Q55bb.txt + line-notify-v6/Q55bb-1920.png + line-notify-v6/Q55bb-test-sent-1920.png',
     mode: 'viewport', height: 1136, /*
       **押し口は「内容を編集」。** 「発送した」は行の名前で、押せる役を持っていない
       （`role: 'text'` は ARIA に無く0件になる）。設計の並び順で3番目なので `nth: 2`。
     */
     steps: [{ click: '内容を編集', nth: 2, after: 800 }],
-    verdictHead: 'c2e140c321',
+    variants: [{ suffix: '-test-sent', steps: [{ click: '自分にテスト送信', after: 800 }] }],
+    verdictHead: '3ddca80cc4',
   },
   {
     ...LINE_NOTIFY, node: 'X8JCA5', name: '24-1-B 送れなかったもの',
@@ -2702,7 +2704,7 @@ export const SCREENS = [
   { ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new', verdict: 'unjudged', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** **撮れていないので判定しない。** `/staff/new` を開くとログイン画面になった。撮影の途中でモックが落ちたときと同じ症状なので、**モックを起こし直して撮り直す**。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **P2 人を招待する。段の作りは設計どおり。**#475 `15febf7f` で撮った。ルート `/staff/new`。段は 1 どなたを追加するか（名前・メールアドレス）→ 2 役割 → 3 最初に表示するLINEアカウント。**良い点**：役割を**できることの文で**説明する（管理者「すべての権限で設定・操作できます」／スタッフ「選択した機能だけを操作できます」／閲覧のみ「すべて閲覧できますが、操作はできません」）。「このアドレスに招待メールが届きます。」と**何が起きるかを書く**。3段目に「ログイン直後の表示だけを決めます。組織内のほかのアカウントにも切り替えて操作できます。」と、**この設定が何を縛らないか**まで書く。**P2 残る差**：設計 30-1-C は LINE連携での招待も選べるが、実装はメールだけ。担当範囲の割り当ても追加後の「範囲を編集」へ回している。内部語・壊れ値0件、1440・1920とも横スクロール0。取得元：`staff-v6/I3ZSrU.txt` **推奨修正**：LINE連携での招待と担当範囲割り当ては書き込み契約の追加後に接続する。', verdictSource: 'staff-v6/I3ZSrU.txt' , verdictHead: '31293424' },
 
   // ── 機能31 機能設定 ─────────────────────────────────────
-  { ...FEATURE_SET, node: 'c4R6F', name: '31-1 機能設定', verdict: 'needs_fix', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正。**機能の説明文が6つ足りない**（ECの会員・注文・定期便データを取り込みます／LINEアカウントの登録と切り替え／UIDなど既存データの移行状況を確認します／GBP投稿・LINE配信・メニュー改定の承認／GBP口コミ返信と最新情報の下書き管理／予約前・来店後・口コミ・会員証のLINEカード）。**説明が無いと、切り替えたときに何が起きるか分からない。**※ 設計側: この1枚だけ **2004×1248** で、1920 にも 1080 にも収まらない。※ 設計側: 設計に「未対応の数」が描かれている。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#478 `66883866` で撮った。** **オフにしたときに何が起きないかを先に書く**——「オフにしても作ったデータは削除されません。**公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。**」。機能設定・並び替え・初期値に戻すが揃う。内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計は機能ごとに「いま使っている数」を並べて、切ってよいかを判断させる。実装は一覧と並び替えまで **ルート**：`/settings`。**推奨修正**：機能ごとに「いま使っている数」を並べて、切ってよいかを判断させる。**`QQ1SR`（分析の使われ方）が8分類の作成数・利用中を既に返している**ので、**同じ口をここでも読む**のが早い。「オフにしても作ったデータは削除されません。公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。」の断りは残す。', verdictSource: 'settings-v6/c4R6F.txt' , verdictHead: '31293424' },
+  { ...FEATURE_SET, node: 'c4R6F', name: '31-1 機能設定', verdict: 'match', verdictNote: '**2026-09-07 Issue #440 で再判定。** `/api/settings/features` と `/api/analytics/usage` を並行取得し、友だち属性22/101、シナリオ11/11、テンプレート0/0、リッチメニュー2/4、回答フォーム5/8、流入・成果9/16、オートメーション3/7の利用中／作成数を表示した。取得できない共通情報・登録メディアは0にせず「利用数は未取得」と明示する。説明、必須表示、切替、並び替え、初期値復元を設計画像と照合し、1440・1920とも横はみ出し0。', verdictSource: 'settings-v6/c4R6F.txt + settings-v6/c4R6F-1920.png', verdictHead: '3ddca80cc4' },
 
   // ── 機能32 運用状態 ─────────────────────────────────────
   /* タブ3本は設計とそろっている（健全性チェック／緊急コントロール／更新履歴）。 */
@@ -3312,9 +3314,9 @@ const ISSUE_422_REVIEW = {
   k8VCU: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で通常・読込中・0件・取得失敗を1440・1920pxで再撮影。** 全状態で横はみ出し0。状態を分け、未取得を0件に置き換えていない。並び順保存・対象条件・公開版導線は画面/API差が残るため構造一致・データ待ち。', verdictSource: 'mileage-v6/k8VCU.txt + k8VCU-error.txt', verdictHead: 'e98decafa' },
   BmoGY: { verdict: 'needs_fix', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。有効期限、取消時の差し引き、倍率表、LINEプレビュー、タグ条件を確認した。15軸条件ビルダーと自動通知の送信口が無いため要修正。', verdictSource: 'mileage-v6/BmoGY.txt', verdictHead: 'e98decafa' },
   p9CcEB: { verdict: 'unjudged', verdictNote: '**2026-09-07 Issue #422。** 1440・1920pxとも「画面を表示できませんでした」で撮影が止まり比較画像を取得できなかった。「撮影が固まる(/mileage/rewards/edit?id=mr-1)」として判定保留。', verdictSource: 'mileage-v6/p9CcEB.txt', verdictHead: 'e98decafa' },
-  Q55bb: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。編集欄、差し込み項目、ボタン、LINEプレビュー、公開版と下書きの分離を確認した。新しい通知定義・送信テストAPIが固定データに無いため構造一致・データ待ち。', verdictSource: 'line-notify-v6/Q55bb.txt', verdictHead: 'e98decafa' },
-  c4R6F: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。説明、必須表示、切替、並び替え、初期値復元、利用中/作成数を確認した。一部利用数が未取得のため構造一致・データ待ち。', verdictSource: 'settings-v6/c4R6F.txt', verdictHead: 'e98decafa' },
-  kQ1bs: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。STEP 2、条件、対象人数、優先順位、標準15軸・追加6軸、保存導線を確認した。重複人数と実配布人数は固定入力不足のため構造一致・データ待ち。', verdictSource: 'rich-menus-v6/kQ1bs.txt', verdictHead: 'e98decafa' },
+  Q55bb: { verdict: 'match', verdictNote: '**2026-09-07 Issue #440 で再判定。** 通知定義の公開版v2と下書きを実API固定応答から表示し、テスト送信の成功状態まで1440・1920で撮影した。公開前の下書きを公開版から分離し、横はみ出し0。', verdictSource: 'line-notify-v6/Q55bb.txt + line-notify-v6/Q55bb-1920.png + line-notify-v6/Q55bb-test-sent-1920.png', verdictHead: '3ddca80cc4' },
+  c4R6F: { verdict: 'match', verdictNote: '**2026-09-07 Issue #440 で再判定。** 機能設定と利用状況を実API固定応答から読み、利用中／作成数を機能行へ表示した。取得不能の分類は0にせず未取得とし、1440・1920とも横はみ出し0。', verdictSource: 'settings-v6/c4R6F.txt + settings-v6/c4R6F-1920.png', verdictHead: '3ddca80cc4' },
+  kQ1bs: { verdict: 'match', verdictNote: '**2026-09-07 Issue #440 で再判定。** 対象1,020人、重複180人、実配布840人、優先順位2を実API固定応答から表示し、STEP 2の構造を設計画像と照合した。1440・1920とも横はみ出し0。', verdictSource: 'rich-menus-v6/kQ1bs.txt + rich-menus-v6/kQ1bs-1920.png', verdictHead: '3ddca80cc4' },
   GqFTV: { verdict: 'match', verdictNote: '**2026-09-07 Issue #422。** 1440px設計と1920px実装を同じ本文・状態で照合し、横はみ出し0。1920pxの設計PNGが無いため、画像は実装側の配置を確認したうえで本文一致としてmatchに更新した。', verdictSource: 'affiliates-v6/GqFTV.txt + GqFTV-1440.png + GqFTV-1920.png', verdictHead: 'e98decafa' },
 }
 
@@ -4439,14 +4441,14 @@ for (const screen of SCREENS) {
 
 const issue413Judgments = {
   bfB50: {
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #413 / UI `88673e254` を3101/8788で再撮影。** bfB50の通常・読込・空・異常・権限不足を1440/1920pxで確認し、月別集計の件数・金額を返す `monthlyStats` と開始・停止件数をAPIへ追加した。現モックは新しい集計値を返さないため、設計の月別集計表示はデータ待ちとして記録。全画像で横はみ出し0。',
-    verdictSource: 'ec-v6/bfB50.txt + ec-v6/bfB50-normal-1920.png', verdictHead: '88673e254',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #440 で再判定。** 月別3か月の件数・金額、今月開始12件・停止3件・最多取消理由を実API固定応答から表示した。通常・読込・空・失敗・権限不足の1440・1920全画像で横はみ出し0。',
+    verdictSource: 'ec-v6/bfB50.txt + ec-v6/bfB50-normal-1920.png', verdictHead: '3ddca80cc4',
   },
   oHAN4: {
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #413 / UI `88673e254` を3101/8788で再撮影。** oHAN4の通常・読込・空・異常・権限不足を1440/1920pxで確認し、NEN配信・成果・マイル・友だち属性・分析の影響件数をAPIから返すようにした。現モックは新しい件数を返さないため、設計の影響件数はデータ待ちとして記録。全画像で横はみ出し0、秘密値露出0。',
-    verdictSource: 'ec-v6/oHAN4.txt + ec-v6/oHAN4-normal-1920.png', verdictHead: '88673e254',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #440 で再判定。** 下流影響3/18/2/7/5件と再試行の決めごとを実API固定応答から表示した。通常・読込・空・失敗・権限不足の1440・1920全画像で横はみ出し0、秘密値露出0。',
+    verdictSource: 'ec-v6/oHAN4.txt + ec-v6/oHAN4-normal-1920.png', verdictHead: '3ddca80cc4',
   },
 }
 for (const screen of SCREENS) {
