@@ -1532,6 +1532,20 @@ export const COMMON_VAR_DETAIL = {
   ],
 }
 
+/*
+ * 共通情報の切り替え予約。編集画面の予約表を撮影・検証するために置く。
+ * 口の形は GET /api/common-vars/:id/schedules の serializeSchedule と同じ。
+ */
+export const COMMON_VAR_SCHEDULES = [
+  {
+    id: 'common-var-schedule-1',
+    varId: COMMON_VAR_DETAIL.id,
+    effectiveFrom: '2026-10-01T10:00',
+    value: '株式会社NEN（10月〜）',
+    appliedAt: null,
+  },
+]
+
 export const COMMON_VAR_REPLACEMENT_CANDIDATES = {
   source: {
     id: COMMON_VAR_SOURCE.id,

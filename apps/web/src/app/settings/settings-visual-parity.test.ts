@@ -71,4 +71,24 @@ describe('機能設定の添付デザイン', () => {
     expect(source).toContain('<div key={columnIndex} className="space-y-3">')
     expect(source).not.toContain('!ordering && columnIndex === 2')
   })
+
+  it('利用数は後から読み、失敗時は読み直せる', () => {
+    // 重い集計で設定の表示を待たせない。以前は Promise.all で一緒に待っていた。
+    expect(source).toContain('const loadUsage = useCallback')
+    expect(source).toContain('void loadUsage()')
+    expect(source).toContain('usageFailed')
+    expect(source).toContain('利用数を読み直す')
+    expect(source).not.toContain('usageOverview(selectedAccountId).catch(() => null)')
+  })
+
+  it('保存後はサーバ値を読み直して確定する', () => {
+    // 無効環境でサーバーが正した値（飲食店テストなど）をオン表示のままにしない。
+    expect(source).toContain('サーバ値を読み直して確定')
+    expect(source).toContain('setFeatures(serverFeatures)')
+    expect(source).toContain('setSavedFeatures(serverFeatures)')
+  })
+
+  it('変更ありの判定は画面に出ないキーも比べる', () => {
+    expect(source).toContain('Object.keys({ ...savedFeatures, ...features })')
+  })
 })

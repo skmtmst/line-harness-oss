@@ -73,6 +73,18 @@
   font-size: var(--text-label); /* fontSize: $size-label */
 }
 
+/* 「確かめる」「保存」の失敗。無言にせず、表の上に残す。 */
+.actionError {
+  padding: 12px 16px;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-card);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  font-size: var(--text-label);
+  font-weight: bold;
+  line-height: 1.6;
+}
+
 .footNote {
   color: var(--color-ink-faint); /* fill: $ink-faint */
   font-size: var(--text-caption); /* fontSize: $size-caption */

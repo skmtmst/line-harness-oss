@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { emptyLayout, type FormInputBlock } from '@line-crm/shared'
-import { summarizeFormDestinations } from './form-destination-summary'
+import { hasStoredDestination, summarizeFormDestinations } from './form-destination-summary'
 
 describe('summarizeFormDestinations', () => {
   it('フォームが書き換える情報欄とタグを重複なく数える', () => {
@@ -65,5 +65,27 @@ describe('summarizeFormDestinations', () => {
       tagCount: 0,
       label: '友だち情報欄 0・タグ 0',
     })
+  })
+})
+
+describe('hasStoredDestination', () => {
+  it('保存先が無いときだけ偽（文言が変わっても絞り込みが嘘にならない）', () => {
+    expect(hasStoredDestination(emptyLayout(), null)).toBe(false)
+  })
+
+  it('情報欄・タグ・回答時タグのどれかがあれば真', () => {
+    const layout = emptyLayout()
+    layout.header = [
+      {
+        id: 'name',
+        kind: 'input',
+        type: 'text',
+        name: 'name',
+        label: 'お名前',
+        destinations: { friendFieldIds: ['field-name'] },
+      },
+    ]
+    expect(hasStoredDestination(layout, null)).toBe(true)
+    expect(hasStoredDestination(emptyLayout(), 'tag-submit')).toBe(true)
   })
 })

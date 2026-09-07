@@ -72,3 +72,17 @@ export function summarizeFormDestinations(
     label: `友だち情報欄 ${friendFieldCount}・タグ ${tagCount}`,
   }
 }
+
+/**
+ * 「情報欄に保存している」の絞り込み用。
+ *
+ * `label` の文言で比べない。文言が変わっても絞り込みが嘘にならないよう、
+ * 保存先の数で見る。
+ */
+export function hasStoredDestination(
+  layout: FormLayout,
+  onSubmitTagId: string | null,
+): boolean {
+  const { friendFieldCount, tagCount } = summarizeFormDestinations(layout, onSubmitTagId)
+  return friendFieldCount + tagCount > 0
+}

@@ -32,6 +32,7 @@ import {
   COMMON_VAR_FOLDERS,
   COMMON_VAR_DETAIL,
   COMMON_VAR_DELETE_IMPACT,
+  COMMON_VAR_SCHEDULES,
   commonVarChangeImpact,
   COMMON_VAR_DELETE_IMPACT_EMPTY,
   COMMON_VAR_REPLACEMENT_CANDIDATES,
@@ -899,6 +900,8 @@ const SHAPES = {
     sidebarItemOrder: null,
     parentChildMode: false,
     specializedFeatureKeys: ['nen_campaigns', 'photo_review', 'ec_commerce', 'line_notifications'],
+    // 本物は版を返す。無いと画面の expectedVersion 付き保存の欠落に気づけない。
+    version: 1,
   },
   '/api/inbox/unanswered/count': { total: 0, byAccount: [], oldestWaitMinutes: null },
   // 設計 `vUXKb` の「写真審査 1件 確認待ち」。0で返すとカードが空のまま撮れる。
@@ -1673,6 +1676,10 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === `/api/forms/${FORM_DETAIL.id}`) return { success: true, data: FORM_DETAIL }
   const formSubmissions = new RegExp(`^/api/forms/${FORM_DETAIL.id}/submissions$`).test(pathname)
   if (formSubmissions) {
+    // 互換用の古い形（ページ分けなし）は配列だけを返す。実口と同じく上限500件。
+    if (query.get('page') === null && query.get('limit') === null) {
+      return { success: true, data: FORM_SUBMISSIONS.items.slice(0, 500) }
+    }
     const page = Number.parseInt(query.get('page') ?? '1', 10)
     const limit = Number.parseInt(query.get('limit') ?? '20', 10)
     const safePage = Number.isInteger(page) && page > 0 ? page : 1
@@ -2290,6 +2297,17 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       ? COMMON_VAR_DELETE_IMPACT_EMPTY
       : COMMON_VAR_DELETE_IMPACT
     return { success: true, data: impact }
+  }
+  /*
+    共通情報の切り替え予約の一覧。予約表が常に空だと、予約ありの
+    見た目・契約が検証されない。固定の予約を1件だけ返す。
+  */
+  const commonVarSchedules = /^\/api\/common-vars\/([^/]+)\/schedules$/.exec(pathname)
+  if (commonVarSchedules) {
+    return {
+      success: true,
+      data: commonVarSchedules[1] === COMMON_VAR_DETAIL.id ? COMMON_VAR_SCHEDULES : [],
+    }
   }
   const mediaDeleteImpact = /^\/api\/media\/([^/]+)\/delete-impact$/.exec(pathname)
   if (mediaDeleteImpact) {
@@ -3070,6 +3088,34 @@ const server = createServer((req, res) => {
           data: commonVarChangeImpact(typeof nextValue === 'string' ? nextValue : ''),
         }))
       })
+      return
+    }
+    /*
+      共通情報の切り替え予約の登録と削除。モックは保存せず、
+      受け取った値をそのまま返して成功の絵が撮れるようにする。
+    */
+    if (method === 'POST' && /^\/api\/common-vars\/[^/]+\/schedules$/.test(url.pathname)) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        const varId = decodeURIComponent(url.pathname.split('/')[3] ?? '')
+        res.writeHead(201).end(JSON.stringify({
+          success: true,
+          data: {
+            id: 'common-var-schedule-new',
+            varId,
+            effectiveFrom: typeof body.effectiveFrom === 'string' ? body.effectiveFrom : '2026-10-01T10:00',
+            value: typeof body.value === 'string' ? body.value : '',
+            appliedAt: null,
+          },
+        }))
+      })
+      return
+    }
+    if (method === 'DELETE' && /^\/api\/common-vars\/[^/]+\/schedules\/[^/]+$/.test(url.pathname)) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: null }))
       return
     }
     /*
