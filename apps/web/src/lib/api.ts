@@ -1905,6 +1905,7 @@ export type MileageHistoryItem = {
   ruleName: string | null
   mode: 'automatic' | 'manual'
   executedByStaffName: string | null
+  balanceAfter?: number
   occurredAt: string
 }
 export type MileageSelfInsights = {
@@ -1980,6 +1981,8 @@ export type MileageRewardSummary = {
   exchangedThisMonth: number
   /** 引換コードの残り。数える経路が無いときは null。**0 と混ぜない。** */
   availableCodeCount: number | null
+  /** 交換後に実行する共通アクションの運用名。 */
+  benefitName: string | null
   createdAt: string
   updatedAt: string
 }
@@ -2113,6 +2116,8 @@ export type MileageAdminHistoryItem = {
   ruleName: string | null
   mode: 'automatic' | 'manual'
   executedByStaffName: string | null
+  lineAccountName: string
+  balanceAfter: number
   occurredAt: string
 }
 export type MileageAdminHistory = {
@@ -2128,6 +2133,7 @@ export type MileageAdminHistory = {
     }>
     totalAmount: number
     manualCount: number
+    pendingCount: number
     measuredAt: string
   }
 }
@@ -2138,6 +2144,10 @@ export type MileageFriendV6 = {
   pictureUrl: string | null
   rank: string | null
   rankReason: string
+  rankThreshold: number | null
+  nextRank: string | null
+  nextRankThreshold: number | null
+  milesToNextRank: number | null
   monthChange: number
   available: number
   pending: number
@@ -2155,6 +2165,8 @@ export type MileageFriendsV6Overview = {
     withBalanceCount: number
     available: number
     pending: number
+    monthChange: number
+    rankCounts: Array<{ rewardId: string; rankName: string; requiredMiles: number; friendCount: number }>
     expiringMiles30d: number | null
   }
   items: MileageFriendV6[]
@@ -2180,6 +2192,10 @@ export type MileageEarningRuleDraftV6 = {
   cancellationEventTypes: string[]
   targetConditions: MileageTargetConditionV6 | null
   sortOrder: number
+  notification?: {
+    enabled: boolean
+    messageTemplate: string
+  }
 }
 
 export type MileageEarningRuleV6 = {
@@ -3208,6 +3224,11 @@ export type NenColumn = {
   deliveryAt: string | null
   lineAccountId: string | null
   updatedAt: string
+  targetMode: 'all' | 'tag'
+  targetTagId: string | null
+  completionEventName: string | null
+  completionTagId: string | null
+  sourceColumnId: string | null
 }
 
 export type NenColumnCreateInput = {
@@ -3218,6 +3239,12 @@ export type NenColumnCreateInput = {
   imageUrl?: string | null
   /** タイムゾーン付きISO 8601。未公開の下書きはnullまたは省略。 */
   publishedAt?: string | null
+  targetMode?: 'all' | 'tag'
+  targetTagId?: string | null
+  scheduledAt?: string | null
+  completionEventName?: string | null
+  completionTagId?: string | null
+  sourceColumnId?: string | null
 }
 
 export type NenPetProfile = {
@@ -3242,25 +3269,25 @@ export type NenMetricsRange = { days: number; from: string; to: string }
 
 export type NenFlowMetrics = {
   range: NenMetricsRange
-  summary: { active: number; paused: number; planned: number; sent: number; associatedConversions: number }
+  summary: { active: number; paused: number; planned: number; sent: number; associatedConversions: number; associatedConversionAmount: number }
   flows: Array<{
     campaignKey: string; label: string; category: string; isEnabled: boolean
     planned: number; sent: number; failed: number; skipped: number
-    openRate: NenUnavailableMetric; associatedConversions: number; attribution: string
+    openRate: NenUnavailableMetric; associatedConversions: number; associatedConversionAmount: number; attribution: string
   }>
 }
 
 export type NenColumnMetrics = {
   range: NenMetricsRange
-  summary: { total: number; sent: number; drafts: number; scheduled: number; unread: number | null; associatedConversions: number }
+  summary: { total: number; sent: number; drafts: number; scheduled: number; unread: number | null; associatedConversions: number; associatedConversionAmount: number }
   columns: Array<{
     id: string; title: string; category: string | null; deliveryStatus: string
     publishedAt: string | null; deliveryAt: string | null
     period: { from: string | null; to: string | null }
     targeted: number; sent: number; pending: number; failed: number
     articleOpened: { value: number | null; rate: number | null; state: 'available' | 'unavailable'; reason: string | null }
-    unread: number | null; completionRate: NenUnavailableMetric
-    associatedConversions: number; attribution: string
+    unread: number | null; completionRate: { value: number | null; rate: number | null; state: 'available' | 'unavailable'; reason: string | null }
+    associatedConversions: number; associatedConversionAmount: number; attribution: string
   }>
 }
 
@@ -3269,6 +3296,7 @@ export type NenPetMetrics = {
   summary: {
     pets: number; birthdayRegistered: number; birthdayMissing: number; birthdayThisMonth: number
     friends: number; friendsWithoutPet: number; birthdayOpenRate: NenUnavailableMetric
+    birthdayReachRate: number; birthdayClickRate: number
     coupons: { issued: number; used: number; usageRate: number }
   }
   breeds: Array<{ name: string; count: number }>
@@ -3289,7 +3317,7 @@ export type NenDelivery = {
 
 export type NenDeliveryList = {
   range: NenMetricsRange
-  summary: { pending: number; processing: number; sent: number; skipped: number; failed: number; cancelled: number; retryRequired: number }
+  summary: { pending: number; processing: number; sent: number; skipped: number; failed: number; cancelled: number; retryRequired: number; unmetReasons: Partial<Record<'blocked' | 'unfollowed' | 'other', number>> }
   deliveries: NenDelivery[]
   pagination: { total: number; limit: number; cursor: string; nextCursor: string | null }
 }
@@ -6972,10 +7000,29 @@ export const api = {
     ),
     /** NENコラムの管理画面下書き。本文・slug・アカウントIDはWorkerで受け取らない。 */
     createColumn: (accountId: string, data: NenColumnCreateInput) =>
-      fetchApi<ApiResponse<{ id: string }>>(
+      fetchApi<ApiResponse<{ id: string; queued: number }>>(
         `/api/nen-campaigns/columns?lineAccountId=${encodeURIComponent(accountId)}`,
         { method: 'POST', body: JSON.stringify(data) },
       ),
+    columnAudience: (accountId: string, targetMode: 'all' | 'tag', targetTagId?: string | null) => {
+      const query = new URLSearchParams({ lineAccountId: accountId, targetMode })
+      if (targetTagId) query.set('targetTagId', targetTagId)
+      return fetchApi<ApiResponse<{ count: number; targetMode: 'all' | 'tag'; targetTagId: string | null }>>(
+        `/api/nen-campaigns/columns-preview?${query}`,
+      )
+    },
+    duplicateColumn: (id: string, accountId: string) => fetchApi<ApiResponse<{ id: string; sourceColumnId: string }>>(
+      `/api/nen-campaigns/columns/${encodeURIComponent(id)}/duplicate`,
+      { method: 'POST', body: JSON.stringify({ accountId }) },
+    ),
+    testColumn: (id: string, accountId: string, friendId: string) => fetchApi<{ success: boolean }>(
+      `/api/nen-campaigns/columns/${encodeURIComponent(id)}/test-send`,
+      { method: 'POST', body: JSON.stringify({ accountId, friendId }) },
+    ),
+    sendPendingNow: (accountId: string, expectedCount: number) => fetchApi<ApiResponse<{ queued: number }>>(
+      '/api/nen-campaigns/deliveries/pending-now',
+      { method: 'POST', body: JSON.stringify({ accountId, expectedCount }) },
+    ),
     deliverColumn: (id: string, data: { accountId: string; scheduledAt?: string }) =>
       fetchApi<ApiResponse<{ queued: number }>>(`/api/nen-campaigns/columns/${encodeURIComponent(id)}/deliver`, {
         method: 'POST', body: JSON.stringify(data),

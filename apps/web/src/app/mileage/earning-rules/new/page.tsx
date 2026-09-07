@@ -149,6 +149,7 @@ export default function NewMileageRulePage() {
   const [reverseOnCancellation, setReverseOnCancellation] = useState(true)
   const [targetConditions, setTargetConditions] = useState<SegmentCondition | null>(null)
   const [isActive, setIsActive] = useState(true)
+  const [notifyFriend, setNotifyFriend] = useState(true)
   const [tags, setTags] = useState<Tag[]>([])
 
   useEffect(() => {
@@ -235,6 +236,10 @@ export default function NewMileageRulePage() {
             cancellationEventTypes: reverseOnCancellation && cancellationEvent ? [cancellationEvent] : [],
             targetConditions: pruneCondition(targetConditions),
             sortOrder: 0,
+            notification: {
+              enabled: notifyFriend,
+              messageTemplate: 'ありがとうございます。{awardedMiles} マイルが付きました。現在の残高は {balance} マイルです。',
+            },
           },
         })
         if (!draftResponse.success) {
@@ -301,7 +306,11 @@ export default function NewMileageRulePage() {
             <div className="mt-3 rounded-card bg-accent-soft p-3 text-sm leading-6 text-ink">
               ありがとうございます。{validAmount ? value.toLocaleString('ja-JP') : '—'} マイルが付きました。現在の残高は、配信時に自動で入ります。
             </div>
-            <p className="mt-3 text-xs text-ink-faint">通知の送信口は未接続です。保存しても、この文はまだ自動送信されません。</p>
+            <label className="mt-3 flex items-start gap-2 text-xs text-ink-secondary">
+              <input type="checkbox" checked={notifyFriend} onChange={(event) => setNotifyFriend(event.target.checked)} />
+              <span>マイルが付いたら、この内容を自動で知らせる</span>
+            </label>
+            <p className="mt-2 text-xs text-ink-faint">通知するかどうかと本文を、たまる決めごとの下書きへ一緒に保存します。</p>
           </AsideCard>
 
           <AsideCard title="この下書きに保存する設定">

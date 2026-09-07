@@ -1,12 +1,15 @@
 'use client'
 
-import React, { Suspense, useState } from 'react'
+import React, { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import type { Tag } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
+import { Field as FormField } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
 import PageHeader from '@/components/shared/page-header'
+import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -42,6 +45,21 @@ function NewNenColumnInner() {
   const [touched, setTouched] = useState(false)
   /* 打ち間違えたURLは読み込めない。**壊れた画像の印を出さない。** */
   const [imageBroken, setImageBroken] = useState(false)
+  const [tags, setTags] = useState<Tag[]>([])
+  const [audienceCount, setAudienceCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    void api.tags.list().then((response) => response.success && setTags(response.data)).catch(() => undefined)
+  }, [])
+  useEffect(() => {
+    if (!selectedAccountId || (draft.targetMode === 'tag' && !draft.targetTagId)) {
+      setAudienceCount(null)
+      return
+    }
+    void api.nenCampaigns.columnAudience(selectedAccountId, draft.targetMode, draft.targetTagId || null)
+      .then((response) => setAudienceCount(response.success ? response.data.count : null))
+      .catch(() => setAudienceCount(null))
+  }, [draft.targetMode, draft.targetTagId, selectedAccountId])
 
   if (!selectedAccountId) {
     return (
@@ -88,7 +106,7 @@ function NewNenColumnInner() {
         title="コラムを書く"
         description="外部サイトの記事へつなぐ下書きを作ります。記事本文は外部サイトで管理します。"
         actions={(
-          <Button disabled title="コラム複製の接続後に使えます">
+          <Button href="/nen-campaigns?tab=columns" title="一覧で元のコラムを選びます">
             前のコラムを下敷きにする
           </Button>
         )}
@@ -179,14 +197,52 @@ function NewNenColumnInner() {
               空のままなら公開日時は入りません。日本時間で保存します。
             </p>
             <h3>いつ・だれに出しますか</h3>
-            <p className={styles.note}>
-              配信日時と対象人数は、下書きを保存したあとNENコラムの一覧で確認します。
-              対象人数を確認してから配信予約できます。
-            </p>
+            <FormField label="配信対象">
+              <Select
+                aria-label="配信対象"
+                size="full"
+                value={draft.targetMode}
+                options={[
+                  { value: 'all', label: '友だち全員' },
+                  { value: 'tag', label: 'タグで絞る' },
+                ]}
+                onChange={(value) => setDraft((current) => ({
+                  ...current,
+                  targetMode: value as 'all' | 'tag',
+                }))}
+              />
+            </FormField>
+            {draft.targetMode === 'tag' ? (
+              <FormField label="対象タグ">
+                <Select
+                  aria-label="対象タグ"
+                  size="full"
+                  value={draft.targetTagId}
+                  error={errorFor('targetTagId')}
+                  options={[
+                    { value: '', label: 'タグを選択' },
+                    ...tags.map((tag) => ({ value: tag.id, label: tag.name })),
+                  ]}
+                  onChange={(value) => setDraft((current) => ({ ...current, targetTagId: value }))}
+                />
+              </FormField>
+            ) : null}
+            <p className={styles.note}>この条件では {audienceCount == null ? '—' : audienceCount.toLocaleString('ja-JP')}人に届きます。</p>
+            <Field label="配信日時（日本時間）" type="datetime-local" value={draft.scheduledAt} error={errorFor('scheduledAt')} onChange={(v) => setDraft((d) => ({ ...d, scheduledAt: v }))} />
             <h3>読んだ人にすること</h3>
-            <p className={styles.note}>
-              読了イベントとタグ付けが接続されると設定できます。現在は下書き保存だけを行います。
-            </p>
+            <Field label="読了イベント名" value={draft.completionEventName} placeholder="例: 秋の食事コラムを読了" onChange={(v) => setDraft((d) => ({ ...d, completionEventName: v }))} />
+            <FormField label="読了後に付けるタグ">
+              <Select
+                aria-label="読了後に付けるタグ"
+                size="full"
+                value={draft.completionTagId}
+                options={[
+                  { value: '', label: '付けない' },
+                  ...tags.map((tag) => ({ value: tag.id, label: tag.name })),
+                ]}
+                onChange={(value) => setDraft((current) => ({ ...current, completionTagId: value }))}
+              />
+            </FormField>
           </Card>
         </div>
 
@@ -256,8 +312,7 @@ function NewNenColumnInner() {
           <Card layout="vertical" className={styles.section}>
             <CardHeader title="この画面でできないこと" />
             <p className={styles.note}>
-              記事本文の編集、配信の予約・公開、読んだ人へのタグ付けはここでは行いません。
-              本文は外部サイトで、配信は保存したあとNENコラムの一覧から行います。
+              記事本文の編集はここでは行いません。本文は外部サイトで管理します。
             </p>
           </Card>
         </aside>

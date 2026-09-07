@@ -337,6 +337,10 @@ describe('mileage admin API', () => {
       expiresAfterDays: 365, cancellationEventTypes: ['order_cancelled'],
       targetConditions: { operator: 'AND', rules: [{ type: 'tag_exists', value: '購入者' }] },
       sortOrder: 1,
+      notification: {
+        enabled: true,
+        messageTemplate: '{awardedMiles}マイル付きました。残高は{balance}マイルです。',
+      },
     };
     dbMocks.saveMileageEarningRuleDraft.mockResolvedValue({ ruleId: 'rule-1', version: 2, draft });
     const response = await call('/api/mileage/earning-rules/rule-1/draft', {

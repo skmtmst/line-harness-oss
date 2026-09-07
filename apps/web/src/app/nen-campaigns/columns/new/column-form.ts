@@ -21,10 +21,16 @@ export type ColumnDraft = {
   articleUrl: string
   imageUrl: string
   publishedAt: string
+  targetMode: 'all' | 'tag'
+  targetTagId: string
+  scheduledAt: string
+  completionEventName: string
+  completionTagId: string
 }
 
 export const EMPTY_DRAFT: ColumnDraft = {
   title: '', category: '', excerpt: '', articleUrl: '', imageUrl: '', publishedAt: '',
+  targetMode: 'all', targetTagId: '', scheduledAt: '', completionEventName: '', completionTagId: '',
 }
 
 /**
@@ -76,6 +82,12 @@ export function validateDraft(draft: ColumnDraft): FieldError[] {
   if (draft.publishedAt.trim() && publishedAtIso(draft.publishedAt) === null) {
     errors.push({ field: 'publishedAt', message: '公開日時は日付と時刻の両方を選んでください。' })
   }
+  if (draft.targetMode === 'tag' && !draft.targetTagId) {
+    errors.push({ field: 'targetTagId', message: '配信対象のタグを選んでください。' })
+  }
+  if (draft.scheduledAt.trim() && publishedAtIso(draft.scheduledAt) === null) {
+    errors.push({ field: 'scheduledAt', message: '配信日時は日付と時刻の両方を選んでください。' })
+  }
   return errors
 }
 
@@ -108,6 +120,11 @@ export function toCreateInput(draft: ColumnDraft): NenColumnCreateInput {
     articleUrl: draft.articleUrl.trim(),
     imageUrl: optional(draft.imageUrl) ?? null,
     publishedAt: publishedAtIso(draft.publishedAt),
+    targetMode: draft.targetMode,
+    targetTagId: draft.targetMode === 'tag' ? draft.targetTagId : null,
+    scheduledAt: publishedAtIso(draft.scheduledAt),
+    completionEventName: optional(draft.completionEventName) ?? null,
+    completionTagId: optional(draft.completionTagId) ?? null,
   }
 }
 
@@ -118,6 +135,9 @@ const CODE_MESSAGE: Record<string, string> = {
   category_too_long: '分類を指定の文字数以内にしてください。',
   excerpt_too_long: '概要を指定の文字数以内にしてください。',
   published_at_invalid: '公開日時をタイムゾーン付きで入力してください。',
+  target_invalid: '配信対象のタグを選んでください。',
+  scheduled_at_invalid: '配信日時を日本時間で入力してください。',
+  completion_invalid: '読了後の設定を確認してください。',
   payload_too_large: '入力内容が大きすぎます。本文は入力せず、外部記事のURLを指定してください。',
   column_already_exists: '同じ記事のコラムがすでにあります。一覧を読み直してください。',
   column_create_failed: '下書きを保存できませんでした。時間をおいて、もう一度お試しください。',

@@ -46,6 +46,7 @@ export interface MileageRewardSummary {
   currentVersion: MileageRewardVersion | null;
   exchangedThisMonth: number;
   availableCodeCount: number | null;
+  benefitName: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -141,6 +142,7 @@ type RewardRow = {
   published_at: string | null;
   exchanged_this_month: number;
   available_code_count: number | null;
+  benefit_name: string | null;
 };
 
 type RedemptionRow = {
@@ -296,6 +298,7 @@ function mapReward(row: RewardRow): MileageRewardSummary {
     currentVersion: mapVersion(row),
     exchangedThisMonth: row.exchanged_this_month,
     availableCodeCount: row.reward_kind === 'coupon' ? row.available_code_count : null,
+    benefitName: row.benefit_name,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -314,10 +317,13 @@ function rewardSelect(versionExpression: string): string {
            WHERE mr.reward_id = r.id AND mr.status = 'succeeded'
              AND mr.delivered_at >= datetime('now', 'start of month')) AS exchanged_this_month,
          (SELECT COUNT(*) FROM mileage_reward_codes mc
-           WHERE mc.reward_version_id = v.id AND mc.status = 'available') AS available_code_count
+           WHERE mc.reward_version_id = v.id AND mc.status = 'available') AS available_code_count,
+         ca.name AS benefit_name
     FROM mileage_rewards r
     LEFT JOIN mileage_reward_versions v
-      ON v.id = ${versionExpression}`;
+      ON v.id = ${versionExpression}
+    LEFT JOIN common_action_versions cav ON cav.id = v.common_action_version_id
+    LEFT JOIN common_actions ca ON ca.id = cav.common_action_id`;
 }
 
 export async function listMileageRewards(
@@ -367,6 +373,14 @@ export async function getMileageRewardAdminOverview(
          JOIN mileage_reward_versions v ON v.id = mr.reward_version_id
         WHERE mr.line_account_id = ? AND mr.status = 'succeeded'
           AND mr.delivered_at >= datetime('now', 'start of month')), 0) AS redeemed_miles_this_month,
+       (SELECT COUNT(*) FROM friends f
+         WHERE f.line_account_id = ? AND f.is_following = 1
+           AND NOT EXISTS (
+             SELECT 1 FROM mileage_redemptions mr
+              WHERE mr.line_account_id = ? AND mr.status != 'refunded'
+                AND ((f.user_id IS NOT NULL AND mr.beneficiary_key = 'user:' || f.user_id)
+                  OR (f.user_id IS NULL AND mr.beneficiary_key = 'friend:' || f.id))
+           )) AS never_redeemed_friend_count,
        (SELECT r.name FROM mileage_rewards r
          JOIN mileage_redemptions mr ON mr.reward_id = r.id AND mr.status = 'succeeded'
        WHERE r.line_account_id = ?
@@ -375,9 +389,10 @@ export async function getMileageRewardAdminOverview(
          JOIN mileage_rewards r ON r.id = mr.reward_id
         WHERE r.line_account_id = ? AND mr.status = 'succeeded'
         GROUP BY r.id ORDER BY COUNT(*) DESC, r.name LIMIT 1) AS most_redeemed_reward_count`,
-  ).bind(lineAccountId, lineAccountId, lineAccountId, lineAccountId).first<{
+  ).bind(lineAccountId, lineAccountId, lineAccountId, lineAccountId, lineAccountId, lineAccountId).first<{
     published_count: number;
     redeemed_miles_this_month: number;
+    never_redeemed_friend_count: number;
     most_redeemed_reward_name: string | null;
     most_redeemed_reward_count: number | null;
   }>();
@@ -386,7 +401,7 @@ export async function getMileageRewardAdminOverview(
     summary: {
       publishedCount: summary?.published_count ?? 0,
       redeemedMilesThisMonth: summary?.redeemed_miles_this_month ?? 0,
-      neverRedeemedFriendCount: null,
+      neverRedeemedFriendCount: Number(summary?.never_redeemed_friend_count ?? 0),
       mostRedeemedRewardName: summary?.most_redeemed_reward_name ?? null,
       mostRedeemedRewardCount: summary?.most_redeemed_reward_count ?? null,
     },

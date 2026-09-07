@@ -57,7 +57,9 @@ describe('V6回答フォーム一覧', () => {
   it('一覧で回答の保存先をフォーム定義の実値から表示する', () => {
     expect(PAGE).toContain('summarizeFormDestinations(form.layout, form.onSubmitTagId)')
     expect(PAGE).toContain('回答の保存先')
-    expect(PAGE).toContain('{destinationSummary.label}</td>')
+    expect(PAGE).toContain('form.destinationSummary.friendFieldCount')
+    expect(PAGE).toContain('form.destinationSummary.tagCount')
+    expect(PAGE).toContain('title={listDestinationSummary}>{listDestinationSummary}</td>')
   })
 
   it('選択中のLINE公式アカウントだけを読み書きする', () => {

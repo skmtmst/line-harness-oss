@@ -247,7 +247,7 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
                           {reach && <p className="mt-1 text-xs text-ink-faint">今すぐ交換できる人 {reach.reachableFriendCount.toLocaleString('ja-JP')}人</p>}
                         </Td>
                         <Td align="right" className="tabular-nums">{miles(reward.currentVersion?.requiredMiles)}</Td>
-                        <Td>{KIND_LABEL[reward.rewardKind]}</Td>
+                        <Td>{reward.benefitName ? `${KIND_LABEL[reward.rewardKind]}「${reward.benefitName}」` : KIND_LABEL[reward.rewardKind]}</Td>
                         <Td align="right" className="tabular-nums">{reward.exchangedThisMonth.toLocaleString('ja-JP')}回</Td>
                         <Td>{STATUS_LABEL[reward.status]}</Td>
                         <Td align="right">
