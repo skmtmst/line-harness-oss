@@ -7,6 +7,9 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import {
   bookingApi,
   type BookingMenu,
+  type BookingResource,
+  type BookingSettings,
+  type BookingAvailabilitySlot,
   type BookingShift,
   type BookingStaff,
 } from '@/lib/api'
@@ -65,6 +68,9 @@ function StaffShiftsPageContent() {
   const [allStaff, setAllStaff] = useState<BookingStaff[]>([])
   const [staffMember, setStaffMember] = useState<BookingStaff | null>(null)
   const [menus, setMenus] = useState<BookingMenu[]>([])
+  const [bookingSettings, setBookingSettings] = useState<BookingSettings | null>(null)
+  const [resources, setResources] = useState<BookingResource[]>([])
+  const [previewSlots, setPreviewSlots] = useState<BookingAvailabilitySlot[]>([])
   const [shifts, setShifts] = useState<BookingShift[]>([])
   const [template, setTemplate] = useState<WeeklyTemplate>(EMPTY_TEMPLATE)
   const [calendarId, setCalendarId] = useState('')
@@ -96,10 +102,14 @@ function StaffShiftsPageContent() {
     void Promise.all([
       bookingApi.listStaff(selectedAccountId),
       bookingApi.listMenus(selectedAccountId),
-    ]).then(([staffResult, menuResult]) => {
+      bookingApi.getSettings(selectedAccountId),
+      bookingApi.listResources(selectedAccountId),
+    ]).then(([staffResult, menuResult, settingsResult, resourcesResult]) => {
       if (!alive) return
       setAllStaff(staffResult.staff)
       setMenus(menuResult.menus)
+      setBookingSettings(settingsResult.success ? settingsResult.data : null)
+      setResources(resourcesResult.data.resources)
       if (!sp.get('staff_id') && !pickedStaffId && staffResult.staff.length > 0) {
         setPickedStaffId(staffResult.staff[0].id)
       }
@@ -107,6 +117,8 @@ function StaffShiftsPageContent() {
       if (!alive) return
       setAllStaff([])
       setMenus([])
+      setBookingSettings(null)
+      setResources([])
     })
     return () => {
       alive = false
@@ -114,6 +126,17 @@ function StaffShiftsPageContent() {
     // 最初の取得で、URL指定が無いときだけ先頭の担当者を選ぶ。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAccountId])
+
+  useEffect(() => {
+    const menu = menus.find((item) => item.is_active)
+    if (!selectedAccountId || !staffId || !menu) { setPreviewSlots([]); return }
+    const today = new Date()
+    const from = today.toISOString().slice(0, 10)
+    const end = new Date(today.getTime() + 6 * 86400_000).toISOString().slice(0, 10)
+    void bookingApi.getAvailability(selectedAccountId, { menuId: menu.id, staffId, from, to: end })
+      .then((result) => setPreviewSlots(result.by_staff[0]?.slots ?? []))
+      .catch(() => setPreviewSlots([]))
+  }, [menus, selectedAccountId, staffId])
 
   const load = useCallback(async () => {
     const requestId = ++loadRequestRef.current
@@ -345,7 +368,7 @@ function StaffShiftsPageContent() {
                           ) : '—'}
                         </Td>
                         <Td title="休けい時間を保存するAPIは未接続です">—</Td>
-                        <Td title="店舗・設備を含む受付上限APIは未接続です">—</Td>
+                        <Td>{bookingSettings?.businessHours.find((item) => item.weekday === day.weekday)?.intervals[0]?.capacity ?? '—'}件</Td>
                       </Tr>
                     )
                   })}
@@ -360,7 +383,7 @@ function StaffShiftsPageContent() {
 
             <section id="special" data-design="Special" className="bg-canvas border-hairline rounded-card border p-4">
               <h2 className="text-ink font-semibold">特別な休み・営業</h2>
-              <p className="text-ink-faint mt-1 text-xs">この日は、曜日の決めごとより優先します。現在のAPIは特別営業の時間だけを返します。</p>
+              <p className="text-ink-faint mt-1 text-xs">この日は、曜日の決めごとより優先します。設備の受付上限も空き枠へ反映します。</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {shifts.length === 0 ? <span className="text-ink-faint text-sm">特別な日はありません</span> : shifts.map((shift) => (
                   <span key={shift.id} className="border-hairline rounded-pill inline-flex items-center gap-2 border px-3 py-2 text-sm">
@@ -373,13 +396,13 @@ function StaffShiftsPageContent() {
 
             <section id="rules" data-design="Rules" className="bg-canvas border-hairline rounded-card border p-4">
               <h2 className="text-ink font-semibold">予約のルール</h2>
-              <p className="text-ink-faint mt-1 text-xs">店舗共通の設定APIがないため、公開中メニューに保存された値をまとめて表示します。</p>
+              <p className="text-ink-faint mt-1 text-xs">店舗・設備・メニューの上限をまとめて計算します。</p>
               <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {[
                   ['何日先まで取れるか', bookingWindow, '日'],
                   ['何時間前まで取れるか', cutoff, '時間'],
                   ['何時間前まで取り消せるか', cancelDeadline, '時間'],
-                  ['同じ人が同時に持てる予約', '—', 'API待ち'],
+                    ['同じ人が同時に持てる予約', bookingSettings?.maxActiveBookingsPerFriend ?? '—', '件'],
                 ].map(([label, value, unit]) => (
                   <div key={label} className="border-hairline rounded-control border p-3">
                     <p className="text-ink-secondary text-xs font-medium">{label}</p>
@@ -402,8 +425,19 @@ function StaffShiftsPageContent() {
                     {['月', '火', '水', '木', '金', '土', '日'].map((day) => <span key={day} className="font-medium">{day}</span>)}
                     {Array.from({ length: 14 }, (_, index) => <span key={index} className="bg-canvas-sunken rounded-control py-2">—</span>)}
                   </div>
-                  <p className="text-ink-faint mt-3 text-xs leading-5">実際の空きと残数を返すプレビューAPIの接続後に、○・△・×・休を表示します。</p>
+                  <p className="text-ink-faint mt-3 text-xs leading-5">実際の空きと残数を表示します。</p>
+                  <div className="mt-3 space-y-1 text-xs">
+                    {previewSlots.slice(0, 6).map((slot) => <div key={`${slot.date}-${slot.start}`} className="flex justify-between"><span>{dateLabel(slot.date)} {slot.start}</span><span>{slot.state === 'available' ? '○' : slot.state === 'limited' ? '△' : '×'} 残り{slot.remaining}/{slot.capacity}</span></div>)}
+                    {previewSlots.length === 0 ? <span className="text-ink-faint">表示できる空き枠はありません</span> : null}
+                  </div>
                 </div>
+              </div>
+            </section>
+
+            <section data-design="Resources" className="bg-canvas border-hairline rounded-card border p-4">
+              <h2 className="text-ink font-semibold">設備ごとの受付上限</h2>
+              <div className="mt-3 space-y-2 text-sm">
+                {resources.length === 0 ? <p className="text-ink-faint">設備は登録されていません</p> : resources.map((resource) => <div key={resource.id} className="flex justify-between"><span>{resource.name}</span><span>{resource.isActive ? `${resource.capacity}枠` : '停止中'}</span></div>)}
               </div>
             </section>
 

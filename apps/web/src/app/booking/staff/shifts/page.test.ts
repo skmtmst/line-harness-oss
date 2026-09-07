@@ -17,10 +17,11 @@ describe('受付枠と休業日のV6契約', () => {
     }
   })
 
-  it('未契約の値を作らずAPI待ちと示す', () => {
+  it('受付上限と空き枠のAPI結果を表示する', () => {
     expect(PAGE).toContain('休けい時間を保存するAPIは未接続です')
-    expect(PAGE).toContain('店舗・設備を含む受付上限APIは未接続です')
-    expect(PAGE).toContain('実際の空きと残数を返すプレビューAPIの接続後')
+    expect(PAGE).toContain('bookingApi.listResources')
+    expect(PAGE).toContain('bookingApi.getAvailability')
+    expect(PAGE).toContain('実際の空きと残数を表示します')
     expect(PAGE).not.toContain('準備中')
   })
 

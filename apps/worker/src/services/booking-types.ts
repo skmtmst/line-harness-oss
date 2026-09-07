@@ -85,6 +85,9 @@ export interface AvailabilitySlot {
   date: string;  // YYYY-MM-DD JST
   start: string; // HH:MM JST
   end: string;   // HH:MM JST
+  capacity: number;
+  remaining: number;
+  state: 'available' | 'limited' | 'full' | 'closed';
 }
 
 export interface AvailabilityByStaff {

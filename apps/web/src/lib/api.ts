@@ -7875,7 +7875,7 @@ export interface BookingSettings {
   inactiveMenuCount: number;
   businessHours: Array<{
     weekday: number;
-    intervals: Array<{ start: string; end: string }>;
+    intervals: Array<{ start: string; end: string; capacity: number }>;
   }>;
   exceptions: Array<{
     date: string;
@@ -7965,6 +7965,20 @@ export interface BookingAvailabilitySlot {
   date: string;
   start: string;
   end: string;
+  capacity: number;
+  remaining: number;
+  state: 'available' | 'limited' | 'full' | 'closed';
+}
+
+export interface BookingResource {
+  id: string;
+  lineAccountId: string;
+  name: string;
+  type: string;
+  capacity: number;
+  isActive: boolean;
+  businessHours: Array<{ start: string; end: string; capacity?: number }>;
+  exceptions: Array<{ date: string | null; kind: 'open' | 'closed' | 'custom_hours'; intervals: Array<{ start: string; end: string }>; note: string | null }>;
 }
 
 export interface BookingAvailabilityResponse {
@@ -7989,6 +8003,10 @@ function withAccount(path: string, accountId: string): string {
 export const bookingApi = {
   getSettings: (accountId: string) =>
     fetchApi<ApiResponse<BookingSettings>>(withAccount('/api/booking/admin/settings', accountId)),
+  listResources: (accountId: string) =>
+    fetchApi<{ success: true; data: { resources: BookingResource[] } }>(
+      withAccount('/api/booking/admin/resources', accountId),
+    ),
   // Menus
   listMenus: (accountId: string) =>
     fetchApi<{ menus: BookingMenu[] }>(withAccount('/api/booking/admin/menus', accountId)),
