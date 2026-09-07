@@ -169,7 +169,7 @@ export default function UsersPage() {
         <Button href="/friends/identity-candidates" variant="primary">
           ＋ 統合ユーザーを作成
         </Button>
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <UsersFilters
             q={q}
             onlyDups={onlyDups}

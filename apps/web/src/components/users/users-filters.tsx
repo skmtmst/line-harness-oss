@@ -23,13 +23,13 @@ export default function UsersFilters({
   onChange,
 }: Props) {
   return (
-    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+    <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-2">
       <input
         type="search"
         value={q}
         onChange={(e) => onChange({ q: e.target.value })}
         placeholder="名前・X・メール・電話・UIDで検索"
-        className="h-9 min-w-60 flex-1 rounded-control border border-hairline bg-canvas px-3 text-sm text-ink outline-none focus:border-accent"
+        className="h-9 min-w-0 flex-1 rounded-control border border-hairline bg-canvas px-3 text-sm text-ink outline-none focus:border-accent"
       />
       <label className="flex h-9 items-center gap-2 whitespace-nowrap rounded-control border border-hairline bg-canvas px-3 text-sm text-ink-secondary">
         <input
@@ -42,7 +42,7 @@ export default function UsersFilters({
       <select
         value={uid}
         onChange={(e) => onChange({ uid: e.target.value })}
-        className="h-9 rounded-control border border-hairline bg-canvas px-3 text-sm text-ink"
+        className="h-9 w-36 rounded-control border border-hairline bg-canvas px-3 text-sm text-ink"
       >
         <option value="">UID：すべて</option>
         <option value="linked">UID：連携済み</option>
@@ -51,7 +51,7 @@ export default function UsersFilters({
       <select
         value={account}
         onChange={(e) => onChange({ account: e.target.value })}
-        className="h-9 rounded-control border border-hairline bg-canvas px-3 text-sm text-ink"
+        className="h-9 w-36 rounded-control border border-hairline bg-canvas px-3 text-sm text-ink"
       >
         <option value="">所属：すべて</option>
         {accountOptions.map((a) => (
