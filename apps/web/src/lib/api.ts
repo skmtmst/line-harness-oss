@@ -1703,13 +1703,14 @@ export class ApiError extends Error {
 /**
  * Statuses whose response body is safe to show the operator verbatim.
  *
- * 400 is the Worker rejecting input it validated itself — the message names
- * what to fix and contains nothing the operator should not see. Everything
- * else (upstream LINE API failures, unhandled exceptions, proxy pages) can
- * carry internal detail, so those keep the generic status message no matter
- * what the body says.
+ * 400 and 422 are the Worker rejecting input it validated itself — the
+ * message names what to fix and contains nothing the operator should not
+ * see (all 422 bodies are Japanese validation messages, audited 2026-09-08
+ * for #496-11). Everything else (upstream LINE API failures, unhandled
+ * exceptions, proxy pages) can carry internal detail, so those keep the
+ * generic status message no matter what the body says.
  */
-const BODY_MESSAGE_STATUSES = new Set([400])
+const BODY_MESSAGE_STATUSES = new Set([400, 422])
 
 /**
  * Pull the human-readable reason out of an error response body.
@@ -1733,15 +1734,17 @@ export function extractApiErrorMessage(raw: string, status: number): string {
 /**
  * 画面分岐にだけ使う、Worker由来の機械コードを取り出す。
  *
- * 本文を利用者へ表示してよいかとは別の契約。英小文字と数字のsnake_caseだけに
- * 絞り、SQL・外部API・HTMLなどの内部文言はコードとしても受け取らない。
+ * 本文を利用者へ表示してよいかとは別の契約。大文字・小文字どちらの
+ * SNAKE_CASEも受け取る(判定画面の `STALE_CANDIDATE` 等、#496-12)。
+ * 英字始まり・英数字と `_` のみ・64文字以内に絞り、SQL・外部API・HTML
+ * などの内部文言はコードとしても受け取らない。
  */
 export function extractApiErrorCode(raw: string): string | undefined {
   if (!raw) return undefined
   try {
     const body = JSON.parse(raw) as { code?: unknown; error?: unknown }
     const candidate = typeof body.code === 'string' ? body.code : body.error
-    if (typeof candidate === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(candidate)) {
+    if (typeof candidate === 'string' && /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(candidate)) {
       return candidate
     }
   } catch {

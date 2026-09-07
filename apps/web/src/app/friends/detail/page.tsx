@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import type { FriendField } from '@line-crm/shared'
@@ -73,9 +73,19 @@ function FieldInput({
       />
     )
   }
-  if (field.type === 'select' || field.type === 'multi_select') {
-    // 複数選択も、いまは1つ選ぶ形にしている。複数選択のUIは
-    // 値の持ち方（区切り文字）を決めてから作る。
+  if (field.type === 'multi_select') {
+    // 複数選択を単一選択で保存すると、既存の複数値が1値で黙って上書きされる
+    // (#496-16)。複数選択UIと区切りの持ち方を決めるまで、読み取り専用にする。
+    return (
+      <div>
+        <p className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control border px-3 py-2 text-sm">
+          {value || '未入力'}
+        </p>
+        <p className="text-ink-faint mt-1 text-xs">複数選択の項目はこの画面では変更できません。</p>
+      </div>
+    )
+  }
+  if (field.type === 'select') {
     return (
       <SelectField
         value={value}
@@ -187,6 +197,9 @@ function FriendDetailInner() {
   const [warnings, setWarnings] = useState<string[]>([])
   const [mileage, setMileage] = useState<MileageSummary | null>(null)
   const [richMenu, setRichMenu] = useState<{ name: string | null; isDefault: boolean } | null>(null)
+  const [richMenuFailed, setRichMenuFailed] = useState(false)
+  // ID切替で遅い返事が新しい画面に残らないよう、世代で捨てる(#496-20。一覧側と同型)。
+  const loadRequestRef = useRef(0)
   const group = params.get('group') ?? BASIC_GROUP
 
   const load = useCallback(async () => {
@@ -194,8 +207,10 @@ function FriendDetailInner() {
       setLoading(false)
       return
     }
+    const requestId = ++loadRequestRef.current
     setLoading(true)
     setError('')
+    setRichMenuFailed(false)
     try {
       // マイル・リッチメニュー・フォルダは、取れなくても詳細は出す。
       const [friendRes, fieldsRes, mileageRes, menuRes] = await Promise.all([
@@ -204,8 +219,11 @@ function FriendDetailInner() {
         api.friends.mileage(friendId, 1).catch(() => null),
         api.friends.richMenu(friendId).catch(() => null),
       ])
+      if (requestId !== loadRequestRef.current) return
       if (mileageRes?.success) setMileage(mileageRes.data.summary)
+      // 失敗時と「未設定」は出し分ける。失敗を「既定のメニュー」に倒すと誤表示(#496-13)。
       if (menuRes?.success) setRichMenu(menuRes.data)
+      else setRichMenuFailed(true)
       if (friendRes.success) setFriend(friendRes.data)
       if (fieldsRes.success) {
         setFields(fieldsRes.data.items)
@@ -215,9 +233,10 @@ function FriendDetailInner() {
         setValues(next)
       }
     } catch {
+      if (requestId !== loadRequestRef.current) return
       setError('読み込みに失敗しました')
     } finally {
-      setLoading(false)
+      if (requestId === loadRequestRef.current) setLoading(false)
     }
   }, [friendId])
 
@@ -445,8 +464,8 @@ function FriendDetailInner() {
                   <div className="flex justify-between gap-2">
                     <dt className="text-ink-faint">現在の設定</dt>
                     <dd className="text-ink-secondary truncate text-right">
-                      {richMenu?.name ?? '既定のメニュー'}
-                      {richMenu?.isDefault && (
+                      {richMenuFailed ? '取得できませんでした' : (richMenu?.name ?? '既定のメニュー')}
+                      {!richMenuFailed && richMenu?.isDefault && (
                         <span className="text-ink-faint ml-1">（全員に出しているもの）</span>
                       )}
                     </dd>
