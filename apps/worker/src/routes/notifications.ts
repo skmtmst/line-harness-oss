@@ -406,10 +406,14 @@ notifications.get('/api/notifications/operator-rules', requireRole('owner', 'adm
       excluded_today: number; last_occurred_at: string | null;
     }>();
     const byRule = new Map((activity.results ?? []).map((row) => [row.rule_id, row]));
+    const resolvedRecipientIds = new Set<string>();
     const items = await Promise.all(rules.map(async (rule) => {
       const conditions = ruleConditions(rule);
       const recipients = await operatorRecipients(c.env.DB, lineAccountId, conditions.recipientIds);
       const preview = recipients.map((recipient) => recipientPreview(recipient, ruleChannels(rule)));
+      for (const recipient of preview) {
+        if (recipient.canReceive) resolvedRecipientIds.add(recipient.id);
+      }
       const stats = byRule.get(rule.id);
       return {
         ...serializeRule(rule),
@@ -422,7 +426,21 @@ notifications.get('/api/notifications/operator-rules', requireRole('owner', 'adm
         lastOccurredAt: stats?.last_occurred_at ?? null,
       };
     }));
-    return c.json({ success: true, data: { items } });
+    return c.json({
+      success: true,
+      data: {
+        items,
+        summary: {
+          total: items.length,
+          published: items.filter((item) => item.status === 'published').length,
+          stopped: items.filter((item) => item.status !== 'published').length,
+          missingRecipients: items.filter((item) => item.recipientCount === 0).length,
+          recipients: resolvedRecipientIds.size,
+          acceptedToday: items.reduce((sum, item) => sum + item.acceptedToday, 0),
+          excludedToday: items.reduce((sum, item) => sum + item.excludedToday, 0),
+        },
+      },
+    });
   } catch (err) {
     console.error('GET /api/notifications/operator-rules error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);

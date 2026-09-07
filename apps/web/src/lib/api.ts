@@ -7647,7 +7647,10 @@ export const api = {
   notifications: {
     operatorRules: {
       list: (lineAccountId: string) =>
-        fetchApi<ApiResponse<{ items: OperatorNotificationRule[] }>>(
+        fetchApi<ApiResponse<{
+          items: OperatorNotificationRule[]
+          summary: { total: number; published: number; stopped: number; missingRecipients: number; recipients: number; acceptedToday: number; excludedToday: number }
+        }>>(
           `/api/notifications/operator-rules?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
       previewRecipients: (data: {

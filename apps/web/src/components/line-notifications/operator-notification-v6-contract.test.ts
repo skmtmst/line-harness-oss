@@ -20,7 +20,8 @@ describe('V6 運用者へのお知らせ — 宛先・送信・実行記録の�
 
   it('一覧はアカウント別の実行記録APIを読み、未取得を0件にしない', () => {
     expect(list).toContain('api.notifications.operatorRules.list(lineAccountId)')
-    expect(list).toContain("state === 'ready' ? published : null")
+    expect(list).toContain("state === 'ready' ? summary?.published ?? null : null")
+    expect(list).toContain("summary?.total ?? '—'")
     expect(list).toContain('kind="error"')
     expect(list).toContain('kind="forbidden"')
     expect(list).toContain('data-list-state={listState}')

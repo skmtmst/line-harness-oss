@@ -2377,7 +2377,7 @@ export const SCREENS = [
   {
     ...LINE_NOTIFY, node: 'DpxOK', name: '24-2 運用者へのお知らせ',
     route: '/line-notifications?tab=operator', mode: 'page',
-    states: { apis: ['**/api/notifications/rules?**', '**/api/notifications/rules'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    states: { apis: ['**/api/notifications/operator-rules?**', '**/api/notifications/operator-rules'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-06 PR #958（Issue #237）head `1a0a71ba` で設計と再比較。** 帯・作成導線・検索・絞り込み・表・CSV未接続の断りを維持。読込・通常・空・失敗・権限不足・絞込0件を data-list-state で名前付きにし、取得不能な数を0にしない。1440・1920の5状態、全12枚で横はみ出し0。送信処理と実行記録が未接続のため、構造一致・データ未接続を維持。',
     verdictSource: 'line-notify-v6/DpxOK-forbidden.txt + DpxOK-normal.txt',
