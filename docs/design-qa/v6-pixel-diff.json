@@ -1,11 +1,11 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
-  "generatedAt": "2026-09-07T12:01:09.513Z",
+  "generatedAt": "2026-09-07T12:28:24.106Z",
   "thresholdPercent": 10,
   "screenCount": 272,
   "comparedCount": 250,
   "unavailableCount": 22,
-  "aboveThresholdCount": 40,
+  "aboveThresholdCount": 28,
   "entries": [
     {
       "feature": 1,
@@ -23,9 +23,9 @@
           "implementationHeight": 1841,
           "heightDifferencePx": 173,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 128987,
+          "mismatchedPixels": 128948,
           "comparedPixels": 3202560,
-          "pixelDiffPercent": 4.0276,
+          "pixelDiffPercent": 4.0264,
           "boundingBox": {
             "left": 1,
             "top": 10,
@@ -35,14 +35,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/dashboard-v6/vUXKb.png",
           "implementationPath": "docs/design-qa/dashboard-v6/vUXKb-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/dashboard-v6/vUXKb-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 4.0276,
+      "pixelDiffPercent": 4.0264,
       "heightDifferencePx": 173,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/dashboard-v6/vUXKb-diff-1920.png",
       "aboveThreshold": false
     },
@@ -74,14 +72,12 @@
           "dominantRegion": "下部・右",
           "designPath": "docs/design-reference/dashboard-v6/ZN0ov.png",
           "implementationPath": "docs/design-qa/dashboard-v6/ZN0ov-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/dashboard-v6/ZN0ov-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.8383,
       "heightDifferencePx": 0,
       "dominantRegion": "下部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/dashboard-v6/ZN0ov-diff-1920.png",
       "aboveThreshold": false
     },
@@ -113,14 +109,12 @@
           "dominantRegion": "下部・中央",
           "designPath": "docs/design-reference/dashboard-v6/JN6mQ.png",
           "implementationPath": "docs/design-qa/dashboard-v6/JN6mQ-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/dashboard-v6/JN6mQ-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 14.4089,
       "heightDifferencePx": 0,
       "dominantRegion": "下部・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/dashboard-v6/JN6mQ-diff-1920.png",
       "aboveThreshold": true
     },
@@ -152,14 +146,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/dashboard-v6/NjK9q.png",
           "implementationPath": "docs/design-qa/dashboard-v6/NjK9q-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/dashboard-v6/NjK9q-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.9639,
       "heightDifferencePx": 173,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/dashboard-v6/NjK9q-diff-1920.png",
       "aboveThreshold": false
     },
@@ -191,14 +183,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/dashboard-v6/Alekb.png",
           "implementationPath": "docs/design-qa/dashboard-v6/Alekb-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/dashboard-v6/Alekb-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.9837,
       "heightDifferencePx": 173,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/dashboard-v6/Alekb-diff-1920.png",
       "aboveThreshold": false
     },
@@ -218,9 +208,9 @@
           "implementationHeight": 1840,
           "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 243568,
+          "mismatchedPixels": 243364,
           "comparedPixels": 3532800,
-          "pixelDiffPercent": 6.8945,
+          "pixelDiffPercent": 6.8887,
           "boundingBox": {
             "left": 1,
             "top": 10,
@@ -230,14 +220,12 @@
           "dominantRegion": "上部・中央",
           "designPath": "docs/design-reference/inbox-v6/xGLVe.png",
           "implementationPath": "docs/design-qa/inbox-v6/xGLVe-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inbox-v6/xGLVe-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 6.8945,
+      "pixelDiffPercent": 6.8887,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/inbox-v6/xGLVe-diff-1920.png",
       "aboveThreshold": false
     },
@@ -269,14 +257,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/inbox-v6/NfgOs.png",
           "implementationPath": "docs/design-qa/inbox-v6/NfgOs-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inbox-v6/NfgOs-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 8.3011,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/inbox-v6/NfgOs-diff-1920.png",
       "aboveThreshold": false
     },
@@ -308,14 +294,12 @@
           "dominantRegion": "下部・右",
           "designPath": "docs/design-reference/inbox-v6/H3lAOB.png",
           "implementationPath": "docs/design-qa/inbox-v6/H3lAOB-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inbox-v6/H3lAOB-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.7926,
       "heightDifferencePx": 0,
       "dominantRegion": "下部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/inbox-v6/H3lAOB-diff-1920.png",
       "aboveThreshold": false
     },
@@ -347,14 +331,12 @@
           "dominantRegion": "上部・中央",
           "designPath": "docs/design-reference/inbox-v6/Xi4x9.png",
           "implementationPath": "docs/design-qa/inbox-v6/Xi4x9-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inbox-v6/Xi4x9-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 7.6287,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/inbox-v6/Xi4x9-diff-1920.png",
       "aboveThreshold": false
     },
@@ -386,14 +368,12 @@
           "dominantRegion": "上部・中央",
           "designPath": "docs/design-reference/inbox-v6/f0zn6.png",
           "implementationPath": "docs/design-qa/inbox-v6/f0zn6-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inbox-v6/f0zn6-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 7.0329,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/inbox-v6/f0zn6-diff-1920.png",
       "aboveThreshold": false
     },
@@ -413,28 +393,26 @@
           "implementationHeight": 1840,
           "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 2167814,
+          "mismatchedPixels": 336243,
           "comparedPixels": 3532800,
-          "pixelDiffPercent": 61.3625,
+          "pixelDiffPercent": 9.5177,
           "boundingBox": {
-            "left": 0,
-            "top": 0,
-            "right": 1919,
+            "left": 13,
+            "top": 21,
+            "right": 1864,
             "bottom": 1839
           },
-          "dominantRegion": "下部・左",
+          "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/inbox-v6/NWbuF.png",
           "implementationPath": "docs/design-qa/inbox-v6/NWbuF-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inbox-v6/NWbuF-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 61.3625,
+      "pixelDiffPercent": 9.5177,
       "heightDifferencePx": 0,
-      "dominantRegion": "下部・左",
-      "implementationSource": "docs",
+      "dominantRegion": "中央・中央",
       "diffPath": "docs/design-qa/inbox-v6/NWbuF-diff-1920.png",
-      "aboveThreshold": true
+      "aboveThreshold": false
     },
     {
       "feature": 2,
@@ -464,14 +442,12 @@
           "dominantRegion": "下部・中央",
           "designPath": "docs/design-reference/inbox-v6/B7CER8.png",
           "implementationPath": "docs/design-qa/inbox-v6/B7CER8-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inbox-v6/B7CER8-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 7.6933,
       "heightDifferencePx": 0,
       "dominantRegion": "下部・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/inbox-v6/B7CER8-diff-1920.png",
       "aboveThreshold": false
     },
@@ -503,14 +479,12 @@
           "dominantRegion": "上部・中央",
           "designPath": "docs/design-reference/inbox-v6/YZaDK.png",
           "implementationPath": "docs/design-qa/inbox-v6/YZaDK-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inbox-v6/YZaDK-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 6.7842,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/inbox-v6/YZaDK-diff-1920.png",
       "aboveThreshold": false
     },
@@ -542,14 +516,12 @@
           "dominantRegion": "上部・中央",
           "designPath": "docs/design-reference/inbox-v6/L35UOV.png",
           "implementationPath": "docs/design-qa/inbox-v6/L35UOV-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inbox-v6/L35UOV-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 7.4672,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/inbox-v6/L35UOV-diff-1920.png",
       "aboveThreshold": false
     },
@@ -581,14 +553,12 @@
           "dominantRegion": "上部・中央",
           "designPath": "docs/design-reference/inbox-v6/IYjvu.png",
           "implementationPath": "docs/design-qa/inbox-v6/IYjvu-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inbox-v6/IYjvu-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 7.6578,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/inbox-v6/IYjvu-diff-1920.png",
       "aboveThreshold": false
     },
@@ -608,28 +578,26 @@
           "implementationHeight": 1840,
           "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 2109584,
+          "mismatchedPixels": 283691,
           "comparedPixels": 3532800,
-          "pixelDiffPercent": 59.7142,
+          "pixelDiffPercent": 8.0302,
           "boundingBox": {
-            "left": 0,
-            "top": 0,
-            "right": 1919,
+            "left": 13,
+            "top": 21,
+            "right": 1864,
             "bottom": 1839
           },
-          "dominantRegion": "下部・左",
+          "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/inbox-v6/TUveA.png",
           "implementationPath": "docs/design-qa/inbox-v6/TUveA-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inbox-v6/TUveA-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 59.7142,
+      "pixelDiffPercent": 8.0302,
       "heightDifferencePx": 0,
-      "dominantRegion": "下部・左",
-      "implementationSource": "docs",
+      "dominantRegion": "中央・中央",
       "diffPath": "docs/design-qa/inbox-v6/TUveA-diff-1920.png",
-      "aboveThreshold": true
+      "aboveThreshold": false
     },
     {
       "feature": 2,
@@ -647,28 +615,26 @@
           "implementationHeight": 1840,
           "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 2234888,
+          "mismatchedPixels": 267652,
           "comparedPixels": 3532800,
-          "pixelDiffPercent": 63.2611,
+          "pixelDiffPercent": 7.5762,
           "boundingBox": {
-            "left": 0,
-            "top": 0,
-            "right": 1919,
+            "left": 1,
+            "top": 10,
+            "right": 1891,
             "bottom": 1839
           },
-          "dominantRegion": "下部・左",
+          "dominantRegion": "上部・中央",
           "designPath": "docs/design-reference/inbox-v6/w72a2.png",
           "implementationPath": "docs/design-qa/inbox-v6/w72a2-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inbox-v6/w72a2-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 63.2611,
+      "pixelDiffPercent": 7.5762,
       "heightDifferencePx": 0,
-      "dominantRegion": "下部・左",
-      "implementationSource": "docs",
+      "dominantRegion": "上部・中央",
       "diffPath": "docs/design-qa/inbox-v6/w72a2-diff-1920.png",
-      "aboveThreshold": true
+      "aboveThreshold": false
     },
     {
       "feature": 2,
@@ -698,14 +664,12 @@
           "dominantRegion": "上部・右",
           "designPath": "docs/design-reference/inbox-v6/ASsb3.png",
           "implementationPath": "docs/design-qa/inbox-v6/ASsb3-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inbox-v6/ASsb3-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 7.6164,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/inbox-v6/ASsb3-diff-1920.png",
       "aboveThreshold": false
     },
@@ -737,14 +701,12 @@
           "dominantRegion": "上部・右",
           "designPath": "docs/design-reference/inbox-v6/ANgda.png",
           "implementationPath": "docs/design-qa/inbox-v6/ANgda-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inbox-v6/ANgda-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 20.1023,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/inbox-v6/ANgda-diff-1920.png",
       "aboveThreshold": true
     },
@@ -776,14 +738,12 @@
           "dominantRegion": "上部・中央",
           "designPath": "docs/design-reference/inbox-v6/tBlkL.png",
           "implementationPath": "docs/design-qa/inbox-v6/tBlkL-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inbox-v6/tBlkL-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 7.8207,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/inbox-v6/tBlkL-diff-1920.png",
       "aboveThreshold": false
     },
@@ -815,14 +775,12 @@
           "dominantRegion": "上部・右",
           "designPath": "docs/design-reference/inbox-v6/AuSDY.png",
           "implementationPath": "docs/design-qa/inbox-v6/AuSDY-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inbox-v6/AuSDY-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 18.7581,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/inbox-v6/AuSDY-diff-1920.png",
       "aboveThreshold": true
     },
@@ -854,14 +812,12 @@
           "dominantRegion": "上部・右",
           "designPath": "docs/design-reference/inbox-v6/LHjwD.png",
           "implementationPath": "docs/design-qa/inbox-v6/LHjwD-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inbox-v6/LHjwD-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 19.0288,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/inbox-v6/LHjwD-diff-1920.png",
       "aboveThreshold": true
     },
@@ -893,14 +849,12 @@
           "dominantRegion": "上部・右",
           "designPath": "docs/design-reference/friends-v6/PhxG6.png",
           "implementationPath": "docs/design-qa/friends-v6/PhxG6-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friends-v6/PhxG6-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.4617,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friends-v6/PhxG6-diff-1920.png",
       "aboveThreshold": false
     },
@@ -932,14 +886,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/friends-v6/LT8RS.png",
           "implementationPath": "docs/design-qa/friends-v6/LT8RS-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friends-v6/LT8RS-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.001,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friends-v6/LT8RS-diff-1920.png",
       "aboveThreshold": false
     },
@@ -959,28 +911,26 @@
           "implementationHeight": 1080,
           "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 1240494,
+          "mismatchedPixels": 98288,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 59.8232,
+          "pixelDiffPercent": 4.74,
           "boundingBox": {
-            "left": 0,
-            "top": 1,
-            "right": 1919,
-            "bottom": 1079
+            "left": 25,
+            "top": 21,
+            "right": 1913,
+            "bottom": 1078
           },
-          "dominantRegion": "下部・右",
+          "dominantRegion": "下部・中央",
           "designPath": "docs/design-reference/friends-v6/Igi72.png",
           "implementationPath": "docs/design-qa/friends-v6/Igi72-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friends-v6/Igi72-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 59.8232,
+      "pixelDiffPercent": 4.74,
       "heightDifferencePx": 0,
-      "dominantRegion": "下部・右",
-      "implementationSource": "docs",
+      "dominantRegion": "下部・中央",
       "diffPath": "docs/design-qa/friends-v6/Igi72-diff-1920.png",
-      "aboveThreshold": true
+      "aboveThreshold": false
     },
     {
       "feature": 3,
@@ -992,8 +942,7 @@
       "reason": "実装画像なし（1920px）",
       "comparisons": [],
       "pixelDiffPercent": null,
-      "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T11:48:13.253Z"
+      "aboveThreshold": false
     },
     {
       "feature": 3,
@@ -1023,14 +972,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/friends-v6/I6UAdr.png",
           "implementationPath": "docs/design-qa/friends-v6/I6UAdr-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friends-v6/I6UAdr-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.5861,
       "heightDifferencePx": -304,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friends-v6/I6UAdr-diff-1920.png",
       "aboveThreshold": false
     },
@@ -1062,14 +1009,12 @@
           "dominantRegion": "上部・右",
           "designPath": "docs/design-reference/friends-v6/bzDn6.png",
           "implementationPath": "docs/design-qa/friends-v6/bzDn6-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friends-v6/bzDn6-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.2564,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friends-v6/bzDn6-diff-1920.png",
       "aboveThreshold": false
     },
@@ -1101,14 +1046,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/friends-v6/YzxU1.png",
           "implementationPath": "docs/design-qa/friends-v6/YzxU1-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friends-v6/YzxU1-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.036,
       "heightDifferencePx": -351,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friends-v6/YzxU1-diff-1920.png",
       "aboveThreshold": false
     },
@@ -1140,14 +1083,12 @@
           "dominantRegion": "上部・左",
           "designPath": "docs/design-reference/friends-v6/InCDe.png",
           "implementationPath": "docs/design-qa/friends-v6/InCDe-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friends-v6/InCDe-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.8999,
       "heightDifferencePx": 117,
       "dominantRegion": "上部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friends-v6/InCDe-diff-1920.png",
       "aboveThreshold": false
     },
@@ -1167,9 +1108,9 @@
           "implementationHeight": 1080,
           "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 78800,
+          "mismatchedPixels": 78418,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 3.8002,
+          "pixelDiffPercent": 3.7817,
           "boundingBox": {
             "left": 0,
             "top": 0,
@@ -1179,14 +1120,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/friends-v6/r7eSi.png",
           "implementationPath": "docs/design-qa/friends-v6/r7eSi-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friends-v6/r7eSi-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 3.8002,
+      "pixelDiffPercent": 3.7817,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friends-v6/r7eSi-diff-1920.png",
       "aboveThreshold": false
     },
@@ -1218,14 +1157,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/friends-v6/w8W4Eh.png",
           "implementationPath": "docs/design-qa/friends-v6/w8W4Eh-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friends-v6/w8W4Eh-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.0048,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friends-v6/w8W4Eh-diff-1920.png",
       "aboveThreshold": false
     },
@@ -1257,14 +1194,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/friends-v6/vtBCu.png",
           "implementationPath": "docs/design-qa/friends-v6/vtBCu-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friends-v6/vtBCu-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 6.0778,
       "heightDifferencePx": 146,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friends-v6/vtBCu-diff-1920.png",
       "aboveThreshold": false
     },
@@ -1284,9 +1219,9 @@
           "implementationHeight": 1080,
           "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 78689,
+          "mismatchedPixels": 75466,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 3.7948,
+          "pixelDiffPercent": 3.6394,
           "boundingBox": {
             "left": 0,
             "top": 0,
@@ -1296,14 +1231,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/scenarios-v6/TC1b1.png",
           "implementationPath": "docs/design-qa/scenarios-v6/TC1b1-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/scenarios-v6/TC1b1-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 3.7948,
+      "pixelDiffPercent": 3.6394,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/scenarios-v6/TC1b1-diff-1920.png",
       "aboveThreshold": false
     },
@@ -1335,14 +1268,12 @@
           "dominantRegion": "下部・中央",
           "designPath": "docs/design-reference/scenarios-v6/cCB7r.png",
           "implementationPath": "docs/design-qa/scenarios-v6/cCB7r-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/scenarios-v6/cCB7r-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 10.1778,
       "heightDifferencePx": 0,
       "dominantRegion": "下部・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/scenarios-v6/cCB7r-diff-1920.png",
       "aboveThreshold": true
     },
@@ -1374,14 +1305,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/scenarios-v6/kk8dz.png",
           "implementationPath": "docs/design-qa/scenarios-v6/kk8dz-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/scenarios-v6/kk8dz-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.7896,
       "heightDifferencePx": 65,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/scenarios-v6/kk8dz-diff-1920.png",
       "aboveThreshold": false
     },
@@ -1413,14 +1342,12 @@
           "dominantRegion": "上部・右",
           "designPath": "docs/design-reference/scenarios-v6/bV5Vs.png",
           "implementationPath": "docs/design-qa/scenarios-v6/bV5Vs-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/scenarios-v6/bV5Vs-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.4237,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/scenarios-v6/bV5Vs-diff-1920.png",
       "aboveThreshold": false
     },
@@ -1452,14 +1379,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/scenarios-v6/xfYLn.png",
           "implementationPath": "docs/design-qa/scenarios-v6/xfYLn-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/scenarios-v6/xfYLn-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 11.2533,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/scenarios-v6/xfYLn-diff-1920.png",
       "aboveThreshold": true
     },
@@ -1491,14 +1416,12 @@
           "dominantRegion": "上部・右",
           "designPath": "docs/design-reference/scenarios-v6/r6Gzsu.png",
           "implementationPath": "docs/design-qa/scenarios-v6/r6Gzsu-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/scenarios-v6/r6Gzsu-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 10.0651,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/scenarios-v6/r6Gzsu-diff-1920.png",
       "aboveThreshold": true
     },
@@ -1530,14 +1453,12 @@
           "dominantRegion": "上部・右",
           "designPath": "docs/design-reference/scenarios-v6/hz9ti.png",
           "implementationPath": "docs/design-qa/scenarios-v6/hz9ti-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/scenarios-v6/hz9ti-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 9.4239,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/scenarios-v6/hz9ti-diff-1920.png",
       "aboveThreshold": false
     },
@@ -1569,14 +1490,12 @@
           "dominantRegion": "上部・右",
           "designPath": "docs/design-reference/scenarios-v6/dqFft.png",
           "implementationPath": "docs/design-qa/scenarios-v6/dqFft-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/scenarios-v6/dqFft-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 9.8357,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/scenarios-v6/dqFft-diff-1920.png",
       "aboveThreshold": false
     },
@@ -1608,14 +1527,12 @@
           "dominantRegion": "上部・左",
           "designPath": "docs/design-reference/scenarios-v6/EvVO5.png",
           "implementationPath": "docs/design-qa/scenarios-v6/EvVO5-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/scenarios-v6/EvVO5-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.2237,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/scenarios-v6/EvVO5-diff-1920.png",
       "aboveThreshold": false
     },
@@ -1647,14 +1564,12 @@
           "dominantRegion": "上部・左",
           "designPath": "docs/design-reference/scenarios-v6/RUxNf.png",
           "implementationPath": "docs/design-qa/scenarios-v6/RUxNf-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/scenarios-v6/RUxNf-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.0442,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/scenarios-v6/RUxNf-diff-1920.png",
       "aboveThreshold": false
     },
@@ -1686,14 +1601,12 @@
           "dominantRegion": "上部・左",
           "designPath": "docs/design-reference/scenarios-v6/NrBkW.png",
           "implementationPath": "docs/design-qa/scenarios-v6/NrBkW-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/scenarios-v6/NrBkW-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.4857,
       "heightDifferencePx": 8,
       "dominantRegion": "上部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/scenarios-v6/NrBkW-diff-1920.png",
       "aboveThreshold": false
     },
@@ -1725,14 +1638,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/scenarios-v6/g2UNV.png",
           "implementationPath": "docs/design-qa/scenarios-v6/g2UNV-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/scenarios-v6/g2UNV-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 6.6573,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/scenarios-v6/g2UNV-diff-1920.png",
       "aboveThreshold": false
     },
@@ -1764,14 +1675,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/scenarios-v6/M2b2B.png",
           "implementationPath": "docs/design-qa/scenarios-v6/M2b2B-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/scenarios-v6/M2b2B-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.7403,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/scenarios-v6/M2b2B-diff-1920.png",
       "aboveThreshold": false
     },
@@ -1803,14 +1712,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/scenarios-v6/q5G45.png",
           "implementationPath": "docs/design-qa/scenarios-v6/q5G45-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/scenarios-v6/q5G45-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.4938,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/scenarios-v6/q5G45-diff-1920.png",
       "aboveThreshold": false
     },
@@ -1830,26 +1737,24 @@
           "implementationHeight": 1080,
           "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 69352,
+          "mismatchedPixels": 65355,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 3.3445,
+          "pixelDiffPercent": 3.1518,
           "boundingBox": {
             "left": 0,
             "top": 0,
             "right": 1881,
             "bottom": 1079
           },
-          "dominantRegion": "上部・左",
+          "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/broadcasts-v6/q76C35.png",
           "implementationPath": "docs/design-qa/broadcasts-v6/q76C35-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/broadcasts-v6/q76C35-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 3.3445,
+      "pixelDiffPercent": 3.1518,
       "heightDifferencePx": 0,
-      "dominantRegion": "上部・左",
-      "implementationSource": "docs",
+      "dominantRegion": "中央・中央",
       "diffPath": "docs/design-qa/broadcasts-v6/q76C35-diff-1920.png",
       "aboveThreshold": false
     },
@@ -1881,14 +1786,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/broadcasts-v6/zZ9fA.png",
           "implementationPath": "docs/design-qa/broadcasts-v6/zZ9fA-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/broadcasts-v6/zZ9fA-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 12.1502,
       "heightDifferencePx": 30,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/broadcasts-v6/zZ9fA-diff-1920.png",
       "aboveThreshold": true
     },
@@ -1920,14 +1823,12 @@
           "dominantRegion": "下部・中央",
           "designPath": "docs/design-reference/broadcasts-v6/cPk8A.png",
           "implementationPath": "docs/design-qa/broadcasts-v6/cPk8A-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/broadcasts-v6/cPk8A-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.4534,
       "heightDifferencePx": 0,
       "dominantRegion": "下部・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/broadcasts-v6/cPk8A-diff-1920.png",
       "aboveThreshold": false
     },
@@ -1959,14 +1860,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/broadcasts-v6/XQfMD.png",
           "implementationPath": "docs/design-qa/broadcasts-v6/XQfMD-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/broadcasts-v6/XQfMD-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 15.7404,
       "heightDifferencePx": 38,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/broadcasts-v6/XQfMD-diff-1920.png",
       "aboveThreshold": true
     },
@@ -1998,14 +1897,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/broadcasts-v6/p97Tf.png",
           "implementationPath": "docs/design-qa/broadcasts-v6/p97Tf-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/broadcasts-v6/p97Tf-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.7571,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/broadcasts-v6/p97Tf-diff-1920.png",
       "aboveThreshold": false
     },
@@ -2037,14 +1934,12 @@
           "dominantRegion": "下部・右",
           "designPath": "docs/design-reference/broadcasts-v6/Bw0zt.png",
           "implementationPath": "docs/design-qa/broadcasts-v6/Bw0zt-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/broadcasts-v6/Bw0zt-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 11.6072,
       "heightDifferencePx": 0,
       "dominantRegion": "下部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/broadcasts-v6/Bw0zt-diff-1920.png",
       "aboveThreshold": true
     },
@@ -2076,14 +1971,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/broadcasts-v6/h0kahp.png",
           "implementationPath": "docs/design-qa/broadcasts-v6/h0kahp-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/broadcasts-v6/h0kahp-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 9.6138,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/broadcasts-v6/h0kahp-diff-1920.png",
       "aboveThreshold": false
     },
@@ -2115,14 +2008,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/broadcasts-v6/vW4Es.png",
           "implementationPath": "docs/design-qa/broadcasts-v6/vW4Es-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/broadcasts-v6/vW4Es-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.482,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/broadcasts-v6/vW4Es-diff-1920.png",
       "aboveThreshold": false
     },
@@ -2154,14 +2045,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/broadcasts-v6/FpgxH.png",
           "implementationPath": "docs/design-qa/broadcasts-v6/FpgxH-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/broadcasts-v6/FpgxH-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 15.8702,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/broadcasts-v6/FpgxH-diff-1920.png",
       "aboveThreshold": true
     },
@@ -2193,14 +2082,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/broadcasts-v6/bPF0s.png",
           "implementationPath": "docs/design-qa/broadcasts-v6/bPF0s-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/broadcasts-v6/bPF0s-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 2.8796,
       "heightDifferencePx": 43,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/broadcasts-v6/bPF0s-diff-1920.png",
       "aboveThreshold": false
     },
@@ -2232,14 +2119,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/broadcasts-v6/u6gHt.png",
           "implementationPath": "docs/design-qa/broadcasts-v6/u6gHt-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/broadcasts-v6/u6gHt-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 6.2805,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/broadcasts-v6/u6gHt-diff-1920.png",
       "aboveThreshold": false
     },
@@ -2271,14 +2156,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/broadcasts-v6/EGMb1.png",
           "implementationPath": "docs/design-qa/broadcasts-v6/EGMb1-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/broadcasts-v6/EGMb1-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 13.605,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/broadcasts-v6/EGMb1-diff-1920.png",
       "aboveThreshold": true
     },
@@ -2310,14 +2193,12 @@
           "dominantRegion": "下部・中央",
           "designPath": "docs/design-reference/broadcasts-v6/sqFXf.png",
           "implementationPath": "docs/design-qa/broadcasts-v6/sqFXf-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/broadcasts-v6/sqFXf-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 7.1272,
       "heightDifferencePx": 0,
       "dominantRegion": "下部・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/broadcasts-v6/sqFXf-diff-1920.png",
       "aboveThreshold": false
     },
@@ -2349,14 +2230,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/broadcasts-v6/xkRDb.png",
           "implementationPath": "docs/design-qa/broadcasts-v6/xkRDb-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/broadcasts-v6/xkRDb-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.2987,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/broadcasts-v6/xkRDb-diff-1920.png",
       "aboveThreshold": false
     },
@@ -2388,14 +2267,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/broadcasts-v6/TmHjF.png",
           "implementationPath": "docs/design-qa/broadcasts-v6/TmHjF-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/broadcasts-v6/TmHjF-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 2.8644,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/broadcasts-v6/TmHjF-diff-1920.png",
       "aboveThreshold": false
     },
@@ -2427,14 +2304,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/reminders-v6/M1EXwB.png",
           "implementationPath": "docs/design-qa/reminders-v6/M1EXwB-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/reminders-v6/M1EXwB-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.0901,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/reminders-v6/M1EXwB-diff-1920.png",
       "aboveThreshold": false
     },
@@ -2466,14 +2341,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/reminders-v6/uJP22.png",
           "implementationPath": "docs/design-qa/reminders-v6/uJP22-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/reminders-v6/uJP22-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 12.0397,
       "heightDifferencePx": 65,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/reminders-v6/uJP22-diff-1920.png",
       "aboveThreshold": true
     },
@@ -2505,14 +2378,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/reminders-v6/J64xI.png",
           "implementationPath": "docs/design-qa/reminders-v6/J64xI-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/reminders-v6/J64xI-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 11.1932,
       "heightDifferencePx": 93,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/reminders-v6/J64xI-diff-1920.png",
       "aboveThreshold": true
     },
@@ -2544,14 +2415,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/reminders-v6/s7T2dz.png",
           "implementationPath": "docs/design-qa/reminders-v6/s7T2dz-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/reminders-v6/s7T2dz-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.2914,
       "heightDifferencePx": -56,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/reminders-v6/s7T2dz-diff-1920.png",
       "aboveThreshold": false
     },
@@ -2583,14 +2452,12 @@
           "dominantRegion": "下部・右",
           "designPath": "docs/design-reference/reminders-v6/JCz6J.png",
           "implementationPath": "docs/design-qa/reminders-v6/JCz6J-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/reminders-v6/JCz6J-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 9.5545,
       "heightDifferencePx": -56,
       "dominantRegion": "下部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/reminders-v6/JCz6J-diff-1920.png",
       "aboveThreshold": false
     },
@@ -2622,14 +2489,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/reminders-v6/W98zZQ.png",
           "implementationPath": "docs/design-qa/reminders-v6/W98zZQ-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/reminders-v6/W98zZQ-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 18.4705,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/reminders-v6/W98zZQ-diff-1920.png",
       "aboveThreshold": true
     },
@@ -2661,14 +2526,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/reminders-v6/s6Vvp.png",
           "implementationPath": "docs/design-qa/reminders-v6/s6Vvp-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/reminders-v6/s6Vvp-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 8.5733,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/reminders-v6/s6Vvp-diff-1920.png",
       "aboveThreshold": false
     },
@@ -2700,14 +2563,12 @@
           "dominantRegion": "下部・右",
           "designPath": "docs/design-reference/reminders-v6/PSmHo.png",
           "implementationPath": "docs/design-qa/reminders-v6/PSmHo-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/reminders-v6/PSmHo-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 8.4985,
       "heightDifferencePx": -56,
       "dominantRegion": "下部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/reminders-v6/PSmHo-diff-1920.png",
       "aboveThreshold": false
     },
@@ -2739,14 +2600,12 @@
           "dominantRegion": "下部・右",
           "designPath": "docs/design-reference/reminders-v6/GC4St.png",
           "implementationPath": "docs/design-qa/reminders-v6/GC4St-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/reminders-v6/GC4St-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 9.7844,
       "heightDifferencePx": 67,
       "dominantRegion": "下部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/reminders-v6/GC4St-diff-1920.png",
       "aboveThreshold": false
     },
@@ -2778,14 +2637,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/reminders-v6/Y0Sn3.png",
           "implementationPath": "docs/design-qa/reminders-v6/Y0Sn3-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/reminders-v6/Y0Sn3-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 13.5984,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/reminders-v6/Y0Sn3-diff-1920.png",
       "aboveThreshold": true
     },
@@ -2817,14 +2674,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/reminders-v6/dC0yg.png",
           "implementationPath": "docs/design-qa/reminders-v6/dC0yg-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/reminders-v6/dC0yg-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 2.9622,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/reminders-v6/dC0yg-diff-1920.png",
       "aboveThreshold": false
     },
@@ -2856,14 +2711,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/auto-replies-v6/cmDfJ.png",
           "implementationPath": "docs/design-qa/auto-replies-v6/cmDfJ-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/auto-replies-v6/cmDfJ-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.7387,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/auto-replies-v6/cmDfJ-diff-1920.png",
       "aboveThreshold": false
     },
@@ -2895,14 +2748,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/auto-replies-v6/K7vg2.png",
           "implementationPath": "docs/design-qa/auto-replies-v6/K7vg2-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/auto-replies-v6/K7vg2-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 10.7442,
       "heightDifferencePx": 36,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/auto-replies-v6/K7vg2-diff-1920.png",
       "aboveThreshold": true
     },
@@ -2934,14 +2785,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/auto-replies-v6/nzWIX.png",
           "implementationPath": "docs/design-qa/auto-replies-v6/nzWIX-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/auto-replies-v6/nzWIX-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.8555,
       "heightDifferencePx": 131,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/auto-replies-v6/nzWIX-diff-1920.png",
       "aboveThreshold": false
     },
@@ -2973,14 +2822,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/auto-replies-v6/ivDoe.png",
           "implementationPath": "docs/design-qa/auto-replies-v6/ivDoe-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/auto-replies-v6/ivDoe-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 11.1802,
       "heightDifferencePx": -56,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/auto-replies-v6/ivDoe-diff-1920.png",
       "aboveThreshold": true
     },
@@ -3012,14 +2859,12 @@
           "dominantRegion": "下部・右",
           "designPath": "docs/design-reference/auto-replies-v6/U9hzqH.png",
           "implementationPath": "docs/design-qa/auto-replies-v6/U9hzqH-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/auto-replies-v6/U9hzqH-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.5345,
       "heightDifferencePx": 57,
       "dominantRegion": "下部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/auto-replies-v6/U9hzqH-diff-1920.png",
       "aboveThreshold": false
     },
@@ -3051,14 +2896,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/auto-replies-v6/g46ja.png",
           "implementationPath": "docs/design-qa/auto-replies-v6/g46ja-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/auto-replies-v6/g46ja-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.9914,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/auto-replies-v6/g46ja-diff-1920.png",
       "aboveThreshold": false
     },
@@ -3090,14 +2933,12 @@
           "dominantRegion": "下部・中央",
           "designPath": "docs/design-reference/auto-replies-v6/Yj6CQ.png",
           "implementationPath": "docs/design-qa/auto-replies-v6/Yj6CQ-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/auto-replies-v6/Yj6CQ-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.614,
       "heightDifferencePx": 0,
       "dominantRegion": "下部・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/auto-replies-v6/Yj6CQ-diff-1920.png",
       "aboveThreshold": false
     },
@@ -3129,14 +2970,12 @@
           "dominantRegion": "下部・右",
           "designPath": "docs/design-reference/auto-replies-v6/e6iJG.png",
           "implementationPath": "docs/design-qa/auto-replies-v6/e6iJG-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/auto-replies-v6/e6iJG-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.5472,
       "heightDifferencePx": 23,
       "dominantRegion": "下部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/auto-replies-v6/e6iJG-diff-1920.png",
       "aboveThreshold": false
     },
@@ -3168,14 +3007,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/auto-replies-v6/t7UtYQ.png",
           "implementationPath": "docs/design-qa/auto-replies-v6/t7UtYQ-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/auto-replies-v6/t7UtYQ-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.5475,
       "heightDifferencePx": 14,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/auto-replies-v6/t7UtYQ-diff-1920.png",
       "aboveThreshold": false
     },
@@ -3207,14 +3044,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/auto-replies-v6/Gy9OK.png",
           "implementationPath": "docs/design-qa/auto-replies-v6/Gy9OK-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/auto-replies-v6/Gy9OK-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 14.6352,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/auto-replies-v6/Gy9OK-diff-1920.png",
       "aboveThreshold": true
     },
@@ -3246,14 +3081,12 @@
           "dominantRegion": "上部・左",
           "designPath": "docs/design-reference/auto-replies-v6/q8wSqO.png",
           "implementationPath": "docs/design-qa/auto-replies-v6/q8wSqO-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/auto-replies-v6/q8wSqO-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.492,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/auto-replies-v6/q8wSqO-diff-1920.png",
       "aboveThreshold": false
     },
@@ -3285,14 +3118,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/friend-add-v6/uLQQc.png",
           "implementationPath": "docs/design-qa/friend-add-v6/uLQQc-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friend-add-v6/uLQQc-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.8692,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friend-add-v6/uLQQc-diff-1920.png",
       "aboveThreshold": false
     },
@@ -3360,14 +3191,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/friend-add-v6/txMO9.png",
           "implementationPath": "docs/design-qa/friend-add-v6/txMO9-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friend-add-v6/txMO9-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 18.3887,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friend-add-v6/txMO9-diff-1920.png",
       "aboveThreshold": true
     },
@@ -3399,14 +3228,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/friend-add-v6/U3SI5.png",
           "implementationPath": "docs/design-qa/friend-add-v6/U3SI5-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friend-add-v6/U3SI5-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 10.27,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friend-add-v6/U3SI5-diff-1920.png",
       "aboveThreshold": true
     },
@@ -3438,14 +3265,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/friend-add-v6/ec9vg.png",
           "implementationPath": "docs/design-qa/friend-add-v6/ec9vg-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friend-add-v6/ec9vg-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 9.2198,
       "heightDifferencePx": -56,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friend-add-v6/ec9vg-diff-1920.png",
       "aboveThreshold": false
     },
@@ -3477,14 +3302,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/friend-add-v6/quhg6.png",
           "implementationPath": "docs/design-qa/friend-add-v6/quhg6-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friend-add-v6/quhg6-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.7517,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friend-add-v6/quhg6-diff-1920.png",
       "aboveThreshold": false
     },
@@ -3516,14 +3339,12 @@
           "dominantRegion": "下部・中央",
           "designPath": "docs/design-reference/friend-add-v6/P2J0Te.png",
           "implementationPath": "docs/design-qa/friend-add-v6/P2J0Te-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friend-add-v6/P2J0Te-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.0878,
       "heightDifferencePx": 0,
       "dominantRegion": "下部・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friend-add-v6/P2J0Te-diff-1920.png",
       "aboveThreshold": false
     },
@@ -3567,14 +3388,12 @@
           "dominantRegion": "上部・左",
           "designPath": "docs/design-reference/webinars-v6/ZC13r.png",
           "implementationPath": "docs/design-qa/webinars-v6/ZC13r-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/webinars-v6/ZC13r-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 2.896,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/webinars-v6/ZC13r-diff-1920.png",
       "aboveThreshold": false
     },
@@ -3594,9 +3413,9 @@
           "implementationHeight": 1080,
           "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 222741,
+          "mismatchedPixels": 155409,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 10.7418,
+          "pixelDiffPercent": 7.4946,
           "boundingBox": {
             "left": 0,
             "top": 0,
@@ -3610,12 +3429,12 @@
           "diffPath": "docs/design-qa/webinars-v6/lvaY5-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 10.7418,
+      "pixelDiffPercent": 7.4946,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
       "implementationSource": "docs",
       "diffPath": "docs/design-qa/webinars-v6/lvaY5-diff-1920.png",
-      "aboveThreshold": true
+      "aboveThreshold": false
     },
     {
       "feature": 10,
@@ -3633,9 +3452,9 @@
           "implementationHeight": 1080,
           "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 220665,
+          "mismatchedPixels": 153491,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 10.6416,
+          "pixelDiffPercent": 7.4022,
           "boundingBox": {
             "left": 0,
             "top": 0,
@@ -3649,12 +3468,12 @@
           "diffPath": "docs/design-qa/webinars-v6/PV1Vh-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 10.6416,
+      "pixelDiffPercent": 7.4022,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
       "implementationSource": "docs",
       "diffPath": "docs/design-qa/webinars-v6/PV1Vh-diff-1920.png",
-      "aboveThreshold": true
+      "aboveThreshold": false
     },
     {
       "feature": 10,
@@ -3672,9 +3491,9 @@
           "implementationHeight": 1080,
           "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 228902,
+          "mismatchedPixels": 154681,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 11.0389,
+          "pixelDiffPercent": 7.4595,
           "boundingBox": {
             "left": 0,
             "top": 0,
@@ -3688,12 +3507,12 @@
           "diffPath": "docs/design-qa/webinars-v6/d3rFGD-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 11.0389,
+      "pixelDiffPercent": 7.4595,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
       "implementationSource": "docs",
       "diffPath": "docs/design-qa/webinars-v6/d3rFGD-diff-1920.png",
-      "aboveThreshold": true
+      "aboveThreshold": false
     },
     {
       "feature": 10,
@@ -3711,9 +3530,9 @@
           "implementationHeight": 1080,
           "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 229741,
+          "mismatchedPixels": 162565,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 11.0793,
+          "pixelDiffPercent": 7.8397,
           "boundingBox": {
             "left": 0,
             "top": 0,
@@ -3727,12 +3546,12 @@
           "diffPath": "docs/design-qa/webinars-v6/Ho8z4-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 11.0793,
+      "pixelDiffPercent": 7.8397,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
       "implementationSource": "docs",
       "diffPath": "docs/design-qa/webinars-v6/Ho8z4-diff-1920.png",
-      "aboveThreshold": true
+      "aboveThreshold": false
     },
     {
       "feature": 10,
@@ -3747,31 +3566,31 @@
           "width": 1920,
           "comparedHeight": 1080,
           "designHeight": 1080,
-          "implementationHeight": 1263,
-          "heightDifferencePx": 183,
+          "implementationHeight": 1080,
+          "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 305815,
+          "mismatchedPixels": 170193,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 14.748,
+          "pixelDiffPercent": 8.2076,
           "boundingBox": {
             "left": 0,
             "top": 0,
             "right": 1887,
             "bottom": 1079
           },
-          "dominantRegion": "中央・右",
+          "dominantRegion": "上部・右",
           "designPath": "docs/design-reference/webinars-v6/Xjk8q.png",
           "implementationPath": "docs/design-qa/webinars-v6/Xjk8q-1920.png",
           "implementationSource": "docs",
           "diffPath": "docs/design-qa/webinars-v6/Xjk8q-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 14.748,
-      "heightDifferencePx": 183,
-      "dominantRegion": "中央・右",
+      "pixelDiffPercent": 8.2076,
+      "heightDifferencePx": 0,
+      "dominantRegion": "上部・右",
       "implementationSource": "docs",
       "diffPath": "docs/design-qa/webinars-v6/Xjk8q-diff-1920.png",
-      "aboveThreshold": true
+      "aboveThreshold": false
     },
     {
       "feature": 10,
@@ -3789,9 +3608,9 @@
           "implementationHeight": 1080,
           "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 225758,
+          "mismatchedPixels": 151970,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 10.8872,
+          "pixelDiffPercent": 7.3288,
           "boundingBox": {
             "left": 0,
             "top": 0,
@@ -3805,12 +3624,12 @@
           "diffPath": "docs/design-qa/webinars-v6/GB0NR-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 10.8872,
+      "pixelDiffPercent": 7.3288,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
       "implementationSource": "docs",
       "diffPath": "docs/design-qa/webinars-v6/GB0NR-diff-1920.png",
-      "aboveThreshold": true
+      "aboveThreshold": false
     },
     {
       "feature": 10,
@@ -3825,31 +3644,31 @@
           "width": 1920,
           "comparedHeight": 1136,
           "designHeight": 1136,
-          "implementationHeight": 1431,
-          "heightDifferencePx": 295,
+          "implementationHeight": 1136,
+          "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 299284,
+          "mismatchedPixels": 160061,
           "comparedPixels": 2181120,
-          "pixelDiffPercent": 13.7216,
+          "pixelDiffPercent": 7.3385,
           "boundingBox": {
             "left": 0,
             "top": 0,
             "right": 1881,
             "bottom": 1135
           },
-          "dominantRegion": "中央・右",
+          "dominantRegion": "上部・右",
           "designPath": "docs/design-reference/webinars-v6/D6yO7e.png",
           "implementationPath": "docs/design-qa/webinars-v6/D6yO7e-1920.png",
           "implementationSource": "docs",
           "diffPath": "docs/design-qa/webinars-v6/D6yO7e-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 13.7216,
-      "heightDifferencePx": 295,
-      "dominantRegion": "中央・右",
+      "pixelDiffPercent": 7.3385,
+      "heightDifferencePx": 0,
+      "dominantRegion": "上部・右",
       "implementationSource": "docs",
       "diffPath": "docs/design-qa/webinars-v6/D6yO7e-diff-1920.png",
-      "aboveThreshold": true
+      "aboveThreshold": false
     },
     {
       "feature": 10,
@@ -3879,14 +3698,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/webinars-v6/TimXl.png",
           "implementationPath": "docs/design-qa/webinars-v6/TimXl-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/webinars-v6/TimXl-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.6839,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/webinars-v6/TimXl-diff-1920.png",
       "aboveThreshold": false
     },
@@ -3918,14 +3735,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/webinars-v6/Q8sHa.png",
           "implementationPath": "docs/design-qa/webinars-v6/Q8sHa-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/webinars-v6/Q8sHa-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.9349,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/webinars-v6/Q8sHa-diff-1920.png",
       "aboveThreshold": false
     },
@@ -3945,9 +3760,9 @@
           "implementationHeight": 1080,
           "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 223311,
+          "mismatchedPixels": 159841,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 10.7692,
+          "pixelDiffPercent": 7.7084,
           "boundingBox": {
             "left": 0,
             "top": 0,
@@ -3961,12 +3776,12 @@
           "diffPath": "docs/design-qa/webinars-v6/yxyzQ-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 10.7692,
+      "pixelDiffPercent": 7.7084,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
       "implementationSource": "docs",
       "diffPath": "docs/design-qa/webinars-v6/yxyzQ-diff-1920.png",
-      "aboveThreshold": true
+      "aboveThreshold": false
     },
     {
       "feature": 10,
@@ -4008,14 +3823,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/webinars-v6/zCQXe.png",
           "implementationPath": "docs/design-qa/webinars-v6/zCQXe-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/webinars-v6/zCQXe-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.009,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/webinars-v6/zCQXe-diff-1920.png",
       "aboveThreshold": false
     },
@@ -4047,14 +3860,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/templates-v6/W7LBc.png",
           "implementationPath": "docs/design-qa/templates-v6/W7LBc-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/templates-v6/W7LBc-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.0116,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/templates-v6/W7LBc-diff-1920.png",
       "aboveThreshold": false
     },
@@ -4086,14 +3897,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/templates-v6/GFlD7.png",
           "implementationPath": "docs/design-qa/templates-v6/GFlD7-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/templates-v6/GFlD7-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 8.0376,
       "heightDifferencePx": -56,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/templates-v6/GFlD7-diff-1920.png",
       "aboveThreshold": false
     },
@@ -4125,14 +3934,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/templates-v6/FRkls.png",
           "implementationPath": "docs/design-qa/templates-v6/FRkls-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/templates-v6/FRkls-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 6.6401,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/templates-v6/FRkls-diff-1920.png",
       "aboveThreshold": false
     },
@@ -4164,14 +3971,12 @@
           "dominantRegion": "上部・右",
           "designPath": "docs/design-reference/templates-v6/NNDMR.png",
           "implementationPath": "docs/design-qa/templates-v6/NNDMR-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/templates-v6/NNDMR-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 6.8783,
       "heightDifferencePx": 160,
       "dominantRegion": "上部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/templates-v6/NNDMR-diff-1920.png",
       "aboveThreshold": false
     },
@@ -4203,14 +4008,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/templates-v6/j9ixI.png",
           "implementationPath": "docs/design-qa/templates-v6/j9ixI-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/templates-v6/j9ixI-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.6969,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/templates-v6/j9ixI-diff-1920.png",
       "aboveThreshold": false
     },
@@ -4242,14 +4045,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/templates-v6/hsBtl.png",
           "implementationPath": "docs/design-qa/templates-v6/hsBtl-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/templates-v6/hsBtl-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 6.4859,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/templates-v6/hsBtl-diff-1920.png",
       "aboveThreshold": false
     },
@@ -4281,14 +4082,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/templates-v6/J3GxEZ.png",
           "implementationPath": "docs/design-qa/templates-v6/J3GxEZ-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/templates-v6/J3GxEZ-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 7.159,
       "heightDifferencePx": 1,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/templates-v6/J3GxEZ-diff-1920.png",
       "aboveThreshold": false
     },
@@ -4320,14 +4119,12 @@
           "dominantRegion": "上部・左",
           "designPath": "docs/design-reference/templates-v6/M9cij.png",
           "implementationPath": "docs/design-qa/templates-v6/M9cij-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/templates-v6/M9cij-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.1187,
       "heightDifferencePx": -1,
       "dominantRegion": "上部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/templates-v6/M9cij-diff-1920.png",
       "aboveThreshold": false
     },
@@ -4359,14 +4156,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/templates-v6/CzndJ.png",
           "implementationPath": "docs/design-qa/templates-v6/CzndJ-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/templates-v6/CzndJ-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.0695,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/templates-v6/CzndJ-diff-1920.png",
       "aboveThreshold": false
     },
@@ -4398,14 +4193,12 @@
           "dominantRegion": "上部・左",
           "designPath": "docs/design-reference/templates-v6/NKyoA.png",
           "implementationPath": "docs/design-qa/templates-v6/NKyoA-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/templates-v6/NKyoA-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.5635,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/templates-v6/NKyoA-diff-1920.png",
       "aboveThreshold": false
     },
@@ -4437,14 +4230,12 @@
           "dominantRegion": "上部・左",
           "designPath": "docs/design-reference/rich-menus-v6/GO8RQ.png",
           "implementationPath": "docs/design-qa/rich-menus-v6/GO8RQ-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/rich-menus-v6/GO8RQ-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.5247,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/rich-menus-v6/GO8RQ-diff-1920.png",
       "aboveThreshold": false
     },
@@ -4476,14 +4267,12 @@
           "dominantRegion": "上部・右",
           "designPath": "docs/design-reference/rich-menus-v6/XtfO3.png",
           "implementationPath": "docs/design-qa/rich-menus-v6/XtfO3-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/rich-menus-v6/XtfO3-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 7.7052,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/rich-menus-v6/XtfO3-diff-1920.png",
       "aboveThreshold": false
     },
@@ -4515,14 +4304,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/rich-menus-v6/kQ1bs.png",
           "implementationPath": "docs/design-qa/rich-menus-v6/kQ1bs-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/rich-menus-v6/kQ1bs-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.1634,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/rich-menus-v6/kQ1bs-diff-1920.png",
       "aboveThreshold": false
     },
@@ -4554,14 +4341,12 @@
           "dominantRegion": "上部・右",
           "designPath": "docs/design-reference/rich-menus-v6/DIUbO.png",
           "implementationPath": "docs/design-qa/rich-menus-v6/DIUbO-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/rich-menus-v6/DIUbO-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 6.8123,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/rich-menus-v6/DIUbO-diff-1920.png",
       "aboveThreshold": false
     },
@@ -4593,14 +4378,12 @@
           "dominantRegion": "上部・右",
           "designPath": "docs/design-reference/rich-menus-v6/NXdDk.png",
           "implementationPath": "docs/design-qa/rich-menus-v6/NXdDk-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/rich-menus-v6/NXdDk-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.7131,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/rich-menus-v6/NXdDk-diff-1920.png",
       "aboveThreshold": false
     },
@@ -4632,14 +4415,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/rich-menus-v6/UMiJ9.png",
           "implementationPath": "docs/design-qa/rich-menus-v6/UMiJ9-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/rich-menus-v6/UMiJ9-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.9878,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/rich-menus-v6/UMiJ9-diff-1920.png",
       "aboveThreshold": false
     },
@@ -4671,14 +4452,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/rich-menus-v6/TL7tp.png",
           "implementationPath": "docs/design-qa/rich-menus-v6/TL7tp-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/rich-menus-v6/TL7tp-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.5394,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/rich-menus-v6/TL7tp-diff-1920.png",
       "aboveThreshold": false
     },
@@ -4710,14 +4489,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/rich-menus-v6/szXsT.png",
           "implementationPath": "docs/design-qa/rich-menus-v6/szXsT-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/rich-menus-v6/szXsT-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 8.8107,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/rich-menus-v6/szXsT-diff-1920.png",
       "aboveThreshold": false
     },
@@ -4749,14 +4526,12 @@
           "dominantRegion": "上部・左",
           "designPath": "docs/design-reference/rich-menus-v6/RW5Tb.png",
           "implementationPath": "docs/design-qa/rich-menus-v6/RW5Tb-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/rich-menus-v6/RW5Tb-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.1879,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/rich-menus-v6/RW5Tb-diff-1920.png",
       "aboveThreshold": false
     },
@@ -4788,14 +4563,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/forms-v6/EMBIK.png",
           "implementationPath": "docs/design-qa/forms-v6/EMBIK-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/forms-v6/EMBIK-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.3943,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/forms-v6/EMBIK-diff-1920.png",
       "aboveThreshold": false
     },
@@ -4827,14 +4600,12 @@
           "dominantRegion": "下部・左",
           "designPath": "docs/design-reference/forms-v6/vCqUj.png",
           "implementationPath": "docs/design-qa/forms-v6/vCqUj-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/forms-v6/vCqUj-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 6.5395,
       "heightDifferencePx": 2758,
       "dominantRegion": "下部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/forms-v6/vCqUj-diff-1920.png",
       "aboveThreshold": false
     },
@@ -4866,14 +4637,12 @@
           "dominantRegion": "下部・左",
           "designPath": "docs/design-reference/forms-v6/ava2n.png",
           "implementationPath": "docs/design-qa/forms-v6/ava2n-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/forms-v6/ava2n-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.7465,
       "heightDifferencePx": -1,
       "dominantRegion": "下部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/forms-v6/ava2n-diff-1920.png",
       "aboveThreshold": false
     },
@@ -4905,14 +4674,12 @@
           "dominantRegion": "下部・左",
           "designPath": "docs/design-reference/forms-v6/cSqvP.png",
           "implementationPath": "docs/design-qa/forms-v6/cSqvP-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/forms-v6/cSqvP-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 6.3555,
       "heightDifferencePx": 0,
       "dominantRegion": "下部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/forms-v6/cSqvP-diff-1920.png",
       "aboveThreshold": false
     },
@@ -4944,14 +4711,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/forms-v6/v9tYhl.png",
           "implementationPath": "docs/design-qa/forms-v6/v9tYhl-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/forms-v6/v9tYhl-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.33,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/forms-v6/v9tYhl-diff-1920.png",
       "aboveThreshold": false
     },
@@ -4983,14 +4748,12 @@
           "dominantRegion": "上部・中央",
           "designPath": "docs/design-reference/forms-v6/gBp2J.png",
           "implementationPath": "docs/design-qa/forms-v6/gBp2J-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/forms-v6/gBp2J-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 10.4375,
       "heightDifferencePx": -1,
       "dominantRegion": "上部・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/forms-v6/gBp2J-diff-1920.png",
       "aboveThreshold": true
     },
@@ -5022,14 +4785,12 @@
           "dominantRegion": "上部・左",
           "designPath": "docs/design-reference/forms-v6/ZOPyc.png",
           "implementationPath": "docs/design-qa/forms-v6/ZOPyc-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/forms-v6/ZOPyc-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 2.9594,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/forms-v6/ZOPyc-diff-1920.png",
       "aboveThreshold": false
     },
@@ -5061,14 +4822,12 @@
           "dominantRegion": "上部・左",
           "designPath": "docs/design-reference/common-vars-v6/WuKzU.png",
           "implementationPath": "docs/design-qa/common-vars-v6/WuKzU-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/common-vars-v6/WuKzU-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.1703,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/common-vars-v6/WuKzU-diff-1920.png",
       "aboveThreshold": false
     },
@@ -5100,14 +4859,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/common-vars-v6/gBtaK.png",
           "implementationPath": "docs/design-qa/common-vars-v6/gBtaK-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/common-vars-v6/gBtaK-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.9666,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/common-vars-v6/gBtaK-diff-1920.png",
       "aboveThreshold": false
     },
@@ -5139,14 +4896,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/common-vars-v6/uNBlA.png",
           "implementationPath": "docs/design-qa/common-vars-v6/uNBlA-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/common-vars-v6/uNBlA-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.2428,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/common-vars-v6/uNBlA-diff-1920.png",
       "aboveThreshold": false
     },
@@ -5178,14 +4933,12 @@
           "dominantRegion": "下部・中央",
           "designPath": "docs/design-reference/common-vars-v6/yPkWe.png",
           "implementationPath": "docs/design-qa/common-vars-v6/yPkWe-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/common-vars-v6/yPkWe-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 14.7419,
       "heightDifferencePx": 0,
       "dominantRegion": "下部・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/common-vars-v6/yPkWe-diff-1920.png",
       "aboveThreshold": true
     },
@@ -5217,14 +4970,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/media-v6/g89Tc.png",
           "implementationPath": "docs/design-qa/media-v6/g89Tc-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/media-v6/g89Tc-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 2.8874,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/media-v6/g89Tc-diff-1920.png",
       "aboveThreshold": false
     },
@@ -5256,14 +5007,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/media-v6/voJtX.png",
           "implementationPath": "docs/design-qa/media-v6/voJtX-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/media-v6/voJtX-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 2.7174,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/media-v6/voJtX-diff-1920.png",
       "aboveThreshold": false
     },
@@ -5295,14 +5044,12 @@
           "dominantRegion": "下部・中央",
           "designPath": "docs/design-reference/media-v6/eXAJP.png",
           "implementationPath": "docs/design-qa/media-v6/eXAJP-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/media-v6/eXAJP-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 8.4698,
       "heightDifferencePx": 0,
       "dominantRegion": "下部・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/media-v6/eXAJP-diff-1920.png",
       "aboveThreshold": false
     },
@@ -5334,14 +5081,12 @@
           "dominantRegion": "上部・中央",
           "designPath": "docs/design-reference/media-v6/YfTfJ.png",
           "implementationPath": "docs/design-qa/media-v6/YfTfJ-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/media-v6/YfTfJ-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 12.034,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/media-v6/YfTfJ-diff-1920.png",
       "aboveThreshold": true
     },
@@ -5373,14 +5118,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/media-v6/h8pBZr.png",
           "implementationPath": "docs/design-qa/media-v6/h8pBZr-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/media-v6/h8pBZr-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.4629,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/media-v6/h8pBZr-diff-1920.png",
       "aboveThreshold": false
     },
@@ -5412,14 +5155,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/affiliates-v6/PouPn.png",
           "implementationPath": "docs/design-qa/affiliates-v6/PouPn-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/affiliates-v6/PouPn-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.6352,
       "heightDifferencePx": -56,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/affiliates-v6/PouPn-diff-1920.png",
       "aboveThreshold": false
     },
@@ -5451,14 +5192,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/affiliates-v6/GH8VL.png",
           "implementationPath": "docs/design-qa/affiliates-v6/GH8VL-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/affiliates-v6/GH8VL-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.3863,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/affiliates-v6/GH8VL-diff-1920.png",
       "aboveThreshold": false
     },
@@ -5490,14 +5229,12 @@
           "dominantRegion": "下部・右",
           "designPath": "docs/design-reference/affiliates-v6/n5VVTb.png",
           "implementationPath": "docs/design-qa/affiliates-v6/n5VVTb-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/affiliates-v6/n5VVTb-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 6.5642,
       "heightDifferencePx": -56,
       "dominantRegion": "下部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/affiliates-v6/n5VVTb-diff-1920.png",
       "aboveThreshold": false
     },
@@ -5529,14 +5266,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/affiliates-v6/njLGA.png",
           "implementationPath": "docs/design-qa/affiliates-v6/njLGA-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/affiliates-v6/njLGA-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.1592,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/affiliates-v6/njLGA-diff-1920.png",
       "aboveThreshold": false
     },
@@ -5568,14 +5303,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/affiliates-v6/xqT1Z.png",
           "implementationPath": "docs/design-qa/affiliates-v6/xqT1Z-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/affiliates-v6/xqT1Z-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.3374,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/affiliates-v6/xqT1Z-diff-1920.png",
       "aboveThreshold": false
     },
@@ -5607,14 +5340,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/affiliates-v6/jwrbf.png",
           "implementationPath": "docs/design-qa/affiliates-v6/jwrbf-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/affiliates-v6/jwrbf-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.1568,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/affiliates-v6/jwrbf-diff-1920.png",
       "aboveThreshold": false
     },
@@ -5646,14 +5377,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/affiliates-v6/GPWzq.png",
           "implementationPath": "docs/design-qa/affiliates-v6/GPWzq-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/affiliates-v6/GPWzq-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.0148,
       "heightDifferencePx": 209,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/affiliates-v6/GPWzq-diff-1920.png",
       "aboveThreshold": false
     },
@@ -5697,14 +5426,12 @@
           "dominantRegion": "下部・中央",
           "designPath": "docs/design-reference/affiliates-v6/GqFTV.png",
           "implementationPath": "docs/design-qa/affiliates-v6/GqFTV-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/affiliates-v6/GqFTV-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 7.9215,
       "heightDifferencePx": -1,
       "dominantRegion": "下部・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/affiliates-v6/GqFTV-diff-1920.png",
       "aboveThreshold": false
     },
@@ -5736,14 +5463,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/mileage-v6/s98Vfw.png",
           "implementationPath": "docs/design-qa/mileage-v6/s98Vfw-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/mileage-v6/s98Vfw-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.7372,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/mileage-v6/s98Vfw-diff-1920.png",
       "aboveThreshold": false
     },
@@ -5775,14 +5500,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/mileage-v6/N46cQ.png",
           "implementationPath": "docs/design-qa/mileage-v6/N46cQ-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/mileage-v6/N46cQ-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.2533,
       "heightDifferencePx": 512,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/mileage-v6/N46cQ-diff-1920.png",
       "aboveThreshold": false
     },
@@ -5814,14 +5537,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/mileage-v6/qlVLJ.png",
           "implementationPath": "docs/design-qa/mileage-v6/qlVLJ-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/mileage-v6/qlVLJ-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.4946,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/mileage-v6/qlVLJ-diff-1920.png",
       "aboveThreshold": false
     },
@@ -5853,14 +5574,12 @@
           "dominantRegion": "上部・左",
           "designPath": "docs/design-reference/mileage-v6/MvZm5.png",
           "implementationPath": "docs/design-qa/mileage-v6/MvZm5-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/mileage-v6/MvZm5-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.7272,
       "heightDifferencePx": 83,
       "dominantRegion": "上部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/mileage-v6/MvZm5-diff-1920.png",
       "aboveThreshold": false
     },
@@ -5892,14 +5611,12 @@
           "dominantRegion": "上部・右",
           "designPath": "docs/design-reference/mileage-v6/BmoGY.png",
           "implementationPath": "docs/design-qa/mileage-v6/BmoGY-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/mileage-v6/BmoGY-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 7.0172,
       "heightDifferencePx": 895,
       "dominantRegion": "上部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/mileage-v6/BmoGY-diff-1920.png",
       "aboveThreshold": false
     },
@@ -5931,14 +5648,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/mileage-v6/HIU5O.png",
           "implementationPath": "docs/design-qa/mileage-v6/HIU5O-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/mileage-v6/HIU5O-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.4628,
       "heightDifferencePx": -56,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/mileage-v6/HIU5O-diff-1920.png",
       "aboveThreshold": false
     },
@@ -5970,14 +5685,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/mileage-v6/vz0Ji.png",
           "implementationPath": "docs/design-qa/mileage-v6/vz0Ji-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/mileage-v6/vz0Ji-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 6.1014,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/mileage-v6/vz0Ji-diff-1920.png",
       "aboveThreshold": false
     },
@@ -6009,14 +5722,12 @@
           "dominantRegion": "上部・右",
           "designPath": "docs/design-reference/mileage-v6/p9CcEB.png",
           "implementationPath": "docs/design-qa/mileage-v6/p9CcEB-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/mileage-v6/p9CcEB-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 6.3678,
       "heightDifferencePx": 701,
       "dominantRegion": "上部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/mileage-v6/p9CcEB-diff-1920.png",
       "aboveThreshold": false
     },
@@ -6048,14 +5759,12 @@
           "dominantRegion": "上部・左",
           "designPath": "docs/design-reference/mileage-v6/k8VCU.png",
           "implementationPath": "docs/design-qa/mileage-v6/k8VCU-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/mileage-v6/k8VCU-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.0657,
       "heightDifferencePx": 512,
       "dominantRegion": "上部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/mileage-v6/k8VCU-diff-1920.png",
       "aboveThreshold": false
     },
@@ -6087,14 +5796,12 @@
           "dominantRegion": "上部・左",
           "designPath": "docs/design-reference/mileage-v6/z3PB2.png",
           "implementationPath": "docs/design-qa/mileage-v6/z3PB2-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/mileage-v6/z3PB2-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.2937,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/mileage-v6/z3PB2-diff-1920.png",
       "aboveThreshold": false
     },
@@ -6138,14 +5845,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/inflow-v6/Q4bkTg.png",
           "implementationPath": "docs/design-qa/inflow-v6/Q4bkTg-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inflow-v6/Q4bkTg-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.6635,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/inflow-v6/Q4bkTg-diff-1920.png",
       "aboveThreshold": false
     },
@@ -6177,14 +5882,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/inflow-v6/IhSBB.png",
           "implementationPath": "docs/design-qa/inflow-v6/IhSBB-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inflow-v6/IhSBB-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.7742,
       "heightDifferencePx": -40,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/inflow-v6/IhSBB-diff-1920.png",
       "aboveThreshold": false
     },
@@ -6216,14 +5919,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/inflow-v6/v0HaI.png",
           "implementationPath": "docs/design-qa/inflow-v6/v0HaI-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inflow-v6/v0HaI-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.8252,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/inflow-v6/v0HaI-diff-1920.png",
       "aboveThreshold": false
     },
@@ -6255,14 +5956,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/inflow-v6/TEVk8.png",
           "implementationPath": "docs/design-qa/inflow-v6/TEVk8-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inflow-v6/TEVk8-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.0606,
       "heightDifferencePx": 408,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/inflow-v6/TEVk8-diff-1920.png",
       "aboveThreshold": false
     },
@@ -6294,14 +5993,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/inflow-v6/JupxW.png",
           "implementationPath": "docs/design-qa/inflow-v6/JupxW-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inflow-v6/JupxW-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.0418,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/inflow-v6/JupxW-diff-1920.png",
       "aboveThreshold": false
     },
@@ -6333,14 +6030,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/inflow-v6/UIaM7.png",
           "implementationPath": "docs/design-qa/inflow-v6/UIaM7-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inflow-v6/UIaM7-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.0928,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/inflow-v6/UIaM7-diff-1920.png",
       "aboveThreshold": false
     },
@@ -6372,14 +6067,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/inflow-v6/BMmxU.png",
           "implementationPath": "docs/design-qa/inflow-v6/BMmxU-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inflow-v6/BMmxU-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.1326,
       "heightDifferencePx": -56,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/inflow-v6/BMmxU-diff-1920.png",
       "aboveThreshold": false
     },
@@ -6411,14 +6104,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/inflow-v6/BuVDB.png",
           "implementationPath": "docs/design-qa/inflow-v6/BuVDB-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inflow-v6/BuVDB-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.3284,
       "heightDifferencePx": 202,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/inflow-v6/BuVDB-diff-1920.png",
       "aboveThreshold": false
     },
@@ -6450,14 +6141,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/inflow-v6/Im2b1.png",
           "implementationPath": "docs/design-qa/inflow-v6/Im2b1-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inflow-v6/Im2b1-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.0981,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/inflow-v6/Im2b1-diff-1920.png",
       "aboveThreshold": false
     },
@@ -6489,14 +6178,12 @@
           "dominantRegion": "下部・右",
           "designPath": "docs/design-reference/conversions-v6/ZrpKn.png",
           "implementationPath": "docs/design-qa/conversions-v6/ZrpKn-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/conversions-v6/ZrpKn-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 6.4001,
       "heightDifferencePx": 0,
       "dominantRegion": "下部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/conversions-v6/ZrpKn-diff-1920.png",
       "aboveThreshold": false
     },
@@ -6528,14 +6215,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/conversions-v6/GUxsj.png",
           "implementationPath": "docs/design-qa/conversions-v6/GUxsj-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/conversions-v6/GUxsj-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 8.2785,
       "heightDifferencePx": 15,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/conversions-v6/GUxsj-diff-1920.png",
       "aboveThreshold": false
     },
@@ -6567,14 +6252,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/conversions-v6/GtylA.png",
           "implementationPath": "docs/design-qa/conversions-v6/GtylA-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/conversions-v6/GtylA-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.6535,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/conversions-v6/GtylA-diff-1920.png",
       "aboveThreshold": false
     },
@@ -6606,14 +6289,12 @@
           "dominantRegion": "下部・右",
           "designPath": "docs/design-reference/conversions-v6/d8d3Mz.png",
           "implementationPath": "docs/design-qa/conversions-v6/d8d3Mz-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/conversions-v6/d8d3Mz-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 7.8171,
       "heightDifferencePx": 0,
       "dominantRegion": "下部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/conversions-v6/d8d3Mz-diff-1920.png",
       "aboveThreshold": false
     },
@@ -6645,14 +6326,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/analytics-v6/Zxezb.png",
           "implementationPath": "docs/design-qa/analytics-v6/Zxezb-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/analytics-v6/Zxezb-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 7.4027,
       "heightDifferencePx": -56,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/analytics-v6/Zxezb-diff-1920.png",
       "aboveThreshold": false
     },
@@ -6684,14 +6363,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/analytics-v6/J6Inc.png",
           "implementationPath": "docs/design-qa/analytics-v6/J6Inc-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/analytics-v6/J6Inc-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 6.0785,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/analytics-v6/J6Inc-diff-1920.png",
       "aboveThreshold": false
     },
@@ -6723,14 +6400,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/analytics-v6/YBGtm.png",
           "implementationPath": "docs/design-qa/analytics-v6/YBGtm-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/analytics-v6/YBGtm-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.2928,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/analytics-v6/YBGtm-diff-1920.png",
       "aboveThreshold": false
     },
@@ -6762,14 +6437,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/analytics-v6/QQ1SR.png",
           "implementationPath": "docs/design-qa/analytics-v6/QQ1SR-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/analytics-v6/QQ1SR-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.4144,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/analytics-v6/QQ1SR-diff-1920.png",
       "aboveThreshold": false
     },
@@ -6813,14 +6486,12 @@
           "dominantRegion": "下部・中央",
           "designPath": "docs/design-reference/analytics-v6/f5HsX.png",
           "implementationPath": "docs/design-qa/analytics-v6/f5HsX-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/analytics-v6/f5HsX-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 6.5307,
       "heightDifferencePx": 441,
       "dominantRegion": "下部・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/analytics-v6/f5HsX-diff-1920.png",
       "aboveThreshold": false
     },
@@ -6852,14 +6523,12 @@
           "dominantRegion": "下部・左",
           "designPath": "docs/design-reference/analytics-v6/C2I7ry.png",
           "implementationPath": "docs/design-qa/analytics-v6/C2I7ry-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/analytics-v6/C2I7ry-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 8.2295,
       "heightDifferencePx": 393,
       "dominantRegion": "下部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/analytics-v6/C2I7ry-diff-1920.png",
       "aboveThreshold": false
     },
@@ -6891,14 +6560,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/analytics-v6/Fh2Qj.png",
           "implementationPath": "docs/design-qa/analytics-v6/Fh2Qj-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/analytics-v6/Fh2Qj-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.1944,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/analytics-v6/Fh2Qj-diff-1920.png",
       "aboveThreshold": false
     },
@@ -6930,14 +6597,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/analytics-v6/dfwD4.png",
           "implementationPath": "docs/design-qa/analytics-v6/dfwD4-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/analytics-v6/dfwD4-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.4324,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/analytics-v6/dfwD4-diff-1920.png",
       "aboveThreshold": false
     },
@@ -6969,14 +6634,12 @@
           "dominantRegion": "下部・右",
           "designPath": "docs/design-reference/nen-v6/VLMGH.png",
           "implementationPath": "docs/design-qa/nen-v6/VLMGH-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/nen-v6/VLMGH-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.9451,
       "heightDifferencePx": 191,
       "dominantRegion": "下部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/nen-v6/VLMGH-diff-1920.png",
       "aboveThreshold": false
     },
@@ -7008,14 +6671,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/nen-v6/DEX0k.png",
           "implementationPath": "docs/design-qa/nen-v6/DEX0k-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/nen-v6/DEX0k-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.011,
       "heightDifferencePx": 192,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/nen-v6/DEX0k-diff-1920.png",
       "aboveThreshold": false
     },
@@ -7047,14 +6708,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/nen-v6/q4lajm.png",
           "implementationPath": "docs/design-qa/nen-v6/q4lajm-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/nen-v6/q4lajm-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 7.5653,
       "heightDifferencePx": 230,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/nen-v6/q4lajm-diff-1920.png",
       "aboveThreshold": false
     },
@@ -7086,14 +6745,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/nen-v6/WeXbL.png",
           "implementationPath": "docs/design-qa/nen-v6/WeXbL-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/nen-v6/WeXbL-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.0101,
       "heightDifferencePx": 43,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/nen-v6/WeXbL-diff-1920.png",
       "aboveThreshold": false
     },
@@ -7125,14 +6782,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/nen-v6/HpKyF.png",
           "implementationPath": "docs/design-qa/nen-v6/HpKyF-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/nen-v6/HpKyF-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.5549,
       "heightDifferencePx": 28,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/nen-v6/HpKyF-diff-1920.png",
       "aboveThreshold": false
     },
@@ -7164,14 +6819,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/nen-v6/ymXJK.png",
           "implementationPath": "docs/design-qa/nen-v6/ymXJK-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/nen-v6/ymXJK-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 7.0115,
       "heightDifferencePx": 236,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/nen-v6/ymXJK-diff-1920.png",
       "aboveThreshold": false
     },
@@ -7203,14 +6856,12 @@
           "dominantRegion": "上部・左",
           "designPath": "docs/design-reference/nen-v6/i9sQP.png",
           "implementationPath": "docs/design-qa/nen-v6/i9sQP-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/nen-v6/i9sQP-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.2514,
       "heightDifferencePx": 192,
       "dominantRegion": "上部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/nen-v6/i9sQP-diff-1920.png",
       "aboveThreshold": false
     },
@@ -7242,14 +6893,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/photos-v6/Qu6Vk.png",
           "implementationPath": "docs/design-qa/photos-v6/Qu6Vk-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/photos-v6/Qu6Vk-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 6.0722,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/photos-v6/Qu6Vk-diff-1920.png",
       "aboveThreshold": false
     },
@@ -7293,14 +6942,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/photos-v6/N2J629.png",
           "implementationPath": "docs/design-qa/photos-v6/N2J629-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/photos-v6/N2J629-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 11.6056,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/photos-v6/N2J629-diff-1920.png",
       "aboveThreshold": true
     },
@@ -7344,14 +6991,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/ec-v6/eI3gs.png",
           "implementationPath": "docs/design-qa/ec-v6/eI3gs-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/ec-v6/eI3gs-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.9047,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/ec-v6/eI3gs-diff-1920.png",
       "aboveThreshold": false
     },
@@ -7383,14 +7028,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/ec-v6/ELayY.png",
           "implementationPath": "docs/design-qa/ec-v6/ELayY-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/ec-v6/ELayY-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.5071,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/ec-v6/ELayY-diff-1920.png",
       "aboveThreshold": false
     },
@@ -7446,14 +7089,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/line-notify-v6/festr.png",
           "implementationPath": "docs/design-qa/line-notify-v6/festr-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/line-notify-v6/festr-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.8107,
       "heightDifferencePx": 38,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/line-notify-v6/festr-diff-1920.png",
       "aboveThreshold": false
     },
@@ -7485,14 +7126,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/line-notify-v6/Q55bb.png",
           "implementationPath": "docs/design-qa/line-notify-v6/Q55bb-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/line-notify-v6/Q55bb-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 7.7882,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/line-notify-v6/Q55bb-diff-1920.png",
       "aboveThreshold": false
     },
@@ -7524,14 +7163,12 @@
           "dominantRegion": "上部・左",
           "designPath": "docs/design-reference/line-notify-v6/X8JCA5.png",
           "implementationPath": "docs/design-qa/line-notify-v6/X8JCA5-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/line-notify-v6/X8JCA5-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.5328,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/line-notify-v6/X8JCA5-diff-1920.png",
       "aboveThreshold": false
     },
@@ -7563,14 +7200,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/line-notify-v6/Se65i.png",
           "implementationPath": "docs/design-qa/line-notify-v6/Se65i-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/line-notify-v6/Se65i-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.0349,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/line-notify-v6/Se65i-diff-1920.png",
       "aboveThreshold": false
     },
@@ -7602,14 +7237,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/line-notify-v6/DpxOK.png",
           "implementationPath": "docs/design-qa/line-notify-v6/DpxOK-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/line-notify-v6/DpxOK-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.7706,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/line-notify-v6/DpxOK-diff-1920.png",
       "aboveThreshold": false
     },
@@ -7641,14 +7274,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/line-notify-v6/N2gAza.png",
           "implementationPath": "docs/design-qa/line-notify-v6/N2gAza-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/line-notify-v6/N2gAza-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.1884,
       "heightDifferencePx": 67,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/line-notify-v6/N2gAza-diff-1920.png",
       "aboveThreshold": false
     },
@@ -7680,14 +7311,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/automations-v6/gief7.png",
           "implementationPath": "docs/design-qa/automations-v6/gief7-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/automations-v6/gief7-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.1613,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/automations-v6/gief7-diff-1920.png",
       "aboveThreshold": false
     },
@@ -7719,14 +7348,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/automations-v6/Rv8Jv.png",
           "implementationPath": "docs/design-qa/automations-v6/Rv8Jv-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/automations-v6/Rv8Jv-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 6.106,
       "heightDifferencePx": 169,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/automations-v6/Rv8Jv-diff-1920.png",
       "aboveThreshold": false
     },
@@ -7758,14 +7385,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/automations-v6/DkPY0.png",
           "implementationPath": "docs/design-qa/automations-v6/DkPY0-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/automations-v6/DkPY0-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.3876,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/automations-v6/DkPY0-diff-1920.png",
       "aboveThreshold": false
     },
@@ -7797,14 +7422,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/automations-v6/WjYAC.png",
           "implementationPath": "docs/design-qa/automations-v6/WjYAC-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/automations-v6/WjYAC-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.1685,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/automations-v6/WjYAC-diff-1920.png",
       "aboveThreshold": false
     },
@@ -7836,14 +7459,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/automations-v6/Vdbv5.png",
           "implementationPath": "docs/design-qa/automations-v6/Vdbv5-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/automations-v6/Vdbv5-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.4432,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/automations-v6/Vdbv5-diff-1920.png",
       "aboveThreshold": false
     },
@@ -7875,14 +7496,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/automations-v6/xOpDs.png",
           "implementationPath": "docs/design-qa/automations-v6/xOpDs-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/automations-v6/xOpDs-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.2763,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/automations-v6/xOpDs-diff-1920.png",
       "aboveThreshold": false
     },
@@ -7914,14 +7533,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/automations-v6/py5CG.png",
           "implementationPath": "docs/design-qa/automations-v6/py5CG-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/automations-v6/py5CG-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.2824,
       "heightDifferencePx": 85,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/automations-v6/py5CG-diff-1920.png",
       "aboveThreshold": false
     },
@@ -7953,14 +7570,12 @@
           "dominantRegion": "上部・左",
           "designPath": "docs/design-reference/automations-v6/syWp4.png",
           "implementationPath": "docs/design-qa/automations-v6/syWp4-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/automations-v6/syWp4-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.7846,
       "heightDifferencePx": 220,
       "dominantRegion": "上部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/automations-v6/syWp4-diff-1920.png",
       "aboveThreshold": false
     },
@@ -7992,14 +7607,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/webhooks-v6/k3WxrO.png",
           "implementationPath": "docs/design-qa/webhooks-v6/k3WxrO-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/webhooks-v6/k3WxrO-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.4603,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/webhooks-v6/k3WxrO-diff-1920.png",
       "aboveThreshold": false
     },
@@ -8031,14 +7644,12 @@
           "dominantRegion": "下部・中央",
           "designPath": "docs/design-reference/webhooks-v6/M0Gb7.png",
           "implementationPath": "docs/design-qa/webhooks-v6/M0Gb7-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/webhooks-v6/M0Gb7-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 16.0302,
       "heightDifferencePx": 223,
       "dominantRegion": "下部・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/webhooks-v6/M0Gb7-diff-1920.png",
       "aboveThreshold": true
     },
@@ -8070,14 +7681,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/webhooks-v6/KNG00.png",
           "implementationPath": "docs/design-qa/webhooks-v6/KNG00-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/webhooks-v6/KNG00-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.0487,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/webhooks-v6/KNG00-diff-1920.png",
       "aboveThreshold": false
     },
@@ -8109,14 +7718,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/webhooks-v6/f8SBSh.png",
           "implementationPath": "docs/design-qa/webhooks-v6/f8SBSh-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/webhooks-v6/f8SBSh-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.8223,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/webhooks-v6/f8SBSh-diff-1920.png",
       "aboveThreshold": false
     },
@@ -8148,14 +7755,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/booking-v6/TV2DI.png",
           "implementationPath": "docs/design-qa/booking-v6/TV2DI-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/booking-v6/TV2DI-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.673,
       "heightDifferencePx": -64,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/booking-v6/TV2DI-diff-1920.png",
       "aboveThreshold": false
     },
@@ -8187,14 +7792,12 @@
           "dominantRegion": "上部・右",
           "designPath": "docs/design-reference/booking-v6/TnDbq.png",
           "implementationPath": "docs/design-qa/booking-v6/TnDbq-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/booking-v6/TnDbq-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.3594,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/booking-v6/TnDbq-diff-1920.png",
       "aboveThreshold": false
     },
@@ -8226,14 +7829,12 @@
           "dominantRegion": "上部・右",
           "designPath": "docs/design-reference/booking-v6/cpdDi.png",
           "implementationPath": "docs/design-qa/booking-v6/cpdDi-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/booking-v6/cpdDi-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 6.668,
       "heightDifferencePx": 227,
       "dominantRegion": "上部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/booking-v6/cpdDi-diff-1920.png",
       "aboveThreshold": false
     },
@@ -8265,14 +7866,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/booking-v6/SbuUI.png",
           "implementationPath": "docs/design-qa/booking-v6/SbuUI-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/booking-v6/SbuUI-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.4693,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/booking-v6/SbuUI-diff-1920.png",
       "aboveThreshold": false
     },
@@ -8304,14 +7903,12 @@
           "dominantRegion": "上部・右",
           "designPath": "docs/design-reference/booking-v6/GFDqW.png",
           "implementationPath": "docs/design-qa/booking-v6/GFDqW-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/booking-v6/GFDqW-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 7.6298,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/booking-v6/GFDqW-diff-1920.png",
       "aboveThreshold": false
     },
@@ -8343,14 +7940,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/booking-v6/GfceK.png",
           "implementationPath": "docs/design-qa/booking-v6/GfceK-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/booking-v6/GfceK-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 6.8003,
       "heightDifferencePx": 26,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/booking-v6/GfceK-diff-1920.png",
       "aboveThreshold": false
     },
@@ -8382,14 +7977,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/booking-v6/Lg8ff.png",
           "implementationPath": "docs/design-qa/booking-v6/Lg8ff-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/booking-v6/Lg8ff-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.8883,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/booking-v6/Lg8ff-diff-1920.png",
       "aboveThreshold": false
     },
@@ -8421,14 +8014,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/booking-settings-v6/QSLEH.png",
           "implementationPath": "docs/design-qa/booking-settings-v6/QSLEH-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/booking-settings-v6/QSLEH-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.4602,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/booking-settings-v6/QSLEH-diff-1920.png",
       "aboveThreshold": false
     },
@@ -8460,14 +8051,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/booking-settings-v6/tksPc.png",
           "implementationPath": "docs/design-qa/booking-settings-v6/tksPc-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/booking-settings-v6/tksPc-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.9219,
       "heightDifferencePx": 171,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/booking-settings-v6/tksPc-diff-1920.png",
       "aboveThreshold": false
     },
@@ -8499,14 +8088,12 @@
           "dominantRegion": "上部・右",
           "designPath": "docs/design-reference/booking-settings-v6/GhOb3.png",
           "implementationPath": "docs/design-qa/booking-settings-v6/GhOb3-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/booking-settings-v6/GhOb3-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 6.8295,
       "heightDifferencePx": 658,
       "dominantRegion": "上部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/booking-settings-v6/GhOb3-diff-1920.png",
       "aboveThreshold": false
     },
@@ -8538,14 +8125,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/booking-settings-v6/W6465r.png",
           "implementationPath": "docs/design-qa/booking-settings-v6/W6465r-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/booking-settings-v6/W6465r-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 2.8767,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/booking-settings-v6/W6465r-diff-1920.png",
       "aboveThreshold": false
     },
@@ -8577,14 +8162,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/events-v6/ugP5y.png",
           "implementationPath": "docs/design-qa/events-v6/ugP5y-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/events-v6/ugP5y-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.4,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/events-v6/ugP5y-diff-1920.png",
       "aboveThreshold": false
     },
@@ -8616,14 +8199,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/events-v6/MKrPY.png",
           "implementationPath": "docs/design-qa/events-v6/MKrPY-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/events-v6/MKrPY-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 6.0708,
       "heightDifferencePx": 642,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/events-v6/MKrPY-diff-1920.png",
       "aboveThreshold": false
     },
@@ -8655,14 +8236,12 @@
           "dominantRegion": "上部・左",
           "designPath": "docs/design-reference/events-v6/i5SN2j.png",
           "implementationPath": "docs/design-qa/events-v6/i5SN2j-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/events-v6/i5SN2j-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.3306,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/events-v6/i5SN2j-diff-1920.png",
       "aboveThreshold": false
     },
@@ -8694,14 +8273,12 @@
           "dominantRegion": "上部・左",
           "designPath": "docs/design-reference/events-v6/k5m5Bc.png",
           "implementationPath": "docs/design-qa/events-v6/k5m5Bc-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/events-v6/k5m5Bc-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.7226,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/events-v6/k5m5Bc-diff-1920.png",
       "aboveThreshold": false
     },
@@ -8733,14 +8310,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/staff-v6/e3jz3.png",
           "implementationPath": "docs/design-qa/staff-v6/e3jz3-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/staff-v6/e3jz3-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.3899,
       "heightDifferencePx": 194,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/staff-v6/e3jz3-diff-1920.png",
       "aboveThreshold": false
     },
@@ -8772,14 +8347,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/staff-v6/EOTS4.png",
           "implementationPath": "docs/design-qa/staff-v6/EOTS4-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/staff-v6/EOTS4-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.8683,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/staff-v6/EOTS4-diff-1920.png",
       "aboveThreshold": false
     },
@@ -8811,14 +8384,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/staff-v6/jwVlo.png",
           "implementationPath": "docs/design-qa/staff-v6/jwVlo-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/staff-v6/jwVlo-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.6135,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/staff-v6/jwVlo-diff-1920.png",
       "aboveThreshold": false
     },
@@ -8850,14 +8421,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/staff-v6/I3ZSrU.png",
           "implementationPath": "docs/design-qa/staff-v6/I3ZSrU-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/staff-v6/I3ZSrU-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.8181,
       "heightDifferencePx": -16,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/staff-v6/I3ZSrU-diff-1920.png",
       "aboveThreshold": false
     },
@@ -8889,14 +8458,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/settings-v6/c4R6F.png",
           "implementationPath": "docs/design-qa/settings-v6/c4R6F-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/settings-v6/c4R6F-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 7.5002,
       "heightDifferencePx": 81,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/settings-v6/c4R6F-diff-1920.png",
       "aboveThreshold": false
     },
@@ -8928,14 +8495,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/operations-v6/UgonK.png",
           "implementationPath": "docs/design-qa/operations-v6/UgonK-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/operations-v6/UgonK-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.1817,
       "heightDifferencePx": 75,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/operations-v6/UgonK-diff-1920.png",
       "aboveThreshold": false
     },
@@ -8967,14 +8532,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/operations-v6/b3HfZ.png",
           "implementationPath": "docs/design-qa/operations-v6/b3HfZ-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/operations-v6/b3HfZ-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.3686,
       "heightDifferencePx": -56,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/operations-v6/b3HfZ-diff-1920.png",
       "aboveThreshold": false
     },
@@ -9006,14 +8569,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/operations-v6/UhC2O.png",
           "implementationPath": "docs/design-qa/operations-v6/UhC2O-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/operations-v6/UhC2O-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.9458,
       "heightDifferencePx": 445,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/operations-v6/UhC2O-diff-1920.png",
       "aboveThreshold": false
     },
@@ -9045,14 +8606,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/operations-v6/U0BwS.png",
           "implementationPath": "docs/design-qa/operations-v6/U0BwS-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/operations-v6/U0BwS-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.8497,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/operations-v6/U0BwS-diff-1920.png",
       "aboveThreshold": false
     },
@@ -9069,12 +8628,12 @@
           "width": 1920,
           "comparedHeight": 1080,
           "designHeight": 1080,
-          "implementationHeight": 1576,
-          "heightDifferencePx": 496,
+          "implementationHeight": 1572,
+          "heightDifferencePx": 492,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 82081,
+          "mismatchedPixels": 79381,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 3.9584,
+          "pixelDiffPercent": 3.8282,
           "boundingBox": {
             "left": 1,
             "top": 10,
@@ -9084,14 +8643,12 @@
           "dominantRegion": "上部・左",
           "designPath": "docs/design-reference/friend-attributes-v6/hqrOv.png",
           "implementationPath": "docs/design-qa/friend-attributes-v6/hqrOv-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friend-attributes-v6/hqrOv-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 3.9584,
-      "heightDifferencePx": 496,
+      "pixelDiffPercent": 3.8282,
+      "heightDifferencePx": 492,
       "dominantRegion": "上部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friend-attributes-v6/hqrOv-diff-1920.png",
       "aboveThreshold": false
     },
@@ -9123,14 +8680,12 @@
           "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/friend-attributes-v6/dKlkz.png",
           "implementationPath": "docs/design-qa/friend-attributes-v6/dKlkz-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friend-attributes-v6/dKlkz-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 17.0407,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friend-attributes-v6/dKlkz-diff-1920.png",
       "aboveThreshold": true
     },
@@ -9201,14 +8756,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/friend-attributes-v6/sfTEW.png",
           "implementationPath": "scripts/visual-qa/capture.spec.mjs-snapshots/tags-csv-preview-1920-darwin.png",
-          "implementationSource": "snapshot",
           "diffPath": "docs/design-qa/friend-attributes-v6/sfTEW-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.4576,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "snapshot",
       "diffPath": "docs/design-qa/friend-attributes-v6/sfTEW-diff-1920.png",
       "aboveThreshold": false
     },
@@ -9240,14 +8793,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/friend-attributes-v6/op1rh.png",
           "implementationPath": "scripts/visual-qa/capture.spec.mjs-snapshots/tags-csv-success-1920-darwin.png",
-          "implementationSource": "snapshot",
           "diffPath": "docs/design-qa/friend-attributes-v6/op1rh-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 2.5624,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "snapshot",
       "diffPath": "docs/design-qa/friend-attributes-v6/op1rh-diff-1920.png",
       "aboveThreshold": false
     },
@@ -9279,14 +8830,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/friend-attributes-v6/QzRsJ.png",
           "implementationPath": "scripts/visual-qa/capture.spec.mjs-snapshots/tags-csv-partial-1920-darwin.png",
-          "implementationSource": "snapshot",
           "diffPath": "docs/design-qa/friend-attributes-v6/QzRsJ-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.0981,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "snapshot",
       "diffPath": "docs/design-qa/friend-attributes-v6/QzRsJ-diff-1920.png",
       "aboveThreshold": false
     },
@@ -9318,14 +8867,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/friend-attributes-v6/HBTk0.png",
           "implementationPath": "docs/design-qa/friend-attributes-v6/HBTk0-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friend-attributes-v6/HBTk0-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.6538,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friend-attributes-v6/HBTk0-diff-1920.png",
       "aboveThreshold": false
     },
@@ -9357,14 +8904,12 @@
           "dominantRegion": "上部・左",
           "designPath": "docs/design-reference/friend-attributes-v6/yKEdO.png",
           "implementationPath": "docs/design-qa/friend-attributes-v6/yKEdO-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friend-attributes-v6/yKEdO-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.4372,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friend-attributes-v6/yKEdO-diff-1920.png",
       "aboveThreshold": false
     },
@@ -9396,14 +8941,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/friend-attributes-v6/rIhbN.png",
           "implementationPath": "docs/design-qa/friend-attributes-v6/rIhbN-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friend-attributes-v6/rIhbN-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.5762,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friend-attributes-v6/rIhbN-diff-1920.png",
       "aboveThreshold": false
     },
@@ -9435,14 +8978,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/friend-attributes-v6/QKx8Q.png",
           "implementationPath": "docs/design-qa/friend-attributes-v6/QKx8Q-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friend-attributes-v6/QKx8Q-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.9848,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friend-attributes-v6/QKx8Q-diff-1920.png",
       "aboveThreshold": false
     },
@@ -9474,14 +9015,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/friend-attributes-v6/l25rlp.png",
           "implementationPath": "docs/design-qa/friend-attributes-v6/l25rlp-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friend-attributes-v6/l25rlp-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.1692,
       "heightDifferencePx": 4,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friend-attributes-v6/l25rlp-diff-1920.png",
       "aboveThreshold": false
     },
@@ -9513,14 +9052,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/friend-attributes-v6/tP0RW.png",
           "implementationPath": "docs/design-qa/friend-attributes-v6/tP0RW-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friend-attributes-v6/tP0RW-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 5.3077,
       "heightDifferencePx": 228,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friend-attributes-v6/tP0RW-diff-1920.png",
       "aboveThreshold": false
     },
@@ -9552,14 +9089,12 @@
           "dominantRegion": "上部・右",
           "designPath": "docs/design-reference/friend-attributes-v6/LfrQs.png",
           "implementationPath": "docs/design-qa/friend-attributes-v6/LfrQs-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friend-attributes-v6/LfrQs-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.8876,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・右",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friend-attributes-v6/LfrQs-diff-1920.png",
       "aboveThreshold": false
     },
@@ -9591,14 +9126,12 @@
           "dominantRegion": "下部・左",
           "designPath": "docs/design-reference/friend-attributes-v6/ee0sk.png",
           "implementationPath": "docs/design-qa/friend-attributes-v6/ee0sk-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friend-attributes-v6/ee0sk-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.9532,
       "heightDifferencePx": 242,
       "dominantRegion": "下部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friend-attributes-v6/ee0sk-diff-1920.png",
       "aboveThreshold": false
     },
@@ -9630,14 +9163,12 @@
           "dominantRegion": "下部・中央",
           "designPath": "docs/design-reference/friend-attributes-v6/VjXGX.png",
           "implementationPath": "docs/design-qa/friend-attributes-v6/VjXGX-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friend-attributes-v6/VjXGX-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 19.6324,
       "heightDifferencePx": 0,
       "dominantRegion": "下部・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friend-attributes-v6/VjXGX-diff-1920.png",
       "aboveThreshold": true
     },
@@ -9669,14 +9200,12 @@
           "dominantRegion": "下部・中央",
           "designPath": "docs/design-reference/friend-attributes-v6/byqIW.png",
           "implementationPath": "docs/design-qa/friend-attributes-v6/byqIW-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friend-attributes-v6/byqIW-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 7.3995,
       "heightDifferencePx": 0,
       "dominantRegion": "下部・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friend-attributes-v6/byqIW-diff-1920.png",
       "aboveThreshold": false
     },
@@ -9708,14 +9237,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/friend-attributes-v6/A1ZYeP.png",
           "implementationPath": "docs/design-qa/friend-attributes-v6/A1ZYeP-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friend-attributes-v6/A1ZYeP-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.3495,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friend-attributes-v6/A1ZYeP-diff-1920.png",
       "aboveThreshold": false
     },
@@ -9747,14 +9274,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/friend-attributes-v6/KoT6c.png",
           "implementationPath": "docs/design-qa/friend-attributes-v6/KoT6c-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friend-attributes-v6/KoT6c-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 3.3877,
       "heightDifferencePx": 112,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friend-attributes-v6/KoT6c-diff-1920.png",
       "aboveThreshold": false
     },
@@ -9786,14 +9311,12 @@
           "dominantRegion": "上部・左",
           "designPath": "docs/design-reference/friend-attributes-v6/GMvBd.png",
           "implementationPath": "docs/design-qa/friend-attributes-v6/GMvBd-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friend-attributes-v6/GMvBd-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 2.9869,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friend-attributes-v6/GMvBd-diff-1920.png",
       "aboveThreshold": false
     },
@@ -9825,14 +9348,12 @@
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/friend-attributes-v6/zGZMA.png",
           "implementationPath": "docs/design-qa/friend-attributes-v6/zGZMA-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friend-attributes-v6/zGZMA-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 9.2834,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friend-attributes-v6/zGZMA-diff-1920.png",
       "aboveThreshold": false
     },
@@ -9864,14 +9385,12 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/friend-attributes-v6/XBkiQ.png",
           "implementationPath": "docs/design-qa/friend-attributes-v6/XBkiQ-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/friend-attributes-v6/XBkiQ-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 4.8057,
       "heightDifferencePx": 68,
       "dominantRegion": "中央・左",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/friend-attributes-v6/XBkiQ-diff-1920.png",
       "aboveThreshold": false
     },
@@ -9915,14 +9434,12 @@
           "dominantRegion": "上部・中央",
           "designPath": "docs/design-reference/inbox-v6/ohj8J.png",
           "implementationPath": "docs/design-qa/inbox-v6/ohj8J-1920.png",
-          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inbox-v6/ohj8J-diff-1920.png"
         }
       ],
       "pixelDiffPercent": 6.9015,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・中央",
-      "implementationSource": "docs",
       "diffPath": "docs/design-qa/inbox-v6/ohj8J-diff-1920.png",
       "aboveThreshold": false
     },
