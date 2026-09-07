@@ -149,6 +149,7 @@ const SEARCH = {
 const FOLDER = {
   id: 'fo-1',
   kind: 'template',
+  account_id: null,
   name: 'よく使う',
   parent_id: null,
   display_order: 0,
@@ -1108,17 +1109,63 @@ describe('フォルダ', () => {
   });
 
   it('ウェビナーフォルダは閲覧可能なアカウント内の件数を返す', async () => {
-    folders.getFolders.mockResolvedValue([{ ...FOLDER, id: 'fo-webinar', kind: 'webinar' }]);
+    folders.getFolders.mockResolvedValue([{
+      ...FOLDER, id: 'fo-webinar', kind: 'webinar', account_id: 'account-1',
+    }]);
 
     const res = await req('/api/folders?kind=webinar&account_id=account-1', 'GET');
 
     expect(res.status).toBe(200);
+    expect(folders.getFolders).toHaveBeenCalledWith(env.DB, 'webinar', 'account-1');
     expect(folders.getWebinarFolderCounts).toHaveBeenCalledWith(env.DB, {
       allowedAccountIds: ['account-1'],
       canSeeUnassigned: false,
       accountId: 'account-1',
     });
-    expect(await res.json()).toMatchObject({ data: [{ id: 'fo-webinar', count: 2 }] });
+    expect(await res.json()).toMatchObject({
+      data: [{ id: 'fo-webinar', accountId: 'account-1', count: 2 }],
+    });
+  });
+
+  it('ウェビナーフォルダの作成・改名・削除を選択中アカウントへ固定する', async () => {
+    const webinarFolder = {
+      ...FOLDER, id: 'fo-webinar', kind: 'webinar', account_id: 'account-1', name: 'セミナー',
+    };
+    folders.createFolder.mockResolvedValue(webinarFolder);
+    folders.getFolderById.mockResolvedValue(webinarFolder);
+    folders.updateFolder.mockResolvedValue({ ...webinarFolder, name: '商品説明' });
+
+    const created = await req('/api/folders', 'POST', {
+      kind: 'webinar', accountId: 'account-1', name: 'セミナー',
+    });
+    const renamed = await req('/api/folders/fo-webinar', 'PATCH', {
+      accountId: 'account-1', name: '商品説明',
+    });
+    const deleted = await req('/api/folders/fo-webinar?account_id=account-1', 'DELETE');
+
+    expect(created.status).toBe(201);
+    expect(renamed.status).toBe(200);
+    expect(deleted.status).toBe(200);
+    expect(folders.createFolder).toHaveBeenCalledWith(env.DB, expect.objectContaining({
+      kind: 'webinar', accountId: 'account-1', name: 'セミナー',
+    }));
+    expect(folders.updateFolder).toHaveBeenCalledWith(env.DB, 'fo-webinar', { name: '商品説明' });
+    expect(folders.deleteFolder).toHaveBeenCalledWith(env.DB, 'fo-webinar');
+  });
+
+  it('別アカウントのウェビナーフォルダを更新・削除できない', async () => {
+    folders.getFolderById.mockResolvedValue({
+      ...FOLDER, id: 'fo-webinar', kind: 'webinar', account_id: 'account-other',
+    });
+    const renamed = await req('/api/folders/fo-webinar', 'PATCH', {
+      accountId: 'account-1', name: '変更',
+    });
+    const deleted = await req('/api/folders/fo-webinar?account_id=account-1', 'DELETE');
+
+    expect(renamed.status).toBe(404);
+    expect(deleted.status).toBe(404);
+    expect(folders.updateFolder).not.toHaveBeenCalled();
+    expect(folders.deleteFolder).not.toHaveBeenCalled();
   });
 
   it('ウェビナーフォルダ件数は見えないアカウントを404にする', async () => {

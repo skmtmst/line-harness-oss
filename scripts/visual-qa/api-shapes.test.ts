@@ -27,6 +27,8 @@ import { BROADCAST_LIST_META, TEMPLATES } from './fixtures.mjs';
 import { NEN_CAMPAIGN_SETTINGS, NEN_COLUMNS, NEN_PETS, NEN_JOBS, NEN_FLOW_METRICS, NEN_COLUMN_METRICS, NEN_PET_METRICS, NEN_DELIVERIES, NEN_DELIVERY_DETAILS } from './fixtures.mjs';
 // @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
 import { COMMON_VAR_DETAIL, COMMON_VAR_REPLACEMENT_CANDIDATES, COMMON_VAR_REPLACEMENT_PREVIEW, COMMON_VAR_REPLACEMENT_RESULT } from './fixtures.mjs';
+// @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
+import { WEBINAR_FOLDERS } from './fixtures.mjs';
 
 describe('画面確認モックの口の形', () => {
   const paths: Set<string> = readArrayGetPaths();
@@ -71,6 +73,17 @@ describe('画面確認モックの口の形', () => {
     // 静かに0件になると、全部の口が `{items:[],total:0}` に落ちて
     // 全画面が真っ白になる。原因はどこにも出ない。
     expect(() => readArrayGetPaths('// api.ts が読めなかった場合')).toThrow(/配列の口/);
+  });
+});
+
+describe('ウェビナーフォルダの画面確認データ', () => {
+  it('選択中アカウントと件数を持つ', () => {
+    expect(WEBINAR_FOLDERS).toHaveLength(4);
+    for (const folder of WEBINAR_FOLDERS) {
+      expect(folder).toMatchObject({
+        kind: 'webinar', accountId: 'visual-qa-account', count: expect.any(Number),
+      });
+    }
   });
 });
 
