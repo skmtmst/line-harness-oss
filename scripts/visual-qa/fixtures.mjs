@@ -5360,6 +5360,17 @@ export const LINE_ACCOUNTS = [
   }),
 ]
 
+/** 運用状態画面だけが読む固定ヘルスログ。見出し行を実データ状態で撮る。 */
+export const ACCOUNT_HEALTH_LOGS = {
+  'visual-qa-account': [
+    {
+      id: 'health-log-1', lineAccountId: 'visual-qa-account', errorCode: 429,
+      errorCount: 3, checkPeriod: '直近24時間', riskLevel: 'warning',
+      createdAt: '2026-09-07T02:20:00.000Z',
+    },
+  ],
+}
+
 /** 登録前の接続確認。設計 `b2NGxk` と同じく3段目で止める。保存は行わない。 */
 export const LINE_ACCOUNT_VERIFY_CONNECTION = {
   messagingApi: true,
@@ -6021,6 +6032,11 @@ export const WEBINAR_CTAS = [{
 export const WEBINAR_ACTIONS = [
   { id: 'webinar-action-1', trigger: 'completed', actionType: 'add_tag', config: { tagId: '配信済み' }, position: 0, version: 2 },
   { id: 'webinar-action-2', trigger: 'completed', actionType: 'start_scenario', config: { scenarioId: '相談シナリオ' }, position: 1, version: 2 },
+]
+
+export const WEBINAR_COMMENTS = [
+  { id: 'webinar-comment-1', webinarId: 'webinar-1', atSeconds: 120, authorName: 'スタッフ', body: '本日はご参加ありがとうございます。' },
+  { id: 'webinar-comment-2', webinarId: 'webinar-1', atSeconds: 900, authorName: 'スタッフ', body: 'ご質問はLINEからお送りください。' },
 ]
 
 /** 機能10の編集・公開・運用画面だけが読む固定応答。 */

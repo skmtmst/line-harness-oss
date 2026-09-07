@@ -178,9 +178,9 @@ export const SCREENS = [
     node: 'vUXKb', feature: 1, name: '1-1 ダッシュボード',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
     verdict: "match",
-    verdictNote: "**2026-09-07 #454 再撮影で一致。** 設計画像と実装画像を上端から並べ、今日やること4枚の値と補足の間を8px、右カードの見出しと本文の間を10pxへ戻した。今月の送信枠は22px・1行（残り197 / 上限200通）、友だち追加リンクは発行中選択の外側にあった二重枠を除去。3104/8791で1440/1920pxを撮影し、両幅とも横はみ出し0。",
-    verdictSource: "dashboard-v6/vUXKb.txt + vUXKb-{1440,1920}.png + 2026-09-07 #454 top-aligned visual/dimension comparison",
-    verdictHead: "088cea8a8",
+    verdictNote: "**2026-09-07 Issue #458で再撮影し、一致を維持。** 左メニュー先頭に区分見出し「メイン」を追加し、ダッシュボード・受信箱・友だち・友だち属性をその下へ配置。選択中の緑枠とアカウント下の区切り線が重ならないことを、Pencilと実装の上端比較で確認した。3107/8794の1440/1920pxで横はみ出し0。",
+    verdictSource: "dashboard-v6/vUXKb.txt + dashboard-v6/vUXKb.png（Pencil） + dashboard-v6/vUXKb-{1440,1920}.png（実装） + Issue #458",
+    verdictHead: "f088f93bf",
   },
   {
     node: 'ZN0ov', feature: 1, name: '1-1-1 ダッシュボード編集',
@@ -220,6 +220,9 @@ export const SCREENS = [
     verdictSource: "inbox-v6/xGLVe.txt + 2026-09-07 same-input visual comparison",
     verdictHead: "4f8dfd8e0",
     ...issue455InboxReview('xGLVe'),
+    verdictNote: "**2026-09-07 Issue #458で再撮影し、一致を維持。** 左メニュー先頭に区分見出し「メイン」を追加し、ダッシュボード・受信箱・友だち・友だち属性をその下へ配置。選択中の緑枠とアカウント下の区切り線が重ならないことを、Pencilと実装の上端比較で確認した。Issue #455取り込み後の受信箱を3107/8794で1440/1920px撮影し、横はみ出し0。",
+    verdictSource: "inbox-v6/xGLVe.txt + inbox-v6/xGLVe.png（Pencil） + inbox-v6/xGLVe-{1440,1920}.png（実装） + Issue #458",
+    verdictHead: "f088f93bf",
   },
   {
     ...INBOX, node: 'NfgOs', name: '2-2 テンプレート選択',
@@ -444,9 +447,9 @@ export const SCREENS = [
       { suffix: 'attention', steps: [{ click: '注目のみ' }] },
     ],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #457で修正・再判定。** 一致。表の下の余分な空白をなくし、未対応・注目のみを設計と同じ小さい押し口へそろえた。選択中は色・枠・チェックで状態が分かり、実際に押して絞り込みが反映されることを確認。通常・未対応・注目のみを1440/1920pxで撮影し、横はみ出し0。",
-    verdictSource: "friends-v6/PhxG6{,-unhandled,-attention}.txt + 同名-{1440,1920}.png",
-    verdictHead: "07b5835cf5",
+    verdictNote: "**2026-09-07 Issue #458で再撮影し、一致を維持。** 左メニュー先頭の「メイン」見出しと、その下の4項目をPencilと同じ順・間隔にした。選択中の緑枠は上の区切り線と重ならない。通常・未対応・注目のみを3107/8794で1440/1920px撮影し、横はみ出し0。",
+    verdictSource: "friends-v6/PhxG6.txt + friends-v6/PhxG6.png（Pencil） + friends-v6/PhxG6{,-unhandled,-attention}-{1440,1920}.png（実装） + Issue #458",
+    verdictHead: "f088f93bf",
   },
   {
     /*
@@ -1138,9 +1141,9 @@ export const SCREENS = [
   */
   { ...AUTO_REPLY, node: 'cmDfJ', name: '8-1 自動応答',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #451 / UI HEAD `3a3bc7a31` で再撮影・一致。** 本文側の旧見出しを外し、画面名は上部バーだけに統一。「フォルダを追加」「ルールを作成」を4指標の直後へ移し、Pencil V6と同じ順序にした。1440/1920pxとも横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #461 / UI HEAD `84039ceca` で再撮影・一致。** 表の見出しを `px-4 py-3` に統一し、縦余白と高さをPencil V6にそろえた。3106/8793の1440/1920pxとも横はみ出し0。',
     verdictSource: 'auto-replies-v6/cmDfJ.png + docs/design-qa/auto-replies-v6/cmDfJ-{1440,1920}.png + cmDfJ.txt',
-    verdictHead: '3a3bc7a31', },
+    verdictHead: '84039ceca', },
   {
     ...AUTO_REPLY, node: 'K7vg2', name: '8-1-A 自動応答ルール編集',
     verdict: 'match',
@@ -1436,17 +1439,17 @@ export const SCREENS = [
   {
     ...WEBINAR, node: 'Q8sHa', name: '10-1-I 参加者管理',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #417 / UI HEAD `527f120ec` で一致。** 参加者APIの実行エラーと担当者連携状態を表示し、4指標、友だち別の視聴・実行結果・状態・時刻、参加内訳、要分析を設計画像と照合した。3101/8788の2幅で横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #461 / UI HEAD `84039ceca` で再撮影・一致。** 表の見出しを `px-4 py-3` に統一し、縦余白と高さをPencil V6にそろえた。3106/8793の1440/1920pxとも横はみ出し0。',
     verdictSource: 'webinars-v6/Q8sHa.png + Q8sHa-1920.png + Q8sHa.txt',
-    verdictHead: '527f120ec', route: `${WEBINAR_EDIT}&pane=participants`, mode: 'viewport', height: 1080,
+    verdictHead: '84039ceca', route: `${WEBINAR_EDIT}&pane=participants`, mode: 'viewport', height: 1080,
 
   },
   {
     ...WEBINAR, node: 'yxyzQ', name: '10-1-J 分析',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #417 / UI HEAD `527f120ec` で一致。** ハートビートから記録した実視聴区間を分析APIへ接続し、申込・再生・完了・CTA、平均視聴、最大離脱18:20、要約、LINEプレビューを設計画像と照合した。3101/8788の2幅で横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #461 / UI HEAD `84039ceca` で再撮影・一致。** 表の見出しを `px-4 py-3` に統一し、縦余白と高さをPencil V6にそろえた。3106/8793の1440/1920pxとも横はみ出し0。',
     verdictSource: 'webinars-v6/yxyzQ.png + yxyzQ-1920.png + yxyzQ.txt',
-    verdictHead: '527f120ec', route: `${WEBINAR_EDIT}&pane=analytics`, mode: 'viewport', height: 1080,
+    verdictHead: '84039ceca', route: `${WEBINAR_EDIT}&pane=analytics`, mode: 'viewport', height: 1080,
 
   },
   {
@@ -2035,9 +2038,9 @@ export const SCREENS = [
   },
   { ...MILEAGE, node: 'BmoGY', name: '17-1-D たまる決めごとをつくる', route: '/mileage/earning-rules/new',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #445 / UI HEAD 78c19bea32 で再判定。** タグだけだった利用対象を共通条件ビルダーへ置き換え、シナリオ購読を含む15軸をAND/ORで組み合わせて下書きへ保存できる。3107/8794で1440・1920pxを撮影し、両幅とも横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #461 / UI HEAD `84039ceca` で再撮影・一致。** 表の見出しを `px-4 py-3` に統一し、縦余白と高さをPencil V6にそろえた。3106/8793の1440/1920pxとも横はみ出し0。',
     verdictSource: 'mileage-v6/BmoGY.txt + BmoGY-1440.png + BmoGY-1920.png + apps/web/src/app/mileage/earning-rules-v6-contract.test.ts',
-    verdictHead: '78c19bea32',
+    verdictHead: '84039ceca',
   },
   {
     /*
@@ -3005,8 +3008,9 @@ export const SCREENS = [
   */
   { node: 'hqrOv', feature: 4, name: '4-1 友だち属性・タグ', dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #297で修正・再判定。** 一致。4指標、4タブ、フォルダ帯、3絞り込み、5つのよく使う条件、10列の一覧、ページ送りを設計順に表示した。設計の先頭6行と101件の固定データで確認し、1440・1920pxとも横はみ出し0。",
-    verdictSource: "friend-attributes-v6/hqrOv.txt + friend-attributes-v6/hqrOv-{1440,1920}.png",
+    verdictNote: "**2026-09-07 Issue #458で再撮影し、一致を維持。** 左メニュー先頭の「メイン」見出しと、その下の4項目をPencilと同じ順・間隔にした。友だち属性の緑枠は上の区切り線から十分離れ、3107/8794の1440/1920pxで横はみ出し0。",
+    verdictSource: "friend-attributes-v6/hqrOv.txt + friend-attributes-v6/hqrOv.png（Pencil） + friend-attributes-v6/hqrOv-{1440,1920}.png（実装） + Issue #458",
+    verdictHead: "f088f93bf",
   },
   {
     node: 'dKlkz', feature: 4, name: '4-1-F タグ削除の確認ダイアログ',
@@ -3504,6 +3508,7 @@ export const CAPTURED_AT = {
         + '`GMvBd`（「保留」）と `zGZMA`（「対応中を保管」）は、固定データにその行やボタンが出ず撮れていない。' },
   ],
   10: [
+    { pr: 1258, head: '84039ceca', on: '2026-09-07', screens: ['Q8sHa', 'yxyzQ'], note: 'Issue #461 / PR #1258。ウェビナー編集の表見出しをpx-4 py-3へ統一し、3106/8793で1440/1920pxを撮影。両幅とも横はみ出し0で一致を維持した。' },
     { pr: 1231, head: '8577adf01', on: '2026-09-07', screens: ['lvaY5', 'PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'GB0NR', 'D6yO7e', 'TimXl', 'Q8sHa', 'yxyzQ'], note: 'Issue #417。作成・編集・公開・参加者・分析を実APIと機能10専用固定応答へ接続し、3101/8788で対象10画面を1440・1920px撮影。全画像で横はみ出し0、設計画像と照合して10画面を一致へ更新した。' },
     { pr: 1081, head: 'a55f719b9b', on: '2026-09-07', screens: ['ZC13r', 'PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'GB0NR', 'D6yO7e', 'TimXl', 'Q8sHa', 'yxyzQ', 'zCQXe'], note: 'Issue #324。一覧API PR #1071 と固定データを列車92まで取り込んだ枝で、対象11画面を3102/8789・1440/1920pxで再撮影し、全画像で横はみ出し0。一覧2画面を一致へ更新し、残る9画面は未提供APIを判定注記へ個別に残した。' },
     { pr: 1070, head: 'a325ab485', on: '2026-09-07', screens: ['ZC13r', 'PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'GB0NR', 'D6yO7e', 'TimXl', 'Q8sHa', 'yxyzQ', 'LKuAQ', 'zCQXe'], note: 'Issue #289。UI HEAD a571acc25 と固定データ PR #1060 を含む統合 #1067 を3102/8789で通常・全状態、1440/1920pxの対象38枚に最終撮影。全画像で横はみ出し0。一致1、構造一致・データ未接続11。' },
@@ -3653,6 +3658,7 @@ export const CAPTURED_AT = {
     { pr: 0, head: '4af43fb6', on: '2026-09-01', screens: ['festr'], note: 'Claudeが実装して撮った。**doctorが合格になったが、この3本はまだ push していない**' },
   ],
   17: [
+    { pr: 1258, head: '84039ceca', on: '2026-09-07', screens: ['BmoGY'], note: 'Issue #461 / PR #1258。マイル付与ルール作成の表見出しをpx-4 py-3へ統一し、3106/8793で1440/1920pxを撮影。両幅とも横はみ出し0で一致を維持した。' },
     { pr: 1234, head: '78c19bea32', on: '2026-09-07', screens: ['N46cQ', 'BmoGY', 'p9CcEB'], note: 'Issue #445 / PR #1234。30日付与集計と1人平均、15軸の利用対象、使い道の交換対象条件保存を実契約へ接続し、3107/8794で1440/1920px撮影。全画像で横はみ出し0。' },
     { pr: 1217, head: '1c8055931', on: '2026-09-07', screens: ['s98Vfw', 'qlVLJ', 'MvZm5', 'BmoGY', 'HIU5O', 'vz0Ji', 'z3PB2'], note: 'Issue #418。機能17の不足していた集計・履歴・特典・ランク進捗・高額調整境界・行動理由と、付与ルールの自動通知設定を実API契約へ接続。3106/8793で対象と定義済み状態を1440/1920px撮影し、対象画像は横はみ出し0。' },
     { pr: 1215, head: '65390c132', on: '2026-09-07', screens: ['N46cQ', 'BmoGY', 'p9CcEB', 'k8VCU'], note: 'Issue #429 / PR #1215。決めごとの並び順・公開版・15軸条件と、使い道の共通アクション選択を実装し、3102/8789で1440/1920pxを撮影。全画像で横はみ出し0。k8VCUは一致、残るAPI契約は3画面の判定注記へ記録した。' },
@@ -3694,6 +3700,7 @@ export const CAPTURED_AT = {
     { pr: 927, head: 'eb41ad0d', on: '2026-09-06', screens: ['M1EXwB', 'uJP22', 'J64xI', 's7T2dz', 'JCz6J', 'W98zZQ', 's6Vvp', 'PSmHo', 'Y0Sn3', 'dC0yg'], note: '★V6の対象10画面を1440・1920と全状態で比較。横はみ出し0。' },
   ],
   8: [
+    { pr: 1258, head: '84039ceca', on: '2026-09-07', screens: ['cmDfJ'], note: 'Issue #461 / PR #1258。自動応答一覧の表見出しをpx-4 py-3へ統一し、3106/8793で1440/1920pxを撮影。両幅とも横はみ出し0で一致を維持した。' },
     { pr: 1135, head: 'a86933ba8', on: '2026-09-07', screens: ['cmDfJ', 'K7vg2', 'nzWIX', 'ivDoe'], note: 'Issue #375。4画面を実API契約へ接続し、統合 #1132 の固定データで3101/8788・1440/1920pxを正式撮影。横はみ出し0。3画面を一致、受信元の保存値を契約が返さない1画面だけ理由付き構造一致・データ待ちとした。' },
     { pr: 1082, head: 'c1355bb54', on: '2026-09-07', screens: ['K7vg2', 'nzWIX', 'ivDoe', 'U9hzqH', 't7UtYQ'], note: 'Issue #292。編集3段を画面ごとに分割し、競合と実行結果を固定データへ接続。3106/8793で1440・1920と全状態を比較し、横はみ出し0。' },
     { pr: 955, head: '564c91d0fe', on: '2026-09-06', screens: ['g46ja', 'Yj6CQ', 'e6iJG'], note: '競合確認、実在する友だちでのdry-run、最終確認、冪等な有効化を通し、1440・1920pxで設計と目視比較。横はみ出し0。' },
