@@ -59,6 +59,15 @@ describe('V6 対応マーク', () => {
     expect(LIST).not.toContain('force: mark.friendCount > 0')
   })
 
+  it('保管確認は zGZMA の位置と幅で、置換先と対象人数に絞る', () => {
+    expect(LIST).toContain('data-design-node="zGZMA"')
+    expect(LIST).toContain('保管後は新しく選べません')
+    expect(LIST).toContain('{impact.friendCount}人を「{selected.name}」へ置き換えます。')
+    expect(LIST).toContain("[data-design-part='archive-position']")
+    expect(LIST).toContain('margin-top: 310px')
+    expect(LIST).toContain('max-width: 680px')
+  })
+
   it('タブ行から追加画面へ進める', () => {
     expect(TABS).toContain('href="/tags/marks/new"')
     expect(TABS).toContain('＋ マークを追加')

@@ -2162,7 +2162,7 @@ function bodyFor(pathname, query = new URLSearchParams()) {
         periodFrom: '2026-08-01T00:00:00+09:00',
         periodTo: '2026-08-31T23:59:59+09:00',
         closeDate: null,
-        paymentDate: null,
+        paymentDate: '2026-09-30T00:00:00+09:00',
         bankDestination: null,
         breakdown: [
           { offerName: '定期便のはじめて購入', conversions: 8, unitReward: 5000, subtotal: 40000 },

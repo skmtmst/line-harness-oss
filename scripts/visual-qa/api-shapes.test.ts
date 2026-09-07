@@ -152,7 +152,7 @@ describe('NEN配信の新しい集計・履歴契約', () => {
 
 describe('テンプレートの画面確認データ', () => {
   it('全行に今月と累計の送信数があり、設計の先頭行を再現する', () => {
-    expect(TEMPLATES).toHaveLength(20);
+    expect(TEMPLATES).toHaveLength(26);
     expect(TEMPLATES[0]).toMatchObject({ monthlySendCount: 1240, totalSendCount: 18300 });
     for (const template of TEMPLATES) {
       expect(template.monthlySendCount).toBeGreaterThanOrEqual(0);
