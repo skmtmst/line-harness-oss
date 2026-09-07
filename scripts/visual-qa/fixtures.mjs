@@ -223,7 +223,7 @@ const TAG_REFERENCE_COUNTS = {
   entryRoutes: 0,
   trackedLinks: 0,
   bookingMenus: 0,
-  affiliateOffers: 0,
+  affiliateOffers: 1,
   events: 0,
   analyticsFunnels: 0,
   friendAddSettings: 0,
@@ -240,10 +240,9 @@ export const TAG_DEPENDENCIES_NEN_SUBSCRIPTION = {
     { kind: 'auto_reply', name: '自動応答', href: '/auto-replies', count: 1, state: 'active', definitionVersion: 4 },
     { kind: 'saved_search', name: '保存した検索', href: '/tags?tab=searches', count: 1, state: 'active', definitionVersion: 3 },
   ],
-  linkedActions: [
-    { kind: 'common_action', name: 'NEN会員（定期）が付いたとき', version: 4, state: 'published' },
-    { kind: 'common_action', name: 'NEN会員（定期）が付いたとき', version: 5, state: 'draft' },
-  ],
+  // `dKlkz` は公開・下書き版を持たない資産の完全削除確認（設計どおり5行）。
+  // 参照は残すので、アーカイブ優先の安全動作は変えない。
+  linkedActions: [],
   pendingRunCount: 0,
   mileageImpact: {
     configured: true,
@@ -1980,7 +1979,8 @@ export const RICH_MENU_TAP_STATS = {
 }
 
 /**
- * 受信箱のLINEの会話。設計 `★ V6 2-1 受信箱` `xGLVe` の一覧のうち、LINEの3件。
+ * 受信箱のLINEの会話。設計 `★ V6 2-1 受信箱` `xGLVe` の一覧のうちLINE 5件。
+ * `/api/support/inbox?channel=email` のメール2件と混ぜ、一覧は合計7件になる。
  *
  * **メールはここに入れない。** 画面は `/api/chats`（LINE）と
  * `/api/support/inbox?channel=email`（メール）を別々に読んで混ぜる。
@@ -1999,6 +1999,8 @@ export const CHATS = [
   ['Kyohei Yamamoto', 'unread', 'operator-kenta', '本日8月19日のお知らせです。内容をご確認ください。', '2026-08-19T09:48:00.000Z', true],
   ['Kenta Kawano (Obama)', 'in_progress', 'operator-kenta', 'テスト', '2026-08-18T10:20:00.000Z', false],
   ['菅野 亮', 'resolved', 'operator-masato', '最新のやり取りを確認できます。', '2026-08-13T05:16:00.000Z', false],
+  ['山田 花子', 'resolved', 'operator-kenta', '予約内容を確認しました。', '2026-08-12T08:20:00.000Z', false],
+  ['佐藤 美咲', 'resolved', 'operator-masato', 'ありがとうございました。', '2026-08-11T04:15:00.000Z', false],
 ].map(([friendName, status, operatorId, lastMessageContent, lastMessageAt, isUnread], index) => ({
   id: `chat-${index}`,
   friendId: `friend-${index}`,
@@ -3216,10 +3218,10 @@ export const BROADCAST_FOLDERS = [
  * **5行とも同じきっかけで撮れてしまう**（機能4で一度やった）。
  */
 export const REMINDER_FOLDERS = [
-  { id: 'rf-booking', kind: 'reminder', name: '予約', parentId: null, displayOrder: 1, color: '#2563eb' },
-  { id: 'rf-contract', kind: 'reminder', name: '契約更新', parentId: null, displayOrder: 2, color: '#d97706' },
-  { id: 'rf-event', kind: 'reminder', name: 'イベント', parentId: null, displayOrder: 3, color: '#7c3aed' },
-  { id: 'rf-follow', kind: 'reminder', name: 'フォロー', parentId: null, displayOrder: 4, color: '#059669' },
+  { id: 'rf-booking', kind: 'reminder', name: '予約', parentId: null, displayOrder: 1, color: '#2563eb', itemCount: 3, listTotal: 9 },
+  { id: 'rf-contract', kind: 'reminder', name: '契約更新', parentId: null, displayOrder: 2, color: '#d97706', itemCount: 2 },
+  { id: 'rf-event', kind: 'reminder', name: 'イベント', parentId: null, displayOrder: 3, color: '#7c3aed', itemCount: 2 },
+  { id: 'rf-follow', kind: 'reminder', name: 'フォロー', parentId: null, displayOrder: 4, color: '#059669', itemCount: 4 },
 ]
 
 export const REMINDERS = [
@@ -3229,6 +3231,7 @@ export const REMINDERS = [
     triggerOffsetMinutes: -1440, sendAtTime: '18:00', targetTagId: null,
     triggerFieldId: null, repeatYearly: false,
     folderId: 'rf-booking', stepCount: 1, displayOrder: 1,
+    lifecycleStatus: 'published', timingSummary: '1日前 18:00 ／ テキスト 1通', baseDateSummary: '予約日時', plannedDeliveries: 42, lastSentAt: '2026-08-22T09:00:00.000Z',
     createdAt: '2026-06-02T00:00:00.000Z', updatedAt: '2026-08-22T09:00:00.000Z',
   },
   {
@@ -3237,6 +3240,7 @@ export const REMINDERS = [
     triggerOffsetMinutes: -60, sendAtTime: null, targetTagId: null,
     triggerFieldId: null, repeatYearly: false,
     folderId: 'rf-booking', stepCount: 1, displayOrder: 2,
+    lifecycleStatus: 'published', timingSummary: '1時間前 ／ テキスト 1通', baseDateSummary: '予約日時', plannedDeliveries: 39, lastSentAt: '2026-08-22T13:00:00.000Z',
     createdAt: '2026-06-02T00:00:00.000Z', updatedAt: '2026-08-22T11:00:00.000Z',
   },
   {
@@ -3245,6 +3249,7 @@ export const REMINDERS = [
     triggerOffsetMinutes: -43200, sendAtTime: '10:00', targetTagId: null,
     triggerFieldId: 'field-contract-end', repeatYearly: false,
     folderId: 'rf-contract', stepCount: 2, displayOrder: 3,
+    lifecycleStatus: 'published', timingSummary: '30日前 10:00 ／ テキスト 2通', baseDateSummary: '契約終了日', plannedDeliveries: 18, lastSentAt: '2026-08-21T01:00:00.000Z',
     createdAt: '2026-05-11T00:00:00.000Z', updatedAt: '2026-08-21T01:00:00.000Z',
   },
   {
@@ -3255,6 +3260,7 @@ export const REMINDERS = [
     triggerOffsetMinutes: 0, sendAtTime: '09:00', targetTagId: null,
     triggerFieldId: null, repeatYearly: false,
     folderId: 'rf-event', stepCount: 1, displayOrder: 4,
+    lifecycleStatus: 'draft', timingSummary: '当日 09:00 ／ テキスト 1通', baseDateSummary: 'イベント当日', plannedDeliveries: 0, lastSentAt: null,
     createdAt: '2026-08-10T00:00:00.000Z', updatedAt: '2026-08-10T00:00:00.000Z',
   },
   {
@@ -3265,6 +3271,7 @@ export const REMINDERS = [
     triggerOffsetMinutes: 4320, sendAtTime: '12:00', targetTagId: null,
     triggerFieldId: null, repeatYearly: false,
     folderId: 'rf-follow', stepCount: 1, displayOrder: 5,
+    lifecycleStatus: 'stopped', timingSummary: '3日後 12:00 ／ テキスト 1通', baseDateSummary: '最終送信日', plannedDeliveries: 25, lastSentAt: '2026-08-19T03:00:00.000Z',
     createdAt: '2026-04-01T00:00:00.000Z', updatedAt: '2026-08-19T03:00:00.000Z',
   },
 ]
@@ -3436,10 +3443,10 @@ export const FRIEND_FIELD_MIGRATION_PREVIEW = {
  * **設計の一覧と比べるものが何も無くなる。**
  */
 export const AUTO_REPLY_FOLDERS = [
-  { id: 'arf-inquiry', kind: 'auto_reply', name: 'お問い合わせ', parentId: null, displayOrder: 1, color: '#2563eb' },
-  { id: 'arf-booking', kind: 'auto_reply', name: '予約', parentId: null, displayOrder: 2, color: '#059669' },
-  { id: 'arf-keyword', kind: 'auto_reply', name: 'キーワード', parentId: null, displayOrder: 3, color: '#d97706' },
-  { id: 'arf-afterhours', kind: 'auto_reply', name: '営業時間外', parentId: null, displayOrder: 4, color: '#7c3aed' },
+  { id: 'arf-inquiry', kind: 'auto_reply', name: 'お問い合わせ', parentId: null, displayOrder: 1, color: '#2563eb', itemCount: 5, listTotal: 14, activeTotal: 10, monthlyTotal: 682 },
+  { id: 'arf-booking', kind: 'auto_reply', name: '予約', parentId: null, displayOrder: 2, color: '#059669', itemCount: 4 },
+  { id: 'arf-keyword', kind: 'auto_reply', name: 'キーワード', parentId: null, displayOrder: 3, color: '#d97706', itemCount: 3 },
+  { id: 'arf-afterhours', kind: 'auto_reply', name: '営業時間外', parentId: null, displayOrder: 4, color: '#7c3aed', itemCount: 4 },
 ]
 
 const AR_BASE = {
@@ -3564,19 +3571,20 @@ export const AUTO_REPLY_PUBLISH_DRAFT = {
   lastTestStatus: null,
   lastTestedAt: null,
   publishedAt: null,
-  matchedLast28Days: 214,
+  matchedLast28Days: 86,
+  conflictAttentionCount: 0,
   settings: {
     keyword: '予約',
     matchType: 'contains',
     responseType: 'text',
-    responseContent: 'Kentaさん、お問い合わせありがとうございます。\nご予約内容を確認します。',
-    templateId: 'template-booking',
+    responseContent: '{{name}}さん、お問い合わせありがとうございます。\nご予約内容を確認します。日時の変更・キャンセルの場合は下のボタンからお選びください。',
+    templateId: null,
     lineAccountId: 'visual-qa-account',
-    activeFrom: '08:00',
-    activeUntil: '21:00',
+    activeFrom: null,
+    activeUntil: null,
     cooldownMinutes: 5,
     skipWhenOperatorActive: true,
-    priority: 1,
+    priority: 2,
     messageKinds: ['text'],
     receiveSources: ['line', 'email'],
     friendConditions: { label: '予約者・未対応' },
@@ -3589,9 +3597,9 @@ export const AUTO_REPLY_PUBLISH_DRAFT = {
     oncePerFriend: true,
     keywords: [{ keyword: '予約', matchType: 'contains' }],
     respondToAll: false,
-    name: '予約問い合わせ',
+    name: '予約変更のお問い合わせ',
     keywordMatchMode: 'any',
-    folderId: 'arf-booking',
+    folderId: 'arf-inquiry',
     internalMemo: '日程変更の一次対応。担当者に引き継ぐ前の受け止めとして使う。',
     replyDelaySeconds: 0,
     unmatchedAction: { type: 'notify_operator' },

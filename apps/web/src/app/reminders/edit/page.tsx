@@ -12,7 +12,7 @@ import { describeReminderTiming } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
-import ReminderStepEditorV6 from '@/components/reminders/reminder-step-editor-v6'
+import { Issue469ReminderStepEditor, Issue469ReminderTestStage } from './issue469-reminder-screens'
 
 /**
  * リマインダの編集。
@@ -59,6 +59,9 @@ function ReminderEditInner() {
   const params = useSearchParams()
   const id = params.get('id') ?? ''
   const rawStage = params.get('stage')
+  if (rawStage === 'test' && id) {
+    return <Issue469ReminderTestStage reminderId={id} />
+  }
   if (rawStage && PUBLISH_STAGES.has(rawStage as ReminderPublishStage)) {
     if (!id) {
       return <p className="text-danger p-6 text-sm">リマインダが指定されていません。</p>
@@ -68,7 +71,7 @@ function ReminderEditInner() {
   if (!id) {
     return <p className="text-danger p-6 text-sm">リマインダが指定されていません。</p>
   }
-  return <ReminderStepEditorV6 reminderId={id} />
+  return <Issue469ReminderStepEditor reminderId={id} />
 }
 
 function LegacyReminderEditInner() {
