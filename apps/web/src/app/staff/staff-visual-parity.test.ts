@@ -58,9 +58,9 @@ describe('V6 30 ログインユーザーの画面契約', () => {
     expect(staffSource).not.toContain('完全に削除する')
   })
 
-  it('一覧は1440pxで横スクロールさせない6列の固定表にする', () => {
+  it('一覧は1440pxで横スクロールさせない7列の固定表にする', () => {
     expect(staffSource).toContain('w-full table-fixed text-sm')
-    expect(staffSource).toContain('colSpan={6}')
+    expect(staffSource).toContain('colSpan={7}')
     expect(staffSource).not.toContain('min-w-[1180px]')
   })
 

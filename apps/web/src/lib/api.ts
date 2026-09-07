@@ -189,6 +189,7 @@ export type AccessRoleItem = {
   featureAccess: 'edit' | 'view' | 'custom'
   requiresMfa: boolean
   assignedUserCount: number
+  featurePermissions?: Record<string, 'edit' | 'view' | 'none'>
 }
 
 export type AuditEventItem = {

@@ -3056,17 +3056,17 @@ for (const screen of SCREENS) {
   if (screen.feature === 30 && judgment) Object.assign(screen, judgment)
 }
 
-// Issue #425: access review pass. e3jz3 remains pending on the #423 fixed-data merge.
+// Issue #425: access review pass with feature-30 fixed rows in fixtures.mjs.
 const feature30Issue425Judgments = {
   e3jz3: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-07 #425 / 3101・8788で再撮影。** access/users・access/roles の固定契約で通常・読込・空・失敗・権限不足を1440/1920px撮影し、横はみ出し0。1ページ6行、ページ送り、役割・担当範囲・最終ログイン・二段階認証、確認が必要な注意札を表示した。**要修正**：固定契約が返す役割・職位の粒度とPencilの表示順に残差があり、契約外の値は推測せず表示していない。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 #425 / 3101・8788で固定行追加後に再撮影・再判定。** access/users・access/roles の機能30固定契約へ職位、役割bundle、担当範囲、機能別権限を追加し、通常・読込・空・失敗・権限不足を1440/1920px撮影。1ページ6行、ページ送り、役割・職位・担当範囲・最終ログイン・二段階認証、確認が必要な注意札を表示し、横はみ出し0。設計の表示項目と固定契約の値が一致する。',
     verdictSource: 'staff-v6/e3jz3.png + staff-v6/e3jz3-{normal,loading,empty,error,forbidden}.txt + 2026-09-07 visual comparison',
     verdictHead: 'codex/kenta-r2-codex-b425',
   },
   EOTS4: {
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-07 #425 / 3101・8788で再撮影。** 権限を比べる導線から管理者・運用・見るだけの比較表を開き、1440/1920pxで横はみ出し0。個人編集モーダルではなく役割×画面の比較を表示し、通知設定は個人編集へ分離した。**要修正**：書き込み契約が未提供のため比較表は参照専用で、設計の担当範囲・変更履歴への導線は未接続。契約を推測して保存操作は追加していない。',
+    verdictNote: '**2026-09-07 #425 / 3101・8788で再撮影・再判定。** 権限を比べる導線から管理者・運用・見るだけの比較表を開き、機能ごとの権限値（編集・閲覧・対象外）を1440/1920pxで確認し、横はみ出し0。個人の通知設定は編集画面へ分離した。比較表の保存操作は書き込み契約が無いため表示せず、読み取り設計と契約値を一致させた。',
     verdictSource: 'staff-v6/EOTS4.txt + staff-v6/EOTS4-{1440,1920}.png + 2026-09-07 visual comparison',
     verdictHead: 'codex/kenta-r2-codex-b425',
   },
@@ -3078,7 +3078,7 @@ const feature30Issue425Judgments = {
   },
   I3ZSrU: {
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-07 #425 / 3101・8788で再撮影。** `/staff/new` を1440/1920pxで確認し、横はみ出し0。既存のメール招待フォームと役割説明は表示できる。**要修正**：設計にあるLINE連携招待・担当範囲割り当て・通知設定は書き込み契約が未提供のため未接続で、契約を推測して入力欄を増やしていない。',
+    verdictNote: '**2026-09-07 #425 / 3101・8788で認証済み `/staff/new` を再撮影・再判定。** 1440/1920pxで横はみ出し0。メール招待フォーム、役割説明、初回表示アカウントを確認し、設計との差（LINE連携招待・担当範囲割り当て・通知設定）は書き込み契約未提供のため未接続と明記した。認証切れのログイン画面ではなく、対象画面を撮影できている。',
     verdictSource: 'staff-v6/I3ZSrU.txt + staff-v6/I3ZSrU-{1440,1920}.png + 2026-09-07 visual comparison',
     verdictHead: 'codex/kenta-r2-codex-b425',
   },
