@@ -133,6 +133,7 @@ function Kpis({
 
 export function NenOverview({
   tab,
+  topAction,
   onTabChange,
   settings,
   columns,
@@ -176,6 +177,7 @@ export function NenOverview({
   renderColumnPreview,
 }: {
   tab: NenTab
+  topAction: ReactNode
   onTabChange: (tab: NenTab) => void
   settings: NenCampaignSetting[]
   columns: NenColumn[]
@@ -220,6 +222,14 @@ export function NenOverview({
 }) {
   return (
     <main className="mx-auto flex w-full flex-col gap-4 px-4 pb-8 sm:px-6" style={{ maxWidth: 1600 }} data-design-node={tab === 'flow' ? 'VLMGH' : tab === 'columns' ? 'DEX0k' : tab === 'pets' ? 'q4lajm' : 'WeXbL'}>
+      <div data-design="Crumb" className="flex flex-wrap items-center justify-between gap-3 text-xs">
+        <nav className="text-ink-faint" aria-label="パンくず">
+          <span className="text-action font-semibold">専用機能</span>
+          <span className="mx-2">›</span>
+          <span>NEN配信</span>
+        </nav>
+        {topAction}
+      </div>
       <Tabs
         items={[
           { label: '配信フロー', count: settings.length, current: tab === 'flow', onClick: () => onTabChange('flow') },

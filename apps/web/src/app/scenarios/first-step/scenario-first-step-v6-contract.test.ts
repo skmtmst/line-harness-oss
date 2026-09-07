@@ -27,12 +27,19 @@ const PREVIEW_CSS = fs.readFileSync(path.join(COMPONENTS, 'step-preview.module.c
 const TABS_CSS = fs.readFileSync(path.join(COMPONENTS, 'message-type-tabs.module.css'), 'utf8')
 
 describe('V6 1通目設定の契約', () => {
+  it('画面名を上部バーだけに置き、本文はパンくずとキャンセルから始める', () => {
+    expect(PAGE).toContain("usePageTitle('1通目を設定')")
+    expect(PAGE).not.toContain("import Header from '@/components/layout/header'")
+    expect(PAGE).not.toContain('<Header')
+    expect(PAGE).toContain('✕ キャンセル')
+  })
+
   it('設計Node IDを画面に残す', () => {
     expect(PAGE).toContain('data-design-node="kk8dz"')
   })
 
   it('段の見出しを設計の言葉にする', () => {
-    expect(PAGE).toContain('title="1通目を設定"')
+    expect(PAGE).toContain("usePageTitle('1通目を設定')")
     expect(PAGE).toContain('この1通目を誰に送るか')
     expect(PAGE).toContain('1通目の内容')
     expect(PAGE).not.toContain('>配信対象の絞り込み</h2>')

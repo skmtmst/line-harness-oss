@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Copy, Trash2 } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, type CommonActionResources, type TagDefinitionAction } from '@/lib/api'
+import Breadcrumb from '@/components/layout/breadcrumb'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import Drawer from '@/components/shared/drawer'
@@ -375,7 +376,9 @@ export default function TagEditorV4({
 
   return (
     <div className="pb-24">
-      <nav className="mb-5 text-xs text-ink-faint"><Link href="/tags" className="text-action hover:underline">友だち属性</Link><span className="mx-2">›</span>{mode === 'create' ? 'タグを作る' : 'タグを編集'}</nav>
+      <div className="mb-5">
+        <Breadcrumb items={[{ label: '友だち属性', href: '/tags' }, { label: mode === 'create' ? 'タグを作る' : 'タグを編集' }]} />
+      </div>
 
       {error && <Notice className="mb-4" tone="error" message={error} />}
       {notice && <Notice className="mb-4" tone="success" message={notice} />}

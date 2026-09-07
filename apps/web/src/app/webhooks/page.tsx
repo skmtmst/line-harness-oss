@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import Header from '@/components/layout/header'
 import { api, type OutgoingWebhookOverview } from '@/lib/api'
 import type { IncomingWebhook, WebhookInteractionSummary } from '@line-crm/shared'
 import { Suspense } from 'react'
@@ -13,6 +12,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import SelectField from '@/components/shared/select-field'
 import WebhookInteractions from './webhook-interactions'
 import { IncomingOverview, OutgoingOverview } from './webhook-overviews'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 type Tab = 'incoming' | 'outgoing'
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -390,26 +390,20 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
 
   return (
     <div>
-      <div data-design="Head">
-        <Header
-          title={tab === 'incoming' ? 'こちらで受け取る' : '外部連携'}
-          description={
-            tab === 'incoming'
-              ? '相手のサービスで起きたことを、うちに取り込みます。'
-              : 'うちで起きたことを、相手のサービスへ安全に知らせます。'
-          }
-          action={
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button variant="secondary" href="/webhooks?tab=notify">
-                見本から作る
-              </Button>
-              <Button variant="primary" onClick={() => setShowCreate(!showCreate)}>
-                {showCreate ? 'キャンセル' : tab === 'incoming' ? '受け取り口を追加' : '送り先を追加'}
-              </Button>
-            </div>
-          }
-        />
+      <div data-design="Crumb" className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <nav className="text-ink-faint text-xs" aria-label="パンくず">
+          <span className="text-action font-semibold">自動化</span>
+          <span className="mx-2">›</span>
+          <span>外部連携</span>
+        </nav>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button variant="secondary" href="/webhooks?tab=notify">見本から作る</Button>
+          <Button variant="primary" onClick={() => setShowCreate(!showCreate)}>
+            {showCreate ? 'キャンセル' : tab === 'incoming' ? '受け取り口を追加' : '送り先を追加'}
+          </Button>
+        </div>
       </div>
+      <MergedTabs basePath="/webhooks" paramName="tab" tabs={MERGED_TABS} active={tab} />
 
       {/* Rotate-secret modal — used to recover legacy webhooks or rotate. */}
       {rotateTarget && (
@@ -748,10 +742,11 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
 
 function WebhooksPageHost() {
   const tab = useMergedTab(MERGED_TABS)
+  usePageTitle(tab === 'incoming' ? 'こちらで受け取る' : '外部連携')
+  if (tab === 'incoming' || tab === 'outgoing') return <WebhooksPageInner key={tab} tab={tab} />
   return (
     <div>
       <MergedTabs basePath="/webhooks" paramName="tab" tabs={MERGED_TABS} active={tab} />
-      {(tab === 'incoming' || tab === 'outgoing') && <WebhooksPageInner key={tab} tab={tab} />}
       {tab === 'interactions' && <WebhookInteractions />}
       {tab === 'notify' && <NotificationsPage />}
     </div>
