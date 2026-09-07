@@ -1091,7 +1091,7 @@ const RAW = {
   */
   /* 空いている時間。包むと `res.by_staff` が undefined になり、選ぶ口が0件になる。 */
   '/api/booking/admin/availability': BOOKING_AVAILABILITY,
-  '/api/booking/admin/resources': { resources: BOOKING_RESOURCES },
+  '/api/booking/admin/resources': { success: true, data: { resources: BOOKING_RESOURCES } },
   '/api/booking/admin/menus': { menus: BOOKING_MENUS },
   '/api/booking/admin/staff': { staff: BOOKING_STAFF },
   '/api/booking/admin/customer-context': { customer: BOOKING_CUSTOMER_CONTEXT },

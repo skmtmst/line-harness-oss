@@ -64,8 +64,10 @@ function businessHourSummary(settings: BookingSettings | null): { value: string;
   if (!settings || !Array.isArray(settings.businessHours) || settings.businessHours.length === 0) return { value: '—', detail: '受付枠で曜日ごとに確認' }
   const spans = settings.businessHours.flatMap((day) => {
     if (day.intervals.length === 0) return []
+    const last = day.intervals.at(-1)
+    if (!last) return []
     const start = day.intervals[0].start.replace(/^0/, '')
-    const end = day.intervals.at(-1)!.end.replace(/^0/, '')
+    const end = last.end.replace(/^0/, '')
     return [`${start}〜${end}`]
   })
   const counts = new Map<string, number>()
@@ -495,7 +497,8 @@ function Modal({
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
-  function set<K extends keyof BookingMenu>(k: K, v: BookingMenu[K] | string | null) {
+  /** 数値欄に文字列が入らないよう、鍵と値の型をそろえる。 */
+  function set<K extends keyof BookingMenu>(k: K, v: BookingMenu[K]) {
     setForm({ ...form, [k]: v })
   }
 
@@ -533,7 +536,7 @@ function Modal({
               type="text"
               value={form.name ?? ''}
               onChange={(e) => set('name', e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2"
               placeholder="例: カット"
             />
           </Field>
@@ -542,7 +545,7 @@ function Modal({
               type="text"
               value={form.category_label ?? ''}
               onChange={(e) => set('category_label', e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2"
               placeholder="例: カット / カラー / パーマ"
             />
           </Field>
@@ -550,7 +553,7 @@ function Modal({
             <textarea
               value={form.description ?? ''}
               onChange={(e) => set('description', e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
+              className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2 resize-y"
               rows={2}
               placeholder="顧客に表示される説明文"
             />
@@ -728,7 +731,7 @@ function NumField({
         type="number"
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 tabular-nums"
+        className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2 tabular-nums"
       />
     </Field>
   )
@@ -772,7 +775,7 @@ function MenusPageHost() {
           受付枠
         </Link>
         <Link
-          href="/booking/staff/shifts"
+          href="/booking/staff/shifts#special"
           className="text-ink-faint hover:text-ink-secondary rounded-t-md px-4 py-2 text-sm"
         >
           休業日
