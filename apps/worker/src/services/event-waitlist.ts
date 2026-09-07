@@ -654,7 +654,10 @@ export function createEventWaitlistOfferSender(
         channel_access_token_encrypted: string | null;
         line_user_id: string;
       }>();
-    if (!row?.channel_access_token || !row.line_user_id) {
+    if (
+      (!row?.channel_access_token && !row?.channel_access_token_encrypted)
+      || !row.line_user_id
+    ) {
       throw new Error('waitlist_notification_destination_missing');
     }
     const accessToken = await resolveLineCredential(

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
+  createEventWaitlistOfferSender,
   enqueueEventWaitlistPromotion,
   getEventOccurrenceApplicants,
   processEventWaitlistPromotionJobs,
@@ -160,6 +161,27 @@ describe('V6 event waitlist and applicants', () => {
     expect(sqlite.prepare(
       `SELECT status, offered_at, offer_expires_at, offer_token_hash FROM event_waitlist WHERE id = 'wait-a'`,
     ).get()).toEqual({ status: 'waiting', offered_at: null, offer_expires_at: null, offer_token_hash: null });
+  });
+
+  test('暗号化済みトークンだけのアカウントを送信先なしと誤判定しない', async () => {
+    sqlite.prepare(
+      `UPDATE line_accounts
+          SET channel_access_token = '', channel_access_token_encrypted = 'invalid-ciphertext'
+        WHERE id = 'account-a'`,
+    ).run();
+    const sender = createEventWaitlistOfferSender(db, {});
+
+    await expect(sender({
+      waitlistId: 'wait-a',
+      lineAccountId: 'account-a',
+      friendId: 'friend-a',
+      eventName: 'しつけ教室',
+      startsAt: '2099-06-01T01:00:00.000Z',
+      venueName: '教室A',
+      venueUrl: null,
+      token: 'offer-token',
+      expiresAt: '2099-06-02T01:00:00.000Z',
+    })).rejects.not.toThrow('waitlist_notification_destination_missing');
   });
 
   test('Cron: 席解放jobを一度だけ処理し、一時失敗は再試行可能に残す', async () => {
