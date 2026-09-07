@@ -289,7 +289,9 @@ export async function getWebinarList(
                FROM webinar_viewers v
               WHERE v.webinar_id = w.id) AS viewer_count
        FROM webinars w
-       LEFT JOIN folders f ON f.id = w.folder_id AND f.kind = 'webinar'
+       LEFT JOIN folders f ON f.id = w.folder_id
+                            AND f.kind = 'webinar'
+                            AND f.account_id = w.account_id
       WHERE ${where.sql} AND w.status <> 'archived'
       ORDER BY w.created_at DESC`,
   ).bind(...where.bindings).all<WebinarListRow>();
@@ -305,7 +307,9 @@ export async function getWebinarFolderCounts(
   const result = await db.prepare(
     `SELECT w.folder_id, COUNT(*) AS item_count
        FROM webinars w
-       JOIN folders f ON f.id = w.folder_id AND f.kind = 'webinar'
+       JOIN folders f ON f.id = w.folder_id
+                     AND f.kind = 'webinar'
+                     AND f.account_id = w.account_id
       WHERE ${where.sql} AND w.status <> 'archived'
       GROUP BY w.folder_id`,
   ).bind(...where.bindings).all<{ folder_id: string; item_count: number }>();

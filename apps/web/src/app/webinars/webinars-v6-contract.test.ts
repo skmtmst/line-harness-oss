@@ -30,12 +30,14 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(PAGE).not.toContain('保存した条件は準備中です')
   })
 
-  it('選択アカウントのフォルダ件数を表示し、保存契約が来るまでは操作できるように見せない', () => {
+  it('選択アカウントのフォルダ件数を表示し、追加・改名・並び替え・削除を保存する', () => {
     expect(PAGE).toContain("import FolderPanel from '@/components/shared/folder-panel'")
     expect(PAGE).toContain('lg:grid-cols-[16rem_minmax(0,1fr)]')
-    expect(PAGE).toContain('<Button disabled title="フォルダの保存契約を接続後に使えます">フォルダを追加</Button>')
+    expect(PAGE).toContain("webinarApi.createFolder(selectedAccountId, { name })")
+    expect(PAGE).toContain('webinarApi.updateFolder(selectedAccountId, editingFolder.id, { name })')
+    expect(PAGE).toContain('webinarApi.deleteFolder(selectedAccountId, deletingFolder.id)')
     expect(PAGE).toContain('webinarApi.folders(selectedAccountId)')
-    expect(PAGE).toContain('visibleItems.filter((item) => item.folderId === folder.id).length')
+    expect(PAGE).toContain('count: folder.count')
     expect(PAGE).toContain("selectedFolder === UNFILED")
     expect(PAGE).not.toContain('const WEBINAR_FOLDERS')
     expect(PAGE).not.toContain('min-h-[640px]')

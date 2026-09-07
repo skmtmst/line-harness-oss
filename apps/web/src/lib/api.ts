@@ -9514,7 +9514,7 @@ export type WebinarListItem = Webinar & {
   viewerCount: number | null
 }
 
-export type WebinarFolder = Folder & { count: number }
+export type WebinarFolder = Folder & { accountId: string; count: number }
 
 export type WebinarInput = Partial<Omit<Webinar, 'id' | 'createdAt' | 'updatedAt'>> & {
   deliveryKind?: 'on_demand' | 'scheduled' | 'external'
@@ -9738,6 +9738,23 @@ export const webinarApi = {
   ),
   folders: (accountId: string) => fetchApi<ApiResponse<WebinarFolder[]>>(
     `/api/folders?kind=webinar&account_id=${encodeURIComponent(accountId)}`,
+  ),
+  createFolder: (accountId: string, input: { name: string; color?: string | null }) =>
+    fetchApi<ApiResponse<WebinarFolder>>('/api/folders', {
+      method: 'POST',
+      body: JSON.stringify({ kind: 'webinar', accountId, ...input }),
+    }),
+  updateFolder: (
+    accountId: string,
+    id: string,
+    input: { name?: string; displayOrder?: number; color?: string | null },
+  ) => fetchApi<ApiResponse<WebinarFolder>>(`/api/folders/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ accountId, ...input }),
+  }),
+  deleteFolder: (accountId: string, id: string) => fetchApi<ApiResponse<null>>(
+    `/api/folders/${encodeURIComponent(id)}?account_id=${encodeURIComponent(accountId)}`,
+    { method: 'DELETE' },
   ),
   overview: (accountId: string) => fetchApi<{ data: WebinarOverview }>(
     `/api/webinars/overview?account_id=${encodeURIComponent(accountId)}`,

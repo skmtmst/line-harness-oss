@@ -59,5 +59,8 @@ describe('機能設定の添付デザイン', () => {
     expect(source).toContain('api.analytics.usageOverview(selectedAccountId)')
     expect(source).toContain('利用中 {inUse.toLocaleString')
     expect(source).toContain('利用数は未取得')
+    expect(source).toContain('px-3 py-2')
+    expect(source).toContain('<div key={columnIndex} className="space-y-3">')
+    expect(source).not.toContain('!ordering && columnIndex === 2')
   })
 })

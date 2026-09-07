@@ -5880,7 +5880,7 @@ export const WEBINAR_FOLDERS = [
   ['webinar-folder-seminars', 'セミナー', 5],
   ['webinar-folder-archive', 'アーカイブ', 4],
 ].map(([id, name, count], index) => ({
-  id, kind: 'webinar', name, parentId: null, displayOrder: index, count,
+  id, kind: 'webinar', accountId: 'visual-qa-account', name, parentId: null, displayOrder: index, count,
   color: null, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-25T02:00:00.000Z',
 }))
 

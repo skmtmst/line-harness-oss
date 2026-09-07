@@ -113,7 +113,7 @@ export function definitionsForSave(actions: LinkedAction[]): TagDefinitionAction
 const cardClass =
   'rounded-card border border-hairline bg-canvas p-5 [box-shadow:1px_1px_1px_rgba(15,23,42,0.14)]'
 const inputClass =
-  'w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/15'
+  'w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/15'
 
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (next: boolean) => void; label: string }) {
   return (
@@ -381,7 +381,7 @@ export default function TagEditorV4({
   }
 
   return (
-    <div className="pb-24">
+    <div>
       <div className="mb-5">
         <Breadcrumb items={[{ label: '友だち属性', href: '/tags' }, { label: mode === 'create' ? 'タグを作る' : 'タグを編集' }]} />
       </div>
@@ -428,32 +428,32 @@ export default function TagEditorV4({
                 </ul>
               </div>
             ) : (
-              <div className="space-y-5">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <label><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">本人へのマイル付与</span><div className="flex items-center gap-2"><input type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={inputClass} /><span className="text-sm text-ink-faint">mile</span></div><span className="mt-1 block text-[11px] leading-5 text-ink-faint">このタグが付いた本人へ、一度だけ積みます。</span></label>
-                  <label><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">紹介者へのマイル付与</span><div className="flex items-center gap-2"><input type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={inputClass} /><span className="text-sm text-ink-faint">mile</span></div><span className="mt-1 block text-[11px] leading-5 text-ink-faint">紹介経由の友だちなら、その紹介者にも積みます。</span></label>
-                  <label><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">今後のマイル倍率</span><select value={multiplier} onChange={(event) => setMultiplier(event.target.value)} className={inputClass}>{MULTIPLIERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select><span className="mt-1 block text-[11px] leading-5 text-ink-faint">このタグが付いている間、次回以降の付与倍率に使います。</span></label>
-                  <label><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">倍率の優先度</span><select value={priority} onChange={(event) => setPriority(event.target.value)} className={inputClass}>{[0,1,2,3,4,5].map((value) => <option key={value} value={value}>{value === 0 ? '標準' : `優先度 ${value}`}</option>)}</select><span className="mt-1 block text-[11px] leading-5 text-ink-faint">倍率タグが複数ある場合、数字が大きい設定を優先します。</span></label>
+              <div className="space-y-3">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label><span className="mb-1 block text-xs font-semibold text-ink-secondary">本人へのマイル付与</span><div className="flex items-center gap-2"><input type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={inputClass} /><span className="text-sm text-ink-faint">mile</span></div><span className="mt-1 block text-[11px] leading-4 text-ink-faint">このタグが付いた本人へ、一度だけ積みます。</span></label>
+                  <label><span className="mb-1 block text-xs font-semibold text-ink-secondary">紹介者へのマイル付与</span><div className="flex items-center gap-2"><input type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={inputClass} /><span className="text-sm text-ink-faint">mile</span></div><span className="mt-1 block text-[11px] leading-4 text-ink-faint">紹介経由の友だちなら、その紹介者にも積みます。</span></label>
+                  <label><span className="mb-1 block text-xs font-semibold text-ink-secondary">今後のマイル倍率</span><select value={multiplier} onChange={(event) => setMultiplier(event.target.value)} className={inputClass}>{MULTIPLIERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select><span className="mt-1 block text-[11px] leading-4 text-ink-faint">このタグが付いている間、次回以降の付与倍率に使います。</span></label>
+                  <label><span className="mb-1 block text-xs font-semibold text-ink-secondary">倍率の優先度</span><select value={priority} onChange={(event) => setPriority(event.target.value)} className={inputClass}>{[0,1,2,3,4,5].map((value) => <option key={value} value={value}>{value === 0 ? '標準' : `優先度 ${value}`}</option>)}</select><span className="mt-1 block text-[11px] leading-4 text-ink-faint">倍率タグが複数ある場合、数字が大きい設定を優先します。</span></label>
                 </div>
-                <fieldset className="rounded-control border border-hairline bg-canvas-sunken p-4">
+                <fieldset className="rounded-control border border-hairline bg-canvas-sunken px-3 py-2">
                   <legend className="px-1 text-xs font-semibold text-ink-secondary">タグを外して付け直したときの扱い</legend>
-                  <label className="mt-2 flex items-start gap-2 text-sm text-ink"><input type="radio" name="reapplyMode" checked={reapplyMode === 'once'} onChange={() => setReapplyMode('once')} className="mt-1 accent-accent" /><span>最初の1回だけ積む<span className="block text-xs font-normal leading-5 text-ink-faint">誤操作や付け直しで、同じマイルが重複しません。</span></span></label>
-                  <label className="mt-3 flex items-start gap-2 text-sm text-ink"><input type="radio" name="reapplyMode" checked={reapplyMode === 'every'} onChange={() => setReapplyMode('every')} className="mt-1 accent-accent" /><span>付け直すたびに積む<span className="block text-xs font-normal leading-5 text-ink-faint">購入回数など、同じタグを繰り返し使う運用向けです。</span></span></label>
+                  <label className="mt-1 flex items-start gap-2 text-sm text-ink"><input type="radio" name="reapplyMode" checked={reapplyMode === 'once'} onChange={() => setReapplyMode('once')} className="mt-1 accent-accent" /><span>最初の1回だけ積む<span className="block text-xs font-normal leading-4 text-ink-faint">誤操作や付け直しで、同じマイルが重複しません。</span></span></label>
+                  <label className="mt-1 flex items-start gap-2 text-sm text-ink"><input type="radio" name="reapplyMode" checked={reapplyMode === 'every'} onChange={() => setReapplyMode('every')} className="mt-1 accent-accent" /><span>付け直すたびに積む<span className="block text-xs font-normal leading-4 text-ink-faint">購入回数など、同じタグを繰り返し使う運用向けです。</span></span></label>
                 </fieldset>
-                <div className="border-t border-hairline pt-5">
-                  <div className="mb-3 flex items-center justify-between"><div><h3 className="text-sm font-bold text-ink">連動アクション</h3><p className="mt-0.5 text-xs text-ink-faint">上から順に実行されます。つまんで順番を変更できます。</p></div><button type="button" onClick={() => setDrawerOpen(true)} className="rounded-control border border-action/25 bg-action-soft px-3 py-2 text-sm font-medium text-action">＋ アクションを追加</button></div>
-                  {actions.length === 0 ? <p className="rounded-control border border-dashed border-hairline p-5 text-center text-sm text-ink-faint">連動アクションはまだありません</p> : <ol className="space-y-2">{actions.map((action, index) => <li key={action.id} className="grid grid-cols-[28px_32px_118px_minmax(0,1fr)_90px_32px_32px] items-center gap-2 rounded-control border border-hairline px-3 py-2.5 text-sm"><span className="cursor-grab text-ink-faint">⋮⋮</span><span className="flex h-6 w-6 items-center justify-center rounded-full bg-canvas-sunken text-xs font-bold">{index + 1}</span><span className={`rounded-control border px-2 py-1 text-center text-xs ${action.type === 'タグ追加' || action.type === 'タグ解除' || action.type === 'マイル付与' ? 'border-success bg-success-bg text-success' : action.type === '友だち情報更新' || action.type === '対応マーク変更' || action.type.startsWith('リマインダ') ? 'border-warning bg-warning-bg text-warning' : action.type.startsWith('シナリオ') || action.type === 'リッチメニュー切替' ? 'border-action bg-action-soft text-action' : 'border-info bg-info-bg text-action'}`}>{action.type}</span><span className="truncate font-medium text-ink" title={action.label}>{action.label}</span><span className={`rounded-pill px-2 py-1 text-center text-xs ${action.timing === 'すぐに' ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'}`}>{action.timing === 'すぐに' ? '即時' : action.timing}</span><IconButton onClick={() => duplicateAction(action, index)} aria-label={`${index + 1}番目のアクションを複製`}><Copy size={15} aria-hidden /></IconButton><IconButton onClick={() => setActions((current) => current.filter((item) => item.id !== action.id))} className="text-danger" aria-label={`${index + 1}番目のアクションを削除`}><Trash2 size={15} aria-hidden /></IconButton></li>)}</ol>}
+                <div className="border-t border-hairline pt-3">
+                  <div className="mb-2 flex items-center justify-between"><div><h3 className="text-sm font-bold text-ink">連動アクション</h3><p className="mt-0.5 text-xs text-ink-faint">上から順に実行されます。つまんで順番を変更できます。</p></div><button type="button" onClick={() => setDrawerOpen(true)} className="rounded-control border border-action/25 bg-action-soft px-3 py-2 text-sm font-medium text-action">＋ アクションを追加</button></div>
+                  {actions.length === 0 ? <p className="rounded-control border border-dashed border-hairline p-5 text-center text-sm text-ink-faint">連動アクションはまだありません</p> : <ol className="space-y-2">{actions.map((action, index) => <li key={action.id} className="grid grid-cols-[28px_32px_118px_minmax(0,1fr)_90px_32px_32px] items-center gap-2 rounded-control border border-hairline px-3 py-2 text-sm"><span className="cursor-grab text-ink-faint">⋮⋮</span><span className="flex h-6 w-6 items-center justify-center rounded-full bg-canvas-sunken text-xs font-bold">{index + 1}</span><span className={`rounded-control border px-2 py-1 text-center text-xs ${action.type === 'タグ追加' || action.type === 'タグ解除' || action.type === 'マイル付与' ? 'border-success bg-success-bg text-success' : action.type === '友だち情報更新' || action.type === '対応マーク変更' || action.type.startsWith('リマインダ') ? 'border-warning bg-warning-bg text-warning' : action.type.startsWith('シナリオ') || action.type === 'リッチメニュー切替' ? 'border-action bg-action-soft text-action' : 'border-info bg-info-bg text-action'}`}>{action.type}</span><span className="truncate font-medium text-ink" title={action.label}>{action.label}</span><span className={`rounded-pill px-2 py-1 text-center text-xs ${action.timing === 'すぐに' ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'}`}>{action.timing === 'すぐに' ? '即時' : action.timing}</span><IconButton onClick={() => duplicateAction(action, index)} aria-label={`${index + 1}番目のアクションを複製`}><Copy size={15} aria-hidden /></IconButton><IconButton onClick={() => setActions((current) => current.filter((item) => item.id !== action.id))} className="text-danger" aria-label={`${index + 1}番目のアクションを削除`}><Trash2 size={15} aria-hidden /></IconButton></li>)}</ol>}
                 </div>
               </div>
             )}
-            <p className="mt-4 text-xs leading-5 text-ink-faint">OFFのままでも、タグの手動付与・配信の絞り込み・シナリオ条件には使えます。</p>
+            <p className="mt-2 text-xs leading-4 text-ink-faint">OFFのままでも、タグの手動付与・配信の絞り込み・シナリオ条件には使えます。</p>
             {/*
               **戻したときに何が戻らないかを言う。** OFFにすれば元通りだと
               読めてしまうが、すでに積んだマイルは戻らない（設計 `ee0sk`）。
               編集のときだけ出す——新規作成にはまだ積んだものが無い。
             */}
             {mode === 'edit' && linked ? (
-              <p className="mt-2 text-xs leading-5 text-ink-faint">
+              <p className="mt-1 text-xs leading-4 text-ink-faint">
                 OFFに戻すと、これ以降このタグが付いても連動は動きません。
                 すでに積んだマイルは取り消されません。
               </p>
@@ -489,7 +489,7 @@ export default function TagEditorV4({
       </div>
 
       <StickyBar
-        className="sticky bottom-0 z-30 mt-4"
+        className="sticky bottom-0 z-30"
         status={mode === 'edit' && onDelete ? (
           <button type="button" onClick={onDelete} className="rounded-control border border-danger/25 px-3 py-2 text-sm font-medium text-danger hover:bg-danger-bg">タグを削除</button>
         ) : 'まだ保存していません'}
