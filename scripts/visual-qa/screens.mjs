@@ -1802,21 +1802,16 @@ export const SCREENS = [
   {
     ...COMMON_VAR, node: 'yPkWe', name: '14-1-C 共通情報の削除確認',
     mode: 'viewport', height: 1080,
-    pixelComparisonSuffix: 'deletable',
-    steps: [{ qaOpen: 'yPkWe', after: 900 }],
+    steps: [{ click: '臨時のお知らせを削除', after: 900 }],
     variants: [
       /*
-        消せるもの（どこにも差し込まれていない2件目）。
-
-        **先に窓を閉じる。** `steps` と `variant.steps` はつながって走るので、
-        1件目の削除の窓が開いたまま2件目の「削除」を押すことになり、
-        重なりに遮られて15秒で時間切れになっていた（見つかった数3・押せず）。
+        比較対象はPencilと同じ削除可能状態。使用中の影響確認は別状態に残す。
       */
-      { suffix: '-deletable', steps: [{ click: 'キャンセル', after: 500 }, { click: '臨時のお知らせを削除', after: 900 }] },
+      { suffix: '-used', steps: [{ click: 'キャンセル', after: 500 }, { qaOpen: 'yPkWe', after: 900 }] },
     ],
     verdict: 'match',
     verdictNote: '**2026-09-07 Issue #472の差し戻し対応で、Pencilと同じ削除可能状態を比較対象にして画素差分4.4655%で一致。** 使用先なしの共通情報を用意し、単純な確認文・720px幅・取消と削除の操作を1440/1920pxで照合した。使用中の影響確認は別状態として維持し、比較対象から分離した。横はみ出し0。',
-    verdictSource: 'common-vars-v6/yPkWe.txt + common-vars-v6/yPkWe-{1440,1920}.png + common-vars-v6/yPkWe-deletable-{1440,1920}.png + api.test.ts + delete-screen-contract.test.ts',
+    verdictSource: 'common-vars-v6/yPkWe.txt + common-vars-v6/yPkWe-{1440,1920}.png + common-vars-v6/yPkWe-used-{1440,1920}.png + api.test.ts + delete-screen-contract.test.ts',
     verdictHead: 'bc92f54ea',
 
   },
@@ -1862,21 +1857,16 @@ export const SCREENS = [
   {
     ...MEDIA, node: 'YfTfJ', name: '15-1-C メディアの削除確認',
     mode: 'viewport', height: 1080,
-    pixelComparisonSuffix: 'deletable',
-    steps: [{ qaOpen: 'YfTfJ', after: 900 }],
+    steps: [{ click: '削除', nth: 4, after: 900 }],
     variants: [
       /*
-        消せるもの（どこでも使っていない `未使用の案内.png`）。**2枚目の札。**
-
-        **先に窓を閉じる。** 1枚目の削除の窓が開いたまま2枚目の「削除」を押すことになり、
-        重なりに遮られて時間切れになっていた。窓を閉じる押し口はメディアでは「閉じる」。
-        3枚目を指していたのも入れ替え前の固定データのまま。
+        比較対象はPencilと同じ削除可能状態。使用中の影響確認は別状態に残す。
       */
-      { suffix: '-deletable', steps: [{ click: '閉じる', after: 500 }, { click: '削除', nth: 4, after: 900 }] },
+      { suffix: '-used', steps: [{ click: '閉じる', after: 500 }, { qaOpen: 'YfTfJ', after: 900 }] },
     ],
     verdict: "match",
     verdictNote: "**2026-09-07 Issue #472の差し戻し対応で、Pencilと同じ未使用メディアの削除可能状態を比較対象にして再計測。** 単純な確認文・680px幅・取消と削除の操作は設計と一致した。画素差分12.8230%の残差は背面一覧のPencil固定値186件と撮影用固定値10件によるもので、使用中の影響確認は別状態として比較対象から分離した。1440/1920pxとも横はみ出し0。",
-    verdictSource: "media-v6/YfTfJ.txt + YfTfJ-1440.png + YfTfJ-1920.png + YfTfJ-deletable.txt + YfTfJ-deletable-1440.png + YfTfJ-deletable-1920.png",
+    verdictSource: "media-v6/YfTfJ.txt + YfTfJ-{1440,1920}.png + YfTfJ-used-{1440,1920}.png + media-delete-contract.test.ts",
   },
   {
     ...MEDIA, node: 'h8pBZr', name: '15-1-D 一覧の状態（空・読込・エラー）',

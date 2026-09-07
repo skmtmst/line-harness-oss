@@ -194,30 +194,4 @@ describe('Pencil設計との画素比較', () => {
       rmSync(root, { recursive: true, force: true })
     }
   })
-
-  it('設計と同じ派生状態を画面ごとの比較対象にできる', () => {
-    const root = mkdtempSync(join(tmpdir(), 'pixel-diff-'))
-    try {
-      const designDir = join(root, 'docs/design-reference/test-v6')
-      const implementationDir = join(root, 'docs/design-qa/test-v6')
-      for (const dir of [designDir, implementationDir]) mkdirSync(dir, { recursive: true })
-      writePng(join(designDir, 'node.png'), WHITE)
-      writePng(join(implementationDir, 'node-1920.png'), BLACK)
-      writePng(join(implementationDir, 'node-deletable-1920.png'), WHITE)
-
-      const result = compareScreen({
-        feature: 14,
-        node: 'node',
-        name: '削除可能状態',
-        dir: 'test-v6',
-        verdict: 'match',
-        pixelComparisonSuffix: 'deletable',
-      }, { root, writeDiffImages: false })
-
-      expect(result.pixelDiffPercent).toBe(0)
-      expect(result.comparisons[0].implementationPath).toBe('docs/design-qa/test-v6/node-deletable-1920.png')
-    } finally {
-      rmSync(root, { recursive: true, force: true })
-    }
-  })
 })

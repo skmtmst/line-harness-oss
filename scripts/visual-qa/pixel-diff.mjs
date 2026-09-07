@@ -149,11 +149,7 @@ function implementationImage(screen, width, root = ROOT) {
     return existsSync(portableEvidence) ? portableEvidence : null
   }
   const dir = join(root, 'docs', 'design-qa', screen.dir)
-  const comparisonSuffix = screen.pixelComparisonSuffix
-    ? normalizeSuffix(screen.pixelComparisonSuffix)
-    : null
   const named = [
-    ...(comparisonSuffix ? [`${screen.node}${comparisonSuffix}-${width}.png`] : []),
     `${screen.node}-${width}.png`,
     `${screen.node}-normal-${width}.png`,
     ...(screen.states?.kinds ?? []).map((kind) => `${screen.node}-${kind}-${width}.png`),

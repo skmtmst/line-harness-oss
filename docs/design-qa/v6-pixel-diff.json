@@ -1,6 +1,6 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
-  "generatedAt": "2026-09-07T13:04:53.111Z",
+  "generatedAt": "2026-09-07T13:14:47.556Z",
   "thresholdPercent": 10,
   "screenCount": 272,
   "comparedCount": 259,
@@ -1291,7 +1291,7 @@
       "dominantRegion": "中央・中央",
       "diffPath": "docs/design-qa/friends-v6/vtBCu-diff-1920.png",
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T12:28:24.106Z"
+      "retainedFrom": "2026-09-07T13:14:26.718Z"
     },
     {
       "feature": 5,
@@ -2889,7 +2889,7 @@
       "dominantRegion": "中央・左",
       "diffPath": "docs/design-qa/auto-replies-v6/cmDfJ-diff-1920.png",
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T12:28:24.106Z"
+      "retainedFrom": "2026-09-07T13:14:26.718Z"
     },
     {
       "feature": 8,
@@ -3083,7 +3083,7 @@
       "dominantRegion": "中央・右",
       "diffPath": "docs/design-qa/auto-replies-v6/g46ja-diff-1920.png",
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T12:28:24.106Z"
+      "retainedFrom": "2026-09-07T13:14:26.718Z"
     },
     {
       "feature": 8,
@@ -3121,7 +3121,7 @@
       "dominantRegion": "下部・中央",
       "diffPath": "docs/design-qa/auto-replies-v6/Yj6CQ-diff-1920.png",
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T12:28:24.106Z"
+      "retainedFrom": "2026-09-07T13:14:26.718Z"
     },
     {
       "feature": 8,
@@ -3159,7 +3159,7 @@
       "dominantRegion": "下部・右",
       "diffPath": "docs/design-qa/auto-replies-v6/e6iJG-diff-1920.png",
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T12:28:24.106Z"
+      "retainedFrom": "2026-09-07T13:14:26.718Z"
     },
     {
       "feature": 8,
@@ -3236,7 +3236,7 @@
       "dominantRegion": "中央・中央",
       "diffPath": "docs/design-qa/auto-replies-v6/Gy9OK-diff-1920.png",
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T12:28:24.106Z"
+      "retainedFrom": "2026-09-07T13:14:26.718Z"
     },
     {
       "feature": 8,
@@ -4114,7 +4114,7 @@
       "dominantRegion": "中央・右",
       "diffPath": "docs/design-qa/templates-v6/GFlD7-diff-1920.png",
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T12:28:24.106Z"
+      "retainedFrom": "2026-09-07T13:14:26.718Z"
     },
     {
       "feature": 11,
@@ -4152,7 +4152,7 @@
       "dominantRegion": "中央・右",
       "diffPath": "docs/design-qa/templates-v6/FRkls-diff-1920.png",
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T12:28:24.106Z"
+      "retainedFrom": "2026-09-07T13:14:26.718Z"
     },
     {
       "feature": 11,
@@ -4229,7 +4229,7 @@
       "dominantRegion": "中央・右",
       "diffPath": "docs/design-qa/templates-v6/j9ixI-diff-1920.png",
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T12:28:24.106Z"
+      "retainedFrom": "2026-09-07T13:14:26.718Z"
     },
     {
       "feature": 11,
@@ -4267,7 +4267,7 @@
       "dominantRegion": "中央・右",
       "diffPath": "docs/design-qa/templates-v6/hsBtl-diff-1920.png",
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T12:28:24.106Z"
+      "retainedFrom": "2026-09-07T13:14:26.718Z"
     },
     {
       "feature": 11,
@@ -4305,7 +4305,7 @@
       "dominantRegion": "中央・右",
       "diffPath": "docs/design-qa/templates-v6/J3GxEZ-diff-1920.png",
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T12:28:24.106Z"
+      "retainedFrom": "2026-09-07T13:14:26.718Z"
     },
     {
       "feature": 11,
@@ -4577,7 +4577,7 @@
       "dominantRegion": "上部・右",
       "diffPath": "docs/design-qa/rich-menus-v6/DIUbO-diff-1920.png",
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T12:28:24.106Z"
+      "retainedFrom": "2026-09-07T13:14:26.718Z"
     },
     {
       "feature": 12,
@@ -5191,7 +5191,7 @@
           },
           "dominantRegion": "中央・中央",
           "designPath": "docs/design-reference/common-vars-v6/yPkWe.png",
-          "implementationPath": "docs/design-qa/common-vars-v6/yPkWe-deletable-1920.png",
+          "implementationPath": "docs/design-qa/common-vars-v6/yPkWe-1920.png",
           "implementationSource": "docs",
           "diffPath": "docs/design-qa/common-vars-v6/yPkWe-diff-1920.png"
         }
@@ -5347,7 +5347,7 @@
           },
           "dominantRegion": "上部・中央",
           "designPath": "docs/design-reference/media-v6/YfTfJ.png",
-          "implementationPath": "docs/design-qa/media-v6/YfTfJ-deletable-1920.png",
+          "implementationPath": "docs/design-qa/media-v6/YfTfJ-1920.png",
           "implementationSource": "docs",
           "diffPath": "docs/design-qa/media-v6/YfTfJ-diff-1920.png"
         }
@@ -5758,7 +5758,7 @@
       "dominantRegion": "中央・左",
       "diffPath": "docs/design-qa/mileage-v6/s98Vfw-diff-1920.png",
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T12:28:24.106Z"
+      "retainedFrom": "2026-09-07T13:14:26.718Z"
     },
     {
       "feature": 17,
@@ -5991,7 +5991,7 @@
       "dominantRegion": "中央・左",
       "diffPath": "docs/design-qa/mileage-v6/vz0Ji-diff-1920.png",
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T12:28:24.106Z"
+      "retainedFrom": "2026-09-07T13:14:26.718Z"
     },
     {
       "feature": 17,
@@ -6068,7 +6068,7 @@
       "dominantRegion": "上部・左",
       "diffPath": "docs/design-qa/mileage-v6/k8VCU-diff-1920.png",
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T12:28:24.106Z"
+      "retainedFrom": "2026-09-07T13:14:26.718Z"
     },
     {
       "feature": 17,
@@ -6106,7 +6106,7 @@
       "dominantRegion": "上部・左",
       "diffPath": "docs/design-qa/mileage-v6/z3PB2-diff-1920.png",
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T12:28:24.106Z"
+      "retainedFrom": "2026-09-07T13:14:26.718Z"
     },
     {
       "feature": 17,
@@ -8595,7 +8595,7 @@
       "dominantRegion": "中央・左",
       "diffPath": "docs/design-qa/events-v6/ugP5y-diff-1920.png",
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T12:28:24.106Z"
+      "retainedFrom": "2026-09-07T13:14:26.718Z"
     },
     {
       "feature": 29,
@@ -8633,7 +8633,7 @@
       "dominantRegion": "中央・右",
       "diffPath": "docs/design-qa/events-v6/MKrPY-diff-1920.png",
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T12:28:24.106Z"
+      "retainedFrom": "2026-09-07T13:14:26.718Z"
     },
     {
       "feature": 29,
@@ -8671,7 +8671,7 @@
       "dominantRegion": "上部・左",
       "diffPath": "docs/design-qa/events-v6/i5SN2j-diff-1920.png",
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T12:28:24.106Z"
+      "retainedFrom": "2026-09-07T13:14:26.718Z"
     },
     {
       "feature": 29,
@@ -8709,7 +8709,7 @@
       "dominantRegion": "上部・左",
       "diffPath": "docs/design-qa/events-v6/k5m5Bc-diff-1920.png",
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T12:28:24.106Z"
+      "retainedFrom": "2026-09-07T13:14:26.718Z"
     },
     {
       "feature": 30,
@@ -8864,7 +8864,7 @@
       "dominantRegion": "中央・左",
       "diffPath": "docs/design-qa/staff-v6/I3ZSrU-diff-1920.png",
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T12:28:24.106Z"
+      "retainedFrom": "2026-09-07T13:14:26.718Z"
     },
     {
       "feature": 31,
@@ -8941,7 +8941,7 @@
       "dominantRegion": "中央・左",
       "diffPath": "docs/design-qa/operations-v6/UgonK-diff-1920.png",
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T12:28:24.106Z"
+      "retainedFrom": "2026-09-07T13:14:26.718Z"
     },
     {
       "feature": 32,
@@ -8979,7 +8979,7 @@
       "dominantRegion": "中央・右",
       "diffPath": "docs/design-qa/operations-v6/b3HfZ-diff-1920.png",
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T12:28:24.106Z"
+      "retainedFrom": "2026-09-07T13:14:26.718Z"
     },
     {
       "feature": 32,
@@ -9017,7 +9017,7 @@
       "dominantRegion": "中央・左",
       "diffPath": "docs/design-qa/operations-v6/UhC2O-diff-1920.png",
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T12:28:24.106Z"
+      "retainedFrom": "2026-09-07T13:14:26.718Z"
     },
     {
       "feature": 32,
