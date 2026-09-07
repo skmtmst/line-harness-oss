@@ -2921,7 +2921,7 @@ export const SCREENS = [
     ],
     verdict: 'match',
     verdictNote: '**2026-09-07 S0 が実API契約へ接続し、1920px設計と1440/1920px実装を再撮影して一致。** タイムゾーン・国・役割メモ・親アカウントを登録内容として送信し、入力済み値と保存前の接続確認失敗を固定応答で再現した。接続確認は設計どおり1・2が「通りました」、3が「直してください」、4が「確かめていません」で止まり、保存しない。右欄にWebhook・Callback・LIFFのURLとコピー操作を表示する。2幅とも横スクロール0、壊れ値0、秘密値の平文表示0。',
-    verdictSource: 'settings-v6/b2NGxk.txt + settings-v6/b2NGxk-{1440,1920}.png', verdictHead: 'b21f830bd',
+    verdictSource: 'settings-v6/b2NGxk.txt + settings-v6/b2NGxk-{1440,1920}.png', verdictHead: '712903532',
   },
   {
     node: 'T9rA9', feature: 33, name: '33-3 LINEアカウントの詳細・編集',
