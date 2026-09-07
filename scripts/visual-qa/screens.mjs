@@ -919,9 +919,9 @@ export const SCREENS = [
   },
   { ...BROADCAST, node: 'u6gHt', name: '6-1-J 結果詳細',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #384で一致判定。** インサイトAPIの到達624人・開封444人・リンク別クリック2行を、概要・クリック・友だち・エラー・配信内容の各タブとLINEプレビューへ接続。1440/1920pxで横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #451 / UI HEAD `3a3bc7a31` で再撮影・一致。** 本文側の旧見出しを外し、画面名は上部バーだけに統一。CSV出力を下部の追従操作へ移し、パンくず・タブ・結果本文の順をPencil V6と同じにした。1440/1920pxとも横はみ出し0。',
     verdictSource: 'broadcasts-v6/u6gHt.txt + broadcasts-v6/u6gHt-{1440,1920}.png',
-    verdictHead: '55b3531ecb', route: '/broadcasts/detail?id=broadcast-2',
+    verdictHead: '3a3bc7a31', route: '/broadcasts/detail?id=broadcast-2',
 
   },
   {
@@ -1104,9 +1104,9 @@ export const SCREENS = [
   */
   { ...AUTO_REPLY, node: 'cmDfJ', name: '8-1 自動応答',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #375 / UI HEAD `06d05c170` で一致。** 一覧APIと全体競合集計APIへ接続し、ルール数・今月の応答・累計、アクション実行214回、要確認3件、フォルダ別件数と5行の実データを表示した。統合 #1132 の固定データを使って3101/8788で1440/1920px撮影し、同Node画像と横並びで4指標、案内帯、検索・並び順、フォルダ、6列表を比較。両幅とも横はみ出し0で、未接続の `—` は解消した。',
+    verdictNote: '**2026-09-07 Issue #451 / UI HEAD `3a3bc7a31` で再撮影・一致。** 本文側の旧見出しを外し、画面名は上部バーだけに統一。「フォルダを追加」「ルールを作成」を4指標の直後へ移し、Pencil V6と同じ順序にした。1440/1920pxとも横はみ出し0。',
     verdictSource: 'auto-replies-v6/cmDfJ.png + docs/design-qa/auto-replies-v6/cmDfJ-{1440,1920}.png + cmDfJ.txt',
-    verdictHead: '06d05c170', },
+    verdictHead: '3a3bc7a31', },
   {
     ...AUTO_REPLY, node: 'K7vg2', name: '8-1-A 自動応答ルール編集',
     verdict: 'match',
@@ -2295,9 +2295,9 @@ export const SCREENS = [
       kinds: ['loading', 'empty', 'error'],
     },
     verdict: "match",
-    verdictNote: '**2026-09-07 Issue #446 / UI HEAD 64436d463b でPencil V6を修正し再判定。** 個人の開封率を作らず、到達率・クリック率はLINE集計で確認する設計と表示へ統一した。30日の関連成果142件・612,400円と配信別成果金額も維持。通常・読込・空・失敗を3102/8789で1440/1920px撮影し、全画像で横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #451 / UI HEAD `3a3bc7a31` で再撮影・一致。** 本文側の旧見出しを外し、画面名は上部バーだけに統一。パンくずと「NEN配信を作成」を最初の内容行へ置き、タブ・4指標へ続くPencil V6の順序にした。通常・読込・空・失敗を1440/1920pxで確認し、全画像で横はみ出し0。',
     verdictSource: 'nen-v6/VLMGH.txt + VLMGH-1440.png + VLMGH-1920.png + VLMGH-loading/empty/error screenshots',
-    verdictHead: '64436d463b',
+    verdictHead: '3a3bc7a31',
   },
   { ...NEN, node: 'DEX0k', name: '21-1-A NENコラム', route: '/nen-campaigns?tab=columns',
     verdict: 'match',
@@ -2326,9 +2326,9 @@ export const SCREENS = [
     variants: [{ suffix: '-birthday', route: '/nen-campaigns/edit?key=birthday_coupon' }],
     route: '/nen-campaigns/edit?key=review_request',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #442 / UI HEAD 3b560eb0fを3102/8789で再撮影・判定。** Pencil V6どおり、配信時刻と重複防止、差し込み対応の本文エディタ、吹き出し追加、回答フォーム「口コミ」を開く・回答後200マイル付与、LINEプレビュー、つながる先、注意、追従保存を実装した。送信後アクションはアカウント別設定へ保存し、回答フォームは選択中アカウントのLIFF URLへ接続する。通常・誕生日を1440/1920pxで確認し、横はみ出し0。",
+    verdictNote: "**2026-09-07 Issue #451 / UI HEAD `3a3bc7a31` で再撮影・一致。** 旧見出しを持たない編集画面の構造を維持し、画面名は上部バーだけに統一した。通常・誕生日の両状態をPencil V6と横並びで再確認し、1440/1920pxとも横はみ出し0。",
     verdictSource: "nen-v6/HpKyF.txt + HpKyF-birthday.txt + HpKyF-{1440,1920}.png + HpKyF-birthday-{1440,1920}.png",
-    verdictHead: "3b560eb0f",
+    verdictHead: "3a3bc7a31",
   },
   {
     ...NEN, node: 'ymXJK', name: '21-1-E コラムを書く',
@@ -2644,7 +2644,7 @@ export const SCREENS = [
   {
     ...WEBHOOK, node: 'k3WxrO', name: '26-1 外部連携',
     route: '/webhooks?tab=outgoing',
-    verdict: 'match', verdictNote: '**2026-09-07 Issue #419 / UI HEAD `a16927af23` で再撮影・一致。** 送信先6本、30日1,486回、失敗6回、直近結果と再送可否を実APIへ接続し、各行の「1回試してみる」をテスト送信APIへ接続した。URLは途中を伏せ、1440/1920pxとも横はみ出し0。', verdictSource: 'webhooks-v6/k3WxrO.txt + webhooks-v6/k3WxrO-{1440,1920}.png', verdictHead: 'a16927af23',
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #451 / UI HEAD `3a3bc7a31` で再撮影・一致。** 本文側の旧見出しを外し、画面名は上部バーだけに統一。パンくずと追加操作を最初の内容行へ置き、その下にタブが続くPencil V6の順序にした。1440/1920pxとも横はみ出し0。', verdictSource: 'webhooks-v6/k3WxrO.txt + webhooks-v6/k3WxrO-{1440,1920}.png', verdictHead: '3a3bc7a31',
   },
   { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', route: '/webhooks?tab=incoming', verdict: 'match', verdictNote: '**2026-09-07 Issue #419 / UI HEAD `a16927af23` で再撮影・一致。** 受け取り口のURL、照合方法、合言葉、最新受信、差し込み項目に加え、APIが返すタグ名・テンプレート名を「届いたらすること」へ表示した。受信後の処理は同じ保存契約の実行器へ接続し、秘密値は再表示しない。1440/1920pxとも横はみ出し0。', verdictSource: 'webhooks-v6/M0Gb7.txt + webhooks-v6/M0Gb7-{1440,1920}.png', verdictHead: 'a16927af23' },
     // ---- 2026-09-02 `a0bb3f44` で実装を読み直した ----
@@ -3081,9 +3081,9 @@ export const SCREENS = [
     dir: 'friend-attributes-v6', route: '/tags/edit?id=tag-0', mode: 'page',
     steps: [{ click: '遡及反映', role: 'switch', onlyIfOff: true }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #330で実API接続後に再判定。** 一致。既存タグの128人・紹介者34人、本人10mile、紹介者5mile、1.5倍・優先度3、3件の連動アクション、既存友だちへの遡及反映と右側4項目の要約を実APIから同じ状態で表示した。2幅とも横はみ出し0。",
+    verdictNote: "**2026-09-07 Issue #451 / UI HEAD `3a3bc7a31` で再撮影・一致。** 旧実装として残っていた本文側の見出し構造を削除し、実画面は上部バーだけに画面名を表示する構成を維持した。Pencil V6と横並びで再確認し、1440/1920pxとも横はみ出し0。",
     verdictSource: "friend-attributes-v6/ee0sk.txt + friend-attributes-v6/ee0sk-{1440,1920}.png + 2026-09-07同一状態比較",
-    verdictHead: "5959c1756",
+    verdictHead: "3a3bc7a31",
   },
   {
     node: 'VjXGX', feature: 4, name: '4-1-E 遡及反映の確認ダイアログ',
