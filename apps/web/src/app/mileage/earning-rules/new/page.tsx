@@ -268,9 +268,9 @@ export default function NewMileageRulePage() {
               <table className="mt-3 w-full text-xs">
                 <thead>
                   <tr className="text-ink-faint text-left">
-                    <th className="pb-1 font-normal">タグ</th>
-                    <th className="pb-1 text-right font-normal">倍率</th>
-                    <th className="pb-1 text-right font-normal">付与</th>
+                    <th className="px-4 py-3 font-normal">タグ</th>
+                    <th className="px-4 py-3 text-right font-normal">倍率</th>
+                    <th className="px-4 py-3 text-right font-normal">付与</th>
                   </tr>
                 </thead>
                 <tbody className="text-ink-secondary">

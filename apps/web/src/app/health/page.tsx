@@ -232,11 +232,11 @@ export default function HealthPage() {
                           <table className="w-full text-sm">
                             <thead>
                               <tr className="text-left text-xs text-gray-500 border-b border-gray-100">
-                                <th className="pb-2 pr-3 font-medium">エラーコード</th>
-                                <th className="pb-2 pr-3 font-medium">エラー数</th>
-                                <th className="pb-2 pr-3 font-medium">チェック期間</th>
-                                <th className="pb-2 pr-3 font-medium">リスク</th>
-                                <th className="pb-2 font-medium">日時</th>
+                                <th className="px-4 py-3 font-medium">エラーコード</th>
+                                <th className="px-4 py-3 font-medium">エラー数</th>
+                                <th className="px-4 py-3 font-medium">チェック期間</th>
+                                <th className="px-4 py-3 font-medium">リスク</th>
+                                <th className="px-4 py-3 font-medium">日時</th>
                               </tr>
                             </thead>
                             <tbody>
