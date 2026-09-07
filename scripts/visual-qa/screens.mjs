@@ -3051,7 +3051,15 @@ const feature30Judgments = {
     verdictHead: '04057fb9da53',
   },
 }
+const ISSUE_420_REVIEW = new Set(['r6Gzsu', 'hz9ti', 'EvVO5', 'RUxNf', 'NrBkW', 'g2UNV', 'M2b2B'])
+
 for (const screen of SCREENS) {
+  if (screen.feature === 5 && ISSUE_420_REVIEW.has(screen.node)) {
+    screen.verdict = 'structure_match_data_pending'
+    screen.verdictNote = '**2026-09-07 Issue #420で再判定。** 3104/8791で対象状態を撮影。送信後アクション8種（テキスト送信・テンプレート送信・タグ操作・友だち情報操作・シナリオ操作・リマインダ操作・対応マーク操作・イベント予約操作）の保存口を確認した。固定データ/API不足の状態は未取得として扱い、理由を表示する。横スクロール0。'
+    screen.verdictSource = `scenarios-v6/${screen.node}.txt + ${screen.node}-{1440,1920}.png`
+    screen.verdictHead = 'codex/kenta-r2-s2-b420'
+  }
   const judgment = feature30Judgments[screen.node]
   if (screen.feature === 30 && judgment) Object.assign(screen, judgment)
 }
@@ -4363,6 +4371,14 @@ const ISSUE_211_SCREENS = new Set([
   'uLQQc', 's9gAx', 'W1wzCa', 'K0Dbr2', 'txMO9', 'U3SI5', 'Q3qP1r',
   'ZC13r', 'PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'GB0NR', 'D6yO7e', 'Q8sHa', 'yxyzQ', 'LKuAQ', 'zCQXe',
 ])
+for (const screen of SCREENS) {
+  if (screen.feature === 5 && ISSUE_420_REVIEW.has(screen.node)) {
+    screen.verdict = 'structure_match_data_pending'
+    screen.verdictNote = '**2026-09-07 Issue #420で再判定。** 3104/8791で対象状態を撮影。送信後アクション8種の保存口を確認した。固定データ/API不足の状態は未取得として扱い、理由を表示する。横スクロール0。'
+    screen.verdictSource = `scenarios-v6/${screen.node}.txt + ${screen.node}-{1440,1920}.png`
+    screen.verdictHead = 'codex/kenta-r2-s2-b420'
+  }
+}
 for (const screen of SCREENS) {
   if (ISSUE_211_SCREENS.has(screen.node)) {
     screen.verdictNote = screen.verdictNote.replace('Issue #211 ', 'Issue #211 / PR #962 ')
