@@ -83,11 +83,12 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
     <>
       <div className={styles.kpis}>
         <SummaryCard variant="v6" title="続いている定期便" value={summary?.active ?? null} unit="件" detail={summary?.monthlyAmount === null ? '今月の金額は未取得' : `今月 ¥${summary?.monthlyAmount.toLocaleString('ja-JP')}`} />
-        <SummaryCard variant="v6" title="今月 はじまった" value={summary?.startedThisMonth ?? null} unit="件" detail="月別集計は未取得" badge={summary?.startedThisMonth === null ? '未取得' : undefined} badgeTone="neutral" />
-        <SummaryCard variant="v6" title="今月 止まった" value={summary?.cancelledThisMonth ?? null} unit="件" detail={summary?.cancellationTopReason ? `多い理由「${summary.cancellationTopReason}」` : '止めた理由は未取得'} badge={summary?.cancelledThisMonth === null ? '未取得' : undefined} badgeTone="neutral" />
+        <SummaryCard variant="v6" title="今月 はじまった" value={summary?.startedThisMonth ?? null} unit="件" detail="定期便の開始日から集計" badge={summary?.startedThisMonth === null ? '未取得' : undefined} badgeTone="neutral" />
+        <SummaryCard variant="v6" title="今月 止まった" value={summary?.cancelledThisMonth ?? null} unit="件" detail={summary?.cancellationTopReason ? `多い理由「${summary.cancellationTopReason}」` : '解約理由の記録なし'} badge={summary?.cancelledThisMonth === null ? '未取得' : undefined} badgeTone="neutral" />
         <SummaryCard variant="v6" title="支払いを確認" value={summary?.atRisk ?? null} unit="人" detail="ECの決済状態から確認" />
       </div>
       <NoteBar>「支払いを確認」はECから届いた決済状態です。将来止めるかどうかを予測した数字ではありません。</NoteBar>
+      {(summary?.monthlyStats ?? []).length > 0 ? <div className="my-4 rounded-card border border-hairline bg-canvas p-4"><p className="text-sm font-semibold text-ink">月別の定期便</p><div className="mt-3 grid gap-2 sm:grid-cols-3">{summary?.monthlyStats.slice(-6).map((item) => <div key={item.month} className="rounded-control bg-canvas-sunken px-3 py-2"><p className="text-xs text-ink-faint">{item.month}</p><p className="mt-1 text-sm font-semibold text-ink">{item.count.toLocaleString('ja-JP')}件</p><p className="text-xs text-ink-secondary">¥{item.amount.toLocaleString('ja-JP')}</p></div>)}</div></div> : null}
       <div className={styles.toolbar}>
         <input className={styles.search} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="お客様の名前・注文番号で検索" aria-label="定期便を検索" />
         <div className={styles.filters}>

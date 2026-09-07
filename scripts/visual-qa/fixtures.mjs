@@ -4075,6 +4075,14 @@ export const CONVERSION_DEFINITIONS = {
       status: point.isActive ? 'active' : 'stopped',
       version: 1,
       usageCount: CONVERSION_USAGE_COUNTS.get(point.id) ?? 0,
+      usageNames: {
+        'cp-1': ['オートメーション「購入後フォロー」', '分析「売上レポート」'],
+        'cp-2': ['回答フォーム「体験申込」', 'シナリオ「申込後の案内」', '分析「フォーム成果」'],
+        'cp-3': ['予約「来店後のお礼」', '分析「予約成果」'],
+        'cp-4': ['NEN配信「定期便のご案内」', '分析「定期便成果」'],
+        'cp-5': ['ウェビナー「活用講座」', '分析「視聴成果」'],
+        'cp-6': [],
+      }[point.id] ?? [],
       metrics: {
         recordedCount: current?.totalCount ?? 0,
         netCount: current?.totalCount ?? 0,
@@ -4082,6 +4090,8 @@ export const CONVERSION_DEFINITIONS = {
         netValue: current?.totalValue ?? 0,
         reversalState: 'unavailable',
         reversalReason: '取消イベント台帳はまだ接続されていません',
+        cancellationCount: null,
+        cancellationValue: null,
       },
       stoppedAt: point.isActive ? null : '2026-08-20T09:00:00.000Z',
       createdAt: point.createdAt,
@@ -4147,6 +4157,8 @@ export const CONVERSION_DEFINITION_REPORT = {
     countChangeRate: 17.96,
     reversalState: 'unavailable',
     reversalReason: '取消イベント台帳はまだ接続されていません',
+    cancellationCount: null,
+    cancellationValue: null,
     fastestGrowing: {
       conversionPointId: 'cp-1',
       conversionPointName: '商品を買った',
@@ -4177,6 +4189,20 @@ export const CONVERSION_DEFINITION_REPORT = {
       previousNetCount: previous?.totalCount ?? 0,
       previousNetValue: previous?.totalValue ?? 0,
       countChange: current.totalCount - (previous?.totalCount ?? 0),
+      cancellationCount: null,
+      cancellationValue: null,
+      routes: {
+        'cp-1': [
+          { routeKey: 'nen-regular', label: 'NEN配信「定期便のご案内」', attributionState: 'attributed', netCount: 200, netValue: 520000, audience: null, conversionRate: null },
+          { routeKey: 'google-summer', label: 'Google広告 夏キャンペーン', attributionState: 'attributed', netCount: 110, netValue: 336000, audience: null, conversionRate: null },
+          { routeKey: 'unattributed', label: '未帰属', attributionState: 'unattributed', netCount: 76, netValue: 90000, audience: null, conversionRate: null },
+        ],
+        'cp-2': [{ routeKey: 'google-summer', label: 'Google広告 夏キャンペーン', attributionState: 'attributed', netCount: 42, netValue: 504000, audience: null, conversionRate: null }],
+        'cp-3': [{ routeKey: 'rich-menu-booking', label: 'リッチメニュー「予約する」', attributionState: 'attributed', netCount: 38, netValue: 69000, audience: null, conversionRate: null }],
+        'cp-4': [{ routeKey: 'nen-regular', label: 'NEN配信「定期便のご案内」', attributionState: 'attributed', netCount: 12, netValue: 98600, audience: null, conversionRate: null }],
+        'cp-5': [{ routeKey: 'rich-menu-booking', label: 'リッチメニュー「予約する」', attributionState: 'attributed', netCount: 8, netValue: 0, audience: null, conversionRate: null }],
+        'cp-6': [],
+      }[current.conversionPointId] ?? [],
     }
   }),
   byRoute: [
@@ -4478,13 +4504,13 @@ export const BOOKING_SETTINGS = {
   maxActiveBookingsPerFriend: 2, approvalMode: 'manual', holdMinutes: 15, slotGranularityMinutes: 15,
   menuCount: 8, activeMenuCount: 6, inactiveMenuCount: 2,
   businessHours: [
-    { weekday: 0, intervals: [{ start: '10:00', end: '17:00' }] },
-    { weekday: 1, intervals: [{ start: '09:00', end: '12:00' }, { start: '13:00', end: '19:00' }] },
-    { weekday: 2, intervals: [{ start: '09:00', end: '12:00' }, { start: '13:00', end: '19:00' }] },
+    { weekday: 0, intervals: [{ start: '10:00', end: '17:00', capacity: 2 }] },
+    { weekday: 1, intervals: [{ start: '09:00', end: '12:00', capacity: 3 }, { start: '13:00', end: '19:00', capacity: 3 }] },
+    { weekday: 2, intervals: [{ start: '09:00', end: '12:00', capacity: 3 }, { start: '13:00', end: '19:00', capacity: 3 }] },
     { weekday: 3, intervals: [] },
-    { weekday: 4, intervals: [{ start: '09:00', end: '12:00' }, { start: '13:00', end: '19:00' }] },
-    { weekday: 5, intervals: [{ start: '09:00', end: '20:00' }] },
-    { weekday: 6, intervals: [{ start: '09:00', end: '18:00' }] },
+    { weekday: 4, intervals: [{ start: '09:00', end: '12:00', capacity: 3 }, { start: '13:00', end: '19:00', capacity: 3 }] },
+    { weekday: 5, intervals: [{ start: '09:00', end: '20:00', capacity: 4 }] },
+    { weekday: 6, intervals: [{ start: '09:00', end: '18:00', capacity: 2 }] },
   ],
   exceptions: [
     {
@@ -4511,6 +4537,18 @@ export const BOOKING_SETTINGS = {
   ],
   updatedAt: '2026-08-22T09:20:00.000Z',
 }
+
+/** 機能28 tksPc 用の店舗資源。実APIの resources 契約と同じ形で返す。 */
+export const BOOKING_RESOURCES = [
+  {
+    id: 'resource-room-a', name: 'トリミングルームA', type: 'room', capacity: 1, isActive: true,
+    businessHours: BOOKING_SETTINGS.businessHours, exceptions: BOOKING_SETTINGS.exceptions,
+  },
+  {
+    id: 'resource-room-b', name: 'トリミングルームB', type: 'room', capacity: 1, isActive: true,
+    businessHours: BOOKING_SETTINGS.businessHours, exceptions: [],
+  },
+]
 
 /** 予約スタッフ。設計 `tksPc` の押し口「佐々木」を含む。 */
 export const BOOKING_STAFF = [
@@ -4580,6 +4618,18 @@ export const BOOKING_AVAILABILITY = {
       ],
     },
   ],
+}
+
+/* #414 の availability 契約。予約枠ごとの定員・残数・状態を固定する。 */
+for (const staff of BOOKING_AVAILABILITY.by_staff) {
+  for (const slot of staff.slots) {
+    Object.assign(slot, {
+      capacity: 2,
+      remaining: slot.start === '14:00' ? 0 : 1,
+      state: slot.start === '14:00' ? 'full' : 'limited',
+      resources: ['resource-room-a'],
+    })
+  }
 }
 
 /*
