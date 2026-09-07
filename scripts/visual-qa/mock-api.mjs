@@ -32,6 +32,7 @@ import {
   COMMON_VAR_FOLDERS,
   COMMON_VAR_DETAIL,
   COMMON_VAR_DELETE_IMPACT,
+  COMMON_VAR_SCHEDULES,
   commonVarChangeImpact,
   COMMON_VAR_DELETE_IMPACT_EMPTY,
   COMMON_VAR_REPLACEMENT_CANDIDATES,
@@ -2268,6 +2269,17 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       : COMMON_VAR_DELETE_IMPACT
     return { success: true, data: impact }
   }
+  /*
+    共通情報の切り替え予約の一覧。予約表が常に空だと、予約ありの
+    見た目・契約が検証されない。固定の予約を1件だけ返す。
+  */
+  const commonVarSchedules = /^\/api\/common-vars\/([^/]+)\/schedules$/.exec(pathname)
+  if (commonVarSchedules) {
+    return {
+      success: true,
+      data: commonVarSchedules[1] === COMMON_VAR_DETAIL.id ? COMMON_VAR_SCHEDULES : [],
+    }
+  }
   const mediaDeleteImpact = /^\/api\/media\/([^/]+)\/delete-impact$/.exec(pathname)
   if (mediaDeleteImpact) {
     const impact = mediaDeleteImpact[1] === MEDIA_DELETE_IMPACT_EMPTY.media.id
@@ -3047,6 +3059,34 @@ const server = createServer((req, res) => {
           data: commonVarChangeImpact(typeof nextValue === 'string' ? nextValue : ''),
         }))
       })
+      return
+    }
+    /*
+      共通情報の切り替え予約の登録と削除。モックは保存せず、
+      受け取った値をそのまま返して成功の絵が撮れるようにする。
+    */
+    if (method === 'POST' && /^\/api\/common-vars\/[^/]+\/schedules$/.test(url.pathname)) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        const varId = decodeURIComponent(url.pathname.split('/')[3] ?? '')
+        res.writeHead(201).end(JSON.stringify({
+          success: true,
+          data: {
+            id: 'common-var-schedule-new',
+            varId,
+            effectiveFrom: typeof body.effectiveFrom === 'string' ? body.effectiveFrom : '2026-10-01T10:00',
+            value: typeof body.value === 'string' ? body.value : '',
+            appliedAt: null,
+          },
+        }))
+      })
+      return
+    }
+    if (method === 'DELETE' && /^\/api\/common-vars\/[^/]+\/schedules\/[^/]+$/.test(url.pathname)) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: null }))
       return
     }
     /*
