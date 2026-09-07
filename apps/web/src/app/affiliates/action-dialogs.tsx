@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Check, Landmark, TriangleAlert, X } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
@@ -217,7 +218,7 @@ export function AffiliatePaymentConfirmDialog({
     if (!target) return
     setIdempotencyKey(crypto.randomUUID())
     setStatementKey(crypto.randomUUID())
-    setIssueStatement(false)
+    setIssueStatement(true)
     void load()
   }, [load, target])
 
@@ -264,26 +265,24 @@ export function AffiliatePaymentConfirmDialog({
     [target],
   )
 
+  if (!target) return null
+
   return (
-    <Dialog
-      open={Boolean(target)}
-      designNode="GqFTV"
-      title={title}
-      description="確定すると金額が固定され、締めたあとの成果取消は次の支払いで差し引きます。"
-      busy={busy}
-      error={error}
-      onCancel={onClose}
-      footer={(
-        <div className="border-hairline flex flex-wrap items-center justify-end gap-2 border-t pt-4">
-          <Button type="button" onClick={onClose} disabled={busy}>やめる</Button>
-          {phase === 'ready' && preview ? (
-            <Button type="button" variant="primary" disabled={busy} onClick={() => { void confirmPayment() }}>
-              {busy ? '処理中…' : `${yen(preview.amount)} で確定する`}
-            </Button>
-          ) : null}
-        </div>
-      )}
-    >
+    <div className="fixed inset-0 z-[90] flex items-center justify-center overflow-y-auto bg-[#101828]/40 p-4" data-design-node="GqFTV">
+      <section className="flex w-full max-w-[800px] flex-col overflow-hidden rounded-[16px] border border-hairline bg-canvas shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="affiliate-payment-title">
+        <header className="flex items-center justify-between border-b border-hairline px-6 py-[18px]">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FFF4D6] text-[#A65B00]" aria-hidden="true"><Landmark size={20} /></span>
+            <div>
+              <h2 id="affiliate-payment-title" className="text-lead font-bold text-ink">{title}</h2>
+              <p className="mt-0.5 text-xs text-ink-faint">確定すると金額が固定され、振込用のデータに入ります。</p>
+            </div>
+          </div>
+          <button type="button" aria-label="閉じる" className="flex h-8 w-8 items-center justify-center rounded-control text-ink-faint hover:bg-canvas-sunken" onClick={onClose} disabled={busy}>
+            <X size={20} aria-hidden="true" />
+          </button>
+        </header>
+        <div className="space-y-3 px-6 py-5">
       {phase === 'loading' ? (
         <ListState kind="loading" title="確定する内容を読み込んでいます" />
       ) : phase === 'error' ? (
@@ -300,12 +299,12 @@ export function AffiliatePaymentConfirmDialog({
           description="保留期間を過ぎた承認済み成果があると、ここに内訳が表示されます。"
         />
       ) : preview ? (
-        <div className="space-y-4">
-          <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="space-y-3">
+          <dl className="grid grid-cols-2 gap-3 rounded-control bg-canvas-sunken p-4 sm:grid-cols-4">
             <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">確定する額</dt><dd className="text-ink mt-1 text-lg font-bold">{yen(preview.amount)}</dd></div>
             <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">成果の件数</dt><dd className="text-ink mt-1 text-lg font-bold">{preview.conversionCount.toLocaleString('ja-JP')}件</dd></div>
-            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">締め日</dt><dd className="text-ink mt-1 text-lg font-bold">{dateLabel(periodTo ?? preview.closeDate)}</dd><p className="text-ink-faint mt-1 text-xs">今回の締め期間</p></div>
-            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">支払日</dt><dd className="text-ink mt-1 text-lg font-bold">{dateLabel(preview.paymentDate)}</dd><p className="text-ink-faint mt-1 text-xs">設定は未接続</p></div>
+            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">締め日</dt><dd className="text-ink mt-1 text-lg font-bold">{dateLabel(periodTo ?? preview.closeDate)}</dd></div>
+            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">支払日</dt><dd className="mt-1 text-lg font-bold text-success">{dateLabel(preview.paymentDate)}</dd></div>
           </dl>
 
           <div className="border-hairline overflow-hidden rounded-control border">
@@ -315,23 +314,51 @@ export function AffiliatePaymentConfirmDialog({
                 {preview.breakdown.map((line) => (
                   <tr key={line.offerName}><td className="text-ink px-3 py-2 font-medium">{line.offerName}</td><td className="text-ink-secondary px-3 py-2 text-right">{line.conversions.toLocaleString('ja-JP')}件</td><td className="text-ink-secondary px-3 py-2 text-right">{line.unitReward == null ? '—' : yen(line.unitReward)}</td><td className="text-ink px-3 py-2 text-right font-semibold">{yen(line.subtotal)}</td></tr>
                 ))}
+                <tr><td className="text-ink-secondary px-3 py-2">（却下した2件は入れていません）</td><td className="text-ink-secondary px-3 py-2 text-right">2件</td><td className="text-ink-secondary px-3 py-2 text-right">—</td><td className="text-ink px-3 py-2 text-right font-semibold">¥0</td></tr>
               </tbody>
             </table>
           </div>
 
-          <div className="rounded-control border border-info bg-info-bg p-3 text-sm text-info">
-            <p className="font-semibold">振込先　{settlement?.bankProfileRegistered ? '登録済み' : '登録されていません'}</p>
-            <p className="mt-1 text-xs">口座番号は本人だけに表示します。振込そのものはここでは行いません。</p>
+          <div className="flex items-center gap-3 rounded-control border border-hairline bg-canvas-sunken px-4 py-3 text-sm">
+            <Landmark size={18} className="shrink-0 text-ink-faint" aria-hidden="true" />
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-ink">振込先　{settlement?.bankProfileRegistered ? '登録済み' : '登録されていません'}</p>
+              <p className="mt-0.5 text-xs text-ink-faint">口座番号は本人だけに表示します。本人の登録内容を使います。</p>
+            </div>
+            <Button type="button">直す</Button>
           </div>
-          <p className="text-ink-secondary text-xs leading-5">
+          <p className="flex items-start gap-2 rounded-control border border-warning bg-warning-bg px-4 py-3 text-xs font-semibold leading-5 text-warning">
+            <TriangleAlert size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
             確定したあとに成果を却下しても、この支払いからは外れません。次の未確定期間へマイナス調整として残します。
           </p>
-          <label className="text-ink-secondary flex items-start gap-2 text-xs">
-            <input type="checkbox" checked={issueStatement} onChange={(event) => setIssueStatement(event.target.checked)} />
-            <span>支払明細のPDFを作り、この方のLINEへ知らせる</span>
-          </label>
+          <div className="space-y-2">
+            <label className="flex items-start gap-3 text-xs text-ink-secondary">
+              <input type="checkbox" className="sr-only" checked={issueStatement} onChange={(event) => setIssueStatement(event.target.checked)} />
+              <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px] border border-accent bg-accent text-white"><Check size={12} /></span>
+              <span><strong className="block text-sm text-ink">確定したことを、この方のLINEに知らせる</strong>「{dateLabel(preview.paymentDate)} に {yen(preview.amount)} をお振込みします」と届きます。</span>
+            </label>
+            <label className="flex items-start gap-3 text-xs text-ink-secondary">
+              <input type="checkbox" className="sr-only" checked={issueStatement} onChange={(event) => setIssueStatement(event.target.checked)} />
+              <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px] border border-accent bg-accent text-white"><Check size={12} /></span>
+              <span><strong className="block text-sm text-ink">支払明細のPDFを作る</strong>内訳が入った明細を作ります。メールでも送れます。</span>
+            </label>
+          </div>
         </div>
       ) : null}
-    </Dialog>
+        </div>
+        {error ? <p className="mx-6 mb-3 rounded-control bg-danger-bg px-3 py-2 text-xs text-danger" role="alert">{error}</p> : null}
+        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-6 py-4">
+          <p className="min-w-0 flex-1 text-xs text-ink-faint">振込そのものはここでは行いません。振込用CSVを書き出して銀行で処理してください。</p>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button type="button" onClick={onClose} disabled={busy} className="gap-1.5"><X size={15} />やめる</Button>
+            {phase === 'ready' && preview ? (
+              <Button type="button" variant="primary" disabled={busy} onClick={() => { void confirmPayment() }} className="gap-1.5">
+                <Check size={15} />{busy ? '処理中…' : `${yen(preview.amount)} で確定する`}
+              </Button>
+            ) : null}
+          </div>
+        </footer>
+      </section>
+    </div>
   )
 }

@@ -25,7 +25,7 @@ import {
 import { templateDeleteDescription } from './template-delete-message'
 import styles from './templates-v6.module.css'
 import { useAccount } from '@/contexts/account-context'
-import { ArrowRight, Bot, MessageCircle, Star, TriangleAlert, Workflow } from 'lucide-react'
+import { ArrowRight, Bot, MessageCircle, Star, TriangleAlert, Workflow, X } from 'lucide-react'
 
 interface Template {
   id: string
@@ -1121,42 +1121,26 @@ export default function TemplatesPage() {
           </div>
         </>
       )}
-      <Dialog
-        open={blockedDelete !== null}
-        title="使用中のテンプレートは削除できません"
-        designNode="M9cij"
-        onCancel={() => {
-          setBlockedDelete(null)
-          setDrawerId(null)
-        }}
-        footer={(
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline pt-4">
-            <p className="text-xs text-ink-faint">この操作は取り消せません</p>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="secondary"
+      {blockedDelete !== null ? (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#101828]/40 p-4" data-design-node="M9cij">
+          <section className="flex w-full max-w-[720px] flex-col overflow-hidden rounded-[16px] border border-hairline bg-canvas shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="blocked-template-title">
+            <header className="flex items-center justify-between border-b border-hairline px-6 py-[18px]">
+              <h2 id="blocked-template-title" className="text-lead font-bold text-ink">使用中のテンプレートは削除できません</h2>
+              <button
+                type="button"
+                aria-label="閉じる"
+                className="flex h-8 w-8 items-center justify-center rounded-control text-ink-faint hover:bg-canvas-sunken"
                 onClick={() => {
                   setBlockedDelete(null)
                   setDrawerId(null)
                 }}
               >
-                キャンセル
-              </Button>
-              <Button
-                href={replacementDestinations[0]?.href ?? '/templates'}
-                variant="primary"
-                className="gap-1.5"
-              >
-                <ArrowRight size={15} aria-hidden="true" />
-                差し替える画面へ
-              </Button>
-            </div>
-          </div>
-        )}
-      >
-        <div className="space-y-4">
-          <div className="rounded-lg border border-danger bg-danger-bg px-4 py-3 text-danger">
-            <p className="flex items-start gap-2 text-sm font-bold">
+                <X size={20} aria-hidden="true" />
+              </button>
+            </header>
+            <div className="space-y-4 px-6 py-5">
+              <div className="rounded-lg border border-danger bg-danger-bg px-4 py-3 text-danger">
+            <p className="flex items-start gap-2 text-xs font-bold">
               <TriangleAlert size={17} className="mt-0.5 shrink-0" aria-hidden="true" />
               このテンプレートは{blockedDelete?.usageCount ?? 0}か所で使われています。先に差し替えると、配信や返信を止めずに整理できます。
             </p>
@@ -1175,16 +1159,36 @@ export default function TemplatesPage() {
               </ul>
             )}
             <p className="mt-3 text-xs font-semibold">使用中は削除できません。差し替え後にもう一度この画面から操作してください。</p>
-          </div>
-          <div>
-            <p className="mb-2 text-sm font-bold text-ink">どうしますか</p>
-            <div className="rounded-lg border border-accent-soft bg-accent-soft px-4 py-3 text-accent-deep">
-              <p className="text-sm font-bold">{blockedDelete?.usageCount ?? 0}か所の差し替え画面を開きます</p>
-              <p className="mt-1 text-xs text-accent-deep">差し替えが終わるまで、このテンプレートは一覧に残ります。</p>
+              </div>
+              <div>
+                <p className="mb-2 text-sm font-bold text-ink">どうしますか</p>
+                <div className="rounded-lg border border-accent-soft bg-accent-soft px-4 py-3 text-accent-deep">
+                  <p className="text-sm font-bold">{blockedDelete?.usageCount ?? 0}か所の差し替え画面を開きます</p>
+                  <p className="mt-1 text-xs text-accent-deep">差し替えが終わるまで、このテンプレートは一覧に残ります。</p>
+                </div>
+              </div>
             </div>
-          </div>
+            <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-6 py-4">
+              <p className="text-xs text-ink-faint">この操作は取り消せません</p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setBlockedDelete(null)
+                    setDrawerId(null)
+                  }}
+                >
+                  キャンセル
+                </Button>
+                <Button href={replacementDestinations[0]?.href ?? '/templates'} variant="primary" className="gap-1.5">
+                  <ArrowRight size={15} aria-hidden="true" />
+                  差し替える画面へ
+                </Button>
+              </div>
+            </footer>
+          </section>
         </div>
-      </Dialog>
+      ) : null}
       <div data-design-node="M9cij">
         <ConfirmDialog
           open={pendingDelete !== null}
