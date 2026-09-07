@@ -1,12 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Header from '@/components/layout/header'
 import InboxFilters from '@/components/inbox/inbox-filters'
 import InboxList from '@/components/inbox/inbox-list'
 import InboxSummaryBar from '@/components/inbox/inbox-summary-bar'
 import { api } from '@/lib/api'
 import type { InboxRowData } from '@/components/inbox/inbox-row'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 const PAGE_SIZE = 50
 const POLL_INTERVAL_MS = 30_000
@@ -21,6 +21,7 @@ interface AccountOption {
 }
 
 export default function InboxPage() {
+  usePageTitle('未対応インボックス')
   const [allRows, setAllRows] = useState<InboxRowData[]>([])
   // サーバが返す真の総件数 (2000件超のとき allRows は capped されるので別途保持)。
   // Codex Round 2 指摘: summary.total を allRows.length から取ると under-report。
@@ -135,11 +136,6 @@ export default function InboxPage() {
 
   return (
     <div className="space-y-6">
-      <Header
-        title="未対応インボックス"
-        description="人間が返事してない LINE 会話の triage。auto_reply は人間の返事に数えない。"
-      />
-
       <InboxSummaryBar
         total={summary.total}
         byAccount={summary.byAccount}

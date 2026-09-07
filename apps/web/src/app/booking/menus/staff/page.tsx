@@ -3,9 +3,9 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import Header from '@/components/layout/header'
 import { bookingApi, type BookingMenu, type BookingStaff, type StaffMenuMatrix } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 /**
  * メニューごとの担当スタッフ（設計 V2 8-2-4 / node B88kuI）。
@@ -19,6 +19,7 @@ import { useAccount } from '@/contexts/account-context'
  * まとめてしか送れないので、保存は人数ぶんのPUTになる。
  */
 function MenuStaffMatrixContent() {
+  usePageTitle('予約設定')
   const sp = useSearchParams()
   /** 一覧から「スタッフ割当」で来たときに、その行を目立たせる。 */
   const focusMenuId = sp.get('menu_id') ?? ''
@@ -138,19 +139,7 @@ function MenuStaffMatrixContent() {
         <span>担当スタッフ</span>
       </nav>
 
-      <div data-design="Head">
-        <Header
-          title="メニューごとの担当スタッフ"
-          description="どのスタッフがどのメニューを提供できるかを決めます。スタッフごとに料金と所要時間を上書きできます。"
-        />
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <button
-            disabled
-            title="操作マニュアルは準備中です"
-            className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
-          >
-            マニュアル
-          </button>
+      <div data-design="Actions" className="mb-4 flex flex-wrap items-center gap-2">
           <Link
             href="/booking/staff/new"
             className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-2 text-sm"
@@ -166,7 +155,6 @@ function MenuStaffMatrixContent() {
           >
             {saving ? '保存中…' : '変更を保存'}
           </button>
-        </div>
       </div>
 
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">

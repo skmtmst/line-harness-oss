@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import Header from '@/components/layout/header'
 import EventForm from '@/components/events/event-form'
 import { useAccount } from '@/contexts/account-context'
 import {
@@ -126,27 +125,20 @@ function EditEventInner() {
 
   return (
     <div>
-      <nav className="text-ink-faint mb-2 text-xs" data-design="Crumb">
-        <Link href="/events" className="hover:underline">
-          イベント予約
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <nav className="text-ink-faint text-xs" data-design="Crumb" aria-label="パンくず">
+          <Link href="/events" className="hover:underline">
+            イベント予約
+          </Link>
+          <span className="mx-1.5">/</span>
+          <span>編集</span>
+        </nav>
+        <Link
+          href={`/events/bookings?eventId=${id}`}
+          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
+        >
+          申込の一覧を見る
         </Link>
-        <span className="mx-1.5">/</span>
-        <span>編集</span>
-      </nav>
-
-      <div data-design="Head">
-        <Header
-          title="イベントの編集"
-          description="開催内容と申込のルールを決めます。承認制にすると、申込のたびに確認できます。"
-          action={
-            <Link
-              href={`/events/bookings?eventId=${id}`}
-              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
-            >
-              申込の一覧を見る
-            </Link>
-          }
-        />
       </div>
 
       {!selectedAccountId ? (

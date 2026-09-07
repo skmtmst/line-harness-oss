@@ -1,11 +1,11 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 247,
+  "compared": 250,
   "unimplemented": 0,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 25,
+  "missing": 22,
   "match": 268,
   "structureMatchDataPending": 0,
   "needsFix": 0,
@@ -27,6 +27,15 @@
       "unjudged": 0,
       "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1251,
+          "head": "088cea8a8",
+          "on": "2026-09-07",
+          "screens": [
+            "vUXKb"
+          ],
+          "note": "Issue #454 / PR #1251。今日やることと右カードの空白をPencil寸法へ戻し、送信枠を22px・1行にした。追加URL選択の外側の二重枠を除去し、3104/8791で1440・1920pxを上端から比較。両幅とも横はみ出し0、一致を維持した。"
+        },
         {
           "pr": 419,
           "head": "c84baa63",
@@ -194,17 +203,28 @@
       "feature": 3,
       "name": "友だち",
       "total": 12,
-      "compared": 2,
+      "compared": 5,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 10,
+      "missing": 7,
       "match": 12,
       "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
       "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1247,
+          "head": "fb07e4a3f3",
+          "on": "2026-09-07",
+          "screens": [
+            "I6UAdr",
+            "YzxU1",
+            "r7eSi"
+          ],
+          "note": "Issue #452 / PR #1247。旧Headerを外し、パンくず・友だち機能タブ・顧客操作をV6設計の位置へそろえて3102/8789で全状態を1440/1920px再撮影。横はみ出し0で3画面とも一致を確認した。"
+        },
         {
           "pr": 1230,
           "head": "b62d7d070",
@@ -991,6 +1011,15 @@
       "remaining": 0,
       "capturedAt": [
         {
+          "pr": 1250,
+          "head": "d77d0877e",
+          "on": "2026-09-07",
+          "screens": [
+            "J64xI"
+          ],
+          "note": "Issue #453。本文上部の旧Headerを外し、3101/8788で1440・1920pxを撮影。設計画像なしのため正本テキストと上端から照合し、横はみ出し0で一致とした。独立V6 Nodeのない通知・検索分析・プール管理も同じ2幅で旧Header 0、横はみ出し0、ブラウザエラー0を確認した。"
+        },
+        {
           "pr": 1030,
           "head": "a828e5afc3",
           "on": "2026-09-07",
@@ -1524,6 +1553,16 @@
       "remaining": 0,
       "capturedAt": [
         {
+          "pr": 1247,
+          "head": "fb07e4a3f3",
+          "on": "2026-09-07",
+          "screens": [
+            "GFlD7",
+            "FRkls"
+          ],
+          "note": "Issue #452 / PR #1247。旧Headerを外して画面名を共通上部バーへ集約し、3102/8789で1440/1920pxを再撮影。設計と上端から照合し、横はみ出し0で2画面とも一致を確認した。"
+        },
+        {
           "pr": 1208,
           "head": "68d536652",
           "on": "2026-09-07",
@@ -1652,6 +1691,15 @@
       "unjudged": 0,
       "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1247,
+          "head": "fb07e4a3f3",
+          "on": "2026-09-07",
+          "screens": [
+            "XtfO3"
+          ],
+          "note": "Issue #452 / PR #1247。旧Headerを外し、パンくず・STEP・操作帯をV6設計の位置へそろえて3102/8789で1440/1920pxを再撮影。横はみ出し0で一致を確認した。"
+        },
         {
           "pr": 1224,
           "head": "3ddca80cc4",
@@ -1809,6 +1857,15 @@
       "unjudged": 0,
       "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1247,
+          "head": "fb07e4a3f3",
+          "on": "2026-09-07",
+          "screens": [
+            "vCqUj"
+          ],
+          "note": "Issue #452 / PR #1247。旧Headerを外し、パンくず・編集タブをV6設計の位置へそろえて3102/8789で1440/1920pxを再撮影。横はみ出し0で一致を確認した。"
+        },
         {
           "pr": 436,
           "head": "35c613a6",

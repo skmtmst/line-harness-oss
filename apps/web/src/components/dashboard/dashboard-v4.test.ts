@@ -86,6 +86,25 @@ describe('ダッシュボードV4の初期表示', () => {
     expect(source).toContain('ダッシュボード編集')
   })
 
+  it('Pencil vUXKbどおりカード内を詰め、送信枠を1行で表示する', () => {
+    const page = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    const sideCards = readFileSync(path.join(process.cwd(), 'src/components/dashboard/side-cards.tsx'), 'utf8')
+
+    expect(page).toContain('className="mt-2 flex items-end justify-between gap-3"')
+    expect(page).not.toContain('className="mt-auto flex items-end justify-between gap-3 pt-2"')
+    expect(page).toContain('className="text-metric leading-none font-bold tabular-nums"')
+    expect(page).toContain('className="text-ink mt-3 flex items-baseline gap-2 whitespace-nowrap"')
+    expect(sideCards).toContain('<Card padding="roomy">')
+    expect(sideCards).toContain('className="flex flex-col gap-2.5"')
+    expect(sideCards).not.toContain('<CardHeader')
+  })
+
+  it('追加URLの発行中ラベルに二重の外枠を付けない', () => {
+    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    expect(source).toContain('<label className="flex min-w-[220px] items-center gap-2">')
+    expect(source).not.toContain('rounded-control flex min-w-[220px] items-center gap-2 border')
+  })
+
   it('旧Workerが追加集計を返さなくてもダッシュボードを描画できる', () => {
     const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
     expect(source).toContain('data?.partialFailures?.length')

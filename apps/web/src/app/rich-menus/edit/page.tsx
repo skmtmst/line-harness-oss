@@ -5,7 +5,6 @@ import Button from '@/components/shared/button'
 import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Header from '@/components/layout/header'
 import { api } from '@/lib/api'
 import { CanvasEditor, type Area } from '@/components/rich-menus/canvas-editor'
 import { AreaProperties, intentOf } from '@/components/rich-menus/area-properties'
@@ -70,7 +69,6 @@ const SIZE_LABEL: Record<Group['size'], string> = {
 }
 
 export default function RichMenuEditPage() {
-  usePageTitle('リッチメニュー編集')
   return (
     <Suspense
       fallback={
@@ -89,7 +87,7 @@ function RichMenuEditPageInner() {
   const router = useRouter()
   const groupId = searchParams.get('id') ?? ''
   const editorStep = searchParams.get('step')
-  usePageTitle(editorStep === 'targeting' ? '誰に出すか' : editorStep === 'publish' ? '公開のしかた' : 'リッチメニュー編集')
+  usePageTitle(editorStep === 'targeting' ? '誰に出すか' : editorStep === 'publish' ? '公開のしかた' : 'メニューを作る')
 
   if (!groupId) {
     return (
@@ -641,52 +639,7 @@ function Editor({
         <span>{name || '(無名)'}</span>
       </nav>
 
-      <Header
-        description="トーク画面の下に出るメニューを作ります。エリアを選んで、押したときの動きを設定してください。"
-        action={
-          <StickyBar actions={(
-            <div className="flex items-center gap-2">
-            <label className="flex items-center gap-1.5 text-sm text-gray-600 mr-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={preview}
-                onChange={(e) => setPreview(e.target.checked)}
-              />
-              プレビュー
-            </label>
-            <button
-              onClick={handleSave}
-              disabled={saving || publishing || unpublishing || busy}
-              className="px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
-            >
-              {saving ? '保存中...' : '下書き保存'}
-            </button>
-            <button
-              onClick={() => {
-                setConfirmError('')
-                setConfirmKind('publish')
-              }}
-              disabled={saving || publishing || unpublishing || busy}
-              className="px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-opacity hover:opacity-90"
-              style={{ backgroundColor: 'var(--color-accent)' }}
-            >
-              {publishing
-                ? 'LINE 登録中...'
-                : group.status === 'published'
-                  ? 'LINE に再登録'
-                  : 'LINE に登録'}
-            </button>
-            </div>
-          )} />
-        }
-      />
-
-      <Link
-        href="/rich-menus"
-        className="text-sm text-gray-500 hover:underline mb-4 inline-block"
-      >
-        ← 一覧に戻る
-      </Link>
+      <StepHeader active={1} groupId={group.id} />
 
       {/* 登録・取り下げの結果。`alert()` と違い、押したあとも読み返せる。 */}
       {notice && (
@@ -1200,11 +1153,46 @@ function Editor({
           <li>・戻せます: もう一度「LINEに登録」すれば、また出せます。</li>
         </ul>
       </ConfirmDialog>
+
+      <StickyBar actions={(
+        <div className="flex items-center gap-2">
+          <label className="mr-2 flex cursor-pointer items-center gap-1.5 text-sm text-gray-600">
+            <input
+              type="checkbox"
+              checked={preview}
+              onChange={(e) => setPreview(e.target.checked)}
+            />
+            プレビュー
+          </label>
+          <button
+            onClick={handleSave}
+            disabled={saving || publishing || unpublishing || busy}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium transition-colors hover:bg-gray-50 disabled:opacity-50"
+          >
+            {saving ? '保存中...' : '下書きに保存'}
+          </button>
+          <button
+            onClick={() => {
+              setConfirmError('')
+              setConfirmKind('publish')
+            }}
+            disabled={saving || publishing || unpublishing || busy}
+            className="rounded-lg px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            style={{ backgroundColor: 'var(--color-accent)' }}
+          >
+            {publishing
+              ? 'LINE 登録中...'
+              : group.status === 'published'
+                ? 'LINE に再登録'
+                : 'LINE に登録'}
+          </button>
+        </div>
+      )} />
     </main>
   )
 }
 
-function StepHeader({ active, groupId }: { active: 2 | 3; groupId: string }) {
+function StepHeader({ active, groupId }: { active: 1 | 2 | 3; groupId: string }) {
   const steps = [
     { number: 1, label: '形とボタン', href: `/rich-menus/edit?id=${groupId}` },
     { number: 2, label: '誰に出すか', href: `/rich-menus/edit?id=${groupId}&step=targeting` },
@@ -1279,7 +1267,6 @@ function TargetingStep({
   return (
     <main data-design-node="kQ1bs" className="mx-auto max-w-7xl p-6 pb-24">
       <nav className="text-ink-faint mb-2 text-xs"><Link href="/rich-menus">リッチメニュー</Link><span className="mx-1.5">/</span>{group.name}</nav>
-      <Header description="条件と優先順位を決め、友だちごとに表示するメニューを1つ選びます。" />
       <StepHeader active={2} groupId={group.id} />
 
       <div className="grid gap-5 xl:grid-cols-3">
@@ -1385,7 +1372,6 @@ function PublishStep({
   return (
     <main data-design-node="UMiJ9" className="mx-auto max-w-7xl p-6 pb-24">
       <nav className="text-ink-faint mb-2 text-xs"><Link href="/rich-menus">リッチメニュー</Link><span className="mx-1.5">/</span>{group.name}</nav>
-      <Header description="いつ公開し、期間終了後にどのメニューへ戻すかを決めます。" />
       <StepHeader active={3} groupId={group.id} />
       <div className="grid gap-5 xl:grid-cols-3">
         <section className="border-hairline bg-canvas rounded-card border p-6 shadow-sm xl:col-span-2">

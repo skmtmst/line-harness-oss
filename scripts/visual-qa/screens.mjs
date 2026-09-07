@@ -171,9 +171,9 @@ export const SCREENS = [
     node: 'vUXKb', feature: 1, name: '1-1 ダッシュボード',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
     verdict: "match",
-    verdictNote: "**2026-09-07 再撮影で一致。** #270 のダッシュボード指標APIを接続し、有効友だち398人、今月の送信枠（残り197 / 上限200通）、7日分の友だち推移を設計値で表示した。3102/8789で1440/1920pxを撮影し、両幅とも横はみ出し0。表示中の本文差0を確認した（閉じた追加URL選択肢の運用データ名だけ実装側にある）。",
-    verdictSource: "dashboard-v6/vUXKb.txt + vUXKb-{1440,1920}.png + 2026-09-07 visual/text comparison",
-    verdictHead: "d9cfe531d",
+    verdictNote: "**2026-09-07 #454 再撮影で一致。** 設計画像と実装画像を上端から並べ、今日やること4枚の値と補足の間を8px、右カードの見出しと本文の間を10pxへ戻した。今月の送信枠は22px・1行（残り197 / 上限200通）、友だち追加リンクは発行中選択の外側にあった二重枠を除去。3104/8791で1440/1920pxを撮影し、両幅とも横はみ出し0。",
+    verdictSource: "dashboard-v6/vUXKb.txt + vUXKb-{1440,1920}.png + 2026-09-07 #454 top-aligned visual/dimension comparison",
+    verdictHead: "088cea8a8",
   },
   {
     node: 'ZN0ov', feature: 1, name: '1-1-1 ダッシュボード編集',
@@ -495,8 +495,9 @@ export const SCREENS = [
   },
   { ...FRIENDS, node: 'I6UAdr', name: '3-1-D 友だち詳細', route: '/friends/detail?id=friend-0',
     verdict: "match",
-    verdictNote: "**2026-09-06 Issue #265で修正・再判定。** 一致。左を顧客情報カード、右を概要タブに組み替え、進行中の配信・自動処理、同じ人としてつながる情報、最近の履歴、この友だちに行う操作を設計と同じ順で配置した。未接続の予約・EC・横断履歴は値を作らず取得元待ちと明記。1440/1920pxで横スクロール0、壊れ値・内部IDは0件。",
+    verdictNote: "**2026-09-07 Issue #452 / UI HEAD fb07e4a3f3 で再判定し一致。** 本文上部の旧題ブロックを外し、画面名はトップバーだけに表示。パンくずの隣に受信箱・個別操作・その他を残し、その直下を顧客情報と概要タブから始めるPencil V6の上端順へ統一した。3102/8789の1440/1920pxで横はみ出し0。",
     verdictSource: "friends-v6/I6UAdr.txt + I6UAdr-{1440,1920}.png",
+    verdictHead: "fb07e4a3f3",
   },
   {
     ...FRIENDS, node: 'bzDn6', name: '3-1-E 友だち一覧の状態（空・読込・エラー）',
@@ -513,8 +514,9 @@ export const SCREENS = [
   },
   { ...FRIENDS, node: 'YzxU1', name: '3-2 重複検出', route: '/friends?tab=duplicates',
     verdict: "match",
-    verdictNote: "**2026-09-06 Issue #265で修正・再判定。** 一致。自動統合しない注意帯、5指標、検索・状態絞り込み、候補表、再検出、アカウント別内訳、重複マトリックスを設計と同じ順で配置した。候補表は本人照合候補APIの根拠・確信度・所属・状態を表示し、配信削減の実績だけは未接続のため値を作らず `—` と説明を表示。1440/1920pxで横スクロール0、壊れ値・内部IDは0件。",
+    verdictNote: "**2026-09-07 Issue #452 / UI HEAD fb07e4a3f3 で再判定し一致。** 本文上部の旧題ブロックを外し、画面名はトップバーだけに表示。友だち機能タブ、自動統合しない注意、5指標の順で始まるPencil V6の上端構造へ統一した。3102/8789の1440/1920pxで横はみ出し0。",
     verdictSource: "friends-v6/YzxU1.txt + YzxU1-{1440,1920}.png",
+    verdictHead: "fb07e4a3f3",
   },
   {
     ...FRIENDS, node: 'InCDe', name: '3-2-A 重複候補詳細・統合前確認',
@@ -540,8 +542,9 @@ export const SCREENS = [
       kinds: ['normal', 'loading', 'empty', 'error'],
     },
     verdict: "match",
-    verdictNote: "**2026-09-06 Issue #265で修正・再判定。** 一致。4指標、統合ユーザー作成導線、検索、複数アカウント・UID・所属の絞り込み、CSV、表、ページ送りを設計と同じ構造にした。LINEユーザーIDは出さず連携状態だけを表示し、詳細ボタンも設計の緑へ統一。重複配信削減の実績は未接続なので値を作らず `—` と説明を表示。通常・読込・空・失敗を1440/1920pxで撮影し、横スクロール0、壊れ値・内部IDは0件。",
+    verdictNote: "**2026-09-07 Issue #452 / UI HEAD fb07e4a3f3 で再判定し一致。** 本文上部の旧題ブロックを外し、画面名はトップバーだけに表示。友だち機能タブ、横断管理の注記、4指標の順で始まるPencil V6の上端構造へ統一した。通常・読込・空・失敗を3102/8789の1440/1920pxで撮影し、全14枚で横はみ出し0。",
     verdictSource: "friends-v6/r7eSi-{normal,loading,empty,error}.txt + 同名-{1440,1920}.png",
+    verdictHead: "fb07e4a3f3",
   },
   {
     ...FRIENDS, node: 'w8W4Eh', name: '3-3-A 統合ユーザー詳細',
@@ -1000,8 +1003,9 @@ export const SCREENS = [
   {
     ...REMINDER, node: 'J64xI', name: '7-1-B 通知ステップ編集',
     verdict: 'match',
-    verdictNote: '**2026-09-06 S2 #220。** 正本 `J64xI` の通知カード3件、時刻/繰越、差し込み分類、本文、送信後アクション、URL扱い、右プレビューを実装。1440/1920で横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
-    verdictHead: 'eb41ad0d',
+    verdictNote: '**2026-09-07 Codex #453。** 本文上部の旧Headerを外し、正本 `J64xI.txt` と上端から通知カード3件、時刻/繰越、差し込み分類、本文、送信後アクション、URL扱い、右プレビューまで照合した。設計画像なし。3101/8788で1440/1920を撮影し、横はみ出し0。head `d77d0877e`。',
+    verdictSource: 'reminders-v6/J64xI.txt + reminders-v6/J64xI-{1440,1920}.png（設計画像なし）',
+    verdictHead: 'd77d0877e',
     route: '/reminders/edit?id=reminder-3',
 
   },
@@ -1460,16 +1464,16 @@ export const SCREENS = [
   {
     ...TEMPLATE, node: 'GFlD7', name: '11-1-A メッセージを作る',
     verdict: 'match',
-    verdictNote: '**2026-09-06 Issue #224 / PR #944 で一致。** `/templates/edit?visual=1` を1440/1920pxで撮影（はみ出し0）。テンプレート名・フォルダ・種類・差し込み・本文、差し込み後のLINEプレビュー、URLの扱い3列をPencilと目視比較した。`Flex` と `内容 / JSON` は画面から除き、4,500文字超過時の分割も明記した。取得元 `templates-v6/GFlD7.txt` と同Nodeの実装画像。',
-    verdictHead: '98abf756a',
+    verdictNote: '**2026-09-07 Issue #452 / UI HEAD fb07e4a3f3 で再判定し一致。** 本文上部の旧題・説明・マニュアルを外し、画面名とマニュアルはトップバーだけに表示。パンくずからテンプレート名へ始まるPencil V6の上端順を3102/8789の1440/1920pxで確認し、両幅とも横はみ出し0。',
+    verdictHead: 'fb07e4a3f3',
     route: '/templates/edit?visual=1', mode: 'page',
 
   },
   {
     ...TEMPLATE, node: 'FRkls', name: '11-1-B カルーセルを作る',
     verdict: 'match',
-    verdictNote: '**2026-09-06 Issue #224 / PR #944 で一致。** `/templates/carousel?visual=1` を1440/1920pxで撮影（はみ出し0）。「パネル」表記、5/10枚、推奨1024×678px、最大3つの選択肢、パネル2編集、横スクロールするLINEプレビューをPencilと目視比較した。取得元 `templates-v6/FRkls.txt` と同Nodeの実装画像。',
-    verdictHead: '98abf756a',
+    verdictNote: '**2026-09-07 Issue #452 / UI HEAD fb07e4a3f3 で再判定し一致。** 本文上部の旧題・説明・テスト送信を外し、画面名とマニュアルはトップバーだけに表示。パンくずからテンプレート名へ始まるPencil V6の上端順を3102/8789の1440/1920pxで確認し、両幅とも横はみ出し0。',
+    verdictHead: 'fb07e4a3f3',
     route: '/templates/carousel?visual=1', mode: 'viewport', height: 1080,
 
   },
@@ -1571,8 +1575,8 @@ export const SCREENS = [
   { ...RICH_MENU, node: 'XtfO3', name: '12-1-A メニューを作る・形とボタン',
     mode: 'viewport', height: 1200, route: '/rich-menus/edit?id=rmg-1',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #441 で画像本体を含めて再判定し、一致。** `/api/rich-menu-groups/rmg-1` の画像キーを撮影用PNGの取得口へ接続し、黒い空キャンバスではなく6面を見分けられる画像、保存済み名称・フォルダ・面A〜Fを1440・1920pxで確認した。両幅とも横はみ出し0。",
-    verdictHead: "49484d5ab",
+    verdictNote: "**2026-09-07 Issue #452 / UI HEAD fb07e4a3f3 で再判定し一致。** 本文上部の旧説明と戻るリンクを外し、画面名はトップバーだけに表示。パンくず、STEP 1〜3、ページタブから始まり、保存操作は下部追従帯に残るPencil V6の構造へ統一した。3102/8789の1440/1920pxで横はみ出し0。",
+    verdictHead: "fb07e4a3f3",
   },
   { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか', route: '/rich-menus/edit?id=rmg-1&step=targeting', mode: 'viewport', height: 1080,
     verdict: 'match',
@@ -1666,8 +1670,9 @@ export const SCREENS = [
   },
   { ...FORM, node: 'vCqUj', name: '13-1-A フォームを作る', route: `${FORM_EDIT}&tab=basic`,
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #368 / PR #1134で実API接続後に再判定。** 3104/8791で1440px・1920pxを撮影し、全画像で横はみ出し0。Pencil 1920pxと実装1920pxを目視比較した。一致。固定フォーム定義から、共通ヘッダを含む9ブロック、質問ごとの入力種別・選択肢・保存先、顧客プレビュー、公開状態、回答URL、回答数、保存操作を表示した。値は運用データで変わるが、配置・項目・操作は一致する。",
+    verdictNote: "**2026-09-07 Issue #452 / UI HEAD fb07e4a3f3 で再判定し一致。** 本文上部の旧題・説明・重複保存操作を外し、フォーム名はトップバーだけに表示。パンくず、編集・デザイン・オプションのタブ、基本情報から始まり、保存は下部追従帯に残るPencil V6の上端順へ統一した。3102/8789の1440/1920pxで横はみ出し0。",
     verdictSource: "forms-v6/vCqUj.txt + forms-v6/vCqUj-{1440,1920}.png",
+    verdictHead: "fb07e4a3f3",
   },
   {
     ...FORM, node: 'ava2n', name: '13-1-B フォームのデザイン設定',
@@ -2683,7 +2688,7 @@ export const SCREENS = [
     日・週の台帳は、固定予約を時間×担当／曜日の格子へ並べる。
     LINE予約は緑、LINE未連携の電話予約は青で同じ格子に載せる。
   */
-  { ...BOOKING, node: 'TV2DI', name: '27-1 予約管理', verdict: 'match', verdictNote: '**2026-09-06、PR #TBD の実装を1440px・1920pxで撮影し、★V6設計と見比べた。** 時間（縦）×担当（横）の格子、LINE予約（緑）と電話予約（青）の同居、4つの集計、読み方の青帯、注意事項・今日の内訳・関連導線の右欄がそろった。固定データの予約件数と日付は撮影用データに従うが、情報の位置・余白・色・枠・角丸と操作の骨格は一致。両幅とも横はみ出し0。', verdictSource: 'booking-v6/TV2DI.txt', verdictHead: 'ed3e365aa' },
+  { ...BOOKING, node: 'TV2DI', name: '27-1 予約管理', verdict: 'match', verdictNote: '**2026-09-07 Issue #450 / UI HEAD `cded0de47` を固定ポート3105/8792で再撮影し、★V6設計と上端から照合して一致。** 本文に重複していた「予約管理」と説明文を外し、パンくず・電話予約・今日/今週/今月/一覧の切替・4指標の順で開始する。時間×担当の格子、LINE予約と電話予約、注意事項・今日の内訳・関連導線を維持し、1440/1920pxとも横はみ出し0。', verdictSource: 'booking-v6/TV2DI.txt + TV2DI-{1440,1920}.png', verdictHead: 'cded0de47' },
   {
     ...BOOKING, node: 'TnDbq', name: '27-1-A 予約の詳細',
     mode: 'viewport', height: 1136, /*
@@ -2695,10 +2700,11 @@ export const SCREENS = [
       { click: '一覧' },
       { click: '詳細', nth: 0 },
     ],
+    variants: [{ suffix: '-detail-route', route: '/booking/bookings/detail?id=bk-1', standalone: true }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #444 / UI HEAD `522f8babf` を固定ポート3105/8792で再撮影し一致。** 詳細APIから電話、ペット、タグ、マイル、過去予約、前回申し送り、予約確認LINEの送信・開封、リマインダ実績を読み、予約内容・顧客カルテ・操作履歴・関連先を同じ画面へ表示した。1440px・1920pxとも横はみ出し0。",
-    verdictSource: "booking-v6/TnDbq.txt + TnDbq-{1440,1920}.png",
-    verdictHead: "522f8babf",
+    verdictNote: "**2026-09-07 Issue #450 / UI HEAD `cded0de47` を固定ポート3105/8792で再撮影し、★V6設計と上端から照合して一致。** `/booking/bookings/detail` 本文の重複した題・説明・無効な保存帯を外し、パンくずの直後から予約状態と内容を表示する。既存の一覧内詳細も含め、予約内容・顧客カルテ・操作履歴・関連先を維持し、1440/1920pxとも横はみ出し0。",
+    verdictSource: "booking-v6/TnDbq.txt + TnDbq-{1440,1920}.png + TnDbq-detail-route-{1440,1920}.png",
+    verdictHead: "cded0de47",
   },
   /*
     **判定を改めた（PR #459 head `ba0bf62d`）。** 代理予約の画面ができた
@@ -2809,7 +2815,7 @@ export const SCREENS = [
 
   // ── 機能28 予約設定 ─────────────────────────────────────
   /* 設計の4入口を同じ帯へ置き、受付枠・休業日は既存の勤務設定へつないだ。 */
-  { ...BOOKING_SET, node: 'QSLEH', name: '28-1 予約設定', clock: '2026-08-26T00:00:00.000Z', verdict: 'match', verdictNote: '**2026-09-07 Issue #370 / UI HEAD `e1126c5c9` を3107/8794で再撮影し、★V6設計と一致。** PR #1107 の店舗設定と8件のメニューを実API契約で読み、4入口、出している6件・休止2件、最多メニュー、9:00〜19:00の受付時間、60日先までの受付範囲、設計順の6列表、担当者、料金、公開操作、ページ送りをそろえた。1440・1920pxとも横はみ出し0、内部語・壊れ値0件。', verdictSource: 'booking-settings-v6/QSLEH.txt + 2026-09-07 QSLEH 1440/1920px screenshots', verdictHead: 'e1126c5c9' },
+  { ...BOOKING_SET, node: 'QSLEH', name: '28-1 予約設定', clock: '2026-08-26T00:00:00.000Z', variants: [{ suffix: '-menu-staff', route: '/booking/menus/staff', standalone: true }, { suffix: '-booking-staff', route: '/booking/staff', standalone: true }], verdict: 'match', verdictNote: '**2026-09-07 Issue #450 / UI HEAD `cded0de47` を固定ポート3105/8792で再撮影し、★V6設計と上端から照合して一致。** V6で予約設定へ統合されたメニュー担当・予約スタッフの独立画面から旧題と説明を外し、パンくず・操作・指標/一覧から開始する形に統一した。店舗設定、メニュー一覧、担当割当、スタッフ一覧の機能を維持し、全画面で1440/1920pxとも横はみ出し0。', verdictSource: 'booking-settings-v6/QSLEH.txt + QSLEH-{1440,1920}.png + QSLEH-menu-staff-{1440,1920}.png + QSLEH-booking-staff-{1440,1920}.png', verdictHead: 'cded0de47' },
   { ...BOOKING_SET, node: 'tksPc',
     clock: '2026-09-07T00:00:00.000Z',
     states: {
@@ -2853,7 +2859,7 @@ export const SCREENS = [
     verdictSource: 'events-v6/ugP5y.txt + ugP5y-{1440,1920}.png + apps/worker/src/services/event-waitlist.ts',
     verdictHead: 'ea4284f42',
   },
-  { ...EVENT, node: 'MKrPY', name: '29-1-A イベントをつくる', route: '/events/new', verdict: 'match', verdictNote: '**2026-09-06 Issue #242 / PR #1015 / UI HEAD c31b32f90 を3105/8792で最終照合して一致。** 概要と同じ画面で最初の開催日・開始・所要時間・定員を入力し、イベント本体と予約枠を続けて保存する。右側に入力連動のLINEプレビュー、満席時のキャンセル待ち、承認制、前日通知を配置した。保存途中で枠だけ失敗してもイベントを重複作成しない。1440・1920pxとも横スクロール0。', verdictSource: 'events-v6/MKrPY.txt + 2026-09-06 1440/1920px screenshots', verdictHead: 'c31b32f90' },
+  { ...EVENT, node: 'MKrPY', name: '29-1-A イベントをつくる', route: '/events/new', variants: [{ suffix: '-edit', route: '/events/edit?id=ev-1', standalone: true }], verdict: 'match', verdictNote: '**2026-09-07 Issue #450 / UI HEAD `cded0de47` を固定ポート3105/8792で再撮影し、★V6設計と上端から照合して一致。** 同じ入力骨組みを使う編集画面から重複した題と説明を外し、パンくずと申込一覧の操作に続いて予約状態・入力節が始まる形へ統一した。作成・編集とも開催内容、申込ルール、LINEプレビュー、注意事項を維持し、1440/1920pxとも横はみ出し0。', verdictSource: 'events-v6/MKrPY.txt + MKrPY-{1440,1920}.png + MKrPY-edit-{1440,1920}.png', verdictHead: 'cded0de47' },
   {
     /*
       **#593 で拒否とキャンセルの窓が入った。**押し口は `data-qa-open` で
@@ -3482,6 +3488,7 @@ export const CAPTURED_AT = {
     { pr: 0, head: '96ed41b6', on: '2026-09-01', screens: ['PV1Vh', 'd3rFGD', 'Ho8z4', 'Q8sHa'], note: 'Claudeが実装して撮った。**doctorが合格になったが、この3本はまだ push していない**' },
   ],
   11: [
+    { pr: 1247, head: 'fb07e4a3f3', on: '2026-09-07', screens: ['GFlD7', 'FRkls'], note: 'Issue #452 / PR #1247。旧Headerを外して画面名を共通上部バーへ集約し、3102/8789で1440/1920pxを再撮影。設計と上端から照合し、横はみ出し0で2画面とも一致を確認した。' },
     { pr: 1208, head: '68d536652', on: '2026-09-07', screens: ['M9cij'], note: 'Issue #426。PR #1197で修正されたPencil正本を取り込み、使用中3か所の削除不可・使用先一覧・差し替え導線を実装。3102/8789で1440/1920pxを再撮影し、両幅とも横はみ出し0、一致へ更新した。' },
     { pr: 1024, head: '031081d69', on: '2026-09-07', screens: ['W7LBc', 'NNDMR', 'M9cij'], note: 'Issue #224。割当ポート3104/8791で3画面を1440・1920px再撮影し、Pencil正本と同じ比較入力で照合。W7LBcとNNDMRを一致へ更新し、M9cijは要件とPencilの矛盾を根拠に要修正を維持。CzndJはPR #1019を正として差分から除外' },
     { pr: 944, head: '98abf756a', on: '2026-09-06', screens: ['W7LBc', 'GFlD7', 'FRkls', 'NNDMR', 'j9ixI', 'hsBtl', 'J3GxEZ', 'M9cij', 'NKyoA'], note: '割当ポート3104/8791で通常・状態別を含む36枚を撮影。対象9画面は一致6、構造一致・集計未接続1、要修正2。横はみ出し0' },
@@ -3531,6 +3538,7 @@ export const CAPTURED_AT = {
       note: 'Issue #219。作成を正本の5段へ分け、対象13画面と状態別を3104/8791の1440・1920pxで撮影。全画像で横はみ出し0。一致2、構造一致・データ未接続5、要修正6。' },
   ],
   12: [
+    { pr: 1247, head: 'fb07e4a3f3', on: '2026-09-07', screens: ['XtfO3'], note: 'Issue #452 / PR #1247。旧Headerを外し、パンくず・STEP・操作帯をV6設計の位置へそろえて3102/8789で1440/1920pxを再撮影。横はみ出し0で一致を確認した。' },
     { pr: 1224, head: '3ddca80cc4', on: '2026-09-07', screens: ['kQ1bs'], note: 'Issue #440 / PR #1224。取り込み済みの固定データを表示した対象条件画面を3104/8791で1440・1920px撮影し、横はみ出し0で一致へ更新した。' },
     { pr: 1191, head: 'e98decafa', on: '2026-09-07', screens: ['kQ1bs'], note: 'Issue #422 / PR #1191。対象条件画面を3102/8789で1440・1920px再撮影し、横はみ出し0。条件軸・対象人数・優先順位を確認し、固定入力不足は構造一致・データ待ちで記録した。' },
     { pr: 1129, head: 'af74a0bbd', on: '2026-09-07', screens: ['GO8RQ', 'XtfO3', 'UMiJ9', 'TL7tp', 'szXsT'], note: 'Issue #367。統合済みの月間人数・外部メニュー面アクション・削除影響人数を画面へ接続し、3104/8791で1440・1920pxを撮影。全10枚で横はみ出し0。共有固定応答に残る不足を理由付きで5画面の判定へ記録した。' },
@@ -3640,6 +3648,7 @@ export const CAPTURED_AT = {
     { pr: 1041, head: '16e2331cb', on: '2026-09-07', screens: ['s98Vfw', 's6MBc'], note: 'Issue #230 の残件2画面。3104/8791で通常と全状態を1440・1920px撮影し、正本と同じ入力で左右比較した。全12枚で横はみ出し0。s6MBcは一致、s98Vfwは未接続API値を作らず構造一致・データ未接続。' },
   ],
   7: [
+    { pr: 1250, head: 'd77d0877e', on: '2026-09-07', screens: ['J64xI'], note: 'Issue #453。本文上部の旧Headerを外し、3101/8788で1440・1920pxを撮影。設計画像なしのため正本テキストと上端から照合し、横はみ出し0で一致とした。独立V6 Nodeのない通知・検索分析・プール管理も同じ2幅で旧Header 0、横はみ出し0、ブラウザエラー0を確認した。' },
     { pr: 1030, head: 'a828e5afc3', on: '2026-09-07', screens: ['M1EXwB', 'GC4St'], note: 'Issue #73。一覧の操作メニューと、実行台帳を公開状態 planned で絞る配信予定画面を3104/8791で1440・1920px撮影。正本と同じ入力で比較し、横はみ出し0。' },
     { pr: 429, head: '0f612926', on: '2026-08-29', screens: ['uJP22'], note: '**撮り直していない。** 旧head `838116b4` から `reminders/new` の blob が不変（差分は Worker の機能設定だけ）。#429 の受入条件5項目だけをコードで確認した。画面全体は要修正のまま' },
     { pr: 551, head: '44692a37', on: '2026-08-29', screens: ['s7T2dz', 'JCz6J', 'W98zZQ', 's6Vvp', 'PSmHo'], note: '公開までの5段。`?stage=` で1枚ずつ開く。届く予定・公開前チェック・公開の3つの口だけモックで405に落とさず、**公開の人数は公開前チェックと同じ数から作る**' },
@@ -3715,6 +3724,7 @@ export const CAPTURED_AT = {
     { pr: 1059, head: '6f9a64684', on: '2026-09-07', screens: ['xGLVe', 'NfgOs', 'H3lAOB', 'Xi4x9', 'f0zn6', 'NWbuF', 'B7CER8', 'IYjvu', 'TUveA', 'w72a2', 'ASsb3', 'ANgda', 'tBlkL', 'LHjwD'], note: 'Issue #293。受信箱専用部品と撮影用固定データを設計状態へそろえ、3104/8791で1440・1920pxを撮影。同じ状態のPencilと横並び比較し、要修正14画面をすべて一致へ更新した。' },
   ],
   13: [
+    { pr: 1247, head: 'fb07e4a3f3', on: '2026-09-07', screens: ['vCqUj'], note: 'Issue #452 / PR #1247。旧Headerを外し、パンくず・編集タブをV6設計の位置へそろえて3102/8789で1440/1920pxを再撮影。横はみ出し0で一致を確認した。' },
     { pr: 436, head: '35c613a6', on: '2026-08-29', screens: ['EMBIK', 'v9tYhl'], note: '#436 の最新head。**`ZOPyc` は撮り直していない**——旧head `950073ab` から `apps/web` の差分0件で、判定は #556 `6037aeef` のまま。受入条件5項目の確認と、画面全体の一致判定は分けて記録した' },
     { pr: 436, head: '950073ab', on: '2026-08-29', screens: ['ZOPyc'], note: '読込・空・失敗を分ける直し。**P0は解決**。帯の2枚が0件のまま残る' },
     { pr: 556, head: '1c1546cb', on: '2026-08-30', screens: ['ZOPyc'], note: '回答フォームの帯を未取得と0件で分ける。失敗のときは作成の誘いを出さない。**`codex/development` 直結へ張り替えられたが撮り直していない**——`page.tsx` と `form-kpi-value.tsx` の blob が `6037aeef` と同一' },
@@ -3737,6 +3747,7 @@ export const CAPTURED_AT = {
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['UgonK', 'UhC2O'], note: 'development そのもので撮った' },
   ],
   3: [
+    { pr: 1247, head: 'fb07e4a3f3', on: '2026-09-07', screens: ['I6UAdr', 'YzxU1', 'r7eSi'], note: 'Issue #452 / PR #1247。旧Headerを外し、パンくず・友だち機能タブ・顧客操作をV6設計の位置へそろえて3102/8789で全状態を1440/1920px再撮影。横はみ出し0で3画面とも一致を確認した。' },
     { pr: 1230, head: 'b62d7d070', on: '2026-09-07', screens: ['ux7of'], note: 'Issue #443 / PR #1230。CSV書き出し・確認取込・二重反映防止・履歴を正本文言と照合し、3104/8791の1440・1920pxで横はみ出し0を確認して一致へ更新した。' },
     { pr: 520, head: '4848a8f3', on: '2026-08-29', screens: ['bzDn6'], note: '友だち一覧の帯を未取得 `—人` に。**development 直結の根元PR**' },
     { pr: 565, head: 'ea2e730d', on: '2026-08-29', screens: ['r7eSi'], note: '統合ユーザーの7列。内部の統合キーを外し、未取得と0件を分ける。空の返事の形も直した（`rows` の無い返事だと画面ごと落ちる）' },
@@ -3776,6 +3787,7 @@ export const CAPTURED_AT = {
     { pr: 478, head: '66883866', on: '2026-08-30', screens: ['c4R6F'], note: '機能設定。オフにしても消えないことを先に書く' },
   ],
   1: [
+    { pr: 1251, head: '088cea8a8', on: '2026-09-07', screens: ['vUXKb'], note: 'Issue #454 / PR #1251。今日やることと右カードの空白をPencil寸法へ戻し、送信枠を22px・1行にした。追加URL選択の外側の二重枠を除去し、3104/8791で1440・1920pxを上端から比較。両幅とも横はみ出し0、一致を維持した。' },
     { pr: 419, head: 'c84baa63', on: '2026-08-30', screens: ['vUXKb', 'ZN0ov', 'JN6mQ', 'NjK9q', 'Alekb'], note: 'ダッシュボード。お知らせの口を撮影モックへ足した（`counts` の4つが欠けると `undefined.all` で落ちる）' },
     { pr: 971, head: 'd69099cd9', on: '2026-09-06', screens: ['vUXKb', 'JN6mQ'], note: 'Issue #267。3102/8789で対象2画面を1440・1920px撮影し、Pencil設計と比較。両画面とも横はみ出し0。構造は一致し、設計値と公式プロフィール短縮URLを返すAPIがないためデータ未接続を維持した。' },
     { pr: 1028, head: '7cc11af48', on: '2026-09-07', screens: ['vUXKb', 'JN6mQ'], note: 'Issue #267。#270の指標APIと#277の撮影モックを接続し、3102/8789で1440・1920pxを再撮影。両画面とも横はみ出し0、表示中の本文差0。有効友だち398人、送信枠197/200、7日推移、公式lin.ee URL、実QRを確認して一致にした。' },
