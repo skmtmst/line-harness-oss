@@ -3780,6 +3780,7 @@ export const CAPTURED_AT = {
     { pr: 625, head: '73d25b41', on: '2026-08-31', screens: ['bV5Vs', 'xfYLn', 'r6Gzsu', 'hz9ti', 'dqFft', 'EvVO5', 'g2UNV'], note: 'Claudeが実装して撮った。#591 の上（#591 は #553 と scenario-started を含む）。**dqFft の「シナリオごと削除がまだ confirm」は #591 で解決済みだった**' },
   ],
   2: [
+    { pr: 1310, head: 'a9d041efb', on: '2026-09-07', screens: ['ANgda', 'AuSDY', 'LHjwD', 'NWbuF', 'TUveA', 'w72a2', 'Igi72'], note: 'Issue #488。受信箱の一覧を7件・420px幅へそろえ、保存窓の暗幕と注意表示を修正。3102/8789で7画面の1440/1920pxを再撮影し、全画面10%未満・高さ差0・横はみ出し0、一致268を維持した。' },
     { pr: 1295, head: '81f2cd36a', on: '2026-09-07', screens: ['ANgda', 'AuSDY', 'LHjwD'], note: 'Issue #473。暗幕越しに見える共通shellの会社名・版・担当者と一覧7件／要返信1件／期限超過1件、ダイアログ操作38pxを設計状態へそろえ、3107/8794で1440/1920pxを撮影。残差は画面固有の一覧・中央列・顧客情報の配置差。' },
     { pr: 513, head: '60b39036', on: '2026-08-29', screens: ['tBlkL', 'AuSDY', 'LHjwD'], note: '保存の成否を窓へ返す直し。**P0は解決**' },
     { pr: 555, head: 'e873eeb9', on: '2026-08-29', screens: ['ANgda', 'tBlkL', 'AuSDY', 'LHjwD'], note: '保存した検索の窓。未入力は赤帯＋押せない保存ボタン。同じ部品を使う4枚を撮り直した' },
