@@ -21,7 +21,6 @@ import {
   SummaryCard,
 } from '@/components/reminders/reminder-v6-ui'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import styles from './issue469-reminder-screens.module.css'
 export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string }) {
   usePageTitle('リマインダを作成・通知ステップ')
   const router = useRouter()
@@ -58,9 +57,9 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
     } catch { setError('通知ステップを保存できませんでした。') } finally { setSaving(false) }
   }
 
-  return <div data-design-node="J64xI" className={`${styles.screen} space-y-3`}>
+  return <div data-design-node="J64xI" className="grid gap-3">
     <ReminderWizard current={3} />
-    <ReminderWorkspace aside={<div className={`${styles.aside} grid gap-3`}>
+    <ReminderWorkspace aside={<div data-issue546-aside className="grid gap-3">
       <SummaryCard rows={[["対象者", '398人'], ['基準日', '予約日時（Google Meet相談）'], ['通知ステップ', `${settings.steps.length}件`], ['状態', '下書き']]} />
       <LinePreview caption="基準日の 1日前 18:00 に届きます">Kentaさん、明日のGoogle Meet相談のご案内です。{`\n`}日時：8/24（月）18:00{`\n`}参加URL：meet.google.com/xxx-xxxx-xxx{`\n\n`}Google Meetに参加</LinePreview>
     </div>}>
@@ -84,6 +83,24 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
       {error ? <p className="text-danger text-xs">{error}</p> : null}
     </ReminderWorkspace>
     <div className="mt-16"><ReminderFooter primary={saving ? '保存中…' : '送信設定へ'} primaryDisabled={saving || !body.trim()} onPrimary={() => void save()} /></div>
+    <style jsx global>{`
+      [data-design-node='J64xI'] > div:nth-of-type(2) {
+        grid-template-columns: minmax(0, 1fr) 390px;
+      }
+      [data-issue546-aside] > section:first-child {
+        min-height: 299px;
+      }
+      [data-issue546-aside] > section:first-child dl > div {
+        padding-block: 20px;
+      }
+      [data-issue546-aside] > section:nth-child(2) {
+        min-height: 389px;
+      }
+      [data-design-node='J64xI'] textarea {
+        min-height: 86px;
+        height: 86px;
+      }
+    `}</style>
   </div>
 }
 

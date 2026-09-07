@@ -1,6 +1,6 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
-  "generatedAt": "2026-09-07T18:39:49.550Z",
+  "generatedAt": "2026-09-07T18:51:14.464Z",
   "thresholdPercent": 10,
   "heightDiffThresholdPx": 24,
   "screenCount": 272,
@@ -2775,9 +2775,9 @@
           "implementationHeight": 1136,
           "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 147190,
+          "mismatchedPixels": 140868,
           "comparedPixels": 2181120,
-          "pixelDiffPercent": 6.7484,
+          "pixelDiffPercent": 6.4585,
           "boundingBox": {
             "left": 0,
             "top": 0,
@@ -2792,7 +2792,7 @@
           "diffPath": "docs/design-qa/reminders-v6/J64xI-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 6.7484,
+      "pixelDiffPercent": 6.4585,
       "heightDifferencePx": 0,
       "heightReason": null,
       "dominantRegion": "中央・右",
