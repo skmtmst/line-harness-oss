@@ -1027,9 +1027,9 @@ export const SCREENS = [
   /* 設計どおり、基本設定→対象者→通知ステップ→送信設定→確認を段ごとに撮る。 */
   { ...REMINDER, node: 'M1EXwB', name: '7-1 リマインダ',
     verdict: 'match',
-    verdictNote: '**2026-09-07 S2 #73。** 正本 `M1EXwB.png` の操作列に合わせ、削除をアイコン化し、「…」から配信予定と実行履歴を選べるようにした。通常・メニュー展開を1440/1920で撮影し、横はみ出し0。予定は実行台帳の公開状態 `planned` へ接続し、固定件数を作らない。head `a828e5afc3`。',
+    verdictNote: '**2026-09-07 Issue #478 / UI HEAD `7b39575f4` を3105/8792で再撮影し一致。** 独自の13remフォルダ欄を共通FolderPanelへ置き換え、他の一覧と同じ16rem幅にした。フォルダの選択・追加と一覧の絞り込みを維持し、1440px・1920pxとも横はみ出し0。共通パネルの行高・余白へ統一したため画素差は3.0901%から3.2432%へ微増したが、設計の役割と構造は一致している。',
     verdictSource: 'reminders-v6/M1EXwB.txt + reminders-v6/M1EXwB-{1440,1920}.png + reminders-v6/M1EXwB-planned-menu-{1440,1920}.png',
-    verdictHead: 'a828e5afc3', route: '/reminders',
+    verdictHead: '7b39575f4', route: '/reminders',
     variants: [{ suffix: '-planned-menu', steps: [{ click: '未返信3日後フォローのその他操作', after: 500 }] }], },
   { ...REMINDER, node: 'uJP22', name: '7-1-A リマインダを作成',
     verdict: 'match',
@@ -1355,9 +1355,9 @@ export const SCREENS = [
   */
   { ...WEBINAR, node: 'ZC13r', name: '10-1 ウェビナー',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #324 / UI HEAD a55f719b9b / 一覧API PR #1071（統合 #1074）で再判定し一致。** 選択中のLINE公式アカウントを一覧とフォルダ集計の両APIへ渡し、4指標、フォルダ件数、5行の申込・視聴・公開状態・公開期間、検索・絞り込み、6列表、ページ送りを実値で表示した。通常・空・失敗・権限不足を3102/8789で1440/1920px撮影し、全10枚で横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #478 / UI HEAD `7b39575f4` を3105/8792で再撮影し一致。** 縦長の独自asideを共通FolderPanelへ置き換え、16rem幅・中身に合う高さへ統一した。フォルダ別件数は一覧のfolderIdから算出して表示し、選択すると実際に絞り込む。保存契約待ちの追加ボタンは上部だけに置き、フォルダ欄と重ならない。1440px・1920pxとも横はみ出し0。共通パネルの行高・余白へ統一したため画素差は2.8960%から3.0431%へ微増したが、設計の役割と構造は一致している。',
     verdictSource: 'webinars-v6/ZC13r.png + ZC13r-1920.png + ZC13r*.txt',
-    verdictHead: 'a55f719b9b',
+    verdictHead: '7b39575f4',
     /*
       帯は `GET /api/webinars/overview` を読む。通常・0件・取得失敗・
       権限不足を混ぜないので、口を差し替えて1つずつ撮る。
@@ -2162,8 +2162,9 @@ export const SCREENS = [
   */
   { ...INFLOW, node: 'Q4bkTg', name: '18-1 流入と計測', route: '/inflow-links?tab=links',
     verdict: "match",
-    verdictNote: "**2026-09-06 Issue #231 / PR #951 / UI HEAD 43b3aae50で設計画像と実装画像を同じ幅で並べて再確認し、一致。** 流入元24本、今月312人（経路が分かる289人）、クリック8,420回、平均追加率6.4%を接続。タブ件数、フォルダ、検索・絞り込み、CSV、まとめて操作、一覧も設計の役割と順序にそろえた。1440px・1920pxとも横はみ出し0。",
-    verdictSource: "inflow-v6/Q4bkTg.txt + Q4bkTg-1440.png + Q4bkTg-1920.png",
+    verdictNote: "**2026-09-07 Issue #478 / UI HEAD `7b39575f4` を3105/8792で再撮影し一致。** 独自フォルダ欄を16remの共通FolderPanelへ置き換え、緑の重複追加ボタンと独自説明文を外した。上部の白い追加ボタン1つ、フォルダ選択・編集、一覧絞り込みを維持。狭かった3列を再配分し、「同時に動く配信」「友だち追加」「クリック」を重ねず表示した。1440px・1920pxとも横はみ出し0、画素差は5.6635%から5.2356%へ改善した。",
+    verdictSource: "inflow-v6/Q4bkTg.txt + Q4bkTg-1440.png + Q4bkTg-1920.png + Issue #478 pixel diff",
+    verdictHead: "7b39575f4",
   },
   { ...INFLOW, node: 'IhSBB', name: '18-1-A サイトスクリプト', route: '/inflow-links?tab=script',
     verdict: "match",
@@ -3519,6 +3520,7 @@ export const CAPTURED_AT = {
         + '`GMvBd`（「保留」）と `zGZMA`（「対応中を保管」）は、固定データにその行やボタンが出ず撮れていない。' },
   ],
   10: [
+    { pr: 1285, head: '7b39575f4', on: '2026-09-07', screens: ['ZC13r'], note: 'Issue #478。ウェビナー一覧の独自asideを16remの共通FolderPanelへ置換し、一覧データからフォルダ別件数を表示。3105/8792で1440/1920px撮影し、横はみ出し0。' },
     { pr: 1275, head: 'c85f9e523', on: '2026-09-07', screens: ['lvaY5', 'PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'GB0NR', 'D6yO7e', 'yxyzQ'], note: 'Issue #471 / PR #1275。列車148を取り込み、3105/8792で8画面を1440/1920px撮影。LINEプレビュー色、右列順序、撮影範囲をPencil V6へそろえ、正式画素差7.3288〜8.2076%、全画面高さ差0px・横はみ出し0で一致を維持した。' },
     { pr: 1258, head: '84039ceca', on: '2026-09-07', screens: ['Q8sHa', 'yxyzQ'], note: 'Issue #461 / PR #1258。ウェビナー編集の表見出しをpx-4 py-3へ統一し、3106/8793で1440/1920pxを撮影。両幅とも横はみ出し0で一致を維持した。' },
     { pr: 1231, head: '8577adf01', on: '2026-09-07', screens: ['lvaY5', 'PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'GB0NR', 'D6yO7e', 'TimXl', 'Q8sHa', 'yxyzQ'], note: 'Issue #417。作成・編集・公開・参加者・分析を実APIと機能10専用固定応答へ接続し、3101/8788で対象10画面を1440・1920px撮影。全画像で横はみ出し0、設計画像と照合して10画面を一致へ更新した。' },
@@ -3697,6 +3699,7 @@ export const CAPTURED_AT = {
     { pr: 1041, head: '16e2331cb', on: '2026-09-07', screens: ['s98Vfw', 's6MBc'], note: 'Issue #230 の残件2画面。3104/8791で通常と全状態を1440・1920px撮影し、正本と同じ入力で左右比較した。全12枚で横はみ出し0。s6MBcは一致、s98Vfwは未接続API値を作らず構造一致・データ未接続。' },
   ],
   7: [
+    { pr: 1285, head: '7b39575f4', on: '2026-09-07', screens: ['M1EXwB'], note: 'Issue #478。リマインダ一覧の独自13remフォルダ欄を16remの共通FolderPanelへ置換。3105/8792で1440/1920px撮影し、横はみ出し0。' },
     { pr: 1250, head: 'd77d0877e', on: '2026-09-07', screens: ['J64xI'], note: 'Issue #453。本文上部の旧Headerを外し、3101/8788で1440・1920pxを撮影。設計画像なしのため正本テキストと上端から照合し、横はみ出し0で一致とした。独立V6 Nodeのない通知・検索分析・プール管理も同じ2幅で旧Header 0、横はみ出し0、ブラウザエラー0を確認した。' },
     { pr: 1030, head: 'a828e5afc3', on: '2026-09-07', screens: ['M1EXwB', 'GC4St'], note: 'Issue #73。一覧の操作メニューと、実行台帳を公開状態 planned で絞る配信予定画面を3104/8791で1440・1920px撮影。正本と同じ入力で比較し、横はみ出し0。' },
     { pr: 429, head: '0f612926', on: '2026-08-29', screens: ['uJP22'], note: '**撮り直していない。** 旧head `838116b4` から `reminders/new` の blob が不変（差分は Worker の機能設定だけ）。#429 の受入条件5項目だけをコードで確認した。画面全体は要修正のまま' },
@@ -3861,6 +3864,7 @@ export const CAPTURED_AT = {
       { pr: 615, head: '5873f18b', on: '2026-08-31', screens: ['ec9vg', 'quhg6'], note: 'Claude実装。#597 の公開の読み口の上に、最終確認と有効化完了を1本で作った' },
   ],
   18: [
+    { pr: 1285, head: '7b39575f4', on: '2026-09-07', screens: ['Q4bkTg'], note: 'Issue #478。流入経路の独自フォルダ欄を16remの共通FolderPanelへ置換し、重複追加ボタンと見出し重なりを解消。3105/8792で1440/1920px撮影し、横はみ出し0。' },
     { pr: 443, head: 'f372ff30', on: '2026-08-28' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['Q4bkTg', 'IhSBB', 'v0HaI', 'TEVk8', 'JupxW', 'BMmxU', 'BuVDB', 'Im2b1'], note: 'development そのもので撮った（根元9本のマージ後）' },
     { pr: 574, head: '0906b8fa', on: '2026-08-30', screens: ['JupxW', 'BMmxU', 'UIaM7'], note: 'refの初期選択、一覧の4状態、削除確認の窓。撮影モックに詳細・ファネル・流入元の口を足した' },
