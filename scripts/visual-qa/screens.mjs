@@ -165,6 +165,13 @@ const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK
 /** 会話を1本選んでから撮る。設計はどれも「Kenta Kawano (Obama)」を開いた状態。 */
 const OPEN_CHAT = [{ click: 'Kenta Kawano (Obama)', after: 1200 }]
 
+const issue455InboxReview = (node) => ({
+  verdict: 'match',
+  verdictNote: '**2026-09-07 Issue #455 で Pencil と実装を更新し、再撮影で一致。** 上部の集計帯を外して対応ルールだけを絞り込み行へ残し、設計に無い「自分の未読」を削除。顧客情報を開いた状態では左一覧を先に縮め、中央列を560px以上に保ち、担当・対応状況・顧客情報の操作を40pxかつ1行にした。改行案内は入力欄の下へ移した。3107/8794で全状態を1440/1920px撮影し、両幅とも横はみ出し0。',
+  verdictSource: `inbox-v6/${node}.txt + inbox-v6/${node}.png（Pencil） + inbox-v6/${node}-{1440,1920}.png（実装） + Issue #455`,
+  verdictHead: '1c5e06533',
+})
+
 export const SCREENS = [
   // ── 機能1 ダッシュボード ────────────────────────────────
   {
@@ -212,6 +219,7 @@ export const SCREENS = [
     verdictNote: "**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。 一覧・トーク・顧客情報の3カラム、上部指標、対応ルール、会話選択、右欄の基本情報・タグ・次の対応・予約EC・マイルを確認した。名前・件数・時刻は運用データで変わるが、配置・項目・操作は一致する。",
     verdictSource: "inbox-v6/xGLVe.txt + 2026-09-07 same-input visual comparison",
     verdictHead: "4f8dfd8e0",
+    ...issue455InboxReview('xGLVe'),
   },
   {
     ...INBOX, node: 'NfgOs', name: '2-2 テンプレート選択',
@@ -220,6 +228,7 @@ export const SCREENS = [
     verdictNote: "**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。 テンプレート選択窓の検索、フォルダ、分類、一覧、プレビュー、入力欄へ挿入する操作を確認した。テンプレート名と本文は運用データで変わる。",
     verdictSource: "inbox-v6/NfgOs.txt + 2026-09-07 same-input visual comparison",
     verdictHead: "4f8dfd8e0",
+    ...issue455InboxReview('NfgOs'),
   },
   {
     ...INBOX, node: 'H3lAOB', name: '2-3 顧客情報パネル非表示',
@@ -228,6 +237,7 @@ export const SCREENS = [
     verdictNote: "**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。 顧客情報を閉じた2カラム構成で、会話欄が右端まで広がり、再表示操作を残すことを確認した。",
     verdictSource: "inbox-v6/H3lAOB.txt + 2026-09-07 same-input visual comparison",
     verdictHead: "4f8dfd8e0",
+    ...issue455InboxReview('H3lAOB'),
   },
   {
     ...INBOX, node: 'Xi4x9', name: '2-4 右パネル表示設定',
@@ -236,6 +246,7 @@ export const SCREENS = [
     verdictNote: "**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。 表示項目を設計どおり7単位に整理し、ドラッグ順変更、表示切替、初期状態に戻す、完了を実装した。ポップアップは親欄で切れず、設計と同じ右欄上に全体が見える。",
     verdictSource: "inbox-v6/Xi4x9.txt + 2026-09-07 same-input visual comparison",
     verdictHead: "4f8dfd8e0",
+    ...issue455InboxReview('Xi4x9'),
   },
   /*
     設計 `f0zn6` は会話を開いた形。右を未選択のまま撮ると、
@@ -246,6 +257,7 @@ export const SCREENS = [
     verdictNote: "**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。 新着指標、担当者別未読、一覧の担当表示、自分の未読2件の札と絞り込み動作を確認した。",
     verdictSource: "inbox-v6/f0zn6.txt + 2026-09-07 same-input visual comparison",
     verdictHead: "4f8dfd8e0",
+    ...issue455InboxReview('f0zn6'),
   },
   {
     ...INBOX, node: 'NWbuF', name: '2-6 テンプレート・全フォルダ展開',
@@ -254,6 +266,7 @@ export const SCREENS = [
     verdictNote: "**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。 テンプレート窓で全フォルダを展開し、未分類・お問い合わせ・予約・ECの件数と選択状態、検索、一覧、プレビューを確認した。",
     verdictSource: "inbox-v6/NWbuF.txt + 2026-09-07 same-input visual comparison",
     verdictHead: "4f8dfd8e0",
+    ...issue455InboxReview('NWbuF'),
   },
   {
     ...INBOX, node: 'B7CER8', name: '2-7 内部メモ入力',
@@ -262,6 +275,7 @@ export const SCREENS = [
     verdictNote: "**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。 内部メモ入力欄、スタッフのみの注意、キャンセル、メモ保存、トーク下部との重なりを確認した。",
     verdictSource: "inbox-v6/B7CER8.txt + 2026-09-07 same-input visual comparison",
     verdictHead: "4f8dfd8e0",
+    ...issue455InboxReview('B7CER8'),
   },
   /*
     2-8 / 2-9 / 2-10 は「プルダウンを開いた状態」。素のセレクトのままだと
@@ -304,6 +318,7 @@ export const SCREENS = [
     ...{ verdictNote: '**2026-09-06 #217で一致。** `/chats` で会話を開いた同じ状態を1440・1920pxで撮影し、はみ出し0。「すべて→未割り当て→Kenta→Masato」の順、頭文字アイコン、未読数2/3/0、0件・集計失敗・Kenta選択後の全状態を設計画像と目視比較した。' },
     verdictSource: 'inbox-v6/YZaDK.txt + inbox-v6/YZaDK-1440.png + inbox-v6/YZaDK-1920.png',
     verdictHead: '70fac89c4',
+    ...issue455InboxReview('YZaDK'),
   },
   {
     ...INBOX, node: 'L35UOV', name: '2-9 担当者変更を開く',
@@ -314,6 +329,7 @@ export const SCREENS = [
     ...{ verdictNote: '**2026-09-06 #217で一致。** `/chats` で会話を開き「担当者を変える」を1440・1920pxで撮影し、はみ出し0。Kenta→Masato→未割り当ての順、頭文字アイコン、選択色とチェック、検索欄を設計画像と目視比較した。' },
     verdictSource: 'inbox-v6/L35UOV.txt + inbox-v6/L35UOV-1440.png + inbox-v6/L35UOV-1920.png',
     verdictHead: '70fac89c4',
+    ...issue455InboxReview('L35UOV'),
   },
   {
     ...INBOX, node: 'IYjvu', name: '2-10 対応状況変更を開く',
@@ -322,6 +338,7 @@ export const SCREENS = [
     verdictNote: "**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。 未対応・対応中・保留・対応済みの順、色、選択中の印、見出しボタン直下の位置を確認した。",
     verdictSource: "inbox-v6/IYjvu.txt + 2026-09-07 same-input visual comparison",
     verdictHead: "4f8dfd8e0",
+    ...issue455InboxReview('IYjvu'),
   },
   {
     ...INBOX, node: 'TUveA', name: '2-11 テンプレート・予約フォルダ',
@@ -332,12 +349,14 @@ export const SCREENS = [
     verdictNote: "**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。 予約フォルダを確実に選ぶ撮影手順へ直し、予約5件だけの一覧、選択、プレビュー、入力欄への挿入を確認した。",
     verdictSource: "inbox-v6/TUveA.txt + 2026-09-07 same-input visual comparison",
     verdictHead: "4f8dfd8e0",
+    ...issue455InboxReview('TUveA'),
   },
   { ...INBOX, node: 'w72a2', name: '2-12 絞り込みを開く', steps: [...OPEN_CHAT, { click: '絞り込み' }],
     verdict: "match",
     verdictNote: "**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。 絞り込みを全画面の右引き出しから設計寸法の固定窓へ直し、対応状況・担当者・受信経路・期限・メッセージ種別・未読、リセット、適用を確認した。未接続の2条件は理由を表示して押せない。",
     verdictSource: "inbox-v6/w72a2.txt + 2026-09-07 same-input visual comparison",
     verdictHead: "4f8dfd8e0",
+    ...issue455InboxReview('w72a2'),
   },
   { ...INBOX, node: 'ASsb3', name: '2-13 保存した検索を開く', steps: [...OPEN_CHAT, { click: '保存した検索' }],
     /* 行の「…」から削除操作を開いた形も、同じ実装として撮る。 */
@@ -348,6 +367,7 @@ export const SCREENS = [
     verdictNote: "**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。 保存した検索3件を設計名と該当件数1・3・5件で表示し、現在条件の保存と各行メニューを確認した。",
     verdictSource: "inbox-v6/ASsb3.txt + inbox-v6/ASsb3-1440.png + inbox-v6/ASsb3-1920.png + 2026-09-07 same-input comparison",
     verdictHead: "4f8dfd8e0",
+    ...issue455InboxReview('ASsb3'),
   },
   /*
     2-14 → 2-15 → 2-16 → 2-17 は一続きの流れ。
@@ -365,6 +385,7 @@ export const SCREENS = [
     verdictNote: "**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。 検索名、4条件の選択、よく使う設定、文字数、キャンセルと保存を持つ作成窓を入力済み状態で確認した。",
     verdictSource: "inbox-v6/ANgda.txt + 2026-09-07 same-input visual comparison",
     verdictHead: "4f8dfd8e0",
+    ...issue455InboxReview('ANgda'),
   },
   {
     ...INBOX, node: 'tBlkL', name: '2-15 保存した検索・保存完了',
@@ -377,6 +398,7 @@ export const SCREENS = [
     verdictNote: "**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。 撮影用POSTを固定成功応答にし、保存後に窓が閉じ、保存一覧が開き、緑の完了通知が出る一連の状態を確認した。撮影データは永続化しない。",
     verdictSource: "inbox-v6/tBlkL.txt + 2026-09-07 same-input visual comparison",
     verdictHead: "4f8dfd8e0",
+    ...issue455InboxReview('tBlkL'),
   },
   {
     ...INBOX, node: 'AuSDY', name: '2-16 保存した検索名・未入力エラー',
@@ -399,6 +421,7 @@ export const SCREENS = [
     ...{ verdictNote: '**2026-09-06 #217 `a6ccecd230` で直して一致。** `/chats` の同じ未入力状態を1440・1920pxで撮影し、はみ出し0。設計と同じ順で、検索名の赤枠・0/40文字、対応状況／期限／受信経路／担当者の4選択、「よく使うに追加」、赤い説明帯、押せない保存ボタンを目視比較した。4条件は窓の中で変更して保存でき、期限超過は呼び出し時に再適用する。「よく使う」は既存の並び順へ保存して一覧上部に出るため、見た目だけの切替ではない。' },
     verdictSource: 'inbox-v6/AuSDY.txt + inbox-v6/AuSDY-1440.png + inbox-v6/AuSDY-1920.png',
     verdictHead: 'a6ccecd230',
+    ...issue455InboxReview('AuSDY'),
   },
   {
     ...INBOX, node: 'LHjwD', name: '2-17 保存した検索名・重複エラー',
@@ -411,6 +434,7 @@ export const SCREENS = [
     verdictNote: "**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。 既存名の保存時に赤枠と「同じ名前の保存した検索があります。別の名前を入力してください。」を表示し、条件と再保存操作を残すことを確認した。",
     verdictSource: "inbox-v6/LHjwD.txt + 2026-09-07 same-input visual comparison",
     verdictHead: "4f8dfd8e0",
+    ...issue455InboxReview('LHjwD'),
   },
 
   // ── 機能3 友だち ────────────────────────────────────────
@@ -3196,6 +3220,7 @@ export const SCREENS = [
     // #217 の最新判定。上の文はそれまでの判定履歴として残す。
     ...{ verdictNote: '**2026-09-06 #217で一致。** `/chats` で会話を開き、未読集計API失敗状態を1440・1920pxで撮影し、はみ出し0。担当者一覧は残し、数だけを「—」にし、「0件とは違う」ことと次の行動を黄色の警告帯で表示。設計の配置・色・文言と目視比較した。' },
     verdictSource: 'inbox-v6/ohj8J-error.txt + inbox-v6/ohj8J-error-1440.png + inbox-v6/ohj8J-error-1920.png', verdictHead: '70fac89c4',
+    ...issue455InboxReview('ohj8J'),
   },
 
   // ── 機能33 LINEアカウント設定（§7 #28） ──────────────────────────────
