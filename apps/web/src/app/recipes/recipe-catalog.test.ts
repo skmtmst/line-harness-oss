@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_FEATURES } from '@/lib/feature-settings'
 import {
   CARE_ITEMS,
+  apiRecipeFeatureSummary,
+  apiRecipeRequirements,
+  apiRecipeRest,
   CLONE_COUNT_UNAVAILABLE,
   CLONE_UNAVAILABLE_NOTE,
   ITEMS_UNDECIDED_NOTE,
@@ -48,6 +51,22 @@ describe('レシピは設計の3本', () => {
 })
 
 describe('必要な機能', () => {
+  it('APIの機能キーを設計の表示名へ変え、切れない友だち属性を補う', () => {
+    const recipe = {
+      id: 'signup-7day-follow', name: '案内', purpose: '案内', creates: 'タグ', version: 1,
+      origin: 'builtin' as const, requiredFeatures: ['friend_add_routing', 'scenarios'],
+      missingFeatures: ['scenarios'], items: RECIPES[0].items?.map(({ kind, name, note }) => ({ kind, name, note })) ?? null,
+      itemCount: 16, cloneCount: 12,
+    }
+    expect(apiRecipeRequirements(recipe).map((item) => [item.label, item.on])).toEqual([
+      ['友だち属性', true],
+      ['友だち追加時の配信', true],
+      ['シナリオ配信', false],
+    ])
+    expect(apiRecipeFeatureSummary(recipe)).toContain('シナリオ配信がオフ')
+    expect(apiRecipeRest(recipe)).toContain('ほか 11件')
+  })
+
   /*
     **鍵の無い機能を「オフ」と読まない。** 友だち属性のように切れない機能は、
     機能設定に行が無い。行が無いことをオフと読むと、どのレシピも使えなくなる。

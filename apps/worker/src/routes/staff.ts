@@ -39,6 +39,7 @@ async function serializeStaff(db: D1Database, row: StaffMember) {
     permissionKeys: safeJson<string[]>(row.permission_keys, []),
     notificationPreferences: safeJson<Record<string, { email: boolean; line: boolean }>>(row.notification_preferences, {}),
     inviteStatus: row.invite_status || 'active',
+    policyVersion: Number(row.policy_version ?? 1),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     assignedLineAccountId: row.assigned_line_account_id ?? null,

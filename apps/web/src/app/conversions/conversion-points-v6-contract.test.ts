@@ -36,17 +36,19 @@ describe('V6 成果地点一覧の契約', () => {
     expect(PAGE).toContain('const [loadFailed, setLoadFailed] = useState(false)')
   })
 
-  it('集計を取得できないときは成果数を0件にしない', () => {
-    expect(PAGE).toContain('const [reportAvailable, setReportAvailable] = useState(false)')
-    expect(PAGE).toContain('setReportAvailable(false)')
-    expect(PAGE).toContain("reportAvailable ? `${(countByPoint.get(point.id) ?? 0).toLocaleString()}件` : '—'")
+  it('V6一覧APIの集計・状態・利用先をそのまま使う', () => {
+    expect(PAGE).toContain('api.conversions.definitions({')
+    expect(PAGE).toContain('point.metrics.netCount.toLocaleString')
+    expect(PAGE).toContain('point.metrics.netValue.toLocaleString')
+    expect(PAGE).toContain('point.usageCount === 0')
+    expect(PAGE).toContain('definitions.stateCounts.active')
+    expect(PAGE).not.toContain('利用先の取得は未接続')
   })
 
-  it('一覧でない返事を成功扱いせず、前の集計も残さない', () => {
-    for (const reset of ['setPoints([])', 'setReport([])', 'setPreviousReport([])']) {
-      expect(PAGE).toContain(reset)
-    }
-    expect(PAGE.match(/Array\.isArray\(/g)?.length).toBeGreaterThanOrEqual(5)
+  it('一覧でない返事を成功扱いせず、前の一覧を残さない', () => {
+    expect(PAGE).toContain('setDefinitions(null)')
+    expect(PAGE).toContain('Array.isArray(listResult.value.data.items)')
+    expect(PAGE).toContain('setLoadFailed(true)')
   })
 
   it('検索と並び順を共通部品にし、数えられる並びだけを載せる', () => {
@@ -64,24 +66,27 @@ describe('V6 成果地点一覧の契約', () => {
     expect(PAGE).not.toContain('ページの切り替えは準備中です')
   })
 
-  it('期間は実際の集計口へつなぎ、口の無い書き出しは理由を本文に出す', () => {
-    expect(PAGE).toContain('api.conversions.report(reportRange(30))')
-    expect(PAGE).toContain('api.conversions.report(reportRange(periodDays))')
+  it('期間・V6レポート・CSVを実際の口へつなぐ', () => {
+    expect(PAGE).toContain('api.conversions.definitionReport({')
+    expect(PAGE).toContain('api.conversions.exportDefinitions({')
     expect(PAGE).toContain("{ value: '30', label: 'この30日' }")
-    expect(PAGE).toContain('書き出しはまだ繋がっていません。')
-    expect(PAGE).toContain('CSVの書き出し口は未接続です。')
+    expect(PAGE).toContain('この画面をCSVで書き出す')
+    expect(PAGE).not.toContain('書き出しはまだ繋がっていません。')
+    expect(PAGE).not.toContain('CSVの書き出し口は未接続です。')
     expect(PAGE).not.toContain('準備中')
   })
 
   it('一覧とレポートを別の運用目的で表示する', () => {
-    for (const text of ['何が起きたら数えるか', '使われている場所', '利用先の取得は未接続']) {
+    for (const text of ['何が起きたら数えるか', '使われている場所', '使う場所を足す']) {
       expect(PAGE).toContain(text)
     }
     for (const text of ['日ごとの成果', '前の期間', '増減', 'いちばん多い経路']) {
       expect(PAGE).toContain(text)
     }
-    expect(PAGE).toContain('日別の集計口はまだ接続されていません。')
-    expect(PAGE).toContain('帰属根拠の集計は未接続')
+    expect(PAGE).toContain('report.daily')
+    expect(PAGE).toContain('report.byRoute[0]')
+    expect(PAGE).not.toContain('日別の集計口はまだ接続されていません。')
+    expect(PAGE).not.toContain('帰属根拠の集計は未接続')
   })
 
   it('作成画面で重複を止め、試算口の未接続を隠さない', () => {
