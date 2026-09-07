@@ -116,7 +116,7 @@ export default function SavedViewDialog({
 
   return createPortal(
     <div
-      className="bg-ink/45 fixed inset-0 z-[110] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-[rgb(16_24_40/33%)] p-4"
       role="presentation"
       onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}
     >
@@ -233,7 +233,12 @@ export default function SavedViewDialog({
                 tone="error"
                 message={error || '検索名を入力してください。'}
               />
-            ) : null}
+            ) : (
+              <Notice
+                tone="validation"
+                message="保存されるのは検索条件です。受信件数は最新の状態に自動更新されます。"
+              />
+            )}
           </div>
         )}
 

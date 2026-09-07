@@ -77,6 +77,16 @@ describe('受信箱 保存した検索の完了判定', () => {
     expect(PAGE).toContain("setQuickFilter(conditions.due === 'overdue' ? 'overdue' : 'all')")
   })
 
+  it('保存内容の注意を入力済みでも残し、設計と同じ濃さで背景を暗くする', () => {
+    expect(DIALOG).toContain('bg-[rgb(16_24_40/33%)]')
+    expect(DIALOG).toContain('保存されるのは検索条件です。受信件数は最新の状態に自動更新されます。')
+    expect(DIALOG).toContain('tone="validation"')
+  })
+
+  it('顧客情報を開いても会話一覧の幅を保つ', () => {
+    expect(PAGE).toContain("showFriendInfo ? 'lg:w-72 2xl:w-[420px]'")
+  })
+
   it('保存条件ごとの件数が未接続なら0件にせず理由を出す', () => {
     expect(PAGE).toContain("typeof view.matchCount === 'number' ? `${view.matchCount}件` : '—件'")
     expect(PAGE).toContain('「—件」は0件ではありません。')
