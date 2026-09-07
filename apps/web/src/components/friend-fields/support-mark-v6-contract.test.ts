@@ -6,7 +6,6 @@ import { element } from './design-fit-slice'
 
 const ROOT = path.resolve(__dirname)
 const LIST = fs.readFileSync(path.join(ROOT, 'mark-list.tsx'), 'utf8')
-const LIST_STYLES = fs.readFileSync(path.join(ROOT, 'mark-list.module.css'), 'utf8')
 const EDITOR = fs.readFileSync(path.join(ROOT, 'support-mark-editor.tsx'), 'utf8')
 const TABS = fs.readFileSync(path.join(ROOT, 'tags-page-v4.tsx'), 'utf8')
 
@@ -64,8 +63,9 @@ describe('V6 対応マーク', () => {
     expect(LIST).toContain('data-design-node="zGZMA"')
     expect(LIST).toContain('保管後は新しく選べません')
     expect(LIST).toContain('{impact.friendCount}人を「{selected.name}」へ置き換えます。')
-    expect(LIST_STYLES).toContain('padding-top: 310px')
-    expect(LIST_STYLES).toContain('max-width: 680px')
+    expect(LIST).toContain("[data-design-part='archive-position']")
+    expect(LIST).toContain('margin-top: 310px')
+    expect(LIST).toContain('max-width: 680px')
   })
 
   it('タブ行から追加画面へ進める', () => {

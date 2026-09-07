@@ -307,25 +307,25 @@
 | 32 | `UhC2O` | 32-1-B 更新履歴 | —（実装画像なし（1920px）） | — | — | — | **一致** |
 | 32 | `U0BwS` | 32-1-C 緊急停止の最終確認 | —（実装画像なし（1920px）） | — | — | — | **一致** |
 | 4 | `hqrOv` | 4-1 友だち属性・タグ | 3.9584% | +496px | 上部・左 | [差分画像](friend-attributes-v6/hqrOv-diff-1920.png) | **一致** |
-| 4 | `dKlkz` | 4-1-F タグ削除の確認ダイアログ | 17.0407% ⚠ | 0px | 中央・右 | [差分画像](friend-attributes-v6/dKlkz-diff-1920.png) | **一致** |
+| 4 | `dKlkz` | 4-1-F タグ削除の確認ダイアログ | 17.0484% ⚠ | 0px | 中央・右 | [差分画像](friend-attributes-v6/dKlkz-diff-1920.png) | **一致** |
 | 4 | `H374MR` | 4-1-H タグCSV一括登録 | 3.0953% | 0px | 中央・中央 | [差分画像](friend-attributes-v6/H374MR-diff-1920.png) | **一致** |
 | 4 | `sfTEW` | 4-1-H-A CSV取り込み・確認（dry-run） | 3.4576% | 0px | 中央・左 | [差分画像](friend-attributes-v6/sfTEW-diff-1920.png) | **一致** |
 | 4 | `op1rh` | 4-1-H-B CSV取り込み・完了 | 2.5624% | 0px | 中央・中央 | [差分画像](friend-attributes-v6/op1rh-diff-1920.png) | **一致** |
 | 4 | `QzRsJ` | 4-1-H-C CSV取り込み・一部失敗 | 3.0981% | 0px | 中央・中央 | [差分画像](friend-attributes-v6/QzRsJ-diff-1920.png) | **一致** |
-| 4 | `HBTk0` | 4-2 友だち情報欄 | 3.6538% | 0px | 中央・左 | [差分画像](friend-attributes-v6/HBTk0-diff-1920.png) | **一致** |
-| 4 | `yKEdO` | 4-2-C 一覧の状態（空・読込・エラー） | 3.4372% | 0px | 上部・左 | [差分画像](friend-attributes-v6/yKEdO-diff-1920.png) | **一致** |
-| 4 | `rIhbN` | 4-3 対応マーク | 3.5762% | 0px | 中央・中央 | [差分画像](friend-attributes-v6/rIhbN-diff-1920.png) | **一致** |
-| 4 | `QKx8Q` | 4-4 保存した検索 | 3.9848% | 0px | 中央・左 | [差分画像](friend-attributes-v6/QKx8Q-diff-1920.png) | **一致** |
+| 4 | `HBTk0` | 4-2 友だち情報欄 | 3.6837% | 0px | 中央・左 | [差分画像](friend-attributes-v6/HBTk0-diff-1920.png) | **一致** |
+| 4 | `yKEdO` | 4-2-C 一覧の状態（空・読込・エラー） | 3.4689% | 0px | 上部・左 | [差分画像](friend-attributes-v6/yKEdO-diff-1920.png) | **一致** |
+| 4 | `rIhbN` | 4-3 対応マーク | 3.5898% | 0px | 中央・中央 | [差分画像](friend-attributes-v6/rIhbN-diff-1920.png) | **一致** |
+| 4 | `QKx8Q` | 4-4 保存した検索 | 4.0086% | 0px | 中央・左 | [差分画像](friend-attributes-v6/QKx8Q-diff-1920.png) | **一致** |
 | 4 | `l25rlp` | 4-1-A タグを作る・初期状態 | 4.1692% | +4px | 中央・左 | [差分画像](friend-attributes-v6/l25rlp-diff-1920.png) | **一致** |
-| 4 | `tP0RW` | 4-1-B タグを作る・連動ON | 5.3077% | +228px | 中央・左 | [差分画像](friend-attributes-v6/tP0RW-diff-1920.png) | **一致** |
-| 4 | `LfrQs` | 4-1-C 連動アクション追加ドロワー | 4.8876% | 0px | 上部・右 | [差分画像](friend-attributes-v6/LfrQs-diff-1920.png) | **一致** |
+| 4 | `tP0RW` | 4-1-B タグを作る・連動ON | 5.2134% | +224px | 中央・左 | [差分画像](friend-attributes-v6/tP0RW-diff-1920.png) | **一致** |
+| 4 | `LfrQs` | 4-1-C 連動アクション追加ドロワー | 4.8942% | 0px | 上部・右 | [差分画像](friend-attributes-v6/LfrQs-diff-1920.png) | **一致** |
 | 4 | `ee0sk` | 4-1-D タグを編集・既存設定あり | 4.9532% | +242px | 下部・左 | [差分画像](friend-attributes-v6/ee0sk-diff-1920.png) | **一致** |
-| 4 | `VjXGX` | 4-1-E 遡及反映の確認ダイアログ | 19.6324% ⚠ | 0px | 下部・中央 | [差分画像](friend-attributes-v6/VjXGX-diff-1920.png) | **一致** |
+| 4 | `VjXGX` | 4-1-E 遡及反映の確認ダイアログ | 19.6437% ⚠ | 0px | 下部・中央 | [差分画像](friend-attributes-v6/VjXGX-diff-1920.png) | **一致** |
 | 4 | `byqIW` | 4-1-G 属性フォルダを追加・色編集 | 7.3995% | 0px | 下部・中央 | [差分画像](friend-attributes-v6/byqIW-diff-1920.png) | **一致** |
 | 4 | `A1ZYeP` | 4-2-A 友だち情報欄の項目を追加 | 3.3495% | 0px | 中央・中央 | [差分画像](friend-attributes-v6/A1ZYeP-diff-1920.png) | **一致** |
 | 4 | `KoT6c` | 4-2-B 友だち情報欄・項目移行 | 3.3877% | +112px | 中央・左 | [差分画像](friend-attributes-v6/KoT6c-diff-1920.png) | **一致** |
-| 4 | `GMvBd` | 4-3-A 対応マークを追加・編集 | 2.9869% | 0px | 上部・左 | [差分画像](friend-attributes-v6/GMvBd-diff-1920.png) | **一致** |
-| 4 | `zGZMA` | 4-3-B 対応マーク削除の確認ダイアログ | 9.0706% | 0px | 中央・中央 | [差分画像](friend-attributes-v6/zGZMA-diff-1920.png) | **一致** |
+| 4 | `GMvBd` | 4-3-A 対応マークを追加・編集 | 2.9877% | 0px | 上部・左 | [差分画像](friend-attributes-v6/GMvBd-diff-1920.png) | **一致** |
+| 4 | `zGZMA` | 4-3-B 対応マーク削除の確認ダイアログ | 9.2834% | 0px | 中央・中央 | [差分画像](friend-attributes-v6/zGZMA-diff-1920.png) | **一致** |
 | 4 | `XBkiQ` | 4-4-A 保存した検索の条件確認・編集 | 4.8057% | +68px | 中央・左 | [差分画像](friend-attributes-v6/XBkiQ-diff-1920.png) | **一致** |
 | 3 | `ux7of` | 3-4-A UID・顧客データ移行／CSV | —（設計画像なし） | — | — | — | **一致** |
 | 2 | `ohj8J` | 2-8-A 担当者の未読が数えられないとき | 6.8228% | 0px | 上部・中央 | [差分画像](inbox-v6/ohj8J-diff-1920.png) | **一致** |

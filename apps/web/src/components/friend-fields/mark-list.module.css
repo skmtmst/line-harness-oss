@@ -1,9 +1,0 @@
-/* Pencil V6 zGZMA: the archive confirmation sits above the page centre. */
-.archiveBackdrop {
-  align-items: flex-start;
-  padding-top: 310px;
-}
-
-.archiveDialog {
-  max-width: 680px;
-}
