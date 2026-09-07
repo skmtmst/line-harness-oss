@@ -899,10 +899,17 @@ autoReplies.get('/api/auto-replies', requireRole('owner', 'admin', 'staff'), asy
     const conflictsById = conflictCounts(conflictPairs(activeItems));
 
     // active LINE accounts を取得 + automations の keyword -> accounts インデックスを構築
-    const accRes = await c.env.DB
-      .prepare(`SELECT id, name FROM line_accounts WHERE is_active = 1 ORDER BY name`)
-      .all<{ id: string; name: string }>();
-    const activeAccounts = accRes.results ?? [];
+    const activeAccounts = scope.allowedAccountIds.length
+      ? (await c.env.DB
+        .prepare(
+          `SELECT id, name FROM line_accounts
+            WHERE is_active = 1
+              AND id IN (${scope.allowedAccountIds.map(() => '?').join(',')})
+            ORDER BY name`,
+        )
+        .bind(...scope.allowedAccountIds)
+        .all<{ id: string; name: string }>()).results ?? []
+      : [];
     const automationIdx = await buildAutomationKeywordIndex(c.env.DB);
 
     // 当たった回数（152）。今月と累計を並べて出す。

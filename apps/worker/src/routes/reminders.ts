@@ -4,7 +4,6 @@ import {
   getReminders,
   reorderReminders,
   getReminderById,
-  getReminderStepById,
   createReminder,
   updateReminder,
   deleteReminder,
@@ -822,17 +821,15 @@ reminders.post('/api/reminders/:id/steps', requireRole('owner', 'admin'), async 
   }
 });
 
-reminders.delete('/api/reminders/:reminderId/steps/:stepId', requireRole('owner', 'admin'), async (c) => {
+reminders.delete('/api/reminders/:id/steps/:stepId', requireRole('owner', 'admin'), async (c) => {
   try {
-    const reminderId = c.req.param('reminderId');
-    const step = await getReminderStepById(c.env.DB, c.req.param('stepId'));
-    if (!step || step.reminder_id !== reminderId) {
+    const deleted = await deleteReminderStep(c.env.DB, c.req.param('id'), c.req.param('stepId'));
+    if (!deleted) {
       return c.json({ success: false, error: 'Reminder step not found' }, 404);
     }
-    await deleteReminderStep(c.env.DB, step.id);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/reminders/:reminderId/steps/:stepId error:', err);
+    console.error('DELETE /api/reminders/:id/steps/:stepId error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

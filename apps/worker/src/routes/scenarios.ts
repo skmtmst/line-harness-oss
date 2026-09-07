@@ -359,10 +359,12 @@ scenarios.patch('/api/scenarios/reorder', requireRole('owner', 'admin'), async (
 scenarios.get('/api/scenarios', scenarioPermission('view'), async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId');
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     let items: DbScenarioWithStepCount[];
     if (lineAccountId) {
-      const scopeError = await requireScenarioAccountScope(c, lineAccountId);
-      if (scopeError) return scopeError;
+      if (!scope.allowedAccountIds.includes(lineAccountId)) {
+        return c.json({ success: false, error: 'シナリオが見つかりません' }, 404);
+      }
       // NULL line_account_id = global scenario (webhook.ts:211 / liff.ts:878 fire it for every
       // account). Include both account-bound and global rows so the list mirrors the engine.
       const result = await c.env.DB
@@ -370,7 +372,7 @@ scenarios.get('/api/scenarios', scenarioPermission('view'), async (c) => {
           `SELECT s.*, COUNT(ss.id) as step_count
            FROM scenarios s
            LEFT JOIN scenario_steps ss ON s.id = ss.scenario_id
-           WHERE s.line_account_id IS NULL OR s.line_account_id = ?
+           WHERE s.line_account_id = ?${scope.canSeeUnassigned ? ' OR s.line_account_id IS NULL' : ''}
            GROUP BY s.id
            ORDER BY s.created_at DESC`,
         )
@@ -378,7 +380,6 @@ scenarios.get('/api/scenarios', scenarioPermission('view'), async (c) => {
         .all<DbScenarioWithStepCount>();
       items = result.results;
     } else {
-      const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
       const rows = await getScenarios(c.env.DB);
       items = rows.filter((row) => {
         const accountId = (row as { line_account_id?: string | null }).line_account_id ?? null;
@@ -437,7 +438,7 @@ scenarios.use('/api/scenarios/:id', requireVisibleScenario);
 scenarios.use('/api/scenarios/:id/*', requireVisibleScenario);
 scenarios.get('/api/scenarios/:id', scenarioPermission('view'), async (c) => {
   try {
-    const id = c.req.param('id');
+    const id = c.req.param('id')!;
     const scenario = await getScenarioById(c.env.DB, id);
 
     if (!scenario) {
@@ -1160,7 +1161,7 @@ scenarios.get('/api/scenarios/:id/preview', scenarioPermission('view'), async (c
 // GET /api/scenarios/:id/stats - reach rate dashboard
 scenarios.get('/api/scenarios/:id/stats', scenarioPermission('view'), async (c) => {
   try {
-    const scenarioId = c.req.param('id');
+    const scenarioId = c.req.param('id')!;
     const scenario = await c.env.DB
       .prepare(`SELECT id FROM scenarios WHERE id = ?`)
       .bind(scenarioId)
@@ -1680,7 +1681,7 @@ scenarios.post(
 
 scenarios.get('/api/scenarios/:id/triggers', scenarioPermission('view'), async (c) => {
   try {
-    const rows = await getScenarioTriggers(c.env.DB, c.req.param('id'));
+    const rows = await getScenarioTriggers(c.env.DB, c.req.param('id')!);
     return c.json({
       success: true,
       data: rows.map((t) => ({ id: t.id, kind: t.kind, tagId: t.tag_id })),

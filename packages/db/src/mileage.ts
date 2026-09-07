@@ -1012,7 +1012,7 @@ export interface MileageRuleRow {
   amount: number;
   initial_status: 'pending' | 'available';
   conditions: string | null;
-  /** 334(#521): 帰属アカウント。NULL=全店共通(従来どおり全店に効く)。 */
+  /** 334(#521): 帰属アカウント。NULL は変更不可の既存全店ルール。 */
   line_account_id?: string | null;
   is_active: number;
   valid_from: string | null;
@@ -1073,12 +1073,15 @@ export async function createMileageRule(
     /** 期間限定のキャンペーン。列も突き合わせも前からあったが、書き込む口が無かった。 */
     validFrom?: string | null;
     validUntil?: string | null;
-    /** 334(#521): 帰属アカウント。省略・NULL=全店共通。 */
-    lineAccountId?: string | null;
+    /** 334(#521): 帰属アカウント。新規ルールでは必須。 */
+    lineAccountId: string;
   },
 ): Promise<MileageRuleRow> {
   if (!Number.isInteger(input.amount) || input.amount <= 0) {
     throw new Error('Mileage rule amount must be a positive integer');
+  }
+  if (!input.lineAccountId.trim()) {
+    throw new Error('Mileage rule line account is required');
   }
   await ensureDefaultMileageProgram(db);
   const id = crypto.randomUUID();
@@ -1098,7 +1101,7 @@ export async function createMileageRule(
       input.amount,
       input.initialStatus ?? 'available',
       input.conditions ? JSON.stringify(input.conditions) : null,
-      input.lineAccountId ?? null,
+      input.lineAccountId,
       input.validFrom ?? null,
       input.validUntil ?? null,
       now,
