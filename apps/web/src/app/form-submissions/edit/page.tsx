@@ -29,7 +29,6 @@ import {
 } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import Header from '@/components/layout/header'
 import { Field, inputClass } from '@/components/shared/form-controls'
 import BlockEditor, { BLOCK_MENU } from '@/components/forms/block-editor'
 import FormPreview from '@/components/forms/form-preview'
@@ -118,6 +117,7 @@ function FormEditInner() {
   const answerUrl = liffId ? `https://liff.line.me/${liffId}/forms/${id}` : null
 
   const [name, setName] = useState('')
+  usePageTitle(name || '回答フォーム編集')
   const [description, setDescription] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [submitCount, setSubmitCount] = useState(0)
@@ -437,36 +437,26 @@ function FormEditInner() {
         <span>{name || '（名前なし）'}</span>
       </nav>
 
-      <div data-design="Head">
-        <Header
-          title="回答フォーム編集"
-          description="ブロックを積んでフォームを作ります。選択肢ごとにタグを付けたり、答えを友だち情報へ入れたりできます。"
-          action={
-            <div className="flex flex-wrap gap-2">
-              <Button href="/support">マニュアル</Button>
-              <Button onClick={() => void save()} disabled={saving}>下書き保存</Button>
-              <Button
-                href={`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=basic`}
-                variant={editorTab === 'basic' ? 'primary' : 'secondary'}
-              >
-                フォーム編集
-              </Button>
-              <Button
-                href={`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=design`}
-                variant={editorTab === 'design' ? 'primary' : 'secondary'}
-              >
-                デザイン設定
-              </Button>
-              <Button
-                href={`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=options`}
-                variant={editorTab === 'options' ? 'primary' : 'secondary'}
-              >
-                オプション設定
-              </Button>
-            </div>
-          }
-        />
-      </div>
+      <nav className="mb-4 flex flex-wrap gap-2" aria-label="回答フォームの編集画面">
+        <Button
+          href={`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=basic`}
+          variant={editorTab === 'basic' ? 'primary' : 'secondary'}
+        >
+          フォーム編集
+        </Button>
+        <Button
+          href={`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=design`}
+          variant={editorTab === 'design' ? 'primary' : 'secondary'}
+        >
+          デザイン設定
+        </Button>
+        <Button
+          href={`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=options`}
+          variant={editorTab === 'options' ? 'primary' : 'secondary'}
+        >
+          オプション設定
+        </Button>
+      </nav>
 
       {loading ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
@@ -834,7 +824,6 @@ function FormEditInner() {
 }
 
 export default function FormEditPage() {
-  usePageTitle('回答フォーム編集')
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>

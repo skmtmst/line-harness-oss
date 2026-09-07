@@ -5,8 +5,8 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { bookingApi, type BookingRequest } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import Header from '@/components/layout/header'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 type BookingAction = 'approve' | 'reject' | 'cancel' | 'complete' | 'no_show'
 
@@ -114,6 +114,7 @@ function BookingDetailInner() {
   const [acting, setActing] = useState(false)
   const [decideTarget, setDecideTarget] = useState<BookingAction | null>(null)
   const [error, setError] = useState('')
+  usePageTitle(booking ? `${booking.friend_name ?? 'お客様'} ／ ${booking.menu_name}` : '予約の詳細')
 
   const load = useCallback(async () => {
     if (!id || !selectedAccountId) {
@@ -169,7 +170,6 @@ function BookingDetailInner() {
   if (!id) {
     return (
       <div>
-        <Header title="予約の詳細" />
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           予約が指定されていません。
           <Link href="/booking/bookings" className="text-accent ml-1 hover:underline">
@@ -184,34 +184,13 @@ function BookingDetailInner() {
 
   return (
     <div>
-      <div data-design="Head">
-        <nav className="text-ink-faint mb-2 text-xs">
-          <Link href="/booking/bookings" className="hover:underline">
-            予約管理
-          </Link>
-          <span className="mx-1.5">/</span>
-          <span>予約の詳細</span>
-        </nav>
-        <Header
-          title="予約の詳細"
-          description="内容を確認して、承認・拒否・日時の変更を行います。"
-        />
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <Link
-            href="/booking/bookings"
-            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-2 text-sm"
-          >
-            一覧に戻る
-          </Link>
-          <button
-            disabled
-            title="この画面から予約の中身を書き換える仕組みは準備中です"
-            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium opacity-50"
-          >
-            変更を保存
-          </button>
-        </div>
-      </div>
+      <nav className="text-ink-faint mb-2 text-xs" aria-label="パンくず">
+        <Link href="/booking/bookings" className="hover:underline">
+          予約管理
+        </Link>
+        <span className="mx-1.5">/</span>
+        <span>予約の詳細</span>
+      </nav>
 
       {error && (
         <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">

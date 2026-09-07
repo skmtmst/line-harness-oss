@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Header from '@/components/layout/header'
 import MergedTabs from '@/components/layout/merged-tabs'
 import { api } from '@/lib/api'
 import type {
@@ -211,35 +210,28 @@ export default function SearchConsolePage() {
 
   return (
     <div>
-      <div data-design="Head">
-        <Header
-          description="Google検索でサイトがどれだけ表示され、どれだけ押されたかを見ます。Search Console から取り込んでいます。"
-          action={
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
-                {ranges.map((range) => (
-                  <button
-                    key={range}
-                    onClick={() => setDays(range)}
-                    className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold transition ${days === range ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
-                  >
-                    {range}日
-                  </button>
-                ))}
-              </div>
-              {/* 書き出しと連携の設定は、まだ受け口がない。 */}
-              <button disabled title="準備中です" className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-400 opacity-60">
-                CSVで書き出す
-              </button>
-              <button disabled title="準備中です" className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-400 opacity-60">
-                連携を設定
-              </button>
-            </div>
-          }
-        />
-      </div>
-
       <MergedTabs basePath="/analytics" tabs={ANALYTICS_TABS} active="search" />
+
+      <div data-design="Head" className="mb-4 flex flex-wrap items-center justify-end gap-2">
+        <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+          {ranges.map((range) => (
+            <button
+              key={range}
+              onClick={() => setDays(range)}
+              className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold transition ${days === range ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+            >
+              {range}日
+            </button>
+          ))}
+        </div>
+        {/* 書き出しと連携の設定は、まだ受け口がない。 */}
+        <button disabled title="準備中です" className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-400 opacity-60">
+          CSVで書き出す
+        </button>
+        <button disabled title="準備中です" className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-400 opacity-60">
+          連携を設定
+        </button>
+      </div>
 
       {loading ? (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">{metrics.map((item) => <div key={item.label} className="h-36 animate-pulse rounded-2xl bg-slate-200/70" />)}</div>

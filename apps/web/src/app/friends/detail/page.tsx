@@ -5,11 +5,11 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import type { FriendField } from '@line-crm/shared'
 import { api, type FriendDetail, type MileageSummary } from '@/lib/api'
-import Header from '@/components/layout/header'
 import TagBadge from '@/components/friends/tag-badge'
 import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import Button from '@/components/shared/button'
 import SelectField from '@/components/shared/select-field'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 /**
  * 友だち詳細。
@@ -169,6 +169,7 @@ function SupportMarkBadge({ status }: { status?: 'unread' | 'in_progress' | 'on_
 }
 
 function FriendDetailInner() {
+  usePageTitle('友だち詳細')
   const params = useSearchParams()
   const friendId = params.get('id') ?? ''
   const rawTab = params.get('tab')
@@ -260,7 +261,6 @@ function FriendDetailInner() {
   if (!friendId) {
     return (
       <div>
-        <Header title="友だち詳細" />
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           友だちが指定されていません。
           <Link href="/friends" className="text-accent ml-1 hover:underline">
@@ -286,45 +286,24 @@ function FriendDetailInner() {
 
   return (
     <div data-friends-detail-design="v4">
-      <nav className="text-ink-faint mb-2 text-xs" data-design="Crumb">
-        <Link href="/friends" className="hover:underline">
-          友だち
-        </Link>
-        <span className="mx-1.5">/</span>
-        <span>{friend?.displayName ?? '詳細'}</span>
-      </nav>
-
-      <div data-design="Head">
-        <Header
-          title="友だち詳細"
-          action={
-            <div className="flex flex-wrap gap-2">
-              {/* 一覧から隠す・LINE側でブロックする、どちらも受け口が無い。 */}
-              <button
-                disabled
-                title="一覧から隠す操作は準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-              >
-                非表示
-              </button>
-              <button
-                disabled
-                title="ブロックはLINE側の操作です。管理画面からは変えられません"
-                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-              >
-                ブロック
-              </button>
-              <Link
-                href={`/chats?friendId=${friendId}`}
-                className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors"
-              >
-                受信箱で開く
-              </Link>
-              <Button type="button">個別操作</Button>
-              <Button type="button" aria-label="その他の操作">…</Button>
-            </div>
-          }
-        />
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <nav className="text-ink-faint text-xs" data-design="Crumb">
+          <Link href="/friends" className="hover:underline">
+            友だち
+          </Link>
+          <span className="mx-1.5">/</span>
+          <span>{friend?.displayName ?? '詳細'}</span>
+        </nav>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/chats?friendId=${friendId}`}
+            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors"
+          >
+            受信箱で開く
+          </Link>
+          <Button type="button">個別操作</Button>
+          <Button type="button" aria-label="その他の操作">…</Button>
+        </div>
       </div>
 
       {error && (

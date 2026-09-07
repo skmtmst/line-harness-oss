@@ -5,9 +5,9 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
-import Header from '@/components/layout/header'
 import { Field, inputClass } from '@/components/shared/create-page'
 import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import TemplateAssetEditor from '../template-asset-editor'
 
 const TYPES = [
@@ -23,6 +23,7 @@ function TemplateEditInner() {
   const id = params.get('id')
   const assetKind = params.get('kind')
   const visual = params.get('visual') === '1'
+  usePageTitle(id ? 'メッセージを編集' : 'メッセージを作る')
 
   const [name, setName] = useState(visual ? '定期便 初回のご案内' : '')
   const [category, setCategory] = useState(visual ? '01_定期便' : '')
@@ -132,22 +133,6 @@ function TemplateEditInner() {
         <span className="mx-1.5">/</span>
         <span>{name || (id ? '編集' : '作成')}</span>
       </nav>
-
-      <div data-design="Head">
-        <Header
-          title={id ? 'メッセージを編集' : 'メッセージを作る'}
-          description="配信で使うメッセージを作ります。友だち情報欄や共通情報を差し込むと、一人ひとりに合わせた文面になります。"
-          action={
-            <button
-              disabled
-              title="マニュアルは準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-            >
-              マニュアル
-            </button>
-          }
-        />
-      </div>
 
       {loading ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">

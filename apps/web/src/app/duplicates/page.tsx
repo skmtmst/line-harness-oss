@@ -1,13 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { Th } from '@/components/shared/table'
-import { useEmbeddedPage } from '@/components/layout/embedded-page-context'
 import { api } from '@/lib/api'
 import type { IdentityCandidateListItem } from '@line-crm/shared'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 interface PerAccountStat {
   accountId: string
@@ -53,7 +52,7 @@ function formatRelative(iso: string): string {
 const fmt = new Intl.NumberFormat('ja-JP')
 
 export default function DuplicatesPage() {
-  const embedded = useEmbeddedPage()
+  usePageTitle('重複検出')
   const [data, setData] = useState<DuplicatesStatsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -126,13 +125,6 @@ export default function DuplicatesPage() {
 
   return (
     <div className="space-y-4" data-duplicates-design="v4">
-      {!embedded ? (
-        <Header
-          title="重複検出"
-          description="複数アカウントに重複している友だちを把握し、配信コストの無駄を減らすためのビューです。"
-        />
-      ) : null}
-
       <section className="rounded-card border border-hairline bg-canvas px-4 py-3 shadow-card">
         <p className="text-sm font-bold text-ink">重複の可能性を検出します。自動統合はしません。</p>
         <p className="mt-1 text-xs leading-5 text-ink-secondary">確定済みID・連携UID・メール／電話の一致は強い根拠、プロフィール画像や名前だけの一致は候補として表示します。確認後も元のLINE友だちデータは残ります。</p>

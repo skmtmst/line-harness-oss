@@ -17,6 +17,12 @@ describe('統括設定', () => {
     expect(source).toContain('<HqStaffSection />')
   })
 
+  it('画面名はトップバーだけに置き、本文に旧見出しを重ねない', () => {
+    expect(source).toContain("usePageTitle('統括設定')")
+    expect(source).not.toContain("@/components/layout/header")
+    expect(source).not.toContain('<Header')
+  })
+
   it('権限者の追加フォームでは管理者と閲覧のみを選べ、スタッフは選べない', () => {
     expect(staffSectionSource).toContain('<option value="admin">管理者</option>')
     expect(staffSectionSource).toContain('<option value="viewer">閲覧のみ</option>')

@@ -1,8 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Header from '@/components/layout/header'
-import { useEmbeddedPage } from '@/components/layout/embedded-page-context'
 import SummaryBar from '@/components/users/summary-bar'
 import UsersFilters from '@/components/users/users-filters'
 import UsersTable from '@/components/users/users-table'
@@ -10,6 +8,7 @@ import MergedPersonDetailView from '@/components/merged-person/merged-person-det
 import Button from '@/components/shared/button'
 import { api } from '@/lib/api'
 import type { UserRowData } from '@/components/users/user-row'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 const PAGE_SIZE = 50
 
@@ -19,7 +18,7 @@ interface AccountOption {
 }
 
 export default function UsersPage() {
-  const embedded = useEmbeddedPage()
+  usePageTitle('統合ユーザー')
   const [rows, setRows] = useState<UserRowData[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -117,11 +116,6 @@ export default function UsersPage() {
     load()
   }, [load])
 
-  const headerDescription = useMemo(
-    () => '複数のLINEアカウントにいる同じ人を、元の友だちを残したまま確認します。',
-    [],
-  )
-
   const visibleRows = useMemo(() => rows.filter((row) => {
     if (uid === 'linked') return row.identityKeyKind === 'uid'
     if (uid === 'unlinked') return row.identityKeyKind !== 'uid'
@@ -150,7 +144,6 @@ export default function UsersPage() {
   if (openedPersonId) {
     return (
       <div className="space-y-4" data-users-design="v6">
-        {!embedded ? <Header title="統合ユーザー" description={headerDescription} /> : null}
         <MergedPersonDetailView
           personId={openedPersonId}
           onClose={() => setOpenedPersonId(null)}
@@ -161,8 +154,6 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-4" data-users-design="v6" data-design-node="r7eSi">
-      {!embedded ? <Header title="統合ユーザー" description={headerDescription} /> : null}
-
       <section className="rounded-card border border-hairline bg-canvas px-4 py-3 shadow-card">
         <p className="text-sm font-bold text-ink">
           複数の友だちを、1人の顧客として横断管理します。
