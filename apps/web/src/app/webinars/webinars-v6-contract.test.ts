@@ -24,19 +24,21 @@ describe('V6 ウェビナー一覧の契約', () => {
   })
 
   it('公開中と下書きの条件を実際に絞り込む', () => {
-    expect(PAGE).toContain("searched.filter((w) => w.status === savedFilter)")
+    expect(PAGE).toContain("foldered.filter((w) => w.status === savedFilter)")
     expect(PAGE).toContain("{ key: 'active', label: '公開中のみ' }")
     expect(PAGE).toContain("{ key: 'draft', label: '下書きのみ' }")
     expect(PAGE).not.toContain('保存した条件は準備中です')
   })
 
   it('選択アカウントのフォルダ件数を表示し、保存契約が来るまでは操作できるように見せない', () => {
-    expect(PAGE).toContain('const WEBINAR_FOLDERS')
-    expect(PAGE).toContain('aria-label="ウェビナーのフォルダ"')
+    expect(PAGE).toContain("import FolderPanel from '@/components/shared/folder-panel'")
+    expect(PAGE).toContain('lg:grid-cols-[16rem_minmax(0,1fr)]')
     expect(PAGE).toContain('<Button disabled title="フォルダの保存契約を接続後に使えます">フォルダを追加</Button>')
     expect(PAGE).toContain('webinarApi.folders(selectedAccountId)')
-    expect(PAGE).toContain("folders.length > 0 ? `${folders.length + 1}件` : '—'")
-    expect(PAGE).toContain("measuredFolder?.count ?? '—'")
+    expect(PAGE).toContain('visibleItems.filter((item) => item.folderId === folder.id).length')
+    expect(PAGE).toContain("selectedFolder === UNFILED")
+    expect(PAGE).not.toContain('const WEBINAR_FOLDERS')
+    expect(PAGE).not.toContain('min-h-[640px]')
     expect(PAGE).not.toContain('フォルダ名と件数は一覧APIへの接続後に表示します。')
     expect(PAGE).toContain('measuredCount(w.registrationCount)')
     expect(PAGE).toContain('measuredCount(w.viewerCount)')
