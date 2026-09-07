@@ -372,7 +372,7 @@ export default function WebinarsPage() {
         onCancel={() => { if (!archiving) setArchiveTarget(null) }}
         onConfirm={() => void archiveSelected()}
       >
-        {archiveTarget ? <p className="rounded-control border border-danger bg-danger-soft p-3 text-xs font-semibold text-danger">申込者・視聴履歴・分析結果は消えません。ウェビナーの一覧には出なくなります。</p> : null}
+        {archiveTarget ? <p className="rounded-control border border-danger bg-danger-bg p-3 text-xs font-semibold text-danger">申込者・視聴履歴・分析結果は消えません。ウェビナーの一覧には出なくなります。</p> : null}
         {archiveError ? <p className="text-danger text-sm">{archiveError}</p> : null}
       </ConfirmDialog>
     </>
@@ -381,11 +381,11 @@ export default function WebinarsPage() {
 
 function ArchiveReviewBackdrop({ target }: { target: WebinarListItem }) {
   return (
-    <div className="bg-canvas-sunken fixed inset-y-[58px] left-[255px] right-0 z-[1] overflow-hidden px-10 py-5" data-design-node="LKuAQ">
-      <div className="mx-auto max-w-[1584px]">
+    <div className="bg-canvas-sunken fixed inset-y-14 left-64 right-0 z-10 overflow-hidden px-10 py-5" data-design-node="LKuAQ">
+      <div className="mx-auto max-w-screen-2xl">
         <p className="text-accent text-xs font-bold">← ウェビナー一覧</p>
-        <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
-          <main className="space-y-4">
+        <div className="mt-5 grid gap-4 xl:grid-cols-4">
+          <main className="space-y-4 xl:col-span-3">
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h2 className="text-base font-bold text-ink">アーカイブする対象</h2>
               <p className="mt-1 text-xs text-ink-secondary">アーカイブするウェビナーを確認します。</p>
@@ -399,7 +399,7 @@ function ArchiveReviewBackdrop({ target }: { target: WebinarListItem }) {
           </main>
           <aside className="space-y-4">
             <section className="rounded-card border border-hairline bg-canvas p-5"><h2 className="text-sm font-bold text-ink">設定サマリー</h2><dl className="mt-4 divide-y divide-hairline text-xs"><div className="flex justify-between py-3"><dt className="text-ink-faint">状態</dt><dd className="font-semibold text-ink">{STATUS_LABEL[target.status]}</dd></div><div className="flex justify-between py-3"><dt className="text-ink-faint">申込</dt><dd className="font-semibold text-ink">{measuredCount(target.registrationCount)}</dd></div><div className="flex justify-between py-3"><dt className="text-ink-faint">視聴</dt><dd className="font-semibold text-ink">{measuredCount(target.viewerCount)}</dd></div></dl></section>
-            <section className="min-h-[365px] rounded-card bg-[#7399c4] p-5"><p className="text-center text-xs font-bold text-white">LINEプレビュー</p><div className="mt-12 rounded-control bg-canvas p-4 text-xs text-ink">このウェビナーは{target.status === 'active' ? '公開中' : '非公開'}です。</div></section>
+            <section className="min-h-96 rounded-card bg-line-preview p-5"><p className="text-center text-xs font-bold text-on-accent">LINEプレビュー</p><div className="mt-12 rounded-control bg-canvas p-4 text-xs text-ink">このウェビナーは{target.status === 'active' ? '公開中' : '非公開'}です。</div></section>
           </aside>
         </div>
       </div>

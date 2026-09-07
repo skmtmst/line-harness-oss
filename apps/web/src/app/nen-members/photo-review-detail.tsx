@@ -51,7 +51,7 @@ export function PhotoReviewDetail({
   const reviewDerivative = derivatives?.items.find((item) => item.kind === 'review') ?? null
   const reviewUrl = derivatives?.knownUrls.find((item) => item.kind === 'review')?.url || text(photo.image_url)
   const latestAssetJob = assetStatus?.jobs[0] ?? null
-  return <main className="mx-auto max-w-[1660px] p-6" data-photo-view="detail">
+  return <main className="mx-auto max-w-screen-2xl p-6" data-photo-view="detail">
     {notice && <div className="mb-4 rounded-control border border-accent-border bg-accent-soft px-4 py-3 text-sm text-accent-hover">{notice}</div>}
     <div className="flex items-center justify-between gap-2 max-md:flex-col max-md:items-start">
       <div>
@@ -68,9 +68,9 @@ export function PhotoReviewDetail({
 
     {hasFaceRisk && <div className="mt-4"><NoteBar tone="warn">うしろに人の顔が写っている可能性があります（自動で見つけました）</NoteBar></div>}
 
-    <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
-      <Card overflow="hidden">
-        <div className="grid h-96 place-items-center overflow-hidden bg-ink lg:h-[760px]">
+    <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-4">
+      <Card className="xl:col-span-3" overflow="hidden">
+        <div className="grid h-96 place-items-center overflow-hidden bg-ink lg:h-160">
           {reviewUrl ? <img
             src={reviewUrl}
             alt={`${text(photo.pet_name)}の審査用写真`}

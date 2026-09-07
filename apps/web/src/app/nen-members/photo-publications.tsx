@@ -98,7 +98,7 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
   if (!data || data.items.length === 0) return <main className="mx-auto max-w-screen-2xl p-6"><Button onClick={onBack}>写真審査へ戻る</Button><ListState kind="empty" title="出している写真はありません" description="同意のある写真を掲載すると、使っている場所と表示回数がここに出ます。" /></main>
 
   const top = data.summary.topPhoto
-  return <><main className="mx-auto max-w-[1660px] p-6" data-photo-view="publications">
+  return <><main className="mx-auto max-w-screen-2xl p-6" data-photo-view="publications">
     <div className="flex items-center justify-between gap-2 max-md:flex-col max-md:items-start">
       <div><p className="text-xs font-bold text-ink-faint">専用機能</p><h1 className="mt-1 text-2xl font-extrabold text-ink">写真審査</h1></div>
       <Button onClick={onBack}>見ていないものへ戻る</Button>
@@ -112,8 +112,8 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
       <Card padding="default"><span className="block text-xs text-ink-faint">ご本人の同意</span><strong className="my-1 block text-2xl text-ink">{data.summary.consentedCount}枚 すべて</strong><small className="block text-xs text-ink-faint">投稿時に同意をいただいています</small></Card>
     </section>
     <div className="mt-4"><NoteBar>出している写真は、投稿してくださった方の名前を写真ごとに伏せられます。ご本人の希望があれば、すべての掲載先から外せます。</NoteBar></div>
-    <div className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
-      <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+    <div className="mt-4 grid items-start gap-4 xl:grid-cols-5">
+      <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:col-span-4 xl:grid-cols-4">
         {data.items.map((item) => {
           const placements = Array.isArray(item.placements) ? item.placements as Array<Record<string, unknown>> : []
           return <Card key={text(item.id)} layout="vertical" overflow="hidden">

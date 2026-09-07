@@ -128,7 +128,7 @@ export function AffiliateArchiveDialog({
         />
       ) : impact ? (
         <div className="space-y-4">
-          <section className="rounded-control border border-danger bg-danger-soft p-4">
+          <section className="rounded-control border border-danger bg-danger-bg p-4">
             <h3 className="text-danger text-sm font-bold">アーカイブすると、次の3つが変わります</h3>
             <dl className="mt-2 divide-y divide-danger/20 text-sm">
               <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">発行ずみの紹介リンク</dt><dd className="text-ink mt-0.5 font-bold">{impact.activeLinks.toLocaleString('ja-JP')}本</dd></div><a className="rounded-control border border-danger bg-canvas px-3 py-1.5 text-xs font-semibold text-danger" href="/affiliate-offers">ここを開く</a></div>

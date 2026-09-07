@@ -136,7 +136,7 @@ export default function AnalyticsReportNewPage() {
   )
 
   return (
-    <div className="text-ink mx-auto max-w-[1600px] px-6 pb-24" data-design-node="URqOA">
+    <div className="text-ink mx-auto max-w-screen-2xl px-6 pb-24" data-design-node="URqOA">
       <PageHeader
         breadcrumb={[{ label: '分析', href: '/analytics' }, { label: '定期レポートをつくる' }]}
         title="定期レポートをつくる"
@@ -210,9 +210,9 @@ export default function AnalyticsReportNewPage() {
             <p className="text-ink-secondary mb-4 mt-1 text-sm">数字がふだんと大きくちがうときだけ、待たずに知らせます。</p>
             <label className="mb-3 flex items-center gap-2 text-sm font-semibold"><input className="accent-accent size-5" type="checkbox" checked={alertsEnabled} onChange={(event) => setAlertsEnabled(event.target.checked)} />大きな変化を知らせる</label>
             <ul className="grid list-none gap-3 p-0">
-              <li className="grid grid-cols-[18px_1fr] gap-2 text-xs"><input type="checkbox" checked readOnly className="accent-accent size-4" /><span className="grid gap-1"><strong>ブロックが 0.5% をこえたら、その場で知らせる</strong><span className="text-ink-secondary">配信の事故に早く気づけます。</span></span></li>
-              <li className="grid grid-cols-[18px_1fr] gap-2 text-xs"><input type="checkbox" checked readOnly className="accent-accent size-4" /><strong>友だちが前の週より 20% 減ったら、その場で知らせる</strong></li>
-              <li className="grid grid-cols-[18px_1fr] gap-2 text-xs"><input type="checkbox" checked readOnly className="accent-accent size-4" /><span className="grid gap-1"><strong>成果が0件の日が3日つづいたら、その場で知らせる</strong><span className="text-ink-secondary">計測が壊れていることに気づけます。</span></span></li>
+              <li className="flex items-start gap-2 text-xs"><input type="checkbox" checked readOnly className="accent-accent size-4 shrink-0" /><span className="grid gap-1"><strong>ブロックが 0.5% をこえたら、その場で知らせる</strong><span className="text-ink-secondary">配信の事故に早く気づけます。</span></span></li>
+              <li className="flex items-start gap-2 text-xs"><input type="checkbox" checked readOnly className="accent-accent size-4 shrink-0" /><strong>友だちが前の週より 20% 減ったら、その場で知らせる</strong></li>
+              <li className="flex items-start gap-2 text-xs"><input type="checkbox" checked readOnly className="accent-accent size-4 shrink-0" /><span className="grid gap-1"><strong>成果が0件の日が3日つづいたら、その場で知らせる</strong><span className="text-ink-secondary">計測が壊れていることに気づけます。</span></span></li>
             </ul>
           </section>
         </main>
