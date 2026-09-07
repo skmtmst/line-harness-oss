@@ -59,8 +59,12 @@ function decodeState(encoded: string): string {
 const liffRoutes = new Hono<Env>();
 
 async function analyticsAccountScope(c: Context<Env>, lineAccountId?: string) {
-  if (lineAccountId) return { where: 'AND f.line_account_id = ?', binds: [lineAccountId] };
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  if (lineAccountId) {
+    return scope.allowedAccountIds.includes(lineAccountId)
+      ? { where: 'AND f.line_account_id = ?', binds: [lineAccountId] }
+      : null;
+  }
   const where = scope.allowedAccountIds.length
     ? `AND (f.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
     : scope.canSeeUnassigned
@@ -1506,11 +1510,14 @@ liffRoutes.post('/api/liff/link', async (c) => {
 /**
  * GET /api/analytics/ref-summary — ref code analytics summary
  */
-liffRoutes.get('/api/analytics/ref-summary', async (c) => {
+liffRoutes.get('/api/analytics/ref-summary', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const db = c.env.DB;
     const lineAccountId = c.req.query('lineAccountId');
     const accountScope = await analyticsAccountScope(c, lineAccountId);
+    if (!accountScope) {
+      return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+    }
 
     // friends 起点で集計することで、entry_routes に登録されていない ref
     // (例えば X Harness が発行する UUID ref) も summary に拾えるようにする。
@@ -1578,10 +1585,15 @@ liffRoutes.get('/api/analytics/ref-summary', async (c) => {
 /**
  * GET /api/analytics/ref/:refCode — detailed friend list for a single ref code
  */
-liffRoutes.get('/api/analytics/ref/:refCode', async (c) => {
+liffRoutes.get('/api/analytics/ref/:refCode', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const db = c.env.DB;
     const refCode = c.req.param('refCode');
+    const lineAccountId = c.req.query('lineAccountId');
+    const accountScope = await analyticsAccountScope(c, lineAccountId);
+    if (!accountScope) {
+      return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+    }
 
     // Look up the registered entry_route to surface the operator-facing name,
     // but do NOT 404 when missing. /inflow-links surfaces refs that exist in
@@ -1593,8 +1605,6 @@ liffRoutes.get('/api/analytics/ref/:refCode', async (c) => {
       .bind(refCode)
       .first<{ ref_code: string; name: string }>();
 
-    const lineAccountId = c.req.query('lineAccountId');
-    const accountScope = await analyticsAccountScope(c, lineAccountId);
     const binds = [refCode, refCode, ...accountScope.binds];
 
     const friends = await db

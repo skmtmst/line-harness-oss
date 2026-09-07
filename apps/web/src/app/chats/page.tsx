@@ -19,7 +19,6 @@ import FlexPreviewComponent from '@/components/flex-preview'
 import FriendInfoSidebar from '@/components/chats/friend-info-sidebar'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
 import { Suspense } from 'react'
-import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import EmailThread from '@/components/support/email-thread'
 import Button from '@/components/shared/button'
 import { MoreAction } from '@/components/shared/row-actions'
@@ -382,11 +381,6 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
     </div>
   )
 }
-
-const MERGED_TABS = [
-  { key: 'line', label: 'LINE' },
-  { key: 'email', label: 'お問い合わせ（メール）' },
-]
 
 function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const router = useRouter()
@@ -1427,7 +1421,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             メールを開いても一覧が残って中央が半分のままだった。 */}
         <div
           data-inbox-v4="conversation-list"
-          className={`w-full border-[#E5E7EB] bg-canvas lg:flex-shrink-0 border-r flex-col overflow-hidden ${showFriendInfo ? 'lg:w-72 2xl:w-96' : 'lg:w-[330px] 2xl:w-[420px]'} ${selectedChatId || selectedThreadId ? 'hidden lg:flex' : 'flex'}`}
+          className={`w-full border-[#E5E7EB] bg-canvas lg:flex-shrink-0 border-r flex-col overflow-hidden ${showFriendInfo ? 'lg:w-72 2xl:w-[420px]' : 'lg:w-[330px] 2xl:w-[420px]'} ${selectedChatId || selectedThreadId ? 'hidden lg:flex' : 'flex'}`}
         >
           {/* タブ (すべて / 未読 / 対応中 / 対応済み) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
 

@@ -29,6 +29,8 @@ export type IdentityReview = {
   /** 判定窓の中だけに出す言い換え（版競合など）。 */
   decideError: string
   deciding: boolean
+  loadingMore: boolean
+  hasMore: boolean
   /** 詳細を読み込んでいる候補。開いていなければ null。 */
   selectedId: string | null
   /** 判定窓が出ているか。詳細を読むことと、窓を開くことは別。 */
@@ -37,6 +39,7 @@ export type IdentityReview = {
   openDialog: (id: string) => void
   closeDialog: () => void
   reload: () => void
+  loadMore: () => void
   decide: (input: {
     decision: IdentityCandidateDecision
     reason: string
@@ -50,7 +53,12 @@ function failureFrom(error: unknown): IdentityFailure {
   return failureOf(null)
 }
 
-export function useIdentityReview(kind: IdentityCandidateKind): IdentityReview {
+export function useIdentityReview(
+  kind: IdentityCandidateKind,
+  options: { lineAccountId?: string | null; pageSize?: number } = {},
+): IdentityReview {
+  const pageSize = options.pageSize ?? 20
+  const lineAccountId = options.lineAccountId ?? undefined
   const [state, setState] = useState<IdentityViewState>('loading')
   const [items, setItems] = useState<IdentityCandidateListItem[]>([])
   const [failure, setFailure] = useState<IdentityFailure | null>(null)
@@ -59,14 +67,27 @@ export function useIdentityReview(kind: IdentityCandidateKind): IdentityReview {
   const [detail, setDetail] = useState<IdentityCandidateDetail | IdentityCandidateWithProfiles | null>(null)
   const [decideError, setDecideError] = useState('')
   const [deciding, setDeciding] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [total, setTotal] = useState(0)
+  const [offset, setOffset] = useState(0)
   const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
+    setItems([])
+    setTotal(0)
+    setOffset(0)
+    setSelectedId(null)
+    setDetail(null)
+    setDialogOpen(false)
+  }, [kind, lineAccountId])
+
+  useEffect(() => {
     let alive = true
-    setState('loading')
+    if (offset === 0) setState('loading')
+    else setLoadingMore(true)
     setFailure(null)
     api.identityCandidates
-      .list({ kind, status: 'pending', limit: 20, offset: 0 })
+      .list({ kind, status: 'pending', lineAccountId, limit: pageSize, offset })
       .then((res) => {
         if (!alive) return
         /*
@@ -76,21 +97,25 @@ export function useIdentityReview(kind: IdentityCandidateKind): IdentityReview {
         if (!res.success) {
           setFailure(failureOf(null))
           setState('error')
+          setLoadingMore(false)
           return
         }
-        setItems(res.data.items)
-        setState(res.data.items.length === 0 ? 'empty' : 'ready')
+        setItems((current) => offset === 0 ? res.data.items : [...current, ...res.data.items])
+        setTotal(res.data.total)
+        setState(offset === 0 && res.data.items.length === 0 ? 'empty' : 'ready')
+        setLoadingMore(false)
       })
       .catch((error: unknown) => {
         if (!alive) return
         const next = failureFrom(error)
         setFailure(next)
         setState(next.kind === 'forbidden' ? 'forbidden' : 'error')
+        setLoadingMore(false)
       })
     return () => {
       alive = false
     }
-  }, [kind, reloadKey])
+  }, [kind, lineAccountId, offset, pageSize, reloadKey])
 
   // 一覧の1件を開く。詳細は判定に要る `version` と履歴を持っている。
   useEffect(() => {
@@ -160,6 +185,8 @@ export function useIdentityReview(kind: IdentityCandidateKind): IdentityReview {
     failure,
     decideError,
     deciding,
+    loadingMore,
+    hasMore: items.length < total,
     selectedId,
     dialogOpen,
     select: setSelectedId,
@@ -169,7 +196,14 @@ export function useIdentityReview(kind: IdentityCandidateKind): IdentityReview {
       setDialogOpen(true)
     },
     closeDialog: () => setDialogOpen(false),
-    reload: () => setReloadKey((key) => key + 1),
+    reload: () => {
+      setItems([])
+      setOffset(0)
+      setReloadKey((key) => key + 1)
+    },
+    loadMore: () => {
+      if (!loadingMore && items.length < total) setOffset(items.length)
+    },
     decide,
   }
 }

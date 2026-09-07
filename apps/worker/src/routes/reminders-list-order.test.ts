@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 
@@ -21,6 +21,7 @@ import type { Env } from '../index.js';
 const mocks = {
   getReminders: vi.fn(async () => []),
   getReminderById: vi.fn(),
+  getFriendById: vi.fn(),
   createReminder: vi.fn(),
   updateReminder: vi.fn(),
   deleteReminder: vi.fn(),
@@ -33,6 +34,12 @@ const mocks = {
   reorderReminders: vi.fn(),
 };
 vi.mock('@line-crm/db', () => mocks);
+
+const accountAccessMocks = vi.hoisted(() => ({
+  canAccessAllLineAccounts: vi.fn(),
+  getVisibleLineAccountScope: vi.fn(),
+}));
+vi.mock('../services/account-access.js', () => accountAccessMocks);
 
 const { reminders } = await import('./reminders.js');
 
@@ -65,6 +72,17 @@ function makeApp() {
   return app;
 }
 
+beforeEach(() => {
+  vi.clearAllMocks();
+  accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(true);
+  accountAccessMocks.getVisibleLineAccountScope.mockResolvedValue({
+    allowedAccountIds: ['acc-1'], canSeeUnassigned: false,
+  });
+  mocks.getReminderById.mockResolvedValue({ id: 'reminder-1', line_account_id: 'acc-1' });
+  mocks.getFriendById.mockResolvedValue({ id: 'friend-1', line_account_id: 'acc-1' });
+  mocks.deleteReminderStep.mockResolvedValue(true);
+});
+
 describe('リマインダ一覧の並び', () => {
   it('アカウントを選んでいるときも display_order を見る', async () => {
     const seen: string[] = [];
@@ -94,5 +112,34 @@ describe('リマインダ一覧の並び', () => {
     expect(res.status).toBe(200);
     // 並びの決め方が2か所に散らないよう、こちらは db 側の関数を通す。
     expect(mocks.getReminders).toHaveBeenCalled();
+  });
+
+  it('担当外アカウントの一覧を返さない', async () => {
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
+    const res = await makeApp().request('/api/reminders?lineAccountId=acc-other', {}, {
+      DB: makeDb([]),
+    });
+    expect(res.status).toBe(404);
+    expect(mocks.getReminders).not.toHaveBeenCalled();
+  });
+
+  it('担当外の友だちの登録一覧を返さない', async () => {
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
+    const res = await makeApp().request('/api/friends/friend-other/reminders', {}, {
+      DB: makeDb([]),
+    });
+    expect(res.status).toBe(404);
+    expect(mocks.getFriendReminders).not.toHaveBeenCalled();
+  });
+
+  it('URLの親に属さない通は削除しない', async () => {
+    mocks.deleteReminderStep.mockResolvedValue(false);
+    const res = await makeApp().request('/api/reminders/reminder-1/steps/step-other', {
+      method: 'DELETE',
+    }, { DB: makeDb([]) });
+    expect(res.status).toBe(404);
+    expect(mocks.deleteReminderStep).toHaveBeenCalledWith(
+      expect.anything(), 'reminder-1', 'step-other',
+    );
   });
 });

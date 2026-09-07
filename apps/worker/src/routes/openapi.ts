@@ -485,9 +485,84 @@ const spec = {
         responses: { '200': { description: '13 action schemas and scoped resources' }, '422': { description: 'Unsupported trigger' } },
       },
     },
+    '/api/friends/{id}/fields': {
+      get: {
+        tags: ['Friends'], summary: '閲覧可能な友だちの情報欄を取得',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Friend fields' }, '403': { description: 'Staff role required' }, '404': { description: 'Friend not found in account scope' } },
+      },
+      put: {
+        tags: ['Friends'], summary: '閲覧可能な友だちの情報欄を更新',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Friend fields updated' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Friend not found in account scope' } },
+      },
+    },
+    '/api/reminders': {
+      get: {
+        tags: ['Reminders'], summary: 'LINEアカウント範囲内のリマインダ一覧を取得',
+        parameters: [{ name: 'lineAccountId', in: 'query', schema: { type: 'string' } }],
+        responses: { '200': { description: 'Visible reminders' }, '403': { description: 'Staff role required' }, '404': { description: 'LINE account not found in account scope' } },
+      },
+    },
+    '/api/reminders/{id}/steps/{stepId}': {
+      delete: {
+        tags: ['Reminders'], summary: '指定したリマインダに属する通を削除',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'stepId', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Reminder step deleted' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Reminder or step not found in account scope' } },
+      },
+    },
+    '/api/friends/{friendId}/reminders': {
+      get: {
+        tags: ['Reminders'], summary: '閲覧可能な友だちのリマインダ登録を取得',
+        parameters: [{ name: 'friendId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Friend reminders' }, '403': { description: 'Staff role required' }, '404': { description: 'Friend not found in account scope' } },
+      },
+    },
+    '/api/auto-replies': {
+      get: {
+        tags: ['Auto replies'], summary: 'LINEアカウント範囲内の自動応答一覧を取得',
+        parameters: [{ name: 'accountId', in: 'query', schema: { type: 'string' } }],
+        responses: { '200': { description: 'Visible auto replies' }, '403': { description: 'Staff role required' }, '404': { description: 'LINE account not found in account scope' } },
+      },
+    },
+    '/api/mileage/rules': {
+      get: {
+        tags: ['Mileage'], summary: 'LINEアカウント範囲内のマイル付与ルールを取得',
+        responses: { '200': { description: 'Visible mileage rules' }, '403': { description: 'Staff role required' } },
+      },
+      post: {
+        tags: ['Mileage'], summary: 'LINEアカウントに属するマイル付与ルールを作成',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['lineAccountId', 'name', 'eventType', 'amount'], properties: { lineAccountId: { type: 'string' }, name: { type: 'string' }, eventType: { type: 'string' }, amount: { type: 'integer', minimum: 1 } } } } } },
+        responses: { '201': { description: 'Mileage rule created' }, '400': { description: 'LINE account is required' }, '403': { description: 'Owner or admin role or account scope required' } },
+      },
+    },
+    '/api/mileage/rules/{id}': {
+      put: {
+        tags: ['Mileage'], summary: '所属LINEアカウント内のマイル付与ルールを更新',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Mileage rule updated' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found in account scope' }, '409': { description: 'Legacy global rule is immutable' } },
+      },
+      delete: {
+        tags: ['Mileage'], summary: '所属LINEアカウント内のマイル付与ルールを削除',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Mileage rule deleted' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found in account scope' }, '409': { description: 'Legacy global rule is immutable' } },
+      },
+    },
     // ── Scenarios ────────────────────────────────────────────────────────────
     '/api/scenarios': {
-      get: { tags: ['Scenarios'], summary: 'シナリオ一覧取得', responses: { '200': { description: 'All scenarios' } } },
+      get: {
+        tags: ['Scenarios'],
+        summary: '閲覧権限とLINEアカウント範囲内のシナリオ一覧取得',
+        parameters: [{ name: 'lineAccountId', in: 'query', schema: { type: 'string' } }],
+        responses: {
+          '200': { description: 'Visible scenarios' },
+          '403': { description: 'Scenario view permission required' },
+          '404': { description: 'LINE account not found in account scope' },
+        },
+      },
       post: {
         tags: ['Scenarios'],
         summary: 'シナリオ作成',
@@ -500,7 +575,11 @@ const spec = {
         tags: ['Scenarios'],
         summary: 'シナリオ詳細取得 (ステップ含む)',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { '200': { description: 'Scenario with steps' } },
+        responses: {
+          '200': { description: 'Scenario with steps' },
+          '403': { description: 'Scenario view permission required' },
+          '404': { description: 'Not found in account scope' },
+        },
       },
       put: {
         tags: ['Scenarios'],
@@ -513,6 +592,34 @@ const spec = {
         summary: 'シナリオ削除',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         responses: { '200': { description: 'Deleted' } },
+      },
+    },
+    '/api/scenarios/{id}/preview': {
+      get: {
+        tags: ['Scenarios'], summary: 'シナリオの配信時系列を確認',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Timeline preview' }, '403': { description: 'Scenario view permission required' }, '404': { description: 'Not found in account scope' } },
+      },
+    },
+    '/api/scenarios/{id}/stats': {
+      get: {
+        tags: ['Scenarios'], summary: 'シナリオの到達率を確認',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Scenario statistics' }, '403': { description: 'Scenario view permission required' }, '404': { description: 'Not found in account scope' } },
+      },
+    },
+    '/api/scenarios/{id}/actions': {
+      get: {
+        tags: ['Scenarios'], summary: 'シナリオのアクションを確認',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Scenario actions' }, '403': { description: 'Scenario view permission required' }, '404': { description: 'Not found in account scope' } },
+      },
+    },
+    '/api/scenarios/{id}/triggers': {
+      get: {
+        tags: ['Scenarios'], summary: 'シナリオの開始条件を確認',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Scenario triggers' }, '403': { description: 'Scenario view permission required' }, '404': { description: 'Not found in account scope' } },
       },
     },
     '/api/scenarios/{id}/simulate': {

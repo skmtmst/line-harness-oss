@@ -117,6 +117,24 @@ describe('identity candidate HTTP contract', () => {
     });
   });
 
+  it('指定アカウントだけで一覧を取得し、範囲外は404にする', async () => {
+    const visible = await harness().request(
+      '/api/identity-candidates?kind=ec_member&lineAccountId=account-a&limit=50&offset=20',
+    );
+    expect(visible.status).toBe(200);
+    expect(identityMocks.listIdentityCandidates).toHaveBeenCalledWith(expect.anything(), {
+      tenantId: 'tenant-a', kind: 'ec_member', status: 'pending',
+      allowedAccountIds: ['account-a'], limit: 50, offset: 20,
+    });
+
+    identityMocks.listIdentityCandidates.mockClear();
+    const hidden = await harness().request(
+      '/api/identity-candidates?kind=ec_member&lineAccountId=account-z',
+    );
+    expect(hidden.status).toBe(404);
+    expect(identityMocks.listIdentityCandidates).not.toHaveBeenCalled();
+  });
+
   it('lets an owner detect friend candidates only inside the visible account scope', async () => {
     const response = await harness().request(
       '/api/identity-candidates/detect?kind=friend_duplicate&limit=25',

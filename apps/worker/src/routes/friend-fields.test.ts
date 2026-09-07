@@ -25,6 +25,7 @@ const mocks = {
   markFieldMigrationStale: vi.fn(),
   executeFieldMigration: vi.fn(),
   getFriendFieldsWithValues: vi.fn(),
+  getFriendById: vi.fn(),
   setFriendFieldValue: vi.fn(),
   recordLoginAudit: vi.fn(),
   validateFieldKey: (key: unknown) =>
@@ -51,9 +52,11 @@ const mocks = {
 vi.mock('@line-crm/db', () => mocks);
 const accountMocks = {
   getVisibleLineAccountScope: vi.fn().mockResolvedValue({ allowedAccountIds: ['account-1'] }),
+  canAccessAllLineAccounts: vi.fn().mockResolvedValue(true),
 };
 vi.mock('../services/account-access.js', () => ({
   getVisibleLineAccountScope: accountMocks.getVisibleLineAccountScope,
+  canAccessAllLineAccounts: accountMocks.canAccessAllLineAccounts,
 }));
 
 const { friendFields } = await import('./friend-fields.js');
@@ -109,6 +112,8 @@ const FIELD = {
 beforeEach(() => {
   vi.clearAllMocks();
   accountMocks.getVisibleLineAccountScope.mockResolvedValue({ allowedAccountIds: ['account-1'] });
+  accountMocks.canAccessAllLineAccounts.mockResolvedValue(true);
+  mocks.getFriendById.mockResolvedValue({ id: 'f-1', line_account_id: 'account-1' });
   mocks.getFriendFields.mockResolvedValue([FIELD]);
   mocks.getFriendFieldsForScope.mockResolvedValue([{ ...FIELD, line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0 }]);
   mocks.getFriendFieldById.mockResolvedValue(FIELD);
@@ -497,6 +502,22 @@ describe('個人情報の項目', () => {
     ]);
     await req(makeApp('admin'), '/api/friends/f-1/fields', 'GET');
     expect(mocks.recordLoginAudit).not.toHaveBeenCalled();
+  });
+});
+
+describe('友だちのLINEアカウント境界', () => {
+  it.each(['GET', 'PUT'] as const)('担当外の友だちへ %s で到達できない', async (method) => {
+    mocks.getFriendById.mockResolvedValue({ id: 'f-other', line_account_id: 'account-2' });
+    accountMocks.canAccessAllLineAccounts.mockResolvedValue(false);
+    const res = await req(
+      makeApp('admin'),
+      '/api/friends/f-other/fields',
+      method,
+      method === 'PUT' ? { values: { 'ff-1': '秘密' } } : undefined,
+    );
+    expect(res.status).toBe(404);
+    expect(mocks.getFriendFieldsWithValues).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
   });
 });
 

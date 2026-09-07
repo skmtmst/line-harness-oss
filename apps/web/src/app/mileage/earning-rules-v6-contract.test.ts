@@ -23,6 +23,7 @@ function rule(over: Partial<MileageRule> & { id: string }): MileageRule {
     amount: 1,
     initialStatus: 'available',
     conditions: {},
+    lineAccountId: null,
     isActive: true,
     validFrom: null,
     validUntil: null,

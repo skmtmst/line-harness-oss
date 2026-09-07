@@ -532,6 +532,36 @@ describe('api.mileage reward draft contract', () => {
   })
 })
 
+describe('api.mileage rules contract(#532/#521)', () => {
+  it('旧マイルールの作成は選択中のLINEアカウントIDを送る', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: { id: 'rule-1' } }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await api.mileage.createRule({
+      name: '予約してくれたら 300 マイル',
+      eventType: 'booking_created',
+      source: null,
+      amount: 300,
+      initialStatus: 'available',
+      conditions: {},
+      validFrom: null,
+      validUntil: null,
+      lineAccountId: 'account/1',
+    })
+
+    expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
+      'https://worker.example.com/api/mileage/rules',
+    ])
+    expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({ method: 'POST' })
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body))).toMatchObject({
+      lineAccountId: 'account/1',
+    })
+  })
+})
+
 describe('api.mileage V6 admin contract', () => {
   it('残高・付与ルールを選択中アカウントで読み、下書きを版付きで保存する', async () => {
     const fetchSpy = vi.fn(async () => new Response(
@@ -907,14 +937,22 @@ describe('extractApiErrorMessage', () => {
     expect(extractApiErrorMessage(JSON.stringify({ error: { code: 500 } }), 400)).toBe('')
   })
 
-  // 表示してよいのは、worker が自分で検証して返した 400 だけ。
-  it.each([401, 403, 404, 409, 429, 500, 502, 503])(
+  it.each([409, 422, 428])('%i の復旧可能な案内を表示する', (status) => {
+    expect(extractApiErrorMessage(JSON.stringify({ error: '最新の内容を確認して、もう一度お試しください' }), status))
+      .toBe('最新の内容を確認して、もう一度お試しください')
+  })
+
+  it.each([401, 403, 404, 429, 500, 502, 503])(
     '%i の本文は内部情報を含みうるため表示しない',
     (status) => {
       const body = JSON.stringify({ error: 'D1_ERROR: no such table: rich_menu_groups' })
       expect(extractApiErrorMessage(body, status)).toBe('')
     },
   )
+
+  it.each([400, 409, 422, 428])('%i でも内部情報は表示しない', (status) => {
+    expect(extractApiErrorMessage(JSON.stringify({ error: 'D1_ERROR: no such table: secrets' }), status)).toBe('')
+  })
 })
 
 describe('extractApiErrorCode', () => {
@@ -989,7 +1027,7 @@ describe('fetchApi error response', () => {
     expect(new ApiError(401).message).toBe('API error: 401')
   })
 
-  it('メディア削除409の最新影響を保持しても本文は利用者向けメッセージにしない', async () => {
+  it('メディア削除409の最新影響と復旧案内を保持する', async () => {
     const impact = {
       usageCount: 2,
       canDelete: false,
@@ -1009,7 +1047,7 @@ describe('fetchApi error response', () => {
         name: 'ApiError',
         status: 409,
         code: 'media_delete_blocked',
-        message: 'API error: 409',
+        message: 'このファイルは2か所で使われています。先に使用先から外してください。',
         data: impact,
       })
   })
@@ -1068,7 +1106,7 @@ describe('fetchApi error response', () => {
     })
   })
 
-  it('共通情報削除409の最新影響を保持しても本文は利用者向けメッセージにしない', async () => {
+  it('共通情報削除409の最新影響と復旧案内を保持する', async () => {
     const impact = {
       blockingTotal: 2,
       canDelete: false,
@@ -1088,12 +1126,12 @@ describe('fetchApi error response', () => {
         name: 'ApiError',
         status: 409,
         code: 'common_var_delete_blocked',
-        message: 'API error: 409',
+        message: '2件で使用中のため削除できません',
         data: impact,
       })
   })
 
-  it('409の最新状態は保持し、本文は利用者へ直接出さない', async () => {
+  it('409の最新状態と復旧案内を保持する', async () => {
     const impact = { canDelete: false, blockers: ['incoming_switches'] }
     vi.stubGlobal('fetch', vi.fn(async () =>
       new Response(JSON.stringify({
@@ -1109,7 +1147,7 @@ describe('fetchApi error response', () => {
         name: 'ApiError',
         status: 409,
         code: 'rich_menu_delete_blocked',
-        message: 'API error: 409',
+        message: '削除する前に、公開状態と使われている場所を確認してください',
         data: impact,
       })
   })
