@@ -238,7 +238,9 @@ describe('2画面が同じ部品で組まれている', () => {
 
   it('それぞれの種類だけを読む', () => {
     expect(friend).toContain("useIdentityReview('friend_duplicate')")
-    expect(ec).toContain("useIdentityReview('ec_member')")
+    expect(ec).toContain("useIdentityReview('ec_member'")
+    // ECは選んだアカウントだけを読む(#530)。種類の分離は変えない。
+    expect(ec).toContain('lineAccountId: selectedAccountId')
   })
 
   it('中身は「通常」のときだけ描く', () => {

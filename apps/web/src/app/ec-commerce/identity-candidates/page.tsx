@@ -46,8 +46,13 @@ function candidateImpactText(value: unknown): string {
  * account scope付き集計を使う。推測した数字は表示しない。
  */
 export default function EcIdentityCandidatesPage() {
-  const review = useIdentityReview('ec_member')
   const { selectedAccountId } = useAccount()
+  /*
+   * 選んだアカウントの候補だけを読む(#530)。口に絞りが無いので
+   * hook 側で全頁を集めてから絞る。先頭20件の手元絞りでは枠外の
+   * 候補が「いない」ように見えて対応漏れになる。
+   */
+  const review = useIdentityReview('ec_member', { lineAccountId: selectedAccountId ?? undefined })
   const detail = review.detail
   const [operations, setOperations] = useState<EcIdentityCandidateOperationsList | null>(null)
   const [operationsState, setOperationsState] = useState<'loading' | 'ready' | 'empty' | 'error' | 'forbidden'>('loading')
