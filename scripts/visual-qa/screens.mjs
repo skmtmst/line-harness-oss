@@ -2634,7 +2634,7 @@ export const SCREENS = [
   // ── 機能30 ログインユーザー ─────────────────────────────
   {
     ...STAFF, node: 'e3jz3', name: '30-1 ログインユーザー',
-    states: { apis: ['**/api/staff', '**/api/login-audit*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    states: { apis: ['**/api/access/users*', '**/api/access/roles*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-07 Issue #243 / PR #1039 / UI HEAD 1b4774050 を3105/8792で再撮影。構造一致・集計データ待ち。** いまいる人・招待中・入った記録・権限のかたまりの4タブ、4指標、見せる範囲の案内、役割の札、並び順、設計順の6列をそろえた。二段階認証の未設定は上の注意で残し、役割・表示機能・LINE連携・通知・利用状態の編集も維持した。1440・1920pxとも横はみ出し0。残る差は90日未使用の正確な集計、一覧全員の最終ログイン、役割bundle総数を返すAPIで、現在の監査200件から推測せず未取得と明記したため一致にはしない。',
     verdictSource: 'staff-v6/e3jz3-1920.png + staff-v6/e3jz3-{normal,loading,empty,error,forbidden}.txt + Pencil node e3jz3', verdictHead: '1b4774050',
@@ -2651,7 +2651,7 @@ export const SCREENS = [
     verdictHead: '7b509106',
   },
   { ...STAFF, node: 'jwVlo', name: '30-1-B 入った記録', route: '/staff?tab=audit',
-    states: { apis: ['**/api/login-audit*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    states: { apis: ['**/api/audit/events*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #243 / PR #1039 / UI HEAD 1b4774050 を3105/8792で再撮影。構造一致・共通監査API待ち。** 4指標、説明帯、検索、期間・表示件数、6つの絞り込み札、並び順、設計順の5列、CSV書き出し、取得範囲内のページ送りをそろえた。失敗・拒否は赤く表示し、通常・読込・空・失敗・権限不足を分ける。1440・1920pxとも横はみ出し0。残る差は全業務操作、総件数、対象詳細、変更前後、場所のrisk判定を返す共通監査APIで、現在のログイン監査5種類だけでは埋められない。未取得を作り値にしないため一致にはしない。',
     verdictSource: 'staff-v6/jwVlo-1920.png + staff-v6/jwVlo-{normal,loading,empty,error,forbidden}.txt + Pencil node jwVlo', verdictHead: '1b4774050',
   },
