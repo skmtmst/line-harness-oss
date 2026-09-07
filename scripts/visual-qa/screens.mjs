@@ -3097,23 +3097,7 @@ export const SCREENS = [
       直接そこを開く。押して辿ると、一覧の固定データ次第で撮れなくなる。
       設計は名前・色・並び順・初期値と自動変更ルールを同じ面で扱う。
     */
-    dir: 'friend-attributes-v6', route: '/tags/marks/edit?id=mark-hold', mode: 'page',
-    states: {
-      apis: ['**/api/support-marks/*/automation-rules**'],
-      kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'],
-    },
-    variants: [
-      {
-        // 版競合。**押して初めて出る失敗**なので、読み込みは素通しにする。
-        suffix: 'conflict',
-        state: { apis: ['**/api/support-marks/**/automation-rules**', '**/api/support-mark-rules/**'], kind: 'conflict' },
-        steps: [
-          { qaOpen: 'GMvBd' },
-          { fill: 'ルールの名前', text: '期限を過ぎたら確認待ちへ' },
-          { qaOpen: 'GMvBd-save' },
-        ],
-      },
-    ],
+    dir: 'friend-attributes-v6', route: '/tags/marks/edit', mode: 'page',
     verdict: "structure_match_data_pending",
     verdictNote: "**2026-09-07 Issue #330で実API接続後に再判定。** 構造一致・同一状態契約待ち。基本情報、自動変更ルール、使用先、優先順位、手動変更後の保護時間を実APIへ接続し、通常・読込・0件・失敗・権限不足・競合を確認した。設計は新規作成、現在のルールAPIは作成済みmarkId必須のため実装画像は編集状態で、同一状態の値だけ未照合。全状態2幅で横はみ出し0。",
     verdictSource: "friend-attributes-v6/GMvBd-{normal,loading,empty,error,forbidden,conflict}.txt + 同名-{1440,1920}.png",

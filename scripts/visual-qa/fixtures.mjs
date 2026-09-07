@@ -261,6 +261,9 @@ export const TAG_DEPENDENCIES_NEN_SUBSCRIPTION = {
   revision: 'tag:tag-0:v3:2026-08-20T19:20:00+09:00',
 }
 
+/** 機能4。画面確認では保存せず、保管APIの成功時の器だけを固定する。 */
+export const TAG_ARCHIVE_RESULT = { archived: true, replacedFriendCount: 0 }
+
 /**
  * タグ101件。設計の「1〜20 / 101件」に合わせる。
  *
@@ -1437,11 +1440,11 @@ export const COMMON_VAR_DETAIL = {
     {
       id: 'common-var-version-3', version: 3, name: '会社名', value: '株式会社NEN',
       memo: '契約書・請求書・お客さま案内で使う正式な会社名',
-      changeReason: '登記上の表記に統一', actorId: 'staff-1', createdAt: '2026-08-01T10:12:00.000+09:00',
+      changeReason: '登記上の表記に統一', actorId: 'staff-1', actorName: '川野 健太', createdAt: '2026-08-01T10:12:00.000+09:00',
     },
     {
       id: 'common-var-version-2', version: 2, name: '会社名', value: 'NEN', memo: '',
-      changeReason: '初回登録', actorId: 'staff-1', createdAt: '2025-11-20T16:40:00.000+09:00',
+      changeReason: '初回登録', actorId: 'staff-1', actorName: '川野 健太', createdAt: '2025-11-20T16:40:00.000+09:00',
     },
   ],
 }
@@ -3002,6 +3005,15 @@ export const BROADCAST_LIST_META = {
   pagination: { total: 24, limit: 20, cursor: 0, nextCursor: '20' },
 }
 
+/** 機能6。予約完了画面に出すSlack通知設定。 */
+export const BROADCAST_NOTIFICATION_SETTINGS = {
+  version: 1,
+  started: true,
+  completed: true,
+  failed: true,
+  displayText: '配信開始・完了・エラーはSlackの同じスレッドへ通知します。',
+}
+
 /** 機能6 `sqFXf`。検索条件を保存済みの状態と、新規保存の固定結果。 */
 export const BROADCAST_SAVED_VIEWS = [
   {
@@ -3323,6 +3335,7 @@ export const AUTO_REPLY_FOLDERS = [
 const AR_BASE = {
   templateId: null, lineAccountId: null, activeFrom: null, activeUntil: null,
   cooldownMinutes: null, skipWhenOperatorActive: false, messageKinds: null,
+  receiveSources: ['line'],
   responseWeekdays: null, responseHolidayRule: null, oncePerFriend: false,
   friendConditions: null, respondToAll: false, keywordMatchMode: 'any',
 }
@@ -3455,6 +3468,7 @@ export const AUTO_REPLY_PUBLISH_DRAFT = {
     skipWhenOperatorActive: true,
     priority: 1,
     messageKinds: ['text'],
+    receiveSources: ['line', 'email'],
     friendConditions: { label: '予約者・未対応' },
     actions: [
       { actionType: 'add_tag', config: { tagId: 'tag-booking' } },
@@ -3634,6 +3648,9 @@ export const OUTGOING_WEBHOOKS = [
   },
 ]
 
+/** 機能26。外部送信は行わず、本番APIと同じ成功の器だけを返す。 */
+export const OUTGOING_WEBHOOK_TEST_RESULT = { delivered: true, responseStatus: 204 }
+
 /** 受け取る口。設計 `M0Gb7` の3本。 */
 export const INCOMING_WEBHOOKS = [
   {
@@ -3663,12 +3680,12 @@ export const INCOMING_WEBHOOK_DETAILS = {
       onNotFound: 'do_nothing',
     },
     actions: [
-      { refKind: 'tag', refId: 'tag-external-booking', refVersionId: null },
-      { refKind: 'template', refId: 'template-booking-received', refVersionId: 'template-booking-received-v2' },
+      { refKind: 'tag', refId: 'tag-external-booking', refVersionId: null, displayName: '外部予約あり' },
+      { refKind: 'template', refId: 'template-booking-received', refVersionId: 'template-booking-received-v2', displayName: 'ご予約を承りました' },
     ],
     actionExecution: {
-      state: 'not_connected',
-      reason: '受信後の構造化アクション実行器はまだ接続されていません',
+      state: 'connected',
+      reason: null,
     },
     latestSample: {
       receivedAt: '2026-08-25T01:12:00.000Z',

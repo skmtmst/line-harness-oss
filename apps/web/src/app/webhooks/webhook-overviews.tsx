@@ -82,13 +82,11 @@ function matchesOutgoing(item: OutgoingWebhookOverview, filter: OutgoingFilter, 
 function OutgoingKpis({
   items,
   incomingCount,
-  lineAccountId,
   summary,
   summaryStatus,
 }: {
   items: OutgoingWebhookOverview[]
   incomingCount: number
-  lineAccountId: string | null
   summary: WebhookInteractionSummary | null
   summaryStatus: LoadStatus
 }) {
@@ -147,6 +145,7 @@ export function OutgoingOverview({
   summary,
   summaryStatus,
   incomingCount,
+  lineAccountId,
   onReload,
   onToggle,
   onRotate,
@@ -158,6 +157,7 @@ export function OutgoingOverview({
   summary: WebhookInteractionSummary | null
   summaryStatus: LoadStatus
   incomingCount: number
+  lineAccountId: string | null
   onReload: () => void
   onToggle: (id: string, active: boolean) => void
   onRotate: (item: OutgoingWebhookOverview) => void
