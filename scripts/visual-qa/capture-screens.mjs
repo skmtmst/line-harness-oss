@@ -164,6 +164,9 @@ async function newPage(browser, width, height, clock) {
   await page.addInitScript(() => {
     try {
       window.sessionStorage.setItem('lh_auth_selection_cleared', '1')
+      // Pencil の正本に無い運用向け告知帯は、画面比較に混ぜない。
+      // sessionStorage なので、この撮影ページを閉じれば残らない。
+      window.sessionStorage.setItem('lh_visual_qa_capture', '1')
       window.localStorage.setItem('lh_selected_account', 'visual-qa-account')
     } catch {
       // ストレージが使えない環境では何もしない
