@@ -83,6 +83,8 @@ import {
   BOOKING_AVAILABILITY_RULES, BOOKING_STAFF_SHIFTS, BOOKING_GOOGLE_CALENDAR,
   BOOKING_PROXY_CREATE, BOOKING_REQUESTS,
   EC_NOTIFICATION_SETTINGS, EC_NOTIFICATION_RUNS, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, NEN_PHOTO_DETAIL,
+  NEN_PHOTO_REVIEW_METRICS, NEN_PHOTO_ASSET_STATUS, NEN_PHOTO_DERIVATIVES,
+  NEN_PHOTO_ASSET_PROCESS_RESULT, NEN_PHOTO_BULK_DECISION_RESULT,
   NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, EC_ORDERS, EC_ACTION_EXECUTIONS, EC_IDENTITY_CANDIDATES, MILEAGE_RULES,
   FORM_FOLDERS, FORMS, FORM_DETAIL,
   LINE_ACCOUNTS, LINE_ACCOUNT_DETAIL, LINE_ACCOUNT_VERIFY_CONNECTION, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
@@ -1955,7 +1957,23 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname === '/api/nen-members/photos') return { success: true, data: NEN_PHOTOS }
+  if (pathname === '/api/nen-members/photos/review-metrics') {
+    return { success: true, data: NEN_PHOTO_REVIEW_METRICS }
+  }
   if (pathname === '/api/nen-members/photos/publications') return { success: true, data: NEN_PHOTO_PUBLICATIONS }
+  const photoAssetStatus = /^\/api\/nen-members\/photos\/([^/]+)\/assets\/status$/.exec(pathname)
+  if (photoAssetStatus) {
+    return {
+      success: true,
+      data: {
+        ...NEN_PHOTO_ASSET_STATUS,
+        jobs: NEN_PHOTO_ASSET_STATUS.jobs.map((job) => ({ ...job, photoId: photoAssetStatus[1] })),
+      },
+    }
+  }
+  if (/^\/api\/nen-members\/photos\/[^/]+\/assets\/derivatives$/.test(pathname)) {
+    return { success: true, data: NEN_PHOTO_DERIVATIVES }
+  }
   if (/^\/api\/nen-members\/photos\/[^/]+$/.test(pathname)) return { success: true, data: NEN_PHOTO_DETAIL }
   if (pathname === '/api/ec-commerce/overview') return { success: true, data: EC_OVERVIEW }
   /* 取り込みの記録。ページ送りの数を器の外に持つ口。 */
@@ -2527,6 +2545,25 @@ const server = createServer((req, res) => {
     if (method === 'POST' && url.pathname === '/api/affiliate-statements') {
       res.writeHead(201).end(JSON.stringify({
         success: true, data: AFFILIATE_STATEMENT, notificationAttempted: true,
+      }))
+      return
+    }
+    /*
+      写真審査の一括判断と派生画像処理。撮影用に本番と同じ受付結果を返すだけで、
+      審査・ポイント付与・画像生成・通知は一切実行しない。
+    */
+    if (method === 'POST' && url.pathname === '/api/nen-members/photos/decisions/bulk') {
+      res.writeHead(201).end(JSON.stringify({
+        success: true, duplicate: false, data: NEN_PHOTO_BULK_DECISION_RESULT,
+      }))
+      return
+    }
+    const photoAssetProcess = /^\/api\/nen-members\/photos\/([^/]+)\/assets\/process$/.exec(url.pathname)
+    if (method === 'POST' && photoAssetProcess) {
+      res.writeHead(202).end(JSON.stringify({
+        success: true,
+        duplicate: false,
+        data: { ...NEN_PHOTO_ASSET_PROCESS_RESULT, photoId: photoAssetProcess[1] },
       }))
       return
     }
