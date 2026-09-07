@@ -2694,7 +2694,7 @@ export const SCREENS = [
       （`page.tsx:142` の行末が `範囲を編集`）。
     */
     steps: [{ wait: 1500 }, { qaOpen: 'EOTS4' }],
-    verdictHead: 'codex/kenta-r2-codex-b434',
+    verdictHead: '54f1910a7',
   },
   { ...STAFF, node: 'jwVlo', name: '30-1-B 入った記録', route: '/staff?tab=audit',
     states: { apis: ['**/api/audit/events*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
@@ -2706,7 +2706,7 @@ export const SCREENS = [
     verdict: 'match',
     verdictNote: '**2026-09-07 Issue #434 / 3101・8788で再撮影・再判定。** 認証済みセッションのまま `/staff/new` へ到達し、ログイン画面へ戻らないことを確認した。名前・メールアドレス・役割・最初に表示するLINEアカウント・スタッフの機能別担当範囲・通知先と、追加後の流れを表示。1440/1920pxとも横はみ出し0。',
     verdictSource: 'staff-v6/I3ZSrU.txt + staff-v6/I3ZSrU-{1440,1920}.png + 2026-09-07 visual comparison',
-    verdictHead: 'codex/kenta-r2-codex-b434',
+    verdictHead: '54f1910a7',
   },
 
   // ── 機能31 機能設定 ─────────────────────────────────────
