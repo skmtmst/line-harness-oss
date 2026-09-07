@@ -530,7 +530,7 @@ export const SCREENS = [
     verdictNote: "**2026-09-06 Issue #265で修正・再判定。** 一致。独立した一括操作面、9操作タイル、分類タブ、右の実行内容、下の選択友だち表を設計と同じ構造にした。タグの付け外しは実行可能、入力契約が未接続の操作は理由付きで無効化した。通常・失敗・権限不足・操作選択・結果を1440/1920pxで撮影し、全状態で横スクロール0。壊れ値・内部IDは0件。",
     verdictSource: "friends-v6/IAf7j.png（Pencil HTML） + friends-v6/IAf7j-{normal,error,forbidden,pick,result}.txt + 同名-{1440,1920}.png（実装） + Issue #474",
   },
-  { ...FRIENDS, node: 'I6UAdr', name: '3-1-D 友だち詳細', route: '/friends/detail?id=friend-0',
+  { ...FRIENDS, node: 'I6UAdr', name: '3-1-D 友だち詳細', route: '/friends/detail?id=friend-1',
     verdict: "match",
     verdictNote: "**2026-09-07 Issue #452・#457で修正・再判定。** 一致。本文上部の旧題ブロックを外し、画面名はトップバーだけに表示。左列のマイルは見出しと詳細リンクに続く一段のカードへ変更し、利用可能数を `2,450 mile` の大きさと単位で表示した。3102/8789の1440/1920pxで横はみ出し0。",
     verdictSource: "friends-v6/I6UAdr.txt + I6UAdr-{1440,1920}.png",

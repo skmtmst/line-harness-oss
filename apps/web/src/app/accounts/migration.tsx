@@ -6,11 +6,11 @@ import type { LineAccount } from '@line-crm/shared'
 import { api, type UidMigrationItem, type UidMigrationRun } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
-import PageHeader from '@/components/shared/page-header'
 import SelectField from '@/components/shared/select-field'
 import StatusBadge from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 const STEPS = ['移行の登録', '対応表の取込', '事前確認', '要確認の判断', '本移行と照合'] as const
 
@@ -30,6 +30,7 @@ export function parseUidCsv(text: string) {
 const classLabel = { auto: '自動一致', review: '要確認', unmatched: '未一致', conflict: '競合' } as const
 
 export default function AccountMigration() {
+  usePageTitle('UID移行')
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   const [runs, setRuns] = useState<UidMigrationRun[]>([])
   const [active, setActive] = useState<UidMigrationRun | null>(null)
@@ -120,16 +121,13 @@ export default function AccountMigration() {
 
   return (
     <div data-design-node="vtBCu">
-      <PageHeader breadcrumb={[{ label: '友だち', href: '/friends' }, { label: 'UID移行' }]} title="UID移行"
-        description="対応表を事前確認し、競合を判断してから安全に本移行します。"
-        actions={<Button href="/friends/migrations">CSVで書き出す・取り込む</Button>} />
-
-      <nav aria-label="友だち画面" className="border-hairline mb-4 flex gap-5 border-b text-sm">
+      <nav aria-label="友だち画面" className="border-hairline mb-4 flex min-h-10 items-start gap-5 border-b text-sm">
         <Link href="/friends" className="text-ink-secondary pb-3">友だち一覧</Link>
         <Link href="/friends?tab=duplicates" className="text-ink-secondary pb-3">重複検出</Link>
         <Link href="/friends?tab=merged" className="text-ink-secondary pb-3">統合ユーザー</Link>
         <span className="border-action text-action border-b-2 pb-3 font-semibold">UID移行</span>
         <a href="#migration-history" className="text-ink-secondary pb-3">移行履歴</a>
+        <Button href="/friends/migrations" className="ml-auto">CSVで書き出す・取り込む</Button>
       </nav>
 
       <div className="bg-canvas rounded-card border-hairline mb-4 grid grid-cols-5 border">
@@ -140,11 +138,6 @@ export default function AccountMigration() {
       </div>
 
       <div className="bg-success-bg text-success mb-4 rounded-control px-4 py-3 text-sm font-medium">本移行まで、既存ユーザー・配信・シナリオには影響しません。</div>
-      <section className="bg-warning-bg border-warning mb-4 rounded-card border p-4">
-        <h2 className="text-warning text-sm font-bold">別のLINEプロバイダーのUIDは、自動では対応づけできません。</h2>
-        <p className="text-ink-secondary mt-1 text-xs leading-relaxed">プロバイダーが違うと同じ人でも別のUIDになり、LINE側に変換する仕組みがありません。確認済みの対応表を取り込み、利用目的・規約・同意も確認してください。</p>
-      </section>
-
       <section className="bg-canvas rounded-card border-hairline mb-4 border p-4">
         <div className="grid gap-3 lg:grid-cols-3">
           <label className="text-ink-secondary text-xs font-semibold">移行元<SelectField aria-label="移行元アカウント" value={fromAccountId} onChange={(event) => setFromAccountId(event.target.value)} options={[{ value: '', label: '移行元アカウントを選択' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} /></label>

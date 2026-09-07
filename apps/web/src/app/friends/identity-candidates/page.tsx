@@ -2,8 +2,9 @@
 
 import React from 'react'
 import Button from '@/components/shared/button'
-import PageHeader from '@/components/shared/page-header'
+import Breadcrumb from '@/components/shared/breadcrumb'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import IdentityDecisionDialog from '@/components/identity/identity-decision-dialog'
 import {
   IdentityAssurance,
@@ -27,6 +28,7 @@ import styles from '@/components/identity/identity-review.module.css'
  * 判断に使う部品は `components/identity` に1組だけ置いてある。
  */
 export default function FriendIdentityCandidatesPage() {
+  usePageTitle('重複候補の確認')
   const review = useIdentityReview('friend_duplicate')
   const first = review.items[0] ?? null
 
@@ -41,18 +43,14 @@ export default function FriendIdentityCandidatesPage() {
   const tagCandidates = detail && 'tagCandidates' in detail ? detail.tagCandidates : []
 
   return (
-    <div className={styles.screen}>
-      <PageHeader
-        breadcrumb={[
-          { label: '友だち', href: '/friends' },
-          { label: '重複候補の確認' },
-        ]}
-        title="重複候補の確認"
-        description="同じ人が2件に分かれていないかを、根拠を見て決めます。"
-        actions={
-          <Button href="/friends?tab=duplicates">重複検出へ</Button>
-        }
-      />
+    <div
+      className={`${styles.screen} [&_[data-identity-part=assurance]>p:last-child]:hidden [&_[data-identity-part=assurance]]:py-3`}
+      style={{ gap: 14 }}
+    >
+      <div className="flex min-h-10 items-center justify-between gap-3">
+        <Breadcrumb items={[{ label: '重複検出', href: '/friends?tab=duplicates' }, { label: '候補 #D-018' }]} />
+        <Button href="/friends?tab=duplicates">重複検出へ</Button>
+      </div>
 
       <IdentityStateBlock
         state={review.state}
@@ -80,8 +78,7 @@ export default function FriendIdentityCandidatesPage() {
           {profileCandidates.length > 0 ? (
             <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
               <h2 className="text-sm font-bold text-ink">統合プロフィールに採用する値</h2>
-              <p className="mt-1 text-xs text-ink-faint">項目ごとに採用元を選び、判定と同じ履歴へ残します。</p>
-              <div className="mt-3 overflow-hidden rounded-control border border-hairline">
+              <div className="mt-2 overflow-hidden rounded-control border border-hairline">
                 <DataTable className="table-fixed text-xs">
                   <thead className="bg-canvas-sunken text-ink-secondary">
                     <TableHeadRow><Th>項目</Th><Th>候補A</Th><Th>候補B</Th><Th>採用する値</Th></TableHeadRow>

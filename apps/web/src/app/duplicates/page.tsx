@@ -229,8 +229,9 @@ export default function DuplicatesPage() {
             <div className="border-t border-hairline px-4 py-3 text-xs text-ink-faint">{fmt.format(candidateTotal)}組中 1〜{fmt.format(visibleCandidates.length)}組</div>
           </section>
 
-          <section>
+          <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
             <h2 className="text-sm font-bold text-[#1D1D1F]">アカウント別ブレイクダウン</h2>
+            <p className="mt-1 text-xs text-[#8B938D]">どのアカウントに重複が偏っているかを見ます。</p>
             {data.perAccount.length === 0 ? (
               <p className="mt-3 text-sm text-[#8B938D]">アカウントが登録されていません。</p>
             ) : (
@@ -238,19 +239,19 @@ export default function DuplicatesPage() {
                 <table className="w-full table-fixed text-sm">
                   <thead className="border-b border-[#DADDE2] bg-[#F6F6F8] text-left text-[11px] font-semibold text-[#565F59]">
                     <tr>
-                      <th className="px-4 py-3">アカウント</th>
-                      <th className="px-4 py-3 text-right">友だち数</th>
-                      <th className="px-4 py-3 text-right">うち重複</th>
-                      <th className="px-4 py-3 text-right">重複率</th>
+                      <th className="px-4 py-4">アカウント</th>
+                      <th className="px-4 py-4 text-right">友だち数</th>
+                      <th className="px-4 py-4 text-right">うち重複</th>
+                      <th className="px-4 py-4 text-right">重複率</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#EAEBED] bg-white text-[#565F59]">
                     {data.perAccount.map((row) => (
                       <tr key={row.accountId}>
-                        <td className="truncate px-4 py-3 font-semibold text-[#1D1D1F]" title={row.accountName}>{row.accountName}</td>
-                        <td className="px-4 py-3 text-right tabular-nums">{fmt.format(row.friends)}</td>
-                        <td className="px-4 py-3 text-right tabular-nums">{fmt.format(row.dups)}</td>
-                        <td className="px-4 py-3 text-right tabular-nums">
+                        <td className="truncate px-4 py-4 font-semibold text-[#1D1D1F]" title={row.accountName}>{row.accountName}</td>
+                        <td className="px-4 py-4 text-right tabular-nums">{fmt.format(row.friends)}</td>
+                        <td className="px-4 py-4 text-right tabular-nums">{fmt.format(row.dups)}</td>
+                        <td className="px-4 py-4 text-right tabular-nums">
                           {(row.dupRate * 100).toFixed(0)}%
                         </td>
                       </tr>
@@ -266,7 +267,7 @@ export default function DuplicatesPage() {
             // keep the non-undefined narrowing.
             const pairwise = data.pairwiseOverlap
             return (
-            <section>
+            <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
               <h2 className="text-sm font-bold text-[#1D1D1F]">アカウント間 重複マトリックス</h2>
               <p className="mt-1 text-xs text-[#8B938D]">
                 行アカウントの友だちのうち、列アカウントにも居る人数 （行のアカウントに対する割合）。
@@ -275,12 +276,12 @@ export default function DuplicatesPage() {
                 <table className="w-full table-fixed text-sm">
                   <thead className="border-b border-[#DADDE2] bg-[#F6F6F8] text-left text-[11px] font-semibold text-[#565F59]">
                     <tr>
-                      <th className="px-4 py-3">行 \ 列</th>
+                      <th className="px-4 py-4">行 \ 列</th>
                       {data.perAccount.map((col) => (
                         <th
                           key={col.accountId}
                           title={col.accountName}
-                          className="truncate px-2 py-3 text-right"
+                          className="truncate px-2 py-4 text-right"
                         >
                           {col.accountName}
                         </th>
@@ -290,7 +291,7 @@ export default function DuplicatesPage() {
                   <tbody className="divide-y divide-[#EAEBED] bg-white text-[#565F59]">
                     {data.perAccount.map((row) => (
                       <tr key={row.accountId}>
-                        <td title={row.accountName} className="truncate px-2 py-3 font-semibold text-[#1D1D1F]">
+                        <td title={row.accountName} className="truncate px-2 py-4 font-semibold text-[#1D1D1F]">
                           {row.accountName}
                         </td>
                         {data.perAccount.map((col) => {
@@ -298,7 +299,7 @@ export default function DuplicatesPage() {
                             return (
                               <td
                                 key={col.accountId}
-                                className="px-4 py-3 text-right text-[#B8BCC2]"
+                                className="px-4 py-4 text-right text-[#B8BCC2]"
                               >
                                 —
                               </td>
@@ -314,7 +315,7 @@ export default function DuplicatesPage() {
                           return (
                             <td
                               key={col.accountId}
-                              className="px-2 py-3 text-right tabular-nums"
+                              className="px-2 py-4 text-right tabular-nums"
                             >
                               {fmt.format(overlap)}{' '}
                               <span className="text-xs text-[#8B938D]">

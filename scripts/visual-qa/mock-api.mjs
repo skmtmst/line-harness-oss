@@ -1578,6 +1578,19 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   const detail = pathname.match(/^\/api\/friends\/([^/]+)$/)
   if (detail && FRIEND_DETAILS[detail[1]]) return { success: true, data: FRIEND_DETAILS[detail[1]] }
   if (/^\/api\/friends\/[^/]+\/mileage$/.test(pathname)) return { success: true, data: FRIEND_MILEAGE }
+  if (pathname === '/api/friends/friend-1/fields') {
+    const values = ['1988-04-12', '2026-12-31', '2026-09-15', 'プレミアム']
+    return {
+      success: true,
+      data: {
+        items: FRIEND_FIELDS.map((field, index) => ({ ...field, value: values[index] })),
+        hiddenPersonalCount: 0,
+      },
+    }
+  }
+  if (pathname === '/api/friends/friend-1/rich-menu') {
+    return { success: true, data: { id: 'rich-menu-main', name: '通常メニュー・予約', isDefault: false } }
+  }
   const messages = pathname.match(/^\/api\/friends\/([^/]+)\/messages$/)
   if (messages) {
     // 設計 `xGLVe` のトーク欄。載っていない友だちは空で返す（実際に空の人もいる）。

@@ -320,7 +320,7 @@ function FriendDetailInner() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[23.5rem_1fr]">
           {/* 左：プロフィール（設計の並び：マイル → 対応 → 名前 → タグ →
               ★つき友だち情報 → リッチメニュー → 友だち情報 → フォーム回答） */}
-          <aside data-design="Left" className="bg-canvas rounded-card border-hairline overflow-hidden border">
+          <aside data-design="Left" className="bg-canvas rounded-card border-hairline min-h-[1266px] overflow-hidden border">
             <div className="border-hairline border-b px-5 py-3.5">
               <div className="flex items-center justify-between"><h2 className="text-ink text-sm font-semibold">顧客情報</h2><Link href="/friends" className="text-ink-faint text-lg">×</Link></div>
             </div>
