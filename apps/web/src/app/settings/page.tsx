@@ -109,7 +109,7 @@ const USAGE_ITEM_IDS_BY_KEY: Record<string, string[]> = {
   media_vars: ['common-vars', 'contents'],
 }
 
-function UsageBadge({ category }: { category: UsageCategory }) {
+function UsageBadge({ category, onRetry }: { category: UsageCategory; onRetry?: () => void }) {
   const created = category.created.value
   const inUse = category.inUse.value
   if (created === null || inUse === null) {
@@ -119,6 +119,16 @@ function UsageBadge({ category }: { category: UsageCategory }) {
         title={category.inUse.reason ?? category.created.reason ?? '利用状況を取得できません'}
       >
         利用数は未取得
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            aria-label="利用数を読み直す"
+            className="ml-1 cursor-pointer underline hover:no-underline"
+          >
+            読み直す
+          </button>
+        )}
       </span>
     )
   }
@@ -132,11 +142,12 @@ function UsageBadge({ category }: { category: UsageCategory }) {
   )
 }
 
-function FeatureRow({ item, features, ordering, usage, sharedSwitch, canMoveUp, canMoveDown, onMove, onToggle }: {
+function FeatureRow({ item, features, ordering, usage, usageRetry, sharedSwitch, canMoveUp, canMoveDown, onMove, onToggle }: {
   item: FeatureItem
   features: Record<string, boolean>
   ordering: boolean
   usage?: UsageCategory
+  usageRetry?: () => void
   sharedSwitch: boolean
   canMoveUp: boolean
   canMoveDown: boolean
@@ -161,7 +172,7 @@ function FeatureRow({ item, features, ordering, usage, sharedSwitch, canMoveUp, 
                 {item.badge}
               </span>
             )}
-            {usage && <UsageBadge category={usage} />}
+            {usage && <UsageBadge category={usage} onRetry={usageRetry} />}
           </div>
           <p className="mt-0.5 truncate text-[11px] leading-relaxed text-ink-faint" title={item.note}>{item.note}</p>
         </div>
@@ -204,11 +215,12 @@ function FeatureRow({ item, features, ordering, usage, sharedSwitch, canMoveUp, 
   )
 }
 
-function FeatureSection({ group, features, ordering, usageByItemId, onItemToggle, onGroupToggle, onMove }: {
+function FeatureSection({ group, features, ordering, usageByItemId, usageRetry, onItemToggle, onGroupToggle, onMove }: {
   group: FeatureGroup
   features: Record<string, boolean>
   ordering: boolean
   usageByItemId: Map<string, UsageCategory>
+  usageRetry?: () => void
   onItemToggle: (item: FeatureItem, next: boolean) => void
   onGroupToggle: (group: FeatureGroup, next: boolean) => void
   onMove: (groupId: string, itemId: string, direction: -1 | 1) => void
@@ -241,6 +253,7 @@ function FeatureSection({ group, features, ordering, usageByItemId, onItemToggle
             features={features}
             ordering={ordering}
             usage={usageByItemId.get(item.id)}
+            usageRetry={usageRetry}
             sharedSwitch={Boolean(item.keys[0]) && group.items.filter((candidate) => candidate.keys[0] === item.keys[0]).length > 1}
             canMoveUp={index > 0}
             canMoveDown={index < group.items.length - 1}
@@ -316,6 +329,8 @@ export default function SettingsPage() {
   const [itemOrder, setItemOrder] = useState<MenuItemOrder>({})
   const [specializedFeatureKeys, setSpecializedFeatureKeys] = useState<string[]>([])
   const [usageCategories, setUsageCategories] = useState<UsageCategory[]>([])
+  /** 利用数の取得に失敗したときだけ出す「読み直す」の印。 */
+  const [usageFailed, setUsageFailed] = useState(false)
   const [ordering, setOrdering] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -323,6 +338,28 @@ export default function SettingsPage() {
   const [settingsVersion, setSettingsVersion] = useState(0)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+
+  /**
+   * 利用数だけ後から読む。設定の表示を重い集計で待たせない。
+   *
+   * 集計が8系統の数え直しで重いため、以前は設定と一緒に待っていた。
+   * 先に設定を出して、数は届き次第バッジに足す。失敗しても設定は
+   * 触れるままにし、バッジの「読み直す」から取り直せる。
+   */
+  const loadUsage = useCallback(async () => {
+    if (!selectedAccountId) return
+    setUsageFailed(false)
+    try {
+      const usageResponse = await api.analytics.usageOverview(selectedAccountId)
+      if (usageResponse?.success) {
+        setUsageCategories(usageResponse.data.data.categories)
+      } else {
+        setUsageFailed(true)
+      }
+    } catch {
+      setUsageFailed(true)
+    }
+  }, [selectedAccountId])
 
   const load = useCallback(async () => {
     if (!selectedAccountId) {
@@ -332,10 +369,7 @@ export default function SettingsPage() {
     setLoading(true)
     setError('')
     try {
-      const [response, usageResponse] = await Promise.all([
-        api.featureSettings.get(selectedAccountId),
-        api.analytics.usageOverview(selectedAccountId).catch(() => null),
-      ])
+      const response = await api.featureSettings.get(selectedAccountId)
       if (!response.success) {
         setError(response.error)
         return
@@ -348,13 +382,14 @@ export default function SettingsPage() {
       setSettingsVersion(response.data.version ?? 0)
       setItemOrder(nextOrder)
       setSpecializedFeatureKeys(response.data.specializedFeatureKeys ?? [])
-      setUsageCategories(usageResponse?.success ? usageResponse.data.data.categories : [])
+      // 設定を先に出し、利用数は後から足す（表示を集計で待たせない）。
+      void loadUsage()
     } catch {
       setError('機能設定を読み込めませんでした。時間をおいてもう一度お試しください。')
     } finally {
       setLoading(false)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, loadUsage])
 
   useEffect(() => { void load() }, [load])
 
@@ -374,8 +409,12 @@ export default function SettingsPage() {
   }, [itemOrder, specializedFeatureKeys])
 
   const currentOrder = useMemo(() => itemOrderFromGroups(groups), [groups])
+  /*
+   * 画面に出ないキー（サーバーだけが知る多店舗系など）も比べる。
+   * DEFAULT の顔ぶれだけで比べると、サーバー側の変化を見落とす。
+   */
   const dirty =
-    Object.keys(DEFAULT_FEATURES).some((key) => features[key] !== savedFeatures[key]) ||
+    Object.keys({ ...savedFeatures, ...features }).some((key) => features[key] !== savedFeatures[key]) ||
     JSON.stringify(currentOrder) !== JSON.stringify(itemOrderFromGroups(
       visibleFeatureGroups({ specializedFeatureKeys, includeRestaurantTest: true }).map((group) => {
         const order = savedItemOrder[group.id]
@@ -460,10 +499,34 @@ export default function SettingsPage() {
         setError(response.error)
         return
       }
-      setSettingsVersion(response.data.version)
-      setSavedFeatures({ ...features })
-      setSavedItemOrder(currentOrder)
-      setItemOrder(currentOrder)
+      /*
+       * 保存したつもりの値をそのまま確定しない。サーバーが正した値
+       * （無効環境の飲食店テストなど）を、そのままオン表示にすると
+       * 読み直すまで誤った状態を見せる。サーバ値を読み直して確定する。
+       */
+      try {
+        const latest = await api.featureSettings.get(selectedAccountId)
+        if (latest.success) {
+          const serverFeatures = { ...DEFAULT_FEATURES, ...latest.data.features }
+          setSavedFeatures(serverFeatures)
+          setFeatures(serverFeatures)
+          const serverOrder = latest.data.sidebarItemOrder ?? {}
+          setSavedItemOrder(serverOrder)
+          setItemOrder(serverOrder)
+          setSettingsVersion(latest.data.version ?? response.data.version)
+          setSpecializedFeatureKeys(latest.data.specializedFeatureKeys ?? [])
+        } else {
+          setSettingsVersion(response.data.version)
+          setSavedFeatures({ ...features })
+          setSavedItemOrder(currentOrder)
+          setItemOrder(currentOrder)
+        }
+      } catch {
+        setSettingsVersion(response.data.version)
+        setSavedFeatures({ ...features })
+        setSavedItemOrder(currentOrder)
+        setItemOrder(currentOrder)
+      }
       setNotice('機能設定を保存しました。サイドメニューにも反映されています。')
       window.dispatchEvent(new CustomEvent(FEATURE_SETTINGS_UPDATED_EVENT, { detail: { accountId: selectedAccountId } }))
     } catch (error) {
@@ -574,6 +637,7 @@ export default function SettingsPage() {
                         features={features}
                         ordering={ordering}
                         usageByItemId={usageByItemId}
+                        usageRetry={usageFailed ? () => void loadUsage() : undefined}
                         onItemToggle={toggleItem}
                         onGroupToggle={toggleGroup}
                         onMove={moveItem}
