@@ -116,7 +116,7 @@ export default function SavedViewDialog({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[110] flex items-center justify-center bg-[rgb(16_24_40/33%)] p-4"
+      className="bg-ink/35 fixed inset-0 z-[110] flex items-center justify-center p-4"
       role="presentation"
       onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}
     >

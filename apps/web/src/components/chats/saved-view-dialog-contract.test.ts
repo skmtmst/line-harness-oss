@@ -78,7 +78,7 @@ describe('受信箱 保存した検索の完了判定', () => {
   })
 
   it('保存内容の注意を入力済みでも残し、設計と同じ濃さで背景を暗くする', () => {
-    expect(DIALOG).toContain('bg-[rgb(16_24_40/33%)]')
+    expect(DIALOG).toContain('bg-ink/35')
     expect(DIALOG).toContain('保存されるのは検索条件です。受信件数は最新の状態に自動更新されます。')
     expect(DIALOG).toContain('tone="validation"')
   })
