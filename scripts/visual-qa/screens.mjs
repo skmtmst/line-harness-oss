@@ -524,6 +524,10 @@ export const SCREENS = [
     },
     variants: [
       {
+        suffix: '-profile',
+        steps: [{ qaOpen: 'w8W4Eh-profile', after: 700 }],
+      },
+      {
         suffix: '-edit',
         steps: [
           { qaOpen: 'w8W4Eh', after: 900 },
@@ -548,10 +552,10 @@ export const SCREENS = [
         ],
       },
     ],
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#22 トップバーに人名が入っていたのを画面名へ（`I6UAdr`「友だち詳細」／`w8W4Eh`「統合ユーザー」）／#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#42 青の主ボタンを緑へ（`r7eSi` の「詳細を見る」4件、`w8W4Eh` の「プロフィールを編集」ほか）／#47 `[sticker]`→スタンプ／#48 表記の統一。設計画像は `docs/design-reference/friends-v6/` を撮り直した。**実装との突き合わせはこれから。** **#601 `cfab56e0`（#599 `3385ba56` の上）で新規実装。設計 `w8W4Eh` 3-3-A。** ルート `/friends?tab=merged`。一覧の押し口（`data-qa-open="w8W4Eh"`）から開き、**同じ画面を二重に作らないよう詳細に別のルートは足していない**。1440・1920とも横スクロール0。 **① 4状態を撮り分けた**：通常・読込・失敗・権限不足は面ごと差し替え、**取得できた0件は各節の中で「まだありません」**（`w8W4Eh-empty` は 統合された属性 0件・採用した値はまだありません・まだ記録がありません、で 結び付いている友だち 1件 は実値）。失敗と0件が同じ文にならない。 **② 未取得と実値を分けている**：確からしさは本店 `92%`、移行で入った結び付きは `—`。`null` は「記録していない」で 0% ではない（`merged-person-view.ts:confidenceText`）。空の絵では メールアドレス・電話番号・担当 が `—`。 **③ 内部IDを本文へ出さない**：`friendId` は「友だちを開く」の行き先だけ。`candidateId`・`lineAccountId` は本文に出ない（`w8W4Eh-*.txt` に `merged-person-1`・`friend-identity-*`・`visual-qa-account` は0件）。 **④ メール・電話はマスク済みのまま** `ta***@example.jp` ／ `090-****-0001`。 **⑤ 版競合**（`w8W4Eh-conflict`）：保存だけ409にして押した先を撮った。「別の人が先に変更しました。最新の状態を読み直してから、もう一度変更してください。」と「読み直す」が、窓の中と面の上の両方に出る。**撮って初めて、409が一般のエラーへ落ちていたのが分かった**——`extractApiErrorCode` は本文の `error` が英小文字snake_caseのときだけコードを拾うので、Workerの `code:\'STALE_PERSON\'` は画面へ届かない。状態番号で判断する形に直した（同じ誤りが `InCDe`/`ELayY` にもあり #600 で直した）。 **⑥ 配信元**（`w8W4Eh-edit`）：用途ごとにまとめて順位で並べ、上へ・下へ・使わないを出す。全部を「使わない」にすると承知の印がつくまで保存できない（空配列＝全部解除のため）。 設計にある「統合を解除」「採用値の変更」「UID」「タグ」「履歴のアカウント列」は、**解除APIも候補値の読み口も無く、内部IDは出せず、タグと列は契約が返さない**ので作っていない。押しても何も起きない操作を置かず、代わりに解除の道筋を文で書いた。P2。 **`undefined`・`NaN`・`Invalid Date`・`API error` は0件。** 取得元：`friends-v6/w8W4Eh-normal.txt`・`w8W4Eh-empty.txt`・`w8W4Eh-conflict.txt` ＋ `merged-person-view.ts` ＋ `components/users/user-row.tsx`',
-    verdictSource: 'friends-v6/w8W4Eh-normal.txt + merged-person-view.ts',
-    verdictHead: '7b509106',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 #411 で一致。** 設計 `w8W4Eh` と実装の通常・読込中・0件・取得失敗・権限不足・プロフィール編集・配信元編集・解除確認・版競合を1440/1920pxで横並び比較した。上段3カード、結び付く友だち、統合属性、横断履歴、主要操作の位置と情報の順序がそろい、全状態で横はみ出し0。プロフィール編集は、Workerが現在の候補から発行した候補IDだけを画面から返し、サーバー側で再照合して採用する。候補が古い場合は409で再読込を案内し、権限・操作履歴・版番号も既存契約のまま守る。画面にはマスク済み値だけを表示し、候補ID・友だちID・LINEアカウントID・生のメールアドレスと電話番号は表示しない。`undefined`・`NaN`・`Invalid Date`・`API error` は0件。',
+    verdictSource: 'friends-v6/w8W4Eh-normal-1920.png + friends-v6/w8W4Eh-profile-1920.png',
+    verdictHead: 'cd54cfd63',
   },
   {
     ...FRIENDS, node: 'vtBCu', name: '3-4 UID移行', route: '/accounts?tab=migration',
@@ -3445,9 +3449,9 @@ const ISSUE_265_REVIEW = {
     source: 'friends-v6/r7eSi-{normal,loading,empty,error}.txt + 同名-{1440,1920}.png',
   },
   w8W4Eh: {
-    verdict: 'structure_match_data_pending',
-    note: '構造一致・データ未接続。通常・読込中・0件・取得失敗・権限不足・編集・版競合を2幅で撮影し、横はみ出し0。上段プロフィール、結び付く友だち、統合属性、横断履歴、配信元の優先順、409の再読込を表示する。解除API、項目ごとの候補値、タグ、履歴のアカウント列が契約に無いため、設計の解除・採用値変更は未接続。',
-    source: 'friends-v6/w8W4Eh-{normal,loading,empty,error,forbidden,edit,conflict}.txt + 同名-{1440,1920}.png',
+    verdict: 'match',
+    note: '一致。通常・読込中・0件・取得失敗・権限不足・プロフィール編集・配信元編集・解除確認・版競合を2幅で撮影し、横はみ出し0。項目ごとの候補値はマスク済み表示から選び、候補IDで保存する実APIへ接続した。サーバーで候補を再照合し、古い候補は409で再読込を案内する。候補ID・内部ID・生の連絡先は画面へ出さない。',
+    source: 'friends-v6/w8W4Eh-{normal,loading,empty,error,forbidden,profile,edit,unlink,conflict}.txt + friends-v6/w8W4Eh-{normal,profile}-1920.png',
   },
 }
 
