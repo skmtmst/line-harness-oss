@@ -2187,7 +2187,9 @@ export type AutomationDraftDetail = {
   draftVersionId: string
   name: string
   description: string | null
-  eventType: 'friend_add' | 'tag_change' | 'message_received'
+  eventType: 'friend_add' | 'tag_change' | 'message_received' | 'form_submitted'
+    | 'link_clicked' | 'calendar_booked' | 'datetime' | 'daily' | 'weekly'
+    | 'ec.order.confirmed'
   triggerConfig: Record<string, unknown>
   conditions: Record<string, unknown>
   actions: AutomationDraftAction[]
@@ -6419,11 +6421,17 @@ export const api = {
       name: string
       eventType: AutomationDraftDetail['eventType']
       triggerConfig: Record<string, unknown>
+      conditions?: Record<string, unknown>
       actions: AutomationDraftAction[]
     }) => fetchApi<ApiResponse<{ updated: true }>>(
       `/api/automation-drafts/${encodeURIComponent(id)}?account_id=${encodeURIComponent(accountId)}`,
       { method: 'PUT', body: JSON.stringify(data) },
     ),
+    publishDraft: (id: string, accountId: string, expectedDraftVersionId: string, activate = true) =>
+      fetchApi<ApiResponse<{ id: string; versionId: string; versionNumber: number; status: 'active' | 'stopped' }>>(
+        `/api/automation-drafts/${encodeURIComponent(id)}/publish?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify({ expectedDraftVersionId, activate }) },
+      ),
   },
   commonActions: {
     resources: (accountId: string, excludeId?: string, trigger?: 'tag.added') => {

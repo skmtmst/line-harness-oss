@@ -33,12 +33,13 @@ describe('V6 オートメーションが動いた記録（DkPY0）', () => {
     expect(PAGE).toContain('動いた記録を読み込めませんでした')
   })
 
-  it('安全な口が無い再実行・詳細・CSVを押せる形で出さない', () => {
+  it('詳細を開き、安全な口が無い再実行・CSVだけを押せる形で出さない', () => {
     expect(PAGE).not.toContain('もう一度やる')
     expect(PAGE).toContain('CSV書き出しは未接続')
-    expect(PAGE).toContain('実行詳細の画面は未接続です')
     expect(PAGE).toContain('<Button disabled>CSVで書き出す</Button>')
-    expect(PAGE).toContain('<Button disabled title="実行詳細の画面は未接続です">')
+    expect(PAGE).toContain('setSelectedRun(run)')
+    expect(PAGE).toContain('実行記録の中身')
+    expect(PAGE).toContain('成功済みの処理を二重に動かさないため')
   })
 
   it('壊れた応答を描画せず取得失敗へ倒す', () => {

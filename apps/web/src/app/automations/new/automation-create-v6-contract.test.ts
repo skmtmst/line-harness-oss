@@ -64,6 +64,7 @@ function firedEventTypes(): Set<string> {
     for (const m of source.matchAll(/trigger_type IN \('datetime', 'daily', 'weekly'\)/g)) {
       for (const type of ['datetime', 'daily', 'weekly']) fired.add(type)
     }
+    if (source.includes("'ec.order.confirmed'") && source.includes('EVENT_TRIGGER_TYPES')) fired.add('ec.order.confirmed')
   }
   return fired
 }
@@ -81,7 +82,7 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
   it('保存・キャンセルは下部追従バーにしか置かない', () => {
     expect(PAGE).toContain("import StickyBar from '@/components/shared/sticky-bar'")
     const bar = PAGE.slice(PAGE.indexOf('<StickyBar'))
-    for (const label of ['キャンセル', '有効にして続けて作る', '作成して有効にする']) {
+    for (const label of ['キャンセル', '下書きに保存', 'つくって動かす']) {
       expect(bar, `${label} が追従バーの外にあります`).toContain(label)
     }
     // 追従バーより前に保存の押し口を置かない。
@@ -197,5 +198,15 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
     expect(PAGE).toContain('actions: actions.map(')
     // 1つしか送らない形へ戻さない。
     expect(PAGE).not.toContain('actions: [\n')
+  })
+
+  it('設計の6種類を表示し、下書き・見込み人数・1人テスト・公開へ接続する', () => {
+    expect(screenEventValues()).toHaveLength(6)
+    expect(PAGE).toContain('api.automations.createDraftFromTemplate')
+    expect(PAGE).toContain('api.automations.updateDraft')
+    expect(PAGE).toContain('api.automations.audiencePreview')
+    expect(PAGE).toContain('api.automations.test')
+    expect(PAGE).toContain('api.automations.publishDraft')
+    expect(PAGE).toContain('つくって動かす')
   })
 })

@@ -78,6 +78,7 @@ export default function AutomationRunsPage() {
   const [data, setData] = useState<RunsResponse | null>(null)
   const [query, setQuery] = useState('')
   const [resultFilter, setResultFilter] = useState<'all' | 'executed' | 'skipped' | 'problems'>('all')
+  const [selectedRun, setSelectedRun] = useState<AutomationRun | null>(null)
 
   const load = useCallback(async () => {
     if (accountLoading) return
@@ -164,12 +165,45 @@ export default function AutomationRunsPage() {
               <span className={run.status === 'permanent_failed' || run.status === 'retry_wait' ? 'font-semibold text-danger' : run.status === 'succeeded' ? 'font-semibold text-accent-deep' : 'font-semibold text-ink-faint'}>{STATUS_LABEL[run.status]}</span>
               <p className="truncate text-ink-secondary" title={run.detail ?? '何もしていません'}>{run.detail ?? '何もしていません'}</p>
               <span className="tabular-nums text-ink-secondary">{formatDuration(run.durationMs)}</span>
-              <Button disabled title="実行詳細の画面は未接続です">中身を見る</Button>
+              <Button onClick={() => setSelectedRun(run)}>中身を見る</Button>
             </div>
           ))}
           <div className="border-t border-hairline px-4 py-3 text-xs text-ink-faint">記録 {data.pagination.total.toLocaleString('ja-JP')}件中 1〜{data.items.length}件を表示</div>
         </div>
       )}
+
+      {selectedRun ? (
+        <section data-design="run-detail" className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-sm" aria-label="実行記録の中身">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold text-info">実行記録の中身</p>
+              <h2 className="mt-1 text-lg font-bold text-ink">{selectedRun.automationName}</h2>
+              <p className="mt-1 text-sm text-ink-secondary">{formatOccurredAt(selectedRun.occurredAt)} ／ {selectedRun.subject ?? '友だち名なし'}</p>
+            </div>
+            <Button onClick={() => setSelectedRun(null)}>閉じる</Button>
+          </div>
+          <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+            <RunDetail label="きっかけ" value={selectedRun.triggerLabel} />
+            <RunDetail label="結果" value={STATUS_LABEL[selectedRun.status]} />
+            <RunDetail label="したこと・失敗理由" value={selectedRun.detail ?? '何もしていません'} />
+            <RunDetail label="かかった時間" value={formatDuration(selectedRun.durationMs)} />
+          </dl>
+          <div className="mt-4 rounded-control border border-hairline bg-canvas-sunken px-4 py-3 text-sm text-ink-secondary">
+            {selectedRun.canRetry
+              ? '失敗した処理だけを、成功済みの処理と重ならないようにもう一度実行できます。'
+              : '安全な再実行の対象ではありません。成功済みの処理を二重に動かさないため、この記録からは再実行できません。'}
+          </div>
+        </section>
+      ) : null}
+    </div>
+  )
+}
+
+function RunDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-control border border-hairline p-3">
+      <dt className="text-xs font-semibold text-ink-faint">{label}</dt>
+      <dd className="mt-1 text-ink">{value}</dd>
     </div>
   )
 }

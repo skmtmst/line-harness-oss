@@ -18,6 +18,7 @@ import {
   getAutomationDraft,
   listAutomationDraftResources,
   listAutomationTemplates,
+  publishAutomationDraft,
   updateAutomationDraft,
 } from '../services/automation-drafts.js';
 import {
@@ -332,6 +333,24 @@ automations.put(
       });
       return { updated: true };
     });
+  },
+);
+
+automations.post(
+  '/api/automation-drafts/:id/publish',
+  requireAutomationPermission,
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const accountId = await requireDraftAccount(c);
+    if (typeof accountId !== 'string') return accountId;
+    const body = await c.req.json<{ expectedDraftVersionId?: unknown; activate?: unknown }>()
+      .catch((): { expectedDraftVersionId?: unknown; activate?: unknown } => ({}));
+    return draftEndpoint(c, () => publishAutomationDraft(c.env.DB, {
+      id: c.req.param('id'),
+      lineAccountId: accountId,
+      expectedDraftVersionId: body.expectedDraftVersionId,
+      activate: body.activate,
+    }));
   },
 );
 

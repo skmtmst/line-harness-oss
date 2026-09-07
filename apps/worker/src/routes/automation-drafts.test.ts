@@ -191,6 +191,52 @@ describe('オートメーション下書きAPI', () => {
     await expect(unsupported.json()).resolves.toMatchObject({ code: 'trigger_unsupported' });
   });
 
+  it('複数の処理を保存し、確認した下書きだけを動作中として公開する', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO tags (id, name, line_account_id) VALUES ('tag-1', '会員', 'account-1')`,
+    ).run();
+    const adminApp = app(testDb.db, admin);
+    const created = await adminApp.request(
+      '/api/automation-templates/received-message-tag/drafts?account_id=account-1',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+    );
+    const createdBody = await created.json() as { data: { id: string; draftVersionId: string } };
+    const updated = await adminApp.request(
+      `/api/automation-drafts/${createdBody.data.id}?account_id=account-1`,
+      {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          expectedDraftVersionId: createdBody.data.draftVersionId,
+          name: '注文後の案内', eventType: 'ec.order.confirmed', triggerConfig: {}, conditions: {},
+          actions: [
+            { id: 'tag', type: 'add_tag', params: { tagId: 'tag-1' }, onFailure: 'stop' },
+            { id: 'message', type: 'send_message', params: { content: 'ありがとうございます' }, onFailure: 'stop' },
+          ],
+        }),
+      },
+    );
+    expect(updated.status).toBe(200);
+    const published = await adminApp.request(
+      `/api/automation-drafts/${createdBody.data.id}/publish?account_id=account-1`,
+      {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedDraftVersionId: createdBody.data.draftVersionId, activate: true }),
+      },
+    );
+    expect(published.status).toBe(200);
+    await expect(published.json()).resolves.toMatchObject({
+      success: true,
+      data: { id: createdBody.data.id, versionId: createdBody.data.draftVersionId, status: 'active' },
+    });
+    expect(testDb.raw.prepare(
+      `SELECT status, current_draft_version_id, current_published_version_id
+         FROM automation_definitions WHERE id = ?`,
+    ).get(createdBody.data.id)).toEqual({
+      status: 'active', current_draft_version_id: null,
+      current_published_version_id: createdBody.data.draftVersionId,
+    });
+  });
+
   it('別統括のアカウントは存在も明かさない', async () => {
     const response = await app(testDb.db, admin)
       .request('/api/automation-templates/welcome-scenario/drafts?account_id=account-2', {
