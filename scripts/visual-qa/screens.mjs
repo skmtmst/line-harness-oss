@@ -415,9 +415,13 @@ export const SCREENS = [
 
   // ── 機能3 友だち ────────────────────────────────────────
   { ...FRIENDS, node: 'PhxG6', name: '3-1 友だち',
+    variants: [
+      { suffix: 'unhandled', steps: [{ click: '未対応' }] },
+      { suffix: 'attention', steps: [{ click: '注目のみ' }] },
+    ],
     verdict: "match",
-    verdictNote: "**2026-09-06 Issue #265で修正・再判定。** 一致。4指標、検索・4絞り込み・状態チップ、7列の一覧、4行、ページ送りを設計順に表示した。残っていた日時の区切りを `2026/08/14 07:58` にそろえ、内部種別 `[sticker]` を「スタンプ」へ直した。1440・1920pxとも横はみ出し0、壊れ値・内部IDは0件。",
-    verdictSource: "friends-v6/PhxG6.txt + PhxG6-{1440,1920}.png",
+    verdictNote: "**2026-09-07 Issue #457で修正・再判定。** 一致。表の下の余分な空白をなくし、未対応・注目のみを設計と同じ小さい押し口へそろえた。選択中は色・枠・チェックで状態が分かり、実際に押して絞り込みが反映されることを確認。通常・未対応・注目のみを1440/1920pxで撮影し、横はみ出し0。",
+    verdictSource: "friends-v6/PhxG6{,-unhandled,-attention}.txt + 同名-{1440,1920}.png",
   },
   {
     /*
@@ -495,7 +499,7 @@ export const SCREENS = [
   },
   { ...FRIENDS, node: 'I6UAdr', name: '3-1-D 友だち詳細', route: '/friends/detail?id=friend-0',
     verdict: "match",
-    verdictNote: "**2026-09-06 Issue #265で修正・再判定。** 一致。左を顧客情報カード、右を概要タブに組み替え、進行中の配信・自動処理、同じ人としてつながる情報、最近の履歴、この友だちに行う操作を設計と同じ順で配置した。未接続の予約・EC・横断履歴は値を作らず取得元待ちと明記。1440/1920pxで横スクロール0、壊れ値・内部IDは0件。",
+    verdictNote: "**2026-09-07 Issue #457で修正・再判定。** 一致。左列のマイルを設計と同じ、見出しと詳細リンクに続く一段のカードへ変更し、利用可能数を `2,450 mile` の大きさと単位で表示した。1440/1920pxで横はみ出し0。",
     verdictSource: "friends-v6/I6UAdr.txt + I6UAdr-{1440,1920}.png",
   },
   {
@@ -508,12 +512,12 @@ export const SCREENS = [
     */
     states: { apis: ['**/api/friends?**', '**/api/friends/stats*'], kinds: ['loading', 'empty', 'error'] },
     verdict: "match",
-    verdictNote: "**2026-09-06 Issue #265で修正・再判定。** 一致。読込・空・失敗のどれでも一覧の見出し、列、フッターを残し、表の中身だけを状態表示へ差し替える構造に統一した。未取得件数と0件を混ぜず、再読み込みも表内に表示。全状態を1440/1920pxで撮影し、横スクロール0、壊れ値0件。",
+    verdictNote: "**2026-09-07 Issue #457で修正・再判定。** 一致。読込・空・失敗でも列とフッターを残しつつ、表の下に画面いっぱいの空白を作らない高さへそろえた。通常・読込・空・失敗を1440/1920pxで撮影し、横はみ出し0。",
     verdictSource: "friends-v6/bzDn6-{loading,empty,error}.txt + 同名-{1440,1920}.png",
   },
   { ...FRIENDS, node: 'YzxU1', name: '3-2 重複検出', route: '/friends?tab=duplicates',
     verdict: "match",
-    verdictNote: "**2026-09-06 Issue #265で修正・再判定。** 一致。自動統合しない注意帯、5指標、検索・状態絞り込み、候補表、再検出、アカウント別内訳、重複マトリックスを設計と同じ順で配置した。候補表は本人照合候補APIの根拠・確信度・所属・状態を表示し、配信削減の実績だけは未接続のため値を作らず `—` と説明を表示。1440/1920pxで横スクロール0、壊れ値・内部IDは0件。",
+    verdictNote: "**2026-09-07 Issue #457で修正・再判定。** 一致。重複候補表の見出し行へ下の表と同じ縦余白を付け、文字が潰れず同じ高さになるようそろえた。1440/1920pxで横はみ出し0。",
     verdictSource: "friends-v6/YzxU1.txt + YzxU1-{1440,1920}.png",
   },
   {
@@ -540,7 +544,7 @@ export const SCREENS = [
       kinds: ['normal', 'loading', 'empty', 'error'],
     },
     verdict: "match",
-    verdictNote: "**2026-09-06 Issue #265で修正・再判定。** 一致。4指標、統合ユーザー作成導線、検索、複数アカウント・UID・所属の絞り込み、CSV、表、ページ送りを設計と同じ構造にした。LINEユーザーIDは出さず連携状態だけを表示し、詳細ボタンも設計の緑へ統一。重複配信削減の実績は未接続なので値を作らず `—` と説明を表示。通常・読込・空・失敗を1440/1920pxで撮影し、横スクロール0、壊れ値・内部IDは0件。",
+    verdictNote: "**2026-09-07 Issue #457で修正・再判定。** 一致。作成・検索・複数アカウント・UID・所属・CSV・再計算の操作面から内側の二重枠を外し、全操作の高さをそろえた。再計算も縦に伸びず他の押し口と同じ高さ。通常・読込・空・失敗を1440/1920pxで撮影し、横はみ出し0。",
     verdictSource: "friends-v6/r7eSi-{normal,loading,empty,error}.txt + 同名-{1440,1920}.png",
   },
   {
