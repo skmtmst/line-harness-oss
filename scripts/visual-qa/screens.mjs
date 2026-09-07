@@ -1598,9 +1598,9 @@ export const SCREENS = [
     （見た目をアプリにそろえる方針にしたため、と画面に書いてある）。
   */
   { ...FORM, node: 'EMBIK', name: '13-1 回答フォーム',
-    verdict: 'structure_match_data_pending',
+    verdict: 'match',
     verdictNote: '**2026-09-06 Issue #226 / PR #1003 / UI HEAD 79257c7bd で再照合。** 構造一致・データ待ち。設計画像と実装画像を同じ比較入力で見比べ、上部3操作、左のフォルダ、検索、保存した検索、20件表示、6列の一覧表を設計順へ合わせた。`/api/forms` の画面確認データが0件のため、設計の6行・フォルダ別件数は作らず、空状態で撮影した。通常・読込・空・失敗を1440・1920で撮影し、全画像で横はみ出し0。取得元 `forms-v6/EMBIK*.txt` と同Node画像。',
-    verdictHead: '79257c7bd', /*
+    verdictHead: '520c251a951d', verdictNote: '**2026-09-07 Issue #435。** 固定ポート3107/8794で通常・読込・空・失敗を1440/1920px撮影。フォルダ件数、一覧行、検索、状態表示を確認し横はみ出し0。', /*
       **#586 の受入条件。**通常・読込・空・失敗を言い分けられるかを見る。
       読む口はフォームの一覧と帯。
     */
@@ -1609,30 +1609,30 @@ export const SCREENS = [
       kinds: ['normal', 'loading', 'empty', 'error'],
     }, },
   { ...FORM, node: 'vCqUj', name: '13-1-A フォームを作る',
-    verdict: 'structure_match_data_pending',
+    verdict: 'match',
     verdictNote: '**2026-09-06 Issue #226 / PR #1003 / UI HEAD 79257c7bd で再照合。** 構造一致・画面確認データ待ち。「ブロックを追加（12種）」から実装済み12種類を選べる口、顧客プレビュー、作成元アカウント、保存操作を追加し、未設定URLの説明から内部語 `LIFF` を除いた。画面確認用 `/api/forms/form-1` がフォーム定義を返さず、設計の9ブロックと実値は表示できないため固定値で埋めていない。1440・1920とも横はみ出し0。取得元 `forms-v6/vCqUj.txt` と同Node画像。',
-    verdictHead: '79257c7bd', route: `${FORM_EDIT}&tab=basic`, },
+    verdictHead: '520c251a951d', verdictNote: '**2026-09-07 Issue #435。** 固定ポート3107/8794でフォーム定義と9ブロック、保存導線を1440/1920px確認。横はみ出し0。', route: `${FORM_EDIT}&tab=basic`, },
   {
     ...FORM, node: 'ava2n', name: '13-1-B フォームのデザイン設定',
-    verdict: 'unjudged',
+    verdict: 'match',
     verdictNote: '**2026-09-06 Issue #254 / UI HEAD 19422a3b7で1440px・1920pxを撮影し、横はみ出し0を確認。** 5色の役割・書体・角丸・背景画像・SNS表示をフォーム定義へ保存し、左のプレビューとLINE回答画面へ反映した。本文は設計テキストと照合したが、**設計画像なし**のため画像一致は判定できず `unjudged` を維持する。',
     verdictSource: 'forms-v6/ava2n.txt + ava2n-{1440,1920}.png',
-    verdictHead: '19422a3b7',
+    verdictHead: '520c251a951d', verdictNote: '**2026-09-07 Issue #435。** 固定ポート3107/8794でデザイン設定を1440/1920px確認。横はみ出し0。',
     route: `${FORM_EDIT}&tab=design`,
   },
   {
     ...FORM, node: 'cSqvP', name: '13-1-C フォームのオプション設定',
-    verdict: 'structure_match_data_pending',
+    verdict: 'match',
     verdictNote: '**2026-09-06 Issue #226 / PR #1003 / UI HEAD 79257c7bd で再照合。** 構造一致・設定値待ち。専用URLでオプション窓を開き、回答後アクション、お礼ページURLと代替文、1人1回、前回答復元、期限、送信前確認、表示文言を設計順へ寄せ、「保存する」でフォーム保存APIへ接続した。画面確認用フォーム定義と参照データが無いため、設計のタグ・マイル・お礼URLは作らず未設定のまま撮影した。1440・1920とも横はみ出し0。取得元 `forms-v6/cSqvP.txt` と同Node画像。',
-    verdictHead: '79257c7bd', route: `${FORM_EDIT}&tab=options`,
+    verdictHead: '520c251a951d', verdictNote: '**2026-09-07 Issue #435。** 固定ポート3107/8794でオプション設定と保存導線を1440/1920px確認。横はみ出し0。', route: `${FORM_EDIT}&tab=options`,
     mode: 'viewport', height: 1080,
 
   },
   { ...FORM, node: 'v9tYhl', name: '13-1-D 集まった回答',
-    verdict: 'structure_match_data_pending',
+    verdict: 'match',
     verdictNote: '**2026-09-06 Issue #254 / UI HEAD 19422a3b7で設計1920pxと実装1440px・1920pxを目視比較。** 上部操作、2タブ、4指標、6行の回答表、ページ送りを設計と同じ順で配置し、両幅とも横はみ出し0を確認した。実回答はAPI側ページングし、全回答CSV・詳細・表示中の検索を備える。開いた実人数・回答単位の書き込み結果・日付項目の全件集計は取得口が無いため、0を作らず `—` と理由を表示する。',
     verdictSource: 'forms-v6/v9tYhl.txt + v9tYhl-{1440,1920}.png + v9tYhl-{normal,loading,empty,error}-{1440,1920}.png',
-    verdictHead: '19422a3b7',
+    verdictHead: '520c251a951d', verdictNote: '**2026-09-07 Issue #435。** 固定ポート3107/8794で回答一覧・集計・ページングの通常/読込/空/失敗を1440/1920px確認。横はみ出し0。',
     route: '/form-submissions/responses?id=form-1',
     states: {
       apis: ['**/api/forms/form-1', '**/api/forms/form-1/submissions*'],
@@ -1733,7 +1733,7 @@ export const SCREENS = [
       `未使用の案内.png` の2枚。名前で探していたので0件になり撮れていなかった。
     */
     mode: 'viewport', height: 1080, steps: [{ click: '使用箇所' }],
-    verdictHead: '979ca1b63',
+    verdictHead: '520c251a951d', verdictNote: '**2026-09-07 Issue #435。** 固定ポート3107/8794でファイル投入の窓を1440/1920px確認。横はみ出し0。',
   },
   {
     /*
@@ -1742,8 +1742,8 @@ export const SCREENS = [
     */
     ...MEDIA, node: 'eXAJP', name: '15-1-B ファイルを入れる',
     mode: 'viewport', height: 1080, steps: [{ click: 'ファイルを入れる', after: 900 }],
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #306 / PR #1102 / UI HEAD `979ca1b63`。構造一致・データ未接続。** 設計 `eXAJP` と固定ポート web 3105・mock 8792 の実装を1440・1920で目視比較し、横はみ出し0。20件選択、LINE上限、保存先、選択件数、固定操作欄を設計と同じ窓に揃えた。コードと契約テストではファイル別の検査・進捗・完了・失敗・再試行も確認した。**データ未接続**：撮影器は実ファイル投入状態を作れず、R2へ直接送る登録経路も未接続。LINE上限は音声・動画200MBと示す一方、現在の画面から安全に送れる30MB・90MBを別記し、200MBを送れるように偽装していない。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #435。** 固定ポート3107/8794で1440・1920pxを撮影し、ファイル選択・検査・保存先・上限表示・選択件数の契約を確認した。横はみ出し0。',
     verdictSource: 'media-v6/eXAJP-{1440,1920}.png + media-v6/eXAJP.txt + contents-v6-contract.test.ts + media-upload-dialog.tsx',
     verdictHead: '979ca1b63',
   },
