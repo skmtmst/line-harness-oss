@@ -1,6 +1,6 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
-  "generatedAt": "2026-09-07T12:28:24.106Z",
+  "generatedAt": "2026-09-07T13:18:17.154Z",
   "thresholdPercent": 10,
   "screenCount": 272,
   "comparedCount": 250,
@@ -2292,9 +2292,9 @@
           "implementationHeight": 1080,
           "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 64077,
+          "mismatchedPixels": 67252,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 3.0901,
+          "pixelDiffPercent": 3.2432,
           "boundingBox": {
             "left": 0,
             "top": 0,
@@ -2304,12 +2304,14 @@
           "dominantRegion": "中央・左",
           "designPath": "docs/design-reference/reminders-v6/M1EXwB.png",
           "implementationPath": "docs/design-qa/reminders-v6/M1EXwB-1920.png",
+          "implementationSource": "docs",
           "diffPath": "docs/design-qa/reminders-v6/M1EXwB-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 3.0901,
+      "pixelDiffPercent": 3.2432,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
+      "implementationSource": "docs",
       "diffPath": "docs/design-qa/reminders-v6/M1EXwB-diff-1920.png",
       "aboveThreshold": false
     },
@@ -3376,9 +3378,9 @@
           "implementationHeight": 1080,
           "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 60052,
+          "mismatchedPixels": 63102,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 2.896,
+          "pixelDiffPercent": 3.0431,
           "boundingBox": {
             "left": 0,
             "top": 0,
@@ -3388,12 +3390,14 @@
           "dominantRegion": "上部・左",
           "designPath": "docs/design-reference/webinars-v6/ZC13r.png",
           "implementationPath": "docs/design-qa/webinars-v6/ZC13r-1920.png",
+          "implementationSource": "docs",
           "diffPath": "docs/design-qa/webinars-v6/ZC13r-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 2.896,
+      "pixelDiffPercent": 3.0431,
       "heightDifferencePx": 0,
       "dominantRegion": "上部・左",
+      "implementationSource": "docs",
       "diffPath": "docs/design-qa/webinars-v6/ZC13r-diff-1920.png",
       "aboveThreshold": false
     },
@@ -5833,24 +5837,26 @@
           "implementationHeight": 1080,
           "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 117439,
+          "mismatchedPixels": 108565,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 5.6635,
+          "pixelDiffPercent": 5.2356,
           "boundingBox": {
             "left": 0,
             "top": 0,
             "right": 1881,
             "bottom": 1079
           },
-          "dominantRegion": "中央・左",
+          "dominantRegion": "中央・右",
           "designPath": "docs/design-reference/inflow-v6/Q4bkTg.png",
           "implementationPath": "docs/design-qa/inflow-v6/Q4bkTg-1920.png",
+          "implementationSource": "docs",
           "diffPath": "docs/design-qa/inflow-v6/Q4bkTg-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 5.6635,
+      "pixelDiffPercent": 5.2356,
       "heightDifferencePx": 0,
-      "dominantRegion": "中央・左",
+      "dominantRegion": "中央・右",
+      "implementationSource": "docs",
       "diffPath": "docs/design-qa/inflow-v6/Q4bkTg-diff-1920.png",
       "aboveThreshold": false
     },

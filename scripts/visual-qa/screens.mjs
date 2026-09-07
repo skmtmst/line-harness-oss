@@ -1027,9 +1027,9 @@ export const SCREENS = [
   /* 設計どおり、基本設定→対象者→通知ステップ→送信設定→確認を段ごとに撮る。 */
   { ...REMINDER, node: 'M1EXwB', name: '7-1 リマインダ',
     verdict: 'match',
-    verdictNote: '**2026-09-07 S2 #73。** 正本 `M1EXwB.png` の操作列に合わせ、削除をアイコン化し、「…」から配信予定と実行履歴を選べるようにした。通常・メニュー展開を1440/1920で撮影し、横はみ出し0。予定は実行台帳の公開状態 `planned` へ接続し、固定件数を作らない。head `a828e5afc3`。',
+    verdictNote: '**2026-09-07 Issue #478 / UI HEAD `7b39575f4` を3105/8792で再撮影し一致。** 独自の13remフォルダ欄を共通FolderPanelへ置き換え、他の一覧と同じ16rem幅にした。フォルダの選択・追加と一覧の絞り込みを維持し、1440px・1920pxとも横はみ出し0。共通パネルの行高・余白へ統一したため画素差は3.0901%から3.2432%へ微増したが、設計の役割と構造は一致している。',
     verdictSource: 'reminders-v6/M1EXwB.txt + reminders-v6/M1EXwB-{1440,1920}.png + reminders-v6/M1EXwB-planned-menu-{1440,1920}.png',
-    verdictHead: 'a828e5afc3', route: '/reminders',
+    verdictHead: '7b39575f4', route: '/reminders',
     variants: [{ suffix: '-planned-menu', steps: [{ click: '未返信3日後フォローのその他操作', after: 500 }] }], },
   { ...REMINDER, node: 'uJP22', name: '7-1-A リマインダを作成',
     verdict: 'match',
@@ -1355,9 +1355,9 @@ export const SCREENS = [
   */
   { ...WEBINAR, node: 'ZC13r', name: '10-1 ウェビナー',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #324 / UI HEAD a55f719b9b / 一覧API PR #1071（統合 #1074）で再判定し一致。** 選択中のLINE公式アカウントを一覧とフォルダ集計の両APIへ渡し、4指標、フォルダ件数、5行の申込・視聴・公開状態・公開期間、検索・絞り込み、6列表、ページ送りを実値で表示した。通常・空・失敗・権限不足を3102/8789で1440/1920px撮影し、全10枚で横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #478 / UI HEAD `7b39575f4` を3105/8792で再撮影し一致。** 縦長の独自asideを共通FolderPanelへ置き換え、16rem幅・中身に合う高さへ統一した。フォルダ別件数は一覧のfolderIdから算出して表示し、選択すると実際に絞り込む。保存契約待ちの追加ボタンは上部だけに置き、フォルダ欄と重ならない。1440px・1920pxとも横はみ出し0。共通パネルの行高・余白へ統一したため画素差は2.8960%から3.0431%へ微増したが、設計の役割と構造は一致している。',
     verdictSource: 'webinars-v6/ZC13r.png + ZC13r-1920.png + ZC13r*.txt',
-    verdictHead: 'a55f719b9b',
+    verdictHead: '7b39575f4',
     /*
       帯は `GET /api/webinars/overview` を読む。通常・0件・取得失敗・
       権限不足を混ぜないので、口を差し替えて1つずつ撮る。
@@ -2162,8 +2162,9 @@ export const SCREENS = [
   */
   { ...INFLOW, node: 'Q4bkTg', name: '18-1 流入と計測', route: '/inflow-links?tab=links',
     verdict: "match",
-    verdictNote: "**2026-09-06 Issue #231 / PR #951 / UI HEAD 43b3aae50で設計画像と実装画像を同じ幅で並べて再確認し、一致。** 流入元24本、今月312人（経路が分かる289人）、クリック8,420回、平均追加率6.4%を接続。タブ件数、フォルダ、検索・絞り込み、CSV、まとめて操作、一覧も設計の役割と順序にそろえた。1440px・1920pxとも横はみ出し0。",
-    verdictSource: "inflow-v6/Q4bkTg.txt + Q4bkTg-1440.png + Q4bkTg-1920.png",
+    verdictNote: "**2026-09-07 Issue #478 / UI HEAD `7b39575f4` を3105/8792で再撮影し一致。** 独自フォルダ欄を16remの共通FolderPanelへ置き換え、緑の重複追加ボタンと独自説明文を外した。上部の白い追加ボタン1つ、フォルダ選択・編集、一覧絞り込みを維持。狭かった3列を再配分し、「同時に動く配信」「友だち追加」「クリック」を重ねず表示した。1440px・1920pxとも横はみ出し0、画素差は5.6635%から5.2356%へ改善した。",
+    verdictSource: "inflow-v6/Q4bkTg.txt + Q4bkTg-1440.png + Q4bkTg-1920.png + Issue #478 pixel diff",
+    verdictHead: "7b39575f4",
   },
   { ...INFLOW, node: 'IhSBB', name: '18-1-A サイトスクリプト', route: '/inflow-links?tab=script',
     verdict: "match",
