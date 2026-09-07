@@ -428,6 +428,7 @@ function EditCommonVarInner() {
                   <input
                     id="cv-value"
                     type={item.type === 'number' ? 'number' : 'text'}
+                    maxLength={item.type === 'number' ? undefined : 200}
                     value={value}
                     onChange={(e) => setValue(e.target.value)}
                     className="border-hairline rounded-control w-full border px-3 py-3 text-sm"

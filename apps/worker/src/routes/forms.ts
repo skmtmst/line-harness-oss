@@ -67,6 +67,13 @@ const FORM_UPLOAD_TYPES: Record<string, string> = {
 
 const FORM_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 const FORM_ARCHIVE_BODY_MAX_BYTES = 16 * 1024;
+/**
+ * 下書き保存(partial)が友だちmetadataへ書き込む上限。
+ * 短い答えの一時置き場のため十分な大きさ。
+ */
+const PARTIAL_MERGED_MAX_BYTES = 32 * 1024;
+/** ページ分けなし回答取得の上限。互換用の古い形だけに適用する。 */
+const NON_PAGINATED_SUBMISSIONS_MAX = 500;
 
 class FormArchiveBodyError extends Error {
   constructor(readonly status: 400 | 413, message: string) {
@@ -163,7 +170,15 @@ function serializeForm(
     usedByAccounts?: FormUsedByAccount[];
     accountScopeReviewRequired?: boolean;
   },
+  opts?: {
+    /**
+     * 閲覧だけの役割(staff)へ返すときは連携先の秘密を隠す。
+     * 有無だけを残し、中身は owner / admin だけが読める。
+     */
+    redactSecrets?: boolean;
+  },
 ) {
+  const redactSecrets = opts?.redactSecrets === true;
   return {
     id: row.id,
     name: row.name,
@@ -174,8 +189,9 @@ function serializeForm(
     onSubmitScenarioId: row.on_submit_scenario_id,
     onSubmitMessageType: row.on_submit_message_type,
     onSubmitMessageContent: row.on_submit_message_content,
-    onSubmitWebhookUrl: row.on_submit_webhook_url,
-    onSubmitWebhookHeaders: row.on_submit_webhook_headers,
+    onSubmitWebhookUrl: redactSecrets ? null : row.on_submit_webhook_url,
+    onSubmitWebhookHeaders: redactSecrets ? null : row.on_submit_webhook_headers,
+    hasSubmitWebhook: Boolean(row.on_submit_webhook_url),
     onSubmitWebhookFailMessage: row.on_submit_webhook_fail_message,
     saveToMetadata: Boolean(row.save_to_metadata),
     isActive: Boolean(row.is_active),
@@ -359,6 +375,7 @@ forms.get('/api/forms', requireRole('owner', 'admin', 'staff'), async (c) => {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
     const items = await getFormsWithStats(c.env.DB, { lineAccountIds: [accountId] });
+    const redactSecrets = c.get('staff')?.role === 'staff';
     return c.json({
       success: true,
       data: items.map((row) =>
@@ -366,7 +383,7 @@ forms.get('/api/forms', requireRole('owner', 'admin', 'staff'), async (c) => {
           lastSubmittedAt: row.last_submitted_at,
           usedByAccounts: row.used_by_accounts,
           accountScopeReviewRequired: row.account_scope_review_required,
-        }),
+        }, { redactSecrets }),
       ),
     });
   } catch (err) {
@@ -387,7 +404,9 @@ forms.get('/api/forms/:id', async (c) => {
     if (staff && !await canUseFormFromAccount(c, id, c.req.query('account_id'))) {
       return c.json({ success: false, error: 'Form not found' }, 404);
     }
-    const data = staff ? serializeForm(form) : serializePublicForm(form);
+    const data = staff
+      ? serializeForm(form, undefined, { redactSecrets: staff.role === 'staff' })
+      : serializePublicForm(form);
     return c.json({ success: true, data });
   } catch (err) {
     console.error('GET /api/forms/:id error:', err);
@@ -696,8 +715,17 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
     const hasPagination = c.req.query('page') !== undefined || c.req.query('limit') !== undefined;
     if (!hasPagination) {
       // SDKなど既存利用先との互換性を保つ。V6管理画面だけが明示的にページ分けを要求する。
+      // 大きいフォームで重い応答になるため上限を置く。page/limit 付きへ移行すること。
       const submissions = await getFormSubmissions(c.env.DB, id);
-      return c.json({ success: true, data: submissions.map(serializeSubmission) });
+      // Header 値は ASCII のみ。日本語の案内は PR と票に残す。
+      c.header(
+        'Warning',
+        '299 - "non-paginated submissions are limited to 500 rows; use page/limit"',
+      );
+      return c.json({
+        success: true,
+        data: submissions.slice(0, NON_PAGINATED_SUBMISSIONS_MAX).map(serializeSubmission),
+      });
     }
     const page = listPage(c.req.query('page'));
     const limit = listLimit(c.req.query('limit'), 20);
@@ -792,12 +820,39 @@ forms.post('/api/forms/:id/partial', async (c) => {
       return c.json({ success: false, error: 'Friend not found' }, 404);
     }
 
-    // Save survey data to friend metadata (merge with existing)
-    const existingMeta = friend.metadata ? JSON.parse(friend.metadata) : {};
-    const merged = { ...existingMeta, ...body.data };
+    const form = await getFormById(c.env.DB, c.req.param('id'));
+    if (!form) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
+    // 回答定義に無い鍵は受け付けない。業務で使う鍵の上書きを防ぐ。
+    const allowedNames = new Set(
+      collectInputs(parseLayout(form.layout, form.fields)).map((block) => block.name),
+    );
+    const incoming = body.data && typeof body.data === 'object' ? body.data : {};
+    const filtered: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(incoming)) {
+      if (allowedNames.has(key)) filtered[key] = value;
+    }
+
+    // Save survey data to friend metadata (merge with existing).
+    // 壊れた既存値は空として扱う。ここで例外を投げると500になる。
+    let existingMeta: Record<string, unknown> = {};
+    try {
+      const parsed: unknown = friend.metadata ? JSON.parse(friend.metadata) : {};
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        existingMeta = parsed as Record<string, unknown>;
+      }
+    } catch {
+      existingMeta = {};
+    }
+    const merged = { ...existingMeta, ...filtered };
+    const mergedJson = JSON.stringify(merged);
+    if (new TextEncoder().encode(mergedJson).byteLength > PARTIAL_MERGED_MAX_BYTES) {
+      return c.json({ success: false, error: '送信内容が大きすぎます' }, 413);
+    }
     await c.env.DB.prepare(
       'UPDATE friends SET metadata = ?, updated_at = ? WHERE id = ?',
-    ).bind(JSON.stringify(merged), jstNow(), friend.id).run();
+    ).bind(mergedJson, jstNow(), friend.id).run();
 
     return c.json({ success: true });
   } catch (err) {

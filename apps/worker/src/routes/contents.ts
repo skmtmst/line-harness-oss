@@ -21,10 +21,13 @@ import {
   MediaVersionConflictError,
   jstNow,
   getCommonVars,
+  countCommonVars,
+  COMMON_VARS_LIST_LIMIT,
   getCommonVarUsageSummaries,
   getCommonVarById,
   createCommonVar,
   updateCommonVar,
+  CommonVarFolderError,
   deleteCommonVar,
   getCommonVarUsageImpact,
   getCommonVarVersions,
@@ -1284,10 +1287,15 @@ contents.get('/api/common-vars', async (c) => {
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
-    const items = await getCommonVars(c.env.DB, {
-      lineAccountId: accountId,
-      folderId: c.req.query('folderId') || undefined,
-    });
+    const rawLimit = Number(c.req.query('limit'));
+    const limit = Number.isFinite(rawLimit)
+      ? Math.max(1, Math.min(Math.floor(rawLimit), COMMON_VARS_LIST_LIMIT))
+      : COMMON_VARS_LIST_LIMIT;
+    const folderId = c.req.query('folderId') || undefined;
+    const [items, total] = await Promise.all([
+      getCommonVars(c.env.DB, { lineAccountId: accountId, folderId, limit }),
+      countCommonVars(c.env.DB, { lineAccountId: accountId, folderId }),
+    ]);
     const usageSummaries = await getCommonVarUsageSummaries(
       c.env.DB,
       items.map((item) => item.var_key),
@@ -1300,7 +1308,11 @@ contents.get('/api/common-vars', async (c) => {
         Object.keys(COMMON_VAR_USAGE_KIND_LABELS).map((kind) => [kind, 0]),
       ) as CommonVar['usage_by_kind'];
     }
-    return c.json({ success: true, data: items.map(serializeVar) });
+    return c.json({
+      success: true,
+      data: items.map(serializeVar),
+      meta: { total, limited: total > items.length, limit },
+    });
   } catch (err) {
     console.error('GET /api/common-vars error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -1369,22 +1381,42 @@ contents.post('/api/common-vars', requireRole('owner', 'admin'), async (c) => {
     const keyCheck = validateFieldKey(body.varKey);
     if (!keyCheck.ok) return c.json({ success: false, error: keyCheck.error }, 422);
 
-    const type = (COMMON_VAR_TYPES as readonly string[]).includes(String(body.type))
-      ? (String(body.type) as CommonVarType)
-      : 'text';
+    // 不正な種別は黙って標準にしない。誤った種別での登録に気づけなくなる。
+    const typeRaw = body.type === undefined ? 'text' : String(body.type);
+    if (!(COMMON_VAR_TYPES as readonly string[]).includes(typeRaw)) {
+      return c.json({ success: false, error: '種別が正しくありません。選び直してください' }, 400);
+    }
+    const type = typeRaw as CommonVarType;
+
+    // 編集画面の入力欄と同じ上限を口でも守る。超えた値は送信時に落ち、
+    // 原因がこの操作と結びつかなくなる。
+    const value = body.value == null ? '' : String(body.value);
+    const memo = body.memo == null ? '' : String(body.memo);
+    if (name.length > 200) {
+      return c.json({ success: false, error: '名前は200文字までで入力してください' }, 400);
+    }
+    if (value.length > 200) {
+      return c.json({ success: false, error: '差し込まれる文字は200文字までで入力してください' }, 400);
+    }
+    if (memo.length > 1000) {
+      return c.json({ success: false, error: 'メモは1000文字までで入力してください' }, 400);
+    }
 
     const created = await createCommonVar(c.env.DB, {
       lineAccountId: accountId,
       name,
       varKey: String(body.varKey),
       type,
-      value: body.value == null ? '' : String(body.value),
-      memo: body.memo == null ? '' : String(body.memo),
+      value,
+      memo,
       actorId: c.get('staff').id,
       folderId: body.folderId ? String(body.folderId) : null,
     });
     return c.json({ success: true, data: serializeVar(created) }, 201);
   } catch (err) {
+    if (err instanceof CommonVarFolderError) {
+      return c.json({ success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400);
+    }
     if (err instanceof Error && err.message.includes('UNIQUE constraint')) {
       return c.json({ success: false, error: 'その差し込み名は既に使われています' }, 409);
     }
@@ -1422,10 +1454,27 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
         422,
       );
     }
+    // 空の名前は作れない(登録時と同じ)。版番号なしの上書きは許すが、
+    // その旨は契約テストに明記する(同時編集の衝突検出は版番号つきのみ)。
+    const patchName = body.name === undefined ? undefined : String(body.name).trim();
+    if (patchName !== undefined && !patchName) {
+      return c.json({ success: false, error: '名前を入力してください' }, 400);
+    }
+    if (patchName !== undefined && patchName.length > 200) {
+      return c.json({ success: false, error: '名前は200文字までで入力してください' }, 400);
+    }
+    const patchValue = body.value === undefined ? undefined : String(body.value);
+    if (patchValue !== undefined && patchValue.length > 200) {
+      return c.json({ success: false, error: '差し込まれる文字は200文字までで入力してください' }, 400);
+    }
+    const patchMemo = body.memo === undefined ? undefined : String(body.memo);
+    if (patchMemo !== undefined && patchMemo.length > 1000) {
+      return c.json({ success: false, error: 'メモは1000文字までで入力してください' }, 400);
+    }
     const updated = await updateCommonVar(c.env.DB, id, accountId, {
-      name: body.name === undefined ? undefined : String(body.name).trim(),
-      value: body.value === undefined ? undefined : String(body.value),
-      memo: body.memo === undefined ? undefined : String(body.memo),
+      name: patchName,
+      value: patchValue,
+      memo: patchMemo,
       expectedVersion,
       actorId: c.get('staff').id,
       changeReason: typeof body.changeReason === 'string' ? body.changeReason : undefined,
@@ -1433,6 +1482,9 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
     });
     return c.json({ success: true, data: serializeVar(updated!) });
   } catch (err) {
+    if (err instanceof CommonVarFolderError) {
+      return c.json({ success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400);
+    }
     if (err instanceof CommonVarVersionConflictError) {
       return c.json({
         success: false,

@@ -1,4 +1,5 @@
 import type { CommonVar } from '@line-crm/shared'
+import { csvCell } from '@/lib/presentation'
 
 export type CommonVarFilter = 'all' | 'empty' | 'scheduled' | 'unused'
 export type CommonVarOrder = 'usage_desc' | 'updated_desc' | 'name_asc'
@@ -26,10 +27,6 @@ export function filterAndSortCommonVars(
       const rightUsage = right.usageCount ?? -1
       return rightUsage - leftUsage || left.name.localeCompare(right.name, 'ja-JP')
     })
-}
-
-function csvCell(value: string | number): string {
-  return `"${String(value).replaceAll('"', '""')}"`
 }
 
 export function commonVarsCsv(items: CommonVar[]): string {
