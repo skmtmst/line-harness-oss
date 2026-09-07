@@ -1,9 +1,9 @@
 # 18-1-A サイトスクリプト
 # /inflow-links?tab=script
 
-画
-画面確認アカウント
-Ver. 0.0.0-dev
+然
+株式会社 然
+Ver. 2.6.4
 
 メイン
 
@@ -77,7 +77,7 @@ LINEアカウント
 2025年イベント
 旧テストアカウント
 統括
-画面確認
+Kenta Kawano
 ログアウト
 流入経路 24
 サイトスクリプト
@@ -97,7 +97,7 @@ LINEアカウント
 
 あなたのアカウントで使うコード
 
-<script async src="http://127.0.0.1:8792/api/site/script.js" data-key="hk_9f3a2c81b4"></script>
+<script async src="http://127.0.0.1:8789/api/site/script.js" data-key="hk_d1ef89e503d398ce9e0931984858ebc1"></script>
 コピー
 貼るとできるようになること
 どのページを見て来たか

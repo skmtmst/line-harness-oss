@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useState, useEffect, useCallback } from 'react'
+import { Suspense, useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Trash2 } from 'lucide-react'
 import type { Folder, Tag } from '@line-crm/shared'
@@ -99,6 +99,16 @@ function BroadcastList() {
   const [folderError, setFolderError] = useState('')
   const [insights, setInsights] = useState<Record<string, BroadcastInsight>>({})
   const [fetchingInsight, setFetchingInsight] = useState<string | null>(null)
+  /*
+   * 一覧のページ送り・件数・並び順。APIの limit/cursor/status/folderId/sort と
+   * 連動する。全件取得→手元絞り込みだったのを、口側のページ送りで読む。
+   * タイトル・日付の絞り込みだけは手元に残す(打つたびに取り直すと重い)。
+   */
+  const [pageSize, setPageSize] = useState(20)
+  const [sortKey, setSortKey] = useState<'newest' | 'oldest'>('newest')
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [loadingMoreBroadcasts, setLoadingMoreBroadcasts] = useState(false)
+  const [listTotal, setListTotal] = useState<number | null>(null)
   /**
    * 削除の確認。ブラウザの `confirm()` は「この配信を削除してもよいですか？」
    * としか言えず、予約が取り消されることも、送った記録が残ることも読めない。
@@ -113,14 +123,50 @@ function BroadcastList() {
   const [savedViewBusy, setSavedViewBusy] = useState(false)
   const [savedViewError, setSavedViewError] = useState('')
 
-  const loadInsight = async (id: string) => {
-    try {
-      const res = await api.broadcasts.getInsight(id)
-      if (res.success && res.data) {
-        setInsights(prev => ({ ...prev, [id]: res.data! }))
-      }
-    } catch { /* ignore */ }
+  /*
+   * 一覧に同梱の集計(insightSummary)を、行の表示形に直す。
+   * 値が1つも無い(未送信・未取得)ときは undefined で、手動の取得ボタンを出す。
+   * 以前は送信済みごとに getInsight を自動発行(N+1)していたが、一覧1回で
+   * 足りるようになった。LINEへの再取得は下の手動ボタンに寄せる。
+   */
+  const summaryInsight = (summary: ApiBroadcast['insightSummary']): BroadcastInsight | undefined => {
+    if (!summary) return undefined
+    if (summary.delivered == null && summary.uniqueImpression == null
+      && summary.uniqueClick == null && summary.openRate == null && summary.clickRate == null) {
+      return undefined
+    }
+    return {
+      delivered: summary.delivered,
+      uniqueImpression: summary.uniqueImpression,
+      uniqueClick: summary.uniqueClick,
+      uniqueMediaPlayed: null,
+      openRate: summary.openRate,
+      clickRate: summary.clickRate,
+    }
   }
+
+  /*
+   * 一覧同梱の集計が無い送信済みだけ1回ずつ取る。新しい口では summary で
+   * 足りるが、旧い口・目視確認用の mock には同梱が無いため、数が空欄に
+   * ならないよう不足分だけ補う(二重取り防止の済み印付き)。
+   */
+  const fetchedInsightIdsRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    const missing = broadcasts.filter((b) =>
+      b.status === 'sent'
+      && !insights[b.id]
+      && !summaryInsight(b.insightSummary)
+      && !fetchedInsightIdsRef.current.has(b.id))
+    if (missing.length === 0) return
+    missing.forEach((b) => {
+      fetchedInsightIdsRef.current.add(b.id)
+      api.broadcasts.getInsight(b.id).then((res) => {
+        if (res.success && res.data) {
+          setInsights((prev) => ({ ...prev, [b.id]: res.data as BroadcastInsight }))
+        }
+      }).catch(() => undefined)
+    })
+  }, [broadcasts, insights])
 
   const handleFetchInsight = async (id: string) => {
     setFetchingInsight(id)
@@ -186,31 +232,55 @@ function BroadcastList() {
     }
   }
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (cursor?: string | null, append = false) => {
+    if (append) {
+      if (loadingMoreBroadcasts) return
+      setLoadingMoreBroadcasts(true)
+    } else {
+      setLoading(true)
+    }
     setError('')
     setForbidden(false)
     try {
       const [broadcastsRes, tagsRes] = await Promise.all([
-        api.broadcasts.list({ accountId: selectedAccountId || undefined }),
-        api.tags.list(),
+        api.broadcasts.list({
+          accountId: selectedAccountId || undefined,
+          limit: pageSize,
+          cursor: cursor ?? undefined,
+          // 状態・フォルダは口側で絞る。タイトル・日付は手元で絞る。
+          status: statusFilter === 'all' ? undefined : statusFilter,
+          folderId: folderFilter === UNFILED ? 'unfiled' : folderFilter || undefined,
+          sort: sortKey,
+        }),
+        append ? null : api.tags.list(),
       ])
       if (broadcastsRes.success) {
-        setBroadcasts(broadcastsRes.data)
+        if (append) {
+          const rows = broadcastsRes.data
+          setBroadcasts((prev) => {
+            const seen = new Set(prev.map((b) => b.id))
+            return [...prev, ...rows.filter((r) => !seen.has(r.id))]
+          })
+        } else {
+          setBroadcasts(broadcastsRes.data)
+        }
         setListKpis(broadcastsRes.kpis)
+        setNextCursor(broadcastsRes.pagination?.nextCursor ?? null)
+        setListTotal(broadcastsRes.pagination?.total ?? null)
       }
       else setError(broadcastsRes.error)
-      if (tagsRes.success) setTags(tagsRes.data)
+      if (tagsRes && tagsRes.success) setTags(tagsRes.data)
     } catch (err) {
       /* 403 は読み直しても直らない。失敗と別の1枚にする。 */
       if (err instanceof ApiError && err.status === 403) setForbidden(true)
       else setError('データの読み込みに失敗しました。もう一度お試しください。')
     } finally {
-      setLoading(false)
+      if (append) setLoadingMoreBroadcasts(false)
+      else setLoading(false)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, pageSize, sortKey, statusFilter, folderFilter, loadingMoreBroadcasts])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { void load() }, [load])
 
   useEffect(() => {
     if (!selectedAccountId) {
@@ -230,8 +300,24 @@ function BroadcastList() {
     const view = savedViews.find((item) => item.id === id)
     if (!view) return
     const filters = view.filters
+    /*
+     * 旧形式（`statuses: ['scheduled']` など）で保存された行は、新形式に
+     * 読み替える。読み替えないと、選んでも何も変わらず復元不良になる
+     * （点検 #490 中5）。`openRateMax` は口も画面も未接続のため、
+     * ここでは絞りに使わず無視する。
+     */
+    const legacyStatuses = Array.isArray(filters.statuses) ? filters.statuses : []
+    const legacyStatus = legacyStatuses.includes('scheduled')
+      ? 'scheduled'
+      : legacyStatuses.includes('draft')
+        ? 'draft'
+        : null
     setTitleQuery(typeof filters.titleQuery === 'string' ? filters.titleQuery : '')
-    setStatusFilter(filters.statusFilter === 'scheduled' || filters.statusFilter === 'draft' ? filters.statusFilter : 'all')
+    setStatusFilter(
+      filters.statusFilter === 'scheduled' || filters.statusFilter === 'draft'
+        ? filters.statusFilter
+        : legacyStatus ?? 'all',
+    )
     setDateFrom(typeof filters.dateFrom === 'string' ? filters.dateFrom : '')
     setDateTo(typeof filters.dateTo === 'string' ? filters.dateTo : '')
     setFolderFilter(typeof filters.folderFilter === 'string' ? filters.folderFilter : '')
@@ -258,11 +344,6 @@ function BroadcastList() {
       setSavedViewBusy(false)
     }
   }
-
-  // 送信済みbroadcastのinsightを読み込み
-  useEffect(() => {
-    broadcasts.filter(b => b.status === 'sent').forEach(b => loadInsight(b.id))
-  }, [broadcasts])
 
   const handleDelete = async () => {
     // 押している間は受け付けない。二度押しの2回目は404になり、
@@ -291,16 +372,11 @@ function BroadcastList() {
 
   // タブで分類: 1アカウントへの配信 (multi-account-dedup 以外) と 複数アカウントの重複除外配信 を分ける。
   // 全件タブは未フィルタ。サイドバー account context のフィルタは API 側で済んでる。
+  // 状態・フォルダは口側で絞り済み。タイトル・日付だけ手元で絞る。
   const visibleBroadcasts = broadcasts.filter((b) => {
     // タイトルは手元で絞る。打つたびに取り直すと重い。
     const query = titleQuery.trim().toLowerCase()
     if (query && !`${b.title} ${b.messageContent}`.toLowerCase().includes(query)) {
-      return false
-    }
-    if (statusFilter !== 'all' && b.status !== statusFilter) return false
-    if (folderFilter === UNFILED) {
-      if (b.folderId) return false
-    } else if (folderFilter && b.folderId !== folderFilter) {
       return false
     }
     if (dateFrom || dateTo) {
@@ -367,8 +443,15 @@ function BroadcastList() {
       <div data-design="Body">
           {/* 設計はフォルダを左の縦パネルに置く。タグ・シナリオと同じ形。 */}
           <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+            {/*
+              件数は読み込んだ範囲での数。まだ奥があるときだけ口の total を
+              総数に出す(読み込んだ分だけを総数に見せない)。全部読めていれば
+              従来どおりの数え方で、見た目は変わらない。
+            */}
             <FolderPanel
-              total={`${broadcasts.length} 件`}
+              total={listTotal !== null && listTotal > broadcasts.length
+                ? `全${listTotal}件`
+                : `${broadcasts.length} 件`}
               activeId={folderFilter}
               onSelect={setFolderFilter}
               rows={[
@@ -420,7 +503,17 @@ function BroadcastList() {
               ]}
             />
             <Button type="button" onClick={() => setSavedViewOpen((open) => !open)}>この条件を保存</Button>
-            <SelectField aria-label="表示件数" defaultValue="20" size="compact" options={[{ value: '20', label: '20件表示' }]} />
+            <SelectField
+              aria-label="表示件数"
+              value={String(pageSize)}
+              size="compact"
+              onChange={(event) => setPageSize(Number(event.target.value) || 20)}
+              options={[
+                { value: '20', label: '20件表示' },
+                { value: '50', label: '50件表示' },
+                { value: '100', label: '100件表示' },
+              ]}
+            />
           </div>
           {savedViewOpen && (
             <div className="border-hairline bg-canvas mb-3 flex flex-wrap items-center gap-2 rounded-control border p-3">
@@ -458,7 +551,15 @@ function BroadcastList() {
               aria-label="配信日（終了）"
               className="border-hairline rounded-control border px-2 py-2 text-sm"
             />
-            <SelectField aria-label="並び順" defaultValue="newest" options={[{ value: 'newest', label: '配信日が新しい順' }]} />
+            <SelectField
+              aria-label="並び順"
+              value={sortKey}
+              onChange={(event) => setSortKey(event.target.value === 'oldest' ? 'oldest' : 'newest')}
+              options={[
+                { value: 'newest', label: '配信日が新しい順' },
+                { value: 'oldest', label: '配信日が古い順' },
+              ]}
+            />
             {(dateFrom || dateTo) && <button type="button" className="text-xs font-semibold text-action" onClick={() => { setDateFrom(''); setDateTo('') }}>日付を外す</button>}
           </div>
 
@@ -561,7 +662,8 @@ function BroadcastList() {
               {visibleBroadcasts.map((broadcast) => {
                 const statusInfo = statusConfig[broadcast.status]
                 const isDedup = broadcast.targetType === 'multi-account-dedup'
-                const insight = insights[broadcast.id]
+                // 手動で取り直した値があればそれを、一覧同梱の集計があればそれを使う。
+                const insight = insights[broadcast.id] ?? summaryInsight(broadcast.insightSummary)
 
                 return (
                   <tr key={broadcast.id} className="hover:bg-canvas-sunken transition-colors">
@@ -680,6 +782,20 @@ function BroadcastList() {
             </tbody>
           </table>
           </div>
+          {/*
+            口側ページ送りの続き。押すと次のカーソルから足す。
+            件数・タブを変えると先頭から取り直す(load の依存で自動)。
+          */}
+          {nextCursor && (
+            <button
+              type="button"
+              onClick={() => { void load(nextCursor, true) }}
+              disabled={loadingMoreBroadcasts}
+              className="text-success hover:bg-accent-soft w-full border-t border-hairline px-4 py-3 text-sm disabled:opacity-50"
+            >
+              {loadingMoreBroadcasts ? '読み込み中...' : 'さらに読み込む'}
+            </button>
+          )}
         </div>
       )}
             </div>

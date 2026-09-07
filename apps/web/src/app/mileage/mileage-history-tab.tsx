@@ -9,6 +9,7 @@ import Pagination from '@/components/shared/pagination'
 import SummaryCard from '@/components/shared/summary-card'
 import { DataTable, NameCell, Td, Th, Tr } from '@/components/shared/table'
 import { api, type MileageAdminHistory, type MileageAdminHistoryItem, type MileageHistoryItem } from '@/lib/api'
+import { csvCell } from '@/lib/presentation'
 import {
   formatMileageChange,
   formatMileageDate,
@@ -130,7 +131,7 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
       item.mode === 'manual' ? item.executedByStaffName ?? '担当者未取得' : '自動',
     ])
     const csv = [['日時', '友だち', '増減', '理由', '残高', 'だれが'], ...rows]
-      .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))
+      .map((row) => row.map((value) => csvCell(value)).join(','))
       .join('\n')
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
@@ -152,7 +153,7 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
       <NoteBar>マイルが増えた・減った記録です。手で増やしたものは理由と担当者が残り、あとから辿れます。</NoteBar>
 
       <div className="flex justify-end">
-        <Button onClick={exportHistoryCsv} disabled={items.length === 0}>履歴をCSVで書き出す</Button>
+        <Button onClick={exportHistoryCsv} disabled={items.length === 0}>この頁の履歴をCSVで書き出す</Button>
       </div>
 
       <div className="rounded-card border border-hairline bg-canvas p-4">

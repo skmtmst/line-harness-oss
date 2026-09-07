@@ -63,14 +63,18 @@ function FriendAddSettingsList() {
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [search, setSearch] = useState('')
+  const [appliedSearch, setAppliedSearch] = useState('')
+  const [folder, setFolder] = useState<string | null>(null)
   const [cursorStack, setCursorStack] = useState<Array<string | null>>([null])
   const [folderBusy, setFolderBusy] = useState(false)
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [folderName, setFolderName] = useState('')
   const folderKey = useRef(crypto.randomUUID())
+  const requestSequence = useRef(0)
   const cursor = cursorStack[cursorStack.length - 1]
 
   const load = useCallback(async () => {
+    const requestId = ++requestSequence.current
     if (!selectedAccountId) {
       setData(null)
       setLoading(false)
@@ -79,10 +83,15 @@ function FriendAddSettingsList() {
     setLoading(true)
     setError('')
     try {
+      // 検索とフォルダ絞りはサーバ側へ送る。取得済みページ内だけに効かせると
+      // 21件目以降が検索に出ない。
       const response = await api.friendAddRules.list(selectedAccountId, kind, {
         cursor: cursor ?? undefined,
         limit: 20,
+        q: appliedSearch.trim() || undefined,
+        folder: folder ?? undefined,
       })
+      if (requestId !== requestSequence.current) return
       if (!response.success) {
         setError(response.error)
         setData(null)
@@ -90,30 +99,53 @@ function FriendAddSettingsList() {
       }
       setData(response.data)
     } catch {
+      if (requestId !== requestSequence.current) return
       setError('友だち追加時の配信を読み込めませんでした。')
       setData(null)
     } finally {
-      setLoading(false)
+      if (requestId === requestSequence.current) setLoading(false)
     }
-  }, [cursor, kind, selectedAccountId])
+  }, [appliedSearch, cursor, folder, kind, selectedAccountId])
 
   useEffect(() => { void load() }, [load])
 
   useEffect(() => { setCursorStack([null]) }, [kind, selectedAccountId])
+
+  // 検索の入力は少し待ってから、巻き戻しと一緒に1回だけサーバへ送る。
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedSearch(search)
+      setCursorStack([null])
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  const selectFolder = (next: string | null) => {
+    setFolder(next)
+    setCursorStack([null])
+  }
 
   useEffect(() => {
     if (!requestedDeleteId || !data) return
     setDeleting(data.items.find((item) => item.id === requestedDeleteId) ?? null)
   }, [data, requestedDeleteId])
 
+  /*
+   * フォルダ欄の件数はサーバの全ページ合計 (folderCounts)。取得済みページ内
+   * で数えると、2ページ目以降があるときに件数が少なく見える。
+   */
   const folders = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const folder of data?.options.folders ?? []) counts.set(folder.name, 0)
-    for (const rule of data?.items ?? []) {
-      const name = rule.folderName || '未分類'
-      counts.set(name, (counts.get(name) ?? 0) + 1)
+    const counts = new Map<string | null, number>()
+    for (const entry of data?.folderCounts ?? []) counts.set(entry.name, entry.count)
+    const rows: Array<{ key: string; name: string; count: number }> = []
+    for (const option of data?.options.folders ?? []) {
+      rows.push({ key: option.name, name: option.name, count: counts.get(option.name) ?? 0 })
     }
-    return Array.from(counts.entries())
+    const uncategorized = counts.get(null) ?? 0
+    if (uncategorized > 0 || !rows.some((row) => row.name === '未分類')) {
+      rows.push({ key: '__uncategorized', name: '未分類', count: uncategorized })
+    }
+    return rows
   }, [data])
 
   const createFolder = async () => {
@@ -139,13 +171,8 @@ function FriendAddSettingsList() {
     }
   }
 
-  const visibleItems = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase('ja-JP')
-    if (!query) return data?.items ?? []
-    return (data?.items ?? []).filter((rule) =>
-      [rule.name, ...rule.routeNames].some((value) => value.toLocaleLowerCase('ja-JP').includes(query)),
-    )
-  }, [data, search])
+  // 検索はサーバ側で全ページに効かせる。ここでは表示絞りをしない。
+  const visibleItems = useMemo(() => data?.items ?? [], [data])
 
   const closeDelete = () => {
     setDeleting(null)
@@ -207,18 +234,26 @@ function FriendAddSettingsList() {
       <div className="grid items-start gap-4 xl:grid-cols-[190px_minmax(0,1fr)]">
         <aside className="bg-canvas rounded-card border-hairline overflow-hidden border" aria-label="流入の束">
           <div className="border-hairline flex justify-between border-b px-4 py-3 text-xs font-bold"><span>流入の束</span><span>{data?.total ?? data?.items.length ?? 0}件</span></div>
-          <div className="bg-accent-soft text-accent-deep flex justify-between px-4 py-3 text-xs font-bold"><span>すべて</span><span>{data?.total ?? data?.items.length ?? 0}</span></div>
-          {folders.map(([name, count]) => <div key={name} className="text-ink-secondary flex justify-between px-4 py-3 text-xs"><span>{name}</span><span>{count}</span></div>)}
+          <button type="button" onClick={() => selectFolder(null)} aria-pressed={folder === null} className={`${folder === null ? 'bg-accent-soft text-accent-deep' : 'text-ink-secondary'} flex w-full justify-between px-4 py-3 text-xs font-bold`}><span>すべて</span><span>{data?.total ?? data?.items.length ?? 0}</span></button>
+          {folders.map((entry) => (
+            <button type="button" key={entry.key} onClick={() => selectFolder(entry.key)} aria-pressed={folder === entry.key} className={`${folder === entry.key ? 'bg-accent-soft text-accent-deep' : 'text-ink-secondary'} flex w-full justify-between px-4 py-3 text-xs`}>
+              <span>{entry.name}</span><span>{entry.count}</span>
+            </button>
+          ))}
         </aside>
 
         <section data-design="Rule" aria-label={`${KIND_LABELS[kind]}の設定`}>
           <span className="sr-only">判定の基準。はじめての人の判定。ブロック解除の判定。ブロック解除の回数が1回以上。</span>
-          <ListToolbar searchPlaceholder="設定名・流入リンクで検索" searchValue={search} onSearchChange={setSearch}>
+          <ListToolbar searchPlaceholder="設定名で検索" searchValue={search} onSearchChange={setSearch}>
             <Button variant="secondary" onClick={() => setFolderDialogOpen(true)} disabled={folderBusy}><Plus size={14} />フォルダを追加</Button>
             <span className="text-ink-faint text-xs whitespace-nowrap">20件表示</span>
           </ListToolbar>
           {!data || data.items.length === 0 ? (
-            <ListState kind="empty" title="友だち追加時の配信がまだありません" description="最初の案内を作ると、ここに表示されます。" action={<Button href="/friend-add-settings?view=new" variant="primary">友だち追加時配信を作る</Button>} />
+            appliedSearch.trim() || folder ? (
+              <ListState kind="empty" title="条件に合う設定はありません" description="検索やフォルダの絞り込みを変えてください。" />
+            ) : (
+              <ListState kind="empty" title="友だち追加時の配信がまだありません" description="最初の案内を作ると、ここに表示されます。" action={<Button href="/friend-add-settings?view=new" variant="primary">友だち追加時配信を作る</Button>} />
+            )
           ) : (
             <>
               <DataTable>

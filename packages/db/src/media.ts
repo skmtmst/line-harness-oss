@@ -67,7 +67,18 @@ export interface MediaReplacementPlan {
 
 export async function getMedia(
   db: D1Database,
-  opts: { lineAccountId: string; kind?: MediaKind; folderId?: string; limit?: number },
+  opts: {
+    lineAccountId: string;
+    kind?: MediaKind;
+    folderId?: string;
+    excludeId?: string;
+    query?: string;
+    unusedOnly?: boolean;
+    nearLimitOnly?: boolean;
+    sort?: 'newest' | 'oldest' | 'name' | 'size' | 'usage';
+    limit?: number;
+    offset?: number;
+  },
 ): Promise<Media[]> {
   const conditions: string[] = ['m.line_account_id = ?'];
   const values: unknown[] = [opts.lineAccountId];
@@ -76,23 +87,72 @@ export async function getMedia(
     values.push(opts.kind);
   }
   if (opts.folderId) {
-    conditions.push('folder_id = ?');
-    values.push(opts.folderId);
+    if (opts.folderId === '__ungrouped__') conditions.push('m.folder_id IS NULL');
+    else {
+      conditions.push('m.folder_id = ?');
+      values.push(opts.folderId);
+    }
+  }
+  if (opts.excludeId) {
+    conditions.push('m.id != ?');
+    values.push(opts.excludeId);
+  }
+  if (opts.query) {
+    conditions.push("LOWER(m.filename) LIKE ? ESCAPE '\\'");
+    values.push(`%${opts.query.toLowerCase().replace(/[\\%_]/g, '\\$&')}%`);
+  }
+  if (opts.unusedOnly) {
+    conditions.push('(SELECT COUNT(*) FROM media_usages u WHERE u.media_id = m.id) = 0');
+  }
+  if (opts.nearLimitOnly) {
+    conditions.push(`m.size_bytes >= CASE m.kind
+      WHEN 'image' THEN ? WHEN 'file' THEN ? ELSE ? END`);
+    values.push(8 * 1024 * 1024, 16 * 1024 * 1024, 160 * 1024 * 1024);
   }
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-  values.push(opts.limit ?? 200);
+  const orderBy = opts.sort === 'oldest' ? 'm.created_at ASC'
+    : opts.sort === 'name' ? 'm.filename COLLATE NOCASE ASC'
+      : opts.sort === 'size' ? 'm.size_bytes DESC'
+        : opts.sort === 'usage' ? 'usage_count DESC, m.created_at DESC'
+          : 'm.created_at DESC';
+  values.push(opts.limit ?? 200, opts.offset ?? 0);
   const result = await db
     .prepare(
       `SELECT m.*,
               (SELECT COUNT(*) FROM media_usages u WHERE u.media_id = m.id) AS usage_count
          FROM media m
          ${where}
-        ORDER BY m.created_at DESC
-        LIMIT ?`,
+        ORDER BY ${orderBy}
+        LIMIT ? OFFSET ?`,
     )
     .bind(...values)
     .all<Media>();
   return result.results;
+}
+
+/** 一覧と同じ条件で、ページ外を含む総件数を返す。 */
+export async function countMedia(
+  db: D1Database,
+  opts: Omit<Parameters<typeof getMedia>[1], 'limit' | 'offset' | 'sort'>,
+): Promise<number> {
+  const conditions = ['m.line_account_id = ?'];
+  const values: unknown[] = [opts.lineAccountId];
+  if (opts.kind) { conditions.push('m.kind = ?'); values.push(opts.kind); }
+  if (opts.folderId === '__ungrouped__') conditions.push('m.folder_id IS NULL');
+  else if (opts.folderId) { conditions.push('m.folder_id = ?'); values.push(opts.folderId); }
+  if (opts.excludeId) { conditions.push('m.id != ?'); values.push(opts.excludeId); }
+  if (opts.query) {
+    conditions.push("LOWER(m.filename) LIKE ? ESCAPE '\\'");
+    values.push(`%${opts.query.toLowerCase().replace(/[\\%_]/g, '\\$&')}%`);
+  }
+  if (opts.unusedOnly) conditions.push('(SELECT COUNT(*) FROM media_usages u WHERE u.media_id = m.id) = 0');
+  if (opts.nearLimitOnly) {
+    conditions.push(`m.size_bytes >= CASE m.kind WHEN 'image' THEN ? WHEN 'file' THEN ? ELSE ? END`);
+    values.push(8 * 1024 * 1024, 16 * 1024 * 1024, 160 * 1024 * 1024);
+  }
+  const row = await db.prepare(`SELECT COUNT(*) AS total FROM media m WHERE ${conditions.join(' AND ')}`)
+    .bind(...values).first<{ total: number }>();
+  return Number(row?.total ?? 0);
 }
 
 export async function getMediaById(

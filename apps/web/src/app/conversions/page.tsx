@@ -9,7 +9,7 @@ import {
   type ConversionDefinitionReport,
 } from '@/lib/api'
 import type { ConversionPoint } from '@line-crm/shared'
-import KpiCard from '@/components/dashboard/kpi-card'
+import KpiCard from '@/components/shared/kpi-card'
 
 /**
  * 数え方を運用者の言葉にする。既定（manual）も省略せずに出す。

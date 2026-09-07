@@ -36,7 +36,7 @@ import type {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
-import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { validateTemplateMessage } from '../services/template-message-validation.js';
 import {
   getScenarioRuns,
@@ -356,11 +356,15 @@ scenarios.patch('/api/scenarios/reorder', requireRole('owner', 'admin'), async (
 });
 
 // GET /api/scenarios - list all
-scenarios.get('/api/scenarios', async (c) => {
+scenarios.get('/api/scenarios', scenarioPermission('view'), async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId');
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     let items: DbScenarioWithStepCount[];
     if (lineAccountId) {
+      if (!scope.allowedAccountIds.includes(lineAccountId)) {
+        return c.json({ success: false, error: 'シナリオが見つかりません' }, 404);
+      }
       // NULL line_account_id = global scenario (webhook.ts:211 / liff.ts:878 fire it for every
       // account). Include both account-bound and global rows so the list mirrors the engine.
       const result = await c.env.DB
@@ -368,7 +372,7 @@ scenarios.get('/api/scenarios', async (c) => {
           `SELECT s.*, COUNT(ss.id) as step_count
            FROM scenarios s
            LEFT JOIN scenario_steps ss ON s.id = ss.scenario_id
-           WHERE s.line_account_id IS NULL OR s.line_account_id = ?
+           WHERE s.line_account_id = ?${scope.canSeeUnassigned ? ' OR s.line_account_id IS NULL' : ''}
            GROUP BY s.id
            ORDER BY s.created_at DESC`,
         )
@@ -376,7 +380,13 @@ scenarios.get('/api/scenarios', async (c) => {
         .all<DbScenarioWithStepCount>();
       items = result.results;
     } else {
-      items = await getScenarios(c.env.DB);
+      const rows = await getScenarios(c.env.DB);
+      items = rows.filter((row) => {
+        const accountId = (row as { line_account_id?: string | null }).line_account_id ?? null;
+        return accountId == null
+          ? scope.canSeeUnassigned
+          : scope.allowedAccountIds.includes(accountId);
+      });
     }
 
     /*
@@ -426,9 +436,9 @@ scenarios.get('/api/scenarios', async (c) => {
 // GET /api/scenarios/:id - get with steps
 scenarios.use('/api/scenarios/:id', requireVisibleScenario);
 scenarios.use('/api/scenarios/:id/*', requireVisibleScenario);
-scenarios.get('/api/scenarios/:id', async (c) => {
+scenarios.get('/api/scenarios/:id', scenarioPermission('view'), async (c) => {
   try {
-    const id = c.req.param('id');
+    const id = c.req.param('id')!;
     const scenario = await getScenarioById(c.env.DB, id);
 
     if (!scenario) {
@@ -1056,7 +1066,7 @@ scenarios.post('/api/scenarios/:id/steps/reorder', requireRole('owner', 'admin')
 // GET /api/scenarios/:id/preview - timeline preview (deterministic, no jitter)
 const WEEKDAY_JA = ['日', '月', '火', '水', '木', '金', '土'] as const;
 
-scenarios.get('/api/scenarios/:id/preview', async (c) => {
+scenarios.get('/api/scenarios/:id/preview', scenarioPermission('view'), async (c) => {
   try {
     const scenarioId = c.req.param('id');
     const scenarioRow = await c.env.DB
@@ -1149,9 +1159,9 @@ scenarios.get('/api/scenarios/:id/preview', async (c) => {
 });
 
 // GET /api/scenarios/:id/stats - reach rate dashboard
-scenarios.get('/api/scenarios/:id/stats', async (c) => {
+scenarios.get('/api/scenarios/:id/stats', scenarioPermission('view'), async (c) => {
   try {
-    const scenarioId = c.req.param('id');
+    const scenarioId = c.req.param('id')!;
     const scenario = await c.env.DB
       .prepare(`SELECT id FROM scenarios WHERE id = ?`)
       .bind(scenarioId)
@@ -1262,6 +1272,25 @@ scenarios.post('/api/scenarios/:id/enroll/:friendId', requireRole('owner', 'admi
     }
     if (!friend) {
       return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
+
+    /*
+     * 手動登録は本物の購読を作る。IDを直接渡されても、見えない友だちや
+     * 別アカウントの友だちを混ぜない（点検 #495 中12）。
+     * テスト送信と同じく、友だち側のアカウント一致を見る。
+     */
+    const friendAccountId = (friend as { line_account_id?: string | null }).line_account_id ?? null;
+    if (!await canAccessAllLineAccounts(db, c.get('staff'), [friendAccountId])) {
+      return c.json({ success: false, error: '登録する友だちが見つかりません。' }, 404);
+    }
+    if (scenario.line_account_id && friendAccountId !== scenario.line_account_id) {
+      return c.json(
+        { success: false, error: 'このシナリオと同じLINEアカウントの友だちを選んでください。' },
+        422,
+      );
+    }
+    if ((friend as { is_following?: number | null }).is_following !== 1) {
+      return c.json({ success: false, error: 'ブロック中の友だちは登録できません。' }, 422);
     }
 
     const enrollment = await enrollFriendInScenario(db, friendId, scenarioId);
@@ -1387,7 +1416,7 @@ function validateActionConfig(
 }
 
 // GET /api/scenarios/:id/actions — シナリオのアクションを全部返す
-scenarios.get('/api/scenarios/:id/actions', async (c) => {
+scenarios.get('/api/scenarios/:id/actions', scenarioPermission('view'), async (c) => {
   try {
     const rows = await c.env.DB.prepare(
       `SELECT id, scenario_id, hook, step_id, choice_index, sort_order,
@@ -1669,9 +1698,9 @@ scenarios.post(
  * 友だち追加時の配信から開始できるので、それが手動と同じ意味になる。
  */
 
-scenarios.get('/api/scenarios/:id/triggers', async (c) => {
+scenarios.get('/api/scenarios/:id/triggers', scenarioPermission('view'), async (c) => {
   try {
-    const rows = await getScenarioTriggers(c.env.DB, c.req.param('id'));
+    const rows = await getScenarioTriggers(c.env.DB, c.req.param('id')!);
     return c.json({
       success: true,
       data: rows.map((t) => ({ id: t.id, kind: t.kind, tagId: t.tag_id })),

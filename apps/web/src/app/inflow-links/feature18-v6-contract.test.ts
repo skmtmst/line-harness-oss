@@ -8,6 +8,8 @@ const ADS = readFileSync(join(ROOT, 'ad-integration.tsx'), 'utf8')
 const CREATE = readFileSync(join(ROOT, 'new', 'page.tsx'), 'utf8')
 const DETAIL = readFileSync(join(ROOT, 'detail', 'page.tsx'), 'utf8')
 const SITE = readFileSync(join(ROOT, '..', '..', 'components', 'inflow-links', 'site-script.tsx'), 'utf8')
+const API = readFileSync(join(ROOT, '..', '..', 'lib', 'api.ts'), 'utf8')
+const MOCK = readFileSync(join(ROOT, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'), 'utf8')
 
 describe('V6 機能18の画面契約', () => {
   it('4つの役割を別のタブと画面に分ける', () => {
@@ -48,5 +50,34 @@ describe('V6 機能18の画面契約', () => {
     expect(DETAIL).toContain('/api/analytics/ref/${encodeURIComponent(r.value.data.refCode)}')
     expect(DETAIL).toContain('この経路から来た友だち')
     expect(DETAIL).toContain('/friends/detail?id=${encodeURIComponent(friend.id)}')
+  })
+})
+
+describe('V6 機能18の計測鍵の契約(#514-2)', () => {
+  it('計測コードに固定の鍵を埋めない', () => {
+    expect(SITE).not.toContain('hk_9f3a2c81b4')
+    expect(API).not.toContain('hk_9f3a2c81b4')
+  })
+
+  it('選択中アカウントの鍵を口から取って埋め込む', () => {
+    // 画面: 選択中アカウントを渡して鍵を取り、取れた鍵だけを data-key にする。
+    expect(SITE).toContain('selectedAccountId')
+    expect(SITE).toContain('.trackingKey(selectedAccountId')
+    expect(SITE).toContain('[selectedAccountId, keyAttempt]')
+    expect(SITE).toContain('data-key="${trackingKey}"')
+    // 口: GET /api/site/tracking-key?accountId=…。
+    expect(API).toContain('/api/site/tracking-key?accountId=${encodeURIComponent(accountId)}')
+    expect(API).toContain('trackingKey: string')
+  })
+
+  it('取得前・失敗時はコードを出さず案内を出す', () => {
+    expect(SITE).toContain('あなたのアカウントのコードを取得しています')
+    expect(SITE).toContain('計測コードを取得できませんでした')
+    expect(SITE).toContain('コードをもう一度取得する')
+  })
+
+  it('画面確認の mock もアカウントごとに鍵を返す', () => {
+    expect(MOCK).toContain("pathname === '/api/site/tracking-key'")
+    expect(MOCK).toContain('trackingKey')
   })
 })

@@ -187,6 +187,12 @@ function makeRuleCursor(row: FriendAddRuleRow): string {
   return encodeURIComponent(JSON.stringify({ priority: row.priority, createdAt: row.created_at, id: row.id }));
 }
 
+export const FRIEND_ADD_UNCATEGORIZED_FOLDER = '__uncategorized';
+
+function escapeLikePattern(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
 export async function listFriendAddRulesPage(
   db: D1Database,
   input: {
@@ -195,6 +201,8 @@ export async function listFriendAddRulesPage(
     status?: FriendAddRuleStatus | null;
     cursor?: string | null;
     limit?: number;
+    search?: string | null;
+    folderName?: string | null;
   },
 ): Promise<FriendAddRulePage> {
   const limit = Math.max(1, Math.min(input.limit ?? 20, 100));
@@ -209,6 +217,18 @@ export async function listFriendAddRulesPage(
   if (input.status) {
     clauses.push('r.status = ?');
     bindings.push(input.status);
+  }
+  if (input.search) {
+    clauses.push("r.name LIKE ? ESCAPE '\\'");
+    bindings.push(`%${escapeLikePattern(input.search)}%`);
+  }
+  if (input.folderName) {
+    if (input.folderName === FRIEND_ADD_UNCATEGORIZED_FOLDER) {
+      clauses.push('r.folder_name IS NULL');
+    } else {
+      clauses.push('r.folder_name = ?');
+      bindings.push(input.folderName);
+    }
   }
   const count = await db.prepare(
     `SELECT COUNT(*) AS total FROM friend_add_rules r WHERE ${clauses.join(' AND ')}`,

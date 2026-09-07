@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { bookingApi, type BookingAdminDetail, type BookingMenu, type BookingRequest } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -90,11 +90,6 @@ function formatJpTime(iso: string): string {
   })
 }
 
-/** JSTでの年月（2026-08）。集計の区切りに使う。 */
-function jstMonth(iso: string): string {
-  return new Date(new Date(iso).getTime() + 9 * 3600_000).toISOString().slice(0, 7)
-}
-
 function jstDay(iso: string): string {
   return new Date(new Date(iso).getTime() + 9 * 3600_000).toISOString().slice(0, 10)
 }
@@ -116,8 +111,13 @@ export default function BookingsPage() {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [items, setItems] = useState<BookingRequest[]>([])
-  /** KPIとメニュー別の件数を出すための全件。タブとは別に取る。 */
-  const [allItems, setAllItems] = useState<BookingRequest[]>([])
+  const [total, setTotal] = useState(0)
+  const [calendarItems, setCalendarItems] = useState<BookingRequest[]>([])
+  const [summary, setSummary] = useState({
+    total: 0, requested: 0, monthTotal: 0, monthConfirmed: 0,
+    monthCancelled: 0, lastMonthTotal: 0, todayTotal: 0, weekTotal: 0,
+    byMenu: [] as Array<{ name: string; total: number }>,
+  })
   const [menus, setMenus] = useState<BookingMenu[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -165,32 +165,47 @@ export default function BookingsPage() {
     // 残ってしまい、誤って別ステータスの予約を操作してしまう事故を防ぐ。
     setItems([])
     try {
-      const r = await bookingApi.listRequests(selectedAccountId, tab)
+      const today = jstDay(new Date().toISOString())
+      const weekTo = jstDay(new Date(Date.now() + 7 * 86_400_000).toISOString())
+      const r = await bookingApi.listRequests(selectedAccountId, tab, {
+        limit: PAGE_SIZE,
+        offset: (page - 1) * PAGE_SIZE,
+        query: query.trim() || undefined,
+        menuName: menuFilter === 'all' ? undefined : menuFilter,
+        from: range === 'all' ? undefined : new Date(`${today}T00:00:00+09:00`).toISOString(),
+        to: range === 'today'
+          ? new Date(`${jstDay(new Date(Date.now() + 86_400_000).toISOString())}T00:00:00+09:00`).toISOString()
+          : range === 'week' ? new Date(`${weekTo}T00:00:00+09:00`).toISOString() : undefined,
+      })
       setItems(r.requests)
+      setTotal(r.total)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
     }
-  }, [selectedAccountId, tab])
+  }, [menuFilter, page, query, range, selectedAccountId, tab])
 
   useEffect(() => {
     load()
   }, [load])
 
-  // KPIとメニュー棚は、いま見ているタブに関係なく全件から出す。
-  // タブを切り替えるたびに数が動くと、上の数字が何を指しているか読めない。
+  // KPIとメニュー棚は集計口から読む。一覧全件をブラウザへ運ばない。
   useEffect(() => {
     if (!selectedAccountId) return
     let alive = true
     void (async () => {
       try {
-        const [all, menuList] = await Promise.all([
-          bookingApi.listRequests(selectedAccountId, 'all'),
+        const today = jstDay(new Date().toISOString())
+        const [counts, menuList] = await Promise.all([
+          bookingApi.requestsSummary(selectedAccountId, {
+            month: monthKey(0), lastMonth: monthKey(-1), today,
+            weekTo: jstDay(new Date(Date.now() + 6 * 86_400_000).toISOString()),
+          }),
           bookingApi.listMenus(selectedAccountId),
         ])
         if (!alive) return
-        setAllItems(all.requests)
+        setSummary(counts)
         setMenus(menuList.menus)
       } catch {
         // KPI が出ないだけで一覧は使える。ここで画面全体を止めない。
@@ -200,6 +215,30 @@ export default function BookingsPage() {
       alive = false
     }
   }, [selectedAccountId])
+
+  // カレンダーは今日/今週の範囲だけをページごとに読み、200件を越えても欠落させない。
+  useEffect(() => {
+    if (!selectedAccountId || (view !== 'day' && view !== 'week')) return
+    let alive = true
+    void (async () => {
+      const today = jstDay(new Date().toISOString())
+      const endDay = jstDay(new Date(Date.now() + (view === 'day' ? 1 : 7) * 86_400_000).toISOString())
+      const collected: BookingRequest[] = []
+      let offset = 0
+      while (alive) {
+        const response = await bookingApi.listRequests(selectedAccountId, 'all', {
+          limit: 100, offset,
+          from: new Date(`${today}T00:00:00+09:00`).toISOString(),
+          to: new Date(`${endDay}T00:00:00+09:00`).toISOString(),
+        })
+        collected.push(...response.requests)
+        offset += response.requests.length
+        if (offset >= response.total || response.requests.length === 0) break
+      }
+      if (alive) setCalendarItems(collected)
+    })().catch(() => { if (alive) setError('カレンダーの読み込みに失敗しました') })
+    return () => { alive = false }
+  }, [selectedAccountId, view])
 
   type BookingAction = 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete'
 
@@ -230,48 +269,17 @@ export default function BookingsPage() {
     setDecideTarget({ id, action })
   }
 
-  const kpi = useMemo(() => {
-    const thisMonth = monthKey(0)
-    const lastMonth = monthKey(-1)
-    const inThis = allItems.filter((b) => jstMonth(b.starts_at) === thisMonth)
-    const inLast = allItems.filter((b) => jstMonth(b.starts_at) === lastMonth)
-    const cancelled = inThis.filter(
-      (b) => b.status === 'cancelled' || b.status === 'rejected' || b.status === 'no_show',
-    ).length
-    return {
-      total: inThis.length,
-      diff: inThis.length - inLast.length,
-      confirmed: inThis.filter((b) => b.status === 'confirmed').length,
-      cancelled,
-      rate: inThis.length > 0 ? Math.round((cancelled / inThis.length) * 100) : null,
-    }
-  }, [allItems])
-
-  const menuCounts = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const b of allItems) counts.set(b.menu_name, (counts.get(b.menu_name) ?? 0) + 1)
-    return counts
-  }, [allItems])
-
-  const filtered = useMemo(() => {
-    const today = jstDay(new Date().toISOString())
-    const weekAhead = jstDay(new Date(Date.now() + 6 * 86_400_000).toISOString())
-    const q = query.trim()
-    return items.filter((b) => {
-      if (menuFilter !== 'all' && b.menu_name !== menuFilter) return false
-      if (q && !(b.friend_name ?? '').includes(q)) return false
-      if (range === 'today' && jstDay(b.starts_at) !== today) return false
-      if (range === 'week') {
-        const d = jstDay(b.starts_at)
-        if (d < today || d > weekAhead) return false
-      }
-      return true
-    })
-  }, [items, menuFilter, query, range])
-
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const kpi = {
+    total: summary.monthTotal,
+    diff: summary.monthTotal - summary.lastMonthTotal,
+    confirmed: summary.monthConfirmed,
+    cancelled: summary.monthCancelled,
+    rate: summary.monthTotal > 0 ? Math.round((summary.monthCancelled / summary.monthTotal) * 100) : null,
+  }
+  const menuCounts = new Map(summary.byMenu.map((item) => [item.name, item.total]))
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const current = Math.min(page, pageCount)
-  const shown = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE)
+  const shown = items
 
   // 絞り込みが変わったら1ページ目に戻す。3ページ目のまま条件を狭めると
   // 「該当なし」に見えてしまう。
@@ -282,21 +290,16 @@ export default function BookingsPage() {
   // タブ切替やアカウント切替で items が入れ替わったとき、開いていた予約が
   // 一覧から消えることがある。その場合はパネルを閉じる。
   const detail = detailId
-    ? (allItems.find((b) => b.id === detailId) ?? items.find((b) => b.id === detailId) ?? null)
+    ? (calendarItems.find((b) => b.id === detailId) ?? items.find((b) => b.id === detailId) ?? null)
     : null
   useEffect(() => {
-    if (detailId && !allItems.some((b) => b.id === detailId) && !items.some((b) => b.id === detailId)) {
+    if (detailId && !calendarItems.some((b) => b.id === detailId) && !items.some((b) => b.id === detailId)) {
       setDetailId(null)
     }
-  }, [allItems, items, detailId])
+  }, [calendarItems, items, detailId])
 
-  const today = jstDay(new Date().toISOString())
-  const weekAhead = jstDay(new Date(Date.now() + 6 * 86_400_000).toISOString())
-  const todayCount = allItems.filter((booking) => jstDay(booking.starts_at) === today).length
-  const weekCount = allItems.filter((booking) => {
-    const day = jstDay(booking.starts_at)
-    return day >= today && day <= weekAhead
-  }).length
+  const todayCount = summary.todayTotal
+  const weekCount = summary.weekTotal
 
   const pageHead = (
     <>
@@ -368,7 +371,7 @@ export default function BookingsPage() {
             {error}
           </div>
         )}
-        <BookingCalendar mode={view} items={allItems} onOpen={setDetailId} />
+        <BookingCalendar mode={view} items={calendarItems} onOpen={setDetailId} />
         {dialogs}
       </div>
     )
@@ -396,7 +399,7 @@ export default function BookingsPage() {
             承認待ちを出す。要対応であることは変わらない。 */}
         <Kpi
           title="変更依頼"
-          value={allItems.filter((b) => b.status === 'requested').length}
+          value={summary.requested}
           unit="件"
           detail="要対応"
         />
@@ -415,13 +418,13 @@ export default function BookingsPage() {
         >
           <div className="mb-2 flex items-center justify-between">
             <span className="text-ink text-xs font-semibold">メニュー</span>
-            <span className="text-ink-faint text-xs">{allItems.length} 件</span>
+            <span className="text-ink-faint text-xs">{summary.total} 件</span>
           </div>
           <ul className="space-y-0.5">
             <li>
               <FolderRow
                 label="すべて"
-                count={allItems.length}
+                count={summary.total}
                 active={menuFilter === 'all'}
                 onClick={() => setMenuFilter('all')}
               />
@@ -635,7 +638,7 @@ export default function BookingsPage() {
           </div>
 
           <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-ink-faint text-xs">全 {filtered.length} 件</span>
+            <span className="text-ink-faint text-xs">全 {total} 件</span>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -769,7 +772,7 @@ function BookingDetailPanel({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <span className={`rounded-pill px-3 py-1 text-xs font-semibold ${statusBadgeColor[b.status] ?? 'bg-canvas-sunken'}`}>{statusLabel[b.status] ?? b.status}</span>
-            <Button href={`/chats?friend=${b.friend_id}`} variant="primary">この人と話す</Button>
+            {b.friend_id ? <Button href={`/chats?friend=${b.friend_id}`} variant="primary">この人と話す</Button> : null}
             <Button disabled title="日時変更は準備中です">時間や担当を変える</Button>
             <Button onClick={() => onAction('cancel')} className="border-danger text-danger">予約を取り消す</Button>
             <Button onClick={onClose}>閉じる</Button>
@@ -806,7 +809,7 @@ function BookingDetailPanel({
             {(detail?.history.length ? detail.history : [{ id: b.id, startsAt: b.starts_at, menuName: b.menu_name, staffName: b.staff_name, price: b.price_at_booking, customerNote: b.customer_note, handoverNote: null, status: b.status }]).slice(0, 3).map((item) => (
               <div key={item.id} className="grid grid-cols-4 gap-3 py-3 text-sm"><span>{formatJpDateTime(item.startsAt)} {item.menuName}</span><span>{item.staffName}</span><span>¥{item.price.toLocaleString()}</span><span>{item.customerNote ?? '記入なし'}</span></div>
             ))}
-            <Link href={`/friends/detail?id=${encodeURIComponent(b.friend_id)}`} className="text-accent text-xs font-semibold">顧客カルテで以前の予約を見る →</Link>
+            {b.friend_id ? <Link href={`/friends/detail?id=${encodeURIComponent(b.friend_id)}`} className="text-accent text-xs font-semibold">顧客カルテで以前の予約を見る →</Link> : null}
           </section>
 
           <section className="bg-canvas rounded-card border-hairline border p-5">
@@ -824,7 +827,7 @@ function BookingDetailPanel({
           <aside className="space-y-4">
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <h3 className="text-ink text-sm font-semibold">お客様とペット</h3>
-            <div className="mt-3 flex items-center gap-3"><span className="bg-action-soft text-action flex h-10 w-10 items-center justify-center rounded-full font-bold">{b.friend_name?.charAt(0) ?? '?'}</span><div><Link href={`/friends/detail?id=${encodeURIComponent(b.friend_id)}`} className="text-ink font-semibold hover:underline">{b.friend_name ?? '名前未設定'}さま</Link><p className="text-ink-faint text-xs">LINEの友だち情報と来店履歴</p></div></div>
+            <div className="mt-3 flex items-center gap-3"><span className="bg-action-soft text-action flex h-10 w-10 items-center justify-center rounded-full font-bold">{b.friend_name?.charAt(0) ?? '?'}</span><div>{b.friend_id ? <Link href={`/friends/detail?id=${encodeURIComponent(b.friend_id)}`} className="text-ink font-semibold hover:underline">{b.friend_name ?? '名前未設定'}さま</Link> : <span className="text-ink font-semibold">{b.friend_name ?? '名前未設定'}さま</span>}<p className="text-ink-faint text-xs">{b.friend_id ? 'LINEの友だち情報と来店履歴' : '電話受付のお客さま'}</p></div></div>
             <DetailRow label="ペット">{detail?.customer.petName ?? '登録なし'}</DetailRow>
             <DetailRow label="連絡先">{detail?.customer.phone ?? '登録なし'}</DetailRow>
             {detail?.customer.tags.length ? <DetailRow label="タグ">{detail.customer.tags.map((tag) => tag.name).join('、')}</DetailRow> : null}
@@ -836,7 +839,7 @@ function BookingDetailPanel({
           </section>
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <h3 className="text-ink text-sm font-semibold">つながる先</h3>
-            <div className="mt-3 space-y-2 text-xs"><p><Link href="/booking/menus" className="text-accent font-semibold">→ 予約設定</Link>　メニューと受付枠</p><p><Link href="/reminders" className="text-accent font-semibold">→ リマインダ</Link>　前日・開始前のお知らせ</p><p><Link href={`/chats?friend=${b.friend_id}`} className="text-accent font-semibold">→ 受信箱</Link>　この方とのやりとり</p><p><Link href="/mileage" className="text-accent font-semibold">→ マイル</Link>　来店時の付与</p></div>
+            <div className="mt-3 space-y-2 text-xs"><p><Link href="/booking/menus" className="text-accent font-semibold">→ 予約設定</Link>　メニューと受付枠</p><p><Link href="/reminders" className="text-accent font-semibold">→ リマインダ</Link>　前日・開始前のお知らせ</p>{b.friend_id ? <p><Link href={`/chats?friend=${b.friend_id}`} className="text-accent font-semibold">→ 受信箱</Link>　この方とのやりとり</p> : null}<p><Link href="/mileage" className="text-accent font-semibold">→ マイル</Link>　来店時の付与</p></div>
           </section>
           <div className="bg-canvas rounded-card border-hairline border p-5">
             <p className="text-ink-faint mb-2 text-xs">

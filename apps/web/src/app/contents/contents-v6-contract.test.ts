@@ -31,7 +31,7 @@ describe('V6 登録メディア一覧の契約', () => {
   it('使っていないメディアだけを一覧で絞り込める', () => {
     expect(PAGE).toContain("import FilterChip from '@/components/shared/filter-chip'")
     expect(PAGE).toContain('selected={showUnusedOnly}')
-    expect(PAGE).toContain('!showUnusedOnly || item.usageCount === 0')
+    expect(PAGE).toContain('unusedOnly: showUnusedOnly')
     expect(PAGE).toContain('使っていない')
   })
 
@@ -46,10 +46,11 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(PAGE).toContain("const [sort, setSort] = useState<MediaSort>('newest')")
     expect(PAGE).toContain('入れた日が新しい順')
     expect(PAGE).toContain('使われている順')
-    expect(PAGE).toContain('right.usageCount == null')
+    expect(PAGE).toContain('sort,')
     expect(PAGE).toContain('const [pageSize, setPageSize] = useState(20)')
     expect(PAGE).toContain('PAGE_SIZE_OPTIONS')
-    expect(PAGE).toContain('filtered.slice((page - 1) * pageSize, page * pageSize)')
+    expect(PAGE).toContain('offset: (page - 1) * pageSize')
+    expect(PAGE).toContain('setTotal(res.data.total)')
   })
 
   it('保存容量APIの実値で使用量と上限付近を表示する', () => {
@@ -60,7 +61,7 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(PAGE).toContain('quota.remainingBytes')
     expect(PAGE).toContain('style={{ width')
     expect(PAGE).toContain('selected={showNearLimitOnly}')
-    expect(PAGE).toContain('!showNearLimitOnly || isNearLimit(item)')
+    expect(PAGE).toContain('nearLimitOnly: showNearLimitOnly')
   })
 
   it('格子と一覧の切り替えを持つ', () => {
@@ -91,7 +92,7 @@ describe('V6 登録メディア一覧の契約', () => {
   it('フォルダを取得し、未分類と分けて一覧を絞り込む', () => {
     expect(PAGE).toContain("api.folders.list('media')")
     expect(PAGE).toContain("api.folders.create({ kind: 'media', name })")
-    expect(PAGE).toContain('folderFilter === UNGROUPED ? item.folderId === null')
+    expect(PAGE).toContain('folderId: folderFilter || undefined')
     expect(PAGE).toContain('<FolderPanel')
   })
 
@@ -138,6 +139,12 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(REPLACEMENT).toContain('disabled={busy || !impact?.canReplace}')
   })
 
+  it('差し替え候補も一覧の200件上限に依存しない', () => {
+    expect(REPLACEMENT).toContain('excludeId: source.id')
+    expect(REPLACEMENT).toContain('limit: 50')
+    expect(REPLACEMENT).toContain('candidatePage * 50 >= candidateTotal')
+  })
+
   it('使用中メディアの強制削除口を持たない', () => {
     expect(PAGE).not.toContain('force: true')
     expect(PAGE).toContain('使用先から外すまで削除できません')
@@ -147,7 +154,7 @@ describe('V6 登録メディア一覧の契約', () => {
   it('使用先を取得できないメディアを未使用として選択・削除しない', () => {
     expect(PAGE).toContain('function isKnownUnused(item: MediaItem)')
     expect(PAGE).toContain('return item.usageCount === 0')
-    expect(PAGE).toContain('const removable = filtered.filter(isKnownUnused)')
+    expect(PAGE).toContain('const removable = items.filter(isKnownUnused)')
     expect(PAGE).toContain('disabled={!isKnownUnused(item)}')
     expect(PAGE).toContain('使用先を確認できないため選べません')
     expect(PAGE).toContain('removableSelected.length !== selected.size')
@@ -155,7 +162,7 @@ describe('V6 登録メディア一覧の契約', () => {
   })
 
   it('選択中のLINEアカウントを一覧・登録・変更・使用先・削除へ渡す', () => {
-    expect(PAGE).toContain('api.media.list(accountAtRequest)')
+    expect(PAGE).toContain('api.media.list(accountAtRequest, {')
     expect(PAGE).toContain('latestAccountRef.current')
     expect(API).toContain("q.set('accountId', accountId)")
     expect(WORKER).toContain("c.req.query('accountId')")

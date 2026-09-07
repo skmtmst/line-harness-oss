@@ -191,11 +191,64 @@ export async function listUidMigrationRuns(db: D1Database, accountIds: string[],
   return result.results;
 }
 
-export async function listUidMigrationItems(db: D1Database, runId: string): Promise<UidMigrationItemRow[]> {
-  const result = await db.prepare(`SELECT * FROM uid_migration_items WHERE run_id = ?
-    ORDER BY CASE classification WHEN 'conflict' THEN 0 WHEN 'review' THEN 1
-      WHEN 'unmatched' THEN 2 ELSE 3 END, created_at`).bind(runId).all<UidMigrationItemRow>();
+export interface UidMigrationItemFilter {
+  classifications?: UidMigrationClassification[];
+  pendingOnly?: boolean;
+}
+
+export interface UidMigrationItemPage {
+  limit?: number;
+  offset?: number;
+}
+
+function itemFilterSql(filter: UidMigrationItemFilter, params: unknown[]): string {
+  const conditions: string[] = [];
+  if (filter.classifications && filter.classifications.length > 0) {
+    conditions.push(`classification IN (${filter.classifications.map(() => '?').join(',')})`);
+    params.push(...filter.classifications);
+  }
+  if (filter.pendingOnly) {
+    conditions.push(`decision = 'pending'`);
+  }
+  return conditions.length > 0 ? ` AND ${conditions.join(' AND ')}` : '';
+}
+
+const ITEM_ORDER_SQL = `ORDER BY CASE classification WHEN 'conflict' THEN 0 WHEN 'review' THEN 1
+      WHEN 'unmatched' THEN 2 ELSE 3 END, created_at`;
+
+export async function listUidMigrationItems(
+  db: D1Database,
+  runId: string,
+  filter: UidMigrationItemFilter = {},
+  page: UidMigrationItemPage = {},
+): Promise<UidMigrationItemRow[]> {
+  const params: unknown[] = [runId];
+  const where = itemFilterSql(filter, params);
+  let sql = `SELECT * FROM uid_migration_items WHERE run_id = ?${where} ${ITEM_ORDER_SQL}`;
+  if (page.limit !== undefined) {
+    sql += ' LIMIT ?';
+    params.push(page.limit);
+  }
+  if (page.offset !== undefined) {
+    if (page.limit === undefined) sql += ' LIMIT -1';
+    sql += ' OFFSET ?';
+    params.push(page.offset);
+  }
+  const result = await db.prepare(sql).bind(...params).all<UidMigrationItemRow>();
   return result.results;
+}
+
+export async function countUidMigrationItems(
+  db: D1Database,
+  runId: string,
+  filter: UidMigrationItemFilter = {},
+): Promise<number> {
+  const params: unknown[] = [runId];
+  const where = itemFilterSql(filter, params);
+  const result = await db.prepare(
+    `SELECT COUNT(*) AS count FROM uid_migration_items WHERE run_id = ?${where}`,
+  ).bind(...params).first<{ count: number }>();
+  return result?.count ?? 0;
 }
 
 export function protectCsvCell(value: string | null | undefined): string {

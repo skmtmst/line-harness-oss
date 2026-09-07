@@ -82,4 +82,27 @@ describe('A-8b omitted account scope', () => {
     expect(friendQuery.sql).toContain('f.line_account_id IN (?,?)');
     expect(friendQuery.binds).toEqual(['campaign-a', 'campaign-a', 'account-a', 'account-b']);
   });
+
+  test.each([
+    '/api/analytics/ref-summary?lineAccountId=account-hidden',
+    '/api/analytics/ref/campaign-a?lineAccountId=account-hidden',
+  ])('explicit account selection rejects an invisible account before any analytics query: %s', async (path) => {
+    const records: RecordedQuery[] = [];
+    const response = await app(liffRoutes).request(path, {}, { DB: database(records) });
+
+    expect(response.status).toBe(403);
+    expect(records).toHaveLength(0);
+  });
+
+  test('explicit visible account keeps the existing filtered response', async () => {
+    const records: RecordedQuery[] = [];
+    const response = await app(liffRoutes).request(
+      '/api/analytics/ref-summary?lineAccountId=account-a', {}, { DB: database(records) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(records).toHaveLength(3);
+    expect(records.every((record) => record.sql.includes('f.line_account_id = ?'))).toBe(true);
+    expect(records.every((record) => record.binds[0] === 'account-a')).toBe(true);
+  });
 });

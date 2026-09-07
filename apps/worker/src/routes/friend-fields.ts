@@ -31,6 +31,7 @@ import {
 import { recordLoginAudit } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { requireVisibleFriend } from './friends.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 
 const friendFields = new Hono<Env>();
@@ -699,15 +700,19 @@ friendFields.delete('/api/friend-fields/:id', requireRole('owner', 'admin'), asy
 // GET /api/friends/:id/fields
 //
 // 個人情報の項目は役割で絞る。閲覧できる人が開いたときは記録を残す。
-friendFields.get('/api/friends/:id/fields', async (c) => {
-  try {
-    const friendId = c.req.param('id');
-    const staff = c.get('staff');
-    const canSeePersonal = !!staff && (staff.role === 'owner' || staff.role === 'admin');
+friendFields.get(
+  '/api/friends/:id/fields',
+  requireRole('owner', 'admin', 'staff'),
+  requireVisibleFriend,
+  async (c) => {
+    try {
+      const friendId = c.req.param('id');
+      const staff = c.get('staff');
+      const canSeePersonal = !!staff && (staff.role === 'owner' || staff.role === 'admin');
 
-    const rows = await getFriendFieldsWithValues(c.env.DB, friendId);
-    const visible = rows.filter((r) => r.is_personal === 0 || canSeePersonal);
-    const hiddenCount = rows.length - visible.length;
+      const rows = await getFriendFieldsWithValues(c.env.DB, friendId);
+      const visible = rows.filter((r) => r.is_personal === 0 || canSeePersonal);
+      const hiddenCount = rows.length - visible.length;
 
     if (canSeePersonal && rows.some((r) => r.is_personal === 1 && r.value)) {
       // 個人情報保護法上の利用記録。値が入っている項目を実際に見たときだけ残す。
@@ -730,25 +735,26 @@ friendFields.get('/api/friends/:id/fields', async (c) => {
       if (!deferred) await audit;
     }
 
-    return c.json({
-      success: true,
-      data: {
-        items: visible.map(serialize),
-        // 「見えない項目がある」ことは伝える。何があるかは伝えない。
-        hiddenPersonalCount: hiddenCount,
-      },
-    });
-  } catch (err) {
-    console.error('GET /api/friends/:id/fields error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
-  }
-});
+      return c.json({
+        success: true,
+        data: {
+          items: visible.map(serialize),
+          // 「見えない項目がある」ことは伝える。何があるかは伝えない。
+          hiddenPersonalCount: hiddenCount,
+        },
+      });
+    } catch (err) {
+      console.error('GET /api/friends/:id/fields error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
 
 // PUT /api/friends/:id/fields
 //
 // まとめて更新する。EC を正としている項目は書き換えず、理由を warnings で返す。
 // 黙って無視すると「保存したのに戻る」という形で表に出る。
-friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin'), async (c) => {
+friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin'), requireVisibleFriend, async (c) => {
   try {
     const friendId = c.req.param('id');
     const staff = c.get('staff');

@@ -3,6 +3,7 @@
 import type { CommonVarChangeImpact } from '@line-crm/shared'
 import Link from 'next/link'
 import { useState } from 'react'
+import { csvCell } from '@/lib/presentation'
 import Button from '@/components/shared/button'
 import Pagination from '@/components/shared/pagination'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -44,10 +45,6 @@ export function urgentImpactCount(impact: CommonVarChangeImpact): number | null 
 
 export function overLimitCount(impact: CommonVarChangeImpact): number {
   return impact.items.filter((item) => item.exceedsCharacterLimit).length
-}
-
-function csvCell(value: string | number): string {
-  return `"${String(value).replaceAll('"', '""')}"`
 }
 
 export function impactCsv(impact: CommonVarChangeImpact): string {

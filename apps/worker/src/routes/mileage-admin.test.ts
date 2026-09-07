@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 
 const dbMocks = {
   getStaffByApiKey: vi.fn().mockResolvedValue(null),
+  getFriendById: vi.fn(),
   getMileageAdminOverview: vi.fn(),
   getMileageAdminHistory: vi.fn(),
   getMileageEarningRulesV6: vi.fn(),
@@ -71,6 +72,7 @@ vi.mock('../services/mileage-adjustment-notification.js', () => adjustmentNotifi
 
 const accountAccessMocks = {
   getVisibleLineAccountScope: vi.fn(),
+  canAccessAllLineAccounts: vi.fn(),
 };
 vi.mock('../services/account-access.js', () => accountAccessMocks);
 
@@ -107,6 +109,7 @@ beforeEach(() => {
   accountAccessMocks.getVisibleLineAccountScope.mockResolvedValue({
     allowedAccountIds: ['account-1'], canSeeUnassigned: false, ids: ['account-1'], accounts: [],
   });
+  accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(true);
   dbMocks.getMileageRewardAdminOverview.mockResolvedValue({ rewards: [], summary: {} });
   dbMocks.getMileageRewardReachMetrics.mockResolvedValue([]);
   dbMocks.getMileageHistoryPeriodSummary.mockResolvedValue({ byType: [], totalAmount: 0, manualCount: 0 });
@@ -442,15 +445,69 @@ describe('mileage admin API', () => {
   });
 
   it('serializes editable mileage rules', async () => {
-    dbMocks.getMileageRules.mockResolvedValue([{
-      id: 'rule-1', program_id: 'default', name: 'メッセージ送信', event_type: 'message_received',
-      source: 'line', amount: 1, initial_status: 'available', conditions: '{"dailyCapActions":5}',
-      is_active: 1, created_at: '2026-08-09', updated_at: '2026-08-09',
-    }]);
+    const base = {
+      program_id: 'default', source: 'line', amount: 1, initial_status: 'available',
+      conditions: '{"dailyCapActions":5}', is_active: 1,
+      created_at: '2026-08-09', updated_at: '2026-08-09',
+    };
+    dbMocks.getMileageRules.mockResolvedValue([
+      { ...base, id: 'rule-1', name: 'メッセージ送信', event_type: 'message_received', line_account_id: 'account-1' },
+      { ...base, id: 'rule-other', name: '他店ルール', event_type: 'visit', line_account_id: 'account-other' },
+      { ...base, id: 'legacy', name: '旧全店ルール', event_type: 'legacy', line_account_id: null },
+    ]);
     const response = await call('/api/mileage/rules');
     expect(response.status).toBe(200);
-    const body = await response.json() as { data: Array<{ amount: number; conditions: { dailyCapActions: number } }> };
+    const body = await response.json() as { data: Array<{
+      id: string; amount: number; conditions: { dailyCapActions: number };
+    }> };
+    expect(body.data.map((rule) => rule.id)).toEqual(['rule-1']);
     expect(body.data[0]).toMatchObject({ amount: 1, conditions: { dailyCapActions: 5 } });
+  });
+
+  it('creates mileage rules only inside an authorized LINE account', async () => {
+    const body = { name: '来店', eventType: 'visit', amount: 10 };
+    expect((await call('/api/mileage/rules', {
+      method: 'POST', body: JSON.stringify(body),
+    })).status).toBe(400);
+
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
+    expect((await call('/api/mileage/rules', {
+      method: 'POST', body: JSON.stringify({ ...body, lineAccountId: 'account-other' }),
+    })).status).toBe(403);
+    expect(dbMocks.createMileageRule).not.toHaveBeenCalled();
+
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(true);
+    dbMocks.createMileageRule.mockResolvedValue({
+      id: 'rule-1', name: '来店', event_type: 'visit', amount: 10,
+      line_account_id: 'account-1', initial_status: 'available', is_active: 1,
+    });
+    expect((await call('/api/mileage/rules', {
+      method: 'POST', body: JSON.stringify({ ...body, lineAccountId: 'account-1' }),
+    })).status).toBe(201);
+    expect(dbMocks.createMileageRule).toHaveBeenCalledWith(env.DB, expect.objectContaining({
+      lineAccountId: 'account-1',
+    }));
+  });
+
+  it.each(['PUT', 'DELETE'] as const)('%s cannot modify another account mileage rule', async (method) => {
+    dbMocks.getMileageRuleById.mockResolvedValue({ id: 'rule-other', line_account_id: 'account-other' });
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
+    const response = await call('/api/mileage/rules/rule-other', {
+      method,
+      ...(method === 'PUT' ? { body: JSON.stringify({ amount: 2 }) } : {}),
+    });
+    expect(response.status).toBe(404);
+    expect(dbMocks.updateMileageRule).not.toHaveBeenCalled();
+    expect(dbMocks.deleteMileageRule).not.toHaveBeenCalled();
+  });
+
+  it.each(['PUT', 'DELETE'] as const)('%s cannot change a legacy global mileage rule', async (method) => {
+    dbMocks.getMileageRuleById.mockResolvedValue({ id: 'legacy', line_account_id: null });
+    const response = await call('/api/mileage/rules/legacy', {
+      method,
+      ...(method === 'PUT' ? { body: JSON.stringify({ amount: 2 }) } : {}),
+    });
+    expect(response.status).toBe(409);
   });
 
   it('rejects a zero-mile rule update before touching D1', async () => {
@@ -711,5 +768,40 @@ describe('mileage admin API', () => {
       body: JSON.stringify({ accountId: 'account-1', approvalThreshold: 1_000 }),
     });
     expect(admin.status).toBe(403);
+  });
+
+  it('reads a visible friend score but hides other-account friends', async () => {
+    dbMocks.getFriendById.mockResolvedValue({ id: 'friend-1', line_account_id: 'account-1' });
+    dbMocks.getFriendScore.mockResolvedValue(42);
+    dbMocks.getFriendScoreHistory.mockResolvedValue([]);
+    const visible = await call('/api/friends/friend-1/score');
+    expect(visible.status).toBe(200);
+    expect(dbMocks.getFriendScore).toHaveBeenCalledWith(env.DB, 'friend-1');
+
+    dbMocks.getFriendById.mockResolvedValue({ id: 'friend-2', line_account_id: 'account-2' });
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
+    const hidden = await call('/api/friends/friend-2/score');
+    expect(hidden.status).toBe(404);
+    expect(dbMocks.getFriendScore).toHaveBeenCalledTimes(1);
+  });
+
+  it('adds a score only for a visible friend', async () => {
+    dbMocks.getFriendById.mockResolvedValue({ id: 'friend-1', line_account_id: 'account-1' });
+    dbMocks.getFriendScore.mockResolvedValue(45);
+    const added = await call('/api/friends/friend-1/score', {
+      method: 'POST', body: JSON.stringify({ scoreChange: 3, reason: '対応記録' }),
+    });
+    expect(added.status).toBe(201);
+    expect(dbMocks.addScore).toHaveBeenCalledWith(env.DB, {
+      friendId: 'friend-1', scoreChange: 3, reason: '対応記録',
+    });
+
+    dbMocks.getFriendById.mockResolvedValue({ id: 'friend-2', line_account_id: 'account-2' });
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
+    const hidden = await call('/api/friends/friend-2/score', {
+      method: 'POST', body: JSON.stringify({ scoreChange: 3 }),
+    });
+    expect(hidden.status).toBe(404);
+    expect(dbMocks.addScore).toHaveBeenCalledTimes(1);
   });
 });

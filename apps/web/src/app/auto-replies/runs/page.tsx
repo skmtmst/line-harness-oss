@@ -25,6 +25,17 @@ const STATUS: Record<ExecutionRunStatus, { label: string; tone: StatusBadgeTone 
   skipped: { label: '何もしませんでした', tone: 'neutral' },
   pending: { label: '確認待ち', tone: 'warning' },
   cancelled: { label: '取り消しました', tone: 'neutral' },
+  claimed: { label: '処理中', tone: 'warning' },
+  permanent_failed: { label: '失敗', tone: 'danger' },
+}
+
+/*
+ * 口が将来の状態を返しても白い画面にしない。
+ * 表に無い状態が来たら「確認中」で出す。理由は detail に残る。
+ */
+function statusView(status: string): { label: string; tone: StatusBadgeTone } {
+  return (STATUS as Record<string, { label: string; tone: StatusBadgeTone }>)[status]
+    ?? { label: '確認中', tone: 'neutral' }
 }
 
 function formatTime(value: string | null): string {
@@ -76,7 +87,7 @@ function csvFor(items: AutoReplyRun[]): string {
       item.accountLabel ?? '—',
       item.inputPreview ?? '—',
       item.triggerLabel,
-      STATUS[item.status].label,
+      statusView(item.status).label,
       actionLabel(item),
       item.durationMs === null ? '—' : `${item.durationMs}ms`,
     ]),
@@ -203,7 +214,7 @@ export default function AutoReplyRunsPage() {
               <>
                 <div className={styles.runList}>
                   {items.map((item, index) => {
-                    const view = STATUS[item.status]
+                    const view = statusView(item.status)
                     return (
                       <article key={item.id} className={`${styles.runRow} ${index === 0 ? styles.highlight : ''}`}>
                         <span className={styles.avatar} aria-hidden="true">{(item.friendName ?? '?').slice(0, 1)}</span>

@@ -1,7 +1,7 @@
 'use client'
 
 import { Fragment, useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import KpiCard from '@/components/dashboard/kpi-card'
+import KpiCard from '@/components/shared/kpi-card'
 import {
   api,
   type AffiliateAccountSettlementPreview,
@@ -49,11 +49,6 @@ import {
   type OfferFilter,
   type OfferSort,
 } from './offer-list-view'
-
-const WORKER_BASE = process.env.NEXT_PUBLIC_API_URL
-if (!WORKER_BASE) {
-  throw new Error('NEXT_PUBLIC_API_URL is not set. Build cannot proceed.')
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types

@@ -194,9 +194,11 @@ export async function saveMileageEarningRuleDraft(
   },
 ) {
   const draft = validateMileageEarningRuleDraft(input.draft);
-  const rule = await db.prepare(`SELECT id FROM mileage_rules WHERE id = ?`).bind(input.ruleId)
-    .first<{ id: string }>();
-  if (!rule) throw new MileageV6Error('rule_not_found', '付与ルールが見つかりません', 404);
+  const rule = await db.prepare(`SELECT id, line_account_id FROM mileage_rules WHERE id = ?`).bind(input.ruleId)
+    .first<{ id: string; line_account_id: string | null }>();
+  if (!rule || (rule.line_account_id != null && rule.line_account_id !== input.lineAccountId)) {
+    throw new MileageV6Error('rule_not_found', '付与ルールが見つかりません', 404);
+  }
   const current = await db.prepare(
     `SELECT rule_id, line_account_id, version, draft_json, updated_at
        FROM mileage_earning_rule_drafts WHERE rule_id = ?`,

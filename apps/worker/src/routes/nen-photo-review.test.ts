@@ -29,7 +29,12 @@ const { nenMembers } = await import('./nen-members.js');
 
 type Entry = { query: string; bindings: unknown[] };
 
-function harness(options: { photoAccount?: string; duplicate?: boolean; customerId?: string | null } = {}) {
+function harness(options: {
+  photoAccount?: string;
+  duplicate?: boolean;
+  customerId?: string | null;
+  permissionKeys?: string[];
+} = {}) {
   const statements: Entry[] = [];
   const batches: Entry[][] = [];
   const photoAccount = options.photoAccount ?? 'account-a';
@@ -42,6 +47,12 @@ function harness(options: { photoAccount?: string; duplicate?: boolean; customer
         get bindings() { return entry.bindings; },
         bind(...bindings: unknown[]) { entry.bindings = bindings; return statement; },
         async first() {
+          if (query.includes('LEFT JOIN line_accounts la') && query.includes('WHERE f.id = ?')) {
+            return {
+              id: 'friend-1', line_user_id: 'U1', display_name: '利用者', is_following: 1,
+              line_account_id: photoAccount, line_account_name: '店舗A',
+            };
+          }
           if (query.includes('ps.review_image_url AS image_url') && query.includes('submission_count')) {
             if (entry.bindings[1] !== photoAccount || entry.bindings[2] !== photoAccount) return null;
             return { id: 'photo-1', image_url: 'https://example.test/review.jpg', review_version: 1 };
@@ -77,7 +88,8 @@ function harness(options: { photoAccount?: string; duplicate?: boolean; customer
             return { results: [{ id: 'publication-1', photo_id: 'photo-1', view_count: null, version: 2 }] };
           }
           if (query.includes('FROM nen_photo_publication_placements')) {
-            return { results: [{ id: 'placement-1', placement_type: 'column', placement_label: 'コラム', view_count: null }] };
+            // 一覧は掲載先をINで1発取得する。振り分け鍵の publication_id を返す。
+            return { results: [{ publication_id: 'publication-1', id: 'placement-1', placement_type: 'column', placement_label: 'コラム', view_count: null }] };
           }
           if (query.includes('FROM nen_photo_risk_assessments')) {
             return { results: [{ flag: 'face', confidence: 0.78 }] };
@@ -102,7 +114,8 @@ function harness(options: { photoAccount?: string; duplicate?: boolean; customer
   app.use('*', async (c, next) => {
     c.set('staff', {
       id: 'staff-a', name: '担当者', role: 'staff', readOnly: false,
-      permissionKeys: ['photo.submission.view', 'photo.submission.review'],
+      permissionKeys: options.permissionKeys
+        ?? ['photo.submission.view', 'photo.submission.review'],
     });
     c.env = { DB: db, WORKER_PUBLIC_URL: 'https://worker.example' };
     await next();
@@ -151,6 +164,26 @@ describe('NEN photo review', () => {
     const list = statements.find((entry) => entry.query.includes('FROM nen_photo_publications pub'));
     expect(list?.query).toContain("pub.line_account_id = ? AND pub.status = 'published'");
     expect(list?.query).toContain('ps.publication_consent_at IS NOT NULL');
+  });
+
+  it('requires photo view permission before listing publications', async () => {
+    const { app, statements } = harness({ permissionKeys: [] });
+    const response = await app.request('/api/nen-members/photos/publications?accountId=account-a');
+
+    expect(response.status).toBe(403);
+    expect(statements.some((entry) => entry.query.includes('FROM nen_photo_publications pub'))).toBe(false);
+  });
+
+  it('friend overview never selects the private original object key', async () => {
+    const { app, statements } = harness();
+    const response = await app.request('/api/nen-members/friends/friend-1');
+
+    expect(response.status).toBe(200);
+    const photoQuery = statements.find((entry) => entry.query.includes('FROM nen_photo_submissions ps')
+      && entry.query.includes('WHERE ps.friend_id = ?'));
+    expect(photoQuery?.query).not.toContain('ps.*');
+    expect(photoQuery?.query).not.toContain('r2_key');
+    expect(photoQuery?.query).not.toMatch(/\bps\.image_url\b/);
   });
 
   it('returns permission denied before reading photo workspace data', async () => {

@@ -340,10 +340,31 @@ export interface CommonVarSchedule {
   applied_at: string | null;
 }
 
-export async function getCommonVars(
+/**
+ * 一覧の総件数。件数上限で切ったときに「絞り込み誘導」を出すために使う。
+ *
+ * 未取得を0件と見せない規則と同じく、切ったことを黙らない。
+ */
+export async function countCommonVars(
   db: D1Database,
   opts: { folderId?: string; lineAccountId: string },
+): Promise<number> {
+  const row = opts.folderId
+    ? await db.prepare(`SELECT COUNT(*) AS total FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL AND folder_id = ?`)
+      .bind(opts.lineAccountId, opts.folderId).first<{ total: number }>()
+    : await db.prepare(`SELECT COUNT(*) AS total FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL`)
+      .bind(opts.lineAccountId).first<{ total: number }>();
+  return Number(row?.total ?? 0);
+}
+
+/** 一覧の1回の上限。件数に比例して使用先の走査が重くなるため、上限と絞り込み誘導で守る。 */
+export const COMMON_VARS_LIST_LIMIT = 200;
+
+export async function getCommonVars(
+  db: D1Database,
+  opts: { folderId?: string; lineAccountId: string; limit?: number },
 ): Promise<CommonVar[]> {
+  const limit = Math.max(1, Math.min(Math.floor(opts.limit ?? COMMON_VARS_LIST_LIMIT), COMMON_VARS_LIST_LIMIT));
   const overview = `,
     (SELECT s.effective_from FROM common_var_schedules s
       WHERE s.var_id = common_vars.id AND s.applied_at IS NULL
@@ -355,14 +376,14 @@ export async function getCommonVars(
       WHERE s.var_id = common_vars.id AND s.applied_at IS NULL) AS pending_schedule_count`;
   if (opts.folderId) {
     const result = await db
-      .prepare(`SELECT common_vars.* ${overview} FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL AND folder_id = ? ORDER BY name ASC`)
-      .bind(opts.lineAccountId, opts.folderId)
+      .prepare(`SELECT common_vars.* ${overview} FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL AND folder_id = ? ORDER BY name ASC LIMIT ?`)
+      .bind(opts.lineAccountId, opts.folderId, limit)
       .all<CommonVar>();
     return result.results;
   }
   const result = await db
-    .prepare(`SELECT common_vars.* ${overview} FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL ORDER BY name ASC`)
-    .bind(opts.lineAccountId)
+    .prepare(`SELECT common_vars.* ${overview} FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL ORDER BY name ASC LIMIT ?`)
+    .bind(opts.lineAccountId, limit)
     .all<CommonVar>();
   return result.results;
 }
@@ -428,10 +449,44 @@ export async function getCommonVarById(
     .bind(id, lineAccountId).first<CommonVar>();
 }
 
+/** 履歴表示専用。更新・削除の判定には使わず、アーカイブ済みも参照できる。 */
+export async function getCommonVarByIdIncludingArchived(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+): Promise<CommonVar | null> {
+  return db.prepare(`SELECT * FROM common_vars WHERE id = ? AND line_account_id = ?`)
+    .bind(id, lineAccountId).first<CommonVar>();
+}
+
 export class CommonVarVersionConflictError extends Error {
   constructor(readonly currentVersion: number) {
     super('Common variable version conflict');
   }
+}
+
+export class CommonVarFolderError extends Error {
+  constructor() {
+    super('Common variable folder not found or wrong kind');
+  }
+}
+
+export class CommonVarKeyConflictError extends Error {
+  constructor() {
+    super('Common variable key already exists in this account');
+  }
+}
+
+/**
+ * フォルダの存在と種別を確認する。
+ *
+ * 違う画面のフォルダIDを指定されると、絞り込み表示が想定外になる。
+ * 共通情報以外のフォルダ・存在しないフォルダは受け付けない。
+ */
+async function assertCommonVarFolder(db: D1Database, folderId: string): Promise<void> {
+  const row = await db.prepare(`SELECT id FROM folders WHERE id = ? AND kind = 'common_var'`)
+    .bind(folderId).first<{ id: string }>();
+  if (!row) throw new CommonVarFolderError();
 }
 
 export async function createCommonVar(
@@ -451,24 +506,39 @@ export async function createCommonVar(
   const now = jstNow();
   const memo = input.memo ?? '';
   const value = input.value ?? '';
-  await db.batch([
-    db.prepare(
-      `INSERT INTO common_vars
-         (id, line_account_id, folder_id, name, var_key, type, value, memo, version,
-          updated_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
-    ).bind(
-      id, input.lineAccountId, input.folderId ?? null, input.name, input.varKey,
-      input.type ?? 'text', value, memo, input.actorId ?? null, now, now,
-    ),
-    db.prepare(
-      `INSERT INTO common_var_versions
-         (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
-       VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?)`,
-    ).bind(
-      crypto.randomUUID(), id, input.name, value, memo, '作成', input.actorId ?? null, now,
-    ),
-  ]);
+  if (input.folderId) await assertCommonVarFolder(db, input.folderId);
+  const duplicate = await db.prepare(
+    `SELECT id FROM common_vars
+      WHERE line_account_id = ? AND var_key = ?
+      LIMIT 1`,
+  ).bind(input.lineAccountId, input.varKey).first<{ id: string }>();
+  if (duplicate) throw new CommonVarKeyConflictError();
+  try {
+    await db.batch([
+      db.prepare(
+        `INSERT INTO common_vars
+           (id, line_account_id, folder_id, name, var_key, type, value, memo, version,
+            updated_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+      ).bind(
+        id, input.lineAccountId, input.folderId ?? null, input.name, input.varKey,
+        input.type ?? 'text', value, memo, input.actorId ?? null, now, now,
+      ),
+      db.prepare(
+        `INSERT INTO common_var_versions
+           (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
+         VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        crypto.randomUUID(), id, input.name, value, memo, '作成', input.actorId ?? null, now,
+      ),
+    ]);
+  } catch (error) {
+    if (error instanceof Error
+      && error.message.includes('UNIQUE constraint failed: common_vars.line_account_id, common_vars.var_key')) {
+      throw new CommonVarKeyConflictError();
+    }
+    throw error;
+  }
   return (await getCommonVarById(db, id, input.lineAccountId))!;
 }
 
@@ -506,6 +576,7 @@ export async function updateCommonVar(
     values.push(input.memo);
   }
   if ('folderId' in input) {
+    if (input.folderId) await assertCommonVarFolder(db, input.folderId);
     sets.push('folder_id = ?');
     values.push(input.folderId ?? null);
   }
@@ -560,8 +631,42 @@ export async function getCommonVarVersions(
   return result.results;
 }
 
-export async function deleteCommonVar(db: D1Database, id: string, lineAccountId: string): Promise<void> {
-  await db.prepare(`DELETE FROM common_vars WHERE id = ? AND line_account_id = ?`).bind(id, lineAccountId).run();
+export async function deleteCommonVar(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+  actorId: string | null,
+  changeReason = '未使用のため削除（アーカイブ）',
+): Promise<void> {
+  const existing = await getCommonVarById(db, id, lineAccountId);
+  if (!existing) return;
+  const now = jstNow();
+  const nextVersion = existing.version + 1;
+  const results = await db.batch([
+    db.prepare(
+      `UPDATE common_vars
+          SET archived_at = ?, version = ?, updated_by = ?, updated_at = ?
+        WHERE id = ? AND line_account_id = ? AND version = ? AND archived_at IS NULL`,
+    ).bind(now, nextVersion, actorId, now, id, lineAccountId, existing.version),
+    db.prepare(
+      `INSERT INTO common_var_versions
+         (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+        WHERE EXISTS (
+          SELECT 1 FROM common_vars
+           WHERE id = ? AND line_account_id = ? AND version = ? AND archived_at = ?
+        )`,
+    ).bind(
+      crypto.randomUUID(), id, nextVersion, existing.name, existing.value, existing.memo,
+      changeReason.trim() || '削除（アーカイブ）', actorId, now,
+      id, lineAccountId, nextVersion, now,
+    ),
+  ]);
+  if (Number(results[0]?.meta.changes ?? 0) === 0) {
+    throw new CommonVarVersionConflictError(
+      (await getCommonVarByIdIncludingArchived(db, id, lineAccountId))?.version ?? existing.version,
+    );
+  }
 }
 
 export interface CommonVarReplacementTarget {
@@ -873,15 +978,65 @@ export async function applyDueCommonVarSchedules(
     .all<CommonVarSchedule>();
   let applied = 0;
   for (const row of due.results) {
-    await db
-      .prepare(`UPDATE common_vars SET value = ?, updated_at = ? WHERE id = ?`)
-      .bind(row.value, jstNow(), row.var_id)
-      .run();
-    await db
-      .prepare(`UPDATE common_var_schedules SET applied_at = ? WHERE id = ?`)
-      .bind(jstNow(), row.id)
-      .run();
-    applied++;
+    // 適用のたびに版を1つ進め、履歴に1行残す。値・版・履歴・適用済み印を
+    // 同じ batch にして、途中で落ちたら「値だけ変わって記録なし」にしない。
+    // 版の一致を条件に入れるので、利用者の同時編集とぶつかった回は
+    // 何も書かず、次回の Cron で当て直す。
+    const current = await db
+      .prepare(
+        `SELECT name, value, memo, version FROM common_vars
+          WHERE id = ? AND archived_at IS NULL`,
+      )
+      .bind(row.var_id)
+      .first<{ name: string; value: string; memo: string | null; version: number }>();
+    const stamp = jstNow();
+    if (!current) {
+      // 変数自体が無い(削除済み等)の予約は、繰り返し拾わないよう印だけ打つ。
+      await db
+        .prepare(`UPDATE common_var_schedules SET applied_at = ? WHERE id = ?`)
+        .bind(stamp, row.id)
+        .run();
+      applied++;
+      continue;
+    }
+    const nextVersion = current.version + 1;
+    const results = await db.batch([
+      // SELECT後からbatch開始までに画面保存が入っていたら、意図的にSQLエラーを
+      // 起こしてbatch全体を戻す。batch内は同一トランザクションなので、この確認後に
+      // 値・履歴・適用済み印が分かれることはない。
+      db.prepare(
+        `SELECT CASE WHEN EXISTS (
+           SELECT 1 FROM common_vars
+            WHERE id = ? AND version = ? AND archived_at IS NULL
+         ) THEN 1 ELSE json('') END AS version_is_current`,
+      ).bind(row.var_id, current.version),
+      db.prepare(
+        `UPDATE common_vars SET value = ?, version = ?, updated_by = NULL, updated_at = ?
+          WHERE id = ? AND version = ? AND archived_at IS NULL`,
+      ).bind(row.value, nextVersion, stamp, row.var_id, current.version),
+      db.prepare(
+        `INSERT INTO common_var_versions
+           (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+          WHERE EXISTS (
+            SELECT 1 FROM common_vars
+             WHERE id = ? AND version = ? AND archived_at IS NULL
+          )`,
+      ).bind(
+        crypto.randomUUID(), row.var_id, nextVersion,
+        current.name, row.value, current.memo ?? '',
+        '予約適用', null, stamp,
+        row.var_id, nextVersion,
+      ),
+      db.prepare(
+        `UPDATE common_var_schedules SET applied_at = ?
+          WHERE id = ? AND applied_at IS NULL AND EXISTS (
+            SELECT 1 FROM common_vars
+             WHERE id = ? AND version = ? AND archived_at IS NULL
+          )`,
+      ).bind(stamp, row.id, row.var_id, nextVersion),
+    ]);
+    if ((results[1].meta?.changes ?? 0) > 0) applied++;
   }
   return applied;
 }

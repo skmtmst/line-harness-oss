@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -18,14 +19,22 @@ type TrackingSummary = {
 }
 
 export default function SiteScript() {
+  const { selectedAccountId } = useAccount()
   const [pages, setPages] = useState<PageRow[]>([])
   const [summary, setSummary] = useState<TrackingSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
   const [copied, setCopied] = useState(false)
   const [copyFailed, setCopyFailed] = useState(false)
+  // アカウント別の計測鍵。取れるまで・取れないときはコードを出さない
+  // (固定の鍵を出すと他アカウントの計測が混ざる)。
+  const [trackingKey, setTrackingKey] = useState<string | null>(null)
+  const [keyLoading, setKeyLoading] = useState(true)
+  const [keyAttempt, setKeyAttempt] = useState(0)
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? ''
-  const snippet = `<script async src="${apiUrl}/api/site/script.js" data-key="hk_9f3a2c81b4"></script>`
+  const snippet = trackingKey
+    ? `<script async src="${apiUrl}/api/site/script.js" data-key="${trackingKey}"></script>`
+    : null
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -50,7 +59,32 @@ export default function SiteScript() {
     void load()
   }, [load])
 
+  // 選択中アカウントの計測鍵を取る。未選択のときは口に省いて送り、
+  // 可視アカウントが1つだけなら向こうで補う。複数ある・失敗のときは
+  // コードを出さず案内にする。
+  useEffect(() => {
+    let cancelled = false
+    setKeyLoading(true)
+    void api.siteTracking
+      .trackingKey(selectedAccountId ?? undefined)
+      .then((res) => {
+        if (cancelled) return
+        setTrackingKey(res.success && res.data.trackingKey ? res.data.trackingKey : null)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setTrackingKey(null)
+      })
+      .finally(() => {
+        if (!cancelled) setKeyLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedAccountId, keyAttempt])
+
   const copy = async () => {
+    if (!snippet) return
     try {
       await navigator.clipboard.writeText(snippet)
       setCopied(true)
@@ -102,14 +136,29 @@ export default function SiteScript() {
           <section className="rounded-card border border-hairline bg-canvas p-5">
             <h2 className="text-base font-bold text-ink">サイトに貼るコード</h2>
             <p className="mt-1 text-xs leading-relaxed text-ink-faint">ホームページの &lt;/head&gt; の直前に、この1行をそのまま貼ってください。ページごとに書き換える必要はありません。</p>
-            <div className="mt-3 rounded-control bg-ink p-4 text-on-accent">
-              <p className="text-xs text-on-accent">あなたのアカウントで使うコード</p>
-              <div className="mt-2 flex items-center gap-3">
-                <code className="min-w-0 flex-1 overflow-x-auto text-xs">{snippet}</code>
-                <Button onClick={copy}>{copied ? 'コピーしました' : 'コピー'}</Button>
+            {keyLoading ? (
+              <p className="mt-3 text-xs text-ink-faint">あなたのアカウントのコードを取得しています…</p>
+            ) : snippet ? (
+              <>
+                <div className="mt-3 rounded-control bg-ink p-4 text-on-accent">
+                  <p className="text-xs text-on-accent">あなたのアカウントで使うコード</p>
+                  <div className="mt-2 flex items-center gap-3">
+                    <code className="min-w-0 flex-1 overflow-x-auto text-xs">{snippet}</code>
+                    <Button onClick={copy}>{copied ? 'コピーしました' : 'コピー'}</Button>
+                  </div>
+                </div>
+                {copyFailed && <p className="mt-2 text-xs text-status-danger">コピーできませんでした。上のコードを選んでコピーしてください。</p>}
+              </>
+            ) : (
+              <div className="mt-3 rounded-control bg-canvas-sunken p-4">
+                <p className="text-xs leading-relaxed text-ink-secondary">
+                  計測コードを取得できませんでした。アカウントごとの鍵が無いと他の計測と混ざるため、以前の共通の鍵は表示しません。通信状態を確かめて、もう一度お試しください。
+                </p>
+                <div className="mt-2">
+                  <Button onClick={() => setKeyAttempt((n) => n + 1)}>コードをもう一度取得する</Button>
+                </div>
               </div>
-            </div>
-            {copyFailed && <p className="mt-2 text-xs text-status-danger">コピーできませんでした。上のコードを選んでコピーしてください。</p>}
+            )}
           </section>
 
           <section className="rounded-card border border-hairline bg-canvas p-5">

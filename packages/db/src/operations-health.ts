@@ -198,13 +198,93 @@ export async function getLatestOperationHealthRun(
 
 export async function createStepUpGrant(
   db: D1Database,
-  input: { tokenHash: string; staffId: string; purpose: string; expiresAt: string; now?: string },
-): Promise<void> {
-  await db.prepare(
-    `INSERT INTO auth_step_up_grants
-       (token_hash, staff_id, purpose, expires_at, created_at) VALUES (?, ?, ?, ?, ?)`,
-  ).bind(input.tokenHash, input.staffId, input.purpose, input.expiresAt,
-    input.now ?? new Date().toISOString()).run();
+  input: {
+    tokenHash: string;
+    staffId: string;
+    purpose: string;
+    expiresAt: string;
+    now?: string;
+    totpStep?: number;
+  },
+): Promise<boolean> {
+  const now = input.now ?? new Date().toISOString();
+  if (input.totpStep === undefined) {
+    await db.prepare(
+      `INSERT INTO auth_step_up_grants
+         (token_hash, staff_id, purpose, expires_at, created_at) VALUES (?, ?, ?, ?, ?)`,
+    ).bind(input.tokenHash, input.staffId, input.purpose, input.expiresAt, now).run();
+    return true;
+  }
+
+  const results = await db.batch([
+    db.prepare(
+      `UPDATE staff_members
+          SET totp_last_used_step = ?, updated_at = ?
+        WHERE id = ? AND (totp_last_used_step IS NULL OR totp_last_used_step < ?)`,
+    ).bind(input.totpStep, now, input.staffId, input.totpStep),
+    // D1 batchは同じtransaction・接続で順に実行される。changes()が直前の
+    // claim成功を示すときだけgrantを保存し、並列の同一コードを増殖させない。
+    db.prepare(
+      `INSERT INTO auth_step_up_grants
+         (token_hash, staff_id, purpose, expires_at, created_at)
+       SELECT ?, ?, ?, ?, ? WHERE changes() = 1`,
+    ).bind(input.tokenHash, input.staffId, input.purpose, input.expiresAt, now),
+    db.prepare(
+      `DELETE FROM auth_step_up_attempts
+        WHERE staff_id = ?
+          AND EXISTS (SELECT 1 FROM auth_step_up_grants WHERE token_hash = ?)`,
+    ).bind(input.staffId, input.tokenHash),
+  ]);
+  return Number(results[1]?.meta?.changes ?? 0) === 1;
+}
+
+const STEP_UP_MAX_ATTEMPTS = 5;
+const STEP_UP_ATTEMPT_WINDOW_MS = 10 * 60_000;
+
+export type StepUpAttemptReservation = {
+  attempts: number;
+  maxAttempts: number;
+  windowStartedAt: string;
+};
+
+/**
+ * TOTPを検証する前に、職員単位の試行枠を原子的に1つ確保する。
+ *
+ * SELECT後にUPDATEする形だと、並列リクエストが同じ回数を見て上限を
+ * すり抜ける。UPSERTのWHEREで、期限内かつ上限到達済みの更新を拒否する。
+ */
+export async function reserveStepUpAttempt(
+  db: D1Database,
+  staffId: string,
+  now = new Date().toISOString(),
+): Promise<StepUpAttemptReservation | null> {
+  const windowCutoff = new Date(Date.parse(now) - STEP_UP_ATTEMPT_WINDOW_MS).toISOString();
+  const row = await db.prepare(
+    `INSERT INTO auth_step_up_attempts
+       (staff_id, attempts, window_started_at, updated_at)
+     VALUES (?, 1, ?, ?)
+     ON CONFLICT(staff_id) DO UPDATE SET
+       attempts = CASE
+         WHEN auth_step_up_attempts.window_started_at <= ? THEN 1
+         ELSE auth_step_up_attempts.attempts + 1
+       END,
+       window_started_at = CASE
+         WHEN auth_step_up_attempts.window_started_at <= ? THEN excluded.window_started_at
+         ELSE auth_step_up_attempts.window_started_at
+       END,
+       updated_at = excluded.updated_at
+     WHERE auth_step_up_attempts.window_started_at <= ?
+        OR auth_step_up_attempts.attempts < ?
+     RETURNING attempts, window_started_at`,
+  ).bind(
+    staffId, now, now,
+    windowCutoff, windowCutoff, windowCutoff, STEP_UP_MAX_ATTEMPTS,
+  ).first<{ attempts: number; window_started_at: string }>();
+  return row ? {
+    attempts: Number(row.attempts),
+    maxAttempts: STEP_UP_MAX_ATTEMPTS,
+    windowStartedAt: row.window_started_at,
+  } : null;
 }
 
 export async function consumeStepUpGrant(

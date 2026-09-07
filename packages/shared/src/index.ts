@@ -12,3 +12,4 @@ export * from "./friend-bulk-runs";
 export * from "./identity-candidates";
 export * from "./merged-people";
 export * from "./template-message";
+export * from "./feature-catalog";

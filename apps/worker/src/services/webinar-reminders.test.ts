@@ -5,6 +5,9 @@ const dbMocks = {
   markWebinarRegistrationNotified: vi.fn(),
   getFriendById: vi.fn(),
   getLineAccountById: vi.fn(),
+  getVersionedAccountSetting: vi.fn(),
+  getAccountSetting: vi.fn(),
+  recordAuditEvent: vi.fn(),
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
@@ -34,6 +37,9 @@ beforeEach(() => {
     id: 'acc-1', channel_access_token: 'tok', liff_id: '111-aaa',
   });
   dbMocks.markWebinarRegistrationNotified.mockResolvedValue(true);
+  dbMocks.getVersionedAccountSetting.mockResolvedValue(null);
+  dbMocks.getAccountSetting.mockResolvedValue('{"enabled":true}');
+  dbMocks.recordAuditEvent.mockResolvedValue(undefined);
   proxyFetch.mockResolvedValue(new Response(null, { status: 200 }));
   vi.stubGlobal('fetch', proxyFetch);
 });
@@ -94,6 +100,21 @@ describe('processWebinarReminders', () => {
     expect(proxyFetch).not.toHaveBeenCalled();
     expect(dbMocks.markWebinarRegistrationNotified).toHaveBeenCalledWith(expect.anything(), 'reg-1');
     expect(result).toEqual({ sent: 0, failed: 0 });
+  });
+
+  test('機能オフ中は予約を消化せず送信もしない', async () => {
+    dbMocks.getDueWebinarRegistrations.mockResolvedValue([REG]);
+    dbMocks.getAccountSetting.mockResolvedValue('{"enabled":false}');
+
+    const result = await processWebinarReminders({} as D1Database, OPTIONS);
+
+    expect(result).toEqual({ sent: 0, failed: 0 });
+    expect(proxyFetch).not.toHaveBeenCalled();
+    expect(dbMocks.markWebinarRegistrationNotified).not.toHaveBeenCalled();
+    expect(dbMocks.recordAuditEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: 'feature.execution.skipped' }),
+    );
   });
 
   test('開始済みセッションは「始まりました」文言になる', async () => {

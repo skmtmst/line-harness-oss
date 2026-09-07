@@ -47,7 +47,10 @@ vi.mock('@line-crm/db', () => ({
   incrementTwoFactorChallengeAttempts: vi.fn(async () => undefined),
   deleteTwoFactorChallenge: vi.fn(async () => undefined),
   claimStaffTotpStep: vi.fn(async () => true),
-  createStepUpGrant: vi.fn(async () => undefined),
+  reserveStepUpAttempt: vi.fn(async () => ({
+    attempts: 1, maxAttempts: 5, windowStartedAt: new Date().toISOString(),
+  })),
+  createStepUpGrant: vi.fn(async () => true),
   updateStaffMember: vi.fn(async () => null),
   deleteAdminSession: vi.fn(async () => undefined),
   // ログイン・ログアウト・失敗を記録する。本体では例外を握るので、
@@ -106,6 +109,8 @@ function app() {
   a.post('/api/integrations/slack/actions', (c) => c.json({ success: true }));
   a.post('/api/integrations/slack/events', (c) => c.json({ success: true }));
   a.get('/api/public/brand', (c) => c.json({ success: true, staff: c.get('staff') ?? null }));
+  a.get('/api/site/script.js', (c) => c.json({ success: true, staff: c.get('staff') ?? null }));
+  a.post('/api/site/collect', (c) => c.json({ success: true, staff: c.get('staff') ?? null }));
   for (const path of [
     '/api/support', '/api/operators', '/api/support-marks', '/api/saved-searches',
     '/api/folders', '/api/tag-groups', '/api/friends/:id', '/api/friends/:id/messages',
@@ -526,6 +531,17 @@ describe('public form method boundaries', () => {
       method: 'DELETE',
     }, crossSiteEnv());
     expect(res.status).toBe(401);
+  });
+});
+
+describe('公開サイト計測の認証境界', () => {
+  test.each([
+    ['GET', '/api/site/script.js'],
+    ['POST', '/api/site/collect'],
+  ])('%s %s は管理者認証より前へ通す', async (method, path) => {
+    const res = await app().request(path, { method }, crossSiteEnv());
+    expect(res.status).toBe(200);
+    expect((await res.json() as { staff: unknown }).staff).toBeNull();
   });
 });
 

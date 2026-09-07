@@ -526,11 +526,20 @@ tags.patch('/api/tags/:id/group', requireRole('owner', 'admin'), async (c) => {
 // the many picker/filter consumers keep the cheap plain SELECT.
 tags.get('/api/tags', async (c) => {
   try {
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const requestedAccountId = requestedLineAccountId(c);
+    if (requestedAccountId && !scope.allowedAccountIds.includes(requestedAccountId)) {
+      return c.json({ success: false, error: '対象のLINE公式アカウントが見つかりません' }, 404);
+    }
     const withCounts = c.req.query('withCounts') === '1';
     const items = withCounts
       ? await getTagsWithUsage(c.env.DB)
       : await getTags(c.env.DB);
-    return c.json({ success: true, data: items.map(serializeTag) });
+    const allowedIds = requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds;
+    const visibleItems = items.filter((item) => item.line_account_id == null
+      ? scope.canSeeUnassigned
+      : allowedIds.includes(item.line_account_id));
+    return c.json({ success: true, data: visibleItems.map(serializeTag) });
   } catch (err) {
     console.error('GET /api/tags error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);

@@ -89,6 +89,13 @@ describe('V6 mileage admin read models', () => {
       ruleId: 'builtin-link-clicked', lineAccountId: 'account-1', expectedVersion: 0,
       draft: { ...draft, notification: { enabled: true, messageTemplate: '' } },
     })).rejects.toMatchObject<MileageV6Error>({ code: 'notification_message_required' });
+
+    sqlite.prepare(
+      `UPDATE mileage_rules SET line_account_id = 'account-2' WHERE id = 'builtin-link-clicked'`,
+    ).run();
+    await expect(saveMileageEarningRuleDraft(db, {
+      ruleId: 'builtin-link-clicked', lineAccountId: 'account-1', expectedVersion: 0, draft,
+    })).rejects.toMatchObject<MileageV6Error>({ code: 'rule_not_found', status: 404 });
   });
 
   it('returns real balances, expiration, period totals, score reasons, and reward reach', async () => {

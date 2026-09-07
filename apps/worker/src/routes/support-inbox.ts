@@ -462,7 +462,7 @@ supportInbox.patch(
 
     // 知らないIDを入れると、誰も見ていない担当になる。実在を確かめる。
     if (staffId) {
-      const exists = await c.env.DB.prepare(`SELECT 1 FROM users WHERE id = ?`)
+      const exists = await c.env.DB.prepare(`SELECT 1 FROM staff_members WHERE id = ? AND is_active = 1`)
         .bind(staffId)
         .first();
       if (!exists) return c.json({ success: false, error: '担当者が見つかりません' }, 400);

@@ -47,7 +47,7 @@ export interface DuplicatesStats {
  * entire lifetime), and always honor the TTL — no permanent caching.
  */
 const CACHE_TTL_MS = 5 * 60 * 1000;
-let cached: { stats: DuplicatesStats; at: number } | null = null;
+let cached: { stats: DuplicatesStats; at: number; scopeKey: string } | null = null;
 
 /** Test-only: clear the in-isolate cache so unit tests don't leak across each other. */
 export function _resetCacheForTest(): void {
@@ -124,16 +124,56 @@ const PAIRWISE_RAW_SQL = `
   JOIN dup_keys dk ON dk.ident_key = i.ident_key
 `;
 
+/**
+ * 可視アカウントへの絞り (#496-14)。
+ *
+ * 絞り無し(undefined)は従来どおり全アカウント。空配列は「見られる
+ * アカウントが無い」= 0件の集計になる（`IN ()` は不正SQLなので
+ * `1 = 0` に倒す）。
+ */
+function accountFilterClause(column: string, accountIds: string[] | undefined): string {
+  if (accountIds === undefined) return '';
+  if (accountIds.length === 0) return 'AND 1 = 0';
+  return `AND ${column} IN (${accountIds.map(() => '?').join(',')})`;
+}
+
 export async function computeDuplicatesStats(
   db: D1Database,
-  options: { forceRefresh?: boolean } = {},
+  options: { forceRefresh?: boolean; accountIds?: string[] } = {},
 ): Promise<DuplicatesStats> {
-  if (!options.forceRefresh && cached && Date.now() - cached.at < CACHE_TTL_MS) {
+  const accountIds = options.accountIds;
+  const scopeKey = accountIds === undefined ? '' : [...accountIds].sort().join(',');
+  if (!options.forceRefresh && cached && cached.scopeKey === scopeKey && Date.now() - cached.at < CACHE_TTL_MS) {
     return cached.stats;
   }
 
+  // 同じ WHERE 文が1つのSQLに複数ある（TOTALSは2か所）ため、
+  // 置き換えたか所の数だけ binds を繰り返す。
+  const FRIEND_SCOPE_WHERE = 'WHERE friends.is_following = 1 AND line_accounts.is_active = 1';
+  const scopedWithBinds = (sql: string, column: string, extraSites = 0): { sql: string; binds: unknown[] } => {
+    const sites = sql.split(FRIEND_SCOPE_WHERE).length - 1 + extraSites;
+    const clause = accountFilterClause(column, accountIds);
+    return {
+      sql: sql.split(FRIEND_SCOPE_WHERE).join(`${FRIEND_SCOPE_WHERE} ${clause}`),
+      binds: Array.from({ length: sites }, () => accountIds ?? []).flat(),
+    };
+  };
+  const totalsQuery = scopedWithBinds(TOTALS_SQL, 'line_accounts.id');
+  const perAccountQuery = (() => {
+    const base = scopedWithBinds(PER_ACCOUNT_SQL, 'line_accounts.id', 1);
+    return {
+      sql: base.sql.replace(
+        'WHERE la.is_active = 1',
+        `WHERE la.is_active = 1 ${accountFilterClause('la.id', accountIds)}`,
+      ),
+      binds: base.binds,
+    };
+  })();
+  const pairwiseQuery = scopedWithBinds(PAIRWISE_RAW_SQL, 'line_accounts.id');
+
   const totals = await db
-    .prepare(TOTALS_SQL)
+    .prepare(totalsQuery.sql)
+    .bind(...totalsQuery.binds)
     .first<{ total_following: number; duplicate_groups: number; friend_dups: number }>();
 
   const total_following = totals?.total_following ?? 0;
@@ -142,7 +182,8 @@ export async function computeDuplicatesStats(
   const unique_people = total_following - friend_dups;
 
   const perAccountResult = await db
-    .prepare(PER_ACCOUNT_SQL)
+    .prepare(perAccountQuery.sql)
+    .bind(...perAccountQuery.binds)
     .all<{ account_id: string; account_name: string; friends: number; dups: number }>();
 
   const per_account: PerAccountStat[] = (perAccountResult.results ?? []).map((row) => ({
@@ -157,7 +198,8 @@ export async function computeDuplicatesStats(
   // pairwise overlap matrix in JS (D1's CPU limit can't handle a self-join
   // on the un-indexed CTE for our dataset size).
   const pairwiseRawResult = await db
-    .prepare(PAIRWISE_RAW_SQL)
+    .prepare(pairwiseQuery.sql)
+    .bind(...pairwiseQuery.binds)
     .all<{ ident_key: string; line_account_id: string }>();
 
   const groups = new Map<string, Set<string>>();
@@ -213,7 +255,7 @@ export async function computeDuplicatesStats(
   // so reverting to the stale non-zero value on the next normal request
   // would be lying to them.
   if (total_following > 0) {
-    cached = { stats, at: Date.now() };
+    cached = { stats, at: Date.now(), scopeKey };
   } else {
     cached = null;
   }
