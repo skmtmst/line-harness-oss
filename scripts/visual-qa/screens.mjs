@@ -599,9 +599,9 @@ export const SCREENS = [
   // ── 機能5 シナリオ配信 ──────────────────────────────────
   { ...SCENARIO, node: 'TC1b1', name: '5-1 シナリオ配信', route: '/scenarios',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #325で固定データ反映後に再判定。** 設計1920pxと実装1920pxを同じ比較画像に並べ、実装1440/1920pxも確認。一致。#1073の固定応答から「初回案内・購入後・予約フォロー」3分類と未分類を表示し、案内、4指標、フォルダ、検索・絞り込み、5行の一覧、状態と行操作が設計と同じ役割・順序になった。1440/1920pxとも横はみ出し0。",
-    verdictSource: "scenarios-v6/TC1b1.txt + scenarios-v6/TC1b1-{1440,1920}.png + 2026-09-07 same-input comparison",
-    verdictHead: "31c2fddcc",
+    verdictNote: "**2026-09-07 Issue #448でオーナー指摘を修正し再判定。** Pencil 1920pxと実装1920pxを上端から並べて照合し、実装1440pxも確認。一致。本文上端に残っていた旧Headerの題・説明・操作枠を外し、トップバー直下を一行の開始案内、「配信を始める方法」、4指標の順にそろえた。フォルダ、検索・絞り込み、5行の一覧、状態と行操作も維持し、1440/1920pxとも横はみ出し0。",
+    verdictSource: "design-reference/scenarios-v6/TC1b1.png + design-qa/scenarios-v6/TC1b1-{1440,1920}.png + design-qa/scenarios-v6/TC1b1.txt + apps/web/src/app/scenarios/page.tsx",
+    verdictHead: "8be88c690",
   },
   { ...SCENARIO, node: 'cCB7r', name: '5-1-A シナリオ作成・配信方式', route: '/scenarios/mode?id=scenario-0',
     verdict: "match",
