@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { bookingApi, type BookingRequest } from '@/lib/api'
+import { bookingApi, type BookingAdminDetail, type BookingHistorySummary, type BookingRequest } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -103,13 +103,33 @@ function approvedText(b: BookingRequest): string {
   ].join('\n')
 }
 
+function detailAsRequest(detail: BookingAdminDetail): BookingRequest {
+  return {
+    id: detail.id,
+    friend_id: detail.customer.friendId,
+    booking_customer_id: detail.customer.bookingCustomerId,
+    starts_at: detail.startsAt,
+    ends_at: detail.endsAt,
+    status: detail.status,
+    customer_note: detail.customerNote,
+    internal_note: detail.internalNote,
+    price_at_booking: detail.price,
+    menu_name: detail.menuName,
+    staff_name: detail.staffName,
+    friend_name: detail.customer.displayName,
+    requested_at: detail.requestedAt,
+    decided_at: detail.decidedAt,
+    external_event_id: null,
+  }
+}
+
 function BookingDetailInner() {
   const { selectedAccountId } = useAccount()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
   const [booking, setBooking] = useState<BookingRequest | null>(null)
   /** 同じ友だちの予約。「これまでの予約」に使う。 */
-  const [history, setHistory] = useState<BookingRequest[]>([])
+  const [history, setHistory] = useState<BookingHistorySummary[]>([])
   const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState(false)
   const [decideTarget, setDecideTarget] = useState<BookingAction | null>(null)
@@ -123,12 +143,9 @@ function BookingDetailInner() {
     }
     setLoading(true)
     try {
-      const res = await bookingApi.listRequests(selectedAccountId, 'all')
-      const found = res.requests.find((r) => r.id === id) ?? null
-      setBooking(found)
-      setHistory(
-        found ? res.requests.filter((r) => r.friend_id === found.friend_id && r.id !== found.id) : [],
-      )
+      const res = await bookingApi.getBooking(selectedAccountId, id)
+      setBooking(detailAsRequest(res.booking))
+      setHistory(res.booking.history)
     } catch {
       setError('読み込みに失敗しました')
     } finally {
@@ -163,7 +180,7 @@ function BookingDetailInner() {
   const lastVisit = useMemo(() => {
     const past = history
       .filter((r) => r.status === 'completed' || r.status === 'confirmed')
-      .sort((a, b) => b.starts_at.localeCompare(a.starts_at))
+      .sort((a, b) => b.startsAt.localeCompare(a.startsAt))
     return past[0] ?? null
   }, [history])
 
@@ -236,12 +253,14 @@ function BookingDetailInner() {
             <section className="bg-canvas rounded-card border-hairline border p-5">
               <div className="mb-3 flex items-center justify-between gap-2">
                 <h2 className="text-ink text-sm font-semibold">お客さま</h2>
-                <Link
-                  href={`/friends/detail?id=${encodeURIComponent(booking.friend_id)}`}
-                  className="text-accent text-xs hover:underline"
-                >
-                  友だち詳細を見る
-                </Link>
+                {booking.friend_id ? (
+                  <Link
+                    href={`/friends/detail?id=${encodeURIComponent(booking.friend_id)}`}
+                    className="text-accent text-xs hover:underline"
+                  >
+                    友だち詳細を見る
+                  </Link>
+                ) : null}
               </div>
               <Row label="お名前">
                 {booking.friend_name ? `${booking.friend_name} さま` : '未設定'}
@@ -258,7 +277,7 @@ function BookingDetailInner() {
                 ) : (
                   <>
                     {history.length}件
-                    {lastVisit && `（直近 ${jpStamp(lastVisit.starts_at).slice(0, 10)}）`}
+                    {lastVisit && `（直近 ${jpStamp(lastVisit.startsAt).slice(0, 10)}）`}
                   </>
                 )}
               </Row>

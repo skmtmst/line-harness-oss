@@ -16,6 +16,7 @@ class MockMediaVersionConflictError extends Error {
 
 const mocks = {
   getMedia: vi.fn(),
+  countMedia: vi.fn(),
   getMediaById: vi.fn(),
   createMedia: vi.fn(),
   updateMedia: vi.fn(),
@@ -260,6 +261,7 @@ beforeEach(() => {
   accessMocks.canAccessAllLineAccounts.mockResolvedValue(true);
   scanMocks.scanSingleMediaUsage.mockResolvedValue({ scanned: 1, matched: 0, pruned: 0 });
   mocks.getMedia.mockResolvedValue([MEDIA]);
+  mocks.countMedia.mockResolvedValue(1);
   mocks.getMediaById.mockResolvedValue(MEDIA);
   mocks.createMedia.mockResolvedValue(MEDIA);
   mocks.updateMedia.mockResolvedValue(MEDIA);
@@ -341,12 +343,20 @@ describe('メディアのアップロード', () => {
   it('一覧に使用先件数を含める', async () => {
     const res = await req('/api/media?accountId=account-1', 'GET');
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { data: Array<{ usageCount: number }> };
-    expect(body.data[0]?.usageCount).toBe(3);
+    const body = (await res.json()) as { data: { items: Array<{ usageCount: number }>; total: number } };
+    expect(body.data.items[0]?.usageCount).toBe(3);
+    expect(body.data.total).toBe(1);
     expect(mocks.getMedia).toHaveBeenCalledWith(env.DB, {
       lineAccountId: 'account-1',
       kind: undefined,
       folderId: undefined,
+      excludeId: undefined,
+      query: undefined,
+      unusedOnly: false,
+      nearLimitOnly: false,
+      sort: 'newest',
+      limit: 20,
+      offset: 0,
     });
   });
 

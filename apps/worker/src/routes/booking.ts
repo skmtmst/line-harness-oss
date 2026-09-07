@@ -2475,43 +2475,75 @@ booking.post('/api/booking/admin/staff/:id/shifts/generate', requireRole('owner'
 booking.get('/api/booking/admin/requests', async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
-  const status = c.req.query('status');
-  const sql = status === 'all'
-    ? `SELECT b.*,
-              m.name AS menu_name,
-              s.display_name AS staff_name,
+  const status = c.req.query('status') || 'requested';
+  const limit = Math.min(100, Math.max(1, Number.parseInt(c.req.query('limit') || '50', 10) || 50));
+  const offset = Math.max(0, Number.parseInt(c.req.query('offset') || '0', 10) || 0);
+  const conditions = ['b.line_account_id = ?'];
+  const values: unknown[] = [accountId];
+  if (status !== 'all') { conditions.push('b.status = ?'); values.push(status); }
+  const customerQuery = c.req.query('query')?.trim();
+  if (customerQuery) {
+    conditions.push("LOWER(COALESCE(f.display_name, bc.display_name, '')) LIKE ? ESCAPE '\\'");
+    values.push(`%${customerQuery.toLowerCase().replace(/[\\%_]/g, '\\$&')}%`);
+  }
+  const menuName = c.req.query('menu_name')?.trim();
+  if (menuName) { conditions.push('m.name = ?'); values.push(menuName); }
+  const from = c.req.query('from')?.trim();
+  const to = c.req.query('to')?.trim();
+  if (from) { conditions.push('b.starts_at >= ?'); values.push(from); }
+  if (to) { conditions.push('b.starts_at < ?'); values.push(to); }
+  const joins = `FROM bookings b
+    INNER JOIN menus m ON m.id = b.menu_id
+    INNER JOIN staff s ON s.id = b.staff_id
+    LEFT JOIN friends f ON f.id = b.friend_id
+    LEFT JOIN booking_customers bc ON bc.id = b.booking_customer_id`;
+  const where = `WHERE ${conditions.join(' AND ')}`;
+  const [rows, count] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT b.*, m.name AS menu_name, s.display_name AS staff_name,
               COALESCE(f.display_name, bc.display_name) AS friend_name,
               bc.phone_last4 AS customer_phone_last4,
               bc.pet_name AS customer_pet_name,
               CASE WHEN f.id IS NULL THEN 0 ELSE 1 END AS is_line_linked
-         FROM bookings b
-         INNER JOIN menus m ON m.id = b.menu_id
-         INNER JOIN staff s ON s.id = b.staff_id
-         LEFT JOIN friends f ON f.id = b.friend_id
-         LEFT JOIN booking_customers bc ON bc.id = b.booking_customer_id
-        WHERE b.line_account_id = ?
-        ORDER BY b.starts_at ASC
-        LIMIT 200`
-    : `SELECT b.*,
-              m.name AS menu_name,
-              s.display_name AS staff_name,
-              COALESCE(f.display_name, bc.display_name) AS friend_name,
-              bc.phone_last4 AS customer_phone_last4,
-              bc.pet_name AS customer_pet_name,
-              CASE WHEN f.id IS NULL THEN 0 ELSE 1 END AS is_line_linked
-         FROM bookings b
-         INNER JOIN menus m ON m.id = b.menu_id
-         INNER JOIN staff s ON s.id = b.staff_id
-         LEFT JOIN friends f ON f.id = b.friend_id
-         LEFT JOIN booking_customers bc ON bc.id = b.booking_customer_id
-        WHERE b.line_account_id = ? AND b.status = ?
-        ORDER BY b.starts_at ASC
-        LIMIT 200`;
-  const stmt = c.env.DB.prepare(sql);
-  const rows = await (status === 'all' || !status
-    ? (status === 'all' ? stmt.bind(accountId) : stmt.bind(accountId, 'requested'))
-    : stmt.bind(accountId, status)).all();
-  return c.json({ requests: rows.results });
+         ${joins} ${where}
+        ORDER BY b.starts_at ASC LIMIT ? OFFSET ?`,
+    ).bind(...values, limit, offset).all(),
+    c.env.DB.prepare(`SELECT COUNT(*) AS total ${joins} ${where}`)
+      .bind(...values).first<{ total: number }>(),
+  ]);
+  return c.json({ requests: rows.results, total: Number(count?.total ?? 0), limit, offset });
+});
+
+booking.get('/api/booking/admin/requests-summary', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const thisMonth = c.req.query('month') || '';
+  const lastMonth = c.req.query('last_month') || '';
+  const today = c.req.query('today') || '';
+  const weekTo = c.req.query('week_to') || '';
+  const totals = await c.env.DB.prepare(
+    `SELECT COUNT(*) AS total,
+            SUM(CASE WHEN status = 'requested' THEN 1 ELSE 0 END) AS requested,
+            SUM(CASE WHEN substr(datetime(starts_at, '+9 hours'), 1, 7) = ? THEN 1 ELSE 0 END) AS month_total,
+            SUM(CASE WHEN substr(datetime(starts_at, '+9 hours'), 1, 7) = ? AND status = 'confirmed' THEN 1 ELSE 0 END) AS month_confirmed,
+            SUM(CASE WHEN substr(datetime(starts_at, '+9 hours'), 1, 7) = ? AND status IN ('cancelled','rejected','no_show') THEN 1 ELSE 0 END) AS month_cancelled,
+            SUM(CASE WHEN substr(datetime(starts_at, '+9 hours'), 1, 7) = ? THEN 1 ELSE 0 END) AS last_month_total,
+            SUM(CASE WHEN date(datetime(starts_at, '+9 hours')) = ? THEN 1 ELSE 0 END) AS today_total,
+            SUM(CASE WHEN date(datetime(starts_at, '+9 hours')) BETWEEN ? AND ? THEN 1 ELSE 0 END) AS week_total
+       FROM bookings WHERE line_account_id = ?`,
+  ).bind(thisMonth, thisMonth, thisMonth, lastMonth, today, today, weekTo, accountId).first<Record<string, number>>();
+  const byMenu = await c.env.DB.prepare(
+    `SELECT m.name, COUNT(*) AS total FROM bookings b
+       INNER JOIN menus m ON m.id = b.menu_id
+      WHERE b.line_account_id = ? GROUP BY m.id, m.name`,
+  ).bind(accountId).all<{ name: string; total: number }>();
+  return c.json({
+    total: Number(totals?.total ?? 0), requested: Number(totals?.requested ?? 0),
+    monthTotal: Number(totals?.month_total ?? 0), monthConfirmed: Number(totals?.month_confirmed ?? 0),
+    monthCancelled: Number(totals?.month_cancelled ?? 0), lastMonthTotal: Number(totals?.last_month_total ?? 0),
+    todayTotal: Number(totals?.today_total ?? 0), weekTotal: Number(totals?.week_total ?? 0),
+    byMenu: byMenu.results.map((row) => ({ name: row.name, total: Number(row.total) })),
+  });
 });
 
 booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', 'staff'), async (c) => {

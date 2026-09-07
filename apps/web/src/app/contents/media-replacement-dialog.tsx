@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { MediaItem, MediaReplacementImpact } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import Button from './media-button'
@@ -10,22 +10,19 @@ import { checkedAtText, referenceKindText, referenceNameText } from './media-del
 
 export default function MediaReplacementDialog({
   source,
-  items,
   accountId,
   onClose,
   onComplete,
 }: {
   source: MediaItem | null
-  items: MediaItem[]
   accountId: string | null
   onClose: () => void
   onComplete: (message: string) => void
 }) {
   const requestRef = useRef(0)
-  const candidates = useMemo(
-    () => source ? items.filter((item) => item.id !== source.id && item.kind === source.kind) : [],
-    [items, source],
-  )
+  const [candidates, setCandidates] = useState<MediaItem[]>([])
+  const [candidateTotal, setCandidateTotal] = useState(0)
+  const [candidatePage, setCandidatePage] = useState(1)
   const [replacementId, setReplacementId] = useState('')
   const [impact, setImpact] = useState<MediaReplacementImpact | null>(null)
   const [phase, setPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
@@ -39,7 +36,26 @@ export default function MediaReplacementDialog({
     setPhase('idle')
     setBusy(false)
     setError('')
+    setCandidatePage(1)
   }, [source])
+
+  useEffect(() => {
+    if (!source || !accountId) { setCandidates([]); setCandidateTotal(0); return }
+    let active = true
+    void api.media.list(accountId, {
+      kind: source.kind,
+      excludeId: source.id,
+      limit: 50,
+      offset: (candidatePage - 1) * 50,
+    })
+      .then((response) => {
+        if (!active || !response.success) return
+        setCandidates(response.data.items)
+        setCandidateTotal(response.data.total)
+      })
+      .catch(() => { if (active) setError('差し替え候補を読み込めませんでした') })
+    return () => { active = false }
+  }, [accountId, candidatePage, source])
 
   async function selectReplacement(id: string) {
     setReplacementId(id)
@@ -120,6 +136,15 @@ export default function MediaReplacementDialog({
           />
           {candidates.length === 0 ? (
             <p className="text-ink-faint mt-2 text-xs">同じ種類の別メディアがありません。先に差し替え先を登録してください。</p>
+          ) : null}
+          {candidateTotal > 50 ? (
+            <div className="mt-2 flex items-center justify-between text-xs">
+              <span className="text-ink-faint">候補 {candidateTotal}件</span>
+              <div className="flex gap-2">
+                <Button type="button" disabled={candidatePage <= 1} onClick={() => setCandidatePage((page) => page - 1)}>前へ</Button>
+                <Button type="button" disabled={candidatePage * 50 >= candidateTotal} onClick={() => setCandidatePage((page) => page + 1)}>次へ</Button>
+              </div>
+            </div>
           ) : null}
         </div>
 

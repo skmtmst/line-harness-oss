@@ -4886,13 +4886,32 @@ export const api = {
   },
   /** メディアライブラリ。1か所に置いて使い回す。 */
   media: {
-    list: (accountId: string, params?: { kind?: string; folderId?: string }) => {
+    list: (accountId: string, params?: {
+      kind?: string
+      folderId?: string
+      excludeId?: string
+      query?: string
+      unusedOnly?: boolean
+      nearLimitOnly?: boolean
+      sort?: 'newest' | 'oldest' | 'name' | 'size' | 'usage'
+      limit?: number
+      offset?: number
+    }) => {
       const q = new URLSearchParams()
       q.set('accountId', accountId)
       if (params?.kind) q.set('kind', params.kind)
       if (params?.folderId) q.set('folderId', params.folderId)
+      if (params?.excludeId) q.set('excludeId', params.excludeId)
+      if (params?.query) q.set('query', params.query)
+      if (params?.unusedOnly) q.set('unusedOnly', '1')
+      if (params?.nearLimitOnly) q.set('nearLimitOnly', '1')
+      if (params?.sort) q.set('sort', params.sort)
+      if (params?.limit) q.set('limit', String(params.limit))
+      if (params?.offset) q.set('offset', String(params.offset))
       const query = q.toString()
-      return fetchApi<ApiResponse<MediaItem[]>>(`/api/media${query ? `?${query}` : ''}`)
+      return fetchApi<ApiResponse<{ items: MediaItem[]; total: number; limit: number; offset: number }>>(
+        `/api/media${query ? `?${query}` : ''}`,
+      )
     },
     /** data は base64。data: URL 形式でも受け付ける。 */
     upload: (data: {
@@ -8850,7 +8869,8 @@ export interface StaffMenuMatrix {
 
 export interface BookingRequest {
   id: string;
-  friend_id: string;
+  friend_id: string | null;
+  booking_customer_id: string | null;
   starts_at: string;
   ends_at: string;
   status: string;
@@ -9253,10 +9273,49 @@ export const bookingApi = {
       { method: 'DELETE' },
     ),
   // Requests
-  listRequests: (accountId: string, status: string = 'requested') =>
-    fetchApi<{ requests: BookingRequest[] }>(
-      withAccount(`/api/booking/admin/requests?status=${status}`, accountId),
-    ),
+  listRequests: (accountId: string, status: string = 'requested', params?: {
+    limit?: number
+    offset?: number
+    query?: string
+    menuName?: string
+    from?: string
+    to?: string
+  }) => {
+    const query = new URLSearchParams({ status })
+    if (params?.limit) query.set('limit', String(params.limit))
+    if (params?.offset) query.set('offset', String(params.offset))
+    if (params?.query) query.set('query', params.query)
+    if (params?.menuName) query.set('menu_name', params.menuName)
+    if (params?.from) query.set('from', params.from)
+    if (params?.to) query.set('to', params.to)
+    return fetchApi<{ requests: BookingRequest[]; total: number }>(
+      withAccount(`/api/booking/admin/requests?${query.toString()}`, accountId),
+    )
+  },
+  requestsSummary: (accountId: string, params: {
+    month: string
+    lastMonth: string
+    today: string
+    weekTo: string
+  }) => {
+    const query = new URLSearchParams({
+      month: params.month,
+      last_month: params.lastMonth,
+      today: params.today,
+      week_to: params.weekTo,
+    })
+    return fetchApi<{
+      total: number
+      requested: number
+      monthTotal: number
+      monthConfirmed: number
+      monthCancelled: number
+      lastMonthTotal: number
+      todayTotal: number
+      weekTotal: number
+      byMenu: Array<{ name: string; total: number }>
+    }>(withAccount(`/api/booking/admin/requests-summary?${query.toString()}`, accountId))
+  },
   decideRequest: (
     accountId: string,
     id: string,
