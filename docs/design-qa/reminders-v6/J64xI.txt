@@ -147,11 +147,11 @@ Google Meet 参加URL　参加URL（差し込み）
 下書き
 LINEプレビュー
 
-基準日の 1日前 18:00 に届きます
+表示例：基準日の 1日前 18:00 に届きます
 
-Kentaさん、明日のGoogle Meet相談のご案内です。
-日時：8/24（月）18:00
-参加URL：meet.google.com/xxx-xxxx-xxx
+名前さん、明日のGoogle Meet相談のご案内です。
+日時：相談の日時
+参加URL：参加URL
 
 Google Meetに参加
 

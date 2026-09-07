@@ -1771,7 +1771,45 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const found = AUTO_REPLIES.find((item) => item.id === autoReplyOne[1])
     return found ? { success: true, data: found } : { success: false, error: 'Not found' }
   }
-  if (pathname === '/api/reminders') return { success: true, data: REMINDERS }
+  if (pathname === '/api/reminders') {
+    const usesListContract = ['page', 'limit', 'q', 'folderId', 'status'].some((key) => query.has(key))
+    if (!usesListContract) return { success: true, data: REMINDERS }
+    const requestedPage = Number.parseInt(query.get('page') ?? '', 10)
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 200) : 20
+    const q = (query.get('q') ?? '').trim().toLocaleLowerCase('ja-JP')
+    const folderId = query.get('folderId') ?? ''
+    const status = query.get('status') ?? ''
+    const filtered = REMINDERS.filter((reminder) => {
+      if (q && !reminder.name.toLocaleLowerCase('ja-JP').includes(q)) return false
+      if (folderId === '__unfiled__' && reminder.folderId) return false
+      if (folderId && folderId !== '__unfiled__' && reminder.folderId !== folderId) return false
+      if (status === 'failed' && !reminder.hasFailure) return false
+      if (status === 'draft' && reminder.lifecycleStatus !== 'draft') return false
+      if (status === 'active' && (reminder.lifecycleStatus === 'draft' || reminder.lifecycleStatus === 'stopped' || !reminder.isActive)) return false
+      if (status === 'stopped' && reminder.lifecycleStatus !== 'stopped' && reminder.isActive) return false
+      return true
+    }).sort((left, right) => (
+      (left.displayOrder ?? 0) - (right.displayOrder ?? 0)
+      || right.createdAt.localeCompare(left.createdAt)
+      || left.id.localeCompare(right.id)
+    ))
+    const offset = (page - 1) * limit
+    return {
+      success: true,
+      data: {
+        items: filtered.slice(offset, offset + limit),
+        total: filtered.length,
+        limit,
+        sort: [
+          { field: 'displayOrder', direction: 'asc' },
+          { field: 'createdAt', direction: 'desc' },
+          { field: 'id', direction: 'asc' },
+        ],
+      },
+    }
+  }
   if (/^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) {
     return { success: true, data: REMINDER_DRAFT }
   }

@@ -40,6 +40,7 @@ import {
   testReminderDraft,
   validateReminderDraft,
 } from '../services/reminder-draft.js';
+import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 
 const reminders = new Hono<Env>();
 
@@ -72,6 +73,40 @@ function commonRunStatus(status: ReminderDeliveryRunStatus) {
   if (status === 'skipped') return 'skipped' as const;
   if (status === 'cancelled') return 'cancelled' as const;
   return 'pending' as const;
+}
+
+type ReminderListRow = Awaited<ReturnType<typeof getReminders>>[number] & {
+  step_count?: number | string | null;
+  has_failure?: number | string | null;
+};
+
+function publicReminder(row: ReminderListRow, stepCount?: number, hasFailure?: boolean) {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    isActive: Boolean(row.is_active),
+    lifecycleStatus: row.lifecycle_status,
+    currentDraftVersionId: row.current_draft_version_id,
+    currentPublishedVersionId: row.current_published_version_id,
+    triggerType: row.trigger_type ?? 'manual',
+    deliveryMode: row.delivery_mode ?? 'countdown',
+    triggerFieldId: row.trigger_field_id ?? null,
+    repeatYearly: row.repeat_yearly === 1,
+    triggerOffsetMinutes: row.trigger_offset_minutes ?? null,
+    sendAtTime: row.send_at_time ?? null,
+    targetTagId: row.target_tag_id ?? null,
+    folderId: row.folder_id ?? null,
+    stepCount: stepCount ?? Number(row.step_count ?? 0),
+    hasFailure: hasFailure ?? Number(row.has_failure ?? 0) > 0,
+    displayOrder: row.display_order ?? 0,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function escapedLike(value: string): string {
+  return value.replace(/[\\%_]/g, '\\$&');
 }
 
 function runDurationMs(startedAt: string | null, completedAt: string | null): number | null {
@@ -376,6 +411,82 @@ reminders.patch('/api/reminders/reorder', requireRole('owner', 'admin'), async (
 reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId');
+    const paging = parseOffsetPaging({
+      page: c.req.query('page'),
+      limit: c.req.query('limit'),
+    }, { defaultLimit: 20 });
+    const q = (c.req.query('q') ?? '').trim().toLocaleLowerCase('ja-JP');
+    const folderId = c.req.query('folderId') ?? '';
+    const status = c.req.query('status') ?? '';
+    const usesListContract = ['page', 'limit', 'q', 'folderId', 'status']
+      .some((key) => c.req.query(key) !== undefined);
+
+    if (usesListContract) {
+      const clauses = ['r.deleted_at IS NULL'];
+      const bindings: unknown[] = [];
+      if (lineAccountId) {
+        if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+          return c.json({ success: false, error: 'Reminder not found' }, 404);
+        }
+        clauses.push('r.line_account_id = ?');
+        bindings.push(lineAccountId);
+      } else {
+        const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+        const accountParts: string[] = [];
+        if (scope.allowedAccountIds.length > 0) {
+          accountParts.push(`r.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(', ')})`);
+          bindings.push(...scope.allowedAccountIds);
+        }
+        if (scope.canSeeUnassigned) accountParts.push('r.line_account_id IS NULL');
+        clauses.push(accountParts.length > 0 ? `(${accountParts.join(' OR ')})` : '1 = 0');
+      }
+      if (q) {
+        clauses.push(`LOWER(r.name) LIKE ? ESCAPE '\\'`);
+        bindings.push(`%${escapedLike(q)}%`);
+      }
+      if (folderId === '__unfiled__') clauses.push('r.folder_id IS NULL');
+      else if (folderId) {
+        clauses.push('r.folder_id = ?');
+        bindings.push(folderId);
+      }
+      if (status === 'failed') {
+        clauses.push(`EXISTS (SELECT 1 FROM reminder_delivery_runs failed
+          WHERE failed.reminder_id = r.id AND failed.status IN ('retry_wait', 'permanent_failed'))`);
+      } else if (status === 'draft') clauses.push(`r.lifecycle_status = 'draft'`);
+      else if (status === 'active') clauses.push(`COALESCE(r.lifecycle_status, 'published') NOT IN ('draft', 'stopped') AND r.is_active = 1`);
+      else if (status === 'stopped') clauses.push(`(r.lifecycle_status = 'stopped' OR r.is_active = 0)`);
+      else if (status) return c.json({ success: false, error: 'status is invalid' }, 400);
+
+      const where = clauses.join(' AND ');
+      const totalRow = await c.env.DB
+        .prepare(`SELECT COUNT(*) AS total FROM reminders r WHERE ${where}`)
+        .bind(...bindings)
+        .first<{ total: number | string }>();
+      const result = await c.env.DB
+        .prepare(`SELECT r.*,
+            (SELECT COUNT(*) FROM reminder_steps steps WHERE steps.reminder_id = r.id) AS step_count,
+            EXISTS (SELECT 1 FROM reminder_delivery_runs failed
+              WHERE failed.reminder_id = r.id AND failed.status IN ('retry_wait', 'permanent_failed')) AS has_failure
+          FROM reminders r WHERE ${where}
+          ORDER BY r.display_order ASC, r.created_at DESC, r.id ASC
+          LIMIT ? OFFSET ?`)
+        .bind(...bindings, paging.limit, paging.offset)
+        .all<ReminderListRow>();
+      return c.json({
+        success: true,
+        data: buildOffsetListResponse({
+          items: result.results.map((row) => publicReminder(row)),
+          total: Number(totalRow?.total ?? 0),
+          paging,
+          sort: [
+            { field: 'displayOrder', direction: 'asc' },
+            { field: 'createdAt', direction: 'desc' },
+            { field: 'id', direction: 'asc' },
+          ],
+        }),
+      });
+    }
+
     let items: Awaited<ReturnType<typeof getReminders>>;
     if (lineAccountId) {
       if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
@@ -391,7 +502,7 @@ reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c
       const result = await c.env.DB
         .prepare(
           `SELECT * FROM reminders WHERE line_account_id = ? AND deleted_at IS NULL
-            ORDER BY display_order ASC, created_at DESC`,
+            ORDER BY display_order ASC, created_at DESC, id ASC`,
         )
         .bind(lineAccountId)
         .all();
@@ -418,30 +529,20 @@ reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c
       .all<{ reminder_id: string; c: number }>();
     const stepCounts = new Map(counts.results.map((row) => [row.reminder_id, Number(row.c)]));
 
-    return c.json({
-      success: true,
-      data: items.map((r) => ({
-        id: r.id,
-        name: r.name,
-        description: r.description,
-        isActive: Boolean(r.is_active),
-        lifecycleStatus: r.lifecycle_status,
-        currentDraftVersionId: r.current_draft_version_id,
-        currentPublishedVersionId: r.current_published_version_id,
-        triggerType: r.trigger_type ?? 'manual',
-        deliveryMode: r.delivery_mode ?? 'countdown',
-        triggerFieldId: r.trigger_field_id ?? null,
-        repeatYearly: r.repeat_yearly === 1,
-        triggerOffsetMinutes: r.trigger_offset_minutes ?? null,
-        sendAtTime: r.send_at_time ?? null,
-        targetTagId: r.target_tag_id ?? null,
-        folderId: r.folder_id ?? null,
-        stepCount: stepCounts.get(r.id) ?? 0,
-        displayOrder: r.display_order ?? 0,
-        createdAt: r.created_at,
-        updatedAt: r.updated_at,
-      })),
-    });
+    const failures = await c.env.DB
+      .prepare(`SELECT DISTINCT reminder_id FROM reminder_delivery_runs
+        WHERE status IN ('retry_wait', 'permanent_failed')`)
+      .all<{ reminder_id: string }>();
+    const failedReminderIds = new Set(failures.results.map((row) => row.reminder_id));
+
+    const publicItems = items.map((r) => publicReminder(
+      r,
+      stepCounts.get(r.id) ?? 0,
+      failedReminderIds.has(r.id),
+    ));
+
+    /* 旧配列応答は、移行期限（2026-10-31）まで未移行の呼び出しだけに残す。 */
+    return c.json({ success: true, data: publicItems });
   } catch (err) {
     console.error('GET /api/reminders error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
