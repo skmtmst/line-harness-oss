@@ -180,6 +180,27 @@ export async function getReminderById(db: D1Database, id: string): Promise<Remin
   return db.prepare(`SELECT * FROM reminders WHERE id = ? AND deleted_at IS NULL`).bind(id).first<ReminderRow>();
 }
 
+/**
+ * 並び替え前の所属確認用。idとLINEアカウントだけを返す。
+ *
+ * 削除済みは対象外。渡されたidが1件でも欠けたら、呼び出し側で404にする。
+ */
+export async function getRemindersByIds(
+  db: D1Database,
+  ids: string[],
+): Promise<Array<{ id: string; line_account_id: string | null }>> {
+  if (ids.length === 0) return [];
+  const unique = [...new Set(ids)];
+  const placeholders = unique.map(() => '?').join(',');
+  const result = await db
+    .prepare(
+      `SELECT id, line_account_id FROM reminders WHERE id IN (${placeholders}) AND deleted_at IS NULL`,
+    )
+    .bind(...unique)
+    .all<{ id: string; line_account_id: string | null }>();
+  return result.results;
+}
+
 export interface ReminderTriggerInput {
   triggerType?: 'manual' | 'booking' | 'event' | 'friend_field';
   /** 153: 'time'（ゴールの○日前の●時）か 'countdown'（何分ずらすか）。作成後は変えない。 */

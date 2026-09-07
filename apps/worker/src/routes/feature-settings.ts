@@ -9,6 +9,7 @@ import {
 import {
   DEFAULT_TENANT_ID,
   FEATURE_CATALOG,
+  FEATURE_IDS,
   type FeatureId,
 } from '@line-crm/shared';
 import type { Env } from '../index.js';
@@ -19,59 +20,14 @@ import { canAccessAllLineAccounts } from '../services/account-access.js';
 /**
  * 機能のオン／オフ。
  *
- * 新しいテーブルは要らない。account_settings が既に key/value の置き場で、
- * ここへ 'feature.<キー>' として入れる。機能が増えるたびに列を足す形に
- * すると、機能を1つ足すのにマイグレーションが要ることになる。
+ * account_settings の版付き一括設定を正本にし、旧 `feature.<キー>` は
+ * 保存済みデータを読むための互換経路として残す。
  */
 const featureSettings = new Hono<Env>();
 
-/**
- * 切り替えられる機能。
- *
- * ここに無いキーは受け付けない。任意のキーを書けるようにすると、
- * 打ち間違いがそのまま保存され、「切ったはずなのに出ている」という
- * 形で表に出る。
- *
- * V2 10-3 でオフと定義された機能だけ既定を無効にし、それ以外は有効。
- * 保存済みの値がある場合は、そちらを優先する。
- */
-// web の既存静的契約テストがこの配列をソースから読むため、共有カタログの
-// 互換ミラーを残す。feature-settings.test.ts で FEATURE_IDS との完全一致を固定する。
-export const TOGGLEABLE_FEATURES = [
-  'scenarios',
-  'broadcasts',
-  'templates',
-  'reminders',
-  'auto_replies',
-  'rich_menus',
-  'inflow_tracking',
-  'forms',
-  'photo_review',
-  'automations',
-  'external_integrations',
-  'friend_add_routing',
-  'multi_store_hierarchy',
-  'multi_store_bulk_updates',
-  'reservation_ledger',
-  'external_reservations',
-  'google_business_profile',
-  'friend_fields',
-  'support_marks',
-  'saved_searches',
-  'media',
-  'common_vars',
-  'analytics',
-  'site_tracking',
-  'webinars',
-  'events',
-  'booking',
-  'affiliates',
-  'mileage',
-  'ec_commerce',
-  'line_notifications',
-  'nen_campaigns',
-  'restaurant_test',
-] as const satisfies readonly FeatureId[];
+/** 受け付けるIDは共有カタログそのもの。画面・Workerで別の配列を持たない。 */
+export const TOGGLEABLE_FEATURES: readonly FeatureId[] = FEATURE_IDS;
+const TOGGLEABLE_FEATURE_SET = new Set<string>(TOGGLEABLE_FEATURES);
 
 export type ToggleableFeature = FeatureId;
 
@@ -97,7 +53,7 @@ type FeatureSettingsData = {
 
 type FeatureSettingsState = FeatureSettingsData & { version: number };
 
-/** V2 10-3 の初期表示。記録が無い契約ではこの状態から始める。 */
+/** 共有カタログで既定オフの機能。記録が無いアカウントではこの状態から始める。 */
 export const DEFAULT_DISABLED_FEATURES = new Set<ToggleableFeature>(
   FEATURE_CATALOG.filter(({ defaultEnabled }) => !defaultEnabled).map(({ featureId }) => featureId),
 );
@@ -114,7 +70,7 @@ export const NEN_SPECIALIZED_FEATURES: ToggleableFeature[] = [
 ];
 
 function isToggleable(key: unknown): key is ToggleableFeature {
-  return typeof key === 'string' && (TOGGLEABLE_FEATURES as readonly string[]).includes(key);
+  return typeof key === 'string' && TOGGLEABLE_FEATURE_SET.has(key);
 }
 
 export function featureIsEnabled(raw: string | null, key: ToggleableFeature): boolean {
@@ -299,7 +255,7 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
     let catalog: ToggleableFeature[] | undefined;
     if (body.catalog !== undefined) {
       const staff = c.get('staff');
-      // TODO(OPS-b): 運営フラグが追加されたら、既定統括による暫定判定を見直す。
+      // #558: 運営ロール未導入の現行契約では、既定統括の owner だけが変更できる。
       if (staff?.role !== 'owner' || staff.readOnly
         || (staff.tenantId ?? DEFAULT_TENANT_ID) !== DEFAULT_TENANT_ID) {
         return c.json({ success: false, error: 'この操作には運営権限が必要です' }, 403);
@@ -399,8 +355,7 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
       }
       savedVersion = result.setting.version;
     } else if (hasBundleUpdate) {
-      // 画面側が版番号へ切り替わるまでは従来形式も受け付ける。
-      // expectedVersion が届いた後は上の1行保存だけを使う。
+      // #558: 旧クライアント互換のため、expectedVersion なしの形式も当面受け付ける。
       for (const [key, value] of Object.entries(body.features ?? {})) {
         const enabled = key === 'restaurant_test' && !restaurantTestEnabled(c.env)
           ? false

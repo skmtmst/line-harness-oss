@@ -20,7 +20,8 @@ import { useAccount } from '@/contexts/account-context'
 import { Suspense } from 'react'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import BookingStaffPage from '@/app/booking/staff/page'
-import { bookingMenuBaseError } from './menu-validation'
+import { bookingMenuError } from './menu-validation'
+import { bookingWindowEnd, businessHourSummary } from '../lib/format-time'
 
 /**
  * 予約設定（設計 V2 8-2 / node nFCBf）。
@@ -37,7 +38,6 @@ const MERGED_TABS = [
 ]
 
 const MENU_PAGE_SIZE = 6
-const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
 
 type SupportingLoadState = 'loading' | 'ready' | 'error'
 
@@ -60,38 +60,11 @@ function supportingDetail(
   return readyDetail
 }
 
-function businessHourSummary(settings: BookingSettings | null): { value: string; detail: string } {
-  if (!settings || !Array.isArray(settings.businessHours) || settings.businessHours.length === 0) return { value: '—', detail: '受付枠で曜日ごとに確認' }
-  const spans = settings.businessHours.flatMap((day) => {
-    if (day.intervals.length === 0) return []
-    const last = day.intervals.at(-1)
-    if (!last) return []
-    const start = day.intervals[0].start.replace(/^0/, '')
-    const end = last.end.replace(/^0/, '')
-    return [`${start}〜${end}`]
-  })
-  const counts = new Map<string, number>()
-  for (const span of spans) counts.set(span, (counts.get(span) ?? 0) + 1)
-  const value = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? '—'
-  const detail = settings.businessHours
-    .filter((day) => day.intervals.length > 0)
-    .map((day) => WEEKDAYS[day.weekday] ?? '')
-    .filter(Boolean)
-    .join('・')
-  return { value, detail }
-}
-
-function bookingWindowEnd(days: number): string {
-  const date = new Date()
-  date.setDate(date.getDate() + Math.max(0, days - 1))
-  return new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' }).format(date)
-}
-
 function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuCount: (count: number | null) => void }) {
   const { selectedAccountId } = useAccount()
   const [items, setItems] = useState<BookingMenu[]>([])
   const [settings, setSettings] = useState<BookingSettings | null>(null)
-  const [editing, setEditing] = useState<Partial<BookingMenu> | null>(null)
+  const [editing, setEditing] = useState<BookingMenu | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   // copy 状態は menu.id 単位で持つ。複数メニューを連続でコピーしたとき
@@ -172,13 +145,9 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
     }
   }, [])
 
-  async function save(m: Partial<BookingMenu>) {
+  async function save(m: BookingMenu) {
     if (!selectedAccountId) return
-    if (m.id) {
-      await bookingApi.updateMenu(selectedAccountId, m.id, m)
-    } else {
-      await bookingApi.createMenu(selectedAccountId, m)
-    }
+    await bookingApi.updateMenu(selectedAccountId, m.id, m)
     setEditing(null)
     await load()
   }
@@ -242,7 +211,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
     () => [...new Set(items.filter((menu) => menu.is_active).map((menu) => menu.booking_window_days).filter((days): days is number => typeof days === 'number'))].sort((a, b) => a - b),
     [items],
   )
-  const businessHours = businessHourSummary(settings)
+  const businessHours = businessHourSummary(settings?.businessHours)
   const configuredWindowDays = settings?.bookingWindowDays
   const bookingWindowDays = typeof configuredWindowDays === 'number' && configuredWindowDays > 0
     ? configuredWindowDays
@@ -397,7 +366,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
       </div>
       </>}
 
-      {editing && <Modal menu={editing} tags={tags} onSave={save} onClose={() => setEditing(null)} />}
+      {editing && <EditMenuModal menu={editing} tags={tags} onSave={save} onClose={() => setEditing(null)} />}
 
       <ConfirmDialog
         open={visibilityTarget !== null}
@@ -482,18 +451,18 @@ function Kpi({
   )
 }
 
-function Modal({
+function EditMenuModal({
   menu,
   tags,
   onSave,
   onClose,
 }: {
-  menu: Partial<BookingMenu>
+  menu: BookingMenu
   tags: Tag[]
-  onSave: (m: Partial<BookingMenu>) => Promise<void>
+  onSave: (m: BookingMenu) => Promise<void>
   onClose: () => void
 }) {
-  const [form, setForm] = useState<Partial<BookingMenu>>(menu)
+  const [form, setForm] = useState<BookingMenu>(menu)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
@@ -503,11 +472,12 @@ function Modal({
   }
 
   async function submit() {
-    const validationError = bookingMenuBaseError({
+    const validationError = bookingMenuError({
       name: form.name,
       durationMinutes: form.duration_minutes,
       bufferAfterMinutes: form.buffer_after_minutes,
       sortOrder: form.sort_order,
+      assignedStaffCount: form.assigned_staff?.length ?? 0,
     })
     if (validationError) {
       setErr(validationError)
@@ -528,7 +498,7 @@ function Modal({
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b border-hairline">
-          <h2 className="text-base font-semibold">{form.id ? 'メニュー編集' : '新規メニュー'}</h2>
+          <h2 className="text-base font-semibold">メニュー編集</h2>
         </div>
         <div className="px-6 py-4 space-y-4">
           <Field label="名前" required>

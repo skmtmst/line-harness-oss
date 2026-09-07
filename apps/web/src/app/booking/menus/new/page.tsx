@@ -11,7 +11,7 @@ import CreatePage, {
   inputClass,
 } from '@/components/shared/create-page'
 import Button from '@/components/shared/button'
-import { bookingMenuBaseError } from '../menu-validation'
+import { bookingMenuError } from '../menu-validation'
 
 /**
  * メニューを追加する（設計 V6 28-1-B / node GhOb3）。
@@ -121,16 +121,14 @@ export default function NewBookingMenuPage() {
       statusLabel={isActive ? 'まだ出していません' : '下書きとして保存'}
       validate={() => {
         if (!selectedAccountId) return '先に上部でLINEアカウントを選んでください'
-        const baseError = bookingMenuBaseError({
+        const validationError = bookingMenuError({
           name,
           durationMinutes,
           bufferAfterMinutes,
           sortOrder: 0,
+          assignedStaffCount: assigned.size,
         })
-        if (baseError) return baseError
-        if (assigned.size === 0)
-          return '担当できる人を1人以上選んでください。0人だと予約画面に枠が出ません'
-        return null
+        return validationError
       }}
       onReset={() => {
         setName('')

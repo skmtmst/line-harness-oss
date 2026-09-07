@@ -17,6 +17,8 @@ import { FeatureLinkCard } from '@/components/shared/side-cards'
 import { formatPhotoReceivedAt } from './photo-review-time'
 import { PhotoReviewDetail } from './photo-review-detail'
 import { PhotoPublications } from './photo-publications'
+import { safePhotoSrc } from './photo-src'
+import { photoNoticeFor } from './photo-notice'
 import styles from './photo-review.module.css'
 
 type PhotoStatus = 'pending' | 'adopted' | 'rejected'
@@ -25,6 +27,8 @@ const REVIEW_REASONS: Array<{ value: ReviewReasonCode; label: string; message: s
   { value: 'privacy', label: 'ほかの人の顔が写っています', message: 'うしろに他のお客様が写っているようです。もう一度お願いできますか。' },
   { value: 'unrelated', label: 'ほかのお店のロゴや商品名が写っています', message: '商品の名前が入っていない写真をいただけますか。' },
   { value: 'quality', label: '暗くて見えにくいです', message: '明るいところで、もう一度お願いできますか。' },
+  // 口・型・DBは前から重複に対応している。選べないと「理由未記録」になる。
+  { value: 'duplicate', label: '同じ写真をすでにもらっています', message: 'すでにいただいた写真と重複しているようです。別のお写真をお願いできますか。' },
   { value: 'other', label: '自分で書く', message: '文章をそのまま書きます。' },
 ]
 const STATUS_TABS: ReadonlyArray<[PhotoStatus, string]> = [
@@ -156,6 +160,7 @@ export default function PhotoReviewsPage() {
   const rejectingPhoto = rejectingPhotoDetail
     ?? photos.find((photo) => text(photo.id) === rejectingPhotoId)
     ?? null
+  const rejectingPhotoSrc = rejectingPhoto ? safePhotoSrc(rejectingPhoto.image_url) : null
   const selectedReason = REVIEW_REASONS.find((reason) => reason.value === reasonCode)
   const selectedReasonLabel = selectedReason?.label ?? ''
   const selectedReasonMessage = selectedReason?.message ?? ''
@@ -175,8 +180,12 @@ export default function PhotoReviewsPage() {
       : null)
   }
 
+  // 詳細表示の世代。一覧の loadSequence と同じく、「前・次」を連打したとき
+  // 遅い応答が新しい写真を上書きしないようにする。
+  const detailSequence = useRef(0)
   const openDetail = async (id: string) => {
     if (!selectedAccountId) return
+    const sequence = ++detailSequence.current
     setView('detail')
     setDetailPhoto(null)
     setDetailAssetStatus(null)
@@ -187,6 +196,7 @@ export default function PhotoReviewsPage() {
         api.nenMembers.photo(id, selectedAccountId),
         refreshDetailAssets(id, selectedAccountId),
       ])
+      if (sequence !== detailSequence.current) return
       if (!response.success) throw new Error(response.error)
       if (Array.isArray(response.data)) {
         setDetailState('empty')
@@ -195,8 +205,11 @@ export default function PhotoReviewsPage() {
       setDetailPhoto(response.data)
       setDetailState('ready')
     } catch (error) {
+      if (sequence !== detailSequence.current) return
       setDetailState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
-    } finally { setDetailLoading(false) }
+    } finally {
+      if (sequence === detailSequence.current) setDetailLoading(false)
+    }
   }
 
   const openRejectDialog = async (id: string, knownPhoto?: Record<string, unknown>) => {
@@ -218,8 +231,10 @@ export default function PhotoReviewsPage() {
   const selectedPendingPhotos = pendingPhotos.filter((photo) => selectedPhotoIds.includes(text(photo.id)))
   const selectedPhotosAreLowRisk = selectedPendingPhotos.length > 0
     && selectedPendingPhotos.every((photo) => ['safe', 'none', 'low'].includes(text(photo.latest_risk_flag)))
+  // いま見ている札の一覧を基準にする。審査待ち基準だと、通した・戻した
+  // 写真の詳細で「N枚のうちM枚目」がずれる。
   const detailPosition = detailPhoto
-    ? Math.max(0, pendingPhotos.findIndex((photo) => text(photo.id) === text(detailPhoto.id)))
+    ? Math.max(0, visiblePhotos.findIndex((photo) => text(photo.id) === text(detailPhoto.id)))
     : 0
 
   const review = async (
@@ -256,7 +271,7 @@ export default function PhotoReviewsPage() {
       setReasonError('')
       await load()
       setView('list')
-    } catch (error) { setNotice(error instanceof Error ? error.message : '審査結果を保存できませんでした。') }
+    } catch (error) { setNotice(photoNoticeFor(error, '審査結果を保存できませんでした。')) }
     finally { setReviewing(null) }
   }
 
@@ -290,7 +305,7 @@ export default function PhotoReviewsPage() {
       setReasonError('')
       await load()
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'まとめて審査できませんでした。')
+      setNotice(photoNoticeFor(error, 'まとめて審査できませんでした。'))
     } finally {
       setBulkReviewing(false)
     }
@@ -354,7 +369,7 @@ export default function PhotoReviewsPage() {
     return <PhotoReviewDetail
       photo={detailPhoto}
       position={detailPosition}
-      total={pendingPhotos.length}
+      total={visiblePhotos.length}
       loading={detailLoading}
       loadKind={detailState}
       reviewing={Boolean(reviewing)}
@@ -364,7 +379,7 @@ export default function PhotoReviewsPage() {
       assetProcessing={assetProcessing}
       onBack={() => setView('list')}
       onMove={(direction) => {
-        const next = pendingPhotos[detailPosition + direction]
+        const next = visiblePhotos[detailPosition + direction]
         if (next) void openDetail(text(next.id))
       }}
       onApprove={() => { if (detailPhoto) void review(text(detailPhoto.id), 'adopted') }}
@@ -413,7 +428,13 @@ export default function PhotoReviewsPage() {
           ...STATUS_TABS.map(([value, label]) => ({
             label: `${label}（${countsReady ? counts[value] : '—'}）`,
             current: status === value,
-            onClick: () => setStatus(value),
+            onClick: () => {
+              setStatus(value)
+              // まとめて処理できるのは審査待ちだけ。札を変えたら選び直す。
+              setSelectedPhotoIds([])
+              setBulkApproveOpen(false)
+              setBulkReturnOpen(false)
+            },
           })),
           { label: '出しているもの', current: false, onClick: () => setView('publications') },
         ]}
@@ -454,7 +475,7 @@ export default function PhotoReviewsPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-control bg-accent-soft px-3 py-2 text-sm font-semibold text-accent">{selectedPhotoIds.length}枚を選択中</span>
+          <span className="rounded-control bg-accent-soft px-3 py-2 text-sm font-semibold text-accent">{selectedPendingPhotos.length}枚を選択中</span>
           <Button variant="primary" disabled={!selectedPhotosAreLowRisk || bulkReviewing} title={!selectedPhotosAreLowRisk && selectedPendingPhotos.length > 0 ? 'まとめて通せるのは、注意候補がない写真だけです' : undefined} onClick={() => setBulkApproveOpen(true)}>{bulkReviewing ? '処理中...' : 'まとめて通す'}</Button>
           <Button variant="secondary" disabled={selectedPendingPhotos.length === 0 || bulkReviewing} onClick={() => setBulkReturnOpen(true)}>まとめて戻す</Button>
           <span className="text-xs text-ink-faint">審査待ちの写真だけをまとめて処理します</span>
@@ -478,9 +499,12 @@ export default function PhotoReviewsPage() {
         {visiblePhotos.map((photo) => {
           const photoId = text(photo.id)
           const selected = selectedPhotoIds.includes(photoId)
+          const imageSrc = safePhotoSrc(photo.image_url)
           return <article key={photoId} className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card" style={selected ? { borderColor: 'var(--color-accent)', boxShadow: '0 0 0 1px var(--color-accent)' } : undefined}>
           <div className="relative h-40 overflow-hidden bg-canvas-sunken">
-            <img src={text(photo.image_url)} alt={`${photoPetName(photo)}の投稿写真`} className="h-full w-full object-cover" />
+            {imageSrc
+              ? <img src={imageSrc} alt={`${photoPetName(photo)}の投稿写真`} loading="lazy" className="h-full w-full object-cover" />
+              : <div className="grid h-full w-full place-items-center text-xs font-bold text-ink-faint">画像を表示できません</div>}
             <label className="absolute left-2 top-2 flex cursor-pointer items-center gap-1.5 rounded-control border border-hairline bg-canvas px-2 py-1 text-xs font-semibold text-ink-secondary"><input type="checkbox" checked={selected} onChange={() => togglePhotoSelection(photoId)} className="accent-accent" /><span>選ぶ</span></label>
           </div>
           <div className="p-4">
@@ -552,7 +576,9 @@ export default function PhotoReviewsPage() {
     }}>
         <div className="space-y-4">
             <div className="grid grid-cols-[64px_1fr] items-center gap-3 rounded-control bg-surface-pearl px-3 py-2 text-sm text-ink-secondary">
-              <img src={text(rejectingPhoto.image_url)} alt="" className="h-16 w-16 rounded-control object-cover" />
+              {rejectingPhotoSrc
+                ? <img src={rejectingPhotoSrc} alt="" loading="lazy" className="h-16 w-16 rounded-control object-cover" />
+                : <div className="grid h-16 w-16 place-items-center rounded-control bg-canvas-sunken text-xs font-bold text-ink-faint">—</div>}
               <div>
               <p className="font-semibold text-ink">
                 {photoPetName(rejectingPhoto)}／{text(rejectingPhoto.owner_name) || 'お名前は未取得'}

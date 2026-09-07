@@ -46,12 +46,7 @@ import {
   MEDIA_FOLDERS,
   MEDIA_ITEMS,
   MEDIA_QUOTA,
-  FRIEND_ADD_EVENTS,
   FRIEND_ADD_RUNS,
-  FRIEND_ADD_LIFECYCLE_DRAFT,
-  FRIEND_ADD_LIFECYCLE_PUBLISHED,
-  FRIEND_ADD_LIFECYCLE_TEST_RESULT,
-  FRIEND_ADD_LIFECYCLE_VALIDATION,
   AUTO_REPLIES, AUTO_REPLY_FOLDERS, AUTO_REPLY_RUNS, AUTO_REPLY_CONFLICT_SUMMARY,
   AUTO_REPLY_PUBLISH_CONFLICTS, AUTO_REPLY_PUBLISH_DRAFT,
   AUTO_REPLY_PUBLISH_RESULT, AUTO_REPLY_PUBLISH_TEST, AUTO_REPLY_PUBLISH_VALIDATION,
@@ -67,7 +62,7 @@ import {
   FRIEND_SAVED_VIEWS, MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
   LIST_STATS, NEN_BIRTHDAY_COUPON, NEN_CAMPAIGN_SETTINGS, NEN_COLUMN_CREATE, NEN_COLUMN_OPERATIONS, NEN_COLUMNS, NEN_JOBS, NEN_PETS,
   NEN_FLOW_METRICS, NEN_COLUMN_METRICS, NEN_PET_METRICS, NEN_DELIVERIES, NEN_DELIVERY_DETAILS,
-  OPERATORS, REMINDERS, REMINDER_DRAFT, REMINDER_FOLDERS, SCENARIO_ACTIONS, SCENARIO_DRAFT, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, SCENARIO_SIMULATION, SCENARIO_RUNS, USERS_GROUPED,
+  OPERATORS, REMINDERS, REMINDER_DRAFT, REMINDER_FOLDERS, REMINDER_VALIDATE, REMINDER_PREVIEW, REMINDER_TEST_SEND, REMINDER_PUBLISH, SCENARIO_ACTIONS, SCENARIO_DRAFT, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, SCENARIO_SIMULATION, SCENARIO_RUNS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   RICH_MENU_GROUPS, RICH_MENU_GROUP_DETAILS, RICH_MENU_EXTERNAL, RICH_MENU_TAP_STATS,
   TAGS, TAG_GROUPS, TAG_DEFINITION_NEN_SUBSCRIPTION, TAG_DEPENDENCIES_NEN_SUBSCRIPTION,
@@ -489,15 +484,20 @@ const ARRAY_PREFIXES = [
   '/api/users/',
 ]
 
-/** 機能のオン／オフ。全部オンにして、どの画面も出るようにする。 */
-const FEATURE_KEYS = [
-  'scenarios', 'broadcasts', 'templates', 'reminders', 'auto_replies',
-  'rich_menus', 'webinars', 'inflow_tracking', 'forms', 'mileage',
-  'affiliates', 'analytics', 'media', 'events', 'booking', 'automations',
-  'external_integrations', 'friend_add_routing', 'nen_campaigns',
-  'photo_review', 'ec_commerce', 'line_notifications', 'restaurant_test',
-]
-const FEATURES = Object.fromEntries(FEATURE_KEYS.map((k) => [k, true]))
+/** 機能31の固定応答。本物と同じ全ID・既定値・版を返す。 */
+const FEATURES = {
+  scenarios: true, broadcasts: true, templates: true, reminders: true,
+  auto_replies: true, rich_menus: true, inflow_tracking: true, forms: true,
+  photo_review: true, automations: true, external_integrations: true,
+  friend_add_routing: true, multi_store_hierarchy: false,
+  multi_store_bulk_updates: false, reservation_ledger: false,
+  external_reservations: false, google_business_profile: false,
+  friend_fields: true, support_marks: true, saved_searches: true,
+  media: true, common_vars: true, analytics: true, site_tracking: true,
+  webinars: false, events: true, booking: true, affiliates: false, mileage: true,
+  ec_commerce: true, line_notifications: true, nen_campaigns: true,
+  restaurant_test: true,
+}
 
 /** 設計 `bfB50` / `oHAN4` を確認するための固定ECデータ。秘密値そのものは置かない。 */
 const EC_SUBSCRIPTIONS = {
@@ -960,10 +960,6 @@ const SHAPES = {
   '/api/rich-menu-groups/external': RICH_MENU_EXTERNAL,
   '/api/rich-menu-groups/tap-stats': RICH_MENU_TAP_STATS,
 
-  /* 友だち追加時配信の公開前確認（PR #597）。契約と同じ形を返す。 */
-  '/api/friend-add-routing/draft': FRIEND_ADD_LIFECYCLE_DRAFT,
-  '/api/friend-add-routing/conflicts': { conflicts: [] },
-
 }
 
 /**
@@ -982,6 +978,16 @@ function visualQaWriteBody(method, pathname) {
     return { ...SCENARIO_SIMULATION, scenarioId: scenarioSimulation[1] }
   }
   if (method === 'PUT' && /^\/api\/scenarios\/[^/]+\/draft$/.test(pathname)) return SCENARIO_DRAFT
+  /*
+   * リマインダの公開フロー（下書き保存・検査・予定・試し送り・公開）。
+   * 読みの `/draft` と `/runs` は従来のGET側にある。ここは書き込み側で、
+   * 本番と同じ器（`{success:true,data}`）で固定の返事を返す。
+   */
+  if (method === 'PUT' && /^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) return REMINDER_DRAFT
+  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/validate$/.test(pathname)) return REMINDER_VALIDATE
+  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/preview$/.test(pathname)) return REMINDER_PREVIEW
+  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/test-send$/.test(pathname)) return REMINDER_TEST_SEND
+  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/publish$/.test(pathname)) return REMINDER_PUBLISH
   if (method === 'POST' && /^\/api\/scenarios\/[^/]+\/test-send$/.test(pathname)) return { sent: 1 }
   if (method === 'POST' && /^\/api\/scenarios\/[^/]+\/steps\/[^/]+\/test-send$/.test(pathname)) return { sent: 1 }
   if (method === 'POST' && pathname === '/api/ec-commerce/test-send') return { sent: 1 }
@@ -1060,15 +1066,6 @@ function visualQaWriteBody(method, pathname) {
   }
   if (method === 'POST' && /^\/api\/webhooks\/outgoing\/[^/]+\/test$/.test(pathname)) {
     return OUTGOING_WEBHOOK_TEST_RESULT
-  }
-  if (method === 'POST' && pathname === '/api/friend-add-routing/validate') {
-    return FRIEND_ADD_LIFECYCLE_VALIDATION
-  }
-  if (method === 'POST' && pathname === '/api/friend-add-routing/draft/test') {
-    return FRIEND_ADD_LIFECYCLE_TEST_RESULT
-  }
-  if (method === 'POST' && pathname === '/api/friend-add-routing/publish') {
-    return FRIEND_ADD_LIFECYCLE_PUBLISHED
   }
   if (method === 'POST' && pathname === '/api/saved-searches/preview') {
     return FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL
@@ -1761,7 +1758,45 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const found = AUTO_REPLIES.find((item) => item.id === autoReplyOne[1])
     return found ? { success: true, data: found } : { success: false, error: 'Not found' }
   }
-  if (pathname === '/api/reminders') return { success: true, data: REMINDERS }
+  if (pathname === '/api/reminders') {
+    const usesListContract = ['page', 'limit', 'q', 'folderId', 'status'].some((key) => query.has(key))
+    if (!usesListContract) return { success: true, data: REMINDERS }
+    const requestedPage = Number.parseInt(query.get('page') ?? '', 10)
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 200) : 20
+    const q = (query.get('q') ?? '').trim().toLocaleLowerCase('ja-JP')
+    const folderId = query.get('folderId') ?? ''
+    const status = query.get('status') ?? ''
+    const filtered = REMINDERS.filter((reminder) => {
+      if (q && !`${reminder.name} ${reminder.description ?? ''}`.toLocaleLowerCase('ja-JP').includes(q)) return false
+      if (folderId === '__unfiled__' && reminder.folderId) return false
+      if (folderId && folderId !== '__unfiled__' && reminder.folderId !== folderId) return false
+      if (status === 'failed' && !reminder.hasFailure) return false
+      if (status === 'draft' && reminder.lifecycleStatus !== 'draft') return false
+      if (status === 'active' && (reminder.lifecycleStatus === 'draft' || reminder.lifecycleStatus === 'stopped' || !reminder.isActive)) return false
+      if (status === 'stopped' && reminder.lifecycleStatus !== 'stopped' && reminder.isActive) return false
+      return true
+    }).sort((left, right) => (
+      (left.displayOrder ?? 0) - (right.displayOrder ?? 0)
+      || right.createdAt.localeCompare(left.createdAt)
+      || left.id.localeCompare(right.id)
+    ))
+    const offset = (page - 1) * limit
+    return {
+      success: true,
+      data: {
+        items: filtered.slice(offset, offset + limit),
+        total: filtered.length,
+        limit,
+        sort: [
+          { field: 'displayOrder', direction: 'asc' },
+          { field: 'createdAt', direction: 'desc' },
+          { field: 'id', direction: 'asc' },
+        ],
+      },
+    }
+  }
   if (/^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) {
     return { success: true, data: REMINDER_DRAFT }
   }
@@ -1785,21 +1820,6 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (reminderSteps) {
     const reminder = REMINDERS.find((item) => item.id === reminderSteps[1])
     return { success: true, data: reminder ? reminderStepsOf(reminder) : [] }
-  }
-  if (pathname === '/api/friend-add-routing/events') {
-    const kind = query.get('kind')
-    const attributionStatus = query.get('attribution_status')
-    const routingStatus = query.get('routing_status')
-    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
-    const limit = Number.isFinite(requestedLimit) && requestedLimit >= 0
-      ? requestedLimit
-      : FRIEND_ADD_EVENTS.items.length
-    const items = FRIEND_ADD_EVENTS.items
-      .filter((item) => !kind || item.kind === kind)
-      .filter((item) => !attributionStatus || item.attributionStatus === attributionStatus)
-      .filter((item) => !routingStatus || item.routingStatus === routingStatus)
-      .slice(0, limit)
-    return { success: true, data: { ...FRIEND_ADD_EVENTS, items } }
   }
   if (pathname === '/api/friend-add-runs') {
     const status = query.get('status')
@@ -1947,43 +1967,6 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     いま入っている人。34-1「はじめの設定」の最終確認が役割で言い分けるので、
     一覧の形（items/total）ではなく 1 人ぶんを返す。
   */
-  /*
-    友だち追加時の振り分け。34-1 の段3・段4 がこれを読む。
-    下書きはあるが公開していない——設計 `RAW35` が「止まっています」で
-    描いている状態を、そのまま固定データにする。
-  */
-  if (pathname === '/api/friend-add-routing')
-    return {
-      success: true,
-      data: {
-        configured: true,
-        routing: {
-          firstTime: { scenarioId: 'visual-qa-scenario', actions: [], timing: 'immediate' },
-          returning: { scenarioId: null, actions: [], mode: 'none', startPosition: 'start' },
-          criteria: { firstTime: 'never_added' },
-        },
-        scenarios: [{ id: 'visual-qa-scenario', name: '新規登録 7日間フォロー' }],
-        tags: [],
-      },
-    }
-  if (pathname === '/api/friend-add-routing/draft')
-    return {
-      success: true,
-      data: {
-        accountId: 'visual-qa-account',
-        versionId: 'visual-qa-draft',
-        versionNumber: 1,
-        status: 'draft',
-        routing: {
-          firstTime: { scenarioId: 'visual-qa-scenario', actions: [], timing: 'immediate' },
-          returning: { scenarioId: null, actions: [], mode: 'none', startPosition: 'start' },
-          criteria: { firstTime: 'never_added' },
-        },
-        lastTestStatus: null,
-        lastTestedAt: null,
-        publishedAt: null,
-      },
-    }
   if (pathname === '/api/staff/me')
     return {
       success: true,

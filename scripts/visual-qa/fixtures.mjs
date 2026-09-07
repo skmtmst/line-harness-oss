@@ -405,9 +405,9 @@ export const OPERATORS = [
 export const FRIEND_SCENARIOS = [
   // 名前, 説明, 配信方式, 購読中, 読了, 登録日, 終了後, 稼働
   ['新規登録7日間フォロー', '登録直後から7日間の初回案内', 'absolute_time', 428, 312, '2026-08-16', 'pause', true],
-  ['商品購入後サポート', '購入1日後から使い方を案内', 'elapsed', 316, 201, '2026-08-18', 'start_other', true],
+  ['商品購入後サポート', '購入1日後から使い方を案内', 'elapsed', 316, 201, '2026-08-18', 'move', true],
   ['予約前日・当日案内', '予約日を基準に前日と当日へ配信', 'absolute_time', 164, 98, '2026-08-20', 'pause', true],
-  ['休眠ユーザー復帰', '90日反応がない友だちへ再案内', 'relative', 0, 0, '2026-08-22', 'restart_prev', false],
+  ['休眠ユーザー復帰', '90日反応がない友だちへ再案内', 'relative', 0, 0, '2026-08-22', 'resume_previous', false],
   ['会員更新リマインド', '更新月の14日前からお知らせ', 'elapsed', 83, 51, '2026-08-23', 'pause', false],
 ].map(([name, description, deliveryMode, subscriberCount, completedCount, day, onCompleteMode, isActive], index) => ({
   id: `scenario-${index}`,
@@ -3144,7 +3144,9 @@ export const BROADCAST_SAVED_VIEWS = [
   {
     id: 'broadcast-view-reserved',
     name: '予約中のみ',
-    filters: { statuses: ['scheduled'] },
+    // 保存側（page.tsx saveCurrentView）と同じ形にする。旧形の
+    // `statuses` では適用処理が読み替えられず復元不良になる（点検 #490 中5）。
+    filters: { titleQuery: '', statusFilter: 'scheduled', dateFrom: '', dateTo: '', folderFilter: '' },
     sortKey: 'scheduled',
     pageSize: 20,
     createdBy: 'staff-owner',
@@ -3178,9 +3180,11 @@ export const BROADCAST_PREFLIGHT = {
     sendable: 1213,
     evaluatedAt: '2026-08-24T00:55:00.000Z',
     representatives: [
-      { friendId: 'friend-1', displayName: 'Kenta Kawano', note: '予約・未対応' },
-      { friendId: 'friend-2', displayName: 'Masato S.', note: '予約・対応中' },
-      { friendId: 'friend-3', displayName: '菅野 亮', note: '予約・未対応' },
+      // 画面（broadcast-form 対象プレビュー）と口（BroadcastPreflight）の
+      // 実形に合わせる。`note` だけでは画像と要約が空表示になる（点検 #490 中6）。
+      { friendId: 'friend-1', displayName: 'Kenta Kawano', pictureUrl: null, summary: '予約・未対応' },
+      { friendId: 'friend-2', displayName: 'Masato S.', pictureUrl: null, summary: '予約・対応中' },
+      { friendId: 'friend-3', displayName: '菅野 亮', pictureUrl: null, summary: '予約・未対応' },
     ],
   },
   exclusions: {
@@ -3360,6 +3364,41 @@ export const REMINDER_DRAFT = {
   lastTestStatus: 'succeeded',
   lastTestedAt: '2026-09-06T09:00:00.000Z',
   publishedAt: null,
+}
+
+/** 機能7の公開前チェック（`POST /api/reminders/:id/validate` の固定の返事）。 */
+export const REMINDER_VALIDATE = {
+  valid: true,
+  checks: [
+    { key: 'steps', label: '通知ステップ', status: 'passed', message: '3件の通知があります' },
+    { key: 'bodies', label: '送る内容', status: 'passed', message: '空の通知はありません' },
+    { key: 'test_send', label: 'テスト送信', status: 'passed', message: '直近のテストは成功しています' },
+  ],
+  audience: { matched: 398, excluded: 28 },
+}
+
+/** 機能7の配信予定（`POST /api/reminders/:id/preview` の固定の返事）。 */
+export const REMINDER_PREVIEW = {
+  targetDate: '2026-08-25T00:00:00.000Z',
+  items: [
+    { stableStepId: 'day-before', stepNumber: 1, scheduledAt: '2026-08-24T09:00:00.000Z', label: '前日のお知らせ', state: 'scheduled' },
+    { stableStepId: 'hour-before', stepNumber: 2, scheduledAt: '2026-08-25T01:00:00.000Z', label: '1時間前のお知らせ', state: 'scheduled' },
+    { stableStepId: 'same-day', stepNumber: 3, scheduledAt: '2026-08-25T00:00:00.000Z', label: '当日のご案内', state: 'scheduled' },
+  ],
+  summary: { audience: 398, next7Days: 426, next30Days: 1194, duplicateCount: 2 },
+}
+
+/** 機能7のテスト送信（`POST /api/reminders/:id/test-send` の固定の返事）。 */
+export const REMINDER_TEST_SEND = {
+  sent: 1, recipientName: 'Kenta Kawano', replayed: false,
+  requestId: 'visual-qa-test-1', testedAt: '2026-09-06T09:00:00.000Z',
+}
+
+/** 機能7の公開（`POST /api/reminders/:id/publish` の固定の返事）。 */
+export const REMINDER_PUBLISH = {
+  reminderId: 'reminder-3', versionId: 'reminder-3-draft-v3', versionNumber: 3,
+  publishedAt: '2026-09-06T09:00:00.000Z', audience: 398,
+  plannedDeliveries: 1194, nextScheduledAt: '2026-08-24T09:00:00.000Z',
 }
 
 /**
@@ -5153,7 +5192,7 @@ export const MANUAL_LINKS = {
     { key: '5-1', keyKind: 'screen', name: 'シナリオ配信', url: 'https://help.line-harness.example/scenarios', status: 'ok', lastCheckedAt: '2026-08-27T19:00:00.000Z', lastHttpStatus: 200, lastError: null, version: 2 },
     { key: '33-1', keyKind: 'screen', name: 'LINEアカウント', url: null, status: 'broken', lastCheckedAt: null, lastHttpStatus: null, lastError: 'URL_UNSET', version: 1 },
   ],
-  total: 266,
+  total: 5,
   brokenCount: 2,
 }
 
@@ -5551,8 +5590,9 @@ export const NEN_PHOTOS = [
   petPhoto('ph-3', '木村 亮', 'こむぎ', 'おやつを待つ顔', 'pending', 20),
   petPhoto('ph-4', '中村 彩', 'ぷりん', 'ひなたぼっこ', 'adopted', 14),
   petPhoto('ph-5', '石田 未来', 'レオ', '新しい首輪', 'adopted', 8),
-  /* 戻したもの。**理由が無いと、なぜ戻したのかが画面から読めない。** */
-  petPhoto('ph-6', '松本 圭', 'むぎ', '店内で撮影', 'rejected', 3, 'other_person', '人の顔が写っています'),
+  /* 戻したもの。**理由が無いと、なぜ戻したのかが画面から読めない。**
+     理由はDB制約・API許可値にある正規値を使う（`other_person` は存在しない値）。 */
+  petPhoto('ph-6', '松本 圭', 'むぎ', '店内で撮影', 'rejected', 3, 'privacy', '人の顔が写っています'),
 ]
 
 export const NEN_PHOTO_DETAIL = {

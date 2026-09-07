@@ -2,6 +2,7 @@ import { Hono, type Context } from 'hono';
 import {
   getFriendById,
   getReminders,
+  getRemindersByIds,
   reorderReminders,
   getReminderById,
   createReminder,
@@ -39,6 +40,7 @@ import {
   testReminderDraft,
   validateReminderDraft,
 } from '../services/reminder-draft.js';
+import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 
 const reminders = new Hono<Env>();
 
@@ -71,6 +73,40 @@ function commonRunStatus(status: ReminderDeliveryRunStatus) {
   if (status === 'skipped') return 'skipped' as const;
   if (status === 'cancelled') return 'cancelled' as const;
   return 'pending' as const;
+}
+
+type ReminderListRow = Awaited<ReturnType<typeof getReminders>>[number] & {
+  step_count?: number | string | null;
+  has_failure?: number | string | null;
+};
+
+function publicReminder(row: ReminderListRow, stepCount?: number, hasFailure?: boolean) {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    isActive: Boolean(row.is_active),
+    lifecycleStatus: row.lifecycle_status,
+    currentDraftVersionId: row.current_draft_version_id,
+    currentPublishedVersionId: row.current_published_version_id,
+    triggerType: row.trigger_type ?? 'manual',
+    deliveryMode: row.delivery_mode ?? 'countdown',
+    triggerFieldId: row.trigger_field_id ?? null,
+    repeatYearly: row.repeat_yearly === 1,
+    triggerOffsetMinutes: row.trigger_offset_minutes ?? null,
+    sendAtTime: row.send_at_time ?? null,
+    targetTagId: row.target_tag_id ?? null,
+    folderId: row.folder_id ?? null,
+    stepCount: stepCount ?? Number(row.step_count ?? 0),
+    hasFailure: hasFailure ?? Number(row.has_failure ?? 0) > 0,
+    displayOrder: row.display_order ?? 0,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function escapedLike(value: string): string {
+  return value.replace(/[\\%_]/g, '\\$&');
 }
 
 function runDurationMs(startedAt: string | null, completedAt: string | null): number | null {
@@ -174,7 +210,7 @@ const REMINDER_MESSAGE_TYPES = new Set([
 
 function readDraftSettings(
   raw: unknown,
-): { ok: true; value: ReminderDraftSettings } | { ok: false; error: string } {
+): { ok: true; value: ReminderDraftSettings } | { ok: false; error: string; status?: number } {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return { ok: false, error: '下書きの内容が正しくありません' };
   }
@@ -226,14 +262,24 @@ function readDraftSettings(
     const objectOrEmpty = (value: unknown) => value && typeof value === 'object' && !Array.isArray(value)
       ? value as Record<string, unknown>
       : {};
+    const templateId = typeof step.templateId === 'string' && step.templateId ? step.templateId : null;
+    const messageContent = typeof step.messageContent === 'string' ? step.messageContent : '';
+    // 公開前検査と同じく、型紙なしの空本文はここで止める。空の通は届いても
+    // 何も表示されず、公開時に初めて気づくことになる。
+    if (!templateId && !messageContent.trim()) {
+      return { ok: false, error: '送る内容が空の通知があります', status: 422 };
+    }
+    if (messageContent.length > 5000) {
+      return { ok: false, error: '送る内容は5000文字以内で指定してください', status: 422 };
+    }
     steps.push({
       stableStepId,
       offsetMinutes,
       messageType,
-      messageContent: typeof step.messageContent === 'string' ? step.messageContent : '',
+      messageContent,
       offsetDays,
       sendAtTime,
-      templateId: typeof step.templateId === 'string' && step.templateId ? step.templateId : null,
+      templateId,
       targetCondition: objectOrEmpty(step.targetCondition),
       action: objectOrEmpty(step.action),
     });
@@ -342,6 +388,18 @@ reminders.patch('/api/reminders/reorder', requireRole('owner', 'admin'), async (
     if (body.ids.length > 500) {
       return c.json({ success: false, error: 'too many ids' }, 400);
     }
+    /*
+     * 渡されたidが操作できるアカウントのものか確かめる。範囲外が1件でも
+     * 混ざったら並べ替え自体を行わない（他アカウントの並びを書き換えない）。
+     */
+    const targets = await getRemindersByIds(c.env.DB, body.ids as string[]);
+    if (targets.length !== new Set(body.ids as string[]).size) {
+      return c.json({ success: false, error: 'リマインダが見つかりません' }, 404);
+    }
+    const targetAccountIds = [...new Set(targets.map((row) => row.line_account_id))];
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), targetAccountIds)) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+    }
     await reorderReminders(c.env.DB, body.ids as string[]);
     return c.json({ success: true, data: { updated: body.ids.length } });
   } catch (err) {
@@ -353,6 +411,83 @@ reminders.patch('/api/reminders/reorder', requireRole('owner', 'admin'), async (
 reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId');
+    const paging = parseOffsetPaging({
+      page: c.req.query('page'),
+      limit: c.req.query('limit'),
+    }, { defaultLimit: 20 });
+    const q = (c.req.query('q') ?? '').trim().toLocaleLowerCase('ja-JP');
+    const folderId = c.req.query('folderId') ?? '';
+    const status = c.req.query('status') ?? '';
+    const usesListContract = ['page', 'limit', 'q', 'folderId', 'status']
+      .some((key) => c.req.query(key) !== undefined);
+
+    if (usesListContract) {
+      const clauses = ['r.deleted_at IS NULL'];
+      const bindings: unknown[] = [];
+      if (lineAccountId) {
+        if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+          return c.json({ success: false, error: 'Reminder not found' }, 404);
+        }
+        clauses.push('r.line_account_id = ?');
+        bindings.push(lineAccountId);
+      } else {
+        const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+        const accountParts: string[] = [];
+        if (scope.allowedAccountIds.length > 0) {
+          accountParts.push(`r.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(', ')})`);
+          bindings.push(...scope.allowedAccountIds);
+        }
+        if (scope.canSeeUnassigned) accountParts.push('r.line_account_id IS NULL');
+        clauses.push(accountParts.length > 0 ? `(${accountParts.join(' OR ')})` : '1 = 0');
+      }
+      if (q) {
+        clauses.push(`(LOWER(r.name) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(r.description, '')) LIKE ? ESCAPE '\\')`);
+        const searchPattern = `%${escapedLike(q)}%`;
+        bindings.push(searchPattern, searchPattern);
+      }
+      if (folderId === '__unfiled__') clauses.push('r.folder_id IS NULL');
+      else if (folderId) {
+        clauses.push('r.folder_id = ?');
+        bindings.push(folderId);
+      }
+      if (status === 'failed') {
+        clauses.push(`EXISTS (SELECT 1 FROM reminder_delivery_runs failed
+          WHERE failed.reminder_id = r.id AND failed.status IN ('retry_wait', 'permanent_failed'))`);
+      } else if (status === 'draft') clauses.push(`r.lifecycle_status = 'draft'`);
+      else if (status === 'active') clauses.push(`COALESCE(r.lifecycle_status, 'published') NOT IN ('draft', 'stopped') AND r.is_active = 1`);
+      else if (status === 'stopped') clauses.push(`(r.lifecycle_status = 'stopped' OR r.is_active = 0)`);
+      else if (status) return c.json({ success: false, error: 'status is invalid' }, 400);
+
+      const where = clauses.join(' AND ');
+      const totalRow = await c.env.DB
+        .prepare(`SELECT COUNT(*) AS total FROM reminders r WHERE ${where}`)
+        .bind(...bindings)
+        .first<{ total: number | string }>();
+      const result = await c.env.DB
+        .prepare(`SELECT r.*,
+            (SELECT COUNT(*) FROM reminder_steps steps WHERE steps.reminder_id = r.id) AS step_count,
+            EXISTS (SELECT 1 FROM reminder_delivery_runs failed
+              WHERE failed.reminder_id = r.id AND failed.status IN ('retry_wait', 'permanent_failed')) AS has_failure
+          FROM reminders r WHERE ${where}
+          ORDER BY r.display_order ASC, r.created_at DESC, r.id ASC
+          LIMIT ? OFFSET ?`)
+        .bind(...bindings, paging.limit, paging.offset)
+        .all<ReminderListRow>();
+      return c.json({
+        success: true,
+        data: buildOffsetListResponse({
+          items: result.results.map((row) => publicReminder(row)),
+          total: Number(totalRow?.total ?? 0),
+          paging,
+          sort: [
+            { field: 'displayOrder', direction: 'asc' },
+            { field: 'createdAt', direction: 'desc' },
+            { field: 'id', direction: 'asc' },
+          ],
+        }),
+      });
+    }
+
     let items: Awaited<ReturnType<typeof getReminders>>;
     if (lineAccountId) {
       if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
@@ -368,7 +503,7 @@ reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c
       const result = await c.env.DB
         .prepare(
           `SELECT * FROM reminders WHERE line_account_id = ? AND deleted_at IS NULL
-            ORDER BY display_order ASC, created_at DESC`,
+            ORDER BY display_order ASC, created_at DESC, id ASC`,
         )
         .bind(lineAccountId)
         .all();
@@ -395,30 +530,20 @@ reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c
       .all<{ reminder_id: string; c: number }>();
     const stepCounts = new Map(counts.results.map((row) => [row.reminder_id, Number(row.c)]));
 
-    return c.json({
-      success: true,
-      data: items.map((r) => ({
-        id: r.id,
-        name: r.name,
-        description: r.description,
-        isActive: Boolean(r.is_active),
-        lifecycleStatus: r.lifecycle_status,
-        currentDraftVersionId: r.current_draft_version_id,
-        currentPublishedVersionId: r.current_published_version_id,
-        triggerType: r.trigger_type ?? 'manual',
-        deliveryMode: r.delivery_mode ?? 'countdown',
-        triggerFieldId: r.trigger_field_id ?? null,
-        repeatYearly: r.repeat_yearly === 1,
-        triggerOffsetMinutes: r.trigger_offset_minutes ?? null,
-        sendAtTime: r.send_at_time ?? null,
-        targetTagId: r.target_tag_id ?? null,
-        folderId: r.folder_id ?? null,
-        stepCount: stepCounts.get(r.id) ?? 0,
-        displayOrder: r.display_order ?? 0,
-        createdAt: r.created_at,
-        updatedAt: r.updated_at,
-      })),
-    });
+    const failures = await c.env.DB
+      .prepare(`SELECT DISTINCT reminder_id FROM reminder_delivery_runs
+        WHERE status IN ('retry_wait', 'permanent_failed')`)
+      .all<{ reminder_id: string }>();
+    const failedReminderIds = new Set(failures.results.map((row) => row.reminder_id));
+
+    const publicItems = items.map((r) => publicReminder(
+      r,
+      stepCounts.get(r.id) ?? 0,
+      failedReminderIds.has(r.id),
+    ));
+
+    /* 旧配列応答は、移行期限（2026-10-31）まで未移行の呼び出しだけに残す。 */
+    return c.json({ success: true, data: publicItems });
   } catch (err) {
     console.error('GET /api/reminders error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -429,7 +554,7 @@ reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c
 reminders.post('/api/reminders/drafts', requireRole('owner', 'admin'), async (c) => {
   try {
     const parsed = readDraftSettings(await c.req.json<unknown>());
-    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, parsed.status === 422 ? 422 : 400);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [parsed.value.lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
@@ -513,7 +638,7 @@ reminders.get('/api/reminders/:id/draft', async (c) => {
 reminders.put('/api/reminders/:id/draft', requireRole('owner', 'admin'), async (c) => {
   try {
     const parsed = readDraftSettings(await c.req.json<unknown>());
-    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, parsed.status === 422 ? 422 : 400);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [parsed.value.lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
@@ -758,6 +883,18 @@ reminders.put('/api/reminders/:id', requireRole('owner', 'admin'), async (c) => 
     const body = await c.req.json<Record<string, unknown>>();
     const trigger = readTriggerInput(body);
     if (!trigger.ok) return c.json({ success: false, error: trigger.error }, 400);
+    /*
+     * 送るタイミングの決め方は作成後に変えられない（画面にもそう書いてある）。
+     * 変えると登録済みの配信予定がずれるので、変わっているときだけ422で止める。
+     * 同じ値の再送は通す（画面のフォルダ移動などが同じ本文を送るため）。
+     */
+    if (Object.prototype.hasOwnProperty.call(body, 'triggerType')) {
+      const current = await getReminderById(c.env.DB, id);
+      if (!current) return c.json({ success: false, error: 'Not found' }, 404);
+      if ((current.trigger_type ?? 'manual') !== trigger.value.triggerType) {
+        return c.json({ success: false, error: '送るタイミングの決め方は作成後に変えられません' }, 422);
+      }
+    }
     const folderError = await validateReminderFolder(c.env.DB, trigger.value.folderId);
     if (folderError) return c.json({ success: false, error: folderError }, 422);
     await updateReminder(c.env.DB, id, { ...body, ...trigger.value });
@@ -795,6 +932,16 @@ reminders.post('/api/reminders/:id/steps', requireRole('owner', 'admin'), async 
     }>();
     if (body.offsetMinutes === undefined || !body.messageType || !body.messageContent) {
       return c.json({ success: false, error: 'offsetMinutes, messageType, messageContent are required' }, 400);
+    }
+    // 下書き側と同じ種類の一覧で検査する。巨大な本文や変な種類をDBへ入れない。
+    if (!REMINDER_MESSAGE_TYPES.has(body.messageType)) {
+      return c.json({ success: false, error: `messageType must be one of ${[...REMINDER_MESSAGE_TYPES].join(', ')}` }, 400);
+    }
+    if (typeof body.messageContent !== 'string' || !body.messageContent.trim()) {
+      return c.json({ success: false, error: 'messageContent must not be empty' }, 400);
+    }
+    if (body.messageContent.length > 5000) {
+      return c.json({ success: false, error: 'messageContent must be at most 5000 characters' }, 400);
     }
     if (
       body.sendAtTime !== undefined &&

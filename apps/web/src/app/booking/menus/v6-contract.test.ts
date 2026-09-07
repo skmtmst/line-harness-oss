@@ -97,6 +97,21 @@ describe('V6 予約設定', () => {
     expect(LIST).toContain('function set<K extends keyof BookingMenu>(k: K, v: BookingMenu[K])')
   })
 
+  it('作成は専用画面だけに寄せ、作成と編集で同じ担当必須の検証を使う', () => {
+    expect(CREATE).toContain('bookingMenuError({')
+    expect(LIST).toContain('bookingMenuError({')
+    expect(LIST).toContain('assignedStaffCount: form.assigned_staff?.length ?? 0')
+    expect(LIST).toContain('function EditMenuModal(')
+    expect(LIST).not.toContain('bookingApi.createMenu(')
+    expect(LIST).not.toContain("'新規メニュー'")
+  })
+
+  it('日時の表示は予約設定内の共通整形を使う', () => {
+    expect(LIST).toContain("from '../lib/format-time'")
+    expect(LIST).not.toContain('function bookingWindowEnd(')
+    expect(LIST).not.toContain('function businessHourSummary(')
+  })
+
   it('営業時間の要約で存在しない末尾を断言しない', () => {
     expect(LIST).not.toContain('.at(-1)!')
   })
