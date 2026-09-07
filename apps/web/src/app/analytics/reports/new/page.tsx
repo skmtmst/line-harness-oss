@@ -140,6 +140,7 @@ export default function AnalyticsReportNewPage() {
       <PageHeader
         breadcrumb={[{ label: '分析', href: '/analytics' }, { label: '定期レポートをつくる' }]}
         title="定期レポートをつくる"
+        description=""
       />
       {!canManage && <div className="bg-canvas-sunken mb-4 rounded-control px-4 py-3 text-sm">運用担当は内容を確認できます。作成は統括または管理者が行います。</div>}
       {error && <div className="bg-danger-bg text-danger mb-4 rounded-control px-4 py-3 text-sm" role="alert">{error}</div>}
