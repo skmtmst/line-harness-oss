@@ -179,7 +179,7 @@ export default function QrDialog({
   return (
     <div
       data-design="QR"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4"
       role="dialog"
       aria-modal="true"
       aria-label="友だち追加のQRコード"
@@ -332,16 +332,16 @@ export default function QrDialog({
                 PDFで印刷
               </button>
             </div>
-          </div>
-        </div>
 
-        <div className="border-hairline bg-surface-pearl mt-5 rounded-control border p-4">
-          <h3 className="text-ink text-sm font-bold">使うときのヒント</h3>
-          <ul className="text-ink-faint mt-2 space-y-1 text-xs leading-relaxed">
-            <li>・印刷は 1200px 以上を推奨します（小さいと読み取れないことがあります）</li>
-            <li>・流入経路ごとにリンクを分けると、どこから来たかを計測できます</li>
-            <li>・QRの周囲は余白を1cm以上あけてください</li>
-          </ul>
+            <div className="border-hairline bg-surface-pearl rounded-control border p-4">
+              <h3 className="text-ink text-sm font-bold">使うときのヒント</h3>
+              <ul className="text-ink-faint mt-2 space-y-1 text-xs leading-relaxed">
+                <li>・印刷は 1200px 以上を推奨します（小さいと読み取れないことがあります）</li>
+                <li>・流入経路ごとにリンクを分けると、どこから来たかを計測できます</li>
+                <li>・QRの周囲は余白を1cm以上あけてください</li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
     </div>

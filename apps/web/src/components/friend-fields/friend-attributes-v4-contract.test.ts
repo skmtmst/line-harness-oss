@@ -284,7 +284,7 @@ describe('友だち属性 V4 contract', () => {
     expect(source).toContain('影響を確認しています')
     expect(source).toContain('影響を確認できませんでした')
     expect(source).toContain('api.tags.archive(tag.id, accountId')
-    expect(source).toContain('max-w-[670px] -translate-y-7')
+    expect(source).toContain('max-w-[670px] -translate-y-5')
     expect(source).toContain('gap-3 px-4 py-3')
     expect(source).toContain('expectedVersion: impact.tag.version')
     expect(source).toContain('impactRevision: impact.revision')
@@ -312,8 +312,9 @@ describe('友だち属性 V4 contract', () => {
     // 0件は出さない。
     expect(source).toContain('labels.filter(([key]) => refs[key] > 0)')
     // 取れていないときは `—`。0件（「なし」）と書き分ける。
-    expect(source).toContain("refs ? refSummary(refs, MANUAL_REFS) : '—'")
+    expect(source).toContain("refs ? manualRefSummary(refs) : '—'")
     expect(source).toContain("refs ? refSummary(refs, AUTO_REFS) : '—'")
+    expect(source).toContain("MANUAL_REFS.filter(([key]) => key !== 'affiliateOffers')")
   })
 
   it('タグの作成・編集・一覧ルートはV4を既定表示にする', () => {

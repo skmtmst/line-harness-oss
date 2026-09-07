@@ -1,6 +1,7 @@
 'use client'
 
 import React, { type ReactNode } from 'react'
+import { CircleCheck, Trash2, TriangleAlert } from 'lucide-react'
 import Dialog from './dialog'
 
 interface ConfirmDialogProps {
@@ -51,6 +52,11 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const shownTitleIcon = titleIcon ?? (destructive
+    ? <TriangleAlert size={22} />
+    : <CircleCheck size={22} />)
+  const shownConfirmIcon = confirmIcon ?? (destructive ? <Trash2 size={16} /> : undefined)
+
   return (
     <Dialog
       open={open}
@@ -61,9 +67,11 @@ export default function ConfirmDialog({
       cancelLabel={cancelLabel}
       busy={busy}
       error={error}
-      titleIcon={titleIcon}
-      confirmIcon={confirmIcon}
+      titleIcon={shownTitleIcon}
+      confirmIcon={shownConfirmIcon}
       designNode={designNode}
+      confirmation
+      compact={!children}
       onConfirm={onConfirm}
       onCancel={onCancel}
     >
