@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import SummaryCard from '@/components/shared/summary-card'
@@ -82,10 +81,6 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
   const summary = data?.summary
   return (
     <>
-      <div className={styles.toolbarTitle}>
-        <div><p className={styles.sectionEyebrow}>定期便</p><p className={styles.sectionTitle}>続いている定期便</p></div>
-        <Button href="/broadcasts/new" variant="primary">対象を選んで配信</Button>
-      </div>
       <div className={styles.kpis}>
         <SummaryCard variant="v6" title="続いている定期便" value={summary?.active ?? null} unit="件" detail={summary?.monthlyAmount === null ? '今月の金額は未取得' : `今月 ¥${summary?.monthlyAmount.toLocaleString('ja-JP')}`} />
         <SummaryCard variant="v6" title="今月 はじまった" value={summary?.startedThisMonth ?? null} unit="件" detail="月別集計は未取得" badge={summary?.startedThisMonth === null ? '未取得' : undefined} badgeTone="neutral" />

@@ -3472,6 +3472,12 @@ export const OUTGOING_WEBHOOKS = [
     url: 'https://hooks.slack.com/services/T0XXXXXXXXX/BXXXXXXXXX/visual-qa',
     eventTypes: ['conversion.confirmed'], hasSecret: true, isActive: true,
     maxRetries: 3, consecutiveFailures: 2, lastFailedAt: '2026-08-24T05:12:00.000Z',
+    deliverySummary: {
+      periodDays: 30, total: 486, succeeded: 480, failed: 6, pending: 0,
+      successRate: 98.77,
+      lastResult: { status: 'failed', responseStatus: 503, completedAt: '2026-08-24T05:12:00.000Z', failureReason: '相手が応答しませんでした' },
+      canRetry: true,
+    },
     createdAt: '2026-04-01T00:00:00.000Z', updatedAt: '2026-08-24T05:12:00.000Z',
   },
   {
@@ -3479,6 +3485,12 @@ export const OUTGOING_WEBHOOKS = [
     url: 'https://script.google.com/macros/s/visual-qa/exec',
     eventTypes: ['friend.added'], hasSecret: true, isActive: true,
     maxRetries: 3, consecutiveFailures: 0, lastFailedAt: null,
+    deliverySummary: {
+      periodDays: 30, total: 312, succeeded: 312, failed: 0, pending: 0,
+      successRate: 100,
+      lastResult: { status: 'succeeded', responseStatus: 200, completedAt: '2026-08-25T02:30:00.000Z', failureReason: null },
+      canRetry: false,
+    },
     createdAt: '2026-03-10T00:00:00.000Z', updatedAt: '2026-08-25T02:30:00.000Z',
   },
   {
@@ -3486,29 +3498,50 @@ export const OUTGOING_WEBHOOKS = [
     url: 'https://visual-qa.cybozu.com/k/v1/record.json',
     eventTypes: ['form.submitted'], hasSecret: true, isActive: true,
     maxRetries: 3, consecutiveFailures: 0, lastFailedAt: null,
+    deliverySummary: {
+      periodDays: 30, total: 42, succeeded: 42, failed: 0, pending: 0,
+      successRate: 100,
+      lastResult: { status: 'succeeded', responseStatus: 200, completedAt: '2026-08-25T01:10:00.000Z', failureReason: null },
+      canRetry: false,
+    },
     createdAt: '2026-02-01T00:00:00.000Z', updatedAt: '2026-08-25T01:10:00.000Z',
   },
   {
+    id: 'owh-zapier', name: 'Zapier ／ ひとまとめ',
+    url: 'https://hooks.zapier.com/hooks/catch/000000/visual-qa/',
+    eventTypes: ['form.submitted'], hasSecret: true, isActive: true,
+    maxRetries: 3, consecutiveFailures: 0, lastFailedAt: null,
+    deliverySummary: {
+      periodDays: 30, total: 34, succeeded: 34, failed: 0, pending: 0,
+      successRate: 100,
+      lastResult: { status: 'succeeded', responseStatus: 200, completedAt: '2026-08-22T04:00:00.000Z', failureReason: null },
+      canRetry: false,
+    },
+    createdAt: '2026-06-02T00:00:00.000Z', updatedAt: '2026-08-22T04:00:00.000Z',
+  },
+  {
+    /* 設計の5行目。**合言葉なしの1本**でもある（健全性チェックの「注意」の元）。 */
+    id: 'owh-inventory', name: '自社の在庫システム',
+    url: 'https://api.example.com/stock/visual-qa',
+    eventTypes: ['conversion.confirmed'], hasSecret: false, isActive: false,
+    maxRetries: 0, consecutiveFailures: 0, lastFailedAt: null,
+    deliverySummary: {
+      periodDays: 30, total: 0, succeeded: 0, failed: 0, pending: 0,
+      successRate: null, lastResult: null, canRetry: false,
+    },
+    createdAt: '2026-07-15T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+  },
+  {
+    /* 2ページ目の1本。設計の先頭5件へ割り込まないよう、送信実績は0件。 */
     id: 'owh-chatwork', name: 'Chatwork ／ 店舗連絡',
     url: 'https://api.chatwork.com/v2/rooms/000000/messages',
     eventTypes: ['booking.created'], hasSecret: true, isActive: true,
     maxRetries: 3, consecutiveFailures: 0, lastFailedAt: null,
-    createdAt: '2026-05-20T00:00:00.000Z', updatedAt: '2026-08-23T09:00:00.000Z',
-  },
-  {
-    id: 'owh-zapier', name: 'Zapier ／ 申込のふり分け',
-    url: 'https://hooks.zapier.com/hooks/catch/000000/visual-qa/',
-    eventTypes: ['form.submitted'], hasSecret: true, isActive: true,
-    maxRetries: 3, consecutiveFailures: 0, lastFailedAt: null,
-    createdAt: '2026-06-02T00:00:00.000Z', updatedAt: '2026-08-22T04:00:00.000Z',
-  },
-  {
-    /* 設計の「止めているもの 1本」。**合言葉なしの1本**でもある（健全性チェックの「注意」の元）。 */
-    id: 'owh-paused', name: 'テスト用の受け口 ／ 検証中',
-    url: 'https://example.com/hook/visual-qa',
-    eventTypes: ['friend.added'], hasSecret: false, isActive: false,
-    maxRetries: 0, consecutiveFailures: 0, lastFailedAt: null,
-    createdAt: '2026-07-15T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+    deliverySummary: {
+      periodDays: 30, total: 0, succeeded: 0, failed: 0, pending: 0,
+      successRate: null, lastResult: null, canRetry: false,
+    },
+    createdAt: '2026-05-20T00:00:00.000Z', updatedAt: '2026-07-31T09:00:00.000Z',
   },
 ]
 
@@ -3520,16 +3553,52 @@ export const INCOMING_WEBHOOKS = [
     createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z',
   },
   {
-    id: 'iwh-ec', name: 'ECサイトから（注文）', sourceType: 'ec',
+    id: 'iwh-survey', name: 'アンケートツールから', sourceType: 'form',
     hasSecret: true, isActive: true,
     createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z',
   },
   {
-    id: 'iwh-form', name: '外部フォームから', sourceType: 'form',
-    hasSecret: false, isActive: true,
+    id: 'iwh-accounting', name: '会計ソフトから', sourceType: 'payment',
+    hasSecret: false, isActive: false,
     createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z',
   },
 ]
+
+/** 受け取り口1件。本文は構造だけ残し、値をすべてマスクする。 */
+export const INCOMING_WEBHOOK_DETAILS = {
+  'iwh-booking': {
+    ...INCOMING_WEBHOOKS[0],
+    version: 3,
+    identityMatching: {
+      methods: [{ kind: 'verified_email', path: '$.email' }],
+      onNotFound: 'do_nothing',
+    },
+    actions: [
+      { refKind: 'tag', refId: 'tag-external-booking', refVersionId: null },
+      { refKind: 'template', refId: 'template-booking-received', refVersionId: 'template-booking-received-v2' },
+    ],
+    actionExecution: {
+      state: 'not_connected',
+      reason: '受信後の構造化アクション実行器はまだ接続されていません',
+    },
+    latestSample: {
+      receivedAt: '2026-08-25T01:12:00.000Z',
+      fields: [
+        { path: '$.email', type: 'string', maskedValue: '••••' },
+        { path: '$.booked_at', type: 'string', maskedValue: '••••' },
+        { path: '$.menu', type: 'string', maskedValue: '••••' },
+        { path: '$.staff', type: 'string', maskedValue: '••••' },
+      ],
+      truncated: false,
+    },
+    templateFields: [
+      { path: '$.email', type: 'string', token: '{{payload.email}}' },
+      { path: '$.booked_at', type: 'string', token: '{{payload.booked_at}}' },
+      { path: '$.menu', type: 'string', token: '{{payload.menu}}' },
+      { path: '$.staff', type: 'string', token: '{{payload.staff}}' },
+    ],
+  },
+}
 
 /*
   流入経路。設計 `Q4bkTg` の6本そのまま。
@@ -3624,6 +3693,85 @@ export const LOGIN_AUDIT = [
   { id: 'la-4', adminUserId: 'stf-4', userName: '高田 誠', role: 'staff', lineLinked: false, isActive: true, action: 'delete', screen: 'テンプレート', ip: '203.0.113.13', connectionSource: '社外', result: 'success', createdAt: '2026-08-23T08:20:00.000Z' },
   { id: 'la-5', adminUserId: null, userName: '名前を取得できませんでした', role: null, lineLinked: false, isActive: false, action: 'login', screen: null, ip: '198.51.100.7', connectionSource: '社外', result: 'failure', createdAt: '2026-08-22T19:44:00.000Z' },
 ]
+
+/** 機能30。ログインユーザーの一覧・役割・監査を実API契約で撮る固定値。 */
+const accessUser = (id, name, roleBundle, status, options = {}) => ({
+  id, name, email: `${id}@example.invalid`, jobTitle: null,
+  roleBundle, featureCount: roleBundle === 'administrator' ? null : (options.featureCount ?? 8),
+  hasFieldMasks: null,
+  accountScope: options.accountScope ?? {
+    type: 'accounts', assignedLineAccountId: 'visual-qa-account',
+    lineAccountIds: ['visual-qa-account'], includesDescendants: false,
+  },
+  lastLoginAt: options.lastLoginAt ?? (status === 'active' ? '2026-09-06T23:02:00.000Z' : null),
+  lastActionAt: options.lastActionAt ?? (status === 'active' ? '2026-09-07T00:18:00.000Z' : null),
+  mfaEnabled: options.mfaEnabled ?? false,
+  status, policyVersion: options.policyVersion ?? 1,
+  createdAt: options.createdAt ?? '2026-01-10T00:00:00.000Z',
+  updatedAt: options.updatedAt ?? '2026-09-01T00:00:00.000Z',
+})
+
+export const ACCESS_USERS = {
+  items: [
+    accessUser('access-user-1', '佐々木 亮太', 'administrator', 'active', {
+      mfaEnabled: true, policyVersion: 4,
+      accountScope: { type: 'all', assignedLineAccountId: null, lineAccountIds: [], includesDescendants: true },
+    }),
+    accessUser('access-user-2', '山本 京子', 'administrator', 'active', {
+      mfaEnabled: true, policyVersion: 3,
+      accountScope: { type: 'all', assignedLineAccountId: null, lineAccountIds: [], includesDescendants: true },
+      lastLoginAt: '2026-09-06T22:40:00.000Z', lastActionAt: '2026-09-06T23:41:00.000Z',
+    }),
+    accessUser('access-user-3', '中川 由美', 'operations', 'active', { mfaEnabled: true, policyVersion: 2, featureCount: 14 }),
+    accessUser('access-user-4', '高田 誠', 'operations', 'active', { mfaEnabled: true, policyVersion: 2, featureCount: 12 }),
+    accessUser('access-user-5', '森 涼太', 'reception', 'active', { mfaEnabled: true, policyVersion: 2, featureCount: 6 }),
+    accessUser('access-user-6', '新井 千夏', 'reception', 'active', { mfaEnabled: true, policyVersion: 2, featureCount: 6 }),
+    accessUser('access-user-7', '外部デザイン', 'view_only', 'active', {
+      featureCount: 5, lastLoginAt: '2026-09-01T03:20:00.000Z', lastActionAt: null,
+    }),
+    accessUser('access-user-8', '佐野 直人', 'view_only', 'active', {
+      featureCount: 4, lastLoginAt: '2026-05-20T01:00:00.000Z', lastActionAt: null,
+    }),
+    accessUser('access-user-9', '招待中 運用担当', 'operations', 'invited', {
+      featureCount: 10, createdAt: '2026-09-05T00:00:00.000Z', updatedAt: '2026-09-05T00:00:00.000Z',
+    }),
+    accessUser('access-user-10', '招待中 個別権限', 'custom', 'invited', {
+      featureCount: 3, createdAt: '2026-09-06T00:00:00.000Z', updatedAt: '2026-09-06T00:00:00.000Z',
+    }),
+  ],
+  summary: {
+    active: 8, invited: 2, expiredInvitations: 0, unused90Days: 1,
+    mfaEnabled: 6, mfaRate: 75,
+    roleCounts: { administrator: 2, operations: 3, reception: 2, view_only: 2, custom: 1 },
+  },
+  pagination: { total: 10, limit: 200, offset: 0 },
+}
+
+export const ACCESS_ROLES = {
+  items: [
+    { id: 'administrator', name: '管理者', description: '全機能と権限・監査を管理', featureAccess: 'edit', requiresMfa: true, assignedUserCount: 2 },
+    { id: 'operations', name: '運用', description: '配信・予約・コンテンツを運用', featureAccess: 'edit', requiresMfa: false, assignedUserCount: 3 },
+    { id: 'reception', name: '受付', description: '受信箱・友だち・予約を担当', featureAccess: 'edit', requiresMfa: false, assignedUserCount: 2 },
+    { id: 'view_only', name: '見るだけ', description: '選択した機能を閲覧', featureAccess: 'view', requiresMfa: false, assignedUserCount: 2 },
+    { id: 'custom', name: 'カスタム', description: '機能ごとに個別設定', featureAccess: 'custom', requiresMfa: false, assignedUserCount: 1 },
+  ],
+  totalBundles: 5,
+  totalAssignedUsers: 10,
+}
+
+export const ACCESS_AUDIT_EVENTS = {
+  items: [
+    { id: 'audit-access-1', category: 'auth', lineAccountId: 'visual-qa-account', actor: { id: 'access-user-1', name: '佐々木 亮太', role: 'admin' }, action: 'auth.login', target: null, result: 'success', before: null, after: null, reason: null, requestTraceId: null, ipPrefix: '203.0.113.***', deviceFamily: 'mac', riskLevel: 'normal', retentionClass: 'security', createdAt: '2026-09-07T00:02:00.000Z' },
+    { id: 'audit-access-2', category: 'business', lineAccountId: 'visual-qa-account', actor: { id: 'access-user-2', name: '山本 京子', role: 'admin' }, action: 'broadcast.send', target: { kind: 'broadcast', id: 'broadcast-september' }, result: 'success', before: null, after: { status: 'sent', count: 1842 }, reason: null, requestTraceId: null, ipPrefix: '203.0.113.***', deviceFamily: 'windows', riskLevel: 'normal', retentionClass: 'general', createdAt: '2026-09-06T23:41:00.000Z' },
+    { id: 'audit-access-3', category: 'business', lineAccountId: 'visual-qa-account', actor: { id: 'access-user-3', name: '中川 由美', role: 'staff' }, action: 'booking.update', target: { kind: 'booking', id: 'booking-1008' }, result: 'success', before: { status: 'pending' }, after: { status: 'confirmed' }, reason: null, requestTraceId: null, ipPrefix: '203.0.113.***', deviceFamily: 'mobile', riskLevel: 'normal', retentionClass: 'general', createdAt: '2026-09-06T10:05:00.000Z' },
+    { id: 'audit-access-4', category: 'business', lineAccountId: 'visual-qa-account', actor: { id: 'access-user-4', name: '高田 誠', role: 'staff' }, action: 'template.delete', target: { kind: 'template', id: 'template-old' }, result: 'success', before: { status: 'draft' }, after: null, reason: '不要になったため', requestTraceId: null, ipPrefix: '203.0.113.***', deviceFamily: 'mac', riskLevel: 'normal', retentionClass: 'general', createdAt: '2026-09-06T08:20:00.000Z' },
+    { id: 'audit-access-5', category: 'auth', lineAccountId: 'visual-qa-account', actor: { id: null, name: null, role: null }, action: 'auth.login', target: null, result: 'failed', before: null, after: null, reason: '本人確認に失敗しました', requestTraceId: null, ipPrefix: '198.51.100.***', deviceFamily: 'other', riskLevel: 'suspicious', retentionClass: 'security', createdAt: '2026-09-05T19:44:00.000Z' },
+    { id: 'audit-access-6', category: 'business', lineAccountId: 'visual-qa-account', actor: { id: 'access-user-1', name: '佐々木 亮太', role: 'admin' }, action: 'access.user.change', target: { kind: 'staff_member', id: 'access-user-7' }, result: 'success', before: { roleBundle: 'custom' }, after: { roleBundle: 'view_only' }, reason: '閲覧だけに変更', requestTraceId: null, ipPrefix: '203.0.113.***', deviceFamily: 'mac', riskLevel: 'normal', retentionClass: 'security', createdAt: '2026-09-05T04:10:00.000Z' },
+    { id: 'audit-access-7', category: 'business', lineAccountId: 'visual-qa-account', actor: { id: 'access-user-2', name: '山本 京子', role: 'admin' }, action: 'webhook.send', target: { kind: 'outgoing_webhook', id: 'owh-slack-order' }, result: 'denied', before: null, after: null, reason: '相手が応答しませんでした', requestTraceId: null, ipPrefix: '203.0.113.***', deviceFamily: 'windows', riskLevel: 'high', retentionClass: 'general', createdAt: '2026-09-04T05:12:00.000Z' },
+  ],
+  summary: { periodDays: 30, total: 4286, deleted: 12, sent: 18, changed: 46, logins: 286, suspiciousLogins: 1 },
+  pagination: { total: 4286, limit: 20, offset: 0 },
+}
 
 /*
   紹介者。設計 `PouPn` の「アフィリエイター 12」のうち、札の内訳が撮れる6人。
@@ -3922,18 +4070,40 @@ export const CONVERSION_DEFINITIONS = {
 }
 
 /*
-  設計の積み上げグラフ用。8日分にまとめているが、地点別の合計は一覧KPIの
-  486件と一致する（商品386、申込42、予約38、定期12、視聴8）。
+  設計の積み上げグラフ用。期間の30日を省略せず、8/13の山を含める。
+  地点別の合計も一覧KPIの486件と一致する（商品386、申込42、予約38、定期12、視聴8）。
 */
 const CONVERSION_DAILY_COUNTS = [
-  ['2026-07-27', 60, 6, 5, 2, 1],
-  ['2026-08-01', 63, 7, 6, 2, 1],
-  ['2026-08-06', 62, 6, 5, 2, 1],
-  ['2026-08-11', 58, 5, 5, 1, 1],
-  ['2026-08-13', 75, 10, 7, 2, 2],
-  ['2026-08-16', 35, 4, 4, 1, 1],
-  ['2026-08-21', 20, 3, 3, 1, 1],
-  ['2026-08-25', 13, 1, 3, 1, 0],
+  ['2026-07-27', 10, 1, 1, 0, 0],
+  ['2026-07-28', 11, 1, 1, 0, 0],
+  ['2026-07-29', 12, 1, 1, 0, 0],
+  ['2026-07-30', 9, 1, 1, 0, 0],
+  ['2026-07-31', 10, 1, 1, 1, 0],
+  ['2026-08-01', 11, 1, 1, 0, 0],
+  ['2026-08-02', 12, 1, 1, 1, 1],
+  ['2026-08-03', 10, 1, 1, 0, 0],
+  ['2026-08-04', 11, 1, 1, 0, 0],
+  ['2026-08-05', 12, 1, 1, 1, 0],
+  ['2026-08-06', 13, 1, 1, 0, 0],
+  ['2026-08-07', 10, 1, 1, 0, 1],
+  ['2026-08-08', 11, 1, 1, 1, 0],
+  ['2026-08-09', 12, 1, 1, 0, 0],
+  ['2026-08-10', 13, 1, 1, 0, 0],
+  ['2026-08-11', 14, 1, 1, 1, 0],
+  ['2026-08-12', 16, 1, 1, 0, 0],
+  ['2026-08-13', 30, 6, 4, 2, 2],
+  ['2026-08-14', 15, 2, 2, 1, 0],
+  ['2026-08-15', 14, 2, 2, 0, 0],
+  ['2026-08-16', 13, 2, 1, 0, 1],
+  ['2026-08-17', 12, 1, 1, 1, 0],
+  ['2026-08-18', 11, 1, 1, 0, 0],
+  ['2026-08-19', 10, 1, 1, 0, 0],
+  ['2026-08-20', 13, 2, 2, 1, 0],
+  ['2026-08-21', 14, 2, 2, 0, 1],
+  ['2026-08-22', 15, 2, 2, 1, 0],
+  ['2026-08-23', 16, 1, 1, 0, 1],
+  ['2026-08-24', 12, 1, 1, 1, 0],
+  ['2026-08-25', 14, 2, 1, 0, 1],
 ]
 
 const CONVERSION_DAILY_VALUES = [1587, 12000, 1816, 8217, 0]
@@ -4053,6 +4223,43 @@ export const AFFILIATE_REPORT_DETAIL = {
   ],
   revenue: 860000, estimatedCommission: 86000, confirmedReward: 86000,
   duplicateFlags: [{ friendId: 'friend-4', identityKey: 'ik-friend-4' }],
+}
+
+/** 機能16。成果を締め、振込データと明細を作る新しい実API契約。 */
+export const AFFILIATE_SETTLEMENT_PREVIEW = {
+  lineAccountId: 'visual-qa-account',
+  periodFrom: '2026-08-01T00:00:00.000Z',
+  periodTo: '2026-08-31T23:59:59.999Z',
+  currency: 'JPY',
+  totalAmount: 174000,
+  conversionCount: 36,
+  affiliates: [
+    { affiliateId: 'af-2', affiliateName: '合同会社ノース', code: 'north', amount: 72000, conversionCount: 18, bankProfileRegistered: true },
+    { affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka01', amount: 62000, conversionCount: 12, bankProfileRegistered: true },
+    { affiliateId: 'af-4', affiliateName: '中村 彩', code: 'aya-n', amount: 40000, conversionCount: 6, bankProfileRegistered: false },
+  ],
+  previewVersion: '82e052367d36df0428262a3c69e38ec22e45b05de382deec83e924960f1aa13d',
+}
+
+export const AFFILIATE_SETTLEMENT_CREATED = {
+  kind: 'created', settlementId: 'visual-qa-settlement-2026-08',
+  totalAmount: 174000, conversionCount: 36, version: 1,
+  closedAt: '2026-09-07T02:00:00.000Z',
+}
+
+export const AFFILIATE_PAYOUT_BATCH = {
+  id: 'visual-qa-payout-batch-2026-08', lineAccountId: 'visual-qa-account',
+  settlementId: AFFILIATE_SETTLEMENT_CREATED.settlementId,
+  totalAmount: 174000, currency: 'JPY', lineCount: 36, state: 'created',
+  bankFormat: 'zengin_csv', fileChecksum: null, version: 1,
+  downloadExpiresAt: null, createdAt: '2026-09-07T02:01:00.000Z',
+}
+
+export const AFFILIATE_STATEMENT = {
+  id: 'visual-qa-affiliate-statement-2026-08', lineAccountId: 'visual-qa-account',
+  affiliateId: 'af-1', settlementId: AFFILIATE_SETTLEMENT_CREATED.settlementId,
+  totalAmount: 62000, status: 'generated', version: 1,
+  expiresAt: '2026-10-07T02:02:00.000Z', createdAt: '2026-09-07T02:02:00.000Z',
 }
 
 /** 紹介者が配っているリンク。設計 `jwrbf` の下半分。 */
@@ -4241,9 +4448,10 @@ export const BOOKING_MENUS = [
 
 /** 予約の店舗共通設定。設計 `W6465r` の受付期間・承認・営業時間。 */
 export const BOOKING_SETTINGS = {
-  lineAccountId: 'visual-qa-account', organizationName: '然-NEN- 本店', timeZone: 'Asia/Tokyo',
+  id: 'booking-settings-visual-qa', lineAccountId: 'visual-qa-account',
+  organizationName: '然-NEN- 本店', version: 1, timeZone: 'Asia/Tokyo',
   bookingWindowDays: 60, cutoffMinutesBefore: 1440, cancelDeadlineMinutesBefore: 1440,
-  maxActiveBookingsPerFriend: 1, approvalMode: 'manual', holdMinutes: 15, slotGranularityMinutes: 15,
+  maxActiveBookingsPerFriend: 2, approvalMode: 'manual', holdMinutes: 15, slotGranularityMinutes: 15,
   menuCount: 8, activeMenuCount: 6, inactiveMenuCount: 2,
   businessHours: [
     { weekday: 0, intervals: [{ start: '10:00', end: '17:00' }] },
@@ -4255,8 +4463,27 @@ export const BOOKING_SETTINGS = {
     { weekday: 6, intervals: [{ start: '09:00', end: '18:00' }] },
   ],
   exceptions: [
-    { date: '2026-09-23', kind: 'open', intervals: [{ start: '10:00', end: '17:00' }], note: '祝日営業' },
-    { date: '2026-12-30', kind: 'closed', intervals: [], note: '年末休業' },
+    {
+      id: 'booking-exception-obon', lineAccountId: 'visual-qa-account',
+      scopeKind: 'store', scopeId: null, date: null,
+      dateFrom: '2026-08-13', dateTo: '2026-08-16', kind: 'closed', intervals: [],
+      reason: 'お盆休み', note: 'お盆休み', version: 1,
+      createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+    },
+    {
+      id: 'booking-exception-holiday', lineAccountId: 'visual-qa-account',
+      scopeKind: 'store', scopeId: null, date: '2026-09-23',
+      dateFrom: '2026-09-23', dateTo: '2026-09-23', kind: 'closed', intervals: [],
+      reason: '祝日のため休業', note: '祝日のため休業', version: 1,
+      createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+    },
+    {
+      id: 'booking-exception-new-year', lineAccountId: 'visual-qa-account',
+      scopeKind: 'store', scopeId: null, date: null,
+      dateFrom: '2026-12-29', dateTo: '2027-01-03', kind: 'closed', intervals: [],
+      reason: '年末年始休業', note: '年末年始休業', version: 1,
+      createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+    },
   ],
   updatedAt: '2026-08-22T09:20:00.000Z',
 }
@@ -4297,11 +4524,36 @@ export const BOOKING_AVAILABILITY = {
         /* 台帳の `Lg8ff`（予約枠の重なりと入力エラー）が選ぶ枠。 */
         { date: '2026-09-03', start: '14:00', end: '15:45' },
         { date: '2026-09-04', start: '10:00', end: '11:45' },
+        { date: '2026-09-08', start: '09:00', end: '10:45' },
+        { date: '2026-09-08', start: '13:00', end: '14:45' },
+        { date: '2026-09-09', start: '10:00', end: '11:45' },
+        { date: '2026-09-11', start: '09:00', end: '10:45' },
+        { date: '2026-09-11', start: '15:00', end: '16:45' },
+        { date: '2026-09-12', start: '13:00', end: '14:45' },
+        { date: '2026-09-13', start: '10:00', end: '11:45' },
+        { date: '2026-09-14', start: '09:00', end: '10:45' },
+        { date: '2026-09-15', start: '13:00', end: '14:45' },
+        { date: '2026-09-17', start: '09:00', end: '10:45' },
+        { date: '2026-09-18', start: '15:00', end: '16:45' },
+        { date: '2026-09-19', start: '10:00', end: '11:45' },
+        { date: '2026-09-20', start: '10:00', end: '11:45' },
+        { date: '2026-09-21', start: '13:00', end: '14:45' },
       ],
     },
     {
       staff_id: 'bs-3', display_name: '高田',
-      slots: [{ date: '2026-09-03', start: '15:00', end: '16:45' }],
+      slots: [
+        { date: '2026-09-03', start: '15:00', end: '16:45' },
+        { date: '2026-09-08', start: '15:00', end: '16:45' },
+        { date: '2026-09-10', start: '09:00', end: '10:45' },
+        { date: '2026-09-10', start: '13:00', end: '14:45' },
+        { date: '2026-09-12', start: '15:00', end: '16:45' },
+        { date: '2026-09-14', start: '13:00', end: '14:45' },
+        { date: '2026-09-16', start: '09:00', end: '10:45' },
+        { date: '2026-09-16', start: '15:00', end: '16:45' },
+        { date: '2026-09-18', start: '09:00', end: '10:45' },
+        { date: '2026-09-20', start: '15:00', end: '16:45' },
+      ],
     },
   ],
 }
@@ -4705,6 +4957,58 @@ export const NEN_PHOTO_DETAIL = {
   ],
 }
 
+/** 機能22の実APIで返す一覧集計。設計 `Qu6Vk` の通常状態。 */
+export const NEN_PHOTO_REVIEW_METRICS = {
+  pendingCount: 18,
+  reviewedCount: 142,
+  averageReviewMinutes: 22 / 60,
+  oldestPendingAt: '2026-08-23T00:00:00.000Z',
+  attentionCount: 2,
+}
+
+/** 派生画像処理の最新状態。原本のURLや秘密値は含めない。 */
+export const NEN_PHOTO_ASSET_STATUS = {
+  reviewVersion: 1,
+  jobs: [
+    {
+      id: 'photo-asset-job-1', photoId: 'ph-1', lineAccountId: 'visual-qa-account',
+      requestedVersion: 1, status: 'completed', requestedBy: 'visual-qa-owner', operation: 'all',
+      createdAt: '2026-08-25T00:10:00.000Z', startedAt: '2026-08-25T00:10:01.000Z',
+      completedAt: '2026-08-25T00:10:04.000Z', errorMessage: null,
+    },
+  ],
+}
+
+/** 実際に作成済みとして見せる3種類の派生画像。 */
+export const NEN_PHOTO_DERIVATIVES = {
+  reviewVersion: 1,
+  items: [
+    { kind: 'public', sourceVersion: 1, objectKey: 'public/ph-1-v1.webp', contentType: 'image/webp', byteSize: 184320, width: 1280, height: 960, createdAt: '2026-08-25T00:10:04.000Z' },
+    { kind: 'review', sourceVersion: 1, objectKey: 'review/ph-1-v1.webp', contentType: 'image/webp', byteSize: 286720, width: 1600, height: 1200, createdAt: '2026-08-25T00:10:03.000Z' },
+    { kind: 'thumbnail', sourceVersion: 1, objectKey: 'thumbnail/ph-1-v1.webp', contentType: 'image/webp', byteSize: 24576, width: 320, height: 240, createdAt: '2026-08-25T00:10:02.000Z' },
+  ],
+  knownUrls: [
+    { kind: 'review', url: NEN_PHOTOS[0].image_url, sourceVersion: 1 },
+    { kind: 'public', url: NEN_PHOTOS[0].image_url, sourceVersion: 1 },
+  ],
+}
+
+/** POSTは保存せず、本番と同じ受付結果だけを返す。 */
+export const NEN_PHOTO_ASSET_PROCESS_RESULT = {
+  id: 'photo-asset-job-2', photoId: 'ph-1', lineAccountId: 'visual-qa-account',
+  requestedVersion: 1, status: 'queued', requestedBy: 'visual-qa-owner', operation: 'all',
+  createdAt: '2026-08-25T00:12:00.000Z', startedAt: null, completedAt: null, errorMessage: null,
+}
+
+export const NEN_PHOTO_BULK_DECISION_RESULT = {
+  updatedCount: 3,
+  items: [
+    { photoId: 'ph-1', decision: 'approve', reviewVersion: 2 },
+    { photoId: 'ph-2', decision: 'approve', reviewVersion: 2 },
+    { photoId: 'ph-3', decision: 'approve', reviewVersion: 2 },
+  ],
+}
+
 const publicationPhoto = (id, photoId, petName, ownerName, count, label, type = 'column') => ({
   id, photo_id: photoId, status: 'published', show_owner_name: ownerName ? 1 : 0,
   view_count: count, version: 1, published_at: '2026-08-20T00:00:00.000Z',
@@ -4767,6 +5071,111 @@ export const EC_OVERVIEW = {
     { eventType: 'ec_payment.received', label: '入金', count: 32 },
     { eventType: 'ec_shipping.shipped', label: '発送', count: 20 },
   ],
+}
+
+/** 機能23。注文・個別処理・会員照合を実APIの読み取り模型で返す。 */
+export const EC_ORDERS = {
+  items: [
+    {
+      id: 'ec-order-1', lineAccountId: 'visual-qa-account', externalOrderId: 'external-order-12492',
+      orderNumber: 'NEN-12492', customerId: 'customer-1', friendId: 'friend-1', customerName: '高橋 直人',
+      status: 'current', providerStatus: 'confirmed', currency: 'JPY', totalAmount: 12800, refundedAmount: 0,
+      orderedAt: '2026-08-25T08:48:00.000Z', detailUrl: 'https://example.invalid/orders/NEN-12492', version: 2,
+      orderLines: [
+        { id: 'ec-order-line-1', productId: 'nen-venison-1kg', productName: '鹿肉ドッグフード 1kg', quantity: 2, unitAmount: 5400, lineAmount: 10800, productUrl: 'https://example.invalid/products/nen-venison-1kg' },
+        { id: 'ec-order-line-2', productId: 'nen-topping', productName: '季節のトッピング', quantity: 1, unitAmount: 2000, lineAmount: 2000, productUrl: 'https://example.invalid/products/nen-topping' },
+      ],
+    },
+    {
+      id: 'ec-order-2', lineAccountId: 'visual-qa-account', externalOrderId: 'external-order-12488',
+      orderNumber: 'NEN-12488', customerId: 'customer-2', friendId: 'friend-2', customerName: '前田 さくら',
+      status: 'current', providerStatus: 'paid', currency: 'JPY', totalAmount: 8400, refundedAmount: 0,
+      orderedAt: '2026-08-25T08:20:00.000Z', detailUrl: 'https://example.invalid/orders/NEN-12488', version: 1,
+      orderLines: [{ id: 'ec-order-line-3', productId: 'nen-fish-1kg', productName: '魚のドッグフード 1kg', quantity: 2, unitAmount: 4200, lineAmount: 8400, productUrl: null }],
+    },
+    {
+      id: 'ec-order-3', lineAccountId: 'visual-qa-account', externalOrderId: 'external-order-12486',
+      orderNumber: 'NEN-12486', customerId: 'customer-3', friendId: null, customerName: null,
+      status: 'current', providerStatus: 'confirmed', currency: 'JPY', totalAmount: 5400, refundedAmount: 0,
+      orderedAt: '2026-08-25T08:40:00.000Z', detailUrl: 'https://example.invalid/orders/NEN-12486', version: 1,
+      orderLines: [{ id: 'ec-order-line-4', productId: 'nen-venison-1kg', productName: '鹿肉ドッグフード 1kg', quantity: 1, unitAmount: 5400, lineAmount: 5400, productUrl: null }],
+    },
+    {
+      id: 'ec-order-4', lineAccountId: 'visual-qa-account', externalOrderId: 'external-order-12471',
+      orderNumber: 'NEN-12471', customerId: 'customer-4', friendId: 'friend-3', customerName: '木村 亮',
+      status: 'current', providerStatus: 'shipped', currency: 'JPY', totalAmount: 16200, refundedAmount: 0,
+      orderedAt: '2026-08-25T07:30:00.000Z', detailUrl: 'https://example.invalid/orders/NEN-12471', version: 3,
+      orderLines: [{ id: 'ec-order-line-5', productId: 'nen-subscription', productName: '定期便セット', quantity: 1, unitAmount: 16200, lineAmount: 16200, productUrl: null }],
+    },
+    {
+      id: 'ec-order-5', lineAccountId: 'visual-qa-account', externalOrderId: 'external-order-12402',
+      orderNumber: 'NEN-12402', customerId: 'customer-5', friendId: 'friend-5', customerName: '石田 未来',
+      status: 'refunded', providerStatus: 'refunded', currency: 'JPY', totalAmount: 10800, refundedAmount: 10800,
+      orderedAt: '2026-08-25T06:00:00.000Z', detailUrl: 'https://example.invalid/orders/NEN-12402', version: 4,
+      orderLines: [{ id: 'ec-order-line-6', productId: 'nen-venison-1kg', productName: '鹿肉ドッグフード 1kg', quantity: 2, unitAmount: 5400, lineAmount: 10800, productUrl: null }],
+    },
+    {
+      id: 'ec-order-6', lineAccountId: 'visual-qa-account', externalOrderId: 'external-order-12398',
+      orderNumber: 'NEN-12398', customerId: 'customer-6', friendId: 'friend-4', customerName: '中村 彩',
+      status: 'cancelled', providerStatus: 'cancelled', currency: 'JPY', totalAmount: 6400, refundedAmount: 0,
+      orderedAt: '2026-08-24T23:30:00.000Z', detailUrl: null, version: 2,
+      orderLines: [{ id: 'ec-order-line-7', productId: 'nen-trial', productName: 'お試しセット', quantity: 1, unitAmount: 6400, lineAmount: 6400, productUrl: null }],
+    },
+  ],
+  total: 2486,
+  summary: { total: 2486, current: 2412, refunded: 48, cancelled: 26, totalAmount: 31820400 },
+}
+
+export const EC_ACTION_EXECUTIONS = {
+  items: [
+    { id: 'ec-action-1', eventId: 'ece-1', eventType: 'ec_order.confirmed', actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'succeeded', attemptCount: 1, maxAttempts: 3, errorCode: null, errorMessage: null, lastAttemptedAt: '2026-08-25T08:49:00.000Z', nextRetryAt: null, version: 2, receivedAt: '2026-08-25T08:48:00.000Z', orderNumber: 'NEN-12492', customerName: '高橋 直人', retryAvailable: false },
+    { id: 'ec-action-2', eventId: 'ece-2', eventType: 'ec_payment.received', actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'processing', attemptCount: 1, maxAttempts: 3, errorCode: null, errorMessage: null, lastAttemptedAt: '2026-08-25T08:21:00.000Z', nextRetryAt: null, version: 1, receivedAt: '2026-08-25T08:20:00.000Z', orderNumber: 'NEN-12488', customerName: '前田 さくら', retryAvailable: false },
+    { id: 'ec-action-3', eventId: 'ece-3', eventType: 'ec_shipping.shipped', actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'succeeded', attemptCount: 1, maxAttempts: 3, errorCode: null, errorMessage: null, lastAttemptedAt: '2026-08-25T07:31:00.000Z', nextRetryAt: null, version: 1, receivedAt: '2026-08-25T07:30:00.000Z', orderNumber: 'NEN-12471', customerName: '木村 亮', retryAvailable: false },
+    { id: 'ec-action-4', eventId: 'ece-4', eventType: 'ec_order.confirmed', actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'skipped', attemptCount: 0, maxAttempts: 3, errorCode: 'IDENTITY_PENDING', errorMessage: 'LINEの友だちとのつき合わせが必要です', lastAttemptedAt: null, nextRetryAt: null, version: 1, receivedAt: '2026-08-25T08:40:00.000Z', orderNumber: 'NEN-12486', customerName: null, retryAvailable: false },
+    { id: 'ec-action-5', eventId: 'ece-5', eventType: 'ec_subscription.renewed', actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'pending', attemptCount: 0, maxAttempts: 3, errorCode: null, errorMessage: null, lastAttemptedAt: null, nextRetryAt: '2026-08-25T09:05:00.000Z', version: 1, receivedAt: '2026-08-25T08:55:00.000Z', orderNumber: 'NEN-12480', customerName: '中村 彩', retryAvailable: false },
+    { id: 'ec-action-6', eventId: 'ece-6', eventType: 'ec_support.refunded', actionType: 'conversion_mileage_adjustment', ruleVersion: 'ec-rule-v4', status: 'retryable_failed', attemptCount: 1, maxAttempts: 3, errorCode: 'LINE_REJECTED', errorMessage: 'LINEが送信を受け付けませんでした', lastAttemptedAt: '2026-08-25T06:01:00.000Z', nextRetryAt: '2026-08-25T09:10:00.000Z', version: 2, receivedAt: '2026-08-25T06:00:00.000Z', orderNumber: 'NEN-12402', customerName: '石田 未来', retryAvailable: true },
+  ],
+  total: 2486,
+  summary: { pending: 24, processing: 48, succeeded: 2394, skipped: 18, retryable_failed: 2, permanent_failed: 0 },
+}
+
+export const EC_IDENTITY_CANDIDATES = {
+  items: [
+    {
+      id: 'ec-identity-1', status: 'pending', version: 1, confidenceScore: 94,
+      left: { externalCustomerId: 'customer-3', displayName: '田中 美咲', attributes: [{ label: 'メール', valuePreview: 'mi***@example.jp' }, { label: '電話', valuePreview: '***4821' }] },
+      right: { friendId: 'friend-candidate-1', displayName: '田中 みさき', attributes: [{ label: 'メール', valuePreview: 'mi***@example.jp' }] },
+      evidence: [{ label: 'メールアドレス', matched: true }, { label: '氏名', matched: true }],
+      impact: [{ key: 'orders', value: 8, unit: '件' }, { key: 'revenue', value: 86400, unit: '円' }],
+      detectedAt: '2026-08-25T08:40:00.000Z', reviewedAt: null,
+    },
+    {
+      id: 'ec-identity-2', status: 'pending', version: 2, confidenceScore: 82,
+      left: { externalCustomerId: 'customer-7', displayName: '佐藤 健', attributes: [{ label: 'メール', valuePreview: 'ke***@example.jp' }, { label: '電話', valuePreview: '***1034' }] },
+      right: { friendId: 'friend-candidate-2', displayName: '佐藤 けん', attributes: [{ label: '電話', valuePreview: '***1034' }] },
+      evidence: [{ label: '電話番号', matched: true }, { label: '氏名', matched: true }],
+      impact: [{ key: 'orders', value: 5, unit: '件' }, { key: 'revenue', value: 62800, unit: '円' }],
+      detectedAt: '2026-08-25T08:12:00.000Z', reviewedAt: null,
+    },
+    {
+      id: 'ec-identity-3', status: 'pending', version: 1, confidenceScore: 71,
+      left: { externalCustomerId: 'customer-8', displayName: '鈴木 あおい', attributes: [{ label: 'メール', valuePreview: 'ao***@example.jp' }] },
+      right: { friendId: 'friend-candidate-3', displayName: '鈴木 葵', attributes: [{ label: 'メール', valuePreview: 'ao***@example.jp' }] },
+      evidence: [{ label: 'メールアドレス', matched: true }, { label: '氏名', matched: false }],
+      impact: [{ key: 'orders', value: 3, unit: '件' }, { key: 'revenue', value: 41200, unit: '円' }],
+      detectedAt: '2026-08-25T07:50:00.000Z', reviewedAt: null,
+    },
+    {
+      id: 'ec-identity-4', status: 'pending', version: 1, confidenceScore: 63,
+      left: { externalCustomerId: 'customer-9', displayName: '伊藤 海', attributes: [{ label: '電話', valuePreview: '***7788' }] },
+      right: { friendId: 'friend-candidate-4', displayName: '伊藤 海斗', attributes: [{ label: '電話', valuePreview: '***7788' }] },
+      evidence: [{ label: '電話番号', matched: true }, { label: '氏名', matched: false }],
+      impact: [{ key: 'orders', value: 9, unit: '件' }, { key: 'revenue', value: 122000, unit: '円' }],
+      detectedAt: '2026-08-25T07:20:00.000Z', reviewedAt: null,
+    },
+  ],
+  total: 16,
+  summary: { unmatched: 24, candidates: 16, candidateExternalCustomers: 14, duplicateSuspicions: 2, linked: 2462, potentialRevenue: 312400 },
 }
 
 /**
