@@ -178,9 +178,9 @@ export const SCREENS = [
     node: 'vUXKb', feature: 1, name: '1-1 ダッシュボード',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #456で共通操作の規定値を再確認し、一致を維持。** 通常ボタン36px、入力用の押し口40px、共通の検索・選択42pxというPencilの役割別寸法と白背景を確認した。3107/8794の1440/1920pxで横はみ出し0。",
-    verdictSource: "dashboard-v6/vUXKb.txt + dashboard-v6/vUXKb.png（Pencil） + dashboard-v6/vUXKb-{1440,1920}.png（実装） + Issue #456",
-    verdictHead: "526490a86",
+    verdictNote: "**2026-09-07 Issue #487で再計測し、一致を維持。** 設計にない末尾の更新時刻を外し、カード116px・送信枠16pxは維持。画素差4.4250%、高さ差+13px、1440/1920pxとも横はみ出し0。",
+    verdictSource: "dashboard-v6/vUXKb.txt + dashboard-v6/vUXKb.png（Pencil） + dashboard-v6/vUXKb-{1440,1920}.png（実装） + Issue #487 pixel diff",
+    verdictHead: "bb4baef1cc",
   },
   {
     node: 'ZN0ov', feature: 1, name: '1-1-1 ダッシュボード編集',
@@ -200,17 +200,17 @@ export const SCREENS = [
   },
   {
     node: 'NjK9q', feature: 1, name: '1-1-3 対応受信の表示件数を開く',
-    verdict: 'match', verdictNote: '**2026-09-04 再照合で一致。** 表示件数の選択口、1〜5 / 5件、前へ・1・次へのページ送りを確認。テキスト差0、2026-09-03の1440/1920px画像で横スクロール0。現在コミットの画像はPlaywrightのOS権限で取得できず、旧画像と差分照合で判定。', verdictSource: 'dashboard-v6/NjK9q.txt + 2026-09-03 1440/1920px screenshots + 2026-09-04 static diff audit',
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #487で再計測し、一致を維持。** 表示件数を開いた状態で、画素差5.3167%、高さ差+13px、1440/1920pxとも横はみ出し0。カード116px・送信枠16pxも維持した。', verdictSource: 'dashboard-v6/NjK9q.txt + dashboard-v6/NjK9q.png（Pencil） + dashboard-v6/NjK9q-{1440,1920}.png（実装） + Issue #487 pixel diff',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
     steps: [{ click: '表示件数' }],
-    verdictHead: '145c497d1',
+    verdictHead: 'bb4baef1cc',
   },
   {
     node: 'Alekb', feature: 1, name: '1-1-4 通知パネルを開く',
-    verdict: 'match', verdictNote: '**2026-09-04 再照合で一致。** 通知API接続後のパネル構造・文言を確認し、テキスト差0。2026-09-03の1440/1920px画像で横スクロール0。現在コミットの画像はPlaywrightのOS権限で取得できず、旧画像と差分照合で判定。', verdictSource: 'dashboard-v6/Alekb.txt + 2026-09-03 1440/1920px screenshots + 2026-09-04 static diff audit',
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #487で再計測し、一致を維持。** 通知パネルを開いた状態で、画素差5.3103%、高さ差+13px、1440/1920pxとも横はみ出し0。カード116px・送信枠16pxも維持した。', verdictSource: 'dashboard-v6/Alekb.txt + dashboard-v6/Alekb.png（Pencil） + dashboard-v6/Alekb-{1440,1920}.png（実装） + Issue #487 pixel diff',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
     steps: [{ click: '通知' }],
-    verdictHead: '145c497d1',
+    verdictHead: 'bb4baef1cc',
   },
 
   // ── 機能2 受信箱 ────────────────────────────────────────
@@ -659,9 +659,9 @@ export const SCREENS = [
   },
   { ...SCENARIO, node: 'kk8dz', name: '5-1-B シナリオ作成・1通目設定', route: '/scenarios/first-step?id=scenario-0',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #448で旧Headerを外して再判定。** Pencil 1920pxと実装1920pxを上端から並べ、実装1440pxも確認。一致。画面名をトップバーの「1通目を設定」へ一本化し、本文先頭をパンくず・キャンセル、3段の現在地、配信方式の案内、対象と1通目内容の順にそろえた。固定データの本文・LINEプレビュー・配信の流れ・設定サマリーも維持し、1440/1920pxとも横はみ出し0。",
-    verdictSource: "design-reference/scenarios-v6/kk8dz.txt + design-qa/scenarios-v6/kk8dz-{1440,1920}.png + design-qa/scenarios-v6/kk8dz.txt + apps/web/src/app/scenarios/first-step/page.tsx",
-    verdictHead: "dacb67014",
+    verdictNote: "**2026-09-07 Issue #486 / UI HEAD `57fb09478` で高さを再判定。** #1287の撮影高規約と統合#1293を取り込み、設計1153pxに対して実装1163px（+10px）、画素差6.2051%。本文・LINEプレビュー・配信の流れ・設定サマリーを維持し、1440/1920pxとも横はみ出し0で一致。",
+    verdictSource: "scenarios-v6/kk8dz.txt + scenarios-v6/kk8dz-{1440,1920}.png + Issue #486 pixel comparison",
+    verdictHead: "57fb09478",
   },
   { ...SCENARIO, node: 'bV5Vs', name: '5-1-C シナリオ編集', route: EDIT,
     verdict: "match",
@@ -1507,8 +1507,9 @@ export const SCREENS = [
   {
     ...TEMPLATE, node: 'GFlD7', name: '11-1-A メッセージを作る',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #452 / UI HEAD fb07e4a3f3 で再判定し一致。** 本文上部の旧題・説明・マニュアルを外し、画面名とマニュアルはトップバーだけに表示。パンくずからテンプレート名へ始まるPencil V6の上端順を3102/8789の1440/1920pxで確認し、両幅とも横はみ出し0。',
-    verdictHead: 'fb07e4a3f3',
+    verdictNote: '**2026-09-07 Issue #486 / UI HEAD `57fb09478` で高さを再判定。** #1287の設計高を初期viewportにする規約で撮り直し、高さ差-56pxは0pxへ解消。画素差7.7695%、1440/1920pxとも横はみ出し0で一致。',
+    verdictSource: 'templates-v6/GFlD7.txt + templates-v6/GFlD7-{1440,1920}.png + Issue #486 pixel comparison',
+    verdictHead: '57fb09478',
     route: '/templates/edit?visual=1', mode: 'page',
 
   },
@@ -1528,9 +1529,9 @@ export const SCREENS = [
     */
     ...TEMPLATE, node: 'NNDMR', name: '11-1-C 質問を作る',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #224 / PR #1024 / UI HEAD 031081d69 で一致。** `/templates/questions/new` を割当ポート3104/8791で1440/1920px再撮影し、Pencil正本と実装1920pxを同じ比較画像で目視確認した。#275 / PR #1014 の共通質問編集修正により、タグ・友だち情報・シナリオの詳しい設定は閉じた選択UIになり、質問文、2選択肢、各返信、右のLINEプレビューを同じ画面で確認できる。両幅とも横はみ出し0。',
-    verdictSource: 'templates-v6/NNDMR.txt + NNDMR-1440.png + NNDMR-1920.png',
-    verdictHead: '031081d69',
+    verdictNote: '**2026-09-07 Issue #486 / UI HEAD `57fb09478` で高さを再判定。** #1287の設計高を初期viewportにする規約で撮り直し、高さ差+160pxは0pxへ解消。質問文、2選択肢、各返信、右のLINEプレビューを維持し、画素差7.0482%、1440/1920pxとも横はみ出し0で一致。',
+    verdictSource: 'templates-v6/NNDMR.txt + templates-v6/NNDMR-{1440,1920}.png + Issue #486 pixel comparison',
+    verdictHead: '57fb09478',
     route: '/templates/questions/new', mode: 'page',
 
   },
@@ -1958,9 +1959,9 @@ export const SCREENS = [
     verdictNote: "**2026-09-07、Issue #394 / PR #1180 / HEAD `3721857fb` で支払台帳の固定データを接続して再撮影し、一致。** 3102/8789の1440px・1920pxはいずれも横はみ出し0。田中 明の行を開き、今回の金額・成果件数・締め日・振込先登録状態を実API契約から表示した。設計との差として検出される金額・件数・日付は固定データの値で、画面構造の差ではない。",
     verdictSource: "affiliates-v6/jwrbf.txt + jwrbf-{1440,1920}.png",
   },
-  { ...AFFILIATE, node: 'GPWzq', name: '16-1-F 案件をつくる', route: '/affiliate-offers/new',
+  { ...AFFILIATE, node: 'GPWzq', name: '16-1-F 案件をつくる', route: '/affiliate-offers/new', mode: 'viewport', height: 1136,
     verdict: "match",
-    verdictNote: "**2026-09-06、Issue #229 / PR #965 / HEAD 9a4c4d520 で入力済み状態を再撮影し、一致。** 1440px・1920pxとも横はみ出し0。案件・成果条件・報酬・成果時動作の4区画、右欄プレビュー、対象LINEアカウント、現金とマイル、タグ・シナリオを設計画像と目視比較した。成果地点・期間・二重計上・自動承認は保存口が無いため、各欄に接続条件を表示する。",
+    verdictNote: "**2026-09-07、Issue #483でPencil V6の設計高1136pxを撮影状態へ適用し、高さ差0px・画素差5.0253%で再判定。** 1440px・1920pxとも横はみ出し0。案件・成果条件・報酬・成果時動作の4区画、右欄プレビュー、対象LINEアカウント、現金とマイル、タグ・シナリオを確認した。成果地点・期間・二重計上・自動承認は保存口が無いため、各欄に接続条件を表示する。",
     verdictSource: "affiliates-v6/GPWzq.txt + GPWzq-1440.png + GPWzq-1920.png",
   },
   {
@@ -2329,41 +2330,37 @@ export const SCREENS = [
     verdictSource: 'analytics-v6/URqOA.png（Pencil HTML） + analytics-v6/URqOA.txt + URqOA-{1440,1920}.png（実装） + URqOA-loading/empty/error screenshots + Issue #474',
     verdictHead: 'd3bcf1f75',
   },
-  { ...ANALYTICS, node: 'f5HsX', name: '20-2 クロス分析', route: '/analytics?tab=cross', steps: [{ click: 'この30日を集計', after: 1800 }, { click: '142', after: 500 }], verdict: 'match', verdictNote: '**2026-09-06、台帳 #233・PR #974、撮影HEAD d7fe26794で設計画像と比較し一致。** 固定データを接続し、5経路×タグ有無の行列表、合計1,404人、選択マス142人、保存、CSV、対象者導線を実値で確認した。追加条件はAPIが `filters: []` 固定のため、最大15個の接続条件を本文に表示する。1440px・1920pxとも横スクロール0。', verdictSource: 'analytics-v6/f5HsX.txt + f5HsX-1440.png + f5HsX-1920.png', verdictHead: 'd7fe26794' },
-  { ...ANALYTICS, node: 'C2I7ry', name: '20-2-A ファネル分析', route: '/analytics?tab=funnel', steps: [{ click: 'フォームに答えたの段', after: 500 }], verdict: 'match', verdictNote: '**2026-09-06、台帳 #233・PR #974、撮影HEAD d7fe26794で設計画像と比較し一致。** 固定データを接続し、5段の通過人数1,404→886→412→238→96、段ごとの離脱、最大離脱474人、対象者導線、保存、CSVを実値で確認した。比較条件が無い平均到達日数と差は `—` のまま表示する。1440px・1920pxとも横スクロール0。', verdictSource: 'analytics-v6/C2I7ry.txt + C2I7ry-1440.png + C2I7ry-1920.png', verdictHead: 'd7fe26794' },
+  { ...ANALYTICS, node: 'f5HsX', name: '20-2 クロス分析', route: '/analytics?tab=cross', steps: [{ click: 'この30日を集計', after: 1800 }, { click: '142', after: 500 }], verdict: 'match', verdictNote: '**2026-09-07、Issue #483でPencil V6と同じ1080pxの撮影状態を確認し、高さ差0px・画素差6.6983%で再判定。** 固定データを接続し、5経路×タグ有無の行列表、合計1,404人、選択マス142人、保存、CSV、対象者導線を実値で確認した。1440px・1920pxとも横スクロール0。', verdictSource: 'analytics-v6/f5HsX.txt + f5HsX-1440.png + f5HsX-1920.png' },
+  { ...ANALYTICS, node: 'C2I7ry', name: '20-2-A ファネル分析', route: '/analytics?tab=funnel', mode: 'viewport', height: 1136, steps: [{ click: 'フォームに答えたの段', after: 500 }], verdict: 'match', verdictNote: '**2026-09-07、Issue #483で固定フレームをページ全体として撮っていた差を直し、設計高1136px・高さ差0px・画素差8.4200%で再判定。** 固定データを接続し、5段の通過人数1,404→886→412→238→96、段ごとの離脱、最大離脱474人、対象者導線、保存、CSVを実値で確認した。1440px・1920pxとも横スクロール0。', verdictSource: 'analytics-v6/C2I7ry.txt + C2I7ry-1440.png + C2I7ry-1920.png' },
   { ...ANALYTICS, node: 'Fh2Qj', name: '20-2-B URLクリック', route: '/analytics?tab=url-clicks', verdict: 'match', verdictNote: '**2026-09-06、台帳 #233・PR #974、撮影HEAD d7fe26794で設計画像と再比較し一致。** KPI4枚、中継URLだけを数える説明、検索、CSV、リンク元・クリック・実人数・露出分母・率・状態を確認した。APIの16.9を1690%にしていた表示も修正済み。1440px・1920pxとも横スクロール0。', verdictSource: 'analytics-v6/Fh2Qj.txt + Fh2Qj-1440.png + Fh2Qj-1920.png', verdictHead: 'd7fe26794' },
   { ...ANALYTICS, node: 'dfwD4', name: '20-2-C 保存した分析', route: '/analytics?tab=saved', verdict: 'match', verdictNote: '**2026-09-06、台帳 #233・PR #974、撮影HEAD d7fe26794で設計画像と比較し一致。** 固定データを接続し、KPI4枚、保存分析6件、定義版・期間・状態・結果件数、選択した分析の結果履歴3件を実値で確認した。定期レポートは対象外の `URqOA` が未実装のため「なし」と明記する。1440px・1920pxとも横スクロール0。', verdictSource: 'analytics-v6/dfwD4.txt + dfwD4-1440.png + dfwD4-1920.png', verdictHead: 'd7fe26794' },
 
   // ── 機能21 NEN配信 ──────────────────────────────────────
   /* タブ4本は設計とそろっている（配信フロー／NENコラム／ペット／配信履歴）。 */
-  { ...NEN, node: 'VLMGH', name: '21-1 NEN配信',
+  { ...NEN, node: 'VLMGH', name: '21-1 NEN配信', mode: 'viewport', height: 1081,
     /* 失敗を空として出していないかを見る。読込・空・失敗の3つ。 */
     states: {
       apis: ['**/api/nen-campaigns/**', '**/api/nen-campaigns'],
       kinds: ['loading', 'empty', 'error'],
     },
     verdict: "match",
-    verdictNote: '**2026-09-07 Issue #451 / UI HEAD `3a3bc7a31` で再撮影・一致。** 本文側の旧見出しを外し、画面名は上部バーだけに統一。パンくずと「NEN配信を作成」を最初の内容行へ置き、タブ・4指標へ続くPencil V6の順序にした。通常・読込・空・失敗を1440/1920pxで確認し、全画像で横はみ出し0。',
+    verdictNote: '**2026-09-07、Issue #483で固定フレームをページ全体として撮っていた差を直し、設計高1081px・高さ差0px・画素差4.9576%で再判定。** 本文側に旧見出しはなく、パンくず・作成操作・タブ・4指標へ続くPencil V6の順序を維持。1440/1920pxとも横はみ出し0。',
     verdictSource: 'nen-v6/VLMGH.txt + VLMGH-1440.png + VLMGH-1920.png + VLMGH-loading/empty/error screenshots',
-    verdictHead: '3a3bc7a31',
   },
   { ...NEN, node: 'DEX0k', name: '21-1-A NENコラム', route: '/nen-campaigns?tab=columns',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #418 / HEAD 1c8055931 で実APIへ接続し、設計画像と実装画像を同じ1920pxで並べて再判定。** 成果金額、記事の読了人数、コラム複製、テスト送信を一覧から確認・実行できるようにした。24本の集計・絞り込み・ページ情報も維持し、1440・1920pxとも横はみ出し0。',
+    verdictNote: '**2026-09-07、Issue #483でPencil V6と同じ1080pxの撮影状態を確認し、高さ差0px・画素差5.0110%で再判定。** 成果金額、記事の読了人数、コラム複製、テスト送信、24本の集計・絞り込み・ページ情報を維持し、1440/1920pxとも横はみ出し0。',
     verdictSource: 'nen-v6/DEX0k.txt + DEX0k-1440.png + DEX0k-1920.png',
-    verdictHead: '1c8055931',
   },
-  { ...NEN, node: 'q4lajm', name: '21-1-B ペット・記念日', route: '/nen-campaigns?tab=pets',
+  { ...NEN, node: 'q4lajm', name: '21-1-B ペット・記念日', route: '/nen-campaigns?tab=pets', mode: 'viewport', height: 1137,
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #445 / UI HEAD 78c19bea32 で再判定。** #428で直った設計正本に合わせ、取得可能な誕生日配信の到達率94.6%とクリック率38.2%を別カードで表示した。個人開封率には依存しない。3107/8794で1440・1920pxを撮影し、両幅とも横はみ出し0。',
+    verdictNote: '**2026-09-07、Issue #483で固定フレームをページ全体として撮っていた差を直し、設計高1137px・高さ差0px・画素差7.5896%で再判定。** 誕生日配信の到達率94.6%とクリック率38.2%を別カードで表示し、1440/1920pxとも横はみ出し0。',
     verdictSource: 'nen-v6/q4lajm.txt + q4lajm-1440.png + q4lajm-1920.png',
-    verdictHead: '78c19bea32',
   },
-  { ...NEN, node: 'WeXbL', name: '21-1-C NEN配信の履歴', route: '/nen-campaigns?tab=history',
+  { ...NEN, node: 'WeXbL', name: '21-1-C NEN配信の履歴', route: '/nen-campaigns?tab=history', mode: 'viewport', height: 1081,
     verdict: "match",
-    verdictNote: '**2026-09-07 Issue #446 / UI HEAD 64436d463b でPencil V6を修正し再判定。** 個人別の反応を作らず、到達率・クリック率の列は取得不可と明示する設計と表示へ統一した。未達6通の内訳と待機中を今すぐ送る操作も維持。3102/8789で1440/1920px撮影し、両幅とも横はみ出し0。',
+    verdictNote: '**2026-09-07、Issue #483で固定フレームをページ全体として撮っていた差を直し、設計高1081px・高さ差0px・画素差5.0225%で再判定。** 到達率・クリック率は取得不可と明示し、未達6通の内訳と待機中を今すぐ送る操作を維持。1440/1920pxとも横はみ出し0。',
     verdictSource: 'nen-v6/WeXbL.txt + WeXbL-1440.png + WeXbL-1920.png',
-    verdictHead: '64436d463b',
   },
   {
     ...NEN, node: 'HpKyF', name: '21-1-D NEN配信の中身を編集する',
@@ -2372,19 +2369,17 @@ export const SCREENS = [
       #526 はここで「何日後」を出さないようにした。行は増やさない。
     */
     variants: [{ suffix: '-birthday', route: '/nen-campaigns/edit?key=birthday_coupon' }],
-    route: '/nen-campaigns/edit?key=review_request',
+    route: '/nen-campaigns/edit?key=review_request', mode: 'viewport', height: 1136,
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #451 / UI HEAD `3a3bc7a31` で再撮影・一致。** 旧見出しを持たない編集画面の構造を維持し、画面名は上部バーだけに統一した。通常・誕生日の両状態をPencil V6と横並びで再確認し、1440/1920pxとも横はみ出し0。",
+    verdictNote: "**2026-09-07、Issue #483で固定フレームをページ全体として撮っていた差を直し、設計高1136px・高さ差0px・画素差5.7424%で再判定。** 旧見出しを持たない編集画面の構造を維持し、1440/1920pxとも横はみ出し0。",
     verdictSource: "nen-v6/HpKyF.txt + HpKyF-birthday.txt + HpKyF-{1440,1920}.png + HpKyF-birthday-{1440,1920}.png",
-    verdictHead: "3a3bc7a31",
   },
   {
     ...NEN, node: 'ymXJK', name: '21-1-E コラムを書く',
-    route: '/nen-campaigns/columns/new', mode: 'page',
+    route: '/nen-campaigns/columns/new', mode: 'viewport', height: 1137,
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #446 / UI HEAD 64436d463b でPencil V6を修正し再判定。** 本文エディタを外し、外部記事URL・画像URL・LINE紹介文を確認する承認済み契約へ設計を統一した。対象人数、予約日時、読了イベント、読了後タグ、複製、テスト送信も表示・保存できる。通常・入力済み・入力誤り・重複・権限不足・保存失敗を3102/8789で1440/1920px撮影し、全画像で横はみ出し0。',
+    verdictNote: '**2026-09-07、Issue #483で固定フレームをページ全体として撮っていた差を直し、設計高1137px・高さ差0px・画素差7.0357%で再判定。** 外部記事URL・画像URL・LINE紹介文、対象人数、予約日時、読了イベント、読了後タグ、複製、テスト送信を維持し、1440/1920pxとも横はみ出し0。',
     verdictSource: 'nen-v6/ymXJK.txt + ymXJK-1920.png + ymXJK-filled-1920.png',
-    verdictHead: '64436d463b',
     states: {
       apis: ['**/api/nen-campaigns/columns**'],
       kinds: ['normal'],
@@ -2443,7 +2438,7 @@ export const SCREENS = [
     ...NEN, node: 'i9sQP', name: '21-1-F NENコラム・一覧の状態', route: '/nen-campaigns?tab=columns',
     states: { apis: ['**/api/nen-campaigns/columns?*', '**/api/nen-campaigns/metrics/columns?*'], kinds: ['loading', 'empty', 'error'] },
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #376 / UI HEAD 15846e74aを3102/8789で再撮影して一致。** このNodeの対象である通常・読込・空・失敗を1440px・1920pxの全8枚で確認し、横はみ出し0。通常はコラム集計APIの24本・6件表示・4ページ、読込は「読み込んでいます」、空は「まだコラムがありません」と作成導線、失敗は「表示できませんでした」と再読込を出す。空の説明と失敗時の説明・ボタンも設計語へそろえ、失敗を0件として扱わない。通常一覧そのものの測定不能項目はDEX0k側に理由付きで記録する。",
+    verdictNote: "**2026-09-07、Issue #483でPencil V6と同じ1080pxの撮影状態を確認し、高さ差0px・画素差4.2514%で再判定。** 通常はコラム集計APIの24本・6件表示・4ページを表示し、1440/1920pxとも横はみ出し0。読込・空・失敗の状態証跡も維持する。",
     verdictSource: "nen-v6/i9sQP.txt + i9sQP-1440.png + i9sQP-1920.png + i9sQP-loading/empty/error screenshots",
   },
 
@@ -2546,9 +2541,9 @@ export const SCREENS = [
     route: '/ec-commerce?tab=connector',
     states: { apis: ['**/api/ec-commerce/connector?**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #440 で再判定。** `/api/ec-commerce/connector` の固定応答から、NEN配信3件・コンバージョン18件・マイル2件・友だち属性7件・分析5件と、再試行は3回まで・10分間隔を表示した。通常・読込・空・失敗・権限不足を1440・1920で撮影し、全状態で横はみ出し0、鍵は末尾4文字以外を露出していない。',
-    verdictSource: 'ec-v6/oHAN4.png（Pencil HTML） + ec-v6/oHAN4.txt + ec-v6/oHAN4-normal-1920.png（実装） + Issue #474',
-    verdictHead: '3ddca80cc4',
+    verdictNote: '**2026-09-07 Issue #486 / UI HEAD `57fb09478` で高さを修正・再判定。** つなぎ先の種類・アドレス・鍵をPencilと同じ3列1段にし、保存済み鍵の更新日時と非表示説明を鍵欄へ統合。高さ差+43pxは0px、画素差4.2002%。通常・読込・空・失敗・権限不足の1440/1920pxで横はみ出し0、鍵は末尾4文字以外を露出せず一致。',
+    verdictSource: 'ec-v6/oHAN4.txt + ec-v6/oHAN4-{1440,1920}.png + ec-v6/oHAN4-normal-{1440,1920}.png + Issue #486 pixel comparison',
+    verdictHead: '57fb09478',
   },
 
   // ── 機能24 LINE通知 ─────────────────────────────────────
@@ -2561,7 +2556,7 @@ export const SCREENS = [
     states: {
       apis: ['**/api/ec-commerce/overview**', '**/api/ec-commerce/settings**'],
       kinds: ['normal', 'empty', 'error', 'forbidden'],
-  }, name: '24-1 LINE通知', verdict: 'match', verdictNote: '**2026-09-07 Issue #430 で再判定。** `/api/ec-commerce/overview` と設定固定応答から通知定義・30日集計（96、148、32、132、20、96、88、74、51）を表示し、一覧の「LINE上で表示」と状態別画面を確認した。個人の開封値は契約どおり作らず、未取得表示も仕様内。1440/1920の全状態で横はみ出しはない。', verdictSource: 'line-notify-v6/festr-{normal,empty,error,forbidden}.txt + festr-normal-1920.png', verdictHead: '49484d5ab' },
+  }, name: '24-1 LINE通知', verdict: 'match', verdictNote: '**2026-09-07 Issue #486 / UI HEAD `57fb09478` で高さを再判定。** #1287の設計高を初期viewportにする規約で通常・空・失敗・権限不足を撮り直し、高さ差+38pxは0pxへ解消。画素差4.8107%、1440/1920pxの全状態で横はみ出し0、通知定義と30日集計を維持して一致。', verdictSource: 'line-notify-v6/festr-{normal,empty,error,forbidden}.txt + festr-{1440,1920}.png + Issue #486 pixel comparison', verdictHead: '57fb09478' },
   {
     ...LINE_NOTIFY, node: 'Q55bb', name: '24-1-A お知らせの中身を編集する',
     mode: 'viewport', height: 1136, /*
@@ -2611,9 +2606,9 @@ export const SCREENS = [
     ...LINE_NOTIFY, node: 'N2gAza', name: '24-2-A 運用者へのお知らせをつくる',
     route: '/line-notifications/operator/new', mode: 'page',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #439 / UI HEAD 082be35e7を3102/8789で再撮影・判定。** 実在スタッフの受信可否と人数を専用APIから表示し、きっかけ・件数・重要度・宛先・時間・重複防止を下書きへ保存して、本人テスト後に公開できる。LINE未ログイン時の確認済みメール代替も送信処理と実行記録へ接続した。設計の主欄・右プレビュー・注意・関連導線・追従操作を1440/1920pxで確認し、横はみ出し0。',
-    verdictSource: 'line-notify-v6/N2gAza.txt + N2gAza-{1440,1920}.png',
-    verdictHead: '082be35e7',
+    verdictNote: '**2026-09-07 Issue #486 / UI HEAD `57fb09478` で高さを再判定。** #1287の設計高を初期viewportにする規約で撮り直し、高さ差+67pxは0pxへ解消。主欄・右プレビュー・注意・関連導線・追従操作を維持し、画素差4.1880%、1440/1920pxとも横はみ出し0で一致。',
+    verdictSource: 'line-notify-v6/N2gAza.txt + line-notify-v6/N2gAza-{1440,1920}.png + Issue #486 pixel comparison',
+    verdictHead: '57fb09478',
   },
 
   // ── 機能25 オートメーション ─────────────────────────────
@@ -2636,7 +2631,7 @@ export const SCREENS = [
       { click: '下書きに保存', after: 1000 },
       { fill: '1人テストの友だちID', text: 'friend-visual-1' },
     ],
-    verdict: 'match', verdictNote: '**2026-09-07 Issue #438 / UI HEAD `e20d921b8` を固定ポート3105/8792で再撮影し、★V6設計と同じ1920pxで比較して一致を確認。** 6種のきっかけ、タグの付け外し、15軸の条件、処理、下書き保存、見込み人数286人、対象友だちを指定する1人テストを実API契約へ接続した。1440px・1920pxとも横はみ出し0。', verdictSource: 'automations-v6/Rv8Jv.txt + automation-create-v6-contract.test.ts', verdictHead: 'e20d921b8',
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #485・撮影HEAD `833383f6e` で再判定し一致。** #1287の規約どおり設計高1080pxを初期viewportにして再撮影し、旧+169pxの差を0pxへ解消した。1920px画素差6.0491%、1440/1920pxとも横はみ出し0。', verdictSource: 'automations-v6/Rv8Jv.png + Rv8Jv-{1440,1920}.png + Rv8Jv-diff-1920.png + Issue #485', verdictHead: '833383f6e',
   },
   {
     /*
@@ -2681,8 +2676,8 @@ export const SCREENS = [
     verdictSource: 'automations-v6/Vdbv5.txt + Vdbv5-loading.txt + Vdbv5-empty.txt + Vdbv5-error.txt', verdictHead: '44e671b2c',
   },
   { ...AUTOMATION, node: 'xOpDs', name: '25-2 共通アクション', route: '/common-actions', verdict: 'match', verdictNote: '**2026-09-07 Issue #377 / UI HEAD `bd900c36d` を3107/8794で再撮影し、★V6設計と同じ1920pxで比較。** 実API契約から14件（公開11・下書き3）、呼び出し元38、今月2,847回・失敗6回、古い版2件・3か所を表示。5種の絞り込み、CSV、6行単位のAPIページ送りも接続し、1440px・1920pxとも横はみ出し0で一致。', verdictSource: 'automations-v6/xOpDs.txt + common-actions-v6-contract.test.ts', verdictHead: 'bd900c36d' },
-  { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new', steps: [{ click: '条件で分ける', after: 500 }], verdict: 'match', verdictNote: '**2026-09-07 Issue #444 / UI HEAD `522f8babf` を固定ポート3105/8792で再撮影し一致。** 名前・説明、処理順、失敗時設定、待ち時間、公開版呼び出し、下書き保存に加え、タグ条件の当否で公開版を分ける処理を編集・検査・実行台帳まで接続した。深さ3まで検査し、選ばれなかった側も実行記録へ残す。正本 §4-7 どおり作成画面は下書き保存だけとし、1人テストは保存後の公開版を選ぶ説明を維持。1440px・1920pxとも横はみ出し0。', verdictSource: 'automations-v6/py5CG-{1440,1920}.png + common-actions-v6-contract.test.ts + common-actions.test.ts + automation-engine.test.ts', verdictHead: '522f8babf' },
-  { ...AUTOMATION, node: 'syWp4', name: '25-2-B 共通アクションの版と使われている場所', route: '/common-actions/versions?id=ca-1', verdict: 'match', verdictNote: '**2026-09-07 Issue #377 / UI HEAD `bd900c36d` を3107/8794で再撮影し、★V6設計と同じ1920pxで比較。** 実API契約からv4〜v1、利用先5件・古い版1件、今月1,284回・失敗2回、実行中18件・待機中6件を表示。利用先を版履歴より先に置き、機能名・固定版・進行中件数を1行で読める形へそろえた。1440px・1920pxとも横はみ出し0で一致。', verdictSource: 'automations-v6/syWp4.txt + usage-summary.test.ts + common-actions-v6-contract.test.ts', verdictHead: 'bd900c36d' },
+  { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new', steps: [{ click: '条件で分ける', after: 500 }], verdict: 'match', verdictNote: '**2026-09-07 Issue #485・撮影HEAD `833383f6e` で再判定し一致。** #1287の規約どおり設計高1080pxで再撮影し、旧+85pxの差を0pxへ解消した。1920px画素差4.2829%、1440/1920pxとも横はみ出し0。', verdictSource: 'automations-v6/py5CG.png + py5CG-{1440,1920}.png + py5CG-diff-1920.png + Issue #485', verdictHead: '833383f6e' },
+  { ...AUTOMATION, node: 'syWp4', name: '25-2-B 共通アクションの版と使われている場所', route: '/common-actions/versions?id=ca-1', verdict: 'match', verdictNote: '**2026-09-07 Issue #485・撮影HEAD `833383f6e` で再判定し一致。** #1287の規約どおり設計高1080pxで再撮影し、旧+220pxの差を0pxへ解消した。1920px画素差4.7846%、1440/1920pxとも横はみ出し0。', verdictSource: 'automations-v6/syWp4.png + syWp4-{1440,1920}.png + syWp4-diff-1920.png + Issue #485', verdictHead: '833383f6e' },
 
   // ── 機能26 外部連携 ─────────────────────────────────────
   /*
@@ -2732,7 +2727,7 @@ export const SCREENS = [
     日・週の台帳は、固定予約を時間×担当／曜日の格子へ並べる。
     LINE予約は緑、LINE未連携の電話予約は青で同じ格子に載せる。
   */
-  { ...BOOKING, node: 'TV2DI', name: '27-1 予約管理', verdict: 'match', verdictNote: '**2026-09-07 Issue #450 / UI HEAD `cded0de47` を固定ポート3105/8792で再撮影し、★V6設計と上端から照合して一致。** 本文に重複していた「予約管理」と説明文を外し、パンくず・電話予約・今日/今週/今月/一覧の切替・4指標の順で開始する。時間×担当の格子、LINE予約と電話予約、注意事項・今日の内訳・関連導線を維持し、1440/1920pxとも横はみ出し0。', verdictSource: 'booking-v6/TV2DI.txt + TV2DI-{1440,1920}.png', verdictHead: 'cded0de47' },
+  { ...BOOKING, node: 'TV2DI', name: '27-1 予約管理', verdict: 'match', verdictNote: '**2026-09-07 Issue #485・撮影HEAD `833383f6e` で再判定し一致。** 設計高1144pxを初期viewportにして本文全体を再撮影し、旧-64pxの差を0pxへ解消した。1920px画素差4.4690%、1440/1920pxとも横はみ出し0。', verdictSource: 'booking-v6/TV2DI.png + TV2DI-{1440,1920}.png + TV2DI-diff-1920.png + Issue #485', verdictHead: '833383f6e' },
   {
     ...BOOKING, node: 'TnDbq', name: '27-1-A 予約の詳細',
     mode: 'viewport', height: 1136, /*
@@ -2764,8 +2759,8 @@ export const SCREENS = [
       { fill: '日付', text: '2026-09-03', after: 900 },
       { select: '空いている時間', label: '10:00〜11:45' },
     ],
-    verdict: 'match', verdictNote: '**2026-09-07 Issue #444 / UI HEAD `522f8babf` を固定ポート3105/8792で再撮影し一致。** LINE友だちとLINE未連携の電話客を選べ、電話・ペット・過去予約・前回申し送り・タグ・マイルを顧客カルテAPIから表示する。選択したメニュー・担当・日付・空き枠を保持し、確認へ進めることを実操作した。1440px・1920pxとも横はみ出し0。',
-    verdictSource: 'booking-v6/cpdDi-{1440,1920}.png + page.test.ts', verdictHead: '522f8babf',
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #485・撮影HEAD `833383f6e` で再判定し一致。** #1287の規約どおり設計高1080pxで再撮影し、旧+227pxの差を0pxへ解消した。1920px画素差6.8421%、1440/1920pxとも横はみ出し0。',
+    verdictSource: 'booking-v6/cpdDi.png + cpdDi-{1440,1920}.png + cpdDi-diff-1920.png + Issue #485', verdictHead: '833383f6e',
   },
   { ...BOOKING, node: 'SbuUI', name: '27-1-C 今週の予約', steps: [{ click: '今週' }], verdict: 'match', verdictNote: '**2026-09-06、PR #TBD の実装を1440px・1920pxで撮影し、★V6設計と見比べた。** 時間（縦）×曜日（横）の週格子、LINE予約（緑）と電話予約（青）、4つの集計、読み方の青帯、注意事項・週の内訳・関連導線の右欄がそろった。固定データの予約件数と日付は撮影用データに従うが、情報の位置・余白・色・枠・角丸と操作の骨格は一致。両幅とも横はみ出し0。', verdictSource: 'booking-v6/SbuUI.txt', verdictHead: 'ed3e365aa' },
   /*
@@ -2811,9 +2806,9 @@ export const SCREENS = [
       { click: 'この内容で予約を入れる', after: 1200 },
     ],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #444 / UI HEAD `522f8babf` を固定ポート3105/8792で再撮影し一致。** 代理予約成功応答から予約ID、Google連携、確認LINEの処理状態、実際のリマインド予定、自動化結果を表示した。送信前を送信済みと作らず「処理中」と示し、実績は予約単位の処理台帳から追跡できる。登録完了まで実操作し、1440px・1920pxとも横はみ出し0。",
-    verdictSource: "booking-v6/GfceK.txt + GfceK-{1440,1920}.png",
-    verdictHead: "522f8babf",
+    verdictNote: "**2026-09-07 Issue #485・撮影HEAD `833383f6e` で再判定し一致。** #1287の規約どおり設計高1080pxで再撮影し、旧+26pxの差を0pxへ解消した。1920px画素差6.9745%、1440/1920pxとも横はみ出し0。",
+    verdictSource: "booking-v6/GfceK.png + GfceK-{1440,1920}.png + GfceK-diff-1920.png + Issue #485",
+    verdictHead: "833383f6e",
   },
   {
     ...BOOKING, node: 'Lg8ff', name: '27-1-F 代理予約・予約枠の重なりと入力エラー',
@@ -2867,9 +2862,9 @@ export const SCREENS = [
       kinds: ['normal', 'loading', 'error'],
     }, name: '28-1-A 受付枠と休業日', route: '/booking/staff/shifts',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #433 で実値を再判定。** #1198/#1188の固定応答を読み、曜日ごとの上限（3/3/休/3/4/2/2件）、顧客向け○・△・×・休、時間帯の「残り1/2・0/2」、休業日、設備A/Bを画面で確認した。通常・読込中・失敗を1440/1920で再撮影し、全8枚で横はみ出し0。",
-    verdictSource: "booking-settings-v6/tksPc-{normal,loading,error}.txt + tksPc-{normal,loading,error}-{1440,1920}.png",
-    verdictHead: "58989eeaa",
+    verdictNote: "**2026-09-07 Issue #485・撮影HEAD `c90756ba0a` で再判定し一致。** 曜日表と予約ルールをPencilの行高へそろえ、設計にない設備上限・空き枠内訳は必要時だけ開く形にした。旧+171pxの差を0pxへ解消し、1920px画素差5.6699%、1440/1920pxとも横はみ出し0。",
+    verdictSource: "booking-settings-v6/tksPc.png + tksPc-{1440,1920}.png + tksPc-diff-1920.png + Issue #485",
+    verdictHead: "c90756ba0a",
   },
   { ...BOOKING_SET, node: 'GhOb3', name: '28-1-B 予約メニューをつくる', route: '/booking/menus/new',
     variants: [{ suffix: '-pencil-input', steps: [
@@ -2880,9 +2875,9 @@ export const SCREENS = [
       { fill: '説明', text: 'カット・シャンプー・爪切り・耳そうじが入ります。' },
     ] }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #433 で入力例を入力後に再判定。** #1184の`variant=\"v6\"`骨格で番号付き5節、右側プレビュー・注意、下部固定アクションを確認した。撮影時にメニュー名「トリミング（小型犬）」、105分、¥8,400、分類「トリミング」、説明文を実際に入力し、1440/1920の変種画像で一致・横はみ出し0を確認した。",
-    verdictSource: "booking-settings-v6/GhOb3.txt + GhOb3-pencil-input-{1440,1920}.png + 2026-09-07 visual comparison",
-    verdictHead: "58989eeaa",
+    verdictNote: "**2026-09-07 Issue #485・撮影HEAD `833383f6e` で再判定し一致。** #1287の規約どおり設計高1080pxで再撮影し、旧+658pxの差を0pxへ解消した。1920px画素差6.8295%、1440/1920pxとも横はみ出し0。",
+    verdictSource: "booking-settings-v6/GhOb3.png + GhOb3-{1440,1920}.png + GhOb3-diff-1920.png + Issue #485",
+    verdictHead: "833383f6e",
   },
   {
     ...BOOKING_SET, node: 'W6465r', name: '28-1-C 一覧の状態（空・読込・エラー）',
@@ -2903,7 +2898,7 @@ export const SCREENS = [
     verdictSource: 'events-v6/ugP5y.txt + ugP5y-{1440,1920}.png + apps/worker/src/services/event-waitlist.ts',
     verdictHead: 'ea4284f42',
   },
-  { ...EVENT, node: 'MKrPY', name: '29-1-A イベントをつくる', route: '/events/new', variants: [{ suffix: '-edit', route: '/events/edit?id=ev-1', standalone: true }], verdict: 'match', verdictNote: '**2026-09-07 Issue #450 / UI HEAD `cded0de47` を固定ポート3105/8792で再撮影し、★V6設計と上端から照合して一致。** 同じ入力骨組みを使う編集画面から重複した題と説明を外し、パンくずと申込一覧の操作に続いて予約状態・入力節が始まる形へ統一した。作成・編集とも開催内容、申込ルール、LINEプレビュー、注意事項を維持し、1440/1920pxとも横はみ出し0。', verdictSource: 'events-v6/MKrPY.txt + MKrPY-{1440,1920}.png + MKrPY-edit-{1440,1920}.png', verdictHead: 'cded0de47' },
+  { ...EVENT, node: 'MKrPY', name: '29-1-A イベントをつくる', route: '/events/new', variants: [{ suffix: '-edit', route: '/events/edit?id=ev-1', standalone: true }], verdict: 'match', verdictNote: '**2026-09-07 Issue #485・撮影HEAD `833383f6e` で再判定し一致。** 設計にない画像設定を折りたたみ、説明欄と6つの入力節をPencilの横配置へ圧縮した。旧+642pxの差を0pxへ解消し、1920px画素差6.3529%、1440/1920pxとも横はみ出し0。', verdictSource: 'events-v6/MKrPY.png + MKrPY-{1440,1920}.png + MKrPY-diff-1920.png + Issue #485', verdictHead: '833383f6e' },
   {
     /*
       **#593 で拒否とキャンセルの窓が入った。**押し口は `data-qa-open` で
@@ -2933,9 +2928,9 @@ export const SCREENS = [
     ...STAFF, node: 'e3jz3', name: '30-1 ログインユーザー',
     states: { apis: ['**/api/access/users*', '**/api/access/roles*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     verdict: "match",
-    verdictNote: "**2026-09-07 #425 / 3101・8788で固定行追加後に再撮影・再判定。** access/users・access/roles の機能30固定契約へ職位、役割bundle、担当範囲、機能別権限を追加し、通常・読込・空・失敗・権限不足を1440/1920px撮影。1ページ6行、ページ送り、役割・職位・担当範囲・最終ログイン・二段階認証、確認が必要な注意札を表示し、横はみ出し0。設計の表示項目と固定契約の値が一致する。",
-    verdictSource: "staff-v6/e3jz3.png + staff-v6/e3jz3-{normal,loading,empty,error,forbidden}.txt + 2026-09-07 visual comparison",
-    verdictHead: "5c9238525",
+    verdictNote: "**2026-09-07 Issue #485・撮影HEAD `833383f6e` で再判定し一致。** #1287の規約どおり設計高1080pxで再撮影し、旧+194pxの差を0pxへ解消した。1920px画素差4.4622%、1440/1920pxとも横はみ出し0。",
+    verdictSource: "staff-v6/e3jz3.png + e3jz3-{1440,1920}.png + e3jz3-diff-1920.png + Issue #485",
+    verdictHead: "833383f6e",
   },
   {
     ...STAFF, node: 'EOTS4', name: '30-1-A 見せる範囲を決める',
@@ -2968,33 +2963,33 @@ export const SCREENS = [
   // ── 機能31 機能設定 ─────────────────────────────────────
   { ...FEATURE_SET, node: 'c4R6F', name: '31-1 機能設定',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #440 で再判定。** `/api/settings/features` と `/api/analytics/usage` を並行取得し、友だち属性22/101、シナリオ11/11、テンプレート0/0、リッチメニュー2/4、回答フォーム5/8、流入・成果9/16、オートメーション3/7の利用中／作成数を表示した。取得できない共通情報・登録メディアは0にせず「利用数は未取得」と明示する。説明、必須表示、切替、並び替え、初期値復元を設計画像と照合し、1440・1920とも横はみ出し0。',
-    verdictSource: 'settings-v6/c4R6F.txt + settings-v6/c4R6F-1920.png',
-    verdictHead: '3ddca80cc4',
+    verdictNote: '**2026-09-07 Issue #487で再計測し、一致を維持。** 通常表示をPencilの3列密度へそろえ、運営入口は並べ替え画面だけに残した。画素差7.4636%、高さ差+1px、1440/1920pxとも横はみ出し0。',
+    verdictSource: 'settings-v6/c4R6F.txt + settings-v6/c4R6F-{1440,1920}.png（実装） + Pencil ★V6 + Issue #487 pixel diff',
+    verdictHead: 'bb4baef1cc',
   },
 
   // ── 機能32 運用状態 ─────────────────────────────────────
   /* タブ3本は設計とそろっている（健全性チェック／緊急コントロール／更新履歴）。 */
   { ...OPERATIONS, node: 'UgonK', name: '32-1 運用状態・健全性チェック', route: '/emergency?tab=health',
     verdict: "match",
-    verdictNote: "**2026-09-07、Issue #387・`88912c59c3` を固定ポート3105/8792で1440・1920撮影し、設計と目視比較して一致。** 6列、次回確認時刻、判定の見方4種を設計の情報順で表示。サーバー保存の健全性結果と観測時刻を読み、古い結果を未確認にし、手動確認も同じ契約へ保存する。両幅とも横はみ出し0。",
-    verdictSource: "operations-v6/UgonK.txt + operations-v6/UgonK-{1440,1920}.png + 2026-09-07 visual comparison",
-    verdictHead: "88912c59c3",
+    verdictNote: "**2026-09-07 Issue #487で新しい撮影高規約により再計測し、一致を維持。** 画素差5.1817%、高さ差0px、1440/1920pxとも横はみ出し0。着手時の+75pxは撮影範囲由来だった。",
+    verdictSource: "operations-v6/UgonK.txt + operations-v6/UgonK-{1440,1920}.png（実装） + Pencil ★V6 + Issue #487 pixel diff",
+    verdictHead: "bb4baef1cc",
   },
   {
     /* 通常・読込・失敗を見る。**下見が取れないと停止を押せないはず**。 */
     ...OPERATIONS, node: 'b3HfZ', name: '32-1-A 緊急コントロール', route: '/emergency?tab=control',
     states: { apis: ['**/api/operations/control/preview*'], kinds: ['normal', 'loading', 'error'] },
     verdict: "match",
-    verdictNote: "**2026-09-07、Issue #387・`88912c59c3` の通常・読込・失敗を固定ポート3105/8792で1440・1920撮影し、設計と目視比較して一致。** サーバーの下見値で件数・人数・理由・アカウント・補足・復旧を表示し、取得失敗は0件にせず操作不可。停止・復旧は操作専用の6桁本人確認、重複防止、版番号確認を通し、ログインユーザーへのLINE・メール通知もサーバー契約へ接続した。全状態・両幅とも横はみ出し0。",
-    verdictSource: "operations-v6/b3HfZ-normal.txt + operations-v6/b3HfZ-loading.txt + operations-v6/b3HfZ-error.txt + operations-v6/b3HfZ-*-{1440,1920}.png + 2026-09-07 visual comparison",
-    verdictHead: "88912c59c3",
+    verdictNote: "**2026-09-07 Issue #487で新しい撮影高規約により通常・読込・失敗を再計測し、一致を維持。** 画素差5.1955%、高さ差0px、全状態の1440/1920pxで横はみ出し0。着手時の-56pxは撮影範囲由来だった。",
+    verdictSource: "operations-v6/b3HfZ-normal.txt + operations-v6/b3HfZ-loading.txt + operations-v6/b3HfZ-error.txt + operations-v6/b3HfZ-*-{1440,1920}.png + Issue #487 pixel diff",
+    verdictHead: "bb4baef1cc",
   },
   { ...OPERATIONS, node: 'UhC2O', name: '32-1-B 更新履歴', route: '/emergency?tab=history',
     verdict: "match",
-    verdictNote: "**2026-09-07、Issue #387・`88912c59c3` を固定ポート3105/8792で1440・1920撮影し、設計と目視比較して一致。** サーバーが保存した停止・復旧と管理画面更新を統合履歴から読み、期間、CSV、4つの概要、停止記録と更新履歴の2表、右欄を設計の構造で表示する。反映時間・停止時間・移行内容を含む配備記録も同じ履歴へ接続済み。両幅とも横はみ出し0。",
-    verdictSource: "operations-v6/UhC2O.txt + operations-v6/UhC2O-{1440,1920}.png + 2026-09-07 visual comparison",
-    verdictHead: "88912c59c3",
+    verdictNote: "**2026-09-07 Issue #487で再計測し、一致を維持。** 設計どおり更新履歴を直近4件に絞り、履歴タブでは重複する説明を外した。画素差5.0121%、高さ差+7px、1440/1920pxとも横はみ出し0。",
+    verdictSource: "operations-v6/UhC2O.txt + operations-v6/UhC2O-{1440,1920}.png（実装） + Pencil ★V6 + Issue #487 pixel diff",
+    verdictHead: "bb4baef1cc",
   },
   {
     ...OPERATIONS, node: 'U0BwS', name: '32-1-C 緊急停止の最終確認',
@@ -3019,9 +3014,9 @@ export const SCREENS = [
   */
   { node: 'hqrOv', feature: 4, name: '4-1 友だち属性・タグ', dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #456でPencilと実装を更新し、一致を維持。** 検索欄は残り幅を使い、使用状態・付与元・表示件数は最長文字と矢印余白を確保した。全欄40px・白背景、矢印は右端から12px内側。3107/8794の1440/1920pxで文字切れと横はみ出し0。",
-    verdictSource: "friend-attributes-v6/hqrOv.txt + friend-attributes-v6/hqrOv.png（Pencil） + friend-attributes-v6/hqrOv-{1440,1920}.png（実装） + Issue #456",
-    verdictHead: "526490a86",
+    verdictNote: "**2026-09-07 Issue #486 / UI HEAD `57fb09478` で高さを再判定。** #1287の設計高を初期viewportにする規約で撮り直し、高さ差+496pxは0pxへ解消。検索・絞り込み・一覧を維持し、画素差3.9584%、1440/1920pxとも文字切れ・横はみ出し0で一致。",
+    verdictSource: "friend-attributes-v6/hqrOv.txt + friend-attributes-v6/hqrOv-{1440,1920}.png + Issue #486 pixel comparison",
+    verdictHead: "57fb09478",
   },
   {
     node: 'dKlkz', feature: 4, name: '4-1-F タグ削除の確認ダイアログ',
@@ -3114,9 +3109,9 @@ export const SCREENS = [
     dir: 'friend-attributes-v6', route: '/tags/new?copy=tag-0', mode: 'page',
     steps: [{ fill: 'タグ名', text: 'NEN会員（定期）' }, { click: 'タグ連動', role: 'switch', onlyIfOff: true }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #330で実API接続後に再判定。** 一致。固定タグを複製し、購入フォルダ、NEN会員（定期）、本人10mile、紹介者5mile、1.5倍・優先度3、3件の連動アクションと右側4項目の要約を同じ状態で表示した。2幅とも横はみ出し0。",
-    verdictSource: "friend-attributes-v6/tP0RW.txt + friend-attributes-v6/tP0RW-{1440,1920}.png + 2026-09-07同一状態比較",
-    verdictHead: "5959c1756",
+    verdictNote: "**2026-09-07 Issue #486 / UI HEAD `57fb09478` で高さを修正・再判定。** 連動設定の入力・付け直し条件・アクション行の余白と行間をPencilの密度へそろえ、下部操作前の余分な間隔を削除。高さ差+228pxは0px、画素差5.3779%。3件の連動アクションと右側要約を維持し、1440/1920pxとも横はみ出し0で一致。",
+    verdictSource: "friend-attributes-v6/tP0RW.txt + friend-attributes-v6/tP0RW-{1440,1920}.png + Issue #486 pixel comparison",
+    verdictHead: "57fb09478",
   },
   {
     node: 'LfrQs', feature: 4, name: '4-1-C 連動アクション追加ドロワー',
@@ -3132,9 +3127,9 @@ export const SCREENS = [
     dir: 'friend-attributes-v6', route: '/tags/edit?id=tag-0', mode: 'page',
     steps: [{ click: '遡及反映', role: 'switch', onlyIfOff: true }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #451 / UI HEAD `9931ceba2` で再撮影・一致。** 旧実装として残っていた本文側の見出し構造を削除し、実画面は上部バーだけに画面名を表示する構成を維持した。パンくずは共通部品へ統一し、Pencil V6と横並びで再確認。1440/1920pxとも横はみ出し0。",
-    verdictSource: "friend-attributes-v6/ee0sk.txt + friend-attributes-v6/ee0sk-{1440,1920}.png + 2026-09-07同一状態比較",
-    verdictHead: "9931ceba2",
+    verdictNote: "**2026-09-07 Issue #486 / UI HEAD `57fb09478` で高さを修正・再判定。** 連動設定の入力・付け直し条件・アクション行の余白と行間をPencilの密度へそろえ、下部操作前の余分な間隔を削除。高さ差+242pxは+6px、画素差5.3388%。既存128人への反映欄と右側要約を維持し、1440/1920pxとも横はみ出し0で一致。",
+    verdictSource: "friend-attributes-v6/ee0sk.txt + friend-attributes-v6/ee0sk-{1440,1920}.png + Issue #486 pixel comparison",
+    verdictHead: "57fb09478",
   },
   {
     node: 'VjXGX', feature: 4, name: '4-1-E 遡及反映の確認ダイアログ',
@@ -3178,9 +3173,9 @@ export const SCREENS = [
     dir: 'friend-attributes-v6', route: '/tags/fields/migrate?id=field-birthday', mode: 'page',
     steps: [{ click: '事前確認する' }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #430 / #1194 の固定応答で再判定。** 移行元/移行先、13種類、差し込み名、事前確認の注意書きを確認した。固定応答のプレビューは値あり141人・そのまま137人・要確認3人・空欄1人で、設計の確認導線と一致する。1440/1920とも横スクロールはない。",
-    verdictSource: "friend-attributes-v6/KoT6c.txt",
-    verdictHead: "49484d5ab",
+    verdictNote: "**2026-09-07 Issue #486 / UI HEAD `57fb09478` で高さを再判定。** #1287の設計高を初期viewportにする規約で撮り直し、高さ差+112pxは0pxへ解消。移行元/移行先、13種類、事前確認と141人の内訳を維持し、画素差3.3877%、1440/1920pxとも横はみ出し0で一致。",
+    verdictSource: "friend-attributes-v6/KoT6c.txt + friend-attributes-v6/KoT6c-{1440,1920}.png + Issue #486 pixel comparison",
+    verdictHead: "57fb09478",
   },
   {
     node: 'GMvBd', feature: 4, name: '4-3-A 対応マークを追加・編集',
@@ -3212,9 +3207,9 @@ export const SCREENS = [
     node: 'XBkiQ', feature: 4, name: '4-4-A 保存した検索の条件確認・編集',
     dir: 'friend-attributes-v6', route: '/tags/searches/edit?id=ss-1', mode: 'page',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #330で実API接続後に再判定。** 一致。固定の保存条件を読み、名前・説明・共有範囲、AND・OR条件、該当18人、LINE15人・MAIL3人、3件の使用先、一覧表示、削除・取消・保存を実APIから表示した。2幅とも横はみ出し0。",
-    verdictSource: "friend-attributes-v6/XBkiQ.txt + friend-attributes-v6/XBkiQ-{1440,1920}.png + 2026-09-07同一状態比較",
-    verdictHead: "5959c1756",
+    verdictNote: "**2026-09-07 Issue #486 / UI HEAD `57fb09478` で高さを修正・再判定。** 画面末尾の96pxの余分な下余白を外し、高さ差+68pxは0pxへ解消。名前・共有範囲、AND/OR条件、該当18人、3件の使用先、下部操作を維持し、画素差4.8267%、1440/1920pxとも横はみ出し0で一致。",
+    verdictSource: "friend-attributes-v6/XBkiQ.txt + friend-attributes-v6/XBkiQ-{1440,1920}.png + Issue #486 pixel comparison",
+    verdictHead: "57fb09478",
   },
 
   // ── pen から届いた新画面（台帳 kentavndng/line-harness-board#18） ──────────
@@ -3500,6 +3495,7 @@ export const CAPTURED_AT = {
       note: 'Issue #387。固定ポート3105/8792で4画面14枚（通常・読込・失敗を含む）を1440/1920px撮影。全画像で横はみ出し0。健全性保存、停止・復旧、統合履歴、本人確認、通知の本流契約へ接続し、4画面を一致へ更新した。' },
   ],
   4: [
+    { pr: 1301, head: '57fb09478', on: '2026-09-07', screens: ['hqrOv', 'tP0RW', 'ee0sk', 'KoT6c', 'XBkiQ'], note: 'Issue #486 / PR #1301。統合#1293後、機能4の5画面を3105/8792で1440/1920px再撮影。タグ連動欄の密度と保存検索の下余白をPencilへそろえ、高さ差0〜+6px・画素差10%未満・横はみ出し0を確認した。' },
     { pr: 1279, head: '52d194d19b', on: '2026-09-07', screens: ['dKlkz', 'VjXGX'], note: 'Issue #470 / PR #1279。削除確認を設計の縦配置・影響5行・警告へ揃え、遡及確認に連動アイコン・取消不能警告・新規作成注記を追加。3106/8793で1440/1920pxを再撮影し、横はみ出し0。' },
     { pr: 1241, head: '64436d463b', on: '2026-09-07', screens: ['zGZMA'], note: 'Issue #446 / PR #1241。対応マークを物理削除せず、別のマークへ置き換えて履歴を残す保管としてPencil V6と実装を統一。3102/8789で1440/1920pxを撮影し、両幅とも横はみ出し0で一致。' },
     { pr: 420, head: '87c150ad', on: '2026-08-28', screens: ['HBTk0', 'yKEdO', 'KoT6c', 'A1ZYeP', 'l25rlp', 'rIhbN'] },
@@ -3543,6 +3539,7 @@ export const CAPTURED_AT = {
     { pr: 0, head: '96ed41b6', on: '2026-09-01', screens: ['PV1Vh', 'd3rFGD', 'Ho8z4', 'Q8sHa'], note: 'Claudeが実装して撮った。**doctorが合格になったが、この3本はまだ push していない**' },
   ],
   11: [
+    { pr: 1301, head: '57fb09478', on: '2026-09-07', screens: ['GFlD7', 'NNDMR'], note: 'Issue #486 / PR #1301。統合#1293後、テンプレート2画面を3105/8792で1440/1920px再撮影。新しい撮影高規約で高さ差を0pxへそろえ、画素差10%未満・横はみ出し0を確認した。' },
     { pr: 1247, head: 'fb07e4a3f3', on: '2026-09-07', screens: ['GFlD7', 'FRkls'], note: 'Issue #452 / PR #1247。旧Headerを外して画面名を共通上部バーへ集約し、3102/8789で1440/1920pxを再撮影。設計と上端から照合し、横はみ出し0で2画面とも一致を確認した。' },
     { pr: 1208, head: '68d536652', on: '2026-09-07', screens: ['M9cij'], note: 'Issue #426。PR #1197で修正されたPencil正本を取り込み、使用中3か所の削除不可・使用先一覧・差し替え導線を実装。3102/8789で1440/1920pxを再撮影し、両幅とも横はみ出し0、一致へ更新した。' },
     { pr: 1024, head: '031081d69', on: '2026-09-07', screens: ['W7LBc', 'NNDMR', 'M9cij'], note: 'Issue #224。割当ポート3104/8791で3画面を1440・1920px再撮影し、Pencil正本と同じ比較入力で照合。W7LBcとNNDMRを一致へ更新し、M9cijは要件とPencilの矛盾を根拠に要修正を維持。CzndJはPR #1019を正として差分から除外' },
@@ -3670,6 +3667,7 @@ export const CAPTURED_AT = {
     { pr: 587, head: '425a6b1a', on: '2026-08-30', screens: ['GFDqW', 'GfceK', 'Lg8ff'], note: '確認直前の空き再取得、完了画面のリマインダ時刻と台帳の事実。撮影データの slots[].date を要件どおりに直した' },
   ],
   24: [
+    { pr: 1301, head: '57fb09478', on: '2026-09-07', screens: ['festr', 'N2gAza'], note: 'Issue #486 / PR #1301。統合#1293後、LINE通知2画面と状態別画面を3105/8792で1440/1920px再撮影。新しい撮影高規約で高さ差を0pxへそろえ、画素差10%未満・横はみ出し0を確認した。' },
     { pr: 1224, head: '3ddca80cc4', on: '2026-09-07', screens: ['Q55bb'], note: 'Issue #440 / PR #1224。公開版・下書きとテスト送信結果を実API応答へ接続し、3104/8791で1440・1920px撮影。横はみ出し0で一致へ更新した。' },
     { pr: 1076, head: '8e7c374991', on: '2026-09-07', screens: ['festr', 'Q55bb', 'X8JCA5', 'Se65i'], note: 'Issue #291。固定ポート3102/8789で通常・読込・空・失敗の全状態を1440/1920px撮影し、全画像で横はみ出し0。4画面の構造をV6へそろえた。通知実行の通常fixtureと配信・開封・再試行・版管理のAPI契約が未提供のため、理由つきの構造一致・データ未接続とした。' },
     { pr: 504, head: '806ed169', on: '2026-08-30', screens: ['festr', 'Q55bb'], note: '顧客通知の一覧とテンプレート。**`DpxOK` はここでは撮らない**——#504 に運用者タブは無く、撮ると #564 の絵を巻き戻す（実際に一度やって git から戻した）' },
@@ -3732,6 +3730,7 @@ export const CAPTURED_AT = {
     { pr: 596, head: 'edb94936', on: '2026-08-30', screens: ['U9hzqH', 'g46ja', 'Yj6CQ', 'e6iJG'], note: 'Claudeが実装した。#595 の契約の上に公開までの4段。実装した本人が比較している' },
   ],
   5: [
+    { pr: 1301, head: '57fb09478', on: '2026-09-07', screens: ['kk8dz'], note: 'Issue #486 / PR #1301。統合#1293後、1通目設定を3105/8792で1440/1920px再撮影。設計高との差+10px・画素差6.2051%・横はみ出し0を確認した。' },
     { pr: 1255, head: '1e278a643', on: '2026-09-07', screens: ['TC1b1'], note: 'Issue #459 / PR #1255。Pencilに無い並び替え案内の押し口を外し、名前列と配信方式列の重なり、フォルダ選択の左余白を修正。3104/8791で1440・1920pxを上端から比較し、両幅とも横はみ出し0、一致を維持した。' },
     { pr: 1244, head: 'fa2d7bf8e', on: '2026-09-07',
       screens: ['TC1b1', 'cCB7r', 'kk8dz'],
@@ -3856,6 +3855,7 @@ export const CAPTURED_AT = {
     { pr: 1028, head: '7cc11af48', on: '2026-09-07', screens: ['vUXKb', 'JN6mQ'], note: 'Issue #267。#270の指標APIと#277の撮影モックを接続し、3102/8789で1440・1920pxを再撮影。両画面とも横はみ出し0、表示中の本文差0。有効友だち398人、送信枠197/200、7日推移、公式lin.ee URL、実QRを確認して一致にした。' },
   ],
   23: [
+    { pr: 1301, head: '57fb09478', on: '2026-09-07', screens: ['oHAN4'], note: 'Issue #486 / PR #1301。つなぎ先情報を3列へそろえ、通常・読込・空・失敗・権限不足を3105/8792で1440/1920px再撮影。高さ差0px・画素差4.2002%・横はみ出し0、鍵の露出なしを確認した。' },
     { pr: 1224, head: '3ddca80cc4', on: '2026-09-07', screens: ['bfB50', 'oHAN4'], note: 'Issue #440 / PR #1224。月別集計、下流影響件数、再試行方針を実API応答へ接続し、3104/8791で通常・読込・空・失敗・権限不足を1440・1920px撮影。全状態で横はみ出し0、一致へ更新した。' },
     { pr: 1190, head: '88673e254', on: '2026-09-07', screens: ['bfB50', 'oHAN4'], note: 'Issue #413。月別集計と下流影響件数のAPIを追加し、bfB50・oHAN4を3101/8788で通常・読込・空・異常・権限不足の各状態まで撮影。横はみ出し0。' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['eI3gs'], note: '同上' },

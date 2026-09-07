@@ -139,8 +139,7 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
             <div className={styles.fields}>
               <label className={styles.field}>ネットショップの種類<select className={styles.select} value={form.provider} onChange={(event) => setForm({ ...form, provider: event.target.value as Form['provider'] })}><option value="shopify">Shopify</option><option value="ec_cube">EC-CUBE</option></select></label>
               <label className={styles.field}>ショップのアドレス<input className={styles.input} value={form.shopDomain} onChange={(event) => setForm({ ...form, shopDomain: event.target.value })} placeholder="nen-store.myshopify.com" /></label>
-              <label className={styles.field}>つなぐための鍵<input className={styles.input} type="password" autoComplete="new-password" value={form.inboundSecret} onChange={(event) => setForm({ ...form, inboundSecret: event.target.value })} placeholder={connector?.secretConfigured ? `設定済み（末尾 ${connector.secretLastFour ?? '----'}）` : '32文字以上'} /></label>
-              <div className={styles.field}>保存している鍵<span className={styles.readOnlyValue}>{connector?.secretConfigured ? `設定済み（末尾 ${connector.secretLastFour ?? '----'}）` : '未設定'}</span><span className={styles.cardNote}>{connector?.secretUpdatedAt ? `${dateTime(connector.secretUpdatedAt)} に更新` : '鍵そのものは表示しません'}</span></div>
+              <label className={styles.field}>つなぐための鍵<input className={styles.input} type="password" autoComplete="new-password" value={form.inboundSecret} onChange={(event) => setForm({ ...form, inboundSecret: event.target.value })} placeholder={connector?.secretConfigured ? `設定済み（末尾 ${connector.secretLastFour ?? '----'}）` : '32文字以上'} /><span className={styles.cardNote}>{connector?.secretUpdatedAt ? `${dateTime(connector.secretUpdatedAt)} に更新。鍵そのものは表示しません` : '鍵そのものは表示しません'}</span></label>
             </div>
           </section>
 

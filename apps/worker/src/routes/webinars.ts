@@ -1069,7 +1069,7 @@ webinarRoutes.post('/api/webinars', requireRole('owner', 'admin'), async (c) => 
     if (typeof input === 'string') return c.json({ success: false, error: input }, 400);
     if (body.folderId) {
       const folder = await getFolderById(c.env.DB, body.folderId);
-      if (!folder || folder.kind !== 'webinar') {
+      if (!folder || folder.kind !== 'webinar' || folder.account_id !== body.accountId) {
         return c.json({ success: false, error: 'invalid_folder' }, 400);
       }
     }
@@ -1487,7 +1487,8 @@ webinarRoutes.put('/api/webinars/:id', requireRole('owner', 'admin'), async (c) 
     if (typeof input === 'string') return c.json({ success: false, error: input }, 400);
     if (body.folderId) {
       const folder = await getFolderById(c.env.DB, body.folderId);
-      if (!folder || folder.kind !== 'webinar') {
+      const targetAccountId = body.accountId ?? row.account_id;
+      if (!folder || folder.kind !== 'webinar' || folder.account_id !== targetAccountId) {
         return c.json({ success: false, error: 'invalid_folder' }, 400);
       }
     }

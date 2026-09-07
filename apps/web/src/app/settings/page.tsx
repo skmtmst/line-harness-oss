@@ -145,7 +145,7 @@ function FeatureRow({ item, features, ordering, usage, sharedSwitch, canMoveUp, 
 }) {
   const enabled = itemIsEnabled(item, features)
   return (
-    <li className="flex min-h-14 items-center justify-between gap-3 px-3 py-2.5">
+    <li className="flex min-h-14 items-center justify-between gap-3 px-3 py-2">
       <div className="flex min-w-0 items-start gap-2.5">
         {ordering && <span className="mt-0.5"><GripIcon /></span>}
         <div className="min-w-0">
@@ -511,7 +511,7 @@ export default function SettingsPage() {
         )}
       />
 
-      <div className="mb-5 flex items-start gap-3 rounded-[16px] bg-[#edf8ff] px-5 py-3.5 text-xs leading-relaxed text-[#3f4b53]">
+      <div className="mb-4 flex items-start gap-3 rounded-[16px] bg-[#edf8ff] px-5 py-2.5 text-xs leading-relaxed text-[#3f4b53]">
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="mt-px h-4 w-4 shrink-0 text-[#0066d6]">
           <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
           <path d="M12 10.5v6M12 7.5h.01" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
@@ -545,7 +545,7 @@ export default function SettingsPage() {
                 className={ordering ? 'space-y-4' : 'grid items-start gap-4 xl:grid-cols-3'}
               >
                 {(ordering ? [groups] : groupColumns).map((column, columnIndex) => (
-                  <div key={columnIndex} className="space-y-4">
+                  <div key={columnIndex} className="space-y-3">
                     {column.map((group) => (
                       <FeatureSection
                         key={group.id}
@@ -558,15 +558,6 @@ export default function SettingsPage() {
                         onMove={moveItem}
                       />
                     ))}
-                    {!ordering && columnIndex === 2 && (
-                      <div data-design="運営" className="border-hairline rounded-xl border bg-canvas p-4">
-                        <p className="text-sm font-bold text-ink">運営</p>
-                        <p className="mt-1 text-xs leading-5 text-ink-faint">お客さまの組織からは見えません。</p>
-                        <Link href="/settings/manual-links" className="mt-2 inline-block text-sm font-bold text-[#087d3d]">
-                          マニュアルの正本表
-                        </Link>
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>

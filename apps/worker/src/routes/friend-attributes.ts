@@ -325,6 +325,7 @@ function serializeFolder(row: Folder, count?: number) {
   return {
     id: row.id,
     kind: row.kind,
+    accountId: row.account_id ?? null,
     name: row.name,
     parentId: row.parent_id,
     displayOrder: row.display_order,
@@ -1333,19 +1334,23 @@ friendAttributes.get('/api/folders', async (c) => {
     if (raw && !isFolderKind(raw)) {
       return c.json({ success: false, error: '知らないフォルダの種類です' }, 400);
     }
-    const items = await getFolders(c.env.DB, raw && isFolderKind(raw) ? raw : undefined);
     if (raw !== 'webinar') {
+      const items = await getFolders(c.env.DB, raw && isFolderKind(raw) ? raw : undefined);
       return c.json({ success: true, data: items.map((row) => serializeFolder(row)) });
     }
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-    const requestedAccountId = c.req.query('account_id');
-    if (requestedAccountId && !scope.allowedAccountIds.includes(requestedAccountId)) {
+    const requestedAccountId = c.req.query('account_id')?.trim();
+    if (!requestedAccountId) {
+      return c.json({ success: false, error: 'account_id_required' }, 400);
+    }
+    if (!scope.allowedAccountIds.includes(requestedAccountId)) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
+    const items = await getFolders(c.env.DB, 'webinar', requestedAccountId);
     const counts = await getWebinarFolderCounts(c.env.DB, {
       allowedAccountIds: scope.allowedAccountIds,
       canSeeUnassigned: scope.canSeeUnassigned,
-      accountId: requestedAccountId || undefined,
+      accountId: requestedAccountId,
     });
     return c.json({
       success: true,
@@ -1366,6 +1371,17 @@ friendAttributes.post('/api/folders', requireRole('owner', 'admin'), async (c) =
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) return c.json({ success: false, error: 'フォルダ名を入力してください' }, 400);
 
+    const accountId = body.kind === 'webinar'
+      ? (typeof body.accountId === 'string' ? body.accountId.trim() : '')
+      : '';
+    if (body.kind === 'webinar') {
+      if (!accountId) return c.json({ success: false, error: 'account_id_required' }, 400);
+      const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      if (!scope.allowedAccountIds.includes(accountId)) {
+        return c.json({ success: false, error: 'Not found' }, 404);
+      }
+    }
+
     // 入れ子は1段まで。深くすると画面が組み立てられなくなる。
     if (body.parentId) {
       const parent = await getFolderById(c.env.DB, String(body.parentId));
@@ -1375,6 +1391,9 @@ friendAttributes.post('/api/folders', requireRole('owner', 'admin'), async (c) =
       }
       if (parent.kind !== body.kind) {
         return c.json({ success: false, error: '別の種類のフォルダには入れられません' }, 422);
+      }
+      if (body.kind === 'webinar' && parent.account_id !== accountId) {
+        return c.json({ success: false, error: '親フォルダが見つかりません' }, 400);
       }
     }
 
@@ -1394,6 +1413,7 @@ friendAttributes.post('/api/folders', requireRole('owner', 'admin'), async (c) =
       parentId: body.parentId ? String(body.parentId) : null,
       displayOrder: Number(body.displayOrder ?? 0),
       color,
+      accountId: accountId || null,
     });
     return c.json({ success: true, data: serializeFolder(folder) }, 201);
   } catch (err) {
@@ -1409,6 +1429,15 @@ friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), async 
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
 
     const body = await c.req.json<Record<string, unknown>>();
+    let webinarAccountId = '';
+    if (existing.kind === 'webinar') {
+      webinarAccountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+      if (!webinarAccountId) return c.json({ success: false, error: 'account_id_required' }, 400);
+      const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      if (!scope.allowedAccountIds.includes(webinarAccountId) || existing.account_id !== webinarAccountId) {
+        return c.json({ success: false, error: 'Not found' }, 404);
+      }
+    }
     const patch: Parameters<typeof updateFolder>[2] = {};
     if (body.name !== undefined) {
       const name = String(body.name).trim();
@@ -1422,6 +1451,16 @@ friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), async 
         return c.json({ success: false, error: '自分自身を親にはできません' }, 422);
       }
       patch.parentId = parentId;
+      if (parentId) {
+        const parent = await getFolderById(c.env.DB, parentId);
+        if (!parent || parent.kind !== existing.kind
+          || (existing.kind === 'webinar' && parent.account_id !== webinarAccountId)) {
+          return c.json({ success: false, error: '親フォルダが見つかりません' }, 400);
+        }
+        if (parent.parent_id) {
+          return c.json({ success: false, error: 'フォルダは2段までです' }, 422);
+        }
+      }
     }
     if (body.displayOrder !== undefined) patch.displayOrder = Number(body.displayOrder);
     if ('color' in body) {
@@ -1448,7 +1487,18 @@ friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), async 
 // 中身は消えず「未分類」に戻る。ただし子フォルダは一緒に消える。
 friendAttributes.delete('/api/folders/:id', requireRole('owner', 'admin'), async (c) => {
   try {
-    await deleteFolder(c.env.DB, c.req.param('id'));
+    const id = c.req.param('id');
+    const existing = await getFolderById(c.env.DB, id);
+    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+    if (existing.kind === 'webinar') {
+      const accountId = c.req.query('account_id')?.trim();
+      if (!accountId) return c.json({ success: false, error: 'account_id_required' }, 400);
+      const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      if (!scope.allowedAccountIds.includes(accountId) || existing.account_id !== accountId) {
+        return c.json({ success: false, error: 'Not found' }, 404);
+      }
+    }
+    await deleteFolder(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/folders/:id error:', err);

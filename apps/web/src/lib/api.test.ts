@@ -405,6 +405,9 @@ describe('webinarApi list data', () => {
 
     await webinarApi.list('account/1')
     await webinarApi.folders('account/1')
+    await webinarApi.createFolder('account/1', { name: '商品説明' })
+    await webinarApi.updateFolder('account/1', 'folder/1', { name: '導入事例' })
+    await webinarApi.deleteFolder('account/1', 'folder/1')
 
     expect(fetchSpy.mock.calls[0]?.[0]).toBe(
       'https://worker.example.com/api/webinars?account_id=account%2F1',
@@ -412,6 +415,17 @@ describe('webinarApi list data', () => {
     expect(fetchSpy.mock.calls[1]?.[0]).toBe(
       'https://worker.example.com/api/folders?kind=webinar&account_id=account%2F1',
     )
+    expect(fetchSpy.mock.calls[2]?.[1]).toMatchObject({
+      method: 'POST', body: JSON.stringify({ kind: 'webinar', accountId: 'account/1', name: '商品説明' }),
+    })
+    expect(fetchSpy.mock.calls[3]?.[0]).toBe('https://worker.example.com/api/folders/folder%2F1')
+    expect(fetchSpy.mock.calls[3]?.[1]).toMatchObject({
+      method: 'PATCH', body: JSON.stringify({ accountId: 'account/1', name: '導入事例' }),
+    })
+    expect(fetchSpy.mock.calls[4]?.[0]).toBe(
+      'https://worker.example.com/api/folders/folder%2F1?account_id=account%2F1',
+    )
+    expect(fetchSpy.mock.calls[4]?.[1]).toMatchObject({ method: 'DELETE' })
   })
 })
 

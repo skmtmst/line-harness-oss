@@ -37,6 +37,8 @@ describe('V6 機能32 運用状態の表示確認', () => {
     expect(source).toContain('問題がないか自動で確認し、エラーがあれば内容と次の行動を表示します。')
     expect(source).toContain('止める配信を選び、理由を入力して緊急停止します。')
     expect(source).toContain('エラー、緊急停止、システム更新、設定変更を時間順に確認できます。')
+    expect(source).toContain("description={tab === 'history' ? '' : description}")
+    expect(source).toContain('.slice(0, 4)')
   })
 
   it('仮表示を解除し、異常がないときは異常なしと表示する', () => {

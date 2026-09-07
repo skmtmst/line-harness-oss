@@ -802,8 +802,6 @@ export default function DashboardPage() {
         </aside>
       </div>
 
-      {data && <p className="text-ink-faint mt-5 text-xs">{new Date(data.generatedAt).toLocaleString('ja-JP')} 時点 ・ 最新データへ更新</p>}
-
       <DashboardEditor open={editorOpen} preferences={preferences} onCancel={() => setEditorOpen(false)} onApply={applyPreferences} onReset={resetPreferences} />
     </div>
   )

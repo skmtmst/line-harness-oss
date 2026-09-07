@@ -37,6 +37,8 @@ export type FolderKind = (typeof FOLDER_KINDS)[number];
 export interface Folder {
   id: string;
   kind: string;
+  /** ウェビナー用フォルダの所有LINE公式アカウント。ほかの種類は null。 */
+  account_id: string | null;
   name: string;
   parent_id: string | null;
   display_order: number;
@@ -50,7 +52,22 @@ export function isFolderKind(value: unknown): value is FolderKind {
   return typeof value === 'string' && (FOLDER_KINDS as readonly string[]).includes(value);
 }
 
-export async function getFolders(db: D1Database, kind?: FolderKind): Promise<Folder[]> {
+export async function getFolders(
+  db: D1Database,
+  kind?: FolderKind,
+  accountId?: string,
+): Promise<Folder[]> {
+  if (kind === 'webinar' && accountId) {
+    const result = await db
+      .prepare(
+        `SELECT * FROM folders
+          WHERE kind = ? AND account_id = ?
+          ORDER BY display_order ASC, name ASC`,
+      )
+      .bind(kind, accountId)
+      .all<Folder>();
+    return result.results;
+  }
   if (kind) {
     const result = await db
       .prepare(
@@ -78,14 +95,15 @@ export async function createFolder(
     parentId?: string | null;
     displayOrder?: number;
     color?: string | null;
+    accountId?: string | null;
   },
 ): Promise<Folder> {
   const id = crypto.randomUUID();
   const now = jstNow();
   await db
     .prepare(
-      `INSERT INTO folders (id, kind, name, parent_id, display_order, color, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO folders (id, kind, name, parent_id, display_order, color, account_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -94,6 +112,7 @@ export async function createFolder(
       input.parentId ?? null,
       input.displayOrder ?? 0,
       input.color ?? null,
+      input.accountId ?? null,
       now,
       now,
     )

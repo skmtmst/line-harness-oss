@@ -411,21 +411,20 @@ function OverviewStep({
     return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
   })()
   return (
-    <div data-design="Body" className="flex flex-col gap-4 xl:flex-row">
-      <div data-design="Left" className="bg-canvas rounded-card border-hairline min-w-0 flex-1 space-y-5 border p-6">
+    <div data-design="Body" className="flex flex-col items-start gap-4 xl:flex-row">
+      <div data-design="Left" className="bg-canvas rounded-card border-hairline min-w-0 flex-1 space-y-3 border p-4">
       <FormSection step={1} label="イベントの中身" note="友だちの予約ページにそのまま出ます">
-        <Field label="イベント名" htmlFor="ev-name" required>
-          <input
-            id="ev-name"
-            value={draft.name}
-            onChange={(e) => update('name', e.target.value)}
-            maxLength={255}
-            placeholder="例：第1回 定期便のはじめ方 説明会"
-            className={inputClass}
-          />
-        </Field>
-
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Field label="イベント名" htmlFor="ev-name" required>
+            <input
+              id="ev-name"
+              value={draft.name}
+              onChange={(e) => update('name', e.target.value)}
+              maxLength={255}
+              placeholder="例：第1回 定期便のはじめ方 説明会"
+              className={inputClass}
+            />
+          </Field>
           <Field label="開催場所" htmlFor="ev-venue">
             <input
               id="ev-venue"
@@ -447,12 +446,17 @@ function OverviewStep({
           </Field>
         </div>
 
-        <ImageUploader
-          mode="url"
-          value={draft.image_url ? { mode: 'url', url: draft.image_url } : null}
-          onChange={(v) => update('image_url', v?.mode === 'url' ? v.url : null)}
-          label="イベント画像"
-        />
+        <details className="border-hairline rounded-control border px-3 py-2">
+          <summary className="text-accent cursor-pointer text-sm font-medium">イベント画像を設定する</summary>
+          <div className="mt-3">
+            <ImageUploader
+              mode="url"
+              value={draft.image_url ? { mode: 'url', url: draft.image_url } : null}
+              onChange={(v) => update('image_url', v?.mode === 'url' ? v.url : null)}
+              label="イベント画像"
+            />
+          </div>
+        </details>
 
         <div>
           <div className="mb-1 flex items-center justify-between">
@@ -467,7 +471,7 @@ function OverviewStep({
             id="ev-desc"
             value={draft.description ?? ''}
             onChange={(e) => update('description', e.target.value || null)}
-            rows={8}
+            rows={2}
             placeholder="例：開催趣旨、注意事項、持ち物などを記載…"
             className={inputClass}
           />
@@ -526,6 +530,7 @@ function OverviewStep({
         </div>
       </FormSection>
 
+      <div className="grid gap-4 xl:grid-cols-2">
       <FormSection step={3} label="申し込みの上限">
         <Field
           label="1人あたりの予約回数"
@@ -574,7 +579,9 @@ function OverviewStep({
           </p>
         )}
       </FormSection>
+      </div>
 
+      <div className="grid gap-4 xl:grid-cols-2">
       <FormSection
         step={5}
         label="満席になったとき"
@@ -630,6 +637,7 @@ function OverviewStep({
           </span>
         </label>
       </FormSection>
+      </div>
 
       <div className="border-hairline mt-5 flex flex-wrap justify-between gap-2 border-t pt-4">
         <button
