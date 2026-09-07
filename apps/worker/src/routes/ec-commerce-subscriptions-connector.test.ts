@@ -83,7 +83,9 @@ describe('EC subscriptions and connector', () => {
       items: '鹿肉フード × 2', riskReason: '定期便のお支払いを確認できませんでした',
     })
     expect(body.data.summary).toMatchObject({ total: 1, atRisk: 1, monthlyAmount: 4280 })
-    expect(body.data.summary.startedThisMonth).toBeNull()
+    expect(body.data.summary.startedThisMonth).toBe(0)
+    expect(body.data.summary.cancelledThisMonth).toBe(0)
+    expect(body.data.summary.monthlyStats).toEqual([])
     expect(body.data.risk.predictiveScoreAvailable).toBe(false)
   })
 
