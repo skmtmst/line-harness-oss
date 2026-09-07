@@ -84,7 +84,7 @@ function BookingStatus({ accountId, eventId }: { accountId: string; eventId: str
           </span>
         )}
         <Link
-          href={`/events/bookings?eventId=${eventId}`}
+          href={`/events/bookings?id=${eventId}`}
           className="text-accent ml-auto text-xs hover:underline"
         >
           予約者を見る
@@ -134,7 +134,7 @@ function EditEventInner() {
           <span>編集</span>
         </nav>
         <Link
-          href={`/events/bookings?eventId=${id}`}
+          href={`/events/bookings?id=${id}`}
           className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
         >
           申込の一覧を見る

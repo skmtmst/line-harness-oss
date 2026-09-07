@@ -2123,6 +2123,8 @@ export type MileageRule = {
     uniquePerReferredFriend?: boolean
     uniquePerReferredFriendPerSubject?: boolean
   }
+  /** #532: 帰属するLINEアカウント。旧い全店共通ルールは null。 */
+  lineAccountId: string | null
   isActive: boolean
   validFrom: string | null
   validUntil: string | null
@@ -7719,6 +7721,8 @@ export const api = {
       conditions?: MileageRule['conditions'] | null
       validFrom?: string | null
       validUntil?: string | null
+      /** #532(#521): 帰属するLINEアカウント。口で必須。 */
+      lineAccountId: string
     }) => fetchApi<ApiResponse<MileageRule>>('/api/mileage/rules', {
       method: 'POST',
       body: JSON.stringify(data),
