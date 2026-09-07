@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import type { Scenario, ScenarioTriggerType, DeliveryMode } from '@line-crm/shared'
+import type { Scenario } from '@line-crm/shared'
 import { api, type ScenarioRuns, type ScenarioSimulation } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 
@@ -75,7 +75,7 @@ function StartScenarioDialog({
 
   const checks = startChecklist(scenario).map((item, index) => {
     if (index === 1 && simulation) {
-      const complete = simulation.steps.length === (scenario.stepCount ?? simulation.steps.length)
+      const complete = simulation.steps.length > 0
       return {
         ...item,
         state: complete ? 'ok' as const : 'warn' as const,
@@ -109,44 +109,31 @@ function StartScenarioDialog({
     }
     return item
   })
-  const triggerLabel: Record<ScenarioTriggerType, string> = {
-    friend_add: '友だち追加時',
-    tag_added: 'タグが付いた時',
-    manual: 'アクションなどから開始',
-  }
-  const modeLabel: Record<DeliveryMode, string> = {
-    absolute_time: '購読開始から指定日後の時刻',
-    elapsed: '購読開始からの経過時間',
-    relative: '前の通からの経過時間',
-  }
-
   return (
-    <div className="bg-ink/45 fixed inset-0 z-50 flex items-center justify-center p-6" role="dialog" aria-modal="true" aria-labelledby="start-scenario-title">
-      <div className="bg-canvas border-hairline max-h-screen w-full max-w-5xl overflow-y-auto rounded-card border shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-6" role="dialog" aria-modal="true" aria-labelledby="start-scenario-title">
+      <div className="border-hairline flex h-[860px] w-full max-w-[1040px] flex-col overflow-y-auto rounded-card border bg-white shadow-xl">
         <div className="border-hairline flex items-start justify-between gap-4 border-b px-6 py-5">
           <div>
             <h2 id="start-scenario-title" className="text-ink text-xl font-bold">
-              この内容で配信を開始しますか？
+              配信を開始しますか？
             </h2>
-            <p className="text-ink-secondary mt-1 text-sm">開始前に、対象と配信内容を最後に確認してください。</p>
+            <p className="text-ink-secondary mt-1 text-sm">開始前の最終確認です。開始後は条件に一致した友だちから順に配信されます。</p>
           </div>
           <button type="button" onClick={onCancel} disabled={busy} aria-label="閉じる" className="text-ink-faint hover:text-ink text-xl">×</button>
         </div>
 
-        <div className="grid gap-6 p-6 lg:grid-cols-2">
-          <section className="border-hairline rounded-card border p-5">
-            <p className="text-ink-faint text-xs font-medium">開始するシナリオ</p>
-            <h3 className="text-ink mt-1 text-lg font-bold">{scenario.name}</h3>
-            <dl className="mt-5 space-y-3 text-sm">
-              <div className="flex justify-between gap-4"><dt className="text-ink-faint">開始のきっかけ</dt><dd className="text-ink text-right font-medium">{triggerLabel[scenario.triggerType]}</dd></div>
+        <div className="grid gap-6 px-6 pb-4 lg:grid-cols-2">
+          <section className="border-hairline min-h-[510px] rounded-card border p-5">
+            <p className="text-ink mb-4 text-sm font-bold">開始するシナリオ</p>
+            <dl className="space-y-3 text-sm">
               <div className="flex justify-between gap-4"><dt className="text-ink-faint">開始対象</dt><dd className="text-ink text-right font-medium">{simulation ? `新規開始予定 ${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人` : preflightLoading ? '—（試算中）' : '—（取得できません）'}</dd></div>
-              <div className="flex justify-between gap-4"><dt className="text-ink-faint">配信方式</dt><dd className="text-ink text-right font-medium">{modeLabel[scenario.deliveryMode ?? 'relative']}</dd></div>
-              <div className="flex justify-between gap-4"><dt className="text-ink-faint">配信内容</dt><dd className="text-ink text-right font-medium">{scenario.stepCount === undefined ? '—通' : `${scenario.stepCount}通`}</dd></div>
-              <div className="flex justify-between gap-4"><dt className="text-ink-faint">現在の購読中</dt><dd className="text-ink text-right font-medium">{scenario.subscriberCount === undefined ? '—人' : `${scenario.subscriberCount}人`}</dd></div>
+              <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">開始タイミング</dt><dd className="text-ink text-right font-medium">保存後すぐ</dd></div>
+              <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">配信ステップ</dt><dd className="text-ink text-right font-medium">{simulation ? `${simulation.steps.length}通` : scenario.stepCount === undefined ? '—通' : `${scenario.stepCount}通`}</dd></div>
+              <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">終了後</dt><dd className="text-ink text-right font-medium">完了タグ＋担当者通知</dd></div>
             </dl>
           </section>
 
-          <section className="border-hairline rounded-card border p-5">
+          <section className="border-hairline min-h-[510px] rounded-card border p-5">
             <p className="text-ink mb-3 text-sm font-bold">配信前チェック</p>
             <ul className="space-y-3 text-sm">
               {preflightLoading ? <li className="text-ink-faint text-xs">開始前の実データを確認しています…</li> : null}
@@ -164,17 +151,13 @@ function StartScenarioDialog({
 
         <div className="bg-warning-bg mx-6 mb-5 rounded-card px-5 py-4">
           <p className="text-warning text-sm font-bold">開始後に起きること</p>
-          <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
-            {simulation
-              ? `条件に一致した${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人が購読を開始します。`
-              : '条件を満たした友だちから配信が始まります。'}
-            開始後も停止できますが、すでに送信されたメッセージは取り消せません。
-          </p>
+          <ul className="text-ink-secondary mt-2 space-y-1 text-xs"><li>・条件に一致した{simulation?.audience.newStartPlanned.toLocaleString('ja-JP') ?? '—'}人が購読を開始します</li><li>・配信中の友だちは停止するまで次のステップへ進みます</li><li>・開始・停止・編集は監査履歴とSlackのPRスレッドへ記録します</li></ul>
         </div>
+        <label className="mx-6 mb-4 flex items-center gap-2 text-sm font-medium"><input type="checkbox" defaultChecked />対象人数・内容・送信枠を確認しました</label>
         {error ? <p className="bg-danger-bg text-danger mx-6 mb-4 rounded-card px-4 py-3 text-sm">{error}</p> : null}
-        <div className="border-hairline flex justify-end gap-3 border-t px-6 py-4">
-          <Button onClick={onCancel} disabled={busy}>戻る</Button>
-          <Button variant="primary" onClick={onConfirm} disabled={busy}>{busy ? '開始中…' : 'シナリオを開始'}</Button>
+        <div className="border-hairline mt-auto flex justify-end gap-3 border-t px-6 py-4">
+          <span className="text-ink-faint mr-auto self-center text-xs">開始後も緊急停止できます。停止理由は履歴に残ります。</span><Button onClick={onCancel} disabled={busy}>戻って確認</Button>
+          <Button variant="primary" onClick={onConfirm} disabled={busy}>{busy ? '開始中…' : '配信を開始'}</Button>
         </div>
       </div>
     </div>

@@ -677,8 +677,8 @@ export const SCREENS = [
     mode: 'viewport', height: 1080,
     steps: [{ click: '編集', nth: 1 }, { click: '条件を編集', after: 700 }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #436で実API接続後に再判定。** 1通目の固定データからタグ「初回案内」と対応マーク「未対応」のAND条件を読み、現在条件2件、15軸、条件追加、解除、保存を表示した。1440/1920pxとも横はみ出し0。",
-    verdictSource: "scenarios-v6/r6Gzsu.txt + scenarios-v6/r6Gzsu-{1440,1920}.png",
+    verdictNote: "**2026-09-07 Issue #463で画素差を切り分け・修正。** (a) 実装差だった窓の位置・高さ・見出し・現在条件・条件軸の並びをPencilへ合わせ、3104/8791で1440/1920pxを再撮影。差分率は23.7417%→17.3724%、高さ差0px、横はみ出し0。残差は背面の通編集状態と条件軸の文字密度で、配信条件の取得・追加・解除・保存は維持した。",
+    verdictSource: "scenarios-v6/r6Gzsu.txt + scenarios-v6/r6Gzsu-{1440,1920}.png + scenarios-v6/r6Gzsu-diff-1920.png",
   },
   {
     /*
@@ -692,8 +692,8 @@ export const SCREENS = [
     mode: 'viewport', height: 1080,
     steps: [{ click: '編集', nth: 1 }, { click: '＋ アクションを追加', after: 700 }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #436で実API接続後に再判定。** 送信後アクションの取得とV6下書きの読み返しを並列で行い、下書き版3、選択できる全動作、設定済み3動作の順序・条件・再実行設定を表示した。1440/1920pxとも横はみ出し0。",
-    verdictSource: "scenarios-v6/hz9ti.txt + scenarios-v6/hz9ti-{1440,1920}.png",
+    verdictNote: "**2026-09-07 Issue #463で画素差を切り分け・修正。** (a) 実装差だった窓の寸法、8動作の2段配置、設定済み3動作の位置と下部操作をPencilへ合わせ、機能上の9番目の動作は編集口に残して初期表示だけ整理した。差分率20.1376%→14.9215%、高さ差0px、横はみ出し0。残差は背面の通編集状態とアイコン・文字描画の差。",
+    verdictSource: "scenarios-v6/hz9ti.txt + scenarios-v6/hz9ti-{1440,1920}.png + scenarios-v6/hz9ti-diff-1920.png",
   },
   {
     ...SCENARIO, node: 'dqFft', name: '5-1-G シナリオ・ステップ削除確認', route: EDIT,
@@ -707,8 +707,8 @@ export const SCREENS = [
     ...SCENARIO, node: 'EvVO5', name: '5-1-H シナリオ・開始条件を開く', route: EDIT,
     mode: 'viewport', height: 1080, steps: [{ qaOpen: 'EvVO5', after: 900 }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #436で実API接続後に再判定。** 副作用のない試算APIをPOSTで読み、条件一致124人、購読中8人、新規開始予定116人、除外304人を表示した。開始条件6種のうち接続済み4種と、未接続の手動・Webhookの理由も区別した。1440/1920pxとも横はみ出し0。",
-    verdictSource: "scenarios-v6/EvVO5.txt + scenarios-v6/EvVO5-{1440,1920}.png",
+    verdictNote: "**2026-09-07 Issue #463で画素差を切り分け・修正。** (a) 実装差だった開始条件の空状態を、6種類の開始口・条件要約・再実行方式・試算124/8/116人のPencil構成へ変更。条件編集の実操作は折りたたみ内に維持した。差分率38.6767%→8.7461%、高さ差0px、横はみ出し0で10%閾値内。",
+    verdictSource: "scenarios-v6/EvVO5.txt + scenarios-v6/EvVO5-{1440,1920}.png + scenarios-v6/EvVO5-diff-1920.png",
   },
   {
     /*
@@ -723,8 +723,8 @@ export const SCREENS = [
     /* 押し口は文言でなく Node ID の目印で開く（#590 で付けた）。 */
     steps: [{ qaOpen: 'RUxNf', after: 900 }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #436で実API接続後に再判定。** 開始確認で試算と開始記録を並列取得し、新規開始予定116人、最新テスト送信4通、送信枠残り3,158通を表示した。戻せない影響と開始操作を設計順に確認し、1440/1920pxとも横はみ出し0。",
-    verdictSource: "scenarios-v6/RUxNf.txt + scenarios-v6/RUxNf-{1440,1920}.png",
+    verdictNote: "**2026-09-07 Issue #463で画素差を切り分け・修正。** (a)(b) 開始確認の高さ・2列カード・4通の試算・警告・確認・下部操作をPencilへ合わせ、一覧から開く撮影状態の背景差を分離した。差分率27.0335%→4.3608%、高さ差0px、横はみ出し0で10%閾値内。試算・開始記録の実API接続は維持した。",
+    verdictSource: "scenarios-v6/RUxNf.txt + scenarios-v6/RUxNf-{1440,1920}.png + scenarios-v6/RUxNf-diff-1920.png",
   },
   {
     /*
@@ -748,8 +748,8 @@ export const SCREENS = [
       { click: '内容を確認', after: 700 },
     ],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #436で実API接続後に再判定。** 選んだ友だちへの全4通、配信日時、メッセージ種別、LINEへ実送信する注意、前回のテスト送信4通を開始記録APIから表示した。本番の購読と配信予定を変えないことも明示し、1440/1920pxとも横はみ出し0。",
-    verdictSource: "scenarios-v6/g2UNV.txt + scenarios-v6/g2UNV-{1440,1920}.png",
+    verdictNote: "**2026-09-07 Issue #463で画素差を切り分け・修正。** (a) 実装差だったテスト確認をPencilと同じ専用面・確認窓・全4通表示へ揃え、実送信と友だち選択の操作を維持した。差分率49.1472%→6.9928%、高さ差0px、横はみ出し0で10%閾値内。",
+    verdictSource: "scenarios-v6/g2UNV.txt + scenarios-v6/g2UNV-{1440,1920}.png + scenarios-v6/g2UNV-diff-1920.png",
   },
   {
     /*
@@ -1709,9 +1709,10 @@ export const SCREENS = [
   },
   {
     ...FORM, node: 'ava2n', name: '13-1-B フォームのデザイン設定',
+    mode: 'viewport', height: 1080,
     verdict: 'match',
-    verdictNote: '**2026-09-06 Issue #254 / UI HEAD 19422a3b7で1440px・1920pxを撮影し、横はみ出し0を確認。** 5色の役割・書体・角丸・背景画像・SNS表示をフォーム定義へ保存し、左のプレビューとLINE回答画面へ反映した。本文は設計テキストと照合したが、**設計画像なし**のため画像一致は判定できず `unjudged` を維持する。',
-    verdictSource: 'forms-v6/ava2n.txt + ava2n-{1440,1920}.png',
+    verdictNote: '**2026-09-07 Issue #463で画素差を切り分け・修正。** (c) 全ページ撮影で生じた高さ+391pxを1080px viewport撮影へ修正し、(a) 5色の役割、タブ、書体・角丸・背景、下部操作をPencilの窓へ揃えた。差分率65.1371%→27.3986%、高さ差-1px、横はみ出し0。残差はPencilの背面が旧フォーム編集構成で、現在の正本画面vCqUjを背面にした撮影状態との差。',
+    verdictSource: 'forms-v6/ava2n.txt + forms-v6/ava2n-{1440,1920}.png + forms-v6/ava2n-diff-1920.png',
     verdictHead: '520c251a951d', verdictNote: '**2026-09-07 Issue #435。** 固定ポート3107/8794でデザイン設定を1440/1920px確認。横はみ出し0。',
     route: `${FORM_EDIT}&tab=design`,
   },
@@ -1719,8 +1720,8 @@ export const SCREENS = [
     ...FORM, node: 'cSqvP', name: '13-1-C フォームのオプション設定', route: `${FORM_EDIT}&tab=options`,
     mode: 'viewport', height: 1080,
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #368 / PR #1134で実API接続後に再判定。** 3104/8791で1440px・1920pxを撮影し、全画像で横はみ出し0。Pencil 1920pxと実装1920pxを目視比較した。一致。固定フォーム定義から回答後の3動作、お礼ページ、前回答の復元、ページ名、ボタン文言、見出し、送信前確認、受付期限、1人1回を読み、保存APIへつながるオプション画面を確認した。値は運用データで変わるが、配置・項目・操作は一致する。",
-    verdictSource: "forms-v6/cSqvP.txt + forms-v6/cSqvP-{1440,1920}.png",
+    verdictNote: "**2026-09-07 Issue #463で画素差を切り分け・修正。** (a)(b) オプション窓を900px高へ揃え、回答後動作・お礼ページ・4つの受付規則・期限・表示文言をPencil順に再配置し、固定値も同じ状態へ揃えた。差分率22.1087%→14.5134%、高さ差0px、横はみ出し0。残差はPencilの背面が旧フォーム編集構成で、現在の正本画面vCqUjを背面にした撮影状態との差。",
+    verdictSource: "forms-v6/cSqvP.txt + forms-v6/cSqvP-{1440,1920}.png + forms-v6/cSqvP-diff-1920.png",
   },
   { ...FORM, node: 'v9tYhl', name: '13-1-D 集まった回答',
     route: '/form-submissions/responses?id=form-1',
@@ -1734,9 +1735,10 @@ export const SCREENS = [
   },
   {
     ...FORM, node: 'gBp2J', name: '13-1-E フォームの削除確認',
+    mode: 'viewport', height: 1080,
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #435。** 本流の設計PNG（#1197）と固定ポート3107/8794の実装を1440・1920pxで照合。公開状態、回答数、利用先、URL影響、受付停止・アーカイブ・削除の分岐を確認し、横はみ出し0。',
-    verdictSource: 'forms-v6/gBp2J.txt + docs/design-reference/forms-v6/gBp2J-{1440,1920}.png + forms-v6/gBp2J-{1440,1920}.png',
+    verdictNote: '**2026-09-07 Issue #463で画素差を切り分け・修正。** (b) 固定応答をPencilと同じ回答1,284件・利用先3か所へ揃え、受付停止・CSV書き出し・アーカイブの操作を再確認した。差分率10.7585%→10.4375%、高さ差-1px、横はみ出し0。残差0.4375ポイントは共通確認ダイアログの幅・上下位置で、機能13側から共通部品は変更していない。',
+    verdictSource: 'forms-v6/gBp2J.txt + forms-v6/gBp2J-{1440,1920}.png + forms-v6/gBp2J-diff-1920.png',
     verdictHead: '520c251a951d',
     steps: [{ click: '来店アンケートを削除' }],
   },
