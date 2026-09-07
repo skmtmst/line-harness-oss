@@ -132,13 +132,13 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
     expect(PAGE).toContain('いまの決めごとを文章にすると')
     expect(PAGE).toContain('この文章のとおりに動きます。')
     expect(PAGE).toContain('同じきっかけのルールは両方動きます')
-    expect(PAGE).toContain('条件を足す（15の軸から選べます）')
+    expect(PAGE).toContain('15軸')
     expect(PAGE).toContain('失敗したとき: 現在はここで止まります。')
   })
 
-  it('取れない数は未接続の言葉で出し、0件と書かない', () => {
+  it('保存後に見込み人数を確認でき、0件と書かない', () => {
     expect(PAGE).toContain(
-      'まだ繋がっていません。見込み人数を数える口が接続されると表示されます。',
+      '保存後に見込み人数を確認できます。',
     )
     // 見込み人数の枠に 0 を書かない。
     expect(PAGE).not.toContain('見込み人数: 0')

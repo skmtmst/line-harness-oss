@@ -63,6 +63,15 @@ const EVENTS: ReadonlyArray<{ value: Automation['eventType']; label: string; not
 /** 言葉で絞れるきっかけ。ほかは本文を持たないので条件欄を出さない。 */
 const KEYWORD_EVENTS: ReadonlyArray<string> = ['message_received', 'postback_received']
 
+const CONDITION_AXES = [
+  ['tag_exists', 'タグを持っている'], ['tag_not_exists', 'タグを持っていない'],
+  ['is_following', '友だち状態'], ['name', '名前'], ['private_memo', '個人メモ'],
+  ['status_message', 'ステータスメッセージ'], ['registered_at', '登録日'],
+  ['support_mark', '対応マーク'], ['is_hidden', '非表示状態'], ['friend_field', '友だち情報欄'],
+  ['scenario_subscribed', 'シナリオ購読'], ['scenario_state', 'シナリオ状態'],
+  ['form_answered', 'フォーム回答'], ['last_reaction_at', '最終反応日'], ['score_range', '行動スコア'],
+] as const
+
 /**
  * 画面に出す「すること」。
  *
@@ -101,6 +110,8 @@ export default function NewAutomationPage() {
   const [name, setName] = useState('')
   const [eventType, setEventType] = useState<string>(EVENTS[0].value)
   const [keyword, setKeyword] = useState('')
+  const [conditionType, setConditionType] = useState<(typeof CONDITION_AXES)[number][0] | ''>('')
+  const [conditionValue, setConditionValue] = useState('')
   const [actions, setActions] = useState<ActionDraft[]>([newActionDraft()])
   const [tags, setTags] = useState<Tag[]>([])
   const [tagsLoading, setTagsLoading] = useState(true)
@@ -200,7 +211,10 @@ export default function NewAutomationPage() {
       const res = await api.automations.create({
         name: name.trim(),
         eventType: selectedEvent.value,
-        conditions: usesKeyword && keyword.trim() ? { keyword: keyword.trim() } : {},
+        conditions: {
+          ...(usesKeyword && keyword.trim() ? { keyword: keyword.trim() } : {}),
+          ...(conditionType && conditionValue.trim() ? { operator: 'AND', rules: [{ type: conditionType, value: conditionType === 'is_following' || conditionType === 'is_hidden' ? conditionValue.trim() === 'true' : conditionValue.trim() }] } : {}),
+        },
         // すること（アクション）は { type, params } の形で持つ。
         // params の中身は type ごとに違う。
         actions: actions.map(
@@ -312,9 +326,13 @@ export default function NewAutomationPage() {
             ) : null}
             <div className="mt-3 flex flex-wrap gap-2">
               {usesKeyword && keyword.trim() ? <span className="inline-flex min-h-9 items-center rounded-full border border-hairline bg-canvas px-3 text-xs font-bold text-ink-secondary">「{keyword.trim()}」を含む</span> : <span className="inline-flex min-h-9 items-center rounded-full border border-hairline bg-canvas px-3 text-xs font-bold text-ink-secondary">条件なし</span>}
-              <button type="button" disabled className={styles.conditionAdd}>条件を足す（15の軸から選べます）</button>
+              <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                <SelectField aria-label="条件の軸" value={conditionType} onChange={(event) => setConditionType(event.target.value as typeof conditionType)} options={[{ value: '', label: '条件の軸を選ぶ' }, ...CONDITION_AXES.map(([value, label]) => ({ value, label }))]} className={styles.select} />
+                <TextField aria-label="条件の値" value={conditionValue} onChange={(event) => setConditionValue(event.target.value)} placeholder="値を入力" />
+                <span className="text-ink-faint self-center text-xs">15軸</span>
+              </div>
             </div>
-            <p className="mt-3 text-xs font-bold text-info">いまの条件に当てはまる友だち　—（見込み人数の集計は未接続）</p>
+            <p className="mt-3 text-xs font-bold text-info">いまの条件に当てはまる友だち　保存後に見込み人数を確認できます。</p>
           </Step>
 
           <Step step={3} done={actions.length > 0} title="何をするか" note="上から順に実行します。">
