@@ -1886,10 +1886,6 @@ export const SCREENS = [
       状態別に撮るための口の当てはめ（affiliate-payments）が一度も当たらないのも、
       画面がその口を呼んでいないため。**在るふりをして状態別に撮らない。**
     */
-    status: 'unimplemented',
-    gap: 'build',
-    gapNote: '締め（あと何日で金額が固定されるか）・支払予定日・振込用CSV・振込先・人ごとの金額を出す画面。口は `/api/affiliate-payments` が既に在るので、画面を作れば足りる',
-    why: '`/conversions?tab=payment` は既定タブへ落ち、支払いの画面が出ない。`MERGED_TABS` に `payment` が無く、`conversions`・`affiliates` 配下に `payment` の語が1つも無い（2026-09-04 確認）',
     // ---- 2026-09-02 `7d830282` で撮った。**絵を見て確かめた範囲だけ書く。** ----
     // 解決：名前が取れない行が **「名前を取得できませんでした」** と出ている。IDの断片は出ていない。
     // 解決：表のどこにも内部IDが無い。案件・金額・フラグの空きは `—`。
@@ -2298,10 +2294,10 @@ export const SCREENS = [
       apis: ['**/api/nen-campaigns/**', '**/api/nen-campaigns'],
       kinds: ['loading', 'empty', 'error'],
     },
-    verdict: "structure_match_data_pending",
-    verdictNote: '**2026-09-07 Issue #418 / HEAD 1c8055931 で実APIへ接続し、設計画像と実装画像を同じ1920pxで並べて再判定。** 30日の関連成果142件・612,400円と配信別成果金額を表示した。通常・読込・空・失敗を両幅で撮影し横はみ出し0。残る差はLINEが個人の開封・押下を提供しないため反応率を作れないことだけで、理由を表示して構造一致・データ待ちとする。',
+    verdict: "match",
+    verdictNote: '**2026-09-07 Issue #446 / UI HEAD 64436d463b でPencil V6を修正し再判定。** 個人の開封率を作らず、到達率・クリック率はLINE集計で確認する設計と表示へ統一した。30日の関連成果142件・612,400円と配信別成果金額も維持。通常・読込・空・失敗を3102/8789で1440/1920px撮影し、全画像で横はみ出し0。',
     verdictSource: 'nen-v6/VLMGH.txt + VLMGH-1440.png + VLMGH-1920.png + VLMGH-loading/empty/error screenshots',
-    verdictHead: '1c8055931',
+    verdictHead: '64436d463b',
   },
   { ...NEN, node: 'DEX0k', name: '21-1-A NENコラム', route: '/nen-campaigns?tab=columns',
     verdict: 'match',
@@ -2316,10 +2312,10 @@ export const SCREENS = [
     verdictHead: '78c19bea32',
   },
   { ...NEN, node: 'WeXbL', name: '21-1-C NEN配信の履歴', route: '/nen-campaigns?tab=history',
-    verdict: "structure_match_data_pending",
-    verdictNote: '**2026-09-07 Issue #418 / HEAD 1c8055931 で実APIへ接続し、設計画像と実装画像を同じ1920pxで並べて再判定。** 未達6通をブロック4・退会2・その他0に分け、待機中をまとめて今すぐ送る操作を接続した。1440・1920pxとも横はみ出し0。残る差は個人の反応をLINEから取得できないことだけで、取得不可と明示して構造一致・データ待ちとする。',
+    verdict: "match",
+    verdictNote: '**2026-09-07 Issue #446 / UI HEAD 64436d463b でPencil V6を修正し再判定。** 個人別の反応を作らず、到達率・クリック率の列は取得不可と明示する設計と表示へ統一した。未達6通の内訳と待機中を今すぐ送る操作も維持。3102/8789で1440/1920px撮影し、両幅とも横はみ出し0。',
     verdictSource: 'nen-v6/WeXbL.txt + WeXbL-1440.png + WeXbL-1920.png',
-    verdictHead: '1c8055931',
+    verdictHead: '64436d463b',
   },
   {
     ...NEN, node: 'HpKyF', name: '21-1-D NEN配信の中身を編集する',
@@ -2337,12 +2333,10 @@ export const SCREENS = [
   {
     ...NEN, node: 'ymXJK', name: '21-1-E コラムを書く',
     route: '/nen-campaigns/columns/new', mode: 'page',
-    gap: 'parts',
-    gapNote: '設計の本文エディタ・配信予約・タグ付けは、この契約（#618）の外',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #418 / HEAD 1c8055931 で実APIへ接続し、設計画像と実装画像を同じ1920pxで並べて再判定。** 対象人数、予約日時、読了イベント、読了後タグ、複製、テスト送信の保存・実行APIを接続した。通常・入力済み・入力誤り・重複・権限不足・保存失敗を両幅で撮影し横はみ出し0。記事本文は外部サイトを正本とする承認済み契約のため、Pencilに残る本文エディタが修正されるまでは理由付きの構造一致・データ待ちとする。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #446 / UI HEAD 64436d463b でPencil V6を修正し再判定。** 本文エディタを外し、外部記事URL・画像URL・LINE紹介文を確認する承認済み契約へ設計を統一した。対象人数、予約日時、読了イベント、読了後タグ、複製、テスト送信も表示・保存できる。通常・入力済み・入力誤り・重複・権限不足・保存失敗を3102/8789で1440/1920px撮影し、全画像で横はみ出し0。',
     verdictSource: 'nen-v6/ymXJK.txt + ymXJK-1920.png + ymXJK-filled-1920.png',
-    verdictHead: '1c8055931',
+    verdictHead: '64436d463b',
     states: {
       apis: ['**/api/nen-campaigns/columns**'],
       kinds: ['normal'],
@@ -3150,18 +3144,12 @@ export const SCREENS = [
   {
     node: 'zGZMA', feature: 4, name: '4-3-B 対応マーク削除の確認ダイアログ',
     dir: 'friend-attributes-v6', route: '/tags?tab=marks', mode: 'viewport', height: 1080,
-    /*
-      **設計は「削除」、現行要件と実装は「保管」。** 設計 `zGZMA` は
-      「対応マーク削除の確認ダイアログ」だが、実装の行の操作は
-      「対応中を保管」で、消さずにしまう作りになっている。
-      撮るために実装の言葉へ合わせた。履歴を残す保管が正本であり、
-      Pencil側の物理削除表現はオーナー票での修正待ちとして残す。
-    */
+    /* 対応マークは物理削除せず、置き換えて履歴を残す保管として扱う。 */
     steps: [{ click: '保留を保管', scope: 'main' }],
-    verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07 Issue #419 / UI HEAD `a16927af23` で理由付き保留。** 保留3人、利用ルール、表示先、置換先、履歴保持、取消・保管を実APIから表示した。現行要件とAPIは履歴を残す保管で確定しているが、Pencil画像だけが物理削除の表現なので、設計修正までは一致にしない。1440/1920pxとも横はみ出し0。",
+    verdict: "match",
+    verdictNote: "**2026-09-07 Issue #446 / UI HEAD `64436d463b` でPencil V6を修正し再判定。** 対応マークは物理削除せず、3人を別のマークへ置き換えて履歴を残す保管として設計と実装を統一した。3102/8789で1440/1920pxを撮影し、両幅とも横はみ出し0。",
     verdictSource: "friend-attributes-v6/zGZMA.txt + friend-attributes-v6/zGZMA-{1440,1920}.png + 2026-09-07同一状態比較",
-    verdictHead: "5959c1756",
+    verdictHead: "64436d463b",
   },
   {
     /* **#421（head `71aff344`）で `/tags/searches/edit` が入った。** */
@@ -3455,6 +3443,7 @@ export const CAPTURED_AT = {
       note: 'Issue #387。固定ポート3105/8792で4画面14枚（通常・読込・失敗を含む）を1440/1920px撮影。全画像で横はみ出し0。健全性保存、停止・復旧、統合履歴、本人確認、通知の本流契約へ接続し、4画面を一致へ更新した。' },
   ],
   4: [
+    { pr: 1241, head: '64436d463b', on: '2026-09-07', screens: ['zGZMA'], note: 'Issue #446 / PR #1241。対応マークを物理削除せず、別のマークへ置き換えて履歴を残す保管としてPencil V6と実装を統一。3102/8789で1440/1920pxを撮影し、両幅とも横はみ出し0で一致。' },
     { pr: 420, head: '87c150ad', on: '2026-08-28', screens: ['HBTk0', 'yKEdO', 'KoT6c', 'A1ZYeP', 'l25rlp', 'rIhbN'] },
     { pr: 421, head: 'f7b7974a', on: '2026-08-28', screens: ['QKx8Q', 'XBkiQ'] },
   { pr: 541, head: 'e929f22a', on: '2026-08-29', screens: ['QKx8Q', 'XBkiQ'], note: '保存した検索から内部IDを外し、選ぶ形へ。**#541 は #539 を含む**。束3' },
@@ -3838,6 +3827,7 @@ export const CAPTURED_AT = {
       note: '台帳 #233。PR headの同じ実装を1440px・1920pxで撮影し、22枚すべて横スクロール0。設計との比較は一致5枚、構造一致・データ未接続3枚。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
   ],
   21: [
+    { pr: 1241, head: '64436d463b', on: '2026-09-07', screens: ['VLMGH', 'WeXbL', 'ymXJK'], note: 'Issue #446 / PR #1241。個人開封率を作らないNEN計測、外部記事を正本にするコラム入力へPencil V6と実装を統一。3102/8789で全状態を1440/1920px撮影し、横はみ出し0で3画面一致。' },
     { pr: 1237, head: 'c6dfe250c', on: '2026-09-07', screens: ['HpKyF'], note: 'Issue #442 / PR #1237。NEN配信の本文エディタと、回答フォームを開く・回答後200マイル付与の設定保存を実装。通常・誕生日を3102/8789で1440/1920px撮影し、全画像で横はみ出し0、Pencil V6と一致。' },
     { pr: 1234, head: '78c19bea32', on: '2026-09-07', screens: ['q4lajm'], note: 'Issue #445 / PR #1234。修正済み設計に合わせて誕生日配信の到達率94.6%とクリック率38.2%を表示し、3107/8794で1440/1920px撮影。両画像で横はみ出し0。' },
     { pr: 1217, head: '1c8055931', on: '2026-09-07', screens: ['VLMGH', 'DEX0k', 'q4lajm', 'WeXbL', 'ymXJK'], note: 'Issue #418。機能21の成果金額・読了・複製・未達内訳・一括即時送信・作成保存操作を実API契約へ接続。3106/8793で通常と定義済み状態を1440/1920px撮影し、対象画像は横はみ出し0。LINE非提供の個人反応と設計修正待ちは理由付きで保留。' },

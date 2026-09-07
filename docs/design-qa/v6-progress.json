@@ -2,15 +2,15 @@
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
   "compared": 247,
-  "unimplemented": 1,
+  "unimplemented": 0,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 24,
-  "match": 263,
-  "structureMatchDataPending": 4,
+  "missing": 25,
+  "match": 268,
+  "structureMatchDataPending": 0,
   "needsFix": 0,
   "unjudged": 0,
-  "remaining": 5,
+  "remaining": 0,
   "features": [
     {
       "feature": 1,
@@ -346,12 +346,21 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 6,
-      "match": 16,
-      "structureMatchDataPending": 1,
+      "match": 17,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 1,
+      "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1241,
+          "head": "64436d463b",
+          "on": "2026-09-07",
+          "screens": [
+            "zGZMA"
+          ],
+          "note": "Issue #446 / PR #1241。対応マークを物理削除せず、別のマークへ置き換えて履歴を残す保管としてPencil V6と実装を統一。3102/8789で1440/1920pxを撮影し、両幅とも横はみ出し0で一致。"
+        },
         {
           "pr": 420,
           "head": "87c150ad",
@@ -2024,15 +2033,15 @@
       "name": "成果とアフィリエイト",
       "total": 9,
       "compared": 7,
-      "unimplemented": 1,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 1,
-      "match": 8,
+      "missing": 2,
+      "match": 9,
       "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 1,
+      "remaining": 0,
       "capturedAt": [
         {
           "pr": 1230,
@@ -2597,12 +2606,23 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 1,
-      "match": 4,
-      "structureMatchDataPending": 3,
+      "match": 7,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 3,
+      "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1241,
+          "head": "64436d463b",
+          "on": "2026-09-07",
+          "screens": [
+            "VLMGH",
+            "WeXbL",
+            "ymXJK"
+          ],
+          "note": "Issue #446 / PR #1241。個人開封率を作らないNEN計測、外部記事を正本にするコラム入力へPencil V6と実装を統一。3102/8789で全状態を1440/1920px撮影し、横はみ出し0で3画面一致。"
+        },
         {
           "pr": 1237,
           "head": "c6dfe250c",
@@ -3463,13 +3483,5 @@
       "capturedAt": null
     }
   ],
-  "gaps": [
-    {
-      "feature": 16,
-      "node": "njLGA",
-      "name": "16-1-C 支払い",
-      "gap": "build",
-      "gapNote": "締め（あと何日で金額が固定されるか）・支払予定日・振込用CSV・振込先・人ごとの金額を出す画面。口は `/api/affiliate-payments` が既に在るので、画面を作れば足りる"
-    }
-  ]
+  "gaps": []
 }
