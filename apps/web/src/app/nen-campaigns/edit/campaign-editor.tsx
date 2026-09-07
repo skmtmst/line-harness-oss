@@ -6,10 +6,12 @@ import { Eye, FlaskConical, Gift, Plus, X } from 'lucide-react'
 import { api, type NenCampaignAfterAction, type NenCampaignSetting } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { Field, inputClass } from '@/components/shared/form-controls'
+import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import styles from './campaign-editor.module.css'
 
 const TRIGGER_LABEL: Record<string, string> = {
   'ec.order.confirmed': '注文を受け付けたとき',
@@ -202,11 +204,11 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
   return (
     <div data-design-node="HpKyF" className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <nav className="text-ink-faint flex min-w-0 flex-1 items-center gap-2 text-xs" aria-label="パンくず">
+        <nav data-design="Crumb" className="text-ink-faint flex min-w-0 flex-1 items-center gap-2 text-xs" aria-label="パンくず">
           <Link href="/nen-campaigns" className="text-accent hover:underline">NEN配信</Link><span>›</span>
           <Link href="/nen-campaigns?tab=flows" className="text-accent hover:underline">配信フロー</Link><span>›</span><span>{setting.label}</span>
         </nav>
-        <button type="button" onClick={() => setTestSearchOpen((open) => !open)} className="border-hairline text-ink rounded-control flex h-10 items-center gap-2 border bg-white px-4 text-sm font-bold hover:bg-canvas-sunken"><FlaskConical aria-hidden size={17} />自分にテスト送信</button>
+        <Button onClick={() => setTestSearchOpen((open) => !open)} className="h-10"><FlaskConical aria-hidden size={17} />自分にテスト送信</Button>
       </div>
 
       {error && <p className="bg-danger-bg text-danger rounded-card px-4 py-3 text-sm">{error}</p>}
@@ -215,16 +217,16 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
       {testSearchOpen && (
         <section className="bg-canvas rounded-card border-hairline flex flex-wrap items-center gap-2 border p-3">
           <input type="search" value={testSearch} onChange={(event) => setTestSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void searchFriends() }} placeholder="テスト送信の相手を名前で探す" aria-label="テスト送信の相手を名前で探す" className={`${inputClass} max-w-sm`} />
-          <button type="button" onClick={() => void searchFriends()} className="border-hairline rounded-control border px-3 py-2 text-sm">探す</button>
-          {testCandidates.map((candidate) => <button key={candidate.id} type="button" disabled={testing} onClick={() => void sendTest(candidate.id)} className="bg-accent-deep text-on-accent rounded-control px-3 py-2 text-sm">{candidate.displayName ?? '名前なし'}へ送る</button>)}
+          <Button onClick={() => void searchFriends()}>探す</Button>
+          {testCandidates.map((candidate) => <Button key={candidate.id} variant="primary" disabled={testing} onClick={() => void sendTest(candidate.id)}>{candidate.displayName ?? '名前なし'}へ送る</Button>)}
         </section>
       )}
 
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
-        <div className="space-y-4">
+      <div className={styles.editorGrid}>
+        <div data-design="Body" className="space-y-4">
           <section className="bg-canvas rounded-card border-hairline border p-4">
             <h2 className="text-ink mb-4 text-base font-bold">いつ送りますか</h2>
-             <div className="grid gap-3 md:grid-cols-[1.3fr_120px_140px_220px]">
+             <div className={styles.timingGrid}>
               <Field label="きっかけ"><p className="border-hairline rounded-control border px-3 py-2 text-sm">{triggerLabel(setting)}</p></Field>
               <Field label={isBirthday ? '送る日' : '何日後'}>{isBirthday ? <p className="border-hairline rounded-control border px-3 py-2 text-sm">3日前</p> : <input type="number" min={0} max={365} value={merged.delayDays} onChange={(event) => setDraft((previous) => ({ ...previous, delayDays: Number(event.target.value) }))} className={inputClass} />}</Field>
               <Field label="時刻">{isBirthday ? <p className="border-hairline rounded-control border px-3 py-2 text-sm">10:00（固定）</p> : <input type="time" value={merged.deliveryTime.slice(0, 5)} onChange={(event) => setDraft((previous) => ({ ...previous, deliveryTime: event.target.value }))} className={inputClass} />}</Field>
@@ -240,38 +242,38 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
           <section className="bg-canvas rounded-card border-hairline border p-4">
             <h2 className="text-ink mb-4 text-base font-bold">送るもの</h2>
             <div className="bg-canvas-sunken rounded-card border-hairline border p-3">
-              <div className="mb-3 flex items-center justify-between gap-3"><p className="text-ink-secondary text-xs font-bold">1つめ ／ リッチメッセージ</p><div className="flex gap-2"><button type="button" className="border-hairline rounded-control border bg-white px-3 py-1.5 text-xs">差し替える</button><button type="button" className="border-hairline rounded-control border bg-white px-3 py-1.5 text-xs">消す</button></div></div>
-              <div className="rounded-card border-hairline border bg-white p-3">
+              <div className="mb-3 flex items-center justify-between gap-3"><p className="text-ink-secondary text-xs font-bold">1つめ ／ リッチメッセージ</p><div className="flex gap-2"><Button>差し替える</Button><Button>消す</Button></div></div>
+              <div className="bg-canvas rounded-card border-hairline border p-3">
                 <InsertToolbar targetRef={bodyRef} value={merged.bodyText} onChange={(bodyText) => setDraft((previous) => ({ ...previous, bodyText }))} />
                 <p className="text-ink-faint mt-2 text-right text-xs tabular-nums">{merged.bodyText.length.toLocaleString('ja-JP')} / 4,500</p>
                 <textarea ref={bodyRef} rows={5} maxLength={4500} value={merged.bodyText} onChange={(event) => setDraft((previous) => ({ ...previous, bodyText: event.target.value }))} aria-label="配信本文" className={`${inputClass} mt-2 resize-y leading-relaxed`} />
               </div>
             </div>
-            <button type="button" className="border-hairline text-ink-secondary rounded-control mt-3 flex h-11 w-full items-center justify-center gap-2 border text-sm font-bold"><Plus aria-hidden size={16} />吹き出しを追加する（あと2つまで）</button>
+            <Button className="mt-3 h-11 w-full"><Plus aria-hidden size={16} />吹き出しを追加する（あと2つまで）</Button>
           </section>
 
           <section className="bg-canvas rounded-card border-hairline border p-4">
             <h2 className="text-ink text-base font-bold">押されたあとにすること</h2><p className="text-ink-faint mt-1 text-xs">リッチメッセージの面を押した人に何をするかです。</p>
             <div className="mt-3 space-y-2">
-              {formAction?.kind === 'open_form' && <div className="border-hairline rounded-control flex items-center gap-3 border px-4 py-3"><span className="text-accent text-lg">▣</span><div className="min-w-0 flex-1"><p className="text-sm font-bold">回答フォーム「{formAction.formName}」を開く</p><p className="text-ink-faint text-xs">星の評価と、ひとことだけの短いフォームです</p></div><button type="button" aria-label="回答フォームを外す" onClick={() => setActions(actions.filter((action) => action !== formAction))}><X aria-hidden size={16} /></button></div>}
-              {mileageAction?.kind === 'award_mileage' && <div className="border-hairline rounded-control flex items-center gap-3 border px-4 py-3"><Gift aria-hidden className="text-accent" size={18} /><div className="min-w-0 flex-1"><p className="text-sm font-bold">書いてくれたらマイルを {mileageAction.amount.toLocaleString('ja-JP')} 付ける</p><p className="text-ink-faint text-xs">回答フォームへの送信をきっかけにしています</p></div><button type="button" aria-label="マイル付与を外す" onClick={() => setActions(actions.filter((action) => action !== mileageAction))}><X aria-hidden size={16} /></button></div>}
+              {formAction?.kind === 'open_form' && <div className="border-hairline rounded-control flex items-center gap-3 border px-4 py-3"><span className="text-accent text-lg">▣</span><div className="min-w-0 flex-1"><p className="text-sm font-bold">回答フォーム「{formAction.formName}」を開く</p><p className="text-ink-faint text-xs">星の評価と、ひとことだけの短いフォームです</p></div><Button aria-label="回答フォームを外す" onClick={() => setActions(actions.filter((action) => action !== formAction))}><X aria-hidden size={16} /></Button></div>}
+              {mileageAction?.kind === 'award_mileage' && <div className="border-hairline rounded-control flex items-center gap-3 border px-4 py-3"><Gift aria-hidden className="text-accent" size={18} /><div className="min-w-0 flex-1"><p className="text-sm font-bold">書いてくれたらマイルを {mileageAction.amount.toLocaleString('ja-JP')} 付ける</p><p className="text-ink-faint text-xs">回答フォームへの送信をきっかけにしています</p></div><Button aria-label="マイル付与を外す" onClick={() => setActions(actions.filter((action) => action !== mileageAction))}><X aria-hidden size={16} /></Button></div>}
               {!formAction && <label className="block text-xs font-bold">回答フォームを開く<select defaultValue="" onChange={(event) => addFormAction(event.target.value)} className={`${inputClass} mt-1`}><option value="" disabled>回答フォームを選ぶ</option>{forms.map((form) => <option key={form.id} value={form.id}>{form.name}</option>)}</select></label>}
-              {!mileageAction && <button type="button" onClick={addMileageAction} className="border-hairline rounded-control flex w-full items-center justify-center gap-2 border px-3 py-2 text-sm"><Gift aria-hidden size={16} />回答後に200マイル付ける</button>}
+              {!mileageAction && <Button onClick={addMileageAction} className="w-full"><Gift aria-hidden size={16} />回答後に200マイル付ける</Button>}
             </div>
           </section>
         </div>
 
-        <aside className="space-y-3">
+        <aside data-design="Right" className="space-y-3">
           <section className="bg-canvas rounded-card border-hairline border p-4">
             <p className="text-ink-secondary mb-3 flex items-center gap-2 text-xs font-bold"><Eye aria-hidden size={15} />高橋 直人さん（ももちゃん）にはこう届きます</p>
-            <div className="bg-line-preview rounded-card p-4"><h2 className="text-on-accent text-center text-sm font-bold">LINEプレビュー</h2><p className="mt-3 text-center"><span className="bg-line-preview-label text-on-accent rounded-pill px-3 py-1 text-[10px] font-bold">◷ {timing}</span></p><div className="mt-4 rounded-card bg-white p-4"><p className="text-sm leading-relaxed whitespace-pre-wrap">{previewBody(merged.bodyText)}</p>{merged.buttonLabel && <p className="bg-accent-deep text-on-accent rounded-control mt-3 py-2 text-center text-xs font-bold">★ {merged.buttonLabel}</p>}</div></div>
+            <div className="bg-line-preview rounded-card p-4"><h2 className="text-on-accent text-center text-sm font-bold">LINEプレビュー</h2><p className="mt-3 text-center"><span className="bg-line-preview-label text-on-accent rounded-pill text-micro px-3 py-1 font-bold">◷ {timing}</span></p><div className="bg-canvas mt-4 rounded-card p-4"><p className="text-sm leading-relaxed whitespace-pre-wrap">{previewBody(merged.bodyText)}</p>{merged.buttonLabel && <p className="bg-accent-deep text-on-accent rounded-control mt-3 py-2 text-center text-xs font-bold">★ {merged.buttonLabel}</p>}</div></div>
           </section>
           <section className="bg-canvas rounded-card border-hairline border p-4"><h2 className="text-sm font-bold">つながる先</h2><dl className="mt-3 space-y-2 text-xs"><div className="flex justify-between gap-3"><dt className="text-accent font-bold">→ EC連携</dt><dd className="text-ink-secondary">注文と到着の記録</dd></div><div className="flex justify-between gap-3"><dt className="text-accent font-bold">→ 共通情報</dt><dd className="text-ink-secondary">差し込んでいる「商品名」</dd></div><div className="flex justify-between gap-3"><dt className="text-accent font-bold">→ 友だち属性</dt><dd className="text-ink-secondary">友だち情報欄「ペットの名前」</dd></div>{mileageAction?.kind === 'award_mileage' && <div className="flex justify-between gap-3"><dt className="text-accent font-bold">→ マイル</dt><dd className="text-ink-secondary">書いてくれたら {mileageAction.amount}</dd></div>}{formAction?.kind === 'open_form' && <div className="flex justify-between gap-3"><dt className="text-accent font-bold">→ 回答フォーム</dt><dd className="text-ink-secondary">{formAction.formName}</dd></div>}</dl></section>
           <section className="border-warning bg-warning-bg text-warning rounded-card border p-4"><h2 className="text-sm font-bold">気をつけること</h2><div className="mt-3 space-y-3 text-xs"><p><strong className="block">◷ 20時台がいちばん押されます</strong>分析の「配信の反応」で確かめられます</p><p><strong className="block">▣ 3つ以上の吹き出しは嫌がられます</strong>1回に3つ送った配信は、ブロック率が3倍でした</p></div></section>
         </aside>
       </div>
 
-      <StickyBar status={merged.isEnabled ? '動いています。保存すると、これから届く42通に新しい中身が使われます。' : '停止中です。保存しても新しい配信は始まりません。'} actions={<><Link href="/nen-campaigns" className="border-hairline rounded-control border px-4 py-2 text-sm font-bold">キャンセル</Link><button type="button" onClick={() => setTestSearchOpen(true)} className="border-hairline rounded-control flex items-center gap-2 border px-4 py-2 text-sm font-bold"><FlaskConical aria-hidden size={16} />自分にテスト送信</button><button type="button" onClick={() => void save()} disabled={saving} className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50">{saving ? '保存中…' : '配信内容を保存'}</button></>} />
+      <StickyBar status={merged.isEnabled ? '動いています。保存すると、これから届く42通に新しい中身が使われます。' : '停止中です。保存しても新しい配信は始まりません。'} actions={<><Button href="/nen-campaigns">キャンセル</Button><Button onClick={() => setTestSearchOpen(true)}><FlaskConical aria-hidden size={16} />自分にテスト送信</Button><Button variant="primary" onClick={() => void save()} disabled={saving}>{saving ? '保存中…' : '配信内容を保存'}</Button></>} />
     </div>
   )
 }
