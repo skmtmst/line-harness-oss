@@ -184,10 +184,10 @@ export const SCREENS = [
   },
   {
     node: 'ZN0ov', feature: 1, name: '1-1-1 ダッシュボード編集',
-    verdict: 'match', verdictNote: '**2026-09-04 再照合で一致。** テキスト差0。パネル幅540px、見出しの副文、札型タブ、カードの配置説明、4枠警告、5枚目ON時の自動OFF、「ダッシュボードに反映」まで設計に合わせた。2026-09-03の1440/1920px画像と最新コード差分で確認。現在コミットの画像はPlaywrightのOS権限で取得できず、旧画像と差分照合で判定。', verdictSource: 'dashboard-v6/ZN0ov.txt + 2026-09-03 1440/1920px screenshots + 2026-09-04 static diff audit',
-    dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #465 / UI HEAD 894450db8 を3105/8792で再撮影し、画素差4.8383%で一致。** 分類(c)：旧撮影は設計より87px長く、分類(a)：背景暗転が設計30%に対して25%だった。撮影高を1754pxへ固定し、暗転を30%へ合わせた。パネル幅540px、4枠警告、5枚目ON時の自動OFF、固定フッターを目視でも照合し、横はみ出し0。', verdictSource: 'dashboard-v6/ZN0ov.png + ZN0ov-{1440,1920}.png + Issue #465 pixel diff',
+    dir: 'dashboard-v6', route: '/', mode: 'viewport', height: 1754, clock: DASHBOARD_CLOCK,
     steps: [{ click: 'ダッシュボード編集' }],
-    verdictHead: '145c497d1',
+    verdictHead: '894450db8',
   },
   {
     node: 'JN6mQ', feature: 1, name: '1-1-2 友だち追加QR',
@@ -2187,6 +2187,7 @@ export const SCREENS = [
     */
     ...INFLOW, node: 'UIaM7', name: '18-1-E 流入リンクの削除確認',
     route: '/inflow-links/detail?ref=summer-ig', mode: 'page',
+    steps: [{ click: '夏のInstagram投稿の削除を確認' }],
     gap: 'api',
     gapNote: '使用先の一覧・別リンクへの差し替え・アーカイブを返す口がまだ無い。段1（窓）だけでは要件 §4-6 を満たさない',
     variants: [
@@ -2203,8 +2204,9 @@ export const SCREENS = [
     //         設計のどちらが正かはこの絵から決められないので判定は据え置く。
     // 取得元：`inflow-v6/Q4bkTg-1440.png`（`7d830282`）,
     verdict: "match",
-    verdictNote: "**2026-09-06 Issue #231 / PR #951 / UI HEAD 43b3aae50で設計画像と実装画像を同じ幅で並べて再確認し、一致。** 対象名、使用中URL、現在の流入86人、分析と過去記録への影響を示し、受付停止・別リンクへ転送・削除の3択を確認窓へ配置した。通常・確認・失敗の全状態を2幅で撮影し、横はみ出し0。",
-    verdictSource: "inflow-v6/UIaM7-open.txt + UIaM7-open-1440.png + UIaM7-open-1920.png + UIaM7-fail.txt",
+    verdictNote: "**2026-09-07 Issue #465 / UI HEAD 894450db8 を3105/8792で再撮影し、確認状態の画素差5.0928%で一致。** 分類(a)：旧確認窓は設計より短く、影響が2行だけで選択肢の記号・説明も不足していた。URL・過去記録・追加時の動きの3影響、残るもの、受付停止・転送・削除の3択、固定フッターへ合わせた。分類(b)：設計は一覧背景、現行要件の正規導線は詳細背景のため、確認窓を比較対象として扱う。両幅とも横はみ出し0。",
+    verdictSource: "inflow-v6/UIaM7.png + UIaM7-open-{1440,1920}.png + UIaM7-fail.txt + Issue #465 pixel diff",
+    verdictHead: '894450db8',
   },
   {
     ...INFLOW, node: 'BMmxU', name: '18-1-F 一覧の状態（空・読込・エラー）',
@@ -2932,15 +2934,15 @@ export const SCREENS = [
   {
     ...STAFF, node: 'EOTS4', name: '30-1-A 見せる範囲を決める',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #434 / 3101・8788で再撮影・再判定。** `access/roles` の機能30固定行を読み、管理者・運用・見るだけの3役割を横に、対象機能を縦に並べ、編集・閲覧・対象外を比較できる表として表示した。個人通知は比較表から分離し、ユーザー編集側へ残した。1440/1920pxとも対象画面へ到達し、横はみ出し0。',
-    verdictSource: 'staff-v6/EOTS4.txt + staff-v6/EOTS4-{1440,1920}.png + 2026-09-07 visual comparison',
+    verdictNote: '**2026-09-07 Issue #465 / UI HEAD 894450db8 を3105/8792で再撮影し、画素差4.8683%で一致。** 分類(a)：旧実装は役割を比べる小窓で、設計の「高田 誠さんに見せる範囲」と構造が異なっていた。個人の全画面編集へ改め、4つの権限かたまり、8項目の3択、見え方・つながる先・注意、固定保存欄を設計順に配置した。両幅とも横はみ出し0。',
+    verdictSource: 'staff-v6/EOTS4.png + EOTS4-{1440,1920}.png + Issue #465 pixel diff',
     mode: 'viewport', height: 1080, /*
       **行の押し口は「範囲を編集」。** 人の名前は文字で、押せる役を持っていない。
       名前で探していたので、固定データを足したあとも0件のままだった
       （`page.tsx:142` の行末が `範囲を編集`）。
     */
     steps: [{ wait: 1500 }, { qaOpen: 'EOTS4' }],
-    verdictHead: '54f1910a7',
+    verdictHead: '894450db8',
   },
   { ...STAFF, node: 'jwVlo', name: '30-1-B 入った記録', route: '/staff?tab=audit',
     states: { apis: ['**/api/audit/events*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
@@ -2998,9 +3000,9 @@ export const SCREENS = [
     */
     steps: [{ click: '緊急停止する', after: 900 }],
     verdict: "match",
-    verdictNote: "**2026-09-07、Issue #387・`88912c59c3` の最終確認を固定ポート3105/8792で1440・1920撮影し、設計と目視比較して一致。** 下見と同じ件数・人数、アカウント、対象、理由、止まらないもの、取り消せない配信を表示。「停止」入力後に操作専用の6桁本人確認を行い、重複防止キーと版番号を付けて停止する。ログインユーザーへのLINE・メール通知も実送信契約へ接続済み。両幅とも横はみ出し0。",
-    verdictSource: "operations-v6/U0BwS.txt + operations-v6/U0BwS-{1440,1920}.png + 2026-09-07 visual comparison",
-    verdictHead: "88912c59c3",
+    verdictNote: "**2026-09-07 Issue #465 / UI HEAD 894450db8 を3105/8792で再撮影し、画素差4.8497%で一致。** 分類(a)：旧確認窓は設計より小さく、理由が危険欄へ混在し、確認入力も横に広すぎた。720×700pxの窓へ、3対象の影響、理由、止まらないもの、280px確認入力、固定フッターを設計順に分離。分類(c)：背景暗転を設計と同じ35%へ合わせた。両幅とも横はみ出し0。",
+    verdictSource: "operations-v6/U0BwS.png + U0BwS-{1440,1920}.png + Issue #465 pixel diff",
+    verdictHead: "894450db8",
   },
 
   // ── 機能4 友だち属性（PR #402 で比較した残り10枚を台帳へ統合） ──

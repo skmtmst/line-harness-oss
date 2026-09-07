@@ -2,7 +2,7 @@
 
 `scripts/visual-qa/screens.mjs` から機械で組み立てています。**手で書き写していません。**
 
-総数 **272** ／ 比較済み **253** ／ 未実装 **0** ／ 未確認 **0** ／ 別の仕掛けで撮影 **0** ／ 未撮影 **19**
+総数 **272** ／ 比較済み **254** ／ 未実装 **0** ／ 未確認 **0** ／ 別の仕掛けで撮影 **0** ／ 未撮影 **18**
 
 ## 判定
 
@@ -42,7 +42,7 @@
 | 15 | 登録メディア | 5 | 4 | 5 | 0 | 0 | 0 | 0 | 5 | 1 | 0 | 0 | 0 | 1 | #1157 `0cc67ed91d` 2026-09-07（g89Tc・voJtX・eXAJP・YfTfJ）<br>#997 `3eae16770` 2026-09-06（g89Tc・voJtX・eXAJP・YfTfJ・h8pBZr）<br>#559 `7922c002` 2026-08-29（g89Tc）<br>#560 `7c1acd0f` 2026-08-29（g89Tc）<br>#0 `c275749d` 2026-08-30（eXAJP）<br>#617 `b7e58a51` 2026-08-31（YfTfJ）<br>#667 `7d830282` 2026-09-02（g89Tc・eXAJP・YfTfJ・h8pBZr） |
 | 16 | 成果とアフィリエイト | 9 | 7 | 9 | 0 | 0 | 0 | 0 | 8 | 1 | 1 | 0 | 0 | 2 | #1230 `b62d7d070` 2026-09-07（QX70l）<br>#1180 `3721857fb` 2026-09-07（jwrbf・GqFTV・njLGA）<br>#558 `ef7b5773` 2026-08-29（PouPn・xqT1Z・jwrbf）<br>#563 `64798425` 2026-08-29（jwrbf）<br>#0 `c275749d` 2026-08-30（PouPn・GH8VL・n5VVTb・xqT1Z・GPWzq）<br>#585 `75d6eb9a` 2026-08-30（njLGA）<br>#585 `3857365b` 2026-08-30（njLGA）<br>#667 `7d830282` 2026-09-02（n5VVTb・PouPn・GH8VL・njLGA・GPWzq・xqT1Z） |
 | 17 | マイル・行動スコア | 11 | 11 | 11 | 0 | 0 | 0 | 0 | 10 | 0 | 1 | 0 | 0 | 0 | #1258 `84039ceca` 2026-09-07（BmoGY）<br>#1234 `78c19bea32` 2026-09-07（N46cQ・BmoGY・p9CcEB）<br>#1217 `1c8055931` 2026-09-07（s98Vfw・qlVLJ・MvZm5・BmoGY・HIU5O・vz0Ji・z3PB2）<br>#1215 `65390c132` 2026-09-07（N46cQ・BmoGY・p9CcEB・k8VCU）<br>#1137 `5e1ccd22d` 2026-09-07（s98Vfw・N46cQ・qlVLJ・MvZm5・BmoGY・HIU5O・vz0Ji・k8VCU・z3PB2）<br>#549 `0ae3e094` 2026-08-29（qlVLJ・p9CcEB）<br>#441 `05c5b103` 2026-08-28（MvZm5・BmoGY・HIU5O）<br>#441 `e953109c` 2026-08-28（s98Vfw・N46cQ・k8VCU）<br>#494 `0ca45f98` 2026-08-28（HIU5O）<br>#495 `55301679` 2026-08-30（z3PB2・vz0Ji）<br>#496 `4dac7986` 2026-08-28（s6MBc）<br>#499 `642b8222` 2026-08-30（s6MBc）<br>#0 `c275749d` 2026-08-30（s98Vfw・N46cQ・BmoGY・k8VCU）<br>#582 `78e2f065` 2026-08-30（vz0Ji）<br>#624 `5e8f32d3` 2026-08-31（z3PB2・p9CcEB・s98Vfw・MvZm5・HIU5O・N46cQ・qlVLJ）<br>#667 `7d830282` 2026-09-02（MvZm5・HIU5O・z3PB2・k8VCU・s98Vfw・N46cQ・qlVLJ・BmoGY）<br>#914 `48742a352` 2026-09-06（s98Vfw・N46cQ・qlVLJ・MvZm5・BmoGY・HIU5O・k8VCU・z3PB2・s6MBc）<br>#1041 `16e2331cb` 2026-09-07（s98Vfw・s6MBc） |
-| 18 | 流入と計測 | 9 | 7 | 9 | 0 | 0 | 0 | 0 | 9 | 1 | 0 | 0 | 0 | 2 | #443 `f372ff30` 2026-08-28<br>#0 `c275749d` 2026-08-30（Q4bkTg・IhSBB・v0HaI・TEVk8・JupxW・BMmxU・BuVDB・Im2b1）<br>#574 `0906b8fa` 2026-08-30（JupxW・BMmxU・UIaM7）<br>#589 `45b3efc5` 2026-08-30（TEVk8）<br>#627 `d80ef8ce` 2026-08-31（Q4bkTg・IhSBB・v0HaI・BuVDB・Im2b1・BMmxU・UIaM7）<br>#666 `7d830282` 2026-09-02（Q4bkTg・BMmxU・IhSBB・v0HaI・BuVDB・Im2b1・TEVk8・JupxW・UIaM7）<br>#951 `43b3aae50` 2026-09-06（Q4bkTg・IhSBB・v0HaI・TEVk8・JupxW・UIaM7・BMmxU・BuVDB・Im2b1） |
+| 18 | 流入と計測 | 9 | 8 | 9 | 0 | 0 | 0 | 0 | 9 | 1 | 0 | 0 | 0 | 1 | #443 `f372ff30` 2026-08-28<br>#0 `c275749d` 2026-08-30（Q4bkTg・IhSBB・v0HaI・TEVk8・JupxW・BMmxU・BuVDB・Im2b1）<br>#574 `0906b8fa` 2026-08-30（JupxW・BMmxU・UIaM7）<br>#589 `45b3efc5` 2026-08-30（TEVk8）<br>#627 `d80ef8ce` 2026-08-31（Q4bkTg・IhSBB・v0HaI・BuVDB・Im2b1・BMmxU・UIaM7）<br>#666 `7d830282` 2026-09-02（Q4bkTg・BMmxU・IhSBB・v0HaI・BuVDB・Im2b1・TEVk8・JupxW・UIaM7）<br>#951 `43b3aae50` 2026-09-06（Q4bkTg・IhSBB・v0HaI・TEVk8・JupxW・UIaM7・BMmxU・BuVDB・Im2b1） |
 | 19 | コンバージョン | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | #1230 `b62d7d070` 2026-09-07（GtylA・d8d3Mz）<br>#1207 `46a869f74` 2026-09-07（ZrpKn・GUxsj）<br>#444 `ccbd0975` 2026-08-28<br>#0 `c275749d` 2026-08-30（ZrpKn・GUxsj・GtylA）<br>#1183 `b5e3dd6a3` 2026-09-07（ZrpKn・GUxsj） |
 | 20 | 分析 | 9 | 9 | 9 | 0 | 0 | 0 | 0 | 8 | 0 | 1 | 0 | 0 | 0 | #445 `787a4b46` 2026-08-28<br>#0 `c275749d` 2026-08-30（Zxezb・J6Inc・YBGtm・QQ1SR・f5HsX・C2I7ry・Fh2Qj・dfwD4）<br>#584 `d0e62d59` 2026-08-30（QQ1SR）<br>#676 `a0bb3f44` 2026-09-02（Zxezb・J6Inc・YBGtm・QQ1SR・f5HsX・C2I7ry・dfwD4）<br>#924 `bd8f0482` 2026-09-06（Zxezb・J6Inc・YBGtm・QQ1SR・f5HsX・C2I7ry・Fh2Qj・dfwD4） |
 | 21 | NEN配信 | 7 | 6 | 7 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 1 | #1241 `64436d463b` 2026-09-07（VLMGH・WeXbL・ymXJK）<br>#1237 `c6dfe250c` 2026-09-07（HpKyF）<br>#1234 `78c19bea32` 2026-09-07（q4lajm）<br>#1217 `1c8055931` 2026-09-07（VLMGH・DEX0k・q4lajm・WeXbL・ymXJK）<br>#446 `4307088d` 2026-08-28<br>#525 `deff5ffb` 2026-08-29（DEX0k）<br>#526 `dfcc9a53` 2026-08-29（HpKyF）<br>#0 `c275749d` 2026-08-30（VLMGH・q4lajm・WeXbL・i9sQP）<br>#526 `1c91a7bc` 2026-08-30（HpKyF・VLMGH）<br>#620 `ed5c0932` 2026-08-31（ymXJK）<br>#1050 `8d3557ce0` 2026-09-07（VLMGH・DEX0k・q4lajm・WeXbL・ymXJK・i9sQP） |
@@ -59,7 +59,7 @@
 | 32 | 運用状態 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 4 | 1 | 0 | 0 | 0 | 0 | #482 `b346d467` 2026-08-29（b3HfZ・U0BwS）<br>#0 `c275749d` 2026-08-30（UgonK・UhC2O） |
 | 33 | LINEアカウント設定 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 |  |
 | 34 | はじめの設定と案内 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 |  |
-| | **合計** | **272** | **253** | **268** | **0** | **0** | **0** | **0** | **250** | **56** | **22** | **0** | **0** | **19** | |
+| | **合計** | **272** | **254** | **268** | **0** | **0** | **0** | **0** | **250** | **56** | **22** | **0** | **0** | **18** | |
 
 ## 画面ごとの画素差
 
