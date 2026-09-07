@@ -111,11 +111,12 @@ describe('友だち属性の一覧（設計 hqrOv）', () => {
 
   it('ツールバーを枠付きカードで包まず、フォルダは240で置く', () => {
     const source = read('components/friend-fields/tags-page-v4.tsx')
-    // 設計 `XchZz` に枠は無い。中の3つは h=36(h-9)・r=8(`rounded-control`)・13。
+    // Issue #456 で Pencil `XchZz` も更新。検索は余白を使い、選択欄は
+    // 最長文字＋矢印余白を確保する。すべて h=40 で文字を切らない。
     expect(source).toContain('mb-[10px] flex flex-wrap items-center gap-2')
-    expect(source).toMatch(/h-9 w-\[144px\] rounded-control/u)
-    expect(source).toMatch(/h-9 w-\[129px\] rounded-control/u)
-    expect(source).toMatch(/h-9 w-\[116px\] rounded-control/u)
+    expect(source).toContain('h-10 min-w-[180px] flex-1 rounded-control')
+    expect(source).toContain('h-10 min-w-[176px] rounded-control')
+    expect(source).toContain('h-10 min-w-[152px] rounded-control')
     // 設計 `DgeL8` はフォルダ 240 固定。
     expect(source).toContain('xl:grid-cols-[240px_minmax(0,1fr)]')
   })
