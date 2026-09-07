@@ -105,7 +105,12 @@ export default function StaffShiftsPage() {
       if (requestId !== requestRef.current) return
       if (!settingsResult.success) throw new Error(settingsResult.error)
       setSettings(settingsResult.data)
-      setResources(resourcesResult.data.resources)
+      // 予約設定APIは {success,data} を返す。撮影用固定データの旧形式
+      // ({resources}) も安全に読み、受付枠全体をエラーにしない。
+      const resources = resourcesResult.data?.resources
+        ?? (resourcesResult as unknown as { resources?: BookingResource[] }).resources
+        ?? []
+      setResources(resources)
       setLoadStatus('ready')
 
       const menu = menuResult.menus.find((item) => item.is_active)
