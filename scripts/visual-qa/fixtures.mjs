@@ -957,6 +957,25 @@ export const FORM_DETAIL = {
   },
 }
 
+/** 機能13 v9tYhl。回答一覧と集計を設計比較できる固定ページ。 */
+export const FORM_SUBMISSIONS = {
+  items: [
+    { id: 'submission-1', formId: 'form-1', friendId: 'friend-1', friendName: '高橋 直人', data: { real_name: '高橋 直人', satisfaction: '大変満足', good_points: ['接客', '仕上がり'], opinion: '説明が分かりやすかったです', next_visit: '2026-09-12' }, destinationWrite: { status: 'succeeded', attempted: 3, succeeded: 3, failed: 0 }, createdAt: '2026-08-25T10:20:00+09:00' },
+    { id: 'submission-2', formId: 'form-1', friendId: 'friend-2', friendName: '前田 さくら', data: { real_name: '前田 さくら', satisfaction: '満足', good_points: ['店内'], opinion: 'また利用します', next_visit: '2026-09-18' }, destinationWrite: { status: 'partial', attempted: 3, succeeded: 2, failed: 1 }, createdAt: '2026-08-24T15:04:00+09:00' },
+    { id: 'submission-3', formId: 'form-1', friendId: 'friend-3', friendName: '木村 亮', data: { real_name: '木村 亮', satisfaction: 'ふつう', good_points: ['説明'], opinion: '', next_visit: '2026-09-18' }, destinationWrite: { status: 'failed', attempted: 3, succeeded: 0, failed: 3 }, createdAt: '2026-08-23T09:12:00+09:00' },
+    { id: 'submission-4', formId: 'form-1', friendId: 'friend-4', friendName: '中村 彩', data: { real_name: '中村 彩', satisfaction: '大変満足', good_points: ['接客'], opinion: '満足です', next_visit: '2026-09-20' }, destinationWrite: { status: 'succeeded', attempted: 3, succeeded: 3, failed: 0 }, createdAt: '2026-08-22T18:30:00+09:00' },
+    { id: 'submission-5', formId: 'form-1', friendId: null, friendName: null, data: { real_name: 'ゲスト回答', satisfaction: '満足', good_points: [], opinion: 'ありがとうございました', next_visit: null }, destinationWrite: { status: 'not_requested', attempted: 0, succeeded: 0, failed: 0 }, createdAt: '2026-08-21T07:40:00+09:00' },
+    { id: 'submission-6', formId: 'form-1', friendId: 'friend-5', friendName: '石田 未来', data: { real_name: '石田 未来', satisfaction: '不満', good_points: ['仕上がり'], opinion: '確認したいことがあります', next_visit: null }, destinationWrite: { status: 'pending', attempted: 3, succeeded: 0, failed: 0 }, createdAt: '2026-08-20T12:16:00+09:00' },
+  ],
+  total: 6, page: 1, limit: 20,
+  summary: {
+    startedUnique: 8, submitted: 6, completionRate: 0.75,
+    destinationWrites: { pending: 1, succeeded: 3, partial: 1, failed: 1, not_requested: 1, unknown: 0 },
+    dateAnsweredUniqueFriends: 4,
+    dateFields: [{ key: 'next_visit', label: '次回来店の希望日', answered: 4, uniqueFriends: 3, minDate: '2026-09-12', maxDate: '2026-09-20' }],
+  },
+}
+
 /**
  * V6 `ymXJK` NENコラム下書き作成。Workerの公開契約と同じ6項目だけを持つ。
  * 画面側は通常・入力エラー・重複・保存失敗を、このstatus/bodyで描き分ける。
