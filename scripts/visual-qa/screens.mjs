@@ -3081,9 +3081,9 @@ export const SCREENS = [
     dir: 'friend-attributes-v6', route: '/tags/edit?id=tag-0', mode: 'page',
     steps: [{ click: '遡及反映', role: 'switch', onlyIfOff: true }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #451 / UI HEAD `3a3bc7a31` で再撮影・一致。** 旧実装として残っていた本文側の見出し構造を削除し、実画面は上部バーだけに画面名を表示する構成を維持した。Pencil V6と横並びで再確認し、1440/1920pxとも横はみ出し0。",
+    verdictNote: "**2026-09-07 Issue #451 / UI HEAD `9931ceba2` で再撮影・一致。** 旧実装として残っていた本文側の見出し構造を削除し、実画面は上部バーだけに画面名を表示する構成を維持した。パンくずは共通部品へ統一し、Pencil V6と横並びで再確認。1440/1920pxとも横はみ出し0。",
     verdictSource: "friend-attributes-v6/ee0sk.txt + friend-attributes-v6/ee0sk-{1440,1920}.png + 2026-09-07同一状態比較",
-    verdictHead: "3a3bc7a31",
+    verdictHead: "9931ceba2",
   },
   {
     node: 'VjXGX', feature: 4, name: '4-1-E 遡及反映の確認ダイアログ',
