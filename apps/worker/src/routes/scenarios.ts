@@ -1274,6 +1274,25 @@ scenarios.post('/api/scenarios/:id/enroll/:friendId', requireRole('owner', 'admi
       return c.json({ success: false, error: 'Friend not found' }, 404);
     }
 
+    /*
+     * 手動登録は本物の購読を作る。IDを直接渡されても、見えない友だちや
+     * 別アカウントの友だちを混ぜない（点検 #495 中12）。
+     * テスト送信と同じく、友だち側のアカウント一致を見る。
+     */
+    const friendAccountId = (friend as { line_account_id?: string | null }).line_account_id ?? null;
+    if (!await canAccessAllLineAccounts(db, c.get('staff'), [friendAccountId])) {
+      return c.json({ success: false, error: '登録する友だちが見つかりません。' }, 404);
+    }
+    if (scenario.line_account_id && friendAccountId !== scenario.line_account_id) {
+      return c.json(
+        { success: false, error: 'このシナリオと同じLINEアカウントの友だちを選んでください。' },
+        422,
+      );
+    }
+    if ((friend as { is_following?: number | null }).is_following !== 1) {
+      return c.json({ success: false, error: 'ブロック中の友だちは登録できません。' }, 422);
+    }
+
     const enrollment = await enrollFriendInScenario(db, friendId, scenarioId);
     if (!enrollment) {
       return c.json({ success: false, error: 'Already enrolled in this scenario' }, 409);
