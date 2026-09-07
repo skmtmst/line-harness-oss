@@ -10,6 +10,7 @@ import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
 import { FeatureLinkCard } from '@/components/shared/side-cards'
 import { Tabs } from '@/components/shared/tabs'
+import { safePhotoSrc } from './photo-src'
 
 const text = (value: unknown) => String(value ?? '')
 const views = (value: unknown) => value == null ? '—（未取得）' : `${Number(value).toLocaleString('ja-JP')}回`
@@ -116,8 +117,9 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
       <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:col-span-4 xl:grid-cols-4">
         {data.items.map((item) => {
           const placements = Array.isArray(item.placements) ? item.placements as Array<Record<string, unknown>> : []
+          const imageSrc = safePhotoSrc(item.image_url)
           return <Card key={text(item.id)} layout="vertical" overflow="hidden">
-            {text(item.image_url) ? <img className="h-36 w-full object-cover" src={text(item.image_url)} alt={`${text(item.pet_name)}の公開写真`} /> : <div className="grid h-36 w-full place-items-center bg-canvas-sunken text-xs font-bold text-ink-faint">公開用画像を作成中です</div>}
+            {imageSrc ? <img className="h-36 w-full object-cover" src={imageSrc} alt={`${text(item.pet_name)}の公開写真`} loading="lazy" /> : <div className="grid h-36 w-full place-items-center bg-canvas-sunken text-xs font-bold text-ink-faint">{text(item.image_url) ? '画像を表示できません' : '公開用画像を作成中です'}</div>}
             <div className="p-2.5"><strong className="text-sm text-accent-deep">{views(item.view_count)}</strong><h2 className="mt-0.5 text-base font-extrabold text-ink">{text(item.pet_name) || 'ペット名未取得'}</h2><p className="mt-0.5 text-xs text-ink-faint">{text(item.owner_name) || '名前は伏せています'}</p>
               <div className="mt-1 text-xs text-ink-faint">{placements.length ? placements.map((placement) => <span className="block truncate" key={text(placement.id)}>{text(placement.placement_label)}／{views(placement.view_count)}</span>) : <span>どこにも出していません</span>}</div>
               <div className="mt-2 flex items-center gap-2"><Button data-qa-open="J3Wxl8-placements" onClick={() => openPlacements(item)}>使う場所</Button><Button disabled={busyId === item.id} onClick={() => void withdraw(item)}>{busyId === item.id ? '外しています...' : '外す'}</Button></div>
