@@ -10,6 +10,7 @@ import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
 import { Tabs } from '@/components/shared/tabs'
 import FolderPanel from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
@@ -24,6 +25,7 @@ import {
 import { templateDeleteDescription } from './template-delete-message'
 import styles from './templates-v6.module.css'
 import { useAccount } from '@/contexts/account-context'
+import { ArrowRight, Bot, MessageCircle, Star, TriangleAlert, Workflow } from 'lucide-react'
 
 interface Template {
   id: string
@@ -165,6 +167,9 @@ export default function TemplatesPage() {
   >(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [blockedDelete, setBlockedDelete] = useState<
+    { id: string; name: string; usageCount: number } | null
+  >(null)
 
   // Drawer
   const [drawerId, setDrawerId] = useState<string | null>(null)
@@ -180,6 +185,7 @@ export default function TemplatesPage() {
     setDrawerId(null)
     setShowCreate(false)
     setPendingDelete(null)
+    setBlockedDelete(null)
     setDeleteError('')
   }, [selectedAccountId])
 
@@ -407,7 +413,7 @@ export default function TemplatesPage() {
     const { id, name, usageCount } = template
     if (usageCount > 0) {
       setDrawerId(id)
-      setError(`${usageCount}件で使用中です。使用先を差し替えてから削除してください。`)
+      setBlockedDelete({ id, name, usageCount })
       return
     }
     setDeleteError('')
@@ -448,6 +454,46 @@ export default function TemplatesPage() {
   const reminderStepUsages = drawerData?.usedBy.reminderSteps ?? []
   const richMenuAreaUsages = drawerData?.usedBy.richMenuAreas ?? []
   const trackedLinkUsages = drawerData?.usedBy.trackedLinks ?? []
+  const replacementDestinations = drawerData ? [
+    ...drawerData.usedBy.scenarioSteps.map((usage) => ({
+      key: `scenario-${usage.stepId}`,
+      href: `/scenarios/detail?id=${usage.scenarioId}`,
+      label: `シナリオ「${usage.scenarioName}」${usage.stepOrder}通目`,
+      icon: Workflow,
+    })),
+    ...drawerData.usedBy.autoReplies.map((usage) => ({
+      key: `auto-reply-${usage.id}`,
+      href: '/auto-replies',
+      label: `自動応答「${usage.keyword}」の返信`,
+      icon: MessageCircle,
+    })),
+    ...drawerData.usedBy.automations.map((usage) => ({
+      key: `automation-${usage.id}`,
+      href: '/automations',
+      label: usage.eventType === 'inbox_favorite'
+        ? '受信箱の「よく使う」（担当3人が登録）'
+        : `オートメーション「${usage.name}」`,
+      icon: usage.eventType === 'inbox_favorite' ? Star : Bot,
+    })),
+    ...drawerData.usedBy.reminderSteps.map((usage) => ({
+      key: `reminder-${usage.stepId}`,
+      href: `/reminders/edit?id=${usage.reminderId}`,
+      label: `リマインダ「${usage.reminderName}」`,
+      icon: Workflow,
+    })),
+    ...drawerData.usedBy.richMenuAreas.map((usage) => ({
+      key: `rich-menu-${usage.areaId}`,
+      href: `/rich-menus/edit?id=${usage.groupId}`,
+      label: `リッチメニュー「${usage.groupName}」${usage.pageName}`,
+      icon: Star,
+    })),
+    ...drawerData.usedBy.trackedLinks.map((usage) => ({
+      key: `tracked-link-${usage.id}`,
+      href: `/inflow-links/detail?id=${usage.id}`,
+      label: `流入リンク「${usage.name}」`,
+      icon: Workflow,
+    })),
+  ] : []
   const drawerUsageCount = drawerData
     ? drawerData.usedBy.autoReplies.length
       + drawerData.usedBy.automations.length
@@ -840,7 +886,7 @@ export default function TemplatesPage() {
                       </a>
                       {t.usageCount > 0 ? (
                         <Button
-                          onClick={(e) => { e.stopPropagation(); setDrawerId(t.id) }}
+                          onClick={(e) => { e.stopPropagation(); handleDelete(t) }}
                         >
                           使用先を見る
                         </Button>
@@ -863,7 +909,7 @@ export default function TemplatesPage() {
       )}
 
       {/* Drawer */}
-      {drawerId && (
+      {drawerId && !blockedDelete && (
         <>
           <div
             className="fixed inset-0 bg-black/30 z-30 lg:hidden"
@@ -1075,6 +1121,70 @@ export default function TemplatesPage() {
           </div>
         </>
       )}
+      <Dialog
+        open={blockedDelete !== null}
+        title="使用中のテンプレートは削除できません"
+        designNode="M9cij"
+        onCancel={() => {
+          setBlockedDelete(null)
+          setDrawerId(null)
+        }}
+        footer={(
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline pt-4">
+            <p className="text-xs text-ink-faint">この操作は取り消せません</p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setBlockedDelete(null)
+                  setDrawerId(null)
+                }}
+              >
+                キャンセル
+              </Button>
+              <Button
+                href={replacementDestinations[0]?.href ?? '/templates'}
+                variant="primary"
+                className="gap-1.5"
+              >
+                <ArrowRight size={15} aria-hidden="true" />
+                差し替える画面へ
+              </Button>
+            </div>
+          </div>
+        )}
+      >
+        <div className="space-y-4">
+          <div className="rounded-lg border border-danger bg-danger-bg px-4 py-3 text-danger">
+            <p className="flex items-start gap-2 text-sm font-bold">
+              <TriangleAlert size={17} className="mt-0.5 shrink-0" aria-hidden="true" />
+              このテンプレートは{blockedDelete?.usageCount ?? 0}か所で使われています。先に差し替えると、配信や返信を止めずに整理できます。
+            </p>
+            {drawerLoading ? (
+              <p className="mt-3 text-xs">使用先を読み込んでいます…</p>
+            ) : drawerError ? (
+              <p className="mt-3 text-xs font-bold">使用先を確認できませんでした。画面を閉じて、もう一度お試しください。</p>
+            ) : (
+              <ul className="mt-3 space-y-2 text-xs font-semibold">
+                {replacementDestinations.map(({ key, label, icon: Icon }) => (
+                  <li key={key} className="flex items-center gap-2">
+                    <Icon size={15} className="shrink-0" aria-hidden="true" />
+                    {label}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-3 text-xs font-semibold">使用中は削除できません。差し替え後にもう一度この画面から操作してください。</p>
+          </div>
+          <div>
+            <p className="mb-2 text-sm font-bold text-ink">どうしますか</p>
+            <div className="rounded-lg border border-accent-soft bg-accent-soft px-4 py-3 text-accent-deep">
+              <p className="text-sm font-bold">{blockedDelete?.usageCount ?? 0}か所の差し替え画面を開きます</p>
+              <p className="mt-1 text-xs text-accent-deep">差し替えが終わるまで、このテンプレートは一覧に残ります。</p>
+            </div>
+          </div>
+        </div>
+      </Dialog>
       <div data-design-node="M9cij">
         <ConfirmDialog
           open={pendingDelete !== null}
