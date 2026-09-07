@@ -313,7 +313,7 @@ export default function NewProxyBookingPage() {
       {step === 'input' && (
         <div data-design="Body" className="grid gap-4 xl:flex">
           <div className="min-w-0 flex-1 space-y-4">
-            <Card title="だれの予約ですか" note="LINEの友だち、またはLINE未連携の電話客を登録できます。">
+            <Card title="だれの予約ですか" note="LINEの友だちなら、名前で探して結びつけてください。LINE未連携の電話客も登録できます。">
               <div className="mb-3 flex gap-2">
                 <Button className="text-xs" variant={!phoneCustomer ? 'primary' : 'secondary'} onClick={() => { setPhoneCustomer(false); setCustomer(null) }}>LINEの友だち</Button>
                 <Button className="text-xs" variant={phoneCustomer ? 'primary' : 'secondary'} onClick={() => { setPhoneCustomer(true); setFriend(null) }}>LINE未連携の電話客</Button>
@@ -359,6 +359,7 @@ export default function NewProxyBookingPage() {
                 </div>
               )}
               {!phoneCustomer ? <p className="text-ink-faint mt-2 text-xs">別の友だちへ推測で結び付けず、選んだ相手だけに予約を記録します。</p> : null}
+              <p className="text-ink-faint mt-2 text-xs">この方について入力した情報は、予約と顧客台帳に残ります。</p>
             </Card>
 
             <Card title="いつ・何を">

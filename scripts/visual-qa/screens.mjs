@@ -2394,7 +2394,7 @@ export const SCREENS = [
     **同じ帯**に並ぶ。実装は `/automations` と `/common-actions` の別ページ。
   */
   { ...AUTOMATION, node: 'gief7', name: '25-1 オートメーション', route: '/automations', verdict: 'match', verdictNote: '**2026-09-07 Issue #377 / UI HEAD `bd900c36d` を3107/8794で再撮影し、★V6設計と同じ1920pxで比較。** 実API契約から18本（稼働14・停止4）、この30日8,420回・失敗6回・未実行3本、設計先頭6行の実行数と失敗表示、詳細導線を表示した。1440px・1920pxとも横はみ出し0で一致。', verdictSource: 'automations-v6/gief7.txt + automation-load-state-contract.test.ts', verdictHead: 'bd900c36d' },
-  { ...AUTOMATION, node: 'Rv8Jv', name: '25-1-A オートメーションをつくる', route: '/automations/new', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #377 / UI HEAD `bd900c36d` を3107/8794で再撮影。** 3段の決めごと帯、名前、条件、処理、要約、注意、追従操作は1440px・1920pxで横はみ出し0。登録APIは接続済みだが、設計6種のきっかけのうち画面で選べるのは4種で、条件15軸・見込み人数・1人テストを返すAPI契約が無い。表現できない項目を作らず、理由付き構造一致・データ未接続を維持する。', verdictSource: 'automations-v6/Rv8Jv.txt + automation-create-v6-contract.test.ts', verdictHead: 'bd900c36d' },
+  { ...AUTOMATION, node: 'Rv8Jv', name: '25-1-A オートメーションをつくる', route: '/automations/new', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #421 で固定ポート3105/8792にて再撮影。** 名前・処理・15軸の条件入力・要約・注意・追従操作は1440px・1920pxで横はみ出し0。条件保存と見込み人数・1人テストのAPIは実装済みだが作成画面への接続は次段で、設計6種のきっかけとプレビュー値は未接続のため構造一致・データ未接続と判定する。', verdictSource: 'automations-v6/Rv8Jv.txt + automation-create-v6-contract.test.ts', verdictHead: 'd2ea91a4b' },
   {
     /*
       **PR #502（head `75b010fc`）で `/automations/runs` が入った。**
@@ -2515,7 +2515,7 @@ export const SCREENS = [
       { fill: '日付', text: '2026-09-03', after: 900 },
       { select: '空いている時間', label: '10:00〜11:45' },
     ],
-    verdict: 'needs_fix', verdictNote: '**2026-09-06、PR #TBD の実装を1440px・1920pxで撮影し、★V6設計と見比べた。** 友だち検索、メニュー・担当・日付・空き時間、空き確認の緑帯、要望、送信予定、LINEプレビュー、この方について、関連導線、保存前の注意まで配置した。両幅とも横はみ出し0。**ただし要修正を据え置く。** 現在の予約APIは `friend_id` を必須にしており、設計にある「お名前（LINEにいない方）／電話番号／ペットの名前」でLINE未連携客を保存する口がない。別の友だちへ誤って結び付けず、画面には登録できない理由を明記した。**推奨修正：** 顧客台帳と予約APIへLINE未連携客の名前・電話番号・ペット名を保存する契約を追加し、その後この3入力と電話客向け保存経路を有効にする。',
+    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #421 で固定ポート3105/8792にて再撮影。** LINE友だち検索に加え、LINE未連携の電話客へ名前・電話番号・ペット名を入力し、確認時に顧客台帳へ保存して代理予約へ渡す経路を接続した。1440px・1920pxとも横はみ出し0。予約後の顧客カルテ項目や通知実績は別APIのため、構造一致・データ未接続と判定する。',
     verdictSource: 'booking-v6/cpdDi.txt', verdictHead: 'ed3e365aa',
   },
   { ...BOOKING, node: 'SbuUI', name: '27-1-C 今週の予約', steps: [{ click: '今週' }], verdict: 'match', verdictNote: '**2026-09-06、PR #TBD の実装を1440px・1920pxで撮影し、★V6設計と見比べた。** 時間（縦）×曜日（横）の週格子、LINE予約（緑）と電話予約（青）、4つの集計、読み方の青帯、注意事項・週の内訳・関連導線の右欄がそろった。固定データの予約件数と日付は撮影用データに従うが、情報の位置・余白・色・枠・角丸と操作の骨格は一致。両幅とも横はみ出し0。', verdictSource: 'booking-v6/SbuUI.txt', verdictHead: 'ed3e365aa' },
@@ -2544,7 +2544,7 @@ export const SCREENS = [
       { click: '予約内容を確認する', after: 700 },
     ],
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #304 / PR #1095 / UI HEAD `ff26e0f1f` を3105/8792で再撮影。構造一致・顧客連携データ待ち。** 左にお客様・予約内容・要望・通知予定、右にLINEプレビュー・注意・関連先・空き再確認を配置し、実際の枠を使って10:00〜11:45の105分を表示した。1440px・1920pxとも横はみ出し0。友だち一覧APIは電話・ペット・店舗・来店回数を返さず、撮影時計では前日と2時間前の通知時刻が過去になるため、存在しない値や過ぎた送信予定を作らず一致扱いにしない。',
+    verdictNote: '**2026-09-07 Issue #421 で固定ポート3105/8792にて再撮影。** LINE友だち・電話客の顧客情報、予約内容、要望、通知予定、LINEプレビュー、注意、関連先、空き再確認を配置し、10:00〜11:45の枠で確認まで進めた。1440px・1920pxとも横はみ出し0。通知実績と顧客カルテの詳細は別APIのため構造一致・データ未接続と判定する。',
     verdictSource: 'booking-v6/GFDqW.txt + GFDqW-{1440,1920}.png',
     verdictHead: 'ff26e0f1f',
   },
