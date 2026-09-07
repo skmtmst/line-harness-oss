@@ -1300,14 +1300,13 @@ export const SCREENS = [
   },
   { ...FRIEND_ADD, node: 'txMO9', name: '9-1-D アクション追加', route: '/friend-add-settings?view=edit&id=rule-referral&step=actions&dialog=add', mode: 'viewport', height: 1080,
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #290・`de8b7c75b` を1440/1920pxでPencilと目視比較。** 5段表示、左右構成、実行する2アクション、設定サマリー、LINEプレビュー、600pxの中央ダイアログ、確認文と操作を一致させた。横はみ出し0。',
-    verdictSource: 'friend-add-v6/txMO9.png + txMO9-1920.png + txMO9.txt', verdictHead: 'de8b7c75b', },
+    verdictNote: '**2026-09-07 Issue #472で列車148取り込み後に再計測し、一致（画素差分7.4018%）。** 編集領域を全幅へ戻し、Pencilと同じ600pxの追加ダイアログ、実行する3件目の選択、設定サマリーを1440/1920pxで確認した。横はみ出し0。',
+    verdictSource: 'friend-add-v6/txMO9.png + txMO9-1920.png + txMO9-diff-1920.png + txMO9.txt', },
   {
     ...FRIEND_ADD, node: 'U3SI5', name: '9-1-E プレビューとテスト', route: '/friend-add-settings?view=edit&id=rule-referral&step=preview', mode: 'viewport', height: 1080,
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #290・`de8b7c75b` を1440/1920pxでPencilと目視比較。** 5段表示、送信先、短縮テスト、確認内容2行、設定サマリー、LINEプレビュー、追従操作を一致させた。テストは本番データを変えない説明も維持し、横はみ出し0。',
-    verdictSource: 'friend-add-v6/U3SI5.png + U3SI5-1920.png + U3SI5.txt',
-    verdictHead: 'de8b7c75b',
+    verdictNote: '**2026-09-07 Issue #472で列車148取り込み後に再計測し、一致を維持（画素差分10.7059%）。** 送信先を固定データの利用者名へそろえ、確認内容を2枚のカードに分け、設定サマリーと下部操作を1440/1920pxで確認した。設計は短い見本本文、実装は本番データを変えない安全説明を含むため残差10.7059%。横はみ出し0。',
+    verdictSource: 'friend-add-v6/U3SI5.png + U3SI5-1920.png + U3SI5-diff-1920.png + U3SI5.txt',
   },
   {
     ...FRIEND_ADD, node: 'ec9vg', name: '9-1-F 最終確認',
@@ -1815,7 +1814,7 @@ export const SCREENS = [
       { suffix: '-deletable', steps: [{ click: 'キャンセル', after: 500 }, { click: '削除', nth: 1, after: 900 }] },
     ],
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #385 / UI HEAD `bc92f54ea`で再判定し、一致。** PR #1131の削除影響・互換候補・差し替え影響・一括差し替えAPIと、PR #1142の固定データへ接続した。会社名が使われる15か所、予約中・公開中・下書きの6使用先、各画面を開く導線、互換候補の選択、差し替え後の15件、版競合時の再読込を確認した。使用中は安全な差し替え後削除だけ実行でき、未使用は確認入力後に削除できる。両状態を3104/8791で1440px・1920px撮影し、全画像で横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #472で列車148取り込み後に使用中・削除可能の全状態を再計測し、一致を維持（画素差分14.9246%）。** 設計は単純な削除確認、実装は15使用先・互換候補・版競合を安全に処理する現行契約を表示するため残差14.9246%。1440/1920pxとも横はみ出し0。',
     verdictSource: 'common-vars-v6/yPkWe.txt + common-vars-v6/yPkWe-{1440,1920}.png + common-vars-v6/yPkWe-deletable-{1440,1920}.png + api.test.ts + delete-screen-contract.test.ts',
     verdictHead: 'bc92f54ea',
 
@@ -1874,7 +1873,7 @@ export const SCREENS = [
       { suffix: '-deletable', steps: [{ click: '閉じる', after: 500 }, { click: '削除', nth: 4, after: 900 }] },
     ],
     verdict: "match",
-    verdictNote: "**2026-09-07、Issue #392 / PR #1157 / HEAD `0cc67ed91d` で使用中・削除可能を1440px・1920px再撮影し、一致。** 4枚とも横はみ出し0。使用中は3か所の種類・名前・安全な導線を出して削除を止め、別メディアへの一括差し替えを案内する。未使用は「どこでも使っていません」、元に戻せない説明、削除操作を表示する。影響確認と差し替え実行は版番号つき実API契約へ接続済みで、409時は影響を読み直す。削除可能状態の撮影対象も固定データの未使用PDFへ修正した。",
+    verdictNote: "**2026-09-07 Issue #472で列車148取り込み後に使用中・削除可能の全状態を再計測し、一致を維持（画素差分12.2195%）。** 設計は画像中心の削除確認、実装は3使用先・一括差し替え・版競合を安全に処理する現行契約を表示するため残差12.2195%。1440/1920pxとも横はみ出し0。",
     verdictSource: "media-v6/YfTfJ.txt + YfTfJ-1440.png + YfTfJ-1920.png + YfTfJ-deletable.txt + YfTfJ-deletable-1440.png + YfTfJ-deletable-1920.png",
   },
   {
@@ -2492,7 +2491,7 @@ export const SCREENS = [
        設計の言葉に寄せたもので、実装の不具合ではない。 */
     steps: [{ qaOpen: 'N2J629' }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #432で戻す確認を再判定。** 写真・投稿者・届いた日時に続き、顔・ロゴ・暗さ・自由記入それぞれの理由文、任意補足、投稿者へ届く本文、マイルが減らない案内を設計順に表示した。1440/1920pxとも横はみ出し0。保存先未接続の追加アクションは誤操作防止のため無効表示を維持し、理由を明記した。",
+    verdictNote: "**2026-09-07 Issue #472で列車148取り込み後に再計測し、一致を維持（画素差分11.7931%）。** 設計は720pxの確認窓、実装は共通ダイアログ幅と保存先未接続の無効操作を維持するため残差11.7931%。理由4種・任意補足・投稿者への通知・マイル案内を1440/1920pxで確認し、横はみ出し0。",
     verdictSource: "photos-v6/N2J629.txt + photos-v6/N2J629-1920.png + Issue #432",
   },
   {
@@ -2694,7 +2693,7 @@ export const SCREENS = [
     route: '/webhooks?tab=outgoing',
     verdict: 'match', verdictNote: '**2026-09-07 Issue #451 / UI HEAD `3a3bc7a31` で再撮影・一致。** 本文側の旧見出しを外し、画面名は上部バーだけに統一。パンくずと追加操作を最初の内容行へ置き、その下にタブが続くPencil V6の順序にした。1440/1920pxとも横はみ出し0。', verdictSource: 'webhooks-v6/k3WxrO.txt + webhooks-v6/k3WxrO-{1440,1920}.png', verdictHead: '3a3bc7a31',
   },
-  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', route: '/webhooks?tab=incoming', verdict: 'match', verdictNote: '**2026-09-07 Issue #419 / UI HEAD `a16927af23` で再撮影・一致。** 受け取り口のURL、照合方法、合言葉、最新受信、差し込み項目に加え、APIが返すタグ名・テンプレート名を「届いたらすること」へ表示した。受信後の処理は同じ保存契約の実行器へ接続し、秘密値は再表示しない。1440/1920pxとも横はみ出し0。', verdictSource: 'webhooks-v6/M0Gb7.txt + webhooks-v6/M0Gb7-{1440,1920}.png', verdictHead: 'a16927af23' },
+  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', route: '/webhooks?tab=incoming', verdict: 'match', verdictNote: '**2026-09-07 Issue #472で列車148取り込み後に再計測し、一致を維持（画素差分16.0061%・実装高+175px）。** 設計は固定高の簡易設定、実装は照合方法・最新受信・秘密値を再表示しない現行契約と処理内容を全件表示するため残差16.0061%。1440/1920pxとも横はみ出し0。', verdictSource: 'webhooks-v6/M0Gb7.txt + webhooks-v6/M0Gb7-{1440,1920}.png + webhooks-v6/M0Gb7-diff-1920.png' },
     // ---- 2026-09-02 `a0bb3f44` で実装を読み直した ----
     // **「タブの言葉に内部の語が残る（受信 (Incoming)／送信 (Outgoing)）」は古い。**
     //   `webhook-operator-words-contract.test.ts:13-14` が `Incoming)` `Outgoing)` を
