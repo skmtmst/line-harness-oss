@@ -23,15 +23,15 @@ export default function UsersFilters({
   onChange,
 }: Props) {
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-[14px] border border-[#DADDE2] bg-white p-4 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
+    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
       <input
         type="search"
         value={q}
         onChange={(e) => onChange({ q: e.target.value })}
         placeholder="名前・X・メール・電話・UIDで検索"
-        className="min-w-[240px] flex-1 rounded-[9px] border border-[#DADDE2] px-3 py-2 text-sm outline-none focus:border-[#07C653]"
+        className="h-9 min-w-60 flex-1 rounded-control border border-hairline bg-canvas px-3 text-sm text-ink outline-none focus:border-accent"
       />
-      <label className="flex items-center gap-2 whitespace-nowrap text-sm text-[#565F59]">
+      <label className="flex h-9 items-center gap-2 whitespace-nowrap rounded-control border border-hairline bg-canvas px-3 text-sm text-ink-secondary">
         <input
           type="checkbox"
           checked={onlyDups}
@@ -42,7 +42,7 @@ export default function UsersFilters({
       <select
         value={uid}
         onChange={(e) => onChange({ uid: e.target.value })}
-        className="rounded-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink"
+        className="h-9 rounded-control border border-hairline bg-canvas px-3 text-sm text-ink"
       >
         <option value="">UID：すべて</option>
         <option value="linked">UID：連携済み</option>
@@ -51,7 +51,7 @@ export default function UsersFilters({
       <select
         value={account}
         onChange={(e) => onChange({ account: e.target.value })}
-        className="rounded-[9px] border border-[#DADDE2] bg-white px-3 py-2 text-sm text-[#1D1D1F]"
+        className="h-9 rounded-control border border-hairline bg-canvas px-3 text-sm text-ink"
       >
         <option value="">所属：すべて</option>
         {accountOptions.map((a) => (
