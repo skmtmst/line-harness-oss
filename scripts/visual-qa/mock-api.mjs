@@ -493,8 +493,8 @@ const EC_CONNECTOR = {
     identityRules: ['verified_email', 'verified_phone', 'manual_name_postal'], version: 3, updatedAt: '2026-09-06T09:58:00+09:00',
   },
   health: { today: 148, last30Days: 2486, failed: 2, lastReceivedAt: '2026-09-06T09:58:00+09:00', lastSucceededAt: '2026-09-06T09:58:00+09:00' },
-  impact: { nenCampaigns: null, conversions: null, mileageRules: null, friendFields: null, analytics: null },
-  retryPolicy: null,
+  impact: { ...EC_OVERVIEW.impact },
+  retryPolicy: '3回まで・10分あけて',
 }
 
 /**

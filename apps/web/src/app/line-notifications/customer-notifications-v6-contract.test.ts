@@ -77,4 +77,10 @@ describe('V6 顧客へのお知らせの寸法', () => {
     expect(PAGE).toContain('顧客へのお知らせを公開')
     expect(PAGE).toContain('公開中の内容は変わりません')
   })
+
+  it('編集画面でもテスト送信の結果を操作の直後に表示する', () => {
+    expect(PAGE).toContain("notice: { tone: 'success' | 'error'; text: string } | null")
+    expect(PAGE).toContain('notice={notice}')
+    expect(PAGE).toContain('テスト受信者 ${result.data.sent}名へ送信しました。')
+  })
 })
