@@ -3251,10 +3251,10 @@ const FEATURE_17_REVIEW = {
     verdictHead: '5e1ccd22d',
   },
   N46cQ: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-07、Issue #373 / HEAD 5e1ccd22d で新契約へ接続し確定撮影。** 1440・1920とも横スクロール0。9本の公開版・下書き版、30日の付与1,281回・対象外27回、有効期限と取消時の扱いを実値で表示。新契約の `friend_added` `broadcast_link_clicked` `inflow_return` も日本語化した。残る差は、公開版の中身を見る導線、利用対象条件の表示、並び順保存。`sortOrder` と `targetConditions` は口にあるので、画面側の修正が残る。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #429 / UI HEAD 65390c132 で再判定。** 並び替えと `sortOrder` の保存、公開版の中身を見る導線、V6下書きの利用対象条件を実装し、3102/8789で1440/1920pxを撮影した。両幅とも横はみ出し0。設計の操作と一覧構造はそろった。**残る口**：現在の `/api/mileage/earning-rules` は行別の付与回数だけで、設計上段の「この30日で付いたマイル」「1人あたり平均」を返さない。Issue #418がこの集計契約を実装中のため、値を作らず `structure_match_data_pending` とする。',
     verdictSource: 'mileage-v6/N46cQ.txt',
-    verdictHead: '5e1ccd22d',
+    verdictHead: '65390c132',
   },
   qlVLJ: {
     verdict: 'structure_match_data_pending',
@@ -3269,10 +3269,10 @@ const FEATURE_17_REVIEW = {
     verdictHead: '5e1ccd22d',
   },
   BmoGY: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-07、Issue #373 / HEAD 5e1ccd22d で新契約へ接続し確定撮影。** 1440・1920とも横スクロール0。有効期限、予約取消時の差し引き、タグ条件をV6下書きへ保存し、LINEプレビューも表示した。残る差は、15軸から選ぶ条件ビルダーと自動通知の送信口。`targetConditions` はAPIにあるが画面はタグ1軸のみのため、画面側の要修正とする。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #429 / UI HEAD 65390c132 で再判定。** 一斉配信と同じ15軸の条件ビルダーを接続し、有効期限・取消時の減算・LINEプレビューとともにV6下書きへ保存する。3102/8789で1440/1920pxを撮影し、両幅とも横はみ出し0。**残る口**：取消でマイルを引いたときの友だち向け自動通知はIssue #418で実装中であり、現画面も未接続と明記している。条件や通知結果を偽らず、通知口の統合まで `structure_match_data_pending` とする。',
     verdictSource: 'mileage-v6/BmoGY.txt',
-    verdictHead: '5e1ccd22d',
+    verdictHead: '65390c132',
   },
   HIU5O: {
     verdict: 'structure_match_data_pending',
@@ -3287,10 +3287,10 @@ const FEATURE_17_REVIEW = {
     verdictHead: '5e1ccd22d',
   },
   k8VCU: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-07、Issue #373 / HEAD 5e1ccd22d で通常・読込中・0件・取得失敗を確定撮影。** 4状態×2幅の8枚はすべて横スクロール0。取得中・0件・取得失敗を混同せず、通常時は30日実績や有効期限を実値で表示した。残る画面差は N46cQ と同じ、公開版の中身を見る導線、利用対象条件、並び順保存。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #429 / UI HEAD 65390c132 で一致。** N46cQと同じ一覧に、通常・読込中・0件・取得失敗を分けて実装した。3102/8789で全4状態を1440/1920px撮影し、状態名、案内、再読込導線、件数表示をPencil正本と目視比較した。全画像で横はみ出し0。並び順保存・公開版確認・利用対象条件も通常状態から到達できる。',
     verdictSource: 'mileage-v6/k8VCU.txt + k8VCU-error.txt',
-    verdictHead: '5e1ccd22d',
+    verdictHead: '65390c132',
   },
   z3PB2: {
     verdict: 'structure_match_data_pending',
@@ -3308,10 +3308,10 @@ const FEATURE_17_REVIEW = {
 
 // Issue #422（機能17/24/31/12）の再判定結果。
 const ISSUE_422_REVIEW = {
-  N46cQ: { verdict: 'needs_fix', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。9件の決めごと、30日実績、失効・取消の扱いを表示できた。並び順保存・公開版の中身を見る導線・利用対象条件が未実装のため要修正。', verdictSource: 'mileage-v6/N46cQ.txt', verdictHead: 'e98decafa' },
-  k8VCU: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で通常・読込中・0件・取得失敗を1440・1920pxで再撮影。** 全状態で横はみ出し0。状態を分け、未取得を0件に置き換えていない。並び順保存・対象条件・公開版導線は画面/API差が残るため構造一致・データ待ち。', verdictSource: 'mileage-v6/k8VCU.txt + k8VCU-error.txt', verdictHead: 'e98decafa' },
-  BmoGY: { verdict: 'needs_fix', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。有効期限、取消時の差し引き、倍率表、LINEプレビュー、タグ条件を確認した。15軸条件ビルダーと自動通知の送信口が無いため要修正。', verdictSource: 'mileage-v6/BmoGY.txt', verdictHead: 'e98decafa' },
-  p9CcEB: { verdict: 'unjudged', verdictNote: '**2026-09-07 Issue #422。** 1440・1920pxとも「画面を表示できませんでした」で撮影が止まり比較画像を取得できなかった。「撮影が固まる(/mileage/rewards/edit?id=mr-1)」として判定保留。', verdictSource: 'mileage-v6/p9CcEB.txt', verdictHead: 'e98decafa' },
+  N46cQ: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #429 / UI HEAD 65390c132 で再判定。** 並び替えと `sortOrder` の保存、公開版の中身を見る導線、V6下書きの利用対象条件を実装。残る口は30日付与マイルと1人あたり平均の集計契約（Issue #418）。', verdictSource: 'mileage-v6/N46cQ.png + N46cQ.txt + N46cQ-1440.png + N46cQ-1920.png', verdictHead: '65390c132' },
+  k8VCU: { verdict: 'match', verdictNote: '**2026-09-07 Issue #429 / UI HEAD 65390c132 で一致。** 通常・読込中・0件・取得失敗の全4状態を1440/1920pxで照合し、全画像で横はみ出し0。並び順保存・公開版確認・利用対象条件にも到達できる。', verdictSource: 'mileage-v6/k8VCU.png + k8VCU.txt + k8VCU-*-1440.png + k8VCU-*-1920.png', verdictHead: '65390c132' },
+  BmoGY: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #429 / UI HEAD 65390c132 で再判定。** 15軸条件ビルダーをV6下書き保存へ接続。残る口は取消時の友だち向け自動通知（Issue #418）。', verdictSource: 'mileage-v6/BmoGY.png + BmoGY.txt + BmoGY-1440.png + BmoGY-1920.png', verdictHead: '65390c132' },
+  p9CcEB: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #429 / UI HEAD 65390c132 で再判定。** 表示エラーを解消し、公開中の共通アクションと版を選べる。残る口は交換対象条件 `targetConditions` の保存契約。', verdictSource: 'mileage-v6/p9CcEB.txt + apps/web/src/app/mileage/rewards/edit/page.tsx + apps/web/src/app/mileage/rewards/edit/reward-form.test.ts', verdictHead: '65390c132' },
   Q55bb: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。編集欄、差し込み項目、ボタン、LINEプレビュー、公開版と下書きの分離を確認した。新しい通知定義・送信テストAPIが固定データに無いため構造一致・データ待ち。', verdictSource: 'line-notify-v6/Q55bb.txt', verdictHead: 'e98decafa' },
   c4R6F: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。説明、必須表示、切替、並び替え、初期値復元、利用中/作成数を確認した。一部利用数が未取得のため構造一致・データ待ち。', verdictSource: 'settings-v6/c4R6F.txt', verdictHead: 'e98decafa' },
   kQ1bs: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。STEP 2、条件、対象人数、優先順位、標準15軸・追加6軸、保存導線を確認した。重複人数と実配布人数は固定入力不足のため構造一致・データ待ち。', verdictSource: 'rich-menus-v6/kQ1bs.txt', verdictHead: 'e98decafa' },

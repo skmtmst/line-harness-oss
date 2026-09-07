@@ -10,12 +10,12 @@
 
 | 判定 | 数 |
 |---|---|
-| 一致 | **187** |
-| 構造一致・データ未接続 | 66 |
-| 要修正 | 11 |
+| 一致 | **188** |
+| 構造一致・データ未接続 | 68 |
+| 要修正 | 9 |
 | 未実装 | 0 |
-| 未判定 | 4 |
-| **完了まで残り** | **81** |
+| 未判定 | 3 |
+| **完了まで残り** | **80** |
 
 「完了まで残り」＝ 構造一致・データ未接続 ＋ 要修正 ＋ 未実装 ＋ 未判定。
 
@@ -37,7 +37,7 @@
 | 14 | 共通情報 | 4 | 4 | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | #1150 `bc92f54ea` 2026-09-07（WuKzU・gBtaK・uNBlA・yPkWe）<br>#1099 `bb8a139b3` 2026-09-07（WuKzU・gBtaK・yPkWe）<br>#1075 `24313778e` 2026-09-07（WuKzU・gBtaK・yPkWe）<br>#548 `d4a85ad4` 2026-08-29（uNBlA・gBtaK）<br>#0 `c275749d` 2026-08-30（WuKzU・gBtaK）<br>#619 `31b44202` 2026-08-31（yPkWe）<br>#668 `7d830282` 2026-09-02（gBtaK・yPkWe・WuKzU） |
 | 15 | 登録メディア | 5 | 5 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | #1157 `0cc67ed91d` 2026-09-07（g89Tc・voJtX・eXAJP・YfTfJ）<br>#997 `3eae16770` 2026-09-06（g89Tc・voJtX・eXAJP・YfTfJ・h8pBZr）<br>#559 `7922c002` 2026-08-29（g89Tc）<br>#560 `7c1acd0f` 2026-08-29（g89Tc）<br>#0 `c275749d` 2026-08-30（eXAJP）<br>#617 `b7e58a51` 2026-08-31（YfTfJ）<br>#667 `7d830282` 2026-09-02（g89Tc・eXAJP・YfTfJ・h8pBZr） |
 | 16 | 成果とアフィリエイト | 9 | 9 | 8 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | #1180 `3721857fb` 2026-09-07（jwrbf・GqFTV・njLGA）<br>#558 `ef7b5773` 2026-08-29（PouPn・xqT1Z・jwrbf）<br>#563 `64798425` 2026-08-29（jwrbf）<br>#0 `c275749d` 2026-08-30（PouPn・GH8VL・n5VVTb・xqT1Z・GPWzq）<br>#585 `75d6eb9a` 2026-08-30（njLGA）<br>#585 `3857365b` 2026-08-30（njLGA）<br>#667 `7d830282` 2026-09-02（n5VVTb・PouPn・GH8VL・njLGA・GPWzq・xqT1Z） |
-| 17 | マイル・行動スコア | 11 | 11 | 1 | 7 | 2 | 0 | 1 | 0 | 0 | 0 | #1137 `5e1ccd22d` 2026-09-07（s98Vfw・N46cQ・qlVLJ・MvZm5・BmoGY・HIU5O・vz0Ji・k8VCU・z3PB2）<br>#549 `0ae3e094` 2026-08-29（qlVLJ・p9CcEB）<br>#441 `05c5b103` 2026-08-28（MvZm5・BmoGY・HIU5O）<br>#441 `e953109c` 2026-08-28（s98Vfw・N46cQ・k8VCU）<br>#494 `0ca45f98` 2026-08-28（HIU5O）<br>#495 `55301679` 2026-08-30（z3PB2・vz0Ji）<br>#496 `4dac7986` 2026-08-28（s6MBc）<br>#499 `642b8222` 2026-08-30（s6MBc）<br>#0 `c275749d` 2026-08-30（s98Vfw・N46cQ・BmoGY・k8VCU）<br>#582 `78e2f065` 2026-08-30（vz0Ji）<br>#624 `5e8f32d3` 2026-08-31（z3PB2・p9CcEB・s98Vfw・MvZm5・HIU5O・N46cQ・qlVLJ）<br>#667 `7d830282` 2026-09-02（MvZm5・HIU5O・z3PB2・k8VCU・s98Vfw・N46cQ・qlVLJ・BmoGY）<br>#914 `48742a352` 2026-09-06（s98Vfw・N46cQ・qlVLJ・MvZm5・BmoGY・HIU5O・k8VCU・z3PB2・s6MBc）<br>#1041 `16e2331cb` 2026-09-07（s98Vfw・s6MBc） |
+| 17 | マイル・行動スコア | 11 | 11 | 2 | 9 | 0 | 0 | 0 | 0 | 0 | 0 | #1137 `5e1ccd22d` 2026-09-07（s98Vfw・N46cQ・qlVLJ・MvZm5・BmoGY・HIU5O・vz0Ji・k8VCU・z3PB2）<br>#549 `0ae3e094` 2026-08-29（qlVLJ・p9CcEB）<br>#441 `05c5b103` 2026-08-28（MvZm5・BmoGY・HIU5O）<br>#441 `e953109c` 2026-08-28（s98Vfw・N46cQ・k8VCU）<br>#494 `0ca45f98` 2026-08-28（HIU5O）<br>#495 `55301679` 2026-08-30（z3PB2・vz0Ji）<br>#496 `4dac7986` 2026-08-28（s6MBc）<br>#499 `642b8222` 2026-08-30（s6MBc）<br>#0 `c275749d` 2026-08-30（s98Vfw・N46cQ・BmoGY・k8VCU）<br>#582 `78e2f065` 2026-08-30（vz0Ji）<br>#624 `5e8f32d3` 2026-08-31（z3PB2・p9CcEB・s98Vfw・MvZm5・HIU5O・N46cQ・qlVLJ）<br>#667 `7d830282` 2026-09-02（MvZm5・HIU5O・z3PB2・k8VCU・s98Vfw・N46cQ・qlVLJ・BmoGY）<br>#914 `48742a352` 2026-09-06（s98Vfw・N46cQ・qlVLJ・MvZm5・BmoGY・HIU5O・k8VCU・z3PB2・s6MBc）<br>#1041 `16e2331cb` 2026-09-07（s98Vfw・s6MBc） |
 | 18 | 流入と計測 | 9 | 9 | 9 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | #443 `f372ff30` 2026-08-28<br>#0 `c275749d` 2026-08-30（Q4bkTg・IhSBB・v0HaI・TEVk8・JupxW・BMmxU・BuVDB・Im2b1）<br>#574 `0906b8fa` 2026-08-30（JupxW・BMmxU・UIaM7）<br>#589 `45b3efc5` 2026-08-30（TEVk8）<br>#627 `d80ef8ce` 2026-08-31（Q4bkTg・IhSBB・v0HaI・BuVDB・Im2b1・BMmxU・UIaM7）<br>#666 `7d830282` 2026-09-02（Q4bkTg・BMmxU・IhSBB・v0HaI・BuVDB・Im2b1・TEVk8・JupxW・UIaM7）<br>#951 `43b3aae50` 2026-09-06（Q4bkTg・IhSBB・v0HaI・TEVk8・JupxW・UIaM7・BMmxU・BuVDB・Im2b1） |
 | 19 | コンバージョン | 4 | 4 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | #1207 `46a869f74` 2026-09-07（ZrpKn・GUxsj）<br>#444 `ccbd0975` 2026-08-28<br>#0 `c275749d` 2026-08-30（ZrpKn・GUxsj・GtylA）<br>#1183 `b5e3dd6a3` 2026-09-07（ZrpKn・GUxsj） |
 | 20 | 分析 | 9 | 9 | 9 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | #445 `787a4b46` 2026-08-28<br>#0 `c275749d` 2026-08-30（Zxezb・J6Inc・YBGtm・QQ1SR・f5HsX・C2I7ry・Fh2Qj・dfwD4）<br>#584 `d0e62d59` 2026-08-30（QQ1SR）<br>#676 `a0bb3f44` 2026-09-02（Zxezb・J6Inc・YBGtm・QQ1SR・f5HsX・C2I7ry・dfwD4）<br>#924 `bd8f0482` 2026-09-06（Zxezb・J6Inc・YBGtm・QQ1SR・f5HsX・C2I7ry・Fh2Qj・dfwD4） |
@@ -55,6 +55,6 @@
 | 32 | 運用状態 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | #482 `b346d467` 2026-08-29（b3HfZ・U0BwS）<br>#0 `c275749d` 2026-08-30（UgonK・UhC2O） |
 | 33 | LINEアカウント設定 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |  |
 | 34 | はじめの設定と案内 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |  |
-| | **合計** | **272** | **264** | **187** | **66** | **11** | **0** | **4** | **0** | **0** | **8** | |
+| | **合計** | **272** | **264** | **188** | **68** | **9** | **0** | **3** | **0** | **0** | **8** | |
 
 **「撮った先」が空**の機能は、まだ実装PRのheadで撮り直していません（自分の枝で撮ったものです）。**空欄を確認済みと読まないでください。**
