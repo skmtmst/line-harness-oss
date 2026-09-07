@@ -2298,10 +2298,10 @@ export const SCREENS = [
       apis: ['**/api/nen-campaigns/**', '**/api/nen-campaigns'],
       kinds: ['loading', 'empty', 'error'],
     },
-    verdict: "structure_match_data_pending",
-    verdictNote: '**2026-09-07 Issue #418 / HEAD 1c8055931 で実APIへ接続し、設計画像と実装画像を同じ1920pxで並べて再判定。** 30日の関連成果142件・612,400円と配信別成果金額を表示した。通常・読込・空・失敗を両幅で撮影し横はみ出し0。残る差はLINEが個人の開封・押下を提供しないため反応率を作れないことだけで、理由を表示して構造一致・データ待ちとする。',
+    verdict: "match",
+    verdictNote: '**2026-09-07 Issue #446 / UI HEAD 64436d463b でPencil V6を修正し再判定。** 個人の開封率を作らず、到達率・クリック率はLINE集計で確認する設計と表示へ統一した。30日の関連成果142件・612,400円と配信別成果金額も維持。通常・読込・空・失敗を3102/8789で1440/1920px撮影し、全画像で横はみ出し0。',
     verdictSource: 'nen-v6/VLMGH.txt + VLMGH-1440.png + VLMGH-1920.png + VLMGH-loading/empty/error screenshots',
-    verdictHead: '1c8055931',
+    verdictHead: '64436d463b',
   },
   { ...NEN, node: 'DEX0k', name: '21-1-A NENコラム', route: '/nen-campaigns?tab=columns',
     verdict: 'match',
@@ -2316,10 +2316,10 @@ export const SCREENS = [
     verdictHead: '78c19bea32',
   },
   { ...NEN, node: 'WeXbL', name: '21-1-C NEN配信の履歴', route: '/nen-campaigns?tab=history',
-    verdict: "structure_match_data_pending",
-    verdictNote: '**2026-09-07 Issue #418 / HEAD 1c8055931 で実APIへ接続し、設計画像と実装画像を同じ1920pxで並べて再判定。** 未達6通をブロック4・退会2・その他0に分け、待機中をまとめて今すぐ送る操作を接続した。1440・1920pxとも横はみ出し0。残る差は個人の反応をLINEから取得できないことだけで、取得不可と明示して構造一致・データ待ちとする。',
+    verdict: "match",
+    verdictNote: '**2026-09-07 Issue #446 / UI HEAD 64436d463b でPencil V6を修正し再判定。** 個人別の反応を作らず、到達率・クリック率の列は取得不可と明示する設計と表示へ統一した。未達6通の内訳と待機中を今すぐ送る操作も維持。3102/8789で1440/1920px撮影し、両幅とも横はみ出し0。',
     verdictSource: 'nen-v6/WeXbL.txt + WeXbL-1440.png + WeXbL-1920.png',
-    verdictHead: '1c8055931',
+    verdictHead: '64436d463b',
   },
   {
     ...NEN, node: 'HpKyF', name: '21-1-D NEN配信の中身を編集する',
@@ -2337,12 +2337,10 @@ export const SCREENS = [
   {
     ...NEN, node: 'ymXJK', name: '21-1-E コラムを書く',
     route: '/nen-campaigns/columns/new', mode: 'page',
-    gap: 'parts',
-    gapNote: '設計の本文エディタ・配信予約・タグ付けは、この契約（#618）の外',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #418 / HEAD 1c8055931 で実APIへ接続し、設計画像と実装画像を同じ1920pxで並べて再判定。** 対象人数、予約日時、読了イベント、読了後タグ、複製、テスト送信の保存・実行APIを接続した。通常・入力済み・入力誤り・重複・権限不足・保存失敗を両幅で撮影し横はみ出し0。記事本文は外部サイトを正本とする承認済み契約のため、Pencilに残る本文エディタが修正されるまでは理由付きの構造一致・データ待ちとする。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #446 / UI HEAD 64436d463b でPencil V6を修正し再判定。** 本文エディタを外し、外部記事URL・画像URL・LINE紹介文を確認する承認済み契約へ設計を統一した。対象人数、予約日時、読了イベント、読了後タグ、複製、テスト送信も表示・保存できる。通常・入力済み・入力誤り・重複・権限不足・保存失敗を3102/8789で1440/1920px撮影し、全画像で横はみ出し0。',
     verdictSource: 'nen-v6/ymXJK.txt + ymXJK-1920.png + ymXJK-filled-1920.png',
-    verdictHead: '1c8055931',
+    verdictHead: '64436d463b',
     states: {
       apis: ['**/api/nen-campaigns/columns**'],
       kinds: ['normal'],
@@ -3150,18 +3148,12 @@ export const SCREENS = [
   {
     node: 'zGZMA', feature: 4, name: '4-3-B 対応マーク削除の確認ダイアログ',
     dir: 'friend-attributes-v6', route: '/tags?tab=marks', mode: 'viewport', height: 1080,
-    /*
-      **設計は「削除」、現行要件と実装は「保管」。** 設計 `zGZMA` は
-      「対応マーク削除の確認ダイアログ」だが、実装の行の操作は
-      「対応中を保管」で、消さずにしまう作りになっている。
-      撮るために実装の言葉へ合わせた。履歴を残す保管が正本であり、
-      Pencil側の物理削除表現はオーナー票での修正待ちとして残す。
-    */
+    /* 対応マークは物理削除せず、置き換えて履歴を残す保管として扱う。 */
     steps: [{ click: '保留を保管', scope: 'main' }],
-    verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07 Issue #419 / UI HEAD `a16927af23` で理由付き保留。** 保留3人、利用ルール、表示先、置換先、履歴保持、取消・保管を実APIから表示した。現行要件とAPIは履歴を残す保管で確定しているが、Pencil画像だけが物理削除の表現なので、設計修正までは一致にしない。1440/1920pxとも横はみ出し0。",
+    verdict: "match",
+    verdictNote: "**2026-09-07 Issue #446 / UI HEAD `64436d463b` でPencil V6を修正し再判定。** 対応マークは物理削除せず、3人を別のマークへ置き換えて履歴を残す保管として設計と実装を統一した。3102/8789で1440/1920pxを撮影し、両幅とも横はみ出し0。",
     verdictSource: "friend-attributes-v6/zGZMA.txt + friend-attributes-v6/zGZMA-{1440,1920}.png + 2026-09-07同一状態比較",
-    verdictHead: "5959c1756",
+    verdictHead: "64436d463b",
   },
   {
     /* **#421（head `71aff344`）で `/tags/searches/edit` が入った。** */
