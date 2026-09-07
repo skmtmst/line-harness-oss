@@ -37,7 +37,11 @@ export default function CommonActionsPage() {
   const canManage = useCanManageCommonActions()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [items, setItems] = useState<CommonActionSummary[]>([])
-  const [summaryItems, setSummaryItems] = useState<CommonActionSummary[]>([])
+  const [summary, setSummary] = useState<{
+    total: number; published: number; draft: number; oldVersion: number; unused: number;
+    actions: number; bindings: number; outdated: number; outdatedItems: number;
+    executions: number; failures: number;
+  } | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
   const deferredQuery = useDeferredValue(query)
@@ -52,7 +56,7 @@ export default function CommonActionsPage() {
   const load = useCallback(async () => {
     if (!selectedAccountId) {
       setItems([])
-      setSummaryItems([])
+      setSummary(null)
       setTotal(0)
       setLoading(false)
       return
@@ -60,8 +64,8 @@ export default function CommonActionsPage() {
     setLoading(true)
     setError('')
     try {
-      const [summaryResponse, response, automationsResponse, templatesResponse] = await Promise.all([
-        api.commonActions.list({ accountId: selectedAccountId }),
+      // 件数表示のための全件取得はしない。札・KPIの数字は口の集計で受け取る。
+      const [response, automationsResponse, templatesResponse] = await Promise.all([
         api.commonActions.list({
           accountId: selectedAccountId,
           status: filter,
@@ -72,10 +76,10 @@ export default function CommonActionsPage() {
         api.automations.list({ accountId: selectedAccountId }).catch(() => null),
         api.automations.templates(selectedAccountId).catch(() => null),
       ])
-      if (summaryResponse.success) setSummaryItems(summaryResponse.data)
       if (response.success) {
         setItems(response.data)
         setTotal(response.pagination?.total ?? response.data.length)
+        if (response.summary) setSummary(response.summary)
       }
       else setError(response.error)
       setAutomationCounts(automationsResponse?.success ? {
@@ -95,20 +99,23 @@ export default function CommonActionsPage() {
   }, [accountLoading, load])
 
   const totals = useMemo(() => ({
-    actions: summaryItems.reduce((sum, item) => sum + item.actionCount, 0),
-    bindings: summaryItems.reduce((sum, item) => sum + item.bindingCount, 0),
-    outdated: summaryItems.reduce((sum, item) => sum + item.oldVersionBindingCount, 0),
-    outdatedItems: summaryItems.filter((item) => item.oldVersionBindingCount > 0).length,
-    published: summaryItems.filter((item) => item.status === 'published').length,
-    executions: summaryItems.reduce((sum, item) => sum + item.executionCountThisMonth, 0),
-    failures: summaryItems.reduce((sum, item) => sum + item.failureCountThisMonth, 0),
-  }), [summaryItems])
+    actions: summary?.actions ?? 0,
+    bindings: summary?.bindings ?? 0,
+    outdated: summary?.outdated ?? 0,
+    outdatedItems: summary?.outdatedItems ?? 0,
+    published: summary?.published ?? 0,
+    executions: summary?.executions ?? 0,
+    failures: summary?.failures ?? 0,
+  }), [summary])
 
   const filterCount = (value: Filter): number => {
-    if (value === 'all') return summaryItems.length
-    if (value === 'old_version') return totals.outdatedItems
-    if (value === 'unused') return summaryItems.filter((item) => item.status === 'published' && item.bindingCount === 0).length
-    return summaryItems.filter((item) => item.status === value).length
+    if (!summary) return 0
+    if (value === 'all') return summary.total
+    if (value === 'old_version') return summary.oldVersion
+    if (value === 'unused') return summary.unused
+    if (value === 'published') return summary.published
+    if (value === 'draft') return summary.draft
+    return 0
   }
 
   const duplicate = async (item: CommonActionSummary) => {
@@ -147,11 +154,11 @@ export default function CommonActionsPage() {
         { label: '止めているもの', count: automationCounts?.stopped, href: '/automations?tab=stopped' },
         { label: '動いた記録', href: '/automations/runs' },
         { label: '見本', count: templateCount ?? undefined, href: '/automations?tab=templates' },
-        { label: '共通アクション', count: summaryItems.length, current: true },
+        { label: '共通アクション', count: summary?.total, current: true },
       ]} className="mb-4" />
 
       <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <SummaryCard variant="v6" title="共通アクション" value={loading ? null : summaryItems.length} unit="" detail={loading ? '' : `うち公開中 ${totals.published}`} loading={loading} />
+        <SummaryCard variant="v6" title="共通アクション" value={loading ? null : (summary?.total ?? 0)} unit="" detail={loading ? '' : `うち公開中 ${totals.published}`} loading={loading} />
         <SummaryCard variant="v6" title="呼び出し元" value={loading ? null : totals.bindings} unit="" detail="5機能から" loading={loading} />
         <SummaryCard variant="v6" title="今月 動いた回数" value={loading ? null : totals.executions} unit="" detail={loading ? '' : `失敗 ${totals.failures}`} loading={loading} />
         <SummaryCard variant="v6" title="古い版のまま" value={loading ? null : totals.outdatedItems} unit="" detail={loading ? '' : `呼び出し元 ${totals.outdated}か所`} loading={loading} badge={totals.outdatedItems > 0 ? '要確認' : undefined} />
