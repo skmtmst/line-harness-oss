@@ -68,6 +68,15 @@ export default function PendingInboxCard({
 }) {
   const [summary, setSummary] = useState<PendingInboxSummary | null>(null)
   const [items, setItems] = useState<InboxItem[]>([])
+  /*
+   * **読めなかったのか、0件なのかを分ける。**
+   *
+   * 前は失敗しても `summary` が `null` のまま残り、下の表示条件で
+   * 「返信を待っている問い合わせはありません。」になった。通信障害・
+   * 500 のときに未対応があるのか無いのか区別できず、返信漏れになる。
+   * 取れていないときは「なし」と言い切らず、読み直しを出す。
+   */
+  const [loadFailed, setLoadFailed] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const total = summary?.total ?? 0
@@ -85,9 +94,15 @@ export default function PendingInboxCard({
         setSummary(inboxResponse.data.summary)
         onSummaryChange?.(inboxResponse.data.summary)
         setItems(inboxResponse.data.items)
+        setLoadFailed(false)
+      } else {
+        // 形違いの返事も「なし」にしない。無いのは数ではなく取れた事実。
+        setLoadFailed(true)
       }
     } catch {
       // ダッシュボード本体は残し、次のポーリングで復旧する。
+      // ただし取れていないことを黙らせない（下の表示で読み直しを出す）。
+      setLoadFailed(true)
     }
   }, [onSummaryChange, page, pageSize])
 
@@ -131,7 +146,12 @@ export default function PendingInboxCard({
         actionTone="info"
       />
 
-      {!summary || summary.total === 0 ? (
+      {loadFailed && !summary ? (
+        <div className="flex min-h-24 flex-col items-center justify-center gap-1 px-5 py-6 text-center">
+          <p className="text-ink-faint text-sm">データを取得できませんでした。</p>
+          <button type="button" onClick={() => void load()} className="text-action text-xs font-medium hover:underline">もう一度読み込む</button>
+        </div>
+      ) : !summary || summary.total === 0 ? (
         <p className="text-ink-faint flex min-h-24 items-center justify-center px-5 py-6 text-center text-sm">
           返信を待っている問い合わせはありません。
         </p>

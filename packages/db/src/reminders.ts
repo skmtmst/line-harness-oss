@@ -631,8 +631,16 @@ export async function createReminderStep(
   return (await db.prepare(`SELECT * FROM reminder_steps WHERE id = ?`).bind(id).first<ReminderStepRow>())!;
 }
 
-export async function deleteReminderStep(db: D1Database, id: string): Promise<void> {
-  await db.prepare(`DELETE FROM reminder_steps WHERE id = ?`).bind(id).run();
+export async function deleteReminderStep(
+  db: D1Database,
+  reminderId: string,
+  stepId: string,
+): Promise<boolean> {
+  const result = await db
+    .prepare(`DELETE FROM reminder_steps WHERE id = ? AND reminder_id = ?`)
+    .bind(stepId, reminderId)
+    .run();
+  return (result.meta?.changes ?? 0) === 1;
 }
 
 // --- 友だちリマインダ ---

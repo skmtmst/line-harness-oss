@@ -55,7 +55,7 @@ async function adminAccountScope(c: Context<Env>, alias = '') {
   return { scope, where };
 }
 
-const requireVisibleFriend: MiddlewareHandler<Env> = async (c, next) => {
+export const requireVisibleFriend: MiddlewareHandler<Env> = async (c, next) => {
   const friend = await getFriendById(c.env.DB, c.req.param('id') ?? '');
   const accountId = friend
     ? ((friend as unknown as Record<string, unknown>).line_account_id as string | null) ?? null

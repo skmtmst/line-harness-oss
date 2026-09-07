@@ -29,7 +29,7 @@ import type {
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { currentMonthRange } from '../lib/jst-range.js';
-import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import {
   compareAutoReplyCandidates,
   evaluateAutoReplyCandidates,
@@ -880,18 +880,36 @@ async function buildAutomationKeywordIndex(db: D1Database): Promise<Map<string, 
 }
 
 // GET /api/auto-replies — list all auto-replies (optional ?accountId filter)
-autoReplies.get('/api/auto-replies', async (c) => {
+autoReplies.get('/api/auto-replies', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const accountId = c.req.query('accountId');
-    const items = await getAutoReplies(c.env.DB, accountId || undefined);
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (accountId) {
+      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+        return c.json({ success: false, error: '自動応答を確認できません' }, 404);
+      }
+    }
+    const items = (await getAutoReplies(c.env.DB, accountId || undefined)).filter((item) => {
+      const itemAccountId = (item as { line_account_id?: string | null }).line_account_id ?? null;
+      return itemAccountId == null
+        ? scope.canSeeUnassigned
+        : scope.allowedAccountIds.includes(itemAccountId);
+    });
     const activeItems = items.filter((item) => item.is_active === 1);
     const conflictsById = conflictCounts(conflictPairs(activeItems));
 
     // active LINE accounts を取得 + automations の keyword -> accounts インデックスを構築
-    const accRes = await c.env.DB
-      .prepare(`SELECT id, name FROM line_accounts WHERE is_active = 1 ORDER BY name`)
-      .all<{ id: string; name: string }>();
-    const activeAccounts = accRes.results ?? [];
+    const activeAccounts = scope.allowedAccountIds.length
+      ? (await c.env.DB
+        .prepare(
+          `SELECT id, name FROM line_accounts
+            WHERE is_active = 1
+              AND id IN (${scope.allowedAccountIds.map(() => '?').join(',')})
+            ORDER BY name`,
+        )
+        .bind(...scope.allowedAccountIds)
+        .all<{ id: string; name: string }>()).results ?? []
+      : [];
     const automationIdx = await buildAutomationKeywordIndex(c.env.DB);
 
     // 当たった回数（152）。今月と累計を並べて出す。
