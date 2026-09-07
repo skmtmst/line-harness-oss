@@ -1057,6 +1057,15 @@
       "remaining": 0,
       "capturedAt": [
         {
+          "pr": 1285,
+          "head": "7b39575f4",
+          "on": "2026-09-07",
+          "screens": [
+            "M1EXwB"
+          ],
+          "note": "Issue #478。リマインダ一覧の独自13remフォルダ欄を16remの共通FolderPanelへ置換。3105/8792で1440/1920px撮影し、横はみ出し0。"
+        },
+        {
           "pr": 1250,
           "head": "d77d0877e",
           "on": "2026-09-07",
@@ -1415,6 +1424,15 @@
       "pixelAboveThreshold": 0,
       "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1285,
+          "head": "7b39575f4",
+          "on": "2026-09-07",
+          "screens": [
+            "ZC13r"
+          ],
+          "note": "Issue #478。ウェビナー一覧の独自asideを16remの共通FolderPanelへ置換し、一覧データからフォルダ別件数を表示。3105/8792で1440/1920px撮影し、横はみ出し0。"
+        },
         {
           "pr": 1275,
           "head": "c85f9e523",
@@ -2554,6 +2572,15 @@
       "pixelAboveThreshold": 0,
       "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1285,
+          "head": "7b39575f4",
+          "on": "2026-09-07",
+          "screens": [
+            "Q4bkTg"
+          ],
+          "note": "Issue #478。流入経路の独自フォルダ欄を16remの共通FolderPanelへ置換し、重複追加ボタンと見出し重なりを解消。3105/8792で1440/1920px撮影し、横はみ出し0。"
+        },
         {
           "pr": 443,
           "head": "f372ff30",
