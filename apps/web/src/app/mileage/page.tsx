@@ -135,6 +135,8 @@ const RULE_SORTS: Array<{ value: RuleSort; label: string }> = [
   { value: 'amount', label: 'マイルが多い順' },
 ]
 
+const RULE_PAGE_SIZE = 8
+
 
 function MileagePageInner() {
   const tab = useMergedTab(TABS, 'tab', 'balances')
@@ -155,6 +157,7 @@ function MileagePageInner() {
   const [ruleOrderDirty, setRuleOrderDirty] = useState(false)
   const [ruleFilters, setRuleFilters] = useState<RuleFilter[]>([])
   const [ruleSort, setRuleSort] = useState<RuleSort>('order')
+  const [rulePage, setRulePage] = useState(1)
   const [tabCounts, setTabCounts] = useState<{ balances: number | null; rules: number | null; rewards: number | null }>({ balances: null, rules: null, rewards: null })
   const [canAdjustMileage, setCanAdjustMileage] = useState(false)
   const overviewTotal = mileagePaginationTotal(overview)
@@ -203,6 +206,7 @@ function MileagePageInner() {
     })
     setRuleOrder(res.data.items.map((rule) => rule.id))
     setRuleOrderDirty(false)
+    setRulePage(1)
   }, [selectedAccountId])
 
   const loadOverview = useCallback(async () => {
@@ -307,6 +311,8 @@ function MileagePageInner() {
       return (order.get(a.id) ?? a.draft.sortOrder) - (order.get(b.id) ?? b.draft.sortOrder)
     })
   }, [ruleFilters, ruleOrder, ruleSort, rules])
+  const rulePageCount = Math.max(1, Math.ceil(shownRules.length / RULE_PAGE_SIZE))
+  const visibleRules = shownRules.slice((rulePage - 1) * RULE_PAGE_SIZE, rulePage * RULE_PAGE_SIZE)
 
   const moveRule = (id: string, direction: -1 | 1) => {
     if (ruleFilters.length > 0 || ruleSort !== 'order') return
@@ -524,18 +530,19 @@ function MileagePageInner() {
           />
         ) : (
         <>
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <Button href="/mileage/earning-rules/new" variant="primary">決めごとをつくる</Button>
-        </div>
         <div
           className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
         >
+          <Button href="/mileage/earning-rules/new" variant="primary">決めごとをつくる</Button>
           <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
           <Select
             aria-label="並び順"
             value={ruleSort}
             options={RULE_SORTS.map((o) => ({ value: o.value, label: o.label }))}
-            onChange={(value) => setRuleSort(value as RuleSort)}
+            onChange={(value) => {
+              setRulePage(1)
+              setRuleSort(value as RuleSort)
+            }}
           />
           <Button
             onClick={() => void saveRuleOrder()}
@@ -554,6 +561,7 @@ function MileagePageInner() {
               key={f.key}
               selected={ruleFilters.includes(f.key)}
               onChange={(selected) => {
+                setRulePage(1)
                 setRuleFilters((current) =>
                   selected ? [...current, f.key] : current.filter((k) => k !== f.key),
                 )
@@ -585,24 +593,28 @@ function MileagePageInner() {
               </TableHeadRow>
             </thead>
             <tbody className="divide-hairline divide-y">
-              {shownRules.map((rule, index) => (
+              {visibleRules.map((rule, index) => (
                 <tr key={rule.id} className="hover:bg-canvas-sunken">
                   <td className="text-ink px-4 py-3 text-sm font-medium">
                     <p className="truncate" title={rule.draft.name}>{rule.draft.name}</p>
-                    <p className="mt-1 text-xs font-normal text-ink-faint">下書き v{rule.draftVersion}</p>
-                    <details className="mt-2 text-xs font-normal text-ink-secondary">
-                      <summary className="cursor-pointer font-semibold text-accent">公開版の中身を見る</summary>
-                      <dl className="mt-2 space-y-1 rounded-control bg-canvas-sunken p-2">
-                        <div><dt className="inline text-ink-faint">名前：</dt><dd className="inline">{rule.published.name}</dd></div>
-                        <div><dt className="inline text-ink-faint">対象：</dt><dd className="inline">{ruleEventLabel(rule.published.eventType, EVENT_LABELS)}</dd></div>
-                        <div><dt className="inline text-ink-faint">付与：</dt><dd className="inline">{formatNumber(rule.published.amount)}マイル</dd></div>
-                      </dl>
-                    </details>
-                    <p className="mt-2 text-xs font-normal text-ink-faint">
-                      {rule.draft.targetConditions
-                        ? `利用対象：${rule.draft.targetConditions.operator === 'AND' ? 'すべて満たす' : 'いずれかを満たす'}条件 ${rule.draft.targetConditions.rules.length + (rule.draft.targetConditions.groups?.reduce((sum, group) => sum + group.rules.length, 0) ?? 0)}件`
-                        : '利用対象：すべての友だち'}
-                    </p>
+                    <div className="mt-1 flex min-w-0 items-center gap-2 text-xs font-normal">
+                      <span
+                        className="min-w-0 truncate text-ink-faint"
+                        title={rule.draft.targetConditions
+                          ? `利用対象：条件 ${rule.draft.targetConditions.rules.length + (rule.draft.targetConditions.groups?.reduce((sum, group) => sum + group.rules.length, 0) ?? 0)}件・下書き v${rule.draftVersion}`
+                          : `利用対象：すべての友だち・下書き v${rule.draftVersion}`}
+                      >
+                        {rule.draft.targetConditions
+                          ? `利用対象：条件 ${rule.draft.targetConditions.rules.length + (rule.draft.targetConditions.groups?.reduce((sum, group) => sum + group.rules.length, 0) ?? 0)}件・下書き v${rule.draftVersion}`
+                          : `利用対象：すべての友だち・下書き v${rule.draftVersion}`}
+                      </span>
+                      <details className="relative shrink-0 text-ink-secondary">
+                        <summary className="cursor-pointer font-semibold text-accent">公開版の中身を見る</summary>
+                        <p className="absolute left-0 top-full z-10 mt-1 w-72 rounded-control border border-hairline bg-canvas p-2 shadow-card" title={`${rule.published.name} / ${ruleEventLabel(rule.published.eventType, EVENT_LABELS)} / ${formatNumber(rule.published.amount)}マイル`}>
+                          {rule.published.name}・{ruleEventLabel(rule.published.eventType, EVENT_LABELS)}・{formatNumber(rule.published.amount)}マイル
+                        </p>
+                      </details>
+                    </div>
                   </td>
                   <td className="text-ink-secondary px-4 py-3 text-sm">
                     {ruleEventLabel(rule.draft.eventType, EVENT_LABELS)}
@@ -622,10 +634,10 @@ function MileagePageInner() {
                     {rule.published.status === 'published' ? <Chip tone="ok">動いています</Chip> : <Chip>止めています</Chip>}
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <div className="flex flex-col items-center gap-2">
+                    <div className="flex items-center justify-center gap-1">
                       <div className="flex gap-1" aria-label={`${rule.draft.name}の並び順`}>
-                        <Button disabled={ruleSort !== 'order' || ruleFilters.length > 0 || index === 0} onClick={() => moveRule(rule.id, -1)}>上へ</Button>
-                        <Button disabled={ruleSort !== 'order' || ruleFilters.length > 0 || index === shownRules.length - 1} onClick={() => moveRule(rule.id, 1)}>下へ</Button>
+                        <Button disabled={ruleSort !== 'order' || ruleFilters.length > 0 || (rulePage - 1) * RULE_PAGE_SIZE + index === 0} onClick={() => moveRule(rule.id, -1)}>上へ</Button>
+                        <Button disabled={ruleSort !== 'order' || ruleFilters.length > 0 || (rulePage - 1) * RULE_PAGE_SIZE + index === shownRules.length - 1} onClick={() => moveRule(rule.id, 1)}>下へ</Button>
                       </div>
                       <Button
                         disabled={savingRuleId === rule.id}
@@ -645,11 +657,16 @@ function MileagePageInner() {
         </div>
         )}
 
-        <p className="text-ink-faint mt-3 text-xs font-semibold tabular-nums">
-          {shownRules.length === rules.length
-            ? `全 ${rules.length}件`
-            : `${shownRules.length}件 / 全 ${rules.length}件`}
-        </p>
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <p className="text-xs font-semibold tabular-nums text-ink-faint">
+            {shownRules.length === rules.length
+              ? `決めごと ${rules.length}件のうち ${Math.min((rulePage - 1) * RULE_PAGE_SIZE + 1, shownRules.length)}〜${Math.min(rulePage * RULE_PAGE_SIZE, shownRules.length)}件を表示`
+              : `${shownRules.length}件 / 全 ${rules.length}件`}
+          </p>
+          {rulePageCount > 1 ? (
+            <Pagination page={rulePage} pageCount={rulePageCount} onPageChange={setRulePage} />
+          ) : null}
+        </div>
         </>
         )}
       </div>}

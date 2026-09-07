@@ -217,6 +217,7 @@
 .arp-evaluationList small { grid-column: 1 / -1; color: var(--color-ink-faint); }
 
 .arp-linePreview { min-height: 356px; border-radius: var(--radius-card); background: var(--color-line-preview); padding: 18px; }
+[data-design-node='U9hzqH'] .arp-linePreview { min-height: 322px; }
 .arp-confirmPreview { min-height: 410px; }
 .arp-donePreview { min-height: 280px; }
 .arp-linePreview > strong,

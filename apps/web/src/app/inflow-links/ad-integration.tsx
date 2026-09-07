@@ -263,6 +263,8 @@ export default function AdIntegration({ view }: { view: AdView }) {
           広告をつながなくても流入リンクの計測は使えます。つなぐと、成果を広告側へ安全に返せるようになります。
         </p>
 
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
+        <div className="space-y-4">
         <section className="rounded-card border border-hairline bg-canvas p-4">
           <h3 className="text-sm font-bold text-ink">つないでいる広告</h3>
           <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
@@ -313,8 +315,9 @@ export default function AdIntegration({ view }: { view: AdView }) {
             ].map((row) => <tr key={row[0]}>{row.slice(0, 5).map((cell, index) => <td key={index} className={`px-3 py-3 ${index === 0 ? 'font-semibold text-ink' : index === 3 ? 'text-right tabular-nums text-ink-secondary' : 'text-ink-secondary'}`}>{cell}</td>)}<td className="px-3 py-3 text-right"><Button variant="secondary">{row[4] === '返しています' ? '対応を変える' : '対応を付ける'}</Button></td></tr>)}
           </tbody></table></div>
         </section>
+        </div>
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <aside className="space-y-4">
           <section className="rounded-card border border-hairline bg-canvas p-4">
             <h3 className="text-sm font-bold text-ink">返すしくみ</h3>
             <ol className="mt-3 space-y-2 text-xs leading-relaxed text-ink-secondary">
@@ -331,6 +334,7 @@ export default function AdIntegration({ view }: { view: AdView }) {
               <li>お客様の名前やメールアドレスは広告へ送りません。</li>
             </ul>
           </section>
+        </aside>
         </div>
       </div>
     )

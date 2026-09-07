@@ -238,12 +238,13 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
                   />
                   <Td align="right"><span className={item.amount < 0 ? 'font-bold text-danger' : 'font-bold text-accent'}>{formatMileageChange(item.amount)}</span></Td>
                   <Td>
-                    <p className="max-w-52 truncate font-medium text-ink" title={item.reason}>{item.reason}</p>
-                    <p className="mt-1 text-xs text-ink-faint">{mileageEntryTypeLabel(item.entryType)}・{mileageStatusLabel(item.status)}</p>
-                    <p className="mt-1 text-xs text-ink-faint">{mileageSourceLabel(item.source)}</p>
-                    <p className="text-xs text-ink-faint">
-                      {mileageSourceNoteText({ sourceReferenceId: item.sourceReferenceId, hasSourceEvent: item.hasSourceEvent })}
+                    <p
+                      className="max-w-52 truncate font-medium text-ink"
+                      title={`${item.reason} / ${mileageEntryTypeLabel(item.entryType)}・${mileageStatusLabel(item.status)} / ${mileageSourceLabel(item.source)} / ${mileageSourceNoteText({ sourceReferenceId: item.sourceReferenceId, hasSourceEvent: item.hasSourceEvent })}`}
+                    >
+                      {item.reason}
                     </p>
+                    <p className="mt-1 truncate text-xs text-ink-faint">{mileageEntryTypeLabel(item.entryType)}・{mileageStatusLabel(item.status)}</p>
                   </Td>
                   <Td align="right" className="tabular-nums">{item.balanceAfter === null ? <span className="text-ink-faint">— 未取得</span> : item.balanceAfter.toLocaleString('ja-JP')}</Td>
                   <Td>{item.mode === 'manual' ? item.executedByStaffName ?? '担当者未取得' : item.entryType === 'spend' ? '本人' : '自動'}</Td>
