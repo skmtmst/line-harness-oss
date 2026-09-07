@@ -13,6 +13,10 @@ node scripts/visual-qa/ledger.mjs --html > docs/design-qa/v6-progress.html
 
 画素比較は `docs/design-reference/<機能>-v6/<node>.png` と `docs/design-qa/<機能>-v6/<node>-<幅>.png` を使います。比較結果は `docs/design-qa/v6-pixel-diff.json`、赤い差分画像は各機能の `docs/design-qa/<機能>-v6/` に出ます。
 
+`shots` 指定画面は、同じ状態の Playwright snapshot があれば最優先で使います。
+snapshot が無い環境では、追跡済みの `docs/design-qa/<機能>-v6/<node>-<幅>.png` を使います。
+台帳の「実装画像」列には、実際に使った出典を `snapshot` または `docs` で残します。
+
 ## 比較方法
 
 - 左上を揃え、両画像に共通する幅と高さを比較します。

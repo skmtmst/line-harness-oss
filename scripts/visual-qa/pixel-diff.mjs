@@ -144,7 +144,8 @@ function implementationImage(screen, width, root = ROOT) {
         .find((name) => name.startsWith(`${screen.shots}-${width}-`) && name.endsWith('.png'))
       if (portable) return join(snapshots, portable)
     }
-    return null
+    const portableEvidence = join(root, 'docs', 'design-qa', screen.dir, `${screen.node}-${width}.png`)
+    return existsSync(portableEvidence) ? portableEvidence : null
   }
   const dir = join(root, 'docs', 'design-qa', screen.dir)
   const named = [
@@ -167,6 +168,13 @@ function implementationImage(screen, width, root = ROOT) {
 
 function relativePath(path, root = ROOT) {
   return relative(root, path).split('\\').join('/')
+}
+
+function implementationSource(path, root = ROOT) {
+  const relativeImplementationPath = relativePath(path, root)
+  return relativeImplementationPath.startsWith('scripts/visual-qa/capture.spec.mjs-snapshots/')
+    ? 'snapshot'
+    : 'docs'
 }
 
 export function compareScreen(screen, options = {}) {
@@ -205,6 +213,7 @@ export function compareScreen(screen, options = {}) {
       ...serializable,
       designPath: relativePath(designFile.path, root),
       implementationPath: relativePath(implementationPath, root),
+      implementationSource: implementationSource(implementationPath, root),
       diffPath: relativePath(outputPath, root),
     })
   }
@@ -227,6 +236,7 @@ export function compareScreen(screen, options = {}) {
     pixelDiffPercent: worst.pixelDiffPercent,
     heightDifferencePx: worst.heightDifferencePx,
     dominantRegion: worst.dominantRegion,
+    implementationSource: worst.implementationSource,
     diffPath: worst.diffPath,
     aboveThreshold: worst.pixelDiffPercent > thresholdPercent,
   }
