@@ -1471,10 +1471,10 @@ export const SCREENS = [
       使用数3件の行から「使用先を見る」を押し、削除不可と差し替え導線を開く。
     */
     ...TEMPLATE, node: 'M9cij', name: '11-1-G テンプレートの削除確認',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-07 Issue #224 / PR #1024 / UI HEAD 031081d69 で再判定。** 未使用テンプレートの削除確認を割当ポート3104/8791で1440/1920px再撮影し、Pencil正本と実装1920pxを同じ比較画像で目視確認した。両幅とも横はみ出し0。実装は要件 §4-9 / §11 どおり未使用だけを安全に削除できるが、Pencil M9cij は使用中3か所の強制削除を描いたままで一致しない。危険な画面へ戻さず `needs_fix` を維持する。**残る依存**：オーナーIssue #276でPencilを要件に合わせて直した後、同じ2幅で再撮影する。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #426 / UI HEAD 68d536652 で一致。** PR #1197で修正されたPencil正本に合わせ、使用中3か所の削除を止め、シナリオ・自動応答・受信箱の使用先と差し替え導線を表示した。3102/8789で1440/1920pxを再撮影し、警告、3件の使用先、差し替え案内、取消不能の注記、2つの操作を同Nodeの設計画像と目視比較した。両幅とも横はみ出し0。未使用テンプレートだけは従来どおり削除確認から削除できる。',
     verdictSource: 'templates-v6/M9cij.txt + M9cij-1440.png + M9cij-1920.png',
-    verdictHead: '031081d69',
+    verdictHead: '68d536652',
     mode: 'viewport', height: 1080,
     steps: [{ click: '使用先を見る', scope: 'main', nth: 9 }],
   },
