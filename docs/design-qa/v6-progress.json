@@ -1,11 +1,11 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 250,
+  "compared": 252,
   "unimplemented": 0,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 22,
+  "missing": 20,
   "match": 268,
   "structureMatchDataPending": 0,
   "needsFix": 0,
@@ -203,17 +203,30 @@
       "feature": 3,
       "name": "友だち",
       "total": 12,
-      "compared": 5,
+      "compared": 7,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 7,
+      "missing": 5,
       "match": 12,
       "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
       "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1254,
+          "head": "07b5835cf5",
+          "on": "2026-09-07",
+          "screens": [
+            "PhxG6",
+            "I6UAdr",
+            "bzDn6",
+            "YzxU1",
+            "r7eSi"
+          ],
+          "note": "Issue #457 / PR #1254。友だち一覧の余分な空白と選択中の絞り込み、詳細のマイル、重複候補表の見出し、統合ユーザーの操作行をPencil V6へそろえ、3102/8789で通常・全状態を1440/1920px撮影。横はみ出し0で5画面とも一致を確認した。"
+        },
         {
           "pr": 1247,
           "head": "fb07e4a3f3",
@@ -542,6 +555,15 @@
       "unjudged": 0,
       "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1255,
+          "head": "1e278a643",
+          "on": "2026-09-07",
+          "screens": [
+            "TC1b1"
+          ],
+          "note": "Issue #459 / PR #1255。Pencilに無い並び替え案内の押し口を外し、名前列と配信方式列の重なり、フォルダ選択の左余白を修正。3104/8791で1440・1920pxを上端から比較し、両幅とも横はみ出し0、一致を維持した。"
+        },
         {
           "pr": 1244,
           "head": "fa2d7bf8e",

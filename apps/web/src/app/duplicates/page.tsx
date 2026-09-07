@@ -211,7 +211,7 @@ export default function DuplicatesPage() {
           <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
             <table className="w-full table-fixed text-sm">
               <colgroup><col style={{ width: '18%' }}/><col style={{ width: '10%' }}/><col style={{ width: '27%' }}/><col style={{ width: '18%' }}/><col style={{ width: '12%' }}/><col style={{ width: '8%' }}/><col style={{ width: '12%' }}/></colgroup>
-              <thead className="border-b border-hairline bg-canvas-sunken text-left text-micro font-semibold text-ink-secondary"><tr><Th>候補</Th><Th>確信度</Th><Th>一致した根拠</Th><Th>所属アカウント</Th><Th>最終更新</Th><Th>状態</Th><Th>操作</Th></tr></thead>
+              <thead className="border-b border-hairline bg-canvas-sunken text-left text-micro font-semibold text-ink-secondary"><tr><Th className="py-3">候補</Th><Th className="py-3">確信度</Th><Th className="py-3">一致した根拠</Th><Th className="py-3">所属アカウント</Th><Th className="py-3">最終更新</Th><Th className="py-3">状態</Th><Th className="py-3">操作</Th></tr></thead>
               <tbody className="divide-y divide-hairline">
                 {visibleCandidates.length ? visibleCandidates.map((candidate) => (
                   <tr key={candidate.id}>

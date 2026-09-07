@@ -336,22 +336,21 @@ function FriendDetailInner() {
               <Button href={`/friends/detail?id=${friendId}&tab=info`} className="mt-3">♙ 友だち詳細</Button>
             </div>
 
-            {/*
-              マイル。設計ではここだけ地を黒く反転している。ほかの節と
-              同じ白地にすると、残高が並の情報に見える。
-            */}
+            {/* マイル。設計どおり、見出しの下に利用可能残高を1行で置く。 */}
             <div className="border-hairline border-b bg-canvas px-5 py-4">
               <div className="flex items-center justify-between"><p className="text-ink text-xs font-bold">マイル</p><Link href="/mileage" className="text-action text-xs">詳細を見る</Link></div>
-              <p className="bg-canvas-sunken text-ink mt-2 rounded-control px-3 py-3 text-right text-2xl font-bold tabular-nums">
-                {mileage ? mileage.available.toLocaleString('ja-JP') : '—'}
-                <span className="text-ink-faint ml-1 text-xs font-normal">mile</span>
-              </p>
-              <p className="text-ink-faint mt-1 text-xs">
-                利用可能
-                {mileage && mileage.pending > 0
-                  ? ` ・ 確定待ち ${mileage.pending.toLocaleString('ja-JP')}`
-                  : ''}
-              </p>
+              <div className="bg-canvas-sunken mt-2 flex items-center justify-between rounded-control px-3 py-3">
+                <span className="text-ink-faint text-xs">
+                  利用可能
+                  {mileage && mileage.pending > 0
+                    ? ` ・ 確定待ち ${mileage.pending.toLocaleString('ja-JP')}`
+                    : ''}
+                </span>
+                <strong className="text-ink text-base font-bold tabular-nums">
+                  {mileage ? mileage.available.toLocaleString('ja-JP') : '—'}
+                  <span className="ml-1 text-xs font-semibold">mile</span>
+                </strong>
+              </div>
             </div>
 
             <div className="space-y-4 p-5">
