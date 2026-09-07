@@ -93,12 +93,13 @@ export default function BookingStaffPage() {
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <nav className="text-ink-faint text-xs" aria-label="パンくず">
+        <nav data-design="Crumb" className="text-ink-faint text-xs" aria-label="パンくず">
           <Link href="/booking/menus" className="hover:underline">予約設定</Link>
           <span className="mx-1.5">/</span>
           <span>担当スタッフ</span>
         </nav>
         <button
+          data-design="Actions"
           onClick={() => setEditing(EMPTY)}
           disabled={!selectedAccountId || loadStatus !== 'ready'}
           className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:brightness-92 disabled:opacity-50"
@@ -121,7 +122,7 @@ export default function BookingStaffPage() {
       ) : items.length === 0 ? (
         <ListState kind="empty" title="予約スタッフはまだいません" description="「＋ 新規スタッフ」から最初のスタッフを追加してください。" />
       ) : (
-        <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
+        <div data-design="Table" className="bg-canvas rounded-card border border-hairline overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px]">
               <thead>

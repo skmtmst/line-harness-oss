@@ -90,7 +90,6 @@ const DESIGN_WORDS: Record<string, number> = {
 const REMAINING: Record<string, number> = {
   'app/booking/bookings/detail/page.tsx': 4,
   'app/booking/bookings/page.tsx': 5,
-  'app/booking/menus/staff/page.tsx': 1,
   'app/booking/staff/new/page.tsx': 2,
   'app/broadcasts/detail/page.tsx': 2,
   'app/friends/detail/page.tsx': 1,
