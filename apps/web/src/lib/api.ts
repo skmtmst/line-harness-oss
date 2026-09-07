@@ -7157,6 +7157,7 @@ export const api = {
       }>>(`/api/friend-add-rules/${encodeURIComponent(ruleId)}/validate?account_id=${encodeURIComponent(accountId)}`, {
         method: 'POST',
       }),
+    /** 新しい rules 契約でテスト実行し、本番データは変更しない。 */
     test: (accountId: string, ruleId: string) =>
       fetchApi<ApiResponse<{
         stateChanged: false
