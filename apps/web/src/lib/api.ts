@@ -102,6 +102,80 @@ import type {
   UndoIdentityCandidateRequest,
 } from '@line-crm/shared'
 
+export type AccessUserStatus = 'active' | 'invited' | 'expired' | 'suspended'
+export type AccessRoleBundle = 'administrator' | 'operations' | 'reception' | 'view_only' | 'custom'
+
+export type AccessUserItem = {
+  id: string
+  name: string
+  email: string | null
+  jobTitle: string | null
+  roleBundle: AccessRoleBundle
+  featureCount: number | null
+  hasFieldMasks: boolean | null
+  accountScope: {
+    type: 'all' | 'accounts'
+    assignedLineAccountId: string | null
+    lineAccountIds: string[]
+    includesDescendants: boolean
+  }
+  lastLoginAt: string | null
+  lastActionAt: string | null
+  mfaEnabled: boolean
+  status: AccessUserStatus
+  policyVersion: number
+  createdAt: string
+  updatedAt: string
+}
+
+export type AccessUserSummary = {
+  active: number
+  invited: number
+  expiredInvitations: number
+  unused90Days: number
+  mfaEnabled: number
+  mfaRate: number | null
+  roleCounts: Record<AccessRoleBundle, number>
+}
+
+export type AccessRoleItem = {
+  id: AccessRoleBundle
+  name: string
+  description: string
+  featureAccess: 'edit' | 'view' | 'custom'
+  requiresMfa: boolean
+  assignedUserCount: number
+}
+
+export type AuditEventItem = {
+  id: string
+  category: 'auth' | 'business'
+  lineAccountId: string | null
+  actor: { id: string | null; name: string | null; role: string | null }
+  action: string
+  target: { kind: string | null; id: string | null } | null
+  result: 'success' | 'denied' | 'failed'
+  before: Record<string, unknown> | null
+  after: Record<string, unknown> | null
+  reason: string | null
+  requestTraceId: string | null
+  ipPrefix: string | null
+  deviceFamily: string | null
+  riskLevel: 'normal' | 'suspicious' | 'high'
+  retentionClass: 'general' | 'security' | 'personal_data'
+  createdAt: string
+}
+
+export type AuditEventSummary = {
+  periodDays: 30
+  total: number
+  deleted: number
+  sent: number
+  changed: number
+  logins: number
+  suspiciousLogins: number
+}
+
 export type FriendProfileCandidateOption = {
   sourceFriendId: string
   sourceLabel: string
@@ -3994,6 +4068,74 @@ export const api = {
           }>
         >
       >(`/api/login-audit${query ? `?${query}` : ''}`)
+    },
+  },
+  /** ログインユーザーの利用状況と権限bundle。 */
+  access: {
+    users: (params?: {
+      lineAccountId?: string
+      status?: AccessUserStatus
+      roleBundle?: AccessRoleBundle
+      query?: string
+      limit?: number
+      offset?: number
+    }) => {
+      const q = new URLSearchParams()
+      if (params?.lineAccountId) q.set('lineAccountId', params.lineAccountId)
+      if (params?.status) q.set('status', params.status)
+      if (params?.roleBundle) q.set('roleBundle', params.roleBundle)
+      if (params?.query) q.set('query', params.query)
+      if (params?.limit !== undefined) q.set('limit', String(params.limit))
+      if (params?.offset !== undefined) q.set('offset', String(params.offset))
+      const query = q.toString()
+      return fetchApi<ApiResponse<{
+        items: AccessUserItem[]
+        summary: AccessUserSummary
+        pagination: { total: number; limit: number; offset: number }
+      }>>(`/api/access/users${query ? `?${query}` : ''}`)
+    },
+    roles: (lineAccountId?: string) => {
+      const query = lineAccountId
+        ? `?lineAccountId=${encodeURIComponent(lineAccountId)}`
+        : ''
+      return fetchApi<ApiResponse<{
+        items: AccessRoleItem[]
+        totalBundles: number
+        totalAssignedUsers: number
+      }>>(`/api/access/roles${query}`)
+    },
+  },
+  /** 認証と業務操作をまとめた共通監査。 */
+  audit: {
+    events: (params?: {
+      lineAccountId?: string
+      category?: 'auth' | 'business'
+      result?: 'success' | 'denied' | 'failed'
+      actorId?: string
+      action?: string
+      query?: string
+      from?: string
+      to?: string
+      limit?: number
+      offset?: number
+    }) => {
+      const q = new URLSearchParams()
+      if (params?.lineAccountId) q.set('lineAccountId', params.lineAccountId)
+      if (params?.category) q.set('category', params.category)
+      if (params?.result) q.set('result', params.result)
+      if (params?.actorId) q.set('actorId', params.actorId)
+      if (params?.action) q.set('action', params.action)
+      if (params?.query) q.set('query', params.query)
+      if (params?.from) q.set('from', params.from)
+      if (params?.to) q.set('to', params.to)
+      if (params?.limit !== undefined) q.set('limit', String(params.limit))
+      if (params?.offset !== undefined) q.set('offset', String(params.offset))
+      const query = q.toString()
+      return fetchApi<ApiResponse<{
+        items: AuditEventItem[]
+        summary: AuditEventSummary
+        pagination: { total: number; limit: number; offset: number }
+      }>>(`/api/audit/events${query ? `?${query}` : ''}`)
     },
   },
   /** 回答フォーム。 */
