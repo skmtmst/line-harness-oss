@@ -500,7 +500,7 @@ export const SCREENS = [
     ],
     verdict: "match",
     verdictNote: "**2026-09-07 Issue #488で正式画像を再収録し、一致を維持。** 3102/8789の1440/1920pxで詳細検索のAND条件3件を撮影し、横はみ出し0、高さ差0px、1920px画素差4.7296%。AND・ORの14軸、表示対象、並び順、保存・実行操作をPencilと比較した。",
-    verdictSource: "friends-v6/Igi72.png（Pencil） + friends-v6/Igi72-{1440,1920}.png（実装） + friends-v6/Igi72-diff-1920.png + Issue #488 pixel comparison",
+    verdictSource: "friends-v6/Igi72.txt + friends-v6/Igi72-{1440,1920}.png（実装） + friends-v6/Igi72-diff-1920.png + Issue #488 pixel comparison",
     verdictHead: "2109109a9",
   },
   {
