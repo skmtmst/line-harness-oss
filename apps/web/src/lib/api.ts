@@ -2479,6 +2479,10 @@ export type ScenarioActionType =
   | 'support_mark'
   | 'scenario'
   | 'common_var'
+  | 'send_message'
+  | 'send_template'
+  | 'reminder'
+  | 'event_booking'
 
 export type ScenarioAction = {
   id: string

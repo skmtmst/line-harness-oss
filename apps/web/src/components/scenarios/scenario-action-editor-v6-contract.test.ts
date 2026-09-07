@@ -79,15 +79,18 @@ describe('V6 送信後アクションの契約', () => {
   })
 
   /*
-   * 設計は8つ、実装が持つ種別は5つ。作れない札を3つ増やしても
-   * できることは増えない（押しても何も起きない札になる）。
+   * 設計の8種類をすべて保存できる札として並べる。
    */
   it('作れる動作だけを並べる', () => {
     const kinds = EDITOR.slice(
       EDITOR.indexOf('export const ACTION_KINDS'),
       EDITOR.indexOf('const KIND_LABEL'),
     )
-    expect(kinds.match(/type: '/g)).toHaveLength(5)
+    expect(kinds.match(/type: '/g)).toHaveLength(9)
+    expect(kinds).toContain("type: 'send_message'")
+    expect(kinds).toContain("type: 'send_template'")
+    expect(kinds).toContain("type: 'reminder'")
+    expect(kinds).toContain("type: 'event_booking'")
   })
 
   it('変更後の安全な設定をV6下書きAPIへ保存する', () => {

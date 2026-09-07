@@ -1280,7 +1280,7 @@ scenarios.post('/api/scenarios/:id/enroll/:friendId', requireRole('owner', 'admi
 // ============================================================
 
 const VALID_ACTION_HOOKS = ['step_sent', 'scenario_completed', 'choice_selected'] as const;
-const VALID_ACTION_TYPES = ['tag', 'friend_field', 'support_mark', 'scenario', 'common_var'] as const;
+const VALID_ACTION_TYPES = ['tag', 'friend_field', 'support_mark', 'scenario', 'common_var', 'send_message', 'send_template', 'reminder', 'event_booking'] as const;
 
 interface ActionBody {
   hook?: string;
@@ -1368,6 +1368,18 @@ function validateActionConfig(
       if (c.op !== undefined && c.op !== 'add' && c.op !== 'sub') {
         return { ok: false, error: '共通情報の操作は加算か減算です。' };
       }
+      return { ok: true };
+    case 'send_message':
+      if (c.content !== undefined && typeof c.content !== 'string') return { ok: false, error: '本文が不正です。' };
+      return { ok: true };
+    case 'send_template':
+      if (c.templateId !== undefined && typeof c.templateId !== 'string') return { ok: false, error: 'テンプレートの指定が不正です。' };
+      return { ok: true };
+    case 'reminder':
+      if (c.reminderId !== undefined && typeof c.reminderId !== 'string') return { ok: false, error: 'リマインダの指定が不正です。' };
+      return { ok: true };
+    case 'event_booking':
+      if (c.eventId !== undefined && typeof c.eventId !== 'string') return { ok: false, error: 'イベント予約の指定が不正です。' };
       return { ok: true };
     default:
       return { ok: false, error: `知らないアクション種別です: ${actionType}` };
