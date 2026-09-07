@@ -24,6 +24,7 @@ const mocks = {
   getMedia: vi.fn(),
   countMedia: vi.fn(),
   getMediaById: vi.fn(),
+  getFolderById: vi.fn(),
   createMedia: vi.fn(),
   updateMedia: vi.fn(),
   deleteMedia: vi.fn(),
@@ -272,6 +273,7 @@ beforeEach(() => {
   mocks.getMedia.mockResolvedValue([MEDIA]);
   mocks.countMedia.mockResolvedValue(1);
   mocks.getMediaById.mockResolvedValue(MEDIA);
+  mocks.getFolderById.mockResolvedValue({ id: 'folder-1', kind: 'media', name: '配信用' });
   mocks.createMedia.mockResolvedValue(MEDIA);
   mocks.updateMedia.mockResolvedValue(MEDIA);
   mocks.countMediaUsages.mockResolvedValue(0);
@@ -689,6 +691,63 @@ describe('メディアの削除', () => {
     // 孤児のファイルが残るだけで、画面には出てこない。
     await req('/api/media/md-1?accountId=account-1', 'DELETE');
     expect(mocks.deleteMedia).toHaveBeenCalledWith(env.DB, 'md-1', 'account-1');
+  });
+});
+
+describe('#550 M6 メディアの名前・フォルダ変更の検証', () => {
+  it('空のファイル名は保存しない', async () => {
+    const res = await req('/api/media/md-1?accountId=account-1', 'PATCH', { filename: '   ' });
+    expect(res.status).toBe(400);
+    expect(mocks.updateMedia).not.toHaveBeenCalled();
+  });
+
+  it('255文字を超えるファイル名は保存しない', async () => {
+    const res = await req('/api/media/md-1?accountId=account-1', 'PATCH', { filename: `${'あ'.repeat(256)}.png` });
+    expect(res.status).toBe(400);
+    expect(mocks.updateMedia).not.toHaveBeenCalled();
+  });
+
+  it('制御文字を含むファイル名は保存しない', async () => {
+    // 垂直タブ(制御文字)が1文字入っている。
+    const res = await req('/api/media/md-1?accountId=account-1', 'PATCH', { filename: 'a' + String.fromCharCode(11) + 'b.png' });
+    expect(res.status).toBe(400);
+    expect(mocks.updateMedia).not.toHaveBeenCalled();
+  });
+
+  it('存在しないフォルダは保存しない', async () => {
+    mocks.getFolderById.mockResolvedValueOnce(null);
+    const res = await req('/api/media/md-1?accountId=account-1', 'PATCH', { folderId: 'folder-gone' });
+    expect(res.status).toBe(400);
+    expect(mocks.updateMedia).not.toHaveBeenCalled();
+  });
+
+  it('別種のフォルダは保存しない', async () => {
+    mocks.getFolderById.mockResolvedValueOnce({ id: 'folder-tag', kind: 'tag', name: '分類' });
+    const res = await req('/api/media/md-1?accountId=account-1', 'PATCH', { folderId: 'folder-tag' });
+    expect(res.status).toBe(400);
+    expect(mocks.updateMedia).not.toHaveBeenCalled();
+  });
+
+  it('他アカウントのメディアは存在も返さない', async () => {
+    mocks.getMediaById.mockResolvedValueOnce(null);
+    const res = await req('/api/media/md-1?accountId=account-1', 'PATCH', { filename: 'b.png' });
+    expect(res.status).toBe(404);
+    expect(mocks.updateMedia).not.toHaveBeenCalled();
+  });
+
+  it('正しい名前とメディア用フォルダは通る', async () => {
+    const res = await req('/api/media/md-1?accountId=account-1', 'PATCH', { filename: 'b.png', folderId: 'folder-1' });
+    expect(res.status).toBe(200);
+    expect(mocks.updateMedia).toHaveBeenCalledWith(env.DB, 'md-1', 'account-1', {
+      filename: 'b.png',
+      folderId: 'folder-1',
+    });
+  });
+
+  it('フォルダを外す（未分類へ戻す）は通る', async () => {
+    const res = await req('/api/media/md-1?accountId=account-1', 'PATCH', { folderId: null });
+    expect(res.status).toBe(200);
+    expect(mocks.updateMedia).toHaveBeenCalledWith(env.DB, 'md-1', 'account-1', { folderId: null });
   });
 });
 

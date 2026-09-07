@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { parseStickerMessageContent, stickerFallback } from '@line-crm/shared'
-import { api, ApiError, fetchApi, type InboxStats } from '@/lib/api'
+import { api, ApiError, fetchApi, type ChatDetailMessage, type InboxStats } from '@/lib/api'
 import { buildSupportEmailInboxQuery } from './support-email-query'
 import { OperatorDropdown, StatusDropdown, type ChatStatus } from '@/components/chats/inbox-dropdown'
 import { unreadLookup } from '@/components/chats/assignee-unread'
@@ -43,18 +43,12 @@ interface Chat {
   updatedAt: string
 }
 
-interface ChatMessage {
-  id: string
-  direction: 'incoming' | 'outgoing'
-  messageType: string
-  content: string
-  source?: string | null
-  originKind?: string | null
-  sentByStaffId?: string | null
-  sentByStaffName?: string | null
-  scenarioName?: string | null
-  createdAt: string
-}
+/**
+ * 会話のメッセージ1件。形は `api.ts` の `ChatDetailMessage`
+ *（`GET /api/chats/:id` の実応答）に寄せる。画面が独自の型を持つと
+ * 口の形が変わっても型検査が黙るため、ここでは別名にするだけ。
+ */
+type ChatMessage = ChatDetailMessage
 
 interface ChatDetail extends Chat {
   friendName: string
@@ -100,6 +94,7 @@ const statusFilters: { key: StatusFilter; label: string }[] = [
 
 import { normalizeSavedViewConditions, type InboxSavedViewConditions } from './saved-view-types'
 import { savedViewSummary } from './saved-view-summary'
+import { buildOutgoingMessage, refreshChatListAfterSend } from './send-optimistic'
 
 type InboxSavedView = {
   id: string
@@ -402,6 +397,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
    * 返信を待っている人を2か所で探すことになる。
    */
   const [emailItems, setEmailItems] = useState<EmailInboxItem[]>([])
+  /*
+   * メール一覧だけの失敗表示。LINE側の `error` とは別にする。
+   * 以前は失敗が無言で「メール0件」に見え、未対応の見落としになった。
+   * 成功したら消す。ふだんは何も出ない。
+   */
+  const [emailError, setEmailError] = useState('')
   // 中央ペインで開いているメール。LINEのトークと排他。
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null)
   const [allFriends, setAllFriends] = useState<FriendItem[]>([])
@@ -581,6 +582,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         })}`,
       )
       if (res.success) {
+        setEmailError('')
         if (append) {
           const rows = res.data.items
           setEmailItems((prev) => {
@@ -593,9 +595,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           setHasMoreEmails(res.data.items.length >= EMAIL_PAGE_SIZE
             && res.data.items.length < (res.data.summary?.total ?? res.data.items.length + 1))
         }
+      } else {
+        // 口が success:false を返したときも、0件と区別できるよう失敗を出す。
+        setEmailError('メールの読み込みに失敗しました。')
+        if (!append) setEmailItems([])
       }
     } catch {
-      // メールが出ないだけ。LINEのトークは使える。
+      // メールが出ないだけ。LINEのトークは使えるが、0件と区別できるよう失敗を出す。
+      setEmailError('メールの読み込みに失敗しました。')
       if (!append) setEmailItems([])
     } finally {
       if (append) setLoadingMoreEmails(false)
@@ -1025,43 +1032,31 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         sendKeysRef.current.clear(signature)
         setPendingImage(null)
         // Optimistic update for image
+        const imageMessage = buildOutgoingMessage({
+          messageType: 'image',
+          content: imgPayload,
+          sentByStaffName: sendResult.success ? sendResult.data.sentByStaffName : '自分',
+          sentAt: now,
+        })
         setChatDetail((prev) => (prev && prev.id === sendingChatId) ? {
           ...prev,
           lastMessageAt: now,
           status: 'in_progress',
           revision: sendResult.success ? sendResult.data.revision : prev.revision,
-          messages: [
-            ...(prev.messages ?? []),
-            {
-              id: crypto.randomUUID(),
-              direction: 'outgoing',
-              messageType: 'image',
-              content: imgPayload,
-              sentByStaffName: sendResult.success ? sendResult.data.sentByStaffName : '自分',
-              createdAt: now,
-            },
-          ],
+          messages: [...(prev.messages ?? []), imageMessage],
         } : prev)
         setChats((prev) => {
           const exists = prev.some((c) => c.id === sendingChatId)
           if (!exists) return prev
-          const currentFilter = statusFilterRef.current
-          const updated = prev.map((c) => c.id === sendingChatId ? {
+          // 返信すると対応中に変わるので、別の絞り込みを見ているときは一覧から外れる
+          return refreshChatListAfterSend(prev, statusFilterRef.current, (c) => (c.id === sendingChatId ? {
             ...c,
             lastMessageAt: now,
             status: 'in_progress' as const,
             lastMessageContent: '[画像]',
             lastMessageDirection: 'outgoing' as const,
             lastMessageType: 'image' as const,
-          } : c)
-          // 返信すると対応中に変わるので、別の絞り込みを見ているときは一覧から外れる
-          const filtered =
-            currentFilter === 'all' ? updated : updated.filter((c) => c.status === currentFilter)
-          return [...filtered].sort((a, b) => {
-            const at = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0
-            const bt = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0
-            return bt - at
-          })
+          } : c))
         })
       }
       // --- Text send path (runs independently — both paths execute when both image and text are present) ---
@@ -1077,29 +1072,25 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         setMessageContent('')
         // Optimistic update: append message locally instead of refetching (prevents scroll jump / full reload feel)
         // Only mutate chatDetail if it still corresponds to the chat we just sent to
+        const textMessage = buildOutgoingMessage({
+          messageType: 'text',
+          content,
+          sentByStaffName: sendResult.success ? sendResult.data.sentByStaffName : '自分',
+          sentAt: now,
+        })
         setChatDetail((prev) => (prev && prev.id === sendingChatId) ? {
           ...prev,
           lastMessageAt: now,
           status: 'in_progress',
           revision: sendResult.success ? sendResult.data.revision : prev.revision,
-          messages: [
-            ...(prev.messages ?? []),
-            {
-              id: crypto.randomUUID(),
-              direction: 'outgoing',
-              messageType: 'text',
-              content,
-              sentByStaffName: sendResult.success ? sendResult.data.sentByStaffName : '自分',
-              createdAt: now,
-            },
-          ],
+          messages: [...(prev.messages ?? []), textMessage],
         } : prev)
         setChats((prev) => {
           // Skip reconciliation if the list no longer contains this chat (e.g. tab changed mid-send)
           const exists = prev.some((c) => c.id === sendingChatId)
           if (!exists) return prev
-          const currentFilter = statusFilterRef.current
-          const updated = prev.map((c) => c.id === sendingChatId ? {
+          // 返信すると対応中に変わるので、別の絞り込みを見ているときは一覧から外れる
+          return refreshChatListAfterSend(prev, statusFilterRef.current, (c) => (c.id === sendingChatId ? {
             ...c,
             lastMessageAt: now,
             status: 'in_progress' as const,
@@ -1109,15 +1100,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             lastMessageContent: content,
             lastMessageDirection: 'outgoing' as const,
             lastMessageType: 'text' as const,
-          } : c)
-          // 返信すると対応中に変わるので、別の絞り込みを見ているときは一覧から外れる
-          const filtered =
-            currentFilter === 'all' ? updated : updated.filter((c) => c.status === currentFilter)
-          return [...filtered].sort((a, b) => {
-            const at = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0
-            const bt = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0
-            return bt - at
-          })
+          } : c))
         })
       }
       // 手動返信で未対応が 1 件減るので、サイドバーのバッジを即時更新させる
@@ -1597,6 +1580,23 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               </div>
             ) : (
               <>
+                {/*
+                  メール一覧の失敗行。LINEだけ見ているときは出さない。
+                  以前は失敗が無言で「メール0件」に見え、未対応の見落としになった。
+                  ふだん（成功時）は何も出ないので、一覧の見た目は変わらない。
+                */}
+                {channel !== 'line' && emailError && (
+                  <div role="alert" className="border-b border-hairline bg-danger-bg px-4 py-3">
+                    <p className="text-sm text-danger">{emailError}</p>
+                    <button
+                      type="button"
+                      onClick={() => { void loadEmails() }}
+                      className="mt-1.5 text-sm font-semibold text-danger underline underline-offset-2"
+                    >
+                      メールを読み込み直す
+                    </button>
+                  </div>
+                )}
                 {/*
                   メールの問い合わせを同じ一覧の先頭に混ぜる。
                   設計 `V2 2-1 受信箱` の一覧は「✉ 定期便の解約について」のように
