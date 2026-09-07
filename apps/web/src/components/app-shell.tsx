@@ -52,11 +52,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div className={`${styles.workspace} ${isFriendAttributesV2 ? 'friend-attributes-v2-shell' : ''}`}>
               <Sidebar friendAttributesV2Mode={isFriendAttributesV2} />
               <Workspace>
-                <RootLandingGate>
-                  <StoreSelectionGate>
-                    <FeatureDisabledGate>{children}</FeatureDisabledGate>
-                  </StoreSelectionGate>
-                </RootLandingGate>
+                <RootLandingGate><StoreSelectionGate><FeatureDisabledGate>{children}</FeatureDisabledGate></StoreSelectionGate></RootLandingGate>
               </Workspace>
             </div>
           </div>
