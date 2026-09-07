@@ -2,14 +2,14 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
-import { AlertTriangle, ArrowRight, Building2, Mail, Users } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { AlertTriangle, ArrowRight, Building2, Users } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { Field, TextInput } from '@/components/shared/form-controls'
 import SelectField from '@/components/shared/select-field'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useAccount } from '@/contexts/account-context'
-import { ApiError, api } from '@/lib/api'
+import { ApiError, api, type OperatorRecipientPreview } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
 const EVENT_OPTIONS = [
@@ -52,13 +52,34 @@ export default function NewOperatorNotificationPage() {
   const [threshold, setThreshold] = useState('one')
   const [importance, setImportance] = useState('normal')
   const [name, setName] = useState('')
-  const [recipientLabel, setRecipientLabel] = useState('')
+  const [recipients, setRecipients] = useState<OperatorRecipientPreview | null>(null)
+  const [recipientIds, setRecipientIds] = useState<string[]>([])
   const [schedule, setSchedule] = useState('anytime')
   const [dedupeMinutes, setDedupeMinutes] = useState('10')
   const [onlyAvailable, setOnlyAvailable] = useState(false)
-  const [fallbackEmail, setFallbackEmail] = useState(true)
+  const [message, setMessage] = useState('')
+  const [savedRuleId, setSavedRuleId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    if (!selectedAccountId) { setRecipients(null); setRecipientIds([]); return }
+    void api.notifications.operatorRules.previewRecipients({
+      lineAccountId: selectedAccountId,
+      channels: ['dashboard', 'line'],
+    }).then((result) => {
+      if (!active) return
+      if (!result.success) throw new Error(result.error)
+      setRecipients(result.data)
+      setRecipientIds(result.data.items.map((item) => item.id))
+    }).catch(() => {
+      if (!active) return
+      setRecipients(null)
+      setError('受け取る人を読み込めませんでした。')
+    })
+    return () => { active = false }
+  }, [selectedAccountId])
 
   const saveDraft = async () => {
     if (saving) return
@@ -68,6 +89,10 @@ export default function NewOperatorNotificationPage() {
     }
     if (!name.trim()) {
       setError('お知らせの名前を入力してください。')
+      return
+    }
+    if (recipientIds.length === 0) {
+      setError('受け取るスタッフを1人以上選んでください。')
       return
     }
     setSaving(true)
@@ -82,18 +107,20 @@ export default function NewOperatorNotificationPage() {
           threshold,
           importance,
           recipientType: 'team',
-          recipientLabel: recipientLabel.trim() || null,
+          recipientIds,
+          recipientLabel: `${recipientIds.length}人`,
+          message: message.trim() || null,
           schedule,
           scheduleLabel,
           dedupeMinutes: Number(dedupeMinutes),
           onlyAvailable,
-          fallbackEmail,
           lifecycle: 'draft',
         },
-        channels: fallbackEmail ? ['dashboard', 'email'] : ['dashboard'],
+        channels: ['dashboard', 'line'],
       })
       if (!result.success) throw new Error('save failed')
-      router.push(`/line-notifications?tab=operator&highlight=${encodeURIComponent(result.data.id)}`)
+      setSavedRuleId(result.data.id)
+      setError('')
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 403) {
         setError('このLINEアカウントのお知らせを変更する権限がありません。')
@@ -105,6 +132,29 @@ export default function NewOperatorNotificationPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const publish = async () => {
+    if (!selectedAccountId || !savedRuleId || saving) return
+    setSaving(true); setError('')
+    try {
+      await api.notifications.operatorRules.publish(savedRuleId, selectedAccountId)
+      router.push(`/line-notifications?tab=operator&highlight=${encodeURIComponent(savedRuleId)}`)
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : '公開できませんでした。')
+    } finally { setSaving(false) }
+  }
+
+  const testSend = async () => {
+    if (!selectedAccountId || !savedRuleId || saving) return
+    setSaving(true); setError('')
+    try {
+      const result = await api.notifications.operatorRules.test(savedRuleId, selectedAccountId, message.trim() || undefined)
+      if (!result.success) throw new Error(result.error)
+      setError(result.data.accepted > 0 ? '自分へのテスト送信を受け付けました。' : '受け取れる通知方法がありません。受信設定を確認してください。')
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'テスト送信できませんでした。')
+    } finally { setSaving(false) }
   }
 
   return (
@@ -147,12 +197,10 @@ export default function NewOperatorNotificationPage() {
           <section className="border-hairline bg-canvas rounded-card border p-5">
             <h2 className="text-sm font-semibold text-ink">だれが受け取るか</h2>
             <p className="mt-1 text-xs text-ink-faint">LINEログインを済ませた人にだけ届きます。担当が決まっていないと届きません。</p>
-            <p className="mt-1 text-xs text-ink-faint">いまは下書きにチーム名を保存します。実際のスタッフ人数は送信処理の接続後に確認します。</p>
-            <div className="mt-4 max-w-xl">
-              <Field label="受け取るチーム" htmlFor="operator-recipient" note="未入力の下書きは公開できません。">
-                <TextInput id="operator-recipient" value={recipientLabel} onChange={(event) => setRecipientLabel(event.target.value)} placeholder="例：予約チーム" maxLength={80} />
-              </Field>
+            <div className="mt-4 space-y-2">
+              {recipients ? recipients.items.map((recipient) => <label key={recipient.id} className="flex items-center justify-between gap-3 rounded-control border border-hairline px-3 py-2 text-sm"><span className="flex items-center gap-2"><input type="checkbox" checked={recipientIds.includes(recipient.id)} onChange={(event) => setRecipientIds((current) => event.target.checked ? [...current, recipient.id] : current.filter((id) => id !== recipient.id))} className="h-4 w-4 accent-accent" /><strong>{recipient.name}</strong></span><span className="text-xs text-ink-faint">管理画面{recipient.channels.line ? '・LINE' : '（LINE未連携）'}</span></label>) : <p className="text-sm text-ink-faint">受け取る人を読み込んでいます…</p>}
             </div>
+            {recipients ? <p className="mt-3 text-xs text-ink-secondary">選択 {recipientIds.length}人 ／ LINEで受け取れる {recipients.items.filter((item) => recipientIds.includes(item.id) && item.channels.line).length}人 ／ 管理画面で受け取れる {recipientIds.length}人</p> : null}
           </section>
 
           <section className="border-hairline bg-canvas rounded-card border p-5">
@@ -169,10 +217,7 @@ export default function NewOperatorNotificationPage() {
               <input type="checkbox" checked={onlyAvailable} onChange={(event) => setOnlyAvailable(event.target.checked)} className="mt-0.5 h-4 w-4 accent-accent" />
               <span><strong className="block text-ink">手が空いている人だけに送る</strong><span className="text-xs text-ink-faint">対応中の人には送りません。</span></span>
             </label>
-            <label className="mt-4 flex items-start gap-3 text-sm text-ink-secondary">
-              <input type="checkbox" checked={fallbackEmail} onChange={(event) => setFallbackEmail(event.target.checked)} className="mt-0.5 h-4 w-4 accent-accent" />
-              <span><strong className="block text-ink">だれも受け取れないときはメールでも送る</strong><span className="block text-xs text-ink-faint">LINEにログインしていない人がいるときの代替手段です。</span><span className="block text-xs text-ink-faint">メール送信は実行処理の接続後に有効になります。</span></span>
-            </label>
+            <div className="mt-4 max-w-xl"><Field label="届く文面" htmlFor="operator-message" note="空欄なら、お知らせ名と管理画面への案内を送ります。"><TextInput id="operator-message" value={message} onChange={(event) => setMessage(event.target.value)} placeholder="例：新しい予約が入りました。内容を確認してください。" maxLength={500} /></Field></div>
           </section>
 
           {error ? <p role="alert" className="border-danger bg-danger-bg text-danger rounded-control border px-4 py-3 text-sm">{error}</p> : null}
@@ -181,7 +226,7 @@ export default function NewOperatorNotificationPage() {
         <aside className="space-y-4">
           <section className="border-hairline bg-canvas rounded-card border p-4">
             <div className="flex items-center gap-2"><Building2 aria-hidden="true" size={18} className="text-accent" /><h2 className="text-sm font-semibold text-ink">お店の人にはこう届きます</h2></div>
-            <p className="mt-2 text-xs text-ink-faint">文面と遷移先は、送信処理を接続するときに確認します。</p>
+            <p className="mt-2 whitespace-pre-wrap text-xs text-ink-faint">{message.trim() || `【運用者へのお知らせ】${name.trim() || 'お知らせ名'}\n管理画面で内容を確認してください。`}</p>
           </section>
           <section className="border-warning bg-warning-bg text-warning rounded-card border p-4">
             <div className="flex items-center gap-2"><AlertTriangle aria-hidden="true" size={18} /><h2 className="text-sm font-semibold">気をつけること</h2></div>
@@ -202,15 +247,16 @@ export default function NewOperatorNotificationPage() {
               ].map(([href, label, note]) => <Link key={href} href={href} className="flex items-center justify-between gap-2 text-accent hover:underline"><span className="inline-flex items-center gap-1"><ArrowRight aria-hidden="true" size={13} />{label}</span><span className="text-ink-faint">{note}</span></Link>)}
             </div>
           </section>
-          {fallbackEmail ? <div className="border-hairline bg-canvas flex items-start gap-2 rounded-card border p-4 text-xs text-ink-secondary"><Mail aria-hidden="true" size={16} className="mt-0.5 shrink-0" />メールは受け取る人の確認済みアドレスだけに送ります。</div> : null}
         </aside>
       </div>
 
       <StickyBar
-        status="下書きです。保存しても通知は始まりません。"
+        status={savedRuleId ? '下書きを保存しました。テスト後に公開できます。' : '下書きです。保存しても通知は始まりません。'}
         actions={<>
           <Button href="/line-notifications?tab=operator" variant="secondary">やめる</Button>
-          <Button onClick={() => void saveDraft()} disabled={saving} variant="primary">{saving ? '保存中…' : '下書きに保存'}</Button>
+          {savedRuleId ? <Button onClick={() => void testSend()} disabled={saving}>自分にテスト送信</Button> : null}
+          <Button onClick={() => void saveDraft()} disabled={saving || Boolean(savedRuleId)}>{saving ? '保存中…' : savedRuleId ? '保存済み' : '下書きに保存'}</Button>
+          {savedRuleId ? <Button onClick={() => void publish()} disabled={saving} variant="primary">運用者へのお知らせを公開</Button> : null}
         </>}
       />
     </div>

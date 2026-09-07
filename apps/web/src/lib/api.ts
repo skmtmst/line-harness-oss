@@ -102,6 +102,44 @@ import type {
   UndoIdentityCandidateRequest,
 } from '@line-crm/shared'
 
+export type OperatorNotificationRule = NotificationRule & {
+  status: 'draft' | 'published'
+  recipientCount: number
+  lineRecipientCount: number
+  occurredToday: number
+  acceptedToday: number
+  excludedToday: number
+  lastOccurredAt: string | null
+}
+
+export type OperatorRecipientPreviewItem = {
+  id: string
+  name: string
+  lineLinked: boolean
+  emailVerified: boolean
+  channels: { line: boolean; email: boolean; dashboard: boolean }
+  canReceive: boolean
+}
+
+export type OperatorRecipientPreview = {
+  items: OperatorRecipientPreviewItem[]
+  summary: {
+    staff: number
+    canReceive: number
+    line: number
+    email: number
+    dashboard: number
+    unavailable: number
+  }
+}
+
+export type OperatorDeliveryResult = {
+  accepted: number
+  excluded: number
+  failed: number
+  duplicate: number
+}
+
 export type OutgoingWebhookOverview = OutgoingWebhook & {
   deliverySummary: {
     periodDays: number
@@ -7607,6 +7645,32 @@ export const api = {
     },
   },
   notifications: {
+    operatorRules: {
+      list: (lineAccountId: string) =>
+        fetchApi<ApiResponse<{ items: OperatorNotificationRule[] }>>(
+          `/api/notifications/operator-rules?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        ),
+      previewRecipients: (data: {
+        lineAccountId: string
+        recipientIds?: string[]
+        channels: string[]
+      }) => fetchApi<ApiResponse<OperatorRecipientPreview>>(
+        '/api/notifications/operator-rules/recipients-preview',
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+      publish: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<NotificationRule>>(
+          `/api/notifications/operator-rules/${encodeURIComponent(id)}/publish`,
+          { method: 'POST', body: JSON.stringify({ lineAccountId }) },
+        ),
+      test: (id: string, lineAccountId: string, message?: string) =>
+        fetchApi<ApiResponse<OperatorDeliveryResult>>(
+          `/api/notifications/operator-rules/${encodeURIComponent(id)}/test`,
+          { method: 'POST', body: JSON.stringify({ lineAccountId, message }) },
+        ),
+      exportCsv: (lineAccountId: string, reason: string) =>
+        fetchApiBlob(`/api/notifications/operator-deliveries.csv?${new URLSearchParams({ lineAccountId, reason })}`),
+    },
     center: {
       list: (lineAccountId: string, params?: { category?: 'all' | 'error' | 'update'; limit?: number }) => {
         const query = new URLSearchParams({ lineAccountId });
