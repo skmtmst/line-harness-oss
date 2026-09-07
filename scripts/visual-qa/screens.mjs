@@ -1108,9 +1108,9 @@ export const SCREENS = [
   */
   { ...AUTO_REPLY, node: 'cmDfJ', name: '8-1 自動応答',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #451 / UI HEAD `3a3bc7a31` で再撮影・一致。** 本文側の旧見出しを外し、画面名は上部バーだけに統一。「フォルダを追加」「ルールを作成」を4指標の直後へ移し、Pencil V6と同じ順序にした。1440/1920pxとも横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #461 / UI HEAD `84039ceca` で再撮影・一致。** 表の見出しを `px-4 py-3` に統一し、縦余白と高さをPencil V6にそろえた。3106/8793の1440/1920pxとも横はみ出し0。',
     verdictSource: 'auto-replies-v6/cmDfJ.png + docs/design-qa/auto-replies-v6/cmDfJ-{1440,1920}.png + cmDfJ.txt',
-    verdictHead: '3a3bc7a31', },
+    verdictHead: '84039ceca', },
   {
     ...AUTO_REPLY, node: 'K7vg2', name: '8-1-A 自動応答ルール編集',
     verdict: 'match',
@@ -1406,17 +1406,17 @@ export const SCREENS = [
   {
     ...WEBINAR, node: 'Q8sHa', name: '10-1-I 参加者管理',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #417 / UI HEAD `527f120ec` で一致。** 参加者APIの実行エラーと担当者連携状態を表示し、4指標、友だち別の視聴・実行結果・状態・時刻、参加内訳、要分析を設計画像と照合した。3101/8788の2幅で横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #461 / UI HEAD `84039ceca` で再撮影・一致。** 表の見出しを `px-4 py-3` に統一し、縦余白と高さをPencil V6にそろえた。3106/8793の1440/1920pxとも横はみ出し0。',
     verdictSource: 'webinars-v6/Q8sHa.png + Q8sHa-1920.png + Q8sHa.txt',
-    verdictHead: '527f120ec', route: `${WEBINAR_EDIT}&pane=participants`, mode: 'viewport', height: 1080,
+    verdictHead: '84039ceca', route: `${WEBINAR_EDIT}&pane=participants`, mode: 'viewport', height: 1080,
 
   },
   {
     ...WEBINAR, node: 'yxyzQ', name: '10-1-J 分析',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #417 / UI HEAD `527f120ec` で一致。** ハートビートから記録した実視聴区間を分析APIへ接続し、申込・再生・完了・CTA、平均視聴、最大離脱18:20、要約、LINEプレビューを設計画像と照合した。3101/8788の2幅で横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #461 / UI HEAD `84039ceca` で再撮影・一致。** 表の見出しを `px-4 py-3` に統一し、縦余白と高さをPencil V6にそろえた。3106/8793の1440/1920pxとも横はみ出し0。',
     verdictSource: 'webinars-v6/yxyzQ.png + yxyzQ-1920.png + yxyzQ.txt',
-    verdictHead: '527f120ec', route: `${WEBINAR_EDIT}&pane=analytics`, mode: 'viewport', height: 1080,
+    verdictHead: '84039ceca', route: `${WEBINAR_EDIT}&pane=analytics`, mode: 'viewport', height: 1080,
 
   },
   {
@@ -2005,9 +2005,9 @@ export const SCREENS = [
   },
   { ...MILEAGE, node: 'BmoGY', name: '17-1-D たまる決めごとをつくる', route: '/mileage/earning-rules/new',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #445 / UI HEAD 78c19bea32 で再判定。** タグだけだった利用対象を共通条件ビルダーへ置き換え、シナリオ購読を含む15軸をAND/ORで組み合わせて下書きへ保存できる。3107/8794で1440・1920pxを撮影し、両幅とも横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #461 / UI HEAD `84039ceca` で再撮影・一致。** 表の見出しを `px-4 py-3` に統一し、縦余白と高さをPencil V6にそろえた。3106/8793の1440/1920pxとも横はみ出し0。',
     verdictSource: 'mileage-v6/BmoGY.txt + BmoGY-1440.png + BmoGY-1920.png + apps/web/src/app/mileage/earning-rules-v6-contract.test.ts',
-    verdictHead: '78c19bea32',
+    verdictHead: '84039ceca',
   },
   {
     /*
