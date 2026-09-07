@@ -220,7 +220,7 @@
 | 17 | `N46cQ` | 17-1-A たまる決めごと | 5.8712% | 0px | 中央・左 | docs | [差分画像](mileage-v6/N46cQ-diff-1920.png) | **一致** |
 | 17 | `qlVLJ` | 17-1-B マイルの使い道 | 4.3193% | 0px | 中央・左 | docs | [差分画像](mileage-v6/qlVLJ-diff-1920.png) | **一致** |
 | 17 | `MvZm5` | 17-1-C マイルの履歴 | 5.0185% | 0px | 上部・左 | docs | [差分画像](mileage-v6/MvZm5-diff-1920.png) | **一致** |
-| 17 | `BmoGY` | 17-1-D たまる決めごとをつくる | 7.1030% | 0px | 上部・右 | docs | [差分画像](mileage-v6/BmoGY-diff-1920.png) | **一致** |
+| 17 | `BmoGY` | 17-1-D たまる決めごとをつくる | 7.0861% | 0px | 上部・右 | docs | [差分画像](mileage-v6/BmoGY-diff-1920.png) | **一致** |
 | 17 | `HIU5O` | 17-1-E 友だちのマイル明細 | 5.4063% | 0px | 上部・右 | docs | [差分画像](mileage-v6/HIU5O-diff-1920.png) | **一致** |
 | 17 | `vz0Ji` | 17-1-F マイルを手で増やす・減らす | 6.1014%（前回値） | 0px | 中央・左 | docs | [差分画像](mileage-v6/vz0Ji-diff-1920.png) | **一致** |
 | 17 | `p9CcEB` | 17-1-G マイルの使い道をつくる | 6.4103% | +7px | 上部・右 | docs | [差分画像](mileage-v6/p9CcEB-diff-1920.png) | **一致** |

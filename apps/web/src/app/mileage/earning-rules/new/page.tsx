@@ -329,7 +329,7 @@ export default function NewMileageRulePage() {
       }
     >
       <FormSection step={1} label="どのルールか">
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="grid gap-3 lg:grid-cols-3">
         <Field
           label="ルール名"
           htmlFor="sc-name"
@@ -377,7 +377,7 @@ export default function NewMileageRulePage() {
       </FormSection>
 
       <FormSection step={2} label="何マイル付けるか">
-        <div className="grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+        <div className="grid items-end gap-3 sm:grid-cols-2">
         <Field label="付与マイル" htmlFor="sc-amount" required note="1以上で入力してください。">
           <input
             id="sc-amount"

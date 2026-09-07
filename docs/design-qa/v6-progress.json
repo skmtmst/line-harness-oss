@@ -3832,7 +3832,7 @@
   "pixelDiff": {
     "thresholdPercent": 10,
     "heightDiffThresholdPx": 24,
-    "generatedAt": "2026-09-07T14:21:44.140Z",
+    "generatedAt": "2026-09-07T14:29:06.431Z",
     "comparedCount": 272,
     "unavailableCount": 0,
     "pixelAboveThresholdCount": 31,
@@ -11576,9 +11576,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 147288,
+            "mismatchedPixels": 146937,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 7.103,
+            "pixelDiffPercent": 7.0861,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -11593,7 +11593,7 @@
             "diffPath": "docs/design-qa/mileage-v6/BmoGY-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 7.103,
+        "pixelDiffPercent": 7.0861,
         "heightDifferencePx": 0,
         "heightReason": null,
         "dominantRegion": "上部・右",

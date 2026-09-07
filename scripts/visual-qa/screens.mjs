@@ -2037,7 +2037,7 @@ export const SCREENS = [
   },
   { ...MILEAGE, node: 'BmoGY', name: '17-1-D たまる決めごとをつくる', route: '/mileage/earning-rules/new',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #482 / UI HEAD 2559631b1 で再判定。** 基本項目を横並びにし、倍率・利用対象・期間などの補助設定を必要時に開く構成へ整理した。3105/8792で1440・1920pxを撮り直し、横はみ出し0、高さ差0px、画素差7.1030%。',
+    verdictNote: '**2026-09-07 Issue #482 / UI HEAD 2559631b1 で再判定。** 基本項目を横並びにし、倍率・利用対象・期間などの補助設定を必要時に開く構成へ整理した。3105/8792で1440・1920pxを撮り直し、横はみ出し0、高さ差0px、画素差7.0861%。',
     verdictSource: 'mileage-v6/BmoGY.txt + BmoGY-1440.png + BmoGY-1920.png + BmoGY-diff-1920.png + docs/design-qa/v6-pixel-diff.json',
     verdictHead: '2559631b1',
   },
