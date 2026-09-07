@@ -1,11 +1,11 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 247,
+  "compared": 249,
   "unimplemented": 0,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 25,
+  "missing": 23,
   "match": 268,
   "structureMatchDataPending": 0,
   "needsFix": 0,
@@ -341,11 +341,11 @@
       "feature": 4,
       "name": "友だち属性",
       "total": 21,
-      "compared": 15,
+      "compared": 17,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 6,
+      "missing": 4,
       "match": 17,
       "structureMatchDataPending": 0,
       "needsFix": 0,
@@ -990,6 +990,15 @@
       "unjudged": 0,
       "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1250,
+          "head": "d77d0877e",
+          "on": "2026-09-07",
+          "screens": [
+            "J64xI"
+          ],
+          "note": "Issue #453。本文上部の旧Headerを外し、3101/8788で1440・1920pxを撮影。設計画像なしのため正本テキストと上端から照合し、横はみ出し0で一致とした。独立V6 Nodeのない通知・検索分析・プール管理も同じ2幅で旧Header 0、横はみ出し0、ブラウザエラー0を確認した。"
+        },
         {
           "pr": 1030,
           "head": "a828e5afc3",
