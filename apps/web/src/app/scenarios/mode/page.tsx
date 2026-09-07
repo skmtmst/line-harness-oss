@@ -6,8 +6,8 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { DeliveryMode, Folder, Scenario } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
-import Header from '@/components/layout/header'
 import SelectField from '@/components/shared/select-field'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 /**
  * 配信方式の選択（設計）。
@@ -28,6 +28,7 @@ export default function ScenarioModePage() {
 }
 
 function ScenarioModeContent() {
+  usePageTitle('シナリオを作成')
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
@@ -182,36 +183,20 @@ function ScenarioModeContent() {
 
   return (
     <div data-design-node="cCB7r" data-list-state={scenarioState} aria-busy={scenarioState === 'loading'}>
-      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
-        <Link href="/scenarios" className="hover:underline">
-          シナリオ配信
+      <div data-design="Head" className="mb-7 flex items-center justify-between">
+        <nav data-design="Crumb" className="text-ink-faint text-xs">
+          <Link href="/scenarios" className="hover:underline">
+            シナリオ配信
+          </Link>
+          <span className="mx-1.5">/</span>
+          <span>新規作成</span>
+        </nav>
+        <Link
+          href="/scenarios"
+          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control inline-flex items-center border px-3 py-2 text-sm font-medium"
+        >
+          ✕ キャンセル
         </Link>
-        <span className="mx-1.5">/</span>
-        <span>配信方式の選択</span>
-      </nav>
-
-      <div data-design="Head">
-        <Header
-          title="配信方式の選択"
-          description="このシナリオでステップを並べる基準を選びます。あとから変更できますが、設定済みのステップは作り直しになります。"
-          action={
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                disabled
-                title="マニュアルは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-              >
-                マニュアル
-              </button>
-              <Link
-                href="/scenarios"
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control inline-flex items-center border px-3 py-2 text-sm font-medium"
-              >
-                ✕ キャンセル
-              </Link>
-            </div>
-          }
-        />
       </div>
 
       <StepTrail

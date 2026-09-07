@@ -1,9 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import {
   api,
@@ -44,6 +44,7 @@ function CampaignLinePreview({ setting, onClose }: { setting: NenCampaignSetting
 }
 
 export default function NenCampaignsPage() {
+  usePageTitle('NEN配信')
   const { selectedAccountId } = useAccount()
   const [tab, setTab] = useState<NenTab>('flow')
   const [settings, setSettings] = useState<NenCampaignSetting[]>([])
@@ -197,8 +198,8 @@ export default function NenCampaignsPage() {
   }
   const changeTab = (next: NenTab) => { setTab(next); window.history.replaceState(window.history.state, '', next === 'flow' ? '/nen-campaigns' : `/nen-campaigns?tab=${next}`) }
 
-  if (loading) return <><Header title="NEN配信" /><main className="p-6"><ListState kind="loading" /></main></>
-  if (loadError) return <><Header title="NEN配信" /><main className="p-6"><ListState kind="error" description={tab === 'columns' ? '再読み込みしても直らないときは、エラー報告へお知らせください。' : loadError} action={<Button variant="primary" onClick={() => void load()}>{tab === 'columns' ? 'もう一度読み込む' : 'フォロー配信を再読み込み'}</Button>} /></main></>
+  if (loading) return <main className="p-6"><ListState kind="loading" /></main>
+  if (loadError) return <main className="p-6"><ListState kind="error" description={tab === 'columns' ? '再読み込みしても直らないときは、エラー報告へお知らせください。' : loadError} action={<Button variant="primary" onClick={() => void load()}>{tab === 'columns' ? 'もう一度読み込む' : 'フォロー配信を再読み込み'}</Button>} /></main>
 
   const headerAction = tab === 'columns' ? <Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button>
     : tab === 'pets' ? <Button href="/form-submissions" variant="primary">聞きとりフォームを開く</Button>
@@ -207,8 +208,8 @@ export default function NenCampaignsPage() {
 
   return (
     <>
-      <div data-design="Head"><Header title="NEN配信" description="購入してくれた方へ、到着確認から記念日までの配信を管理します。" action={headerAction} /></div>
       <NenOverview
+        topAction={headerAction}
         tab={tab} onTabChange={changeTab} settings={settings} columns={columns} pets={pets} friends={friends} coupon={coupon}
         flowMetrics={flowMetrics} columnMetrics={columnMetrics} petMetrics={petMetrics} deliveryList={deliveryList} deliveryDetail={deliveryDetail}
         testFriendId={testFriendId} previewCampaignKey={previewCampaignKey} previewColumnId={previewColumnId} editingColumnId={editingColumnId}

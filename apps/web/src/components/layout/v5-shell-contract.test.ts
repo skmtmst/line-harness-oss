@@ -101,7 +101,7 @@ describe('共通部品への移管実証', () => {
   */
   const tags = read('src', 'components', 'friend-fields', 'tags-page-v4.tsx')
   const tagEntry = read('src', 'app', 'tags', 'page.tsx')
-  const tagEdit = read('src', 'app', 'tags', 'edit', 'page.tsx')
+  const tagEdit = read('src', 'components', 'friend-fields', 'tag-editor-v4.tsx')
 
   it.each([
     ['ダッシュボード', dashboard],

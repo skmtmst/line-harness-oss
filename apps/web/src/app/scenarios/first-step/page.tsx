@@ -12,7 +12,6 @@ import {
   type Template,
 } from '@line-crm/shared'
 import { api } from '@/lib/api'
-import Header from '@/components/layout/header'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
 import MessageTypeTabs, { type StepMessageKind } from '@/components/scenarios/message-type-tabs'
 import MessageKindFields, {
@@ -33,6 +32,7 @@ import CharCounter, { LINE_TEXT_LIMIT, isOverCharLimit } from '@/components/scen
 import styles from './first-step.module.css'
 import type { SegmentCondition } from '@/components/shared/condition-builder'
 import SelectField from '@/components/shared/select-field'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 /**
  * ステップの作成（設計の3段目）。
@@ -62,6 +62,7 @@ const modeLabel: Record<DeliveryMode, string> = {
 }
 
 function FirstStepContent() {
+  usePageTitle('1通目を設定')
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
@@ -288,36 +289,20 @@ function FirstStepContent() {
 
   return (
     <div data-design-node="kk8dz">
-      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
-        <Link href="/scenarios" className="hover:underline">
-          シナリオ配信
+      <div data-design="Head" className="mb-7 flex items-center justify-between">
+        <nav data-design="Crumb" className="text-ink-faint text-xs">
+          <Link href="/scenarios" className="hover:underline">
+            シナリオ配信
+          </Link>
+          <span className="mx-1.5">/</span>
+          <span>1通目を設定</span>
+        </nav>
+        <Link
+          href="/scenarios"
+          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control inline-flex items-center border px-3 py-2 text-sm font-medium"
+        >
+          ✕ キャンセル
         </Link>
-        <span className="mx-1.5">/</span>
-        <span>1通目を設定</span>
-      </nav>
-
-      <div data-design="Head">
-        <Header
-          title="1通目を設定"
-          description="最初に届ける相手、配信時刻、内容を決めます。保存後も編集できます。"
-          action={
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                disabled
-                title="マニュアルは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-              >
-                マニュアル
-              </button>
-              <Link
-                href="/scenarios"
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control inline-flex items-center border px-3 py-2 text-sm font-medium"
-              >
-                ✕ キャンセル
-              </Link>
-            </div>
-          }
-        />
       </div>
 
       <ol
