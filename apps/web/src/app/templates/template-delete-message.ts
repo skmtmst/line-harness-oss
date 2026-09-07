@@ -12,8 +12,8 @@ export function templateDeleteDescription(usageCount: number): string {
   if (usageCount > 0) {
     return (
       `このテンプレートは${usageCount}箇所で使われています。` +
-      '削除すると、その箇所からの参照が外れ、本文が空のまま動きます。' +
-      'すでに送ったメッセージは残ります。この操作は取り消せません。'
+      '使用中は削除できません。先に使用先を差し替えてください。' +
+      'すでに送ったメッセージは残ります。'
     )
   }
   return (

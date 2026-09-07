@@ -1504,6 +1504,21 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   // テンプレート選択（設計 `NfgOs` / `NWbuF`）。空だと選ぶものが1つも出ない。
   if (pathname === '/api/templates') return { success: true, data: TEMPLATES }
+  const templateDetail = /^\/api\/templates\/(template-\d+)$/.exec(pathname)
+  if (templateDetail) {
+    const template = TEMPLATES.find((item) => item.id === templateDetail[1])
+    if (template) {
+      const usedBy = template.id === 'template-9' ? {
+        scenarioSteps: [{ scenarioId: 'scenario-welcome', scenarioName: '新規登録7日間フォロー', stepId: 'step-1', stepOrder: 1 }],
+        autoReplies: [{ id: 'auto-reply-document', keyword: '資料請求', matchType: 'exact', lineAccountId: 'visual-qa-account' }],
+        automations: [{ id: 'automation-inbox-favorite', name: '受信箱の「よく使う」（担当3人が登録）', eventType: 'inbox_favorite' }],
+        reminderSteps: [], richMenuAreas: [], trackedLinks: [],
+      } : {
+        autoReplies: [], automations: [], scenarioSteps: [], reminderSteps: [], richMenuAreas: [], trackedLinks: [],
+      }
+      return { success: true, data: { ...template, accountId: 'visual-qa-account', question: null, questionStatus: 'draft', usedBy } }
+    }
+  }
   if (pathname === '/api/account-settings/test-recipients') {
     return { success: true, data: TEMPLATE_TEST_RECIPIENTS }
   }

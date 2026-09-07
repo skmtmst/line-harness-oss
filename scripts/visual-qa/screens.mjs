@@ -1468,8 +1468,7 @@ export const SCREENS = [
       **#433（head `51020a97`）で窓が入った。** それまでは削除がブラウザの
       `confirm()` で、撮ることもできなかった。実装側に
       `data-design-node="M9cij"` の印が付いている（`templates/page.tsx:831`）。
-      使用中のテンプレートは「使用先を見る」に変わるので、
-      **使っていない行の「テンプレートを削除」を押す。**
+      使用数3件の行から「使用先を見る」を押し、削除不可と差し替え導線を開く。
     */
     ...TEMPLATE, node: 'M9cij', name: '11-1-G テンプレートの削除確認',
     verdict: 'needs_fix',
@@ -1477,7 +1476,7 @@ export const SCREENS = [
     verdictSource: 'templates-v6/M9cij.txt + M9cij-1440.png + M9cij-1920.png',
     verdictHead: '031081d69',
     mode: 'viewport', height: 1080,
-    steps: [{ click: 'テンプレートを削除', scope: 'main' }],
+    steps: [{ click: '使用先を見る', scope: 'main', nth: 9 }],
   },
   {
     /*
