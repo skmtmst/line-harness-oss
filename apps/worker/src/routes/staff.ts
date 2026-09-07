@@ -26,12 +26,24 @@ function displayRole(row: StaffMember): 'admin' | 'staff' | 'viewer' {
   return row.role === 'staff' ? 'staff' : 'admin';
 }
 
-async function serializeStaff(db: D1Database, row: StaffMember) {
+function maskEmail(email: string | null): string | null {
+  if (!email) return null;
+  const at = email.indexOf('@');
+  return at > 0 ? `${email.slice(0, 1)}***${email.slice(at)}` : '***';
+}
+
+function canViewStaffEmail(c: { get: (key: 'staff') => Env['Variables']['staff'] }, targetId: string): boolean {
+  const current = c.get('staff');
+  return current.id === targetId || current.role === 'owner' || current.role === 'admin'
+    || current.permissionKeys?.includes('access.user.email.view') === true;
+}
+
+async function serializeStaff(db: D1Database, row: StaffMember, exposeEmail = true) {
   const accountScope = row.account_scope ?? 'all';
   return {
     id: row.id,
     name: row.name,
-    email: row.email,
+    email: exposeEmail ? row.email : maskEmail(row.email),
     role: displayRole(row),
     lineLinked: Boolean(row.line_user_id),
     twoFactorEnabled: Boolean(row.totp_enabled_at && row.totp_secret_enc),
@@ -170,7 +182,12 @@ staff.get('/api/staff/me', async (c) => {
 staff.get('/api/staff', async (c) => {
   try {
     const members = await getStaffMembers(c.env.DB, currentTenantId(c));
-    return c.json({ success: true, data: await Promise.all(members.map((member) => serializeStaff(c.env.DB, member))) });
+    return c.json({
+      success: true,
+      data: await Promise.all(members.map((member) => (
+        serializeStaff(c.env.DB, member, canViewStaffEmail(c, member.id))
+      ))),
+    });
   } catch (error) {
     console.error('GET /api/staff error:', error);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -190,10 +207,15 @@ staff.get('/api/staff/:id/login-summary', requireRole('owner', 'admin'), async (
   }
 });
 
-staff.get('/api/staff/:id', async (c) => {
-  const member = await getStaffById(c.env.DB, c.req.param('id'));
+staff.get('/api/staff/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const id = c.req.param('id');
+  const current = c.get('staff');
+  if (current.id !== id && current.role !== 'owner' && current.role !== 'admin') {
+    return c.json({ success: false, error: 'この情報を表示する権限がありません' }, 403);
+  }
+  const member = await getStaffById(c.env.DB, id);
   return member && isInCurrentTenant(c, member)
-    ? c.json({ success: true, data: await serializeStaff(c.env.DB, member) })
+    ? c.json({ success: true, data: await serializeStaff(c.env.DB, member, canViewStaffEmail(c, member.id)) })
     : c.json({ success: false, error: 'Staff member not found' }, 404);
 });
 
@@ -402,7 +424,7 @@ staff.post('/api/staff/:id/two-factor/setup', async (c) => {
   const id = c.req.param('id');
   const member = await getStaffById(c.env.DB, id);
   if (!member || !isInCurrentTenant(c, member)) return c.json({ success: false, error: 'Staff member not found' }, 404);
-  if (!canEditMember(c, id)) return c.json({ success: false, error: '自分の二段階認証だけ設定できます' }, 403);
+  if (c.get('staff').id !== id) return c.json({ success: false, error: '自分の二段階認証だけ設定できます' }, 403);
   const key = totpMasterKey(c);
   if (!key) return c.json({ success: false, error: '二段階認証の暗号鍵が設定されていません' }, 503);
 
@@ -423,7 +445,7 @@ staff.post('/api/staff/:id/two-factor/confirm', async (c) => {
   const id = c.req.param('id');
   const member = await getStaffById(c.env.DB, id);
   if (!member || !isInCurrentTenant(c, member)) return c.json({ success: false, error: 'Staff member not found' }, 404);
-  if (!canEditMember(c, id)) return c.json({ success: false, error: '自分の二段階認証だけ設定できます' }, 403);
+  if (c.get('staff').id !== id) return c.json({ success: false, error: '自分の二段階認証だけ設定できます' }, 403);
   const key = totpMasterKey(c);
   if (!key) return c.json({ success: false, error: '二段階認証の暗号鍵が設定されていません' }, 503);
   if (!member?.totp_pending_secret_enc) return c.json({ success: false, error: '先にQRコードを表示してください' }, 400);

@@ -23,6 +23,7 @@ import {
   type ActionScoreRuleConfiguration,
   type ActionScoreRuleTestResult,
 } from '@/lib/api'
+import { localDateTime, utcDateTime } from '@/lib/presentation'
 
 type ConfirmAction = { kind: 'publish'; draftVersionId: string } | { kind: 'stop' } | null
 
@@ -72,20 +73,6 @@ function RuleIcon({ eventType }: { eventType: string }) {
   if (eventType === 'purchase_completed') return <ShoppingBag className="h-4 w-4 shrink-0" aria-hidden="true" />
   if (eventType === 'inactivity_30d') return <Clock3 className="h-4 w-4 shrink-0" aria-hidden="true" />
   return <Ban className="h-4 w-4 shrink-0" aria-hidden="true" />
-}
-
-function localDateTime(value: string | null) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
-  return local.toISOString().slice(0, 16)
-}
-
-function utcDateTime(value: string) {
-  if (!value) return null
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? null : date.toISOString()
 }
 
 function cloneBundle(config: ActionScoreRuleConfiguration): ActionScoreRuleBundle {

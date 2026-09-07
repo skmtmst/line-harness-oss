@@ -169,6 +169,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
     return (
       <ListState
         kind={state}
+        emptyPreset={accountId ? 'readonly' : 'createable'}
         title={state === 'error'
           ? 'ECデータ連携の情報を読み込めませんでした'
           : state === 'empty' && !accountId
