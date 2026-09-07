@@ -205,7 +205,7 @@
 | 15 | `g89Tc` | 15-1 登録メディア | 2.8874% | 0px | 中央・右 | docs | [差分画像](media-v6/g89Tc-diff-1920.png) | **一致** |
 | 15 | `voJtX` | 15-1-A メディアの詳細と差し替え | 2.7174% | 0px | 中央・右 | docs | [差分画像](media-v6/voJtX-diff-1920.png) | **一致** |
 | 15 | `eXAJP` | 15-1-B ファイルを入れる | 8.4698% | 0px | 下部・中央 | docs | [差分画像](media-v6/eXAJP-diff-1920.png) | **一致** |
-| 15 | `YfTfJ` | 15-1-C メディアの削除確認 | 12.8230% ⚠ | 0px | 上部・中央 | docs | [差分画像](media-v6/YfTfJ-diff-1920.png) | **一致** |
+| 15 | `YfTfJ` | 15-1-C メディアの削除確認 | 13.2802% ⚠ | 0px | 下部・中央 | docs | [差分画像](media-v6/YfTfJ-diff-1920.png) | **一致** |
 | 15 | `h8pBZr` | 15-1-D 一覧の状態（空・読込・エラー） | 3.4629% | 0px | 中央・中央 | docs | [差分画像](media-v6/h8pBZr-diff-1920.png) | **一致** |
 | 16 | `PouPn` | 16-1 成果とアフィリエイト | 4.6352% | -56px | 中央・左 | docs | [差分画像](affiliates-v6/PouPn-diff-1920.png) | **一致** |
 | 16 | `GH8VL` | 16-1-A 案件 | 4.3863% | 0px | 中央・左 | docs | [差分画像](affiliates-v6/GH8VL-diff-1920.png) | **一致** |
@@ -279,7 +279,7 @@
 | 25 | `py5CG` | 25-2-A 共通アクションをつくる | 3.9089% | +85px | 中央・右 | docs | [差分画像](automations-v6/py5CG-diff-1920.png) | **一致** |
 | 25 | `syWp4` | 25-2-B 共通アクションの版と使われている場所 | 4.6105% | +220px | 上部・左 | docs | [差分画像](automations-v6/syWp4-diff-1920.png) | **一致** |
 | 26 | `k3WxrO` | 26-1 外部連携 | 4.4603% | 0px | 中央・右 | docs | [差分画像](webhooks-v6/k3WxrO-diff-1920.png) | **一致** |
-| 26 | `M0Gb7` | 26-1-A こちらで受け取る | 9.9686% | +34px | 下部・中央 | docs | [差分画像](webhooks-v6/M0Gb7-diff-1920.png) | **一致** |
+| 26 | `M0Gb7` | 26-1-A こちらで受け取る | 9.9862% | 0px | 下部・中央 | docs | [差分画像](webhooks-v6/M0Gb7-diff-1920.png) | **一致** |
 | 26 | `KNG00` | 26-1-B やり取りの記録 | 5.0487% | 0px | 中央・左 | docs | [差分画像](webhooks-v6/KNG00-diff-1920.png) | **一致** |
 | 26 | `f8SBSh` | 26-1-C 一覧の状態（空・読込・エラー） | 3.8223% | 0px | 中央・中央 | docs | [差分画像](webhooks-v6/f8SBSh-diff-1920.png) | **一致** |
 | 27 | `TV2DI` | 27-1 予約管理 | 4.4990% | -7px | 中央・右 | docs | [差分画像](booking-v6/TV2DI-diff-1920.png) | **一致** |

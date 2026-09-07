@@ -1634,6 +1634,22 @@ export const MEDIA_ITEMS = [
     sizeBytes: 655360, width: null, height: null, durationMs: null,
     url: 'data:application/pdf;base64,JVBERi0xLjQ=', uploadedBy: '川野 健太', createdAt: '2026-08-09T09:00:00.000Z', usageCount: 1,
   },
+  ...Array.from({ length: 176 }, (_, index) => ({
+    id: `media-archive-${index + 1}`,
+    lineAccountId: 'visual-qa-account',
+    folderId: index < 81 ? 'media-product' : index < 124 ? 'media-banner' : index < 134 ? 'media-video' : null,
+    kind: 'image',
+    filename: `保管画像_${String(index + 1).padStart(3, '0')}.jpg`,
+    mimeType: 'image/jpeg',
+    sizeBytes: 204800,
+    width: 1024,
+    height: 678,
+    durationMs: null,
+    url: mediaPreview('#eef0f2'),
+    uploadedBy: '川野 健太',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    usageCount: 0,
+  })),
 ]
 
 export const MEDIA_DELETE_IMPACT = {

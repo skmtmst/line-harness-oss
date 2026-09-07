@@ -3724,7 +3724,7 @@
   ],
   "pixelDiff": {
     "thresholdPercent": 10,
-    "generatedAt": "2026-09-07T13:14:47.556Z",
+    "generatedAt": "2026-09-07T13:36:46.221Z",
     "comparedCount": 259,
     "unavailableCount": 13,
     "aboveThresholdCount": 28
@@ -10045,25 +10045,25 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 265898,
+            "mismatchedPixels": 275378,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 12.823,
+            "pixelDiffPercent": 13.2802,
             "boundingBox": {
               "left": 1,
               "top": 11,
               "right": 1881,
               "bottom": 1078
             },
-            "dominantRegion": "上部・中央",
+            "dominantRegion": "下部・中央",
             "designPath": "docs/design-reference/media-v6/YfTfJ.png",
             "implementationPath": "docs/design-qa/media-v6/YfTfJ-1920.png",
             "implementationSource": "docs",
             "diffPath": "docs/design-qa/media-v6/YfTfJ-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 12.823,
+        "pixelDiffPercent": 13.2802,
         "heightDifferencePx": 0,
-        "dominantRegion": "上部・中央",
+        "dominantRegion": "下部・中央",
         "implementationSource": "docs",
         "diffPath": "docs/design-qa/media-v6/YfTfJ-diff-1920.png",
         "aboveThreshold": true
@@ -13253,12 +13253,12 @@
             "width": 1920,
             "comparedHeight": 1136,
             "designHeight": 1136,
-            "implementationHeight": 1170,
-            "heightDifferencePx": 34,
+            "implementationHeight": 1136,
+            "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 217427,
+            "mismatchedPixels": 217810,
             "comparedPixels": 2181120,
-            "pixelDiffPercent": 9.9686,
+            "pixelDiffPercent": 9.9862,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -13272,8 +13272,8 @@
             "diffPath": "docs/design-qa/webhooks-v6/M0Gb7-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 9.9686,
-        "heightDifferencePx": 34,
+        "pixelDiffPercent": 9.9862,
+        "heightDifferencePx": 0,
         "dominantRegion": "下部・中央",
         "implementationSource": "docs",
         "diffPath": "docs/design-qa/webhooks-v6/M0Gb7-diff-1920.png",

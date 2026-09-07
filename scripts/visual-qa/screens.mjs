@@ -1865,8 +1865,8 @@ export const SCREENS = [
       { suffix: '-used', steps: [{ click: '閉じる', after: 500 }, { qaOpen: 'YfTfJ', after: 900 }] },
     ],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #472の差し戻し対応で、Pencilと同じ未使用メディアの削除可能状態を比較対象にして再計測。** 単純な確認文・680px幅・取消と削除の操作は設計と一致した。画素差分12.8230%の残差は背面一覧のPencil固定値186件と撮影用固定値10件によるもので、使用中の影響確認は別状態として比較対象から分離した。1440/1920pxとも横はみ出し0。",
-    verdictSource: "media-v6/YfTfJ.txt + YfTfJ-{1440,1920}.png + YfTfJ-used-{1440,1920}.png + media-delete-contract.test.ts",
+    verdictNote: "**2026-09-07 Issue #472の差し戻し対応で、Pencilと同じ未使用メディアの削除可能状態を比較対象にして再計測。** 単純な確認文・680px幅・取消と削除の操作を設計に合わせ、背面一覧も186件（商品84／バナー46／動画12／未分類44）に揃えた。画素差分13.2802%、1440/1920pxとも横はみ出し0。使用中の影響確認は `-used` の別状態として証跡を残した。",
+    verdictSource: "media-v6/YfTfJ.txt + media-v6/YfTfJ-1440.png + media-v6/YfTfJ-1920.png + media-v6/YfTfJ-diff-1920.png + media-v6/YfTfJ-used.txt + media-v6/YfTfJ-used-1440.png + media-v6/YfTfJ-used-1920.png + media-v6/YfTfJ-used-diff-1920.png + media-delete-contract.test.ts",
   },
   {
     ...MEDIA, node: 'h8pBZr', name: '15-1-D 一覧の状態（空・読込・エラー）',
@@ -2685,7 +2685,7 @@ export const SCREENS = [
     route: '/webhooks?tab=outgoing',
     verdict: 'match', verdictNote: '**2026-09-07 Issue #451 / UI HEAD `3a3bc7a31` で再撮影・一致。** 本文側の旧見出しを外し、画面名は上部バーだけに統一。パンくずと追加操作を最初の内容行へ置き、その下にタブが続くPencil V6の順序にした。1440/1920pxとも横はみ出し0。', verdictSource: 'webhooks-v6/k3WxrO.txt + webhooks-v6/k3WxrO-{1440,1920}.png', verdictHead: '3a3bc7a31',
   },
-  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', route: '/webhooks?tab=incoming', verdict: 'match', verdictNote: '**2026-09-07 Issue #472の差し戻し対応でPencilと同じ簡易設定へ整え、画素差分9.9686%で一致。** 照合方法・最新受信・処理内容を既定でコンパクトにまとめ、受信本文の見本を1行化した。実装高の差は+34pxまで縮小し、1440/1920pxとも横はみ出し0。', verdictSource: 'webhooks-v6/M0Gb7.txt + webhooks-v6/M0Gb7-{1440,1920}.png + webhooks-v6/M0Gb7-diff-1920.png' },
+  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', route: '/webhooks?tab=incoming', verdict: 'match', verdictNote: '**2026-09-07 Issue #472の差し戻し対応でPencilと同じ簡易設定へ整え、画素差分9.9862%で一致。** 照合方法・最新受信・処理内容を既定でコンパクトにまとめ、受信本文の見本を1行化した。上部タイトルも設計の「外部連携」に揃え、実装高の差は0px、1440/1920pxとも横はみ出し0。', verdictSource: 'webhooks-v6/M0Gb7.txt + webhooks-v6/M0Gb7-1440.png + webhooks-v6/M0Gb7-1920.png + webhooks-v6/M0Gb7-diff-1920.png' },
     // ---- 2026-09-02 `a0bb3f44` で実装を読み直した ----
     // **「タブの言葉に内部の語が残る（受信 (Incoming)／送信 (Outgoing)）」は古い。**
     //   `webhook-operator-words-contract.test.ts:13-14` が `Incoming)` `Outgoing)` を

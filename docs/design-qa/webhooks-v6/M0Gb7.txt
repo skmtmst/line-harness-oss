@@ -66,7 +66,7 @@ LINEアカウント
 運用状態
 1
 1 件
-こちらで受け取る
+外部連携
 LINEアカウント
 然
 然-NEN- TEST
@@ -116,12 +116,7 @@ http://localhost:3107/api/webhooks/incoming/iwh-booking/receive
 
 8/25 10:12 に届いたもの
 
-{
-  "email": "••••",
-  "booked_at": "••••",
-  "menu": "••••",
-  "staff": "••••"
-}
+{ "email": "••••", "booked_at": "••••", "menu": "••••", "staff": "••••" }
 {{payload.email}}
 {{payload.booked_at}}
 {{payload.menu}}

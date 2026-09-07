@@ -237,7 +237,11 @@ describe('登録メディアの画面確認データ', () => {
     expect(MEDIA_FOLDERS.map((folder: { name: string }) => folder.name)).toEqual([
       '01_商品写真', '02_バナー', '03_動画',
     ]);
-    expect(MEDIA_ITEMS).toHaveLength(10);
+    expect(MEDIA_ITEMS).toHaveLength(186);
+    expect(MEDIA_ITEMS.filter((item: { folderId: string | null }) => item.folderId === 'media-product')).toHaveLength(84);
+    expect(MEDIA_ITEMS.filter((item: { folderId: string | null }) => item.folderId === 'media-banner')).toHaveLength(46);
+    expect(MEDIA_ITEMS.filter((item: { folderId: string | null }) => item.folderId === 'media-video')).toHaveLength(12);
+    expect(MEDIA_ITEMS.filter((item: { folderId: string | null }) => item.folderId === null)).toHaveLength(44);
     expect(MEDIA_ITEMS.filter((item: { kind: string }) => item.kind === 'file')).toHaveLength(2);
     expect(MEDIA_DELETE_IMPACT).toMatchObject({ usageCount: 3, canDelete: false });
     expect(MEDIA_DELETE_IMPACT.references).toHaveLength(3);
