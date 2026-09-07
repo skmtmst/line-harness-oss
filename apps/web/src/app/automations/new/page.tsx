@@ -326,7 +326,7 @@ export default function NewAutomationPage() {
             ) : null}
             <div className="mt-3 flex flex-wrap gap-2">
               {usesKeyword && keyword.trim() ? <span className="inline-flex min-h-9 items-center rounded-full border border-hairline bg-canvas px-3 text-xs font-bold text-ink-secondary">「{keyword.trim()}」を含む</span> : <span className="inline-flex min-h-9 items-center rounded-full border border-hairline bg-canvas px-3 text-xs font-bold text-ink-secondary">条件なし</span>}
-              <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
                 <SelectField aria-label="条件の軸" value={conditionType} onChange={(event) => setConditionType(event.target.value as typeof conditionType)} options={[{ value: '', label: '条件の軸を選ぶ' }, ...CONDITION_AXES.map(([value, label]) => ({ value, label }))]} className={styles.select} />
                 <TextField aria-label="条件の値" value={conditionValue} onChange={(event) => setConditionValue(event.target.value)} placeholder="値を入力" />
                 <span className="text-ink-faint self-center text-xs">15軸</span>
