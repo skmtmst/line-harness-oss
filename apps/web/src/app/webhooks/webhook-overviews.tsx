@@ -486,9 +486,7 @@ export function IncomingOverview({
               <Button variant="secondary" onClick={() => onRotate(selected)}>合言葉を更新</Button>
               <Button variant="secondary" onClick={() => onDelete(selected)}>削除</Button>
             </div>
-          </section>
-
-          <section className="bg-canvas border-hairline rounded-card border p-5">
+          <div className="border-hairline mt-5 border-t pt-4">
             <h2 className="text-ink mb-3 text-lg font-bold">届いたらすること</h2>
             {detailStatus === 'loading' ? (
               <p className="text-ink-secondary text-sm">保存されている処理を読み込んでいます。</p>
@@ -511,6 +509,7 @@ export function IncomingOverview({
             ) : (
               <p className="text-ink-secondary text-sm">届いた後に動かす処理は、まだ設定されていません。</p>
             )}
+          </div>
           </section>
 
           <section className="bg-canvas border-hairline rounded-card border p-5">
@@ -641,9 +640,9 @@ function formatReceivedAt(value: string): string {
 function maskedSampleText(fields: NonNullable<IncomingWebhookDetail['latestSample']>['fields']): string {
   const rows = fields.map((field) => {
     const name = field.path.replace(/^\$\.?/, '') || '$'
-    return `  "${name}": "${field.maskedValue}"`
+    return `"${name}": "${field.maskedValue}"`
   })
-  return `{\n${rows.join(',\n')}\n}`
+  return `{ ${rows.join(', ')} }`
 }
 
 function maskedEndpoint(value: string): string {

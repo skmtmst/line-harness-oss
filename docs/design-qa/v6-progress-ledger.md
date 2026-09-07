@@ -2,7 +2,7 @@
 
 `scripts/visual-qa/screens.mjs` から機械で組み立てています。**手で書き写していません。**
 
-総数 **272** ／ 比較済み **266** ／ 未実装 **0** ／ 未確認 **0** ／ 別の仕掛けで撮影 **0** ／ 未撮影 **6**
+総数 **272** ／ 比較済み **267** ／ 未実装 **0** ／ 未確認 **0** ／ 別の仕掛けで撮影 **0** ／ 未撮影 **5**
 
 ## 判定
 
@@ -21,7 +21,7 @@
 
 ## 画素比較
 
-比較済み **235** ／ 比較不可 **37** ／ 10%超 **39**。高さは上端を揃えて共通領域を比較し、高さ差を別に記録します。
+比較済み **235** ／ 比較不可 **37** ／ 10%超 **35**。高さは上端を揃えて共通領域を比較し、高さ差を別に記録します。
 
 | 機能 | 名前 | 総数 | 比較済み | 一致 | 構造一致・データ未接続 | 要修正 | 未実装 | 未判定 | 画素比較 | 10%超 | 比較不可 | 未確認 | 別の仕掛け | 未撮影 | 撮った先 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -33,12 +33,12 @@
 | 6 | 一斉配信 | 15 | 15 | 15 | 0 | 0 | 0 | 0 | 15 | 5 | 0 | 0 | 0 | 0 | #543 `819895dd` 2026-08-29（h0kahp）<br>#497 `84e5bab9` 2026-08-28（FpgxH）<br>#503 `6db5ad7f` 2026-08-28（q76C35・zZ9fA・XQfMD・p97Tf・Bw0zt・vW4Es・u6gHt・EGMb1・xkRDb・TmHjF）<br>#531 `1a943082` 2026-08-29（u6gHt）<br>#561 `51827fe1` 2026-08-29（bPF0s）<br>#557 `697cee2c` 2026-08-29（q76C35）<br>#554 `875a9ed3` 2026-08-29（EGMb1）<br>#550 `f7c5a99e` 2026-08-29（cPk8A・sqFXf）<br>#602 `d02be6d8` 2026-08-31（q76C35・xkRDb・EGMb1・TmHjF）<br>#603 `c86d7242` 2026-08-31（zZ9fA・cPk8A・XQfMD・p97Tf・Bw0zt・vW4Es）<br>#0 `0857c068` 2026-09-01（vW4Es）<br>#674 `df3f4e3b` 2026-09-02（q76C35・zZ9fA・XQfMD・p97Tf・Bw0zt・h0kahp・vW4Es・FpgxH・bPF0s・u6gHt・EGMb1・xkRDb）<br>#674 `7d830282` 2026-09-02（q76C35・zZ9fA・XQfMD・p97Tf・Bw0zt・h0kahp・vW4Es・FpgxH・bPF0s・u6gHt・EGMb1・xkRDb・TmHjF）<br>#979 `3c6e4ec948` 2026-09-06（q76C35・zZ9fA・cPk8A・XQfMD・p97Tf・Bw0zt・h0kahp・vW4Es・FpgxH・u6gHt・EGMb1・sqFXf・TmHjF） |
 | 7 | リマインダ | 11 | 11 | 11 | 0 | 0 | 0 | 0 | 11 | 4 | 0 | 0 | 0 | 0 | #1250 `d77d0877e` 2026-09-07（J64xI）<br>#1030 `a828e5afc3` 2026-09-07（M1EXwB・GC4St）<br>#429 `0f612926` 2026-08-29（uJP22）<br>#551 `44692a37` 2026-08-29（s7T2dz・JCz6J・W98zZQ・s6Vvp・PSmHo）<br>#514 `9a72dba6` 2026-08-29（Y0Sn3・M1EXwB）<br>#500 `409f00bb` 2026-08-28（GC4St）<br>#511 `4bc71249` 2026-08-29（GC4St）<br>#498 `f30890f2` 2026-08-30（Y0Sn3）<br>#514 `d064bded` 2026-08-30（Y0Sn3）<br>#0 `c275749d` 2026-08-30（M1EXwB）<br>#613 `a504fec0` 2026-08-31（dC0yg・s6Vvp・JCz6J・W98zZQ・M1EXwB・uJP22・J64xI・PSmHo・GC4St）<br>#927 `eb41ad0d` 2026-09-06（M1EXwB・uJP22・J64xI・s7T2dz・JCz6J・W98zZQ・s6Vvp・PSmHo・Y0Sn3・dC0yg） |
 | 8 | 自動応答 | 11 | 11 | 11 | 0 | 0 | 0 | 0 | 6 | 2 | 5 | 0 | 0 | 0 | #1258 `84039ceca` 2026-09-07（cmDfJ）<br>#1135 `a86933ba8` 2026-09-07（cmDfJ・K7vg2・nzWIX・ivDoe）<br>#1082 `c1355bb54` 2026-09-07（K7vg2・nzWIX・ivDoe・U9hzqH・t7UtYQ）<br>#955 `564c91d0fe` 2026-09-06（g46ja・Yj6CQ・e6iJG）<br>#544 `6053c271` 2026-08-29（Gy9OK・cmDfJ・K7vg2・nzWIX・ivDoe）<br>#501 `93edbe17` 2026-08-28（t7UtYQ）<br>#566 `d0680774` 2026-08-29（q8wSqO・cmDfJ）<br>#0 `c275749d` 2026-08-30（K7vg2）<br>#596 `edb94936` 2026-08-30（U9hzqH・g46ja・Yj6CQ・e6iJG） |
-| 9 | 友だち追加時の配信 | 10 | 10 | 10 | 0 | 0 | 0 | 0 | 6 | 1 | 4 | 0 | 0 | 0 | #1079 `f13421d869` 2026-09-07（uLQQc・s9gAx・W1wzCa・K0Dbr2・txMO9・U3SI5・P2J0Te・Q3qP1r）<br>#1010 `3d6b7e7e8` 2026-09-06（ec9vg・quhg6）<br>#962 `9b8f7451` 2026-09-06（uLQQc・s9gAx・W1wzCa・K0Dbr2・txMO9・U3SI5・Q3qP1r）<br>#431 `2ab18c88` 2026-08-30（uLQQc・txMO9・U3SI5）<br>#506 `5dc99107` 2026-08-29（P2J0Te）<br>#615 `5873f18b` 2026-08-31（ec9vg・quhg6） |
+| 9 | 友だち追加時の配信 | 10 | 10 | 10 | 0 | 0 | 0 | 0 | 6 | 0 | 4 | 0 | 0 | 0 | #1079 `f13421d869` 2026-09-07（uLQQc・s9gAx・W1wzCa・K0Dbr2・txMO9・U3SI5・P2J0Te・Q3qP1r）<br>#1010 `3d6b7e7e8` 2026-09-06（ec9vg・quhg6）<br>#962 `9b8f7451` 2026-09-06（uLQQc・s9gAx・W1wzCa・K0Dbr2・txMO9・U3SI5・Q3qP1r）<br>#431 `2ab18c88` 2026-08-30（uLQQc・txMO9・U3SI5）<br>#506 `5dc99107` 2026-08-29（P2J0Te）<br>#615 `5873f18b` 2026-08-31（ec9vg・quhg6） |
 | 10 | ウェビナー | 13 | 13 | 13 | 0 | 0 | 0 | 0 | 12 | 8 | 1 | 0 | 0 | 0 | #1258 `84039ceca` 2026-09-07（Q8sHa・yxyzQ）<br>#1231 `8577adf01` 2026-09-07（lvaY5・PV1Vh・d3rFGD・Ho8z4・Xjk8q・GB0NR・D6yO7e・TimXl・Q8sHa・yxyzQ）<br>#1081 `a55f719b9b` 2026-09-07（ZC13r・PV1Vh・d3rFGD・Ho8z4・Xjk8q・GB0NR・D6yO7e・TimXl・Q8sHa・yxyzQ・zCQXe）<br>#1070 `a325ab485` 2026-09-07（ZC13r・PV1Vh・d3rFGD・Ho8z4・Xjk8q・GB0NR・D6yO7e・TimXl・Q8sHa・yxyzQ・LKuAQ・zCQXe）<br>#1011 `98e104b7c` 2026-09-06（lvaY5）<br>#962 `9b8f7451` 2026-09-06（ZC13r・PV1Vh・d3rFGD・Ho8z4・Xjk8q・GB0NR・D6yO7e・Q8sHa・yxyzQ・LKuAQ・zCQXe）<br>#917 `c5e1095e` 2026-09-06（ZC13r・PV1Vh・d3rFGD・Ho8z4・Xjk8q・GB0NR・D6yO7e・Q8sHa・yxyzQ・LKuAQ・zCQXe）<br>#508 `61eeb3c7` 2026-08-29（TimXl・GB0NR）<br>#546 `de0848b9` 2026-08-29（Ho8z4）<br>#623 `988cc37a` 2026-08-31（PV1Vh・d3rFGD・Ho8z4・Xjk8q・D6yO7e・Q8sHa・yxyzQ）<br>#524 `a6c35ee0` 2026-08-29（zCQXe）<br>#0 `c275749d` 2026-08-30（ZC13r・lvaY5・PV1Vh・d3rFGD・Xjk8q・Q8sHa・yxyzQ）<br>#0 `f4c3f012` 2026-09-01（ZC13r・Ho8z4）<br>#0 `96ed41b6` 2026-09-01（PV1Vh・d3rFGD・Ho8z4・Q8sHa） |
 | 11 | テンプレート | 10 | 10 | 10 | 0 | 0 | 0 | 0 | 5 | 0 | 5 | 0 | 0 | 0 | #1247 `fb07e4a3f3` 2026-09-07（GFlD7・FRkls）<br>#1208 `68d536652` 2026-09-07（M9cij）<br>#1024 `031081d69` 2026-09-07（W7LBc・NNDMR・M9cij）<br>#944 `98abf756a` 2026-09-06（W7LBc・GFlD7・FRkls・NNDMR・j9ixI・hsBtl・J3GxEZ・M9cij・NKyoA）<br>#433 `51020a97` 2026-08-28（M9cij）<br>#493 `62ddaebe` 2026-08-28（CzndJ・M9cij）<br>#572 `e4ab641f` 2026-08-29（NNDMR）<br>#528 `1b95452d` 2026-08-29（NKyoA）<br>#0 `c275749d` 2026-08-30（W7LBc・GFlD7・FRkls・j9ixI・hsBtl・J3GxEZ）<br>#493 `cdbfe42c` 2026-08-30（W7LBc）<br>#626 `d0af5581` 2026-08-31（CzndJ・M9cij・GFlD7・FRkls・j9ixI・hsBtl・J3GxEZ・NKyoA） |
 | 12 | リッチメニュー | 9 | 9 | 9 | 0 | 0 | 0 | 0 | 8 | 0 | 1 | 0 | 0 | 0 | #1247 `fb07e4a3f3` 2026-09-07（XtfO3）<br>#1224 `3ddca80cc4` 2026-09-07（kQ1bs）<br>#1191 `e98decafa` 2026-09-07（kQ1bs）<br>#1129 `af74a0bbd` 2026-09-07（GO8RQ・XtfO3・UMiJ9・TL7tp・szXsT）<br>#1007 `f2be359e5` 2026-09-06（GO8RQ・XtfO3・TL7tp・RW5Tb）<br>#509 `e148615c` 2026-08-29（DIUbO・NXdDk）<br>#523 `47e7846e` 2026-08-29（RW5Tb）<br>#0 `c275749d` 2026-08-30（GO8RQ・XtfO3・kQ1bs・UMiJ9・TL7tp）<br>#583 `0218ef61` 2026-08-30（GO8RQ）<br>#509 `4cf82bd9` 2026-08-30（DIUbO・NXdDk）<br>#575 `ab5750ec` 2026-08-30（szXsT）<br>#577 `7b8df2f4` 2026-08-30（RW5Tb）<br>#583 `bb1e4dfd` 2026-08-30（kQ1bs・XtfO3）<br>#592 `84f35a0b` 2026-08-30（XtfO3）<br>#616 `0a11c9e8` 2026-08-31（szXsT） |
 | 13 | 回答フォーム | 7 | 7 | 7 | 0 | 0 | 0 | 0 | 7 | 1 | 0 | 0 | 0 | 0 | #1247 `fb07e4a3f3` 2026-09-07（vCqUj）<br>#436 `35c613a6` 2026-08-29（EMBIK・v9tYhl）<br>#436 `950073ab` 2026-08-29（ZOPyc）<br>#556 `1c1546cb` 2026-08-30（ZOPyc）<br>#0 `c275749d` 2026-08-30（vCqUj・cSqvP）<br>#586 `7428a314` 2026-08-30（EMBIK） |
-| 14 | 共通情報 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 4 | 1 | 0 | 0 | 0 | 0 | #1150 `bc92f54ea` 2026-09-07（WuKzU・gBtaK・uNBlA・yPkWe）<br>#1099 `bb8a139b3` 2026-09-07（WuKzU・gBtaK・yPkWe）<br>#1075 `24313778e` 2026-09-07（WuKzU・gBtaK・yPkWe）<br>#548 `d4a85ad4` 2026-08-29（uNBlA・gBtaK）<br>#0 `c275749d` 2026-08-30（WuKzU・gBtaK）<br>#619 `31b44202` 2026-08-31（yPkWe）<br>#668 `7d830282` 2026-09-02（gBtaK・yPkWe・WuKzU） |
+| 14 | 共通情報 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | #1150 `bc92f54ea` 2026-09-07（WuKzU・gBtaK・uNBlA・yPkWe）<br>#1099 `bb8a139b3` 2026-09-07（WuKzU・gBtaK・yPkWe）<br>#1075 `24313778e` 2026-09-07（WuKzU・gBtaK・yPkWe）<br>#548 `d4a85ad4` 2026-08-29（uNBlA・gBtaK）<br>#0 `c275749d` 2026-08-30（WuKzU・gBtaK）<br>#619 `31b44202` 2026-08-31（yPkWe）<br>#668 `7d830282` 2026-09-02（gBtaK・yPkWe・WuKzU） |
 | 15 | 登録メディア | 5 | 5 | 5 | 0 | 0 | 0 | 0 | 5 | 1 | 0 | 0 | 0 | 0 | #1157 `0cc67ed91d` 2026-09-07（g89Tc・voJtX・eXAJP・YfTfJ）<br>#997 `3eae16770` 2026-09-06（g89Tc・voJtX・eXAJP・YfTfJ・h8pBZr）<br>#559 `7922c002` 2026-08-29（g89Tc）<br>#560 `7c1acd0f` 2026-08-29（g89Tc）<br>#0 `c275749d` 2026-08-30（eXAJP）<br>#617 `b7e58a51` 2026-08-31（YfTfJ）<br>#667 `7d830282` 2026-09-02（g89Tc・eXAJP・YfTfJ・h8pBZr） |
 | 16 | 成果とアフィリエイト | 9 | 9 | 9 | 0 | 0 | 0 | 0 | 8 | 0 | 1 | 0 | 0 | 0 | #1230 `b62d7d070` 2026-09-07（QX70l）<br>#1180 `3721857fb` 2026-09-07（jwrbf・GqFTV・njLGA）<br>#558 `ef7b5773` 2026-08-29（PouPn・xqT1Z・jwrbf）<br>#563 `64798425` 2026-08-29（jwrbf）<br>#0 `c275749d` 2026-08-30（PouPn・GH8VL・n5VVTb・xqT1Z・GPWzq）<br>#585 `75d6eb9a` 2026-08-30（njLGA）<br>#585 `3857365b` 2026-08-30（njLGA）<br>#667 `7d830282` 2026-09-02（n5VVTb・PouPn・GH8VL・njLGA・GPWzq・xqT1Z） |
 | 17 | マイル・行動スコア | 11 | 11 | 11 | 0 | 0 | 0 | 0 | 6 | 0 | 5 | 0 | 0 | 0 | #1258 `84039ceca` 2026-09-07（BmoGY）<br>#1234 `78c19bea32` 2026-09-07（N46cQ・BmoGY・p9CcEB）<br>#1217 `1c8055931` 2026-09-07（s98Vfw・qlVLJ・MvZm5・BmoGY・HIU5O・vz0Ji・z3PB2）<br>#1215 `65390c132` 2026-09-07（N46cQ・BmoGY・p9CcEB・k8VCU）<br>#1137 `5e1ccd22d` 2026-09-07（s98Vfw・N46cQ・qlVLJ・MvZm5・BmoGY・HIU5O・vz0Ji・k8VCU・z3PB2）<br>#549 `0ae3e094` 2026-08-29（qlVLJ・p9CcEB）<br>#441 `05c5b103` 2026-08-28（MvZm5・BmoGY・HIU5O）<br>#441 `e953109c` 2026-08-28（s98Vfw・N46cQ・k8VCU）<br>#494 `0ca45f98` 2026-08-28（HIU5O）<br>#495 `55301679` 2026-08-30（z3PB2・vz0Ji）<br>#496 `4dac7986` 2026-08-28（s6MBc）<br>#499 `642b8222` 2026-08-30（s6MBc）<br>#0 `c275749d` 2026-08-30（s98Vfw・N46cQ・BmoGY・k8VCU）<br>#582 `78e2f065` 2026-08-30（vz0Ji）<br>#624 `5e8f32d3` 2026-08-31（z3PB2・p9CcEB・s98Vfw・MvZm5・HIU5O・N46cQ・qlVLJ）<br>#667 `7d830282` 2026-09-02（MvZm5・HIU5O・z3PB2・k8VCU・s98Vfw・N46cQ・qlVLJ・BmoGY）<br>#914 `48742a352` 2026-09-06（s98Vfw・N46cQ・qlVLJ・MvZm5・BmoGY・HIU5O・k8VCU・z3PB2・s6MBc）<br>#1041 `16e2331cb` 2026-09-07（s98Vfw・s6MBc） |
@@ -46,11 +46,11 @@
 | 19 | コンバージョン | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | #1230 `b62d7d070` 2026-09-07（GtylA・d8d3Mz）<br>#1207 `46a869f74` 2026-09-07（ZrpKn・GUxsj）<br>#444 `ccbd0975` 2026-08-28<br>#0 `c275749d` 2026-08-30（ZrpKn・GUxsj・GtylA）<br>#1183 `b5e3dd6a3` 2026-09-07（ZrpKn・GUxsj） |
 | 20 | 分析 | 9 | 9 | 9 | 0 | 0 | 0 | 0 | 8 | 0 | 1 | 0 | 0 | 0 | #445 `787a4b46` 2026-08-28<br>#0 `c275749d` 2026-08-30（Zxezb・J6Inc・YBGtm・QQ1SR・f5HsX・C2I7ry・Fh2Qj・dfwD4）<br>#584 `d0e62d59` 2026-08-30（QQ1SR）<br>#676 `a0bb3f44` 2026-09-02（Zxezb・J6Inc・YBGtm・QQ1SR・f5HsX・C2I7ry・dfwD4）<br>#924 `bd8f0482` 2026-09-06（Zxezb・J6Inc・YBGtm・QQ1SR・f5HsX・C2I7ry・Fh2Qj・dfwD4） |
 | 21 | NEN配信 | 7 | 7 | 7 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | #1241 `64436d463b` 2026-09-07（VLMGH・WeXbL・ymXJK）<br>#1237 `c6dfe250c` 2026-09-07（HpKyF）<br>#1234 `78c19bea32` 2026-09-07（q4lajm）<br>#1217 `1c8055931` 2026-09-07（VLMGH・DEX0k・q4lajm・WeXbL・ymXJK）<br>#446 `4307088d` 2026-08-28<br>#525 `deff5ffb` 2026-08-29（DEX0k）<br>#526 `dfcc9a53` 2026-08-29（HpKyF）<br>#0 `c275749d` 2026-08-30（VLMGH・q4lajm・WeXbL・i9sQP）<br>#526 `1c91a7bc` 2026-08-30（HpKyF・VLMGH）<br>#620 `ed5c0932` 2026-08-31（ymXJK）<br>#1050 `8d3557ce0` 2026-09-07（VLMGH・DEX0k・q4lajm・WeXbL・ymXJK・i9sQP） |
-| 22 | 写真審査 | 4 | 3 | 4 | 0 | 0 | 0 | 0 | 2 | 1 | 2 | 0 | 0 | 1 | #1207 `46a869f74` 2026-09-07（hHrz8・N2J629）<br>#447 `65adbc59` 2026-08-28<br>#0 `c275749d` 2026-08-30（Qu6Vk・N2J629）<br>#1044 `98588d0275` 2026-09-07（Qu6Vk）<br>#1185 `c992fbd82` 2026-09-07（Qu6Vk・hHrz8・N2J629） |
+| 22 | 写真審査 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 0 | #1207 `46a869f74` 2026-09-07（hHrz8・N2J629）<br>#447 `65adbc59` 2026-08-28<br>#0 `c275749d` 2026-08-30（Qu6Vk・N2J629）<br>#1044 `98588d0275` 2026-09-07（Qu6Vk）<br>#1185 `c992fbd82` 2026-09-07（Qu6Vk・hHrz8・N2J629） |
 | 23 | EC連携 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 0 | #1224 `3ddca80cc4` 2026-09-07（bfB50・oHAN4）<br>#1190 `88673e254` 2026-09-07（bfB50・oHAN4）<br>#0 `c275749d` 2026-08-30（eI3gs）<br>#600 `484c0cd8` 2026-08-31（ELayY）<br>#1006 `f7623915e` 2026-09-06（bfB50・oHAN4） |
 | 24 | LINE通知 | 6 | 6 | 6 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | #1224 `3ddca80cc4` 2026-09-07（Q55bb）<br>#1076 `8e7c374991` 2026-09-07（festr・Q55bb・X8JCA5・Se65i）<br>#504 `806ed169` 2026-08-30（festr・Q55bb）<br>#545 `c9bb193d` 2026-08-30（X8JCA5・Se65i・DpxOK・N2gAza）<br>#564 `ad59fde6` 2026-08-29（DpxOK）<br>#0 `4af43fb6` 2026-09-01（festr） |
 | 25 | オートメーション | 8 | 8 | 8 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | #0 `e20d921b8` 2026-09-07（Rv8Jv・DkPY0・py5CG）<br>#502 `75b010fc` 2026-08-28（DkPY0）<br>#552 `6ce43563` 2026-08-29（gief7・Rv8Jv・WjYAC・Vdbv5）<br>#0 `c275749d` 2026-08-30（xOpDs・py5CG・syWp4）<br>#0 `2d0ee180` 2026-08-30（xOpDs・py5CG・syWp4）<br>#594 `a389b70a` 2026-08-30（syWp4）<br>#989 `44e671b2c` 2026-09-06（gief7・Rv8Jv・WjYAC・Vdbv5・xOpDs・py5CG・syWp4）<br>#1055 `08369795c` 2026-09-07（gief7・Rv8Jv・DkPY0・WjYAC・py5CG）<br>#1151 `bd900c36d` 2026-09-07（gief7・Rv8Jv・DkPY0・WjYAC・Vdbv5・xOpDs・py5CG・syWp4） |
-| 26 | 外部連携 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 4 | 1 | 0 | 0 | 0 | 0 | #547 `48715569` 2026-08-29（KNG00）<br>#515 `09054b78` 2026-08-29（f8SBSh）<br>#527 `c6fd4388` 2026-08-29（k3WxrO・f8SBSh）<br>#0 `c275749d` 2026-08-30（M0Gb7） |
+| 26 | 外部連携 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | #547 `48715569` 2026-08-29（KNG00）<br>#515 `09054b78` 2026-08-29（f8SBSh）<br>#527 `c6fd4388` 2026-08-29（k3WxrO・f8SBSh）<br>#0 `c275749d` 2026-08-30（M0Gb7） |
 | 27 | 予約管理 | 7 | 7 | 7 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 0 | #0 `e20d921b8` 2026-09-07（TnDbq・GFDqW・GfceK・Lg8ff）<br>#459 `ba0bf62d` 2026-08-29（GFDqW・GfceK・Lg8ff）<br>#562 `45789965` 2026-08-29（Lg8ff）<br>#0 `c275749d` 2026-08-30（TV2DI・TnDbq・SbuUI）<br>#587 `425a6b1a` 2026-08-30（GFDqW・GfceK・Lg8ff） |
 | 28 | 予約設定 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | #1177 `7ebf0d654` 2026-09-07（tksPc・GhOb3）<br>#1126 `e1126c5c9` 2026-09-07（QSLEH・W6465r）<br>#1096 `a89279ce7` 2026-09-07（tksPc）<br>#517 `43d3d20e` 2026-08-30（tksPc）<br>#532 `6cc74968` 2026-08-29（W6465r）<br>#0 `c275749d` 2026-08-30（QSLEH・GhOb3）<br>#0 `595c8359` 2026-09-01（tksPc）<br>#1022 `abae52d46` 2026-09-07（QSLEH・GhOb3・W6465r） |
 | 29 | イベント予約 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | #1176 `ea4284f42` 2026-09-07（ugP5y）<br>#533 `d1070487` 2026-08-29（k5m5Bc）<br>#467 `6bb950f3` 2026-08-30（MKrPY・i5SN2j・ugP5y）<br>#533 `c9d33d95` 2026-08-30（ugP5y・k5m5Bc）<br>#593 `f9619297` 2026-08-30（i5SN2j） |
@@ -59,7 +59,7 @@
 | 32 | 運用状態 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 1 | 0 | 3 | 0 | 0 | 0 | #482 `b346d467` 2026-08-29（b3HfZ・U0BwS）<br>#0 `c275749d` 2026-08-30（UgonK・UhC2O） |
 | 33 | LINEアカウント設定 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 |  |
 | 34 | はじめの設定と案内 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 |  |
-| | **合計** | **272** | **266** | **268** | **0** | **0** | **0** | **0** | **235** | **39** | **37** | **0** | **0** | **6** | |
+| | **合計** | **272** | **267** | **268** | **0** | **0** | **0** | **0** | **235** | **35** | **37** | **0** | **0** | **5** | |
 
 ## 画面ごとの画素差
 
@@ -153,8 +153,8 @@
 | 9 | `s9gAx` | 9-1-A 基本設定 | —（設計画像なし） | — | — | — | — | **一致** |
 | 9 | `W1wzCa` | 9-1-B 流入条件 | —（設計画像なし） | — | — | — | — | **一致** |
 | 9 | `K0Dbr2` | 9-1-C 初回案内 | —（設計画像なし） | — | — | — | — | **一致** |
-| 9 | `txMO9` | 9-1-D アクション追加 | 7.4018% | 0px | 中央・右 | docs | [差分画像](friend-add-v6/txMO9-diff-1920.png) | **一致** |
-| 9 | `U3SI5` | 9-1-E プレビューとテスト | 10.7059% ⚠ | 0px | 中央・右 | docs | [差分画像](friend-add-v6/U3SI5-diff-1920.png) | **一致** |
+| 9 | `txMO9` | 9-1-D アクション追加 | 7.3996% | 0px | 中央・右 | docs | [差分画像](friend-add-v6/txMO9-diff-1920.png) | **一致** |
+| 9 | `U3SI5` | 9-1-E プレビューとテスト | 6.8898% | 0px | 中央・右 | docs | [差分画像](friend-add-v6/U3SI5-diff-1920.png) | **一致** |
 | 9 | `ec9vg` | 9-1-F 最終確認 | 9.2198% | -56px | 中央・右 | docs | [差分画像](friend-add-v6/ec9vg-diff-1920.png) | **一致** |
 | 9 | `quhg6` | 9-1-G 有効化完了 | 3.7517% | 0px | 中央・右 | docs | [差分画像](friend-add-v6/quhg6-diff-1920.png) | **一致** |
 | 9 | `P2J0Te` | 9-1-H 実行結果 | 5.0878% | 0px | 下部・中央 | docs | [差分画像](friend-add-v6/P2J0Te-diff-1920.png) | **一致** |
@@ -201,12 +201,12 @@
 | 14 | `WuKzU` | 14-1 共通情報 | 3.1703% | 0px | 上部・左 | docs | [差分画像](common-vars-v6/WuKzU-diff-1920.png) | **一致** |
 | 14 | `gBtaK` | 14-1-A 共通情報を編集 | 4.9666% | 0px | 中央・左 | docs | [差分画像](common-vars-v6/gBtaK-diff-1920.png) | **一致** |
 | 14 | `uNBlA` | 14-1-B 変える前に影響を見る | 4.2428% | 0px | 中央・中央 | docs | [差分画像](common-vars-v6/uNBlA-diff-1920.png) | **一致** |
-| 14 | `yPkWe` | 14-1-C 共通情報の削除確認 | 14.9246% ⚠ | 0px | 下部・中央 | docs | [差分画像](common-vars-v6/yPkWe-diff-1920.png) | **一致** |
+| 14 | `yPkWe` | 14-1-C 共通情報の削除確認 | 4.4655% | 0px | 中央・中央 | docs | [差分画像](common-vars-v6/yPkWe-diff-1920.png) | **一致** |
 | 15 | `g89Tc` | 15-1 登録メディア | 2.8874% | 0px | 中央・右 | docs | [差分画像](media-v6/g89Tc-diff-1920.png) | **一致** |
 | 15 | `voJtX` | 15-1-A メディアの詳細と差し替え | 2.7174% | 0px | 中央・右 | docs | [差分画像](media-v6/voJtX-diff-1920.png) | **一致** |
 | 15 | `eXAJP` | 15-1-B ファイルを入れる | 8.4698% | 0px | 下部・中央 | docs | [差分画像](media-v6/eXAJP-diff-1920.png) | **一致** |
-| 15 | `YfTfJ` | 15-1-C メディアの削除確認 | 12.2195% ⚠ | 0px | 上部・中央 | docs | [差分画像](media-v6/YfTfJ-diff-1920.png) | **一致** |
-| 15 | `h8pBZr` | 15-1-D 一覧の状態（空・読込・エラー） | 3.2902% | 0px | 中央・中央 | docs | [差分画像](media-v6/h8pBZr-diff-1920.png) | **一致** |
+| 15 | `YfTfJ` | 15-1-C メディアの削除確認 | 12.8230% ⚠ | 0px | 上部・中央 | docs | [差分画像](media-v6/YfTfJ-diff-1920.png) | **一致** |
+| 15 | `h8pBZr` | 15-1-D 一覧の状態（空・読込・エラー） | 3.4629% | 0px | 中央・中央 | docs | [差分画像](media-v6/h8pBZr-diff-1920.png) | **一致** |
 | 16 | `PouPn` | 16-1 成果とアフィリエイト | 4.6352% | -56px | 中央・左 | docs | [差分画像](affiliates-v6/PouPn-diff-1920.png) | **一致** |
 | 16 | `GH8VL` | 16-1-A 案件 | 4.3863% | 0px | 中央・左 | docs | [差分画像](affiliates-v6/GH8VL-diff-1920.png) | **一致** |
 | 16 | `n5VVTb` | 16-1-B 成果承認 | 6.5642% | -56px | 下部・右 | docs | [差分画像](affiliates-v6/n5VVTb-diff-1920.png) | **一致** |
@@ -258,7 +258,7 @@
 | 21 | `i9sQP` | 21-1-F NENコラム・一覧の状態 | 2.4475% | 0px | 上部・左 | docs | [差分画像](nen-v6/i9sQP-diff-1920.png) | **一致** |
 | 22 | `Qu6Vk` | 22-1 写真審査 | 6.0722% | 0px | 中央・中央 | docs | [差分画像](photos-v6/Qu6Vk-diff-1920.png) | **一致** |
 | 22 | `hHrz8` | 22-1-A 写真を1枚ずつ見る | —（設計画像なし） | — | — | — | — | **一致** |
-| 22 | `N2J629` | 22-1-B 写真を戻す理由をえらぶ | 11.7931% ⚠ | 0px | 中央・左 | docs | [差分画像](photos-v6/N2J629-diff-1920.png) | **一致** |
+| 22 | `N2J629` | 22-1-B 写真を戻す理由をえらぶ | 7.5973% | 0px | 下部・中央 | docs | [差分画像](photos-v6/N2J629-diff-1920.png) | **一致** |
 | 22 | `J3Wxl8` | 22-1-C 出しているもの | —（設計画像なし） | — | — | — | — | **一致** |
 | 23 | `eI3gs` | 23-1 EC連携 | 4.7306% | 0px | 中央・左 | docs | [差分画像](ec-v6/eI3gs-diff-1920.png) | **一致** |
 | 23 | `ELayY` | 23-1-A 会員のつき合わせ | 3.3330% | 0px | 中央・左 | docs | [差分画像](ec-v6/ELayY-diff-1920.png) | **一致** |
@@ -279,9 +279,9 @@
 | 25 | `py5CG` | 25-2-A 共通アクションをつくる | 3.9089% | +85px | 中央・右 | docs | [差分画像](automations-v6/py5CG-diff-1920.png) | **一致** |
 | 25 | `syWp4` | 25-2-B 共通アクションの版と使われている場所 | 4.6105% | +220px | 上部・左 | docs | [差分画像](automations-v6/syWp4-diff-1920.png) | **一致** |
 | 26 | `k3WxrO` | 26-1 外部連携 | 4.4603% | 0px | 中央・右 | docs | [差分画像](webhooks-v6/k3WxrO-diff-1920.png) | **一致** |
-| 26 | `M0Gb7` | 26-1-A こちらで受け取る | 16.0061% ⚠ | +175px | 下部・中央 | docs | [差分画像](webhooks-v6/M0Gb7-diff-1920.png) | **一致** |
-| 26 | `KNG00` | 26-1-B やり取りの記録 | 4.8817% | 0px | 中央・左 | docs | [差分画像](webhooks-v6/KNG00-diff-1920.png) | **一致** |
-| 26 | `f8SBSh` | 26-1-C 一覧の状態（空・読込・エラー） | 3.9862% | 0px | 中央・中央 | docs | [差分画像](webhooks-v6/f8SBSh-diff-1920.png) | **一致** |
+| 26 | `M0Gb7` | 26-1-A こちらで受け取る | 9.9686% | +34px | 下部・中央 | docs | [差分画像](webhooks-v6/M0Gb7-diff-1920.png) | **一致** |
+| 26 | `KNG00` | 26-1-B やり取りの記録 | 5.0487% | 0px | 中央・左 | docs | [差分画像](webhooks-v6/KNG00-diff-1920.png) | **一致** |
+| 26 | `f8SBSh` | 26-1-C 一覧の状態（空・読込・エラー） | 3.8223% | 0px | 中央・中央 | docs | [差分画像](webhooks-v6/f8SBSh-diff-1920.png) | **一致** |
 | 27 | `TV2DI` | 27-1 予約管理 | 4.4990% | -7px | 中央・右 | docs | [差分画像](booking-v6/TV2DI-diff-1920.png) | **一致** |
 | 27 | `TnDbq` | 27-1-A 予約の詳細 | 5.3594% | 0px | 上部・右 | docs | [差分画像](booking-v6/TnDbq-diff-1920.png) | **一致** |
 | 27 | `cpdDi` | 27-1-B 電話の予約を入れる | 6.6680% | +227px | 上部・右 | docs | [差分画像](booking-v6/cpdDi-diff-1920.png) | **一致** |

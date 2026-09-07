@@ -1399,6 +1399,12 @@ export const COMMON_VARS = [
     createdAt: '2026-06-10T10:00:00.000+09:00', updatedAt: '2026-06-10T10:00:00.000+09:00',
     nextSchedule: null, pendingScheduleCount: 0, usageCount: 2,
   },
+  {
+    id: 'common-var-delete-safe', lineAccountId: 'visual-qa-account', folderId: 'cvf-guides',
+    name: '臨時のお知らせ', varKey: 'temporary_notice', type: 'text', value: '本日は17時まで営業します',
+    createdAt: '2026-09-01T10:00:00.000+09:00', updatedAt: '2026-09-01T10:00:00.000+09:00',
+    nextSchedule: null, pendingScheduleCount: 0, usageCount: 0,
+  },
 ]
 
 export const COMMON_VAR_DELETE_IMPACT = {
