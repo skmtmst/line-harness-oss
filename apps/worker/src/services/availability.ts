@@ -220,6 +220,25 @@ export async function getAvailability(
   const dates = eachDate(params.from, params.to);
   const placeholders = staffIds.map(() => '?').join(',');
 
+  const [businessHours, menuResources] = await Promise.all([
+    db.prepare(`SELECT bh.weekday, bh.start_time, bh.end_time, bh.capacity
+      FROM booking_business_hours bh
+      INNER JOIN booking_settings bs ON bs.id = bh.booking_settings_id
+      WHERE bs.line_account_id = ? ORDER BY bh.weekday, bh.start_time`)
+      .bind(params.lineAccountId)
+      .all<{ weekday: number; start_time: string; end_time: string; capacity: number }>(),
+    db.prepare(`SELECT r.capacity, mr.quantity
+      FROM booking_menu_resources mr
+      INNER JOIN booking_resources r ON r.id = mr.resource_id
+      WHERE mr.menu_id = ? AND r.line_account_id = ? AND r.is_active = 1`)
+      .bind(params.menuId, params.lineAccountId)
+      .all<{ capacity: number; quantity: number }>(),
+  ]);
+  const resourceCapacity = (menuResources.results ?? []).reduce(
+    (min, row) => Math.min(min, Math.floor(Number(row.capacity) / Math.max(1, Number(row.quantity)))),
+    Number.POSITIVE_INFINITY,
+  );
+
   const shifts = await db
     .prepare(
       `SELECT staff_id, work_date, start_time, end_time
@@ -327,17 +346,36 @@ export async function getAvailability(
       const googleBusy = googleBusyByStaff.get(s.id);
       // 外の予定は定員に関係なく塞ぐ（sameMenu を付けない）。
       if (googleBusy) dayBookings.push(...googleBusyForJstDate(googleBusy, date));
+      const storeCapacity = (businessHours.results ?? [])
+        .filter((hour) => hour.weekday === weekdayForDate(date))
+        .filter((hour) => hour.start_time <= working.start_time && hour.end_time >= working.end_time)
+        .reduce((min, hour) => Math.min(min, Number(hour.capacity ?? 1)), Number.POSITIVE_INFINITY);
+      const effectiveCapacity = Math.max(1, Math.min(
+        Number(menu.concurrent_capacity ?? 1),
+        Number.isFinite(storeCapacity) ? storeCapacity : Number.POSITIVE_INFINITY,
+        resourceCapacity,
+      ));
       const daySlots = computeSlots({
         working: [{ start: working.start_time, end: working.end_time }],
         busy: dayBookings,
         menu: menuForCalc,
         granularityMinutes: SLOT_GRANULARITY_MINUTES,
-        capacity: menu.concurrent_capacity,
+        capacity: effectiveCapacity,
       });
       for (const slot of daySlots) {
         const slotStartUtc = new Date(`${date}T${slot.start}:00+09:00`);
         if (slotStartUtc < minLeadAt) continue;
-        slots.push({ date, start: slot.start, end: slot.end });
+        const sameMenuCount = dayBookings.filter((booking) => booking.sameMenu === true
+          && overlaps(toMin(slot.start), toMin(slot.end), toMin(booking.start), toMin(booking.end))).length;
+        const remaining = Math.max(0, effectiveCapacity - sameMenuCount);
+        slots.push({
+          date,
+          start: slot.start,
+          end: slot.end,
+          capacity: effectiveCapacity,
+          remaining,
+          state: remaining === 0 ? 'full' : remaining < effectiveCapacity ? 'limited' : 'available',
+        });
       }
     }
     by_staff.push({ staff_id: s.id, display_name: s.display_name, slots });

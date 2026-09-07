@@ -58,9 +58,9 @@ describe('V6 代理予約の接続契約', () => {
   })
 
   test('アカウントや予約対象が変わったあとの古い返事を画面へ反映しない', () => {
-    expect(PAGE).toContain("const selectionKey = [selectedAccountId ?? '', friend?.id ?? '', menuId, staffId, date, time]")
+    expect(PAGE).toContain("const selectionKey = [selectedAccountId ?? '', friend?.id ?? customer?.id ?? '', menuId, staffId, date, time]")
     expect(PAGE).toContain('latestSelectionKey.current = selectionKey')
-    expect(PAGE).toContain('const requestKey = selectionKey')
+    expect(PAGE).toContain('const requestKey = [selectedAccountId, friend?.id ?? selectedCustomer?.id ?? \'\', menuId, staffId, date, time]')
     expect(PAGE).toContain('if (latestSelectionKey.current !== requestKey) return')
     expect(PAGE).toContain('if (latestSelectionKey.current === requestKey) setLoading(false)')
     expect(PAGE).toContain("setIdempotencyKey('')")
