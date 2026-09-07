@@ -2867,9 +2867,9 @@ export const SCREENS = [
       kinds: ['normal', 'loading', 'error'],
     }, name: '28-1-A 受付枠と休業日', route: '/booking/staff/shifts',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #485・撮影HEAD `833383f6e` で再判定し一致。** 曜日表と予約ルールをPencilの行高へそろえ、設計にない設備上限・空き枠内訳は必要時だけ開く形にした。旧+171pxの差を0pxへ解消し、1920px画素差5.6416%、1440/1920pxとも横はみ出し0。",
+    verdictNote: "**2026-09-07 Issue #485・撮影HEAD `c90756ba0a` で再判定し一致。** 曜日表と予約ルールをPencilの行高へそろえ、設計にない設備上限・空き枠内訳は必要時だけ開く形にした。旧+171pxの差を0pxへ解消し、1920px画素差5.6699%、1440/1920pxとも横はみ出し0。",
     verdictSource: "booking-settings-v6/tksPc.png + tksPc-{1440,1920}.png + tksPc-diff-1920.png + Issue #485",
-    verdictHead: "833383f6e",
+    verdictHead: "c90756ba0a",
   },
   { ...BOOKING_SET, node: 'GhOb3', name: '28-1-B 予約メニューをつくる', route: '/booking/menus/new',
     variants: [{ suffix: '-pencil-input', steps: [

@@ -290,14 +290,14 @@
 | 27 | `GfceK` | 27-1-E 代理予約・登録完了 | 6.9745%（前回値） | 0px | 中央・右 | docs | [差分画像](booking-v6/GfceK-diff-1920.png) | **一致** |
 | 27 | `Lg8ff` | 27-1-F 代理予約・予約枠の重なりと入力エラー | 4.8883%（前回値） | 0px | 中央・左 | docs | [差分画像](booking-v6/Lg8ff-diff-1920.png) | **一致** |
 | 28 | `QSLEH` | 28-1 予約設定 | 3.4602%（前回値） | 0px | 中央・左 | docs | [差分画像](booking-settings-v6/QSLEH-diff-1920.png) | **一致** |
-| 28 | `tksPc` | 28-1-A 受付枠と休業日 | 5.6416%（前回値） | 0px | 中央・右 | docs | [差分画像](booking-settings-v6/tksPc-diff-1920.png) | **一致** |
+| 28 | `tksPc` | 28-1-A 受付枠と休業日 | 5.6699% | 0px | 中央・右 | docs | [差分画像](booking-settings-v6/tksPc-diff-1920.png) | **一致** |
 | 28 | `GhOb3` | 28-1-B 予約メニューをつくる | 6.8295%（前回値） | 0px | 上部・右 | docs | [差分画像](booking-settings-v6/GhOb3-diff-1920.png) | **一致** |
 | 28 | `W6465r` | 28-1-C 一覧の状態（空・読込・エラー） | 2.8767%（前回値） | 0px | 中央・中央 | docs | [差分画像](booking-settings-v6/W6465r-diff-1920.png) | **一致** |
 | 29 | `ugP5y` | 29-1 イベント予約 | 4.4000%（前回値） | 0px | 中央・左 | docs | [差分画像](events-v6/ugP5y-diff-1920.png) | **一致** |
 | 29 | `MKrPY` | 29-1-A イベントをつくる | 6.3529%（前回値） | 0px | 中央・右 | docs | [差分画像](events-v6/MKrPY-diff-1920.png) | **一致** |
 | 29 | `i5SN2j` | 29-1-B 申込者の一覧 | 3.3306%（前回値） | 0px | 上部・左 | docs | [差分画像](events-v6/i5SN2j-diff-1920.png) | **一致** |
 | 29 | `k5m5Bc` | 29-1-C 一覧の状態（空・読込・エラー） | 3.7226%（前回値） | 0px | 上部・左 | docs | [差分画像](events-v6/k5m5Bc-diff-1920.png) | **一致** |
-| 30 | `e3jz3` | 30-1 ログインユーザー | 4.4622% | 0px | 中央・左 | docs | [差分画像](staff-v6/e3jz3-diff-1920.png) | **一致** |
+| 30 | `e3jz3` | 30-1 ログインユーザー | 4.4622%（前回値） | 0px | 中央・左 | docs | [差分画像](staff-v6/e3jz3-diff-1920.png) | **一致** |
 | 30 | `EOTS4` | 30-1-A 見せる範囲を決める | 4.8683%（前回値） | 0px | 中央・左 | docs | [差分画像](staff-v6/EOTS4-diff-1920.png) | **一致** |
 | 30 | `jwVlo` | 30-1-B 入った記録 | 4.6135%（前回値） | 0px | 中央・左 | docs | [差分画像](staff-v6/jwVlo-diff-1920.png) | **一致** |
 | 30 | `I3ZSrU` | 30-1-C 人を招待する | 4.8181%（前回値） | -16px | 中央・左 | docs | [差分画像](staff-v6/I3ZSrU-diff-1920.png) | **一致** |
