@@ -1640,10 +1640,10 @@ export const SCREENS = [
     }, },
   {
     ...FORM, node: 'gBp2J', name: '13-1-E フォームの削除確認',
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-06 Issue #254 / UI HEAD 19422a3b7で1440px・1920pxを撮影し、横はみ出し0を確認。** 影響確認APIの公開状態・回答数・利用先・開けなくなるURLを表示し、受付停止・アーカイブ・完全削除を条件で分けた。本文は設計テキストと照合したが、**設計画像なし**のため画像一致は判定できず `unjudged` を維持する。',
-    verdictSource: 'forms-v6/gBp2J.txt + gBp2J-{1440,1920}.png',
-    verdictHead: '19422a3b7',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #435。** 本流の設計PNG（#1197）と固定ポート3107/8794の実装を1440・1920pxで照合。公開状態、回答数、利用先、URL影響、受付停止・アーカイブ・削除の分岐を確認し、横はみ出し0。',
+    verdictSource: 'forms-v6/gBp2J.txt + docs/design-reference/forms-v6/gBp2J-{1440,1920}.png + forms-v6/gBp2J-{1440,1920}.png',
+    verdictHead: '520c251a951d',
     steps: [{ click: '来店アンケートを削除' }],
   },
   {
