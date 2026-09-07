@@ -70,7 +70,7 @@ export function PhotoReviewDetail({
 
     <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-4">
       <Card className="xl:col-span-3" overflow="hidden">
-        <div className="grid h-96 place-items-center overflow-hidden bg-ink lg:h-screen lg:max-h-screen">
+        <div className="grid h-96 place-items-center overflow-hidden bg-ink lg:h-160">
           {reviewUrl ? <img
             src={reviewUrl}
             alt={`${text(photo.pet_name)}の審査用写真`}
@@ -86,8 +86,7 @@ export function PhotoReviewDetail({
           <Button disabled={assetProcessing} onClick={onProcessReviewAsset}>{assetProcessing ? '作成中...' : '審査用画像を作り直す'}</Button>
           <Button onClick={() => { setDownloadOpen(true); setDownloadCode(''); setDownloadError('') }}>もとの画像を保存</Button>
         </div>
-        <p className="px-4 pb-1 pt-1 text-xs text-ink-faint">{numberOrDash(reviewDerivative?.width ?? photo.image_width)} × {numberOrDash(reviewDerivative?.height ?? photo.image_height)} ／ {(reviewDerivative?.byteSize ?? photo.image_byte_size) == null ? '—（未取得）' : `${(Number(reviewDerivative?.byteSize ?? photo.image_byte_size) / 1024 / 1024).toFixed(1)}MB`} ／ {text(photo.captured_device) || '—（未取得）'}</p>
-        <p className="px-4 pb-4 text-xs text-ink-faint">派生画像：{reviewDerivative ? `審査用 v${reviewDerivative.sourceVersion}` : latestAssetJob ? `${assetStatusLabel(latestAssetJob.status)}（v${latestAssetJob.requestedVersion}）` : '未取得'}</p>
+        <p className="px-4 pb-4 pt-1 text-xs text-ink-faint">{numberOrDash(reviewDerivative?.width ?? photo.image_width)} × {numberOrDash(reviewDerivative?.height ?? photo.image_height)} ／ {(reviewDerivative?.byteSize ?? photo.image_byte_size) == null ? '—（未取得）' : `${(Number(reviewDerivative?.byteSize ?? photo.image_byte_size) / 1024 / 1024).toFixed(1)}MB`} ／ {text(photo.captured_device) || '—（未取得）'}　派生画像：{reviewDerivative ? `審査用 v${reviewDerivative.sourceVersion}` : latestAssetJob ? `${assetStatusLabel(latestAssetJob.status)}（v${latestAssetJob.requestedVersion}）` : '未取得'}</p>
       </Card>
 
       <aside className="flex flex-col gap-3">

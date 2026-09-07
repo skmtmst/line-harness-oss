@@ -120,7 +120,7 @@ function AccountDetail() {
                 <p className="text-ink text-base font-bold">登録の内容</p>
                 <Button href={`/accounts/detail?id=${account.id}&tab=credentials`}>編集する</Button>
               </div>
-              <dl className="mt-3 space-y-2">
+              <dl className="mt-3">
                 <InlineRow label="表示名" value={account.name} />
                 <InlineRow label="チャネルID" value={account.channelId} />
                 <InlineRow label="タイムゾーン" value={account.timezone ?? 'Asia/Tokyo'} />
@@ -145,7 +145,7 @@ function AccountDetail() {
                 </div>
                 <Button href={`/accounts/detail?id=${account.id}&tab=credentials`}>差し替える</Button>
               </div>
-              <dl className="mt-3 space-y-2">
+              <dl className="mt-3">
                 <CredentialRow
                   label="チャネルシークレット"
                   configured={account.channelSecretConfigured}
@@ -186,7 +186,6 @@ function AccountDetail() {
                     <div>
                       <p className={action.key === 'archive' ? 'text-danger text-sm font-medium' : 'text-ink text-sm font-medium'}>{action.title}</p>
                       <p className="text-ink-secondary mt-1 text-xs leading-relaxed">{action.description}</p>
-                      {action.blockedReason && <p className="text-ink-faint mt-1 text-xs leading-relaxed">{action.blockedReason}</p>}
                     </div>
                     {action.blockedReason ? null : action.key === 'handover' ? (
                       <Button href={`/accounts/handover?id=${account.id}`}>{action.actionLabel}</Button>
@@ -344,15 +343,15 @@ function InlineRow({
 }) {
   return (
     <div
-      className="grid min-w-0 gap-3 rounded-control px-3 py-2 odd:bg-canvas-sunken"
+      className="grid min-w-0 gap-3 border-b border-hairline py-1 last:border-b-0"
       style={{ gridTemplateColumns: '9rem minmax(0, 1fr)' }}
     >
       <dt className="text-ink-faint text-xs">{label}</dt>
       <dd className={tone === 'success'
-        ? 'text-success min-w-0 break-words text-sm font-medium'
+        ? 'text-success min-w-0 break-words text-right text-sm font-medium'
         : tone === 'muted'
-          ? 'text-ink-secondary min-w-0 break-words text-sm'
-          : 'text-ink min-w-0 break-words text-sm'}>
+          ? 'text-ink-secondary min-w-0 break-words text-right text-sm'
+          : 'text-ink min-w-0 break-words text-right text-sm'}>
         {value}
       </dd>
     </div>

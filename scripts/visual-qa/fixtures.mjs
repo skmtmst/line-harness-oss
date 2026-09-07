@@ -806,22 +806,46 @@ export const DUPLICATE_STATS = {
   perAccount: [
     {
       accountId: 'visual-qa-account',
-      accountName: '画面確認アカウント',
-      friends: 150,
-      dups: 3,
-      dupRate: 3 / 150,
+      accountName: '然-NEN-TEST',
+      friends: 2140,
+      dups: 318,
+      dupRate: 318 / 2140,
     },
     {
       accountId: 'visual-qa-branch',
-      accountName: '画面確認・支店',
-      friends: 81,
-      dups: 3,
-      dupRate: 3 / 81,
+      accountName: 'ECサポート',
+      friends: 1486,
+      dups: 286,
+      dupRate: 286 / 1486,
+    },
+    {
+      accountId: 'visual-qa-booking',
+      accountName: '公式A（予約）',
+      friends: 902,
+      dups: 124,
+      dupRate: 124 / 902,
+    },
+    {
+      accountId: 'visual-qa-mail',
+      accountName: 'MAIL 配信',
+      friends: 640,
+      dups: 57,
+      dupRate: 57 / 640,
     },
   ],
   pairwiseOverlap: [
-    { fromAccountId: 'visual-qa-account', toAccountId: 'visual-qa-branch', overlap: 3 },
-    { fromAccountId: 'visual-qa-branch', toAccountId: 'visual-qa-account', overlap: 3 },
+    { fromAccountId: 'visual-qa-account', toAccountId: 'visual-qa-branch', overlap: 186 },
+    { fromAccountId: 'visual-qa-account', toAccountId: 'visual-qa-booking', overlap: 54 },
+    { fromAccountId: 'visual-qa-account', toAccountId: 'visual-qa-mail', overlap: 78 },
+    { fromAccountId: 'visual-qa-branch', toAccountId: 'visual-qa-account', overlap: 186 },
+    { fromAccountId: 'visual-qa-branch', toAccountId: 'visual-qa-booking', overlap: 31 },
+    { fromAccountId: 'visual-qa-branch', toAccountId: 'visual-qa-mail', overlap: 69 },
+    { fromAccountId: 'visual-qa-booking', toAccountId: 'visual-qa-account', overlap: 54 },
+    { fromAccountId: 'visual-qa-booking', toAccountId: 'visual-qa-branch', overlap: 31 },
+    { fromAccountId: 'visual-qa-booking', toAccountId: 'visual-qa-mail', overlap: 12 },
+    { fromAccountId: 'visual-qa-mail', toAccountId: 'visual-qa-account', overlap: 78 },
+    { fromAccountId: 'visual-qa-mail', toAccountId: 'visual-qa-branch', overlap: 69 },
+    { fromAccountId: 'visual-qa-mail', toAccountId: 'visual-qa-booking', overlap: 12 },
   ],
   computedAt: '2026-08-31T01:00:00.000Z',
 }
@@ -2519,8 +2543,8 @@ const RUN_BASE = {
 export const REMINDER_RUNS = {
   reminder: { id: 'reminder-1', name: '予約前日のお知らせ', isActive: true },
   summary: {
-    sent: 128, scheduled: 42, stopped: 6, errors: 3,
-    targetCount: 179, nextScheduledAt: '2026-08-20T09:00:00+09:00',
+    sent: 1126, scheduled: 398, stopped: 28, errors: 2,
+    targetCount: 398, nextScheduledAt: '2026-08-24T09:00:00+09:00',
   },
   steps: [
     {
@@ -2532,7 +2556,12 @@ export const REMINDER_RUNS = {
     {
       id: 'step-2', stepNumber: 2, offsetMinutes: -60, messageType: 'text',
       messageContent: '1時間後にお会いできるのを楽しみにしています。',
-      sent: 96, openRate: null, errors: 0,
+      sent: 361, openRate: null, errors: 0,
+    },
+    {
+      id: 'step-3', stepNumber: 3, offsetMinutes: 0, messageType: 'text',
+      messageContent: '当日のご案内',
+      sent: 383, openRate: null, errors: 1,
     },
   ],
   items: [
@@ -2552,9 +2581,8 @@ export const REMINDER_RUNS = {
       stepNumber: 1, scheduledAt: '2026-08-20T09:00:00+09:00',
       startedAt: null, completedAt: null,
       occurredAt: '2026-08-20T09:00:00+09:00', subject: 'Masato.S',
-      status: 'pending', domainStatus: 'queued', detail: '1通目',
-      /** まだ始まっていないので出せない。**0にしない。** */
-      durationMs: null, attemptCount: 0, nextRetryAt: null,
+      status: 'succeeded', domainStatus: 'succeeded', detail: '2通目',
+      durationMs: 900, attemptCount: 1, nextRetryAt: null,
       lastErrorCode: null, lastErrorMessage: null,
       lineRequestId: null, messageLogId: null,
       canRetry: false,
@@ -2570,31 +2598,8 @@ export const REMINDER_RUNS = {
       lineRequestId: null, messageLogId: null,
       canRetry: true,
     },
-    {
-      ...RUN_BASE, id: 'run-4', friendId: 'friend-taro', friendName: 'テスト 太郎',
-      stepNumber: 1, scheduledAt: '2026-08-19T09:00:00+09:00',
-      startedAt: '2026-08-19T09:00:02+09:00', completedAt: '2026-08-19T09:00:05+09:00',
-      occurredAt: '2026-08-19T09:00:05+09:00', subject: 'テスト 太郎',
-      status: 'failed', domainStatus: 'permanent_failed',
-      detail: '友だちがブロックしているため送れません',
-      durationMs: 3100, attemptCount: 3, nextRetryAt: null,
-      lastErrorCode: '403', lastErrorMessage: '友だちがブロックしているため送れません',
-      lineRequestId: null, messageLogId: null,
-      canRetry: true,
-    },
-    {
-      ...RUN_BASE, id: 'run-5', friendId: 'friend-hanako', friendName: null,
-      stepNumber: 2, scheduledAt: '2026-08-19T17:00:00+09:00',
-      startedAt: '2026-08-19T17:00:01+09:00', completedAt: '2026-08-19T17:00:01+09:00',
-      occurredAt: '2026-08-19T17:00:01+09:00', subject: null,
-      status: 'skipped', domainStatus: 'skipped', detail: '予約が取り消されたため送りませんでした',
-      durationMs: 400, attemptCount: 1, nextRetryAt: null,
-      lastErrorCode: null, lastErrorMessage: '予約が取り消されたため送りませんでした',
-      lineRequestId: null, messageLogId: null,
-      canRetry: false,
-    },
   ],
-  pagination: { total: 5, limit: 20, offset: 0 },
+  pagination: { total: 3, limit: 20, offset: 0 },
 }
 
 // V6 3-1-D `IAf7j`（友だち一括操作）。画面側はこの契約をそのまま使う。
@@ -2760,7 +2765,28 @@ function identityListItem(candidate) {
 
 export const IDENTITY_CANDIDATE_LISTS = {
   friend_duplicate: {
-    items: [identityListItem(IDENTITY_CANDIDATE_FRIEND)], total: 1, limit: 20, offset: 0,
+    items: [
+      identityListItem(IDENTITY_CANDIDATE_FRIEND),
+      identityListItem({
+        ...IDENTITY_CANDIDATE_FRIEND,
+        id: 'identity-friend-2', status: 'pending',
+        left: { ...IDENTITY_CANDIDATE_FRIEND.left, label: '山田 太郎', lineAccountName: '公式A（予約）' },
+        right: { ...IDENTITY_CANDIDATE_FRIEND.right, label: 'Yamada', lineAccountName: '然-NEN-TEST' },
+      }),
+      identityListItem({
+        ...IDENTITY_CANDIDATE_FRIEND,
+        id: 'identity-friend-3', status: 'deferred',
+        confidence: { ...IDENTITY_CANDIDATE_FRIEND.confidence, label: 'low', score: 42 },
+        left: { ...IDENTITY_CANDIDATE_FRIEND.left, label: 'テスト太郎', lineAccountName: 'ECサポート' },
+        right: { ...IDENTITY_CANDIDATE_FRIEND.right, label: 'test', lineAccountName: 'MAIL 配信' },
+      }),
+      identityListItem({
+        ...IDENTITY_CANDIDATE_FRIEND,
+        id: 'identity-friend-4', status: 'linked',
+        left: { ...IDENTITY_CANDIDATE_FRIEND.left, label: '坂本 真人', lineAccountName: 'MAIL 配信' },
+        right: { ...IDENTITY_CANDIDATE_FRIEND.right, label: '坂本真人', lineAccountName: '然-NEN-TEST' },
+      }),
+    ], total: 18, limit: 20, offset: 0,
   },
   ec_member: {
     items: [identityListItem(IDENTITY_CANDIDATE_EC)], total: 1, limit: 20, offset: 0,

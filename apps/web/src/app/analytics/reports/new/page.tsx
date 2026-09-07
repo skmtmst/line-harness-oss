@@ -34,9 +34,9 @@ export default function AnalyticsReportNewPage() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [saving, setSaving] = useState(false)
-  const [name, setName] = useState('週次まとめ')
+  const name = '週次まとめ'
   const [sections, setSections] = useState<AnalyticsReportSection[]>(['friends', 'reactions', 'routes', 'usage'])
-  const [savedAnalysisIds, setSavedAnalysisIds] = useState<string[]>([])
+  const savedAnalysisIds: string[] = []
   const [cadence, setCadence] = useState<'weekly' | 'monthly'>('weekly')
   const [weekday, setWeekday] = useState('1')
   const [monthDay, setMonthDay] = useState('1')
@@ -136,11 +136,11 @@ export default function AnalyticsReportNewPage() {
   )
 
   return (
-    <div className="text-ink mx-auto max-w-screen-2xl pb-24" data-design-node="URqOA">
+    <div className="text-ink mx-auto max-w-screen-2xl px-6 pb-24" data-design-node="URqOA">
       <PageHeader
         breadcrumb={[{ label: '分析', href: '/analytics' }, { label: '定期レポートをつくる' }]}
         title="定期レポートをつくる"
-        description="決まった曜日と時刻に、必要な数字だけを担当者へ届けます。"
+        description=""
       />
       {!canManage && <div className="bg-canvas-sunken mb-4 rounded-control px-4 py-3 text-sm">運用担当は内容を確認できます。作成は統括または管理者が行います。</div>}
       {error && <div className="bg-danger-bg text-danger mb-4 rounded-control px-4 py-3 text-sm" role="alert">{error}</div>}
@@ -151,31 +151,19 @@ export default function AnalyticsReportNewPage() {
           <section className="border-hairline bg-canvas rounded-card border p-6">
             <h2 className="text-lg font-semibold">何を入れますか</h2>
             <p className="text-ink-secondary mb-4 mt-1 text-sm">チェックしたものが、この順にレポートへ並びます。</p>
-            <div className="border-hairline border-t">
+            <div className="grid gap-x-8 gap-y-3 md:grid-cols-2">
               {SECTION_CHOICES.map((choice) => (
-                <label className="border-hairline flex cursor-pointer items-start gap-3 border-b px-1 py-4" key={choice.id}>
+                <label className="flex cursor-pointer items-start gap-3" key={choice.id}>
                   <input className="accent-accent mt-0.5 size-5" type="checkbox" checked={sections.includes(choice.id)} onChange={() => toggleSection(choice.id)} />
                   <span className="grid gap-1"><strong className="text-sm">{choice.title}</strong><small className="text-ink-secondary text-xs font-normal">{choice.detail}</small></span>
                 </label>
               ))}
             </div>
-            {options.savedAnalyses.length > 0 && (
-              <div className="mt-5 grid gap-3">
-                <h3 className="text-sm font-semibold">保存した分析</h3>
-                {options.savedAnalyses.map((item) => (
-                  <label className="flex items-center gap-2 text-sm" key={item.id}>
-                    <input className="accent-accent size-5" type="checkbox" checked={savedAnalysisIds.includes(item.id)} onChange={() => setSavedAnalysisIds((current) => current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id])} />
-                    {item.name}
-                  </label>
-                ))}
-              </div>
-            )}
           </section>
 
           <section className="border-hairline bg-canvas rounded-card border p-6">
             <h2 className="mb-4 text-lg font-semibold">いつ送りますか</h2>
             <div className="grid items-end gap-4 md:grid-cols-4">
-              <label className="text-ink-secondary grid gap-2 text-xs font-semibold md:col-span-4">レポート名<input className="border-hairline text-ink bg-canvas h-10 rounded-control border px-3 text-sm" value={name} maxLength={120} onChange={(event) => setName(event.target.value)} /></label>
               <label className="text-ink-secondary grid gap-2 text-xs font-semibold">間かく<SelectField value={cadence} onChange={(event) => setCadence(event.target.value as 'weekly' | 'monthly')} options={[{ value: 'weekly', label: '毎週' }, { value: 'monthly', label: '毎月' }]} /></label>
               {cadence === 'weekly' ? (
                 <label className="text-ink-secondary grid gap-2 text-xs font-semibold">曜日<SelectField value={weekday} onChange={(event) => setWeekday(event.target.value)} options={['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'].map((label, value) => ({ value: String(value), label }))} /></label>
@@ -190,19 +178,19 @@ export default function AnalyticsReportNewPage() {
 
           <section className="border-hairline bg-canvas rounded-card border p-6">
             <h2 className="mb-4 text-lg font-semibold">だれに送りますか</h2>
-            <div className="grid gap-2">
+            <div className="flex flex-wrap gap-2">
               {options.recipients.map((person) => (
-                <label className="border-hairline rounded-control flex items-center gap-3 border px-4 py-3" key={person.id}>
-                  <input className="accent-accent size-5" type="checkbox" checked={staffIds.includes(person.id)} onChange={() => setStaffIds((current) => current.includes(person.id) ? current.filter((id) => id !== person.id) : [...current, person.id])} />
-                  <span className="grid flex-1 gap-1"><strong className="text-sm">{person.name}</strong><small className="text-ink-secondary text-xs font-normal">ログインユーザー ／ {ROLE_LABEL[person.role]}</small></span>
-                  <em className="text-ink-faint text-xs not-italic">{person.lineLinked ? 'LINE連携済み' : 'LINE未連携'}</em>
+                <label className="border-hairline rounded-pill flex items-center gap-2 border px-3 py-2" key={person.id}>
+                  <input className="accent-accent size-4" type="checkbox" checked={staffIds.includes(person.id)} onChange={() => setStaffIds((current) => current.includes(person.id) ? current.filter((id) => id !== person.id) : [...current, person.id])} />
+                  <strong className="text-xs">{person.name}</strong>
+                  <span className="text-ink-secondary text-xs">ログインユーザー ／ {ROLE_LABEL[person.role]}</span>
                 </label>
               ))}
               {emails.map((email, index) => (
-                <label className="text-ink-secondary mt-2 grid max-w-md gap-2 text-xs font-semibold" key={index}>
-                  メールだけ
+                <label className="border-hairline rounded-pill flex items-center gap-2 border px-3 py-1.5 text-xs font-semibold" key={index}>
+                  <span className="whitespace-nowrap">メールだけ</span>
                   <input
-                    className="border-hairline text-ink bg-canvas h-10 rounded-control border px-3 text-sm"
+                    className="text-ink bg-transparent text-xs outline-none"
                     type="email"
                     value={email}
                     onChange={(event) => setEmails((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}
@@ -222,10 +210,10 @@ export default function AnalyticsReportNewPage() {
             <h2 className="text-lg font-semibold">知らせの決めごと</h2>
             <p className="text-ink-secondary mb-4 mt-1 text-sm">数字がふだんと大きくちがうときだけ、待たずに知らせます。</p>
             <label className="mb-3 flex items-center gap-2 text-sm font-semibold"><input className="accent-accent size-5" type="checkbox" checked={alertsEnabled} onChange={(event) => setAlertsEnabled(event.target.checked)} />大きな変化を知らせる</label>
-            <ul className="grid list-none gap-2 p-0">
-              <li className="bg-canvas-sunken rounded-control grid gap-1 px-3 py-2 text-xs"><strong>ブロックが 0.5% をこえたら、その場で知らせる</strong><span className="text-ink-secondary">配信の事故に早く気づけます。</span></li>
-              <li className="bg-canvas-sunken rounded-control grid gap-1 px-3 py-2 text-xs"><strong>友だちが前の週より 20% 減ったら、その場で知らせる</strong></li>
-              <li className="bg-canvas-sunken rounded-control grid gap-1 px-3 py-2 text-xs"><strong>成果が0件の日が3日つづいたら、その場で知らせる</strong><span className="text-ink-secondary">計測が壊れていることに気づけます。</span></li>
+            <ul className="grid list-none gap-3 p-0">
+              <li className="flex items-start gap-2 text-xs"><input type="checkbox" checked readOnly className="accent-accent size-4 shrink-0" /><span className="grid gap-1"><strong>ブロックが 0.5% をこえたら、その場で知らせる</strong><span className="text-ink-secondary">配信の事故に早く気づけます。</span></span></li>
+              <li className="flex items-start gap-2 text-xs"><input type="checkbox" checked readOnly className="accent-accent size-4 shrink-0" /><strong>友だちが前の週より 20% 減ったら、その場で知らせる</strong></li>
+              <li className="flex items-start gap-2 text-xs"><input type="checkbox" checked readOnly className="accent-accent size-4 shrink-0" /><span className="grid gap-1"><strong>成果が0件の日が3日つづいたら、その場で知らせる</strong><span className="text-ink-secondary">計測が壊れていることに気づけます。</span></span></li>
             </ul>
           </section>
         </main>

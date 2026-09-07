@@ -269,7 +269,8 @@ describe('本人照合候補の画面確認データ', () => {
   });
 
   it('通常・空・失敗を別の形で用意する', () => {
-    expect(IDENTITY_CANDIDATE_LISTS.friend_duplicate).toMatchObject({ total: 1, limit: 20, offset: 0 });
+    expect(IDENTITY_CANDIDATE_LISTS.friend_duplicate).toMatchObject({ total: 18, limit: 20, offset: 0 });
+    expect(IDENTITY_CANDIDATE_LISTS.friend_duplicate.items).toHaveLength(4);
     expect(IDENTITY_CANDIDATE_LISTS.empty).toEqual({ items: [], total: 0, limit: 20, offset: 0 });
     expect(IDENTITY_CANDIDATE_ERROR).toMatchObject({ success: false, code: 'VISUAL_QA_ERROR' });
     expect(IDENTITY_CANDIDATE_DETECTION.normal).toEqual({
@@ -321,8 +322,8 @@ describe('統合ユーザー一覧と重複集計の画面確認データ', () =
       friendDups: 3,
       duplicateGroups: 3,
     });
-    expect(DUPLICATE_STATS.perAccount).toHaveLength(2);
-    expect(DUPLICATE_STATS.pairwiseOverlap).toHaveLength(2);
+    expect(DUPLICATE_STATS.perAccount).toHaveLength(4);
+    expect(DUPLICATE_STATS.pairwiseOverlap).toHaveLength(12);
   });
 
   it('平文のメールと電話を固定データへ置かない', () => {
