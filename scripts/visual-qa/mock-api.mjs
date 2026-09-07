@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url'
 const FINGERPRINT = createHash('sha256').update(readFileSync(fileURLToPath(import.meta.url))).digest('hex').slice(0, 16)
 import { readArrayGetPaths } from './api-shapes.mjs'
 import {
+  mileageWriteResponse,
   MILEAGE_REWARDS,
   FORM_DELETE_IMPACT_FIXTURES,
   COMMON_VARS,
@@ -2812,6 +2813,21 @@ const server = createServer((req, res) => {
   // ただし画面側のエラー報告だけは 204 で受ける。405 を返すと、
   // 報告が失敗したこと自体が新しいエラーになって際限なく増える。
   if (method !== 'GET') {
+    if (/^\/api\/(mileage\/(rules|rewards|adjustments)|action-scores\/rules)/.test(url.pathname)) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let requestBody = {}
+        try { requestBody = JSON.parse(raw || '{}') } catch { requestBody = {} }
+        const fixed = mileageWriteResponse(method, url.pathname, requestBody, req.headers)
+        if (fixed) {
+          res.writeHead(fixed.status).end(JSON.stringify(fixed.body))
+          return
+        }
+        res.writeHead(405).end(JSON.stringify({ success: false, error: '画面確認用のため、更新はできません' }))
+      })
+      return
+    }
     if (method === 'POST' && url.pathname === '/api/folders') {
       let raw = ''
       req.on('data', (chunk) => { raw += chunk })

@@ -383,10 +383,24 @@ describe('V6共通アクション', () => {
   });
 
   it('編集画面の選択肢をLINE公式アカウント内に限定する', async () => {
+    const published = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '公開済み', actions: tagAction('tag-1'),
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: published.id,
+      lineAccountId: 'account-1',
+      draftVersionId: published.draftVersionId,
+    });
     const resources = await listCommonActionResources(testDb.db, {
       lineAccountId: 'account-1',
     });
     expect(resources.tags).toEqual([{ id: 'tag-1', name: 'tag-1' }]);
     expect(resources.tags).not.toContainEqual(expect.objectContaining({ id: 'tag-2' }));
+    expect(resources.commonActions).toContainEqual({
+      id: published.id,
+      name: '公開済み',
+      version: 1,
+      currentPublishedVersionId: published.draftVersionId,
+    });
   });
 });

@@ -1629,7 +1629,12 @@ export type CommonActionResources = {
   notificationRules?: Array<{ id: string; name: string }>;
   webhooks: Array<{ id: string; name: string }>;
   richMenus: Array<{ id: string; name: string }>;
-  commonActions: Array<{ id: string; name: string; version: number }>;
+  commonActions: Array<{
+    id: string;
+    name: string;
+    version: number;
+    currentPublishedVersionId: string;
+  }>;
 };
 
 export type BroadcastInsight = {
