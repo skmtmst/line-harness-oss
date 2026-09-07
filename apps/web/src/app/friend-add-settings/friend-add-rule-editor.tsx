@@ -106,7 +106,15 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
         const response = await api.friendAddRules.list(selectedAccountId, 'first_time')
         if (!response.success) { setError(response.error); return }
         setOptions({ ...response.data.options, folders: response.data.options.folders ?? [] })
-        setRule((current) => ({ ...current, priority: Math.max(1, response.data.items.filter((item) => !item.isFallback).length + 1) }))
+        /*
+         * 優先順位は競合一覧 (全件) の最大+1にする。一覧は既定20件のため、
+         * 件数+1では21件を超えると重複し same_priority 競合になる。
+         */
+        const conflictRes = await api.friendAddRules.conflicts(selectedAccountId, 'first_time')
+        const maxPriority = conflictRes.success
+          ? conflictRes.data.rules.reduce((max, item) => Math.max(max, item.priority), 0)
+          : response.data.items.filter((item) => !item.isFallback).length
+        setRule((current) => ({ ...current, priority: Math.max(1, maxPriority + 1) }))
       }
     } catch {
       setError('設定を読み込めませんでした。')
@@ -136,7 +144,9 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
 
   const validate = () => {
     if (!rule.name.trim()) return '設定名を入力してください。'
-    if (!definition.scenarioId) return '実際に配信するシナリオを決めてください。'
+    // 再追加で「何も配信しない」ときはシナリオを使わない (サーバも同じ判断)。
+    const skipsScenario = rule.friendKind === 'returning' && definition.returningMode === 'none'
+    if (!definition.scenarioId && !skipsScenario) return '実際に配信するシナリオを決めてください。'
     if (!rule.isFallback && definition.routeIds.length === 0) return '対象にする流入リンクを1つ以上選んでください。'
     return ''
   }
@@ -183,7 +193,15 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
     setError('')
     try {
       const response = await api.friendAddRules.test(selectedAccountId, activeId)
-      if (!response.success) { setError(response.error); return }
+      /*
+       * 失敗時も理由 (reasons) が返る。失敗で return だけすると理由が捨てられ、
+       * 確認面の失敗分岐に届かない。理由を入れてから知らせる。
+       */
+      if (!response.success) {
+        if ('data' in response && response.data) setTestResult(response.data)
+        setError(response.error)
+        return
+      }
       setTestResult(response.data)
       setNotice('テストが完了しました。本番の登録・送信・タグ・マイルは変更していません。')
     } catch {
@@ -233,7 +251,7 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
 
       <div className={'friend-add-editor-layout'}>
         <main className={step === 'preview' ? 'friend-add-editor-panel friend-add-editor-panelSplit' : 'friend-add-editor-panel'}>
-          {step === 'basic' && <BasicStep rule={rule} setRule={setRule} definition={definition} setDefinition={setDefinition} />}
+          {step === 'basic' && <BasicStep rule={rule} setRule={setRule} definition={definition} setDefinition={setDefinition} options={options} />}
           {step === 'routes' && <RoutesStep rule={rule} definition={definition} options={options} toggleRoute={toggleRoute} setDefinition={setDefinition} />}
           {step === 'message' && <MessageStep definition={definition} setDefinition={setDefinition} openActions={() => router.replace(hrefFor('actions'))} />}
           {step === 'actions' && <ActionsStep definition={definition} setDefinition={setDefinition} options={options} actionType={actionType} actionTarget={actionTarget} setActionType={setActionType} setActionTarget={setActionTarget} openDialog={() => router.replace(hrefFor('actions', '&dialog=add'))} />}
@@ -264,8 +282,15 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
   )
 }
 
-function BasicStep({ rule, setRule, definition, setDefinition }: { rule: EditorRule; setRule: React.Dispatch<React.SetStateAction<EditorRule>>; definition: FriendAddRuleDefinition; setDefinition: React.Dispatch<React.SetStateAction<FriendAddRuleDefinition>> }) {
-  return <Section title="基本設定" description="管理名・フォルダ・優先順位を設定します。"><div className={'friend-add-editor-twoCols'}><Field label="設定名" required><TextField value={rule.name} maxLength={60} onChange={(event) => setRule((current) => ({ ...current, name: event.target.value }))} /><small>{rule.name.length} / 60文字　友だちには表示されません</small></Field><Field label="フォルダ"><TextField value={rule.folderName ?? ''} placeholder="例: 店頭QR" onChange={(event) => setRule((current) => ({ ...current, folderName: event.target.value }))} /></Field><Field label="優先順位"><TextField type="number" min={1} value={rule.priority} onChange={(event) => setRule((current) => ({ ...current, priority: Math.max(1, Number(event.target.value) || 1) }))} /></Field><Field label="判定する人"><SelectField value={rule.friendKind} disabled={rule.isFallback} onChange={(event) => setRule((current) => ({ ...current, friendKind: event.target.value as FriendAddRuleKind }))} options={[{ value: 'first_time', label: 'はじめて友だち追加した人' }, { value: 'returning', label: '以前からの友だち・ブロック解除した人' }]} /></Field></div><Field label="社内メモ"><TextArea value={definition.friendCondition} onChange={(event) => setDefinition((current) => ({ ...current, friendCondition: event.target.value }))} placeholder="この設定を使う理由を残せます。" /></Field></Section>
+function BasicStep({ rule, setRule, definition, setDefinition, options }: { rule: EditorRule; setRule: React.Dispatch<React.SetStateAction<EditorRule>>; definition: FriendAddRuleDefinition; setDefinition: React.Dispatch<React.SetStateAction<FriendAddRuleDefinition>>; options: FriendAddRuleOptions }) {
+  /*
+   * フォルダは表にあるものから選ぶ。自由入力にすると表に無い名が増え、
+   * 整理が壊れる。新しい束は一覧の「フォルダを追加」で作る。
+   */
+  const folderOptions = options.folders.some((folder) => folder.name === (rule.folderName ?? ''))
+    ? options.folders
+    : rule.folderName ? [...options.folders, { id: rule.folderName, name: rule.folderName }] : options.folders
+  return <Section title="基本設定" description="管理名・フォルダ・優先順位を設定します。"><div className={'friend-add-editor-twoCols'}><Field label="設定名" required><TextField value={rule.name} maxLength={60} onChange={(event) => setRule((current) => ({ ...current, name: event.target.value }))} /><small>{rule.name.length} / 60文字　友だちには表示されません</small></Field><Field label="フォルダ"><SelectField value={rule.folderName ?? ''} onChange={(event) => setRule((current) => ({ ...current, folderName: event.target.value || null }))} options={[{ value: '', label: '未分類' }, ...folderOptions.map((folder) => ({ value: folder.name, label: folder.name }))]} /></Field><Field label="優先順位"><TextField type="number" min={1} value={rule.priority} onChange={(event) => setRule((current) => ({ ...current, priority: Math.max(1, Number(event.target.value) || 1) }))} /></Field><Field label="判定する人"><SelectField value={rule.friendKind} disabled={rule.isFallback} onChange={(event) => setRule((current) => ({ ...current, friendKind: event.target.value as FriendAddRuleKind }))} options={[{ value: 'first_time', label: 'はじめて友だち追加した人' }, { value: 'returning', label: '以前からの友だち・ブロック解除した人' }]} /></Field>{rule.friendKind === 'returning' && !rule.isFallback && <Field label="再追加時の配信"><SelectField value={definition.returningMode ?? ''} onChange={(event) => setDefinition((current) => ({ ...current, returningMode: (event.target.value || undefined) as FriendAddRuleDefinition['returningMode'] }))} options={[{ value: '', label: '選んでください' }, { value: 'none', label: '何も配信しない' }, { value: 'same', label: 'はじめてと同じ内容' }, { value: 'other', label: '別のシナリオ' }]} /><small>「何も配信しない」はシナリオなしで保存できます。</small></Field>}</div><Field label="社内メモ"><TextArea value={definition.friendCondition} onChange={(event) => setDefinition((current) => ({ ...current, friendCondition: event.target.value }))} placeholder="この設定を使う理由を残せます。" /></Field></Section>
 }
 
 function RoutesStep({ rule, definition, options, toggleRoute, setDefinition }: { rule: Pick<FriendAddRule, 'isFallback'>; definition: FriendAddRuleDefinition; options: FriendAddRuleOptions; toggleRoute: (id: string) => void; setDefinition: React.Dispatch<React.SetStateAction<FriendAddRuleDefinition>> }) {
