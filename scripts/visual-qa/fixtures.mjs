@@ -405,9 +405,9 @@ export const OPERATORS = [
 export const FRIEND_SCENARIOS = [
   // 名前, 説明, 配信方式, 購読中, 読了, 登録日, 終了後, 稼働
   ['新規登録7日間フォロー', '登録直後から7日間の初回案内', 'absolute_time', 428, 312, '2026-08-16', 'pause', true],
-  ['商品購入後サポート', '購入1日後から使い方を案内', 'elapsed', 316, 201, '2026-08-18', 'start_other', true],
+  ['商品購入後サポート', '購入1日後から使い方を案内', 'elapsed', 316, 201, '2026-08-18', 'move', true],
   ['予約前日・当日案内', '予約日を基準に前日と当日へ配信', 'absolute_time', 164, 98, '2026-08-20', 'pause', true],
-  ['休眠ユーザー復帰', '90日反応がない友だちへ再案内', 'relative', 0, 0, '2026-08-22', 'restart_prev', false],
+  ['休眠ユーザー復帰', '90日反応がない友だちへ再案内', 'relative', 0, 0, '2026-08-22', 'resume_previous', false],
   ['会員更新リマインド', '更新月の14日前からお知らせ', 'elapsed', 83, 51, '2026-08-23', 'pause', false],
 ].map(([name, description, deliveryMode, subscriberCount, completedCount, day, onCompleteMode, isActive], index) => ({
   id: `scenario-${index}`,
@@ -3144,7 +3144,9 @@ export const BROADCAST_SAVED_VIEWS = [
   {
     id: 'broadcast-view-reserved',
     name: '予約中のみ',
-    filters: { statuses: ['scheduled'] },
+    // 保存側（page.tsx saveCurrentView）と同じ形にする。旧形の
+    // `statuses` では適用処理が読み替えられず復元不良になる（点検 #490 中5）。
+    filters: { titleQuery: '', statusFilter: 'scheduled', dateFrom: '', dateTo: '', folderFilter: '' },
     sortKey: 'scheduled',
     pageSize: 20,
     createdBy: 'staff-owner',
@@ -3178,9 +3180,11 @@ export const BROADCAST_PREFLIGHT = {
     sendable: 1213,
     evaluatedAt: '2026-08-24T00:55:00.000Z',
     representatives: [
-      { friendId: 'friend-1', displayName: 'Kenta Kawano', note: '予約・未対応' },
-      { friendId: 'friend-2', displayName: 'Masato S.', note: '予約・対応中' },
-      { friendId: 'friend-3', displayName: '菅野 亮', note: '予約・未対応' },
+      // 画面（broadcast-form 対象プレビュー）と口（BroadcastPreflight）の
+      // 実形に合わせる。`note` だけでは画像と要約が空表示になる（点検 #490 中6）。
+      { friendId: 'friend-1', displayName: 'Kenta Kawano', pictureUrl: null, summary: '予約・未対応' },
+      { friendId: 'friend-2', displayName: 'Masato S.', pictureUrl: null, summary: '予約・対応中' },
+      { friendId: 'friend-3', displayName: '菅野 亮', pictureUrl: null, summary: '予約・未対応' },
     ],
   },
   exclusions: {
