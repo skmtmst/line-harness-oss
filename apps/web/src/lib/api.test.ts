@@ -23,6 +23,37 @@ beforeAll(async () => {
   } = await import('./api'))
 })
 
+describe('api.conversions の V6一覧・レポート契約', () => {
+  it('期間と選択中アカウントを新しい一覧・レポート・CSVへ渡す', async () => {
+    const fetchSpy = vi.fn(async (url: string | URL | Request) => {
+      const path = String(url)
+      if (path.includes('/export?')) {
+        return new Response('期間開始,成果地点名\r\n', {
+          status: 200,
+          headers: { 'content-type': 'text/csv' },
+        })
+      }
+      return new Response(JSON.stringify({ success: true, data: {} }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    })
+    vi.stubGlobal('fetch', fetchSpy)
+
+    const range = { from: '2026-08-09', to: '2026-09-07', lineAccountId: 'account/a' }
+    await api.conversions.definitions({ ...range, limit: 100 })
+    await api.conversions.definitionReport(range)
+    const csv = await api.conversions.exportDefinitions(range)
+
+    expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
+      'https://worker.example.com/api/conversions/definitions?from=2026-08-09&to=2026-09-07&lineAccountId=account%2Fa&limit=100',
+      'https://worker.example.com/api/conversions/report?from=2026-08-09&to=2026-09-07&lineAccountId=account%2Fa',
+      'https://worker.example.com/api/conversions/export?from=2026-08-09&to=2026-09-07&lineAccountId=account%2Fa',
+    ])
+    expect(await csv.text()).toContain('成果地点名')
+  })
+})
+
 describe('api.autoReplies の V6 集計・下書き契約', () => {
   it('選択中のLINEアカウントを競合集計へ渡す', async () => {
     const fetchSpy = vi.fn(async () => new Response(

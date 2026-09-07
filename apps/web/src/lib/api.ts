@@ -629,6 +629,100 @@ export type ConversionApprovalItem = {
   duplicateFlag: boolean
 }
 
+export type ConversionDefinitionStatus = 'active' | 'stopped'
+
+export type ConversionDefinitionListItem = {
+  id: string
+  name: string
+  sourceType: string
+  value: number | null
+  measureMethod: ConversionMeasureMethod
+  targetUrl: string | null
+  countRepeat: boolean
+  attributionDays: number | null
+  lineAccountId: string | null
+  status: ConversionDefinitionStatus
+  version: number
+  usageCount: number
+  metrics: {
+    recordedCount: number
+    netCount: number
+    reversedCount: number | null
+    netValue: number
+    reversalState: 'unavailable'
+    reversalReason: string
+  }
+  stoppedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type ConversionDefinitionList = {
+  items: ConversionDefinitionListItem[]
+  stateCounts: {
+    active: number
+    draft: number
+    stopped: number
+    invalid: number
+    sourceStopped: number
+  }
+  range: { from: string; to: string; timeZone: 'Asia/Tokyo' }
+  pagination: { total: number; limit: number; cursor: string; nextCursor: string | null }
+}
+
+export type ConversionDefinitionReport = {
+  range: { from: string; to: string; timeZone: 'Asia/Tokyo' }
+  previousRange: { from: string; to: string; timeZone: 'Asia/Tokyo' }
+  kpis: {
+    recordedCount: number
+    reversedCount: number | null
+    netCount: number
+    netValue: number
+    averageNetValue: number | null
+    previousNetCount: number
+    previousNetValue: number
+    countChangeRate: number | null
+    reversalState: 'unavailable'
+    reversalReason: string
+    fastestGrowing: {
+      conversionPointId: string
+      conversionPointName: string
+      sourceType: string
+      netCount: number
+      netValue: number
+      previousNetCount: number
+      previousNetValue: number
+      countChange: number
+    } | null
+  }
+  daily: Array<{
+    day: string
+    conversionPointId: string
+    conversionPointName: string
+    netCount: number
+    netValue: number
+  }>
+  byDefinition: Array<{
+    conversionPointId: string
+    conversionPointName: string
+    sourceType: string
+    netCount: number
+    netValue: number
+    previousNetCount: number
+    previousNetValue: number
+    countChange: number
+  }>
+  byRoute: Array<{
+    routeKey: string
+    label: string
+    attributionState: 'attributed' | 'unattributed'
+    netCount: number
+    netValue: number
+    audience: number | null
+    conversionRate: number | null
+  }>
+}
+
 /** 支払台帳を作る前に安全に表示できる、承認済み報酬の読み取り専用集計。 */
 export type AffiliatePaymentSummary = {
   affiliateId: string
@@ -1385,6 +1479,26 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
   }
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
+}
+
+async function fetchApiBlob(path: string): Promise<Blob> {
+  const res = await fetch(`${API_URL}${path}`, {
+    credentials: 'include',
+    headers: adminSessionHeaders(),
+  })
+  if (res.status === 401 && typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(SESSION_LOST_EVENT))
+  }
+  if (res.status >= 500) reportServerFailure(path, res.status)
+  if (!res.ok) {
+    const raw = await res.text()
+    throw new ApiError(
+      res.status,
+      extractApiErrorMessage(raw, res.status),
+      extractApiErrorCode(raw),
+    )
+  }
+  return res.blob()
 }
 
 export type FriendListParams = {
@@ -5121,6 +5235,44 @@ export const api = {
       ),
   },
   conversions: {
+    definitions: (params: {
+      from: string
+      to: string
+      lineAccountId?: string
+      q?: string
+      status?: ConversionDefinitionStatus
+      sourceType?: string
+      sort?: 'count_desc' | 'value_desc' | 'updated_desc' | 'name_asc'
+      cursor?: string
+      limit?: number
+    }) => {
+      const query = Object.fromEntries(
+        Object.entries(params)
+          .filter(([, value]) => value !== undefined && value !== '')
+          .map(([key, value]) => [key, String(value)]),
+      )
+      return fetchApi<ApiResponse<ConversionDefinitionList>>(
+        `/api/conversions/definitions?${new URLSearchParams(query)}`,
+      )
+    },
+    definitionReport: (params: { from: string; to: string; lineAccountId?: string }) => {
+      const query = Object.fromEntries(
+        Object.entries(params)
+          .filter(([, value]) => value !== undefined && value !== '')
+          .map(([key, value]) => [key, String(value)]),
+      )
+      return fetchApi<ApiResponse<ConversionDefinitionReport>>(
+        `/api/conversions/report?${new URLSearchParams(query)}`,
+      )
+    },
+    exportDefinitions: (params: { from: string; to: string; lineAccountId?: string }) => {
+      const query = Object.fromEntries(
+        Object.entries(params)
+          .filter(([, value]) => value !== undefined && value !== '')
+          .map(([key, value]) => [key, String(value)]),
+      )
+      return fetchApiBlob(`/api/conversions/export?${new URLSearchParams(query)}`)
+    },
     points: () =>
       fetchApi<ApiResponse<ConversionPoint[]>>('/api/conversions/points'),
     createPoint: (data: {
