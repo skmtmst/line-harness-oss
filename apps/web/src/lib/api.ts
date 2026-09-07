@@ -5127,6 +5127,10 @@ export const api = {
       loginChannelId?: string | null;
       loginChannelSecret?: string | null;
       liffId?: string | null;
+      timezone?: string;
+      country?: string | null;
+      role?: string | null;
+      parentLineAccountId?: string | null;
       ogSiteName?: string | null;
       ogDefaultImageUrl?: string | null;
       ogDefaultDescription?: string | null;

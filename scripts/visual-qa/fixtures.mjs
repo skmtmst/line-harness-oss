@@ -4408,6 +4408,16 @@ export const LINE_ACCOUNTS = [
   }),
 ]
 
+/** 登録前の接続確認。設計 `b2NGxk` と同じく3段目で止める。保存は行わない。 */
+export const LINE_ACCOUNT_VERIFY_CONNECTION = {
+  messagingApi: true,
+  webhook: false,
+  lineLogin: true,
+  liff: true,
+  webhookUrl: 'https://old-tool.example/webhook',
+  errors: ['Webhook URLの一致・利用設定・接続テストを確認してください'],
+}
+
 /** アカウント詳細。資格情報の末尾だけを持ち、秘密値そのものは置かない。 */
 export const LINE_ACCOUNT_DETAIL = {
   ...LINE_ACCOUNTS[0],

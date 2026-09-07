@@ -17,6 +17,16 @@ import {
   getLineAccounts,
   resolveLineCredential,
   searchBookingCustomers,
+  createBookingAvailabilityException,
+  getBookingAdminSettings,
+  getBookingAvailabilityException,
+  listBookingAvailabilityExceptions,
+  updateBookingAvailabilityException,
+  updateBookingMenuSettings,
+  type BookingExceptionKind,
+  type BookingExceptionScope,
+  type BookingInterval,
+  type BookingPriceMode,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -268,7 +278,7 @@ booking.get('/api/liff/booking/menus', async (c) => {
     .prepare(
       `SELECT id, name, category_label, description,
               duration_minutes, buffer_after_minutes,
-              base_price, sort_order,
+              base_price, price_mode, sort_order,
               cancel_deadline_hours_before, intake_question
          FROM menus
         WHERE line_account_id = ? AND is_active = 1 AND deleted_at IS NULL
@@ -288,6 +298,7 @@ booking.get('/api/liff/booking/menus/:id/staff', async (c) => {
       `SELECT s.id, s.display_name, s.role, s.profile_image_url, s.bio,
               s.is_designation_optional,
               COALESCE(sm.override_price, m.base_price) AS price,
+              m.price_mode,
               COALESCE(sm.override_duration_minutes, m.duration_minutes) AS duration_minutes
          FROM staff s
          INNER JOIN staff_menus sm ON sm.staff_id = s.id AND sm.menu_id = ?2 AND sm.is_offered = 1
@@ -686,6 +697,197 @@ booking.post(
 
 // ---- Menus CRUD ----
 
+const BOOKING_EXCEPTION_KINDS = new Set<BookingExceptionKind>(['closed', 'custom_hours', 'open']);
+const BOOKING_EXCEPTION_SCOPES = new Set<BookingExceptionScope>(['store', 'staff', 'resource']);
+const BOOKING_PRICE_MODES = new Set<BookingPriceMode>(['fixed', 'free', 'inquiry']);
+
+function isCalendarDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function readBookingIntervals(raw: unknown): { ok: true; value: BookingInterval[] } | { ok: false } {
+  if (!Array.isArray(raw) || raw.length > 8) return { ok: false };
+  const intervals: BookingInterval[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') return { ok: false };
+    const value = item as Record<string, unknown>;
+    const start = typeof value.start === 'string' ? value.start : '';
+    const end = typeof value.end === 'string' ? value.end : '';
+    if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(start)
+      || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(end) || start >= end) {
+      return { ok: false };
+    }
+    intervals.push({ start, end });
+  }
+  intervals.sort((a, b) => a.start.localeCompare(b.start));
+  for (let index = 1; index < intervals.length; index++) {
+    if (intervals[index - 1].end > intervals[index].start) return { ok: false };
+  }
+  return { ok: true, value: intervals };
+}
+
+function readBookingException(input: Record<string, unknown>):
+  | {
+    ok: true;
+    value: {
+      scopeKind: BookingExceptionScope;
+      scopeId: string | null;
+      dateFrom: string;
+      dateTo: string;
+      kind: BookingExceptionKind;
+      intervals: BookingInterval[];
+      reason: string | null;
+    };
+  }
+  | { ok: false; error: string } {
+  const scopeKind = String(input.scopeKind ?? '');
+  const kind = String(input.kind ?? '');
+  const dateFrom = typeof input.dateFrom === 'string' ? input.dateFrom : '';
+  const dateTo = typeof input.dateTo === 'string' ? input.dateTo : '';
+  const rawScopeId = typeof input.scopeId === 'string' ? input.scopeId.trim() : '';
+  const reason = input.reason == null ? null : typeof input.reason === 'string' ? input.reason.trim() : '';
+  if (!BOOKING_EXCEPTION_SCOPES.has(scopeKind as BookingExceptionScope)) {
+    return { ok: false, error: 'scopeKindが正しくありません' };
+  }
+  if ((scopeKind === 'store' && rawScopeId) || (scopeKind !== 'store' && !rawScopeId)) {
+    return { ok: false, error: '対象とscopeIdの組み合わせが正しくありません' };
+  }
+  if (!isCalendarDate(dateFrom) || !isCalendarDate(dateTo) || dateFrom > dateTo) {
+    return { ok: false, error: '例外日の期間が正しくありません' };
+  }
+  if (!BOOKING_EXCEPTION_KINDS.has(kind as BookingExceptionKind)) {
+    return { ok: false, error: '例外日の種類が正しくありません' };
+  }
+  if (reason !== null && (!reason || reason.length > 200)) {
+    return { ok: false, error: '理由は200文字以内で指定してください' };
+  }
+  const intervals = readBookingIntervals(input.intervals);
+  if (!intervals.ok || (kind === 'closed' && intervals.value.length > 0)
+    || (kind !== 'closed' && intervals.value.length === 0)) {
+    return { ok: false, error: '営業時間は重ならない正しい時刻で指定してください' };
+  }
+  return {
+    ok: true,
+    value: {
+      scopeKind: scopeKind as BookingExceptionScope,
+      scopeId: scopeKind === 'store' ? null : rawScopeId,
+      dateFrom,
+      dateTo,
+      kind: kind as BookingExceptionKind,
+      intervals: intervals.value,
+      reason,
+    },
+  };
+}
+
+function readPriceModeAndAmount(input: { price_mode?: unknown; base_price?: unknown }):
+  | { ok: true; priceMode: BookingPriceMode; basePrice: number }
+  | { ok: false; error: string } {
+  const priceMode = String(input.price_mode ?? 'fixed') as BookingPriceMode;
+  if (!BOOKING_PRICE_MODES.has(priceMode)) {
+    return { ok: false, error: 'price_mode must be fixed, free, or inquiry' };
+  }
+  if (priceMode !== 'fixed') return { ok: true, priceMode, basePrice: 0 };
+  const basePrice = Number(input.base_price);
+  if (!Number.isInteger(basePrice) || basePrice < 0 || basePrice > 100_000_000) {
+    return { ok: false, error: 'base_price must be an integer between 0 and 100000000' };
+  }
+  return { ok: true, priceMode, basePrice };
+}
+
+booking.get('/api/booking/admin/settings', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ success: false, error: 'missing_account_id' }, 400);
+  try {
+    const settings = await getBookingAdminSettings(c.env.DB, accountId);
+    if (!settings) return c.json({ success: false, error: 'not_found' }, 404);
+    return c.json({ success: true, data: settings });
+  } catch {
+    console.error(JSON.stringify({ event: 'booking_settings_read_failed' }));
+    return c.json({ success: false, error: 'booking_settings_unavailable' }, 503);
+  }
+});
+
+booking.get('/api/booking/admin/exceptions', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ success: false, error: 'missing_account_id' }, 400);
+  try {
+    const items = await listBookingAvailabilityExceptions(c.env.DB, accountId);
+    return c.json({ success: true, data: { items } });
+  } catch {
+    console.error(JSON.stringify({ event: 'booking_exceptions_read_failed' }));
+    return c.json({ success: false, error: 'booking_exceptions_unavailable' }, 503);
+  }
+});
+
+booking.post('/api/booking/admin/exceptions', requireRole('owner', 'admin'), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ success: false, error: 'missing_account_id' }, 400);
+  try {
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    if (!body) return c.json({ success: false, error: 'invalid_json' }, 400);
+    const parsed = readBookingException(body);
+    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+    const item = await createBookingAvailabilityException(c.env.DB, {
+      lineAccountId: accountId,
+      ...parsed.value,
+    });
+    if (!item) return c.json({ success: false, error: 'scope_not_found' }, 422);
+    return c.json({ success: true, data: item }, 201);
+  } catch {
+    console.error(JSON.stringify({ event: 'booking_exception_create_failed' }));
+    return c.json({ success: false, error: 'booking_exception_save_failed' }, 503);
+  }
+});
+
+booking.patch('/api/booking/admin/exceptions/:id', requireRole('owner', 'admin'), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ success: false, error: 'missing_account_id' }, 400);
+  try {
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    const expectedVersion = Number(body?.expectedVersion);
+    if (!body || !Number.isInteger(expectedVersion) || expectedVersion < 1) {
+      return c.json({ success: false, error: 'expectedVersionは1以上の整数で指定してください' }, 400);
+    }
+    const current = await getBookingAvailabilityException(c.env.DB, c.req.param('id'), accountId);
+    if (!current) return c.json({ success: false, error: 'not_found' }, 404);
+    const parsed = readBookingException({
+      scopeKind: body.scopeKind ?? current.scopeKind,
+      scopeId: Object.prototype.hasOwnProperty.call(body, 'scopeId') ? body.scopeId : current.scopeId,
+      dateFrom: body.dateFrom ?? current.dateFrom,
+      dateTo: body.dateTo ?? current.dateTo,
+      kind: body.kind ?? current.kind,
+      intervals: body.intervals ?? current.intervals,
+      reason: Object.prototype.hasOwnProperty.call(body, 'reason') ? body.reason : current.reason,
+    });
+    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+    const result = await updateBookingAvailabilityException(c.env.DB, {
+      id: current.id,
+      lineAccountId: accountId,
+      expectedVersion,
+      ...parsed.value,
+    });
+    if (result.status === 'not_found') return c.json({ success: false, error: 'not_found' }, 404);
+    if (result.status === 'scope_not_found') {
+      return c.json({ success: false, error: 'scope_not_found' }, 422);
+    }
+    if (result.status === 'conflict') {
+      return c.json({
+        success: false,
+        code: 'version_conflict',
+        error: '例外日が更新されています。読み直してください',
+        data: { currentVersion: result.currentVersion },
+      }, 409);
+    }
+    return c.json({ success: true, data: result.item });
+  } catch {
+    console.error(JSON.stringify({ event: 'booking_exception_update_failed' }));
+    return c.json({ success: false, error: 'booking_exception_save_failed' }, 503);
+  }
+});
+
 /** 受付条件として画面から送られてくる項目。 */
 interface MenuBookingRuleBody {
   concurrent_capacity?: unknown;
@@ -758,20 +960,64 @@ function readMenuBookingRules(
 booking.get('/api/booking/admin/menus', async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
-  const rows = await c.env.DB
-    .prepare(
-      `SELECT id, name, category_label, description,
-              duration_minutes, buffer_after_minutes,
-              base_price, sort_order, is_active, auto_tag_id,
-              concurrent_capacity, booking_window_days, cutoff_hours_before,
-              cancel_deadline_hours_before, intake_question
-         FROM menus
-        WHERE line_account_id = ? AND deleted_at IS NULL
-        ORDER BY sort_order ASC, id ASC`,
-    )
-    .bind(accountId)
-    .all();
-  return c.json({ menus: rows.results });
+  try {
+    const rows = await c.env.DB
+      .prepare(
+        `SELECT m.id, m.name, m.category_label, m.description,
+                m.duration_minutes, m.buffer_after_minutes,
+                m.base_price, m.price_mode, m.version,
+                m.sort_order, m.is_active, m.auto_tag_id,
+                m.concurrent_capacity, m.booking_window_days, m.cutoff_hours_before,
+                m.cancel_deadline_hours_before, m.intake_question,
+                COALESCE(bs.booking_window_days, 60) AS store_booking_window_days,
+                COALESCE(bs.cutoff_minutes_before, 1440) AS store_cutoff_minutes_before,
+                COALESCE(bs.cancel_deadline_minutes_before, 1440) AS store_cancel_deadline_minutes_before
+           FROM menus m
+      LEFT JOIN booking_settings bs ON bs.line_account_id = m.line_account_id
+          WHERE m.line_account_id = ? AND m.deleted_at IS NULL
+          ORDER BY m.sort_order ASC, m.id ASC`,
+      )
+      .bind(accountId)
+      .all<Record<string, unknown>>();
+    return c.json({
+      menus: (rows.results ?? []).map((row) => ({
+        id: row.id,
+        name: row.name,
+        category_label: row.category_label,
+        description: row.description,
+        duration_minutes: row.duration_minutes,
+        buffer_after_minutes: row.buffer_after_minutes,
+        base_price: row.base_price,
+        price_mode: row.price_mode,
+        version: row.version,
+        sort_order: row.sort_order,
+        is_active: row.is_active,
+        auto_tag_id: row.auto_tag_id,
+        concurrent_capacity: row.concurrent_capacity,
+        booking_window_days: row.booking_window_days,
+        cutoff_hours_before: row.cutoff_hours_before,
+        cancel_deadline_hours_before: row.cancel_deadline_hours_before,
+        intake_question: row.intake_question,
+        effectiveBookingRules: {
+          bookingWindowDays: row.booking_window_days ?? row.store_booking_window_days,
+          cutoffMinutesBefore: row.cutoff_hours_before == null
+            ? row.store_cutoff_minutes_before
+            : Number(row.cutoff_hours_before) * 60,
+          cancelDeadlineMinutesBefore: row.cancel_deadline_hours_before == null
+            ? row.store_cancel_deadline_minutes_before
+            : Number(row.cancel_deadline_hours_before) * 60,
+          source: {
+            bookingWindowDays: row.booking_window_days == null ? 'store' : 'menu',
+            cutoffMinutesBefore: row.cutoff_hours_before == null ? 'store' : 'menu',
+            cancelDeadlineMinutesBefore: row.cancel_deadline_hours_before == null ? 'store' : 'menu',
+          },
+        },
+      })),
+    });
+  } catch {
+    console.error(JSON.stringify({ event: 'booking_menu_list_failed' }));
+    return c.json({ error: 'booking_menu_data_unavailable' }, 503);
+  }
 });
 
 booking.post('/api/booking/admin/menus', requireRole('owner', 'admin'), async (c) => {
@@ -783,12 +1029,18 @@ booking.post('/api/booking/admin/menus', requireRole('owner', 'admin'), async (c
     description?: string | null;
     duration_minutes: number;
     buffer_after_minutes?: number;
-    base_price: number;
+    base_price?: number;
+    price_mode?: BookingPriceMode;
     sort_order?: number;
     auto_tag_id?: string | null;
   } & MenuBookingRuleBody>();
   const rules = readMenuBookingRules(b);
   if (!rules.ok) return c.json({ error: rules.error }, 400);
+  const hasPriceMode = Object.prototype.hasOwnProperty.call(b, 'price_mode');
+  const price = readPriceModeAndAmount(hasPriceMode ? b : {
+    price_mode: 'fixed', base_price: b.base_price,
+  });
+  if (!price.ok) return c.json({ error: price.error }, 400);
   const autoTagId = (b.auto_tag_id ?? '').trim() === '' ? null : (b.auto_tag_id as string);
   if (autoTagId) {
     const tagExists = await c.env.DB
@@ -805,10 +1057,10 @@ booking.post('/api/booking/admin/menus', requireRole('owner', 'admin'), async (c
       // （従来と同じ動き）が入る。
       `INSERT INTO menus
         (id, line_account_id, name, category_label, description,
-         duration_minutes, buffer_after_minutes, base_price, sort_order, auto_tag_id${
+         duration_minutes, buffer_after_minutes, base_price, price_mode, sort_order, auto_tag_id${
            ruleColumns.map((col) => `, ${col}`).join('')
          })
-       VALUES (?,?,?,?,?,?,?,?,?,?${ruleColumns.map(() => ',?').join('')})`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?${ruleColumns.map(() => ',?').join('')})`,
     )
     .bind(
       id,
@@ -818,13 +1070,14 @@ booking.post('/api/booking/admin/menus', requireRole('owner', 'admin'), async (c
       b.description ?? null,
       b.duration_minutes,
       b.buffer_after_minutes ?? 0,
-      b.base_price,
+      price.basePrice,
+      price.priceMode,
       b.sort_order ?? 0,
       autoTagId,
       ...ruleColumns.map((col) => rules.value[col]),
     )
     .run();
-  return c.json({ id }, 201);
+  return c.json({ id, version: 1 }, 201);
 });
 
 booking.put('/api/booking/admin/menus/:id', requireRole('owner', 'admin'), async (c) => {
@@ -838,6 +1091,7 @@ booking.put('/api/booking/admin/menus/:id', requireRole('owner', 'admin'), async
     duration_minutes: number;
     buffer_after_minutes?: number;
     base_price: number;
+    price_mode?: BookingPriceMode;
     sort_order?: number;
     is_active?: boolean;
     auto_tag_id?: string | null;
@@ -845,6 +1099,11 @@ booking.put('/api/booking/admin/menus/:id', requireRole('owner', 'admin'), async
 
   const rules = readMenuBookingRules(b);
   if (!rules.ok) return c.json({ error: rules.error }, 400);
+  const hasPriceMode = Object.prototype.hasOwnProperty.call(b, 'price_mode');
+  const price = readPriceModeAndAmount(hasPriceMode ? b : {
+    price_mode: 'fixed', base_price: b.base_price,
+  });
+  if (!price.ok) return c.json({ error: price.error }, 400);
 
   // 古いクライアントは新しい項目を送らない。`undefined` を null として
   // 書き込むと既存設定を消してしまうので、明示的に送られたものだけ更新する。
@@ -878,10 +1137,14 @@ booking.put('/api/booking/admin/menus/:id', requireRole('owner', 'admin'), async
     b.description ?? null,
     b.duration_minutes,
     b.buffer_after_minutes ?? 0,
-    b.base_price,
+    price.basePrice,
     b.sort_order ?? 0,
     b.is_active === false ? 0 : 1,
   ];
+  if (hasPriceMode) {
+    sets.push('price_mode = ?');
+    values.push(price.priceMode);
+  }
   if (hasAutoTagId) {
     sets.push('auto_tag_id = ?');
     values.push(autoTagId);
@@ -901,6 +1164,65 @@ booking.put('/api/booking/admin/menus/:id', requireRole('owner', 'admin'), async
     .bind(...values, id, accountId)
     .run();
   return c.json({ ok: true });
+});
+
+booking.patch('/api/booking/admin/menus/:id', requireRole('owner', 'admin'), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ success: false, error: 'missing_account_id' }, 400);
+  try {
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    const expectedVersion = Number(body?.expectedVersion);
+    if (!body || !Number.isInteger(expectedVersion) || expectedVersion < 1) {
+      return c.json({ success: false, error: 'expectedVersionは1以上の整数で指定してください' }, 400);
+    }
+    const hasPriceMode = Object.prototype.hasOwnProperty.call(body, 'price_mode');
+    const hasBasePrice = Object.prototype.hasOwnProperty.call(body, 'base_price');
+    let priceMode: BookingPriceMode | undefined;
+    let basePrice: number | undefined;
+    if (hasPriceMode) {
+      const rawMode = String(body.price_mode) as BookingPriceMode;
+      if (!BOOKING_PRICE_MODES.has(rawMode)) {
+        return c.json({ success: false, error: 'price_mode must be fixed, free, or inquiry' }, 400);
+      }
+      priceMode = rawMode;
+      if (rawMode !== 'fixed') basePrice = 0;
+    }
+    if (hasBasePrice && priceMode !== 'free' && priceMode !== 'inquiry') {
+      const amount = Number(body.base_price);
+      if (!Number.isInteger(amount) || amount < 0 || amount > 100_000_000) {
+        return c.json({ success: false, error: 'base_price must be an integer between 0 and 100000000' }, 400);
+      }
+      basePrice = amount;
+    }
+    const rules = readMenuBookingRules(body);
+    if (!rules.ok) return c.json({ success: false, error: rules.error }, 400);
+    const result = await updateBookingMenuSettings(c.env.DB, {
+      id: c.req.param('id'),
+      lineAccountId: accountId,
+      expectedVersion,
+      priceMode,
+      basePrice,
+      bookingWindowDays: rules.value.booking_window_days as number | null | undefined,
+      cutoffHoursBefore: rules.value.cutoff_hours_before as number | null | undefined,
+      cancelDeadlineHoursBefore: rules.value.cancel_deadline_hours_before as number | null | undefined,
+    });
+    if (result.status === 'no_changes') {
+      return c.json({ success: false, error: '更新する項目を指定してください' }, 400);
+    }
+    if (result.status === 'not_found') return c.json({ success: false, error: 'not_found' }, 404);
+    if (result.status === 'conflict') {
+      return c.json({
+        success: false,
+        code: 'version_conflict',
+        error: '予約メニューが更新されています。読み直してください',
+        data: { currentVersion: result.currentVersion },
+      }, 409);
+    }
+    return c.json({ success: true, data: { id: c.req.param('id'), version: result.version } });
+  } catch {
+    console.error(JSON.stringify({ event: 'booking_menu_settings_update_failed' }));
+    return c.json({ success: false, error: 'booking_menu_save_failed' }, 503);
+  }
 });
 
 booking.delete('/api/booking/admin/menus/:id', requireRole('owner', 'admin'), async (c) => {
@@ -931,6 +1253,7 @@ booking.get('/api/booking/admin/menus/:id/staff', async (c) => {
       `SELECT s.id, s.display_name, s.role, s.profile_image_url, s.bio,
               s.is_designation_optional,
               COALESCE(sm.override_price, m.base_price) AS price,
+              m.price_mode,
               COALESCE(sm.override_duration_minutes, m.duration_minutes) AS duration_minutes
          FROM staff s
          INNER JOIN staff_menus sm ON sm.staff_id = s.id AND sm.menu_id = ?2 AND sm.is_offered = 1
