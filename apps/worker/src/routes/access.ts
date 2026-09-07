@@ -166,6 +166,7 @@ access.get(
       const audit = await listAuditEvents(c.env.DB, {
         tenantId: c.get('staff').tenantId ?? DEFAULT_TENANT_ID,
         allowedLineAccountIds: accessScope.scope.allowedAccountIds,
+        includeTenantWide: !accessScope.scope.isAccountScoped,
         lineAccountId: accessScope.lineAccountId,
         category,
         result,

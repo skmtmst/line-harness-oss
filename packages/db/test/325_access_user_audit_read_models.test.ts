@@ -109,13 +109,17 @@ describe('common audit read model', () => {
       id: 'event-a', tenantId: TENANT, lineAccountId: 'account-a', category: 'business',
       actorPrincipalId: 'owner-a', actorRole: 'administrator', action: 'broadcast.send',
       targetKind: 'broadcast', targetId: 'broadcast-1', result: 'success',
-      before: { status: 'draft', email: 'customer@example.com', nested: { token: 'secret', count: 1 } },
-      after: { status: 'sent', customerPhone: '09000000000' },
+      before: { status: 'draft', email: 'customer@example.com', note: 'contact customer@example.com', nested: { token: 'secret', count: 1 } },
+      after: { status: 'sent', customerPhone: '09000000000', note: 'call 090-0000-0000' },
       ipPrefix: '203.0.113.***', createdAt: '2026-09-06T00:00:00.000Z',
     });
     await recordAuditEvent(db, {
       id: 'event-b', tenantId: TENANT, lineAccountId: 'account-b', category: 'business',
       action: 'broadcast.send', result: 'success', createdAt: '2026-09-06T01:00:00.000Z',
+    });
+    await recordAuditEvent(db, {
+      id: 'event-unscoped', tenantId: TENANT, category: 'business',
+      action: 'settings.update', result: 'success', createdAt: '2026-09-06T02:00:00.000Z',
     });
 
     const result = await listAuditEvents(db, {
@@ -123,7 +127,9 @@ describe('common audit read model', () => {
     });
     expect(result.items).toHaveLength(1);
     expect(result.items[0]).toMatchObject({
-      id: 'event-a', before: { status: 'draft', nested: { count: 1 } }, after: { status: 'sent' },
+      id: 'event-a',
+      before: { status: 'draft', note: 'contact [masked-email]', nested: { count: 1 } },
+      after: { status: 'sent', note: 'call [masked-phone]' },
       ipPrefix: '203.0.113.***',
     });
     expect(JSON.stringify(result.items[0])).not.toContain('customer@example.com');

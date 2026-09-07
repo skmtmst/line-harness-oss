@@ -261,10 +261,17 @@ export type RecordAuditEventInput = {
 
 const SENSITIVE_KEY = /(secret|token|password|payload|body|message|content|email|phone|address|customer|friend.?name|raw)/i;
 
+function redactAuditText(value: string): string {
+  return value
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[masked-email]')
+    .replace(/(?:\+?81[- ]?|0)\d{1,4}[- ]?\d{1,4}[- ]?\d{3,4}/g, '[masked-phone]')
+    .replace(/\b(?:Bearer\s+)?[A-Za-z0-9_-]{32,}\b/g, '[masked-value]');
+}
+
 function safeAuditValue(value: unknown, depth = 0): unknown {
   if (depth > 4) return '[省略]';
   if (value === null || typeof value === 'boolean' || typeof value === 'number') return value;
-  if (typeof value === 'string') return value.slice(0, 200);
+  if (typeof value === 'string') return redactAuditText(value).slice(0, 200);
   if (Array.isArray(value)) return value.slice(0, 50).map((item) => safeAuditValue(item, depth + 1));
   if (typeof value !== 'object') return null;
   const result: Record<string, unknown> = {};
@@ -307,7 +314,7 @@ export async function recordAuditEvent(db: D1Database, input: RecordAuditEventIn
     input.result ?? 'success',
     safeAuditJson(input.before),
     safeAuditJson(input.after),
-    safeText(input.reason, 300),
+    input.reason ? redactAuditText(input.reason).slice(0, 300) : null,
     safeText(input.requestTraceId, 160),
     safeText(input.ipPrefix, 80),
     safeText(input.deviceFamily, 80),
@@ -359,6 +366,7 @@ type AuditEventRow = {
 export type ListAuditEventsInput = {
   tenantId?: string | null;
   allowedLineAccountIds: string[];
+  includeTenantWide?: boolean;
   lineAccountId?: string;
   category?: AuditCategory;
   result?: AuditResult;
@@ -390,11 +398,23 @@ function auditScopeSql(input: ListAuditEventsInput): { conditions: string[]; val
   if (input.lineAccountId) {
     conditions.push('ae.line_account_id = ?');
     values.push(input.lineAccountId);
-  } else if (input.allowedLineAccountIds.length > 0) {
+  } else if (input.includeTenantWide && input.allowedLineAccountIds.length > 0) {
     conditions.push(`(ae.line_account_id IS NULL OR ae.line_account_id IN (${input.allowedLineAccountIds.map(() => '?').join(', ')}))`);
     values.push(...input.allowedLineAccountIds);
-  } else {
+  } else if (input.includeTenantWide) {
     conditions.push('ae.line_account_id IS NULL');
+  } else if (input.allowedLineAccountIds.length > 0) {
+    const placeholders = input.allowedLineAccountIds.map(() => '?').join(', ');
+    conditions.push(`(ae.line_account_id IN (${placeholders}) OR (
+      ae.line_account_id IS NULL AND ae.actor_principal_id IS NOT NULL AND EXISTS (
+        SELECT 1 FROM staff_account_scopes audit_scope
+         WHERE audit_scope.staff_id = ae.actor_principal_id
+           AND audit_scope.line_account_id IN (${placeholders})
+      )
+    ))`);
+    values.push(...input.allowedLineAccountIds, ...input.allowedLineAccountIds);
+  } else {
+    conditions.push('1 = 0');
   }
   return { conditions, values };
 }

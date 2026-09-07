@@ -142,7 +142,8 @@ describe('audit event route', () => {
     const response = await request('/api/audit/events?lineAccountId=account-a&category=business&result=failed&query=配信');
     expect(response.status).toBe(200);
     expect(mocks.listAuditEvents).toHaveBeenCalledWith(env.DB, expect.objectContaining({
-      tenantId: 'tenant-a', lineAccountId: 'account-a', category: 'business', result: 'failed', query: '配信',
+      tenantId: 'tenant-a', includeTenantWide: true, lineAccountId: 'account-a',
+      category: 'business', result: 'failed', query: '配信',
     }));
   });
 

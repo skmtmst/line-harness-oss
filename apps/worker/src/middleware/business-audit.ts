@@ -1,4 +1,4 @@
-import type { MiddlewareHandler } from 'hono';
+import type { Context, MiddlewareHandler } from 'hono';
 import { auditDeviceFamily, maskAuditIp, recordAuditEvent } from '@line-crm/db';
 import type { Env } from '../index.js';
 
@@ -14,20 +14,36 @@ function resultForStatus(status: number): 'success' | 'denied' | 'failed' {
   return status >= 400 ? 'failed' : 'success';
 }
 
+async function requestLineAccountId(c: Context<Env>): Promise<string | null> {
+  const queryValue = c.req.query('lineAccountId') ?? c.req.query('account_id');
+  if (queryValue?.trim()) return queryValue.trim().slice(0, 160);
+  if (!c.req.header('content-type')?.toLowerCase().includes('application/json')) return null;
+  try {
+    const body = await c.req.raw.clone().json() as Record<string, unknown>;
+    const value = body.lineAccountId ?? body.account_id;
+    return typeof value === 'string' && value.trim() ? value.trim().slice(0, 160) : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * 認証済み管理APIの変更を、routeごとの記録漏れに左右されず残す。
- * bodyは読まず、登録済みroute patternだけを記録するため顧客本文や秘密値は入らない。
+ * bodyからはaccount IDだけを抽出し、登録済みroute patternと結果だけを記録する。
+ * 顧客本文や秘密値は監査入力へ渡さない。
  */
 export const businessAuditMiddleware: MiddlewareHandler<Env> = async (c, next) => {
+  const shouldAudit = Boolean(c.get('staff')) && MUTATING_METHODS.has(c.req.method);
+  const lineAccountIdPromise = shouldAudit ? requestLineAccountId(c) : Promise.resolve(null);
   await next();
   const staff = c.get('staff');
-  if (!staff || !MUTATING_METHODS.has(c.req.method) || c.get('auditRecorded')) return;
+  if (!staff || !shouldAudit || c.get('auditRecorded')) return;
   const db = c.env?.DB;
   if (!db || typeof db.prepare !== 'function') return;
 
   const routePath = c.req.routePath || new URL(c.req.url).pathname;
   const method = c.req.method.toLowerCase();
-  const lineAccountId = c.req.query('lineAccountId') ?? c.req.query('account_id') ?? null;
+  const lineAccountId = await lineAccountIdPromise;
   const task = recordAuditEvent(db, {
     tenantId: staff.tenantId,
     lineAccountId,

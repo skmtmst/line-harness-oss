@@ -27,10 +27,10 @@ function app(explicitAudit = false) {
 describe('businessAuditMiddleware', () => {
   it('records a mutating route pattern without reading request body', async () => {
     recordAuditEvent.mockClear();
-    const response = await app().request('/api/widgets/widget-secret?lineAccountId=account-a', {
+    const response = await app().request('/api/widgets/widget-secret', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'cf-connecting-ip': '203.0.113.42' },
-      body: JSON.stringify({ password: 'never-store-this' }),
+      body: JSON.stringify({ lineAccountId: 'account-a', password: 'never-store-this' }),
     }, { DB: { prepare: vi.fn() } as unknown as D1Database });
     expect(response.status).toBe(200);
     expect(recordAuditEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
