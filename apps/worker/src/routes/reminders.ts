@@ -441,8 +441,9 @@ reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c
         clauses.push(accountParts.length > 0 ? `(${accountParts.join(' OR ')})` : '1 = 0');
       }
       if (q) {
-        clauses.push(`LOWER(r.name) LIKE ? ESCAPE '\\'`);
-        bindings.push(`%${escapedLike(q)}%`);
+        clauses.push(`(LOWER(r.name) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(r.description, '')) LIKE ? ESCAPE '\\')`);
+        const searchPattern = `%${escapedLike(q)}%`;
+        bindings.push(searchPattern, searchPattern);
       }
       if (folderId === '__unfiled__') clauses.push('r.folder_id IS NULL');
       else if (folderId) {

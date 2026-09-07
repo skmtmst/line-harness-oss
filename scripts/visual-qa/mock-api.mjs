@@ -1787,7 +1787,7 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const folderId = query.get('folderId') ?? ''
     const status = query.get('status') ?? ''
     const filtered = REMINDERS.filter((reminder) => {
-      if (q && !reminder.name.toLocaleLowerCase('ja-JP').includes(q)) return false
+      if (q && !`${reminder.name} ${reminder.description ?? ''}`.toLocaleLowerCase('ja-JP').includes(q)) return false
       if (folderId === '__unfiled__' && reminder.folderId) return false
       if (folderId && folderId !== '__unfiled__' && reminder.folderId !== folderId) return false
       if (status === 'failed' && !reminder.hasFailure) return false
