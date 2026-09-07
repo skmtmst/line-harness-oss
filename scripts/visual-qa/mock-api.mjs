@@ -115,7 +115,7 @@ const HOST = '127.0.0.1'
 /** 画面を見るだけなので、いちばん権限のある人で固定する。実在しない名前。 */
 const STAFF = {
   id: 'visual-qa-owner',
-  name: '画面確認',
+  name: 'Kenta Kawano',
   role: 'owner',
   readOnly: false,
   permissionKeys: [],
@@ -657,7 +657,7 @@ const REJECTED_APPROVALS = Array.from({ length: 8 }, (_, index) => ({
 const CONVERSION_APPROVALS = [...PENDING_APPROVALS, ...APPROVED_APPROVALS, ...REJECTED_APPROVALS]
 
 const SHAPES = {
-  '/api/public/brand': { name: '画面確認アカウント', iconUrl: null },
+  '/api/public/brand': { name: '株式会社 然', iconUrl: null },
   /*
     マイルの履歴。**既定の器（`{items,total,page,limit}`）では形が違う。**
 
