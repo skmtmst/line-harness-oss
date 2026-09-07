@@ -2757,8 +2757,7 @@
       "diffPath": "docs/design-qa/reminders-v6/uJP22-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T18:39:49.269Z"
+      "aboveThreshold": false
     },
     {
       "feature": 7,
@@ -3915,8 +3914,7 @@
       "diffPath": "docs/design-qa/friend-add-v6/ec9vg-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T18:39:49.269Z"
+      "aboveThreshold": false
     },
     {
       "feature": 9,
@@ -7048,8 +7046,7 @@
       "diffPath": "docs/design-qa/inflow-v6/IhSBB-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T18:39:49.269Z"
+      "aboveThreshold": false
     },
     {
       "feature": 18,
@@ -7264,8 +7261,7 @@
       "diffPath": "docs/design-qa/inflow-v6/BMmxU-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T18:39:49.269Z"
+      "aboveThreshold": false
     },
     {
       "feature": 18,
@@ -8561,8 +8557,7 @@
       "diffPath": "docs/design-qa/ec-v6/oHAN4-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T18:39:49.269Z"
+      "aboveThreshold": false
     },
     {
       "feature": 24,
@@ -9372,8 +9367,7 @@
       "diffPath": "docs/design-qa/booking-v6/TV2DI-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T18:39:49.269Z"
+      "aboveThreshold": false
     },
     {
       "feature": 27,

@@ -1045,9 +1045,9 @@ export const SCREENS = [
     variants: [{ suffix: '-planned-menu', steps: [{ click: '未返信3日後フォローのその他操作', after: 500 }] }], },
   { ...REMINDER, node: 'uJP22', name: '7-1-A リマインダを作成',
     verdict: 'match',
-    verdictNote: '**2026-09-08 Issue #537で共通告知帯を撮影から外して再判定し、一致を維持。** 3107/8794の1440/1920pxで横はみ出し0、告知帯による高さ差を解消し高さ差0px。1920px画素差11.8442%の残差は、Pencilと実装で異なる基本設定欄・右プレビュー・下部操作の画面固有配置であり、共通shell由来ではない。',
-    verdictSource: 'reminders-v6/uJP22.txt + reminders-v6/uJP22-{1440,1920}.png + reminders-v6/uJP22-diff-1920.png + Issue #469 pixel comparison',
-    verdictHead: 'eb41ad0d', route: '/reminders/new',
+    verdictNote: '**2026-09-08 Issue #546 / UI HEAD `fa224f18c4` を3102/8789で現行規約により再撮影し、一致を維持。** 右欄をPencilと同じ幅にし、設定内容とLINEプレビューの高さをそろえた。1440/1920pxとも横はみ出し0、高さ差0px、1920px画素差6.2993%。',
+    verdictSource: 'reminders-v6/uJP22.txt + reminders-v6/uJP22-{1440,1920}.png + reminders-v6/uJP22-diff-1920.png + Issue #546 pixel comparison',
+    verdictHead: 'fa224f18c4', route: '/reminders/new',
     steps: [
       { fill: 'input[maxlength="60"]', selector: true, text: 'Google Meet相談の前日案内' },
       { fill: 'textarea[placeholder="運用目的や注意点を入力"]', selector: true, text: 'Meet相談の無断キャンセルを減らす目的。前日・1時間前・当日の3回で運用する。' },
@@ -1055,9 +1055,9 @@ export const SCREENS = [
   {
     ...REMINDER, node: 'J64xI', name: '7-1-B 通知ステップ編集',
     verdict: 'match',
-    verdictNote: '**2026-09-08 Issue #537で共通告知帯を撮影から外して再判定し、一致を維持。** 3107/8794の1440/1920pxで横はみ出し0、告知帯による高さ差を解消し高さ差+2px。1920px画素差11.1271%の残差は、Pencilと実装で異なる通知編集欄・右プレビュー・下部操作の画面固有配置であり、共通shell由来ではない。',
-    verdictSource: 'reminders-v6/J64xI.txt + reminders-v6/J64xI-{1440,1920}.png + reminders-v6/J64xI-diff-1920.png + Issue #469 pixel comparison',
-    verdictHead: 'd77d0877e',
+    verdictNote: '**2026-09-08 Issue #546 / UI HEAD `fa224f18c4` を3102/8789で現行規約により再撮影し、一致を維持。** 本文欄・右欄・設定内容・LINEプレビューをPencilの寸法へそろえた。1440/1920pxとも横はみ出し0、高さ差0px、1920px画素差6.7484%。',
+    verdictSource: 'reminders-v6/J64xI.txt + reminders-v6/J64xI-{1440,1920}.png + reminders-v6/J64xI-diff-1920.png + Issue #546 pixel comparison',
+    verdictHead: 'fa224f18c4',
     route: '/reminders/edit?id=reminder-3',
 
   },
@@ -1327,9 +1327,9 @@ export const SCREENS = [
   {
     ...FRIEND_ADD, node: 'ec9vg', name: '9-1-F 最終確認',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #374・UI HEAD `a0278d076`・固定データ PR #1130（統合 #1132）で一致。** 検証APIの合格結果、保存済みルールの設定名・流入条件・送信時刻・対象・初回案内・アクション・24時間制限、最後のテスト、対象214人、Slack監視の接続状態を表示した。Pencil画像と通常・読込・空・失敗・権限不足を3102/8789の1440/1920pxで目視比較し、全12枚で横はみ出し0。',
-    verdictSource: 'friend-add-v6/ec9vg.png + ec9vg-{normal,loading,empty,error,forbidden}-{1440,1920}.png + ec9vg*.txt',
-    verdictHead: 'a0278d076',
+    verdictNote: '**2026-09-08 Issue #546 / UI HEAD `fa224f18c4` を3102/8789で現行規約により再撮影し、一致を維持。** 初期viewportを設計高へそろえ、1440/1920pxとも横はみ出し0、高さ差0px、1920px画素差7.8586%。',
+    verdictSource: 'friend-add-v6/ec9vg.txt + ec9vg-{1440,1920}.png + ec9vg-diff-1920.png + Issue #546 pixel comparison',
+    verdictHead: 'fa224f18c4',
     route: '/friend-add-settings/publish',
     states: { apis: ['**/api/friend-add-rules*', '**/api/friend-add-rules/**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
 
@@ -2178,9 +2178,9 @@ export const SCREENS = [
   },
   { ...INFLOW, node: 'IhSBB', name: '18-1-A サイトスクリプト', route: '/inflow-links?tab=script',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #482 / UI HEAD 1caca7407 で再判定。** #1287の設計高を初期viewportにする規約で撮り直し、主欄＋右欄、貼るコード、受信確認、ドメイン情報を同時に表示できることを確認。3105/8792の1440・1920pxとも横はみ出し0、高さ差0px、画素差4.8042%。",
-    verdictSource: "inflow-v6/IhSBB.txt + IhSBB-1440.png + IhSBB-1920.png + IhSBB-diff-1920.png + docs/design-qa/v6-pixel-diff.json",
-    verdictHead: "1caca7407",
+    verdictNote: "**2026-09-08 Issue #546 / UI HEAD `fa224f18c4` を3102/8789で現行規約により再撮影し、一致を維持。** 初期viewportを設計高へそろえ、1440/1920pxとも横はみ出し0、高さ差0px、1920px画素差4.8070%。",
+    verdictSource: "inflow-v6/IhSBB.txt + IhSBB-{1440,1920}.png + IhSBB-diff-1920.png + Issue #546 pixel comparison",
+    verdictHead: "fa224f18c4",
   },
   { ...INFLOW, node: 'v0HaI', name: '18-1-B 広告連携', route: '/inflow-links?tab=ads',
     verdict: "match",
@@ -2235,8 +2235,9 @@ export const SCREENS = [
       kinds: ['normal', 'loading', 'empty', 'error'],
     },
     verdict: "match",
-    verdictNote: "**2026-09-06 Issue #231 / PR #951 / UI HEAD 43b3aae50で設計画像と実装画像を同じ幅で並べて再確認し、一致。** 通常・読込中・0件・取得失敗で共通の外枠と操作位置を保ち、未取得を0と誤表示せず、次の操作を状態ごとに示した。全4状態の1440px・1920pxで横はみ出し0。",
-    verdictSource: "inflow-v6/BMmxU-normal.txt + BMmxU-loading.txt + BMmxU-empty.txt + BMmxU-error.txt + BMmxU-error-1440.png + BMmxU-error-1920.png",
+    verdictNote: "**2026-09-08 Issue #546 / UI HEAD `fa224f18c4` を3102/8789で現行規約により再撮影し、一致を維持。** 初期viewportを設計高へそろえ、1440/1920pxとも横はみ出し0、高さ差0px、1920px画素差4.3314%。",
+    verdictSource: "inflow-v6/BMmxU.txt + BMmxU-{1440,1920}.png + BMmxU-diff-1920.png + Issue #546 pixel comparison",
+    verdictHead: "fa224f18c4",
   },
   /*
     **判定を改めた（PR #443 head `f372ff30`）。**
@@ -2554,9 +2555,9 @@ export const SCREENS = [
     route: '/ec-commerce?tab=connector',
     states: { apis: ['**/api/ec-commerce/connector?**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #486 / UI HEAD `57fb09478` で高さを修正・再判定。** つなぎ先の種類・アドレス・鍵をPencilと同じ3列1段にし、保存済み鍵の更新日時と非表示説明を鍵欄へ統合。高さ差+43pxは0px、画素差4.2002%。通常・読込・空・失敗・権限不足の1440/1920pxで横はみ出し0、鍵は末尾4文字以外を露出せず一致。',
-    verdictSource: 'ec-v6/oHAN4.txt + ec-v6/oHAN4-{1440,1920}.png + ec-v6/oHAN4-normal-{1440,1920}.png + Issue #486 pixel comparison',
-    verdictHead: '57fb09478',
+    verdictNote: '**2026-09-08 Issue #546 / UI HEAD `fa224f18c4` を3102/8789で現行規約により再撮影し、一致を維持。** 告知帯を撮影対象から外し、1440/1920pxとも横はみ出し0、高さ差0px、1920px画素差4.1775%。',
+    verdictSource: 'ec-v6/oHAN4.txt + ec-v6/oHAN4-{1440,1920}.png + ec-v6/oHAN4-diff-1920.png + Issue #546 pixel comparison',
+    verdictHead: 'fa224f18c4',
   },
 
   // ── 機能24 LINE通知 ─────────────────────────────────────
@@ -2740,7 +2741,7 @@ export const SCREENS = [
     日・週の台帳は、固定予約を時間×担当／曜日の格子へ並べる。
     LINE予約は緑、LINE未連携の電話予約は青で同じ格子に載せる。
   */
-  { ...BOOKING, node: 'TV2DI', name: '27-1 予約管理', verdict: 'match', verdictNote: '**2026-09-08 Issue #538 を固定ポート3105/8792で再撮影し、一致を維持。** 一覧は全件取得をやめ、集計と表示ページを別々に取得する。201件目以降もページ移動で取得でき、検索・メニュー・日付もサーバー側で絞り込む。1920px画素差4.764%、1440/1920pxとも横はみ出し0。本流の更新案内帯が表示されたため全体高は設計より37px長いが、予約管理本文の配置は維持。', verdictSource: 'booking-v6/TV2DI.png + TV2DI-{1440,1920}.png + TV2DI-diff-1920.png + Issue #538', verdictHead: '748c8b810' },
+  { ...BOOKING, node: 'TV2DI', name: '27-1 予約管理', verdict: 'match', verdictNote: '**2026-09-08 Issue #546 / UI HEAD `fa224f18c4` を3102/8789で現行規約により再撮影し、一致を維持。** 告知帯を撮影対象から外し、1440/1920pxとも横はみ出し0、高さ差0px、1920px画素差4.4558%。', verdictSource: 'booking-v6/TV2DI.txt + TV2DI-{1440,1920}.png + TV2DI-diff-1920.png + Issue #546 pixel comparison', verdictHead: 'fa224f18c4' },
   {
     ...BOOKING, node: 'TnDbq', name: '27-1-A 予約の詳細',
     mode: 'viewport', height: 1136, /*
