@@ -1,6 +1,6 @@
 # 機能オフを API・自動処理へ強制する仕様
 
-対象: V6 機能31「機能設定」／Issue #526  
+対象: V6 機能31「機能設定」／Issue #526
 根拠: `v6-31-feature-settings-requirements-draft.md` §5、§6、§10-3、§15
 
 ## 1. 目的と判定順
