@@ -52,13 +52,15 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(PAGE).toContain('filtered.slice((page - 1) * pageSize, page * pageSize)')
   })
 
-  it('無い保存容量のバーを作らず、繋がっていないと言う', () => {
-    // 設計は使用量のバー（220×5）と実績（53×5）を描いているが、
-    // `/api/media` は保存容量も上限も返さない。作り物の帯は出さない。
+  it('保存容量APIの実値で使用量と上限付近を表示する', () => {
     expect(PAGE).toContain('使っている容量')
-    expect(PAGE).toContain('容量集計APIが接続されると、使用量と上限を表示します。')
-    // 作り物の帯を出さない。幅を持つ帯は `style={{ width` でしか描けない。
-    expect(PAGE).not.toContain('style={{ width')
+    expect(PAGE).toContain('api.media.quota(accountAtRequest)')
+    expect(PAGE).toContain('quota.usageBytes')
+    expect(PAGE).toContain('quota.limitBytes')
+    expect(PAGE).toContain('quota.remainingBytes')
+    expect(PAGE).toContain('style={{ width')
+    expect(PAGE).toContain('selected={showNearLimitOnly}')
+    expect(PAGE).toContain('!showNearLimitOnly || isNearLimit(item)')
   })
 
   it('格子と一覧の切り替えを持つ', () => {
@@ -93,12 +95,17 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(PAGE).toContain('<FolderPanel')
   })
 
-  it('詳細では取得済みメタデータと使用先を表示し、無い版APIを利用不可と明記する', () => {
+  it('詳細では取得済みメタデータと使用先を表示し、安全確認後に新版を追加する', () => {
     expect(PAGE).toContain('<MediaDetailDialog')
     expect(DETAIL).toContain('data-design-node="voJtX"')
     expect(DETAIL).toContain('api.media.deleteImpact')
     expect(DETAIL).toContain('名前と管理用URLを保ったまま新しい版を追加します。')
-    expect(DETAIL).toContain('版追加API待ち')
+    expect(DETAIL).toContain('api.media.prepareUploads')
+    expect(DETAIL).toContain('api.media.completeUpload')
+    expect(DETAIL).toContain('api.media.previewVersion')
+    expect(DETAIL).toContain('api.media.createVersion')
+    expect(DETAIL).toContain('変更理由')
+    expect(DETAIL).toContain('固定版は変わりません')
   })
 
   it('詳細を一覧上の小窓ではなく、設計の全面詳細として描く', () => {
@@ -111,10 +118,13 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(DETAIL).toContain('使われているあいだは削除できません')
   })
 
-  it('LINEの上限と現行の登録上限を混ぜず、個別進捗と再試行を持つ', () => {
-    expect(UPLOAD).toContain('LINEは200MBまで（この画面からは30MBまで）')
-    expect(UPLOAD).toContain('LINEは200MBまで（この画面からは90MBまで）')
-    expect(UPLOAD).toContain('R2へ直接送る登録経路の接続が必要です。')
+  it('署名URLへ直接送り、LINE上限・個別進捗・再試行を持つ', () => {
+    expect(UPLOAD).toContain("{ label: '音声', note: 'MP3・M4A ／ 200MBまで' }")
+    expect(UPLOAD).toContain("{ label: '動画', note: 'MP4 ／ 200MBまで' }")
+    expect(UPLOAD).toContain('api.media.prepareUploads')
+    expect(UPLOAD).toContain('putMediaFile')
+    expect(UPLOAD).toContain('api.media.completeUpload')
+    expect(UPLOAD).toContain('保存先へ直接送ります')
     expect(UPLOAD).toContain('aria-live="polite"')
     expect(UPLOAD).toContain('この1件を再試行')
     expect(UPLOAD).toContain("entry.state === 'uploading'")

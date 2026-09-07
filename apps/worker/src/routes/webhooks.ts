@@ -15,7 +15,12 @@ import {
   getWebhookInteractionById,
   listFailedWebhookInteractionsForRetry,
   listWebhookInteractions,
+  getOutgoingWebhookDeliverySummaries,
+  updateIncomingWebhookConfig,
+  updateIncomingWebhookMaskedSample,
   type WebhookInteractionRow,
+  type IncomingWebhookIdentityMatch,
+  type IncomingWebhookActionRef,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -27,6 +32,113 @@ import {
 } from '../services/webhook-interactions.js';
 
 const webhooks = new Hono<Env>();
+
+const MATCH_KINDS = new Set([
+  'harness_friend_id', 'external_customer_id', 'verified_email', 'verified_phone',
+]);
+const NOT_FOUND_ACTIONS = new Set(['do_nothing', 'unmatched_box', 'create_candidate']);
+const INCOMING_ACTION_KINDS = new Set([
+  'common_action', 'tag', 'friend_field', 'support_mark', 'template', 'scenario',
+  'reminder', 'conversion', 'mileage_rule', 'score_rule', 'outgoing_webhook',
+  'operator_notification',
+]);
+
+function safeJson<T>(raw: string | null | undefined, fallback: T): T {
+  try {
+    return raw ? JSON.parse(raw) as T : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function jsonPathSegment(key: string): string {
+  return /^[A-Za-z_][A-Za-z0-9_-]*$/.test(key) ? `.${key}` : `[${JSON.stringify(key)}]`;
+}
+
+function maskedPayloadShape(payload: unknown) {
+  const fields: Array<{ path: string; type: string; maskedValue: '••••' }> = [];
+  let truncated = false;
+  const visit = (value: unknown, path: string, depth: number) => {
+    if (fields.length >= 50) {
+      truncated = true;
+      return;
+    }
+    if (depth >= 6 || value === null || typeof value !== 'object') {
+      const type = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
+      fields.push({ path, type, maskedValue: '••••' });
+      return;
+    }
+    if (Array.isArray(value)) {
+      if (value.length === 0) fields.push({ path, type: 'array', maskedValue: '••••' });
+      else visit(value[0], `${path}[0]`, depth + 1);
+      return;
+    }
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) fields.push({ path, type: 'object', maskedValue: '••••' });
+    for (const [key, child] of entries) visit(child, `${path}${jsonPathSegment(key)}`, depth + 1);
+  };
+  visit(payload, '$', 0);
+  return { fields, truncated };
+}
+
+function readIncomingConfig(body: unknown):
+  | { ok: true; expectedVersion: number; identityMatching: IncomingWebhookIdentityMatch; actions: IncomingWebhookActionRef[] }
+  | { ok: false; error: string } {
+  if (!body || typeof body !== 'object') return { ok: false, error: 'JSON本文が正しくありません' };
+  const input = body as Record<string, unknown>;
+  const expectedVersion = Number(input.expectedVersion);
+  const identity = input.identityMatching as Record<string, unknown> | undefined;
+  const methods = identity?.methods;
+  const onNotFound = identity?.onNotFound;
+  if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+    return { ok: false, error: 'expectedVersionは1以上の整数で指定してください' };
+  }
+  if (!Array.isArray(methods) || methods.length > 4 || !NOT_FOUND_ACTIONS.has(String(onNotFound))) {
+    return { ok: false, error: '人の照合方法または未照合時の扱いが正しくありません' };
+  }
+  const normalizedMethods: IncomingWebhookIdentityMatch['methods'] = [];
+  const seenKinds = new Set<string>();
+  for (const raw of methods) {
+    if (!raw || typeof raw !== 'object') return { ok: false, error: '人の照合方法が正しくありません' };
+    const item = raw as Record<string, unknown>;
+    const kind = String(item.kind);
+    const path = typeof item.path === 'string' ? item.path.trim() : '';
+    if (!MATCH_KINDS.has(kind) || seenKinds.has(kind)
+      || path.length > 200 || !/^\$(?:\.[A-Za-z_][A-Za-z0-9_-]*|\[\d+\])+$/.test(path)) {
+      return { ok: false, error: '名前照合は使わず、許可された識別子とJSONPathを指定してください' };
+    }
+    seenKinds.add(kind);
+    normalizedMethods.push({
+      kind: kind as IncomingWebhookIdentityMatch['methods'][number]['kind'], path,
+    });
+  }
+  if (!Array.isArray(input.actions) || input.actions.length > 20) {
+    return { ok: false, error: '実行処理は20件以内で指定してください' };
+  }
+  const actions: IncomingWebhookActionRef[] = [];
+  for (const raw of input.actions) {
+    if (!raw || typeof raw !== 'object') return { ok: false, error: '実行処理が正しくありません' };
+    const item = raw as Record<string, unknown>;
+    const refKind = String(item.refKind);
+    const refId = typeof item.refId === 'string' ? item.refId.trim() : '';
+    const refVersionId = item.refVersionId === null || item.refVersionId === undefined
+      ? null : typeof item.refVersionId === 'string' ? item.refVersionId.trim() : '';
+    if (!INCOMING_ACTION_KINDS.has(refKind) || !refId || refId.length > 200
+      || (refVersionId !== null && (!refVersionId || refVersionId.length > 200))) {
+      return { ok: false, error: '実行処理は許可された種類と構造化IDで指定してください' };
+    }
+    actions.push({ refKind, refId, refVersionId });
+  }
+  return {
+    ok: true,
+    expectedVersion,
+    identityMatching: {
+      methods: normalizedMethods,
+      onNotFound: String(onNotFound) as IncomingWebhookIdentityMatch['onNotFound'],
+    },
+    actions,
+  };
+}
 
 /**
  * 送り直しの回数を検証する。
@@ -117,6 +229,97 @@ webhooks.get('/api/webhooks/incoming', requireRole('owner', 'admin', 'staff'), a
   } catch (err) {
     console.error('GET /api/webhooks/incoming error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+webhooks.get('/api/webhooks/incoming/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    const staff = c.get('staff');
+    if (staff?.role === 'staff' && !staff.permissionKeys?.includes('/webhooks')) {
+      return c.json({ success: false, error: 'この機能を表示する権限がありません' }, 403);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, staff, [lineAccountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const item = await getIncomingWebhookById(c.env.DB, c.req.param('id'), lineAccountId);
+    if (!item) return c.json({ success: false, error: 'Not found' }, 404);
+    const identityMatching = safeJson<IncomingWebhookIdentityMatch>(item.identity_match_json, {
+      methods: [], onNotFound: 'do_nothing',
+    });
+    const actions = safeJson<IncomingWebhookActionRef[]>(item.action_refs_json, []);
+    const sample = safeJson<{ fields: Array<{ path: string; type: string; maskedValue: string }>; truncated: boolean } | null>(
+      item.latest_masked_sample_json, null,
+    );
+    return c.json({
+      success: true,
+      data: {
+        id: item.id,
+        name: item.name,
+        sourceType: item.source_type,
+        hasSecret: Boolean(item.secret && item.secret.length >= MIN_SECRET_LENGTH),
+        isActive: Boolean(item.is_active),
+        version: Number(item.version ?? 1),
+        identityMatching,
+        actions,
+        actionExecution: {
+          state: actions.length > 0 ? 'not_connected' : 'not_configured',
+          reason: actions.length > 0 ? '受信後の構造化アクション実行器はまだ接続されていません' : null,
+        },
+        latestSample: sample && item.latest_received_at
+          ? { receivedAt: item.latest_received_at, ...sample }
+          : null,
+        templateFields: sample?.fields.map((field) => ({
+          path: field.path,
+          type: field.type,
+          token: `{{payload${field.path.slice(1)}}}`,
+        })) ?? [],
+        createdAt: item.created_at,
+        updatedAt: item.updated_at,
+      },
+    });
+  } catch {
+    console.error(JSON.stringify({
+      event: 'incoming_webhook_detail_failed',
+      path: c.req.path,
+    }));
+    return c.json({ success: false, error: '受け取り口の詳細を表示できませんでした' }, 500);
+  }
+});
+
+webhooks.patch('/api/webhooks/incoming/:id/config', requireRole('owner'), async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const parsed = readIncomingConfig(await c.req.json<unknown>().catch(() => null));
+    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+    const result = await updateIncomingWebhookConfig(c.env.DB, {
+      id: c.req.param('id'),
+      lineAccountId,
+      expectedVersion: parsed.expectedVersion,
+      identityMatching: parsed.identityMatching,
+      actions: parsed.actions,
+    });
+    if (result.status === 'not_found') return c.json({ success: false, error: 'Not found' }, 404);
+    if (result.status === 'conflict') {
+      return c.json({
+        success: false,
+        code: 'version_conflict',
+        error: '受け取り口が更新されています。読み直してください',
+        data: { currentVersion: result.currentVersion },
+      }, 409);
+    }
+    return c.json({ success: true, data: { id: result.item.id, version: result.item.version } });
+  } catch {
+    console.error(JSON.stringify({
+      event: 'incoming_webhook_config_update_failed',
+      path: c.req.path,
+    }));
+    return c.json({ success: false, error: '受け取り口の設定を保存できませんでした' }, 500);
   }
 });
 
@@ -244,25 +447,49 @@ webhooks.get('/api/webhooks/outgoing', requireRole('owner', 'admin', 'staff'), a
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
-    const items = await getOutgoingWebhooks(c.env.DB, lineAccountId);
+    const [items, summaries] = await Promise.all([
+      getOutgoingWebhooks(c.env.DB, lineAccountId),
+      getOutgoingWebhookDeliverySummaries(c.env.DB, lineAccountId, 30),
+    ]);
+    const summaryById = new Map(summaries.map((summary) => [summary.webhook_id, summary]));
     return c.json({
       success: true,
-      data: items.map((w) => ({
-        id: w.id,
-        name: w.name,
-        url: w.url,
-        eventTypes: JSON.parse(w.event_types),
-        hasSecret: Boolean(w.secret && w.secret.length >= MIN_SECRET_LENGTH),
-        isActive: Boolean(w.is_active),
-        maxRetries: w.max_retries ?? 0,
-        consecutiveFailures: w.consecutive_failures ?? 0,
-        lastFailedAt: w.last_failed_at ?? null,
-        createdAt: w.created_at,
-        updatedAt: w.updated_at,
-      })),
+      data: items.map((w) => {
+        const summary = summaryById.get(w.id);
+        const succeeded = Number(summary?.succeeded ?? 0);
+        const total = Number(summary?.total ?? 0);
+        return {
+          id: w.id,
+          name: w.name,
+          url: w.url,
+          eventTypes: JSON.parse(w.event_types),
+          hasSecret: Boolean(w.secret && w.secret.length >= MIN_SECRET_LENGTH),
+          isActive: Boolean(w.is_active),
+          maxRetries: w.max_retries ?? 0,
+          consecutiveFailures: w.consecutive_failures ?? 0,
+          lastFailedAt: w.last_failed_at ?? null,
+          deliverySummary: {
+            periodDays: 30,
+            total,
+            succeeded,
+            failed: Number(summary?.failed ?? 0),
+            pending: Number(summary?.pending ?? 0),
+            successRate: total > 0 ? Math.round((succeeded / total) * 10_000) / 100 : null,
+            lastResult: summary?.last_status ? {
+              status: summary.last_status,
+              responseStatus: summary.last_response_status,
+              completedAt: summary.last_completed_at,
+              failureReason: webhookFailureLabel(summary.last_failure_reason),
+            } : null,
+            canRetry: Boolean(summary?.can_retry),
+          },
+          createdAt: w.created_at,
+          updatedAt: w.updated_at,
+        };
+      }),
     });
-  } catch (err) {
-    console.error('GET /api/webhooks/outgoing error:', err);
+  } catch {
+    console.error(JSON.stringify({ event: 'outgoing_webhook_list_failed', path: c.req.path }));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -582,6 +809,22 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
       payload = JSON.parse(rawBody);
     } catch {
       return c.json({ success: false, error: 'Invalid JSON body' }, 400);
+    }
+
+    if (wh.line_account_id) {
+      try {
+        await updateIncomingWebhookMaskedSample(
+          c.env.DB,
+          wh.id,
+          wh.line_account_id,
+          maskedPayloadShape(payload),
+        );
+      } catch {
+        console.error(JSON.stringify({
+          event: 'incoming_webhook_masked_sample_update_failed',
+          webhookId: wh.id,
+        }));
+      }
     }
 
     const { fireEvent } = await import('../services/event-bus.js');

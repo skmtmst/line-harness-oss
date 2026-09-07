@@ -116,6 +116,7 @@ import adminVersion from './routes/admin-version.js';
 import adminUpdate from './routes/admin-update.js';
 import { ecIntegrations } from './routes/ec-integrations.js';
 import { ecCommerce } from './routes/ec-commerce.js';
+import { ecOperations } from './routes/ec-operations.js';
 import { nenCampaigns } from './routes/nen-campaigns.js';
 import { nenMembers } from './routes/nen-members.js';
 import { supportInbox } from './routes/support-inbox.js';
@@ -401,6 +402,7 @@ app.route('/', lineProxy);
 app.route('/', ecIntegrations);
 // NEN EC連携の管理画面API（通常の管理者認証・CSRF保護対象）。
 app.route('/', ecCommerce);
+app.route('/', ecOperations);
 app.route('/', nenCampaigns);
 app.route('/', nenMembers);
 app.route('/', supportInbox);

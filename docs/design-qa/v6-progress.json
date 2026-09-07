@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 31,
-  "match": 163,
-  "structureMatchDataPending": 80,
-  "needsFix": 20,
+  "match": 166,
+  "structureMatchDataPending": 79,
+  "needsFix": 18,
   "unjudged": 5,
-  "remaining": 105,
+  "remaining": 102,
   "features": [
     {
       "feature": 1,
@@ -1869,12 +1869,24 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 1,
-      "match": 1,
-      "structureMatchDataPending": 2,
-      "needsFix": 2,
+      "match": 4,
+      "structureMatchDataPending": 1,
+      "needsFix": 0,
       "unjudged": 0,
-      "remaining": 4,
+      "remaining": 1,
       "capturedAt": [
+        {
+          "pr": 1157,
+          "head": "0cc67ed91d",
+          "on": "2026-09-07",
+          "screens": [
+            "g89Tc",
+            "voJtX",
+            "eXAJP",
+            "YfTfJ"
+          ],
+          "note": "Issue #392。統合済みの容量・直接アップロード・版追加・使用先差し替え契約へ接続し、固定ポート3105/8792で1440px・1920pxを再撮影。対象10枚は横はみ出し0。一覧・詳細・削除確認を一致へ更新し、ファイル投入を撮影器で表現できない登録窓だけ理由付き構造一致を維持した。"
+        },
         {
           "pr": 997,
           "head": "3eae16770",
