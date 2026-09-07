@@ -118,7 +118,7 @@ let webinarFolders = WEBINAR_FOLDERS.map((folder) => ({ ...folder }))
 /** 画面を見るだけなので、いちばん権限のある人で固定する。実在しない名前。 */
 const STAFF = {
   id: 'visual-qa-owner',
-  name: '画面確認',
+  name: 'Kenta Kawano',
   role: 'owner',
   readOnly: false,
   permissionKeys: [],
@@ -428,12 +428,12 @@ const SUPPORT_EMAIL_ITEMS = [
     customerIdentifier: 'sakamoto@example.com',
     subject: '発送について',
     preview: 'ご注文ありがとうございます。発送状況をご案内します。',
-    status: 'unread',
+    status: 'resolved',
     revision: 1,
     assignedStaffId: null,
     assignedStaffName: null,
     lastIncomingAt: '2026-08-16T02:10:00.000Z',
-    isUnread: true,
+    isUnread: false,
   },
   {
     id: 'email:mail-2',
@@ -442,11 +442,39 @@ const SUPPORT_EMAIL_ITEMS = [
     customerIdentifier: 'taro@example.com',
     subject: 'ご注文について',
     preview: 'ご注文ありがとうございます。内容を確認して対応します。',
-    status: 'unread',
+    status: 'resolved',
     revision: 1,
     assignedStaffId: null,
     assignedStaffName: null,
     lastIncomingAt: '2026-08-16T01:30:00.000Z',
+    isUnread: false,
+  },
+  {
+    id: 'email:mail-3',
+    threadId: 'mail-3',
+    customerName: '佐藤 美咲',
+    customerIdentifier: 'misaki@example.com',
+    subject: '予約内容について',
+    preview: '予約内容を確認しました。ありがとうございます。',
+    status: 'resolved',
+    revision: 1,
+    assignedStaffId: 'operator-kenta',
+    assignedStaffName: 'Kenta',
+    lastIncomingAt: '2026-08-15T23:20:00.000Z',
+    isUnread: false,
+  },
+  {
+    id: 'email:mail-4',
+    threadId: 'mail-4',
+    customerName: '田中 花子',
+    customerIdentifier: 'hanako@example.com',
+    subject: 'ありがとうございました',
+    preview: 'ご案内ありがとうございました。',
+    status: 'resolved',
+    revision: 1,
+    assignedStaffId: 'operator-masato',
+    assignedStaffName: 'Masato',
+    lastIncomingAt: '2026-08-15T21:00:00.000Z',
     isUnread: false,
   },
 ]
@@ -675,7 +703,7 @@ const REJECTED_APPROVALS = Array.from({ length: 8 }, (_, index) => ({
 const CONVERSION_APPROVALS = [...PENDING_APPROVALS, ...APPROVED_APPROVALS, ...REJECTED_APPROVALS]
 
 const SHAPES = {
-  '/api/public/brand': { name: '画面確認アカウント', iconUrl: null },
+  '/api/public/brand': { name: '株式会社 然', iconUrl: null },
   /*
     マイルの履歴。**既定の器（`{items,total,page,limit}`）では形が違う。**
 
@@ -1073,7 +1101,7 @@ function visualQaWriteBody(method, pathname) {
 const RAW = {
   // `0.0.0-dev` のときはバナー自体を出さない。manifest も見に行かない。
   //（update-banner.tsx の DEV_VERSION と同じ値でないと効かない）
-  '/admin/version': { version: '0.0.0-dev', worker_hash: '', admin_hash: '', liff_hash: '' },
+  '/admin/version': { version: '2.6.4', worker_hash: '', admin_hash: '', liff_hash: '' },
   '/admin/manifest': { releases: [], versions: [] },
 
   /*

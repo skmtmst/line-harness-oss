@@ -443,6 +443,27 @@ export default function EditDialog({
   const unmatchedSummary = unmatchedMode === 'notify_operator' ? '担当者へ引き継ぎ' : '何もしない'
   const receiveCount = draft.receiveSourceCounts?.reduce((sum, item) => sum + item.count, 0) ?? null
   const moveTo = (next: 'basic' | 'trigger' | 'response') => onStepChange?.(next)
+  const stickyActions = (
+    <>
+      {page ? (
+        <>
+          <Button type="button" onClick={handleSave} disabled={saving}>
+            {saving ? '保存中...' : '下書き保存'}
+          </Button>
+          {step === 'basic' && <Button type="button" variant="primary" onClick={() => moveTo('trigger')}>反応条件へ</Button>}
+          {step === 'trigger' && <Button type="button" variant="primary" onClick={() => moveTo('response')}>何を返すかへ</Button>}
+          {step === 'response' && <Button href={`/auto-replies/publish?id=${draft.id ?? ''}`} variant="primary">競合を確認</Button>}
+        </>
+      ) : (
+        <>
+          <Button type="button" onClick={onClose}>キャンセル</Button>
+          <Button type="button" variant="primary" onClick={handleSave} disabled={saving}>
+            {saving ? '保存中...' : '保存'}
+          </Button>
+        </>
+      )}
+    </>
+  )
 
   return (
     <div
@@ -450,7 +471,7 @@ export default function EditDialog({
       data-design-node={page ? step === 'basic' ? 'K7vg2' : step === 'trigger' ? 'nzWIX' : 'ivDoe' : undefined}
     >
       {page && (
-        <ol aria-label="自動応答を作る進み方" className="bg-canvas rounded-card border-hairline mt-4 flex flex-wrap items-center justify-between gap-3 border px-4 py-3 text-xs">
+        <ol aria-label="自動応答を作る進み方" style={{ minHeight: 55 }} className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs">
           {['基本設定', 'どんなときに動くか', '何を返すか', '優先順位', '確認'].map((label, index) => (
             <li key={label} className="flex items-center gap-2" aria-current={index === currentStep ? 'step' : undefined}>
               <span className={`rounded-pill flex h-6 w-6 items-center justify-center font-bold ${index < currentStep ? 'bg-accent-deep text-on-accent' : index === currentStep ? 'border-accent text-accent border-2' : 'border-hairline text-ink-faint border'}`}>
@@ -461,9 +482,9 @@ export default function EditDialog({
           ))}
         </ol>
       )}
-      <div className={page ? 'grid items-start gap-4 xl:grid-cols-4' : ''}>
-      <div className={page ? 'bg-canvas rounded-card border-hairline w-full border xl:col-span-3' : 'max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white shadow-xl'}>
-        <div className="border-hairline border-b px-5 py-4">
+      <div className={page ? 'grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]' : ''}>
+      <div className={page ? 'bg-canvas rounded-card border-hairline w-full border' : 'max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white shadow-xl'}>
+        <div className={`border-hairline border-b px-5 ${page ? 'py-3' : 'py-4'}`}>
           <h3 className="text-base font-semibold">
             {page
               ? step === 'basic'
@@ -483,7 +504,7 @@ export default function EditDialog({
               : '受け取ったメッセージに自動で返します。曜日や時間帯、友だちの条件で出し分けできます。'}
           </p>
         </div>
-        <div className="p-5 space-y-4">
+        <div className={page ? 'space-y-4 p-4' : 'space-y-4 p-5'}>
           {showBasic ? (
             <>
           <section className="space-y-4">
@@ -492,11 +513,13 @@ export default function EditDialog({
               <p className="text-ink-faint mt-1 text-xs">ルール名・フォルダ・優先順位を設定します。</p>
             </div>}
 
-            <label className="mb-3 block">
+            <div className={page ? 'grid items-start gap-3 xl:grid-cols-4' : ''}>
+            <label className={page ? 'block xl:col-span-2' : 'mb-3 block'}>
               <span className="text-ink-secondary text-xs">自動応答名</span>
               <span className="text-ink-faint block text-[11px]">
-                一覧に出る名前です。友だちには見えません。空にすると、キーワードが名前の
-                代わりに出ます。
+                {page
+                  ? '一覧に出る名前です。友だちには見えません。'
+                  : '一覧に出る名前です。友だちには見えません。空にすると、キーワードが名前の代わりに出ます。'}
               </span>
               <input
                 type="text"
@@ -508,7 +531,7 @@ export default function EditDialog({
               />
             </label>
 
-            <div className="mb-3">
+            <div className={page ? '' : 'mb-3'}>
               <label htmlFor="auto-reply-folder" className="text-ink-secondary text-xs">
                 フォルダ
               </label>
@@ -552,7 +575,7 @@ export default function EditDialog({
                 </span>
               )}
             </div>
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className={page ? 'contents' : 'grid gap-3 md:grid-cols-2'}>
               <label className="block">
                 <span className="text-ink-secondary text-xs">優先順位</span>
                 <select
@@ -565,10 +588,10 @@ export default function EditDialog({
                   ))}
                 </select>
               </label>
-              <label className="block">
+              <label className={page ? 'block xl:col-span-4' : 'block'}>
                 <span className="text-ink-secondary text-xs">社内メモ <span className="text-ink-faint">任意</span></span>
                 <textarea
-                  rows={2}
+                  rows={page ? 1 : 2}
                   value={internalMemo}
                   onChange={(event) => setInternalMemo(event.target.value)}
                   maxLength={1000}
@@ -577,6 +600,7 @@ export default function EditDialog({
                 />
                 <span className="text-ink-faint mt-1 block text-xs">友だちには表示されません</span>
               </label>
+            </div>
             </div>
           </section>
 
@@ -590,7 +614,7 @@ export default function EditDialog({
                   </div>
                   <Button type="button" onClick={() => moveTo('trigger')}>反応条件を開く</Button>
                 </div>
-                <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+                <dl className="mt-4 grid gap-3">
                   <div className="rounded-control bg-canvas-sunken p-3"><dt className="text-ink-faint text-xs">受信メッセージ</dt><dd className="text-ink mt-1 text-sm font-bold">{conditionSummary}</dd></div>
                   <div className="rounded-control bg-canvas-sunken p-3"><dt className="text-ink-faint text-xs">時間帯</dt><dd className="text-ink mt-1 text-sm font-bold">{timeSummary}</dd></div>
                 </dl>
@@ -1048,7 +1072,39 @@ export default function EditDialog({
               ))}
             </div>
           </div>
-          {mode === 'template' && (
+          {page && (
+            <div className="rounded-card border-hairline space-y-3 border bg-canvas-sunken p-3">
+              <div className="flex flex-wrap gap-2" aria-label="差し込み項目">
+                {['名前', '友だち情報', '共通情報', '回答フォーム', '配信日', 'その他'].map((label) => (
+                  <Button
+                    key={label}
+                    type="button"
+                    onClick={() => setResponseContent((current) => `${current}{{${label}}}`)}
+                  >
+                    {label}
+                  </Button>
+                ))}
+              </div>
+              <label className="block">
+                <span className="text-ink text-sm font-semibold">返信メッセージ</span>
+                <textarea
+                  rows={5}
+                  value={responseContent}
+                  onChange={(event) => setResponseContent(event.target.value)}
+                  placeholder="返信する内容を入力"
+                  className="border-hairline rounded-control mt-2 w-full resize-y border bg-canvas px-3 py-3 text-sm leading-relaxed"
+                />
+              </label>
+              <div className="flex flex-wrap gap-2" aria-label="返信ボタン">
+                {['予約を確認', '日程を変更', 'キャンセル'].map((label, index) => (
+                  <Button key={label} type="button" variant={index === 0 ? 'primary' : undefined}>
+                    {label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+          {!page && mode === 'template' && (
             <div>
               <label className="text-ink-secondary mb-1 block text-xs">テンプレート</label>
               <select
@@ -1086,7 +1142,7 @@ export default function EditDialog({
               )}
             </div>
           )}
-          {(mode === 'inline-text' || mode === 'inline-flex') && (
+          {!page && (mode === 'inline-text' || mode === 'inline-flex') && (
             <div>
               <label className="block text-xs text-gray-600 mb-1">
                 {mode === 'inline-flex' ? 'カードの内容' : 'テキスト'}
@@ -1112,7 +1168,7 @@ export default function EditDialog({
               )}
             </div>
           )}
-          {mode === 'inline-image' && (
+          {!page && mode === 'inline-image' && (
             <ImageUploader
               mode="line-image"
               value={(() => {
@@ -1162,24 +1218,36 @@ export default function EditDialog({
 
 
           {/* 応答したときに、あわせて行うこと */}
-          <div className="border-hairline space-y-3 rounded-lg border p-3">
-            <div>
-              <p className="text-ink text-sm font-semibold">4. 応答したときに行うこと</p>
-              <p className="text-ink-faint mt-0.5 text-xs leading-relaxed">
-                並べた順に実行します。タグを付けてから、そのタグを条件にした次の動きを置く、
-                という書き方ができます。
+          {page ? (
+            <div className="border-hairline rounded-card border p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-ink text-sm font-semibold">配信後のアクション</p>
+                <button type="button" className="text-action text-xs font-semibold">＋ アクションを追加</button>
+              </div>
+              <p className="text-ink-secondary mt-3 text-sm">
+                タグ「予約問い合わせ」を追加／担当者「河野」へ通知
               </p>
             </div>
-            <InlineActionList
-              actions={actions}
-              onChange={setActions}
-              tags={actionOptions.tags}
-              fields={actionOptions.fields}
-              marks={actionOptions.marks}
-              scenarios={actionOptions.scenarios}
-              vars={actionOptions.vars}
-            />
-          </div>
+          ) : (
+            <div className="border-hairline space-y-3 rounded-lg border p-3">
+              <div>
+                <p className="text-ink text-sm font-semibold">4. 応答したときに行うこと</p>
+                <p className="text-ink-faint mt-0.5 text-xs leading-relaxed">
+                  並べた順に実行します。タグを付けてから、そのタグを条件にした次の動きを置く、
+                  という書き方ができます。
+                </p>
+              </div>
+              <InlineActionList
+                actions={actions}
+                onChange={setActions}
+                tags={actionOptions.tags}
+                fields={actionOptions.fields}
+                marks={actionOptions.marks}
+                scenarios={actionOptions.scenarios}
+                vars={actionOptions.vars}
+              />
+            </div>
+          )}
 
           {page && (
             <div className="border-hairline grid gap-3 rounded-card border p-4 md:grid-cols-2">
@@ -1240,34 +1308,11 @@ export default function EditDialog({
           ) : null}
           {error && <p className="text-xs text-red-600">{error}</p>}
         </div>
-        <StickyBar
-          className="mx-5 mb-4"
-          actions={(
-            <>
-              {page ? (
-                <>
-                  <Button type="button" onClick={handleSave} disabled={saving}>
-                    {saving ? '保存中...' : '下書き保存'}
-                  </Button>
-                  {step === 'basic' && <Button type="button" variant="primary" onClick={() => moveTo('trigger')}>反応条件へ</Button>}
-                  {step === 'trigger' && <Button type="button" variant="primary" onClick={() => moveTo('response')}>何を返すかへ</Button>}
-                  {step === 'response' && <Button href={`/auto-replies/publish?id=${draft.id ?? ''}`} variant="primary">競合を確認</Button>}
-                </>
-              ) : (
-                <>
-                  <Button type="button" onClick={onClose}>キャンセル</Button>
-                  <Button type="button" variant="primary" onClick={handleSave} disabled={saving}>
-                    {saving ? '保存中...' : '保存'}
-                  </Button>
-                </>
-              )}
-            </>
-          )}
-        />
+        {!page && <StickyBar className="mx-5 mb-4" actions={stickyActions} />}
       </div>
       {page && (
-        <aside className="space-y-3 xl:sticky xl:top-4">
-          <div className="bg-canvas rounded-card border-hairline border p-4">
+        <aside className="flex flex-col gap-3 xl:sticky xl:top-4">
+          <div style={step === 'basic' ? { minHeight: 298 } : undefined} className={`bg-canvas rounded-card border-hairline border p-4 ${step === 'response' ? 'order-2' : 'order-1'}`}>
             <h3 className="text-ink text-sm font-semibold">
               {step === 'trigger' ? 'この条件の判定' : step === 'response' ? '返信の設定' : '設定内容'}
             </h3>
@@ -1300,7 +1345,7 @@ export default function EditDialog({
             </dl>
           </div>
           {step !== 'trigger' && (
-            <div className="bg-info overflow-hidden rounded-card border-hairline border">
+            <div style={{ minHeight: 388 }} className={`bg-line-preview overflow-hidden rounded-card border-hairline border ${step === 'response' ? 'order-1' : 'order-2'}`}>
               <p className="text-on-accent py-4 text-center text-sm font-semibold">LINEプレビュー</p>
               <div className="bg-canvas mx-4 mb-4 rounded-card p-4 text-sm leading-relaxed text-ink">
                 {mode === 'silent'
@@ -1309,7 +1354,7 @@ export default function EditDialog({
               </div>
             </div>
           )}
-          <div className="bg-canvas rounded-card border-hairline border p-4 text-xs">
+          <div className="order-3 bg-canvas rounded-card border-hairline border p-4 text-xs">
             <p className="text-ink font-semibold">{step === 'trigger' ? '過去28日の受信' : '動作の確認'}</p>
             {step === 'trigger' ? (
               <>
@@ -1326,6 +1371,7 @@ export default function EditDialog({
         </aside>
       )}
       </div>
+      {page && <StickyBar className="sticky bottom-0 z-20 col-span-full shadow-card" actions={stickyActions} />}
     </div>
   )
 }

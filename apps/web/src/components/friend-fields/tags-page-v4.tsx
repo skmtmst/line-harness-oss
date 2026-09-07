@@ -387,6 +387,11 @@ function refSummary(
   return parts.length ? parts.join('・') : 'なし'
 }
 
+/** アフィリエイト参照は削除不可の警告欄で目立たせ、通常の参照行へ重ねて出さない。 */
+function manualRefSummary(refs: TagDeleteImpactReferences): string {
+  return refSummary(refs, MANUAL_REFS.filter(([key]) => key !== 'affiliateOffers'))
+}
+
 /**
  * 設計 `★ V6 4-1-F タグ削除の確認ダイアログ`（`dKlkz`）の影響5行。
  *
@@ -412,7 +417,7 @@ function deleteImpactRows(
       value: `${(impact?.friendCount ?? tag.friendCount ?? 0).toLocaleString('ja-JP')}人`,
       result: 'タグが外れます',
     },
-    { name: '参照先', value: refs ? refSummary(refs, MANUAL_REFS) : '—', result: '絞り込み条件から外れます' },
+    { name: '参照先', value: refs ? manualRefSummary(refs) : '—', result: '絞り込み条件から外れます' },
     { name: '参照先（自動）', value: refs ? refSummary(refs, AUTO_REFS) : '—', result: '開始条件が空になります' },
     { name: '連動の停止', value: impact?.mileageImpact.configured ? `本人+${impact.mileageImpact.self}／紹介者+${impact.mileageImpact.referrer}／${impact.mileageImpact.multiplier ? `${impact.mileageImpact.multiplier / 10000}倍` : '倍率なし'}／アクション${impact.linkedActions.length || tag.otherActionCount || 0}件` : linked || 'なし', result: '以後は実行されません' },
     /*
@@ -477,8 +482,8 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
       : ''
 
   return (
-    <div ref={dialogRef} className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/45 p-4" data-qa-dialog="tag-delete" data-impact={impactStatus}>
-      <section className="w-full max-w-[670px] -translate-y-7 rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
+    <div ref={dialogRef} className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/35 p-4" data-qa-dialog="tag-delete" data-impact={impactStatus}>
+      <section className="w-full max-w-[670px] -translate-y-5 rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
         <div>
           {/* 設計 `iTwNX`/`lUbvQ`。赤いゴミ箱を22pxで見出しの左に置く。 */}
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-danger-bg text-danger">
