@@ -19,6 +19,7 @@ import type {
   FormInputType,
   FormSection,
 } from '@line-crm/shared'
+import { newBlockId } from '@line-crm/shared'
 import ChoiceTable from './choice-table'
 import { cellInput, fieldInput, fieldSelect, type FormRefs } from './form-refs'
 
@@ -101,8 +102,8 @@ export default function BlockEditor({
         type,
         choiceMode: block.choiceMode ?? 'tag',
         choices: [
-          { id: `c_${Math.random().toString(36).slice(2, 8)}`, label: '選択肢1' },
-          { id: `c_${Math.random().toString(36).slice(2, 8)}`, label: '選択肢2' },
+          { id: newBlockId('c'), label: '選択肢1' },
+          { id: newBlockId('c'), label: '選択肢2' },
         ],
       })
       return

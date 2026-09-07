@@ -24,6 +24,7 @@ const COLOR_ROLES: Array<{
 ]
 
 export default function FormDesignSettings({
+  formId,
   value,
   ogTitle,
   ogDescription,
@@ -33,6 +34,7 @@ export default function FormDesignSettings({
   onOgDescriptionChange,
   onOgImageUrlChange,
 }: {
+  formId: string
   value: FormTheme | undefined
   ogTitle: string
   ogDescription: string
@@ -49,7 +51,7 @@ export default function FormDesignSettings({
     onChange({ ...theme, [key]: next })
   }
 
-  const close = () => router.replace('/form-submissions/edit?id=form-1&tab=basic')
+  const close = () => router.replace(`/form-submissions/edit?id=${encodeURIComponent(formId)}&tab=basic`)
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4" style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }} role="dialog" aria-modal="true" aria-label="デザイン設定">
