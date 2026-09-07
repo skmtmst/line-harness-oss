@@ -7,8 +7,8 @@ import {
 } from './feature-settings.js';
 
 describe('feature settings defaults', () => {
-  it('Worker の互換ミラーは共有機能カタログと完全一致する', () => {
-    expect(TOGGLEABLE_FEATURES).toEqual(FEATURE_IDS);
+  it('Worker は共有機能カタログをそのまま受付一覧にする', () => {
+    expect(TOGGLEABLE_FEATURES).toBe(FEATURE_IDS);
   });
 
   it('V2でオフの機能は保存値が無くても無効', () => {

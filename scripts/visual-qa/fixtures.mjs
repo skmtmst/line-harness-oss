@@ -5192,7 +5192,7 @@ export const MANUAL_LINKS = {
     { key: '5-1', keyKind: 'screen', name: 'シナリオ配信', url: 'https://help.line-harness.example/scenarios', status: 'ok', lastCheckedAt: '2026-08-27T19:00:00.000Z', lastHttpStatus: 200, lastError: null, version: 2 },
     { key: '33-1', keyKind: 'screen', name: 'LINEアカウント', url: null, status: 'broken', lastCheckedAt: null, lastHttpStatus: null, lastError: 'URL_UNSET', version: 1 },
   ],
-  total: 266,
+  total: 5,
   brokenCount: 2,
 }
 
