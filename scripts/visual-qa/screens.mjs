@@ -2616,7 +2616,7 @@ export const SCREENS = [
     states: {
       apis: ['**/api/booking/admin/settings*', '**/api/booking/admin/menus*', '**/api/booking/admin/availability*'],
       kinds: ['normal', 'loading', 'error'],
-    }, name: '28-1-A 受付枠と休業日', route: '/booking/staff/shifts', verdict: 'match', verdictNote: '**2026-09-07 Issue #414 で固定ポート3105/8792にて再撮影し、一致。** 曜日別受付時間、休業日、予約ルール、顧客向け○・△・×プレビュー、1時間あたりの受付上限、時間帯ごとの残数・state、設備ごとの上限を実契約データで表示した。通常・読込中・取得失敗を1440px・1920pxで撮影し、全8枚で横はみ出し0。', verdictSource: 'booking-settings-v6/tksPc-{normal,loading,error}.txt + tksPc-{normal,loading,error}-{1440,1920}.png', verdictHead: 'HEAD' },
+    }, name: '28-1-A 受付枠と休業日', route: '/booking/staff/shifts', verdict: 'match', verdictNote: '**2026-09-07 Issue #433 / PR #1198・#1188 の固定応答で再判定。** `/api/booking/admin/settings`・`menus`・`availability`・`resources` から曜日別受付時間、休業日、予約ルール、顧客向け○・△・×、時間帯ごとのcapacity/remaining/state、設備別上限を表示した。通常・読込中・取得失敗を1440/1920で再撮影し、全8枚で横はみ出し0。', verdictSource: 'booking-settings-v6/tksPc-{normal,loading,error}.txt + tksPc-{normal,loading,error}-{1440,1920}.png', verdictHead: '520c251a9' },
   { ...BOOKING_SET, node: 'GhOb3', name: '28-1-B 予約メニューをつくる', route: '/booking/menus/new',
     variants: [{ suffix: '-pencil-input', steps: [
       { fill: 'メニュー名', text: 'トリミング（小型犬）' },
@@ -2625,7 +2625,7 @@ export const SCREENS = [
       { fill: '分類', text: 'トリミング' },
       { fill: '説明', text: 'カット・シャンプー・爪切り・耳そうじが入ります。' },
     ] }],
-    verdict: 'match', verdictNote: '**2026-09-07 Issue #415 / V6共通作成画面を3107/8794で再撮影し、一致。** `variant="v6"` の作成骨格で番号付き5節、右側プレビュー・注意、下部固定アクションを設計どおり配置した。Pencilの入力例（メニュー名・時間・料金・分類・説明）は撮影変種で入力し、実データを作らずに1440/1920pxで目視比較した。両幅とも横はみ出し0。', verdictSource: 'booking-settings-v6/GhOb3.txt + GhOb3-pencil-input-{1440,1920}.png + 2026-09-07 visual comparison', verdictHead: 'e98decafa' },
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #433 / PR #1184 の固定応答で再判定。** `variant="v6"` の共通作成骨格で番号付き5節、右側プレビュー・注意、下部固定アクションを確認した。Pencil入力例（トリミング（小型犬）・105分・8,400円・分類・説明文）を変種で入力し、実データを作らず1440/1920で目視比較、両幅とも横はみ出し0。', verdictSource: 'booking-settings-v6/GhOb3.txt + GhOb3-pencil-input-{1440,1920}.png + 2026-09-07 visual comparison', verdictHead: '520c251a9' },
   {
     ...BOOKING_SET, node: 'W6465r', name: '28-1-C 一覧の状態（空・読込・エラー）',
     /* `**' + '/api/booking/admin/menus*` は `/menus/:id/staff` に届かない（`*` は `/` をまたがない）。この画面は呼ばないが、呼ぶようになったとき静かに素通りするのを防ぐ。 */
