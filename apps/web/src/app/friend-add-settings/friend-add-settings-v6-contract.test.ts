@@ -53,10 +53,10 @@ describe('V6 友だち追加時配信 7画面の契約', () => {
     expect(EDITOR).not.toContain("value: 'send_webhook'")
   })
 
-  it('テストが本番データを変更しないことを運用者へ伝える', () => {
+  it('テスト実行後だけ本番データを変更しないことを運用者へ伝える', () => {
     expect(EDITOR).toContain('stateChanged: false')
-    expect(EDITOR).toContain('テストは本番の登録、送信、タグ、マイル、回数を更新しません。')
     expect(EDITOR).toContain('本番の登録・送信・タグ・マイルは変更していません。')
+    expect(EDITOR).not.toContain('テストは本番の登録、送信、タグ、マイル、回数を更新しません。')
   })
 })
 
@@ -93,7 +93,7 @@ describe('V6 友だち追加時配信の運用者向け表示', () => {
 
   it('確認画面は案内と後続処理の2段にまとめる', () => {
     expect(EDITOR).toContain('<strong>登録直後のご案内</strong>')
-    expect(EDITOR).toContain('<strong>あわせて行うこと</strong>')
-    expect(EDITOR).toContain("definition.actions.map((action) => action.label).join('／')")
+    expect(EDITOR).toContain('<strong>タグ付与</strong>')
+    expect(EDITOR).toContain('<small>新規友だち</small>')
   })
 })
