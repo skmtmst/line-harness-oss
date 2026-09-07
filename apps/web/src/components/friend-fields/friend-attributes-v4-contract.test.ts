@@ -322,4 +322,23 @@ describe('友だち属性 V4 contract', () => {
     expect(read('app/tags/new/page.tsx')).toContain('<NewTagPageV4 />')
     expect(read('app/tags/edit/page.tsx')).toContain('<EditTagPageV4 />')
   })
+
+  it('タグ編集の削除確認は参照件数の実値を出し、取れなければ押せなくする', () => {
+    const source = read('components/friend-fields/edit-tag-page-v4.tsx')
+    // `load()` で取った `dependencies` を窓へ渡す。固定値を書かない。
+    expect(source).toContain('api.tags.dependencies(tagId, selectedAccountId)')
+    expect(source).toContain('dependencies={dependencies} dependenciesStatus={dependenciesStatus}')
+    expect(source).not.toMatch(/参照<\/dt><dd[^>]*>3件/)
+    expect(source).not.toMatch(/自動付与の参照<\/dt><dd[^>]*>1件/)
+    // 実値が出るのは「人が選ぶ参照」と「自動の参照」の合計。
+    expect(source).toContain('MANUAL_REF_KEYS')
+    expect(source).toContain('AUTO_REF_KEYS')
+    expect(source).toContain("manualRefs === null ? '—'")
+    expect(source).toContain("autoRefs === null ? '—'")
+    // 取れていないあいだは削除を押せなくし、理由を出す。
+    expect(source).toContain("const blocked = dependenciesStatus !== 'ready' || !dependencies")
+    expect(source).toContain('disabled={deleting || blocked || confirmation !== tag.name}')
+    expect(source).toContain('影響を確認しています')
+    expect(source).toContain('影響を確認できませんでした')
+  })
 })

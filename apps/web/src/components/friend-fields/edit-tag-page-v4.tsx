@@ -3,13 +3,46 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { Tag, TagGroup } from '@line-crm/shared'
-import { api, type TagDefinition } from '@/lib/api'
+import { api, type TagDefinition, type TagDependencies, type TagDeleteImpactReferences } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import TagEditorV4, { definitionsForSave, linkedActionFromDefinition, type TagEditorValues } from './tag-editor-v4'
 
-export function DeleteDialog({ tag, onCancel, onDelete, deleting, initialConfirmation = '' }: { tag: Tag; onCancel: () => void; onDelete: () => void; deleting: boolean; initialConfirmation?: string }) {
+/**
+ * 一覧の `DeleteTagDialog` (`tags-page-v4.tsx`) と同じ分け方。
+ *
+ * - 配信・シナリオなどの参照 … 人が選んで使っているもの(11種)
+ * - 自動付与の参照 … ひとりでに動くもの(7種)
+ */
+const MANUAL_REF_KEYS: Array<keyof TagDeleteImpactReferences> = [
+  'broadcasts', 'forms', 'templates', 'richMenus', 'webinars', 'events',
+  'bookingMenus', 'entryRoutes', 'trackedLinks', 'affiliateOffers', 'analyticsFunnels',
+]
+const AUTO_REF_KEYS: Array<keyof TagDeleteImpactReferences> = [
+  'scenarios', 'autoReplies', 'savedSearches', 'automations',
+  'commonActions', 'reminders', 'friendAddSettings',
+]
+
+function sumRefCounts(counts: TagDeleteImpactReferences, keys: Array<keyof TagDeleteImpactReferences>): number {
+  return keys.reduce((total, key) => total + (counts[key] ?? 0), 0)
+}
+
+export function DeleteDialog({ tag, dependencies, dependenciesStatus, onCancel, onDelete, deleting, initialConfirmation = '' }: { tag: Tag; dependencies: TagDependencies | null; dependenciesStatus: 'loading' | 'ready' | 'error'; onCancel: () => void; onDelete: () => void; deleting: boolean; initialConfirmation?: string }) {
   const [confirmation, setConfirmation] = useState(initialConfirmation)
+  /*
+   * 参照件数は `load()` で取った実値を出す。取れていないときは `—`。
+   * 0件と書くと「消しても大丈夫」と読み違える。**取れていないあいだは
+   * 削除を押せなくする。** 失敗を「参照0件」と読み違えて使用中の
+   * タグを消させないため(一覧の `DeleteTagDialog` と同じ作法)。
+   */
+  const manualRefs = dependencies ? sumRefCounts(dependencies.referenceCounts, MANUAL_REF_KEYS) : null
+  const autoRefs = dependencies ? sumRefCounts(dependencies.referenceCounts, AUTO_REF_KEYS) : null
+  const blocked = dependenciesStatus !== 'ready' || !dependencies
+  const blockedReason = dependenciesStatus === 'loading'
+    ? '影響を確認しています'
+    : dependenciesStatus === 'error'
+      ? '影響を確認できませんでした。開き直してください'
+      : ''
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/45 p-4">
       <section className="w-full max-w-[680px] rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
@@ -17,16 +50,16 @@ export function DeleteDialog({ tag, onCancel, onDelete, deleting, initialConfirm
         <p className="mt-2 text-sm leading-6 text-ink-secondary">削除すると、このタグを使っている設定と友だちへの付与状態に影響します。</p>
         <div className="mt-5 overflow-hidden rounded-control border border-hairline">
           <dl className="divide-y divide-hairline text-sm">
-            <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">タグが付いている友だち</dt><dd className="font-bold">{tag.friendCount ?? 0}人</dd></div>
-            <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">配信・シナリオなどの参照</dt><dd className="font-bold">3件</dd></div>
-            <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">自動付与の参照</dt><dd className="font-bold">1件</dd></div>
+            <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">タグが付いている友だち</dt><dd className="font-bold">{(dependencies?.friendCount ?? tag.friendCount ?? 0).toLocaleString('ja-JP')}人</dd></div>
+            <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">配信・シナリオなどの参照</dt><dd className="font-bold">{manualRefs === null ? '—' : `${manualRefs}件`}</dd></div>
+            <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">自動付与の参照</dt><dd className="font-bold">{autoRefs === null ? '—' : `${autoRefs}件`}</dd></div>
             <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">連動アクション</dt><dd className="font-bold">停止</dd></div>
             <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">すでに積んだマイル</dt><dd className="font-bold">そのまま残る</dd></div>
           </dl>
         </div>
         <p className="mt-4 rounded-control border border-danger/25 bg-danger-bg p-3 text-sm font-medium leading-6 text-danger">アフィリエイトや外部連携で使用中の場合は削除できません。削除後は元に戻せません。</p>
-        <label className="mt-5 block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">確認のため「{tag.name}」と入力してください</span><input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm outline-none focus:border-danger" /></label>
-        <div className="mt-6 flex justify-end gap-2"><button type="button" onClick={onCancel} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">キャンセル</button><button type="button" disabled={deleting || confirmation !== tag.name} onClick={onDelete} className="rounded-control bg-danger px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">{deleting ? '削除中…' : 'タグを削除'}</button></div>
+        <label className="mt-5 block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">確認のため「{tag.name}」と入力してください</span><input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} disabled={blocked} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm outline-none focus:border-danger disabled:bg-canvas-sunken" /></label>
+        <div className="mt-6 flex items-center justify-end gap-2">{blockedReason && <p className="min-w-0 flex-1 text-xs text-ink-faint">{blockedReason}</p>}<button type="button" onClick={onCancel} className="shrink-0 rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">キャンセル</button><button type="button" disabled={deleting || blocked || confirmation !== tag.name} onClick={onDelete} className="rounded-control bg-danger px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">{deleting ? '削除中…' : 'タグを削除'}</button></div>
       </section>
     </div>
   )
@@ -48,22 +81,38 @@ export default function EditTagPageV4() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  /*
+   * 削除確認に出す参照件数。`load()` で取った実値を `DeleteDialog` へ渡す。
+   * 取れていないのに開いたら、窓の中は `—` で削除は押せない。
+   */
+  const [dependencies, setDependencies] = useState<TagDependencies | null>(null)
+  const [dependenciesStatus, setDependenciesStatus] = useState<'loading' | 'ready' | 'error'>('loading')
 
   const load = useCallback(async () => {
     if (!tagId || !selectedAccountId) { setLoading(false); return }
     setLoading(true)
     try {
-      const [detail, dependencies, folders] = await Promise.all([
+      const [detail, dependenciesResult, folders] = await Promise.all([
         api.tags.definition(tagId, selectedAccountId),
         api.tags.dependencies(tagId, selectedAccountId),
         api.tagGroups.list(),
       ])
       if (folders.success) setGroups(folders.data)
+      if (dependenciesResult.success) {
+        setDependencies(dependenciesResult.data)
+        setDependenciesStatus('ready')
+      } else {
+        setDependencies(null)
+        setDependenciesStatus('error')
+      }
       if (!detail.success) throw new Error(detail.error)
       setDefinition(detail.data)
-      setTag({ ...detail.data.tag, friendCount: dependencies.success ? dependencies.data.friendCount : detail.data.tag.friendCount })
+      setTag({ ...detail.data.tag, friendCount: dependenciesResult.success ? dependenciesResult.data.friendCount : detail.data.tag.friendCount })
     } catch {
       setError('読み込みに失敗しました')
+      // 参照だけ取れていたのに消すと、窓が「取れていない」扱いになる。
+      // 取れていた分は残し、まだ無いときだけ失敗にする。
+      setDependenciesStatus((prev) => (prev === 'ready' ? prev : 'error'))
     } finally {
       setLoading(false)
     }
@@ -122,7 +171,7 @@ export default function EditTagPageV4() {
   return (
     <>
       <TagEditorV4 key={`${tag.id}:${tag.version ?? 1}`} mode="edit" groups={groups} tag={tag} accountId={selectedAccountId} initialApplyToExisting={retroactiveReference} initialRetroactiveOpen={retroactiveReference} referenceRetroactiveState={retroactiveReference} initialValues={{ reapplyPolicy: tag.reapplyPolicy ?? 'first_only', actions: (definition.automation?.actions ?? []).map((action) => linkedActionFromDefinition(action, tag.linkedActions?.find((saved) => saved.id === action.id))) }} saving={saving} error={error} notice={notice} onCancel={() => router.push('/tags')} onSave={save} onDelete={() => setDeleteOpen(true)} />
-      {deleteOpen && <DeleteDialog tag={tag} deleting={deleting} onCancel={() => setDeleteOpen(false)} onDelete={() => void remove()} />}
+      {deleteOpen && <DeleteDialog tag={tag} dependencies={dependencies} dependenciesStatus={dependenciesStatus} deleting={deleting} onCancel={() => setDeleteOpen(false)} onDelete={() => void remove()} />}
     </>
   )
 }

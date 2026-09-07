@@ -1,5 +1,6 @@
 import { Hono, type Context } from 'hono';
 import {
+  getFriendById,
   getReminders,
   reorderReminders,
   getReminderById,
@@ -31,7 +32,7 @@ import {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
-import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import {
   previewReminderDraft,
@@ -349,11 +350,14 @@ reminders.patch('/api/reminders/reorder', requireRole('owner', 'admin'), async (
   }
 });
 
-reminders.get('/api/reminders', async (c) => {
+reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId');
     let items: Awaited<ReturnType<typeof getReminders>>;
     if (lineAccountId) {
+      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+        return c.json({ success: false, error: 'Reminder not found' }, 404);
+      }
       /*
        * 並びは getReminders() と同じにする（161）。
        *
@@ -370,7 +374,14 @@ reminders.get('/api/reminders', async (c) => {
         .all();
       items = result.results as unknown as Awaited<ReturnType<typeof getReminders>>;
     } else {
-      items = await getReminders(c.env.DB);
+      const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      const rows = await getReminders(c.env.DB);
+      items = rows.filter((row) => {
+        const accountId = (row as { line_account_id?: string | null }).line_account_id ?? null;
+        return accountId == null
+          ? scope.canSeeUnassigned
+          : scope.allowedAccountIds.includes(accountId);
+      });
     }
     /*
      * 通の数を1回のクエリでまとめて数える。
@@ -810,12 +821,15 @@ reminders.post('/api/reminders/:id/steps', requireRole('owner', 'admin'), async 
   }
 });
 
-reminders.delete('/api/reminders/:reminderId/steps/:stepId', requireRole('owner', 'admin'), async (c) => {
+reminders.delete('/api/reminders/:id/steps/:stepId', requireRole('owner', 'admin'), async (c) => {
   try {
-    await deleteReminderStep(c.env.DB, c.req.param('stepId'));
+    const deleted = await deleteReminderStep(c.env.DB, c.req.param('id'), c.req.param('stepId'));
+    if (!deleted) {
+      return c.json({ success: false, error: 'Reminder step not found' }, 404);
+    }
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/reminders/:reminderId/steps/:stepId error:', err);
+    console.error('DELETE /api/reminders/:id/steps/:stepId error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -839,9 +853,16 @@ reminders.post('/api/reminders/:id/enroll/:friendId', requireRole('owner', 'admi
   }
 });
 
-reminders.get('/api/friends/:friendId/reminders', async (c) => {
+reminders.get('/api/friends/:friendId/reminders', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const friendId = c.req.param('friendId');
+    const friend = await getFriendById(c.env.DB, friendId);
+    const accountId = friend
+      ? ((friend as unknown as Record<string, unknown>).line_account_id as string | null) ?? null
+      : null;
+    if (!friend || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
     const items = await getFriendReminders(c.env.DB, friendId);
     return c.json({
       success: true,
