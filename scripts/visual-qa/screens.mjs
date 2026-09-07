@@ -402,7 +402,12 @@ export const SCREENS = [
   },
   {
     ...FRIENDS, node: 'Igi72', name: '3-1-B 友だち（詳細検索・14軸）',
-    steps: [{ click: '詳細条件' }],
+    steps: [
+      { click: '詳細条件' },
+      { select: 'タグ名を選ぶ', label: 'NEN会員', after: 300 },
+      { fill: 'input[placeholder="友だち情報欄名を入力"]', selector: true, text: '会員ランク', after: 200 },
+      { fill: 'input[placeholder="値を入力"]', selector: true, text: 'ゴールド', after: 700 },
+    ],
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#22 トップバーに人名が入っていたのを画面名へ（`I6UAdr`「友だち詳細」／`w8W4Eh`「統合ユーザー」）／#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#42 青の主ボタンを緑へ（`r7eSi` の「詳細を見る」4件、`w8W4Eh` の「プロフィールを編集」ほか）／#47 `[sticker]`→スタンプ／#48 表記の統一。設計画像は `docs/design-reference/friends-v6/` を撮り直した。**実装との突き合わせはこれから。** **`7b509106` の1440・1920を設計と見比べて、注記を書き直した。** 前の注記の「設計は入れ子の and/or を作れる」は**設計を読み違えていた**——設計も入れ子ではなく、AND の束と OR の束が1つずつ並ぶ形。実装もその2つの束になったので、**そこはもう差ではない**。現在の条件に一致する人数と「自動で再計算」、対象／並び順／表示件数、条件を保存、N人を表示 もそろっている。**まだ足りないもの**：①設計の OR は 対応マーク／シナリオ／イベント予約／カレンダー予約／回答フォーム／最終反応日／リマインダ／個別メモ／ステータスメッセージ／友だち登録日／その他 の11個。実装は シナリオ／予約／回答フォーム／最終反応日 の4個だけで、しかも**押せない灰色のまま置かれ、なぜ押せないかが書かれていない**。②設計の「表示する友だち」の節（表示中・非表示・ブロックした人 のチェックと「友だちの状態」の選択）が**まるごと無い**。③設計の「保存した検索から読み込む」が無い。④言葉の差：条件をリセット→条件をすべてクリア、対象：すべての友だち→対象 友だち中。**壊れ値・内部IDは0件。** **推奨修正**：まず②の節を足す。OR の軸は口の形が要るものが多いので、押せない灰色ではなく**何が接続されると選べるようになるかを本文に書く**。',
     verdictSource: 'friends-v6/Igi72.txt', verdictHead: '7b509106',
   },
@@ -481,7 +486,10 @@ export const SCREENS = [
   {
     ...FRIENDS, node: 'InCDe', name: '3-2-A 重複候補詳細・統合前確認',
     route: '/friends/identity-candidates',
-    states: { apis: ['**/api/identity-candidates*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    states: {
+      apis: ['**/api/identity-candidates*', '**/api/friends/duplicates/**'],
+      kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'],
+    },
     variants: [{ suffix: '-decide', steps: [{ qaOpen: 'InCDe', after: 700 }] }],
     verdict: 'unjudged',
     verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#22 トップバーに人名が入っていたのを画面名へ（`I6UAdr`「友だち詳細」／`w8W4Eh`「統合ユーザー」）／#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#42 青の主ボタンを緑へ（`r7eSi` の「詳細を見る」4件、`w8W4Eh` の「プロフィールを編集」ほか）／#47 `[sticker]`→スタンプ／#48 表記の統一。設計画像は `docs/design-reference/friends-v6/` を撮り直した。**実装との突き合わせはこれから。** **#600 `484c0cd8`（#598 `a13be90c` の上）で新規実装。設計 `InCDe` 3-2-A。** ルート `/friends/identity-candidates`。1440・1920とも横スクロール0。 **① 5状態を撮り分けた**：通常・読込・空・失敗・権限不足。**失敗と権限不足では候補を1件も描かない**（`page.tsx` は `review.state === \'ready\'` の中でだけ中身を組む）ので、見てよい人が決まっている名前・マスク値が断片で漏れない。 **② 未取得と実値0を分けている**：影響は 重複配信 `3通` ／ 注文（取得元を接続後に表示） `—（未取得）`。`impact.value === null` を `—（未取得）`、`0` を `0通` にする判断は `identity-view.ts:impactText`。 **③ 根拠に強さと確認済みの札**：確認済みのメールアドレスが同じ〈決め手になる／確認済み〉、表示名が似ている〈参考／未確認〉。「表示名やプロフィール画像だけの一致は、決め手にはしません。」も出る。 **④ 判定窓**（`data-qa-open="InCDe"`）は3つの判定と理由入力を持ち、**理由が空のうちは送りのボタンが押せない**。「別人として記録する」には「根拠が変わるまで候補へ戻しません。」が付く。友だち同士なので再処理の欄は出さない（Workerが422を返すため）。 **⑤ 消えないことと取り消しの効き方**を判定前と判定窓の両方に出す。 設計の「統合プロフィールに採用する値」表は、**項目ごとの採用値を保存する口が契約に無い**ため作っていない（`DecideIdentityCandidateRequest` は `decision` と `reason` だけ）。押しても何も起きない操作を置かなかった。 **`undefined`・`NaN`・`Invalid Date`・`API error` は0件。平文のメール・電話・内部IDの露出なし。** 取得元：`friends-v6/InCDe-normal.txt`・`InCDe-forbidden.txt` ＋ `identity-view.ts` ＋ `friends/identity-candidates/page.tsx`',
@@ -523,9 +531,16 @@ export const SCREENS = [
         ],
       },
       {
+        suffix: '-unlink',
+        steps: [
+          { qaOpen: 'w8W4Eh', after: 900 },
+          { qaOpen: 'w8W4Eh-unlink', after: 700 },
+        ],
+      },
+      {
         /* 保存だけ 409 にして、押した先の版競合を撮る。読み込みは素通し。 */
         suffix: '-conflict',
-        state: { apis: ['**/api/friends/people/**'], kind: 'conflict' },
+        state: { apis: ['**/api/friends/people/**'], kind: 'conflict', method: 'PATCH' },
         steps: [
           { qaOpen: 'w8W4Eh', after: 900 },
           { click: '優先順位を変更', after: 700 },
@@ -3437,6 +3452,28 @@ const ISSUE_265_REVIEW = {
 }
 
 /**
+ * board #381。#1123 の実API契約と #1156 の固定データを取り込み、
+ * 2026-09-07 に 3102/8789 で対象3 Node・全状態を1440/1920px撮影した。
+ */
+const ISSUE_381_REVIEW = {
+  Igi72: {
+    verdict: 'match',
+    note: '一致。AND条件、ORの11軸、表示する友だち、対象・並び順・表示件数、保存済み条件の読込・保存、該当人数と実行操作を設計順に表示し、検索条件とsaved-viewsの実APIへ接続した。設計と固定データで人数・タグ名は異なるが、値を作らずAPI応答を表示している。1440/1920pxを撮影し、横はみ出し0、壊れ値・内部ID0件。',
+    source: 'friends-v6/Igi72.txt + Igi72-{1440,1920}.png',
+  },
+  InCDe: {
+    verdict: 'match',
+    note: '一致。判定根拠、結び付け後の影響、候補2件、項目ごとの採用値、タグ、判断履歴、別人・保留・結び付けの3判断、理由必須、利用目的と規約の確認を設計順に表示し、候補取得と判定保存の実APIへ接続した。連絡先は安全のためマスク済み値だけを表示する。通常・読込中・0件・取得失敗・権限不足・判定窓の全14枚で横はみ出し0、壊れ値・内部ID0件。',
+    source: 'friends-v6/InCDe-{normal,loading,empty,error,forbidden,decide}.txt + 同名-{1440,1920}.png',
+  },
+  w8W4Eh: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・安全な更新契約待ち。上段3カード、結び付く友だち、統合属性、タグ、横断履歴、配信元の優先順、解除、409の再読込を表示し、取得・配信優先順・解除の実APIへ接続した。プロフィール候補APIはマスク済み表示値だけを返す一方、更新APIは生値を要求するため、マスク文字列を保存して連絡先を壊さないよう「統合プロフィールを編集」だけ未接続。通常・読込中・0件・取得失敗・権限不足・編集・解除・版競合の全18枚で横はみ出し0、壊れ値・内部ID0件。',
+    source: 'friends-v6/w8W4Eh-{normal,loading,empty,error,forbidden,edit,unlink,conflict}.txt + 同名-{1440,1920}.png',
+  },
+}
+
+/**
  * board #297。2026-09-07 に development 14b51dc8c を 3101/8788 で起動し、
  * 機能4の21 Nodeを設計1920pxと実装1440/1920pxで比較した結果。
  * board #310・PR #1056 の共通固定データを取り込み、画面側の構造と実値を照合した。
@@ -4052,6 +4089,13 @@ for (const screen of SCREENS) {
     screen.verdict = issue265Review.verdict
     screen.verdictNote = `**2026-09-06 Issue #265で修正・再判定。** ${issue265Review.note}`
     screen.verdictSource = issue265Review.source
+    delete screen.verdictHead
+  }
+  const issue381Review = ISSUE_381_REVIEW[screen.node]
+  if (screen.feature === 3 && issue381Review) {
+    screen.verdict = issue381Review.verdict
+    screen.verdictNote = `**2026-09-07 Issue #381で実API接続後に再判定。** ${issue381Review.note}`
+    screen.verdictSource = issue381Review.source
     delete screen.verdictHead
   }
   const issue297Review = ISSUE_297_REVIEW[screen.node]

@@ -34,6 +34,7 @@ import type {
   SupportMark,
   Folder,
   SavedSearch,
+  SavedSearchConditions,
   SavedSegmentPreset,
   SavedSegmentConditions,
   MediaItem,
@@ -100,6 +101,55 @@ import type {
   DecideIdentityCandidateRequest,
   UndoIdentityCandidateRequest,
 } from '@line-crm/shared'
+
+export type FriendProfileCandidateOption = {
+  sourceFriendId: string
+  sourceLabel: string
+  valuePreview: string | null
+  verified: boolean
+}
+
+export type FriendProfileCandidate = {
+  fieldKey: string
+  fieldLabel: string
+  options: FriendProfileCandidateOption[]
+}
+
+export type FriendTagCandidate = {
+  id: string
+  name: string
+  color: string | null
+  sourceFriendIds: string[]
+}
+
+export type IdentityCandidateWithProfiles = IdentityCandidateDetail & {
+  profileCandidates: FriendProfileCandidate[]
+  tagCandidates: FriendTagCandidate[]
+}
+
+export type MergedPersonWithCandidates = MergedPersonDetail & {
+  profileCandidates: FriendProfileCandidate[]
+  tagCandidates: FriendTagCandidate[]
+}
+
+export type FriendSavedView = {
+  id: string
+  name: string
+  conditions: SavedSearchConditions
+  revision: number
+  isShared: boolean
+  ownerId: string | null
+  lineAccountId: string | null
+  displayOrder: number
+  match: {
+    total: number | null
+    byChannel: { line: number | null; mail: number | null }
+    calculatedAt: string
+    error: string | null
+  }
+  createdAt: string
+  updatedAt: string
+}
 
 export type CommonVarHistoryItem = {
   id: string
@@ -1529,6 +1579,8 @@ export type FriendListParams = {
   scenarioId?: string
   /** サーバーへ保存したAND/OR条件。選択中のLINEアカウントが必須。 */
   savedSearchId?: string
+  /** V6の14軸。AND/ORを同じJSONのまま件数確認と一覧へ渡す。 */
+  conditions?: SavedSearchConditions
 
   // ── 詳細検索（設計 V2 2-2 の「絞り込み条件を設定」）─────────────────
   // どれも足し算。指定が無ければ何も起きない。
@@ -3320,6 +3372,7 @@ export const api = {
       if (params?.operatorId) query.operatorId = params.operatorId
       if (params?.scenarioId) query.scenarioId = params.scenarioId
       if (params?.savedSearchId) query.savedSearchId = params.savedSearchId
+      if (params?.conditions) query.conditions = JSON.stringify(params.conditions)
       if (params?.tagIds?.length) query.tagIds = params.tagIds.join(',')
       if (params?.excludeTagIds?.length) query.excludeTagIds = params.excludeTagIds.join(',')
       if (params?.statusMessage) query.statusMessage = params.statusMessage
@@ -7612,6 +7665,15 @@ export const api = {
         { method: 'POST' },
       )
     },
+    getFriendDuplicate: (id: string) =>
+      fetchApi<ApiResponse<IdentityCandidateWithProfiles>>(
+        `/api/friends/duplicates/${encodeURIComponent(id)}`,
+      ),
+    decideFriendDuplicate: (id: string, body: DecideIdentityCandidateRequest) =>
+      fetchApi<ApiResponse<IdentityCandidateWithProfiles>>(
+        `/api/friends/duplicates/${encodeURIComponent(id)}`,
+        { method: 'PATCH', body: JSON.stringify(body) },
+      ),
   },
   /**
    * 統合ユーザーの詳細（設計 `w8W4Eh` 3-3-A）。
@@ -7619,11 +7681,11 @@ export const api = {
    * 更新は**読み込んだ `revision` を必ず送る**。先に別の人が変えていれば
    * Worker が 409 `STALE_PERSON` を返すので、画面は上書きせず読み直す。
    *
-   * 結び付け・解除の口はここに無い。#598 の候補判定・取り消しを使う。
+   * 解除は元の友だちと履歴を残す専用のDELETE契約を使う。
    */
   mergedPeople: {
     get: (id: string) =>
-      fetchApi<ApiResponse<MergedPersonDetail>>(
+      fetchApi<ApiResponse<MergedPersonWithCandidates>>(
         `/api/friends/people/${encodeURIComponent(id)}`,
       ),
     update: (id: string, body: UpdateMergedPersonRequest) =>
@@ -7638,6 +7700,22 @@ export const api = {
       fetchApi<ApiResponse<MergedPersonDetail>>(
         `/api/friends/people/${encodeURIComponent(id)}/delivery-priorities`,
         { method: 'PATCH', body: JSON.stringify(body) },
+      ),
+    unlink: (id: string, friendId: string, body: { expectedRevision: number; reason: string }) =>
+      fetchApi<ApiResponse<MergedPersonDetail>>(
+        `/api/friends/people/${encodeURIComponent(id)}/links/${encodeURIComponent(friendId)}`,
+        { method: 'DELETE', body: JSON.stringify(body) },
+      ),
+  },
+  friendSavedViews: {
+    list: (accountId: string) =>
+      fetchApi<ApiResponse<{ items: FriendSavedView[]; total: number }>>(
+        `/api/friends/saved-views?lineAccountId=${encodeURIComponent(accountId)}`,
+      ),
+    create: (accountId: string, body: { name: string; conditions: SavedSearchConditions; isShared?: boolean }) =>
+      fetchApi<ApiResponse<FriendSavedView>>(
+        `/api/friends/saved-views?lineAccountId=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify(body) },
       ),
   },
   duplicates: {
