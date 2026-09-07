@@ -116,7 +116,12 @@ export default function ReminderRunsPage() {
   }, [isPlannedView])
 
   const load = useCallback(async () => {
-    if (!reminderId) return
+    // idなしで帰ると「読み込んでいます」が永遠に出る。先に止めて文面を出す。
+    if (!reminderId) {
+      setLoading(false)
+      setError('リマインダが指定されていません。一覧から選び直してください。')
+      return
+    }
     setLoading(true)
     setError('')
     // 読み直しに失敗したとき、前に取れた数字を現在値として残さない。
@@ -164,6 +169,8 @@ export default function ReminderRunsPage() {
     }
   }
 
+  // 書き出しの上限。実行結果が多いとき、手元に全部ため込むと固まる。
+  const EXPORT_LIMIT = 5000
   const exportCsv = async () => {
     if (!reminderId || exporting) return
     setExporting(true)
@@ -171,6 +178,7 @@ export default function ReminderRunsPage() {
     try {
       const all: ReminderDeliveryRun[] = []
       let offset = 0
+      let total = 0
       for (;;) {
         const response = await api.reminders.runs(reminderId, {
           status: status || undefined,
@@ -178,9 +186,16 @@ export default function ReminderRunsPage() {
           offset,
         })
         if (!response.success) throw new Error(response.error)
-        all.push(...response.data.items)
+        total = response.data.pagination.total
+        for (const item of response.data.items) {
+          if (all.length >= EXPORT_LIMIT) break
+          all.push(item)
+        }
         offset += response.data.items.length
-        if (offset >= response.data.pagination.total || response.data.items.length === 0) break
+        if (all.length >= EXPORT_LIMIT || offset >= total || response.data.items.length === 0) break
+      }
+      if (total > EXPORT_LIMIT) {
+        setActionMessage(`件数が多いため、全${total.toLocaleString('ja-JP')}件のうち${EXPORT_LIMIT.toLocaleString('ja-JP')}件まで書き出しました。`)
       }
       const url = URL.createObjectURL(new Blob([csvFor(all)], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
