@@ -8,7 +8,7 @@ import type {
   MediaItem,
 } from '@line-crm/shared'
 import { LayoutGrid, List as ListIcon } from 'lucide-react'
-import { api, ApiError } from '@/lib/api'
+import { api, ApiError, type MediaQuota } from '@/lib/api'
 import Button from './media-button'
 import Dialog from '@/components/shared/dialog'
 import {
@@ -78,6 +78,21 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
+function formatStorage(bytes: number): string {
+  if (bytes < 1024 * 1024 * 1024) return `${Math.round(bytes / 1024 / 1024)}MB`
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(1)}GB`
+}
+
+function mediaSizeLimit(item: MediaItem): number {
+  if (item.kind === 'image') return 10 * 1024 * 1024
+  if (item.kind === 'file') return 20 * 1024 * 1024
+  return 200 * 1024 * 1024
+}
+
+function isNearLimit(item: MediaItem): boolean {
+  return item.sizeBytes >= mediaSizeLimit(item) * 0.8
+}
+
 function formatMediaDetails(item: MediaItem): string {
   const format = item.mimeType.split('/').at(-1)?.replace('jpeg', 'jpg').toUpperCase() ?? ''
   const details = [format]
@@ -106,6 +121,8 @@ export default function MediaLibraryPage() {
   const [items, setItems] = useState<MediaItem[]>([])
   const [loading, setLoading] = useState(true)
   const [loadFailed, setLoadFailed] = useState(false)
+  const [quota, setQuota] = useState<MediaQuota | null>(null)
+  const [quotaFailed, setQuotaFailed] = useState(false)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [folders, setFolders] = useState<Folder[]>([])
@@ -120,6 +137,7 @@ export default function MediaLibraryPage() {
   )
   const [query, setQuery] = useState('')
   const [showUnusedOnly, setShowUnusedOnly] = useState(false)
+  const [showNearLimitOnly, setShowNearLimitOnly] = useState(false)
   const [sort, setSort] = useState<MediaSort>('newest')
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
@@ -183,20 +201,28 @@ export default function MediaLibraryPage() {
     const accountAtRequest = selectedAccountId
     if (!accountAtRequest) {
       setItems([])
+      setQuota(null)
       setLoading(false)
       return
     }
     setLoading(true)
     setLoadFailed(false)
+    setQuotaFailed(false)
     setError('')
     try {
-      const [res, folderResponse] = await Promise.all([
+      const [res, folderResponse, quotaResponse] = await Promise.all([
         api.media.list(accountAtRequest),
         api.folders.list('media'),
+        api.media.quota(accountAtRequest).catch(() => null),
       ])
       if (accountAtRequest !== latestAccountRef.current) return
       if (res.success) setItems(res.data)
       if (folderResponse.success) setFolders(folderResponse.data)
+      if (quotaResponse?.success) setQuota(quotaResponse.data)
+      else {
+        setQuota(null)
+        setQuotaFailed(true)
+      }
     } catch {
       if (accountAtRequest === latestAccountRef.current) setLoadFailed(true)
     } finally {
@@ -409,6 +435,7 @@ export default function MediaLibraryPage() {
         kinds.has(item.kind) &&
         (!folderFilter || (folderFilter === UNGROUPED ? item.folderId === null : item.folderId === folderFilter)) &&
         (!showUnusedOnly || item.usageCount === 0) &&
+        (!showNearLimitOnly || isNearLimit(item)) &&
         (!needle || item.filename.toLowerCase().includes(needle)),
     )
     return next.toSorted((left, right) => {
@@ -422,7 +449,7 @@ export default function MediaLibraryPage() {
       }
       return right.createdAt.localeCompare(left.createdAt)
     })
-  }, [folderFilter, items, kinds, query, showUnusedOnly, sort])
+  }, [folderFilter, items, kinds, query, showNearLimitOnly, showUnusedOnly, sort])
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
   const current = useMemo(
@@ -448,6 +475,11 @@ export default function MediaLibraryPage() {
           setDetailsFor(null)
           setReplacementFor(item)
         }}
+        onVersionCreated={(message) => {
+          setDetailsFor(null)
+          setSuccessMessage(message)
+          void load()
+        }}
       />
     )
   }
@@ -471,9 +503,20 @@ export default function MediaLibraryPage() {
           <Button type="button" onClick={() => setAddingFolder(true)}>フォルダを追加</Button>
           <Button type="button" variant="primary" onClick={() => setUploadOpen(true)}>ファイルを入れる</Button>
         </div>
-        <div className="text-right">
-          <p className="text-ink-secondary text-nano font-semibold">使っている容量 <span className="text-ink ml-1">—</span></p>
-          <p className="text-ink-faint text-xs">容量集計APIが接続されると、使用量と上限を表示します。</p>
+        <div className="w-full max-w-xs text-right">
+          <p className="text-ink-secondary text-nano font-semibold">
+            使っている容量 <span className="text-ink ml-1">{quota ? `${formatStorage(quota.usageBytes)} / ${formatStorage(quota.limitBytes)}` : '—（未取得）'}</span>
+          </p>
+          {quota ? (
+            <>
+              <div className="bg-canvas-sunken mt-1 ml-auto h-1.5 w-56 overflow-hidden rounded-pill" role="progressbar" aria-label="保存容量" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, Math.round(quota.usageRate * 100))}>
+                <div className={`h-full rounded-pill ${quota.state === 'full' ? 'bg-danger' : quota.state === 'warning' ? 'bg-warning' : 'bg-accent-deep'}`} style={{ width: `${Math.min(100, quota.usageRate * 100)}%` }} />
+              </div>
+              <p className="text-ink-faint mt-1 text-xs">残り {formatStorage(quota.remainingBytes)}{quota.reservedBytes > 0 ? `（送信のため確保中 ${formatStorage(quota.reservedBytes)} を含む）` : ''}</p>
+            </>
+          ) : (
+            <p className={quotaFailed ? 'text-danger text-xs' : 'text-ink-faint text-xs'}>保存容量を確認できませんでした。</p>
+          )}
         </div>
       </div>
 
@@ -593,6 +636,7 @@ export default function MediaLibraryPage() {
           onChange={() => {
             setKinds(new Set(KINDS.map((kind) => kind.key)))
             setShowUnusedOnly(false)
+            setShowNearLimitOnly(false)
             setPage(1)
           }}
         >
@@ -605,6 +649,7 @@ export default function MediaLibraryPage() {
             onChange={() => {
               setKinds(new Set([kind.key]))
               setShowUnusedOnly(false)
+              setShowNearLimitOnly(false)
               setPage(1)
             }}
           >
@@ -615,15 +660,24 @@ export default function MediaLibraryPage() {
           selected={showUnusedOnly}
           onChange={(selectedValue) => {
             setShowUnusedOnly(selectedValue)
+            setShowNearLimitOnly(false)
             if (selectedValue) setKinds(new Set(KINDS.map((kind) => kind.key)))
             setPage(1)
           }}
         >
           使っていない
         </FilterChip>
-        <span className="text-ink-faint text-xs" title="容量集計APIが未接続のため絞り込めません">
-          上限に近い：—（容量未接続）
-        </span>
+        <FilterChip
+          selected={showNearLimitOnly}
+          onChange={(selectedValue) => {
+            setShowNearLimitOnly(selectedValue)
+            setShowUnusedOnly(false)
+            if (selectedValue) setKinds(new Set(KINDS.map((kind) => kind.key)))
+            setPage(1)
+          }}
+        >
+          上限に近い
+        </FilterChip>
       </div>
 
       <div data-design-node="h8pBZr">

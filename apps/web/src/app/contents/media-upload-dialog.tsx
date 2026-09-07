@@ -7,48 +7,24 @@ import { ApiError, api } from '@/lib/api'
 import Button from './media-button'
 import Select from '@/components/shared/select'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import { MEDIA_ACCEPT, putMediaFile, validateMediaFile } from './media-direct-upload'
 
-type UploadState = 'ready' | 'uploading' | 'done' | 'error'
+type UploadState = 'ready' | 'preparing' | 'uploading' | 'verifying' | 'done' | 'error'
 
 type UploadEntry = {
   file: File
   state: UploadState
   message: string
   retryable: boolean
+  progress: number
 }
-
-const ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,video/mp4,audio/mpeg,audio/mp4,application/pdf'
 
 const LIMITS = [
   { label: '画像', note: 'JPG・PNG・GIF・WebP ／ 10MBまで' },
-  { label: '音声', note: 'MP3・M4A ／ LINEは200MBまで（この画面からは30MBまで）' },
-  { label: '動画', note: 'MP4 ／ LINEは200MBまで（この画面からは90MBまで）' },
+  { label: '音声', note: 'MP3・M4A ／ 200MBまで' },
+  { label: '動画', note: 'MP4 ／ 200MBまで' },
   { label: 'PDF', note: '20MBまで。LINEでは直接送れないので、リンクとして使います' },
 ]
-
-function limitBytes(file: File): number | null {
-  if (file.type.startsWith('image/')) return 10 * 1024 * 1024
-  if (file.type.startsWith('audio/')) return 30 * 1024 * 1024
-  if (file.type === 'video/mp4') return 90 * 1024 * 1024
-  if (file.type === 'application/pdf') return 20 * 1024 * 1024
-  return null
-}
-
-function validate(file: File): string {
-  const limit = limitBytes(file)
-  if (limit == null) return 'この形式は登録できません'
-  if (file.size > limit) return `${Math.round(limit / 1024 / 1024)}MBを超えています`
-  return ''
-}
-
-function readDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result))
-    reader.onerror = () => reject(new Error('読み取りに失敗しました'))
-    reader.readAsDataURL(file)
-  })
-}
 
 export default function MediaUploadDialog({
   open,
@@ -91,8 +67,8 @@ export default function MediaUploadDialog({
 
   function stage(files: File[]) {
     const next = files.slice(0, 20).map((file) => {
-      const message = validate(file)
-      return { file, state: message ? 'error' : 'ready', message, retryable: false } satisfies UploadEntry
+      const message = validateMediaFile(file)
+      return { file, state: message ? 'error' : 'ready', message, retryable: false, progress: 0 } satisfies UploadEntry
     })
     setEntries(next)
     setError(files.length > 20 ? 'いちどに登録できるのは20件までです。先頭の20件を表示しています。' : '')
@@ -103,35 +79,67 @@ export default function MediaUploadDialog({
     setBusy(true)
     setError('')
     let completed = 0
-    for (let index = 0; index < entries.length; index += 1) {
-      if (entries[index]?.state !== 'ready') continue
-      setEntries((current) => current.map((entry, entryIndex) => (
-        entryIndex === index ? { ...entry, state: 'uploading', message: '登録しています' } : entry
-      )))
-      try {
-        const entry = entries[index]
-        if (!entry) continue
-        const data = await readDataUrl(entry.file)
-        const response = await api.media.upload({
-          accountId,
+    const pending = entries
+      .map((entry, index) => ({ entry, index }))
+      .filter(({ entry }) => entry.state === 'ready')
+    setEntries((current) => current.map((entry) => (
+      entry.state === 'ready' ? { ...entry, state: 'preparing', message: '送信を準備しています', progress: 0 } : entry
+    )))
+    try {
+      const prepared = await api.media.prepareUploads({
+        accountId,
+        files: pending.map(({ entry }) => ({
           filename: entry.file.name,
           mimeType: entry.file.type,
-          data,
+          sizeBytes: entry.file.size,
           folderId: folderId || null,
-        })
-        if (!response.success) throw new Error(response.error)
-        completed += 1
-        setEntries((current) => current.map((item, entryIndex) => (
-          entryIndex === index ? { ...item, state: 'done', message: '入りました', retryable: false } : item
-        )))
-      } catch (caught) {
-        const message = caught instanceof ApiError || caught instanceof Error
-          ? caught.message
-          : '登録できませんでした'
-        setEntries((current) => current.map((item, entryIndex) => (
-          entryIndex === index ? { ...item, state: 'error', message, retryable: true } : item
-        )))
+        })),
+      })
+      if (!prepared.success || prepared.data.sessions.length !== pending.length) {
+        throw new Error('送信の準備結果を確認できませんでした')
       }
+      for (let position = 0; position < pending.length; position += 1) {
+        const selected = pending[position]
+        const session = prepared.data.sessions[position]
+        if (!selected || !session) continue
+        const { index, entry } = selected
+        try {
+          setEntries((current) => current.map((item, entryIndex) => (
+            entryIndex === index ? { ...item, state: 'uploading', message: '送信中 0%', progress: 0 } : item
+          )))
+          const etag = await putMediaFile(session, entry.file, (progress) => {
+            setEntries((current) => current.map((item, entryIndex) => (
+              entryIndex === index
+                ? { ...item, progress, message: `送信中 ${progress}%` }
+                : item
+            )))
+          })
+          setEntries((current) => current.map((item, entryIndex) => (
+            entryIndex === index ? { ...item, state: 'verifying', message: '中身を確認しています', progress: 100 } : item
+          )))
+          const response = await api.media.completeUpload(session.id, { accountId, etag })
+          if (!response.success || response.data.status !== 'completed') throw new Error('登録を完了できませんでした')
+          completed += 1
+          setEntries((current) => current.map((item, entryIndex) => (
+            entryIndex === index ? { ...item, state: 'done', message: '入りました', retryable: false, progress: 100 } : item
+          )))
+        } catch (caught) {
+          const message = caught instanceof ApiError || caught instanceof Error
+            ? caught.message
+            : '登録できませんでした'
+          setEntries((current) => current.map((item, entryIndex) => (
+            entryIndex === index ? { ...item, state: 'error', message, retryable: true } : item
+          )))
+        }
+      }
+    } catch (caught) {
+      const message = caught instanceof ApiError || caught instanceof Error
+        ? caught.message
+        : '送信を準備できませんでした'
+      setEntries((current) => current.map((item) => (
+        item.state === 'preparing' ? { ...item, state: 'error', message, retryable: true } : item
+      )))
+      setError(message)
     }
     setBusy(false)
     if (completed > 0) onComplete()
@@ -177,7 +185,7 @@ export default function MediaUploadDialog({
           id={inputId}
           type="file"
           multiple
-          accept={ACCEPT}
+          accept={MEDIA_ACCEPT}
           className="sr-only"
           onChange={(event) => stage([...(event.target.files ?? [])])}
         />
@@ -185,7 +193,7 @@ export default function MediaUploadDialog({
         <div className="bg-info-bg text-info rounded-control p-3 text-xs leading-5">
           <p className="font-bold">LINEで送れる大きさ（超えると入れられません）</p>
           {LIMITS.map((limit) => <p key={limit.label}>{limit.label} {limit.note}</p>)}
-          <p className="mt-2 font-semibold">200MBの音声・動画を入れるには、R2へ直接送る登録経路の接続が必要です。</p>
+          <p className="mt-2 font-semibold">大きなファイルも管理画面を経由せず、保存先へ直接送ります。</p>
           <p className="mt-2 font-semibold">中身の形式とファイル名の拡張子が食い違うものは保存できません。</p>
           <p className="font-semibold">公開リンクが作られるため、個人情報の取り扱いに注意してください。</p>
         </div>
@@ -207,14 +215,16 @@ export default function MediaUploadDialog({
                   </div>
                   <p className="text-ink-faint mt-1 text-xs">{(entry.file.size / 1024 / 1024).toFixed(1)}MB</p>
                   {entry.state === 'done' ? <div className="bg-success mt-2 h-1 w-full rounded-pill" aria-hidden="true" /> : null}
-                  {entry.state === 'uploading' ? <div className="bg-info mt-2 h-1 w-full animate-pulse rounded-pill" aria-hidden="true" /> : null}
+                  {entry.state === 'uploading' || entry.state === 'preparing' || entry.state === 'verifying' ? (
+                    <progress className="mt-2 h-1 w-full" max={100} value={entry.progress} aria-label={`${entry.file.name}の送信進捗`} />
+                  ) : null}
                   {entry.state === 'error' ? <div className="bg-danger mt-2 h-1 w-full rounded-pill" aria-hidden="true" /> : null}
                   {entry.state === 'error' && entry.retryable ? (
                     <button
                       type="button"
                       className="text-action mt-2 text-xs font-bold"
                       onClick={() => setEntries((current) => current.map((item, entryIndex) => (
-                        entryIndex === index ? { ...item, state: 'ready', message: '', retryable: false } : item
+                        entryIndex === index ? { ...item, state: 'ready', message: '', retryable: false, progress: 0 } : item
                       )))}
                     >
                       この1件を再試行

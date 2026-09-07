@@ -3132,6 +3132,53 @@ export type FriendAddRunList = {
   }
 }
 
+export type MediaQuota = {
+  usageBytes: number
+  reservedBytes: number
+  limitBytes: number
+  remainingBytes: number
+  usageRate: number
+  state: 'normal' | 'notice' | 'warning' | 'full'
+}
+
+export type MediaUploadSession = {
+  id: string
+  filename: string
+  sizeBytes: number
+  targetMediaId: string | null
+  method: 'PUT'
+  /** 15分で失効するため、画面や履歴へ保存しない。 */
+  uploadUrl: string
+  requiredHeaders: Record<string, string>
+  expiresAt: string
+}
+
+export type MediaUploadCompletion = {
+  uploadSessionId: string
+  status: 'verified' | 'completed'
+  mediaId?: string | null
+  targetMediaId?: string | null
+}
+
+export type MediaVersionPreview = {
+  mediaId: string
+  uploadSessionId: string
+  currentVersionNo: number
+  previewToken: string
+  blockers: Array<'different_kind' | 'upload_not_verified'>
+  canReplace: boolean
+}
+
+export type MediaVersionResult = {
+  id: string
+  mediaId: string
+  versionNo: number
+  mimeType: string
+  sizeBytes: number
+  changeReason: string
+  createdAt: string
+}
+
 export const api = {
   system: {
     health: () =>
@@ -4086,6 +4133,42 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+    quota: (accountId: string) =>
+      fetchApi<ApiResponse<MediaQuota>>(
+        `/api/media/quota?accountId=${encodeURIComponent(accountId)}`,
+      ),
+    prepareUploads: (data: {
+      accountId: string
+      files: Array<{
+        filename: string
+        mimeType: string
+        sizeBytes: number
+        folderId?: string | null
+        targetMediaId?: string | null
+      }>
+    }) => fetchApi<ApiResponse<{ sessions: MediaUploadSession[] }>>('/api/media/upload-sessions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    completeUpload: (sessionId: string, data: { accountId: string; etag: string }) =>
+      fetchApi<ApiResponse<MediaUploadCompletion>>(
+        `/api/media/upload-sessions/${encodeURIComponent(sessionId)}/complete`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+    previewVersion: (
+      id: string,
+      data: { accountId: string; uploadSessionId: string },
+    ) => fetchApi<ApiResponse<MediaVersionPreview>>(
+      `/api/media/${encodeURIComponent(id)}/replacement-preview`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+    createVersion: (
+      id: string,
+      data: { accountId: string; uploadSessionId: string; previewToken: string; changeReason: string },
+    ) => fetchApi<ApiResponse<MediaVersionResult>>(
+      `/api/media/${encodeURIComponent(id)}/versions`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
     update: (id: string, accountId: string, data: { filename?: string; folderId?: string | null }) =>
       fetchApi<ApiResponse<MediaItem>>(`/api/media/${id}?accountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',
