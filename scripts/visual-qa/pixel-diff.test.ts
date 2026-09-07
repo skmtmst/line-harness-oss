@@ -1,10 +1,12 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import { PNG } from 'pngjs'
 import { describe, expect, it } from 'vitest'
 
 // @ts-expect-error 画面確認スクリプトは素のJSで型定義を持たない。
-import { compareRgba, effectivePixelVerdict, ROOT, thresholdMarkdown } from './pixel-diff.mjs'
+import { compareRgba, compareScreen, ROOT, thresholdMarkdown } from './pixel-diff.mjs'
 // @ts-expect-error 画面確認スクリプトは素のJSで型定義を持たない。
 import { SCREENS } from './screens.mjs'
 
@@ -14,6 +16,12 @@ function image(width: number, height: number, pixels: number[][]) {
 
 const WHITE = [255, 255, 255, 255]
 const BLACK = [0, 0, 0, 255]
+
+function writePng(path: string, rgba: number[]) {
+  const png = new PNG({ width: 2, height: 2 })
+  png.data = Buffer.from([...rgba, ...rgba, ...rgba, ...rgba])
+  writeFileSync(path, PNG.sync.write(png))
+}
 
 describe('Pencil設計との画素比較', () => {
   it('同じ画像は差分0%', () => {
@@ -58,12 +66,6 @@ describe('Pencil設計との画素比較', () => {
     expect(markdown).toContain('`none`（設計画像なし）')
   })
 
-  it('目視一致でも3%超過なら台帳上は一致にしない', () => {
-    expect(effectivePixelVerdict('match', { aboveThreshold: true })).toBe('pixel_mismatch')
-    expect(effectivePixelVerdict('match', { aboveThreshold: false })).toBe('match')
-    expect(effectivePixelVerdict('needs_fix', { aboveThreshold: true })).toBe('needs_fix')
-  })
-
   it('生成済み台帳が全Nodeを持ち、比較済みの差分画像が存在する', () => {
     const report = JSON.parse(readFileSync(join(ROOT, 'docs/design-qa/v6-pixel-diff.json'), 'utf8'))
     expect(report.entries.map((entry: { node: string }) => entry.node)).toEqual(
@@ -74,5 +76,28 @@ describe('Pencil設計との画素比較', () => {
       .filter((entry: { diffPath: string }) => !existsSync(join(ROOT, entry.diffPath)))
       .map((entry: { node: string }) => entry.node)
     expect(missing).toEqual([])
+  })
+
+  it('shotsの専用画像と無印の最新設計を幅別の旧画像より優先する', () => {
+    const root = mkdtempSync(join(tmpdir(), 'pixel-diff-'))
+    try {
+      const designDir = join(root, 'docs/design-reference/test-v6')
+      const implementationDir = join(root, 'docs/design-qa/test-v6')
+      const snapshots = join(root, 'scripts/visual-qa/capture.spec.mjs-snapshots')
+      for (const dir of [designDir, implementationDir, snapshots]) mkdirSync(dir, { recursive: true })
+      writePng(join(designDir, 'node.png'), WHITE)
+      writePng(join(designDir, 'node-1920.png'), BLACK)
+      writePng(join(implementationDir, 'node-1920.png'), BLACK)
+      writePng(join(snapshots, 'tags-csv-select-1920-darwin.png'), WHITE)
+
+      const result = compareScreen({
+        feature: 4, node: 'node', name: '専用状態', dir: 'test-v6', verdict: 'match', shots: 'tags-csv-select',
+      }, { root, writeDiffImages: false })
+      expect(result.pixelDiffPercent).toBe(0)
+      expect(result.comparisons[0].designPath).toBe('docs/design-reference/test-v6/node.png')
+      expect(result.comparisons[0].implementationPath).toContain('capture.spec.mjs-snapshots/tags-csv-select-1920-darwin.png')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })

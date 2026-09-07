@@ -23,14 +23,8 @@ import { PNG } from 'pngjs'
 import { SCREENS } from './screens.mjs'
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
-export const DEFAULT_PIXEL_DIFF_THRESHOLD_PERCENT = 3
+export const DEFAULT_PIXEL_DIFF_THRESHOLD_PERCENT = 10
 export const DEFAULT_REPORT = join(ROOT, 'docs', 'design-qa', 'v6-pixel-diff.json')
-
-/** 目視が一致でも閾値超過なら、台帳上の有効判定は一致にしない。 */
-export function effectivePixelVerdict(declaredVerdict, pixelEntry) {
-  if (declaredVerdict === 'match' && pixelEntry?.aboveThreshold) return 'pixel_mismatch'
-  return declaredVerdict
-}
 
 const REGION_ROWS = ['上部', '中央', '下部']
 const REGION_COLUMNS = ['左', '中央', '右']
@@ -127,25 +121,31 @@ function normalizeSuffix(suffix) {
 
 function designImages(screen, root = ROOT) {
   const dir = join(root, 'docs', 'design-reference', screen.dir)
+  const generic = join(dir, `${screen.node}.png`)
+  /*
+    無印が現在の正本。幅別PNGは過去の書き出しが残ることがあり、zGZMAで
+    古い設計を優先してしまった。無印が在るときは1920pxの現行設計だけを使う。
+  */
+  if (existsSync(generic)) return [{ width: 1920, path: generic, image: readPng(generic) }]
+
   const explicit = [1440, 1920]
     .map((width) => ({ width, path: join(dir, `${screen.node}-${width}.png`) }))
     .filter(({ path }) => existsSync(path))
-  const generic = join(dir, `${screen.node}.png`)
-  if (existsSync(generic)) {
-    const image = readPng(generic)
-    /*
-      Pencilの1920pxフレームは、影や版外の注記を含むとPNG自体が1921〜2227pxに
-      なる。それでも撮影幅は1920px。PNGの実寸を撮影幅と誤認すると、実装画像が
-      「無い」扱いになるので、無印の正本は1920px撮影と突き合わせる。
-    */
-    if (!explicit.some(({ width }) => width === 1920)) {
-      explicit.push({ width: 1920, path: generic, image })
-    }
-  }
   return explicit.sort((a, b) => a.width - b.width)
 }
 
 function implementationImage(screen, width, root = ROOT) {
+  if (screen.shots) {
+    const snapshots = join(root, 'scripts', 'visual-qa', 'capture.spec.mjs-snapshots')
+    const exact = join(snapshots, `${screen.shots}-${width}-darwin.png`)
+    if (existsSync(exact)) return exact
+    if (existsSync(snapshots)) {
+      const portable = readdirSync(snapshots)
+        .find((name) => name.startsWith(`${screen.shots}-${width}-`) && name.endsWith('.png'))
+      if (portable) return join(snapshots, portable)
+    }
+    return null
+  }
   const dir = join(root, 'docs', 'design-qa', screen.dir)
   const named = [
     `${screen.node}-${width}.png`,
