@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Header from '@/components/layout/header'
-import { api } from '@/lib/api'
-import type { IncomingWebhook, OutgoingWebhook, WebhookInteractionSummary } from '@line-crm/shared'
+import { api, type OutgoingWebhookOverview } from '@/lib/api'
+import type { IncomingWebhook, WebhookInteractionSummary } from '@line-crm/shared'
 import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import NotificationsPage from '@/app/notifications/page'
@@ -72,7 +72,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
   selectedAccountIdRef.current = selectedAccountId
   const loadGenerationRef = useRef(0)
   const [incoming, setIncoming] = useState<IncomingWebhook[]>([])
-  const [outgoing, setOutgoing] = useState<OutgoingWebhook[]>([])
+  const [outgoing, setOutgoing] = useState<OutgoingWebhookOverview[]>([])
   const [incomingStatus, setIncomingStatus] = useState<LoadStatus>('loading')
   const [outgoingStatus, setOutgoingStatus] = useState<LoadStatus>('loading')
   const [interactionSummary, setInteractionSummary] = useState<WebhookInteractionSummary | null>(null)
@@ -689,6 +689,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
           items={incoming}
           status={activeStatus}
           showCreate={showCreate}
+          lineAccountId={selectedAccountId}
           endpointUrl={endpointUrl}
           onReload={() => void load()}
           onToggle={handleToggleIncoming}

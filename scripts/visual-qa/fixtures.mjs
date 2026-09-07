@@ -1794,6 +1794,10 @@ export const RICH_MENU_GROUPS = [
     ...RICH_MENU_BASE,
     id: 'rmg-1',
     name: '会員ランク上位',
+    monthlyStats: {
+      from: '2026-08-01', to: '2026-08-31', taps: 3210,
+      uniqueAudience: { value: 8140, state: 'available', reason: null },
+    },
     targetingCondition: JSON.stringify({
       operator: 'AND',
       rules: [{ type: 'tag_exists', value: 'tag-0' }],
@@ -1838,7 +1842,7 @@ export const RICH_MENU_GROUP_DETAILS = {
       ], 'visual-qa/rich-menus/rmg-1-product.png'),
       richMenuPage('rmg-1-booking', 2, '予約する', [
         richMenuArea('rmg-1-booking-product', '商品を見る', 'rmg-1-product', 833),
-      ], 'visual-qa/rich-menus/rmg-1-booking.png'),
+      ], null),
     ],
   },
   'rmg-2': {
@@ -1857,6 +1861,14 @@ export const RICH_MENU_EXTERNAL = {
       chatBarText: 'メニュー',
       size: { width: 2500, height: 1686 },
       areasCount: 6,
+      areas: [
+        { bounds: { x: 0, y: 0, width: 833, height: 843 }, action: { type: 'uri', label: '商品を見る', url: 'https://example.com/products', text: null, displayText: null, richMenuAliasId: null, supported: true, unsupportedReason: null } },
+        { bounds: { x: 833, y: 0, width: 834, height: 843 }, action: { type: 'message', label: '予約する', url: null, text: '予約', displayText: null, richMenuAliasId: null, supported: true, unsupportedReason: null } },
+        { bounds: { x: 1667, y: 0, width: 833, height: 843 }, action: { type: 'postback', label: 'クーポン', url: null, text: null, displayText: 'クーポンを確認', richMenuAliasId: null, supported: true, unsupportedReason: null } },
+        { bounds: { x: 0, y: 843, width: 833, height: 843 }, action: { type: 'uri', label: 'お知らせ', url: 'https://example.com/news', text: null, displayText: null, richMenuAliasId: null, supported: true, unsupportedReason: null } },
+        { bounds: { x: 833, y: 843, width: 834, height: 843 }, action: { type: 'richmenuswitch', label: '会員メニュー', url: null, text: null, displayText: null, richMenuAliasId: 'visual-rmg-1-top', supported: true, unsupportedReason: null } },
+        { bounds: { x: 1667, y: 843, width: 833, height: 843 }, action: { type: 'message', label: 'お問い合わせ', url: null, text: '問い合わせ', displayText: null, richMenuAliasId: null, supported: true, unsupportedReason: null } },
+      ],
       isCurrentDefault: true,
       adminManaged: false,
       adminInfo: null,
@@ -3179,6 +3191,18 @@ export const FRIEND_ATTRIBUTE_FIELDS = [
     displayTargets: ['友だち詳細', 'オートメーション'],
     createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-08-17T00:00:00.000Z',
   },
+  {
+    id: 'field-phone', folderId: null, name: '電話番号', fieldKey: 'phone_number',
+    type: 'text', options: null, defaultValue: null, source: 'manual',
+    ecFieldPath: null, ecIsMaster: false, isPersonal: true, isStarred: false,
+    displayOrder: 5, usageCount: 78, formUsageCount: 1,
+    displayTargets: ['友だち詳細', '配信の絞り込み'],
+    createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-08-16T00:00:00.000Z',
+  },
+]
+
+export const FRIEND_FIELD_FOLDERS = [
+  { id: 'friend-field-folder-pets', kind: 'friend_field', name: 'ペットプロフィール', displayOrder: 1 },
 ]
 
 /**
@@ -4051,6 +4075,14 @@ export const CONVERSION_DEFINITIONS = {
       status: point.isActive ? 'active' : 'stopped',
       version: 1,
       usageCount: CONVERSION_USAGE_COUNTS.get(point.id) ?? 0,
+      usageNames: {
+        'cp-1': ['オートメーション「購入後フォロー」', '分析「売上レポート」'],
+        'cp-2': ['回答フォーム「体験申込」', 'シナリオ「申込後の案内」', '分析「フォーム成果」'],
+        'cp-3': ['予約「来店後のお礼」', '分析「予約成果」'],
+        'cp-4': ['NEN配信「定期便のご案内」', '分析「定期便成果」'],
+        'cp-5': ['ウェビナー「活用講座」', '分析「視聴成果」'],
+        'cp-6': [],
+      }[point.id] ?? [],
       metrics: {
         recordedCount: current?.totalCount ?? 0,
         netCount: current?.totalCount ?? 0,
@@ -4058,6 +4090,8 @@ export const CONVERSION_DEFINITIONS = {
         netValue: current?.totalValue ?? 0,
         reversalState: 'unavailable',
         reversalReason: '取消イベント台帳はまだ接続されていません',
+        cancellationCount: null,
+        cancellationValue: null,
       },
       stoppedAt: point.isActive ? null : '2026-08-20T09:00:00.000Z',
       createdAt: point.createdAt,
@@ -4123,6 +4157,8 @@ export const CONVERSION_DEFINITION_REPORT = {
     countChangeRate: 17.96,
     reversalState: 'unavailable',
     reversalReason: '取消イベント台帳はまだ接続されていません',
+    cancellationCount: null,
+    cancellationValue: null,
     fastestGrowing: {
       conversionPointId: 'cp-1',
       conversionPointName: '商品を買った',
@@ -4153,6 +4189,20 @@ export const CONVERSION_DEFINITION_REPORT = {
       previousNetCount: previous?.totalCount ?? 0,
       previousNetValue: previous?.totalValue ?? 0,
       countChange: current.totalCount - (previous?.totalCount ?? 0),
+      cancellationCount: null,
+      cancellationValue: null,
+      routes: {
+        'cp-1': [
+          { routeKey: 'nen-regular', label: 'NEN配信「定期便のご案内」', attributionState: 'attributed', netCount: 200, netValue: 520000, audience: null, conversionRate: null },
+          { routeKey: 'google-summer', label: 'Google広告 夏キャンペーン', attributionState: 'attributed', netCount: 110, netValue: 336000, audience: null, conversionRate: null },
+          { routeKey: 'unattributed', label: '未帰属', attributionState: 'unattributed', netCount: 76, netValue: 90000, audience: null, conversionRate: null },
+        ],
+        'cp-2': [{ routeKey: 'google-summer', label: 'Google広告 夏キャンペーン', attributionState: 'attributed', netCount: 42, netValue: 504000, audience: null, conversionRate: null }],
+        'cp-3': [{ routeKey: 'rich-menu-booking', label: 'リッチメニュー「予約する」', attributionState: 'attributed', netCount: 38, netValue: 69000, audience: null, conversionRate: null }],
+        'cp-4': [{ routeKey: 'nen-regular', label: 'NEN配信「定期便のご案内」', attributionState: 'attributed', netCount: 12, netValue: 98600, audience: null, conversionRate: null }],
+        'cp-5': [{ routeKey: 'rich-menu-booking', label: 'リッチメニュー「予約する」', attributionState: 'attributed', netCount: 8, netValue: 0, audience: null, conversionRate: null }],
+        'cp-6': [],
+      }[current.conversionPointId] ?? [],
     }
   }),
   byRoute: [
@@ -4454,13 +4504,13 @@ export const BOOKING_SETTINGS = {
   maxActiveBookingsPerFriend: 2, approvalMode: 'manual', holdMinutes: 15, slotGranularityMinutes: 15,
   menuCount: 8, activeMenuCount: 6, inactiveMenuCount: 2,
   businessHours: [
-    { weekday: 0, intervals: [{ start: '10:00', end: '17:00' }] },
-    { weekday: 1, intervals: [{ start: '09:00', end: '12:00' }, { start: '13:00', end: '19:00' }] },
-    { weekday: 2, intervals: [{ start: '09:00', end: '12:00' }, { start: '13:00', end: '19:00' }] },
+    { weekday: 0, intervals: [{ start: '10:00', end: '17:00', capacity: 2 }] },
+    { weekday: 1, intervals: [{ start: '09:00', end: '12:00', capacity: 3 }, { start: '13:00', end: '19:00', capacity: 3 }] },
+    { weekday: 2, intervals: [{ start: '09:00', end: '12:00', capacity: 3 }, { start: '13:00', end: '19:00', capacity: 3 }] },
     { weekday: 3, intervals: [] },
-    { weekday: 4, intervals: [{ start: '09:00', end: '12:00' }, { start: '13:00', end: '19:00' }] },
-    { weekday: 5, intervals: [{ start: '09:00', end: '20:00' }] },
-    { weekday: 6, intervals: [{ start: '09:00', end: '18:00' }] },
+    { weekday: 4, intervals: [{ start: '09:00', end: '12:00', capacity: 3 }, { start: '13:00', end: '19:00', capacity: 3 }] },
+    { weekday: 5, intervals: [{ start: '09:00', end: '20:00', capacity: 4 }] },
+    { weekday: 6, intervals: [{ start: '09:00', end: '18:00', capacity: 2 }] },
   ],
   exceptions: [
     {
@@ -4487,6 +4537,18 @@ export const BOOKING_SETTINGS = {
   ],
   updatedAt: '2026-08-22T09:20:00.000Z',
 }
+
+/** 機能28 tksPc 用の店舗資源。実APIの resources 契約と同じ形で返す。 */
+export const BOOKING_RESOURCES = [
+  {
+    id: 'resource-room-a', name: 'トリミングルームA', type: 'room', capacity: 1, isActive: true,
+    businessHours: BOOKING_SETTINGS.businessHours, exceptions: BOOKING_SETTINGS.exceptions,
+  },
+  {
+    id: 'resource-room-b', name: 'トリミングルームB', type: 'room', capacity: 1, isActive: true,
+    businessHours: BOOKING_SETTINGS.businessHours, exceptions: [],
+  },
+]
 
 /** 予約スタッフ。設計 `tksPc` の押し口「佐々木」を含む。 */
 export const BOOKING_STAFF = [
@@ -4556,6 +4618,18 @@ export const BOOKING_AVAILABILITY = {
       ],
     },
   ],
+}
+
+/* #414 の availability 契約。予約枠ごとの定員・残数・状態を固定する。 */
+for (const staff of BOOKING_AVAILABILITY.by_staff) {
+  for (const slot of staff.slots) {
+    Object.assign(slot, {
+      capacity: 2,
+      remaining: slot.start === '14:00' ? 0 : 1,
+      state: slot.start === '14:00' ? 'full' : 'limited',
+      resources: ['resource-room-a'],
+    })
+  }
 }
 
 /*
@@ -4735,6 +4809,33 @@ export const EC_NOTIFICATION_SETTINGS = [
   { ...ecNotification('ec_order.backordered', '入荷待ちになった', 'order', 9, false), title: null, introText: '', outroText: '' },
 ]
 
+export const LINE_NOTIFICATION_DEFINITIONS = EC_NOTIFICATION_SETTINGS.map((setting, index) => ({
+  id: `line-notification-${index + 1}`,
+  lineAccountId: 'visual-qa-account',
+  key: setting.eventType,
+  name: setting.label,
+  category: setting.category,
+  sourceEventType: setting.eventType,
+  status: setting.isEnabled ? 'published' : 'stopped',
+  draft: { title: setting.title, introText: setting.introText, outroText: setting.outroText, buttonLabel: setting.buttonLabel, buttonUrl: setting.buttonUrl, fixedFields: setting.fixedFields },
+  currentVersionId: setting.isEnabled ? `line-notification-${index + 1}-v2` : null,
+  currentVersionNumber: setting.isEnabled ? 2 : null,
+  transactionalOnly: true,
+  version: setting.isEnabled ? 2 : 1,
+  updatedAt: setting.updatedAt,
+}))
+
+export const LINE_NOTIFICATION_METRICS = {
+  items: LINE_NOTIFICATION_DEFINITIONS.map((definition, index) => ({
+    definitionId: definition.id,
+    notificationName: definition.name,
+    accepted: { value: [148, 132, 96, 88, 74, 51, 23, 3, 0][index] },
+    displayed: { state: 'unavailable', value: null, reason: 'LINE側の個人開封は取得できません' },
+    clicked: { value: [42, 31, 18, 16, 12, 9, 4, 0, 0][index] },
+  })),
+  coverage: { individualOpenAvailable: false, lineAggregateOnly: true, unavailableIsNull: true },
+}
+
 /** 機能24。LINE受付までの事実だけを持ち、届いた・既読は作らない。 */
 export const EC_NOTIFICATION_RUNS = {
   items: [
@@ -4778,6 +4879,20 @@ export const EC_NOTIFICATION_RUNS = {
     attemptHistoryAvailable: false,
     retryAvailable: false,
   },
+}
+
+export const LINE_NOTIFICATION_DELIVERIES = {
+  items: EC_NOTIFICATION_RUNS.items.map((run) => ({
+    ...run,
+    attemptCount: run.status === 'failed' ? 3 : 1,
+    nextRetryAt: run.status === 'failed' ? '2026-08-25T11:14:00+09:00' : null,
+    clickedAt: run.status === 'accepted' ? '2026-08-25T10:45:00+09:00' : null,
+    version: 2,
+    retryAvailable: run.status === 'failed',
+    attemptHistory: [{ attempt: 1, status: run.status === 'failed' ? 'failed' : run.status, occurredAt: run.receivedAt }],
+  })),
+  summary: EC_NOTIFICATION_RUNS.summary,
+  coverage: { source: 'notification_delivery_ledger', unassignedHistoricalRowsExcluded: true, attemptHistoryAvailable: true, retryAvailable: true },
 }
 
 /*
