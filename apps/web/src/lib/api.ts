@@ -189,6 +189,7 @@ export type AccessRoleItem = {
   featureAccess: 'edit' | 'view' | 'custom'
   requiresMfa: boolean
   assignedUserCount: number
+  featurePermissions?: Record<string, 'edit' | 'view' | 'none'>
 }
 
 export type AuditEventItem = {
@@ -204,6 +205,7 @@ export type AuditEventItem = {
   reason: string | null
   requestTraceId: string | null
   ipPrefix: string | null
+  regionLabel?: string | null
   deviceFamily: string | null
   riskLevel: 'normal' | 'suspicious' | 'high'
   retentionClass: 'general' | 'security' | 'personal_data'
@@ -2518,7 +2520,7 @@ export type RichMenuAreaResponse = {
 export type ScenarioTriggerItem = {
   id: string
   /** friend_add … 友だち追加時 / tag_added … 決めたタグが付いたとき */
-  kind: 'friend_add' | 'tag_added'
+  kind: 'friend_add' | 'tag_added' | 'form_answer' | 'booking_confirmed'
   /** kind が tag_added のときだけ入る。 */
   tagId: string | null
 }
@@ -2535,6 +2537,10 @@ export type ScenarioActionType =
   | 'support_mark'
   | 'scenario'
   | 'common_var'
+  | 'send_message'
+  | 'send_template'
+  | 'reminder'
+  | 'event_booking'
 
 export type ScenarioAction = {
   id: string
@@ -5089,6 +5095,8 @@ export const api = {
         ? { success: true, data: response.data }
         : { success: false, error: 'シナリオの下書き保存結果を確認できませんでした' }
     },
+    getDraft: (id: string, lineAccountId: string) =>
+      fetchApi<ApiResponse<ScenarioDraftV6 | null>>(`/api/scenarios/${id}/draft?lineAccountId=${encodeURIComponent(lineAccountId)}`),
 
     /* ---- アクション（Lステップの「アクション設定」にあたる） ---- */
     actions: {

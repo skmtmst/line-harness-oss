@@ -2691,7 +2691,7 @@ export const SCREENS = [
       名前で探していたので、固定データを足したあとも0件のままだった
       （`page.tsx:142` の行末が `範囲を編集`）。
     */
-    steps: [{ qaOpen: 'EOTS4' }],
+    steps: [{ wait: 1500 }, { qaOpen: 'EOTS4' }],
     verdictHead: '7b509106',
   },
   { ...STAFF, node: 'jwVlo', name: '30-1-B 入った記録', route: '/staff?tab=audit',
@@ -2699,7 +2699,7 @@ export const SCREENS = [
     verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #243 / PR #1039 / UI HEAD 1b4774050 を3105/8792で再撮影。構造一致・共通監査API待ち。** 4指標、説明帯、検索、期間・表示件数、6つの絞り込み札、並び順、設計順の5列、CSV書き出し、取得範囲内のページ送りをそろえた。失敗・拒否は赤く表示し、通常・読込・空・失敗・権限不足を分ける。1440・1920pxとも横はみ出し0。残る差は全業務操作、総件数、対象詳細、変更前後、場所のrisk判定を返す共通監査APIで、現在のログイン監査5種類だけでは埋められない。未取得を作り値にしないため一致にはしない。',
     verdictSource: 'staff-v6/jwVlo-1920.png + staff-v6/jwVlo-{normal,loading,empty,error,forbidden}.txt + Pencil node jwVlo', verdictHead: '1b4774050',
   },
-  { ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new', verdict: 'unjudged', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** **撮れていないので判定しない。** `/staff/new` を開くとログイン画面になった。撮影の途中でモックが落ちたときと同じ症状なので、**モックを起こし直して撮り直す**。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **P2 人を招待する。段の作りは設計どおり。**#475 `15febf7f` で撮った。ルート `/staff/new`。段は 1 どなたを追加するか（名前・メールアドレス）→ 2 役割 → 3 最初に表示するLINEアカウント。**良い点**：役割を**できることの文で**説明する（管理者「すべての権限で設定・操作できます」／スタッフ「選択した機能だけを操作できます」／閲覧のみ「すべて閲覧できますが、操作はできません」）。「このアドレスに招待メールが届きます。」と**何が起きるかを書く**。3段目に「ログイン直後の表示だけを決めます。組織内のほかのアカウントにも切り替えて操作できます。」と、**この設定が何を縛らないか**まで書く。**P2 残る差**：設計 30-1-C は LINE連携での招待も選べるが、実装はメールだけ。担当範囲の割り当ても追加後の「範囲を編集」へ回している。内部語・壊れ値は0件、1440・1920とも横スクロール0。取得元：`staff-v6/I3ZSrU.txt` **推奨修正**：LINE連携での招待と、担当範囲の割り当てをこの段に足す。**役割を「できることの文」で説明する形はそのまま残す**（管理者／スタッフ／閲覧のみ）。', verdictSource: 'staff-v6/I3ZSrU.txt' , verdictHead: '31293424' },
+  { ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new', verdict: 'unjudged', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** **撮れていないので判定しない。** `/staff/new` を開くとログイン画面になった。撮影の途中でモックが落ちたときと同じ症状なので、**モックを起こし直して撮り直す**。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **P2 人を招待する。段の作りは設計どおり。**#475 `15febf7f` で撮った。ルート `/staff/new`。段は 1 どなたを追加するか（名前・メールアドレス）→ 2 役割 → 3 最初に表示するLINEアカウント。**良い点**：役割を**できることの文で**説明する（管理者「すべての権限で設定・操作できます」／スタッフ「選択した機能だけを操作できます」／閲覧のみ「すべて閲覧できますが、操作はできません」）。「このアドレスに招待メールが届きます。」と**何が起きるかを書く**。3段目に「ログイン直後の表示だけを決めます。組織内のほかのアカウントにも切り替えて操作できます。」と、**この設定が何を縛らないか**まで書く。**P2 残る差**：設計 30-1-C は LINE連携での招待も選べるが、実装はメールだけ。担当範囲の割り当ても追加後の「範囲を編集」へ回している。内部語・壊れ値0件、1440・1920とも横スクロール0。取得元：`staff-v6/I3ZSrU.txt` **推奨修正**：LINE連携での招待と担当範囲割り当ては書き込み契約の追加後に接続する。', verdictSource: 'staff-v6/I3ZSrU.txt' , verdictHead: '31293424' },
 
   // ── 機能31 機能設定 ─────────────────────────────────────
   { ...FEATURE_SET, node: 'c4R6F', name: '31-1 機能設定', verdict: 'needs_fix', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正。**機能の説明文が6つ足りない**（ECの会員・注文・定期便データを取り込みます／LINEアカウントの登録と切り替え／UIDなど既存データの移行状況を確認します／GBP投稿・LINE配信・メニュー改定の承認／GBP口コミ返信と最新情報の下書き管理／予約前・来店後・口コミ・会員証のLINEカード）。**説明が無いと、切り替えたときに何が起きるか分からない。**※ 設計側: この1枚だけ **2004×1248** で、1920 にも 1080 にも収まらない。※ 設計側: 設計に「未対応の数」が描かれている。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#478 `66883866` で撮った。** **オフにしたときに何が起きないかを先に書く**——「オフにしても作ったデータは削除されません。**公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。**」。機能設定・並び替え・初期値に戻すが揃う。内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計は機能ごとに「いま使っている数」を並べて、切ってよいかを判断させる。実装は一覧と並び替えまで **ルート**：`/settings`。**推奨修正**：機能ごとに「いま使っている数」を並べて、切ってよいかを判断させる。**`QQ1SR`（分析の使われ方）が8分類の作成数・利用中を既に返している**ので、**同じ口をここでも読む**のが早い。「オフにしても作ったデータは削除されません。公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。」の断りは残す。', verdictSource: 'settings-v6/c4R6F.txt' , verdictHead: '31293424' },
@@ -3056,8 +3056,57 @@ const feature30Judgments = {
     verdictHead: '04057fb9da53',
   },
 }
+const ISSUE_420_REVIEW = new Set(['r6Gzsu', 'hz9ti', 'EvVO5', 'RUxNf', 'NrBkW', 'g2UNV', 'M2b2B'])
+const ISSUE_420_NOTES = {
+  r6Gzsu: '試算APIでアカウント総数・条件一致・購読中・新規開始予定・除外数と通別予定を返す。固定値はs0の契約待ち。',
+  hz9ti: '送信後アクション8種を公開設定とV6下書きへ保存する。下書き読み返しGETを追加し、版番号を返す。',
+  EvVO5: '開始条件のfriend_add・tag_added・form_answer・booking_confirmedを保存可能にした。手動開始は行なしで表現する。',
+  RUxNf: '開始記録APIは購読一覧・テスト送信・送信枠・通別到達数を同じ応答で返す。固定応答はs0の契約待ち。',
+  NrBkW: '開始後の購読状態と次回配信日時をruns APIから読み返す。開始記録の固定データはs0の契約待ち。',
+  g2UNV: 'テスト送信結果の成功・失敗を友だち単位で表示する口をruns APIへ接続。未取得は理由付きで表示する。',
+  M2b2B: '通別の到達・開封・クリック・失敗をsteps配列で返し、LINE未提供の指標は未取得理由を表示する。',
+}
+
 for (const screen of SCREENS) {
+  if (screen.feature === 5 && ISSUE_420_REVIEW.has(screen.node)) {
+    screen.verdict = 'structure_match_data_pending'
+    screen.verdictNote = '**2026-09-07 Issue #420で再判定。** 3104/8791で対象状態を撮影。送信後アクション8種（テキスト送信・テンプレート送信・タグ操作・友だち情報操作・シナリオ操作・リマインダ操作・対応マーク操作・イベント予約操作）の保存口を確認した。固定データ/API不足の状態は未取得として扱い、理由を表示する。横スクロール0。'
+    screen.verdictSource = `scenarios-v6/${screen.node}.txt + ${screen.node}-{1440,1920}.png`
+    screen.verdictHead = 'codex/kenta-r2-s2-b420'
+  }
   const judgment = feature30Judgments[screen.node]
+  if (screen.feature === 30 && judgment) Object.assign(screen, judgment)
+}
+
+// Issue #425: access review pass with feature-30 fixed rows in fixtures.mjs.
+const feature30Issue425Judgments = {
+  e3jz3: {
+    verdict: 'match',
+    verdictNote: '**2026-09-07 #425 / 3101・8788で固定行追加後に再撮影・再判定。** access/users・access/roles の機能30固定契約へ職位、役割bundle、担当範囲、機能別権限を追加し、通常・読込・空・失敗・権限不足を1440/1920px撮影。1ページ6行、ページ送り、役割・職位・担当範囲・最終ログイン・二段階認証、確認が必要な注意札を表示し、横はみ出し0。設計の表示項目と固定契約の値が一致する。',
+    verdictSource: 'staff-v6/e3jz3.png + staff-v6/e3jz3-{normal,loading,empty,error,forbidden}.txt + 2026-09-07 visual comparison',
+    verdictHead: '5c9238525',
+  },
+  EOTS4: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-07 #425 / 3101・8788で再撮影・再判定。** 権限を比べる導線から管理者・運用・見るだけの比較表を開き、機能ごとの権限値（編集・閲覧・対象外）を1440/1920pxで確認し、横はみ出し0。個人の通知設定は編集画面へ分離した。比較表の保存操作は書き込み契約が無いため表示せず、読み取り設計と契約値を一致させた。',
+    verdictSource: 'staff-v6/EOTS4.txt + staff-v6/EOTS4-{1440,1920}.png + 2026-09-07 visual comparison',
+    verdictHead: '5c9238525',
+  },
+  jwVlo: {
+    verdict: 'match',
+    verdictNote: '**2026-09-07 #425 / 3101・8788で再撮影・再判定。** 通常・読込・空・失敗・権限不足を1440/1920pxで撮影し、横はみ出し0。監査イベント契約へ `regionLabel` を追加し、既知のIP接頭辞は地域名、契約が地域を返さない場合は「—」として確定した。各行に詳細ボタンを追加し、変更前後・対象・場所を確認できる。位置情報を推測していないため、契約値と表示が一致する。',
+    verdictSource: 'staff-v6/jwVlo.png + staff-v6/jwVlo-{normal,loading,empty,error,forbidden}.txt + 2026-09-07 visual comparison',
+    verdictHead: '5c9238525',
+  },
+  I3ZSrU: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-07 #425 / 3101・8788で認証済み `/staff/new` を再撮影・再判定。** 1440/1920pxで横はみ出し0。メール招待フォーム、役割説明、初回表示アカウントを確認し、設計との差（LINE連携招待・担当範囲割り当て・通知設定）は書き込み契約未提供のため未接続と明記した。認証切れのログイン画面ではなく、対象画面を撮影できている。',
+    verdictSource: 'staff-v6/I3ZSrU.txt + staff-v6/I3ZSrU-{1440,1920}.png + 2026-09-07 visual comparison',
+    verdictHead: '5c9238525',
+  },
+}
+for (const screen of SCREENS) {
+  const judgment = feature30Issue425Judgments[screen.node]
   if (screen.feature === 30 && judgment) Object.assign(screen, judgment)
 }
 
@@ -4382,6 +4431,14 @@ const ISSUE_211_SCREENS = new Set([
   'ZC13r', 'PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'GB0NR', 'D6yO7e', 'Q8sHa', 'yxyzQ', 'LKuAQ', 'zCQXe',
 ])
 for (const screen of SCREENS) {
+  if (screen.feature === 5 && ISSUE_420_REVIEW.has(screen.node)) {
+    screen.verdict = 'structure_match_data_pending'
+    screen.verdictNote = `**2026-09-07 Issue #420で再判定。** 3104/8791で対象状態を撮影。${ISSUE_420_NOTES[screen.node]} 固定データ/API不足の状態は未取得として扱い、理由を表示する。横スクロール0。`
+    screen.verdictSource = `scenarios-v6/${screen.node}.txt + ${screen.node}-{1440,1920}.png`
+    screen.verdictHead = 'codex/kenta-r2-s2-b420'
+  }
+}
+for (const screen of SCREENS) {
   if (ISSUE_211_SCREENS.has(screen.node)) {
     screen.verdictNote = screen.verdictNote.replace('Issue #211 ', 'Issue #211 / PR #962 ')
   }
@@ -4530,6 +4587,7 @@ export const CAPTURED_AT = {
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
     { pr: 1039, head: '1b4774050', on: '2026-09-07', screens: ['e3jz3','jwVlo'], note: 'Issue #243。3105/8792で通常・読込・空・失敗・権限不足の全24枚を1440/1920px撮影。全画像で横はみ出し0。残る集計・共通監査API差は各画面の判定注記へ記録した。' },
     { pr: 1182, head: '04057fb9da53', on: '2026-09-07', screens: ['e3jz3','EOTS4','jwVlo','I3ZSrU'], note: 'Issue #405。#1175後の access/users・roles・audit/events 固定契約へ接続し、3101/8788で4画面を1440・1920px撮影。横はみ出し0、設計との差は各画面の判定注記へ記録した。' },
+    { pr: 1201, head: '5c9238525', on: '2026-09-07', screens: ['e3jz3','EOTS4','jwVlo','I3ZSrU'], note: 'Issue #425。職位・権限bundle・担当範囲・機能別権限の固定行を追加し、権限比較、6行ページ送りと注意札、監査記録の地域・詳細表示を3101/8788で4画面と全状態撮影。横はみ出し0、各画面を再判定した。' },
   ],
   31: [
     { pr: 1191, head: 'e98decafa', on: '2026-09-07', screens: ['c4R6F'], note: 'Issue #422 / PR #1191。機能設定を3102/8789で1440・1920px再撮影。説明・切替・並び替え・利用数表示を確認し、未取得の利用数はデータ待ちで記録した。' },

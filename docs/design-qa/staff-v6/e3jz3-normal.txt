@@ -115,6 +115,7 @@ LINEアカウント
 管理者は必ず入れてください（75%）
 
 「見せる範囲」は、画面ごとに決められます。電話番号や住所など、必要な情報だけを見せると事故が減ります。
+権限を比べる
 最後に入った日が新しい順
 すべて
 8
@@ -128,14 +129,14 @@ LINEアカウント
 2
 個別設定
 0
-人	役わり	見せる範囲	最後に入った	2段階の確認	操作
+人	役わり	職位	見せる範囲	最後に入った	2段階の確認	操作
 
 
 佐々木 亮太
 
 access-user-1@example.invalid
 
-	管理者
+	管理者	統括責任者
 
 すべての機能
 
@@ -157,7 +158,7 @@ access-user-1@example.invalid
 
 access-user-3@example.invalid
 
-	運用
+	運用	運用担当
 
 14機能
 
@@ -179,7 +180,7 @@ access-user-3@example.invalid
 
 access-user-4@example.invalid
 
-	運用
+	運用	配信担当
 
 12機能
 
@@ -201,7 +202,7 @@ access-user-4@example.invalid
 
 access-user-5@example.invalid
 
-	受付
+	受付	受付担当
 
 6機能
 
@@ -223,7 +224,7 @@ access-user-5@example.invalid
 
 access-user-6@example.invalid
 
-	受付
+	受付	予約担当
 
 6機能
 
@@ -245,7 +246,7 @@ access-user-6@example.invalid
 
 access-user-2@example.invalid
 
-	管理者
+	管理者	管理責任者
 
 すべての機能
 
@@ -261,51 +262,11 @@ access-user-2@example.invalid
 中身を見る
 この人を外す
 
+権限・担当範囲・職位・最終ログイン・2段階認証はアクセス API の最新状態です。確認が必要な人には注意札を表示します。
 
+ログインユーザー 8人中 6人を表示
 
-外部デザイン
-
-access-user-7@example.invalid
-
-	見るだけ
-
-5機能
-
-然-NEN- TEST
-
-
-
-9/1 12:20
-
-最後の操作：9/7 09:18
-
-	入れていません
-中身を見る
-この人を外す
-
-
-
-佐野 直人
-
-access-user-8@example.invalid
-
-	見るだけ
-
-4機能
-
-然-NEN- TEST
-
-
-
-5/20 10:00
-
-最後の操作：9/7 09:18
-
-	入れていません
-中身を見る
-この人を外す
-
-権限・担当範囲・最終ログイン・2段階認証はアクセス API の最新状態です。編集できる項目は、書き込み契約がある操作だけに限ります。
-
-ログインユーザー 8人を表示
+前へ
+1 / 2
+次へ
 人の名前・メールで検索

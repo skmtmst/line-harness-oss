@@ -58,9 +58,9 @@ describe('V6 30 ログインユーザーの画面契約', () => {
     expect(staffSource).not.toContain('完全に削除する')
   })
 
-  it('一覧は1440pxで横スクロールさせない6列の固定表にする', () => {
+  it('一覧は1440pxで横スクロールさせない7列の固定表にする', () => {
     expect(staffSource).toContain('w-full table-fixed text-sm')
-    expect(staffSource).toContain('colSpan={6}')
+    expect(staffSource).toContain('colSpan={7}')
     expect(staffSource).not.toContain('min-w-[1180px]')
   })
 
@@ -68,7 +68,7 @@ describe('V6 30 ログインユーザーの画面契約', () => {
     for (const word of ['消した操作', '配信した操作', 'いつもと違う場所から', '気になるもの', '元の値 → 新しい値']) {
       expect(auditSource).toContain(word)
     }
-    expect(auditSource).toContain('colSpan={5}')
+    expect(auditSource).toContain('colSpan={6}')
     expect(auditSource).toContain('row.actor.name')
     expect(auditSource).toContain('targetLabel(row)')
     expect(auditSource).toContain('locationLabel(row)')
