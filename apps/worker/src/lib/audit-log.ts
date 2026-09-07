@@ -58,6 +58,8 @@ export type AuditAction =
   | 'line_notification.definition.publish'
   | 'line_notification.definition.stop'
   | 'line_notification.delivery.retry'
+  | 'nen.column.duplicate'
+  | 'nen.delivery.pending_now'
   | 'nen.delivery.retry'
   | 'photo.assessment.request'
   | 'photo.asset.request'
