@@ -11,6 +11,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import ListKpis from '@/components/shared/list-kpis'
 import { PRESETS as LIST_STATE_PRESETS } from '@/components/shared/list-state'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import FolderPanel from '@/components/shared/folder-panel'
 import Button from '@/components/shared/button'
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -125,15 +126,22 @@ export default function RemindersPage() {
     }} /></div>
     <div className="mb-3 flex gap-2"><Button onClick={() => setFolderDialogOpen(true)}>フォルダを追加</Button><Button href="/reminders/new" variant="primary">リマインダを作成</Button></div>
     {error ? <div className="bg-danger-bg text-danger mb-3 rounded-lg p-3 text-sm">{error}</div> : null}
-    <div data-design="Body" className="grid gap-4 lg:grid-cols-[13rem_minmax(0,1fr)]">
-      <aside className="bg-canvas rounded-card border-hairline overflow-hidden border self-start">
-        <div className="border-hairline flex items-center justify-between border-b px-3 py-2"><b className="text-xs">フォルダ</b><span className="text-ink-faint text-micro">{loading || error ? '—' : `${listTotal}件`}</span></div>
-        <div className="p-2">{[
+    <div data-design="Body" className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+      <FolderPanel
+        total={loading || error ? '—' : `${listTotal}件`}
+        activeId={folderFilter}
+        onSelect={(id) => { setFolderFilter(id); setPage(1) }}
+        rows={[
           { id: '', label: 'すべて', count: listTotal },
-          ...folders.map((folder) => ({ id: folder.id, label: folder.name, count: (folder as VisualFolder).itemCount ?? reminders.filter((item) => item.folderId === folder.id).length })),
+          ...folders.map((folder) => ({
+            id: folder.id,
+            label: folder.name,
+            count: (folder as VisualFolder).itemCount ?? reminders.filter((item) => item.folderId === folder.id).length,
+            color: folder.color,
+          })),
           { id: UNFILED, label: '未分類', count: reminders.filter((item) => !item.folderId).length },
-        ].map((row) => <button key={row.id || 'all'} type="button" onClick={() => { setFolderFilter(row.id); setPage(1) }} className={`flex w-full items-center justify-between rounded px-2 py-2 text-xs ${folderFilter === row.id ? 'bg-accent-soft text-accent-deep font-bold' : 'text-ink-secondary'}`}><span>{row.label}</span><span>{loading || error ? '—' : row.count}</span></button>)}</div>
-      </aside>
+        ]}
+      />
       <div className="min-w-0">
         <div className="bg-canvas rounded-card border-hairline mb-3 border p-3">
           <div className="flex items-center gap-2"><TextInput type="search" placeholder="名前・内容で検索" aria-label="名前・内容で検索" value={nameQuery} onChange={(event) => setNameQuery(event.target.value)} className="min-w-0 flex-1 text-xs" /><SelectField aria-label="表示件数" className="text-xs" defaultValue="20" options={[{ value: '20', label: '20件表示' }]} /></div>
