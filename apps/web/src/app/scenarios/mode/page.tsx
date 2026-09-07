@@ -242,7 +242,7 @@ function ScenarioModeContent() {
           </label>
 
           <label className="block">
-            <span className="text-ink-secondary mb-1 block text-xs font-medium">フォルダ</span>
+            <span className="text-ink-secondary mb-1 block text-xs font-medium">フォルダ：</span>
             <SelectField
               value={folderId}
               title={selectedFolderName}

@@ -99,7 +99,7 @@
 | 3 | `w8W4Eh` | 3-3-A 統合ユーザー詳細 | 5.0048%（前回値） | 0px | 中央・中央 | docs | [差分画像](friends-v6/w8W4Eh-diff-1920.png) | **一致** |
 | 3 | `vtBCu` | 3-4 UID移行 | 5.9972%（前回値） | 0px | 中央・中央 | docs | [差分画像](friends-v6/vtBCu-diff-1920.png) | **一致** |
 | 5 | `TC1b1` | 5-1 シナリオ配信 | 3.7948%（前回値） | 0px | 中央・中央 | docs | [差分画像](scenarios-v6/TC1b1-diff-1920.png) | **一致** |
-| 5 | `cCB7r` | 5-1-A シナリオ作成・配信方式 | 10.9889% ⚠（前回値） | 0px | 下部・右 | docs | [差分画像](scenarios-v6/cCB7r-diff-1920.png) | **一致** |
+| 5 | `cCB7r` | 5-1-A シナリオ作成・配信方式 | 10.9890% ⚠ | 0px | 下部・右 | docs | [差分画像](scenarios-v6/cCB7r-diff-1920.png) | **一致** |
 | 5 | `kk8dz` | 5-1-B シナリオ作成・1通目設定 | 6.2051%（前回値） | +10px | 中央・右 | docs | [差分画像](scenarios-v6/kk8dz-diff-1920.png) | **一致** |
 | 5 | `bV5Vs` | 5-1-C シナリオ編集 | 5.4237%（前回値） | 0px | 上部・右 | docs | [差分画像](scenarios-v6/bV5Vs-diff-1920.png) | **一致** |
 | 5 | `xfYLn` | 5-1-D シナリオ・ステップ編集 | 10.1843% ⚠（前回値） | 0px | 上部・右 | docs | [差分画像](scenarios-v6/xfYLn-diff-1920.png) | **一致** |
@@ -196,7 +196,7 @@
 | 13 | `ava2n` | 13-1-B フォームのデザイン設定 | 5.7465%（前回値） | -1px | 下部・左 | docs | [差分画像](forms-v6/ava2n-diff-1920.png) | **一致** |
 | 13 | `cSqvP` | 13-1-C フォームのオプション設定 | 6.3555%（前回値） | 0px | 下部・左 | docs | [差分画像](forms-v6/cSqvP-diff-1920.png) | **一致** |
 | 13 | `v9tYhl` | 13-1-D 集まった回答 | 3.3300%（前回値） | 0px | 中央・左 | docs | [差分画像](forms-v6/v9tYhl-diff-1920.png) | **一致** |
-| 13 | `gBp2J` | 13-1-E フォームの削除確認 | 6.9594% | 0px | 下部・中央 | docs | [差分画像](forms-v6/gBp2J-diff-1920.png) | **一致** |
+| 13 | `gBp2J` | 13-1-E フォームの削除確認 | 6.9594%（前回値） | 0px | 下部・中央 | docs | [差分画像](forms-v6/gBp2J-diff-1920.png) | **一致** |
 | 13 | `ZOPyc` | 13-1-F 一覧の状態（空・読込・エラー） | 2.9594%（前回値） | 0px | 上部・左 | docs | [差分画像](forms-v6/ZOPyc-diff-1920.png) | **一致** |
 | 14 | `WuKzU` | 14-1 共通情報 | 3.1703%（前回値） | 0px | 上部・左 | docs | [差分画像](common-vars-v6/WuKzU-diff-1920.png) | **一致** |
 | 14 | `gBtaK` | 14-1-A 共通情報を編集 | 4.9666%（前回値） | 0px | 中央・左 | docs | [差分画像](common-vars-v6/gBtaK-diff-1920.png) | **一致** |
