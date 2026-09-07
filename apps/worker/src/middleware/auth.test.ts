@@ -47,7 +47,10 @@ vi.mock('@line-crm/db', () => ({
   incrementTwoFactorChallengeAttempts: vi.fn(async () => undefined),
   deleteTwoFactorChallenge: vi.fn(async () => undefined),
   claimStaffTotpStep: vi.fn(async () => true),
-  createStepUpGrant: vi.fn(async () => undefined),
+  reserveStepUpAttempt: vi.fn(async () => ({
+    attempts: 1, maxAttempts: 5, windowStartedAt: new Date().toISOString(),
+  })),
+  createStepUpGrant: vi.fn(async () => true),
   updateStaffMember: vi.fn(async () => null),
   deleteAdminSession: vi.fn(async () => undefined),
   // ログイン・ログアウト・失敗を記録する。本体では例外を握るので、

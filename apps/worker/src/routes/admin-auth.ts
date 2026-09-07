@@ -30,6 +30,7 @@ import {
   getStaffByLineUserIdIncludingInactive,
   getTwoFactorChallenge,
   incrementTwoFactorChallengeAttempts,
+  reserveStepUpAttempt,
   updateStaffMember,
 } from '@line-crm/db';
 import { decryptTotpSecret, verifyTotp } from '../lib/totp.js';
@@ -43,6 +44,7 @@ const OAUTH_INVITE_COOKIE = 'lh_line_invite';
 const OAUTH_MAX_AGE = 600;
 const TWO_FACTOR_CHALLENGE_MAX_AGE = 5 * 60 * 1000;
 const TWO_FACTOR_MAX_ATTEMPTS = 5;
+const STEP_UP_ATTEMPT_LIMIT_ERROR = '入力回数を超えました。しばらく待ってからやり直してください';
 
 function randomToken(bytes = 32): string {
   const value = new Uint8Array(bytes);
@@ -316,6 +318,10 @@ adminAuth.post('/api/auth/step-up', async (c) => {
   if (!staff?.is_active || !staff.totp_enabled_at || !staff.totp_secret_enc || !masterKey) {
     return c.json({ success: false, error: '重要操作には二段階認証の設定が必要です' }, 403);
   }
+  const attempt = await reserveStepUpAttempt(c.env.DB, staff.id);
+  if (!attempt) {
+    return c.json({ success: false, error: STEP_UP_ATTEMPT_LIMIT_ERROR }, 429);
+  }
   const verified = await verifyTotp(
     await decryptTotpSecret(staff.totp_secret_enc, masterKey),
     code,
@@ -323,19 +329,22 @@ adminAuth.post('/api/auth/step-up', async (c) => {
     staff.totp_last_used_step,
   );
   if (!verified.valid || verified.step === null) {
+    if (attempt.attempts >= attempt.maxAttempts) {
+      return c.json({ success: false, error: STEP_UP_ATTEMPT_LIMIT_ERROR }, 429);
+    }
     return c.json({ success: false, error: '認証コードが正しくありません' }, 400);
-  }
-  if (!await claimStaffTotpStep(c.env.DB, staff.id, verified.step)) {
-    return c.json({ success: false, error: 'この認証コードは使用済みです' }, 409);
   }
   const token = randomToken();
   const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
-  await createStepUpGrant(c.env.DB, {
+  if (!await createStepUpGrant(c.env.DB, {
     tokenHash: await sha256Hex(token),
     staffId: staff.id,
     purpose,
     expiresAt,
-  });
+    totpStep: verified.step,
+  })) {
+    return c.json({ success: false, error: 'この認証コードは使用済みです' }, 409);
+  }
   return c.json({ success: true, data: { token, purpose, expiresAt } }, 201);
 });
 
