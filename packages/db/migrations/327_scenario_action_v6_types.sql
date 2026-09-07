@@ -20,3 +20,18 @@ DROP TABLE scenario_actions;
 ALTER TABLE scenario_actions_new RENAME TO scenario_actions;
 CREATE INDEX IF NOT EXISTS idx_scenario_actions_lookup
   ON scenario_actions (scenario_id, hook, step_id, choice_index, sort_order);
+
+CREATE TABLE scenario_triggers_new (
+  id TEXT PRIMARY KEY,
+  scenario_id TEXT NOT NULL REFERENCES scenarios (id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('friend_add', 'tag_added', 'form_answer', 'booking_confirmed')),
+  tag_id TEXT REFERENCES tags (id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+INSERT INTO scenario_triggers_new (id, scenario_id, kind, tag_id, created_at)
+SELECT id, scenario_id, kind, tag_id, created_at FROM scenario_triggers;
+DROP TABLE scenario_triggers;
+ALTER TABLE scenario_triggers_new RENAME TO scenario_triggers;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_scenario_triggers_unique
+  ON scenario_triggers (scenario_id, kind, COALESCE(tag_id, ''));
+CREATE INDEX IF NOT EXISTS idx_scenario_triggers_lookup ON scenario_triggers (kind, tag_id);

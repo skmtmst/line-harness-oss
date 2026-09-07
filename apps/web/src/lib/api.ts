@@ -2506,7 +2506,7 @@ export type RichMenuAreaResponse = {
 export type ScenarioTriggerItem = {
   id: string
   /** friend_add … 友だち追加時 / tag_added … 決めたタグが付いたとき */
-  kind: 'friend_add' | 'tag_added'
+  kind: 'friend_add' | 'tag_added' | 'form_answer' | 'booking_confirmed'
   /** kind が tag_added のときだけ入る。 */
   tagId: string | null
 }
@@ -5069,6 +5069,8 @@ export const api = {
         ? { success: true, data: response.data }
         : { success: false, error: 'シナリオの下書き保存結果を確認できませんでした' }
     },
+    getDraft: (id: string, lineAccountId: string) =>
+      fetchApi<ApiResponse<ScenarioDraftV6 | null>>(`/api/scenarios/${id}/draft?lineAccountId=${encodeURIComponent(lineAccountId)}`),
 
     /* ---- アクション（Lステップの「アクション設定」にあたる） ---- */
     actions: {

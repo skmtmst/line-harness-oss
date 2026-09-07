@@ -3052,6 +3052,15 @@ const feature30Judgments = {
   },
 }
 const ISSUE_420_REVIEW = new Set(['r6Gzsu', 'hz9ti', 'EvVO5', 'RUxNf', 'NrBkW', 'g2UNV', 'M2b2B'])
+const ISSUE_420_NOTES = {
+  r6Gzsu: '試算APIでアカウント総数・条件一致・購読中・新規開始予定・除外数と通別予定を返す。固定値はs0の契約待ち。',
+  hz9ti: '送信後アクション8種を公開設定とV6下書きへ保存する。下書き読み返しGETを追加し、版番号を返す。',
+  EvVO5: '開始条件のfriend_add・tag_added・form_answer・booking_confirmedを保存可能にした。手動開始は行なしで表現する。',
+  RUxNf: '開始記録APIは購読一覧・テスト送信・送信枠・通別到達数を同じ応答で返す。固定応答はs0の契約待ち。',
+  NrBkW: '開始後の購読状態と次回配信日時をruns APIから読み返す。開始記録の固定データはs0の契約待ち。',
+  g2UNV: 'テスト送信結果の成功・失敗を友だち単位で表示する口をruns APIへ接続。未取得は理由付きで表示する。',
+  M2b2B: '通別の到達・開封・クリック・失敗をsteps配列で返し、LINE未提供の指標は未取得理由を表示する。',
+}
 
 for (const screen of SCREENS) {
   if (screen.feature === 5 && ISSUE_420_REVIEW.has(screen.node)) {
@@ -4387,7 +4396,7 @@ const ISSUE_211_SCREENS = new Set([
 for (const screen of SCREENS) {
   if (screen.feature === 5 && ISSUE_420_REVIEW.has(screen.node)) {
     screen.verdict = 'structure_match_data_pending'
-    screen.verdictNote = '**2026-09-07 Issue #420で再判定。** 3104/8791で対象状態を撮影。送信後アクション8種の保存口を確認した。固定データ/API不足の状態は未取得として扱い、理由を表示する。横スクロール0。'
+    screen.verdictNote = `**2026-09-07 Issue #420で再判定。** 3104/8791で対象状態を撮影。${ISSUE_420_NOTES[screen.node]} 固定データ/API不足の状態は未取得として扱い、理由を表示する。横スクロール0。`
     screen.verdictSource = `scenarios-v6/${screen.node}.txt + ${screen.node}-{1440,1920}.png`
     screen.verdictHead = 'codex/kenta-r2-s2-b420'
   }

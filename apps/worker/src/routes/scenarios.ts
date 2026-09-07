@@ -1687,7 +1687,7 @@ scenarios.post('/api/scenarios/:id/triggers', requireRole('owner', 'admin'), asy
     const scenarioId = c.req.param('id');
     const body = await c.req.json<{ kind?: string; tagId?: string | null }>();
     const kind = String(body.kind ?? '');
-    if (kind !== 'friend_add' && kind !== 'tag_added') {
+    if (!['friend_add', 'tag_added', 'form_answer', 'booking_confirmed'].includes(kind)) {
       return c.json({ success: false, error: 'きっかけの種類が不正です。' }, 400);
     }
     if (kind === 'tag_added' && !body.tagId) {
@@ -1706,7 +1706,7 @@ scenarios.post('/api/scenarios/:id/triggers', requireRole('owner', 'admin'), asy
       if (!tag) return c.json({ success: false, error: 'タグが見つかりません。' }, 400);
     }
 
-    await addScenarioTrigger(c.env.DB, scenarioId, kind, body.tagId ?? null);
+    await addScenarioTrigger(c.env.DB, scenarioId, kind as 'friend_add' | 'tag_added' | 'form_answer' | 'booking_confirmed', body.tagId ?? null);
     const rows = await getScenarioTriggers(c.env.DB, scenarioId);
     return c.json({
       success: true,
@@ -1716,6 +1716,23 @@ scenarios.post('/api/scenarios/:id/triggers', requireRole('owner', 'admin'), asy
     console.error('POST /api/scenarios/:id/triggers error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
+});
+
+// GET /api/scenarios/:id/draft — 編集画面を開いたときの下書き読み返し。
+scenarios.get('/api/scenarios/:id/draft', scenarioPermission('view'), async (c) => {
+  const lineAccountId = (c.req.query('lineAccountId') ?? '').trim();
+  if (!lineAccountId) return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+  const scopeError = await requireScenarioAccountScope(c, lineAccountId);
+  if (scopeError) return scopeError;
+  const row = await c.env.DB.prepare(
+    `SELECT scenario_id, line_account_id, version, after_actions_json, updated_by, updated_at
+       FROM scenario_drafts WHERE scenario_id = ? AND line_account_id = ?`,
+  ).bind(c.req.param('id'), lineAccountId).first<{ scenario_id: string; line_account_id: string; version: number; after_actions_json: string; updated_by: string; updated_at: string }>();
+  if (!row) return c.json({ success: true, data: null });
+  return c.json({ success: true, data: {
+    scenarioId: row.scenario_id, lineAccountId: row.line_account_id, version: row.version,
+    afterActions: parseJson(row.after_actions_json), updatedBy: row.updated_by, updatedAt: row.updated_at,
+  }});
 });
 
 scenarios.delete(
