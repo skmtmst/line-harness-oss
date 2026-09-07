@@ -1427,7 +1427,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             メールを開いても一覧が残って中央が半分のままだった。 */}
         <div
           data-inbox-v4="conversation-list"
-          className={`w-full border-[#E5E7EB] bg-canvas lg:flex-shrink-0 border-r flex-col overflow-hidden ${showFriendInfo ? 'lg:w-72 2xl:w-96' : 'lg:w-[330px] 2xl:w-[420px]'} ${selectedChatId || selectedThreadId ? 'hidden lg:flex' : 'flex'}`}
+          className={`w-full border-[#E5E7EB] bg-canvas lg:flex-shrink-0 border-r flex-col overflow-hidden ${showFriendInfo ? 'lg:w-72 2xl:w-[420px]' : 'lg:w-[330px] 2xl:w-[420px]'} ${selectedChatId || selectedThreadId ? 'hidden lg:flex' : 'flex'}`}
         >
           {/* タブ (すべて / 未読 / 対応中 / 対応済み) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
 

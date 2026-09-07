@@ -45,6 +45,7 @@ import {
   createCommonVarSchedule,
   applyDueCommonVarSchedules,
   getCommonVarById,
+  getCommonVarVersions,
 } from '../src/common-vars.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -777,7 +778,14 @@ describe('共通情報の日付切り替え', () => {
     });
     const applied = await applyDueCommonVarSchedules(db, '2026-08-16T00:00:00.000');
     expect(applied).toBe(1);
-    expect((await getCommonVarById(db, v.id, 'account-1'))?.value).toBe('11-20');
+    expect(await getCommonVarById(db, v.id, 'account-1')).toMatchObject({
+      value: '11-20',
+      version: 2,
+    });
+    expect(await getCommonVarVersions(db, v.id, 'account-1')).toEqual([
+      expect.objectContaining({ version_no: 2, value: '11-20', change_reason: '予約適用' }),
+      expect.objectContaining({ version_no: 1, value: '10-19', change_reason: '作成' }),
+    ]);
   });
 
   test('二度反映されない', async () => {
@@ -789,6 +797,31 @@ describe('共通情報の日付切り替え', () => {
     });
     expect(await applyDueCommonVarSchedules(db, '2026-08-16T00:00:00.000')).toBe(1);
     expect(await applyDueCommonVarSchedules(db, '2026-08-16T00:00:00.000')).toBe(0);
+  });
+
+  test('値の書き込みが失敗したら履歴と適用済み印も残さない', async () => {
+    const v = await createCommonVar(db, {
+      lineAccountId: 'account-1', name: 'x', varKey: 'atomic_x', value: 'A',
+    });
+    const schedule = await createCommonVarSchedule(db, {
+      varId: v.id,
+      effectiveFrom: '2026-08-01T00:00:00.000',
+      value: 'B',
+    });
+    sqlite.exec(`
+      CREATE TRIGGER reject_scheduled_value
+      BEFORE UPDATE OF value ON common_vars
+      BEGIN
+        SELECT RAISE(ABORT, 'forced value failure');
+      END;
+    `);
+
+    await expect(applyDueCommonVarSchedules(db, '2026-08-16T00:00:00.000')).rejects.toThrow();
+    expect(await getCommonVarById(db, v.id, 'account-1')).toMatchObject({ value: 'A', version: 1 });
+    expect(sqlite.prepare(`SELECT applied_at FROM common_var_schedules WHERE id = ?`).get(schedule.id))
+      .toEqual({ applied_at: null });
+    expect(await getCommonVarVersions(db, v.id, 'account-1')).toHaveLength(1);
+    sqlite.exec(`DROP TRIGGER reject_scheduled_value`);
   });
 
   test('溜まった予約は古い順に当て、最後のものが残る', async () => {

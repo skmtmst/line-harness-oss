@@ -382,6 +382,8 @@ export async function updateBookingMenuSettings(
     bookingWindowDays?: number | null;
     cutoffHoursBefore?: number | null;
     cancelDeadlineHoursBefore?: number | null;
+    /** 公開切替だけ変えるときに使う。送らなければ今のまま。 */
+    isActive?: boolean;
   },
 ): Promise<
   | { status: 'updated'; version: number }
@@ -407,6 +409,7 @@ export async function updateBookingMenuSettings(
   if (input.cancelDeadlineHoursBefore !== undefined) {
     add('cancel_deadline_hours_before', input.cancelDeadlineHoursBefore);
   }
+  if (input.isActive !== undefined) add('is_active', input.isActive ? 1 : 0);
   if (sets.length === 0) return { status: 'no_changes' };
   sets.push('version = version + 1', 'updated_at = ?');
   values.push(jstNow(), input.id, input.lineAccountId, input.expectedVersion);
