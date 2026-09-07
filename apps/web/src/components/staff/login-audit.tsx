@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Button from '@/components/shared/button'
+import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import { Tabs } from '@/components/shared/tabs'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -189,7 +190,7 @@ export default function LoginAudit({ userId }: { userId?: string }) {
     </div>
     <div className="mb-4 rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-accent">だれが、いつ、何をしたかの記録です。いつもと違う場所からのログインは赤く出します。消した・配信した・設定を変えたで絞れます。</div>
     <div className="mb-3 flex flex-wrap items-center gap-3">
-      <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="人の名前・操作の内容で検索" className="min-w-64 flex-1 rounded-control border border-hairline px-3 py-2 text-sm outline-none focus:border-accent" />
+      <SearchField value={query} onChange={setQuery} placeholder="人の名前・操作の内容で検索" className="min-w-64 flex-1" />
       <Select aria-label="期間で絞り込む" value={periodFilter} onChange={setPeriodFilter} options={PERIOD_OPTIONS} />
       <Select aria-label="表示件数" value={String(pageSize)} onChange={(value) => setPageSize(Number(value))} options={PAGE_SIZE_OPTIONS} />
     </div>
@@ -216,7 +217,7 @@ export default function LoginAudit({ userId }: { userId?: string }) {
 }
 
 function AuditKpi({ label, value, note, attention = false }: { label: string; value: number; note: string; attention?: boolean }) {
-  return <div className="flex h-[105px] flex-col gap-[5px] rounded-[18px] border border-hairline bg-canvas p-[15px]"><p className="text-xs font-semibold leading-[1.45] text-ink-faint">{label}</p><p className={`text-xl font-bold leading-[1.45] tabular-nums ${attention ? 'text-danger' : 'text-ink'}`}>{value.toLocaleString()}<span className="ml-1 text-xs font-medium text-ink-faint">件</span></p><p className="text-[11px] leading-[1.45] text-ink-faint">{note}</p></div>
+  return <div className="flex h-28 flex-col gap-1 rounded-card border border-hairline bg-canvas p-4"><p className="text-xs font-semibold leading-normal text-ink-faint">{label}</p><p className={`text-xl font-bold leading-normal tabular-nums ${attention ? 'text-danger' : 'text-ink'}`}>{value.toLocaleString()}<span className="ml-1 text-xs font-medium text-ink-faint">件</span></p><p className="text-xs leading-normal text-ink-faint">{note}</p></div>
 }
 
 function AuditPageLink({ children, disabled, onClick }: { children: React.ReactNode; disabled: boolean; onClick: () => void }) {
