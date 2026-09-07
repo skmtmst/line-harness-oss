@@ -3,33 +3,13 @@
   flex-direction: column;
   gap: 18px;
   min-width: 0;
-  padding: 14px 40px 32px;
+  padding-top: 14px;
 }
 
 .kpis {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
-}
-
-.toolbarTitle {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.sectionEyebrow {
-  color: var(--color-ink-faint);
-  font-size: var(--text-caption);
-  font-weight: 600;
-}
-
-.sectionTitle {
-  margin-top: 2px;
-  color: var(--color-ink);
-  font-size: var(--text-heading);
-  font-weight: 700;
 }
 
 .metric {
@@ -157,6 +137,11 @@
 .statusWarn {
   background: var(--color-status-warn-soft);
   color: var(--color-status-warn-deep);
+}
+
+.statusDanger {
+  background: var(--color-status-danger-soft);
+  color: var(--color-status-danger);
 }
 
 .statusMuted {
@@ -360,15 +345,6 @@
 }
 
 @media (max-width: 1100px) {
-  .root {
-    padding-inline: 24px;
-  }
-
-  .toolbarTitle {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
   .kpis,
   .fields,
   .checks {
@@ -381,10 +357,6 @@
 }
 
 @media (max-width: 640px) {
-  .root {
-    padding-inline: 16px;
-  }
-
   .kpis,
   .fields,
   .checks {

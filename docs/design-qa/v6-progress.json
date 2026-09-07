@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 241,
+  "compared": 243,
   "unimplemented": 0,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 31,
-  "match": 173,
-  "structureMatchDataPending": 72,
+  "missing": 29,
+  "match": 176,
+  "structureMatchDataPending": 71,
   "needsFix": 18,
-  "unjudged": 5,
-  "remaining": 95,
+  "unjudged": 3,
+  "remaining": 92,
   "features": [
     {
       "feature": 1,
@@ -2561,16 +2561,16 @@
       "feature": 23,
       "name": "EC連携",
       "total": 4,
-      "compared": 2,
+      "compared": 4,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 2,
-      "match": 0,
+      "missing": 0,
+      "match": 2,
       "structureMatchDataPending": 2,
       "needsFix": 0,
-      "unjudged": 2,
-      "remaining": 4,
+      "unjudged": 0,
+      "remaining": 2,
       "capturedAt": [
         {
           "pr": 0,
@@ -2913,6 +2913,16 @@
       "remaining": 2,
       "capturedAt": [
         {
+          "pr": 1177,
+          "head": "7ebf0d654",
+          "on": "2026-09-07",
+          "screens": [
+            "tksPc",
+            "GhOb3"
+          ],
+          "note": "Issue #401。店舗営業時間・休業日・予約ルール・空きプレビュー、価格種別・店舗共通ルール継承を実契約へ接続。3105/8792で1440/1920pxを撮影し、全10枚で横はみ出し0。未提供APIとPencil入力例の差は理由付き構造一致・データ未接続とした。"
+        },
+        {
           "pr": 1126,
           "head": "e1126c5c9",
           "on": "2026-09-07",
@@ -2990,12 +3000,21 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 3,
-      "structureMatchDataPending": 1,
+      "match": 4,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 1,
+      "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1176,
+          "head": "ea4284f42",
+          "on": "2026-09-07",
+          "screens": [
+            "ugP5y"
+          ],
+          "note": "Issue #403。キャンセル待ちの自動繰上げ処理を確認し、案内を設計どおり表示。3102/8789で1440/1920pxを撮影し、横はみ出し0で一致へ更新した。"
+        },
         {
           "pr": 533,
           "head": "d1070487",

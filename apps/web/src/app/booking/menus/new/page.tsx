@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { api, bookingApi, type BookingStaff } from '@/lib/api'
+import { api, bookingApi, type BookingSettings, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import CreatePage, {
@@ -13,7 +13,7 @@ import CreatePage, {
 import Button from '@/components/shared/button'
 
 /**
- * メニューを追加する（設計 V2 8-2-1 / node swtmr）。
+ * メニューを追加する（設計 V6 28-1-B / node GhOb3）。
  *
  * 設計は左に番号つきの4節、右に「予約画面での見え方」と「気をつけること」。
  * 入力欄だけ縦に並んでいると、どこまで埋めれば予約を受けられるのかが
@@ -30,26 +30,39 @@ export default function NewBookingMenuPage() {
   const [bufferAfterMinutes, setBufferAfterMinutes] = useState('0')
   const [basePrice, setBasePrice] = useState('')
   const [concurrentCapacity, setConcurrentCapacity] = useState('1')
-  const [windowDays, setWindowDays] = useState('30')
+  const [windowDays, setWindowDays] = useState('')
   const [cutoffHours, setCutoffHours] = useState('')
   const [cancelDeadlineHours, setCancelDeadlineHours] = useState('')
   const [intakeQuestion, setIntakeQuestion] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [staff, setStaff] = useState<BookingStaff[]>([])
+  const [storeSettings, setStoreSettings] = useState<BookingSettings | null>(null)
   const [bookingMileage, setBookingMileage] = useState<number | null>(null)
   /** チェックした担当。保存後に staff_menus へ流し込む。 */
   const [assigned, setAssigned] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    if (!selectedAccountId) return
+    if (!selectedAccountId) {
+      setStaff([])
+      setStoreSettings(null)
+      return
+    }
     let alive = true
-    bookingApi
-      .listStaff(selectedAccountId)
-      .then((r) => {
-        if (alive) setStaff(r.staff)
+    Promise.all([
+      bookingApi.listStaff(selectedAccountId),
+      bookingApi.getSettings(selectedAccountId),
+    ])
+      .then(([staffResult, settingsResult]) => {
+        if (!alive) return
+        setStaff(staffResult.staff)
+        setStoreSettings(settingsResult.success ? settingsResult.data : null)
       })
       .catch(() => {
         // 担当の一覧が出ないだけ。あとで割り当て画面から設定できる。
+        if (alive) {
+          setStaff([])
+          setStoreSettings(null)
+        }
       })
     return () => {
       alive = false
@@ -78,6 +91,17 @@ export default function NewBookingMenuPage() {
       return next
     })
   }
+
+  const priceMode = basePrice.trim() === ''
+    ? 'inquiry'
+    : Number(basePrice) === 0
+      ? 'free'
+      : 'fixed'
+  const priceLabel = priceMode === 'inquiry'
+    ? 'お問い合わせ'
+    : priceMode === 'free'
+      ? '無料'
+      : `¥${Number(basePrice).toLocaleString()}`
 
   return (
     <CreatePage
@@ -108,6 +132,7 @@ export default function NewBookingMenuPage() {
           duration_minutes: Number(durationMinutes),
           buffer_after_minutes: Number(bufferAfterMinutes) || 0,
           base_price: Number(basePrice) || 0,
+          price_mode: priceMode,
           concurrent_capacity: Number(concurrentCapacity) || 1,
           booking_window_days: windowDays ? Number(windowDays) : null,
           cutoff_hours_before: cutoffHours ? Number(cutoffHours) : null,
@@ -147,7 +172,7 @@ export default function NewBookingMenuPage() {
               <div className="text-ink-faint mt-2 flex items-center gap-3 text-xs">
                 <span>{durationMinutes || '—'}分</span>
                 <span>
-                  {basePrice ? `¥${Number(basePrice).toLocaleString()}` : '料金は当日ご案内'}
+                  {priceLabel}
                 </span>
               </div>
               <div className="bg-accent-deep text-on-accent rounded-control mt-3 px-3 py-2 text-center text-xs font-medium">
@@ -160,7 +185,7 @@ export default function NewBookingMenuPage() {
             <ul className="text-ink-secondary space-y-1.5 text-xs leading-5">
               <li>・担当スタッフを1人も選ばないと予約できません</li>
               <li>・所要時間は受付時間の区切りに合わせて表示されます</li>
-              <li>・料金を空欄にすると「料金は当日ご案内」と表示されます</li>
+              <li>・料金を空欄にすると「お問い合わせ」と表示されます</li>
             </ul>
           </AsideCard>
         </>
@@ -189,7 +214,7 @@ export default function NewBookingMenuPage() {
               className={`${inputClass} tabular-nums`}
             />
           </Field>
-          <Field label="料金" htmlFor="bm-price" note="税込の金額を入力してください。">
+          <Field label="料金" htmlFor="bm-price" note="税込の金額。0円は「無料」、空けると「お問い合わせ」と出ます。">
             <input
               id="bm-price"
               type="number"
@@ -244,7 +269,7 @@ export default function NewBookingMenuPage() {
           <Field
             label="予約を受け付ける期間"
             htmlFor="bm-window"
-            note="当日から何日先まで受けるか。空欄なら制限なし。"
+            note={`空欄なら店舗設定を使います${storeSettings ? `（現在 ${storeSettings.bookingWindowDays}日）` : ''}。`}
           >
             <div className="flex items-center gap-1.5">
               <input
@@ -253,7 +278,7 @@ export default function NewBookingMenuPage() {
                 min={1}
                 value={windowDays}
                 onChange={(e) => setWindowDays(e.target.value)}
-                placeholder="なし"
+                placeholder={storeSettings ? String(storeSettings.bookingWindowDays) : '店舗設定'}
                 className={`${inputClass} tabular-nums`}
               />
               <span className="text-ink-faint text-xs whitespace-nowrap">日先まで</span>
@@ -262,7 +287,7 @@ export default function NewBookingMenuPage() {
           <Field
             label="締め切り"
             htmlFor="bm-cutoff"
-            note="開始の何時間前まで受けるか。空欄なら直前まで受けます。"
+            note={`空欄なら店舗設定を使います${storeSettings ? `（現在 ${storeSettings.cutoffMinutesBefore / 60}時間前）` : ''}。`}
           >
             <div className="flex items-center gap-1.5">
               <input
@@ -271,7 +296,7 @@ export default function NewBookingMenuPage() {
                 min={1}
                 value={cutoffHours}
                 onChange={(e) => setCutoffHours(e.target.value)}
-                placeholder="なし"
+                placeholder={storeSettings ? String(storeSettings.cutoffMinutesBefore / 60) : '店舗設定'}
                 className={`${inputClass} tabular-nums`}
               />
               <span className="text-ink-faint text-xs whitespace-nowrap">時間前</span>
@@ -280,7 +305,7 @@ export default function NewBookingMenuPage() {
           <Field
             label="キャンセル期限"
             htmlFor="bm-cancel"
-            note="開始の何時間前までキャンセルできるか。"
+            note={`空欄なら店舗設定を使います${storeSettings ? `（現在 ${storeSettings.cancelDeadlineMinutesBefore / 60}時間前）` : ''}。`}
           >
             <div className="flex items-center gap-1.5">
               <input
@@ -289,7 +314,7 @@ export default function NewBookingMenuPage() {
                 min={1}
                 value={cancelDeadlineHours}
                 onChange={(e) => setCancelDeadlineHours(e.target.value)}
-                placeholder="なし"
+                placeholder={storeSettings ? String(storeSettings.cancelDeadlineMinutesBefore / 60) : '店舗設定'}
                 className={`${inputClass} tabular-nums`}
               />
               <span className="text-ink-faint text-xs whitespace-nowrap">時間前</span>
