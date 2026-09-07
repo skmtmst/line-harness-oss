@@ -1870,7 +1870,7 @@ export const SCREENS = [
     **「使い道」「履歴」「行動スコア」はまるごと無い。**
   */
   { ...MILEAGE, node: 's98Vfw', name: '17-1 マイル', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 PR #1041（head `16e2331cb`）で再実装・再撮影。** Pencil実ノード `s98Vfw` と `/mileage?tab=balances` を同じ1920px入力で左右に並べ、1440pxも確認した。4つの集計帯、案内、検索・絞り込み札、固定幅の一覧、明細と手動調整、件数・ページ送りをV6構造へ揃えた。通常2枚（1440・1920）は横スクロール0。**残る未接続**：ランク、今月の増減、失効予定のAPI値はまだ無いため、設計サンプル値を作らず `— 未取得` と理由を表示する。これらの口が入るまで `structure_match_data_pending` が実態どおり。取得元：`mileage-v6/s98Vfw.txt`。', verdictSource: 'mileage-v6/s98Vfw.txt', verdictHead: '16e2331cb' },
-  { ...MILEAGE, node: 'N46cQ', name: '17-1-A たまる決めごと', route: '/mileage?tab=earning-rules', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 構造一致・データ未接続。「まだ決めごとがありません」の空の絵。枠で見ると、帯（止めているもの2つ／この30日で付いたマイル）、札（すべて9／動いている7／止めている2／ほかの機能から呼ばれている3）、「決めごと 9つのうち 8つを表示」の件数表示、CSVが無い。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像は `docs/design-reference/mileage-v6/` を撮り直した。**実装との突き合わせはこれから。** **P2 たまる決めごと。作りは設計に近い。** ルート `/mileage?tab=earning-rules`。決めごとごとに 名前・説明・停止/再開・稼働（動いています／止めています）・付与数・上限（対象ごとに1回／1日1回まで／紹介された人1人につき1回）が並ぶ。**良い点**：「付与数を変更すると、変更後に発生した行動から新しい値が使われます。」と**いつから効くかを書く**（さかのぼらないことが分かる）。**撮った本文で付与数が空に見えるのは撮影の都合**——付与数は `<input type="number">`（`mileage/page.tsx:339`）で、本文の書き出しに入力欄の値は入らない。**実装の不具合ではない。** **P2 残る差**：設計は決めごとの並び替えと、効いている範囲（どのアカウント・どの友だち）をその場で出す。実装は一覧まで。取得元：`mileage-v6/N46cQ.txt`。1440・1920とも横スクロール0 **推奨修正**：決めごとの並び替えと、効いている範囲（どのアカウント・どの友だち）を出す。**「付与数を変更すると、変更後に発生した行動から新しい値が使われます。」の断りはそのまま残す**（さかのぼらないことが分かる）。', verdictSource: 'mileage-v6/N46cQ.txt' , verdictHead: '31293424' },
+  { ...MILEAGE, node: 'N46cQ', name: '17-1-A たまる決めごと', route: '/mileage?tab=earning-rules', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #429 / UI HEAD 65390c132 で再判定。** 並び替えと `sortOrder` の保存、公開版の中身を見る導線、V6下書きの利用対象条件を実装し、3102/8789で1440/1920pxを撮影した。両幅とも横はみ出し0。設計の操作と一覧構造はそろった。**残る口**：現在の `/api/mileage/earning-rules` は行別の付与回数だけで、設計上段の「この30日で付いたマイル」「1人あたり平均」を返さない。Issue #418がこの集計契約を実装中のため、値を作らず `structure_match_data_pending` とする。', verdictSource: 'mileage-v6/N46cQ.png + N46cQ.txt + N46cQ-1440.png + N46cQ-1920.png', verdictHead: '65390c132' },
   {
     /*
       **#549 で「マイルの使い道」が入った。**
@@ -1909,7 +1909,7 @@ export const SCREENS = [
     // （`mileage/page.tsx:185` だけは `overview?.pagination?.total` と正しく書けている）
     // **今回は撮影側の口と固定データを足して撮れるようにしただけで、実装は直していない。**
   },
-  { ...MILEAGE, node: 'BmoGY', name: '17-1-D たまる決めごとをつくる', route: '/mileage/earning-rules/new', verdict: 'needs_fix', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正。**実装のほうが進んでいる部分がある**：倍率表（倍率なしの人1.0倍／EC顧客連携済み1.2倍／NEN会員1.5倍）と「倍率はタグ側の設定で決まります。優先度がいちばん高いタグ1枚だけが効きます。」——**これは残し、設計側にも足す**。実装に無いのは「付いてから1年」（有効期限）、**「予約が取り消されたら 300 マイルを引きます。残高が足りなければ 0」**（取り消しの扱い）、「条件を足す（15の軸から選べます）」、**LINEプレビュー**。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像は `docs/design-reference/mileage-v6/` を撮り直した。**実装との突き合わせはこれから。** **development `c275749d` で撮った。** 構造は設計とそろっており、残るのは実データの接続', verdictSource: 'mileage-v6/BmoGY.txt + mileage-v6/design-qa.md' , verdictHead: '31293424' },
+  { ...MILEAGE, node: 'BmoGY', name: '17-1-D たまる決めごとをつくる', route: '/mileage/earning-rules/new', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #429 / UI HEAD 65390c132 で再判定。** 一斉配信と同じ15軸の条件ビルダーを接続し、有効期限・取消時の減算・LINEプレビューとともにV6下書きへ保存する。3102/8789で1440/1920pxを撮影し、両幅とも横はみ出し0。**残る口**：取消でマイルを引いたときの友だち向け自動通知はIssue #418で実装中であり、現画面も未接続と明記している。条件や通知結果を偽らず、通知口の統合まで `structure_match_data_pending` とする。', verdictSource: 'mileage-v6/BmoGY.png + BmoGY.txt + BmoGY-1440.png + BmoGY-1920.png', verdictHead: '65390c132' },
   {
     /*
       **#441 で `/mileage/friends/detail` が入った。**
@@ -1953,18 +1953,18 @@ export const SCREENS = [
     verdictHead: '5e8f32d3',
     /* #863 合流後の実装を照合した現在の判定。 */
     ...{
-      verdict: 'needs_fix',
-      verdictNote: '**2026-09-04 S3 第2段で再照合。** 要修正。#863 合流後の実装には、名前・説明・必要マイル、渡す種類、在庫、1人あたり上限、期間、有効日数、公開版を直接変えない下書き、受け渡し失敗時の再試行・返却、顧客への案内、公開前確認がそろう。今回 `eb0a4fea8` で、既存の副作用なしテストAPIを「自分で交換をテスト」へ接続し、残高と在庫を動かさない結果を表示した。残る差は「だれが交換できるか」の条件、運用者が選べる共通アクション、画像・クーポンの選択、右側の作り方とつながる先。回答フォーム・品ものは保存契約に無いため、選べるふりをさせない。新規実装画像は実行環境の Chromium Mach port 拒否で未取得。**推奨修正**：次は共通条件と共通アクションの選択APIを接続し、1440/1920で撮り直す。',
+      verdict: 'structure_match_data_pending',
+      verdictNote: '**2026-09-07 Issue #429 / UI HEAD 65390c132 で再判定。** `mr-1` の詳細取得を正しい器で受け、一覧データへの安全なフォールバックも備えたため表示エラーを解消した。公開中の共通アクションと版をAPIから読み、交換後の処理として選択できる。3102/8789で1440/1920pxを撮影し、両幅とも横はみ出し0。**残る口**：`MileageRewardVersion` と `MileageRewardDraftInput` に交換対象条件 `targetConditions` が無く、保存APIも受け取らないため、設計の「だれが交換できますか」を永続化できない。選べるふりを足さず、契約追加まで `structure_match_data_pending` とする。',
       verdictSource: 'mileage-v6/p9CcEB.txt + apps/web/src/app/mileage/rewards/edit/page.tsx + apps/web/src/app/mileage/rewards/edit/reward-form.test.ts + docs/v6-requirements/v6-17-mileage-score-requirements-draft.md',
-      verdictHead: 'eb0a4fea8',
+      verdictHead: '65390c132',
     },
   },
   {
     ...MILEAGE, node: 'k8VCU', name: '17-1-H たまる決めごと・一覧の状態',
-    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 構造一致・データ未接続。`N46cQ` と同じ差。4状態は撮れている。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像は `docs/design-reference/mileage-v6/` を撮り直した。**実装との突き合わせはこれから。** **development `c275749d` で撮った。設計と一致。** 読込・空・失敗が分かれ、**実装が設計より2点足している**（未取得と実値0の言い分け、取れていない理由を言葉で出す）。1440・1920とも横スクロール0', verdictSource: 'mileage-v6/k8VCU-error.txt + mileage-v6/design-qa.md',
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #429 / UI HEAD 65390c132 で一致。** N46cQと同じ一覧に、通常・読込中・0件・取得失敗を分けて実装した。3102/8789で全4状態を1440/1920px撮影し、状態名、案内、再読込導線、件数表示をPencil正本と目視比較した。全画像で横はみ出し0。並び順保存・公開版確認・利用対象条件も通常状態から到達できる。', verdictSource: 'mileage-v6/k8VCU.png + k8VCU.txt + k8VCU-*-1440.png + k8VCU-*-1920.png',
     route: '/mileage?tab=earning-rules',
     states: { apis: ['**/api/mileage/earning-rules*'], kinds: ['loading', 'empty', 'error'] },
-    verdictHead: '31293424',
+    verdictHead: '65390c132',
   },
   {
     /*
