@@ -403,9 +403,9 @@ export const SCREENS = [
     ],
     ...issue455InboxReview('ANgda'),
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #488で画面固有の残差を修正し、一致を維持。** 会話一覧をPencilと同じ7件・420px幅にし、保存窓の暗幕濃度と入力済み時の注意をそろえた。3102/8789の1440/1920pxで横はみ出し0、高さ差0px、1920px画素差6.8865%。",
+    verdictNote: "**2026-09-07 Issue #488で画面固有の残差を修正し、一致を維持。** 会話一覧をPencilと同じ7件・420px幅にし、保存窓の暗幕濃度と入力済み時の注意をそろえた。3102/8789の1440/1920pxで横はみ出し0、高さ差0px、1920px画素差6.8943%。",
     verdictSource: "inbox-v6/ANgda.png（Pencil） + inbox-v6/ANgda-{1440,1920}.png（実装） + inbox-v6/ANgda-diff-1920.png + Issue #488 pixel comparison",
-    verdictHead: "2109109a9",
+    verdictHead: "a9d041efb",
   },
   {
     ...INBOX, node: 'tBlkL', name: '2-15 保存した検索・保存完了',
@@ -442,9 +442,9 @@ export const SCREENS = [
     verdictSource: 'inbox-v6/AuSDY.png + inbox-v6/AuSDY-{1440,1920}.png + Issue #469 pixel comparison',
     verdictHead: 'a6ccecd230',
     ...issue455InboxReview('AuSDY'),
-    verdictNote: '**2026-09-07 Issue #488で画面固有の残差を修正し、一致を維持。** 会話一覧をPencilと同じ7件・420px幅にし、保存窓の暗幕濃度をそろえた。未入力の赤枠・案内・押せない保存ボタンも維持。3102/8789の1440/1920pxで横はみ出し0、高さ差0px、1920px画素差6.8881%。',
+    verdictNote: '**2026-09-07 Issue #488で画面固有の残差を修正し、一致を維持。** 会話一覧をPencilと同じ7件・420px幅にし、保存窓の暗幕濃度をそろえた。未入力の赤枠・案内・押せない保存ボタンも維持。3102/8789の1440/1920pxで横はみ出し0、高さ差0px、1920px画素差6.8958%。',
     verdictSource: 'inbox-v6/AuSDY.png（Pencil） + inbox-v6/AuSDY-{1440,1920}.png（実装） + inbox-v6/AuSDY-diff-1920.png + Issue #488 pixel comparison',
-    verdictHead: '2109109a9',
+    verdictHead: 'a9d041efb',
   },
   {
     ...INBOX, node: 'LHjwD', name: '2-17 保存した検索名・重複エラー',
@@ -457,9 +457,9 @@ export const SCREENS = [
     ],
     ...issue455InboxReview('LHjwD'),
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #488で画面固有の残差を修正し、一致を維持。** 会話一覧をPencilと同じ7件・420px幅にし、保存窓の暗幕濃度をそろえた。重複名の赤枠・案内と再保存操作も維持。3102/8789の1440/1920pxで横はみ出し0、高さ差0px、1920px画素差6.8624%。",
+    verdictNote: "**2026-09-07 Issue #488で画面固有の残差を修正し、一致を維持。** 会話一覧をPencilと同じ7件・420px幅にし、保存窓の暗幕濃度をそろえた。重複名の赤枠・案内と再保存操作も維持。3102/8789の1440/1920pxで横はみ出し0、高さ差0px、1920px画素差6.8701%。",
     verdictSource: "inbox-v6/LHjwD.png（Pencil） + inbox-v6/LHjwD-{1440,1920}.png（実装） + inbox-v6/LHjwD-diff-1920.png + Issue #488 pixel comparison",
-    verdictHead: "2109109a9",
+    verdictHead: "a9d041efb",
   },
 
   // ── 機能3 友だち ────────────────────────────────────────
