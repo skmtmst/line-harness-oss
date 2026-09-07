@@ -3308,10 +3308,10 @@ const FEATURE_17_REVIEW = {
 
 // Issue #422（機能17/24/31/12）の再判定結果。
 const ISSUE_422_REVIEW = {
-  N46cQ: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #429 / UI HEAD 65390c132 で再判定。** 並び替えと `sortOrder` の保存、公開版の中身を見る導線、V6下書きの利用対象条件を実装。残る口は30日付与マイルと1人あたり平均の集計契約（Issue #418）。', verdictSource: 'mileage-v6/N46cQ.txt', verdictHead: '65390c132' },
-  k8VCU: { verdict: 'match', verdictNote: '**2026-09-07 Issue #429 / UI HEAD 65390c132 で一致。** 通常・読込中・0件・取得失敗の全4状態を1440/1920pxで照合し、全画像で横はみ出し0。並び順保存・公開版確認・利用対象条件にも到達できる。', verdictSource: 'mileage-v6/k8VCU.txt + k8VCU-error.txt', verdictHead: '65390c132' },
-  BmoGY: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #429 / UI HEAD 65390c132 で再判定。** 15軸条件ビルダーをV6下書き保存へ接続。残る口は取消時の友だち向け自動通知（Issue #418）。', verdictSource: 'mileage-v6/BmoGY.txt', verdictHead: '65390c132' },
-  p9CcEB: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #429 / UI HEAD 65390c132 で再判定。** 表示エラーを解消し、公開中の共通アクションと版を選べる。残る口は交換対象条件 `targetConditions` の保存契約。', verdictSource: 'mileage-v6/p9CcEB.txt + apps/web/src/app/mileage/rewards/edit/page.tsx + apps/web/src/app/mileage/rewards/edit/reward-form.test.ts', verdictHead: '65390c132' },
+  N46cQ: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #429 / PR #1215 / UI HEAD 65390c132 で再判定。** 並び替えと `sortOrder` の保存、公開版の中身を見る導線、V6下書きの利用対象条件を実装。残る口は30日付与マイルと1人あたり平均の集計契約（Issue #418）。', verdictSource: 'mileage-v6/N46cQ.txt', verdictHead: '65390c132' },
+  k8VCU: { verdict: 'match', verdictNote: '**2026-09-07 Issue #429 / PR #1215 / UI HEAD 65390c132 で一致。** 通常・読込中・0件・取得失敗の全4状態を1440/1920pxで照合し、全画像で横はみ出し0。並び順保存・公開版確認・利用対象条件にも到達できる。', verdictSource: 'mileage-v6/k8VCU.txt + k8VCU-error.txt', verdictHead: '65390c132' },
+  BmoGY: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #429 / PR #1215 / UI HEAD 65390c132 で再判定。** 15軸条件ビルダーをV6下書き保存へ接続。残る口は取消時の友だち向け自動通知（Issue #418）。', verdictSource: 'mileage-v6/BmoGY.txt', verdictHead: '65390c132' },
+  p9CcEB: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #429 / PR #1215 / UI HEAD 65390c132 で再判定。** 表示エラーを解消し、公開中の共通アクションと版を選べる。残る口は交換対象条件 `targetConditions` の保存契約。', verdictSource: 'mileage-v6/p9CcEB.txt + apps/web/src/app/mileage/rewards/edit/page.tsx + apps/web/src/app/mileage/rewards/edit/reward-form.test.ts', verdictHead: '65390c132' },
   Q55bb: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。編集欄、差し込み項目、ボタン、LINEプレビュー、公開版と下書きの分離を確認した。新しい通知定義・送信テストAPIが固定データに無いため構造一致・データ待ち。', verdictSource: 'line-notify-v6/Q55bb.txt', verdictHead: 'e98decafa' },
   c4R6F: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。説明、必須表示、切替、並び替え、初期値復元、利用中/作成数を確認した。一部利用数が未取得のため構造一致・データ待ち。', verdictSource: 'settings-v6/c4R6F.txt', verdictHead: 'e98decafa' },
   kQ1bs: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。STEP 2、条件、対象人数、優先順位、標準15軸・追加6軸、保存導線を確認した。重複人数と実配布人数は固定入力不足のため構造一致・データ待ち。', verdictSource: 'rich-menus-v6/kQ1bs.txt', verdictHead: 'e98decafa' },
@@ -4797,6 +4797,7 @@ export const CAPTURED_AT = {
     { pr: 0, head: '4af43fb6', on: '2026-09-01', screens: ['festr'], note: 'Claudeが実装して撮った。**doctorが合格になったが、この3本はまだ push していない**' },
   ],
   17: [
+    { pr: 1215, head: '65390c132', on: '2026-09-07', screens: ['N46cQ', 'BmoGY', 'p9CcEB', 'k8VCU'], note: 'Issue #429 / PR #1215。決めごとの並び順・公開版・15軸条件と、使い道の共通アクション選択を実装し、3102/8789で1440/1920pxを撮影。全画像で横はみ出し0。k8VCUは一致、残るAPI契約は3画面の判定注記へ記録した。' },
     { pr: 1137, head: '5e1ccd22d', on: '2026-09-07', screens: ['s98Vfw', 'N46cQ', 'qlVLJ', 'MvZm5', 'BmoGY', 'HIU5O', 'vz0Ji', 'k8VCU', 'z3PB2'], note: 'Issue #373。機能17の新しい残高・付与ルール・使い道・履歴契約へ接続し、固定ポート3105/8792で通常と定義済みの全状態を1440/1920px撮影。全画像で横はみ出し0。友だち明細は全体履歴を友だちIDで絞り込んで表示するようにした。残差は画面とAPIに分けて各verdictNoteへ記録。' },
     { pr: 549, head: '0ae3e094', on: '2026-08-29', screens: ['qlVLJ', 'p9CcEB'], note: 'マイルの使い道を交換まで接続。公開版の固定・二重交換の防止・渡せなかったときの決めごとが入っている' },
     { pr: 441, head: '05c5b103', on: '2026-08-28', screens: ['MvZm5', 'BmoGY', 'HIU5O'] },
