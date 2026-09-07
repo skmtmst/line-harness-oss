@@ -852,7 +852,7 @@ export const SCREENS = [
     */
     ...BROADCAST, node: 'p97Tf', name: '6-1-D テンプレート選択',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #384で一致判定。** 固定データの予約確認テンプレートを選び、更新日・使用回数・本文と読み込み前チェックを確認窓へ表示。1440/1920pxで横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #462で画素比較。** 切り分けは(a)実UI差。確認窓と背景の設定サマリー・LINEプレビューを設計の情報量と位置に合わせた。1920pxの差分率5.7571%、1440/1920pxとも横はみ出し0で一致。',
     verdictSource: 'broadcasts-v6/p97Tf.txt + broadcasts-v6/p97Tf-{1440,1920}.png',
     verdictHead: '55b3531ecb', route: `${NEW_BC}?step=message`,
     mode: 'viewport', height: 1080, steps: [
@@ -879,7 +879,7 @@ export const SCREENS = [
     */
     ...BROADCAST, node: 'h0kahp', name: '6-1-F テスト送信',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #384で一致判定。** LINE連携済み担当者2人を固定データから確認窓へ表示し、選択して送る導線と送信前の説明を1440/1920pxで撮影。横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #462で画素比較。** 切り分けは(a)実UI差。確認窓の見出し、送信先2人の選択状態、ボタン、背景のLINEプレビューとテスト履歴を設計に合わせた。1920pxの差分率9.6138%、1440/1920pxとも横はみ出し0で一致。',
     verdictSource: 'broadcasts-v6/h0kahp.txt + broadcasts-v6/h0kahp-{1440,1920}.png',
     verdictHead: '55b3531ecb', route: `${NEW_BC}?step=message&templateId=template-11`,
     mode: 'viewport', height: 1080,
@@ -898,9 +898,10 @@ export const SCREENS = [
   {
     ...BROADCAST, node: 'vW4Es', name: '6-1-G 配信前チェック',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #384で一致判定。** 対象・日時・テスト送信・LINEプレビューと、事前確認APIの残り送信枠3,158通を同じ確認窓へ表示。1440/1920pxで横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #462で画素比較。** 切り分けは(a)実UI差と(c)撮影範囲差。配信内容・確認項目・右側サマリーと確認窓を設計に合わせ、全体縦長ではなく1080pxの同一範囲で撮影した。1920pxの差分率5.4820%、1440/1920pxとも横はみ出し0で一致。',
     verdictSource: 'broadcasts-v6/vW4Es.txt + broadcasts-v6/vW4Es-{1440,1920}.png',
     verdictHead: '55b3531ecb', route: `${NEW_BC}?step=confirm&templateId=template-11&scheduledDate=2026-08-24&scheduledTime=10%3A00`,
+    mode: 'viewport', height: 1080,
     /*
       **確かめました（2026-08-28）。実装は在ります。**
       置き文のままだったのは、こちらの口が `POST /api/broadcasts/preflight` を
@@ -3031,7 +3032,7 @@ export const SCREENS = [
     status: 'elsewhere', shots: 'tags-csv-select',
     why: 'ファイルを選ばせる操作が要る。`capture.spec.mjs` の `tags-csv-select` が撮っている',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #297で修正・再判定。** 一致。CSV選択、UTF-8・500件上限、確認してから登録する説明、未分類の扱い、取消・確認を同じダイアログに配置した。専用Playwrightで1440・1920pxを撮影し、横はみ出し0。",
+    verdictNote: "**2026-09-07 Issue #462で画素比較。** 切り分けは(c)撮影範囲・実装画像選択差。通常のタグ一覧で上書きせず、`shots: tags-csv-select`のCSV選択状態を同幅1920pxで比較した。差分率3.0953%、1440/1920pxとも横はみ出し0で一致。",
     verdictSource: "friend-attributes-v6/H374MR.txt + H374MR-{1440,1920}.png",
   },
   {
@@ -3040,7 +3041,7 @@ export const SCREENS = [
     status: 'elsewhere', shots: 'tags-csv-preview',
     why: '同上。`tags-csv-preview` が撮っている',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #328で修正・再判定。** 一致。CSV名、4件数、状態絞り込み、代表5行、行別の扱いと理由、部分登録の注意、取消・登録を設計順に表示した。件数はAPI応答で変わるため、固定データの500行・作成404・飛ばす73・エラー23で照合した。1440・1920pxとも横はみ出し0、壊れた値0。",
+    verdictNote: "**2026-09-07 Issue #462で画素比較。** 切り分けは(c)撮影範囲・実装画像選択差。`shots: tags-csv-preview`の500行を読み込んだ確認状態を、通常一覧ではなく同幅1920pxで比較した。差分率3.4576%、1440/1920pxとも横はみ出し0で一致。",
     verdictSource: "friend-attributes-v6/sfTEW.txt + friend-attributes-v6/sfTEW-{1440,1920}.png",
   },
   {
@@ -3049,7 +3050,7 @@ export const SCREENS = [
     status: 'elsewhere', shots: 'tags-csv-success',
     why: '同上。`tags-csv-success` が撮っている',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #328で修正・再判定。** 一致。完了の緑帯、登録404件、フォルダ別内訳（VIP120・会員200・未分類84）、飛ばした73件、一覧へ戻る操作を設計順に表示した。1440・1920pxとも横はみ出し0、壊れた値0。",
+    verdictNote: "**2026-09-07 Issue #462で画素比較。** 切り分けは(c)撮影範囲・実装画像選択差。`shots: tags-csv-success`の登録完了状態を、通常一覧ではなく同幅1920pxで比較した。差分率2.5624%、1440/1920pxとも横はみ出し0で一致。",
     verdictSource: "friend-attributes-v6/op1rh.txt + friend-attributes-v6/op1rh-{1440,1920}.png",
   },
   {
@@ -3058,7 +3059,7 @@ export const SCREENS = [
     status: 'elsewhere', shots: 'tags-csv-partial',
     why: '同上。`tags-csv-partial` が撮っている',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #328で修正・再判定。** 一致。部分失敗の黄帯、登録404件・未登録23件、代表5行の異なる理由、失敗行CSV、一覧へ戻る操作を設計順に表示した。フォルダ名は失敗CSVへ残し、画面表は設計どおり行・タグ名・理由の3列に絞った。1440・1920pxとも横はみ出し0、壊れた値0。",
+    verdictNote: "**2026-09-07 Issue #462で画素比較。** 切り分けは(c)撮影範囲・実装画像選択差。`shots: tags-csv-partial`の部分失敗状態を、通常一覧ではなく同幅1920pxで比較した。差分率3.0981%、1440/1920pxとも横はみ出し0で一致。",
     verdictSource: "friend-attributes-v6/QzRsJ.txt + friend-attributes-v6/QzRsJ-{1440,1920}.png",
   },
   { node: 'HBTk0', feature: 4, name: '4-2 友だち情報欄', dir: 'friend-attributes-v6', route: '/tags?tab=fields', mode: 'page',
@@ -3187,7 +3188,7 @@ export const SCREENS = [
     /* 対応マークは物理削除せず、置き換えて履歴を残す保管として扱う。 */
     steps: [{ click: '保留を保管', scope: 'main' }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #446 / UI HEAD `64436d463b` でPencil V6を修正し再判定。** 対応マークは物理削除せず、3人を別のマークへ置き換えて履歴を残す保管として設計と実装を統一した。3102/8789で1440/1920pxを撮影し、両幅とも横はみ出し0。",
+    verdictNote: "**2026-09-07 Issue #462で画素比較。** 切り分けは(a)実UI差と(c)設計画像選択差。古い幅別画像ではなく現行の無印V6画像を比較元にし、保管確認窓を説明・置換先・対象人数に絞って上端310px・幅680pxへ合わせた。1920pxの差分率9.0706%、1440/1920pxとも横はみ出し0で一致。",
     verdictSource: "friend-attributes-v6/zGZMA.txt + friend-attributes-v6/zGZMA-{1440,1920}.png + 2026-09-07同一状態比較",
     verdictHead: "64436d463b",
   },
