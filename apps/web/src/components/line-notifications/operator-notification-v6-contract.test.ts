@@ -36,7 +36,7 @@ describe('V6 運用者へのお知らせ — 宛先・送信・実行記録の�
     expect(create).toContain('operatorRules.test')
     expect(create).toContain('>出す</Button>')
     expect(create).toContain('自分にテスト送信')
-    expect(create).toContain('LINEログインを済ませた人にだけ届きます')
+    expect(create).toContain('LINEログイン済みの人にだけ届きます')
     expect(create).toContain('だれも受け取れないときはメールでも送る')
   })
 

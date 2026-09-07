@@ -198,7 +198,7 @@ export default function NewOperatorNotificationPage() {
 
           <section className="border-hairline bg-canvas rounded-card border p-5">
             <h2 className="text-sm font-semibold text-ink">だれが受け取るか</h2>
-            <p className="mt-1 text-xs text-ink-faint">LINEログインを済ませた人にだけ届きます。担当が決まっていないと届きません。</p>
+            <p className="mt-1 text-xs text-ink-faint">LINEログイン済みの人にだけ届きます。担当が決まっていないと届きません。</p>
             <div className="mt-4 grid max-w-3xl gap-3 sm:grid-cols-2"><Field label="送り先" htmlFor="operator-recipient-kind"><SelectField id="operator-recipient-kind" className="w-full" value="staff" onChange={() => undefined} options={[{ value: 'staff', label: 'スタッフ' }]} /></Field><Field label="チーム" htmlFor="operator-recipient-team"><SelectField id="operator-recipient-team" className="w-full" value="all" onChange={() => undefined} options={[{ value: 'all', label: `選択中のスタッフ（${recipientIds.length}人）` }]} /></Field></div>
             <div className="mt-3 flex flex-wrap gap-2">
               {recipients ? recipients.items.map((recipient) => { const selected = recipientIds.includes(recipient.id); return <button type="button" key={recipient.id} aria-pressed={selected} onClick={() => setRecipientIds((current) => selected ? current.filter((id) => id !== recipient.id) : [...current, recipient.id])} className={`rounded-pill border px-3 py-1 text-xs font-semibold ${selected ? 'border-accent bg-accent-soft text-accent' : 'border-hairline bg-canvas text-ink-secondary'}`}>{recipient.name}{recipient.channels.line ? '' : '（LINE未連携）'}</button> }) : <p className="text-sm text-ink-faint">受け取る人を読み込んでいます…</p>}
@@ -220,7 +220,7 @@ export default function NewOperatorNotificationPage() {
               <input type="checkbox" checked={onlyAvailable} onChange={(event) => setOnlyAvailable(event.target.checked)} className="mt-0.5 h-4 w-4 accent-accent" />
               <span><strong className="block text-ink">手が空いている人だけに送る</strong><span className="text-xs text-ink-faint">対応中の人には送りません。</span></span>
             </label>
-            <label className="mt-4 flex items-start gap-3 text-sm text-ink-secondary"><input type="checkbox" checked={emailFallback} onChange={(event) => setEmailFallback(event.target.checked)} className="mt-0.5 h-4 w-4 accent-accent" /><span><strong className="block text-ink">だれも受け取れないときはメールでも送る</strong><span className="text-xs text-ink-faint">LINEでログインしていない人がいるとき</span></span></label>
+            <label className="mt-4 flex items-start gap-3 text-sm text-ink-secondary"><input type="checkbox" checked={emailFallback} onChange={(event) => setEmailFallback(event.target.checked)} className="mt-0.5 h-4 w-4 accent-accent" /><span><strong className="block text-ink">だれも受け取れないときはメールでも送る</strong><span className="text-xs text-ink-faint">LINE未ログインの人がいるとき</span></span></label>
           </section>
 
           {error ? <p role="alert" className="border-danger bg-danger-bg text-danger rounded-control border px-4 py-3 text-sm">{error}</p> : null}
