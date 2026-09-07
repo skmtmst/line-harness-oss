@@ -2611,6 +2611,32 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     */
     return { success: true, data: { total: 12, inUse: 9, registeredFriends: 187, formLinks: 6, updatedThisMonth: 3 } }
   }
+  if (pathname === '/api/friends') {
+    /*
+     * 点検 #496-23：絞り・検索・ページ送りを無視した固定231件だと、
+     * 画面確認で絞りが効いて見えて実機差異に気づけない。
+     * クエリに連動させる。絞り無しの既定は従来どおり（全件・total 231）で、
+     * 既定の撮影が変わらないようにする。
+     */
+    const search = (query.get('search') ?? '').trim().toLocaleLowerCase('ja')
+    const tagId = query.get('tagId') ?? ''
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? requestedLimit : FRIENDS.length
+    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    let items = FRIENDS
+    if (search) {
+      items = items.filter((friend) => (friend.displayName ?? '').toLocaleLowerCase('ja').includes(search))
+    }
+    if (tagId) {
+      items = items.filter((friend) => (friend.tags ?? []).some((tag) => tag.id === tagId))
+    }
+    const narrowed = search !== '' || tagId !== ''
+    return {
+      success: true,
+      data: { items: items.slice(offset, offset + limit), total: narrowed ? items.length : 231, page: 1, limit },
+    }
+  }
   if (pathname in SHAPES) {
     return { success: true, data: SHAPES[pathname] }
   }

@@ -55,6 +55,17 @@ async function adminAccountScope(c: Context<Env>, alias = '') {
   return { scope, where };
 }
 
+/**
+ * 利用者入力を LIKE パターンに埋める前の逃がし (#496-18)。
+ *
+ * `%` / `_` をそのまま渡すとワイルドカードとして効いて過剰一致する
+ * （注入ではなく人数・ページ送りのぶれ）。`\` も逃がしたうえで、
+ * 使う側はすべて `ESCAPE '\'` を付ける。
+ */
+export function escapeLikePattern(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
 export const requireVisibleFriend: MiddlewareHandler<Env> = async (c, next) => {
   const friend = await getFriendById(c.env.DB, c.req.param('id') ?? '');
   const accountId = friend
@@ -439,8 +450,8 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
       binds.push(...compiled.value.binds);
     }
     if (search) {
-      conditions.push('f.display_name LIKE ?');
-      binds.push(`%${search}%`);
+      conditions.push(`f.display_name LIKE ? ESCAPE '\\'`);
+      binds.push(`%${escapeLikePattern(search)}%`);
     }
     if (scoreMin.provided) {
       conditions.push('f.score >= ?');
@@ -542,8 +553,8 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
     /** ステータスメッセージに含む。`?statusMessage=...` */
     const statusMessage = c.req.query('statusMessage');
     if (statusMessage) {
-      conditions.push('f.status_message LIKE ?');
-      binds.push(`%${statusMessage}%`);
+      conditions.push(`f.status_message LIKE ? ESCAPE '\\'`);
+      binds.push(`%${escapeLikePattern(statusMessage)}%`);
     }
 
     /** 友だち登録日の範囲。`?createdFrom=YYYY-MM-DD&createdTo=YYYY-MM-DD` */
@@ -631,16 +642,17 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
     let listStmt;
     let listBinds: unknown[];
     if (search) {
-      const exactPattern = search;
-      const prefixPattern = `${search}%`;
-      const wordStartAscii = `% ${search}%`;
-      const wordStartFullWidth = `%　${search}%`;
+      const escapedSearch = escapeLikePattern(search);
+      const exactPattern = escapedSearch;
+      const prefixPattern = `${escapedSearch}%`;
+      const wordStartAscii = `% ${escapedSearch}%`;
+      const wordStartFullWidth = `%　${escapedSearch}%`;
       listStmt = db.prepare(
         `SELECT ${baseSelect},
                 CASE
-                  WHEN f.display_name LIKE ? THEN 0
-                  WHEN f.display_name LIKE ? THEN 1
-                  WHEN f.display_name LIKE ? OR f.display_name LIKE ? THEN 2
+                  WHEN f.display_name LIKE ? ESCAPE '\\' THEN 0
+                  WHEN f.display_name LIKE ? ESCAPE '\\' THEN 1
+                  WHEN f.display_name LIKE ? ESCAPE '\\' OR f.display_name LIKE ? ESCAPE '\\' THEN 2
                   ELSE 3
                 END AS match_score
          ${baseFrom} ${where}

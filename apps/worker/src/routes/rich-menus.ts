@@ -4,7 +4,7 @@ import { getFriendById, getLineAccountById, recordRichMenuAssignment } from '@li
 import type { Env } from '../index.js';
 import { resolveLineToken } from '../services/line-token.js';
 import { requireRole } from '../middleware/role-guard.js';
-import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 
 const richMenus = new Hono<Env>();
 
@@ -170,6 +170,23 @@ richMenus.delete('/api/friends/:friendId/rich-menu', requireRole('owner', 'admin
   }
 });
 
+/**
+ * 友だちのリッチメニュー取得の短時間キャッシュ (#496-13)。
+ *
+ * 取得のたびに LINE API を最大3本（個別→既定→一覧）叩くと、列挙で
+ * 制限・課金を消費される。認可の検査は毎回行い、通った後だけここを見る。
+ */
+const FRIEND_RICH_MENU_CACHE_TTL_MS = 60 * 1000;
+const friendRichMenuCache = new Map<
+  string,
+  { at: number; data: { id: string | null; name: string | null; isDefault: boolean } }
+>();
+
+/** Test-only: キャッシュを消して単体テスト同士の漏れを防ぐ。 */
+export function _resetFriendRichMenuCacheForTest(): void {
+  friendRichMenuCache.clear();
+}
+
 // GET /api/friends/:friendId/rich-menu — get rich menu currently linked to a friend
 richMenus.get('/api/friends/:friendId/rich-menu', async (c) => {
   try {
@@ -177,12 +194,19 @@ richMenus.get('/api/friends/:friendId/rich-menu', async (c) => {
     const db = c.env.DB;
 
     const friend = await getFriendById(db, friendId);
-    if (!friend) {
+    const friendAccId = (friend as unknown as Record<string, string | null> | null)?.line_account_id ?? null;
+    // 認可: 隣の GET /api/friends/:id と同じく、見られる友だちだけ。
+    // 存在の有無は 404 に倒して、ID列挙の手がかりを漏らさない (#496-13)。
+    if (!friend || !await canAccessAllLineAccounts(db, c.get('staff'), [friendAccId])) {
       return c.json({ success: false, error: 'Friend not found' }, 404);
     }
 
+    const cached = friendRichMenuCache.get(friendId);
+    if (cached && Date.now() - cached.at < FRIEND_RICH_MENU_CACHE_TTL_MS) {
+      return c.json({ success: true, data: cached.data });
+    }
+
     let accountToken: string | null = null;
-    const friendAccId = (friend as unknown as Record<string, string | null>).line_account_id;
     if (friendAccId) {
       const account = await getLineAccountById(db, friendAccId);
       accountToken = account?.channel_access_token ?? null;
@@ -232,14 +256,14 @@ richMenus.get('/api/friends/:friendId/rich-menu', async (c) => {
       }
     }
 
-    return c.json({
-      success: true,
-      data: { id: effectiveId, name, isDefault },
-    });
+    const data = { id: effectiveId, name, isDefault };
+    friendRichMenuCache.set(friendId, { at: Date.now(), data });
+    return c.json({ success: true, data });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('GET /api/friends/:friendId/rich-menu error:', message);
-    return c.json({ success: false, error: `Failed to fetch friend rich menu: ${message}` }, 500);
+    // 内部文言（`${message}`）をそのまま返すと紛れ込むため、利用者向けの定型文にする (#496-13)。
+    return c.json({ success: false, error: 'リッチメニューを取得できませんでした' }, 500);
   }
 });
 

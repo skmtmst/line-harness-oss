@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import type { Message } from '@line-crm/line-sdk';
+import type { FlexContainer, Message } from '@line-crm/line-sdk';
 import { extractFlexAltText } from '../utils/flex-alt-text.js';
 import {
   getOperators,
@@ -644,9 +644,19 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
       // 壊れた任意項目があっても受信箱そのものは開ける。
     }
 
-    // 新しい1000件を取って昇順に戻す。LIMIT 200 ASC だと古い200件だけで broadcast/scenario 等の
-    // 新しい push が欠落していた（Shu で 481件中 281件欠落のバグあり）。一覧側と同様に test 配信は除外。
-    // 現状の最重量ユーザー(481件)の2倍バッファ。これ以上の履歴はページング未実装（Phase 2 TODO）。
+    // 直近から limit 件ずつ返すカーソルページング。全文一括(LIMIT 1000)だと長期の
+    // 会話で応答が重くなり、画像/Flex再描画時のスクロール追従も高コストになる。
+    // 1件多めに取って「続きがあるか」だけ見て捨てる(limit+1方式)。
+    const rawMessageLimit = Number.parseInt(c.req.query('limit') ?? '', 10);
+    const messageLimit = Number.isSafeInteger(rawMessageLimit)
+      ? Math.min(1000, Math.max(1, rawMessageLimit))
+      : 100;
+    const beforeAt = c.req.query('beforeAt') || undefined;
+    const beforeId = c.req.query('beforeId') || undefined;
+    const useMessageCursor = Boolean(beforeAt && beforeId);
+    const messageBindings: unknown[] = [resolvedFriendId];
+    if (useMessageCursor) messageBindings.push(beforeAt, beforeAt, beforeId);
+    messageBindings.push(messageLimit + 1);
     const messages = await c.env.DB
       .prepare(
         `SELECT id, friend_id, direction, message_type, content, source, origin_kind,
@@ -658,11 +668,16 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
                 created_at
          FROM messages_log
          WHERE friend_id = ? AND (delivery_type IS NULL OR delivery_type != 'test')
-         ORDER BY created_at DESC LIMIT 1000`,
+         ${useMessageCursor ? 'AND (created_at < ? OR (created_at = ? AND id < ?))' : ''}
+         ORDER BY created_at DESC, id DESC LIMIT ?`,
       )
-      .bind(resolvedFriendId)
+      .bind(...messageBindings)
       .all();
-    messages.results = (messages.results as Record<string, unknown>[]).reverse();
+    // 新しい push の欠落を防ぐため DESC で取って昇順に戻す(従来どおり)。
+    const messageRows = messages.results as Record<string, unknown>[];
+    const hasMoreMessages = messageRows.length > messageLimit;
+    if (hasMoreMessages) messageRows.pop();
+    messageRows.reverse();
 
     return c.json({
       success: true,
@@ -679,7 +694,9 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
         revision,
         lastMessageAt,
         createdAt,
-        messages: (messages.results as Record<string, unknown>[]).map((m) => ({
+        // 古い履歴が残っているか。画面は「前のメッセージ」ボタンで遡る。
+        hasMoreMessages,
+        messages: messageRows.map((m) => ({
           id: m.id,
           direction: m.direction,
           messageType: m.message_type,
@@ -1109,7 +1126,13 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
     const chat = await resolveOrCreateChat(c.env.DB, chatId);
     if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
 
-    const body = await c.req.json<{ messageType?: string; content: string; revision?: number }>();
+    // 壊れたJSONは外側catchの500に落とさない。運用者が原因を判別できるよう400で返す。
+    let body: { messageType?: string; content: string; revision?: number };
+    try {
+      body = await c.req.json<{ messageType?: string; content: string; revision?: number }>();
+    } catch {
+      return c.json({ success: false, error: 'content is required' }, 400);
+    }
     if (!body.content) return c.json({ success: false, error: 'content is required' }, 400);
     if (body.revision !== undefined && body.revision !== chat.revision) {
       return c.json({
@@ -1161,15 +1184,34 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
     const messageType = body.messageType ?? 'text';
     let message: Message;
     if (messageType === 'text') {
+      // LINEのtext上限(5000字)を超える本文はここで止める。送ってから弾かれると
+      // 送信済みか未送信かが分からなくなり、運用者が二重送信しかねない。
+      if (body.content.length > 5000) {
+        return c.json({ success: false, error: 'メッセージは5000文字以内で入力してください' }, 400);
+      }
       message = { type: 'text', text: body.content };
     } else if (messageType === 'flex') {
-      const contents = JSON.parse(body.content);
+      // 壊れたJSONは外側catchの500に落とさず400で返す(形式が合うJSONは従来どおり送る)。
+      let contents: FlexContainer;
+      try {
+        contents = JSON.parse(body.content) as FlexContainer;
+      } catch {
+        return c.json({ success: false, error: 'Flexメッセージの形式が正しくありません' }, 400);
+      }
       message = { type: 'flex', altText: extractFlexAltText(contents), contents };
     } else if (messageType === 'image') {
-      const parsed = JSON.parse(body.content) as {
+      let parsed: {
         originalContentUrl: string;
         previewImageUrl: string;
       };
+      try {
+        parsed = JSON.parse(body.content) as {
+          originalContentUrl: string;
+          previewImageUrl: string;
+        };
+      } catch {
+        return c.json({ success: false, error: '画像メッセージの形式が正しくありません' }, 400);
+      }
       message = {
         type: 'image',
         originalContentUrl: parsed.originalContentUrl,
