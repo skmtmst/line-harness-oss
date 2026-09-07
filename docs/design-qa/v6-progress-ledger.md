@@ -21,11 +21,11 @@
 
 ## 画素比較
 
-比較済み **203** ／ 比較不可 **69** ／ 10%超 **33**。高さは上端を揃えて共通領域を比較し、高さ差を別に記録します。
+比較済み **205** ／ 比較不可 **67** ／ 10%超 **33**。高さは上端を揃えて共通領域を比較し、高さ差を別に記録します。
 
 | 機能 | 名前 | 総数 | 比較済み | 一致 | 構造一致・データ未接続 | 要修正 | 未実装 | 未判定 | 画素比較 | 10%超 | 比較不可 | 未確認 | 別の仕掛け | 未撮影 | 撮った先 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | ダッシュボード | 5 | 5 | 5 | 0 | 0 | 0 | 0 | 3 | 1 | 2 | 0 | 0 | 0 | #1279 `a44a51dbc` 2026-09-07（JN6mQ）<br>#1251 `088cea8a8` 2026-09-07（vUXKb）<br>#419 `c84baa63` 2026-08-30（vUXKb・ZN0ov・JN6mQ・NjK9q・Alekb）<br>#971 `d69099cd9` 2026-09-06（vUXKb・JN6mQ）<br>#1028 `7cc11af48` 2026-09-07（vUXKb・JN6mQ） |
+| 1 | ダッシュボード | 5 | 5 | 5 | 0 | 0 | 0 | 0 | 5 | 1 | 0 | 0 | 0 | 0 | #1279 `a44a51dbc` 2026-09-07（JN6mQ）<br>#1251 `088cea8a8` 2026-09-07（vUXKb）<br>#419 `c84baa63` 2026-08-30（vUXKb・ZN0ov・JN6mQ・NjK9q・Alekb）<br>#971 `d69099cd9` 2026-09-06（vUXKb・JN6mQ）<br>#1028 `7cc11af48` 2026-09-07（vUXKb・JN6mQ） |
 | 2 | 受信箱 | 18 | 18 | 18 | 0 | 0 | 0 | 0 | 8 | 1 | 10 | 0 | 0 | 0 | #513 `60b39036` 2026-08-29（tBlkL・AuSDY・LHjwD）<br>#555 `e873eeb9` 2026-08-29（ANgda・tBlkL・AuSDY・LHjwD）<br>#0 `c275749d` 2026-08-30（xGLVe）<br>#583 `0218ef61` 2026-08-30（GO8RQ）<br>#0 `c275749d` 2026-08-30（f0zn6）<br>#555 `9eee9655` 2026-08-30（tBlkL・ANgda・AuSDY・LHjwD）<br>#604 `6011cfeb` 2026-08-31（ASsb3・Xi4x9・NfgOs・NWbuF・TUveA・w72a2・B7CER8・YZaDK・L35UOV・H3lAOB）<br>#0 `4196cc7b` 2026-09-01（YZaDK）<br>#1059 `6f9a64684` 2026-09-07（xGLVe・NfgOs・H3lAOB・Xi4x9・f0zn6・NWbuF・B7CER8・IYjvu・TUveA・w72a2・ASsb3・ANgda・tBlkL・LHjwD） |
 | 3 | 友だち | 12 | 12 | 12 | 0 | 0 | 0 | 0 | 11 | 2 | 1 | 0 | 0 | 0 | #1254 `07b5835cf5` 2026-09-07（PhxG6・I6UAdr・bzDn6・YzxU1・r7eSi）<br>#1247 `fb07e4a3f3` 2026-09-07（I6UAdr・YzxU1・r7eSi）<br>#1230 `b62d7d070` 2026-09-07（ux7of）<br>#520 `4848a8f3` 2026-08-29（bzDn6）<br>#565 `ea2e730d` 2026-08-29（r7eSi）<br>#0 `c275749d` 2026-08-30（PhxG6・Igi72・I6UAdr・YzxU1）<br>#600 `484c0cd8` 2026-08-31（InCDe）<br>#601 `cfab56e0` 2026-08-31（w8W4Eh）<br>#628 `846be01f` 2026-08-31（PhxG6・Igi72・I6UAdr・bzDn6・YzxU1・r7eSi）<br>#628 `846be01f` 2026-09-01（bzDn6）<br>#645 `6e9ed4d6` 2026-09-01（IAf7j）<br>#966 `baa097e99` 2026-09-06（PhxG6・LT8RS・Igi72・IAf7j・I6UAdr・bzDn6・YzxU1・InCDe・r7eSi・w8W4Eh）<br>#975 `bdf6abfa7` 2026-09-06（vtBCu・ux7of）<br>#983 `36e8b070b` 2026-09-06（IAf7j・I6UAdr・bzDn6・YzxU1・r7eSi） |
 | 4 | 友だち属性 | 21 | 17 | 17 | 0 | 0 | 0 | 0 | 21 | 2 | 0 | 0 | 4 | 0 | #1279 `a44a51dbc` 2026-09-07（dKlkz・VjXGX）<br>#1241 `64436d463b` 2026-09-07（zGZMA）<br>#420 `87c150ad` 2026-08-28（HBTk0・yKEdO・KoT6c・A1ZYeP・l25rlp・rIhbN）<br>#421 `f7b7974a` 2026-08-28（QKx8Q・XBkiQ）<br>#541 `e929f22a` 2026-08-29（QKx8Q・XBkiQ）<br>#0 `c275749d` 2026-08-30（hqrOv・dKlkz・sfTEW・HBTk0・yKEdO・rIhbN・tP0RW・LfrQs・VjXGX・byqIW・KoT6c・zGZMA）<br>#420 `f77de350` 2026-08-30（HBTk0・yKEdO・KoT6c）<br>#605 `3b5098a3` 2026-08-31（l25rlp・ee0sk）<br>#578 `a744c582` 2026-08-31（A1ZYeP・hqrOv）<br>#0 `3aef8ded` 2026-08-31（GMvBd）<br>#605 `3b5098a3` 2026-09-01（l25rlp・ee0sk）<br>#670 `df3f4e3b` 2026-09-02（l25rlp・tP0RW・LfrQs・ee0sk・byqIW・A1ZYeP・XBkiQ）<br>#670 `7d830282` 2026-09-02（l25rlp・tP0RW・LfrQs・ee0sk・VjXGX・byqIW・A1ZYeP・KoT6c・HBTk0・yKEdO・dKlkz・hqrOv・rIhbN・QKx8Q・XBkiQ・H374MR・sfTEW・op1rh・QzRsJ） |
@@ -59,7 +59,7 @@
 | 32 | 運用状態 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 1 | 0 | 3 | 0 | 0 | 0 | #482 `b346d467` 2026-08-29（b3HfZ・U0BwS）<br>#0 `c275749d` 2026-08-30（UgonK・UhC2O） |
 | 33 | LINEアカウント設定 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 |  |
 | 34 | はじめの設定と案内 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 |  |
-| | **合計** | **272** | **265** | **268** | **0** | **0** | **0** | **0** | **203** | **33** | **69** | **0** | **4** | **3** | |
+| | **合計** | **272** | **265** | **268** | **0** | **0** | **0** | **0** | **205** | **33** | **67** | **0** | **4** | **3** | |
 
 ## 画面ごとの画素差
 
@@ -67,9 +67,9 @@
 |---|---|---|---:|---:|---|---|---|---|
 | 1 | `vUXKb` | 1-1 ダッシュボード | 4.0276% | +173px | 中央・右 | docs | [差分画像](dashboard-v6/vUXKb-diff-1920.png) | **一致** |
 | 1 | `ZN0ov` | 1-1-1 ダッシュボード編集 | 4.8383% | 0px | 下部・右 | docs | [差分画像](dashboard-v6/ZN0ov-diff-1920.png) | **一致** |
-| 1 | `JN6mQ` | 1-1-2 友だち追加QR | 13.8777% ⚠ | 0px | 下部・中央 | docs | [差分画像](dashboard-v6/JN6mQ-diff-1920.png) | **一致** |
-| 1 | `NjK9q` | 1-1-3 対応受信の表示件数を開く | —（実装画像なし（1920px）） | — | — | — | — | **一致** |
-| 1 | `Alekb` | 1-1-4 通知パネルを開く | —（実装画像なし（1920px）） | — | — | — | — | **一致** |
+| 1 | `JN6mQ` | 1-1-2 友だち追加QR | 13.7000% ⚠ | 0px | 下部・中央 | docs | [差分画像](dashboard-v6/JN6mQ-diff-1920.png) | **一致** |
+| 1 | `NjK9q` | 1-1-3 対応受信の表示件数を開く | 5.0391% | +65px | 中央・右 | docs | [差分画像](dashboard-v6/NjK9q-diff-1920.png) | **一致** |
+| 1 | `Alekb` | 1-1-4 通知パネルを開く | 5.0597% | +65px | 中央・右 | docs | [差分画像](dashboard-v6/Alekb-diff-1920.png) | **一致** |
 | 2 | `xGLVe` | 2-1 受信箱 | 6.8945% | 0px | 上部・中央 | docs | [差分画像](inbox-v6/xGLVe-diff-1920.png) | **一致** |
 | 2 | `NfgOs` | 2-2 テンプレート選択 | 8.3011% | 0px | 中央・中央 | docs | [差分画像](inbox-v6/NfgOs-diff-1920.png) | **一致** |
 | 2 | `H3lAOB` | 2-3 顧客情報パネル非表示 | —（実装画像なし（1920px）） | — | — | — | — | **一致** |
@@ -113,14 +113,14 @@
 | 5 | `M2b2B` | 5-1-L シナリオ・配信結果 | 3.8932% | 0px | 中央・右 | docs | [差分画像](scenarios-v6/M2b2B-diff-1920.png) | **一致** |
 | 5 | `q5G45` | 5-1-M 一覧の状態（空・読込・エラー） | 2.9600% | 0px | 上部・左 | docs | [差分画像](scenarios-v6/q5G45-diff-1920.png) | **一致** |
 | 6 | `q76C35` | 6-1 一斉配信 | 3.3445% | 0px | 上部・左 | docs | [差分画像](broadcasts-v6/q76C35-diff-1920.png) | **一致** |
-| 6 | `zZ9fA` | 6-1-A 一斉配信を作成 | 9.2080% | +28px | 中央・右 | docs | [差分画像](broadcasts-v6/zZ9fA-diff-1920.png) | **一致** |
+| 6 | `zZ9fA` | 6-1-A 一斉配信を作成 | 9.2300% | 0px | 中央・右 | docs | [差分画像](broadcasts-v6/zZ9fA-diff-1920.png) | **一致** |
 | 6 | `cPk8A` | 6-1-B 対象条件 | 4.4534% | 0px | 下部・中央 | docs | [差分画像](broadcasts-v6/cPk8A-diff-1920.png) | **一致** |
-| 6 | `XQfMD` | 6-1-C メッセージ編集 | 16.6727% ⚠ | +38px | 中央・右 | docs | [差分画像](broadcasts-v6/XQfMD-diff-1920.png) | **一致** |
+| 6 | `XQfMD` | 6-1-C メッセージ編集 | 16.7100% ⚠ | 0px | 中央・右 | docs | [差分画像](broadcasts-v6/XQfMD-diff-1920.png) | **一致** |
 | 6 | `p97Tf` | 6-1-D テンプレート選択 | 5.7571% | 0px | 中央・右 | docs | [差分画像](broadcasts-v6/p97Tf-diff-1920.png) | **一致** |
 | 6 | `Bw0zt` | 6-1-E 送信設定 | 9.5955% | 0px | 下部・右 | docs | [差分画像](broadcasts-v6/Bw0zt-diff-1920.png) | **一致** |
 | 6 | `h0kahp` | 6-1-F テスト送信 | 9.6138% | 0px | 中央・右 | docs | [差分画像](broadcasts-v6/h0kahp-diff-1920.png) | **一致** |
 | 6 | `vW4Es` | 6-1-G 配信前チェック | 5.4820% | 0px | 中央・右 | docs | [差分画像](broadcasts-v6/vW4Es-diff-1920.png) | **一致** |
-| 6 | `FpgxH` | 6-1-H 最終確認 | 16.4160% ⚠ | 0px | 中央・右 | docs | [差分画像](broadcasts-v6/FpgxH-diff-1920.png) | **一致** |
+| 6 | `FpgxH` | 6-1-H 最終確認 | 16.2004% ⚠ | 0px | 中央・右 | docs | [差分画像](broadcasts-v6/FpgxH-diff-1920.png) | **一致** |
 | 6 | `bPF0s` | 6-1-I 一斉配信・予約完了 | 2.8796% | +43px | 中央・中央 | docs | [差分画像](broadcasts-v6/bPF0s-diff-1920.png) | **一致** |
 | 6 | `u6gHt` | 6-1-J 結果詳細 | 6.2805% | 0px | 中央・右 | docs | [差分画像](broadcasts-v6/u6gHt-diff-1920.png) | **一致** |
 | 6 | `EGMb1` | 6-1-K 削除確認 | 4.0645% | 0px | 中央・中央 | docs | [差分画像](broadcasts-v6/EGMb1-diff-1920.png) | **一致** |
@@ -307,7 +307,7 @@
 | 32 | `UhC2O` | 32-1-B 更新履歴 | —（実装画像なし（1920px）） | — | — | — | — | **一致** |
 | 32 | `U0BwS` | 32-1-C 緊急停止の最終確認 | 4.8497% | 0px | 中央・中央 | docs | [差分画像](operations-v6/U0BwS-diff-1920.png) | **一致** |
 | 4 | `hqrOv` | 4-1 友だち属性・タグ | 3.9584% | +496px | 上部・左 | docs | [差分画像](friend-attributes-v6/hqrOv-diff-1920.png) | **一致** |
-| 4 | `dKlkz` | 4-1-F タグ削除の確認ダイアログ | 15.3714% ⚠ | 0px | 中央・右 | docs | [差分画像](friend-attributes-v6/dKlkz-diff-1920.png) | **一致** |
+| 4 | `dKlkz` | 4-1-F タグ削除の確認ダイアログ | 14.1917% ⚠ | 0px | 中央・右 | docs | [差分画像](friend-attributes-v6/dKlkz-diff-1920.png) | **一致** |
 | 4 | `H374MR` | 4-1-H タグCSV一括登録 | 3.0953% | 0px | 中央・中央 | snapshot | [差分画像](friend-attributes-v6/H374MR-diff-1920.png) | **一致** |
 | 4 | `sfTEW` | 4-1-H-A CSV取り込み・確認（dry-run） | 3.4576% | 0px | 中央・左 | snapshot | [差分画像](friend-attributes-v6/sfTEW-diff-1920.png) | **一致** |
 | 4 | `op1rh` | 4-1-H-B CSV取り込み・完了 | 2.5624% | 0px | 中央・中央 | snapshot | [差分画像](friend-attributes-v6/op1rh-diff-1920.png) | **一致** |
@@ -320,7 +320,7 @@
 | 4 | `tP0RW` | 4-1-B タグを作る・連動ON | 5.2134% | +224px | 中央・左 | docs | [差分画像](friend-attributes-v6/tP0RW-diff-1920.png) | **一致** |
 | 4 | `LfrQs` | 4-1-C 連動アクション追加ドロワー | 4.8942% | 0px | 上部・右 | docs | [差分画像](friend-attributes-v6/LfrQs-diff-1920.png) | **一致** |
 | 4 | `ee0sk` | 4-1-D タグを編集・既存設定あり | 4.9532% | +242px | 下部・左 | docs | [差分画像](friend-attributes-v6/ee0sk-diff-1920.png) | **一致** |
-| 4 | `VjXGX` | 4-1-E 遡及反映の確認ダイアログ | 18.0964% ⚠ | 0px | 下部・中央 | docs | [差分画像](friend-attributes-v6/VjXGX-diff-1920.png) | **一致** |
+| 4 | `VjXGX` | 4-1-E 遡及反映の確認ダイアログ | 18.0861% ⚠ | 0px | 下部・中央 | docs | [差分画像](friend-attributes-v6/VjXGX-diff-1920.png) | **一致** |
 | 4 | `byqIW` | 4-1-G 属性フォルダを追加・色編集 | 7.3995% | 0px | 下部・中央 | docs | [差分画像](friend-attributes-v6/byqIW-diff-1920.png) | **一致** |
 | 4 | `A1ZYeP` | 4-2-A 友だち情報欄の項目を追加 | 3.3495% | 0px | 中央・中央 | docs | [差分画像](friend-attributes-v6/A1ZYeP-diff-1920.png) | **一致** |
 | 4 | `KoT6c` | 4-2-B 友だち情報欄・項目移行 | 3.3877% | +112px | 中央・左 | docs | [差分画像](friend-attributes-v6/KoT6c-diff-1920.png) | **一致** |

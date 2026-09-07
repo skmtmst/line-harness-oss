@@ -86,6 +86,7 @@ function NewBroadcastPageContent() {
           initialScheduledTime={initialScheduledTime}
           currentStep={currentStep}
           onStepChange={changeStep}
+          visualQaAugustCampaign={searchParams.get('visualQa') === 'august-campaign'}
         />
       )}
     </div>

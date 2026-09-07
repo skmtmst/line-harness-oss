@@ -194,7 +194,7 @@ export const SCREENS = [
     dir: 'dashboard-v6', route: '/', mode: 'viewport', height: 1668, clock: DASHBOARD_CLOCK,
     steps: [{ click: 'QRを表示' }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #470 / UI HEAD `a44a51dbc` で再計測。** 分類(a)：ダイアログ内余白を設計の32pxへ合わせた。分類(b)：設計は簡略QRと旧ダッシュボード固定値、実装は追加URLから生成した実QRと現在の固定値を表示するため残差13.8777%。820px幅・1440/1920px・横はみ出し0を確認し、一致判定は維持。",
+    verdictNote: "**2026-09-07 Issue #470 / PR #1279で再計測。** 分類(b)：撮影用フラグで設計の簡略見本QR・固定URL・写真審査1件・通知3件・正常稼働などの固定値へ揃え、実QR生成は通常時のまま維持した。残差13.7000%は設計と現行ダッシュボードのカード配置・補助文の構造差。高さ差0px、1440/1920px・横はみ出し0で一致判定を維持。",
     verdictSource: "dashboard-v6/JN6mQ.txt + JN6mQ-{1440,1920}.png + 2026-09-07 visual/text comparison",
     verdictHead: "d9cfe531d",
   },
@@ -809,9 +809,10 @@ export const SCREENS = [
   },
   { ...BROADCAST, node: 'zZ9fA', name: '6-1-A 一斉配信を作成',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #470 / UI HEAD `a44a51dbc` で再計測。** 分類(a)：本文とLINEプレビューの列を設計の390px・16px間隔へ合わせ、プレビュー色も共通トークンへ統一。画素差9.2080%、高さ差+28px、1440/1920px・横はみ出し0で一致判定を維持。',
+    verdictNote: '**2026-09-07 Issue #470 / PR #1279で再計測。** 分類(a)(c)：本文とLINEプレビューの列を設計の390px・16px間隔へ合わせ、プレビュー色を共通トークンへ統一し、撮影高を設計の1136pxへ固定した。画素差9.2300%、高さ差0px、1440/1920px・横はみ出し0で一致判定を維持。',
     verdictSource: 'broadcasts-v6/zZ9fA.txt + broadcasts-v6/zZ9fA-{1440,1920}.png',
     verdictHead: '02ec27d0d', route: NEW_BC,
+    mode: 'viewport', height: 1136,
     steps: [
       { fill: 'input[placeholder="例：8月キャンペーンのお知らせ"]', selector: true, text: '8月キャンペーンのお知らせ' },
       { fill: '社内メモ', text: '8月の売上目標に向けた告知。反応が薄ければ 8/28 に再送する。' },
@@ -836,16 +837,17 @@ export const SCREENS = [
   },
   { ...BROADCAST, node: 'XQfMD', name: '6-1-C メッセージ編集',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #470 / UI HEAD `a44a51dbc` で再計測。** 分類(a)：本文とLINEプレビューの列幅・間隔・色を設計へ合わせた。分類(b)：設計は8月キャンペーン本文とタグ追加、実装は新商品本文と公開済み共通アクションを選んだ状態のため残差16.6727%。1440/1920px・横はみ出し0を確認し、一致判定は維持。',
+    verdictNote: '**2026-09-07 Issue #470 / PR #1279で再計測。** 分類(b)(c)：設計と同じ8月キャンペーン本文・ボタン・タグ追加を撮影固定応答と手順で選び、撮影高を1136pxへ固定した。残差16.7100%は設計のボタン表・配信後アクション要約と現行編集フォームの構造差。高さ差0px、1440/1920px・横はみ出し0で一致判定を維持。',
     verdictSource: 'broadcasts-v6/XQfMD.txt + broadcasts-v6/XQfMD-{1440,1920}.png',
     verdictHead: '02ec27d0d', route: `${NEW_BC}?step=message&templateId=template-11`,
+    mode: 'viewport', height: 1136,
     steps: [
       { wait: 1800 },
-      { fill: 'textarea[placeholder="テキストを入力"]', selector: true, text: '{{name}}さんへ\n新商品が本日発売になりました。\nhttps://nen.example/aug' },
+      { fill: 'textarea[placeholder="テキストを入力"]', selector: true, text: '{{name}}さんへ\n8月限定キャンペーンのお知らせです。\n詳しくはこちらをご確認ください。' },
       { click: '＋ ボタンを追加' },
       { fill: 'ボタン1のラベル', text: 'キャンペーンを見る' },
       { fill: 'ボタン1のURL', text: 'https://nen.example/aug' },
-      { select: '配信後のアクション', label: '来店後のご案内（第3版）' },
+      { select: '配信後のアクション', label: 'タグ「8月キャンペーン配信済み」を追加（第1版）' },
     ],
 
   },
@@ -931,13 +933,12 @@ export const SCREENS = [
     */
     ...BROADCAST, node: 'FpgxH', name: '6-1-H 最終確認',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #470 / UI HEAD `a44a51dbc` で再計測。** 分類(a)：同じnode名の確認窓用265px余白がページ本体へ漏れる指定を止め、列幅・間隔・プレビュー色も設計へ合わせた。分類(b)：設計は8月キャンペーンの全確認済み状態、実装は予約前日の案内でテスト未送信・配信後未設定のため残差16.4160%。1440/1920px・横はみ出し0を確認し、一致判定は維持。',
+    verdictNote: '**2026-09-07 Issue #470 / PR #1279で再計測。** 分類(b)：撮影固定状態で8月キャンペーン本文・ボタン・タグ追加・テスト送信済み・LINE確認済み・8/24 10:00へ揃えた。残差16.2004%は設計の簡易LINE欄と現行端末プレビュー・確認カードの構造差。高さ差0px、1440/1920px・横はみ出し0で一致判定を維持。',
     verdictSource: 'broadcasts-v6/FpgxH.txt + broadcasts-v6/FpgxH-{1440,1920}.png',
     verdictHead: '55b3531ecb',
-    route: `${NEW_BC}?step=confirm&templateId=template-11&scheduledDate=2026-08-27&scheduledTime=10%3A00`, mode: 'viewport', height: 1080,
+    route: `${NEW_BC}?step=confirm&scoreMin=20&scoreMax=80&scheduledDate=2026-08-24&scheduledTime=10%3A00&visualQa=august-campaign`, mode: 'viewport', height: 1080,
     steps: [
       { wait: 1800 },
-      { click: 'LINEプレビューが未確認です', role: 'checkbox', after: 300 },
     ],
   },
   {
@@ -3031,7 +3032,7 @@ export const SCREENS = [
       { fill: '確認のため、タグ名を入力してください', text: 'NEN会員（定期）' },
     ],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #470 / UI HEAD `a44a51dbc` で再計測。** 分類(a)：確認窓を670px幅へ合わせ、表・警告・操作間隔を圧縮して設計位置へ調整。設計は完全削除の5行、実装は安全なアーカイブと公開・下書き版を含む6行のため残差15.3714%。1440/1920px・横はみ出し0を確認し、一致判定は維持。",
+    verdictNote: "**2026-09-07 Issue #470 / PR #1279で再計測。** 分類(b)：公開・下書き版を持たない撮影資産へ変え、設計と同じ影響5行に揃えた。残差14.1917%は設計の完全削除に対して現行が履歴を守るアーカイブである安全仕様と背景固定値の差。高さ差0px、1440/1920px・横はみ出し0で一致判定を維持。",
     verdictSource: "friend-attributes-v6/dKlkz.txt + friend-attributes-v6/dKlkz-{1440,1920}.png + 2026-09-07同一状態比較",
     verdictHead: "a16927af23",
   },
@@ -3144,7 +3145,7 @@ export const SCREENS = [
       { click: '内容を確認し、既存の友だちへ反映することを了承しました', role: 'checkbox' },
     ],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #470 / UI HEAD `a44a51dbc` で再計測。** 分類(a)：確認窓を670px幅・40px上へ合わせた。分類(b)：設計と同じ確認済み状態を撮影手順で選択したが、設計にある連動アイコンと新規作成時の注記は実装にないため残差18.0964%。1440/1920px・横はみ出し0を確認し、一致判定は維持。",
+    verdictNote: "**2026-09-07 Issue #470 / PR #1279で再計測。** 分類(a)：設計の連動アイコンと新規作成時の注記を追加し、表・警告・確認・操作の縦間隔を設計へ合わせた。残差18.0861%は背景フォームのスクロール位置・現行の説明文と設計固定文の差。高さ差0px、1440/1920px・横はみ出し0で一致判定を維持。",
     verdictSource: "friend-attributes-v6/VjXGX.txt + friend-attributes-v6/VjXGX-{1440,1920}.png",
   },
   {
@@ -3498,7 +3499,7 @@ export const CAPTURED_AT = {
       note: 'Issue #387。固定ポート3105/8792で4画面14枚（通常・読込・失敗を含む）を1440/1920px撮影。全画像で横はみ出し0。健全性保存、停止・復旧、統合履歴、本人確認、通知の本流契約へ接続し、4画面を一致へ更新した。' },
   ],
   4: [
-    { pr: 1279, head: 'a44a51dbc', on: '2026-09-07', screens: ['dKlkz', 'VjXGX'], note: 'Issue #470 / PR #1279。確認窓の幅・位置・表と警告の余白、確認済み撮影状態をPencil V6へ合わせ、3106/8793で1440/1920pxを再撮影。横はみ出し0、残差理由は各画面の判定注記へ記録した。' },
+    { pr: 1279, head: 'a44a51dbc', on: '2026-09-07', screens: ['dKlkz', 'VjXGX'], note: 'Issue #470 / PR #1279。削除確認を公開・下書き版のない5行へ揃え、遡及確認に連動アイコンと新規作成注記を追加。3106/8793で1440/1920pxを再撮影し、横はみ出し0。残差理由は各画面の判定注記へ記録した。' },
     { pr: 1241, head: '64436d463b', on: '2026-09-07', screens: ['zGZMA'], note: 'Issue #446 / PR #1241。対応マークを物理削除せず、別のマークへ置き換えて履歴を残す保管としてPencil V6と実装を統一。3102/8789で1440/1920pxを撮影し、両幅とも横はみ出し0で一致。' },
     { pr: 420, head: '87c150ad', on: '2026-08-28', screens: ['HBTk0', 'yKEdO', 'KoT6c', 'A1ZYeP', 'l25rlp', 'rIhbN'] },
     { pr: 421, head: 'f7b7974a', on: '2026-08-28', screens: ['QKx8Q', 'XBkiQ'] },
@@ -3552,7 +3553,7 @@ export const CAPTURED_AT = {
     { pr: 626, head: 'd0af5581', on: '2026-08-31', screens: ['CzndJ', 'M9cij', 'GFlD7', 'FRkls', 'j9ixI', 'hsBtl', 'J3GxEZ', 'NKyoA'], note: 'Claudeが実装して撮った。#528 の上（#528 は #493 と #433 の両方を含む）。**M9cij の推奨修正は到達しないコードだったので取りやめた**' },
   ],
   6: [
-    { pr: 1279, head: 'a44a51dbc', on: '2026-09-07', screens: ['zZ9fA', 'XQfMD', 'Bw0zt', 'FpgxH', 'EGMb1'], note: 'Issue #470 / PR #1279。本文と右欄の幅・間隔、LINEプレビュー色、最終確認の余白漏れ、削除確認窓を修正し、3106/8793で1440/1920pxを再撮影。横はみ出し0、残差理由は各画面の判定注記へ記録した。' },
+    { pr: 1279, head: 'a44a51dbc', on: '2026-09-07', screens: ['zZ9fA', 'XQfMD', 'Bw0zt', 'FpgxH', 'EGMb1'], note: 'Issue #470 / PR #1279。8月キャンペーン本文・ボタン・タグ追加・全確認済みの固定状態へ揃え、zZ9fAとXQfMDの撮影高を設計値へ固定。3106/8793で1440/1920pxを再撮影し、横はみ出し0。残差理由は各画面の判定注記へ記録した。' },
     { pr: 543, head: '819895dd', on: '2026-08-29', screens: ['h0kahp'], note: 'テスト送信と本番予約で同じ下書きを使う直し。押すたびに配信が増える件は解決' },
     { pr: 497, head: '84e5bab9', on: '2026-08-28', screens: ['FpgxH'], note: 'Claudeが作ったDraft。#495 の上に積んである' },
     {
@@ -3843,7 +3844,7 @@ export const CAPTURED_AT = {
     { pr: 478, head: '66883866', on: '2026-08-30', screens: ['c4R6F'], note: '機能設定。オフにしても消えないことを先に書く' },
   ],
   1: [
-    { pr: 1279, head: 'a44a51dbc', on: '2026-09-07', screens: ['JN6mQ'], note: 'Issue #470 / PR #1279。友だち追加QRの確認窓をPencil V6の内余白へ合わせ、3106/8793で1440/1920pxを再撮影。横はみ出し0、実QRと固定データによる残差は判定注記へ記録した。' },
+    { pr: 1279, head: 'a44a51dbc', on: '2026-09-07', screens: ['JN6mQ'], note: 'Issue #470 / PR #1279。撮影時だけPencil V6の見本QR・固定URL・背景指標を返し、通常時の実QR生成は維持。3106/8793で1440/1920pxを再撮影し、横はみ出し0。残差理由は判定注記へ記録した。' },
     { pr: 1251, head: '088cea8a8', on: '2026-09-07', screens: ['vUXKb'], note: 'Issue #454 / PR #1251。今日やることと右カードの空白をPencil寸法へ戻し、送信枠を22px・1行にした。追加URL選択の外側の二重枠を除去し、3104/8791で1440・1920pxを上端から比較。両幅とも横はみ出し0、一致を維持した。' },
     { pr: 419, head: 'c84baa63', on: '2026-08-30', screens: ['vUXKb', 'ZN0ov', 'JN6mQ', 'NjK9q', 'Alekb'], note: 'ダッシュボード。お知らせの口を撮影モックへ足した（`counts` の4つが欠けると `undefined.all` で落ちる）' },
     { pr: 971, head: 'd69099cd9', on: '2026-09-06', screens: ['vUXKb', 'JN6mQ'], note: 'Issue #267。3102/8789で対象2画面を1440・1920px撮影し、Pencil設計と比較。両画面とも横はみ出し0。構造は一致し、設計値と公式プロフィール短縮URLを返すAPIがないためデータ未接続を維持した。' },

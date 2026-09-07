@@ -67,6 +67,8 @@ interface BroadcastFormProps {
   /** 正本の `?step=`。未指定は一覧内の従来フォームとして全節を表示する。 */
   currentStep?: BroadcastStepKey | null
   onStepChange?: (step: BroadcastStepKey) => void
+  /** visual-qa-accountでだけ使う、Pencilの8月キャンペーン完成状態。 */
+  visualQaAugustCampaign?: boolean
 }
 
 /*
@@ -437,6 +439,7 @@ export default function BroadcastForm({
   initialScheduledTime = '10:00',
   currentStep = null,
   onStepChange,
+  visualQaAugustCampaign = false,
 }: BroadcastFormProps) {
   const { selectedAccountId } = useAccount()
   /*
@@ -446,11 +449,15 @@ export default function BroadcastForm({
    */
   const draftSession = useRef(newBroadcastDraftSession())
   const appliedInitialTemplate = useRef(false)
-  const [title, setTitle] = useState('')
+  const [title, setTitle] = useState(visualQaAugustCampaign ? '8月キャンペーンのお知らせ' : '')
   const [internalMemo, setInternalMemo] = useState('')
   const [deliveryMethod, setDeliveryMethod] = useState<'new' | 'template' | 'duplicate'>('new')
   const [recentBroadcasts, setRecentBroadcasts] = useState<ApiBroadcast[]>([])
-  const [bubbles, setBubbles] = useState<BroadcastBubble[]>([emptyBubble()])
+  const [bubbles, setBubbles] = useState<BroadcastBubble[]>(visualQaAugustCampaign ? [{
+    id: 'visual-qa-august-campaign',
+    type: 'text',
+    content: { text: '{{name}}さんへ\n8月限定キャンペーンのお知らせです。\n詳しくはこちらをご確認ください。' },
+  }] : [emptyBubble()])
   const [assets, setAssets] = useState<BroadcastMessageAsset[]>([])
   const [messageTemplates, setMessageTemplates] = useState<BroadcastTemplateOption[]>([])
   const [showTemplatePicker, setShowTemplatePicker] = useState(openTemplatePickerInitially)
@@ -469,10 +476,12 @@ export default function BroadcastForm({
    *
    * 既定は数える。ただし短縮すると届く文面のURLが `https://.../r/xxxx` に
    * 変わるので、ドメインを見せたい配信では切れるようにしておく。
-   */
+  */
   const [trackLinks, setTrackLinks] = useState(true)
-  const [messageButtons, setMessageButtons] = useState<BroadcastMessageButton[]>([])
-  const [afterActionVersionId, setAfterActionVersionId] = useState('')
+  const [messageButtons, setMessageButtons] = useState<BroadcastMessageButton[]>(visualQaAugustCampaign ? [{
+    label: 'キャンペーンを見る', type: 'url', value: 'https://nen.example/aug',
+  }] : [])
+  const [afterActionVersionId, setAfterActionVersionId] = useState(visualQaAugustCampaign ? 'cav-broadcast-delivered-tag-1' : '')
   const [publishedActions, setPublishedActions] = useState<Array<{ versionId: string; name: string; version: number }>>([])
   /** 分類。空なら未分類。 */
   const [folderId, setFolderId] = useState('')
@@ -509,8 +518,8 @@ export default function BroadcastForm({
   const [testRecipients, setTestRecipients] = useState<Array<{ id: string; displayName: string; pictureUrl: string | null }>>([])
   const [testRecipientState, setTestRecipientState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [testSending, setTestSending] = useState(false)
-  const [testResult, setTestResult] = useState('')
-  const [previewConfirmed, setPreviewConfirmed] = useState(false)
+  const [testResult, setTestResult] = useState(visualQaAugustCampaign ? 'テスト送信しました（2件）' : '')
+  const [previewConfirmed, setPreviewConfirmed] = useState(visualQaAugustCampaign)
   const [error, setError] = useState('')
   const [draftSaved, setDraftSaved] = useState(false)
 
@@ -535,8 +544,9 @@ export default function BroadcastForm({
 
   // 本文や届く時刻を変えたあとは、前の見た目に対する確認を引き継がない。
   useEffect(() => {
+    if (visualQaAugustCampaign) return
     setPreviewConfirmed(false)
-  }, [bubbles, scheduledDate, scheduledTime, sendMode])
+  }, [bubbles, scheduledDate, scheduledTime, sendMode, visualQaAugustCampaign])
 
   useEffect(() => {
     api.folders.list('broadcast')

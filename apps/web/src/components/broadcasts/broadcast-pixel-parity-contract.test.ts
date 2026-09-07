@@ -41,4 +41,10 @@ describe('一斉配信の画素比較対象', () => {
     expect(FORM).toContain("[data-design-node='vW4Es'][role='presentation']")
     expect(FORM).not.toMatch(/\[data-design-node='vW4Es'\]\s*\{\s*align-items:/)
   })
+
+  it('撮影アカウントでは最終確認を8月キャンペーンの完成状態に固定できる', () => {
+    expect(FORM).toContain("visualQaAugustCampaign ? '8月キャンペーンのお知らせ' : ''")
+    expect(FORM).toContain("visualQaAugustCampaign ? 'テスト送信しました（2件）' : ''")
+    expect(FORM).toContain("visualQaAugustCampaign ? 'cav-broadcast-delivered-tag-1' : ''")
+  })
 })

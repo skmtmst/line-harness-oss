@@ -405,7 +405,7 @@ function deleteImpactRows(
     tag.otherActionCount ? `アクション${tag.otherActionCount}件` : null,
   ].filter(Boolean).join('／')
 
-  return [
+  const rows = [
     {
       name: '付与人数',
       // 人数はサーバーが数え直したものを使う。取れなければ一覧の値。
@@ -424,8 +424,11 @@ function deleteImpactRows(
       ように見え、いつまでも埋まらない欄になる。
     */
     { name: '積んだマイル', value: 'そのまま残る', result: '取り消されません' },
-    { name: '使用中の版', value: impact ? impact.linkedActions.map((item) => `${item.state === 'published' ? '公開' : '下書き'} v${item.version}`).join('・') || 'なし' : '—', result: impact?.linkedActions.some((item) => item.state === 'published') ? '公開している版があるので消せません' : '公開版はありません' },
   ]
+  if (impact?.linkedActions.length) {
+    rows.push({ name: '使用中の版', value: impact.linkedActions.map((item) => `${item.state === 'published' ? '公開' : '下書き'} v${item.version}`).join('・'), result: impact.linkedActions.some((item) => item.state === 'published') ? '公開している版があるので消せません' : '公開版はありません' })
+  }
+  return rows
 }
 
 function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; accountId: string | null; onCancel: () => void; onArchived: () => void }) {

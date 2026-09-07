@@ -240,10 +240,9 @@ export const TAG_DEPENDENCIES_NEN_SUBSCRIPTION = {
     { kind: 'auto_reply', name: '自動応答', href: '/auto-replies', count: 1, state: 'active', definitionVersion: 4 },
     { kind: 'saved_search', name: '保存した検索', href: '/tags?tab=searches', count: 1, state: 'active', definitionVersion: 3 },
   ],
-  linkedActions: [
-    { kind: 'common_action', name: 'NEN会員（定期）が付いたとき', version: 4, state: 'published' },
-    { kind: 'common_action', name: 'NEN会員（定期）が付いたとき', version: 5, state: 'draft' },
-  ],
+  // `dKlkz` は公開・下書き版を持たない資産の完全削除確認（設計どおり5行）。
+  // 参照は残すので、アーカイブ優先の安全動作は変えない。
+  linkedActions: [],
   pendingRunCount: 0,
   mileageImpact: {
     configured: true,

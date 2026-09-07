@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Copy, Trash2 } from 'lucide-react'
+import { Coins, Copy, Trash2 } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, type CommonActionResources, type TagDefinitionAction } from '@/lib/api'
 import Breadcrumb from '@/components/layout/breadcrumb'
@@ -265,24 +265,28 @@ function RetroactiveDialog({ values, count, onCancel, onSave, referenceState = f
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/45 p-4">
       <section className="w-full max-w-[670px] -translate-y-10 rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
+        <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-warning-bg text-warning" aria-hidden="true">
+          <Coins size={21} strokeWidth={2} />
+        </span>
         <h2 className="text-xl font-bold text-ink">{count + referralTargets}人にさかのぼってマイルを積みますか？</h2>
         <p className="mt-2 text-sm leading-6 text-ink-secondary">保存と同時に、すでにこのタグが付いている人へ未反映分を積みます。</p>
-        <div className="mt-5 overflow-hidden rounded-control border border-hairline">
+        <div className="mt-4 overflow-hidden rounded-control border border-hairline">
           <dl className="divide-y divide-hairline text-sm">
-            <div className="grid grid-cols-[1fr_150px_140px] bg-canvas-sunken px-4 py-2 text-xs font-semibold text-ink-faint"><dt>対象</dt><dd>計算</dd><dd className="text-right">付与予定</dd></div>
-            <div className="grid grid-cols-[1fr_150px_140px] px-4 py-3"><dt>本人マイル</dt><dd>+{values.rewardMiles} mile × {count}人</dd><dd className="text-right font-semibold text-success">+{rewardTotal.toLocaleString()} mile</dd></div>
-            <div className="grid grid-cols-[1fr_150px_140px] px-4 py-3"><dt>紹介者マイル</dt><dd>+{values.referralRewardMiles} mile × {referralTargets}人</dd><dd className="text-right font-semibold text-success">+{referralTotal.toLocaleString()} mile</dd></div>
-            <div className="grid grid-cols-[1fr_150px_140px] bg-success-bg/40 px-4 py-3 font-bold"><dt>合計</dt><dd>{count + referralTargets}人が対象</dd><dd className="text-right text-success">+{(rewardTotal + referralTotal).toLocaleString()} mile</dd></div>
-            <div className="grid grid-cols-[1fr_150px_140px] px-4 py-3"><dt>倍率 {values.multiplierBps ? `${values.multiplierBps / 10000}倍` : 'なし'}</dt><dd>さかのぼりません</dd><dd className="text-right">次回付与から</dd></div>
-            <div className="grid grid-cols-[1fr_150px_140px] px-4 py-3"><dt>連動アクションの送信</dt><dd>さかのぼって送りません</dd><dd className="text-right">送信0件</dd></div>
+            <div className="grid grid-cols-[1fr_165px_130px] bg-canvas-sunken px-4 py-2 text-xs font-semibold text-ink-faint"><dt>対象</dt><dd>計算</dd><dd className="text-right">付与予定</dd></div>
+            <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2"><dt>本人マイル</dt><dd>+{values.rewardMiles} mile × {count}人</dd><dd className="text-right font-semibold text-success">+{rewardTotal.toLocaleString()} mile</dd></div>
+            <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2"><dt>紹介者マイル</dt><dd>+{values.referralRewardMiles} mile × {referralTargets}人</dd><dd className="text-right font-semibold text-success">+{referralTotal.toLocaleString()} mile</dd></div>
+            <div className="grid grid-cols-[1fr_165px_130px] bg-success-bg/40 px-4 py-2 font-bold"><dt>合計</dt><dd>{count + referralTargets}人が対象</dd><dd className="text-right text-success">+{(rewardTotal + referralTotal).toLocaleString()} mile</dd></div>
+            <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2"><dt>倍率 {values.multiplierBps ? `${values.multiplierBps / 10000}倍` : 'なし'}</dt><dd>さかのぼりません</dd><dd className="text-right">次回付与から</dd></div>
+            <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2"><dt>連動アクションの送信</dt><dd>さかのぼって送りません</dd><dd className="text-right">送信0件</dd></div>
           </dl>
         </div>
-        <p className="mt-4 rounded-control border border-danger/25 bg-danger-bg p-3 text-sm font-medium leading-6 text-danger">一度積んだマイルは、この画面から元に戻せません。人数と設定値を確認してください。</p>
-        <label className="mt-4 flex items-start gap-3 text-sm text-ink-secondary"><input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} className="mt-1 accent-accent" />内容を確認し、既存の友だちへ反映することを了承しました</label>
-        <div className="mt-6 flex justify-end gap-2">
+        <p className="mt-3 rounded-control border border-danger/25 bg-danger-bg p-2 text-sm font-medium leading-5 text-danger">一度積んだマイルは、この画面から元に戻せません。人数と設定値を確認してください。</p>
+        <label className="mt-3 flex items-start gap-3 text-sm text-ink-secondary"><input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} className="mt-1 accent-accent" />内容を確認し、既存の友だちへ反映することを了承しました</label>
+        <div className="mt-4 flex justify-end gap-2">
           <button type="button" onClick={onCancel} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">反映しないで保存</button>
           <button type="button" disabled={!accepted} onClick={onSave} className="rounded-control bg-accent-deep px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">さかのぼって反映して保存</button>
         </div>
+        <p className="mt-3 whitespace-nowrap text-xs leading-4 text-ink-faint">新規作成のときはこのダイアログは出ません。まだ誰にもタグが付いていないため、送信やマイル付与も起きません。</p>
       </section>
     </div>
   )

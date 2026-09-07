@@ -58,4 +58,14 @@ describe('一斉配信の画面確認契約', () => {
       expect.objectContaining({ suffix: '-save', steps: expect.arrayContaining([expect.objectContaining({ click: 'この条件を保存' })]) }),
     )
   })
+
+  it('メッセージ編集と最終確認を8月キャンペーンの同じ完成状態で撮る', () => {
+    const xq = screen('XQfMD') as { steps?: Array<Record<string, unknown>> }
+    const final = screen('FpgxH') as { route?: string; steps?: Array<Record<string, unknown>> }
+    expect(xq.steps).toContainEqual(expect.objectContaining({ text: expect.stringContaining('8月限定キャンペーン') }))
+    expect(xq.steps).toContainEqual(expect.objectContaining({ select: '配信後のアクション', label: 'タグ「8月キャンペーン配信済み」を追加（第1版）' }))
+    expect(final.route).toContain('step=confirm')
+    expect(final.route).toContain('visualQa=august-campaign')
+    expect(MOCK_API).toContain("id: 'ca-broadcast-delivered-tag'")
+  })
 })
