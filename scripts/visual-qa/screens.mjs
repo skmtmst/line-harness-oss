@@ -2329,10 +2329,10 @@ export const SCREENS = [
     */
     variants: [{ suffix: '-birthday', route: '/nen-campaigns/edit?key=birthday_coupon' }],
     route: '/nen-campaigns/edit?key=review_request',
-    verdict: "needs_fix",
-    verdictNote: "**2026-09-07 Issue #439 / UI HEAD 082be35e7を3102/8789で再撮影・判定。** `review_request` と `birthday_coupon` の機能専用固定応答を接続し、通常・誕生日の2状態を1440/1920pxで表示できた。横はみ出し0。以前の「配信が見つかりません」は解消したが、実装は4区画の汎用フォームで、設計の吹き出し編集（あと2つまで）、差し込み項目、LINEプレビュー、回答フォームを開く・マイル200付与の送信後アクションが無い。**推奨修正：設計の本文エディタと送信後アクションを画面コードへ実装する。**",
+    verdict: "match",
+    verdictNote: "**2026-09-07 Issue #442 / UI HEAD 3b560eb0fを3102/8789で再撮影・判定。** Pencil V6どおり、配信時刻と重複防止、差し込み対応の本文エディタ、吹き出し追加、回答フォーム「口コミ」を開く・回答後200マイル付与、LINEプレビュー、つながる先、注意、追従保存を実装した。送信後アクションはアカウント別設定へ保存し、回答フォームは選択中アカウントのLIFF URLへ接続する。通常・誕生日を1440/1920pxで確認し、横はみ出し0。",
     verdictSource: "nen-v6/HpKyF.txt + HpKyF-birthday.txt + HpKyF-{1440,1920}.png + HpKyF-birthday-{1440,1920}.png",
-    verdictHead: "082be35e7",
+    verdictHead: "3b560eb0f",
   },
   {
     ...NEN, node: 'ymXJK', name: '21-1-E コラムを書く',
@@ -3447,6 +3447,7 @@ export const CAPTURED_AT = {
       note: 'Issue #387。固定ポート3105/8792で4画面14枚（通常・読込・失敗を含む）を1440/1920px撮影。全画像で横はみ出し0。健全性保存、停止・復旧、統合履歴、本人確認、通知の本流契約へ接続し、4画面を一致へ更新した。' },
   ],
   4: [
+    { pr: 1241, head: '64436d463b', on: '2026-09-07', screens: ['zGZMA'], note: 'Issue #446 / PR #1241。対応マークを物理削除せず、別のマークへ置き換えて履歴を残す保管としてPencil V6と実装を統一。3102/8789で1440/1920pxを撮影し、両幅とも横はみ出し0で一致。' },
     { pr: 420, head: '87c150ad', on: '2026-08-28', screens: ['HBTk0', 'yKEdO', 'KoT6c', 'A1ZYeP', 'l25rlp', 'rIhbN'] },
     { pr: 421, head: 'f7b7974a', on: '2026-08-28', screens: ['QKx8Q', 'XBkiQ'] },
   { pr: 541, head: 'e929f22a', on: '2026-08-29', screens: ['QKx8Q', 'XBkiQ'], note: '保存した検索から内部IDを外し、選ぶ形へ。**#541 は #539 を含む**。束3' },
@@ -3830,6 +3831,8 @@ export const CAPTURED_AT = {
       note: '台帳 #233。PR headの同じ実装を1440px・1920pxで撮影し、22枚すべて横スクロール0。設計との比較は一致5枚、構造一致・データ未接続3枚。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
   ],
   21: [
+    { pr: 1241, head: '64436d463b', on: '2026-09-07', screens: ['VLMGH', 'WeXbL', 'ymXJK'], note: 'Issue #446 / PR #1241。個人開封率を作らないNEN計測、外部記事を正本にするコラム入力へPencil V6と実装を統一。3102/8789で全状態を1440/1920px撮影し、横はみ出し0で3画面一致。' },
+    { pr: 1237, head: 'c6dfe250c', on: '2026-09-07', screens: ['HpKyF'], note: 'Issue #442 / PR #1237。NEN配信の本文エディタと、回答フォームを開く・回答後200マイル付与の設定保存を実装。通常・誕生日を3102/8789で1440/1920px撮影し、全画像で横はみ出し0、Pencil V6と一致。' },
     { pr: 1234, head: '78c19bea32', on: '2026-09-07', screens: ['q4lajm'], note: 'Issue #445 / PR #1234。修正済み設計に合わせて誕生日配信の到達率94.6%とクリック率38.2%を表示し、3107/8794で1440/1920px撮影。両画像で横はみ出し0。' },
     { pr: 1217, head: '1c8055931', on: '2026-09-07', screens: ['VLMGH', 'DEX0k', 'q4lajm', 'WeXbL', 'ymXJK'], note: 'Issue #418。機能21の成果金額・読了・複製・未達内訳・一括即時送信・作成保存操作を実API契約へ接続。3106/8793で通常と定義済み状態を1440/1920px撮影し、対象画像は横はみ出し0。LINE非提供の個人反応と設計修正待ちは理由付きで保留。' },
     { pr: 446, head: '4307088d', on: '2026-08-28' },

@@ -4,6 +4,7 @@ import {
   buildDefaultColumnIntro,
   buildNenDeliveryMessages,
   buildNenFlexMessage,
+  parseNenCampaignAfterActions,
   readNenCampaignSnapshot,
 } from './nen-engagement.js';
 
@@ -22,6 +23,17 @@ const campaign = {
 };
 
 describe('buildNenFlexMessage', () => {
+  it('keeps only supported NEN editor actions', () => {
+    expect(parseNenCampaignAfterActions([
+      { kind: 'open_form', formId: 'form-review', formName: ' 口コミ ', buttonLabel: '感想を書く' },
+      { kind: 'award_mileage', amount: 200, trigger: 'form_submitted' },
+    ])).toEqual([
+      { kind: 'open_form', formId: 'form-review', formName: '口コミ', buttonLabel: '感想を書く' },
+      { kind: 'award_mileage', amount: 200, trigger: 'form_submitted' },
+    ]);
+    expect(parseNenCampaignAfterActions([{ kind: 'award_mileage', amount: 0, trigger: 'form_submitted' }])).toEqual([]);
+  });
+
   it('schedules birthday delivery at 10:00 JST three days before, including year boundaries', () => {
     expect(birthdayDeliveryTarget(new Date('2026-08-27T15:00:00.000Z'))).toMatchObject({
       issueYear: 2026, monthDay: '08-31', deliveryAt: new Date('2026-08-28T01:00:00.000Z'),

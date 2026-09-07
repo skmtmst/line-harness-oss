@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 7,
-  "match": 266,
+  "match": 267,
   "structureMatchDataPending": 0,
-  "needsFix": 1,
+  "needsFix": 0,
   "unjudged": 0,
-  "remaining": 2,
+  "remaining": 1,
   "features": [
     {
       "feature": 1,
@@ -352,6 +352,15 @@
       "unjudged": 0,
       "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1241,
+          "head": "64436d463b",
+          "on": "2026-09-07",
+          "screens": [
+            "zGZMA"
+          ],
+          "note": "Issue #446 / PR #1241。対応マークを物理削除せず、別のマークへ置き換えて履歴を残す保管としてPencil V6と実装を統一。3102/8789で1440/1920pxを撮影し、両幅とも横はみ出し0で一致。"
+        },
         {
           "pr": 420,
           "head": "87c150ad",
@@ -2597,12 +2606,32 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 6,
+      "match": 7,
       "structureMatchDataPending": 0,
-      "needsFix": 1,
+      "needsFix": 0,
       "unjudged": 0,
-      "remaining": 1,
+      "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1241,
+          "head": "64436d463b",
+          "on": "2026-09-07",
+          "screens": [
+            "VLMGH",
+            "WeXbL",
+            "ymXJK"
+          ],
+          "note": "Issue #446 / PR #1241。個人開封率を作らないNEN計測、外部記事を正本にするコラム入力へPencil V6と実装を統一。3102/8789で全状態を1440/1920px撮影し、横はみ出し0で3画面一致。"
+        },
+        {
+          "pr": 1237,
+          "head": "c6dfe250c",
+          "on": "2026-09-07",
+          "screens": [
+            "HpKyF"
+          ],
+          "note": "Issue #442 / PR #1237。NEN配信の本文エディタと、回答フォームを開く・回答後200マイル付与の設定保存を実装。通常・誕生日を3102/8789で1440/1920px撮影し、全画像で横はみ出し0、Pencil V6と一致。"
+        },
         {
           "pr": 1234,
           "head": "78c19bea32",
