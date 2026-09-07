@@ -66,7 +66,7 @@ import {
   FRIEND_SAVED_VIEWS, MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
   LIST_STATS, NEN_BIRTHDAY_COUPON, NEN_CAMPAIGN_SETTINGS, NEN_COLUMN_CREATE, NEN_COLUMN_OPERATIONS, NEN_COLUMNS, NEN_JOBS, NEN_PETS,
   NEN_FLOW_METRICS, NEN_COLUMN_METRICS, NEN_PET_METRICS, NEN_DELIVERIES, NEN_DELIVERY_DETAILS,
-  OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_ACTIONS, SCENARIO_DRAFT, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, SCENARIO_SIMULATION, SCENARIO_RUNS, USERS_GROUPED,
+  OPERATORS, REMINDERS, REMINDER_DRAFT, REMINDER_FOLDERS, SCENARIO_ACTIONS, SCENARIO_DRAFT, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, SCENARIO_SIMULATION, SCENARIO_RUNS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   RICH_MENU_GROUPS, RICH_MENU_GROUP_DETAILS, RICH_MENU_EXTERNAL, RICH_MENU_TAP_STATS,
   TAGS, TAG_GROUPS, TAG_DEFINITION_NEN_SUBSCRIPTION, TAG_DEPENDENCIES_NEN_SUBSCRIPTION,
@@ -1188,6 +1188,42 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/auth/session') {
     return { success: true, data: STAFF, csrfToken: 'visual-qa-csrf' }
   }
+  if (pathname === '/api/inbox/unanswered') {
+    return {
+      success: true,
+      data: {
+        total: 2,
+        page: 1,
+        pageSize: 2000,
+        rows: [
+          {
+            friendId: 'friend-inbox-1',
+            displayName: '佐藤 美咲',
+            pictureUrl: null,
+            accountId: 'visual-qa-account',
+            accountName: '画面確認アカウント',
+            lastIncomingAt: '2026-09-07T04:30:00.000Z',
+            lastManualAt: null,
+            lastMachineAt: '2026-09-07T04:31:00.000Z',
+            lastIncomingType: 'text',
+            lastIncomingContent: '予約について確認したいです',
+          },
+          {
+            friendId: 'friend-inbox-2',
+            displayName: '鈴木 健太',
+            pictureUrl: null,
+            accountId: 'visual-qa-account',
+            accountName: '画面確認アカウント',
+            lastIncomingAt: '2026-09-07T03:15:00.000Z',
+            lastManualAt: null,
+            lastMachineAt: null,
+            lastIncomingType: 'text',
+            lastIncomingContent: '商品の発送日はいつですか？',
+          },
+        ],
+      },
+    }
+  }
   if (pathname === '/api/affiliate-settlements/preview') {
     return { success: true, data: AFFILIATE_SETTLEMENT_PREVIEW }
   }
@@ -1640,6 +1676,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return found ? { success: true, data: found } : { success: false, error: 'Not found' }
   }
   if (pathname === '/api/reminders') return { success: true, data: REMINDERS }
+  if (/^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) {
+    return { success: true, data: REMINDER_DRAFT }
+  }
   const reminderOne = /^\/api\/reminders\/([^/]+)$/.exec(pathname)
   if (reminderOne) {
     const found = REMINDERS.find((item) => item.id === reminderOne[1])

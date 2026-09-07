@@ -3242,6 +3242,41 @@ export const REMINDERS = [
 /** 設計 `M1EXwB` の帯。リマインダ9件（有効7）／送信予定124通／今月386通／失敗2通。 */
 export const REMINDER_STATS = { total: 9, active: 7, waiting: 124, sentThisMonth: 386, failed: 2 }
 
+/** 機能7 `J64xI`。公開版を変えずに編集する通知ステップの固定下書き。 */
+export const REMINDER_DRAFT = {
+  reminderId: 'reminder-3',
+  versionId: 'reminder-3-draft-v3',
+  versionNumber: 3,
+  status: 'draft',
+  settings: {
+    name: 'Google Meet相談の前日案内',
+    description: '前日・1時間前・当日の3回で案内する',
+    lineAccountId: 'visual-qa-account',
+    triggerType: 'booking',
+    deliveryMode: 'time',
+    triggerFieldId: null,
+    repeatYearly: false,
+    triggerOffsetMinutes: null,
+    sendAtTime: null,
+    targetTagId: null,
+    folderId: 'rf-booking',
+    stopConditions: {
+      bookingCancelled: true,
+      supportMarkCompleted: true,
+      daysAfterTarget: 7,
+      friendBlocked: true,
+    },
+    steps: [
+      { stableStepId: 'day-before', offsetMinutes: 0, messageType: 'text', messageContent: '明日のGoogle Meet相談のご案内です。日時と参加URLを差し込みます。', offsetDays: -1, sendAtTime: '18:00' },
+      { stableStepId: 'hour-before', offsetMinutes: -60, messageType: 'text', messageContent: 'まもなく開始です。参加URLをもう一度お送りします。', offsetDays: null, sendAtTime: null },
+      { stableStepId: 'same-day', offsetMinutes: 0, messageType: 'text', messageContent: '本日の相談についてのご案内と持ち物の確認です。', offsetDays: 0, sendAtTime: '09:00' },
+    ],
+  },
+  lastTestStatus: 'succeeded',
+  lastTestedAt: '2026-09-06T09:00:00.000Z',
+  publishedAt: null,
+}
+
 /**
  * 友だち情報欄の項目。リマインダの起点（`triggerFieldId`）に日付の欄が要る。
  *
