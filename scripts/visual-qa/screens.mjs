@@ -640,10 +640,9 @@ export const SCREENS = [
     ...SCENARIO, node: 'r6Gzsu', name: '5-1-E シナリオ・配信条件を開く', route: EDIT,
     mode: 'viewport', height: 1080,
     steps: [{ click: '編集', nth: 1 }, { click: '条件を編集', after: 700 }],
-    verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07 Issue #420で再判定。** 3104/8791で対象状態を撮影。試算APIでアカウント総数・条件一致・購読中・新規開始予定・除外数と通別予定を返す。固定値はs0の契約待ち。 固定データ/API不足の状態は未取得として扱い、理由を表示する。横スクロール0。",
-    verdictSource: "scenarios-v6/r6Gzsu.txt + r6Gzsu-{1440,1920}.png",
-    verdictHead: "codex/kenta-r2-s2-b420",
+    verdict: "match",
+    verdictNote: "**2026-09-07 Issue #436で実API接続後に再判定。** 1通目の固定データからタグ「初回案内」と対応マーク「未対応」のAND条件を読み、現在条件2件、15軸、条件追加、解除、保存を表示した。1440/1920pxとも横はみ出し0。",
+    verdictSource: "scenarios-v6/r6Gzsu.txt + scenarios-v6/r6Gzsu-{1440,1920}.png",
   },
   {
     /*
@@ -656,10 +655,9 @@ export const SCREENS = [
     ...SCENARIO, node: 'hz9ti', name: '5-1-F シナリオ・送信後アクションを開く', route: EDIT,
     mode: 'viewport', height: 1080,
     steps: [{ click: '編集', nth: 1 }, { click: '＋ アクションを追加', after: 700 }],
-    verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07 Issue #420で再判定。** 3104/8791で対象状態を撮影。送信後アクション8種を公開設定とV6下書きへ保存する。下書き読み返しGETを追加し、版番号を返す。 固定データ/API不足の状態は未取得として扱い、理由を表示する。横スクロール0。",
-    verdictSource: "scenarios-v6/hz9ti.txt + hz9ti-{1440,1920}.png",
-    verdictHead: "codex/kenta-r2-s2-b420",
+    verdict: "match",
+    verdictNote: "**2026-09-07 Issue #436で実API接続後に再判定。** 送信後アクションの取得とV6下書きの読み返しを並列で行い、下書き版3、選択できる全動作、設定済み3動作の順序・条件・再実行設定を表示した。1440/1920pxとも横はみ出し0。",
+    verdictSource: "scenarios-v6/hz9ti.txt + scenarios-v6/hz9ti-{1440,1920}.png",
   },
   {
     ...SCENARIO, node: 'dqFft', name: '5-1-G シナリオ・ステップ削除確認', route: EDIT,
@@ -672,10 +670,9 @@ export const SCREENS = [
   {
     ...SCENARIO, node: 'EvVO5', name: '5-1-H シナリオ・開始条件を開く', route: EDIT,
     mode: 'viewport', height: 1080, steps: [{ qaOpen: 'EvVO5', after: 900 }],
-    verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07 Issue #420で再判定。** 3104/8791で対象状態を撮影。開始条件のfriend_add・tag_added・form_answer・booking_confirmedを保存可能にした。手動開始は行なしで表現する。 固定データ/API不足の状態は未取得として扱い、理由を表示する。横スクロール0。",
-    verdictSource: "scenarios-v6/EvVO5.txt + EvVO5-{1440,1920}.png",
-    verdictHead: "codex/kenta-r2-s2-b420",
+    verdict: "match",
+    verdictNote: "**2026-09-07 Issue #436で実API接続後に再判定。** 副作用のない試算APIをPOSTで読み、条件一致124人、購読中8人、新規開始予定116人、除外304人を表示した。開始条件6種のうち接続済み4種と、未接続の手動・Webhookの理由も区別した。1440/1920pxとも横はみ出し0。",
+    verdictSource: "scenarios-v6/EvVO5.txt + scenarios-v6/EvVO5-{1440,1920}.png",
   },
   {
     /*
@@ -689,10 +686,9 @@ export const SCREENS = [
     steps: [{ click: '再開' }],
     /* 押し口は文言でなく Node ID の目印で開く（#590 で付けた）。 */
     steps: [{ qaOpen: 'RUxNf', after: 900 }],
-    verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07 Issue #420で再判定。** 3104/8791で対象状態を撮影。開始記録APIは購読一覧・テスト送信・送信枠・通別到達数を同じ応答で返す。固定応答はs0の契約待ち。 固定データ/API不足の状態は未取得として扱い、理由を表示する。横スクロール0。",
-    verdictSource: "scenarios-v6/RUxNf.txt + RUxNf-{1440,1920}.png",
-    verdictHead: "codex/kenta-r2-s2-b420",
+    verdict: "match",
+    verdictNote: "**2026-09-07 Issue #436で実API接続後に再判定。** 開始確認で試算と開始記録を並列取得し、新規開始予定116人、最新テスト送信4通、送信枠残り3,158通を表示した。戻せない影響と開始操作を設計順に確認し、1440/1920pxとも横はみ出し0。",
+    verdictSource: "scenarios-v6/RUxNf.txt + scenarios-v6/RUxNf-{1440,1920}.png",
   },
   {
     /*
@@ -703,10 +699,9 @@ export const SCREENS = [
     */
     ...SCENARIO, node: 'NrBkW', name: '5-1-J シナリオ・配信開始完了',
     route: '/scenarios/detail?id=scenario-0&started=1', mode: 'page',
-    verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07 Issue #420で再判定。** 3104/8791で対象状態を撮影。開始後の購読状態と次回配信日時をruns APIから読み返す。開始記録の固定データはs0の契約待ち。 固定データ/API不足の状態は未取得として扱い、理由を表示する。横スクロール0。",
-    verdictSource: "scenarios-v6/NrBkW.txt + NrBkW-{1440,1920}.png",
-    verdictHead: "codex/kenta-r2-s2-b420",
+    verdict: "match",
+    verdictNote: "**2026-09-07 Issue #436で実API接続後に再判定。** 開始後の案内へ試算の新規開始予定116人を表示し、開始記録から配信中116人、完了312人、開始時刻、4通の到達数を読み返した。開始履歴への次の行動も確認し、1440/1920pxとも横はみ出し0。",
+    verdictSource: "scenarios-v6/NrBkW.txt + scenarios-v6/NrBkW-{1440,1920}.png",
   },
   {
     ...SCENARIO, node: 'g2UNV', name: '5-1-K シナリオ・テスト送信', route: EDIT,
@@ -716,10 +711,9 @@ export const SCREENS = [
       { click: 'Kenta Kawano(Obama)', after: 300 },
       { click: '内容を確認', after: 700 },
     ],
-    verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07 Issue #420で再判定。** 3104/8791で対象状態を撮影。テスト送信結果の成功・失敗を友だち単位で表示する口をruns APIへ接続。未取得は理由付きで表示する。 固定データ/API不足の状態は未取得として扱い、理由を表示する。横スクロール0。",
-    verdictSource: "scenarios-v6/g2UNV.txt + g2UNV-{1440,1920}.png",
-    verdictHead: "codex/kenta-r2-s2-b420",
+    verdict: "match",
+    verdictNote: "**2026-09-07 Issue #436で実API接続後に再判定。** 選んだ友だちへの全4通、配信日時、メッセージ種別、LINEへ実送信する注意、前回のテスト送信4通を開始記録APIから表示した。本番の購読と配信予定を変えないことも明示し、1440/1920pxとも横はみ出し0。",
+    verdictSource: "scenarios-v6/g2UNV.txt + scenarios-v6/g2UNV-{1440,1920}.png",
   },
   {
     /*
@@ -740,10 +734,9 @@ export const SCREENS = [
     ...SCENARIO, node: 'M2b2B', name: '5-1-L シナリオ・配信結果',
     route: '/scenarios/results?id=scenario-1',
     states: { apis: ['**/api/scenarios/*', '**/api/scenarios/**'], kinds: ['normal', 'loading', 'error'] },
-    verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07 Issue #420で再判定。** 3104/8791で対象状態を撮影。通別の到達・開封・クリック・失敗をsteps配列で返し、LINE未提供の指標は未取得理由を表示する。 固定データ/API不足の状態は未取得として扱い、理由を表示する。横スクロール0。",
-    verdictSource: "scenarios-v6/M2b2B.txt + M2b2B-{1440,1920}.png",
-    verdictHead: "codex/kenta-r2-s2-b420",
+    verdict: "match",
+    verdictNote: "**2026-09-07 Issue #436で実API接続後に再判定。** 開始428人、完了312人、参加中134人と4通の到達・クリック・失敗内訳を開始記録APIから表示した。LINEが提供しない個別開封率は「—」と未取得理由を残した。通常・読込中・取得失敗を1440/1920pxで撮影し、全画像で横はみ出し0。",
+    verdictSource: "scenarios-v6/M2b2B.txt + scenarios-v6/M2b2B-{normal,loading,error}.txt + scenarios-v6/M2b2B-{normal,loading,error}-{1440,1920}.png",
   },
   {
     ...SCENARIO, node: 'q5G45', name: '5-1-M 一覧の状態（空・読込・エラー）', route: '/scenarios',
@@ -1954,10 +1947,10 @@ export const SCREENS = [
     verdictHead: "5e1ccd22d",
   },
   { ...MILEAGE, node: 'N46cQ', name: '17-1-A たまる決めごと', route: '/mileage?tab=earning-rules',
-    verdict: "needs_fix",
-    verdictNote: "**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。9件の決めごと、30日実績、失効・取消の扱いを表示できた。並び順保存・公開版の中身を見る導線・利用対象条件が未実装のため要修正。",
+    verdict: "structure_match_data_pending",
+    verdictNote: "**2026-09-07 Issue #429 / PR #1215 / UI HEAD 65390c132 で再判定。** 並び替えと `sortOrder` の保存、公開版の中身を見る導線、V6下書きの利用対象条件を実装。残る口は30日付与マイルと1人あたり平均の集計契約（Issue #418）。",
     verdictSource: "mileage-v6/N46cQ.txt",
-    verdictHead: "e98decafa",
+    verdictHead: "65390c132",
   },
   {
     /*
@@ -2000,10 +1993,10 @@ export const SCREENS = [
     verdictHead: "5e1ccd22d",
   },
   { ...MILEAGE, node: 'BmoGY', name: '17-1-D たまる決めごとをつくる', route: '/mileage/earning-rules/new',
-    verdict: "needs_fix",
-    verdictNote: "**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。有効期限、取消時の差し引き、倍率表、LINEプレビュー、タグ条件を確認した。15軸条件ビルダーと自動通知の送信口が無いため要修正。",
+    verdict: "structure_match_data_pending",
+    verdictNote: "**2026-09-07 Issue #429 / PR #1215 / UI HEAD 65390c132 で再判定。** 15軸条件ビルダーをV6下書き保存へ接続。残る口は取消時の友だち向け自動通知（Issue #418）。",
     verdictSource: "mileage-v6/BmoGY.txt",
-    verdictHead: "e98decafa",
+    verdictHead: "65390c132",
   },
   {
     /*
@@ -2048,24 +2041,24 @@ export const SCREENS = [
     route: '/mileage/rewards/edit?id=mr-1', mode: 'page',
     /* #863 合流後の実装を照合した現在の判定。 */
     ...{
-      verdict: 'needs_fix',
-      verdictNote: '**2026-09-04 S3 第2段で再照合。** 要修正。#863 合流後の実装には、名前・説明・必要マイル、渡す種類、在庫、1人あたり上限、期間、有効日数、公開版を直接変えない下書き、受け渡し失敗時の再試行・返却、顧客への案内、公開前確認がそろう。今回 `eb0a4fea8` で、既存の副作用なしテストAPIを「自分で交換をテスト」へ接続し、残高と在庫を動かさない結果を表示した。残る差は「だれが交換できるか」の条件、運用者が選べる共通アクション、画像・クーポンの選択、右側の作り方とつながる先。回答フォーム・品ものは保存契約に無いため、選べるふりをさせない。新規実装画像は実行環境の Chromium Mach port 拒否で未取得。**推奨修正**：次は共通条件と共通アクションの選択APIを接続し、1440/1920で撮り直す。',
+      verdict: 'structure_match_data_pending',
+      verdictNote: '**2026-09-07 Issue #429 / UI HEAD 65390c132 で再判定。** `mr-1` の詳細取得を正しい器で受け、一覧データへの安全なフォールバックも備えたため表示エラーを解消した。公開中の共通アクションと版をAPIから読み、交換後の処理として選択できる。3102/8789で1440/1920pxを撮影し、両幅とも横はみ出し0。**残る口**：`MileageRewardVersion` と `MileageRewardDraftInput` に交換対象条件 `targetConditions` が無く、保存APIも受け取らないため、設計の「だれが交換できますか」を永続化できない。選べるふりを足さず、契約追加まで `structure_match_data_pending` とする。',
       verdictSource: 'mileage-v6/p9CcEB.txt + apps/web/src/app/mileage/rewards/edit/page.tsx + apps/web/src/app/mileage/rewards/edit/reward-form.test.ts + docs/v6-requirements/v6-17-mileage-score-requirements-draft.md',
-      verdictHead: 'eb0a4fea8',
+      verdictHead: '65390c132',
     },
-    verdict: "unjudged",
-    verdictNote: "**2026-09-07 Issue #422。** 1440・1920pxとも「画面を表示できませんでした」で撮影が止まり比較画像を取得できなかった。「撮影が固まる(/mileage/rewards/edit?id=mr-1)」として判定保留。",
-    verdictSource: "mileage-v6/p9CcEB.txt",
-    verdictHead: "e98decafa",
+    verdict: "structure_match_data_pending",
+    verdictNote: "**2026-09-07 Issue #429 / PR #1215 / UI HEAD 65390c132 で再判定。** 表示エラーを解消し、公開中の共通アクションと版を選べる。残る口は交換対象条件 `targetConditions` の保存契約。",
+    verdictSource: "mileage-v6/p9CcEB.txt + apps/web/src/app/mileage/rewards/edit/page.tsx + apps/web/src/app/mileage/rewards/edit/reward-form.test.ts",
+    verdictHead: "65390c132",
   },
   {
     ...MILEAGE, node: 'k8VCU', name: '17-1-H たまる決めごと・一覧の状態',
     route: '/mileage?tab=earning-rules',
     states: { apis: ['**/api/mileage/earning-rules*'], kinds: ['loading', 'empty', 'error'] },
-    verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07 Issue #422 / HEAD e98decafa で通常・読込中・0件・取得失敗を1440・1920pxで再撮影。** 全状態で横はみ出し0。状態を分け、未取得を0件に置き換えていない。並び順保存・対象条件・公開版導線は画面/API差が残るため構造一致・データ待ち。",
+    verdict: "match",
+    verdictNote: "**2026-09-07 Issue #429 / PR #1215 / UI HEAD 65390c132 で一致。** 通常・読込中・0件・取得失敗の全4状態を1440/1920pxで照合し、全画像で横はみ出し0。並び順保存・公開版確認・利用対象条件にも到達できる。",
     verdictSource: "mileage-v6/k8VCU.txt + k8VCU-error.txt",
-    verdictHead: "e98decafa",
+    verdictHead: "65390c132",
   },
   {
     /*
@@ -2862,16 +2855,16 @@ export const SCREENS = [
   },
   {
     ...STAFF, node: 'EOTS4', name: '30-1-A 見せる範囲を決める',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #434 / 3101・8788で再撮影・再判定。** `access/roles` の機能30固定行を読み、管理者・運用・見るだけの3役割を横に、対象機能を縦に並べ、編集・閲覧・対象外を比較できる表として表示した。個人通知は比較表から分離し、ユーザー編集側へ残した。1440/1920pxとも対象画面へ到達し、横はみ出し0。',
+    verdictSource: 'staff-v6/EOTS4.txt + staff-v6/EOTS4-{1440,1920}.png + 2026-09-07 visual comparison',
     mode: 'viewport', height: 1080, /*
       **行の押し口は「範囲を編集」。** 人の名前は文字で、押せる役を持っていない。
       名前で探していたので、固定データを足したあとも0件のままだった
       （`page.tsx:142` の行末が `範囲を編集`）。
     */
     steps: [{ wait: 1500 }, { qaOpen: 'EOTS4' }],
-    verdict: "needs_fix",
-    verdictNote: "**2026-09-06 #212で判定。** 設計1920pxと実装1440/1920pxを目視比較。2幅とも横はみ出し0。設計は役割3種と機能ごとの権限を表で比較する全画面だが、実装は1ユーザーの基本情報・通知設定を含む縦長の編集窓で、比較表になっていない。**推奨修正**：役割ごとの閲覧・操作範囲を設計の表へ戻し、個人通知の設定とは画面を分ける。",
-    verdictSource: "staff-v6/EOTS4.txt + EOTS4-1440.png + EOTS4-1920.png",
-    verdictHead: "bf7434ff",
+    verdictHead: '54f1910a7',
   },
   { ...STAFF, node: 'jwVlo', name: '30-1-B 入った記録', route: '/staff?tab=audit',
     states: { apis: ['**/api/audit/events*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
@@ -2880,11 +2873,12 @@ export const SCREENS = [
     verdictSource: "staff-v6/jwVlo.png + staff-v6/jwVlo-{normal,loading,empty,error,forbidden}.txt + 2026-09-07 visual comparison",
     verdictHead: "5c9238525",
   },
-  { ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new',
-    verdict: "needs_fix",
-    verdictNote: "**2026-09-06 #212で判定。** 実装を1440/1920pxで2回撮影しようとしたが、対象画面へ到達できず未取得。mock APIが稼働している状態で2回撮り直したが、1440px・1920pxともログイン画面へ遷移し、設計の招待フォームを確認できなかった。**推奨修正**：撮影セッションで `/staff/new` を認証済みのまま開けるようにし、名前・メール・役割・LINEアカウント・担当範囲の全状態を再撮影する。",
-    verdictSource: "capture-screens.mjs撮影結果（2026-09-06、ログイン画面へ遷移・実装画像なし）",
-    verdictHead: "bf7434ff",
+  {
+    ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #434 / 3101・8788で再撮影・再判定。** 認証済みセッションのまま `/staff/new` へ到達し、ログイン画面へ戻らないことを確認した。名前・メールアドレス・役割・最初に表示するLINEアカウント・スタッフの機能別担当範囲・通知先と、追加後の流れを表示。1440/1920pxとも横はみ出し0。',
+    verdictSource: 'staff-v6/I3ZSrU.txt + staff-v6/I3ZSrU-{1440,1920}.png + 2026-09-07 visual comparison',
+    verdictHead: '54f1910a7',
   },
 
   // ── 機能31 機能設定 ─────────────────────────────────────
@@ -3412,6 +3406,7 @@ export const CAPTURED_AT = {
     { pr: 1039, head: '1b4774050', on: '2026-09-07', screens: ['e3jz3','jwVlo'], note: 'Issue #243。3105/8792で通常・読込・空・失敗・権限不足の全24枚を1440/1920px撮影。全画像で横はみ出し0。残る集計・共通監査API差は各画面の判定注記へ記録した。' },
     { pr: 1182, head: '04057fb9da53', on: '2026-09-07', screens: ['e3jz3','EOTS4','jwVlo','I3ZSrU'], note: 'Issue #405。#1175後の access/users・roles・audit/events 固定契約へ接続し、3101/8788で4画面を1440・1920px撮影。横はみ出し0、設計との差は各画面の判定注記へ記録した。' },
     { pr: 1201, head: '5c9238525', on: '2026-09-07', screens: ['e3jz3','EOTS4','jwVlo','I3ZSrU'], note: 'Issue #425。職位・権限bundle・担当範囲・機能別権限の固定行を追加し、権限比較、6行ページ送りと注意札、監査記録の地域・詳細表示を3101/8788で4画面と全状態撮影。横はみ出し0、各画面を再判定した。' },
+    { pr: 1213, head: '54f1910a7', on: '2026-09-07', screens: ['EOTS4','I3ZSrU'], note: 'Issue #434。権限比較と認証済み招待フォームを3101/8788で1440・1920px再撮影し、旧Issueの上書きを外して2画面の実効判定をmatchへ更新した。横はみ出し0。' },
   ],
   31: [
     { pr: 1191, head: 'e98decafa', on: '2026-09-07', screens: ['c4R6F'], note: 'Issue #422 / PR #1191。機能設定を3102/8789で1440・1920px再撮影。説明・切替・並び替え・利用数表示を確認し、未取得の利用数はデータ待ちで記録した。' },
@@ -3594,6 +3589,7 @@ export const CAPTURED_AT = {
     { pr: 0, head: '4af43fb6', on: '2026-09-01', screens: ['festr'], note: 'Claudeが実装して撮った。**doctorが合格になったが、この3本はまだ push していない**' },
   ],
   17: [
+    { pr: 1215, head: '65390c132', on: '2026-09-07', screens: ['N46cQ', 'BmoGY', 'p9CcEB', 'k8VCU'], note: 'Issue #429 / PR #1215。決めごとの並び順・公開版・15軸条件と、使い道の共通アクション選択を実装し、3102/8789で1440/1920pxを撮影。全画像で横はみ出し0。k8VCUは一致、残るAPI契約は3画面の判定注記へ記録した。' },
     { pr: 1137, head: '5e1ccd22d', on: '2026-09-07', screens: ['s98Vfw', 'N46cQ', 'qlVLJ', 'MvZm5', 'BmoGY', 'HIU5O', 'vz0Ji', 'k8VCU', 'z3PB2'], note: 'Issue #373。機能17の新しい残高・付与ルール・使い道・履歴契約へ接続し、固定ポート3105/8792で通常と定義済みの全状態を1440/1920px撮影。全画像で横はみ出し0。友だち明細は全体履歴を友だちIDで絞り込んで表示するようにした。残差は画面とAPIに分けて各verdictNoteへ記録。' },
     { pr: 549, head: '0ae3e094', on: '2026-08-29', screens: ['qlVLJ', 'p9CcEB'], note: 'マイルの使い道を交換まで接続。公開版の固定・二重交換の防止・渡せなかったときの決めごとが入っている' },
     { pr: 441, head: '05c5b103', on: '2026-08-28', screens: ['MvZm5', 'BmoGY', 'HIU5O'] },
@@ -3641,6 +3637,9 @@ export const CAPTURED_AT = {
     { pr: 596, head: 'edb94936', on: '2026-08-30', screens: ['U9hzqH', 'g46ja', 'Yj6CQ', 'e6iJG'], note: 'Claudeが実装した。#595 の契約の上に公開までの4段。実装した本人が比較している' },
   ],
   5: [
+    { pr: 1218, head: '52cdb3fa6', on: '2026-09-07',
+      screens: ['r6Gzsu', 'hz9ti', 'EvVO5', 'RUxNf', 'NrBkW', 'g2UNV', 'M2b2B'],
+      note: 'Issue #436。#1199 のAPI契約と #1204 の固定データを使い、7画面を3104/8791で1440・1920px撮影した。試算、開始記録、V6下書き、通別結果を実API経由で表示し、7画面すべて一致。全画像で横はみ出し0。' },
     { pr: 1121, head: '1d9e8d36c', on: '2026-09-07',
       screens: ['kk8dz', 'r6Gzsu', 'hz9ti', 'EvVO5', 'RUxNf', 'g2UNV', 'NrBkW', 'M2b2B'],
       note: 'Issue #366 / PR #1121 の差し戻し対応。機能5の8画面を試算・開始記録・V6下書きAPIへ接続し、3104/8791で1440・1920pxと結果画面3状態を撮影。全22枚で横はみ出し0。1画面を一致、契約が返さない値だけを理由付き構造一致・データ待ちとして記録した。' },
