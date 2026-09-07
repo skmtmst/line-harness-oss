@@ -3268,8 +3268,22 @@ export type NenCampaignSetting = {
   buttonLabel: string | null
   buttonUrl: string | null
   imageUrl: string | null
+  afterActions: NenCampaignAfterAction[]
   updatedAt: string
 }
+
+export type NenCampaignAfterAction =
+  | {
+      kind: 'open_form'
+      formId: string
+      formName: string
+      buttonLabel: string
+    }
+  | {
+      kind: 'award_mileage'
+      amount: number
+      trigger: 'form_submitted'
+    }
 
 export type NenColumn = {
   id: string
@@ -7124,7 +7138,7 @@ export const api = {
       `/api/nen-campaigns/settings?lineAccountId=${encodeURIComponent(accountId)}`,
     ),
     updateSetting: (accountId: string, campaignKey: string, data: Pick<NenCampaignSetting,
-      'isEnabled' | 'title' | 'bodyText' | 'delayDays' | 'deliveryTime' | 'buttonLabel' | 'buttonUrl' | 'imageUrl'>) =>
+      'isEnabled' | 'title' | 'bodyText' | 'delayDays' | 'deliveryTime' | 'buttonLabel' | 'buttonUrl' | 'imageUrl' | 'afterActions'>) =>
       fetchApi<{ success: boolean }>(`/api/nen-campaigns/settings/${encodeURIComponent(campaignKey)}?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PUT', body: JSON.stringify(data),
       }),

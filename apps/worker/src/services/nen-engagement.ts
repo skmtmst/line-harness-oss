@@ -29,8 +29,51 @@ export type CampaignRow = {
   button_label: string | null;
   button_url: string | null;
   image_url: string | null;
+  after_actions?: NenCampaignAfterAction[];
   updated_at?: string;
 };
+
+export type NenCampaignAfterAction =
+  | { kind: 'open_form'; formId: string; formName: string; buttonLabel: string }
+  | { kind: 'award_mileage'; amount: number; trigger: 'form_submitted' };
+
+export function parseNenCampaignAfterActions(value: unknown): NenCampaignAfterAction[] {
+  if (!Array.isArray(value) || value.length > 10) return [];
+  return value.flatMap<NenCampaignAfterAction>((item) => {
+    if (!item || typeof item !== 'object') return [];
+    const action = item as Record<string, unknown>;
+    if (
+      action.kind === 'open_form'
+      && typeof action.formId === 'string'
+      && action.formId.trim().length > 0
+      && action.formId.length <= 100
+      && typeof action.formName === 'string'
+      && action.formName.trim().length > 0
+      && action.formName.length <= 120
+      && typeof action.buttonLabel === 'string'
+      && action.buttonLabel.trim().length > 0
+      && action.buttonLabel.length <= 20
+    ) {
+      return [{
+        kind: 'open_form',
+        formId: action.formId.trim(),
+        formName: action.formName.trim(),
+        buttonLabel: action.buttonLabel.trim(),
+      }];
+    }
+    const amount = Number(action.amount);
+    if (
+      action.kind === 'award_mileage'
+      && action.trigger === 'form_submitted'
+      && Number.isInteger(amount)
+      && amount >= 1
+      && amount <= 1_000_000
+    ) {
+      return [{ kind: 'award_mileage', amount, trigger: 'form_submitted' }];
+    }
+    return [];
+  });
+}
 
 export type NenBirthdayCouponSettingRow = {
   is_enabled: number;
@@ -141,6 +184,7 @@ export function readNenCampaignSnapshot(value: string | null, campaignKey: strin
       button_label: typeof parsed.button_label === 'string' ? parsed.button_label : null,
       button_url: typeof parsed.button_url === 'string' ? parsed.button_url : null,
       image_url: typeof parsed.image_url === 'string' ? parsed.image_url : null,
+      after_actions: parseNenCampaignAfterActions(parsed.after_actions),
       updated_at: typeof parsed.updated_at === 'string' ? parsed.updated_at : '',
     };
   } catch {

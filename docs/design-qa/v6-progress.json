@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 24,
-  "match": 262,
+  "match": 263,
   "structureMatchDataPending": 4,
-  "needsFix": 1,
+  "needsFix": 0,
   "unjudged": 0,
-  "remaining": 6,
+  "remaining": 5,
   "features": [
     {
       "feature": 1,
@@ -2597,12 +2597,21 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 1,
-      "match": 3,
+      "match": 4,
       "structureMatchDataPending": 3,
-      "needsFix": 1,
+      "needsFix": 0,
       "unjudged": 0,
-      "remaining": 4,
+      "remaining": 3,
       "capturedAt": [
+        {
+          "pr": 1237,
+          "head": "c6dfe250c",
+          "on": "2026-09-07",
+          "screens": [
+            "HpKyF"
+          ],
+          "note": "Issue #442 / PR #1237。NEN配信の本文エディタと、回答フォームを開く・回答後200マイル付与の設定保存を実装。通常・誕生日を3102/8789で1440/1920px撮影し、全画像で横はみ出し0、Pencil V6と一致。"
+        },
         {
           "pr": 1234,
           "head": "78c19bea32",
