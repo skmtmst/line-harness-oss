@@ -1838,6 +1838,7 @@ export const SCREENS = [
     verdict: "match",
     verdictNote: "**2026-09-08、Issue #538 を固定ポート web 3105・mock 8792 で1440px・1920px再撮影し、一致。** 2幅とも横はみ出し0、1920px画素差4.0422%。一覧は総件数と表示範囲を示し、200件を超えてもサーバー側ページ送りで全件を確認できる。検索・種別・フォルダ・使用状態・並び順もページの外まで含めて絞り込む。",
     verdictSource: "media-v6/g89Tc.txt + g89Tc-1440.png + g89Tc-1920.png",
+    verdictHead: "748c8b810",
   },
   {
     ...MEDIA, node: 'voJtX', name: '15-1-A メディアの詳細と差し替え',
@@ -2738,7 +2739,7 @@ export const SCREENS = [
     日・週の台帳は、固定予約を時間×担当／曜日の格子へ並べる。
     LINE予約は緑、LINE未連携の電話予約は青で同じ格子に載せる。
   */
-  { ...BOOKING, node: 'TV2DI', name: '27-1 予約管理', verdict: 'match', verdictNote: '**2026-09-08 Issue #538 を固定ポート3105/8792で再撮影し、一致を維持。** 一覧は全件取得をやめ、集計と表示ページを別々に取得する。201件目以降もページ移動で取得でき、検索・メニュー・日付もサーバー側で絞り込む。1920px画素差4.764%、1440/1920pxとも横はみ出し0。本流の更新案内帯が表示されたため全体高は設計より37px長いが、予約管理本文の配置は維持。', verdictSource: 'booking-v6/TV2DI.png + TV2DI-{1440,1920}.png + TV2DI-diff-1920.png + Issue #538' },
+  { ...BOOKING, node: 'TV2DI', name: '27-1 予約管理', verdict: 'match', verdictNote: '**2026-09-08 Issue #538 を固定ポート3105/8792で再撮影し、一致を維持。** 一覧は全件取得をやめ、集計と表示ページを別々に取得する。201件目以降もページ移動で取得でき、検索・メニュー・日付もサーバー側で絞り込む。1920px画素差4.764%、1440/1920pxとも横はみ出し0。本流の更新案内帯が表示されたため全体高は設計より37px長いが、予約管理本文の配置は維持。', verdictSource: 'booking-v6/TV2DI.png + TV2DI-{1440,1920}.png + TV2DI-diff-1920.png + Issue #538', verdictHead: '748c8b810' },
   {
     ...BOOKING, node: 'TnDbq', name: '27-1-A 予約の詳細',
     mode: 'viewport', height: 1136, /*
@@ -2754,7 +2755,7 @@ export const SCREENS = [
     verdict: "match",
     verdictNote: "**2026-09-08 Issue #538 を固定ポート3105/8792で再撮影し、一致を維持。** 詳細ページは一覧全件から探さず単票APIを使い、LINE未連携の電話予約は顧客IDで履歴を取得して無効な友だち・トークリンクを出さない。1920px画素差5.5954%、1440/1920pxとも横はみ出し0。",
     verdictSource: "booking-v6/TnDbq.txt + TnDbq-{1440,1920}.png + TnDbq-detail-route-{1440,1920}.png",
-    verdictHead: "cded0de47",
+    verdictHead: "748c8b810",
   },
   /*
     **判定を改めた（PR #459 head `ba0bf62d`）。** 代理予約の画面ができた
