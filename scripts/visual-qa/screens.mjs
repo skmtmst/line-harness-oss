@@ -3062,25 +3062,25 @@ const feature30Issue425Judgments = {
     verdict: 'match',
     verdictNote: '**2026-09-07 #425 / 3101・8788で固定行追加後に再撮影・再判定。** access/users・access/roles の機能30固定契約へ職位、役割bundle、担当範囲、機能別権限を追加し、通常・読込・空・失敗・権限不足を1440/1920px撮影。1ページ6行、ページ送り、役割・職位・担当範囲・最終ログイン・二段階認証、確認が必要な注意札を表示し、横はみ出し0。設計の表示項目と固定契約の値が一致する。',
     verdictSource: 'staff-v6/e3jz3.png + staff-v6/e3jz3-{normal,loading,empty,error,forbidden}.txt + 2026-09-07 visual comparison',
-    verdictHead: 'codex/kenta-r2-codex-b425',
+    verdictHead: '5c9238525',
   },
   EOTS4: {
     verdict: 'needs_fix',
     verdictNote: '**2026-09-07 #425 / 3101・8788で再撮影・再判定。** 権限を比べる導線から管理者・運用・見るだけの比較表を開き、機能ごとの権限値（編集・閲覧・対象外）を1440/1920pxで確認し、横はみ出し0。個人の通知設定は編集画面へ分離した。比較表の保存操作は書き込み契約が無いため表示せず、読み取り設計と契約値を一致させた。',
     verdictSource: 'staff-v6/EOTS4.txt + staff-v6/EOTS4-{1440,1920}.png + 2026-09-07 visual comparison',
-    verdictHead: 'codex/kenta-r2-codex-b425',
+    verdictHead: '5c9238525',
   },
   jwVlo: {
     verdict: 'match',
     verdictNote: '**2026-09-07 #425 / 3101・8788で再撮影・再判定。** 通常・読込・空・失敗・権限不足を1440/1920pxで撮影し、横はみ出し0。監査イベント契約へ `regionLabel` を追加し、既知のIP接頭辞は地域名、契約が地域を返さない場合は「—」として確定した。各行に詳細ボタンを追加し、変更前後・対象・場所を確認できる。位置情報を推測していないため、契約値と表示が一致する。',
     verdictSource: 'staff-v6/jwVlo.png + staff-v6/jwVlo-{normal,loading,empty,error,forbidden}.txt + 2026-09-07 visual comparison',
-    verdictHead: 'codex/kenta-r2-codex-b425',
+    verdictHead: '5c9238525',
   },
   I3ZSrU: {
     verdict: 'needs_fix',
     verdictNote: '**2026-09-07 #425 / 3101・8788で認証済み `/staff/new` を再撮影・再判定。** 1440/1920pxで横はみ出し0。メール招待フォーム、役割説明、初回表示アカウントを確認し、設計との差（LINE連携招待・担当範囲割り当て・通知設定）は書き込み契約未提供のため未接続と明記した。認証切れのログイン画面ではなく、対象画面を撮影できている。',
     verdictSource: 'staff-v6/I3ZSrU.txt + staff-v6/I3ZSrU-{1440,1920}.png + 2026-09-07 visual comparison',
-    verdictHead: 'codex/kenta-r2-codex-b425',
+    verdictHead: '5c9238525',
   },
 }
 for (const screen of SCREENS) {
@@ -4557,7 +4557,7 @@ export const CAPTURED_AT = {
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
     { pr: 1039, head: '1b4774050', on: '2026-09-07', screens: ['e3jz3','jwVlo'], note: 'Issue #243。3105/8792で通常・読込・空・失敗・権限不足の全24枚を1440/1920px撮影。全画像で横はみ出し0。残る集計・共通監査API差は各画面の判定注記へ記録した。' },
     { pr: 1182, head: '04057fb9da53', on: '2026-09-07', screens: ['e3jz3','EOTS4','jwVlo','I3ZSrU'], note: 'Issue #405。#1175後の access/users・roles・audit/events 固定契約へ接続し、3101/8788で4画面を1440・1920px撮影。横はみ出し0、設計との差は各画面の判定注記へ記録した。' },
-    { pr: 1201, head: '5957e63eeb', on: '2026-09-07', screens: ['e3jz3','EOTS4','jwVlo','I3ZSrU'], note: 'Issue #425。権限比較、6行ページ送りと注意札、監査記録の地域・詳細表示を接続し、3101/8788で4画面と全状態を1440/1920px撮影。横はみ出し0、残る設計差と未提供契約は各画面の判定注記へ記録した。' },
+    { pr: 1201, head: '5c9238525', on: '2026-09-07', screens: ['e3jz3','EOTS4','jwVlo','I3ZSrU'], note: 'Issue #425。職位・権限bundle・担当範囲・機能別権限の固定行を追加し、権限比較、6行ページ送りと注意札、監査記録の地域・詳細表示を3101/8788で4画面と全状態撮影。横はみ出し0、各画面を再判定した。' },
   ],
   31: [
     { pr: 1191, head: 'e98decafa', on: '2026-09-07', screens: ['c4R6F'], note: 'Issue #422 / PR #1191。機能設定を3102/8789で1440・1920px再撮影。説明・切替・並び替え・利用数表示を確認し、未取得の利用数はデータ待ちで記録した。' },
