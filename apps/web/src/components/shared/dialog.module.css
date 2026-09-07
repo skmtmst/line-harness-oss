@@ -10,6 +10,18 @@
   padding: 16px;
 }
 
+/* ★V6 の短い確認窓は、一覧の内容を隠しすぎない固定位置に置く。 */
+.confirmationOverlay {
+  align-items: flex-start;
+  padding-top: 280px;
+}
+
+@media (max-height: 640px) {
+  .confirmationOverlay {
+    padding-top: 80px;
+  }
+}
+
 .panel {
   display: flex;
   width: min(844px, 100%);

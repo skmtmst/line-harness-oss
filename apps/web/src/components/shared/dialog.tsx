@@ -60,6 +60,11 @@ export default function Dialog({
   const descriptionId = useId()
   const [mounted, setMounted] = useState(false)
   const panelRef = useOverlayFocus(open && modal, onCancel, busy)
+  const confirmationSizeClass = confirmation && compact
+    ? tone === 'destructive'
+      ? styles.destructiveConfirmation
+      : styles.compactConfirmation
+    : ''
 
   useEffect(() => setMounted(true), [])
   if (!open) return null
@@ -82,7 +87,7 @@ export default function Dialog({
   const panel = (
     <div
       ref={panelRef}
-      className={`${styles.panel} ${styles.standardPanel} ${confirmation ? styles.confirmationPanel : ''} ${confirmation && compact ? tone === 'destructive' ? styles.destructiveConfirmation : styles.compactConfirmation : '' : ''}`}
+      className={`${styles.panel} ${styles.standardPanel} ${confirmation ? styles.confirmationPanel : ''} ${confirmationSizeClass}`}
       role={tone === 'destructive' ? 'alertdialog' : 'dialog'}
       aria-modal={modal || undefined}
       aria-labelledby={titleId}
@@ -111,7 +116,7 @@ export default function Dialog({
 
   if (!modal) return panel
   const overlay = (
-    <div className={styles.overlay} role="presentation" data-design-node={designNode} onMouseDown={(event) => {
+    <div className={`${styles.overlay} ${confirmation && compact ? styles.confirmationOverlay : ''}`} role="presentation" data-design-node={designNode} onMouseDown={(event) => {
       if (!busy && event.target === event.currentTarget) onCancel()
     }}>
       {panel}

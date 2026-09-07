@@ -90,12 +90,10 @@ function AutoReplyEditInner() {
 
   return (
     <div>
-      <nav className="text-ink-faint mb-4 text-xs">
-        <Link href="/auto-replies" className="hover:underline">
-          自動応答
+      <nav className="mb-4 text-xs">
+        <Link href="/auto-replies" className="text-action font-semibold hover:underline">
+          ← 自動応答一覧
         </Link>
-        <span className="mx-1.5">›</span>
-        <span>{id ? '編集' : '作成'}</span>
       </nav>
 
       {error && (
