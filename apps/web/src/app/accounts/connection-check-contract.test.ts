@@ -41,17 +41,13 @@ describe('V6 33-2 保存する前の接続確認', () => {
     expect(steps.slice(1).every((s) => s.state === 'skipped')).toBe(true)
   })
 
-  it('4段目は、口が無いので「止まった」と言わない', () => {
-    /*
-      実際に届くかのテストを打つ口はまだ無い。**失敗と書くと、
-      直しようのないものを直させることになる。**
-    */
+  it('Webhookの接続テストまで通れば4段目も「通りました」', () => {
     const steps = toSteps(result())
-    expect(steps[3].state).toBe('skipped')
+    expect(steps[3].state).toBe('passed')
     expect(stoppedAt(steps)).toBeNull()
   })
 
-  it('3段目まで通れば保存できる', () => {
+  it('4段すべて通ったときだけ保存できる', () => {
     expect(canSave(toSteps(result()))).toBe(true)
     expect(canSave(toSteps(result({ webhook: false })))).toBe(false)
     expect(canSave(toSteps(null))).toBe(false)

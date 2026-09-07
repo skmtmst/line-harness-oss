@@ -17,6 +17,7 @@ export * from './conversions';
 export * from './conversion-definitions';
 export * from './affiliates';
 export * from './webhooks';
+export * from './booking-settings';
 export * from './line-webhook-events';
 export * from './friend-add-events';
 export * from './friend-add-routing-versions';
@@ -56,6 +57,7 @@ export * from './affiliate-payments';
 export * from './affiliate-settlements';
 export * from './affiliate-payouts';
 export * from './account-settings';
+export * from './ec-operations';
 export * from './webinars';
 
 /**
@@ -100,4 +102,5 @@ export * from './booking-customers';
 export * from './operation-audit';
 export * from './operations';
 export * from './operations-health';
+export * from './nen-photo-operations';
 export * from './friend-bulk-runs';

@@ -53,12 +53,18 @@ export type AuditAction =
   | 'conversion.definition.usage.create'
   | 'conversion.report.export'
   | 'ec.connector.update'
+  | 'ec.action.retry'
   | 'line_notification.definition.create'
   | 'line_notification.definition.update'
   | 'line_notification.definition.publish'
   | 'line_notification.definition.stop'
   | 'line_notification.delivery.retry'
   | 'nen.delivery.retry'
+  | 'photo.assessment.request'
+  | 'photo.asset.request'
+  | 'photo.review.bulk'
+  | 'photo.original.issue'
+  | 'photo.original.download'
   | 'webinar.archive'
   | 'webinar.participant.export';
 

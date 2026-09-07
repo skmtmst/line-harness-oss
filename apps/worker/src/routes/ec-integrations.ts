@@ -1,5 +1,12 @@
 import { Hono } from 'hono';
-import { getFriendByLineUserIdForAccount, getLineAccountById, jstNow } from '@line-crm/db';
+import {
+  attachEcOrderFriend,
+  getFriendByLineUserIdForAccount,
+  getLineAccountById,
+  jstNow,
+  setEcActionExecutionStatus,
+  upsertEcEventReadModels,
+} from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
 import type { Env } from '../index.js';
@@ -26,7 +33,14 @@ export const EC_EVENT_TYPES = [
 ] as const;
 const EVENT_TYPES = new Set<string>(EC_EVENT_TYPES);
 
-type EcItem = { name: string; quantity: number; product_id?: string | number | null; product_url?: string | null };
+type EcItem = {
+  name: string;
+  quantity: number;
+  product_id?: string | number | null;
+  product_url?: string | null;
+  unit_amount?: number | null;
+  line_amount?: number | null;
+};
 export type EcEvent = {
   event_id: string;
   event_type: string;
@@ -39,6 +53,8 @@ export type EcEvent = {
   order?: {
     number?: string;
     total?: number;
+    currency?: string;
+    date?: string;
     payment_method?: string;
     items?: EcItem[];
     delivery_date?: string | null;
@@ -351,6 +367,29 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
         `SELECT id, status FROM ec_events WHERE source = ? AND external_event_id = ?`,
       ).bind(source, event.event_id).first<{ id: string; status: string }>();
   if (!row) return c.json({ success: false, error: 'Event ledger failure' }, 500);
+  try {
+    await upsertEcEventReadModels(c.env.DB, {
+      eventId: row.id,
+      sourceKey: source,
+      externalEventId: event.event_id,
+      eventType: event.event_type,
+      lineAccountId,
+      customerId: event.customer_id == null ? null : String(event.customer_id),
+      occurredAt: event.occurred_at,
+      order: event.order,
+      refund: event.refund,
+    }, now);
+  } catch (error) {
+    await c.env.DB.prepare(
+      `UPDATE ec_events SET status = 'failed', error_message = 'read_model_failed', updated_at = ? WHERE id = ?`,
+    ).bind(now, row.id).run();
+    await setEcActionExecutionStatus(c.env.DB, {
+      eventId: row.id, lineAccountId, status: 'retryable_failed',
+      errorCode: 'read_model_failed', errorMessageSafe: '注文情報を取り込めませんでした', now,
+    }).catch(() => undefined);
+    console.error(`[ec-event] read model failed event=${event.event_id}`, error);
+    return c.json({ success: false, error: 'Event processing failed' }, 503);
+  }
   if (row.status === 'processed' || row.status === 'skipped') {
     return c.json({ success: true, duplicate: true, status: row.status });
   }
@@ -361,6 +400,10 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
           SET status = 'identity_pending', error_message = 'line_identity_unmatched', updated_at = ?
         WHERE id = ? AND status IN ('received', 'failed', 'identity_pending')`,
     ).bind(now, row.id).run();
+    await setEcActionExecutionStatus(c.env.DB, {
+      eventId: row.id, lineAccountId, status: 'skipped',
+      errorCode: 'line_identity_unmatched', errorMessageSafe: 'LINEの友だちが見つかりません', now,
+    });
     return c.json({ success: true, status: 'identity_pending' }, 202);
   }
 
@@ -382,10 +425,17 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
         now,
         row.id,
       ).run();
+      await setEcActionExecutionStatus(c.env.DB, {
+        eventId: row.id, lineAccountId, status: 'skipped',
+        errorCode: friend ? 'friend_not_following' : 'line_identity_unmatched',
+        errorMessageSafe: friend ? 'LINEの友だちが現在フォローしていません' : 'LINEの友だちが見つかりません',
+        now,
+      });
       return c.json({ success: true, status: friend ? 'skipped' : 'identity_pending' }, 202);
     }
 
     if (friend.line_account_id !== lineAccountId) throw new Error('EC event account mismatch');
+    await attachEcOrderFriend(c.env.DB, { eventId: row.id, lineAccountId, friendId: friend.id, now });
     const accessToken = account.channel_access_token;
     if (!accessToken) throw new Error('LINE access token is not configured');
 
@@ -400,6 +450,9 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
         `UPDATE ec_events SET friend_id = ?, status = 'processed', processed_at = ?, updated_at = ? WHERE id = ?`,
       ).bind(friend.id, now, now, row.id).run();
       await fireEvent(c.env.DB, event.event_type, { friendId: friend.id, eventData: event }, accessToken, account.id);
+      await setEcActionExecutionStatus(c.env.DB, {
+        eventId: row.id, lineAccountId, status: 'succeeded', now,
+      });
       return c.json({ success: true, status: 'processed' });
     }
 
@@ -428,6 +481,10 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
         friendId: friend.id,
         eventData: event,
       }, accessToken, account.id);
+      await setEcActionExecutionStatus(c.env.DB, {
+        eventId: row.id, lineAccountId, status: 'skipped',
+        errorCode: 'notification_disabled', errorMessageSafe: 'この通知は設定で停止されています', now,
+      });
       return c.json({ success: true, status: 'skipped' }, 202);
     }
 
@@ -459,12 +516,21 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       eventData: event,
     }, accessToken, account.id);
 
+    await setEcActionExecutionStatus(c.env.DB, {
+      eventId: row.id, lineAccountId, status: 'succeeded', now,
+    });
+
     return c.json({ success: true, status: 'processed' });
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 500) : 'Unknown error';
     await c.env.DB.prepare(
       `UPDATE ec_events SET status = 'failed', error_message = ?, updated_at = ? WHERE id = ?`,
     ).bind(message, jstNow(), row.id).run();
+    await setEcActionExecutionStatus(c.env.DB, {
+      eventId: row.id, lineAccountId, status: 'retryable_failed',
+      errorCode: 'event_processing_failed', errorMessageSafe: 'ECの処理を完了できませんでした',
+      now: jstNow(),
+    }).catch(() => undefined);
     console.error(`[ec-event] processing failed event=${event.event_id}`, error);
     return c.json({ success: false, error: 'Event processing failed' }, 503);
   }

@@ -25,6 +25,22 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
     expect(setupSource).toContain('data-design-node="b2NGxk"')
   })
 
+  it('登録画面で運用情報と3つの接続URLを保存前に確認できる', () => {
+    for (const value of [
+      'timezone,',
+      'country: country || null',
+      'role: role || null',
+      'parentLineAccountId: parentLineAccountId || null',
+      '`${workerBase}/webhook`',
+      '`${workerBase}/auth/callback`',
+      '?liffId=',
+    ]) {
+      expect(setupSource).toContain(value)
+    }
+    expect(setupSource).toContain('api.lineAccounts.list()')
+    expect(setupSource).not.toContain('登録後に設定できます')
+  })
+
   it('追加先の店舗ウィザードは利用規約を先頭にした5ステップを維持する', () => {
     for (const label of [
       '利用規約への同意',
