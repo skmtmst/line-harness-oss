@@ -113,7 +113,7 @@ describe('店舗共通の予約設定API', () => {
         inactiveMenuCount: 1,
         businessHours: expect.arrayContaining([{
           weekday: 1,
-          intervals: [{ start: '09:00', end: '12:00' }, { start: '13:00', end: '19:00' }],
+          intervals: [{ start: '09:00', end: '12:00', capacity: 1 }, { start: '13:00', end: '19:00', capacity: 1 }],
         }]),
         exceptions: [expect.objectContaining({ date: '2026-12-30', kind: 'closed' })],
       },

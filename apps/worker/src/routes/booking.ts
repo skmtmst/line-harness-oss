@@ -19,6 +19,7 @@ import {
   searchBookingCustomers,
   createBookingAvailabilityException,
   getBookingAdminSettings,
+  listBookingAdminResources,
   getBookingAvailabilityException,
   listBookingAvailabilityExceptions,
   updateBookingAvailabilityException,
@@ -807,6 +808,18 @@ booking.get('/api/booking/admin/settings', async (c) => {
   } catch {
     console.error(JSON.stringify({ event: 'booking_settings_read_failed' }));
     return c.json({ success: false, error: 'booking_settings_unavailable' }, 503);
+  }
+});
+
+booking.get('/api/booking/admin/resources', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ success: false, error: 'missing_account_id' }, 400);
+  try {
+    const resources = await listBookingAdminResources(c.env.DB, accountId);
+    return c.json({ success: true, data: { resources } });
+  } catch {
+    console.error(JSON.stringify({ event: 'booking_resources_read_failed' }));
+    return c.json({ success: false, error: 'booking_resources_unavailable' }, 503);
   }
 });
 
