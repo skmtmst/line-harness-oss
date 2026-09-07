@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 265,
+  "compared": 266,
   "unimplemented": 0,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 7,
-  "match": 179,
+  "missing": 6,
+  "match": 180,
   "structureMatchDataPending": 69,
-  "needsFix": 16,
+  "needsFix": 15,
   "unjudged": 4,
-  "remaining": 89,
+  "remaining": 88,
   "features": [
     {
       "feature": 1,
@@ -2550,16 +2550,16 @@
       "feature": 22,
       "name": "写真審査",
       "total": 4,
-      "compared": 3,
+      "compared": 4,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 1,
-      "match": 1,
+      "missing": 0,
+      "match": 2,
       "structureMatchDataPending": 2,
-      "needsFix": 1,
+      "needsFix": 0,
       "unjudged": 0,
-      "remaining": 3,
+      "remaining": 2,
       "capturedAt": [
         {
           "pr": 447,
@@ -2584,6 +2584,17 @@
             "Qu6Vk"
           ],
           "note": "Issue #235。3105/8792で通常・読込・空・失敗・権限不足の全12枚を1440/1920px撮影。全画像で横はみ出し0。残る審査時間・注意候補・一括審査API差は判定注記へ記録した。"
+        },
+        {
+          "pr": 1185,
+          "head": "c992fbd82",
+          "on": "2026-09-07",
+          "screens": [
+            "Qu6Vk",
+            "hHrz8",
+            "N2J629"
+          ],
+          "note": "Issue #400。固定データ #410（PR #1181）反映後、3104/8791で3画面を全状態撮影。42枚すべて横はみ出し0。Qu6Vkを一致、残る2画面は再認証・設計差分を理由付き未接続とした。"
         }
       ]
     },

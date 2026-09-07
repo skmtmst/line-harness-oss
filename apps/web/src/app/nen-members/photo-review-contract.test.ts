@@ -19,6 +19,21 @@ describe('V6 photo review contract', () => {
     expect(api).toContain('/api/nen-members/photos?accountId=');
   });
 
+  it('loads review metrics and shows unknown values as unknown', () => {
+    expect(page).toContain('api.nenMembers.photoReviewMetrics(selectedAccountId)');
+    expect(page).toContain('reviewMetrics.pendingCount');
+    expect(page).toContain('reviewMetrics.attentionCount');
+    expect(page).toContain('formatAverageReviewTime(reviewMetrics?.averageReviewMinutes)');
+    expect(page).toContain("if (minutes == null || !Number.isFinite(minutes)) return '—'");
+  });
+
+  it('loads derivative status with the detail and can regenerate the review image', () => {
+    expect(page).toContain('api.nenMembers.photoAssetStatus(id, accountId)');
+    expect(page).toContain('api.nenMembers.photoDerivatives(id, accountId)');
+    expect(page).toContain('api.nenMembers.processPhotoAssets(id, {');
+    expect(page).toContain("operation: 'review'");
+  });
+
   it('separates loading, empty and failed states without making zero counts', () => {
     expect(page).toContain("import ListState from '@/components/shared/list-state'");
     expect(page).toContain('kind="loading"');
@@ -31,14 +46,15 @@ describe('V6 photo review contract', () => {
   });
 
   it('requires a reason and previews the submitter message', () => {
-    expect(page).toContain('写真を戻す理由を選ぶ');
-    expect(page).toContain('投稿者に届く内容');
+    expect(page).toContain("'N2J629'");
+    expect(page).toContain('この写真を戻しますか？');
+    expect(page).toContain('お客様にはこう届きます');
     expect(page).toContain("reasonCode === 'other' && !reasonNote.trim()");
-    for (const code of ['quality', 'privacy', 'unrelated', 'duplicate', 'other']) {
+    for (const code of ['quality', 'privacy', 'unrelated', 'other']) {
       expect(page).toContain(`value: '${code}'`);
     }
     expect(page).toContain('投稿者へ：今回は「{reason.label}」のため、掲載を見送らせていただきました。');
-    expect(page).toContain('投稿者に届く補足（直せます）');
+    expect(page).toContain('お客様に届く補足（直せます）');
   });
 
   it('uses one set of operator words for reviewed states', () => {

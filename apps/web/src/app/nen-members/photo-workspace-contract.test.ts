@@ -26,11 +26,21 @@ describe('V6 写真審査の一枚表示と掲載管理', () => {
     }
   })
 
-  it('does not expose an original URL or enable original download without permission', () => {
+  it('does not expose an original URL and only downloads it after photo-specific step-up', () => {
     expect(detail).not.toContain('r2_key')
     expect(detail).not.toContain('image_url_original')
-    expect(detail).toContain('原本の保存には専用権限と再認証が必要です')
-    expect(detail).toContain('disabled title="原本の保存には専用権限と再認証が必要です"')
+    expect(detail).toContain('6桁の再認証コードを入力すると、一度だけ保存できます。')
+    expect(page).toContain('api.nenMembers.photoOriginalStepUp(code)')
+    expect(page).toContain('api.nenMembers.issuePhotoOriginalDownload(')
+    expect(page).toContain('api.nenMembers.downloadPhotoOriginal(issued.data.downloadUrl)')
+    expect(page).toContain('URL.createObjectURL(blob)')
+  })
+
+  it('uses the review derivative when available and exposes its generation status', () => {
+    expect(detail).toContain("derivatives?.knownUrls.find((item) => item.kind === 'review')")
+    expect(detail).toContain("derivatives?.items.find((item) => item.kind === 'review')")
+    expect(detail).toContain('審査用画像を作り直す')
+    expect(detail).toContain('派生画像：')
   })
 
   it('keeps human review final and sends the expected version', () => {

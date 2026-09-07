@@ -45,9 +45,7 @@ describe('V6 写真審査一覧（Qu6Vk）の骨格', () => {
 
   it('AIは確認順の補助に限り、人の判断を自動化しない', () => {
     expect(PAGE).toContain('確認順を決める条件')
-    expect(PAGE).toContain(
-      '注意候補APIがつながると、確認を急ぐ写真を先に並べます。通す・戻す・公開する判断は、必ず人が行います。',
-    )
+    expect(PAGE).toContain('自動で見つけた注意候補の総数です。通す・戻す・公開する判断は、必ず人が行います。')
     // 口が無いのに「自動で戻しました」と読める押し口・件数を置かない。
     expect(PAGE).not.toContain('自動で戻しました')
     expect(PAGE).not.toContain('自動審査を実行')
@@ -77,12 +75,19 @@ describe('V6 写真審査一覧（Qu6Vk）の骨格', () => {
     expect(CSS).toContain('grid-template-columns: minmax(0, 1fr) 390px;')
   })
 
-  it('選択と一括操作の場所を出し、未接続の操作を実行可能に見せない', () => {
+  it('選択した審査待ち写真だけを一括審査APIへ送る', () => {
     expect(PAGE).toContain('枚を選択中')
     expect(PAGE).toContain('togglePhotoSelection')
     expect(PAGE).toContain('まとめて通す')
     expect(PAGE).toContain('まとめて戻す')
-    expect(PAGE).toContain('一括審査はAPI接続待ちです')
-    expect(PAGE).toContain('<Button variant="primary" disabled title="一括審査APIがつながると使えます">')
+    expect(PAGE).toContain('api.nenMembers.bulkReviewPhotos')
+    expect(PAGE).toContain('selectedPendingPhotos.map')
+    expect(PAGE).toContain('selectedPhotosAreLowRisk')
+    expect(PAGE).toContain('setBulkApproveOpen(true)')
+    expect(PAGE).toContain("onConfirm={() => void bulkReview('approve')}")
+    expect(PAGE).toContain('setBulkReturnOpen(true)')
+    expect(PAGE).toContain('crypto.randomUUID()')
+    expect(PAGE).toContain('合計 {selectedPendingPhotos.length * 5}ポイント')
+    expect(PAGE).toContain('公開しない')
   })
 })

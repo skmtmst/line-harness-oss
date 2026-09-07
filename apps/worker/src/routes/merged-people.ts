@@ -2,7 +2,6 @@ import { Hono, type Context } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type {
   MergedPersonDeliveryPriorityInput,
-  MergedPersonJsonValue,
   MergedPersonProfileSelectionInput,
   MergedPersonStatus,
   UpdateMergedPersonDeliveryPrioritiesRequest,
@@ -11,7 +10,11 @@ import type {
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-import { getFriendProfileCandidates } from '../services/friend-profile-candidates.js';
+import {
+  getFriendProfileCandidates,
+  resolveProfileCandidateSelections,
+  type ProfileCandidateSelectionReference,
+} from '../services/friend-profile-candidates.js';
 import {
   getMergedPerson,
   listMergedPeople,
@@ -36,50 +39,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isJsonValue(value: unknown, depth = 0): value is MergedPersonJsonValue {
-  if (depth > 8) return false;
-  if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
-  if (typeof value === 'number') return Number.isFinite(value);
-  if (Array.isArray(value)) return value.every((item) => isJsonValue(item, depth + 1));
-  if (!isRecord(value)) return false;
-  return Object.entries(value).every(([key, item]) => key.length <= 100 && isJsonValue(item, depth + 1));
-}
-
-function nullableString(value: unknown, label: string): string | null {
-  if (value === null) return null;
-  if (typeof value !== 'string') {
-    throw new MergedPersonError(422, 'INVALID_BODY', `${label}を確認できません`);
-  }
-  return value;
-}
-
-function parseProfileSelection(value: unknown): MergedPersonProfileSelectionInput {
-  if (!isRecord(value)
-    || typeof value.fieldKey !== 'string'
-    || typeof value.fieldLabel !== 'string'
-    || !isJsonValue(value.value)
-    || (value.valuePreview !== null && typeof value.valuePreview !== 'string')
-    || !['friend', 'friend_field', 'form', 'ec', 'manual'].includes(String(value.sourceType))
-    || typeof value.sourceLabel !== 'string'
-    || (value.sourceFriendId !== null && typeof value.sourceFriendId !== 'string')
-    || (value.verifiedAt !== null && typeof value.verifiedAt !== 'string')
-    || !['auto', 'fixed'].includes(String(value.updateMode))) {
-    throw new MergedPersonError(422, 'INVALID_PROFILE_SELECTION', 'プロフィールの採用値を確認できません');
-  }
-  return {
-    fieldKey: value.fieldKey,
-    fieldLabel: value.fieldLabel,
-    value: value.value,
-    valuePreview: value.valuePreview,
-    sourceType: value.sourceType as MergedPersonProfileSelectionInput['sourceType'],
-    sourceId: nullableString(value.sourceId, '取得元ID'),
-    sourceLabel: value.sourceLabel,
-    sourceFriendId: value.sourceFriendId,
-    verifiedAt: value.verifiedAt,
-    updateMode: value.updateMode as MergedPersonProfileSelectionInput['updateMode'],
-  };
-}
-
 function parseUpdateBody(value: unknown): UpdateMergedPersonRequest {
   if (!isRecord(value) || !Number.isInteger(value.expectedRevision) || Number(value.expectedRevision) < 1) {
     throw new MergedPersonError(422, 'EXPECTED_REVISION_REQUIRED', '読み込んだ版を指定してください');
@@ -91,8 +50,12 @@ function parseUpdateBody(value: unknown): UpdateMergedPersonRequest {
   if (value.primaryDisplayName !== undefined && typeof value.primaryDisplayName !== 'string') {
     throw new MergedPersonError(422, 'INVALID_DISPLAY_NAME', '表示名を確認できません');
   }
-  if (value.profileSelections !== undefined && !Array.isArray(value.profileSelections)) {
-    throw new MergedPersonError(422, 'INVALID_PROFILE_SELECTIONS', 'プロフィールの採用値を確認できません');
+  if (value.profileSelections !== undefined) {
+    throw new MergedPersonError(
+      422,
+      'PROFILE_CANDIDATE_REQUIRED',
+      'プロフィールの採用値は候補を選ぶ専用の操作から変更してください',
+    );
   }
   return {
     expectedRevision: Number(value.expectedRevision),
@@ -100,10 +63,43 @@ function parseUpdateBody(value: unknown): UpdateMergedPersonRequest {
       ? { primaryDisplayName: value.primaryDisplayName }
       : {}),
     ...(status ? { status } : {}),
-    ...(Array.isArray(value.profileSelections)
-      ? { profileSelections: value.profileSelections.map(parseProfileSelection) }
-      : {}),
   };
+}
+
+function parseProfileCandidateBody(value: unknown): {
+  expectedRevision: number;
+  selections: ProfileCandidateSelectionReference[];
+} {
+  if (!isRecord(value)
+    || !Number.isInteger(value.expectedRevision)
+    || Number(value.expectedRevision) < 1
+    || !Array.isArray(value.selections)) {
+    throw new MergedPersonError(422, 'INVALID_BODY', '読み込んだ版とプロフィール候補を確認してください');
+  }
+  const fields = new Set<string>();
+  const selections = value.selections.map((raw) => {
+    if (!isRecord(raw)
+      || typeof raw.fieldKey !== 'string'
+      || !/^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,99}$/.test(raw.fieldKey)
+      || typeof raw.candidateId !== 'string'
+      || !/^pc_[0-9a-f]{64}$/.test(raw.candidateId)
+      || !['auto', 'fixed'].includes(String(raw.updateMode))) {
+      throw new MergedPersonError(422, 'INVALID_PROFILE_CANDIDATE', '採用するプロフィール候補を確認できません');
+    }
+    if (fields.has(raw.fieldKey)) {
+      throw new MergedPersonError(422, 'PROFILE_SELECTION_DUPLICATE', '同じプロフィール項目を複数回選べません');
+    }
+    fields.add(raw.fieldKey);
+    return {
+      fieldKey: raw.fieldKey,
+      candidateId: raw.candidateId,
+      updateMode: raw.updateMode as ProfileCandidateSelectionReference['updateMode'],
+    };
+  });
+  if (selections.length === 0 || selections.length > 100) {
+    throw new MergedPersonError(422, 'PROFILE_SELECTIONS_REQUIRED', '採用するプロフィール候補を1件以上選んでください');
+  }
+  return { expectedRevision: Number(value.expectedRevision), selections };
 }
 
 function parsePriority(value: unknown): MergedPersonDeliveryPriorityInput {
@@ -215,6 +211,49 @@ mergedPeople.patch('/api/friends/people/:id', requireRole('owner', 'admin'), asy
       parseUpdateBody(await safeBody(c)),
     );
     return c.json({ success: true, data });
+  } catch (error) {
+    return errorResponse(c, error);
+  }
+});
+
+mergedPeople.patch('/api/friends/people/:id/profile-values', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const id = c.req.param('id');
+    if (!await canAccessPerson(c, id)) {
+      return c.json({ success: false, error: 'この統合ユーザーを変更する権限がありません', code: 'FORBIDDEN' }, 403);
+    }
+    const request = parseProfileCandidateBody(await safeBody(c));
+    const before = await getMergedPerson(c.env.DB, tenantId(c), id);
+    let selections: MergedPersonProfileSelectionInput[];
+    try {
+      selections = await resolveProfileCandidateSelections(
+        c.env.DB,
+        before.linkedFriends.map((friend) => friend.friendId),
+        request.selections,
+      );
+    } catch (error) {
+      const code = error instanceof Error ? error.message : '';
+      if (code === 'PROFILE_SELECTION_DUPLICATE') {
+        throw new MergedPersonError(422, code, '同じプロフィール項目を複数回選べません');
+      }
+      throw new MergedPersonError(
+        409,
+        'STALE_PROFILE_CANDIDATE',
+        '候補の値が変わりました。最新の状態を読み直してください',
+      );
+    }
+    const staff = getStaff(c)!;
+    const data = await updateMergedPerson(
+      c.env.DB,
+      { id: staff.id, name: staff.name, tenantId: tenantId(c) },
+      id,
+      { expectedRevision: request.expectedRevision, profileSelections: selections },
+    );
+    const candidates = await getFriendProfileCandidates(
+      c.env.DB,
+      data.linkedFriends.map((friend) => friend.friendId),
+    );
+    return c.json({ success: true, data: { ...data, ...candidates } });
   } catch (error) {
     return errorResponse(c, error);
   }

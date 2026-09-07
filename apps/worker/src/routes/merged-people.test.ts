@@ -28,7 +28,10 @@ const accessMocks = vi.hoisted(() => ({
   getVisibleLineAccountScope: vi.fn(),
 }));
 
-const profileMocks = vi.hoisted(() => ({ getFriendProfileCandidates: vi.fn() }));
+const profileMocks = vi.hoisted(() => ({
+  getFriendProfileCandidates: vi.fn(),
+  resolveProfileCandidateSelections: vi.fn(),
+}));
 
 vi.mock('../services/merged-people.js', () => personMocks);
 vi.mock('../services/account-access.js', () => accessMocks);
@@ -81,6 +84,12 @@ beforeEach(() => {
   profileMocks.getFriendProfileCandidates.mockResolvedValue({
     profileCandidates: [], tagCandidates: [],
   });
+  profileMocks.resolveProfileCandidateSelections.mockResolvedValue([{
+    fieldKey: 'display_name', fieldLabel: 'LINE表示名', value: '田中 花子',
+    valuePreview: '田中 花子', sourceType: 'friend', sourceId: 'friend-a',
+    sourceLabel: '田中 花子', sourceFriendId: 'friend-a', verifiedAt: null,
+    updateMode: 'fixed',
+  }]);
 });
 
 describe('merged person HTTP contract', () => {
@@ -143,6 +152,86 @@ describe('merged person HTTP contract', () => {
     });
     expect(stale.status).toBe(409);
     expect(await stale.json()).toMatchObject({ success: false, code: 'STALE_PERSON' });
+  });
+
+  it('rejects raw profile values on the generic update endpoint', async () => {
+    const response = await harness({ role: 'admin' }).request('/api/friends/people/user-a', {
+      method: 'PATCH', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        expectedRevision: 1,
+        profileSelections: [{
+          fieldKey: 'display_name', fieldLabel: 'LINE表示名', value: '平文の値',
+          valuePreview: '平文の値', sourceType: 'manual', sourceId: null,
+          sourceLabel: '手入力', sourceFriendId: null, verifiedAt: null, updateMode: 'fixed',
+        }],
+      }),
+    });
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({
+      success: false, code: 'PROFILE_CANDIDATE_REQUIRED',
+    });
+    expect(personMocks.updateMergedPerson).not.toHaveBeenCalled();
+  });
+
+  it('adopts a profile candidate by candidate id without receiving the raw value', async () => {
+    const candidateId = `pc_${'a'.repeat(64)}`;
+    const denied = await harness({ role: 'staff' }).request(
+      '/api/friends/people/user-a/profile-values',
+      {
+        method: 'PATCH', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          expectedRevision: 1,
+          selections: [{ fieldKey: 'display_name', candidateId, updateMode: 'fixed' }],
+        }),
+      },
+    );
+    expect(denied.status).toBe(403);
+    expect(profileMocks.resolveProfileCandidateSelections).not.toHaveBeenCalled();
+
+    const accepted = await harness({ role: 'admin' }).request(
+      '/api/friends/people/user-a/profile-values',
+      {
+        method: 'PATCH', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          expectedRevision: 1,
+          selections: [{ fieldKey: 'display_name', candidateId, updateMode: 'fixed' }],
+        }),
+      },
+    );
+    expect(accepted.status).toBe(200);
+    expect(profileMocks.resolveProfileCandidateSelections).toHaveBeenCalledWith(
+      expect.anything(), ['friend-a'],
+      [{ fieldKey: 'display_name', candidateId, updateMode: 'fixed' }],
+    );
+    expect(personMocks.updateMergedPerson).toHaveBeenCalledWith(
+      expect.anything(),
+      { id: 'staff-a', name: '担当者', tenantId: 'tenant-a' },
+      'user-a',
+      expect.objectContaining({ expectedRevision: 1, profileSelections: expect.any(Array) }),
+    );
+  });
+
+  it('returns 409 when the selected profile candidate changed after it was displayed', async () => {
+    profileMocks.resolveProfileCandidateSelections.mockRejectedValue(
+      new Error('PROFILE_CANDIDATE_STALE'),
+    );
+    const response = await harness({ role: 'admin' }).request(
+      '/api/friends/people/user-a/profile-values',
+      {
+        method: 'PATCH', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          expectedRevision: 1,
+          selections: [{
+            fieldKey: 'display_name', candidateId: `pc_${'b'.repeat(64)}`, updateMode: 'fixed',
+          }],
+        }),
+      },
+    );
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      success: false, code: 'STALE_PROFILE_CANDIDATE',
+    });
+    expect(personMocks.updateMergedPerson).not.toHaveBeenCalled();
   });
 
   it('accepts an explicit empty priority list instead of turning it into missing data', async () => {
