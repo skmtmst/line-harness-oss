@@ -1,4 +1,5 @@
 import type { Context } from 'hono';
+import { auditDeviceFamily, maskAuditIp, recordAuditEvent } from '@line-crm/db';
 import type { Env } from '../index.js';
 
 /**
@@ -70,6 +71,7 @@ export function auditLog(
   // 認証前に呼ばれることはない想定だが、ログのために例外を投げたくない。
   const actorId = staff?.id ?? 'unknown';
   const actorRole = staff?.role ?? 'unknown';
+  c.set('auditRecorded', true);
   console.log(
     JSON.stringify({
       tag: 'audit',
@@ -81,4 +83,30 @@ export function auditLog(
       at: new Date().toISOString(),
     }),
   );
+
+  const db = c.env?.DB;
+  if (!db || typeof db.prepare !== 'function') return;
+  const lineAccountId = c.req.query('lineAccountId') ?? c.req.query('account_id') ?? null;
+  const task = recordAuditEvent(db, {
+    tenantId: staff?.tenantId,
+    lineAccountId,
+    category: 'business',
+    actorPrincipalId: staff?.id,
+    actorRole,
+    action,
+    targetKind: target?.kind ?? null,
+    targetId: target?.id ?? null,
+    result: 'success',
+    requestTraceId: c.req.header('cf-ray') ?? c.req.header('x-request-id') ?? null,
+    ipPrefix: maskAuditIp(c.req.header('cf-connecting-ip')),
+    deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
+  }).catch((error: unknown) => {
+    console.error('audit_events insert failed:', error instanceof Error ? error.name : 'unknown');
+  });
+  try {
+    c.executionCtx.waitUntil(task);
+  } catch {
+    // 単体テスト等でExecutionContextが無い場合も、開始済みPromiseのcatchは維持する。
+    void task;
+  }
 }
