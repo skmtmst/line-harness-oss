@@ -27,7 +27,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { Flag, Tag, User, Variable, Workflow } from 'lucide-react'
+import { Bell, Calendar, FileText, Flag, MessageSquare, Tag, User, Variable, Workflow } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import styles from './action-editor.module.css'
 import {
@@ -70,6 +70,10 @@ export const ACTION_KINDS: {
     icon: Variable,
     make: () => ({ varKey: '', op: 'add', value: '1' }),
   },
+  { type: 'send_message', label: 'テキスト送信', icon: MessageSquare, make: () => ({ content: '' }) },
+  { type: 'send_template', label: 'テンプレート送信', icon: FileText, make: () => ({ templateId: '' }) },
+  { type: 'reminder', label: 'リマインダ操作', icon: Bell, make: () => ({ reminderId: '' }) },
+  { type: 'event_booking', label: 'イベント予約操作', icon: Calendar, make: () => ({ eventId: '' }) },
 ]
 
 const KIND_LABEL: Record<ScenarioActionType, string> = {
@@ -78,6 +82,10 @@ const KIND_LABEL: Record<ScenarioActionType, string> = {
   support_mark: '対応マーク操作',
   scenario: 'シナリオ操作',
   common_var: '共通情報操作',
+  send_message: 'テキスト送信',
+  send_template: 'テンプレート送信',
+  reminder: 'リマインダ操作',
+  event_booking: 'イベント予約操作',
 }
 
 /** 既存5種を、機能5 V6の下書き契約へ安全に写せる形だけ変換する。 */
@@ -135,6 +143,18 @@ function toDraftActions(actions: ScenarioAction[]): ScenarioDraftActionV6[] {
         params: { values: { [config.fieldId]: config.value ?? '' } },
         sortOrder: actionIndex * 10,
       }]
+    }
+    if (action.actionType === 'send_message' && typeof config.content === 'string' && config.content.trim()) {
+      return [{ ...common, id: action.id, type: 'send_message', params: { content: config.content }, sortOrder: actionIndex * 10 }]
+    }
+    if (action.actionType === 'send_template' && typeof config.templateId === 'string' && config.templateId) {
+      return [{ ...common, id: action.id, type: 'send_message', params: { templateId: config.templateId }, sortOrder: actionIndex * 10 }]
+    }
+    if (action.actionType === 'reminder' && typeof config.reminderId === 'string' && config.reminderId) {
+      return [{ ...common, id: action.id, type: 'start_reminder', params: { reminderId: config.reminderId }, sortOrder: actionIndex * 10 }]
+    }
+    if (action.actionType === 'event_booking' && typeof config.eventId === 'string' && config.eventId) {
+      return [{ ...common, id: action.id, type: 'common_action', params: { eventId: config.eventId }, sortOrder: actionIndex * 10 }]
     }
     return []
   })
@@ -723,6 +743,15 @@ export function ActionConfigEditor({
           <span className="text-ink-secondary text-sm">する</span>
         </div>
       )
+
+    case 'send_message':
+      return <textarea value={String(c.content ?? '')} onChange={(e) => onChange({ ...c, content: e.target.value })} placeholder="送信する本文" />
+    case 'send_template':
+      return <input value={String(c.templateId ?? '')} onChange={(e) => onChange({ ...c, templateId: e.target.value })} placeholder="テンプレートID" />
+    case 'reminder':
+      return <input value={String(c.reminderId ?? '')} onChange={(e) => onChange({ ...c, reminderId: e.target.value })} placeholder="リマインダID" />
+    case 'event_booking':
+      return <input value={String(c.eventId ?? '')} onChange={(e) => onChange({ ...c, eventId: e.target.value })} placeholder="イベント予約ID" />
 
     default:
       return null

@@ -392,6 +392,12 @@ function parseAuditJson(value: string | null): Record<string, unknown> | null {
   }
 }
 
+function auditRegionLabel(ipPrefix: string | null): string | null {
+  if (!ipPrefix) return null;
+  const known: Record<string, string> = { '203.0.113': '東京', '198.51.100': '大阪' };
+  return known[ipPrefix.replace(/\.\*\*\*$/, '')] ?? null;
+}
+
 function auditScopeSql(input: ListAuditEventsInput): { conditions: string[]; values: unknown[] } {
   const conditions = ['ae.tenant_id = ?'];
   const values: unknown[] = [input.tenantId ?? DEFAULT_TENANT_ID];
@@ -481,6 +487,7 @@ export async function listAuditEvents(db: D1Database, input: ListAuditEventsInpu
       reason: row.reason,
       requestTraceId: row.request_trace_id,
       ipPrefix: row.ip_prefix,
+      regionLabel: auditRegionLabel(row.ip_prefix),
       deviceFamily: row.device_family,
       riskLevel: row.risk_level,
       retentionClass: row.retention_class,
