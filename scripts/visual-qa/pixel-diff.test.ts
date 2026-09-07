@@ -6,14 +6,7 @@ import { PNG } from 'pngjs'
 import { describe, expect, it } from 'vitest'
 
 // @ts-expect-error 画面確認スクリプトは素のJSで型定義を持たない。
-import {
-  buildPixelDiffReport,
-  classifyHeightReason,
-  compareRgba,
-  compareScreen,
-  ROOT,
-  thresholdMarkdown,
-} from './pixel-diff.mjs'
+import { buildPixelDiffReport, classifyHeightReason, compareRgba, compareScreen, ROOT, thresholdMarkdown } from './pixel-diff.mjs'
 // @ts-expect-error 画面確認スクリプトは素のJSで型定義を持たない。
 import { SCREENS } from './screens.mjs'
 

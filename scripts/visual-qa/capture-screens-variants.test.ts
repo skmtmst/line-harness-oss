@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 // @ts-expect-error 画面撮影CLIは素のJS。テストする純粋関数だけを公開している。
-import {
-  failureResponseForState,
-  implementationScreenshotOptions,
-  implementationViewportHeight,
-  shouldApplyStateToMethod,
-  shotSpecsFor,
-} from './capture-screens.mjs'
+import { failureResponseForState, implementationScreenshotOptions, implementationViewportHeight, shouldApplyStateToMethod, shotSpecsFor } from './capture-screens.mjs'
 
 describe('画面撮影の変種', () => {
   it('設計高に合わせ、短いpageだけを切り長いpageは全体を撮る', () => {
