@@ -20,7 +20,7 @@ describe('一斉配信の作成', () => {
     expect(FORM).toContain("previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'")
     expect(FORM).toContain('setPreviewConfirmed(event.target.checked)')
     expect(FORM).toContain('+ (previewConfirmed ? 0 : 1)')
-    expect(FORM).toContain('}, [bubbles, scheduledDate, scheduledTime, sendMode])')
+    expect(FORM).toContain('}, [bubbles, scheduledDate, scheduledTime, sendMode, visualQaAugustCampaign])')
   })
 
   it('本文の上限を直書きしない', () => {

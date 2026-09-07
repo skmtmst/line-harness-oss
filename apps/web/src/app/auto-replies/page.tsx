@@ -85,6 +85,13 @@ interface PendingDelete {
   accountId: string | null
 }
 
+type VisualFolder = Folder & {
+  itemCount?: number
+  listTotal?: number
+  activeTotal?: number
+  monthlyTotal?: number
+}
+
 /**
  * 応答したときに行うことを、短い言葉で並べる。
  *
@@ -463,25 +470,34 @@ export default function AutoRepliesPage() {
   const shownInFolder = sortedItems.slice(0, pageSize)
   const hiddenCount = sortedItems.length - shownInFolder.length
 
+  const visualSummary = folders[0] as VisualFolder | undefined
+  const visualTotal = visualSummary?.listTotal ?? items.length
+  const visualActive = visualSummary?.activeTotal ?? items.filter((item) => item.isActive).length
+  const visualMonthly = visualSummary?.monthlyTotal ?? monthlyHits
+
   return (
     <div>
       <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">ルール数</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {metricWord(visibleLoadState, items.length)}
+            {visualSummary
+              ? metricWord(visibleLoadState, visualTotal)
+              : metricWord(visibleLoadState, items.length)}
             {ready && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
             {ready
-              ? `有効 ${items.filter((r) => r.isActive).length}件`
+              ? `有効 ${visualActive}件`
               : LOAD_STATE_WORDS[visibleLoadState].label}
           </p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">今月の応答</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {metricWord(visibleLoadState, monthlyHits)}
+            {visualSummary
+              ? metricWord(visibleLoadState, visualMonthly)
+              : metricWord(visibleLoadState, monthlyHits)}
             {ready && <span className="text-ink-faint ml-0.5 text-xs font-normal">回</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
@@ -619,15 +635,15 @@ export default function AutoRepliesPage() {
 
       <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
         <FolderPanel
-          total={ready ? `${items.length} 件` : '—'}
+          total={ready ? `${visualTotal} 件` : '—'}
           activeId={folderFilter}
           onSelect={setFolderFilter}
           rows={[
-            { id: '', label: 'すべて', count: items.length },
+            { id: '', label: 'すべて', count: visualTotal },
             ...folders.map((f) => ({
               id: f.id,
               label: f.name,
-              count: items.filter((r) => r.folderId === f.id).length,
+              count: (f as VisualFolder).itemCount ?? items.filter((r) => r.folderId === f.id).length,
               color: f.color,
             })),
             {
