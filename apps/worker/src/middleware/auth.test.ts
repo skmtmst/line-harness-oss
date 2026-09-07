@@ -17,6 +17,10 @@ vi.mock('@line-crm/db', () => ({
     if (token === 'auto-replies-key') return { id: 'auto-replies-1', name: 'Auto Replies Staff', role: 'staff', permission_keys: '["/auto-replies"]' };
     if (token === 'automations-key') return { id: 'automations-1', name: 'Automations Staff', role: 'staff', permission_keys: '["/automations"]' };
     if (token === 'booking-key') return { id: 'booking-1', name: 'Booking Staff', role: 'staff', permission_keys: '["/booking/bookings"]' };
+    if (token === 'photo-view-key') return { id: 'photo-view-1', name: 'Photo Viewer', role: 'staff', permission_keys: '["photo.submission.view"]' };
+    if (token === 'photo-review-key') return { id: 'photo-review-1', name: 'Photo Reviewer', role: 'staff', permission_keys: '["photo.submission.review"]' };
+    if (token === 'photo-bulk-key') return { id: 'photo-bulk-1', name: 'Photo Bulk Reviewer', role: 'staff', permission_keys: '["photo.submission.bulk_review"]' };
+    if (token === 'photo-download-key') return { id: 'photo-download-1', name: 'Photo Downloader', role: 'staff', permission_keys: '["photo.original.download"]' };
     if (token === 'no-permissions-key') return { id: 'none-1', name: 'No Permission Staff', role: 'staff', permission_keys: '[]' };
     if (token !== 'staff-key') return null;
     return {
@@ -113,6 +117,13 @@ function app() {
   a.get('/api/action-scores/rules', (c) => c.json({ success: true }));
   a.get('/api/booking/admin/customers', (c) => c.json({ success: true }));
   a.post('/api/booking/admin/customers', (c) => c.json({ success: true }));
+  a.get('/api/nen-members/photos', (c) => c.json({ success: true }));
+  a.get('/api/nen-members/photos/photo-1/assets/status', (c) => c.json({ success: true }));
+  a.post('/api/nen-members/photos/photo-1/review', (c) => c.json({ success: true }));
+  a.post('/api/nen-members/photos/photo-1/assets/process', (c) => c.json({ success: true }));
+  a.post('/api/nen-members/photos/decisions/bulk', (c) => c.json({ success: true }));
+  a.post('/api/nen-members/photos/photo-1/original-download', (c) => c.json({ success: true }));
+  a.get('/api/nen-members/photos/original-download/token', (c) => c.json({ success: true }));
   return a;
 }
 
@@ -264,7 +275,9 @@ describe('Authenticator verification', () => {
     expect(db.claimStaffTotpStep).toHaveBeenCalledWith(expect.anything(), 'staff-1', expect.any(Number));
   });
 
-  test('authenticated operator exchanges a TOTP code for a one-time step-up grant', async () => {
+  test.each(['operations.control', 'photo.original.download'])(
+    'authenticated operator exchanges a TOTP code for a one-time %s step-up grant',
+    async (purpose) => {
     const db = await import('@line-crm/db');
     const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
     const masterKey = 'test-master-key-which-is-longer-than-32-characters';
@@ -279,19 +292,20 @@ describe('Authenticator verification', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer staff-key' },
       body: JSON.stringify({
-        purpose: 'operations.control',
+        purpose,
         code: await totpAtStep(secret, Math.floor(Date.now() / 30_000)),
       }),
     }, env({ TOTP_ENCRYPTION_KEY: masterKey }));
     expect(response.status).toBe(201);
     expect(await response.json()).toMatchObject({
       success: true,
-      data: { token: expect.any(String), purpose: 'operations.control', expiresAt: expect.any(String) },
+      data: { token: expect.any(String), purpose, expiresAt: expect.any(String) },
     });
     expect(db.createStepUpGrant).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-      staffId: 'staff-1', purpose: 'operations.control', tokenHash: expect.any(String),
+      staffId: 'staff-1', purpose, tokenHash: expect.any(String),
     }));
-  });
+    },
+  );
 });
 
 describe('topology guard', () => {
@@ -450,6 +464,22 @@ describe('staff feature permissions', () => {
         .toBe(200);
       expect((await app().request(path, { ...bearer('friends-key'), method }, crossSiteEnv())).status)
         .toBe(403);
+    }
+  });
+
+  test('写真審査は閲覧・判断・一括判断・原本取得の専用権限を分離する', async () => {
+    const checks = [
+      ['GET', '/api/nen-members/photos', 'photo-view-key'],
+      ['GET', '/api/nen-members/photos/photo-1/assets/status', 'photo-view-key'],
+      ['POST', '/api/nen-members/photos/photo-1/review', 'photo-review-key'],
+      ['POST', '/api/nen-members/photos/photo-1/assets/process', 'photo-review-key'],
+      ['POST', '/api/nen-members/photos/decisions/bulk', 'photo-bulk-key'],
+      ['POST', '/api/nen-members/photos/photo-1/original-download', 'photo-download-key'],
+      ['GET', '/api/nen-members/photos/original-download/token', 'photo-download-key'],
+    ] as const;
+    for (const [method, path, token] of checks) {
+      expect((await app().request(path, { ...bearer(token), method }, crossSiteEnv())).status).toBe(200);
+      expect((await app().request(path, { ...bearer('no-permissions-key'), method }, crossSiteEnv())).status).toBe(403);
     }
   });
 

@@ -175,6 +175,10 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
  * cannot inherit chat or friend-attribute access from the friends permission.
  */
 const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
+  [/^\/api\/nen-members\/photos\/decisions\/bulk(?:\/|$)/, 'photo.submission.bulk_review'],
+  [/^\/api\/nen-members\/photos\/(?:original-download\/[^/]+|[^/]+\/original-download)(?:\/|$)/, 'photo.original.download'],
+  [/^\/api\/nen-members\/photos\/[^/]+\/(?:assessments\/re-evaluate|assets\/process|review|notification\/retry)(?:\/|$)/, 'photo.submission.review'],
+  [/^\/api\/nen-members\/photos(?:\/|$)/, 'photo.submission.view'],
   [/^\/api\/friends\/[^/]+\/messages(?:\/|$)/, '/chats'],
   [/^\/api\/friends\/[^/]+\/fields(?:\/|$)/, '/tags'],
   [/^\/api\/friends\/[^/]+\/support-mark(?:\/|$)/, '/tags'],
