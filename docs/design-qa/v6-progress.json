@@ -2,15 +2,15 @@
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
   "compared": 247,
-  "unimplemented": 1,
+  "unimplemented": 0,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 24,
-  "match": 263,
+  "missing": 25,
+  "match": 264,
   "structureMatchDataPending": 4,
   "needsFix": 0,
   "unjudged": 0,
-  "remaining": 5,
+  "remaining": 4,
   "features": [
     {
       "feature": 1,
@@ -2024,15 +2024,15 @@
       "name": "成果とアフィリエイト",
       "total": 9,
       "compared": 7,
-      "unimplemented": 1,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 1,
-      "match": 8,
+      "missing": 2,
+      "match": 9,
       "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 1,
+      "remaining": 0,
       "capturedAt": [
         {
           "pr": 1230,
@@ -3463,13 +3463,5 @@
       "capturedAt": null
     }
   ],
-  "gaps": [
-    {
-      "feature": 16,
-      "node": "njLGA",
-      "name": "16-1-C 支払い",
-      "gap": "build",
-      "gapNote": "締め（あと何日で金額が固定されるか）・支払予定日・振込用CSV・振込先・人ごとの金額を出す画面。口は `/api/affiliate-payments` が既に在るので、画面を作れば足りる"
-    }
-  ]
+  "gaps": []
 }

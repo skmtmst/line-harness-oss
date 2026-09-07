@@ -1886,10 +1886,6 @@ export const SCREENS = [
       状態別に撮るための口の当てはめ（affiliate-payments）が一度も当たらないのも、
       画面がその口を呼んでいないため。**在るふりをして状態別に撮らない。**
     */
-    status: 'unimplemented',
-    gap: 'build',
-    gapNote: '締め（あと何日で金額が固定されるか）・支払予定日・振込用CSV・振込先・人ごとの金額を出す画面。口は `/api/affiliate-payments` が既に在るので、画面を作れば足りる',
-    why: '`/conversions?tab=payment` は既定タブへ落ち、支払いの画面が出ない。`MERGED_TABS` に `payment` が無く、`conversions`・`affiliates` 配下に `payment` の語が1つも無い（2026-09-04 確認）',
     // ---- 2026-09-02 `7d830282` で撮った。**絵を見て確かめた範囲だけ書く。** ----
     // 解決：名前が取れない行が **「名前を取得できませんでした」** と出ている。IDの断片は出ていない。
     // 解決：表のどこにも内部IDが無い。案件・金額・フラグの空きは `—`。
