@@ -2154,6 +2154,10 @@ export type MileageEarningRuleDraftV6 = {
   cancellationEventTypes: string[]
   targetConditions: MileageTargetConditionV6 | null
   sortOrder: number
+  notification?: {
+    enabled: boolean
+    messageTemplate: string
+  }
 }
 
 export type MileageEarningRuleV6 = {

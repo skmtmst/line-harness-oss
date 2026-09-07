@@ -39,6 +39,10 @@ export interface MileageEarningRuleDraft {
   cancellationEventTypes: string[];
   targetConditions: MileageTargetCondition | null;
   sortOrder: number;
+  notification: {
+    enabled: boolean;
+    messageTemplate: string;
+  };
 }
 
 function optionalDate(value: unknown, field: string): string | null {
@@ -132,6 +136,19 @@ export function validateMileageEarningRuleDraft(value: unknown): MileageEarningR
   if (!Number.isInteger(sortOrder) || sortOrder < 0 || sortOrder > 10_000) {
     throw new MileageV6Error('sort_order_invalid', '並び順を確認してください', 422, 'sortOrder');
   }
+  const rawNotification = raw.notification && typeof raw.notification === 'object' && !Array.isArray(raw.notification)
+    ? raw.notification as Record<string, unknown>
+    : null;
+  const notificationEnabled = rawNotification?.enabled === true;
+  const messageTemplate = typeof rawNotification?.messageTemplate === 'string'
+    ? rawNotification.messageTemplate.trim()
+    : '';
+  if (notificationEnabled && !messageTemplate) {
+    throw new MileageV6Error('notification_message_required', '自動通知の本文を入力してください', 422, 'notification.messageTemplate');
+  }
+  if (messageTemplate.length > 1000) {
+    throw new MileageV6Error('notification_message_too_long', '自動通知の本文は1000文字以内で入力してください', 422, 'notification.messageTemplate');
+  }
   return {
     name,
     eventType,
@@ -144,6 +161,7 @@ export function validateMileageEarningRuleDraft(value: unknown): MileageEarningR
     cancellationEventTypes,
     targetConditions: validateTargetCondition(raw.targetConditions),
     sortOrder,
+    notification: { enabled: notificationEnabled, messageTemplate },
   };
 }
 

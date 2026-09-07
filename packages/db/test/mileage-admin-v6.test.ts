@@ -54,6 +54,10 @@ describe('V6 mileage admin read models', () => {
       cancellationEventTypes: ['message_deleted'],
       targetConditions: { operator: 'AND', rules: [{ type: 'tag_exists', value: '会員' }] },
       sortOrder: 2,
+      notification: {
+        enabled: true,
+        messageTemplate: '{awardedMiles}マイル付きました。残高は{balance}マイルです。',
+      },
     } as const;
     const first = await saveMileageEarningRuleDraft(db, {
       ruleId: 'builtin-message-received', lineAccountId: 'account-1', expectedVersion: 0,
@@ -80,6 +84,11 @@ describe('V6 mileage admin read models', () => {
       ruleId: 'builtin-link-clicked', lineAccountId: 'account-1', expectedVersion: 0,
       draft: { ...draft, targetConditions: { operator: 'OR', rules: tooMany } },
     })).rejects.toMatchObject<MileageV6Error>({ code: 'target_conditions_too_many' });
+
+    await expect(saveMileageEarningRuleDraft(db, {
+      ruleId: 'builtin-link-clicked', lineAccountId: 'account-1', expectedVersion: 0,
+      draft: { ...draft, notification: { enabled: true, messageTemplate: '' } },
+    })).rejects.toMatchObject<MileageV6Error>({ code: 'notification_message_required' });
   });
 
   it('returns real balances, expiration, period totals, score reasons, and reward reach', async () => {
