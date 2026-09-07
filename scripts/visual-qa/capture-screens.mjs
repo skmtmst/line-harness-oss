@@ -146,6 +146,22 @@ async function newPage(browser, width, height, clock) {
 async function runSteps(page, steps = [], node = '') {
   for (const step of steps) {
     if (step.wait) { await page.waitForTimeout(step.wait); continue }
+    if (step.files !== undefined) {
+      const input = (step.scope === 'main' ? page.locator('main') : page)
+        .locator(step.selector ?? 'input[type="file"]')
+        .first()
+      if (await input.count() === 0) {
+        throw new Error(`${node}: ファイルを入れる input が見つかりません`)
+      }
+      const files = step.files.map((file) => ({
+        name: file.name,
+        mimeType: file.mimeType,
+        buffer: Buffer.alloc(file.size, file.byte ?? 0x41),
+      }))
+      await input.setInputFiles(files, { timeout: 15_000 })
+      await page.waitForTimeout(step.after ?? 800)
+      continue
+    }
     if (step.fill !== undefined) {
       /*
         入力してから撮る状態（保存した検索の名前など）。

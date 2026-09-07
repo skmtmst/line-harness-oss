@@ -1707,6 +1707,8 @@ export interface MileageAdminHistoryItem {
   ruleName: string | null;
   mode: 'automatic' | 'manual';
   executedByStaffName: string | null;
+  lineAccountName: string;
+  balanceAfter: number;
   occurredAt: string;
 }
 
@@ -1996,9 +1998,11 @@ export async function getMileageAdminHistory(
     SELECT CASE WHEN f.user_id IS NOT NULL THEN 'user:' || f.user_id ELSE 'friend:' || f.id END AS identity_key,
            MIN(f.id) AS primary_friend_id,
            COALESCE(MAX(u.display_name), MAX(f.display_name), '名前未設定') AS display_name,
-           MAX(f.picture_url) AS picture_url
+           MAX(f.picture_url) AS picture_url,
+           MAX(la.name) AS line_account_name
       FROM friends f
       LEFT JOIN users u ON u.id = f.user_id
+      JOIN line_accounts la ON la.id = f.line_account_id
      WHERE f.line_account_id = ?
      GROUP BY identity_key
   ), ledger_rows AS (
@@ -2007,7 +2011,14 @@ export async function getMileageAdminHistory(
              WHEN COALESCE(ml.beneficiary_user_id, bf.user_id) IS NOT NULL
                THEN 'user:' || COALESCE(ml.beneficiary_user_id, bf.user_id)
              ELSE 'friend:' || ml.beneficiary_friend_id
-           END AS identity_key
+           END AS identity_key,
+           SUM(CASE WHEN ml.status = 'available' THEN ml.amount ELSE 0 END) OVER (
+             PARTITION BY CASE
+               WHEN COALESCE(ml.beneficiary_user_id, bf.user_id) IS NOT NULL
+                 THEN 'user:' || COALESCE(ml.beneficiary_user_id, bf.user_id)
+               ELSE 'friend:' || ml.beneficiary_friend_id END
+             ORDER BY ml.occurred_at, ml.created_at, ml.id ROWS UNBOUNDED PRECEDING
+           ) AS balance_after
       FROM mileage_ledger ml
       LEFT JOIN friends bf ON bf.id = ml.beneficiary_friend_id
      WHERE ml.program_id = 'default'
@@ -2054,12 +2065,12 @@ export async function getMileageAdminHistory(
     db
       .prepare(
         `${ctes}
-         SELECT lr.id, sp.primary_friend_id, sp.display_name, sp.picture_url,
+         SELECT lr.id, sp.primary_friend_id, sp.display_name, sp.picture_url, sp.line_account_name,
                 lr.entry_type, lr.status, lr.amount, lr.reason, lr.source,
                 lr.source_event_id, mr.name AS rule_name,
                 json_extract(lr.metadata, '$.sourceReferenceId') AS source_reference_id,
                 json_extract(lr.metadata, '$.executedByStaffName') AS executed_by_staff_name,
-                lr.occurred_at
+                lr.occurred_at, lr.balance_after
            FROM ledger_rows lr
            INNER JOIN selected_profiles sp ON sp.identity_key = lr.identity_key
            LEFT JOIN mileage_rules mr ON mr.id = lr.mileage_rule_id
@@ -2083,6 +2094,8 @@ export async function getMileageAdminHistory(
         rule_name: string | null;
         executed_by_staff_name: string | null;
         occurred_at: string;
+        line_account_name: string;
+        balance_after: number;
       }>(),
     db
       .prepare(
@@ -2114,6 +2127,8 @@ export async function getMileageAdminHistory(
         ? 'manual'
         : 'automatic',
       executedByStaffName: row.executed_by_staff_name,
+      lineAccountName: row.line_account_name,
+      balanceAfter: Number(row.balance_after ?? 0),
       occurredAt: row.occurred_at,
     })),
     pagination: { total: Number(count?.total ?? 0), limit, offset },

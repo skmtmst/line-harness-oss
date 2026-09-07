@@ -884,25 +884,35 @@ const FORM_BASE_LAYOUT = {
   },
 }
 
-const formRow = (id, name, description, folderId, isActive, submitCount, weeklySubmitCount, lastSubmittedAt, updatedAt, destinationCount) => ({
+const formRow = (id, name, description, folderId, isActive, submitCount, weeklySubmitCount, lastSubmittedAt, updatedAt, destinationSummary) => ({
   id, lineAccountId: 'visual-qa-account', name, description, folderId,
   fields: [], layout: FORM_BASE_LAYOUT, onSubmitTagId: null, onSubmitScenarioId: null,
   onSubmitMessageType: null, onSubmitMessageContent: null, onSubmitWebhookUrl: null,
   onSubmitWebhookHeaders: null, onSubmitWebhookFailMessage: null,
-  saveToMetadata: destinationCount > 0, isActive, status: 'active', archivedAt: null,
+  saveToMetadata: destinationSummary.friendFieldCount > 0, isActive, status: 'active', archivedAt: null,
   revision: 1, submitCount, weeklySubmitCount, createdAt: updatedAt, updatedAt, lastSubmittedAt,
-  usedByAccounts: [], accountScopeReviewRequired: false, destinationCount,
+  usedByAccounts: [], accountScopeReviewRequired: false,
+  destinationCount: destinationSummary.friendFieldCount + destinationSummary.tagCount,
+  destinationSummary,
 })
 
 /** 回答フォーム一覧。設計 `EMBIK` に見えている6行。 */
 export const FORMS = [
-  formRow('form-1', '来店アンケート', '来店後に感想と次回の希望を聞く・9ブロック', 'form-folder-visit', true, 1284, 42, '2026-08-21T03:00:00.000Z', '2026-08-21T03:00:00.000Z', 5),
-  formRow('form-2', '資料請求', '名前と連絡先・5ブロック', 'form-folder-request', true, 3410, 128, '2026-08-22T03:00:00.000Z', '2026-08-12T03:00:00.000Z', 6),
-  formRow('form-3', '休止の理由', '定期便を止める人に理由を聞く・3ブロック', 'form-folder-survey', true, 96, 4, '2026-08-20T03:00:00.000Z', '2026-08-18T03:00:00.000Z', 1),
-  formRow('form-4', 'イベント申込（8月）', '日時の希望と人数・7ブロック', 'form-folder-visit', true, 220, 61, '2026-08-25T03:00:00.000Z', '2026-08-22T03:00:00.000Z', 4),
-  formRow('form-5', '会員登録', '住所と生年月日・12ブロック', 'form-folder-request', false, 0, 0, null, '2026-08-15T03:00:00.000Z', 7),
-  { ...formRow('form-6', '旧アンケート（2025春）', '3ブロック', null, false, 1860, 0, '2025-05-30T03:00:00.000Z', '2025-05-30T03:00:00.000Z', 2), status: 'archived', archivedAt: '2025-05-30T03:00:00.000Z' },
+  formRow('form-1', '来店アンケート', '来店後に感想と次回の希望を聞く・9ブロック', 'form-folder-visit', true, 1284, 42, '2026-08-21T03:00:00.000Z', '2026-08-21T03:00:00.000Z', { friendFieldCount: 3, tagCount: 2 }),
+  formRow('form-2', '資料請求', '名前と連絡先・5ブロック', 'form-folder-request', true, 3410, 128, '2026-08-22T03:00:00.000Z', '2026-08-12T03:00:00.000Z', { friendFieldCount: 5, tagCount: 1 }),
+  formRow('form-3', '休止の理由', '定期便を止める人に理由を聞く・3ブロック', 'form-folder-survey', true, 96, 4, '2026-08-20T03:00:00.000Z', '2026-08-18T03:00:00.000Z', { friendFieldCount: 1, tagCount: 0 }),
+  formRow('form-4', 'イベント申込（8月）', '日時の希望と人数・7ブロック', 'form-folder-visit', true, 220, 61, '2026-08-25T03:00:00.000Z', '2026-08-22T03:00:00.000Z', { friendFieldCount: 4, tagCount: 0 }),
+  formRow('form-5', '会員登録', '住所と生年月日・12ブロック', 'form-folder-request', false, 0, 0, null, '2026-08-15T03:00:00.000Z', { friendFieldCount: 7, tagCount: 0 }),
+  { ...formRow('form-6', '旧アンケート（2025春）', '3ブロック', null, false, 1860, 0, '2025-05-30T03:00:00.000Z', '2025-05-30T03:00:00.000Z', { friendFieldCount: 2, tagCount: 0 }), status: 'archived', archivedAt: '2025-05-30T03:00:00.000Z' },
 ]
+
+/** 機能13 `EMBIK`。一覧6行と、画面全体18件の集計を同じ応答で返す。 */
+export const FORM_LIST = {
+  items: FORMS,
+  total: 18,
+  page: 1,
+  limit: 20,
+}
 
 /** 来店アンケートの9ブロックと公開設定。設計 `vCqUj` / `cSqvP`。 */
 export const FORM_DETAIL = {
@@ -972,7 +982,7 @@ export const FORM_SUBMISSIONS = {
   ],
   total: 6, page: 1, limit: 20,
   summary: {
-    startedUnique: 8, submitted: 6, completionRate: 0.75,
+    startedUnique: 8, submitted: 6, completionRate: 75,
     destinationWrites: { pending: 1, succeeded: 3, partial: 1, failed: 1, not_requested: 1, unknown: 0 },
     dateAnsweredUniqueFriends: 4,
     dateFields: [{ key: 'next_visit', label: '次回来店の希望日', answered: 4, uniqueFriends: 3, minDate: '2026-09-12', maxDate: '2026-09-20' }],
@@ -991,6 +1001,11 @@ export const NEN_COLUMN_CREATE = {
     articleUrl: 'https://example.com/columns/venison-guide',
     imageUrl: 'https://cdn.example.com/columns/venison-guide.jpg',
     publishedAt: null,
+    targetMode: 'tag',
+    targetTagId: 'tag-2',
+    scheduledAt: '2026-09-08T10:00:00+09:00',
+    completionEventName: '鹿肉の選び方を読了',
+    completionTagId: 'tag-3',
   },
   success: {
     status: 201,
@@ -1008,6 +1023,14 @@ export const NEN_COLUMN_CREATE = {
     status: 500,
     body: { success: false, error: 'column_create_failed' },
   },
+}
+
+/** 機能21の書き込み口。撮影では保存・配信せず、本番契約と同じ結果だけを返す。 */
+export const NEN_COLUMN_OPERATIONS = {
+  audience: { count: 486, targetMode: 'tag', targetTagId: 'tag-2' },
+  duplicate: { id: 'nen-column-copy-1', sourceColumnId: 'nen-column-tooth' },
+  pendingNow: { queued: 148 },
+  readEvent: { recorded: true, tagged: true },
 }
 
 /**
@@ -1054,6 +1077,11 @@ const nenColumn = (id, title, category, excerpt, deliveryStatus, publishedAt, de
   publishedAt,
   deliveryStatus,
   deliveryAt,
+  targetMode: id === 'nen-column-water' ? 'tag' : 'all',
+  targetTagId: id === 'nen-column-water' ? 'tag-2' : null,
+  completionEventName: `${title}を読了`,
+  completionTagId: 'tag-3',
+  sourceColumnId: null,
   lineAccountId: 'visual-qa-account',
   updatedAt: '2026-08-25T10:00:00+09:00',
 })
@@ -1133,19 +1161,19 @@ const NEN_METRICS_RANGE = {
 const nenUnavailable = (reason) => ({ value: null, state: 'unavailable', reason })
 
 const NEN_FLOW_COUNTS = {
-  order_thanks: { planned: 486, sent: 486, failed: 0, skipped: 0, associatedConversions: 28 },
-  shipping_notice: { planned: 462, sent: 462, failed: 0, skipped: 0, associatedConversions: 22 },
-  arrival_check: { planned: 424, sent: 418, failed: 6, skipped: 0, associatedConversions: 18 },
-  care_check: { planned: 550, sent: 402, failed: 0, skipped: 148, associatedConversions: 20 },
-  review_request: { planned: 386, sent: 386, failed: 0, skipped: 0, associatedConversions: 28 },
-  cross_sell: { planned: 0, sent: 0, failed: 0, skipped: 0, associatedConversions: 0 },
-  birthday_coupon: { planned: 148, sent: 148, failed: 0, skipped: 0, associatedConversions: 12 },
-  column: { planned: 184, sent: 184, failed: 0, skipped: 0, associatedConversions: 14 },
+  order_thanks: { planned: 486, sent: 486, failed: 0, skipped: 0, associatedConversions: 28, associatedConversionAmount: 156800 },
+  shipping_notice: { planned: 462, sent: 462, failed: 0, skipped: 0, associatedConversions: 22, associatedConversionAmount: 118400 },
+  arrival_check: { planned: 424, sent: 418, failed: 6, skipped: 0, associatedConversions: 18, associatedConversionAmount: 86400 },
+  care_check: { planned: 550, sent: 402, failed: 0, skipped: 148, associatedConversions: 20, associatedConversionAmount: 72000 },
+  review_request: { planned: 386, sent: 386, failed: 0, skipped: 0, associatedConversions: 28, associatedConversionAmount: 96400 },
+  cross_sell: { planned: 0, sent: 0, failed: 0, skipped: 0, associatedConversions: 0, associatedConversionAmount: 0 },
+  birthday_coupon: { planned: 148, sent: 148, failed: 0, skipped: 0, associatedConversions: 12, associatedConversionAmount: 32400 },
+  column: { planned: 184, sent: 184, failed: 0, skipped: 0, associatedConversions: 14, associatedConversionAmount: 50000 },
 }
 
 export const NEN_FLOW_METRICS = {
   range: NEN_METRICS_RANGE,
-  summary: { active: 6, paused: 2, planned: 2_640, sent: 2_486, associatedConversions: 142 },
+  summary: { active: 6, paused: 2, planned: 2_640, sent: 2_486, associatedConversions: 142, associatedConversionAmount: 612400 },
   flows: NEN_CAMPAIGN_SETTINGS.map((setting) => ({
     campaignKey: setting.campaignKey,
     label: setting.label,
@@ -1158,17 +1186,17 @@ export const NEN_FLOW_METRICS = {
 }
 
 const NEN_COLUMN_RESULTS = {
-  'nen-column-tooth': { targeted: 1_248, sent: 1_248, opened: 976, rate: 0.782, conversions: 12 },
-  'nen-column-water': { targeted: 1_284, sent: 0, pending: 1_284, opened: null, rate: null, conversions: 0 },
-  'nen-column-food': { targeted: 1_196, sent: 1_196, opened: 854, rate: 0.714, conversions: 14 },
-  'nen-column-nail': { targeted: 1_180, sent: 1_180, opened: 812, rate: 0.688, conversions: 8 },
-  'nen-column-toilet': { targeted: 1_164, sent: 1_164, opened: 490, rate: 0.421, conversions: 1 },
-  'nen-column-rain': { targeted: 0, sent: 0, opened: null, rate: null, conversions: 0 },
+  'nen-column-tooth': { targeted: 1_248, sent: 1_248, opened: 976, completed: 842, rate: 0.782, conversions: 12, conversionAmount: 48000 },
+  'nen-column-water': { targeted: 1_284, sent: 0, pending: 1_284, opened: null, completed: 0, rate: null, conversions: 0, conversionAmount: 0 },
+  'nen-column-food': { targeted: 1_196, sent: 1_196, opened: 854, completed: 731, rate: 0.714, conversions: 14, conversionAmount: 56000 },
+  'nen-column-nail': { targeted: 1_180, sent: 1_180, opened: 812, completed: 684, rate: 0.688, conversions: 8, conversionAmount: 32000 },
+  'nen-column-toilet': { targeted: 1_164, sent: 1_164, opened: 490, completed: 318, rate: 0.421, conversions: 1, conversionAmount: 6000 },
+  'nen-column-rain': { targeted: 0, sent: 0, opened: null, completed: 0, rate: null, conversions: 0, conversionAmount: 0 },
 }
 
 export const NEN_COLUMN_METRICS = {
   range: NEN_METRICS_RANGE,
-  summary: { total: 24, sent: 18, drafts: 5, scheduled: 1, unread: 1_656, associatedConversions: 38 },
+  summary: { total: 24, sent: 18, drafts: 5, scheduled: 1, unread: 1_656, associatedConversions: 38, associatedConversionAmount: 142000 },
   columns: NEN_COLUMNS.map((column) => {
     const result = NEN_COLUMN_RESULTS[column.id] ?? {
       targeted: 0,
@@ -1176,6 +1204,8 @@ export const NEN_COLUMN_METRICS = {
       opened: null,
       rate: null,
       conversions: 0,
+      completed: 0,
+      conversionAmount: 0,
     }
     const trackingAvailable = result.opened !== null
     return {
@@ -1194,8 +1224,14 @@ export const NEN_COLUMN_METRICS = {
         ? { value: result.opened, rate: result.rate, state: 'available', reason: null }
         : { value: null, rate: null, state: 'unavailable', reason: 'この記事URLの計測台帳がありません' },
       unread: trackingAvailable ? Math.max(result.sent - result.opened, 0) : null,
-      completionRate: nenUnavailable('記事のスクロール読了eventをまだ記録していません'),
+      completionRate: {
+        value: result.completed,
+        rate: result.opened ? result.completed / result.opened : 0,
+        state: 'available',
+        reason: null,
+      },
       associatedConversions: result.conversions,
+      associatedConversionAmount: result.conversionAmount,
       attribution: '送信後7日以内の関連成果',
     }
   }),
@@ -1219,6 +1255,8 @@ export const NEN_PET_METRICS = {
     friends: 1_284,
     friendsWithoutPet: 420,
     birthdayOpenRate: nenUnavailable('LINEは誕生日配信の個人開封を提供していません'),
+    birthdayReachRate: 69.4 / 100,
+    birthdayClickRate: 18.2 / 100,
     coupons: { issued: 73, used: 28, usageRate: 28 / 73 },
   },
   breeds: [
@@ -1249,7 +1287,10 @@ const nenDeliveryReaction = () => nenUnavailable('この配信記録に対応す
 
 export const NEN_DELIVERIES = {
   range: NEN_METRICS_RANGE,
-  summary: { pending: 148, processing: 0, sent: 2_486, skipped: 0, failed: 6, cancelled: 0, retryRequired: 0 },
+  summary: {
+    pending: 148, processing: 0, sent: 2_486, skipped: 0, failed: 6, cancelled: 0, retryRequired: 0,
+    unmetReasons: { blocked: 4, unfollowed: 2, other: 0 },
+  },
   deliveries: NEN_JOBS.map((job, index) => ({
     id: job.id,
     campaignKey: job.campaignKey,
@@ -3952,6 +3993,12 @@ export const MILEAGE_FRIENDS = {
     available: 486200,
     pending: 300,
     expiringMiles30d: 24600,
+    monthChange: 960,
+    rankCounts: [
+      { rewardId: 'rank-bronze', rankName: 'ブロンズ', requiredMiles: 0, friendCount: 886 },
+      { rewardId: 'rank-silver', rankName: 'シルバー', requiredMiles: 2000, friendCount: 312 },
+      { rewardId: 'rank-gold', rankName: 'ゴールド', requiredMiles: 5000, friendCount: 86 },
+    ],
   },
   items: [
     ['friend-1', '高橋 直人', 'gold', 8420, 0, 1200, 2100, 12400, 3980, '2026-08-25T00:12:00.000Z', 'LINE 本店'],
@@ -3966,6 +4013,9 @@ export const MILEAGE_FRIENDS = {
   ], index) => ({
     friendId, displayName, pictureUrl: null, rank,
     rankReason: rank === 'gold' ? '5,000マイル以上' : rank === 'silver' ? '2,000マイル以上' : '2,000マイル未満',
+    rankThreshold: rank === 'gold' ? 5000 : rank === 'silver' ? 2000 : 0,
+    nextRank: rank === 'gold' ? null : rank === 'silver' ? 'ゴールド' : 'シルバー',
+    milesToNextRank: rank === 'gold' ? null : rank === 'silver' ? Math.max(0, 5000 - available) : Math.max(0, 2000 - available),
     monthChange, available, pending, expiringMiles30d, lifetimeEarned, spent, lastChangedAt,
     walletScope: index < 2 ? 'verified_user' : 'friend',
     lineAccount: {
@@ -4066,6 +4116,8 @@ export const MILEAGE_HISTORY = {
     id, primaryFriendId, displayName, pictureUrl: null, entryType, status, amount, reason, source,
     hasSourceEvent: sourceReferenceId !== null, sourceReferenceId,
     ruleName: reason, mode, executedByStaffName, occurredAt,
+    lineAccountName: primaryFriendId === 'friend-3' || primaryFriendId === 'friend-6' ? 'LINE 二号店' : 'LINE 本店',
+    balanceAfter: ({ 'ml-1': 8420, 'ml-2': 2480, 'ml-3': 3900, 'ml-4': 6150, 'ml-5': 620, 'ml-6': 100, 'ml-7': 8320 })[id],
   })),
   pagination: { total: 4180, limit: 20, offset: 0 },
   summary: {
@@ -4078,6 +4130,7 @@ export const MILEAGE_HISTORY = {
     ],
     totalAmount: 12600,
     manualCount: 12,
+    pendingCount: 18,
     measuredAt: '2026-08-25T01:00:00.000Z',
   },
 }
@@ -5413,10 +5466,7 @@ export const EC_IDENTITY_CANDIDATES = {
 /**
  * `/api/mileage/rewards` — マイルの使い道（`qlVLJ` 17-1-B）。
  *
- * 設計の数字をそのまま置いている。**`neverRedeemedFriendCount` は null。**
- * 本物の口（`packages/db/src/mileage-rewards.ts`）がいま固定で null を返すので、
- * ここで 786 を入れると、**撮った絵だけが本物より良く見える**。
- * 設計の 786人 と実装の `—` の差は、絵ではなく台帳の判定で言う。
+ * 設計の数字をそのまま置き、本物の口が返す未交換人数と特典名も同じ形で持つ。
  */
 function mileageRewardVersion(requiredMiles, stockLimit, extra = {}) {
   return {
@@ -5431,12 +5481,12 @@ function mileageRewardVersion(requiredMiles, stockLimit, extra = {}) {
 
 export const MILEAGE_REWARDS = {
   rewards: [
-    { id: 'mr-1', name: '送料無料', description: '次のお買い物の送料が無料になります', rewardKind: 'coupon', status: 'published', sortOrder: 1, currentVersion: mileageRewardVersion(500, null), exchangedThisMonth: 32, availableCodeCount: null },
-    { id: 'mr-2', name: '500円ぶんのクーポン', description: '1回のお買い物で使えます', rewardKind: 'coupon', status: 'published', sortOrder: 2, currentVersion: mileageRewardVersion(1000, null), exchangedThisMonth: 18, availableCodeCount: 168 },
-    { id: 'mr-3', name: '1,000円ぶんのクーポン', description: '1回のお買い物で使えます', rewardKind: 'coupon', status: 'published', sortOrder: 3, currentVersion: mileageRewardVersion(1800, null), exchangedThisMonth: 6, availableCodeCount: 94 },
-    { id: 'mr-4', name: '新商品の先行案内', description: 'ふつうより3日早くお知らせします', rewardKind: 'early_access', status: 'published', sortOrder: 4, currentVersion: mileageRewardVersion(3000, null), exchangedThisMonth: 2, availableCodeCount: null },
+    { id: 'mr-1', name: '送料無料', description: '次のお買い物の送料が無料になります', rewardKind: 'coupon', benefitName: '送料無料', status: 'published', sortOrder: 1, currentVersion: mileageRewardVersion(500, null), exchangedThisMonth: 32, availableCodeCount: null },
+    { id: 'mr-2', name: '500円ぶんのクーポン', description: '1回のお買い物で使えます', rewardKind: 'coupon', benefitName: '500円引き', status: 'published', sortOrder: 2, currentVersion: mileageRewardVersion(1000, null), exchangedThisMonth: 18, availableCodeCount: 168 },
+    { id: 'mr-3', name: '1,000円ぶんのクーポン', description: '1回のお買い物で使えます', rewardKind: 'coupon', benefitName: '1,000円引き', status: 'published', sortOrder: 3, currentVersion: mileageRewardVersion(1800, null), exchangedThisMonth: 6, availableCodeCount: 94 },
+    { id: 'mr-4', name: '新商品の先行案内', description: 'ふつうより3日早くお知らせします', rewardKind: 'early_access', benefitName: '先行案内', status: 'published', sortOrder: 4, currentVersion: mileageRewardVersion(3000, null), exchangedThisMonth: 2, availableCodeCount: null },
     // 引換コードを数える経路がまだ無い使い道。**残りを 0 と書かない。**
-    { id: 'mr-5', name: 'オリジナルトートバッグ', description: '数量に限りがあります', rewardKind: 'template', status: 'draft', sortOrder: 5, currentVersion: mileageRewardVersion(5000, 12), exchangedThisMonth: 0, availableCodeCount: 12 },
+    { id: 'mr-5', name: 'オリジナルトートバッグ', description: '数量に限りがあります', rewardKind: 'template', benefitName: '発送先の確認メッセージ', status: 'draft', sortOrder: 5, currentVersion: mileageRewardVersion(5000, 12), exchangedThisMonth: 0, availableCodeCount: 12 },
   ].map((reward) => ({
     lineAccountId: 'visual-qa-account', programId: 'mp-1', imageUrl: null,
     currentDraftVersionId: null, currentPublishedVersionId: reward.currentVersion.id,
@@ -5446,7 +5496,7 @@ export const MILEAGE_REWARDS = {
   summary: {
     publishedCount: 4,
     redeemedMilesThisMonth: 18900,
-    neverRedeemedFriendCount: null,
+    neverRedeemedFriendCount: 786,
     mostRedeemedRewardName: '送料無料',
     mostRedeemedRewardCount: 32,
   },

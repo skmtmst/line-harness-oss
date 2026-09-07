@@ -64,7 +64,7 @@ import {
   IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND,
   IDENTITY_CANDIDATE_LISTS,
   FRIEND_SAVED_VIEWS, MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
-  LIST_STATS, NEN_BIRTHDAY_COUPON, NEN_CAMPAIGN_SETTINGS, NEN_COLUMN_CREATE, NEN_COLUMNS, NEN_JOBS, NEN_PETS,
+  LIST_STATS, NEN_BIRTHDAY_COUPON, NEN_CAMPAIGN_SETTINGS, NEN_COLUMN_CREATE, NEN_COLUMN_OPERATIONS, NEN_COLUMNS, NEN_JOBS, NEN_PETS,
   NEN_FLOW_METRICS, NEN_COLUMN_METRICS, NEN_PET_METRICS, NEN_DELIVERIES, NEN_DELIVERY_DETAILS,
   OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_ACTIONS, SCENARIO_DRAFT, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, SCENARIO_SIMULATION, SCENARIO_RUNS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
@@ -89,7 +89,7 @@ import {
   NEN_PHOTO_REVIEW_METRICS, NEN_PHOTO_ASSET_STATUS, NEN_PHOTO_DERIVATIVES,
   NEN_PHOTO_ASSET_PROCESS_RESULT, NEN_PHOTO_BULK_DECISION_RESULT,
   NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, EC_ORDERS, EC_ACTION_EXECUTIONS, EC_IDENTITY_CANDIDATES, MILEAGE_RULES,
-  FORM_FOLDERS, FORMS, FORM_DETAIL, FORM_SUBMISSIONS,
+  FORM_FOLDERS, FORMS, FORM_LIST, FORM_DETAIL, FORM_SUBMISSIONS,
   LINE_ACCOUNTS, LINE_ACCOUNT_DETAIL, LINE_ACCOUNT_VERIFY_CONNECTION, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
   CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
   CONVERSION_DEFINITIONS, CONVERSION_DEFINITION_REPORT, CONVERSION_EXPORT_CSV,
@@ -693,11 +693,13 @@ const SHAPES = {
       highMin: 70, normalMin: 30,
     },
     items: [
-      { friendId: 'friend-1', displayName: 'さかもとまさと', score: 82, band: 'high', change30d: 4, lastActionAt: '2026-08-24T20:53:00+09:00' },
-      { friendId: 'friend-2', displayName: 'Kyohei Yamamoto', score: 55, band: 'normal', change30d: 0, lastActionAt: '2026-08-19T09:12:00+09:00' },
-      { friendId: 'friend-3', displayName: '菅野 亮', score: 31, band: 'low', change30d: -6, lastActionAt: '2026-08-13T20:52:00+09:00' },
+      { friendId: 'friend-1', displayName: 'さかもとまさと', currentScore: 82, band: 'high', change30d: 4, lastReason: '配信URLクリック → 夏のご案内', lastChangedAt: '2026-08-24T20:53:00+09:00' },
+      { friendId: 'friend-2', displayName: 'Kyohei Yamamoto', currentScore: 55, band: 'normal', change30d: 0, lastReason: '回答フォーム回答 → 食生活アンケート', lastChangedAt: '2026-08-19T09:12:00+09:00' },
+      { friendId: 'friend-3', displayName: '菅野 亮', currentScore: 31, band: 'normal', change30d: -6, lastReason: 'ブロック', lastChangedAt: '2026-08-13T20:52:00+09:00' },
+      { friendId: 'friend-4', displayName: '前田 さくら', currentScore: 47, band: 'normal', change30d: 3, lastReason: 'メッセージ返信 → 配送日のご相談', lastChangedAt: '2026-08-12T18:15:00+09:00' },
+      { friendId: 'friend-5', displayName: '大西 健一', currentScore: 22, band: 'low', change30d: 0, lastReason: '30日間反応なし', lastChangedAt: '2026-08-10T09:00:00+09:00' },
     ],
-    pagination: { total: 3, limit: 20, offset: 0 },
+    pagination: { total: 5, limit: 20, offset: 0 },
   },
   /*
     分析・友だちの増減。**既定の器では `data.data` が無く、画面ごと落ちる**
@@ -1551,7 +1553,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/account-settings/test-recipients') {
     return { success: true, data: TEMPLATE_TEST_RECIPIENTS }
   }
-  if (pathname === '/api/forms') return { success: true, data: FORMS }
+  if (pathname === '/api/forms') {
+    return { success: true, data: query.get('with_list_summary') === '1' ? FORM_LIST : FORMS }
+  }
   if (pathname === `/api/forms/${FORM_DETAIL.id}`) return { success: true, data: FORM_DETAIL }
   const formSubmissions = new RegExp(`^/api/forms/${FORM_DETAIL.id}/submissions$`).test(pathname)
   if (formSubmissions) {
@@ -2122,6 +2126,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/mileage/friends') return { success: true, data: MILEAGE_FRIENDS }
   if (pathname === '/api/mileage/earning-rules') return { success: true, data: MILEAGE_EARNING_RULES }
   if (pathname === '/api/mileage/rules') return { success: true, data: MILEAGE_RULES }
+  if (pathname === '/api/mileage/adjustment-policy') {
+    return { success: true, data: { configured: true, approvalThreshold: 10_000 } }
+  }
   if (/^\/api\/mileage\/rewards\/[^/]+$/.test(pathname)) {
     const rewardId = pathname.split('/').pop()
     const reward = MILEAGE_REWARDS.rewards.find((item) => item.id === rewardId)
@@ -2277,6 +2284,15 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/nen-campaigns/settings') return { success: true, data: NEN_CAMPAIGN_SETTINGS }
   if (pathname === '/api/nen-campaigns/columns') return { success: true, data: NEN_COLUMNS }
+  if (pathname === '/api/nen-campaigns/columns-preview') {
+    const targetMode = query.get('targetMode') === 'tag' ? 'tag' : 'all'
+    return {
+      success: true,
+      data: targetMode === 'tag'
+        ? NEN_COLUMN_OPERATIONS.audience
+        : { count: 1_284, targetMode: 'all', targetTagId: null },
+    }
+  }
   if (pathname === '/api/nen-campaigns/pets') return { success: true, data: NEN_PETS }
   if (pathname === '/api/nen-campaigns/jobs') return { success: true, data: NEN_JOBS }
   if (pathname === '/api/nen-campaigns/metrics/flows') return { success: true, data: nenMetricsBody(NEN_FLOW_METRICS, query) }
@@ -2496,6 +2512,7 @@ const server = createServer((req, res) => {
     'Content-Type, X-CSRF-Token, X-Admin-Session, Idempotency-Key, X-Confirm-Irreversible',
   )
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS')
+  res.setHeader('Access-Control-Expose-Headers', 'ETag')
 
   if (method === 'OPTIONS') {
     res.writeHead(204).end()
@@ -2536,7 +2553,9 @@ const server = createServer((req, res) => {
   }
 
   if (method === 'GET' && url.pathname.startsWith('/api/rich-menu-images/')) {
-    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
+    // 6面が見分けられる撮影専用画像。1px画像ではキャンバスが黒く見え、
+    // 画像本体を取得できたか判定できないため、実際の比率に近いPNGを返す。
+    const png = Buffer.from('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', 'base64')
     res.setHeader('Content-Type', 'image/png')
     res.setHeader('Cache-Control', 'no-store')
     res.writeHead(200).end(png)
@@ -2657,6 +2676,25 @@ const server = createServer((req, res) => {
     // DB更新はせず、ほかのPOSTは従来どおり405にする。
     if (method === 'POST' && url.pathname === '/api/nen-campaigns/columns') {
       res.writeHead(NEN_COLUMN_CREATE.success.status).end(JSON.stringify(NEN_COLUMN_CREATE.success.body))
+      return
+    }
+    const nenDuplicate = /^\/api\/nen-campaigns\/columns\/[^/]+\/duplicate$/.test(url.pathname)
+    if (method === 'POST' && nenDuplicate) {
+      res.writeHead(201).end(JSON.stringify({ success: true, data: NEN_COLUMN_OPERATIONS.duplicate }))
+      return
+    }
+    const nenTestSend = /^\/api\/nen-campaigns\/columns\/[^/]+\/test-send$/.test(url.pathname)
+    if (method === 'POST' && nenTestSend) {
+      res.writeHead(200).end(JSON.stringify({ success: true }))
+      return
+    }
+    const nenReadEvent = /^\/api\/nen-campaigns\/columns\/[^/]+\/read-events$/.test(url.pathname)
+    if (method === 'POST' && nenReadEvent) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: NEN_COLUMN_OPERATIONS.readEvent }))
+      return
+    }
+    if (method === 'POST' && url.pathname === '/api/nen-campaigns/deliveries/pending-now') {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: NEN_COLUMN_OPERATIONS.pendingNow }))
       return
     }
     /*

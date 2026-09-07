@@ -139,6 +139,22 @@ export default function NenCampaignsPage() {
     try { await api.nenCampaigns.updateColumnMessage(selectedAccountId, column.id, column.introText); setNotice({ tone: 'success', text: `「${column.title}」の配信文を保存しました。` }); setEditingColumnId(null) }
     catch { setNotice({ tone: 'error', text: 'コラムの配信文を保存できませんでした。' }) } finally { setSavingColumnId(null) }
   }
+  const duplicateColumn = async (column: NenColumn) => {
+    if (!selectedAccountId) return
+    try { const result = await api.nenCampaigns.duplicateColumn(column.id, selectedAccountId); if (!result.success) throw new Error(); setNotice({ tone: 'success', text: `「${column.title}」を下書きへ複製しました。` }); await load() }
+    catch { setNotice({ tone: 'error', text: 'コラムを複製できませんでした。' }) }
+  }
+  const testColumn = async (column: NenColumn) => {
+    if (!selectedAccountId || !testFriendId) { setNotice({ tone: 'error', text: 'テスト送信先を選択してください。' }); return }
+    try { await api.nenCampaigns.testColumn(column.id, selectedAccountId, testFriendId); setNotice({ tone: 'success', text: `「${column.title}」をテスト送信しました。` }) }
+    catch { setNotice({ tone: 'error', text: 'コラムをテスト送信できませんでした。' }) }
+  }
+  const sendPendingNow = async () => {
+    if (!selectedAccountId || !deliveryList) return
+    const expectedCount = deliveryList.summary.pending
+    try { const result = await api.nenCampaigns.sendPendingNow(selectedAccountId, expectedCount); if (!result.success) throw new Error(); setNotice({ tone: 'success', text: `${result.data.queued}件を今すぐ送る待ち行列へ移しました。` }); await load() }
+    catch { setNotice({ tone: 'error', text: '待っている配信の件数が変わりました。読み直して確認してください。' }) }
+  }
   const addPet = async () => {
     if (!selectedAccountId || !petDraft.friendId || !petDraft.name.trim()) { setNotice({ tone: 'error', text: 'LINEユーザーとペットのお名前を入力してください。' }); return }
     try { await api.nenCampaigns.createPet(selectedAccountId, { ...petDraft, birthday: petDraft.birthday || undefined }); setPetDraft((current) => ({ ...current, name: '', birthday: '', gender: 'unknown' })); setNotice({ tone: 'success', text: 'ペット情報を登録しました。' }); await load() }
@@ -186,7 +202,7 @@ export default function NenCampaignsPage() {
 
   const headerAction = tab === 'columns' ? <Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button>
     : tab === 'pets' ? <Button href="/form-submissions" variant="primary">聞きとりフォームを開く</Button>
-      : tab === 'history' ? <Button disabled title="一括送信APIが接続されると使えます">待っているものを今すぐ送る</Button>
+      : tab === 'history' ? <Button disabled={!deliveryList?.summary.pending} onClick={() => void sendPendingNow()}>待っているものを今すぐ送る</Button>
         : <Button onClick={() => document.getElementById('nen-test-send')?.scrollIntoView({ behavior: 'smooth' })}>テスト送信</Button>
 
   return (
@@ -200,6 +216,7 @@ export default function NenCampaignsPage() {
         onTestFriendChange={setTestFriendId} onPreviewCampaign={setPreviewCampaignKey} onPreviewColumn={setPreviewColumnId} onEditColumn={setEditingColumnId}
         onUpdateColumn={(id, introText) => setColumns((current) => current.map((column) => column.id === id ? { ...column, introText } : column))}
         onSaveColumn={(column) => void saveColumnMessage(column)} onDeliverColumn={(column, scheduledAt) => void deliverColumn(column, scheduledAt)}
+        onDuplicateColumn={(column) => void duplicateColumn(column)} onTestColumn={(column) => void testColumn(column)}
         onToggleSetting={(setting) => void saveSetting(setting, { isEnabled: !setting.isEnabled })} onTestSend={(setting) => void testSend(setting)}
         onPetDraftChange={setPetDraft} onAddPet={() => void addPet()} onDeletePet={(pet) => void deletePet(pet)} onCouponChange={setCoupon} onSaveCoupon={() => void saveCoupon()}
         onShowDelivery={(id) => void showDelivery(id)} onRetryDelivery={(id, version, reason) => void retryDelivery(id, version, reason)}
