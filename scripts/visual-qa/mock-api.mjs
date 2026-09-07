@@ -3262,6 +3262,78 @@ const server = createServer((req, res) => {
       res.writeHead(201).end(JSON.stringify({ success: true, data: FRIEND_SAVED_VIEWS.items[0] }))
       return
     }
+    /*
+      リッチメニューの書き込み系 (#502中)。DBへは書かず、本番契約と同じ
+      HTTP状態と器を返す。編集・公開・予約・適用・削除の画面検証用。
+      409/400 の代表例つき (削除ブロック・冪等キーなし・順序の形違い)。
+    */
+    if (method === 'POST' && url.pathname === '/api/rich-menu-groups') {
+      res.writeHead(201).end(JSON.stringify({
+        success: true, data: { id: 'rmg-new', pages: [{ id: 'rmg-new-top' }] },
+      }))
+      return
+    }
+    if (method === 'POST' && url.pathname === '/api/rich-menu-groups/reorder-priorities') {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        if (!Array.isArray(body.orderedIds)) {
+          res.writeHead(400).end(JSON.stringify({ success: false, error: 'orderedIds must be string array' }))
+          return
+        }
+        res.writeHead(200).end(JSON.stringify({ success: true, data: { updated: body.orderedIds.length } }))
+      })
+      return
+    }
+    const richMenuWriteGroup = /^\/api\/rich-menu-groups\/([^/]+)$/.exec(url.pathname)
+    if (method === 'PATCH' && richMenuWriteGroup) {
+      if (!RICH_MENU_GROUP_DETAILS[richMenuWriteGroup[1]]) {
+        res.writeHead(404).end(JSON.stringify({ success: false, error: 'not found' }))
+        return
+      }
+      res.writeHead(200).end(JSON.stringify({ success: true, data: { id: richMenuWriteGroup[1] } }))
+      return
+    }
+    if (method === 'DELETE' && richMenuWriteGroup) {
+      if (!RICH_MENU_GROUP_DETAILS[richMenuWriteGroup[1]]
+        && richMenuWriteGroup[1] !== 'rich-menu-target') {
+        res.writeHead(404).end(JSON.stringify({ success: false, error: 'not found' }))
+        return
+      }
+      if (richMenuWriteGroup[1] === 'rich-menu-target') {
+        res.writeHead(409).end(JSON.stringify({
+          success: false,
+          code: 'rich_menu_delete_blocked',
+          error: '削除する前に、公開状態と使われている場所を確認してください',
+          data: RICH_MENU_DELETE_IMPACT,
+        }))
+        return
+      }
+      res.writeHead(200).end(JSON.stringify({ success: true }))
+      return
+    }
+    const richMenuWriteAction = /^\/api\/rich-menu-groups\/([^/]+)\/(publish|unpublish|schedule|apply-to-tag)$/.exec(url.pathname)
+    if (method === 'POST' && richMenuWriteAction) {
+      const action = richMenuWriteAction[2]
+      if (action === 'schedule' || action === 'apply-to-tag') {
+        if (!req.headers['idempotency-key']) {
+          res.writeHead(400).end(JSON.stringify({ success: false, error: 'Idempotency-Key header required' }))
+          return
+        }
+      }
+      const payloads = {
+        publish: { pages: [] },
+        unpublish: { pages: [], warnings: [] },
+        schedule: { id: 'rms-visual-qa', status: 'scheduled' },
+        'apply-to-tag': { chunks: 1, total: 2, runId: 'visual-qa-run' },
+      }
+      res.writeHead(action === 'schedule' ? 201 : 200).end(
+        JSON.stringify({ success: true, data: payloads[action] }),
+      )
+      return
+    }
     const fixedResult = visualQaWriteBody(method, url.pathname)
     if (fixedResult) {
       res.writeHead(200).end(JSON.stringify({ success: true, data: fixedResult }))
