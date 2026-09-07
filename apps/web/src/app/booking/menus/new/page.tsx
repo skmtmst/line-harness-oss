@@ -37,6 +37,8 @@ export default function NewBookingMenuPage() {
   const [intakeQuestion, setIntakeQuestion] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [staff, setStaff] = useState<BookingStaff[]>([])
+  /** 担当一覧の取得に失敗したときは「未登録」と混ぜずに文言を分ける。 */
+  const [staffLoadFailed, setStaffLoadFailed] = useState(false)
   const [storeSettings, setStoreSettings] = useState<BookingSettings | null>(null)
   const [bookingMileage, setBookingMileage] = useState<number | null>(null)
   const [createdMenuNeedingStaff, setCreatedMenuNeedingStaff] = useState<string | null>(null)
@@ -57,12 +59,14 @@ export default function NewBookingMenuPage() {
       .then(([staffResult, settingsResult]) => {
         if (!alive) return
         setStaff(staffResult.staff)
+        setStaffLoadFailed(false)
         setStoreSettings(settingsResult.success ? settingsResult.data : null)
       })
       .catch(() => {
-        // 担当の一覧が出ないだけ。あとで割り当て画面から設定できる。
+        // 取得失敗は「未登録」と混ぜない。登録作業へ誘導しない。
         if (alive) {
           setStaff([])
+          setStaffLoadFailed(true)
           setStoreSettings(null)
         }
       })
@@ -368,7 +372,11 @@ export default function NewBookingMenuPage() {
         label="このメニューを担当できる人"
         note="チェックした人だけ、お客様が指名できます。"
       >
-        {staff.length === 0 ? (
+        {staffLoadFailed ? (
+          <p className="text-ink-faint text-sm">
+            担当を読み込めませんでした。開き直してください。
+          </p>
+        ) : staff.length === 0 ? (
           <p className="text-ink-faint text-sm">
             まだスタッフが登録されていません。先に予約設定の「担当スタッフ」から登録してください。
           </p>

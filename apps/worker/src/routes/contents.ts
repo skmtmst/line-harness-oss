@@ -3,6 +3,7 @@ import {
   getMedia,
   countMedia,
   getMediaById,
+  getFolderById,
   createMedia,
   updateMedia,
   deleteMedia,
@@ -796,9 +797,31 @@ contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
     const existing = await getMediaById(c.env.DB, id, accountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
     const body = await c.req.json<{ filename?: string; folderId?: string | null }>();
+    // 名前は空・長すぎ・制御文字を受け付けない（直接アップロードの申告時と同じ決まり）。
+    const filename = body.filename === undefined ? undefined : String(body.filename).trim();
+    if (filename !== undefined) {
+      if (!filename) return c.json({ success: false, error: 'ファイル名を入力してください' }, 400);
+      if (filename.length > 255) {
+        return c.json({ success: false, error: 'ファイル名は255文字までで入力してください' }, 400);
+      }
+      if (/[\u0000-\u001f]/.test(filename)) {
+        return c.json({ success: false, error: 'ファイル名に使えない文字が含まれています' }, 400);
+      }
+    }
+    // 存在しない・別種のフォルダを指すと、一覧の絞り込みから消える。
+    let folderId: string | null | undefined;
+    if ('folderId' in body) {
+      folderId = body.folderId ? String(body.folderId) : null;
+      if (folderId) {
+        const folder = await getFolderById(c.env.DB, folderId);
+        if (!folder || folder.kind !== 'media') {
+          return c.json({ success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400);
+        }
+      }
+    }
     const media = await updateMedia(c.env.DB, id, accountId, {
-      filename: body.filename === undefined ? undefined : String(body.filename).trim(),
-      ...(('folderId' in body) ? { folderId: body.folderId ?? null } : {}),
+      ...(filename !== undefined ? { filename } : {}),
+      ...(folderId !== undefined ? { folderId } : {}),
     });
     const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
     return c.json({ success: true, data: serializeMedia(media!, workerUrl) });

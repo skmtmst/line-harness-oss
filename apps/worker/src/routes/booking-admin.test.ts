@@ -698,6 +698,23 @@ describe('POST /api/booking/admin/bookings', () => {
   });
 });
 
+describe('GET /api/booking/admin/resources', () => {
+  test('200で{success,data:{resources}}の包みで返す', async () => {
+    const { app, env } = makeApp(emptyDb);
+    const res = await app.request('/api/booking/admin/resources?account_id=acc1', {}, env);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { success: boolean; data: { resources: unknown[] } };
+    expect(body.success).toBe(true);
+    expect(Array.isArray(body.data.resources)).toBe(true);
+  });
+
+  test('400 without account_id', async () => {
+    const { app, env } = makeApp(emptyDb);
+    const res = await app.request('/api/booking/admin/resources', {}, env);
+    expect(res.status).toBe(400);
+  });
+});
+
 describe('jstDayWindowUtc', () => {
   test('July date: bounds cover the full JST calendar day', async () => {
     const { jstDayWindowUtc } = await import('./booking.js');
