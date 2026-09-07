@@ -63,7 +63,7 @@ import {
   IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND,
   IDENTITY_CANDIDATE_LISTS,
   FRIEND_SAVED_VIEWS, MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
-  LIST_STATS, NEN_BIRTHDAY_COUPON, NEN_CAMPAIGN_SETTINGS, NEN_COLUMN_CREATE, NEN_COLUMNS, NEN_JOBS, NEN_PETS,
+  LIST_STATS, NEN_BIRTHDAY_COUPON, NEN_CAMPAIGN_SETTINGS, NEN_COLUMN_CREATE, NEN_COLUMN_OPERATIONS, NEN_COLUMNS, NEN_JOBS, NEN_PETS,
   NEN_FLOW_METRICS, NEN_COLUMN_METRICS, NEN_PET_METRICS, NEN_DELIVERIES, NEN_DELIVERY_DETAILS,
   OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_ACTIONS, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
@@ -688,9 +688,9 @@ const SHAPES = {
       highMin: 70, normalMin: 30,
     },
     items: [
-      { friendId: 'friend-1', displayName: 'さかもとまさと', score: 82, band: 'high', change30d: 4, lastActionAt: '2026-08-24T20:53:00+09:00' },
-      { friendId: 'friend-2', displayName: 'Kyohei Yamamoto', score: 55, band: 'normal', change30d: 0, lastActionAt: '2026-08-19T09:12:00+09:00' },
-      { friendId: 'friend-3', displayName: '菅野 亮', score: 31, band: 'low', change30d: -6, lastActionAt: '2026-08-13T20:52:00+09:00' },
+      { friendId: 'friend-1', displayName: 'さかもとまさと', currentScore: 82, band: 'high', change30d: 4, lastReason: '配信URLクリック → 夏のご案内', lastChangedAt: '2026-08-24T20:53:00+09:00' },
+      { friendId: 'friend-2', displayName: 'Kyohei Yamamoto', currentScore: 55, band: 'normal', change30d: 0, lastReason: '回答フォーム回答 → 食生活アンケート', lastChangedAt: '2026-08-19T09:12:00+09:00' },
+      { friendId: 'friend-3', displayName: '菅野 亮', currentScore: 31, band: 'normal', change30d: -6, lastReason: 'ブロック', lastChangedAt: '2026-08-13T20:52:00+09:00' },
     ],
     pagination: { total: 3, limit: 20, offset: 0 },
   },
@@ -2053,6 +2053,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/mileage/friends') return { success: true, data: MILEAGE_FRIENDS }
   if (pathname === '/api/mileage/earning-rules') return { success: true, data: MILEAGE_EARNING_RULES }
   if (pathname === '/api/mileage/rules') return { success: true, data: MILEAGE_RULES }
+  if (pathname === '/api/mileage/adjustment-policy') {
+    return { success: true, data: { configured: true, approvalThreshold: 10_000 } }
+  }
   if (pathname === '/api/conversions/definitions') return { success: true, data: CONVERSION_DEFINITIONS }
   if (pathname === '/api/conversions/points') return { success: true, data: CONVERSION_POINTS }
   if (pathname === '/api/conversions/report') {
@@ -2201,6 +2204,15 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/nen-campaigns/settings') return { success: true, data: NEN_CAMPAIGN_SETTINGS }
   if (pathname === '/api/nen-campaigns/columns') return { success: true, data: NEN_COLUMNS }
+  if (pathname === '/api/nen-campaigns/columns-preview') {
+    const targetMode = query.get('targetMode') === 'tag' ? 'tag' : 'all'
+    return {
+      success: true,
+      data: targetMode === 'tag'
+        ? NEN_COLUMN_OPERATIONS.audience
+        : { count: 1_284, targetMode: 'all', targetTagId: null },
+    }
+  }
   if (pathname === '/api/nen-campaigns/pets') return { success: true, data: NEN_PETS }
   if (pathname === '/api/nen-campaigns/jobs') return { success: true, data: NEN_JOBS }
   if (pathname === '/api/nen-campaigns/metrics/flows') return { success: true, data: nenMetricsBody(NEN_FLOW_METRICS, query) }
@@ -2476,6 +2488,25 @@ const server = createServer((req, res) => {
     // DB更新はせず、ほかのPOSTは従来どおり405にする。
     if (method === 'POST' && url.pathname === '/api/nen-campaigns/columns') {
       res.writeHead(NEN_COLUMN_CREATE.success.status).end(JSON.stringify(NEN_COLUMN_CREATE.success.body))
+      return
+    }
+    const nenDuplicate = /^\/api\/nen-campaigns\/columns\/[^/]+\/duplicate$/.test(url.pathname)
+    if (method === 'POST' && nenDuplicate) {
+      res.writeHead(201).end(JSON.stringify({ success: true, data: NEN_COLUMN_OPERATIONS.duplicate }))
+      return
+    }
+    const nenTestSend = /^\/api\/nen-campaigns\/columns\/[^/]+\/test-send$/.test(url.pathname)
+    if (method === 'POST' && nenTestSend) {
+      res.writeHead(200).end(JSON.stringify({ success: true }))
+      return
+    }
+    const nenReadEvent = /^\/api\/nen-campaigns\/columns\/[^/]+\/read-events$/.test(url.pathname)
+    if (method === 'POST' && nenReadEvent) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: NEN_COLUMN_OPERATIONS.readEvent }))
+      return
+    }
+    if (method === 'POST' && url.pathname === '/api/nen-campaigns/deliveries/pending-now') {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: NEN_COLUMN_OPERATIONS.pendingNow }))
       return
     }
     /*

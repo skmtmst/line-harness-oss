@@ -41,7 +41,7 @@ export async function duplicateNenColumn(db: D1Database, input: { id: string; li
        completion_event_name, completion_tag_id, source_column_id, created_at, updated_at)
      VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', NULL, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
-    id, slug, `${String(source.title)}（複製）`, source.category, source.excerpt, source.intro_text,
+    id, slug, `${String(source.title).slice(0, 116)}（複製）`, source.category, source.excerpt, source.intro_text,
     source.article_url, source.image_url, source.published_at, input.lineAccountId,
     source.target_mode, source.target_tag_id, source.completion_event_name, source.completion_tag_id,
     input.id, now, now,
@@ -55,6 +55,9 @@ export async function recordNenColumnReadEvent(db: D1Database, input: {
 }) {
   if (!input.idempotencyKey.trim() || input.idempotencyKey.length > 200) {
     throw new NenColumnOperationError('idempotency_key_invalid', '読了イベントの識別子を確認してください');
+  }
+  if (input.occurredAt !== undefined && !Number.isFinite(Date.parse(input.occurredAt))) {
+    throw new NenColumnOperationError('occurred_at_invalid', '読了日時を確認してください');
   }
   const target = await db.prepare(
     `SELECT c.completion_tag_id
@@ -83,6 +86,9 @@ export async function sendPendingNenDeliveriesNow(
   db: D1Database,
   input: { lineAccountId: string; expectedCount: number },
 ) {
+  if (!Number.isSafeInteger(input.expectedCount) || input.expectedCount < 0) {
+    throw new NenColumnOperationError('expected_count_invalid', '画面に表示された配信待ち件数を確認してください');
+  }
   const count = await db.prepare(
     `SELECT COUNT(*) AS count FROM nen_delivery_jobs
       WHERE line_account_id = ? AND status = 'pending' AND datetime(scheduled_at) > datetime('now')`,

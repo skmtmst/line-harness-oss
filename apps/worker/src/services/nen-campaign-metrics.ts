@@ -110,16 +110,20 @@ export async function getNenFlowMetrics(
       GROUP BY campaign_key`,
   ).bind(lineAccountId, range.fromSql, range.toSql).all<FlowAggregateRow>();
   const conversions = await db.prepare(
-    `SELECT j.campaign_key, COUNT(DISTINCT ce.id) AS total,
-            COALESCE(SUM(ce.value_snapshot), 0) AS amount
-       FROM nen_delivery_jobs j
-       JOIN conversion_events ce ON ce.friend_id = j.friend_id
-        AND datetime(ce.created_at) >= datetime(j.sent_at)
-        AND datetime(ce.created_at) < datetime(j.sent_at, '+7 days')
-       JOIN conversion_points cp ON cp.id = ce.conversion_point_id AND cp.line_account_id = ?
-      WHERE j.line_account_id = ? AND j.status = 'sent' AND j.sent_at IS NOT NULL
-        AND datetime(j.sent_at) >= datetime(?) AND datetime(j.sent_at) < datetime(?)
-      GROUP BY j.campaign_key`,
+    `WITH attributed AS (
+       SELECT j.campaign_key, ce.id AS conversion_id,
+              MAX(COALESCE(ce.value_snapshot, 0)) AS amount
+         FROM nen_delivery_jobs j
+         JOIN conversion_events ce ON ce.friend_id = j.friend_id
+          AND datetime(ce.created_at) >= datetime(j.sent_at)
+          AND datetime(ce.created_at) < datetime(j.sent_at, '+7 days')
+         JOIN conversion_points cp ON cp.id = ce.conversion_point_id AND cp.line_account_id = ?
+        WHERE j.line_account_id = ? AND j.status = 'sent' AND j.sent_at IS NOT NULL
+          AND datetime(j.sent_at) >= datetime(?) AND datetime(j.sent_at) < datetime(?)
+        GROUP BY j.campaign_key, ce.id
+     )
+     SELECT campaign_key, COUNT(*) AS total, COALESCE(SUM(amount), 0) AS amount
+       FROM attributed GROUP BY campaign_key`,
   ).bind(lineAccountId, lineAccountId, range.fromSql, range.toSql).all<ConversionAggregateRow>();
   const byKey = new Map((aggregates.results ?? []).map((row) => [row.campaign_key, row]));
   const conversionsByKey = new Map((conversions.results ?? []).map((row) => [row.campaign_key, {
@@ -216,17 +220,21 @@ export async function getNenColumnMetrics(
     range.fromSql, range.toSql, range.fromSql, range.toSql, lineAccountId,
   ).all<ColumnMetricRow>();
   const conversions = await db.prepare(
-    `SELECT substr(j.source_key, 8) AS column_id, COUNT(DISTINCT ce.id) AS total,
-            COALESCE(SUM(ce.value_snapshot), 0) AS amount
-       FROM nen_delivery_jobs j
-       JOIN conversion_events ce ON ce.friend_id = j.friend_id
-        AND datetime(ce.created_at) >= datetime(j.sent_at)
-        AND datetime(ce.created_at) < datetime(j.sent_at, '+7 days')
-       JOIN conversion_points cp ON cp.id = ce.conversion_point_id AND cp.line_account_id = ?
-      WHERE j.line_account_id = ? AND j.campaign_key = 'column' AND j.status = 'sent'
-        AND j.source_key LIKE 'column:%'
-        AND datetime(j.sent_at) >= datetime(?) AND datetime(j.sent_at) < datetime(?)
-      GROUP BY substr(j.source_key, 8)`,
+    `WITH attributed AS (
+       SELECT substr(j.source_key, 8) AS column_id, ce.id AS conversion_id,
+              MAX(COALESCE(ce.value_snapshot, 0)) AS amount
+         FROM nen_delivery_jobs j
+         JOIN conversion_events ce ON ce.friend_id = j.friend_id
+          AND datetime(ce.created_at) >= datetime(j.sent_at)
+          AND datetime(ce.created_at) < datetime(j.sent_at, '+7 days')
+         JOIN conversion_points cp ON cp.id = ce.conversion_point_id AND cp.line_account_id = ?
+        WHERE j.line_account_id = ? AND j.campaign_key = 'column' AND j.status = 'sent'
+          AND j.source_key LIKE 'column:%'
+          AND datetime(j.sent_at) >= datetime(?) AND datetime(j.sent_at) < datetime(?)
+        GROUP BY substr(j.source_key, 8), ce.id
+     )
+     SELECT column_id, COUNT(*) AS total, COALESCE(SUM(amount), 0) AS amount
+       FROM attributed GROUP BY column_id`,
   ).bind(lineAccountId, lineAccountId, range.fromSql, range.toSql)
     .all<{ column_id: string; total: number; amount: number }>();
   const conversionByColumn = new Map(

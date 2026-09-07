@@ -393,11 +393,17 @@ nenCampaigns.post('/api/nen-campaigns/columns', requireRole('owner', 'admin'), a
   if (!validated.ok) return c.json({ success: false, error: validated.error }, 400);
 
   const input = validated.value;
-  if (input.targetTagId) {
+  for (const tagId of new Set([input.targetTagId, input.completionTagId].filter((value): value is string => Boolean(value)))) {
     const tag = await c.env.DB.prepare(
       `SELECT id FROM tags WHERE id = ? AND line_account_id = ?`,
-    ).bind(input.targetTagId, accountId).first<{ id: string }>();
+    ).bind(tagId, accountId).first<{ id: string }>();
     if (!tag) return c.json({ success: false, error: 'target_invalid' }, 400);
+  }
+  if (input.sourceColumnId) {
+    const source = await c.env.DB.prepare(
+      `SELECT id FROM nen_columns WHERE id = ? AND line_account_id = ?`,
+    ).bind(input.sourceColumnId, accountId).first<{ id: string }>();
+    if (!source) return c.json({ success: false, error: 'target_invalid' }, 400);
   }
   const existing = await c.env.DB.prepare(
     `SELECT id FROM nen_columns WHERE slug = ?`,

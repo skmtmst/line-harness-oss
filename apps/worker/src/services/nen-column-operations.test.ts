@@ -41,6 +41,8 @@ describe('NEN column operations', () => {
     await expect(recordNenColumnReadEvent(testDb.db, input)).resolves.toEqual({ recorded: true, tagged: true });
     await expect(recordNenColumnReadEvent(testDb.db, input)).resolves.toEqual({ recorded: false, tagged: true });
     expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM friend_tags WHERE friend_id = 'friend-a' AND tag_id = 'tag-read'`).get()).toEqual({ count: 1 });
+    await expect(recordNenColumnReadEvent(testDb.db, { ...input, idempotencyKey: 'read-bad-date', occurredAt: 'not-a-date' }))
+      .rejects.toMatchObject({ code: 'occurred_at_invalid', status: 400 });
   });
 
   it('moves only the confirmed number of future pending jobs to now', async () => {
@@ -54,5 +56,7 @@ describe('NEN column operations', () => {
       .rejects.toMatchObject({ code: 'pending_count_changed', status: 409 });
     await expect(sendPendingNenDeliveriesNow(testDb.db, { lineAccountId: 'account-a', expectedCount: 1 }))
       .resolves.toEqual({ queued: 1 });
+    await expect(sendPendingNenDeliveriesNow(testDb.db, { lineAccountId: 'account-a', expectedCount: Number.NaN }))
+      .rejects.toMatchObject({ code: 'expected_count_invalid', status: 400 });
   });
 });
