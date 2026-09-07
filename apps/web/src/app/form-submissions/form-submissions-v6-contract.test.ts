@@ -47,11 +47,18 @@ describe('V6回答フォーム一覧', () => {
     expect(PAGE).not.toContain('準備中')
   })
 
-  it('回答はAPI側でページ分けし、共通の表示件数とページ送りを使う', () => {
-    expect(PAGE).toContain('submissions?page=${requestedPage}&limit=${requestedLimit}')
-    expect(PAGE).toContain('<Pagination')
-    expect(PAGE).toContain('<Select')
-    expect(PAGE).not.toContain('submissions.slice(')
+  it('回答の閲覧は専用ルートへ導き、一覧に到達不能の回答表を置かない(#503 M2)', () => {
+    expect(PAGE).toContain('集まった回答を見る')
+    expect(PAGE).toContain('/form-submissions/responses?id=')
+    expect(PAGE).not.toContain('loadSubmissions')
+    expect(PAGE).not.toContain('selectedForm')
+    expect(PAGE).not.toContain('AnswerValue')
+    expect(PAGE).not.toContain('submissions?page=')
+  })
+
+  it('「情報欄に保存している」の絞り込みは文言でなく数で見る(#503 M1)', () => {
+    expect(PAGE).toContain('hasStoredDestination(form.layout, form.onSubmitTagId)')
+    expect(PAGE).not.toContain(".label === '—'")
   })
 
   it('一覧で回答の保存先をフォーム定義の実値から表示する', () => {
@@ -118,11 +125,23 @@ describe('V6回答フォームの未実装3画面', () => {
 
   it('回答はアカウントを限定してAPI側ページングし、全ページをCSVへ集める', () => {
     expect(RESPONSES_PAGE).toContain('submissions?page=${nextPage}&limit=${nextLimit}&${account}')
-    expect(RESPONSES_PAGE).toContain('submissions?page=${currentPage}&limit=50&account_id=')
+    expect(RESPONSES_PAGE).toContain('submissions?page=${currentPage}&limit=${EXPORT_PAGE_LIMIT}&account_id=')
     expect(RESPONSES_PAGE).toContain('while (all.length < expected')
     expect(RESPONSES_PAGE).toContain('<Pagination')
     expect(RESPONSES_PAGE).toContain('<TableHeadRow>')
     expect(RESPONSES_PAGE).toContain('<Th')
+  })
+
+  it('CSV書き出しは上限を超えたら止めて件数を言い、進み具合を出す(#503 M7)', () => {
+    expect(RESPONSES_PAGE).toContain('MAX_EXPORT_ROWS')
+    expect(RESPONSES_PAGE).toContain('export_too_many')
+    expect(RESPONSES_PAGE).toContain('一度に書き出せる上限')
+    expect(RESPONSES_PAGE).toContain('件を取得中')
+  })
+
+  it('回答一覧は速いページ送りでも最新の要求だけを描く(#503 M8)', () => {
+    expect(RESPONSES_PAGE).toContain('loadRequest.current')
+    expect(RESPONSES_PAGE).toContain('request !== loadRequest.current')
   })
 
   it('開始数・書き込み結果・日付項目の全件集計を実APIから表示する', () => {
@@ -156,5 +175,22 @@ describe('V6回答フォームの重大修正(#503 R1・R2)', () => {
     const BLOCK_EDITOR = readFileSync(join(HERE, '..', '..', 'components', 'forms', 'block-editor.tsx'), 'utf8')
     expect(BLOCK_EDITOR).toContain("newBlockId('c')")
     expect(BLOCK_EDITOR).not.toContain('Math.random')
+  })
+})
+
+describe('V6回答フォームの中項目(#503 M3・M9)', () => {
+  it('編集画面の参照一覧は選んでいる公式アカウントに絞る', () => {
+    expect(EDIT_PAGE).toContain('/api/tags?lineAccountId=${encodeURIComponent(selectedAccountId)}')
+    expect(EDIT_PAGE).toContain('api.scenarios.list(accountFilter)')
+    expect(EDIT_PAGE).toContain('api.reminders.list(accountFilter)')
+    expect(EDIT_PAGE).toContain('api.templates.list(undefined, selectedAccountId ?? undefined)')
+    expect(EDIT_PAGE).not.toContain('api.tags.list()')
+  })
+
+  it('保存前に選択肢・URL・期限の形を見て、未保存のままの移動は確認する', () => {
+    expect(EDIT_PAGE).toContain('validateLayoutForSave(layout)')
+    expect(EDIT_PAGE).toContain('beforeunload')
+    expect(EDIT_PAGE).toContain('保存していない変更があります')
+    expect(EDIT_PAGE).toContain('savedSnapshot.current = currentSnapshot')
   })
 })
