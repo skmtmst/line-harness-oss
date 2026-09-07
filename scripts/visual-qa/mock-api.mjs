@@ -1640,6 +1640,10 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === `/api/forms/${FORM_DETAIL.id}`) return { success: true, data: FORM_DETAIL }
   const formSubmissions = new RegExp(`^/api/forms/${FORM_DETAIL.id}/submissions$`).test(pathname)
   if (formSubmissions) {
+    // 互換用の古い形（ページ分けなし）は配列だけを返す。実口と同じく上限500件。
+    if (query.get('page') === null && query.get('limit') === null) {
+      return { success: true, data: FORM_SUBMISSIONS.items.slice(0, 500) }
+    }
     const page = Number.parseInt(query.get('page') ?? '1', 10)
     const limit = Number.parseInt(query.get('limit') ?? '20', 10)
     const safePage = Number.isInteger(page) && page > 0 ? page : 1
