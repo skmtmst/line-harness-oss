@@ -679,6 +679,100 @@ export type ConversionApprovalItem = {
   duplicateFlag: boolean
 }
 
+export type ConversionDefinitionStatus = 'active' | 'stopped'
+
+export type ConversionDefinitionListItem = {
+  id: string
+  name: string
+  sourceType: string
+  value: number | null
+  measureMethod: ConversionMeasureMethod
+  targetUrl: string | null
+  countRepeat: boolean
+  attributionDays: number | null
+  lineAccountId: string | null
+  status: ConversionDefinitionStatus
+  version: number
+  usageCount: number
+  metrics: {
+    recordedCount: number
+    netCount: number
+    reversedCount: number | null
+    netValue: number
+    reversalState: 'unavailable'
+    reversalReason: string
+  }
+  stoppedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type ConversionDefinitionList = {
+  items: ConversionDefinitionListItem[]
+  stateCounts: {
+    active: number
+    draft: number
+    stopped: number
+    invalid: number
+    sourceStopped: number
+  }
+  range: { from: string; to: string; timeZone: 'Asia/Tokyo' }
+  pagination: { total: number; limit: number; cursor: string; nextCursor: string | null }
+}
+
+export type ConversionDefinitionReport = {
+  range: { from: string; to: string; timeZone: 'Asia/Tokyo' }
+  previousRange: { from: string; to: string; timeZone: 'Asia/Tokyo' }
+  kpis: {
+    recordedCount: number
+    reversedCount: number | null
+    netCount: number
+    netValue: number
+    averageNetValue: number | null
+    previousNetCount: number
+    previousNetValue: number
+    countChangeRate: number | null
+    reversalState: 'unavailable'
+    reversalReason: string
+    fastestGrowing: {
+      conversionPointId: string
+      conversionPointName: string
+      sourceType: string
+      netCount: number
+      netValue: number
+      previousNetCount: number
+      previousNetValue: number
+      countChange: number
+    } | null
+  }
+  daily: Array<{
+    day: string
+    conversionPointId: string
+    conversionPointName: string
+    netCount: number
+    netValue: number
+  }>
+  byDefinition: Array<{
+    conversionPointId: string
+    conversionPointName: string
+    sourceType: string
+    netCount: number
+    netValue: number
+    previousNetCount: number
+    previousNetValue: number
+    countChange: number
+  }>
+  byRoute: Array<{
+    routeKey: string
+    label: string
+    attributionState: 'attributed' | 'unattributed'
+    netCount: number
+    netValue: number
+    audience: number | null
+    conversionRate: number | null
+  }>
+}
+
 /** 支払台帳を作る前に安全に表示できる、承認済み報酬の読み取り専用集計。 */
 export type AffiliatePaymentSummary = {
   affiliateId: string
@@ -2990,6 +3084,8 @@ function rangeQuery(params?: { from?: string; to?: string; accountId?: string })
 export interface GettingStartedStep {
   key: 'accounts' | 'attributes' | 'friendAdd' | 'scenario' | 'firstMessage'
   state: 'done' | 'stalled' | 'todo' | 'forbidden' | 'unknown'
+  href: string | null
+  reason: string | null
   /** 段1だけ。Webhook をアカウントごとに確かめた結果。 */
   webhook?: Array<{ id: string; status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown' }>
 }
@@ -3019,7 +3115,9 @@ export interface ManualLink {
   /** **確かめていない URL は `ok` にならない。** */
   status: 'ok' | 'broken' | 'unset'
   lastCheckedAt: string | null
+  lastHttpStatus: number | null
   lastError: string | null
+  version: number
 }
 
 /** 事前確認の4区分。設計 ★V6 33-4 の言葉と1対1。 */
@@ -4981,10 +5079,10 @@ export const api = {
      * 複製する。**冪等キーが要る。** 同じキーで2回呼んでも2回作らない。
      * 途中失敗は全部戻る（部分的に作らない）。
      */
-    clone: (id: string, input: { accountId: string; namePrefix?: string | null }, idempotencyKey: string) =>
+    clone: (id: string, input: { accountId: string; namePrefix?: string | null; expectedVersion: number }, idempotencyKey: string) =>
       fetchApi<ApiResponse<{
         runId: string
-        status: 'running' | 'succeeded' | 'failed'
+        status: 'queued' | 'succeeded' | 'failed' | 'rolled_back'
         createdCount: number
         items?: Array<{ kind: string; target_id: string; name: string }>
       }>>(`/api/recipes/${id}/clone`, {
@@ -4995,7 +5093,7 @@ export const api = {
     run: (runId: string) =>
       fetchApi<ApiResponse<{
         runId: string
-        status: 'running' | 'succeeded' | 'failed'
+        status: 'queued' | 'succeeded' | 'failed' | 'rolled_back'
         createdCount: number
         failureReason: string | null
         items: Array<{ kind: string; target_id: string; name: string }>
@@ -5018,7 +5116,7 @@ export const api = {
       fetchApi<ApiResponse<{ items: ManualLink[]; total: number; brokenCount: number }>>(
         '/api/manual-links',
       ),
-    update: (key: string, data: { name?: string; url?: string | null; keyKind?: 'screen' | 'task' }) =>
+    update: (key: string, data: { name?: string; url?: string | null; keyKind?: 'screen' | 'task'; expectedVersion: number }) =>
       fetchApi<ApiResponse<ManualLink>>(`/api/manual-links/${encodeURIComponent(key)}`, {
         method: 'PUT',
         body: JSON.stringify(data),
@@ -5248,6 +5346,44 @@ export const api = {
       ),
   },
   conversions: {
+    definitions: (params: {
+      from: string
+      to: string
+      lineAccountId?: string
+      q?: string
+      status?: ConversionDefinitionStatus
+      sourceType?: string
+      sort?: 'count_desc' | 'value_desc' | 'updated_desc' | 'name_asc'
+      cursor?: string
+      limit?: number
+    }) => {
+      const query = Object.fromEntries(
+        Object.entries(params)
+          .filter(([, value]) => value !== undefined && value !== '')
+          .map(([key, value]) => [key, String(value)]),
+      )
+      return fetchApi<ApiResponse<ConversionDefinitionList>>(
+        `/api/conversions/definitions?${new URLSearchParams(query)}`,
+      )
+    },
+    definitionReport: (params: { from: string; to: string; lineAccountId?: string }) => {
+      const query = Object.fromEntries(
+        Object.entries(params)
+          .filter(([, value]) => value !== undefined && value !== '')
+          .map(([key, value]) => [key, String(value)]),
+      )
+      return fetchApi<ApiResponse<ConversionDefinitionReport>>(
+        `/api/conversions/report?${new URLSearchParams(query)}`,
+      )
+    },
+    exportDefinitions: (params: { from: string; to: string; lineAccountId?: string }) => {
+      const query = Object.fromEntries(
+        Object.entries(params)
+          .filter(([, value]) => value !== undefined && value !== '')
+          .map(([key, value]) => [key, String(value)]),
+      )
+      return fetchApiBlob(`/api/conversions/export?${new URLSearchParams(query)}`)
+    },
     points: () =>
       fetchApi<ApiResponse<ConversionPoint[]>>('/api/conversions/points'),
     createPoint: (data: {

@@ -48,6 +48,7 @@ import { authMiddleware } from './middleware/auth.js';
 import type { AuthenticatedStaff } from './middleware/auth.js';
 import { tenantScopeMiddleware } from './middleware/tenant-scope.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
+import { businessAuditMiddleware } from './middleware/business-audit.js';
 import { webhook } from './routes/webhook.js';
 import { friends } from './routes/friends.js';
 import { friendBulkRuns } from './routes/friend-bulk-runs.js';
@@ -97,6 +98,7 @@ import { entryRoutes } from './routes/entry-routes.js';
 import { forms } from './routes/forms.js';
 import { adPlatforms } from './routes/ad-platforms.js';
 import { staff } from './routes/staff.js';
+import { access } from './routes/access.js';
 import { capabilities } from './routes/capabilities.js';
 import { images } from './routes/images.js';
 import { accountSettings } from './routes/account-settings.js';
@@ -281,6 +283,8 @@ export type Env = {
   Variables: {
     // 役割と読み取り専用は別の軸。middleware/auth.ts の AuthenticatedStaff と揃える。
     staff: AuthenticatedStaff;
+    /** route固有の監査を残した場合、共通middlewareとの二重記録を防ぐ。 */
+    auditRecorded?: boolean;
   };
 };
 
@@ -331,6 +335,9 @@ app.use('*', authMiddleware);
 // Tenant boundary — authenticated admin APIs may only select LINE accounts
 // that belong to the signed-in staff member's tenant.
 app.use('*', tenantScopeMiddleware);
+
+// 認証済み管理APIの変更を共通監査へ残す。route固有の監査がある場合は重複させない。
+app.use('/api/*', businessAuditMiddleware);
 
 // Mount route groups — MVP & Round 2
 app.route('/', webhook);
@@ -384,6 +391,7 @@ app.route('/', entryRoutes);
 app.route('/', forms);
 app.route('/', adPlatforms);
 app.route('/', staff);
+app.route('/', access);
 app.route('/', capabilities);
 app.route('/', images);
 app.route('/', setup);
