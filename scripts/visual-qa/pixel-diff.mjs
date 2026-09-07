@@ -9,6 +9,7 @@
  *   node scripts/visual-qa/pixel-diff.mjs
  *   node scripts/visual-qa/pixel-diff.mjs --feature 7
  *   node scripts/visual-qa/pixel-diff.mjs --node J64xI
+ *   node scripts/visual-qa/pixel-diff.mjs --fresh
  *   node scripts/visual-qa/pixel-diff.mjs --markdown
  */
 import {
@@ -244,12 +245,36 @@ export function compareScreen(screen, options = {}) {
 
 export function buildPixelDiffReport(screens = SCREENS, options = {}) {
   const thresholdPercent = options.thresholdPercent ?? DEFAULT_PIXEL_DIFF_THRESHOLD_PERCENT
-  const entries = screens.map((screen) => compareScreen(screen, { ...options, thresholdPercent }))
+  const allScreens = options.allScreens ?? screens
+  const previousReport = options.previousReport ?? null
+  const previousByNode = new Map((previousReport?.entries ?? []).map((entry) => [entry.node, entry]))
+  const scopedNodes = new Set(screens.map((screen) => screen.node))
+  const previousGeneratedAt = previousReport?.generatedAt ?? null
+  const entries = allScreens.map((screen) => {
+    const previous = previousByNode.get(screen.node)
+    if (!scopedNodes.has(screen.node)) {
+      if (previous && !options.fresh) return { ...previous, retainedFrom: previousGeneratedAt }
+      return {
+        feature: screen.feature, node: screen.node, name: screen.name, dir: screen.dir,
+        declaredVerdict: screen.verdict ?? null,
+        status: 'unavailable', reason: '指定範囲外（前回結果なし）', comparisons: [],
+        pixelDiffPercent: null, aboveThreshold: false,
+      }
+    }
+
+    const compared = compareScreen(screen, { ...options, thresholdPercent })
+    const implementationMissing = compared.status === 'unavailable'
+      && compared.reason?.startsWith('実装画像なし')
+    if (implementationMissing && previous && !options.fresh) {
+      return { ...previous, retainedFrom: previousGeneratedAt }
+    }
+    return compared
+  })
   return {
     generatedFrom: 'scripts/visual-qa/screens.mjs',
-    generatedAt: new Date().toISOString(),
+    generatedAt: options.generatedAt ?? new Date().toISOString(),
     thresholdPercent,
-    screenCount: screens.length,
+    screenCount: allScreens.length,
     comparedCount: entries.filter((entry) => entry.status === 'compared').length,
     unavailableCount: entries.filter((entry) => entry.status === 'unavailable').length,
     aboveThresholdCount: entries.filter((entry) => entry.aboveThreshold).length,
@@ -295,12 +320,30 @@ function runCli() {
     && (node === null || screen.node === node)
   ))
   if (screens.length === 0) throw new Error('対象画面がありません')
+  const fresh = process.argv.includes('--fresh')
+  if (fresh && (feature !== null || node !== null)) {
+    throw new Error('--fresh は全画面の完全再撮影時だけ使えます。--feature / --node とは併用できません')
+  }
 
+  const reportPath = resolve(valueAfter('--report') ?? DEFAULT_REPORT)
+  const previousReport = !fresh && existsSync(reportPath)
+    ? JSON.parse(readFileSync(reportPath, 'utf8'))
+    : null
   const report = buildPixelDiffReport(screens, {
+    allScreens: SCREENS,
+    previousReport,
+    fresh,
     thresholdPercent,
     writeDiffImages: !process.argv.includes('--no-diff-images'),
   })
-  const reportPath = resolve(valueAfter('--report') ?? DEFAULT_REPORT)
+  if (fresh) {
+    const missing = report.entries.filter((entry) => (
+      entry.status === 'unavailable' && entry.reason?.startsWith('実装画像なし')
+    ))
+    if (missing.length) {
+      throw new Error(`--fresh を中止しました。実装画像が無い画面: ${missing.map((entry) => entry.node).join(', ')}`)
+    }
+  }
   writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`)
   if (process.argv.includes('--markdown')) console.log(thresholdMarkdown(report))
   else console.log(`画素比較 ${report.comparedCount}/${report.screenCount} ／ ${thresholdPercent}%超 ${report.aboveThresholdCount} ／ 比較不能 ${report.unavailableCount}`)

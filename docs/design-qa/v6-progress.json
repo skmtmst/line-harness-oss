@@ -12,7 +12,7 @@
   "unjudged": 0,
   "pixelCompared": 250,
   "pixelUnavailable": 22,
-  "pixelAboveThreshold": 36,
+  "pixelAboveThreshold": 28,
   "remaining": 0,
   "features": [
     {
@@ -1412,9 +1412,25 @@
       "unjudged": 0,
       "pixelCompared": 12,
       "pixelUnavailable": 1,
-      "pixelAboveThreshold": 8,
+      "pixelAboveThreshold": 0,
       "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1275,
+          "head": "c85f9e523",
+          "on": "2026-09-07",
+          "screens": [
+            "lvaY5",
+            "PV1Vh",
+            "d3rFGD",
+            "Ho8z4",
+            "Xjk8q",
+            "GB0NR",
+            "D6yO7e",
+            "yxyzQ"
+          ],
+          "note": "Issue #471 / PR #1275。列車148を取り込み、3105/8792で8画面を1440/1920px撮影。LINEプレビュー色、右列順序、撮影範囲をPencil V6へそろえ、正式画素差7.3288〜8.2076%、全画面高さ差0px・横はみ出し0で一致を維持した。"
+        },
         {
           "pr": 1258,
           "head": "84039ceca",
@@ -3708,10 +3724,10 @@
   ],
   "pixelDiff": {
     "thresholdPercent": 10,
-    "generatedAt": "2026-09-07T11:48:13.253Z",
+    "generatedAt": "2026-09-07T12:28:24.106Z",
     "comparedCount": 250,
     "unavailableCount": 22,
-    "aboveThresholdCount": 36
+    "aboveThresholdCount": 28
   },
   "screens": [
     {
@@ -7791,9 +7807,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 222741,
+            "mismatchedPixels": 155409,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 10.7418,
+            "pixelDiffPercent": 7.4946,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -7803,14 +7819,16 @@
             "dominantRegion": "中央・右",
             "designPath": "docs/design-reference/webinars-v6/lvaY5.png",
             "implementationPath": "docs/design-qa/webinars-v6/lvaY5-1920.png",
+            "implementationSource": "docs",
             "diffPath": "docs/design-qa/webinars-v6/lvaY5-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 10.7418,
+        "pixelDiffPercent": 7.4946,
         "heightDifferencePx": 0,
         "dominantRegion": "中央・右",
+        "implementationSource": "docs",
         "diffPath": "docs/design-qa/webinars-v6/lvaY5-diff-1920.png",
-        "aboveThreshold": true
+        "aboveThreshold": false
       }
     },
     {
@@ -7835,9 +7853,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 220665,
+            "mismatchedPixels": 153491,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 10.6416,
+            "pixelDiffPercent": 7.4022,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -7847,14 +7865,16 @@
             "dominantRegion": "中央・右",
             "designPath": "docs/design-reference/webinars-v6/PV1Vh.png",
             "implementationPath": "docs/design-qa/webinars-v6/PV1Vh-1920.png",
+            "implementationSource": "docs",
             "diffPath": "docs/design-qa/webinars-v6/PV1Vh-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 10.6416,
+        "pixelDiffPercent": 7.4022,
         "heightDifferencePx": 0,
         "dominantRegion": "中央・右",
+        "implementationSource": "docs",
         "diffPath": "docs/design-qa/webinars-v6/PV1Vh-diff-1920.png",
-        "aboveThreshold": true
+        "aboveThreshold": false
       }
     },
     {
@@ -7879,9 +7899,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 228902,
+            "mismatchedPixels": 154681,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 11.0389,
+            "pixelDiffPercent": 7.4595,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -7891,14 +7911,16 @@
             "dominantRegion": "中央・右",
             "designPath": "docs/design-reference/webinars-v6/d3rFGD.png",
             "implementationPath": "docs/design-qa/webinars-v6/d3rFGD-1920.png",
+            "implementationSource": "docs",
             "diffPath": "docs/design-qa/webinars-v6/d3rFGD-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 11.0389,
+        "pixelDiffPercent": 7.4595,
         "heightDifferencePx": 0,
         "dominantRegion": "中央・右",
+        "implementationSource": "docs",
         "diffPath": "docs/design-qa/webinars-v6/d3rFGD-diff-1920.png",
-        "aboveThreshold": true
+        "aboveThreshold": false
       }
     },
     {
@@ -7923,9 +7945,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 229741,
+            "mismatchedPixels": 162565,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 11.0793,
+            "pixelDiffPercent": 7.8397,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -7935,14 +7957,16 @@
             "dominantRegion": "中央・右",
             "designPath": "docs/design-reference/webinars-v6/Ho8z4.png",
             "implementationPath": "docs/design-qa/webinars-v6/Ho8z4-1920.png",
+            "implementationSource": "docs",
             "diffPath": "docs/design-qa/webinars-v6/Ho8z4-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 11.0793,
+        "pixelDiffPercent": 7.8397,
         "heightDifferencePx": 0,
         "dominantRegion": "中央・右",
+        "implementationSource": "docs",
         "diffPath": "docs/design-qa/webinars-v6/Ho8z4-diff-1920.png",
-        "aboveThreshold": true
+        "aboveThreshold": false
       }
     },
     {
@@ -7964,29 +7988,31 @@
             "width": 1920,
             "comparedHeight": 1080,
             "designHeight": 1080,
-            "implementationHeight": 1263,
-            "heightDifferencePx": 183,
+            "implementationHeight": 1080,
+            "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 305815,
+            "mismatchedPixels": 170193,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 14.748,
+            "pixelDiffPercent": 8.2076,
             "boundingBox": {
               "left": 0,
               "top": 0,
               "right": 1887,
               "bottom": 1079
             },
-            "dominantRegion": "中央・右",
+            "dominantRegion": "上部・右",
             "designPath": "docs/design-reference/webinars-v6/Xjk8q.png",
             "implementationPath": "docs/design-qa/webinars-v6/Xjk8q-1920.png",
+            "implementationSource": "docs",
             "diffPath": "docs/design-qa/webinars-v6/Xjk8q-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 14.748,
-        "heightDifferencePx": 183,
-        "dominantRegion": "中央・右",
+        "pixelDiffPercent": 8.2076,
+        "heightDifferencePx": 0,
+        "dominantRegion": "上部・右",
+        "implementationSource": "docs",
         "diffPath": "docs/design-qa/webinars-v6/Xjk8q-diff-1920.png",
-        "aboveThreshold": true
+        "aboveThreshold": false
       }
     },
     {
@@ -8011,9 +8037,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 225758,
+            "mismatchedPixels": 151970,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 10.8872,
+            "pixelDiffPercent": 7.3288,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -8023,14 +8049,16 @@
             "dominantRegion": "中央・右",
             "designPath": "docs/design-reference/webinars-v6/GB0NR.png",
             "implementationPath": "docs/design-qa/webinars-v6/GB0NR-1920.png",
+            "implementationSource": "docs",
             "diffPath": "docs/design-qa/webinars-v6/GB0NR-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 10.8872,
+        "pixelDiffPercent": 7.3288,
         "heightDifferencePx": 0,
         "dominantRegion": "中央・右",
+        "implementationSource": "docs",
         "diffPath": "docs/design-qa/webinars-v6/GB0NR-diff-1920.png",
-        "aboveThreshold": true
+        "aboveThreshold": false
       }
     },
     {
@@ -8052,29 +8080,31 @@
             "width": 1920,
             "comparedHeight": 1136,
             "designHeight": 1136,
-            "implementationHeight": 1431,
-            "heightDifferencePx": 295,
+            "implementationHeight": 1136,
+            "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 299284,
+            "mismatchedPixels": 160061,
             "comparedPixels": 2181120,
-            "pixelDiffPercent": 13.7216,
+            "pixelDiffPercent": 7.3385,
             "boundingBox": {
               "left": 0,
               "top": 0,
               "right": 1881,
               "bottom": 1135
             },
-            "dominantRegion": "中央・右",
+            "dominantRegion": "上部・右",
             "designPath": "docs/design-reference/webinars-v6/D6yO7e.png",
             "implementationPath": "docs/design-qa/webinars-v6/D6yO7e-1920.png",
+            "implementationSource": "docs",
             "diffPath": "docs/design-qa/webinars-v6/D6yO7e-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 13.7216,
-        "heightDifferencePx": 295,
-        "dominantRegion": "中央・右",
+        "pixelDiffPercent": 7.3385,
+        "heightDifferencePx": 0,
+        "dominantRegion": "上部・右",
+        "implementationSource": "docs",
         "diffPath": "docs/design-qa/webinars-v6/D6yO7e-diff-1920.png",
-        "aboveThreshold": true
+        "aboveThreshold": false
       }
     },
     {
@@ -8187,9 +8217,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 223311,
+            "mismatchedPixels": 159841,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 10.7692,
+            "pixelDiffPercent": 7.7084,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -8199,14 +8229,16 @@
             "dominantRegion": "中央・右",
             "designPath": "docs/design-reference/webinars-v6/yxyzQ.png",
             "implementationPath": "docs/design-qa/webinars-v6/yxyzQ-1920.png",
+            "implementationSource": "docs",
             "diffPath": "docs/design-qa/webinars-v6/yxyzQ-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 10.7692,
+        "pixelDiffPercent": 7.7084,
         "heightDifferencePx": 0,
         "dominantRegion": "中央・右",
+        "implementationSource": "docs",
         "diffPath": "docs/design-qa/webinars-v6/yxyzQ-diff-1920.png",
-        "aboveThreshold": true
+        "aboveThreshold": false
       }
     },
     {

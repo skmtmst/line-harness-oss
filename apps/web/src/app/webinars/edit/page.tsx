@@ -112,16 +112,17 @@ function SummaryAside({
   rows,
   previewBody,
   previewButton,
+  previewFirst = false,
   children,
 }: {
   rows: Array<[string, string]>
   previewBody: string
   previewButton?: string | null
+  previewFirst?: boolean
   children?: ReactNode
 }) {
-  return (
-    <aside className="space-y-3 xl:w-[390px] xl:shrink-0">
-      <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
+  const summary = (
+    <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
         <h2 className="text-ink text-sm font-bold">設定サマリー</h2>
         <dl className="divide-hairline mt-3 divide-y">
           {rows.map(([label, value]) => (
@@ -129,13 +130,19 @@ function SummaryAside({
           ))}
         </dl>
         <p className="text-ink mt-2 text-xs font-semibold">タグ「配信済み」を追加</p>
-      </section>
-      <section className="bg-info min-h-[365px] rounded-card p-4 text-on-accent shadow-card">
+    </section>
+  )
+  const preview = (
+    <section className="bg-line-preview min-h-[365px] rounded-card p-4 text-on-accent shadow-card">
         <h2 className="text-center text-sm font-bold">LINEプレビュー</h2>
-        <p className="mx-auto mt-3 w-fit rounded-pill bg-ink/20 px-3 py-1 text-micro">実際のLINE表示に近いプレビューです</p>
+        <p className="bg-line-preview-label mx-auto mt-3 w-fit rounded-pill px-3 py-1 text-micro">実際のLINE表示に近いプレビューです</p>
         <div className="bg-canvas text-ink mt-4 rounded-control p-4 text-sm font-medium leading-relaxed">{previewBody}</div>
         {previewButton ? <div className="bg-accent-deep text-on-accent mx-auto mt-3 w-fit rounded-control px-4 py-2 text-xs font-bold">{previewButton}</div> : null}
-      </section>
+    </section>
+  )
+  return (
+    <aside className="space-y-3 xl:w-[390px] xl:shrink-0">
+      {previewFirst ? <>{preview}{summary}</> : <>{summary}{preview}</>}
       {children}
     </aside>
   )
@@ -1323,7 +1330,7 @@ function WebinarActionsTab({ webinarId, editor, onEditorChange }: { webinarId: s
         ['実行時点', '視聴完了直後'],
         ['通知・アクション', completedActions.length > 0 ? `${completedActions.length}件` : '未設定'],
         ['結果未取得時', missingResultPolicy === 'escalate' ? '要対応へ追加' : '翌日に再取得'],
-      ]} previewBody={templateBody || '視聴完了メッセージは未設定です。'} />
+      ]} previewBody={templateBody || '視聴完了メッセージは未設定です。'} previewFirst />
     </div>
   )
 }
@@ -1478,7 +1485,7 @@ function ReviewStep({ webinar, editor, registrations, onBack }: { webinar: Webin
         ['申込見込み', registrations === null ? '—（未取得）' : `${registrations.toLocaleString('ja-JP')}人`],
         ['通知重複', validation?.checks.find((check) => check.key === 'notification_duplicates')?.status === 'passed' ? '重複なし' : '要確認'],
         ['監視', '運用者通知へ連携'],
-      ]} previewBody={validation ? '公開ページと通知のテスト結果を確認しました。' : '公開前検査を読み込んでいます。'} />
+      ]} previewBody={validation ? '公開ページと通知のテスト結果を確認しました。' : '公開前検査を読み込んでいます。'} previewFirst />
     </div>
   )
 }

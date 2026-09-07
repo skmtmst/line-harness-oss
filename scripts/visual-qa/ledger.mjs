@@ -170,9 +170,10 @@ function signed(value) {
 }
 
 function pixelPercent(entry) {
+  const retained = entry.retainedFrom ? '（前回値）' : ''
   return entry.status === 'compared'
-    ? `${entry.pixelDiffPercent.toFixed(4)}%${entry.aboveThreshold ? ' ⚠' : ''}`
-    : `—（${entry.reason}）`
+    ? `${entry.pixelDiffPercent.toFixed(4)}%${entry.aboveThreshold ? ' ⚠' : ''}${retained}`
+    : `—（${entry.reason}）${retained}`
 }
 
 function implementationSourceLabel(entry) {
