@@ -68,7 +68,7 @@ describe('V6 30 ログインユーザーの画面契約', () => {
     for (const word of ['消した操作', '配信した操作', 'いつもと違う場所から', '気になるもの', '元の値 → 新しい値']) {
       expect(auditSource).toContain(word)
     }
-    expect(auditSource).toContain('colSpan={5}')
+    expect(auditSource).toContain('colSpan={6}')
     expect(auditSource).toContain('row.actor.name')
     expect(auditSource).toContain('targetLabel(row)')
     expect(auditSource).toContain('locationLabel(row)')

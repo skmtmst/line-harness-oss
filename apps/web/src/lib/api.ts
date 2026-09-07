@@ -160,6 +160,7 @@ export type AuditEventItem = {
   reason: string | null
   requestTraceId: string | null
   ipPrefix: string | null
+  regionLabel?: string | null
   deviceFamily: string | null
   riskLevel: 'normal' | 'suspicious' | 'high'
   retentionClass: 'general' | 'security' | 'personal_data'
