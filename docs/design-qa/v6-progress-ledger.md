@@ -289,10 +289,10 @@
 | 27 | `GFDqW` | 27-1-D 代理予約・内容確認 | 7.6298% | 0px | 上部・右 | docs | [差分画像](booking-v6/GFDqW-diff-1920.png) | **一致** |
 | 27 | `GfceK` | 27-1-E 代理予約・登録完了 | 6.9745% | 0px | 中央・右 | docs | [差分画像](booking-v6/GfceK-diff-1920.png) | **一致** |
 | 27 | `Lg8ff` | 27-1-F 代理予約・予約枠の重なりと入力エラー | 4.8883% | 0px | 中央・左 | docs | [差分画像](booking-v6/Lg8ff-diff-1920.png) | **一致** |
-| 28 | `QSLEH` | 28-1 予約設定 | 3.4602%（前回値） | 0px | 中央・左 | docs | [差分画像](booking-settings-v6/QSLEH-diff-1920.png) | **一致** |
-| 28 | `tksPc` | 28-1-A 受付枠と休業日 | 5.6766% | 0px | 中央・右 | docs | [差分画像](booking-settings-v6/tksPc-diff-1920.png) | **一致** |
-| 28 | `GhOb3` | 28-1-B 予約メニューをつくる | 6.8295% | 0px | 上部・右 | docs | [差分画像](booking-settings-v6/GhOb3-diff-1920.png) | **一致** |
-| 28 | `W6465r` | 28-1-C 一覧の状態（空・読込・エラー） | 2.8767%（前回値） | 0px | 中央・中央 | docs | [差分画像](booking-settings-v6/W6465r-diff-1920.png) | **一致** |
+| 28 | `QSLEH` | 28-1 予約設定 | 3.4245% | 0px | 中央・左 | docs | [差分画像](booking-settings-v6/QSLEH-diff-1920.png) | **一致** |
+| 28 | `tksPc` | 28-1-A 受付枠と休業日 | 5.6757% | 0px | 中央・右 | docs | [差分画像](booking-settings-v6/tksPc-diff-1920.png) | **一致** |
+| 28 | `GhOb3` | 28-1-B 予約メニューをつくる | 6.7937% | 0px | 上部・右 | docs | [差分画像](booking-settings-v6/GhOb3-diff-1920.png) | **一致** |
+| 28 | `W6465r` | 28-1-C 一覧の状態（空・読込・エラー） | 2.8410% | 0px | 中央・中央 | docs | [差分画像](booking-settings-v6/W6465r-diff-1920.png) | **一致** |
 | 29 | `ugP5y` | 29-1 イベント予約 | 4.4000%（前回値） | 0px | 中央・左 | docs | [差分画像](events-v6/ugP5y-diff-1920.png) | **一致** |
 | 29 | `MKrPY` | 29-1-A イベントをつくる | 6.3529% | 0px | 中央・右 | docs | [差分画像](events-v6/MKrPY-diff-1920.png) | **一致** |
 | 29 | `i5SN2j` | 29-1-B 申込者の一覧 | 3.3306%（前回値） | 0px | 上部・左 | docs | [差分画像](events-v6/i5SN2j-diff-1920.png) | **一致** |
