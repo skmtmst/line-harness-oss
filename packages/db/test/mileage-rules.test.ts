@@ -133,6 +133,30 @@ describe('configurable mileage rules', () => {
     expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM mileage_ledger`).get()).toEqual({ count: 2 });
   });
 
+  it('applies an account-scoped rule only to friends in that LINE account', async () => {
+    sqlite.prepare(
+      `INSERT INTO mileage_rules
+         (id, program_id, name, event_type, source, amount, initial_status,
+          line_account_id, is_active, created_at, updated_at)
+       VALUES (?, 'default', ?, 'store_visit', 'manual', ?, 'available', ?, 1, ?, ?)`,
+    ).run('visit-a', 'A店来店', 10, 'account-1', FIXED_NOW.toISOString(), FIXED_NOW.toISOString());
+    sqlite.prepare(
+      `INSERT INTO mileage_rules
+         (id, program_id, name, event_type, source, amount, initial_status,
+          line_account_id, is_active, created_at, updated_at)
+       VALUES (?, 'default', ?, 'store_visit', 'manual', ?, 'available', ?, 1, ?, ?)`,
+    ).run('visit-b', 'B店来店', 20, 'account-2', FIXED_NOW.toISOString(), FIXED_NOW.toISOString());
+
+    await applyMileageRulesForEvent(db, {
+      eventType: 'store_visit', source: 'manual', sourceEventId: 'visit-1', friendId: 'friend-1',
+    });
+    await processPendingMileageEvents(db, { now: '2026-08-10T12:00:00.000+09:00' });
+
+    expect(sqlite.prepare(
+      `SELECT mileage_rule_id, amount FROM mileage_ledger WHERE source_event_id = 'visit-1'`,
+    ).all()).toEqual([{ mileage_rule_id: 'visit-a', amount: 10 }]);
+  });
+
   it('builds one cross-account ranking row and respects edited rule amounts', async () => {
     await updateMileageRule(db, 'builtin-booking-created', { amount: 25 });
     await applyMileageRulesForEvent(db, {

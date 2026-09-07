@@ -123,7 +123,7 @@ describe('#455 受信箱の上端と入力欄', () => {
 
   it('チャネルと並び順は折り返さず、左列を先に縮める', () => {
     expect(PAGE).toContain('mt-2 flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden')
-    expect(PAGE).toContain("showFriendInfo ? 'lg:w-72 2xl:w-96'")
+    expect(PAGE).toContain("showFriendInfo ? 'lg:w-72 2xl:w-[420px]'")
   })
 
   it('改行案内を入力欄の下へ置く', () => {
