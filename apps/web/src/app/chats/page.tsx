@@ -124,15 +124,22 @@ function ChannelBadge({ channel }: { channel: 'line' | 'email' }) {
   )
 }
 
-// 一覧の1ページ件数。worker 側 /api/chats のデフォルト LIMIT と揃える。
-const CHAT_PAGE_SIZE = 300
+// 一覧の1ページ件数。worker 側の上限(MAX_LIST_LIMIT=200)と揃える。
+// 300 のままだと API が200件に丸めるのに画面は300件で「続き」を判定し、
+// 201件目以降に「さらに読み込む」が出ず開けなくなる。
+const CHAT_PAGE_SIZE = 200
 
 function StickerMessageImage({ content }: { content: string }) {
   const [failed, setFailed] = useState(false)
   const sticker = parseStickerMessageContent(content)
   const fallback = stickerFallback(content)
 
-  if (!sticker || failed) return <span>{fallback}</span>
+  // 本文由来のURLをそのまま読みに行く。https 以外(意図しない scheme・
+  // 空文字など)は画像にせず、文字の代替表示に倒す。共通側の許可リスト
+  // 検証(#493-C1)が入るまでの間の最低限の guard。
+  if (!sticker || failed || !sticker.stickerUrl.startsWith('https://')) {
+    return <span>{fallback}</span>
+  }
 
   return (
     <img
@@ -140,6 +147,7 @@ function StickerMessageImage({ content }: { content: string }) {
       alt={fallback}
       className="max-h-[140px] max-w-[140px] object-contain"
       loading="lazy"
+      referrerPolicy="no-referrer"
       onError={() => setFailed(true)}
     />
   )
@@ -548,20 +556,51 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     return params
   }, [statusFilter, selectedAccountId, debouncedNameQuery])
 
+  // メール一覧の1ページ件数。上限200切りっぱなしだった offset なし取得を、
+  // LINE側と同じく「さらに読み込む」で遡れるようにする。
+  const EMAIL_PAGE_SIZE = 200
+  const [loadingMoreEmails, setLoadingMoreEmails] = useState(false)
+  const [hasMoreEmails, setHasMoreEmails] = useState(false)
+
   /** メールの問い合わせを取る。LINEと同じ一覧に混ぜるため。 */
-  const loadEmails = useCallback(async () => {
+  const loadEmails = useCallback(async (offset = 0, append = false) => {
+    if (append) {
+      if (loadingMoreEmails) return
+      setLoadingMoreEmails(true)
+    }
     try {
-      const res = await fetchApi<{ success: boolean; data: { items: EmailInboxItem[] } }>(
+      const res = await fetchApi<{
+        success: boolean
+        data: { items: EmailInboxItem[]; summary?: { total: number } }
+      }>(
         `/api/support/inbox?${buildSupportEmailInboxQuery({
           status: statusFilter,
           query: debouncedNameQuery,
+          limit: EMAIL_PAGE_SIZE,
+          offset,
         })}`,
       )
-      if (res.success) setEmailItems(res.data.items)
+      if (res.success) {
+        if (append) {
+          const rows = res.data.items
+          setEmailItems((prev) => {
+            const seen = new Set(prev.map((e) => e.id))
+            return [...prev, ...rows.filter((r) => !seen.has(r.id))]
+          })
+          setHasMoreEmails(offset + rows.length < (res.data.summary?.total ?? offset + rows.length))
+        } else {
+          setEmailItems(res.data.items)
+          setHasMoreEmails(res.data.items.length >= EMAIL_PAGE_SIZE
+            && res.data.items.length < (res.data.summary?.total ?? res.data.items.length + 1))
+        }
+      }
     } catch {
       // メールが出ないだけ。LINEのトークは使える。
+      if (!append) setEmailItems([])
+    } finally {
+      if (append) setLoadingMoreEmails(false)
     }
-  }, [statusFilter, debouncedNameQuery])
+  }, [statusFilter, debouncedNameQuery, loadingMoreEmails])
 
   useEffect(() => {
     void loadEmails()
@@ -628,7 +667,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     } catch { /* silent */ }
   }, [selectedAccountId])
 
-  useEffect(() => { void loadAllFriends() }, [loadAllFriends])
+  // 友だち800件は初回表示に要らない。DM欄(DirectMessagePanel)が開いたときだけ
+  // 取る。マウント時に6系統と並列で取ると、回線の細い店舗で一覧が遅れる。
+  useEffect(() => {
+    if (selectedFriendId) void loadAllFriends()
+  }, [selectedFriendId, loadAllFriends])
 
   // Keep refs in sync so setChats updater can read the latest filter without stale closure
   useEffect(() => { statusFilterRef.current = statusFilter }, [statusFilter])
@@ -739,27 +782,69 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     try { localStorage.setItem('chat.sendMode', sendMode) } catch { /* ignore */ }
   }, [sendMode])
 
+  // 会話詳細は直近100件ずつ。全文一括(1000件)だと長期の会話で応答が重い。
+  // 古い分は「前のメッセージ」で遡る。
+  const CHAT_MESSAGE_PAGE_SIZE = 100
+  const [messagesHasMore, setMessagesHasMore] = useState(false)
+  const [loadingOlderMessages, setLoadingOlderMessages] = useState(false)
+
   const loadChatDetail = useCallback(async (chatId: string) => {
     const requestId = ++detailRequestIdRef.current
     setDetailLoading(true)
     setError('')
     try {
-      const res = await api.chats.get(chatId)
+      const res = await api.chats.get(chatId, { limit: CHAT_MESSAGE_PAGE_SIZE })
       if (requestId !== detailRequestIdRef.current) return
       if (res.success) {
-        setChatDetail(res.data as unknown as ChatDetail)
+        const detail = res.data as unknown as ChatDetail & { hasMoreMessages?: boolean }
+        setChatDetail(detail)
+        setMessagesHasMore(detail.hasMoreMessages === true)
       } else {
         setChatDetail(null)
+        setMessagesHasMore(false)
         setError('会話を読み込めませんでした。時間を置いてもう一度お試しください。')
       }
     } catch {
       if (requestId !== detailRequestIdRef.current) return
       setChatDetail(null)
+      setMessagesHasMore(false)
       setError('会話を読み込めませんでした。時間を置いてもう一度お試しください。')
     } finally {
       if (requestId === detailRequestIdRef.current) setDetailLoading(false)
     }
   }, [])
+
+  // 「前のメッセージ」— 表示中の最古の1件より古い分を先頭に足す。
+  const loadOlderMessages = useCallback(async () => {
+    if (loadingOlderMessages || !selectedChatId) return
+    const oldest = chatDetail?.messages?.[0]
+    if (!oldest) {
+      setMessagesHasMore(false)
+      return
+    }
+    setLoadingOlderMessages(true)
+    try {
+      const res = await api.chats.get(selectedChatId, {
+        limit: CHAT_MESSAGE_PAGE_SIZE,
+        beforeAt: oldest.createdAt,
+        beforeId: oldest.id,
+      })
+      if (res.success) {
+        const detail = res.data as unknown as { messages?: ChatMessage[]; hasMoreMessages?: boolean }
+        const rows = detail.messages ?? []
+        setChatDetail((prev) => {
+          if (!prev) return prev
+          const seen = new Set((prev.messages ?? []).map((m) => m.id))
+          return { ...prev, messages: [...rows.filter((m) => !seen.has(m.id)), ...(prev.messages ?? [])] }
+        })
+        setMessagesHasMore(detail.hasMoreMessages === true)
+      }
+    } catch {
+      setError('前のメッセージを読み込めませんでした。')
+    } finally {
+      setLoadingOlderMessages(false)
+    }
+  }, [loadingOlderMessages, selectedChatId, chatDetail?.messages])
 
   // 同じ会話IDが別アカウントにも存在していても、切替前の遅い応答を表示しない。
   // 初回表示では深いリンクを消さず、実際にアカウントが変わったときだけ外す。
@@ -1748,6 +1833,20 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     {loadingMore ? '読み込み中...' : 'さらに読み込む'}
                   </button>
                 )}
+                {/*
+                  メールの続き。メールは上限200件で切れていた分を offset で遡る。
+                  LINEの「さらに読み込む」とは別物なので文言を分ける。
+                */}
+                {hasMoreEmails && (
+                  <button
+                    onClick={() => { void loadEmails(emailItems.length, true) }}
+                    disabled={loadingMoreEmails}
+                    className="w-full px-4 py-3 text-sm text-success hover:bg-accent-soft disabled:opacity-50 border-b"
+                    style={{ borderBottomColor: 'var(--color-hairline)' }}
+                  >
+                    {loadingMoreEmails ? '読み込み中...' : 'メールの続きを読み込む'}
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -1896,6 +1995,22 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
               {/* Messages — LINE-style chat bubbles */}
               <div ref={messagesScrollRef} className="flex-1 space-y-2 overflow-y-auto p-4" style={{ backgroundColor: '#7292BD' }}>
+                {/*
+                  古い履歴の続き。直近100件だけ読んでいる会話で出す。
+                  押すと今見えている最古の1件より古い分を上に足す。
+                */}
+                {messagesHasMore && (chatDetail.messages?.length ?? 0) > 0 && (
+                  <div className="flex justify-center pb-1">
+                    <button
+                      type="button"
+                      onClick={() => { void loadOlderMessages() }}
+                      disabled={loadingOlderMessages}
+                      className="bg-canvas/90 rounded-pill px-3 py-1 text-xs font-semibold text-action shadow-sm disabled:opacity-50"
+                    >
+                      {loadingOlderMessages ? '読み込み中...' : '前のメッセージ'}
+                    </button>
+                  </div>
+                )}
                 {(!chatDetail.messages || chatDetail.messages.length === 0) ? (
                   <div className="text-center py-8">
                     <p className="text-on-accent/60 text-sm">メッセージはまだありません。</p>
