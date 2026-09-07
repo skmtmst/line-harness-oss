@@ -118,6 +118,20 @@ describe('POST /api/affiliate-offers', () => {
     expect(res.status).toBe(400);
     expect(dbMocks.createAffiliateOffer).not.toHaveBeenCalled();
   });
+
+  // #505 重大1: 選べる先が複数あるのに空欄で押すと 400。文言はそのまま
+  // 画面へ出すので、運用者の言葉で返す。
+  it('rejects a missing lineAccountId with 400 when several accounts are visible', async () => {
+    dbMocks.getLineAccounts.mockResolvedValue([
+      { id: 'account-1', tenant_id: '00000000-0000-4000-8000-000000000001' },
+      { id: 'account-2', tenant_id: '00000000-0000-4000-8000-000000000001' },
+    ]);
+    const res = await req('POST', '/api/affiliate-offers', { name: 'x' });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.error).toContain('LINEアカウントを選んでください');
+    expect(dbMocks.createAffiliateOffer).not.toHaveBeenCalled();
+  });
 });
 
 describe('GET /api/affiliate-offers', () => {
