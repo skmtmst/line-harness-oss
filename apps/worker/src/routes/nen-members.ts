@@ -3,6 +3,7 @@ import type { Message } from '@line-crm/line-sdk';
 import { getFriendByLineUserIdForAccount, jstNow, resolveLineCredential } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { requirePhotoPermission } from './nen-photo-operations.js';
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
 import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
@@ -674,7 +675,7 @@ nenMembers.put('/api/nen-members/care-flags/:id', requireRole('owner', 'admin', 
   return c.json({ success: true });
 });
 
-nenMembers.get('/api/nen-members/photos', async (c) => {
+nenMembers.get('/api/nen-members/photos', requirePhotoPermission('photo.submission.view'), async (c) => {
   const accountId = c.req.query('accountId')?.trim();
   if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
@@ -686,7 +687,17 @@ nenMembers.get('/api/nen-members/photos', async (c) => {
             ps.updated_at, ps.review_version, ps.publication_consent_at,
             ps.publication_withdrawn_at, ps.public_pet_name, ps.review_reason_code,
             ps.review_reason_note, ps.review_notification_status,
-            p.name pet_name, f.display_name owner_name
+            p.name pet_name, f.display_name owner_name,
+            (SELECT r.flag FROM nen_photo_risk_assessments r
+              WHERE r.photo_id = ps.id AND r.line_account_id = ps.line_account_id
+              ORDER BY r.created_at DESC, r.id DESC LIMIT 1) AS latest_risk_flag,
+            (SELECT r.confidence FROM nen_photo_risk_assessments r
+              WHERE r.photo_id = ps.id AND r.line_account_id = ps.line_account_id
+              ORDER BY r.created_at DESC, r.id DESC LIMIT 1) AS latest_risk_confidence,
+            CASE WHEN EXISTS (
+              SELECT 1 FROM nen_photo_asset_jobs j
+               WHERE j.photo_id = ps.id AND j.line_account_id = ps.line_account_id AND j.status = 'failed'
+            ) THEN 1 ELSE 0 END AS has_failed_asset_job
        FROM nen_photo_submissions ps
        JOIN nen_pet_profiles p ON p.id = ps.pet_id
        JOIN friends f ON f.id = ps.friend_id
@@ -849,7 +860,7 @@ nenMembers.put('/api/nen-members/photos/publications/:id/placements', requireRol
   return c.json({ success: true, data: { version: publication.version + 1, placementCount: placements.length } });
 });
 
-nenMembers.get('/api/nen-members/photos/:id', async (c) => {
+nenMembers.get('/api/nen-members/photos/:id', requirePhotoPermission('photo.submission.view'), async (c) => {
   const accountId = c.req.query('accountId')?.trim();
   if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
@@ -879,7 +890,7 @@ nenMembers.get('/api/nen-members/photos/:id', async (c) => {
   return c.json({ success: true, data: { ...photo, risks: risks.results } });
 });
 
-nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin', 'staff'), async (c) => {
+nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.submission.review'), async (c) => {
   const body = await c.req.json<{
     accountId?: string;
     status?: string;
@@ -1011,7 +1022,7 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
   });
 });
 
-nenMembers.post('/api/nen-members/photos/:id/notification/retry', requireRole('owner', 'admin', 'staff'), async (c) => {
+nenMembers.post('/api/nen-members/photos/:id/notification/retry', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.submission.review'), async (c) => {
   const body = await c.req.json<{ accountId?: string }>().catch(() => null);
   const accountId = body?.accountId?.trim();
   if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
