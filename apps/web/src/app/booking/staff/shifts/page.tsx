@@ -32,7 +32,7 @@ function isoDate(date: Date): string {
 
 function previewDates(): Array<{ date: string; day: number }> {
   const now = new Date()
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1))
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
   return Array.from({ length: 14 }, (_, index) => {
     const date = new Date(start)
     date.setUTCDate(start.getUTCDate() + index)

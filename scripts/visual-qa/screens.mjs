@@ -2585,7 +2585,7 @@ export const SCREENS = [
   /* 設計の4入口を同じ帯へ置き、受付枠・休業日は既存の勤務設定へつないだ。 */
   { ...BOOKING_SET, node: 'QSLEH', name: '28-1 予約設定', clock: '2026-08-26T00:00:00.000Z', verdict: 'match', verdictNote: '**2026-09-07 Issue #370 / UI HEAD `e1126c5c9` を3107/8794で再撮影し、★V6設計と一致。** PR #1107 の店舗設定と8件のメニューを実API契約で読み、4入口、出している6件・休止2件、最多メニュー、9:00〜19:00の受付時間、60日先までの受付範囲、設計順の6列表、担当者、料金、公開操作、ページ送りをそろえた。1440・1920pxとも横はみ出し0、内部語・壊れ値0件。', verdictSource: 'booking-settings-v6/QSLEH.txt + 2026-09-07 QSLEH 1440/1920px screenshots', verdictHead: 'e1126c5c9' },
   { ...BOOKING_SET, node: 'tksPc',
-    clock: '2026-08-26T00:00:00.000Z',
+    clock: '2026-09-07T00:00:00.000Z',
     states: {
       apis: ['**/api/booking/admin/settings*', '**/api/booking/admin/menus*', '**/api/booking/admin/availability*'],
       kinds: ['normal', 'loading', 'error'],
