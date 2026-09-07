@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 240,
-  "unimplemented": 0,
+  "compared": 244,
+  "unimplemented": 1,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 32,
-  "match": 202,
-  "structureMatchDataPending": 58,
-  "needsFix": 7,
+  "missing": 27,
+  "match": 217,
+  "structureMatchDataPending": 47,
+  "needsFix": 2,
   "unjudged": 1,
-  "remaining": 66,
+  "remaining": 51,
   "features": [
     {
       "feature": 1,
@@ -194,16 +194,16 @@
       "feature": 3,
       "name": "友だち",
       "total": 12,
-      "compared": 0,
+      "compared": 1,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 12,
-      "match": 10,
-      "structureMatchDataPending": 1,
+      "missing": 11,
+      "match": 11,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 1,
-      "remaining": 2,
+      "remaining": 1,
       "capturedAt": [
         {
           "pr": 520,
@@ -337,11 +337,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 6,
-      "match": 11,
-      "structureMatchDataPending": 6,
+      "match": 14,
+      "structureMatchDataPending": 3,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 6,
+      "remaining": 3,
       "capturedAt": [
         {
           "pr": 420,
@@ -493,11 +493,11 @@
       "feature": 5,
       "name": "シナリオ配信",
       "total": 14,
-      "compared": 13,
+      "compared": 14,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 1,
+      "missing": 0,
       "match": 14,
       "structureMatchDataPending": 0,
       "needsFix": 0,
@@ -1599,11 +1599,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 3,
-      "structureMatchDataPending": 6,
+      "match": 9,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 6,
+      "remaining": 0,
       "capturedAt": [
         {
           "pr": 1191,
@@ -1988,15 +1988,15 @@
       "name": "成果とアフィリエイト",
       "total": 9,
       "compared": 7,
-      "unimplemented": 0,
+      "unimplemented": 1,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 2,
-      "match": 8,
+      "missing": 1,
+      "match": 7,
       "structureMatchDataPending": 1,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 1,
+      "remaining": 2,
       "capturedAt": [
         {
           "pr": 1180,
@@ -2596,11 +2596,11 @@
       "feature": 22,
       "name": "写真審査",
       "total": 4,
-      "compared": 2,
+      "compared": 4,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 2,
+      "missing": 0,
       "match": 4,
       "structureMatchDataPending": 0,
       "needsFix": 0,
@@ -2663,11 +2663,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 2,
-      "structureMatchDataPending": 2,
+      "match": 4,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 2,
+      "remaining": 0,
       "capturedAt": [
         {
           "pr": 1190,
@@ -2718,11 +2718,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 3,
-      "structureMatchDataPending": 3,
+      "match": 4,
+      "structureMatchDataPending": 2,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 3,
+      "remaining": 2,
       "capturedAt": [
         {
           "pr": 1076,
@@ -2788,8 +2788,8 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 5,
-      "structureMatchDataPending": 2,
-      "needsFix": 1,
+      "structureMatchDataPending": 3,
+      "needsFix": 0,
       "unjudged": 0,
       "remaining": 3,
       "capturedAt": [
@@ -2955,8 +2955,8 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 2,
-      "structureMatchDataPending": 1,
-      "needsFix": 4,
+      "structureMatchDataPending": 5,
+      "needsFix": 0,
       "unjudged": 0,
       "remaining": 5,
       "capturedAt": [
@@ -3013,11 +3013,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 2,
-      "structureMatchDataPending": 2,
+      "match": 4,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 2,
+      "remaining": 0,
       "capturedAt": [
         {
           "pr": 1177,
@@ -3213,11 +3213,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 1,
+      "match": 1,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 1,
+      "remaining": 0,
       "capturedAt": [
         {
           "pr": 478,
@@ -3300,5 +3300,13 @@
       "capturedAt": null
     }
   ],
-  "gaps": []
+  "gaps": [
+    {
+      "feature": 16,
+      "node": "njLGA",
+      "name": "16-1-C 支払い",
+      "gap": "build",
+      "gapNote": "締め（あと何日で金額が固定されるか）・支払予定日・振込用CSV・振込先・人ごとの金額を出す画面。口は `/api/affiliate-payments` が既に在るので、画面を作れば足りる"
+    }
+  ]
 }
