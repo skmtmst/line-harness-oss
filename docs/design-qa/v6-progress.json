@@ -3832,7 +3832,7 @@
   "pixelDiff": {
     "thresholdPercent": 10,
     "heightDiffThresholdPx": 24,
-    "generatedAt": "2026-09-07T14:07:10.639Z",
+    "generatedAt": "2026-09-07T14:09:06.297Z",
     "comparedCount": 272,
     "unavailableCount": 0,
     "pixelAboveThresholdCount": 34,
@@ -3982,7 +3982,7 @@
         "pixelAboveThreshold": true,
         "heightAboveThreshold": false,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -4031,7 +4031,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -4080,7 +4080,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -4993,7 +4993,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -5042,7 +5042,7 @@
         "pixelAboveThreshold": true,
         "heightAboveThreshold": false,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -5139,7 +5139,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -5188,7 +5188,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -5237,7 +5237,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -5286,7 +5286,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -5431,7 +5431,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -7640,7 +7640,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -7689,7 +7689,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -7738,7 +7738,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -7835,7 +7835,7 @@
         "pixelAboveThreshold": true,
         "heightAboveThreshold": false,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -8916,9 +8916,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 359905,
+            "mismatchedPixels": 359697,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 17.3565,
+            "pixelDiffPercent": 17.3465,
             "boundingBox": {
               "left": 1,
               "top": 11,
@@ -8932,7 +8932,7 @@
             "diffPath": "docs/design-qa/webinars-v6/LKuAQ-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 17.3565,
+        "pixelDiffPercent": 17.3465,
         "heightDifferencePx": 0,
         "dominantRegion": "中央・中央",
         "implementationSource": "docs",
@@ -9660,7 +9660,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -10861,7 +10861,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -10958,7 +10958,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -11199,7 +11199,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -11344,7 +11344,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -11441,7 +11441,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -11490,7 +11490,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -11539,7 +11539,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -11588,7 +11588,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -12741,7 +12741,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -12790,7 +12790,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -12839,7 +12839,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -12888,7 +12888,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -12985,7 +12985,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -13034,7 +13034,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -13467,7 +13467,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -13564,7 +13564,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -13613,7 +13613,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -13662,7 +13662,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -13711,7 +13711,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -13760,7 +13760,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -13809,7 +13809,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -13858,7 +13858,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -13907,7 +13907,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -13956,7 +13956,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -14005,7 +14005,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -14054,7 +14054,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -14103,7 +14103,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -14296,7 +14296,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -14345,7 +14345,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -14490,7 +14490,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -14683,7 +14683,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -14732,7 +14732,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -14781,7 +14781,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -14830,7 +14830,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -14879,7 +14879,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -14928,7 +14928,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -14977,7 +14977,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -15026,7 +15026,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -15219,7 +15219,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -15316,7 +15316,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -15365,7 +15365,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -15414,7 +15414,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -15559,7 +15559,7 @@
         "pixelAboveThreshold": true,
         "heightAboveThreshold": false,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -15800,7 +15800,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -15897,7 +15897,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -15946,7 +15946,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -16043,7 +16043,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -16092,7 +16092,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -16189,7 +16189,7 @@
         "pixelAboveThreshold": true,
         "heightAboveThreshold": false,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -16334,7 +16334,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -16383,7 +16383,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {
@@ -16480,7 +16480,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T13:59:06.844Z"
+        "retainedFrom": "2026-09-07T14:07:10.639Z"
       }
     },
     {

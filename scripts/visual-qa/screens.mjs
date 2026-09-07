@@ -1461,7 +1461,7 @@ export const SCREENS = [
   {
     ...WEBINAR, node: 'LKuAQ', name: '10-1-K アーカイブ確認',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #477・UI HEAD `d3bcf1f75` で再判定し一致。** 背面をアーカイブ確認の詳細画面へそろえ、旧機能説明会、申込85人、視聴99人、公開URL無効化、履歴保持、設定サマリー、LINEプレビューを表示した。3104/8791の1440/1920pxで横はみ出し0、高さ差0px。1920px画素差17.3565%は共通ConfirmDialogの幅・配置だけに残り、共通部品票 #473 待ち。',
+    verdictNote: '**2026-09-07 Issue #477・UI HEAD `d3bcf1f75` で再判定し一致。** 背面をアーカイブ確認の詳細画面へそろえ、旧機能説明会、申込85人、視聴99人、公開URL無効化、履歴保持、設定サマリー、LINEプレビューを表示した。3104/8791の1440/1920pxで横はみ出し0、高さ差0px。1920px画素差17.3465%は共通ConfirmDialogの幅・配置だけに残り、共通部品票 #473 待ち。',
     verdictSource: 'webinars-v6/LKuAQ.png（Pencil HTML） + webinars-v6/LKuAQ.txt + LKuAQ-1920.png（実装） + Issue #474',
     verdictHead: 'd3bcf1f75',
     route: '/webinars', mode: 'viewport', height: 1080,
