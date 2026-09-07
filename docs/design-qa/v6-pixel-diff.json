@@ -1,6 +1,6 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
-  "generatedAt": "2026-09-07T12:28:24.106Z",
+  "generatedAt": "2026-09-07T12:56:37.180Z",
   "thresholdPercent": 10,
   "screenCount": 272,
   "comparedCount": 250,
@@ -60,9 +60,9 @@
           "implementationHeight": 1754,
           "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 162937,
+          "mismatchedPixels": 163188,
           "comparedPixels": 3367680,
-          "pixelDiffPercent": 4.8383,
+          "pixelDiffPercent": 4.8457,
           "boundingBox": {
             "left": 0,
             "top": 0,
@@ -72,12 +72,14 @@
           "dominantRegion": "下部・右",
           "designPath": "docs/design-reference/dashboard-v6/ZN0ov.png",
           "implementationPath": "docs/design-qa/dashboard-v6/ZN0ov-1920.png",
+          "implementationSource": "docs",
           "diffPath": "docs/design-qa/dashboard-v6/ZN0ov-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 4.8383,
+      "pixelDiffPercent": 4.8457,
       "heightDifferencePx": 0,
       "dominantRegion": "下部・右",
+      "implementationSource": "docs",
       "diffPath": "docs/design-qa/dashboard-v6/ZN0ov-diff-1920.png",
       "aboveThreshold": false
     },
@@ -97,9 +99,9 @@
           "implementationHeight": 1668,
           "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 461454,
+          "mismatchedPixels": 478390,
           "comparedPixels": 3202560,
-          "pixelDiffPercent": 14.4089,
+          "pixelDiffPercent": 14.9377,
           "boundingBox": {
             "left": 1,
             "top": 10,
@@ -109,12 +111,14 @@
           "dominantRegion": "下部・中央",
           "designPath": "docs/design-reference/dashboard-v6/JN6mQ.png",
           "implementationPath": "docs/design-qa/dashboard-v6/JN6mQ-1920.png",
+          "implementationSource": "docs",
           "diffPath": "docs/design-qa/dashboard-v6/JN6mQ-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 14.4089,
+      "pixelDiffPercent": 14.9377,
       "heightDifferencePx": 0,
       "dominantRegion": "下部・中央",
+      "implementationSource": "docs",
       "diffPath": "docs/design-qa/dashboard-v6/JN6mQ-diff-1920.png",
       "aboveThreshold": true
     },
