@@ -7610,6 +7610,8 @@ export interface BookingMenu {
   duration_minutes: number;
   buffer_after_minutes: number;
   base_price: number;
+  price_mode?: 'fixed' | 'free' | 'inquiry';
+  version?: number;
   sort_order: number;
   is_active: number;
   auto_tag_id: string | null;
@@ -7623,11 +7625,23 @@ export interface BookingMenu {
   cancel_deadline_hours_before?: number | null;
   /** 予約時にお客様へ聞く質問。null なら質問しない */
   intake_question?: string | null;
+  effectiveBookingRules?: {
+    bookingWindowDays: number;
+    cutoffMinutesBefore: number;
+    cancelDeadlineMinutesBefore: number;
+    source: {
+      bookingWindowDays: 'store' | 'menu';
+      cutoffMinutesBefore: 'store' | 'menu';
+      cancelDeadlineMinutesBefore: 'store' | 'menu';
+    };
+  };
 }
 
 export interface BookingSettings {
+  id: string | null;
   lineAccountId: string;
   organizationName: string;
+  version: number;
   timeZone: string;
   bookingWindowDays: number;
   cutoffMinutesBefore: number;
@@ -7644,10 +7658,20 @@ export interface BookingSettings {
     intervals: Array<{ start: string; end: string }>;
   }>;
   exceptions: Array<{
-    date: string;
+    id: string;
+    lineAccountId: string;
+    scopeKind: 'store' | 'staff' | 'resource';
+    scopeId: string | null;
+    date: string | null;
+    dateFrom: string;
+    dateTo: string;
     kind: 'open' | 'closed' | 'custom_hours';
     intervals: Array<{ start: string; end: string }>;
+    reason: string | null;
     note: string | null;
+    version: number;
+    createdAt: string;
+    updatedAt: string;
   }>;
   updatedAt: string;
 }
