@@ -1,14 +1,14 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
-  "generatedAt": "2026-09-07T14:07:13.922Z",
+  "generatedAt": "2026-09-07T14:54:03.491Z",
   "thresholdPercent": 10,
   "heightDiffThresholdPx": 24,
   "screenCount": 272,
   "comparedCount": 272,
   "unavailableCount": 0,
   "pixelAboveThresholdCount": 31,
-  "heightAboveThresholdCount": 65,
-  "aboveThresholdCount": 91,
+  "heightAboveThresholdCount": 55,
+  "aboveThresholdCount": 81,
   "entries": [
     {
       "feature": 1,
@@ -51,7 +51,8 @@
       "diffPath": "docs/design-qa/dashboard-v6/vUXKb-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 1,
@@ -94,7 +95,8 @@
       "diffPath": "docs/design-qa/dashboard-v6/ZN0ov-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 1,
@@ -136,7 +138,7 @@
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 1,
@@ -178,7 +180,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 1,
@@ -220,7 +222,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 2,
@@ -263,7 +265,8 @@
       "diffPath": "docs/design-qa/inbox-v6/xGLVe-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 2,
@@ -306,7 +309,8 @@
       "diffPath": "docs/design-qa/inbox-v6/NfgOs-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 2,
@@ -348,7 +352,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 2,
@@ -390,7 +394,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 2,
@@ -432,7 +436,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 2,
@@ -474,7 +478,7 @@
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 2,
@@ -516,7 +520,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 2,
@@ -559,7 +563,8 @@
       "diffPath": "docs/design-qa/inbox-v6/YZaDK-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 2,
@@ -602,7 +607,8 @@
       "diffPath": "docs/design-qa/inbox-v6/L35UOV-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 2,
@@ -645,7 +651,8 @@
       "diffPath": "docs/design-qa/inbox-v6/IYjvu-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 2,
@@ -687,7 +694,7 @@
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 2,
@@ -729,7 +736,7 @@
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 2,
@@ -772,7 +779,8 @@
       "diffPath": "docs/design-qa/inbox-v6/ASsb3-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 2,
@@ -814,7 +822,7 @@
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 2,
@@ -856,7 +864,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 2,
@@ -899,7 +907,8 @@
       "diffPath": "docs/design-qa/inbox-v6/AuSDY-diff-1920.png",
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 2,
@@ -941,7 +950,7 @@
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 3,
@@ -984,7 +993,8 @@
       "diffPath": "docs/design-qa/friends-v6/PhxG6-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 3,
@@ -1026,7 +1036,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 3,
@@ -1068,7 +1078,7 @@
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 3,
@@ -1111,7 +1121,8 @@
       "diffPath": "docs/design-qa/friends-v6/IAf7j-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 3,
@@ -1153,7 +1164,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 3,
@@ -1195,7 +1206,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 3,
@@ -1237,7 +1248,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 3,
@@ -1279,7 +1290,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 3,
@@ -1322,7 +1333,8 @@
       "diffPath": "docs/design-qa/friends-v6/r7eSi-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 3,
@@ -1365,7 +1377,8 @@
       "diffPath": "docs/design-qa/friends-v6/w8W4Eh-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 3,
@@ -1407,7 +1420,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 5,
@@ -1450,7 +1463,8 @@
       "diffPath": "docs/design-qa/scenarios-v6/TC1b1-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 5,
@@ -1493,7 +1507,8 @@
       "diffPath": "docs/design-qa/scenarios-v6/cCB7r-diff-1920.png",
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 5,
@@ -1536,7 +1551,8 @@
       "diffPath": "docs/design-qa/scenarios-v6/kk8dz-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 5,
@@ -1579,7 +1595,8 @@
       "diffPath": "docs/design-qa/scenarios-v6/bV5Vs-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 5,
@@ -1622,7 +1639,8 @@
       "diffPath": "docs/design-qa/scenarios-v6/xfYLn-diff-1920.png",
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 5,
@@ -1665,7 +1683,8 @@
       "diffPath": "docs/design-qa/scenarios-v6/r6Gzsu-diff-1920.png",
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 5,
@@ -1708,7 +1727,8 @@
       "diffPath": "docs/design-qa/scenarios-v6/hz9ti-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 5,
@@ -1750,7 +1770,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 5,
@@ -1793,7 +1813,8 @@
       "diffPath": "docs/design-qa/scenarios-v6/EvVO5-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 5,
@@ -1836,7 +1857,8 @@
       "diffPath": "docs/design-qa/scenarios-v6/RUxNf-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 5,
@@ -1879,7 +1901,8 @@
       "diffPath": "docs/design-qa/scenarios-v6/NrBkW-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 5,
@@ -1922,7 +1945,8 @@
       "diffPath": "docs/design-qa/scenarios-v6/g2UNV-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 5,
@@ -1965,7 +1989,8 @@
       "diffPath": "docs/design-qa/scenarios-v6/M2b2B-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 5,
@@ -2008,7 +2033,8 @@
       "diffPath": "docs/design-qa/scenarios-v6/q5G45-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 6,
@@ -2051,7 +2077,8 @@
       "diffPath": "docs/design-qa/broadcasts-v6/q76C35-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 6,
@@ -2094,7 +2121,8 @@
       "diffPath": "docs/design-qa/broadcasts-v6/zZ9fA-diff-1920.png",
       "pixelAboveThreshold": true,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 6,
@@ -2137,7 +2165,8 @@
       "diffPath": "docs/design-qa/broadcasts-v6/cPk8A-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 6,
@@ -2180,7 +2209,8 @@
       "diffPath": "docs/design-qa/broadcasts-v6/XQfMD-diff-1920.png",
       "pixelAboveThreshold": true,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 6,
@@ -2223,7 +2253,8 @@
       "diffPath": "docs/design-qa/broadcasts-v6/p97Tf-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 6,
@@ -2266,7 +2297,8 @@
       "diffPath": "docs/design-qa/broadcasts-v6/Bw0zt-diff-1920.png",
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 6,
@@ -2309,7 +2341,8 @@
       "diffPath": "docs/design-qa/broadcasts-v6/h0kahp-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 6,
@@ -2352,7 +2385,8 @@
       "diffPath": "docs/design-qa/broadcasts-v6/vW4Es-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 6,
@@ -2395,7 +2429,8 @@
       "diffPath": "docs/design-qa/broadcasts-v6/FpgxH-diff-1920.png",
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 6,
@@ -2438,7 +2473,8 @@
       "diffPath": "docs/design-qa/broadcasts-v6/bPF0s-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 6,
@@ -2481,7 +2517,8 @@
       "diffPath": "docs/design-qa/broadcasts-v6/u6gHt-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 6,
@@ -2524,7 +2561,8 @@
       "diffPath": "docs/design-qa/broadcasts-v6/EGMb1-diff-1920.png",
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 6,
@@ -2567,7 +2605,8 @@
       "diffPath": "docs/design-qa/broadcasts-v6/sqFXf-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 6,
@@ -2610,7 +2649,8 @@
       "diffPath": "docs/design-qa/broadcasts-v6/xkRDb-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 6,
@@ -2653,7 +2693,8 @@
       "diffPath": "docs/design-qa/broadcasts-v6/TmHjF-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 7,
@@ -2696,7 +2737,8 @@
       "diffPath": "docs/design-qa/reminders-v6/M1EXwB-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 7,
@@ -2739,7 +2781,8 @@
       "diffPath": "docs/design-qa/reminders-v6/uJP22-diff-1920.png",
       "pixelAboveThreshold": true,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 7,
@@ -2782,7 +2825,8 @@
       "diffPath": "docs/design-qa/reminders-v6/J64xI-diff-1920.png",
       "pixelAboveThreshold": true,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 7,
@@ -2825,7 +2869,8 @@
       "diffPath": "docs/design-qa/reminders-v6/s7T2dz-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 7,
@@ -2868,7 +2913,8 @@
       "diffPath": "docs/design-qa/reminders-v6/JCz6J-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 7,
@@ -2911,7 +2957,8 @@
       "diffPath": "docs/design-qa/reminders-v6/W98zZQ-diff-1920.png",
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 7,
@@ -2954,7 +3001,8 @@
       "diffPath": "docs/design-qa/reminders-v6/s6Vvp-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 7,
@@ -2997,7 +3045,8 @@
       "diffPath": "docs/design-qa/reminders-v6/PSmHo-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 7,
@@ -3040,7 +3089,8 @@
       "diffPath": "docs/design-qa/reminders-v6/GC4St-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 7,
@@ -3083,7 +3133,8 @@
       "diffPath": "docs/design-qa/reminders-v6/Y0Sn3-diff-1920.png",
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 7,
@@ -3126,7 +3177,8 @@
       "diffPath": "docs/design-qa/reminders-v6/dC0yg-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 8,
@@ -3168,7 +3220,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 8,
@@ -3211,7 +3263,8 @@
       "diffPath": "docs/design-qa/auto-replies-v6/K7vg2-diff-1920.png",
       "pixelAboveThreshold": true,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 8,
@@ -3254,7 +3307,8 @@
       "diffPath": "docs/design-qa/auto-replies-v6/nzWIX-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 8,
@@ -3297,7 +3351,8 @@
       "diffPath": "docs/design-qa/auto-replies-v6/ivDoe-diff-1920.png",
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 8,
@@ -3340,7 +3395,8 @@
       "diffPath": "docs/design-qa/auto-replies-v6/U9hzqH-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 8,
@@ -3382,7 +3438,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 8,
@@ -3424,7 +3480,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 8,
@@ -3466,7 +3522,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 8,
@@ -3509,7 +3565,8 @@
       "diffPath": "docs/design-qa/auto-replies-v6/t7UtYQ-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 8,
@@ -3551,7 +3608,7 @@
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 8,
@@ -3594,7 +3651,8 @@
       "diffPath": "docs/design-qa/auto-replies-v6/q8wSqO-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 9,
@@ -3637,7 +3695,8 @@
       "diffPath": "docs/design-qa/friend-add-v6/uLQQc-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 9,
@@ -3680,7 +3739,8 @@
       "diffPath": "docs/design-qa/friend-add-v6/s9gAx-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 9,
@@ -3723,7 +3783,8 @@
       "diffPath": "docs/design-qa/friend-add-v6/W1wzCa-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 9,
@@ -3766,7 +3827,8 @@
       "diffPath": "docs/design-qa/friend-add-v6/K0Dbr2-diff-1920.png",
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 9,
@@ -3809,7 +3871,8 @@
       "diffPath": "docs/design-qa/friend-add-v6/txMO9-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 9,
@@ -3852,7 +3915,8 @@
       "diffPath": "docs/design-qa/friend-add-v6/U3SI5-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 9,
@@ -3895,7 +3959,8 @@
       "diffPath": "docs/design-qa/friend-add-v6/ec9vg-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 9,
@@ -3937,7 +4002,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 9,
@@ -3980,7 +4045,8 @@
       "diffPath": "docs/design-qa/friend-add-v6/P2J0Te-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 9,
@@ -4023,7 +4089,8 @@
       "diffPath": "docs/design-qa/friend-add-v6/Q3qP1r-diff-1920.png",
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 10,
@@ -4066,7 +4133,8 @@
       "diffPath": "docs/design-qa/webinars-v6/ZC13r-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 10,
@@ -4109,7 +4177,8 @@
       "diffPath": "docs/design-qa/webinars-v6/lvaY5-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 10,
@@ -4152,7 +4221,8 @@
       "diffPath": "docs/design-qa/webinars-v6/PV1Vh-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 10,
@@ -4195,7 +4265,8 @@
       "diffPath": "docs/design-qa/webinars-v6/d3rFGD-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 10,
@@ -4238,7 +4309,8 @@
       "diffPath": "docs/design-qa/webinars-v6/Ho8z4-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 10,
@@ -4281,7 +4353,8 @@
       "diffPath": "docs/design-qa/webinars-v6/Xjk8q-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 10,
@@ -4324,7 +4397,8 @@
       "diffPath": "docs/design-qa/webinars-v6/GB0NR-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 10,
@@ -4367,7 +4441,8 @@
       "diffPath": "docs/design-qa/webinars-v6/D6yO7e-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 10,
@@ -4410,7 +4485,8 @@
       "diffPath": "docs/design-qa/webinars-v6/TimXl-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 10,
@@ -4453,7 +4529,8 @@
       "diffPath": "docs/design-qa/webinars-v6/Q8sHa-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 10,
@@ -4496,7 +4573,8 @@
       "diffPath": "docs/design-qa/webinars-v6/yxyzQ-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 10,
@@ -4539,7 +4617,8 @@
       "diffPath": "docs/design-qa/webinars-v6/LKuAQ-diff-1920.png",
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 10,
@@ -4582,7 +4661,8 @@
       "diffPath": "docs/design-qa/webinars-v6/zCQXe-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 11,
@@ -4625,7 +4705,8 @@
       "diffPath": "docs/design-qa/templates-v6/W7LBc-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 11,
@@ -4667,7 +4748,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 11,
@@ -4709,7 +4790,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 11,
@@ -4752,7 +4833,8 @@
       "diffPath": "docs/design-qa/templates-v6/NNDMR-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 11,
@@ -4794,7 +4876,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 11,
@@ -4836,7 +4918,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 11,
@@ -4878,7 +4960,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 11,
@@ -4921,7 +5003,8 @@
       "diffPath": "docs/design-qa/templates-v6/M9cij-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 11,
@@ -4964,7 +5047,8 @@
       "diffPath": "docs/design-qa/templates-v6/CzndJ-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 11,
@@ -5007,7 +5091,8 @@
       "diffPath": "docs/design-qa/templates-v6/NKyoA-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 12,
@@ -5050,7 +5135,8 @@
       "diffPath": "docs/design-qa/rich-menus-v6/GO8RQ-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 12,
@@ -5093,7 +5179,8 @@
       "diffPath": "docs/design-qa/rich-menus-v6/XtfO3-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 12,
@@ -5136,7 +5223,8 @@
       "diffPath": "docs/design-qa/rich-menus-v6/kQ1bs-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 12,
@@ -5178,7 +5266,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 12,
@@ -5221,7 +5309,8 @@
       "diffPath": "docs/design-qa/rich-menus-v6/NXdDk-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 12,
@@ -5264,7 +5353,8 @@
       "diffPath": "docs/design-qa/rich-menus-v6/UMiJ9-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 12,
@@ -5307,7 +5397,8 @@
       "diffPath": "docs/design-qa/rich-menus-v6/TL7tp-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 12,
@@ -5350,7 +5441,8 @@
       "diffPath": "docs/design-qa/rich-menus-v6/szXsT-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 12,
@@ -5393,7 +5485,8 @@
       "diffPath": "docs/design-qa/rich-menus-v6/RW5Tb-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 13,
@@ -5436,7 +5529,8 @@
       "diffPath": "docs/design-qa/forms-v6/EMBIK-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 13,
@@ -5479,7 +5573,8 @@
       "diffPath": "docs/design-qa/forms-v6/vCqUj-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 13,
@@ -5522,7 +5617,8 @@
       "diffPath": "docs/design-qa/forms-v6/ava2n-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 13,
@@ -5565,7 +5661,8 @@
       "diffPath": "docs/design-qa/forms-v6/cSqvP-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 13,
@@ -5608,7 +5705,8 @@
       "diffPath": "docs/design-qa/forms-v6/v9tYhl-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 13,
@@ -5651,7 +5749,8 @@
       "diffPath": "docs/design-qa/forms-v6/gBp2J-diff-1920.png",
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 13,
@@ -5694,7 +5793,8 @@
       "diffPath": "docs/design-qa/forms-v6/ZOPyc-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 14,
@@ -5737,7 +5837,8 @@
       "diffPath": "docs/design-qa/common-vars-v6/WuKzU-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 14,
@@ -5780,7 +5881,8 @@
       "diffPath": "docs/design-qa/common-vars-v6/gBtaK-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 14,
@@ -5823,7 +5925,8 @@
       "diffPath": "docs/design-qa/common-vars-v6/uNBlA-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 14,
@@ -5866,7 +5969,8 @@
       "diffPath": "docs/design-qa/common-vars-v6/yPkWe-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 15,
@@ -5909,7 +6013,8 @@
       "diffPath": "docs/design-qa/media-v6/g89Tc-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 15,
@@ -5952,7 +6057,8 @@
       "diffPath": "docs/design-qa/media-v6/voJtX-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 15,
@@ -5995,7 +6101,8 @@
       "diffPath": "docs/design-qa/media-v6/eXAJP-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 15,
@@ -6038,7 +6145,8 @@
       "diffPath": "docs/design-qa/media-v6/YfTfJ-diff-1920.png",
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 15,
@@ -6081,7 +6189,8 @@
       "diffPath": "docs/design-qa/media-v6/h8pBZr-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 16,
@@ -6124,7 +6233,8 @@
       "diffPath": "docs/design-qa/affiliates-v6/PouPn-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 16,
@@ -6167,7 +6277,8 @@
       "diffPath": "docs/design-qa/affiliates-v6/GH8VL-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 16,
@@ -6210,7 +6321,8 @@
       "diffPath": "docs/design-qa/affiliates-v6/n5VVTb-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 16,
@@ -6252,7 +6364,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 16,
@@ -6295,7 +6407,8 @@
       "diffPath": "docs/design-qa/affiliates-v6/xqT1Z-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 16,
@@ -6337,7 +6450,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 16,
@@ -6380,7 +6493,8 @@
       "diffPath": "docs/design-qa/affiliates-v6/GPWzq-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 16,
@@ -6423,7 +6537,8 @@
       "diffPath": "docs/design-qa/affiliates-v6/QX70l-diff-1920.png",
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 16,
@@ -6466,7 +6581,8 @@
       "diffPath": "docs/design-qa/affiliates-v6/GqFTV-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 17,
@@ -6508,7 +6624,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 17,
@@ -6550,7 +6666,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 17,
@@ -6593,7 +6709,8 @@
       "diffPath": "docs/design-qa/mileage-v6/qlVLJ-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 17,
@@ -6636,7 +6753,8 @@
       "diffPath": "docs/design-qa/mileage-v6/MvZm5-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 17,
@@ -6678,7 +6796,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 17,
@@ -6721,7 +6839,8 @@
       "diffPath": "docs/design-qa/mileage-v6/HIU5O-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 17,
@@ -6763,7 +6882,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 17,
@@ -6805,7 +6924,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 17,
@@ -6847,7 +6966,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 17,
@@ -6889,7 +7008,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 17,
@@ -6931,7 +7050,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 18,
@@ -6974,7 +7093,8 @@
       "diffPath": "docs/design-qa/inflow-v6/Q4bkTg-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 18,
@@ -7017,7 +7137,8 @@
       "diffPath": "docs/design-qa/inflow-v6/IhSBB-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 18,
@@ -7060,7 +7181,8 @@
       "diffPath": "docs/design-qa/inflow-v6/v0HaI-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 18,
@@ -7103,7 +7225,8 @@
       "diffPath": "docs/design-qa/inflow-v6/TEVk8-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 18,
@@ -7146,7 +7269,8 @@
       "diffPath": "docs/design-qa/inflow-v6/JupxW-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 18,
@@ -7189,7 +7313,8 @@
       "diffPath": "docs/design-qa/inflow-v6/UIaM7-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 18,
@@ -7232,7 +7357,8 @@
       "diffPath": "docs/design-qa/inflow-v6/BMmxU-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 18,
@@ -7275,7 +7401,8 @@
       "diffPath": "docs/design-qa/inflow-v6/BuVDB-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 18,
@@ -7318,7 +7445,8 @@
       "diffPath": "docs/design-qa/inflow-v6/Im2b1-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 19,
@@ -7361,7 +7489,8 @@
       "diffPath": "docs/design-qa/conversions-v6/ZrpKn-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 19,
@@ -7404,7 +7533,8 @@
       "diffPath": "docs/design-qa/conversions-v6/GUxsj-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 19,
@@ -7447,7 +7577,8 @@
       "diffPath": "docs/design-qa/conversions-v6/GtylA-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 19,
@@ -7490,7 +7621,8 @@
       "diffPath": "docs/design-qa/conversions-v6/d8d3Mz-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 20,
@@ -7533,7 +7665,8 @@
       "diffPath": "docs/design-qa/analytics-v6/Zxezb-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 20,
@@ -7576,7 +7709,8 @@
       "diffPath": "docs/design-qa/analytics-v6/J6Inc-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 20,
@@ -7619,7 +7753,8 @@
       "diffPath": "docs/design-qa/analytics-v6/YBGtm-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 20,
@@ -7662,7 +7797,8 @@
       "diffPath": "docs/design-qa/analytics-v6/QQ1SR-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 20,
@@ -7705,7 +7841,8 @@
       "diffPath": "docs/design-qa/analytics-v6/URqOA-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 20,
@@ -7748,7 +7885,8 @@
       "diffPath": "docs/design-qa/analytics-v6/f5HsX-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 20,
@@ -7791,7 +7929,8 @@
       "diffPath": "docs/design-qa/analytics-v6/C2I7ry-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 20,
@@ -7834,7 +7973,8 @@
       "diffPath": "docs/design-qa/analytics-v6/Fh2Qj-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 20,
@@ -7877,7 +8017,8 @@
       "diffPath": "docs/design-qa/analytics-v6/dfwD4-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 21,
@@ -7919,7 +8060,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 21,
@@ -7961,7 +8102,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 21,
@@ -8003,7 +8144,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 21,
@@ -8045,7 +8186,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 21,
@@ -8088,7 +8229,8 @@
       "diffPath": "docs/design-qa/nen-v6/HpKyF-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 21,
@@ -8130,7 +8272,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 21,
@@ -8172,7 +8314,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 22,
@@ -8215,7 +8357,8 @@
       "diffPath": "docs/design-qa/photos-v6/Qu6Vk-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 22,
@@ -8258,7 +8401,8 @@
       "diffPath": "docs/design-qa/photos-v6/hHrz8-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 22,
@@ -8301,7 +8445,8 @@
       "diffPath": "docs/design-qa/photos-v6/N2J629-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 22,
@@ -8344,7 +8489,8 @@
       "diffPath": "docs/design-qa/photos-v6/J3Wxl8-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 23,
@@ -8387,7 +8533,8 @@
       "diffPath": "docs/design-qa/ec-v6/eI3gs-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 23,
@@ -8430,7 +8577,8 @@
       "diffPath": "docs/design-qa/ec-v6/ELayY-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 23,
@@ -8473,7 +8621,8 @@
       "diffPath": "docs/design-qa/ec-v6/bfB50-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 23,
@@ -8516,7 +8665,8 @@
       "diffPath": "docs/design-qa/ec-v6/oHAN4-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 24,
@@ -8558,7 +8708,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 24,
@@ -8601,7 +8751,8 @@
       "diffPath": "docs/design-qa/line-notify-v6/Q55bb-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 24,
@@ -8643,7 +8794,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 24,
@@ -8685,7 +8836,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 24,
@@ -8727,7 +8878,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 24,
@@ -8769,7 +8920,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 25,
@@ -8811,7 +8962,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 25,
@@ -8826,34 +8977,36 @@
           "width": 1920,
           "comparedHeight": 1080,
           "designHeight": 1080,
-          "implementationHeight": 1249,
-          "heightDifferencePx": 169,
+          "implementationHeight": 1080,
+          "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 126614,
+          "mismatchedPixels": 125434,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 6.106,
+          "pixelDiffPercent": 6.0491,
           "boundingBox": {
             "left": 0,
-            "top": 11,
+            "top": 0,
             "right": 1881,
             "bottom": 1079
           },
-          "dominantRegion": "中央・左",
+          "dominantRegion": "上部・右",
+          "heightReason": null,
           "designPath": "docs/design-reference/automations-v6/Rv8Jv.png",
           "implementationPath": "docs/design-qa/automations-v6/Rv8Jv-1920.png",
           "implementationSource": "docs",
           "diffPath": "docs/design-qa/automations-v6/Rv8Jv-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 6.106,
-      "heightDifferencePx": 169,
-      "dominantRegion": "中央・左",
+      "pixelDiffPercent": 6.0491,
+      "heightDifferencePx": 0,
+      "heightReason": null,
+      "dominantRegion": "上部・右",
       "implementationSource": "docs",
       "diffPath": "docs/design-qa/automations-v6/Rv8Jv-diff-1920.png",
       "pixelAboveThreshold": false,
-      "heightAboveThreshold": true,
-      "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "heightAboveThreshold": false,
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 25,
@@ -8895,7 +9048,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 25,
@@ -8937,7 +9090,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 25,
@@ -8979,7 +9132,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 25,
@@ -9021,7 +9174,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 25,
@@ -9036,12 +9189,12 @@
           "width": 1920,
           "comparedHeight": 1080,
           "designHeight": 1080,
-          "implementationHeight": 1165,
-          "heightDifferencePx": 85,
+          "implementationHeight": 1080,
+          "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 88800,
+          "mismatchedPixels": 88805,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 4.2824,
+          "pixelDiffPercent": 4.2826,
           "boundingBox": {
             "left": 0,
             "top": 0,
@@ -9049,21 +9202,23 @@
             "bottom": 1079
           },
           "dominantRegion": "中央・右",
+          "heightReason": null,
           "designPath": "docs/design-reference/automations-v6/py5CG.png",
           "implementationPath": "docs/design-qa/automations-v6/py5CG-1920.png",
           "implementationSource": "docs",
           "diffPath": "docs/design-qa/automations-v6/py5CG-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 4.2824,
-      "heightDifferencePx": 85,
+      "pixelDiffPercent": 4.2826,
+      "heightDifferencePx": 0,
+      "heightReason": null,
       "dominantRegion": "中央・右",
       "implementationSource": "docs",
       "diffPath": "docs/design-qa/automations-v6/py5CG-diff-1920.png",
       "pixelAboveThreshold": false,
-      "heightAboveThreshold": true,
-      "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "heightAboveThreshold": false,
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 25,
@@ -9078,8 +9233,8 @@
           "width": 1920,
           "comparedHeight": 1080,
           "designHeight": 1080,
-          "implementationHeight": 1300,
-          "heightDifferencePx": 220,
+          "implementationHeight": 1080,
+          "heightDifferencePx": 0,
           "widthDifferencePx": 0,
           "mismatchedPixels": 99214,
           "comparedPixels": 2073600,
@@ -9091,6 +9246,7 @@
             "bottom": 1079
           },
           "dominantRegion": "上部・左",
+          "heightReason": null,
           "designPath": "docs/design-reference/automations-v6/syWp4.png",
           "implementationPath": "docs/design-qa/automations-v6/syWp4-1920.png",
           "implementationSource": "docs",
@@ -9098,14 +9254,15 @@
         }
       ],
       "pixelDiffPercent": 4.7846,
-      "heightDifferencePx": 220,
+      "heightDifferencePx": 0,
+      "heightReason": null,
       "dominantRegion": "上部・左",
       "implementationSource": "docs",
       "diffPath": "docs/design-qa/automations-v6/syWp4-diff-1920.png",
       "pixelAboveThreshold": false,
-      "heightAboveThreshold": true,
-      "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "heightAboveThreshold": false,
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 26,
@@ -9148,7 +9305,8 @@
       "diffPath": "docs/design-qa/webhooks-v6/k3WxrO-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 26,
@@ -9191,7 +9349,8 @@
       "diffPath": "docs/design-qa/webhooks-v6/M0Gb7-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 26,
@@ -9234,7 +9393,8 @@
       "diffPath": "docs/design-qa/webhooks-v6/KNG00-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 26,
@@ -9276,7 +9436,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 27,
@@ -9289,36 +9449,38 @@
       "comparisons": [
         {
           "width": 1920,
-          "comparedHeight": 1080,
+          "comparedHeight": 1144,
           "designHeight": 1144,
-          "implementationHeight": 1080,
-          "heightDifferencePx": -64,
+          "implementationHeight": 1144,
+          "heightDifferencePx": 0,
           "widthDifferencePx": -28,
-          "mismatchedPixels": 96899,
-          "comparedPixels": 2073600,
-          "pixelDiffPercent": 4.673,
+          "mismatchedPixels": 98161,
+          "comparedPixels": 2196480,
+          "pixelDiffPercent": 4.469,
           "boundingBox": {
             "left": 0,
             "top": 0,
             "right": 1909,
-            "bottom": 1079
+            "bottom": 1143
           },
           "dominantRegion": "中央・右",
+          "heightReason": null,
           "designPath": "docs/design-reference/booking-v6/TV2DI.png",
           "implementationPath": "docs/design-qa/booking-v6/TV2DI-1920.png",
           "implementationSource": "docs",
           "diffPath": "docs/design-qa/booking-v6/TV2DI-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 4.673,
-      "heightDifferencePx": -64,
+      "pixelDiffPercent": 4.469,
+      "heightDifferencePx": 0,
+      "heightReason": null,
       "dominantRegion": "中央・右",
       "implementationSource": "docs",
       "diffPath": "docs/design-qa/booking-v6/TV2DI-diff-1920.png",
       "pixelAboveThreshold": false,
-      "heightAboveThreshold": true,
-      "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "heightAboveThreshold": false,
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 27,
@@ -9361,7 +9523,8 @@
       "diffPath": "docs/design-qa/booking-v6/TnDbq-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 27,
@@ -9376,12 +9539,12 @@
           "width": 1920,
           "comparedHeight": 1080,
           "designHeight": 1080,
-          "implementationHeight": 1307,
-          "heightDifferencePx": 227,
+          "implementationHeight": 1080,
+          "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 138267,
+          "mismatchedPixels": 141878,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 6.668,
+          "pixelDiffPercent": 6.8421,
           "boundingBox": {
             "left": 0,
             "top": 0,
@@ -9389,22 +9552,23 @@
             "bottom": 1079
           },
           "dominantRegion": "上部・右",
-          "heightReason": "実装",
+          "heightReason": null,
           "designPath": "docs/design-reference/booking-v6/cpdDi.png",
           "implementationPath": "docs/design-qa/booking-v6/cpdDi-1920.png",
           "implementationSource": "docs",
           "diffPath": "docs/design-qa/booking-v6/cpdDi-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 6.668,
-      "heightDifferencePx": 227,
-      "heightReason": "実装",
+      "pixelDiffPercent": 6.8421,
+      "heightDifferencePx": 0,
+      "heightReason": null,
       "dominantRegion": "上部・右",
       "implementationSource": "docs",
       "diffPath": "docs/design-qa/booking-v6/cpdDi-diff-1920.png",
       "pixelAboveThreshold": false,
-      "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "heightAboveThreshold": false,
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 27,
@@ -9446,7 +9610,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 27,
@@ -9489,7 +9653,8 @@
       "diffPath": "docs/design-qa/booking-v6/GFDqW-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 27,
@@ -9504,12 +9669,12 @@
           "width": 1920,
           "comparedHeight": 1080,
           "designHeight": 1080,
-          "implementationHeight": 1106,
-          "heightDifferencePx": 26,
+          "implementationHeight": 1080,
+          "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 141012,
+          "mismatchedPixels": 144623,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 6.8003,
+          "pixelDiffPercent": 6.9745,
           "boundingBox": {
             "left": 0,
             "top": 0,
@@ -9517,22 +9682,23 @@
             "bottom": 1079
           },
           "dominantRegion": "中央・右",
-          "heightReason": "実装",
+          "heightReason": null,
           "designPath": "docs/design-reference/booking-v6/GfceK.png",
           "implementationPath": "docs/design-qa/booking-v6/GfceK-1920.png",
           "implementationSource": "docs",
           "diffPath": "docs/design-qa/booking-v6/GfceK-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 6.8003,
-      "heightDifferencePx": 26,
-      "heightReason": "実装",
+      "pixelDiffPercent": 6.9745,
+      "heightDifferencePx": 0,
+      "heightReason": null,
       "dominantRegion": "中央・右",
       "implementationSource": "docs",
       "diffPath": "docs/design-qa/booking-v6/GfceK-diff-1920.png",
       "pixelAboveThreshold": false,
-      "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "heightAboveThreshold": false,
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 27,
@@ -9575,7 +9741,8 @@
       "diffPath": "docs/design-qa/booking-v6/Lg8ff-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 28,
@@ -9617,7 +9784,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 28,
@@ -9632,34 +9799,35 @@
           "width": 1920,
           "comparedHeight": 1136,
           "designHeight": 1136,
-          "implementationHeight": 1307,
-          "heightDifferencePx": 171,
+          "implementationHeight": 1136,
+          "heightDifferencePx": 0,
           "widthDifferencePx": -28,
-          "mismatchedPixels": 129164,
+          "mismatchedPixels": 123049,
           "comparedPixels": 2181120,
-          "pixelDiffPercent": 5.9219,
+          "pixelDiffPercent": 5.6416,
           "boundingBox": {
             "left": 0,
             "top": 0,
             "right": 1909,
-            "bottom": 1129
+            "bottom": 1135
           },
           "dominantRegion": "中央・右",
+          "heightReason": null,
           "designPath": "docs/design-reference/booking-settings-v6/tksPc.png",
           "implementationPath": "docs/design-qa/booking-settings-v6/tksPc-1920.png",
           "implementationSource": "docs",
           "diffPath": "docs/design-qa/booking-settings-v6/tksPc-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 5.9219,
-      "heightDifferencePx": 171,
+      "pixelDiffPercent": 5.6416,
+      "heightDifferencePx": 0,
+      "heightReason": null,
       "dominantRegion": "中央・右",
       "implementationSource": "docs",
       "diffPath": "docs/design-qa/booking-settings-v6/tksPc-diff-1920.png",
       "pixelAboveThreshold": false,
-      "heightAboveThreshold": true,
-      "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "heightAboveThreshold": false,
+      "aboveThreshold": false
     },
     {
       "feature": 28,
@@ -9674,8 +9842,8 @@
           "width": 1920,
           "comparedHeight": 1080,
           "designHeight": 1080,
-          "implementationHeight": 1738,
-          "heightDifferencePx": 658,
+          "implementationHeight": 1080,
+          "heightDifferencePx": 0,
           "widthDifferencePx": 0,
           "mismatchedPixels": 141617,
           "comparedPixels": 2073600,
@@ -9687,6 +9855,7 @@
             "bottom": 1079
           },
           "dominantRegion": "上部・右",
+          "heightReason": null,
           "designPath": "docs/design-reference/booking-settings-v6/GhOb3.png",
           "implementationPath": "docs/design-qa/booking-settings-v6/GhOb3-1920.png",
           "implementationSource": "docs",
@@ -9694,14 +9863,15 @@
         }
       ],
       "pixelDiffPercent": 6.8295,
-      "heightDifferencePx": 658,
+      "heightDifferencePx": 0,
+      "heightReason": null,
       "dominantRegion": "上部・右",
       "implementationSource": "docs",
       "diffPath": "docs/design-qa/booking-settings-v6/GhOb3-diff-1920.png",
       "pixelAboveThreshold": false,
-      "heightAboveThreshold": true,
-      "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "heightAboveThreshold": false,
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 28,
@@ -9743,7 +9913,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 29,
@@ -9785,7 +9955,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 29,
@@ -9800,12 +9970,12 @@
           "width": 1920,
           "comparedHeight": 1136,
           "designHeight": 1136,
-          "implementationHeight": 1778,
-          "heightDifferencePx": 642,
+          "implementationHeight": 1136,
+          "heightDifferencePx": 0,
           "widthDifferencePx": -307,
-          "mismatchedPixels": 132412,
+          "mismatchedPixels": 138578,
           "comparedPixels": 2181120,
-          "pixelDiffPercent": 6.0708,
+          "pixelDiffPercent": 6.3535,
           "boundingBox": {
             "left": 0,
             "top": 0,
@@ -9813,21 +9983,23 @@
             "bottom": 1135
           },
           "dominantRegion": "中央・右",
+          "heightReason": null,
           "designPath": "docs/design-reference/events-v6/MKrPY.png",
           "implementationPath": "docs/design-qa/events-v6/MKrPY-1920.png",
           "implementationSource": "docs",
           "diffPath": "docs/design-qa/events-v6/MKrPY-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 6.0708,
-      "heightDifferencePx": 642,
+      "pixelDiffPercent": 6.3535,
+      "heightDifferencePx": 0,
+      "heightReason": null,
       "dominantRegion": "中央・右",
       "implementationSource": "docs",
       "diffPath": "docs/design-qa/events-v6/MKrPY-diff-1920.png",
       "pixelAboveThreshold": false,
-      "heightAboveThreshold": true,
-      "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "heightAboveThreshold": false,
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 29,
@@ -9869,7 +10041,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 29,
@@ -9911,7 +10083,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 30,
@@ -9926,35 +10098,36 @@
           "width": 1920,
           "comparedHeight": 1080,
           "designHeight": 1080,
-          "implementationHeight": 1274,
-          "heightDifferencePx": 194,
+          "implementationHeight": 1080,
+          "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 91030,
+          "mismatchedPixels": 92528,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 4.3899,
+          "pixelDiffPercent": 4.4622,
           "boundingBox": {
             "left": 0,
             "top": 0,
             "right": 1881,
             "bottom": 1079
           },
-          "dominantRegion": "中央・右",
-          "heightReason": "実装",
+          "dominantRegion": "中央・左",
+          "heightReason": null,
           "designPath": "docs/design-reference/staff-v6/e3jz3.png",
           "implementationPath": "docs/design-qa/staff-v6/e3jz3-1920.png",
           "implementationSource": "docs",
           "diffPath": "docs/design-qa/staff-v6/e3jz3-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 4.3899,
-      "heightDifferencePx": 194,
-      "heightReason": "実装",
-      "dominantRegion": "中央・右",
+      "pixelDiffPercent": 4.4622,
+      "heightDifferencePx": 0,
+      "heightReason": null,
+      "dominantRegion": "中央・左",
       "implementationSource": "docs",
       "diffPath": "docs/design-qa/staff-v6/e3jz3-diff-1920.png",
       "pixelAboveThreshold": false,
-      "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "heightAboveThreshold": false,
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 30,
@@ -9997,7 +10170,8 @@
       "diffPath": "docs/design-qa/staff-v6/EOTS4-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 30,
@@ -10040,7 +10214,8 @@
       "diffPath": "docs/design-qa/staff-v6/jwVlo-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 30,
@@ -10082,7 +10257,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 31,
@@ -10125,7 +10300,8 @@
       "diffPath": "docs/design-qa/settings-v6/c4R6F-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 32,
@@ -10167,7 +10343,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 32,
@@ -10209,7 +10385,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 32,
@@ -10251,7 +10427,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 32,
@@ -10294,7 +10470,8 @@
       "diffPath": "docs/design-qa/operations-v6/U0BwS-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 4,
@@ -10337,7 +10514,8 @@
       "diffPath": "docs/design-qa/friend-attributes-v6/hqrOv-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 4,
@@ -10379,7 +10557,7 @@
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 4,
@@ -10422,7 +10600,8 @@
       "diffPath": "docs/design-qa/friend-attributes-v6/H374MR-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 4,
@@ -10465,7 +10644,8 @@
       "diffPath": "docs/design-qa/friend-attributes-v6/sfTEW-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 4,
@@ -10508,7 +10688,8 @@
       "diffPath": "docs/design-qa/friend-attributes-v6/op1rh-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 4,
@@ -10551,7 +10732,8 @@
       "diffPath": "docs/design-qa/friend-attributes-v6/QzRsJ-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 4,
@@ -10593,7 +10775,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 4,
@@ -10636,7 +10818,8 @@
       "diffPath": "docs/design-qa/friend-attributes-v6/yKEdO-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 4,
@@ -10678,7 +10861,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 4,
@@ -10720,7 +10903,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 4,
@@ -10763,7 +10946,8 @@
       "diffPath": "docs/design-qa/friend-attributes-v6/l25rlp-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 4,
@@ -10805,7 +10989,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 4,
@@ -10847,7 +11031,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 4,
@@ -10890,7 +11074,8 @@
       "diffPath": "docs/design-qa/friend-attributes-v6/ee0sk-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 4,
@@ -10932,7 +11117,7 @@
       "pixelAboveThreshold": true,
       "heightAboveThreshold": false,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 4,
@@ -10975,7 +11160,8 @@
       "diffPath": "docs/design-qa/friend-attributes-v6/byqIW-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 4,
@@ -11018,7 +11204,8 @@
       "diffPath": "docs/design-qa/friend-attributes-v6/A1ZYeP-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 4,
@@ -11060,7 +11247,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 4,
@@ -11102,7 +11289,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 4,
@@ -11145,7 +11332,8 @@
       "diffPath": "docs/design-qa/friend-attributes-v6/zGZMA-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 4,
@@ -11187,7 +11375,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
       "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T13:46:10.447Z"
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 3,
@@ -11230,7 +11418,8 @@
       "diffPath": "docs/design-qa/friends-v6/ux7of-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 2,
@@ -11273,7 +11462,8 @@
       "diffPath": "docs/design-qa/inbox-v6/ohj8J-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 33,
@@ -11316,7 +11506,8 @@
       "diffPath": "docs/design-qa/settings-v6/QT91v-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 33,
@@ -11359,7 +11550,8 @@
       "diffPath": "docs/design-qa/settings-v6/b2NGxk-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 33,
@@ -11402,7 +11594,8 @@
       "diffPath": "docs/design-qa/settings-v6/T9rA9-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "aboveThreshold": true,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 33,
@@ -11445,7 +11638,8 @@
       "diffPath": "docs/design-qa/settings-v6/nx3XW-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 34,
@@ -11488,7 +11682,8 @@
       "diffPath": "docs/design-qa/settings-v6/RAW35-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 34,
@@ -11531,7 +11726,8 @@
       "diffPath": "docs/design-qa/settings-v6/y0P0Qx-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 34,
@@ -11574,7 +11770,8 @@
       "diffPath": "docs/design-qa/settings-v6/D5UaX-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     },
     {
       "feature": 34,
@@ -11617,7 +11814,8 @@
       "diffPath": "docs/design-qa/settings-v6/f9oUm-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-07T14:52:50.258Z"
     }
   ]
 }
