@@ -1,19 +1,19 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 253,
+  "compared": 267,
   "unimplemented": 0,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 19,
+  "missing": 5,
   "match": 268,
   "structureMatchDataPending": 0,
   "needsFix": 0,
   "unjudged": 0,
   "pixelCompared": 272,
   "pixelUnavailable": 0,
-  "pixelAboveThreshold": 40,
-  "pixelDiffAboveThreshold": 12,
+  "pixelAboveThreshold": 37,
+  "pixelDiffAboveThreshold": 9,
   "heightDiffAboveThreshold": 28,
   "remaining": 0,
   "features": [
@@ -124,8 +124,8 @@
       "unjudged": 0,
       "pixelCompared": 18,
       "pixelUnavailable": 0,
-      "pixelAboveThreshold": 3,
-      "pixelDiffAboveThreshold": 3,
+      "pixelAboveThreshold": 0,
+      "pixelDiffAboveThreshold": 0,
       "heightDiffAboveThreshold": 0,
       "remaining": 0,
       "capturedAt": [
@@ -257,11 +257,11 @@
       "feature": 3,
       "name": "友だち",
       "total": 12,
-      "compared": 9,
+      "compared": 12,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 3,
+      "missing": 0,
       "match": 12,
       "structureMatchDataPending": 0,
       "needsFix": 0,
@@ -641,11 +641,11 @@
       "feature": 5,
       "name": "シナリオ配信",
       "total": 14,
-      "compared": 13,
+      "compared": 14,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 1,
+      "missing": 0,
       "match": 14,
       "structureMatchDataPending": 0,
       "needsFix": 0,
@@ -2285,11 +2285,11 @@
       "feature": 15,
       "name": "登録メディア",
       "total": 5,
-      "compared": 4,
+      "compared": 5,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 1,
+      "missing": 0,
       "match": 5,
       "structureMatchDataPending": 0,
       "needsFix": 0,
@@ -2380,11 +2380,11 @@
       "feature": 16,
       "name": "成果とアフィリエイト",
       "total": 9,
-      "compared": 7,
+      "compared": 9,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 2,
+      "missing": 0,
       "match": 9,
       "structureMatchDataPending": 0,
       "needsFix": 0,
@@ -2719,11 +2719,11 @@
       "feature": 18,
       "name": "流入と計測",
       "total": 9,
-      "compared": 8,
+      "compared": 9,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 1,
+      "missing": 0,
       "match": 9,
       "structureMatchDataPending": 0,
       "needsFix": 0,
@@ -2992,11 +2992,11 @@
       "feature": 21,
       "name": "NEN配信",
       "total": 7,
-      "compared": 1,
+      "compared": 7,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 6,
+      "missing": 0,
       "match": 7,
       "structureMatchDataPending": 0,
       "needsFix": 0,
@@ -3966,12 +3966,12 @@
   "pixelDiff": {
     "thresholdPercent": 10,
     "heightDiffThresholdPx": 24,
-    "generatedAt": "2026-09-07T16:12:49.191Z",
+    "generatedAt": "2026-09-07T16:42:52.305Z",
     "comparedCount": 272,
     "unavailableCount": 0,
-    "pixelAboveThresholdCount": 12,
+    "pixelAboveThresholdCount": 9,
     "heightAboveThresholdCount": 28,
-    "aboveThresholdCount": 40
+    "aboveThresholdCount": 37
   },
   "screens": [
     {
@@ -4021,7 +4021,8 @@
         "diffPath": "docs/design-qa/dashboard-v6/vUXKb-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -4071,7 +4072,8 @@
         "diffPath": "docs/design-qa/dashboard-v6/ZN0ov-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -4121,7 +4123,8 @@
         "diffPath": "docs/design-qa/dashboard-v6/JN6mQ-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -4170,7 +4173,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -4219,7 +4222,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -4354,6 +4357,7 @@
               "bottom": 1839
             },
             "dominantRegion": "下部・右",
+            "heightReason": null,
             "designPath": "docs/design-reference/inbox-v6/H3lAOB.png",
             "implementationPath": "docs/design-qa/inbox-v6/H3lAOB-1920.png",
             "implementationSource": "docs",
@@ -4362,13 +4366,13 @@
         ],
         "pixelDiffPercent": 5.7926,
         "heightDifferencePx": 0,
+        "heightReason": null,
         "dominantRegion": "下部・右",
         "implementationSource": "docs",
         "diffPath": "docs/design-qa/inbox-v6/H3lAOB-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "aboveThreshold": false
       }
     },
     {
@@ -4403,6 +4407,7 @@
               "bottom": 1839
             },
             "dominantRegion": "上部・中央",
+            "heightReason": null,
             "designPath": "docs/design-reference/inbox-v6/Xi4x9.png",
             "implementationPath": "docs/design-qa/inbox-v6/Xi4x9-1920.png",
             "implementationSource": "docs",
@@ -4411,13 +4416,13 @@
         ],
         "pixelDiffPercent": 7.6287,
         "heightDifferencePx": 0,
+        "heightReason": null,
         "dominantRegion": "上部・中央",
         "implementationSource": "docs",
         "diffPath": "docs/design-qa/inbox-v6/Xi4x9-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "aboveThreshold": false
       }
     },
     {
@@ -4442,7 +4447,7 @@
             "implementationHeight": 1840,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 248457,
+            "mismatchedPixels": 248458,
             "comparedPixels": 3532800,
             "pixelDiffPercent": 7.0329,
             "boundingBox": {
@@ -4452,6 +4457,7 @@
               "bottom": 1839
             },
             "dominantRegion": "上部・中央",
+            "heightReason": null,
             "designPath": "docs/design-reference/inbox-v6/f0zn6.png",
             "implementationPath": "docs/design-qa/inbox-v6/f0zn6-1920.png",
             "implementationSource": "docs",
@@ -4460,13 +4466,13 @@
         ],
         "pixelDiffPercent": 7.0329,
         "heightDifferencePx": 0,
+        "heightReason": null,
         "dominantRegion": "上部・中央",
         "implementationSource": "docs",
         "diffPath": "docs/design-qa/inbox-v6/f0zn6-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "aboveThreshold": false
       }
     },
     {
@@ -4491,9 +4497,9 @@
             "implementationHeight": 1840,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 338313,
+            "mismatchedPixels": 315092,
             "comparedPixels": 3532800,
-            "pixelDiffPercent": 9.5763,
+            "pixelDiffPercent": 8.919,
             "boundingBox": {
               "left": 13,
               "top": 21,
@@ -4508,7 +4514,7 @@
             "diffPath": "docs/design-qa/inbox-v6/NWbuF-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 9.5763,
+        "pixelDiffPercent": 8.919,
         "heightDifferencePx": 0,
         "heightReason": null,
         "dominantRegion": "中央・中央",
@@ -4551,6 +4557,7 @@
               "bottom": 1839
             },
             "dominantRegion": "下部・中央",
+            "heightReason": null,
             "designPath": "docs/design-reference/inbox-v6/B7CER8.png",
             "implementationPath": "docs/design-qa/inbox-v6/B7CER8-1920.png",
             "implementationSource": "docs",
@@ -4559,13 +4566,13 @@
         ],
         "pixelDiffPercent": 7.6933,
         "heightDifferencePx": 0,
+        "heightReason": null,
         "dominantRegion": "下部・中央",
         "implementationSource": "docs",
         "diffPath": "docs/design-qa/inbox-v6/B7CER8-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "aboveThreshold": false
       }
     },
     {
@@ -4740,9 +4747,9 @@
             "implementationHeight": 1840,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 285751,
+            "mismatchedPixels": 262540,
             "comparedPixels": 3532800,
-            "pixelDiffPercent": 8.0885,
+            "pixelDiffPercent": 7.4315,
             "boundingBox": {
               "left": 13,
               "top": 21,
@@ -4757,7 +4764,7 @@
             "diffPath": "docs/design-qa/inbox-v6/TUveA-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 8.0885,
+        "pixelDiffPercent": 7.4315,
         "heightDifferencePx": 0,
         "heightReason": null,
         "dominantRegion": "中央・中央",
@@ -4790,16 +4797,16 @@
             "implementationHeight": 1840,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 270169,
+            "mismatchedPixels": 222051,
             "comparedPixels": 3532800,
-            "pixelDiffPercent": 7.6474,
+            "pixelDiffPercent": 6.2854,
             "boundingBox": {
               "left": 1,
               "top": 10,
               "right": 1891,
               "bottom": 1839
             },
-            "dominantRegion": "上部・中央",
+            "dominantRegion": "下部・中央",
             "heightReason": null,
             "designPath": "docs/design-reference/inbox-v6/w72a2.png",
             "implementationPath": "docs/design-qa/inbox-v6/w72a2-1920.png",
@@ -4807,10 +4814,10 @@
             "diffPath": "docs/design-qa/inbox-v6/w72a2-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 7.6474,
+        "pixelDiffPercent": 6.2854,
         "heightDifferencePx": 0,
         "heightReason": null,
-        "dominantRegion": "上部・中央",
+        "dominantRegion": "下部・中央",
         "implementationSource": "docs",
         "diffPath": "docs/design-qa/inbox-v6/w72a2-diff-1920.png",
         "pixelAboveThreshold": false,
@@ -4890,13 +4897,13 @@
             "implementationHeight": 1840,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 710643,
+            "mismatchedPixels": 243288,
             "comparedPixels": 3532800,
-            "pixelDiffPercent": 20.1156,
+            "pixelDiffPercent": 6.8865,
             "boundingBox": {
-              "left": 0,
-              "top": 0,
-              "right": 1919,
+              "left": 13,
+              "top": 21,
+              "right": 1864,
               "bottom": 1839
             },
             "dominantRegion": "上部・右",
@@ -4907,15 +4914,15 @@
             "diffPath": "docs/design-qa/inbox-v6/ANgda-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 20.1156,
+        "pixelDiffPercent": 6.8865,
         "heightDifferencePx": 0,
         "heightReason": null,
         "dominantRegion": "上部・右",
         "implementationSource": "docs",
         "diffPath": "docs/design-qa/inbox-v6/ANgda-diff-1920.png",
-        "pixelAboveThreshold": true,
+        "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": true
+        "aboveThreshold": false
       }
     },
     {
@@ -4940,7 +4947,7 @@
             "implementationHeight": 1840,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 276291,
+            "mismatchedPixels": 276289,
             "comparedPixels": 3532800,
             "pixelDiffPercent": 7.8207,
             "boundingBox": {
@@ -4950,6 +4957,7 @@
               "bottom": 1839
             },
             "dominantRegion": "上部・中央",
+            "heightReason": null,
             "designPath": "docs/design-reference/inbox-v6/tBlkL.png",
             "implementationPath": "docs/design-qa/inbox-v6/tBlkL-1920.png",
             "implementationSource": "docs",
@@ -4958,13 +4966,13 @@
         ],
         "pixelDiffPercent": 7.8207,
         "heightDifferencePx": 0,
+        "heightReason": null,
         "dominantRegion": "上部・中央",
         "implementationSource": "docs",
         "diffPath": "docs/design-qa/inbox-v6/tBlkL-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "aboveThreshold": false
       }
     },
     {
@@ -4989,13 +4997,13 @@
             "implementationHeight": 1840,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 689556,
+            "mismatchedPixels": 243342,
             "comparedPixels": 3532800,
-            "pixelDiffPercent": 19.5187,
+            "pixelDiffPercent": 6.8881,
             "boundingBox": {
-              "left": 0,
-              "top": 0,
-              "right": 1919,
+              "left": 13,
+              "top": 21,
+              "right": 1864,
               "bottom": 1839
             },
             "dominantRegion": "上部・右",
@@ -5006,15 +5014,15 @@
             "diffPath": "docs/design-qa/inbox-v6/AuSDY-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 19.5187,
+        "pixelDiffPercent": 6.8881,
         "heightDifferencePx": 0,
         "heightReason": null,
         "dominantRegion": "上部・右",
         "implementationSource": "docs",
         "diffPath": "docs/design-qa/inbox-v6/AuSDY-diff-1920.png",
-        "pixelAboveThreshold": true,
+        "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": true
+        "aboveThreshold": false
       }
     },
     {
@@ -5039,13 +5047,13 @@
             "implementationHeight": 1840,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 688649,
+            "mismatchedPixels": 242435,
             "comparedPixels": 3532800,
-            "pixelDiffPercent": 19.493,
+            "pixelDiffPercent": 6.8624,
             "boundingBox": {
-              "left": 0,
-              "top": 0,
-              "right": 1919,
+              "left": 13,
+              "top": 21,
+              "right": 1864,
               "bottom": 1839
             },
             "dominantRegion": "上部・右",
@@ -5056,15 +5064,15 @@
             "diffPath": "docs/design-qa/inbox-v6/LHjwD-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 19.493,
+        "pixelDiffPercent": 6.8624,
         "heightDifferencePx": 0,
         "heightReason": null,
         "dominantRegion": "上部・右",
         "implementationSource": "docs",
         "diffPath": "docs/design-qa/inbox-v6/LHjwD-diff-1920.png",
-        "pixelAboveThreshold": true,
+        "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": true
+        "aboveThreshold": false
       }
     },
     {
@@ -5114,7 +5122,8 @@
         "diffPath": "docs/design-qa/friends-v6/PhxG6-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -5163,7 +5172,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -5188,9 +5197,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 98287,
+            "mismatchedPixels": 98074,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 4.7399,
+            "pixelDiffPercent": 4.7296,
             "boundingBox": {
               "left": 25,
               "top": 21,
@@ -5205,7 +5214,7 @@
             "diffPath": "docs/design-qa/friends-v6/Igi72-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 4.7399,
+        "pixelDiffPercent": 4.7296,
         "heightDifferencePx": 0,
         "heightReason": null,
         "dominantRegion": "下部・中央",
@@ -5213,7 +5222,8 @@
         "diffPath": "docs/design-qa/friends-v6/Igi72-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -5263,7 +5273,8 @@
         "diffPath": "docs/design-qa/friends-v6/IAf7j-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -5312,7 +5323,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -5361,7 +5372,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -5410,7 +5421,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -5459,7 +5470,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -5509,7 +5520,8 @@
         "diffPath": "docs/design-qa/friends-v6/r7eSi-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -5559,7 +5571,8 @@
         "diffPath": "docs/design-qa/friends-v6/w8W4Eh-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -5608,7 +5621,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -5658,7 +5671,8 @@
         "diffPath": "docs/design-qa/scenarios-v6/TC1b1-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -5708,7 +5722,8 @@
         "diffPath": "docs/design-qa/scenarios-v6/cCB7r-diff-1920.png",
         "pixelAboveThreshold": true,
         "heightAboveThreshold": false,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -5758,7 +5773,8 @@
         "diffPath": "docs/design-qa/scenarios-v6/kk8dz-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -5808,7 +5824,8 @@
         "diffPath": "docs/design-qa/scenarios-v6/bV5Vs-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -5858,7 +5875,8 @@
         "diffPath": "docs/design-qa/scenarios-v6/xfYLn-diff-1920.png",
         "pixelAboveThreshold": true,
         "heightAboveThreshold": false,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -5908,7 +5926,8 @@
         "diffPath": "docs/design-qa/scenarios-v6/r6Gzsu-diff-1920.png",
         "pixelAboveThreshold": true,
         "heightAboveThreshold": false,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -5958,7 +5977,8 @@
         "diffPath": "docs/design-qa/scenarios-v6/hz9ti-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -6007,7 +6027,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -6057,7 +6077,8 @@
         "diffPath": "docs/design-qa/scenarios-v6/EvVO5-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -6107,7 +6128,8 @@
         "diffPath": "docs/design-qa/scenarios-v6/RUxNf-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -6157,7 +6179,8 @@
         "diffPath": "docs/design-qa/scenarios-v6/NrBkW-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -6207,7 +6230,8 @@
         "diffPath": "docs/design-qa/scenarios-v6/g2UNV-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -6257,7 +6281,8 @@
         "diffPath": "docs/design-qa/scenarios-v6/M2b2B-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -6307,7 +6332,8 @@
         "diffPath": "docs/design-qa/scenarios-v6/q5G45-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -6357,7 +6383,8 @@
         "diffPath": "docs/design-qa/broadcasts-v6/q76C35-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -6407,7 +6434,8 @@
         "diffPath": "docs/design-qa/broadcasts-v6/zZ9fA-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -6457,7 +6485,8 @@
         "diffPath": "docs/design-qa/broadcasts-v6/cPk8A-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -6507,7 +6536,8 @@
         "diffPath": "docs/design-qa/broadcasts-v6/XQfMD-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -6557,7 +6587,8 @@
         "diffPath": "docs/design-qa/broadcasts-v6/p97Tf-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -6607,7 +6638,8 @@
         "diffPath": "docs/design-qa/broadcasts-v6/Bw0zt-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -6657,7 +6689,8 @@
         "diffPath": "docs/design-qa/broadcasts-v6/h0kahp-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -6707,7 +6740,8 @@
         "diffPath": "docs/design-qa/broadcasts-v6/vW4Es-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -6757,7 +6791,8 @@
         "diffPath": "docs/design-qa/broadcasts-v6/FpgxH-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -6807,7 +6842,8 @@
         "diffPath": "docs/design-qa/broadcasts-v6/bPF0s-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -6857,7 +6893,8 @@
         "diffPath": "docs/design-qa/broadcasts-v6/u6gHt-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -6907,7 +6944,8 @@
         "diffPath": "docs/design-qa/broadcasts-v6/EGMb1-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -6957,7 +6995,8 @@
         "diffPath": "docs/design-qa/broadcasts-v6/sqFXf-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -7007,7 +7046,8 @@
         "diffPath": "docs/design-qa/broadcasts-v6/xkRDb-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -7057,7 +7097,8 @@
         "diffPath": "docs/design-qa/broadcasts-v6/TmHjF-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -7107,7 +7148,8 @@
         "diffPath": "docs/design-qa/reminders-v6/M1EXwB-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -7157,7 +7199,8 @@
         "diffPath": "docs/design-qa/reminders-v6/uJP22-diff-1920.png",
         "pixelAboveThreshold": true,
         "heightAboveThreshold": false,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -7207,7 +7250,8 @@
         "diffPath": "docs/design-qa/reminders-v6/J64xI-diff-1920.png",
         "pixelAboveThreshold": true,
         "heightAboveThreshold": false,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -7257,7 +7301,8 @@
         "diffPath": "docs/design-qa/reminders-v6/s7T2dz-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -7307,7 +7352,8 @@
         "diffPath": "docs/design-qa/reminders-v6/JCz6J-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -7357,7 +7403,8 @@
         "diffPath": "docs/design-qa/reminders-v6/W98zZQ-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -7407,7 +7454,8 @@
         "diffPath": "docs/design-qa/reminders-v6/s6Vvp-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -7457,7 +7505,8 @@
         "diffPath": "docs/design-qa/reminders-v6/PSmHo-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -7507,7 +7556,8 @@
         "diffPath": "docs/design-qa/reminders-v6/GC4St-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -7557,7 +7607,8 @@
         "diffPath": "docs/design-qa/reminders-v6/Y0Sn3-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -7607,7 +7658,8 @@
         "diffPath": "docs/design-qa/reminders-v6/dC0yg-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -7656,7 +7708,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -7706,7 +7758,8 @@
         "diffPath": "docs/design-qa/auto-replies-v6/K7vg2-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -7756,7 +7809,8 @@
         "diffPath": "docs/design-qa/auto-replies-v6/nzWIX-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -7806,7 +7860,8 @@
         "diffPath": "docs/design-qa/auto-replies-v6/ivDoe-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -7856,7 +7911,8 @@
         "diffPath": "docs/design-qa/auto-replies-v6/U9hzqH-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -7905,7 +7961,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -7954,7 +8010,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -8003,7 +8059,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -8053,7 +8109,8 @@
         "diffPath": "docs/design-qa/auto-replies-v6/t7UtYQ-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -8103,7 +8160,8 @@
         "diffPath": "docs/design-qa/auto-replies-v6/Gy9OK-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -8153,7 +8211,8 @@
         "diffPath": "docs/design-qa/auto-replies-v6/q8wSqO-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -8203,7 +8262,8 @@
         "diffPath": "docs/design-qa/friend-add-v6/uLQQc-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -8253,7 +8313,8 @@
         "diffPath": "docs/design-qa/friend-add-v6/s9gAx-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -8303,7 +8364,8 @@
         "diffPath": "docs/design-qa/friend-add-v6/W1wzCa-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -8353,7 +8415,8 @@
         "diffPath": "docs/design-qa/friend-add-v6/K0Dbr2-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -8403,7 +8466,8 @@
         "diffPath": "docs/design-qa/friend-add-v6/txMO9-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -8453,7 +8517,8 @@
         "diffPath": "docs/design-qa/friend-add-v6/U3SI5-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -8503,7 +8568,8 @@
         "diffPath": "docs/design-qa/friend-add-v6/ec9vg-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -8552,7 +8618,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -8602,7 +8668,8 @@
         "diffPath": "docs/design-qa/friend-add-v6/P2J0Te-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -8652,7 +8719,8 @@
         "diffPath": "docs/design-qa/friend-add-v6/Q3qP1r-diff-1920.png",
         "pixelAboveThreshold": true,
         "heightAboveThreshold": false,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -8702,7 +8770,8 @@
         "diffPath": "docs/design-qa/webinars-v6/ZC13r-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -8752,7 +8821,8 @@
         "diffPath": "docs/design-qa/webinars-v6/lvaY5-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -8802,7 +8872,8 @@
         "diffPath": "docs/design-qa/webinars-v6/PV1Vh-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -8852,7 +8923,8 @@
         "diffPath": "docs/design-qa/webinars-v6/d3rFGD-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -8902,7 +8974,8 @@
         "diffPath": "docs/design-qa/webinars-v6/Ho8z4-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -8952,7 +9025,8 @@
         "diffPath": "docs/design-qa/webinars-v6/Xjk8q-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -9002,7 +9076,8 @@
         "diffPath": "docs/design-qa/webinars-v6/GB0NR-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -9052,7 +9127,8 @@
         "diffPath": "docs/design-qa/webinars-v6/D6yO7e-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -9102,7 +9178,8 @@
         "diffPath": "docs/design-qa/webinars-v6/TimXl-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -9152,7 +9229,8 @@
         "diffPath": "docs/design-qa/webinars-v6/Q8sHa-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -9202,7 +9280,8 @@
         "diffPath": "docs/design-qa/webinars-v6/yxyzQ-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -9252,7 +9331,8 @@
         "diffPath": "docs/design-qa/webinars-v6/LKuAQ-diff-1920.png",
         "pixelAboveThreshold": true,
         "heightAboveThreshold": false,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -9302,7 +9382,8 @@
         "diffPath": "docs/design-qa/webinars-v6/zCQXe-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -9352,7 +9433,8 @@
         "diffPath": "docs/design-qa/templates-v6/W7LBc-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -9401,7 +9483,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -9450,7 +9532,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -9500,7 +9582,8 @@
         "diffPath": "docs/design-qa/templates-v6/NNDMR-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -9549,7 +9632,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -9598,7 +9681,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -9647,7 +9730,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -9697,7 +9780,8 @@
         "diffPath": "docs/design-qa/templates-v6/M9cij-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -9747,7 +9831,8 @@
         "diffPath": "docs/design-qa/templates-v6/CzndJ-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -9797,7 +9882,8 @@
         "diffPath": "docs/design-qa/templates-v6/NKyoA-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -9847,7 +9933,8 @@
         "diffPath": "docs/design-qa/rich-menus-v6/GO8RQ-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -9897,7 +9984,8 @@
         "diffPath": "docs/design-qa/rich-menus-v6/XtfO3-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -9947,7 +10035,8 @@
         "diffPath": "docs/design-qa/rich-menus-v6/kQ1bs-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -9996,7 +10085,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -10046,7 +10135,8 @@
         "diffPath": "docs/design-qa/rich-menus-v6/NXdDk-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -10096,7 +10186,8 @@
         "diffPath": "docs/design-qa/rich-menus-v6/UMiJ9-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -10146,7 +10237,8 @@
         "diffPath": "docs/design-qa/rich-menus-v6/TL7tp-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -10196,7 +10288,8 @@
         "diffPath": "docs/design-qa/rich-menus-v6/szXsT-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -10246,7 +10339,8 @@
         "diffPath": "docs/design-qa/rich-menus-v6/RW5Tb-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -10296,7 +10390,8 @@
         "diffPath": "docs/design-qa/forms-v6/EMBIK-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -10346,7 +10441,8 @@
         "diffPath": "docs/design-qa/forms-v6/vCqUj-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -10396,7 +10492,8 @@
         "diffPath": "docs/design-qa/forms-v6/ava2n-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -10446,7 +10543,8 @@
         "diffPath": "docs/design-qa/forms-v6/cSqvP-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -10496,7 +10594,8 @@
         "diffPath": "docs/design-qa/forms-v6/v9tYhl-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -10546,7 +10645,8 @@
         "diffPath": "docs/design-qa/forms-v6/gBp2J-diff-1920.png",
         "pixelAboveThreshold": true,
         "heightAboveThreshold": false,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -10596,7 +10696,8 @@
         "diffPath": "docs/design-qa/forms-v6/ZOPyc-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -10646,7 +10747,8 @@
         "diffPath": "docs/design-qa/common-vars-v6/WuKzU-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -10696,7 +10798,8 @@
         "diffPath": "docs/design-qa/common-vars-v6/gBtaK-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -10746,7 +10849,8 @@
         "diffPath": "docs/design-qa/common-vars-v6/uNBlA-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -10796,7 +10900,8 @@
         "diffPath": "docs/design-qa/common-vars-v6/yPkWe-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -10846,7 +10951,8 @@
         "diffPath": "docs/design-qa/media-v6/g89Tc-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -10896,7 +11002,8 @@
         "diffPath": "docs/design-qa/media-v6/voJtX-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -10946,7 +11053,8 @@
         "diffPath": "docs/design-qa/media-v6/eXAJP-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -10996,7 +11104,8 @@
         "diffPath": "docs/design-qa/media-v6/YfTfJ-diff-1920.png",
         "pixelAboveThreshold": true,
         "heightAboveThreshold": false,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -11046,7 +11155,8 @@
         "diffPath": "docs/design-qa/media-v6/h8pBZr-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -11096,7 +11206,8 @@
         "diffPath": "docs/design-qa/affiliates-v6/PouPn-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -11146,7 +11257,8 @@
         "diffPath": "docs/design-qa/affiliates-v6/GH8VL-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -11196,7 +11308,8 @@
         "diffPath": "docs/design-qa/affiliates-v6/n5VVTb-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -11245,7 +11358,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -11295,7 +11408,8 @@
         "diffPath": "docs/design-qa/affiliates-v6/xqT1Z-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -11344,7 +11458,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -11394,7 +11508,8 @@
         "diffPath": "docs/design-qa/affiliates-v6/GPWzq-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -11444,7 +11559,8 @@
         "diffPath": "docs/design-qa/affiliates-v6/QX70l-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -11494,7 +11610,8 @@
         "diffPath": "docs/design-qa/affiliates-v6/GqFTV-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -11543,7 +11660,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -11592,7 +11709,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -11642,7 +11759,8 @@
         "diffPath": "docs/design-qa/mileage-v6/qlVLJ-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -11692,7 +11810,8 @@
         "diffPath": "docs/design-qa/mileage-v6/MvZm5-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -11741,7 +11860,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -11791,7 +11910,8 @@
         "diffPath": "docs/design-qa/mileage-v6/HIU5O-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -11840,7 +11960,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -11889,7 +12009,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -11938,7 +12058,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -11987,7 +12107,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -12036,7 +12156,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -12086,7 +12206,8 @@
         "diffPath": "docs/design-qa/inflow-v6/Q4bkTg-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -12136,7 +12257,8 @@
         "diffPath": "docs/design-qa/inflow-v6/IhSBB-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -12186,7 +12308,8 @@
         "diffPath": "docs/design-qa/inflow-v6/v0HaI-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -12236,7 +12359,8 @@
         "diffPath": "docs/design-qa/inflow-v6/TEVk8-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -12286,7 +12410,8 @@
         "diffPath": "docs/design-qa/inflow-v6/JupxW-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -12336,7 +12461,8 @@
         "diffPath": "docs/design-qa/inflow-v6/UIaM7-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -12386,7 +12512,8 @@
         "diffPath": "docs/design-qa/inflow-v6/BMmxU-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -12436,7 +12563,8 @@
         "diffPath": "docs/design-qa/inflow-v6/BuVDB-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -12486,7 +12614,8 @@
         "diffPath": "docs/design-qa/inflow-v6/Im2b1-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -12536,7 +12665,8 @@
         "diffPath": "docs/design-qa/conversions-v6/ZrpKn-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -12586,7 +12716,8 @@
         "diffPath": "docs/design-qa/conversions-v6/GUxsj-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -12636,7 +12767,8 @@
         "diffPath": "docs/design-qa/conversions-v6/GtylA-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -12686,7 +12818,8 @@
         "diffPath": "docs/design-qa/conversions-v6/d8d3Mz-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -12736,7 +12869,8 @@
         "diffPath": "docs/design-qa/analytics-v6/Zxezb-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -12786,7 +12920,8 @@
         "diffPath": "docs/design-qa/analytics-v6/J6Inc-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -12836,7 +12971,8 @@
         "diffPath": "docs/design-qa/analytics-v6/YBGtm-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -12886,7 +13022,8 @@
         "diffPath": "docs/design-qa/analytics-v6/QQ1SR-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -12936,7 +13073,8 @@
         "diffPath": "docs/design-qa/analytics-v6/URqOA-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -12986,7 +13124,8 @@
         "diffPath": "docs/design-qa/analytics-v6/f5HsX-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -13036,7 +13175,8 @@
         "diffPath": "docs/design-qa/analytics-v6/C2I7ry-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -13086,7 +13226,8 @@
         "diffPath": "docs/design-qa/analytics-v6/Fh2Qj-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -13136,7 +13277,8 @@
         "diffPath": "docs/design-qa/analytics-v6/dfwD4-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -13185,7 +13327,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -13234,7 +13376,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -13283,7 +13425,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -13332,7 +13474,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -13382,7 +13524,8 @@
         "diffPath": "docs/design-qa/nen-v6/HpKyF-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -13431,7 +13574,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -13480,7 +13623,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -13530,7 +13673,8 @@
         "diffPath": "docs/design-qa/photos-v6/Qu6Vk-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -13580,7 +13724,8 @@
         "diffPath": "docs/design-qa/photos-v6/hHrz8-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -13630,7 +13775,8 @@
         "diffPath": "docs/design-qa/photos-v6/N2J629-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -13680,7 +13826,8 @@
         "diffPath": "docs/design-qa/photos-v6/J3Wxl8-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -13730,7 +13877,8 @@
         "diffPath": "docs/design-qa/ec-v6/eI3gs-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -13780,7 +13928,8 @@
         "diffPath": "docs/design-qa/ec-v6/ELayY-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -13830,7 +13979,8 @@
         "diffPath": "docs/design-qa/ec-v6/bfB50-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -13880,7 +14030,8 @@
         "diffPath": "docs/design-qa/ec-v6/oHAN4-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -13929,7 +14080,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -13979,7 +14130,8 @@
         "diffPath": "docs/design-qa/line-notify-v6/Q55bb-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -14028,7 +14180,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -14077,7 +14229,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -14126,7 +14278,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -14175,7 +14327,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -14224,7 +14376,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -14274,7 +14426,8 @@
         "diffPath": "docs/design-qa/automations-v6/Rv8Jv-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -14323,7 +14476,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -14372,7 +14525,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -14421,7 +14574,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -14470,7 +14623,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -14520,7 +14673,8 @@
         "diffPath": "docs/design-qa/automations-v6/py5CG-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -14570,7 +14724,8 @@
         "diffPath": "docs/design-qa/automations-v6/syWp4-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -14620,7 +14775,8 @@
         "diffPath": "docs/design-qa/webhooks-v6/k3WxrO-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -14670,7 +14826,8 @@
         "diffPath": "docs/design-qa/webhooks-v6/M0Gb7-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -14720,7 +14877,8 @@
         "diffPath": "docs/design-qa/webhooks-v6/KNG00-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -14769,7 +14927,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -14819,7 +14977,8 @@
         "diffPath": "docs/design-qa/booking-v6/TV2DI-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -14869,7 +15028,8 @@
         "diffPath": "docs/design-qa/booking-v6/TnDbq-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -14919,7 +15079,8 @@
         "diffPath": "docs/design-qa/booking-v6/cpdDi-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -14968,7 +15129,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -15018,7 +15179,8 @@
         "diffPath": "docs/design-qa/booking-v6/GFDqW-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -15068,7 +15230,8 @@
         "diffPath": "docs/design-qa/booking-v6/GfceK-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -15118,7 +15281,8 @@
         "diffPath": "docs/design-qa/booking-v6/Lg8ff-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -15167,7 +15331,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -15217,7 +15381,8 @@
         "diffPath": "docs/design-qa/booking-settings-v6/tksPc-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -15267,7 +15432,8 @@
         "diffPath": "docs/design-qa/booking-settings-v6/GhOb3-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -15316,7 +15482,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -15365,7 +15531,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -15415,7 +15581,8 @@
         "diffPath": "docs/design-qa/events-v6/MKrPY-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -15464,7 +15631,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -15513,7 +15680,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -15563,7 +15730,8 @@
         "diffPath": "docs/design-qa/staff-v6/e3jz3-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -15613,7 +15781,8 @@
         "diffPath": "docs/design-qa/staff-v6/EOTS4-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -15663,7 +15832,8 @@
         "diffPath": "docs/design-qa/staff-v6/jwVlo-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -15712,7 +15882,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -15762,7 +15932,8 @@
         "diffPath": "docs/design-qa/settings-v6/c4R6F-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -15811,7 +15982,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -15860,7 +16031,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -15909,7 +16080,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -15959,7 +16130,8 @@
         "diffPath": "docs/design-qa/operations-v6/U0BwS-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -16009,7 +16181,8 @@
         "diffPath": "docs/design-qa/friend-attributes-v6/hqrOv-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -16059,7 +16232,8 @@
         "diffPath": "docs/design-qa/friend-attributes-v6/dKlkz-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -16109,7 +16283,8 @@
         "diffPath": "docs/design-qa/friend-attributes-v6/H374MR-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -16159,7 +16334,8 @@
         "diffPath": "docs/design-qa/friend-attributes-v6/sfTEW-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -16209,7 +16385,8 @@
         "diffPath": "docs/design-qa/friend-attributes-v6/op1rh-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -16259,7 +16436,8 @@
         "diffPath": "docs/design-qa/friend-attributes-v6/QzRsJ-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -16308,7 +16486,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -16358,7 +16536,8 @@
         "diffPath": "docs/design-qa/friend-attributes-v6/yKEdO-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -16407,7 +16586,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -16456,7 +16635,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -16506,7 +16685,8 @@
         "diffPath": "docs/design-qa/friend-attributes-v6/l25rlp-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -16555,7 +16735,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -16604,7 +16784,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -16654,7 +16834,8 @@
         "diffPath": "docs/design-qa/friend-attributes-v6/ee0sk-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -16704,7 +16885,8 @@
         "diffPath": "docs/design-qa/friend-attributes-v6/VjXGX-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -16754,7 +16936,8 @@
         "diffPath": "docs/design-qa/friend-attributes-v6/byqIW-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -16804,7 +16987,8 @@
         "diffPath": "docs/design-qa/friend-attributes-v6/A1ZYeP-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -16853,7 +17037,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -16902,7 +17086,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -16952,7 +17136,8 @@
         "diffPath": "docs/design-qa/friend-attributes-v6/zGZMA-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -17001,7 +17186,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
         "aboveThreshold": true,
-        "retainedFrom": "2026-09-07T15:38:05.887Z"
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -17051,7 +17236,8 @@
         "diffPath": "docs/design-qa/friends-v6/ux7of-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -17076,9 +17262,9 @@
             "implementationHeight": 1840,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 241036,
+            "mismatchedPixels": 243815,
             "comparedPixels": 3532800,
-            "pixelDiffPercent": 6.8228,
+            "pixelDiffPercent": 6.9015,
             "boundingBox": {
               "left": 1,
               "top": 10,
@@ -17088,12 +17274,12 @@
             "dominantRegion": "上部・中央",
             "heightReason": null,
             "designPath": "docs/design-reference/inbox-v6/ohj8J.png",
-            "implementationPath": "docs/design-qa/inbox-v6/ohj8J-error-1920.png",
+            "implementationPath": "docs/design-qa/inbox-v6/ohj8J-1920.png",
             "implementationSource": "docs",
             "diffPath": "docs/design-qa/inbox-v6/ohj8J-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 6.8228,
+        "pixelDiffPercent": 6.9015,
         "heightDifferencePx": 0,
         "heightReason": null,
         "dominantRegion": "上部・中央",
@@ -17151,7 +17337,8 @@
         "diffPath": "docs/design-qa/settings-v6/QT91v-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -17201,7 +17388,8 @@
         "diffPath": "docs/design-qa/settings-v6/b2NGxk-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -17251,7 +17439,8 @@
         "diffPath": "docs/design-qa/settings-v6/T9rA9-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -17301,7 +17490,8 @@
         "diffPath": "docs/design-qa/settings-v6/nx3XW-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -17351,7 +17541,8 @@
         "diffPath": "docs/design-qa/settings-v6/RAW35-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -17401,7 +17592,8 @@
         "diffPath": "docs/design-qa/settings-v6/y0P0Qx-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -17451,7 +17643,8 @@
         "diffPath": "docs/design-qa/settings-v6/D5UaX-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     },
     {
@@ -17501,7 +17694,8 @@
         "diffPath": "docs/design-qa/settings-v6/f9oUm-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T16:41:05.250Z"
       }
     }
   ],
