@@ -185,7 +185,7 @@ export const SCREENS = [
   {
     node: 'ZN0ov', feature: 1, name: '1-1-1 ダッシュボード編集',
     verdict: 'match', verdictNote: '**2026-09-04 再照合で一致。** テキスト差0。パネル幅540px、見出しの副文、札型タブ、カードの配置説明、4枠警告、5枚目ON時の自動OFF、「ダッシュボードに反映」まで設計に合わせた。2026-09-03の1440/1920px画像と最新コード差分で確認。現在コミットの画像はPlaywrightのOS権限で取得できず、旧画像と差分照合で判定。', verdictSource: 'dashboard-v6/ZN0ov.txt + 2026-09-03 1440/1920px screenshots + 2026-09-04 static diff audit',
-    dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
+    dir: 'dashboard-v6', route: '/', mode: 'viewport', height: 1754, clock: DASHBOARD_CLOCK,
     steps: [{ click: 'ダッシュボード編集' }],
     verdictHead: '145c497d1',
   },

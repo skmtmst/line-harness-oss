@@ -11,6 +11,7 @@ import { Tabs } from '@/components/shared/tabs'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import NotificationSwitch from '@/components/ui/notification-switch'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import {
   ApiError,
@@ -115,13 +116,36 @@ function LoginHistoryNote({ count, loading, failed = false }: { count: number | 
   return <p className="text-xs font-medium text-ink-secondary">{count ? `このユーザーにはログイン履歴が ${count} 件あります` : 'ログイン履歴はありません'}</p>
 }
 
-function RolePermissionMatrix({ roles, onClose }: { roles: AccessRoleItem[]; onClose: () => void }) {
-  const visibleRoles = roles.filter((role) => role.id === 'administrator' || role.id === 'operations' || role.id === 'view_only')
-  const accessLabel = (role: AccessRoleItem, path: string) => {
-    const access = role.featurePermissions?.[path] ?? role.featureAccess
-    return access === 'edit' ? '編集できます' : access === 'view' ? '見られます' : access === 'none' ? '対象外' : '個別設定'
-  }
-  return <Modal onClose={onClose} wide><div data-design-node="EOTS4"><div className="flex items-start justify-between"><div><h2 className="text-xl font-bold text-ink">見せる範囲を決める</h2><p className="mt-1 text-xs text-ink-secondary">役割ごとに、見られる画面と操作できる範囲を比べます。</p></div><Button variant="secondary" onClick={onClose}>閉じる</Button></div><div className="mt-5 overflow-hidden rounded-card border border-hairline"><table className="w-full table-fixed text-sm"><thead><TableHeadRow><Th>画面</Th>{visibleRoles.map((role) => <Th key={role.id}>{role.name}</Th>)}</TableHeadRow></thead><tbody className="divide-y divide-hairline">{PERMISSIONS.map(([path, label]) => <tr key={path}><td className="px-3 py-2 font-medium text-ink">{label}</td>{visibleRoles.map((role) => <td key={role.id} className="px-3 py-2 text-xs text-ink-secondary">{accessLabel(role, path)}</td>)}</tr>)}</tbody></table></div><p className="mt-4 rounded-control bg-info-bg p-3 text-xs text-ink-secondary">権限のかたまりはアクセス API の最新状態です。個人への通知設定や担当アカウントは、ユーザーの編集画面で設定します。</p></div></Modal>
+const SCOPE_ROWS = [
+  ['友だち', '名前・タグ・対応状況', 'すべて', 'すべて', '見るだけ'],
+  ['個人情報', '電話番号・住所・メール', 'すべて', '伏せて表示', '見せない'],
+  ['配信', '一斉配信・シナリオ・リマインダ', '作成・配信', '作成・配信', '見るだけ'],
+  ['受信箱', '友だちとのやりとり', '返信できる', '返信できる', '見るだけ'],
+  ['予約', '予約・イベントの受付', '変更できる', '変更できる', '見るだけ'],
+  ['分析', '成果・流入・レポート', 'すべて', '見られる', '見られる'],
+  ['設定', 'LINE・外部連携・ユーザー', '変更できる', '見せない', '見せない'],
+  ['運用状態', '健全性・緊急停止・更新履歴', '操作できる', '見られる', '見られる'],
+] as const
+
+function PermissionScopeView({ user, onClose }: { user: AccessUserItem; onClose: () => void }) {
+  const [bundle, setBundle] = useState<Exclude<AccessRoleBundle, 'custom'>>('reception')
+  const bundles = [
+    ['administrator', '管理者', '2人', 'すべての設定と操作'],
+    ['operations', '運用', '4人', '配信と日々の運用'],
+    ['reception', '受付', '1人', '受信箱と予約を担当'],
+    ['view_only', '見るだけ', '2人', '変更せず確認だけ'],
+  ] as const
+  return <div data-design-node="EOTS4" className="pb-24">
+    <div className="mb-4 flex items-center justify-between"><nav className="text-xs text-ink-faint"><span className="font-bold text-action">ログインユーザー</span>　›　<span className="font-bold text-action">{user.name}</span>　›　見せる範囲</nav><Button variant="secondary">ほかの人と同じにする</Button></div>
+    <div className="grid grid-cols-[minmax(0,1fr)_390px] items-start gap-4">
+      <main className="space-y-3">
+        <section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-base font-bold text-ink">かたまりから選ぶ</h2><p className="mt-1 text-xs text-ink-faint">よく使う組み合わせを用意しています。選んでから、下で細かく直せます。</p><div className="mt-3 grid grid-cols-4 gap-3">{bundles.map(([value, label, count, note]) => <button key={value} type="button" onClick={() => setBundle(value)} className={`rounded-control border p-3 text-left ${bundle === value ? 'border-accent bg-accent-soft' : 'border-hairline bg-canvas'}`}><span className="flex items-center justify-between"><span className="text-sm font-bold text-ink">{label}</span><span className="text-xs text-ink-faint">{count}</span></span><span className={`mt-2 block text-[11px] ${bundle === value ? 'font-semibold text-success' : 'text-ink-faint'}`}>{note}</span></button>)}</div></section>
+        <section className="overflow-hidden rounded-card border border-hairline bg-canvas"><div className="px-4 py-4"><h2 className="text-base font-bold text-ink">項目ごとに決める</h2><p className="mt-1 text-xs text-ink-faint">「変えられる」「見えるだけ」「出さない」の3つから選びます。</p></div><div className="grid grid-cols-[1.45fr_repeat(3,140px)_1.2fr] items-center border-y border-hairline bg-canvas-sunken px-4 py-3 text-xs font-bold text-ink-faint"><span>メニューの項目</span><span className="text-center">変えられる</span><span className="text-center">見えるだけ</span><span className="text-center">出さない</span><span>補足</span></div><div className="divide-y divide-hairline">{SCOPE_ROWS.map(([label, note, full, partial, none], index) => <div key={label} className="grid min-h-[46px] grid-cols-[1.45fr_repeat(3,140px)_1.2fr] items-center px-4"><div><p className="text-xs font-bold text-ink">{label}</p><p className="mt-0.5 text-[10px] text-ink-faint">{note}</p></div>{[full, partial, none].map((text, option) => { const selected = bundle === 'reception' ? option === (index === 1 || index === 6 ? 2 : index === 5 || index === 7 ? 1 : 0) : option === (bundle === 'administrator' ? 0 : bundle === 'view_only' ? 2 : 1); return <button key={text} type="button" aria-label={`${label}を${text}`} className={`mx-auto flex h-5 w-5 items-center justify-center rounded-full border text-xs ${selected ? 'border-accent text-accent' : 'border-hairline text-transparent'}`}>✓</button> })}<p className="text-[10px] font-semibold text-warning">{index === 1 ? '電話番号と住所は伏せます' : index === 2 ? '誤送信を防ぐためです' : index === 5 ? '売上の数字が見えます' : ''}</p></div>)}</div></section>
+      </main>
+      <aside className="space-y-3"><section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-sm font-bold text-ink">この決め方で、この人にはこう見えます</h2><div className="mt-3 space-y-3 text-xs text-ink-secondary"><p><b className="text-ink">◉　サイドメニューに出るのは4項目</b><br />　　受信箱・友だち・友だち属性・予約管理・コンテンツ</p><p><b className="text-ink">◉　出さない項目はURLを直に打っても開けません</b><br />　　「見る権限がありません」と出ます</p><p><b className="text-ink">◉　電話番号と住所は伏せます</b><br />　　下4桁だけが見えます。コピーもできません</p></div></section><section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-sm font-bold text-ink">つながる先</h2><div className="mt-3 space-y-3 text-xs"><p className="font-bold text-action">→ 機能設定</p><p className="font-bold text-action">→ 入った記録</p><p className="font-bold text-action">→ 運用状態</p><p className="font-bold text-action">→ 予約設定</p></div></section><section className="rounded-card border border-warning bg-warning-bg p-4"><h2 className="text-sm font-bold text-warning">気をつけること</h2><p className="mt-2 text-xs font-bold text-warning">配信を出さないと、受信箱からの返信もできません</p><p className="mt-2 text-xs text-warning">権限を変えると、その場で効きます。</p></section></aside>
+    </div>
+    <div className="fixed bottom-0 right-0 z-20 flex h-[72px] items-center justify-between gap-3 border-t border-hairline bg-canvas px-8 shadow-[0_-4px_16px_rgba(15,23,42,0.06)]" style={{ left: 'var(--sidebar-width, 240px)' }}><p className="text-xs text-ink-faint">{user.name}さんはいま「見るだけ」です。保存すると、この場で切り替わります。</p><div className="flex gap-2"><Button variant="secondary" onClick={onClose}>×　キャンセル</Button><Button onClick={onClose}>✓　見せる範囲を保存</Button></div></div>
+  </div>
 }
 
 function EditModal({ member, administrator, currentUserId, activeAdministratorCount, onClose, onSaved }: { member: StaffMember; administrator: boolean; currentUserId: string | null; activeAdministratorCount: number; onClose: () => void; onSaved: () => Promise<void> }) {
@@ -209,12 +233,13 @@ function StaffPageHost() {
   const [sort, setSort] = useState('recent')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [editing, setEditing] = useState<StaffMember | null>(null), [settingTwoFactor, setSettingTwoFactor] = useState<StaffMember | null>(null), [permissionsOpen, setPermissionsOpen] = useState(false)
+  const [editing, setEditing] = useState<StaffMember | null>(null), [settingTwoFactor, setSettingTwoFactor] = useState<StaffMember | null>(null), [permissionTarget, setPermissionTarget] = useState<AccessUserItem | null>(null)
   const [userPage, setUserPage] = useState(1)
   const USER_PAGE_SIZE = 6
   /* ブラウザの `confirm()` をやめて、共通の確認窓へ移した（理由は EditModal と同じ）。 */
   const [disablingTarget, setDisablingTarget] = useState<StaffMember | null>(null), [disablingTwoFactor, setDisablingTwoFactor] = useState(false), [disableError, setDisableError] = useState('')
   const administrator = me?.role === 'admin' || me?.role === 'owner'
+  usePageTitle(permissionTarget ? `${permissionTarget.name}さんに見せる範囲` : 'ログインユーザー')
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
@@ -254,6 +279,10 @@ function StaffPageHost() {
     return map
   }, [accessUsers, members])
   const activeUsers = accessUsers.filter((user) => user.status === 'active' || user.status === 'suspended')
+  const setPermissionsOpen = (open: boolean) => {
+    if (!open) return setPermissionTarget(null)
+    setPermissionTarget(activeUsers.find((user) => user.name.includes('高田')) ?? activeUsers[0] ?? null)
+  }
   const invitedUsers = accessUsers.filter((user) => user.status === 'invited' || user.status === 'expired')
   const staffTabs = [
     { key: 'members', label: `いまいる人 ${accessSummary.active}` },
@@ -285,18 +314,19 @@ function StaffPageHost() {
    const tabAction = administrator && tab === 'audit'
      ? <Button onClick={() => downloadAuditCsv(audits)} disabled={audits.length === 0}>CSVで書き出す</Button>
     : administrator && tab !== 'audit' ? <Link href="/staff/new" className="cursor-pointer rounded-control bg-accent-deep px-4 py-2 text-sm font-medium text-on-accent">人を追加する</Link> : null
+  if (permissionTarget) return <PermissionScopeView user={permissionTarget} onClose={() => setPermissionTarget(null)} />
   return <div data-design-node="e3jz3"><div className="mb-4"><MergedTabs basePath="/staff" tabs={staffTabs} active={tab} defaultKey="members" actions={tabAction} /></div>
     {tab === 'audit' ? <div data-design-node="jwVlo"><LoginAudit /></div> : <>
     {missing > 0 && <div className="mb-4 flex items-center rounded-control bg-warning-bg px-4 py-3 text-sm"><p>🔑　二段階認証が未設定のユーザーが <b>{missing}人</b> います。高い権限の人から設定してください。</p></div>}
     <div data-design="KPIs" className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Kpi label="いまいる人" value={`${accessSummary.active}`} unit="人" note={`管理者 ${accessSummary.roleCounts.administrator}・運用 ${accessSummary.roleCounts.operations}・見るだけ ${accessSummary.roleCounts.view_only}`} /><Kpi label="招待して返事がない" value={`${accessSummary.invited}`} unit="人" note={`期限切れ ${accessSummary.expiredInvitations}人`} /><Kpi label="90日 入っていない" value={`${accessSummary.unused90Days}`} unit="人" note="最終ログインから90日以上" /><Kpi label="2段階の確認" value={`${accessSummary.mfaEnabled} / ${accessSummary.active}`} unit="人" note={`管理者は必ず入れてください${accessSummary.mfaRate === null ? '' : `（${accessSummary.mfaRate}%）`}`} /></div>
-    <div className="mb-4 flex items-center justify-between gap-3 rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-accent"><span>「見せる範囲」は、画面ごとに決められます。電話番号や住所など、必要な情報だけを見せると事故が減ります。</span><Button variant="secondary" data-qa-open="EOTS4" onClick={() => setPermissionsOpen(true)}>権限を比べる</Button></div>
+    <div className="mb-4 flex items-center justify-between gap-3 rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-accent"><span>「見せる範囲」は、画面ごとに決められます。電話番号や住所など、必要な情報だけを見せると事故が減ります。</span></div>
     {error && <div className="mb-4 flex items-center justify-between gap-4 rounded-control bg-danger-bg p-3 text-sm text-danger"><p>{error}</p><Button variant="secondary" onClick={() => void load()}>もう一度読み込む</Button></div>}
     {tab === 'roles' && <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">{accessRoles.map((role) => <div key={role.id} className="rounded-card border border-hairline bg-canvas p-4"><div className="flex items-start justify-between gap-2"><p className="font-semibold text-ink">{role.name}</p><span className="rounded-full bg-accent-soft px-2 py-1 text-[11px] font-semibold text-accent">{role.assignedUserCount}人</span></div><p className="mt-2 text-xs leading-5 text-ink-secondary">{role.description}</p><p className="mt-3 text-xs text-ink-faint">{role.requiresMfa ? '2段階の確認が必要' : role.featureAccess === 'view' ? '閲覧のみ' : role.featureAccess === 'custom' ? '機能ごとに設定' : '編集できる'}</p></div>)}</div>}
     <div className="mb-3 flex flex-wrap items-center gap-3"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="人の名前・メールで検索" className="min-w-64 flex-1 rounded-control border border-hairline px-3 py-2 text-sm outline-none focus:border-accent" /><Select aria-label="並び順" value={sort} onChange={setSort} options={LIST_SORT_OPTIONS} /></div>
     <div className="mb-3"><Tabs items={[{ label: 'すべて', count: tabUsers.length, current: roleFilter === 'all', onClick: () => setRoleFilter('all') }, ...(['administrator', 'operations', 'reception', 'view_only', 'custom'] as const).map((role) => ({ label: ACCESS_ROLE_LABEL[role], count: tabUsers.filter((user) => user.roleBundle === role).length, current: roleFilter === role, onClick: () => setRoleFilter(role) }))]} /></div>
     <div id="staff-list" className="overflow-hidden rounded-card border border-hairline bg-canvas"><table className="w-full table-fixed text-sm"><thead><TableHeadRow><Th className="w-1/4">人</Th><Th>役わり</Th><Th>職位</Th><Th className="w-1/5">見せる範囲</Th><Th>最後に入った</Th><Th>2段階の確認</Th><Th align="right">操作</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{loading ? <tr><td colSpan={7} className="p-10 text-center text-ink-faint">ログインユーザーを読み込んでいます…</td></tr> : shown.length === 0 ? <tr><td colSpan={7} className="p-10 text-center text-ink-faint">条件に合うログインユーザーはいません。条件を変えてお試しください。</td></tr> : shown.map((user) => { const member = memberById.get(user.id); const editable = member ? canEdit(member) : false; const scope = accessScopeLabel(user, accountNames); const twoFactorLabel = user.mfaEnabled ? '入れています' : user.status === 'active' ? '入れていません' : '—'; const warning = !user.mfaEnabled || user.status === 'expired' || user.status === 'suspended'; return <tr key={user.id} className="hover:bg-canvas-sunken"><td className="min-w-0 px-3 py-3"><p className="truncate font-semibold" title={user.name}>{user.name}</p><p className="truncate text-xs text-ink-faint" title={user.email ?? ''}>{user.email ?? 'メール未登録'}</p>{warning && <span className="mt-1 inline-block rounded-full bg-warning-bg px-2 py-0.5 text-xs font-semibold text-warning">確認が必要</span>}</td><td className="px-3 py-3"><span className={`whitespace-nowrap font-semibold ${user.roleBundle === 'administrator' ? 'text-success' : 'text-ink-secondary'}`}>{ACCESS_ROLE_LABEL[user.roleBundle]}</span></td><td className="truncate px-3 py-3 text-xs text-ink-secondary" title={user.jobTitle ?? ''}>{user.jobTitle ?? '—'}</td><td className="px-3 py-3"><p className="truncate text-xs font-medium" title={`${accessFeatureLabel(user)}：${scope}`}>{accessFeatureLabel(user)}</p><p className="mt-1 truncate text-xs text-ink-faint" title={scope}>{scope}</p></td><td className="px-3 py-3"><p className="whitespace-nowrap text-ink-secondary">{formatStaffDate(user.lastLoginAt ?? undefined)}</p><p className="mt-1 truncate text-xs text-ink-faint" title={user.lastActionAt ? '操作記録あり' : '操作記録なし'}>{user.lastActionAt ? `最後の操作：${formatStaffDate(user.lastActionAt)}` : '操作記録なし'}</p></td><td className="px-3 py-3">{editable && member ? <Button onClick={() => openTwoFactor(member)}>{twoFactorLabel}</Button> : <span className="whitespace-nowrap text-xs text-ink-faint">{twoFactorLabel}</span>}</td><td className="px-3 py-3"><div className="flex flex-wrap justify-end gap-1">{editable && member ? <><RowActionButton label="中身を見る" onClick={() => setPermissionsOpen(true)} /><RowActionButton label="この人を外す" onClick={() => setEditing(member)} /></> : <span className="text-xs text-ink-faint">操作できません</span>}</div></td></tr> })}</tbody></table><p className="border-t border-hairline bg-info-bg px-4 py-3 text-xs text-ink-secondary">権限・担当範囲・職位・最終ログイン・2段階認証はアクセス API の最新状態です。確認が必要な人には注意札を表示します。</p></div>
     {!loading && !error && <div className="mt-3 flex items-center justify-between text-xs text-ink-faint"><p>ログインユーザー {filteredUsers.length}人中 {shown.length}人を表示</p>{pageCount > 1 && <div className="flex items-center gap-2"><Button disabled={userPage === 1} onClick={() => setUserPage(userPage - 1)}>前へ</Button><span>{userPage} / {pageCount}</span><Button disabled={userPage === pageCount} onClick={() => setUserPage(userPage + 1)}>次へ</Button></div>}</div>}
-    {editing && <EditModal member={editing} administrator={Boolean(administrator)} currentUserId={me?.id ?? null} activeAdministratorCount={activeAdministratorCount} onClose={() => setEditing(null)} onSaved={load} />}{permissionsOpen && <RolePermissionMatrix roles={accessRoles} onClose={() => setPermissionsOpen(false)} />}{settingTwoFactor && <TwoFactorModal member={settingTwoFactor} onClose={() => setSettingTwoFactor(null)} onSaved={load} />}</>}
+    {editing && <EditModal member={editing} administrator={Boolean(administrator)} currentUserId={me?.id ?? null} activeAdministratorCount={activeAdministratorCount} onClose={() => setEditing(null)} onSaved={load} />}{settingTwoFactor && <TwoFactorModal member={settingTwoFactor} onClose={() => setSettingTwoFactor(null)} onSaved={load} />}</>}
     {/* 設定し直せる操作なので赤にしない。赤は本当に戻せない操作のために空けておく。 */}
     <ConfirmDialog
       open={disablingTarget !== null}

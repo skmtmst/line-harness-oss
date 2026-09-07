@@ -278,7 +278,7 @@ export default function DashboardEditor({ open, preferences, onCancel, onApply, 
   }
 
   return (
-    <div data-design="Editor" className="bg-ink/25 fixed inset-0 z-50 flex justify-end" role="presentation" onMouseDown={onCancel}>
+    <div data-design="Editor" className="bg-ink/30 fixed inset-0 z-50 flex justify-end" role="presentation" onMouseDown={onCancel}>
       <aside role="dialog" aria-modal="true" aria-labelledby="dashboard-editor-title" className="bg-canvas flex h-full w-full max-w-[540px] flex-col shadow-[-8px_0_28px_rgba(26,28,26,0.14)]" onMouseDown={(event) => event.stopPropagation()}>
         <header className="border-hairline border-b px-[22px] pb-4 pt-5">
           <div className="flex items-start justify-between gap-4">
