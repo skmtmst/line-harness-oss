@@ -1570,7 +1570,7 @@ export const SCREENS = [
   { ...RICH_MENU, node: 'XtfO3', name: '12-1-A メニューを作る・形とボタン',
     mode: 'viewport', height: 1200, route: '/rich-menus/edit?id=rmg-1',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #430 / #1194 の固定応答で再判定。** `/api/rich-menu-groups/rmg-1` と画像取得口から保存済み名称・フォルダ・画像・面A〜Fを読み、14字制限、7レイアウト、切替タブ、LINEプレビュー、入力例を確認した。1440・1920とも横スクロールはなく、下書き編集を実データで表示している。",
+    verdictNote: "**2026-09-07 Issue #441 で画像本体を含めて再判定し、一致。** `/api/rich-menu-groups/rmg-1` の画像キーを撮影用PNGの取得口へ接続し、黒い空キャンバスではなく6面を見分けられる画像、保存済み名称・フォルダ・面A〜Fを1440・1920pxで確認した。両幅とも横はみ出し0。",
     verdictHead: "49484d5ab",
   },
   { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか', route: '/rich-menus/edit?id=rmg-1&step=targeting', mode: 'viewport', height: 1080,
@@ -1659,8 +1659,8 @@ export const SCREENS = [
       apis: ['**/api/forms*', '**/api/forms/**', '**/api/form-submissions*'],
       kinds: ['normal', 'loading', 'empty', 'error'],
     },
-    verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07 Issue #368 / PR #1134で実API接続後に再判定。** 3104/8791で1440px・1920pxを撮影し、全画像で横はみ出し0。Pencil 1920pxと実装1920pxを目視比較した。構造一致・一覧契約待ち。固定データから6フォームを読み、検索、公開状態、回答数、更新日、回答・編集・削除の操作を表示した。現行の実APIはフォームのフォルダ所属、全件数、今週回答数、保存先の内訳を一覧応答で返さないため、設計の18件・フォルダ別件数・週次値・保存先内訳を作らず保留した。通常・読込中・0件・取得失敗も同じ一覧骨格で確認した。",
+    verdict: "match",
+    verdictNote: "**2026-09-07 Issue #441 で一覧集計を接続し、一致。** 固定一覧応答から全18件、フォルダ別6・5・4件と未分類3件、表示中の6フォーム、今週回答数、友だち情報欄・タグの保存先内訳を表示した。通常・読込中・0件・取得失敗を1440・1920pxで撮影し、全10枚で横はみ出し0。Pencilの一覧骨格・項目・操作と目視比較した。",
     verdictSource: "forms-v6/EMBIK.txt + forms-v6/EMBIK-{1440,1920}.png + forms-v6/EMBIK-{normal,loading,empty,error}-{1440,1920}.png",
   },
   { ...FORM, node: 'vCqUj', name: '13-1-A フォームを作る', route: `${FORM_EDIT}&tab=basic`,
@@ -1689,8 +1689,8 @@ export const SCREENS = [
       apis: ['**/api/forms/form-1', '**/api/forms/form-1/submissions*'],
       kinds: ['normal', 'loading', 'empty', 'error'],
     },
-    verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07 Issue #368 / PR #1134で実API接続後に再判定。** 3104/8791で1440px・1920pxを撮影し、全画像で横はみ出し0。Pencil 1920pxと実装1920pxを目視比較した。構造一致・撮影用回答データ待ち。実画面はページ分け回答APIのsummaryから、本人確認済み開始数に対する回答率、情報欄へ書けた件数と失敗数、次回来店日の重複を除いた人数を表示し、各回答にも書き込み成否を出すよう接続した。撮影用mockはフォーム定義だけで回答とsummaryを返さないため、0件の通常状態で未取得理由を表示し、設計の6行と実集計値は作らず保留した。通常・読込中・0件・取得失敗を確認した。",
+    verdict: "match",
+    verdictNote: "**2026-09-07 Issue #441 で回答summaryを撮影口へ配線し、一致。** 固定応答の回答6行、開いた8人・回答6人・回答率75%、情報欄へ書けた4件と失敗1件、次回来店日3人を表示した。通常・読込中・0件・取得失敗を1440・1920pxで撮影し、全10枚で横はみ出し0。Pencilの集計帯・回答表・操作と目視比較した。",
     verdictSource: "forms-v6/v9tYhl.txt + forms-v6/v9tYhl-{1440,1920}.png + forms-v6/v9tYhl-{normal,loading,empty,error}-{1440,1920}.png",
   },
   {
@@ -1799,9 +1799,17 @@ export const SCREENS = [
       一覧だけを撮ると窓が写らないため、押してから突き合わせる。
     */
     ...MEDIA, node: 'eXAJP', name: '15-1-B ファイルを入れる',
-    mode: 'viewport', height: 1080, steps: [{ click: 'ファイルを入れる', after: 900 }],
-    verdict: "structure_match_data_pending",
-    verdictNote: "**2026-09-07、Issue #392 / PR #1157 / HEAD `0cc67ed91d` を1440px・1920px再撮影し、構造一致・ファイル投入状態のみ画像未確認。** 2幅とも横はみ出し0。設計どおり全面の窓、20件選択、画像10MB・音声/動画200MB・PDF20MB、フォルダ、選択件数、固定操作欄を表示する。実装は署名URLへ直接PUTし、ファイル別の準備中・送信率・確認中・完了・失敗・1件再試行を持ち、25件の契約テストで上限と経路を確認した。**残る理由:** 現行の撮影器はローカルファイル投入を表現できず、設計画像の「完了2件・上限超過1件」を同じ画像に作れない。初期状態の構造と2幅は目視済み。",
+    mode: 'viewport', height: 1080, steps: [
+      { click: 'ファイルを入れる', after: 500 },
+      { files: [
+        { name: '秋の新商品_01.jpg', mimeType: 'image/jpeg', size: 430080 },
+        { name: '秋の新商品_02.jpg', mimeType: 'image/jpeg', size: 389120 },
+        { name: '上限を超えた写真.jpg', mimeType: 'image/jpeg', size: 11534336 },
+      ] },
+      { click: '2件を登録する', after: 1800 },
+    ],
+    verdict: "match",
+    verdictNote: "**2026-09-07 Issue #441 でファイル投入状態を撮影し、一致。** 撮影器から3ファイルを `setInputFiles` で入れ、2件は署名URLへのPUTと完了確認を通して「入りました」、1件は画像10MB上限超過として同じ窓へ表示した。1440・1920pxとも横はみ出し0で、Pencilの「完了2件・上限超過1件」と目視比較した。",
     verdictSource: "media-v6/eXAJP.txt + eXAJP-1440.png + eXAJP-1920.png",
   },
   {

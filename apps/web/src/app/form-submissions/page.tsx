@@ -36,9 +36,25 @@ interface Form {
   status: 'active' | 'archived'
   revision: number
   submitCount?: number
+  weeklySubmitCount?: number
+  folderId?: string | null
+  destinationSummary?: { friendFieldCount: number; tagCount: number }
   createdAt: string
   lastSubmittedAt: string | null
   usedByAccounts: UsedByAccount[]
+}
+
+interface FormFolder {
+  id: string
+  name: string
+  formCount: number
+}
+
+type FormListResponse = Form[] | {
+  items: Form[]
+  total: number
+  page: number
+  limit: number
 }
 
 interface FormDetail extends Form {
@@ -109,6 +125,9 @@ export default function FormSubmissionsPage() {
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [forms, setForms] = useState<Form[]>([])
+  const [folders, setFolders] = useState<FormFolder[]>([])
+  const [formTotal, setFormTotal] = useState(0)
+  const [activeFolderId, setActiveFolderId] = useState('all')
   const [selectedFormId, setSelectedFormId] = useState<string | null>(null)
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [fieldLabels, setFieldLabels] = useState<Record<string, string>>({})
@@ -141,6 +160,8 @@ export default function FormSubmissionsPage() {
     const request = ++formRequest.current
     if (!selectedAccountId) {
       setForms([])
+      setFolders([])
+      setFormTotal(0)
       setSelectedFormId(null)
       setSubmissions([])
       setSubmissionTotal(0)
@@ -150,16 +171,23 @@ export default function FormSubmissionsPage() {
     setLoading(true)
     setLoadError('')
     try {
-      const res = await fetchApi<{ success: boolean; data: Form[] }>(
-        `/api/forms?account_id=${encodeURIComponent(selectedAccountId)}`,
-      )
-      if (!res.success) throw new Error('load_failed')
+      const account = `account_id=${encodeURIComponent(selectedAccountId)}`
+      const [res, folderRes] = await Promise.all([
+        fetchApi<{ success: boolean; data: FormListResponse }>(`/api/forms?${account}&with_list_summary=1`),
+        fetchApi<{ success: boolean; data: FormFolder[] }>(`/api/folders?kind=form&${account}`),
+      ])
+      if (!res.success || !folderRes.success) throw new Error('load_failed')
       if (request !== formRequest.current) return
-      setForms(res.data)
+      const items = Array.isArray(res.data) ? res.data : res.data.items
+      setForms(items)
+      setFolders(folderRes.data)
+      setFormTotal(Array.isArray(res.data) ? items.length : res.data.total)
     } catch {
       if (request !== formRequest.current) return
       setLoadError('回答フォームを読み込めませんでした。')
       setForms([])
+      setFolders([])
+      setFormTotal(0)
     } finally {
       if (request === formRequest.current) setLoading(false)
     }
@@ -332,6 +360,8 @@ export default function FormSubmissionsPage() {
   const filteredForms = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase('ja-JP')
     return sortedForms.filter((form) => {
+      if (activeFolderId === 'unfiled' && form.folderId) return false
+      if (activeFolderId !== 'all' && activeFolderId !== 'unfiled' && form.folderId !== activeFolderId) return false
       if (formFilter === 'published' && !form.isActive) return false
       if (formFilter === 'draft' && form.isActive) return false
       if (formFilter === 'stored' && summarizeFormDestinations(form.layout, form.onSubmitTagId).label === '—') return false
@@ -342,7 +372,7 @@ export default function FormSubmissionsPage() {
         || form.usedByAccounts.some((account) => account.name.toLocaleLowerCase('ja-JP').includes(normalizedQuery))
       )
     })
-  }, [formFilter, query, sortedForms])
+  }, [activeFolderId, formFilter, query, sortedForms])
   const selectedForm = useMemo(
     () => forms.find((f) => f.id === selectedFormId) ?? null,
     [forms, selectedFormId],
@@ -378,12 +408,13 @@ export default function FormSubmissionsPage() {
 
       <div className="grid items-start gap-4 lg:grid-cols-4">
         <FolderPanel
-          total={loading || loadError ? '— 件' : `${forms.length} 件`}
-          activeId="all"
-          onSelect={() => undefined}
+          total={loading || loadError ? '— 件' : `${formTotal} 件`}
+          activeId={activeFolderId}
+          onSelect={setActiveFolderId}
           rows={[
-            { id: 'all', label: 'すべて', count: loading || loadError ? 0 : forms.length },
-            { id: 'unfiled', label: '未分類', count: loading || loadError ? 0 : forms.length },
+            { id: 'all', label: 'すべて', count: loading || loadError ? 0 : formTotal },
+            ...folders.map((folder) => ({ id: folder.id, label: folder.name, count: folder.formCount })),
+            { id: 'unfiled', label: '未分類', count: loading || loadError ? 0 : Math.max(0, formTotal - folders.reduce((sum, folder) => sum + folder.formCount, 0)) },
           ]}
         />
 
@@ -397,7 +428,7 @@ export default function FormSubmissionsPage() {
               aria-label="フォーム名・質問文で検索"
               className="border-hairline rounded-control focus:ring-accent min-w-60 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
             />
-            <span className="text-xs text-ink-faint">回答が新しい順</span>
+            <span className="text-xs text-ink-faint">回答が多い順</span>
             <Select
               aria-label="表示件数"
               size="page-size"
@@ -489,6 +520,12 @@ export default function FormSubmissionsPage() {
               const displayCount = form.submitCount ?? totalCount
               const normalizedName = displayFormName(form.name)
               const destinationSummary = summarizeFormDestinations(form.layout, form.onSubmitTagId)
+              const listDestinationSummary = form.destinationSummary
+                ? [
+                    form.destinationSummary.friendFieldCount > 0 ? `友だち情報欄${form.destinationSummary.friendFieldCount}` : '',
+                    form.destinationSummary.tagCount > 0 ? `タグ${form.destinationSummary.tagCount}` : '',
+                  ].filter(Boolean).join('・') || '—'
+                : destinationSummary.label
               return (
                 <tr key={form.id} className="text-ink-secondary">
                   <td className="px-3 py-2.5">
@@ -496,8 +533,11 @@ export default function FormSubmissionsPage() {
                     <span className="block truncate text-xs text-ink-faint">{form.description || `${form.fields.length}ブロック`}</span>
                   </td>
                   <td className="px-3 py-2.5 text-xs">{form.isActive ? '公開中' : '下書き'}</td>
-                  <td className="truncate px-3 py-2.5 text-xs" title={destinationSummary.label}>{destinationSummary.label}</td>
-                  <td className="px-3 py-2.5 text-right text-xs tabular-nums">{displayCount ? `${displayCount.toLocaleString('ja-JP')}件` : '—'}</td>
+                  <td className="truncate px-3 py-2.5 text-xs" title={listDestinationSummary}>{listDestinationSummary}</td>
+                  <td className="px-3 py-2.5 text-right text-xs tabular-nums">
+                    <span className="block">{displayCount ? `${displayCount.toLocaleString('ja-JP')}件` : '—'}</span>
+                    {form.weeklySubmitCount ? <span className="block text-ink-faint">今週 {form.weeklySubmitCount.toLocaleString('ja-JP')}件</span> : null}
+                  </td>
                   <td className="px-3 py-2.5 text-xs tabular-nums">{new Date(form.createdAt).toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' })}</td>
                   <td className="px-3 py-2.5 text-right text-xs">
                     <Link href={`/form-submissions/responses?id=${encodeURIComponent(form.id)}`} className="text-accent hover:underline">回答</Link>
@@ -512,6 +552,11 @@ export default function FormSubmissionsPage() {
           </div>
           )
         )}
+          {!loading && !loadError && forms.length > 0 ? (
+            <p className="mt-3 text-xs text-ink-faint">
+              {formTotal.toLocaleString('ja-JP')}件中 1〜{filteredForms.length.toLocaleString('ja-JP')}件を表示
+            </p>
+          ) : null}
         </section>
       </div>
 
