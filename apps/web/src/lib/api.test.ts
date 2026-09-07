@@ -90,16 +90,36 @@ describe('api.friends のV6検索・本人照合契約', () => {
       reason: '本人確認済み',
       profileSelections: [{ fieldKey: 'display_name', sourceFriendId: 'friend-1', updateMode: 'fixed' }],
     })
+    await api.mergedPeople.updateProfileValues('person/1', {
+      expectedRevision: 4,
+      selections: [{
+        fieldKey: 'display_name',
+        candidateId: `pc_${'a'.repeat(64)}`,
+        updateMode: 'fixed',
+      }],
+    })
     await api.mergedPeople.unlink('person/1', 'friend/1', { expectedRevision: 4, reason: '別人と確認' })
 
     expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
       'https://worker.example.com/api/friends/saved-views?lineAccountId=account%2F1',
       'https://worker.example.com/api/friends/duplicates/candidate%2F1',
       'https://worker.example.com/api/friends/duplicates/candidate%2F1',
+      'https://worker.example.com/api/friends/people/person%2F1/profile-values',
       'https://worker.example.com/api/friends/people/person%2F1/links/friend%2F1',
     ])
     expect(fetchSpy.mock.calls[2]?.[1]).toMatchObject({ method: 'PATCH' })
     expect(fetchSpy.mock.calls[3]?.[1]).toMatchObject({
+      method: 'PATCH',
+      body: JSON.stringify({
+        expectedRevision: 4,
+        selections: [{
+          fieldKey: 'display_name',
+          candidateId: `pc_${'a'.repeat(64)}`,
+          updateMode: 'fixed',
+        }],
+      }),
+    })
+    expect(fetchSpy.mock.calls[4]?.[1]).toMatchObject({
       method: 'DELETE',
       body: JSON.stringify({ expectedRevision: 4, reason: '別人と確認' }),
     })

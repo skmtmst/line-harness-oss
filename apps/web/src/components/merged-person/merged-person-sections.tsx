@@ -8,6 +8,7 @@ import type {
 } from '@line-crm/shared'
 import type { FriendProfileCandidate, FriendTagCandidate } from '@/lib/api'
 import Card from '@/components/shared/card'
+import Button from '@/components/shared/button'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import {
   confidenceText,
@@ -197,7 +198,15 @@ export function MergedFriendsTable({ friends, onUnlink }: { friends: MergedPerso
 }
 
 /** 統合された属性。項目ごとに「どこから採ったか」を記録する。 */
-export function MergedProfileValues({ values, candidates = [] }: { values: MergedPersonProfileValue[]; candidates?: FriendProfileCandidate[] }) {
+export function MergedProfileValues({
+  values,
+  candidates = [],
+  onEdit,
+}: {
+  values: MergedPersonProfileValue[]
+  candidates?: FriendProfileCandidate[]
+  onEdit?: () => void
+}) {
   return (
     <Card layout="vertical" className={styles.section} data-merged-part="values">
       <p className={styles.sectionTitle}>統合された属性 {values.length}件</p>
@@ -223,9 +232,14 @@ export function MergedProfileValues({ values, candidates = [] }: { values: Merge
       )}
       <p className={styles.sectionNote}>
         {candidates.length > 0
-          ? `変更候補を${candidates.length}項目確認できます。現在の更新契約は元の値を再送する必要があるため、マスク済み候補からは安全に保存できません。`
+          ? `変更候補を${candidates.length}項目確認できます。マスク済みの値から採用元を選べます。`
           : '採用する値の変更候補はまだありません。'}
       </p>
+      {onEdit ? (
+        <div className={styles.actions}>
+          <Button type="button" onClick={onEdit}>統合プロフィールを編集</Button>
+        </div>
+      ) : null}
     </Card>
   )
 }

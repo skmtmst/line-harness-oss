@@ -103,6 +103,7 @@ import type {
 } from '@line-crm/shared'
 
 export type FriendProfileCandidateOption = {
+  candidateId: string
   sourceFriendId: string
   sourceLabel: string
   valuePreview: string | null
@@ -130,6 +131,15 @@ export type IdentityCandidateWithProfiles = IdentityCandidateDetail & {
 export type MergedPersonWithCandidates = MergedPersonDetail & {
   profileCandidates: FriendProfileCandidate[]
   tagCandidates: FriendTagCandidate[]
+}
+
+export type UpdateMergedProfileCandidatesRequest = {
+  expectedRevision: number
+  selections: Array<{
+    fieldKey: string
+    candidateId: string
+    updateMode: 'auto' | 'fixed'
+  }>
 }
 
 export type FriendSavedView = {
@@ -7692,9 +7702,14 @@ export const api = {
       fetchApi<ApiResponse<MergedPersonWithCandidates>>(
         `/api/friends/people/${encodeURIComponent(id)}`,
       ),
-    update: (id: string, body: UpdateMergedPersonRequest) =>
+    update: (id: string, body: Omit<UpdateMergedPersonRequest, 'profileSelections'>) =>
       fetchApi<ApiResponse<MergedPersonDetail>>(
         `/api/friends/people/${encodeURIComponent(id)}`,
+        { method: 'PATCH', body: JSON.stringify(body) },
+      ),
+    updateProfileValues: (id: string, body: UpdateMergedProfileCandidatesRequest) =>
+      fetchApi<ApiResponse<MergedPersonWithCandidates>>(
+        `/api/friends/people/${encodeURIComponent(id)}/profile-values`,
         { method: 'PATCH', body: JSON.stringify(body) },
       ),
     updateDeliveryPriorities: (
