@@ -154,9 +154,9 @@ export default function NewWebinarPage() {
             <p className="text-ink mt-3 text-xs font-semibold">タグ「配信済み」は確認画面で追加できます</p>
           </section>
 
-          <section className="bg-info rounded-card p-4 text-on-accent shadow-card">
+          <section className="bg-line-preview rounded-card p-4 text-on-accent shadow-card">
             <h2 className="text-center text-sm font-bold">LINEプレビュー</h2>
-            <p className="mx-auto mt-3 w-fit rounded-pill bg-ink/20 px-3 py-1 text-micro">実際のLINE表示に近いプレビューです</p>
+            <p className="bg-line-preview-label mx-auto mt-3 w-fit rounded-pill px-3 py-1 text-micro">実際のLINE表示に近いプレビューです</p>
             <div className="bg-canvas text-ink mt-4 min-h-12 rounded-control p-4 text-sm font-medium">
               {title.trim() ? `${title.trim()}へようこそ。` : 'ウェビナー名を入れると、案内文をここで確認できます。'}
             </div>

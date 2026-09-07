@@ -13,7 +13,7 @@
  * どれも**未マージのPRの枝で見たものを、本流の話として書いた**のが元。
  * 枝で見た観察は、本流に入るまで本流の判定にしない。
  */
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -67,5 +67,15 @@ describe('台帳の「無い」という主張', () => {
       .filter((s) => s.status === 'unimplemented' && /未実装ではなくなった/.test(s.verdictNote ?? ''))
       .map((s) => `${s.node} ${s.name}`);
     expect(wrong, `status と注記が食い違っています:\n  ${wrong.join('\n  ')}`).toEqual([]);
+  });
+
+  it('保持した画素比較結果は台帳で前回値と表示する', () => {
+    const report = JSON.parse(readFileSync(join(ROOT, 'docs/design-qa/v6-pixel-diff.json'), 'utf8'));
+    const retained = report.entries.filter((entry: { retainedFrom?: string }) => entry.retainedFrom);
+    const markdown = readFileSync(join(ROOT, 'docs/design-qa/v6-progress-ledger.md'), 'utf8');
+    for (const entry of retained) {
+      const row = markdown.split('\n').find((line) => line.includes(`| \`${entry.node}\` |`));
+      expect(row, `${entry.node} の画素比較行がありません`).toContain('（前回値）');
+    }
   });
 });
