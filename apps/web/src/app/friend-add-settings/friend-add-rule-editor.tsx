@@ -156,6 +156,15 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
         : await api.friendAddRules.createDraft(payload, saveIdempotencyKey.current)
       if (!response.success) { setError(response.error); return null }
       const savedId = response.data.id
+      // 同じ冪等キーを使い回すと、サーバが変更を適用せず現在値を返す
+      // (replay)。保存が通るたびにキーを回し、応答の版番号を手元へ反映する。
+      // なお response.data の型は api.ts 側が `{ id; versionId }` のままなので、
+      // 版番号は存在確認つきで読む(api.ts の型更新は所有レーンへ依頼 #524)。
+      saveIdempotencyKey.current = crypto.randomUUID()
+      const savedVersion = (response.data as { version?: number }).version
+      if (typeof savedVersion === 'number') {
+        setRule((current) => ({ ...current, version: savedVersion }))
+      }
       setNotice('下書きを保存しました。')
       if (!ruleId || nextStep) router.replace(`/friend-add-settings?view=edit&id=${encodeURIComponent(savedId)}&step=${nextStep ?? step}`)
       return savedId
