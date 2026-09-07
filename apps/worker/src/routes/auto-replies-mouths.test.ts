@@ -65,19 +65,27 @@ function settings(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function insertRule(raw: SqliteD1['raw'], id: string, keyword: string, priority: number) {
+function insertRule(
+  raw: SqliteD1['raw'],
+  id: string,
+  keyword: string,
+  priority: number,
+  accountId = 'account-1',
+) {
   raw.prepare(
     `INSERT INTO auto_replies
        (id, keyword, match_type, response_content, line_account_id, is_active,
         priority, message_kinds_json, name, current_draft_version_id, created_at)
-     VALUES (?, ?, 'contains', '返信', 'account-1', 1, ?, '["text"]', ?, ?, ?)`,
-  ).run(id, keyword, priority, `${keyword}受付`, `version-${id}`, `2026-09-01T00:00:0${priority}.000`);
+     VALUES (?, ?, 'contains', '返信', ?, 1, ?, '["text"]', ?, ?, ?)`,
+  ).run(id, keyword, accountId, priority, `${keyword}受付`, `version-${id}`, `2026-09-01T00:00:0${priority}.000`);
   raw.prepare(
     `INSERT INTO auto_reply_versions
        (id, auto_reply_id, version_number, line_account_id, definition_snapshot,
         status, created_at, updated_at)
-     VALUES (?, ?, 2, 'account-1', ?, 'draft', '2026-09-01T00:00:00.000', '2026-09-01T00:00:00.000')`,
-  ).run(`version-${id}`, id, JSON.stringify(settings({ keyword, priority, name: `${keyword}受付` })));
+     VALUES (?, ?, 2, ?, ?, 'draft', '2026-09-01T00:00:00.000', '2026-09-01T00:00:00.000')`,
+  ).run(`version-${id}`, id, accountId, JSON.stringify(settings({
+    keyword, priority, name: `${keyword}受付`, lineAccountId: accountId,
+  })));
 }
 
 describe('V6 自動応答の一覧・競合・下書き保存口', () => {
@@ -202,6 +210,23 @@ describe('V6 自動応答の一覧・競合・下書き保存口', () => {
       staffTarget.bindings,
     );
     expect(denied.status).toBe(403);
+  });
+
+  it('一覧でも対象外アカウントを隠し、アカウント名を漏らさない', async () => {
+    insertRule(testDb.raw, 'rule-other', '他店限定', 3, 'account-2');
+    const target = app(testDb.db);
+    expect((await target.instance.request(
+      '/api/auto-replies?accountId=account-2', {}, target.bindings,
+    )).status).toBe(404);
+
+    const response = await target.instance.request('/api/auto-replies', {}, target.bindings);
+    const body = await response.json() as { data: Array<{
+      id: string; effectiveAccounts: Array<{ accountId: string }>;
+    }> };
+    expect(response.status).toBe(200);
+    expect(body.data.map((item) => item.id)).not.toContain('rule-other');
+    expect(body.data.flatMap((item) => item.effectiveAccounts.map((account) => account.accountId)))
+      .not.toContain('account-2');
   });
 
   it('追加設定を版へ保存し、古い版番号は409で止める', async () => {

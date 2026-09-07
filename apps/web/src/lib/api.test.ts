@@ -5,6 +5,8 @@ let ApiError: typeof import('./api').ApiError
 let extractApiErrorMessage: typeof import('./api').extractApiErrorMessage
 let extractApiErrorCode: typeof import('./api').extractApiErrorCode
 let extractApiErrorData: typeof import('./api').extractApiErrorData
+let extractFeatureDisabledDetail: typeof import('./api').extractFeatureDisabledDetail
+let shouldAnnounceFeatureDisabled: typeof import('./api').shouldAnnounceFeatureDisabled
 let eventsApi: typeof import('./api').eventsApi
 let webinarApi: typeof import('./api').webinarApi
 let api: typeof import('./api').api
@@ -17,6 +19,8 @@ beforeAll(async () => {
     extractApiErrorMessage,
     extractApiErrorCode,
     extractApiErrorData,
+    extractFeatureDisabledDetail,
+    shouldAnnounceFeatureDisabled,
     eventsApi,
     webinarApi,
     api,
@@ -532,6 +536,36 @@ describe('api.mileage reward draft contract', () => {
   })
 })
 
+describe('api.mileage rules contract(#532/#521)', () => {
+  it('旧マイルールの作成は選択中のLINEアカウントIDを送る', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: { id: 'rule-1' } }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await api.mileage.createRule({
+      name: '予約してくれたら 300 マイル',
+      eventType: 'booking_created',
+      source: null,
+      amount: 300,
+      initialStatus: 'available',
+      conditions: {},
+      validFrom: null,
+      validUntil: null,
+      lineAccountId: 'account/1',
+    })
+
+    expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
+      'https://worker.example.com/api/mileage/rules',
+    ])
+    expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({ method: 'POST' })
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body))).toMatchObject({
+      lineAccountId: 'account/1',
+    })
+  })
+})
+
 describe('api.mileage V6 admin contract', () => {
   it('残高・付与ルールを選択中アカウントで読み、下書きを版付きで保存する', async () => {
     const fetchSpy = vi.fn(async () => new Response(
@@ -625,71 +659,6 @@ describe('eventsApi.createSlots', () => {
 
     await expect(eventsApi.createSlots('account', 'event', slots)).rejects.toThrow('400件まで追加されました')
     expect(fetchSpy).toHaveBeenCalledTimes(2)
-  })
-})
-
-describe('api.friendAddRouting draft/test/publish contract', () => {
-  const routing = {
-    firstTime: { scenarioId: 'scenario-1', timing: 'immediate' as const, actions: [] },
-    returning: {
-      scenarioId: null,
-      mode: 'same' as const,
-      startPosition: 'beginning' as const,
-      actions: [],
-    },
-    criteria: { firstTime: 'unfollow_count_zero' as const },
-  }
-
-  it('下書き・確認・競合・テストを同じLINEアカウントに紐づける', async () => {
-    const spy = vi.fn(async () => new Response(
-      JSON.stringify({ success: true, data: {} }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } },
-    ))
-    vi.stubGlobal('fetch', spy)
-
-    await api.friendAddRouting.getDraft('account 1')
-    await api.friendAddRouting.saveDraft('account 1', routing)
-    await api.friendAddRouting.validateDraft('account 1')
-    await api.friendAddRouting.conflicts('account 1')
-    await api.friendAddRouting.testDraft('account 1', 'friend-1')
-
-    expect(spy.mock.calls.map(([url]) => url)).toEqual([
-      'https://worker.example.com/api/friend-add-routing/draft?account_id=account%201',
-      'https://worker.example.com/api/friend-add-routing/draft?account_id=account%201',
-      'https://worker.example.com/api/friend-add-routing/validate?account_id=account%201',
-      'https://worker.example.com/api/friend-add-routing/conflicts?account_id=account%201',
-      'https://worker.example.com/api/friend-add-routing/draft/test?account_id=account%201',
-    ])
-    expect(spy.mock.calls[1][1]).toMatchObject({
-      method: 'PUT',
-      body: JSON.stringify({ routing }),
-    })
-    expect(spy.mock.calls[4][1]).toMatchObject({
-      method: 'POST',
-      body: JSON.stringify({ friendId: 'friend-1' }),
-    })
-  })
-
-  it('公開要求に操作の識別キーを付ける', async () => {
-    const spy = vi.fn(async () => new Response(
-      JSON.stringify({ success: true, data: {} }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } },
-    ))
-    vi.stubGlobal('fetch', spy)
-
-    await api.friendAddRouting.publish('account-1', 'publish-key-00000001')
-
-    expect(spy).toHaveBeenCalledWith(
-      'https://worker.example.com/api/friend-add-routing/publish?account_id=account-1',
-      expect.objectContaining({
-        method: 'POST',
-        credentials: 'include',
-        headers: expect.objectContaining({
-          'Content-Type': 'application/json',
-          'Idempotency-Key': 'publish-key-00000001',
-        }),
-      }),
-    )
   })
 })
 
@@ -907,14 +876,29 @@ describe('extractApiErrorMessage', () => {
     expect(extractApiErrorMessage(JSON.stringify({ error: { code: 500 } }), 400)).toBe('')
   })
 
-  // 表示してよいのは、worker が自分で検証して返した 400 だけ。
-  it.each([401, 403, 404, 409, 429, 500, 502, 503])(
+  it('422 の検証文はそのまま運用者へ出す(#496-11)', () => {
+    expect(extractApiErrorMessage(
+      JSON.stringify({ error: 'Shift_JIS書き出しはまだ接続されていません。UTF-8を選んでください' }),
+      422,
+    )).toBe('Shift_JIS書き出しはまだ接続されていません。UTF-8を選んでください')
+  })
+
+  it.each([409, 422, 428])('%i の復旧可能な案内を表示する', (status) => {
+    expect(extractApiErrorMessage(JSON.stringify({ error: '最新の内容を確認して、もう一度お試しください' }), status))
+      .toBe('最新の内容を確認して、もう一度お試しください')
+  })
+
+  it.each([401, 403, 404, 429, 500, 502, 503])(
     '%i の本文は内部情報を含みうるため表示しない',
     (status) => {
       const body = JSON.stringify({ error: 'D1_ERROR: no such table: rich_menu_groups' })
       expect(extractApiErrorMessage(body, status)).toBe('')
     },
   )
+
+  it.each([400, 409, 422, 428])('%i でも内部情報は表示しない', (status) => {
+    expect(extractApiErrorMessage(JSON.stringify({ error: 'D1_ERROR: no such table: secrets' }), status)).toBe('')
+  })
 })
 
 describe('extractApiErrorCode', () => {
@@ -935,13 +919,86 @@ describe('extractApiErrorCode', () => {
     }))).toBe('media_delete_blocked')
   })
 
+  it('判定画面の大文字コードも取り出す(#496-12)', () => {
+    expect(extractApiErrorCode(JSON.stringify({ code: 'STALE_CANDIDATE' }))).toBe('STALE_CANDIDATE')
+    expect(extractApiErrorCode(JSON.stringify({ code: 'KIND_REQUIRED' }))).toBe('KIND_REQUIRED')
+    expect(extractApiErrorCode(JSON.stringify({ code: 'COMMON_VAR_IN_USE' }))).toBe('COMMON_VAR_IN_USE')
+    expect(extractApiErrorCode(JSON.stringify({ code: 'STALE_PERSON' }))).toBe('STALE_PERSON')
+  })
+
   it('内部文言・HTML・文字列以外はコードとして受け取らない', () => {
     expect(extractApiErrorCode(JSON.stringify({ error: 'D1_ERROR: no such table' }))).toBeUndefined()
-    expect(extractApiErrorCode(JSON.stringify({ code: 'COMMON_VAR_IN_USE' }))).toBeUndefined()
-    expect(extractApiErrorCode(JSON.stringify({ code: 'STALE_PERSON' }))).toBeUndefined()
     expect(extractApiErrorCode(JSON.stringify({ code: 'D1_ERROR: no such table' }))).toBeUndefined()
+    expect(extractApiErrorCode(JSON.stringify({ code: 'Failed to fetch friend rich menu: boom' }))).toBeUndefined()
     expect(extractApiErrorCode('<html>proxy error</html>')).toBeUndefined()
     expect(extractApiErrorCode(JSON.stringify({ error: { code: 'slot_conflict' } }))).toBeUndefined()
+  })
+
+  it('機能停止契約の固定コードだけは大文字でも受け取る', () => {
+    expect(extractApiErrorCode(JSON.stringify({ code: 'FEATURE_DISABLED' }))).toBe('FEATURE_DISABLED')
+    expect(extractApiErrorCode(JSON.stringify({ code: 'FORBIDDEN' }))).toBe('FORBIDDEN')
+  })
+})
+
+describe('機能オフの403契約', () => {
+  function stubBrowser(target: EventTarget) {
+    const storage = {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    }
+    vi.stubGlobal('window', target)
+    vi.stubGlobal('sessionStorage', storage)
+    vi.stubGlobal('localStorage', storage)
+  }
+
+  it('FEATURE_DISABLED だけを専用案内へ送り、通常の403は権限案内に残す', () => {
+    expect(shouldAnnounceFeatureDisabled(403, 'FEATURE_DISABLED')).toBe(true)
+    expect(shouldAnnounceFeatureDisabled(403, undefined)).toBe(false)
+    expect(shouldAnnounceFeatureDisabled(403, 'forbidden')).toBe(false)
+    expect(shouldAnnounceFeatureDisabled(409, 'FEATURE_DISABLED')).toBe(false)
+  })
+
+  it('案内には公開された機能IDだけを渡す', () => {
+    expect(extractFeatureDisabledDetail(JSON.stringify({ featureId: 'webinars' })))
+      .toEqual({ featureId: 'webinars' })
+    expect(extractFeatureDisabledDetail(JSON.stringify({ featureId: '../secret' }))).toEqual({})
+    expect(extractFeatureDisabledDetail('<html>error</html>')).toEqual({})
+  })
+
+  it('API応答から専用案内の合図を出し、ApiErrorにも固定コードを残す', async () => {
+    const target = new EventTarget()
+    let detail: unknown
+    target.addEventListener('lh-feature-disabled', (event) => {
+      detail = (event as CustomEvent).detail
+    })
+    stubBrowser(target)
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      success: false,
+      error: 'この機能は設定でオフになっています',
+      code: 'FEATURE_DISABLED',
+      featureId: 'webinars',
+    }), { status: 403 })))
+
+    await expect(fetchApi('/api/webinars')).rejects.toMatchObject({
+      status: 403,
+      code: 'FEATURE_DISABLED',
+    })
+    expect(detail).toEqual({ featureId: 'webinars' })
+  })
+
+  it('通常の403では専用案内の合図を出さない', async () => {
+    const target = new EventTarget()
+    const listener = vi.fn()
+    target.addEventListener('lh-feature-disabled', listener)
+    stubBrowser(target)
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      success: false,
+      code: 'FORBIDDEN',
+    }), { status: 403 })))
+
+    await expect(fetchApi('/api/webinars')).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' })
+    expect(listener).not.toHaveBeenCalled()
   })
 })
 
@@ -973,6 +1030,25 @@ describe('fetchApi error response', () => {
       .rejects.toThrow('ページ「基本メニュー」のタップ領域1: 送信テキストを入力してください')
   })
 
+  it('422 の検証文も管理画面へ伝える(#496-11)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          success: false,
+          error: '保存した検索の条件が壊れています',
+        }),
+        { status: 422, headers: { 'Content-Type': 'application/json' } },
+      ),
+    ))
+
+    await expect(fetchApi('/api/friends?search=%', { method: 'GET' }))
+      .rejects.toMatchObject({
+        name: 'ApiError',
+        status: 422,
+        message: '保存した検索の条件が壊れています',
+      })
+  })
+
   it('具体的な error を出しても status で分岐できる状態を保つ', async () => {
     vi.stubGlobal('fetch', vi.fn(async () =>
       new Response(JSON.stringify({ error: '送信テキストを入力してください' }), {
@@ -989,7 +1065,7 @@ describe('fetchApi error response', () => {
     expect(new ApiError(401).message).toBe('API error: 401')
   })
 
-  it('メディア削除409の最新影響を保持しても本文は利用者向けメッセージにしない', async () => {
+  it('メディア削除409の最新影響と復旧案内を保持する', async () => {
     const impact = {
       usageCount: 2,
       canDelete: false,
@@ -1009,7 +1085,7 @@ describe('fetchApi error response', () => {
         name: 'ApiError',
         status: 409,
         code: 'media_delete_blocked',
-        message: 'API error: 409',
+        message: 'このファイルは2か所で使われています。先に使用先から外してください。',
         data: impact,
       })
   })
@@ -1068,7 +1144,7 @@ describe('fetchApi error response', () => {
     })
   })
 
-  it('共通情報削除409の最新影響を保持しても本文は利用者向けメッセージにしない', async () => {
+  it('共通情報削除409の最新影響と復旧案内を保持する', async () => {
     const impact = {
       blockingTotal: 2,
       canDelete: false,
@@ -1088,12 +1164,12 @@ describe('fetchApi error response', () => {
         name: 'ApiError',
         status: 409,
         code: 'common_var_delete_blocked',
-        message: 'API error: 409',
+        message: '2件で使用中のため削除できません',
         data: impact,
       })
   })
 
-  it('409の最新状態は保持し、本文は利用者へ直接出さない', async () => {
+  it('409の最新状態と復旧案内を保持する', async () => {
     const impact = { canDelete: false, blockers: ['incoming_switches'] }
     vi.stubGlobal('fetch', vi.fn(async () =>
       new Response(JSON.stringify({
@@ -1109,7 +1185,7 @@ describe('fetchApi error response', () => {
         name: 'ApiError',
         status: 409,
         code: 'rich_menu_delete_blocked',
-        message: 'API error: 409',
+        message: '削除する前に、公開状態と使われている場所を確認してください',
         data: impact,
       })
   })

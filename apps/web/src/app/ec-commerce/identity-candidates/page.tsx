@@ -47,12 +47,7 @@ function candidateImpactText(value: unknown): string {
  */
 export default function EcIdentityCandidatesPage() {
   const { selectedAccountId } = useAccount()
-  /*
-   * 選んだアカウントの候補だけを読む(#530)。口に絞りが無いので
-   * hook 側で全頁を集めてから絞る。先頭20件の手元絞りでは枠外の
-   * 候補が「いない」ように見えて対応漏れになる。
-   */
-  const review = useIdentityReview('ec_member', { lineAccountId: selectedAccountId ?? undefined })
+  const review = useIdentityReview('ec_member', { lineAccountId: selectedAccountId })
   const detail = review.detail
   const [operations, setOperations] = useState<EcIdentityCandidateOperationsList | null>(null)
   const [operationsState, setOperationsState] = useState<'loading' | 'ready' | 'empty' | 'error' | 'forbidden'>('loading')
@@ -84,10 +79,7 @@ export default function EcIdentityCandidatesPage() {
 
   useEffect(() => { void loadOperations() }, [loadOperations])
 
-  const scopedItems = useMemo(
-    () => review.items.filter((item) => item.left.lineAccountId === selectedAccountId),
-    [review.items, selectedAccountId],
-  )
+  const scopedItems = review.items
   const candidateCount = operations?.summary.candidateExternalCustomers ?? 0
   const noneCount = Math.max(0, (operations?.summary.unmatched ?? 0) - candidateCount)
   const conflictCount = operations?.summary.duplicateSuspicions ?? 0
@@ -225,6 +217,14 @@ export default function EcIdentityCandidatesPage() {
               </tbody>
             </DataTable>
           </div>
+
+          {review.hasMore ? (
+            <div className="flex justify-center">
+              <Button type="button" onClick={review.loadMore} disabled={review.loadingMore}>
+                {review.loadingMore ? '読み込み中…' : '続きを読み込む'}
+              </Button>
+            </div>
+          ) : null}
 
           <p className={styles.footerNote}>
             結びついていない {(operations?.summary.unmatched ?? 0).toLocaleString('ja-JP')} 件中 {shown.length.toLocaleString('ja-JP')} 件を表示しています。

@@ -16,7 +16,7 @@
 import SelectField from '@/components/shared/select-field'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   emptyLayout,
   newBlockId,
@@ -27,12 +27,13 @@ import {
   type FormSection,
   type FormTheme,
 } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import { api, fetchApi } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { Field, inputClass } from '@/components/shared/form-controls'
 import BlockEditor, { BLOCK_MENU } from '@/components/forms/block-editor'
 import FormPreview from '@/components/forms/form-preview'
 import FormDesignSettings from './form-design-settings'
+import { validateLayoutForSave } from './form-validate'
 import OptionsDialog from '@/components/forms/options-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -96,8 +97,32 @@ function jumpsInto(layout: FormLayout, sectionId: string): number {
   return count
 }
 
+/**
+ * 複製の回答キーを一意にする。
+ *
+ * 回答は `name` を鍵に保存される。`${base}_copy` が既にあれば
+ * `_copy2`、`_copy3` と番号を足して、重ならない名前を作る。
+ */
+function uniqueCopyName(base: string, taken: Set<string>): string {
+  const first = `${base}_copy`
+  if (!taken.has(first)) return first
+  let n = 2
+  while (taken.has(`${base}_copy${n}`)) n += 1
+  return `${base}_copy${n}`
+}
+
+/** 編集全体の入力欄が使う回答キーの一覧。 */
+function takenAnswerNames(layout: FormLayout): Set<string> {
+  return new Set(
+    layout.header
+      .concat(layout.sections.flatMap((s) => s.blocks))
+      .flatMap((b) => (b.kind === 'input' ? [b.name] : [])),
+  )
+}
+
 function FormEditInner() {
   const params = useSearchParams()
+  const router = useRouter()
   const id = params.get('id') ?? ''
   const editorTab = params.get('tab') === 'design'
     ? 'design'
@@ -135,6 +160,9 @@ function FormEditInner() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  // 保存済み・読み直し直後の姿。タブ移動やタブを閉じる前の確認に使う。
+  const savedSnapshot = useRef<string | null>(null)
+  const [pendingNav, setPendingNav] = useState<string | null>(null)
 
   useEffect(() => {
     if (editorTab === 'options') setShowOptions(true)
@@ -174,12 +202,18 @@ function FormEditInner() {
   useEffect(() => {
     void (async () => {
       try {
+        // 参照一覧は選んでいる公式アカウントに絞る。絞らないと別アカウントの
+        // タグ等が混ざり、付け間違いの元になる。
+        const tagPath = selectedAccountId
+          ? `/api/tags?lineAccountId=${encodeURIComponent(selectedAccountId)}`
+          : '/api/tags'
+        const accountFilter = selectedAccountId ? { accountId: selectedAccountId } : undefined
         const [tagRes, ffRes, scenarioRes, reminderRes, templateRes] = await Promise.all([
-          api.tags.list(),
+          fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(tagPath),
           selectedAccountId ? api.friendFields.list(selectedAccountId) : Promise.resolve({ success: true as const, data: [] }),
-          api.scenarios.list(),
-          api.reminders.list(),
-          api.templates.list(),
+          api.scenarios.list(accountFilter),
+          api.reminders.list(accountFilter),
+          api.templates.list(undefined, selectedAccountId ?? undefined),
         ])
         setRefs({
           tags: tagRes.success ? tagRes.data.map((t) => ({ id: t.id, name: t.name })) : [],
@@ -200,16 +234,29 @@ function FormEditInner() {
         if (!id || !selectedAccountId) return
         const res = await api.forms.get(id, selectedAccountId)
         if (res.success) {
-          setName(res.data.name)
-          setDescription(res.data.description ?? '')
-          setIsActive(res.data.isActive)
-          setSubmitCount(res.data.submitCount ?? 0)
-          setOnSubmitTagId(res.data.onSubmitTagId ?? '')
-          setOgTitle(res.data.ogTitle ?? '')
-          setOgDescription(res.data.ogDescription ?? '')
-          setOgImageUrl(res.data.ogImageUrl ?? '')
           // layout はサーバ側が必ず作って返す（古いフォームは fields から）
-          setLayoutState(res.data.layout ?? emptyLayout())
+          const nextLayout = res.data.layout ?? emptyLayout()
+          const loaded = {
+            name: res.data.name,
+            description: res.data.description ?? '',
+            isActive: res.data.isActive,
+            onSubmitTagId: res.data.onSubmitTagId ?? '',
+            ogTitle: res.data.ogTitle ?? '',
+            ogDescription: res.data.ogDescription ?? '',
+            ogImageUrl: res.data.ogImageUrl ?? '',
+            layout: nextLayout,
+          }
+          setName(loaded.name)
+          setDescription(loaded.description)
+          setIsActive(loaded.isActive)
+          setSubmitCount(res.data.submitCount ?? 0)
+          setOnSubmitTagId(loaded.onSubmitTagId)
+          setOgTitle(loaded.ogTitle)
+          setOgDescription(loaded.ogDescription)
+          setOgImageUrl(loaded.ogImageUrl)
+          setLayoutState(nextLayout)
+          // 未保存のままタブ移動したときの確認に使う。読み直しが基準。
+          savedSnapshot.current = JSON.stringify(loaded)
         }
       } catch {
         setError('読み込みに失敗しました')
@@ -264,9 +311,11 @@ function FormEditInner() {
   const duplicateBlock = () => {
     if (selectedIndex < 0) return
     const source = blocks[selectedIndex]
+    // 回答キーが重なると片方の答えが消える。既存の名前と突き合わせて一意にする。
+    const taken = takenAnswerNames(layout)
     const copy: FormBlock =
       source.kind === 'input'
-        ? { ...source, id: newBlockId(), name: `${source.name}_copy` }
+        ? { ...source, id: newBlockId(), name: uniqueCopyName(source.name, taken) }
         : { ...source, id: newBlockId() }
     const next = [...blocks]
     next.splice(selectedIndex + 1, 0, copy)
@@ -306,11 +355,16 @@ function FormEditInner() {
     const copy: FormSection = {
       id: newBlockId('s'),
       name: `${source.name}のコピー`,
-      blocks: source.blocks.map((b) =>
-        b.kind === 'input'
-          ? { ...b, id: newBlockId(), name: `${b.name}_copy` }
-          : { ...b, id: newBlockId() },
-      ),
+      blocks: (() => {
+        // ページ内の複製同士でも重ねないよう、作るたびに一覧へ足す。
+        const taken = takenAnswerNames(layout)
+        return source.blocks.map((b) => {
+          if (b.kind !== 'input') return { ...b, id: newBlockId() }
+          const name = uniqueCopyName(b.name, taken)
+          taken.add(name)
+          return { ...b, id: newBlockId(), name }
+        })
+      })(),
     }
     setLayout((prev) => ({
       ...prev,
@@ -368,6 +422,37 @@ function FormEditInner() {
     setRemoveSectionIndex(index)
   }
 
+  // いまの入力と保存済みの姿を比べる。読み直し前は何も比べない。
+  const currentSnapshot = JSON.stringify({
+    name,
+    description,
+    isActive,
+    onSubmitTagId,
+    ogTitle,
+    ogDescription,
+    ogImageUrl,
+    layout,
+  })
+  const dirtyRef = useRef(false)
+  dirtyRef.current = savedSnapshot.current !== null && currentSnapshot !== savedSnapshot.current
+
+  // タブを閉じる・戻る前の確認。保存していない変更があるときだけ出す。
+  useEffect(() => {
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (dirtyRef.current) event.preventDefault()
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [])
+
+  // 編集中のタブ移動は確認してから。止めた先は共通の確認窓で聞く。
+  const confirmTabNav = (href: string) => (event: { preventDefault(): void }) => {
+    if (dirtyRef.current) {
+      event.preventDefault()
+      setPendingNav(href)
+    }
+  }
+
   const save = async (): Promise<boolean> => {
     if (!selectedAccountId) {
       setError('LINE公式アカウントを選んでください')
@@ -382,6 +467,26 @@ function FormEditInner() {
       .find((b) => b.kind === 'input' && !b.label.trim())
     if (unnamed) {
       setError('タイトルが空のブロックがあります')
+      return false
+    }
+    // 回答キーが重なると片方の答えが消える。保存の直前にも止める。
+    const seenNames = new Set<string>()
+    const dup = layout.header
+      .concat(layout.sections.flatMap((s) => s.blocks))
+      .find((b) => {
+        if (b.kind !== 'input') return false
+        if (seenNames.has(b.name)) return true
+        seenNames.add(b.name)
+        return false
+      })
+    if (dup) {
+      setError('回答キーが重なっています。複製した入力欄を確認してください')
+      return false
+    }
+    // 空の選択肢・URLの形・期限の形。壊れた定義のまま保存させない。
+    const layoutError = validateLayoutForSave(layout)
+    if (layoutError) {
+      setError(layoutError)
       return false
     }
 
@@ -404,6 +509,7 @@ function FormEditInner() {
         return false
       }
       setNotice('保存しました')
+      savedSnapshot.current = currentSnapshot
       return true
     } catch (e) {
       setError(e instanceof Error ? e.message : '保存に失敗しました')
@@ -441,18 +547,21 @@ function FormEditInner() {
         <Button
           href={`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=basic`}
           variant={editorTab === 'basic' ? 'primary' : 'secondary'}
+          onClick={confirmTabNav(`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=basic`)}
         >
           フォーム編集
         </Button>
         <Button
           href={`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=design`}
           variant={editorTab === 'design' ? 'primary' : 'secondary'}
+          onClick={confirmTabNav(`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=design`)}
         >
           デザイン設定
         </Button>
         <Button
           href={`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=options`}
           variant={editorTab === 'options' ? 'primary' : 'secondary'}
+          onClick={confirmTabNav(`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=options`)}
         >
           オプション設定
         </Button>
@@ -553,6 +662,7 @@ function FormEditInner() {
             {/* ---- 設定 ---- */}
             {editorTab === 'design' ? (
               <FormDesignSettings
+                formId={id}
                 value={layout.options.theme}
                 ogTitle={ogTitle}
                 ogDescription={ogDescription}
@@ -806,6 +916,23 @@ function FormEditInner() {
           </ul>
         )}
       </ConfirmDialog>
+
+      {/*
+        未保存のままタブを移動しようとしたときの確認。保存済みのフォームと
+        集まった回答は変わらないが、画面上の下書きは消えるので聞く。
+      */}
+      <ConfirmDialog
+        open={pendingNav !== null}
+        title="保存していない変更があります"
+        description="このまま移動すると、保存していない変更は消えます。先に保存しますか。"
+        confirmLabel="保存せずに移動"
+        onConfirm={() => {
+          const href = pendingNav
+          setPendingNav(null)
+          if (href) router.push(href)
+        }}
+        onCancel={() => setPendingNav(null)}
+      />
 
       {showOptions && (
         <OptionsDialog

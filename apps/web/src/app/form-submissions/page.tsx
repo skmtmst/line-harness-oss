@@ -10,12 +10,12 @@ import { displayFormName, sortFormsByLatestAnswer } from './form-list'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
-import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import type { FormLayout } from '@line-crm/shared'
-import { summarizeFormDestinations } from './form-destination-summary'
+import { hasStoredDestination, summarizeFormDestinations } from './form-destination-summary'
 import FolderPanel from '@/components/shared/folder-panel'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import './form-submissions.css'
 
 interface UsedByAccount {
   id: string
@@ -57,69 +57,7 @@ type FormListResponse = Form[] | {
   limit: number
 }
 
-interface FormDetail extends Form {
-  fields: Array<{ name: string; label: string; type?: string }>
-}
-
-interface Submission {
-  id: string
-  formId: string
-  friendId: string | null
-  friendName?: string | null
-  data: Record<string, unknown>
-  createdAt: string
-}
-
 type FormFilter = 'all' | 'published' | 'draft' | 'stored'
-
-function formatDateTime(iso: string): string {
-  const d = new Date(iso)
-  return d.toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
-/**
- * 添付された画像の回答か。
- *
- * 回答に入るのはURLだけで、中身は R2 にある。文字として出すと
- * `https://.../images/form-uploads/...` の長い1行になり、何が送られたのか
- * 分からない。ここだけ絵で出す。
- */
-function isUploadedImage(v: unknown): v is string {
-  return typeof v === 'string' && /^https?:\/\/[^\s]+\/images\/form-uploads\//.test(v)
-}
-
-/** 回答1つを描く。画像なら小さく出し、押すと元の大きさで開く。 */
-function AnswerValue({ value, thumb }: { value: unknown; thumb?: boolean }) {
-  if (isUploadedImage(value)) {
-    return (
-      <a href={value} target="_blank" rel="noreferrer" className="inline-block">
-        {/* R2 に置いた画像をそのまま出すため next/image は使わない */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={value}
-          alt="送られた画像"
-          className={`rounded-control border-hairline border object-cover ${
-            thumb ? 'h-10 w-10' : 'max-h-60'
-          }`}
-        />
-      </a>
-    )
-  }
-  return <>{formatValue(value)}</>
-}
-
-function formatValue(v: unknown): string {
-  if (v === null || v === undefined || v === '') return '—'
-  if (Array.isArray(v)) return v.length === 0 ? '—' : v.join(', ')
-  if (typeof v === 'object') return JSON.stringify(v)
-  return String(v)
-}
 
 export default function FormSubmissionsPage() {
   const router = useRouter()
@@ -128,17 +66,8 @@ export default function FormSubmissionsPage() {
   const [folders, setFolders] = useState<FormFolder[]>([])
   const [formTotal, setFormTotal] = useState(0)
   const [activeFolderId, setActiveFolderId] = useState('all')
-  const [selectedFormId, setSelectedFormId] = useState<string | null>(null)
-  const [submissions, setSubmissions] = useState<Submission[]>([])
-  const [fieldLabels, setFieldLabels] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
-  const [subLoading, setSubLoading] = useState(false)
-  const [subError, setSubError] = useState('')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
-  const [submissionTotal, setSubmissionTotal] = useState(0)
-  const [detailSubmission, setDetailSubmission] = useState<Submission | null>(null)
   const [query, setQuery] = useState('')
   const [formFilter, setFormFilter] = useState<FormFilter>('all')
   const [editingForm, setEditingForm] = useState<Form | null>(null)
@@ -153,7 +82,6 @@ export default function FormSubmissionsPage() {
   const [deleteError, setDeleteError] = useState('')
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
-  const submissionRequest = useRef(0)
   const formRequest = useRef(0)
 
   const loadForms = useCallback(async () => {
@@ -162,9 +90,6 @@ export default function FormSubmissionsPage() {
       setForms([])
       setFolders([])
       setFormTotal(0)
-      setSelectedFormId(null)
-      setSubmissions([])
-      setSubmissionTotal(0)
       setLoading(false)
       return
     }
@@ -194,58 +119,8 @@ export default function FormSubmissionsPage() {
   }, [selectedAccountId])
 
   useEffect(() => {
-    submissionRequest.current += 1
-    setSelectedFormId(null)
-    setSubmissions([])
-    setSubmissionTotal(0)
     void loadForms()
   }, [loadForms])
-
-  const loadSubmissions = useCallback(async (formId: string, requestedPage = 1, requestedLimit = 20) => {
-    if (!selectedAccountId) return
-    const request = ++submissionRequest.current
-    setSubLoading(true)
-    setSubError('')
-    setPage(1)
-    setDetailSubmission(null)
-    try {
-      const accountQuery = `account_id=${encodeURIComponent(selectedAccountId)}`
-      const formRes = await fetchApi<{ success: boolean; data: FormDetail | { fields: string | FormDetail['fields'] } }>(`/api/forms/${formId}?${accountQuery}`)
-      const subRes = await fetchApi<{
-        success: boolean
-        data: { items: Submission[]; total: number; page: number; limit: number }
-      }>(`/api/forms/${formId}/submissions?page=${requestedPage}&limit=${requestedLimit}&${accountQuery}`)
-      if (!subRes.success) throw new Error('submissions_failed')
-      if (request !== submissionRequest.current) return
-
-      if (formRes.success) {
-        const rawFields = (formRes.data as { fields: unknown }).fields
-        const fields = typeof rawFields === 'string'
-          ? (JSON.parse(rawFields) as Array<{ name: string; label: string }>)
-          : (rawFields as Array<{ name: string; label: string }>)
-        const labels: Record<string, string> = {}
-        for (const f of fields ?? []) labels[f.name] = f.label
-        setFieldLabels(labels)
-      }
-      setPage(subRes.data.page)
-      setPageSize(subRes.data.limit)
-      setSubmissionTotal(subRes.data.total)
-      setSubmissions(
-        subRes.data.items.map((s) => ({
-          ...s,
-          data: typeof s.data === 'string' ? JSON.parse(s.data) : s.data,
-          friendName: s.friendName ?? null,
-        })),
-      )
-    } catch {
-      if (request !== submissionRequest.current) return
-      setSubError('回答を読み込めませんでした。')
-      setSubmissions([])
-      setSubmissionTotal(0)
-    } finally {
-      if (request === submissionRequest.current) setSubLoading(false)
-    }
-  }, [selectedAccountId])
 
   const createDraft = async () => {
     if (creating || !selectedAccountId) return
@@ -322,13 +197,6 @@ export default function FormSubmissionsPage() {
         : await api.forms.archive(targetId, selectedAccountId, deleteImpact.revision)
       if (!result.success) throw new Error('delete_failed')
       setForms((current) => current.filter((form) => form.id !== targetId))
-      if (selectedFormId === targetId) {
-        submissionRequest.current += 1
-        setSelectedFormId(null)
-        setSubmissions([])
-        setSubmissionTotal(0)
-        setDetailSubmission(null)
-      }
       setDeleteTarget(null)
     } catch {
       setDeleteError('この回答フォームをアーカイブできませんでした。状態を読み直してから、もう一度お試しください。')
@@ -364,7 +232,7 @@ export default function FormSubmissionsPage() {
       if (activeFolderId !== 'all' && activeFolderId !== 'unfiled' && form.folderId !== activeFolderId) return false
       if (formFilter === 'published' && !form.isActive) return false
       if (formFilter === 'draft' && form.isActive) return false
-      if (formFilter === 'stored' && summarizeFormDestinations(form.layout, form.onSubmitTagId).label === '—') return false
+      if (formFilter === 'stored' && !hasStoredDestination(form.layout, form.onSubmitTagId)) return false
       if (!normalizedQuery) return true
       return (
         displayFormName(form.name).toLocaleLowerCase('ja-JP').includes(normalizedQuery)
@@ -373,20 +241,6 @@ export default function FormSubmissionsPage() {
       )
     })
   }, [activeFolderId, formFilter, query, sortedForms])
-  const selectedForm = useMemo(
-    () => forms.find((f) => f.id === selectedFormId) ?? null,
-    [forms, selectedFormId],
-  )
-
-  const totalPages = Math.max(1, Math.ceil(submissionTotal / pageSize))
-
-  const fieldKeys = useMemo(
-    () =>
-      submissions.length > 0
-        ? [...new Set(submissions.flatMap((s) => Object.keys(s.data)))]
-        : [],
-    [submissions],
-  )
 
   return (
     <div data-design-node="EMBIK">
@@ -559,189 +413,6 @@ export default function FormSubmissionsPage() {
           ) : null}
         </section>
       </div>
-
-      {/* Submissions table */}
-      {selectedForm && (
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-baseline gap-2">
-              <h2 className="text-base font-semibold text-gray-900">{displayFormName(selectedForm.name)}</h2>
-              <span className="text-xs text-gray-400">
-                {subLoading ? '読み込み中...' : `${submissionTotal}件`}
-              </span>
-            </div>
-            <button
-              onClick={() => {
-                submissionRequest.current++
-                setSelectedFormId(null)
-                setSubmissions([])
-                setSubmissionTotal(0)
-                setDetailSubmission(null)
-              }}
-              className="text-xs text-gray-400 hover:text-gray-600"
-            >
-              閉じる ✕
-            </button>
-          </div>
-
-          {subLoading ? (
-            <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400 text-sm">読み込み中...</div>
-          ) : subError ? (
-            <ListState
-              kind="error"
-              title="回答を読み込めませんでした"
-              description="通信状態を確認して、もう一度読み込んでください。"
-              onRetry={() => void loadSubmissions(selectedForm.id, page, pageSize)}
-            />
-          ) : submissions.length === 0 ? (
-            <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400 text-sm">回答がありません</div>
-          ) : (
-            <>
-              <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-                <table className="w-full min-w-[700px]">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">名前</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">日時</th>
-                      {fieldKeys.slice(0, 4).map((key) => (
-                        <th key={key} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">
-                          {fieldLabels[key] || key}
-                        </th>
-                      ))}
-                      {fieldKeys.length > 4 && (
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">…</th>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {submissions.map((sub) => (
-                      <tr
-                        key={sub.id}
-                        onClick={() => setDetailSubmission(sub)}
-                        className="hover:bg-gray-50 cursor-pointer"
-                      >
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">
-                          {sub.friendId ? (
-                            <Link
-                              href={`/chats?friend=${encodeURIComponent(sub.friendId)}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-accent hover:underline"
-                            >
-                              {sub.friendName || '不明'}
-                            </Link>
-                          ) : (
-                            <span>{sub.friendName || '不明'}</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
-                          {new Date(sub.createdAt).toLocaleString('ja-JP', {
-                            month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
-                          })}
-                        </td>
-                        {fieldKeys.slice(0, 4).map((key) => (
-                          <td key={key} className="px-4 py-3 text-sm text-gray-700 max-w-[200px] truncate">
-                            <AnswerValue value={sub.data[key]} thumb />
-                          </td>
-                        ))}
-                        {fieldKeys.length > 4 && (
-                          <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">他 {fieldKeys.length - 4} 項目</td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {submissionTotal > 0 && (
-                <div className="flex items-center justify-between mt-4">
-                  <p className="text-xs text-gray-400">
-                    {(page - 1) * pageSize + 1}〜{Math.min(page * pageSize, submissionTotal)}件 / 全{submissionTotal}件
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Select
-                      aria-label="回答の表示件数"
-                      size="page-size"
-                      value={String(pageSize)}
-                      options={[10, 20, 50].map((value) => ({ value: String(value), label: `${value}件表示` }))}
-                      onChange={(value) => void loadSubmissions(selectedForm.id, 1, Number(value))}
-                    />
-                    <Pagination
-                      page={page}
-                      pageCount={totalPages}
-                      disabled={subLoading}
-                      ariaLabel="回答一覧のページ送り"
-                      onPageChange={(nextPage) => void loadSubmissions(selectedForm.id, nextPage, pageSize)}
-                    />
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </section>
-      )}
-
-      {/* Detail panel */}
-      {detailSubmission && (
-        <div className="fixed inset-0 z-40 flex justify-end">
-          <div
-            className="absolute inset-0 bg-black/30"
-            onClick={() => setDetailSubmission(null)}
-            aria-hidden
-          />
-          <aside className="relative h-full w-full max-w-md bg-white shadow-xl overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-4 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-900">回答詳細</h3>
-              <button
-                onClick={() => setDetailSubmission(null)}
-                className="text-gray-400 hover:text-gray-600 text-lg leading-none"
-                aria-label="閉じる"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="p-5 space-y-5">
-              <div>
-                <div className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">回答者</div>
-                {detailSubmission.friendId ? (
-                  <Link
-                    href={`/chats?friend=${encodeURIComponent(detailSubmission.friendId)}`}
-                    className="inline-flex items-center gap-2 text-sm text-accent hover:underline"
-                  >
-                    <span className="font-medium">{detailSubmission.friendName || '不明'}</span>
-                    <span className="text-[11px] text-gray-400">→ チャットを開く</span>
-                  </Link>
-                ) : (
-                  <span className="text-sm text-gray-700">{detailSubmission.friendName || '不明'}</span>
-                )}
-              </div>
-
-              <div>
-                <div className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">送信日時</div>
-                <div className="text-sm text-gray-700">{formatDateTime(detailSubmission.createdAt)}</div>
-              </div>
-
-              <div>
-                <div className="text-[11px] text-gray-400 uppercase tracking-wide mb-2">回答内容</div>
-                <dl className="space-y-3">
-                  {fieldKeys.length === 0 ? (
-                    <div className="text-sm text-gray-400">項目なし</div>
-                  ) : (
-                    fieldKeys.map((key) => (
-                      <div key={key} className="grid grid-cols-1 gap-1">
-                        <dt className="text-[11px] text-gray-500">{fieldLabels[key] || key}</dt>
-                        <dd className="text-sm text-gray-900 break-words whitespace-pre-wrap">
-                          <AnswerValue value={detailSubmission.data[key]} />
-                        </dd>
-                      </div>
-                    ))
-                  )}
-                </dl>
-              </div>
-            </div>
-          </aside>
-        </div>
-      )}
 
       {/* Rename dialog */}
       {editingForm && (

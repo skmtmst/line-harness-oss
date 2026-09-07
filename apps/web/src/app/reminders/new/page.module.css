@@ -3,6 +3,18 @@
   gap: 12px;
 }
 
+.screen [data-design='Right'] > section:first-child {
+  min-height: 299px;
+}
+
+.screen [data-design='Right'] > section:first-child dl > div {
+  padding-block: 20px;
+}
+
+.screen [data-design='Right'] > section:nth-child(2) {
+  min-height: 389px;
+}
+
 .previewActions {
   display: grid;
   grid-template-columns: 1fr 1fr;

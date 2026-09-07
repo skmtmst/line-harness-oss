@@ -14,12 +14,6 @@ import type {
   AutoReplyPublishResult,
   AutoReplyValidationResult,
   Friend,
-  FriendAddRouting,
-  FriendAddRoutingDraftTestResult,
-  FriendAddRoutingPublishResult,
-  FriendAddRoutingValidation,
-  FriendAddRoutingVersion,
-  FriendAddEventList,
   FriendAddEventKind,
   FriendAddEventAttributionStatus,
   FriendAddEventRoutingStatus,
@@ -556,6 +550,24 @@ export type SavedSearchDetail = SavedSearch & {
   accountScope: { type: 'line_account'; id: string }
   owner: { id: string | null; isCurrentUser: boolean }
   match: SavedSearchMatchPreview
+}
+
+/**
+ * 会話詳細のメッセージ1件（`GET /api/chats/:id` の実応答）。
+ * `messages_log` の行をそのまま写す。送信向きは `direction: 'outgoing'` で
+ * 見分け、`senderType` という名の項目は口に存在しない。
+ */
+export interface ChatDetailMessage {
+  id: string
+  direction: 'incoming' | 'outgoing'
+  messageType: string
+  content: string
+  source: string | null
+  originKind: string | null
+  sentByStaffId: string | null
+  sentByStaffName: string | null
+  scenarioName: string | null
+  createdAt: string
 }
 
 /** 緊急停止の対象、影響、停止状態をサーバーと共有する契約。 */
@@ -1134,6 +1146,17 @@ export type ApiBroadcast = Omit<Broadcast, 'targetType'> & {
   segmentConditions?: SegmentCondition | null;
   /** 分類。null なら未分類。 */
   folderId?: string | null;
+  /**
+   * 一覧に同梱される集計の最新値。行が無い(未送信・未取得)ときは null。
+   * 送信済みごとの insight 取得(N+1)を一覧1回で済ませるため。
+   */
+  insightSummary?: {
+    delivered: number | null
+    uniqueImpression: number | null
+    uniqueClick: number | null
+    openRate: number | null
+    clickRate: number | null
+  } | null;
   /** 開封数を取るか。 */
   measureOpens?: boolean;
   /** 友だちには見せない運用メモ。 */
@@ -1667,6 +1690,13 @@ export const CSRF_STORAGE_KEY = 'lh_csrf'
  */
 export const SESSION_LOST_EVENT = 'lh-session-lost'
 
+/** 機能設定でオフになっている API を開いたとき、共通 shell へ知らせる合図。 */
+export const FEATURE_DISABLED_EVENT = 'lh-feature-disabled'
+
+export type FeatureDisabledEventDetail = {
+  featureId?: string
+}
+
 export function getCsrfToken(): string {
   if (typeof window === 'undefined') return ''
   return localStorage.getItem(CSRF_STORAGE_KEY) || ''
@@ -1703,13 +1733,28 @@ export class ApiError extends Error {
 /**
  * Statuses whose response body is safe to show the operator verbatim.
  *
- * 400 is the Worker rejecting input it validated itself — the message names
- * what to fix and contains nothing the operator should not see. Everything
- * else (upstream LINE API failures, unhandled exceptions, proxy pages) can
- * carry internal detail, so those keep the generic status message no matter
- * what the body says.
+ * These are application-level validation or conflict responses whose message
+ * tells the operator how to recover. A separate content guard below keeps
+ * database, stack, HTML and other internal detail out of the screen.
+ * (422 の本文は日本語の検証文のみであることを #496-11 で監査済み。)
  */
-const BODY_MESSAGE_STATUSES = new Set([400])
+const BODY_MESSAGE_STATUSES = new Set([400, 409, 422, 428])
+
+const INTERNAL_ERROR_MARKERS = [
+  /D1_ERROR/i,
+  /\b(?:SELECT|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER)\b.+\b(?:FROM|INTO|TABLE|SET)\b/is,
+  /(?:stack trace|node_modules|\.tsx?:\d+|\.mjs:\d+)/i,
+  /<\/?(?:html|script|body)\b/i,
+  /(?:api[_ -]?key|authorization|bearer|password|secret|token)\s*[:=]/i,
+]
+
+function safeOperatorMessage(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  const message = value.trim()
+  if (!message || message.length > 240 || /^[a-z][a-z0-9_]{0,63}$/.test(message)
+    || INTERNAL_ERROR_MARKERS.some((marker) => marker.test(message))) return ''
+  return message
+}
 
 /**
  * Pull the human-readable reason out of an error response body.
@@ -1722,8 +1767,7 @@ export function extractApiErrorMessage(raw: string, status: number): string {
   if (!raw || !BODY_MESSAGE_STATUSES.has(status)) return ''
   try {
     const body = JSON.parse(raw) as { error?: unknown; message?: unknown }
-    if (typeof body.error === 'string') return body.error
-    if (typeof body.message === 'string') return body.message
+    return safeOperatorMessage(body.error) || safeOperatorMessage(body.message)
   } catch {
     // Not JSON — fall through to the status-only message.
   }
@@ -1733,21 +1777,47 @@ export function extractApiErrorMessage(raw: string, status: number): string {
 /**
  * 画面分岐にだけ使う、Worker由来の機械コードを取り出す。
  *
- * 本文を利用者へ表示してよいかとは別の契約。英小文字と数字のsnake_caseだけに
- * 絞り、SQL・外部API・HTMLなどの内部文言はコードとしても受け取らない。
+ * 本文を利用者へ表示してよいかとは別の契約。大文字・小文字どちらの
+ * SNAKE_CASEも受け取る(判定画面の `STALE_CANDIDATE` 等、#496-12)。
+ * 英字始まり・英数字と `_` のみ・64文字以内に絞り、SQL・外部API・HTML
+ * などの内部文言はコードとしても受け取らない。
  */
 export function extractApiErrorCode(raw: string): string | undefined {
   if (!raw) return undefined
   try {
     const body = JSON.parse(raw) as { code?: unknown; error?: unknown }
     const candidate = typeof body.code === 'string' ? body.code : body.error
-    if (typeof candidate === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(candidate)) {
+    if (typeof candidate === 'string' && /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(candidate)) {
       return candidate
     }
   } catch {
     // JSONでなければ機械コードも無い。
   }
   return undefined
+}
+
+/** FEATURE_DISABLED の公開情報だけを共通 shell へ渡す。 */
+export function extractFeatureDisabledDetail(raw: string): FeatureDisabledEventDetail {
+  if (!raw) return {}
+  try {
+    const body = JSON.parse(raw) as { featureId?: unknown }
+    return typeof body.featureId === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(body.featureId)
+      ? { featureId: body.featureId }
+      : {}
+  } catch {
+    return {}
+  }
+}
+
+export function shouldAnnounceFeatureDisabled(status: number, code: string | undefined): boolean {
+  return status === 403 && code === 'FEATURE_DISABLED'
+}
+
+function announceFeatureDisabled(status: number, code: string | undefined, raw: string): void {
+  if (typeof window === 'undefined' || !shouldAnnounceFeatureDisabled(status, code)) return
+  window.dispatchEvent(new CustomEvent<FeatureDisabledEventDetail>(FEATURE_DISABLED_EVENT, {
+    detail: extractFeatureDisabledDetail(raw),
+  }))
 }
 
 /** エラー本文の `data` だけを機械処理用に保持する。本文の文言は表示契約と分ける。 */
@@ -1818,10 +1888,12 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
   if (res.status >= 500) reportServerFailure(path, res.status)
   if (!res.ok) {
     const raw = await res.text()
+    const code = extractApiErrorCode(raw)
+    announceFeatureDisabled(res.status, code, raw)
     throw new ApiError(
       res.status,
       extractApiErrorMessage(raw, res.status),
-      extractApiErrorCode(raw),
+      code,
       // 最新状態は409のときだけ保持する。500等の内部データは画面へ渡さない。
       res.status === 409 ? extractApiErrorData(raw) : undefined,
     )
@@ -1841,10 +1913,12 @@ async function fetchApiBlob(path: string): Promise<Blob> {
   if (res.status >= 500) reportServerFailure(path, res.status)
   if (!res.ok) {
     const raw = await res.text()
+    const code = extractApiErrorCode(raw)
+    announceFeatureDisabled(res.status, code, raw)
     throw new ApiError(
       res.status,
       extractApiErrorMessage(raw, res.status),
-      extractApiErrorCode(raw),
+      code,
     )
   }
   return res.blob()
@@ -2123,6 +2197,8 @@ export type MileageRule = {
     uniquePerReferredFriend?: boolean
     uniquePerReferredFriendPerSubject?: boolean
   }
+  /** #532: 帰属するLINEアカウント。旧い全店共通ルールは null。 */
+  lineAccountId: string | null
   isActive: boolean
   validFrom: string | null
   validUntil: string | null
@@ -3751,6 +3827,8 @@ export type FriendAddRuleListData = {
   items: FriendAddRule[]
   total: number
   nextCursor: string | null
+  /** フォルダ欄の件数。全ページの合計で、検索・絞りの影響を受けない。 */
+  folderCounts: Array<{ name: string | null; count: number }>
   summary: {
     rules: number
     active: number
@@ -3863,6 +3941,11 @@ export type MediaVersionResult = {
   sizeBytes: number
   changeReason: string
   createdAt: string
+}
+
+/** 共通情報の一覧。件数上限で切ったときは limited で絞り込み誘導を出す。 */
+export type CommonVarsListResponse = ApiResponse<CommonVar[]> & {
+  meta?: { total: number; limited: boolean; limit: number }
 }
 
 export const api = {
@@ -4418,6 +4501,8 @@ export const api = {
         sidebarItemOrder: Record<string, string[]> | null
         parentChildMode: boolean
         specializedFeatureKeys: string[]
+        /** 保存時に送り返す版。一括保存の競合検出に使う。 */
+        version: number
       }>>(
         `/api/settings/features?account_id=${encodeURIComponent(accountId)}`,
       ),
@@ -4425,8 +4510,10 @@ export const api = {
       features?: Record<string, boolean>
       sidebarOrder?: string[]
       sidebarItemOrder?: Record<string, string[]>
+      /** GET で受けた版。付けると1行でまとめて保存し、古ければ409で返す。 */
+      expectedVersion: number
     }) =>
-      fetchApi<ApiResponse<null>>(
+      fetchApi<ApiResponse<{ version: number }>>(
         `/api/settings/features?account_id=${encodeURIComponent(accountId)}`,
         { method: 'PUT', body: JSON.stringify(data) },
       ),
@@ -4834,6 +4921,17 @@ export const api = {
       fetchApi<ApiResponse<Array<{ path: string; views: number; visitors: number }>>>(
         `/api/site/pages${rangeQuery(params)}`,
       ),
+    /**
+     * 選択中アカウントの計測鍵。サイトに貼るコードの data-key に埋める。
+     * accountId を省くと可視アカウントが1つだけのときだけ鍵が返る
+     * (複数あるときは 400)。鍵は公開識別子で、帰属の分離にだけ使う。
+     */
+    trackingKey: (accountId?: string) =>
+      fetchApi<ApiResponse<{ accountId: string; trackingKey: string }>>(
+        accountId
+          ? `/api/site/tracking-key?accountId=${encodeURIComponent(accountId)}`
+          : '/api/site/tracking-key',
+      ),
     friendEvents: (friendId: string) =>
       fetchApi<
         ApiResponse<
@@ -4880,13 +4978,32 @@ export const api = {
   },
   /** メディアライブラリ。1か所に置いて使い回す。 */
   media: {
-    list: (accountId: string, params?: { kind?: string; folderId?: string }) => {
+    list: (accountId: string, params?: {
+      kind?: string
+      folderId?: string
+      excludeId?: string
+      query?: string
+      unusedOnly?: boolean
+      nearLimitOnly?: boolean
+      sort?: 'newest' | 'oldest' | 'name' | 'size' | 'usage'
+      limit?: number
+      offset?: number
+    }) => {
       const q = new URLSearchParams()
       q.set('accountId', accountId)
       if (params?.kind) q.set('kind', params.kind)
       if (params?.folderId) q.set('folderId', params.folderId)
+      if (params?.excludeId) q.set('excludeId', params.excludeId)
+      if (params?.query) q.set('query', params.query)
+      if (params?.unusedOnly) q.set('unusedOnly', '1')
+      if (params?.nearLimitOnly) q.set('nearLimitOnly', '1')
+      if (params?.sort) q.set('sort', params.sort)
+      if (params?.limit) q.set('limit', String(params.limit))
+      if (params?.offset) q.set('offset', String(params.offset))
       const query = q.toString()
-      return fetchApi<ApiResponse<MediaItem[]>>(`/api/media${query ? `?${query}` : ''}`)
+      return fetchApi<ApiResponse<{ items: MediaItem[]; total: number; limit: number; offset: number }>>(
+        `/api/media${query ? `?${query}` : ''}`,
+      )
     },
     /** data は base64。data: URL 形式でも受け付ける。 */
     upload: (data: {
@@ -4969,7 +5086,7 @@ export const api = {
   /** 共通情報。営業時間などを1か所で直す。 */
   commonVars: {
     list: (accountId: string, params?: { folderId?: string }) =>
-      fetchApi<ApiResponse<CommonVar[]>>(
+      fetchApi<CommonVarsListResponse>(
         `/api/common-vars?accountId=${encodeURIComponent(accountId)}${params?.folderId ? `&folderId=${encodeURIComponent(params.folderId)}` : ''}`,
       ),
     detail: (id: string, accountId: string) =>
@@ -5323,12 +5440,27 @@ export const api = {
       fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}/cancel`, {
         method: 'POST',
       }),
-    list: (params?: { accountId?: string }) => {
-      const query = params?.accountId ? '?lineAccountId=' + params.accountId : ''
+    list: (params?: {
+      accountId?: string
+      limit?: number
+      cursor?: string | number
+      status?: string
+      folderId?: string
+      /** 'newest' (既定) または 'oldest'。一覧の並び順選択と連動する。 */
+      sort?: 'newest' | 'oldest'
+    }) => {
+      const query = new URLSearchParams()
+      if (params?.accountId) query.set('lineAccountId', params.accountId)
+      if (params?.limit !== undefined) query.set('limit', String(params.limit))
+      if (params?.cursor !== undefined && params.cursor !== '') query.set('cursor', String(params.cursor))
+      if (params?.status) query.set('status', params.status)
+      if (params?.folderId) query.set('folderId', params.folderId)
+      if (params?.sort && params.sort !== 'newest') query.set('sort', params.sort)
+      const qs = query.toString()
       return fetchApi<ApiResponse<ApiBroadcast[]> & {
         kpis?: BroadcastListKpis
         pagination?: { total: number; limit: number; cursor: number; nextCursor: string | null }
-      }>('/api/broadcasts' + query)
+      }>(`/api/broadcasts${qs ? `?${qs}` : ''}`)
     },
     get: (id: string) =>
       fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}`),
@@ -6940,93 +7072,25 @@ export const api = {
     },
   },
   /**
-   * 友だち追加時の配信の振り分け（設計 V2 4-6）。
-   *
-   * `configured: false` は「まだ決めていない」。このときは従来どおり
-   * 有効な friend_add シナリオが全部流れている。
+   * @deprecated 旧互換の `friendAddRouting` client は #560 で削除済み。
+   * 以後はこの V6 rules/runs 契約だけを使う。
    */
-  friendAddRouting: {
-    get: (accountId: string) =>
-      fetchApi<ApiResponse<{
-        configured: boolean
-        routing: FriendAddRouting
-        scenarios: { id: string; name: string }[]
-        tags: { id: string; name: string }[]
-      }>>(`/api/friend-add-routing?account_id=${encodeURIComponent(accountId)}`),
-    save: (accountId: string, routing: FriendAddRouting) =>
-      fetchApi<ApiResponse<{ routing: FriendAddRouting }>>(
-        `/api/friend-add-routing?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'PUT', body: JSON.stringify({ routing }) },
-      ),
-    getDraft: (accountId: string) =>
-      fetchApi<ApiResponse<FriendAddRoutingVersion>>(
-        `/api/friend-add-routing/draft?account_id=${encodeURIComponent(accountId)}`,
-      ),
-    saveDraft: (accountId: string, routing: FriendAddRouting) =>
-      fetchApi<ApiResponse<FriendAddRoutingVersion>>(
-        `/api/friend-add-routing/draft?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'PUT', body: JSON.stringify({ routing }) },
-      ),
-    validateDraft: (accountId: string) =>
-      fetchApi<ApiResponse<FriendAddRoutingValidation>>(
-        `/api/friend-add-routing/validate?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'POST' },
-      ),
-    conflicts: (accountId: string) =>
-      fetchApi<ApiResponse<{ conflicts: FriendAddRoutingValidation['conflicts'] }>>(
-        `/api/friend-add-routing/conflicts?account_id=${encodeURIComponent(accountId)}`,
-      ),
-    testDraft: (accountId: string, friendId: string) =>
-      fetchApi<ApiResponse<FriendAddRoutingDraftTestResult>>(
-        `/api/friend-add-routing/draft/test?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'POST', body: JSON.stringify({ friendId }) },
-      ),
-    publish: (accountId: string, idempotencyKey: string) =>
-      fetchApi<ApiResponse<FriendAddRoutingPublishResult>>(
-        `/api/friend-add-routing/publish?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
-      ),
-    /** テスト実行。登録も配信もしない。振り分け先だけを返す。 */
-    test: (accountId: string, friendId: string) =>
-      fetchApi<ApiResponse<{
-        configured: boolean
-        kind: 'first_time' | 'returning'
-        scenarioId: string | null
-        suppressed: boolean
-        displayName: string | null
-        unfollowCount: number
-        firstFollowedAt: string | null
-      }>>(`/api/friend-add-routing/test?account_id=${encodeURIComponent(accountId)}`, {
-        method: 'POST',
-        body: JSON.stringify({ friendId }),
-      }),
-    /** V6履歴。Pencil共通デザイン側はこの返り値から各表示状態を組み立てる。 */
-    events: (accountId: string, params?: {
-      limit?: number
-      cursor?: string
-      kind?: FriendAddEventKind
-      attributionStatus?: FriendAddEventAttributionStatus
-      routingStatus?: FriendAddEventRoutingStatus
-    }) => {
-      const query = new URLSearchParams({ account_id: accountId })
-      if (params?.limit !== undefined) query.set('limit', String(params.limit))
-      if (params?.cursor) query.set('cursor', params.cursor)
-      if (params?.kind) query.set('kind', params.kind)
-      if (params?.attributionStatus) query.set('attribution_status', params.attributionStatus)
-      if (params?.routingStatus) query.set('routing_status', params.routingStatus)
-      return fetchApi<ApiResponse<FriendAddEventList>>(`/api/friend-add-routing/events?${query}`)
-    },
-  },
   friendAddRules: {
     list: (accountId: string, kind: FriendAddRuleKind, params?: {
       status?: FriendAddRuleStatus
       cursor?: string
       limit?: number
+      /** 設定名の部分一致。サーバ側で全ページに効かせる。 */
+      q?: string
+      /** フォルダ名での絞り込み。未分類は '__uncategorized'。 */
+      folder?: string
     }) => {
       const query = new URLSearchParams({ account_id: accountId, kind })
       if (params?.status) query.set('status', params.status)
       if (params?.cursor) query.set('cursor', params.cursor)
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
+      if (params?.q) query.set('q', params.q)
+      if (params?.folder) query.set('folder', params.folder)
       return fetchApi<ApiResponse<FriendAddRuleListData>>(`/api/friend-add-rules?${query}`)
     },
     get: (accountId: string, ruleId: string) =>
@@ -7056,12 +7120,18 @@ export const api = {
     runs: (accountId: string, params?: {
       status?: FriendAddEventRoutingStatus
       ruleId?: string
+      /** 追加の種類での絞り込み。サーバ側で全ページに効かせる。 */
+      kind?: FriendAddEventKind
+      /** 流入経路の取得状態での絞り込み。サーバ側で全ページに効かせる。 */
+      attribution?: FriendAddEventAttributionStatus
       cursor?: string
       limit?: number
     }) => {
       const query = new URLSearchParams({ account_id: accountId })
       if (params?.status) query.set('status', params.status)
       if (params?.ruleId) query.set('rule_id', params.ruleId)
+      if (params?.kind) query.set('kind', params.kind)
+      if (params?.attribution) query.set('attribution', params.attribution)
       if (params?.cursor) query.set('cursor', params.cursor)
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
       return fetchApi<ApiResponse<FriendAddRunList>>(`/api/friend-add-runs?${query}`)
@@ -7080,10 +7150,17 @@ export const api = {
     validate: (accountId: string, ruleId: string) =>
       fetchApi<ApiResponse<{
         canPublish: boolean
-        checks: Array<{ status: 'passed' | 'failed'; label: string }>
+        /** 鍵付きの確認。画面は鍵で突き合わせ、順番に意味を持たせない。 */
+        checks: Array<{
+          key: 'first_time' | 'returning' | 'actions' | 'duplicate_prevention'
+          status: 'passed' | 'failed'
+          label: string
+          detail: string
+        }>
       }>>(`/api/friend-add-rules/${encodeURIComponent(ruleId)}/validate?account_id=${encodeURIComponent(accountId)}`, {
         method: 'POST',
       }),
+    /** 新しい rules 契約でテスト実行し、本番データは変更しない。 */
     test: (accountId: string, ruleId: string) =>
       fetchApi<ApiResponse<{
         stateChanged: false
@@ -7093,7 +7170,20 @@ export const api = {
         scenarioId: string | null
         message: string | null
         actions: FriendAddRuleAction[]
-      }>>('/api/friend-add-rules/test', {
+      }> | {
+        success: false
+        error: string
+        /** 失敗時も理由を返す (成功時と同じ器・HTTP 200)。 */
+        data: {
+          stateChanged: false
+          ruleId: string
+          matched: false
+          reasons: string[]
+          scenarioId: string | null
+          message: string | null
+          actions: FriendAddRuleAction[]
+        }
+      }>('/api/friend-add-rules/test', {
         method: 'POST',
         body: JSON.stringify({ accountId, ruleId }),
       }),
@@ -7325,10 +7415,20 @@ export const api = {
         '/api/chats?' + new URLSearchParams(query),
       )
     },
-    get: (id: string) =>
-      fetchApi<ApiResponse<Chat & { messages?: { id: string; content: string; senderType: string; createdAt: string }[] }>>(
-        `/api/chats/${id}`,
-      ),
+    get: (id: string, params?: { limit?: number; beforeAt?: string; beforeId?: string }) => {
+      const query = new URLSearchParams()
+      if (params?.limit !== undefined) query.set('limit', String(params.limit))
+      if (params?.beforeAt) query.set('beforeAt', params.beforeAt)
+      if (params?.beforeId) query.set('beforeId', params.beforeId)
+      const qs = query.toString()
+      return fetchApi<ApiResponse<Chat & {
+        messages?: ChatDetailMessage[]
+        /** 古い履歴が残っているか。画面は「前のメッセージ」で遡る。 */
+        hasMoreMessages?: boolean
+      }>>(
+        `/api/chats/${id}${qs ? `?${qs}` : ''}`,
+      )
+    },
     create: (data: { friendId: string; operatorId?: string | null }) =>
       fetchApi<ApiResponse<Chat>>('/api/chats', {
         method: 'POST',
@@ -7715,6 +7815,8 @@ export const api = {
       conditions?: MileageRule['conditions'] | null
       validFrom?: string | null
       validUntil?: string | null
+      /** #532(#521): 帰属するLINEアカウント。口で必須。 */
+      lineAccountId: string
     }) => fetchApi<ApiResponse<MileageRule>>('/api/mileage/rules', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -8518,11 +8620,13 @@ export const api = {
     list: (params: {
       kind: IdentityCandidateKind
       status?: IdentityCandidateStatus
+      lineAccountId?: string
       limit?: number
       offset?: number
     }) => {
       const query = new URLSearchParams({ kind: params.kind })
       if (params.status) query.set('status', params.status)
+      if (params.lineAccountId) query.set('lineAccountId', params.lineAccountId)
       if (params.limit !== undefined) query.set('limit', String(params.limit))
       if (params.offset !== undefined) query.set('offset', String(params.offset))
       return fetchApi<ApiResponse<IdentityCandidateList>>(`/api/identity-candidates?${query.toString()}`)
@@ -8745,6 +8849,10 @@ export interface BookingMenu {
   cancel_deadline_hours_before?: number | null;
   /** 予約時にお客様へ聞く質問。null なら質問しない */
   intake_question?: string | null;
+  /** 一覧と同じ応答で返す担当。メニュー件数ぶんの追加通信をしない。 */
+  assigned_staff?: Array<{ id: string; display_name: string }>;
+  /** 個人情報を含む予約明細ではなく、Workerで集計した直近30日の件数。 */
+  booking_count_30_days?: number;
   effectiveBookingRules?: {
     bookingWindowDays: number;
     cutoffMinutesBefore: number;
@@ -8838,7 +8946,8 @@ export interface StaffMenuMatrix {
 
 export interface BookingRequest {
   id: string;
-  friend_id: string;
+  friend_id: string | null;
+  booking_customer_id: string | null;
   starts_at: string;
   ends_at: string;
   status: string;
@@ -9131,6 +9240,15 @@ export const bookingApi = {
       method: 'PUT',
       body: JSON.stringify(body),
     }),
+  patchMenu: (
+    accountId: string,
+    id: string,
+    expectedVersion: number,
+    body: { is_active?: boolean },
+  ) => fetchApi<{ success: true; data: { id: string; version: number } }>(
+    withAccount(`/api/booking/admin/menus/${id}`, accountId),
+    { method: 'PATCH', body: JSON.stringify({ ...body, expectedVersion }) },
+  ),
   deleteMenu: (accountId: string, id: string) =>
     fetchApi<{ ok: true }>(withAccount(`/api/booking/admin/menus/${id}`, accountId), {
       method: 'DELETE',
@@ -9232,10 +9350,49 @@ export const bookingApi = {
       { method: 'DELETE' },
     ),
   // Requests
-  listRequests: (accountId: string, status: string = 'requested') =>
-    fetchApi<{ requests: BookingRequest[] }>(
-      withAccount(`/api/booking/admin/requests?status=${status}`, accountId),
-    ),
+  listRequests: (accountId: string, status: string = 'requested', params?: {
+    limit?: number
+    offset?: number
+    query?: string
+    menuName?: string
+    from?: string
+    to?: string
+  }) => {
+    const query = new URLSearchParams({ status })
+    if (params?.limit) query.set('limit', String(params.limit))
+    if (params?.offset) query.set('offset', String(params.offset))
+    if (params?.query) query.set('query', params.query)
+    if (params?.menuName) query.set('menu_name', params.menuName)
+    if (params?.from) query.set('from', params.from)
+    if (params?.to) query.set('to', params.to)
+    return fetchApi<{ requests: BookingRequest[]; total: number }>(
+      withAccount(`/api/booking/admin/requests?${query.toString()}`, accountId),
+    )
+  },
+  requestsSummary: (accountId: string, params: {
+    month: string
+    lastMonth: string
+    today: string
+    weekTo: string
+  }) => {
+    const query = new URLSearchParams({
+      month: params.month,
+      last_month: params.lastMonth,
+      today: params.today,
+      week_to: params.weekTo,
+    })
+    return fetchApi<{
+      total: number
+      requested: number
+      monthTotal: number
+      monthConfirmed: number
+      monthCancelled: number
+      lastMonthTotal: number
+      todayTotal: number
+      weekTotal: number
+      byMenu: Array<{ name: string; total: number }>
+    }>(withAccount(`/api/booking/admin/requests-summary?${query.toString()}`, accountId))
+  },
   decideRequest: (
     accountId: string,
     id: string,

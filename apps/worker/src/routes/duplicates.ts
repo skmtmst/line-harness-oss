@@ -1,5 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
+import { requireRole } from '../middleware/role-guard.js';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
 import {
   computeDuplicatesStats,
   type DuplicatesStats,
@@ -72,10 +74,16 @@ export const duplicates = new Hono<Env>();
 duplicates.route('/', identityCandidates);
 duplicates.route('/', mergedPeople);
 
-duplicates.get('/api/duplicates/stats', async (c) => {
+duplicates.get('/api/duplicates/stats', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
+    // 全アカウント分の計数をそのまま返すと、見せてよい範囲を超える (#496-14)。
+    // 可視アカウントだけを集計する。見られる先が無い人は 0 件の集計になる。
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const forceRefresh = c.req.query('refresh') === '1';
-    const stats = await computeDuplicatesStats(c.env.DB, { forceRefresh });
+    const stats = await computeDuplicatesStats(c.env.DB, {
+      forceRefresh,
+      accountIds: scope.allowedAccountIds,
+    });
     return c.json({ success: true, data: serializeDuplicatesStats(stats) });
   } catch (err) {
     console.error('GET /api/duplicates/stats error:', err);

@@ -13,15 +13,15 @@ import {
   ApiError,
   bookingApi,
   type BookingMenu,
-  type BookingRequest,
   type BookingSettings,
-  type BookingStaff,
 } from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import { Suspense } from 'react'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import BookingStaffPage from '@/app/booking/staff/page'
+import { bookingMenuError } from './menu-validation'
+import { bookingWindowEnd, businessHourSummary } from '../lib/format-time'
 
 /**
  * 予約設定（設計 V2 8-2 / node nFCBf）。
@@ -38,7 +38,6 @@ const MERGED_TABS = [
 ]
 
 const MENU_PAGE_SIZE = 6
-const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
 
 type SupportingLoadState = 'loading' | 'ready' | 'error'
 
@@ -61,49 +60,21 @@ function supportingDetail(
   return readyDetail
 }
 
-function businessHourSummary(settings: BookingSettings | null): { value: string; detail: string } {
-  if (!settings || !Array.isArray(settings.businessHours) || settings.businessHours.length === 0) return { value: '—', detail: '受付枠で曜日ごとに確認' }
-  const spans = settings.businessHours.flatMap((day) => {
-    if (day.intervals.length === 0) return []
-    const start = day.intervals[0].start.replace(/^0/, '')
-    const end = day.intervals.at(-1)!.end.replace(/^0/, '')
-    return [`${start}〜${end}`]
-  })
-  const counts = new Map<string, number>()
-  for (const span of spans) counts.set(span, (counts.get(span) ?? 0) + 1)
-  const value = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? '—'
-  const detail = settings.businessHours
-    .filter((day) => day.intervals.length > 0)
-    .map((day) => WEEKDAYS[day.weekday] ?? '')
-    .filter(Boolean)
-    .join('・')
-  return { value, detail }
-}
-
-function bookingWindowEnd(days: number): string {
-  const date = new Date()
-  date.setDate(date.getDate() + Math.max(0, days - 1))
-  return new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' }).format(date)
-}
-
 function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuCount: (count: number | null) => void }) {
   const { selectedAccountId } = useAccount()
   const [items, setItems] = useState<BookingMenu[]>([])
   const [settings, setSettings] = useState<BookingSettings | null>(null)
-  const [editing, setEditing] = useState<Partial<BookingMenu> | null>(null)
+  const [editing, setEditing] = useState<BookingMenu | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   // copy 状態は menu.id 単位で持つ。複数メニューを連続でコピーしたとき
   // 直近にコピーした行だけ「コピー済」が出る。
   const [visibilityTarget, setVisibilityTarget] = useState<BookingMenu | null>(null)
   const [updatingVisibility, setUpdatingVisibility] = useState(false)
+  const [visibilityError, setVisibilityError] = useState<string | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
-  const [, setStaff] = useState<BookingStaff[]>([])
   /** メニューID → 担当できるスタッフの表示名。 */
   const [menuStaff, setMenuStaff] = useState<Map<string, string[]>>(new Map())
-  /** 担当を引けなかったメニュー名。空でなければ、その行の担当表示は当てにならない。 */
-  const [staffReadFailed, setStaffReadFailed] = useState<string[]>([])
-  const [bookings, setBookings] = useState<BookingRequest[]>([])
   const [supportingLoadState, setSupportingLoadState] = useState<SupportingLoadState>('loading')
   const [page, setPage] = useState(1)
   const loadGenerationRef = useRef(0)
@@ -113,16 +84,20 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
     if (!selectedAccountId) {
       setItems([])
       setSettings(null)
+      setMenuStaff(new Map())
+      setSupportingLoadState('loading')
       setLoading(false)
       setError(null)
       return
     }
     setLoading(true)
     setError(null)
+    setSupportingLoadState('loading')
     // アカウント切替時は前 account の menus が表示・操作可能なまま残らないよう
     // 先にクリア。fetch 失敗でも cross-account の操作事故が起きない。
     setItems([])
     setSettings(null)
+    setMenuStaff(new Map())
     try {
       const [r, bookingSettingsResponse] = await Promise.all([
         bookingApi.listMenus(selectedAccountId),
@@ -130,11 +105,18 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
       ])
       if (loadGenerationRef.current !== requestGeneration) return
       // 状態撮影や移行途中の口が空の器を返しても、画面全体を落とさず0件として扱う。
-      setItems(Array.isArray(r.menus) ? r.menus : [])
+      const menus = Array.isArray(r.menus) ? r.menus : []
+      setItems(menus)
+      setMenuStaff(new Map(menus.map((menu) => [
+        menu.id,
+        (menu.assigned_staff ?? []).map((person) => person.display_name || person.id),
+      ])))
+      setSupportingLoadState('ready')
       setSettings(bookingSettingsResponse?.success ? bookingSettingsResponse.data : null)
     } catch (e) {
       if (loadGenerationRef.current !== requestGeneration) return
       setError(bookingErrorMessage(e, '読み込み'))
+      setSupportingLoadState('error')
     } finally {
       if (loadGenerationRef.current === requestGeneration) setLoading(false)
     }
@@ -163,61 +145,9 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
     }
   }, [])
 
-  // スタッフ・割り当て・予約件数。表の右半分と上のKPIに要る。
-  // 担当はメニュー単位の既存APIから読み、画面確認用モックと本番で同じ口を使う。
-  useEffect(() => {
-    setStaff([])
-    setBookings([])
-    setMenuStaff(new Map())
-    setStaffReadFailed([])
-    setSupportingLoadState('loading')
+  async function save(m: BookingMenu) {
     if (!selectedAccountId) return
-    let alive = true
-    void (async () => {
-      try {
-        const [staffRes, bookingRes] = await Promise.all([
-          bookingApi.listStaff(selectedAccountId),
-          bookingApi.listRequests(selectedAccountId, 'all'),
-        ])
-        if (!alive) return
-        setStaff(staffRes.staff)
-        setBookings(bookingRes.requests)
-
-        const map = new Map<string, string[]>()
-        const failed: string[] = []
-        await Promise.all(
-          items.map(async (menu) => {
-            try {
-              const { staff: assignedStaff } = await bookingApi.listMenuStaff(selectedAccountId, menu.id)
-              map.set(menu.id, assignedStaff.map((person) => person.display_name || person.id))
-            } catch {
-              // 1メニューぶん引けなくても他の行は出せる。ただし、その行を
-              // 「担当なし」と言い切らず、未取得と分かるよう名前を控える。
-              failed.push(menu.name)
-            }
-          }),
-        )
-        if (alive) {
-          setMenuStaff(map)
-          setStaffReadFailed(failed)
-          setSupportingLoadState('ready')
-        }
-      } catch {
-        if (alive) setSupportingLoadState('error')
-      }
-    })()
-    return () => {
-      alive = false
-    }
-  }, [items, selectedAccountId])
-
-  async function save(m: Partial<BookingMenu>) {
-    if (!selectedAccountId) return
-    if (m.id) {
-      await bookingApi.updateMenu(selectedAccountId, m.id, m)
-    } else {
-      await bookingApi.createMenu(selectedAccountId, m)
-    }
+    await bookingApi.updateMenu(selectedAccountId, m.id, m)
     setEditing(null)
     await load()
   }
@@ -226,26 +156,38 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
    * 公開状態を変える前に、**何が止まり何が残るかを本文で読ませる。**
    * 既存予約を残したまま新規受付だけを止めるため、確認窓を挟む。
    */
+  /**
+   * 公開切替だけを版付きで送る(PATCH)。PUT は送らなかった項目まで
+   * 既定値で上書きしてしまうため、ここでは使わない。
+   */
   async function toggleVisibility(menu: BookingMenu) {
     if (!selectedAccountId) return
     setUpdatingVisibility(true)
+    setVisibilityError(null)
     try {
-      await bookingApi.updateMenu(selectedAccountId, menu.id, { is_active: menu.is_active ? 0 : 1 })
+      const version = menu.version
+      if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
+        // 版が無ければ最新を読み直してからやり直してもらう。
+        await load()
+        setVisibilityError('最新の状態を読み直しました。もう一度お試しください。')
+        return
+      }
+      await bookingApi.patchMenu(selectedAccountId, menu.id, version, { is_active: !menu.is_active })
       setVisibilityTarget(null)
+      setVisibilityError(null)
       await load()
+    } catch (error) {
+      // 失敗しても窓は開けたままにし、理由を窓の中で伝える。
+      setVisibilityError(bookingErrorMessage(error, '保存'))
     } finally {
       setUpdatingVisibility(false)
     }
   }
 
-  /** メニュー名 → 直近の予約件数。 */
+  /** メニューID → Workerで集計済みの直近30日予約件数。 */
   const bookingCounts = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const b of bookings) {
-      counts.set(b.menu_name, (counts.get(b.menu_name) ?? 0) + 1)
-    }
-    return counts
-  }, [bookings])
+    return new Map(items.map((menu) => [menu.id, menu.booking_count_30_days ?? 0]))
+  }, [items])
 
   const shown = useMemo(() => {
     return [...items].sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id))
@@ -261,7 +203,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   const favorite = useMemo(() => {
     if (supportingLoadState !== 'ready' || items.length === 0) return null
     return items.reduce((best, menu) =>
-      (bookingCounts.get(menu.name) ?? 0) > (bookingCounts.get(best.name) ?? 0) ? menu : best,
+      (bookingCounts.get(menu.id) ?? 0) > (bookingCounts.get(best.id) ?? 0) ? menu : best,
     items[0])
   }, [bookingCounts, items, supportingLoadState])
 
@@ -269,7 +211,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
     () => [...new Set(items.filter((menu) => menu.is_active).map((menu) => menu.booking_window_days).filter((days): days is number => typeof days === 'number'))].sort((a, b) => a - b),
     [items],
   )
-  const businessHours = businessHourSummary(settings)
+  const businessHours = businessHourSummary(settings?.businessHours)
   const configuredWindowDays = settings?.bookingWindowDays
   const bookingWindowDays = typeof configuredWindowDays === 'number' && configuredWindowDays > 0
     ? configuredWindowDays
@@ -299,7 +241,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
           detail={supportingDetail(
             Boolean(selectedAccountId),
             supportingLoadState,
-            favorite ? `この30日で ${bookingCounts.get(favorite.name) ?? 0}件` : '予約実績はありません',
+            favorite ? `この30日で ${bookingCounts.get(favorite.id) ?? 0}件` : '予約実績はありません',
           )}
         />
         <Kpi
@@ -330,14 +272,6 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
           onRetry={() => void load()}
         />
       ) : <>
-      {staffReadFailed.length > 0 && (
-        <div className="bg-warning-bg text-warning rounded-card mb-3 px-4 py-3 text-xs">
-          {staffReadFailed.join('・')} の担当を読み取れませんでした。
-          このメニューは、実際には担当がいても「担当なし」と出る場合があります。
-          時間をおいて開き直してください。
-        </div>
-      )}
-
       {!selectedAccountId ? (
         <div data-design-node="W6465r"><ListState kind="empty" title="LINEアカウントを選んでください" description="共通メニューで、予約設定を開くLINEアカウントを選んでください。" /></div>
       ) : loading ? (
@@ -404,7 +338,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                       )}
                     </td>
                     <td className="px-4 py-3 text-right text-sm tabular-nums">
-                      {supportingLoadState === 'ready' ? `${bookingCounts.get(m.name) ?? 0} 件` : '—'}
+                      {supportingLoadState === 'ready' ? `${bookingCounts.get(m.id) ?? 0} 件` : '—'}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex gap-2 text-xs">
@@ -432,7 +366,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
       </div>
       </>}
 
-      {editing && <Modal menu={editing} tags={tags} onSave={save} onClose={() => setEditing(null)} />}
+      {editing && <EditMenuModal menu={editing} tags={tags} onSave={save} onClose={() => setEditing(null)} />}
 
       <ConfirmDialog
         open={visibilityTarget !== null}
@@ -443,7 +377,8 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
         confirmLabel={visibilityTarget?.is_active ? '新しい予約を止める' : 'お客様の画面へ出す'}
         destructive={Boolean(visibilityTarget?.is_active)}
         busy={updatingVisibility}
-        onCancel={() => setVisibilityTarget(null)}
+        error={visibilityError ?? undefined}
+        onCancel={() => { setVisibilityTarget(null); setVisibilityError(null) }}
         onConfirm={() => { if (visibilityTarget) void toggleVisibility(visibilityTarget) }}
       />
     </div>
@@ -516,26 +451,38 @@ function Kpi({
   )
 }
 
-function Modal({
+function EditMenuModal({
   menu,
   tags,
   onSave,
   onClose,
 }: {
-  menu: Partial<BookingMenu>
+  menu: BookingMenu
   tags: Tag[]
-  onSave: (m: Partial<BookingMenu>) => Promise<void>
+  onSave: (m: BookingMenu) => Promise<void>
   onClose: () => void
 }) {
-  const [form, setForm] = useState<Partial<BookingMenu>>(menu)
+  const [form, setForm] = useState<BookingMenu>(menu)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
-  function set<K extends keyof BookingMenu>(k: K, v: BookingMenu[K] | string | null) {
+  /** 数値欄に文字列が入らないよう、鍵と値の型をそろえる。 */
+  function set<K extends keyof BookingMenu>(k: K, v: BookingMenu[K]) {
     setForm({ ...form, [k]: v })
   }
 
   async function submit() {
+    const validationError = bookingMenuError({
+      name: form.name,
+      durationMinutes: form.duration_minutes,
+      bufferAfterMinutes: form.buffer_after_minutes,
+      sortOrder: form.sort_order,
+      assignedStaffCount: form.assigned_staff?.length ?? 0,
+    })
+    if (validationError) {
+      setErr(validationError)
+      return
+    }
     setSaving(true)
     setErr(null)
     try {
@@ -551,7 +498,7 @@ function Modal({
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b border-hairline">
-          <h2 className="text-base font-semibold">{form.id ? 'メニュー編集' : '新規メニュー'}</h2>
+          <h2 className="text-base font-semibold">メニュー編集</h2>
         </div>
         <div className="px-6 py-4 space-y-4">
           <Field label="名前" required>
@@ -559,7 +506,7 @@ function Modal({
               type="text"
               value={form.name ?? ''}
               onChange={(e) => set('name', e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2"
               placeholder="例: カット"
             />
           </Field>
@@ -568,7 +515,7 @@ function Modal({
               type="text"
               value={form.category_label ?? ''}
               onChange={(e) => set('category_label', e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2"
               placeholder="例: カット / カラー / パーマ"
             />
           </Field>
@@ -576,7 +523,7 @@ function Modal({
             <textarea
               value={form.description ?? ''}
               onChange={(e) => set('description', e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
+              className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2 resize-y"
               rows={2}
               placeholder="顧客に表示される説明文"
             />
@@ -754,7 +701,7 @@ function NumField({
         type="number"
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 tabular-nums"
+        className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2 tabular-nums"
       />
     </Field>
   )
@@ -798,7 +745,7 @@ function MenusPageHost() {
           受付枠
         </Link>
         <Link
-          href="/booking/staff/shifts"
+          href="/booking/staff/shifts#special"
           className="text-ink-faint hover:text-ink-secondary rounded-t-md px-4 py-2 text-sm"
         >
           休業日

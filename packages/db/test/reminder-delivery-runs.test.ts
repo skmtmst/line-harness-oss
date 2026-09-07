@@ -9,6 +9,7 @@ import {
   claimReminderDeliveryRun,
   completeReminderDeliveryRunStatement,
   completeReminderIfDone,
+  deleteReminderStep,
   deleteReminder,
   failReminderDeliveryRun,
   getReminderDeliveryRunById,
@@ -101,6 +102,19 @@ describe('リマインダ実行記録', () => {
     expect(recovered?.id).toBe(first?.id)
     expect(recovered?.line_retry_key).toBe(first?.line_retry_key)
     expect(recovered?.attempt_count).toBe(2)
+  })
+
+  it('別リマインダに属する通を親IDの取り違えで削除しない', async () => {
+    sqlite.exec(`
+      INSERT INTO reminders (id, name, line_account_id)
+      VALUES ('reminder-2', '別のお知らせ', 'account-1');
+      INSERT INTO reminder_steps (id, reminder_id, offset_minutes, message_type, message_content)
+      VALUES ('step-2', 'reminder-2', -30, 'text', '別の本文');
+    `)
+    expect(await deleteReminderStep(db, 'reminder-1', 'step-2')).toBe(false)
+    expect(sqlite.prepare(`SELECT reminder_id FROM reminder_steps WHERE id = 'step-2'`).get())
+      .toEqual({ reminder_id: 'reminder-2' })
+    expect(await deleteReminderStep(db, 'reminder-2', 'step-2')).toBe(true)
   })
 
   it('次の予定は計画時刻を出し、再試行待ちでは過去の予定より再試行時刻を出す', async () => {

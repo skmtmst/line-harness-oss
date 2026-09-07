@@ -10,6 +10,7 @@ import {
 } from '@/lib/api'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -59,6 +60,10 @@ function Handover() {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [copyState, setCopyState] = useState<'idle' | 'copied'>('idle')
   const [refreshing, setRefreshing] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [executing, setExecuting] = useState(false)
+  const [executeError, setExecuteError] = useState('')
+  const [executeMessage, setExecuteMessage] = useState('')
 
   const load = useCallback(async () => {
     if (!id) return
@@ -125,6 +130,36 @@ function Handover() {
     if (!handover?.code) return
     await navigator.clipboard.writeText(handover.code)
     setCopyState('copied')
+  }
+
+  /**
+   * 段5。本実行。**確認窓なしでは進めない。**
+   * 決め残し・実行ずみは口側でも止めるが、画面でも押せない形にする。
+   */
+  const executeHandover = async () => {
+    if (!handover || executing) return
+    setExecuting(true)
+    setExecuteError('')
+    setExecuteMessage('')
+    try {
+      const result = await api.accountHandovers.execute(handover.id)
+      if (!result.success) {
+        setExecuteError(result.error)
+        return
+      }
+      setConfirmOpen(false)
+      const detail = await api.accountHandovers.get(handover.id)
+      if (detail.success) setHandover(detail.data as HandoverView)
+      const moved = result.data.movedCount ?? result.data.plannedCount ?? 0
+      setExecuteMessage(
+        result.data.failureReason
+          ?? `本実行が終わりました。${moved.toLocaleString('ja-JP')}人を移しました。`,
+      )
+    } catch {
+      setExecuteError('本実行できませんでした。しばらくおいてから、もう一度お試しください。')
+    } finally {
+      setExecuting(false)
+    }
   }
 
   if (status === 'loading') return <ListState kind="loading" />
@@ -266,17 +301,42 @@ function Handover() {
             </p>
           </section>
 
+          {executeMessage && (
+            <p role="status" className="bg-success-bg text-success rounded-control mt-3 p-3 text-xs leading-relaxed">
+              {executeMessage}
+            </p>
+          )}
+          {executeError && (
+            <p role="alert" className="bg-warning-bg text-warning rounded-control mt-3 p-3 text-xs leading-relaxed">
+              {executeError}
+            </p>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Button href={`/accounts/detail?id=${account.id}`}>やめる</Button>
             <div className="flex flex-wrap gap-2">
               <Button type="button" disabled={refreshing || !countsAreComplete} onClick={() => void rerunPreview()}>
                 {refreshing ? '確認中…' : '事前確認をやり直す'}
               </Button>
-              <Button type="button" variant="primary" disabled={(handover.unresolvedReviews ?? 1) > 0}>
-                本実行へ進む
+              <Button
+                type="button"
+                variant="primary"
+                disabled={(handover.unresolvedReviews ?? 1) > 0}
+                onClick={() => { setExecuteError(''); setExecuteMessage(''); setConfirmOpen(true) }}
+              >
+                {executing ? '実行中…' : '本実行へ進む'}
               </Button>
             </div>
           </div>
+          <ConfirmDialog
+            open={confirmOpen}
+            title="本実行しますか？"
+            description={`要確認はすべて決めました。本実行すると、決めた内容で友だちが「${destination?.name ?? '受け取り先'}」へ移ります。元のアカウントの友だち・履歴・配信は消しません。`}
+            confirmLabel={executing ? '実行中…' : '本実行する'}
+            busy={executing}
+            error={executeError}
+            onConfirm={() => void executeHandover()}
+            onCancel={() => { if (!executing) { setConfirmOpen(false); setExecuteError('') } }}
+          />
         </div>
 
         <aside className="space-y-4">

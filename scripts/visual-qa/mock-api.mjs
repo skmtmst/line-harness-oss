@@ -32,6 +32,7 @@ import {
   COMMON_VAR_FOLDERS,
   COMMON_VAR_DETAIL,
   COMMON_VAR_DELETE_IMPACT,
+  COMMON_VAR_SCHEDULES,
   commonVarChangeImpact,
   COMMON_VAR_DELETE_IMPACT_EMPTY,
   COMMON_VAR_REPLACEMENT_CANDIDATES,
@@ -45,12 +46,7 @@ import {
   MEDIA_FOLDERS,
   MEDIA_ITEMS,
   MEDIA_QUOTA,
-  FRIEND_ADD_EVENTS,
   FRIEND_ADD_RUNS,
-  FRIEND_ADD_LIFECYCLE_DRAFT,
-  FRIEND_ADD_LIFECYCLE_PUBLISHED,
-  FRIEND_ADD_LIFECYCLE_TEST_RESULT,
-  FRIEND_ADD_LIFECYCLE_VALIDATION,
   AUTO_REPLIES, AUTO_REPLY_FOLDERS, AUTO_REPLY_RUNS, AUTO_REPLY_CONFLICT_SUMMARY,
   AUTO_REPLY_PUBLISH_CONFLICTS, AUTO_REPLY_PUBLISH_DRAFT,
   AUTO_REPLY_PUBLISH_RESULT, AUTO_REPLY_PUBLISH_TEST, AUTO_REPLY_PUBLISH_VALIDATION,
@@ -66,7 +62,7 @@ import {
   FRIEND_SAVED_VIEWS, MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
   LIST_STATS, NEN_BIRTHDAY_COUPON, NEN_CAMPAIGN_SETTINGS, NEN_COLUMN_CREATE, NEN_COLUMN_OPERATIONS, NEN_COLUMNS, NEN_JOBS, NEN_PETS,
   NEN_FLOW_METRICS, NEN_COLUMN_METRICS, NEN_PET_METRICS, NEN_DELIVERIES, NEN_DELIVERY_DETAILS,
-  OPERATORS, REMINDERS, REMINDER_DRAFT, REMINDER_FOLDERS, SCENARIO_ACTIONS, SCENARIO_DRAFT, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, SCENARIO_SIMULATION, SCENARIO_RUNS, USERS_GROUPED,
+  OPERATORS, REMINDERS, REMINDER_DRAFT, REMINDER_FOLDERS, REMINDER_VALIDATE, REMINDER_PREVIEW, REMINDER_TEST_SEND, REMINDER_PUBLISH, SCENARIO_ACTIONS, SCENARIO_DRAFT, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, SCENARIO_SIMULATION, SCENARIO_RUNS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   RICH_MENU_GROUPS, RICH_MENU_GROUP_DETAILS, RICH_MENU_EXTERNAL, RICH_MENU_TAP_STATS,
   TAGS, TAG_GROUPS, TAG_DEFINITION_NEN_SUBSCRIPTION, TAG_DEPENDENCIES_NEN_SUBSCRIPTION,
@@ -114,6 +110,10 @@ const HOST = '127.0.0.1'
 
 // 機能10専用。フォルダ操作後の再取得でも、同じプロセス内では保存結果を返す。
 let webinarFolders = WEBINAR_FOLDERS.map((folder) => ({ ...folder }))
+
+// 機能15専用。版追加の撮影では、差し替え用セッションの確定が本番口と同じ
+// `verified` を返す必要がある。申告時に受けた targetMediaId を覚えておく。
+const mediaUploadSessionTargets = new Map()
 
 /** 画面を見るだけなので、いちばん権限のある人で固定する。実在しない名前。 */
 const STAFF = {
@@ -449,34 +449,6 @@ const SUPPORT_EMAIL_ITEMS = [
     lastIncomingAt: '2026-08-16T01:30:00.000Z',
     isUnread: false,
   },
-  {
-    id: 'email:mail-3',
-    threadId: 'mail-3',
-    customerName: '佐藤 美咲',
-    customerIdentifier: 'misaki@example.com',
-    subject: '予約内容について',
-    preview: '予約内容を確認しました。ありがとうございます。',
-    status: 'resolved',
-    revision: 1,
-    assignedStaffId: 'operator-kenta',
-    assignedStaffName: 'Kenta',
-    lastIncomingAt: '2026-08-15T23:20:00.000Z',
-    isUnread: false,
-  },
-  {
-    id: 'email:mail-4',
-    threadId: 'mail-4',
-    customerName: '田中 花子',
-    customerIdentifier: 'hanako@example.com',
-    subject: 'ありがとうございました',
-    preview: 'ご案内ありがとうございました。',
-    status: 'resolved',
-    revision: 1,
-    assignedStaffId: 'operator-masato',
-    assignedStaffName: 'Masato',
-    lastIncomingAt: '2026-08-15T21:00:00.000Z',
-    isUnread: false,
-  },
 ]
 
 /**
@@ -512,15 +484,20 @@ const ARRAY_PREFIXES = [
   '/api/users/',
 ]
 
-/** 機能のオン／オフ。全部オンにして、どの画面も出るようにする。 */
-const FEATURE_KEYS = [
-  'scenarios', 'broadcasts', 'templates', 'reminders', 'auto_replies',
-  'rich_menus', 'webinars', 'inflow_tracking', 'forms', 'mileage',
-  'affiliates', 'analytics', 'media', 'events', 'booking', 'automations',
-  'external_integrations', 'friend_add_routing', 'nen_campaigns',
-  'photo_review', 'ec_commerce', 'line_notifications', 'restaurant_test',
-]
-const FEATURES = Object.fromEntries(FEATURE_KEYS.map((k) => [k, true]))
+/** 機能31の固定応答。本物と同じ全ID・既定値・版を返す。 */
+const FEATURES = {
+  scenarios: true, broadcasts: true, templates: true, reminders: true,
+  auto_replies: true, rich_menus: true, inflow_tracking: true, forms: true,
+  photo_review: true, automations: true, external_integrations: true,
+  friend_add_routing: true, multi_store_hierarchy: false,
+  multi_store_bulk_updates: false, reservation_ledger: false,
+  external_reservations: false, google_business_profile: false,
+  friend_fields: true, support_marks: true, saved_searches: true,
+  media: true, common_vars: true, analytics: true, site_tracking: true,
+  webinars: false, events: true, booking: true, affiliates: false, mileage: true,
+  ec_commerce: true, line_notifications: true, nen_campaigns: true,
+  restaurant_test: true,
+}
 
 /** 設計 `bfB50` / `oHAN4` を確認するための固定ECデータ。秘密値そのものは置かない。 */
 const EC_SUBSCRIPTIONS = {
@@ -927,6 +904,8 @@ const SHAPES = {
     sidebarItemOrder: null,
     parentChildMode: false,
     specializedFeatureKeys: ['nen_campaigns', 'photo_review', 'ec_commerce', 'line_notifications'],
+    // 本物は版を返す。無いと画面の expectedVersion 付き保存の欠落に気づけない。
+    version: 1,
   },
   '/api/inbox/unanswered/count': { total: 0, byAccount: [], oldestWaitMinutes: null },
   // 設計 `vUXKb` の「写真審査 1件 確認待ち」。0で返すとカードが空のまま撮れる。
@@ -951,11 +930,11 @@ const SHAPES = {
   '/api/duplicates/stats': DUPLICATE_STATS,
   '/api/operators': OPERATORS,
   '/api/scenarios': FRIEND_SCENARIOS,
-  '/api/media': MEDIA_ITEMS,
+  '/api/media': { items: MEDIA_ITEMS, total: MEDIA_ITEMS.length, limit: 20, offset: 0 },
   '/api/media/quota': MEDIA_QUOTA,
 
   /* 予約。`api.ts` を通らない口なので、読む側（`app/page.tsx`）に合わせる。 */
-  '/api/booking/admin/requests': { requests: [] },
+  '/api/booking/admin/requests': { requests: [], total: 0, limit: 50, offset: 0 },
 
   /* EC の出荷予定（`EcShipmentList`）。`soon`/`later` は配列で要る。 */
   '/api/ec-commerce/shipments': {
@@ -981,10 +960,6 @@ const SHAPES = {
   '/api/rich-menu-groups/external': RICH_MENU_EXTERNAL,
   '/api/rich-menu-groups/tap-stats': RICH_MENU_TAP_STATS,
 
-  /* 友だち追加時配信の公開前確認（PR #597）。契約と同じ形を返す。 */
-  '/api/friend-add-routing/draft': FRIEND_ADD_LIFECYCLE_DRAFT,
-  '/api/friend-add-routing/conflicts': { conflicts: [] },
-
 }
 
 /**
@@ -1003,6 +978,16 @@ function visualQaWriteBody(method, pathname) {
     return { ...SCENARIO_SIMULATION, scenarioId: scenarioSimulation[1] }
   }
   if (method === 'PUT' && /^\/api\/scenarios\/[^/]+\/draft$/.test(pathname)) return SCENARIO_DRAFT
+  /*
+   * リマインダの公開フロー（下書き保存・検査・予定・試し送り・公開）。
+   * 読みの `/draft` と `/runs` は従来のGET側にある。ここは書き込み側で、
+   * 本番と同じ器（`{success:true,data}`）で固定の返事を返す。
+   */
+  if (method === 'PUT' && /^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) return REMINDER_DRAFT
+  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/validate$/.test(pathname)) return REMINDER_VALIDATE
+  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/preview$/.test(pathname)) return REMINDER_PREVIEW
+  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/test-send$/.test(pathname)) return REMINDER_TEST_SEND
+  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/publish$/.test(pathname)) return REMINDER_PUBLISH
   if (method === 'POST' && /^\/api\/scenarios\/[^/]+\/test-send$/.test(pathname)) return { sent: 1 }
   if (method === 'POST' && /^\/api\/scenarios\/[^/]+\/steps\/[^/]+\/test-send$/.test(pathname)) return { sent: 1 }
   if (method === 'POST' && pathname === '/api/ec-commerce/test-send') return { sent: 1 }
@@ -1082,15 +1067,6 @@ function visualQaWriteBody(method, pathname) {
   if (method === 'POST' && /^\/api\/webhooks\/outgoing\/[^/]+\/test$/.test(pathname)) {
     return OUTGOING_WEBHOOK_TEST_RESULT
   }
-  if (method === 'POST' && pathname === '/api/friend-add-routing/validate') {
-    return FRIEND_ADD_LIFECYCLE_VALIDATION
-  }
-  if (method === 'POST' && pathname === '/api/friend-add-routing/draft/test') {
-    return FRIEND_ADD_LIFECYCLE_TEST_RESULT
-  }
-  if (method === 'POST' && pathname === '/api/friend-add-routing/publish') {
-    return FRIEND_ADD_LIFECYCLE_PUBLISHED
-  }
   if (method === 'POST' && pathname === '/api/saved-searches/preview') {
     return FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL
   }
@@ -1119,7 +1095,7 @@ const RAW = {
   */
   /* 空いている時間。包むと `res.by_staff` が undefined になり、選ぶ口が0件になる。 */
   '/api/booking/admin/availability': BOOKING_AVAILABILITY,
-  '/api/booking/admin/resources': { resources: BOOKING_RESOURCES },
+  '/api/booking/admin/resources': { success: true, data: { resources: BOOKING_RESOURCES } },
   '/api/booking/admin/menus': { menus: BOOKING_MENUS },
   '/api/booking/admin/staff': { staff: BOOKING_STAFF },
   '/api/booking/admin/customer-context': { customer: BOOKING_CUSTOMER_CONTEXT },
@@ -1127,7 +1103,21 @@ const RAW = {
   '/api/booking/admin/alternatives': BOOKING_CONFLICT_ALTERNATIVES,
   '/api/events/admin/events': { items: ADMIN_EVENTS },
   // 予約メニューの帯は `requests` から件数を出す。包むと `.filter` で落ちる。
-  '/api/booking/admin/requests': { requests: BOOKING_REQUESTS },
+  '/api/booking/admin/requests': { requests: BOOKING_REQUESTS, total: BOOKING_REQUESTS.length, limit: 50, offset: 0 },
+  '/api/booking/admin/requests-summary': {
+    total: BOOKING_REQUESTS.length,
+    requested: BOOKING_REQUESTS.filter((item) => item.status === 'requested').length,
+    monthTotal: BOOKING_REQUESTS.length,
+    monthConfirmed: BOOKING_REQUESTS.filter((item) => item.status === 'confirmed').length,
+    monthCancelled: BOOKING_REQUESTS.filter((item) => ['cancelled', 'rejected', 'no_show'].includes(item.status)).length,
+    lastMonthTotal: 0,
+    todayTotal: BOOKING_REQUESTS.length,
+    weekTotal: BOOKING_REQUESTS.length,
+    byMenu: BOOKING_MENUS.map((menu) => ({
+      name: menu.name,
+      total: BOOKING_REQUESTS.filter((item) => item.menu_name === menu.name).length,
+    })),
+  },
 }
 
 /**
@@ -1525,7 +1515,26 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     ] }
   }
   if (pathname === '/api/friend-add-rules') {
-    return { success: true, data: FRIEND_ADD_RULES }
+    // 検索とフォルダ絞りはサーバ側で全件に効かせる (本物と同じ契約)。
+    const q = (query.get('q') ?? '').trim().toLocaleLowerCase('ja-JP')
+    const folder = query.get('folder') ?? ''
+    const items = FRIEND_ADD_RULES.items
+      .filter((item) => !q || item.name.toLocaleLowerCase('ja-JP').includes(q))
+      .filter((item) => !folder
+        || (folder === '__uncategorized' ? item.folderName == null : item.folderName === folder))
+    const counts = new Map()
+    for (const item of FRIEND_ADD_RULES.items) {
+      counts.set(item.folderName ?? null, (counts.get(item.folderName ?? null) ?? 0) + 1)
+    }
+    return {
+      success: true,
+      data: {
+        ...FRIEND_ADD_RULES,
+        items,
+        total: items.length,
+        folderCounts: Array.from(counts.entries()).map(([name, count]) => ({ name, count })),
+      },
+    }
   }
   if (pathname === '/api/friend-add-rules/conflicts') {
     return {
@@ -1668,6 +1677,10 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === `/api/forms/${FORM_DETAIL.id}`) return { success: true, data: FORM_DETAIL }
   const formSubmissions = new RegExp(`^/api/forms/${FORM_DETAIL.id}/submissions$`).test(pathname)
   if (formSubmissions) {
+    // 互換用の古い形（ページ分けなし）は配列だけを返す。実口と同じく上限500件。
+    if (query.get('page') === null && query.get('limit') === null) {
+      return { success: true, data: FORM_SUBMISSIONS.items.slice(0, 500) }
+    }
     const page = Number.parseInt(query.get('page') ?? '1', 10)
     const limit = Number.parseInt(query.get('limit') ?? '20', 10)
     const safePage = Number.isInteger(page) && page > 0 ? page : 1
@@ -1745,7 +1758,45 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const found = AUTO_REPLIES.find((item) => item.id === autoReplyOne[1])
     return found ? { success: true, data: found } : { success: false, error: 'Not found' }
   }
-  if (pathname === '/api/reminders') return { success: true, data: REMINDERS }
+  if (pathname === '/api/reminders') {
+    const usesListContract = ['page', 'limit', 'q', 'folderId', 'status'].some((key) => query.has(key))
+    if (!usesListContract) return { success: true, data: REMINDERS }
+    const requestedPage = Number.parseInt(query.get('page') ?? '', 10)
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 200) : 20
+    const q = (query.get('q') ?? '').trim().toLocaleLowerCase('ja-JP')
+    const folderId = query.get('folderId') ?? ''
+    const status = query.get('status') ?? ''
+    const filtered = REMINDERS.filter((reminder) => {
+      if (q && !`${reminder.name} ${reminder.description ?? ''}`.toLocaleLowerCase('ja-JP').includes(q)) return false
+      if (folderId === '__unfiled__' && reminder.folderId) return false
+      if (folderId && folderId !== '__unfiled__' && reminder.folderId !== folderId) return false
+      if (status === 'failed' && !reminder.hasFailure) return false
+      if (status === 'draft' && reminder.lifecycleStatus !== 'draft') return false
+      if (status === 'active' && (reminder.lifecycleStatus === 'draft' || reminder.lifecycleStatus === 'stopped' || !reminder.isActive)) return false
+      if (status === 'stopped' && reminder.lifecycleStatus !== 'stopped' && reminder.isActive) return false
+      return true
+    }).sort((left, right) => (
+      (left.displayOrder ?? 0) - (right.displayOrder ?? 0)
+      || right.createdAt.localeCompare(left.createdAt)
+      || left.id.localeCompare(right.id)
+    ))
+    const offset = (page - 1) * limit
+    return {
+      success: true,
+      data: {
+        items: filtered.slice(offset, offset + limit),
+        total: filtered.length,
+        limit,
+        sort: [
+          { field: 'displayOrder', direction: 'asc' },
+          { field: 'createdAt', direction: 'desc' },
+          { field: 'id', direction: 'asc' },
+        ],
+      },
+    }
+  }
   if (/^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) {
     return { success: true, data: REMINDER_DRAFT }
   }
@@ -1770,24 +1821,11 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const reminder = REMINDERS.find((item) => item.id === reminderSteps[1])
     return { success: true, data: reminder ? reminderStepsOf(reminder) : [] }
   }
-  if (pathname === '/api/friend-add-routing/events') {
-    const kind = query.get('kind')
-    const attributionStatus = query.get('attribution_status')
-    const routingStatus = query.get('routing_status')
-    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
-    const limit = Number.isFinite(requestedLimit) && requestedLimit >= 0
-      ? requestedLimit
-      : FRIEND_ADD_EVENTS.items.length
-    const items = FRIEND_ADD_EVENTS.items
-      .filter((item) => !kind || item.kind === kind)
-      .filter((item) => !attributionStatus || item.attributionStatus === attributionStatus)
-      .filter((item) => !routingStatus || item.routingStatus === routingStatus)
-      .slice(0, limit)
-    return { success: true, data: { ...FRIEND_ADD_EVENTS, items } }
-  }
   if (pathname === '/api/friend-add-runs') {
     const status = query.get('status')
     const ruleId = query.get('rule_id')
+    const kind = query.get('kind')
+    const attribution = query.get('attribution')
     const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
     const limit = Number.isInteger(requestedLimit) && requestedLimit > 0
       ? Math.min(requestedLimit, 100)
@@ -1795,6 +1833,8 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const items = FRIEND_ADD_RUNS.items
       .filter((item) => !status || item.status === status)
       .filter((item) => !ruleId || item.rule?.id === ruleId)
+      .filter((item) => !kind || item.friendKind === kind)
+      .filter((item) => !attribution || item.attribution?.status === attribution)
       .slice(0, limit)
     return { success: true, data: { ...FRIEND_ADD_RUNS, items } }
   }
@@ -1927,43 +1967,6 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     いま入っている人。34-1「はじめの設定」の最終確認が役割で言い分けるので、
     一覧の形（items/total）ではなく 1 人ぶんを返す。
   */
-  /*
-    友だち追加時の振り分け。34-1 の段3・段4 がこれを読む。
-    下書きはあるが公開していない——設計 `RAW35` が「止まっています」で
-    描いている状態を、そのまま固定データにする。
-  */
-  if (pathname === '/api/friend-add-routing')
-    return {
-      success: true,
-      data: {
-        configured: true,
-        routing: {
-          firstTime: { scenarioId: 'visual-qa-scenario', actions: [], timing: 'immediate' },
-          returning: { scenarioId: null, actions: [], mode: 'none', startPosition: 'start' },
-          criteria: { firstTime: 'never_added' },
-        },
-        scenarios: [{ id: 'visual-qa-scenario', name: '新規登録 7日間フォロー' }],
-        tags: [],
-      },
-    }
-  if (pathname === '/api/friend-add-routing/draft')
-    return {
-      success: true,
-      data: {
-        accountId: 'visual-qa-account',
-        versionId: 'visual-qa-draft',
-        versionNumber: 1,
-        status: 'draft',
-        routing: {
-          firstTime: { scenarioId: 'visual-qa-scenario', actions: [], timing: 'immediate' },
-          returning: { scenarioId: null, actions: [], mode: 'none', startPosition: 'start' },
-          criteria: { firstTime: 'never_added' },
-        },
-        lastTestStatus: null,
-        lastTestedAt: null,
-        publishedAt: null,
-      },
-    }
   if (pathname === '/api/staff/me')
     return {
       success: true,
@@ -2026,6 +2029,12 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/site/summary') return { success: true, data: SITE_TRACKING_SUMMARY }
   if (pathname === '/api/site/pages') return { success: true, data: SITE_TRACKING_PAGES }
+  if (pathname === '/api/site/tracking-key') {
+    // アカウントごとに違う鍵を返す。乱数は使わない(毎回同じ絵にする)。
+    const accountId = query.get('accountId') ?? 'visual-qa-account'
+    const trackingKey = `hk_${createHash('sha256').update(`site-tracking:${accountId}`).digest('hex').slice(0, 32)}`
+    return { success: true, data: { accountId, trackingKey } }
+  }
   if (pathname === '/api/ad-platforms') return { success: true, data: AD_PLATFORMS }
   const adPlatformLogs = /^\/api\/ad-platforms\/([^/]+)\/logs$/.exec(pathname)
   if (adPlatformLogs) {
@@ -2275,6 +2284,17 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       ? COMMON_VAR_DELETE_IMPACT_EMPTY
       : COMMON_VAR_DELETE_IMPACT
     return { success: true, data: impact }
+  }
+  /*
+    共通情報の切り替え予約の一覧。予約表が常に空だと、予約ありの
+    見た目・契約が検証されない。固定の予約を1件だけ返す。
+  */
+  const commonVarSchedules = /^\/api\/common-vars\/([^/]+)\/schedules$/.exec(pathname)
+  if (commonVarSchedules) {
+    return {
+      success: true,
+      data: commonVarSchedules[1] === COMMON_VAR_DETAIL.id ? COMMON_VAR_SCHEDULES : [],
+    }
   }
   const mediaDeleteImpact = /^\/api\/media\/([^/]+)\/delete-impact$/.exec(pathname)
   if (mediaDeleteImpact) {
@@ -2633,6 +2653,32 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     */
     return { success: true, data: { total: 12, inUse: 9, registeredFriends: 187, formLinks: 6, updatedThisMonth: 3 } }
   }
+  if (pathname === '/api/friends') {
+    /*
+     * 点検 #496-23：絞り・検索・ページ送りを無視した固定231件だと、
+     * 画面確認で絞りが効いて見えて実機差異に気づけない。
+     * クエリに連動させる。絞り無しの既定は従来どおり（全件・total 231）で、
+     * 既定の撮影が変わらないようにする。
+     */
+    const search = (query.get('search') ?? '').trim().toLocaleLowerCase('ja')
+    const tagId = query.get('tagId') ?? ''
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? requestedLimit : FRIENDS.length
+    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    let items = FRIENDS
+    if (search) {
+      items = items.filter((friend) => (friend.displayName ?? '').toLocaleLowerCase('ja').includes(search))
+    }
+    if (tagId) {
+      items = items.filter((friend) => (friend.tags ?? []).some((tag) => tag.id === tagId))
+    }
+    const narrowed = search !== '' || tagId !== ''
+    return {
+      success: true,
+      data: { items: items.slice(offset, offset + limit), total: narrowed ? items.length : 231, page: 1, limit },
+    }
+  }
   if (pathname in SHAPES) {
     return { success: true, data: SHAPES[pathname] }
   }
@@ -2678,6 +2724,56 @@ const server = createServer((req, res) => {
   */
   if (url.pathname === '/__mock-fingerprint') {
     res.writeHead(200).end(JSON.stringify({ fingerprint: FINGERPRINT }))
+    return
+  }
+
+  if (method === 'GET' && url.pathname === '/api/media') {
+    const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || 20)))
+    const offset = Math.max(0, Number(url.searchParams.get('offset') || 0))
+    const kind = url.searchParams.get('kind')
+    const query = (url.searchParams.get('query') || '').toLowerCase()
+    const folderId = url.searchParams.get('folderId')
+    const excludeId = url.searchParams.get('excludeId')
+    const sort = url.searchParams.get('sort') || 'newest'
+    const filtered = MEDIA_ITEMS.filter((item) =>
+      (!kind || item.kind === kind)
+      && (!excludeId || item.id !== excludeId)
+      && (!query || item.filename.toLowerCase().includes(query))
+      && (!folderId || (folderId === '__ungrouped__' ? item.folderId == null : item.folderId === folderId))
+      && (url.searchParams.get('unusedOnly') !== '1' || item.usageCount === 0)
+      && (url.searchParams.get('nearLimitOnly') !== '1' || item.sizeBytes >= (item.kind === 'image' ? 8 : item.kind === 'file' ? 16 : 160) * 1024 * 1024),
+    ).toSorted((left, right) => {
+      if (sort === 'oldest') return left.createdAt.localeCompare(right.createdAt)
+      if (sort === 'name') return left.filename.localeCompare(right.filename, 'ja')
+      if (sort === 'size') return right.sizeBytes - left.sizeBytes
+      if (sort === 'usage') return (right.usageCount ?? -1) - (left.usageCount ?? -1)
+      return right.createdAt.localeCompare(left.createdAt)
+    })
+    res.writeHead(200).end(JSON.stringify({
+      success: true,
+      data: { items: filtered.slice(offset, offset + limit), total: filtered.length, limit, offset },
+    }))
+    return
+  }
+
+  if (method === 'GET' && url.pathname === '/api/booking/admin/requests') {
+    const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || 50)))
+    const offset = Math.max(0, Number(url.searchParams.get('offset') || 0))
+    const status = url.searchParams.get('status') || 'requested'
+    const query = url.searchParams.get('query') || ''
+    const menuName = url.searchParams.get('menu_name')
+    const from = url.searchParams.get('from')
+    const to = url.searchParams.get('to')
+    const filtered = BOOKING_REQUESTS.filter((item) =>
+      (status === 'all' || item.status === status)
+      && (!query || (item.friend_name || '').includes(query))
+      && (!menuName || item.menu_name === menuName)
+      && (!from || item.starts_at >= from)
+      && (!to || item.starts_at < to),
+    )
+    res.writeHead(200).end(JSON.stringify({
+      requests: filtered.slice(offset, offset + limit), total: filtered.length, limit, offset,
+    }))
     return
   }
 
@@ -2900,6 +2996,11 @@ const server = createServer((req, res) => {
           requiredHeaders: { 'Content-Type': String(file.mimeType ?? 'application/octet-stream') },
           expiresAt: '2026-09-07T15:15:00.000Z',
         }))
+        for (const session of sessions) {
+          // IDは申告順の連番で再利用されるため、最新の申告で上書きする。
+          if (session.targetMediaId) mediaUploadSessionTargets.set(session.id, session.targetMediaId)
+          else mediaUploadSessionTargets.delete(session.id)
+        }
         res.writeHead(201).end(JSON.stringify({ success: true, data: { sessions } }))
       })
       return
@@ -2910,7 +3011,15 @@ const server = createServer((req, res) => {
       return
     }
     if (method === 'POST' && /^\/api\/media\/upload-sessions\/[^/]+\/complete$/.test(url.pathname)) {
-      res.writeHead(200).end(JSON.stringify({ success: true, data: { uploadSessionId: url.pathname.split('/')[4], status: 'completed', mediaId: 'media-uploaded-1', targetMediaId: null } }))
+      const uploadSessionId = url.pathname.split('/')[4]
+      const targetMediaId = mediaUploadSessionTargets.get(uploadSessionId) ?? null
+      // 差し替え用（版追加）の確定は、本番口と同じ `verified` を返す。
+      // 新規登録形のまま `completed` を返すと、詳細の版追加フローが検証不能になる。
+      if (targetMediaId) {
+        res.writeHead(200).end(JSON.stringify({ success: true, data: { uploadSessionId, status: 'verified', targetMediaId } }))
+        return
+      }
+      res.writeHead(200).end(JSON.stringify({ success: true, data: { uploadSessionId, status: 'completed', mediaId: 'media-uploaded-1', targetMediaId: null } }))
       return
     }
     if (url.pathname === '/api/client-errors') {
@@ -2979,6 +3088,34 @@ const server = createServer((req, res) => {
           data: commonVarChangeImpact(typeof nextValue === 'string' ? nextValue : ''),
         }))
       })
+      return
+    }
+    /*
+      共通情報の切り替え予約の登録と削除。モックは保存せず、
+      受け取った値をそのまま返して成功の絵が撮れるようにする。
+    */
+    if (method === 'POST' && /^\/api\/common-vars\/[^/]+\/schedules$/.test(url.pathname)) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        const varId = decodeURIComponent(url.pathname.split('/')[3] ?? '')
+        res.writeHead(201).end(JSON.stringify({
+          success: true,
+          data: {
+            id: 'common-var-schedule-new',
+            varId,
+            effectiveFrom: typeof body.effectiveFrom === 'string' ? body.effectiveFrom : '2026-10-01T10:00',
+            value: typeof body.value === 'string' ? body.value : '',
+            appliedAt: null,
+          },
+        }))
+      })
+      return
+    }
+    if (method === 'DELETE' && /^\/api\/common-vars\/[^/]+\/schedules\/[^/]+$/.test(url.pathname)) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: null }))
       return
     }
     /*

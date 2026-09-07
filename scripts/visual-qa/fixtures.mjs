@@ -405,9 +405,9 @@ export const OPERATORS = [
 export const FRIEND_SCENARIOS = [
   // 名前, 説明, 配信方式, 購読中, 読了, 登録日, 終了後, 稼働
   ['新規登録7日間フォロー', '登録直後から7日間の初回案内', 'absolute_time', 428, 312, '2026-08-16', 'pause', true],
-  ['商品購入後サポート', '購入1日後から使い方を案内', 'elapsed', 316, 201, '2026-08-18', 'start_other', true],
+  ['商品購入後サポート', '購入1日後から使い方を案内', 'elapsed', 316, 201, '2026-08-18', 'move', true],
   ['予約前日・当日案内', '予約日を基準に前日と当日へ配信', 'absolute_time', 164, 98, '2026-08-20', 'pause', true],
-  ['休眠ユーザー復帰', '90日反応がない友だちへ再案内', 'relative', 0, 0, '2026-08-22', 'restart_prev', false],
+  ['休眠ユーザー復帰', '90日反応がない友だちへ再案内', 'relative', 0, 0, '2026-08-22', 'resume_previous', false],
   ['会員更新リマインド', '更新月の14日前からお知らせ', 'elapsed', 83, 51, '2026-08-23', 'pause', false],
 ].map(([name, description, deliveryMode, subscriberCount, completedCount, day, onCompleteMode, isActive], index) => ({
   id: `scenario-${index}`,
@@ -1531,6 +1531,20 @@ export const COMMON_VAR_DETAIL = {
     },
   ],
 }
+
+/*
+ * 共通情報の切り替え予約。編集画面の予約表を撮影・検証するために置く。
+ * 口の形は GET /api/common-vars/:id/schedules の serializeSchedule と同じ。
+ */
+export const COMMON_VAR_SCHEDULES = [
+  {
+    id: 'common-var-schedule-1',
+    varId: COMMON_VAR_DETAIL.id,
+    effectiveFrom: '2026-10-01T10:00',
+    value: '株式会社NEN（10月〜）',
+    appliedAt: null,
+  },
+]
 
 export const COMMON_VAR_REPLACEMENT_CANDIDATES = {
   source: {
@@ -3130,7 +3144,9 @@ export const BROADCAST_SAVED_VIEWS = [
   {
     id: 'broadcast-view-reserved',
     name: '予約中のみ',
-    filters: { statuses: ['scheduled'] },
+    // 保存側（page.tsx saveCurrentView）と同じ形にする。旧形の
+    // `statuses` では適用処理が読み替えられず復元不良になる（点検 #490 中5）。
+    filters: { titleQuery: '', statusFilter: 'scheduled', dateFrom: '', dateTo: '', folderFilter: '' },
     sortKey: 'scheduled',
     pageSize: 20,
     createdBy: 'staff-owner',
@@ -3164,9 +3180,11 @@ export const BROADCAST_PREFLIGHT = {
     sendable: 1213,
     evaluatedAt: '2026-08-24T00:55:00.000Z',
     representatives: [
-      { friendId: 'friend-1', displayName: 'Kenta Kawano', note: '予約・未対応' },
-      { friendId: 'friend-2', displayName: 'Masato S.', note: '予約・対応中' },
-      { friendId: 'friend-3', displayName: '菅野 亮', note: '予約・未対応' },
+      // 画面（broadcast-form 対象プレビュー）と口（BroadcastPreflight）の
+      // 実形に合わせる。`note` だけでは画像と要約が空表示になる（点検 #490 中6）。
+      { friendId: 'friend-1', displayName: 'Kenta Kawano', pictureUrl: null, summary: '予約・未対応' },
+      { friendId: 'friend-2', displayName: 'Masato S.', pictureUrl: null, summary: '予約・対応中' },
+      { friendId: 'friend-3', displayName: '菅野 亮', pictureUrl: null, summary: '予約・未対応' },
     ],
   },
   exclusions: {
@@ -3346,6 +3364,41 @@ export const REMINDER_DRAFT = {
   lastTestStatus: 'succeeded',
   lastTestedAt: '2026-09-06T09:00:00.000Z',
   publishedAt: null,
+}
+
+/** 機能7の公開前チェック（`POST /api/reminders/:id/validate` の固定の返事）。 */
+export const REMINDER_VALIDATE = {
+  valid: true,
+  checks: [
+    { key: 'steps', label: '通知ステップ', status: 'passed', message: '3件の通知があります' },
+    { key: 'bodies', label: '送る内容', status: 'passed', message: '空の通知はありません' },
+    { key: 'test_send', label: 'テスト送信', status: 'passed', message: '直近のテストは成功しています' },
+  ],
+  audience: { matched: 398, excluded: 28 },
+}
+
+/** 機能7の配信予定（`POST /api/reminders/:id/preview` の固定の返事）。 */
+export const REMINDER_PREVIEW = {
+  targetDate: '2026-08-25T00:00:00.000Z',
+  items: [
+    { stableStepId: 'day-before', stepNumber: 1, scheduledAt: '2026-08-24T09:00:00.000Z', label: '前日のお知らせ', state: 'scheduled' },
+    { stableStepId: 'hour-before', stepNumber: 2, scheduledAt: '2026-08-25T01:00:00.000Z', label: '1時間前のお知らせ', state: 'scheduled' },
+    { stableStepId: 'same-day', stepNumber: 3, scheduledAt: '2026-08-25T00:00:00.000Z', label: '当日のご案内', state: 'scheduled' },
+  ],
+  summary: { audience: 398, next7Days: 426, next30Days: 1194, duplicateCount: 2 },
+}
+
+/** 機能7のテスト送信（`POST /api/reminders/:id/test-send` の固定の返事）。 */
+export const REMINDER_TEST_SEND = {
+  sent: 1, recipientName: 'Kenta Kawano', replayed: false,
+  requestId: 'visual-qa-test-1', testedAt: '2026-09-06T09:00:00.000Z',
+}
+
+/** 機能7の公開（`POST /api/reminders/:id/publish` の固定の返事）。 */
+export const REMINDER_PUBLISH = {
+  reminderId: 'reminder-3', versionId: 'reminder-3-draft-v3', versionNumber: 3,
+  publishedAt: '2026-09-06T09:00:00.000Z', audience: 398,
+  plannedDeliveries: 1194, nextScheduledAt: '2026-08-24T09:00:00.000Z',
 }
 
 /**
@@ -4159,7 +4212,9 @@ export const MILEAGE_FRIENDS = {
  */
 const mileageRule = (id, name, eventType, amount, conditions, isActive = true) => ({
   id, name, eventType, source: null, amount,
-  initialStatus: 'available', conditions, isActive,
+  initialStatus: 'available', conditions,
+  /* #532(#521): 旧口も帰属アカウントを持つ。新規は必須。 */
+  lineAccountId: 'visual-qa-account', isActive,
   validFrom: null, validUntil: null,
   createdAt: '2026-02-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z',
 })
@@ -4782,15 +4837,36 @@ export const COMMON_ACTION_DETAIL = {
   料金は設計の ¥8,400／¥12,600／¥4,200／¥1,200／¥2,800。
   **`is_active` は 0/1 の数**（この口は DB の行をそのまま返す）。
 */
+const BOOKING_MENU_ASSIGNED_STAFF = [
+  { id: 'bs-1', display_name: '佐々木' },
+  { id: 'bs-3', display_name: '高田' },
+]
+/**
+ * 本番の `GET /api/booking/admin/menus` と同じ器。
+ * `price_mode`・`version`・`effectiveBookingRules` が無いと、
+ * これを根拠に実装した画面で項目漏れになる。
+ * 店舗共通の初期値は BOOKING_SETTINGS(受付60日・締切1440分・取消1440分)。
+ */
+const BOOKING_MENU_STORE_RULES = { bookingWindowDays: 60, cutoffMinutesBefore: 1440, cancelDeadlineMinutesBefore: 1440 }
+const bookingMenuRules = (windowDays, cutoffHours) => ({
+  bookingWindowDays: windowDays ?? BOOKING_MENU_STORE_RULES.bookingWindowDays,
+  cutoffMinutesBefore: cutoffHours == null ? BOOKING_MENU_STORE_RULES.cutoffMinutesBefore : cutoffHours * 60,
+  cancelDeadlineMinutesBefore: BOOKING_MENU_STORE_RULES.cancelDeadlineMinutesBefore,
+  source: {
+    bookingWindowDays: windowDays == null ? 'store' : 'menu',
+    cutoffMinutesBefore: cutoffHours == null ? 'store' : 'menu',
+    cancelDeadlineMinutesBefore: 'store',
+  },
+})
 export const BOOKING_MENUS = [
-  { id: 'bm-1', name: 'トリミング（小型犬）', category_label: 'トリミング', description: 'シャンプー・カット・爪切り', duration_minutes: 105, buffer_after_minutes: 15, base_price: 8400, sort_order: 1, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 24 },
-  { id: 'bm-2', name: 'トリミング（中型犬）', category_label: 'トリミング', description: 'シャンプー・カット・爪切り', duration_minutes: 150, buffer_after_minutes: 15, base_price: 12600, sort_order: 2, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 24 },
-  { id: 'bm-3', name: 'シャンプーのみ', category_label: 'トリミング', description: null, duration_minutes: 60, buffer_after_minutes: 10, base_price: 4200, sort_order: 3, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 60, cutoff_hours_before: 12 },
-  { id: 'bm-4', name: '爪切り', category_label: 'お手入れ', description: null, duration_minutes: 15, buffer_after_minutes: 5, base_price: 1200, sort_order: 4, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 30, cutoff_hours_before: 2 },
-  { id: 'bm-5', name: '初回相談', category_label: '相談', description: 'はじめての方向け', duration_minutes: 30, buffer_after_minutes: 0, base_price: 0, sort_order: 5, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 12 },
-  { id: 'bm-6', name: '歯みがき教室', category_label: 'お手入れ', description: null, duration_minutes: 60, buffer_after_minutes: 5, base_price: 2800, sort_order: 6, is_active: 0, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 30, cutoff_hours_before: 6 },
-  { id: 'bm-7', name: '足裏ケア', category_label: 'お手入れ', description: null, duration_minutes: 20, buffer_after_minutes: 5, base_price: 1800, sort_order: 7, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 30, cutoff_hours_before: 2 },
-  { id: 'bm-8', name: '夏の毛刈り（終了）', category_label: '季節', description: null, duration_minutes: 60, buffer_after_minutes: 10, base_price: 6000, sort_order: 8, is_active: 0, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: null, cutoff_hours_before: null },
+  { id: 'bm-1', name: 'トリミング（小型犬）', category_label: 'トリミング', description: 'シャンプー・カット・爪切り', duration_minutes: 105, buffer_after_minutes: 15, base_price: 8400, price_mode: 'fixed', version: 1, sort_order: 1, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 24, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 3, effectiveBookingRules: bookingMenuRules(60, 24) },
+  { id: 'bm-2', name: 'トリミング（中型犬）', category_label: 'トリミング', description: 'シャンプー・カット・爪切り', duration_minutes: 150, buffer_after_minutes: 15, base_price: 12600, price_mode: 'fixed', version: 1, sort_order: 2, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 24, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 0, effectiveBookingRules: bookingMenuRules(60, 24) },
+  { id: 'bm-3', name: 'シャンプーのみ', category_label: 'トリミング', description: null, duration_minutes: 60, buffer_after_minutes: 10, base_price: 4200, price_mode: 'fixed', version: 1, sort_order: 3, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 60, cutoff_hours_before: 12, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 1, effectiveBookingRules: bookingMenuRules(60, 12) },
+  { id: 'bm-4', name: '爪切り', category_label: 'お手入れ', description: null, duration_minutes: 15, buffer_after_minutes: 5, base_price: 1200, price_mode: 'fixed', version: 1, sort_order: 4, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 30, cutoff_hours_before: 2, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 0, effectiveBookingRules: bookingMenuRules(30, 2) },
+  { id: 'bm-5', name: '初回相談', category_label: '相談', description: 'はじめての方向け', duration_minutes: 30, buffer_after_minutes: 0, base_price: 0, price_mode: 'free', version: 1, sort_order: 5, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 12, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 0, effectiveBookingRules: bookingMenuRules(60, 12) },
+  { id: 'bm-6', name: '歯みがき教室', category_label: 'お手入れ', description: null, duration_minutes: 60, buffer_after_minutes: 5, base_price: 2800, price_mode: 'fixed', version: 1, sort_order: 6, is_active: 0, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 30, cutoff_hours_before: 6, cancel_deadline_hours_before: null, assigned_staff: [], booking_count_30_days: 0, effectiveBookingRules: bookingMenuRules(30, 6) },
+  { id: 'bm-7', name: '足裏ケア', category_label: 'お手入れ', description: null, duration_minutes: 20, buffer_after_minutes: 5, base_price: 1800, price_mode: 'fixed', version: 1, sort_order: 7, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 30, cutoff_hours_before: 2, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 0, effectiveBookingRules: bookingMenuRules(30, 2) },
+  { id: 'bm-8', name: '夏の毛刈り（終了）', category_label: '季節', description: null, duration_minutes: 60, buffer_after_minutes: 10, base_price: 6000, price_mode: 'fixed', version: 1, sort_order: 8, is_active: 0, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: null, cutoff_hours_before: null, cancel_deadline_hours_before: null, assigned_staff: [], booking_count_30_days: 0, effectiveBookingRules: bookingMenuRules(null, null) },
 ]
 
 /** 予約の店舗共通設定。設計 `W6465r` の受付期間・承認・営業時間。 */
@@ -5125,7 +5201,7 @@ export const MANUAL_LINKS = {
     { key: '5-1', keyKind: 'screen', name: 'シナリオ配信', url: 'https://help.line-harness.example/scenarios', status: 'ok', lastCheckedAt: '2026-08-27T19:00:00.000Z', lastHttpStatus: 200, lastError: null, version: 2 },
     { key: '33-1', keyKind: 'screen', name: 'LINEアカウント', url: null, status: 'broken', lastCheckedAt: null, lastHttpStatus: null, lastError: 'URL_UNSET', version: 1 },
   ],
-  total: 266,
+  total: 5,
   brokenCount: 2,
 }
 
@@ -5523,8 +5599,9 @@ export const NEN_PHOTOS = [
   petPhoto('ph-3', '木村 亮', 'こむぎ', 'おやつを待つ顔', 'pending', 20),
   petPhoto('ph-4', '中村 彩', 'ぷりん', 'ひなたぼっこ', 'adopted', 14),
   petPhoto('ph-5', '石田 未来', 'レオ', '新しい首輪', 'adopted', 8),
-  /* 戻したもの。**理由が無いと、なぜ戻したのかが画面から読めない。** */
-  petPhoto('ph-6', '松本 圭', 'むぎ', '店内で撮影', 'rejected', 3, 'other_person', '人の顔が写っています'),
+  /* 戻したもの。**理由が無いと、なぜ戻したのかが画面から読めない。**
+     理由はDB制約・API許可値にある正規値を使う（`other_person` は存在しない値）。 */
+  petPhoto('ph-6', '松本 圭', 'むぎ', '店内で撮影', 'rejected', 3, 'privacy', '人の顔が写っています'),
 ]
 
 export const NEN_PHOTO_DETAIL = {
@@ -5821,7 +5898,13 @@ export const MILEAGE_REWARDS = {
 /** 機能9の最終確認と公開完了を描く、保存を伴わない固定応答。 */
 export const FRIEND_ADD_RULE_VALIDATE = {
   canPublish: true,
-  checks: [{ status: 'passed', label: '配信内容と参照先を確認できました。' }],
+  // 確認は鍵付きで返し、説明文はサーバ値をそのまま出す (順番に意味を持たせない)。
+  checks: [{
+    key: 'first_time',
+    status: 'passed',
+    label: '配信内容と参照先を確認できました。',
+    detail: '保存済みのルールと参照先を確認できました。',
+  }],
 }
 
 export const FRIEND_ADD_RULE_PUBLISH = {

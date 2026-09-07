@@ -1,9 +1,11 @@
 import {
-  getAccountSetting,
   isOperationCapabilityStopped,
   resolveLineCredential,
   jstNow,
 } from '@line-crm/db';
+import {
+  featureJobCanRun,
+} from './feature-enforcement.js';
 
 import { pushViaHarnessProxy, type HarnessProxyDispatch } from './line-proxy-send.js';
 import { buildWebinarUrl } from './webinar-reminders.js';
@@ -506,15 +508,6 @@ export async function sendWebinarNotificationTest(
   return { sent, failed };
 }
 
-function featureEnabled(raw: string | null): boolean {
-  if (!raw) return false;
-  try {
-    return (JSON.parse(raw) as { enabled?: boolean }).enabled !== false;
-  } catch {
-    return false;
-  }
-}
-
 export async function processWebinarNotificationJobs(
   db: D1Database,
   options: WebinarNotificationDeliveryOptions,
@@ -556,6 +549,15 @@ export async function processWebinarNotificationJobs(
   let failed = 0;
   let skipped = 0;
   for (const row of due.results ?? []) {
+    if (!row.account_id || !await featureJobCanRun(db, {
+      accountId: row.account_id,
+      featureId: 'webinars',
+      job: 'webinar-notifications',
+      occurredAt: now.toISOString(),
+    })) {
+      skipped++;
+      continue;
+    }
     const claimed = await db.prepare(
       `UPDATE webinar_notification_jobs
           SET status='claimed', attempt_count=attempt_count+1, lease_expires_at=?, updated_at=?
@@ -569,9 +571,6 @@ export async function processWebinarNotificationJobs(
       const isMissedButViewed = row.kind === 'missed' && Boolean(row.viewed);
       const isLateReminder = ['day_before', 'hour_before', 'session_start'].includes(row.kind)
         && nowEpoch >= row.session_start_at + row.duration_seconds;
-      const featureRaw = row.account_id
-        ? await getAccountSetting(db, row.account_id, 'feature.webinars')
-        : null;
       const operationStopped = await isOperationCapabilityStopped(
         db,
         row.account_id,
@@ -587,9 +586,7 @@ export async function processWebinarNotificationJobs(
               ? { code: 'line_account_mismatch', message: '送信先とウェビナーのLINEアカウントが一致しないため送信しませんでした。' }
               : !row.line_account_active
                 ? { code: 'line_account_inactive', message: 'LINEアカウントが停止中のため送信しませんでした。' }
-                : !featureEnabled(featureRaw)
-                  ? { code: 'feature_disabled', message: 'ウェビナー機能が停止中のため送信しませんでした。' }
-                  : operationStopped
+                : operationStopped
                     ? { code: 'operation_stopped', message: '緊急停止中のため送信しませんでした。' }
                     : null;
       if (

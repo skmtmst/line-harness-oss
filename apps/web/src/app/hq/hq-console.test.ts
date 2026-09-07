@@ -43,7 +43,7 @@ describe('統括コンソール', () => {
     expect(shell).not.toContain('<HqReturnButton />')
     expect(topBar).toContain("router.push('/hq')")
     expect(topBar).toContain('clearSelectedAccountId')
-    expect(shell).toContain('<RootLandingGate><StoreSelectionGate>{children}</StoreSelectionGate></RootLandingGate>')
+    expect(shell).toContain('<RootLandingGate><StoreSelectionGate><FeatureDisabledGate>{children}</FeatureDisabledGate></StoreSelectionGate></RootLandingGate>')
   })
 
   it('統括と店舗のサイドバーを分け、採用フローを作らない', () => {

@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   saveNenCampaignAccountSetting: vi.fn(),
   getNenBirthdayCouponSetting: vi.fn(),
   saveNenBirthdayCouponSetting: vi.fn(),
+  prepare: vi.fn(),
+  push: vi.fn(),
 }));
 
 vi.mock('../services/account-access.js', () => ({ canAccessAllLineAccounts: mocks.canAccess }));
@@ -26,18 +28,18 @@ vi.mock('../services/nen-engagement.js', () => ({
   saveNenBirthdayCouponSetting: mocks.saveNenBirthdayCouponSetting,
 }));
 vi.mock('../services/nen-tag-sync.js', () => ({ syncNenPetTags: vi.fn() }));
+vi.mock('../services/line-proxy-send.js', () => ({ pushViaHarnessProxy: mocks.push }));
+vi.mock('../services/local-line-proxy.js', () => ({ dispatchLineProxyLocally: vi.fn() }));
 
 const { nenCampaigns } = await import('./nen-campaigns.js');
 
-function app() {
+function app(withStaff = true) {
   const instance = new Hono<{ Bindings: { DB: D1Database } }>();
   instance.use('*', async (c, next) => {
-    const statement = {
-      bind: () => statement,
-      first: vi.fn(async () => null),
-    };
-    c.env = { DB: { prepare: () => statement } as unknown as D1Database };
-    c.set('staff' as never, { id: 'owner', role: 'owner', tenantId: 'tenant-a' } as never);
+    c.env = { DB: { prepare: mocks.prepare } as unknown as D1Database };
+    if (withStaff) {
+      c.set('staff' as never, { id: 'owner', role: 'owner', tenantId: 'tenant-a' } as never);
+    }
     await next();
   });
   instance.route('/', nenCampaigns);
@@ -52,6 +54,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.canAccess.mockResolvedValue(true);
   mocks.queueColumnDelivery.mockResolvedValue(1);
+  mocks.prepare.mockImplementation(() => {
+    const statement = { bind: () => statement, first: vi.fn(async () => null) };
+    return statement;
+  });
+  mocks.push.mockResolvedValue(undefined);
 });
 
 describe('NEN campaign tenant scope', () => {
@@ -103,6 +110,51 @@ describe('NEN campaign tenant scope', () => {
     expect(response.status).toBe(404);
     expect(mocks.getLineAccountById).toHaveBeenCalledWith(expect.anything(), 'own-account');
     expect(mocks.getNenCampaign).toHaveBeenCalled();
+  });
+
+  test('test-send only resolves recipients configured for that account', async () => {
+    mocks.getNenCampaign.mockResolvedValue({ body_text: '本文', button_url: null, image_url: null });
+    mocks.getLineAccountById.mockResolvedValue({ channel_access_token: 'token' });
+    mocks.prepare.mockImplementation((sql: string) => {
+      const statement = {
+        bind: () => statement,
+        first: vi.fn(async () => sql.includes("s.key = 'test_recipients'")
+          ? { id: 'friend-1', line_user_id: 'U1' }
+          : null),
+      };
+      return statement;
+    });
+
+    const response = await app().request('/api/nen-campaigns/test-send', json({
+      campaignKey: 'column', accountId: 'own-account', friendId: 'friend-1',
+    }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.prepare).toHaveBeenCalledWith(expect.stringContaining("s.key = 'test_recipients'"));
+    expect(mocks.prepare).toHaveBeenCalledWith(expect.stringContaining('json_each(s.value)'));
+    expect(mocks.push).toHaveBeenCalled();
+  });
+
+  test('read/completion events reject another account before recording or tagging', async () => {
+    mocks.canAccess.mockResolvedValue(false);
+    const response = await app().request('/api/nen-campaigns/columns/column-1/read-events', json({
+      lineAccountId: 'other-account', friendId: 'friend-1', eventKind: 'completed',
+      idempotencyKey: 'read-event-1',
+    }));
+
+    expect(response.status).toBe(403);
+    expect(mocks.prepare).not.toHaveBeenCalled();
+  });
+
+  test('read/completion events require an allowed staff role', async () => {
+    const response = await app(false).request('/api/nen-campaigns/columns/column-1/read-events', json({
+      lineAccountId: 'own-account', friendId: 'friend-1', eventKind: 'opened',
+      idempotencyKey: 'read-event-1',
+    }));
+
+    expect(response.status).toBe(403);
+    expect(mocks.canAccess).not.toHaveBeenCalled();
+    expect(mocks.prepare).not.toHaveBeenCalled();
   });
 
   test('rejects another tenant column delivery before it is queued', async () => {

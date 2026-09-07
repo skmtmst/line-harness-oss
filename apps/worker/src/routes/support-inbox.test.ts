@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { extractContactFormReceipt, paginateSupportInboxItems } from './support-inbox.js';
 
@@ -39,5 +40,13 @@ ECサイトのお問い合わせフォームから送信しています。`);
 本メールは自動配信のため返信できません。`);
 
     expect(result.inquiry).toBe('商品の保存方法を教えてください。');
+  });
+});
+
+describe('support inbox assignee contract', () => {
+  it('担当者は顧客usersではなく有効なstaff_membersで確認する', () => {
+    const source = readFileSync(new URL('./support-inbox.ts', import.meta.url), 'utf8');
+    expect(source).toContain('SELECT 1 FROM staff_members WHERE id = ? AND is_active = 1');
+    expect(source).not.toContain('SELECT 1 FROM users WHERE id = ?');
   });
 });

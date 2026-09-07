@@ -182,7 +182,7 @@ describe('通の編集を設計の段へ分ける', () => {
     expect(detail).toContain('{editingStepId ? (')
     expect(detail).toContain('<section data-design-node="xfYLn"')
     expect(detail).toContain('{renderStepForm()}')
-    expect(detail).toContain("title={editingStepId ? `${stepForm.stepOrder}通目を編集` : 'シナリオ編集'}")
+    expect(detail).toContain("usePageTitle(editingStepId ? `${stepForm.stepOrder}通目を編集` : 'シナリオ詳細')")
   })
 
   it('4つの面を、1枚の中で段に分ける', () => {

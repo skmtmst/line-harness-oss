@@ -97,3 +97,52 @@ describe('V6 友だち追加時配信の運用者向け表示', () => {
     expect(EDITOR).toContain('<small>新規友だち</small>')
   })
 })
+
+describe('V6 友だち追加時配信の点検・中の再発防止(#501)', () => {
+  it('一覧の検索とフォルダ絞りをサーバ側へ送り、件数は全ページの合計で出す', () => {
+    expect(LIST_PAGE).toContain('q: appliedSearch.trim() || undefined')
+    expect(LIST_PAGE).toContain('folder: folder ?? undefined')
+    expect(LIST_PAGE).toContain('folderCounts')
+    expect(LIST_PAGE).toContain('aria-pressed={folder === null}')
+    expect(LIST_PAGE).not.toContain('toLocaleLowerCase')
+  })
+
+  it('新規作成の優先順位は競合一覧の最大+1にする', () => {
+    // 一覧は既定20件のため、件数+1では21件を超えると重複する。
+    expect(EDITOR).toContain("api.friendAddRules.conflicts(selectedAccountId, 'first_time')")
+    expect(EDITOR).toContain('conflictRes.data.rules.reduce')
+  })
+
+  it('再追加の「何も配信しない」を選べ、シナリオなしで保存できる', () => {
+    expect(EDITOR).toContain("value: 'none', label: '何も配信しない'")
+    expect(EDITOR).toContain("value: 'same', label: 'はじめてと同じ内容'")
+    expect(EDITOR).toContain("value: 'other', label: '別のシナリオ'")
+    expect(EDITOR).toContain("rule.friendKind === 'returning' && definition.returningMode === 'none'")
+  })
+
+  it('フォルダは表にあるものから選び、自由入力で増やさない', () => {
+    expect(EDITOR).toContain('options.folders')
+    expect(EDITOR).not.toContain('placeholder="例: 店頭QR"')
+  })
+
+  it('テストの失敗時も理由を捨てず、確認面へ渡す', () => {
+    expect(EDITOR).toContain("if ('data' in response && response.data) setTestResult(response.data)")
+  })
+
+  it('設定画面は旧振り分け口を参照しない', () => {
+    // 旧口は webhook の実行経路が使う旧互換。新契約が正本。
+    expect(`${LIST_PAGE}\n${EDITOR}`).not.toContain('friendAddRouting')
+    expect(API).toContain('@deprecated 旧互換')
+  })
+})
+
+describe('V6 友だち追加時配信の保存の取りこぼし防止(#501 重大)', () => {
+  it('保存が通るたびに冪等キーを回す', () => {
+    expect(EDITOR).toContain('saveIdempotencyKey.current = crypto.randomUUID()')
+  })
+
+  it('応答の版番号を手元へ反映する', () => {
+    expect(EDITOR).toContain('const savedVersion = (response.data as { version?: number }).version')
+    expect(EDITOR).toContain('setRule((current) => ({ ...current, version: savedVersion }))')
+  })
+})

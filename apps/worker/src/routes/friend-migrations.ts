@@ -1,12 +1,14 @@
 import { Hono, type Context } from 'hono';
 import {
   UID_EVIDENCE_TYPES,
+  countUidMigrationItems,
   createUidMigrationRun,
   getUidMigrationRun,
   listUidMigrationItems,
   listUidMigrationRuns,
   protectCsvCell,
   type UidEvidenceType,
+  type UidMigrationClassification,
   type UidMigrationItemRow,
   type UidMigrationRunRow,
 } from '@line-crm/db';
@@ -18,6 +20,10 @@ export const friendMigrations = new Hono<Env>();
 const MAX_MAPPING_ROWS = 5_000;
 const EXPORT_COLUMNS = ['basic', 'tags_fields', 'support'] as const;
 type ExportColumn = (typeof EXPORT_COLUMNS)[number];
+type ImportCandidate = {
+  id: string; display_name: string | null;
+  real_name: string | null; system_display_name: string | null;
+};
 
 function runJson(row: UidMigrationRunRow) {
   return {
@@ -139,12 +145,49 @@ friendMigrations.post('/api/friends/migrations', requireRole('owner', 'admin'), 
   }
 });
 
+const ITEM_CLASSIFICATIONS = ['auto', 'review', 'unmatched', 'conflict'] as const;
+
 friendMigrations.get('/api/friends/migrations/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const run = await accessibleRun(c, c.req.param('id'));
     if (!run) return c.json({ success: false, error: 'Not found' }, 404);
-    const items = await listUidMigrationItems(c.env.DB, run.id);
-    return c.json({ success: true, data: { ...runJson(run), items: items.map(itemJson) } });
+    /*
+      **対応表はページで区切って返す。** 全件返すと数千行で応答が重く、
+      画面も先頭しか触れない。分類と「未判断のみ」の絞り込みもここで受ける。
+    */
+    const limitParam = c.req.query('limit');
+    const offsetParam = c.req.query('offset');
+    const rawLimit = limitParam === undefined || limitParam === '' ? NaN : Number(limitParam);
+    const rawOffset = offsetParam === undefined || offsetParam === '' ? NaN : Number(offsetParam);
+    const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.floor(rawLimit), 1), 500) : 20;
+    const offset = Number.isFinite(rawOffset) ? Math.max(Math.floor(rawOffset), 0) : 0;
+    const classification = c.req.query('classification');
+    if (classification !== undefined && !(ITEM_CLASSIFICATIONS as readonly string[]).includes(classification)) {
+      return c.json({ success: false, error: '分類を確認してください' }, 400);
+    }
+    const pendingOnly = c.req.query('pendingOnly') === '1' || c.req.query('pendingOnly') === 'true';
+    const filter = {
+      classifications: classification === undefined
+        ? undefined
+        : [classification as UidMigrationClassification],
+      pendingOnly: pendingOnly || undefined,
+    };
+    const [items, itemTotal, unresolved] = await Promise.all([
+      listUidMigrationItems(c.env.DB, run.id, filter, { limit, offset }),
+      countUidMigrationItems(c.env.DB, run.id, filter),
+      countUidMigrationItems(c.env.DB, run.id, { pendingOnly: true }),
+    ]);
+    return c.json({
+      success: true,
+      data: {
+        ...runJson(run),
+        items: items.map(itemJson),
+        itemTotal,
+        itemLimit: limit,
+        itemOffset: offset,
+        unresolved,
+      },
+    });
   } catch (error) {
     console.error(JSON.stringify({ event: 'friend_migration_detail_failed', error: String(error) }));
     return c.json({ success: false, error: '移行結果を読み込めませんでした' }, 500);
@@ -168,6 +211,13 @@ friendMigrations.patch('/api/friends/migrations/:id/items/:itemId', requireRole(
     if (!item) return c.json({ success: false, error: 'Not found' }, 404);
     if (body.decision === 'link' && (!item.old_friend_id || !item.new_friend_id)) {
       return c.json({ success: false, error: '新旧の友だちが両方見つからないため結び付けられません' }, 422);
+    }
+    /*
+      **一致先のない行に「新規作成」を選ばせない。** 選べても本移行で
+      失敗に数えるだけなので、ここで止めて除外か取り込みへ案内する。
+    */
+    if (body.decision === 'create' && !item.new_friend_id) {
+      return c.json({ success: false, error: '一致先がない行は新規作成できません。除外するか、取り込み画面で作ってください' }, 422);
     }
     const now = new Date().toISOString();
     await c.env.DB.prepare(`UPDATE uid_migration_items
@@ -404,19 +454,27 @@ friendMigrations.post('/api/friends/imports', requireRole('owner', 'admin'), asy
         continue;
       }
       seen.add(lineUid);
-      const existing = await c.env.DB.prepare(`SELECT id, line_account_id, display_name, real_name, system_display_name
-        FROM friends WHERE line_user_id = ? LIMIT 1`).bind(lineUid).first<{
-        id: string; line_account_id: string | null; display_name: string | null;
-        real_name: string | null; system_display_name: string | null;
-      }>();
-      if (existing && existing.line_account_id !== accountId) {
-        results.push({ lineUid, kind: 'conflict', reason: '別のLINEアカウントに同じUIDがあります', values });
-      } else if (!existing) {
-        results.push({ lineUid, kind: 'add', reason: null, values });
-      } else if (
-        existing.display_name === values.displayName
-        && existing.real_name === values.realName
-        && existing.system_display_name === values.systemDisplayName
+      /*
+        **同じUIDの有無は2本で見る。** 1本(`LIMIT 1`)だと拾った行が
+        たまたま同アカウントの場合に他アカウントの重複を見逃す。
+        先に対象アカウントを見て、無ければ他アカウントを探す。
+      */
+      const sameAccount = await c.env.DB.prepare(`SELECT id, display_name, real_name, system_display_name
+        FROM friends WHERE line_account_id = ? AND line_user_id = ? LIMIT 1`).bind(accountId, lineUid).first<ImportCandidate>();
+      if (!sameAccount) {
+        const otherAccount = await c.env.DB.prepare(`SELECT id FROM friends
+          WHERE line_user_id = ? AND line_account_id != ? LIMIT 1`).bind(lineUid, accountId).first<{ id: string }>();
+        if (otherAccount) {
+          results.push({ lineUid, kind: 'conflict', reason: '別のLINEアカウントに同じUIDがあります', values });
+        } else {
+          results.push({ lineUid, kind: 'add', reason: null, values });
+        }
+        continue;
+      }
+      if (
+        sameAccount.display_name === values.displayName
+        && sameAccount.real_name === values.realName
+        && sameAccount.system_display_name === values.systemDisplayName
       ) {
         results.push({ lineUid, kind: 'unchanged', reason: null, values });
       } else {
@@ -458,6 +516,18 @@ friendMigrations.post('/api/friends/imports/:id/execute', requireRole('owner', '
       lineUid: string; kind: 'add' | 'update' | 'unchanged' | 'conflict' | 'error';
       values: { displayName: string | null; realName: string | null; systemDisplayName: string | null };
     }> };
+    /*
+      **競合・エラーが残るまま反映しない。** 画面は無効化しているが、
+      直接呼ばれると該当行を捨てて `completed` になっていた。
+    */
+    const remainingConflict = result.rows.filter((row) => row.kind === 'conflict').length;
+    const remainingError = result.rows.filter((row) => row.kind === 'error').length;
+    if (remainingConflict > 0) {
+      return c.json({ success: false, error: `競合が${remainingConflict}件のこっています。確認画面で解消してから反映してください` }, 409);
+    }
+    if (remainingError > 0) {
+      return c.json({ success: false, error: `入力不備が${remainingError}件のこっています。ファイルを確認画面で直してから反映してください` }, 422);
+    }
     const now = new Date().toISOString();
     const statements: D1PreparedStatement[] = [];
     for (const row of result.rows) {

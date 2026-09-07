@@ -10,6 +10,7 @@ import type {
 import { useAccount } from '@/contexts/account-context'
 import { api, type FriendAddRunList } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { csvCell } from './csv'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
@@ -61,8 +62,11 @@ function formatJstTime(value: string | null): string {
   return dateTime === '—' ? dateTime : dateTime.slice(-5)
 }
 
-function csvCell(value: string) {
-  return `"${value.replaceAll('"', '""')}"`
+const RULE_STATUS_LABELS: Record<string, string> = {
+  published: '稼働中',
+  stopped: '停止中',
+  draft: '下書き',
+  archived: 'アーカイブ',
 }
 
 export default function FriendAddRunsPage() {
@@ -78,6 +82,7 @@ export default function FriendAddRunsPage() {
   const [stopBusy, setStopBusy] = useState(false)
   const [stopDialogOpen, setStopDialogOpen] = useState(false)
   const [stopMessage, setStopMessage] = useState('')
+  const [ruleState, setRuleState] = useState<{ status: string; resendSuppressionHours: number | null } | null>(null)
   const requestSequence = useRef(0)
   const cursor = cursorStack[cursorStack.length - 1]
 
@@ -92,10 +97,14 @@ export default function FriendAddRunsPage() {
     setLoading(true)
     setError('')
     try {
+      // 種類・経路の絞り込みはサーバ側へ送る。取得済み20件への表示絞りでは
+      // 2ページ目以降が漏れる。
       const response = await api.friendAddRules.runs(selectedAccountId, {
         limit: 20,
         cursor: cursor ?? undefined,
         status: routing === 'all' ? undefined : routing,
+        kind: kind === 'all' ? undefined : kind,
+        attribution: attribution === 'all' ? undefined : attribution,
       })
       if (requestId !== requestSequence.current) return
       if (!response.success) {
@@ -114,12 +123,24 @@ export default function FriendAddRunsPage() {
   }, [attribution, cursor, kind, routing, selectedAccountId])
 
   useEffect(() => {
-    setCursorStack([null])
-  }, [attribution, kind, routing, selectedAccountId])
-
-  useEffect(() => {
     if (!accountLoading) void load()
   }, [accountLoading, load])
+
+  // アカウントを変えたら古いカーソルで読まないよう巻き戻す。
+  useEffect(() => {
+    setCursorStack([null])
+  }, [selectedAccountId])
+
+  /*
+   * 絞りの変更はカーソルの巻き戻しと同時に1回だけ読み直す。巻き戻しと取得を
+   * 別の effect に分けると、絞り変更のたびに無駄な再取得が起きる。
+   */
+  const applyFilter = (patch: { kind?: KindFilter; attribution?: AttributionFilter; routing?: RoutingFilter }) => {
+    if (patch.kind !== undefined) setKind(patch.kind)
+    if (patch.attribution !== undefined) setAttribution(patch.attribution)
+    if (patch.routing !== undefined) setRouting(patch.routing)
+    setCursorStack([null])
+  }
 
   const summary = data?.summary ?? null
   const selectedAccountExists = selectedAccountId && accounts.some((account) => account.id === selectedAccountId)
@@ -134,11 +155,33 @@ export default function FriendAddRunsPage() {
     return Array.from(counts.entries()).sort((a, b) => b[1] - a[1])
   }, [data])
   const latestProcessedAt = data?.items.find((item) => item.processedAt)?.processedAt ?? null
-  const visibleItems = useMemo(() => (data?.items ?? []).filter((item) => (
-    (kind === 'all' || item.friendKind === kind)
-    && (attribution === 'all' || item.attribution.status === attribution)
-  )), [attribution, data, kind])
+  // 絞り込みはサーバ側で済んでいるため、ここでは表示絞りをしない。
+  const visibleItems = useMemo(() => data?.items ?? [], [data])
   const activeRuleId = data?.items.find((item) => item.rule)?.rule?.id ?? null
+
+  const loadRuleState = useCallback(async () => {
+    if (!selectedAccountId || !activeRuleId) {
+      setRuleState(null)
+      return
+    }
+    try {
+      const detail = await api.friendAddRules.get(selectedAccountId, activeRuleId)
+      if (!detail.success) {
+        setRuleState(null)
+        return
+      }
+      setRuleState({
+        status: detail.data.rule.status,
+        resendSuppressionHours: detail.data.rule.definition.resendSuppressionHours ?? null,
+      })
+    } catch {
+      setRuleState(null)
+    }
+  }, [activeRuleId, selectedAccountId])
+
+  useEffect(() => {
+    void loadRuleState()
+  }, [loadRuleState])
 
   const stopDelivery = async () => {
     if (!selectedAccountId || !activeRuleId || stopBusy) return
@@ -149,13 +192,26 @@ export default function FriendAddRunsPage() {
       if (!detail.success) throw new Error('rule detail missing')
       const response = await api.friendAddRules.stop(selectedAccountId, activeRuleId, detail.data.rule.version)
       setStopMessage(response.success ? '配信を一時停止しました。' : '配信を停止できませんでした。')
-      if (response.success) setStopDialogOpen(false)
+      if (response.success) {
+        setStopDialogOpen(false)
+        // 停止後の状態を読み直す。読み直さないと停止中も稼働中に見える。
+        await load()
+        await loadRuleState()
+      }
     } catch {
       setStopMessage('配信を停止できませんでした。状態を読み直してください。')
     } finally {
       setStopBusy(false)
     }
   }
+
+  const ruleStatusLabel = ruleState ? RULE_STATUS_LABELS[ruleState.status] ?? ruleState.status : '—'
+  const suppressionLabel = !ruleState || ruleState.resendSuppressionHours === null
+    ? '—'
+    : ruleState.resendSuppressionHours > 0 ? '有効' : '無効'
+  const editHref = (step: 'basic' | 'preview') => activeRuleId
+    ? `/friend-add-settings?view=edit&id=${encodeURIComponent(activeRuleId)}&step=${step}`
+    : null
 
   const exportCsv = () => {
     if (!data?.items.length) return
@@ -194,7 +250,7 @@ export default function FriendAddRunsPage() {
                 aria-label="追加の種類"
                 label="追加の種類"
                 value={kind}
-                onChange={(value) => setKind(value as KindFilter)}
+                onChange={(value) => applyFilter({ kind: value as KindFilter })}
                 options={[
                   { value: 'all', label: 'すべての追加' },
                   { value: 'first_time', label: 'はじめて' },
@@ -205,7 +261,7 @@ export default function FriendAddRunsPage() {
                 aria-label="流入経路"
                 label="流入経路"
                 value={attribution}
-                onChange={(value) => setAttribution(value as AttributionFilter)}
+                onChange={(value) => applyFilter({ attribution: value as AttributionFilter })}
                 options={[
                   { value: 'all', label: 'すべての経路' },
                   { value: 'captured', label: '経路を取得できた' },
@@ -216,7 +272,7 @@ export default function FriendAddRunsPage() {
                 aria-label="配信・処理"
                 label="配信・処理"
                 value={routing}
-                onChange={(value) => setRouting(value as RoutingFilter)}
+                onChange={(value) => applyFilter({ routing: value as RoutingFilter })}
                 options={[
                   { value: 'all', label: 'すべての結果' },
                   { value: 'completed', label: '成功' },
@@ -267,7 +323,7 @@ export default function FriendAddRunsPage() {
           <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
             <div className="border-b border-hairline px-4 py-3">
               <h2 className="font-bold">最近の友だち追加</h2>
-              <p className="mt-1 text-xs text-ink-faint">何をきっかけに、何が実行されたかを確認できます。</p>
+              <p className="mt-1 text-xs text-ink-faint">何をきっかけに、何が実行されたかを確認できます。絞り込みはすべての記録に効きます。CSVの書き出しもこのページに表示中の記録だけです。</p>
             </div>
             <div className="divide-y divide-hairline px-4">
               {visibleItems.map((item) => {
@@ -342,8 +398,8 @@ export default function FriendAddRunsPage() {
             <h2 className="font-bold">稼働状況</h2>
             <p className="mt-1 text-xs text-ink-faint">現在取得できる初回案内の状態です。</p>
             <dl className="mt-4 divide-y divide-hairline text-sm">
-              <div className="flex justify-between gap-3 py-3"><dt>状態</dt><dd className="font-bold">稼働中</dd></div>
-              <div className="flex justify-between gap-3 py-3"><dt>二重送信防止</dt><dd className="font-bold">有効</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>状態</dt><dd className="font-bold">{ruleStatusLabel}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>二重送信防止</dt><dd className="font-bold">{suppressionLabel}</dd></div>
               <div className="flex justify-between gap-3 py-3"><dt>最終配信</dt><dd className="font-bold">{formatJstTime(latestProcessedAt)}</dd></div>
               <div className="flex justify-between gap-3 py-3"><dt>平均送信</dt><dd className="font-bold">{summary?.averageSendTimeMs === null || summary?.averageSendTimeMs === undefined ? '未取得' : `${(summary.averageSendTimeMs / 1000).toFixed(1)}秒`}</dd></div>
             </dl>
@@ -355,7 +411,12 @@ export default function FriendAddRunsPage() {
               <strong>未送信 {summary?.failed ?? '—'}件</strong>
               <p className="mt-1 text-xs">失敗した記録は使用ルール・版・処理結果と一緒に一覧で確認できます。</p>
             </div>
-            <Button className="mt-3 w-full" href="/friend-add-settings?view=edit&id=rule-referral&step=preview">友だち追加時配信をテスト</Button>
+            {(() => {
+              const href = editHref('preview')
+              return href
+                ? <Button className="mt-3 w-full" href={href}>友だち追加時配信をテスト</Button>
+                : <Button className="mt-3 w-full" disabled title="実行結果がまだありません">友だち追加時配信をテスト</Button>
+            })()}
           </section>
           <section className="rounded-card border border-hairline bg-canvas p-4">
             <h2 className="font-bold">担当者シナリオ開始</h2>
@@ -367,7 +428,12 @@ export default function FriendAddRunsPage() {
         </aside>
       </div>
 
-      <StickyBar status={stopMessage || undefined} actions={<><Button disabled={!activeRuleId || stopBusy} onClick={() => setStopDialogOpen(true)}>{stopBusy ? '停止中…' : '配信を一時停止'}</Button><Button href="/friend-add-settings?view=edit&id=rule-referral&step=basic" variant="primary">友だち追加時の設定を編集</Button></>} />
+      <StickyBar status={stopMessage || undefined} actions={<><Button disabled={!activeRuleId || stopBusy} onClick={() => setStopDialogOpen(true)}>{stopBusy ? '停止中…' : '配信を一時停止'}</Button>{(() => {
+        const href = editHref('basic')
+        return href
+          ? <Button href={href} variant="primary">友だち追加時の設定を編集</Button>
+          : <Button disabled title="実行結果がまだありません" variant="primary">友だち追加時の設定を編集</Button>
+      })()}</>} />
       <ConfirmDialog
         open={stopDialogOpen}
         title="友だち追加時の配信を一時停止しますか？"

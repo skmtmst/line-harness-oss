@@ -7,6 +7,7 @@ import Button from '@/components/shared/button'
 import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import './webinars.css'
 import FolderPanel from '@/components/shared/folder-panel'
 import { webinarLoadFailure, type WebinarLoadFailure } from './webinar-load-failure'
 import { useAccount } from '@/contexts/account-context'
@@ -463,7 +464,7 @@ export default function WebinarsPage() {
                         <div className="text-ink-secondary text-sm tabular-nums" title={w.registrationCount == null ? '申込人数は一覧APIに未接続です。' : undefined}><span className="text-ink-faint md:hidden">申込 </span>{measuredCount(w.registrationCount)}</div>
                         <div className="text-ink-secondary text-sm tabular-nums" title={w.viewerCount == null ? '視聴人数は一覧APIに未接続です。' : undefined}><span className="text-ink-faint md:hidden">視聴 </span>{measuredCount(w.viewerCount)}</div>
                         <div className="text-ink-secondary truncate text-sm md:col-span-2" title={publicationSummary(w)}>{publicationSummary(w)}</div>
-                        <div className="flex items-center gap-2 md:col-span-2"><Link href={`/webinars/edit?id=${w.id}`} className="text-accent text-xs font-semibold">編集</Link><button type="button" onClick={() => { setArchiveError(''); setArchiveTarget(w) }} className="text-danger text-xs font-semibold" aria-label={`${w.title}をアーカイブ`}>アーカイブ</button></div>
+                        <div className="flex items-center gap-2 md:col-span-2"><Link href={`/webinars/edit?id=${w.id}`} className="text-accent text-xs font-semibold">編集</Link><button type="button" data-qa-open={w.id === 'webinar-5' ? 'LKuAQ' : undefined} onClick={() => { setArchiveError(''); setArchiveTarget(w) }} className="text-danger text-xs font-semibold" aria-label={`${w.title}をアーカイブ`}>アーカイブ</button></div>
                       </div>
                     ))}
                   </div>
@@ -480,18 +481,18 @@ export default function WebinarsPage() {
       {archiveTarget ? <ArchiveReviewBackdrop target={archiveTarget} /> : null}
       <ConfirmDialog
         open={archiveTarget !== null}
+        designNode="LKuAQ"
         title="ウェビナーをアーカイブしますか？"
         description={archiveTarget
           ? `「${archiveTarget.title}」は一覧から外れ、新しく使えなくなります。申込者・視聴履歴・CTA・分析結果は消えません。`
           : ''}
         confirmLabel="アーカイブする"
+        destructive
         busy={archiving}
+        error={archiveError || (archiveTarget ? '申込者・視聴履歴・分析結果は消えません。ウェビナーの一覧には出なくなります。' : undefined)}
         onCancel={() => { if (!archiving) setArchiveTarget(null) }}
         onConfirm={() => void archiveSelected()}
-      >
-        {archiveTarget ? <p className="rounded-control border border-danger bg-danger-bg p-3 text-xs font-semibold text-danger">申込者・視聴履歴・分析結果は消えません。ウェビナーの一覧には出なくなります。</p> : null}
-        {archiveError ? <p className="text-danger text-sm">{archiveError}</p> : null}
-      </ConfirmDialog>
+      />
       {(folderDialogOpen || editingFolder) ? (
         <WebinarFolderDialog
           folder={editingFolder}
