@@ -363,7 +363,7 @@ export default function ScenariosPage() {
 
   return (
     <div>
-      <section className="bg-success-bg text-success mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-card px-4 py-3 text-sm">
+      <section data-design="Head" className="bg-success-bg text-success mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-card px-4 py-3 text-sm">
         <span aria-hidden>ⓘ</span>
         <strong>作成しただけでは配信されません。開始条件を設定すると配信が始まります。</strong>
         <span className="font-semibold underline underline-offset-2">配信を始める方法</span>
