@@ -1,6 +1,6 @@
 import { jstNow } from './utils.js';
 
-export type BookingInterval = { start: string; end: string };
+export type BookingInterval = { start: string; end: string; capacity?: number };
 export type BookingExceptionKind = 'closed' | 'custom_hours' | 'open';
 export type BookingExceptionScope = 'store' | 'staff' | 'resource';
 export type BookingPriceMode = 'fixed' | 'free' | 'inquiry';
@@ -58,6 +58,17 @@ export interface BookingAdminSettings {
   updatedAt: string;
 }
 
+export interface BookingAdminResource {
+  id: string;
+  lineAccountId: string;
+  name: string;
+  type: string;
+  capacity: number;
+  isActive: boolean;
+  businessHours: BookingInterval[];
+  exceptions: BookingAvailabilityException[];
+}
+
 const DEFAULT_SETTINGS = {
   timeZone: 'Asia/Tokyo',
   bookingWindowDays: 60,
@@ -77,7 +88,7 @@ function parseIntervals(raw: string): BookingInterval[] {
       if (!item || typeof item !== 'object') return [];
       const value = item as Record<string, unknown>;
       return typeof value.start === 'string' && typeof value.end === 'string'
-        ? [{ start: value.start, end: value.end }]
+        ? [{ start: value.start, end: value.end, ...(Number.isFinite(Number(value.capacity)) ? { capacity: Number(value.capacity) } : {}) }]
         : [];
     });
   } catch {
@@ -129,13 +140,13 @@ export async function getBookingAdminSettings(
         version: number;
         updated_at: string;
       }>(),
-    db.prepare(`SELECT bh.weekday, bh.start_time, bh.end_time
+    db.prepare(`SELECT bh.weekday, bh.start_time, bh.end_time, bh.capacity
       FROM booking_business_hours bh
       INNER JOIN booking_settings bs ON bs.id = bh.booking_settings_id
       WHERE bs.line_account_id = ?
       ORDER BY bh.weekday ASC, bh.start_time ASC`)
       .bind(lineAccountId)
-      .all<{ weekday: number; start_time: string; end_time: string }>(),
+      .all<{ weekday: number; start_time: string; end_time: string; capacity: number }>(),
     db.prepare(`SELECT * FROM booking_availability_exceptions
       WHERE line_account_id = ? AND scope_kind = 'store'
       ORDER BY date_from ASC, date_to ASC, id ASC`)
@@ -152,7 +163,7 @@ export async function getBookingAdminSettings(
   const grouped = new Map<number, BookingInterval[]>();
   for (let weekday = 0; weekday <= 6; weekday++) grouped.set(weekday, []);
   for (const row of hoursResult.results ?? []) {
-    grouped.get(Number(row.weekday))?.push({ start: row.start_time, end: row.end_time });
+    grouped.get(Number(row.weekday))?.push({ start: row.start_time, end: row.end_time, capacity: Number(row.capacity ?? 1) });
   }
   const menuCount = Number(counts?.menu_count ?? 0);
   const activeMenuCount = Number(counts?.active_menu_count ?? 0);
@@ -181,6 +192,39 @@ export async function getBookingAdminSettings(
     exceptions: (exceptionResult.results ?? []).map(serializeBookingException),
     updatedAt: setting?.updated_at ?? account.created_at,
   };
+}
+
+export async function listBookingAdminResources(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<BookingAdminResource[]> {
+  const [resources, exceptions] = await Promise.all([
+    db.prepare(`SELECT id, line_account_id, name, resource_type, capacity, is_active
+      FROM booking_resources WHERE line_account_id = ? ORDER BY name ASC, id ASC`)
+      .bind(lineAccountId)
+      .all<{ id: string; line_account_id: string; name: string; resource_type: string; capacity: number; is_active: number }>(),
+    db.prepare(`SELECT * FROM booking_availability_exceptions
+      WHERE line_account_id = ? AND scope_kind = 'resource'
+      ORDER BY date_from ASC, date_to ASC, id ASC`)
+      .bind(lineAccountId)
+      .all<BookingAvailabilityExceptionRow>(),
+  ]);
+  const byResource = new Map<string, BookingAvailabilityException[]>();
+  for (const row of exceptions.results ?? []) {
+    const list = byResource.get(row.scope_id ?? '') ?? [];
+    list.push(serializeBookingException(row));
+    byResource.set(row.scope_id ?? '', list);
+  }
+  return (resources.results ?? []).map((row) => ({
+    id: row.id,
+    lineAccountId: row.line_account_id,
+    name: row.name,
+    type: row.resource_type,
+    capacity: Number(row.capacity),
+    isActive: row.is_active === 1,
+    businessHours: [],
+    exceptions: byResource.get(row.id) ?? [],
+  }));
 }
 
 export async function listBookingAvailabilityExceptions(

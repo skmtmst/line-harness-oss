@@ -6,6 +6,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import {
   bookingApi,
   type BookingAvailabilitySlot,
+  type BookingResource,
   type BookingSettings,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -65,6 +66,7 @@ export default function StaffShiftsPage() {
   usePageTitle('予約設定')
   const { selectedAccountId, selectedAccount } = useAccount()
   const [settings, setSettings] = useState<BookingSettings | null>(null)
+  const [resources, setResources] = useState<BookingResource[]>([])
   const [slots, setSlots] = useState<BookingAvailabilitySlot[]>([])
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [previewError, setPreviewError] = useState(false)
@@ -98,10 +100,17 @@ export default function StaffShiftsPage() {
     void Promise.all([
       bookingApi.getSettings(selectedAccountId),
       bookingApi.listMenus(selectedAccountId),
-    ]).then(async ([settingsResult, menuResult]) => {
+      bookingApi.listResources(selectedAccountId),
+    ]).then(async ([settingsResult, menuResult, resourcesResult]) => {
       if (requestId !== requestRef.current) return
       if (!settingsResult.success) throw new Error(settingsResult.error)
       setSettings(settingsResult.data)
+      // 予約設定APIは {success,data} を返す。撮影用固定データの旧形式
+      // ({resources}) も安全に読み、受付枠全体をエラーにしない。
+      const resources = resourcesResult.data?.resources
+        ?? (resourcesResult as unknown as { resources?: BookingResource[] }).resources
+        ?? []
+      setResources(resources)
       setLoadStatus('ready')
 
       const menu = menuResult.menus.find((item) => item.is_active)
@@ -125,6 +134,7 @@ export default function StaffShiftsPage() {
     }).catch(() => {
       if (requestId !== requestRef.current) return
       setSettings(null)
+      setResources([])
       setSlots([])
       setLoadStatus('error')
     })
@@ -251,7 +261,7 @@ export default function StaffShiftsPage() {
                         <Td className="whitespace-nowrap">{accepts ? 'はい' : 'いいえ（定休日）'}</Td>
                         <Td className="whitespace-nowrap tabular-nums">{openHours(intervals)}</Td>
                         <Td className="whitespace-nowrap tabular-nums">{breakHours(intervals)}</Td>
-                        <Td className="whitespace-nowrap" title="店舗・設備単位の1時間受付上限は現在の設定APIに含まれません">—</Td>
+                        <Td className="whitespace-nowrap">{intervals[0]?.capacity ?? '—'}件</Td>
                       </Tr>
                     )
                   })}
@@ -341,8 +351,18 @@ export default function StaffShiftsPage() {
                     <div className="flex gap-2"><dt className="text-danger font-semibold">×</dt><dd>満席です</dd></div>
                     <div className="flex gap-2"><dt className="font-semibold">休</dt><dd>お休み</dd></div>
                   </dl>
-                  <p className="text-ink-faint mt-3 text-xs">残数が現在の空き情報に含まれないため、「少しあいています」は区別していません。</p>
+                  <p className="text-ink-faint mt-3 text-xs">○・△・×は受付上限に対する残数を反映しています。</p>
+                  <div className="mt-3 space-y-1 text-xs">
+                    {slots.slice(0, 6).map((slot) => <div key={`${slot.date}-${slot.start}`} className="flex justify-between"><span>{shortDate(slot.date)} {slot.start}</span><span>残り{slot.remaining}/{slot.capacity}</span></div>)}
+                  </div>
                 </div>
+              </div>
+            </section>
+
+            <section className="bg-canvas border-hairline rounded-card border p-4">
+              <h2 className="text-ink font-semibold">設備ごとの受付上限</h2>
+              <div className="mt-3 space-y-2 text-sm">
+                {resources.length === 0 ? <p className="text-ink-faint">設備は登録されていません</p> : resources.map((resource) => <div key={resource.id} className="flex justify-between"><span>{resource.name}</span><span>{resource.isActive ? `${resource.capacity}枠` : '停止中'}</span></div>)}
               </div>
             </section>
 
