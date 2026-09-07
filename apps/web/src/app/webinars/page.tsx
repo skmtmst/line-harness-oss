@@ -187,6 +187,7 @@ export default function WebinarsPage() {
   useEffect(() => {
     const generation = ++folderRequestGeneration.current
     setFolders([])
+    setSelectedFolder('')
     if (!selectedAccountId) return
     webinarApi.folders(selectedAccountId)
       .then((response) => {
