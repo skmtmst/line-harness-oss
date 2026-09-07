@@ -11,6 +11,7 @@ import {
   queueColumnDelivery,
   saveNenBirthdayCouponSetting,
   saveNenCampaignAccountSetting,
+  parseNenCampaignAfterActions,
 } from '../services/nen-engagement.js';
 import { syncNenPetTags } from '../services/nen-tag-sync.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
@@ -162,6 +163,7 @@ nenCampaigns.get('/api/nen-campaigns/settings', async (c) => {
     buttonLabel: row.button_label,
     buttonUrl: row.button_url,
     imageUrl: row.image_url,
+    afterActions: row.after_actions ?? [],
     updatedAt: row.updated_at ?? '',
   })) });
 });
@@ -180,6 +182,10 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireRole('owner'
   const buttonLabel = typeof body.buttonLabel === 'string' ? body.buttonLabel.trim() : '';
   const buttonUrl = typeof body.buttonUrl === 'string' ? body.buttonUrl.trim() : '';
   const imageUrl = typeof body.imageUrl === 'string' ? body.imageUrl.trim() : '';
+  const afterActions = parseNenCampaignAfterActions(body.afterActions);
+  if (!Array.isArray(body.afterActions) || afterActions.length !== body.afterActions.length) {
+    return c.json({ success: false, error: 'Invalid campaign actions' }, 400);
+  }
   if (!body.title.trim() || body.title.trim().length > 120 || body.bodyText.length > 1500
       || !Number.isInteger(delayDays) || delayDays < 0 || delayDays > 365
       || !/^([01]\d|2[0-3]):[0-5]\d$/.test(body.deliveryTime)
@@ -198,6 +204,7 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireRole('owner'
     button_label: buttonLabel || null,
     button_url: buttonUrl || null,
     image_url: imageUrl || null,
+    after_actions: afterActions,
     updated_at: jstNow(),
   });
   return c.json({ success: true });

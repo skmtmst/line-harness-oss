@@ -1047,6 +1047,10 @@ const nenCampaignSetting = (campaignKey, label, category, triggerEvent, delayDay
   buttonLabel,
   buttonUrl: buttonLabel ? 'https://example.com/nen' : null,
   imageUrl: null,
+  afterActions: campaignKey === 'review_request' ? [
+    { kind: 'open_form', formId: 'form-review', formName: '口コミ', buttonLabel: '感想を書く（30秒）' },
+    { kind: 'award_mileage', amount: 200, trigger: 'form_submitted' },
+  ] : [],
   updatedAt: '2026-08-25T10:00:00+09:00',
 })
 
@@ -1055,7 +1059,7 @@ export const NEN_CAMPAIGN_SETTINGS = [
   nenCampaignSetting('shipping_notice', 'お荷物を送りました', 'transactional', 'ec.shipping.shipped', 0, '09:00', true, 'お荷物を発送しました', '追跡番号から配送状況をご確認いただけます。', '配送状況を見る'),
   nenCampaignSetting('arrival_check', '使い方のご案内', 'follow_up', 'ec.order.arrived', 1, '10:00', true, '商品は無事に届きましたか？', '使い方のポイントを3つにまとめました。', '使い方を見る'),
   nenCampaignSetting('care_check', '困っていませんか', 'follow_up', 'ec.order.arrived', 3, '19:00', true, 'お困りのことはありませんか？', '気になることを、2つの選択肢から教えてください。', '回答する'),
-  nenCampaignSetting('review_request', '口コミのお願い', 'follow_up', 'ec.order.arrived', 7, '20:00', true, '使ってみた感想を教えてください', 'いただいた声を、これからの商品づくりに役立てます。', '口コミを書く'),
+  nenCampaignSetting('review_request', '口コミのお願い', 'follow_up', 'ec.order.arrived', 7, '20:00', true, '口コミのお願い', '{{ペットの名前}}ちゃん、{{商品名}}はいかがでしたか。よろしければ、ひとことだけ感想を聞かせてください。星をえらぶだけでも大丈夫です。', '感想を書く（30秒）'),
   nenCampaignSetting('cross_sell', 'そろそろ無くなるころ', 'follow_up', 'ec.order.arrived', 30, '10:00', false, 'そろそろ無くなるころです', '次回のお買い物に使えるご案内をお送りします。', '商品を見る'),
   nenCampaignSetting('birthday_coupon', 'お誕生日クーポン', 'birthday', 'pet.birthday', 0, '10:00', true, '{{pet_name}}、お誕生日おめでとうございます', '{{coupon_code}} を {{coupon_expiry}} までお使いいただけます。', 'クーポンを受け取る'),
   nenCampaignSetting('column', 'NENコラム', 'column', 'column.scheduled', 0, '10:00', false, '今週のNENコラム', '愛犬・愛猫との暮らしに役立つ読みものをお届けします。', 'コラムを読む'),
