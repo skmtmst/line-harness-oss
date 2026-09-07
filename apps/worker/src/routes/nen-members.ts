@@ -707,52 +707,56 @@ nenMembers.get('/api/nen-members/photos', requirePhotoPermission('photo.submissi
   return c.json({ success: true, data: rows.results });
 });
 
-nenMembers.get('/api/nen-members/photos/publications', async (c) => {
-  const accountId = c.req.query('accountId')?.trim();
-  if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
-  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-    return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
-  }
-  const rows = await c.env.DB.prepare(
-    `SELECT pub.id, pub.photo_id, pub.status, pub.show_owner_name, pub.view_count,
-            pub.version, pub.published_at, ps.public_image_url AS image_url,
-            ps.publication_consent_at, p.name AS pet_name,
-            CASE WHEN pub.show_owner_name = 1 THEN f.display_name ELSE NULL END AS owner_name
-       FROM nen_photo_publications pub
-       JOIN nen_photo_submissions ps ON ps.id = pub.photo_id AND ps.line_account_id = pub.line_account_id
-       JOIN nen_pet_profiles p ON p.id = ps.pet_id
-       JOIN friends f ON f.id = ps.friend_id AND f.line_account_id = pub.line_account_id
-      WHERE pub.line_account_id = ? AND pub.status = 'published'
-        AND ps.status = 'adopted' AND ps.publication_consent_at IS NOT NULL
-        AND ps.publication_withdrawn_at IS NULL
-      ORDER BY pub.published_at DESC LIMIT 200`,
-  ).bind(accountId).all<Record<string, unknown>>();
-  const items = await Promise.all(rows.results.map(async (row) => {
-    const placements = await c.env.DB.prepare(
-      `SELECT id, placement_type, placement_label, view_count
-         FROM nen_photo_publication_placements
-        WHERE publication_id = ? AND line_account_id = ? AND active = 1
-        ORDER BY created_at`,
-    ).bind(row.id, accountId).all<Record<string, unknown>>();
-    return { ...row, placements: placements.results } as Record<string, unknown> & {
-      placements: Array<Record<string, unknown>>;
-    };
-  }));
-  const measured = items.filter((item) => item.view_count !== null && item.view_count !== undefined);
-  return c.json({ success: true, data: {
-    summary: {
-      publishedCount: items.length,
-      placementCount: new Set(items.flatMap((item) => (
-        item.placements
-      ).map((placement) => `${placement.placement_type}:${placement.placement_label}`))).size,
-      topPhoto: measured.length
-        ? measured.reduce((top, item) => Number(item.view_count) > Number(top.view_count) ? item : top)
-        : null,
-      consentedCount: items.length,
-    },
-    items,
-  } });
-});
+nenMembers.get(
+  '/api/nen-members/photos/publications',
+  requirePhotoPermission('photo.submission.view'),
+  async (c) => {
+    const accountId = c.req.query('accountId')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+    }
+    const rows = await c.env.DB.prepare(
+      `SELECT pub.id, pub.photo_id, pub.status, pub.show_owner_name, pub.view_count,
+              pub.version, pub.published_at, ps.public_image_url AS image_url,
+              ps.publication_consent_at, p.name AS pet_name,
+              CASE WHEN pub.show_owner_name = 1 THEN f.display_name ELSE NULL END AS owner_name
+         FROM nen_photo_publications pub
+         JOIN nen_photo_submissions ps ON ps.id = pub.photo_id AND ps.line_account_id = pub.line_account_id
+         JOIN nen_pet_profiles p ON p.id = ps.pet_id
+         JOIN friends f ON f.id = ps.friend_id AND f.line_account_id = pub.line_account_id
+        WHERE pub.line_account_id = ? AND pub.status = 'published'
+          AND ps.status = 'adopted' AND ps.publication_consent_at IS NOT NULL
+          AND ps.publication_withdrawn_at IS NULL
+        ORDER BY pub.published_at DESC LIMIT 200`,
+    ).bind(accountId).all<Record<string, unknown>>();
+    const items = await Promise.all(rows.results.map(async (row) => {
+      const placements = await c.env.DB.prepare(
+        `SELECT id, placement_type, placement_label, view_count
+           FROM nen_photo_publication_placements
+          WHERE publication_id = ? AND line_account_id = ? AND active = 1
+          ORDER BY created_at`,
+      ).bind(row.id, accountId).all<Record<string, unknown>>();
+      return { ...row, placements: placements.results } as Record<string, unknown> & {
+        placements: Array<Record<string, unknown>>;
+      };
+    }));
+    const measured = items.filter((item) => item.view_count !== null && item.view_count !== undefined);
+    return c.json({ success: true, data: {
+      summary: {
+        publishedCount: items.length,
+        placementCount: new Set(items.flatMap((item) => (
+          item.placements
+        ).map((placement) => `${placement.placement_type}:${placement.placement_label}`))).size,
+        topPhoto: measured.length
+          ? measured.reduce((top, item) => Number(item.view_count) > Number(top.view_count) ? item : top)
+          : null,
+        consentedCount: items.length,
+      },
+      items,
+    } });
+  },
+);
 
 nenMembers.put('/api/nen-members/photos/publications/:id/withdraw', requireRole('owner', 'admin', 'staff'), async (c) => {
   const body = await c.req.json<{ accountId?: string; expectedVersion?: number }>().catch(() => null);
@@ -1091,7 +1095,7 @@ nenMembers.post('/api/nen-members/tags/resync', requireRole('owner', 'admin'), a
   return c.json({ success: true, data: result });
 });
 
-nenMembers.get('/api/nen-members/friends/:friendId', async (c) => {
+nenMembers.get('/api/nen-members/friends/:friendId', requireRole('owner', 'admin', 'staff'), async (c) => {
   const friendId = c.req.param('friendId');
   const friend = await c.env.DB.prepare(
     `SELECT f.id, f.line_user_id, f.display_name, f.picture_url, f.is_following,
@@ -1106,7 +1110,20 @@ nenMembers.get('/api/nen-members/friends/:friendId', async (c) => {
     c.env.DB.prepare(`SELECT * FROM nen_ec_member_snapshots WHERE friend_id = ?`).bind(friendId).first<Record<string, unknown>>(),
     c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE friend_id = ? ORDER BY created_at ASC`).bind(friendId).all<Record<string, unknown>>(),
     c.env.DB.prepare(`SELECT * FROM nen_health_logs WHERE friend_id = ? ORDER BY logged_on DESC LIMIT 100`).bind(friendId).all<Record<string, unknown>>(),
-    c.env.DB.prepare(`SELECT ps.*, p.name AS pet_name FROM nen_photo_submissions ps LEFT JOIN nen_pet_profiles p ON p.id = ps.pet_id WHERE ps.friend_id = ? ORDER BY ps.created_at DESC LIMIT 100`).bind(friendId).all<Record<string, unknown>>(),
+    c.env.DB.prepare(
+      `SELECT ps.id, ps.friend_id, ps.pet_id, ps.caption, ps.status, ps.awarded_points,
+              ps.point_transaction_id, ps.created_at, ps.reviewed_at, ps.updated_at,
+              ps.line_account_id, ps.publication_consent_version, ps.publication_consent_at,
+              ps.publication_withdrawn_at, ps.public_pet_name, ps.review_reason_code,
+              ps.review_reason_note, ps.reviewed_by, ps.reviewed_by_name,
+              ps.review_notification_status, ps.review_image_url, ps.public_image_url,
+              ps.image_width, ps.image_height, ps.image_byte_size, ps.captured_device,
+              ps.review_version, p.name AS pet_name
+         FROM nen_photo_submissions ps
+         LEFT JOIN nen_pet_profiles p ON p.id = ps.pet_id
+        WHERE ps.friend_id = ?
+        ORDER BY ps.created_at DESC LIMIT 100`,
+    ).bind(friendId).all<Record<string, unknown>>(),
     c.env.DB.prepare(`SELECT * FROM nen_point_ledger WHERE friend_id = ? ORDER BY created_at DESC LIMIT 100`).bind(friendId).all<Record<string, unknown>>(),
     c.env.DB.prepare(`SELECT id, source, external_event_id, event_type, customer_id, status, error_message, received_at, processed_at FROM ec_events WHERE friend_id = ? ORDER BY received_at DESC LIMIT 100`).bind(friendId).all<Record<string, unknown>>(),
   ]);

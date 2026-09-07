@@ -937,14 +937,29 @@ describe('extractApiErrorMessage', () => {
     expect(extractApiErrorMessage(JSON.stringify({ error: { code: 500 } }), 400)).toBe('')
   })
 
-  // 表示してよいのは、worker が自分で検証して返した 400 だけ。
-  it.each([401, 403, 404, 409, 429, 500, 502, 503])(
+  it('422 の検証文はそのまま運用者へ出す(#496-11)', () => {
+    expect(extractApiErrorMessage(
+      JSON.stringify({ error: 'Shift_JIS書き出しはまだ接続されていません。UTF-8を選んでください' }),
+      422,
+    )).toBe('Shift_JIS書き出しはまだ接続されていません。UTF-8を選んでください')
+  })
+
+  it.each([409, 422, 428])('%i の復旧可能な案内を表示する', (status) => {
+    expect(extractApiErrorMessage(JSON.stringify({ error: '最新の内容を確認して、もう一度お試しください' }), status))
+      .toBe('最新の内容を確認して、もう一度お試しください')
+  })
+
+  it.each([401, 403, 404, 429, 500, 502, 503])(
     '%i の本文は内部情報を含みうるため表示しない',
     (status) => {
       const body = JSON.stringify({ error: 'D1_ERROR: no such table: rich_menu_groups' })
       expect(extractApiErrorMessage(body, status)).toBe('')
     },
   )
+
+  it.each([400, 409, 422, 428])('%i でも内部情報は表示しない', (status) => {
+    expect(extractApiErrorMessage(JSON.stringify({ error: 'D1_ERROR: no such table: secrets' }), status)).toBe('')
+  })
 })
 
 describe('extractApiErrorCode', () => {
@@ -965,11 +980,17 @@ describe('extractApiErrorCode', () => {
     }))).toBe('media_delete_blocked')
   })
 
+  it('判定画面の大文字コードも取り出す(#496-12)', () => {
+    expect(extractApiErrorCode(JSON.stringify({ code: 'STALE_CANDIDATE' }))).toBe('STALE_CANDIDATE')
+    expect(extractApiErrorCode(JSON.stringify({ code: 'KIND_REQUIRED' }))).toBe('KIND_REQUIRED')
+    expect(extractApiErrorCode(JSON.stringify({ code: 'COMMON_VAR_IN_USE' }))).toBe('COMMON_VAR_IN_USE')
+    expect(extractApiErrorCode(JSON.stringify({ code: 'STALE_PERSON' }))).toBe('STALE_PERSON')
+  })
+
   it('内部文言・HTML・文字列以外はコードとして受け取らない', () => {
     expect(extractApiErrorCode(JSON.stringify({ error: 'D1_ERROR: no such table' }))).toBeUndefined()
-    expect(extractApiErrorCode(JSON.stringify({ code: 'COMMON_VAR_IN_USE' }))).toBeUndefined()
-    expect(extractApiErrorCode(JSON.stringify({ code: 'STALE_PERSON' }))).toBeUndefined()
     expect(extractApiErrorCode(JSON.stringify({ code: 'D1_ERROR: no such table' }))).toBeUndefined()
+    expect(extractApiErrorCode(JSON.stringify({ code: 'Failed to fetch friend rich menu: boom' }))).toBeUndefined()
     expect(extractApiErrorCode('<html>proxy error</html>')).toBeUndefined()
     expect(extractApiErrorCode(JSON.stringify({ error: { code: 'slot_conflict' } }))).toBeUndefined()
   })
@@ -1003,6 +1024,25 @@ describe('fetchApi error response', () => {
       .rejects.toThrow('ページ「基本メニュー」のタップ領域1: 送信テキストを入力してください')
   })
 
+  it('422 の検証文も管理画面へ伝える(#496-11)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          success: false,
+          error: '保存した検索の条件が壊れています',
+        }),
+        { status: 422, headers: { 'Content-Type': 'application/json' } },
+      ),
+    ))
+
+    await expect(fetchApi('/api/friends?search=%', { method: 'GET' }))
+      .rejects.toMatchObject({
+        name: 'ApiError',
+        status: 422,
+        message: '保存した検索の条件が壊れています',
+      })
+  })
+
   it('具体的な error を出しても status で分岐できる状態を保つ', async () => {
     vi.stubGlobal('fetch', vi.fn(async () =>
       new Response(JSON.stringify({ error: '送信テキストを入力してください' }), {
@@ -1019,7 +1059,7 @@ describe('fetchApi error response', () => {
     expect(new ApiError(401).message).toBe('API error: 401')
   })
 
-  it('メディア削除409の最新影響を保持しても本文は利用者向けメッセージにしない', async () => {
+  it('メディア削除409の最新影響と復旧案内を保持する', async () => {
     const impact = {
       usageCount: 2,
       canDelete: false,
@@ -1039,7 +1079,7 @@ describe('fetchApi error response', () => {
         name: 'ApiError',
         status: 409,
         code: 'media_delete_blocked',
-        message: 'API error: 409',
+        message: 'このファイルは2か所で使われています。先に使用先から外してください。',
         data: impact,
       })
   })
@@ -1098,7 +1138,7 @@ describe('fetchApi error response', () => {
     })
   })
 
-  it('共通情報削除409の最新影響を保持しても本文は利用者向けメッセージにしない', async () => {
+  it('共通情報削除409の最新影響と復旧案内を保持する', async () => {
     const impact = {
       blockingTotal: 2,
       canDelete: false,
@@ -1118,12 +1158,12 @@ describe('fetchApi error response', () => {
         name: 'ApiError',
         status: 409,
         code: 'common_var_delete_blocked',
-        message: 'API error: 409',
+        message: '2件で使用中のため削除できません',
         data: impact,
       })
   })
 
-  it('409の最新状態は保持し、本文は利用者へ直接出さない', async () => {
+  it('409の最新状態と復旧案内を保持する', async () => {
     const impact = { canDelete: false, blockers: ['incoming_switches'] }
     vi.stubGlobal('fetch', vi.fn(async () =>
       new Response(JSON.stringify({
@@ -1139,7 +1179,7 @@ describe('fetchApi error response', () => {
         name: 'ApiError',
         status: 409,
         code: 'rich_menu_delete_blocked',
-        message: 'API error: 409',
+        message: '削除する前に、公開状態と使われている場所を確認してください',
         data: impact,
       })
   })

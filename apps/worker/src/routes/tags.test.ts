@@ -25,6 +25,9 @@ const dbMocks = {
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
+const accountAccessMocks = vi.hoisted(() => ({ getVisibleLineAccountScope: vi.fn() }));
+vi.mock('../services/account-access.js', () => accountAccessMocks);
+
 const { tags } = await import('./tags.js');
 
 type TestEnv = {
@@ -113,6 +116,10 @@ function tagDeleteImpact(overrides: {
 describe('GET /api/tags', () => {
   beforeEach(() => {
     for (const fn of Object.values(dbMocks)) if ('mockReset' in fn) fn.mockReset();
+    accountAccessMocks.getVisibleLineAccountScope.mockReset();
+    accountAccessMocks.getVisibleLineAccountScope.mockResolvedValue({
+      allowedAccountIds: ['account-1'], ids: ['account-1'], canSeeUnassigned: true, isAccountScoped: false, accounts: [],
+    });
   });
 
   test('管理一覧では人数と使用先をまとめて取得する', async () => {
@@ -166,6 +173,23 @@ describe('GET /api/tags', () => {
     expect(body.data[0]).not.toHaveProperty('usedIn');
     expect(body.data[0]).not.toHaveProperty('otherActionCount');
     expect(body.data[0]).toHaveProperty('cleanupReasons', ['unused']);
+  });
+
+  test('見てよいLINE公式アカウントのタグだけを返す', async () => {
+    dbMocks.getTags.mockResolvedValue([
+      { ...TAG_ROW, id: 'visible', line_account_id: 'account-1' },
+      { ...TAG_ROW, id: 'hidden', line_account_id: 'account-2' },
+    ]);
+
+    const res = await app().request('/api/tags?lineAccountId=account-1');
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ data: [{ id: 'visible' }] });
+  });
+
+  test('範囲外のLINE公式アカウントは存在を明かさない', async () => {
+    const res = await app().request('/api/tags?lineAccountId=account-2');
+    expect(res.status).toBe(404);
+    expect(dbMocks.getTags).not.toHaveBeenCalled();
   });
 
   test('集計済みで候補なしは空配列を返し、未取得と区別する', async () => {

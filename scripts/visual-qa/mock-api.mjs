@@ -2012,6 +2012,12 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/site/summary') return { success: true, data: SITE_TRACKING_SUMMARY }
   if (pathname === '/api/site/pages') return { success: true, data: SITE_TRACKING_PAGES }
+  if (pathname === '/api/site/tracking-key') {
+    // アカウントごとに違う鍵を返す。乱数は使わない(毎回同じ絵にする)。
+    const accountId = query.get('accountId') ?? 'visual-qa-account'
+    const trackingKey = `hk_${createHash('sha256').update(`site-tracking:${accountId}`).digest('hex').slice(0, 32)}`
+    return { success: true, data: { accountId, trackingKey } }
+  }
   if (pathname === '/api/ad-platforms') return { success: true, data: AD_PLATFORMS }
   const adPlatformLogs = /^\/api\/ad-platforms\/([^/]+)\/logs$/.exec(pathname)
   if (adPlatformLogs) {
@@ -2618,6 +2624,32 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       画面側も `undefined` を出さないよう直したが、正しい返事もここに置く。
     */
     return { success: true, data: { total: 12, inUse: 9, registeredFriends: 187, formLinks: 6, updatedThisMonth: 3 } }
+  }
+  if (pathname === '/api/friends') {
+    /*
+     * 点検 #496-23：絞り・検索・ページ送りを無視した固定231件だと、
+     * 画面確認で絞りが効いて見えて実機差異に気づけない。
+     * クエリに連動させる。絞り無しの既定は従来どおり（全件・total 231）で、
+     * 既定の撮影が変わらないようにする。
+     */
+    const search = (query.get('search') ?? '').trim().toLocaleLowerCase('ja')
+    const tagId = query.get('tagId') ?? ''
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? requestedLimit : FRIENDS.length
+    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    let items = FRIENDS
+    if (search) {
+      items = items.filter((friend) => (friend.displayName ?? '').toLocaleLowerCase('ja').includes(search))
+    }
+    if (tagId) {
+      items = items.filter((friend) => (friend.tags ?? []).some((tag) => tag.id === tagId))
+    }
+    const narrowed = search !== '' || tagId !== ''
+    return {
+      success: true,
+      data: { items: items.slice(offset, offset + limit), total: narrowed ? items.length : 231, page: 1, limit },
+    }
   }
   if (pathname in SHAPES) {
     return { success: true, data: SHAPES[pathname] }

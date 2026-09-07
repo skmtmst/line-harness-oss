@@ -62,9 +62,17 @@ export async function getBroadcasts(
   db: D1Database,
   accountId?: string,
   scope?: { allowedAccountIds: string[]; canSeeUnassigned: boolean },
+  // 一覧の並び順。一覧画面の「並び順」選択と連動する。既定は新しい順。
+  opts?: { order?: 'asc' | 'desc' },
 ): Promise<Broadcast[]> {
+  // 一覧に集計の最新行を同梱する。送信済みごとに insight 口を叩く N+1 を
+  // 一覧1クエリで吸収するため。LINEへの再取得は手動ボタン(fetch-insight)に寄せる。
   let sql = `SELECT b.*,
+       bi.id as insight_id,
        bi.status as insight_status,
+       bi.delivered as insight_delivered,
+       bi.unique_impression as insight_unique_impression,
+       bi.unique_click as insight_unique_click,
        bi.open_rate, bi.click_rate
 FROM broadcasts b
 LEFT JOIN broadcast_insights bi ON b.id = bi.broadcast_id
@@ -107,7 +115,7 @@ LEFT JOIN broadcast_insights bi ON b.id = bi.broadcast_id
     }
     sql += ` WHERE ${conditions.length > 0 ? conditions.join(' OR ') : '0 = 1'}`;
   }
-  sql += ` ORDER BY COALESCE(b.sent_at, b.scheduled_at, b.created_at) DESC`;
+  sql += ` ORDER BY COALESCE(b.sent_at, b.scheduled_at, b.created_at) ${opts?.order === 'asc' ? 'ASC' : 'DESC'}`;
   const result = params.length > 0
     ? await db.prepare(sql).bind(...params).all<Broadcast>()
     : await db.prepare(sql).all<Broadcast>();

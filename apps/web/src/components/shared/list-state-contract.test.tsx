@@ -50,6 +50,12 @@ describe('一覧の状態とページ送り', () => {
     expect(html).not.toContain('データがありません')
   })
 
+  it('画面から作れない記録一覧では作成を促さない', () => {
+    const html = renderToStaticMarkup(<ListState kind="empty" emptyPreset="readonly" />)
+    expect(html).toContain('記録が増えると')
+    expect(html).not.toContain('新しく作成')
+  })
+
   it('送る先が1ページしか無いとき、ページ送りを描かない', () => {
     // 画面ごとに `{pageCount > 1 && …}` と書くと、書き忘れた画面だけ
     // 出たままになる。**部品の側で決める。**
