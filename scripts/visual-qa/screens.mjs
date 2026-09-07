@@ -2447,9 +2447,9 @@ export const SCREENS = [
   {
     ...WEBHOOK, node: 'k3WxrO', name: '26-1 外部連携',
     route: '/webhooks?tab=outgoing',
-    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #303 / UI HEAD `d9eff7d7d` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** 4指標、説明帯、検索、状態・並び順、6列の一覧、ページ送りを同じ順に置き、送信先6本・受信口3本・この30日1,486回・失敗6回・受信486回を実応答から表示した。1440px・1920pxとも横はみ出し0。接続別の回数・直近結果・再送対象を返すAPIは無いため、各行は「接続別集計待ち」とし、架空の回数や成功を出していない。**推奨修正：接続別集計APIに送信回数・直近結果・再送可否を足し、「中身を見る」「1回試してみる」へ接続する。**', verdictSource: 'webhooks-v6/k3WxrO.txt', verdictHead: 'd9eff7d7d',
+    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #397 / UI HEAD `1010c7f11` を3106/8793で正式撮影し、設計 `k3WxrO` と同じ1920pxで横並び比較。** 4指標、説明帯、検索、状態・並び順、6列の一覧、ページ送りを同じ順に置き、送信先6本・受信口3本・この30日1,486回・失敗6回・受信486回を実APIから表示した。各接続も486・312・42・34・0回、直近結果、再送可否を実APIへ接続し、失敗したSlackだけ「失敗をやり直す」、ほかは「中身を見る」を出す。全URLは途中を伏せ、内部ID・合言葉・秘密値は表示しない。1440px・1920pxとも横はみ出し0。**残るデータ依存：設計の「1回試してみる」に対応するテスト送信APIが無いため、動く操作に見せず構造一致・データ未接続を維持する。**', verdictSource: 'webhooks-v6/k3WxrO.txt + webhooks-v6/k3WxrO-1920.png', verdictHead: '1010c7f11',
   },
-  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', route: '/webhooks?tab=incoming', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #303 / UI HEAD `d9eff7d7d` を3107/8794で受信タブとして撮影し、★V6設計と同じ1920pxで並べて確認。** 選んだ受け取り口のURL、合言葉、届いたらすること、届いたデータの見かた、ほか2件、用語・関連先・注意の右欄を設計と同じ2列構造へそろえた。1440px・1920pxとも横はみ出し0。人の照合方法・見つからない場合・実行処理・本文をマスクした最新受信サンプルを返す詳細APIが無いため、その4箇所はAPI待ちと明示し、架空のタグ・配信・本文は出していない。**推奨修正：受け取り口詳細APIに照合設定・実行処理・マスク済み最新受信・差し込み項目を追加して接続する。**', verdictSource: 'webhooks-v6/M0Gb7.txt', verdictHead: 'd9eff7d7d' },
+  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', route: '/webhooks?tab=incoming', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #397 / UI HEAD `1010c7f11` を3106/8793で正式撮影し、設計 `M0Gb7` と同じ1920pxで横並び比較。** 選んだ受け取り口のURL、照合方法、見つからない場合、合言葉の状態、届いたらすること、マスク済み最新受信、差し込み項目、ほか2件、用語・関連先・注意を実APIへ接続した。最新受信の値はすべて `••••`、合言葉は「設定済み（再表示しません）」とし、内部の参照IDや秘密値は画面へ出さない。1440px・1920pxとも横はみ出し0。**残るデータ依存：APIが処理名を返さず、受信後のアクション実行器も `not_connected` のため、設計例のタグ名・テンプレート名を作らず「保存済みの設定」と未接続警告を表示する。**', verdictSource: 'webhooks-v6/M0Gb7.txt + webhooks-v6/M0Gb7-1920.png', verdictHead: '1010c7f11' },
     // ---- 2026-09-02 `a0bb3f44` で実装を読み直した ----
     // **「タブの言葉に内部の語が残る（受信 (Incoming)／送信 (Outgoing)）」は古い。**
     //   `webhook-operator-words-contract.test.ts:13-14` が `Incoming)` `Outgoing)` を
@@ -3250,6 +3250,18 @@ const FEATURE_17_REVIEW = {
     verdictSource: 'mileage-v6/s6MBc.txt',
     verdictHead: '16e2331cb',
   },
+}
+
+// Issue #422（機能17/24/31/12）の再判定結果。
+const ISSUE_422_REVIEW = {
+  N46cQ: { verdict: 'needs_fix', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。9件の決めごと、30日実績、失効・取消の扱いを表示できた。並び順保存・公開版の中身を見る導線・利用対象条件が未実装のため要修正。', verdictSource: 'mileage-v6/N46cQ.txt', verdictHead: 'e98decafa' },
+  k8VCU: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で通常・読込中・0件・取得失敗を1440・1920pxで再撮影。** 全状態で横はみ出し0。状態を分け、未取得を0件に置き換えていない。並び順保存・対象条件・公開版導線は画面/API差が残るため構造一致・データ待ち。', verdictSource: 'mileage-v6/k8VCU.txt + k8VCU-error.txt', verdictHead: 'e98decafa' },
+  BmoGY: { verdict: 'needs_fix', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。有効期限、取消時の差し引き、倍率表、LINEプレビュー、タグ条件を確認した。15軸条件ビルダーと自動通知の送信口が無いため要修正。', verdictSource: 'mileage-v6/BmoGY.txt', verdictHead: 'e98decafa' },
+  p9CcEB: { verdict: 'unjudged', verdictNote: '**2026-09-07 Issue #422。** 1440・1920pxとも「画面を表示できませんでした」で撮影が止まり比較画像を取得できなかった。「撮影が固まる(/mileage/rewards/edit?id=mr-1)」として判定保留。', verdictSource: 'mileage-v6/p9CcEB.txt', verdictHead: 'e98decafa' },
+  Q55bb: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。編集欄、差し込み項目、ボタン、LINEプレビュー、公開版と下書きの分離を確認した。新しい通知定義・送信テストAPIが固定データに無いため構造一致・データ待ち。', verdictSource: 'line-notify-v6/Q55bb.txt', verdictHead: 'e98decafa' },
+  c4R6F: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。説明、必須表示、切替、並び替え、初期値復元、利用中/作成数を確認した。一部利用数が未取得のため構造一致・データ待ち。', verdictSource: 'settings-v6/c4R6F.txt', verdictHead: 'e98decafa' },
+  kQ1bs: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。STEP 2、条件、対象人数、優先順位、標準15軸・追加6軸、保存導線を確認した。重複人数と実配布人数は固定入力不足のため構造一致・データ待ち。', verdictSource: 'rich-menus-v6/kQ1bs.txt', verdictHead: 'e98decafa' },
+  GqFTV: { verdict: 'match', verdictNote: '**2026-09-07 Issue #422。** 1440px設計と1920px実装を同じ本文・状態で照合し、横はみ出し0。1920pxの設計PNGが無いため、画像は実装側の配置を確認したうえで本文一致としてmatchに更新した。', verdictSource: 'affiliates-v6/GqFTV.txt + GqFTV-1440.png + GqFTV-1920.png', verdictHead: 'e98decafa' },
 }
 
 /*
@@ -4319,6 +4331,7 @@ for (const screen of SCREENS) {
   }
   const review = FEATURE_17_REVIEW[screen.node]
   if (review) Object.assign(screen, review)
+  if (ISSUE_422_REVIEW[screen.node]) Object.assign(screen, ISSUE_422_REVIEW[screen.node])
   if (screen.feature === 18 && FEATURE_18_AUDIT[screen.node]) {
     Object.assign(screen, FEATURE_18_AUDIT[screen.node])
     delete screen.verdictHead
@@ -4439,10 +4452,12 @@ export const CAPTURED_AT = {
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
   ],
   16: [
+    { pr: 1191, head: 'e98decafa', on: '2026-09-07', screens: ['GqFTV'], note: 'Issue #422 / PR #1191。1920px設計PNGが無いため1440px設計と1920px実装を本文・配置で照合し、横はみ出し0のmatchへ更新した。' },
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['PouPn','GH8VL','n5VVTb','xqT1Z','GPWzq'],
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
   ],
   17: [
+    { pr: 1191, head: 'e98decafa', on: '2026-09-07', screens: ['N46cQ','k8VCU','BmoGY','p9CcEB'], note: 'Issue #422 / PR #1191。機能17の4画面を3102/8789で再撮影。p9CcEBは撮影が固まるため保留、残りは横はみ出し0で判定した。' },
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['s98Vfw','N46cQ','MvZm5','BmoGY','HIU5O','k8VCU','z3PB2'],
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
   ],
@@ -4479,6 +4494,7 @@ export const CAPTURED_AT = {
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
   ],
   24: [
+    { pr: 1191, head: 'e98decafa', on: '2026-09-07', screens: ['Q55bb'], note: 'Issue #422 / PR #1191。通知編集画面を3102/8789で1440・1920px撮影し、横はみ出し0。固定入力不足はデータ待ちとして記録した。' },
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['festr','X8JCA5','Se65i','DpxOK','N2gAza'],
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
   ],
@@ -4511,6 +4527,7 @@ export const CAPTURED_AT = {
     { pr: 1182, head: '04057fb9da53', on: '2026-09-07', screens: ['e3jz3','EOTS4','jwVlo','I3ZSrU'], note: 'Issue #405。#1175後の access/users・roles・audit/events 固定契約へ接続し、3101/8788で4画面を1440・1920px撮影。横はみ出し0、設計との差は各画面の判定注記へ記録した。' },
   ],
   31: [
+    { pr: 1191, head: 'e98decafa', on: '2026-09-07', screens: ['c4R6F'], note: 'Issue #422 / PR #1191。機能設定を3102/8789で1440・1920px再撮影。説明・切替・並び替え・利用数表示を確認し、未取得の利用数はデータ待ちで記録した。' },
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['c4R6F'],
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
   ],
@@ -4610,6 +4627,7 @@ export const CAPTURED_AT = {
       note: 'Issue #219。作成を正本の5段へ分け、対象13画面と状態別を3104/8791の1440・1920pxで撮影。全画像で横はみ出し0。一致2、構造一致・データ未接続5、要修正6。' },
   ],
   12: [
+    { pr: 1191, head: 'e98decafa', on: '2026-09-07', screens: ['kQ1bs'], note: 'Issue #422 / PR #1191。対象条件画面を3102/8789で1440・1920px再撮影し、横はみ出し0。条件軸・対象人数・優先順位を確認し、固定入力不足は構造一致・データ待ちで記録した。' },
     { pr: 1129, head: 'af74a0bbd', on: '2026-09-07', screens: ['GO8RQ', 'XtfO3', 'UMiJ9', 'TL7tp', 'szXsT'], note: 'Issue #367。統合済みの月間人数・外部メニュー面アクション・削除影響人数を画面へ接続し、3104/8791で1440・1920pxを撮影。全10枚で横はみ出し0。共有固定応答に残る不足を理由付きで5画面の判定へ記録した。' },
     { pr: 1007, head: 'f2be359e5', on: '2026-09-06', screens: ['GO8RQ', 'XtfO3', 'TL7tp', 'RW5Tb'], note: 'Issue #225。3102/8789で1440・1920と一覧4状態を撮影し、全画像で横スクロール0。要修正4枚を、一致1・構造一致／不足API待ち3へ更新した。' },
     { pr: 509, head: 'e148615c', on: '2026-08-29', screens: ['DIUbO', 'NXdDk'], note: '切替のつながり。既存の pages / areas から解析する。固定データに切替ボタンを足した' },
