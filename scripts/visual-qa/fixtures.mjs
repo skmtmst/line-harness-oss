@@ -2880,6 +2880,32 @@ export const SCENARIO_STATS = {
   })),
 }
 
+/** 機能5 V6の試算・開始記録。送信は行わず、契約で定めた数だけ返す。 */
+export const SCENARIO_SIMULATION = {
+  scenarioId: 'scenario-0', lineAccountId: 'visual-qa-account',
+  computedAt: '2026-09-07T00:00:00.000Z', sideEffects: false,
+  audience: { accountTotal: 428, matched: 124, alreadySubscribed: 8, newStartPlanned: 116, excluded: 304 },
+  steps: [428, 410, 382, 351].map((targetCount, index) => ({
+    id: `step-${index}`, stepOrder: index + 1,
+    scheduledAt: `2026-09-${7 + index}T11:00:00.000Z`, targetCount,
+    excludedCount: [0, 18, 46, 77][index],
+  })),
+}
+
+export const SCENARIO_RUNS = {
+  summary: { active: 116, paused: 0, completed: 312, delivering: 18 },
+  subscriptions: [
+    { id: 'scenario-sub-1', friendId: 'friend-1', friendName: '高橋 直人', status: 'active', currentStepOrder: 2, startedAt: '2026-09-05T01:00:00.000Z', nextDeliveryAt: '2026-09-06T11:00:00.000Z', updatedAt: '2026-09-05T01:00:00.000Z' },
+    { id: 'scenario-sub-2', friendId: 'friend-2', friendName: '前田 さくら', status: 'completed', currentStepOrder: 4, startedAt: '2026-08-28T01:00:00.000Z', nextDeliveryAt: null, updatedAt: '2026-09-04T11:00:00.000Z' },
+  ],
+  pagination: { total: 428, limit: 20, cursor: '', nextCursor: null },
+  testSends: [{ id: 'scenario-test-1', friendId: 'friend-1', friendName: '高橋 直人', sentAt: '2026-09-07T00:05:00.000Z', messageCount: 4 }],
+  quota: { limit: 5000, used: 1842, remaining: 3158, state: 'available', reason: null, asOf: '2026-09-07T00:00:00.000Z' },
+  concurrentBroadcasts: [{ id: 'broadcast-0', title: '8月キャンペーンのお知らせ', status: 'scheduled', scheduledAt: '2026-09-08T01:00:00.000Z' }],
+  scenarioClickTotal: 86,
+  steps: SCENARIO_STEPS.map((step, index) => ({ id: step.id, stepOrder: step.stepOrder, delivered: [428, 412, 386, 351][index], opened: { value: null, state: 'unavailable', reason: '開封計測は現在利用できません' }, clicked: { value: [42, 38, 31, 24][index], state: 'available', reason: null }, failed: { value: [2, 1, 1, 0][index], state: 'available', reason: null } })),
+}
+
 /**
  * 一斉配信の一覧。設計 `★ V6 6-1` `q76C35` の5行そのまま。
  *
@@ -5186,6 +5212,12 @@ export const EC_OVERVIEW = {
     { eventType: 'ec_payment.received', label: '入金', count: 32 },
     { eventType: 'ec_shipping.shipped', label: '発送', count: 20 },
   ],
+  monthlyStats: [
+    { month: '2026-06', count: 158, amount: 1248000 },
+    { month: '2026-07', count: 169, amount: 1324000 },
+    { month: '2026-08', count: 172, amount: 1482000 },
+  ],
+  impact: { nenCampaigns: 3, conversions: 18, mileageRules: 2, friendFields: 7, analytics: 5 },
 }
 
 /** 機能23。注文・個別処理・会員照合を実APIの読み取り模型で返す。 */
