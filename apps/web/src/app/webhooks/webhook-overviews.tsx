@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import type { IncomingWebhook, OutgoingWebhook, WebhookInteractionSummary } from '@line-crm/shared'
+import type { IncomingWebhook, WebhookInteractionSummary } from '@line-crm/shared'
+import { api, type IncomingWebhookDetail, type OutgoingWebhookOverview } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -14,7 +15,7 @@ import { ActionCell, DataTable, NameCell, Td, Th, TableHeadRow, Tr } from '@/com
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 type OutgoingFilter = 'all' | 'active' | 'paused' | 'failed'
-type OutgoingSort = 'recent' | 'name'
+type OutgoingSort = 'volume' | 'name'
 
 const PAGE_SIZE = 5
 
@@ -34,14 +35,14 @@ const PAYLOAD_LABEL: Record<string, string> = {
   '*': '選んだ出来事の項目',
 }
 
-function firstEventLabel(item: OutgoingWebhook): string {
+function firstEventLabel(item: OutgoingWebhookOverview): string {
   const first = item.eventTypes[0]
   if (!first) return 'まだ決めていません'
   const label = EVENT_LABEL[first] ?? first
   return item.eventTypes.length > 1 ? `${label} ほか${item.eventTypes.length - 1}件` : label
 }
 
-function payloadLabel(item: OutgoingWebhook): string {
+function payloadLabel(item: OutgoingWebhookOverview): string {
   const first = item.eventTypes[0]
   return first ? PAYLOAD_LABEL[first] ?? '選んだ出来事の項目' : 'まだ決めていません'
 }
@@ -65,11 +66,11 @@ function isHttpsUrl(value: string): boolean {
   }
 }
 
-function matchesOutgoing(item: OutgoingWebhook, filter: OutgoingFilter, query: string): boolean {
+function matchesOutgoing(item: OutgoingWebhookOverview, filter: OutgoingFilter, query: string): boolean {
   const matchesFilter = filter === 'all'
     || (filter === 'active' && item.isActive)
     || (filter === 'paused' && !item.isActive)
-    || (filter === 'failed' && (item.consecutiveFailures ?? 0) > 0)
+    || (filter === 'failed' && item.deliverySummary.failed > 0)
   const needle = query.trim().toLocaleLowerCase('ja-JP')
   if (!matchesFilter) return false
   if (!needle) return true
@@ -84,14 +85,14 @@ function OutgoingKpis({
   summary,
   summaryStatus,
 }: {
-  items: OutgoingWebhook[]
+  items: OutgoingWebhookOverview[]
   incomingCount: number
   summary: WebhookInteractionSummary | null
   summaryStatus: LoadStatus
 }) {
   const paused = items.filter((item) => !item.isActive).length
   const failedNames = items
-    .filter((item) => (item.consecutiveFailures ?? 0) > 0)
+    .filter((item) => item.deliverySummary.failed > 0)
     .map((item) => item.name.split('／')[0].trim())
     .join('、')
   const summaryLoading = summaryStatus === 'loading'
@@ -149,7 +150,7 @@ export function OutgoingOverview({
   onRotate,
   onDelete,
 }: {
-  items: OutgoingWebhook[]
+  items: OutgoingWebhookOverview[]
   status: LoadStatus
   showCreate: boolean
   summary: WebhookInteractionSummary | null
@@ -157,25 +158,25 @@ export function OutgoingOverview({
   incomingCount: number
   onReload: () => void
   onToggle: (id: string, active: boolean) => void
-  onRotate: (item: OutgoingWebhook) => void
-  onDelete: (item: OutgoingWebhook) => void
+  onRotate: (item: OutgoingWebhookOverview) => void
+  onDelete: (item: OutgoingWebhookOverview) => void
 }) {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<OutgoingFilter>('all')
-  const [sort, setSort] = useState<OutgoingSort>('recent')
+  const [sort, setSort] = useState<OutgoingSort>('volume')
   const [page, setPage] = useState(1)
 
   const filtered = useMemo(() => {
     const rows = items.filter((item) => matchesOutgoing(item, filter, query))
     return [...rows].sort((a, b) => sort === 'name'
       ? a.name.localeCompare(b.name, 'ja-JP')
-      : b.updatedAt.localeCompare(a.updatedAt))
+      : b.deliverySummary.total - a.deliverySummary.total)
   }, [filter, items, query, sort])
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const visible = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
   const activeCount = items.filter((item) => item.isActive).length + incomingCount
   const pausedCount = items.filter((item) => !item.isActive).length
-  const failedCount = items.filter((item) => (item.consecutiveFailures ?? 0) > 0).length
+  const failedCount = items.filter((item) => item.deliverySummary.failed > 0).length
 
   useEffect(() => {
     setPage(1)
@@ -219,7 +220,7 @@ export function OutgoingOverview({
           value={sort}
           onChange={(event) => setSort(event.target.value as OutgoingSort)}
           options={[
-            { value: 'recent', label: '更新が新しい順' },
+            { value: 'volume', label: '送った回数が多い順' },
             { value: 'name', label: '名前順' },
           ]}
         />
@@ -260,7 +261,8 @@ export function OutgoingOverview({
           </thead>
           <tbody>
             {visible.map((item) => {
-              const failed = (item.consecutiveFailures ?? 0) > 0
+              const failed = item.deliverySummary.lastResult?.status === 'failed'
+                || item.deliverySummary.failed > 0
               const canActivate = item.hasSecret && isHttpsUrl(item.url)
               return (
                 <Tr key={item.id}>
@@ -268,31 +270,47 @@ export function OutgoingOverview({
                   <Td>{firstEventLabel(item)}</Td>
                   <Td>{payloadLabel(item)}</Td>
                   <Td align="right">
-                    <span className="text-ink-faint">—</span>
-                    <span className="text-ink-faint block text-xs">接続別集計待ち</span>
+                    <span className="text-ink tabular-nums">
+                      {item.deliverySummary.total.toLocaleString('ja-JP')}回
+                    </span>
+                    {item.deliverySummary.pending > 0 ? (
+                      <span className="text-ink-faint block text-xs">
+                        送信中 {item.deliverySummary.pending.toLocaleString('ja-JP')}回
+                      </span>
+                    ) : null}
                   </Td>
                   <Td>
                     <StatusBadge tone={failed ? 'danger' : item.isActive ? 'success' : 'neutral'} size="compact">
                       {failed ? '返事がありません' : item.isActive ? 'うまくいっています' : '止めています'}
                     </StatusBadge>
-                    {failed && item.lastFailedAt ? (
+                    {failed && item.deliverySummary.lastResult?.completedAt ? (
                       <span className="text-ink-faint mt-1 block text-xs">
-                        最終 {new Date(item.lastFailedAt).toLocaleString('ja-JP')}
+                        最終 {new Date(item.deliverySummary.lastResult.completedAt).toLocaleString('ja-JP')}
                       </span>
                     ) : null}
                   </Td>
                   <ActionCell>
-                    <div className="flex flex-wrap justify-end gap-2">
-                      <Button
-                        variant="secondary"
-                        onClick={() => onToggle(item.id, item.isActive)}
-                        disabled={!item.isActive && !canActivate}
-                        title={!item.isActive && !canActivate ? 'URLと合言葉を確かめてください' : undefined}
-                      >
-                        {item.isActive ? '止める' : '動かす'}
+                    <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                      <Button variant="secondary" href="/webhooks?tab=interactions">
+                        {item.deliverySummary.canRetry ? '失敗をやり直す' : '中身を見る'}
                       </Button>
-                      <Button variant="secondary" onClick={() => onRotate(item)}>合言葉</Button>
-                      <Button variant="secondary" onClick={() => onDelete(item)}>削除</Button>
+                      <details className="relative">
+                        <summary className="border-hairline bg-canvas text-ink-secondary rounded-control cursor-pointer list-none border px-3 py-2 text-sm font-semibold">
+                          設定
+                        </summary>
+                        <div className="bg-canvas border-hairline rounded-card absolute right-0 z-10 mt-2 flex min-w-max gap-2 border p-2 shadow-lg">
+                          <Button
+                            variant="secondary"
+                            onClick={() => onToggle(item.id, item.isActive)}
+                            disabled={!item.isActive && !canActivate}
+                            title={!item.isActive && !canActivate ? 'URLと合言葉を確かめてください' : undefined}
+                          >
+                            {item.isActive ? '止める' : '動かす'}
+                          </Button>
+                          <Button variant="secondary" onClick={() => onRotate(item)}>合言葉</Button>
+                          <Button variant="secondary" onClick={() => onDelete(item)}>削除</Button>
+                        </div>
+                      </details>
                     </div>
                   </ActionCell>
                 </Tr>
@@ -316,6 +334,7 @@ export function IncomingOverview({
   items,
   status,
   showCreate,
+  lineAccountId,
   endpointUrl,
   onReload,
   onToggle,
@@ -325,6 +344,7 @@ export function IncomingOverview({
   items: IncomingWebhook[]
   status: LoadStatus
   showCreate: boolean
+  lineAccountId: string | null
   endpointUrl: (id: string) => string
   onReload: () => void
   onToggle: (id: string, active: boolean) => void
@@ -332,11 +352,39 @@ export function IncomingOverview({
   onDelete: (item: IncomingWebhook) => void
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [detail, setDetail] = useState<IncomingWebhookDetail | null>(null)
+  const [detailStatus, setDetailStatus] = useState<LoadStatus>('loading')
+  const [detailReloadKey, setDetailReloadKey] = useState(0)
   const selected = items.find((item) => item.id === selectedId) ?? items[0] ?? null
+  const selectedDetailId = selected?.id ?? null
 
   useEffect(() => {
     if (selectedId && !items.some((item) => item.id === selectedId)) setSelectedId(null)
   }, [items, selectedId])
+
+  useEffect(() => {
+    let cancelled = false
+    setDetail(null)
+    if (!selectedDetailId || !lineAccountId) {
+      setDetailStatus('ready')
+      return () => { cancelled = true }
+    }
+    setDetailStatus('loading')
+    void api.webhooks.incoming.detail(selectedDetailId, lineAccountId)
+      .then((response) => {
+        if (cancelled) return
+        if (!response.success) {
+          setDetailStatus('error')
+          return
+        }
+        setDetail(response.data)
+        setDetailStatus('ready')
+      })
+      .catch(() => {
+        if (!cancelled) setDetailStatus('error')
+      })
+    return () => { cancelled = true }
+  }, [detailReloadKey, lineAccountId, selectedDetailId])
 
   if (status === 'loading') {
     return <ListState kind="loading" title="こちらで受け取る設定を読み込んでいます" />
@@ -388,15 +436,27 @@ export function IncomingOverview({
             </div>
             <dl className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div>
-                <dt className="text-ink-faint text-xs">だれの出来事か</dt>
-                <dd className="text-ink mt-1 text-sm">照合方法のAPI待ち</dd>
+                <dt className="text-ink-faint text-xs">だれの出来事か（人の見分けかた）</dt>
+                <dd className="text-ink mt-1 text-sm">
+                  {detailStatus === 'loading'
+                    ? '読み込んでいます'
+                    : detailStatus === 'error'
+                      ? '確認できませんでした'
+                      : identityMatchingLabel(detail)}
+                </dd>
               </div>
               <div>
                 <dt className="text-ink-faint text-xs">見つからなかったとき</dt>
-                <dd className="text-ink mt-1 text-sm">設定のAPI待ち</dd>
+                <dd className="text-ink mt-1 text-sm">
+                  {detailStatus === 'loading'
+                    ? '読み込んでいます'
+                    : detailStatus === 'error'
+                      ? '確認できませんでした'
+                      : notFoundLabel(detail?.identityMatching.onNotFound)}
+                </dd>
               </div>
               <div>
-                <dt className="text-ink-faint text-xs">合言葉</dt>
+                <dt className="text-ink-faint text-xs">合言葉（相手にも同じものを入れてもらう）</dt>
                 <dd className="mt-1"><StatusBadge tone={selected.hasSecret ? 'success' : 'warning'} size="compact">{selected.hasSecret ? '設定済み（再表示しません）' : '未設定'}</StatusBadge></dd>
               </div>
             </dl>
@@ -411,19 +471,65 @@ export function IncomingOverview({
 
           <section className="bg-canvas border-hairline rounded-card border p-5">
             <h2 className="text-ink mb-3 text-lg font-bold">届いたらすること</h2>
-            <p className="text-ink-secondary text-sm leading-6">
-              この受け取り口に届いたあと動かす処理は、詳細APIがまだ無いため確かめられません。設定値が返るまでは、作り物のタグや配信を表示しません。
-            </p>
+            {detailStatus === 'loading' ? (
+              <p className="text-ink-secondary text-sm">保存されている処理を読み込んでいます。</p>
+            ) : detailStatus === 'error' ? (
+              <ListState
+                kind="error"
+                title="届いた後の処理を表示できませんでした"
+                description="設定は消えていません。詳細だけをもう一度読み込めます。"
+                action={<Button variant="secondary" onClick={() => setDetailReloadKey((key) => key + 1)}>詳細を再読み込み</Button>}
+              />
+            ) : detail && detail.actions.length > 0 ? (
+              <div className="space-y-3">
+                {detail.actions.map((action, index) => (
+                  <div key={`${action.refKind}-${index}`} className="bg-canvas-sunken rounded-control px-4 py-3">
+                    <strong className="text-ink block text-sm">{incomingActionLabel(action.refKind)}</strong>
+                    <span className="text-ink-secondary mt-1 block text-xs">保存済みの設定を使います</span>
+                  </div>
+                ))}
+                {detail.actionExecution.state === 'not_connected' ? (
+                  <p className="bg-warning-bg text-warning rounded-control px-4 py-3 text-sm leading-6">
+                    設定は保存されていますが、届いた後の処理はまだ実行されません。接続が完了するまで受信記録だけが残ります。
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-ink-secondary text-sm">届いた後に動かす処理は、まだ設定されていません。</p>
+            )}
           </section>
 
           <section className="bg-canvas border-hairline rounded-card border p-5">
             <h2 className="text-ink mb-2 text-lg font-bold">届いたデータの見かた</h2>
-            <p className="text-ink-secondary text-sm leading-6">
-              最近届いた本文を安全にマスクして返すAPIがまだありません。APIが接続されたら、ここに最新時刻・見本・差し込み項目を表示します。
-            </p>
-            <div className="bg-canvas-sunken text-ink-faint rounded-control mt-3 p-4 text-sm">
-              届いたデータの見本はまだ表示できません
-            </div>
+            {detailStatus === 'loading' ? (
+              <p className="text-ink-secondary text-sm">いちばん最近届いた見本を読み込んでいます。</p>
+            ) : detailStatus === 'error' ? (
+              <p className="text-ink-secondary text-sm">見本を表示できませんでした。上の「詳細を再読み込み」をお試しください。</p>
+            ) : detail?.latestSample ? (
+              <>
+                <p className="text-ink-secondary text-sm leading-6">
+                  いちばん最近届いたものです。値は安全のため隠しています。項目名を差し込みに使えます。
+                </p>
+                <p className="text-ink-faint mt-2 text-xs">
+                  {formatReceivedAt(detail.latestSample.receivedAt)} に届いたもの
+                </p>
+                <pre className="bg-ink text-canvas rounded-control mt-3 overflow-x-auto p-4 text-sm leading-6">{maskedSampleText(detail.latestSample.fields)}</pre>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {detail.templateFields.map((field) => (
+                    <code key={field.token} className="bg-accent-soft text-accent-deep rounded-control px-2 py-1 text-xs">
+                      {field.token}
+                    </code>
+                  ))}
+                </div>
+                {detail.latestSample.truncated ? (
+                  <p className="text-ink-faint mt-2 text-xs">項目が多いため、先頭50件まで表示しています。</p>
+                ) : null}
+              </>
+            ) : (
+              <div className="bg-canvas-sunken text-ink-faint rounded-control mt-3 p-4 text-sm">
+                まだ受け取ったデータはありません
+              </div>
+            )}
           </section>
 
           <section>
@@ -439,6 +545,7 @@ export function IncomingOverview({
                   >
                     <strong className="text-ink block text-sm">{item.name}</strong>
                     <span className="text-ink-faint mt-1 block text-xs">{sourceName(item.sourceType)}</span>
+                    <span className="text-ink-faint mt-1 block text-xs">{maskedEndpoint(endpointUrl(item.id))}</span>
                   </button>
                   <StatusBadge tone={item.isActive ? 'success' : 'neutral'} size="compact">
                     {item.isActive ? '動いています' : '止めています'}
@@ -469,6 +576,66 @@ export function IncomingOverview({
       </div>
     </section>
   )
+}
+
+function identityMatchingLabel(detail: IncomingWebhookDetail | null): string {
+  if (!detail || detail.identityMatching.methods.length === 0) return '照合しない'
+  return detail.identityMatching.methods.map((method) => ({
+    harness_friend_id: '友だちIDで探す',
+    external_customer_id: '外部サービスのお客様IDで探す',
+    verified_email: 'メールアドレスで探す',
+    verified_phone: '電話番号で探す',
+  })[method.kind]).join('、')
+}
+
+function notFoundLabel(value: IncomingWebhookDetail['identityMatching']['onNotFound'] | undefined): string {
+  return ({
+    do_nothing: '何もしない',
+    unmatched_box: '未照合として確認する',
+    create_candidate: '友だち候補を作る',
+  } as const)[value ?? 'do_nothing']
+}
+
+function incomingActionLabel(kind: string): string {
+  return ({
+    common_action: '共通アクションを動かす',
+    tag: 'タグを付ける',
+    friend_field: '友だち情報を更新する',
+    support_mark: '対応マークを付ける',
+    template: 'テンプレートを送る',
+    scenario: 'シナリオを開始する',
+    reminder: 'リマインダを開始する',
+    conversion: '成果を記録する',
+    mileage_rule: 'マイルを付ける',
+    score_rule: 'スコアを更新する',
+    outgoing_webhook: '別のサービスへ知らせる',
+    operator_notification: '担当者へ知らせる',
+  } as Record<string, string>)[kind] ?? '保存済みの処理を動かす'
+}
+
+function formatReceivedAt(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '受信時刻不明'
+  return date.toLocaleString('ja-JP', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function maskedSampleText(fields: NonNullable<IncomingWebhookDetail['latestSample']>['fields']): string {
+  const rows = fields.map((field) => {
+    const name = field.path.replace(/^\$\.?/, '') || '$'
+    return `  "${name}": "${field.maskedValue}"`
+  })
+  return `{\n${rows.join(',\n')}\n}`
+}
+
+function maskedEndpoint(value: string): string {
+  const parts = value.split('/')
+  const id = parts.pop() ?? ''
+  return `${parts.join('/')}/${id.slice(0, 4)}•••`
 }
 
 function sourceName(value: string): string {
