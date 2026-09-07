@@ -193,6 +193,18 @@ describe('filterVisibleLineAccounts', () => {
       canSeeUnassigned: true,
     });
   });
+
+  it('機能オフ middleware の一時範囲を通常のtenant・担当範囲へ重ねる', async () => {
+    const featureScoped = {
+      ...staff(),
+      featureEnabledLineAccountIds: ['child', 'tenant-b-account'],
+    };
+    await expect(getVisibleLineAccountScope({} as D1Database, featureScoped)).resolves.toMatchObject({
+      allowedAccountIds: ['child'],
+      ids: ['child'],
+      canSeeUnassigned: false,
+    });
+  });
 });
 
 describe('validateAccountHierarchy', () => {

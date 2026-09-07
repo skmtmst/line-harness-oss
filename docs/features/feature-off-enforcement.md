@@ -42,7 +42,7 @@ type FeatureRouteMetadata = {
 
 共通 middleware は認証と tenant scope の後、各 route handler の前に一度だけ動く。対象 LINE アカウントは metadata の resolver で決める。query/body は `account_id`、`accountId`、`line_account_id`、`lineAccountId` を同じ規則で読む。resource は URL の ID から所有アカウントを DB で引く。管理 API で必要なアカウントを一意に決められない時は、既定アカウントへ寄せず `400 LINE_ACCOUNT_REQUIRED` とする。
 
-`staff-scope` は複数アカウントを一覧する API に限る。見えるアカウントごとに機能判定し、オフのアカウントのデータを結果から除外する。全対象がオフなら 403 とする。公開経路は認証済み管理 API と同じ middleware を通さず、公開 token または resource から所有アカウントを解決した後、同じ有効判定関数を使う。
+`staff-scope` は複数アカウントを一覧する API に限る。見えるアカウントごとに機能判定し、オフのアカウントのデータを結果から除外し、`meta.featureDisabledAccounts` に除外件数を返す。全対象がオフなら 403 とする。公開経路は認証済み管理 API と同じ middleware を通さず、公開 token または resource から所有アカウントを解決した後、同じ有効判定関数を使う。
 
 ## 4. オフ時の応答契約
 
@@ -73,7 +73,7 @@ job 全体が複数アカウントを走査する場合、サービスへ「有�
 
 CI の契約テストで、実際に mount された `app.routes` と `FEATURE_ROUTE_MANIFEST` を method＋正規化 path で突き合わせる。未分類、存在しない宣言、重複宣言、未知の `featureId` を一件でも検出したら失敗する。dispatcher/cron の実行一覧も `FEATURE_JOB_MANIFEST` と同じ検査を行う。
 
-実行時に管理 API の分類が見つからない場合は fail closed とし、handler を動かさず `500 ROUTE_FEATURE_UNCLASSIFIED` を返して構造化エラーを記録する。`OPTIONS` と not-found は共通基盤として明示的に除外する。
+実行時に管理 API の分類が見つからない場合は fail closed とし、handler を動かさず `500 ROUTE_FEATURE_UNCLASSIFIED` を返して構造化エラーを記録する。ただし有効化順は、manifest 完成 → 実際に mount された全 route との CI 照合合格 → runtime fail-closed の順とし、同じ PR の途中状態で既存 API を止めない。`OPTIONS` と not-found は共通基盤として明示的に除外する。
 
 ## 7. 完了条件と導入順
 
