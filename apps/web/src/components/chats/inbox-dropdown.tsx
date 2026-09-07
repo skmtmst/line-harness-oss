@@ -118,6 +118,7 @@ export function OperatorDropdown({
   label = '担当者',
   ariaLabel = '担当者を選ぶ',
   allowAll = true,
+  compact = false,
   unreadOf,
   unreadUnavailable = false,
 }: {
@@ -129,6 +130,8 @@ export function OperatorDropdown({
   ariaLabel?: string
   /** 一覧の絞り込みでは true。担当者を変更するときは「すべて」を選べないので false。 */
   allowAll?: boolean
+  /** 顧客情報欄を開いた狭い中央列では、名前を省いて操作列を1行に保つ。 */
+  compact?: boolean
   /**
    * 行に添える未読数。**渡さなければ数を出さない**（担当を変える口など、
    * 未読数が要らない場面で使うため）。
@@ -156,10 +159,14 @@ export function OperatorDropdown({
         aria-label={ariaLabel}
         aria-expanded={open}
         onClick={() => setOpen((now) => !now)}
-        className={`border-hairline rounded-control bg-canvas text-ink flex w-full items-center gap-1.5 border px-2.5 py-1.5 text-xs ${open ? 'border-accent' : ''}`}
+        className={`border-hairline rounded-control bg-canvas text-ink flex h-10 w-full items-center gap-1.5 whitespace-nowrap border px-2.5 text-xs ${open ? 'border-accent' : ''}`}
       >
-        <span className="text-ink-faint">{label}：</span>
-        <span className="truncate font-medium">{current?.name ?? (allowAll ? 'すべて' : '未割り当て')}</span>
+        {compact && current && current.id !== 'all'
+          ? <OperatorMark option={current} />
+          : <span className="text-ink-faint">{label}：</span>}
+        <span className="truncate font-medium">
+          {compact ? label : current?.name ?? (allowAll ? 'すべて' : '未割り当て')}
+        </span>
         <span className="text-ink-faint ml-auto"><Chevron open={open} /></span>
       </button>
       {open ? (
@@ -260,7 +267,7 @@ export function StatusDropdown({
         aria-label={ariaLabel}
         aria-expanded={open}
         onClick={() => setOpen((now) => !now)}
-        className={`border-hairline rounded-control bg-canvas flex items-center gap-1.5 border px-2.5 py-1.5 text-xs ${open ? 'border-accent' : ''}`}
+        className={`border-hairline rounded-control bg-canvas flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap border px-2.5 text-xs ${open ? 'border-accent' : ''}`}
       >
         <span className={`h-2 w-2 rounded-full ${current.dot}`} aria-hidden="true" />
         <span className="font-medium">{current.label}</span>

@@ -15,7 +15,6 @@ import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useAccount } from '@/contexts/account-context'
 import TemplatePicker from '@/components/chats/template-picker'
-import InboxKpis from '@/components/chats/inbox-kpis'
 import FlexPreviewComponent from '@/components/flex-preview'
 import FriendInfoSidebar from '@/components/chats/friend-info-sidebar'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
@@ -410,12 +409,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [quickFilter, setQuickFilter] = useState<'all' | 'reply' | 'overdue'>('all')
   const [assigneeFilter, setAssigneeFilter] = useState('all')
-  /*
-    設計 `f0zn6` の「自分の未読」。`isUnread` は
-    **ログイン中の担当者だけの未読**で、対応状況とは別の値。
-    札の数は「いま一覧に出ている自分の未読」で、新しい口は要らない。
-  */
-  const [mineUnreadOnly, setMineUnreadOnly] = useState(false)
   const [filterOpen, setFilterOpen] = useState(false)
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
   const [unreadOnly, setUnreadOnly] = useState(false)
@@ -1206,13 +1199,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       visibleMailItems.filter((item) => item.status === 'unread' && isOlderThanOneHour(item.lastIncomingAt)).length
       + visibleLineItems.filter((chat) => chat.status === 'unread' && isOlderThanOneHour(chat.lastMessageAt)).length,
   }
-  /*
-    設計 `f0zn6` の札の数。**いま一覧に持っている行の中の自分の未読**で、
-    総数ではない。全体の数を出す口はまだ無い。
-  */
-  const mineUnreadCount =
-    visibleMailItems.filter((item) => item.isUnread).length
-    + visibleLineItems.filter((chat) => chat.isUnread).length
   const activeFriendId = selectedFriendId
     ?? (chatDetail?.id === selectedChatId ? chatDetail.friendId : null)
     ?? chats.find((chat) => chat.id === selectedChatId)?.friendId
@@ -1373,6 +1359,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             </div>
           )}
         </div>
+        <Link
+          href="/tags?tab=marks"
+          className="border-hairline text-action inline-flex h-10 shrink-0 items-center gap-2 rounded-control border bg-canvas px-3 text-xs font-semibold hover:bg-canvas-sunken"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M9 4v6M15 14v6" /></svg>
+          対応ルール
+        </Link>
         <SavedViewDialog
           open={saveDialogOpen}
           initialValue={{
@@ -1415,7 +1408,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
       <div
         data-design="Panes"
-        className="border-[#E5E7EB] bg-canvas shadow-[1px_1px_2px_rgba(29,29,31,0.13)] relative flex h-[calc(100vh-282px)] min-h-[560px] overflow-hidden rounded-[10px] border"
+        className="border-[#E5E7EB] bg-canvas shadow-[1px_1px_2px_rgba(29,29,31,0.13)] relative flex h-[calc(100vh-196px)] min-h-[560px] overflow-hidden rounded-[10px] border"
       >
         {/* Left Panel: Chat List */}
         {/* 設計 `ListPane` 360px。 */}
@@ -1424,7 +1417,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             メールを開いても一覧が残って中央が半分のままだった。 */}
         <div
           data-inbox-v4="conversation-list"
-          className={`w-full border-[#E5E7EB] bg-canvas lg:w-[330px] 2xl:w-[420px] lg:flex-shrink-0 border-r flex-col overflow-hidden ${selectedChatId || selectedThreadId ? 'hidden lg:flex' : 'flex'}`}
+          className={`w-full border-[#E5E7EB] bg-canvas lg:flex-shrink-0 border-r flex-col overflow-hidden ${showFriendInfo ? 'lg:w-[300px] 2xl:w-[360px]' : 'lg:w-[330px] 2xl:w-[420px]'} ${selectedChatId || selectedThreadId ? 'hidden lg:flex' : 'flex'}`}
         >
           {/* タブ (すべて / 未読 / 対応中 / 対応済み) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
 
@@ -1460,7 +1453,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 />
               </span>
             </label>
-            <div className="mt-2 flex items-center gap-1">
+            <div className="mt-2 flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden">
               {CHANNELS.map((item) => (
                 <button
                   key={item.key}
@@ -1477,25 +1470,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 </button>
               ))}
               <SelectField aria-label="並び順" defaultValue="newest" options={[{ value: "newest", label: "新しい順" }]} className="ml-auto shrink-0 rounded-lg border border-[#E5E7EB] bg-canvas px-1.5 py-1 text-[11px] font-semibold whitespace-nowrap text-[#2563EB] outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/15" />
-              {/*
-                設計 `f0zn6` の「自分の未読」。担当ではなく**自分が読んだか**で
-                絞る。対応状況の絞り込み（下の帯）とは別の物差しなので、
-                同じ帯には混ぜない。
-              */}
-              <button
-                type="button"
-                data-inbox-v6="mine-unread-toggle"
-                onClick={() => setMineUnreadOnly((current) => !current)}
-                aria-pressed={mineUnreadOnly}
-                className={`inline-flex shrink-0 items-center gap-1 rounded-pill px-2 py-1 text-[11px] font-semibold whitespace-nowrap ${
-                  mineUnreadOnly ? 'bg-status-danger-soft text-danger' : 'text-ink-secondary hover:bg-canvas-sunken'
-                }`}
-              >
-                <span className="bg-status-danger text-on-accent text-nano inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 font-bold">
-                  {mineUnreadCount}
-                </span>
-                自分の未読
-              </button>
             </div>
           </div>
 
@@ -1562,7 +1536,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           .filter(Boolean)
                           .some((value) => String(value).toLowerCase().includes(nameQuery.trim().toLowerCase())),
                   )
-                  .filter((item) => (mineUnreadOnly ? item.isUnread : true))
                   .filter((item) => statusFilter === 'all' || item.status === statusFilter)
                   .filter((item) => assigneeFilter === 'all'
                     || (assigneeFilter === 'unassigned' ? !item.assignedStaffId : item.assignedStaffId === assigneeFilter))
@@ -1641,7 +1614,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           .filter(Boolean)
                           .some((value) => String(value).toLowerCase().includes(nameQuery.trim().toLowerCase())),
                   )
-                  .filter((chat) => (mineUnreadOnly ? chat.isUnread : true))
                   .filter((chat) => {
                     if (assigneeFilter !== 'all') {
                       if (assigneeFilter === 'unassigned' ? Boolean(chat.operatorId) : chat.operatorId !== assigneeFilter) return false
@@ -1780,7 +1752,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         {/* Right Panel: Chat Detail */}
         <div
           data-inbox-v4="talk-pane"
-          className={`min-w-0 flex-1 bg-canvas flex-col overflow-hidden ${showFriendInfo ? 'border-r border-[#E5E7EB]' : ''} ${selectedChatId || selectedFriendId || selectedThreadId ? 'flex' : 'hidden lg:flex'}`}
+          className={`min-w-0 flex-1 bg-canvas flex-col overflow-hidden ${showFriendInfo ? 'xl:min-w-[560px] border-r border-[#E5E7EB]' : ''} ${selectedChatId || selectedFriendId || selectedThreadId ? 'flex' : 'hidden lg:flex'}`}
         >
           {selectedThreadId ? (
             /* メールの往復。LINEのトークと同じ場所に出す。 */
@@ -1852,14 +1824,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   同じ場所に置く。
                 */}
                 {/* 右へ寄せる。名前は左、操作は右。目で追う向きがそろう。 */}
-                <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+                <div className="ml-auto flex flex-nowrap items-center justify-end gap-2">
                   <button
                     type="button"
                     aria-label={chatDetail.isAttention ? '注目から外す' : '注目にする'}
                     aria-pressed={chatDetail.isAttention}
                     disabled={attentionSaving}
                     onClick={() => void handleAttentionUpdate()}
-                    className={`flex h-9 w-9 items-center justify-center rounded-control border disabled:cursor-wait disabled:opacity-60 ${chatDetail.isAttention ? 'border-warning bg-warning-bg text-warning' : 'border-hairline bg-canvas text-ink-faint hover:bg-canvas-sunken'}`}
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-control border disabled:cursor-wait disabled:opacity-60 ${chatDetail.isAttention ? 'border-warning bg-warning-bg text-warning' : 'border-hairline bg-canvas text-ink-faint hover:bg-canvas-sunken'}`}
                   >
                     <Star aria-hidden="true" size={17} fill={chatDetail.isAttention ? 'currentColor' : 'none'} />
                   </button>
@@ -1884,6 +1856,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     label="担当"
                     ariaLabel="担当者を変える"
                     allowAll={false}
+                    compact={showFriendInfo}
                   />
                   <StatusDropdown
                     value={chatDetail.status as ChatStatus}
@@ -1900,7 +1873,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     data-inbox-v6="customer-info-toggle"
                     onClick={() => setShowFriendInfo((current) => !current)}
                     aria-expanded={showFriendInfo}
-                    className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-control border border-[#E5E7EB] bg-canvas px-2.5 py-1.5 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
+                    className="inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border border-[#E5E7EB] bg-canvas px-2.5 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
                   >
                     {showFriendInfo
                       ? <PanelRightClose aria-hidden="true" size={14} />
@@ -2059,9 +2032,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               {/*
                 入力欄（設計 `Reply`）。3段。
 
-                  上: テンプレートを選択 …… Shift + Enter で改行
+                  上: テンプレート・送信設定・内部メモ
                   中: メッセージを入力
-                  下: 画像は JPEG / PNG、1枚 10MB まで …… 送信
+                  下: 改行案内、画像は JPEG / PNG、1枚 10MB まで …… 送信
 
                 以前は送信キーの設定・入力中ローディング・画像の投入枠が
                 すべて出しっぱなしで、入力欄が縦に伸びてトークが読めなかった。
@@ -2069,20 +2042,20 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               */}
               <div data-inbox-v4="composer" className="sticky bottom-0 z-10 border-t border-[#E5E7EB] bg-canvas px-4 py-3 relative">
                 {/* 上段 */}
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
+                <div className="mb-2 flex items-center gap-2">
+                  <div className="flex min-w-0 flex-nowrap items-center gap-2">
                     {/* 設計 2-1-1。選ぶと本文が入力欄に入る。 */}
                     <button
                       type="button"
                       onClick={() => setShowTemplatePicker(true)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
+                      className="inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-canvas px-3 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
                     >
                       ▧ テンプレートを選択
                     </button>
                     <button
                       type="button"
                       onClick={() => setShowComposerOptions((v) => !v)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
+                      className="inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-canvas px-3 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
                     >
                       ⚙ {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
                     </button>
@@ -2096,7 +2069,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       data-inbox-v6="internal-memo-toggle"
                       onClick={() => setShowMemoEditor((current) => !current)}
                       aria-expanded={showMemoEditor}
-                      className={`inline-flex items-center gap-1.5 rounded-control border px-3 py-2 text-xs font-semibold ${
+                      className={`inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border px-3 text-xs font-semibold ${
                         showMemoEditor
                           ? 'border-status-warn bg-status-warn-soft text-status-warn-deep'
                           : 'border-[#E5E7EB] bg-canvas text-[#344054] hover:bg-[#F7F8F6]'
@@ -2106,9 +2079,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       内部メモ
                     </button>
                   </div>
-                  <span className="text-ink-faint text-xs">
-                    {sendMode === 'enter' ? 'Shift + Enter で改行' : 'Enter で改行'}
-                  </span>
                 </div>
 
                 {/* 送信の設定は送信キーだけ。入力中ローディングと画像の投入枠は
@@ -2217,6 +2187,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   aria-label="メッセージを入力"
                   className="w-full resize-none border-0 px-1 py-1 text-sm outline-none"
                   />
+
+                  <p className="text-ink-faint mt-1 text-right text-xs">
+                    {sendMode === 'enter' ? 'Shift + Enter で改行' : 'Enter で改行'}
+                  </p>
 
                   {/* 下段 */}
                   <div className="mt-1 flex items-center justify-between gap-2">
@@ -2442,10 +2416,6 @@ function ChatsPageHost() {
 
   return (
     <div className="space-y-3">
-      <div data-design="KPIs" data-inbox-v4="summary">
-        <InboxKpis />
-      </div>
-
       {/*
         1つの受信箱。LINEもメールも同じ一覧に並び、同じ場所で開く。
 
