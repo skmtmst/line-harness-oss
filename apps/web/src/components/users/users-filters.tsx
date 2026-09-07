@@ -29,9 +29,9 @@ export default function UsersFilters({
         value={q}
         onChange={(e) => onChange({ q: e.target.value })}
         placeholder="名前・X・メール・電話・UIDで検索"
-        className="h-9 min-w-0 flex-1 rounded-control border border-hairline bg-canvas px-3 text-sm text-ink outline-none focus:border-accent"
+        className="h-10 min-w-0 flex-1 rounded-control border border-hairline bg-canvas px-3 text-sm text-ink outline-none focus:border-accent"
       />
-      <label className="flex h-9 items-center gap-2 whitespace-nowrap rounded-control border border-hairline bg-canvas px-3 text-sm text-ink-secondary">
+      <label className="flex h-10 items-center gap-2 whitespace-nowrap rounded-control border border-hairline bg-canvas px-3 text-sm text-ink-secondary">
         <input
           type="checkbox"
           checked={onlyDups}
@@ -42,7 +42,7 @@ export default function UsersFilters({
       <select
         value={uid}
         onChange={(e) => onChange({ uid: e.target.value })}
-        className="h-9 w-36 rounded-control border border-hairline bg-canvas px-3 text-sm text-ink"
+        className="v6-select h-10 min-w-44 rounded-control border border-hairline bg-canvas pl-3 text-sm text-ink"
       >
         <option value="">UID：すべて</option>
         <option value="linked">UID：連携済み</option>
@@ -51,7 +51,7 @@ export default function UsersFilters({
       <select
         value={account}
         onChange={(e) => onChange({ account: e.target.value })}
-        className="h-9 w-36 rounded-control border border-hairline bg-canvas px-3 text-sm text-ink"
+        className="v6-select h-10 min-w-44 rounded-control border border-hairline bg-canvas pl-3 text-sm text-ink"
       >
         <option value="">所属：すべて</option>
         {accountOptions.map((a) => (
