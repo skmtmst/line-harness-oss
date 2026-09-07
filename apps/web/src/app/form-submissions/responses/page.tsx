@@ -12,6 +12,7 @@ import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { fetchApi } from '@/lib/api'
+import { csvCell } from '@/lib/presentation'
 import {
   completedDestinationWrites,
   destinationWriteText,
@@ -60,12 +61,6 @@ function normalizedSubmission(item: Submission): Submission {
   } catch {
     return { ...item, data: {} }
   }
-}
-
-function csvCell(value: unknown): string {
-  let text = valueText(value)
-  if (/^[=+\-@]/.test(text)) text = `'${text}`
-  return `"${text.replaceAll('"', '""')}"`
 }
 
 function saveCsv(filename: string, rows: Submission[], fieldKeys: string[], labels: Record<string, string>) {

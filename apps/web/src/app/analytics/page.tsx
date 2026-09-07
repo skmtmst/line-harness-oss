@@ -18,7 +18,7 @@ import {
   type SavedAnalyticsSnapshot,
   type SavedAnalyticsSummary,
 } from '@/lib/api'
-import KpiCard from '@/components/dashboard/kpi-card'
+import KpiCard from '@/components/shared/kpi-card'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
 import type { ButtonProps } from '@/components/shared/button'
@@ -26,6 +26,7 @@ import Breadcrumb from '@/components/shared/breadcrumb'
 import Chip, { type ChipTone } from '@/components/shared/chip'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
+import { csvCell } from '@/lib/presentation'
 import { formatAnalyticsDateTime } from './analytics-time'
 import { canTidyUsage, summarizeMenuFeatures, usageObservation } from './analytics-usage'
 
@@ -39,11 +40,6 @@ const TABS = [
   { key: 'url-clicks', label: 'URLクリック' },
   { key: 'saved', label: '保存した分析' },
 ]
-
-function csvCell(value: string | number | null | undefined): string {
-  if (value === null || value === undefined) return ''
-  return `"${String(value).replaceAll('"', '""')}"`
-}
 
 function downloadCsv(filename: string, rows: Array<Array<string | number | null | undefined>>) {
   const csv = rows.map((row) => row.map(csvCell).join(',')).join('\n')

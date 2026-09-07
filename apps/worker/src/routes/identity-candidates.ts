@@ -157,8 +157,13 @@ identityCandidates.get('/api/identity-candidates', requireRole('owner', 'admin',
       return c.json({ success: false, error: 'この候補を表示する権限がありません', code: 'FORBIDDEN' }, 403);
     }
     const scope = await getVisibleLineAccountScope(c.env.DB, getStaff(c));
+    const requestedAccountId = c.req.query('lineAccountId')?.trim() || null;
+    if (requestedAccountId && !scope.allowedAccountIds.includes(requestedAccountId)) {
+      return c.json({ success: false, error: '候補が見つかりません', code: 'CANDIDATE_NOT_FOUND' }, 404);
+    }
     const data = await listIdentityCandidates(c.env.DB, {
-      tenantId: tenantId(c), kind, status, allowedAccountIds: scope.allowedAccountIds,
+      tenantId: tenantId(c), kind, status,
+      allowedAccountIds: requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
       limit: Math.max(1, positiveInt(c.req.query('limit'), 20, 100)),
       offset: positiveInt(c.req.query('offset'), 0, 100_000),
     });
