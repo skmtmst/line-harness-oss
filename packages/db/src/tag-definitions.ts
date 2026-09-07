@@ -552,3 +552,62 @@ export async function getScopedTagDeleteImpact(
     revision: `tag:${detail.tag.id}:v${detail.tag.version}:${detail.tag.updated_at ?? detail.tag.created_at}`,
   };
 }
+
+export class TagArchiveError extends Error {
+  constructor(public readonly code: 'not_found' | 'version_conflict' | 'impact_changed' | 'replacement_not_found') {
+    super(code);
+  }
+}
+
+/** 履歴と現在の付与を残したまま、新規利用だけを止める。 */
+export async function archiveTag(
+  db: D1Database,
+  input: {
+    tagId: string;
+    lineAccountId: string;
+    expectedVersion: number;
+    impactRevision: string;
+    replacementTagId?: string | null;
+    actorId?: string | null;
+  },
+): Promise<{ archived: true; replacedFriendCount: number }> {
+  const tag = await db.prepare(
+    `SELECT * FROM tags WHERE id = ? AND line_account_id = ?`,
+  ).bind(input.tagId, input.lineAccountId).first<Tag>();
+  if (!tag) throw new TagArchiveError('not_found');
+  if (Number(tag.version) !== input.expectedVersion) throw new TagArchiveError('version_conflict');
+  const impact = await getScopedTagDeleteImpact(db, input.tagId, input.lineAccountId);
+  if (!impact) throw new TagArchiveError('not_found');
+  if (impact.revision !== input.impactRevision) throw new TagArchiveError('impact_changed');
+  if (input.replacementTagId) {
+    const replacement = await db.prepare(
+      `SELECT id FROM tags WHERE id = ? AND line_account_id = ? AND status = 'active'`,
+    ).bind(input.replacementTagId, input.lineAccountId).first<{ id: string }>();
+    if (!replacement || replacement.id === input.tagId) throw new TagArchiveError('replacement_not_found');
+  }
+  const now = jstNow();
+  const statements: D1PreparedStatement[] = [];
+  if (input.replacementTagId) {
+    statements.push(db.prepare(
+      `INSERT OR IGNORE INTO friend_tags (friend_id, tag_id, assigned_at)
+       SELECT friend_id, ?, ? FROM friend_tags WHERE tag_id = ?`,
+    ).bind(input.replacementTagId, now, input.tagId));
+    statements.push(db.prepare(`DELETE FROM friend_tags WHERE tag_id = ?`).bind(input.tagId));
+  }
+  statements.push(db.prepare(
+    `UPDATE tags SET status = 'archived', version = version + 1,
+       updated_by = ?, updated_at = ?
+     WHERE id = ? AND line_account_id = ? AND version = ?`,
+  ).bind(input.actorId ?? null, now, input.tagId, input.lineAccountId, input.expectedVersion));
+  statements.push(db.prepare(
+    `INSERT INTO operation_audit
+       (id, target_kind, target_id, action, actor_id, detail_json, created_at)
+     VALUES (?, 'tag', ?, 'archived', ?, ?, ?)`,
+  ).bind(crypto.randomUUID(), input.tagId, input.actorId ?? null, JSON.stringify({
+    replacementTagId: input.replacementTagId ?? null,
+    friendCount: impact.friendCount,
+    historyPreserved: true,
+  }), now));
+  await db.batch(statements);
+  return { archived: true, replacedFriendCount: input.replacementTagId ? impact.friendCount : 0 };
+}

@@ -71,6 +71,7 @@ function ReservedBroadcastContent() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [broadcast, setBroadcast] = useState<ApiBroadcast | null>(null)
   const [estimate, setEstimate] = useState<AudienceEstimate | null>(null)
+  const [notificationText, setNotificationText] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   /*
@@ -114,6 +115,14 @@ function ReservedBroadcastContent() {
       }
 
       setBroadcast(result.data)
+      if (result.data.lineAccountId) {
+        try {
+          const notifications = await api.broadcasts.notificationSettings(result.data.lineAccountId)
+          if (isCurrent() && notifications.success) setNotificationText(notifications.data.displayText)
+        } catch {
+          if (isCurrent()) setNotificationText('')
+        }
+      }
       // 完了した予約の取得と、現在人数の再集計は別の結果として扱う。
       // 人数だけ取れないときに予約そのものまで「表示できない」に戻さない。
       try {
@@ -277,7 +286,7 @@ function ReservedBroadcastContent() {
           </dl>
 
           <NoteBar className="mx-auto mt-4 max-w-3xl">
-            配信対象は送信開始直前に再集計します。現在の見込みは、友だちやタグの変化で予約時刻までに増減します。
+            {notificationText || '配信対象は送信開始直前に再集計します。現在の見込みは、友だちやタグの変化で予約時刻までに増減します。'}
           </NoteBar>
 
           <div className="mt-4 flex flex-wrap justify-center gap-2">

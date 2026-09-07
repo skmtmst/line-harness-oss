@@ -70,6 +70,9 @@ export type AuditAction =
   | 'photo.original.issue'
   | 'photo.original.download'
   | 'webinar.archive'
+  | 'webinar.publish'
+  | 'webinar.pause'
+  | 'webinar.duplicate'
   | 'webinar.participant.export';
 
 function commonAuditWriter(): typeof recordAuditEvent | null {

@@ -42,6 +42,8 @@ export interface AutoReplyDraft {
   priority?: number
   /** 対象にするメッセージ種別。null / 空で全部 */
   messageKinds?: string[] | null
+  /** このルールを評価する受信経路。既存データはLINE。 */
+  receiveSources?: Array<'line' | 'email'>
   /** 151: 応答したときに順に実行すること。 */
   actions?: unknown[] | null
   /** 151: 応答する曜日（0=日 … 6=土）。null / 空で曜日を問わない。 */
@@ -100,6 +102,7 @@ export function toDraft(rule: {
   skipWhenOperatorActive?: boolean
   priority: number
   messageKinds?: string[] | null
+  receiveSources?: Array<'line' | 'email'>
   actions?: unknown[] | null
   responseWeekdays?: number[] | null
   responseHolidayRule?: string | null
@@ -130,6 +133,7 @@ export function toDraft(rule: {
     skipWhenOperatorActive: rule.skipWhenOperatorActive ?? false,
     priority: rule.priority,
     messageKinds: rule.messageKinds ?? null,
+    receiveSources: rule.receiveSources ?? ['line'],
     actions: rule.actions ?? null,
     responseWeekdays: rule.responseWeekdays ?? null,
     responseHolidayRule: rule.responseHolidayRule ?? null,
@@ -232,6 +236,9 @@ export default function EditDialog({
   )
   const [priority, setPriority] = useState(String(draft.priority ?? 0))
   const [messageKinds, setMessageKinds] = useState<string[]>(draft.messageKinds ?? [])
+  const [receiveSources, setReceiveSources] = useState<Array<'line' | 'email'>>(
+    draft.receiveSources?.length ? draft.receiveSources : ['line'],
+  )
   const [keywordRules, setKeywordRules] = useState<KeywordRuleDraft[]>(() =>
     readKeywordRules(draft),
   )
@@ -319,6 +326,7 @@ export default function EditDialog({
         skipWhenOperatorActive: boolean;
         priority: number;
         messageKinds: string[] | null;
+        receiveSources: Array<'line' | 'email'>;
         actions: unknown[] | null;
         responseWeekdays: number[] | null;
         responseHolidayRule: string | null;
@@ -354,6 +362,7 @@ export default function EditDialog({
           messageKinds.length === 0 || messageKinds.length === MESSAGE_KIND_LABELS.length
             ? null
             : messageKinds,
+        receiveSources,
         actions: actions.length > 0 ? actions.map(toActionPayload) : null,
         // 全部の曜日を選ぶことと、1つも選ばないことは同じ意味。null に寄せる。
         responseWeekdays: weekdays.length === 0 || weekdays.length === 7 ? null : weekdays,
@@ -878,6 +887,30 @@ export default function EditDialog({
                 すべて選んだ状態と、1つも選ばない状態は同じ意味です（種別で絞りません）。
               </p>
             </div>}
+
+            {page && (
+              <fieldset className="block">
+                <legend className="text-ink-faint mb-1 block text-xs">受信元</legend>
+                <div className="flex flex-wrap gap-2">
+                  {([['line', 'LINE'], ['email', 'メール']] as const).map(([source, label]) => {
+                    const checked = receiveSources.includes(source)
+                    return (
+                      <label key={source} className="border-hairline rounded-control flex items-center gap-2 border px-3 py-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => setReceiveSources((current) => {
+                            if (checked) return current.length === 1 ? current : current.filter((item) => item !== source)
+                            return [...current, source]
+                          })}
+                        />
+                        {label}
+                      </label>
+                    )
+                  })}
+                </div>
+              </fieldset>
+            )}
 
             {page && (
               <div className="block">

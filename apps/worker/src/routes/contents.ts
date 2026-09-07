@@ -1324,6 +1324,7 @@ contents.get('/api/common-vars/:id', async (c) => {
           memo: version.memo,
           changeReason: version.change_reason,
           actorId: version.actor_id,
+          actorName: version.actor_name,
           createdAt: version.created_at,
         })),
       },

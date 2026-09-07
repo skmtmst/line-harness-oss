@@ -171,9 +171,10 @@ export type IncomingWebhookDetail = IncomingWebhook & {
     refKind: string
     refId: string
     refVersionId: string | null
+    displayName: string
   }>
   actionExecution: {
-    state: 'not_connected' | 'not_configured'
+    state: 'connected' | 'not_configured'
     reason: string | null
   }
   latestSample: {
@@ -327,6 +328,7 @@ export type CommonVarHistoryItem = {
   memo: string
   changeReason: string | null
   actorId: string | null
+  actorName: string | null
   createdAt: string
 }
 
@@ -4016,6 +4018,18 @@ export const api = {
       }),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/tags/${id}`, { method: 'DELETE' }),
+    archive: (id: string, accountId: string, data: {
+      expectedVersion: number
+      impactRevision: string
+      replacementTagId?: string | null
+    }, idempotencyKey: string) => fetchApi<ApiResponse<{
+      archived: true
+      replacedFriendCount: number
+    }>>(`/api/tags/${id}/archive?lineAccountId=${encodeURIComponent(accountId)}`, {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(data),
+    }),
   },
   /**
    * タグの親分類。経路が /api/tag-groups なのは /api/tags/:id と
@@ -5220,6 +5234,16 @@ export const api = {
       ),
   },
   broadcasts: {
+    notificationSettings: (lineAccountId: string) =>
+      fetchApi<ApiResponse<{ version: number; started: boolean; completed: boolean; failed: boolean; displayText: string }>>(
+        `/api/broadcasts/notification-settings?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+      ),
+    saveNotificationSettings: (lineAccountId: string, data: {
+      expectedVersion: number; started: boolean; completed: boolean; failed: boolean
+    }) => fetchApi<ApiResponse<{ version: number; started: boolean; completed: boolean; failed: boolean; displayText: string }>>(
+      `/api/broadcasts/notification-settings?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+      { method: 'PUT', body: JSON.stringify(data) },
+    ),
     /** 予約中の配信だけを、内容を残した下書きへ安全に戻す。 */
     cancelReservation: (id: string) =>
       fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}/cancel`, {
@@ -6290,6 +6314,7 @@ export const api = {
         skipWhenOperatorActive: boolean;
         priority: number;
         messageKinds: string[] | null;
+        receiveSources: Array<'line' | 'email'>;
         actions: unknown[] | null;
         responseWeekdays: number[] | null;
         responseHolidayRule: string | null;
@@ -6335,6 +6360,7 @@ export const api = {
         skipWhenOperatorActive: boolean;
         priority: number;
         messageKinds: string[] | null;
+        receiveSources: Array<'line' | 'email'>;
         actions: unknown[] | null;
         responseWeekdays: number[] | null;
         responseHolidayRule: string | null;
@@ -6366,6 +6392,7 @@ export const api = {
       priority?: number;
       /** 対象にするメッセージ種別。null で全部 */
       messageKinds?: string[] | null;
+      receiveSources?: Array<'line' | 'email'>;
       /** 151: 応答したときに順に実行すること。 */
       actions?: unknown[] | null;
       /** 151: 応答する曜日（0=日 … 6=土）。null で曜日を問わない */
@@ -6405,6 +6432,7 @@ export const api = {
       skipWhenOperatorActive?: boolean;
       priority?: number;
       messageKinds?: string[] | null;
+      receiveSources?: Array<'line' | 'email'>;
       /** 151: 応答したときに順に実行すること。 */
       actions?: unknown[] | null;
       /** 151: 応答する曜日（0=日 … 6=土）。null で曜日を問わない */
@@ -7681,6 +7709,11 @@ export const api = {
         fetchApi<ApiResponse<null>>(
           `/api/webhooks/outgoing/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'DELETE' },
+        ),
+      test: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<{ delivered: boolean; responseStatus: number | null }>>(
+          `/api/webhooks/outgoing/${encodeURIComponent(id)}/test?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'POST' },
         ),
     },
     interactions: {
@@ -9229,7 +9262,13 @@ export type WebinarListItem = Webinar & {
 
 export type WebinarFolder = Folder & { count: number }
 
-export type WebinarInput = Partial<Omit<Webinar, 'id' | 'createdAt' | 'updatedAt'>>
+export type WebinarInput = Partial<Omit<Webinar, 'id' | 'createdAt' | 'updatedAt'>> & {
+  deliveryKind?: 'on_demand' | 'scheduled' | 'external'
+  viewingCondition?: { kind: string; label: string }
+  publicDescription?: string
+  registrationFormId?: string | null
+  expectedVersion?: number
+}
 
 export type WebinarNotificationSettings = {
   webinarId: string
@@ -9322,6 +9361,8 @@ export type WebinarAnalytics = {
   }>
   sessions: Array<{ sessionStartAt: number; viewers: number; avgWatchedSeconds: number; ctaClicks: number }>
   dropoff: Array<{ bucketStart: number; viewers: number }>
+  viewSegments?: Array<{ startSeconds: number; endSeconds: number; viewers: number }>
+  measurement?: { state: 'available' | 'unavailable'; reason: string | null }
   formFunnel: {
     ctaImpressions: number
     ctaClicks: number
@@ -9366,6 +9407,77 @@ export type WebinarAction = {
   version?: number
 }
 
+export type WebinarEditor = {
+  version: number
+  deliveryKind: 'on_demand' | 'scheduled' | 'external'
+  viewingCondition: { kind: string; label: string }
+  publicDescription: string
+  registrationFormId: string | null
+  notificationMessages: Record<string, string>
+  notificationTest: { status?: string; sent?: number; failed?: number; testedAt?: string } | null
+  actionPolicy: {
+    templateBody: string
+    missingResultPolicy: 'escalate' | 'retry_next_day'
+  }
+  publicPage: {
+    liffId: string | null
+    url: string | null
+    unavailableReason: string | null
+    description: string
+    test: { status?: string; testedAt?: string } | null
+    form: {
+      id: string
+      name: string
+      active: boolean
+      fields: string[]
+      completionActions: string[]
+    } | null
+  }
+  publication: {
+    status: Webinar['status']
+    draftVersion: number
+    publishedVersion: number | null
+    publishedAt: string | null
+  }
+  monitoring: {
+    notificationFailures: number
+    duplicateRegistrations: number
+    viewSegmentFailures: number
+    actionFailures: number
+  }
+}
+
+export type WebinarPublishValidation = {
+  version: number
+  checks: Array<{
+    key: string
+    label: string
+    status: 'passed' | 'warning' | 'failed'
+    detail: string | null
+  }>
+  blockers: string[]
+  warnings: string[]
+}
+
+export type WebinarParticipantPage = {
+  items: Array<{
+    friendId: string
+    friendName: string | null
+    pictureUrl: string | null
+    sessions: number
+    firstJoinedAt: string | null
+    latestJoinedAt: string | null
+    maxWatchedSeconds: number
+    ctaClickedAt: string | null
+    registered: boolean
+    formSubmittedAt: string | null
+    actionStatus: string | null
+    errorDetail: string | null
+    staffIntegrationStatus: 'completed' | 'needs_attention' | 'pending'
+  }>
+  nextCursor: string | null
+}
+
 export const webinarApi = {
   list: (accountId?: string) => fetchApi<{ data: WebinarListItem[] }>(
     `/api/webinars${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`,
@@ -9377,6 +9489,28 @@ export const webinarApi = {
     `/api/webinars/overview?account_id=${encodeURIComponent(accountId)}`,
   ),
   get: (id: string) => fetchApi<{ data: Webinar }>(`/api/webinars/${id}`),
+  editor: (id: string) => fetchApi<{ data: WebinarEditor }>(`/api/webinars/${id}/editor`),
+  saveEditor: (id: string, input: Partial<Omit<WebinarEditor, 'version' | 'publicPage' | 'publication' | 'monitoring' | 'actionPolicy'>> & {
+    expectedVersion: number
+    actionTemplateBody?: string
+    missingResultPolicy?: WebinarEditor['actionPolicy']['missingResultPolicy']
+    publicPageTest?: Record<string, unknown> | null
+  }) => fetchApi<{ data: WebinarEditor }>(`/api/webinars/${id}/editor`, {
+    method: 'PUT', body: JSON.stringify(input),
+  }),
+  testPublicPage: (id: string, expectedVersion: number) => fetchApi<{ data: WebinarEditor }>(`/api/webinars/${id}/public-page/test`, {
+    method: 'POST', body: JSON.stringify({ expectedVersion }),
+  }),
+  publishValidation: (id: string) => fetchApi<{ data: WebinarPublishValidation }>(`/api/webinars/${id}/publish-validation`),
+  publish: (id: string, expectedVersion: number) => fetchApi<{ data: { webinar: Webinar; validation: WebinarPublishValidation } }>(`/api/webinars/${id}/publish`, {
+    method: 'POST', body: JSON.stringify({ expectedVersion }),
+  }),
+  pause: (id: string, expectedVersion: number) => fetchApi<{ data: Webinar }>(`/api/webinars/${id}/pause`, {
+    method: 'POST', body: JSON.stringify({ expectedVersion }),
+  }),
+  duplicate: (id: string, expectedVersion: number) => fetchApi<{ data: Webinar }>(`/api/webinars/${id}/duplicate`, {
+    method: 'POST', body: JSON.stringify({ expectedVersion }),
+  }),
   create: (input: WebinarInput) =>
     fetchApi<{ data: Webinar }>('/api/webinars', { method: 'POST', body: JSON.stringify(input) }),
   update: (id: string, input: WebinarInput) =>
@@ -9425,6 +9559,9 @@ export const webinarApi = {
       }),
     }),
   analytics: (id: string) => fetchApi<{ data: WebinarAnalytics }>(`/api/webinars/${id}/analytics`),
+  participants: (id: string, cursor?: string) => fetchApi<{ data: WebinarParticipantPage }>(
+    `/api/webinars/${id}/participants${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
+  ),
   userComments: (id: string) =>
     fetchApi<{ data: WebinarUserComment[] }>(`/api/webinars/${id}/user-comments`),
 }

@@ -38,6 +38,7 @@ function settings(overrides: Partial<AutoReplyDraftSettings> = {}): AutoReplyDra
     cooldownMinutes: null,
     skipWhenOperatorActive: false,
     priority: 10,
+    receiveSources: ['line'],
     messageKinds: null,
     friendConditions: null,
     actions: null,

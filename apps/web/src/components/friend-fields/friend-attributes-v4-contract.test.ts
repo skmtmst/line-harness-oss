@@ -259,23 +259,25 @@ describe('友だち属性 V4 contract', () => {
     expect(dialog).not.toContain('<Th>フォルダ</Th><Th>入らなかった理由</Th>')
   })
 
-  it('使用中のタグを、画面が削除させない', () => {
+  it('使用中のタグは削除せず、影響確認後に履歴を残してアーカイブする', () => {
     const source = read('components/friend-fields/tags-page-v4.tsx')
     // アーカイブ前に実参照と版を返す正本の口を叩く。
     expect(source).toContain('api.tags.dependencies(tag.id, accountId)')
     /*
-      **DELETE 側にはまだ強制停止が入っていない。** 止めるのは画面の役目。
-      読込中・失敗・使用中の3つとも押せなくする。
-      失敗を「参照0件」と読み違えて消させないため、失敗も止める側に入れる。
+      読込中・失敗は押せなくする。使用中でも物理削除はせず、いま付いている
+      友だちと履歴を残すアーカイブなら実行できる。
     */
-    expect(source).toContain('const blocked = true')
+    expect(source).toContain("const blocked = impactStatus !== 'ready' || !impact || !accountId || saving")
     expect(source).toContain('disabled={blocked || text !== tag.name}')
     // 確認欄も止める。名前を打てば消せる、と思わせない。
     expect(source).toContain('disabled={blocked}')
     // 止まっている理由を必ず出す。押せないだけだと理由が分からない。
     expect(source).toContain('影響を確認しています')
     expect(source).toContain('影響を確認できませんでした')
-    expect(source).toContain('アーカイブの保存口は未接続です')
+    expect(source).toContain('api.tags.archive(tag.id, accountId')
+    expect(source).toContain('expectedVersion: impact.tag.version')
+    expect(source).toContain('impactRevision: impact.revision')
+    expect(source).toContain('crypto.randomUUID()')
     // 消せるタグに赤い警告を出さない。以前は三項演算子の else で
     // 「アフィリエイトのオファーで使用中」と誤表示していた。
     expect(source).toContain("impactStatus === 'ready' && impact && !impact.canDelete && (")

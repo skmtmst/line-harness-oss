@@ -25,6 +25,7 @@ import {
   replaceWebinarComments,
   upsertWebinarViewer,
   updateWebinarViewerPosition,
+  recordWebinarViewSegment,
   recordWebinarCtaClick,
   recordWebinarFunnelEvent,
   insertWebinarUserComment,
@@ -38,11 +39,19 @@ import {
   getWebinarFormFunnelStats,
   getWebinarOverview,
   getWebinarList,
+  getWebinarEditorSettings,
+  saveWebinarEditorSettings,
+  publishWebinarEditorVersion,
+  getWebinarViewSegmentCoverage,
+  getWebinarParticipantOperations,
+  getWebinarMonitoringSummary,
+  getWebinarPublicAccount,
   getWebinarActions,
   replaceWebinarActions,
   getFriendByLineUserId,
   getFriendByLineUserIdForAccount,
   getFormById,
+  formBelongsToLineAccount,
   type Webinar,
   type WebinarListRow,
   getFolderById,
@@ -51,6 +60,8 @@ import {
   recordWebinarPickerOpen,
   type WebinarActionInput,
   type WebinarActionType,
+  type WebinarEditorSettings,
+  type WebinarEditorSettingsInput,
 } from '@line-crm/db';
 import { verifyCallerLineUserId } from '../services/liff-auth.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
@@ -356,6 +367,11 @@ webinarRoutes.post('/api/liff/webinars/:slug/heartbeat', async (c) => {
     await updateWebinarViewerPosition(
       c.env.DB, loaded.webinar.id, auth.friendId, sessionStartAt, positionSeconds,
     );
+    if (positionSeconds > 0) {
+      await recordWebinarViewSegment(
+        c.env.DB, loaded.webinar.id, auth.friendId, sessionStartAt, positionSeconds,
+      );
+    }
     c.executionCtx.waitUntil(awardWebinarPositionMileage(c.env.DB, {
       webinarId: loaded.webinar.id,
       friendId: auth.friendId,
@@ -766,6 +782,102 @@ function serializeWebinarList(row: WebinarListRow) {
   };
 }
 
+function parseJson<T>(value: string | null | undefined, fallback: T): T {
+  if (!value) return fallback;
+  try { return JSON.parse(value) as T; } catch { return fallback; }
+}
+
+function defaultEditorSettings(row: Webinar): WebinarEditorSettings {
+  return {
+    webinar_id: row.id,
+    version: 0,
+    delivery_kind: row.schedule_json === '[]' ? 'on_demand' : 'scheduled',
+    viewing_condition_json: JSON.stringify({ kind: 'registered', label: '申込者向け' }),
+    public_description: '',
+    registration_form_id: null,
+    notification_messages_json: '{}',
+    notification_test_json: null,
+    action_template_body: '',
+    missing_result_policy: 'escalate',
+    public_page_test_json: null,
+    published_version: null,
+    published_at: null,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+function formFieldLabels(form: Awaited<ReturnType<typeof getFormById>>): string[] {
+  if (!form) return [];
+  const fields = parseJson<Array<Record<string, unknown>>>(form.fields, []);
+  return fields.map((field) => String(field.label ?? field.name ?? field.key ?? '').trim()).filter(Boolean);
+}
+
+function formCompletionActions(form: Awaited<ReturnType<typeof getFormById>>): string[] {
+  if (!form) return [];
+  const actions: string[] = [];
+  if (form.on_submit_tag_id) actions.push('タグを付ける');
+  if (form.on_submit_scenario_id) actions.push('シナリオを開始する');
+  if (form.on_submit_message_type) actions.push('完了メッセージを送る');
+  if (form.on_submit_webhook_url) actions.push('Webhookへ送る');
+  return actions;
+}
+
+async function getEditorPayload(c: Context<Env>, row: Webinar) {
+  const stored = await getWebinarEditorSettings(c.env.DB, row.id);
+  const settings = stored ?? defaultEditorSettings(row);
+  const [form, account, monitoring] = await Promise.all([
+    settings.registration_form_id
+      ? getFormById(c.env.DB, settings.registration_form_id)
+      : Promise.resolve(null),
+    getWebinarPublicAccount(c.env.DB, row.account_id),
+    getWebinarMonitoringSummary(c.env.DB, row.id),
+  ]);
+  const liffId = account?.liff_id ?? null;
+  const publicUrl = liffId
+    ? `https://liff.line.me/${encodeURIComponent(liffId)}/webinar/${encodeURIComponent(row.slug)}`
+    : null;
+  return {
+    version: settings.version,
+    deliveryKind: settings.delivery_kind,
+    viewingCondition: parseJson(settings.viewing_condition_json, { kind: 'registered', label: '申込者向け' }),
+    publicDescription: settings.public_description,
+    registrationFormId: settings.registration_form_id,
+    notificationMessages: parseJson<Record<string, string>>(settings.notification_messages_json, {}),
+    notificationTest: parseJson<Record<string, unknown> | null>(settings.notification_test_json, null),
+    actionPolicy: {
+      templateBody: settings.action_template_body,
+      missingResultPolicy: settings.missing_result_policy,
+    },
+    publicPage: {
+      liffId,
+      url: publicUrl,
+      unavailableReason: publicUrl ? null : 'LINE公式アカウントにLIFF IDが設定されていません',
+      description: settings.public_description,
+      test: parseJson<Record<string, unknown> | null>(settings.public_page_test_json, null),
+      form: form ? {
+        id: form.id,
+        name: form.name,
+        active: Boolean(form.is_active),
+        fields: formFieldLabels(form),
+        completionActions: formCompletionActions(form),
+      } : null,
+    },
+    publication: {
+      status: row.status,
+      draftVersion: settings.version,
+      publishedVersion: settings.published_version,
+      publishedAt: settings.published_at,
+    },
+    monitoring: {
+      notificationFailures: Number(monitoring.notification_failures),
+      duplicateRegistrations: Number(monitoring.duplicate_registrations),
+      viewSegmentFailures: Number(monitoring.view_segment_failures),
+      actionFailures: Number(monitoring.action_failures),
+    },
+  };
+}
+
 interface WebinarBody {
   accountId?: string | null;
   title?: string;
@@ -780,6 +892,11 @@ interface WebinarBody {
   folderId?: string | null;
   publicationStartsAt?: string | null;
   publicationEndsAt?: string | null;
+  expectedVersion?: number;
+  deliveryKind?: WebinarEditorSettingsInput['deliveryKind'];
+  viewingCondition?: Record<string, unknown>;
+  publicDescription?: string;
+  registrationFormId?: string | null;
 }
 
 const WEBINAR_ACTION_TYPES = new Set<WebinarActionType>([
@@ -961,6 +1078,12 @@ webinarRoutes.post('/api/webinars', requireRole('owner', 'admin'), async (c) => 
     const created = await createWebinar(
       c.env.DB, input as unknown as Parameters<typeof createWebinar>[1],
     );
+    await saveWebinarEditorSettings(c.env.DB, created.id, 0, {
+      deliveryKind: body.deliveryKind,
+      viewingCondition: body.viewingCondition,
+      publicDescription: body.publicDescription,
+      registrationFormId: body.registrationFormId,
+    });
     return c.json({ success: true, data: serializeWebinar(created) });
   } catch (err) {
     console.error('POST /api/webinars error:', err);
@@ -975,6 +1098,248 @@ webinarRoutes.get('/api/webinars/:id', async (c) => {
     return c.json({ success: true, data: serializeWebinar(row) });
   } catch (err) {
     console.error('GET /api/webinars/:id error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+webinarRoutes.get('/api/webinars/:id/editor', async (c) => {
+  try {
+    const row = await getWebinarById(c.env.DB, c.req.param('id'));
+    if (!row) return c.json({ success: false, error: 'Not found' }, 404);
+    return c.json({ success: true, data: await getEditorPayload(c, row) });
+  } catch (err) {
+    console.error('GET /api/webinars/:id/editor error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+webinarRoutes.put('/api/webinars/:id/editor', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const row = await getWebinarById(c.env.DB, c.req.param('id'));
+    if (!row) return c.json({ success: false, error: 'Not found' }, 404);
+    const body = await c.req.json<WebinarEditorSettingsInput & { expectedVersion?: unknown }>();
+    if (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 0) {
+      return c.json({ success: false, error: 'expected_version_required' }, 400);
+    }
+    if (body.deliveryKind && !['on_demand', 'scheduled', 'external'].includes(body.deliveryKind)) {
+      return c.json({ success: false, error: 'invalid_delivery_kind' }, 400);
+    }
+    if (
+      body.missingResultPolicy &&
+      !['escalate', 'retry_next_day'].includes(body.missingResultPolicy)
+    ) {
+      return c.json({ success: false, error: 'invalid_missing_result_policy' }, 400);
+    }
+    if (body.registrationFormId) {
+      const form = await getFormById(c.env.DB, body.registrationFormId);
+      if (!form || !form.is_active) {
+        return c.json({ success: false, error: 'form_inactive_or_missing' }, 400);
+      }
+      if (!row.account_id || !await formBelongsToLineAccount(c.env.DB, form.id, row.account_id)) {
+        return c.json({ success: false, error: 'form_account_mismatch' }, 400);
+      }
+    }
+    const saved = await saveWebinarEditorSettings(
+      c.env.DB,
+      row.id,
+      Number(body.expectedVersion),
+      body,
+    );
+    if (!saved) return c.json({ success: false, error: 'version_conflict' }, 409);
+    return c.json({ success: true, data: await getEditorPayload(c, row) });
+  } catch (err) {
+    console.error('PUT /api/webinars/:id/editor error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+webinarRoutes.post('/api/webinars/:id/public-page/test', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const row = await getWebinarById(c.env.DB, c.req.param('id'));
+    if (!row) return c.json({ success: false, error: 'Not found' }, 404);
+    const body = await c.req.json<{ expectedVersion?: unknown }>();
+    const editor = await getEditorPayload(c, row);
+    if (!Number.isInteger(body.expectedVersion) || editor.version !== Number(body.expectedVersion)) {
+      return c.json({ success: false, error: 'version_conflict' }, 409);
+    }
+    const failures = [
+      !editor.publicPage.url ? 'missing_liff_id' : null,
+      !row.video_prefix ? 'video_not_ready' : null,
+      !editor.publicPage.form?.active ? 'form_inactive_or_missing' : null,
+    ].filter((value): value is string => Boolean(value));
+    const saved = await saveWebinarEditorSettings(c.env.DB, row.id, editor.version, {
+      publicPageTest: {
+        status: failures.length === 0 ? 'passed' : 'failed',
+        failures,
+        testedAt: new Date().toISOString(),
+      },
+    });
+    if (!saved) return c.json({ success: false, error: 'version_conflict' }, 409);
+    return c.json({ success: true, data: await getEditorPayload(c, row) });
+  } catch (err) {
+    console.error('POST /api/webinars/:id/public-page/test error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+async function buildPublishValidation(c: Context<Env>, row: Webinar) {
+  const [editor, ctas, actions] = await Promise.all([
+    getEditorPayload(c, row),
+    getWebinarCtas(c.env.DB, row.id),
+    getWebinarActions(c.env.DB, row.id),
+  ]);
+  const notificationTest = editor.notificationTest as { status?: unknown } | null;
+  const publicPageTest = editor.publicPage.test as { status?: unknown } | null;
+  const checks = [
+    {
+      key: 'video_ready',
+      label: '動画・公開が設定されています',
+      status: row.video_prefix ? 'passed' : 'failed',
+      detail: row.video_prefix ? '動画を配信できます' : '動画がreadyではありません',
+    },
+    {
+      key: 'form_active',
+      label: '申込フォームが公開中です',
+      status: editor.publicPage.form?.active ? 'passed' : 'failed',
+      detail: editor.publicPage.form?.active ? editor.publicPage.form.name : '公開中の回答フォームを選んでください',
+    },
+    {
+      key: 'cta_range',
+      label: 'CTAの表示時刻とURLが有効です',
+      status: ctas.length > 0 && ctas.every((cta) =>
+        cta.at_seconds >= 0 && cta.at_seconds <= row.duration_seconds &&
+        (cta.kind !== 'url' || Boolean(cta.url && /^https:\/\//.test(cta.url)))
+      ) ? 'passed' : 'failed',
+      detail: 'CTAは動画の長さ以内、外部URLはhttpsで検査します',
+    },
+    {
+      key: 'notification_test',
+      label: '通知のテスト送信が成功しています',
+      status: notificationTest?.status === 'passed' ? 'passed' : 'failed',
+      detail: notificationTest?.status === 'passed' ? '最後のテスト送信は成功です' : '通知をテスト送信してください',
+    },
+    {
+      key: 'public_page_test',
+      label: '公開ページを確認済みです',
+      status: publicPageTest?.status === 'passed' && editor.publicPage.url ? 'passed' : 'failed',
+      detail: editor.publicPage.url ? '公開ページの表示結果を確認します' : editor.publicPage.unavailableReason,
+    },
+    {
+      key: 'notification_duplicates',
+      label: '通知の重複がありません',
+      status: editor.monitoring.duplicateRegistrations === 0 ? 'passed' : 'failed',
+      detail: editor.monitoring.duplicateRegistrations === 0
+        ? '同じ人・版・開催回・通知種別は1回です'
+        : `${editor.monitoring.duplicateRegistrations}件の重複候補があります`,
+    },
+    {
+      key: 'action_dependencies',
+      label: '視聴後アクションの参照先が有効です',
+      status: actions.length > 0 ? 'passed' : 'warning',
+      detail: actions.length > 0 ? `${actions.length}件のアクションを確認しました` : '視聴後アクションは未設定です',
+    },
+  ];
+  return {
+    version: editor.version,
+    checks,
+    blockers: checks.filter((check) => check.status === 'failed').map((check) => check.key),
+    warnings: checks.filter((check) => check.status === 'warning').map((check) => check.key),
+  };
+}
+
+webinarRoutes.get('/api/webinars/:id/publish-validation', async (c) => {
+  try {
+    const row = await getWebinarById(c.env.DB, c.req.param('id'));
+    if (!row) return c.json({ success: false, error: 'Not found' }, 404);
+    return c.json({ success: true, data: await buildPublishValidation(c, row) });
+  } catch (err) {
+    console.error('GET /api/webinars/:id/publish-validation error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+webinarRoutes.post('/api/webinars/:id/publish', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const id = c.req.param('id');
+    const row = await getWebinarById(c.env.DB, id);
+    if (!row) return c.json({ success: false, error: 'Not found' }, 404);
+    const body = await c.req.json<{ expectedVersion?: unknown }>();
+    if (!Number.isInteger(body.expectedVersion)) {
+      return c.json({ success: false, error: 'expected_version_required' }, 400);
+    }
+    const validation = await buildPublishValidation(c, row);
+    if (validation.blockers.length > 0) {
+      return c.json({ success: false, error: 'publish_validation_failed', data: validation }, 409);
+    }
+    const published = await publishWebinarEditorVersion(c.env.DB, id, Number(body.expectedVersion));
+    if (!published) return c.json({ success: false, error: 'version_conflict' }, 409);
+    const updated = await updateWebinar(c.env.DB, id, { status: 'active' });
+    auditLog(c, 'webinar.publish', { kind: 'webinar', id });
+    return c.json({ success: true, data: { webinar: serializeWebinar(updated!), validation } });
+  } catch (err) {
+    console.error('POST /api/webinars/:id/publish error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+webinarRoutes.post('/api/webinars/:id/pause', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const id = c.req.param('id');
+    const row = await getWebinarById(c.env.DB, id);
+    if (!row) return c.json({ success: false, error: 'Not found' }, 404);
+    const body = await c.req.json<{ expectedVersion?: unknown }>();
+    const settings = await getWebinarEditorSettings(c.env.DB, id);
+    if (!Number.isInteger(body.expectedVersion) || settings?.version !== Number(body.expectedVersion)) {
+      return c.json({ success: false, error: 'version_conflict' }, 409);
+    }
+    const updated = await updateWebinar(c.env.DB, id, { status: 'draft' });
+    auditLog(c, 'webinar.pause', { kind: 'webinar', id });
+    return c.json({ success: true, data: serializeWebinar(updated!) });
+  } catch (err) {
+    console.error('POST /api/webinars/:id/pause error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+webinarRoutes.post('/api/webinars/:id/duplicate', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const id = c.req.param('id');
+    const row = await getWebinarById(c.env.DB, id);
+    if (!row) return c.json({ success: false, error: 'Not found' }, 404);
+    const body = await c.req.json<{ expectedVersion?: unknown }>();
+    const settings = await getWebinarEditorSettings(c.env.DB, id);
+    if (!settings || !Number.isInteger(body.expectedVersion) || settings.version !== Number(body.expectedVersion)) {
+      return c.json({ success: false, error: 'version_conflict' }, 409);
+    }
+    const suffix = crypto.randomUUID().slice(0, 8);
+    const duplicate = await createWebinar(c.env.DB, {
+      accountId: row.account_id,
+      title: `${row.title}（複製）`,
+      slug: `${row.slug.slice(0, 54)}-${suffix}`,
+      status: 'draft',
+      videoPrefix: row.video_prefix,
+      durationSeconds: row.duration_seconds,
+      scheduleJson: row.schedule_json,
+      ctaJson: row.cta_json,
+      tagOnAttend: row.tag_on_attend,
+      tagOnCtaClick: row.tag_on_cta_click,
+      folderId: row.folder_id,
+      publicationStartsAt: row.publication_starts_at,
+      publicationEndsAt: row.publication_ends_at,
+    });
+    await saveWebinarEditorSettings(c.env.DB, duplicate.id, 0, {
+      deliveryKind: settings.delivery_kind,
+      viewingCondition: parseJson(settings.viewing_condition_json, {}),
+      publicDescription: settings.public_description,
+      registrationFormId: settings.registration_form_id,
+      notificationMessages: parseJson(settings.notification_messages_json, {}),
+      actionTemplateBody: settings.action_template_body,
+      missingResultPolicy: settings.missing_result_policy,
+    });
+    auditLog(c, 'webinar.duplicate', { kind: 'webinar', id });
+    return c.json({ success: true, data: serializeWebinar(duplicate) }, 201);
+  } catch (err) {
+    console.error('POST /api/webinars/:id/duplicate error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1077,6 +1442,17 @@ webinarRoutes.post(
           proxyDispatch: (request) => dispatchLineProxyLocally(request, c.env, c.executionCtx),
         },
       );
+      const editor = await getWebinarEditorSettings(c.env.DB, webinar.id);
+      if (editor) {
+        await saveWebinarEditorSettings(c.env.DB, webinar.id, editor.version, {
+          notificationTest: {
+            status: result.failed === 0 ? 'passed' : 'failed',
+            sent: result.sent,
+            failed: result.failed,
+            testedAt: new Date().toISOString(),
+          },
+        });
+      }
       return c.json({ success: true, data: result });
     } catch (err) {
       const code = err instanceof Error ? err.message : 'test_send_failed';
@@ -1286,7 +1662,7 @@ webinarRoutes.put('/api/webinars/:id/ctas', requireRole('owner', 'admin'), async
       if (kind === 'form') {
         if (!formId) return c.json({ success: false, error: 'form_id_required' }, 400);
         formIdsToCheck.add(formId);
-      } else if (!url || !/^https?:\/\//.test(url)) {
+      } else if (!url || !/^https:\/\//.test(url)) {
         return c.json({ success: false, error: 'invalid_url' }, 400);
       }
       cleaned.push({
@@ -1305,6 +1681,16 @@ webinarRoutes.put('/api/webinars/:id/ctas', requireRole('owner', 'admin'), async
     if (forms.some((f) => f && !f.is_active)) {
       return c.json({ success: false, error: 'form_inactive' }, 400);
     }
+    if (
+      formIdsToCheck.size > 0 &&
+      (!row.account_id || !(await Promise.all(
+        [...formIdsToCheck].map((formId) =>
+          formBelongsToLineAccount(c.env.DB, formId, row.account_id!),
+        ),
+      )).every(Boolean))
+    ) {
+      return c.json({ success: false, error: 'form_account_mismatch' }, 400);
+    }
     const count = await replaceWebinarCtas(c.env.DB, id, cleaned);
     return c.json({ success: true, data: { count } });
   } catch (err) {
@@ -1319,13 +1705,15 @@ webinarRoutes.get('/api/webinars/:id/analytics', async (c) => {
     const row = await getWebinarById(c.env.DB, id);
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
     const completionThreshold = Math.max(1, Math.floor(row.duration_seconds * 0.9));
-    const [sessions, dropoff, participants, summary, daily, formFunnel] = await Promise.all([
+    const [sessions, dropoff, participants, summary, daily, formFunnel, viewSegments, editor] = await Promise.all([
       getWebinarSessionStats(c.env.DB, id),
       getWebinarDropoff(c.env.DB, id),
       getWebinarParticipantStats(c.env.DB, id, 200),
       getWebinarAnalyticsSummary(c.env.DB, id, completionThreshold),
       getWebinarDailyStats(c.env.DB, id),
       getWebinarFormFunnelStats(c.env.DB, id),
+      getWebinarViewSegmentCoverage(c.env.DB, id),
+      getWebinarEditorSettings(c.env.DB, id),
     ]);
     return c.json({
       success: true,
@@ -1367,6 +1755,16 @@ webinarRoutes.get('/api/webinars/:id/analytics', async (c) => {
           ctaClicks: s.cta_clicks,
         })),
         dropoff: dropoff.map((d) => ({ bucketStart: d.bucket_start, viewers: d.viewers })),
+        viewSegments: viewSegments.map((segment) => ({
+          startSeconds: segment.start_seconds,
+          endSeconds: segment.end_seconds,
+          viewers: Number(segment.viewers),
+        })),
+        measurement: editor?.delivery_kind === 'external'
+          ? { state: 'unavailable', reason: '外部動画では個人の視聴区間を取得できません' }
+          : viewSegments.length > 0
+            ? { state: 'available', reason: null }
+            : { state: 'unavailable', reason: '実視聴区間がまだ記録されていません' },
         formFunnel: {
           ctaImpressions: formFunnel.cta_impressions,
           ctaClicks: formFunnel.cta_clicks,
@@ -1384,6 +1782,40 @@ webinarRoutes.get('/api/webinars/:id/analytics', async (c) => {
     });
   } catch (err) {
     console.error('GET /api/webinars/:id/analytics error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+webinarRoutes.get('/api/webinars/:id/participants', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const limit = Math.min(200, Math.max(1, Number(c.req.query('limit') ?? 50) || 50));
+    const offset = Math.max(0, Number(c.req.query('cursor') ?? 0) || 0);
+    const rows = await getWebinarParticipantOperations(c.env.DB, id, limit + 1, offset);
+    const hasNext = rows.length > limit;
+    return c.json({
+      success: true,
+      data: {
+        items: rows.slice(0, limit).map((row) => ({
+          friendId: row.friend_id,
+          friendName: row.friend_name,
+          pictureUrl: row.picture_url,
+          sessions: Number(row.sessions),
+          firstJoinedAt: row.first_joined_at || null,
+          latestJoinedAt: row.latest_joined_at || null,
+          maxWatchedSeconds: Number(row.max_watched_seconds),
+          ctaClickedAt: row.cta_clicked_at,
+          registered: Boolean(row.registered),
+          formSubmittedAt: row.form_submitted_at,
+          actionStatus: row.action_status,
+          errorDetail: row.action_error,
+          staffIntegrationStatus: row.integration_status,
+        })),
+        nextCursor: hasNext ? String(offset + limit) : null,
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/webinars/:id/participants error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

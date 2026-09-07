@@ -55,6 +55,7 @@ import {
   AUTO_REPLY_PUBLISH_CONFLICTS, AUTO_REPLY_PUBLISH_DRAFT,
   AUTO_REPLY_PUBLISH_RESULT, AUTO_REPLY_PUBLISH_TEST, AUTO_REPLY_PUBLISH_VALIDATION,
   BROADCASTS, BROADCAST_FOLDERS, BROADCAST_INSIGHTS, BROADCAST_LIST_META,
+  BROADCAST_NOTIFICATION_SETTINGS,
   BROADCAST_PREFLIGHT, BROADCAST_SAVED_VIEWS, CHATS, FRIEND_FIELDS, FRIEND_ATTRIBUTE_FIELDS, FRIEND_FIELD_FOLDERS,
   FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL, FRIEND_ATTRIBUTE_SAVED_SEARCH_RESPONSE, FRIEND_FIELD_MIGRATION_PREVIEW,
   INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
@@ -69,10 +70,11 @@ import {
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   RICH_MENU_GROUPS, RICH_MENU_GROUP_DETAILS, RICH_MENU_EXTERNAL, RICH_MENU_TAP_STATS,
   TAGS, TAG_GROUPS, TAG_DEFINITION_NEN_SUBSCRIPTION, TAG_DEPENDENCIES_NEN_SUBSCRIPTION,
+  TAG_ARCHIVE_RESULT,
   TAG_IMPORT_SAMPLE_ROWS, tagImportPreview, tagImportResult, REMINDER_RUNS,
   ACTION_SCORE_RULES,
   SUPPORT_MARKS, SUPPORT_MARK_ARCHIVE_IMPACT, SUPPORT_MARK_AUTOMATION_RULES,
-  OUTGOING_WEBHOOKS, INCOMING_WEBHOOKS, INCOMING_WEBHOOK_DETAILS, ENTRY_ROUTES, INFLOW_SUMMARY,
+  OUTGOING_WEBHOOKS, OUTGOING_WEBHOOK_TEST_RESULT, INCOMING_WEBHOOKS, INCOMING_WEBHOOK_DETAILS, ENTRY_ROUTES, INFLOW_SUMMARY,
   SITE_TRACKING_SUMMARY, SITE_TRACKING_PAGES, AD_PLATFORMS, AD_CONVERSION_LOGS,
   STAFF_MEMBERS, LOGIN_AUDIT,
   AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS,
@@ -93,6 +95,7 @@ import {
   CONVERSION_DEFINITIONS, CONVERSION_DEFINITION_REPORT, CONVERSION_EXPORT_CSV,
   OPERATION_CONTROL_PREVIEW, OPERATION_HEALTH, OPERATION_HISTORY,
   WEBINARS, WEBINAR_FOLDERS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_ANALYTICS,
+  WEBINAR_EDITOR, WEBINAR_PUBLISH_VALIDATION, WEBINAR_PARTICIPANTS,
   FRIEND_ADD_RULE_PUBLISH, FRIEND_ADD_RULE_VALIDATE,
   ACCESS_USERS, ACCESS_ROLES, ACCESS_AUDIT_EVENTS,
   GETTING_STARTED, RECIPES, MANUAL_LINKS,
@@ -892,6 +895,7 @@ const SHAPES = {
     failed: 0,
     openRate: 69.4,
   },
+  '/api/broadcasts/notification-settings': BROADCAST_NOTIFICATION_SETTINGS,
   '/api/friends/stats': FRIEND_STATS,
   '/api/friends': { items: FRIENDS, total: 231, page: 1, limit: 20 },
   '/api/users-grouped': USERS_GROUPED,
@@ -1019,6 +1023,15 @@ function visualQaWriteBody(method, pathname) {
   }
   if (method === 'POST' && pathname === '/api/broadcasts/preflight') {
     return BROADCAST_PREFLIGHT
+  }
+  if (method === 'PUT' && pathname === '/api/broadcasts/notification-settings') {
+    return BROADCAST_NOTIFICATION_SETTINGS
+  }
+  if (method === 'POST' && /^\/api\/tags\/[^/]+\/archive$/.test(pathname)) {
+    return TAG_ARCHIVE_RESULT
+  }
+  if (method === 'POST' && /^\/api\/webhooks\/outgoing\/[^/]+\/test$/.test(pathname)) {
+    return OUTGOING_WEBHOOK_TEST_RESULT
   }
   if (method === 'POST' && pathname === '/api/friend-add-routing/validate') {
     return FRIEND_ADD_LIFECYCLE_VALIDATION
@@ -1691,6 +1704,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/broadcasts/saved-views') {
     return { success: true, data: BROADCAST_SAVED_VIEWS }
+  }
+  if (pathname === '/api/broadcasts/notification-settings') {
+    return { success: true, data: BROADCAST_NOTIFICATION_SETTINGS }
   }
   const broadcastInsight = pathname.match(/^\/api\/broadcasts\/([^/]+)\/insight$/)
   if (broadcastInsight) {
@@ -2447,6 +2463,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/webinars') return { success: true, data: WEBINARS }
   if (pathname === '/api/webinars/overview') return { success: true, data: WEBINAR_OVERVIEW }
+  if (/^\/api\/webinars\/[^/]+\/editor$/.test(pathname)) return { success: true, data: WEBINAR_EDITOR }
+  if (/^\/api\/webinars\/[^/]+\/publish-validation$/.test(pathname)) return { success: true, data: WEBINAR_PUBLISH_VALIDATION }
+  if (/^\/api\/webinars\/[^/]+\/participants$/.test(pathname)) return { success: true, data: WEBINAR_PARTICIPANTS }
   if (/^\/api\/webinars\/[^/]+\/notifications$/.test(pathname)) return { success: true, data: WEBINAR_NOTIFICATIONS }
   if (/^\/api\/webinars\/[^/]+\/ctas$/.test(pathname)) return { success: true, data: WEBINAR_CTAS }
   if (/^\/api\/webinars\/[^/]+\/actions$/.test(pathname)) return { success: true, data: WEBINAR_ACTIONS }
@@ -2556,6 +2575,18 @@ const server = createServer((req, res) => {
   // ただし画面側のエラー報告だけは 204 で受ける。405 を返すと、
   // 報告が失敗したこと自体が新しいエラーになって際限なく増える。
   if (method !== 'GET') {
+    if (method === 'POST' && /^\/api\/webinars\/[^/]+\/public-page\/test$/.test(url.pathname)) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: WEBINAR_EDITOR }))
+      return
+    }
+    if (method === 'POST' && /^\/api\/webinars\/[^/]+\/(publish|pause|duplicate)$/.test(url.pathname)) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: WEBINARS[0] }))
+      return
+    }
+    if (method === 'POST' && /^\/api\/webinars\/[^/]+\/notifications\/test$/.test(url.pathname)) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: { sent: 1, failed: 0 } }))
+      return
+    }
     if (method === 'POST' && /^\/api\/automation-runs\/[^/]+\/retry$/.test(url.pathname)) {
       res.writeHead(202).end(JSON.stringify({
         success: true,

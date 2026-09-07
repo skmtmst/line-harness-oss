@@ -261,6 +261,9 @@ export const TAG_DEPENDENCIES_NEN_SUBSCRIPTION = {
   revision: 'tag:tag-0:v3:2026-08-20T19:20:00+09:00',
 }
 
+/** 機能4。画面確認では保存せず、保管APIの成功時の器だけを固定する。 */
+export const TAG_ARCHIVE_RESULT = { archived: true, replacedFriendCount: 0 }
+
 /**
  * タグ101件。設計の「1〜20 / 101件」に合わせる。
  *
@@ -1482,11 +1485,11 @@ export const COMMON_VAR_DETAIL = {
     {
       id: 'common-var-version-3', version: 3, name: '会社名', value: '株式会社NEN',
       memo: '契約書・請求書・お客さま案内で使う正式な会社名',
-      changeReason: '登記上の表記に統一', actorId: 'staff-1', createdAt: '2026-08-01T10:12:00.000+09:00',
+      changeReason: '登記上の表記に統一', actorId: 'staff-1', actorName: '川野 健太', createdAt: '2026-08-01T10:12:00.000+09:00',
     },
     {
       id: 'common-var-version-2', version: 2, name: '会社名', value: 'NEN', memo: '',
-      changeReason: '初回登録', actorId: 'staff-1', createdAt: '2025-11-20T16:40:00.000+09:00',
+      changeReason: '初回登録', actorId: 'staff-1', actorName: '川野 健太', createdAt: '2025-11-20T16:40:00.000+09:00',
     },
   ],
 }
@@ -3047,6 +3050,15 @@ export const BROADCAST_LIST_META = {
   pagination: { total: 24, limit: 20, cursor: 0, nextCursor: '20' },
 }
 
+/** 機能6。予約完了画面に出すSlack通知設定。 */
+export const BROADCAST_NOTIFICATION_SETTINGS = {
+  version: 1,
+  started: true,
+  completed: true,
+  failed: true,
+  displayText: '配信開始・完了・エラーはSlackの同じスレッドへ通知します。',
+}
+
 /** 機能6 `sqFXf`。検索条件を保存済みの状態と、新規保存の固定結果。 */
 export const BROADCAST_SAVED_VIEWS = [
   {
@@ -3368,6 +3380,7 @@ export const AUTO_REPLY_FOLDERS = [
 const AR_BASE = {
   templateId: null, lineAccountId: null, activeFrom: null, activeUntil: null,
   cooldownMinutes: null, skipWhenOperatorActive: false, messageKinds: null,
+  receiveSources: ['line'],
   responseWeekdays: null, responseHolidayRule: null, oncePerFriend: false,
   friendConditions: null, respondToAll: false, keywordMatchMode: 'any',
 }
@@ -3500,6 +3513,7 @@ export const AUTO_REPLY_PUBLISH_DRAFT = {
     skipWhenOperatorActive: true,
     priority: 1,
     messageKinds: ['text'],
+    receiveSources: ['line', 'email'],
     friendConditions: { label: '予約者・未対応' },
     actions: [
       { actionType: 'add_tag', config: { tagId: 'tag-booking' } },
@@ -3679,6 +3693,9 @@ export const OUTGOING_WEBHOOKS = [
   },
 ]
 
+/** 機能26。外部送信は行わず、本番APIと同じ成功の器だけを返す。 */
+export const OUTGOING_WEBHOOK_TEST_RESULT = { delivered: true, responseStatus: 204 }
+
 /** 受け取る口。設計 `M0Gb7` の3本。 */
 export const INCOMING_WEBHOOKS = [
   {
@@ -3708,12 +3725,12 @@ export const INCOMING_WEBHOOK_DETAILS = {
       onNotFound: 'do_nothing',
     },
     actions: [
-      { refKind: 'tag', refId: 'tag-external-booking', refVersionId: null },
-      { refKind: 'template', refId: 'template-booking-received', refVersionId: 'template-booking-received-v2' },
+      { refKind: 'tag', refId: 'tag-external-booking', refVersionId: null, displayName: '外部予約あり' },
+      { refKind: 'template', refId: 'template-booking-received', refVersionId: 'template-booking-received-v2', displayName: 'ご予約を承りました' },
     ],
     actionExecution: {
-      state: 'not_connected',
-      reason: '受信後の構造化アクション実行器はまだ接続されていません',
+      state: 'connected',
+      reason: null,
     },
     latestSample: {
       receivedAt: '2026-08-25T01:12:00.000Z',
@@ -5799,6 +5816,59 @@ export const WEBINAR_ACTIONS = [
   { id: 'webinar-action-2', trigger: 'completed', actionType: 'start_scenario', config: { scenarioId: '相談シナリオ' }, position: 1, version: 2 },
 ]
 
+/** 機能10の編集・公開・運用画面だけが読む固定応答。 */
+export const WEBINAR_EDITOR = {
+  version: 4,
+  deliveryKind: 'on_demand',
+  viewingCondition: { kind: 'registered', label: '申込済みの友だち' },
+  publicDescription: 'LINE活用の基本から、申込後の自動フォローまでを実演します。',
+  registrationFormId: 'form-1',
+  notificationMessages: {
+    registration: 'お申し込みありがとうございます。視聴ページはこちらです。',
+    dayBefore: 'ウェビナーは明日20:00からです。',
+    hourBefore: '開始まであと1時間です。',
+  },
+  notificationTest: { status: 'passed', sent: 1, failed: 0, testedAt: '2026-09-07T04:30:00.000Z' },
+  actionPolicy: {
+    templateBody: 'ご視聴ありがとうございました。個別相談はこちらからご予約ください。',
+    missingResultPolicy: 'escalate',
+  },
+  publicPage: {
+    liffId: '2000000000-visualqa',
+    url: 'https://liff.line.me/2000000000-visualqa/webinar/nen-start',
+    unavailableReason: null,
+    description: 'LINE活用の基本から、申込後の自動フォローまでを実演します。',
+    test: { status: 'passed', testedAt: '2026-09-07T04:31:00.000Z' },
+    form: {
+      id: 'form-1', name: 'ウェビナー申込フォーム', active: true,
+      fields: ['お名前', '会社名・屋号', 'メールアドレス'],
+      completionActions: ['タグを付ける', 'シナリオを開始する', '完了メッセージを送る'],
+    },
+  },
+  publication: {
+    status: 'active', draftVersion: 4, publishedVersion: 3,
+    publishedAt: '2026-08-25T02:00:00.000Z',
+  },
+  monitoring: {
+    notificationFailures: 0, duplicateRegistrations: 0,
+    viewSegmentFailures: 0, actionFailures: 0,
+  },
+}
+
+export const WEBINAR_PUBLISH_VALIDATION = {
+  version: 4,
+  checks: [
+    ['video_ready', '動画・公開が設定されています', '動画を配信できます'],
+    ['form_active', '申込フォームが公開中です', 'ウェビナー申込フォーム'],
+    ['cta_range', 'CTAの表示時刻とURLが有効です', '動画の長さ以内で確認済みです'],
+    ['notification_test', '通知のテスト送信が成功しています', '最後のテスト送信は成功です'],
+    ['public_page_test', '公開ページを確認済みです', 'LIFFの公開ページを確認しました'],
+    ['notification_duplicates', '通知の重複がありません', '同じ通知は1回だけ送ります'],
+    ['action_dependencies', '視聴後アクションの参照先が有効です', '2件のアクションを確認しました'],
+  ].map(([key, label, detail]) => ({ key, label, detail, status: 'passed' })),
+  blockers: [], warnings: [],
+}
+
 export const WEBINAR_ANALYTICS = {
   summary: {
     reservations: 184, viewers: 142, registeredAndJoined: 128, watched5m: 128,
@@ -5817,10 +5887,27 @@ export const WEBINAR_ANALYTICS = {
     formSubmittedAt: form ? latestJoinedAt : null,
   })),
   sessions: [], dropoff: [],
+  viewSegments: [
+    { startSeconds: 0, endSeconds: 300, viewers: 142 },
+    { startSeconds: 300, endSeconds: 1_100, viewers: 136 },
+    { startSeconds: 1_100, endSeconds: 1_800, viewers: 101 },
+    { startSeconds: 1_800, endSeconds: 2_538, viewers: 98 },
+  ],
+  measurement: { state: 'available', reason: null },
   formFunnel: {
     ctaImpressions: 96, ctaClicks: 52, formOpens: 41, formStarts: 32,
     submitAttempts: 21, submitSuccesses: 18, submitErrors: 3, fieldCompletions: [],
   },
+}
+
+export const WEBINAR_PARTICIPANTS = {
+  items: WEBINAR_ANALYTICS.participants.map((participant, index) => ({
+    ...participant,
+    actionStatus: index === 3 ? 'failed' : 'completed',
+    errorDetail: index === 3 ? '視聴結果を取得できませんでした' : null,
+    staffIntegrationStatus: index === 3 ? 'needs_attention' : 'completed',
+  })),
+  nextCursor: null,
 }
 
 /**

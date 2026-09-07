@@ -47,6 +47,8 @@ export interface AutoReplyDraftSettings {
   skipWhenOperatorActive: boolean;
   priority: number;
   messageKinds: string | null;
+  /** 受信経路。版スナップショットだけに保存し、既存版は LINE として読む。 */
+  receiveSources: Array<'line' | 'email'>;
   friendConditions: string | null;
   actions: string | null;
   responseWeekdays: string | null;
@@ -109,6 +111,7 @@ export function autoReplyDraftSettingsFromRow(rule: AutoReply): AutoReplyDraftSe
     skipWhenOperatorActive: rule.skip_when_operator_active === 1,
     priority: rule.priority,
     messageKinds: rule.message_kinds_json,
+    receiveSources: ['line'],
     friendConditions: rule.friend_conditions_json,
     actions: rule.actions_json,
     responseWeekdays: rule.response_weekdays_json,
@@ -157,6 +160,9 @@ export function parseAutoReplyVersionSettings(row: AutoReplyVersionRow): AutoRep
     skipWhenOperatorActive: parsed.skipWhenOperatorActive === true,
     priority: Number.isInteger(parsed.priority) ? Number(parsed.priority) : 0,
     messageKinds: parsed.messageKinds ?? null,
+    receiveSources: Array.isArray(parsed.receiveSources)
+      ? parsed.receiveSources.filter((source): source is 'line' | 'email' => source === 'line' || source === 'email')
+      : ['line'],
     friendConditions: parsed.friendConditions ?? null,
     actions: parsed.actions ?? null,
     responseWeekdays: parsed.responseWeekdays ?? null,

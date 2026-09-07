@@ -707,6 +707,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
           summary={interactionSummary}
           summaryStatus={summaryStatus}
           incomingCount={incoming.length}
+          lineAccountId={selectedAccountId}
           onReload={() => void load()}
           onToggle={handleToggleOutgoing}
           onRotate={(wh) => {

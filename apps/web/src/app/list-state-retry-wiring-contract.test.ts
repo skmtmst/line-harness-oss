@@ -57,7 +57,7 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
     const markEdit = readFileSync(join(HERE, 'tags/marks/edit/page.tsx'), 'utf8')
     const connections = readFileSync(join(HERE, 'rich-menus/connections/page.tsx'), 'utf8')
 
-    expect(markEdit).toContain('<ListState kind="empty" description="編集する対応マークが指定されていません。')
+    expect(markEdit).toContain('<SupportMarkEditor markId={id ?? undefined} />')
     expect(connections).toContain('<ListState kind="empty" title="メニューを特定できませんでした"')
   })
 })

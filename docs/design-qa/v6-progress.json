@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 8,
-  "match": 232,
-  "structureMatchDataPending": 33,
+  "match": 249,
+  "structureMatchDataPending": 16,
   "needsFix": 1,
   "unjudged": 1,
-  "remaining": 36,
+  "remaining": 19,
   "features": [
     {
       "feature": 1,
@@ -337,11 +337,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 4,
-      "match": 14,
-      "structureMatchDataPending": 3,
+      "match": 16,
+      "structureMatchDataPending": 1,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 3,
+      "remaining": 1,
       "capturedAt": [
         {
           "pr": 420,
@@ -759,11 +759,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 14,
-      "structureMatchDataPending": 1,
+      "match": 15,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 1,
+      "remaining": 0,
       "capturedAt": [
         {
           "pr": 543,
@@ -1093,11 +1093,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 10,
-      "structureMatchDataPending": 1,
+      "match": 11,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 1,
+      "remaining": 0,
       "capturedAt": [
         {
           "pr": 1135,
@@ -1287,12 +1287,30 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 3,
-      "structureMatchDataPending": 10,
+      "match": 13,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 10,
+      "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1231,
+          "head": "8577adf01",
+          "on": "2026-09-07",
+          "screens": [
+            "lvaY5",
+            "PV1Vh",
+            "d3rFGD",
+            "Ho8z4",
+            "Xjk8q",
+            "GB0NR",
+            "D6yO7e",
+            "TimXl",
+            "Q8sHa",
+            "yxyzQ"
+          ],
+          "note": "Issue #417。作成・編集・公開・参加者・分析を実APIと機能10専用固定応答へ接続し、3101/8788で対象10画面を1440・1920px撮影。全画像で横はみ出し0、設計画像と照合して10画面を一致へ更新した。"
+        },
         {
           "pr": 1081,
           "head": "a55f719b9b",
@@ -1820,11 +1838,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 3,
-      "structureMatchDataPending": 1,
+      "match": 4,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 1,
+      "remaining": 0,
       "capturedAt": [
         {
           "pr": 1150,
@@ -2967,11 +2985,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 2,
-      "structureMatchDataPending": 2,
+      "match": 4,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 2,
+      "remaining": 0,
       "capturedAt": [
         {
           "pr": 547,

@@ -25,8 +25,10 @@ describe('V6 外部連携の接続別集計と受信口詳細', () => {
     expect(OVERVIEWS).not.toContain('接続別集計待ち')
   })
 
-  it('APIにないテスト送信を動くように見せない', () => {
-    expect(OVERVIEWS).not.toContain('1回 試してみる')
+  it('送信先へテスト送信できる', () => {
+    expect(API).toContain('/api/webhooks/outgoing/${encodeURIComponent(id)}/test')
+    expect(OVERVIEWS).toContain('api.webhooks.outgoing.test(item.id, lineAccountId)')
+    expect(OVERVIEWS).toContain('1回 試してみる')
     expect(OVERVIEWS).toContain("item.deliverySummary.canRetry ? '失敗をやり直す' : '中身を見る'")
     expect(OVERVIEWS).toContain('aria-expanded={settingsId === item.id}')
   })
@@ -38,9 +40,10 @@ describe('V6 外部連携の接続別集計と受信口詳細', () => {
     expect(OVERVIEWS).toContain('if (cancelled) return')
   })
 
-  it('照合・処理・マスク済み見本・差し込み項目だけを表示する', () => {
+  it('照合・処理名・マスク済み見本・差し込み項目だけを表示する', () => {
     expect(OVERVIEWS).toContain('identityMatchingLabel(detail)')
-    expect(OVERVIEWS).toContain('detail.actionExecution.state')
+    expect(OVERVIEWS).toContain('incomingActionLabel(action.refKind)')
+    expect(OVERVIEWS).toContain('{action.displayName}')
     expect(OVERVIEWS).toContain('maskedSampleText(detail.latestSample.fields)')
     expect(OVERVIEWS).toContain('{field.token}')
     expect(OVERVIEWS).not.toContain('{action.refId}')

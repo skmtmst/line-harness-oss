@@ -149,6 +149,35 @@ describe('V6 broadcast data contracts', () => {
     expect(failed.status).toBe(500);
   });
 
+  it('Slack通知の3状態を版付きで保存し、古い版は409にする', async () => {
+    const initial = await app(testDb.db).request(
+      '/api/broadcasts/notification-settings?lineAccountId=account-1',
+    );
+    expect(initial.status).toBe(200);
+    await expect(initial.json()).resolves.toMatchObject({
+      data: {
+        version: 0, started: true, completed: true, failed: true,
+        displayText: '配信開始・完了・エラーはSlackの同じスレッドへ通知します。',
+      },
+    });
+
+    const saved = await app(testDb.db).request(
+      '/api/broadcasts/notification-settings?lineAccountId=account-1',
+      json('PUT', { expectedVersion: 0, started: true, completed: false, failed: true }),
+    );
+    expect(saved.status).toBe(200);
+    await expect(saved.json()).resolves.toMatchObject({
+      data: { version: 1, displayText: '配信開始・エラーはSlackの同じスレッドへ通知します。' },
+    });
+
+    const conflict = await app(testDb.db).request(
+      '/api/broadcasts/notification-settings?lineAccountId=account-1',
+      json('PUT', { expectedVersion: 0, started: true, completed: true, failed: true }),
+    );
+    expect(conflict.status).toBe(409);
+    await expect(conflict.json()).resolves.toMatchObject({ code: 'version_conflict' });
+  });
+
   it('途中下書きとメッセージ設定を保存し、版競合を409にする', async () => {
     testDb.raw.prepare(`
       INSERT INTO common_actions

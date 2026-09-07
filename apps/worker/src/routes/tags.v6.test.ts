@@ -212,6 +212,40 @@ describe('V6 タグ定義と共通アクション連動', () => {
     });
   });
 
+  it('影響revisionと版が一致すると、付与と履歴を残してタグを保管する', async () => {
+    const created = await app(testDb.db).request('/api/tags', json('POST', {
+      lineAccountId: 'account-1',
+      name: '保管するタグ',
+      mileage: { self: 0, referrer: 0, multiplier: null, priority: 0 },
+    }));
+    const createdBody = await created.json() as { data: { tag: { id: string; version: number } } };
+    const impactResponse = await app(testDb.db).request(
+      `/api/tags/${createdBody.data.tag.id}/dependencies?lineAccountId=account-1`,
+    );
+    const impactBody = await impactResponse.json() as { data: { revision: string } };
+
+    const archived = await app(testDb.db).request(
+      `/api/tags/${createdBody.data.tag.id}/archive?lineAccountId=account-1`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'archive-tag-test-1' },
+        body: JSON.stringify({
+          expectedVersion: createdBody.data.tag.version,
+          impactRevision: impactBody.data.revision,
+        }),
+      },
+    );
+    expect(archived.status).toBe(200);
+    await expect(archived.json()).resolves.toMatchObject({
+      data: { archived: true, replacedFriendCount: 0 },
+    });
+    expect(testDb.raw.prepare('SELECT status, version FROM tags WHERE id = ?')
+      .get(createdBody.data.tag.id)).toEqual({ status: 'archived', version: 2 });
+    expect(testDb.raw.prepare(
+      "SELECT action FROM operation_audit WHERE target_kind = 'tag' AND target_id = ?",
+    ).get(createdBody.data.tag.id)).toEqual({ action: 'archived' });
+  });
+
   it('閲覧担当者は作成・更新・依存確認を行えない', async () => {
     const staff: AuthenticatedStaff = { ...admin, id: 'staff-1', role: 'staff', name: '担当者' };
     const instance = app(testDb.db, staff);
