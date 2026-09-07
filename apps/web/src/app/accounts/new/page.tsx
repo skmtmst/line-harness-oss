@@ -6,6 +6,7 @@ import { api } from '@/lib/api'
 import type { LineAccount } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import PageHeader from '@/components/shared/page-header'
+import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import StatusBadge from '@/components/shared/status-badge'
 import { emptyAccountFormState, type AccountFormState } from '@/components/accounts/account-form-fields'
@@ -412,7 +413,7 @@ function EndpointRow({ label, value, help }: { label: string; value: string; hel
       <p className="text-ink-faint text-xs font-medium">{label}</p>
       <div className="mt-1 flex items-stretch gap-2">
         <p className="bg-canvas-sunken rounded-control text-ink min-w-0 flex-1 break-all px-3 py-2 text-xs leading-relaxed">{value}</p>
-        <button type="button" onClick={() => void copy()} disabled={value === '—' || value.startsWith('LIFF ID')} className="border-hairline rounded-control border px-3 text-xs font-semibold disabled:opacity-40">{copied ? 'コピー済み' : 'コピー'}</button>
+        <Button type="button" onClick={() => void copy()} disabled={value === '—' || value.startsWith('LIFF ID')} className="shrink-0">{copied ? 'コピー済み' : 'コピー'}</Button>
       </div>
       <p className="text-ink-faint mt-1 text-xs">{help}</p>
     </div>
@@ -429,9 +430,7 @@ function SelectField({ label, value, onChange, options, required = false }: {
   return (
     <label className="block">
       <span className="text-ink-secondary mb-1 block text-xs font-medium">{label}{required && <span className="text-danger ml-1">必須</span>}</span>
-      <select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} required={required} className="border-hairline rounded-control text-ink w-full border bg-canvas px-3 py-2 text-sm">
-        {options.map((option) => <option key={option.value || 'none'} value={option.value}>{option.label}</option>)}
-      </select>
+      <Select aria-label={label} value={value} onChange={onChange} options={options} size="full" />
     </label>
   )
 }

@@ -87,15 +87,10 @@ LINEアカウントを登録
 表示名必須
 タイムゾーン必須
 Asia/Tokyo
-Asia/Ho_Chi_Minh
 国・地域（任意）
 役割メモ（任意）
 親アカウント（任意）
 選んでください
-然-NEN- TEST
-然-NEN- 本店
-然-NEN- 渋谷店
-旧キャンペーン
 
 Messaging API
 
