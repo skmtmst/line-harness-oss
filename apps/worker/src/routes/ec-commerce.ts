@@ -90,6 +90,12 @@ function subscriptionItems(value: unknown): string | null {
   return labels.length ? labels.join('、') : null;
 }
 
+function monthKey(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const match = value.match(/^(\d{4})-(\d{1,2})/);
+  return match ? `${match[1]}-${match[2].padStart(2, '0')}` : null;
+}
+
 function isValidHttpsUrl(value: string): boolean {
   if (!value) return true;
   try { return new URL(value).protocol === 'https:'; } catch { return false; }
@@ -314,6 +320,20 @@ ecCommerce.get('/api/ec-commerce/subscriptions', requireRole('owner', 'admin', '
   });
   const visible = filter === 'all' ? items : items.filter((item) => item.status === filter);
   const knownAmounts = items.map((item) => item.amount).filter((value): value is number => value !== null);
+  const monthly = new Map<string, { count: number; amount: number }>();
+  for (const item of items) {
+    const month = monthKey(item.startedAt);
+    if (!month) continue;
+    const current = monthly.get(month) ?? { count: 0, amount: 0 };
+    current.count += 1;
+    current.amount += item.amount ?? 0;
+    monthly.set(month, current);
+  }
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const cancelledThisMonth = items.filter((item) => monthKey(item.cancelledAt) === currentMonth).length;
+  const cancellationReasons = new Map<string, number>();
+  for (const item of items) if (item.cancellationReason) cancellationReasons.set(item.cancellationReason, (cancellationReasons.get(item.cancellationReason) ?? 0) + 1);
+  const cancellationTopReason = [...cancellationReasons.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
   return c.json({
     success: true,
@@ -328,9 +348,10 @@ ecCommerce.get('/api/ec-commerce/subscriptions', requireRole('owner', 'admin', '
         monthlyAmount: items.length > 0 && knownAmounts.length === items.length
           ? knownAmounts.reduce((sum, value) => sum + value, 0)
           : null,
-        startedThisMonth: null,
-        cancelledThisMonth: null,
-        cancellationTopReason: null,
+        startedThisMonth: items.filter((item) => monthKey(item.startedAt) === currentMonth).length,
+        cancelledThisMonth,
+        cancellationTopReason,
+        monthlyStats: [...monthly.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([month, value]) => ({ month, ...value })),
       },
       risk: {
         source: 'payment_status',
@@ -349,7 +370,7 @@ ecCommerce.get('/api/ec-commerce/connector', requireRole('owner', 'admin', 'staf
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
   }
-  const [connector, health] = await Promise.all([
+  const [connector, health, impactRows] = await Promise.all([
     c.env.DB.prepare(
       `SELECT id, provider, shop_domain, status, inbound_secret_encrypted,
               inbound_secret_last4, secret_updated_at, event_types_json,
@@ -365,7 +386,15 @@ ecCommerce.get('/api/ec-commerce/connector', requireRole('owner', 'admin', 'staf
          MAX(CASE WHEN status = 'processed' THEN processed_at END) AS last_succeeded_at
        FROM ec_events WHERE line_account_id = ?`,
     ).bind(lineAccountId).first<Record<string, unknown>>(),
+    Promise.all([
+      c.env.DB.prepare('SELECT COUNT(*) AS count FROM nen_campaign_settings').first<{ count: number }>(),
+      c.env.DB.prepare('SELECT COUNT(*) AS count FROM conversion_events e JOIN friends f ON f.id = e.friend_id WHERE f.line_account_id = ?').bind(lineAccountId).first<{ count: number }>(),
+      c.env.DB.prepare('SELECT COUNT(*) AS count FROM mileage_rules').first<{ count: number }>(),
+      c.env.DB.prepare('SELECT COUNT(*) AS count FROM friend_fields').first<{ count: number }>(),
+      c.env.DB.prepare('SELECT COUNT(*) AS count FROM analytics_saved_analyses WHERE line_account_id = ?').bind(lineAccountId).first<{ count: number }>(),
+    ]),
   ]);
+  const [nenCampaigns, conversions, mileageRules, friendFields, analytics] = impactRows;
   return c.json({
     success: true,
     data: {
@@ -391,11 +420,11 @@ ecCommerce.get('/api/ec-commerce/connector', requireRole('owner', 'admin', 'staf
         lastSucceededAt: health?.last_succeeded_at ?? null,
       },
       impact: {
-        nenCampaigns: null,
-        conversions: null,
-        mileageRules: null,
-        friendFields: null,
-        analytics: null,
+        nenCampaigns: nenCampaigns?.count ?? 0,
+        conversions: conversions?.count ?? 0,
+        mileageRules: mileageRules?.count ?? 0,
+        friendFields: friendFields?.count ?? 0,
+        analytics: analytics?.count ?? 0,
       },
       retryPolicy: null,
     },
