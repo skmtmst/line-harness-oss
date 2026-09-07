@@ -261,6 +261,18 @@ function serializeBroadcast(row: DbBroadcast) {
     // 一覧のフォルダ分類と予約完了の設定表示に使う。DBには保存されていたが、
     // APIで落としていたため、再読込すると全件が「未分類」に見えていた。
     folderId: (r.folder_id as string | null | undefined) ?? null,
+    /*
+     * 一覧に載せる集計の最新値。送信済みごとに insight 口を叩く N+1 を
+     * なくすため、一覧クエリで既に読んだ行をそのまま返す。集計行が無い
+     * (未送信・未取得)ときは null で、画面は手動の取得ボタンを出す。
+     */
+    insightSummary: (r.insight_id as string | null | undefined) == null ? null : {
+      delivered: r.insight_delivered == null ? null : Number(r.insight_delivered),
+      uniqueImpression: r.insight_unique_impression == null ? null : Number(r.insight_unique_impression),
+      uniqueClick: r.insight_unique_click == null ? null : Number(r.insight_unique_click),
+      openRate: (r.open_rate as number | null | undefined) ?? null,
+      clickRate: (r.click_rate as number | null | undefined) ?? null,
+    },
     measureOpens: r.measure_opens === undefined ? true : Number(r.measure_opens) !== 0,
     internalMemo: (r.internal_memo as string | null | undefined) ?? null,
     draftStep: (r.draft_step as string | null | undefined) ?? null,
@@ -280,7 +292,9 @@ broadcasts.get('/api/broadcasts', async (c) => {
     if (lineAccountId && !scope.allowedAccountIds.includes(lineAccountId)) {
       return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
     }
-    const allItems = await getBroadcasts(c.env.DB, lineAccountId || undefined, scope);
+    // 並び順は一覧画面の選択と連動する。知らない値は新しい順に倒す。
+    const sort = c.req.query('sort') === 'oldest' ? 'asc' as const : 'desc' as const;
+    const allItems = await getBroadcasts(c.env.DB, lineAccountId || undefined, scope, { order: sort });
     const status = c.req.query('status');
     const folderId = c.req.query('folderId');
     const filtered = allItems.filter((item) =>

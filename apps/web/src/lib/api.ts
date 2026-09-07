@@ -1134,6 +1134,17 @@ export type ApiBroadcast = Omit<Broadcast, 'targetType'> & {
   segmentConditions?: SegmentCondition | null;
   /** 分類。null なら未分類。 */
   folderId?: string | null;
+  /**
+   * 一覧に同梱される集計の最新値。行が無い(未送信・未取得)ときは null。
+   * 送信済みごとの insight 取得(N+1)を一覧1回で済ませるため。
+   */
+  insightSummary?: {
+    delivered: number | null
+    uniqueImpression: number | null
+    uniqueClick: number | null
+    openRate: number | null
+    clickRate: number | null
+  } | null;
   /** 開封数を取るか。 */
   measureOpens?: boolean;
   /** 友だちには見せない運用メモ。 */
@@ -5353,12 +5364,27 @@ export const api = {
       fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}/cancel`, {
         method: 'POST',
       }),
-    list: (params?: { accountId?: string }) => {
-      const query = params?.accountId ? '?lineAccountId=' + params.accountId : ''
+    list: (params?: {
+      accountId?: string
+      limit?: number
+      cursor?: string | number
+      status?: string
+      folderId?: string
+      /** 'newest' (既定) または 'oldest'。一覧の並び順選択と連動する。 */
+      sort?: 'newest' | 'oldest'
+    }) => {
+      const query = new URLSearchParams()
+      if (params?.accountId) query.set('lineAccountId', params.accountId)
+      if (params?.limit !== undefined) query.set('limit', String(params.limit))
+      if (params?.cursor !== undefined && params.cursor !== '') query.set('cursor', String(params.cursor))
+      if (params?.status) query.set('status', params.status)
+      if (params?.folderId) query.set('folderId', params.folderId)
+      if (params?.sort && params.sort !== 'newest') query.set('sort', params.sort)
+      const qs = query.toString()
       return fetchApi<ApiResponse<ApiBroadcast[]> & {
         kpis?: BroadcastListKpis
         pagination?: { total: number; limit: number; cursor: number; nextCursor: string | null }
-      }>('/api/broadcasts' + query)
+      }>(`/api/broadcasts${qs ? `?${qs}` : ''}`)
     },
     get: (id: string) =>
       fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}`),
@@ -7355,10 +7381,20 @@ export const api = {
         '/api/chats?' + new URLSearchParams(query),
       )
     },
-    get: (id: string) =>
-      fetchApi<ApiResponse<Chat & { messages?: { id: string; content: string; senderType: string; createdAt: string }[] }>>(
-        `/api/chats/${id}`,
-      ),
+    get: (id: string, params?: { limit?: number; beforeAt?: string; beforeId?: string }) => {
+      const query = new URLSearchParams()
+      if (params?.limit !== undefined) query.set('limit', String(params.limit))
+      if (params?.beforeAt) query.set('beforeAt', params.beforeAt)
+      if (params?.beforeId) query.set('beforeId', params.beforeId)
+      const qs = query.toString()
+      return fetchApi<ApiResponse<Chat & {
+        messages?: { id: string; content: string; senderType: string; createdAt: string }[]
+        /** 古い履歴が残っているか。画面は「前のメッセージ」で遡る。 */
+        hasMoreMessages?: boolean
+      }>>(
+        `/api/chats/${id}${qs ? `?${qs}` : ''}`,
+      )
+    },
     create: (data: { friendId: string; operatorId?: string | null }) =>
       fetchApi<ApiResponse<Chat>>('/api/chats', {
         method: 'POST',
