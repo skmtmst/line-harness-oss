@@ -7,6 +7,7 @@ import ListState from '@/components/shared/list-state'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import {
   api,
+  type AffiliateAccountSettlementPreview,
   type AffiliateArchiveImpact,
   type AffiliateSettlementPreview,
 } from '@/lib/api'
@@ -177,11 +178,15 @@ export function AffiliateArchiveDialog({
 export function AffiliatePaymentConfirmDialog({
   target,
   accountId,
+  settlement,
+  periodTo,
   onClose,
   onConfirmed,
 }: {
   target: { id: string; name: string } | null
   accountId: string
+  settlement: AffiliateAccountSettlementPreview['affiliates'][number] | null
+  periodTo: string | null
   onClose: () => void
   onConfirmed: () => void
 }) {
@@ -190,6 +195,8 @@ export function AffiliatePaymentConfirmDialog({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [idempotencyKey, setIdempotencyKey] = useState('')
+  const [issueStatement, setIssueStatement] = useState(false)
+  const [statementKey, setStatementKey] = useState('')
 
   const load = useCallback(async () => {
     if (!target) return
@@ -209,6 +216,8 @@ export function AffiliatePaymentConfirmDialog({
   useEffect(() => {
     if (!target) return
     setIdempotencyKey(crypto.randomUUID())
+    setStatementKey(crypto.randomUUID())
+    setIssueStatement(false)
     void load()
   }, [load, target])
 
@@ -225,6 +234,21 @@ export function AffiliatePaymentConfirmDialog({
       if (!response.success) {
         setError(response.error)
         return
+      }
+      if (issueStatement) {
+        try {
+          const statement = await api.affiliates.createStatement({
+            lineAccountId: accountId,
+            settlementId: response.data.settlementId,
+            affiliateId: target.id,
+            expectedVersion: 1,
+          }, statementKey)
+          if (!statement.success) throw new Error(statement.error)
+        } catch {
+          onConfirmed()
+          setError('支払いは確定しましたが、支払明細とLINE通知を作れませんでした。同じ画面でもう一度お試しください。')
+          return
+        }
       }
       onConfirmed()
       onClose()
@@ -280,7 +304,7 @@ export function AffiliatePaymentConfirmDialog({
           <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">確定する額</dt><dd className="text-ink mt-1 text-lg font-bold">{yen(preview.amount)}</dd></div>
             <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">成果の件数</dt><dd className="text-ink mt-1 text-lg font-bold">{preview.conversionCount.toLocaleString('ja-JP')}件</dd></div>
-            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">締め日</dt><dd className="text-ink mt-1 text-lg font-bold">{dateLabel(preview.closeDate)}</dd><p className="text-ink-faint mt-1 text-xs">設定は未接続</p></div>
+            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">締め日</dt><dd className="text-ink mt-1 text-lg font-bold">{dateLabel(periodTo ?? preview.closeDate)}</dd><p className="text-ink-faint mt-1 text-xs">今回の締め期間</p></div>
             <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">支払日</dt><dd className="text-ink mt-1 text-lg font-bold">{dateLabel(preview.paymentDate)}</dd><p className="text-ink-faint mt-1 text-xs">設定は未接続</p></div>
           </dl>
 
@@ -296,14 +320,16 @@ export function AffiliatePaymentConfirmDialog({
           </div>
 
           <div className="rounded-control border border-info bg-info-bg p-3 text-sm text-info">
-            <p className="font-semibold">振込先　—</p>
-            <p className="mt-1 text-xs">銀行口座は未接続です。振込そのものはここでは行いません。</p>
+            <p className="font-semibold">振込先　{settlement?.bankProfileRegistered ? '登録済み' : '登録されていません'}</p>
+            <p className="mt-1 text-xs">口座番号は本人だけに表示します。振込そのものはここでは行いません。</p>
           </div>
           <p className="text-ink-secondary text-xs leading-5">
             確定したあとに成果を却下しても、この支払いからは外れません。次の未確定期間へマイナス調整として残します。
           </p>
-          <label className="text-ink-faint flex items-start gap-2 text-xs"><input type="checkbox" disabled />確定したことをLINEに知らせる（通知は未接続）</label>
-          <label className="text-ink-faint flex items-start gap-2 text-xs"><input type="checkbox" disabled />支払明細のPDFを作る（PDF生成は未接続）</label>
+          <label className="text-ink-secondary flex items-start gap-2 text-xs">
+            <input type="checkbox" checked={issueStatement} onChange={(event) => setIssueStatement(event.target.checked)} />
+            <span>支払明細のPDFを作り、この方のLINEへ知らせる</span>
+          </label>
         </div>
       ) : null}
     </Dialog>

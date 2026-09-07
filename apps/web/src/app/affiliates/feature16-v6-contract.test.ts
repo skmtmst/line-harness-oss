@@ -34,6 +34,10 @@ describe('機能16 V6の一覧', () => {
       expect(affiliates).toContain(word)
     }
     expect(affiliates).toContain('api.affiliates.paymentSummaries(accountId)')
+    expect(affiliates).toContain('api.affiliates.settlementPreview(accountId, settlementPeriod)')
+    expect(affiliates).toContain('accountSettlement?.affiliates.find')
+    expect(affiliates).toContain('口座番号は本人だけに表示')
+    expect(affiliates).toContain('金額を0とは扱いません')
   })
 
   it('成果承認は全状態を読み、確認不要だけをまとめて承認する', () => {

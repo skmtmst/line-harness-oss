@@ -102,6 +102,80 @@ import type {
   UndoIdentityCandidateRequest,
 } from '@line-crm/shared'
 
+export type AccessUserStatus = 'active' | 'invited' | 'expired' | 'suspended'
+export type AccessRoleBundle = 'administrator' | 'operations' | 'reception' | 'view_only' | 'custom'
+
+export type AccessUserItem = {
+  id: string
+  name: string
+  email: string | null
+  jobTitle: string | null
+  roleBundle: AccessRoleBundle
+  featureCount: number | null
+  hasFieldMasks: boolean | null
+  accountScope: {
+    type: 'all' | 'accounts'
+    assignedLineAccountId: string | null
+    lineAccountIds: string[]
+    includesDescendants: boolean
+  }
+  lastLoginAt: string | null
+  lastActionAt: string | null
+  mfaEnabled: boolean
+  status: AccessUserStatus
+  policyVersion: number
+  createdAt: string
+  updatedAt: string
+}
+
+export type AccessUserSummary = {
+  active: number
+  invited: number
+  expiredInvitations: number
+  unused90Days: number
+  mfaEnabled: number
+  mfaRate: number | null
+  roleCounts: Record<AccessRoleBundle, number>
+}
+
+export type AccessRoleItem = {
+  id: AccessRoleBundle
+  name: string
+  description: string
+  featureAccess: 'edit' | 'view' | 'custom'
+  requiresMfa: boolean
+  assignedUserCount: number
+}
+
+export type AuditEventItem = {
+  id: string
+  category: 'auth' | 'business'
+  lineAccountId: string | null
+  actor: { id: string | null; name: string | null; role: string | null }
+  action: string
+  target: { kind: string | null; id: string | null } | null
+  result: 'success' | 'denied' | 'failed'
+  before: Record<string, unknown> | null
+  after: Record<string, unknown> | null
+  reason: string | null
+  requestTraceId: string | null
+  ipPrefix: string | null
+  deviceFamily: string | null
+  riskLevel: 'normal' | 'suspicious' | 'high'
+  retentionClass: 'general' | 'security' | 'personal_data'
+  createdAt: string
+}
+
+export type AuditEventSummary = {
+  periodDays: 30
+  total: number
+  deleted: number
+  sent: number
+  changed: number
+  logins: number
+  suspiciousLogins: number
+}
+
 export type FriendProfileCandidateOption = {
   sourceFriendId: string
   sourceLabel: string
@@ -694,13 +768,16 @@ export type ConversionDefinitionListItem = {
   status: ConversionDefinitionStatus
   version: number
   usageCount: number
+  usageNames: string[]
   metrics: {
     recordedCount: number
     netCount: number
     reversedCount: number | null
     netValue: number
-    reversalState: 'unavailable'
+    reversalState: 'available' | 'unavailable'
     reversalReason: string
+    cancellationCount: number | null
+    cancellationValue: number | null
   }
   stoppedAt: string | null
   createdAt: string
@@ -732,7 +809,7 @@ export type ConversionDefinitionReport = {
     previousNetCount: number
     previousNetValue: number
     countChangeRate: number | null
-    reversalState: 'unavailable'
+    reversalState: 'available' | 'unavailable'
     reversalReason: string
     fastestGrowing: {
       conversionPointId: string
@@ -744,6 +821,8 @@ export type ConversionDefinitionReport = {
       previousNetValue: number
       countChange: number
     } | null
+    cancellationCount: number | null
+    cancellationValue: number | null
   }
   daily: Array<{
     day: string
@@ -761,6 +840,17 @@ export type ConversionDefinitionReport = {
     previousNetCount: number
     previousNetValue: number
     countChange: number
+    cancellationCount: number | null
+    cancellationValue: number | null
+    routes: Array<{
+      routeKey: string
+      label: string
+      attributionState: 'attributed' | 'unattributed'
+      netCount: number
+      netValue: number
+      audience: number | null
+      conversionRate: number | null
+    }>
   }>
   byRoute: Array<{
     routeKey: string
@@ -819,6 +909,62 @@ export type AffiliateSettlementPreview = {
     unitReward: number | null
     subtotal: number
   }>
+}
+
+/** アカウント単位で締める前に確認する、追記台帳の対象。 */
+export type AffiliateAccountSettlementPreview = {
+  lineAccountId: string
+  periodFrom: string
+  periodTo: string
+  currency: 'JPY'
+  totalAmount: number
+  conversionCount: number
+  affiliates: Array<{
+    affiliateId: string
+    affiliateName: string
+    code: string
+    amount: number
+    conversionCount: number
+    /** 管理画面へ口座番号を返さず、登録の有無だけを扱う。 */
+    bankProfileRegistered: boolean
+  }>
+  previewVersion: string
+}
+
+export type AffiliateAccountSettlementResult = {
+  kind: 'created' | 'duplicate'
+  settlementId: string
+  totalAmount: number
+  conversionCount: number
+  version: number
+  closedAt: string
+}
+
+export type AffiliatePayoutBatch = {
+  id: string
+  lineAccountId: string
+  settlementId: string
+  totalAmount: number
+  currency: string
+  lineCount: number
+  state: string
+  bankFormat: string | null
+  fileChecksum: string | null
+  version: number
+  downloadExpiresAt: string | null
+  createdAt: string
+}
+
+export type AffiliateStatement = {
+  id: string
+  lineAccountId: string
+  affiliateId: string
+  settlementId: string
+  totalAmount: number
+  status: string
+  version: number
+  expiresAt: string | null
+  createdAt: string
 }
 
 /** Broadcast type from API (now camelCase after worker serialization) */
@@ -4216,6 +4362,74 @@ export const api = {
       >(`/api/login-audit${query ? `?${query}` : ''}`)
     },
   },
+  /** ログインユーザーの利用状況と権限bundle。 */
+  access: {
+    users: (params?: {
+      lineAccountId?: string
+      status?: AccessUserStatus
+      roleBundle?: AccessRoleBundle
+      query?: string
+      limit?: number
+      offset?: number
+    }) => {
+      const q = new URLSearchParams()
+      if (params?.lineAccountId) q.set('lineAccountId', params.lineAccountId)
+      if (params?.status) q.set('status', params.status)
+      if (params?.roleBundle) q.set('roleBundle', params.roleBundle)
+      if (params?.query) q.set('query', params.query)
+      if (params?.limit !== undefined) q.set('limit', String(params.limit))
+      if (params?.offset !== undefined) q.set('offset', String(params.offset))
+      const query = q.toString()
+      return fetchApi<ApiResponse<{
+        items: AccessUserItem[]
+        summary: AccessUserSummary
+        pagination: { total: number; limit: number; offset: number }
+      }>>(`/api/access/users${query ? `?${query}` : ''}`)
+    },
+    roles: (lineAccountId?: string) => {
+      const query = lineAccountId
+        ? `?lineAccountId=${encodeURIComponent(lineAccountId)}`
+        : ''
+      return fetchApi<ApiResponse<{
+        items: AccessRoleItem[]
+        totalBundles: number
+        totalAssignedUsers: number
+      }>>(`/api/access/roles${query}`)
+    },
+  },
+  /** 認証と業務操作をまとめた共通監査。 */
+  audit: {
+    events: (params?: {
+      lineAccountId?: string
+      category?: 'auth' | 'business'
+      result?: 'success' | 'denied' | 'failed'
+      actorId?: string
+      action?: string
+      query?: string
+      from?: string
+      to?: string
+      limit?: number
+      offset?: number
+    }) => {
+      const q = new URLSearchParams()
+      if (params?.lineAccountId) q.set('lineAccountId', params.lineAccountId)
+      if (params?.category) q.set('category', params.category)
+      if (params?.result) q.set('result', params.result)
+      if (params?.actorId) q.set('actorId', params.actorId)
+      if (params?.action) q.set('action', params.action)
+      if (params?.query) q.set('query', params.query)
+      if (params?.from) q.set('from', params.from)
+      if (params?.to) q.set('to', params.to)
+      if (params?.limit !== undefined) q.set('limit', String(params.limit))
+      if (params?.offset !== undefined) q.set('offset', String(params.offset))
+      const query = q.toString()
+      return fetchApi<ApiResponse<{
+        items: AuditEventItem[]
+        summary: AuditEventSummary
+        pagination: { total: number; limit: number; offset: number }
+      }>>(`/api/audit/events${query ? `?${query}` : ''}`)
+    },
+  },
   /** 回答フォーム。 */
   forms: {
     list: (accountId: string) =>
@@ -5634,6 +5848,65 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+    settlementPreview: (
+      lineAccountId: string,
+      period: { periodFrom: string; periodTo: string },
+    ) => fetchApi<ApiResponse<AffiliateAccountSettlementPreview>>(
+      `/api/affiliate-settlements/preview?${new URLSearchParams({ lineAccountId, ...period })}`,
+    ),
+    closeSettlement: (
+      data: {
+        lineAccountId: string
+        periodFrom: string
+        periodTo: string
+        expectedPreviewVersion: string
+      },
+      idempotencyKey: string,
+    ) => fetchApi<ApiResponse<AffiliateAccountSettlementResult>>('/api/affiliate-settlements', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(data),
+    }),
+    createPayoutBatch: (
+      data: { lineAccountId: string; settlementId: string; expectedVersion: number; bankFormat: 'zengin_csv' },
+      idempotencyKey: string,
+    ) => fetchApi<ApiResponse<AffiliatePayoutBatch>>('/api/affiliate-payout-batches', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(data),
+    }),
+    payoutStepUp: (code: string) =>
+      fetchApi<ApiResponse<{ token: string; purpose: 'affiliate.payout.export'; expiresAt: string }>>(
+        '/api/auth/step-up',
+        { method: 'POST', body: JSON.stringify({ code, purpose: 'affiliate.payout.export' }) },
+      ),
+    exportPayoutBatch: (
+      batchId: string,
+      data: { lineAccountId: string; expectedVersion: number },
+      stepUpToken: string,
+      idempotencyKey: string,
+    ) => fetchApi<ApiResponse<AffiliatePayoutBatch & { downloadUrl: string }>>(
+      `/api/affiliate-payout-batches/${encodeURIComponent(batchId)}/export`,
+      {
+        method: 'POST',
+        headers: {
+          'X-Step-Up-Token': stepUpToken,
+          'Idempotency-Key': idempotencyKey,
+        },
+        body: JSON.stringify(data),
+      },
+    ),
+    createStatement: (
+      data: { lineAccountId: string; settlementId: string; affiliateId: string; expectedVersion: number },
+      idempotencyKey: string,
+    ) => fetchApi<ApiResponse<AffiliateStatement> & { notificationAttempted?: boolean }>(
+      '/api/affiliate-statements',
+      {
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify(data),
+      },
+    ),
   },
   templates: {
     list: (category?: string, accountId?: string) => {
