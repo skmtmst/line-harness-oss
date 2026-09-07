@@ -98,23 +98,20 @@ export default function StaffShiftsPage() {
     void Promise.all([
       bookingApi.getSettings(selectedAccountId),
       bookingApi.listMenus(selectedAccountId),
-      bookingApi.listStaff(selectedAccountId),
-    ]).then(async ([settingsResult, menuResult, staffResult]) => {
+    ]).then(async ([settingsResult, menuResult]) => {
       if (requestId !== requestRef.current) return
       if (!settingsResult.success) throw new Error(settingsResult.error)
       setSettings(settingsResult.data)
       setLoadStatus('ready')
 
       const menu = menuResult.menus.find((item) => item.is_active)
-      const staff = staffResult.staff.find((item) => item.is_active)
-      if (!menu || !staff) {
+      if (!menu) {
         setSlots([])
         return
       }
       try {
         const availability = await bookingApi.getAvailability(selectedAccountId, {
           menuId: menu.id,
-          staffId: staff.id,
           from: dates[0].date,
           to: dates[dates.length - 1].date,
         })

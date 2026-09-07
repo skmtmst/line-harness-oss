@@ -2587,7 +2587,7 @@ export const SCREENS = [
   { ...BOOKING_SET, node: 'tksPc',
     clock: '2026-08-26T00:00:00.000Z',
     states: {
-      apis: ['**/api/booking/admin/settings*', '**/api/booking/admin/menus*', '**/api/booking/admin/staff*', '**/api/booking/admin/availability*'],
+      apis: ['**/api/booking/admin/settings*', '**/api/booking/admin/menus*', '**/api/booking/admin/availability*'],
       kinds: ['normal', 'loading', 'error'],
     }, name: '28-1-A 受付枠と休業日', route: '/booking/staff/shifts', verdict: 'unjudged', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** **撮れていないので判定しない。** スタッフの固定データが空で、押し口（設計の見本では「佐々木」）が0件。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** head `595c8359` で**受付時間を曜日×時間の格子**にした。1行ずつだと「何曜の何時なら受け付けるか」を見比べられない。受け付ける時間が入っている幅だけを出す。**特別な日を「休業」と決めつけない**——見出しは「特別な休み・営業」で、どちらかは口が言っていないので件数だけ示して一覧へ渡す。通常・読込中・取得失敗の3状態を撮った。**`getDay()` が閲覧側の時計で曜日を出す不具合を直した**（開発機がUTC+7で月曜が日曜に化けた）。残る差：設計はGoogleカレンダーの予定も格子に重ねる（予定を返す口が要る）', verdictSource: 'Claude実装' , verdictHead: '31293424' },
   { ...BOOKING_SET, node: 'GhOb3', name: '28-1-B 予約メニューをつくる', route: '/booking/menus/new', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #241 / PR #1022 / UI HEAD abae52d46 を3105/8792で再撮影。構造一致・価格種別と共通設定API待ち。** 予約後の受付通知、前日・開始前リマインダ、実際の「予約してくれた」マイルルール300を同じ画面で確認でき、予約画面プレビュー・担当・質問・公開状態まで設計順に表示した。1440・1920pxとも横はみ出し0。残る差は固定額・無料・お問い合わせを区別して保存する価格種別と、店舗共通値を継承／上書きするAPI。値を作らず現在の保存契約に合わせているため一致にはしない。', verdictSource: 'booking-settings-v6/GhOb3.txt + 2026-09-07 1440/1920px screenshots', verdictHead: 'abae52d46' },
