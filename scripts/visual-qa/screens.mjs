@@ -3965,9 +3965,17 @@ const ISSUE_212_REVIEW = {
 const ISSUE_305_REVIEW = {
   tksPc: {
     verdict: 'structure_match_data_pending',
-    note: '曜日別の受付時間、担当者の切替、特別な休み・営業、予約ルール、顧客向けカレンダープレビュー、困りごと、関連画面、Googleカレンダー連携を設計順へそろえた。通常・読込中・取得失敗を1440/1920pxで撮影し、全6枚で横はみ出し0。残る差は、店舗共通の営業時間と複数休憩、休業理由つき例外日、店舗・設備単位の同時受付数、顧客向け○△×休プレビューを返すAPIがないこと。存在しない値を作らず、現在取得できる担当者別時間・特別営業時間・メニュー別ルール・Google連携だけを表示しているため一致にはしない。',
+    prefix: '**2026-09-07 Issue #401で再判定。** ',
+    note: '店舗の曜日別営業時間、休業日3件、予約ルール、顧客向け○×休プレビュー、困りごと、関連画面を実契約データで表示した。通常・読込中・取得失敗を1440/1920pxで撮影し、全8枚で横はみ出し0。残る差は、店舗・設備単位の1時間受付上限と顧客向け残数による△を返すAPIがないこと。存在しない値を作らず、△は区別しない理由を画面に明記しているため一致にはしない。',
     source: 'booking-settings-v6/tksPc-{normal,loading,error}.txt + 2026-09-07 1440/1920px screenshots',
-    head: 'a89279ce7',
+    head: '7ebf0d654',
+  },
+  GhOb3: {
+    verdict: 'structure_match_data_pending',
+    prefix: '**2026-09-07 Issue #401で再判定。** ',
+    note: '価格種別、店舗共通の受付期間・締め切り・キャンセル期限、担当者、予約後通知・リマインダ・マイルを実契約へ接続し、1440/1920pxで横はみ出し0を確認した。残る差は、Pencilの入力例データと横並びの見た目に対して、未入力の新規作成状態と既存の共通作成画面構造を表示していること。入力例を実データとして作らず、現在の作成契約に合わせているため一致にはしない。',
+    source: 'booking-settings-v6/GhOb3.txt + 2026-09-07 1440/1920px screenshots',
+    head: '7ebf0d654',
   },
 }
 
@@ -4177,7 +4185,7 @@ for (const screen of SCREENS) {
   const issue305Review = ISSUE_305_REVIEW[screen.node]
   if (screen.feature === 28 && issue305Review) {
     screen.verdict = issue305Review.verdict
-    screen.verdictNote = `**2026-09-07 Issue #305で修正・再判定。** ${issue305Review.note}`
+    screen.verdictNote = `${issue305Review.prefix ?? '**2026-09-07 Issue #305で修正・再判定。** '}${issue305Review.note}`
     screen.verdictSource = issue305Review.source
     screen.verdictHead = issue305Review.head
   }
