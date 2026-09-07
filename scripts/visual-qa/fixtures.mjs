@@ -1958,7 +1958,8 @@ export const RICH_MENU_TAP_STATS = {
 }
 
 /**
- * 受信箱のLINEの会話。設計 `★ V6 2-1 受信箱` `xGLVe` の一覧のうち、LINEの3件。
+ * 受信箱のLINEの会話。設計 `★ V6 2-1 受信箱` `xGLVe` の一覧のうちLINE 5件。
+ * `/api/support/inbox?channel=email` のメール2件と混ぜ、一覧は合計7件になる。
  *
  * **メールはここに入れない。** 画面は `/api/chats`（LINE）と
  * `/api/support/inbox?channel=email`（メール）を別々に読んで混ぜる。

@@ -129,10 +129,10 @@
 | 6 | `TmHjF` | 6-1-N 一覧の状態（空・読込・エラー） | 2.8644% | 0px | 中央・中央 | docs | [差分画像](broadcasts-v6/TmHjF-diff-1920.png) | **一致** |
 | 7 | `M1EXwB` | 7-1 リマインダ | 3.0901% | 0px | 中央・左 | docs | [差分画像](reminders-v6/M1EXwB-diff-1920.png) | **一致** |
 | 7 | `uJP22` | 7-1-A リマインダを作成 | 11.9101% ⚠ | -13px | 中央・右 | docs | [差分画像](reminders-v6/uJP22-diff-1920.png) | **一致** |
-| 7 | `J64xI` | 7-1-B 通知ステップ編集 | 11.0761% ⚠ | +4px | 中央・右 | docs | [差分画像](reminders-v6/J64xI-diff-1920.png) | **一致** |
+| 7 | `J64xI` | 7-1-B 通知ステップ編集 | 11.1282% ⚠ | +2px | 中央・右 | docs | [差分画像](reminders-v6/J64xI-diff-1920.png) | **一致** |
 | 7 | `s7T2dz` | 7-1-C 対象と終了条件 | 4.2914% | -56px | 中央・左 | docs | [差分画像](reminders-v6/s7T2dz-diff-1920.png) | **一致** |
 | 7 | `JCz6J` | 7-1-D 配信予定プレビュー | 9.5545% | -56px | 下部・右 | docs | [差分画像](reminders-v6/JCz6J-diff-1920.png) | **一致** |
-| 7 | `W98zZQ` | 7-1-E テスト送信確認 | 18.6430% ⚠ | 0px | 中央・中央 | docs | [差分画像](reminders-v6/W98zZQ-diff-1920.png) | **一致** |
+| 7 | `W98zZQ` | 7-1-E テスト送信確認 | 18.5793% ⚠ | 0px | 中央・中央 | docs | [差分画像](reminders-v6/W98zZQ-diff-1920.png) | **一致** |
 | 7 | `s6Vvp` | 7-1-F 最終確認 | 8.5733% | 0px | 中央・右 | docs | [差分画像](reminders-v6/s6Vvp-diff-1920.png) | **一致** |
 | 7 | `PSmHo` | 7-1-G 有効化完了 | 8.4985% | -56px | 下部・右 | docs | [差分画像](reminders-v6/PSmHo-diff-1920.png) | **一致** |
 | 7 | `GC4St` | 7-1-H 実行結果 | 9.7844% | +67px | 下部・右 | docs | [差分画像](reminders-v6/GC4St-diff-1920.png) | **一致** |

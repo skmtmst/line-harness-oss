@@ -1050,7 +1050,7 @@ export const SCREENS = [
   {
     ...REMINDER, node: 'J64xI', name: '7-1-B 通知ステップ編集',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #469で実装修正。** 通知3件と編集欄を密にし、送信時刻を24時間表記、右プレビュー直下の操作と全幅の下部操作へ変更。3102/8789・1440/1920pxで横はみ出し0、高さ差を+93pxから+4pxへ縮小。1920px画素差11.0761%。**#473待ち:** 共通shellの固定表示。',
+    verdictNote: '**2026-09-07 Issue #469で実装修正。** 通知3件と編集欄を共通トークンで密にし、送信時刻を24時間表記、右プレビュー直下の操作と全幅の下部操作へ変更。3102/8789・1440/1920pxで横はみ出し0、高さ差を+93pxから+2pxへ縮小。1920px画素差11.1282%。**#473待ち:** 共通shellの固定表示。',
     verdictSource: 'reminders-v6/J64xI.txt + reminders-v6/J64xI-{1440,1920}.png + reminders-v6/J64xI-diff-1920.png + Issue #469 pixel comparison',
     verdictHead: 'd77d0877e',
     route: '/reminders/edit?id=reminder-3',
@@ -1075,7 +1075,7 @@ export const SCREENS = [
   {
     ...REMINDER, node: 'W98zZQ', name: '7-1-E テスト送信確認',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #469で実装修正。** 背面の差し込み値3行・履歴3行・右LINEプレビュー・全幅の下部操作をPencilの密度へ変更。3102/8789・1440/1920pxで横はみ出し0、1920px画素差18.6430%。**#473待ち:** 共通確認窓の幅・位置。',
+    verdictNote: '**2026-09-07 Issue #469で実装修正。** 背面の差し込み値3行・履歴3行・右LINEプレビュー・全幅の下部操作をPencilの密度へ変更。3102/8789・1440/1920pxで横はみ出し0、1920px画素差18.5793%。**#473待ち:** 共通確認窓の幅・位置。',
     verdictSource: 'reminders-v6/W98zZQ.txt + reminders-v6/W98zZQ-{1440,1920}.png + reminders-v6/W98zZQ-diff-1920.png + Issue #469 pixel comparison',
     verdictHead: 'eb41ad0d',
     route: '/reminders/edit?id=reminder-3&stage=test', mode: 'page',

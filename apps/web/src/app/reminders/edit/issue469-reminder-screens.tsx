@@ -21,10 +21,6 @@ import {
   SummaryCard,
 } from '@/components/reminders/reminder-v6-ui'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import styles from './issue469-reminder-screens.module.css'
-
-const inputClass = 'border-hairline rounded-control focus:ring-accent block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none'
-
 export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string }) {
   usePageTitle('リマインダを作成・通知ステップ')
   const router = useRouter()
@@ -61,33 +57,33 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
     } catch { setError('通知ステップを保存できませんでした。') } finally { setSaving(false) }
   }
 
-  return <div data-design-node="J64xI" className={styles.screen}>
+  return <div data-design-node="J64xI" className="space-y-3">
     <ReminderWizard current={3} />
-    <ReminderWorkspace aside={<div className={styles.aside}>
+    <ReminderWorkspace aside={<div className="grid gap-3">
       <SummaryCard rows={[["対象者", '398人'], ['基準日', '予約日時（Google Meet相談）'], ['通知ステップ', `${settings.steps.length}件`], ['状態', '下書き']]} />
       <LinePreview caption="基準日の 1日前 18:00 に届きます">Kentaさん、明日のGoogle Meet相談のご案内です。{`\n`}日時：8/24（月）18:00{`\n`}参加URL：meet.google.com/xxx-xxxx-xxx{`\n\n`}Google Meetに参加</LinePreview>
-      <div className={styles.previewActions}><Button>テスト送信</Button><Button>通知イメージを見る</Button></div>
+      <div className="grid grid-cols-2 gap-2"><Button>テスト送信</Button><Button>通知イメージを見る</Button></div>
     </div>}>
       <ReminderPanel title="通知ステップ" note="基準日を軸に、何回・いつ送るかを並べます。上から順に届きます。" action={<Button>＋ 通知を追加</Button>}>
-        <div className="grid gap-2 md:grid-cols-3">{stepRows.map((step, index) => <ReminderStepCard key={step.id} selected={index === 0} number={index + 1} timing={step.timing} title={step.title} note={step.note} />)}</div>
+        <div className="grid min-h-28 gap-2 md:grid-cols-3">{stepRows.map((step, index) => <ReminderStepCard key={step.id} selected={index === 0} number={index + 1} timing={step.timing} title={step.title} note={step.note} />)}</div>
       </ReminderPanel>
       <ReminderPanel title="1通目・前日のお知らせ" note="送るタイミングと文面を決めます。" action={<div className="flex gap-2"><Button>この通知を複製</Button><Button>この通知を削除</Button></div>}>
         <div className="grid gap-3">
-          <div className={styles.timingFields}>
-            <Field label="起点"><TextInput className={inputClass} value="基準日（予約日時）" readOnly /></Field>
-            <Field label="ずらす"><TextInput className={inputClass} value="1日前" readOnly /></Field>
-            <Field label="送信時刻"><TextInput className={inputClass} value="18:00" readOnly /></Field>
-            <Field label="送信可能時間の外になったら"><SelectField className={inputClass} defaultValue="next" options={[{ value: 'next', label: '翌朝 08:00 に繰り越す' }]} /></Field>
+          <div className="grid gap-3 md:grid-cols-4">
+            <Field label="起点"><TextInput className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value="基準日（予約日時）" readOnly /></Field>
+            <Field label="ずらす"><TextInput className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value="1日前" readOnly /></Field>
+            <Field label="送信時刻"><TextInput className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value="18:00" readOnly /></Field>
+            <Field label="送信可能時間の外になったら"><SelectField className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" defaultValue="next" options={[{ value: 'next', label: '翌朝 08:00 に繰り越す' }]} /></Field>
           </div>
           <div className="flex flex-wrap gap-2"><Pill tone="success">名前</Pill><Pill>友だち情報</Pill><Pill>共通情報</Pill><Pill>回答フォーム</Pill><Pill>配信日</Pill><Pill>その他</Pill></div>
-          <Field label="本文　必須" note={`${body.length} / 5,000文字`}><TextArea rows={3} className={inputClass} value={body} onChange={(event) => setBody(event.target.value)} /></Field>
-          <div className={styles.compactBox}><b>この通知の送信後アクション</b><Button>＋ アクションを追加</Button><span>対応マークを「確認待ち」に変更</span></div>
+          <Field label="本文　必須" note={`${body.length} / 5,000文字`}><TextArea rows={3} className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={body} onChange={(event) => setBody(event.target.value)} /></Field>
+          <div className="border-hairline grid grid-cols-2 items-center gap-3 rounded-lg border px-4 py-3 text-xs"><b>この通知の送信後アクション</b><Button>＋ アクションを追加</Button><span className="col-span-2">対応マークを「確認待ち」に変更</span></div>
         </div>
       </ReminderPanel>
       <ReminderPanel title="URLの扱い" note="短縮するとクリック数を計測できます。Meetの参加URLは短縮しない設定です。"><div className="flex items-center justify-between rounded-lg border border-hairline p-3 text-xs"><span>Google Meet 参加URL　<Pill>参加URL（差し込み）</Pill></span><strong>短縮しない</strong></div></ReminderPanel>
       {error ? <p className="text-danger text-xs">{error}</p> : null}
     </ReminderWorkspace>
-    <ReminderFooter primary={saving ? '保存中…' : '送信設定へ'} primaryDisabled={saving || !body.trim()} onPrimary={() => void save()} />
+    <div className="mt-16"><ReminderFooter primary={saving ? '保存中…' : '送信設定へ'} primaryDisabled={saving || !body.trim()} onPrimary={() => void save()} /></div>
   </div>
 }
 
@@ -118,19 +114,19 @@ export function Issue469ReminderTestStage({ reminderId }: { reminderId: string }
 
   if (!draft) return <p className={error ? 'text-danger p-6 text-sm' : 'text-ink-faint p-6 text-sm'}>{error || '下書きを読み込んでいます'}</p>
 
-  return <div data-design-node="W98zZQ" className={styles.screen}>
+  return <div data-design-node="W98zZQ" className="space-y-3">
     <ReminderWizard current={4} />
-    <ReminderWorkspace aside={<div className={styles.aside}>
+    <ReminderWorkspace aside={<div className="grid gap-3">
       <SummaryCard rows={[["本番への影響", 'なし'], ['送信数', '1通'], ['送信先', 'Kenta Kawano'], ['送信方法', 'LINE公式']]} />
       <LinePreview caption="［テスト］いますぐ届きます">［テスト］Kentaさん、明日のGoogle Meet相談のご案内です。{`\n`}日時：8/24（月）18:00{`\n`}参加URL：meet.google.com/test-0000{`\n\n`}Google Meetに参加</LinePreview>
-      <div className={styles.previewActions}><Button onClick={() => setConfirmOpen(true)}>テスト送信</Button><Button>通知イメージを見る</Button></div>
+      <div className="grid grid-cols-2 gap-2"><Button onClick={() => setConfirmOpen(true)}>テスト送信</Button><Button>通知イメージを見る</Button></div>
     </div>}>
-      <ReminderPanel title="テスト対象" note="自分のLINEへ確認用メッセージを送ります。"><dl className="grid grid-cols-2 gap-4 text-xs"><Metric label="送信先" value="Kenta Kawano" /><Metric label="テスト日時" value="8/23 01:30" /></dl></ReminderPanel>
-      <ReminderPanel title="差し込み値の確認" note="テストで使う値と、本番でどこから取るかを並べて確認します。"><table className={styles.dataTable}><thead><TableHeadRow><Th>変数</Th><Th>テストで使う値</Th><Th>本番での取得元</Th></TableHeadRow></thead><tbody><tr><td>{'{{name}}'}</td><td>Kenta</td><td>友だちのLINE表示名</td></tr><tr><td>{'{{meet_datetime}}'}</td><td>8/24（月）18:00</td><td>予約管理の予約日時</td></tr><tr><td>{'{{meet_url}}'}</td><td>meet.google.com/test-0000</td><td>予約ごとに発行されるMeet URL</td></tr></tbody></table></ReminderPanel>
-      <ReminderPanel title="テスト送信の履歴" note="有効化するには、直近のテストが成功している必要があります。" action={<Pill tone="success">直近のテストは成功</Pill>}><table className={styles.dataTable}><thead><TableHeadRow><Th>送信日時</Th><Th>送信した通知・宛先</Th><Th>結果</Th></TableHeadRow></thead><tbody><tr><td>8/23 01:30</td><td>1通目・前日のお知らせ ／ Kenta Kawano</td><td><Pill tone="success">送信できました</Pill></td></tr><tr><td>8/22 22:10</td><td>2通目・1時間前のお知らせ ／ Kenta Kawano</td><td><Pill tone="success">送信できました</Pill></td></tr><tr><td>8/22 21:45</td><td>1通目・前日のお知らせ ／ Kenta Kawano</td><td><Pill tone="warning">変数が空でした</Pill></td></tr></tbody></table></ReminderPanel>
+      <ReminderPanel title="テスト対象" note="自分のLINEへ確認用メッセージを送ります。"><dl className="grid min-h-24 grid-cols-2 gap-4 text-xs"><Metric label="送信先" value="Kenta Kawano" /><Metric label="テスト日時" value="8/23 01:30" /></dl></ReminderPanel>
+      <ReminderPanel title="差し込み値の確認" note="テストで使う値と、本番でどこから取るかを並べて確認します。"><table className="w-full border-collapse text-left text-xs"><thead><TableHeadRow><Th>変数</Th><Th>テストで使う値</Th><Th>本番での取得元</Th></TableHeadRow></thead><tbody className="border-hairline border-t"><tr><td className="px-3 py-3">{'{{name}}'}</td><td className="px-3 py-3">Kenta</td><td className="px-3 py-3">友だちのLINE表示名</td></tr><tr className="border-hairline border-t"><td className="px-3 py-3">{'{{meet_datetime}}'}</td><td className="px-3 py-3">8/24（月）18:00</td><td className="px-3 py-3">予約管理の予約日時</td></tr><tr className="border-hairline border-t"><td className="px-3 py-3">{'{{meet_url}}'}</td><td className="px-3 py-3">meet.google.com/test-0000</td><td className="px-3 py-3">予約ごとに発行されるMeet URL</td></tr></tbody></table></ReminderPanel>
+      <ReminderPanel title="テスト送信の履歴" note="有効化するには、直近のテストが成功している必要があります。" action={<Pill tone="success">直近のテストは成功</Pill>}><table className="w-full border-collapse text-left text-xs"><thead><TableHeadRow><Th>送信日時</Th><Th>送信した通知・宛先</Th><Th>結果</Th></TableHeadRow></thead><tbody className="border-hairline border-t"><tr><td className="px-3 py-3">8/23 01:30</td><td className="px-3 py-3">1通目・前日のお知らせ ／ Kenta Kawano</td><td className="px-3 py-3"><Pill tone="success">送信できました</Pill></td></tr><tr className="border-hairline border-t"><td className="px-3 py-3">8/22 22:10</td><td className="px-3 py-3">2通目・1時間前のお知らせ ／ Kenta Kawano</td><td className="px-3 py-3"><Pill tone="success">送信できました</Pill></td></tr><tr className="border-hairline border-t"><td className="px-3 py-3">8/22 21:45</td><td className="px-3 py-3">1通目・前日のお知らせ ／ Kenta Kawano</td><td className="px-3 py-3"><Pill tone="warning">変数が空でした</Pill></td></tr></tbody></table></ReminderPanel>
       {error ? <p className="text-danger text-xs">{error}</p> : null}
     </ReminderWorkspace>
-    <ReminderFooter status="テスト済み 2026/09/06 18:00" secondary={{ label: 'テスト送信', onClick: () => setConfirmOpen(true) }} primary="最終確認へ" onPrimary={() => router.push(`/reminders/edit?id=${encodeURIComponent(reminderId)}&stage=confirm`)} />
+    <div className="mt-16"><ReminderFooter status="テスト済み 2026/09/06 18:00" secondary={{ label: 'テスト送信', onClick: () => setConfirmOpen(true) }} primary="最終確認へ" onPrimary={() => router.push(`/reminders/edit?id=${encodeURIComponent(reminderId)}&stage=confirm`)} /></div>
     <ConfirmDialog open={confirmOpen} title="テスト送信しますか？" description="Kenta Kawanoさんへ確認用メッセージを1通送信します。" confirmLabel="テスト送信" cancelLabel="配信予定へ戻る" busy={busy} onConfirm={() => void sendTest()} onCancel={() => setConfirmOpen(false)} />
   </div>
 }

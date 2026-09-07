@@ -3724,7 +3724,7 @@
   ],
   "pixelDiff": {
     "thresholdPercent": 10,
-    "generatedAt": "2026-09-07T12:54:51.750Z",
+    "generatedAt": "2026-09-07T13:17:56.094Z",
     "comparedCount": 251,
     "unavailableCount": 21,
     "aboveThresholdCount": 29
@@ -6693,12 +6693,12 @@
             "width": 1920,
             "comparedHeight": 1136,
             "designHeight": 1136,
-            "implementationHeight": 1140,
-            "heightDifferencePx": 4,
+            "implementationHeight": 1138,
+            "heightDifferencePx": 2,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 241584,
+            "mismatchedPixels": 242719,
             "comparedPixels": 2181120,
-            "pixelDiffPercent": 11.0761,
+            "pixelDiffPercent": 11.1282,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -6712,8 +6712,8 @@
             "diffPath": "docs/design-qa/reminders-v6/J64xI-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 11.0761,
-        "heightDifferencePx": 4,
+        "pixelDiffPercent": 11.1282,
+        "heightDifferencePx": 2,
         "dominantRegion": "中央・右",
         "implementationSource": "docs",
         "diffPath": "docs/design-qa/reminders-v6/J64xI-diff-1920.png",
@@ -6834,9 +6834,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 386581,
+            "mismatchedPixels": 385260,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 18.643,
+            "pixelDiffPercent": 18.5793,
             "boundingBox": {
               "left": 1,
               "top": 11,
@@ -6850,7 +6850,7 @@
             "diffPath": "docs/design-qa/reminders-v6/W98zZQ-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 18.643,
+        "pixelDiffPercent": 18.5793,
         "heightDifferencePx": 0,
         "dominantRegion": "中央・中央",
         "implementationSource": "docs",
@@ -7130,7 +7130,7 @@
         "dominantRegion": "中央・左",
         "diffPath": "docs/design-qa/auto-replies-v6/cmDfJ-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
@@ -7359,7 +7359,7 @@
         "dominantRegion": "中央・右",
         "diffPath": "docs/design-qa/auto-replies-v6/g46ja-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
@@ -7404,7 +7404,7 @@
         "dominantRegion": "下部・中央",
         "diffPath": "docs/design-qa/auto-replies-v6/Yj6CQ-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
@@ -7449,7 +7449,7 @@
         "dominantRegion": "下部・右",
         "diffPath": "docs/design-qa/auto-replies-v6/e6iJG-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
@@ -12874,7 +12874,7 @@
         "dominantRegion": "中央・左",
         "diffPath": "docs/design-qa/automations-v6/gief7-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
@@ -12919,7 +12919,7 @@
         "dominantRegion": "中央・左",
         "diffPath": "docs/design-qa/automations-v6/Rv8Jv-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
@@ -12964,7 +12964,7 @@
         "dominantRegion": "中央・左",
         "diffPath": "docs/design-qa/automations-v6/DkPY0-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
@@ -13009,7 +13009,7 @@
         "dominantRegion": "中央・中央",
         "diffPath": "docs/design-qa/automations-v6/WjYAC-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
@@ -13054,7 +13054,7 @@
         "dominantRegion": "中央・左",
         "diffPath": "docs/design-qa/automations-v6/Vdbv5-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
@@ -13099,7 +13099,7 @@
         "dominantRegion": "中央・左",
         "diffPath": "docs/design-qa/automations-v6/xOpDs-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
@@ -13144,7 +13144,7 @@
         "dominantRegion": "中央・右",
         "diffPath": "docs/design-qa/automations-v6/py5CG-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
@@ -13189,7 +13189,7 @@
         "dominantRegion": "上部・左",
         "diffPath": "docs/design-qa/automations-v6/syWp4-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
@@ -13372,7 +13372,7 @@
         "dominantRegion": "中央・中央",
         "diffPath": "docs/design-qa/webhooks-v6/f8SBSh-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
@@ -13417,7 +13417,7 @@
         "dominantRegion": "中央・右",
         "diffPath": "docs/design-qa/booking-v6/TV2DI-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
@@ -13554,7 +13554,7 @@
         "dominantRegion": "中央・左",
         "diffPath": "docs/design-qa/booking-v6/SbuUI-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
@@ -13737,7 +13737,7 @@
         "dominantRegion": "中央・左",
         "diffPath": "docs/design-qa/booking-settings-v6/QSLEH-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
@@ -13782,7 +13782,7 @@
         "dominantRegion": "中央・右",
         "diffPath": "docs/design-qa/booking-settings-v6/tksPc-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
@@ -13827,7 +13827,7 @@
         "dominantRegion": "上部・右",
         "diffPath": "docs/design-qa/booking-settings-v6/GhOb3-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
@@ -13872,7 +13872,7 @@
         "dominantRegion": "中央・中央",
         "diffPath": "docs/design-qa/booking-settings-v6/W6465r-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
@@ -13963,7 +13963,7 @@
         "dominantRegion": "中央・右",
         "diffPath": "docs/design-qa/events-v6/MKrPY-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
@@ -14008,7 +14008,7 @@
         "dominantRegion": "上部・左",
         "diffPath": "docs/design-qa/events-v6/i5SN2j-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
@@ -14053,7 +14053,7 @@
         "dominantRegion": "上部・左",
         "diffPath": "docs/design-qa/events-v6/k5m5Bc-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
@@ -14236,7 +14236,7 @@
         "dominantRegion": "中央・左",
         "diffPath": "docs/design-qa/staff-v6/I3ZSrU-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
@@ -14327,7 +14327,7 @@
         "dominantRegion": "中央・左",
         "diffPath": "docs/design-qa/operations-v6/UgonK-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
@@ -14372,7 +14372,7 @@
         "dominantRegion": "中央・右",
         "diffPath": "docs/design-qa/operations-v6/b3HfZ-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
@@ -14417,7 +14417,7 @@
         "dominantRegion": "中央・左",
         "diffPath": "docs/design-qa/operations-v6/UhC2O-diff-1920.png",
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-07T12:28:24.106Z"
+        "retainedFrom": "2026-09-07T13:15:11.204Z"
       }
     },
     {
