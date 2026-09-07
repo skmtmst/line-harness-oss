@@ -14,6 +14,13 @@ const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
  * 素のTailwind色を共通部品とV6トークンへ寄せたことも、ここで止める。
  */
 describe('V6 流入経路一覧の契約', () => {
+  it('共通フォルダ欄を16remで使い、追加ボタンを重複させない', () => {
+    expect(PAGE).toContain("import FolderPanel from '@/components/shared/folder-panel'")
+    expect(PAGE).toContain('lg:grid-cols-[16rem_minmax(0,1fr)]')
+    expect(PAGE).not.toContain('選ぶと右側のリンクが切り替わります')
+    expect(PAGE.match(/>フォルダを追加<\/Button>/g)).toHaveLength(1)
+  })
+
   it('空・読込・取得失敗の3状態を共通ListStateで言い分ける', () => {
     expect(PAGE).toContain('data-design-node="BMmxU"')
     expect(PAGE).toContain("import ListState from '@/components/shared/list-state'")

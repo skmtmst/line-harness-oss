@@ -1,11 +1,11 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 256,
+  "compared": 255,
   "unimplemented": 0,
   "unconfirmed": 0,
-  "elsewhere": 4,
-  "missing": 12,
+  "elsewhere": 0,
+  "missing": 17,
   "match": 268,
   "structureMatchDataPending": 0,
   "needsFix": 0,
@@ -404,11 +404,11 @@
       "feature": 4,
       "name": "友だち属性",
       "total": 21,
-      "compared": 17,
+      "compared": 16,
       "unimplemented": 0,
       "unconfirmed": 0,
-      "elsewhere": 4,
-      "missing": 0,
+      "elsewhere": 0,
+      "missing": 5,
       "match": 17,
       "structureMatchDataPending": 0,
       "needsFix": 0,
@@ -1083,6 +1083,15 @@
       "remaining": 0,
       "capturedAt": [
         {
+          "pr": 1285,
+          "head": "7b39575f4",
+          "on": "2026-09-07",
+          "screens": [
+            "M1EXwB"
+          ],
+          "note": "Issue #478。リマインダ一覧の独自13remフォルダ欄を16remの共通FolderPanelへ置換。3105/8792で1440/1920px撮影し、横はみ出し0。"
+        },
+        {
           "pr": 1250,
           "head": "d77d0877e",
           "on": "2026-09-07",
@@ -1447,6 +1456,15 @@
       "heightDiffAboveThreshold": 0,
       "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1285,
+          "head": "7b39575f4",
+          "on": "2026-09-07",
+          "screens": [
+            "ZC13r"
+          ],
+          "note": "Issue #478。ウェビナー一覧の独自asideを16remの共通FolderPanelへ置換し、一覧データからフォルダ別件数を表示。3105/8792で1440/1920px撮影し、横はみ出し0。"
+        },
         {
           "pr": 1275,
           "head": "c85f9e523",
@@ -2602,6 +2620,15 @@
       "heightDiffAboveThreshold": 4,
       "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1285,
+          "head": "7b39575f4",
+          "on": "2026-09-07",
+          "screens": [
+            "Q4bkTg"
+          ],
+          "note": "Issue #478。流入経路の独自フォルダ欄を16remの共通FolderPanelへ置換し、重複追加ボタンと見出し重なりを解消。3105/8792で1440/1920px撮影し、横はみ出し0。"
+        },
         {
           "pr": 443,
           "head": "f372ff30",
@@ -3805,7 +3832,7 @@
   "pixelDiff": {
     "thresholdPercent": 10,
     "heightDiffThresholdPx": 24,
-    "generatedAt": "2026-09-07T13:15:17.405Z",
+    "generatedAt": "2026-09-07T13:46:10.447Z",
     "comparedCount": 272,
     "unavailableCount": 0,
     "pixelAboveThresholdCount": 36,
@@ -3954,7 +3981,8 @@
         "diffPath": "docs/design-qa/dashboard-v6/JN6mQ-diff-1920.png",
         "pixelAboveThreshold": true,
         "heightAboveThreshold": false,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -4002,7 +4030,8 @@
         "diffPath": "docs/design-qa/dashboard-v6/NjK9q-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -4050,7 +4079,8 @@
         "diffPath": "docs/design-qa/dashboard-v6/Alekb-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -4194,7 +4224,8 @@
         "diffPath": "docs/design-qa/inbox-v6/H3lAOB-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -4242,7 +4273,8 @@
         "diffPath": "docs/design-qa/inbox-v6/Xi4x9-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -4290,7 +4322,8 @@
         "diffPath": "docs/design-qa/inbox-v6/f0zn6-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -4338,7 +4371,8 @@
         "diffPath": "docs/design-qa/inbox-v6/NWbuF-diff-1920.png",
         "pixelAboveThreshold": true,
         "heightAboveThreshold": false,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -4386,7 +4420,8 @@
         "diffPath": "docs/design-qa/inbox-v6/B7CER8-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -4578,7 +4613,8 @@
         "diffPath": "docs/design-qa/inbox-v6/TUveA-diff-1920.png",
         "pixelAboveThreshold": true,
         "heightAboveThreshold": false,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -4626,7 +4662,8 @@
         "diffPath": "docs/design-qa/inbox-v6/w72a2-diff-1920.png",
         "pixelAboveThreshold": true,
         "heightAboveThreshold": false,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -4722,7 +4759,8 @@
         "diffPath": "docs/design-qa/inbox-v6/ANgda-diff-1920.png",
         "pixelAboveThreshold": true,
         "heightAboveThreshold": false,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -4770,7 +4808,8 @@
         "diffPath": "docs/design-qa/inbox-v6/tBlkL-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -4866,7 +4905,8 @@
         "diffPath": "docs/design-qa/inbox-v6/LHjwD-diff-1920.png",
         "pixelAboveThreshold": true,
         "heightAboveThreshold": false,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -4962,7 +5002,8 @@
         "diffPath": "docs/design-qa/friends-v6/LT8RS-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -5010,7 +5051,8 @@
         "diffPath": "docs/design-qa/friends-v6/Igi72-diff-1920.png",
         "pixelAboveThreshold": true,
         "heightAboveThreshold": false,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -5106,7 +5148,8 @@
         "diffPath": "docs/design-qa/friends-v6/I6UAdr-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -5154,7 +5197,8 @@
         "diffPath": "docs/design-qa/friends-v6/bzDn6-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -5202,7 +5246,8 @@
         "diffPath": "docs/design-qa/friends-v6/YzxU1-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -5250,7 +5295,8 @@
         "diffPath": "docs/design-qa/friends-v6/InCDe-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -5323,9 +5369,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": -32,
-            "mismatchedPixels": 103779,
+            "mismatchedPixels": 100542,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 5.0048,
+            "pixelDiffPercent": 4.8487,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -5334,12 +5380,12 @@
             },
             "dominantRegion": "中央・中央",
             "designPath": "docs/design-reference/friends-v6/w8W4Eh.png",
-            "implementationPath": "docs/design-qa/friends-v6/w8W4Eh-1920.png",
+            "implementationPath": "docs/design-qa/friends-v6/w8W4Eh-normal-1920.png",
             "implementationSource": "docs",
             "diffPath": "docs/design-qa/friends-v6/w8W4Eh-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 5.0048,
+        "pixelDiffPercent": 4.8487,
         "heightDifferencePx": 0,
         "dominantRegion": "中央・中央",
         "implementationSource": "docs",
@@ -5394,7 +5440,8 @@
         "diffPath": "docs/design-qa/friends-v6/vtBCu-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -5778,7 +5825,8 @@
         "diffPath": "docs/design-qa/scenarios-v6/dqFft-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -5995,9 +6043,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 119030,
+            "mismatchedPixels": 80730,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 5.7403,
+            "pixelDiffPercent": 3.8932,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -6006,12 +6054,12 @@
             },
             "dominantRegion": "中央・右",
             "designPath": "docs/design-reference/scenarios-v6/M2b2B.png",
-            "implementationPath": "docs/design-qa/scenarios-v6/M2b2B-1920.png",
+            "implementationPath": "docs/design-qa/scenarios-v6/M2b2B-loading-1920.png",
             "implementationSource": "docs",
             "diffPath": "docs/design-qa/scenarios-v6/M2b2B-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 5.7403,
+        "pixelDiffPercent": 3.8932,
         "heightDifferencePx": 0,
         "dominantRegion": "中央・右",
         "implementationSource": "docs",
@@ -6043,25 +6091,25 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 72447,
+            "mismatchedPixels": 61379,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 3.4938,
+            "pixelDiffPercent": 2.96,
             "boundingBox": {
               "left": 0,
               "top": 0,
               "right": 1881,
               "bottom": 1079
             },
-            "dominantRegion": "中央・中央",
+            "dominantRegion": "上部・左",
             "designPath": "docs/design-reference/scenarios-v6/q5G45.png",
-            "implementationPath": "docs/design-qa/scenarios-v6/q5G45-1920.png",
+            "implementationPath": "docs/design-qa/scenarios-v6/q5G45-loading-1920.png",
             "implementationSource": "docs",
             "diffPath": "docs/design-qa/scenarios-v6/q5G45-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 3.4938,
+        "pixelDiffPercent": 2.96,
         "heightDifferencePx": 0,
-        "dominantRegion": "中央・中央",
+        "dominantRegion": "上部・左",
         "implementationSource": "docs",
         "diffPath": "docs/design-qa/scenarios-v6/q5G45-diff-1920.png",
         "pixelAboveThreshold": false,
@@ -6811,9 +6859,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 64077,
+            "mismatchedPixels": 67252,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 3.0901,
+            "pixelDiffPercent": 3.2432,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -6827,7 +6875,7 @@
             "diffPath": "docs/design-qa/reminders-v6/M1EXwB-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 3.0901,
+        "pixelDiffPercent": 3.2432,
         "heightDifferencePx": 0,
         "dominantRegion": "中央・左",
         "implementationSource": "docs",
@@ -7362,7 +7410,8 @@
         "diffPath": "docs/design-qa/auto-replies-v6/cmDfJ-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -7602,7 +7651,8 @@
         "diffPath": "docs/design-qa/auto-replies-v6/g46ja-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -7650,7 +7700,8 @@
         "diffPath": "docs/design-qa/auto-replies-v6/Yj6CQ-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -7698,7 +7749,8 @@
         "diffPath": "docs/design-qa/auto-replies-v6/e6iJG-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -7794,7 +7846,8 @@
         "diffPath": "docs/design-qa/auto-replies-v6/Gy9OK-diff-1920.png",
         "pixelAboveThreshold": true,
         "heightAboveThreshold": false,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -7819,9 +7872,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 72411,
+            "mismatchedPixels": 72790,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 3.492,
+            "pixelDiffPercent": 3.5103,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -7830,12 +7883,12 @@
             },
             "dominantRegion": "上部・左",
             "designPath": "docs/design-reference/auto-replies-v6/q8wSqO.png",
-            "implementationPath": "docs/design-qa/auto-replies-v6/q8wSqO-1920.png",
+            "implementationPath": "docs/design-qa/auto-replies-v6/q8wSqO-loading-1920.png",
             "implementationSource": "docs",
             "diffPath": "docs/design-qa/auto-replies-v6/q8wSqO-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 3.492,
+        "pixelDiffPercent": 3.5103,
         "heightDifferencePx": 0,
         "dominantRegion": "上部・左",
         "implementationSource": "docs",
@@ -8155,9 +8208,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": -56,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 191181,
+            "mismatchedPixels": 163494,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 9.2198,
+            "pixelDiffPercent": 7.8845,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -8166,12 +8219,12 @@
             },
             "dominantRegion": "中央・右",
             "designPath": "docs/design-reference/friend-add-v6/ec9vg.png",
-            "implementationPath": "docs/design-qa/friend-add-v6/ec9vg-1920.png",
+            "implementationPath": "docs/design-qa/friend-add-v6/ec9vg-loading-1920.png",
             "implementationSource": "docs",
             "diffPath": "docs/design-qa/friend-add-v6/ec9vg-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 9.2198,
+        "pixelDiffPercent": 7.8845,
         "heightDifferencePx": -56,
         "dominantRegion": "中央・右",
         "implementationSource": "docs",
@@ -8226,7 +8279,8 @@
         "diffPath": "docs/design-qa/friend-add-v6/quhg6-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -8347,9 +8401,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 60052,
+            "mismatchedPixels": 63102,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 2.896,
+            "pixelDiffPercent": 3.0431,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -8363,7 +8417,7 @@
             "diffPath": "docs/design-qa/webinars-v6/ZC13r-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 2.896,
+        "pixelDiffPercent": 3.0431,
         "heightDifferencePx": 0,
         "dominantRegion": "上部・左",
         "implementationSource": "docs",
@@ -9042,7 +9096,8 @@
         "diffPath": "docs/design-qa/templates-v6/GFlD7-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -9090,7 +9145,8 @@
         "diffPath": "docs/design-qa/templates-v6/FRkls-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -9186,7 +9242,8 @@
         "diffPath": "docs/design-qa/templates-v6/j9ixI-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -9234,7 +9291,8 @@
         "diffPath": "docs/design-qa/templates-v6/hsBtl-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -9282,7 +9340,8 @@
         "diffPath": "docs/design-qa/templates-v6/J3GxEZ-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -9403,9 +9462,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 94628,
+            "mismatchedPixels": 53809,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 4.5635,
+            "pixelDiffPercent": 2.595,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -9414,12 +9473,12 @@
             },
             "dominantRegion": "上部・左",
             "designPath": "docs/design-reference/templates-v6/NKyoA.png",
-            "implementationPath": "docs/design-qa/templates-v6/NKyoA-1920.png",
+            "implementationPath": "docs/design-qa/templates-v6/NKyoA-loading-1920.png",
             "implementationSource": "docs",
             "diffPath": "docs/design-qa/templates-v6/NKyoA-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 4.5635,
+        "pixelDiffPercent": 2.595,
         "heightDifferencePx": 0,
         "dominantRegion": "上部・左",
         "implementationSource": "docs",
@@ -9618,7 +9677,8 @@
         "diffPath": "docs/design-qa/rich-menus-v6/DIUbO-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -9643,23 +9703,23 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 118467,
+            "mismatchedPixels": 84868,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 5.7131,
+            "pixelDiffPercent": 4.0928,
             "boundingBox": {
               "left": 0,
               "top": 0,
-              "right": 1895,
+              "right": 1881,
               "bottom": 1079
             },
             "dominantRegion": "上部・右",
             "designPath": "docs/design-reference/rich-menus-v6/NXdDk.png",
-            "implementationPath": "docs/design-qa/rich-menus-v6/NXdDk-1920.png",
+            "implementationPath": "docs/design-qa/rich-menus-v6/NXdDk-loading-1920.png",
             "implementationSource": "docs",
             "diffPath": "docs/design-qa/rich-menus-v6/NXdDk-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 5.7131,
+        "pixelDiffPercent": 4.0928,
         "heightDifferencePx": 0,
         "dominantRegion": "上部・右",
         "implementationSource": "docs",
@@ -9835,9 +9895,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 66104,
+            "mismatchedPixels": 47705,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 3.1879,
+            "pixelDiffPercent": 2.3006,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -9846,12 +9906,12 @@
             },
             "dominantRegion": "上部・左",
             "designPath": "docs/design-reference/rich-menus-v6/RW5Tb.png",
-            "implementationPath": "docs/design-qa/rich-menus-v6/RW5Tb-1920.png",
+            "implementationPath": "docs/design-qa/rich-menus-v6/RW5Tb-loading-1920.png",
             "implementationSource": "docs",
             "diffPath": "docs/design-qa/rich-menus-v6/RW5Tb-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 3.1879,
+        "pixelDiffPercent": 2.3006,
         "heightDifferencePx": 0,
         "dominantRegion": "上部・左",
         "implementationSource": "docs",
@@ -10603,25 +10663,25 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 71807,
+            "mismatchedPixels": 39783,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 3.4629,
+            "pixelDiffPercent": 1.9185,
             "boundingBox": {
               "left": 0,
               "top": 0,
               "right": 1881,
               "bottom": 1079
             },
-            "dominantRegion": "中央・中央",
+            "dominantRegion": "上部・左",
             "designPath": "docs/design-reference/media-v6/h8pBZr.png",
-            "implementationPath": "docs/design-qa/media-v6/h8pBZr-1920.png",
+            "implementationPath": "docs/design-qa/media-v6/h8pBZr-error-1920.png",
             "implementationSource": "docs",
             "diffPath": "docs/design-qa/media-v6/h8pBZr-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 3.4629,
+        "pixelDiffPercent": 1.9185,
         "heightDifferencePx": 0,
-        "dominantRegion": "中央・中央",
+        "dominantRegion": "上部・左",
         "implementationSource": "docs",
         "diffPath": "docs/design-qa/media-v6/h8pBZr-diff-1920.png",
         "pixelAboveThreshold": false,
@@ -10818,7 +10878,8 @@
         "diffPath": "docs/design-qa/affiliates-v6/njLGA-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -10914,7 +10975,8 @@
         "diffPath": "docs/design-qa/affiliates-v6/jwrbf-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -11106,7 +11168,8 @@
         "diffPath": "docs/design-qa/mileage-v6/s98Vfw-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -11154,7 +11217,8 @@
         "diffPath": "docs/design-qa/mileage-v6/N46cQ-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -11179,9 +11243,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 93199,
+            "mismatchedPixels": 89565,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 4.4946,
+            "pixelDiffPercent": 4.3193,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -11190,12 +11254,12 @@
             },
             "dominantRegion": "中央・左",
             "designPath": "docs/design-reference/mileage-v6/qlVLJ.png",
-            "implementationPath": "docs/design-qa/mileage-v6/qlVLJ-1920.png",
+            "implementationPath": "docs/design-qa/mileage-v6/qlVLJ-normal-1920.png",
             "implementationSource": "docs",
             "diffPath": "docs/design-qa/mileage-v6/qlVLJ-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 4.4946,
+        "pixelDiffPercent": 4.3193,
         "heightDifferencePx": 0,
         "dominantRegion": "中央・左",
         "implementationSource": "docs",
@@ -11298,7 +11362,8 @@
         "diffPath": "docs/design-qa/mileage-v6/BmoGY-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -11394,7 +11459,8 @@
         "diffPath": "docs/design-qa/mileage-v6/vz0Ji-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -11442,7 +11508,8 @@
         "diffPath": "docs/design-qa/mileage-v6/p9CcEB-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -11490,7 +11557,8 @@
         "diffPath": "docs/design-qa/mileage-v6/k8VCU-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -11538,7 +11606,8 @@
         "diffPath": "docs/design-qa/mileage-v6/z3PB2-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -11586,7 +11655,8 @@
         "diffPath": "docs/design-qa/mileage-v6/s6MBc-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -11611,25 +11681,25 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 117439,
+            "mismatchedPixels": 108565,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 5.6635,
+            "pixelDiffPercent": 5.2356,
             "boundingBox": {
               "left": 0,
               "top": 0,
               "right": 1881,
               "bottom": 1079
             },
-            "dominantRegion": "中央・左",
+            "dominantRegion": "中央・右",
             "designPath": "docs/design-reference/inflow-v6/Q4bkTg.png",
             "implementationPath": "docs/design-qa/inflow-v6/Q4bkTg-1920.png",
             "implementationSource": "docs",
             "diffPath": "docs/design-qa/inflow-v6/Q4bkTg-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 5.6635,
+        "pixelDiffPercent": 5.2356,
         "heightDifferencePx": 0,
-        "dominantRegion": "中央・左",
+        "dominantRegion": "中央・右",
         "implementationSource": "docs",
         "diffPath": "docs/design-qa/inflow-v6/Q4bkTg-diff-1920.png",
         "pixelAboveThreshold": false,
@@ -11899,9 +11969,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": -56,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 106429,
+            "mismatchedPixels": 80939,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 5.1326,
+            "pixelDiffPercent": 3.9033,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -11910,12 +11980,12 @@
             },
             "dominantRegion": "中央・左",
             "designPath": "docs/design-reference/inflow-v6/BMmxU.png",
-            "implementationPath": "docs/design-qa/inflow-v6/BMmxU-1920.png",
+            "implementationPath": "docs/design-qa/inflow-v6/BMmxU-error-1920.png",
             "implementationSource": "docs",
             "diffPath": "docs/design-qa/inflow-v6/BMmxU-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 5.1326,
+        "pixelDiffPercent": 3.9033,
         "heightDifferencePx": -56,
         "dominantRegion": "中央・左",
         "implementationSource": "docs",
@@ -12690,7 +12760,8 @@
         "diffPath": "docs/design-qa/nen-v6/VLMGH-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -12738,7 +12809,8 @@
         "diffPath": "docs/design-qa/nen-v6/DEX0k-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -12786,7 +12858,8 @@
         "diffPath": "docs/design-qa/nen-v6/q4lajm-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -12834,7 +12907,8 @@
         "diffPath": "docs/design-qa/nen-v6/WeXbL-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -12930,7 +13004,8 @@
         "diffPath": "docs/design-qa/nen-v6/ymXJK-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -12978,7 +13053,8 @@
         "diffPath": "docs/design-qa/nen-v6/i9sQP-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -13051,9 +13127,9 @@
             "implementationHeight": 1556,
             "heightDifferencePx": 476,
             "widthDifferencePx": -32,
-            "mismatchedPixels": 62244,
+            "mismatchedPixels": 65231,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 3.0017,
+            "pixelDiffPercent": 3.1458,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -13062,12 +13138,12 @@
             },
             "dominantRegion": "上部・左",
             "designPath": "docs/design-reference/photos-v6/hHrz8.png",
-            "implementationPath": "docs/design-qa/photos-v6/hHrz8-1920.png",
+            "implementationPath": "docs/design-qa/photos-v6/hHrz8-normal-1920.png",
             "implementationSource": "docs",
             "diffPath": "docs/design-qa/photos-v6/hHrz8-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 3.0017,
+        "pixelDiffPercent": 3.1458,
         "heightDifferencePx": 476,
         "dominantRegion": "上部・左",
         "implementationSource": "docs",
@@ -13147,25 +13223,25 @@
             "implementationHeight": 1380,
             "heightDifferencePx": 300,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 72589,
+            "mismatchedPixels": 75576,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 3.5006,
+            "pixelDiffPercent": 3.6447,
             "boundingBox": {
               "left": 0,
               "top": 0,
               "right": 1881,
               "bottom": 1079
             },
-            "dominantRegion": "中央・中央",
+            "dominantRegion": "上部・左",
             "designPath": "docs/design-reference/photos-v6/J3Wxl8.png",
-            "implementationPath": "docs/design-qa/photos-v6/J3Wxl8-1920.png",
+            "implementationPath": "docs/design-qa/photos-v6/J3Wxl8-normal-1920.png",
             "implementationSource": "docs",
             "diffPath": "docs/design-qa/photos-v6/J3Wxl8-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 3.5006,
+        "pixelDiffPercent": 3.6447,
         "heightDifferencePx": 300,
-        "dominantRegion": "中央・中央",
+        "dominantRegion": "上部・左",
         "implementationSource": "docs",
         "diffPath": "docs/design-qa/photos-v6/J3Wxl8-diff-1920.png",
         "pixelAboveThreshold": false,
@@ -13195,9 +13271,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 101704,
+            "mismatchedPixels": 98093,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 4.9047,
+            "pixelDiffPercent": 4.7306,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -13206,12 +13282,12 @@
             },
             "dominantRegion": "中央・左",
             "designPath": "docs/design-reference/ec-v6/eI3gs.png",
-            "implementationPath": "docs/design-qa/ec-v6/eI3gs-1920.png",
+            "implementationPath": "docs/design-qa/ec-v6/eI3gs-normal-1920.png",
             "implementationSource": "docs",
             "diffPath": "docs/design-qa/ec-v6/eI3gs-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 4.9047,
+        "pixelDiffPercent": 4.7306,
         "heightDifferencePx": 0,
         "dominantRegion": "中央・左",
         "implementationSource": "docs",
@@ -13243,9 +13319,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 72724,
+            "mismatchedPixels": 69113,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 3.5071,
+            "pixelDiffPercent": 3.333,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -13254,12 +13330,12 @@
             },
             "dominantRegion": "中央・左",
             "designPath": "docs/design-reference/ec-v6/ELayY.png",
-            "implementationPath": "docs/design-qa/ec-v6/ELayY-1920.png",
+            "implementationPath": "docs/design-qa/ec-v6/ELayY-normal-1920.png",
             "implementationSource": "docs",
             "diffPath": "docs/design-qa/ec-v6/ELayY-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 3.5071,
+        "pixelDiffPercent": 3.333,
         "heightDifferencePx": 0,
         "dominantRegion": "中央・左",
         "implementationSource": "docs",
@@ -13291,9 +13367,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 83292,
+            "mismatchedPixels": 86279,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 4.0168,
+            "pixelDiffPercent": 4.1608,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -13302,12 +13378,12 @@
             },
             "dominantRegion": "中央・左",
             "designPath": "docs/design-reference/ec-v6/bfB50.png",
-            "implementationPath": "docs/design-qa/ec-v6/bfB50-1920.png",
+            "implementationPath": "docs/design-qa/ec-v6/bfB50-normal-1920.png",
             "implementationSource": "docs",
             "diffPath": "docs/design-qa/ec-v6/bfB50-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 4.0168,
+        "pixelDiffPercent": 4.1608,
         "heightDifferencePx": 0,
         "dominantRegion": "中央・左",
         "implementationSource": "docs",
@@ -13339,25 +13415,25 @@
             "implementationHeight": 1179,
             "heightDifferencePx": 43,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 97053,
+            "mismatchedPixels": 100065,
             "comparedPixels": 2181120,
-            "pixelDiffPercent": 4.4497,
+            "pixelDiffPercent": 4.5878,
             "boundingBox": {
               "left": 0,
               "top": 0,
               "right": 1881,
               "bottom": 1127
             },
-            "dominantRegion": "下部・左",
+            "dominantRegion": "中央・左",
             "designPath": "docs/design-reference/ec-v6/oHAN4.png",
-            "implementationPath": "docs/design-qa/ec-v6/oHAN4-1920.png",
+            "implementationPath": "docs/design-qa/ec-v6/oHAN4-normal-1920.png",
             "implementationSource": "docs",
             "diffPath": "docs/design-qa/ec-v6/oHAN4-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 4.4497,
+        "pixelDiffPercent": 4.5878,
         "heightDifferencePx": 43,
-        "dominantRegion": "下部・左",
+        "dominantRegion": "中央・左",
         "implementationSource": "docs",
         "diffPath": "docs/design-qa/ec-v6/oHAN4-diff-1920.png",
         "pixelAboveThreshold": false,
@@ -13410,7 +13486,8 @@
         "diffPath": "docs/design-qa/line-notify-v6/festr-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -13506,7 +13583,8 @@
         "diffPath": "docs/design-qa/line-notify-v6/X8JCA5-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -13554,7 +13632,8 @@
         "diffPath": "docs/design-qa/line-notify-v6/Se65i-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -13602,7 +13681,8 @@
         "diffPath": "docs/design-qa/line-notify-v6/DpxOK-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -13650,7 +13730,8 @@
         "diffPath": "docs/design-qa/line-notify-v6/N2gAza-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -13698,7 +13779,8 @@
         "diffPath": "docs/design-qa/automations-v6/gief7-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -13746,7 +13828,8 @@
         "diffPath": "docs/design-qa/automations-v6/Rv8Jv-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -13794,7 +13877,8 @@
         "diffPath": "docs/design-qa/automations-v6/DkPY0-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -13842,7 +13926,8 @@
         "diffPath": "docs/design-qa/automations-v6/WjYAC-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -13890,7 +13975,8 @@
         "diffPath": "docs/design-qa/automations-v6/Vdbv5-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -13938,7 +14024,8 @@
         "diffPath": "docs/design-qa/automations-v6/xOpDs-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -13986,7 +14073,8 @@
         "diffPath": "docs/design-qa/automations-v6/py5CG-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -14034,7 +14122,8 @@
         "diffPath": "docs/design-qa/automations-v6/syWp4-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -14155,9 +14244,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 104689,
+            "mismatchedPixels": 101218,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 5.0487,
+            "pixelDiffPercent": 4.8813,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -14166,12 +14255,12 @@
             },
             "dominantRegion": "中央・左",
             "designPath": "docs/design-reference/webhooks-v6/KNG00.png",
-            "implementationPath": "docs/design-qa/webhooks-v6/KNG00-1920.png",
+            "implementationPath": "docs/design-qa/webhooks-v6/KNG00-normal-1920.png",
             "implementationSource": "docs",
             "diffPath": "docs/design-qa/webhooks-v6/KNG00-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 5.0487,
+        "pixelDiffPercent": 4.8813,
         "heightDifferencePx": 0,
         "dominantRegion": "中央・左",
         "implementationSource": "docs",
@@ -14226,7 +14315,8 @@
         "diffPath": "docs/design-qa/webhooks-v6/f8SBSh-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -14274,7 +14364,8 @@
         "diffPath": "docs/design-qa/booking-v6/TV2DI-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -14418,7 +14509,8 @@
         "diffPath": "docs/design-qa/booking-v6/SbuUI-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -14610,7 +14702,8 @@
         "diffPath": "docs/design-qa/booking-settings-v6/QSLEH-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -14658,7 +14751,8 @@
         "diffPath": "docs/design-qa/booking-settings-v6/tksPc-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -14706,7 +14800,8 @@
         "diffPath": "docs/design-qa/booking-settings-v6/GhOb3-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -14754,7 +14849,8 @@
         "diffPath": "docs/design-qa/booking-settings-v6/W6465r-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -14802,7 +14898,8 @@
         "diffPath": "docs/design-qa/events-v6/ugP5y-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -14850,7 +14947,8 @@
         "diffPath": "docs/design-qa/events-v6/MKrPY-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -14898,7 +14996,8 @@
         "diffPath": "docs/design-qa/events-v6/i5SN2j-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -14946,7 +15045,8 @@
         "diffPath": "docs/design-qa/events-v6/k5m5Bc-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -15138,7 +15238,8 @@
         "diffPath": "docs/design-qa/staff-v6/I3ZSrU-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -15234,7 +15335,8 @@
         "diffPath": "docs/design-qa/operations-v6/UgonK-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -15282,7 +15384,8 @@
         "diffPath": "docs/design-qa/operations-v6/b3HfZ-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -15330,7 +15433,8 @@
         "diffPath": "docs/design-qa/operations-v6/UhC2O-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -15474,7 +15578,8 @@
         "diffPath": "docs/design-qa/friend-attributes-v6/dKlkz-diff-1920.png",
         "pixelAboveThreshold": true,
         "heightAboveThreshold": false,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -15510,15 +15615,15 @@
             },
             "dominantRegion": "中央・中央",
             "designPath": "docs/design-reference/friend-attributes-v6/H374MR.png",
-            "implementationPath": "scripts/visual-qa/capture.spec.mjs-snapshots/tags-csv-select-1920-darwin.png",
-            "implementationSource": "snapshot",
+            "implementationPath": "docs/design-qa/friend-attributes-v6/H374MR-1920.png",
+            "implementationSource": "docs",
             "diffPath": "docs/design-qa/friend-attributes-v6/H374MR-diff-1920.png"
           }
         ],
         "pixelDiffPercent": 3.0953,
         "heightDifferencePx": 0,
         "dominantRegion": "中央・中央",
-        "implementationSource": "snapshot",
+        "implementationSource": "docs",
         "diffPath": "docs/design-qa/friend-attributes-v6/H374MR-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
@@ -15558,15 +15663,15 @@
             },
             "dominantRegion": "中央・左",
             "designPath": "docs/design-reference/friend-attributes-v6/sfTEW.png",
-            "implementationPath": "scripts/visual-qa/capture.spec.mjs-snapshots/tags-csv-preview-1920-darwin.png",
-            "implementationSource": "snapshot",
+            "implementationPath": "docs/design-qa/friend-attributes-v6/sfTEW-1920.png",
+            "implementationSource": "docs",
             "diffPath": "docs/design-qa/friend-attributes-v6/sfTEW-diff-1920.png"
           }
         ],
         "pixelDiffPercent": 3.4576,
         "heightDifferencePx": 0,
         "dominantRegion": "中央・左",
-        "implementationSource": "snapshot",
+        "implementationSource": "docs",
         "diffPath": "docs/design-qa/friend-attributes-v6/sfTEW-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
@@ -15606,15 +15711,15 @@
             },
             "dominantRegion": "中央・中央",
             "designPath": "docs/design-reference/friend-attributes-v6/op1rh.png",
-            "implementationPath": "scripts/visual-qa/capture.spec.mjs-snapshots/tags-csv-success-1920-darwin.png",
-            "implementationSource": "snapshot",
+            "implementationPath": "docs/design-qa/friend-attributes-v6/op1rh-1920.png",
+            "implementationSource": "docs",
             "diffPath": "docs/design-qa/friend-attributes-v6/op1rh-diff-1920.png"
           }
         ],
         "pixelDiffPercent": 2.5624,
         "heightDifferencePx": 0,
         "dominantRegion": "中央・中央",
-        "implementationSource": "snapshot",
+        "implementationSource": "docs",
         "diffPath": "docs/design-qa/friend-attributes-v6/op1rh-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
@@ -15654,15 +15759,15 @@
             },
             "dominantRegion": "中央・中央",
             "designPath": "docs/design-reference/friend-attributes-v6/QzRsJ.png",
-            "implementationPath": "scripts/visual-qa/capture.spec.mjs-snapshots/tags-csv-partial-1920-darwin.png",
-            "implementationSource": "snapshot",
+            "implementationPath": "docs/design-qa/friend-attributes-v6/QzRsJ-1920.png",
+            "implementationSource": "docs",
             "diffPath": "docs/design-qa/friend-attributes-v6/QzRsJ-diff-1920.png"
           }
         ],
         "pixelDiffPercent": 3.0981,
         "heightDifferencePx": 0,
         "dominantRegion": "中央・中央",
-        "implementationSource": "snapshot",
+        "implementationSource": "docs",
         "diffPath": "docs/design-qa/friend-attributes-v6/QzRsJ-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
@@ -15714,7 +15819,8 @@
         "diffPath": "docs/design-qa/friend-attributes-v6/HBTk0-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -15739,9 +15845,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 71274,
+            "mismatchedPixels": 54111,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 3.4372,
+            "pixelDiffPercent": 2.6095,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -15750,12 +15856,12 @@
             },
             "dominantRegion": "上部・左",
             "designPath": "docs/design-reference/friend-attributes-v6/yKEdO.png",
-            "implementationPath": "docs/design-qa/friend-attributes-v6/yKEdO-1920.png",
+            "implementationPath": "docs/design-qa/friend-attributes-v6/yKEdO-loading-1920.png",
             "implementationSource": "docs",
             "diffPath": "docs/design-qa/friend-attributes-v6/yKEdO-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 3.4372,
+        "pixelDiffPercent": 2.6095,
         "heightDifferencePx": 0,
         "dominantRegion": "上部・左",
         "implementationSource": "docs",
@@ -15810,7 +15916,8 @@
         "diffPath": "docs/design-qa/friend-attributes-v6/rIhbN-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -15858,7 +15965,8 @@
         "diffPath": "docs/design-qa/friend-attributes-v6/QKx8Q-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -15954,7 +16062,8 @@
         "diffPath": "docs/design-qa/friend-attributes-v6/tP0RW-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -16002,7 +16111,8 @@
         "diffPath": "docs/design-qa/friend-attributes-v6/LfrQs-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -16098,7 +16208,8 @@
         "diffPath": "docs/design-qa/friend-attributes-v6/VjXGX-diff-1920.png",
         "pixelAboveThreshold": true,
         "heightAboveThreshold": false,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -16242,7 +16353,8 @@
         "diffPath": "docs/design-qa/friend-attributes-v6/KoT6c-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -16290,7 +16402,8 @@
         "diffPath": "docs/design-qa/friend-attributes-v6/GMvBd-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false
+        "aboveThreshold": false,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -16386,7 +16499,8 @@
         "diffPath": "docs/design-qa/friend-attributes-v6/XBkiQ-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": true,
-        "aboveThreshold": true
+        "aboveThreshold": true,
+        "retainedFrom": "2026-09-07T13:15:17.405Z"
       }
     },
     {
@@ -16459,9 +16573,9 @@
             "implementationHeight": 1840,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 243815,
+            "mismatchedPixels": 241036,
             "comparedPixels": 3532800,
-            "pixelDiffPercent": 6.9015,
+            "pixelDiffPercent": 6.8228,
             "boundingBox": {
               "left": 1,
               "top": 10,
@@ -16470,12 +16584,12 @@
             },
             "dominantRegion": "上部・中央",
             "designPath": "docs/design-reference/inbox-v6/ohj8J.png",
-            "implementationPath": "docs/design-qa/inbox-v6/ohj8J-1920.png",
+            "implementationPath": "docs/design-qa/inbox-v6/ohj8J-error-1920.png",
             "implementationSource": "docs",
             "diffPath": "docs/design-qa/inbox-v6/ohj8J-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 6.9015,
+        "pixelDiffPercent": 6.8228,
         "heightDifferencePx": 0,
         "dominantRegion": "上部・中央",
         "implementationSource": "docs",
