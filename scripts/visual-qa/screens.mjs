@@ -3241,6 +3241,7 @@ const ISSUE_422_REVIEW = {
   Q55bb: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。編集欄、差し込み項目、ボタン、LINEプレビュー、公開版と下書きの分離を確認した。新しい通知定義・送信テストAPIが固定データに無いため構造一致・データ待ち。', verdictSource: 'line-notify-v6/Q55bb.txt', verdictHead: 'e98decafa' },
   c4R6F: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。説明、必須表示、切替、並び替え、初期値復元、利用中/作成数を確認した。一部利用数が未取得のため構造一致・データ待ち。', verdictSource: 'settings-v6/c4R6F.txt', verdictHead: 'e98decafa' },
   kQ1bs: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。STEP 2、条件、対象人数、優先順位、標準15軸・追加6軸、保存導線を確認した。重複人数と実配布人数は固定入力不足のため構造一致・データ待ち。', verdictSource: 'rich-menus-v6/kQ1bs.txt', verdictHead: 'e98decafa' },
+  GqFTV: { verdict: 'match', verdictNote: '**2026-09-07 Issue #422。** 1440px設計と1920px実装を同じ本文・状態で照合し、横はみ出し0。1920pxの設計PNGが無いため、画像は実装側の配置を確認したうえで本文一致としてmatchに更新した。', verdictSource: 'affiliates-v6/GqFTV.txt + GqFTV-1440.png + GqFTV-1920.png', verdictHead: 'e98decafa' },
 }
 
 /*
@@ -4402,6 +4403,7 @@ export const CAPTURED_AT = {
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
   ],
   16: [
+    { pr: 0, head: 'e98decafa', on: '2026-09-07', screens: ['GqFTV'], note: 'Issue #422。1920px設計PNGが無いため1440px設計と1920px実装を本文・配置で照合し、横はみ出し0のmatchへ更新した。' },
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['PouPn','GH8VL','n5VVTb','xqT1Z','GPWzq'],
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
   ],
