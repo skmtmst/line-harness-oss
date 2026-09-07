@@ -100,7 +100,10 @@ function harness(options: { photoAccount?: string; duplicate?: boolean; customer
   };
   const app = new Hono<any>();
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'staff-a', name: '担当者', role: 'staff', readOnly: false });
+    c.set('staff', {
+      id: 'staff-a', name: '担当者', role: 'staff', readOnly: false,
+      permissionKeys: ['photo.submission.view', 'photo.submission.review'],
+    });
     c.env = { DB: db, WORKER_PUBLIC_URL: 'https://worker.example' };
     await next();
   });

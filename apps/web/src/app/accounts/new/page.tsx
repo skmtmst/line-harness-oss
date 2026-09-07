@@ -1,10 +1,12 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api } from '@/lib/api'
+import type { LineAccount } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import PageHeader from '@/components/shared/page-header'
+import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import StatusBadge from '@/components/shared/status-badge'
 import { emptyAccountFormState, type AccountFormState } from '@/components/accounts/account-form-fields'
@@ -31,6 +33,11 @@ export default function NewLineAccountPage() {
   const [form, setForm] = useState<AccountFormState>(emptyAccountFormState)
   const [capacity, setCapacity] = useState('')
   const [warnAt, setWarnAt] = useState('')
+  const [timezone, setTimezone] = useState('Asia/Tokyo')
+  const [country, setCountry] = useState('日本')
+  const [role, setRole] = useState('')
+  const [parentLineAccountId, setParentLineAccountId] = useState('')
+  const [parentAccounts, setParentAccounts] = useState<LineAccount[]>([])
   const [verify, setVerify] = useState<VerifyResult | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -38,8 +45,24 @@ export default function NewLineAccountPage() {
   const steps = useMemo(() => toSteps(verify), [verify])
   const stopped = stoppedAt(steps)
   const capacityMessage = capacityError(capacity, warnAt)
+  const workerBase = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
+  const webhookUrl = workerBase ? `${workerBase}/webhook` : '—'
+  const callbackUrl = workerBase ? `${workerBase}/auth/callback` : '—'
+  const liffEndpointUrl = workerBase && form.liffId
+    ? `${workerBase}?liffId=${encodeURIComponent(form.liffId)}`
+    : 'LIFF IDを入力すると表示します'
 
   const update = (partial: Partial<AccountFormState>) => setForm((f) => ({ ...f, ...partial }))
+
+  useEffect(() => {
+    let active = true
+    void api.lineAccounts.list().then((response) => {
+      if (active && response.success) {
+        setParentAccounts(response.data.filter((account) => !account.archivedAt))
+      }
+    }).catch(() => undefined)
+    return () => { active = false }
+  }, [])
 
   /**
    * 確かめてから保存する。**どこかで止まったら保存しない。**
@@ -68,6 +91,10 @@ export default function NewLineAccountPage() {
         loginChannelId: form.loginChannelId || null,
         loginChannelSecret: form.loginChannelSecret || null,
         liffId: form.liffId || null,
+        timezone,
+        country: country || null,
+        role: role || null,
+        parentLineAccountId: parentLineAccountId || null,
       })
       if (!created.success) { setError(created.error); return }
       router.push(`/accounts/${created.data.id}`)
@@ -100,22 +127,32 @@ export default function NewLineAccountPage() {
               required
             />
             <div className="grid gap-3 sm:grid-cols-2">
-              <ReadOnlyField label="タイムゾーン" value="Asia/Tokyo" />
-              <ReadOnlyField label="国・地域" value="登録後に設定できます" />
+              <SelectField
+                label="タイムゾーン"
+                value={timezone}
+                onChange={setTimezone}
+                options={[
+                  { value: 'Asia/Tokyo', label: 'Asia/Tokyo' },
+                  { value: 'Asia/Ho_Chi_Minh', label: 'Asia/Ho_Chi_Minh' },
+                ]}
+                required
+              />
+              <Field label="国・地域（任意）" value={country} onChange={setCountry} placeholder="例：日本" />
             </div>
             <Field
               label="役割メモ（任意）"
-              value=""
-              onChange={() => undefined}
-              placeholder="登録後に設定できます"
-              disabled
+              value={role}
+              onChange={setRole}
+              placeholder="例：検証用。本番の配信には使わない"
             />
-            <Field
+            <SelectField
               label="親アカウント（任意）"
-              value=""
-              onChange={() => undefined}
-              placeholder="登録後に並び順と一緒に設定できます"
-              disabled
+              value={parentLineAccountId}
+              onChange={setParentLineAccountId}
+              options={[
+                { value: '', label: '選んでください' },
+                ...parentAccounts.map((account) => ({ value: account.id, label: account.name })),
+              ]}
             />
           </SetupSection>
 
@@ -246,20 +283,21 @@ export default function NewLineAccountPage() {
             <div className="mt-3 space-y-3">
               <EndpointRow
                 label="Webhook URL"
-                value={verify?.webhookUrl ?? '接続確認後に表示します'}
+                value={webhookUrl}
                 help="LINE Developers → Messaging API"
               />
               <EndpointRow
                 label="Callback URL"
-                value="登録後に表示します"
+                value={callbackUrl}
                 help="LINE Login → Callback URL"
               />
               <EndpointRow
                 label="LIFF エンドポイント"
-                value="登録後に表示します"
+                value={liffEndpointUrl}
                 help="LIFF → Endpoint URL"
               />
             </div>
+            <a className="text-action mt-3 inline-block text-xs font-semibold hover:underline" href="https://developers.line.biz/console/" target="_blank" rel="noreferrer">LINE Developers を開く</a>
           </section>
 
           <section className="bg-canvas rounded-card border-hairline border p-5">
@@ -359,22 +397,40 @@ function Field({
 }
 
 function EndpointRow({ label, value, help }: { label: string; value: string; help: string }) {
+  const [copied, setCopied] = useState(false)
+  const copy = async () => {
+    if (value === '—' || value.startsWith('LIFF ID')) return
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1200)
+    } catch {
+      // 安全でない接続ではクリップボードが使えないため、表示値を選んでコピーできる形を残す。
+    }
+  }
   return (
     <div>
       <p className="text-ink-faint text-xs font-medium">{label}</p>
-      <p className="bg-canvas-sunken rounded-control text-ink mt-1 break-all px-3 py-2 text-xs leading-relaxed">
-        {value}
-      </p>
+      <div className="mt-1 flex items-stretch gap-2">
+        <p className="bg-canvas-sunken rounded-control text-ink min-w-0 flex-1 break-all px-3 py-2 text-xs leading-relaxed">{value}</p>
+        <Button type="button" onClick={() => void copy()} disabled={value === '—' || value.startsWith('LIFF ID')} className="shrink-0">{copied ? 'コピー済み' : 'コピー'}</Button>
+      </div>
       <p className="text-ink-faint mt-1 text-xs">{help}</p>
     </div>
   )
 }
 
-function ReadOnlyField({ label, value }: { label: string; value: string }) {
+function SelectField({ label, value, onChange, options, required = false }: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  options: Array<{ value: string; label: string }>
+  required?: boolean
+}) {
   return (
-    <div>
-      <p className="text-ink-secondary mb-1 text-xs font-medium">{label}</p>
-      <p className="bg-canvas-sunken rounded-control text-ink px-3 py-2 text-sm">{value}</p>
-    </div>
+    <label className="block">
+      <span className="text-ink-secondary mb-1 block text-xs font-medium">{label}{required && <span className="text-danger ml-1">必須</span>}</span>
+      <Select aria-label={label} value={value} onChange={onChange} options={options} size="full" />
+    </label>
   )
 }
