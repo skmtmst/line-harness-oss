@@ -96,6 +96,29 @@ function jumpsInto(layout: FormLayout, sectionId: string): number {
   return count
 }
 
+/**
+ * 複製の回答キーを一意にする。
+ *
+ * 回答は `name` を鍵に保存される。`${base}_copy` が既にあれば
+ * `_copy2`、`_copy3` と番号を足して、重ならない名前を作る。
+ */
+function uniqueCopyName(base: string, taken: Set<string>): string {
+  const first = `${base}_copy`
+  if (!taken.has(first)) return first
+  let n = 2
+  while (taken.has(`${base}_copy${n}`)) n += 1
+  return `${base}_copy${n}`
+}
+
+/** 編集全体の入力欄が使う回答キーの一覧。 */
+function takenAnswerNames(layout: FormLayout): Set<string> {
+  return new Set(
+    layout.header
+      .concat(layout.sections.flatMap((s) => s.blocks))
+      .flatMap((b) => (b.kind === 'input' ? [b.name] : [])),
+  )
+}
+
 function FormEditInner() {
   const params = useSearchParams()
   const id = params.get('id') ?? ''
@@ -264,9 +287,11 @@ function FormEditInner() {
   const duplicateBlock = () => {
     if (selectedIndex < 0) return
     const source = blocks[selectedIndex]
+    // 回答キーが重なると片方の答えが消える。既存の名前と突き合わせて一意にする。
+    const taken = takenAnswerNames(layout)
     const copy: FormBlock =
       source.kind === 'input'
-        ? { ...source, id: newBlockId(), name: `${source.name}_copy` }
+        ? { ...source, id: newBlockId(), name: uniqueCopyName(source.name, taken) }
         : { ...source, id: newBlockId() }
     const next = [...blocks]
     next.splice(selectedIndex + 1, 0, copy)
@@ -306,11 +331,16 @@ function FormEditInner() {
     const copy: FormSection = {
       id: newBlockId('s'),
       name: `${source.name}のコピー`,
-      blocks: source.blocks.map((b) =>
-        b.kind === 'input'
-          ? { ...b, id: newBlockId(), name: `${b.name}_copy` }
-          : { ...b, id: newBlockId() },
-      ),
+      blocks: (() => {
+        // ページ内の複製同士でも重ねないよう、作るたびに一覧へ足す。
+        const taken = takenAnswerNames(layout)
+        return source.blocks.map((b) => {
+          if (b.kind !== 'input') return { ...b, id: newBlockId() }
+          const name = uniqueCopyName(b.name, taken)
+          taken.add(name)
+          return { ...b, id: newBlockId(), name }
+        })
+      })(),
     }
     setLayout((prev) => ({
       ...prev,
@@ -382,6 +412,20 @@ function FormEditInner() {
       .find((b) => b.kind === 'input' && !b.label.trim())
     if (unnamed) {
       setError('タイトルが空のブロックがあります')
+      return false
+    }
+    // 回答キーが重なると片方の答えが消える。保存の直前にも止める。
+    const seenNames = new Set<string>()
+    const dup = layout.header
+      .concat(layout.sections.flatMap((s) => s.blocks))
+      .find((b) => {
+        if (b.kind !== 'input') return false
+        if (seenNames.has(b.name)) return true
+        seenNames.add(b.name)
+        return false
+      })
+    if (dup) {
+      setError('回答キーが重なっています。複製した入力欄を確認してください')
       return false
     }
 
@@ -553,6 +597,7 @@ function FormEditInner() {
             {/* ---- 設定 ---- */}
             {editorTab === 'design' ? (
               <FormDesignSettings
+                formId={id}
                 value={layout.options.theme}
                 ogTitle={ogTitle}
                 ogDescription={ogDescription}
