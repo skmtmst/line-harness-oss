@@ -99,6 +99,22 @@ function minuteOfDay(value: string): number {
   return hour * 60 + minute;
 }
 
+function isValidShiftDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function isClockTime(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{2}:\d{2}$/.test(value)) return false;
+  const [hour, minute] = value.split(':').map(Number);
+  return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
+}
+
+function isValidTimeRange(start: unknown, end: unknown): boolean {
+  return isClockTime(start) && isClockTime(end) && minuteOfDay(start) < minuteOfDay(end);
+}
+
 async function bookingConflictAlternatives(
   db: D1Database,
   env: Env['Bindings'],
@@ -1023,6 +1039,38 @@ interface MenuBookingRuleBody {
   intake_question?: unknown;
 }
 
+interface MenuBaseBody {
+  name?: unknown;
+  duration_minutes?: unknown;
+  buffer_after_minutes?: unknown;
+  sort_order?: unknown;
+}
+
+function readMenuBase(
+  body: MenuBaseBody,
+): { ok: true; value: { name: string; durationMinutes: number; bufferAfterMinutes: number; sortOrder: number } }
+  | { ok: false; error: string } {
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  if (!name) return { ok: false, error: 'name must not be empty' };
+  if (name.length > 200) return { ok: false, error: 'name must be 200 characters or fewer' };
+
+  const durationMinutes = Number(body.duration_minutes);
+  if (!Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 1_440) {
+    return { ok: false, error: 'duration_minutes must be an integer between 1 and 1440' };
+  }
+  const bufferAfterMinutes = body.buffer_after_minutes === undefined
+    ? 0
+    : Number(body.buffer_after_minutes);
+  if (!Number.isInteger(bufferAfterMinutes) || bufferAfterMinutes < 0 || bufferAfterMinutes > 1_440) {
+    return { ok: false, error: 'buffer_after_minutes must be an integer between 0 and 1440' };
+  }
+  const sortOrder = body.sort_order === undefined ? 0 : Number(body.sort_order);
+  if (!Number.isInteger(sortOrder) || sortOrder < 0 || sortOrder > 1_000_000) {
+    return { ok: false, error: 'sort_order must be an integer between 0 and 1000000' };
+  }
+  return { ok: true, value: { name, durationMinutes, bufferAfterMinutes, sortOrder } };
+}
+
 /**
  * 受付条件を検証して、DBの列名で返す。送られた項目だけを含める。
  *
@@ -1087,8 +1135,8 @@ booking.get('/api/booking/admin/menus', async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
   try {
-    const rows = await c.env.DB
-      .prepare(
+    const [rows, staffRows, countRows] = await Promise.all([
+      c.env.DB.prepare(
         `SELECT m.id, m.name, m.category_label, m.description,
                 m.duration_minutes, m.buffer_after_minutes,
                 m.base_price, m.price_mode, m.version,
@@ -1104,7 +1152,34 @@ booking.get('/api/booking/admin/menus', async (c) => {
           ORDER BY m.sort_order ASC, m.id ASC`,
       )
       .bind(accountId)
-      .all<Record<string, unknown>>();
+      .all<Record<string, unknown>>(),
+      c.env.DB.prepare(
+        `SELECT sm.menu_id, s.id, s.display_name
+           FROM staff_menus sm
+           JOIN menus m ON m.id = sm.menu_id
+           JOIN staff s ON s.id = sm.staff_id
+          WHERE m.line_account_id = ? AND m.deleted_at IS NULL
+            AND s.line_account_id = m.line_account_id
+            AND s.deleted_at IS NULL AND s.is_active = 1 AND sm.is_offered = 1
+          ORDER BY s.sort_order ASC, s.id ASC`,
+      ).bind(accountId).all<{ menu_id: string; id: string; display_name: string }>(),
+      c.env.DB.prepare(
+        `SELECT menu_id, COUNT(*) AS booking_count
+           FROM bookings
+          WHERE line_account_id = ?
+            AND requested_at >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 days')
+          GROUP BY menu_id`,
+      ).bind(accountId).all<{ menu_id: string; booking_count: number }>(),
+    ]);
+    const staffByMenu = new Map<string, Array<{ id: string; display_name: string }>>();
+    for (const row of staffRows.results ?? []) {
+      const assigned = staffByMenu.get(row.menu_id) ?? [];
+      assigned.push({ id: row.id, display_name: row.display_name });
+      staffByMenu.set(row.menu_id, assigned);
+    }
+    const countByMenu = new Map(
+      (countRows.results ?? []).map((row) => [row.menu_id, Number(row.booking_count) || 0]),
+    );
     return c.json({
       menus: (rows.results ?? []).map((row) => ({
         id: row.id,
@@ -1124,6 +1199,8 @@ booking.get('/api/booking/admin/menus', async (c) => {
         cutoff_hours_before: row.cutoff_hours_before,
         cancel_deadline_hours_before: row.cancel_deadline_hours_before,
         intake_question: row.intake_question,
+        assigned_staff: staffByMenu.get(String(row.id)) ?? [],
+        booking_count_30_days: countByMenu.get(String(row.id)) ?? 0,
         effectiveBookingRules: {
           bookingWindowDays: row.booking_window_days ?? row.store_booking_window_days,
           cutoffMinutesBefore: row.cutoff_hours_before == null
@@ -1169,6 +1246,8 @@ booking.post('/api/booking/admin/menus', requireRole('owner', 'admin'), async (c
     auto_tag_id?: string | null;
     is_active?: boolean | number;
   } & MenuBookingRuleBody>();
+  const base = readMenuBase(b);
+  if (!base.ok) return c.json({ error: base.error }, 400);
   const rules = readMenuBookingRules(b);
   if (!rules.ok) return c.json({ error: rules.error }, 400);
   const hasPriceMode = Object.prototype.hasOwnProperty.call(b, 'price_mode');
@@ -1179,8 +1258,8 @@ booking.post('/api/booking/admin/menus', requireRole('owner', 'admin'), async (c
   const autoTagId = (b.auto_tag_id ?? '').trim() === '' ? null : (b.auto_tag_id as string);
   if (autoTagId) {
     const tagExists = await c.env.DB
-      .prepare(`SELECT 1 FROM tags WHERE id = ?`)
-      .bind(autoTagId)
+      .prepare(`SELECT 1 FROM tags WHERE id = ? AND line_account_id = ?`)
+      .bind(autoTagId, accountId)
       .first<{ 1: number }>();
     if (!tagExists) return c.json({ error: 'tag_not_found' }, 400);
   }
@@ -1200,14 +1279,14 @@ booking.post('/api/booking/admin/menus', requireRole('owner', 'admin'), async (c
     .bind(
       id,
       accountId,
-      b.name,
+      base.value.name,
       b.category_label ?? null,
       b.description ?? null,
-      b.duration_minutes,
-      b.buffer_after_minutes ?? 0,
+      base.value.durationMinutes,
+      base.value.bufferAfterMinutes,
       price.basePrice,
       price.priceMode,
-      b.sort_order ?? 0,
+      base.value.sortOrder,
       autoTagId,
       toMenuActiveFlag(b.is_active),
       ...ruleColumns.map((col) => rules.value[col]),
@@ -1233,6 +1312,9 @@ booking.put('/api/booking/admin/menus/:id', requireRole('owner', 'admin'), async
     auto_tag_id?: string | null;
   } & MenuBookingRuleBody>();
 
+  const base = readMenuBase(b);
+  if (!base.ok) return c.json({ error: base.error }, 400);
+
   const rules = readMenuBookingRules(b);
   if (!rules.ok) return c.json({ error: rules.error }, 400);
   const hasPriceMode = Object.prototype.hasOwnProperty.call(b, 'price_mode');
@@ -1250,8 +1332,8 @@ booking.put('/api/booking/admin/menus/:id', requireRole('owner', 'admin'), async
     : null;
   if (hasAutoTagId && autoTagId) {
     const tagExists = await c.env.DB
-      .prepare(`SELECT 1 FROM tags WHERE id = ?`)
-      .bind(autoTagId)
+      .prepare(`SELECT 1 FROM tags WHERE id = ? AND line_account_id = ?`)
+      .bind(autoTagId, accountId)
       .first<{ 1: number }>();
     if (!tagExists) return c.json({ error: 'tag_not_found' }, 400);
   }
@@ -1268,13 +1350,13 @@ booking.put('/api/booking/admin/menus/:id', requireRole('owner', 'admin'), async
     'is_active = ?',
   ];
   const values: unknown[] = [
-    b.name,
+    base.value.name,
     b.category_label ?? null,
     b.description ?? null,
-    b.duration_minutes,
-    b.buffer_after_minutes ?? 0,
+    base.value.durationMinutes,
+    base.value.bufferAfterMinutes,
     price.basePrice,
-    b.sort_order ?? 0,
+    base.value.sortOrder,
     toMenuActiveFlag(b.is_active),
   ];
   if (hasPriceMode) {
@@ -2296,12 +2378,18 @@ booking.put('/api/booking/admin/staff/:id/shifts', requireRole('owner', 'admin')
     return c.json({ error: 'staff_not_found_in_account' }, 404);
   }
   const b = await c.req.json<{
-    shifts: Array<{ work_date: string; start_time: string; end_time: string }>;
-  }>();
-  // Upsert each row
-  for (const s of b.shifts) {
-    await c.env.DB
-      .prepare(
+    shifts?: Array<{ work_date: string; start_time: string; end_time: string }>;
+  }>().catch(() => null);
+  if (!b || !Array.isArray(b.shifts)) return c.json({ error: 'shifts_must_be_an_array' }, 400);
+  if (b.shifts.length > 366) return c.json({ error: 'too_many_shifts' }, 400);
+  const invalid = b.shifts.find((shift) => (
+    !isValidShiftDate(shift.work_date)
+    || !isValidTimeRange(shift.start_time, shift.end_time)
+  ));
+  if (invalid) return c.json({ error: 'invalid_shift_date_or_time' }, 400);
+
+  const statements = b.shifts.map((s) => (
+    c.env.DB.prepare(
         `INSERT INTO staff_shifts (id, staff_id, work_date, start_time, end_time)
          VALUES (?, ?, ?, ?, ?)
          ON CONFLICT(staff_id, work_date) DO UPDATE
@@ -2310,8 +2398,8 @@ booking.put('/api/booking/admin/staff/:id/shifts', requireRole('owner', 'admin')
                 updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')`,
       )
       .bind(crypto.randomUUID(), staffId, s.work_date, s.start_time, s.end_time)
-      .run();
-  }
+  ));
+  if (statements.length > 0) await c.env.DB.batch(statements);
   return c.json({ ok: true, count: b.shifts.length });
 });
 
@@ -2338,23 +2426,34 @@ booking.post('/api/booking/admin/staff/:id/shifts/generate', requireRole('owner'
     return c.json({ error: 'staff_not_found_in_account' }, 404);
   }
   const b = await c.req.json<{
-    from_date: string; // YYYY-MM-DD
-    weeks: number;
-    weekly_template: Record<
+    from_date?: unknown;
+    weeks?: unknown;
+    weekly_template?: Record<
       'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat',
       { start: string; end: string } | null
     >;
-  }>();
-  if (!b.from_date || !b.weeks || !b.weekly_template) {
+  }>().catch(() => null);
+  if (!b || !isValidShiftDate(b.from_date) || !Number.isInteger(b.weeks)
+    || Number(b.weeks) < 1 || Number(b.weeks) > 12 || !b.weekly_template
+    || typeof b.weekly_template !== 'object' || Array.isArray(b.weekly_template)) {
     return c.json({ error: 'missing_params' }, 400);
   }
-  const dayKeys: Array<keyof typeof b.weekly_template> = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const weeklyTemplate = b.weekly_template;
+  const dayKeys: Array<keyof typeof weeklyTemplate> = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  for (const day of dayKeys) {
+    const template = weeklyTemplate[day];
+    if (template !== null && template !== undefined
+      && (!template || typeof template !== 'object'
+        || !isValidTimeRange(template.start, template.end))) {
+      return c.json({ error: 'invalid_weekly_template' }, 400);
+    }
+  }
   const start = new Date(`${b.from_date}T00:00:00Z`);
   const stmts: D1PreparedStatement[] = [];
-  for (let i = 0; i < b.weeks * 7; i++) {
+  for (let i = 0; i < Number(b.weeks) * 7; i++) {
     const d = new Date(start);
     d.setUTCDate(start.getUTCDate() + i);
-    const tpl = b.weekly_template[dayKeys[d.getUTCDay()]];
+    const tpl = weeklyTemplate[dayKeys[d.getUTCDay()]];
     if (!tpl) continue;
     stmts.push(
       c.env.DB

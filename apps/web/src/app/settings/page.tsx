@@ -460,7 +460,7 @@ export default function SettingsPage() {
         setError(response.error)
         return
       }
-      if (response.data) setSettingsVersion(response.data.version)
+      setSettingsVersion(response.data.version)
       setSavedFeatures({ ...features })
       setSavedItemOrder(currentOrder)
       setItemOrder(currentOrder)

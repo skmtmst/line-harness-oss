@@ -4428,9 +4428,9 @@ export const api = {
       sidebarOrder?: string[]
       sidebarItemOrder?: Record<string, string[]>
       /** GET で受けた版。付けると1行でまとめて保存し、古ければ409で返す。 */
-      expectedVersion?: number
+      expectedVersion: number
     }) =>
-      fetchApi<ApiResponse<{ version: number } | null>>(
+      fetchApi<ApiResponse<{ version: number }>>(
         `/api/settings/features?account_id=${encodeURIComponent(accountId)}`,
         { method: 'PUT', body: JSON.stringify(data) },
       ),
@@ -8749,6 +8749,10 @@ export interface BookingMenu {
   cancel_deadline_hours_before?: number | null;
   /** 予約時にお客様へ聞く質問。null なら質問しない */
   intake_question?: string | null;
+  /** 一覧と同じ応答で返す担当。メニュー件数ぶんの追加通信をしない。 */
+  assigned_staff?: Array<{ id: string; display_name: string }>;
+  /** 個人情報を含む予約明細ではなく、Workerで集計した直近30日の件数。 */
+  booking_count_30_days?: number;
   effectiveBookingRules?: {
     bookingWindowDays: number;
     cutoffMinutesBefore: number;
@@ -9135,6 +9139,15 @@ export const bookingApi = {
       method: 'PUT',
       body: JSON.stringify(body),
     }),
+  patchMenu: (
+    accountId: string,
+    id: string,
+    expectedVersion: number,
+    body: { is_active?: boolean },
+  ) => fetchApi<{ success: true; data: { id: string; version: number } }>(
+    withAccount(`/api/booking/admin/menus/${id}`, accountId),
+    { method: 'PATCH', body: JSON.stringify({ ...body, expectedVersion }) },
+  ),
   deleteMenu: (accountId: string, id: string) =>
     fetchApi<{ ok: true }>(withAccount(`/api/booking/admin/menus/${id}`, accountId), {
       method: 'DELETE',

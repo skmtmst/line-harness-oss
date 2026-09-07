@@ -15,7 +15,7 @@ vi.mock('../services/account-access.js', () => accountAccessMocks);
 const { default: booking } = await import('./booking.js');
 
 function asD1(sqlite: Database.Database): D1Database {
-  return {
+  const db = {
     prepare(sql: string) {
       const statement = sqlite.prepare(sql);
       const bound = (params: unknown[]): D1PreparedStatement => ({
@@ -30,7 +30,20 @@ function asD1(sqlite: Database.Database): D1Database {
       } as unknown as D1PreparedStatement);
       return bound([]);
     },
-  } as unknown as D1Database;
+    async batch<T>(statements: D1PreparedStatement[]) {
+      const results = [];
+      sqlite.exec('BEGIN');
+      try {
+        for (const statement of statements) results.push(await statement.run());
+        sqlite.exec('COMMIT');
+      } catch (error) {
+        sqlite.exec('ROLLBACK');
+        throw error;
+      }
+      return results as T;
+    },
+  };
+  return db as unknown as D1Database;
 }
 
 function makeApp(
@@ -81,6 +94,18 @@ describe('店舗共通の予約設定API', () => {
         ('menu-b', 'account-b', '別店舗', 45, 5000, NULL, NULL, 1);
       INSERT INTO staff (id, line_account_id, name, display_name)
       VALUES ('staff-a', 'account-a', '担当A', '担当A');
+      INSERT INTO staff_menus (staff_id, menu_id, is_offered)
+      VALUES ('staff-a', 'menu-a', 1);
+      INSERT INTO friends (id, line_user_id, display_name, line_account_id)
+      VALUES ('friend-a', 'line-friend-a', '予約者', 'account-a');
+      INSERT INTO bookings
+        (id, line_account_id, friend_id, staff_id, menu_id, starts_at, ends_at,
+         block_ends_at, status, price_at_booking, requested_at)
+      VALUES
+        ('booking-a', 'account-a', 'friend-a', 'staff-a', 'menu-a',
+         '2026-09-20T01:00:00.000Z', '2026-09-20T02:00:00.000Z',
+         '2026-09-20T02:00:00.000Z', 'confirmed', 8000,
+         strftime('%Y-%m-%dT%H:%M:%f', 'now'));
       INSERT INTO booking_resources (id, line_account_id, name, resource_type, capacity)
       VALUES ('room-a', 'account-a', '相談室', 'room', 2);
       INSERT INTO booking_availability_exceptions
@@ -269,8 +294,129 @@ describe('店舗共通の予約設定API', () => {
             cancelDeadlineMinutesBefore: 'store',
           },
         },
+        assigned_staff: [{ id: 'staff-a', display_name: '担当A' }],
+        booking_count_30_days: 1,
       })]),
     });
+  });
+
+  test('下書き作成と公開切替を保存し、別店舗タグと壊れた基本値を拒否する', async () => {
+    sqlite.exec(`INSERT INTO tags (id, name, line_account_id) VALUES ('tag-b', '支店タグ', 'account-b')`);
+    const { app, env } = makeApp(db);
+    const invalidTag = await app.request('/api/booking/admin/menus?account_id=account-a', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: '下書き', duration_minutes: 30, base_price: 0, is_active: 0, auto_tag_id: 'tag-b',
+      }),
+    }, env);
+    expect(invalidTag.status).toBe(400);
+
+    const invalidBase = await app.request('/api/booking/admin/menus?account_id=account-a', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: ' ', duration_minutes: 0, buffer_after_minutes: -1 }),
+    }, env);
+    expect(invalidBase.status).toBe(400);
+
+    const draft = await app.request('/api/booking/admin/menus?account_id=account-a', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: ' 下書き ', duration_minutes: 30, base_price: 0, is_active: 0 }),
+    }, env);
+    expect(draft.status).toBe(201);
+    const draftBody = await draft.json() as { id: string };
+    expect(sqlite.prepare(`SELECT name, is_active FROM menus WHERE id = ?`).get(draftBody.id))
+      .toEqual({ name: '下書き', is_active: 0 });
+
+    const invalidPutTag = await app.request('/api/booking/admin/menus/menu-a?account_id=account-a', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: '相談', duration_minutes: 60, base_price: 8000, is_active: 0, auto_tag_id: 'tag-b',
+      }),
+    }, env);
+    expect(invalidPutTag.status).toBe(400);
+
+    const numericInactive = await app.request('/api/booking/admin/menus/menu-a?account_id=account-a', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: '相談', duration_minutes: 60, base_price: 8000, is_active: 0,
+      }),
+    }, env);
+    expect(numericInactive.status).toBe(200);
+    expect(sqlite.prepare(`SELECT is_active FROM menus WHERE id = 'menu-a'`).get())
+      .toEqual({ is_active: 0 });
+
+    const toggled = await app.request('/api/booking/admin/menus/menu-a?account_id=account-a', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedVersion: 1, is_active: false }),
+    }, env);
+    expect(toggled.status).toBe(200);
+    expect(sqlite.prepare(`SELECT name, duration_minutes, base_price, is_active, version
+      FROM menus WHERE id = 'menu-a'`).get()).toEqual({
+      name: '相談', duration_minutes: 60, base_price: 8000, is_active: 0, version: 2,
+    });
+  });
+
+  test('シフト一括保存は日付・時刻・件数を検証し、まとめて保存する', async () => {
+    const { app, env } = makeApp(db);
+    const valid = await app.request('/api/booking/admin/staff/staff-a/shifts?account_id=account-a', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shifts: [
+        { work_date: '2026-09-20', start_time: '09:00', end_time: '18:00' },
+        { work_date: '2026-09-21', start_time: '10:00', end_time: '17:00' },
+      ] }),
+    }, env);
+    expect(valid.status).toBe(200);
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM staff_shifts WHERE staff_id = 'staff-a'`).get())
+      .toEqual({ count: 2 });
+
+    const invalid = await app.request('/api/booking/admin/staff/staff-a/shifts?account_id=account-a', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shifts: [
+        { work_date: '2026-02-30', start_time: '18:00', end_time: '09:00' },
+      ] }),
+    }, env);
+    expect(invalid.status).toBe(400);
+
+    const tooMany = await app.request('/api/booking/admin/staff/staff-a/shifts?account_id=account-a', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shifts: Array.from({ length: 367 }, () => ({
+        work_date: '2026-09-20', start_time: '09:00', end_time: '18:00',
+      })) }),
+    }, env);
+    expect(tooMany.status).toBe(400);
+  });
+
+  test('シフト自動生成は12週を上限にし、日付と時刻を検証する', async () => {
+    const { app, env } = makeApp(db);
+    const request = (body: unknown) => app.request(
+      '/api/booking/admin/staff/staff-a/shifts/generate?account_id=account-a',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+      env,
+    );
+    await expect(request({
+      from_date: '2026-02-30', weeks: 1, weekly_template: {},
+    }).then((response) => response.status)).resolves.toBe(400);
+    await expect(request({
+      from_date: '2026-09-20', weeks: 13, weekly_template: {},
+    }).then((response) => response.status)).resolves.toBe(400);
+    await expect(request({
+      from_date: '2026-09-20', weeks: 1,
+      weekly_template: { sun: { start: '18:00', end: '09:00' } },
+    }).then((response) => response.status)).resolves.toBe(400);
+    const generated = await request({
+      from_date: '2026-09-20', weeks: 1,
+      weekly_template: { sun: { start: '09:00', end: '18:00' } },
+    });
+    expect(generated.status).toBe(200);
+    await expect(generated.json()).resolves.toEqual({ inserted: 1 });
   });
 
   test('無料・問い合わせ価格を0円と区別し、メニュー上書きを版付き更新する', async () => {

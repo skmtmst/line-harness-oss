@@ -12,17 +12,15 @@ import {
   api,
   ApiError,
   bookingApi,
-  fetchApi,
   type BookingMenu,
-  type BookingRequest,
   type BookingSettings,
-  type BookingStaff,
 } from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import { Suspense } from 'react'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import BookingStaffPage from '@/app/booking/staff/page'
+import { bookingMenuBaseError } from './menu-validation'
 
 /**
  * 予約設定（設計 V2 8-2 / node nFCBf）。
@@ -100,12 +98,8 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   const [updatingVisibility, setUpdatingVisibility] = useState(false)
   const [visibilityError, setVisibilityError] = useState<string | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
-  const [, setStaff] = useState<BookingStaff[]>([])
   /** メニューID → 担当できるスタッフの表示名。 */
   const [menuStaff, setMenuStaff] = useState<Map<string, string[]>>(new Map())
-  /** 担当を引けなかったメニュー名。空でなければ、その行の担当表示は当てにならない。 */
-  const [staffReadFailed, setStaffReadFailed] = useState<string[]>([])
-  const [bookings, setBookings] = useState<BookingRequest[]>([])
   const [supportingLoadState, setSupportingLoadState] = useState<SupportingLoadState>('loading')
   const [page, setPage] = useState(1)
   const loadGenerationRef = useRef(0)
@@ -115,16 +109,20 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
     if (!selectedAccountId) {
       setItems([])
       setSettings(null)
+      setMenuStaff(new Map())
+      setSupportingLoadState('loading')
       setLoading(false)
       setError(null)
       return
     }
     setLoading(true)
     setError(null)
+    setSupportingLoadState('loading')
     // アカウント切替時は前 account の menus が表示・操作可能なまま残らないよう
     // 先にクリア。fetch 失敗でも cross-account の操作事故が起きない。
     setItems([])
     setSettings(null)
+    setMenuStaff(new Map())
     try {
       const [r, bookingSettingsResponse] = await Promise.all([
         bookingApi.listMenus(selectedAccountId),
@@ -132,11 +130,18 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
       ])
       if (loadGenerationRef.current !== requestGeneration) return
       // 状態撮影や移行途中の口が空の器を返しても、画面全体を落とさず0件として扱う。
-      setItems(Array.isArray(r.menus) ? r.menus : [])
+      const menus = Array.isArray(r.menus) ? r.menus : []
+      setItems(menus)
+      setMenuStaff(new Map(menus.map((menu) => [
+        menu.id,
+        (menu.assigned_staff ?? []).map((person) => person.display_name || person.id),
+      ])))
+      setSupportingLoadState('ready')
       setSettings(bookingSettingsResponse?.success ? bookingSettingsResponse.data : null)
     } catch (e) {
       if (loadGenerationRef.current !== requestGeneration) return
       setError(bookingErrorMessage(e, '読み込み'))
+      setSupportingLoadState('error')
     } finally {
       if (loadGenerationRef.current === requestGeneration) setLoading(false)
     }
@@ -165,54 +170,6 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
     }
   }, [])
 
-  // スタッフ・割り当て・予約件数。表の右半分と上のKPIに要る。
-  // 担当はメニュー単位の既存APIから読み、画面確認用モックと本番で同じ口を使う。
-  useEffect(() => {
-    setStaff([])
-    setBookings([])
-    setMenuStaff(new Map())
-    setStaffReadFailed([])
-    setSupportingLoadState('loading')
-    if (!selectedAccountId) return
-    let alive = true
-    void (async () => {
-      try {
-        const [staffRes, bookingRes] = await Promise.all([
-          bookingApi.listStaff(selectedAccountId),
-          bookingApi.listRequests(selectedAccountId, 'all'),
-        ])
-        if (!alive) return
-        setStaff(staffRes.staff)
-        setBookings(bookingRes.requests)
-
-        const map = new Map<string, string[]>()
-        const failed: string[] = []
-        await Promise.all(
-          items.map(async (menu) => {
-            try {
-              const { staff: assignedStaff } = await bookingApi.listMenuStaff(selectedAccountId, menu.id)
-              map.set(menu.id, assignedStaff.map((person) => person.display_name || person.id))
-            } catch {
-              // 1メニューぶん引けなくても他の行は出せる。ただし、その行を
-              // 「担当なし」と言い切らず、未取得と分かるよう名前を控える。
-              failed.push(menu.name)
-            }
-          }),
-        )
-        if (alive) {
-          setMenuStaff(map)
-          setStaffReadFailed(failed)
-          setSupportingLoadState('ready')
-        }
-      } catch {
-        if (alive) setSupportingLoadState('error')
-      }
-    })()
-    return () => {
-      alive = false
-    }
-  }, [items, selectedAccountId])
-
   async function save(m: Partial<BookingMenu>) {
     if (!selectedAccountId) return
     if (m.id) {
@@ -232,16 +189,6 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
    * 公開切替だけを版付きで送る(PATCH)。PUT は送らなかった項目まで
    * 既定値で上書きしてしまうため、ここでは使わない。
    */
-  async function patchMenuVisibility(menu: BookingMenu, nextActive: boolean, expectedVersion: number) {
-    return fetchApi<{ success: boolean; data: { id: string; version: number } }>(
-      `/api/booking/admin/menus/${menu.id}?account_id=${encodeURIComponent(selectedAccountId!)}`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify({ is_active: nextActive, expectedVersion }),
-      },
-    )
-  }
-
   async function toggleVisibility(menu: BookingMenu) {
     if (!selectedAccountId) return
     setUpdatingVisibility(true)
@@ -254,7 +201,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
         setVisibilityError('最新の状態を読み直しました。もう一度お試しください。')
         return
       }
-      await patchMenuVisibility(menu, !menu.is_active, version)
+      await bookingApi.patchMenu(selectedAccountId, menu.id, version, { is_active: !menu.is_active })
       setVisibilityTarget(null)
       setVisibilityError(null)
       await load()
@@ -266,14 +213,10 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
     }
   }
 
-  /** メニュー名 → 直近の予約件数。 */
+  /** メニューID → Workerで集計済みの直近30日予約件数。 */
   const bookingCounts = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const b of bookings) {
-      counts.set(b.menu_name, (counts.get(b.menu_name) ?? 0) + 1)
-    }
-    return counts
-  }, [bookings])
+    return new Map(items.map((menu) => [menu.id, menu.booking_count_30_days ?? 0]))
+  }, [items])
 
   const shown = useMemo(() => {
     return [...items].sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id))
@@ -289,7 +232,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   const favorite = useMemo(() => {
     if (supportingLoadState !== 'ready' || items.length === 0) return null
     return items.reduce((best, menu) =>
-      (bookingCounts.get(menu.name) ?? 0) > (bookingCounts.get(best.name) ?? 0) ? menu : best,
+      (bookingCounts.get(menu.id) ?? 0) > (bookingCounts.get(best.id) ?? 0) ? menu : best,
     items[0])
   }, [bookingCounts, items, supportingLoadState])
 
@@ -327,7 +270,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
           detail={supportingDetail(
             Boolean(selectedAccountId),
             supportingLoadState,
-            favorite ? `この30日で ${bookingCounts.get(favorite.name) ?? 0}件` : '予約実績はありません',
+            favorite ? `この30日で ${bookingCounts.get(favorite.id) ?? 0}件` : '予約実績はありません',
           )}
         />
         <Kpi
@@ -358,14 +301,6 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
           onRetry={() => void load()}
         />
       ) : <>
-      {staffReadFailed.length > 0 && (
-        <div className="bg-warning-bg text-warning rounded-card mb-3 px-4 py-3 text-xs">
-          {staffReadFailed.join('・')} の担当を読み取れませんでした。
-          このメニューは、実際には担当がいても「担当なし」と出る場合があります。
-          時間をおいて開き直してください。
-        </div>
-      )}
-
       {!selectedAccountId ? (
         <div data-design-node="W6465r"><ListState kind="empty" title="LINEアカウントを選んでください" description="共通メニューで、予約設定を開くLINEアカウントを選んでください。" /></div>
       ) : loading ? (
@@ -432,7 +367,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                       )}
                     </td>
                     <td className="px-4 py-3 text-right text-sm tabular-nums">
-                      {supportingLoadState === 'ready' ? `${bookingCounts.get(m.name) ?? 0} 件` : '—'}
+                      {supportingLoadState === 'ready' ? `${bookingCounts.get(m.id) ?? 0} 件` : '—'}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex gap-2 text-xs">
@@ -565,6 +500,16 @@ function Modal({
   }
 
   async function submit() {
+    const validationError = bookingMenuBaseError({
+      name: form.name,
+      durationMinutes: form.duration_minutes,
+      bufferAfterMinutes: form.buffer_after_minutes,
+      sortOrder: form.sort_order,
+    })
+    if (validationError) {
+      setErr(validationError)
+      return
+    }
     setSaving(true)
     setErr(null)
     try {

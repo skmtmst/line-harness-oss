@@ -896,6 +896,15 @@ export async function applyDueCommonVarSchedules(
     }
     const nextVersion = current.version + 1;
     const results = await db.batch([
+      // SELECT後からbatch開始までに画面保存が入っていたら、意図的にSQLエラーを
+      // 起こしてbatch全体を戻す。batch内は同一トランザクションなので、この確認後に
+      // 値・履歴・適用済み印が分かれることはない。
+      db.prepare(
+        `SELECT CASE WHEN EXISTS (
+           SELECT 1 FROM common_vars
+            WHERE id = ? AND version = ? AND archived_at IS NULL
+         ) THEN 1 ELSE json('') END AS version_is_current`,
+      ).bind(row.var_id, current.version),
       db.prepare(
         `UPDATE common_vars SET value = ?, version = ?, updated_by = NULL, updated_at = ?
           WHERE id = ? AND version = ? AND archived_at IS NULL`,
@@ -922,7 +931,7 @@ export async function applyDueCommonVarSchedules(
           )`,
       ).bind(stamp, row.id, row.var_id, nextVersion),
     ]);
-    if ((results[0].meta?.changes ?? 0) > 0) applied++;
+    if ((results[1].meta?.changes ?? 0) > 0) applied++;
   }
   return applied;
 }
