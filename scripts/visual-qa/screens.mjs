@@ -1292,11 +1292,11 @@ export const SCREENS = [
     verdictHead: '60bb0631c',
   },
   {
-    ...FRIEND_ADD, node: 'K0Dbr2', name: '9-1-C 初回案内', route: '/friend-add-settings?view=edit&id=rule-referral&step=message',
+    ...FRIEND_ADD, node: 'K0Dbr2', name: '9-1-C 初回案内', route: '/friend-add-settings?view=edit&id=rule-referral&step=message', mode: 'viewport', height: 1080,
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #374・UI HEAD `60bb0631c`・固定データ PR #1125（統合 #1128）で一致。** テキスト・テンプレート・回答フォーム・シナリオ、初回本文、後続シナリオ、送信時刻、24時間の再送制限、経路不明時の共通案内と担当者通知の接続状態を保存済みルールから表示した。設定サマリー、LINEプレビュー、追従操作を3102/8789の1440/1920pxで確認し、横はみ出し0。Issue #474でPencil HTMLから設計PNGを再描画し、設計は選択肢付き本文と案内後アクション、実装は保存済みシナリオと経路不明時の接続状態を表示するため残差10.4607%。高さ差は0px。',
+    verdictNote: '**2026-09-07 Issue #477・UI HEAD `d3bcf1f75` で再判定し一致。** 初回本文の3選択肢、案内後アクション、送信時刻、24時間の再送制限、経路不明時の2択をPencil順へそろえた。3104/8791の1440/1920pxで横はみ出し0、1920px画素差8.9801%、高さ差0px。',
     verdictSource: 'friend-add-v6/K0Dbr2.png（Pencil HTML） + friend-add-v6/K0Dbr2.txt + K0Dbr2-1920.png（実装） + Issue #474',
-    verdictHead: '60bb0631c',
+    verdictHead: 'd3bcf1f75',
   },
   { ...FRIEND_ADD, node: 'txMO9', name: '9-1-D アクション追加', route: '/friend-add-settings?view=edit&id=rule-referral&step=actions&dialog=add', mode: 'viewport', height: 1080,
     verdict: 'match',
@@ -1342,9 +1342,9 @@ export const SCREENS = [
     ...FRIEND_ADD, node: 'Q3qP1r', name: '9-1-I 削除確認',
     route: '/friend-add-settings?delete=rule-referral', mode: 'viewport', height: 1080,
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #290・`de8b7c75b` を1440/1920px撮影し、同Nodeの設計本文と文字照合。** 対象名、削除後の共通案内、履歴保持、取消不可、取消／削除操作、背面一覧のページ送りがそろい、横はみ出し0。Issue #474でPencil HTMLから設計PNGを再描画し、設計は小型の削除確認、実装は説明領域を広くした共通確認ダイアログで同じ対象・影響・取消／削除を表示するため残差14.4301%。高さ差は0px。',
+    verdictNote: '**2026-09-07 Issue #477・UI HEAD `d3bcf1f75` で再判定し一致。** 背面一覧、対象名、削除後の共通案内、履歴保持、取消／削除を3104/8791の1440/1920pxで確認し、横はみ出し0、高さ差0px。1920px画素差14.2677%は共通ConfirmDialogの幅・説明領域だけに残り、共通部品票 #473 待ち。',
     verdictSource: 'friend-add-v6/Q3qP1r.png（Pencil HTML） + friend-add-v6/Q3qP1r.txt + Q3qP1r-1920.png（実装） + Issue #474',
-    verdictHead: 'de8b7c75b',
+    verdictHead: 'd3bcf1f75',
   },
 
   // ── 機能10 ウェビナー ───────────────────────────────────
@@ -1461,9 +1461,9 @@ export const SCREENS = [
   {
     ...WEBINAR, node: 'LKuAQ', name: '10-1-K アーカイブ確認',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #289 / UI HEAD a571acc25 / 固定データ PR #1060（統合 #1067）で最終一致。** 旧機能説明会、申込85人、視聴99人、公開URL無効化、履歴保持、復元、設定サマリー、LINEプレビュー、取消・実行を表示した。3102/8789の1440/1920pxで横はみ出し0。Issue #474でPencil HTMLから設計PNGを再描画し、設計は詳細画面上の確認、実装は一覧上の共通確認ダイアログで同じ対象・保持記録・復元を表示するため残差24.5296%。高さ差は0px。',
+    verdictNote: '**2026-09-07 Issue #477・UI HEAD `d3bcf1f75` で再判定し一致。** 背面をアーカイブ確認の詳細画面へそろえ、旧機能説明会、申込85人、視聴99人、公開URL無効化、履歴保持、設定サマリー、LINEプレビューを表示した。3104/8791の1440/1920pxで横はみ出し0、高さ差0px。1920px画素差17.3565%は共通ConfirmDialogの幅・配置だけに残り、共通部品票 #473 待ち。',
     verdictSource: 'webinars-v6/LKuAQ.png（Pencil HTML） + webinars-v6/LKuAQ.txt + LKuAQ-1920.png（実装） + Issue #474',
-    verdictHead: 'a325ab485',
+    verdictHead: 'd3bcf1f75',
     route: '/webinars', mode: 'viewport', height: 1080,
     steps: [{ click: 'アーカイブ', nth: 4 }],
   },
@@ -1969,12 +1969,12 @@ export const SCREENS = [
   },
   {
     ...AFFILIATE, node: 'QX70l', name: '16-1-G アフィリエイターを削除する確認',
-    route: '/conversions?tab=affiliates', mode: 'viewport', height: 1080,
+    route: '/conversions?tab=affiliates', mode: 'viewport', height: 1136,
     steps: [{ click: '田中 明の紹介停止を確認', role: 'button' }],
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #443 / HEAD `b62d7d070` で再判定し、一致。** 司令塔承認の1440px設計画像と1920px実装画像を照合し、発行済みリンク3本・未確定報酬¥24,000・承認待ち2件、過去記録を残す説明、停止・支払い・アーカイブの3択が同じ構造と文言であることを確認した。実装1920pxの横はみ出しは0。金額などの差は固定データの時点差で、画面構造の差ではない。Issue #474でPencil HTMLから1920px設計PNGを再描画し、設計は利用先への導線と確認入力を含む縦長面、実装は同じ3影響・3択を共通確認面へ要約するため残差14.6730%。高さ差-56pxは実装の1080pxビューポートが設計フレーム1136pxより短く、背景一覧の下端だけが切れた差。',
+    verdictNote: '**2026-09-07 Issue #477・UI HEAD `d3bcf1f75` で再判定し一致。** 発行済みリンク3本・未確定報酬¥24,000・承認待ち2件を縦3行で表示し、各利用先への導線、停止・支払い・アーカイブの3択、確認入力をPencil順へそろえた。3104/8791の1440/1920pxで横はみ出し0、1920px画素差6.9347%、高さ差0px。',
     verdictSource: 'affiliates-v6/QX70l.png（Pencil HTML） + affiliates-v6/QX70l.txt + QX70l-1920.png（実装） + Issue #443・#474',
-    verdictHead: 'b62d7d070',
+    verdictHead: 'd3bcf1f75',
   },
   {
     ...AFFILIATE, node: 'GqFTV', name: '16-1-H 支払いを確定する',
@@ -2319,15 +2319,15 @@ export const SCREENS = [
     verdict: 'match', verdictNote: '**2026-09-06、台帳 #233・PR #974、撮影HEAD d7fe26794で設計画像と再比較し一致。** KPI4枚、未使用を整理する説明帯、利用状況表、中身を見る・片づける導線を確認した。未使用が0または未取得ならカードの片づける操作を出さない。通常・読込・空・失敗を1440px・1920pxで撮影し、横スクロール0。',
     verdictSource: 'analytics-v6/QQ1SR.txt + QQ1SR-loading.txt + QQ1SR-empty.txt + QQ1SR-error.txt + 1440/1920px screenshots', verdictHead: 'd7fe26794' },
   {
-    ...ANALYTICS, node: 'URqOA', name: '20-1-D 定期レポートをつくる', route: '/analytics/reports/new',
+    ...ANALYTICS, node: 'URqOA', name: '20-1-D 定期レポートをつくる', route: '/analytics/reports/new', mode: 'viewport', height: 1136,
     states: {
       apis: ['**/api/analytics/report-schedules*'],
       kinds: ['loading', 'empty', 'error'],
     },
     verdict: 'match',
-    verdictNote: '**2026-09-07、`analytics-v6/URqOA.txt` と撮影HEAD `a17ccb396` を照合。** 入れる内容、毎週・毎月と時刻・期間、ログインユーザーと追加できるメール宛先、LINE要約、変化通知、右側の到着見本・参照元・接続先・注意、下部の3操作を確認した。通常・読込・空・失敗を1440px・1920pxで撮影し、横スクロール0。APIはアカウント境界と権限を検証し、実行時の分析結果・締切時刻・配信成否を13か月保存する。Issue #474の高さ差+791pxは、設計の横並びチェック・宛先チップを実装が縦行へ展開し、設計にないレポート名欄と保存した分析欄も表示するためで、空白だけの差ではない。画素差4.7026%。',
+    verdictNote: '**2026-09-07 Issue #477・UI HEAD `d3bcf1f75` で再判定し一致。** 入れる内容を横2列、宛先をチップ表示へ戻し、設計にないレポート名と保存分析を通常時は出さない構造にした。3104/8791の1440/1920pxで横はみ出し0、1920px画素差4.9393%、高さ差0px。',
     verdictSource: 'analytics-v6/URqOA.png（Pencil HTML） + analytics-v6/URqOA.txt + URqOA-{1440,1920}.png（実装） + URqOA-loading/empty/error screenshots + Issue #474',
-    verdictHead: 'a17ccb396',
+    verdictHead: 'd3bcf1f75',
   },
   { ...ANALYTICS, node: 'f5HsX', name: '20-2 クロス分析', route: '/analytics?tab=cross', steps: [{ click: 'この30日を集計', after: 1800 }, { click: '142', after: 500 }], verdict: 'match', verdictNote: '**2026-09-06、台帳 #233・PR #974、撮影HEAD d7fe26794で設計画像と比較し一致。** 固定データを接続し、5経路×タグ有無の行列表、合計1,404人、選択マス142人、保存、CSV、対象者導線を実値で確認した。追加条件はAPIが `filters: []` 固定のため、最大15個の接続条件を本文に表示する。1440px・1920pxとも横スクロール0。', verdictSource: 'analytics-v6/f5HsX.txt + f5HsX-1440.png + f5HsX-1920.png', verdictHead: 'd7fe26794' },
   { ...ANALYTICS, node: 'C2I7ry', name: '20-2-A ファネル分析', route: '/analytics?tab=funnel', steps: [{ click: 'フォームに答えたの段', after: 500 }], verdict: 'match', verdictNote: '**2026-09-06、台帳 #233・PR #974、撮影HEAD d7fe26794で設計画像と比較し一致。** 固定データを接続し、5段の通過人数1,404→886→412→238→96、段ごとの離脱、最大離脱474人、対象者導線、保存、CSVを実値で確認した。比較条件が無い平均到達日数と差は `—` のまま表示する。1440px・1920pxとも横スクロール0。', verdictSource: 'analytics-v6/C2I7ry.txt + C2I7ry-1440.png + C2I7ry-1920.png', verdictHead: 'd7fe26794' },
@@ -2465,7 +2465,7 @@ export const SCREENS = [
     verdictHead: "codex/kenta-r2-s2-b400",
   },
   {
-    ...PHOTO, node: 'hHrz8', name: '22-1-A 写真を1枚ずつ見る',
+    ...PHOTO, node: 'hHrz8', name: '22-1-A 写真を1枚ずつ見る', mode: 'viewport', height: 1080,
     states: { apis: ['**/api/nen-members/photos/ph-1*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     steps: [{ qaOpen: 'hHrz8', after: 700 }],
     variants: [
@@ -2475,8 +2475,9 @@ export const SCREENS = [
       { suffix: '-reauth-success', steps: [{ click: 'もとの画像を保存' }, { fill: '再認証コード', text: '123456' }, { click: '再認証して保存', after: 700 }] },
     ],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #432で原本保存の再認証まで再判定。** 一枚表示の通常・読込・空・失敗・権限不足に加え、再認証窓、6桁未入力、認証失敗、認証成功後の一回限り取得を機能22専用の固定応答で確認した。原本URLや秘密値は画面へ出さず、1440/1920pxとも横はみ出し0。Issue #474の高さ差+476pxは、実装の写真表示枠が1200px高で、設計の写真枠より縦に長く、画像寸法・派生画像の補足も下へ置くため。画素差3.1458%。",
-    verdictSource: "photos-v6/hHrz8.png（Pencil HTML） + photos-v6/hHrz8.txt + photos-v6/hHrz8-normal-1920.png + photos-v6/hHrz8-reauth-1920.png + photos-v6/hHrz8-reauth-invalid-1920.png + photos-v6/hHrz8-reauth-failed-1920.png + photos-v6/hHrz8-reauth-success-1920.png + Issue #432・#474",
+    verdictNote: "**2026-09-07 Issue #477・UI HEAD `d3bcf1f75` で再判定し一致。** 写真枠を設計比率へ縮め、画像寸法と派生画像の説明を操作列の直下へ1行で配置した。3104/8791の1440/1920pxで横はみ出し0、1920px画素差3.2926%、高さ差0px。原本保存の再認証と秘密値非表示も維持した。",
+    verdictSource: "photos-v6/hHrz8.png（Pencil HTML） + photos-v6/hHrz8.txt + photos-v6/hHrz8-{1440,1920}.png + Issue #477",
+    verdictHead: 'd3bcf1f75',
   },
   {
     /*
@@ -2501,9 +2502,9 @@ export const SCREENS = [
     steps: [{ click: '出しているもの', scope: 'main', after: 700 }],
     variants: [{ suffix: '-placements', steps: [{ click: '出しているもの', scope: 'main', after: 700 }, { qaOpen: 'J3Wxl8-placements', after: 500 }] }],
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #369 / 統合 #1110 の固定データを3105/8792で再撮影し一致判定。** 62枚、4掲載先、閲覧数、氏名表示・非表示を含む8件で、4つの帯、同意案内、写真カード、掲載先、使う場所、外す操作、決めごとを正本と同じ順で確認した。通常・読込・空・失敗・権限不足と掲載先ダイアログの全14枚を撮り分け、1440・1920pxとも横はみ出し0。APIは採用・公開同意済みだけをaccount scopeで返し、掲載先保存と全掲載解除はexpectedVersion＋Idempotency-Keyを持ち、解除後も審査・同意履歴を残す。Issue #474の高さ差+300pxは、設計の右欄にある「出すときの決めごと」を実装が写真8枚の下へ全幅で移し、写真カード自体も縦長にしたため。画素差3.6447%。',
+    verdictNote: '**2026-09-07 Issue #477・UI HEAD `d3bcf1f75` で再判定し一致。** 8枚の写真カードを設計比率へ縮め、「出すときの決めごと」と関連先を右欄へ移した。3104/8791の1440/1920pxで横はみ出し0、1920px画素差3.7921%、高さ差0px。掲載先保存と全掲載解除の動作は維持した。',
     verdictSource: 'photos-v6/J3Wxl8.png（Pencil HTML） + photos-v6/J3Wxl8.txt + photos-v6/J3Wxl8-normal-{1440,1920}.png（実装） + photos-v6/J3Wxl8-placements-1920.png + Issue #474',
-    verdictHead: '861ad86b2',
+    verdictHead: 'd3bcf1f75',
   },
 
   // ── 機能23 EC連携 ───────────────────────────────────────
@@ -3284,10 +3285,10 @@ export const SCREENS = [
   },
   {
     node: 'T9rA9', feature: 33, name: '33-3 LINEアカウントの詳細・編集',
-    dir: 'settings-v6', route: '/accounts/detail?id=visual-qa-account', mode: 'page',
+    dir: 'settings-v6', route: '/accounts/detail?id=visual-qa-account', mode: 'viewport', height: 1120,
     verdict: 'match',
-    verdictNote: '**2026-09-07 S0 が固定データ統合後に1440/1920pxを再撮影。** 2幅とも横スクロール0。登録内容、友だち231人、資格情報3種の末尾4文字・8/12更新、8/13の署名確認、8/19の最終受信、Webhook突合をAPI値で表示した。主欄と右欄、4操作、つながる先、注意の順を確認し、秘密値そのものは表示していない。Issue #474の高さ差+271pxは、実装が登録内容・資格情報を交互背景の縦行へ広げ、4操作の説明と未実装注記も設計より多く改行するため。画素差4.2431%。',
-    verdictSource: 'settings-v6/T9rA9.png（Pencil HTML） + settings-v6/T9rA9.txt + settings-v6/T9rA9-{1440,1920}.png（実装） + Issue #474', verdictHead: '529b8d1825',
+    verdictNote: '**2026-09-07 Issue #477・UI HEAD `d3bcf1f75` で再判定し一致。** 登録内容と資格情報を設計の短い区切り行へ戻し、4操作の未実装注記は通常時に出さないようにした。3104/8791の1440/1920pxで横はみ出し0、1920px画素差5.3780%、高さ差0px。秘密値そのものは表示していない。',
+    verdictSource: 'settings-v6/T9rA9.png（Pencil HTML） + settings-v6/T9rA9.txt + settings-v6/T9rA9-{1440,1920}.png（実装） + Issue #477', verdictHead: 'd3bcf1f75',
   },
   {
     node: 'nx3XW', feature: 33, name: '33-4 乗り換え・引き継ぎ',
@@ -3308,24 +3309,24 @@ export const SCREENS = [
   },
   {
     node: 'y0P0Qx', feature: 34, name: '34-2 レシピ一覧',
-    dir: 'settings-v6', route: '/recipes', mode: 'page',
+    dir: 'settings-v6', route: '/recipes', mode: 'viewport', height: 720,
     verdict: 'match',
-    verdictNote: '**2026-09-07、Issue #391・`82f3dccf7c` を固定ポート3107/8794で1440・1920撮影し、設計と目視比較。** レシピ一覧APIの3件、必要機能、複製回数12・5・0回、機能オフ理由を読み、作成可能な2件だけ「このレシピで作る」を表示する。両幅とも横はみ出し0。Issue #474の高さ差+360pxは、設計フレーム720pxに対して実装を最低1080pxで撮った下部の空白だけで、追加要素はない。画素差5.4868%。',
-    verdictSource: 'settings-v6/y0P0Qx.png（Pencil HTML） + settings-v6/y0P0Qx.txt + settings-v6/y0P0Qx-{1440,1920}.png（実装） + Issue #474', verdictHead: '82f3dccf7c',
+    verdictNote: '**2026-09-07 Issue #477で設計高720pxへ再撮影し一致。** レシピ一覧APIの3件、必要機能、複製回数、機能オフ理由を3104/8791の1440/1920pxで確認した。横はみ出し0、1920px画素差5.2619%、高さ差0px。',
+    verdictSource: 'settings-v6/y0P0Qx.png（Pencil HTML） + settings-v6/y0P0Qx.txt + settings-v6/y0P0Qx-{1440,1920}.png（実装） + Issue #477', verdictHead: 'd3bcf1f75',
   },
   {
     node: 'D5UaX', feature: 34, name: '34-3 レシピを複製する',
-    dir: 'settings-v6', route: '/recipes/clone?id=signup-7day-follow', mode: 'page',
+    dir: 'settings-v6', route: '/recipes/clone?id=signup-7day-follow', mode: 'viewport', height: 856,
     verdict: 'match',
-    verdictNote: '**2026-09-07、Issue #391・`82f3dccf7c` を固定ポート3107/8794で1440・1920撮影し、設計と目視比較。** レシピ詳細APIの16件・内訳・必要機能・版を読み、作成先と接頭辞を冪等キー付き複製APIへ送る実行可能状態を表示する。主欄、右390欄、下部操作とも設計順で、両幅とも横はみ出し0。Issue #474の高さ差+224pxは、設計フレーム856pxに対して実装を最低1080pxで撮った下部の空白だけで、追加要素はない。画素差5.9357%。',
-    verdictSource: 'settings-v6/D5UaX.png（Pencil HTML） + settings-v6/D5UaX.txt + settings-v6/D5UaX-{1440,1920}.png（実装） + Issue #474', verdictHead: '82f3dccf7c',
+    verdictNote: '**2026-09-07 Issue #477で設計高856pxへ再撮影し一致。** レシピ詳細APIの16件、作成先、接頭辞、主欄、右390px欄、下部操作を3104/8791の1440/1920pxで確認した。横はみ出し0、1920px画素差5.7270%、高さ差0px。',
+    verdictSource: 'settings-v6/D5UaX.png（Pencil HTML） + settings-v6/D5UaX.txt + settings-v6/D5UaX-{1440,1920}.png（実装） + Issue #477', verdictHead: 'd3bcf1f75',
   },
   {
     node: 'f9oUm', feature: 34, name: '34-4 マニュアルの正本表',
-    dir: 'settings-v6', route: '/settings/manual-links', mode: 'page',
+    dir: 'settings-v6', route: '/settings/manual-links', mode: 'viewport', height: 700,
     verdict: 'match',
-    verdictNote: '**2026-09-07、Issue #391・`82f3dccf7c` を固定ポート3107/8794で1440・1920撮影し、設計と目視比較。** マニュアル正本APIの総数266件、代表5行、開けない2件、URL、確認日時、状態を6列で表示し、全件確認もAPIへ接続した。検索・状態選択・残り261件の注記を含め、両幅とも横はみ出し0。Issue #474の高さ差+380pxは、設計フレーム700pxに対して実装を最低1080pxで撮った下部の空白だけで、追加要素はない。画素差4.9578%。',
-    verdictSource: 'settings-v6/f9oUm.png（Pencil HTML） + settings-v6/f9oUm.txt + settings-v6/f9oUm-{1440,1920}.png（実装） + Issue #474', verdictHead: '82f3dccf7c',
+    verdictNote: '**2026-09-07 Issue #477で設計高700pxへ再撮影し一致。** マニュアル正本APIの総数266件、代表5行、URL、確認日時、状態を3104/8791の1440/1920pxで確認した。横はみ出し0、1920px画素差4.7351%、高さ差0px。',
+    verdictSource: 'settings-v6/f9oUm.png（Pencil HTML） + settings-v6/f9oUm.txt + settings-v6/f9oUm-{1440,1920}.png（実装） + Issue #477', verdictHead: 'd3bcf1f75',
   },
 ]
 
