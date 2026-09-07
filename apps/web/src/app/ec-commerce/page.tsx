@@ -185,14 +185,14 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
       <div className={styles.kpis}>
         <SummaryCard variant="v6" title="今日 取り込んだ" value={overview?.last24h ?? null} unit="件" detail={overview?.byType.map((item) => `${item.label} ${item.count.toLocaleString('ja-JP')}`).join('・') ?? '内訳は未取得'} />
         <SummaryCard variant="v6" title="つながっていない注文" value={overview?.identityPending ?? null} unit="件" detail="LINEの友だちが見つかりません" badge="つき合わせ" />
-        <SummaryCard variant="v6" title="取り込みに失敗" value={overview?.failed ?? null} unit="件" detail="確認してから再処理します" badge="確認" badgeTone="danger" />
+        <SummaryCard variant="v6" title="取り込みに失敗" value={overview?.failed ?? null} unit="件" detail="3回やり直しても入りませんでした" badge="確認" badgeTone="danger" />
         <div className="min-w-0 rounded-card border border-hairline bg-canvas p-4">
           <p className="text-xs font-semibold text-ink-faint">最後に届いた</p>
           <p className="mt-1 text-2xl font-bold text-ink tabular-nums">{dateTime(overview?.lastReceivedAt ?? null)}</p>
-          <p className="mt-1 text-xs text-ink-faint">最後に受け取った時刻</p>
+          <p className="mt-1 text-xs text-ink-faint">ふつうは1分以内に届きます</p>
         </div>
       </div>
-      <NoteBar>ECの注文にはLINEの友だちが書かれていません。確認済みのメールアドレスか電話番号で結びつけ、見つからない注文は「会員のつき合わせ」に並べます。</NoteBar>
+      <NoteBar>ECの注文には、LINEの友だちが誰なのかが書かれていません。メールアドレスか電話番号で結びつけています。どちらも一致しなかった注文は「会員のつき合わせ」に並びます。</NoteBar>
       {notice ? <div className={notice.tone === 'success' ? styles.noticeSuccess : styles.noticeError} role="status">{notice.text}</div> : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <input

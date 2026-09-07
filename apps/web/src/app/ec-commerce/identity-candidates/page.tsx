@@ -25,6 +25,16 @@ import { ApiError, api, type EcIdentityCandidateOperationsList } from '@/lib/api
 import EcTabs from '../ec-tabs-view'
 import ecStyles from '../ec-commerce-v6.module.css'
 
+function candidateImpactText(value: unknown): string {
+  if (!Array.isArray(value)) return NOT_AVAILABLE
+  const metrics = value.filter((metric): metric is Record<string, unknown> => Boolean(metric) && typeof metric === 'object')
+  const orderCount = metrics.find((metric) => ['orders', 'order_count'].includes(String(metric.key)))?.value
+  const revenue = metrics.find((metric) => ['sales', 'revenue', 'order_amount'].includes(String(metric.key)))?.value
+  const countText = typeof orderCount === 'number' ? `注文 ${orderCount.toLocaleString('ja-JP')}件` : ''
+  const revenueText = typeof revenue === 'number' ? `¥${revenue.toLocaleString('ja-JP')}` : ''
+  return countText || revenueText ? `${[countText, revenueText].filter(Boolean).join(' ')} が入る` : NOT_AVAILABLE
+}
+
 /**
  * 設計 `ELayY` 23-1-A「会員のつき合わせ」。
  *
@@ -76,15 +86,10 @@ export default function EcIdentityCandidatesPage() {
   const candidateCount = operations?.summary.candidateExternalCustomers ?? 0
   const noneCount = Math.max(0, (operations?.summary.unmatched ?? 0) - candidateCount)
   const conflictCount = operations?.summary.duplicateSuspicions ?? 0
-  const impactByCandidate = useMemo(() => new Map((operations?.items ?? []).map((item) => {
-    const metrics = Array.isArray(item.impact) ? item.impact : []
-    const revenue = metrics.find((metric) => {
-      if (!metric || typeof metric !== 'object') return false
-      const key = String((metric as Record<string, unknown>).key ?? '')
-      return ['sales', 'revenue', 'order_amount'].includes(key)
-    }) as Record<string, unknown> | undefined
-    return [item.id, typeof revenue?.value === 'number' ? revenue.value : null] as const
-  })), [operations])
+  const impactByCandidate = useMemo(
+    () => new Map((operations?.items ?? []).map((item) => [item.id, candidateImpactText(item.impact)] as const)),
+    [operations],
+  )
   const shown = useMemo(() => scopedItems
     .filter((item) => {
       if (view === 'candidate') return Boolean(item.right.label)
@@ -128,12 +133,12 @@ export default function EcIdentityCandidatesPage() {
         <>
           <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
             <SummaryCard variant="v6" title="結びついていない" value={operations?.summary.unmatched ?? null} unit="件" detail="確認待ちの注文・会員" badge="要対応" />
-            <SummaryCard variant="v6" title="候補が見つかった" value={candidateCount} unit="件" detail="確認済みの連絡先や名前が近い人" />
+            <SummaryCard variant="v6" title="候補が見つかった" value={candidateCount} unit="件" detail="名前や電話が近い人がいます" />
             <SummaryCard variant="v6" title="自動で結びついた" value={operations?.summary.linked ?? null} unit="件" detail="同じ人として結びついた会員" />
-            <SummaryCard variant="v6" title="結びつけると増える売上" value={operations?.summary.potentialRevenue ?? null} unit="円" detail="確認待ちの会員ぶん" />
+            <SummaryCard variant="v6" title="結びつけると増える売上" value={operations?.summary.potentialRevenue ?? null} unit="円" detail={`この${(operations?.summary.unmatched ?? 0).toLocaleString('ja-JP')}件ぶん。分析にも入ります`} />
           </div>
 
-          <NoteBar>確認済みのメールアドレスか電話番号が同じなら候補になります。名前だけが同じ人は、別人のこともあるため自動では結びつけません。</NoteBar>
+          <NoteBar>メールアドレスか電話番号が同じなら、自動で結びつきます。どちらも違うときに、ここへ並びます。名前だけが同じ人は、別人のこともあるので自動では結びつけません。</NoteBar>
 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Tabs items={([
@@ -196,9 +201,7 @@ export default function EcIdentityCandidatesPage() {
                     <Td>
                       <ConfidenceTag confidence={item.confidence} />
                     </Td>
-                    <Td>{impactByCandidate.get(item.id) === null || impactByCandidate.get(item.id) === undefined
-                      ? NOT_AVAILABLE
-                      : `¥${impactByCandidate.get(item.id)?.toLocaleString('ja-JP')} が入る`}</Td>
+                    <Td>{impactByCandidate.get(item.id) ?? NOT_AVAILABLE}</Td>
                     <ActionCell>
                       <Button type="button" onClick={() => review.select(item.id)}>
                         候補を見る

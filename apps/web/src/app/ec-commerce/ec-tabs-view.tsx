@@ -31,6 +31,7 @@ export default function EcTabs({
       setCounts({})
       return () => { alive = false }
     }
+    setCounts({})
     Promise.allSettled([
       api.ecCommerce.overview(accountId),
       api.ecCommerce.operationIdentityCandidates({ lineAccountId: accountId, limit: 1 }),
