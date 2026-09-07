@@ -960,9 +960,9 @@ export const SCREENS = [
     */
     ...BROADCAST, node: 'bPF0s', name: '6-1-I 一斉配信・予約完了',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #419 / UI HEAD `a16927af23` で再撮影・一致。** 予約日時・対象人数・4項目の要約と次の操作を実APIへ接続し、開始・完了・エラーをSlackの同じスレッドへ通知する設定も取得して案内帯へ表示した。予約取消の確認を含む1440/1920pxで横はみ出し0。',
+    verdictNote: '**2026-09-08 Issue #535 / UI HEAD `77e1c49190` で新しい撮影高規約により再計測し、一致を維持。** 画素差3.0307%、高さ差0px。予約完了と取消確認の全状態を1440/1920pxで撮影し、横はみ出し0を確認した。',
     verdictSource: 'broadcasts-v6/bPF0s.txt + broadcasts-v6/bPF0s-1440.png + broadcasts-v6/bPF0s-1920.png + broadcasts-v6/bPF0s-cancel-1440.png + broadcasts-v6/bPF0s-cancel-1920.png',
-    verdictHead: 'a16927af23',
+    verdictHead: '77e1c49190',
     route: '/broadcasts/reserved?id=broadcast-0', mode: 'page',
     /* 押した先の確認窓。**窓はビューポートで撮る**（`fullPage` だと下へ流れる）。 */
     variants: [{
@@ -1874,16 +1874,17 @@ export const SCREENS = [
   {
     ...MEDIA, node: 'YfTfJ', name: '15-1-C メディアの削除確認',
     mode: 'viewport', height: 1080,
-    steps: [{ click: '削除', nth: 4, after: 900 }],
+    steps: [{ qaOpen: 'YfTfJ', after: 900 }],
     variants: [
       /*
-        比較対象はPencilと同じ削除可能状態。使用中の影響確認は別状態に残す。
+        比較対象はPencilと同じ使用中の削除不可状態。削除可能な確認窓も別状態に残す。
       */
-      { suffix: '-used', steps: [{ click: '閉じる', after: 500 }, { qaOpen: 'YfTfJ', after: 900 }] },
+      { suffix: '-deletable', steps: [{ click: '閉じる', after: 500 }, { click: '削除', nth: 4, after: 900 }] },
     ],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #472の差し戻し対応で、Pencilと同じ未使用メディアの削除可能状態を比較対象にして再計測。** 単純な確認文・680px幅・取消と削除の操作を設計に合わせ、背面一覧も186件（商品84／バナー46／動画12／未分類44）に揃えた。画素差分13.2802%、1440/1920pxとも横はみ出し0。使用中の影響確認は `-used` の別状態として証跡を残した。",
-    verdictSource: "media-v6/YfTfJ.txt + media-v6/YfTfJ-1440.png + media-v6/YfTfJ-1920.png + media-v6/YfTfJ-diff-1920.png + media-v6/YfTfJ-used.txt + media-v6/YfTfJ-used-1440.png + media-v6/YfTfJ-used-1920.png + media-v6/YfTfJ-used-diff-1920.png + media-delete-contract.test.ts",
+    verdictNote: "**2026-09-08 Issue #535 / UI HEAD `77e1c49190` でPencilと同じ使用中の削除不可状態を主比較へ戻し、一致。** 画素差8.8648%、高さ差0px。使用中と削除可能の両状態を1440/1920pxで撮影し、横はみ出し0を確認した。",
+    verdictSource: "media-v6/YfTfJ.txt + media-v6/YfTfJ-{1440,1920}.png + media-v6/YfTfJ-diff-1920.png + media-v6/YfTfJ-deletable.txt + media-v6/YfTfJ-deletable-{1440,1920}.png + media-delete-contract.test.ts",
+    verdictHead: "77e1c49190",
   },
   {
     ...MEDIA, node: 'h8pBZr', name: '15-1-D 一覧の状態（空・読込・エラー）',
@@ -2567,7 +2568,7 @@ export const SCREENS = [
     states: {
       apis: ['**/api/ec-commerce/overview**', '**/api/ec-commerce/settings**'],
       kinds: ['normal', 'empty', 'error', 'forbidden'],
-  }, name: '24-1 LINE通知', verdict: 'match', verdictNote: '**2026-09-07 Issue #486 / UI HEAD `57fb09478` で高さを再判定。** #1287の設計高を初期viewportにする規約で通常・空・失敗・権限不足を撮り直し、高さ差+38pxは0pxへ解消。画素差4.8107%、1440/1920pxの全状態で横はみ出し0、通知定義と30日集計を維持して一致。', verdictSource: 'line-notify-v6/festr-{normal,empty,error,forbidden}.txt + festr-{1440,1920}.png + Issue #486 pixel comparison', verdictHead: '57fb09478' },
+  }, name: '24-1 LINE通知', verdict: 'match', verdictNote: '**2026-09-08 Issue #535 / UI HEAD `77e1c49190` で新しい撮影高規約により再計測し、一致を維持。** 画素差4.7865%、高さ差0px。通常・空・失敗・権限不足の全状態を1440/1920pxで撮影し、横はみ出し0を確認した。', verdictSource: 'line-notify-v6/festr-{normal,empty,error,forbidden}.txt + line-notify-v6/festr-{1440,1920}.png + line-notify-v6/festr-diff-1920.png + Issue #535 pixel comparison', verdictHead: '77e1c49190' },
   {
     ...LINE_NOTIFY, node: 'Q55bb', name: '24-1-A お知らせの中身を編集する',
     mode: 'viewport', height: 1136, /*
@@ -2983,9 +2984,9 @@ export const SCREENS = [
   /* タブ3本は設計とそろっている（健全性チェック／緊急コントロール／更新履歴）。 */
   { ...OPERATIONS, node: 'UgonK', name: '32-1 運用状態・健全性チェック', route: '/emergency?tab=health',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #487で新しい撮影高規約により再計測し、一致を維持。** 画素差5.1817%、高さ差0px、1440/1920pxとも横はみ出し0。着手時の+75pxは撮影範囲由来だった。",
-    verdictSource: "operations-v6/UgonK.txt + operations-v6/UgonK-{1440,1920}.png（実装） + Pencil ★V6 + Issue #487 pixel diff",
-    verdictHead: "bb4baef1cc",
+    verdictNote: "**2026-09-08 Issue #535 / UI HEAD `77e1c49190` で新しい撮影高規約により再計測し、一致を維持。** 画素差5.1575%、高さ差0px、1440/1920pxとも横はみ出し0。着手時の+75pxは撮影範囲由来だった。",
+    verdictSource: "operations-v6/UgonK.txt + operations-v6/UgonK-{1440,1920}.png（実装） + Pencil ★V6 + Issue #535 pixel diff",
+    verdictHead: "77e1c49190",
   },
   {
     /* 通常・読込・失敗を見る。**下見が取れないと停止を押せないはず**。 */

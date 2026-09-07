@@ -1998,6 +1998,12 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/site/summary') return { success: true, data: SITE_TRACKING_SUMMARY }
   if (pathname === '/api/site/pages') return { success: true, data: SITE_TRACKING_PAGES }
+  if (pathname === '/api/site/tracking-key') {
+    // アカウントごとに違う鍵を返す。乱数は使わない(毎回同じ絵にする)。
+    const accountId = query.get('accountId') ?? 'visual-qa-account'
+    const trackingKey = `hk_${createHash('sha256').update(`site-tracking:${accountId}`).digest('hex').slice(0, 32)}`
+    return { success: true, data: { accountId, trackingKey } }
+  }
   if (pathname === '/api/ad-platforms') return { success: true, data: AD_PLATFORMS }
   const adPlatformLogs = /^\/api\/ad-platforms\/([^/]+)\/logs$/.exec(pathname)
   if (adPlatformLogs) {
