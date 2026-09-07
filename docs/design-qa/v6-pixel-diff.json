@@ -1,14 +1,14 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
-  "generatedAt": "2026-09-07T16:59:08.574Z",
+  "generatedAt": "2026-09-07T17:11:01.890Z",
   "thresholdPercent": 10,
   "heightDiffThresholdPx": 24,
   "screenCount": 272,
   "comparedCount": 272,
   "unavailableCount": 0,
-  "pixelAboveThresholdCount": 12,
-  "heightAboveThresholdCount": 28,
-  "aboveThresholdCount": 24,
+  "pixelAboveThresholdCount": 20,
+  "heightAboveThresholdCount": 1,
+  "aboveThresholdCount": 20,
   "entries": [
     {
       "feature": 1,
@@ -2422,12 +2422,12 @@
           "width": 1920,
           "comparedHeight": 1080,
           "designHeight": 1080,
-          "implementationHeight": 1123,
-          "heightDifferencePx": 43,
+          "implementationHeight": 1080,
+          "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 59711,
+          "mismatchedPixels": 62845,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 2.8796,
+          "pixelDiffPercent": 3.0307,
           "boundingBox": {
             "left": 0,
             "top": 0,
@@ -2435,22 +2435,22 @@
             "bottom": 1079
           },
           "dominantRegion": "中央・中央",
-          "heightReason": "実装",
+          "heightReason": null,
           "designPath": "docs/design-reference/broadcasts-v6/bPF0s.png",
           "implementationPath": "docs/design-qa/broadcasts-v6/bPF0s-1920.png",
           "implementationSource": "docs",
           "diffPath": "docs/design-qa/broadcasts-v6/bPF0s-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 2.8796,
-      "heightDifferencePx": 43,
-      "heightReason": "実装",
+      "pixelDiffPercent": 3.0307,
+      "heightDifferencePx": 0,
+      "heightReason": null,
       "dominantRegion": "中央・中央",
       "implementationSource": "docs",
       "diffPath": "docs/design-qa/broadcasts-v6/bPF0s-diff-1920.png",
       "pixelAboveThreshold": false,
-      "heightAboveThreshold": true,
-      "aboveThreshold": true
+      "heightAboveThreshold": false,
+      "aboveThreshold": false
     },
     {
       "feature": 6,
@@ -6020,28 +6020,32 @@
           "implementationHeight": 1080,
           "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 275378,
+          "mismatchedPixels": 183821,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 13.2802,
+          "pixelDiffPercent": 8.8648,
           "boundingBox": {
             "left": 1,
-            "top": 11,
+            "top": 14,
             "right": 1881,
             "bottom": 1078
           },
           "dominantRegion": "下部・中央",
+          "heightReason": null,
           "designPath": "docs/design-reference/media-v6/YfTfJ.png",
           "implementationPath": "docs/design-qa/media-v6/YfTfJ-1920.png",
           "implementationSource": "docs",
           "diffPath": "docs/design-qa/media-v6/YfTfJ-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 13.2802,
+      "pixelDiffPercent": 8.8648,
       "heightDifferencePx": 0,
+      "heightReason": null,
       "dominantRegion": "下部・中央",
       "implementationSource": "docs",
       "diffPath": "docs/design-qa/media-v6/YfTfJ-diff-1920.png",
-      "aboveThreshold": true
+      "pixelAboveThreshold": false,
+      "heightAboveThreshold": false,
+      "aboveThreshold": false
     },
     {
       "feature": 15,
@@ -8549,12 +8553,12 @@
           "width": 1920,
           "comparedHeight": 1080,
           "designHeight": 1080,
-          "implementationHeight": 1118,
-          "heightDifferencePx": 38,
+          "implementationHeight": 1080,
+          "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 99755,
+          "mismatchedPixels": 99252,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 4.8107,
+          "pixelDiffPercent": 4.7865,
           "boundingBox": {
             "left": 0,
             "top": 0,
@@ -8562,21 +8566,22 @@
             "bottom": 1079
           },
           "dominantRegion": "中央・左",
+          "heightReason": null,
           "designPath": "docs/design-reference/line-notify-v6/festr.png",
           "implementationPath": "docs/design-qa/line-notify-v6/festr-1920.png",
           "implementationSource": "docs",
           "diffPath": "docs/design-qa/line-notify-v6/festr-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 4.8107,
-      "heightDifferencePx": 38,
+      "pixelDiffPercent": 4.7865,
+      "heightDifferencePx": 0,
+      "heightReason": null,
       "dominantRegion": "中央・左",
       "implementationSource": "docs",
       "diffPath": "docs/design-qa/line-notify-v6/festr-diff-1920.png",
       "pixelAboveThreshold": false,
-      "heightAboveThreshold": true,
-      "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T15:38:05.887Z"
+      "heightAboveThreshold": false,
+      "aboveThreshold": false
     },
     {
       "feature": 24,
@@ -10172,12 +10177,12 @@
           "width": 1920,
           "comparedHeight": 1080,
           "designHeight": 1080,
-          "implementationHeight": 1155,
-          "heightDifferencePx": 75,
+          "implementationHeight": 1080,
+          "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 107448,
+          "mismatchedPixels": 106945,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 5.1817,
+          "pixelDiffPercent": 5.1575,
           "boundingBox": {
             "left": 0,
             "top": 0,
@@ -10185,21 +10190,22 @@
             "bottom": 1079
           },
           "dominantRegion": "中央・左",
+          "heightReason": null,
           "designPath": "docs/design-reference/operations-v6/UgonK.png",
           "implementationPath": "docs/design-qa/operations-v6/UgonK-1920.png",
           "implementationSource": "docs",
           "diffPath": "docs/design-qa/operations-v6/UgonK-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 5.1817,
-      "heightDifferencePx": 75,
+      "pixelDiffPercent": 5.1575,
+      "heightDifferencePx": 0,
+      "heightReason": null,
       "dominantRegion": "中央・左",
       "implementationSource": "docs",
       "diffPath": "docs/design-qa/operations-v6/UgonK-diff-1920.png",
       "pixelAboveThreshold": false,
-      "heightAboveThreshold": true,
-      "aboveThreshold": true,
-      "retainedFrom": "2026-09-07T15:38:05.887Z"
+      "heightAboveThreshold": false,
+      "aboveThreshold": false
     },
     {
       "feature": 32,
