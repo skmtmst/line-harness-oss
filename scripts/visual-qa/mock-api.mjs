@@ -2451,6 +2451,14 @@ const server = createServer((req, res) => {
     return
   }
 
+  if (method === 'GET' && url.pathname === '/api/nen-members/photos/original-download/visual-qa-once') {
+    const jpeg = Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2Q==', 'base64')
+    res.setHeader('Content-Type', 'image/jpeg')
+    res.setHeader('Cache-Control', 'no-store')
+    res.writeHead(200).end(jpeg)
+    return
+  }
+
   if (method === 'GET' && url.pathname.startsWith('/api/rich-menu-images/')) {
     const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
     res.setHeader('Content-Type', 'image/png')
@@ -2586,6 +2594,47 @@ const server = createServer((req, res) => {
     if (method === 'POST' && url.pathname === '/api/nen-members/photos/decisions/bulk') {
       res.writeHead(201).end(JSON.stringify({
         success: true, duplicate: false, data: NEN_PHOTO_BULK_DECISION_RESULT,
+      }))
+      return
+    }
+    /*
+      機能22の原本保存。実物や秘密値は返さず、再認証と一回限りURLの
+      画面遷移だけを固定応答で確認する。000000 は失敗確認専用。
+    */
+    if (method === 'POST' && url.pathname === '/api/auth/step-up') {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        if (body.purpose !== 'photo.original.download' || body.code === '000000') {
+          res.writeHead(400).end(JSON.stringify({ success: false, error: '再認証コードを確認してください。' }))
+          return
+        }
+        res.writeHead(201).end(JSON.stringify({
+          success: true,
+          data: {
+            token: 'visual-qa-photo-original-step-up',
+            purpose: 'photo.original.download',
+            expiresAt: '2026-09-07T03:10:00.000Z',
+          },
+        }))
+      })
+      return
+    }
+    const photoOriginalIssue = /^\/api\/nen-members\/photos\/([^/]+)\/original-download$/.exec(url.pathname)
+    if (method === 'POST' && photoOriginalIssue) {
+      if (req.headers['x-step-up-token'] !== 'visual-qa-photo-original-step-up') {
+        res.writeHead(428).end(JSON.stringify({ success: false, error: '原本の保存には再認証が必要です。' }))
+        return
+      }
+      res.writeHead(201).end(JSON.stringify({
+        success: true,
+        data: {
+          downloadUrl: '/api/nen-members/photos/original-download/visual-qa-once',
+          expiresAt: '2026-09-07T03:05:00.000Z',
+          oneTime: true,
+        },
       }))
       return
     }

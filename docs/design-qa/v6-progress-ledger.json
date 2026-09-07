@@ -1,0 +1,3248 @@
+{
+  "generatedFrom": "scripts/visual-qa/screens.mjs",
+  "total": 272,
+  "compared": 243,
+  "unimplemented": 0,
+  "unconfirmed": 0,
+  "elsewhere": 0,
+  "missing": 29,
+  "match": 184,
+  "structureMatchDataPending": 66,
+  "needsFix": 14,
+  "unjudged": 4,
+  "remaining": 84,
+  "features": [
+    {
+      "feature": 1,
+      "name": "ダッシュボード",
+      "total": 5,
+      "compared": 5,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 5,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 0,
+      "capturedAt": [
+        {
+          "pr": 419,
+          "head": "c84baa63",
+          "on": "2026-08-30",
+          "screens": [
+            "vUXKb",
+            "ZN0ov",
+            "JN6mQ",
+            "NjK9q",
+            "Alekb"
+          ],
+          "note": "ダッシュボード。お知らせの口を撮影モックへ足した（`counts` の4つが欠けると `undefined.all` で落ちる）"
+        },
+        {
+          "pr": 971,
+          "head": "d69099cd9",
+          "on": "2026-09-06",
+          "screens": [
+            "vUXKb",
+            "JN6mQ"
+          ],
+          "note": "Issue #267。3102/8789で対象2画面を1440・1920px撮影し、Pencil設計と比較。両画面とも横はみ出し0。構造は一致し、設計値と公式プロフィール短縮URLを返すAPIがないためデータ未接続を維持した。"
+        },
+        {
+          "pr": 1028,
+          "head": "7cc11af48",
+          "on": "2026-09-07",
+          "screens": [
+            "vUXKb",
+            "JN6mQ"
+          ],
+          "note": "Issue #267。#270の指標APIと#277の撮影モックを接続し、3102/8789で1440・1920pxを再撮影。両画面とも横はみ出し0、表示中の本文差0。有効友だち398人、送信枠197/200、7日推移、公式lin.ee URL、実QRを確認して一致にした。"
+        }
+      ]
+    },
+    {
+      "feature": 2,
+      "name": "受信箱",
+      "total": 18,
+      "compared": 18,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 18,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 0,
+      "capturedAt": [
+        {
+          "pr": 513,
+          "head": "60b39036",
+          "on": "2026-08-29",
+          "screens": [
+            "tBlkL",
+            "AuSDY",
+            "LHjwD"
+          ],
+          "note": "保存の成否を窓へ返す直し。**P0は解決**"
+        },
+        {
+          "pr": 555,
+          "head": "e873eeb9",
+          "on": "2026-08-29",
+          "screens": [
+            "ANgda",
+            "tBlkL",
+            "AuSDY",
+            "LHjwD"
+          ],
+          "note": "保存した検索の窓。未入力は赤帯＋押せない保存ボタン。同じ部品を使う4枚を撮り直した"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "xGLVe"
+          ],
+          "note": "development そのもので撮った"
+        },
+        {
+          "pr": 583,
+          "head": "0218ef61",
+          "on": "2026-08-30",
+          "screens": [
+            "GO8RQ"
+          ],
+          "note": "出す順番を既定にし、断りと並べ替えの口を足した。Workerの選ぶ順と同率の決め方まで一致"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "f0zn6"
+          ],
+          "note": "本文が取れていなかったので撮った。development そのもの"
+        },
+        {
+          "pr": 555,
+          "head": "9eee9655",
+          "on": "2026-08-30",
+          "screens": [
+            "tBlkL",
+            "ANgda",
+            "AuSDY",
+            "LHjwD"
+          ],
+          "note": "重複エラーの文言を設計へ。変更はこの1行だけ"
+        },
+        {
+          "pr": 604,
+          "head": "6011cfeb",
+          "on": "2026-08-31",
+          "screens": [
+            "ASsb3",
+            "Xi4x9",
+            "NfgOs",
+            "NWbuF",
+            "TUveA",
+            "w72a2",
+            "B7CER8",
+            "YZaDK",
+            "L35UOV",
+            "H3lAOB"
+          ],
+          "note": "Claudeが直した。古い形の保存を開くと受信箱が落ちる不具合を撮影中に見つけた。条件の要約と「…」、右パネルの「初期状態に戻す」も足した"
+        },
+        {
+          "pr": 0,
+          "head": "4196cc7b",
+          "on": "2026-09-01",
+          "screens": [
+            "YZaDK"
+          ],
+          "note": "Claudeが実装して撮った。契約枝のローカルcommit 4b97fab1 の上。**doctorが要確認のため push していない。ローカルcommitのみ**"
+        },
+        {
+          "pr": 1059,
+          "head": "6f9a64684",
+          "on": "2026-09-07",
+          "screens": [
+            "xGLVe",
+            "NfgOs",
+            "H3lAOB",
+            "Xi4x9",
+            "f0zn6",
+            "NWbuF",
+            "B7CER8",
+            "IYjvu",
+            "TUveA",
+            "w72a2",
+            "ASsb3",
+            "ANgda",
+            "tBlkL",
+            "LHjwD"
+          ],
+          "note": "Issue #293。受信箱専用部品と撮影用固定データを設計状態へそろえ、3104/8791で1440・1920pxを撮影。同じ状態のPencilと横並び比較し、要修正14画面をすべて一致へ更新した。"
+        }
+      ]
+    },
+    {
+      "feature": 3,
+      "name": "友だち",
+      "total": 12,
+      "compared": 0,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 12,
+      "match": 10,
+      "structureMatchDataPending": 1,
+      "needsFix": 0,
+      "unjudged": 1,
+      "remaining": 2,
+      "capturedAt": [
+        {
+          "pr": 520,
+          "head": "4848a8f3",
+          "on": "2026-08-29",
+          "screens": [
+            "bzDn6"
+          ],
+          "note": "友だち一覧の帯を未取得 `—人` に。**development 直結の根元PR**"
+        },
+        {
+          "pr": 565,
+          "head": "ea2e730d",
+          "on": "2026-08-29",
+          "screens": [
+            "r7eSi"
+          ],
+          "note": "統合ユーザーの7列。内部の統合キーを外し、未取得と0件を分ける。空の返事の形も直した（`rows` の無い返事だと画面ごと落ちる）"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "PhxG6",
+            "Igi72",
+            "I6UAdr",
+            "YzxU1"
+          ],
+          "note": "判定を具体化するため撮った"
+        },
+        {
+          "pr": 600,
+          "head": "484c0cd8",
+          "on": "2026-08-31",
+          "screens": [
+            "InCDe"
+          ],
+          "note": "Claudeが #598 の読み口の上に実装した2画面のうち友だち同士のほう。5状態＋判定窓で12枚"
+        },
+        {
+          "pr": 601,
+          "head": "cfab56e0",
+          "on": "2026-08-31",
+          "screens": [
+            "w8W4Eh"
+          ],
+          "note": "Claudeが #599 の読み口の上に実装した統合ユーザー詳細。通常・読込・空・失敗・権限不足＋変更窓＋版競合で14枚"
+        },
+        {
+          "pr": 628,
+          "head": "846be01f",
+          "on": "2026-08-31",
+          "screens": [
+            "PhxG6",
+            "Igi72",
+            "I6UAdr",
+            "bzDn6",
+            "YzxU1",
+            "r7eSi"
+          ],
+          "note": "Claudeが実装して撮った。#520 の上（`/friends/page.tsx` を触る唯一の開いているPR）。**#565 が development 経由で入っていることを確かめてから撮った**"
+        },
+        {
+          "pr": 628,
+          "head": "846be01f",
+          "on": "2026-09-01",
+          "screens": [
+            "bzDn6"
+          ],
+          "note": "**#628 が codex/development へマージされた**（#520 の取り込み後）。私の画面修正が初めて本流に入った1本"
+        },
+        {
+          "pr": 645,
+          "head": "6e9ed4d6",
+          "on": "2026-09-01",
+          "screens": [
+            "IAf7j"
+          ],
+          "note": "Claudeが実装して撮った。#606 の契約の上（development 直結）。**ACCOUNT に role が無く、権限で出し分ける画面がすべて権限なし側に倒れていた**のを固定データ側で直した"
+        },
+        {
+          "pr": 966,
+          "head": "baa097e99",
+          "on": "2026-09-06",
+          "screens": [
+            "PhxG6",
+            "LT8RS",
+            "Igi72",
+            "IAf7j",
+            "I6UAdr",
+            "bzDn6",
+            "YzxU1",
+            "InCDe",
+            "r7eSi",
+            "w8W4Eh"
+          ],
+          "note": "Issue #265。10 Node・68枚を1440/1920pxと全状態で撮影し、全画像で横はみ出し0。一覧と表示件数を一致へ更新し、詳細検索は不足APIを明示して構造一致へ更新。IAf7j-pick の撮影手順二重実行も直して再撮影した。"
+        },
+        {
+          "pr": 975,
+          "head": "bdf6abfa7",
+          "on": "2026-09-06",
+          "screens": [
+            "vtBCu",
+            "ux7of"
+          ],
+          "note": "Issue #246。UID移行とCSV移行を本物のAPIへ接続し、1440/1920pxで撮影。vtBCuは設計画像と一致、ux7ofは設計画像なしのため本文照合で未判定。両画面とも横はみ出し0、壊れ値0。"
+        },
+        {
+          "pr": 983,
+          "head": "36e8b070b",
+          "on": "2026-09-06",
+          "screens": [
+            "IAf7j",
+            "I6UAdr",
+            "bzDn6",
+            "YzxU1",
+            "r7eSi"
+          ],
+          "note": "Issue #265 続き。残り5画面を設計構造へ直し、3102/8789で定義済み全状態32枚を1440/1920px撮影。5画面を一致へ更新し、全画像で横はみ出し0、壊れ値・内部ID0。"
+        }
+      ]
+    },
+    {
+      "feature": 4,
+      "name": "友だち属性",
+      "total": 21,
+      "compared": 15,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 6,
+      "match": 11,
+      "structureMatchDataPending": 6,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 6,
+      "capturedAt": [
+        {
+          "pr": 420,
+          "head": "87c150ad",
+          "on": "2026-08-28",
+          "screens": [
+            "HBTk0",
+            "yKEdO",
+            "KoT6c",
+            "A1ZYeP",
+            "l25rlp",
+            "rIhbN"
+          ]
+        },
+        {
+          "pr": 421,
+          "head": "f7b7974a",
+          "on": "2026-08-28",
+          "screens": [
+            "QKx8Q",
+            "XBkiQ"
+          ]
+        },
+        {
+          "pr": 541,
+          "head": "e929f22a",
+          "on": "2026-08-29",
+          "screens": [
+            "QKx8Q",
+            "XBkiQ"
+          ],
+          "note": "保存した検索から内部IDを外し、選ぶ形へ。**#541 は #539 を含む**。束3"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "hqrOv",
+            "dKlkz",
+            "sfTEW",
+            "HBTk0",
+            "yKEdO",
+            "rIhbN",
+            "tP0RW",
+            "LfrQs",
+            "VjXGX",
+            "byqIW",
+            "KoT6c",
+            "zGZMA"
+          ],
+          "note": "判定を具体化するため撮り直した（本文が無かった）。development そのもの"
+        },
+        {
+          "pr": 420,
+          "head": "f77de350",
+          "on": "2026-08-30",
+          "screens": [
+            "HBTk0",
+            "yKEdO",
+            "KoT6c"
+          ],
+          "note": "入力済みを withUsage で読み、未取得は —。帯4つと表示先の列。項目移行の画面も撮れた"
+        },
+        {
+          "pr": 605,
+          "head": "3b5098a3",
+          "on": "2026-08-31",
+          "screens": [
+            "l25rlp",
+            "ee0sk"
+          ],
+          "note": "Claudeが直した。連動OFF時の説明・★の切り替え方・OFFに戻したときの断り。#422 の上"
+        },
+        {
+          "pr": 578,
+          "head": "a744c582",
+          "on": "2026-08-31",
+          "screens": [
+            "A1ZYeP",
+            "hqrOv"
+          ],
+          "note": "Claudeが撮り直して判定を書き直した。A1ZYeP は絵ではなく `FriendFieldType` を読んで数え直した"
+        },
+        {
+          "pr": 0,
+          "head": "3aef8ded",
+          "on": "2026-08-31",
+          "screens": [
+            "GMvBd"
+          ],
+          "note": "Claudeが実装して撮った。契約枝 codex/kenta-v6-support-mark-rules-api（head e95ac2b5）の上。**doctorが要確認のため push していない。ローカルcommitのみ**"
+        },
+        {
+          "pr": 605,
+          "head": "3b5098a3",
+          "on": "2026-09-01",
+          "screens": [
+            "l25rlp",
+            "ee0sk"
+          ],
+          "note": "**#605 が codex/development へマージされた**（#422 の取り込み後）"
+        },
+        {
+          "pr": 670,
+          "head": "df3f4e3b",
+          "on": "2026-09-02",
+          "screens": [
+            "l25rlp",
+            "tP0RW",
+            "LfrQs",
+            "ee0sk",
+            "byqIW",
+            "A1ZYeP",
+            "XBkiQ"
+          ],
+          "note": "第1群5本（#666 #667 #668 #670 #674）と第2群4本（#660 #661 #664 #665）が入った木で撮った。**撮っただけで、判定は書き換えていない**（絵を1枚ずつ見ていないため）。`VjXGX`（遡及反映の確認ダイアログ）と `zGZMA`（対応マーク削除の確認）は、固定データにボタンが出ず撮れなかった。**#670 の主対象 `rIhbN`・`QKx8Q`・`hqrOv` は撮っていない** — 本流 `codex/development` の台帳は95行しかなく、この3件の行が無いため。撮影は内蔵SSDのクローンで実施（外付けドライブが障害のため）"
+        },
+        {
+          "pr": 670,
+          "head": "7d830282",
+          "on": "2026-09-02",
+          "screens": [
+            "l25rlp",
+            "tP0RW",
+            "LfrQs",
+            "ee0sk",
+            "VjXGX",
+            "byqIW",
+            "A1ZYeP",
+            "KoT6c",
+            "HBTk0",
+            "yKEdO",
+            "dKlkz",
+            "hqrOv",
+            "rIhbN",
+            "QKx8Q",
+            "XBkiQ",
+            "H374MR",
+            "sfTEW",
+            "op1rh",
+            "QzRsJ"
+          ],
+          "note": "最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。19 Node が撮れた（前回は本流の台帳が95行で `rIhbN`・`QKx8Q`・`hqrOv` の行が無く撮れなかった）。`GMvBd`（「保留」）と `zGZMA`（「対応中を保管」）は、固定データにその行やボタンが出ず撮れていない。"
+        }
+      ]
+    },
+    {
+      "feature": 5,
+      "name": "シナリオ配信",
+      "total": 14,
+      "compared": 14,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 7,
+      "structureMatchDataPending": 7,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 7,
+      "capturedAt": [
+        {
+          "pr": 1121,
+          "head": "1d9e8d36c",
+          "on": "2026-09-07",
+          "screens": [
+            "kk8dz",
+            "r6Gzsu",
+            "hz9ti",
+            "EvVO5",
+            "RUxNf",
+            "g2UNV",
+            "NrBkW",
+            "M2b2B"
+          ],
+          "note": "Issue #366 / PR #1121 の差し戻し対応。機能5の8画面を試算・開始記録・V6下書きAPIへ接続し、3104/8791で1440・1920pxと結果画面3状態を撮影。全22枚で横はみ出し0。1画面を一致、契約が返さない値だけを理由付き構造一致・データ待ちとして記録した。"
+        },
+        {
+          "pr": 1084,
+          "head": "31c2fddcc",
+          "on": "2026-09-07",
+          "screens": [
+            "TC1b1",
+            "kk8dz",
+            "bV5Vs",
+            "r6Gzsu",
+            "hz9ti",
+            "RUxNf",
+            "g2UNV"
+          ],
+          "note": "Issue #325。#1073の固定データを含む木を3104/8791で1440・1920px撮影し、設計1920pxと同じ状態で横並び比較した。全14枚で横はみ出し0。固定データで差が解消した2画面を一致へ更新し、残る5画面は不足する固定値またはAPI契約を理由に残した。"
+        },
+        {
+          "pr": 1069,
+          "head": "9294bdeeb",
+          "on": "2026-09-07",
+          "screens": [
+            "TC1b1",
+            "cCB7r",
+            "kk8dz",
+            "bV5Vs",
+            "xfYLn",
+            "r6Gzsu",
+            "hz9ti",
+            "RUxNf",
+            "g2UNV"
+          ],
+          "note": "Issue #294。3104/8791で9画面を1440・1920px撮影し、正本と同じ状態・同じ横幅で横並び比較した。全18枚で横はみ出し0。2画面は一致、7画面は存在しないAPI値を作らず理由つきの構造一致・データ待ち。"
+        },
+        {
+          "pr": 954,
+          "head": "c03ebf864",
+          "on": "2026-09-06",
+          "screens": [
+            "TC1b1",
+            "cCB7r",
+            "kk8dz",
+            "bV5Vs",
+            "xfYLn",
+            "r6Gzsu",
+            "hz9ti",
+            "dqFft",
+            "EvVO5",
+            "RUxNf",
+            "NrBkW",
+            "g2UNV",
+            "M2b2B",
+            "q5G45"
+          ],
+          "note": "Issue #266。latest developmentを取り込み、1440・1920と全状態を3102/8789で撮影。全画像で横はみ出し0。"
+        },
+        {
+          "pr": 534,
+          "head": "0158ba8e",
+          "on": "2026-08-29",
+          "screens": [
+            "bV5Vs"
+          ],
+          "note": "到達率の `NaN%` を消す。束4"
+        },
+        {
+          "pr": 519,
+          "head": "a8e00234",
+          "on": "2026-08-29",
+          "screens": [
+            "q5G45"
+          ],
+          "note": "シナリオの失敗を未登録と分ける。束1と束4"
+        },
+        {
+          "pr": 553,
+          "head": "2fdded68",
+          "on": "2026-08-29",
+          "screens": [
+            "dqFft"
+          ],
+          "note": "通の削除を画面内の確認窓へ。シナリオごと削除はまだ標準の confirm"
+        },
+        {
+          "pr": 521,
+          "head": "7d5d74fd",
+          "on": "2026-08-29",
+          "screens": [
+            "RUxNf"
+          ],
+          "note": "開始・停止の確認窓。窓は一覧の行に出る"
+        },
+        {
+          "pr": 522,
+          "head": "3c88b8bd",
+          "on": "2026-08-29",
+          "screens": [
+            "NrBkW"
+          ],
+          "note": "開始完了の知らせ。`?started=1` で開ける。#521 の上に積んである"
+        },
+        {
+          "pr": 503,
+          "head": "6db5ad7f",
+          "on": "2026-08-28",
+          "screens": [
+            "M2b2B"
+          ],
+          "note": "新しい口は足さず既存の統計を読む"
+        },
+        {
+          "pr": 503,
+          "head": "6db5ad7f",
+          "on": "2026-08-28",
+          "screens": [
+            "xfYLn",
+            "hz9ti"
+          ],
+          "note": "撮り方が別の画面に当たっていたので直して撮り直した。固定データの `reachRate` を直したので `NaN%` も消えた"
+        },
+        {
+          "pr": 530,
+          "head": "2568c474",
+          "on": "2026-08-29",
+          "screens": [
+            "xfYLn"
+          ],
+          "note": "通の編集から `cron` を外す。束3"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "kk8dz",
+            "r6Gzsu",
+            "hz9ti",
+            "EvVO5"
+          ],
+          "note": "判定を具体化するため撮った。development そのもの"
+        },
+        {
+          "pr": 569,
+          "head": "92f03199",
+          "on": "2026-08-30",
+          "screens": [
+            "cCB7r"
+          ],
+          "note": "配信方式の選択。段の表示と、作り直しになる断りが入っている"
+        },
+        {
+          "pr": 427,
+          "head": "5f09837c",
+          "on": "2026-08-30",
+          "screens": [
+            "TC1b1",
+            "bV5Vs",
+            "g2UNV"
+          ],
+          "note": "`codex/development` 直結へ張り替え。**#529 の母数の直りは入っていない**（#427 単体では 41% だけ）"
+        },
+        {
+          "pr": 529,
+          "head": "a3511980",
+          "on": "2026-08-30",
+          "screens": [
+            "TC1b1"
+          ],
+          "note": "読了済の母数を明記。束6。**development 直結へ張り替わり head も動いたが撮り直していない**——`scenarios/page.tsx` の blob が同一"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "M1EXwB"
+          ],
+          "note": "development そのもので撮った"
+        },
+        {
+          "pr": 0,
+          "head": "2d0ee180",
+          "on": "2026-08-30",
+          "screens": [
+            "cCB7r",
+            "TC1b1",
+            "RUxNf",
+            "q5G45"
+          ],
+          "note": "同上。配信方式の見本は設計より丁寧に入っていた"
+        },
+        {
+          "pr": 590,
+          "head": "a133916a",
+          "on": "2026-08-30",
+          "screens": [
+            "RUxNf"
+          ],
+          "note": "Claudeが直した。配信前チェック4項目。確かめられない2つは —（未取得）。直した本人が比較している"
+        },
+        {
+          "pr": 625,
+          "head": "73d25b41",
+          "on": "2026-08-31",
+          "screens": [
+            "bV5Vs",
+            "xfYLn",
+            "r6Gzsu",
+            "hz9ti",
+            "dqFft",
+            "EvVO5",
+            "g2UNV"
+          ],
+          "note": "Claudeが実装して撮った。#591 の上（#591 は #553 と scenario-started を含む）。**dqFft の「シナリオごと削除がまだ confirm」は #591 で解決済みだった**"
+        }
+      ]
+    },
+    {
+      "feature": 6,
+      "name": "一斉配信",
+      "total": 15,
+      "compared": 15,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 14,
+      "structureMatchDataPending": 1,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 1,
+      "capturedAt": [
+        {
+          "pr": 543,
+          "head": "819895dd",
+          "on": "2026-08-29",
+          "screens": [
+            "h0kahp"
+          ],
+          "note": "テスト送信と本番予約で同じ下書きを使う直し。押すたびに配信が増える件は解決"
+        },
+        {
+          "pr": 497,
+          "head": "84e5bab9",
+          "on": "2026-08-28",
+          "screens": [
+            "FpgxH"
+          ],
+          "note": "Claudeが作ったDraft。#495 の上に積んである"
+        },
+        {
+          "pr": 503,
+          "head": "6db5ad7f",
+          "on": "2026-08-28",
+          "screens": [
+            "q76C35",
+            "zZ9fA",
+            "XQfMD",
+            "p97Tf",
+            "Bw0zt",
+            "vW4Es",
+            "u6gHt",
+            "EGMb1",
+            "xkRDb",
+            "TmHjF"
+          ],
+          "note": "固定データ（配信の帯・1件の配信）を足して撮り直した。**`FpgxH` は #497 の絵に戻した。** 機能ごと撮り直すと、別のPRで直った1枚が直る前に戻る"
+        },
+        {
+          "pr": 531,
+          "head": "1a943082",
+          "on": "2026-08-29",
+          "screens": [
+            "u6gHt"
+          ],
+          "note": "内部語を外し、開封の母数を明記。束3と束6"
+        },
+        {
+          "pr": 561,
+          "head": "51827fe1",
+          "on": "2026-08-29",
+          "screens": [
+            "bPF0s"
+          ],
+          "note": "予約完了の5段とSTEP帯、右390pxの取り消し導線、確認窓、409の文。取り消しの口だけモックで405に落とさず、Workerと同じく状態を見て分ける"
+        },
+        {
+          "pr": 557,
+          "head": "697cee2c",
+          "on": "2026-08-29",
+          "screens": [
+            "q76C35"
+          ],
+          "note": "帯の未取得を `—` に。返事を差し替えて失敗・一部欠け・実値0の3つを見た"
+        },
+        {
+          "pr": 554,
+          "head": "875a9ed3",
+          "on": "2026-08-29",
+          "screens": [
+            "EGMb1"
+          ],
+          "note": "配信の削除を画面内の確認窓へ"
+        },
+        {
+          "pr": 550,
+          "head": "f7c5a99e",
+          "on": "2026-08-29",
+          "screens": [
+            "cPk8A",
+            "sqFXf"
+          ],
+          "note": "対象条件の保存と呼び出し。**固定データの形は `SegmentCondition`**（`{operator, rules}`）。別名で書いて画面を落とした"
+        },
+        {
+          "pr": 602,
+          "head": "d02be6d8",
+          "on": "2026-08-31",
+          "screens": [
+            "q76C35",
+            "xkRDb",
+            "EGMb1",
+            "TmHjF"
+          ],
+          "note": "Claudeが一覧を直した。帯の4枚・フォルダの「…」・権限不足の分離"
+        },
+        {
+          "pr": 603,
+          "head": "c86d7242",
+          "on": "2026-08-31",
+          "screens": [
+            "zZ9fA",
+            "cPk8A",
+            "XQfMD",
+            "p97Tf",
+            "Bw0zt",
+            "vW4Es"
+          ],
+          "note": "同じくClaude。節の番号・本文の上限5,000字・内部の語の除去。#602 の上に積む"
+        },
+        {
+          "pr": 0,
+          "head": "0857c068",
+          "on": "2026-09-01",
+          "screens": [
+            "vW4Es"
+          ],
+          "note": "Claudeが実装して撮った。#603（codex/kenta-v6-feature6-form-ui）の上。**doctorが要確認のため push していない。ローカルcommitのみ**"
+        },
+        {
+          "pr": 674,
+          "head": "df3f4e3b",
+          "on": "2026-09-02",
+          "screens": [
+            "q76C35",
+            "zZ9fA",
+            "XQfMD",
+            "p97Tf",
+            "Bw0zt",
+            "h0kahp",
+            "vW4Es",
+            "FpgxH",
+            "bPF0s",
+            "u6gHt",
+            "EGMb1",
+            "xkRDb"
+          ],
+          "note": "第1群5本（#666 #667 #668 #670 #674）と第2群4本（#660 #661 #664 #665）が入った木で撮った。**絵を見て判定し直したのは `q76C35` だけ。** 残りは撮っただけで判定は据え置き。`cPk8A`（保存した条件から選ぶ）と `sqFXf`（この条件を保存）は押せる形になっておらず撮れていない。`TmHjF`（一覧の状態）は口の返事を差し替える手順が仕組みに無く撮れない。撮影は内蔵SSDのクローンで実施（外付けドライブが障害のため）"
+        },
+        {
+          "pr": 674,
+          "head": "7d830282",
+          "on": "2026-09-02",
+          "screens": [
+            "q76C35",
+            "zZ9fA",
+            "XQfMD",
+            "p97Tf",
+            "Bw0zt",
+            "h0kahp",
+            "vW4Es",
+            "FpgxH",
+            "bPF0s",
+            "u6gHt",
+            "EGMb1",
+            "xkRDb",
+            "TmHjF"
+          ],
+          "note": "最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。`TmHjF`（一覧の状態）が今回は撮れた。**24枚（12 Node）撮れた。** はじめ `h0kahp`・`vW4Es`・`FpgxH` が `locator.fill` の時間切れで撮れなかったが、原因は実装ではなく**撮る側**だった——`capture-screens.mjs` の `fill` が必ず `getByLabel` を通しており、台帳が `selector: true`（CSS選択子）で書いた10件を1つも拾えていなかった。両方を読むように直して撮れた。`cPk8A`・`sqFXf` は「詳細条件で絞り込んで配信する」が見つからず撮れない。"
+        },
+        {
+          "pr": 979,
+          "head": "3c6e4ec948",
+          "on": "2026-09-06",
+          "screens": [
+            "q76C35",
+            "zZ9fA",
+            "cPk8A",
+            "XQfMD",
+            "p97Tf",
+            "Bw0zt",
+            "h0kahp",
+            "vW4Es",
+            "FpgxH",
+            "u6gHt",
+            "EGMb1",
+            "sqFXf",
+            "TmHjF"
+          ],
+          "note": "Issue #219。作成を正本の5段へ分け、対象13画面と状態別を3104/8791の1440・1920pxで撮影。全画像で横はみ出し0。一致2、構造一致・データ未接続5、要修正6。"
+        }
+      ]
+    },
+    {
+      "feature": 7,
+      "name": "リマインダ",
+      "total": 11,
+      "compared": 11,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 11,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 0,
+      "capturedAt": [
+        {
+          "pr": 1030,
+          "head": "a828e5afc3",
+          "on": "2026-09-07",
+          "screens": [
+            "M1EXwB",
+            "GC4St"
+          ],
+          "note": "Issue #73。一覧の操作メニューと、実行台帳を公開状態 planned で絞る配信予定画面を3104/8791で1440・1920px撮影。正本と同じ入力で比較し、横はみ出し0。"
+        },
+        {
+          "pr": 429,
+          "head": "0f612926",
+          "on": "2026-08-29",
+          "screens": [
+            "uJP22"
+          ],
+          "note": "**撮り直していない。** 旧head `838116b4` から `reminders/new` の blob が不変（差分は Worker の機能設定だけ）。#429 の受入条件5項目だけをコードで確認した。画面全体は要修正のまま"
+        },
+        {
+          "pr": 551,
+          "head": "44692a37",
+          "on": "2026-08-29",
+          "screens": [
+            "s7T2dz",
+            "JCz6J",
+            "W98zZQ",
+            "s6Vvp",
+            "PSmHo"
+          ],
+          "note": "公開までの5段。`?stage=` で1枚ずつ開く。届く予定・公開前チェック・公開の3つの口だけモックで405に落とさず、**公開の人数は公開前チェックと同じ数から作る**"
+        },
+        {
+          "pr": 514,
+          "head": "9a72dba6",
+          "on": "2026-08-29",
+          "screens": [
+            "Y0Sn3",
+            "M1EXwB"
+          ],
+          "note": "削除確認と、未送信だけ取り消して送信済みを残す直し。**#514 は #498 を含む**。**#498 単体（`ac288d48`）では撮り直さない**——`reminders/page.tsx` の blob は違うが、それは #514 が #498 の上でさらに直したため。撮った木のほうが新しく（`ac288d48` は `9a72dba6` の祖先）、#498 で撮り直すと #514 の直りを絵から巻き戻すことになる"
+        },
+        {
+          "pr": 500,
+          "head": "409f00bb",
+          "on": "2026-08-28",
+          "screens": [
+            "GC4St"
+          ]
+        },
+        {
+          "pr": 511,
+          "head": "4bc71249",
+          "on": "2026-08-29",
+          "screens": [
+            "GC4St"
+          ],
+          "note": "実行結果から内部IDを外す。束3"
+        },
+        {
+          "pr": 498,
+          "head": "f30890f2",
+          "on": "2026-08-30",
+          "screens": [
+            "Y0Sn3"
+          ],
+          "note": "`codex/development` 直結へ張り替え。削除確認の窓は入っているが、失敗の文が `API error: 405` のまま"
+        },
+        {
+          "pr": 514,
+          "head": "d064bded",
+          "on": "2026-08-30",
+          "screens": [
+            "Y0Sn3"
+          ],
+          "note": "一部失敗を1件ずつ扱う直し。窓の API error: 405 が日本語になった"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "M1EXwB"
+          ],
+          "note": "development そのもので撮った"
+        },
+        {
+          "pr": 613,
+          "head": "a504fec0",
+          "on": "2026-08-31",
+          "screens": [
+            "dC0yg",
+            "s6Vvp",
+            "JCz6J",
+            "W98zZQ",
+            "M1EXwB",
+            "uJP22",
+            "J64xI",
+            "PSmHo",
+            "GC4St"
+          ],
+          "note": "Claudeが #551 の head で9枚を撮り直した。4枚が一致。文言の直しは dC0yg のみ"
+        },
+        {
+          "pr": 927,
+          "head": "eb41ad0d",
+          "on": "2026-09-06",
+          "screens": [
+            "M1EXwB",
+            "uJP22",
+            "J64xI",
+            "s7T2dz",
+            "JCz6J",
+            "W98zZQ",
+            "s6Vvp",
+            "PSmHo",
+            "Y0Sn3",
+            "dC0yg"
+          ],
+          "note": "★V6の対象10画面を1440・1920と全状態で比較。横はみ出し0。"
+        }
+      ]
+    },
+    {
+      "feature": 8,
+      "name": "自動応答",
+      "total": 11,
+      "compared": 11,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 10,
+      "structureMatchDataPending": 1,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 1,
+      "capturedAt": [
+        {
+          "pr": 1135,
+          "head": "a86933ba8",
+          "on": "2026-09-07",
+          "screens": [
+            "cmDfJ",
+            "K7vg2",
+            "nzWIX",
+            "ivDoe"
+          ],
+          "note": "Issue #375。4画面を実API契約へ接続し、統合 #1132 の固定データで3101/8788・1440/1920pxを正式撮影。横はみ出し0。3画面を一致、受信元の保存値を契約が返さない1画面だけ理由付き構造一致・データ待ちとした。"
+        },
+        {
+          "pr": 1082,
+          "head": "c1355bb54",
+          "on": "2026-09-07",
+          "screens": [
+            "K7vg2",
+            "nzWIX",
+            "ivDoe",
+            "U9hzqH",
+            "t7UtYQ"
+          ],
+          "note": "Issue #292。編集3段を画面ごとに分割し、競合と実行結果を固定データへ接続。3106/8793で1440・1920と全状態を比較し、横はみ出し0。"
+        },
+        {
+          "pr": 955,
+          "head": "564c91d0fe",
+          "on": "2026-09-06",
+          "screens": [
+            "g46ja",
+            "Yj6CQ",
+            "e6iJG"
+          ],
+          "note": "競合確認、実在する友だちでのdry-run、最終確認、冪等な有効化を通し、1440・1920pxで設計と目視比較。横はみ出し0。"
+        },
+        {
+          "pr": 544,
+          "head": "6053c271",
+          "on": "2026-08-29",
+          "screens": [
+            "Gy9OK",
+            "cmDfJ",
+            "K7vg2",
+            "nzWIX",
+            "ivDoe"
+          ],
+          "note": "削除確認の窓。**#544 は #491 を含む**"
+        },
+        {
+          "pr": 501,
+          "head": "93edbe17",
+          "on": "2026-08-28",
+          "screens": [
+            "t7UtYQ"
+          ],
+          "note": "#501 は #500 を含む"
+        },
+        {
+          "pr": 566,
+          "head": "d0680774",
+          "on": "2026-08-29",
+          "screens": [
+            "q8wSqO",
+            "cmDfJ"
+          ],
+          "note": "内部の言葉9つを画面の言葉へ。失敗のとき帯を `—` にし、前の数を残さない。**#540 では直らない**（一覧の言葉はこちら）"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "K7vg2"
+          ],
+          "note": "判定を具体化するため撮った"
+        },
+        {
+          "pr": 596,
+          "head": "edb94936",
+          "on": "2026-08-30",
+          "screens": [
+            "U9hzqH",
+            "g46ja",
+            "Yj6CQ",
+            "e6iJG"
+          ],
+          "note": "Claudeが実装した。#595 の契約の上に公開までの4段。実装した本人が比較している"
+        }
+      ]
+    },
+    {
+      "feature": 9,
+      "name": "友だち追加時の配信",
+      "total": 10,
+      "compared": 10,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 10,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 0,
+      "capturedAt": [
+        {
+          "pr": 1079,
+          "head": "f13421d869",
+          "on": "2026-09-07",
+          "screens": [
+            "uLQQc",
+            "s9gAx",
+            "W1wzCa",
+            "K0Dbr2",
+            "txMO9",
+            "U3SI5",
+            "P2J0Te",
+            "Q3qP1r"
+          ],
+          "note": "Issue #290。固定ポート3105/8792で対象8画面を1440/1920px撮影し、P2J0Teは正常・読込・空・失敗も比較。機能9全体48枚で横はみ出し0。固定データの正常4件と集計を表示し、現APIで取得不能な値は未取得と明記して要修正を0にした。"
+        },
+        {
+          "pr": 1010,
+          "head": "3d6b7e7e8",
+          "on": "2026-09-06",
+          "screens": [
+            "ec9vg",
+            "quhg6"
+          ],
+          "note": "Issue #222。3104/8791で最終確認5状態と有効化完了を1440・1920px撮影し、設計本文に構造・文言を合わせた。現APIで取得不能・未接続の項目はデータ待ちとして明記"
+        },
+        {
+          "pr": 962,
+          "head": "9b8f7451",
+          "on": "2026-09-06",
+          "screens": [
+            "uLQQc",
+            "s9gAx",
+            "W1wzCa",
+            "K0Dbr2",
+            "txMO9",
+            "U3SI5",
+            "Q3qP1r"
+          ],
+          "note": "Issue #211。割当ポート3104/8791で7画面を1440・1920px再撮影し、設計画像または同Nodeの設計本文と再照合。7画面の要修正判定を具体化し、横はみ出し0を確認"
+        },
+        {
+          "pr": 431,
+          "head": "2ab18c88",
+          "on": "2026-08-30",
+          "screens": [
+            "uLQQc",
+            "txMO9",
+            "U3SI5"
+          ],
+          "note": "友だち追加時の配信。はじめての人と以前からの友だちを分ける説明が入っている"
+        },
+        {
+          "pr": 506,
+          "head": "5dc99107",
+          "on": "2026-08-29",
+          "screens": [
+            "P2J0Te"
+          ],
+          "note": "友だち追加時配信の実行結果。既存の `/api/friend-add-routing/events` を読む"
+        },
+        {
+          "pr": 615,
+          "head": "5873f18b",
+          "on": "2026-08-31",
+          "screens": [
+            "ec9vg",
+            "quhg6"
+          ],
+          "note": "Claude実装。#597 の公開の読み口の上に、最終確認と有効化完了を1本で作った"
+        }
+      ]
+    },
+    {
+      "feature": 10,
+      "name": "ウェビナー",
+      "total": 13,
+      "compared": 13,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 3,
+      "structureMatchDataPending": 10,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 10,
+      "capturedAt": [
+        {
+          "pr": 1081,
+          "head": "a55f719b9b",
+          "on": "2026-09-07",
+          "screens": [
+            "ZC13r",
+            "PV1Vh",
+            "d3rFGD",
+            "Ho8z4",
+            "Xjk8q",
+            "GB0NR",
+            "D6yO7e",
+            "TimXl",
+            "Q8sHa",
+            "yxyzQ",
+            "zCQXe"
+          ],
+          "note": "Issue #324。一覧API PR #1071 と固定データを列車92まで取り込んだ枝で、対象11画面を3102/8789・1440/1920pxで再撮影し、全画像で横はみ出し0。一覧2画面を一致へ更新し、残る9画面は未提供APIを判定注記へ個別に残した。"
+        },
+        {
+          "pr": 1070,
+          "head": "a325ab485",
+          "on": "2026-09-07",
+          "screens": [
+            "ZC13r",
+            "PV1Vh",
+            "d3rFGD",
+            "Ho8z4",
+            "Xjk8q",
+            "GB0NR",
+            "D6yO7e",
+            "TimXl",
+            "Q8sHa",
+            "yxyzQ",
+            "LKuAQ",
+            "zCQXe"
+          ],
+          "note": "Issue #289。UI HEAD a571acc25 と固定データ PR #1060 を含む統合 #1067 を3102/8789で通常・全状態、1440/1920pxの対象38枚に最終撮影。全画像で横はみ出し0。一致1、構造一致・データ未接続11。"
+        },
+        {
+          "pr": 1011,
+          "head": "98e104b7c",
+          "on": "2026-09-06",
+          "screens": [
+            "lvaY5"
+          ],
+          "note": "Issue #223。3102/8789で1440・1920を撮影し、両方とも横スクロール0。5段・設定サマリー・LINEプレビューへ整え、構造一致／保存API待ちへ更新した。"
+        },
+        {
+          "pr": 962,
+          "head": "9b8f7451",
+          "on": "2026-09-06",
+          "screens": [
+            "ZC13r",
+            "PV1Vh",
+            "d3rFGD",
+            "Ho8z4",
+            "Xjk8q",
+            "GB0NR",
+            "D6yO7e",
+            "Q8sHa",
+            "yxyzQ",
+            "LKuAQ",
+            "zCQXe"
+          ],
+          "note": "Issue #211。割当ポート3104/8791で11画面を1440・1920px撮影し、設計画像または同Nodeの設計本文と照合。11画面を要修正と判定し、横はみ出し0を確認"
+        },
+        {
+          "pr": 917,
+          "head": "c5e1095e",
+          "on": "2026-09-06",
+          "screens": [
+            "ZC13r",
+            "PV1Vh",
+            "d3rFGD",
+            "Ho8z4",
+            "Xjk8q",
+            "GB0NR",
+            "D6yO7e",
+            "Q8sHa",
+            "yxyzQ",
+            "LKuAQ",
+            "zCQXe"
+          ],
+          "note": "#251 の11画面を実データへ接続して1440・1920pxで撮影。最終判定はlane確認待ちのため未判定のまま"
+        },
+        {
+          "pr": 508,
+          "head": "61eeb3c7",
+          "on": "2026-08-29",
+          "screens": [
+            "TimXl",
+            "GB0NR"
+          ],
+          "note": "公開完了と公開ページの導線。**#508 は #507 を含む**"
+        },
+        {
+          "pr": 546,
+          "head": "de0848b9",
+          "on": "2026-08-29",
+          "screens": [
+            "Ho8z4"
+          ],
+          "note": "通知とリマインド。既存の申込と5分ごとの仕掛けを使う"
+        },
+        {
+          "pr": 623,
+          "head": "988cc37a",
+          "on": "2026-08-31",
+          "screens": [
+            "PV1Vh",
+            "d3rFGD",
+            "Ho8z4",
+            "Xjk8q",
+            "D6yO7e",
+            "Q8sHa",
+            "yxyzQ"
+          ],
+          "note": "Claudeが実装して撮った。編集画面を設計の段（STEP 1〜5）へ。#546 の上（#546 は #524 → #508 → #507 を含む）。**`Xjk8q` はそれまで「いつ見られるようにするか」タブを撮っていて、視聴後の話が写っていなかった**"
+        },
+        {
+          "pr": 524,
+          "head": "a6c35ee0",
+          "on": "2026-08-29",
+          "screens": [
+            "zCQXe"
+          ],
+          "note": "ウェビナーの帯を未取得 `—` に。束4"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "ZC13r",
+            "lvaY5",
+            "PV1Vh",
+            "d3rFGD",
+            "Xjk8q",
+            "Q8sHa",
+            "yxyzQ"
+          ],
+          "note": "development そのもので撮った"
+        },
+        {
+          "pr": 0,
+          "head": "f4c3f012",
+          "on": "2026-09-01",
+          "screens": [
+            "ZC13r",
+            "Ho8z4"
+          ],
+          "note": "Claudeが実装して撮った。契約枝 codex/kenta-v6-webinar-contracts-v2（head 7b2dc2f9）の上。**doctorが要確認のため push していない。ローカルcommitのみ**"
+        },
+        {
+          "pr": 0,
+          "head": "96ed41b6",
+          "on": "2026-09-01",
+          "screens": [
+            "PV1Vh",
+            "d3rFGD",
+            "Ho8z4",
+            "Q8sHa"
+          ],
+          "note": "Claudeが実装して撮った。**doctorが合格になったが、この3本はまだ push していない**"
+        }
+      ]
+    },
+    {
+      "feature": 11,
+      "name": "テンプレート",
+      "total": 10,
+      "compared": 10,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 9,
+      "structureMatchDataPending": 0,
+      "needsFix": 1,
+      "unjudged": 0,
+      "remaining": 1,
+      "capturedAt": [
+        {
+          "pr": 1024,
+          "head": "031081d69",
+          "on": "2026-09-07",
+          "screens": [
+            "W7LBc",
+            "NNDMR",
+            "M9cij"
+          ],
+          "note": "Issue #224。割当ポート3104/8791で3画面を1440・1920px再撮影し、Pencil正本と同じ比較入力で照合。W7LBcとNNDMRを一致へ更新し、M9cijは要件とPencilの矛盾を根拠に要修正を維持。CzndJはPR #1019を正として差分から除外"
+        },
+        {
+          "pr": 944,
+          "head": "98abf756a",
+          "on": "2026-09-06",
+          "screens": [
+            "W7LBc",
+            "GFlD7",
+            "FRkls",
+            "NNDMR",
+            "j9ixI",
+            "hsBtl",
+            "J3GxEZ",
+            "M9cij",
+            "NKyoA"
+          ],
+          "note": "割当ポート3104/8791で通常・状態別を含む36枚を撮影。対象9画面は一致6、構造一致・集計未接続1、要修正2。横はみ出し0"
+        },
+        {
+          "pr": 433,
+          "head": "51020a97",
+          "on": "2026-08-28",
+          "screens": [
+            "M9cij"
+          ]
+        },
+        {
+          "pr": 493,
+          "head": "62ddaebe",
+          "on": "2026-08-28",
+          "screens": [
+            "CzndJ",
+            "M9cij"
+          ],
+          "note": "#493 は #433 を含む"
+        },
+        {
+          "pr": 572,
+          "head": "e4ab641f",
+          "on": "2026-08-29",
+          "screens": [
+            "NNDMR"
+          ],
+          "note": "質問のひな形。下書き/公開の送信内容、シナリオの選択肢、回答先の往復、配信の契約テストまで確認。撮影は既存の2枚を維持"
+        },
+        {
+          "pr": 528,
+          "head": "1b95452d",
+          "on": "2026-08-29",
+          "screens": [
+            "NKyoA"
+          ],
+          "note": "タブとフォルダの件数を未取得 `—` に。束4"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "W7LBc",
+            "GFlD7",
+            "FRkls",
+            "j9ixI",
+            "hsBtl",
+            "J3GxEZ"
+          ],
+          "note": "同上。質問のひな形に `createdAt`/`updatedAt` を足すまで `Invalid Date` で撮れなかった"
+        },
+        {
+          "pr": 493,
+          "head": "cdbfe42c",
+          "on": "2026-08-30",
+          "screens": [
+            "W7LBc"
+          ],
+          "note": "縦帯が category ではなく folderId で数えるようになった。通常・読込・0件・失敗と、押した2つ"
+        },
+        {
+          "pr": 626,
+          "head": "d0af5581",
+          "on": "2026-08-31",
+          "screens": [
+            "CzndJ",
+            "M9cij",
+            "GFlD7",
+            "FRkls",
+            "j9ixI",
+            "hsBtl",
+            "J3GxEZ",
+            "NKyoA"
+          ],
+          "note": "Claudeが実装して撮った。#528 の上（#528 は #493 と #433 の両方を含む）。**M9cij の推奨修正は到達しないコードだったので取りやめた**"
+        }
+      ]
+    },
+    {
+      "feature": 12,
+      "name": "リッチメニュー",
+      "total": 9,
+      "compared": 9,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 3,
+      "structureMatchDataPending": 6,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 6,
+      "capturedAt": [
+        {
+          "pr": 1191,
+          "head": "e98decafa",
+          "on": "2026-09-07",
+          "screens": [
+            "kQ1bs"
+          ],
+          "note": "Issue #422 / PR #1191。対象条件画面を3102/8789で1440・1920px再撮影し、横はみ出し0。条件軸・対象人数・優先順位を確認し、固定入力不足は構造一致・データ待ちで記録した。"
+        },
+        {
+          "pr": 1129,
+          "head": "af74a0bbd",
+          "on": "2026-09-07",
+          "screens": [
+            "GO8RQ",
+            "XtfO3",
+            "UMiJ9",
+            "TL7tp",
+            "szXsT"
+          ],
+          "note": "Issue #367。統合済みの月間人数・外部メニュー面アクション・削除影響人数を画面へ接続し、3104/8791で1440・1920pxを撮影。全10枚で横はみ出し0。共有固定応答に残る不足を理由付きで5画面の判定へ記録した。"
+        },
+        {
+          "pr": 1007,
+          "head": "f2be359e5",
+          "on": "2026-09-06",
+          "screens": [
+            "GO8RQ",
+            "XtfO3",
+            "TL7tp",
+            "RW5Tb"
+          ],
+          "note": "Issue #225。3102/8789で1440・1920と一覧4状態を撮影し、全画像で横スクロール0。要修正4枚を、一致1・構造一致／不足API待ち3へ更新した。"
+        },
+        {
+          "pr": 509,
+          "head": "e148615c",
+          "on": "2026-08-29",
+          "screens": [
+            "DIUbO",
+            "NXdDk"
+          ],
+          "note": "切替のつながり。既存の pages / areas から解析する。固定データに切替ボタンを足した"
+        },
+        {
+          "pr": 523,
+          "head": "47e7846e",
+          "on": "2026-08-29",
+          "screens": [
+            "RW5Tb"
+          ],
+          "note": "内部の言葉の直し（束3）。**束4は半分**——タップ側は `—` だが、メニュー・公開中・出し分けは失敗時も0を数える"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "GO8RQ",
+            "XtfO3",
+            "kQ1bs",
+            "UMiJ9",
+            "TL7tp"
+          ],
+          "note": "同上。**`DIUbO` `NXdDk`（#509）と `RW5Tb`（#523）は別PRの絵なので戻した**"
+        },
+        {
+          "pr": 583,
+          "head": "0218ef61",
+          "on": "2026-08-30",
+          "screens": [
+            "GO8RQ"
+          ],
+          "note": "出す順番を既定にし、断りと並べ替えの口を足した。Workerの選ぶ順と同率の決め方まで一致"
+        },
+        {
+          "pr": 509,
+          "head": "4cf82bd9",
+          "on": "2026-08-30",
+          "screens": [
+            "DIUbO",
+            "NXdDk"
+          ],
+          "note": "つながりの通常・読込・空・失敗を本文まで取った。空を失敗と混ぜない"
+        },
+        {
+          "pr": 575,
+          "head": "ab5750ec",
+          "on": "2026-08-30",
+          "screens": [
+            "szXsT"
+          ],
+          "note": "削除確認が ConfirmDialog へ。管理画面のものとLINE上のものが別の窓。失敗しても閉じない"
+        },
+        {
+          "pr": 577,
+          "head": "7b8df2f4",
+          "on": "2026-08-30",
+          "screens": [
+            "RW5Tb"
+          ],
+          "note": "失敗のとき帯を — に。実値0と未取得を言い分ける"
+        },
+        {
+          "pr": 583,
+          "head": "bb1e4dfd",
+          "on": "2026-08-30",
+          "screens": [
+            "kQ1bs",
+            "XtfO3"
+          ],
+          "note": "編集画面に「出す順番」。表示は1番始まり、保存は0始まりのまま"
+        },
+        {
+          "pr": 592,
+          "head": "84f35a0b",
+          "on": "2026-08-30",
+          "screens": [
+            "XtfO3"
+          ],
+          "note": "Claudeが直した。3段の進み方。段の見た目は cCB7r と共通の部品へ切り出した。直した本人が比較している"
+        },
+        {
+          "pr": 616,
+          "head": "0a11c9e8",
+          "on": "2026-08-31",
+          "screens": [
+            "szXsT"
+          ],
+          "note": "Claude実装。影響4つに加え、409の最新影響と別メニューの遅延応答も再監査で確認した"
+        }
+      ]
+    },
+    {
+      "feature": 13,
+      "name": "回答フォーム",
+      "total": 7,
+      "compared": 7,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 3,
+      "structureMatchDataPending": 2,
+      "needsFix": 0,
+      "unjudged": 2,
+      "remaining": 4,
+      "capturedAt": [
+        {
+          "pr": 436,
+          "head": "35c613a6",
+          "on": "2026-08-29",
+          "screens": [
+            "EMBIK",
+            "v9tYhl"
+          ],
+          "note": "#436 の最新head。**`ZOPyc` は撮り直していない**——旧head `950073ab` から `apps/web` の差分0件で、判定は #556 `6037aeef` のまま。受入条件5項目の確認と、画面全体の一致判定は分けて記録した"
+        },
+        {
+          "pr": 436,
+          "head": "950073ab",
+          "on": "2026-08-29",
+          "screens": [
+            "ZOPyc"
+          ],
+          "note": "読込・空・失敗を分ける直し。**P0は解決**。帯の2枚が0件のまま残る"
+        },
+        {
+          "pr": 556,
+          "head": "1c1546cb",
+          "on": "2026-08-30",
+          "screens": [
+            "ZOPyc"
+          ],
+          "note": "回答フォームの帯を未取得と0件で分ける。失敗のときは作成の誘いを出さない。**`codex/development` 直結へ張り替えられたが撮り直していない**——`page.tsx` と `form-kpi-value.tsx` の blob が `6037aeef` と同一"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "vCqUj",
+            "cSqvP"
+          ],
+          "note": "development そのもので撮った"
+        },
+        {
+          "pr": 586,
+          "head": "7428a314",
+          "on": "2026-08-30",
+          "screens": [
+            "EMBIK"
+          ],
+          "note": "回答の保存先をフォーム定義から数える。重複は Set で除く。固定データにわざと重複を入れて確かめた"
+        }
+      ]
+    },
+    {
+      "feature": 14,
+      "name": "共通情報",
+      "total": 4,
+      "compared": 4,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 3,
+      "structureMatchDataPending": 1,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 1,
+      "capturedAt": [
+        {
+          "pr": 1150,
+          "head": "bc92f54ea",
+          "on": "2026-09-07",
+          "screens": [
+            "WuKzU",
+            "gBtaK",
+            "uNBlA",
+            "yPkWe"
+          ],
+          "note": "Issue #385。PR #1131の実APIとPR #1142の固定データへ4画面を接続し、3104/8791で1440px・1920pxの10枚を撮影。全画像で横はみ出し0。3画面を一致、履歴の担当者表示名が契約にない編集画面だけを理由付き構造一致とした。"
+        },
+        {
+          "pr": 1099,
+          "head": "bb8a139b3",
+          "on": "2026-09-07",
+          "screens": [
+            "WuKzU",
+            "gBtaK",
+            "yPkWe"
+          ],
+          "note": "Issue #327。PR #1077の固定データを使い、3104/8791で一覧・会社名変更後・使用中／未使用の削除確認を1440px・1920px撮影。Pencil 1920pxと同じ比較画像で確認し、全画像で横はみ出し0。一覧を一致へ更新し、編集と削除確認に残るAPI差を記録した。"
+        },
+        {
+          "pr": 1075,
+          "head": "24313778e",
+          "on": "2026-09-07",
+          "screens": [
+            "WuKzU",
+            "gBtaK",
+            "yPkWe"
+          ],
+          "note": "Issue #295。共通情報3画面を3104/8791で1440・1920px撮影し、★V6設計と同じ比較入力で確認。全画像で横はみ出し0。3画面とも、存在しないAPI値を作らず理由つきの構造一致・データ未接続へ更新した。"
+        },
+        {
+          "pr": 548,
+          "head": "d4a85ad4",
+          "on": "2026-08-29",
+          "screens": [
+            "uNBlA",
+            "gBtaK"
+          ],
+          "note": "保存前に影響を見る面。値を変えてから保存を押さないと出ない"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "WuKzU",
+            "gBtaK"
+          ],
+          "note": "development そのもので撮った"
+        },
+        {
+          "pr": 619,
+          "head": "31b44202",
+          "on": "2026-08-31",
+          "screens": [
+            "yPkWe"
+          ],
+          "note": "Claude実装。#611 の delete-impact で、差し込まれている場所と空欄のまま送られることを削除の窓へ出した。差し替えの口は契約待ち"
+        },
+        {
+          "pr": 668,
+          "head": "7d830282",
+          "on": "2026-09-02",
+          "screens": [
+            "gBtaK",
+            "yPkWe",
+            "WuKzU"
+          ],
+          "note": "最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。`uNBlA`（変える前に影響を見る）は `#cv-value` が見つからず撮れていない。`fill` の選択子を読むように直したあとも残ったので、**その id の欄が画面に無い**（ルートは200を返す）。"
+        }
+      ]
+    },
+    {
+      "feature": 15,
+      "name": "登録メディア",
+      "total": 5,
+      "compared": 4,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 1,
+      "match": 4,
+      "structureMatchDataPending": 1,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 1,
+      "capturedAt": [
+        {
+          "pr": 1157,
+          "head": "0cc67ed91d",
+          "on": "2026-09-07",
+          "screens": [
+            "g89Tc",
+            "voJtX",
+            "eXAJP",
+            "YfTfJ"
+          ],
+          "note": "Issue #392。統合済みの容量・直接アップロード・版追加・使用先差し替え契約へ接続し、固定ポート3105/8792で1440px・1920pxを再撮影。対象10枚は横はみ出し0。一覧・詳細・削除確認を一致へ更新し、ファイル投入を撮影器で表現できない登録窓だけ理由付き構造一致を維持した。"
+        },
+        {
+          "pr": 997,
+          "head": "3eae16770",
+          "on": "2026-09-06",
+          "screens": [
+            "g89Tc",
+            "voJtX",
+            "eXAJP",
+            "YfTfJ",
+            "h8pBZr"
+          ],
+          "note": "Issue #228。10件・3フォルダ・使用先3件の固定データで、通常・詳細・登録・削除2状態・一覧4状態を1440pxと1920pxで再撮影。18枚すべて横はみ出し0。"
+        },
+        {
+          "pr": 559,
+          "head": "7922c002",
+          "on": "2026-08-29",
+          "screens": [
+            "g89Tc"
+          ],
+          "note": "未取得を一括削除で選べないようにした。**#559 は #438 を含む**"
+        },
+        {
+          "pr": 560,
+          "head": "7c1acd0f",
+          "on": "2026-08-29",
+          "screens": [
+            "g89Tc"
+          ],
+          "note": "寸法・並び順・表示件数。**#560 は #559 を取り込んでいる**（`7922c002` が親）ので、一括削除の止め方もこの head で見ている"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "eXAJP"
+          ],
+          "note": "development そのもので撮った"
+        },
+        {
+          "pr": 617,
+          "head": "b7e58a51",
+          "on": "2026-08-31",
+          "screens": [
+            "YfTfJ"
+          ],
+          "note": "Claude実装。使われている場所と確認時刻を表示。差し替えAPI待ちに加え、アカウント切替の遅延応答P1を監査で記録"
+        },
+        {
+          "pr": 667,
+          "head": "7d830282",
+          "on": "2026-09-02",
+          "screens": [
+            "g89Tc",
+            "eXAJP",
+            "YfTfJ",
+            "h8pBZr"
+          ],
+          "note": "最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。`voJtX`（詳細と差し替え）は「夏の定番セット.jpgの使用箇所」が見つからず撮れていない。"
+        }
+      ]
+    },
+    {
+      "feature": 16,
+      "name": "成果とアフィリエイト",
+      "total": 9,
+      "compared": 7,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 2,
+      "match": 8,
+      "structureMatchDataPending": 1,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 1,
+      "capturedAt": [
+        {
+          "pr": 1180,
+          "head": "3721857fb",
+          "on": "2026-09-07",
+          "screens": [
+            "jwrbf",
+            "GqFTV",
+            "njLGA"
+          ],
+          "note": "Issue #394。締め・支払い台帳を実API契約へ接続し、3102/8789で3画面と支払い一覧の全状態を1440/1920px撮影。全画像で横はみ出し0。2画面を一致、設計PNGが無い確定画面だけ理由付き構造一致とした。"
+        },
+        {
+          "pr": 558,
+          "head": "ef7b5773",
+          "on": "2026-08-29",
+          "screens": [
+            "PouPn",
+            "xqT1Z",
+            "jwrbf"
+          ],
+          "note": "案件ごとの決まった額を紹介者一覧へ反映。率が0のときだけ確定した定額へ切り替える"
+        },
+        {
+          "pr": 563,
+          "head": "64798425",
+          "on": "2026-08-29",
+          "screens": [
+            "jwrbf"
+          ],
+          "note": "帯から `ref_tracking` を外した。**`ref_code` は列見出しに残っている**"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "PouPn",
+            "GH8VL",
+            "n5VVTb",
+            "xqT1Z",
+            "GPWzq"
+          ],
+          "note": "同上"
+        },
+        {
+          "pr": 585,
+          "head": "75d6eb9a",
+          "on": "2026-08-30",
+          "screens": [
+            "njLGA"
+          ],
+          "note": "支払いのタブ。承認済みだけを集計し、保留期間内と承認日時未取得を分ける。通常・読込・0件・取得失敗の4状態"
+        },
+        {
+          "pr": 585,
+          "head": "3857365b",
+          "on": "2026-08-30",
+          "screens": [
+            "njLGA"
+          ],
+          "note": "取得失敗のとき帯を — にする直し。0円と見分けがつくようになった"
+        },
+        {
+          "pr": 667,
+          "head": "7d830282",
+          "on": "2026-09-02",
+          "screens": [
+            "n5VVTb",
+            "PouPn",
+            "GH8VL",
+            "njLGA",
+            "GPWzq",
+            "xqT1Z"
+          ],
+          "note": "最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。**`n5VVTb`（成果承認）が撮れるようになった。** 撮影の口（`/api/conversions/approvals`）を足したため。`jwrbf`（成果内訳）は「田中 明」が見つからず撮れていない。"
+        }
+      ]
+    },
+    {
+      "feature": 17,
+      "name": "マイル・行動スコア",
+      "total": 11,
+      "compared": 11,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 1,
+      "structureMatchDataPending": 7,
+      "needsFix": 2,
+      "unjudged": 1,
+      "remaining": 10,
+      "capturedAt": [
+        {
+          "pr": 1137,
+          "head": "5e1ccd22d",
+          "on": "2026-09-07",
+          "screens": [
+            "s98Vfw",
+            "N46cQ",
+            "qlVLJ",
+            "MvZm5",
+            "BmoGY",
+            "HIU5O",
+            "vz0Ji",
+            "k8VCU",
+            "z3PB2"
+          ],
+          "note": "Issue #373。機能17の新しい残高・付与ルール・使い道・履歴契約へ接続し、固定ポート3105/8792で通常と定義済みの全状態を1440/1920px撮影。全画像で横はみ出し0。友だち明細は全体履歴を友だちIDで絞り込んで表示するようにした。残差は画面とAPIに分けて各verdictNoteへ記録。"
+        },
+        {
+          "pr": 549,
+          "head": "0ae3e094",
+          "on": "2026-08-29",
+          "screens": [
+            "qlVLJ",
+            "p9CcEB"
+          ],
+          "note": "マイルの使い道を交換まで接続。公開版の固定・二重交換の防止・渡せなかったときの決めごとが入っている"
+        },
+        {
+          "pr": 441,
+          "head": "05c5b103",
+          "on": "2026-08-28",
+          "screens": [
+            "MvZm5",
+            "BmoGY",
+            "HIU5O"
+          ]
+        },
+        {
+          "pr": 441,
+          "head": "e953109c",
+          "on": "2026-08-28",
+          "screens": [
+            "s98Vfw",
+            "N46cQ",
+            "k8VCU"
+          ]
+        },
+        {
+          "pr": 494,
+          "head": "0ca45f98",
+          "on": "2026-08-28",
+          "screens": [
+            "HIU5O"
+          ],
+          "note": "#494 は #441 を含む。**新head `5470ede3` でも撮り直していない**——apps/web の20ファイルすべて blob が同一で、差分は Worker の機能設定だけ"
+        },
+        {
+          "pr": 495,
+          "head": "55301679",
+          "on": "2026-08-30",
+          "screens": [
+            "z3PB2",
+            "vz0Ji"
+          ],
+          "note": "**`codex/development` 直結へ張り替えられたが撮り直していない**——`mileage/page.tsx` と `action-score-tab.tsx` の blob が `7d890d3b` と同一。**`pRHvc` は `screens.mjs` に無いNode**なので判断待ちで飛ばした"
+        },
+        {
+          "pr": 496,
+          "head": "4dac7986",
+          "on": "2026-08-28",
+          "screens": [
+            "s6MBc"
+          ],
+          "note": "#496 は #495 を含む"
+        },
+        {
+          "pr": 499,
+          "head": "642b8222",
+          "on": "2026-08-30",
+          "screens": [
+            "s6MBc"
+          ],
+          "note": "Claudeが作ったDraft。#496 の上に積んである。**head は動いたが撮り直していない**——`apps/web` の差分0件"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "s98Vfw",
+            "N46cQ",
+            "BmoGY",
+            "k8VCU"
+          ],
+          "note": "development そのもので撮った"
+        },
+        {
+          "pr": 582,
+          "head": "78e2f065",
+          "on": "2026-08-30",
+          "screens": [
+            "vz0Ji"
+          ],
+          "note": "手で調整したときの失敗を日本語に。405を実際に起こして確かめた"
+        },
+        {
+          "pr": 624,
+          "head": "5e8f32d3",
+          "on": "2026-08-31",
+          "screens": [
+            "z3PB2",
+            "p9CcEB",
+            "s98Vfw",
+            "MvZm5",
+            "HIU5O",
+            "N46cQ",
+            "qlVLJ"
+          ],
+          "note": "Claudeが実装して撮った。#549 の上。**`z3PB2` の「層の境目が違う」は誤りで、40は撮影用の固定データの誤り**（`DEFAULT_BANDS` は 30 / 70 で設計と一致）。固定データを直して撮り直した"
+        },
+        {
+          "pr": 667,
+          "head": "7d830282",
+          "on": "2026-09-02",
+          "screens": [
+            "MvZm5",
+            "HIU5O",
+            "z3PB2",
+            "k8VCU",
+            "s98Vfw",
+            "N46cQ",
+            "qlVLJ",
+            "BmoGY"
+          ],
+          "note": "最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。**機能17は直前まで4枚とも「画面を表示できませんでした」で1枚も撮れなかった。** 撮影の口と固定データを直して8 Node が撮れた。`vz0Ji` は「マイルを手で増やす・減らす」が見つからず撮れていない。"
+        },
+        {
+          "pr": 914,
+          "head": "48742a352",
+          "on": "2026-09-06",
+          "screens": [
+            "s98Vfw",
+            "N46cQ",
+            "qlVLJ",
+            "MvZm5",
+            "BmoGY",
+            "HIU5O",
+            "k8VCU",
+            "z3PB2",
+            "s6MBc"
+          ],
+          "note": "Issue #230 のS3第2段。Pencilの実ノードと同じ状態を1440・1920で横に並べて確認した。全対象で横スクロール0。絵は版に残さず `.txt` と判定注記を証拠にする。"
+        },
+        {
+          "pr": 1041,
+          "head": "16e2331cb",
+          "on": "2026-09-07",
+          "screens": [
+            "s98Vfw",
+            "s6MBc"
+          ],
+          "note": "Issue #230 の残件2画面。3104/8791で通常と全状態を1440・1920px撮影し、正本と同じ入力で左右比較した。全12枚で横はみ出し0。s6MBcは一致、s98Vfwは未接続API値を作らず構造一致・データ未接続。"
+        }
+      ]
+    },
+    {
+      "feature": 18,
+      "name": "流入と計測",
+      "total": 9,
+      "compared": 7,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 2,
+      "match": 9,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 0,
+      "capturedAt": [
+        {
+          "pr": 443,
+          "head": "f372ff30",
+          "on": "2026-08-28"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "Q4bkTg",
+            "IhSBB",
+            "v0HaI",
+            "TEVk8",
+            "JupxW",
+            "BMmxU",
+            "BuVDB",
+            "Im2b1"
+          ],
+          "note": "development そのもので撮った（根元9本のマージ後）"
+        },
+        {
+          "pr": 574,
+          "head": "0906b8fa",
+          "on": "2026-08-30",
+          "screens": [
+            "JupxW",
+            "BMmxU",
+            "UIaM7"
+          ],
+          "note": "refの初期選択、一覧の4状態、削除確認の窓。撮影モックに詳細・ファネル・流入元の口を足した"
+        },
+        {
+          "pr": 589,
+          "head": "45b3efc5",
+          "on": "2026-08-30",
+          "screens": [
+            "TEVk8"
+          ],
+          "note": "Claudeが直した。タグをフォルダで束ねる。直した本人が比較している"
+        },
+        {
+          "pr": 627,
+          "head": "d80ef8ce",
+          "on": "2026-08-31",
+          "screens": [
+            "Q4bkTg",
+            "IhSBB",
+            "v0HaI",
+            "BuVDB",
+            "Im2b1",
+            "BMmxU",
+            "UIaM7"
+          ],
+          "note": "Claudeが実装して撮った。#574 の上（#574 は #443 を含む）"
+        },
+        {
+          "pr": 666,
+          "head": "7d830282",
+          "on": "2026-09-02",
+          "screens": [
+            "Q4bkTg",
+            "BMmxU",
+            "IhSBB",
+            "v0HaI",
+            "BuVDB",
+            "Im2b1",
+            "TEVk8",
+            "JupxW",
+            "UIaM7"
+          ],
+          "note": "最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。9 Node すべて撮れた。"
+        },
+        {
+          "pr": 951,
+          "head": "43b3aae50",
+          "on": "2026-09-06",
+          "screens": [
+            "Q4bkTg",
+            "IhSBB",
+            "v0HaI",
+            "TEVk8",
+            "JupxW",
+            "UIaM7",
+            "BMmxU",
+            "BuVDB",
+            "Im2b1"
+          ],
+          "note": "Issue #231。9 Node・30状態を1440pxと1920pxで撮影し、Pencil設計画像と同じ幅で並べて確認した。全画像で横はみ出し0、9画面を一致へ更新。"
+        }
+      ]
+    },
+    {
+      "feature": 19,
+      "name": "コンバージョン",
+      "total": 4,
+      "compared": 4,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 2,
+      "structureMatchDataPending": 2,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 2,
+      "capturedAt": [
+        {
+          "pr": 444,
+          "head": "ccbd0975",
+          "on": "2026-08-28"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "ZrpKn",
+            "GUxsj",
+            "GtylA"
+          ],
+          "note": "development そのもので撮った"
+        },
+        {
+          "pr": 1183,
+          "head": "b5e3dd6a3",
+          "on": "2026-09-07",
+          "screens": [
+            "ZrpKn",
+            "GUxsj"
+          ],
+          "note": "Issue #408。利用先名・成果地点ごとの経路・取消内訳を反映し、3104/8791で1440・1920pxを撮影。横はみ出し0。固定モックが旧契約のためデータ未接続を判定注記に記録した。"
+        }
+      ]
+    },
+    {
+      "feature": 20,
+      "name": "分析",
+      "total": 9,
+      "compared": 9,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 9,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 0,
+      "capturedAt": [
+        {
+          "pr": 445,
+          "head": "787a4b46",
+          "on": "2026-08-28",
+          "note": "**#445 は 2026-08-29 に `codex/development` へマージ済み**（merge commit `6a00834f`）"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "Zxezb",
+            "J6Inc",
+            "YBGtm",
+            "QQ1SR",
+            "f5HsX",
+            "C2I7ry",
+            "Fh2Qj",
+            "dfwD4"
+          ],
+          "note": "development そのもので撮った（根元9本のマージ後）"
+        },
+        {
+          "pr": 584,
+          "head": "d0e62d59",
+          "on": "2026-08-30",
+          "screens": [
+            "QQ1SR"
+          ],
+          "note": "使われ方の4つの帯と片づけの導線。通常・読込・空・失敗の4状態"
+        },
+        {
+          "pr": 676,
+          "head": "a0bb3f44",
+          "on": "2026-09-02",
+          "screens": [
+            "Zxezb",
+            "J6Inc",
+            "YBGtm",
+            "QQ1SR",
+            "f5HsX",
+            "C2I7ry",
+            "dfwD4"
+          ],
+          "note": "#676・#677 が入った木で撮り直した。**それまで機能20は9枚とも「画面を表示できませんでした」で1枚も撮れていなかった。**原因は実装ではなく撮影側で、`/api/analytics/friends`・`reactions`・`routes`・`usage` の口がモックに無く、既定の器 `{items,total,page,limit}` が返って `overview.metrics` で投げていた。契約どおりの形を返すようにして7 Node が撮れた。`Fh2Qj`（ファネル）はまだ撮れない。"
+        },
+        {
+          "pr": 924,
+          "head": "bd8f0482",
+          "on": "2026-09-06",
+          "screens": [
+            "Zxezb",
+            "J6Inc",
+            "YBGtm",
+            "QQ1SR",
+            "f5HsX",
+            "C2I7ry",
+            "Fh2Qj",
+            "dfwD4"
+          ],
+          "note": "台帳 #233。PR headの同じ実装を1440px・1920pxで撮影し、22枚すべて横スクロール0。設計との比較は一致5枚、構造一致・データ未接続3枚。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。"
+        }
+      ]
+    },
+    {
+      "feature": 21,
+      "name": "NEN配信",
+      "total": 7,
+      "compared": 1,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 6,
+      "match": 1,
+      "structureMatchDataPending": 4,
+      "needsFix": 2,
+      "unjudged": 0,
+      "remaining": 6,
+      "capturedAt": [
+        {
+          "pr": 446,
+          "head": "4307088d",
+          "on": "2026-08-28"
+        },
+        {
+          "pr": 525,
+          "head": "deff5ffb",
+          "on": "2026-08-29",
+          "screens": [
+            "DEX0k"
+          ],
+          "note": "状態の内部語を日本語へ。束3"
+        },
+        {
+          "pr": 526,
+          "head": "dfcc9a53",
+          "on": "2026-08-29",
+          "screens": [
+            "HpKyF"
+          ],
+          "note": "きっかけの内部名を日本語へ。束3"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "VLMGH",
+            "q4lajm",
+            "WeXbL",
+            "i9sQP"
+          ],
+          "note": "development そのもので撮った"
+        },
+        {
+          "pr": 526,
+          "head": "1c91a7bc",
+          "on": "2026-08-30",
+          "screens": [
+            "HpKyF",
+            "VLMGH"
+          ],
+          "note": "誕生日配信の効かない「何日後」を外し、3日前10:00の固定を書いた。Workerの birthdayDeliveryTarget と突き合わせ済み"
+        },
+        {
+          "pr": 620,
+          "head": "ed5c0932",
+          "on": "2026-08-31",
+          "screens": [
+            "ymXJK"
+          ],
+          "note": "Claudeが実装して撮った。コラムの下書き作成（#618 の作成契約の上）。通常・入力の誤り・重複・権限不足・保存失敗の5状態。**本文エディタは作っていない**——引き継ぎが「本文の入力欄を作らない」と定めており、記事の正本はEC側"
+        },
+        {
+          "pr": 1050,
+          "head": "8d3557ce0",
+          "on": "2026-09-07",
+          "screens": [
+            "VLMGH",
+            "DEX0k",
+            "q4lajm",
+            "WeXbL",
+            "ymXJK",
+            "i9sQP"
+          ],
+          "note": "Issue #234。6 Node・18状態を1440px・1920pxで撮影し、★V6設計の1920px画像と並べて確認。全36枚で横はみ出し0。要修正2画面を構造一致・データ未接続へ更新し、残るAPI・正本契約の差を判定注記へ記録した。"
+        }
+      ]
+    },
+    {
+      "feature": 22,
+      "name": "写真審査",
+      "total": 4,
+      "compared": 4,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 4,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 0,
+      "capturedAt": [
+        {
+          "pr": 447,
+          "head": "65adbc59",
+          "on": "2026-08-28"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "Qu6Vk",
+            "N2J629"
+          ],
+          "note": "development そのもので撮った。「理由を選んで見送る」→「見送る」に名前が変わっていた"
+        },
+        {
+          "pr": 1044,
+          "head": "98588d0275",
+          "on": "2026-09-07",
+          "screens": [
+            "Qu6Vk"
+          ],
+          "note": "Issue #235。3105/8792で通常・読込・空・失敗・権限不足の全12枚を1440/1920px撮影。全画像で横はみ出し0。残る審査時間・注意候補・一括審査API差は判定注記へ記録した。"
+        },
+        {
+          "pr": 1185,
+          "head": "c992fbd82",
+          "on": "2026-09-07",
+          "screens": [
+            "Qu6Vk",
+            "hHrz8",
+            "N2J629"
+          ],
+          "note": "Issue #400。固定データ #410（PR #1181）反映後、3104/8791で3画面を全状態撮影。42枚すべて横はみ出し0。Qu6Vkを一致、残る2画面は再認証・設計差分を理由付き未接続とした。"
+        }
+      ]
+    },
+    {
+      "feature": 23,
+      "name": "EC連携",
+      "total": 4,
+      "compared": 4,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 2,
+      "structureMatchDataPending": 2,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 2,
+      "capturedAt": [
+        {
+          "pr": 1190,
+          "head": "88673e254",
+          "on": "2026-09-07",
+          "screens": [
+            "bfB50",
+            "oHAN4"
+          ],
+          "note": "Issue #413。月別集計と下流影響件数のAPIを追加し、bfB50・oHAN4を3101/8788で通常・読込・空・異常・権限不足の各状態まで撮影。横はみ出し0。"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "eI3gs"
+          ],
+          "note": "同上"
+        },
+        {
+          "pr": 600,
+          "head": "484c0cd8",
+          "on": "2026-08-31",
+          "screens": [
+            "ELayY"
+          ],
+          "note": "同じ候補部品・状態部品・判定窓を使うECのほう。再処理の既定は「今後だけ」"
+        },
+        {
+          "pr": 1006,
+          "head": "f7623915e",
+          "on": "2026-09-06",
+          "screens": [
+            "bfB50",
+            "oHAN4"
+          ],
+          "note": "Issue #258。定期便とつなぎ先を実APIへ接続し、通常・読込・空・失敗・権限不足の全24枚を1440・1920pxで撮影。全画像で横はみ出し0、壊れ値・秘密値露出0。設計画像なしのため本文照合で未判定。"
+        }
+      ]
+    },
+    {
+      "feature": 24,
+      "name": "LINE通知",
+      "total": 6,
+      "compared": 6,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 6,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 6,
+      "capturedAt": [
+        {
+          "pr": 1076,
+          "head": "8e7c374991",
+          "on": "2026-09-07",
+          "screens": [
+            "festr",
+            "Q55bb",
+            "X8JCA5",
+            "Se65i"
+          ],
+          "note": "Issue #291。固定ポート3102/8789で通常・読込・空・失敗の全状態を1440/1920px撮影し、全画像で横はみ出し0。4画面の構造をV6へそろえた。通知実行の通常fixtureと配信・開封・再試行・版管理のAPI契約が未提供のため、理由つきの構造一致・データ未接続とした。"
+        },
+        {
+          "pr": 504,
+          "head": "806ed169",
+          "on": "2026-08-30",
+          "screens": [
+            "festr",
+            "Q55bb"
+          ],
+          "note": "顧客通知の一覧とテンプレート。**`DpxOK` はここでは撮らない**——#504 に運用者タブは無く、撮ると #564 の絵を巻き戻す（実際に一度やって git から戻した）"
+        },
+        {
+          "pr": 545,
+          "head": "c9bb193d",
+          "on": "2026-08-30",
+          "screens": [
+            "X8JCA5",
+            "Se65i",
+            "DpxOK",
+            "N2gAza"
+          ],
+          "note": "顧客通知の記録と失敗、運用者通知の一覧と作成。**#545 は #504 を含む**。個人の既読は作っていない。**head が `03022681` → `c9bb193d` へ動いたが撮り直していない**——`notification-run-list.tsx`・`operator/new/page.tsx`・`operator-notification-rules.tsx` の blob がいずれも同一（差分は development の取り込み）"
+        },
+        {
+          "pr": 564,
+          "head": "ad59fde6",
+          "on": "2026-08-29",
+          "screens": [
+            "DpxOK"
+          ],
+          "note": "絞り込みチップを状態で言い分ける。失敗・権限不足は `—`"
+        },
+        {
+          "pr": 0,
+          "head": "4af43fb6",
+          "on": "2026-09-01",
+          "screens": [
+            "festr"
+          ],
+          "note": "Claudeが実装して撮った。**doctorが合格になったが、この3本はまだ push していない**"
+        }
+      ]
+    },
+    {
+      "feature": 25,
+      "name": "オートメーション",
+      "total": 8,
+      "compared": 8,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 5,
+      "structureMatchDataPending": 2,
+      "needsFix": 1,
+      "unjudged": 0,
+      "remaining": 3,
+      "capturedAt": [
+        {
+          "pr": 502,
+          "head": "75b010fc",
+          "on": "2026-08-28",
+          "screens": [
+            "DkPY0"
+          ],
+          "note": "#502 は #500 を含む。新しい表は作らず既存の automation_runs を読む"
+        },
+        {
+          "pr": 552,
+          "head": "6ce43563",
+          "on": "2026-08-29",
+          "screens": [
+            "gief7",
+            "Rv8Jv",
+            "WjYAC",
+            "Vdbv5"
+          ],
+          "note": "タブ帯5本と見本から下書きを作る道。**`DkPY0` は撮り直していない**（#502 `75b010fc` のまま）"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "xOpDs",
+            "py5CG",
+            "syWp4"
+          ],
+          "note": "development そのもので撮った"
+        },
+        {
+          "pr": 0,
+          "head": "2d0ee180",
+          "on": "2026-08-30",
+          "screens": [
+            "xOpDs",
+            "py5CG",
+            "syWp4"
+          ],
+          "note": "development そのもので撮り直した。帯4つと複製は既に入っていた"
+        },
+        {
+          "pr": 594,
+          "head": "a389b70a",
+          "on": "2026-08-30",
+          "screens": [
+            "syWp4"
+          ],
+          "note": "Claudeが直した。使われている場所に何機能からかを添えた。直した本人が比較している"
+        },
+        {
+          "pr": 989,
+          "head": "44e671b2c",
+          "on": "2026-09-06",
+          "screens": [
+            "gief7",
+            "Rv8Jv",
+            "WjYAC",
+            "Vdbv5",
+            "xOpDs",
+            "py5CG",
+            "syWp4"
+          ],
+          "note": "Issue #238。撮影用APIへ18本の通常一覧、見本12件、v4〜v1と利用先5件を接続し、通常・読込中・0件・取得失敗を含む全対象を1440・1920pxで再撮影。設計画像と同じ入力で比較し、一致1・構造一致2・要修正4を実態どおり記録した。"
+        },
+        {
+          "pr": 1055,
+          "head": "08369795c",
+          "on": "2026-09-07",
+          "screens": [
+            "gief7",
+            "Rv8Jv",
+            "DkPY0",
+            "WjYAC",
+            "py5CG"
+          ],
+          "note": "Issue #299。5画面をV6の情報順と密度へそろえ、PR #1051 の通常データを含む通常・読込中・0件・取得失敗を固定ポート3105/8792で撮影。全30枚で1440・1920pxの横はみ出し0を確認し、一致1・構造一致4を記録した。"
+        },
+        {
+          "pr": 1151,
+          "head": "bd900c36d",
+          "on": "2026-09-07",
+          "screens": [
+            "gief7",
+            "Rv8Jv",
+            "DkPY0",
+            "WjYAC",
+            "Vdbv5",
+            "xOpDs",
+            "py5CG",
+            "syWp4"
+          ],
+          "note": "Issue #377。30日実績、共通アクション集計、CSV、APIページ送り、版ごとの利用状況を接続し、3107/8794で全30枚を再撮影。1440・1920pxとも横はみ出し0。一致を3画面増やし、契約が無い2画面は理由付き構造一致を維持した。"
+        }
+      ]
+    },
+    {
+      "feature": 26,
+      "name": "外部連携",
+      "total": 4,
+      "compared": 4,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 2,
+      "structureMatchDataPending": 2,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 2,
+      "capturedAt": [
+        {
+          "pr": 547,
+          "head": "48715569",
+          "on": "2026-08-29",
+          "screens": [
+            "KNG00"
+          ],
+          "note": "やり取りの記録。送受信・安全な再送・通常/読込/空/失敗"
+        },
+        {
+          "pr": 515,
+          "head": "09054b78",
+          "on": "2026-08-29",
+          "screens": [
+            "f8SBSh"
+          ],
+          "note": "外部連携の失敗を空と分ける。束1"
+        },
+        {
+          "pr": 527,
+          "head": "c6fd4388",
+          "on": "2026-08-29",
+          "screens": [
+            "k3WxrO",
+            "f8SBSh"
+          ],
+          "note": "タブの英語を外す（束3）。**#527 は #515 を含む**"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "M0Gb7"
+          ],
+          "note": "development そのもので撮った"
+        }
+      ]
+    },
+    {
+      "feature": 27,
+      "name": "予約管理",
+      "total": 7,
+      "compared": 7,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 2,
+      "structureMatchDataPending": 1,
+      "needsFix": 4,
+      "unjudged": 0,
+      "remaining": 5,
+      "capturedAt": [
+        {
+          "pr": 459,
+          "head": "ba0bf62d",
+          "on": "2026-08-29",
+          "screens": [
+            "GFDqW",
+            "GfceK",
+            "Lg8ff"
+          ],
+          "note": "代理予約の入力→確認→完了→競合を実際に操作して撮った。競合だけ回復画面に届かない"
+        },
+        {
+          "pr": 562,
+          "head": "45789965",
+          "on": "2026-08-29",
+          "screens": [
+            "Lg8ff"
+          ],
+          "note": "重なりから選び直して登録まで通した。`ApiError.code` を足して、機械コードと人へ見せる文を別の契約に分けている"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "TV2DI",
+            "TnDbq",
+            "SbuUI"
+          ],
+          "note": "development そのもので撮った"
+        },
+        {
+          "pr": 587,
+          "head": "425a6b1a",
+          "on": "2026-08-30",
+          "screens": [
+            "GFDqW",
+            "GfceK",
+            "Lg8ff"
+          ],
+          "note": "確認直前の空き再取得、完了画面のリマインダ時刻と台帳の事実。撮影データの slots[].date を要件どおりに直した"
+        }
+      ]
+    },
+    {
+      "feature": 28,
+      "name": "予約設定",
+      "total": 4,
+      "compared": 4,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 2,
+      "structureMatchDataPending": 2,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 2,
+      "capturedAt": [
+        {
+          "pr": 1177,
+          "head": "7ebf0d654",
+          "on": "2026-09-07",
+          "screens": [
+            "tksPc",
+            "GhOb3"
+          ],
+          "note": "Issue #401。店舗営業時間・休業日・予約ルール・空きプレビュー、価格種別・店舗共通ルール継承を実契約へ接続。3105/8792で1440/1920pxを撮影し、全10枚で横はみ出し0。未提供APIとPencil入力例の差は理由付き構造一致・データ未接続とした。"
+        },
+        {
+          "pr": 1126,
+          "head": "e1126c5c9",
+          "on": "2026-09-07",
+          "screens": [
+            "QSLEH",
+            "W6465r"
+          ],
+          "note": "Issue #370。店舗設定と8件のメニューを実API契約へ接続し、通常・読込中・空・失敗を3107/8794で1440/1920px撮影。全10枚で横はみ出し0、2画面を一致へ更新した。"
+        },
+        {
+          "pr": 1096,
+          "head": "a89279ce7",
+          "on": "2026-09-07",
+          "screens": [
+            "tksPc"
+          ],
+          "note": "Issue #305。3107/8794で通常・読込中・取得失敗を1440/1920px撮影し、全6枚で横はみ出し0。曜日別受付時間と右側プレビューをV6構造へそろえ、未提供APIに依存する値は作らず理由つきの構造一致・データ未接続とした。"
+        },
+        {
+          "pr": 517,
+          "head": "43d3d20e",
+          "on": "2026-08-30",
+          "screens": [
+            "tksPc"
+          ],
+          "note": "受付時間。Googleカレンダーとの関係を先に書く"
+        },
+        {
+          "pr": 532,
+          "head": "6cc74968",
+          "on": "2026-08-29",
+          "screens": [
+            "W6465r"
+          ],
+          "note": "予約設定の帯を未取得 `—` に。束1と束4"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "QSLEH",
+            "GhOb3"
+          ],
+          "note": "development そのもので撮った"
+        },
+        {
+          "pr": 0,
+          "head": "595c8359",
+          "on": "2026-09-01",
+          "screens": [
+            "tksPc"
+          ],
+          "note": "Claudeが実装して撮った。**doctorが合格になったが、この3本はまだ push していない**"
+        },
+        {
+          "pr": 1022,
+          "head": "abae52d46",
+          "on": "2026-09-07",
+          "screens": [
+            "QSLEH",
+            "GhOb3",
+            "W6465r"
+          ],
+          "note": "Issue #241。予約設定の一覧・作成・一覧状態をV6構造へ直し、3105/8792で通常・読込・空・失敗を含む20枚を1440/1920px撮影。全画像で横はみ出し0。残るAPI差は各画面の判定注記へ記録した。"
+        }
+      ]
+    },
+    {
+      "feature": 29,
+      "name": "イベント予約",
+      "total": 4,
+      "compared": 4,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 4,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 0,
+      "capturedAt": [
+        {
+          "pr": 1176,
+          "head": "ea4284f42",
+          "on": "2026-09-07",
+          "screens": [
+            "ugP5y"
+          ],
+          "note": "Issue #403。キャンセル待ちの自動繰上げ処理を確認し、案内を設計どおり表示。3102/8789で1440/1920pxを撮影し、横はみ出し0で一致へ更新した。"
+        },
+        {
+          "pr": 533,
+          "head": "d1070487",
+          "on": "2026-08-29",
+          "screens": [
+            "k5m5Bc"
+          ],
+          "note": "イベント予約の帯を未取得 `—` に。**#533 は #518 を含む**"
+        },
+        {
+          "pr": 467,
+          "head": "6bb950f3",
+          "on": "2026-08-30",
+          "screens": [
+            "MKrPY",
+            "i5SN2j",
+            "ugP5y"
+          ],
+          "note": "イベント予約の作成・予約者・一覧。キャンセル待ちの口を撮影モックへ足した（無いと `waitlist.length` で落ちる）"
+        },
+        {
+          "pr": 533,
+          "head": "c9d33d95",
+          "on": "2026-08-30",
+          "screens": [
+            "ugP5y",
+            "k5m5Bc"
+          ],
+          "note": "帯が「次に何をするか」になった。あと少しで満席・申し込みが少ない。未取得と実値0も言い分ける"
+        },
+        {
+          "pr": 593,
+          "head": "f9619297",
+          "on": "2026-08-30",
+          "screens": [
+            "i5SN2j"
+          ],
+          "note": "帯が次の行動に。拒否は運用メモ、運営キャンセルは3点を示す。撮影モックに申込者の口を足した"
+        }
+      ]
+    },
+    {
+      "feature": 30,
+      "name": "ログインユーザー",
+      "total": 4,
+      "compared": 4,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 4,
+      "unjudged": 0,
+      "remaining": 4,
+      "capturedAt": [
+        {
+          "pr": 475,
+          "head": "15febf7f",
+          "on": "2026-08-30",
+          "screens": [
+            "EOTS4",
+            "I3ZSrU",
+            "e3jz3",
+            "jwVlo"
+          ],
+          "note": "ログインユーザーの一覧・追加・役割。development 直結"
+        },
+        {
+          "pr": 1182,
+          "head": "04057fb9da53",
+          "on": "2026-09-07",
+          "screens": [
+            "e3jz3",
+            "EOTS4",
+            "jwVlo",
+            "I3ZSrU"
+          ],
+          "note": "Issue #405。アクセスユーザー・権限bundle・共通監査の読み取り契約へ接続し、4画面を3101/8788で撮影・判定した。"
+        }
+      ]
+    },
+    {
+      "feature": 31,
+      "name": "機能設定",
+      "total": 1,
+      "compared": 1,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 1,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 1,
+      "capturedAt": [
+        {
+          "pr": 478,
+          "head": "66883866",
+          "on": "2026-08-30",
+          "screens": [
+            "c4R6F"
+          ],
+          "note": "機能設定。オフにしても消えないことを先に書く"
+        }
+      ]
+    },
+    {
+      "feature": 32,
+      "name": "運用状態",
+      "total": 4,
+      "compared": 4,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 4,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 0,
+      "capturedAt": [
+        {
+          "pr": 482,
+          "head": "b346d467",
+          "on": "2026-08-29",
+          "screens": [
+            "b3HfZ",
+            "U0BwS"
+          ],
+          "note": "緊急停止の下見と最終確認。**撮る前に `pnpm dev` で起こす**（`predev` が `@/generated/release-log.json` を作る。`npx next dev` 直叩きだと500で真っ白になる）"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "UgonK",
+            "UhC2O"
+          ],
+          "note": "development そのもので撮った"
+        }
+      ]
+    },
+    {
+      "feature": 33,
+      "name": "LINEアカウント設定",
+      "total": 4,
+      "compared": 4,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 4,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 0,
+      "capturedAt": null
+    },
+    {
+      "feature": 34,
+      "name": "はじめの設定と案内",
+      "total": 4,
+      "compared": 4,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 4,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 0,
+      "capturedAt": null
+    }
+  ],
+  "gaps": []
+}

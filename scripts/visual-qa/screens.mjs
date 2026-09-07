@@ -2061,8 +2061,8 @@ export const SCREENS = [
   { ...INFLOW, node: 'Im2b1', name: '18-2-A 広告への送信履歴', route: '/inflow-links?tab=ads', verdict: 'needs_fix', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正。**これも `v0HaI` と同じ絵で、送信履歴の一覧が無い。**設計は札（すべて885／送れた866／待っている12／断られた7）と、行ごとの「目印 fbclid・友だち 木村 亮」を持つ。**広告へ返した成果が届いたかを確かめる場所が無い。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **development `c275749d` で撮った。`BuVDB` と同じ1枚の中にある**（独立したタブではなく「広告連携」タブの中）。送信履歴の表（日時／成果／クリックの種類／状態／試行／次の再試行）は在り、状態が 送信済み／送信待ち／失敗 で言い分けられる。**P1 やり直す操作が無い**（`BuVDB` の②と同じ）。P2 「試行」「次の再試行」の値が `—` のまま。1440・1920とも横スクロール0 **ルート**：`/inflow-links?tab=ads`（`BuVDB` と同じ1枚の中）。**取得元**：`inflow-v6/Im2b1.txt`。**推奨修正**：失敗の表に選択とやり直しを足す（`BuVDB` の②と同じ作業）。「試行」「次の再試行」が `—` なのは**再試行の記録を持っていないため**で、やり直しの口と同時に埋まる。', verdictSource: 'inflow-v6/Im2b1.txt + inflow-v6/design-qa.md' , verdictHead: '31293424' },
 
   // ── 機能19 コンバージョン ───────────────────────────────
-  { ...CONVERSION, node: 'ZrpKn', name: '19-1 コンバージョン', route: '/conversions?tab=points', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 構造一致・データ未接続。**成果地点の固定データが空**で「まだ成果地点がありません」。タブ名が設計「成果地点」に対し実装「成果地点（CV）」。帯・期間・札・「成果地点 12個中 1〜6個を表示」が無い。CSVは「書き出しはまだ繋がっていません。CSVを作る口が接続されると、この場所に操作が出ます。」と**未接続の断り方としては正しい**。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** P2 「何が起きたら数えるか」にきっかけの名前（EC連携の「注文が確定」／回答フォームの送信）が出ず、種別と数え方のチップになっている。CSVで書き出す、中身を見る、使う場所を足す が無い。**「使う場所を足す」が無いので、作った成果地点を分析へつなぐ導線がこの画面に無い**。期間の選択も無い。成果地点名が長いと…で切れる（設計は折り返す）。**未取得と0件の描き分けは正しい**（金額を持たないものは「金額なし」、使われていないものは「どこからも使われていません」） **ルート**：`/conversions?tab=points`。**取得元**：`conversions-v6/ZrpKn.txt`。**推奨修正**：**「使う場所を足す」を先に足す**——作った成果地点を分析へつなぐ導線がこの画面に無いと、成果地点を作っただけで終わる。**未取得と0件の描き分け（「金額なし」「どこからも使われていません」）はそのまま残す。**', verdictSource: 'conversions-v6/design-qa.md' , verdictHead: '31293424' },
-  { ...CONVERSION, node: 'GUxsj', name: '19-1-A コンバージョン レポート', route: '/conversions?tab=report', verdict: 'needs_fix', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正。設計に在って実装に無いのは帯（この30日の成果 ¥1,284,000／前の30日 ¥1,092,000／単価 ¥2,642）、**日ごとの成果の棒グラフ**、この30日／前の30日の比較、成果地点ごとの行、「この画面をCSVで書き出す」。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **P1 レポートのタブを開くと、成果地点（CV）の表がそのまま出る。** ルート `/conversions?tab=report`。撮った本文はタブ5本と「成果地点（CV）名／種別／CV数／金額」の表で、**「成果地点（CV）」タブ（`sZLDm`）と同じ中身**。設計のレポートは期間で区切って アフィリエイター別／案件別／時系列 を出す面で、CV一覧ではない。**良い点**：金額が無いものを `—`、CV数0のものを `0` と言い分けている（「資料ダウンロード 58 —」「旧キャンペーンの申込 0 —」）。合計 ¥1,284,000 も出る。**推奨修正**：レポートのタブに期間の選び口と集計軸の切り替えを置く。取得元：`conversions-v6/GUxsj.txt`。1440・1920とも横スクロール0', verdictSource: 'conversions-v6/GUxsj.txt' , verdictHead: '31293424' },
+  { ...CONVERSION, node: 'ZrpKn', name: '19-1 コンバージョン', route: '/conversions?tab=points', clock: '2026-08-25T03:00:00.000Z', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 構造一致・データ未接続。**成果地点の固定データが空**で「まだ成果地点がありません」。タブ名が設計「成果地点」に対し実装「成果地点（CV）」。帯・期間・札・「成果地点 12個中 1〜6個を表示」が無い。CSVは「書き出しはまだ繋がっていません。CSVを作る口が接続されると、この場所に操作が出ます。」と**未接続の断り方としては正しい**。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** P2 「何が起きたら数えるか」にきっかけの名前（EC連携の「注文が確定」／回答フォームの送信）が出ず、種別と数え方のチップになっている。CSVで書き出す、中身を見る、使う場所を足す が無い。**「使う場所を足す」が無いので、作った成果地点を分析へつなぐ導線がこの画面に無い**。期間の選択も無い。成果地点名が長いと…で切れる（設計は折り返す）。**未取得と0件の描き分けは正しい**（金額を持たないものは「金額なし」、使われていないものは「どこからも使われていません」） **ルート**：`/conversions?tab=points`。**取得元**：`conversions-v6/ZrpKn.txt`。**推奨修正**：**「使う場所を足す」を先に足す**——作った成果地点を分析へつなぐ導線がこの画面に無いと、成果地点を作っただけで終わる。**未取得と0件の描き分け（「金額なし」「どこからも使われていません」）はそのまま残す。**', verdictSource: 'conversions-v6/design-qa.md' , verdictHead: '31293424' },
+  { ...CONVERSION, node: 'GUxsj', name: '19-1-A コンバージョン レポート', route: '/conversions?tab=report', clock: '2026-08-25T03:00:00.000Z', verdict: 'needs_fix', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正。設計に在って実装に無いのは帯（この30日の成果 ¥1,284,000／前の30日 ¥1,092,000／単価 ¥2,642）、**日ごとの成果の棒グラフ**、この30日／前の30日の比較、成果地点ごとの行、「この画面をCSVで書き出す」。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **P1 レポートのタブを開くと、成果地点（CV）の表がそのまま出る。** ルート `/conversions?tab=report`。撮った本文はタブ5本と「成果地点（CV）名／種別／CV数／金額」の表で、**「成果地点（CV）」タブ（`sZLDm`）と同じ中身**。設計のレポートは期間で区切って アフィリエイター別／案件別／時系列 を出す面で、CV一覧ではない。**良い点**：金額が無いものを `—`、CV数0のものを `0` と言い分けている（「資料ダウンロード 58 —」「旧キャンペーンの申込 0 —」）。合計 ¥1,284,000 も出る。**推奨修正**：レポートのタブに期間の選び口と集計軸の切り替えを置く。取得元：`conversions-v6/GUxsj.txt`。1440・1920とも横スクロール0', verdictSource: 'conversions-v6/GUxsj.txt' , verdictHead: '31293424' },
   {
     ...CONVERSION, node: 'GtylA', name: '19-1-B 成果地点をつくる', route: '/conversions/new',
     steps: [
@@ -2250,6 +2250,12 @@ export const SCREENS = [
     ...PHOTO, node: 'hHrz8', name: '22-1-A 写真を1枚ずつ見る',
     states: { apis: ['**/api/nen-members/photos/ph-1*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     steps: [{ qaOpen: 'hHrz8', after: 700 }],
+    variants: [
+      { suffix: '-reauth', steps: [{ click: 'もとの画像を保存' }] },
+      { suffix: '-reauth-invalid', steps: [{ click: 'もとの画像を保存' }, { click: '再認証して保存' }] },
+      { suffix: '-reauth-failed', steps: [{ click: 'もとの画像を保存' }, { fill: '再認証コード', text: '000000' }, { click: '再認証して保存', after: 700 }] },
+      { suffix: '-reauth-success', steps: [{ click: 'もとの画像を保存' }, { fill: '再認証コード', text: '123456' }, { click: '再認証して保存', after: 700 }] },
+    ],
     verdict: 'structure_match_data_pending',
     verdictNote: '**#257で新規実装し、2026-09-06にPlaywrightで撮影・目視判定。構造一致・派生画像生成待ち。** `hHrz8.txt` の一枚表示、前後移動、警告、画像操作、投稿者・pet・日時・言葉、risk候補、つながる先、下部の採否操作を同じ順で確認した。通常・読込・空・失敗・権限不足を撮り分け、1440・1920とも横スクロール0。個別APIは審査用派生画像だけを返し、原本URLを返さない。採否はexpectedVersionで409競合、採用時の5ポイントはDBのoutboxへ一度だけ積む。**設計画像なし**のためテキスト正本との構造照合であり、pixel一致は未判定。crop派生画像の生成と、原本download専用権限・再認証は未接続なので、誤って原本を出さないよう押し口を無効にした。',
     verdictSource: 'photos-v6/hHrz8.txt + photos-v6/hHrz8-normal-1440.png + photos-v6/hHrz8-normal-1920.png',
@@ -4133,6 +4139,29 @@ const ISSUE_408_REVIEW = {
   },
 }
 
+const ISSUE_432_REVIEW = {
+  ZrpKn: {
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #432で固定データ接続後に再判定。** 成果地点12件、動作中10件、この30日486件、利用先の実名と未使用2件を固定API応答から表示し、1440/1920pxで設計本文と照合した。横はみ出し0。残る差はない。',
+    verdictSource: 'conversions-v6/ZrpKn.txt + conversions-v6/ZrpKn-{1440,1920}.png + Issue #432',
+  },
+  GUxsj: {
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #432で固定データ接続後に再判定。** 30日分の日次推移、成果地点別の前期間比較、成果地点ごとの経路名、取消未提供時の理由表示を固定API応答から確認し、1440/1920pxで設計本文と照合した。横はみ出し0。残る差はない。',
+    verdictSource: 'conversions-v6/GUxsj.txt + conversions-v6/GUxsj-{1440,1920}.png + Issue #432',
+  },
+  hHrz8: {
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #432で原本保存の再認証まで再判定。** 一枚表示の通常・読込・空・失敗・権限不足に加え、再認証窓、6桁未入力、認証失敗、認証成功後の一回限り取得を機能22専用の固定応答で確認した。原本URLや秘密値は画面へ出さず、1440/1920pxとも横はみ出し0。残る差はない。',
+    verdictSource: 'photos-v6/hHrz8.txt + photos-v6/hHrz8-normal-1920.png + photos-v6/hHrz8-reauth-1920.png + photos-v6/hHrz8-reauth-invalid-1920.png + photos-v6/hHrz8-reauth-failed-1920.png + photos-v6/hHrz8-reauth-success-1920.png + Issue #432',
+  },
+  N2J629: {
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #432で戻す確認を再判定。** 写真・投稿者・届いた日時に続き、顔・ロゴ・暗さ・自由記入それぞれの理由文、任意補足、投稿者へ届く本文、マイルが減らない案内を設計順に表示した。1440/1920pxとも横はみ出し0。保存先未接続の追加アクションは誤操作防止のため無効表示を維持し、理由を明記した。',
+    verdictSource: 'photos-v6/N2J629.txt + photos-v6/N2J629-1920.png + Issue #432',
+  },
+}
+
 // Issue #293（機能2 第2周）。Pencil 1920pxと、割当ポート3104/8791で
 // 撮った実装1440/1920pxを横に並べ、同じ操作状態で再判定した。
 const FEATURE_2_R2_PREFIX = '**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。'
@@ -4353,6 +4382,10 @@ for (const screen of SCREENS) {
     Object.assign(screen, FEATURE_2_R2_REVIEW[screen.node])
     screen.verdictSource = `${screen.dir}/${screen.node}.txt + ${screen.dir}/${screen.node}-1440.png + ${screen.dir}/${screen.node}-1920.png + 2026-09-07 same-input comparison`
     screen.verdictHead = '4f8dfd8e0'
+  }
+  if (ISSUE_432_REVIEW[screen.node]) {
+    Object.assign(screen, ISSUE_432_REVIEW[screen.node])
+    delete screen.verdictHead
   }
 }
 

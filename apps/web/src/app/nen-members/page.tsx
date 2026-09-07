@@ -21,11 +21,11 @@ import styles from './photo-review.module.css'
 
 type PhotoStatus = 'pending' | 'adopted' | 'rejected'
 type ReviewReasonCode = 'quality' | 'privacy' | 'unrelated' | 'duplicate' | 'other'
-const REVIEW_REASONS: Array<{ value: ReviewReasonCode; label: string }> = [
-  { value: 'privacy', label: 'ほかの人の顔が写っています' },
-  { value: 'unrelated', label: 'ほかのお店のロゴや商品名が写っています' },
-  { value: 'quality', label: '暗くて見えにくいです' },
-  { value: 'other', label: '自分で書く' },
+const REVIEW_REASONS: Array<{ value: ReviewReasonCode; label: string; message: string }> = [
+  { value: 'privacy', label: 'ほかの人の顔が写っています', message: 'うしろに他のお客様が写っているようです。もう一度お願いできますか。' },
+  { value: 'unrelated', label: 'ほかのお店のロゴや商品名が写っています', message: '商品の名前が入っていない写真をいただけますか。' },
+  { value: 'quality', label: '暗くて見えにくいです', message: '明るいところで、もう一度お願いできますか。' },
+  { value: 'other', label: '自分で書く', message: '文章をそのまま書きます。' },
 ]
 const STATUS_TABS: ReadonlyArray<[PhotoStatus, string]> = [
   ['pending', '見ていないもの'],
@@ -156,7 +156,9 @@ export default function PhotoReviewsPage() {
   const rejectingPhoto = rejectingPhotoDetail
     ?? photos.find((photo) => text(photo.id) === rejectingPhotoId)
     ?? null
-  const selectedReasonLabel = REVIEW_REASONS.find((reason) => reason.value === reasonCode)?.label ?? ''
+  const selectedReason = REVIEW_REASONS.find((reason) => reason.value === reasonCode)
+  const selectedReasonLabel = selectedReason?.label ?? ''
+  const selectedReasonMessage = selectedReason?.message ?? ''
 
   const refreshDetailAssets = async (id: string, accountId: string) => {
     const [statusResult, derivativesResult] = await Promise.allSettled([
@@ -318,7 +320,15 @@ export default function PhotoReviewsPage() {
 
   const downloadOriginal = async (code: string) => {
     if (!selectedAccountId || !detailPhoto) throw new Error('写真を読み直してください。')
-    const grant = await api.nenMembers.photoOriginalStepUp(code)
+    let grant
+    try {
+      grant = await api.nenMembers.photoOriginalStepUp(code)
+    } catch (error) {
+      if (error instanceof ApiError && (error.status === 400 || error.status === 401)) {
+        throw new Error('再認証コードを確認してください。')
+      }
+      throw error
+    }
     if (!grant.success) throw new Error(grant.error)
     const issued = await api.nenMembers.issuePhotoOriginalDownload(
       text(detailPhoto.id),
@@ -555,12 +565,13 @@ export default function PhotoReviewsPage() {
             </div>
             <fieldset className="space-y-2">
               <legend className="text-sm font-semibold text-ink">どうして戻しますか</legend>
-              {REVIEW_REASONS.map((reason) => <label key={reason.value} className="flex cursor-pointer items-start gap-2 rounded-control border border-hairline px-3 py-2.5 text-sm text-ink-secondary"><input type="radio" name="photo-review-reason" value={reason.value} checked={reasonCode === reason.value} onChange={() => { setReasonCode(reason.value); setReasonError('') }} className="mt-0.5" /><span><span className="font-medium text-ink">{reason.label}</span><span className="mt-1 block text-xs text-ink-faint">投稿者へ：今回は「{reason.label}」のため、掲載を見送らせていただきました。</span></span></label>)}
+              {REVIEW_REASONS.map((reason) => <label key={reason.value} className="flex cursor-pointer items-start gap-2 rounded-control border border-hairline px-3 py-2.5 text-sm text-ink-secondary"><input type="radio" name="photo-review-reason" value={reason.value} checked={reasonCode === reason.value} onChange={() => { setReasonCode(reason.value); setReasonError('') }} className="mt-0.5" /><span><span className="font-medium text-ink">{reason.label}</span><span className="mt-1 block text-xs text-ink-faint">「{reason.message}」</span></span></label>)}
             </fieldset>
-            <label className="block text-sm font-semibold text-ink">お客様に届く補足（直せます）<textarea value={reasonNote} onChange={(event) => { setReasonNote(event.target.value.slice(0, 500)); setReasonError('') }} rows={2} placeholder={reasonCode === 'other' ? '理由を入力してください' : '必要な場合だけ入力します'} className="mt-2 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></label>
-            <div className="rounded-control border border-accent-border bg-accent-soft p-3 text-sm text-ink-secondary"><p className="font-semibold text-ink">お客様にはこう届きます</p><p className="mt-1 whitespace-pre-line">お写真をご投稿いただきありがとうございます。{`\n`}今回は「{selectedReasonLabel}」のため、掲載を見送らせていただきました。{reasonNote && `\n${reasonNote}`}{`\n`}内容をご確認のうえ、よろしければ別のお写真をご投稿ください。</p></div>
+            <label className="block text-sm font-semibold text-ink">お客様に届く補足（直せます）<textarea value={reasonNote} onChange={(event) => { setReasonNote(event.target.value.slice(0, 500)); setReasonError('') }} rows={2} placeholder={reasonCode === 'other' ? 'お客様に送る文章を書いてください' : '必要な場合だけ補足します'} className="mt-2 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></label>
+            <div className="rounded-control border border-accent-border bg-accent-soft p-3 text-sm text-ink-secondary"><p className="font-semibold text-ink">お客様にはこう届きます（直せます）</p><p className="mt-1 whitespace-pre-line">{photoPetName(rejectingPhoto)}の写真をありがとうございます。{reasonCode === 'other' ? reasonNote || 'お客様に送る文章を入力してください。' : selectedReasonMessage}{reasonNote && reasonCode !== 'other' ? `\n${reasonNote}` : ''}{`\n`}お手数をおかけします。</p></div>
             <label className="flex items-start gap-2 text-sm text-ink-secondary"><input type="checkbox" disabled className="mt-0.5" /><span><span className="font-semibold text-ink">もう一度 送ってもらえるようお願いする</span><span className="block text-xs text-ink-faint">写真を送るボタンの保存先はまだ接続されていません。</span></span></label>
             <label className="flex items-start gap-2 text-sm text-ink-secondary"><input type="checkbox" disabled className="mt-0.5" /><span><span className="font-semibold text-ink">この人の次の投稿は、必ず人が見る</span><span className="block text-xs text-ink-faint">要注意投稿者の保存先はまだ接続されていません。</span></span></label>
+            <p className="text-xs font-semibold text-ink-faint">戻しても、この方のマイルは減りません。</p>
         </div>
     </Dialog>}
     <Dialog open={bulkReturnOpen} title={`${selectedPendingPhotos.length}枚をまとめて戻す`} description="選んだ理由と補足は、選択した写真すべてに記録され、投稿者へLINEで届きます。" tone="destructive" busy={bulkReviewing} error={reasonError} confirmLabel="この理由でまとめて戻す" cancelLabel="審査へ戻る" onCancel={() => { setBulkReturnOpen(false); setReasonError('') }} onConfirm={() => {
