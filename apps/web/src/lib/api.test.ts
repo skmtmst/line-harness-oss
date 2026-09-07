@@ -7,6 +7,7 @@ let extractApiErrorCode: typeof import('./api').extractApiErrorCode
 let extractApiErrorData: typeof import('./api').extractApiErrorData
 let eventsApi: typeof import('./api').eventsApi
 let webinarApi: typeof import('./api').webinarApi
+let bookingApi: typeof import('./api').bookingApi
 let api: typeof import('./api').api
 
 beforeAll(async () => {
@@ -19,8 +20,45 @@ beforeAll(async () => {
     extractApiErrorData,
     eventsApi,
     webinarApi,
+    bookingApi,
     api,
   } = await import('./api'))
+})
+
+describe('bookingApi の店舗設定・休業日契約', () => {
+  it('選択中アカウントで店舗設定を読み、休業日を同じアカウントへ保存する', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: {} }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await bookingApi.getSettings('account/a')
+    await bookingApi.createException('account/a', {
+      scopeKind: 'store',
+      dateFrom: '2026-12-29',
+      dateTo: '2027-01-03',
+      kind: 'closed',
+      intervals: [],
+      reason: '年末年始',
+    })
+
+    expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
+      'https://worker.example.com/api/booking/admin/settings?account_id=account%2Fa',
+      'https://worker.example.com/api/booking/admin/exceptions?account_id=account%2Fa',
+    ])
+    expect(fetchSpy.mock.calls[1]?.[1]).toMatchObject({
+      method: 'POST',
+      body: JSON.stringify({
+        scopeKind: 'store',
+        dateFrom: '2026-12-29',
+        dateTo: '2027-01-03',
+        kind: 'closed',
+        intervals: [],
+        reason: '年末年始',
+      }),
+    })
+  })
 })
 
 describe('api.conversions の V6一覧・レポート契約', () => {

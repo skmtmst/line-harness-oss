@@ -18,19 +18,25 @@ import { describe, expect, it } from 'vitest'
 const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.tsx'), 'utf8')
 
 describe('V6 23-1 EC連携の読み込み', () => {
-  it('一覧が配列であることを確かめてから state に入れる', () => {
-    expect(source).toContain('Array.isArray(eventsResponse.data)')
+  it('注文と個別処理が配列であることを確かめてから state に入れる', () => {
+    expect(source).toContain('Array.isArray(ordersResponse.data?.items)')
+    expect(source).toContain('Array.isArray(actionsResponse.data?.items)')
     expect(source).toContain("typeof overviewResponse.data === 'object'")
     expect(source).toContain('!Array.isArray(overviewResponse.data)')
   })
 
-  it('形の確認は setEvents より前に置く', () => {
+  it('形の確認は注文と処理を state に入れるより前に置く', () => {
     // 後ろに置くと、確かめる前に非配列が state に入って描画が落ちる。
-    const guard = source.indexOf('Array.isArray(eventsResponse.data)')
-    const assign = source.indexOf('setEvents(eventsResponse.data)')
-    expect(guard).toBeGreaterThan(-1)
-    expect(assign).toBeGreaterThan(-1)
-    expect(guard).toBeLessThan(assign)
+    for (const [guardText, assignText] of [
+      ['Array.isArray(ordersResponse.data?.items)', 'setOrders(ordersResponse.data.items)'],
+      ['Array.isArray(actionsResponse.data?.items)', 'setActions(actionsResponse.data.items)'],
+    ]) {
+      const guard = source.indexOf(guardText)
+      const assign = source.indexOf(assignText)
+      expect(guard).toBeGreaterThan(-1)
+      expect(assign).toBeGreaterThan(-1)
+      expect(guard).toBeLessThan(assign)
+    }
   })
 
   it('読めなかった理由を本文に出す', () => {
