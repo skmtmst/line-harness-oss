@@ -1,4 +1,4 @@
-import { Hono, type Context } from 'hono';
+import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getAffiliates,
   getAffiliateById,
@@ -50,6 +50,36 @@ function accountVisible(
   return lineAccountId == null
     ? visible.canSeeUnassigned
     : visible.allowedAccountIds.includes(lineAccountId);
+}
+
+/**
+ * 紹介者の成績・動線の参照に付ける権限検査（#554 点検#505中9）。
+ *
+ * 成果地点側の `conversionPermission('view')` と同じ考えで、見るだけの人にも
+ * 鍵（`affiliate.report.view`、精算口と共通）で開ける。owner・admin は素通し。
+ */
+function affiliateReportPermission(): MiddlewareHandler<Env> {
+  return async (c, next) => {
+    const staff = c.get('staff');
+    if (!staff || (staff.role === 'staff' && !staff.permissionKeys?.includes('affiliate.report.view'))) {
+      return c.json({ success: false, error: 'この操作を行う権限がありません' }, 403);
+    }
+    await next();
+  };
+}
+
+/**
+ * 報酬率の範囲検査（#554 点検#505中2）。
+ *
+ * 100超をそのまま保存すると報酬計算（revenue*rate/100）が膨らむ。
+ * 省略時はDB既定（0）を使うので undefined は通す。
+ */
+function commissionRateError(value: unknown): string | null {
+  if (value === undefined) return null;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100) {
+    return '報酬率は0から100の間で入力してください';
+  }
+  return null;
 }
 
 function serializeAffiliate(row: {
@@ -401,6 +431,10 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
     if (!visible.allowedAccountIds.includes(lineAccountId)) {
       return c.json({ success: false, error: 'Affiliate not found' }, 404);
     }
+    const rateError = commissionRateError(body.commissionRate);
+    if (rateError) {
+      return c.json({ success: false, error: rateError }, 400);
+    }
 
     // ── Legacy explicit-code path (OSS back-compat) ─────────────────────────
     // Only taken when a code was supplied AND no friend binding is requested.
@@ -508,6 +542,8 @@ affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), async (c) =
 
     const settlement = readAffiliateSettlement(body);
     if (!settlement.ok) return c.json({ success: false, error: settlement.error }, 400);
+    const rateError = commissionRateError(body.commissionRate);
+    if (rateError) return c.json({ success: false, error: rateError }, 400);
 
     const updated = await updateAffiliate(c.env.DB, id, {
       name: body.name,
@@ -545,7 +581,7 @@ affiliates.delete('/api/affiliates/:id', requireRole('owner', 'admin'), async (c
 // GET /api/affiliates/:id/report - affiliate performance report (v2)
 // Extends the legacy report with ref_tracking-based clicks, add-time friendAdds,
 // conversionsByPoint, estimatedCommission and identity-key duplicateFlags.
-affiliates.get('/api/affiliates/:id/report', async (c) => {
+affiliates.get('/api/affiliates/:id/report', affiliateReportPermission(), async (c) => {
   try {
     const { scope } = await getAffiliateScope(c);
     const affiliate = await getAffiliateById(c.env.DB, c.req.param('id'), scope);
@@ -571,7 +607,7 @@ affiliates.get('/api/affiliates/:id/report', async (c) => {
 
 // GET /api/affiliates/:id/journeys - attributed-friend journey summaries
 // Cursor-paginated on (addedAt, friendId), same scheme as GET /api/chats.
-affiliates.get('/api/affiliates/:id/journeys', async (c) => {
+affiliates.get('/api/affiliates/:id/journeys', affiliateReportPermission(), async (c) => {
   try {
     const { scope } = await getAffiliateScope(c);
     const affiliate = await getAffiliateById(c.env.DB, c.req.param('id'), scope);
@@ -592,7 +628,7 @@ affiliates.get('/api/affiliates/:id/journeys', async (c) => {
 });
 
 // GET /api/affiliates/:id/links - list all ref_code links for an affiliate
-affiliates.get('/api/affiliates/:id/links', async (c) => {
+affiliates.get('/api/affiliates/:id/links', affiliateReportPermission(), async (c) => {
   try {
     const { scope } = await getAffiliateScope(c);
     const affiliate = await getAffiliateById(c.env.DB, c.req.param('id'), scope);

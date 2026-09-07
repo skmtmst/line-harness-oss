@@ -206,3 +206,76 @@ describe('PUT /api/affiliate-offers/:id', () => {
     );
   });
 });
+
+describe('タグ・シナリオの所属検査（#554 点検#505中3）', () => {
+  // タグ・シナリオの存在確認だけ本物の振る舞いにし、他は既存モックを使う。
+  const visibleTags = new Map([['tag-1', 'account-1']]);
+  const visibleScenarios = new Map([['sc-1', 'account-1']]);
+  const fakeDb = {
+    prepare: (sql: string) => ({
+      bind: (...args: unknown[]) => ({
+        first: async () => {
+          const [id, lineAccountId] = args as [string, string];
+          const table = sql.includes('FROM tags') ? visibleTags : visibleScenarios;
+          return table.get(id) === lineAccountId ? { id } : null;
+        },
+      }),
+    }),
+  } as unknown as D1Database;
+
+  function reqWithDb(method: string, path: string, body?: unknown) {
+    const separator = path.includes('?') ? '&' : '?';
+    const headers = new Headers({ Authorization: `Bearer ${API_KEY}` });
+    if (body !== undefined) headers.set('Content-Type', 'application/json');
+    return worker.fetch(
+      new Request(`https://worker.example.com${path}${separator}accountId=account-1`, {
+        method,
+        headers,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      }),
+      { ...env, DB: fakeDb },
+      { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext,
+    );
+  }
+
+  it('同じアカウントのタグ・シナリオ付き作成は通す', async () => {
+    dbMocks.createAffiliateOffer.mockResolvedValue(OFFER_ROW);
+    const res = await reqWithDb('POST', '/api/affiliate-offers', {
+      name: 'キャンペーンA', tagId: 'tag-1', scenarioId: 'sc-1',
+    });
+    expect(res.status).toBe(201);
+    expect(dbMocks.createAffiliateOffer).toHaveBeenCalled();
+  });
+
+  it('他アカウントのタグ付き作成を400で弾き、保存しない', async () => {
+    const res = await reqWithDb('POST', '/api/affiliate-offers', {
+      name: 'キャンペーンA', tagId: 'tag-2',
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain('タグ');
+    expect(dbMocks.createAffiliateOffer).not.toHaveBeenCalled();
+  });
+
+  it('存在しないシナリオ付き作成を400で弾く', async () => {
+    const res = await reqWithDb('POST', '/api/affiliate-offers', {
+      name: 'キャンペーンA', scenarioId: 'sc-9',
+    });
+    expect(res.status).toBe(400);
+    expect(dbMocks.createAffiliateOffer).not.toHaveBeenCalled();
+  });
+
+  it('更新で他アカウントのタグを400で弾く', async () => {
+    dbMocks.getAffiliateOfferById.mockResolvedValue({ ...OFFER_ROW, line_account_id: 'account-1' });
+    const res = await reqWithDb('PUT', '/api/affiliate-offers/off-1', { tagId: 'tag-2' });
+    expect(res.status).toBe(400);
+    expect(dbMocks.updateAffiliateOffer).not.toHaveBeenCalled();
+  });
+
+  it('更新で同じアカウントのシナリオは通す', async () => {
+    dbMocks.getAffiliateOfferById.mockResolvedValue({ ...OFFER_ROW, line_account_id: 'account-1' });
+    dbMocks.updateAffiliateOffer.mockResolvedValue({ ...OFFER_ROW, scenario_id: 'sc-1' });
+    const res = await reqWithDb('PUT', '/api/affiliate-offers/off-1', { scenarioId: 'sc-1' });
+    expect(res.status).toBe(200);
+  });
+});
