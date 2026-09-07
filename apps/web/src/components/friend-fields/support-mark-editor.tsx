@@ -22,7 +22,7 @@ const COLORS = [
   { value: '#6B56CF', name: '紫' },
   { value: '#707981', name: 'グレー' },
 ] as const
-const DESTINATIONS = ['受信箱での絞り込み', '一斉配信の配信対象', 'シナリオ配信の分岐条件', '自動応答の条件', 'オートメーションの条件']
+const DESTINATIONS = ['受信箱の絞り込み', '友だち一覧の列と絞り込み', 'ダッシュボードの絞り込み', '配信の絞り込み条件', 'オートメーションの動作']
 type MarkRow = SupportMarkListItem
 
 export default function SupportMarkEditor({ markId }: { markId?: string }) {
@@ -33,9 +33,9 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
 
   const [items, setItems] = useState<MarkRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [name, setName] = useState('')
+  const [name, setName] = useState('要確認')
   const [color, setColor] = useState<string>(COLORS[0].value)
-  const [displayOrder, setDisplayOrder] = useState(0)
+  const [displayOrder, setDisplayOrder] = useState(4)
   const [isDefault, setIsDefault] = useState(false)
   const [createRule, setCreateRule] = useState(true)
   const [ruleEvent, setRuleEvent] = useState<SupportMarkAutomationEvent>('staff_assigned')
@@ -147,14 +147,20 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
         ) : (
           <Card padding="default">
             <h2 className="mb-2 text-sm font-bold text-ink">自動変更ルール</h2>
-            <p className="text-xs leading-relaxed text-ink-faint">受信・返信・担当割当・期限超過などをきっかけに、このマークへ自動で変更できます。</p>
-            <label className="mt-4 flex items-center gap-2 text-sm font-semibold text-ink"><input type="checkbox" checked={createRule} onChange={(event) => setCreateRule(event.target.checked)} className="h-4 w-4 accent-accent" />作成と同時にルールを追加</label>
-            <label className="mt-4 block text-xs font-semibold text-ink-secondary">きっかけ
-              <select value={ruleEvent} onChange={(event) => setRuleEvent(event.target.value as SupportMarkAutomationEvent)} disabled={!createRule} className="v6-select mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 text-sm font-normal disabled:bg-surface-soft">
-                {EVENT_LABELS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-              </select>
-            </label>
-            <p className="mt-3 rounded-control bg-surface-soft p-3 text-xs text-ink-secondary">{createRule ? `${eventLabel(ruleEvent)}に「${name || 'このマーク'}」へ変更します。` : 'ルールは後から編集画面で追加できます。'}</p>
+            <p className="text-xs leading-relaxed text-ink-faint">受信・返信・担当割当・期限超過などをきっかけに自動変更できます。</p>
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <p className="text-xs font-semibold text-ink-secondary">このマークを作るときに登録するルール</p>
+              <Button type="button" onClick={() => setCreateRule(true)}>＋ ルールを追加</Button>
+            </div>
+            {createRule ? (
+              <div className="mt-3 flex items-center gap-2 rounded-control border border-hairline p-3 text-sm">
+                <select aria-label="きっかけ" value={ruleEvent} onChange={(event) => setRuleEvent(event.target.value as SupportMarkAutomationEvent)} className="v6-select h-10 min-w-0 flex-1 rounded-control border border-hairline bg-canvas px-3 text-sm font-semibold">
+                  {EVENT_LABELS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                </select>
+                <span className="shrink-0 text-ink-faint">→</span>
+                <span className="min-w-0 flex-1 rounded-control bg-surface-soft px-3 py-2.5 font-semibold text-ink">「{name || 'このマーク'}」に変更</span>
+              </div>
+            ) : null}
           </Card>
         )}
 
@@ -163,6 +169,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
           <ul className="space-y-2 text-xs text-ink">
             {DESTINATIONS.map((label) => <li key={label} className="flex items-start gap-2"><Circle size={6} fill="currentColor" className="mt-1 shrink-0 text-accent" aria-hidden="true" /><span>{label}</span></li>)}
           </ul>
+          {!editing ? <p className="mt-4 text-xs leading-relaxed text-ink-faint">受信箱・友だち一覧・友だち詳細のすべてに同じ順番で表示します。</p> : null}
           {editing && currentUsages.length > 0 ? <p className="mt-4 text-xs font-semibold text-ink-secondary">現在の使用先：{currentUsages.join('、')}</p> : null}
           <p className="mt-4 text-xs leading-relaxed text-ink-faint">配信などの使用先がある間は保管できません。使用先を外すと、友だちは最初から付けるマークへ移り、変更履歴は残ります。</p>
         </Card>

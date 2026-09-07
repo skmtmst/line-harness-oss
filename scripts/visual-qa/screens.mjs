@@ -2956,7 +2956,11 @@ export const SCREENS = [
   {
     node: 'dKlkz', feature: 4, name: '4-1-F タグ削除の確認ダイアログ',
     dir: 'friend-attributes-v6', route: '/tags', mode: 'viewport', height: 1080,
-    steps: [{ click: 'NEN会員 を削除', scope: 'main' }],
+    steps: [
+      { fill: 'input[placeholder="タグ名・用途で検索"]', selector: true, scope: 'main', text: 'NEN会員（定期）' },
+      { click: 'NEN会員（定期） を削除', scope: 'main' },
+      { fill: '確認のため、タグ名を入力してください', text: 'NEN会員（定期）' },
+    ],
     verdict: "structure_match_data_pending",
     verdictNote: "**2026-09-07 Issue #330で実API接続後に再判定。** 構造・表示データ一致、実行API待ち。固定タグの128人、マイル連動、5件の参照先、版を実APIから表示し、削除前の影響確認を設計順に再現した。タグを保管・削除する更新APIが無いため、事故防止のため確定操作は無効のままにしている。2幅とも横はみ出し0。",
     verdictSource: "friend-attributes-v6/dKlkz.txt + friend-attributes-v6/dKlkz-{1440,1920}.png + 2026-09-07同一状態比較",

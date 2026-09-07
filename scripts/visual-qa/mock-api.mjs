@@ -1700,6 +1700,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/broadcasts/saved-views') {
     return { success: true, data: BROADCAST_SAVED_VIEWS }
   }
+  if (pathname === '/api/broadcasts/notification-settings') {
+    return { success: true, data: BROADCAST_NOTIFICATION_SETTINGS }
+  }
   const broadcastInsight = pathname.match(/^\/api\/broadcasts\/([^/]+)\/insight$/)
   if (broadcastInsight) {
     return { success: true, data: BROADCAST_INSIGHTS[broadcastInsight[1]] ?? null }

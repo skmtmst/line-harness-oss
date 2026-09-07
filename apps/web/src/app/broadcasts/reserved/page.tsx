@@ -286,9 +286,8 @@ function ReservedBroadcastContent() {
           </dl>
 
           <NoteBar className="mx-auto mt-4 max-w-3xl">
-            配信対象は送信開始直前に再集計します。現在の見込みは、友だちやタグの変化で予約時刻までに増減します。
+            {notificationText || '配信対象は送信開始直前に再集計します。現在の見込みは、友だちやタグの変化で予約時刻までに増減します。'}
           </NoteBar>
-          {notificationText ? <p className="text-ink-secondary mt-3 text-sm">{notificationText}</p> : null}
 
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <Button href="/broadcasts"><List size={16} aria-hidden="true" />一覧へ戻る</Button>

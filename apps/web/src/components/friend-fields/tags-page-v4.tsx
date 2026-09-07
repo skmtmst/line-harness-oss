@@ -483,7 +483,7 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
           </span>
           <div className="min-w-0">
             <h2 className="text-xl font-bold text-ink">「{tag.name}」をアーカイブしますか？</h2>
-            <p className="mt-1 text-sm text-ink-secondary">アーカイブ後も、いま付いている友だちと過去の履歴はそのまま残ります。</p>
+            <p className="mt-1 text-sm text-ink-secondary">アーカイブすると、これから新しく付けられなくなります。いま付いている友だちと過去の履歴はそのまま残ります。</p>
           </div>
         </div>
 
