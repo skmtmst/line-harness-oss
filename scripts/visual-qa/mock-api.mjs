@@ -1784,16 +1784,6 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       || left.id.localeCompare(right.id)
     ))
     const offset = (page - 1) * limit
-    const nameQuery = (query.get('query') ?? '').trim().toLocaleLowerCase('ja-JP')
-    const active = query.get('active')
-    const createdFrom = query.get('createdFrom')
-    const folderId = query.get('folderId')
-    const filtered = FRIEND_SCENARIOS
-      .filter((item) => !nameQuery || item.name.toLocaleLowerCase('ja-JP').includes(nameQuery))
-      .filter((item) => active !== '0' || !item.isActive)
-      .filter((item) => !createdFrom || item.createdAt >= createdFrom)
-      .filter((item) => !folderId
-        || (folderId === '__unfiled__' ? !item.folderId : item.folderId === folderId))
     return {
       success: true,
       data: {
@@ -1855,6 +1845,16 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
     const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 200) : 50
     const offset = (page - 1) * limit
+    const nameQuery = (query.get('query') ?? '').trim().toLocaleLowerCase('ja-JP')
+    const active = query.get('active')
+    const createdFrom = query.get('createdFrom')
+    const folderId = query.get('folderId')
+    const filtered = FRIEND_SCENARIOS
+      .filter((item) => !nameQuery || item.name.toLocaleLowerCase('ja-JP').includes(nameQuery))
+      .filter((item) => active !== '0' || !item.isActive)
+      .filter((item) => !createdFrom || item.createdAt >= createdFrom)
+      .filter((item) => !folderId
+        || (folderId === '__unfiled__' ? !item.folderId : item.folderId === folderId))
     return {
       success: true,
       data: {
