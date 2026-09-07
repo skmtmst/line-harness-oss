@@ -899,6 +899,8 @@ const SHAPES = {
     sidebarItemOrder: null,
     parentChildMode: false,
     specializedFeatureKeys: ['nen_campaigns', 'photo_review', 'ec_commerce', 'line_notifications'],
+    // 本物は版を返す。無いと画面の expectedVersion 付き保存の欠落に気づけない。
+    version: 1,
   },
   '/api/inbox/unanswered/count': { total: 0, byAccount: [], oldestWaitMinutes: null },
   // 設計 `vUXKb` の「写真審査 1件 確認待ち」。0で返すとカードが空のまま撮れる。
