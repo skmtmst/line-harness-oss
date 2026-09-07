@@ -98,7 +98,7 @@ function TodayTaskCard({
   status: string
 }) {
   return (
-    <Card layout="vertical" padding="default" className="h-[132px] min-w-0">
+    <Card layout="vertical" padding="default" className="h-[116px] min-w-0">
       <div className="flex items-start justify-between gap-3">
         <h3 className="text-ink text-sm font-semibold">{title}</h3>
         <Link href={href} className="text-action shrink-0 text-xs font-medium hover:underline">{action}</Link>
@@ -293,7 +293,9 @@ function SendQuotaCard({
           「197 / 200通」だけだと、197 が使ったぶんにも残りにも読める。
           この値は `limit - used` なので残り。言葉を付けて向きを固定する。
         */}
-        {remaining === null || limit === null ? '—' : `残り ${remaining.toLocaleString('ja-JP')} / 上限 ${limit.toLocaleString('ja-JP')}通`}
+        <span className="text-base leading-tight">
+          {remaining === null || limit === null ? '—' : `残り ${remaining.toLocaleString('ja-JP')} / 上限 ${limit.toLocaleString('ja-JP')}通`}
+        </span>
       </span>
     </p>
     <div className="bg-hairline mt-3 h-1.5 overflow-hidden rounded-pill"><div className="bg-accent h-full rounded-pill" style={{ width: `${remainingRate ?? 0}%` }} /></div>
