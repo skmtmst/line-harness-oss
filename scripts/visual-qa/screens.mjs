@@ -1000,8 +1000,9 @@ export const SCREENS = [
   {
     ...REMINDER, node: 'J64xI', name: '7-1-B 通知ステップ編集',
     verdict: 'match',
-    verdictNote: '**2026-09-06 S2 #220。** 正本 `J64xI` の通知カード3件、時刻/繰越、差し込み分類、本文、送信後アクション、URL扱い、右プレビューを実装。1440/1920で横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
-    verdictHead: 'eb41ad0d',
+    verdictNote: '**2026-09-07 Codex #453。** 本文上部の旧Headerを外し、正本 `J64xI.txt` と上端から通知カード3件、時刻/繰越、差し込み分類、本文、送信後アクション、URL扱い、右プレビューまで照合した。設計画像なし。3101/8788で1440/1920を撮影し、横はみ出し0。head `d77d0877e`。',
+    verdictSource: 'reminders-v6/J64xI.txt + reminders-v6/J64xI-{1440,1920}.png（設計画像なし）',
+    verdictHead: 'd77d0877e',
     route: '/reminders/edit?id=reminder-3',
 
   },
