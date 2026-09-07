@@ -1,10 +1,11 @@
-import { Hono, type Context } from 'hono';
+import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getScoringRules,
   getScoringRuleById,
   createScoringRule,
   updateScoringRule,
   deleteScoringRule,
+  getFriendById,
   getFriendScore,
   getFriendScoreHistory,
   addScore,
@@ -90,6 +91,20 @@ async function canUseMileageAccount(c: Parameters<typeof auditLog>[0], accountId
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   return scope.allowedAccountIds.includes(accountId);
 }
+
+/*
+ * 友だちの可視検査。`friends.ts` の `requireVisibleFriend` と同じ約束:
+ * 担当外・別アカウントの友だちは「いない」ものとして 404 を返す。
+ * スコアの口だけ別実装にしないため、振る舞いをここに寄せる。
+ */
+const requireVisibleFriendForScore: MiddlewareHandler<Env> = async (c, next) => {
+  const friend = await getFriendById(c.env.DB, c.req.param('id') ?? '');
+  const accountId = (friend as unknown as Record<string, unknown> | null)?.line_account_id as string | null ?? null;
+  if (!friend || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'Friend not found' }, 404);
+  }
+  await next();
+};
 
 function serializeMileageRule(rule: MileageRuleRow) {
   let conditions: Record<string, unknown> = {};
@@ -1122,7 +1137,7 @@ scoring.delete('/api/scoring-rules/:id', requireRole('owner', 'admin'), async (c
 
 // ========== 友だちスコア ==========
 
-scoring.get('/api/friends/:id/score', async (c) => {
+scoring.get('/api/friends/:id/score', requireVisibleFriendForScore, async (c) => {
   try {
     const friendId = c.req.param('id');
     const [score, history] = await Promise.all([
@@ -1150,7 +1165,7 @@ scoring.get('/api/friends/:id/score', async (c) => {
 });
 
 // 手動スコア加算
-scoring.post('/api/friends/:id/score', requireRole('owner', 'admin'), async (c) => {
+scoring.post('/api/friends/:id/score', requireRole('owner', 'admin'), requireVisibleFriendForScore, async (c) => {
   try {
     const friendId = c.req.param('id');
     const body = await c.req.json<{ scoreChange: number; reason?: string }>();

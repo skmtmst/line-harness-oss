@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 
 const dbMocks = {
   getStaffByApiKey: vi.fn().mockResolvedValue(null),
+  getFriendById: vi.fn(),
   getMileageAdminOverview: vi.fn(),
   getMileageAdminHistory: vi.fn(),
   getMileageEarningRulesV6: vi.fn(),
@@ -767,5 +768,40 @@ describe('mileage admin API', () => {
       body: JSON.stringify({ accountId: 'account-1', approvalThreshold: 1_000 }),
     });
     expect(admin.status).toBe(403);
+  });
+
+  it('reads a visible friend score but hides other-account friends', async () => {
+    dbMocks.getFriendById.mockResolvedValue({ id: 'friend-1', line_account_id: 'account-1' });
+    dbMocks.getFriendScore.mockResolvedValue(42);
+    dbMocks.getFriendScoreHistory.mockResolvedValue([]);
+    const visible = await call('/api/friends/friend-1/score');
+    expect(visible.status).toBe(200);
+    expect(dbMocks.getFriendScore).toHaveBeenCalledWith(env.DB, 'friend-1');
+
+    dbMocks.getFriendById.mockResolvedValue({ id: 'friend-2', line_account_id: 'account-2' });
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
+    const hidden = await call('/api/friends/friend-2/score');
+    expect(hidden.status).toBe(404);
+    expect(dbMocks.getFriendScore).toHaveBeenCalledTimes(1);
+  });
+
+  it('adds a score only for a visible friend', async () => {
+    dbMocks.getFriendById.mockResolvedValue({ id: 'friend-1', line_account_id: 'account-1' });
+    dbMocks.getFriendScore.mockResolvedValue(45);
+    const added = await call('/api/friends/friend-1/score', {
+      method: 'POST', body: JSON.stringify({ scoreChange: 3, reason: '対応記録' }),
+    });
+    expect(added.status).toBe(201);
+    expect(dbMocks.addScore).toHaveBeenCalledWith(env.DB, {
+      friendId: 'friend-1', scoreChange: 3, reason: '対応記録',
+    });
+
+    dbMocks.getFriendById.mockResolvedValue({ id: 'friend-2', line_account_id: 'account-2' });
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
+    const hidden = await call('/api/friends/friend-2/score', {
+      method: 'POST', body: JSON.stringify({ scoreChange: 3 }),
+    });
+    expect(hidden.status).toBe(404);
+    expect(dbMocks.addScore).toHaveBeenCalledTimes(1);
   });
 });

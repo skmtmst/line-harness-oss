@@ -244,7 +244,16 @@ export default function NewMileageRulePage() {
           },
         })
         if (!draftResponse.success) {
-          await api.mileage.updateRule(res.data.id, { isActive: false }).catch(() => undefined)
+          /*
+           * 下書きが残せなかった旧口の行は、そのままでは一覧に出ないのに
+           * 付与だけ動く幽霊になる。消せるものは消し、消せなければ止めて、
+           * 残ったときは運用者が一覧で見つけられる文にする。
+           */
+          const deleted = await api.mileage.deleteRule(res.data.id).catch(() => null)
+          if (!deleted?.success) {
+            await api.mileage.updateRule(res.data.id, { isActive: false }).catch(() => undefined)
+            throw new Error(`${draftResponse.error}(作りかけの決めごとが残っているかもしれません。一覧で確認してください)`)
+          }
           throw new Error(draftResponse.error)
         }
         // 作成は常に動く状態で入る。止めた状態で作りたいときだけ、続けて止める。

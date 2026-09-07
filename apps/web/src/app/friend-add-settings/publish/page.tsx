@@ -99,7 +99,8 @@ function StepTrail({ steps, current, complete = false }: { steps: string[]; curr
 function FriendAddPublishInner() {
   const searchParams = useSearchParams()
   const { selectedAccountId } = useAccount()
-  const ruleId = searchParams.get('id') ?? 'rule-referral'
+  // id が無いときは固定値で開かない。fixture の ID が無い環境で404・空画面になる。
+  const ruleId = searchParams.get('id')
   const [phase, setPhase] = useState<Phase>('loading')
   const [draft, setDraft] = useState<FriendAddRoutingVersion | null>(null)
   const [validation, setValidation] = useState<FriendAddRoutingValidation | null>(null)
@@ -123,6 +124,10 @@ function FriendAddPublishInner() {
 
   useEffect(() => {
     if (!selectedAccountId) return
+    if (!ruleId) {
+      setPhase('empty')
+      return
+    }
     let alive = true
     const generation = requestRef.current.generation + 1
     requestRef.current = { accountId: selectedAccountId, generation }
@@ -174,15 +179,20 @@ function FriendAddPublishInner() {
           : null
         setMatchedLast28Days(matched)
         if (validationRes.success) {
-          const keys = ['first_time', 'returning', 'actions', 'duplicate_prevention'] as const
+          /*
+           * 確認はサーバの鍵で突き合わせ、説明文はサーバ値をそのまま出す。
+           * 順番 (配列の位置) で割り振らない。サーバは1件だけ返すことがある。
+           */
           setValidation({
             canPublish: validationRes.data.canPublish,
+            // 共有型が求めるため保持するが、対象見込みの表示には使わない。
+            // 過去28日の実績を未来の対象人数として見せない。
             estimatedAudienceCount: matched,
-            checks: validationRes.data.checks.map((check, index) => ({
-              key: keys[index] ?? 'actions',
+            checks: validationRes.data.checks.map((check) => ({
+              key: check.key,
               label: check.label,
               status: check.status,
-              detail: check.status === 'passed' ? '保存済みのルールと参照先を確認できました。' : check.label,
+              detail: check.detail,
             })),
             conflicts: conflictRes.success ? conflictRes.data.conflicts.map((conflict) => ({ code: conflict.code, message: conflict.message })) : [],
             lastTestStatus: detail.rule.lastTestStatus,
@@ -311,9 +321,7 @@ function FriendAddPublishInner() {
                     </span>
                     <span className={styles.checkLabel}>{check.label}</span>
                     <span className={styles.checkDetail}>
-                      {check.key === 'duplicate_prevention'
-                        ? '同じ友だち追加通知は1回だけ処理します。'
-                        : check.detail}
+                      {check.detail}
                     </span>
                   </p>
                 ))}
@@ -381,7 +389,7 @@ function FriendAddPublishInner() {
             <CardHeader title="設定サマリー" meta="有効化する内容です。" />
             <div className={styles.rows}>
               <Row label="状態" value="有効化前" />
-              <Row label="対象見込み" value={audienceText(matchedLast28Days ?? validation?.estimatedAudienceCount)} />
+              <Row label="過去28日の該当" value={audienceText(matchedLast28Days)} />
               <Row label="二重送信" value={validation?.conflicts.length === 0 ? '重なりなし・確認済み' : `${validation?.conflicts.length ?? 0}件・要確認`} />
               <Row label="監視" value={ruleDetail?.staffNotification?.status === 'connected' ? 'Slack通知・接続済み' : ruleDetail?.staffNotification?.status == null ? NOT_AVAILABLE : 'Slack通知・未接続'} />
             </div>
@@ -449,7 +457,7 @@ function PublishedView({ result, detail, accountId }: { result: FriendAddRouting
             <Row label="対象" value={detail?.rule.friendKind === 'returning' ? '以前からの友だち・ブロック解除' : '初回登録・既存除外'} />
             <Row label="公開した版" value={`第${result.versionNumber}版`} />
             <Row label="公開日時" value={result.publishedAt.slice(0, 16).replace('T', ' ')} />
-            <Row label="対象人数" value={audienceText(result.estimatedAudienceCount)} />
+            <Row label="公開時の過去28日該当" value={audienceText(result.estimatedAudienceCount)} />
             <Row label="二重送信防止" value="有効" />
             <Row label="状態" value="稼働中" />
           </div>

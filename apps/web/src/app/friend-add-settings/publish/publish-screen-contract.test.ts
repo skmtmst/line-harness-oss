@@ -36,8 +36,23 @@ describe('友だち追加時配信の公開画面', () => {
 
   it('公開前の対象見込みはルールの28日集計を優先し、旧契約にも戻せる', () => {
     // 公開後の返事を先取りしたり、設計の数字を置いたりしない。
-    expect(PAGE).toContain('audienceText(matchedLast28Days ?? validation?.estimatedAudienceCount)')
+    // 過去28日の実績を未来の対象人数として見せない。
+    expect(PAGE).toContain('audienceText(matchedLast28Days)')
+    expect(PAGE).toContain('label="過去28日の該当"')
+    expect(PAGE).not.toContain('label="対象見込み"')
     expect(PAGE).not.toContain('214人')
+  })
+
+  it('確認は鍵で突き合わせ、説明文はサーバ値をそのまま出す', () => {
+    // 順番 (配列の位置) で割り振ると、行が欠ける・意味がずれる。
+    expect(PAGE).not.toContain('keys[index]')
+    expect(PAGE).toContain('{check.detail}')
+  })
+
+  it('idが無いときは固定値で開かず、空の面にする', () => {
+    // fixture の ID が無い環境で404・空画面になる。
+    expect(PAGE).not.toContain("?? 'rule-referral'")
+    expect(PAGE).toContain('if (!ruleId)')
   })
 
   it('実行結果へは、つながっているときだけリンクする', () => {
@@ -87,7 +102,9 @@ describe('友だち追加時配信の公開画面', () => {
   it('運用者向けの画面に内部の仕組みの名前を出さない', () => {
     expect(PAGE).not.toContain('value="webhookの記録で防ぎます"')
     expect(PAGE).not.toContain('value="有効（webhookの記録で判定）"')
-    expect(PAGE).toContain('同じ友だち追加通知は1回だけ処理します。')
+    // 確認の説明文はサーバ値をそのまま出す。画面に固定文を持たない
+    // (#542 点検 #501)。文言自体は Worker が返し、Worker の契約テストで守る。
+    expect(PAGE).not.toContain('同じ友だち追加通知は1回だけ処理します。')
   })
 
   it('有効化後に次の操作と監視対象を説明する', () => {

@@ -13,6 +13,7 @@ import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
+import { localDateTime, utcDateTime } from '@/lib/presentation'
 import { validateReward, type FormState } from './reward-form'
 import {
   api,
@@ -86,8 +87,8 @@ function formOf(reward: MileageRewardSummary): FormState {
     /* **`null` は「限りなし」なので空文字へ。0 は「0」のまま残す。** */
     stockLimit: version?.stockLimit == null ? '' : String(version.stockLimit),
     perFriendLimit: version?.perFriendLimit == null ? '' : String(version.perFriendLimit),
-    startsAt: version?.startsAt?.slice(0, 16) ?? '',
-    endsAt: version?.endsAt?.slice(0, 16) ?? '',
+    startsAt: localDateTime(version?.startsAt),
+    endsAt: localDateTime(version?.endsAt),
     benefitExpiresDays: version?.benefitExpiresDays == null ? '' : String(version.benefitExpiresDays),
     commonActionVersionId: version?.commonActionVersionId ?? '',
     targetConditions: version?.targetConditions ?? null,
@@ -122,8 +123,8 @@ function draftOf(form: FormState): MileageRewardDraftInput {
     requiredMiles: Number(form.requiredMiles),
     stockLimit: numberOrNull(form.stockLimit),
     perFriendLimit: numberOrNull(form.perFriendLimit),
-    startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : null,
-    endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : null,
+    startsAt: utcDateTime(form.startsAt),
+    endsAt: utcDateTime(form.endsAt),
     benefitExpiresDays: numberOrNull(form.benefitExpiresDays),
     commonActionVersionId: form.commonActionVersionId.trim() || null,
     targetConditions: pruneCondition(form.targetConditions),
