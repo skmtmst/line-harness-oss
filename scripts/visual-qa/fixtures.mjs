@@ -3362,6 +3362,41 @@ export const REMINDER_DRAFT = {
   publishedAt: null,
 }
 
+/** 機能7の公開前チェック（`POST /api/reminders/:id/validate` の固定の返事）。 */
+export const REMINDER_VALIDATE = {
+  valid: true,
+  checks: [
+    { key: 'steps', label: '通知ステップ', status: 'passed', message: '3件の通知があります' },
+    { key: 'bodies', label: '送る内容', status: 'passed', message: '空の通知はありません' },
+    { key: 'test_send', label: 'テスト送信', status: 'passed', message: '直近のテストは成功しています' },
+  ],
+  audience: { matched: 398, excluded: 28 },
+}
+
+/** 機能7の配信予定（`POST /api/reminders/:id/preview` の固定の返事）。 */
+export const REMINDER_PREVIEW = {
+  targetDate: '2026-08-25T00:00:00.000Z',
+  items: [
+    { stableStepId: 'day-before', stepNumber: 1, scheduledAt: '2026-08-24T09:00:00.000Z', label: '前日のお知らせ', state: 'scheduled' },
+    { stableStepId: 'hour-before', stepNumber: 2, scheduledAt: '2026-08-25T01:00:00.000Z', label: '1時間前のお知らせ', state: 'scheduled' },
+    { stableStepId: 'same-day', stepNumber: 3, scheduledAt: '2026-08-25T00:00:00.000Z', label: '当日のご案内', state: 'scheduled' },
+  ],
+  summary: { audience: 398, next7Days: 426, next30Days: 1194, duplicateCount: 2 },
+}
+
+/** 機能7のテスト送信（`POST /api/reminders/:id/test-send` の固定の返事）。 */
+export const REMINDER_TEST_SEND = {
+  sent: 1, recipientName: 'Kenta Kawano', replayed: false,
+  requestId: 'visual-qa-test-1', testedAt: '2026-09-06T09:00:00.000Z',
+}
+
+/** 機能7の公開（`POST /api/reminders/:id/publish` の固定の返事）。 */
+export const REMINDER_PUBLISH = {
+  reminderId: 'reminder-3', versionId: 'reminder-3-draft-v3', versionNumber: 3,
+  publishedAt: '2026-09-06T09:00:00.000Z', audience: 398,
+  plannedDeliveries: 1194, nextScheduledAt: '2026-08-24T09:00:00.000Z',
+}
+
 /**
  * 友だち情報欄の項目。リマインダの起点（`triggerFieldId`）に日付の欄が要る。
  *
@@ -5534,8 +5569,9 @@ export const NEN_PHOTOS = [
   petPhoto('ph-3', '木村 亮', 'こむぎ', 'おやつを待つ顔', 'pending', 20),
   petPhoto('ph-4', '中村 彩', 'ぷりん', 'ひなたぼっこ', 'adopted', 14),
   petPhoto('ph-5', '石田 未来', 'レオ', '新しい首輪', 'adopted', 8),
-  /* 戻したもの。**理由が無いと、なぜ戻したのかが画面から読めない。** */
-  petPhoto('ph-6', '松本 圭', 'むぎ', '店内で撮影', 'rejected', 3, 'other_person', '人の顔が写っています'),
+  /* 戻したもの。**理由が無いと、なぜ戻したのかが画面から読めない。**
+     理由はDB制約・API許可値にある正規値を使う（`other_person` は存在しない値）。 */
+  petPhoto('ph-6', '松本 圭', 'むぎ', '店内で撮影', 'rejected', 3, 'privacy', '人の顔が写っています'),
 ]
 
 export const NEN_PHOTO_DETAIL = {
