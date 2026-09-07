@@ -9,7 +9,6 @@ import {
 import {
   DEFAULT_TENANT_ID,
   FEATURE_CATALOG,
-  FEATURE_IDS,
   type FeatureId,
 } from '@line-crm/shared';
 import type { Env } from '../index.js';
@@ -36,7 +35,43 @@ const featureSettings = new Hono<Env>();
  * V2 10-3 でオフと定義された機能だけ既定を無効にし、それ以外は有効。
  * 保存済みの値がある場合は、そちらを優先する。
  */
-export const TOGGLEABLE_FEATURES = FEATURE_IDS;
+// web の既存静的契約テストがこの配列をソースから読むため、共有カタログの
+// 互換ミラーを残す。feature-settings.test.ts で FEATURE_IDS との完全一致を固定する。
+export const TOGGLEABLE_FEATURES = [
+  'scenarios',
+  'broadcasts',
+  'templates',
+  'reminders',
+  'auto_replies',
+  'rich_menus',
+  'inflow_tracking',
+  'forms',
+  'photo_review',
+  'automations',
+  'external_integrations',
+  'friend_add_routing',
+  'multi_store_hierarchy',
+  'multi_store_bulk_updates',
+  'reservation_ledger',
+  'external_reservations',
+  'google_business_profile',
+  'friend_fields',
+  'support_marks',
+  'saved_searches',
+  'media',
+  'common_vars',
+  'analytics',
+  'site_tracking',
+  'webinars',
+  'events',
+  'booking',
+  'affiliates',
+  'mileage',
+  'ec_commerce',
+  'line_notifications',
+  'nen_campaigns',
+  'restaurant_test',
+] as const satisfies readonly FeatureId[];
 
 export type ToggleableFeature = FeatureId;
 
