@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 263,
-  "unimplemented": 0,
+  "compared": 261,
+  "unimplemented": 1,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 9,
-  "match": 199,
-  "structureMatchDataPending": 57,
-  "needsFix": 10,
-  "unjudged": 2,
-  "remaining": 69,
+  "missing": 10,
+  "match": 219,
+  "structureMatchDataPending": 45,
+  "needsFix": 2,
+  "unjudged": 1,
+  "remaining": 49,
   "features": [
     {
       "feature": 1,
@@ -199,11 +199,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 10,
-      "structureMatchDataPending": 1,
+      "match": 11,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 1,
-      "remaining": 2,
+      "remaining": 1,
       "capturedAt": [
         {
           "pr": 520,
@@ -337,11 +337,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 6,
-      "match": 11,
-      "structureMatchDataPending": 6,
+      "match": 14,
+      "structureMatchDataPending": 3,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 6,
+      "remaining": 3,
       "capturedAt": [
         {
           "pr": 420,
@@ -493,17 +493,32 @@
       "feature": 5,
       "name": "シナリオ配信",
       "total": 14,
-      "compared": 14,
+      "compared": 13,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0,
-      "match": 7,
-      "structureMatchDataPending": 7,
+      "missing": 1,
+      "match": 14,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 7,
+      "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1218,
+          "head": "52cdb3fa6",
+          "on": "2026-09-07",
+          "screens": [
+            "r6Gzsu",
+            "hz9ti",
+            "EvVO5",
+            "RUxNf",
+            "NrBkW",
+            "g2UNV",
+            "M2b2B"
+          ],
+          "note": "Issue #436。#1199 のAPI契約と #1204 の固定データを使い、7画面を3104/8791で1440・1920px撮影した。試算、開始記録、V6下書き、通別結果を実API経由で表示し、7画面すべて一致。全画像で横はみ出し0。"
+        },
         {
           "pr": 1121,
           "head": "1d9e8d36c",
@@ -1584,11 +1599,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 3,
-      "structureMatchDataPending": 6,
+      "match": 8,
+      "structureMatchDataPending": 1,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 6,
+      "remaining": 1,
       "capturedAt": [
         {
           "pr": 1191,
@@ -1972,16 +1987,16 @@
       "feature": 16,
       "name": "成果とアフィリエイト",
       "total": 9,
-      "compared": 9,
-      "unimplemented": 0,
+      "compared": 8,
+      "unimplemented": 1,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 8,
+      "match": 7,
       "structureMatchDataPending": 1,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 1,
+      "remaining": 2,
       "capturedAt": [
         {
           "pr": 1180,
@@ -2070,11 +2085,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 7,
-      "structureMatchDataPending": 1,
-      "needsFix": 2,
-      "unjudged": 1,
-      "remaining": 4,
+      "match": 8,
+      "structureMatchDataPending": 2,
+      "needsFix": 1,
+      "unjudged": 0,
+      "remaining": 3,
       "capturedAt": [
         {
           "pr": 1217,
@@ -2090,6 +2105,18 @@
             "z3PB2"
           ],
           "note": "Issue #418。機能17の不足していた集計・履歴・特典・ランク進捗・高額調整境界・行動理由と、付与ルールの自動通知設定を実API契約へ接続。3106/8793で対象と定義済み状態を1440/1920px撮影し、対象画像は横はみ出し0。"
+        },
+        {
+          "pr": 1215,
+          "head": "65390c132",
+          "on": "2026-09-07",
+          "screens": [
+            "N46cQ",
+            "BmoGY",
+            "p9CcEB",
+            "k8VCU"
+          ],
+          "note": "Issue #429 / PR #1215。決めごとの並び順・公開版・15軸条件と、使い道の共通アクション選択を実装し、3102/8789で1440/1920pxを撮影。全画像で横はみ出し0。k8VCUは一致、残るAPI契約は3画面の判定注記へ記録した。"
         },
         {
           "pr": 1137,
@@ -2789,8 +2816,8 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 5,
-      "structureMatchDataPending": 2,
-      "needsFix": 1,
+      "structureMatchDataPending": 3,
+      "needsFix": 0,
       "unjudged": 0,
       "remaining": 3,
       "capturedAt": [
@@ -2956,8 +2983,8 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 2,
-      "structureMatchDataPending": 1,
-      "needsFix": 4,
+      "structureMatchDataPending": 5,
+      "needsFix": 0,
       "unjudged": 0,
       "remaining": 5,
       "capturedAt": [
@@ -3014,11 +3041,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 2,
-      "structureMatchDataPending": 2,
+      "match": 4,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 2,
+      "remaining": 0,
       "capturedAt": [
         {
           "pr": 1177,
@@ -3173,11 +3200,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 2,
+      "match": 4,
       "structureMatchDataPending": 0,
-      "needsFix": 2,
+      "needsFix": 0,
       "unjudged": 0,
-      "remaining": 2,
+      "remaining": 0,
       "capturedAt": [
         {
           "pr": 475,
@@ -3301,5 +3328,13 @@
       "capturedAt": null
     }
   ],
-  "gaps": []
+  "gaps": [
+    {
+      "feature": 16,
+      "node": "njLGA",
+      "name": "16-1-C 支払い",
+      "gap": "build",
+      "gapNote": "締め（あと何日で金額が固定されるか）・支払予定日・振込用CSV・振込先・人ごとの金額を出す画面。口は `/api/affiliate-payments` が既に在るので、画面を作れば足りる"
+    }
+  ]
 }

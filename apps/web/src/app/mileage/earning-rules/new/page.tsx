@@ -14,6 +14,10 @@ import CreatePage, {
   inputClass,
 } from '@/components/shared/create-page'
 import { TextInput } from '@/components/shared/form-controls'
+import ConditionBuilder, {
+  pruneCondition,
+  type SegmentCondition,
+} from '@/components/shared/condition-builder'
 
 /**
  * たまる決めごとをつくる（設計 V6 17-1-D / BmoGY）。
@@ -143,7 +147,7 @@ export default function NewMileageRulePage() {
   const [validUntil, setValidUntil] = useState('')
   const [expiresAfterDays, setExpiresAfterDays] = useState('365')
   const [reverseOnCancellation, setReverseOnCancellation] = useState(true)
-  const [targetTagId, setTargetTagId] = useState('')
+  const [targetConditions, setTargetConditions] = useState<SegmentCondition | null>(null)
   const [isActive, setIsActive] = useState(true)
   const [notifyFriend, setNotifyFriend] = useState(true)
   const [tags, setTags] = useState<Tag[]>([])
@@ -230,9 +234,7 @@ export default function NewMileageRulePage() {
             validUntil: validUntil || null,
             expiresAfterDays: expiryDays,
             cancellationEventTypes: reverseOnCancellation && cancellationEvent ? [cancellationEvent] : [],
-            targetConditions: targetTagId
-              ? { operator: 'AND', rules: [{ type: 'tag_exists', value: targetTagId }] }
-              : null,
+            targetConditions: pruneCondition(targetConditions),
             sortOrder: 0,
             notification: {
               enabled: notifyFriend,
@@ -315,7 +317,7 @@ export default function NewMileageRulePage() {
             <ul className="space-y-2 text-xs leading-relaxed text-ink-secondary">
               <li>・付いてからの有効期限</li>
               <li>・予約取消や返品で、付けた分を引く決めごと</li>
-              <li>・タグで絞る対象条件</li>
+              <li>・15軸を組み合わせた利用対象条件</li>
             </ul>
             <p className="mt-3 text-xs text-ink-faint">公開中の版は直接書き換えず、V6の下書きとして保存します。</p>
           </AsideCard>
@@ -518,16 +520,11 @@ export default function NewMileageRulePage() {
           </label>
         ) : null}
 
-        <Field label="だれに付けるか（条件）" htmlFor="sc-target-tag" note="タグを選ばない場合は全員が対象です。">
-          <SelectField
-            id="sc-target-tag"
-            value={targetTagId}
-            onChange={(e) => setTargetTagId(e.target.value)}
-            options={[
-              { value: '', label: '条件を付けない（全員）' },
-              ...tags.map((tag) => ({ value: tag.id, label: `タグ「${tag.name}」が付いている人` })),
-            ]}
-            className="w-full"
+        <Field label="だれに付けるか（条件）" note="条件を付けない場合は全員が対象です。15の軸から組み合わせられます。">
+          <ConditionBuilder
+            value={targetConditions}
+            onChange={setTargetConditions}
+            label="利用対象の条件"
           />
         </Field>
 

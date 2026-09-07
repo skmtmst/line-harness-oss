@@ -132,6 +132,9 @@ function MileagePageInner() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [savingRuleId, setSavingRuleId] = useState<string | null>(null)
+  const [savingRuleOrder, setSavingRuleOrder] = useState(false)
+  const [ruleOrder, setRuleOrder] = useState<string[]>([])
+  const [ruleOrderDirty, setRuleOrderDirty] = useState(false)
   const [ruleFilters, setRuleFilters] = useState<RuleFilter[]>([])
   const [ruleSort, setRuleSort] = useState<RuleSort>('order')
   const [tabCounts, setTabCounts] = useState<{ balances: number | null; rules: number | null; rewards: number | null }>({ balances: null, rules: null, rewards: null })
@@ -157,6 +160,8 @@ function MileagePageInner() {
     if (accountAtRequest !== latestAccountRef.current) return
     if (!res.success || !isMileageEarningRulesV6Overview(res.data)) throw new Error('invalid_mileage_rules')
     setRuleOverview(res.data)
+    setRuleOrder(res.data.items.map((rule) => rule.id))
+    setRuleOrderDirty(false)
   }, [selectedAccountId])
 
   const loadOverview = useCallback(async () => {
@@ -252,13 +257,53 @@ function MileagePageInner() {
   const shownRules = useMemo(() => {
     const filtered = rules.filter((rule) => ruleFilters.length === 0
       || ruleFilters.includes(rule.published.status))
+    const order = new Map(ruleOrder.map((id, index) => [id, index]))
     return [...filtered].sort((a, b) => {
       if (ruleSort === 'granted') return b.metrics30d.granted - a.metrics30d.granted
       if (ruleSort === 'name') return a.draft.name.localeCompare(b.draft.name, 'ja')
       if (ruleSort === 'amount') return b.draft.amount - a.draft.amount
-      return a.draft.sortOrder - b.draft.sortOrder
+      return (order.get(a.id) ?? a.draft.sortOrder) - (order.get(b.id) ?? b.draft.sortOrder)
     })
-  }, [ruleFilters, ruleSort, rules])
+  }, [ruleFilters, ruleOrder, ruleSort, rules])
+
+  const moveRule = (id: string, direction: -1 | 1) => {
+    if (ruleFilters.length > 0 || ruleSort !== 'order') return
+    setRuleOrder((current) => {
+      const index = current.indexOf(id)
+      const target = index + direction
+      if (index < 0 || target < 0 || target >= current.length) return current
+      const next = [...current]
+      ;[next[index], next[target]] = [next[target], next[index]]
+      return next
+    })
+    setRuleOrderDirty(true)
+  }
+
+  const saveRuleOrder = async () => {
+    if (!selectedAccountId || savingRuleOrder || !ruleOrderDirty) return
+    const byId = new Map(rules.map((rule) => [rule.id, rule]))
+    const changed = ruleOrder.flatMap((id, index) => {
+      const rule = byId.get(id)
+      return rule && rule.draft.sortOrder !== index ? [{ rule, sortOrder: index }] : []
+    })
+    setSavingRuleOrder(true)
+    setLoadError('')
+    try {
+      await Promise.all(changed.map(async ({ rule, sortOrder }) => {
+        const response = await api.mileage.saveEarningRuleDraft(rule.id, {
+          accountId: selectedAccountId,
+          expectedVersion: rule.draftVersion,
+          draft: { ...rule.draft, sortOrder },
+        })
+        if (!response.success) throw new Error(response.error)
+      }))
+      await loadRules()
+    } catch {
+      setLoadError('並び順を保存できませんでした。最新の状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setSavingRuleOrder(false)
+    }
+  }
 
   const exportRulesCsv = () => {
     const rows = shownRules.map((rule) => [
@@ -452,7 +497,12 @@ function MileagePageInner() {
             options={RULE_SORTS.map((o) => ({ value: o.value, label: o.label }))}
             onChange={(value) => setRuleSort(value as RuleSort)}
           />
-          {/* 「並び順を保存」は設計にあるが、保存する口が無いので置かない。 */}
+          <Button
+            onClick={() => void saveRuleOrder()}
+            disabled={savingRuleOrder || !ruleOrderDirty || ruleFilters.length > 0 || ruleSort !== 'order'}
+          >
+            {savingRuleOrder ? '保存しています' : '並び順を保存'}
+          </Button>
           <Button onClick={exportRulesCsv} disabled={shownRules.length === 0} className="ml-auto">
             CSVで書き出す
           </Button>
@@ -495,11 +545,24 @@ function MileagePageInner() {
               </TableHeadRow>
             </thead>
             <tbody className="divide-hairline divide-y">
-              {shownRules.map((rule) => (
+              {shownRules.map((rule, index) => (
                 <tr key={rule.id} className="hover:bg-canvas-sunken">
                   <td className="text-ink px-4 py-3 text-sm font-medium">
                     <p className="truncate" title={rule.draft.name}>{rule.draft.name}</p>
                     <p className="mt-1 text-xs font-normal text-ink-faint">下書き v{rule.draftVersion}</p>
+                    <details className="mt-2 text-xs font-normal text-ink-secondary">
+                      <summary className="cursor-pointer font-semibold text-accent">公開版の中身を見る</summary>
+                      <dl className="mt-2 space-y-1 rounded-control bg-canvas-sunken p-2">
+                        <div><dt className="inline text-ink-faint">名前：</dt><dd className="inline">{rule.published.name}</dd></div>
+                        <div><dt className="inline text-ink-faint">対象：</dt><dd className="inline">{ruleEventLabel(rule.published.eventType, EVENT_LABELS)}</dd></div>
+                        <div><dt className="inline text-ink-faint">付与：</dt><dd className="inline">{formatNumber(rule.published.amount)}マイル</dd></div>
+                      </dl>
+                    </details>
+                    <p className="mt-2 text-xs font-normal text-ink-faint">
+                      {rule.draft.targetConditions
+                        ? `利用対象：${rule.draft.targetConditions.operator === 'AND' ? 'すべて満たす' : 'いずれかを満たす'}条件 ${rule.draft.targetConditions.rules.length + (rule.draft.targetConditions.groups?.reduce((sum, group) => sum + group.rules.length, 0) ?? 0)}件`
+                        : '利用対象：すべての友だち'}
+                    </p>
                   </td>
                   <td className="text-ink-secondary px-4 py-3 text-sm">
                     {ruleEventLabel(rule.draft.eventType, EVENT_LABELS)}
@@ -519,15 +582,21 @@ function MileagePageInner() {
                     {rule.published.status === 'published' ? <Chip tone="ok">動いています</Chip> : <Chip>止めています</Chip>}
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <Button
-                      disabled={savingRuleId === rule.id}
-                      onClick={() => void toggleRule(rule)}
-                      aria-label={`${rule.draft.name}を${rule.published.status === 'published' ? '停止' : '再開'}する`}
-                    >
-                      {savingRuleId === rule.id
-                        ? '反映しています'
-                        : rule.published.status === 'published' ? '決めごとを停止' : '決めごとを再開'}
-                    </Button>
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="flex gap-1" aria-label={`${rule.draft.name}の並び順`}>
+                        <Button disabled={ruleSort !== 'order' || ruleFilters.length > 0 || index === 0} onClick={() => moveRule(rule.id, -1)}>上へ</Button>
+                        <Button disabled={ruleSort !== 'order' || ruleFilters.length > 0 || index === shownRules.length - 1} onClick={() => moveRule(rule.id, 1)}>下へ</Button>
+                      </div>
+                      <Button
+                        disabled={savingRuleId === rule.id}
+                        onClick={() => void toggleRule(rule)}
+                        aria-label={`${rule.draft.name}を${rule.published.status === 'published' ? '停止' : '再開'}する`}
+                      >
+                        {savingRuleId === rule.id
+                          ? '反映しています'
+                          : rule.published.status === 'published' ? '決めごとを停止' : '決めごとを再開'}
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}

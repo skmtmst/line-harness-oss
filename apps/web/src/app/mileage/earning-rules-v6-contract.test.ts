@@ -13,6 +13,7 @@ import {
 } from './earning-rule-view'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const NEW_PAGE = readFileSync(new URL('./earning-rules/new/page.tsx', import.meta.url), 'utf8')
 
 function rule(over: Partial<MileageRule> & { id: string }): MileageRule {
   return {
@@ -118,8 +119,17 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     expect(PAGE).toContain('aria-label="並び順"')
   })
 
-  it('口の無い「並び順を保存」を操作として置かない', () => {
-    expect(PAGE).not.toMatch(/>\s*並び順を保存\s*</)
+  it('V6下書きの口へ並び順を保存する', () => {
+    expect(PAGE).toContain('api.mileage.saveEarningRuleDraft')
+    expect(PAGE).toContain("{savingRuleOrder ? '保存しています' : '並び順を保存'}")
+    expect(PAGE).toContain('draft: { ...rule.draft, sortOrder }')
+    expect(PAGE).toContain('expectedVersion: rule.draftVersion')
+  })
+
+  it('利用対象条件と公開版の中身を一覧から確認できる', () => {
+    expect(PAGE).toContain('公開版の中身を見る')
+    expect(PAGE).toContain('rule.draft.targetConditions')
+    expect(PAGE).toContain('利用対象：すべての友だち')
   })
 
   it('一覧を設計の表で出す', () => {
@@ -157,5 +167,15 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     expect(PAGE).toContain('title="たまる決めごとを読み込めませんでした"')
     expect(PAGE).toContain('title="まだ決めごとがありません"')
     expect(PAGE).toContain('title="絞り込みに合う決めごとがありません"')
+  })
+})
+
+describe('V6 たまる決めごとをつくる（BmoGY）の対象条件', () => {
+  it('共通の条件部品で15軸を組み合わせ、V6下書きへ保存する', () => {
+    expect(NEW_PAGE).toContain("import ConditionBuilder, {")
+    expect(NEW_PAGE).toContain('<ConditionBuilder')
+    expect(NEW_PAGE).toContain('value={targetConditions}')
+    expect(NEW_PAGE).toContain('targetConditions: pruneCondition(targetConditions)')
+    expect(NEW_PAGE).toContain('15の軸から組み合わせられます')
   })
 })

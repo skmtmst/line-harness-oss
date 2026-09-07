@@ -2836,7 +2836,15 @@ export const SCENARIO_STEPS = [
     offsetDays: 0, offsetMinutes: null, deliveryTime: '10:00', templateId: null,
     onReachTagId: null, afterSend: 'continue', messageType: 'text',
     messageContent: '{{name}}さん、ご登録ありがとうございます。\n7日間でサービスの使い方を順番にご案内します。',
-    targetCondition: null, question: null, isDraft: false,
+    targetCondition: {
+      operator: 'AND',
+      rules: [
+        { type: 'tag_exists', value: 'tag-first-guide' },
+        { type: 'support_mark', value: { markIds: ['mark-default'], exclude: false } },
+      ],
+      groups: [],
+    },
+    question: null, isDraft: false,
     createdAt: '2026-08-16T00:00:00.000Z',
   },
   {
@@ -2913,6 +2921,17 @@ export const SCENARIO_ACTIONS = [
   },
 ]
 
+/** `hz9ti` を開き直したときに読み返すV6下書き。 */
+export const SCENARIO_DRAFT = {
+  scenarioId: 'scenario-0', lineAccountId: 'visual-qa-account', version: 3,
+  afterActions: [
+    { id: 'scenario-action-1', hook: 'step_sent', stepId: 'step-0', choiceKey: null, type: 'add_tag', params: { tagIds: ['tag-first-guide-complete'] }, condition: null, onFailure: 'stop', sortOrder: 0 },
+    { id: 'scenario-action-2', hook: 'step_sent', stepId: 'step-0', choiceKey: null, type: 'set_support_mark', params: { markId: 'mark-in-progress' }, condition: { operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-first-guide-complete' }], groups: [] }, onFailure: 'stop', sortOrder: 10 },
+    { id: 'scenario-action-3', hook: 'step_sent', stepId: 'step-0', choiceKey: null, type: 'start_scenario', params: { scenarioId: 'scenario-1' }, condition: { operator: 'AND', rules: [{ type: 'registered_at', value: { from: '2026-08-01', to: '' } }], groups: [] }, onFailure: 'stop', sortOrder: 20 },
+  ],
+  updatedBy: 'staff-visual-qa', updatedAt: '2026-09-07T00:10:00.000Z',
+}
+
 /**
  * シナリオの到達率。設計 `bV5Vs` の通ごとの数。
  *
@@ -2938,7 +2957,7 @@ export const SCENARIO_SIMULATION = {
   audience: { accountTotal: 428, matched: 124, alreadySubscribed: 8, newStartPlanned: 116, excluded: 304 },
   steps: [428, 410, 382, 351].map((targetCount, index) => ({
     id: `step-${index}`, stepOrder: index + 1,
-    scheduledAt: `2026-09-${7 + index}T11:00:00.000Z`, targetCount,
+    scheduledAt: `2026-09-${String(7 + index).padStart(2, '0')}T11:00:00.000Z`, targetCount,
     excludedCount: [0, 18, 46, 77][index],
   })),
 }
