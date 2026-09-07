@@ -306,9 +306,11 @@ adminAuth.post('/api/auth/step-up', async (c) => {
   const body = await c.req.json<{ code?: string; purpose?: string }>()
     .catch(() => ({} as { code?: string; purpose?: string }));
   const code = body.code?.trim() ?? '';
-  if ((body.purpose !== 'operations.control' && body.purpose !== 'affiliate.payout.export') || !/^\d{6}$/.test(code)) {
+  if (!['operations.control', 'affiliate.payout.export', 'photo.original.download'].includes(body.purpose ?? '')
+      || !/^\d{6}$/.test(code)) {
     return c.json({ success: false, error: '6桁の認証コードを入力してください' }, 400);
   }
+  const purpose = body.purpose!;
   const staff = await getStaffById(c.env.DB, staffContext.id);
   const masterKey = c.env.TOTP_ENCRYPTION_KEY;
   if (!staff?.is_active || !staff.totp_enabled_at || !staff.totp_secret_enc || !masterKey) {
@@ -331,10 +333,10 @@ adminAuth.post('/api/auth/step-up', async (c) => {
   await createStepUpGrant(c.env.DB, {
     tokenHash: await sha256Hex(token),
     staffId: staff.id,
-    purpose: body.purpose,
+    purpose,
     expiresAt,
   });
-  return c.json({ success: true, data: { token, purpose: body.purpose, expiresAt } }, 201);
+  return c.json({ success: true, data: { token, purpose, expiresAt } }, 201);
 });
 
 /**
