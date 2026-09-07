@@ -63,7 +63,7 @@ export default function NewStaffPage() {
     validate={() => !name.trim() ? '名前を入力してください' : !email.trim() ? 'メールアドレスを入力してください' : !assignedLineAccountId ? '最初に表示するLINEアカウントを選択してください' : role === 'staff' && permissionKeys.length === 0 ? 'スタッフに表示する機能を1つ以上選択してください' : null}
     onSave={async () => { if (!selectedAccountId) throw new Error('店舗を選択してください'); const res = await api.staff.create({ name: name.trim(), email: email.trim(), role, permissionKeys, notificationPreferences: notifications, assignedLineAccountId, canAccessDescendantAccounts: true, accountScope: 'accounts', scopedLineAccountIds: [selectedAccountId] }); if (!res.success) throw new Error(res.error); return res.data.id }}
     aside={<>
-      <AsideCard title="追加後の流れ"><ol className="space-y-3 text-sm text-ink-secondary"><li><b className="text-accent">1.</b> 招待メールでアドレスを確認</li><li><b className="text-accent">2.</b> 続けて届くメールからLINE認証</li><li><b className="text-accent">3.</b> 連携完了後はLINEでログイン</li></ol></AsideCard>
+      <AsideCard title="追加後の流れ"><ol className="space-y-3 text-sm text-ink-secondary"><li><b className="text-accent">1.</b> 招待メールでアドレスを確認</li><li><b className="text-accent">2.</b> 続けて届くメールからLINE認証</li><li><b className="text-accent">3.</b> 連携完了後はLINE認証でログイン</li></ol></AsideCard>
       <AsideCard title="設定内容"><dl className="space-y-2 text-sm"><div className="flex justify-between"><dt className="text-ink-faint">役割</dt><dd className="text-ink">{ROLES.find((item) => item.value === role)?.label}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">表示機能</dt><dd className="text-ink">{role === 'staff' ? `${permissionKeys.length}件` : 'すべて'}</dd></div></dl></AsideCard>
     </>}
   >
