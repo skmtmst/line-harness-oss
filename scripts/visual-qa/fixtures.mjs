@@ -1656,7 +1656,8 @@ export const RICH_MENU_DELETE_IMPACT = {
     name: '来店後フォローメニュー',
     status: 'published',
   },
-  currentAudience: { value: null, reason: 'assignment_ledger_unavailable' },
+  // #430/#1206: 削除影響でも一覧と同じ固定の割当人数を返す。
+  currentAudience: { value: 8140, state: 'available', reason: null },
   nextDisplay: {
     guaranteedGroupId: null,
     reason: 'friend_specific_rules',
@@ -3160,7 +3161,7 @@ export const FRIEND_FIELDS = [
  */
 export const FRIEND_ATTRIBUTE_FIELDS = [
   {
-    id: 'field-dog-name', folderId: null, name: '愛犬のお名前', fieldKey: 'dog_name',
+    id: 'field-dog-name', folderId: 'friend-field-folder-pets', name: '愛犬のお名前', fieldKey: 'dog_name',
     type: 'text', options: null, defaultValue: null, source: 'form',
     ecFieldPath: null, ecIsMaster: false, isPersonal: false, isStarred: false,
     displayOrder: 1, usageCount: 187, formUsageCount: 3,

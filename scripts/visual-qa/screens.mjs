@@ -1518,12 +1518,12 @@ export const SCREENS = [
   { ...RICH_MENU, node: 'GO8RQ', name: '12-1 リッチメニュー',
     mode: 'viewport', height: 1080,
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #430 で再判定。** `/api/rich-menu-groups` の固定応答から今月のタップ3,210回・のべ8,140人を表示し、フォルダ、作成・並べ替え・検索、保存検索、優先順位、一覧6列と操作を設計どおり確認した。1440・1920の実装画像で横スクロールはなく、集計値を未取得扱いしていない。',
+    verdictNote: '**2026-09-07 Issue #430 / #1194 の固定応答で再判定。** `/api/rich-menu-groups` から今月のタップ3,210回・のべ8,140人を表示し、フォルダ、作成・並べ替え・検索、保存検索、優先順位、一覧6列と操作を設計どおり確認した。1440・1920の実装画像で横スクロールはなく、集計値を未取得扱いしていない。',
     verdictHead: '49484d5ab', },
   { ...RICH_MENU, node: 'XtfO3', name: '12-1-A メニューを作る・形とボタン',
     mode: 'viewport', height: 1200,
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #430 で再判定。** `/api/rich-menu-groups/rmg-1` と画像取得口の固定応答から保存済み名称・フォルダ・画像・面A〜Fを読み、14字制限、7レイアウト、切替タブ、LINEプレビュー、入力例を確認した。1440・1920とも横スクロールはなく、下書き編集を実データで表示している。',
+    verdictNote: '**2026-09-07 Issue #430 / #1194 の固定応答で再判定。** `/api/rich-menu-groups/rmg-1` と画像取得口から保存済み名称・フォルダ・画像・面A〜Fを読み、14字制限、7レイアウト、切替タブ、LINEプレビュー、入力例を確認した。1440・1920とも横スクロールはなく、下書き編集を実データで表示している。',
     verdictHead: '49484d5ab', route: '/rich-menus/edit?id=rmg-1', },
   { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか',
     verdict: 'structure_match_data_pending',
@@ -1556,7 +1556,7 @@ export const SCREENS = [
   },
   { ...RICH_MENU, node: 'UMiJ9', name: '12-1-D メニューを作る・公開のしかた',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #430 で再判定。** グループ詳細の画像キー、公開日時・期間・終了後の戻し先、対象要約を読み、STEP 3とLINEプレビューを確認した。面Fが未設定の固定データは画面の警告として明示し、存在しない画像を補っていない。1440・1920とも横スクロールはない。', verdictHead: '49484d5ab', route: '/rich-menus/edit?id=rmg-1&step=publish', mode: 'viewport', height: 1080,
+    verdictNote: '**2026-09-07 Issue #430 / #1194 の固定応答で再判定。** グループ詳細の画像キー、公開日時・期間・終了後の戻し先、対象要約を読み、STEP 3とLINEプレビューを確認した。面Fが未設定の固定データは画面の警告として明示し、存在しない画像を補っていない。1440・1920とも横スクロールはない。', verdictHead: '49484d5ab', route: '/rich-menus/edit?id=rmg-1&step=publish', mode: 'viewport', height: 1080,
     steps: [
       { click: '期間を決める', role: 'radio' },
       { fill: '出しはじめ', text: '2026-08-25T10:00' },
@@ -1566,7 +1566,7 @@ export const SCREENS = [
     mode: 'viewport', height: 1080,
     steps: [{ qaOpen: 'TL7tp' }],
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #430 で再判定。** 管理外メニューの固定応答からA〜FのURL・メッセージ・postbackと現在の面を読み、6面プレビュー、取り込み後の操作、表示を変えない説明、削除注意を確認した。対象8,140人も表示され、1440・1920とも横スクロールはない。',
+    verdictNote: '**2026-09-07 Issue #430 / #1194 の固定応答で再判定。** 管理外メニューのA〜FのURL・メッセージ・postbackと現在の面を読み、6面プレビュー、取り込み後の操作、表示を変えない説明、削除注意を確認した。対象8,140人も表示され、1440・1920とも横スクロールはない。',
     verdictHead: '49484d5ab', },
   {
     /*
@@ -1575,11 +1575,11 @@ export const SCREENS = [
       両方を撮る。取り込みの標準 `confirm` は削除ではないので、この行では見ない。
     */
     ...RICH_MENU, node: 'szXsT', name: '12-1-F リッチメニューの削除確認',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 #253 で再照合。** 構造一致・割当人数は未接続。設計画像と実装画像を同じ比較入力で見比べ、公開中メニューの影響確認、次に出る候補、切替元、配信などの参照を確認した。現在の表示人数を確定する割当台帳が無いため、設計の8,140人を作らず `—（未取得）` と表示する。公開中は安全のため「LINEから取り下げる」を先に行い、取り下げ完了後だけ管理画面から削除できる。1440・1920とも横スクロール0。取得元 `rich-menus-v6/szXsT.txt` と同Node画像。',
-    verdictHead: '89166aa03',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #430 / #1194 の固定応答で再判定。** 削除影響APIから公開中メニューの影響、現在の割当8,140人、次に出る候補、切替元、配信・自動処理の参照を表示し、公開中は取り下げ後に削除する安全導線を確認した。1440・1920とも横スクロールはない。',
+    verdictHead: '49484d5ab',
     route: '/rich-menus', mode: 'viewport', height: 1080,
-    steps: [{ qaOpen: 'szXsT' }],
+    steps: [{ click: '削除', nth: 0 }],
   },
   {
     ...RICH_MENU, node: 'RW5Tb', name: '12-1-G 一覧の状態（空・読込・エラー）',
@@ -2809,7 +2809,7 @@ export const SCREENS = [
     node: 'LfrQs', feature: 4, name: '4-1-C 連動アクション追加ドロワー',
     dir: 'friend-attributes-v6', route: '/tags/new?copy=tag-0&reference=1', mode: 'viewport', height: 1320,
     steps: [{ fill: 'タグ名', text: 'NEN会員（定期）' }, { click: 'タグ連動', role: 'switch', onlyIfOff: true }, { click: '＋ アクションを追加' }],
-    verdict: 'match', verdictNote: '**2026-09-07 Issue #430 で再判定。** 固定応答から「NEN会員（定期）」のテキスト送信・タグ追加・シナリオ開始、即時/24時間後、本人+10・紹介者+5・1.5倍を読み、追加ドロワーと要約を確認した。1440/1920とも横スクロールはない。',
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #430 / #1194 の固定応答で再判定。** 「NEN会員（定期）」のテキスト送信・タグ追加・シナリオ開始、即時/24時間後、本人+10・紹介者+5・1.5倍を読み、追加ドロワーと要約を確認した。1440/1920とも横スクロールはない。',
     verdictSource: 'friend-attributes-v6/LfrQs.txt', verdictHead: '49484d5ab',
   },
   {
@@ -2841,7 +2841,7 @@ export const SCREENS = [
       { fill: 'input[placeholder="例：愛犬のお名前"]', selector: true, text: '愛犬のお名前' },
       { fill: 'input[placeholder="pet_name"]', selector: true, text: 'pet_name' },
     ],
-    verdict: 'match', verdictNote: '**2026-09-07 Issue #430 で再判定。** 「ペットプロフィール」フォルダと、1行・複数行・数値・日付・日時・選択・真偽・URL・電話・メール・画像・PDFの13種類、例示プレースホルダーをフォームで確認した。1440/1920とも横スクロールはない。',
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #430 / #1194 の固定応答で再判定。** 「ペットプロフィール」フォルダと、1行・複数行・数値・日付・日時・選択・真偽・URL・電話・メール・画像・PDFの13種類、例示プレースホルダーをフォームで確認した。1440/1920とも横スクロールはない。',
     verdictSource: 'friend-attributes-v6/A1ZYeP-1920.png', verdictHead: '49484d5ab',
   },
   {
@@ -2851,7 +2851,7 @@ export const SCREENS = [
       （`field-list.tsx:143`）。使っていない項目は消せるので出ない。
     */
     node: 'KoT6c', feature: 4, name: '4-2-B 友だち情報欄・項目移行',
-    verdict: 'match', verdictNote: '**2026-09-07 Issue #430 で再判定。** 移行元/移行先、13種類、差し込み名、事前確認の注意書きを確認した。固定応答のプレビューは値あり141人・そのまま137人・要確認3人・空欄1人で、設計の確認導線と一致する。1440/1920とも横スクロールはない。', verdictSource: 'friend-attributes-v6/KoT6c.txt', verdictHead: '49484d5ab',
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #430 / #1194 の固定応答で再判定。** 移行元/移行先、13種類、差し込み名、事前確認の注意書きを確認した。固定応答のプレビューは値あり141人・そのまま137人・要確認3人・空欄1人で、設計の確認導線と一致する。1440/1920とも横スクロールはない。', verdictSource: 'friend-attributes-v6/KoT6c.txt', verdictHead: '49484d5ab',
     dir: 'friend-attributes-v6', route: '/tags/fields/migrate?id=field-birthday', mode: 'page',
     steps: [{ click: '事前確認する' }],
   },
