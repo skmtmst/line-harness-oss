@@ -43,6 +43,8 @@ type Row = {
   access_level: 'full' | 'read_only';
   is_active: number;
   line_user_id: string | null;
+  email?: string | null;
+  permission_keys?: string | null;
   tenant_id?: string | null;
   assigned_line_account_id?: string | null;
   can_access_descendant_accounts?: number;
@@ -51,7 +53,8 @@ type Row = {
 
 function row(over: Partial<Row> & { id: string }): Row {
   return {
-    name: over.id, role: 'admin', access_level: 'full', is_active: 1, line_user_id: null,
+    name: over.id, email: `${over.id}@example.test`, role: 'admin', access_level: 'full',
+    is_active: 1, line_user_id: null, permission_keys: '[]',
     ...over,
   };
 }
@@ -486,5 +489,62 @@ describe('ログイン履歴件数', () => {
       env.DB,
       { adminUserId: 'staff-a', action: 'login' },
     );
+  });
+});
+
+describe('個人情報と二段階認証の本人境界', () => {
+  it.each([
+    ['setup', undefined],
+    ['confirm', { code: '123456' }],
+  ])('ownerでも他人の二段階認証%sは実行できない', async (action, body) => {
+    dbMocks.getStaffById.mockResolvedValue(row({ id: 'staff-a', role: 'staff' }));
+
+    const response = await send(`/api/staff/staff-a/two-factor/${action}`, 'POST', body);
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).not.toHaveProperty('data.manualKey');
+    expect(dbMocks.updateStaffMember).not.toHaveBeenCalled();
+  });
+
+  it('本人の二段階認証setupは本人検査を通過する', async () => {
+    const self = row({ id: 'staff-self', role: 'staff', tenant_id: 'tenant-a' });
+    dbMocks.getStaffByApiKey.mockResolvedValue(self);
+    dbMocks.getStaffById.mockResolvedValue(self);
+
+    const response = await send(
+      '/api/staff/staff-self/two-factor/setup', 'POST', undefined, 'staff-self-key',
+    );
+
+    expect(response.status).toBe(503);
+    expect((await response.json() as { error: string }).error).toContain('暗号鍵');
+  });
+
+  it('一般スタッフは他人の個別情報を取得できない', async () => {
+    const current = row({ id: 'staff-current', role: 'staff', tenant_id: 'tenant-a' });
+    dbMocks.getStaffByApiKey.mockResolvedValue(current);
+    dbMocks.getStaffById.mockResolvedValue(row({
+      id: 'staff-other', role: 'staff', tenant_id: 'tenant-a', email: 'other@example.test',
+    }));
+
+    const response = await send('/api/staff/staff-other', 'GET', undefined, 'staff-current-key');
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).not.toHaveProperty('data.email');
+  });
+
+  it('旧一覧でも一般スタッフには他人のメールを伏せる', async () => {
+    const current = row({ id: 'staff-current', role: 'staff', tenant_id: 'tenant-a' });
+    dbMocks.getStaffByApiKey.mockResolvedValue(current);
+    dbMocks.getStaffMembers.mockResolvedValue([
+      current,
+      row({ id: 'staff-other', role: 'staff', tenant_id: 'tenant-a', email: 'other@example.test' }),
+    ]);
+
+    const response = await send('/api/staff', 'GET', undefined, 'staff-current-key');
+    const body = await response.json() as { data: Array<{ id: string; email: string }> };
+
+    expect(response.status).toBe(200);
+    expect(body.data.find((item) => item.id === 'staff-current')?.email).toBe('staff-current@example.test');
+    expect(body.data.find((item) => item.id === 'staff-other')?.email).toBe('o***@example.test');
   });
 });

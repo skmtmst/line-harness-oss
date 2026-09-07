@@ -1703,13 +1703,27 @@ export class ApiError extends Error {
 /**
  * Statuses whose response body is safe to show the operator verbatim.
  *
- * 400 is the Worker rejecting input it validated itself — the message names
- * what to fix and contains nothing the operator should not see. Everything
- * else (upstream LINE API failures, unhandled exceptions, proxy pages) can
- * carry internal detail, so those keep the generic status message no matter
- * what the body says.
+ * These are application-level validation or conflict responses whose message
+ * tells the operator how to recover. A separate content guard below keeps
+ * database, stack, HTML and other internal detail out of the screen.
  */
-const BODY_MESSAGE_STATUSES = new Set([400])
+const BODY_MESSAGE_STATUSES = new Set([400, 409, 422, 428])
+
+const INTERNAL_ERROR_MARKERS = [
+  /D1_ERROR/i,
+  /\b(?:SELECT|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER)\b.+\b(?:FROM|INTO|TABLE|SET)\b/is,
+  /(?:stack trace|node_modules|\.tsx?:\d+|\.mjs:\d+)/i,
+  /<\/?(?:html|script|body)\b/i,
+  /(?:api[_ -]?key|authorization|bearer|password|secret|token)\s*[:=]/i,
+]
+
+function safeOperatorMessage(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  const message = value.trim()
+  if (!message || message.length > 240 || /^[a-z][a-z0-9_]{0,63}$/.test(message)
+    || INTERNAL_ERROR_MARKERS.some((marker) => marker.test(message))) return ''
+  return message
+}
 
 /**
  * Pull the human-readable reason out of an error response body.
@@ -1722,8 +1736,7 @@ export function extractApiErrorMessage(raw: string, status: number): string {
   if (!raw || !BODY_MESSAGE_STATUSES.has(status)) return ''
   try {
     const body = JSON.parse(raw) as { error?: unknown; message?: unknown }
-    if (typeof body.error === 'string') return body.error
-    if (typeof body.message === 'string') return body.message
+    return safeOperatorMessage(body.error) || safeOperatorMessage(body.message)
   } catch {
     // Not JSON — fall through to the status-only message.
   }
@@ -8537,11 +8550,13 @@ export const api = {
     list: (params: {
       kind: IdentityCandidateKind
       status?: IdentityCandidateStatus
+      lineAccountId?: string
       limit?: number
       offset?: number
     }) => {
       const query = new URLSearchParams({ kind: params.kind })
       if (params.status) query.set('status', params.status)
+      if (params.lineAccountId) query.set('lineAccountId', params.lineAccountId)
       if (params.limit !== undefined) query.set('limit', String(params.limit))
       if (params.offset !== undefined) query.set('offset', String(params.offset))
       return fetchApi<ApiResponse<IdentityCandidateList>>(`/api/identity-candidates?${query.toString()}`)

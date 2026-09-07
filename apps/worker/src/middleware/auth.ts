@@ -324,6 +324,8 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     path === '/webhooks/xserver/support-email' ||
     path === '/api/public/nen/adopted-photos' ||
     path === '/api/public/nen/gallery-preview' ||
+    path === '/api/site/collect' ||
+    path === '/api/site/script.js' ||
     path.startsWith('/t/') ||
     path.startsWith('/r/') ||
     path.startsWith('/pool/') ||

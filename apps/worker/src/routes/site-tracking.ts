@@ -1,28 +1,47 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import {
   recordSiteEvent,
   linkVisitorToFriend,
   getPageViewSummary,
   getFriendSiteEvents,
+  getOrCreateSiteTrackingKey,
+  getSiteTrackingAccountId,
   SITE_EVENT_TYPES,
   type SiteEventType,
   getSiteTrackingSummary,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { requireRole } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 
 /**
  * 自社サイトの行動記録。
  *
  * 埋め込んだJSから送られてくる訪問と操作を受け取る。
  *
- * 受け口（/api/site/collect）は認証しない。外のサイトのブラウザから
- * 直接叩かれるので、鍵を置いてもページのソースに出てしまう。
+ * 受け口（/api/site/collect）は認証しない。計測鍵はページのソースに出る
+ * 公開識別子であり、LINEアカウントへの帰属にだけ使う。
  * その代わりレート制限を掛け、受け取る中身を厳しく絞る。
  */
 const siteTracking = new Hono<Env>();
 
 /** cookie に入れる訪問者ID。形だけ確かめる（中身は当てにしない）。 */
 const VISITOR_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
+const TRACKING_KEY_PATTERN = /^hk_(?:[a-f0-9]{32}|9f3a2c81b4)$/;
+
+async function visibleAccountId(c: Context<Env>): Promise<string | Response> {
+  const accountId = c.req.query('accountId')?.trim();
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  if (!accountId) {
+    return scope.allowedAccountIds.length === 1
+      ? scope.allowedAccountIds[0]
+      : c.json({ success: false, error: 'accountId required' }, 400);
+  }
+  if (!scope.allowedAccountIds.includes(accountId)) {
+    return c.json({ success: false, error: '対象が見つかりません' }, 404);
+  }
+  return accountId;
+}
 
 /**
  * CORS。
@@ -56,10 +75,16 @@ siteTracking.post('/api/site/collect', async (c) => {
       label?: unknown;
       valueNum?: unknown;
       referrer?: unknown;
+      trackingKey?: unknown;
     }>();
 
     const visitorId = String(body.visitorId ?? '');
-    if (!VISITOR_ID_PATTERN.test(visitorId)) return c.body(null, 204, corsHeaders());
+    const trackingKey = String(body.trackingKey ?? '');
+    if (!VISITOR_ID_PATTERN.test(visitorId) || !TRACKING_KEY_PATTERN.test(trackingKey)) {
+      return c.body(null, 204, corsHeaders());
+    }
+    const lineAccountId = await getSiteTrackingAccountId(c.env.DB, trackingKey);
+    if (!lineAccountId) return c.body(null, 204, corsHeaders());
 
     const eventType = String(body.eventType ?? 'page_view');
     if (!(SITE_EVENT_TYPES as readonly string[]).includes(eventType)) {
@@ -68,6 +93,7 @@ siteTracking.post('/api/site/collect', async (c) => {
 
     await recordSiteEvent(c.env.DB, {
       visitorId,
+      lineAccountId,
       eventType: eventType as SiteEventType,
       // クエリ文字列の除去は recordSiteEvent の中で行う。
       // 受け口ごとに書くと、必ずどこかで忘れる。
@@ -97,6 +123,7 @@ siteTracking.get('/api/site/script.js', (c) => {
   // 差し込めない（環境ごとに違うため）。
   const script = `(function () {
   var ENDPOINT = ${JSON.stringify(`${origin}/api/site/collect`)};
+  var TRACKING_KEY = document.currentScript && document.currentScript.getAttribute('data-key');
   var COOKIE = 'lh_visitor';
   var YEAR = 365 * 24 * 60 * 60;
 
@@ -118,7 +145,9 @@ siteTracking.get('/api/site/script.js', (c) => {
     return id;
   }
   function send(payload) {
+    if (!TRACKING_KEY) return;
     payload.visitorId = visitorId();
+    payload.trackingKey = TRACKING_KEY;
     var body = JSON.stringify(payload);
     // ページを離れる瞬間でも送れるよう sendBeacon を優先する。
     if (navigator.sendBeacon) {
@@ -157,7 +186,7 @@ siteTracking.get('/api/site/script.js', (c) => {
 //
 // LIFF やフォームの中から呼ぶ。ここは認証済みの経路から呼ばれる前提だが、
 // 友だちIDを当てられても「その人の行動が紐づく」だけで、情報は返さない。
-siteTracking.post('/api/site/link', async (c) => {
+siteTracking.post('/api/site/link', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const body = await c.req.json<{ visitorId?: unknown; friendId?: unknown; via?: unknown }>();
     const visitorId = String(body.visitorId ?? '');
@@ -165,10 +194,17 @@ siteTracking.post('/api/site/link', async (c) => {
     if (!VISITOR_ID_PATTERN.test(visitorId) || !friendId) {
       return c.json({ success: false, error: 'visitorId と friendId が必要です' }, 400);
     }
+    const friend = await c.env.DB.prepare(
+      'SELECT line_account_id FROM friends WHERE id = ?',
+    ).bind(friendId).first<{ line_account_id: string | null }>();
+    if (!friend?.line_account_id
+      || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [friend.line_account_id])) {
+      return c.json({ success: false, error: '対象が見つかりません' }, 404);
+    }
     const via = ['entry_route', 'liff', 'form', 'manual'].includes(String(body.via))
       ? (String(body.via) as 'entry_route' | 'liff' | 'form' | 'manual')
       : 'manual';
-    const linked = await linkVisitorToFriend(c.env.DB, visitorId, friendId, via);
+    const linked = await linkVisitorToFriend(c.env.DB, visitorId, friend.line_account_id, friendId, via);
     // 既に別の人と結びついていたら false。上書きしないので、
     // 「結びつかなかった」ことだけ伝える。
     return c.json({ success: true, data: { linked } });
@@ -179,9 +215,23 @@ siteTracking.post('/api/site/link', async (c) => {
 });
 
 // GET /api/site/summary — 計測が動いているかと、その内訳
-siteTracking.get('/api/site/summary', async (c) => {
+siteTracking.get('/api/site/tracking-key', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const accountId = await visibleAccountId(c);
+  if (typeof accountId !== 'string') return accountId;
   try {
-    const summary = await getSiteTrackingSummary(c.env.DB);
+    const trackingKey = await getOrCreateSiteTrackingKey(c.env.DB, accountId);
+    return c.json({ success: true, data: { accountId, trackingKey } });
+  } catch (err) {
+    console.error('GET /api/site/tracking-key error:', err);
+    return c.json({ success: false, error: '計測鍵を取得できませんでした' }, 500);
+  }
+});
+
+siteTracking.get('/api/site/summary', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const accountId = await visibleAccountId(c);
+  if (typeof accountId !== 'string') return accountId;
+  try {
+    const summary = await getSiteTrackingSummary(c.env.DB, accountId);
     return c.json({ success: true, data: summary });
   } catch (err) {
     console.error('GET /api/site/summary error:', err);
@@ -190,7 +240,9 @@ siteTracking.get('/api/site/summary', async (c) => {
 });
 
 // GET /api/site/pages — ページ別の閲覧数（管理画面用）
-siteTracking.get('/api/site/pages', async (c) => {
+siteTracking.get('/api/site/pages', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const accountId = await visibleAccountId(c);
+  if (typeof accountId !== 'string') return accountId;
   try {
     const jstNow = new Date(Date.now() + 9 * 3600_000);
     const to = c.req.query('to') ?? jstNow.toISOString().slice(0, 10);
@@ -200,7 +252,9 @@ siteTracking.get('/api/site/pages', async (c) => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
       return c.json({ success: false, error: '期間は 2026-08-01 の形で指定してください' }, 400);
     }
-    const items = await getPageViewSummary(c.env.DB, { from, to: `${to}T23:59:59.999` });
+    const items = await getPageViewSummary(c.env.DB, {
+      lineAccountId: accountId, from, to: `${to}T23:59:59.999`,
+    });
     return c.json({ success: true, data: items });
   } catch (err) {
     console.error('GET /api/site/pages error:', err);
@@ -209,9 +263,17 @@ siteTracking.get('/api/site/pages', async (c) => {
 });
 
 // GET /api/friends/:id/site-events — 1人の行動履歴（友だち詳細用）
-siteTracking.get('/api/friends/:id/site-events', async (c) => {
+siteTracking.get('/api/friends/:id/site-events', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
-    const items = await getFriendSiteEvents(c.env.DB, c.req.param('id'), 100);
+    const friendId = c.req.param('id');
+    const friend = await c.env.DB.prepare(
+      'SELECT line_account_id FROM friends WHERE id = ?',
+    ).bind(friendId).first<{ line_account_id: string | null }>();
+    if (!friend?.line_account_id
+      || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [friend.line_account_id])) {
+      return c.json({ success: false, error: '対象が見つかりません' }, 404);
+    }
+    const items = await getFriendSiteEvents(c.env.DB, friendId, friend.line_account_id, 100);
     return c.json({
       success: true,
       data: items.map((e) => ({

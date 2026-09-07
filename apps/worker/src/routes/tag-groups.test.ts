@@ -17,6 +17,9 @@ const mocks = {
 };
 vi.mock('@line-crm/db', () => mocks);
 
+const accountAccessMocks = vi.hoisted(() => ({ getVisibleLineAccountScope: vi.fn() }));
+vi.mock('../services/account-access.js', () => accountAccessMocks);
+
 const { tags } = await import('./tags.js');
 const app = new Hono<Env>();
 // 更新系はオーナー／管理者限定。ここで見たいのは本体の挙動なので、
@@ -61,7 +64,16 @@ const TAG = {
   created_at: '2026-08-15',
 };
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  accountAccessMocks.getVisibleLineAccountScope.mockResolvedValue({
+    allowedAccountIds: ['account-1'],
+    ids: ['account-1'],
+    canSeeUnassigned: true,
+    isAccountScoped: false,
+    accounts: [],
+  });
+});
 
 describe('タグの親分類', () => {
   it('分類を作れる', async () => {

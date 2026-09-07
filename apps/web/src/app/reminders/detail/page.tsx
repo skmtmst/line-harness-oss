@@ -19,6 +19,7 @@ import Pagination from '@/components/shared/pagination'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { LinePreview, ReminderFooter } from '@/components/reminders/reminder-v6-ui'
 import styles from './reminder-runs.module.css'
+import { csvCell } from '@/lib/presentation'
 
 const PAGE_SIZE = 20
 
@@ -60,10 +61,6 @@ function timingLabel(offsetMinutes: number): string {
 function stepLabel(step: ReminderDeliveryRunsResponse['steps'][number]): string {
   const firstLine = step.messageContent.trim().split(/\r?\n/, 1)[0]?.trim()
   return firstLine ? firstLine.slice(0, 40) : `${step.stepNumber}通目`
-}
-
-function csvCell(value: unknown): string {
-  return `"${String(value ?? '').replaceAll('"', '""')}"`
 }
 
 function csvFor(items: ReminderDeliveryRun[]): string {

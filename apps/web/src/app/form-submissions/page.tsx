@@ -16,6 +16,7 @@ import type { FormLayout } from '@line-crm/shared'
 import { summarizeFormDestinations } from './form-destination-summary'
 import FolderPanel from '@/components/shared/folder-panel'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import './form-submissions.css'
 
 interface UsedByAccount {
   id: string

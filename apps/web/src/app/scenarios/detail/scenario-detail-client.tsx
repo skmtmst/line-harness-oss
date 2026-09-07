@@ -296,7 +296,6 @@ export default function ScenarioDetailClient({
   scenarioId: string
   showStarted?: boolean
 }) {
-  usePageTitle('シナリオ詳細')
   const id = scenarioId
 
   const [scenario, setScenario] = useState<ScenarioWithSteps | null>(null)
@@ -334,6 +333,7 @@ export default function ScenarioDetailClient({
   const [insertAfter, setInsertAfter] = useState<number | null>(null)
   const [editingStepId, setEditingStepId] = useState<string | null>(null)
   const [stepForm, setStepForm] = useState<StepFormState>(() => emptyStepForm(1))
+  usePageTitle(editingStepId ? `${stepForm.stepOrder}通目を編集` : 'シナリオ詳細')
   const [stepSaving, setStepSaving] = useState(false)
   const [stepError, setStepError] = useState('')
 
@@ -897,10 +897,10 @@ export default function ScenarioDetailClient({
   // 新規追加（上部）とステップ編集（行直下インライン）の両方で使うフォーム。
   // 同時に開くのは常に片方だけなので、state は stepForm を共有する。
   const renderStepForm = () => (
-    <div className={`${editingStepId ? 'mt-3' : 'mb-6'} border-hairline rounded-card bg-canvas-sunken border p-4`}>
-      <h4 className="text-sm font-medium text-ink-secondary mb-3">
-        {editingStepId ? 'ステップを編集' : '新しいステップを追加'}
-      </h4>
+    <div className={editingStepId ? '' : 'border-hairline rounded-card bg-canvas-sunken mb-6 border p-4'}>
+      {!editingStepId && (
+        <h4 className="text-sm font-medium text-ink-secondary mb-3">新しいステップを追加</h4>
+      )}
       {/* 左が編集、右が「いまどの通を触っているか」。任意値の桁指定ではなく
           3列の標準段で組む（2:1）。直書きの数を増やさない。 */}
       <div className="grid gap-4 lg:grid-cols-3">
@@ -1362,37 +1362,31 @@ export default function ScenarioDetailClient({
 
   return (
     <div>
-      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
-        <Link href="/scenarios" className="hover:underline">
-          シナリオ配信
-        </Link>
-        <span className="mx-1.5">/</span>
-        <span>{scenario.name}</span>
-      </nav>
+      <div className={editingStepId ? 'mb-3 flex items-center justify-between gap-4' : ''}>
+        <nav data-design="Crumb" className="text-ink-faint text-xs">
+          <Link href="/scenarios" className="hover:underline">
+            シナリオ配信
+          </Link>
+          <span className="mx-1.5">/</span>
+          <span>{scenario.name}</span>
+          {editingStepId ? <><span className="mx-1.5">/</span><span>{stepForm.stepOrder}通目を編集</span></> : null}
+        </nav>
+        {editingStepId ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={closeStepForm}>編集を閉じる</Button>
+            <Button variant="primary" onClick={() => void handleSaveStep()} disabled={stepSaving}>
+              {stepSaving ? '保存中…' : '変更を保存'}
+            </Button>
+          </div>
+        ) : null}
+      </div>
 
-      <div data-design="Head">
-        <Header
-          title={editingStepId ? `${stepForm.stepOrder}通目を編集` : 'シナリオ編集'}
-          description={
-            editingStepId
-              ? `${scenario.name}の配信タイミング・メッセージ・対象・送信後の動きをまとめて編集します。`
-              : '配信のタイミングと内容を並べます。開始するには友だち追加時の配信やアクションから呼び出します。'
-          }
-          action={
-            editingStepId ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <Button onClick={closeStepForm}>
-                  編集を閉じる
-                </Button>
-                <Button
-                  variant="primary"
-                  onClick={() => void handleSaveStep()}
-                  disabled={stepSaving}
-                >
-                  {stepSaving ? '保存中…' : '変更を保存'}
-                </Button>
-              </div>
-            ) : (
+      {!editingStepId ? (
+        <div data-design="Head">
+          <Header
+            title="シナリオ編集"
+            description="配信のタイミングと内容を並べます。開始するには友だち追加時の配信やアクションから呼び出します。"
+            action={
               /* 設計の並び：マニュアル / 一括プレビュー / 一括テスト送信 / 保存。
                  一覧へ戻る導線は設計では最下部にあり、ここには置かない
                  （下の「シナリオ一覧に戻る」がそれ）。 */
@@ -1432,13 +1426,13 @@ export default function ScenarioDetailClient({
                 {saving ? '保存中…' : '保存'}
               </button>
               </div>
-            )
-          }
-        />
-      </div>
+            }
+          />
+        </div>
+      ) : null}
 
       {editingStepId ? (
-        <section data-design-node="xfYLn" className="bg-canvas rounded-card border-hairline border p-5">
+        <section data-design-node="xfYLn">
           {renderStepForm()}
         </section>
       ) : (
