@@ -97,3 +97,14 @@ describe('V6 友だち追加時配信の運用者向け表示', () => {
     expect(EDITOR).toContain('<small>新規友だち</small>')
   })
 })
+
+describe('V6 友だち追加時配信の保存の取りこぼし防止(#501 重大)', () => {
+  it('保存が通るたびに冪等キーを回す', () => {
+    expect(EDITOR).toContain('saveIdempotencyKey.current = crypto.randomUUID()')
+  })
+
+  it('応答の版番号を手元へ反映する', () => {
+    expect(EDITOR).toContain('const savedVersion = (response.data as { version?: number }).version')
+    expect(EDITOR).toContain('setRule((current) => ({ ...current, version: savedVersion }))')
+  })
+})
