@@ -66,7 +66,7 @@ import {
   FRIEND_SAVED_VIEWS, MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
   LIST_STATS, NEN_BIRTHDAY_COUPON, NEN_CAMPAIGN_SETTINGS, NEN_COLUMN_CREATE, NEN_COLUMN_OPERATIONS, NEN_COLUMNS, NEN_JOBS, NEN_PETS,
   NEN_FLOW_METRICS, NEN_COLUMN_METRICS, NEN_PET_METRICS, NEN_DELIVERIES, NEN_DELIVERY_DETAILS,
-  OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_ACTIONS, SCENARIO_DRAFT, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, SCENARIO_SIMULATION, SCENARIO_RUNS, USERS_GROUPED,
+  OPERATORS, REMINDERS, REMINDER_DRAFT, REMINDER_FOLDERS, SCENARIO_ACTIONS, SCENARIO_DRAFT, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, SCENARIO_SIMULATION, SCENARIO_RUNS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   RICH_MENU_GROUPS, RICH_MENU_GROUP_DETAILS, RICH_MENU_EXTERNAL, RICH_MENU_TAP_STATS,
   TAGS, TAG_GROUPS, TAG_DEFINITION_NEN_SUBSCRIPTION, TAG_DEPENDENCIES_NEN_SUBSCRIPTION,
@@ -81,12 +81,12 @@ import {
   AFFILIATE_SETTLEMENT_PREVIEW, AFFILIATE_SETTLEMENT_CREATED, AFFILIATE_PAYOUT_BATCH, AFFILIATE_STATEMENT,
   MILEAGE_EARNING_RULES, MILEAGE_FRIENDS, MILEAGE_HISTORY, MILEAGE_OVERVIEW,
   COMMON_ACTIONS, COMMON_ACTION_DETAIL, AUTOMATIONS, AUTOMATION_RUNS, AUTOMATION_TEMPLATES,
-  BOOKING_MENUS, BOOKING_SETTINGS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_RESOURCES,
+  BOOKING_MENUS, BOOKING_SETTINGS, BOOKING_STAFF, BOOKING_STAFF_MENUS, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_RESOURCES,
   BOOKING_AVAILABILITY_RULES, BOOKING_STAFF_SHIFTS, BOOKING_GOOGLE_CALENDAR,
   BOOKING_PROXY_CREATE, BOOKING_REQUESTS,
   BOOKING_ADMIN_DETAIL, BOOKING_CUSTOMER_CONTEXT, BOOKING_REMINDER_PREVIEW, BOOKING_CONFLICT_ALTERNATIVES,
   EC_NOTIFICATION_SETTINGS, EC_NOTIFICATION_RUNS, LINE_NOTIFICATION_DEFINITIONS, LINE_NOTIFICATION_METRICS, LINE_NOTIFICATION_DELIVERIES,
-  OPERATOR_NOTIFICATION_RECIPIENTS, OPERATOR_NOTIFICATION_RULES, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, NEN_PHOTO_DETAIL,
+  OPERATOR_NOTIFICATION_RECIPIENTS, OPERATOR_NOTIFICATION_RULES, ADMIN_EVENTS, EVENT_DETAIL, EVENT_SLOTS, EVENT_WAITLIST, EVENT_BOOKINGS, NEN_PHOTOS, NEN_PHOTO_DETAIL,
   NEN_PHOTO_REVIEW_METRICS, NEN_PHOTO_ASSET_STATUS, NEN_PHOTO_DERIVATIVES,
   NEN_PHOTO_ASSET_PROCESS_RESULT, NEN_PHOTO_BULK_DECISION_RESULT,
   NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, EC_ORDERS, EC_ACTION_EXECUTIONS, EC_IDENTITY_CANDIDATES, MILEAGE_RULES,
@@ -1094,6 +1094,12 @@ const RAW = {
  */
 const RAW_PATTERNS = [
   [/^\/api\/booking\/admin\/bookings\/[^/]+$/, BOOKING_ADMIN_DETAIL],
+  [/^\/api\/booking\/admin\/staff\/[^/]+\/menus$/, (url) => ({
+    matrix: BOOKING_STAFF_MENUS[url.pathname.split('/')[5]] ?? [],
+  })],
+  [/^\/api\/events\/admin\/events\/[^/]+$/, EVENT_DETAIL],
+  [/^\/api\/events\/admin\/events\/[^/]+\/slots$/, { items: EVENT_SLOTS }],
+  [/^\/api\/events\/admin\/events\/[^/]+\/waitlist$/, { waitlist: EVENT_WAITLIST }],
   [/^\/api\/events\/admin\/events\/[^/]+\/bookings$/, (url) => ({
     items: url.searchParams.get('status')
       ? EVENT_BOOKINGS.filter((booking) => booking.status === url.searchParams.get('status'))
@@ -1187,6 +1193,42 @@ function nenMetricsBody(data, query) {
 function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/auth/session') {
     return { success: true, data: STAFF, csrfToken: 'visual-qa-csrf' }
+  }
+  if (pathname === '/api/inbox/unanswered') {
+    return {
+      success: true,
+      data: {
+        total: 2,
+        page: 1,
+        pageSize: 2000,
+        rows: [
+          {
+            friendId: 'friend-inbox-1',
+            displayName: '佐藤 美咲',
+            pictureUrl: null,
+            accountId: 'visual-qa-account',
+            accountName: '画面確認アカウント',
+            lastIncomingAt: '2026-09-07T04:30:00.000Z',
+            lastManualAt: null,
+            lastMachineAt: '2026-09-07T04:31:00.000Z',
+            lastIncomingType: 'text',
+            lastIncomingContent: '予約について確認したいです',
+          },
+          {
+            friendId: 'friend-inbox-2',
+            displayName: '鈴木 健太',
+            pictureUrl: null,
+            accountId: 'visual-qa-account',
+            accountName: '画面確認アカウント',
+            lastIncomingAt: '2026-09-07T03:15:00.000Z',
+            lastManualAt: null,
+            lastMachineAt: null,
+            lastIncomingType: 'text',
+            lastIncomingContent: '商品の発送日はいつですか？',
+          },
+        ],
+      },
+    }
   }
   if (pathname === '/api/affiliate-settlements/preview') {
     return { success: true, data: AFFILIATE_SETTLEMENT_PREVIEW }
@@ -1640,6 +1682,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return found ? { success: true, data: found } : { success: false, error: 'Not found' }
   }
   if (pathname === '/api/reminders') return { success: true, data: REMINDERS }
+  if (/^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) {
+    return { success: true, data: REMINDER_DRAFT }
+  }
   const reminderOne = /^\/api\/reminders\/([^/]+)$/.exec(pathname)
   if (reminderOne) {
     const found = REMINDERS.find((item) => item.id === reminderOne[1])

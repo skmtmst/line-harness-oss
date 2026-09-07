@@ -4,10 +4,10 @@ import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
-import Header from '@/components/layout/header'
 import { Field, inputClass } from '@/components/shared/create-page'
 import InlineActionList, { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import {
   readInlineActions,
   toActionPayload,
@@ -70,6 +70,7 @@ function CarouselEditorInner() {
   const params = useSearchParams()
   const id = params.get('id')
   const visual = params.get('visual') === '1'
+  usePageTitle(id ? 'カルーセルの編集' : 'カルーセルを作る')
 
   const [name, setName] = useState(visual ? '夏の定番5点' : '')
   const [panels, setPanels] = useState<Panel[]>(visual ? visualPanels() : [emptyPanel()])
@@ -268,22 +269,6 @@ function CarouselEditorInner() {
         <span className="mx-1.5">/</span>
         <span>{name || 'カルーセル'}</span>
       </nav>
-
-      <div data-design="Head">
-        <Header
-          title={id ? 'カルーセルの編集' : 'カルーセルを作る'}
-          description="画像とボタンの付いたパネルを横に並べて送ります。ボタンを押したときの動きは、アクションから選べます。"
-          action={
-            <button
-              disabled
-              title="テスト送信は準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-            >
-              テスト送信
-            </button>
-          }
-        />
-      </div>
 
       {loading ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">

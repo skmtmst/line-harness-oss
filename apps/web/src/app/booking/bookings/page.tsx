@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import Header from '@/components/layout/header'
 import { bookingApi, type BookingAdminDetail, type BookingMenu, type BookingRequest } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import BookingCalendar from './booking-calendar'
 
 /**
@@ -106,6 +106,7 @@ function monthKey(offset: number): string {
 }
 
 export default function BookingsPage() {
+  usePageTitle('予約管理')
   const { selectedAccountId, selectedAccount } = useAccount()
   const [view, setView] = useState<'day' | 'week' | 'month' | 'list'>('day')
   const [tab, setTab] = useState<string>('requested')
@@ -299,26 +300,18 @@ export default function BookingsPage() {
 
   const pageHead = (
     <>
-      <div data-design="Head">
-        <Header
-          title="予約管理"
-          description="トリミングなどの予約を管理します。友だちが自分で予約履歴を確認できるURLも発行できます。"
-        />
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <Button href="/support">マニュアル</Button>
-          <Link
-            href="/booking/staff/shifts"
-            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-2 text-sm"
-          >
-            受付時間を設定
-          </Link>
-          <Link
-            href="/booking/bookings/new"
-            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium"
-          >
-            電話の予約を入れる
-          </Link>
-        </div>
+      <div data-design="Toolbar" className="mb-2 flex flex-wrap items-center justify-between gap-3">
+        <nav className="text-ink-faint text-xs" aria-label="パンくず">
+          <span>予約</span>
+          <span className="mx-1.5">/</span>
+          <span>予約管理</span>
+        </nav>
+        <Link
+          href="/booking/bookings/new"
+          className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium"
+        >
+          電話の予約を入れる
+        </Link>
       </div>
       <nav aria-label="予約の表示" className="border-hairline mb-4 flex items-center gap-7 border-b">
         {([

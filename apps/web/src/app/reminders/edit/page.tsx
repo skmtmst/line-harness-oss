@@ -10,7 +10,6 @@ import { useSearchParams } from 'next/navigation'
 import type { Reminder, ReminderStep, Tag } from '@line-crm/shared'
 import { describeReminderTiming } from '@line-crm/shared'
 import { api } from '@/lib/api'
-import Header from '@/components/layout/header'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 import ReminderStepEditorV6 from '@/components/reminders/reminder-step-editor-v6'
@@ -230,11 +229,6 @@ function LegacyReminderEditInner() {
         <span className="mx-1.5">/</span>
         <span>{name || '編集'}</span>
       </nav>
-
-      <Header
-        title="リマインダを編集"
-        description="名前・送る相手・通の中身を変えられます。送るタイミングの決め方は、作ったときのまま変わりません。"
-      />
 
       {error && (
         <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-3 text-sm">
