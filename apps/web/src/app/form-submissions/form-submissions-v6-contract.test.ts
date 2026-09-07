@@ -135,3 +135,26 @@ describe('V6回答フォームの未実装3画面', () => {
     expect(RESPONSES_PAGE).toContain('回答後アクションの結果は未取得')
   })
 })
+
+describe('V6回答フォームの重大修正(#503 R1・R2)', () => {
+  it('デザイン設定を閉じたら編集中のフォームへ戻る', () => {
+    expect(DESIGN_SETTINGS).toContain('formId: string')
+    expect(DESIGN_SETTINGS).toContain('encodeURIComponent(formId)')
+    expect(DESIGN_SETTINGS).not.toContain('id=form-1')
+    expect(EDIT_PAGE).toContain('formId={id}')
+  })
+
+  it('複製で回答キーを一意にし、保存前に重複を止める', () => {
+    expect(EDIT_PAGE).toContain('function uniqueCopyName')
+    expect(EDIT_PAGE).toContain('uniqueCopyName(source.name, taken)')
+    expect(EDIT_PAGE).toContain('回答キーが重なっています')
+    expect(EDIT_PAGE).not.toContain('`${source.name}_copy`')
+    expect(EDIT_PAGE).not.toContain('`${b.name}_copy`')
+  })
+
+  it('選択肢IDは他とそろえた作り方に統一する', () => {
+    const BLOCK_EDITOR = readFileSync(join(HERE, '..', '..', 'components', 'forms', 'block-editor.tsx'), 'utf8')
+    expect(BLOCK_EDITOR).toContain("newBlockId('c')")
+    expect(BLOCK_EDITOR).not.toContain('Math.random')
+  })
+})
