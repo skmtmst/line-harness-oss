@@ -4465,6 +4465,55 @@ for (const screen of SCREENS) {
     screen.verdictHead = 'codex/kenta-r2-s2-b420'
   }
 }
+
+/**
+ * board #436。#1199 の機能5 APIと #1204 の固定応答を含む development
+ * ff97d4b46 を3104/8791で起動し、残っていた7 Nodeを再判定した。
+ * #420 の古い保留判定より後ろで適用し、台帳へ最新結果を反映する。
+ */
+const ISSUE_436_REVIEW = {
+  r6Gzsu: {
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #436で実API接続後に再判定。** 1通目の固定データからタグ「初回案内」と対応マーク「未対応」のAND条件を読み、現在条件2件、15軸、条件追加、解除、保存を表示した。1440/1920pxとも横はみ出し0。',
+    verdictSource: 'scenarios-v6/r6Gzsu.txt + scenarios-v6/r6Gzsu-{1440,1920}.png',
+  },
+  hz9ti: {
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #436で実API接続後に再判定。** 送信後アクションの取得とV6下書きの読み返しを並列で行い、下書き版3、選択できる全動作、設定済み3動作の順序・条件・再実行設定を表示した。1440/1920pxとも横はみ出し0。',
+    verdictSource: 'scenarios-v6/hz9ti.txt + scenarios-v6/hz9ti-{1440,1920}.png',
+  },
+  EvVO5: {
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #436で実API接続後に再判定。** 副作用のない試算APIをPOSTで読み、条件一致124人、購読中8人、新規開始予定116人、除外304人を表示した。開始条件6種のうち接続済み4種と、未接続の手動・Webhookの理由も区別した。1440/1920pxとも横はみ出し0。',
+    verdictSource: 'scenarios-v6/EvVO5.txt + scenarios-v6/EvVO5-{1440,1920}.png',
+  },
+  RUxNf: {
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #436で実API接続後に再判定。** 開始確認で試算と開始記録を並列取得し、新規開始予定116人、最新テスト送信4通、送信枠残り3,158通を表示した。戻せない影響と開始操作を設計順に確認し、1440/1920pxとも横はみ出し0。',
+    verdictSource: 'scenarios-v6/RUxNf.txt + scenarios-v6/RUxNf-{1440,1920}.png',
+  },
+  NrBkW: {
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #436で実API接続後に再判定。** 開始後の案内へ試算の新規開始予定116人を表示し、開始記録から配信中116人、完了312人、開始時刻、4通の到達数を読み返した。開始履歴への次の行動も確認し、1440/1920pxとも横はみ出し0。',
+    verdictSource: 'scenarios-v6/NrBkW.txt + scenarios-v6/NrBkW-{1440,1920}.png',
+  },
+  g2UNV: {
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #436で実API接続後に再判定。** 選んだ友だちへの全4通、配信日時、メッセージ種別、LINEへ実送信する注意、前回のテスト送信4通を開始記録APIから表示した。本番の購読と配信予定を変えないことも明示し、1440/1920pxとも横はみ出し0。',
+    verdictSource: 'scenarios-v6/g2UNV.txt + scenarios-v6/g2UNV-{1440,1920}.png',
+  },
+  M2b2B: {
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #436で実API接続後に再判定。** 開始428人、完了312人、参加中134人と4通の到達・クリック・失敗内訳を開始記録APIから表示した。LINEが提供しない個別開封率は「—」と未取得理由を残した。通常・読込中・取得失敗を1440/1920pxで撮影し、全画像で横はみ出し0。',
+    verdictSource: 'scenarios-v6/M2b2B.txt + scenarios-v6/M2b2B-{normal,loading,error}.txt + scenarios-v6/M2b2B-{normal,loading,error}-{1440,1920}.png',
+  },
+}
+for (const screen of SCREENS) {
+  if (screen.feature === 5 && ISSUE_436_REVIEW[screen.node]) {
+    Object.assign(screen, ISSUE_436_REVIEW[screen.node])
+    delete screen.verdictHead
+  }
+}
 for (const screen of SCREENS) {
   if (ISSUE_211_SCREENS.has(screen.node)) {
     screen.verdictNote = screen.verdictNote.replace('Issue #211 ', 'Issue #211 / PR #962 ')
