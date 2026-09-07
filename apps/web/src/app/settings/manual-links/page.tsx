@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { api, type ManualLink } from '@/lib/api'
+import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SelectField from '@/components/shared/select-field'
@@ -146,9 +147,9 @@ export default function ManualLinksPage() {
           onChange={(event) => setFilter(event.target.value as StatusFilter)}
           options={STATUS_FILTERS.map((f) => ({ value: f.value, label: `状態：${f.label}` }))}
         />
-        <button type="button" className={styles.action} disabled={checking} onClick={() => void checkAll()}>
+        <Button disabled={checking} onClick={() => void checkAll()}>
           {checking ? '確かめています…' : 'いま全部を確かめる'}
-        </button>
+        </Button>
       </ListToolbar>
 
       <div data-manual-table-title>
@@ -164,14 +165,22 @@ export default function ManualLinksPage() {
         />
       ) : (
         <DataTable>
+          <colgroup>
+            <col style={{ width: '9%' }} />
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '34%' }} />
+            <col style={{ width: '16%' }} />
+            <col style={{ width: '14%' }} />
+            <col style={{ width: '9%' }} />
+          </colgroup>
           <thead>
             <TableHeadRow>
-              <Th className={styles.idCell}>画面ID</Th>
-              <Th className={styles.nameCell}>画面名</Th>
-              <Th className={styles.urlCell}>公式記事のURL</Th>
-              <Th className={styles.checkedCell}>最後に確かめた日</Th>
-              <Th className={styles.statusCell}>リンクの状態</Th>
-              <Th className={styles.actionCell}>操作</Th>
+              <Th>画面ID</Th>
+              <Th>画面名</Th>
+              <Th>公式記事のURL</Th>
+              <Th>最後に確かめた日</Th>
+              <Th>リンクの状態</Th>
+              <Th>操作</Th>
             </TableHeadRow>
           </thead>
           <tbody>
@@ -180,12 +189,12 @@ export default function ManualLinksPage() {
               const editing = editingKey === key
               return (
               <Tr key={key}>
-                <Td className={styles.idCell}>{row.screenId}</Td>
-                <Td className={styles.nameCell}>{row.name}</Td>
-                <Td className={styles.urlCell}>
+                <Td>{row.screenId}</Td>
+                <Td>{row.name}</Td>
+                <Td>
                   {editing ? (
                     <input
-                      className={styles.urlInput}
+                      style={{ width: '100%', minWidth: 0, padding: '7px 9px' }}
                       aria-label={`${row.name}の公式記事URL`}
                       value={editingUrl}
                       onChange={(event) => setEditingUrl(event.target.value)}
@@ -196,8 +205,8 @@ export default function ManualLinksPage() {
                     </span>
                   )}
                 </Td>
-                <Td className={styles.checkedCell}>{checkedLabel(row.checkedAt)}</Td>
-                <Td className={styles.statusCell}>
+                <Td>{checkedLabel(row.checkedAt)}</Td>
+                <Td>
                   <StatusBadge
                     tone={row.status === 'ok' ? 'success' : row.status === 'broken' ? 'danger' : 'neutral'}
                     size="compact"
@@ -205,14 +214,14 @@ export default function ManualLinksPage() {
                     {LINK_STATUS_LABEL[row.status]}
                   </StatusBadge>
                 </Td>
-                <Td className={styles.actionCell}>
+                <Td>
                   {editing ? (
-                    <span className={styles.editActions}>
-                      <button type="button" className={styles.action} disabled={saving} onClick={() => void saveEdit()}>保存</button>
-                      <button type="button" className={styles.action} disabled={saving} onClick={() => setEditingKey(null)}>やめる</button>
-                    </span>
+                    <>
+                      <Button disabled={saving} onClick={() => void saveEdit()}>保存</Button>
+                      <Button disabled={saving} onClick={() => setEditingKey(null)}>やめる</Button>
+                    </>
                   ) : (
-                    <button type="button" className={styles.action} onClick={() => startEdit(key)}>直す</button>
+                    <Button onClick={() => startEdit(key)}>直す</Button>
                   )}
                 </Td>
               </Tr>
