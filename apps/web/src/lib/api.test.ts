@@ -993,6 +993,17 @@ describe('extractApiErrorCode', () => {
 })
 
 describe('機能オフの403契約', () => {
+  function stubBrowser(target: EventTarget) {
+    const storage = {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    }
+    vi.stubGlobal('window', target)
+    vi.stubGlobal('sessionStorage', storage)
+    vi.stubGlobal('localStorage', storage)
+  }
+
   it('FEATURE_DISABLED だけを専用案内へ送り、通常の403は権限案内に残す', () => {
     expect(shouldAnnounceFeatureDisabled(403, 'FEATURE_DISABLED')).toBe(true)
     expect(shouldAnnounceFeatureDisabled(403, undefined)).toBe(false)
@@ -1013,7 +1024,7 @@ describe('機能オフの403契約', () => {
     target.addEventListener('lh-feature-disabled', (event) => {
       detail = (event as CustomEvent).detail
     })
-    vi.stubGlobal('window', target)
+    stubBrowser(target)
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       success: false,
       error: 'この機能は設定でオフになっています',
@@ -1032,7 +1043,7 @@ describe('機能オフの403契約', () => {
     const target = new EventTarget()
     const listener = vi.fn()
     target.addEventListener('lh-feature-disabled', listener)
-    vi.stubGlobal('window', target)
+    stubBrowser(target)
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       success: false,
       code: 'FORBIDDEN',
