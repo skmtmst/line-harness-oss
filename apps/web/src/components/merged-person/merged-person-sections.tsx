@@ -236,7 +236,7 @@ export function MergedProfileValues({
           : '採用する値の変更候補はまだありません。'}
       </p>
       {onEdit ? (
-        <div className={styles.actions}>
+        <div className="flex flex-wrap items-center gap-2">
           <Button type="button" onClick={onEdit}>統合プロフィールを編集</Button>
         </div>
       ) : null}

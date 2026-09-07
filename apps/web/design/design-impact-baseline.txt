@@ -134,6 +134,8 @@ shared-button-importer components/line-notifications/notification-run-list.tsx
 shared-button-importer components/line-notifications/operator-notification-rules.tsx
 shared-button-importer components/merged-person/merged-delivery-dialog.tsx
 shared-button-importer components/merged-person/merged-person-detail.tsx
+shared-button-importer components/merged-person/merged-person-sections.tsx
+shared-button-importer components/merged-person/merged-profile-dialog.tsx
 shared-button-importer components/reminders/reminder-publish-flow.tsx
 shared-button-importer components/scenarios/scenario-dialogs.tsx
 shared-button-importer components/scenarios/scenario-list.tsx
