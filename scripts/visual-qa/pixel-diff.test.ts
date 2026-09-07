@@ -6,7 +6,14 @@ import { PNG } from 'pngjs'
 import { describe, expect, it } from 'vitest'
 
 // @ts-expect-error 画面確認スクリプトは素のJSで型定義を持たない。
-import { buildPixelDiffReport, compareRgba, compareScreen, ROOT, thresholdMarkdown } from './pixel-diff.mjs'
+import {
+  buildPixelDiffReport,
+  classifyHeightReason,
+  compareRgba,
+  compareScreen,
+  ROOT,
+  thresholdMarkdown,
+} from './pixel-diff.mjs'
 // @ts-expect-error 画面確認スクリプトは素のJSで型定義を持たない。
 import { SCREENS } from './screens.mjs'
 
@@ -70,6 +77,18 @@ describe('Pencil設計との画素比較', () => {
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
+  })
+
+  it('旧1080px固定撮影との差は実装差の注意対象にしない', () => {
+    expect(classifyHeightReason({ height: 700 }, { height: 1080 })).toBe('撮影高')
+    expect(classifyHeightReason(
+      { height: 1136 },
+      { height: 1080 },
+      { screen: { mode: 'viewport', height: 1080 } },
+    )).toBe('撮影高')
+    expect(classifyHeightReason({ height: 1136 }, { height: 1080 })).toBe('実装')
+    expect(classifyHeightReason({ height: 1080 }, { height: 1320 })).toBe('実装')
+    expect(classifyHeightReason({ height: 1080 }, { height: 1100 })).toBeNull()
   })
 
   it('閾値超過だけをMarkdown一覧にする', () => {

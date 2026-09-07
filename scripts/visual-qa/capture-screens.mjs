@@ -60,6 +60,41 @@ function sizeFromHtml(src) {
  * 収まる高さ。設計と並べるぶんには足りる。
  */
 const MAX_SHOT_HEIGHT = 8_000
+export const DEFAULT_CAPTURE_HEIGHT = 1_080
+
+/**
+ * 実装画像の高さは設計PNGを正本にする。
+ * page は短い設計だけ設計高で切り、1080px以上は本文全体を残す。
+ * viewport は重なりを含むため、常に設計高そのものを使う。
+ */
+export function implementationViewportHeight(screen, designHeight) {
+  const height = Number.isFinite(designHeight) ? designHeight : screen.height
+  if (!Number.isFinite(height)) return DEFAULT_CAPTURE_HEIGHT
+  return height
+}
+
+export function implementationScreenshotOptions(screen, designHeight, fullHeight, width) {
+  if (screen.mode === 'viewport') return {}
+  if (Number.isFinite(designHeight) && designHeight <= DEFAULT_CAPTURE_HEIGHT) {
+    return { clip: { x: 0, y: 0, width, height: designHeight } }
+  }
+  if (fullHeight > MAX_SHOT_HEIGHT) {
+    return { clip: { x: 0, y: 0, width, height: MAX_SHOT_HEIGHT } }
+  }
+  return { fullPage: true }
+}
+
+function pngSize(path) {
+  if (!existsSync(path)) return null
+  const bytes = readFileSync(path)
+  const isPng = bytes.length >= 24 && bytes.subarray(1, 4).toString('ascii') === 'PNG'
+  return isPng ? [bytes.readUInt32BE(16), bytes.readUInt32BE(20)] : null
+}
+
+function designSizeOf(screen) {
+  const png = join(ROOT, 'docs', 'design-reference', screen.dir, `${screen.node}.png`)
+  return pngSize(png) ?? DESIGN_SIZE[screen.node] ?? null
+}
 
 /** 画面が落ちたときに出る文言。出ていたら撮らない。 */
 const FAILURE_TEXTS = [
@@ -89,14 +124,14 @@ function check() {
       if (!s.why) problems.push(`${s.node}: ${s.status} なのに理由が無い`)
       continue
     }
-    if (s.status && !['unimplemented', 'unconfirmed'].includes(s.status)) {
+    if (s.status && !['unimplemented', 'unconfirmed', 'elsewhere'].includes(s.status)) {
       problems.push(`${s.node}: 知らない status（${s.status}）`)
     }
     if (!s.route || s.route === '—') problems.push(`${s.node}: route が無い`)
     if (!['page', 'viewport'].includes(s.mode)) problems.push(`${s.node}: mode が page/viewport ではない`)
     if (s.mode === 'viewport' && !s.height) problems.push(`${s.node}: viewport なのに height が無い`)
     /* 設計の大きさは書き出したHTMLから読む。無いときだけ台帳の値を使う。 */
-    if (!DESIGN_SIZE[s.node] && !existsSync(join(designDirOf(s.feature), `${s.node}.html`))) {
+    if (!designSizeOf(s) && !existsSync(join(designDirOf(s.feature), `${s.node}.html`))) {
       problems.push(`${s.node}: 設計HTMLも大きさの控えも無い`)
     }
   }
@@ -484,6 +519,7 @@ async function captureImpl(feature) {
     }
     const out = join(ROOT, 'docs', 'design-qa', s.dir)
     mkdirSync(out, { recursive: true })
+    const designHeight = designSizeOf(s)?.[1] ?? s.height ?? DEFAULT_CAPTURE_HEIGHT
 
     /*
       **1画面が1枚とは限らない。**
@@ -501,7 +537,7 @@ async function captureImpl(feature) {
 
     for (const shotSpec of shots) {
     for (const width of captureWidths) {
-      const page = await newPage(browser, width, s.mode === 'viewport' ? s.height : 1080, s.clock)
+      const page = await newPage(browser, width, implementationViewportHeight(s, designHeight), s.clock)
       try {
         const stateHits = shotSpec.state ? await applyState(page, s.node, shotSpec.state) : null
         /*
@@ -584,11 +620,11 @@ async function captureImpl(feature) {
         const fullHeight = s.mode === 'page'
           ? await page.evaluate(() => document.documentElement.scrollHeight)
           : null
-        const capped = fullHeight !== null && fullHeight > MAX_SHOT_HEIGHT
+        const screenshotOptions = implementationScreenshotOptions(s, designHeight, fullHeight, width)
+        const capped = screenshotOptions.clip?.height === MAX_SHOT_HEIGHT
         await page.screenshot({
           path: join(out, `${s.node}${shotSpec.label}-${width}.png`),
-          fullPage: s.mode === 'page' && !capped,
-          ...(capped ? { clip: { x: 0, y: 0, width, height: MAX_SHOT_HEIGHT } } : {}),
+          ...screenshotOptions,
         })
         if (capped) {
           console.log(`  ✂ ${s.node}${shotSpec.label} ${width}px は ${fullHeight}px あるので ${MAX_SHOT_HEIGHT}px で切った`)
