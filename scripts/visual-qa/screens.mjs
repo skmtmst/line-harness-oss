@@ -2412,7 +2412,7 @@ export const SCREENS = [
       { click: '下書きに保存', after: 1000 },
       { fill: '1人テストの友だちID', text: 'friend-visual-1' },
     ],
-    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #421 で固定ポート3105/8792にて再撮影。** 名前・処理・15軸の条件入力・要約・注意・追従操作は1440px・1920pxで横はみ出し0。条件保存と見込み人数・1人テストのAPIは実装済みだが作成画面への接続は次段で、設計6種のきっかけとプレビュー値は未接続のため構造一致・データ未接続と判定する。', verdictSource: 'automations-v6/Rv8Jv.txt + automation-create-v6-contract.test.ts', verdictHead: 'd2ea91a4b',
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #438 / UI HEAD `e20d921b8` を固定ポート3105/8792で再撮影し、★V6設計と同じ1920pxで比較して一致を確認。** 6種のきっかけ、タグの付け外し、15軸の条件、処理、下書き保存、見込み人数286人、対象友だちを指定する1人テストを実API契約へ接続した。1440px・1920pxとも横はみ出し0。', verdictSource: 'automations-v6/Rv8Jv.txt + automation-create-v6-contract.test.ts', verdictHead: 'e20d921b8',
   },
   {
     /*
@@ -2425,7 +2425,7 @@ export const SCREENS = [
       設計にはあるので、差として記録だけしておく。
     */
     ...AUTOMATION, node: 'DkPY0', name: '25-1-B オートメーションが動いた記録',
-    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #299 / UI HEAD `380cd6631` を固定ポート3105/8792で再撮影。** PR #1051 の固定データを `GET /api/automation-runs` から読み、設計と同じ4指標・7行の通常表示、検索、結果絞り込み、読込・空・失敗を確認した。1440px・1920pxの全状態で横はみ出し0。安全な再実行API・実行詳細画面・CSV書き出しは未接続なので押せる操作を出さず、構造一致・データ未接続と判定する。', verdictSource: 'automations-v6/DkPY0-normal.txt + DkPY0-loading.txt + DkPY0-empty.txt + DkPY0-error.txt', verdictHead: '380cd6631',
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #438 / UI HEAD `e20d921b8` を固定ポート3105/8792で再撮影し、★V6設計と同じ1920pxで比較して一致を確認。** 4指標・7行の実行記録、対象、結果、失敗理由、実行詳細を実APIから表示する。失敗した処理だけを待機へ戻し、成功済み処理を二重実行しない安全な再実行を接続した。通常・読込中・0件・取得失敗の全10枚で横はみ出し0。', verdictSource: 'automations-v6/DkPY0-normal.txt + DkPY0-loading.txt + DkPY0-empty.txt + DkPY0-error.txt + automation-runs-v6-contract.test.ts', verdictHead: 'e20d921b8',
     route: '/automations/runs',
     states: {
       apis: ['**/api/automation-runs*'],
@@ -2454,7 +2454,7 @@ export const SCREENS = [
     verdictSource: 'automations-v6/Vdbv5.txt + Vdbv5-loading.txt + Vdbv5-empty.txt + Vdbv5-error.txt', verdictHead: '44e671b2c',
   },
   { ...AUTOMATION, node: 'xOpDs', name: '25-2 共通アクション', route: '/common-actions', verdict: 'match', verdictNote: '**2026-09-07 Issue #377 / UI HEAD `bd900c36d` を3107/8794で再撮影し、★V6設計と同じ1920pxで比較。** 実API契約から14件（公開11・下書き3）、呼び出し元38、今月2,847回・失敗6回、古い版2件・3か所を表示。5種の絞り込み、CSV、6行単位のAPIページ送りも接続し、1440px・1920pxとも横はみ出し0で一致。', verdictSource: 'automations-v6/xOpDs.txt + common-actions-v6-contract.test.ts', verdictHead: 'bd900c36d' },
-  { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #377 / UI HEAD `bd900c36d` を3107/8794で再撮影。** 名前・説明、処理順、失敗時設定、待ち時間、版の決めごと、利用先、注意、追従保存は1440px・1920pxで横はみ出し0。新規作成は仕様どおり空の下書き＋処理1件で始める。設計例を再現する複製・見本の受け渡し、1人テスト、条件分岐を返すAPI契約が無いため、押せる形や値を作らず理由付き構造一致・データ未接続を維持する。', verdictSource: 'automations-v6/py5CG.txt + common-actions-v6-contract.test.ts', verdictHead: 'bd900c36d' },
+  { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #438 / UI HEAD `e20d921b8` を固定ポート3105/8792で再撮影。** 名前・説明、処理順、失敗時設定、待ち時間、公開版を呼ぶ受け渡し、版の注意、下書き保存は1440px・1920pxで横はみ出し0。一覧の「複製して下書きを作る」も実APIへ接続した。正本 §4-7 は作成画面の操作を下書き保存だけと定め、条件分岐は接続契約で第2期（案）のまま、1人テストは保存後の公開版を03の一括操作から呼ぶ契約のため、設計例の押せるボタンを作らず構造一致・データ未接続とする。', verdictSource: 'automations-v6/py5CG.txt + common-actions-v6-contract.test.ts + v6-25-automation-requirements-draft.md §4-7', verdictHead: 'e20d921b8' },
   { ...AUTOMATION, node: 'syWp4', name: '25-2-B 共通アクションの版と使われている場所', route: '/common-actions/versions?id=ca-1', verdict: 'match', verdictNote: '**2026-09-07 Issue #377 / UI HEAD `bd900c36d` を3107/8794で再撮影し、★V6設計と同じ1920pxで比較。** 実API契約からv4〜v1、利用先5件・古い版1件、今月1,284回・失敗2回、実行中18件・待機中6件を表示。利用先を版履歴より先に置き、機能名・固定版・進行中件数を1行で読める形へそろえた。1440px・1920pxとも横はみ出し0で一致。', verdictSource: 'automations-v6/syWp4.txt + usage-summary.test.ts + common-actions-v6-contract.test.ts', verdictHead: 'bd900c36d' },
 
   // ── 機能26 外部連携 ─────────────────────────────────────
