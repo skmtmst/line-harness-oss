@@ -422,7 +422,7 @@ export const SCREENS = [
     verdict: "match",
     verdictNote: "**2026-09-07 Issue #457で修正・再判定。** 一致。表の下の余分な空白をなくし、未対応・注目のみを設計と同じ小さい押し口へそろえた。選択中は色・枠・チェックで状態が分かり、実際に押して絞り込みが反映されることを確認。通常・未対応・注目のみを1440/1920pxで撮影し、横はみ出し0。",
     verdictSource: "friends-v6/PhxG6{,-unhandled,-attention}.txt + 同名-{1440,1920}.png",
-    verdictHead: "d80d4c99d",
+    verdictHead: "07b5835cf5",
   },
   {
     /*
@@ -502,7 +502,7 @@ export const SCREENS = [
     verdict: "match",
     verdictNote: "**2026-09-07 Issue #452・#457で修正・再判定。** 一致。本文上部の旧題ブロックを外し、画面名はトップバーだけに表示。左列のマイルは見出しと詳細リンクに続く一段のカードへ変更し、利用可能数を `2,450 mile` の大きさと単位で表示した。3102/8789の1440/1920pxで横はみ出し0。",
     verdictSource: "friends-v6/I6UAdr.txt + I6UAdr-{1440,1920}.png",
-    verdictHead: "d80d4c99d",
+    verdictHead: "07b5835cf5",
   },
   {
     ...FRIENDS, node: 'bzDn6', name: '3-1-E 友だち一覧の状態（空・読込・エラー）',
@@ -516,13 +516,13 @@ export const SCREENS = [
     verdict: "match",
     verdictNote: "**2026-09-07 Issue #457で修正・再判定。** 一致。読込・空・失敗でも列とフッターを残しつつ、表の下に画面いっぱいの空白を作らない高さへそろえた。通常・読込・空・失敗を1440/1920pxで撮影し、横はみ出し0。",
     verdictSource: "friends-v6/bzDn6-{loading,empty,error}.txt + 同名-{1440,1920}.png",
-    verdictHead: "d80d4c99d",
+    verdictHead: "07b5835cf5",
   },
   { ...FRIENDS, node: 'YzxU1', name: '3-2 重複検出', route: '/friends?tab=duplicates',
     verdict: "match",
     verdictNote: "**2026-09-07 Issue #452・#457で修正・再判定。** 一致。本文上部の旧題ブロックを外し、友だち機能タブから始まるPencil V6の上端構造へ統一。重複候補表の見出し行には下の表と同じ縦余白を付け、文字が潰れず同じ高さになるようそろえた。3102/8789の1440/1920pxで横はみ出し0。",
     verdictSource: "friends-v6/YzxU1.txt + YzxU1-{1440,1920}.png",
-    verdictHead: "d80d4c99d",
+    verdictHead: "07b5835cf5",
   },
   {
     ...FRIENDS, node: 'InCDe', name: '3-2-A 重複候補詳細・統合前確認',
@@ -550,7 +550,7 @@ export const SCREENS = [
     verdict: "match",
     verdictNote: "**2026-09-07 Issue #452・#457で修正・再判定。** 一致。本文上部の旧題ブロックを外し、友だち機能タブから始まるPencil V6の上端構造へ統一。作成・検索・複数アカウント・UID・所属・CSV・再計算の操作面から内側の二重枠を外し、全操作の高さをそろえた。通常・読込・空・失敗を3102/8789の1440/1920pxで撮影し、横はみ出し0。",
     verdictSource: "friends-v6/r7eSi-{normal,loading,empty,error}.txt + 同名-{1440,1920}.png",
-    verdictHead: "d80d4c99d",
+    verdictHead: "07b5835cf5",
   },
   {
     ...FRIENDS, node: 'w8W4Eh', name: '3-3-A 統合ユーザー詳細',
@@ -3753,7 +3753,7 @@ export const CAPTURED_AT = {
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['UgonK', 'UhC2O'], note: 'development そのもので撮った' },
   ],
   3: [
-    { pr: 0, head: 'd80d4c99d', on: '2026-09-07', screens: ['PhxG6', 'I6UAdr', 'bzDn6', 'YzxU1', 'r7eSi'], note: 'Issue #457。友だち一覧の余分な空白と選択中の絞り込み、詳細のマイル、重複候補表の見出し、統合ユーザーの操作行をPencil V6へそろえ、3102/8789で通常・全状態を1440/1920px撮影。横はみ出し0で5画面とも一致を確認した。' },
+    { pr: 0, head: '07b5835cf5', on: '2026-09-07', screens: ['PhxG6', 'I6UAdr', 'bzDn6', 'YzxU1', 'r7eSi'], note: 'Issue #457。友だち一覧の余分な空白と選択中の絞り込み、詳細のマイル、重複候補表の見出し、統合ユーザーの操作行をPencil V6へそろえ、3102/8789で通常・全状態を1440/1920px撮影。横はみ出し0で5画面とも一致を確認した。' },
     { pr: 1247, head: 'fb07e4a3f3', on: '2026-09-07', screens: ['I6UAdr', 'YzxU1', 'r7eSi'], note: 'Issue #452 / PR #1247。旧Headerを外し、パンくず・友だち機能タブ・顧客操作をV6設計の位置へそろえて3102/8789で全状態を1440/1920px再撮影。横はみ出し0で3画面とも一致を確認した。' },
     { pr: 1230, head: 'b62d7d070', on: '2026-09-07', screens: ['ux7of'], note: 'Issue #443 / PR #1230。CSV書き出し・確認取込・二重反映防止・履歴を正本文言と照合し、3104/8791の1440・1920pxで横はみ出し0を確認して一致へ更新した。' },
     { pr: 520, head: '4848a8f3', on: '2026-08-29', screens: ['bzDn6'], note: '友だち一覧の帯を未取得 `—人` に。**development 直結の根元PR**' },
