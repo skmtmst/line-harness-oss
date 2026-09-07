@@ -1259,8 +1259,8 @@ export const NEN_PET_METRICS = {
     friends: 1_284,
     friendsWithoutPet: 420,
     birthdayOpenRate: nenUnavailable('LINEは誕生日配信の個人開封を提供していません'),
-    birthdayReachRate: 69.4 / 100,
-    birthdayClickRate: 18.2 / 100,
+    birthdayReachRate: 94.6 / 100,
+    birthdayClickRate: 38.2 / 100,
     coupons: { issued: 73, used: 28, usageRate: 28 / 73 },
   },
   breeds: [
@@ -4242,6 +4242,48 @@ export const CONVERSION_DEFINITIONS = {
   pagination: { total: 12, limit: 20, cursor: '0', nextCursor: null },
 }
 
+/* 機能19 GtylA: 入力中の条件だけで行う保存前試算。保存・成果追加はしない。 */
+export const CONVERSION_DEFINITION_PREVIEW = {
+  range: CONVERSION_RANGE,
+  matchedCount: 386,
+  estimatedCount: 214,
+  estimatedValue: 402800,
+  duplicateExcludedCount: 172,
+  cancellationCount: 4,
+  excludedReasons: [],
+  dailyAverage: 7.1,
+  deduplicationWindowDays: null,
+}
+
+/* 機能19 d8d3Mz: 利用先、停止影響、差し替え候補、物理削除可否。 */
+export const CONVERSION_DEFINITION_DELETE_IMPACT = {
+  definition: {
+    ...CONVERSION_DEFINITIONS.items[1],
+    sourceConfig: { triggerKind: 'form' },
+    deduplicationMode: 'once_per_friend',
+    deduplicationWindowDays: null,
+    valueMode: 'fixed',
+    reversalPolicy: 'source_cancelled',
+    currentVersion: {
+      id: 'cp-2:v1', number: 1, sourceType: 'form_submitted', measureMethod: 'webhook',
+      targetUrl: null, countRepeat: false, fixedValue: 12000, attributionDays: 90,
+    },
+    usages: [],
+  },
+  usages: [
+    { id: 'conversion-usage-offer', conversionPointId: 'cp-2', definitionVersion: 1, lineAccountId: 'visual-qa-account', refKind: 'affiliate_offer', refId: 'offer-trial', refVersionId: 'v3', usageName: '案件「無料体験の申込」' },
+    { id: 'conversion-usage-reply', conversionPointId: 'cp-2', definitionVersion: 1, lineAccountId: 'visual-qa-account', refKind: 'auto_reply', refId: 'reply-thanks', refVersionId: 'v2', usageName: '自動応答「申し込みありがとうございます」' },
+    { id: 'conversion-usage-analysis', conversionPointId: 'cp-2', definitionVersion: 1, lineAccountId: 'visual-qa-account', refKind: 'analytics', refId: 'conversion-trend', refVersionId: null, usageName: '分析「成果のうつり変わり」' },
+  ],
+  eventCount: 486,
+  canDelete: false,
+  stopImpact: { affectedUsageCount: 3, preservesPastEvents: true, preservesUsages: true },
+  replacementCandidates: [
+    { id: 'cp-1', name: '商品を買った', version: 1 },
+    { id: 'cp-3', name: '予約が入った', version: 1 },
+  ],
+}
+
 /*
   設計の積み上げグラフ用。期間の30日を省略せず、8/13の山を含める。
   地点別の合計も一覧KPIの486件と一致する（商品386、申込42、予約38、定期12、視聴8）。
@@ -4812,18 +4854,88 @@ export const BOOKING_PROXY_CREATE = {
     status: 201,
     body: {
       booking_id: 'visual-qa-booking-1000',
+      booking_customer_id: null,
       status: 'confirmed',
       calendar_sync: 'not_configured',
+      line_notification: 'queued',
+      reminders: [
+        { id: 'br-proxy-day', kind: 'day_before', scheduled_at: '2026-09-02T01:00:00.000Z', sent_at: null, status: 'pending' },
+        { id: 'br-proxy-hour', kind: 'hours_before', scheduled_at: '2026-09-03T00:00:00.000Z', sent_at: null, status: 'pending' },
+      ],
+      operations: [
+        { id: 'bor-line-proxy', kind: 'confirmation_line', status: 'queued', scheduledAt: null, completedAt: null, openedAt: null, result: { notificationKind: 'approved' }, errorCode: null },
+        { id: 'bor-calendar-proxy', kind: 'google_calendar', status: 'skipped', scheduledAt: null, completedAt: '2026-09-02T02:05:00.000Z', openedAt: null, result: { calendarSync: 'not_configured' }, errorCode: null },
+        { id: 'bor-automation-proxy', kind: 'automation', status: 'succeeded', scheduledAt: null, completedAt: '2026-09-02T02:05:01.000Z', openedAt: null, result: { eventType: 'calendar_booked' }, errorCode: null },
+      ],
+      customer_context: {
+        id: 'friend-kanno', friendId: 'friend-kanno', displayName: '菅野 亮', isLineLinked: true,
+        phone: '090-1234-5678', petName: 'こむぎ',
+        tags: [{ id: 'tag-nen', name: 'NEN会員' }, { id: 'tag-delivery', name: '定期便' }],
+        mileageBalance: 1240, previousHandover: '前回は右耳を短めに整えました。',
+        recentBookings: [
+          { id: 'bk-kanno-1', startsAt: '2026-08-03T01:00:00.000Z', status: 'completed', customerNote: '顔まわりは丸く', handoverNote: '右耳を短めに整えました。', price: 8400, menuName: 'トリミング（小型犬）', staffName: '佐々木' },
+          { id: 'bk-kanno-2', startsAt: '2026-07-04T01:00:00.000Z', status: 'completed', customerNote: null, handoverNote: null, price: 4200, menuName: 'シャンプーのみ', staffName: '高田' },
+        ],
+      },
       replayed: false,
     },
   },
   conflict: {
     status: 409,
-    body: { error: 'slot_conflict' },
+    body: {
+      error: 'slot_conflict',
+      data: {
+        conflict: { from: '2026-09-03T05:00:00.000Z', to: '2026-09-03T06:45:00.000Z', count: 1, source: 'internal_booking' },
+        nearbySlots: [
+          { date: '2026-09-03', start: '10:00', end: '11:45', capacity: 2, remaining: 1, state: 'limited', resources: ['resource-room-a'] },
+          { date: '2026-09-03', start: '13:00', end: '14:45', capacity: 2, remaining: 1, state: 'limited', resources: ['resource-room-a'] },
+        ],
+        alternateStaff: [
+          { staffId: 'bs-3', displayName: '高田', slot: { date: '2026-09-03', start: '15:00', end: '16:45', capacity: 2, remaining: 1, state: 'limited', resources: ['resource-room-a'] } },
+        ],
+      },
+    },
   },
   unavailable: {
     status: 422,
     body: { error: 'slot_not_available' },
+  },
+}
+
+/** #444。代理予約の確認前に読む顧客カルテと、サーバー計算済みの通知予定。 */
+export const BOOKING_CUSTOMER_CONTEXT = BOOKING_PROXY_CREATE.success.body.customer_context
+export const BOOKING_REMINDER_PREVIEW = {
+  reminders: [
+    { kind: 'day_before', scheduledAt: '2026-09-02T01:00:00.000Z' },
+    { kind: 'hours_before', scheduledAt: '2026-09-03T00:00:00.000Z' },
+  ],
+}
+export const BOOKING_CONFLICT_ALTERNATIVES = BOOKING_PROXY_CREATE.conflict.body.data
+
+/** #444。一覧の先頭 `bk-1` を開いたときの顧客・履歴・通知実績。 */
+export const BOOKING_ADMIN_DETAIL = {
+  booking: {
+    id: 'bk-1', startsAt: '2026-09-03T00:00:00.000Z', endsAt: '2026-09-03T01:45:00.000Z', status: 'confirmed',
+    customerNote: '顔まわりはふんわり仕上げてください。', internalNote: '皮膚の赤みに注意。', price: 8400,
+    requestedAt: '2026-09-02T02:00:00.000Z', decidedAt: '2026-09-02T02:05:00.000Z', source: 'liff',
+    createdByStaffId: 'visual-qa-owner', calendarSync: 'synced', menuName: 'トリミング（小型犬）', staffName: '佐々木',
+    customer: {
+      friendId: 'friend-1', bookingCustomerId: null, displayName: '高橋 直人', isLineLinked: true,
+      phone: '090-4321-8765', petName: 'ももちゃん', tags: [{ id: 'tag-vip', name: 'VIP' }], mileageBalance: 2860,
+    },
+    previousHandover: '前回は足先を短めに整えました。',
+    history: [
+      { id: 'bk-history-1', startsAt: '2026-08-03T00:00:00.000Z', status: 'completed', customerNote: '足先は短め', handoverNote: '耳の赤みは落ち着いています。', price: 8400, menuName: 'トリミング（小型犬）', staffName: '佐々木' },
+      { id: 'bk-history-2', startsAt: '2026-07-05T01:00:00.000Z', status: 'completed', customerNote: null, handoverNote: null, price: 4200, menuName: 'シャンプーのみ', staffName: '高田' },
+    ],
+    reminders: [
+      { id: 'br-detail-day', kind: 'day_before', scheduledAt: '2026-09-02T00:00:00.000Z', sentAt: '2026-09-02T00:00:03.000Z', status: 'sent', retryCount: 0 },
+      { id: 'br-detail-hour', kind: 'hours_before', scheduledAt: '2026-09-02T23:00:00.000Z', sentAt: null, status: 'pending', retryCount: 0 },
+    ],
+    operations: [
+      { id: 'bor-line-detail', kind: 'confirmation_line', status: 'succeeded', scheduledAt: null, completedAt: '2026-09-02T02:05:02.000Z', openedAt: '2026-09-02T03:10:00.000Z', result: { notificationKind: 'approved' }, errorCode: null },
+      { id: 'bor-calendar-detail', kind: 'google_calendar', status: 'succeeded', scheduledAt: null, completedAt: '2026-09-02T02:05:03.000Z', openedAt: null, result: { calendarSync: 'synced' }, errorCode: null },
+    ],
   },
 }
 
@@ -5478,6 +5590,7 @@ function mileageRewardVersion(requiredMiles, stockLimit, extra = {}) {
     requiredMiles, stockLimit, perFriendLimit: null,
     startsAt: null, endsAt: null, benefitExpiresDays: 30,
     commonActionVersionId: null, failurePolicy: 'refund',
+    targetConditions: { operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-0' }] },
     customerMessage: '交換ありがとうございます。', publishedAt: '2026-08-01T00:00:00.000Z',
     ...extra,
   }

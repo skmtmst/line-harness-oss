@@ -8,6 +8,7 @@ const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
 const LIST = read('page.tsx')
 const CREATE = read('new', 'page.tsx')
 const EDIT = read('edit', 'page.tsx')
+const BRANCH_EDITOR = read('branch-editor.tsx')
 const VERSIONS = read('versions', 'page.tsx')
 const EDITOR = read('..', '..', 'components', 'automations', 'common-action-editor.tsx')
 const PERMISSION = read('..', '..', 'components', 'automations', 'use-common-action-permission.ts')
@@ -44,6 +45,17 @@ describe('V6共通アクションの画面契約', () => {
     expect(EDITOR).toContain('テンプレート「{selected.name}」')
     expect(EDITOR).toContain('版: —（未取得。テンプレートの版を返す口が接続されると表示します）')
     expect(CREATE).toContain('すでに呼び出している場所はいまの版のまま動きます')
+  })
+
+  it('条件分岐はタグ条件と両方の公開版を保存・実行契約へ接続する', () => {
+    expect(CREATE + EDIT).toContain('<BranchEditors')
+    expect(BRANCH_EDITOR).toContain('条件のタグ')
+    expect(BRANCH_EDITOR).toContain('当てはまるとき')
+    expect(BRANCH_EDITOR).toContain('当てはまらないとき')
+    expect(WORKER).toContain("'branch'")
+    expect(WORKER).toContain('branch_too_deep')
+    expect(ENGINE).toContain("type: 'branch_marker'")
+    expect(ENGINE).toContain('branch_not_selected')
   })
 
   it('利用版の変更前に差分と進行中への影響を確認する', () => {

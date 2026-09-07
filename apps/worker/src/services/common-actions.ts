@@ -18,6 +18,7 @@ const SUPPORTED_ACTION_TYPES = new Set([
   'grant_mileage',
   'wait',
   'common_action',
+  'branch',
 ]);
 
 export class CommonActionValidationError extends Error {
@@ -142,7 +143,10 @@ function parseStoredActions(raw: string): ActionDefinition[] {
   }
 }
 
-export function validateActionShape(value: unknown): ActionDefinition[] {
+export function validateActionShape(value: unknown, depth = 0): ActionDefinition[] {
+  if (depth > 3) {
+    throw new CommonActionValidationError('branch_too_deep', '条件分岐の入れ子は3段までです', 'actions');
+  }
   if (!Array.isArray(value) || value.length === 0) {
     throw new CommonActionValidationError('actions_required', '処理を1つ以上追加してください', 'actions');
   }
@@ -170,7 +174,22 @@ export function validateActionShape(value: unknown): ActionDefinition[] {
     if (onFailure !== 'stop' && onFailure !== 'continue') {
       throw new CommonActionValidationError('failure_mode_invalid', '失敗時は「止める」か「次へ進む」を選んでください', `actions.${index}.onFailure`);
     }
-    return { id, type, params: item.params, onFailure };
+    let params = item.params;
+    if (type === 'branch') {
+      const condition = params.condition;
+      if (!isRecord(condition) || !['AND', 'OR'].includes(String(condition.operator))
+        || !Array.isArray(condition.rules) || condition.rules.length === 0) {
+        throw new CommonActionValidationError(
+          'branch_condition_invalid', '条件分岐の条件を1つ以上指定してください', `actions.${index}.params.condition`,
+        );
+      }
+      params = {
+        ...params,
+        then: validateActionShape(params.then, depth + 1),
+        else: validateActionShape(params.else, depth + 1),
+      };
+    }
+    return { id, type, params, onFailure };
   });
 }
 
@@ -303,6 +322,26 @@ export async function validateTagAddedActionResources(
           `${field}.amount`,
         );
       }
+    } else if (action.type === 'branch') {
+      const condition = action.params.condition as { rules?: Array<{ type?: unknown; value?: unknown }> };
+      for (const [ruleIndex, rule] of (condition.rules ?? []).entries()) {
+        if (rule.type === 'tag_exists' || rule.type === 'tag_not_exists') {
+          await requireResource(db, {
+            table: 'tags', id: rule.value, lineAccountId,
+            field: `${field}.condition.rules.${ruleIndex}.value`, label: '分岐条件のタグ',
+          });
+        }
+      }
+      await validateTagAddedActionResources(
+        db,
+        lineAccountId,
+        action.params.then as ActionDefinition[],
+      );
+      await validateTagAddedActionResources(
+        db,
+        lineAccountId,
+        action.params.else as ActionDefinition[],
+      );
     }
   }
   return actions;
@@ -399,6 +438,22 @@ async function pinAndValidateReferences(
       }
       params.commonActionId = referenced.id;
       params.commonActionVersionId = referenced.version_id;
+    } else if (action.type === 'branch') {
+      const condition = params.condition as { rules?: Array<{ type?: unknown; value?: unknown }> };
+      for (const [ruleIndex, rule] of (condition.rules ?? []).entries()) {
+        if (rule.type === 'tag_exists' || rule.type === 'tag_not_exists') {
+          await requireResource(db, {
+            table: 'tags', id: rule.value, lineAccountId,
+            field: `${field}.condition.rules.${ruleIndex}.value`, label: '分岐条件のタグ',
+          });
+        }
+      }
+      params.then = await pinAndValidateReferences(
+        db, lineAccountId, ownerId, params.then as ActionDefinition[],
+      );
+      params.else = await pinAndValidateReferences(
+        db, lineAccountId, ownerId, params.else as ActionDefinition[],
+      );
     }
     pinned.push({ ...action, params });
   }

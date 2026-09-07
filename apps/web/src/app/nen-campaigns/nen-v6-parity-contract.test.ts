@@ -58,7 +58,10 @@ describe('V6 21 NEN配信の画面契約', () => {
     expect(OVERVIEW).toContain('openRate.reason')
     expect(OVERVIEW).toContain('birthdayReachRate')
     expect(OVERVIEW).toContain('birthdayClickRate')
-    expect(OVERVIEW).toContain('個人開封はLINE非提供')
+    expect(OVERVIEW).toContain('誕生日配信の到達率')
+    expect(OVERVIEW).toContain('誕生日配信のクリック率')
+    expect(OVERVIEW).toContain('ふつうの配信の 2倍以上')
+    expect(OVERVIEW).toContain('LINEから個人開封を取得できません')
     expect(OVERVIEW).not.toContain('12pt')
   })
 

@@ -4,7 +4,6 @@ import { describe, expect, test } from 'vitest'
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 const LIST = readFileSync(new URL('../page.tsx', import.meta.url), 'utf8')
 const API = readFileSync(new URL('../../../../lib/api.ts', import.meta.url), 'utf8')
-const SCHEDULE = readFileSync(new URL('./proxy-booking-schedule.ts', import.meta.url), 'utf8')
 const BOOKING_TYPES = readFileSync(
   new URL('../../../../../../worker/src/services/booking-types.ts', import.meta.url),
   'utf8',
@@ -34,19 +33,17 @@ describe('V6 代理予約の接続契約', () => {
     expect(PAGE).toContain('crypto.randomUUID()')
   })
 
-  test('予約日時からWorkerと同じ前日・2時間前の予定を計算し、過ぎた予定は出さない', () => {
-    expect(SCHEDULE).toContain("{ label: '前日', minutesBefore: 24 * 60 }")
-    expect(SCHEDULE).toContain("{ label: '開始2時間前', minutesBefore: 2 * 60 }")
-    expect(SCHEDULE).toContain('if (scheduledAt <= now) return []')
-    expect(PAGE).toContain("import { reminderScheduleLabels } from './proxy-booking-schedule'")
-    expect(PAGE).toContain("reminderScheduleLabels(date, time).join(' ／ ')")
+  test('予約日時をWorkerへ渡し、実際に作る送信予定時刻を表示する', () => {
+    expect(API).toContain('previewReminders:')
+    expect(API).toContain('/api/booking/admin/reminder-preview?')
+    expect(PAGE).toContain('bookingApi.previewReminders')
+    expect(PAGE).toContain('reminder.scheduledAt')
+    expect(PAGE).toContain('result.reminders.map')
     expect(PAGE).not.toContain('前日19:00')
     expect(PAGE).not.toContain('当日8:00')
     expect(BOOKING_TYPES).toContain('reminder_hours_before: 2')
-    expect(BOOKING_CONFIRM).toContain('args.startsAt.getTime() - 86400_000')
-    expect(BOOKING_CONFIRM).toContain('args.startsAt.getTime() - hours * 3600_000')
-    expect(BOOKING_CONFIRM).toContain('if (dayBefore > args.now)')
-    expect(BOOKING_CONFIRM).toContain('if (hoursBefore > args.now)')
+    expect(BOOKING_CONFIRM).toContain('buildConfirmationReminderSchedule')
+    expect(BOOKING_CONFIRM).toContain('item.scheduledAt')
   })
 
   test('確認へ進む直前に同じ空き枠APIを読み直し、埋まった枠を確定候補にしない', () => {
@@ -76,10 +73,21 @@ describe('V6 代理予約の接続契約', () => {
     expect(PAGE).toContain('cause instanceof ApiError')
     expect(PAGE).toContain("cause.code === 'slot_conflict' || cause.code === 'slot_not_available'")
     expect(PAGE).toContain("setStep('conflict')")
+    expect(PAGE).toContain('cause.data as BookingConflictAlternatives')
+    expect(PAGE).toContain('conflictAlternatives.conflict.count')
+    expect(PAGE).toContain('conflictAlternatives.alternateStaff.map')
     expect(PAGE).toContain('選んだ時間は、ほかの予約で埋まりました')
     expect(PAGE).toContain('予約を登録できませんでした。状態を確認して、もう一度お試しください。')
     expect(PAGE).not.toContain("message.includes('slot_conflict')")
     expect(PAGE).not.toContain('cause.status === 409 || cause.status === 422')
     expect(PAGE).not.toContain('API error:')
+  })
+
+  test('顧客カルテと通知・自動処理の実績をAPIの値で表示する', () => {
+    expect(PAGE).toContain('bookingApi.getCustomerContext')
+    expect(PAGE).toContain('customerContext.previousHandover')
+    expect(PAGE).toContain('result.line_notification')
+    expect(PAGE).toContain('confirmationOperation.status')
+    expect(PAGE).toContain('automaticOperations.map')
   })
 })

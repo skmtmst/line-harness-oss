@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
+import ConditionBuilder, { pruneCondition } from '@/components/shared/condition-builder'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { Field, TextArea, TextInput } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
@@ -70,6 +71,7 @@ const EMPTY: FormState = {
   endsAt: '',
   benefitExpiresDays: '',
   commonActionVersionId: '',
+  targetConditions: null,
   failurePolicy: 'retry',
   customerMessage: '',
 }
@@ -88,6 +90,7 @@ function formOf(reward: MileageRewardSummary): FormState {
     endsAt: version?.endsAt?.slice(0, 16) ?? '',
     benefitExpiresDays: version?.benefitExpiresDays == null ? '' : String(version.benefitExpiresDays),
     commonActionVersionId: version?.commonActionVersionId ?? '',
+    targetConditions: version?.targetConditions ?? null,
     failurePolicy: version?.failurePolicy ?? 'retry',
     customerMessage: version?.customerMessage ?? '',
   }
@@ -123,6 +126,7 @@ function draftOf(form: FormState): MileageRewardDraftInput {
     endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : null,
     benefitExpiresDays: numberOrNull(form.benefitExpiresDays),
     commonActionVersionId: form.commonActionVersionId.trim() || null,
+    targetConditions: pruneCondition(form.targetConditions),
     failurePolicy: form.failurePolicy,
     customerMessage: form.customerMessage.trim(),
   }
@@ -433,6 +437,18 @@ function MileageRewardEditorInner() {
           <Field label="交換したときの案内" htmlFor="reward-message" note="お客様に届く文です。空なら既定の文を送ります">
             <TextArea id="reward-message" rows={3} value={form.customerMessage} onChange={(e) => set('customerMessage', e.target.value)} />
           </Field>
+        </Card>
+
+        <Card padding="default" className="xl:col-span-2">
+          <CardHeader title="だれが交換できますか" />
+          <p className="mb-4 text-xs text-ink-secondary">
+            条件を付けない場合は全員が対象です。ランク・タグ・購入の有無など15の軸から組み合わせられます。
+          </p>
+          <ConditionBuilder
+            value={form.targetConditions}
+            onChange={(next) => set('targetConditions', next)}
+            label="交換対象の条件"
+          />
         </Card>
       </div>
 

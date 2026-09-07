@@ -15,6 +15,12 @@ import {
   listConversionDefinitions,
   getConversionDefinitionDetail,
   addConversionDefinitionUsage,
+  createConversionDefinition,
+  previewConversionDefinition,
+  getConversionDefinitionDeleteImpact,
+  stopConversionDefinition,
+  replaceConversionDefinitionUsages,
+  deleteUnusedConversionDefinition,
   getConversionDefinitionReport,
   listConversionDefinitionsForExport,
   ConversionDefinitionError,
@@ -35,6 +41,9 @@ import type {
   ConversionDefinitionSort,
   ConversionDefinitionStatus,
   ConversionDefinitionUsageKind,
+  ConversionDeduplicationMode,
+  ConversionValueMode,
+  ConversionReversalPolicy,
 } from '@line-crm/db';
 
 const conversions = new Hono<Env>();
@@ -180,6 +189,52 @@ const DEFINITION_STATUSES = new Set<ConversionDefinitionStatus>(['active', 'stop
 const DEFINITION_SORTS = new Set<ConversionDefinitionSort>([
   'count_desc', 'value_desc', 'updated_desc', 'name_asc',
 ]);
+const DEFINITION_SOURCE_TYPES = new Set([
+  'ec_order_confirmed', 'form_submitted', 'reservation_confirmed', 'url_reach',
+  'webinar_completed', 'tag_added',
+]);
+const DEDUPLICATION_MODES = new Set<ConversionDeduplicationMode>(['every', 'once_per_friend', 'window']);
+const VALUE_MODES = new Set<ConversionValueMode>(['source', 'fixed', 'none']);
+const REVERSAL_POLICIES = new Set<ConversionReversalPolicy>(['source_cancelled', 'manual', 'none']);
+
+function positiveVersion(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function plainObject(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown> : null;
+}
+
+function readDefinitionInput(body: Record<string, unknown>) {
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  const sourceType = typeof body.sourceType === 'string' ? body.sourceType : '';
+  const sourceConfig = plainObject(body.sourceConfig) ?? {};
+  const lineAccountId = typeof body.lineAccountId === 'string' ? body.lineAccountId.trim() : '';
+  const deduplicationMode = body.deduplicationMode as ConversionDeduplicationMode;
+  const valueMode = body.valueMode as ConversionValueMode;
+  const reversalPolicy = body.reversalPolicy as ConversionReversalPolicy;
+  const windowDays = body.deduplicationWindowDays == null ? null : Number(body.deduplicationWindowDays);
+  const fixedValue = body.fixedValue == null || body.fixedValue === '' ? null : Number(body.fixedValue);
+  const attributionDays = body.attributionDays == null || body.attributionDays === '' ? null : Number(body.attributionDays);
+  const targetUrl = typeof body.targetUrl === 'string' && body.targetUrl.trim() ? body.targetUrl.trim() : null;
+  if (!name || name.length > 120 || !lineAccountId || !DEFINITION_SOURCE_TYPES.has(sourceType)
+    || !DEDUPLICATION_MODES.has(deduplicationMode) || !VALUE_MODES.has(valueMode)
+    || !REVERSAL_POLICIES.has(reversalPolicy)
+    || (deduplicationMode === 'window' && (!Number.isInteger(windowDays) || windowDays! < 1 || windowDays! > 365))
+    || (valueMode === 'fixed' && (fixedValue === null || !Number.isFinite(fixedValue) || fixedValue < 0))
+    || (attributionDays !== null && (!Number.isInteger(attributionDays) || attributionDays < 1 || attributionDays > 365))
+    || (sourceType === 'url_reach' && (!targetUrl || !/^https?:\/\//.test(targetUrl)))) {
+    return null;
+  }
+  return {
+    name, sourceType, sourceConfig, lineAccountId, deduplicationMode,
+    deduplicationWindowDays: windowDays, valueMode, fixedValue, reversalPolicy,
+    attributionDays, targetUrl,
+    measureMethod: sourceType === 'url_reach' ? 'url_reach' as const : 'webhook' as const,
+  };
+}
 
 function definitionFilters(c: Context<Env>) {
   const status = c.req.query('status');
@@ -320,6 +375,73 @@ conversions.get('/api/conversions/definitions', conversionPermission('view'), as
   }
 });
 
+// POST /api/conversions/definitions - save the complete V6 definition and its initial usages
+conversions.post('/api/conversions/definitions', conversionPermission('edit'), async (c) => {
+  try {
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    if (!body) return c.json({ success: false, error: 'JSON本文が正しくありません' }, 400);
+    const definition = readDefinitionInput(body);
+    const rawUsages = Array.isArray(body.usages) ? body.usages : [];
+    const usages = rawUsages.map((raw) => {
+      const usage = plainObject(raw);
+      return usage && CONVERSION_DEFINITION_USAGE_KINDS.includes(usage.refKind as ConversionDefinitionUsageKind)
+        && typeof usage.refId === 'string' && usage.refId.trim() && usage.refId.length <= 200
+        ? {
+            refKind: usage.refKind as ConversionDefinitionUsageKind,
+            refId: usage.refId.trim(),
+            refVersionId: typeof usage.refVersionId === 'string' && usage.refVersionId.trim()
+              ? usage.refVersionId.trim() : null,
+          }
+        : null;
+    });
+    if (!definition || usages.some((usage) => usage === null)) {
+      return c.json({ success: false, error: '成果地点の入力内容を正しく指定してください' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [definition.lineAccountId])) {
+      return c.json({ success: false, error: '成果地点が見つかりません' }, 404);
+    }
+    const data = await createConversionDefinition(c.env.DB, {
+      ...definition,
+      usages: usages.filter((usage): usage is NonNullable<typeof usage> => usage !== null),
+      staffId: c.get('staff')!.id,
+    });
+    auditLog(c, 'conversion.definition.create', { kind: 'conversion_definition', id: data!.id });
+    return c.json({ success: true, data }, 201);
+  } catch (error) {
+    return conversionContractError(c, error);
+  }
+});
+
+// POST /api/conversions/definitions/preview - calculate from the submitted draft without saving it
+conversions.post('/api/conversions/definitions/preview', conversionPermission('edit'), async (c) => {
+  try {
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    if (!body) return c.json({ success: false, error: 'JSON本文が正しくありません' }, 400);
+    const definition = readDefinitionInput({ name: '保存前試算', reversalPolicy: 'manual', ...body });
+    if (!definition) return c.json({ success: false, error: '試算する入力内容を正しく指定してください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [definition.lineAccountId])) {
+      return c.json({ success: false, error: '成果地点が見つかりません' }, 404);
+    }
+    const scope = await conversionDefinitionScope(c, definition.lineAccountId);
+    if (!scope.ok) return scope.response;
+    const range = conversionRange(c);
+    if (!range.ok) return range.response;
+    const data = await previewConversionDefinition(c.env.DB, {
+      scope: scope.value,
+      lineAccountId: definition.lineAccountId,
+      sourceType: definition.sourceType,
+      deduplicationMode: definition.deduplicationMode,
+      deduplicationWindowDays: definition.deduplicationWindowDays,
+      valueMode: definition.valueMode,
+      fixedValue: definition.fixedValue,
+      range: range.range,
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return conversionContractError(c, error);
+  }
+});
+
 // GET /api/conversions/definitions/:id - definition, current version and usages
 conversions.get('/api/conversions/definitions/:id', conversionPermission('view'), async (c) => {
   try {
@@ -327,6 +449,84 @@ conversions.get('/api/conversions/definitions/:id', conversionPermission('view')
     if (!scope.ok) return scope.response;
     const data = await getConversionDefinitionDetail(c.env.DB, c.req.param('id'), scope.value);
     if (!data) return c.json({ success: false, error: '成果地点が見つかりません' }, 404);
+    return c.json({ success: true, data });
+  } catch (error) {
+    return conversionContractError(c, error);
+  }
+});
+
+conversions.get('/api/conversions/definitions/:id/delete-impact', conversionPermission('view'), async (c) => {
+  try {
+    const scope = await conversionDefinitionScope(c);
+    if (!scope.ok) return scope.response;
+    const data = await getConversionDefinitionDeleteImpact(c.env.DB, c.req.param('id'), scope.value);
+    if (!data) return c.json({ success: false, error: '成果地点が見つかりません' }, 404);
+    return c.json({ success: true, data });
+  } catch (error) {
+    return conversionContractError(c, error);
+  }
+});
+
+conversions.post('/api/conversions/definitions/:id/stop', conversionPermission('edit'), async (c) => {
+  try {
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    const expectedVersion = positiveVersion(body?.expectedVersion);
+    if (!body || expectedVersion === null) {
+      return c.json({ success: false, error: 'expectedVersionを正しく指定してください' }, 400);
+    }
+    const scope = await conversionDefinitionScope(c);
+    if (!scope.ok) return scope.response;
+    const data = await stopConversionDefinition(c.env.DB, {
+      id: c.req.param('id'), scope: scope.value, expectedVersion,
+      reason: typeof body.reason === 'string' ? body.reason.trim() : null,
+      staffId: c.get('staff')!.id,
+    });
+    auditLog(c, 'conversion.definition.stop', { kind: 'conversion_definition', id: c.req.param('id') });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return conversionContractError(c, error);
+  }
+});
+
+conversions.post('/api/conversions/definitions/:id/replace', conversionPermission('edit'), async (c) => {
+  try {
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    const expectedVersion = positiveVersion(body?.expectedVersion);
+    const replacementExpectedVersion = positiveVersion(body?.replacementExpectedVersion);
+    const replacementId = typeof body?.replacementId === 'string' ? body.replacementId.trim() : '';
+    if (!body || expectedVersion === null || replacementExpectedVersion === null || !replacementId) {
+      return c.json({ success: false, error: '差し替え先と版を正しく指定してください' }, 400);
+    }
+    const scope = await conversionDefinitionScope(c);
+    if (!scope.ok) return scope.response;
+    const data = await replaceConversionDefinitionUsages(c.env.DB, {
+      id: c.req.param('id'), replacementId, scope: scope.value,
+      expectedVersion, replacementExpectedVersion,
+      reason: typeof body.reason === 'string' ? body.reason.trim() : null,
+      staffId: c.get('staff')!.id,
+    });
+    auditLog(c, 'conversion.definition.replace', { kind: 'conversion_definition', id: c.req.param('id') });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return conversionContractError(c, error);
+  }
+});
+
+conversions.delete('/api/conversions/definitions/:id', conversionPermission('edit'), async (c) => {
+  try {
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    const expectedVersion = positiveVersion(body?.expectedVersion);
+    if (!body || expectedVersion === null) {
+      return c.json({ success: false, error: 'expectedVersionを正しく指定してください' }, 400);
+    }
+    const scope = await conversionDefinitionScope(c);
+    if (!scope.ok) return scope.response;
+    const data = await deleteUnusedConversionDefinition(c.env.DB, {
+      id: c.req.param('id'), scope: scope.value, expectedVersion,
+      reason: typeof body.reason === 'string' ? body.reason.trim() : null,
+      staffId: c.get('staff')!.id,
+    });
+    auditLog(c, 'conversion.definition.delete', { kind: 'conversion_definition', id: c.req.param('id') });
     return c.json({ success: true, data });
   } catch (error) {
     return conversionContractError(c, error);

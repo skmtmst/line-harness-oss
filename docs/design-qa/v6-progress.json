@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 263,
+  "compared": 264,
   "unimplemented": 1,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 8,
-  "match": 249,
-  "structureMatchDataPending": 16,
-  "needsFix": 1,
-  "unjudged": 1,
-  "remaining": 19,
+  "missing": 7,
+  "match": 263,
+  "structureMatchDataPending": 4,
+  "needsFix": 0,
+  "unjudged": 0,
+  "remaining": 5,
   "features": [
     {
       "feature": 1,
@@ -194,17 +194,26 @@
       "feature": 3,
       "name": "友だち",
       "total": 12,
-      "compared": 10,
+      "compared": 11,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 2,
-      "match": 11,
+      "missing": 1,
+      "match": 12,
       "structureMatchDataPending": 0,
       "needsFix": 0,
-      "unjudged": 1,
-      "remaining": 1,
+      "unjudged": 0,
+      "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1230,
+          "head": "b62d7d070",
+          "on": "2026-09-07",
+          "screens": [
+            "ux7of"
+          ],
+          "note": "Issue #443 / PR #1230。CSV書き出し・確認取込・二重反映防止・履歴を正本文言と照合し、3104/8791の1440・1920pxで横はみ出し0を確認して一致へ更新した。"
+        },
         {
           "pr": 520,
           "head": "4848a8f3",
@@ -2019,12 +2028,21 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 7,
-      "structureMatchDataPending": 1,
+      "match": 8,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 2,
+      "remaining": 1,
       "capturedAt": [
+        {
+          "pr": 1230,
+          "head": "b62d7d070",
+          "on": "2026-09-07",
+          "screens": [
+            "QX70l"
+          ],
+          "note": "Issue #443 / PR #1230。司令塔承認の1440px設計画像と1920px実装画像を照合し、発行済みリンク・未確定報酬・承認待ち成果、3つの安全な操作を一致へ更新した。実装の横はみ出し0。"
+        },
         {
           "pr": 1180,
           "head": "3721857fb",
@@ -2112,12 +2130,23 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 8,
-      "structureMatchDataPending": 2,
-      "needsFix": 1,
+      "match": 11,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
       "unjudged": 0,
-      "remaining": 3,
+      "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1234,
+          "head": "78c19bea32",
+          "on": "2026-09-07",
+          "screens": [
+            "N46cQ",
+            "BmoGY",
+            "p9CcEB"
+          ],
+          "note": "Issue #445 / PR #1234。30日付与集計と1人平均、15軸の利用対象、使い道の交換対象条件保存を実契約へ接続し、3107/8794で1440/1920px撮影。全画像で横はみ出し0。"
+        },
         {
           "pr": 1217,
           "head": "1c8055931",
@@ -2426,12 +2455,22 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 2,
-      "structureMatchDataPending": 2,
+      "match": 4,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 2,
+      "remaining": 0,
       "capturedAt": [
+        {
+          "pr": 1230,
+          "head": "b62d7d070",
+          "on": "2026-09-07",
+          "screens": [
+            "GtylA",
+            "d8d3Mz"
+          ],
+          "note": "Issue #443 / PR #1230。作成条件・保存前試算・利用先、停止影響・差し替え・安全な削除を実API契約へ接続し、3104/8791で1440・1920pxを再撮影。横はみ出し0で2画面を一致へ更新した。"
+        },
         {
           "pr": 1207,
           "head": "46a869f74",
@@ -2558,11 +2597,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 3,
-      "structureMatchDataPending": 4,
+      "match": 4,
+      "structureMatchDataPending": 3,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 4,
+      "remaining": 3,
       "capturedAt": [
         {
           "pr": 1237,
@@ -2572,6 +2611,15 @@
             "HpKyF"
           ],
           "note": "Issue #442 / PR #1237。NEN配信の本文エディタと、回答フォームを開く・回答後200マイル付与の設定保存を実装。通常・誕生日を3102/8789で1440/1920px撮影し、全画像で横はみ出し0、Pencil V6と一致。"
+        },
+        {
+          "pr": 1234,
+          "head": "78c19bea32",
+          "on": "2026-09-07",
+          "screens": [
+            "q4lajm"
+          ],
+          "note": "Issue #445 / PR #1234。修正済み設計に合わせて誕生日配信の到達率94.6%とクリック率38.2%を表示し、3107/8794で1440/1920px撮影。両画像で横はみ出し0。"
         },
         {
           "pr": 1217,
@@ -2870,11 +2918,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 7,
-      "structureMatchDataPending": 1,
+      "match": 8,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 1,
+      "remaining": 0,
       "capturedAt": [
         {
           "pr": 0,
@@ -3048,11 +3096,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 2,
-      "structureMatchDataPending": 5,
+      "match": 7,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 5,
+      "remaining": 0,
       "capturedAt": [
         {
           "pr": 0,

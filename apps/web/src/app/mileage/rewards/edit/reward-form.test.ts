@@ -29,6 +29,7 @@ const base: FormState = {
   endsAt: '',
   benefitExpiresDays: '',
   commonActionVersionId: '',
+  targetConditions: null,
   failurePolicy: 'retry',
   customerMessage: '',
 }
@@ -129,5 +130,13 @@ describe('V6 17-1-G の配線', () => {
     expect(PAGE).toContain('detail.data.currentPublishedVersionId')
     expect(PAGE).toContain('公開中の共通アクションを選ぶ')
     expect(PAGE).not.toContain('placeholder="共通アクションの版"')
+  })
+
+  it('交換対象を15軸の共通条件部品で作り、下書きへ保存する', () => {
+    expect(PAGE).toContain("import ConditionBuilder, { pruneCondition }")
+    expect(PAGE).toContain('value={form.targetConditions}')
+    expect(PAGE).toContain("set('targetConditions', next)")
+    expect(PAGE).toContain('targetConditions: pruneCondition(form.targetConditions)')
+    expect(API).toContain('targetConditions?: MileageTargetConditionV6 | null')
   })
 })

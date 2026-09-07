@@ -18,6 +18,12 @@ const dbMocks = vi.hoisted(() => ({
   listConversionDefinitions: vi.fn(),
   getConversionDefinitionDetail: vi.fn(),
   addConversionDefinitionUsage: vi.fn(),
+  createConversionDefinition: vi.fn(),
+  previewConversionDefinition: vi.fn(),
+  getConversionDefinitionDeleteImpact: vi.fn(),
+  stopConversionDefinition: vi.fn(),
+  replaceConversionDefinitionUsages: vi.fn(),
+  deleteUnusedConversionDefinition: vi.fn(),
   getConversionDefinitionReport: vi.fn(),
   listConversionDefinitionsForExport: vi.fn(),
 }));
@@ -97,6 +103,16 @@ beforeEach(() => {
     kpis: { netCount: 0 }, daily: [], byDefinition: [], byRoute: [],
   });
   dbMocks.listConversionDefinitionsForExport.mockResolvedValue([]);
+  dbMocks.createConversionDefinition.mockResolvedValue({ id: 'point-new', name: '動画完了' });
+  dbMocks.previewConversionDefinition.mockResolvedValue({ estimatedCount: 214, estimatedValue: 402800 });
+  dbMocks.getConversionDefinitionDeleteImpact.mockResolvedValue({
+    definition: { id: 'point-a', version: 1 }, usages: [], eventCount: 0, canDelete: true,
+    stopImpact: { affectedUsageCount: 0, preservesPastEvents: true, preservesUsages: true },
+    replacementCandidates: [],
+  });
+  dbMocks.stopConversionDefinition.mockResolvedValue({ id: 'point-a', status: 'stopped', version: 2 });
+  dbMocks.replaceConversionDefinitionUsages.mockResolvedValue({ id: 'point-a', replacementId: 'point-b', replacedUsageCount: 3, status: 'stopped', version: 2 });
+  dbMocks.deleteUnusedConversionDefinition.mockResolvedValue({ id: 'point-a', deleted: true });
 });
 
 describe('conversion definition V6 routes', () => {
@@ -213,5 +229,61 @@ describe('conversion definition V6 routes', () => {
     expect(dbMocks.listConversionDefinitionsForExport).toHaveBeenCalledWith(
       expect.anything(), expect.objectContaining({ status: 'active', sort: 'count_desc' }),
     );
+  });
+
+  it('動画・30日1回・取消・利用先をまとめて作成する', async () => {
+    const body = {
+      name: '動画完了', sourceType: 'webinar_completed', sourceConfig: { webinarId: 'webinar-1' },
+      lineAccountId: 'account-a', deduplicationMode: 'window', deduplicationWindowDays: 30,
+      valueMode: 'none', reversalPolicy: 'none', attributionDays: 30,
+      usages: [{ refKind: 'analytics', refId: 'analysis-1' }],
+    };
+    const response = await app().request('/api/conversions/definitions', json(body));
+    expect(response.status).toBe(201);
+    expect(dbMocks.createConversionDefinition).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      sourceType: 'webinar_completed', deduplicationMode: 'window', deduplicationWindowDays: 30,
+      usages: [{ refKind: 'analytics', refId: 'analysis-1', refVersionId: null }],
+    }));
+  });
+
+  it('入力だけの試算は保存を呼ばず、担当外アカウントを隠す', async () => {
+    const body = {
+      sourceType: 'ec_order_confirmed', sourceConfig: {}, lineAccountId: 'account-a',
+      deduplicationMode: 'once_per_friend', valueMode: 'source',
+    };
+    const response = await app().request('/api/conversions/definitions/preview', json(body));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ data: { estimatedCount: 214 } });
+    expect(dbMocks.createConversionDefinition).not.toHaveBeenCalled();
+
+    accountMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
+    expect((await app().request('/api/conversions/definitions/preview', json({ ...body, lineAccountId: 'account-b' }))).status).toBe(404);
+  });
+
+  it('削除影響、停止、差し替え、未使用削除を版付きで呼ぶ', async () => {
+    expect((await app().request('/api/conversions/definitions/point-a/delete-impact')).status).toBe(200);
+
+    const stopped = await app().request('/api/conversions/definitions/point-a/stop', json({ expectedVersion: 1 }));
+    expect(stopped.status).toBe(200);
+    expect(dbMocks.stopConversionDefinition).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ expectedVersion: 1 }));
+
+    const replaced = await app().request('/api/conversions/definitions/point-a/replace', json({
+      expectedVersion: 1, replacementId: 'point-b', replacementExpectedVersion: 2,
+    }));
+    expect(replaced.status).toBe(200);
+    expect(dbMocks.replaceConversionDefinitionUsages).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ replacementId: 'point-b' }));
+
+    const deleted = await app().request('/api/conversions/definitions/point-a', {
+      method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ expectedVersion: 1 }),
+    });
+    expect(deleted.status).toBe(200);
+    expect(dbMocks.deleteUnusedConversionDefinition).toHaveBeenCalled();
+  });
+
+  it('作成・停止・差し替えの不正入力をDBへ渡さない', async () => {
+    expect((await app().request('/api/conversions/definitions', json({ name: '不足' }))).status).toBe(400);
+    expect((await app().request('/api/conversions/definitions/point-a/stop', json({ expectedVersion: 0 }))).status).toBe(400);
+    expect((await app().request('/api/conversions/definitions/point-a/replace', json({ expectedVersion: 1 }))).status).toBe(400);
+    expect(dbMocks.createConversionDefinition).not.toHaveBeenCalled();
   });
 });

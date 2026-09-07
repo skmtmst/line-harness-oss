@@ -850,6 +850,12 @@ export type ConversionApprovalItem = {
 }
 
 export type ConversionDefinitionStatus = 'active' | 'stopped'
+export type ConversionDeduplicationMode = 'every' | 'once_per_friend' | 'window'
+export type ConversionValueMode = 'source' | 'fixed' | 'none'
+export type ConversionReversalPolicy = 'source_cancelled' | 'manual' | 'none'
+export type ConversionDefinitionUsageKind =
+  | 'affiliate_offer' | 'analytics' | 'auto_reply' | 'scenario'
+  | 'nen_campaign' | 'mileage_rule' | 'automation' | 'ad_platform'
 
 export type ConversionDefinitionListItem = {
   id: string
@@ -860,6 +866,11 @@ export type ConversionDefinitionListItem = {
   targetUrl: string | null
   countRepeat: boolean
   attributionDays: number | null
+  sourceConfig: Record<string, unknown>
+  deduplicationMode: ConversionDeduplicationMode
+  deduplicationWindowDays: number | null
+  valueMode: ConversionValueMode
+  reversalPolicy: ConversionReversalPolicy
   lineAccountId: string | null
   status: ConversionDefinitionStatus
   version: number
@@ -878,6 +889,52 @@ export type ConversionDefinitionListItem = {
   stoppedAt: string | null
   createdAt: string
   updatedAt: string
+}
+
+export type ConversionDefinitionUsage = {
+  id: string
+  conversionPointId: string
+  definitionVersion: number
+  lineAccountId: string
+  refKind: ConversionDefinitionUsageKind
+  refId: string
+  refVersionId: string | null
+  usageName: string
+}
+
+export type ConversionDefinitionDetail = ConversionDefinitionListItem & {
+  currentVersion: {
+    id: string
+    number: number
+    sourceType: string
+    measureMethod: ConversionMeasureMethod
+    targetUrl: string | null
+    countRepeat: boolean
+    fixedValue: number | null
+    attributionDays: number | null
+  }
+  usages: ConversionDefinitionUsage[]
+}
+
+export type ConversionDefinitionPreview = {
+  range: { from: string; to: string; timeZone: 'Asia/Tokyo' }
+  matchedCount: number
+  estimatedCount: number
+  estimatedValue: number
+  duplicateExcludedCount: number
+  cancellationCount: number
+  excludedReasons: string[]
+  dailyAverage: number
+  deduplicationWindowDays: number | null
+}
+
+export type ConversionDefinitionDeleteImpact = {
+  definition: ConversionDefinitionDetail
+  usages: ConversionDefinitionUsage[]
+  eventCount: number
+  canDelete: boolean
+  stopImpact: { affectedUsageCount: number; preservesPastEvents: true; preservesUsages: true }
+  replacementCandidates: Array<{ id: string; name: string; version: number }>
 }
 
 export type ConversionDefinitionList = {
@@ -1170,7 +1227,7 @@ export type CommonActionStep = {
   id: string;
   type: 'add_tag' | 'remove_tag' | 'set_metadata' | 'start_scenario' | 'stop_scenario'
     | 'resume_scenario' | 'send_message' | 'send_webhook' | 'switch_rich_menu'
-    | 'remove_rich_menu' | 'wait' | 'common_action';
+    | 'remove_rich_menu' | 'wait' | 'common_action' | 'branch';
   params: Record<string, unknown>;
   onFailure: 'stop' | 'continue';
 };
@@ -1962,6 +2019,7 @@ export type MileageRewardVersion = {
   endsAt: string | null
   benefitExpiresDays: number | null
   commonActionVersionId: string | null
+  targetConditions: MileageTargetConditionV6 | null
   failurePolicy: MileageRewardFailurePolicy
   customerMessage: string
   publishedAt: string | null
@@ -2019,6 +2077,8 @@ export type MileageRewardDraftInput = {
   benefitExpiresDays?: number | null
   /** 交換後に渡すもの。**クーポン以外では必須**（Worker が弾く）。 */
   commonActionVersionId?: string | null
+  /** この条件を満たす友だちだけが交換できる。null は全員。 */
+  targetConditions?: MileageTargetConditionV6 | null
   failurePolicy?: MileageRewardFailurePolicy
   customerMessage?: string
 }
@@ -5850,6 +5910,57 @@ export const api = {
         `/api/conversions/definitions?${new URLSearchParams(query)}`,
       )
     },
+    createDefinition: (data: {
+      name: string
+      sourceType: string
+      sourceConfig: Record<string, unknown>
+      targetUrl?: string | null
+      lineAccountId: string
+      deduplicationMode: ConversionDeduplicationMode
+      deduplicationWindowDays?: number | null
+      valueMode: ConversionValueMode
+      fixedValue?: number | null
+      reversalPolicy: ConversionReversalPolicy
+      attributionDays?: number | null
+      usages: Array<{ refKind: ConversionDefinitionUsageKind; refId: string; refVersionId?: string | null }>
+    }) => fetchApi<ApiResponse<ConversionDefinitionDetail>>('/api/conversions/definitions', {
+      method: 'POST', body: JSON.stringify(data),
+    }),
+    previewDefinition: (data: {
+      sourceType: string
+      sourceConfig: Record<string, unknown>
+      targetUrl?: string | null
+      lineAccountId: string
+      deduplicationMode: ConversionDeduplicationMode
+      deduplicationWindowDays?: number | null
+      valueMode: ConversionValueMode
+      fixedValue?: number | null
+    }) => fetchApi<ApiResponse<ConversionDefinitionPreview>>('/api/conversions/definitions/preview', {
+      method: 'POST', body: JSON.stringify(data),
+    }),
+    definitionDeleteImpact: (id: string) =>
+      fetchApi<ApiResponse<ConversionDefinitionDeleteImpact>>(
+        `/api/conversions/definitions/${encodeURIComponent(id)}/delete-impact`,
+      ),
+    stopDefinition: (id: string, data: { expectedVersion: number; reason?: string }) =>
+      fetchApi<ApiResponse<{ id: string; status: 'stopped'; version: number; stoppedAt: string }>>(
+        `/api/conversions/definitions/${encodeURIComponent(id)}/stop`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+    replaceDefinition: (id: string, data: {
+      replacementId: string
+      expectedVersion: number
+      replacementExpectedVersion: number
+      reason?: string
+    }) => fetchApi<ApiResponse<{ id: string; replacementId: string; replacedUsageCount: number; status: 'stopped'; version: number }>>(
+      `/api/conversions/definitions/${encodeURIComponent(id)}/replace`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+    deleteDefinition: (id: string, data: { expectedVersion: number; reason?: string }) =>
+      fetchApi<ApiResponse<{ id: string; deleted: true }>>(
+        `/api/conversions/definitions/${encodeURIComponent(id)}`,
+        { method: 'DELETE', body: JSON.stringify(data) },
+      ),
     definitionReport: (params: { from: string; to: string; lineAccountId?: string }) => {
       const query = Object.fromEntries(
         Object.entries(params)
@@ -8780,7 +8891,107 @@ export interface ProxyBookingResult {
   booking_id: string;
   status: string;
   calendar_sync: 'not_configured' | 'synced' | 'failed' | 'pending';
+  line_notification: 'queued' | 'succeeded' | 'failed' | 'not_applicable';
+  reminders: BookingReminderResult[];
+  operations: BookingOperationResult[];
+  customer_context: BookingCustomerContext | null;
   replayed?: boolean;
+}
+
+export interface BookingReminderResult {
+  id: string;
+  kind: 'day_before' | 'hours_before';
+  scheduled_at: string;
+  sent_at: string | null;
+  status: 'pending' | 'sent' | 'failed' | 'failed_permanent' | 'cancelled';
+}
+
+export interface BookingOperationResult {
+  id: string;
+  kind: 'confirmation_line' | 'google_calendar' | 'conversion' | 'mileage' | 'automation';
+  status: 'queued' | 'succeeded' | 'skipped' | 'retry_wait' | 'permanent_failed' | 'cancelled';
+  scheduledAt: string | null;
+  completedAt: string | null;
+  openedAt: string | null;
+  result: Record<string, unknown>;
+  errorCode: string | null;
+}
+
+export interface BookingHistorySummary {
+  id: string;
+  startsAt: string;
+  status: string;
+  customerNote: string | null;
+  handoverNote: string | null;
+  price: number;
+  menuName: string;
+  staffName: string;
+}
+
+export interface BookingCustomerContext {
+  id: string;
+  friendId: string | null;
+  displayName: string;
+  isLineLinked: boolean;
+  phone: string | null;
+  petName: string | null;
+  tags: Array<{ id: string; name: string }>;
+  mileageBalance: number | null;
+  previousHandover: string | null;
+  recentBookings: BookingHistorySummary[];
+}
+
+export interface BookingAdminDetail {
+  id: string;
+  startsAt: string;
+  endsAt: string;
+  status: string;
+  customerNote: string | null;
+  internalNote: string | null;
+  price: number;
+  requestedAt: string;
+  decidedAt: string | null;
+  source: string;
+  createdByStaffId: string | null;
+  calendarSync: 'synced' | 'not_configured';
+  menuName: string;
+  staffName: string;
+  customer: {
+    friendId: string | null;
+    bookingCustomerId: string | null;
+    displayName: string;
+    isLineLinked: boolean;
+    phone: string | null;
+    petName: string | null;
+    tags: Array<{ id: string; name: string }>;
+    mileageBalance: number | null;
+  };
+  previousHandover: string | null;
+  history: BookingHistorySummary[];
+  reminders: Array<{
+    id: string;
+    kind: string;
+    scheduledAt: string;
+    sentAt: string | null;
+    status: string;
+    retryCount: number;
+  }>;
+  operations: BookingOperationResult[];
+}
+
+export interface BookingConflictAlternatives {
+  conflict: {
+    from: string;
+    to: string;
+    count: number;
+    source: 'internal_booking' | 'google_calendar' | 'schedule';
+  };
+  nearbySlots: BookingAvailabilitySlot[];
+  alternateStaff: Array<{
+    staffId: string;
+    displayName: string;
+    slot: BookingAvailabilitySlot;
+  }>;
 }
 
 export interface BookingCustomerSummary {
@@ -8800,6 +9011,35 @@ function withAccount(path: string, accountId: string): string {
 }
 
 export const bookingApi = {
+  previewReminders: (accountId: string, startsAt: string) => {
+    const params = new URLSearchParams({ account_id: accountId, starts_at: startsAt });
+    return fetchApi<{ reminders: Array<{ kind: 'day_before' | 'hours_before'; scheduledAt: string }> }>(
+      `/api/booking/admin/reminder-preview?${params}`,
+    );
+  },
+  getCustomerContext: (
+    accountId: string,
+    input: { friendId?: string; bookingCustomerId?: string },
+  ) => {
+    const params = new URLSearchParams({ account_id: accountId });
+    if (input.friendId) params.set('friend_id', input.friendId);
+    if (input.bookingCustomerId) params.set('booking_customer_id', input.bookingCustomerId);
+    return fetchApi<{ customer: BookingCustomerContext }>(`/api/booking/admin/customer-context?${params}`);
+  },
+  getBooking: (accountId: string, id: string) =>
+    fetchApi<{ booking: BookingAdminDetail }>(withAccount(`/api/booking/admin/bookings/${id}`, accountId)),
+  getAlternatives: (
+    accountId: string,
+    input: { menuId: string; staffId: string; startsAt: string },
+  ) => {
+    const params = new URLSearchParams({
+      account_id: accountId,
+      menu_id: input.menuId,
+      staff_id: input.staffId,
+      starts_at: input.startsAt,
+    });
+    return fetchApi<BookingConflictAlternatives>(`/api/booking/admin/alternatives?${params}`);
+  },
   listCustomers: (accountId: string, query?: string) => {
     const params = new URLSearchParams({ account_id: accountId });
     if (query?.trim()) params.set('q', query.trim());

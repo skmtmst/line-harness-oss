@@ -138,12 +138,18 @@ describe('mileage admin API', () => {
       method: 'PATCH',
       body: JSON.stringify({
         accountId: 'account-1', expectedVersionId: 'version-1',
-        draft: { name: '交換品', rewardKind: 'coupon', requiredMiles: 300 },
+        draft: {
+          name: '交換品', rewardKind: 'coupon', requiredMiles: 300,
+          targetConditions: { operator: 'AND', rules: [{ type: 'tag_exists', value: '会員' }] },
+        },
       }),
     });
     expect(draft.status).toBe(200);
     expect(dbMocks.updateMileageRewardDraft).toHaveBeenCalledWith(env.DB, expect.objectContaining({
       id: 'reward-1', lineAccountId: 'account-1', expectedVersionId: 'version-1',
+      draft: expect.objectContaining({
+        targetConditions: { operator: 'AND', rules: [{ type: 'tag_exists', value: '会員' }] },
+      }),
     }));
 
     dbMocks.setMileageRewardStatus.mockResolvedValueOnce({ id: 'reward-1', status: 'stopped' });

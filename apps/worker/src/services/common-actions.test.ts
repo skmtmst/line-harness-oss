@@ -111,6 +111,45 @@ describe('V6共通アクション', () => {
     })).rejects.toMatchObject({ code: 'action_type_unsupported' });
   });
 
+  it('タグ条件の分岐を検査し、両方の公開版を固定する', async () => {
+    const yes = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: 'VIP向け', actions: tagAction('tag-1'),
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: yes.id, lineAccountId: 'account-1', draftVersionId: yes.draftVersionId,
+    });
+    const no = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '通常向け', actions: tagAction('tag-1'),
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: no.id, lineAccountId: 'account-1', draftVersionId: no.draftVersionId,
+    });
+    const branched = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1',
+      name: 'VIPで分ける',
+      actions: [{
+        id: 'branch-1', type: 'branch', onFailure: 'stop',
+        params: {
+          condition: { operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-1' }] },
+          then: [{ id: 'yes', type: 'common_action', params: { commonActionId: yes.id }, onFailure: 'stop' }],
+          else: [{ id: 'no', type: 'common_action', params: { commonActionId: no.id }, onFailure: 'stop' }],
+        },
+      }],
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: branched.id, lineAccountId: 'account-1', draftVersionId: branched.draftVersionId,
+    });
+    const detail = await getCommonActionDetail(testDb.db, {
+      id: branched.id, lineAccountId: 'account-1',
+    });
+    const branch = detail.versions[0].actions[0];
+    expect(branch.type).toBe('branch');
+    expect((branch.params.then as Array<{ params: Record<string, unknown> }>)[0].params)
+      .toMatchObject({ commonActionId: yes.id, commonActionVersionId: yes.draftVersionId });
+    expect((branch.params.else as Array<{ params: Record<string, unknown> }>)[0].params)
+      .toMatchObject({ commonActionId: no.id, commonActionVersionId: no.draftVersionId });
+  });
+
   it('複製は元とつながらない独立した下書きを作る', async () => {
     const source = await createCommonAction(testDb.db, {
       lineAccountId: 'account-1', name: '来店後フォロー', actions: tagAction('tag-1'),

@@ -89,13 +89,28 @@ describe('V6 成果地点一覧の契約', () => {
     expect(PAGE).not.toContain('帰属根拠の集計は未接続')
   })
 
-  it('作成画面で重複を止め、試算口の未接続を隠さない', () => {
+  it('作成画面で重複を止め、入力中の条件だけを試算する', () => {
     expect(NEW_PAGE).toContain('designNode="GtylA"')
     expect(NEW_PAGE).toContain('variant="v6"')
     expect(NEW_PAGE).toContain('const duplicateName = useMemo')
     expect(NEW_PAGE).toContain('同じ意味の成果地点を2つ作らないでください')
-    expect(NEW_PAGE).toContain('重複除外・取消を含む保存前試算APIの接続後')
+    expect(NEW_PAGE).toContain('api.conversions.previewDefinition({')
+    expect(NEW_PAGE).toContain('入力中の条件だけで試算しています。')
+    expect(NEW_PAGE).toContain('試算では成果を追加しません。')
+    expect(NEW_PAGE).not.toContain('保存前試算APIの接続後')
     expect(NEW_PAGE).not.toContain('準備中')
     expect(NEW_PAGE).not.toContain('Webhookで受け取った')
+  })
+
+  it('6起点・30日1回・取消・利用先を定義APIへ保存する', () => {
+    expect(NEW_PAGE).toContain("eventType: 'webinar_completed'")
+    expect(NEW_PAGE).toContain("eventType: 'tag_added'")
+    expect(NEW_PAGE).toContain("setDeduplicationMode('window')")
+    expect(NEW_PAGE).toContain("value: 'source', label: '注文の金額をそのまま使う'")
+    expect(NEW_PAGE).toContain("value: 'source_cancelled', label: '返品されたら取り消す'")
+    expect(NEW_PAGE).toContain('api.conversions.createDefinition({')
+    expect(NEW_PAGE).toContain('usages: USAGE_CHOICES')
+    expect(NEW_PAGE).not.toContain('保存契約は未接続')
+    expect(NEW_PAGE).not.toContain('利用先APIの接続後')
   })
 })
