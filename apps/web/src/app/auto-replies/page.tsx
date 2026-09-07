@@ -9,11 +9,11 @@ import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import Header from '@/components/layout/header'
 import EditDialog, { type AutoReplyDraft } from '@/components/auto-replies/edit-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Button from '@/components/shared/button'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import {
   EFFECTIVE_LEGEND,
   LOAD_STATE_WORDS,
@@ -160,6 +160,7 @@ function ruleSubtitle(r: AutoReply, templateName: string | null): string {
 }
 
 export default function AutoRepliesPage() {
+  usePageTitle('自動応答')
   const { selectedAccountId, accounts } = useAccount()
   const [items, setItems] = useState<AutoReply[]>([])
   const [query, setQuery] = useState('')
@@ -464,44 +465,6 @@ export default function AutoRepliesPage() {
 
   return (
     <div>
-      <div data-design="Head">
-      <Header
-        title="自動応答"
-        description="受信したメッセージに自動で返します。キーワード・メッセージ種別・曜日や時間帯・友だち条件で出し分けできます。"
-        action={
-          <div className="flex flex-wrap gap-2">
-          {/*
-            **押しても何も起きない「マニュアル」を出さない**（`v6-common-rules`
-            §5-5「動くまで描かない」／S0 の #719 が一覧の帯で同じことをした）。
-            行き先が決まっていないので、押せない形で位置だけ見せても、
-            いつ使えるようになるのか読む人には分からない。
-            「並び替え」は評価順で自動に決まるため、押す口そのものが要らない。
-          */}
-          <button
-            onClick={() => setFolderDialogOpen(true)}
-            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium transition-colors"
-          >
-            フォルダを追加
-          </button>
-          <button
-            onClick={() => setEditing({
-              keyword: '',
-              matchType: 'exact',
-              responseType: 'text',
-              responseContent: '',
-              templateId: null,
-              lineAccountId: selectedAccountId,
-              isActive: true,
-            })}
-            className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium"
-          >
-            自動応答を作成
-          </button>
-          </div>
-        }
-      />
-      </div>
-
       <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">ルール数</p>
@@ -551,6 +514,24 @@ export default function AutoRepliesPage() {
               : LOAD_STATE_WORDS[visibleLoadState].label}
           </p>
         </div>
+      </div>
+
+      <div data-design="Actions" className="mb-4 flex flex-wrap items-center gap-2">
+        <Button onClick={() => setFolderDialogOpen(true)}>フォルダを追加</Button>
+        <Button
+          variant="primary"
+          onClick={() => setEditing({
+            keyword: '',
+            matchType: 'exact',
+            responseType: 'text',
+            responseContent: '',
+            templateId: null,
+            lineAccountId: selectedAccountId,
+            isActive: true,
+          })}
+        >
+          ルールを作成
+        </Button>
       </div>
 
       {/* 複数当てはまったときの挙動。書いていないと必ず問い合わせになる。 */}

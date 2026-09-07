@@ -4,8 +4,8 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { ApiError, api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
-import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
+import StickyBar from '@/components/shared/sticky-bar'
 import { useAccount } from '@/contexts/account-context'
 import { messageTypeLabel } from '@/lib/broadcast-summary'
 import { broadcastBelongsToSelectedAccount } from './broadcast-detail-account'
@@ -25,6 +25,7 @@ function BroadcastDetailInner() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const id = params.get('id') ?? ''
   const [broadcast, setBroadcast] = useState<ApiBroadcast | null>(null)
+  usePageTitle(broadcast ? `配信結果：${broadcast.title}` : '配信の詳細')
   const [insight, setInsight] = useState<(BroadcastInsight & { suppressedByAudienceSize: boolean }) | null>(null)
   // 集計は配信本体とは別に取る。取れていないのか、取りに行って失敗したのかを
   // 「—」に混ぜると、待てば出るのか操作が要るのかを運用者が判断できない。
@@ -134,33 +135,11 @@ function BroadcastDetailInner() {
 
   return (
     <div>
-      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
+      <nav data-design="Crumb" className="text-ink-faint mb-4 text-xs">
         <Link href="/broadcasts" className="hover:underline">
-          一斉配信
+          ← 一斉配信一覧
         </Link>
-        <span className="mx-1.5">/</span>
-        <span>{broadcast?.title ?? '詳細'}</span>
       </nav>
-
-      <div data-design="Head">
-        <Header
-          title={broadcast ? `配信結果：${broadcast.title}` : '配信の詳細'}
-          description={
-            broadcast?.sentAt
-              ? `${formatBroadcastDateTime(broadcast.sentAt)} に送信`
-              : broadcast?.scheduledAt
-                ? `${formatBroadcastDateTime(broadcast.scheduledAt)} に予約`
-                : undefined
-          }
-          action={
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={exportCsv} disabled={!broadcast}>
-                CSVで書き出す
-              </Button>
-            </div>
-          }
-        />
-      </div>
 
       {loadState === 'loading' ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
@@ -388,6 +367,10 @@ function BroadcastDetailInner() {
           </Link>
         </div>
       )}
+      <StickyBar
+        className="mt-6"
+        actions={<Button onClick={exportCsv} disabled={!broadcast}>CSVで書き出す</Button>}
+      />
     </div>
   )
 }
@@ -526,7 +509,6 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function BroadcastDetailPage() {
-  usePageTitle('配信の詳細')
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
