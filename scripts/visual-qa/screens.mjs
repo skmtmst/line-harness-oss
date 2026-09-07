@@ -4343,6 +4343,22 @@ for (const screen of SCREENS) {
   }
 }
 
+const issue413Judgments = {
+  bfB50: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #413 / UI `88673e254` を3101/8788で再撮影。** bfB50の通常・読込・空・異常・権限不足を1440/1920pxで確認し、月別集計の件数・金額を返す `monthlyStats` と開始・停止件数をAPIへ追加した。現モックは新しい集計値を返さないため、設計の月別集計表示はデータ待ちとして記録。全画像で横はみ出し0。',
+    verdictSource: 'ec-v6/bfB50.txt + ec-v6/bfB50-normal-1920.png', verdictHead: '88673e254',
+  },
+  oHAN4: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #413 / UI `88673e254` を3101/8788で再撮影。** oHAN4の通常・読込・空・異常・権限不足を1440/1920pxで確認し、NEN配信・成果・マイル・友だち属性・分析の影響件数をAPIから返すようにした。現モックは新しい件数を返さないため、設計の影響件数はデータ待ちとして記録。全画像で横はみ出し0、秘密値露出0。',
+    verdictSource: 'ec-v6/oHAN4.txt + ec-v6/oHAN4-normal-1920.png', verdictHead: '88673e254',
+  },
+}
+for (const screen of SCREENS) {
+  if (screen.feature === 23 && issue413Judgments[screen.node]) Object.assign(screen, issue413Judgments[screen.node])
+}
+
 const ISSUE_211_SCREENS = new Set([
   'uLQQc', 's9gAx', 'W1wzCa', 'K0Dbr2', 'txMO9', 'U3SI5', 'Q3qP1r',
   'ZC13r', 'PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'GB0NR', 'D6yO7e', 'Q8sHa', 'yxyzQ', 'LKuAQ', 'zCQXe',
@@ -4827,6 +4843,7 @@ export const CAPTURED_AT = {
     { pr: 1028, head: '7cc11af48', on: '2026-09-07', screens: ['vUXKb', 'JN6mQ'], note: 'Issue #267。#270の指標APIと#277の撮影モックを接続し、3102/8789で1440・1920pxを再撮影。両画面とも横はみ出し0、表示中の本文差0。有効友だち398人、送信枠197/200、7日推移、公式lin.ee URL、実QRを確認して一致にした。' },
   ],
   23: [
+    { pr: 1190, head: '88673e254', on: '2026-09-07', screens: ['bfB50', 'oHAN4'], note: 'Issue #413。月別集計と下流影響件数のAPIを追加し、bfB50・oHAN4を3101/8788で通常・読込・空・異常・権限不足の各状態まで撮影。横はみ出し0。' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['eI3gs'], note: '同上' },
     { pr: 600, head: '484c0cd8', on: '2026-08-31', screens: ['ELayY'], note: '同じ候補部品・状態部品・判定窓を使うECのほう。再処理の既定は「今後だけ」' },
     { pr: 1006, head: 'f7623915e', on: '2026-09-06', screens: ['bfB50', 'oHAN4'], note: 'Issue #258。定期便とつなぎ先を実APIへ接続し、通常・読込・空・失敗・権限不足の全24枚を1440・1920pxで撮影。全画像で横はみ出し0、壊れ値・秘密値露出0。設計画像なしのため本文照合で未判定。' },

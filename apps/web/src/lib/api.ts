@@ -2930,6 +2930,7 @@ export type EcSubscriptionList = {
     startedThisMonth: number | null
     cancelledThisMonth: number | null
     cancellationTopReason: string | null
+    monthlyStats: Array<{ month: string; count: number; amount: number }>
   }
   risk: {
     source: 'payment_status'
