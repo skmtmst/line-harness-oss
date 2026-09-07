@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 9,
-  "match": 171,
-  "structureMatchDataPending": 74,
+  "match": 173,
+  "structureMatchDataPending": 72,
   "needsFix": 18,
   "unjudged": 5,
-  "remaining": 97,
+  "remaining": 95,
   "features": [
     {
       "feature": 1,
@@ -199,11 +199,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 2,
-      "match": 8,
-      "structureMatchDataPending": 3,
+      "match": 10,
+      "structureMatchDataPending": 1,
       "needsFix": 0,
       "unjudged": 1,
-      "remaining": 4,
+      "remaining": 2,
       "capturedAt": [
         {
           "pr": 520,

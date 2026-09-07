@@ -86,6 +86,7 @@ import {
   FORM_FOLDERS, FORMS, FORM_DETAIL,
   LINE_ACCOUNTS, LINE_ACCOUNT_DETAIL, LINE_ACCOUNT_VERIFY_CONNECTION, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
   CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
+  CONVERSION_DEFINITIONS, CONVERSION_DEFINITION_REPORT, CONVERSION_EXPORT_CSV,
   OPERATION_CONTROL_PREVIEW, OPERATION_HEALTH, OPERATION_HISTORY,
   WEBINARS, WEBINAR_FOLDERS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_ANALYTICS,
   FRIEND_ADD_RULE_PUBLISH, FRIEND_ADD_RULE_VALIDATE,
@@ -1891,8 +1892,12 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/mileage/friends') return { success: true, data: MILEAGE_FRIENDS }
   if (pathname === '/api/mileage/earning-rules') return { success: true, data: MILEAGE_EARNING_RULES }
   if (pathname === '/api/mileage/rules') return { success: true, data: MILEAGE_RULES }
+  if (pathname === '/api/conversions/definitions') return { success: true, data: CONVERSION_DEFINITIONS }
   if (pathname === '/api/conversions/points') return { success: true, data: CONVERSION_POINTS }
   if (pathname === '/api/conversions/report') {
+    if (query.has('from') || query.has('to')) {
+      return { success: true, data: CONVERSION_DEFINITION_REPORT }
+    }
     const startDate = query.get('startDate') ?? ''
     const data = startDate >= '2026-08-01'
       ? CONVERSION_REPORT_CURRENT
@@ -2271,6 +2276,14 @@ const server = createServer((req, res) => {
   */
   if (url.pathname === '/__mock-fingerprint') {
     res.writeHead(200).end(JSON.stringify({ fingerprint: FINGERPRINT }))
+    return
+  }
+
+  if (method === 'GET' && url.pathname === '/api/conversions/export') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader('Content-Disposition', 'attachment; filename="conversion-definitions-2026-08-25.csv"')
+    res.setHeader('Cache-Control', 'no-store')
+    res.writeHead(200).end(CONVERSION_EXPORT_CSV)
     return
   }
 

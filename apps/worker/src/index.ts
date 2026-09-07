@@ -38,6 +38,10 @@ import { dispatchActionScoreApplications } from './services/action-score-events.
 import { processDueMileageRewardDeliveries } from './services/mileage-reward-delivery.js';
 import { runEventBookingExpirer } from './services/event-booking-expirer.js';
 import { sendEventBookingNotification } from './services/event-booking-notifier.js';
+import {
+  createEventWaitlistOfferSender,
+  processEventWaitlistPromotionJobs,
+} from './services/event-waitlist.js';
 import { sendBookingNotification } from './services/booking-notifier.js';
 import { DEFAULT_ACCOUNT_SETTINGS } from './services/booking-types.js';
 import { authMiddleware } from './middleware/auth.js';
@@ -1513,6 +1517,22 @@ async function scheduled(
     }
   } catch (e) {
     console.error('event-booking-reminders error:', e);
+  }
+
+  // 取消・拒否・期限切れで空いた席を、同意が必要な24時間の保留として先頭へ案内する。
+  // LINE送信に失敗したjobは完了にせず、次のdelivery tickで再試行する。
+  try {
+    const result = await processEventWaitlistPromotionJobs(env.DB, {
+      now: new Date(event.scheduledTime),
+      sender: createEventWaitlistOfferSender(env.DB, { liffUrl: env.LIFF_URL }),
+    });
+    if (result.processed > 0) {
+      console.log(
+        `[event-waitlist] processed=${result.processed} promoted=${result.promoted} retried=${result.retried}`,
+      );
+    }
+  } catch (e) {
+    console.error('event-waitlist error:', e);
   }
 
   // 外部Google Calendarで確定したMeet個別相談。前日・1時間前のLINE通知を

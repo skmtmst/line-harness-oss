@@ -4,8 +4,8 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Bookmark, Circle, SlidersHorizontal, Star } from 'lucide-react'
-import type { SavedSearch, Scenario, Tag } from '@line-crm/shared'
-import { api, type FriendListItem } from '@/lib/api'
+import type { Scenario, Tag } from '@line-crm/shared'
+import { api, type FriendListItem, type FriendSavedView, type SupportMarkListItem } from '@/lib/api'
 import FriendKpis from '@/components/friends/friend-kpis'
 import FriendListTable from '@/components/friends/friend-list-table'
 import AdvancedSearchDialog, { type AdvancedSearchResult } from '@/components/friends/advanced-search-dialog'
@@ -70,6 +70,7 @@ function FriendsPageInner({
   const [allTags, setAllTags] = useState<Tag[]>([])
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
+  const [marks, setMarks] = useState<SupportMarkListItem[]>([])
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [savedOpen, setSavedOpen] = useState(false)
   const [advanced, setAdvanced] = useState<AdvancedSearchResult | null>(null)
@@ -119,14 +120,16 @@ function FriendsPageInner({
 
   const loadOptions = useCallback(async () => {
     try {
-      const [tagResponse, operatorResponse, scenarioResponse] = await Promise.all([
+      const [tagResponse, operatorResponse, scenarioResponse, markResponse] = await Promise.all([
         api.tags.list(),
         api.operators.list(),
         api.scenarios.list(selectedAccountId ? { accountId: selectedAccountId } : undefined),
+        selectedAccountId ? api.supportMarks.list(selectedAccountId) : Promise.resolve({ success: true as const, data: [] }),
       ])
       if (tagResponse.success) setAllTags(tagResponse.data)
       if (operatorResponse.success) setOperators(operatorResponse.data)
       if (scenarioResponse.success) setScenarios(scenarioResponse.data)
+      if (markResponse.success) setMarks(markResponse.data)
     } catch {
       // 選択肢の取得に失敗しても、友だち一覧と検索は使える。
     }
@@ -446,6 +449,8 @@ function FriendsPageInner({
         accountId={selectedAccountId}
         tags={allTags}
         fieldNames={[]}
+        marks={marks}
+        scenarios={scenarios}
         onClose={() => setAdvancedOpen(false)}
         onLoadSaved={() => {
           setAdvancedOpen(false)
@@ -506,7 +511,7 @@ function SavedSearchDialog({
   onApply: (result: AdvancedSearchResult) => void
   onOpenAdvanced: () => void
 }) {
-  const [saved, setSaved] = useState<SavedSearch[]>([])
+  const [saved, setSaved] = useState<FriendSavedView[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -519,8 +524,8 @@ function SavedSearchDialog({
       setLoading(false)
       return
     }
-    void api.savedSearches.list(accountId).then((res) => {
-      if (!cancelled && res.success) setSaved(res.data)
+    void api.friendSavedViews.list(accountId).then((res) => {
+      if (!cancelled && res.success) setSaved(res.data.items)
     }).catch(() => {
       if (!cancelled) setError('保存した検索を読み込めませんでした')
     }).finally(() => {
@@ -551,6 +556,9 @@ function SavedSearchDialog({
                     <span className="rounded-pill bg-canvas px-2 py-0.5 text-xs font-medium text-ink-faint">{search.isShared ? '全員' : '自分だけ'}</span>
                   </span>
                   <span className="mt-2 block text-xs leading-5 text-ink-secondary">{summary.slice(0, 3).join(' ／ ') || '条件を確認してください'}</span>
+                  <span className="mt-1 block text-xs font-semibold text-accent">
+                    {search.match.total === null ? search.match.error ?? '人数を確認できません' : `${search.match.total.toLocaleString('ja-JP')}人`}
+                  </span>
                 </button>
               )
             })}

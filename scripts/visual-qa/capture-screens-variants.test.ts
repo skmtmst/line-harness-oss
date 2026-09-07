@@ -37,6 +37,13 @@ describe('画面撮影の変種', () => {
     expect(shouldApplyStateToMethod(state, 'POST')).toBe(true)
   })
 
+  it('保存メソッドを明示した変種は、そのメソッドだけに適用する', () => {
+    const state = { apis: ['**/api/items/**'], kind: 'conflict', postOnly: true, method: 'PATCH' }
+    expect(shouldApplyStateToMethod(state, 'GET')).toBe(false)
+    expect(shouldApplyStateToMethod(state, 'POST')).toBe(false)
+    expect(shouldApplyStateToMethod(state, 'PATCH')).toBe(true)
+  })
+
   it.each([
     ['invalid', 400, 'article_url_invalid'],
     ['conflict', 409, 'column_already_exists'],
