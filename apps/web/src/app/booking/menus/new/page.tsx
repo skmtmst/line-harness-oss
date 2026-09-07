@@ -111,6 +111,8 @@ export default function NewBookingMenuPage() {
       parent={['予約設定', '/booking/menus']}
       saveLabel={isActive ? 'つくって出す' : '下書きに保存'}
       showHeader={false}
+      variant="v6"
+      statusLabel={isActive ? 'まだ出していません' : '下書きとして保存'}
       validate={() => {
         if (!selectedAccountId) return '先に上部でLINEアカウントを選んでください'
         if (!name.trim()) return 'メニュー名を入力してください'
