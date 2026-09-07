@@ -25,16 +25,24 @@ const PIXEL_DIFF_PATH = join(ROOT, 'docs', 'design-qa', 'v6-pixel-diff.json')
 
 function readPixelDiff() {
   if (!existsSync(PIXEL_DIFF_PATH)) {
-    return { thresholdPercent: 10, screenCount: 0, comparedCount: 0, unavailableCount: SCREENS.length, aboveThresholdCount: 0, entries: [] }
+    return { thresholdPercent: 10, heightDiffThresholdPx: 24, screenCount: 0, comparedCount: 0, unavailableCount: SCREENS.length, aboveThresholdCount: 0, entries: [] }
   }
   return JSON.parse(readFileSync(PIXEL_DIFF_PATH, 'utf8'))
 }
 
 const PIXEL_DIFF = readPixelDiff()
+const HEIGHT_DIFF_THRESHOLD_PX = PIXEL_DIFF.heightDiffThresholdPx ?? 24
 const PIXEL_BY_NODE = new Map(PIXEL_DIFF.entries.map((entry) => [entry.node, entry]))
 const pixelOf = (screen) => PIXEL_BY_NODE.get(screen.node) ?? {
-  status: 'unavailable', reason: '画素比較結果なし', pixelDiffPercent: null, aboveThreshold: false,
+  status: 'unavailable', reason: '画素比較結果なし', pixelDiffPercent: null,
+  pixelAboveThreshold: false, heightAboveThreshold: false, aboveThreshold: false,
 }
+
+const pixelAboveThreshold = (entry) => entry.pixelAboveThreshold
+  ?? entry.pixelDiffPercent > PIXEL_DIFF.thresholdPercent
+const heightAboveThreshold = (entry) => entry.heightAboveThreshold
+  ?? Math.abs(entry.heightDifferencePx ?? 0) > HEIGHT_DIFF_THRESHOLD_PX
+const isAboveThreshold = (entry) => pixelAboveThreshold(entry) || heightAboveThreshold(entry)
 
 /** 機能の名前。台帳の見出しに使う。 */
 export const FEATURE_NAMES = {
@@ -130,6 +138,7 @@ function tally(list) {
     /* 判定の内訳。**「撮れた」と「合っていた」は別に数える。** */
     match: 0, structureMatchDataPending: 0, needsFix: 0, unjudged: 0,
     pixelCompared: 0, pixelUnavailable: 0, pixelAboveThreshold: 0,
+    pixelDiffAboveThreshold: 0, heightDiffAboveThreshold: 0,
   }
   const VERDICT_KEY = {
     match: 'match',
@@ -141,7 +150,9 @@ function tally(list) {
     const pixel = pixelOf(s)
     if (pixel.status === 'compared') out.pixelCompared += 1
     else out.pixelUnavailable += 1
-    if (pixel.aboveThreshold) out.pixelAboveThreshold += 1
+    if (pixelAboveThreshold(pixel)) out.pixelDiffAboveThreshold += 1
+    if (heightAboveThreshold(pixel)) out.heightDiffAboveThreshold += 1
+    if (isAboveThreshold(pixel)) out.pixelAboveThreshold += 1
     if (s.status) continue
     /* **空欄を一致として数えない。** 判定が無ければ「未判定」。 */
     const key = VERDICT_KEY[s.verdict]
@@ -172,8 +183,13 @@ function signed(value) {
 function pixelPercent(entry) {
   const retained = entry.retainedFrom ? '（前回値）' : ''
   return entry.status === 'compared'
-    ? `${entry.pixelDiffPercent.toFixed(4)}%${entry.aboveThreshold ? ' ⚠' : ''}${retained}`
+    ? `${entry.pixelDiffPercent.toFixed(4)}%${pixelAboveThreshold(entry) ? ' ⚠' : ''}${retained}`
     : `—（${entry.reason}）${retained}`
+}
+
+function pixelHeight(entry) {
+  const value = signed(entry.heightDifferencePx)
+  return `${value}${heightAboveThreshold(entry) ? ' ⚠' : ''}`
 }
 
 function implementationSourceLabel(entry) {
@@ -193,7 +209,7 @@ function pixelRowsMarkdown() {
   return SCREENS.map((screen) => {
     const pixel = pixelOf(screen)
     const diff = pixel.diffPath ? `[差分画像](${pixel.diffPath.replace(/^docs\/design-qa\//, '')})` : '—'
-    return `| ${screen.feature} | \`${screen.node}\` | ${screen.name} | ${pixelPercent(pixel)} | ${signed(pixel.heightDifferencePx)} | ${pixel.dominantRegion ?? '—'} | ${implementationSourceLabel(pixel)} | ${diff} | **${verdictLabel(screen)}** |`
+    return `| ${screen.feature} | \`${screen.node}\` | ${screen.name} | ${pixelPercent(pixel)} | ${pixelHeight(pixel)} | ${pixel.dominantRegion ?? '—'} | ${implementationSourceLabel(pixel)} | ${diff} | **${verdictLabel(screen)}** |`
   }).join('\n')
 }
 
@@ -216,7 +232,7 @@ if (process.argv.includes('--html')) {
     const diff = pixel.diffPath
       ? `<a href="${esc(pixel.diffPath.replace(/^docs\/design-qa\//, ''))}">差分画像</a>`
       : '—'
-    return `      <tr><td>${screen.feature}</td><td><code>${esc(screen.node)}</code></td><td>${esc(screen.name)}</td><td class="n ${pixel.aboveThreshold ? 'bad' : ''}">${esc(pixelPercent(pixel))}</td><td class="n">${signed(pixel.heightDifferencePx)}</td><td>${esc(pixel.dominantRegion ?? '—')}</td><td>${implementationSourceLabel(pixel)}</td><td>${diff}</td><td>${esc(verdictLabel(screen))}</td></tr>`
+    return `      <tr><td>${screen.feature}</td><td><code>${esc(screen.node)}</code></td><td>${esc(screen.name)}</td><td class="n ${pixelAboveThreshold(pixel) ? 'bad' : ''}">${esc(pixelPercent(pixel))}</td><td class="n ${heightAboveThreshold(pixel) ? 'bad' : ''}">${esc(pixelHeight(pixel))}</td><td>${esc(pixel.dominantRegion ?? '—')}</td><td>${implementationSourceLabel(pixel)}</td><td>${diff}</td><td>${esc(verdictLabel(screen))}</td></tr>`
   }).join('\n')
   console.log(`<!-- scripts/visual-qa/ledger.mjs --html が作ります。手で直さないでください。 -->
 <!-- 文字の指定を落とすと、ローカルで開いたときに日本語が全部化けます。 -->
@@ -284,7 +300,7 @@ if (process.argv.includes('--html')) {
 <main>
   <header>
     <h1>V6 画面比較の進捗</h1>
-    <p class="lede">Pencil の設計 ${SCREENS.length} 画面を実装画像と比べた結果です。<strong>画素差は判定を自動変更せず、${PIXEL_DIFF.thresholdPercent}%超に警告を付けます。</strong></p>
+    <p class="lede">Pencil の設計 ${SCREENS.length} 画面を実装画像と比べた結果です。<strong>画素差は判定を自動変更せず、差分率${PIXEL_DIFF.thresholdPercent}%超または高さ差${HEIGHT_DIFF_THRESHOLD_PX}px超に警告を付けます。</strong></p>
   </header>
 
   <section class="cards">
@@ -299,7 +315,7 @@ if (process.argv.includes('--html')) {
     <div class="card"><b>${all.unconfirmed}</b><span>未確認</span></div>
     <div class="card"><b>${all.elsewhere}</b><span>別の仕掛けで撮影</span></div>
     <div class="card"><b>${all.pixelCompared}</b><span>画素比較済み</span></div>
-    <div class="card warn"><b>${all.pixelAboveThreshold}</b><span>画素差${PIXEL_DIFF.thresholdPercent}%超</span></div>
+    <div class="card warn"><b>${all.pixelAboveThreshold}</b><span>画素差・高さ差の注意</span></div>
   </section>
 
   <p class="legend">
@@ -316,7 +332,7 @@ if (process.argv.includes('--html')) {
         <th scope="col">機能</th><th scope="col">内訳</th><th scope="col" class="n">総数</th>
         <th scope="col" class="n">一致</th><th scope="col" class="n">構造一致<br>データ未接続</th>
         <th scope="col" class="n">要修正</th><th scope="col" class="n">未実装</th><th scope="col" class="n">未判定</th>
-        <th scope="col" class="n">画素比較</th><th scope="col" class="n">${PIXEL_DIFF.thresholdPercent}%超</th><th scope="col">撮った先</th>
+        <th scope="col" class="n">画素比較</th><th scope="col" class="n">注意</th><th scope="col">撮った先</th>
       </tr></thead>
       <tbody>
 ${bars}
@@ -387,9 +403,12 @@ ${pixelDetails}
     features: rows.map((r) => ({ ...r, capturedAt: CAPTURED_AT[r.feature] ?? null })),
     pixelDiff: {
       thresholdPercent: PIXEL_DIFF.thresholdPercent,
+      heightDiffThresholdPx: HEIGHT_DIFF_THRESHOLD_PX,
       generatedAt: PIXEL_DIFF.generatedAt ?? null,
       comparedCount: all.pixelCompared,
       unavailableCount: all.pixelUnavailable,
+      pixelAboveThresholdCount: all.pixelDiffAboveThreshold,
+      heightAboveThresholdCount: all.heightDiffAboveThreshold,
       aboveThresholdCount: all.pixelAboveThreshold,
     },
     screens: SCREENS.map((screen) => ({
@@ -422,9 +441,9 @@ ${pixelDetails}
   console.log('\n「完了まで残り」＝ 構造一致・データ未接続 ＋ 要修正 ＋ 未実装 ＋ 未判定。\n')
 
   console.log('## 画素比較\n')
-  console.log(`比較済み **${all.pixelCompared}** ／ 比較不可 **${all.pixelUnavailable}** ／ ${PIXEL_DIFF.thresholdPercent}%超 **${all.pixelAboveThreshold}**。高さは上端を揃えて共通領域を比較し、高さ差を別に記録します。\n`)
+  console.log(`比較済み **${all.pixelCompared}** ／ 比較不可 **${all.pixelUnavailable}** ／ 注意 **${all.pixelAboveThreshold}**。画素差${PIXEL_DIFF.thresholdPercent}%超、または高さ差${HEIGHT_DIFF_THRESHOLD_PX}px超に ⚠ を付けます。\n`)
 
-  console.log(`| 機能 | 名前 | 総数 | 比較済み | 一致 | 構造一致・データ未接続 | 要修正 | 未実装 | 未判定 | 画素比較 | ${PIXEL_DIFF.thresholdPercent}%超 | 比較不可 | 未確認 | 別の仕掛け | 未撮影 | 撮った先 |`)
+  console.log('| 機能 | 名前 | 総数 | 比較済み | 一致 | 構造一致・データ未接続 | 要修正 | 未実装 | 未判定 | 画素比較 | 注意 | 比較不可 | 未確認 | 別の仕掛け | 未撮影 | 撮った先 |')
   console.log('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|')
   for (const r of rows) {
     console.log(`| ${r.feature} | ${r.name} | ${r.total} | ${r.compared} | ${r.match} | ${r.structureMatchDataPending} | ${r.needsFix} | ${r.unimplemented} | ${r.unjudged} | ${r.pixelCompared} | ${r.pixelAboveThreshold} | ${r.pixelUnavailable} | ${r.unconfirmed} | ${r.elsewhere} | ${r.missing} | ${capturedAt(r.feature)} |`)
