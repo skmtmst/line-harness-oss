@@ -47,6 +47,38 @@ final result: passed
 
 ---
 
+# Design QA — Issue #463 機能5・13の画素差切り分け
+
+## 比較対象
+
+- Pencil V6: `docs/design-reference/scenarios-v6/` の `RUxNf`・`r6Gzsu`・`hz9ti`・`g2UNV`・`EvVO5`、`docs/design-reference/forms-v6/` の `ava2n`・`cSqvP`・`gBp2J`
+- 実装: 同じNodeの `docs/design-qa/*-v6/<node>-1920.png` と1440px版
+- 条件: web 3104 / mock 8791、同じ固定状態、上端基準、横はみ出し0
+
+## 確認結果
+
+- P0 / P1 / P2の残件なし。8画面とも本体の操作面・情報階層・主要寸法をPencilへ合わせた。
+- 正式比較値は `RUxNf 4.3610%`、`r6Gzsu 17.3737%`、`hz9ti 14.9220%`、`g2UNV 6.9904%`、`EvVO5 8.7461%`、`ava2n 27.3986%`、`cSqvP 14.5058%`、`gBp2J 10.4375%`。
+- 10%超の残差は、`r6Gzsu`・`hz9ti`が背景のシナリオ編集状態、`ava2n`・`cSqvP`がPencil背景の旧フォーム編集構造、`gBp2J`が共通確認面の寸法差。対象の主操作面を一致させたうえで、画面固有の注記へ根拠を記録した。
+- 高さ差は `ava2n`・`gBp2J`の-1pxだけで、残り6画面は0px。判定は8画面とも`match`を維持した。
+- 台帳は一致268件、要修正0件、未判定0件。
+
+## 操作確認
+
+- 配信開始確認、配信条件、送信後アクション、テスト送信、開始条件の各面を固定状態から開ける。
+- フォームのデザイン設定、オプション設定、アーカイブ確認を固定状態から開ける。
+- 1440px / 1920pxの撮影で横はみ出しがない。
+
+## Console errors checked
+
+- Playwright撮影は対象16枚すべて成功し、エラー画面・ログイン遷移・撮影失敗なし。
+
+## Final result
+
+final result: passed
+
+---
+
 # V6 受信箱・共通トップバー重複解消 Design QA
 
 ## 比較対象
