@@ -4834,6 +4834,17 @@ export const api = {
       fetchApi<ApiResponse<Array<{ path: string; views: number; visitors: number }>>>(
         `/api/site/pages${rangeQuery(params)}`,
       ),
+    /**
+     * 選択中アカウントの計測鍵。サイトに貼るコードの data-key に埋める。
+     * accountId を省くと可視アカウントが1つだけのときだけ鍵が返る
+     * (複数あるときは 400)。鍵は公開識別子で、帰属の分離にだけ使う。
+     */
+    trackingKey: (accountId?: string) =>
+      fetchApi<ApiResponse<{ accountId: string; trackingKey: string }>>(
+        accountId
+          ? `/api/site/tracking-key?accountId=${encodeURIComponent(accountId)}`
+          : '/api/site/tracking-key',
+      ),
     friendEvents: (friendId: string) =>
       fetchApi<
         ApiResponse<
