@@ -677,6 +677,62 @@ export type AffiliateSettlementPreview = {
   }>
 }
 
+/** アカウント単位で締める前に確認する、追記台帳の対象。 */
+export type AffiliateAccountSettlementPreview = {
+  lineAccountId: string
+  periodFrom: string
+  periodTo: string
+  currency: 'JPY'
+  totalAmount: number
+  conversionCount: number
+  affiliates: Array<{
+    affiliateId: string
+    affiliateName: string
+    code: string
+    amount: number
+    conversionCount: number
+    /** 管理画面へ口座番号を返さず、登録の有無だけを扱う。 */
+    bankProfileRegistered: boolean
+  }>
+  previewVersion: string
+}
+
+export type AffiliateAccountSettlementResult = {
+  kind: 'created' | 'duplicate'
+  settlementId: string
+  totalAmount: number
+  conversionCount: number
+  version: number
+  closedAt: string
+}
+
+export type AffiliatePayoutBatch = {
+  id: string
+  lineAccountId: string
+  settlementId: string
+  totalAmount: number
+  currency: string
+  lineCount: number
+  state: string
+  bankFormat: string | null
+  fileChecksum: string | null
+  version: number
+  downloadExpiresAt: string | null
+  createdAt: string
+}
+
+export type AffiliateStatement = {
+  id: string
+  lineAccountId: string
+  affiliateId: string
+  settlementId: string
+  totalAmount: number
+  status: string
+  version: number
+  expiresAt: string | null
+  createdAt: string
+}
+
 /** Broadcast type from API (now camelCase after worker serialization) */
 export type ApiBroadcast = Omit<Broadcast, 'targetType'> & {
   targetType: BroadcastTargetType;
@@ -5323,6 +5379,65 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+    settlementPreview: (
+      lineAccountId: string,
+      period: { periodFrom: string; periodTo: string },
+    ) => fetchApi<ApiResponse<AffiliateAccountSettlementPreview>>(
+      `/api/affiliate-settlements/preview?${new URLSearchParams({ lineAccountId, ...period })}`,
+    ),
+    closeSettlement: (
+      data: {
+        lineAccountId: string
+        periodFrom: string
+        periodTo: string
+        expectedPreviewVersion: string
+      },
+      idempotencyKey: string,
+    ) => fetchApi<ApiResponse<AffiliateAccountSettlementResult>>('/api/affiliate-settlements', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(data),
+    }),
+    createPayoutBatch: (
+      data: { lineAccountId: string; settlementId: string; expectedVersion: number; bankFormat: 'zengin_csv' },
+      idempotencyKey: string,
+    ) => fetchApi<ApiResponse<AffiliatePayoutBatch>>('/api/affiliate-payout-batches', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(data),
+    }),
+    payoutStepUp: (code: string) =>
+      fetchApi<ApiResponse<{ token: string; purpose: 'affiliate.payout.export'; expiresAt: string }>>(
+        '/api/auth/step-up',
+        { method: 'POST', body: JSON.stringify({ code, purpose: 'affiliate.payout.export' }) },
+      ),
+    exportPayoutBatch: (
+      batchId: string,
+      data: { lineAccountId: string; expectedVersion: number },
+      stepUpToken: string,
+      idempotencyKey: string,
+    ) => fetchApi<ApiResponse<AffiliatePayoutBatch & { downloadUrl: string }>>(
+      `/api/affiliate-payout-batches/${encodeURIComponent(batchId)}/export`,
+      {
+        method: 'POST',
+        headers: {
+          'X-Step-Up-Token': stepUpToken,
+          'Idempotency-Key': idempotencyKey,
+        },
+        body: JSON.stringify(data),
+      },
+    ),
+    createStatement: (
+      data: { lineAccountId: string; settlementId: string; affiliateId: string; expectedVersion: number },
+      idempotencyKey: string,
+    ) => fetchApi<ApiResponse<AffiliateStatement> & { notificationAttempted?: boolean }>(
+      '/api/affiliate-statements',
+      {
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify(data),
+      },
+    ),
   },
   templates: {
     list: (category?: string, accountId?: string) => {
