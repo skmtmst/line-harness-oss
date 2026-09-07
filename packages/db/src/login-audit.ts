@@ -1,4 +1,5 @@
 import { jstNow } from './utils.js';
+import { recordAuditEvent, type AuditRiskLevel } from './access-audit.js';
 
 /**
  * ログインと個人情報閲覧の記録。
@@ -44,6 +45,8 @@ export async function recordLoginAudit(
     result?: string;
   },
 ): Promise<void> {
+  const id = crypto.randomUUID();
+  const createdAt = jstNow();
   try {
     await db
       .prepare(
@@ -52,7 +55,7 @@ export async function recordLoginAudit(
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
-        crypto.randomUUID(),
+        id,
         input.adminUserId ?? null,
         input.action,
         input.screen ?? null,
@@ -60,11 +63,47 @@ export async function recordLoginAudit(
         // User-Agent は長い。切っておかないと1行が肥大する。
         input.userAgent ? input.userAgent.slice(0, 300) : null,
         input.result ?? 'ok',
-        jstNow(),
+        createdAt,
       )
       .run();
   } catch (error) {
     console.error('login_audit insert failed:', error);
+  }
+  try {
+    const actor = input.adminUserId
+      ? await db.prepare(
+        `SELECT tenant_id, role, access_level FROM staff_members WHERE id = ?`,
+      ).bind(input.adminUserId).first<{
+        tenant_id: string | null;
+        role: string;
+        access_level: string;
+      }>()
+      : null;
+    const result = input.action === 'fail' || !['ok', 'success'].includes((input.result ?? 'ok').toLowerCase())
+      ? 'failed' as const
+      : 'success' as const;
+    const riskLevel: AuditRiskLevel = result === 'failed' ? 'suspicious' : 'normal';
+    await recordAuditEvent(db, {
+      sourceKind: 'login_audit',
+      sourceId: id,
+      tenantId: actor?.tenant_id,
+      category: 'auth',
+      actorPrincipalId: input.adminUserId,
+      actorRole: actor?.access_level === 'read_only'
+        ? 'view_only'
+        : actor?.role === 'owner' || actor?.role === 'admin' ? 'administrator'
+          : actor?.role === 'staff' ? 'operations' : null,
+      action: `auth.${input.action}`,
+      targetKind: input.screen ? 'screen' : null,
+      targetId: input.screen,
+      result,
+      riskLevel,
+      retentionClass: 'security',
+      createdAt,
+    });
+  } catch (error) {
+    // 認証自体は成功させ、保存失敗は安全な固定文言だけを運用ログへ残す。
+    console.error('audit_events auth insert failed:', error instanceof Error ? error.name : 'unknown');
   }
 }
 
