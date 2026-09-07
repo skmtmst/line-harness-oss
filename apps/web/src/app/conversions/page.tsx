@@ -683,7 +683,11 @@ function ReportTab({ accountId }: { accountId: string | null }) {
 
   if (!report) return null
 
-  const fastest = report.kpis.fastestGrowing
+  const fastest = report.byDefinition
+    .filter((row) => row.previousNetCount > 0)
+    .toSorted((left, right) =>
+      (right.countChange / right.previousNetCount) - (left.countChange / left.previousNetCount),
+    )[0] ?? report.kpis.fastestGrowing
   const fastestRate = fastest && fastest.previousNetCount > 0
     ? Math.round((fastest.countChange / fastest.previousNetCount) * 100)
     : fastest?.netCount ? 100 : 0
