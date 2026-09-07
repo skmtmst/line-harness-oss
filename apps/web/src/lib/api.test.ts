@@ -379,6 +379,49 @@ describe('api.affiliates.paymentSummaries', () => {
       'https://worker.example.com/api/affiliate-payments?lineAccountId=account%2F1',
     )
   })
+
+  it('締めから明細・再認証つきCSVまでアカウント、版、再実行キーを渡す', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: { token: 'step-up-token', downloadUrl: '/download' } }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    const period = {
+      periodFrom: '2026-08-01T00:00:00.000Z',
+      periodTo: '2026-08-31T23:59:59.999Z',
+    }
+    await api.affiliates.settlementPreview('account/1', period)
+    await api.affiliates.closeSettlement({
+      lineAccountId: 'account/1', ...period, expectedPreviewVersion: 'a'.repeat(64),
+    }, 'settlement-key-1')
+    await api.affiliates.createPayoutBatch({
+      lineAccountId: 'account/1', settlementId: 'settlement/1', expectedVersion: 1, bankFormat: 'zengin_csv',
+    }, 'batch-key-1')
+    await api.affiliates.payoutStepUp('123456')
+    await api.affiliates.exportPayoutBatch(
+      'batch/1', { lineAccountId: 'account/1', expectedVersion: 1 }, 'step-up-token', 'export-key-1',
+    )
+    await api.affiliates.createStatement({
+      lineAccountId: 'account/1', settlementId: 'settlement/1', affiliateId: 'affiliate/1', expectedVersion: 1,
+    }, 'statement-key-1')
+
+    expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
+      'https://worker.example.com/api/affiliate-settlements/preview?lineAccountId=account%2F1&periodFrom=2026-08-01T00%3A00%3A00.000Z&periodTo=2026-08-31T23%3A59%3A59.999Z',
+      'https://worker.example.com/api/affiliate-settlements',
+      'https://worker.example.com/api/affiliate-payout-batches',
+      'https://worker.example.com/api/auth/step-up',
+      'https://worker.example.com/api/affiliate-payout-batches/batch%2F1/export',
+      'https://worker.example.com/api/affiliate-statements',
+    ])
+    expect(fetchSpy.mock.calls[1]?.[1]?.headers).toEqual(expect.objectContaining({ 'Idempotency-Key': 'settlement-key-1' }))
+    expect(fetchSpy.mock.calls[2]?.[1]?.headers).toEqual(expect.objectContaining({ 'Idempotency-Key': 'batch-key-1' }))
+    expect(JSON.parse(String(fetchSpy.mock.calls[3]?.[1]?.body))).toEqual({ code: '123456', purpose: 'affiliate.payout.export' })
+    expect(fetchSpy.mock.calls[4]?.[1]?.headers).toEqual(expect.objectContaining({
+      'Idempotency-Key': 'export-key-1', 'X-Step-Up-Token': 'step-up-token',
+    }))
+    expect(fetchSpy.mock.calls[5]?.[1]?.headers).toEqual(expect.objectContaining({ 'Idempotency-Key': 'statement-key-1' }))
+  })
 })
 
 describe('api.mileage reward draft contract', () => {
