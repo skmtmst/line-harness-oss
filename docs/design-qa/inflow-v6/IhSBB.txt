@@ -1,7 +1,6 @@
 # 18-1-A サイトスクリプト
 # /inflow-links?tab=script
 
-カスタマイズ版で動作中です（v2.6.4）。そのままお使いいただけます。 更新したい場合は 手動アップデートガイド をご覧ください。
 然
 株式会社 然
 Ver. 2.6.4
@@ -98,7 +97,7 @@ Kenta Kawano
 
 あなたのアカウントで使うコード
 
-<script async src="http://127.0.0.1:38911/api/site/script.js" data-key="hk_d1ef89e503d398ce9e0931984858ebc1"></script>
+<script async src="http://127.0.0.1:8789/api/site/script.js" data-key="hk_d1ef89e503d398ce9e0931984858ebc1"></script>
 コピー
 貼るとできるようになること
 どのページを見て来たか
