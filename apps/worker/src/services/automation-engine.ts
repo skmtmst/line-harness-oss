@@ -119,6 +119,16 @@ export class AutomationActionError extends Error {
   }
 }
 
+export class AutomationRunRetryError extends Error {
+  constructor(
+    public readonly code: 'not_found' | 'not_retryable' | 'retry_conflict',
+    message: string,
+  ) {
+    super(message);
+    this.name = 'AutomationRunRetryError';
+  }
+}
+
 function addMinutes(value: string, minutes: number): string {
   const date = new Date(value);
   date.setMinutes(date.getMinutes() + minutes);
@@ -740,6 +750,76 @@ export async function processAutomationRun(
   }
 
   return finishRun(db, run.id, now);
+}
+
+/**
+ * 失敗した処理だけを同じ実行計画で再開する。
+ *
+ * 成功・見送り済みの step はそのまま残し、失敗 step だけを waiting に戻す。
+ * processAutomationRun は成功済み step を飛ばすため、外部処理を二重に動かさない。
+ */
+export async function retryAutomationRun(
+  db: D1Database,
+  input: { runId: string; allowedAccountIds: string[]; now?: string },
+): Promise<{ runId: string; retryStepCount: number; status: 'waiting' }> {
+  if (input.allowedAccountIds.length === 0) {
+    throw new AutomationRunRetryError('not_found', '実行記録が見つかりません');
+  }
+  const run = await db.prepare(
+    `SELECT r.id, r.status, r.current_step, v.action_config, r.execution_plan_json
+       FROM automation_runs r
+       JOIN automation_versions v
+         ON v.id = r.automation_version_id AND v.automation_id = r.automation_id
+      WHERE r.id = ? AND r.line_account_id IN (${input.allowedAccountIds.map(() => '?').join(',')})`,
+  ).bind(input.runId, ...input.allowedAccountIds).first<{
+    id: string;
+    status: RunStatus;
+    current_step: number;
+    action_config: string;
+    execution_plan_json: string | null;
+  }>();
+  if (!run) throw new AutomationRunRetryError('not_found', '実行記録が見つかりません');
+  if (run.status !== 'failed' && run.status !== 'partial') {
+    throw new AutomationRunRetryError('not_retryable', '失敗した処理がある実行だけ、もう一度実行できます');
+  }
+
+  const failed = await db.prepare(
+    `SELECT step_key FROM automation_run_steps
+      WHERE automation_run_id = ? AND status = 'failed' AND step_key != '__configuration__'`,
+  ).bind(run.id).all<{ step_key: string }>();
+  if (failed.results.length === 0) {
+    throw new AutomationRunRetryError('not_retryable', '安全に再実行できる失敗処理がありません');
+  }
+  let actions: ActionDefinition[];
+  try {
+    actions = parseActions(run.execution_plan_json ?? run.action_config);
+  } catch {
+    throw new AutomationRunRetryError('not_retryable', '実行時の処理内容を確認できないため、再実行できません');
+  }
+  const indexes = new Map(actions.map((action, index) => [action.id, index]));
+  const retryIndexes = failed.results.map((step) => indexes.get(step.step_key));
+  if (retryIndexes.some((index) => index === undefined)) {
+    throw new AutomationRunRetryError('not_retryable', '失敗した処理を実行時の内容と照合できません');
+  }
+  const currentStep = Math.min(...retryIndexes as number[]);
+  const now = nowIso(input.now);
+  const results = await db.batch([
+    db.prepare(
+      `UPDATE automation_run_steps
+          SET status = 'waiting', retry_at = ?, completed_at = NULL, lease_expires_at = NULL
+        WHERE automation_run_id = ? AND status = 'failed' AND step_key != '__configuration__'`,
+    ).bind(now, run.id),
+    db.prepare(
+      `UPDATE automation_runs
+          SET status = 'waiting', current_step = ?, resume_at = ?, completed_at = NULL,
+              lease_expires_at = NULL
+        WHERE id = ? AND status IN ('failed', 'partial')`,
+    ).bind(currentStep, now, run.id),
+  ]);
+  if ((results[0].meta?.changes ?? 0) !== failed.results.length || (results[1].meta?.changes ?? 0) !== 1) {
+    throw new AutomationRunRetryError('retry_conflict', '実行記録の状態が変わりました。再読み込みしてください');
+  }
+  return { runId: run.id, retryStepCount: failed.results.length, status: 'waiting' };
 }
 
 export async function processDueAutomationRuns(

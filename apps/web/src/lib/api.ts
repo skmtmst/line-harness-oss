@@ -102,6 +102,44 @@ import type {
   UndoIdentityCandidateRequest,
 } from '@line-crm/shared'
 
+export type OperatorNotificationRule = NotificationRule & {
+  status: 'draft' | 'published'
+  recipientCount: number
+  lineRecipientCount: number
+  occurredToday: number
+  acceptedToday: number
+  excludedToday: number
+  lastOccurredAt: string | null
+}
+
+export type OperatorRecipientPreviewItem = {
+  id: string
+  name: string
+  lineLinked: boolean
+  emailVerified: boolean
+  channels: { line: boolean; email: boolean; dashboard: boolean }
+  canReceive: boolean
+}
+
+export type OperatorRecipientPreview = {
+  items: OperatorRecipientPreviewItem[]
+  summary: {
+    staff: number
+    canReceive: number
+    line: number
+    email: number
+    dashboard: number
+    unavailable: number
+  }
+}
+
+export type OperatorDeliveryResult = {
+  accepted: number
+  excluded: number
+  failed: number
+  duplicate: number
+}
+
 export type OutgoingWebhookOverview = OutgoingWebhook & {
   deliverySummary: {
     periodDays: number
@@ -2187,7 +2225,9 @@ export type AutomationDraftDetail = {
   draftVersionId: string
   name: string
   description: string | null
-  eventType: 'friend_add' | 'tag_change' | 'message_received'
+  eventType: 'friend_add' | 'tag_change' | 'message_received' | 'form_submitted'
+    | 'link_clicked' | 'calendar_booked' | 'datetime' | 'daily' | 'weekly'
+    | 'ec.order.confirmed'
   triggerConfig: Record<string, unknown>
   conditions: Record<string, unknown>
   actions: AutomationDraftAction[]
@@ -6419,11 +6459,17 @@ export const api = {
       name: string
       eventType: AutomationDraftDetail['eventType']
       triggerConfig: Record<string, unknown>
+      conditions?: Record<string, unknown>
       actions: AutomationDraftAction[]
     }) => fetchApi<ApiResponse<{ updated: true }>>(
       `/api/automation-drafts/${encodeURIComponent(id)}?account_id=${encodeURIComponent(accountId)}`,
       { method: 'PUT', body: JSON.stringify(data) },
     ),
+    publishDraft: (id: string, accountId: string, expectedDraftVersionId: string, activate = true) =>
+      fetchApi<ApiResponse<{ id: string; versionId: string; versionNumber: number; status: 'active' | 'stopped' }>>(
+        `/api/automation-drafts/${encodeURIComponent(id)}/publish?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify({ expectedDraftVersionId, activate }) },
+      ),
   },
   commonActions: {
     resources: (accountId: string, excludeId?: string, trigger?: 'tag.added') => {
@@ -7607,6 +7653,35 @@ export const api = {
     },
   },
   notifications: {
+    operatorRules: {
+      list: (lineAccountId: string) =>
+        fetchApi<ApiResponse<{
+          items: OperatorNotificationRule[]
+          summary: { total: number; published: number; stopped: number; missingRecipients: number; recipients: number; acceptedToday: number; excludedToday: number }
+        }>>(
+          `/api/notifications/operator-rules?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        ),
+      previewRecipients: (data: {
+        lineAccountId: string
+        recipientIds?: string[]
+        channels: string[]
+      }) => fetchApi<ApiResponse<OperatorRecipientPreview>>(
+        '/api/notifications/operator-rules/recipients-preview',
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+      publish: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<NotificationRule>>(
+          `/api/notifications/operator-rules/${encodeURIComponent(id)}/publish`,
+          { method: 'POST', body: JSON.stringify({ lineAccountId }) },
+        ),
+      test: (id: string, lineAccountId: string, message?: string) =>
+        fetchApi<ApiResponse<OperatorDeliveryResult>>(
+          `/api/notifications/operator-rules/${encodeURIComponent(id)}/test`,
+          { method: 'POST', body: JSON.stringify({ lineAccountId, message }) },
+        ),
+      exportCsv: (lineAccountId: string, reason: string) =>
+        fetchApiBlob(`/api/notifications/operator-deliveries.csv?${new URLSearchParams({ lineAccountId, reason })}`),
+    },
     center: {
       list: (lineAccountId: string, params?: { category?: 'all' | 'error' | 'update'; limit?: number }) => {
         const query = new URLSearchParams({ lineAccountId });

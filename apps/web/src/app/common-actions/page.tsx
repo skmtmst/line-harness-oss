@@ -47,6 +47,7 @@ export default function CommonActionsPage() {
   const [error, setError] = useState('')
   const [automationCounts, setAutomationCounts] = useState<{ active: number; stopped: number } | null>(null)
   const [templateCount, setTemplateCount] = useState<number | null>(null)
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!selectedAccountId) {
@@ -108,6 +109,20 @@ export default function CommonActionsPage() {
     if (value === 'old_version') return totals.outdatedItems
     if (value === 'unused') return summaryItems.filter((item) => item.status === 'published' && item.bindingCount === 0).length
     return summaryItems.filter((item) => item.status === value).length
+  }
+
+  const duplicate = async (item: CommonActionSummary) => {
+    if (!selectedAccountId || duplicatingId) return
+    setDuplicatingId(item.id)
+    setError('')
+    try {
+      const response = await api.commonActions.duplicate(item.id, selectedAccountId)
+      if (!response.success) throw new Error(response.error)
+      window.location.href = `/common-actions/edit?id=${encodeURIComponent(response.data.id)}`
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '共通アクションを複製できませんでした')
+      setDuplicatingId(null)
+    }
   }
 
   return (
@@ -231,14 +246,24 @@ export default function CommonActionsPage() {
                       中身を見る <ExternalLink size={14} aria-hidden />
                     </Link>
                     {canManage ? (
-                      <Link
-                        href={item.status === 'draft'
-                          ? `/common-actions/edit?id=${encodeURIComponent(item.id)}`
-                          : `/common-actions/versions?id=${encodeURIComponent(item.id)}`}
-                        className="text-action whitespace-nowrap text-xs font-medium hover:underline"
-                      >
-                        {item.status === 'draft' ? '公開する' : '使われている場所'}
-                      </Link>
+                      <>
+                        <Link
+                          href={item.status === 'draft'
+                            ? `/common-actions/edit?id=${encodeURIComponent(item.id)}`
+                            : `/common-actions/versions?id=${encodeURIComponent(item.id)}`}
+                          className="text-action whitespace-nowrap text-xs font-medium hover:underline"
+                        >
+                          {item.status === 'draft' ? '公開する' : '使われている場所'}
+                        </Link>
+                        <button
+                          type="button"
+                          className="text-action whitespace-nowrap text-xs font-medium hover:underline disabled:text-ink-faint"
+                          disabled={duplicatingId !== null}
+                          onClick={() => void duplicate(item)}
+                        >
+                          {duplicatingId === item.id ? '複製中' : '複製して下書きを作る'}
+                        </button>
+                      </>
                     ) : null}
                     </div>
                   </ActionCell>
