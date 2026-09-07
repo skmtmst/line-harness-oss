@@ -96,6 +96,27 @@ describe('Pencil設計との画素比較', () => {
       expect(result.pixelDiffPercent).toBe(0)
       expect(result.comparisons[0].designPath).toBe('docs/design-reference/test-v6/node.png')
       expect(result.comparisons[0].implementationPath).toContain('capture.spec.mjs-snapshots/tags-csv-select-1920-darwin.png')
+      expect(result.implementationSource).toBe('snapshot')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('shotsの専用画像が無ければ追跡可能なdocs証拠画像を使う', () => {
+    const root = mkdtempSync(join(tmpdir(), 'pixel-diff-'))
+    try {
+      const designDir = join(root, 'docs/design-reference/test-v6')
+      const implementationDir = join(root, 'docs/design-qa/test-v6')
+      for (const dir of [designDir, implementationDir]) mkdirSync(dir, { recursive: true })
+      writePng(join(designDir, 'node.png'), WHITE)
+      writePng(join(implementationDir, 'node-1920.png'), WHITE)
+
+      const result = compareScreen({
+        feature: 4, node: 'node', name: '専用状態', dir: 'test-v6', verdict: 'match', shots: 'tags-csv-select',
+      }, { root, writeDiffImages: false })
+      expect(result.pixelDiffPercent).toBe(0)
+      expect(result.comparisons[0].implementationPath).toBe('docs/design-qa/test-v6/node-1920.png')
+      expect(result.implementationSource).toBe('docs')
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

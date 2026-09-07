@@ -829,13 +829,14 @@ export const DUPLICATE_STATS = {
 export const FORM_DELETE_IMPACT_FIXTURES = {
   archive: {
     form: { id: 'form-visit', name: '来店アンケート', isActive: true, status: 'active' },
-    submissionCount: 128,
+    submissionCount: 1284,
     openCount: 214,
     references: [
       { kind: 'webinar', name: '使い方講座', href: '/webinars/edit?id=webinar-guide', state: 'available' },
       { kind: 'rich_menu', name: '通常メニュー・予約', href: '/rich-menus/edit?id=rich-menu-main', state: 'available' },
+      { kind: 'scenario', name: '来店後フォロー', href: '/scenarios?id=scenario-followup', state: 'available' },
     ],
-    referenceCount: 2,
+    referenceCount: 3,
     answerUrl: 'https://liff.line.me/visual-qa/?page=form&id=form-visit',
     revision: 7,
     checkedAt: '2026-08-31T11:00:00.000',
@@ -952,8 +953,8 @@ export const FORM_DETAIL = {
       thanksText: 'ありがとうございました。またのご来店をお待ちしています。',
       restorePrevious: true, pageTitle: '来店アンケート', submitLabel: '送信する',
       prevLabel: '前へ', nextLabel: '次へ', sectionHeader: 'name',
-      confirmDialog: { enabled: true, text: 'この内容で送信しますか？', okLabel: '送信する', cancelLabel: '戻る' },
-      deadline: { enabled: true, endsAt: '2026-09-30T23:59:00+09:00', message: '回答の受付は終了しました。' },
+      confirmDialog: { enabled: false, text: 'この内容で送信しますか？', okLabel: '送信する', cancelLabel: '戻る' },
+      deadline: { enabled: true, endsAt: '2026-09-30T23:59', message: '受付は終了しました。ありがとうございました。' },
       oncePerFriend: { enabled: true, message: 'このフォームには回答済みです。' },
       totalLimit: { enabled: false },
       afterActions: [
