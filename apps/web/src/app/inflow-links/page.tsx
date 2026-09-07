@@ -21,6 +21,7 @@ import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
+import FolderPanel from '@/components/shared/folder-panel'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -82,21 +83,6 @@ interface RefDetail {
 const WORKER_BASE = process.env.NEXT_PUBLIC_API_URL ?? ''
 const UNCATEGORIZED = '__uncategorized__'
 const referralUrl = (refCode: string) => `${WORKER_BASE.replace(/\/$/, '')}/r/${encodeURIComponent(refCode)}`
-
-function FolderIcon({ className = '' }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75A1.75 1.75 0 0 1 5.5 5h4l2 2H18.5a1.75 1.75 0 0 1 1.75 1.75v8.75a1.75 1.75 0 0 1-1.75 1.75h-13a1.75 1.75 0 0 1-1.75-1.75V6.75Z" />
-    </svg>
-  )
-}
 
 /**
  * 並び順。**読み込んだ行から数えられるものだけ**にしてある。
@@ -636,78 +622,22 @@ function InflowLinksPageInner() {
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><div className="flex gap-2"><Button href="/inflow-links/new" variant="primary">＋ 流入リンクをつくる</Button><Button onClick={() => setEditingGenre('new')}>フォルダを追加</Button></div><div className="flex gap-2"><Button onClick={exportCurrentRows} disabled={sortedRows.length === 0}>CSVで書き出す</Button><Button variant="secondary">まとめて操作</Button></div></div>
 
-      <div className="grid gap-5 xl:grid-cols-[250px_minmax(0,1fr)]">
-        <aside>
-          <button
-            onClick={() => setEditingGenre('new')}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent-deep px-4 py-3 text-sm font-bold text-on-accent shadow-sm hover:brightness-92"
-          >
-            <span className="text-xl leading-none">＋</span>
-            フォルダを追加
-          </button>
-          <div className="mt-3 overflow-hidden rounded-xl border border-hairline bg-canvas shadow-sm">
-            <div className="border-b border-hairline px-4 py-3">
-              <h2 className="text-sm font-bold text-ink">フォルダ</h2>
-              <p className="mt-0.5 text-xs text-ink-faint">選ぶと右側のリンクが切り替わります</p>
-            </div>
-            {availableGenres.length === 0 && !hasUncategorized ? (
-              <button
-                onClick={() => setEditingGenre('new')}
-                className="w-full px-4 py-8 text-center text-sm text-ink-faint hover:bg-canvas-sunken"
-              >
-                最初のフォルダを作ってください
-              </button>
-            ) : (
-              <div className="divide-y divide-hairline">
-                <button onClick={() => setSelectedGenre('')} className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition ${selectedGenre === '' ? 'bg-accent-soft text-accent-hover' : 'text-ink-secondary hover:bg-canvas-sunken'}`}><span className="flex items-center gap-2 text-sm font-semibold"><FolderIcon className="h-5 w-5 shrink-0" />すべて</span><span className="rounded-full bg-canvas-sunken px-2 py-0.5 text-xs">{accountFilteredRows.length}</span></button>
-                {availableGenres.map((genre) => {
-                  const count = accountFilteredRows.filter((row) => row.genre === genre.name).length
-                  const active = selectedGenre === genre.name
-                  return (
-                    <div
-                      key={genre.id}
-                      className={`flex items-center transition ${active ? 'bg-accent-soft text-accent-hover' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
-                    >
-                      <button
-                        onClick={() => setSelectedGenre(genre.name)}
-                        className="flex min-w-0 flex-1 items-center justify-between gap-3 px-4 py-3 text-left"
-                      >
-                        <span className="flex min-w-0 items-center gap-2">
-                          <FolderIcon className={`h-5 w-5 shrink-0 ${active ? 'text-accent' : 'text-ink-faint'}`} />
-                          <span className="truncate text-sm font-semibold">{genre.name}</span>
-                        </span>
-                        <span className={`rounded-full px-2 py-0.5 text-xs ${active ? 'bg-accent-soft text-accent-hover' : 'bg-canvas-sunken text-ink-faint'}`}>{count}</span>
-                      </button>
-                      {!genre.id.startsWith('legacy-') && (
-                        <button
-                          onClick={() => setEditingGenre(genre)}
-                          className="mr-2 rounded-md px-2 py-1 text-xs font-medium text-ink-faint hover:bg-canvas hover:text-action"
-                          aria-label={`${genre.name}を編集`}
-                        >
-                          編集
-                        </button>
-                      )}
-                    </div>
-                  )
-                })}
-                {hasUncategorized && (
-                  <button
-                    onClick={() => setSelectedGenre(UNCATEGORIZED)}
-                    className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition ${selectedGenre === UNCATEGORIZED ? 'bg-status-warn-soft text-status-warn-deep' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
-                  >
-                    <span className="flex items-center gap-2 text-sm font-semibold">
-                      <FolderIcon className="h-5 w-5 shrink-0" />
-                      未分類
-                    </span>
-                    <span className="rounded-full bg-canvas-sunken px-2 py-0.5 text-xs text-ink-faint">
-                      {accountFilteredRows.filter((row) => !row.genre).length}
-                    </span>
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        </aside>
+      <div className="grid gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
+        <FolderPanel
+          total={`${accountFilteredRows.length}件`}
+          activeId={selectedGenre}
+          onSelect={(id) => { setSelectedGenre(id); setPage(1) }}
+          rows={[
+            { id: '', label: 'すべて', count: accountFilteredRows.length },
+            ...availableGenres.map((genre) => ({
+              id: genre.name,
+              label: genre.name,
+              count: accountFilteredRows.filter((row) => row.genre === genre.name).length,
+              ...(!genre.id.startsWith('legacy-') ? { onEdit: () => setEditingGenre(genre) } : {}),
+            })),
+            ...(hasUncategorized ? [{ id: UNCATEGORIZED, label: '未分類', count: accountFilteredRows.filter((row) => !row.genre).length }] : []),
+          ]}
+        />
 
         <section className="min-w-0">
           <div className="mb-3 flex flex-col gap-3 rounded-xl border border-hairline bg-canvas p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
@@ -837,16 +767,16 @@ function InflowLinksPageInner() {
           <table className="w-full table-fixed text-xs">
             <colgroup>
               <col className="w-[11%]" />
-              <col className="w-[10%]" />
+              <col className="w-[8%]" />
+              <col className="w-[8%]" />
+              <col className="w-[14%]" />
               <col className="w-[9%]" />
-              <col className="w-[16%]" />
-              <col className="w-[10%]" />
-              <col className="w-[6%]" />
-              <col className="w-[6%]" />
-              <col className="w-[6%]" />
+              <col className="w-[11%]" />
               <col className="w-[9%]" />
-              <col className="w-[10%]" />
               <col className="w-[7%]" />
+              <col className="w-[8%]" />
+              <col className="w-[9%]" />
+              <col className="w-[6%]" />
             </colgroup>
             <thead>
               <TableHeadRow>

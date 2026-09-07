@@ -1027,9 +1027,9 @@ export const SCREENS = [
   /* 設計どおり、基本設定→対象者→通知ステップ→送信設定→確認を段ごとに撮る。 */
   { ...REMINDER, node: 'M1EXwB', name: '7-1 リマインダ',
     verdict: 'match',
-    verdictNote: '**2026-09-07 S2 #73。** 正本 `M1EXwB.png` の操作列に合わせ、削除をアイコン化し、「…」から配信予定と実行履歴を選べるようにした。通常・メニュー展開を1440/1920で撮影し、横はみ出し0。予定は実行台帳の公開状態 `planned` へ接続し、固定件数を作らない。head `a828e5afc3`。',
+    verdictNote: '**2026-09-07 Issue #478 / UI HEAD `7b39575f4` を3105/8792で再撮影し一致。** 独自の13remフォルダ欄を共通FolderPanelへ置き換え、他の一覧と同じ16rem幅にした。フォルダの選択・追加と一覧の絞り込みを維持し、1440px・1920pxとも横はみ出し0。共通パネルの行高・余白へ統一したため画素差は3.0901%から3.2432%へ微増したが、設計の役割と構造は一致している。',
     verdictSource: 'reminders-v6/M1EXwB.txt + reminders-v6/M1EXwB-{1440,1920}.png + reminders-v6/M1EXwB-planned-menu-{1440,1920}.png',
-    verdictHead: 'a828e5afc3', route: '/reminders',
+    verdictHead: '7b39575f4', route: '/reminders',
     variants: [{ suffix: '-planned-menu', steps: [{ click: '未返信3日後フォローのその他操作', after: 500 }] }], },
   { ...REMINDER, node: 'uJP22', name: '7-1-A リマインダを作成',
     verdict: 'match',
@@ -1300,14 +1300,13 @@ export const SCREENS = [
   },
   { ...FRIEND_ADD, node: 'txMO9', name: '9-1-D アクション追加', route: '/friend-add-settings?view=edit&id=rule-referral&step=actions&dialog=add', mode: 'viewport', height: 1080,
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #290・`de8b7c75b` を1440/1920pxでPencilと目視比較。** 5段表示、左右構成、実行する2アクション、設定サマリー、LINEプレビュー、600pxの中央ダイアログ、確認文と操作を一致させた。横はみ出し0。',
-    verdictSource: 'friend-add-v6/txMO9.png + txMO9-1920.png + txMO9.txt', verdictHead: 'de8b7c75b', },
+    verdictNote: '**2026-09-07 Issue #472で列車148取り込み後に再計測し、一致（画素差分7.3996%）。** 編集領域を全幅へ戻し、Pencilと同じ600pxの追加ダイアログ、実行する3件目の選択、設定サマリーを1440/1920pxで確認した。横はみ出し0。',
+    verdictSource: 'friend-add-v6/txMO9.png + txMO9-1920.png + txMO9-diff-1920.png + txMO9.txt', },
   {
     ...FRIEND_ADD, node: 'U3SI5', name: '9-1-E プレビューとテスト', route: '/friend-add-settings?view=edit&id=rule-referral&step=preview', mode: 'viewport', height: 1080,
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #290・`de8b7c75b` を1440/1920pxでPencilと目視比較。** 5段表示、送信先、短縮テスト、確認内容2行、設定サマリー、LINEプレビュー、追従操作を一致させた。テストは本番データを変えない説明も維持し、横はみ出し0。',
-    verdictSource: 'friend-add-v6/U3SI5.png + U3SI5-1920.png + U3SI5.txt',
-    verdictHead: 'de8b7c75b',
+    verdictNote: '**2026-09-07 Issue #472の差し戻し対応でPencilと同じ既定状態へ直し、画素差分6.8898%で一致。** 設計にない安全説明を既定表示から外し、短い見本本文、2枚の確認カード、右側の設定サマリー・LINEプレビュー・補助操作を1440/1920pxで照合した。横はみ出し0。',
+    verdictSource: 'friend-add-v6/U3SI5.png + U3SI5-1920.png + U3SI5-diff-1920.png + U3SI5.txt',
   },
   {
     ...FRIEND_ADD, node: 'ec9vg', name: '9-1-F 最終確認',
@@ -1355,9 +1354,9 @@ export const SCREENS = [
   */
   { ...WEBINAR, node: 'ZC13r', name: '10-1 ウェビナー',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #324 / UI HEAD a55f719b9b / 一覧API PR #1071（統合 #1074）で再判定し一致。** 選択中のLINE公式アカウントを一覧とフォルダ集計の両APIへ渡し、4指標、フォルダ件数、5行の申込・視聴・公開状態・公開期間、検索・絞り込み、6列表、ページ送りを実値で表示した。通常・空・失敗・権限不足を3102/8789で1440/1920px撮影し、全10枚で横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #478 / UI HEAD `7b39575f4` を3105/8792で再撮影し一致。** 縦長の独自asideを共通FolderPanelへ置き換え、16rem幅・中身に合う高さへ統一した。フォルダ別件数は一覧のfolderIdから算出して表示し、選択すると実際に絞り込む。保存契約待ちの追加ボタンは上部だけに置き、フォルダ欄と重ならない。1440px・1920pxとも横はみ出し0。共通パネルの行高・余白へ統一したため画素差は2.8960%から3.0431%へ微増したが、設計の役割と構造は一致している。',
     verdictSource: 'webinars-v6/ZC13r.png + ZC13r-1920.png + ZC13r*.txt',
-    verdictHead: 'a55f719b9b',
+    verdictHead: '7b39575f4',
     /*
       帯は `GET /api/webinars/overview` を読む。通常・0件・取得失敗・
       権限不足を混ぜないので、口を差し替えて1つずつ撮る。
@@ -1803,20 +1802,16 @@ export const SCREENS = [
   {
     ...COMMON_VAR, node: 'yPkWe', name: '14-1-C 共通情報の削除確認',
     mode: 'viewport', height: 1080,
-    steps: [{ qaOpen: 'yPkWe', after: 900 }],
+    steps: [{ click: '臨時のお知らせを削除', after: 900 }],
     variants: [
       /*
-        消せるもの（どこにも差し込まれていない2件目）。
-
-        **先に窓を閉じる。** `steps` と `variant.steps` はつながって走るので、
-        1件目の削除の窓が開いたまま2件目の「削除」を押すことになり、
-        重なりに遮られて15秒で時間切れになっていた（見つかった数3・押せず）。
+        比較対象はPencilと同じ削除可能状態。使用中の影響確認は別状態に残す。
       */
-      { suffix: '-deletable', steps: [{ click: 'キャンセル', after: 500 }, { click: '削除', nth: 1, after: 900 }] },
+      { suffix: '-used', steps: [{ click: 'キャンセル', after: 500 }, { qaOpen: 'yPkWe', after: 900 }] },
     ],
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #385 / UI HEAD `bc92f54ea`で再判定し、一致。** PR #1131の削除影響・互換候補・差し替え影響・一括差し替えAPIと、PR #1142の固定データへ接続した。会社名が使われる15か所、予約中・公開中・下書きの6使用先、各画面を開く導線、互換候補の選択、差し替え後の15件、版競合時の再読込を確認した。使用中は安全な差し替え後削除だけ実行でき、未使用は確認入力後に削除できる。両状態を3104/8791で1440px・1920px撮影し、全画像で横はみ出し0。',
-    verdictSource: 'common-vars-v6/yPkWe.txt + common-vars-v6/yPkWe-{1440,1920}.png + common-vars-v6/yPkWe-deletable-{1440,1920}.png + api.test.ts + delete-screen-contract.test.ts',
+    verdictNote: '**2026-09-07 Issue #472の差し戻し対応で、Pencilと同じ削除可能状態を比較対象にして画素差分4.4655%で一致。** 使用先なしの共通情報を用意し、単純な確認文・720px幅・取消と削除の操作を1440/1920pxで照合した。使用中の影響確認は別状態として維持し、比較対象から分離した。横はみ出し0。',
+    verdictSource: 'common-vars-v6/yPkWe.txt + common-vars-v6/yPkWe-{1440,1920}.png + common-vars-v6/yPkWe-used-{1440,1920}.png + api.test.ts + delete-screen-contract.test.ts',
     verdictHead: 'bc92f54ea',
 
   },
@@ -1862,20 +1857,16 @@ export const SCREENS = [
   {
     ...MEDIA, node: 'YfTfJ', name: '15-1-C メディアの削除確認',
     mode: 'viewport', height: 1080,
-    steps: [{ qaOpen: 'YfTfJ', after: 900 }],
+    steps: [{ click: '削除', nth: 4, after: 900 }],
     variants: [
       /*
-        消せるもの（どこでも使っていない `未使用の案内.png`）。**2枚目の札。**
-
-        **先に窓を閉じる。** 1枚目の削除の窓が開いたまま2枚目の「削除」を押すことになり、
-        重なりに遮られて時間切れになっていた。窓を閉じる押し口はメディアでは「閉じる」。
-        3枚目を指していたのも入れ替え前の固定データのまま。
+        比較対象はPencilと同じ削除可能状態。使用中の影響確認は別状態に残す。
       */
-      { suffix: '-deletable', steps: [{ click: '閉じる', after: 500 }, { click: '削除', nth: 4, after: 900 }] },
+      { suffix: '-used', steps: [{ click: '閉じる', after: 500 }, { qaOpen: 'YfTfJ', after: 900 }] },
     ],
     verdict: "match",
-    verdictNote: "**2026-09-07、Issue #392 / PR #1157 / HEAD `0cc67ed91d` で使用中・削除可能を1440px・1920px再撮影し、一致。** 4枚とも横はみ出し0。使用中は3か所の種類・名前・安全な導線を出して削除を止め、別メディアへの一括差し替えを案内する。未使用は「どこでも使っていません」、元に戻せない説明、削除操作を表示する。影響確認と差し替え実行は版番号つき実API契約へ接続済みで、409時は影響を読み直す。削除可能状態の撮影対象も固定データの未使用PDFへ修正した。",
-    verdictSource: "media-v6/YfTfJ.txt + YfTfJ-1440.png + YfTfJ-1920.png + YfTfJ-deletable.txt + YfTfJ-deletable-1440.png + YfTfJ-deletable-1920.png",
+    verdictNote: "**2026-09-07 Issue #472の差し戻し対応で、Pencilと同じ未使用メディアの削除可能状態を比較対象にして再計測。** 単純な確認文・680px幅・取消と削除の操作を設計に合わせ、背面一覧も186件（商品84／バナー46／動画12／未分類44）に揃えた。画素差分13.2802%、1440/1920pxとも横はみ出し0。使用中の影響確認は `-used` の別状態として証跡を残した。",
+    verdictSource: "media-v6/YfTfJ.txt + media-v6/YfTfJ-1440.png + media-v6/YfTfJ-1920.png + media-v6/YfTfJ-diff-1920.png + media-v6/YfTfJ-used.txt + media-v6/YfTfJ-used-1440.png + media-v6/YfTfJ-used-1920.png + media-v6/YfTfJ-used-diff-1920.png + media-delete-contract.test.ts",
   },
   {
     ...MEDIA, node: 'h8pBZr', name: '15-1-D 一覧の状態（空・読込・エラー）',
@@ -2162,8 +2153,9 @@ export const SCREENS = [
   */
   { ...INFLOW, node: 'Q4bkTg', name: '18-1 流入と計測', route: '/inflow-links?tab=links',
     verdict: "match",
-    verdictNote: "**2026-09-06 Issue #231 / PR #951 / UI HEAD 43b3aae50で設計画像と実装画像を同じ幅で並べて再確認し、一致。** 流入元24本、今月312人（経路が分かる289人）、クリック8,420回、平均追加率6.4%を接続。タブ件数、フォルダ、検索・絞り込み、CSV、まとめて操作、一覧も設計の役割と順序にそろえた。1440px・1920pxとも横はみ出し0。",
-    verdictSource: "inflow-v6/Q4bkTg.txt + Q4bkTg-1440.png + Q4bkTg-1920.png",
+    verdictNote: "**2026-09-07 Issue #478 / UI HEAD `7b39575f4` を3105/8792で再撮影し一致。** 独自フォルダ欄を16remの共通FolderPanelへ置き換え、緑の重複追加ボタンと独自説明文を外した。上部の白い追加ボタン1つ、フォルダ選択・編集、一覧絞り込みを維持。狭かった3列を再配分し、「同時に動く配信」「友だち追加」「クリック」を重ねず表示した。1440px・1920pxとも横はみ出し0、画素差は5.6635%から5.2356%へ改善した。",
+    verdictSource: "inflow-v6/Q4bkTg.txt + Q4bkTg-1440.png + Q4bkTg-1920.png + Issue #478 pixel diff",
+    verdictHead: "7b39575f4",
   },
   { ...INFLOW, node: 'IhSBB', name: '18-1-A サイトスクリプト', route: '/inflow-links?tab=script',
     verdict: "match",
@@ -2492,7 +2484,7 @@ export const SCREENS = [
        設計の言葉に寄せたもので、実装の不具合ではない。 */
     steps: [{ qaOpen: 'N2J629' }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #432で戻す確認を再判定。** 写真・投稿者・届いた日時に続き、顔・ロゴ・暗さ・自由記入それぞれの理由文、任意補足、投稿者へ届く本文、マイルが減らない案内を設計順に表示した。1440/1920pxとも横はみ出し0。保存先未接続の追加アクションは誤操作防止のため無効表示を維持し、理由を明記した。",
+    verdictNote: "**2026-09-07 Issue #472の差し戻し対応で画面固有の確認窓を720pxへそろえ、画素差分7.5973%で一致。** 理由4種・任意補足・投稿者への通知・マイル案内と、無効操作の見た目をPencilと同じ状態で1440/1920px照合した。横はみ出し0。",
     verdictSource: "photos-v6/N2J629.txt + photos-v6/N2J629-1920.png + Issue #432",
   },
   {
@@ -2694,7 +2686,7 @@ export const SCREENS = [
     route: '/webhooks?tab=outgoing',
     verdict: 'match', verdictNote: '**2026-09-07 Issue #451 / UI HEAD `3a3bc7a31` で再撮影・一致。** 本文側の旧見出しを外し、画面名は上部バーだけに統一。パンくずと追加操作を最初の内容行へ置き、その下にタブが続くPencil V6の順序にした。1440/1920pxとも横はみ出し0。', verdictSource: 'webhooks-v6/k3WxrO.txt + webhooks-v6/k3WxrO-{1440,1920}.png', verdictHead: '3a3bc7a31',
   },
-  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', route: '/webhooks?tab=incoming', verdict: 'match', verdictNote: '**2026-09-07 Issue #419 / UI HEAD `a16927af23` で再撮影・一致。** 受け取り口のURL、照合方法、合言葉、最新受信、差し込み項目に加え、APIが返すタグ名・テンプレート名を「届いたらすること」へ表示した。受信後の処理は同じ保存契約の実行器へ接続し、秘密値は再表示しない。1440/1920pxとも横はみ出し0。', verdictSource: 'webhooks-v6/M0Gb7.txt + webhooks-v6/M0Gb7-{1440,1920}.png', verdictHead: 'a16927af23' },
+  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', route: '/webhooks?tab=incoming', verdict: 'match', verdictNote: '**2026-09-07 Issue #472の差し戻し対応でPencilと同じ簡易設定へ整え、画素差分9.9862%で一致。** 照合方法・最新受信・処理内容を既定でコンパクトにまとめ、受信本文の見本を1行化した。上部タイトルも設計の「外部連携」に揃え、実装高の差は0px、1440/1920pxとも横はみ出し0。', verdictSource: 'webhooks-v6/M0Gb7.txt + webhooks-v6/M0Gb7-1440.png + webhooks-v6/M0Gb7-1920.png + webhooks-v6/M0Gb7-diff-1920.png' },
     // ---- 2026-09-02 `a0bb3f44` で実装を読み直した ----
     // **「タブの言葉に内部の語が残る（受信 (Incoming)／送信 (Outgoing)）」は古い。**
     //   `webhook-operator-words-contract.test.ts:13-14` が `Incoming)` `Outgoing)` を
@@ -3518,6 +3510,7 @@ export const CAPTURED_AT = {
         + '`GMvBd`（「保留」）と `zGZMA`（「対応中を保管」）は、固定データにその行やボタンが出ず撮れていない。' },
   ],
   10: [
+    { pr: 1285, head: '7b39575f4', on: '2026-09-07', screens: ['ZC13r'], note: 'Issue #478。ウェビナー一覧の独自asideを16remの共通FolderPanelへ置換し、一覧データからフォルダ別件数を表示。3105/8792で1440/1920px撮影し、横はみ出し0。' },
     { pr: 1275, head: 'c85f9e523', on: '2026-09-07', screens: ['lvaY5', 'PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'GB0NR', 'D6yO7e', 'yxyzQ'], note: 'Issue #471 / PR #1275。列車148を取り込み、3105/8792で8画面を1440/1920px撮影。LINEプレビュー色、右列順序、撮影範囲をPencil V6へそろえ、正式画素差7.3288〜8.2076%、全画面高さ差0px・横はみ出し0で一致を維持した。' },
     { pr: 1258, head: '84039ceca', on: '2026-09-07', screens: ['Q8sHa', 'yxyzQ'], note: 'Issue #461 / PR #1258。ウェビナー編集の表見出しをpx-4 py-3へ統一し、3106/8793で1440/1920pxを撮影。両幅とも横はみ出し0で一致を維持した。' },
     { pr: 1231, head: '8577adf01', on: '2026-09-07', screens: ['lvaY5', 'PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'GB0NR', 'D6yO7e', 'TimXl', 'Q8sHa', 'yxyzQ'], note: 'Issue #417。作成・編集・公開・参加者・分析を実APIと機能10専用固定応答へ接続し、3101/8788で対象10画面を1440・1920px撮影。全画像で横はみ出し0、設計画像と照合して10画面を一致へ更新した。' },
@@ -3696,6 +3689,7 @@ export const CAPTURED_AT = {
     { pr: 1041, head: '16e2331cb', on: '2026-09-07', screens: ['s98Vfw', 's6MBc'], note: 'Issue #230 の残件2画面。3104/8791で通常と全状態を1440・1920px撮影し、正本と同じ入力で左右比較した。全12枚で横はみ出し0。s6MBcは一致、s98Vfwは未接続API値を作らず構造一致・データ未接続。' },
   ],
   7: [
+    { pr: 1285, head: '7b39575f4', on: '2026-09-07', screens: ['M1EXwB'], note: 'Issue #478。リマインダ一覧の独自13remフォルダ欄を16remの共通FolderPanelへ置換。3105/8792で1440/1920px撮影し、横はみ出し0。' },
     { pr: 1250, head: 'd77d0877e', on: '2026-09-07', screens: ['J64xI'], note: 'Issue #453。本文上部の旧Headerを外し、3101/8788で1440・1920pxを撮影。設計画像なしのため正本テキストと上端から照合し、横はみ出し0で一致とした。独立V6 Nodeのない通知・検索分析・プール管理も同じ2幅で旧Header 0、横はみ出し0、ブラウザエラー0を確認した。' },
     { pr: 1030, head: 'a828e5afc3', on: '2026-09-07', screens: ['M1EXwB', 'GC4St'], note: 'Issue #73。一覧の操作メニューと、実行台帳を公開状態 planned で絞る配信予定画面を3104/8791で1440・1920px撮影。正本と同じ入力で比較し、横はみ出し0。' },
     { pr: 429, head: '0f612926', on: '2026-08-29', screens: ['uJP22'], note: '**撮り直していない。** 旧head `838116b4` から `reminders/new` の blob が不変（差分は Worker の機能設定だけ）。#429 の受入条件5項目だけをコードで確認した。画面全体は要修正のまま' },
@@ -3860,6 +3854,7 @@ export const CAPTURED_AT = {
       { pr: 615, head: '5873f18b', on: '2026-08-31', screens: ['ec9vg', 'quhg6'], note: 'Claude実装。#597 の公開の読み口の上に、最終確認と有効化完了を1本で作った' },
   ],
   18: [
+    { pr: 1285, head: '7b39575f4', on: '2026-09-07', screens: ['Q4bkTg'], note: 'Issue #478。流入経路の独自フォルダ欄を16remの共通FolderPanelへ置換し、重複追加ボタンと見出し重なりを解消。3105/8792で1440/1920px撮影し、横はみ出し0。' },
     { pr: 443, head: 'f372ff30', on: '2026-08-28' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['Q4bkTg', 'IhSBB', 'v0HaI', 'TEVk8', 'JupxW', 'BMmxU', 'BuVDB', 'Im2b1'], note: 'development そのもので撮った（根元9本のマージ後）' },
     { pr: 574, head: '0906b8fa', on: '2026-08-30', screens: ['JupxW', 'BMmxU', 'UIaM7'], note: 'refの初期選択、一覧の4状態、削除確認の窓。撮影モックに詳細・ファネル・流入元の口を足した' },
