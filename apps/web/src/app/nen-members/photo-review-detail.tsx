@@ -10,6 +10,7 @@ import { FeatureLinkCard } from '@/components/shared/side-cards'
 import StickyBar from '@/components/shared/sticky-bar'
 import type { PhotoAssetStatus, PhotoDerivatives } from '@/lib/api'
 import { formatPhotoReceivedAt } from './photo-review-time'
+import { safePhotoSrc } from './photo-src'
 
 const text = (value: unknown) => String(value ?? '')
 const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? Number(value).toLocaleString('ja-JP') : '—'
@@ -49,7 +50,9 @@ export function PhotoReviewDetail({
   const risks = Array.isArray(photo.risks) ? photo.risks as Array<Record<string, unknown>> : []
   const hasFaceRisk = risks.some((risk) => text(risk.flag) === 'face')
   const reviewDerivative = derivatives?.items.find((item) => item.kind === 'review') ?? null
-  const reviewUrl = derivatives?.knownUrls.find((item) => item.kind === 'review')?.url || text(photo.image_url)
+  // 派生画像・原本どちらも検査を通す。だめな値は作り直し中の表示にする。
+  const reviewUrl = safePhotoSrc(derivatives?.knownUrls.find((item) => item.kind === 'review')?.url)
+    ?? safePhotoSrc(photo.image_url)
   const latestAssetJob = assetStatus?.jobs[0] ?? null
   return <main className="mx-auto max-w-screen-2xl p-6" data-photo-view="detail">
     {notice && <div className="mb-4 rounded-control border border-accent-border bg-accent-soft px-4 py-3 text-sm text-accent-hover">{notice}</div>}

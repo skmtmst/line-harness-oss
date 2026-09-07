@@ -730,17 +730,36 @@ nenMembers.get(
           AND ps.publication_withdrawn_at IS NULL
         ORDER BY pub.published_at DESC LIMIT 200`,
     ).bind(accountId).all<Record<string, unknown>>();
-    const items = await Promise.all(rows.results.map(async (row) => {
-      const placements = await c.env.DB.prepare(
-        `SELECT id, placement_type, placement_label, view_count
-           FROM nen_photo_publication_placements
-          WHERE publication_id = ? AND line_account_id = ? AND active = 1
-          ORDER BY created_at`,
-      ).bind(row.id, accountId).all<Record<string, unknown>>();
-      return { ...row, placements: placements.results } as Record<string, unknown> & {
-        placements: Array<Record<string, unknown>>;
-      };
-    }));
+    /*
+     * 掲載先は1発で取る。写真ごとに1件ずつ取りに行くと、掲載数が増えるほど
+     * 遅くなる（N+1）。表示の形は変えない。
+     */
+    const publicationIds = rows.results.map((row) => String(row.id));
+    const placementRows = publicationIds.length === 0 ? [] : (await c.env.DB.prepare(
+      `SELECT publication_id, id, placement_type, placement_label, view_count
+         FROM nen_photo_publication_placements
+        WHERE publication_id IN (${publicationIds.map(() => '?').join(',')})
+          AND line_account_id = ? AND active = 1
+        ORDER BY created_at`,
+    ).bind(...publicationIds, accountId).all<Record<string, unknown>>()).results;
+    const placementsByPublication = new Map<string, Array<Record<string, unknown>>>();
+    for (const placement of placementRows) {
+      const key = String(placement.publication_id);
+      const list = placementsByPublication.get(key) ?? [];
+      // 返す列は従来どおり4つ（publication_id は振り分け用で返さない）。
+      list.push({
+        id: placement.id,
+        placement_type: placement.placement_type,
+        placement_label: placement.placement_label,
+        view_count: placement.view_count,
+      });
+      placementsByPublication.set(key, list);
+    }
+    const items = rows.results.map((row) => (
+      { ...row, placements: placementsByPublication.get(String(row.id)) ?? [] }
+    )) as Array<Record<string, unknown> & {
+      placements: Array<Record<string, unknown>>;
+    }>;
     const measured = items.filter((item) => item.view_count !== null && item.view_count !== undefined);
     return c.json({ success: true, data: {
       summary: {

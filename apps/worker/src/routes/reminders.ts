@@ -2,6 +2,7 @@ import { Hono, type Context } from 'hono';
 import {
   getFriendById,
   getReminders,
+  getRemindersByIds,
   reorderReminders,
   getReminderById,
   createReminder,
@@ -174,7 +175,7 @@ const REMINDER_MESSAGE_TYPES = new Set([
 
 function readDraftSettings(
   raw: unknown,
-): { ok: true; value: ReminderDraftSettings } | { ok: false; error: string } {
+): { ok: true; value: ReminderDraftSettings } | { ok: false; error: string; status?: number } {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return { ok: false, error: '下書きの内容が正しくありません' };
   }
@@ -226,14 +227,24 @@ function readDraftSettings(
     const objectOrEmpty = (value: unknown) => value && typeof value === 'object' && !Array.isArray(value)
       ? value as Record<string, unknown>
       : {};
+    const templateId = typeof step.templateId === 'string' && step.templateId ? step.templateId : null;
+    const messageContent = typeof step.messageContent === 'string' ? step.messageContent : '';
+    // 公開前検査と同じく、型紙なしの空本文はここで止める。空の通は届いても
+    // 何も表示されず、公開時に初めて気づくことになる。
+    if (!templateId && !messageContent.trim()) {
+      return { ok: false, error: '送る内容が空の通知があります', status: 422 };
+    }
+    if (messageContent.length > 5000) {
+      return { ok: false, error: '送る内容は5000文字以内で指定してください', status: 422 };
+    }
     steps.push({
       stableStepId,
       offsetMinutes,
       messageType,
-      messageContent: typeof step.messageContent === 'string' ? step.messageContent : '',
+      messageContent,
       offsetDays,
       sendAtTime,
-      templateId: typeof step.templateId === 'string' && step.templateId ? step.templateId : null,
+      templateId,
       targetCondition: objectOrEmpty(step.targetCondition),
       action: objectOrEmpty(step.action),
     });
@@ -342,6 +353,18 @@ reminders.patch('/api/reminders/reorder', requireRole('owner', 'admin'), async (
     if (body.ids.length > 500) {
       return c.json({ success: false, error: 'too many ids' }, 400);
     }
+    /*
+     * 渡されたidが操作できるアカウントのものか確かめる。範囲外が1件でも
+     * 混ざったら並べ替え自体を行わない（他アカウントの並びを書き換えない）。
+     */
+    const targets = await getRemindersByIds(c.env.DB, body.ids as string[]);
+    if (targets.length !== new Set(body.ids as string[]).size) {
+      return c.json({ success: false, error: 'リマインダが見つかりません' }, 404);
+    }
+    const targetAccountIds = [...new Set(targets.map((row) => row.line_account_id))];
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), targetAccountIds)) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+    }
     await reorderReminders(c.env.DB, body.ids as string[]);
     return c.json({ success: true, data: { updated: body.ids.length } });
   } catch (err) {
@@ -429,7 +452,7 @@ reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c
 reminders.post('/api/reminders/drafts', requireRole('owner', 'admin'), async (c) => {
   try {
     const parsed = readDraftSettings(await c.req.json<unknown>());
-    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, parsed.status === 422 ? 422 : 400);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [parsed.value.lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
@@ -513,7 +536,7 @@ reminders.get('/api/reminders/:id/draft', async (c) => {
 reminders.put('/api/reminders/:id/draft', requireRole('owner', 'admin'), async (c) => {
   try {
     const parsed = readDraftSettings(await c.req.json<unknown>());
-    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, parsed.status === 422 ? 422 : 400);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [parsed.value.lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
@@ -758,6 +781,18 @@ reminders.put('/api/reminders/:id', requireRole('owner', 'admin'), async (c) => 
     const body = await c.req.json<Record<string, unknown>>();
     const trigger = readTriggerInput(body);
     if (!trigger.ok) return c.json({ success: false, error: trigger.error }, 400);
+    /*
+     * 送るタイミングの決め方は作成後に変えられない（画面にもそう書いてある）。
+     * 変えると登録済みの配信予定がずれるので、変わっているときだけ422で止める。
+     * 同じ値の再送は通す（画面のフォルダ移動などが同じ本文を送るため）。
+     */
+    if (Object.prototype.hasOwnProperty.call(body, 'triggerType')) {
+      const current = await getReminderById(c.env.DB, id);
+      if (!current) return c.json({ success: false, error: 'Not found' }, 404);
+      if ((current.trigger_type ?? 'manual') !== trigger.value.triggerType) {
+        return c.json({ success: false, error: '送るタイミングの決め方は作成後に変えられません' }, 422);
+      }
+    }
     const folderError = await validateReminderFolder(c.env.DB, trigger.value.folderId);
     if (folderError) return c.json({ success: false, error: folderError }, 422);
     await updateReminder(c.env.DB, id, { ...body, ...trigger.value });
@@ -795,6 +830,16 @@ reminders.post('/api/reminders/:id/steps', requireRole('owner', 'admin'), async 
     }>();
     if (body.offsetMinutes === undefined || !body.messageType || !body.messageContent) {
       return c.json({ success: false, error: 'offsetMinutes, messageType, messageContent are required' }, 400);
+    }
+    // 下書き側と同じ種類の一覧で検査する。巨大な本文や変な種類をDBへ入れない。
+    if (!REMINDER_MESSAGE_TYPES.has(body.messageType)) {
+      return c.json({ success: false, error: `messageType must be one of ${[...REMINDER_MESSAGE_TYPES].join(', ')}` }, 400);
+    }
+    if (typeof body.messageContent !== 'string' || !body.messageContent.trim()) {
+      return c.json({ success: false, error: 'messageContent must not be empty' }, 400);
+    }
+    if (body.messageContent.length > 5000) {
+      return c.json({ success: false, error: 'messageContent must be at most 5000 characters' }, 400);
     }
     if (
       body.sendAtTime !== undefined &&

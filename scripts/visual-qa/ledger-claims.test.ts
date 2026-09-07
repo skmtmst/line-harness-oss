@@ -85,7 +85,6 @@ describe('台帳の「無い」という主張', () => {
     const markdown = readFileSync(join(ROOT, 'docs/design-qa/v6-progress-ledger.md'), 'utf8');
     const progress = JSON.parse(readFileSync(join(ROOT, 'docs/design-qa/v6-progress.json'), 'utf8'));
     const html = readFileSync(join(ROOT, 'docs/design-qa/v6-progress.html'), 'utf8');
-    expect(heightWarnings.length).toBeGreaterThan(0);
     expect(progress.pixelDiff.heightDiffThresholdPx).toBe(24);
     expect(progress.pixelDiff.heightAboveThresholdCount).toBe(heightWarnings.length);
     for (const entry of heightWarnings) {

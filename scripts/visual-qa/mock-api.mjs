@@ -67,7 +67,7 @@ import {
   FRIEND_SAVED_VIEWS, MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
   LIST_STATS, NEN_BIRTHDAY_COUPON, NEN_CAMPAIGN_SETTINGS, NEN_COLUMN_CREATE, NEN_COLUMN_OPERATIONS, NEN_COLUMNS, NEN_JOBS, NEN_PETS,
   NEN_FLOW_METRICS, NEN_COLUMN_METRICS, NEN_PET_METRICS, NEN_DELIVERIES, NEN_DELIVERY_DETAILS,
-  OPERATORS, REMINDERS, REMINDER_DRAFT, REMINDER_FOLDERS, SCENARIO_ACTIONS, SCENARIO_DRAFT, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, SCENARIO_SIMULATION, SCENARIO_RUNS, USERS_GROUPED,
+  OPERATORS, REMINDERS, REMINDER_DRAFT, REMINDER_FOLDERS, REMINDER_VALIDATE, REMINDER_PREVIEW, REMINDER_TEST_SEND, REMINDER_PUBLISH, SCENARIO_ACTIONS, SCENARIO_DRAFT, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, SCENARIO_SIMULATION, SCENARIO_RUNS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   RICH_MENU_GROUPS, RICH_MENU_GROUP_DETAILS, RICH_MENU_EXTERNAL, RICH_MENU_TAP_STATS,
   TAGS, TAG_GROUPS, TAG_DEFINITION_NEN_SUBSCRIPTION, TAG_DEPENDENCIES_NEN_SUBSCRIPTION,
@@ -982,6 +982,16 @@ function visualQaWriteBody(method, pathname) {
     return { ...SCENARIO_SIMULATION, scenarioId: scenarioSimulation[1] }
   }
   if (method === 'PUT' && /^\/api\/scenarios\/[^/]+\/draft$/.test(pathname)) return SCENARIO_DRAFT
+  /*
+   * リマインダの公開フロー（下書き保存・検査・予定・試し送り・公開）。
+   * 読みの `/draft` と `/runs` は従来のGET側にある。ここは書き込み側で、
+   * 本番と同じ器（`{success:true,data}`）で固定の返事を返す。
+   */
+  if (method === 'PUT' && /^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) return REMINDER_DRAFT
+  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/validate$/.test(pathname)) return REMINDER_VALIDATE
+  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/preview$/.test(pathname)) return REMINDER_PREVIEW
+  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/test-send$/.test(pathname)) return REMINDER_TEST_SEND
+  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/publish$/.test(pathname)) return REMINDER_PUBLISH
   if (method === 'POST' && /^\/api\/scenarios\/[^/]+\/test-send$/.test(pathname)) return { sent: 1 }
   if (method === 'POST' && /^\/api\/scenarios\/[^/]+\/steps\/[^/]+\/test-send$/.test(pathname)) return { sent: 1 }
   if (method === 'POST' && pathname === '/api/ec-commerce/test-send') return { sent: 1 }

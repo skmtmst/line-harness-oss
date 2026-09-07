@@ -88,7 +88,8 @@ function harness(options: {
             return { results: [{ id: 'publication-1', photo_id: 'photo-1', view_count: null, version: 2 }] };
           }
           if (query.includes('FROM nen_photo_publication_placements')) {
-            return { results: [{ id: 'placement-1', placement_type: 'column', placement_label: 'コラム', view_count: null }] };
+            // 一覧は掲載先をINで1発取得する。振り分け鍵の publication_id を返す。
+            return { results: [{ publication_id: 'publication-1', id: 'placement-1', placement_type: 'column', placement_label: 'コラム', view_count: null }] };
           }
           if (query.includes('FROM nen_photo_risk_assessments')) {
             return { results: [{ flag: 'face', confidence: 0.78 }] };

@@ -68,7 +68,15 @@ export default function RemindersPage() {
   const [deleteError, setDeleteError] = useState('')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
 
-  const loadFolders = useCallback(async () => { try { const res = await api.folders.list('reminder'); if (res.success) setFolders(res.data) } catch {} }, [])
+  const [foldersError, setFoldersError] = useState(false)
+  const loadFolders = useCallback(async () => {
+    setFoldersError(false)
+    try {
+      const res = await api.folders.list('reminder')
+      if (res.success) setFolders(res.data)
+      else setFoldersError(true)
+    } catch { setFoldersError(true) }
+  }, [])
   const loadReminders = useCallback(async () => {
     setLoading(true); setError('')
     try { const res = await api.reminders.list({ accountId: selectedAccountId || undefined }); if (res.success) setReminders(res.data as unknown as Reminder[]); else setError(res.error) }
@@ -77,10 +85,17 @@ export default function RemindersPage() {
   }, [selectedAccountId])
   useEffect(() => { void loadReminders(); void loadFolders() }, [loadReminders, loadFolders])
 
-  /** 一覧の行操作からフォルダを付け替える受け口。 */
+  const [moveError, setMoveError] = useState('')
+  /** 一覧の行操作からフォルダを付け替える受け口。失敗は黙らせず文面で知らせる。 */
   const handleMoveFolder = async (id: string, folderId: string) => {
-    const response = await api.reminders.update(id, { folderId: folderId || null })
-    if (response.success) await loadReminders()
+    setMoveError('')
+    try {
+      const response = await api.reminders.update(id, { folderId: folderId || null })
+      if (!response.success) throw new Error(response.error)
+      await loadReminders()
+    } catch {
+      setMoveError('フォルダを変えられませんでした。読み直してお試しください。')
+    }
   }
 
   const handleDeleteSelected = async () => {
@@ -126,7 +141,9 @@ export default function RemindersPage() {
     }} /></div>
     <div className="mb-3 flex gap-2"><Button onClick={() => setFolderDialogOpen(true)}>フォルダを追加</Button><Button href="/reminders/new" variant="primary">リマインダを作成</Button></div>
     {error ? <div className="bg-danger-bg text-danger mb-3 rounded-lg p-3 text-sm">{error}</div> : null}
+    {moveError ? <div className="bg-danger-bg text-danger mb-3 rounded-lg p-3 text-sm">{moveError}</div> : null}
     <div data-design="Body" className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+      {foldersError ? <div className="bg-danger-bg text-danger rounded-lg p-3 text-sm lg:col-span-2">フォルダを読み込めませんでした。<Button className="ml-2" onClick={() => void loadFolders()}>フォルダを再読み込み</Button></div> : null}
       <FolderPanel
         total={loading || error ? '—' : `${listTotal}件`}
         activeId={folderFilter}

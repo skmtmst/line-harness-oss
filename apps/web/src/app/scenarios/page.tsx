@@ -51,6 +51,12 @@ function StartScenarioDialog({
   const [simulation, setSimulation] = useState<ScenarioSimulation | null>(null)
   const [runs, setRuns] = useState<ScenarioRuns | null>(null)
   const [preflightLoading, setPreflightLoading] = useState(true)
+  /*
+   * 開始は戻せない操作なので、確認のチェックが入るまで開始ボタンを
+   * 押せない。defaultChecked の非制御にすると、見ていないまま
+   * 始められて確認が形だけになる（点検 #495 中4）。
+   */
+  const [confirmed, setConfirmed] = useState(false)
 
   useEffect(() => {
     if (!lineAccountId) {
@@ -153,11 +159,11 @@ function StartScenarioDialog({
           <p className="text-warning text-sm font-bold">開始後に起きること</p>
           <ul className="text-ink-secondary mt-2 space-y-1 text-xs"><li>・条件に一致した{simulation?.audience.newStartPlanned.toLocaleString('ja-JP') ?? '—'}人が購読を開始します</li><li>・配信中の友だちは停止するまで次のステップへ進みます</li><li>・開始・停止・編集は監査履歴とSlackのPRスレッドへ記録します</li></ul>
         </div>
-        <label className="mx-6 mb-4 flex items-center gap-2 text-sm font-medium"><input type="checkbox" defaultChecked />対象人数・内容・送信枠を確認しました</label>
+        <label className="mx-6 mb-4 flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />対象人数・内容・送信枠を確認しました</label>
         {error ? <p className="bg-danger-bg text-danger mx-6 mb-4 rounded-card px-4 py-3 text-sm">{error}</p> : null}
         <div className="border-hairline mt-auto flex justify-end gap-3 border-t px-6 py-4">
           <span className="text-ink-faint mr-auto self-center text-xs">開始後も緊急停止できます。停止理由は履歴に残ります。</span><Button onClick={onCancel} disabled={busy}>戻って確認</Button>
-          <Button variant="primary" onClick={onConfirm} disabled={busy}>{busy ? '開始中…' : '配信を開始'}</Button>
+          <Button variant="primary" onClick={onConfirm} disabled={busy || !confirmed}>{busy ? '開始中…' : '配信を開始'}</Button>
         </div>
       </div>
     </div>
@@ -337,7 +343,13 @@ export default function ScenariosPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      await api.scenarios.delete(id)
+      /*
+       * fetchApi は口の失敗を例外でなく {success:false} で返す。
+       * 成功を見ないと、消えていないのに再読込だけされて気づけない
+       * （点検 #495 中6）。同じ画面の並べ替え・移動・切替は見ている。
+       */
+      const res = await api.scenarios.delete(id)
+      if (!res.success) throw new Error(res.error)
       void loadScenarios()
     } catch {
       setActionError('シナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。')
