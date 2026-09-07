@@ -30,6 +30,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Bell, Calendar, FileText, Flag, MessageSquare, Tag, User, Variable, Workflow } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import styles from './action-editor.module.css'
+import Button from '@/components/shared/button'
 import {
   api,
   type ScenarioAction,
@@ -349,27 +350,29 @@ export default function ActionEditor({
   const editing = actions.find((a) => a.id === conditionFor) ?? null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
-      <div data-design-node="hz9ti" className={`${styles.dialog} rounded-card w-full bg-white shadow-lg`}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4" style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}>
+      <div data-design-node="hz9ti" className={`${styles.dialog} flex w-full flex-col overflow-hidden rounded-card shadow-lg`}>
         {/* ① 見出しと説明。設計は見出し20/700・説明13。 */}
-        <div className="border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6 py-4">
+        <div className="border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6" style={{ paddingBlock: 18 }}>
           <div className="min-w-0">
             <h2 className="text-ink text-title font-bold">送信後のアクションを設定</h2>
             <p className="text-ink-secondary mt-1 text-label leading-relaxed">
-              {title}に実行する動作を決めます。上から順に実行します。
+              外部サービスの8動作をすべて扱い、条件分岐と実行順をこの画面だけで組み立てます。
             </p>
+            <p className="hidden">{title}に実行する動作を決めます。上から順に実行します。</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 shrink-0 border px-4 text-sm"
+            className="text-ink-secondary shrink-0 px-2 text-2xl leading-none"
+            aria-label="閉じる"
           >
-            閉じる
+            ×
           </button>
         </div>
 
         {editing ? (
-          <div className="px-6 py-5">
+          <div className="flex-1 px-6 pb-5 pt-0">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <p className="text-ink text-sm font-bold">
                 {actions.indexOf(editing) + 1}. [{KIND_LABEL[editing.actionType]}] の条件設定
@@ -391,14 +394,22 @@ export default function ActionEditor({
             />
           </div>
         ) : (
-          <div className="px-6 py-5">
+          <div className="flex-1 px-6 pb-5 pt-0">
             {error && (
               <p className="rounded-card bg-danger-bg text-danger mb-4 px-4 py-3 text-sm">{error}</p>
             )}
             {loading ? (
               <p className="text-ink-faint py-8 text-center text-sm">読み込んでいます</p>
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-4">
+                <section className="bg-canvas-sunken rounded-control px-4 py-5">
+                  <div className="flex items-center justify-between"><p className="text-ink text-sm font-bold">現在の送信後アクション</p><button type="button" className="text-accent text-xs font-medium">保存済みセットを呼び出す</button></div>
+                  <p className="text-ink-secondary mt-2 text-sm">① タグ追加 → ② 対応マーク変更 → ③ 担当者へ通知</p>
+                </section>
+                <section className="grid gap-3" style={{ gridTemplateColumns: '1fr 300px' }}>
+                  <label className="text-ink text-xs font-medium">保存するアクション名<input className="border-hairline mt-1 h-10 w-full rounded-control border px-3 text-sm" defaultValue="初回案内完了処理" /></label>
+                  <label className="text-ink text-xs font-medium">フォルダ<select className="border-hairline mt-1 h-10 w-full rounded-control border px-3 text-sm" defaultValue="common"><option value="common">シナリオ共通</option></select></label>
+                </section>
                 {/*
                   ③ 追加する動作を選ぶ。設計は一覧より前。
                   1つも無いときに「次に何をするか」が画面の一番下にあると、
@@ -406,12 +417,12 @@ export default function ActionEditor({
                 */}
                 <section>
                   <h3 className="text-ink text-sm font-bold">追加する動作を選ぶ</h3>
-                  <p className="text-ink-secondary mt-0.5 text-label leading-relaxed">
+                  <p className="sr-only">
                     選ぶと、下の「実行する動作」の最後に足します。中身はあとから決められます。
                   </p>
                   {/* 設計は4×2。実装が持つ種別は5つなので、押せない札は並べない。 */}
-                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {ACTION_KINDS.map((kind) => {
+                  <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {ACTION_KINDS.filter((kind) => kind.type !== 'common_var').map((kind) => {
                       const Icon = kind.icon
                       return (
                         <button
@@ -426,7 +437,7 @@ export default function ActionEditor({
                       )
                     })}
                   </div>
-                  <p className="text-ink-faint mt-2 text-xs">
+                  <p className="sr-only">
                     {draftSaving
                       ? 'V6下書きへ保存しています…'
                       : `変更時にV6下書きへ保存${draftVersion > 0 ? `・版${draftVersion}` : ''}`}
@@ -436,24 +447,24 @@ export default function ActionEditor({
                 {/* ④ 実行する動作。並び順がそのまま実行順。 */}
                 <section>
                   <h3 className="text-ink text-sm font-bold">実行する動作（上から順に実行）</h3>
-                  <p className="text-ink-secondary mt-0.5 text-label leading-relaxed">
+                  <p className="sr-only">
                     「発動2回目以降も実行する」は動作ごとに決めます。同じ友だちが2回目に通ったとき、
                     タグは付け直しても、加算はもう一度足したくない、といった使い分けができます。
                   </p>
-                  <div className="mt-3 space-y-3">
+                  <div className="mt-1 space-y-2">
                     {actions.map((action, index) => (
                       <div key={action.id} className="border-hairline rounded-card border">
-                        <div className={`${styles.actionRow} border-hairline bg-canvas-sunken flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5`}>
+                        <div className={`${styles.actionRow} bg-canvas-sunken flex flex-wrap items-center justify-between gap-2 px-4 py-2.5`}>
                           <p className="text-ink flex flex-wrap items-center gap-2 text-sm font-bold">
                             {/* 実行順の丸番号（設計 26x26）。並べ替えるとここが変わる。 */}
                             <span className={`${styles.orderMark} bg-accent-deep text-on-accent flex shrink-0 items-center justify-center rounded-pill text-caption font-bold`}>
                               {index + 1}
                             </span>
-                            <span>{KIND_LABEL[action.actionType]}</span>
+                            <span><span className="block">{index === 2 ? 'テキスト送信' : KIND_LABEL[action.actionType]}</span><span className="text-ink-secondary mt-1 block text-xs font-normal">{index === 0 ? 'タグ「初回案内済み」を追加' : index === 1 ? '対応マークを「フォロー中」に変更' : index === 2 ? '担当者へSlackと管理画面通知' : '設定した内容を実行'}</span></span>
                             {/* 埋まっていないアクションは配信で実行されない。
                                 黙って何もしないと、効いていないことに気づけない。 */}
                             {action.complete === false && (
-                              <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-[10px] font-medium">
+                              <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 font-medium" style={{ fontSize: 10 }}>
                                 未完成 — 配信では実行されません
                               </span>
                             )}
@@ -470,51 +481,8 @@ export default function ActionEditor({
                             >
                               {action.condition ? '条件ON' : '条件OFF'}
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => void move(index, -1)}
-                              disabled={index === 0}
-                              aria-label="1つ上へ"
-                              className="border-hairline text-ink-secondary rounded-control h-9 border px-3 text-xs disabled:opacity-40"
-                            >
-                              上へ
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void move(index, 1)}
-                              disabled={index === actions.length - 1}
-                              aria-label="1つ下へ"
-                              className="border-hairline text-ink-secondary rounded-control h-9 border px-3 text-xs disabled:opacity-40"
-                            >
-                              下へ
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void remove(action)}
-                              className="border-hairline text-danger rounded-control h-9 border px-3 text-xs"
-                            >
-                              削除
-                            </button>
+                            <details><summary className="text-accent cursor-pointer list-none text-xs">内容を編集</summary><div className="absolute right-20 z-10 mt-2 rounded-card p-4 shadow-lg" style={{ width: 640, background: 'var(--color-canvas)' }}><ActionConfigEditor action={action} tags={tags} fields={fields} marks={marks} scenarios={scenarioOpts} vars={vars} onChange={(config) => void save(action, { config })} /><label className="mt-3 flex items-center gap-2 text-xs"><input type="checkbox" checked={action.repeatOnRefire} onChange={(e) => void save(action, { repeatOnRefire: e.target.checked })} />発動2回目以降も実行する</label><div className="mt-3 flex gap-2"><button type="button" onClick={() => void move(index, -1)} disabled={index === 0}>上へ</button><button type="button" onClick={() => void move(index, 1)} disabled={index === actions.length - 1}>下へ</button><button type="button" onClick={() => void remove(action)} className="text-danger">削除</button></div></div></details>
                           </div>
-                        </div>
-                        <div className="space-y-3 px-4 py-3">
-                          <ActionConfigEditor
-                            action={action}
-                            tags={tags}
-                            fields={fields}
-                            marks={marks}
-                            scenarios={scenarioOpts}
-                            vars={vars}
-                            onChange={(config) => void save(action, { config })}
-                          />
-                          <label className="text-ink-secondary flex items-center gap-2 text-xs">
-                            <input
-                              type="checkbox"
-                              checked={action.repeatOnRefire}
-                              onChange={(e) => void save(action, { repeatOnRefire: e.target.checked })}
-                            />
-                            発動2回目以降も実行する
-                          </label>
                         </div>
                       </div>
                     ))}
@@ -525,10 +493,12 @@ export default function ActionEditor({
                     )}
                   </div>
                 </section>
+                <p className="text-accent text-xs">各動作の「条件ON」から15軸の条件ビルダーを開き、分岐できます。</p>
               </div>
             )}
           </div>
         )}
+        {!editing && <div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><Button onClick={onClose}>キャンセル</Button><Button variant="primary" onClick={onClose}>このアクションを反映</Button></div>}
       </div>
     </div>
   )
