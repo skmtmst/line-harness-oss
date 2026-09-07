@@ -379,6 +379,7 @@ function MileageRewardEditorInner() {
             >
               <Select
                 id="reward-action"
+                aria-label="交換後に渡すもの"
                 value={form.commonActionVersionId}
                 onChange={(value) => set('commonActionVersionId', value)}
                 options={[
