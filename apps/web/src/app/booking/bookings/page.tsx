@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Header from '@/components/layout/header'
-import { bookingApi, type BookingMenu, type BookingRequest } from '@/lib/api'
+import { bookingApi, type BookingAdminDetail, type BookingMenu, type BookingRequest } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
@@ -347,6 +347,7 @@ export default function BookingsPage() {
       {detail && (
         <BookingDetailPanel
           booking={detail}
+          accountId={selectedAccountId}
           onClose={() => setDetailId(null)}
           onAction={(a) => handleDecide(detail.id, a)}
         />
@@ -736,13 +737,29 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 
 function BookingDetailPanel({
   booking: b,
+  accountId,
   onClose,
   onAction,
 }: {
   booking: BookingRequest
+  accountId: string | null
   onClose: () => void
   onAction: (a: 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete') => void
 }) {
+  const [detail, setDetail] = useState<BookingAdminDetail | null>(null)
+  const [detailError, setDetailError] = useState('')
+
+  useEffect(() => {
+    if (!accountId) return
+    let active = true
+    setDetailError('')
+    void bookingApi.getBooking(accountId, b.id)
+      .then((response) => { if (active) setDetail(response.booking) })
+      .catch(() => { if (active) setDetailError('予約の顧客カルテと通知実績を読み込めませんでした') })
+    return () => { active = false }
+  }, [accountId, b.id])
+
+  const lineOperation = detail?.operations.find((item) => item.kind === 'confirmation_line') ?? null
   return (
     <div data-design-node="TnDbq" className="fixed inset-y-0 right-0 left-0 z-50 flex justify-end xl:left-64">
       <button
@@ -768,6 +785,7 @@ function BookingDetailPanel({
 
         <div data-design="Body" className="grid gap-4 px-6 py-4 xl:grid-cols-4">
           <main className="min-w-0 xl:col-span-3">
+          {detailError ? <p className="border-danger bg-danger-bg text-danger mb-4 rounded-card border px-4 py-3 text-sm">{detailError}</p> : null}
           <section className="mb-6">
             <div className="bg-success-bg text-success mb-3 w-fit rounded-pill px-3 py-1 text-xs font-semibold">予約が入っています</div>
             <p className="text-ink-secondary mb-3 text-sm">{formatJpDateTime(b.starts_at)}〜{formatJpTime(b.ends_at)} ／ 担当 {b.staff_name} ／ LINEから入りました。</p>
@@ -792,13 +810,21 @@ function BookingDetailPanel({
             <h3 className="text-ink text-base font-semibold">この方のこれまで</h3>
             <p className="text-ink-faint mt-1 text-xs">顧客カルテの履歴は、友だち詳細で確認できます。前回のことを覚えていると、話が早くなります。</p>
             <div className="border-hairline mt-4 grid grid-cols-4 gap-3 border-b pb-2 text-xs text-ink-faint"><span>いつ・何を</span><span>担当</span><span>金額</span><span>メモ</span></div>
-            <div className="grid grid-cols-4 gap-3 py-3 text-sm"><span>{formatJpDateTime(b.starts_at)} {b.menu_name}</span><span>{b.staff_name}</span><span>¥{b.price_at_booking.toLocaleString()}</span><span>{b.customer_note ?? '記入なし'}</span></div>
+            {(detail?.history.length ? detail.history : [{ id: b.id, startsAt: b.starts_at, menuName: b.menu_name, staffName: b.staff_name, price: b.price_at_booking, customerNote: b.customer_note, handoverNote: null, status: b.status }]).slice(0, 3).map((item) => (
+              <div key={item.id} className="grid grid-cols-4 gap-3 py-3 text-sm"><span>{formatJpDateTime(item.startsAt)} {item.menuName}</span><span>{item.staffName}</span><span>¥{item.price.toLocaleString()}</span><span>{item.customerNote ?? '記入なし'}</span></div>
+            ))}
             <Link href={`/friends/detail?id=${encodeURIComponent(b.friend_id)}`} className="text-accent text-xs font-semibold">顧客カルテで以前の予約を見る →</Link>
           </section>
 
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <h3 className="text-ink text-base font-semibold">この予約で動いたこと</h3>
-            <div className="mt-3 space-y-3 text-sm"><p>✓ {formatJpDateTime(b.requested_at)} 予約を受け付けました</p>{b.decided_at ? <p>✓ {formatJpDateTime(b.decided_at)} 予約を「{statusLabel[b.status] ?? b.status}」にしました</p> : null}<p className="text-ink-faint">お知らせの開封状況は、受信箱で確認できます。</p></div>
+            <div className="mt-3 space-y-3 text-sm">
+              <p>✓ {formatJpDateTime(b.requested_at)} 予約を受け付けました</p>
+              {b.decided_at ? <p>✓ {formatJpDateTime(b.decided_at)} 予約を「{statusLabel[b.status] ?? b.status}」にしました</p> : null}
+              {lineOperation ? <p>{lineOperation.status === 'succeeded' ? '✓' : '…'} 予約確認LINE: {lineOperation.status === 'succeeded' ? '送信済み' : lineOperation.status === 'queued' ? '送信中' : lineOperation.status === 'retry_wait' ? '再試行中' : lineOperation.status === 'permanent_failed' ? '失敗' : '送信なし'}</p> : null}
+              {detail?.reminders.map((reminder) => <p key={reminder.id}>{reminder.status === 'sent' ? '✓' : '…'} {formatJpDateTime(reminder.scheduledAt)} リマインダ: {reminder.status}</p>)}
+              <p className="text-ink-faint">お知らせの開封状況は、受信箱で確認できます。</p>
+            </div>
           </section>
           </main>
 
@@ -806,12 +832,14 @@ function BookingDetailPanel({
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <h3 className="text-ink text-sm font-semibold">お客様とペット</h3>
             <div className="mt-3 flex items-center gap-3"><span className="bg-action-soft text-action flex h-10 w-10 items-center justify-center rounded-full font-bold">{b.friend_name?.charAt(0) ?? '?'}</span><div><Link href={`/friends/detail?id=${encodeURIComponent(b.friend_id)}`} className="text-ink font-semibold hover:underline">{b.friend_name ?? '名前未設定'}さま</Link><p className="text-ink-faint text-xs">LINEの友だち情報と来店履歴</p></div></div>
-            <DetailRow label="ペット">友だち情報欄で確認</DetailRow>
-            <DetailRow label="連絡先">友だち情報欄で確認</DetailRow>
+            <DetailRow label="ペット">{detail?.customer.petName ?? '登録なし'}</DetailRow>
+            <DetailRow label="連絡先">{detail?.customer.phone ?? '登録なし'}</DetailRow>
+            {detail?.customer.tags.length ? <DetailRow label="タグ">{detail.customer.tags.map((tag) => tag.name).join('、')}</DetailRow> : null}
+            {detail?.customer.mileageBalance !== null && detail?.customer.mileageBalance !== undefined ? <DetailRow label="マイル">{detail.customer.mileageBalance.toLocaleString()}</DetailRow> : null}
           </section>
           <section className="border-warning bg-warning-bg rounded-card border p-5">
             <h3 className="text-warning text-sm font-semibold">当日 気をつけること</h3>
-            <p className="text-warning mt-3 text-xs">申し送り情報は顧客カルテで確認してください。取得できない値は、この画面で推測して表示しません。</p>
+            <p className="text-warning mt-3 text-xs">{detail?.previousHandover ?? '前回の申し送りはありません。'}</p>
           </section>
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <h3 className="text-ink text-sm font-semibold">つながる先</h3>

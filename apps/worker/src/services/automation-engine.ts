@@ -3,7 +3,9 @@
  *
  * 旧 automations.actions は読まない。実行開始時に公開版と共通アクション版を
  * 固定し、外部処理は注入された executor に同じ stepExecutionId を渡す。
- */
+*/
+
+import { matchesCondition, type SegmentCondition } from './segment-query.js';
 
 const DEFAULT_LEASE_MINUTES = 5;
 const RETRY_DELAYS_MINUTES = [1, 5, 30] as const;
@@ -29,6 +31,8 @@ export interface ActionDefinition {
   onFailure: FailureMode;
   /** 実行開始時に固定した共通アクション版。実行計画だけが持つ。 */
   commonActionVersionId?: string | null;
+  /** 実行計画で固定した、親分岐の通過条件。保存APIから直接は受け取らない。 */
+  branchConditions?: Array<{ condition: SegmentCondition; expected: boolean }>;
 }
 
 interface RunRow {
@@ -179,7 +183,19 @@ function parseActions(text: string): ActionDefinition[] {
     const commonActionVersionId = typeof item.commonActionVersionId === 'string'
       ? item.commonActionVersionId.trim() || null
       : null;
-    return { id, type, params, onFailure, commonActionVersionId };
+    let branchConditions: ActionDefinition['branchConditions'];
+    if (item.branchConditions !== undefined) {
+      if (!Array.isArray(item.branchConditions)) {
+        throw new AutomationActionError('invalid_branch_condition', '分岐の実行条件が不正です', false);
+      }
+      branchConditions = item.branchConditions.map((entry) => {
+        if (!isRecord(entry) || !isRecord(entry.condition) || typeof entry.expected !== 'boolean') {
+          throw new AutomationActionError('invalid_branch_condition', '分岐の実行条件が不正です', false);
+        }
+        return { condition: entry.condition as unknown as SegmentCondition, expected: entry.expected };
+      });
+    }
+    return { id, type, params, onFailure, commonActionVersionId, branchConditions };
   });
 }
 
@@ -248,9 +264,12 @@ async function buildExecutionPlan(
     prefix?: string;
     depth?: number;
     budget?: { count: number };
+    branchDepth?: number;
+    branchConditions?: Array<{ condition: SegmentCondition; expected: boolean }>;
   },
 ): Promise<ActionDefinition[]> {
   const depth = input.depth ?? 0;
+  const branchDepth = input.branchDepth ?? 0;
   const budget = input.budget ?? { count: 0 };
   if (depth > 20) {
     throw new AutomationActionError('common_action_too_deep', '共通アクションの呼び出しが深すぎます', false);
@@ -262,11 +281,46 @@ async function buildExecutionPlan(
       throw new AutomationActionError('execution_plan_too_large', '実行する処理が多すぎます', false);
     }
     const stepKey = input.prefix ? `${input.prefix}/${action.id}` : action.id;
+    if (action.type === 'branch') {
+      if (branchDepth >= 3) {
+        throw new AutomationActionError('branch_too_deep', '条件分岐の入れ子は3段までです', false);
+      }
+      const condition = action.params.condition as SegmentCondition;
+      const thenActions = action.params.then as ActionDefinition[];
+      const elseActions = action.params.else as ActionDefinition[];
+      if (!condition || !Array.isArray(thenActions) || !Array.isArray(elseActions)) {
+        throw new AutomationActionError('branch_invalid', '条件分岐の設定が壊れています', false);
+      }
+      plan.push({
+        ...action,
+        id: stepKey,
+        type: 'branch_marker',
+        params: { condition },
+        branchConditions: input.branchConditions,
+      });
+      plan.push(...await buildExecutionPlan(db, {
+        ...input,
+        actions: thenActions,
+        prefix: `${stepKey}/then`,
+        branchDepth: branchDepth + 1,
+        branchConditions: [...(input.branchConditions ?? []), { condition, expected: true }],
+        budget,
+      }));
+      plan.push(...await buildExecutionPlan(db, {
+        ...input,
+        actions: elseActions,
+        prefix: `${stepKey}/else`,
+        branchDepth: branchDepth + 1,
+        branchConditions: [...(input.branchConditions ?? []), { condition, expected: false }],
+        budget,
+      }));
+      continue;
+    }
     if (action.type !== 'common_action') {
       const params = action.type === 'wait' && action.params.durationMinutes === undefined
         ? { ...action.params, durationMinutes: action.params.minutes }
         : action.params;
-      plan.push({ ...action, id: stepKey, params });
+      plan.push({ ...action, id: stepKey, params, branchConditions: input.branchConditions });
       continue;
     }
 
@@ -299,6 +353,7 @@ async function buildExecutionPlan(
       params: { commonActionId: action.params.commonActionId },
       onFailure: action.onFailure,
       commonActionVersionId,
+      branchConditions: input.branchConditions,
     });
     plan.push(...await buildExecutionPlan(db, {
       lineAccountId: input.lineAccountId,
@@ -306,6 +361,8 @@ async function buildExecutionPlan(
       actions: parseActions(version.action_config),
       prefix: stepKey,
       depth: depth + 1,
+      branchDepth,
+      branchConditions: input.branchConditions,
       budget,
     }));
   }
@@ -649,6 +706,27 @@ export async function processAutomationRun(
       continue;
     }
 
+    if (action.branchConditions?.length) {
+      const branchSelected = await action.branchConditions.reduce(async (previous, item) => {
+        if (!await previous) return false;
+        const matched = run.friend_id
+          ? await matchesCondition(db, run.friend_id, item.condition)
+          : false;
+        return matched === item.expected;
+      }, Promise.resolve(true));
+      if (!branchSelected) {
+        await db.prepare(
+          `UPDATE automation_run_steps
+              SET status = 'skipped', output_json = ?, completed_at = ?,
+                  retry_at = NULL, lease_expires_at = NULL
+            WHERE id = ? AND status NOT IN ('success', 'skipped')`,
+        ).bind(JSON.stringify({ reason: 'branch_not_selected' }), now, step.id).run();
+        await db.prepare(`UPDATE automation_runs SET current_step = ? WHERE id = ?`)
+          .bind(index + 1, run.id).run();
+        continue;
+      }
+    }
+
     if (action.type === 'wait' && step.status === 'waiting') {
       await db.prepare(
         `UPDATE automation_run_steps
@@ -693,6 +771,21 @@ export async function processAutomationRun(
                   retry_at = NULL, lease_expires_at = NULL
             WHERE id = ? AND status = 'running'`,
         ).bind(JSON.stringify({ versionId: step.common_action_version_id }), now, step.id).run();
+        await db.prepare(`UPDATE automation_runs SET current_step = ? WHERE id = ?`)
+          .bind(index + 1, run.id).run();
+        continue;
+      }
+      if (action.type === 'branch_marker') {
+        const condition = action.params.condition as SegmentCondition;
+        const matched = run.friend_id
+          ? await matchesCondition(db, run.friend_id, condition)
+          : false;
+        await db.prepare(
+          `UPDATE automation_run_steps
+              SET status = 'success', output_json = ?, completed_at = ?,
+                  retry_at = NULL, lease_expires_at = NULL
+            WHERE id = ? AND status = 'running'`,
+        ).bind(JSON.stringify({ matched }), now, step.id).run();
         await db.prepare(`UPDATE automation_runs SET current_step = ? WHERE id = ?`)
           .bind(index + 1, run.id).run();
         continue;

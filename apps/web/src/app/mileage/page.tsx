@@ -16,6 +16,7 @@ import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import {
   api,
+  type MileageAdminHistory,
   type MileageEarningRuleV6,
   type MileageEarningRulesV6Overview,
   type MileageFriendsV6Overview,
@@ -72,6 +73,22 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat('ja-JP').format(value)
 }
 
+function dateOnlyDaysAgo(days: number) {
+  const date = new Date()
+  date.setDate(date.getDate() - days)
+  return date.toISOString().slice(0, 10)
+}
+
+function grantedMiles30d(rule: MileageEarningRuleV6) {
+  return rule.metrics30d.granted * rule.draft.amount
+}
+
+type EarningRuleSummary = {
+  grantedMiles: number
+  grantedCount: number
+  averageBalance: number | null
+}
+
 function rankLabel(rank: string | null) {
   if (rank === 'gold') return 'ゴールド'
   if (rank === 'silver') return 'シルバー'
@@ -126,6 +143,7 @@ function MileagePageInner() {
   latestAccountRef.current = selectedAccountId
   const [overview, setOverview] = useState<MileageFriendsV6Overview | null>(null)
   const [ruleOverview, setRuleOverview] = useState<MileageEarningRulesV6Overview | null>(null)
+  const [ruleSummary, setRuleSummary] = useState<EarningRuleSummary | null>(null)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [offset, setOffset] = useState(0)
@@ -154,12 +172,35 @@ function MileagePageInner() {
     const accountAtRequest = selectedAccountId
     if (!accountAtRequest) {
       setRuleOverview(null)
+      setRuleSummary(null)
       return
     }
-    const res = await api.mileage.earningRulesV6({ accountId: accountAtRequest, limit: 100, offset: 0 })
+    const [res, historyRes, friendsRes] = await Promise.all([
+      api.mileage.earningRulesV6({ accountId: accountAtRequest, limit: 100, offset: 0 }),
+      api.mileage.history({
+        accountId: accountAtRequest,
+        from: dateOnlyDaysAgo(29),
+        to: dateOnlyDaysAgo(0),
+        limit: 1,
+        offset: 0,
+      }),
+      api.mileage.friendsV6({ accountId: accountAtRequest, limit: 1, offset: 0 }),
+    ])
     if (accountAtRequest !== latestAccountRef.current) return
     if (!res.success || !isMileageEarningRulesV6Overview(res.data)) throw new Error('invalid_mileage_rules')
+    if (!historyRes.success || !friendsRes.success || !isMileageFriendsV6Overview(friendsRes.data)) {
+      throw new Error('invalid_mileage_rule_summary')
+    }
+    const grant = (historyRes.data as MileageAdminHistory).summary.byType
+      .find((item) => item.entryType === 'grant')
     setRuleOverview(res.data)
+    setRuleSummary({
+      grantedMiles: grant?.amount ?? 0,
+      grantedCount: grant?.count ?? 0,
+      averageBalance: friendsRes.data.summary.withBalanceCount > 0
+        ? Math.round(friendsRes.data.summary.available / friendsRes.data.summary.withBalanceCount)
+        : null,
+    })
     setRuleOrder(res.data.items.map((rule) => rule.id))
     setRuleOrderDirty(false)
   }, [selectedAccountId])
@@ -200,6 +241,7 @@ function MileagePageInner() {
     setOffset(0)
     setOverview(null)
     setRuleOverview(null)
+    setRuleSummary(null)
     void reloadAll()
   }, [accountLoading, reloadAll])
 
@@ -259,7 +301,7 @@ function MileagePageInner() {
       || ruleFilters.includes(rule.published.status))
     const order = new Map(ruleOrder.map((id, index) => [id, index]))
     return [...filtered].sort((a, b) => {
-      if (ruleSort === 'granted') return b.metrics30d.granted - a.metrics30d.granted
+      if (ruleSort === 'granted') return grantedMiles30d(b) - grantedMiles30d(a)
       if (ruleSort === 'name') return a.draft.name.localeCompare(b.draft.name, 'ja')
       if (ruleSort === 'amount') return b.draft.amount - a.draft.amount
       return (order.get(a.id) ?? a.draft.sortOrder) - (order.get(b.id) ?? b.draft.sortOrder)
@@ -330,9 +372,7 @@ function MileagePageInner() {
   const summary = overview?.summary
   const members = overview?.items ?? []
   const activeRules = rules.filter((rule) => rule.published.status === 'published')
-  const granted30d = rules.reduce((sum, rule) => sum + rule.metrics30d.granted, 0)
-  const excluded30d = rules.reduce((sum, rule) => sum + rule.metrics30d.excluded, 0)
-  const topRule = [...rules].sort((a, b) => b.metrics30d.granted - a.metrics30d.granted)[0] ?? null
+  const topRule = [...rules].sort((a, b) => grantedMiles30d(b) - grantedMiles30d(a))[0] ?? null
   const displayTabs = useMemo(() => TABS.map((item) => {
     const count = item.key === 'balances' ? tabCounts.balances
       : item.key === 'earning-rules' ? tabCounts.rules
@@ -454,9 +494,9 @@ function MileagePageInner() {
             ここで見出しをもう一度書かない。 */}
         {!loading && !loadError ? <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <SummaryCard variant="v6" title="動いている決めごと" value={activeRules.length} unit="つ" detail={`止めているもの ${rules.length - activeRules.length}つ`} />
-          <SummaryCard variant="v6" title="この30日の付与回数" value={granted30d} unit="回" detail="実際に付与記録になった回数" />
-          <SummaryCard variant="v6" title="いちばん動いた決めごと" value={topRule?.metrics30d.granted ?? null} unit="回" detail={topRule?.draft.name ?? 'まだ付与記録はありません'} />
-          <SummaryCard variant="v6" title="対象外になった行動" value={excluded30d} unit="回" detail="対象候補のうち付与しなかった回数" />
+          <SummaryCard variant="v6" title="この30日で付いたマイル" value={ruleSummary?.grantedMiles ?? null} unit="マイル" detail={`のべ ${formatNumber(ruleSummary?.grantedCount ?? 0)}回`} />
+          <SummaryCard variant="v6" title="いちばん付いている" value={topRule ? grantedMiles30d(topRule) : null} unit="マイル" detail={topRule ? `${topRule.draft.name}・${formatNumber(topRule.metrics30d.granted)}回` : 'まだ付与記録はありません'} />
+          <SummaryCard variant="v6" title="1人あたりの平均" value={ruleSummary?.averageBalance ?? null} unit="マイル" detail={`持っている人 ${formatNumber(tabCounts.balances ?? 0)}人で割った数`} />
         </div> : null}
         <NoteBar>
           どんなことをしたら何マイル付けるかを決めます。付与数を変えると、変更後に起きた行動から新しい値を使います。
@@ -575,7 +615,7 @@ function MileagePageInner() {
                     <p className="mt-1 text-ink-faint">{rule.draft.expiresAfterDays == null ? '失効なし' : `付いてから${rule.draft.expiresAfterDays}日`}</p>
                   </td>
                   <td className="px-4 py-3 text-right text-sm tabular-nums">
-                    <p className="font-semibold text-ink">{formatNumber(rule.metrics30d.granted)}回</p>
+                    <p className="font-semibold text-ink">{formatNumber(grantedMiles30d(rule))}</p>
                     <p className="mt-1 text-xs text-ink-faint">対象外 {formatNumber(rule.metrics30d.excluded)}回</p>
                   </td>
                   <td className="px-4 py-3 text-center">

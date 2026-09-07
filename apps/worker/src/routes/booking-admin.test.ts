@@ -461,7 +461,7 @@ describe('POST /api/booking/admin/bookings', () => {
     expect(res.status).toBe(409);
   });
 
-  test('422 when slot not in availability', async () => {
+  test('409と候補データ when slot not in availability', async () => {
     availabilityMocks.computeSlots.mockReturnValue([{ start: '14:00', end: '15:00' }]);
     const db = happyDb();
     const { app, env } = makeApp(db);
@@ -475,7 +475,11 @@ describe('POST /api/booking/admin/bookings', () => {
       env,
       execCtx,
     );
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({
+      error: 'slot_not_available',
+      data: { conflict: { count: 1 }, nearbySlots: expect.any(Array), alternateStaff: expect.any(Array) },
+    });
   });
 
   test('404 when staff belongs to another account', async () => {

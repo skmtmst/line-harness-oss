@@ -15,6 +15,7 @@ import PageHeader from '@/components/shared/page-header'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
 import { TextArea, TextField } from '@/components/shared/text-field'
+import BranchEditors, { newBranchStep, updateBranchStep } from '../branch-editor'
 
 const EMPTY_RESOURCES: CommonActionResources = {
   tags: [], scenarios: [], templates: [], webhooks: [], richMenus: [], commonActions: [],
@@ -89,6 +90,12 @@ function EditCommonActionInner() {
     }
   }
 
+  const branches = actions.filter((action) => action.type === 'branch')
+  const plainActions = actions.filter((action) => action.type !== 'branch')
+  const updateBranch = (branchId: string, patch: { tagId?: string; thenId?: string; elseId?: string }) => {
+    setActions((current) => current.map((step) => step.id === branchId ? updateBranchStep(step, patch) : step))
+  }
+
   if (canManage === null || loading) return <div className="border-hairline rounded-card border bg-canvas p-10 text-center text-sm text-ink-faint" aria-busy="true">下書きを読み込んでいます</div>
   if (!canManage) return (
     <div className="border-hairline rounded-card border bg-canvas p-6">
@@ -134,7 +141,15 @@ function EditCommonActionInner() {
               </section>
               <section>
                 <h2 className="text-ink mb-3 font-semibold">順番に動かす処理</h2>
-                <CommonActionEditor value={actions} resources={resources} onChange={setActions} />
+                <CommonActionEditor value={plainActions} resources={resources} onChange={(next) => setActions([...next, ...branches])} />
+                <BranchEditors
+                  branches={branches}
+                  offset={plainActions.length}
+                  resources={resources}
+                  onUpdate={updateBranch}
+                  onRemove={(branchId) => setActions((current) => current.filter((step) => step.id !== branchId))}
+                />
+                <Button className="mt-3" onClick={() => setActions((current) => [...current, newBranchStep()])}>条件で分ける</Button>
               </section>
             </div>
             <aside className="space-y-4 xl:sticky xl:top-4">

@@ -265,7 +265,13 @@ describe('V6 mileage rewards', () => {
   it('keeps the previous published version active while a new draft is edited', async () => {
     const draft = await createMileageRewardDraft(db, {
       lineAccountId: 'account-1',
-      draft: { name: '旧特典', rewardKind: 'coupon', requiredMiles: 300 },
+      draft: {
+        name: '旧特典', rewardKind: 'coupon', requiredMiles: 300,
+        targetConditions: {
+          operator: 'AND',
+          rules: [{ type: 'tag_exists', value: '会員' }],
+        },
+      },
     });
     await importMileageRewardCodes(db, {
       rewardId: draft.id, lineAccountId: 'account-1',
@@ -281,6 +287,9 @@ describe('V6 mileage rewards', () => {
     });
     expect(next.currentPublishedVersionId).toBe(published.currentPublishedVersionId);
     expect(next.currentDraftVersionId).not.toBeNull();
+    expect(next.currentVersion?.targetConditions).toEqual({
+      operator: 'AND', rules: [{ type: 'tag_exists', value: '会員' }],
+    });
     await updateMileageRewardDraft(db, {
       id: draft.id,
       lineAccountId: 'account-1',
@@ -290,7 +299,31 @@ describe('V6 mileage rewards', () => {
     const edited = await getMileageReward(db, { id: draft.id, lineAccountId: 'account-1' });
     expect(edited?.currentVersion).toMatchObject({ status: 'draft', requiredMiles: 500 });
     expect(sqlite.prepare(
-      `SELECT required_miles FROM mileage_reward_versions WHERE id = ?`,
-    ).get(published.currentPublishedVersionId)).toEqual({ required_miles: 300 });
+      `SELECT required_miles, target_conditions FROM mileage_reward_versions WHERE id = ?`,
+    ).get(published.currentPublishedVersionId)).toEqual({
+      required_miles: 300,
+      target_conditions: '{"operator":"AND","rules":[{"type":"tag_exists","value":"会員"}]}',
+    });
+  });
+
+  it('rejects unsupported or more than 15 reward target conditions', async () => {
+    await expect(createMileageRewardDraft(db, {
+      lineAccountId: 'account-1',
+      draft: {
+        name: '不正な条件', rewardKind: 'coupon', requiredMiles: 300,
+        targetConditions: { operator: 'AND', rules: [{ type: 'unknown', value: true }] },
+      },
+    })).rejects.toMatchObject({ code: 'target_condition_type_invalid' });
+
+    await expect(createMileageRewardDraft(db, {
+      lineAccountId: 'account-1',
+      draft: {
+        name: '多すぎる条件', rewardKind: 'coupon', requiredMiles: 300,
+        targetConditions: {
+          operator: 'OR',
+          rules: Array.from({ length: 16 }, (_, index) => ({ type: 'tag_exists', value: `tag-${index}` })),
+        },
+      },
+    })).rejects.toMatchObject({ code: 'target_conditions_too_many' });
   });
 });

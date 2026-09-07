@@ -84,6 +84,7 @@ import {
   BOOKING_MENUS, BOOKING_SETTINGS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_RESOURCES,
   BOOKING_AVAILABILITY_RULES, BOOKING_STAFF_SHIFTS, BOOKING_GOOGLE_CALENDAR,
   BOOKING_PROXY_CREATE, BOOKING_REQUESTS,
+  BOOKING_ADMIN_DETAIL, BOOKING_CUSTOMER_CONTEXT, BOOKING_REMINDER_PREVIEW, BOOKING_CONFLICT_ALTERNATIVES,
   EC_NOTIFICATION_SETTINGS, EC_NOTIFICATION_RUNS, LINE_NOTIFICATION_DEFINITIONS, LINE_NOTIFICATION_METRICS, LINE_NOTIFICATION_DELIVERIES,
   OPERATOR_NOTIFICATION_RECIPIENTS, OPERATOR_NOTIFICATION_RULES, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, NEN_PHOTO_DETAIL,
   NEN_PHOTO_REVIEW_METRICS, NEN_PHOTO_ASSET_STATUS, NEN_PHOTO_DERIVATIVES,
@@ -93,6 +94,7 @@ import {
   LINE_ACCOUNTS, LINE_ACCOUNT_DETAIL, LINE_ACCOUNT_VERIFY_CONNECTION, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
   CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
   CONVERSION_DEFINITIONS, CONVERSION_DEFINITION_REPORT, CONVERSION_EXPORT_CSV,
+  CONVERSION_DEFINITION_PREVIEW, CONVERSION_DEFINITION_DELETE_IMPACT,
   OPERATION_CONTROL_PREVIEW, OPERATION_HEALTH, OPERATION_HISTORY,
   WEBINARS, WEBINAR_FOLDERS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_ANALYTICS,
   WEBINAR_EDITOR, WEBINAR_PUBLISH_VALIDATION, WEBINAR_PARTICIPANTS,
@@ -1073,6 +1075,9 @@ const RAW = {
   '/api/booking/admin/resources': { resources: BOOKING_RESOURCES },
   '/api/booking/admin/menus': { menus: BOOKING_MENUS },
   '/api/booking/admin/staff': { staff: BOOKING_STAFF },
+  '/api/booking/admin/customer-context': { customer: BOOKING_CUSTOMER_CONTEXT },
+  '/api/booking/admin/reminder-preview': BOOKING_REMINDER_PREVIEW,
+  '/api/booking/admin/alternatives': BOOKING_CONFLICT_ALTERNATIVES,
   '/api/events/admin/events': { items: ADMIN_EVENTS },
   // 予約メニューの帯は `requests` から件数を出す。包むと `.filter` で落ちる。
   '/api/booking/admin/requests': { requests: BOOKING_REQUESTS },
@@ -1088,6 +1093,7 @@ const RAW = {
  * `29-1-B 申込者の一覧` が `.filter` で「画面を表示できませんでした」になっていた。
  */
 const RAW_PATTERNS = [
+  [/^\/api\/booking\/admin\/bookings\/[^/]+$/, BOOKING_ADMIN_DETAIL],
   [/^\/api\/events\/admin\/events\/[^/]+\/bookings$/, (url) => ({
     items: url.searchParams.get('status')
       ? EVENT_BOOKINGS.filter((booking) => booking.status === url.searchParams.get('status'))
@@ -2138,6 +2144,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       : { success: false, error: '使い道が見つかりません' }
   }
   if (pathname === '/api/conversions/definitions') return { success: true, data: CONVERSION_DEFINITIONS }
+  if (/^\/api\/conversions\/definitions\/[^/]+\/delete-impact$/.test(pathname)) {
+    return { success: true, data: CONVERSION_DEFINITION_DELETE_IMPACT }
+  }
   if (pathname === '/api/conversions/points') return { success: true, data: CONVERSION_POINTS }
   if (pathname === '/api/conversions/report') {
     if (query.has('from') || query.has('to')) {
@@ -2515,7 +2524,7 @@ const server = createServer((req, res) => {
     'Access-Control-Allow-Headers',
     'Content-Type, X-CSRF-Token, X-Admin-Session, Idempotency-Key, X-Confirm-Irreversible',
   )
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
   res.setHeader('Access-Control-Expose-Headers', 'ETag')
 
   if (method === 'OPTIONS') {
@@ -2575,6 +2584,26 @@ const server = createServer((req, res) => {
   // ただし画面側のエラー報告だけは 204 で受ける。405 を返すと、
   // 報告が失敗したこと自体が新しいエラーになって際限なく増える。
   if (method !== 'GET') {
+    if (method === 'POST' && url.pathname === '/api/conversions/definitions/preview') {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: CONVERSION_DEFINITION_PREVIEW }))
+      return
+    }
+    if (method === 'POST' && url.pathname === '/api/conversions/definitions') {
+      res.writeHead(201).end(JSON.stringify({ success: true, data: CONVERSION_DEFINITION_DELETE_IMPACT.definition }))
+      return
+    }
+    if (method === 'POST' && /^\/api\/conversions\/definitions\/[^/]+\/stop$/.test(url.pathname)) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: { id: 'cp-2', status: 'stopped', version: 2, stoppedAt: '2026-09-07T14:00:00+09:00' } }))
+      return
+    }
+    if (method === 'POST' && /^\/api\/conversions\/definitions\/[^/]+\/replace$/.test(url.pathname)) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: { id: 'cp-2', replacementId: 'cp-1', replacedUsageCount: 3, status: 'stopped', version: 2 } }))
+      return
+    }
+    if (method === 'DELETE' && /^\/api\/conversions\/definitions\/[^/]+$/.test(url.pathname)) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: { id: 'cp-6', deleted: true } }))
+      return
+    }
     if (method === 'POST' && /^\/api\/webinars\/[^/]+\/public-page\/test$/.test(url.pathname)) {
       res.writeHead(200).end(JSON.stringify({ success: true, data: WEBINAR_EDITOR }))
       return
