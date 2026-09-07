@@ -116,6 +116,10 @@ const HOST = '127.0.0.1'
 // 機能10専用。フォルダ操作後の再取得でも、同じプロセス内では保存結果を返す。
 let webinarFolders = WEBINAR_FOLDERS.map((folder) => ({ ...folder }))
 
+// 機能15専用。版追加の撮影では、差し替え用セッションの確定が本番口と同じ
+// `verified` を返す必要がある。申告時に受けた targetMediaId を覚えておく。
+const mediaUploadSessionTargets = new Map()
+
 /** 画面を見るだけなので、いちばん権限のある人で固定する。実在しない名前。 */
 const STAFF = {
   id: 'visual-qa-owner',
@@ -3009,6 +3013,11 @@ const server = createServer((req, res) => {
           requiredHeaders: { 'Content-Type': String(file.mimeType ?? 'application/octet-stream') },
           expiresAt: '2026-09-07T15:15:00.000Z',
         }))
+        for (const session of sessions) {
+          // IDは申告順の連番で再利用されるため、最新の申告で上書きする。
+          if (session.targetMediaId) mediaUploadSessionTargets.set(session.id, session.targetMediaId)
+          else mediaUploadSessionTargets.delete(session.id)
+        }
         res.writeHead(201).end(JSON.stringify({ success: true, data: { sessions } }))
       })
       return
@@ -3019,7 +3028,15 @@ const server = createServer((req, res) => {
       return
     }
     if (method === 'POST' && /^\/api\/media\/upload-sessions\/[^/]+\/complete$/.test(url.pathname)) {
-      res.writeHead(200).end(JSON.stringify({ success: true, data: { uploadSessionId: url.pathname.split('/')[4], status: 'completed', mediaId: 'media-uploaded-1', targetMediaId: null } }))
+      const uploadSessionId = url.pathname.split('/')[4]
+      const targetMediaId = mediaUploadSessionTargets.get(uploadSessionId) ?? null
+      // 差し替え用（版追加）の確定は、本番口と同じ `verified` を返す。
+      // 新規登録形のまま `completed` を返すと、詳細の版追加フローが検証不能になる。
+      if (targetMediaId) {
+        res.writeHead(200).end(JSON.stringify({ success: true, data: { uploadSessionId, status: 'verified', targetMediaId } }))
+        return
+      }
+      res.writeHead(200).end(JSON.stringify({ success: true, data: { uploadSessionId, status: 'completed', mediaId: 'media-uploaded-1', targetMediaId: null } }))
       return
     }
     if (url.pathname === '/api/client-errors') {
