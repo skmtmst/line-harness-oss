@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const EVENTS = readFileSync(join(HERE, 'page.tsx'), 'utf8')
 const BOOKINGS = readFileSync(join(HERE, 'bookings', 'page.tsx'), 'utf8')
+const EDIT = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
 
 /** 説明の文だけで通ってしまわないよう、判定の前にコメントを落とす。 */
 function code(source: string): string {
@@ -73,6 +74,15 @@ describe('V6 イベント・申込者一覧の状態', () => {
     expect(body).toContain('setTotalCapacity(null)')
     // 控えがあれば取りに行かない、をやめる（前のイベント名が残る）。
     expect(body).not.toContain('Promise.resolve(event)')
+  })
+
+  it('編集画面から申込者一覧へのリンクは申込者画面の読む引数名と揃える', () => {
+    // 申込者画面は `id` だけを読む。一覧と作成フォームは `?id=` で正しい。
+    expect(code(BOOKINGS)).toContain("params.get('id')")
+    expect(code(EDIT)).toContain('/events/bookings?id=${eventId}')
+    expect(code(EDIT)).toContain('/events/bookings?id=${id}')
+    // `?eventId=` では「イベントを選び直してください」になり、承認待ちへ行けない。
+    expect(code(EDIT)).not.toContain('bookings?eventId=')
   })
 
   it('操作の失敗を内部の文字で出さず、一覧は残す', () => {
