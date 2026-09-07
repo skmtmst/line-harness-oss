@@ -57,6 +57,8 @@ export type ConversionDefinitionUsage = {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  /** 表示用の利用先名。参照先が未解決の場合はIDを返す。 */
+  usageName: string;
 };
 
 export type ConversionDefinitionListItem = {
@@ -72,13 +74,16 @@ export type ConversionDefinitionListItem = {
   status: ConversionDefinitionStatus;
   version: number;
   usageCount: number;
+  usageNames: string[];
   metrics: {
     recordedCount: number;
     netCount: number;
-    reversedCount: null;
+    reversedCount: number | null;
     netValue: number;
-    reversalState: 'unavailable';
+    reversalState: 'available' | 'unavailable';
     reversalReason: string;
+    cancellationCount: number | null;
+    cancellationValue: number | null;
   };
   stoppedAt: string | null;
   createdAt: string;
@@ -117,6 +122,14 @@ type UsageRow = {
   created_at: string;
   updated_at: string;
 };
+
+function usageName(row: { ref_kind: ConversionDefinitionUsageKind; ref_id: string }): string {
+  const labels: Record<ConversionDefinitionUsageKind, string> = {
+    affiliate_offer: '案件', analytics: '分析', auto_reply: '自動応答', scenario: 'シナリオ',
+    nen_campaign: 'NEN配信', mileage_rule: 'マイル', automation: 'オートメーション', ad_platform: '広告連携',
+  };
+  return `${labels[row.ref_kind] ?? '利用先'}（${row.ref_id}）`;
+}
 
 export class ConversionDefinitionError extends Error {
   constructor(
@@ -210,7 +223,23 @@ function orderBy(sort: ConversionDefinitionSort): string {
   return 'recorded_count DESC, cp.updated_at DESC, cp.id ASC';
 }
 
-function serializeDefinition(row: DefinitionRow): ConversionDefinitionListItem {
+type CancellationMetric = { count: number; value: number };
+
+async function cancellationMetrics(db: D1Database, from: string, to: string): Promise<Map<string, CancellationMetric>> {
+  const tables = await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('affiliate_adjustments','affiliate_reward_entries')").all<{ name: string }>();
+  if (tables.results.length < 2) return new Map();
+  const rows = await db.prepare(`SELECT ce.conversion_point_id,
+      COUNT(*) AS cancellation_count,
+      COALESCE(SUM(ABS(aa.amount_minor)), 0) AS cancellation_value
+    FROM affiliate_adjustments aa
+    JOIN affiliate_reward_entries re ON re.id = aa.source_entry_id
+    JOIN conversion_events ce ON ce.id = re.conversion_event_id
+    WHERE aa.reason_type = 'cancel' AND aa.created_at >= ? AND aa.created_at <= ?
+    GROUP BY ce.conversion_point_id`).bind(from, to).all<{ conversion_point_id: string; cancellation_count: number; cancellation_value: number }>();
+  return new Map(rows.results.map((row) => [row.conversion_point_id, { count: Number(row.cancellation_count), value: Number(row.cancellation_value) }]));
+}
+
+function serializeDefinition(row: DefinitionRow, cancellation?: CancellationMetric): ConversionDefinitionListItem {
   return {
     id: row.id,
     name: row.name,
@@ -224,13 +253,16 @@ function serializeDefinition(row: DefinitionRow): ConversionDefinitionListItem {
     status: row.status,
     version: row.version,
     usageCount: Number(row.usage_count),
+    usageNames: [],
     metrics: {
       recordedCount: Number(row.recorded_count),
       netCount: Number(row.recorded_count),
-      reversedCount: null,
-      netValue: Number(row.net_value),
-      reversalState: 'unavailable',
-      reversalReason: '取消イベント台帳はまだ接続されていません',
+      reversedCount: cancellation?.count ?? null,
+      netValue: Number(row.net_value) - (cancellation?.value ?? 0),
+      reversalState: cancellation ? 'available' : 'unavailable',
+      reversalReason: cancellation ? '取消イベント台帳から集計' : '取消イベント台帳はまだ接続されていません',
+      cancellationCount: cancellation?.count ?? null,
+      cancellationValue: cancellation?.value ?? null,
     },
     stoppedAt: row.stopped_at,
     createdAt: row.created_at,
@@ -250,6 +282,7 @@ function serializeUsage(row: UsageRow): ConversionDefinitionUsage {
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    usageName: usageName(row),
   };
 }
 
@@ -279,10 +312,18 @@ export async function listConversionDefinitions(db: D1Database, input: Conversio
       .all<{ status: ConversionDefinitionStatus; total: number }>(),
   ]);
   const total = Number(totalRow?.total ?? 0);
+  const cancellations = await cancellationMetrics(db, input.range.from, input.range.to);
   const stateCounts = { active: 0, draft: 0, stopped: 0, invalid: 0, sourceStopped: 0 };
   for (const row of stateRows.results) stateCounts[row.status] = Number(row.total);
+  const usages = rows.results.length === 0 ? [] : (await db.prepare(`SELECT * FROM conversion_definition_usages WHERE conversion_point_id IN (${rows.results.map(() => '?').join(',')}) ORDER BY created_at DESC, id ASC`).bind(...rows.results.map((row) => row.id)).all<UsageRow>()).results;
+  const namesByPoint = new Map<string, string[]>();
+  for (const usage of usages) {
+    const names = namesByPoint.get(usage.conversion_point_id) ?? [];
+    names.push(usageName(usage));
+    namesByPoint.set(usage.conversion_point_id, names);
+  }
   return {
-    items: rows.results.map(serializeDefinition),
+    items: rows.results.map((row) => ({ ...serializeDefinition(row, cancellations.get(row.id)), usageNames: namesByPoint.get(row.id) ?? [] })),
     stateCounts,
     range: input.range,
     pagination: {
@@ -314,12 +355,13 @@ export async function getConversionDefinitionDetail(
     .bind(id, ...account.values)
     .first<DefinitionRow>();
   if (!row) return null;
+  const cancellation = (await cancellationMetrics(db, '0000-01-01', '9999-12-31')).get(row.id);
   const usages = await db.prepare(`SELECT * FROM conversion_definition_usages
     WHERE conversion_point_id = ? ORDER BY created_at DESC, id ASC`)
     .bind(id)
     .all<UsageRow>();
   return {
-    ...serializeDefinition(row),
+    ...serializeDefinition(row, cancellation),
     currentVersion: {
       id: `${row.id}:v${row.version}`,
       number: row.version,
@@ -332,6 +374,7 @@ export async function getConversionDefinitionDetail(
       publishedAt: row.created_at,
     },
     usages: usages.results.map(serializeUsage),
+    usageNames: usages.results.map(serializeUsage).map((usage) => usage.usageName),
   };
 }
 
@@ -495,14 +538,18 @@ export async function getConversionDefinitionReport(
     reportRows(db, input.scope, input.lineAccountId, input.range.from, input.range.to),
     reportRows(db, input.scope, input.lineAccountId, input.previousRange.from, input.previousRange.to),
   ]);
+  const [currentCancellations, previousCancellations] = await Promise.all([
+    cancellationMetrics(db, input.range.from, input.range.to),
+    cancellationMetrics(db, input.previousRange.from, input.previousRange.to),
+  ]);
   const previousById = new Map(previous.map((row) => [row.conversion_point_id, row]));
   const totals = current.reduce((sum, row) => ({
-    count: sum.count + Number(row.total_count),
-    value: sum.value + Number(row.total_value),
+    count: sum.count + Number(row.total_count) - (currentCancellations.get(row.conversion_point_id)?.count ?? 0),
+    value: sum.value + Number(row.total_value) - (currentCancellations.get(row.conversion_point_id)?.value ?? 0),
   }), { count: 0, value: 0 });
   const previousTotals = previous.reduce((sum, row) => ({
-    count: sum.count + Number(row.total_count),
-    value: sum.value + Number(row.total_value),
+    count: sum.count + Number(row.total_count) - (previousCancellations.get(row.conversion_point_id)?.count ?? 0),
+    value: sum.value + Number(row.total_value) - (previousCancellations.get(row.conversion_point_id)?.value ?? 0),
   }), { count: 0, value: 0 });
   const account = accountWhere('cp.', input.scope, input.lineAccountId);
   const [dailyRows, routeRows] = await Promise.all([
@@ -515,27 +562,35 @@ export async function getConversionDefinitionReport(
                  GROUP BY day, cp.id ORDER BY day ASC, cp.id ASC`)
       .bind(input.range.from, input.range.to, ...account.values)
       .all<{ day: string; conversion_point_id: string; conversion_point_name: string; total_count: number; total_value: number }>(),
-    db.prepare(`SELECT COALESCE(ce.attributed_ref_code, 'unattributed') AS route_key,
+    db.prepare(`SELECT ce.conversion_point_id, COALESCE(ce.attributed_ref_code, 'unattributed') AS route_key,
                        COUNT(*) AS total_count,
                        COALESCE(SUM(COALESCE(ce.value_snapshot, 0)), 0) AS total_value
                   FROM conversion_events ce
                   JOIN conversion_points cp ON cp.id = ce.conversion_point_id
                  WHERE ce.created_at >= ? AND ce.created_at <= ? AND ${account.sql}
-                 GROUP BY route_key ORDER BY total_count DESC, route_key ASC`)
+                 GROUP BY ce.conversion_point_id, route_key ORDER BY total_count DESC, route_key ASC`)
       .bind(input.range.from, input.range.to, ...account.values)
-      .all<{ route_key: string; total_count: number; total_value: number }>(),
+      .all<{ conversion_point_id: string; route_key: string; total_count: number; total_value: number }>(),
   ]);
+  const routesByDefinition = new Map<string, Array<{ routeKey: string; label: string; attributionState: 'attributed' | 'unattributed'; netCount: number; netValue: number; audience: number | null; conversionRate: number | null }>>();
+  for (const row of routeRows.results) {
+    const route = { routeKey: row.route_key, label: row.route_key === 'unattributed' ? '未帰属' : row.route_key, attributionState: row.route_key === 'unattributed' ? 'unattributed' as const : 'attributed' as const, netCount: Number(row.total_count), netValue: Number(row.total_value), audience: null, conversionRate: null };
+    routesByDefinition.set(row.conversion_point_id, [...(routesByDefinition.get(row.conversion_point_id) ?? []), route]);
+  }
   const byDefinition = current.map((row) => {
     const before = previousById.get(row.conversion_point_id);
     return {
       conversionPointId: row.conversion_point_id,
       conversionPointName: row.conversion_point_name,
       sourceType: row.event_type,
-      netCount: Number(row.total_count),
-      netValue: Number(row.total_value),
-      previousNetCount: Number(before?.total_count ?? 0),
-      previousNetValue: Number(before?.total_value ?? 0),
-      countChange: Number(row.total_count) - Number(before?.total_count ?? 0),
+      netCount: Number(row.total_count) - (currentCancellations.get(row.conversion_point_id)?.count ?? 0),
+      netValue: Number(row.total_value) - (currentCancellations.get(row.conversion_point_id)?.value ?? 0),
+      previousNetCount: Number(before?.total_count ?? 0) - (previousCancellations.get(row.conversion_point_id)?.count ?? 0),
+      previousNetValue: Number(before?.total_value ?? 0) - (previousCancellations.get(row.conversion_point_id)?.value ?? 0),
+      countChange: (Number(row.total_count) - (currentCancellations.get(row.conversion_point_id)?.count ?? 0)) - (Number(before?.total_count ?? 0) - (previousCancellations.get(row.conversion_point_id)?.count ?? 0)),
+      cancellationCount: currentCancellations.get(row.conversion_point_id)?.count ?? null,
+      cancellationValue: currentCancellations.get(row.conversion_point_id)?.value ?? null,
+      routes: routesByDefinition.get(row.conversion_point_id) ?? [],
     };
   });
   const fastestGrowing = byDefinition
@@ -546,7 +601,7 @@ export async function getConversionDefinitionReport(
     previousRange: input.previousRange,
     kpis: {
       recordedCount: totals.count,
-      reversedCount: null,
+      reversedCount: [...currentCancellations.values()].reduce((sum, metric) => sum + metric.count, 0) || null,
       netCount: totals.count,
       netValue: totals.value,
       averageNetValue: totals.count > 0 ? Math.round((totals.value / totals.count) * 100) / 100 : null,
@@ -555,8 +610,10 @@ export async function getConversionDefinitionReport(
       countChangeRate: previousTotals.count > 0
         ? Math.round(((totals.count - previousTotals.count) / previousTotals.count) * 10_000) / 100
         : null,
-      reversalState: 'unavailable' as const,
-      reversalReason: '取消イベント台帳はまだ接続されていません',
+      reversalState: currentCancellations.size > 0 ? 'available' as const : 'unavailable' as const,
+      reversalReason: currentCancellations.size > 0 ? '取消イベント台帳から集計' : '取消イベント台帳はまだ接続されていません',
+      cancellationCount: [...currentCancellations.values()].reduce((sum, metric) => sum + metric.count, 0) || null,
+      cancellationValue: [...currentCancellations.values()].reduce((sum, metric) => sum + metric.value, 0) || null,
       fastestGrowing,
     },
     daily: dailyRows.results.map((row) => ({
@@ -567,7 +624,10 @@ export async function getConversionDefinitionReport(
       netValue: Number(row.total_value),
     })),
     byDefinition,
-    byRoute: routeRows.results.map((row) => ({
+    byRoute: [...routeRows.results].reduce((all, row) => {
+      const existing = all.find((item) => item.routeKey === row.route_key);
+      if (existing) { existing.netCount += Number(row.total_count); existing.netValue += Number(row.total_value); return all; }
+      all.push({
       routeKey: row.route_key,
       label: row.route_key === 'unattributed' ? '未帰属' : row.route_key,
       attributionState: row.route_key === 'unattributed' ? 'unattributed' : 'attributed',
@@ -575,7 +635,9 @@ export async function getConversionDefinitionReport(
       netValue: Number(row.total_value),
       audience: null,
       conversionRate: null,
-    })),
+      });
+      return all;
+    }, [] as Array<{ routeKey: string; label: string; attributionState: 'attributed' | 'unattributed'; netCount: number; netValue: number; audience: number | null; conversionRate: number | null }>),
   };
 }
 
@@ -592,5 +654,5 @@ export async function listConversionDefinitionsForExport(
      LIMIT 10000`)
     .bind(...cte.values, ...where.values)
     .all<DefinitionRow>();
-  return rows.results.map(serializeDefinition);
+  return rows.results.map((row) => serializeDefinition(row));
 }
