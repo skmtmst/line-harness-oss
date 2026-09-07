@@ -9093,7 +9093,13 @@ export type WebinarListItem = Webinar & {
 
 export type WebinarFolder = Folder & { count: number }
 
-export type WebinarInput = Partial<Omit<Webinar, 'id' | 'createdAt' | 'updatedAt'>>
+export type WebinarInput = Partial<Omit<Webinar, 'id' | 'createdAt' | 'updatedAt'>> & {
+  deliveryKind?: 'on_demand' | 'scheduled' | 'external'
+  viewingCondition?: { kind: string; label: string }
+  publicDescription?: string
+  registrationFormId?: string | null
+  expectedVersion?: number
+}
 
 export type WebinarNotificationSettings = {
   webinarId: string
@@ -9186,6 +9192,8 @@ export type WebinarAnalytics = {
   }>
   sessions: Array<{ sessionStartAt: number; viewers: number; avgWatchedSeconds: number; ctaClicks: number }>
   dropoff: Array<{ bucketStart: number; viewers: number }>
+  viewSegments?: Array<{ startSeconds: number; endSeconds: number; viewers: number }>
+  measurement?: { state: 'available' | 'unavailable'; reason: string | null }
   formFunnel: {
     ctaImpressions: number
     ctaClicks: number
@@ -9230,6 +9238,77 @@ export type WebinarAction = {
   version?: number
 }
 
+export type WebinarEditor = {
+  version: number
+  deliveryKind: 'on_demand' | 'scheduled' | 'external'
+  viewingCondition: { kind: string; label: string }
+  publicDescription: string
+  registrationFormId: string | null
+  notificationMessages: Record<string, string>
+  notificationTest: { status?: string; sent?: number; failed?: number; testedAt?: string } | null
+  actionPolicy: {
+    templateBody: string
+    missingResultPolicy: 'escalate' | 'retry_next_day'
+  }
+  publicPage: {
+    liffId: string | null
+    url: string | null
+    unavailableReason: string | null
+    description: string
+    test: { status?: string; testedAt?: string } | null
+    form: {
+      id: string
+      name: string
+      active: boolean
+      fields: string[]
+      completionActions: string[]
+    } | null
+  }
+  publication: {
+    status: Webinar['status']
+    draftVersion: number
+    publishedVersion: number | null
+    publishedAt: string | null
+  }
+  monitoring: {
+    notificationFailures: number
+    duplicateRegistrations: number
+    viewSegmentFailures: number
+    actionFailures: number
+  }
+}
+
+export type WebinarPublishValidation = {
+  version: number
+  checks: Array<{
+    key: string
+    label: string
+    status: 'passed' | 'warning' | 'failed'
+    detail: string | null
+  }>
+  blockers: string[]
+  warnings: string[]
+}
+
+export type WebinarParticipantPage = {
+  items: Array<{
+    friendId: string
+    friendName: string | null
+    pictureUrl: string | null
+    sessions: number
+    firstJoinedAt: string | null
+    latestJoinedAt: string | null
+    maxWatchedSeconds: number
+    ctaClickedAt: string | null
+    registered: boolean
+    formSubmittedAt: string | null
+    actionStatus: string | null
+    errorDetail: string | null
+    staffIntegrationStatus: 'completed' | 'needs_attention' | 'pending'
+  }>
+  nextCursor: string | null
+}
+
 export const webinarApi = {
   list: (accountId?: string) => fetchApi<{ data: WebinarListItem[] }>(
     `/api/webinars${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`,
@@ -9241,6 +9320,25 @@ export const webinarApi = {
     `/api/webinars/overview?account_id=${encodeURIComponent(accountId)}`,
   ),
   get: (id: string) => fetchApi<{ data: Webinar }>(`/api/webinars/${id}`),
+  editor: (id: string) => fetchApi<{ data: WebinarEditor }>(`/api/webinars/${id}/editor`),
+  saveEditor: (id: string, input: Partial<Omit<WebinarEditor, 'version' | 'publicPage' | 'publication' | 'monitoring' | 'actionPolicy'>> & {
+    expectedVersion: number
+    actionTemplateBody?: string
+    missingResultPolicy?: WebinarEditor['actionPolicy']['missingResultPolicy']
+    publicPageTest?: Record<string, unknown> | null
+  }) => fetchApi<{ data: WebinarEditor }>(`/api/webinars/${id}/editor`, {
+    method: 'PUT', body: JSON.stringify(input),
+  }),
+  publishValidation: (id: string) => fetchApi<{ data: WebinarPublishValidation }>(`/api/webinars/${id}/publish-validation`),
+  publish: (id: string, expectedVersion: number) => fetchApi<{ data: { webinar: Webinar; validation: WebinarPublishValidation } }>(`/api/webinars/${id}/publish`, {
+    method: 'POST', body: JSON.stringify({ expectedVersion }),
+  }),
+  pause: (id: string, expectedVersion: number) => fetchApi<{ data: Webinar }>(`/api/webinars/${id}/pause`, {
+    method: 'POST', body: JSON.stringify({ expectedVersion }),
+  }),
+  duplicate: (id: string, expectedVersion: number) => fetchApi<{ data: Webinar }>(`/api/webinars/${id}/duplicate`, {
+    method: 'POST', body: JSON.stringify({ expectedVersion }),
+  }),
   create: (input: WebinarInput) =>
     fetchApi<{ data: Webinar }>('/api/webinars', { method: 'POST', body: JSON.stringify(input) }),
   update: (id: string, input: WebinarInput) =>
@@ -9289,6 +9387,9 @@ export const webinarApi = {
       }),
     }),
   analytics: (id: string) => fetchApi<{ data: WebinarAnalytics }>(`/api/webinars/${id}/analytics`),
+  participants: (id: string, cursor?: string) => fetchApi<{ data: WebinarParticipantPage }>(
+    `/api/webinars/${id}/participants${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
+  ),
   userComments: (id: string) =>
     fetchApi<{ data: WebinarUserComment[] }>(`/api/webinars/${id}/user-comments`),
 }

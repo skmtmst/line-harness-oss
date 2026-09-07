@@ -188,6 +188,58 @@ export interface WebinarActionInput {
   enabled?: boolean;
 }
 
+export type WebinarDeliveryKind = 'on_demand' | 'scheduled' | 'external';
+export type WebinarMissingResultPolicy = 'escalate' | 'retry_next_day';
+
+export interface WebinarEditorSettings {
+  webinar_id: string;
+  version: number;
+  delivery_kind: WebinarDeliveryKind;
+  viewing_condition_json: string;
+  public_description: string;
+  registration_form_id: string | null;
+  notification_messages_json: string;
+  notification_test_json: string | null;
+  action_template_body: string;
+  missing_result_policy: WebinarMissingResultPolicy;
+  public_page_test_json: string | null;
+  published_version: number | null;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WebinarEditorSettingsInput {
+  deliveryKind?: WebinarDeliveryKind;
+  viewingCondition?: Record<string, unknown>;
+  publicDescription?: string;
+  registrationFormId?: string | null;
+  notificationMessages?: Record<string, string>;
+  notificationTest?: Record<string, unknown> | null;
+  actionTemplateBody?: string;
+  missingResultPolicy?: WebinarMissingResultPolicy;
+  publicPageTest?: Record<string, unknown> | null;
+}
+
+export interface WebinarViewSegmentCoverage {
+  start_seconds: number;
+  end_seconds: number;
+  viewers: number;
+}
+
+export interface WebinarParticipantOperation extends WebinarParticipantStat {
+  action_status: string | null;
+  action_error: string | null;
+  integration_status: 'completed' | 'needs_attention' | 'pending';
+}
+
+export interface WebinarMonitoringSummary {
+  notification_failures: number;
+  duplicate_registrations: number;
+  view_segment_failures: number;
+  action_failures: number;
+}
+
 export async function getWebinars(db: D1Database): Promise<Webinar[]> {
   const { results } = await db
     .prepare('SELECT * FROM webinars ORDER BY created_at DESC')
@@ -386,6 +438,232 @@ export async function updateWebinar(
     )
     .run();
   return getWebinarById(db, id);
+}
+
+export async function getWebinarEditorSettings(
+  db: D1Database,
+  webinarId: string,
+): Promise<WebinarEditorSettings | null> {
+  return db.prepare('SELECT * FROM webinar_editor_settings WHERE webinar_id = ?')
+    .bind(webinarId)
+    .first<WebinarEditorSettings>();
+}
+
+function webinarEditorSnapshot(row: WebinarEditorSettings): string {
+  return JSON.stringify({
+    deliveryKind: row.delivery_kind,
+    viewingCondition: JSON.parse(row.viewing_condition_json),
+    publicDescription: row.public_description,
+    registrationFormId: row.registration_form_id,
+    notificationMessages: JSON.parse(row.notification_messages_json),
+    notificationTest: row.notification_test_json ? JSON.parse(row.notification_test_json) : null,
+    actionTemplateBody: row.action_template_body,
+    missingResultPolicy: row.missing_result_policy,
+    publicPageTest: row.public_page_test_json ? JSON.parse(row.public_page_test_json) : null,
+  });
+}
+
+/**
+ * 編集設定を楽観ロック付きで保存する。公開版は webinar_versions に残し、
+ * 同じ version の行を上書きしない。
+ */
+export async function saveWebinarEditorSettings(
+  db: D1Database,
+  webinarId: string,
+  expectedVersion: number,
+  patch: WebinarEditorSettingsInput,
+): Promise<WebinarEditorSettings | null> {
+  const existing = await getWebinarEditorSettings(db, webinarId);
+  const now = jstNow();
+  if (!existing) {
+    if (expectedVersion !== 0) return null;
+    await db.prepare(
+      `INSERT INTO webinar_editor_settings
+         (webinar_id, version, delivery_kind, viewing_condition_json, public_description,
+          registration_form_id, notification_messages_json, notification_test_json,
+          action_template_body, missing_result_policy, public_page_test_json,
+          created_at, updated_at)
+       VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      webinarId,
+      patch.deliveryKind ?? 'on_demand',
+      JSON.stringify(patch.viewingCondition ?? { kind: 'registered', label: '申込者向け' }),
+      patch.publicDescription ?? '',
+      patch.registrationFormId ?? null,
+      JSON.stringify(patch.notificationMessages ?? {}),
+      patch.notificationTest === undefined || patch.notificationTest === null
+        ? null : JSON.stringify(patch.notificationTest),
+      patch.actionTemplateBody ?? '',
+      patch.missingResultPolicy ?? 'escalate',
+      patch.publicPageTest === undefined || patch.publicPageTest === null
+        ? null : JSON.stringify(patch.publicPageTest),
+      now,
+      now,
+    ).run();
+  } else {
+    if (existing.version !== expectedVersion) return null;
+    const result = await db.prepare(
+      `UPDATE webinar_editor_settings
+          SET version = version + 1,
+              delivery_kind = ?, viewing_condition_json = ?, public_description = ?,
+              registration_form_id = ?, notification_messages_json = ?,
+              notification_test_json = ?, action_template_body = ?, missing_result_policy = ?,
+              public_page_test_json = ?, updated_at = ?
+        WHERE webinar_id = ? AND version = ?`,
+    ).bind(
+      patch.deliveryKind ?? existing.delivery_kind,
+      JSON.stringify(patch.viewingCondition ?? JSON.parse(existing.viewing_condition_json)),
+      patch.publicDescription ?? existing.public_description,
+      patch.registrationFormId !== undefined ? patch.registrationFormId : existing.registration_form_id,
+      JSON.stringify(patch.notificationMessages ?? JSON.parse(existing.notification_messages_json)),
+      patch.notificationTest !== undefined
+        ? (patch.notificationTest === null ? null : JSON.stringify(patch.notificationTest))
+        : existing.notification_test_json,
+      patch.actionTemplateBody ?? existing.action_template_body,
+      patch.missingResultPolicy ?? existing.missing_result_policy,
+      patch.publicPageTest !== undefined
+        ? (patch.publicPageTest === null ? null : JSON.stringify(patch.publicPageTest))
+        : existing.public_page_test_json,
+      now,
+      webinarId,
+      expectedVersion,
+    ).run();
+    if ((result.meta.changes ?? 0) !== 1) return null;
+  }
+  const saved = await getWebinarEditorSettings(db, webinarId);
+  if (!saved) return null;
+  await db.prepare(
+    `INSERT INTO webinar_versions
+       (id, webinar_id, version, state, snapshot_json, created_at)
+     VALUES (?, ?, ?, 'draft', ?, ?, ?)`,
+  ).bind(
+    crypto.randomUUID(), webinarId, saved.version, webinarEditorSnapshot(saved), now, null,
+  ).run();
+  return saved;
+}
+
+export async function publishWebinarEditorVersion(
+  db: D1Database,
+  webinarId: string,
+  expectedVersion: number,
+): Promise<WebinarEditorSettings | null> {
+  const settings = await getWebinarEditorSettings(db, webinarId);
+  if (!settings || settings.version !== expectedVersion) return null;
+  const now = jstNow();
+  await db.batch([
+    db.prepare(
+      `UPDATE webinar_versions SET state = 'superseded'
+       WHERE webinar_id = ? AND state = 'published'`,
+    ).bind(webinarId),
+    db.prepare(
+      `UPDATE webinar_versions SET state = 'published', published_at = ?
+       WHERE webinar_id = ? AND version = ?`,
+    ).bind(now, webinarId, expectedVersion),
+    db.prepare(
+      `UPDATE webinar_editor_settings SET published_version = ?, published_at = ?, updated_at = ?
+       WHERE webinar_id = ? AND version = ?`,
+    ).bind(expectedVersion, now, now, webinarId, expectedVersion),
+  ]);
+  return getWebinarEditorSettings(db, webinarId);
+}
+
+export async function getWebinarViewSegmentCoverage(
+  db: D1Database,
+  webinarId: string,
+): Promise<WebinarViewSegmentCoverage[]> {
+  const result = await db.prepare(
+    `SELECT start_seconds, end_seconds, COUNT(DISTINCT friend_id) AS viewers
+       FROM webinar_view_segments
+      WHERE webinar_id = ?
+      GROUP BY start_seconds, end_seconds
+      ORDER BY start_seconds, end_seconds`,
+  ).bind(webinarId).all<WebinarViewSegmentCoverage>();
+  return result.results ?? [];
+}
+
+export async function getWebinarParticipantOperations(
+  db: D1Database,
+  webinarId: string,
+  limit = 100,
+  offset = 0,
+): Promise<WebinarParticipantOperation[]> {
+  const result = await db.prepare(
+    `WITH identities AS (
+       SELECT friend_id FROM webinar_registrations WHERE webinar_id = ? AND status = 'active'
+       UNION
+       SELECT friend_id FROM webinar_viewers WHERE webinar_id = ?
+     )
+     SELECT i.friend_id,
+            f.display_name AS friend_name,
+            f.picture_url,
+            (SELECT COUNT(*) FROM webinar_viewers v WHERE v.webinar_id = ? AND v.friend_id = i.friend_id) AS sessions,
+            COALESCE((SELECT MIN(v.joined_at) FROM webinar_viewers v WHERE v.webinar_id = ? AND v.friend_id = i.friend_id), '') AS first_joined_at,
+            COALESCE((SELECT MAX(v.joined_at) FROM webinar_viewers v WHERE v.webinar_id = ? AND v.friend_id = i.friend_id), '') AS latest_joined_at,
+            COALESCE((SELECT MAX(v.last_position_seconds) FROM webinar_viewers v WHERE v.webinar_id = ? AND v.friend_id = i.friend_id), 0) AS max_watched_seconds,
+            (SELECT MAX(v.cta_clicked_at) FROM webinar_viewers v WHERE v.webinar_id = ? AND v.friend_id = i.friend_id) AS cta_clicked_at,
+            1 AS registered,
+            (SELECT MAX(fs.created_at)
+               FROM form_submissions fs
+               JOIN webinar_ctas wc ON wc.form_id = fs.form_id
+              WHERE wc.webinar_id = ? AND fs.friend_id = i.friend_id) AS form_submitted_at,
+            (SELECT ae.status FROM webinar_action_executions ae
+              WHERE ae.webinar_id = ? AND ae.friend_id = i.friend_id
+              ORDER BY ae.updated_at DESC LIMIT 1) AS action_status,
+            (SELECT ae.last_error FROM webinar_action_executions ae
+              WHERE ae.webinar_id = ? AND ae.friend_id = i.friend_id
+              ORDER BY ae.updated_at DESC LIMIT 1) AS action_error
+       FROM identities i
+       LEFT JOIN friends f ON f.id = i.friend_id
+      ORDER BY latest_joined_at DESC, i.friend_id
+      LIMIT ? OFFSET ?`,
+  ).bind(
+    webinarId, webinarId, webinarId, webinarId, webinarId, webinarId,
+    webinarId, webinarId, webinarId, webinarId, limit, offset,
+  ).all<Omit<WebinarParticipantOperation, 'integration_status'>>();
+  return (result.results ?? []).map((row) => ({
+    ...row,
+    integration_status: row.action_status === 'succeeded'
+      ? 'completed'
+      : row.action_status === 'permanent_failed'
+        ? 'needs_attention'
+        : 'pending',
+  }));
+}
+
+export async function getWebinarMonitoringSummary(
+  db: D1Database,
+  webinarId: string,
+): Promise<WebinarMonitoringSummary> {
+  const row = await db.prepare(
+    `SELECT
+       (SELECT COUNT(*) FROM webinar_notification_jobs
+         WHERE webinar_id = ? AND status = 'permanent_failed') AS notification_failures,
+       (SELECT COUNT(*) FROM (
+          SELECT friend_id, session_start_at
+            FROM webinar_registrations
+           WHERE webinar_id = ? AND status = 'active'
+           GROUP BY friend_id, session_start_at HAVING COUNT(*) > 1
+        )) AS duplicate_registrations,
+       0 AS view_segment_failures,
+       (SELECT COUNT(*) FROM webinar_action_executions
+         WHERE webinar_id = ? AND status = 'permanent_failed') AS action_failures`,
+  ).bind(webinarId, webinarId, webinarId).first<WebinarMonitoringSummary>();
+  return row ?? {
+    notification_failures: 0,
+    duplicate_registrations: 0,
+    view_segment_failures: 0,
+    action_failures: 0,
+  };
+}
+
+export async function getWebinarPublicAccount(
+  db: D1Database,
+  accountId: string | null,
+): Promise<{ id: string; name: string; liff_id: string | null } | null> {
+  if (!accountId) return null;
+  return db.prepare('SELECT id, name, liff_id FROM line_accounts WHERE id = ? AND archived_at IS NULL')
+    .bind(accountId)
+    .first<{ id: string; name: string; liff_id: string | null }>();
 }
 
 /**

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
@@ -9,7 +9,7 @@ import StepTrail from '@/components/shared/step-trail'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { webinarApi } from '@/lib/api'
+import { webinarApi, type WebinarFolder } from '@/lib/api'
 
 type DeliveryKind = 'on-demand' | 'scheduled'
 
@@ -19,8 +19,21 @@ export default function NewWebinarPage() {
   const { selectedAccountId } = useAccount()
   const [title, setTitle] = useState('')
   const [deliveryKind, setDeliveryKind] = useState<DeliveryKind>('on-demand')
+  const [folders, setFolders] = useState<WebinarFolder[]>([])
+  const [folderId, setFolderId] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!selectedAccountId) {
+      setFolders([])
+      setFolderId('')
+      return
+    }
+    webinarApi.folders(selectedAccountId)
+      .then((response) => setFolders(Array.isArray(response.data) ? response.data : []))
+      .catch(() => setFolders([]))
+  }, [selectedAccountId])
 
   async function save(next: 'list' | 'video') {
     if (!selectedAccountId) {
@@ -39,11 +52,14 @@ export default function NewWebinarPage() {
         accountId: selectedAccountId,
         title: title.trim(),
         status: 'draft',
-        slug: '',
+        slug: `webinar-${Date.now()}`,
         videoPrefix: null,
         durationSeconds: 120 * 60,
         schedule: [],
         cta: null,
+        folderId: folderId || null,
+        deliveryKind: deliveryKind === 'on-demand' ? 'on_demand' : 'scheduled',
+        viewingCondition: { kind: 'registered', label: '申込者向け' },
       })
       router.push(next === 'video' ? `/webinars/edit?id=${created.data.id}` : '/webinars')
     } catch (cause) {
@@ -93,7 +109,15 @@ export default function NewWebinarPage() {
               </div>
               <div>
                 <label htmlFor="webinar-folder" className="text-ink-secondary mb-1 block text-sm font-medium">フォルダ</label>
-                <SelectField id="webinar-folder" value="" disabled options={[{ value: '', label: '保存後にフォルダを設定できます' }]} />
+                <SelectField
+                  id="webinar-folder"
+                  value={folderId}
+                  onChange={(event) => setFolderId(event.target.value)}
+                  options={[
+                    { value: '', label: '未分類' },
+                    ...folders.map((folder) => ({ value: folder.id, label: `${folder.name}（${folder.count}件）` })),
+                  ]}
+                />
               </div>
             </div>
           </section>
@@ -115,7 +139,7 @@ export default function NewWebinarPage() {
                 <span className="text-action ml-auto" aria-hidden="true">›</span>
               </label>
             </div>
-            <p className="text-ink-faint mt-3 text-xs">開催形式は下書き保存後の動画設定で確定します。</p>
+            <p className="text-ink-faint mt-3 text-xs">選んだ開催形式は下書き版へ保存され、動画設定でも変更できます。</p>
           </section>
         </div>
 
