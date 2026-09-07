@@ -5818,7 +5818,13 @@ export const MILEAGE_REWARDS = {
 /** 機能9の最終確認と公開完了を描く、保存を伴わない固定応答。 */
 export const FRIEND_ADD_RULE_VALIDATE = {
   canPublish: true,
-  checks: [{ status: 'passed', label: '配信内容と参照先を確認できました。' }],
+  // 確認は鍵付きで返し、説明文はサーバ値をそのまま出す (順番に意味を持たせない)。
+  checks: [{
+    key: 'first_time',
+    status: 'passed',
+    label: '配信内容と参照先を確認できました。',
+    detail: '保存済みのルールと参照先を確認できました。',
+  }],
 }
 
 export const FRIEND_ADD_RULE_PUBLISH = {
