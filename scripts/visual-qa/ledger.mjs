@@ -1,5 +1,5 @@
 /**
- * 262画面の台帳を、`screens.mjs` と各機能の比較文書から組み立てる。
+ * V6画面の台帳を、`screens.mjs` と各機能の比較文書から組み立てる。
  *
  * **手で表を書き写さない。** 32機能ぶんを手で数えると必ずどこかで狂い、
  * 狂った数を根拠に「あと何枚」を話すことになる。台帳は `screens.mjs` を
@@ -14,6 +14,7 @@
  * 古くなる。古い数を根拠に「あと何枚」を話すことになる。
  */
 import { SCREENS, screensOf, CAPTURED_AT, WIDTHS } from './screens.mjs'
+import { effectivePixelVerdict } from './pixel-diff.mjs'
 import { readFileSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -21,6 +22,25 @@ import { fileURLToPath } from 'node:url'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 /** `capture.spec.mjs` が置く基準画像。`elsewhere` の絵はここに在る。 */
 const SNAPSHOTS = join(ROOT, 'scripts', 'visual-qa', 'capture.spec.mjs-snapshots')
+const PIXEL_DIFF_PATH = join(ROOT, 'docs', 'design-qa', 'v6-pixel-diff.json')
+
+function readPixelDiff() {
+  if (!existsSync(PIXEL_DIFF_PATH)) {
+    return { thresholdPercent: 3, screenCount: 0, comparedCount: 0, unavailableCount: SCREENS.length, aboveThresholdCount: 0, entries: [] }
+  }
+  return JSON.parse(readFileSync(PIXEL_DIFF_PATH, 'utf8'))
+}
+
+const PIXEL_DIFF = readPixelDiff()
+const PIXEL_BY_NODE = new Map(PIXEL_DIFF.entries.map((entry) => [entry.node, entry]))
+const pixelOf = (screen) => PIXEL_BY_NODE.get(screen.node) ?? {
+  status: 'unavailable', reason: '画素比較結果なし', pixelDiffPercent: null, aboveThreshold: false,
+}
+
+/** 目視判定が一致でも、画素差3%超なら台帳上は一致に数えない。 */
+function effectiveVerdict(screen) {
+  return effectivePixelVerdict(screen.verdict, pixelOf(screen))
+}
 
 /** 機能の名前。台帳の見出しに使う。 */
 export const FEATURE_NAMES = {
@@ -106,6 +126,7 @@ const LABELS = {
   vMatch: '一致',
   vStructure: '構造一致・データ未接続',
   vNeedsFix: '要修正',
+  vPixelMismatch: '画素差3%超',
   vUnimplemented: '未実装',
   vUnjudged: '未判定',
 }
@@ -114,23 +135,29 @@ function tally(list) {
   const out = {
     compared: 0, unimplemented: 0, unconfirmed: 0, elsewhere: 0, missing: 0,
     /* 判定の内訳。**「撮れた」と「合っていた」は別に数える。** */
-    match: 0, structureMatchDataPending: 0, needsFix: 0, unjudged: 0,
+    match: 0, structureMatchDataPending: 0, needsFix: 0, pixelMismatch: 0, unjudged: 0,
+    pixelCompared: 0, pixelUnavailable: 0, pixelAboveThreshold: 0,
   }
   const VERDICT_KEY = {
     match: 'match',
     structure_match_data_pending: 'structureMatchDataPending',
     needs_fix: 'needsFix',
+    pixel_mismatch: 'pixelMismatch',
   }
   for (const s of list) {
     out[stateOf(s)] += 1
+    const pixel = pixelOf(s)
+    if (pixel.status === 'compared') out.pixelCompared += 1
+    else out.pixelUnavailable += 1
+    if (pixel.aboveThreshold) out.pixelAboveThreshold += 1
     if (s.status) continue
     /* **空欄を一致として数えない。** 判定が無ければ「未判定」。 */
-    const key = VERDICT_KEY[s.verdict]
+    const key = VERDICT_KEY[effectiveVerdict(s)]
     if (key) out[key] += 1
     else out.unjudged += 1
   }
   /* **完了まで残り。** 一致以外の全部。 */
-  out.remaining = out.structureMatchDataPending + out.needsFix + out.unimplemented + out.unjudged
+  out.remaining = out.structureMatchDataPending + out.needsFix + out.pixelMismatch + out.unimplemented + out.unjudged
   return out
 }
 
@@ -145,18 +172,53 @@ function esc(t) {
   return String(t).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
 }
 
+function signed(value) {
+  if (!Number.isFinite(value)) return '—'
+  return `${value > 0 ? '+' : ''}${value}px`
+}
+
+function pixelPercent(entry) {
+  return entry.status === 'compared' ? `${entry.pixelDiffPercent.toFixed(4)}%` : `—（${entry.reason}）`
+}
+
+function effectiveLabel(screen) {
+  const key = {
+    match: 'vMatch',
+    structure_match_data_pending: 'vStructure',
+    needs_fix: 'vNeedsFix',
+    pixel_mismatch: 'vPixelMismatch',
+  }[effectiveVerdict(screen)]
+  return LABELS[key] ?? '未判定'
+}
+
+function pixelRowsMarkdown() {
+  return SCREENS.map((screen) => {
+    const pixel = pixelOf(screen)
+    const diff = pixel.diffPath ? `[差分画像](${pixel.diffPath.replace(/^docs\/design-qa\//, '')})` : '—'
+    return `| ${screen.feature} | \`${screen.node}\` | ${screen.name} | ${pixelPercent(pixel)} | ${signed(pixel.heightDifferencePx)} | ${pixel.dominantRegion ?? '—'} | ${diff} | **${effectiveLabel(screen)}** |`
+  }).join('\n')
+}
+
 if (process.argv.includes('--html')) {
   const pct = (n) => (SCREENS.length ? Math.round((n / SCREENS.length) * 1000) / 10 : 0)
   const bars = rows.map((r) => {
     const seg = (n, cls) => (n ? `<span class="${cls}" style="flex:${n}" title="${LABELS[cls]} ${n}"></span>` : '')
     return `      <tr>
         <th scope="row"><span class="num">${r.feature}</span>${esc(r.name)}</th>
-        <td class="bar"><div class="track">${seg(r.match, 'vMatch')}${seg(r.structureMatchDataPending, 'vStructure')}${seg(r.needsFix, 'vNeedsFix')}${seg(r.unimplemented, 'vUnimplemented')}${seg(r.unjudged, 'vUnjudged')}</div></td>
+        <td class="bar"><div class="track">${seg(r.match, 'vMatch')}${seg(r.structureMatchDataPending, 'vStructure')}${seg(r.needsFix, 'vNeedsFix')}${seg(r.pixelMismatch, 'vPixelMismatch')}${seg(r.unimplemented, 'vUnimplemented')}${seg(r.unjudged, 'vUnjudged')}</div></td>
         <td class="n">${r.total}</td><td class="n ok">${r.match || '—'}</td>
         <td class="n">${r.structureMatchDataPending || '—'}</td><td class="n">${r.needsFix || '—'}</td>
-        <td class="n">${r.unimplemented || '—'}</td><td class="n">${r.unjudged || '—'}</td>
+        <td class="n">${r.pixelMismatch || '—'}</td><td class="n">${r.unimplemented || '—'}</td><td class="n">${r.unjudged || '—'}</td>
+        <td class="n">${r.pixelCompared}/${r.total}</td><td class="n">${r.pixelAboveThreshold || '—'}</td>
         <td class="at">${capturedAtHtml(r.feature)}</td>
       </tr>`
+  }).join('\n')
+  const pixelDetails = SCREENS.map((screen) => {
+    const pixel = pixelOf(screen)
+    const diff = pixel.diffPath
+      ? `<a href="${esc(pixel.diffPath.replace(/^docs\/design-qa\//, ''))}">差分画像</a>`
+      : '—'
+    return `      <tr><td>${screen.feature}</td><td><code>${esc(screen.node)}</code></td><td>${esc(screen.name)}</td><td class="n ${pixel.aboveThreshold ? 'bad' : ''}">${esc(pixelPercent(pixel))}</td><td class="n">${signed(pixel.heightDifferencePx)}</td><td>${esc(pixel.dominantRegion ?? '—')}</td><td>${diff}</td><td>${esc(effectiveLabel(screen))}</td></tr>`
   }).join('\n')
   console.log(`<!-- scripts/visual-qa/ledger.mjs --html が作ります。手で直さないでください。 -->
 <!-- 文字の指定を落とすと、ローカルで開いたときに日本語が全部化けます。 -->
@@ -205,8 +267,10 @@ if (process.argv.includes('--html')) {
   .track { display: flex; height: 9px; border-radius: 5px; overflow: hidden; background: var(--mute); }
   .compared { background: var(--ok); } .elsewhere { background: var(--ok); opacity: .55; }
   .vMatch { background: var(--ok); } .vStructure { background: var(--warn); opacity: .55; }
-  .vNeedsFix { background: var(--warn); } .vUnimplemented { background: var(--gap); }
+  .vNeedsFix { background: var(--warn); } .vPixelMismatch { background: var(--gap); }
+  .vUnimplemented { background: var(--gap); }
   .vUnjudged { background: var(--mute); }
+  .bad { color: var(--gap); font-weight: 700; }
   .unconfirmed { background: var(--warn); } .unimplemented { background: var(--gap); }
   .missing { background: var(--mute); }
   .legend { display: flex; flex-wrap: wrap; gap: 14px; color: var(--ink-2); font-size: .8rem; margin: 0; }
@@ -223,7 +287,7 @@ if (process.argv.includes('--html')) {
 <main>
   <header>
     <h1>V6 画面比較の進捗</h1>
-    <p class="lede">Pencil の設計 262 画面を、1440px と 1920px の実装画像と並べた結果です。<strong>帯は「撮れたか」ではなく「合っていたか」で塗っています。</strong>撮れた数で塗ると、要修正が何枚あっても帯は緑一色になります。</p>
+    <p class="lede">Pencil の設計 ${SCREENS.length} 画面を実装画像と比べた結果です。<strong>目視で一致でも、画素差が ${PIXEL_DIFF.thresholdPercent}% を超えた画面は一致に数えません。</strong></p>
   </header>
 
   <section class="cards">
@@ -232,17 +296,20 @@ if (process.argv.includes('--html')) {
     <div class="card ok"><b>${all.match}</b><span>一致（${pct(all.match)}%）</span></div>
     <div class="card warn"><b>${all.structureMatchDataPending}</b><span>構造一致・データ未接続</span></div>
     <div class="card warn"><b>${all.needsFix}</b><span>要修正</span></div>
+    <div class="card gap"><b>${all.pixelMismatch}</b><span>画素差${PIXEL_DIFF.thresholdPercent}%超</span></div>
     <div class="card warn"><b>${all.unjudged}</b><span>未判定</span></div>
     <div class="card gap"><b>${all.remaining}</b><span>完了まで残り</span></div>
     <div class="card gap"><b>${all.unimplemented}</b><span>未実装</span></div>
     <div class="card"><b>${all.unconfirmed}</b><span>未確認</span></div>
     <div class="card"><b>${all.elsewhere}</b><span>別の仕掛けで撮影</span></div>
+    <div class="card"><b>${all.pixelCompared}</b><span>画素比較済み</span></div>
   </section>
 
   <p class="legend">
     <span><i class="vMatch"></i>一致</span>
     <span><i class="vStructure"></i>構造一致・データ未接続</span>
     <span><i class="vNeedsFix"></i>要修正</span>
+    <span><i class="vPixelMismatch"></i>画素差${PIXEL_DIFF.thresholdPercent}%超</span>
     <span><i class="vUnimplemented"></i>未実装</span>
     <span><i class="vUnjudged"></i>未判定</span>
   </p>
@@ -252,10 +319,21 @@ if (process.argv.includes('--html')) {
       <thead><tr>
         <th scope="col">機能</th><th scope="col">内訳</th><th scope="col" class="n">総数</th>
         <th scope="col" class="n">一致</th><th scope="col" class="n">構造一致<br>データ未接続</th>
-        <th scope="col" class="n">要修正</th><th scope="col" class="n">未実装</th><th scope="col" class="n">未判定</th><th scope="col">撮った先</th>
+        <th scope="col" class="n">要修正</th><th scope="col" class="n">画素差超過</th><th scope="col" class="n">未実装</th><th scope="col" class="n">未判定</th>
+        <th scope="col" class="n">画素比較</th><th scope="col" class="n">${PIXEL_DIFF.thresholdPercent}%超</th><th scope="col">撮った先</th>
       </tr></thead>
       <tbody>
 ${bars}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>画面ごとの画素差</h2>
+  <div class="wrap">
+    <table>
+      <thead><tr><th>機能</th><th>Node</th><th>画面</th><th class="n">差分率</th><th class="n">高さ差</th><th>差分の中心</th><th>証拠</th><th>有効な判定</th></tr></thead>
+      <tbody>
+${pixelDetails}
       </tbody>
     </table>
   </div>
@@ -311,12 +389,27 @@ ${bars}
     total: SCREENS.length,
     ...all,
     features: rows.map((r) => ({ ...r, capturedAt: CAPTURED_AT[r.feature] ?? null })),
+    pixelDiff: {
+      thresholdPercent: PIXEL_DIFF.thresholdPercent,
+      generatedAt: PIXEL_DIFF.generatedAt ?? null,
+      comparedCount: all.pixelCompared,
+      unavailableCount: all.pixelUnavailable,
+      aboveThresholdCount: all.pixelAboveThreshold,
+    },
+    screens: SCREENS.map((screen) => ({
+      feature: screen.feature,
+      node: screen.node,
+      name: screen.name,
+      declaredVerdict: screen.verdict ?? null,
+      effectiveVerdict: effectiveVerdict(screen),
+      pixelDiff: pixelOf(screen),
+    })),
     gaps: SCREENS.filter((s) => s.status === 'unimplemented').map((s) => ({
       feature: s.feature, node: s.node, name: s.name, gap: s.gap ?? null, gapNote: s.gapNote ?? null,
     })),
   }, null, 2))
 } else {
-  console.log('# V6 進捗台帳（262画面）\n')
+  console.log(`# V6 進捗台帳（${SCREENS.length}画面）\n`)
   console.log('`scripts/visual-qa/screens.mjs` から機械で組み立てています。**手で書き写していません。**\n')
   console.log(`総数 **${SCREENS.length}** ／ 比較済み **${all.compared}** ／ 未実装 **${all.unimplemented}** ／ 未確認 **${all.unconfirmed}** ／ 別の仕掛けで撮影 **${all.elsewhere}** ／ 未撮影 **${all.missing}**\n`)
 
@@ -327,16 +420,24 @@ ${bars}
   console.log(`| 一致 | **${all.match}** |`)
   console.log(`| 構造一致・データ未接続 | ${all.structureMatchDataPending} |`)
   console.log(`| 要修正 | ${all.needsFix} |`)
+  console.log(`| 画素差${PIXEL_DIFF.thresholdPercent}%超（目視は一致） | ${all.pixelMismatch} |`)
   console.log(`| 未実装 | ${all.unimplemented} |`)
   console.log(`| 未判定 | ${all.unjudged} |`)
   console.log(`| **完了まで残り** | **${all.remaining}** |`)
-  console.log('\n「完了まで残り」＝ 構造一致・データ未接続 ＋ 要修正 ＋ 未実装 ＋ 未判定。\n')
+  console.log(`\n「完了まで残り」＝ 構造一致・データ未接続 ＋ 要修正 ＋ 画素差${PIXEL_DIFF.thresholdPercent}%超 ＋ 未実装 ＋ 未判定。\n`)
 
-  console.log('| 機能 | 名前 | 総数 | 比較済み | 一致 | 構造一致・データ未接続 | 要修正 | 未実装 | 未判定 | 未確認 | 別の仕掛け | 未撮影 | 撮った先 |')
-  console.log('|---|---|---|---|---|---|---|---|---|---|---|---|')
+  console.log('## 画素比較\n')
+  console.log(`比較済み **${all.pixelCompared}** ／ 比較不可 **${all.pixelUnavailable}** ／ ${PIXEL_DIFF.thresholdPercent}%超 **${all.pixelAboveThreshold}**。高さは上端を揃えて共通領域を比較し、高さ差を別に記録します。\n`)
+
+  console.log('| 機能 | 名前 | 総数 | 比較済み | 一致 | 構造一致・データ未接続 | 要修正 | 画素差超過 | 未実装 | 未判定 | 画素比較 | 比較不可 | 未確認 | 別の仕掛け | 未撮影 | 撮った先 |')
+  console.log('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|')
   for (const r of rows) {
-    console.log(`| ${r.feature} | ${r.name} | ${r.total} | ${r.compared} | ${r.match} | ${r.structureMatchDataPending} | ${r.needsFix} | ${r.unimplemented} | ${r.unjudged} | ${r.unconfirmed} | ${r.elsewhere} | ${r.missing} | ${capturedAt(r.feature)} |`)
+    console.log(`| ${r.feature} | ${r.name} | ${r.total} | ${r.compared} | ${r.match} | ${r.structureMatchDataPending} | ${r.needsFix} | ${r.pixelMismatch} | ${r.unimplemented} | ${r.unjudged} | ${r.pixelCompared} | ${r.pixelUnavailable} | ${r.unconfirmed} | ${r.elsewhere} | ${r.missing} | ${capturedAt(r.feature)} |`)
   }
-  console.log(`| | **合計** | **${SCREENS.length}** | **${all.compared}** | **${all.match}** | **${all.structureMatchDataPending}** | **${all.needsFix}** | **${all.unimplemented}** | **${all.unjudged}** | **${all.unconfirmed}** | **${all.elsewhere}** | **${all.missing}** | |`)
+  console.log(`| | **合計** | **${SCREENS.length}** | **${all.compared}** | **${all.match}** | **${all.structureMatchDataPending}** | **${all.needsFix}** | **${all.pixelMismatch}** | **${all.unimplemented}** | **${all.unjudged}** | **${all.pixelCompared}** | **${all.pixelUnavailable}** | **${all.unconfirmed}** | **${all.elsewhere}** | **${all.missing}** | |`)
+  console.log('\n## 画面ごとの画素差\n')
+  console.log('| 機能 | Node | 画面 | 差分率 | 高さ差 | 差分の中心 | 証拠 | 有効な判定 |')
+  console.log('|---|---|---|---:|---:|---|---|---|')
+  console.log(pixelRowsMarkdown())
   console.log('\n**「撮った先」が空**の機能は、まだ実装PRのheadで撮り直していません（自分の枝で撮ったものです）。**空欄を確認済みと読まないでください。**')
 }
