@@ -101,6 +101,7 @@ function sourceTriggerLabel(point: Pick<ConversionDefinitionListItem, 'measureMe
 
 function usageLabel(point: ConversionDefinitionListItem): string {
   if (point.usageCount === 0) return 'どこからも使われていません'
+  if (point.usageNames?.length) return point.usageNames.join('・')
   return `${point.usageCount.toLocaleString('ja-JP')}か所で使用中`
 }
 
@@ -508,6 +509,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
             <div><dt className="text-ink-faint">数え方</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.countRepeat ? '毎回数える' : '1人1回'}</dd></div>
             <div><dt className="text-ink-faint">この30日</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.metrics.netCount.toLocaleString('ja-JP')}件</dd></div>
             <div><dt className="text-ink-faint">利用先</dt><dd className="text-ink mt-1 font-semibold">{usageLabel(detailTarget)}</dd></div>
+            <div><dt className="text-ink-faint">取消内訳</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.metrics.cancellationCount == null ? '取消台帳は未接続' : `${detailTarget.metrics.cancellationCount}件・¥${(detailTarget.metrics.cancellationValue ?? 0).toLocaleString('ja-JP')}`}</dd></div>
           </dl>
         ) : null}
       </Dialog>
@@ -830,7 +832,8 @@ function ReportTab({ accountId }: { accountId: string | null }) {
                       {changeRate > 0 ? '+' : changeRate === 0 ? '±' : ''}{changeRate}%
                     </td>
                     <td className="text-ink-secondary px-4 py-3 text-sm">
-                      {topRoute ? `全体では ${topRoute.label}` : '経路の記録はありません'}
+                      {row.routes?.length ? row.routes.slice(0, 2).map((route) => `${route.label} ${route.netCount}件`).join('・') : (topRoute ? `全体では ${topRoute.label}` : '経路の記録はありません')}
+                      <p className="text-ink-faint mt-1 text-xs">取消: {row.cancellationCount == null ? '台帳未接続' : `${row.cancellationCount}件・¥${(row.cancellationValue ?? 0).toLocaleString('ja-JP')}`}</p>
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Button href={`/conversions?tab=points&point=${encodeURIComponent(row.conversionPointId)}`}>中身を見る</Button>

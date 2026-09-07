@@ -7,6 +7,10 @@ import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import { api, ApiError, type MergedPersonWithCandidates } from '@/lib/api'
 import MergedDeliveryDialog from './merged-delivery-dialog'
+import MergedProfileDialog, {
+  emptyProfileCandidateDraft,
+  type ProfileCandidateDraft,
+} from './merged-profile-dialog'
 import {
   MergedAdminCard,
   MergedDeliveryCard,
@@ -41,6 +45,9 @@ export default function MergedPersonDetailView({
   const [person, setPerson] = useState<MergedPersonWithCandidates | null>(null)
   const [failure, setFailure] = useState<MergedPersonFailure | null>(null)
   const [editing, setEditing] = useState(false)
+  const [profileEditing, setProfileEditing] = useState(false)
+  const [profileDraft, setProfileDraft] = useState<ProfileCandidateDraft>({})
+  const [profileSaving, setProfileSaving] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
@@ -139,6 +146,47 @@ export default function MergedPersonDetailView({
     }).finally(() => setUnlinking(false))
   }, [person, unlinkReason, unlinkTarget])
 
+  const openProfileEditor = useCallback(() => {
+    if (!person) return
+    setSaveError('')
+    setProfileDraft(emptyProfileCandidateDraft(person.profileCandidates))
+    setProfileEditing(true)
+  }, [person])
+
+  const saveProfile = useCallback(() => {
+    if (!person) return
+    const selections = person.profileCandidates.flatMap((field) => {
+      const draft = profileDraft[field.fieldKey]
+      const optionIndex = Number(draft?.optionIndex)
+      const option = draft?.optionIndex !== '' && Number.isInteger(optionIndex) && optionIndex >= 0
+        ? field.options[optionIndex]
+        : undefined
+      return option?.candidateId && draft
+        ? [{ fieldKey: field.fieldKey, candidateId: option.candidateId, updateMode: draft.updateMode }]
+        : []
+    })
+    if (selections.length === 0) return
+    setProfileSaving(true)
+    setSaveError('')
+    api.mergedPeople.updateProfileValues(person.id, {
+      expectedRevision: person.revision,
+      selections,
+    }).then((res) => {
+      if (!res.success) {
+        setSaveError(failureOf(null).description)
+        return
+      }
+      setPerson(res.data)
+      setProfileEditing(false)
+      setProfileDraft({})
+    }).catch((error: unknown) => {
+      const next = error instanceof ApiError
+        ? failureOf({ status: error.status, code: error.code })
+        : failureOf(null)
+      setSaveError(`${next.title}。${next.description}`)
+    }).finally(() => setProfileSaving(false))
+  }, [person, profileDraft])
+
   if (phase === 'loading') return <ListState kind="loading" />
   if (phase === 'forbidden') {
     return <ListState kind="forbidden" title={failure?.title} description={failure?.description} />
@@ -171,6 +219,9 @@ export default function MergedPersonDetailView({
           <Button type="button" onClick={onClose}>
             一覧へ戻る
           </Button>
+          <Button type="button" variant="primary" data-qa-open="w8W4Eh-profile" onClick={openProfileEditor}>
+            プロフィールを編集
+          </Button>
         </div>
       </div>
 
@@ -201,7 +252,11 @@ export default function MergedPersonDetailView({
 
       <div className={styles.two}>
         <MergedFriendsTable friends={person.linkedFriends} onUnlink={setUnlinkTarget} />
-        <MergedProfileValues values={person.profileValues} candidates={person.profileCandidates} />
+        <MergedProfileValues
+          values={person.profileValues}
+          candidates={person.profileCandidates}
+          onEdit={openProfileEditor}
+        />
       </div>
 
       <MergedHistoryTable history={person.history} />
@@ -214,6 +269,18 @@ export default function MergedPersonDetailView({
         error={saveError || undefined}
         onCancel={() => setEditing(false)}
         onSave={save}
+      />
+
+      <MergedProfileDialog
+        open={profileEditing}
+        candidates={person.profileCandidates}
+        draft={profileDraft}
+        revision={person.revision}
+        busy={profileSaving}
+        error={saveError || undefined}
+        onChange={setProfileDraft}
+        onCancel={() => setProfileEditing(false)}
+        onSave={saveProfile}
       />
 
       <Dialog

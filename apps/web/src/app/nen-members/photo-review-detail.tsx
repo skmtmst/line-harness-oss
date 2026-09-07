@@ -3,17 +3,20 @@
 import { useState } from 'react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
+import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import { FeatureLinkCard } from '@/components/shared/side-cards'
 import StickyBar from '@/components/shared/sticky-bar'
+import type { PhotoAssetStatus, PhotoDerivatives } from '@/lib/api'
 import { formatPhotoReceivedAt } from './photo-review-time'
 
 const text = (value: unknown) => String(value ?? '')
 const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? Number(value).toLocaleString('ja-JP') : '—'
 
 export function PhotoReviewDetail({
-  photo, position, total, loading, loadKind, reviewing, onBack, onMove, onApprove, onReturn,
+  photo, position, total, loading, loadKind, reviewing, notice, assetStatus, derivatives, assetProcessing,
+  onBack, onMove, onApprove, onReturn, onProcessReviewAsset, onDownloadOriginal,
 }: {
   photo: Record<string, unknown> | null
   position: number
@@ -21,13 +24,23 @@ export function PhotoReviewDetail({
   loading: boolean
   loadKind: 'ready' | 'empty' | 'error' | 'forbidden'
   reviewing: boolean
+  notice: string
+  assetStatus: PhotoAssetStatus | null
+  derivatives: PhotoDerivatives | null
+  assetProcessing: boolean
   onBack: () => void
   onMove: (direction: -1 | 1) => void
   onApprove: () => void
   onReturn: () => void
+  onProcessReviewAsset: () => void
+  onDownloadOriginal: (code: string) => Promise<void>
 }) {
   const [scale, setScale] = useState(1)
   const [rotation, setRotation] = useState(0)
+  const [downloadOpen, setDownloadOpen] = useState(false)
+  const [downloadCode, setDownloadCode] = useState('')
+  const [downloadBusy, setDownloadBusy] = useState(false)
+  const [downloadError, setDownloadError] = useState('')
   if (loading) return <main className="mx-auto max-w-screen-2xl p-6"><ListState kind="loading" title="写真を読み込んでいます" /></main>
   if (loadKind === 'forbidden') return <main className="mx-auto max-w-screen-2xl p-6"><ListState kind="forbidden" /></main>
   if (loadKind === 'error') return <main className="mx-auto max-w-screen-2xl p-6"><ListState kind="error" title="写真を読み込めませんでした" /></main>
@@ -35,7 +48,11 @@ export function PhotoReviewDetail({
 
   const risks = Array.isArray(photo.risks) ? photo.risks as Array<Record<string, unknown>> : []
   const hasFaceRisk = risks.some((risk) => text(risk.flag) === 'face')
+  const reviewDerivative = derivatives?.items.find((item) => item.kind === 'review') ?? null
+  const reviewUrl = derivatives?.knownUrls.find((item) => item.kind === 'review')?.url || text(photo.image_url)
+  const latestAssetJob = assetStatus?.jobs[0] ?? null
   return <main className="mx-auto max-w-screen-2xl p-6" data-photo-view="detail">
+    {notice && <div className="mb-4 rounded-control border border-accent-border bg-accent-soft px-4 py-3 text-sm text-accent-hover">{notice}</div>}
     <div className="flex items-center justify-between gap-2 max-md:flex-col max-md:items-start">
       <div>
         <p className="text-xs font-bold text-ink-faint">写真審査</p>
@@ -54,8 +71,8 @@ export function PhotoReviewDetail({
     <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-4">
       <Card className="xl:col-span-3" overflow="hidden">
         <div className="grid h-96 place-items-center overflow-hidden bg-ink lg:h-screen lg:max-h-screen">
-          {text(photo.image_url) ? <img
-            src={text(photo.image_url)}
+          {reviewUrl ? <img
+            src={reviewUrl}
             alt={`${text(photo.pet_name)}の審査用写真`}
             className="h-full w-full object-contain transition-transform"
             style={{ transform: `scale(${scale}) rotate(${rotation}deg)` }}
@@ -66,9 +83,11 @@ export function PhotoReviewDetail({
           <Button onClick={() => setScale((value) => Math.max(0.7, value - 0.1))}>小さく</Button>
           <Button onClick={() => setRotation((value) => value + 90)}>回す</Button>
           <Button disabled title="切り取りは派生画像の生成口を接続後に使えます">切り取る</Button>
-          <Button disabled title="原本の保存には専用権限と再認証が必要です">もとの画像を保存</Button>
+          <Button disabled={assetProcessing} onClick={onProcessReviewAsset}>{assetProcessing ? '作成中...' : '審査用画像を作り直す'}</Button>
+          <Button onClick={() => { setDownloadOpen(true); setDownloadCode(''); setDownloadError('') }}>もとの画像を保存</Button>
         </div>
-        <p className="px-4 pb-4 pt-1 text-xs text-ink-faint">{numberOrDash(photo.image_width)} × {numberOrDash(photo.image_height)} ／ {photo.image_byte_size == null ? '—（未取得）' : `${(Number(photo.image_byte_size) / 1024 / 1024).toFixed(1)}MB`} ／ {text(photo.captured_device) || '—（未取得）'}</p>
+        <p className="px-4 pb-1 pt-1 text-xs text-ink-faint">{numberOrDash(reviewDerivative?.width ?? photo.image_width)} × {numberOrDash(reviewDerivative?.height ?? photo.image_height)} ／ {(reviewDerivative?.byteSize ?? photo.image_byte_size) == null ? '—（未取得）' : `${(Number(reviewDerivative?.byteSize ?? photo.image_byte_size) / 1024 / 1024).toFixed(1)}MB`} ／ {text(photo.captured_device) || '—（未取得）'}</p>
+        <p className="px-4 pb-4 text-xs text-ink-faint">派生画像：{reviewDerivative ? `審査用 v${reviewDerivative.sourceVersion}` : latestAssetJob ? `${assetStatusLabel(latestAssetJob.status)}（v${latestAssetJob.requestedVersion}）` : '未取得'}</p>
       </Card>
 
       <aside className="flex flex-col gap-3">
@@ -104,5 +123,25 @@ export function PhotoReviewDetail({
         </>}
       />
     </div>
+    <Dialog open={downloadOpen} title="もとの画像を保存" description="原本には個人情報が含まれる場合があります。6桁の再認証コードを入力すると、一度だけ保存できます。" busy={downloadBusy} error={downloadError} confirmLabel="再認証して保存" cancelLabel="やめる" onCancel={() => { setDownloadOpen(false); setDownloadError('') }} onConfirm={() => {
+      if (!/^\d{6}$/.test(downloadCode)) { setDownloadError('6桁の再認証コードを入力してください。'); return }
+      setDownloadBusy(true)
+      setDownloadError('')
+      void onDownloadOriginal(downloadCode)
+        .then(() => setDownloadOpen(false))
+        .catch((error: unknown) => setDownloadError(error instanceof Error ? error.message : '原本を保存できませんでした。'))
+        .finally(() => setDownloadBusy(false))
+    }}>
+      <label className="block text-sm font-semibold text-ink">再認証コード
+        <input value={downloadCode} onChange={(event) => { setDownloadCode(event.target.value.replace(/\D/g, '').slice(0, 6)); setDownloadError('') }} inputMode="numeric" autoComplete="one-time-code" placeholder="6桁のコード" className="mt-2 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" />
+      </label>
+    </Dialog>
   </main>
+}
+
+function assetStatusLabel(status: string) {
+  if (status === 'queued') return '作成待ち'
+  if (status === 'processing') return '作成中'
+  if (status === 'failed') return '作成失敗'
+  return '作成済み'
 }

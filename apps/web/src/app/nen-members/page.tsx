@@ -1,7 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ApiError, api } from '@/lib/api'
+import {
+  ApiError,
+  api,
+  type PhotoAssetStatus,
+  type PhotoDerivatives,
+  type PhotoReviewMetrics,
+} from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Dialog from '@/components/shared/dialog'
 import Button from '@/components/shared/button'
@@ -16,11 +22,10 @@ import styles from './photo-review.module.css'
 type PhotoStatus = 'pending' | 'adopted' | 'rejected'
 type ReviewReasonCode = 'quality' | 'privacy' | 'unrelated' | 'duplicate' | 'other'
 const REVIEW_REASONS: Array<{ value: ReviewReasonCode; label: string }> = [
-  { value: 'quality', label: '写真が暗い・ぼやけている' },
-  { value: 'privacy', label: '人の顔や個人情報が写っている' },
-  { value: 'unrelated', label: 'ペットと関係のない内容が写っている' },
-  { value: 'duplicate', label: '同じ写真がすでに投稿されている' },
-  { value: 'other', label: 'そのほか' },
+  { value: 'privacy', label: 'ほかの人の顔が写っています' },
+  { value: 'unrelated', label: 'ほかのお店のロゴや商品名が写っています' },
+  { value: 'quality', label: '暗くて見えにくいです' },
+  { value: 'other', label: '自分で書く' },
 ]
 const STATUS_TABS: ReadonlyArray<[PhotoStatus, string]> = [
   ['pending', '見ていないもの'],
@@ -32,11 +37,15 @@ const text = (value: unknown) => String(value ?? '')
 export default function PhotoReviewsPage() {
   const { selectedAccountId } = useAccount()
   const [photos, setPhotos] = useState<Array<Record<string, unknown>>>([])
+  const [reviewMetrics, setReviewMetrics] = useState<PhotoReviewMetrics | null>(null)
   const [status, setStatus] = useState<PhotoStatus>('pending')
   const [view, setView] = useState<'list' | 'detail' | 'publications'>('list')
   const [detailPhoto, setDetailPhoto] = useState<Record<string, unknown> | null>(null)
   const [detailState, setDetailState] = useState<'ready' | 'empty' | 'error' | 'forbidden'>('empty')
   const [detailLoading, setDetailLoading] = useState(false)
+  const [detailAssetStatus, setDetailAssetStatus] = useState<PhotoAssetStatus | null>(null)
+  const [detailDerivatives, setDetailDerivatives] = useState<PhotoDerivatives | null>(null)
+  const [assetProcessing, setAssetProcessing] = useState(false)
   const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -44,24 +53,42 @@ export default function PhotoReviewsPage() {
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([])
   const [reviewing, setReviewing] = useState<string | null>(null)
   const [rejectingPhotoId, setRejectingPhotoId] = useState<string | null>(null)
-  const [reasonCode, setReasonCode] = useState<ReviewReasonCode>('quality')
+  const [rejectingPhotoDetail, setRejectingPhotoDetail] = useState<Record<string, unknown> | null>(null)
+  const [reasonCode, setReasonCode] = useState<ReviewReasonCode>('privacy')
   const [reasonNote, setReasonNote] = useState('')
   const [reasonError, setReasonError] = useState('')
+  const [bulkApproveOpen, setBulkApproveOpen] = useState(false)
+  const [bulkReturnOpen, setBulkReturnOpen] = useState(false)
+  const [bulkReviewing, setBulkReviewing] = useState(false)
   const loadSequence = useRef(0)
 
   const load = useCallback(async () => {
     const sequence = ++loadSequence.current
     if (!selectedAccountId) {
       setPhotos([])
+      setReviewMetrics(null)
       setLoadError('')
       setLoading(false)
       return
     }
     setLoading(true)
+    setReviewMetrics(null)
     setLoadError('')
     setLoadForbidden(false)
+    const [photosResult, metricsResult] = await Promise.allSettled([
+      api.nenMembers.photos(selectedAccountId),
+      api.nenMembers.photoReviewMetrics(selectedAccountId),
+    ])
+    if (sequence !== loadSequence.current) return
+    if (metricsResult.status === 'fulfilled' && metricsResult.value.success
+      && isPhotoReviewMetrics(metricsResult.value.data)) {
+      setReviewMetrics(metricsResult.value.data)
+    } else {
+      setReviewMetrics(null)
+    }
     try {
-      const response = await api.nenMembers.photos(selectedAccountId)
+      if (photosResult.status === 'rejected') throw photosResult.reason
+      const response = photosResult.value
       if (sequence !== loadSequence.current) return
       if (!response.success) throw new Error('load_failed')
       setPhotos(response.data)
@@ -80,12 +107,17 @@ export default function PhotoReviewsPage() {
   useEffect(() => {
     setNotice('')
     setRejectingPhotoId(null)
-    setReasonCode('quality')
+    setRejectingPhotoDetail(null)
+    setReasonCode('privacy')
     setReasonNote('')
     setReasonError('')
     setView('list')
     setDetailPhoto(null)
+    setDetailAssetStatus(null)
+    setDetailDerivatives(null)
     setSelectedPhotoIds([])
+    setBulkApproveOpen(false)
+    setBulkReturnOpen(false)
   }, [selectedAccountId])
 
   const counts = useMemo(() => ({
@@ -121,16 +153,38 @@ export default function PhotoReviewsPage() {
     }
     return tally
   }, [photos])
-  const rejectingPhoto = photos.find((photo) => text(photo.id) === rejectingPhotoId) ?? null
+  const rejectingPhoto = rejectingPhotoDetail
+    ?? photos.find((photo) => text(photo.id) === rejectingPhotoId)
+    ?? null
   const selectedReasonLabel = REVIEW_REASONS.find((reason) => reason.value === reasonCode)?.label ?? ''
+
+  const refreshDetailAssets = async (id: string, accountId: string) => {
+    const [statusResult, derivativesResult] = await Promise.allSettled([
+      api.nenMembers.photoAssetStatus(id, accountId),
+      api.nenMembers.photoDerivatives(id, accountId),
+    ])
+    setDetailAssetStatus(statusResult.status === 'fulfilled' && statusResult.value.success
+      && isPhotoAssetStatus(statusResult.value.data)
+      ? statusResult.value.data
+      : null)
+    setDetailDerivatives(derivativesResult.status === 'fulfilled' && derivativesResult.value.success
+      && isPhotoDerivatives(derivativesResult.value.data)
+      ? derivativesResult.value.data
+      : null)
+  }
 
   const openDetail = async (id: string) => {
     if (!selectedAccountId) return
     setView('detail')
     setDetailPhoto(null)
+    setDetailAssetStatus(null)
+    setDetailDerivatives(null)
     setDetailLoading(true)
     try {
-      const response = await api.nenMembers.photo(id, selectedAccountId)
+      const [response] = await Promise.all([
+        api.nenMembers.photo(id, selectedAccountId),
+        refreshDetailAssets(id, selectedAccountId),
+      ])
       if (!response.success) throw new Error(response.error)
       if (Array.isArray(response.data)) {
         setDetailState('empty')
@@ -143,7 +197,25 @@ export default function PhotoReviewsPage() {
     } finally { setDetailLoading(false) }
   }
 
+  const openRejectDialog = async (id: string, knownPhoto?: Record<string, unknown>) => {
+    setRejectingPhotoId(id)
+    setRejectingPhotoDetail(knownPhoto ?? null)
+    setReasonCode('privacy')
+    setReasonNote('')
+    setReasonError('')
+    if (!selectedAccountId || knownPhoto) return
+    try {
+      const response = await api.nenMembers.photo(id, selectedAccountId)
+      if (response.success && !Array.isArray(response.data)) setRejectingPhotoDetail(response.data)
+    } catch {
+      // 一覧の情報で窓を開いたままにする。詳細取得失敗で審査操作を止めない。
+    }
+  }
+
   const pendingPhotos = photos.filter((photo) => text(photo.status) === 'pending')
+  const selectedPendingPhotos = pendingPhotos.filter((photo) => selectedPhotoIds.includes(text(photo.id)))
+  const selectedPhotosAreLowRisk = selectedPendingPhotos.length > 0
+    && selectedPendingPhotos.every((photo) => ['safe', 'none', 'low'].includes(text(photo.latest_risk_flag)))
   const detailPosition = detailPhoto
     ? Math.max(0, pendingPhotos.findIndex((photo) => text(photo.id) === text(detailPhoto.id)))
     : 0
@@ -176,13 +248,92 @@ export default function PhotoReviewsPage() {
         ? `写真を通し、ECへ${response.data.awardedPoints}ポイントを付ける手続きを始めました。公開は本人の同意がある場合だけ行います。${notification}`
         : `戻す理由を保存しました。${notification}`)
       setRejectingPhotoId(null)
-      setReasonCode('quality')
+      setRejectingPhotoDetail(null)
+      setReasonCode('privacy')
       setReasonNote('')
       setReasonError('')
       await load()
       setView('list')
     } catch (error) { setNotice(error instanceof Error ? error.message : '審査結果を保存できませんでした。') }
     finally { setReviewing(null) }
+  }
+
+  const bulkReview = async (
+    decision: 'approve' | 'return',
+    rejection?: { reasonCode: ReviewReasonCode; reasonNote: string },
+  ) => {
+    if (!selectedAccountId || selectedPendingPhotos.length === 0) return
+    setBulkReviewing(true)
+    try {
+      const response = await api.nenMembers.bulkReviewPhotos({
+        lineAccountId: selectedAccountId,
+        decisions: selectedPendingPhotos.map((photo) => ({
+          photoId: text(photo.id),
+          decision,
+          expectedVersion: Number(photo.review_version ?? 1),
+          reasonCode: rejection?.reasonCode ?? null,
+          reasonNote: rejection?.reasonNote || null,
+        })),
+      }, crypto.randomUUID())
+      if (!response.success) throw new Error(response.error)
+      const notification = response.data.notificationFailures > 0
+        ? `うち${response.data.notificationFailures}件はLINE通知を送れませんでした。`
+        : '投稿者へのLINE通知も送信しました。'
+      setNotice(`${response.data.updatedCount}枚の審査結果を保存しました。${notification}`)
+      setSelectedPhotoIds([])
+      setBulkApproveOpen(false)
+      setBulkReturnOpen(false)
+      setReasonCode('privacy')
+      setReasonNote('')
+      setReasonError('')
+      await load()
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'まとめて審査できませんでした。')
+    } finally {
+      setBulkReviewing(false)
+    }
+  }
+
+  const processReviewAsset = async () => {
+    if (!selectedAccountId || !detailPhoto) return
+    const id = text(detailPhoto.id)
+    setAssetProcessing(true)
+    try {
+      const response = await api.nenMembers.processPhotoAssets(id, {
+        lineAccountId: selectedAccountId,
+        expectedVersion: Number(detailPhoto.review_version ?? 1),
+        operation: 'review',
+      }, crypto.randomUUID())
+      if (!response.success) throw new Error(response.error)
+      setNotice(response.data.status === 'completed'
+        ? '審査用画像を作り直しました。'
+        : '審査用画像の作り直しを受け付けました。')
+      await refreshDetailAssets(id, selectedAccountId)
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '審査用画像を作り直せませんでした。')
+    } finally {
+      setAssetProcessing(false)
+    }
+  }
+
+  const downloadOriginal = async (code: string) => {
+    if (!selectedAccountId || !detailPhoto) throw new Error('写真を読み直してください。')
+    const grant = await api.nenMembers.photoOriginalStepUp(code)
+    if (!grant.success) throw new Error(grant.error)
+    const issued = await api.nenMembers.issuePhotoOriginalDownload(
+      text(detailPhoto.id),
+      { lineAccountId: selectedAccountId, expectedVersion: Number(detailPhoto.review_version ?? 1) },
+      grant.data.token,
+      crypto.randomUUID(),
+    )
+    if (!issued.success) throw new Error(issued.error)
+    const blob = await api.nenMembers.downloadPhotoOriginal(issued.data.downloadUrl)
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `photo-${text(detailPhoto.id)}-original`
+    anchor.click()
+    URL.revokeObjectURL(url)
   }
 
   if (view === 'publications' && selectedAccountId) {
@@ -197,6 +348,10 @@ export default function PhotoReviewsPage() {
       loading={detailLoading}
       loadKind={detailState}
       reviewing={Boolean(reviewing)}
+      notice={notice}
+      assetStatus={detailAssetStatus}
+      derivatives={detailDerivatives}
+      assetProcessing={assetProcessing}
       onBack={() => setView('list')}
       onMove={(direction) => {
         const next = pendingPhotos[detailPosition + direction]
@@ -206,8 +361,10 @@ export default function PhotoReviewsPage() {
       onReturn={() => {
         if (!detailPhoto) return
         setView('list')
-        setRejectingPhotoId(text(detailPhoto.id))
+        void openRejectDialog(text(detailPhoto.id), detailPhoto)
       }}
+      onProcessReviewAsset={() => processReviewAsset()}
+      onDownloadOriginal={downloadOriginal}
     />
   }
 
@@ -256,10 +413,10 @@ export default function PhotoReviewsPage() {
         <div className="rounded-card border border-hairline bg-canvas p-4">
           <p className="text-xs font-semibold text-ink-secondary">見ていない写真</p>
           <p className="mt-1 text-2xl font-bold tabular-nums text-ink">
-            {countsReady ? counts.pending : '—'}
+            {reviewMetrics ? reviewMetrics.pendingCount : countsReady ? counts.pending : '—'}
             <span className="ml-0.5 text-xs font-normal text-ink-faint">枚</span>
           </p>
-          <p className="mt-0.5 text-xs text-ink-faint">{countsReady && counts.pending > 0 ? '古いものから確認してください' : '新しい写真をお待ちしています'}</p>
+          <p className="mt-0.5 text-xs text-ink-faint">{reviewMetrics?.oldestPendingAt ? `いちばん古いものは${formatPhotoReceivedAt(reviewMetrics.oldestPendingAt)}` : countsReady && counts.pending > 0 ? '古いものから確認してください' : '新しい写真をお待ちしています'}</p>
         </div>
         <div className="rounded-card border border-hairline bg-canvas p-4">
           <p className="text-xs font-semibold text-ink-secondary">この30日に見た</p>
@@ -271,13 +428,13 @@ export default function PhotoReviewsPage() {
         </div>
         <div className="rounded-card border border-hairline bg-canvas p-4">
           <p className="text-xs font-semibold text-ink-secondary">1枚にかかる時間</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-ink">—</p>
-          <p className="mt-0.5 text-xs text-ink-faint">審査時間の集計API待ち</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-ink">{formatAverageReviewTime(reviewMetrics?.averageReviewMinutes)}</p>
+          <p className="mt-0.5 text-xs text-ink-faint">審査を始めてから保存するまでの平均</p>
         </div>
         <div className="rounded-card border border-hairline bg-canvas p-4">
           <p className="text-xs font-semibold text-ink-secondary">気をつけたい写真</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-ink">—</p>
-          <p className="mt-0.5 text-xs text-ink-faint">一覧向け注意候補API待ち</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-ink">{reviewMetrics ? reviewMetrics.attentionCount : '—'}<span className="ml-0.5 text-xs font-normal text-ink-faint">枚</span></p>
+          <p className="mt-0.5 text-xs text-ink-faint">自動判定は確認順の補助だけに使います</p>
         </div>
       </div>
 
@@ -288,9 +445,9 @@ export default function PhotoReviewsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-control bg-accent-soft px-3 py-2 text-sm font-semibold text-accent">{selectedPhotoIds.length}枚を選択中</span>
-          <Button variant="primary" disabled title="一括審査APIがつながると使えます">まとめて通す</Button>
-          <Button variant="secondary" disabled title="一括審査APIがつながると使えます">まとめて戻す</Button>
-          <span className="text-xs text-ink-faint">一括審査はAPI接続待ちです</span>
+          <Button variant="primary" disabled={!selectedPhotosAreLowRisk || bulkReviewing} title={!selectedPhotosAreLowRisk && selectedPendingPhotos.length > 0 ? 'まとめて通せるのは、注意候補がない写真だけです' : undefined} onClick={() => setBulkApproveOpen(true)}>{bulkReviewing ? '処理中...' : 'まとめて通す'}</Button>
+          <Button variant="secondary" disabled={selectedPendingPhotos.length === 0 || bulkReviewing} onClick={() => setBulkReturnOpen(true)}>まとめて戻す</Button>
+          <span className="text-xs text-ink-faint">審査待ちの写真だけをまとめて処理します</span>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="secondary" disabled>▦ 並べて見る</Button>
@@ -313,16 +470,17 @@ export default function PhotoReviewsPage() {
           const selected = selectedPhotoIds.includes(photoId)
           return <article key={photoId} className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card" style={selected ? { borderColor: 'var(--color-accent)', boxShadow: '0 0 0 1px var(--color-accent)' } : undefined}>
           <div className="relative h-40 overflow-hidden bg-canvas-sunken">
-            <img src={text(photo.image_url)} alt={`${text(photo.pet_name)}ちゃんの投稿写真`} className="h-full w-full object-cover" />
+            <img src={text(photo.image_url)} alt={`${photoPetName(photo)}の投稿写真`} className="h-full w-full object-cover" />
             <label className="absolute left-2 top-2 flex cursor-pointer items-center gap-1.5 rounded-control border border-hairline bg-canvas px-2 py-1 text-xs font-semibold text-ink-secondary"><input type="checkbox" checked={selected} onChange={() => togglePhotoSelection(photoId)} className="accent-accent" /><span>選ぶ</span></label>
           </div>
           <div className="p-4">
-            <div className="flex items-start justify-between gap-3"><div><p className="font-bold text-ink">{text(photo.pet_name)}ちゃん</p><p className="mt-1 text-xs text-ink-faint">{text(photo.owner_name) || '名前未取得'}・{formatPhotoReceivedAt(photo.created_at)}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${photo.status === 'pending' ? 'bg-status-warn-soft text-status-warn-deep' : photo.status === 'adopted' ? 'bg-accent-soft text-accent-hover' : 'bg-canvas-sunken text-ink-faint'}`}>{photo.status === 'pending' ? '審査待ち' : photo.status === 'adopted' ? '通しました' : '戻しました'}</span></div>
+            <div className="flex items-start justify-between gap-3"><div><p className="font-bold text-ink">{photoPetName(photo)}</p><p className="mt-1 text-xs text-ink-faint">{text(photo.owner_name) || '名前未取得'}・{formatPhotoReceivedAt(photo.created_at)}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${photo.status === 'pending' ? 'bg-status-warn-soft text-status-warn-deep' : photo.status === 'adopted' ? 'bg-accent-soft text-accent-hover' : 'bg-canvas-sunken text-ink-faint'}`}>{photo.status === 'pending' ? '審査待ち' : photo.status === 'adopted' ? '通しました' : '戻しました'}</span></div>
             <p className="mt-2 min-h-5 truncate text-sm text-ink-secondary" title={text(photo.caption) || 'コメントなし'}>{text(photo.caption) || 'コメントなし'}</p>
+            {text(photo.latest_risk_flag) && !['safe', 'none', 'low'].includes(text(photo.latest_risk_flag)) && <p className="mt-2 rounded-control bg-status-warn-soft px-3 py-2 text-xs font-semibold text-status-warn-deep">注意候補：{photoRiskLabel(text(photo.latest_risk_flag))}</p>}
             {photo.status === 'adopted' && <p className="mt-3 rounded-control bg-accent-soft px-3 py-2 text-xs font-semibold text-accent-hover">5ポイント付与済み・{photo.publication_consent_at && !photo.publication_withdrawn_at ? '公開中' : '公開は未同意'}</p>}
             {photo.status === 'rejected' && <div className="mt-3 rounded-control bg-surface-pearl px-3 py-2 text-xs text-ink-secondary"><span className="font-semibold">見送った理由：</span>{REVIEW_REASONS.find((reason) => reason.value === photo.review_reason_code)?.label ?? '理由未記録'}{text(photo.review_reason_note) && <p className="mt-1 text-ink-faint">{text(photo.review_reason_note)}</p>}</div>}
             {photo.review_notification_status === 'failed' && <div className="mt-2 flex items-center justify-between gap-3 rounded-control bg-status-warn-soft px-3 py-2 text-xs font-semibold text-status-warn-deep"><span>投稿者へのLINE通知を送れませんでした</span><Button variant="secondary" disabled={reviewing === photo.id} onClick={() => void retryNotification(text(photo.id))} className="shrink-0">{reviewing === photo.id ? '再送中...' : 'LINE通知を再送'}</Button></div>}
-            {photo.status === 'pending' && <div className="mt-3 grid grid-cols-2 gap-2"><Button variant="primary" disabled={reviewing === photo.id} onClick={() => void review(text(photo.id), 'adopted')}>{reviewing === photo.id ? '処理中...' : '通す'}</Button><Button variant="secondary" disabled={reviewing === photo.id} onClick={() => { setRejectingPhotoId(text(photo.id)); setReasonCode('quality'); setReasonNote(''); setReasonError('') }}>戻す</Button></div>}
+            {photo.status === 'pending' && <div className="mt-3 grid grid-cols-2 gap-2"><Button variant="primary" disabled={reviewing === photo.id} onClick={() => void review(text(photo.id), 'adopted')}>{reviewing === photo.id ? '処理中...' : '通す'}</Button><Button data-qa-open={photoId === text(visiblePhotos[0]?.id) && status === 'pending' ? 'N2J629' : undefined} variant="secondary" disabled={reviewing === photo.id} onClick={() => void openRejectDialog(photoId)}>戻す</Button></div>}
           </div>
         </article>})}
       </section>}
@@ -331,9 +489,9 @@ export default function PhotoReviewsPage() {
       <div data-design="Right" className={styles.stack}>
         <section className={styles.sideCard}>
           <h2 className={styles.sideTitle}>確認順を決める条件</h2>
-          <p className={styles.sideMissingValue}>—</p>
+          <p className={styles.sideMissingValue}>{reviewMetrics ? `${reviewMetrics.attentionCount}枚` : '—'}</p>
           <p className={styles.sideNote}>
-            注意候補APIがつながると、確認を急ぐ写真を先に並べます。通す・戻す・公開する判断は、必ず人が行います。
+            自動で見つけた注意候補の総数です。通す・戻す・公開する判断は、必ず人が行います。
           </p>
         </section>
 
@@ -370,30 +528,95 @@ export default function PhotoReviewsPage() {
       </div>
       </div>
     </main>
-    {rejectingPhoto && <Dialog open title="写真を戻す理由を選ぶ" description="選んだ理由と補足は記録され、投稿者へLINEで届きます。" tone="destructive" busy={Boolean(reviewing)} error={reasonError} confirmLabel="この理由で戻す" cancelLabel="審査へ戻る" onCancel={() => { setRejectingPhotoId(null); setReasonError('') }} onConfirm={() => {
+    <Dialog open={bulkApproveOpen} title={`${selectedPendingPhotos.length}枚をまとめて通す`} description="選択した写真の件数、ポイント、公開範囲を確認してください。" busy={bulkReviewing} confirmLabel="まとめて通す" cancelLabel="審査へ戻る" onCancel={() => setBulkApproveOpen(false)} onConfirm={() => void bulkReview('approve')}>
+      <dl className="space-y-3 rounded-control bg-surface-pearl p-4 text-sm text-ink-secondary">
+        <div className="flex justify-between gap-4"><dt>写真</dt><dd className="font-semibold text-ink">{selectedPendingPhotos.length}枚</dd></div>
+        <div className="flex justify-between gap-4"><dt>付与するポイント</dt><dd className="font-semibold text-ink">合計 {selectedPendingPhotos.length * 5}ポイント</dd></div>
+        <div className="flex justify-between gap-4"><dt>公開範囲</dt><dd className="font-semibold text-ink">公開しない</dd></div>
+      </dl>
+      <p className="mt-3 text-xs text-ink-faint">写真を通しても自動公開しません。本人の公開同意を確認したあと、出しているもの画面で公開先を選びます。</p>
+    </Dialog>
+    {rejectingPhoto && <Dialog open title="この写真を戻しますか？" description="理由をえらぶと、お客様への文章が自動でつくられます。" busy={Boolean(reviewing)} error={reasonError} confirmLabel="戻して、この文章を送る" cancelLabel="やめる" onCancel={() => { setRejectingPhotoId(null); setRejectingPhotoDetail(null); setReasonError('') }} onConfirm={() => {
       if (reasonCode === 'other' && !reasonNote.trim()) { setReasonError('そのほかの理由を入力してください'); return }
       void review(text(rejectingPhoto.id), 'rejected', { reasonCode, reasonNote: reasonNote.trim() })
     }}>
-        <div className="grid gap-6 md:grid-cols-[220px_1fr]">
-          <img src={text(rejectingPhoto.image_url)} alt={`${text(rejectingPhoto.pet_name)}ちゃんの投稿写真`} className="aspect-square w-full rounded-xl object-cover" />
-          <div className="space-y-4">
-            <div className="rounded-control bg-surface-pearl px-3 py-2 text-sm text-ink-secondary">
+        <div className="space-y-4">
+            <div className="grid grid-cols-[64px_1fr] items-center gap-3 rounded-control bg-surface-pearl px-3 py-2 text-sm text-ink-secondary">
+              <img src={text(rejectingPhoto.image_url)} alt="" className="h-16 w-16 rounded-control object-cover" />
+              <div>
               <p className="font-semibold text-ink">
-                {text(rejectingPhoto.pet_name)}ちゃん／{text(rejectingPhoto.owner_name) || 'お名前は未取得'}
+                {photoPetName(rejectingPhoto)}／{text(rejectingPhoto.owner_name) || 'お名前は未取得'}
               </p>
               <p className="mt-1 text-xs text-ink-faint">
                 {formatPhotoReceivedAt(rejectingPhoto.created_at)} に届きました
               </p>
-              <p className="mt-1 text-xs text-ink-faint">この方を前に戻した回数は未取得です</p>
+              <p className="mt-1 text-xs text-ink-faint">{Number.isFinite(Number(rejectingPhoto.returned_count)) ? Number(rejectingPhoto.returned_count) === 0 ? 'この方を戻すのははじめてです' : `この方を戻したこと ${Number(rejectingPhoto.returned_count)}回` : 'この方を前に戻した回数は未取得です'}</p>
+              </div>
             </div>
             <fieldset className="space-y-2">
-              <legend className="text-sm font-semibold text-ink">戻す理由</legend>
+              <legend className="text-sm font-semibold text-ink">どうして戻しますか</legend>
               {REVIEW_REASONS.map((reason) => <label key={reason.value} className="flex cursor-pointer items-start gap-2 rounded-control border border-hairline px-3 py-2.5 text-sm text-ink-secondary"><input type="radio" name="photo-review-reason" value={reason.value} checked={reasonCode === reason.value} onChange={() => { setReasonCode(reason.value); setReasonError('') }} className="mt-0.5" /><span><span className="font-medium text-ink">{reason.label}</span><span className="mt-1 block text-xs text-ink-faint">投稿者へ：今回は「{reason.label}」のため、掲載を見送らせていただきました。</span></span></label>)}
             </fieldset>
-            <label className="block text-sm font-semibold text-ink">投稿者に届く補足（直せます）<textarea value={reasonNote} onChange={(event) => { setReasonNote(event.target.value.slice(0, 500)); setReasonError('') }} rows={3} placeholder={reasonCode === 'other' ? '理由を入力してください' : '必要な場合だけ入力します'} className="mt-2 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></label>
-            <div className="rounded-control border border-accent-border bg-accent-soft p-3 text-sm text-ink-secondary"><p className="font-semibold text-ink">投稿者に届く内容</p><p className="mt-1 whitespace-pre-line">お写真をご投稿いただきありがとうございます。{`\n`}今回は「{selectedReasonLabel}」のため、掲載を見送らせていただきました。{reasonNote && `\n${reasonNote}`}{`\n`}内容をご確認のうえ、よろしければ別のお写真をご投稿ください。</p></div>
-          </div>
+            <label className="block text-sm font-semibold text-ink">お客様に届く補足（直せます）<textarea value={reasonNote} onChange={(event) => { setReasonNote(event.target.value.slice(0, 500)); setReasonError('') }} rows={2} placeholder={reasonCode === 'other' ? '理由を入力してください' : '必要な場合だけ入力します'} className="mt-2 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></label>
+            <div className="rounded-control border border-accent-border bg-accent-soft p-3 text-sm text-ink-secondary"><p className="font-semibold text-ink">お客様にはこう届きます</p><p className="mt-1 whitespace-pre-line">お写真をご投稿いただきありがとうございます。{`\n`}今回は「{selectedReasonLabel}」のため、掲載を見送らせていただきました。{reasonNote && `\n${reasonNote}`}{`\n`}内容をご確認のうえ、よろしければ別のお写真をご投稿ください。</p></div>
+            <label className="flex items-start gap-2 text-sm text-ink-secondary"><input type="checkbox" disabled className="mt-0.5" /><span><span className="font-semibold text-ink">もう一度 送ってもらえるようお願いする</span><span className="block text-xs text-ink-faint">写真を送るボタンの保存先はまだ接続されていません。</span></span></label>
+            <label className="flex items-start gap-2 text-sm text-ink-secondary"><input type="checkbox" disabled className="mt-0.5" /><span><span className="font-semibold text-ink">この人の次の投稿は、必ず人が見る</span><span className="block text-xs text-ink-faint">要注意投稿者の保存先はまだ接続されていません。</span></span></label>
         </div>
     </Dialog>}
+    <Dialog open={bulkReturnOpen} title={`${selectedPendingPhotos.length}枚をまとめて戻す`} description="選んだ理由と補足は、選択した写真すべてに記録され、投稿者へLINEで届きます。" tone="destructive" busy={bulkReviewing} error={reasonError} confirmLabel="この理由でまとめて戻す" cancelLabel="審査へ戻る" onCancel={() => { setBulkReturnOpen(false); setReasonError('') }} onConfirm={() => {
+      if (reasonCode === 'other' && !reasonNote.trim()) { setReasonError('そのほかの理由を入力してください'); return }
+      void bulkReview('return', { reasonCode, reasonNote: reasonNote.trim() })
+    }}>
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-semibold text-ink">戻す理由</legend>
+        {REVIEW_REASONS.map((reason) => <label key={reason.value} className="flex cursor-pointer items-start gap-2 rounded-control border border-hairline px-3 py-2.5 text-sm text-ink-secondary"><input type="radio" name="photo-bulk-review-reason" value={reason.value} checked={reasonCode === reason.value} onChange={() => { setReasonCode(reason.value); setReasonError('') }} className="mt-0.5" /><span className="font-medium text-ink">{reason.label}</span></label>)}
+      </fieldset>
+      <label className="mt-4 block text-sm font-semibold text-ink">投稿者に届く補足（直せます）<textarea value={reasonNote} onChange={(event) => { setReasonNote(event.target.value.slice(0, 500)); setReasonError('') }} rows={3} placeholder={reasonCode === 'other' ? '理由を入力してください' : '必要な場合だけ入力します'} className="mt-2 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></label>
+      <div className="mt-4 rounded-control border border-accent-border bg-accent-soft p-3 text-sm text-ink-secondary"><p className="font-semibold text-ink">投稿者に届く内容</p><p className="mt-1 whitespace-pre-line">お写真をご投稿いただきありがとうございます。{`\n`}今回は「{selectedReasonLabel}」のため、掲載を見送らせていただきました。{reasonNote && `\n${reasonNote}`}{`\n`}内容をご確認のうえ、よろしければ別のお写真をご投稿ください。</p></div>
+    </Dialog>
   </>
+}
+
+function formatAverageReviewTime(minutes: number | null | undefined) {
+  if (minutes == null || !Number.isFinite(minutes)) return '—'
+  if (minutes < 1) return `平均 ${Math.max(1, Math.round(minutes * 60))}秒`
+  return `平均 ${Math.round(minutes)}分`
+}
+
+function photoRiskLabel(flag: string) {
+  if (flag === 'face') return '人の顔らしきもの'
+  if (flag === 'blur') return 'ぼやけ'
+  if (flag === 'dark') return '暗さ'
+  if (flag === 'logo') return '他社ロゴらしきもの'
+  if (flag === 'duplicate') return '重複らしきもの'
+  return flag
+}
+
+function photoPetName(photo: Record<string, unknown>) {
+  const name = text(photo.pet_name) || 'ペット'
+  return /(?:ちゃん|くん|さん)$/.test(name) ? name : `${name}ちゃん`
+}
+
+function isPhotoReviewMetrics(value: unknown): value is PhotoReviewMetrics {
+  if (!value || typeof value !== 'object') return false
+  const metrics = value as Partial<PhotoReviewMetrics>
+  return Number.isFinite(metrics.pendingCount)
+    && Number.isFinite(metrics.reviewedCount)
+    && Number.isFinite(metrics.attentionCount)
+    && (metrics.averageReviewMinutes == null || Number.isFinite(metrics.averageReviewMinutes))
+    && (metrics.oldestPendingAt == null || typeof metrics.oldestPendingAt === 'string')
+}
+
+function isPhotoAssetStatus(value: unknown): value is PhotoAssetStatus {
+  if (!value || typeof value !== 'object') return false
+  const status = value as Partial<PhotoAssetStatus>
+  return Number.isFinite(status.reviewVersion) && Array.isArray(status.jobs)
+}
+
+function isPhotoDerivatives(value: unknown): value is PhotoDerivatives {
+  if (!value || typeof value !== 'object') return false
+  const derivatives = value as Partial<PhotoDerivatives>
+  return Number.isFinite(derivatives.reviewVersion)
+    && Array.isArray(derivatives.items)
+    && Array.isArray(derivatives.knownUrls)
 }

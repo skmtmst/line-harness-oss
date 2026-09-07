@@ -102,7 +102,82 @@ import type {
   UndoIdentityCandidateRequest,
 } from '@line-crm/shared'
 
+export type AccessUserStatus = 'active' | 'invited' | 'expired' | 'suspended'
+export type AccessRoleBundle = 'administrator' | 'operations' | 'reception' | 'view_only' | 'custom'
+
+export type AccessUserItem = {
+  id: string
+  name: string
+  email: string | null
+  jobTitle: string | null
+  roleBundle: AccessRoleBundle
+  featureCount: number | null
+  hasFieldMasks: boolean | null
+  accountScope: {
+    type: 'all' | 'accounts'
+    assignedLineAccountId: string | null
+    lineAccountIds: string[]
+    includesDescendants: boolean
+  }
+  lastLoginAt: string | null
+  lastActionAt: string | null
+  mfaEnabled: boolean
+  status: AccessUserStatus
+  policyVersion: number
+  createdAt: string
+  updatedAt: string
+}
+
+export type AccessUserSummary = {
+  active: number
+  invited: number
+  expiredInvitations: number
+  unused90Days: number
+  mfaEnabled: number
+  mfaRate: number | null
+  roleCounts: Record<AccessRoleBundle, number>
+}
+
+export type AccessRoleItem = {
+  id: AccessRoleBundle
+  name: string
+  description: string
+  featureAccess: 'edit' | 'view' | 'custom'
+  requiresMfa: boolean
+  assignedUserCount: number
+}
+
+export type AuditEventItem = {
+  id: string
+  category: 'auth' | 'business'
+  lineAccountId: string | null
+  actor: { id: string | null; name: string | null; role: string | null }
+  action: string
+  target: { kind: string | null; id: string | null } | null
+  result: 'success' | 'denied' | 'failed'
+  before: Record<string, unknown> | null
+  after: Record<string, unknown> | null
+  reason: string | null
+  requestTraceId: string | null
+  ipPrefix: string | null
+  deviceFamily: string | null
+  riskLevel: 'normal' | 'suspicious' | 'high'
+  retentionClass: 'general' | 'security' | 'personal_data'
+  createdAt: string
+}
+
+export type AuditEventSummary = {
+  periodDays: 30
+  total: number
+  deleted: number
+  sent: number
+  changed: number
+  logins: number
+  suspiciousLogins: number
+}
+
 export type FriendProfileCandidateOption = {
+  candidateId: string
   sourceFriendId: string
   sourceLabel: string
   valuePreview: string | null
@@ -130,6 +205,15 @@ export type IdentityCandidateWithProfiles = IdentityCandidateDetail & {
 export type MergedPersonWithCandidates = MergedPersonDetail & {
   profileCandidates: FriendProfileCandidate[]
   tagCandidates: FriendTagCandidate[]
+}
+
+export type UpdateMergedProfileCandidatesRequest = {
+  expectedRevision: number
+  selections: Array<{
+    fieldKey: string
+    candidateId: string
+    updateMode: 'auto' | 'fixed'
+  }>
 }
 
 export type FriendSavedView = {
@@ -694,13 +778,16 @@ export type ConversionDefinitionListItem = {
   status: ConversionDefinitionStatus
   version: number
   usageCount: number
+  usageNames: string[]
   metrics: {
     recordedCount: number
     netCount: number
     reversedCount: number | null
     netValue: number
-    reversalState: 'unavailable'
+    reversalState: 'available' | 'unavailable'
     reversalReason: string
+    cancellationCount: number | null
+    cancellationValue: number | null
   }
   stoppedAt: string | null
   createdAt: string
@@ -732,7 +819,7 @@ export type ConversionDefinitionReport = {
     previousNetCount: number
     previousNetValue: number
     countChangeRate: number | null
-    reversalState: 'unavailable'
+    reversalState: 'available' | 'unavailable'
     reversalReason: string
     fastestGrowing: {
       conversionPointId: string
@@ -744,6 +831,8 @@ export type ConversionDefinitionReport = {
       previousNetValue: number
       countChange: number
     } | null
+    cancellationCount: number | null
+    cancellationValue: number | null
   }
   daily: Array<{
     day: string
@@ -761,6 +850,17 @@ export type ConversionDefinitionReport = {
     previousNetCount: number
     previousNetValue: number
     countChange: number
+    cancellationCount: number | null
+    cancellationValue: number | null
+    routes: Array<{
+      routeKey: string
+      label: string
+      attributionState: 'attributed' | 'unattributed'
+      netCount: number
+      netValue: number
+      audience: number | null
+      conversionRate: number | null
+    }>
   }>
   byRoute: Array<{
     routeKey: string
@@ -819,6 +919,62 @@ export type AffiliateSettlementPreview = {
     unitReward: number | null
     subtotal: number
   }>
+}
+
+/** アカウント単位で締める前に確認する、追記台帳の対象。 */
+export type AffiliateAccountSettlementPreview = {
+  lineAccountId: string
+  periodFrom: string
+  periodTo: string
+  currency: 'JPY'
+  totalAmount: number
+  conversionCount: number
+  affiliates: Array<{
+    affiliateId: string
+    affiliateName: string
+    code: string
+    amount: number
+    conversionCount: number
+    /** 管理画面へ口座番号を返さず、登録の有無だけを扱う。 */
+    bankProfileRegistered: boolean
+  }>
+  previewVersion: string
+}
+
+export type AffiliateAccountSettlementResult = {
+  kind: 'created' | 'duplicate'
+  settlementId: string
+  totalAmount: number
+  conversionCount: number
+  version: number
+  closedAt: string
+}
+
+export type AffiliatePayoutBatch = {
+  id: string
+  lineAccountId: string
+  settlementId: string
+  totalAmount: number
+  currency: string
+  lineCount: number
+  state: string
+  bankFormat: string | null
+  fileChecksum: string | null
+  version: number
+  downloadExpiresAt: string | null
+  createdAt: string
+}
+
+export type AffiliateStatement = {
+  id: string
+  lineAccountId: string
+  affiliateId: string
+  settlementId: string
+  totalAmount: number
+  status: string
+  version: number
+  expiresAt: string | null
+  createdAt: string
 }
 
 /** Broadcast type from API (now camelCase after worker serialization) */
@@ -2774,6 +2930,7 @@ export type EcSubscriptionList = {
     startedThisMonth: number | null
     cancelledThisMonth: number | null
     cancellationTopReason: string | null
+    monthlyStats: Array<{ month: string; count: number; amount: number }>
   }
   risk: {
     source: 'payment_status'
@@ -3064,6 +3221,56 @@ export type NenFriendOverview = {
   photos: Array<Record<string, unknown>>
   pointLedger: Array<Record<string, unknown>>
   ecEvents: Array<Record<string, unknown>>
+}
+
+export type PhotoReviewMetrics = {
+  pendingCount: number
+  reviewedCount: number
+  averageReviewMinutes: number | null
+  oldestPendingAt: string | null
+  attentionCount: number
+}
+
+export type PhotoAssetRun = {
+  id: string
+  photoId: string
+  lineAccountId: string
+  requestedVersion: number
+  status: 'queued' | 'processing' | 'completed' | 'failed'
+  requestedBy: string
+  createdAt: string
+  startedAt: string | null
+  completedAt: string | null
+  errorMessage: string | null
+  operation?: 'review' | 'public' | 'thumbnail' | 'all'
+}
+
+export type PhotoAssetStatus = {
+  reviewVersion: number
+  jobs: PhotoAssetRun[]
+}
+
+export type PhotoDerivatives = {
+  reviewVersion: number
+  items: Array<{
+    kind: string
+    sourceVersion: number
+    objectKey: string
+    contentType: string
+    byteSize: number | null
+    width: number | null
+    height: number | null
+    createdAt: string
+  }>
+  knownUrls: Array<{ kind: string; url: string; sourceVersion: number }>
+}
+
+export type PhotoBulkDecision = {
+  photoId: string
+  decision: 'approve' | 'return' | 'reject'
+  expectedVersion: number
+  reasonCode: 'quality' | 'privacy' | 'unrelated' | 'duplicate' | 'other' | null
+  reasonNote: string | null
 }
 
 export type AdPlatform = {
@@ -4213,6 +4420,74 @@ export const api = {
           }>
         >
       >(`/api/login-audit${query ? `?${query}` : ''}`)
+    },
+  },
+  /** ログインユーザーの利用状況と権限bundle。 */
+  access: {
+    users: (params?: {
+      lineAccountId?: string
+      status?: AccessUserStatus
+      roleBundle?: AccessRoleBundle
+      query?: string
+      limit?: number
+      offset?: number
+    }) => {
+      const q = new URLSearchParams()
+      if (params?.lineAccountId) q.set('lineAccountId', params.lineAccountId)
+      if (params?.status) q.set('status', params.status)
+      if (params?.roleBundle) q.set('roleBundle', params.roleBundle)
+      if (params?.query) q.set('query', params.query)
+      if (params?.limit !== undefined) q.set('limit', String(params.limit))
+      if (params?.offset !== undefined) q.set('offset', String(params.offset))
+      const query = q.toString()
+      return fetchApi<ApiResponse<{
+        items: AccessUserItem[]
+        summary: AccessUserSummary
+        pagination: { total: number; limit: number; offset: number }
+      }>>(`/api/access/users${query ? `?${query}` : ''}`)
+    },
+    roles: (lineAccountId?: string) => {
+      const query = lineAccountId
+        ? `?lineAccountId=${encodeURIComponent(lineAccountId)}`
+        : ''
+      return fetchApi<ApiResponse<{
+        items: AccessRoleItem[]
+        totalBundles: number
+        totalAssignedUsers: number
+      }>>(`/api/access/roles${query}`)
+    },
+  },
+  /** 認証と業務操作をまとめた共通監査。 */
+  audit: {
+    events: (params?: {
+      lineAccountId?: string
+      category?: 'auth' | 'business'
+      result?: 'success' | 'denied' | 'failed'
+      actorId?: string
+      action?: string
+      query?: string
+      from?: string
+      to?: string
+      limit?: number
+      offset?: number
+    }) => {
+      const q = new URLSearchParams()
+      if (params?.lineAccountId) q.set('lineAccountId', params.lineAccountId)
+      if (params?.category) q.set('category', params.category)
+      if (params?.result) q.set('result', params.result)
+      if (params?.actorId) q.set('actorId', params.actorId)
+      if (params?.action) q.set('action', params.action)
+      if (params?.query) q.set('query', params.query)
+      if (params?.from) q.set('from', params.from)
+      if (params?.to) q.set('to', params.to)
+      if (params?.limit !== undefined) q.set('limit', String(params.limit))
+      if (params?.offset !== undefined) q.set('offset', String(params.offset))
+      const query = q.toString()
+      return fetchApi<ApiResponse<{
+        items: AuditEventItem[]
+        summary: AuditEventSummary
+        pagination: { total: number; limit: number; offset: number }
+      }>>(`/api/audit/events${query ? `?${query}` : ''}`)
     },
   },
   /** 回答フォーム。 */
@@ -5633,6 +5908,65 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+    settlementPreview: (
+      lineAccountId: string,
+      period: { periodFrom: string; periodTo: string },
+    ) => fetchApi<ApiResponse<AffiliateAccountSettlementPreview>>(
+      `/api/affiliate-settlements/preview?${new URLSearchParams({ lineAccountId, ...period })}`,
+    ),
+    closeSettlement: (
+      data: {
+        lineAccountId: string
+        periodFrom: string
+        periodTo: string
+        expectedPreviewVersion: string
+      },
+      idempotencyKey: string,
+    ) => fetchApi<ApiResponse<AffiliateAccountSettlementResult>>('/api/affiliate-settlements', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(data),
+    }),
+    createPayoutBatch: (
+      data: { lineAccountId: string; settlementId: string; expectedVersion: number; bankFormat: 'zengin_csv' },
+      idempotencyKey: string,
+    ) => fetchApi<ApiResponse<AffiliatePayoutBatch>>('/api/affiliate-payout-batches', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(data),
+    }),
+    payoutStepUp: (code: string) =>
+      fetchApi<ApiResponse<{ token: string; purpose: 'affiliate.payout.export'; expiresAt: string }>>(
+        '/api/auth/step-up',
+        { method: 'POST', body: JSON.stringify({ code, purpose: 'affiliate.payout.export' }) },
+      ),
+    exportPayoutBatch: (
+      batchId: string,
+      data: { lineAccountId: string; expectedVersion: number },
+      stepUpToken: string,
+      idempotencyKey: string,
+    ) => fetchApi<ApiResponse<AffiliatePayoutBatch & { downloadUrl: string }>>(
+      `/api/affiliate-payout-batches/${encodeURIComponent(batchId)}/export`,
+      {
+        method: 'POST',
+        headers: {
+          'X-Step-Up-Token': stepUpToken,
+          'Idempotency-Key': idempotencyKey,
+        },
+        body: JSON.stringify(data),
+      },
+    ),
+    createStatement: (
+      data: { lineAccountId: string; settlementId: string; affiliateId: string; expectedVersion: number },
+      idempotencyKey: string,
+    ) => fetchApi<ApiResponse<AffiliateStatement> & { notificationAttempted?: boolean }>(
+      '/api/affiliate-statements',
+      {
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify(data),
+      },
+    ),
   },
   templates: {
     list: (category?: string, accountId?: string) => {
@@ -6566,9 +6900,54 @@ export const api = {
     careFlags: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/care-flags'),
     updateCareFlag: (id: string, data: { status: 'active' | 'resolved'; adviceReady: boolean }) => fetchApi<{ success: boolean }>(`/api/nen-members/care-flags/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
     photos: (accountId: string) => fetchApi<ApiResponse<Array<Record<string, unknown>>>>(`/api/nen-members/photos?accountId=${encodeURIComponent(accountId)}`),
+    photoReviewMetrics: (accountId: string) => fetchApi<ApiResponse<PhotoReviewMetrics>>(
+      `/api/nen-members/photos/review-metrics?accountId=${encodeURIComponent(accountId)}`,
+    ),
     photo: (id: string, accountId: string) => fetchApi<ApiResponse<Record<string, unknown>>>(
       `/api/nen-members/photos/${encodeURIComponent(id)}?accountId=${encodeURIComponent(accountId)}`,
     ),
+    photoAssetStatus: (id: string, accountId: string) => fetchApi<ApiResponse<PhotoAssetStatus>>(
+      `/api/nen-members/photos/${encodeURIComponent(id)}/assets/status?accountId=${encodeURIComponent(accountId)}`,
+    ),
+    photoDerivatives: (id: string, accountId: string) => fetchApi<ApiResponse<PhotoDerivatives>>(
+      `/api/nen-members/photos/${encodeURIComponent(id)}/assets/derivatives?accountId=${encodeURIComponent(accountId)}`,
+    ),
+    processPhotoAssets: (
+      id: string,
+      data: { lineAccountId: string; expectedVersion: number; operation: 'review' | 'public' | 'thumbnail' | 'all' },
+      idempotencyKey: string,
+    ) => fetchApi<ApiResponse<PhotoAssetRun>>(
+      `/api/nen-members/photos/${encodeURIComponent(id)}/assets/process`,
+      { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(data) },
+    ),
+    bulkReviewPhotos: (
+      data: { lineAccountId: string; decisions: PhotoBulkDecision[] },
+      idempotencyKey: string,
+    ) => fetchApi<ApiResponse<{ updatedCount: number; awardedPoints: number; notificationFailures: number }>>(
+      '/api/nen-members/photos/decisions/bulk',
+      { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(data) },
+    ),
+    photoOriginalStepUp: (code: string) => fetchApi<ApiResponse<{
+      token: string
+      purpose: 'photo.original.download'
+      expiresAt: string
+    }>>('/api/auth/step-up', {
+      method: 'POST', body: JSON.stringify({ code, purpose: 'photo.original.download' }),
+    }),
+    issuePhotoOriginalDownload: (
+      id: string,
+      data: { lineAccountId: string; expectedVersion: number },
+      stepUpToken: string,
+      idempotencyKey: string,
+    ) => fetchApi<ApiResponse<{ downloadUrl: string; expiresAt: string; oneTime: true }>>(
+      `/api/nen-members/photos/${encodeURIComponent(id)}/original-download`,
+      {
+        method: 'POST',
+        headers: { 'X-Step-Up-Token': stepUpToken, 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify(data),
+      },
+    ),
+    downloadPhotoOriginal: (downloadUrl: string) => fetchApiBlob(downloadUrl),
     photoPublications: (accountId: string) => fetchApi<ApiResponse<{
       summary: { publishedCount: number; placementCount: number; topPhoto: Record<string, unknown> | null; consentedCount: number }
       items: Array<Record<string, unknown>>
@@ -7834,9 +8213,14 @@ export const api = {
       fetchApi<ApiResponse<MergedPersonWithCandidates>>(
         `/api/friends/people/${encodeURIComponent(id)}`,
       ),
-    update: (id: string, body: UpdateMergedPersonRequest) =>
+    update: (id: string, body: Omit<UpdateMergedPersonRequest, 'profileSelections'>) =>
       fetchApi<ApiResponse<MergedPersonDetail>>(
         `/api/friends/people/${encodeURIComponent(id)}`,
+        { method: 'PATCH', body: JSON.stringify(body) },
+      ),
+    updateProfileValues: (id: string, body: UpdateMergedProfileCandidatesRequest) =>
+      fetchApi<ApiResponse<MergedPersonWithCandidates>>(
+        `/api/friends/people/${encodeURIComponent(id)}/profile-values`,
         { method: 'PATCH', body: JSON.stringify(body) },
       ),
     updateDeliveryPriorities: (

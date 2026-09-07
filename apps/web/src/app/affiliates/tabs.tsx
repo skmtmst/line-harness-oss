@@ -2,7 +2,13 @@
 
 import { Fragment, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import KpiCard from '@/components/dashboard/kpi-card'
-import { api, type AffiliateOffer, type AffiliatePaymentSummary, type ConversionApprovalItem } from '@/lib/api'
+import {
+  api,
+  type AffiliateAccountSettlementPreview,
+  type AffiliateOffer,
+  type AffiliatePaymentSummary,
+  type ConversionApprovalItem,
+} from '@/lib/api'
 import type { Tag, Scenario, LineAccount } from '@line-crm/shared'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
@@ -221,7 +227,15 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
   const [approvalItems, setApprovalItems] = useState<ConversionApprovalItem[]>([])
   const [approvalState, setApprovalState] = useState<ConfirmedState>('loading')
   const [paymentItems, setPaymentItems] = useState<AffiliatePaymentSummary[]>([])
+  const [accountSettlement, setAccountSettlement] = useState<AffiliateAccountSettlementPreview | null>(null)
   const [paymentState, setPaymentState] = useState<ConfirmedState>('loading')
+  const settlementPeriod = useMemo(() => {
+    const now = new Date()
+    return {
+      periodFrom: new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).toISOString(),
+      periodTo: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString(),
+    }
+  }, [])
   const [query, setQuery] = useState('')
   const [filters, setFilters] = useState<Array<'active' | 'inactive' | 'reward'>>([])
   const [sort, setSort] = useState<'newest' | 'name' | 'reward'>('newest')
@@ -313,23 +327,31 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
     let cancelled = false
     if (!accountId) {
       setPaymentItems([])
+      setAccountSettlement(null)
       setPaymentState('error')
       return () => { cancelled = true }
     }
     setPaymentState('loading')
-    void api.affiliates.paymentSummaries(accountId).then((result) => {
+    void Promise.all([
+      api.affiliates.settlementPreview(accountId, settlementPeriod),
+      api.affiliates.paymentSummaries(accountId).catch(() => null),
+    ]).then(([settlement, result]) => {
       if (cancelled) return
-      if (!result.success || !Array.isArray(result.data)) {
+      if (!settlement.success || !Array.isArray(settlement.data.affiliates)) {
         setPaymentState('error')
         return
       }
-      setPaymentItems(result.data)
+      setPaymentItems(result?.success && Array.isArray(result.data) ? result.data : [])
+      setAccountSettlement(settlement.data)
       setPaymentState('ready')
     }).catch(() => {
-      if (!cancelled) setPaymentState('error')
+      if (!cancelled) {
+        setAccountSettlement(null)
+        setPaymentState('error')
+      }
     })
     return () => { cancelled = true }
-  }, [accountId])
+  }, [accountId, settlementPeriod])
 
   // ── load detail (report v2 + links) ────────────────────────────────────────
   const loadDetail = useCallback(async (id: string) => {
@@ -428,7 +450,8 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
   const approvedTotals = confirmedTotals(approvedThisMonth)
   const pendingItems = approvalItems.filter((item) => item.approvalStatus === 'pending')
   const pendingYen = pendingItems.reduce((sum, item) => sum + (item.value ?? 0), 0)
-  const paymentTotal = paymentItems.reduce((sum, item) => sum + item.approvedReward, 0)
+  const paymentTotal = accountSettlement?.totalAmount
+    ?? paymentItems.reduce((sum, item) => sum + item.approvedReward, 0)
   const heldTotal = paymentItems.reduce((sum, item) => sum + item.heldReward, 0)
   const payoutCycle = paymentItems.find((item) => item.payoutCycle?.trim())?.payoutCycle ?? null
   const funnel = {
@@ -637,6 +660,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
             <tbody className="divide-hairline divide-y">
               {pagedRows.map((row) => {
                 const isExpanded = selectedId === row.id
+                const settlement = accountSettlement?.affiliates.find((item) => item.affiliateId === row.id) ?? null
                 return (
                   <Fragment key={row.id}>
                     <tr
@@ -683,7 +707,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                           {detailLoading ? (
                             <p className="text-sm text-gray-400">読み込み中...</p>
                           ) : (
-                            <div className="space-y-6">
+                            <div className="flex flex-col gap-6">
 
                               {/* 支払いの取り決め。報酬額そのものは案件側で持つが、
                                   連絡先と支払い条件は人に紐づく。 */}
@@ -693,6 +717,30 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                   void loadList()
                                 }}
                               />
+
+                              <section className="rounded-card border-hairline order-first bg-canvas border p-4" aria-label="次の支払い">
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                  <div>
+                                    <p className="text-ink text-sm font-bold">次の支払い</p>
+                                    <p className="text-ink-faint mt-1 text-xs">今回の締め対象と、本人が登録した振込先の有無</p>
+                                  </div>
+                                  <AffiliateButton href="/conversions?tab=payment">支払いを開く</AffiliateButton>
+                                </div>
+                                {paymentState === 'loading' ? (
+                                  <p className="text-ink-faint mt-4 text-sm">締め対象を確認しています…</p>
+                                ) : paymentState === 'error' ? (
+                                  <p className="text-danger mt-4 text-sm">締め対象を確認できませんでした。金額を0とは扱いません。</p>
+                                ) : settlement ? (
+                                  <dl className="mt-4 grid gap-3 sm:grid-cols-4">
+                                    <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">今回の金額</dt><dd className="text-ink mt-1 font-bold tabular-nums">{formatYen(settlement.amount)}</dd></div>
+                                    <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">成果</dt><dd className="text-ink mt-1 font-bold tabular-nums">{settlement.conversionCount.toLocaleString('ja-JP')}件</dd></div>
+                                    <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">締め日</dt><dd className="text-ink mt-1 font-bold">{formatDate(accountSettlement?.periodTo ?? null)}</dd></div>
+                                    <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">振込先</dt><dd className={`mt-1 font-bold ${settlement.bankProfileRegistered ? 'text-success' : 'text-warning'}`}>{settlement.bankProfileRegistered ? '登録済み' : '未登録'}</dd><p className="text-ink-faint mt-1 text-xs">口座番号は本人だけに表示</p></div>
+                                  </dl>
+                                ) : (
+                                  <p className="text-ink-faint mt-4 text-sm">この方には、今回締められる報酬がありません。</p>
+                                )}
+                              </section>
 
                               {/*
                                 **読めなかったことを、0件として描かない。**
