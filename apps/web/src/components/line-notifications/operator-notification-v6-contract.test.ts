@@ -34,9 +34,10 @@ describe('V6 運用者へのお知らせ — 宛先・送信・実行記録の�
     expect(create).toContain('operatorRules.previewRecipients')
     expect(create).toContain('operatorRules.publish')
     expect(create).toContain('operatorRules.test')
-    expect(create).toContain('運用者へのお知らせを公開')
+    expect(create).toContain('>出す</Button>')
     expect(create).toContain('自分にテスト送信')
     expect(create).toContain('LINEログインを済ませた人にだけ届きます')
+    expect(create).toContain('だれも受け取れないときはメールでも送る')
   })
 
   it('新しいルールはDBで明示的に停止状態へ置く', () => {

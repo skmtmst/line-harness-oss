@@ -12,6 +12,7 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { auditLog } from '../lib/audit-log.js';
+import { sendOperationEmail } from '../services/operation-notifications.js';
 
 const notifications = new Hono<Env>();
 
@@ -283,14 +284,31 @@ async function deliverOperatorRule(
         continue;
       }
 
-      await finishOperatorDelivery(env.DB, {
-        id: claimed.id, lineAccountId: rule.line_account_id!, status: 'excluded',
-        errorCode: preview.channels.email ? 'email_delivery_not_connected' : 'staff_email_not_available',
-        errorMessage: preview.channels.email
-          ? 'メール送信経路の接続を確認してください'
-          : '確認済みのメールアドレスがありません',
-      });
-      excluded += 1;
+      if (!preview.channels.email || !recipient.email) {
+        await finishOperatorDelivery(env.DB, {
+          id: claimed.id, lineAccountId: rule.line_account_id!, status: 'excluded',
+          errorCode: 'staff_email_not_available', errorMessage: '確認済みのメールアドレスがありません',
+        });
+        excluded += 1;
+        continue;
+      }
+      try {
+        await sendOperationEmail(env, {
+          to: recipient.email,
+          subject: `【運用者へのお知らせ】${rule.name}`,
+          body: text,
+        });
+        await finishOperatorDelivery(env.DB, {
+          id: claimed.id, lineAccountId: rule.line_account_id!, status: 'provider_accepted',
+        });
+        accepted += 1;
+      } catch {
+        await finishOperatorDelivery(env.DB, {
+          id: claimed.id, lineAccountId: rule.line_account_id!, status: 'failed',
+          errorCode: 'email_provider_error', errorMessage: 'メールが送信を受け付けませんでした',
+        });
+        failed += 1;
+      }
     }
   }
 

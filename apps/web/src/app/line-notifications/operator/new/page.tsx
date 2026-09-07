@@ -13,7 +13,7 @@ import { ApiError, api, type OperatorRecipientPreview } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
 const EVENT_OPTIONS = [
-  { value: 'message_received', label: '受信箱に届いたとき' },
+  { value: 'message_received', label: '予約が入ったとき' },
   { value: 'friend_add', label: '友だちが追加されたとき' },
   { value: 'cv_fire', label: '成果が記録されたとき' },
   { value: 'incoming_webhook.custom', label: '外部連携のイベントを受け取ったとき' },
@@ -51,13 +51,13 @@ export default function NewOperatorNotificationPage() {
   const [eventType, setEventType] = useState('message_received')
   const [threshold, setThreshold] = useState('one')
   const [importance, setImportance] = useState('normal')
-  const [name, setName] = useState('')
+  const [name, setName] = useState('新しい予約が入りました')
   const [recipients, setRecipients] = useState<OperatorRecipientPreview | null>(null)
   const [recipientIds, setRecipientIds] = useState<string[]>([])
   const [schedule, setSchedule] = useState('anytime')
   const [dedupeMinutes, setDedupeMinutes] = useState('10')
   const [onlyAvailable, setOnlyAvailable] = useState(false)
-  const [message, setMessage] = useState('')
+  const [emailFallback, setEmailFallback] = useState(true)
   const [savedRuleId, setSavedRuleId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -81,19 +81,19 @@ export default function NewOperatorNotificationPage() {
     return () => { active = false }
   }, [selectedAccountId])
 
-  const saveDraft = async () => {
-    if (saving) return
+  const saveDraft = async (): Promise<string | null> => {
+    if (saving) return null
     if (!selectedAccountId) {
       setError('LINEアカウントを選択してください。')
-      return
+      return null
     }
     if (!name.trim()) {
       setError('お知らせの名前を入力してください。')
-      return
+      return null
     }
     if (recipientIds.length === 0) {
       setError('受け取るスタッフを1人以上選んでください。')
-      return
+      return null
     }
     setSaving(true)
     setError('')
@@ -109,18 +109,19 @@ export default function NewOperatorNotificationPage() {
           recipientType: 'team',
           recipientIds,
           recipientLabel: `${recipientIds.length}人`,
-          message: message.trim() || null,
+          message: null,
           schedule,
           scheduleLabel,
           dedupeMinutes: Number(dedupeMinutes),
           onlyAvailable,
           lifecycle: 'draft',
         },
-        channels: ['dashboard', 'line'],
+        channels: emailFallback ? ['dashboard', 'line', 'email'] : ['dashboard', 'line'],
       })
       if (!result.success) throw new Error('save failed')
       setSavedRuleId(result.data.id)
       setError('')
+      return result.data.id
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 403) {
         setError('このLINEアカウントのお知らせを変更する権限がありません。')
@@ -129,27 +130,32 @@ export default function NewOperatorNotificationPage() {
       } else {
         setError('下書きを保存できませんでした。時間をおいてもう一度お試しください。')
       }
+      return null
     } finally {
       setSaving(false)
     }
   }
 
   const publish = async () => {
-    if (!selectedAccountId || !savedRuleId || saving) return
+    if (!selectedAccountId || saving) return
+    const ruleId = savedRuleId ?? await saveDraft()
+    if (!ruleId) return
     setSaving(true); setError('')
     try {
-      await api.notifications.operatorRules.publish(savedRuleId, selectedAccountId)
-      router.push(`/line-notifications?tab=operator&highlight=${encodeURIComponent(savedRuleId)}`)
+      await api.notifications.operatorRules.publish(ruleId, selectedAccountId)
+      router.push(`/line-notifications?tab=operator&highlight=${encodeURIComponent(ruleId)}`)
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : '公開できませんでした。')
     } finally { setSaving(false) }
   }
 
   const testSend = async () => {
-    if (!selectedAccountId || !savedRuleId || saving) return
+    if (!selectedAccountId || saving) return
+    const ruleId = savedRuleId ?? await saveDraft()
+    if (!ruleId) return
     setSaving(true); setError('')
     try {
-      const result = await api.notifications.operatorRules.test(savedRuleId, selectedAccountId, message.trim() || undefined)
+      const result = await api.notifications.operatorRules.test(ruleId, selectedAccountId)
       if (!result.success) throw new Error(result.error)
       setError(result.data.accepted > 0 ? '自分へのテスト送信を受け付けました。' : '受け取れる通知方法がありません。受信設定を確認してください。')
     } catch (caught) {
@@ -159,13 +165,9 @@ export default function NewOperatorNotificationPage() {
 
   return (
     <div data-design-node="N2gAza" className="space-y-4 pb-24">
-      <nav className="text-ink-faint text-xs" aria-label="パンくず">
-        <Link href="/line-notifications" className="text-accent hover:underline">LINE通知</Link>
-        <span className="mx-2">›</span>
-        <Link href="/line-notifications?tab=operator" className="text-accent hover:underline">運用者へのお知らせ</Link>
-        <span className="mx-2">›</span>
-        <span>つくる</span>
-      </nav>
+      <div className="flex items-center justify-between gap-3"><nav className="text-ink-faint text-xs" aria-label="パンくず">
+        <Link href="/line-notifications" className="text-accent hover:underline">LINE通知</Link><span className="mx-2">›</span><Link href="/line-notifications?tab=operator" className="text-accent hover:underline">運用者へのお知らせ</Link><span className="mx-2">›</span><span>つくる</span>
+      </nav><Button onClick={() => void testSend()} disabled={saving}>自分にテスト送信</Button></div>
 
       <div className="border-info bg-info-bg text-info flex items-start gap-2 rounded-control border px-4 py-3 text-sm">
         <Users className="mt-0.5 shrink-0" aria-hidden="true" size={17} />
@@ -218,7 +220,7 @@ export default function NewOperatorNotificationPage() {
               <input type="checkbox" checked={onlyAvailable} onChange={(event) => setOnlyAvailable(event.target.checked)} className="mt-0.5 h-4 w-4 accent-accent" />
               <span><strong className="block text-ink">手が空いている人だけに送る</strong><span className="text-xs text-ink-faint">対応中の人には送りません。</span></span>
             </label>
-            <div className="mt-4 max-w-xl"><Field label="届く文面" htmlFor="operator-message" note="空欄なら、お知らせ名と管理画面への案内を送ります。"><TextInput id="operator-message" value={message} onChange={(event) => setMessage(event.target.value)} placeholder="例：新しい予約が入りました。内容を確認してください。" maxLength={500} /></Field></div>
+            <label className="mt-4 flex items-start gap-3 text-sm text-ink-secondary"><input type="checkbox" checked={emailFallback} onChange={(event) => setEmailFallback(event.target.checked)} className="mt-0.5 h-4 w-4 accent-accent" /><span><strong className="block text-ink">だれも受け取れないときはメールでも送る</strong><span className="text-xs text-ink-faint">LINEでログインしていない人がいるとき</span></span></label>
           </section>
 
           {error ? <p role="alert" className="border-danger bg-danger-bg text-danger rounded-control border px-4 py-3 text-sm">{error}</p> : null}
@@ -227,7 +229,7 @@ export default function NewOperatorNotificationPage() {
         <aside className="space-y-4">
           <section className="border-hairline bg-canvas rounded-card border p-4">
             <div className="flex items-center gap-2"><Building2 aria-hidden="true" size={18} className="text-accent" /><h2 className="text-sm font-semibold text-ink">お店の人にはこう届きます</h2></div>
-            <p className="mt-2 whitespace-pre-wrap text-xs text-ink-faint">{message.trim() || `【運用者へのお知らせ】${name.trim() || 'お知らせ名'}\n管理画面で内容を確認してください。`}</p>
+            <p className="mt-2 whitespace-pre-wrap text-xs text-ink-faint">文面はここで確かめられます。<br />【運用者へのお知らせ】{name.trim() || 'お知らせ名'}</p>
           </section>
           <section className="border-warning bg-warning-bg text-warning rounded-card border p-4">
             <div className="flex items-center gap-2"><AlertTriangle aria-hidden="true" size={18} /><h2 className="text-sm font-semibold">気をつけること</h2></div>
@@ -255,9 +257,8 @@ export default function NewOperatorNotificationPage() {
         status={savedRuleId ? '下書きを保存しました。テスト後に公開できます。' : '下書きです。保存しても通知は始まりません。'}
         actions={<>
           <Button href="/line-notifications?tab=operator" variant="secondary">やめる</Button>
-          {savedRuleId ? <Button onClick={() => void testSend()} disabled={saving}>自分にテスト送信</Button> : null}
           <Button onClick={() => void saveDraft()} disabled={saving || Boolean(savedRuleId)}>{saving ? '保存中…' : savedRuleId ? '保存済み' : '下書きに保存'}</Button>
-          {savedRuleId ? <Button onClick={() => void publish()} disabled={saving} variant="primary">運用者へのお知らせを公開</Button> : null}
+          <Button onClick={() => void publish()} disabled={saving} variant="primary">出す</Button>
         </>}
       />
     </div>

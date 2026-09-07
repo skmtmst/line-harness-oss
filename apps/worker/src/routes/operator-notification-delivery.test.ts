@@ -5,6 +5,7 @@ import type { AuthenticatedStaff } from '../middleware/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 const pushMessageWithRequestId = vi.hoisted(() => vi.fn());
+const sendOperationEmail = vi.hoisted(() => vi.fn());
 vi.mock('@line-crm/line-sdk', () => ({
   LineClient: class {
     pushMessageWithRequestId = pushMessageWithRequestId;
@@ -13,6 +14,7 @@ vi.mock('@line-crm/line-sdk', () => ({
 vi.mock('../services/account-access.js', () => ({
   canAccessAllLineAccounts: vi.fn(async () => true),
 }));
+vi.mock('../services/operation-notifications.js', () => ({ sendOperationEmail }));
 
 const { notifications } = await import('./notifications.js');
 
@@ -75,6 +77,8 @@ describe('運用者へのお知らせの送信と実行記録', () => {
   beforeEach(() => {
     pushMessageWithRequestId.mockReset();
     pushMessageWithRequestId.mockResolvedValue({ data: {}, requestId: 'line-request-1' });
+    sendOperationEmail.mockReset();
+    sendOperationEmail.mockResolvedValue(undefined);
     testDb = createTestD1();
     seed(testDb);
   });
@@ -166,5 +170,27 @@ describe('運用者へのお知らせの送信と実行記録', () => {
     `).get() as { action: string; detail_json: string };
     expect(audit.action).toBe('exported');
     expect(JSON.parse(audit.detail_json)).toMatchObject({ reason: '月次確認' });
+  });
+
+  it('確認済みメールを代替経路として送り、実行記録へ残す', async () => {
+    testDb.raw.prepare(`UPDATE notification_rules SET channels = '["email"]' WHERE id = 'rule-1'`).run();
+    const published = await app(testDb.db).request(
+      '/api/notifications/operator-rules/rule-1/publish',
+      json({ lineAccountId: 'account-1' }),
+    );
+    expect(published.status).toBe(200);
+    const response = await app(testDb.db).request(
+      '/api/notifications/operator-events',
+      json({ lineAccountId: 'account-1', eventType: 'booking_created', sourceEventId: 'booking-email' }),
+    );
+    await expect(response.json()).resolves.toMatchObject({
+      data: { rules: [{ ruleId: 'rule-1', accepted: 1, excluded: 0 }] },
+    });
+    expect(sendOperationEmail).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      to: 'owner@example.test', subject: '【運用者へのお知らせ】新しい予約',
+    }));
+    expect(testDb.raw.prepare(`SELECT channel, status FROM notification_deliveries`).get()).toEqual({
+      channel: 'email', status: 'provider_accepted',
+    });
   });
 });
