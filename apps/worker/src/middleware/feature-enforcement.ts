@@ -195,6 +195,12 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
 /** 同じ prefix 内で公開経路と管理経路が分かれる例外。 */
 export const FEATURE_ROUTE_PATTERN_MANIFEST: readonly FeatureRoutePatternMetadata[] = [
   {
+    pattern: /^\/api\/affiliates\/click$/,
+    methods: ['POST'],
+    accountResolver: 'none',
+    classification: { kind: 'public', reason: '紹介コードからの公開クリック記録' },
+  },
+  {
     pattern: /^\/api\/friends\/[^/]+\/fields(?:\/|$)/,
     methods: ['GET', 'PUT'],
     accountResolver: 'request-or-resource',
