@@ -408,7 +408,7 @@ function BroadcastList() {
               aria-label="タイトル・内容で検索"
               value={titleQuery}
               onChange={(e) => setTitleQuery(e.target.value)}
-              className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+              className="border-hairline rounded-control bg-canvas focus:ring-accent h-10 min-w-0 flex-1 border px-3 text-sm focus:ring-2 focus:outline-none"
             />
             <SelectField
               aria-label="保存した検索"

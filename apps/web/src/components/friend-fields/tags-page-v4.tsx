@@ -762,17 +762,14 @@ export default function TagsPageV4({
           <FolderList groups={groups} items={items} countsKnown={ready} active={folder} onSelect={setFolder} onChanged={() => void load()} />
           <main className="min-w-0">
             {/*
-              設計 `XchZz タグツールバー`。左に検索群（`RAlQh` 405px＝
-              検索144・使用状態129・付与元116）、右に表示件数と範囲（`Olp2S`）。
-              **検索欄を伸ばさない。** 伸ばすと右の2つが端へ飛んで、
-              設計の並びと変わる。
+              検索・選択は最長の表示内容と矢印余白を確保し、残る幅は検索欄へ渡す。
+              狭いときだけ折り返し、文字と矢印を重ねない。
             */}
             <div className="mb-[10px] flex flex-wrap items-center gap-2">
-              <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="タグ名・用途で検索" className="h-9 w-[144px] rounded-control border border-hairline bg-canvas px-2 text-label outline-none focus:border-accent" />
-              <select value={usageFilter} onChange={(event) => setUsageFilter(event.target.value)} className="v6-select v6-select-tight h-9 w-[129px] rounded-control border border-hairline bg-canvas text-label font-semibold text-ink"><option value="all">使用状態：すべて</option><option value="linked">連動あり</option><option value="unused">未使用</option></select>
-              <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="v6-select v6-select-tight h-9 w-[116px] rounded-control border border-hairline bg-canvas text-label font-semibold text-ink"><option value="all">付与元：すべて</option>{Object.entries(SOURCE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-              <span className="flex-1" />
-              <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} className="v6-select h-9 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink">{[20,30,40,50].map((size) => <option key={size} value={size}>{size}件表示</option>)}</select>
+              <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="タグ名・用途で検索" className="h-10 min-w-[180px] flex-1 rounded-control border border-hairline bg-canvas px-3 text-label outline-none focus:border-accent" />
+              <select value={usageFilter} onChange={(event) => setUsageFilter(event.target.value)} className="v6-select h-10 min-w-[176px] rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"><option value="all">使用状態：すべて</option><option value="linked">連動あり</option><option value="unused">未使用</option></select>
+              <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="v6-select h-10 min-w-[152px] rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"><option value="all">付与元：すべて</option>{Object.entries(SOURCE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+              <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} className="v6-select ml-auto h-10 min-w-[128px] rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink">{[20,30,40,50].map((size) => <option key={size} value={size}>{size}件表示</option>)}</select>
               <span className="text-xs tabular-nums text-ink-faint">{ready ? `${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} / ${filtered.length}件` : '—'}</span>
             </div>
             {/* 設計 `UOmne`。**5つ。押した数だけ重ねて絞る。** */}
