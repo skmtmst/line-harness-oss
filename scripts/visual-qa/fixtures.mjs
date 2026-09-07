@@ -5716,6 +5716,59 @@ export const WEBINAR_ACTIONS = [
   { id: 'webinar-action-2', trigger: 'completed', actionType: 'start_scenario', config: { scenarioId: '相談シナリオ' }, position: 1, version: 2 },
 ]
 
+/** 機能10の編集・公開・運用画面だけが読む固定応答。 */
+export const WEBINAR_EDITOR = {
+  version: 4,
+  deliveryKind: 'on_demand',
+  viewingCondition: { kind: 'registered', label: '申込済みの友だち' },
+  publicDescription: 'LINE活用の基本から、申込後の自動フォローまでを実演します。',
+  registrationFormId: 'form-1',
+  notificationMessages: {
+    registration: 'お申し込みありがとうございます。視聴ページはこちらです。',
+    dayBefore: 'ウェビナーは明日20:00からです。',
+    hourBefore: '開始まであと1時間です。',
+  },
+  notificationTest: { status: 'passed', sent: 1, failed: 0, testedAt: '2026-09-07T04:30:00.000Z' },
+  actionPolicy: {
+    templateBody: 'ご視聴ありがとうございました。個別相談はこちらからご予約ください。',
+    missingResultPolicy: 'escalate',
+  },
+  publicPage: {
+    liffId: '2000000000-visualqa',
+    url: 'https://liff.line.me/2000000000-visualqa/webinar/nen-start',
+    unavailableReason: null,
+    description: 'LINE活用の基本から、申込後の自動フォローまでを実演します。',
+    test: { status: 'passed', testedAt: '2026-09-07T04:31:00.000Z' },
+    form: {
+      id: 'form-1', name: 'ウェビナー申込フォーム', active: true,
+      fields: ['お名前', '会社名・屋号', 'メールアドレス'],
+      completionActions: ['タグを付ける', 'シナリオを開始する', '完了メッセージを送る'],
+    },
+  },
+  publication: {
+    status: 'active', draftVersion: 4, publishedVersion: 3,
+    publishedAt: '2026-08-25T02:00:00.000Z',
+  },
+  monitoring: {
+    notificationFailures: 0, duplicateRegistrations: 0,
+    viewSegmentFailures: 0, actionFailures: 0,
+  },
+}
+
+export const WEBINAR_PUBLISH_VALIDATION = {
+  version: 4,
+  checks: [
+    ['video_ready', '動画・公開が設定されています', '動画を配信できます'],
+    ['form_active', '申込フォームが公開中です', 'ウェビナー申込フォーム'],
+    ['cta_range', 'CTAの表示時刻とURLが有効です', '動画の長さ以内で確認済みです'],
+    ['notification_test', '通知のテスト送信が成功しています', '最後のテスト送信は成功です'],
+    ['public_page_test', '公開ページを確認済みです', 'LIFFの公開ページを確認しました'],
+    ['notification_duplicates', '通知の重複がありません', '同じ通知は1回だけ送ります'],
+    ['action_dependencies', '視聴後アクションの参照先が有効です', '2件のアクションを確認しました'],
+  ].map(([key, label, detail]) => ({ key, label, detail, status: 'passed' })),
+  blockers: [], warnings: [],
+}
+
 export const WEBINAR_ANALYTICS = {
   summary: {
     reservations: 184, viewers: 142, registeredAndJoined: 128, watched5m: 128,
@@ -5734,10 +5787,27 @@ export const WEBINAR_ANALYTICS = {
     formSubmittedAt: form ? latestJoinedAt : null,
   })),
   sessions: [], dropoff: [],
+  viewSegments: [
+    { startSeconds: 0, endSeconds: 300, viewers: 142 },
+    { startSeconds: 300, endSeconds: 1_100, viewers: 136 },
+    { startSeconds: 1_100, endSeconds: 1_800, viewers: 101 },
+    { startSeconds: 1_800, endSeconds: 2_538, viewers: 98 },
+  ],
+  measurement: { state: 'available', reason: null },
   formFunnel: {
     ctaImpressions: 96, ctaClicks: 52, formOpens: 41, formStarts: 32,
     submitAttempts: 21, submitSuccesses: 18, submitErrors: 3, fieldCompletions: [],
   },
+}
+
+export const WEBINAR_PARTICIPANTS = {
+  items: WEBINAR_ANALYTICS.participants.map((participant, index) => ({
+    ...participant,
+    actionStatus: index === 3 ? 'failed' : 'completed',
+    errorDetail: index === 3 ? '視聴結果を取得できませんでした' : null,
+    staffIntegrationStatus: index === 3 ? 'needs_attention' : 'completed',
+  })),
+  nextCursor: null,
 }
 
 /**

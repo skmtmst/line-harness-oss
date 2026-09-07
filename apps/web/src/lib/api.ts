@@ -9329,6 +9329,9 @@ export const webinarApi = {
   }) => fetchApi<{ data: WebinarEditor }>(`/api/webinars/${id}/editor`, {
     method: 'PUT', body: JSON.stringify(input),
   }),
+  testPublicPage: (id: string, expectedVersion: number) => fetchApi<{ data: WebinarEditor }>(`/api/webinars/${id}/public-page/test`, {
+    method: 'POST', body: JSON.stringify({ expectedVersion }),
+  }),
   publishValidation: (id: string) => fetchApi<{ data: WebinarPublishValidation }>(`/api/webinars/${id}/publish-validation`),
   publish: (id: string, expectedVersion: number) => fetchApi<{ data: { webinar: Webinar; validation: WebinarPublishValidation } }>(`/api/webinars/${id}/publish`, {
     method: 'POST', body: JSON.stringify({ expectedVersion }),

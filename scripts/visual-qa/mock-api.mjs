@@ -92,6 +92,7 @@ import {
   CONVERSION_DEFINITIONS, CONVERSION_DEFINITION_REPORT, CONVERSION_EXPORT_CSV,
   OPERATION_CONTROL_PREVIEW, OPERATION_HEALTH, OPERATION_HISTORY,
   WEBINARS, WEBINAR_FOLDERS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_ANALYTICS,
+  WEBINAR_EDITOR, WEBINAR_PUBLISH_VALIDATION, WEBINAR_PARTICIPANTS,
   FRIEND_ADD_RULE_PUBLISH, FRIEND_ADD_RULE_VALIDATE,
   ACCESS_USERS, ACCESS_ROLES, ACCESS_AUDIT_EVENTS,
   GETTING_STARTED, RECIPES, MANUAL_LINKS,
@@ -2414,6 +2415,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/webinars') return { success: true, data: WEBINARS }
   if (pathname === '/api/webinars/overview') return { success: true, data: WEBINAR_OVERVIEW }
+  if (/^\/api\/webinars\/[^/]+\/editor$/.test(pathname)) return { success: true, data: WEBINAR_EDITOR }
+  if (/^\/api\/webinars\/[^/]+\/publish-validation$/.test(pathname)) return { success: true, data: WEBINAR_PUBLISH_VALIDATION }
+  if (/^\/api\/webinars\/[^/]+\/participants$/.test(pathname)) return { success: true, data: WEBINAR_PARTICIPANTS }
   if (/^\/api\/webinars\/[^/]+\/notifications$/.test(pathname)) return { success: true, data: WEBINAR_NOTIFICATIONS }
   if (/^\/api\/webinars\/[^/]+\/ctas$/.test(pathname)) return { success: true, data: WEBINAR_CTAS }
   if (/^\/api\/webinars\/[^/]+\/actions$/.test(pathname)) return { success: true, data: WEBINAR_ACTIONS }
@@ -2520,6 +2524,18 @@ const server = createServer((req, res) => {
   // ただし画面側のエラー報告だけは 204 で受ける。405 を返すと、
   // 報告が失敗したこと自体が新しいエラーになって際限なく増える。
   if (method !== 'GET') {
+    if (method === 'POST' && /^\/api\/webinars\/[^/]+\/public-page\/test$/.test(url.pathname)) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: WEBINAR_EDITOR }))
+      return
+    }
+    if (method === 'POST' && /^\/api\/webinars\/[^/]+\/(publish|pause|duplicate)$/.test(url.pathname)) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: WEBINARS[0] }))
+      return
+    }
+    if (method === 'POST' && /^\/api\/webinars\/[^/]+\/notifications\/test$/.test(url.pathname)) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: { sent: 1, failed: 0 } }))
+      return
+    }
     if (method === 'PATCH' && /^\/api\/mileage\/earning-rules\/[^/]+\/draft$/.test(url.pathname)) {
       let raw = ''
       req.on('data', (chunk) => { raw += chunk })

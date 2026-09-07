@@ -535,9 +535,9 @@ export async function saveWebinarEditorSettings(
   await db.prepare(
     `INSERT INTO webinar_versions
        (id, webinar_id, version, state, snapshot_json, created_at)
-     VALUES (?, ?, ?, 'draft', ?, ?, ?)`,
+     VALUES (?, ?, ?, 'draft', ?, ?)`,
   ).bind(
-    crypto.randomUUID(), webinarId, saved.version, webinarEditorSnapshot(saved), now, null,
+    crypto.randomUUID(), webinarId, saved.version, webinarEditorSnapshot(saved), now,
   ).run();
   return saved;
 }
@@ -579,6 +579,28 @@ export async function getWebinarViewSegmentCoverage(
       ORDER BY start_seconds, end_seconds`,
   ).bind(webinarId).all<WebinarViewSegmentCoverage>();
   return result.results ?? [];
+}
+
+/** ハートビート間の実視聴区間を30秒単位で冪等に記録する。 */
+export async function recordWebinarViewSegment(
+  db: D1Database,
+  webinarId: string,
+  friendId: string,
+  sessionStartAt: number,
+  positionSeconds: number,
+): Promise<void> {
+  const endSeconds = Math.max(1, Math.floor(positionSeconds));
+  const startSeconds = Math.max(0, endSeconds - 30);
+  const idempotencyKey = `${webinarId}:${friendId}:${sessionStartAt}:${startSeconds}:${endSeconds}`;
+  await db.prepare(
+    `INSERT OR IGNORE INTO webinar_view_segments
+       (id, webinar_id, friend_id, session_start_at, start_seconds, end_seconds,
+        received_at, idempotency_key)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    crypto.randomUUID(), webinarId, friendId, sessionStartAt,
+    startSeconds, endSeconds, jstNow(), idempotencyKey,
+  ).run();
 }
 
 export async function getWebinarParticipantOperations(

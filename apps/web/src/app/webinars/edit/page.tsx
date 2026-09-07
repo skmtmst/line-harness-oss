@@ -46,6 +46,16 @@ function fmtSec(sec: number): string {
     : `${sign}${m}:${String(s).padStart(2, '0')}`
 }
 
+function largestDropoffAt(segments: NonNullable<WebinarAnalytics['viewSegments']>): number | null {
+  if (segments.length < 2) return null
+  let largest = { at: segments[1].startSeconds, lost: -Infinity }
+  for (let index = 1; index < segments.length; index += 1) {
+    const lost = segments[index - 1].viewers - segments[index].viewers
+    if (lost > largest.lost) largest = { at: segments[index].startSeconds, lost }
+  }
+  return largest.at
+}
+
 function fmtSession(epoch: number): string {
   return new Date(epoch * 1000).toLocaleString('ja-JP')
 }
@@ -419,13 +429,14 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics' }: { webi
 
   if (view === 'analytics') {
     const avgRate = durationSeconds > 0 ? Math.round((summary.avgWatchedSeconds / durationSeconds) * 1000) / 10 : 0
+    const largestDropoff = largestDropoffAt(analytics.viewSegments ?? [])
     return (
       <div className="space-y-4" data-design-node="yxyzQ">
         <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-2">{['概要', '視聴', '離脱', 'CTA', '申込'].map((label, index) => <span key={label} className={`rounded-control px-3 py-2 text-sm font-semibold ${index === 0 ? 'bg-accent-deep text-on-accent' : 'border-hairline bg-canvas text-ink-secondary border'}`}>{label}</span>)}</div><Button href={webinarApi.participantsCsvUrl(webinarId)}>CSVで書き出す</Button></div>
         <div className="flex flex-col gap-4 xl:flex-row">
           <div className="min-w-0 flex-1 space-y-3">
             <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-base font-bold">視聴結果</h2><p className="text-ink-faint mt-1 text-xs">申込・再生・完了率を確認します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">申込</dt><dd className="text-ink text-sm font-bold">{summary.reservations.toLocaleString('ja-JP')}人</dd></div><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">再生</dt><dd className="text-ink text-sm font-bold">{summary.viewers.toLocaleString('ja-JP')}人（{percent(summary.viewers, summary.reservations)}）</dd></div></dl></section>
-            <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-base font-bold">視聴行動</h2><p className="text-ink-faint mt-1 text-xs">離脱箇所とCTA反応を確認します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">平均視聴時間</dt><dd className="text-ink text-sm font-bold">{fmtSec(summary.avgWatchedSeconds)}（{avgRate}%）</dd></div><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">最大離脱</dt><dd className="text-ink text-sm font-bold">{analytics.viewSegments && analytics.viewSegments.length > 0 ? `${fmtSec(analytics.viewSegments.reduce((max, segment) => segment.viewers > max.viewers ? segment : max).startSeconds)}付近` : `—（${analytics.measurement?.reason ?? '区間未取得'}）`}</dd></div></dl></section>
+            <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-base font-bold">視聴行動</h2><p className="text-ink-faint mt-1 text-xs">離脱箇所とCTA反応を確認します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">平均視聴時間</dt><dd className="text-ink text-sm font-bold">{fmtSec(summary.avgWatchedSeconds)}（{avgRate}%）</dd></div><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">最大離脱</dt><dd className="text-ink text-sm font-bold">{largestDropoff !== null ? `${fmtSec(largestDropoff)}付近` : `—（${analytics.measurement?.reason ?? '区間未取得'}）`}</dd></div></dl></section>
           </div>
           <SummaryAside rows={[
             ['視聴完了', `${summary.completed.toLocaleString('ja-JP')}人`],
@@ -1316,14 +1327,31 @@ function PublicPreviewStep({
   publicUrl,
   registrations,
   publicPageReason,
+  onEditorChange,
 }: {
   webinar: Webinar
   editor: WebinarEditor
   publicUrl: string | null
   registrations: number | null
   publicPageReason: string
+  onEditorChange: (editor: WebinarEditor) => void
 }) {
   const canOpenPublicPage = webinar.status === 'active' && publicUrl !== null
+  const [testing, setTesting] = useState(false)
+  const [testNotice, setTestNotice] = useState('')
+  const testPublicPage = async () => {
+    setTesting(true)
+    setTestNotice('')
+    try {
+      const response = await webinarApi.testPublicPage(webinar.id, editor.version)
+      onEditorChange(response.data)
+      setTestNotice(response.data.publicPage.test?.status === 'passed' ? '公開ページを確認しました。' : '公開ページに未設定があります。')
+    } catch (cause) {
+      setTestNotice(cause instanceof Error ? cause.message : '公開ページを確認できませんでした。')
+    } finally {
+      setTesting(false)
+    }
+  }
   return (
     <div className="flex flex-col gap-4 xl:flex-row" data-design-node="GB0NR">
       <div className="min-w-0 flex-1 space-y-3">
@@ -1335,7 +1363,8 @@ function PublicPreviewStep({
         ['公開期間', deliveryWindow(webinar)],
         ['対象', registrations === null ? '—（未取得）' : `${registrations.toLocaleString('ja-JP')}人`],
       ]} previewBody={editor.publicDescription || webinar.title}>
-        <div className="flex gap-2"><Button disabled>テスト送信</Button>{canOpenPublicPage ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : <Button disabled title={publicPageReason}>公開ページを見る</Button>}</div>
+        <div className="flex gap-2"><Button disabled={testing || !publicUrl} onClick={() => void testPublicPage()}>{testing ? '確認中…' : editor.publicPage.test?.status === 'passed' ? 'ページ確認済み' : 'ページをテスト'}</Button>{canOpenPublicPage ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : <Button disabled title={publicPageReason}>公開ページを見る</Button>}</div>
+        {testNotice ? <p className="text-ink-secondary text-xs">{testNotice}</p> : null}
         {!canOpenPublicPage ? <p className="text-ink-faint text-xs">{publicPageReason}</p> : null}
       </SummaryAside>
     </div>
@@ -1607,7 +1636,7 @@ function EditWebinarInner() {
       {pane === 'review' && <ReviewStep webinar={webinar} editor={editor} registrations={registrations} onBack={setPane} />}
       {pane === 'comments' && <CommentsTab webinarId={webinar.id} />}
       {pane === 'actions' && <WebinarActionsTab webinarId={webinar.id} editor={editor} onEditorChange={setEditor} />}
-      {pane === 'preview' && <PublicPreviewStep webinar={webinar} editor={editor} publicUrl={publicUrl} registrations={registrations} publicPageReason={publicPageReason} />}
+      {pane === 'preview' && <PublicPreviewStep webinar={webinar} editor={editor} publicUrl={publicUrl} registrations={registrations} publicPageReason={publicPageReason} onEditorChange={setEditor} />}
       {pane === 'participants' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} view="participants" />}
       {pane === 'analytics' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} />}
 

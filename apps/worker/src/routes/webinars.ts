@@ -25,6 +25,7 @@ import {
   replaceWebinarComments,
   upsertWebinarViewer,
   updateWebinarViewerPosition,
+  recordWebinarViewSegment,
   recordWebinarCtaClick,
   recordWebinarFunnelEvent,
   insertWebinarUserComment,
@@ -366,6 +367,11 @@ webinarRoutes.post('/api/liff/webinars/:slug/heartbeat', async (c) => {
     await updateWebinarViewerPosition(
       c.env.DB, loaded.webinar.id, auth.friendId, sessionStartAt, positionSeconds,
     );
+    if (positionSeconds > 0) {
+      await recordWebinarViewSegment(
+        c.env.DB, loaded.webinar.id, auth.friendId, sessionStartAt, positionSeconds,
+      );
+    }
     c.executionCtx.waitUntil(awardWebinarPositionMileage(c.env.DB, {
       webinarId: loaded.webinar.id,
       friendId: auth.friendId,
@@ -1143,6 +1149,35 @@ webinarRoutes.put('/api/webinars/:id/editor', requireRole('owner', 'admin'), asy
     return c.json({ success: true, data: await getEditorPayload(c, row) });
   } catch (err) {
     console.error('PUT /api/webinars/:id/editor error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+webinarRoutes.post('/api/webinars/:id/public-page/test', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const row = await getWebinarById(c.env.DB, c.req.param('id'));
+    if (!row) return c.json({ success: false, error: 'Not found' }, 404);
+    const body = await c.req.json<{ expectedVersion?: unknown }>();
+    const editor = await getEditorPayload(c, row);
+    if (!Number.isInteger(body.expectedVersion) || editor.version !== Number(body.expectedVersion)) {
+      return c.json({ success: false, error: 'version_conflict' }, 409);
+    }
+    const failures = [
+      !editor.publicPage.url ? 'missing_liff_id' : null,
+      !row.video_prefix ? 'video_not_ready' : null,
+      !editor.publicPage.form?.active ? 'form_inactive_or_missing' : null,
+    ].filter((value): value is string => Boolean(value));
+    const saved = await saveWebinarEditorSettings(c.env.DB, row.id, editor.version, {
+      publicPageTest: {
+        status: failures.length === 0 ? 'passed' : 'failed',
+        failures,
+        testedAt: new Date().toISOString(),
+      },
+    });
+    if (!saved) return c.json({ success: false, error: 'version_conflict' }, 409);
+    return c.json({ success: true, data: await getEditorPayload(c, row) });
+  } catch (err) {
+    console.error('POST /api/webinars/:id/public-page/test error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
