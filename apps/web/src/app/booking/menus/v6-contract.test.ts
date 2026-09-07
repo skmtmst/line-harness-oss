@@ -39,6 +39,18 @@ describe('V6 予約設定', () => {
     expect(CREATE).toContain('マイルを ${bookingMileage.toLocaleString()} 付ける')
   })
 
+  it('作成画面で価格種別と店舗共通ルールの継承を実契約へ送る', () => {
+    expect(CREATE).toContain('bookingApi.getSettings(selectedAccountId)')
+    expect(CREATE).toContain("? 'inquiry'")
+    expect(CREATE).toContain("? 'free'")
+    expect(CREATE).toContain('price_mode: priceMode')
+    expect(CREATE).toContain('空欄なら店舗設定を使います')
+    expect(CREATE).toContain('booking_window_days: windowDays ? Number(windowDays) : null')
+    expect(CREATE).toContain('cutoff_hours_before: cutoffHours ? Number(cutoffHours) : null')
+    expect(CREATE).toContain('cancel_deadline_hours_before: cancelDeadlineHours')
+    expect(CREATE).toContain('? Number(cancelDeadlineHours)')
+  })
+
   it('表示している一覧操作は実際に使える', () => {
     expect(LIST).not.toContain('準備中')
     expect(LIST).toContain('bookingApi.getSettings(selectedAccountId)')

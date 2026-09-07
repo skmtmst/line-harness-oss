@@ -214,6 +214,10 @@ export default function EventsListPage() {
         />
       </div>
 
+      <div className="border-info bg-info-bg text-info mb-4 rounded-control border px-4 py-3 text-sm">
+        定員に達すると、お客様の画面では自動で「満席」になります。キャンセルが出たら、キャンセル待ちの人に自動で順番が回ります。
+      </div>
+
       <div
         data-design="Bar"
         className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
