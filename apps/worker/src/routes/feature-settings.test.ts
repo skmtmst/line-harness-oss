@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DISABLED_FEATURES, featureIsEnabled } from './feature-settings.js';
+import { FEATURE_IDS } from '@line-crm/shared';
+import {
+  DEFAULT_DISABLED_FEATURES,
+  TOGGLEABLE_FEATURES,
+  featureIsEnabled,
+} from './feature-settings.js';
 
 describe('feature settings defaults', () => {
+  it('Worker の互換ミラーは共有機能カタログと完全一致する', () => {
+    expect(TOGGLEABLE_FEATURES).toEqual(FEATURE_IDS);
+  });
+
   it('V2でオフの機能は保存値が無くても無効', () => {
     expect(DEFAULT_DISABLED_FEATURES.has('webinars')).toBe(true);
     expect(featureIsEnabled(null, 'webinars')).toBe(false);

@@ -664,7 +664,7 @@ export const SCREENS = [
   },
   { ...SCENARIO, node: 'cCB7r', name: '5-1-A シナリオ作成・配信方式', route: '/scenarios/mode?id=scenario-0',
     verdict: "match",
-    verdictNote: "**2026-09-08 Issue #527で再撮影・再判定し一致。** 配信方式カードの現在地、シナリオ情報、具体例、操作位置をPencilへそろえた。3104/8791の1440/1920pxで横はみ出し0、高さ差0px。共通告知帯36pxを除く1920px画素差は5.9627%。告知帯自体は共通shell票 #537待ち。",
+    verdictNote: "**2026-09-08 Issue #537で共通告知帯を撮影から外して再判定し、一致。** #527の画面固有修正を含む本流を取り込み、3107/8794の1440/1920pxで横はみ出し0。1920px画素差5.4828%、高さ差0px。",
     verdictSource: "design-reference/scenarios-v6/cCB7r.txt + design-qa/scenarios-v6/cCB7r-{1440,1920}.png + design-qa/scenarios-v6/cCB7r.txt + apps/web/src/app/scenarios/mode/page.tsx",
     verdictHead: "dacb67014",
   },
@@ -691,7 +691,7 @@ export const SCREENS = [
     ...SCENARIO, node: 'xfYLn', name: '5-1-D シナリオ・ステップ編集', route: EDIT,
     mode: 'viewport', height: 1080, steps: [{ click: '編集', nth: 1 }],
     verdict: "match",
-    verdictNote: "**2026-09-08 Issue #527で再撮影・再判定し一致。** 旧本文Headerを外し、トップバーの「1通目を編集」、パンくず、閉じる・保存、編集フォームをPencil順へそろえた。3104/8791の1440/1920pxで横はみ出し0、高さ差0px。共通告知帯36pxを除く1920px画素差は8.0785%。告知帯自体は共通shell票 #537待ち。",
+    verdictNote: "**2026-09-08 Issue #537で共通告知帯を撮影から外して再判定し、一致。** #527の画面固有修正を含む本流を取り込み、3107/8794の1440/1920pxで横はみ出し0。1920px画素差7.9981%、高さ差0px。",
     verdictSource: "scenarios-v6/xfYLn.txt + xfYLn-{1440,1920}.png",
     verdictHead: "9294bdeeb",
   },
@@ -1045,7 +1045,7 @@ export const SCREENS = [
     variants: [{ suffix: '-planned-menu', steps: [{ click: '未返信3日後フォローのその他操作', after: 500 }] }], },
   { ...REMINDER, node: 'uJP22', name: '7-1-A リマインダを作成',
     verdict: 'match',
-    verdictNote: '**2026-09-08 Issue #527で再撮影・再判定し一致。** 名前・フォルダ、社内メモ、右プレビュー、下部操作の画面固有配置を維持した。3104/8791の1440/1920pxで横はみ出し0。共通告知帯36pxを除く1920px画素差11.9127%、高さ差+1px。残差は共通shellの文字描画・告知帯に限られ、告知帯は #537待ち。',
+    verdictNote: '**2026-09-08 Issue #537で共通告知帯を撮影から外して再判定し、一致を維持。** 3107/8794の1440/1920pxで横はみ出し0、告知帯による高さ差を解消し高さ差0px。1920px画素差11.8442%の残差は、Pencilと実装で異なる基本設定欄・右プレビュー・下部操作の画面固有配置であり、共通shell由来ではない。',
     verdictSource: 'reminders-v6/uJP22.txt + reminders-v6/uJP22-{1440,1920}.png + reminders-v6/uJP22-diff-1920.png + Issue #469 pixel comparison',
     verdictHead: 'eb41ad0d', route: '/reminders/new',
     steps: [
@@ -1055,7 +1055,7 @@ export const SCREENS = [
   {
     ...REMINDER, node: 'J64xI', name: '7-1-B 通知ステップ編集',
     verdict: 'match',
-    verdictNote: '**2026-09-08 Issue #527で再撮影・再判定し一致。** 通知3件、編集欄、24時間表記、右プレビューと下部操作の画面固有配置を維持した。3104/8791の1440/1920pxで横はみ出し0。共通告知帯36pxを除く1920px画素差11.4513%、高さ差+3px。残差は共通shellの文字描画・告知帯に限られ、告知帯は #537待ち。',
+    verdictNote: '**2026-09-08 Issue #537で共通告知帯を撮影から外して再判定し、一致を維持。** 3107/8794の1440/1920pxで横はみ出し0、告知帯による高さ差を解消し高さ差+2px。1920px画素差11.1271%の残差は、Pencilと実装で異なる通知編集欄・右プレビュー・下部操作の画面固有配置であり、共通shell由来ではない。',
     verdictSource: 'reminders-v6/J64xI.txt + reminders-v6/J64xI-{1440,1920}.png + reminders-v6/J64xI-diff-1920.png + Issue #469 pixel comparison',
     verdictHead: 'd77d0877e',
     route: '/reminders/edit?id=reminder-3',
@@ -1168,7 +1168,7 @@ export const SCREENS = [
   {
     ...AUTO_REPLY, node: 'K7vg2', name: '8-1-A 自動応答ルール編集',
     verdict: 'match',
-    verdictNote: '**2026-09-08 Issue #527で再撮影・再判定し一致。** 名前・フォルダ・優先順位、社内メモ、反応条件、LINEプレビュー、下部操作の画面固有配置を確認した。3104/8791の1440/1920pxで横はみ出し0。共通告知帯36pxを除く1920px画素差6.4456%、高さ差+2px。告知帯自体は共通shell票 #537待ち。',
+    verdictNote: '**2026-09-08 Issue #537で共通告知帯を撮影から外して再判定し、一致。** 3107/8794の1440/1920pxで横はみ出し0。1920px画素差6.3126%、高さ差+1px。',
     verdictSource: 'auto-replies-v6/K7vg2.png + docs/design-qa/auto-replies-v6/K7vg2-{1440,1920}.png + docs/design-qa/auto-replies-v6/K7vg2-diff-1920.png + K7vg2.txt + Issue #473',
     verdictHead: '81f2cd36a',
     route: '/auto-replies/edit?id=ar-2&step=basic',
@@ -1186,7 +1186,7 @@ export const SCREENS = [
   {
     ...AUTO_REPLY, node: 'ivDoe', name: '8-1-C 応答とアクション',
     verdict: 'match',
-    verdictNote: '**2026-09-08 Issue #527で再撮影・再判定し一致。** 本文編集、差し込み、返信ボタン、配信後アクション、LINEプレビュー、下部操作の画面固有配置を確認した。3104/8791の1440/1920pxで横はみ出し0。共通告知帯36pxを除く1920px画素差7.2574%、高さ差+1px。告知帯自体は共通shell票 #537待ち。',
+    verdictNote: '**2026-09-08 Issue #537で共通告知帯を撮影から外して再判定し、一致。** 3107/8794の1440/1920pxで横はみ出し0。1920px画素差7.1376%、高さ差0px。',
     verdictSource: 'auto-replies-v6/ivDoe.png + docs/design-qa/auto-replies-v6/ivDoe-{1440,1920}.png + docs/design-qa/auto-replies-v6/ivDoe-diff-1920.png + ivDoe.txt + Issue #473',
     verdictHead: '81f2cd36a',
     route: '/auto-replies/edit?id=ar-2&step=response',
@@ -1836,8 +1836,9 @@ export const SCREENS = [
   // ── 機能15 登録メディア ─────────────────────────────────
   { ...MEDIA, node: 'g89Tc', name: '15-1 登録メディア',
     verdict: "match",
-    verdictNote: "**2026-09-07、Issue #392 / PR #1157 / HEAD `0cc67ed91d` を固定ポート web 3105・mock 8792 で1440px・1920px再撮影し、一致。** 2幅とも横はみ出し0。容量APIの実値から2.4GB / 10GB・残り7.6GB・24%帯を表示し、「上限に近い」もファイル種別ごとのLINE上限80%以上だけを絞る。3フォルダ＋未分類、検索、6つの絞り込み、格子/一覧、並び順、表示件数、カード、一括削除を設計画像と目視比較した。固定データは代表10件のため、設計の186件は作り物で埋めない。",
+    verdictNote: "**2026-09-08、Issue #538 を固定ポート web 3105・mock 8792 で1440px・1920px再撮影し、一致。** 2幅とも横はみ出し0、1920px画素差4.0422%。一覧は総件数と表示範囲を示し、200件を超えてもサーバー側ページ送りで全件を確認できる。検索・種別・フォルダ・使用状態・並び順もページの外まで含めて絞り込む。",
     verdictSource: "media-v6/g89Tc.txt + g89Tc-1440.png + g89Tc-1920.png",
+    verdictHead: "748c8b810",
   },
   {
     ...MEDIA, node: 'voJtX', name: '15-1-A メディアの詳細と差し替え',
@@ -2739,7 +2740,7 @@ export const SCREENS = [
     日・週の台帳は、固定予約を時間×担当／曜日の格子へ並べる。
     LINE予約は緑、LINE未連携の電話予約は青で同じ格子に載せる。
   */
-  { ...BOOKING, node: 'TV2DI', name: '27-1 予約管理', verdict: 'match', verdictNote: '**2026-09-07 Issue #485・撮影HEAD `833383f6e` で再判定し一致。** 設計高1144pxを初期viewportにして本文全体を再撮影し、旧-64pxの差を0pxへ解消した。1920px画素差4.4690%、1440/1920pxとも横はみ出し0。', verdictSource: 'booking-v6/TV2DI.png + TV2DI-{1440,1920}.png + TV2DI-diff-1920.png + Issue #485', verdictHead: '833383f6e' },
+  { ...BOOKING, node: 'TV2DI', name: '27-1 予約管理', verdict: 'match', verdictNote: '**2026-09-08 Issue #538 を固定ポート3105/8792で再撮影し、一致を維持。** 一覧は全件取得をやめ、集計と表示ページを別々に取得する。201件目以降もページ移動で取得でき、検索・メニュー・日付もサーバー側で絞り込む。1920px画素差4.764%、1440/1920pxとも横はみ出し0。本流の更新案内帯が表示されたため全体高は設計より37px長いが、予約管理本文の配置は維持。', verdictSource: 'booking-v6/TV2DI.png + TV2DI-{1440,1920}.png + TV2DI-diff-1920.png + Issue #538', verdictHead: '748c8b810' },
   {
     ...BOOKING, node: 'TnDbq', name: '27-1-A 予約の詳細',
     mode: 'viewport', height: 1136, /*
@@ -2753,9 +2754,9 @@ export const SCREENS = [
     ],
     variants: [{ suffix: '-detail-route', route: '/booking/bookings/detail?id=bk-1', standalone: true }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #450 / UI HEAD `cded0de47` を固定ポート3105/8792で再撮影し、★V6設計と上端から照合して一致。** `/booking/bookings/detail` 本文の重複した題・説明・無効な保存帯を外し、パンくずの直後から予約状態と内容を表示する。既存の一覧内詳細も含め、予約内容・顧客カルテ・操作履歴・関連先を維持し、1440/1920pxとも横はみ出し0。",
+    verdictNote: "**2026-09-08 Issue #538 を固定ポート3105/8792で再撮影し、一致を維持。** 詳細ページは一覧全件から探さず単票APIを使い、LINE未連携の電話予約は顧客IDで履歴を取得して無効な友だち・トークリンクを出さない。1920px画素差5.5954%、1440/1920pxとも横はみ出し0。",
     verdictSource: "booking-v6/TnDbq.txt + TnDbq-{1440,1920}.png + TnDbq-detail-route-{1440,1920}.png",
-    verdictHead: "cded0de47",
+    verdictHead: "748c8b810",
   },
   /*
     **判定を改めた（PR #459 head `ba0bf62d`）。** 代理予約の画面ができた

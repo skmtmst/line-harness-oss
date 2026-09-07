@@ -7,7 +7,7 @@ const sidebar = readFileSync(new URL('./layout/sidebar.tsx', import.meta.url), '
 
 describe('店舗未選択の共通ゲート', () => {
   it('AppShellの1か所で子画面のマウントを止める', () => {
-    expect(shell).toContain('<StoreSelectionGate>{children}</StoreSelectionGate>')
+    expect(shell).toContain('<StoreSelectionGate><FeatureDisabledGate>{children}</FeatureDisabledGate></StoreSelectionGate>')
     expect(gate).toContain("decision === 'block-unselected'")
     expect(gate).toContain("decision === 'show'")
   })

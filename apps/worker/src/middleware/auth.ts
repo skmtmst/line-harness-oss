@@ -126,6 +126,8 @@ export type AuthenticatedStaff = {
   canAccessDescendantAccounts?: boolean;
   /** 所属する統括。認可への実適用は後続工程で行う。 */
   tenantId?: string | null;
+  /** 機能オフ middleware が一覧処理へ渡す、このリクエストだけの追加絞り込み。 */
+  featureEnabledLineAccountIds?: string[];
 };
 
 function toAuthenticatedStaff(staff: {

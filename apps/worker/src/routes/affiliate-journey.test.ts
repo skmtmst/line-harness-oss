@@ -7,6 +7,11 @@ const dbMocks = {
   // eager module-load deps (mirror other route tests)
   getLineAccounts: vi.fn().mockResolvedValue([]),
   getLineAccountScopeEntries: vi.fn(async (...args: unknown[]) => dbMocks.getLineAccounts(...args)),
+  getAccountSetting: vi.fn().mockResolvedValue(null),
+  getVersionedAccountSetting: vi.fn().mockResolvedValue({
+    version: 1,
+    data: { features: { affiliates: true } },
+  }),
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
   recoverStuckDeliveries: vi.fn(),
@@ -31,10 +36,12 @@ const env = {
 // These routes sit behind authMiddleware. getStaffByApiKey is mocked to return
 // undefined, so the env API_KEY owner fallback authenticates the Bearer token.
 function call(path: string, init?: RequestInit) {
+  const separator = path.includes('?') ? '&' : '?';
+  const scopedPath = `${path}${separator}accountId=account-1`;
   const headers = new Headers(init?.headers);
   headers.set('Authorization', `Bearer ${API_KEY}`);
   return worker.fetch(
-    new Request(`https://worker.example.com${path}`, { ...init, headers }),
+    new Request(`https://worker.example.com${scopedPath}`, { ...init, headers }),
     env,
     { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext,
   );

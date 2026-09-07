@@ -25,6 +25,7 @@ function booking(id: string, startsAt: string, status = 'confirmed'): BookingReq
   return {
     id,
     friend_id: `friend-${id}`,
+    booking_customer_id: null,
     starts_at: startsAt,
     ends_at: startsAt,
     status,

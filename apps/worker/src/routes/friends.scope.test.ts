@@ -442,4 +442,21 @@ describe('A-8 friends tenant scope', () => {
     expect(response.status).toBe(404);
     expect(mocks.getSavedSearchById).not.toHaveBeenCalled();
   });
+
+  test('search と statusMessage の %/_ はLIKE通しにしない (#496-18)', async () => {
+    const prepared: Array<{ sql: string; binds: unknown[] }> = [];
+    const response = await createApp(prepared).request(
+      '/api/friends?includeTags=false&search=100%25_%5Cx&statusMessage=a%25b',
+    );
+    expect(response.status).toBe(200);
+    const likeStatements = prepared.filter(({ sql }) => sql.includes('LIKE ?'));
+    expect(likeStatements.length).toBeGreaterThan(0);
+    for (const { sql } of likeStatements) {
+      expect(sql).toContain(`ESCAPE '\\'`);
+    }
+    const stringBinds = prepared.flatMap(({ binds }) => binds).filter((bind) => typeof bind === 'string');
+    // search=`100%_\x` → `%100\%\_\\x%`、statusMessage=`a%b` → `%a\%b%`
+    expect(stringBinds).toContain('%100\\%\\_\\\\x%');
+    expect(stringBinds).toContain('%a\\%b%');
+  });
 });

@@ -46,7 +46,7 @@ export default function FriendIdentityCandidatesPage() {
   return (
     <div className={styles.screen} data-issue481-identity style={{ gap: 14 }}>
       <div className="flex min-h-10 items-center justify-between gap-3">
-        <Breadcrumb items={[{ label: '重複検出', href: '/friends?tab=duplicates' }, { label: '候補 #D-018' }]} />
+        <Breadcrumb items={[{ label: '重複検出', href: '/friends?tab=duplicates' }, { label: detail ? `候補 #${String(detail.id).slice(0, 8)}` : '候補' }]} />
         <Button href="/friends?tab=duplicates">重複検出へ</Button>
       </div>
 
