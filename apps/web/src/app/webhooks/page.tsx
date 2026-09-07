@@ -742,7 +742,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
 
 function WebhooksPageHost() {
   const tab = useMergedTab(MERGED_TABS)
-  usePageTitle(tab === 'incoming' ? 'こちらで受け取る' : '外部連携')
+  usePageTitle('外部連携')
   if (tab === 'incoming' || tab === 'outgoing') return <WebhooksPageInner key={tab} tab={tab} />
   return (
     <div>

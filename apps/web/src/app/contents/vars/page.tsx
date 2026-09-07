@@ -833,6 +833,7 @@ function VarsPageInner() {
       */}
       <Dialog
         open={singleTarget !== null}
+        designNode="yPkWe"
         tone="destructive"
         title={singleTarget ? `共通情報「${singleTarget.name}」を削除しますか？` : ''}
         description="この共通情報と、登録値・次回予約を削除します。テンプレート・配信・フォルダ・友だちは削除しません。"

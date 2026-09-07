@@ -431,7 +431,7 @@ export function IncomingOverview({
 
   return (
     <section aria-label="こちらで受け取る詳細">
-      <p className="bg-accent-soft text-ink-secondary rounded-card mb-4 px-4 py-3 text-sm leading-6">
+      <p className="bg-info-bg text-info rounded-card mb-4 px-4 py-3 text-sm leading-6">
         相手のサービスで起きたことを、うちに取り込みます。下のURLを相手に貼ってもらってください。合言葉は人に見せないでください。
       </p>
 
@@ -479,16 +479,14 @@ export function IncomingOverview({
                 <dd className="mt-1"><StatusBadge tone={selected.hasSecret ? 'success' : 'warning'} size="compact">{selected.hasSecret ? '設定済み（再表示しません）' : '未設定'}</StatusBadge></dd>
               </div>
             </dl>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-2 flex flex-wrap gap-2">
               <Button variant="secondary" onClick={() => onToggle(selected.id, selected.isActive)} disabled={!selected.hasSecret && !selected.isActive}>
                 {selected.isActive ? '止める' : '動かす'}
               </Button>
               <Button variant="secondary" onClick={() => onRotate(selected)}>合言葉を更新</Button>
               <Button variant="secondary" onClick={() => onDelete(selected)}>削除</Button>
             </div>
-          </section>
-
-          <section className="bg-canvas border-hairline rounded-card border p-5">
+          <div className="border-hairline mt-4 border-t pt-3.5">
             <h2 className="text-ink mb-3 text-lg font-bold">届いたらすること</h2>
             {detailStatus === 'loading' ? (
               <p className="text-ink-secondary text-sm">保存されている処理を読み込んでいます。</p>
@@ -500,9 +498,9 @@ export function IncomingOverview({
                 action={<Button variant="secondary" onClick={() => setDetailReloadKey((key) => key + 1)}>詳細を再読み込み</Button>}
               />
             ) : detail && detail.actions.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {detail.actions.map((action, index) => (
-                  <div key={`${action.refKind}-${index}`} className="bg-canvas-sunken rounded-control px-4 py-3">
+                  <div key={`${action.refKind}-${index}`} className="bg-canvas-sunken rounded-control px-4 py-2">
                     <strong className="text-ink block text-sm">{incomingActionLabel(action.refKind)}</strong>
                     <span className="text-ink-secondary mt-1 block text-xs">{action.displayName}</span>
                   </div>
@@ -511,6 +509,7 @@ export function IncomingOverview({
             ) : (
               <p className="text-ink-secondary text-sm">届いた後に動かす処理は、まだ設定されていません。</p>
             )}
+          </div>
           </section>
 
           <section className="bg-canvas border-hairline rounded-card border p-5">
@@ -641,9 +640,9 @@ function formatReceivedAt(value: string): string {
 function maskedSampleText(fields: NonNullable<IncomingWebhookDetail['latestSample']>['fields']): string {
   const rows = fields.map((field) => {
     const name = field.path.replace(/^\$\.?/, '') || '$'
-    return `  "${name}": "${field.maskedValue}"`
+    return `"${name}": "${field.maskedValue}"`
   })
-  return `{\n${rows.join(',\n')}\n}`
+  return `{ ${rows.join(', ')} }`
 }
 
 function maskedEndpoint(value: string): string {
