@@ -3507,20 +3507,7 @@ export const OUTGOING_WEBHOOKS = [
     createdAt: '2026-02-01T00:00:00.000Z', updatedAt: '2026-08-25T01:10:00.000Z',
   },
   {
-    id: 'owh-chatwork', name: 'Chatwork ／ 店舗連絡',
-    url: 'https://api.chatwork.com/v2/rooms/000000/messages',
-    eventTypes: ['booking.created'], hasSecret: true, isActive: true,
-    maxRetries: 3, consecutiveFailures: 0, lastFailedAt: null,
-    deliverySummary: {
-      periodDays: 30, total: 612, succeeded: 612, failed: 0, pending: 0,
-      successRate: 100,
-      lastResult: { status: 'succeeded', responseStatus: 200, completedAt: '2026-08-23T09:00:00.000Z', failureReason: null },
-      canRetry: false,
-    },
-    createdAt: '2026-05-20T00:00:00.000Z', updatedAt: '2026-08-23T09:00:00.000Z',
-  },
-  {
-    id: 'owh-zapier', name: 'Zapier ／ 申込のふり分け',
+    id: 'owh-zapier', name: 'Zapier ／ ひとまとめ',
     url: 'https://hooks.zapier.com/hooks/catch/000000/visual-qa/',
     eventTypes: ['form.submitted'], hasSecret: true, isActive: true,
     maxRetries: 3, consecutiveFailures: 0, lastFailedAt: null,
@@ -3533,16 +3520,28 @@ export const OUTGOING_WEBHOOKS = [
     createdAt: '2026-06-02T00:00:00.000Z', updatedAt: '2026-08-22T04:00:00.000Z',
   },
   {
-    /* 設計の「止めているもの 1本」。**合言葉なしの1本**でもある（健全性チェックの「注意」の元）。 */
-    id: 'owh-paused', name: 'テスト用の受け口 ／ 検証中',
-    url: 'https://example.com/hook/visual-qa',
-    eventTypes: ['friend.added'], hasSecret: false, isActive: false,
+    /* 設計の5行目。**合言葉なしの1本**でもある（健全性チェックの「注意」の元）。 */
+    id: 'owh-inventory', name: '自社の在庫システム',
+    url: 'https://api.example.com/stock/visual-qa',
+    eventTypes: ['conversion.confirmed'], hasSecret: false, isActive: false,
     maxRetries: 0, consecutiveFailures: 0, lastFailedAt: null,
     deliverySummary: {
       periodDays: 30, total: 0, succeeded: 0, failed: 0, pending: 0,
       successRate: null, lastResult: null, canRetry: false,
     },
     createdAt: '2026-07-15T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+  },
+  {
+    /* 2ページ目の1本。設計の先頭5件へ割り込まないよう、送信実績は0件。 */
+    id: 'owh-chatwork', name: 'Chatwork ／ 店舗連絡',
+    url: 'https://api.chatwork.com/v2/rooms/000000/messages',
+    eventTypes: ['booking.created'], hasSecret: true, isActive: true,
+    maxRetries: 3, consecutiveFailures: 0, lastFailedAt: null,
+    deliverySummary: {
+      periodDays: 30, total: 0, succeeded: 0, failed: 0, pending: 0,
+      successRate: null, lastResult: null, canRetry: false,
+    },
+    createdAt: '2026-05-20T00:00:00.000Z', updatedAt: '2026-07-31T09:00:00.000Z',
   },
 ]
 
@@ -3554,13 +3553,13 @@ export const INCOMING_WEBHOOKS = [
     createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z',
   },
   {
-    id: 'iwh-ec', name: 'ECサイトから（注文）', sourceType: 'ec',
+    id: 'iwh-survey', name: 'アンケートツールから', sourceType: 'form',
     hasSecret: true, isActive: true,
     createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z',
   },
   {
-    id: 'iwh-form', name: '外部フォームから', sourceType: 'form',
-    hasSecret: false, isActive: true,
+    id: 'iwh-accounting', name: '会計ソフトから', sourceType: 'payment',
+    hasSecret: false, isActive: false,
     createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z',
   },
 ]
@@ -4071,18 +4070,40 @@ export const CONVERSION_DEFINITIONS = {
 }
 
 /*
-  設計の積み上げグラフ用。8日分にまとめているが、地点別の合計は一覧KPIの
-  486件と一致する（商品386、申込42、予約38、定期12、視聴8）。
+  設計の積み上げグラフ用。期間の30日を省略せず、8/13の山を含める。
+  地点別の合計も一覧KPIの486件と一致する（商品386、申込42、予約38、定期12、視聴8）。
 */
 const CONVERSION_DAILY_COUNTS = [
-  ['2026-07-27', 60, 6, 5, 2, 1],
-  ['2026-08-01', 63, 7, 6, 2, 1],
-  ['2026-08-06', 62, 6, 5, 2, 1],
-  ['2026-08-11', 58, 5, 5, 1, 1],
-  ['2026-08-13', 75, 10, 7, 2, 2],
-  ['2026-08-16', 35, 4, 4, 1, 1],
-  ['2026-08-21', 20, 3, 3, 1, 1],
-  ['2026-08-25', 13, 1, 3, 1, 0],
+  ['2026-07-27', 10, 1, 1, 0, 0],
+  ['2026-07-28', 11, 1, 1, 0, 0],
+  ['2026-07-29', 12, 1, 1, 0, 0],
+  ['2026-07-30', 9, 1, 1, 0, 0],
+  ['2026-07-31', 10, 1, 1, 1, 0],
+  ['2026-08-01', 11, 1, 1, 0, 0],
+  ['2026-08-02', 12, 1, 1, 1, 1],
+  ['2026-08-03', 10, 1, 1, 0, 0],
+  ['2026-08-04', 11, 1, 1, 0, 0],
+  ['2026-08-05', 12, 1, 1, 1, 0],
+  ['2026-08-06', 13, 1, 1, 0, 0],
+  ['2026-08-07', 10, 1, 1, 0, 1],
+  ['2026-08-08', 11, 1, 1, 1, 0],
+  ['2026-08-09', 12, 1, 1, 0, 0],
+  ['2026-08-10', 13, 1, 1, 0, 0],
+  ['2026-08-11', 14, 1, 1, 1, 0],
+  ['2026-08-12', 16, 1, 1, 0, 0],
+  ['2026-08-13', 30, 6, 4, 2, 2],
+  ['2026-08-14', 15, 2, 2, 1, 0],
+  ['2026-08-15', 14, 2, 2, 0, 0],
+  ['2026-08-16', 13, 2, 1, 0, 1],
+  ['2026-08-17', 12, 1, 1, 1, 0],
+  ['2026-08-18', 11, 1, 1, 0, 0],
+  ['2026-08-19', 10, 1, 1, 0, 0],
+  ['2026-08-20', 13, 2, 2, 1, 0],
+  ['2026-08-21', 14, 2, 2, 0, 1],
+  ['2026-08-22', 15, 2, 2, 1, 0],
+  ['2026-08-23', 16, 1, 1, 0, 1],
+  ['2026-08-24', 12, 1, 1, 1, 0],
+  ['2026-08-25', 14, 2, 1, 0, 1],
 ]
 
 const CONVERSION_DAILY_VALUES = [1587, 12000, 1816, 8217, 0]
@@ -4933,6 +4954,58 @@ export const NEN_PHOTO_DETAIL = {
   risks: [
     { flag: 'face', confidence: 0.78, note: 'うしろに人の顔', provider: 'visual-qa', model_version: 'fixture-1', assessed_at: '2026-08-25T08:10:00.000Z' },
     { flag: 'blur', confidence: 0.04, note: '明るさ・ぶれは問題ありません', provider: 'visual-qa', model_version: 'fixture-1', assessed_at: '2026-08-25T08:10:00.000Z' },
+  ],
+}
+
+/** 機能22の実APIで返す一覧集計。設計 `Qu6Vk` の通常状態。 */
+export const NEN_PHOTO_REVIEW_METRICS = {
+  pendingCount: 18,
+  reviewedCount: 142,
+  averageReviewMinutes: 22 / 60,
+  oldestPendingAt: '2026-08-23T00:00:00.000Z',
+  attentionCount: 2,
+}
+
+/** 派生画像処理の最新状態。原本のURLや秘密値は含めない。 */
+export const NEN_PHOTO_ASSET_STATUS = {
+  reviewVersion: 1,
+  jobs: [
+    {
+      id: 'photo-asset-job-1', photoId: 'ph-1', lineAccountId: 'visual-qa-account',
+      requestedVersion: 1, status: 'completed', requestedBy: 'visual-qa-owner', operation: 'all',
+      createdAt: '2026-08-25T00:10:00.000Z', startedAt: '2026-08-25T00:10:01.000Z',
+      completedAt: '2026-08-25T00:10:04.000Z', errorMessage: null,
+    },
+  ],
+}
+
+/** 実際に作成済みとして見せる3種類の派生画像。 */
+export const NEN_PHOTO_DERIVATIVES = {
+  reviewVersion: 1,
+  items: [
+    { kind: 'public', sourceVersion: 1, objectKey: 'public/ph-1-v1.webp', contentType: 'image/webp', byteSize: 184320, width: 1280, height: 960, createdAt: '2026-08-25T00:10:04.000Z' },
+    { kind: 'review', sourceVersion: 1, objectKey: 'review/ph-1-v1.webp', contentType: 'image/webp', byteSize: 286720, width: 1600, height: 1200, createdAt: '2026-08-25T00:10:03.000Z' },
+    { kind: 'thumbnail', sourceVersion: 1, objectKey: 'thumbnail/ph-1-v1.webp', contentType: 'image/webp', byteSize: 24576, width: 320, height: 240, createdAt: '2026-08-25T00:10:02.000Z' },
+  ],
+  knownUrls: [
+    { kind: 'review', url: NEN_PHOTOS[0].image_url, sourceVersion: 1 },
+    { kind: 'public', url: NEN_PHOTOS[0].image_url, sourceVersion: 1 },
+  ],
+}
+
+/** POSTは保存せず、本番と同じ受付結果だけを返す。 */
+export const NEN_PHOTO_ASSET_PROCESS_RESULT = {
+  id: 'photo-asset-job-2', photoId: 'ph-1', lineAccountId: 'visual-qa-account',
+  requestedVersion: 1, status: 'queued', requestedBy: 'visual-qa-owner', operation: 'all',
+  createdAt: '2026-08-25T00:12:00.000Z', startedAt: null, completedAt: null, errorMessage: null,
+}
+
+export const NEN_PHOTO_BULK_DECISION_RESULT = {
+  updatedCount: 3,
+  items: [
+    { photoId: 'ph-1', decision: 'approve', reviewVersion: 2 },
+    { photoId: 'ph-2', decision: 'approve', reviewVersion: 2 },
+    { photoId: 'ph-3', decision: 'approve', reviewVersion: 2 },
   ],
 }
 

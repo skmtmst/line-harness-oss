@@ -17,20 +17,30 @@ describe('受付枠と休業日のV6契約', () => {
     }
   })
 
-  it('受付上限と空き枠のAPI結果を表示する', () => {
-    expect(PAGE).toContain('休けい時間を保存するAPIは未接続です')
-    expect(PAGE).toContain('bookingApi.listResources')
-    expect(PAGE).toContain('bookingApi.getAvailability')
-    expect(PAGE).toContain('実際の空きと残数を表示します')
+  it('店舗設定と実際の空き状況を読み、未契約の値だけを作らない', () => {
+    expect(PAGE).toContain('bookingApi.getSettings(selectedAccountId)')
+    expect(PAGE).toContain('settings.businessHours.find')
+    expect(PAGE).toContain('settings.maxActiveBookingsPerFriend')
+    expect(PAGE).toContain('bookingApi.getAvailability(selectedAccountId')
+    expect(PAGE).not.toContain('staffId: staff.id')
+    expect(PAGE).toContain('○・△・×は受付上限に対する残数を反映しています')
+    expect(PAGE).toContain('bookingApi.listResources(selectedAccountId)')
     expect(PAGE).not.toContain('準備中')
   })
 
   it('画面確認APIが通常状態を本番と同じ器で返す', () => {
-    for (const name of ['BOOKING_AVAILABILITY_RULES', 'BOOKING_STAFF_SHIFTS', 'BOOKING_GOOGLE_CALENDAR']) {
+    for (const name of ['BOOKING_SETTINGS', 'BOOKING_AVAILABILITY']) {
       expect(FIXTURES).toContain(`export const ${name}`)
       expect(MOCK).toContain(name)
     }
-    expect(MOCK).toContain("/availability-rules$/")
-    expect(MOCK).toContain("/google-calendar$/")
+    expect(MOCK).toContain("'/api/booking/admin/availability'")
+    expect(MOCK).toContain("'/api/booking/admin/settings'")
+  })
+
+  it('休業日は実APIへ保存し、画面にも追加する', () => {
+    expect(PAGE).toContain('bookingApi.createException(selectedAccountId')
+    expect(PAGE).toContain("scopeKind: 'store'")
+    expect(PAGE).toContain("kind: 'closed'")
+    expect(PAGE).toContain('exceptions: [...current.exceptions, response.data]')
   })
 })
