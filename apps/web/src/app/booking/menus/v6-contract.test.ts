@@ -56,8 +56,17 @@ describe('V6 予約設定', () => {
     expect(LIST).toContain('bookingApi.getSettings(selectedAccountId)')
     expect(LIST).toContain('<Pagination page={page} pageCount={pageCount}')
     expect(LIST).toContain('止める・出す')
+    expect(LIST).toContain('bookingApi.patchMenu(selectedAccountId, menu.id, version')
+    expect(LIST).toContain('error={visibilityError ?? undefined}')
     expect(LIST).not.toContain('メニュー名で検索')
     expect(LIST).not.toContain('CSVで書き出す')
+  })
+
+  it('作成後の担当保存だけが失敗した場合は、作成済みと伝えて設定導線を出す', () => {
+    expect(CREATE).toContain('setCreatedMenuNeedingStaff(res.id)')
+    expect(CREATE).toContain('メニューは作成されましたが、担当スタッフを保存できませんでした。')
+    expect(CREATE).toContain('担当スタッフを設定する')
+    expect(CREATE).toContain('/booking/menus?tab=staff&menu=')
   })
 
   it('読込・失敗・空を同じ空状態として扱わない', () => {

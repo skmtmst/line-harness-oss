@@ -107,6 +107,10 @@ describe('V6 マイルの正本URLと概念分離', () => {
   it('作成画面も mileage_rules のAPIと正本URLを使う', () => {
     expect(NEW_RULE).toContain('api.mileage.createRule')
     expect(NEW_RULE).toContain('api.mileage.saveEarningRuleDraft')
+    // #532(#521): 旧口の作成は選択中のLINEアカウントに帰属させる。
+    expect(NEW_RULE).toContain('lineAccountId: selectedAccountId!')
+    expect(NEW_RULE).toContain("if (!selectedAccountId) return 'LINEアカウントを選択してください'")
+    expect(API).toContain('lineAccountId: string\n    }) => fetchApi<ApiResponse<MileageRule>>')
     expect(NEW_RULE).toContain('expiresAfterDays: expiryDays')
     expect(NEW_RULE).toContain('cancellationEventTypes:')
     expect(NEW_RULE).toContain('notification: {')
