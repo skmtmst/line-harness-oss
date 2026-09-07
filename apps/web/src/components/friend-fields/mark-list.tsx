@@ -71,29 +71,32 @@ function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, saving, e
   const dialogRef = useOverlayFocus(true, onCancel, saving)
   const selected = impact?.replacementOptions.find((option) => option.id === replacementMarkId)
   return (
-    <div ref={dialogRef} className="fixed inset-0 z-50 flex items-center justify-center bg-ink/45 p-4">
-      <section className="w-full max-w-2xl rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
-        <h2 className="text-xl font-bold text-ink">対応マーク「{mark.name}」を保管しますか？</h2>
-        <p className="mt-2 text-sm leading-6 text-ink-secondary">保管後は新しく選べません。いま付いている友だちは、選んだマークへ置き換えて履歴を残します。</p>
-        {loading ? <p className="mt-5 rounded-control bg-surface-soft p-4 text-sm text-ink-faint">影響を確認しています…</p> : impact ? (
-          <div className="mt-5 space-y-4">
-            <dl className="divide-y divide-hairline overflow-hidden rounded-control border border-hairline text-sm">
-              <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">置き換える友だち</dt><dd className="font-bold">{impact.friendCount}人</dd></div>
-              <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">自動変更ルール</dt><dd className="font-bold">{impact.automationRules.length}件</dd></div>
-              <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">表示先</dt><dd className="max-w-md text-right font-bold">{impact.displayTargets.map((target) => DISPLAY_TARGET_LABELS[target]).join('・')}</dd></div>
-            </dl>
+    <div ref={dialogRef} className="fixed inset-0 z-50 flex justify-center bg-ink/45 px-4">
+      <div data-design-part="archive-position" className="w-full">
+      <section data-design-node="zGZMA" className="w-full rounded-card border border-hairline bg-canvas p-4 shadow-2xl" role="alertdialog" aria-modal="true">
+        <h2 className="text-lg font-bold text-ink">対応マーク「{mark.name}」を保管しますか？</h2>
+        <p className="mt-2 text-xs leading-5 text-ink-secondary">保管後は新しく選べません。いま付いている友だちは、選んだマークへ置き換えて履歴を残します。</p>
+        {loading ? <p className="mt-3 rounded-control bg-surface-soft p-3 text-sm text-ink-faint">影響を確認しています…</p> : impact ? (
+          <div className="mt-3">
             <label className="block text-sm font-semibold text-ink">置き換え先
               <select value={replacementMarkId} onChange={(event) => onReplacement(event.target.value)} className="v6-select mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal">
                 <option value="">選んでください</option>
                 {impact.replacementOptions.map((option) => <option key={option.id} value={option.id}>{option.name}{option.isDefault ? '（初期値）' : ''}</option>)}
               </select>
             </label>
-            {selected ? <p className="text-xs text-ink-faint">{impact.friendCount}人を「{selected.name}」へ置き換えます。</p> : null}
+            {selected ? <p className="mt-2 text-xs text-ink-faint">{impact.friendCount}人を「{selected.name}」へ置き換えます。</p> : null}
           </div>
         ) : null}
         {error ? <p role="alert" className="mt-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
-        <div className="mt-6 flex justify-end gap-2"><Button onClick={onCancel} disabled={saving}>やめる</Button><button type="button" onClick={onConfirm} disabled={loading || saving || !impact?.canArchive || !replacementMarkId} className="rounded-control bg-danger px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">{saving ? '保管中…' : '置き換えて保管する'}</button></div>
+        <div className="mt-4 flex justify-end gap-2"><Button onClick={onCancel} disabled={saving}>やめる</Button><button type="button" onClick={onConfirm} disabled={loading || saving || !impact?.canArchive || !replacementMarkId} className="h-9 rounded-control bg-danger px-4 text-sm font-bold text-on-accent disabled:opacity-40">{saving ? '保管中…' : '置き換えて保管する'}</button></div>
       </section>
+      </div>
+      <style jsx global>{`
+        [data-design-part='archive-position'] {
+          margin-top: 310px;
+          max-width: 680px;
+        }
+      `}</style>
     </div>
   )
 }

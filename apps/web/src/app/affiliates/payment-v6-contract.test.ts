@@ -54,13 +54,14 @@ describe('V6 支払いの追記台帳契約', () => {
   })
 
   it('人ごとの内訳は実プレビューを読み、締め期間と登録状態を重ねる', () => {
-    expect(DIALOGS).toContain('designNode="GqFTV"')
+    expect(DIALOGS).toContain('data-design-node="GqFTV"')
     expect(DIALOGS).toContain('api.affiliates.paymentPreview')
     expect(DIALOGS).toContain('api.affiliates.confirmPayment')
     expect(DIALOGS).toContain('periodTo ?? preview.closeDate')
     expect(DIALOGS).toContain('settlement?.bankProfileRegistered')
     expect(DIALOGS).toContain('api.affiliates.createStatement')
-    expect(DIALOGS).toContain('支払明細のPDFを作り、この方のLINEへ知らせる')
+    expect(DIALOGS).toContain('確定したことを、この方のLINEに知らせる')
+    expect(DIALOGS).toContain('支払明細のPDFを作る')
     expect(DIALOGS).toContain('支払いは確定しましたが、支払明細とLINE通知を作れませんでした')
   })
 

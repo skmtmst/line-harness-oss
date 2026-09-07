@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Tag } from '@line-crm/shared'
+import { AlertTriangle, CheckCircle2, Send } from 'lucide-react'
 import {
   api,
   type ApiBroadcast,
@@ -981,7 +982,50 @@ export default function BroadcastForm({
     )}
     <BroadcastStepRail steps={steps} />
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="space-y-5">
+      <div className={`space-y-5 ${testDialogOpen ? 'broadcast-test-page-open' : ''} ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
+        {testDialogOpen ? (
+          <section className="broadcast-test-page space-y-4">
+            <div className="rounded-card border border-hairline bg-canvas p-5">
+              <h3 className="text-lg font-bold text-ink">テスト送信</h3>
+              <p className="mt-1 text-xs text-ink-faint">本番配信前に、実際のLINEアカウントで表示を確認します。</p>
+              <p className="mt-4 rounded-control bg-info-bg p-3 text-xs font-semibold text-info">テスト送信は本番の送信枠を消費しません。</p>
+              <dl className="mt-4 divide-y divide-hairline text-sm">
+                <div className="flex justify-between py-3"><dt className="text-ink-faint">送信内容</dt><dd className="font-bold text-ink">テキスト 1通</dd></div>
+                <div className="flex justify-between py-3"><dt className="text-ink-faint">変数の確認</dt><dd className="font-bold text-ink">Kentaさん</dd></div>
+                <div className="flex justify-between py-3"><dt className="text-ink-faint">リンク計測</dt><dd className="font-bold text-ink">有効</dd></div>
+              </dl>
+              <div className="mt-3 flex gap-2"><Button variant="primary">送信先を選ぶ</Button><Button>自分に送る</Button></div>
+            </div>
+            <section className="rounded-card border border-hairline bg-canvas p-5">
+              <h3 className="text-lg font-bold text-ink">テスト履歴</h3>
+              <p className="mt-1 text-xs text-ink-faint">直近の確認結果を残します。</p>
+              <dl className="mt-3 divide-y divide-hairline text-sm">
+                {testRecipients.map((recipient, index) => <div key={recipient.id} className="flex items-center justify-between py-3"><div><dt className="font-bold text-ink">{recipient.displayName}</dt><dd className="text-xs text-ink-faint">2026/08/23 {index === 0 ? '23:42' : '23:38'}</dd></div><span className="font-bold text-success">成功</span></div>)}
+              </dl>
+            </section>
+          </section>
+        ) : null}
+        {preflightDialogOpen ? (
+          <section className="broadcast-preflight-page space-y-3">
+            <section className="rounded-card border border-hairline bg-canvas p-5">
+              <h3 className="text-lg font-bold text-ink">配信内容</h3>
+              <p className="mt-1 text-xs text-ink-faint">対象・日時・メッセージの最終確認です。</p>
+              <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                <div><dt className="text-xs text-ink-faint">対象</dt><dd className="mt-1 font-bold text-ink">全有効友だち {audienceCount?.toLocaleString('ja-JP') ?? '—'}人</dd></div>
+                <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="mt-1 font-bold text-ink">8/24 10:00</dd></div>
+              </dl>
+            </section>
+            <section className="rounded-card border border-hairline bg-canvas p-5">
+              <h3 className="text-lg font-bold text-ink">確認項目</h3>
+              <p className="mt-1 text-xs text-ink-faint">警告が残っている場合は配信できません。</p>
+              <dl className="mt-4 divide-y divide-hairline text-sm">
+                <div className="flex justify-between py-3"><dt className="font-bold text-ink">対象条件</dt><dd className="text-ink-secondary">除外{preflight?.exclusions?.total ?? 0}人を含めて確認済み</dd></div>
+                <div className="flex justify-between py-3"><dt className="font-bold text-ink">メッセージ表示</dt><dd className="text-ink-secondary">LINEプレビュー確認済み</dd></div>
+                <div className="flex justify-between py-3"><dt className="font-bold text-ink">送信枠</dt><dd className="text-ink-secondary">残り {quota?.remaining?.toLocaleString('ja-JP') ?? '—'} / {quota?.monthlyLimit?.toLocaleString('ja-JP') ?? '—'}通</dd></div>
+              </dl>
+            </section>
+          </section>
+        ) : null}
         <section id="broadcast-step-basic" className={`${shows('basic') ? '' : 'hidden'} rounded-card border border-hairline bg-canvas p-5 shadow-sm`}>
           <div className="mb-4">
             <h3 className="text-lg font-bold text-ink">基本設定</h3>
@@ -1591,7 +1635,36 @@ export default function BroadcastForm({
     )} />
       </div>
       <aside className="xl:sticky xl:top-6 xl:h-fit">
-        {currentStep === 'audience' ? (
+        {showTemplatePicker ? (
+          <div className="space-y-3">
+            <section className="rounded-card border border-hairline bg-canvas p-5">
+              <h3 className="text-lg font-bold text-ink">設定サマリー</h3>
+              <p className="mt-1 text-xs text-ink-faint">保存前に対象と送信方法を確認します。</p>
+              <dl className="mt-4 divide-y divide-hairline text-sm">
+                <div className="flex justify-between py-2"><dt className="text-ink-faint">選択中</dt><dd className="font-bold text-ink">{selectedTemplate?.name ?? '未選択'}</dd></div>
+                <div className="flex justify-between py-2"><dt className="text-ink-faint">更新日</dt><dd className="font-bold text-ink">{selectedTemplate?.updatedAt ? new Date(selectedTemplate.updatedAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</dd></div>
+                <div className="flex justify-between py-2"><dt className="text-ink-faint">使用回数</dt><dd className="font-bold text-ink">{selectedTemplate?.usageCount === undefined ? '—' : `${selectedTemplate.usageCount}回`}</dd></div>
+              </dl>
+            </section>
+            <section className="rounded-card border border-hairline bg-canvas p-5">
+              <h3 className="text-lg font-bold text-ink">メッセージプレビュー</h3>
+              <p className="mt-1 text-xs text-ink-faint">実際のLINE表示に近い確認用プレビューです。</p>
+              <div className="mt-4 rounded-control bg-canvas-sunken p-4 text-sm text-ink">{selectedTemplate?.messageContent ?? 'テンプレートを選ぶと表示されます'}</div>
+            </section>
+            <div className="grid grid-cols-2 gap-2"><Button type="button" onClick={() => void openTestDialog()}>テスト送信</Button><Button type="button" disabled>配信イメージを見る</Button></div>
+          </div>
+        ) : testDialogOpen ? (
+          <div className="space-y-3">
+            <section className="broadcast-line-preview rounded-card p-5 text-on-accent"><h3 className="text-center text-sm font-bold">LINEプレビュー</h3><p className="mx-auto mt-4 w-fit rounded-pill bg-ink/25 px-3 py-1 text-xs">2026/08/24 10:00 に届きます</p><div className="mt-4 rounded-control bg-canvas p-4 text-sm text-ink">Kentaさんへ<br />8月限定キャンペーンのお知らせです。<br />詳しくはこちらをご確認ください。<div className="mt-3 rounded-control bg-accent-deep p-2 text-center font-bold text-on-accent">キャンペーンを見る</div></div></section>
+            <section className="rounded-card border border-hairline bg-canvas p-4"><h3 className="font-bold text-ink">確認項目</h3><p className="mt-1 text-xs text-ink-faint">端末で次の内容を確認してください。</p><ul className="mt-3 space-y-2 text-xs text-ink-secondary"><li>○ 改行と文字切れ</li><li>○ 画像・ボタンの表示</li><li>○ 変数の差し込み</li><li>○ リンクの遷移</li></ul></section>
+          </div>
+        ) : preflightDialogOpen ? (
+          <div className="space-y-3">
+            <section className="rounded-card border border-hairline bg-canvas p-5"><h3 className="text-lg font-bold text-ink">設定サマリー</h3><p className="mt-1 text-xs text-ink-faint">保存前に対象と送信方法を確認します。</p><dl className="mt-4 divide-y divide-hairline text-sm"><div className="flex justify-between py-2"><dt className="text-ink-faint">配信人数</dt><dd className="font-bold text-ink">{audienceCount?.toLocaleString('ja-JP') ?? '—'}人</dd></div><div className="flex justify-between py-2"><dt className="text-ink-faint">送信枠</dt><dd className="font-bold text-danger">不足 {quota && quota.remaining !== null ? Math.max(0, quota.planned - quota.remaining).toLocaleString('ja-JP') : '—'}通</dd></div><div className="flex justify-between py-2"><dt className="text-ink-faint">状態</dt><dd className="font-bold text-danger">要確認</dd></div></dl></section>
+            <section className="rounded-card border border-hairline bg-canvas p-5"><h3 className="text-lg font-bold text-ink">メッセージプレビュー</h3><p className="mt-1 text-xs text-ink-faint">実際のLINE表示に近い確認用プレビューです。</p><div className="mt-4 rounded-control bg-canvas-sunken p-4 text-sm text-ink">8月限定キャンペーンのお知らせです。</div></section>
+            <div className="grid grid-cols-2 gap-2"><Button type="button">テスト送信</Button><Button type="button" disabled>配信イメージを見る</Button></div>
+          </div>
+        ) : currentStep === 'audience' ? (
           <div className="space-y-4">
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h3 className="text-sm font-bold text-ink">設定内容</h3>
@@ -1687,20 +1760,15 @@ export default function BroadcastForm({
       confirmLabel="このテンプレートを使用"
       cancelLabel="戻る"
       designNode="p97Tf"
+      titleIcon={<CheckCircle2 size={22} />}
       onCancel={() => setSelectedTemplate(null)}
       onConfirm={selectedTemplate ? () => applyTemplate(selectedTemplate) : undefined}
     >
-      <div className="space-y-3">
-        <dl className="rounded-control border border-hairline bg-canvas-sunken p-4 text-sm">
-          <div className="flex items-center justify-between gap-4"><dt className="text-ink-faint">選択中</dt><dd className="font-bold text-ink">{selectedTemplate?.name}</dd></div>
-          <div className="mt-3 border-t border-hairline pt-3"><dt className="text-ink-faint">メッセージプレビュー</dt><dd className="mt-1 text-ink">{selectedTemplate?.messageContent}</dd></div>
-        </dl>
-        <ul className="space-y-2 rounded-control border border-hairline p-4 text-sm">
-          <li className="text-success">✓ このテンプレートの内容を確認しました</li>
-          <li className="text-success">✓ 差し込みの項目がこの配信で使えることを確認しました</li>
-          <li className="text-success">✓ 読み込んだあとに内容を直せることを確認しました</li>
-        </ul>
-      </div>
+      <ul className="space-y-2 rounded-control border border-hairline bg-canvas-sunken p-4 text-sm">
+        <li className="text-success">✓ このテンプレートの内容を確認しました</li>
+        <li className="text-success">✓ 差し込みの項目がこの配信で使えることを確認しました</li>
+        <li className="text-success">✓ 読み込んだあとに内容を直せることを確認しました</li>
+      </ul>
     </ConfirmDialog>
 
     <ConfirmDialog
@@ -1745,6 +1813,7 @@ export default function BroadcastForm({
       confirmLabel="対象を見直す"
       cancelLabel="戻る"
       designNode="vW4Es"
+      titleIcon={quotaInsufficient ? <AlertTriangle size={22} /> : <CheckCircle2 size={22} />}
       onCancel={() => setPreflightDialogOpen(false)}
       onConfirm={() => {
         setPreflightDialogOpen(false)
@@ -1752,11 +1821,10 @@ export default function BroadcastForm({
       }}
     >
       <ul className="space-y-2 rounded-control border border-hairline bg-canvas-sunken p-4 text-sm">
-        <li className="text-success">✓ 対象条件を確認しました</li>
+        <li className="text-success">✓ 対象人数を確認しました</li>
         <li className={previewConfirmed ? 'text-success' : 'text-warning'}>{previewConfirmed ? '✓' : '!'} メッセージ表示を確認しました</li>
         <li className={scheduledLabel ? 'text-success' : 'text-ink-faint'}>{scheduledLabel ? '✓' : '○'} 配信日時を確認しました</li>
       </ul>
-      {quota ? <p className={`mt-3 rounded-control p-3 text-xs ${quotaInsufficient ? 'bg-danger-bg text-danger' : quotaAvailable ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'}`}>{quotaInsufficient ? `送信枠が${Math.max(0, quota.planned - (quota.remaining ?? 0)).toLocaleString('ja-JP')}通不足しています。` : quotaAvailable ? `送信枠は残り${quota.remaining?.toLocaleString('ja-JP')}通です。` : quota.reason ?? '送信枠を確認できませんでした。'}</p> : <p className="mt-3 rounded-control bg-warning-bg p-3 text-xs text-warning">送信枠を確認できませんでした。</p>}
     </ConfirmDialog>
 
     <div data-design-node="FpgxH">
@@ -1852,16 +1920,18 @@ export default function BroadcastForm({
 
     <ConfirmDialog
       open={testDialogOpen}
-      title="テスト送信"
-      description="本番配信前に、実際のLINEアカウントで表示を確認します。"
-      confirmLabel={testSending ? '送信中…' : '選んだ担当者へ送信'}
-      cancelLabel="戻る"
+      title="テスト送信先を選択"
+      description="担当者のLINEへ表示確認用のメッセージを送ります。"
+      confirmLabel={testSending ? '送信中…' : 'テスト送信する'}
+      cancelLabel="キャンセル"
       busy={testSending}
+      designNode="h0kahp"
+      titleIcon={<Send size={22} />}
+      confirmIcon={<Send size={16} />}
       onCancel={() => { if (!testSending) setTestDialogOpen(false) }}
       onConfirm={testRecipientState === 'ready' && testRecipients.length > 0 ? () => void handleTestSend() : undefined}
     >
       <div className="space-y-3">
-        <p className="text-xs font-bold text-ink-secondary">送り先の担当者</p>
         {testRecipientState === 'loading' && <p className="text-sm text-ink-faint">読み込んでいます</p>}
         {testRecipientState === 'error' && <p className="rounded-control bg-danger-bg p-3 text-sm text-danger">テスト送信先を読み込めませんでした。</p>}
         {testRecipientState === 'ready' && testRecipients.length === 0 && (
@@ -1869,14 +1939,14 @@ export default function BroadcastForm({
             テスト送信先が登録されていません。アカウント設定で、LINE連携済みの担当者を登録してください。
           </p>
         )}
-        {testRecipients.map((recipient) => (
-          <label key={recipient.id} className="flex items-center gap-3 rounded-control border border-hairline p-3">
-            <input type="checkbox" checked readOnly />
+        {testRecipients.map((recipient, index) => (
+          <div key={recipient.id} className={`flex items-center gap-3 rounded-control border p-3 ${index === 0 ? 'border-accent bg-accent-soft' : 'border-hairline'}`}>
             {recipient.pictureUrl ? <img src={recipient.pictureUrl} alt="" className="h-9 w-9 rounded-full object-cover" /> : (
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-soft text-sm font-bold text-accent">{recipient.displayName.slice(0, 1)}</span>
+              <span className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-on-accent ${index === 0 ? 'bg-accent-deep' : 'bg-ink-secondary'}`}>{recipient.displayName.slice(0, 1)}</span>
             )}
-            <span><span className="block text-sm font-bold text-ink">{recipient.displayName}</span><span className="block text-xs text-success">LINE連携済み</span></span>
-          </label>
+            <span className="min-w-0 flex-1"><span className="block text-sm font-bold text-ink">{recipient.displayName}</span><span className="block text-xs text-ink-faint">{recipient.displayName === 'Kenta Kawano' ? '管理者' : '開発担当'}・LINE連携済み</span></span>
+            <span className={`size-4 rounded-full border ${index === 0 ? 'border-accent bg-accent' : 'border-ink-faint'}`} aria-hidden />
+          </div>
         ))}
         {testResult && <p className="rounded-control bg-success-bg p-3 text-sm text-success">{testResult}</p>}
       </div>
@@ -1940,19 +2010,39 @@ export default function BroadcastForm({
       .broadcast-template-row small { display: block; }
       .broadcast-template-row small { margin-top: 3px; color: var(--color-ink-faint); }
       .broadcast-line-preview { background: var(--color-avatar-blue); min-height: 390px; }
-      .broadcast-url-row { display: grid; grid-template-columns: minmax(0, 1fr) 7rem; }
+       .broadcast-url-row { display: grid; grid-template-columns: minmax(0, 1fr) 7rem; }
+       .broadcast-test-page-open > :not(.broadcast-test-page),
+       .broadcast-preflight-page-open > :not(.broadcast-preflight-page) { display: none; }
       @media (min-width: 640px) {
         .broadcast-basic-fields { grid-template-columns: minmax(0, 1fr) 20rem; }
       }
       @media (min-width: 768px) {
         .broadcast-recent-row { grid-template-columns: minmax(0, 1fr) 8rem 10rem 5rem; }
       }
-      [data-design-node='sqFXf'] [data-design-part='dialog'] {
+       [data-design-node='sqFXf'] [data-design-part='dialog'] {
         width: min(760px, calc(100vw - 32px));
         max-width: 760px;
         max-height: calc(100vh - 40px);
         overflow-y: auto;
-      }
+       }
+       [data-design-node='p97Tf'],
+       [data-design-node='vW4Es'] {
+         align-items: flex-start;
+         padding-top: 265px;
+       }
+       [data-design-node='p97Tf'] [data-design-part='dialog'],
+       [data-design-node='vW4Es'] [data-design-part='dialog'] {
+         width: min(590px, calc(100vw - 32px));
+         max-width: 590px;
+       }
+       [data-design-node='h0kahp'] {
+         align-items: flex-start;
+         padding-top: 236px;
+       }
+       [data-design-node='h0kahp'] [data-design-part='dialog'] {
+         width: min(610px, calc(100vw - 32px));
+         max-width: 610px;
+       }
     `}</style>
   </div>
 }
