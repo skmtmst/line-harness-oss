@@ -50,6 +50,7 @@ describe('ダッシュボードV4の初期表示', () => {
     expect(editor).toContain('ダッシュボードに反映')
     expect(editor).toContain('5つ目をONにすると、いちばん下のカードが自動でOFFになります。')
     expect(qrDialog).toContain('style={{ maxWidth: 820 }}')
+    expect(qrDialog).toContain('border p-8 shadow-')
     expect(qrDialog).toContain("{ value: '300x300', label: '小（300px）'")
     expect(qrDialog).toContain('ダウンロード形式')
     expect(qrDialog).toContain('画像をダウンロード')
@@ -57,6 +58,8 @@ describe('ダッシュボードV4の初期表示', () => {
     expect(qrDialog).toContain("import QRCode from 'qrcode'")
     expect(qrDialog).toContain('QRCode.toDataURL(link')
     expect(qrDialog).toContain('src={qrDataUrl || qrSrc}')
+    expect(qrDialog).toContain('visualReferenceQr ?')
+    expect(qrDialog).toContain('<QrCode aria-label="友だち追加QRコード"')
   })
 
   it('新APIの指標を使い、旧Workerの値へだけ後方互換する', () => {
@@ -74,6 +77,15 @@ describe('ダッシュボードV4の初期表示', () => {
     expect(resolveOfficialProfileUrl(undefined, 'nen')).toBe('https://line.me/R/ti/p/@nen')
     expect(resolveOfficialProfileUrl(null, 'nen')).toBeNull()
     expect(resolveOfficialProfileUrl(null, null)).toBeNull()
+  })
+
+  it('撮影固定応答だけが設計見本QRと固定URLを選べる', () => {
+    const page = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    expect(page).toContain('visualQa?.friendAddUrl')
+    expect(page).toContain('visualReferenceQr={visualQa?.referenceQr ?? false}')
+    expect(page).toContain('data?.visualQa?.notificationUnreadCount')
+    expect(page).toContain('reference?.pendingPhotos')
+    expect(page).toContain('referenceCount={reference?.operationalAlerts}')
   })
 
   it('画面名はV6共通トップバーだけに表示する', () => {

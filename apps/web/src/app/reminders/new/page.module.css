@@ -1,0 +1,58 @@
+.screen [data-design='Right'] {
+  display: grid;
+  gap: 12px;
+}
+
+.previewActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.previewActions button {
+  width: 100%;
+}
+
+.previewNote {
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.basicFields > label:first-child {
+  position: relative;
+}
+
+.basicFieldsGrid {
+  display: grid;
+  gap: 16px;
+}
+
+.basicFields > label:first-child > small {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+.basicFields textarea {
+  min-height: 60px;
+  height: 60px;
+}
+
+.baseChoices button {
+  min-height: 94px;
+}
+
+.screen > :last-child {
+  margin-top: 56px;
+}
+
+@media (min-width: 1280px) {
+  .basicFieldsGrid {
+    grid-template-columns: minmax(0, 2fr) minmax(16rem, 1fr);
+  }
+
+  .screen > [data-design='Crumb'] + [data-design='Head'] + div {
+    grid-template-columns: minmax(0, 1fr) 390px;
+  }
+}
