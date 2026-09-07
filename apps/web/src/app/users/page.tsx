@@ -165,11 +165,11 @@ export default function UsersPage() {
 
       <SummaryBar rows={rows} />
 
-      <div className="flex flex-wrap items-stretch gap-2">
+      <div className="flex flex-wrap items-center gap-2" data-users-actions="true">
         <Button href="/friends/identity-candidates" variant="primary">
           ＋ 統合ユーザーを作成
         </Button>
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <UsersFilters
             q={q}
             onlyDups={onlyDups}
@@ -185,15 +185,14 @@ export default function UsersPage() {
           />
         </div>
         <Button type="button" onClick={exportCsv}>CSVで書き出す</Button>
-        <button
+        <Button
           type="button"
           onClick={() => setPendingForceRefresh(true)}
           disabled={refreshing}
-          className="rounded-[9px] border border-[#DADDE2] bg-white px-4 text-xs font-semibold text-[#565F59] shadow-[1px_1px_2px_rgba(29,29,31,0.13)] hover:bg-[#F6F6F8] disabled:opacity-50"
           title="最新の状態を取得して一覧を更新"
         >
           {refreshing ? '再計算中…' : '再計算'}
-        </button>
+        </Button>
       </div>
 
       <UsersTable

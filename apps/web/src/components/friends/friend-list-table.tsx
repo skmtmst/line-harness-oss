@@ -102,7 +102,7 @@ export default function FriendListTable({
   const rangeEnd = Math.min(page * pageSize, total)
 
   return (
-    <section className="flex min-h-155 flex-col overflow-hidden rounded-card border border-hairline bg-canvas shadow-card" data-design="V6FriendTable" data-design-node="k4Hz0X">
+    <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card" data-design="V6FriendTable" data-design-node="k4Hz0X">
       <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-hairline px-4">
         <h2 className="whitespace-nowrap text-sm font-bold text-ink">
           友だち一覧 <span className="ml-1 text-xs font-bold text-accent">{total.toLocaleString('ja-JP')}件</span>
@@ -179,13 +179,13 @@ export default function FriendListTable({
         {visible.has('last') ? <div className="truncate text-center">最終接触</div> : null}
       </div>
 
-      <div className="min-h-0 flex-1">
+      <div>
         {status === 'loading' ? (
-          <div className="flex h-full min-h-77.5 items-center justify-center bg-canvas-sunken/30 px-6">
+          <div className="flex items-center justify-center bg-canvas-sunken/30 px-6 py-10">
             <ListState kind="loading" title="読み込んでいます" description="このまま少しお待ちください。" />
           </div>
         ) : status === 'error' ? (
-          <div className="flex h-full min-h-77.5 items-center justify-center bg-canvas-sunken/30 px-6">
+          <div className="flex items-center justify-center bg-canvas-sunken/30 px-6 py-10">
             <ListState
               kind="error"
               title="表示できませんでした"
@@ -194,7 +194,7 @@ export default function FriendListTable({
             />
           </div>
         ) : friends.length === 0 ? (
-          <div className="flex h-full min-h-77.5 items-center justify-center bg-canvas-sunken/30 px-6">
+          <div className="flex items-center justify-center bg-canvas-sunken/30 px-6 py-10">
             <ListState kind="empty" title={emptyTitle} description={emptyDescription} />
           </div>
         ) : friends.map((friend) => (
