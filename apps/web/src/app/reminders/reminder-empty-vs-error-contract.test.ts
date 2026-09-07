@@ -22,6 +22,12 @@ const LIST_STATE = readFileSync(
  * もう一度お試しください。」で、ほかの画面は「表示できませんでした」だった。
  */
 describe('リマインダ一覧の空と失敗', () => {
+  it('一覧のフォルダ欄を共通パネルと16rem幅で表示する', () => {
+    expect(PAGE).toContain("import FolderPanel from '@/components/shared/folder-panel'")
+    expect(PAGE).toContain('lg:grid-cols-[16rem_minmax(0,1fr)]')
+    expect(PAGE).not.toContain('lg:grid-cols-[13rem_minmax(0,1fr)]')
+  })
+
   it('失敗の言い方を画面で書き直さない', () => {
     // 共通部品から引く。ここに文字列を直接書かない。
     expect(PAGE).toContain('LIST_STATE_PRESETS.error.title')

@@ -7,6 +7,7 @@ import Button from '@/components/shared/button'
 import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import FolderPanel from '@/components/shared/folder-panel'
 import { webinarLoadFailure, type WebinarLoadFailure } from './webinar-load-failure'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError, webinarApi, type Webinar, type WebinarFolder, type WebinarListItem, type WebinarOverview } from '@/lib/api'
@@ -54,7 +55,7 @@ function scheduleSummary(w: Webinar): string {
 type SortKey = 'updated' | 'created' | 'name'
 type SavedFilter = '' | 'active' | 'draft'
 
-const WEBINAR_FOLDERS = ['商品説明', '導入事例', 'セミナー', 'アーカイブ'] as const
+const UNFILED = '__unfiled__'
 
 function measuredCount(value: number | null | undefined): string {
   return typeof value === 'number' && Number.isFinite(value)
@@ -113,6 +114,7 @@ export default function WebinarsPage() {
   const [archiving, setArchiving] = useState(false)
   const [archiveError, setArchiveError] = useState('')
   const [folders, setFolders] = useState<WebinarFolder[]>([])
+  const [selectedFolder, setSelectedFolder] = useState('')
 
   const visibleItems = loadedAccountId === selectedAccountId ? items : []
   const visibleOverview = loadedOverviewAccountId === selectedAccountId ? overview : null
@@ -206,19 +208,24 @@ export default function WebinarsPage() {
     const searched = q
       ? visibleItems.filter((w) => w.title.includes(q) || w.slug.includes(q))
       : visibleItems
+    const foldered = selectedFolder === UNFILED
+      ? searched.filter((w) => !w.folderId)
+      : selectedFolder
+        ? searched.filter((w) => w.folderId === selectedFolder)
+        : searched
     const narrowed = savedFilter
-      ? searched.filter((w) => w.status === savedFilter)
-      : searched
+      ? foldered.filter((w) => w.status === savedFilter)
+      : foldered
     return [...narrowed].sort((a, b) => {
       if (sortKey === 'name') return a.title.localeCompare(b.title, 'ja')
       if (sortKey === 'created') return b.createdAt.localeCompare(a.createdAt)
       return b.updatedAt.localeCompare(a.updatedAt)
     })
-  }, [visibleItems, query, savedFilter, sortKey])
+  }, [visibleItems, query, selectedFolder, savedFilter, sortKey])
 
   useEffect(() => {
     setPage(1)
-  }, [query, savedFilter, sortKey, pageSize, selectedAccountId])
+  }, [query, selectedFolder, savedFilter, sortKey, pageSize, selectedAccountId])
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
   const currentPage = Math.min(page, pageCount)
@@ -281,27 +288,22 @@ export default function WebinarsPage() {
           <Button variant="primary" href="/webinars/new">ウェビナーを作成</Button>
         </div>
 
-        <div className="grid min-h-[640px] gap-4 lg:grid-cols-[252px_minmax(0,1fr)]">
-          <aside className="border-hairline bg-canvas rounded-card border p-4" aria-label="ウェビナーのフォルダ">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-ink text-sm font-bold">フォルダ</h2>
-              <span className="text-ink-faint text-xs">{folders.length > 0 ? `${folders.length + 1}件` : '—'}</span>
-            </div>
-            <button type="button" className="bg-accent-soft text-accent mt-3 flex w-full items-center justify-between rounded-control px-3 py-2 text-left text-xs font-semibold">
-              <span>すべて</span><span>{hasListData ? visibleItems.length : '—'}</span>
-            </button>
-            <ul className="mt-2 space-y-1">
-              {WEBINAR_FOLDERS.map((folder, index) => {
-                const measuredFolder = folders.find((item) => item.name === folder)
-                return (
-                <li key={folder} className="text-ink-secondary flex items-center justify-between rounded-control px-3 py-2 text-xs">
-                  <span className="flex min-w-0 items-center gap-2"><span className={`h-2 w-2 rounded-full ${['bg-blue-500', 'bg-amber-400', 'bg-violet-500', 'bg-indigo-500'][index]}`} /><span className="truncate">{folder}</span></span>
-                  <span className="text-ink-faint">{measuredFolder?.count ?? '—'}</span>
-                </li>
-                )
-              })}
-            </ul>
-          </aside>
+        <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+          <FolderPanel
+            total={hasListData ? `${visibleItems.length}件` : '—'}
+            activeId={selectedFolder}
+            onSelect={setSelectedFolder}
+            rows={[
+              { id: '', label: 'すべて', count: visibleItems.length },
+              ...folders.map((folder) => ({
+                id: folder.id,
+                label: folder.name,
+                count: visibleItems.filter((item) => item.folderId === folder.id).length,
+                color: folder.color,
+              })),
+              { id: UNFILED, label: '未分類', count: visibleItems.filter((item) => !item.folderId).length },
+            ]}
+          />
 
           <section className="min-w-0">
             <div data-design="Bar" className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
