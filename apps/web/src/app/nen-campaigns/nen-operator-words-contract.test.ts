@@ -8,8 +8,8 @@ const OVERVIEW = fs.readFileSync(path.join(__dirname, 'nen-overview.tsx'), 'utf8
 
 describe('V6 NEN配信の運用者向け文言契約', () => {
   it('メニューと画面でNEN配信の名前をそろえる', () => {
-    expect(PAGE).toContain('Header title="NEN配信"')
-    expect(PAGE).toContain('title="NEN配信"')
+    expect(PAGE).toContain("usePageTitle('NEN配信')")
+    expect(PAGE).not.toContain('<Header')
     expect(PAGE).not.toContain('title="フォロー配信"')
   })
 

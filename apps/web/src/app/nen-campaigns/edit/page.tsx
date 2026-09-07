@@ -4,7 +4,6 @@ import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
-import Header from '@/components/layout/header'
 import StickyBar from '@/components/shared/sticky-bar'
 import CampaignEditor from './campaign-editor'
 import { useAccount } from '@/contexts/account-context'
@@ -91,11 +90,6 @@ function NenColumnEditInner() {
 
   return (
     <div>
-      <Header
-        title="NENコラムを編集する"
-        description="LINEで配るときに前に付ける一言を決めます。"
-      />
-
       <nav className="text-ink-faint mb-4 text-xs">
         <Link href="/nen-campaigns" className="hover:underline">
           フォロー配信
