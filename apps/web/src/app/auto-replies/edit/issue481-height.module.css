@@ -1,0 +1,16 @@
+.screen :global([data-design-node='nzWIX'] > div:nth-child(2) > div:first-child > div:nth-child(2)) {
+  padding: 16px;
+}
+
+.screen :global([data-design-node='nzWIX'] > div:nth-child(2) > div:first-child > div:nth-child(2) > section) {
+  gap: 12px;
+}
+
+/* Pencil は操作の直後に同じ内容を文章で繰り返さない。 */
+.screen :global([data-design-node='nzWIX'] > div:nth-child(2) > div:first-child > div:nth-child(2) > section > div:nth-child(3) > p),
+.screen :global([data-design-node='nzWIX'] > div:nth-child(2) > div:first-child > div:nth-child(2) > section > div:nth-child(4) > p:nth-child(2)),
+.screen :global([data-design-node='nzWIX'] > div:nth-child(2) > div:first-child > div:nth-child(2) > section > div:nth-child(4) > div:nth-child(3) > p),
+.screen :global([data-design-node='nzWIX'] > div:nth-child(2) > div:first-child > div:nth-child(2) > section > div:nth-child(4) > p:nth-child(5)),
+.screen :global([data-design-node='nzWIX'] > div:nth-child(2) > div:first-child > div:nth-child(2) > section > div:nth-child(4) > div:nth-child(7) > span:last-child) {
+  display: none;
+}

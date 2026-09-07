@@ -532,7 +532,7 @@ export const SCREENS = [
   },
   { ...FRIENDS, node: 'I6UAdr', name: '3-1-D 友だち詳細', route: '/friends/detail?id=friend-1',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #452・#457で修正・再判定。** 一致。本文上部の旧題ブロックを外し、画面名はトップバーだけに表示。左列のマイルは見出しと詳細リンクに続く一段のカードへ変更し、利用可能数を `2,450 mile` の大きさと単位で表示した。3102/8789の1440/1920pxで横はみ出し0。",
+    verdictNote: "**2026-09-07 Issue #481で高さ差を再判定。** 一致。比較対象を固定データのある友だちへそろえ、Pencilと同じ高さ1384pxにした。画素差4.005%、1440/1920pxとも横はみ出し0。",
     verdictSource: "friends-v6/I6UAdr.txt + I6UAdr-{1440,1920}.png",
     verdictHead: "07b5835cf5",
   },
@@ -552,7 +552,7 @@ export const SCREENS = [
   },
   { ...FRIENDS, node: 'YzxU1', name: '3-2 重複検出', route: '/friends?tab=duplicates',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #452・#457で修正・再判定。** 一致。本文上部の旧題ブロックを外し、友だち機能タブから始まるPencil V6の上端構造へ統一。重複候補表の見出し行には下の表と同じ縦余白を付け、文字が潰れず同じ高さになるようそろえた。3102/8789の1440/1920pxで横はみ出し0。",
+    verdictNote: "**2026-09-07 Issue #481で高さ差を再判定。** 一致。固定データをPencilと同じ候補4行・アカウント4行・4×4マトリックスへそろえた。高さ差+1px、画素差5.0436%、1440/1920pxとも横はみ出し0。",
     verdictSource: "friends-v6/YzxU1.txt + YzxU1-{1440,1920}.png",
     verdictHead: "07b5835cf5",
   },
@@ -565,7 +565,7 @@ export const SCREENS = [
     },
     variants: [{ suffix: '-decide', steps: [{ qaOpen: 'InCDe', after: 700 }] }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #381で実API接続後に再判定。** 一致。判定根拠、結び付け後の影響、候補2件、項目ごとの採用値、タグ、判断履歴、別人・保留・結び付けの3判断、理由必須、利用目的と規約の確認を設計順に表示し、候補取得と判定保存の実APIへ接続した。連絡先は安全のためマスク済み値だけを表示する。通常・読込中・0件・取得失敗・権限不足・判定窓の全14枚で横はみ出し0、壊れ値・内部ID0件。",
+    verdictNote: "**2026-09-07 Issue #481で高さ差を再判定。** 一致。旧PageHeaderの重複と説明の繰り返しを外し、Pencilと同じ高さ1080pxにした。画素差4.9524%。通常・読込中・0件・取得失敗・権限不足・判定窓の全14枚で横はみ出し0。",
     verdictSource: "friends-v6/InCDe-{normal,loading,empty,error,forbidden,decide}.txt + 同名-{1440,1920}.png",
   },
   {
@@ -634,7 +634,7 @@ export const SCREENS = [
   {
     ...FRIENDS, node: 'vtBCu', name: '3-4 UID移行', route: '/accounts?tab=migration',
     verdict: 'match',
-    verdictNote: '**2026-09-06 #246 で一致。** 1920px設計画像と実装の1440・1920pxを横並びで目視比較した。5段、既存データへ影響しない注意、異なるプロバイダーの制約、移行元・先・利用目的・CSV、4区分の実値、競合3行、判断、本移行、履歴が同じ順序で揃い、横はみ出し0。`uid_migration_runs/items` の事前確認・競合判断・owner二者確認・本移行・切り戻しAPIへ接続した。共通shellの上部画面名はルート規則により「LINEアカウント」だが、機能本文のH1は「UID移行」で一致し、共通部品はs0所有のため変更していない。`undefined`・`NaN`・`Invalid Date`・`API error` は0件。',
+    verdictNote: '**2026-09-07 Issue #481で高さ差を再判定。** 一致。画面名をトップバーへ一本化し、Pencilにない重複説明を外して高さ1080pxへそろえた。画素差5.9972%、1440/1920pxとも横はみ出し0。',
     verdictSource: 'friends-v6/vtBCu.txt + docs/design-qa/friends-v6/vtBCu.txt + apps/web/src/app/accounts/migration.tsx + apps/worker/src/routes/friend-migrations.ts',
   },
   // ── 機能5 シナリオ配信 ──────────────────────────────────
@@ -1103,7 +1103,7 @@ export const SCREENS = [
       kinds: ['normal', 'loading', 'empty', 'error'],
     },
     verdict: 'match',
-    verdictNote: '**2026-09-07 S2 #73。** 正本 `GC4St.png` と同じ実行台帳の骨格を保ち、`?status=planned` では公開APIの `planned` だけを表示する。予定と履歴を相互に切り替えられ、予定画面には過去の送信エラー警告を混ぜない。通常・読込中・0件・取得失敗・予定を1440/1920で撮影し、横はみ出し0。固定件数なし。head `a828e5afc3`。',
+    verdictNote: '**2026-09-07 Issue #481で高さ差を再判定。** 一致。実行結果の固定データをPencilと同じ通知3件・履歴3件へそろえ、高さ1080px、画素差9.867%にした。通常・読込中・0件・取得失敗を1440/1920pxで撮影し、横はみ出し0。',
     verdictSource: 'reminders-v6/GC4St.txt + reminders-v6/GC4St-{normal,loading,empty,error,planned}-{1440,1920}.png',
     verdictHead: 'a828e5afc3',
   },
@@ -1162,7 +1162,7 @@ export const SCREENS = [
   {
     ...AUTO_REPLY, node: 'nzWIX', name: '8-1-B 反応条件',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #419 / UI HEAD `a16927af23` で再撮影・一致。** 下書きAPIが返す保存済みの受信元 `LINE・メール` を画面へ接続した。キーワード、一致方法、曜日・時間帯、友だち条件、28日間の一致214件、実測受信5,842件と種別内訳も実API値で表示し、1440/1920pxとも横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #481で高さ差を再判定。** 一致。画面固有の重複説明と余白を整理し、Pencilと同じ高さ1136pxにした。画素差5.2352%、1440/1920pxとも横はみ出し0。',
     verdictSource: 'auto-replies-v6/nzWIX.png + docs/design-qa/auto-replies-v6/nzWIX-{1440,1920}.png + nzWIX.txt',
     verdictHead: 'a16927af23',
     route: '/auto-replies/edit?id=ar-2&step=trigger',
@@ -1180,7 +1180,7 @@ export const SCREENS = [
   {
     ...AUTO_REPLY, node: 'U9hzqH', name: '8-1-D 競合と優先順位',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #292 / UI HEAD `1a0b0291e` で一致。** 下書き1件と競合2件を優先順位3段として表示し、勝者、停止/対象外、競合警告、一致後の動作、ループ防止、右の判定例・運用監視・LINEプレビュー、固定操作帯を設計順に配置した。通常・読込・空・失敗・権限不足を3106/8793で各1440/1920px撮影し、同Node画像と横並び比較、全12枚で横はみ出し0。競合2件の確認後だけテストへ進める既存の安全ゲートも維持。',
+    verdictNote: '**2026-09-07 Issue #481で高さ差を再判定。** 一致。LINEプレビューの高さをPencilへそろえ、高さ差+23px、画素差5.083%にした。通常・読込・空・失敗・権限不足の全12枚を1440/1920pxで撮影し、横はみ出し0。',
     verdictSource: 'auto-replies-v6/U9hzqH.png + docs/design-qa/auto-replies-v6/U9hzqH*.png + U9hzqH*.txt',
     verdictHead: '1a0b0291e',
     route: '/auto-replies/publish?id=ar-2', mode: 'page',
@@ -1300,14 +1300,13 @@ export const SCREENS = [
   },
   { ...FRIEND_ADD, node: 'txMO9', name: '9-1-D アクション追加', route: '/friend-add-settings?view=edit&id=rule-referral&step=actions&dialog=add', mode: 'viewport', height: 1080,
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #290・`de8b7c75b` を1440/1920pxでPencilと目視比較。** 5段表示、左右構成、実行する2アクション、設定サマリー、LINEプレビュー、600pxの中央ダイアログ、確認文と操作を一致させた。横はみ出し0。',
-    verdictSource: 'friend-add-v6/txMO9.png + txMO9-1920.png + txMO9.txt', verdictHead: 'de8b7c75b', },
+    verdictNote: '**2026-09-07 Issue #472で列車148取り込み後に再計測し、一致（画素差分7.3996%）。** 編集領域を全幅へ戻し、Pencilと同じ600pxの追加ダイアログ、実行する3件目の選択、設定サマリーを1440/1920pxで確認した。横はみ出し0。',
+    verdictSource: 'friend-add-v6/txMO9.png + txMO9-1920.png + txMO9-diff-1920.png + txMO9.txt', },
   {
     ...FRIEND_ADD, node: 'U3SI5', name: '9-1-E プレビューとテスト', route: '/friend-add-settings?view=edit&id=rule-referral&step=preview', mode: 'viewport', height: 1080,
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #290・`de8b7c75b` を1440/1920pxでPencilと目視比較。** 5段表示、送信先、短縮テスト、確認内容2行、設定サマリー、LINEプレビュー、追従操作を一致させた。テストは本番データを変えない説明も維持し、横はみ出し0。',
-    verdictSource: 'friend-add-v6/U3SI5.png + U3SI5-1920.png + U3SI5.txt',
-    verdictHead: 'de8b7c75b',
+    verdictNote: '**2026-09-07 Issue #472の差し戻し対応でPencilと同じ既定状態へ直し、画素差分6.8898%で一致。** 設計にない安全説明を既定表示から外し、短い見本本文、2枚の確認カード、右側の設定サマリー・LINEプレビュー・補助操作を1440/1920pxで照合した。横はみ出し0。',
+    verdictSource: 'friend-add-v6/U3SI5.png + U3SI5-1920.png + U3SI5-diff-1920.png + U3SI5.txt',
   },
   {
     ...FRIEND_ADD, node: 'ec9vg', name: '9-1-F 最終確認',
@@ -1803,20 +1802,16 @@ export const SCREENS = [
   {
     ...COMMON_VAR, node: 'yPkWe', name: '14-1-C 共通情報の削除確認',
     mode: 'viewport', height: 1080,
-    steps: [{ qaOpen: 'yPkWe', after: 900 }],
+    steps: [{ click: '臨時のお知らせを削除', after: 900 }],
     variants: [
       /*
-        消せるもの（どこにも差し込まれていない2件目）。
-
-        **先に窓を閉じる。** `steps` と `variant.steps` はつながって走るので、
-        1件目の削除の窓が開いたまま2件目の「削除」を押すことになり、
-        重なりに遮られて15秒で時間切れになっていた（見つかった数3・押せず）。
+        比較対象はPencilと同じ削除可能状態。使用中の影響確認は別状態に残す。
       */
-      { suffix: '-deletable', steps: [{ click: 'キャンセル', after: 500 }, { click: '削除', nth: 1, after: 900 }] },
+      { suffix: '-used', steps: [{ click: 'キャンセル', after: 500 }, { qaOpen: 'yPkWe', after: 900 }] },
     ],
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #385 / UI HEAD `bc92f54ea`で再判定し、一致。** PR #1131の削除影響・互換候補・差し替え影響・一括差し替えAPIと、PR #1142の固定データへ接続した。会社名が使われる15か所、予約中・公開中・下書きの6使用先、各画面を開く導線、互換候補の選択、差し替え後の15件、版競合時の再読込を確認した。使用中は安全な差し替え後削除だけ実行でき、未使用は確認入力後に削除できる。両状態を3104/8791で1440px・1920px撮影し、全画像で横はみ出し0。',
-    verdictSource: 'common-vars-v6/yPkWe.txt + common-vars-v6/yPkWe-{1440,1920}.png + common-vars-v6/yPkWe-deletable-{1440,1920}.png + api.test.ts + delete-screen-contract.test.ts',
+    verdictNote: '**2026-09-07 Issue #472の差し戻し対応で、Pencilと同じ削除可能状態を比較対象にして画素差分4.4655%で一致。** 使用先なしの共通情報を用意し、単純な確認文・720px幅・取消と削除の操作を1440/1920pxで照合した。使用中の影響確認は別状態として維持し、比較対象から分離した。横はみ出し0。',
+    verdictSource: 'common-vars-v6/yPkWe.txt + common-vars-v6/yPkWe-{1440,1920}.png + common-vars-v6/yPkWe-used-{1440,1920}.png + api.test.ts + delete-screen-contract.test.ts',
     verdictHead: 'bc92f54ea',
 
   },
@@ -1862,20 +1857,16 @@ export const SCREENS = [
   {
     ...MEDIA, node: 'YfTfJ', name: '15-1-C メディアの削除確認',
     mode: 'viewport', height: 1080,
-    steps: [{ qaOpen: 'YfTfJ', after: 900 }],
+    steps: [{ click: '削除', nth: 4, after: 900 }],
     variants: [
       /*
-        消せるもの（どこでも使っていない `未使用の案内.png`）。**2枚目の札。**
-
-        **先に窓を閉じる。** 1枚目の削除の窓が開いたまま2枚目の「削除」を押すことになり、
-        重なりに遮られて時間切れになっていた。窓を閉じる押し口はメディアでは「閉じる」。
-        3枚目を指していたのも入れ替え前の固定データのまま。
+        比較対象はPencilと同じ削除可能状態。使用中の影響確認は別状態に残す。
       */
-      { suffix: '-deletable', steps: [{ click: '閉じる', after: 500 }, { click: '削除', nth: 4, after: 900 }] },
+      { suffix: '-used', steps: [{ click: '閉じる', after: 500 }, { qaOpen: 'YfTfJ', after: 900 }] },
     ],
     verdict: "match",
-    verdictNote: "**2026-09-07、Issue #392 / PR #1157 / HEAD `0cc67ed91d` で使用中・削除可能を1440px・1920px再撮影し、一致。** 4枚とも横はみ出し0。使用中は3か所の種類・名前・安全な導線を出して削除を止め、別メディアへの一括差し替えを案内する。未使用は「どこでも使っていません」、元に戻せない説明、削除操作を表示する。影響確認と差し替え実行は版番号つき実API契約へ接続済みで、409時は影響を読み直す。削除可能状態の撮影対象も固定データの未使用PDFへ修正した。",
-    verdictSource: "media-v6/YfTfJ.txt + YfTfJ-1440.png + YfTfJ-1920.png + YfTfJ-deletable.txt + YfTfJ-deletable-1440.png + YfTfJ-deletable-1920.png",
+    verdictNote: "**2026-09-07 Issue #472の差し戻し対応で、Pencilと同じ未使用メディアの削除可能状態を比較対象にして再計測。** 単純な確認文・680px幅・取消と削除の操作を設計に合わせ、背面一覧も186件（商品84／バナー46／動画12／未分類44）に揃えた。画素差分13.2802%、1440/1920pxとも横はみ出し0。使用中の影響確認は `-used` の別状態として証跡を残した。",
+    verdictSource: "media-v6/YfTfJ.txt + media-v6/YfTfJ-1440.png + media-v6/YfTfJ-1920.png + media-v6/YfTfJ-diff-1920.png + media-v6/YfTfJ-used.txt + media-v6/YfTfJ-used-1440.png + media-v6/YfTfJ-used-1920.png + media-v6/YfTfJ-used-diff-1920.png + media-delete-contract.test.ts",
   },
   {
     ...MEDIA, node: 'h8pBZr', name: '15-1-D 一覧の状態（空・読込・エラー）',
@@ -2493,7 +2484,7 @@ export const SCREENS = [
        設計の言葉に寄せたもので、実装の不具合ではない。 */
     steps: [{ qaOpen: 'N2J629' }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #432で戻す確認を再判定。** 写真・投稿者・届いた日時に続き、顔・ロゴ・暗さ・自由記入それぞれの理由文、任意補足、投稿者へ届く本文、マイルが減らない案内を設計順に表示した。1440/1920pxとも横はみ出し0。保存先未接続の追加アクションは誤操作防止のため無効表示を維持し、理由を明記した。",
+    verdictNote: "**2026-09-07 Issue #472の差し戻し対応で画面固有の確認窓を720pxへそろえ、画素差分7.5973%で一致。** 理由4種・任意補足・投稿者への通知・マイル案内と、無効操作の見た目をPencilと同じ状態で1440/1920px照合した。横はみ出し0。",
     verdictSource: "photos-v6/N2J629.txt + photos-v6/N2J629-1920.png + Issue #432",
   },
   {
@@ -2695,7 +2686,7 @@ export const SCREENS = [
     route: '/webhooks?tab=outgoing',
     verdict: 'match', verdictNote: '**2026-09-07 Issue #451 / UI HEAD `3a3bc7a31` で再撮影・一致。** 本文側の旧見出しを外し、画面名は上部バーだけに統一。パンくずと追加操作を最初の内容行へ置き、その下にタブが続くPencil V6の順序にした。1440/1920pxとも横はみ出し0。', verdictSource: 'webhooks-v6/k3WxrO.txt + webhooks-v6/k3WxrO-{1440,1920}.png', verdictHead: '3a3bc7a31',
   },
-  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', route: '/webhooks?tab=incoming', verdict: 'match', verdictNote: '**2026-09-07 Issue #419 / UI HEAD `a16927af23` で再撮影・一致。** 受け取り口のURL、照合方法、合言葉、最新受信、差し込み項目に加え、APIが返すタグ名・テンプレート名を「届いたらすること」へ表示した。受信後の処理は同じ保存契約の実行器へ接続し、秘密値は再表示しない。1440/1920pxとも横はみ出し0。', verdictSource: 'webhooks-v6/M0Gb7.txt + webhooks-v6/M0Gb7-{1440,1920}.png', verdictHead: 'a16927af23' },
+  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', route: '/webhooks?tab=incoming', verdict: 'match', verdictNote: '**2026-09-07 Issue #472の差し戻し対応でPencilと同じ簡易設定へ整え、画素差分9.9862%で一致。** 照合方法・最新受信・処理内容を既定でコンパクトにまとめ、受信本文の見本を1行化した。上部タイトルも設計の「外部連携」に揃え、実装高の差は0px、1440/1920pxとも横はみ出し0。', verdictSource: 'webhooks-v6/M0Gb7.txt + webhooks-v6/M0Gb7-1440.png + webhooks-v6/M0Gb7-1920.png + webhooks-v6/M0Gb7-diff-1920.png' },
     // ---- 2026-09-02 `a0bb3f44` で実装を読み直した ----
     // **「タブの言葉に内部の語が残る（受信 (Incoming)／送信 (Outgoing)）」は古い。**
     //   `webhook-operator-words-contract.test.ts:13-14` が `Incoming)` `Outgoing)` を

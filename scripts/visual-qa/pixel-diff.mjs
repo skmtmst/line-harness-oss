@@ -26,6 +26,7 @@ import { SCREENS } from './screens.mjs'
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 export const DEFAULT_PIXEL_DIFF_THRESHOLD_PERCENT = 10
 export const DEFAULT_HEIGHT_DIFF_THRESHOLD_PX = 24
+export const LEGACY_CAPTURE_HEIGHT_PX = 1080
 export const DEFAULT_REPORT = join(ROOT, 'docs', 'design-qa', 'v6-pixel-diff.json')
 
 const REGION_ROWS = ['上部', '中央', '下部']
@@ -111,6 +112,24 @@ export function compareRgba(design, implementation, options = {}) {
     ...area,
     diffData,
   }
+}
+
+/**
+ * 旧撮影は page/viewport を問わず1080pxを既定にしていた。
+ * 設計高だけが違い実装画像がちょうど1080pxなら、UIの増減ではなく撮影高の差。
+ */
+export function classifyHeightReason(design, implementation, options = {}) {
+  const threshold = options.heightDiffThresholdPx ?? DEFAULT_HEIGHT_DIFF_THRESHOLD_PX
+  if (Math.abs(implementation.height - design.height) <= threshold) return null
+  const screen = options.screen
+  const shortDesignWithLegacyFloor = design.height < LEGACY_CAPTURE_HEIGHT_PX
+    && implementation.height === LEGACY_CAPTURE_HEIGHT_PX
+  const legacyViewport = screen?.mode === 'viewport'
+    && implementation.height === (screen.height ?? LEGACY_CAPTURE_HEIGHT_PX)
+    && implementation.height !== design.height
+  return shortDesignWithLegacyFloor || legacyViewport
+    ? '撮影高'
+    : '実装'
 }
 
 function readPng(path) {
@@ -205,6 +224,7 @@ export function compareScreen(screen, options = {}) {
     const design = designFile.image ?? readPng(designFile.path)
     const implementation = readPng(implementationPath)
     const result = compareRgba(design, implementation, options)
+    const heightReason = classifyHeightReason(design, implementation, { ...options, screen })
     const outputPath = join(root, 'docs', 'design-qa', screen.dir, `${screen.node}-diff-${designFile.width}.png`)
     if (options.writeDiffImages !== false) {
       mkdirSync(dirname(outputPath), { recursive: true })
@@ -215,6 +235,7 @@ export function compareScreen(screen, options = {}) {
     const { diffData: _diffData, ...serializable } = result
     comparisons.push({
       ...serializable,
+      heightReason,
       designPath: relativePath(designFile.path, root),
       implementationPath: relativePath(implementationPath, root),
       implementationSource: implementationSource(implementationPath, root),
@@ -240,7 +261,8 @@ export function compareScreen(screen, options = {}) {
     (comparison) => comparison.pixelDiffPercent > thresholdPercent,
   )
   const heightAboveThreshold = comparisons.some(
-    (comparison) => Math.abs(comparison.heightDifferencePx) > heightDiffThresholdPx,
+    (comparison) => Math.abs(comparison.heightDifferencePx) > heightDiffThresholdPx
+      && comparison.heightReason !== '撮影高',
   )
   return {
     feature: screen.feature, node: screen.node, name: screen.name, dir: screen.dir,
@@ -249,6 +271,7 @@ export function compareScreen(screen, options = {}) {
     comparisons,
     pixelDiffPercent: worstPixel.pixelDiffPercent,
     heightDifferencePx: worstHeight.heightDifferencePx,
+    heightReason: worstHeight.heightReason,
     dominantRegion: worstPixel.dominantRegion,
     implementationSource: worstPixel.implementationSource,
     diffPath: worstPixel.diffPath,

@@ -56,6 +56,7 @@ const LOGIN_TEXT = 'LINEでログイン'
  * 1文字ぶんが約70点なので、それを超えると文字の入れ替わりを見逃す。
  */
 const MAX_DIFF_PIXELS = 0
+const DEFAULT_CAPTURE_HEIGHT = 1080
 
 test.describe.configure({ mode: 'parallel' })
 
@@ -94,7 +95,7 @@ async function expectLanded(page, path) {
 for (const width of WIDTHS) {
   for (const route of ROUTES) {
     test(`${width}px ${route.name}（${route.path}）`, async ({ page }) => {
-      await page.setViewportSize({ width, height: 1000 })
+      await page.setViewportSize({ width, height: DEFAULT_CAPTURE_HEIGHT })
 
       await signIn(page, route.clock)
       await page.goto(`${BASE}${route.path}`, { waitUntil: 'networkidle' })
@@ -152,7 +153,7 @@ const TAGS_PATH = '/tags'
 for (const width of WIDTHS) {
   for (const state of TAG_STATES) {
     test(`${width}px 友だち属性・${state.label}（${state.name}）`, async ({ page }) => {
-      await page.setViewportSize({ width, height: 1000 })
+      await page.setViewportSize({ width, height: DEFAULT_CAPTURE_HEIGHT })
       await signIn(page)
 
       // タグ・フォルダ・上部の数を**まとめて**差し替える。
@@ -198,7 +199,7 @@ for (const width of WIDTHS) {
   }
 
   test(`${width}px 友だち属性・読み込んでいる途中（tags-loading）`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 1000 })
+    await page.setViewportSize({ width, height: DEFAULT_CAPTURE_HEIGHT })
     await signIn(page)
 
     // 返事を返さない。**待たせたままの絵**を撮るため。
@@ -417,7 +418,7 @@ const DELETE_CASES = [
 for (const width of WIDTHS) {
   for (const item of DELETE_CASES) {
     test(`${width}px 友だち属性・削除の確認／${item.label}（${item.name}）`, async ({ page }) => {
-      await page.setViewportSize({ width, height: 1000 })
+      await page.setViewportSize({ width, height: DEFAULT_CAPTURE_HEIGHT })
       await signIn(page)
       await page.goto(`${BASE}${TAGS_PATH}`, { waitUntil: 'networkidle' })
       await expectLanded(page, TAGS_PATH)
