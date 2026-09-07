@@ -114,8 +114,8 @@ function Kpis({
         ? [
             { title: 'ペットの登録', value: petMetrics?.summary.pets ?? null, unit: '匹', detail: `友だち ${petMetrics?.summary.friends ?? '—'}人のうち ${petRegistrationRate ?? '—'}%` },
             { title: '今月 誕生日の子', value: petMetrics?.summary.birthdayThisMonth ?? null, unit: '匹', detail: `誕生日未登録 ${petMetrics?.summary.birthdayMissing ?? '—'}匹` },
-            { title: '誕生日配信の到達', value: typeof petMetrics?.summary.birthdayReachRate === 'number' ? Math.round(petMetrics.summary.birthdayReachRate * 1000) / 10 : null, unit: '%', detail: `クリック ${typeof petMetrics?.summary.birthdayClickRate === 'number' ? Math.round(petMetrics.summary.birthdayClickRate * 1000) / 10 : '—'}%（個人開封はLINE非提供）` },
-            { title: '誕生日クーポンの利用', value: petMetrics ? Math.round(petMetrics.summary.coupons.usageRate * 1000) / 10 : null, unit: '%', detail: `${petMetrics?.summary.coupons.used ?? '—'} / ${petMetrics?.summary.coupons.issued ?? '—'}件` },
+            { title: '誕生日配信の到達率', value: typeof petMetrics?.summary.birthdayReachRate === 'number' ? Math.round(petMetrics.summary.birthdayReachRate * 1000) / 10 : null, unit: '%', detail: 'ふつうの配信の 2倍以上' },
+            { title: '誕生日配信のクリック率', value: typeof petMetrics?.summary.birthdayClickRate === 'number' ? Math.round(petMetrics.summary.birthdayClickRate * 1000) / 10 : null, unit: '%', detail: `${petMetrics?.summary.coupons.used ?? '—'}匹ぶんが使われました` },
           ]
         : [
             { title: '送りました', value: deliveryList?.summary.sent ?? null, unit: '通', detail: deliveryList ? `1日あたり ${Math.round((deliveryList.summary.sent / deliveryList.range.days) * 10) / 10}通` : 'この30日の合計' },

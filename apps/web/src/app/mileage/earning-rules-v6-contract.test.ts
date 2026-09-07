@@ -147,6 +147,13 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
 
   it('V6の30日集計・版・失効条件を表示する', () => {
     expect(PAGE).toContain('api.mileage.earningRulesV6')
+    expect(PAGE).toContain('api.mileage.history')
+    expect(PAGE).toContain('api.mileage.friendsV6')
+    expect(PAGE).toContain('title="この30日で付いたマイル"')
+    expect(PAGE).toContain('title="1人あたりの平均"')
+    expect(PAGE).toContain('ruleSummary?.grantedMiles')
+    expect(PAGE).toContain('ruleSummary?.averageBalance')
+    expect(PAGE).toContain('grantedMiles30d(rule)')
     expect(PAGE).toContain('rule.metrics30d.granted')
     expect(PAGE).toContain('rule.metrics30d.excluded')
     expect(PAGE).toContain('rule.draftVersion')

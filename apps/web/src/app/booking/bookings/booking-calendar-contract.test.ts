@@ -48,7 +48,9 @@ describe('V6 予約管理の時間台帳', () => {
       '当日 気をつけること',
       '時間や担当を変える',
     ]) expect(PAGE).toContain(text)
-    expect(PAGE).toContain('取得できない値は、この画面で推測して表示しません。')
+    expect(PAGE).toContain('bookingApi.getBooking')
+    expect(PAGE).toContain('detail?.previousHandover')
+    expect(PAGE).toContain('lineOperation.status')
   })
 
   test('確認・完了・競合はV6の左右構造と次の操作を持つ', () => {

@@ -2,6 +2,9 @@ import { jstNow } from './utils.js';
 
 export type ConversionDefinitionStatus = 'active' | 'stopped';
 export type ConversionDefinitionSort = 'count_desc' | 'value_desc' | 'updated_desc' | 'name_asc';
+export type ConversionDeduplicationMode = 'every' | 'once_per_friend' | 'window';
+export type ConversionValueMode = 'source' | 'fixed' | 'none';
+export type ConversionReversalPolicy = 'source_cancelled' | 'manual' | 'none';
 export type ConversionDefinitionUsageKind =
   | 'affiliate_offer'
   | 'analytics'
@@ -70,6 +73,11 @@ export type ConversionDefinitionListItem = {
   targetUrl: string | null;
   countRepeat: boolean;
   attributionDays: number | null;
+  sourceConfig: Record<string, unknown>;
+  deduplicationMode: ConversionDeduplicationMode;
+  deduplicationWindowDays: number | null;
+  valueMode: ConversionValueMode;
+  reversalPolicy: ConversionReversalPolicy;
   lineAccountId: string | null;
   status: ConversionDefinitionStatus;
   version: number;
@@ -99,6 +107,11 @@ type DefinitionRow = {
   target_url: string | null;
   count_repeat: number;
   attribution_days: number | null;
+  source_config_json: string;
+  deduplication_mode: ConversionDeduplicationMode;
+  deduplication_window_days: number | null;
+  value_mode: ConversionValueMode;
+  reversal_policy: ConversionReversalPolicy;
   line_account_id: string | null;
   status: ConversionDefinitionStatus;
   version: number;
@@ -206,7 +219,9 @@ function metricsCte(range: ConversionDefinitionRange): { sql: string; values: un
 
 function selectDefinitionsSql(): string {
   return `SELECT cp.id, cp.name, cp.event_type, cp.value, cp.measure_method, cp.target_url,
-                 cp.count_repeat, cp.attribution_days, cp.line_account_id, cp.status,
+                 cp.count_repeat, cp.attribution_days, cp.source_config_json,
+                 cp.deduplication_mode, cp.deduplication_window_days, cp.value_mode,
+                 cp.reversal_policy, cp.line_account_id, cp.status,
                  cp.version, cp.stopped_at, cp.created_at, cp.updated_at,
                  COALESCE(pm.recorded_count, 0) AS recorded_count,
                  COALESCE(pm.net_value, 0) AS net_value,
@@ -249,6 +264,11 @@ function serializeDefinition(row: DefinitionRow, cancellation?: CancellationMetr
     targetUrl: row.target_url,
     countRepeat: row.count_repeat !== 0,
     attributionDays: row.attribution_days,
+    sourceConfig: JSON.parse(row.source_config_json || '{}') as Record<string, unknown>,
+    deduplicationMode: row.deduplication_mode,
+    deduplicationWindowDays: row.deduplication_window_days,
+    valueMode: row.value_mode,
+    reversalPolicy: row.reversal_policy,
     lineAccountId: row.line_account_id,
     status: row.status,
     version: row.version,
@@ -492,6 +512,273 @@ export async function addConversionDefinitionUsage(
     .first<UsageRow>();
   if (!usage) throw new Error('conversion_definition_usage_insert_failed');
   return { created: true, usage: serializeUsage(usage), currentVersion: input.expectedVersion };
+}
+
+export type CreateConversionDefinitionInput = {
+  name: string;
+  sourceType: string;
+  sourceConfig: Record<string, unknown>;
+  measureMethod: 'url_reach' | 'webhook' | 'manual';
+  targetUrl?: string | null;
+  deduplicationMode: ConversionDeduplicationMode;
+  deduplicationWindowDays?: number | null;
+  valueMode: ConversionValueMode;
+  fixedValue?: number | null;
+  reversalPolicy: ConversionReversalPolicy;
+  attributionDays?: number | null;
+  lineAccountId: string;
+  usages: Array<Pick<AddConversionDefinitionUsageInput, 'refKind' | 'refId' | 'refVersionId'>>;
+  staffId: string;
+};
+
+export async function createConversionDefinition(
+  db: D1Database,
+  input: CreateConversionDefinitionInput,
+) {
+  const duplicate = await db.prepare(`SELECT id FROM conversion_points
+    WHERE line_account_id = ? AND lower(trim(name)) = lower(trim(?)) LIMIT 1`)
+    .bind(input.lineAccountId, input.name)
+    .first<{ id: string }>();
+  if (duplicate) {
+    throw new ConversionDefinitionError('duplicate_name', '同じ名前の成果地点があります', 409);
+  }
+  const id = crypto.randomUUID();
+  const now = jstNow();
+  const value = input.valueMode === 'fixed' ? input.fixedValue ?? null : null;
+  const statements = [
+    db.prepare(`INSERT INTO conversion_points
+      (id, name, event_type, value, measure_method, target_url, count_repeat,
+       attribution_days, line_account_id, source_config_json, deduplication_mode,
+       deduplication_window_days, value_mode, reversal_policy, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(
+        id, input.name, input.sourceType, value, input.measureMethod,
+        input.measureMethod === 'url_reach' ? input.targetUrl ?? null : null,
+        input.deduplicationMode === 'every' ? 1 : 0,
+        input.attributionDays ?? null, input.lineAccountId, JSON.stringify(input.sourceConfig),
+        input.deduplicationMode, input.deduplicationMode === 'window'
+          ? input.deduplicationWindowDays ?? null : null,
+        input.valueMode, input.reversalPolicy, now, now,
+      ),
+    ...input.usages.map((usage) => db.prepare(`INSERT INTO conversion_definition_usages
+      (id, conversion_point_id, definition_version, line_account_id, ref_kind, ref_id,
+       ref_version_id, created_by, created_at, updated_at)
+      VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(
+        crypto.randomUUID(), id, input.lineAccountId, usage.refKind, usage.refId,
+        usage.refVersionId ?? null, input.staffId, now, now,
+      )),
+  ];
+  await db.batch(statements);
+  return getConversionDefinitionDetail(db, id, {
+    allowedAccountIds: [input.lineAccountId], includeUnassigned: false,
+  });
+}
+
+export type PreviewConversionDefinitionInput = {
+  scope: ConversionDefinitionScope;
+  lineAccountId: string;
+  sourceType: string;
+  deduplicationMode: ConversionDeduplicationMode;
+  deduplicationWindowDays?: number | null;
+  valueMode: ConversionValueMode;
+  fixedValue?: number | null;
+  range: ConversionDefinitionRange;
+};
+
+export async function previewConversionDefinition(
+  db: D1Database,
+  input: PreviewConversionDefinitionInput,
+) {
+  const account = accountWhere('cp.', input.scope, input.lineAccountId);
+  const row = await db.prepare(`SELECT COUNT(ce.id) AS matched_count,
+      COUNT(DISTINCT ce.friend_id) AS unique_friends,
+      COALESCE(SUM(COALESCE(ce.value_snapshot, 0)), 0) AS source_value
+    FROM conversion_events ce
+    JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+    WHERE cp.event_type = ? AND ce.created_at >= ? AND ce.created_at <= ? AND ${account.sql}`)
+    .bind(input.sourceType, input.range.from, input.range.to, ...account.values)
+    .first<{ matched_count: number; unique_friends: number; source_value: number }>();
+  const matchedCount = Number(row?.matched_count ?? 0);
+  const uniqueFriends = Number(row?.unique_friends ?? 0);
+  const estimatedCount = input.deduplicationMode === 'every' ? matchedCount : uniqueFriends;
+  const sourceAverage = matchedCount > 0 ? Number(row?.source_value ?? 0) / matchedCount : 0;
+  const unitValue = input.valueMode === 'fixed'
+    ? Number(input.fixedValue ?? 0)
+    : input.valueMode === 'source' ? sourceAverage : 0;
+  return {
+    range: input.range,
+    matchedCount,
+    estimatedCount,
+    estimatedValue: Math.round(estimatedCount * unitValue),
+    duplicateExcludedCount: Math.max(0, matchedCount - estimatedCount),
+    cancellationCount: 0,
+    excludedReasons: matchedCount === 0 ? ['選んだ起点の過去データがありません'] : [],
+    dailyAverage: Math.round((estimatedCount / 30) * 10) / 10,
+    deduplicationWindowDays: input.deduplicationMode === 'window'
+      ? input.deduplicationWindowDays ?? null : null,
+  };
+}
+
+export async function getConversionDefinitionDeleteImpact(
+  db: D1Database,
+  id: string,
+  scope: ConversionDefinitionScope,
+) {
+  const definition = await getConversionDefinitionDetail(db, id, scope);
+  if (!definition) return null;
+  const eventRow = await db.prepare('SELECT COUNT(*) AS total FROM conversion_events WHERE conversion_point_id = ?')
+    .bind(id).first<{ total: number }>();
+  const account = accountWhere('cp.', scope, undefined);
+  const replacements = await db.prepare(`SELECT cp.id, cp.name, cp.version
+    FROM conversion_points cp
+    WHERE cp.id <> ? AND cp.status = 'active' AND ${account.sql}
+    ORDER BY cp.name ASC LIMIT 20`)
+    .bind(id, ...account.values)
+    .all<{ id: string; name: string; version: number }>();
+  const eventCount = Number(eventRow?.total ?? 0);
+  return {
+    definition,
+    usages: definition.usages,
+    eventCount,
+    canDelete: definition.usages.length === 0 && eventCount === 0,
+    stopImpact: {
+      affectedUsageCount: definition.usages.length,
+      preservesPastEvents: true,
+      preservesUsages: true,
+    },
+    replacementCandidates: replacements.results.map((row) => ({
+      id: row.id, name: row.name, version: Number(row.version),
+    })),
+  };
+}
+
+async function currentDefinitionForMutation(
+  db: D1Database,
+  id: string,
+  scope: ConversionDefinitionScope,
+): Promise<{ id: string; version: number; status: ConversionDefinitionStatus; line_account_id: string | null } | null> {
+  const account = accountWhere('cp.', scope, undefined);
+  return db.prepare(`SELECT cp.id, cp.version, cp.status, cp.line_account_id
+    FROM conversion_points cp WHERE cp.id = ? AND ${account.sql}`)
+    .bind(id, ...account.values)
+    .first();
+}
+
+function requireExpectedDefinition(
+  row: { version: number; status: ConversionDefinitionStatus } | null,
+  expectedVersion: number,
+) {
+  if (!row) throw new ConversionDefinitionError('not_found', '成果地点が見つかりません', 404);
+  if (Number(row.version) !== expectedVersion) {
+    throw new ConversionDefinitionError('version_conflict', '成果地点が更新されています。読み直してください', 409);
+  }
+  if (row.status !== 'active') {
+    throw new ConversionDefinitionError('definition_stopped', '成果地点はすでに停止しています', 409);
+  }
+}
+
+export async function stopConversionDefinition(
+  db: D1Database,
+  input: { id: string; scope: ConversionDefinitionScope; expectedVersion: number; reason?: string | null; staffId: string },
+) {
+  const current = await currentDefinitionForMutation(db, input.id, input.scope);
+  requireExpectedDefinition(current, input.expectedVersion);
+  const now = jstNow();
+  const usageRow = await db.prepare('SELECT COUNT(*) AS total FROM conversion_definition_usages WHERE conversion_point_id = ?')
+    .bind(input.id).first<{ total: number }>();
+  const [result] = await db.batch([
+    db.prepare(`UPDATE conversion_points SET status = 'stopped', stopped_at = ?,
+      updated_at = ?, version = version + 1 WHERE id = ? AND version = ? AND status = 'active'`)
+      .bind(now, now, input.id, input.expectedVersion),
+    db.prepare(`INSERT INTO conversion_definition_operations
+      (id, conversion_point_id, action, replacement_id, affected_usages, reason, performed_by, created_at)
+      VALUES (?, ?, 'stop', NULL, ?, ?, ?, ?)`)
+      .bind(crypto.randomUUID(), input.id, Number(usageRow?.total ?? 0), input.reason ?? null, input.staffId, now),
+  ]);
+  if ((result.meta.changes ?? 0) !== 1) {
+    throw new ConversionDefinitionError('version_conflict', '成果地点が更新されています。読み直してください', 409);
+  }
+  return { id: input.id, status: 'stopped' as const, version: input.expectedVersion + 1, stoppedAt: now };
+}
+
+export async function replaceConversionDefinitionUsages(
+  db: D1Database,
+  input: { id: string; replacementId: string; scope: ConversionDefinitionScope; expectedVersion: number; replacementExpectedVersion: number; reason?: string | null; staffId: string },
+) {
+  if (input.id === input.replacementId) {
+    throw new ConversionDefinitionError('invalid_replacement', '別の成果地点を選んでください', 400);
+  }
+  const [source, replacement] = await Promise.all([
+    currentDefinitionForMutation(db, input.id, input.scope),
+    currentDefinitionForMutation(db, input.replacementId, input.scope),
+  ]);
+  requireExpectedDefinition(source, input.expectedVersion);
+  requireExpectedDefinition(replacement, input.replacementExpectedVersion);
+  if (source!.line_account_id !== replacement!.line_account_id) {
+    throw new ConversionDefinitionError('account_mismatch', '同じLINEアカウントの成果地点を選んでください', 409);
+  }
+  const usageRow = await db.prepare('SELECT COUNT(*) AS total FROM conversion_definition_usages WHERE conversion_point_id = ?')
+    .bind(input.id).first<{ total: number }>();
+  const affectedUsages = Number(usageRow?.total ?? 0);
+  const now = jstNow();
+  const results = await db.batch([
+    db.prepare(`DELETE FROM conversion_definition_usages AS source
+      WHERE source.conversion_point_id = ? AND EXISTS (
+        SELECT 1 FROM conversion_definition_usages target
+        WHERE target.conversion_point_id = ? AND target.line_account_id = source.line_account_id
+          AND target.ref_kind = source.ref_kind AND target.ref_id = source.ref_id
+          AND COALESCE(target.ref_version_id, '') = COALESCE(source.ref_version_id, '')
+      )`).bind(input.id, input.replacementId),
+    db.prepare(`UPDATE conversion_definition_usages SET conversion_point_id = ?,
+      definition_version = ?, updated_at = ? WHERE conversion_point_id = ?`)
+      .bind(input.replacementId, input.replacementExpectedVersion, now, input.id),
+    db.prepare(`UPDATE conversion_points SET status = 'stopped', stopped_at = ?,
+      updated_at = ?, version = version + 1 WHERE id = ? AND version = ? AND status = 'active'`)
+      .bind(now, now, input.id, input.expectedVersion),
+    db.prepare(`INSERT INTO conversion_definition_operations
+      (id, conversion_point_id, action, replacement_id, affected_usages, reason, performed_by, created_at)
+      VALUES (?, ?, 'replace', ?, ?, ?, ?, ?)`)
+      .bind(crypto.randomUUID(), input.id, input.replacementId, affectedUsages, input.reason ?? null, input.staffId, now),
+  ]);
+  if ((results[2].meta.changes ?? 0) !== 1) {
+    throw new ConversionDefinitionError('version_conflict', '成果地点が更新されています。読み直してください', 409);
+  }
+  return {
+    id: input.id,
+    replacementId: input.replacementId,
+    replacedUsageCount: affectedUsages,
+    status: 'stopped' as const,
+    version: input.expectedVersion + 1,
+  };
+}
+
+export async function deleteUnusedConversionDefinition(
+  db: D1Database,
+  input: { id: string; scope: ConversionDefinitionScope; expectedVersion: number; reason?: string | null; staffId: string },
+) {
+  const current = await currentDefinitionForMutation(db, input.id, input.scope);
+  requireExpectedDefinition(current, input.expectedVersion);
+  const impact = await getConversionDefinitionDeleteImpact(db, input.id, input.scope);
+  if (!impact?.canDelete) {
+    throw new ConversionDefinitionError('definition_in_use', '成果または利用先があるため、削除せず停止してください', 409);
+  }
+  const now = jstNow();
+  const results = await db.batch([
+    db.prepare(`INSERT INTO conversion_definition_operations
+      (id, conversion_point_id, action, replacement_id, affected_usages, reason, performed_by, created_at)
+      VALUES (?, ?, 'delete', NULL, 0, ?, ?, ?)`)
+      .bind(crypto.randomUUID(), input.id, input.reason ?? null, input.staffId, now),
+    db.prepare(`DELETE FROM conversion_points
+      WHERE id = ? AND version = ?
+        AND NOT EXISTS (SELECT 1 FROM conversion_events WHERE conversion_point_id = ?)
+        AND NOT EXISTS (SELECT 1 FROM conversion_definition_usages WHERE conversion_point_id = ?)`)
+      .bind(input.id, input.expectedVersion, input.id, input.id),
+  ]);
+  if ((results[1].meta.changes ?? 0) !== 1) {
+    throw new ConversionDefinitionError('version_conflict', '成果地点が更新されています。読み直してください', 409);
+  }
+  return { id: input.id, deleted: true as const };
 }
 
 type ReportRow = {

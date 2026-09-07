@@ -16,10 +16,12 @@ import { useCanManageCommonActions } from '@/components/automations/use-common-a
 import { TextField } from '@/components/shared/text-field'
 import SelectField from '@/components/shared/select-field'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import BranchEditors, { newBranchStep, updateBranchStep } from '../branch-editor'
 
 const EMPTY_RESOURCES: CommonActionResources = {
   tags: [], scenarios: [], templates: [], webhooks: [], richMenus: [], commonActions: [],
 }
+
 export default function NewCommonActionPage() {
   usePageTitle('共通アクションをつくる')
   const canManage = useCanManageCommonActions()
@@ -88,6 +90,18 @@ export default function NewCommonActionPage() {
     setActions((current) => [...current, { ...newCommonActionStep('common_action'), params: { commonActionId: id } }])
   }
 
+  const branches = actions.filter((action) => action.type === 'branch')
+  const plainActions = actions.filter((action) => action.type !== 'branch')
+
+  const updatePlainActions = (next: CommonActionStep[]) => setActions([...next, ...branches])
+
+  const updateBranch = (
+    id: string,
+    patch: { tagId?: string; thenId?: string; elseId?: string },
+  ) => {
+    setActions((current) => current.map((step) => step.id === id ? updateBranchStep(step, patch) : step))
+  }
+
   if (canManage === null) return <div className="text-ink-faint p-6 text-sm">権限を確認しています</div>
   if (!canManage) return (
     <div className="border-hairline rounded-card border bg-canvas p-6">
@@ -136,10 +150,17 @@ export default function NewCommonActionPage() {
             {resourcesLoading ? (
               <div className="border-hairline rounded-card border bg-canvas p-8 text-center text-sm text-ink-faint">選択肢を読み込んでいます</div>
             ) : (
-              <div className="compact-common-action-editor"><CommonActionEditor value={actions} resources={resources} onChange={setActions} /></div>
+              <div className="compact-common-action-editor"><CommonActionEditor value={plainActions} resources={resources} onChange={updatePlainActions} /></div>
             )}
+            <BranchEditors
+              branches={branches}
+              offset={plainActions.length}
+              resources={resources}
+              onUpdate={updateBranch}
+              onRemove={(id) => setActions((current) => current.filter((item) => item.id !== id))}
+            />
             <div className="mt-3 flex flex-wrap gap-2">
-              <Button disabled title="条件分岐は共通アクションの契約へ接続中です">条件で分ける（契約接続中）</Button>
+              <Button onClick={() => setActions((current) => [...current, newBranchStep()])}>条件で分ける</Button>
               <Button onClick={() => setActions((current) => [...current, newCommonActionStep('wait')])}>待ち時間を入れる</Button>
               {resources.commonActions.length > 0 ? (
                 <label className="text-ink-secondary flex items-center gap-2 text-sm">

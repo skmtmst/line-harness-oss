@@ -26,6 +26,7 @@ shared-button-importer app/broadcasts/detail/page.tsx
 shared-button-importer app/broadcasts/page.tsx
 shared-button-importer app/broadcasts/reserved/page.tsx
 shared-button-importer app/chats/page.tsx
+shared-button-importer app/common-actions/branch-editor.tsx
 shared-button-importer app/common-actions/edit/page.tsx
 shared-button-importer app/common-actions/new/page.tsx
 shared-button-importer app/common-actions/page.tsx

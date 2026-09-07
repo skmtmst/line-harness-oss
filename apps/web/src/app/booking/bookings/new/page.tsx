@@ -11,13 +11,14 @@ import {
   ApiError,
   bookingApi,
   type BookingAvailabilitySlot,
+  type BookingConflictAlternatives,
+  type BookingCustomerContext,
   type BookingMenu,
   type BookingMenuStaff,
   type BookingCustomerSummary,
   type FriendListItem,
   type ProxyBookingResult,
 } from '@/lib/api'
-import { reminderScheduleLabels } from './proxy-booking-schedule'
 
 type Step = 'input' | 'confirm' | 'done' | 'conflict'
 
@@ -49,6 +50,20 @@ function timeRangeLabel(date: string, time: string, minutes: number): string {
   })}`
 }
 
+function scheduleLabel(value: string): string {
+  return new Date(value).toLocaleString('ja-JP', {
+    month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit',
+    timeZone: 'Asia/Tokyo',
+  })
+}
+
+function operationStatusLabel(status: string): string {
+  return ({
+    queued: '処理中', succeeded: '完了', skipped: '設定なし', retry_wait: '再試行中',
+    permanent_failed: '失敗', cancelled: '取消済み',
+  } as Record<string, string>)[status] ?? status
+}
+
 export default function NewProxyBookingPage() {
   const { selectedAccountId } = useAccount()
   const [step, setStep] = useState<Step>('input')
@@ -70,6 +85,9 @@ export default function NewProxyBookingPage() {
   const [customerNote, setCustomerNote] = useState('')
   const [idempotencyKey, setIdempotencyKey] = useState('')
   const [result, setResult] = useState<ProxyBookingResult | null>(null)
+  const [customerContext, setCustomerContext] = useState<BookingCustomerContext | null>(null)
+  const [conflictAlternatives, setConflictAlternatives] = useState<BookingConflictAlternatives | null>(null)
+  const [reminderPreview, setReminderPreview] = useState<Array<{ kind: 'day_before' | 'hours_before'; scheduledAt: string }>>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const slotRequest = useRef(0)
@@ -85,6 +103,8 @@ export default function NewProxyBookingPage() {
   const occupiedMinutes = selectedSlot
     ? (new Date(`${date}T${selectedSlot.end}:00+09:00`).getTime() - new Date(`${date}T${selectedSlot.start}:00+09:00`).getTime()) / 60_000
     : selectedStaff?.duration_minutes ?? 0
+  const confirmationOperation = result?.operations.find((item) => item.kind === 'confirmation_line') ?? null
+  const automaticOperations = result?.operations.filter((item) => ['conversion', 'mileage', 'automation'].includes(item.kind)) ?? []
 
   useEffect(() => {
     setStep('input')
@@ -100,10 +120,27 @@ export default function NewProxyBookingPage() {
     setDate('')
     setTime('')
     setResult(null)
+    setCustomerContext(null)
+    setConflictAlternatives(null)
+    setReminderPreview([])
     setIdempotencyKey('')
     setLoading(false)
     setError('')
   }, [selectedAccountId])
+
+  useEffect(() => {
+    if (!selectedAccountId || (!friend && !customer)) {
+      setCustomerContext(null)
+      return
+    }
+    let active = true
+    void bookingApi.getCustomerContext(selectedAccountId, friend
+      ? { friendId: friend.id }
+      : { bookingCustomerId: customer!.id })
+      .then((response) => { if (active) setCustomerContext(response.customer) })
+      .catch(() => { if (active) setCustomerContext(null) })
+    return () => { active = false }
+  }, [selectedAccountId, friend, customer])
 
   useEffect(() => {
     if (!selectedAccountId) {
@@ -242,10 +279,20 @@ export default function NewProxyBookingPage() {
         .find((item) => item.staff_id === selectedStaff.id)
         ?.slots.some((slot) => slot.date === date && slot.start === time)
       if (!available) {
+        const alternatives = await bookingApi.getAlternatives(selectedAccountId, {
+          menuId: menu.id,
+          staffId: selectedStaff.id,
+          startsAt: toUtcIso(date, time),
+        })
+        if (latestSelectionKey.current !== requestKey) return
+        setConflictAlternatives(alternatives)
         setStep('conflict')
         setError('選んだ時間は、ほかの予約で埋まりました')
         return
       }
+      const preview = await bookingApi.previewReminders(selectedAccountId, toUtcIso(date, time))
+      if (latestSelectionKey.current !== requestKey) return
+      setReminderPreview(preview.reminders)
       setIdempotencyKey(crypto.randomUUID())
       setStep('confirm')
     } catch {
@@ -271,6 +318,7 @@ export default function NewProxyBookingPage() {
       }, idempotencyKey)
       if (latestSelectionKey.current !== requestKey) return
       setResult(created)
+      setCustomerContext(created.customer_context)
       setStep('done')
     } catch (cause) {
       if (latestSelectionKey.current !== requestKey) return
@@ -278,6 +326,7 @@ export default function NewProxyBookingPage() {
         cause instanceof ApiError
         && (cause.code === 'slot_conflict' || cause.code === 'slot_not_available')
       ) {
+        setConflictAlternatives(cause.data as BookingConflictAlternatives | null)
         setStep('conflict')
         setError('選んだ時間は、ほかの予約で埋まりました')
       } else {
@@ -291,6 +340,7 @@ export default function NewProxyBookingPage() {
   async function recoverConflict() {
     setStep('input')
     setTime('')
+    setConflictAlternatives(null)
     await loadSlots()
   }
 
@@ -442,10 +492,14 @@ export default function NewProxyBookingPage() {
               </div>
             </Card>
             <Card title="この方について">
-              {friend ? (
+              {customerContext ? (
                 <div className="space-y-2 text-xs">
-                  <p><strong className="text-success">LINEと結びついています</strong></p>
-                  <p className="text-ink-faint">来店履歴と前回の申し送りは、友だち詳細で確認できます。</p>
+                  <p><strong className={customerContext.isLineLinked ? 'text-success' : 'text-warning'}>{customerContext.isLineLinked ? 'LINEと結びついています' : 'LINE未連携の電話客です'}</strong></p>
+                  <p><span className="text-ink-faint">電話</span>　{customerContext.phone ?? '登録なし'}</p>
+                  <p><span className="text-ink-faint">ペット</span>　{customerContext.petName ?? '登録なし'}</p>
+                  <p><span className="text-ink-faint">これまでの予約</span>　{customerContext.recentBookings.length}件</p>
+                  <p><span className="text-ink-faint">前回の申し送り</span>　{customerContext.previousHandover ?? 'ありません'}</p>
+                  {customerContext.tags.length > 0 ? <p><span className="text-ink-faint">タグ</span>　{customerContext.tags.map((tag) => tag.name).join('、')}</p> : null}
                 </div>
               ) : <p className="text-ink-faint text-xs">友だちを選ぶと、連絡方法と来店履歴を確認できます。</p>}
             </Card>
@@ -478,9 +532,10 @@ export default function NewProxyBookingPage() {
             </Card>
             <Card title="お客様に送るもの">
               <NoticeRow title="いますぐ LINE に送る" detail="日時・メニュー・担当を書いた案内が届きます" />
-              {reminderScheduleLabels(date, time).map((label) => (
-                <NoticeRow key={label} title={`${label} に思い出してもらう`} detail="リマインダから自動で送ります" />
+              {reminderPreview.map((reminder) => (
+                <NoticeRow key={reminder.kind} title={`${scheduleLabel(reminder.scheduledAt)} に思い出してもらう`} detail="予約設定から計算した実際の送信予定です" />
               ))}
+              {reminderPreview.length === 0 ? <p className="text-ink-faint text-xs">予約開始までの時間が短いため、今後のリマインダはありません。</p> : null}
             </Card>
             <p data-booking-slot-check="available" className="border-success bg-success-bg text-success rounded-card border px-4 py-3 text-xs">
               この日時は、確認画面を開く直前に空きを再確認しました。
@@ -488,7 +543,7 @@ export default function NewProxyBookingPage() {
           </div>
           <aside data-design="Right" className="space-y-4">
             <Card title={`${customerLabel}さんにはこう届きます`} note="送る前に、文面をそのまま確かめられます。">
-              <LinePreview friendName={customerLabel} menuName={menu.name} staffName={selectedStaff.display_name} date={date} time={time} sent={false} />
+              <LinePreview friendName={customerLabel} menuName={menu.name} staffName={selectedStaff.display_name} date={date} time={time} deliveryStatus="not_sent" />
             </Card>
             <WarningCard title="気をつけること" lines={['LINEと結びついていない方には、自動のお知らせは届きません', 'あとで時間を変えたときは、もう一度お知らせを送ってください']} />
             <RelatedLinks includeConversion={false} />
@@ -499,7 +554,15 @@ export default function NewProxyBookingPage() {
       {step === 'conflict' && (friend || customer) && menu && selectedStaff && (
         <>
           <section className="border-danger bg-danger-bg text-danger flex flex-wrap items-center justify-between gap-3 rounded-card border px-4 py-3">
-            <div><p className="text-sm font-semibold">{dateLabel(date, time)} は {selectedStaff.display_name} がふさがっています</p><p className="mt-1 text-xs">同じ担当が同じ時間に2件受けることはできません。時間か担当を変えてください。</p></div>
+            <div>
+              <p className="text-sm font-semibold">{dateLabel(date, time)} は {selectedStaff.display_name} がふさがっています</p>
+              <p className="mt-1 text-xs">
+                {conflictAlternatives
+                  ? `${scheduleLabel(conflictAlternatives.conflict.from)}〜${scheduleLabel(conflictAlternatives.conflict.to)}に${conflictAlternatives.conflict.count}件重なっています（${conflictAlternatives.conflict.source === 'internal_booking' ? '店内予約' : conflictAlternatives.conflict.source === 'google_calendar' ? 'Google予定' : '受付時間外'}）。`
+                  : ''}
+                時間か担当を変えてください。
+              </p>
+            </div>
             <Button onClick={() => void recoverConflict()}>空いている時間を選び直す</Button>
           </section>
           <div data-design="Body" className="grid gap-4 xl:grid-cols-4">
@@ -520,10 +583,19 @@ export default function NewProxyBookingPage() {
             <aside data-design="Right" className="space-y-4">
               <Card title="空いている時間" note={`${selectedStaff.display_name}の ${date || '選択日'} で、続けて取れるところです。`}>
                 <div className="space-y-2">
-                  {slots.filter((slot) => slot.date === date && slot.start !== time).slice(0, 3).map((slot) => <div key={slot.start} className="border-hairline flex items-center justify-between gap-3 border-b pb-2 last:border-0 last:pb-0"><span className="text-sm font-semibold">{slot.start} 〜 {slot.end}</span><Button onClick={() => { setTime(slot.start); setStep('input'); setError('') }}>この時間に変える</Button></div>)}
+                  {(conflictAlternatives?.nearbySlots ?? slots.filter((slot) => slot.date === date && slot.start !== time).slice(0, 3)).map((slot) => <div key={slot.start} className="border-hairline flex items-center justify-between gap-3 border-b pb-2 last:border-0 last:pb-0"><span className="text-sm font-semibold">{slot.start} 〜 {slot.end}</span><Button onClick={() => { setTime(slot.start); setStep('input'); setConflictAlternatives(null); setError('') }}>この時間に変える</Button></div>)}
                 </div>
               </Card>
-              <Card title="ほかの担当なら入れられます"><p className="text-ink-faint text-xs">担当別の空きは、入力へ戻って確認してください。</p></Card>
+              <Card title="ほかの担当なら入れられます">
+                {conflictAlternatives?.alternateStaff.length ? (
+                  <div className="space-y-2">{conflictAlternatives.alternateStaff.map((candidate) => (
+                    <div key={candidate.staffId} className="border-hairline flex items-center justify-between gap-3 border-b pb-2 last:border-0 last:pb-0">
+                      <span className="text-sm font-semibold">{candidate.displayName}　{candidate.slot.start}〜{candidate.slot.end}</span>
+                      <Button onClick={() => { setStaffId(candidate.staffId); setTime(candidate.slot.start); setStep('input'); setConflictAlternatives(null); setError('') }}>この担当に変える</Button>
+                    </div>
+                  ))}</div>
+                ) : <p className="text-ink-faint text-xs">同じ時刻に空いている別担当はいません。</p>}
+              </Card>
               <WarningCard title="気をつけること" lines={['重なったまま予約を入れることはできません', '入力したお客様・メニュー・担当・要望は残っています']} />
               <RelatedLinks includeConversion={false} />
             </aside>
@@ -548,9 +620,13 @@ export default function NewProxyBookingPage() {
                 <Summary label="Googleカレンダー" value={result.calendar_sync === 'synced' ? '反映済み' : result.calendar_sync === 'failed' ? '反映に失敗' : result.calendar_sync === 'pending' ? '確認中' : '未設定'} />
               </Card>
               <Card title="このあと自動で動くもの">
-                <NoticeRow title="いま LINE への案内処理を始めました" detail="送信結果と開封状況は台帳から確認します" />
-                {reminderScheduleLabels(date, time).map((label) => <NoticeRow key={label} title={`${label} にお知らせ`} detail="リマインダから自動で送ります" />)}
-                <Summary label="リマインダの時刻" value={reminderScheduleLabels(date, time).join(' ／ ') || '今後の送信予定はありません'} />
+                <NoticeRow
+                  title={`予約確認LINE: ${confirmationOperation ? operationStatusLabel(confirmationOperation.status) : result.line_notification === 'not_applicable' ? '送信しない' : '処理中'}`}
+                  detail={confirmationOperation?.status === 'permanent_failed' ? '送信に失敗しました。予約詳細から確認してください' : '送信結果と開封状況は受信箱から確認できます'}
+                />
+                {result.reminders.map((reminder) => <NoticeRow key={reminder.id} title={`${scheduleLabel(reminder.scheduled_at)} にお知らせ`} detail={`リマインダ: ${reminder.status === 'pending' ? '送信予定' : reminder.status}`} />)}
+                <Summary label="リマインダの時刻" value={result.reminders.map((item) => scheduleLabel(item.scheduled_at)).join(' ／ ') || '今後の送信予定はありません'} />
+                {automaticOperations.map((operation) => <Summary key={operation.id} label={operation.kind === 'conversion' ? '成果' : operation.kind === 'mileage' ? 'マイル' : '自動化'} value={operationStatusLabel(operation.status)} />)}
                 <Summary label="予約台帳" value="1件追加（電話で受けた予約も同じ台帳へ記録します）" />
               </Card>
               <Card title="次にすること">
@@ -558,7 +634,7 @@ export default function NewProxyBookingPage() {
               </Card>
             </div>
             <aside data-design="Right" className="space-y-4">
-              <Card title="お客様に届いたもの" note="送った案内をそのまま残しています。"><LinePreview friendName={customerLabel} menuName={menu.name} staffName={selectedStaff.display_name} date={date} time={time} sent /></Card>
+              <Card title="お客様に届くもの" note="案内処理の実績と同じ状態を表示しています。"><LinePreview friendName={customerLabel} menuName={menu.name} staffName={selectedStaff.display_name} date={date} time={time} deliveryStatus={confirmationOperation?.status ?? result.line_notification} /></Card>
               <RelatedLinks includeConversion />
             </aside>
           </div>
@@ -609,18 +685,23 @@ function NoticeRow({ title, detail }: { title: string; detail: string }) {
   )
 }
 
-function LinePreview({ friendName, menuName, staffName, date, time, sent }: {
+function LinePreview({ friendName, menuName, staffName, date, time, deliveryStatus }: {
   friendName: string
   menuName: string
   staffName: string
   date: string
   time: string
-  sent: boolean
+  deliveryStatus: string
 }) {
+  const deliveryLabel = deliveryStatus === 'succeeded' ? '送信済み・開封状況は受信箱で確認できます'
+    : deliveryStatus === 'queued' ? '送信処理中です'
+      : deliveryStatus === 'permanent_failed' || deliveryStatus === 'failed' ? '送信に失敗しました'
+        : deliveryStatus === 'not_applicable' ? 'LINE未連携のため送信しません'
+          : '「予約を入れる」を押すと、すぐに届きます'
   return (
     <div className="bg-action rounded-card p-4">
       <p className="text-on-action text-center text-xs font-semibold">LINEプレビュー</p>
-      <p className="bg-ink/25 text-on-action mx-auto mt-3 w-fit rounded-pill px-3 py-1 text-xs">{sent ? '送信済み・配信状況は台帳で確認できます' : '「予約を入れる」を押すと、すぐに届きます'}</p>
+      <p className="bg-ink/25 text-on-action mx-auto mt-3 w-fit rounded-pill px-3 py-1 text-xs">{deliveryLabel}</p>
       <div className="bg-canvas rounded-card mt-3 p-4 text-sm leading-6">
         <p>{friendName}さま</p>
         <p>{dateLabel(date, time)} から、{menuName}をお受けしました。</p>

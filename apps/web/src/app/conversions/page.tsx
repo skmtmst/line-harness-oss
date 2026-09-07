@@ -5,6 +5,7 @@ import {
   api,
   type ConversionDefinitionList,
   type ConversionDefinitionListItem,
+  type ConversionDefinitionDeleteImpact,
   type ConversionDefinitionReport,
 } from '@/lib/api'
 import type { ConversionPoint } from '@line-crm/shared'
@@ -168,6 +169,10 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
    * ない。
    */
   const [stopTarget, setStopTarget] = useState<ConversionDefinitionListItem | null>(null)
+  const [stopImpact, setStopImpact] = useState<ConversionDefinitionDeleteImpact | null>(null)
+  const [stopImpactLoading, setStopImpactLoading] = useState(false)
+  const [stopAction, setStopAction] = useState<'stop' | 'replace' | 'delete'>('stop')
+  const [replacementId, setReplacementId] = useState('')
   const [detailTarget, setDetailTarget] = useState<ConversionDefinitionListItem | null>(null)
   const [stopping, setStopping] = useState(false)
   const [stopError, setStopError] = useState('')
@@ -204,18 +209,59 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
    * 「消せませんでした」と出る。消えているのに失敗に見える）。
    * 失敗は握りつぶさず、窓の中に運用者の言葉で出す。
    */
+  const openStop = async (target: ConversionDefinitionListItem) => {
+    setDetailTarget(null)
+    setStopTarget(target)
+    setStopImpact(null)
+    setStopError('')
+    setStopAction('stop')
+    setReplacementId('')
+    setStopImpactLoading(true)
+    try {
+      const response = await api.conversions.definitionDeleteImpact(target.id)
+      if (!response.success) throw new Error(response.error)
+      setStopImpact(response.data)
+    } catch {
+      setStopError('利用先と停止の影響を読み込めませんでした。画面を閉じて、もう一度お試しください。')
+    } finally {
+      setStopImpactLoading(false)
+    }
+  }
+
   const runStop = async () => {
     if (!stopTarget || stopping) return
+    if (!stopImpact) return
     setStopping(true)
     setStopError('')
     try {
-      // APIのDELETEは物理削除ではなく、計測停止として履歴を残す契約。
-      const res = await api.conversions.deletePoint(stopTarget.id)
+      const replacement = stopImpact.replacementCandidates.find((item) => item.id === replacementId)
+      const res = stopAction === 'replace'
+        ? replacement
+          ? await api.conversions.replaceDefinition(stopTarget.id, {
+              replacementId: replacement.id,
+              expectedVersion: stopImpact.definition.version,
+              replacementExpectedVersion: replacement.version,
+              reason: '管理画面で利用先を差し替え',
+            })
+          : { success: false as const, error: '差し替え先を選んでください' }
+        : stopAction === 'delete'
+          ? await api.conversions.deleteDefinition(stopTarget.id, {
+              expectedVersion: stopImpact.definition.version,
+              reason: '未使用の成果地点を削除',
+            })
+          : await api.conversions.stopDefinition(stopTarget.id, {
+              expectedVersion: stopImpact.definition.version,
+              reason: '管理画面で計測を停止',
+            })
       if (!res.success) throw new Error(res.error)
       setStopTarget(null)
       await load()
     } catch {
-      setStopError('この成果地点の計測を止められませんでした。状態を読み直してから、もう一度お試しください。')
+      setStopError(stopAction === 'replace'
+        ? '利用先を差し替えられませんでした。状態を読み直して、もう一度お試しください。'
+        : stopAction === 'delete'
+          ? 'この成果地点は削除できませんでした。利用先と成果件数を確認してください。'
+          : 'この成果地点の計測を止められませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
       setStopping(false)
     }
@@ -492,11 +538,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           <div className="flex justify-end gap-2">
             <Button onClick={() => setDetailTarget(null)}>閉じる</Button>
             {detailTarget.status === 'active' ? (
-              <Button onClick={() => {
-                setDetailTarget(null)
-                setStopError('')
-                setStopTarget(detailTarget)
-              }}>
+              <Button onClick={() => void openStop(detailTarget)}>
                 停止・削除
               </Button>
             ) : null}
@@ -519,13 +561,16 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         designNode="d8d3Mz"
         title={stopTarget ? `「${stopTarget.name}」を削除しますか？` : ''}
         description="使っている場所と、止めたあとに残る記録を確認してから操作を選びます。"
-        confirmLabel="数えるのをやめる"
+        confirmLabel={stopAction === 'replace'
+          ? '差し替えて数えるのをやめる'
+          : stopAction === 'delete' ? 'この成果地点を削除する' : '数えるのをやめる'}
         busy={stopping}
         error={stopError}
         onConfirm={() => void runStop()}
         onCancel={() => {
           if (stopping) return
           setStopTarget(null)
+          setStopImpact(null)
           setStopError('')
         }}
       >
@@ -534,9 +579,22 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
             <section className="border-danger bg-danger-bg rounded-control border p-4">
               <h3 className="text-danger text-sm font-bold">いま、この成果地点を使っている場所</h3>
               <div className="border-danger/20 mt-3 rounded-control border bg-canvas px-3 py-3">
-                <p className="text-ink text-sm font-semibold">{usageLabel(stopTarget)}</p>
-                <p className="text-ink-faint mt-1 text-xs leading-relaxed">
-                  利用先の件数は実データです。停止後も、過去の成果と利用先の記録は残ります。
+                {stopImpactLoading ? (
+                  <p className="text-ink-faint text-sm">利用先と影響を読み込んでいます。</p>
+                ) : stopImpact?.usages.length ? (
+                  <ul className="space-y-2">
+                    {stopImpact.usages.map((usage) => (
+                      <li key={usage.id} className="text-ink text-sm">
+                        <span className="font-semibold">{usage.usageName}</span>
+                        <span className="text-ink-faint ml-2 text-xs">停止後も記録を残します</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-ink text-sm font-semibold">どこからも使われていません</p>
+                )}
+                <p className="text-ink-faint mt-2 text-xs leading-relaxed">
+                  利用先は実データです。停止後も、過去の成果と利用先の記録は残ります。
                 </p>
               </div>
             </section>
@@ -547,38 +605,56 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                 <strong className="text-ink tabular-nums">
                   {stopTarget.metrics.netCount.toLocaleString('ja-JP')}件
                 </strong>
-                の記録と金額は、そのまま残ります。
+                の記録と金額は、そのまま残ります。停止の影響は {stopImpact?.stopImpact.affectedUsageCount ?? '—'}か所です。
               </p>
             </section>
 
             <section>
               <h3 className="text-ink text-sm font-bold">どうしますか？</h3>
               <div className="mt-2 space-y-2">
-                <div className="border-accent bg-accent-soft rounded-control flex items-start gap-3 border p-3">
-                  <span className="border-accent bg-canvas mt-0.5 h-4 w-4 shrink-0 rounded-full border-4" aria-hidden />
+                <label className={`rounded-control flex cursor-pointer items-start gap-3 border p-3 ${stopAction === 'stop' ? 'border-accent bg-accent-soft' : 'border-hairline'}`}>
+                  <input type="radio" name="conversion-stop-action" checked={stopAction === 'stop'} onChange={() => setStopAction('stop')} className="mt-0.5" />
                   <div>
                     <p className="text-ink text-sm font-semibold">数えるのをやめる（おすすめ）</p>
                     <p className="text-ink-faint mt-0.5 text-xs">これから先は数えません。過去の記録と分析は残します。</p>
                   </div>
-                </div>
-                <div className="border-hairline rounded-control flex items-start gap-3 border p-3 opacity-60">
-                  <span className="border-hairline mt-0.5 h-4 w-4 shrink-0 rounded-full border" aria-hidden />
+                </label>
+                <label className={`rounded-control flex cursor-pointer items-start gap-3 border p-3 ${stopAction === 'replace' ? 'border-accent bg-accent-soft' : 'border-hairline'}`}>
+                  <input type="radio" name="conversion-stop-action" checked={stopAction === 'replace'} onChange={() => setStopAction('replace')} className="mt-0.5" disabled={!stopImpact?.replacementCandidates.length} />
                   <div>
                     <p className="text-ink text-sm font-semibold">別の成果地点に差し替えてから削除する</p>
-                    <p className="text-ink-faint mt-0.5 text-xs">利用先ごとの差し替え操作は、各利用先の画面で行います。</p>
+                    <p className="text-ink-faint mt-0.5 text-xs">利用先を別の成果地点へ切り替え、過去の数字を残します。</p>
+                    {stopAction === 'replace' ? (
+                      <Select
+                        aria-label="差し替え先の成果地点"
+                        value={replacementId}
+                        options={[
+                          { value: '', label: '差し替え先を選ぶ' },
+                          ...(stopImpact?.replacementCandidates ?? []).map((item) => ({ value: item.id, label: item.name })),
+                        ]}
+                        onChange={setReplacementId}
+                        className="mt-2"
+                      />
+                    ) : null}
                   </div>
-                </div>
-                <div className="border-hairline rounded-control flex items-start gap-3 border p-3 opacity-60">
-                  <span className="border-hairline mt-0.5 h-4 w-4 shrink-0 rounded-full border" aria-hidden />
+                </label>
+                <label className={`rounded-control flex items-start gap-3 border p-3 ${stopImpact?.canDelete ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'} ${stopAction === 'delete' ? 'border-accent bg-accent-soft' : 'border-hairline'}`}>
+                  <input type="radio" name="conversion-stop-action" checked={stopAction === 'delete'} onChange={() => setStopAction('delete')} className="mt-0.5" disabled={!stopImpact?.canDelete} />
                   <div>
                     <p className="text-ink text-sm font-semibold">このまま削除する</p>
-                    <p className="text-ink-faint mt-0.5 text-xs">過去の成果を守るため、物理削除は選べません。</p>
+                    <p className="text-ink-faint mt-0.5 text-xs">{stopImpact?.canDelete
+                      ? '成果0件・利用先0件のため、この成果地点だけを削除できます。'
+                      : '成果または利用先があるため、物理削除は選べません。'}</p>
                   </div>
-                </div>
+                </label>
               </div>
             </section>
 
-            <p className="text-ink-faint text-xs">「数えるのをやめる」を選ぶと停止として記録され、過去の成果は削除されません。</p>
+            <p className="text-ink-faint text-xs">{stopAction === 'replace'
+              ? '選んだ成果地点へ利用先を差し替えたあと、元の計測を停止します。'
+              : stopAction === 'delete'
+                ? '成果も利用先もない場合だけ削除できます。'
+                : '「数えるのをやめる」を選ぶと停止として記録され、過去の成果は削除されません。'}</p>
           </div>
         )}
       </ConfirmDialog>

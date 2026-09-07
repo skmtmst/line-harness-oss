@@ -8,6 +8,11 @@ export type MileageRewardKind =
 
 export type MileageRewardStatus = 'draft' | 'published' | 'stopped' | 'archived';
 export type MileageRewardFailurePolicy = 'retry' | 'refund' | 'manual';
+export interface MileageRewardTargetCondition {
+  operator: 'AND' | 'OR';
+  rules: Array<{ type: string; value: unknown }>;
+  groups?: MileageRewardTargetCondition[];
+}
 export type MileageRedemptionStatus =
   | 'reserved'
   | 'delivering'
@@ -26,6 +31,7 @@ export interface MileageRewardVersion {
   endsAt: string | null;
   benefitExpiresDays: number | null;
   commonActionVersionId: string | null;
+  targetConditions: MileageRewardTargetCondition | null;
   failurePolicy: MileageRewardFailurePolicy;
   customerMessage: string;
   publishedAt: string | null;
@@ -74,6 +80,7 @@ export interface MileageRewardDraftInput {
   endsAt?: string | null;
   benefitExpiresDays?: number | null;
   commonActionVersionId?: string | null;
+  targetConditions?: MileageRewardTargetCondition | null;
   failurePolicy?: MileageRewardFailurePolicy;
   customerMessage?: string;
 }
@@ -137,6 +144,7 @@ type RewardRow = {
   ends_at: string | null;
   benefit_expires_days: number | null;
   common_action_version_id: string | null;
+  target_conditions: string | null;
   failure_policy: MileageRewardFailurePolicy | null;
   customer_message: string | null;
   published_at: string | null;
@@ -186,6 +194,14 @@ const REWARD_KINDS = new Set<MileageRewardKind>([
   'coupon', 'tag', 'scenario', 'template', 'early_access', 'rank',
 ]);
 const FAILURE_POLICIES = new Set<MileageRewardFailurePolicy>(['retry', 'refund', 'manual']);
+const TARGET_CONDITION_TYPES = new Set([
+  'tag_exists', 'tag_not_exists', 'tag_all', 'tag_not_all',
+  'metadata_equals', 'metadata_not_equals', 'ref_code', 'is_following',
+  'scenario_subscribed', 'name', 'private_memo', 'status_message',
+  'registered_at', 'support_mark', 'is_hidden', 'friend_field',
+  'scenario_state', 'form_answered', 'last_reaction_at', 'reaction_state',
+  'score_range',
+]);
 
 function requiredText(value: unknown, label: string, max: number): string {
   if (typeof value !== 'string' || !value.trim()) {
@@ -221,13 +237,54 @@ function optionalDate(value: unknown, label: string): string | null {
   return value;
 }
 
+function validateRewardTargetConditions(value: unknown): MileageRewardTargetCondition | null {
+  if (value === null || value === undefined) return null;
+  let count = 0;
+  const visit = (candidate: unknown, depth: number): MileageRewardTargetCondition => {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate) || depth > 3) {
+      throw new MileageRewardError('target_conditions_invalid', '交換できる友だちの条件を確認してください');
+    }
+    const raw = candidate as Record<string, unknown>;
+    if ((raw.operator !== 'AND' && raw.operator !== 'OR') || !Array.isArray(raw.rules)) {
+      throw new MileageRewardError('target_conditions_invalid', '交換できる友だちの条件を確認してください');
+    }
+    const rules = raw.rules.map((rule) => {
+      if (!rule || typeof rule !== 'object' || Array.isArray(rule)) {
+        throw new MileageRewardError('target_conditions_invalid', '交換できる友だちの条件を確認してください');
+      }
+      const typed = rule as Record<string, unknown>;
+      if (typeof typed.type !== 'string' || !TARGET_CONDITION_TYPES.has(typed.type)) {
+        throw new MileageRewardError('target_condition_type_invalid', '利用できない交換条件があります');
+      }
+      count += 1;
+      if (count > 15) {
+        throw new MileageRewardError('target_conditions_too_many', '交換条件は15件までです');
+      }
+      return { type: typed.type, value: typed.value };
+    });
+    const groups = raw.groups === undefined
+      ? undefined
+      : Array.isArray(raw.groups) ? raw.groups.map((group) => visit(group, depth + 1)) : null;
+    if (groups === null) {
+      throw new MileageRewardError('target_conditions_invalid', '交換できる友だちの条件を確認してください');
+    }
+    return { operator: raw.operator, rules, ...(groups ? { groups } : {}) };
+  };
+  const parsed = visit(value, 0);
+  if (JSON.stringify(parsed).length > 16_384) {
+    throw new MileageRewardError('target_conditions_too_large', '交換条件が長すぎます');
+  }
+  return parsed;
+}
+
 export function validateMileageRewardDraft(value: MileageRewardDraftInput): Required<
-  Omit<MileageRewardDraftInput, 'description' | 'imageUrl' | 'stockLimit' | 'perFriendLimit'>
+  Omit<MileageRewardDraftInput, 'description' | 'imageUrl' | 'stockLimit' | 'perFriendLimit' | 'targetConditions'>
 > & {
   description: string | null;
   imageUrl: string | null;
   stockLimit: number | null;
   perFriendLimit: number | null;
+  targetConditions: MileageRewardTargetCondition | null;
 } {
   const rewardKind = value.rewardKind;
   if (!REWARD_KINDS.has(rewardKind)) {
@@ -258,6 +315,7 @@ export function validateMileageRewardDraft(value: MileageRewardDraftInput): Requ
     endsAt,
     benefitExpiresDays: positiveInteger(value.benefitExpiresDays, '交換後の有効日数', true),
     commonActionVersionId,
+    targetConditions: validateRewardTargetConditions(value.targetConditions),
     failurePolicy,
     customerMessage: optionalText(value.customerMessage, '交換後の案内', 1000) ?? '',
   };
@@ -276,6 +334,7 @@ function mapVersion(row: RewardRow): MileageRewardVersion | null {
     endsAt: row.ends_at,
     benefitExpiresDays: row.benefit_expires_days,
     commonActionVersionId: row.common_action_version_id,
+    targetConditions: row.target_conditions ? JSON.parse(row.target_conditions) as MileageRewardTargetCondition : null,
     failurePolicy: row.failure_policy ?? 'retry',
     customerMessage: row.customer_message ?? '',
     publishedAt: row.published_at,
@@ -312,7 +371,7 @@ function rewardSelect(versionExpression: string): string {
          v.id AS version_id, v.version_number, v.status AS version_status,
          v.required_miles, v.stock_limit, v.per_friend_limit, v.starts_at, v.ends_at,
          v.benefit_expires_days, v.common_action_version_id, v.failure_policy,
-         v.customer_message, v.published_at,
+         v.target_conditions, v.customer_message, v.published_at,
          (SELECT COUNT(*) FROM mileage_redemptions mr
            WHERE mr.reward_id = r.id AND mr.status = 'succeeded'
              AND mr.delivered_at >= datetime('now', 'start of month')) AS exchanged_this_month,
@@ -495,11 +554,12 @@ export async function createMileageRewardDraft(
       `INSERT INTO mileage_reward_versions
          (id, reward_id, version_number, status, required_miles, stock_limit,
           per_friend_limit, starts_at, ends_at, benefit_expires_days,
-          common_action_version_id, failure_policy, customer_message, created_by, created_at)
-       VALUES (?, ?, 1, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          common_action_version_id, target_conditions, failure_policy, customer_message, created_by, created_at)
+       VALUES (?, ?, 1, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       versionId, rewardId, draft.requiredMiles, draft.stockLimit, draft.perFriendLimit,
       draft.startsAt, draft.endsAt, draft.benefitExpiresDays, draft.commonActionVersionId,
+      draft.targetConditions ? JSON.stringify(draft.targetConditions) : null,
       draft.failurePolicy, draft.customerMessage, input.createdBy ?? null, now,
     ),
   ]);
@@ -534,11 +594,12 @@ export async function updateMileageRewardDraft(
       `UPDATE mileage_reward_versions
           SET required_miles = ?, stock_limit = ?, per_friend_limit = ?, starts_at = ?,
               ends_at = ?, benefit_expires_days = ?, common_action_version_id = ?,
-              failure_policy = ?, customer_message = ?, created_by = ?
+              target_conditions = ?, failure_policy = ?, customer_message = ?, created_by = ?
         WHERE id = ? AND reward_id = ? AND status = 'draft'`,
     ).bind(
       draft.requiredMiles, draft.stockLimit, draft.perFriendLimit, draft.startsAt,
       draft.endsAt, draft.benefitExpiresDays, draft.commonActionVersionId,
+      draft.targetConditions ? JSON.stringify(draft.targetConditions) : null,
       draft.failurePolicy, draft.customerMessage, input.updatedBy ?? null,
       input.expectedVersionId, input.id,
     ),
@@ -569,10 +630,10 @@ export async function createMileageRewardDraftFromPublished(
       `INSERT INTO mileage_reward_versions
          (id, reward_id, version_number, status, required_miles, stock_limit,
           per_friend_limit, starts_at, ends_at, benefit_expires_days,
-          common_action_version_id, failure_policy, customer_message, created_by, created_at)
+          common_action_version_id, target_conditions, failure_policy, customer_message, created_by, created_at)
        SELECT ?, reward_id, version_number + 1, 'draft', required_miles, stock_limit,
               per_friend_limit, starts_at, ends_at, benefit_expires_days,
-              common_action_version_id, failure_policy, customer_message, ?, ?
+              common_action_version_id, target_conditions, failure_policy, customer_message, ?, ?
          FROM mileage_reward_versions WHERE id = ? AND status = 'published'`,
     ).bind(versionId, input.createdBy ?? null, now, reward.currentPublishedVersionId),
     db.prepare(
