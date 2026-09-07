@@ -94,6 +94,8 @@ describe('一斉配信一覧の削除確認', () => {
   it('確認窓が取り消せない操作として出て、処理中は閉じられない', () => {
     const jsx = dialog(PAGE)
     expect(jsx).toContain('destructive')
+    expect(jsx).toContain('designNode="EGMb1"')
+    expect(jsx).toContain('titleIcon={<Trash2')
     expect(jsx).toContain('confirmLabel="削除する"')
     expect(jsx, '処理中でも押せてしまう').toContain('busy={deleting}')
     expect(jsx, '失敗が窓の中に出ない').toContain('error={deleteError}')

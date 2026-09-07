@@ -372,6 +372,21 @@ const DASHBOARD_OVERVIEW = {
       period: 'latest',
     },
   },
+  // 機能1 `JN6mQ`。撮影時だけPencilの見本QRと固定URLへ合わせる。
+  // 実環境のQR生成とURL解決にはこの値を返さない。
+  visualQa: {
+    referenceQr: true,
+    friendAddUrl: 'https://nen-line-stg.skmtmst.workers.dev/auth/line?account=2011090867',
+    officialProfileUrl: 'https://lin.ee/nen-official',
+    pendingPhotos: 1,
+    hideBookings: true,
+    healthRisk: 'normal',
+    operationalAlerts: 2,
+    twoFactor: { enabled: 0, total: 6 },
+    notificationUnreadCount: 3,
+    shipmentStatus: '未処理なし',
+    supportInbox: { unanswered: 360, resolved: 38 },
+  },
 }
 
 /**
@@ -1578,6 +1593,19 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   const detail = pathname.match(/^\/api\/friends\/([^/]+)$/)
   if (detail && FRIEND_DETAILS[detail[1]]) return { success: true, data: FRIEND_DETAILS[detail[1]] }
   if (/^\/api\/friends\/[^/]+\/mileage$/.test(pathname)) return { success: true, data: FRIEND_MILEAGE }
+  if (pathname === '/api/friends/friend-1/fields') {
+    const values = ['1988-04-12', '2026-12-31', '2026-09-15', 'プレミアム']
+    return {
+      success: true,
+      data: {
+        items: FRIEND_FIELDS.map((field, index) => ({ ...field, value: values[index] })),
+        hiddenPersonalCount: 0,
+      },
+    }
+  }
+  if (pathname === '/api/friends/friend-1/rich-menu') {
+    return { success: true, data: { id: 'rich-menu-main', name: '通常メニュー・予約', isDefault: false } }
+  }
   const messages = pathname.match(/^\/api\/friends\/([^/]+)\/messages$/)
   if (messages) {
     // 設計 `xGLVe` のトーク欄。載っていない友だちは空で返す（実際に空の人もいる）。
@@ -2482,9 +2510,29 @@ function bodyFor(pathname, query = new URLSearchParams()) {
         webhooks: [{ id: 'wh-1', name: '予約サービスへ知らせる' }],
         richMenus: [{ id: 'rmg-1', name: '通常メニュー' }],
         commonActions: [
+          // 機能6。XQfMD/FpgxHの設計状態「配信済みタグを追加」。
+          { id: 'ca-broadcast-delivered-tag', name: 'タグ「8月キャンペーン配信済み」を追加', version: 1 },
           { id: 'ca-1', name: '来店後のご案内', version: 3 },
           { id: 'ca-subscription-guide', name: '定期便スタートガイド', version: 1 },
         ],
+      },
+    }
+  }
+  if (pathname === '/api/common-actions/ca-broadcast-delivered-tag') {
+    return {
+      success: true,
+      data: {
+        ...COMMON_ACTION_DETAIL,
+        id: 'ca-broadcast-delivered-tag',
+        name: 'タグ「8月キャンペーン配信済み」を追加',
+        currentDraftVersionId: null,
+        currentPublishedVersionId: 'cav-broadcast-delivered-tag-1',
+        versions: [{
+          id: 'cav-broadcast-delivered-tag-1', versionNumber: 1, status: 'published',
+          actions: [{ id: 'broadcast-delivered-tag-step', type: 'add_tag', params: { tagId: 'tag-broadcast-delivered' }, onFailure: 'stop' }],
+          createdBy: 'Kenta Kawano', createdAt: '2026-08-20T00:00:00.000Z', publishedAt: '2026-08-20T00:00:00.000Z',
+        }],
+        bindings: [],
       },
     }
   }

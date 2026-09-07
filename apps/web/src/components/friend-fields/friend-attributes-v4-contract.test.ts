@@ -22,7 +22,16 @@ describe('友だち属性 V4 contract', () => {
     expect(editor).toContain("useState(initialValues?.applyToExisting ?? initialApplyToExisting)")
     expect(editor).toContain('すでに付いている人への反映')
     expect(editor).toContain('さかのぼってマイルを積みますか？')
+    expect(editor).toContain('max-w-[670px] -translate-y-7')
+    expect(editor).toContain('<Coins size={21}')
+    expect(editor).toContain('新規作成のときはこのダイアログは出ません')
     expect(page).toContain('applyToExisting: applyRetroactive && values.applyToExisting')
+  })
+
+  it('公開・下書き版が無いタグの削除確認は設計どおり5行にする', () => {
+    const source = read('components/friend-fields/tags-page-v4.tsx')
+    expect(source).toContain('if (impact?.linkedActions.length)')
+    expect(source).toContain("rows.push({ name: '使用中の版'")
   })
 
   it('タグ編集と対応マーク保管はV6の結果を正しく案内する', () => {
@@ -275,6 +284,8 @@ describe('友だち属性 V4 contract', () => {
     expect(source).toContain('影響を確認しています')
     expect(source).toContain('影響を確認できませんでした')
     expect(source).toContain('api.tags.archive(tag.id, accountId')
+    expect(source).toContain('max-w-[670px] -translate-y-7')
+    expect(source).toContain('gap-3 px-4 py-3')
     expect(source).toContain('expectedVersion: impact.tag.version')
     expect(source).toContain('impactRevision: impact.revision')
     expect(source).toContain('crypto.randomUUID()')
@@ -282,7 +293,8 @@ describe('友だち属性 V4 contract', () => {
     // 「アフィリエイトのオファーで使用中」と誤表示していた。
     expect(source).toContain("impactStatus === 'ready' && impact && !impact.canDelete && (")
     expect(source).not.toContain('api.tags.delete(tag.id)')
-    expect(source).not.toContain('アフィリエイトのオファーで使用中のタグは削除できません')
+    expect(source).toContain('impact.referenceCounts.affiliateOffers > 0')
+    expect(source).toContain('有効な参照があるタグは、完全に削除できません')
   })
 
   it('参照先は0件のものを出さず、取れないときは「0」と書かない', () => {

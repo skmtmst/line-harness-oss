@@ -323,14 +323,14 @@ function MileageRewardEditorInner() {
         </NoteBar>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-4 xl:grid-cols-3">
         <Card padding="default">
           <CardHeader title="基本" />
           <Field label="使い道の名前" htmlFor="reward-name" required error={touched && !form.name.trim() ? '使い道の名前を入力してください' : undefined}>
             <TextInput id="reward-name" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="例：送料無料クーポン" />
           </Field>
           <Field label="説明" htmlFor="reward-description" note="一覧と交換の画面に出ます。空でも出せます">
-            <TextArea id="reward-description" rows={3} value={form.description} onChange={(e) => set('description', e.target.value)} />
+            <TextArea id="reward-description" rows={2} className="!min-h-20" value={form.description} onChange={(e) => set('description', e.target.value)} />
           </Field>
           <Field
             label="必要マイル"
@@ -435,7 +435,7 @@ function MileageRewardEditorInner() {
             />
           </Field>
           <Field label="交換したときの案内" htmlFor="reward-message" note="お客様に届く文です。空なら既定の文を送ります">
-            <TextArea id="reward-message" rows={3} value={form.customerMessage} onChange={(e) => set('customerMessage', e.target.value)} />
+            <TextArea id="reward-message" rows={2} className="!min-h-20" value={form.customerMessage} onChange={(e) => set('customerMessage', e.target.value)} />
           </Field>
         </Card>
 
@@ -444,11 +444,18 @@ function MileageRewardEditorInner() {
           <p className="mb-4 text-xs text-ink-secondary">
             条件を付けない場合は全員が対象です。ランク・タグ・購入の有無など15の軸から組み合わせられます。
           </p>
-          <ConditionBuilder
-            value={form.targetConditions}
-            onChange={(next) => set('targetConditions', next)}
-            label="交換対象の条件"
-          />
+          <details className="rounded-control border border-hairline px-3 py-2">
+            <summary className="cursor-pointer text-xs font-semibold text-action">
+              {form.targetConditions ? '設定中の交換対象条件を編集' : '条件を足す（15の軸から選べます）'}
+            </summary>
+            <div className="mt-3">
+              <ConditionBuilder
+                value={form.targetConditions}
+                onChange={(next) => set('targetConditions', next)}
+                label="交換対象の条件"
+              />
+            </div>
+          </details>
         </Card>
       </div>
 

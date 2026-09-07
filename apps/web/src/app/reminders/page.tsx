@@ -36,6 +36,8 @@ interface Reminder {
   createdAt: string; updatedAt: string
 }
 
+type VisualFolder = Folder & { itemCount?: number; listTotal?: number }
+
 const UNFILED = '__unfiled__'
 const PER_PAGE = 20
 function rowView(reminder: Reminder) {
@@ -115,6 +117,7 @@ export default function RemindersPage() {
   const current = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE)
 
   const selectedName = reminders.find((item) => selected.has(item.id))?.name ?? ''
+  const listTotal = (folders[0] as VisualFolder | undefined)?.listTotal ?? reminders.length
   return <div data-design-node="M1EXwB" data-design="Head">
     {folderDialogOpen ? <FolderAddDialog kind="reminder" note="リマインダを整理するフォルダです。" placeholder="例：予約" onClose={() => setFolderDialogOpen(false)} onAdded={() => void loadFolders()} /> : null}
     <div data-design="KPIs"><ListKpis variant="v6" accountId={selectedAccountId} titles={['リマインダ数','送信予定','今月の送信','失敗']} build={(stats) => {
@@ -125,12 +128,17 @@ export default function RemindersPage() {
     {error ? <div className="bg-danger-bg text-danger mb-3 rounded-lg p-3 text-sm">{error}</div> : null}
     <div data-design="Body" className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
       <FolderPanel
-        total={loading || error ? '—' : `${reminders.length}件`}
+        total={loading || error ? '—' : `${listTotal}件`}
         activeId={folderFilter}
         onSelect={(id) => { setFolderFilter(id); setPage(1) }}
         rows={[
-          { id: '', label: 'すべて', count: reminders.length },
-          ...folders.map((folder) => ({ id: folder.id, label: folder.name, count: reminders.filter((item) => item.folderId === folder.id).length, color: folder.color })),
+          { id: '', label: 'すべて', count: listTotal },
+          ...folders.map((folder) => ({
+            id: folder.id,
+            label: folder.name,
+            count: (folder as VisualFolder).itemCount ?? reminders.filter((item) => item.folderId === folder.id).length,
+            color: folder.color,
+          })),
           { id: UNFILED, label: '未分類', count: reminders.filter((item) => !item.folderId).length },
         ]}
       />
