@@ -126,28 +126,13 @@ describe('リッチメニュー編集の確認窓', () => {
   })
 })
 
-describe('リマインダ編集の通の削除', () => {
-  const src = read('app', 'reminders', 'edit', 'page.tsx')
-
-  it('二度押しを止め、失敗は運用者の言葉で窓に出す', () => {
-    const body = fnBody(code(src), 'async function handleDeleteStep')
-    expect(body, '二度押しを止めていない').toContain('if (!deleteStep || deletingStep) return')
-    expect(body, '返事を確かめていない').toContain('if (!res.success) throw new Error(res.error)')
-    expect(body, '処理中の印を戻していない').toMatch(/finally\s*\{\s*setDeletingStep\(false\)/)
-    expect(body, '失敗を窓に出していない').toContain('setDeleteStepError(')
-    // 生のAPIエラーを窓へ流していない（前は e.message を画面に出していた）。
-    expect(body, '生のAPIエラーを出している').not.toMatch(/setDeleteStepError\(e/)
-  })
-
-  it('取り消せない操作なので destructive を付け、消える記録まで書く', () => {
-    const dialog = confirmDialogWith(src, 'この通を削除しますか')
-    expect(dialog, 'destructive が無い').toContain('destructive')
-    expect(dialog, '処理中を窓に渡していない').toContain('busy={deletingStep}')
-    // friend_reminder_deliveries.reminder_step_id は ON DELETE CASCADE。
-    expect(dialog, '記録も消えることを書いていない').toContain('記録も一緒に消えます')
-    expect(dialog, '残るものを書いていない').toContain('残ること')
-  })
-})
+/*
+ * 「リマインダ編集の通の削除」の契約は #539 で外した。
+ * 旧編集器（LegacyReminderEditInner）の通ごとの削除窓を守る契約だったが、
+ * 旧編集器はどこからも呼ばれない死コードとして削除し、使う方
+ * （Issue469ReminderStepEditor）には通ごとの削除が無い。
+ * 取り消せない操作に確認窓を付ける方針自体は変えていない。
+ */
 
 describe('回答フォーム編集のページ削除', () => {
   const src = read('app', 'form-submissions', 'edit', 'page.tsx')

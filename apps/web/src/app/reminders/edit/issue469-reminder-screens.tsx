@@ -62,12 +62,11 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
     <ReminderWorkspace aside={<div className="grid gap-3">
       <SummaryCard rows={[["対象者", '398人'], ['基準日', '予約日時（Google Meet相談）'], ['通知ステップ', `${settings.steps.length}件`], ['状態', '下書き']]} />
       <LinePreview caption="基準日の 1日前 18:00 に届きます">Kentaさん、明日のGoogle Meet相談のご案内です。{`\n`}日時：8/24（月）18:00{`\n`}参加URL：meet.google.com/xxx-xxxx-xxx{`\n\n`}Google Meetに参加</LinePreview>
-      <div className="grid grid-cols-2 gap-2"><Button>テスト送信</Button><Button>通知イメージを見る</Button></div>
     </div>}>
-      <ReminderPanel title="通知ステップ" note="基準日を軸に、何回・いつ送るかを並べます。上から順に届きます。" action={<Button>＋ 通知を追加</Button>}>
+      <ReminderPanel title="通知ステップ" note="基準日を軸に、何回・いつ送るかを並べます。上から順に届きます。">
         <div className="grid min-h-28 gap-2 md:grid-cols-3">{stepRows.map((step, index) => <ReminderStepCard key={step.id} selected={index === 0} number={index + 1} timing={step.timing} title={step.title} note={step.note} />)}</div>
       </ReminderPanel>
-      <ReminderPanel title="1通目・前日のお知らせ" note="送るタイミングと文面を決めます。" action={<div className="flex gap-2"><Button>この通知を複製</Button><Button>この通知を削除</Button></div>}>
+      <ReminderPanel title="1通目・前日のお知らせ" note="送るタイミングと文面を決めます。">
         <div className="grid gap-3">
           <div className="grid gap-3 md:grid-cols-4">
             <Field label="起点"><TextInput className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value="基準日（予約日時）" readOnly /></Field>
@@ -77,7 +76,7 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
           </div>
           <div className="flex flex-wrap gap-2"><Pill tone="success">名前</Pill><Pill>友だち情報</Pill><Pill>共通情報</Pill><Pill>回答フォーム</Pill><Pill>配信日</Pill><Pill>その他</Pill></div>
           <Field label="本文　必須" note={`${body.length} / 5,000文字`}><TextArea rows={3} className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={body} onChange={(event) => setBody(event.target.value)} /></Field>
-          <div className="border-hairline grid grid-cols-2 items-center gap-3 rounded-lg border px-4 py-3 text-xs"><b>この通知の送信後アクション</b><Button>＋ アクションを追加</Button><span className="col-span-2">対応マークを「確認待ち」に変更</span></div>
+          <div className="border-hairline rounded-lg border px-4 py-3 text-xs"><b>この通知の送信後アクション</b><span className="mt-1 block">対応マークを「確認待ち」に変更</span></div>
         </div>
       </ReminderPanel>
       <ReminderPanel title="URLの扱い" note="短縮するとクリック数を計測できます。Meetの参加URLは短縮しない設定です。"><div className="flex items-center justify-between rounded-lg border border-hairline p-3 text-xs"><span>Google Meet 参加URL　<Pill>参加URL（差し込み）</Pill></span><strong>短縮しない</strong></div></ReminderPanel>
@@ -119,7 +118,7 @@ export function Issue469ReminderTestStage({ reminderId }: { reminderId: string }
     <ReminderWorkspace aside={<div className="grid gap-3">
       <SummaryCard rows={[["本番への影響", 'なし'], ['送信数', '1通'], ['送信先', 'Kenta Kawano'], ['送信方法', 'LINE公式']]} />
       <LinePreview caption="［テスト］いますぐ届きます">［テスト］Kentaさん、明日のGoogle Meet相談のご案内です。{`\n`}日時：8/24（月）18:00{`\n`}参加URL：meet.google.com/test-0000{`\n\n`}Google Meetに参加</LinePreview>
-      <div className="grid grid-cols-2 gap-2"><Button onClick={() => setConfirmOpen(true)}>テスト送信</Button><Button>通知イメージを見る</Button></div>
+      <div className="grid grid-cols-2 gap-2"><Button onClick={() => setConfirmOpen(true)}>テスト送信</Button></div>
     </div>}>
       <ReminderPanel title="テスト対象" note="自分のLINEへ確認用メッセージを送ります。"><dl className="grid min-h-24 grid-cols-2 gap-4 text-xs"><Metric label="送信先" value="Kenta Kawano" /><Metric label="テスト日時" value="8/23 01:30" /></dl></ReminderPanel>
       <ReminderPanel title="差し込み値の確認" note="テストで使う値と、本番でどこから取るかを並べて確認します。"><table className="w-full border-collapse text-left text-xs"><thead><TableHeadRow><Th>変数</Th><Th>テストで使う値</Th><Th>本番での取得元</Th></TableHeadRow></thead><tbody className="border-hairline border-t"><tr><td className="px-3 py-3">{'{{name}}'}</td><td className="px-3 py-3">Kenta</td><td className="px-3 py-3">友だちのLINE表示名</td></tr><tr className="border-hairline border-t"><td className="px-3 py-3">{'{{meet_datetime}}'}</td><td className="px-3 py-3">8/24（月）18:00</td><td className="px-3 py-3">予約管理の予約日時</td></tr><tr className="border-hairline border-t"><td className="px-3 py-3">{'{{meet_url}}'}</td><td className="px-3 py-3">meet.google.com/test-0000</td><td className="px-3 py-3">予約ごとに発行されるMeet URL</td></tr></tbody></table></ReminderPanel>
