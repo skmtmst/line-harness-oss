@@ -6402,6 +6402,16 @@ export const api = {
       fetchApi<ApiResponse<AutomationLog[]>>(
         `/api/automations/${id}/logs` + (limit ? `?limit=${limit}` : ''),
       ),
+    audiencePreview: (id: string, accountId: string, versionId?: string) =>
+      fetchApi<ApiResponse<{ automationId: string; versionId: string; matched: number; total: number; freshness: 'available'; calculatedAt: string }>>(
+        `/api/automations/${encodeURIComponent(id)}/audience-preview?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify({ versionId }) },
+      ),
+    test: (id: string, accountId: string, friendId: string, versionId?: string) =>
+      fetchApi<ApiResponse<{ runId: string; versionId: string; status: string }>>(
+        `/api/automations/${encodeURIComponent(id)}/test?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify({ versionId, friendId }) },
+      ),
     templates: (accountId: string) =>
       fetchApi<ApiResponse<AutomationTemplateSummary[]>>(
         `/api/automation-templates?account_id=${encodeURIComponent(accountId)}`,
@@ -8523,7 +8533,7 @@ export interface BookingSettings {
   inactiveMenuCount: number;
   businessHours: Array<{
     weekday: number;
-    intervals: Array<{ start: string; end: string }>;
+    intervals: Array<{ start: string; end: string; capacity?: number }>;
   }>;
   exceptions: BookingException[];
   updatedAt: string;
@@ -8608,6 +8618,20 @@ export interface BookingAvailabilitySlot {
   date: string;
   start: string;
   end: string;
+  capacity: number;
+  remaining: number;
+  state: 'available' | 'limited' | 'full' | 'closed';
+}
+
+export interface BookingResource {
+  id: string;
+  lineAccountId: string;
+  name: string;
+  type: string;
+  capacity: number;
+  isActive: boolean;
+  businessHours: Array<{ start: string; end: string; capacity?: number }>;
+  exceptions: BookingException[];
 }
 
 export interface BookingAvailabilityResponse {
@@ -8625,13 +8649,38 @@ export interface ProxyBookingResult {
   replayed?: boolean;
 }
 
+export interface BookingCustomerSummary {
+  id: string;
+  line_account_id: string;
+  friend_id: string | null;
+  display_name: string;
+  phone_last4: string;
+  pet_name: string | null;
+  is_line_linked: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 function withAccount(path: string, accountId: string): string {
   return `${path}${path.includes('?') ? '&' : '?'}account_id=${encodeURIComponent(accountId)}`;
 }
 
 export const bookingApi = {
+  listCustomers: (accountId: string, query?: string) => {
+    const params = new URLSearchParams({ account_id: accountId });
+    if (query?.trim()) params.set('q', query.trim());
+    return fetchApi<{ customers: BookingCustomerSummary[] }>(`/api/booking/admin/customers?${params}`);
+  },
+  createCustomer: (accountId: string, body: { display_name: string; phone: string; pet_name?: string }) =>
+    fetchApi<{ customer: BookingCustomerSummary }>(withAccount('/api/booking/admin/customers', accountId), {
+      method: 'POST', body: JSON.stringify(body),
+    }),
   getSettings: (accountId: string) =>
     fetchApi<ApiResponse<BookingSettings>>(withAccount('/api/booking/admin/settings', accountId)),
+  listResources: (accountId: string) =>
+    fetchApi<{ success: true; data: { resources: BookingResource[] } }>(
+      withAccount('/api/booking/admin/resources', accountId),
+    ),
   createException: (
     accountId: string,
     body: {
@@ -8670,7 +8719,8 @@ export const bookingApi = {
   createProxyBooking: (
     accountId: string,
     body: {
-      friend_id: string;
+      friend_id?: string;
+      booking_customer_id?: string;
       menu_id: string;
       staff_id: string;
       starts_at: string;

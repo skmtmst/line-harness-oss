@@ -23,8 +23,8 @@ describe('受付枠と休業日のV6契約', () => {
     expect(PAGE).toContain('settings.maxActiveBookingsPerFriend')
     expect(PAGE).toContain('bookingApi.getAvailability(selectedAccountId')
     expect(PAGE).not.toContain('staffId: staff.id')
-    expect(PAGE).toContain('残数が現在の空き情報に含まれないため')
-    expect(PAGE).toContain('店舗・設備単位の1時間受付上限は現在の設定APIに含まれません')
+    expect(PAGE).toContain('○・△・×は受付上限に対する残数を反映しています')
+    expect(PAGE).toContain('bookingApi.listResources(selectedAccountId)')
     expect(PAGE).not.toContain('準備中')
   })
 

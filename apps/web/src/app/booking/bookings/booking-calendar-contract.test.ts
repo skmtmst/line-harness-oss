@@ -35,7 +35,7 @@ describe('V6 予約管理の時間台帳', () => {
       'この方について',
       'つながる先',
     ]) expect(CREATE).toContain(text)
-    expect(CREATE).toContain('顧客台帳の受け皿ができるまで登録できません')
+    expect(CREATE).toContain('予約と顧客台帳に残ります')
   })
 
   test('予約詳細は予約・履歴・顧客・当日の注意を一画面で確認できる', () => {
