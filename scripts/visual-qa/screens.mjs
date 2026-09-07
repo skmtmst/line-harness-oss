@@ -2680,21 +2680,29 @@ export const SCREENS = [
   },
   {
     ...STAFF, node: 'EOTS4', name: '30-1-A 見せる範囲を決める',
-    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#475 `15febf7f` で撮った。** 帯は 管理スタッフ 5人（管理者2・その他3）／二要素認証 **2 / 5**（未設定3人）／過去30日のログイン 2回（失敗1）／最終ログイン 09:02 佐々木 亮太。上に **「🔑 二段階認証が未設定のユーザーが 3人 います」** と、**数ではなく次にすることを出す帯**がある。表は ユーザー・役割・担当範囲・LINE連携・二段階認証・利用状態・操作。内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧は最後の操作と、権限の変更履歴への導線を持つ **ルート**：`/staff?tab=members`（見せる範囲）。**取得元**：`staff-v6/EOTS4.txt`。**推奨修正**：最後の操作と権限の変更履歴への導線を足す。**どちらも `jwVlo`（入った記録）が記録の一覧になってからでないと飛び先が無い**ので、そちらが先。**「二段階認証が未設定のユーザーが 3人 います」という、数ではなく次にすることを出す帯は維持する。**', verdictSource: 'staff-v6/EOTS4.txt',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #434 / 3101・8788で再撮影・再判定。** `access/roles` の機能30固定行を読み、管理者・運用・見るだけの3役割を横に、対象機能を縦に並べ、編集・閲覧・対象外を比較できる表として表示した。個人通知は比較表から分離し、ユーザー編集側へ残した。1440/1920pxとも対象画面へ到達し、横はみ出し0。',
+    verdictSource: 'staff-v6/EOTS4.txt + staff-v6/EOTS4-{1440,1920}.png + 2026-09-07 visual comparison',
     mode: 'viewport', height: 1080, /*
       **行の押し口は「範囲を編集」。** 人の名前は文字で、押せる役を持っていない。
       名前で探していたので、固定データを足したあとも0件のままだった
       （`page.tsx:142` の行末が `範囲を編集`）。
     */
     steps: [{ wait: 1500 }, { qaOpen: 'EOTS4' }],
-    verdictHead: '7b509106',
+    verdictHead: 'codex/kenta-r2-codex-b434',
   },
   { ...STAFF, node: 'jwVlo', name: '30-1-B 入った記録', route: '/staff?tab=audit',
     states: { apis: ['**/api/audit/events*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #243 / PR #1039 / UI HEAD 1b4774050 を3105/8792で再撮影。構造一致・共通監査API待ち。** 4指標、説明帯、検索、期間・表示件数、6つの絞り込み札、並び順、設計順の5列、CSV書き出し、取得範囲内のページ送りをそろえた。失敗・拒否は赤く表示し、通常・読込・空・失敗・権限不足を分ける。1440・1920pxとも横はみ出し0。残る差は全業務操作、総件数、対象詳細、変更前後、場所のrisk判定を返す共通監査APIで、現在のログイン監査5種類だけでは埋められない。未取得を作り値にしないため一致にはしない。',
     verdictSource: 'staff-v6/jwVlo-1920.png + staff-v6/jwVlo-{normal,loading,empty,error,forbidden}.txt + Pencil node jwVlo', verdictHead: '1b4774050',
   },
-  { ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new', verdict: 'unjudged', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** **撮れていないので判定しない。** `/staff/new` を開くとログイン画面になった。撮影の途中でモックが落ちたときと同じ症状なので、**モックを起こし直して撮り直す**。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **P2 人を招待する。段の作りは設計どおり。**#475 `15febf7f` で撮った。ルート `/staff/new`。段は 1 どなたを追加するか（名前・メールアドレス）→ 2 役割 → 3 最初に表示するLINEアカウント。**良い点**：役割を**できることの文で**説明する（管理者「すべての権限で設定・操作できます」／スタッフ「選択した機能だけを操作できます」／閲覧のみ「すべて閲覧できますが、操作はできません」）。「このアドレスに招待メールが届きます。」と**何が起きるかを書く**。3段目に「ログイン直後の表示だけを決めます。組織内のほかのアカウントにも切り替えて操作できます。」と、**この設定が何を縛らないか**まで書く。**P2 残る差**：設計 30-1-C は LINE連携での招待も選べるが、実装はメールだけ。担当範囲の割り当ても追加後の「範囲を編集」へ回している。内部語・壊れ値0件、1440・1920とも横スクロール0。取得元：`staff-v6/I3ZSrU.txt` **推奨修正**：LINE連携での招待と担当範囲割り当ては書き込み契約の追加後に接続する。', verdictSource: 'staff-v6/I3ZSrU.txt' , verdictHead: '31293424' },
+  {
+    ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #434 / 3101・8788で再撮影・再判定。** 認証済みセッションのまま `/staff/new` へ到達し、ログイン画面へ戻らないことを確認した。名前・メールアドレス・役割・最初に表示するLINEアカウント・スタッフの機能別担当範囲・通知先と、追加後の流れを表示。1440/1920pxとも横はみ出し0。',
+    verdictSource: 'staff-v6/I3ZSrU.txt + staff-v6/I3ZSrU-{1440,1920}.png + 2026-09-07 visual comparison',
+    verdictHead: 'codex/kenta-r2-codex-b434',
+  },
 
   // ── 機能31 機能設定 ─────────────────────────────────────
   { ...FEATURE_SET, node: 'c4R6F', name: '31-1 機能設定', verdict: 'needs_fix', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正。**機能の説明文が6つ足りない**（ECの会員・注文・定期便データを取り込みます／LINEアカウントの登録と切り替え／UIDなど既存データの移行状況を確認します／GBP投稿・LINE配信・メニュー改定の承認／GBP口コミ返信と最新情報の下書き管理／予約前・来店後・口コミ・会員証のLINEカード）。**説明が無いと、切り替えたときに何が起きるか分からない。**※ 設計側: この1枚だけ **2004×1248** で、1920 にも 1080 にも収まらない。※ 設計側: 設計に「未対応の数」が描かれている。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#478 `66883866` で撮った。** **オフにしたときに何が起きないかを先に書く**——「オフにしても作ったデータは削除されません。**公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。**」。機能設定・並び替え・初期値に戻すが揃う。内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計は機能ごとに「いま使っている数」を並べて、切ってよいかを判断させる。実装は一覧と並び替えまで **ルート**：`/settings`。**推奨修正**：機能ごとに「いま使っている数」を並べて、切ってよいかを判断させる。**`QQ1SR`（分析の使われ方）が8分類の作成数・利用中を既に返している**ので、**同じ口をここでも読む**のが早い。「オフにしても作ったデータは削除されません。公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。」の断りは残す。', verdictSource: 'settings-v6/c4R6F.txt' , verdictHead: '31293424' },
@@ -3032,22 +3040,10 @@ const feature30Judgments = {
     verdictSource: 'staff-v6/e3jz3.png + staff-v6/e3jz3-{normal,loading,empty,error,forbidden}.txt',
     verdictHead: '04057fb9da53',
   },
-  EOTS4: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-07 #405 / 3101・8788で正式撮影。** e3jz3の「中身を見る」から高田誠を開け、1440/1920pxで横はみ出し0。**要修正**：Pencilは役割bundleカード、3状態の権限比較表、担当範囲・変更履歴への導線を持つ全画面だが、実装は旧来の個人編集モーダル（3役割・通知・LINE連携）で、権限の3状態を保存する口もない。書き込み契約のない操作を見かけだけ追加せず、#405の対象外として残した。',
-    verdictSource: 'staff-v6/EOTS4.png + staff-v6/EOTS4.txt',
-    verdictHead: '04057fb9da53',
-  },
   jwVlo: {
     verdict: 'needs_fix',
     verdictNote: '**2026-09-07 #405 / 3101・8788で正式撮影。** audit/events の固定契約でsummary（4,286・削除12・配信18・変更46・ログイン286・要確認1）と通常7行、対象・変更前後・接続元・異常表示を1440/1920pxで確認し、横はみ出し0。**要修正**：設計にある都市名・個別詳細ボタンと実装契約にない位置情報の対応が未確定。実装はマスク済みIP・端末・riskLevelを表示し、存在しない位置情報を作っていない。',
     verdictSource: 'staff-v6/jwVlo.png + staff-v6/jwVlo-{normal,loading,empty,error,forbidden}.txt',
-    verdictHead: '04057fb9da53',
-  },
-  I3ZSrU: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-07 #405 / 3101・8788で正式撮影。** /staff/new を1440/1920pxで撮影し、横はみ出し0。名前・メール・役割・LINE認証後の流れ・担当アカウント・通知先を表示できた。**要修正**：Pencilの職位、4つのbundle、MFA必須・7日期限・初回通知、予約メニュー、メールプレビューが未接続。#352/#1170には招待作成の書き込み契約がないため、押しても保存できない入力欄は追加していない。設計画像の「パスワード」はV6要件（メール確認→LINE Login→TOTP）と矛盾するため採用しない。',
-    verdictSource: 'staff-v6/I3ZSrU.png + staff-v6/I3ZSrU.txt',
     verdictHead: '04057fb9da53',
   },
 }
@@ -3081,22 +3077,10 @@ const feature30Issue425Judgments = {
     verdictSource: 'staff-v6/e3jz3.png + staff-v6/e3jz3-{normal,loading,empty,error,forbidden}.txt + 2026-09-07 visual comparison',
     verdictHead: '5c9238525',
   },
-  EOTS4: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-07 #425 / 3101・8788で再撮影・再判定。** 権限を比べる導線から管理者・運用・見るだけの比較表を開き、機能ごとの権限値（編集・閲覧・対象外）を1440/1920pxで確認し、横はみ出し0。個人の通知設定は編集画面へ分離した。比較表の保存操作は書き込み契約が無いため表示せず、読み取り設計と契約値を一致させた。',
-    verdictSource: 'staff-v6/EOTS4.txt + staff-v6/EOTS4-{1440,1920}.png + 2026-09-07 visual comparison',
-    verdictHead: '5c9238525',
-  },
   jwVlo: {
     verdict: 'match',
     verdictNote: '**2026-09-07 #425 / 3101・8788で再撮影・再判定。** 通常・読込・空・失敗・権限不足を1440/1920pxで撮影し、横はみ出し0。監査イベント契約へ `regionLabel` を追加し、既知のIP接頭辞は地域名、契約が地域を返さない場合は「—」として確定した。各行に詳細ボタンを追加し、変更前後・対象・場所を確認できる。位置情報を推測していないため、契約値と表示が一致する。',
     verdictSource: 'staff-v6/jwVlo.png + staff-v6/jwVlo-{normal,loading,empty,error,forbidden}.txt + 2026-09-07 visual comparison',
-    verdictHead: '5c9238525',
-  },
-  I3ZSrU: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-07 #425 / 3101・8788で認証済み `/staff/new` を再撮影・再判定。** 1440/1920pxで横はみ出し0。メール招待フォーム、役割説明、初回表示アカウントを確認し、設計との差（LINE連携招待・担当範囲割り当て・通知設定）は書き込み契約未提供のため未接続と明記した。認証切れのログイン画面ではなく、対象画面を撮影できている。',
-    verdictSource: 'staff-v6/I3ZSrU.txt + staff-v6/I3ZSrU-{1440,1920}.png + 2026-09-07 visual comparison',
     verdictHead: '5c9238525',
   },
 }
@@ -4340,7 +4324,8 @@ for (const screen of SCREENS) {
     screen.verdictHead = 'd69099cd9'
   }
   const issue212Review = ISSUE_212_REVIEW[screen.node]
-  if (screen.feature >= 14 && screen.feature <= 32 && issue212Review) {
+  const supersededByIssue434 = screen.feature === 30 && (screen.node === 'EOTS4' || screen.node === 'I3ZSrU')
+  if (screen.feature >= 14 && screen.feature <= 32 && issue212Review && !supersededByIssue434) {
     if (screen.node === 'njLGA') {
       delete screen.status
       delete screen.gap
