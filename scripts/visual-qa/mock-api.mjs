@@ -92,6 +92,7 @@ import {
   WEBINARS, WEBINAR_FOLDERS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_ANALYTICS,
   FRIEND_ADD_RULE_PUBLISH, FRIEND_ADD_RULE_VALIDATE,
   ACCESS_USERS, ACCESS_ROLES, ACCESS_AUDIT_EVENTS,
+  GETTING_STARTED, RECIPES, MANUAL_LINKS,
 } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
@@ -931,6 +932,16 @@ const SHAPES = {
  * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
  */
 function visualQaWriteBody(method, pathname) {
+  if (method === 'PUT' && /^\/api\/manual-links\/[^/]+$/.test(pathname)) {
+    const key = decodeURIComponent(pathname.split('/').pop() ?? '')
+    return MANUAL_LINKS.items.find((item) => item.key === key) ?? null
+  }
+  if (method === 'POST' && /^\/api\/recipes\/[^/]+\/clone$/.test(pathname)) {
+    return { runId: 'visual-recipe-clone-run', status: 'succeeded', createdCount: 16, items: [] }
+  }
+  if (method === 'POST' && pathname === '/api/manual-links/check') {
+    return { checked: 265, ok: 263, broken: 2, unset: 1 }
+  }
   if (method === 'POST' && pathname === '/api/line-accounts/verify-connection') {
     return LINE_ACCOUNT_VERIFY_CONNECTION
   }
@@ -1250,6 +1261,13 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       },
     }
   }
+  if (pathname === '/api/getting-started') return { success: true, data: GETTING_STARTED }
+  if (pathname === '/api/recipes') return { success: true, data: RECIPES }
+  const recipeDetail = /^\/api\/recipes\/([^/]+)$/.exec(pathname)
+  if (recipeDetail) {
+    return { success: true, data: RECIPES.find((recipe) => recipe.id === recipeDetail[1]) ?? null }
+  }
+  if (pathname === '/api/manual-links') return { success: true, data: MANUAL_LINKS }
   if (pathname === '/api/operations/control/preview') {
     return { success: true, data: OPERATION_CONTROL_PREVIEW }
   }
@@ -2360,7 +2378,7 @@ const server = createServer((req, res) => {
     'Access-Control-Allow-Headers',
     'Content-Type, X-CSRF-Token, X-Admin-Session, Idempotency-Key, X-Confirm-Irreversible',
   )
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS')
 
   if (method === 'OPTIONS') {
     res.writeHead(204).end()

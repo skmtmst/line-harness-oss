@@ -1,4 +1,5 @@
 import { MANUAL_LINKS } from '@/lib/manual-links'
+import type { ManualLink } from '@/lib/api'
 
 /**
  * 設計 ★V6 34-4「マニュアルの正本表」（`f9oUm`）。
@@ -69,6 +70,17 @@ export function localRows(): ManualLinkRow[] {
   })
 }
 
+export function manualLinkRow(link: ManualLink): ManualLinkRow {
+  return {
+    screenId: link.keyKind === 'screen' ? link.key : '—',
+    taskId: link.keyKind === 'task' ? link.key : null,
+    name: link.name,
+    url: link.url ?? '',
+    checkedAt: link.lastCheckedAt,
+    status: link.status,
+  }
+}
+
 /** URL の見せ方。空のときは URL に見せない。 */
 export function urlLabel(url: string): string {
   return url.trim() === '' ? '（まだ決めていません）' : url
@@ -76,7 +88,18 @@ export function urlLabel(url: string): string {
 
 /** 最後に確かめた日。確かめていなければ `—`。 */
 export function checkedLabel(checkedAt: string | null): string {
-  return checkedAt ?? '—'
+  if (!checkedAt) return '—'
+  if (/^\d{1,2}\/\d{1,2}\s+\d{2}:\d{2}$/.test(checkedAt)) return checkedAt
+  const date = new Date(checkedAt)
+  if (Number.isNaN(date.getTime())) return checkedAt
+  return new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date)
 }
 
 /** 絞り込みの区分。設計の「状態：すべて」。 */

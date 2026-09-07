@@ -39,7 +39,7 @@ describe('成果地点の削除確認', () => {
   })
 
   it('停止の本体が二度押しを止め、返事を確かめ、finally で戻す', () => {
-    const body = slice(PAGE, 'const runStop = async', '\n  const countByPoint')
+    const body = slice(PAGE, 'const runStop = async', '\n  const exportCsv')
     expect(body, '処理中でも受け付けてしまう').toContain('if (!stopTarget || stopping) return')
     expect(body, '返事を確かめていない').toContain('if (!res.success) throw new Error(res.error)')
     expect(body, '失敗を握りつぶしている').toContain(
@@ -58,16 +58,14 @@ describe('成果地点の削除確認', () => {
     expect(dialog).toContain('confirmLabel="数えるのをやめる"')
   })
 
-  it('過去記録を残し、数えられない参照と3つの選択肢を本文で断る', () => {
+  it('過去記録を残し、実データの利用先件数と3つの選択肢を本文で示す', () => {
     const dialog = dialogWith(PAGE, 'open={stopTarget !== null}')
     expect(dialog).toContain('の記録と金額は、そのまま残ります。')
-    // 使用先を数える口が無い。0件と書かず、数えていないことを断る。
-    expect(dialog).toContain('— 利用先の取得は未接続')
-    expect(dialog, '取れない数を0件として作っている').not.toContain('利用先 0件')
+    expect(dialog).toContain('{usageLabel(stopTarget)}')
+    expect(dialog).toContain('利用先の件数は実データです。')
     for (const choice of ['数えるのをやめる（おすすめ）', '別の成果地点に差し替えてから削除する', 'このまま削除する']) {
       expect(dialog).toContain(choice)
     }
-    // レポートが落ちているときは件数を作らず「読み込めませんでした」と出す。
-    expect(dialog).toContain('成果件数を読み込めていません。0件とは扱いません。')
+    expect(dialog).toContain('stopTarget.metrics.netCount.toLocaleString')
   })
 })
