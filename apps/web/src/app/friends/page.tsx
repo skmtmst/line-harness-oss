@@ -20,6 +20,7 @@ import Chip from '@/components/shared/chip'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import { emptyMessageOf } from './friend-list-empty'
+import { csvExportLine } from './csv-export'
 import BulkRunDialog from '@/components/friends/bulk-run-dialog'
 import { canRunBulk } from '@/components/friends/bulk-run-view'
 import { savedSearchParams, savedSearchSummary } from '@/components/friends/saved-search-utils'
@@ -86,6 +87,7 @@ function FriendsPageInner({
   const [scenarioId, setScenarioId] = useState('')
   const [attentionOnly, setAttentionOnly] = useState(false)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
+  const [optionsFailed, setOptionsFailed] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const selectedFriendIds = useMemo(() => [...selectedIds], [selectedIds])
   const loadRequestRef = useRef(0)
@@ -130,8 +132,11 @@ function FriendsPageInner({
       if (operatorResponse.success) setOperators(operatorResponse.data)
       if (scenarioResponse.success) setScenarios(scenarioResponse.data)
       if (markResponse.success) setMarks(markResponse.data)
+      setOptionsFailed(false)
     } catch {
       // 選択肢の取得に失敗しても、友だち一覧と検索は使える。
+      // ただし「タグがない」と「取れなかった」の区別が付くよう一言出す(#496-19)。
+      setOptionsFailed(true)
     }
   }, [selectedAccountId])
 
@@ -219,9 +224,8 @@ function FriendsPageInner({
       friend.latestIncomingMessage?.content ?? '',
       friend.createdAt.slice(0, 10),
     ])
-    const csv = [header, ...rows]
-      .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))
-      .join('\n')
+    // 先頭 =+-@ の数式インジェクション対策つき(#496-4)。出るのは表示中のページ分だけ(#496-21)。
+    const csv = [header, ...rows].map((row) => csvExportLine(row)).join('\n')
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
@@ -391,6 +395,12 @@ function FriendsPageInner({
           </button>
           <span className="shrink-0 whitespace-nowrap text-xs text-ink-faint">{loadStatus === 'ready' ? `${total.toLocaleString('ja-JP')}件` : '—'}</span>
         </div>
+        {optionsFailed ? (
+          <p className="mt-2 text-xs text-ink-secondary">
+            絞り込みの選択肢を読み込めませんでした。タグが空なのは、取れなかっただけかもしれません。
+            <button type="button" onClick={() => void loadOptions()} className="font-semibold text-action hover:underline">再読み込み</button>
+          </p>
+        ) : null}
       </section>
 
       {selectedIds.size > 0 ? (
@@ -622,7 +632,7 @@ function FriendsPageHost() {
           active={tab}
           actions={(
             <div className="flex flex-wrap items-center justify-end gap-2">
-              {tab === 'list' ? <button type="button" onClick={() => exportCurrentPage?.()} disabled={!exportCurrentPage} className="h-9.5 rounded-control border border-hairline bg-canvas px-4 text-sm font-semibold text-ink-secondary hover:bg-canvas-sunken disabled:text-ink-disabled">CSVで書き出す</button> : null}
+              {tab === 'list' ? <button type="button" onClick={() => exportCurrentPage?.()} disabled={!exportCurrentPage} className="h-9.5 rounded-control border border-hairline bg-canvas px-4 text-sm font-semibold text-ink-secondary hover:bg-canvas-sunken disabled:text-ink-disabled">表示中をCSVで書き出す</button> : null}
               <Link href="/accounts?tab=migration" className="flex h-9.5 items-center rounded-control border border-hairline bg-canvas px-4 text-sm font-semibold text-action hover:bg-action-soft">UID移行</Link>
             </div>
           )}

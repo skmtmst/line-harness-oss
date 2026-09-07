@@ -19,13 +19,18 @@ const JOB_STATUS_LABELS: Record<string, string> = {
   completed: '反映ずみ', previewed: '確認まで', expired: '期限切れ', failed: '失敗',
 }
 
+// 取り込みファイルの上限（#496-22）。全文を画面のメモリへ読むため、
+// 大きすぎるファイルは固まる前に断る。5000行の取り込み上限に対し十分な大きさ。
+const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024
+
 export default function FriendMigrationsPage() {
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   const [accountId, setAccountId] = useState('')
   const [jobs, setJobs] = useState<FriendMigrationJob[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [columns, setColumns] = useState<Array<'basic' | 'tags_fields' | 'support'>>(['basic', 'tags_fields'])
-  const [encoding, setEncoding] = useState<'utf-8' | 'shift_jis'>('utf-8')
+  // Shift_JIS書き出しはAPI未対応(#496-5)。対応までUTF-8固定で、選択肢は出さない。
+  const encoding = 'utf-8' as const
   const [exportResult, setExportResult] = useState<{ rowCount: number | null; downloadUrl: string } | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [rows, setRows] = useState<FriendImportRow[]>([])
@@ -67,11 +72,30 @@ export default function FriendMigrationsPage() {
     finally { setBusy(false) }
   }
 
+  const onPickFile = async (selected: File | null) => {
+    setSummary(null)
+    if (!selected) { setFile(null); setRows([]); return }
+    // 元バイトで重複判定の指紋を取る（再符号化した文の指紋では意味が薄れる、#496-22）。
+    // UTF-8以外（Shift_JIS等）は文字化けするため、UTF-8の案内とセットで断る。
+    if (selected.size > MAX_IMPORT_FILE_BYTES) {
+      setFile(null); setRows([])
+      setMessage('ファイルが大きすぎます（上限5MB）。分割するか、UTF-8で保存し直してください。')
+      return
+    }
+    setFile(selected)
+    try {
+      setRows(parseFriendCsv(await selected.text()))
+    } catch {
+      setRows([])
+      setMessage('CSVを読めませんでした。UTF-8のCSVを選んでください。')
+    }
+  }
+
   const previewImport = async () => {
     if (!accountId || !file || rows.length === 0) { setMessage('このシステムから書き出したCSVを選んでください。'); return }
     setBusy(true); setMessage(null)
     try {
-      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(await file.text()))
+      const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer())
       const sourceChecksum = Array.from(new Uint8Array(digest)).map((value) => value.toString(16).padStart(2, '0')).join('')
       const response = await api.friendMigrations.previewImport({ accountId, sourceFilename: file.name, sourceChecksum, rows })
       if (!response.success) throw new Error(response.error)
@@ -103,14 +127,14 @@ export default function FriendMigrationsPage() {
           {([['basic', '基本（名前・LINEアカウント・登録日）'], ['tags_fields', 'タグ・友だち情報'], ['support', '対応状況・対応マーク・担当者']] as const).map(([value, label]) => <label key={value} className="text-ink flex items-center gap-2 text-sm"><input type="checkbox" checked={columns.includes(value)} onChange={() => toggleColumn(value)} />{label}</label>)}
         </fieldset>
         <p className="text-ink-faint mt-2 text-xs">電話番号やメールなどの個人情報は、見る権限がある人だけ選べます。</p>
-        <fieldset className="mt-4 flex gap-4"><legend className="text-ink-secondary mb-2 text-xs font-semibold">文字コード</legend><label className="text-sm"><input type="radio" checked={encoding === 'utf-8'} onChange={() => setEncoding('utf-8')} /> UTF-8（おすすめ）</label><label className="text-sm"><input type="radio" checked={encoding === 'shift_jis'} onChange={() => setEncoding('shift_jis')} /> Shift_JIS</label></fieldset>
+        <p className="text-ink-secondary mt-4 text-sm">文字コード： UTF-8</p><p className="text-ink-faint mt-1 text-xs">Shift_JISの書き出しはまだ使えません。今はUTF-8を選んでください。</p>
         <div className="mt-4 flex items-center gap-3"><Button variant="primary" disabled={busy} onClick={() => void createExport()}>書き出しを作る</Button>{exportResult && <a className="text-action text-sm font-semibold hover:underline" href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}${exportResult.downloadUrl}`}>CSVをダウンロード（{exportResult.rowCount ?? '—'}件）</a>}</div>
         <p className="text-ink-faint mt-2 text-xs">件数が多いときは、できあがったらお知らせします。ダウンロードできる期間は7日です。</p>
       </section>
 
       <section className="bg-canvas rounded-card border-hairline border p-4">
         <h2 className="text-ink text-base font-bold">CSVを取り込む</h2>
-        <div className="border-hairline bg-canvas-sunken mt-4 rounded-card border border-dashed p-6 text-center"><p className="text-ink text-sm font-medium">ここにCSVを置くか、ファイルを選んでください。</p><p className="text-ink-faint mt-1 text-xs">このシステムから書き出したCSVは、そのまま取り込めます。</p><label className="border-hairline bg-canvas rounded-control mt-3 inline-block cursor-pointer border px-4 py-2 text-sm font-semibold">ファイルを選ぶ<input type="file" accept=".csv,text/csv" className="sr-only" onChange={async (event) => { const selected = event.target.files?.[0] ?? null; setFile(selected); setRows(selected ? parseFriendCsv(await selected.text()) : []); setSummary(null) }} /></label>{file && <p className="text-ink-secondary mt-2 text-sm">{file.name}（{rows.length.toLocaleString()}行）</p>}</div>
+        <div className="border-hairline bg-canvas-sunken mt-4 rounded-card border border-dashed p-6 text-center"><p className="text-ink text-sm font-medium">ここにCSVを置くか、ファイルを選んでください。</p><p className="text-ink-faint mt-1 text-xs">このシステムから書き出したUTF-8のCSVは、そのまま取り込めます（上限5MB）。</p><label className="border-hairline bg-canvas rounded-control mt-3 inline-block cursor-pointer border px-4 py-2 text-sm font-semibold">ファイルを選ぶ<input type="file" accept=".csv,text/csv" className="sr-only" onChange={(event) => { void onPickFile(event.target.files?.[0] ?? null) }} /></label>{file && <p className="text-ink-secondary mt-2 text-sm">{file.name}（{rows.length.toLocaleString()}行）</p>}</div>
         <div className="mt-4 flex items-center gap-3"><Button variant="primary" disabled={busy} onClick={() => void previewImport()}>まず確認だけする</Button><span className="text-ink-faint text-xs">確認の結果を見てから反映</span></div>
         {summary && <><h3 className="text-ink mt-5 text-sm font-bold">確認の結果</h3><div className="mt-2 grid grid-cols-5 gap-2"><SummaryCard variant="v6" title="追加" value={summary.add} unit="件" detail="新しく登録" /><SummaryCard variant="v6" title="更新" value={summary.update} unit="件" detail="値を変更" /><SummaryCard variant="v6" title="変更なし" value={summary.unchanged} unit="件" detail="同じ内容" /><SummaryCard variant="v6" title="競合" value={summary.conflict} unit="件" detail="判断が必要" /><SummaryCard variant="v6" title="エラー" value={summary.error} unit="件" detail="直して再確認" /></div>{importId && <div className="mt-4"><Button disabled={summary.conflict + summary.error > 0 || busy} onClick={async () => { setBusy(true); const response = await api.friendMigrations.executeImport(importId); setMessage(response.success ? `${response.data.applied ?? 0}件を反映しました。` : response.error); setBusy(false); await load() }}>確認した内容を反映</Button></div>}</>}
         <p className="text-ink-faint mt-4 text-xs leading-relaxed">LINEのユーザーIDとLINEアカウントは、既存行の取り込みでは変わりません。同じファイルをもう一度入れても二重には反映しません。</p>

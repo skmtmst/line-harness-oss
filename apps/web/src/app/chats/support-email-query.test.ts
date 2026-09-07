@@ -14,4 +14,13 @@ describe('buildSupportEmailInboxQuery', () => {
     expect(query.get('limit')).toBe('200')
     expect(query.has('lineAccountId')).toBe(false)
   })
+
+  it('2ページ目以降はoffsetを付けて遡れる', () => {
+    const first = new URLSearchParams(buildSupportEmailInboxQuery({ status: 'all' }))
+    expect(first.has('offset')).toBe(false)
+
+    const next = new URLSearchParams(buildSupportEmailInboxQuery({ status: 'all', offset: 200 }))
+    expect(next.get('offset')).toBe('200')
+    expect(next.get('limit')).toBe('200')
+  })
 })
