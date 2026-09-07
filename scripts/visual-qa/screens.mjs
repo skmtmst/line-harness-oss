@@ -2674,7 +2674,7 @@ export const SCREENS = [
       名前で探していたので、固定データを足したあとも0件のままだった
       （`page.tsx:142` の行末が `範囲を編集`）。
     */
-    steps: [{ click: '範囲を編集' }],
+    steps: [{ qaOpen: 'EOTS4' }],
     verdictHead: '7b509106',
   },
   { ...STAFF, node: 'jwVlo', name: '30-1-B 入った記録', route: '/staff?tab=audit',
@@ -3012,6 +3012,38 @@ export const SCREENS = [
   },
 ]
 
+/* 機能30は #406 の固定契約を取り込んだ正式撮影結果。設計との差を画面単位で残す。 */
+const feature30Judgments = {
+  e3jz3: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-07 #405 / 3101・8788で正式撮影。** access/users・access/roles の固定契約で4状態（通常・読込・空・失敗・権限不足）を1440/1920px撮影し、横はみ出し0。集計（8人・招待2・90日未ログイン1・MFA6/8）と5つの権限bundleを実値で表示できた。**要修正**：設計の1ページ6行＋ページ送り、役割・担当範囲・職位の表示順と行データが現在の固定契約と一致せず、設計の注意札も不足している。実装は取得値を推測せずそのまま表示しているため、契約側または設計側の確定が必要。',
+    verdictSource: 'staff-v6/e3jz3.png + staff-v6/e3jz3-{normal,loading,empty,error,forbidden}.txt',
+    verdictHead: '04057fb9da53',
+  },
+  EOTS4: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-07 #405 / 3101・8788で正式撮影。** e3jz3の「中身を見る」から高田誠を開け、1440/1920pxで横はみ出し0。**要修正**：Pencilは役割bundleカード、3状態の権限比較表、担当範囲・変更履歴への導線を持つ全画面だが、実装は旧来の個人編集モーダル（3役割・通知・LINE連携）で、権限の3状態を保存する口もない。書き込み契約のない操作を見かけだけ追加せず、#405の対象外として残した。',
+    verdictSource: 'staff-v6/EOTS4.png + staff-v6/EOTS4.txt',
+    verdictHead: '04057fb9da53',
+  },
+  jwVlo: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-07 #405 / 3101・8788で正式撮影。** audit/events の固定契約でsummary（4,286・削除12・配信18・変更46・ログイン286・要確認1）と通常7行、対象・変更前後・接続元・異常表示を1440/1920pxで確認し、横はみ出し0。**要修正**：設計にある都市名・個別詳細ボタンと実装契約にない位置情報の対応が未確定。実装はマスク済みIP・端末・riskLevelを表示し、存在しない位置情報を作っていない。',
+    verdictSource: 'staff-v6/jwVlo.png + staff-v6/jwVlo-{normal,loading,empty,error,forbidden}.txt',
+    verdictHead: '04057fb9da53',
+  },
+  I3ZSrU: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-07 #405 / 3101・8788で正式撮影。** /staff/new を1440/1920pxで撮影し、横はみ出し0。名前・メール・役割・LINE認証後の流れ・担当アカウント・通知先を表示できた。**要修正**：Pencilの職位、4つのbundle、MFA必須・7日期限・初回通知、予約メニュー、メールプレビューが未接続。#352/#1170には招待作成の書き込み契約がないため、押しても保存できない入力欄は追加していない。設計画像の「パスワード」はV6要件（メール確認→LINE Login→TOTP）と矛盾するため採用しない。',
+    verdictSource: 'staff-v6/I3ZSrU.png + staff-v6/I3ZSrU.txt',
+    verdictHead: '04057fb9da53',
+  },
+}
+for (const screen of SCREENS) {
+  const judgment = feature30Judgments[screen.node]
+  if (screen.feature === 30 && judgment) Object.assign(screen, judgment)
+}
+
 // Issue #245（機能32）。同じ実装headで4画面と全状態を撮り直した最新判定。
 const FEATURE_32_REVIEW = {
   UgonK: {
@@ -3098,9 +3130,23 @@ const FEATURE_16_REVIEW = {
     variants: [{ suffix: '-detail', steps: [{ click: '見る', nth: 0, after: 500 }] }],
   },
   njLGA: {
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07、Issue #307 で通常・読込中・0件・取得失敗を再撮影し、構造一致・データ未接続。** 3102/8789 で4状態を1440px・1920pxの両方で撮り、10枚すべて横はみ出し0。通常は5人の支払い確定前報酬、保留額、支払い条件の覚書と行ごとの確定操作を表示し、0件と取得失敗も混同しない。前回 #212 の「通常と0件が取得失敗になる」は解消した。残る差は、支払結果・締め日・支払日・振込先を返すAPIが無いこと。Pencilの「今年払った合計」「次の締め」「次の支払日」「振込先」「過去の支払い」「振込用CSV」は値を作らず、未接続の理由を表示する。**接続条件:** 支払台帳・締め設定・振込先APIが入ったら、設計の4指標、状態札、6列表、締め・明細・CSV操作を接続して同じ4状態を再撮影する。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07、Issue #394 / PR #1180 / HEAD `3721857fb` で締め台帳の固定データを接続して再撮影し、一致。** 3102/8789で通常・読込中・0件・取得失敗を1440px・1920px撮影し、10枚すべて横はみ出し0。通常は締め前の3人、金額・成果件数・締め日・振込先登録状態・確定操作を実API契約から表示する。0件と取得失敗を混同せず、未提供の支払日・支払履歴は値を作らず `—` と理由を表示する。',
     verdictSource: 'affiliates-v6/njLGA.txt + njLGA-{normal,loading,empty,error}.txt + njLGA-{normal,loading,empty,error}-{1440,1920}.png',
+    verdictHead: '3721857fb',
+    states: { apis: ['**/api/affiliate-settlements/preview*'], kinds: ['normal', 'loading', 'empty', 'error'] },
+  },
+  jwrbf: {
+    verdict: 'match',
+    verdictNote: '**2026-09-07、Issue #394 / PR #1180 / HEAD `3721857fb` で支払台帳の固定データを接続して再撮影し、一致。** 3102/8789の1440px・1920pxはいずれも横はみ出し0。田中 明の行を開き、今回の金額・成果件数・締め日・振込先登録状態を実API契約から表示した。設計との差として検出される金額・件数・日付は固定データの値で、画面構造の差ではない。',
+    verdictSource: 'affiliates-v6/jwrbf.txt + jwrbf-{1440,1920}.png',
+    verdictHead: '3721857fb',
+  },
+  GqFTV: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07、Issue #394 / PR #1180 / HEAD `3721857fb` で締めプレビューを接続して再撮影し、構造一致・設計画像待ち。** 3102/8789の1440px・1920pxはいずれも横はみ出し0。確定額・成果件数・案件別内訳・締め日・振込先登録状態を実API契約から表示し、確定後は締め台帳・振込データ・明細を順に作る。正本の本文とは照合できたが、このNodeだけ1920pxの設計PNGが保管されていないため、画像一致とは判定しない。支払日は未提供なので `—` と理由を表示する。**接続条件:** Pencil実Node `GqFTV` の1920px設計画像を保管して同じ幅で目視比較する。',
+    verdictSource: 'affiliates-v6/GqFTV.txt + GqFTV-{1440,1920}.png + design-reference/affiliates-v6/GqFTV.txt',
+    verdictHead: '3721857fb',
   },
   xqT1Z: {
     verdict: 'match',
@@ -4048,6 +4094,21 @@ const ISSUE_367_REVIEW = {
   },
 }
 
+const ISSUE_408_REVIEW = {
+  ZrpKn: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**Issue #408 再判定。** 利用先の種別名と取消内訳の表示欄、成果地点ごとの実データ契約を追加。撮影モックは旧契約のため利用先名・取消台帳が未接続で、実APIの固定データ反映後に一致へ更新する。横スクロール0。',
+    verdictSource: 'conversions-v6/ZrpKn.txt + Issue #408',
+    verdictHead: 'codex/kenta-r2-s2-b408',
+  },
+  GUxsj: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**Issue #408 再判定。** 成果地点ごとの経路内訳と取消件数・金額を表示する契約へ更新。撮影モックは旧契約のため取消台帳・利用先名が未接続で、固定データ反映後に一致へ更新する。横スクロール0。',
+    verdictSource: 'conversions-v6/GUxsj.txt + Issue #408',
+    verdictHead: 'codex/kenta-r2-s2-b408',
+  },
+}
+
 // Issue #293（機能2 第2周）。Pencil 1920pxと、割当ポート3104/8791で
 // 撮った実装1440/1920pxを横に並べ、同じ操作状態で再判定した。
 const FEATURE_2_R2_PREFIX = '**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。'
@@ -4253,6 +4314,9 @@ for (const screen of SCREENS) {
   if (screen.feature === 19 && FEATURE_19_AUDIT[screen.node]) {
     Object.assign(screen, FEATURE_19_AUDIT[screen.node])
   }
+  if (screen.feature === 19 && ISSUE_408_REVIEW[screen.node]) {
+    Object.assign(screen, ISSUE_408_REVIEW[screen.node])
+  }
   if (screen.feature === 19 && ISSUE_296_REVIEW[screen.node]) {
     Object.assign(screen, ISSUE_296_REVIEW[screen.node])
   }
@@ -4416,6 +4480,7 @@ export const CAPTURED_AT = {
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['e3jz3','jwVlo'],
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
     { pr: 1039, head: '1b4774050', on: '2026-09-07', screens: ['e3jz3','jwVlo'], note: 'Issue #243。3105/8792で通常・読込・空・失敗・権限不足の全24枚を1440/1920px撮影。全画像で横はみ出し0。残る集計・共通監査API差は各画面の判定注記へ記録した。' },
+    { pr: 1182, head: '04057fb9da53', on: '2026-09-07', screens: ['e3jz3','EOTS4','jwVlo','I3ZSrU'], note: 'Issue #405。#1175後の access/users・roles・audit/events 固定契約へ接続し、3101/8788で4画面を1440・1920px撮影。横はみ出し0、設計との差は各画面の判定注記へ記録した。' },
   ],
   31: [
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['c4R6F'],
@@ -4567,6 +4632,7 @@ export const CAPTURED_AT = {
         + '`voJtX`（詳細と差し替え）は「夏の定番セット.jpgの使用箇所」が見つからず撮れていない。' },
   ],
   16: [
+    { pr: 1180, head: '3721857fb', on: '2026-09-07', screens: ['jwrbf', 'GqFTV', 'njLGA'], note: 'Issue #394。締め・支払い台帳を実API契約へ接続し、3102/8789で3画面と支払い一覧の全状態を1440/1920px撮影。全画像で横はみ出し0。2画面を一致、設計PNGが無い確定画面だけ理由付き構造一致とした。' },
     { pr: 558, head: 'ef7b5773', on: '2026-08-29', screens: ['PouPn', 'xqT1Z', 'jwrbf'], note: '案件ごとの決まった額を紹介者一覧へ反映。率が0のときだけ確定した定額へ切り替える' },
     { pr: 563, head: '64798425', on: '2026-08-29', screens: ['jwrbf'], note: '帯から `ref_tracking` を外した。**`ref_code` は列見出しに残っている**' },
 
@@ -4738,6 +4804,7 @@ export const CAPTURED_AT = {
   ],
   30: [
     { pr: 475, head: '15febf7f', on: '2026-08-30', screens: ['EOTS4', 'I3ZSrU', 'e3jz3', 'jwVlo'], note: 'ログインユーザーの一覧・追加・役割。development 直結' },
+    { pr: 1182, head: '04057fb9da53', on: '2026-09-07', screens: ['e3jz3', 'EOTS4', 'jwVlo', 'I3ZSrU'], note: 'Issue #405。アクセスユーザー・権限bundle・共通監査の読み取り契約へ接続し、4画面を3101/8788で撮影・判定した。' },
   ],
   31: [
     { pr: 478, head: '66883866', on: '2026-08-30', screens: ['c4R6F'], note: '機能設定。オフにしても消えないことを先に書く' },
@@ -4777,6 +4844,7 @@ export const CAPTURED_AT = {
   19: [
     { pr: 444, head: 'ccbd0975', on: '2026-08-28' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['ZrpKn', 'GUxsj', 'GtylA'], note: 'development そのもので撮った' },
+    { pr: 1183, head: 'b5e3dd6a3', on: '2026-09-07', screens: ['ZrpKn', 'GUxsj'], note: 'Issue #408。利用先名・成果地点ごとの経路・取消内訳を反映し、3104/8791で1440・1920pxを撮影。横はみ出し0。固定モックが旧契約のためデータ未接続を判定注記に記録した。' },
   ],
   20: [
     { pr: 445, head: '787a4b46', on: '2026-08-28', note: '**#445 は 2026-08-29 に `codex/development` へマージ済み**（merge commit `6a00834f`）' },
