@@ -5,21 +5,12 @@
   "unimplemented": 0,
   "unconfirmed": 0,
   "elsewhere": 0,
-<<<<<<< HEAD
   "missing": 9,
-  "match": 164,
-  "structureMatchDataPending": 79,
-  "needsFix": 20,
-  "unjudged": 5,
-  "remaining": 104,
-=======
-  "missing": 31,
-  "match": 166,
-  "structureMatchDataPending": 79,
+  "match": 167,
+  "structureMatchDataPending": 78,
   "needsFix": 18,
   "unjudged": 5,
-  "remaining": 102,
->>>>>>> origin/codex/development
+  "remaining": 101,
   "features": [
     {
       "feature": 1,
@@ -1877,17 +1868,10 @@
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-<<<<<<< HEAD
       "missing": 0,
-      "match": 1,
-      "structureMatchDataPending": 2,
-      "needsFix": 2,
-=======
-      "missing": 1,
       "match": 4,
       "structureMatchDataPending": 1,
       "needsFix": 0,
->>>>>>> origin/codex/development
       "unjudged": 0,
       "remaining": 1,
       "capturedAt": [
