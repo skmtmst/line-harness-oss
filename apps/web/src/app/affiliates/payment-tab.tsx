@@ -275,7 +275,7 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
     setOperationError('')
     setNotice('')
     try {
-      await Promise.all(preview.affiliates.map((item) => {
+      const statements = await Promise.all(preview.affiliates.map((item) => {
         const key = statementKeysRef.current.get(item.affiliateId) ?? crypto.randomUUID()
         statementKeysRef.current.set(item.affiliateId, key)
         return api.affiliates.createStatement({
@@ -285,6 +285,8 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
           expectedVersion: closed.version,
         }, key)
       }))
+      const failed = statements.find((statement) => !statement.success)
+      if (failed && !failed.success) throw new Error(failed.error)
       setNotice(`${preview.affiliates.length.toLocaleString('ja-JP')}人分の支払明細を発行し、LINE通知を依頼しました。`)
     } catch (cause) {
       setOperationError(cause instanceof Error ? cause.message : '支払明細を発行できませんでした')

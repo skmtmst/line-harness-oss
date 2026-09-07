@@ -32,6 +32,7 @@ describe('V6 支払いの追記台帳契約', () => {
     expect(API).toContain("purpose: 'affiliate.payout.export'")
     expect(PAYMENT).toContain("process.env.NEXT_PUBLIC_API_URL ?? ''")
     expect(PAYMENT).toContain('statementKeysRef.current.get(item.affiliateId)')
+    expect(PAYMENT).toContain('statements.find((statement) => !statement.success)')
     expect(PAYMENT).toContain('}, payoutKey)')
     expect(PAYMENT).toContain('exportKey,')
   })
