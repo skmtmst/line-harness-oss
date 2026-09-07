@@ -106,7 +106,7 @@ function TodayTaskCard({
       <p className="text-ink mt-2 text-[28px] leading-none font-bold tabular-nums">
         {value === null ? '—' : value.toLocaleString('ja-JP')}<span className="ml-0.5 text-lg">件</span>
       </p>
-      <div className="mt-auto flex items-end justify-between gap-3 pt-2">
+      <div className="mt-2 flex items-end justify-between gap-3">
         <span className="text-ink-faint truncate text-xs" title={detail}>{detail}</span>
         <span className="text-success shrink-0 text-xs font-medium">{status}</span>
       </div>
@@ -159,7 +159,7 @@ function FriendAddLinkCard({ officialProfileUrl }: { officialProfileUrl: string 
           <p className="text-ink-faint mt-1 text-xs leading-relaxed">このURLから追加された友だちは、流入元を記録して計測できます。</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <label className="border-hairline bg-canvas rounded-control flex min-w-[220px] items-center gap-2 border px-3 py-2">
+          <label className="flex min-w-[220px] items-center gap-2">
             <span className="text-ink-faint shrink-0 text-[10px] font-medium">発行中</span>
             <SelectField
               value={routeId}
@@ -285,9 +285,9 @@ function SendQuotaCard({
       の枠で、メールには効かない。どちらの枠かが書いていないと、メールが
       止まったときにここを見てしまう。
     */}
-    <p className="text-ink mt-3 flex items-baseline gap-2">
-      <span className="text-ink-secondary text-xs font-medium">LINE公式</span>
-      <span className="text-2xl font-bold tabular-nums">
+    <p className="text-ink mt-3 flex items-baseline gap-2 whitespace-nowrap">
+      <span className="text-ink-secondary text-sm font-semibold">LINE公式</span>
+      <span className="text-metric leading-none font-bold tabular-nums">
         {/*
           **使用数か残りか読めない形にしない。**
           「197 / 200通」だけだと、197 が使ったぶんにも残りにも読める。
