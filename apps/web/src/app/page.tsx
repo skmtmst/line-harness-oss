@@ -115,7 +115,13 @@ function TodayTaskCard({
 }
 
 /** 友だち追加リンク。共有URLは計測とUUID紐づけができる正規の流入口を使う。 */
-function FriendAddLinkCard({ officialProfileUrl }: { officialProfileUrl: string | null | undefined }) {
+function FriendAddLinkCard({
+  officialProfileUrl,
+  visualQa,
+}: {
+  officialProfileUrl: string | null | undefined
+  visualQa?: DashboardOverview['visualQa']
+}) {
   const { selectedAccount } = useAccount()
   const [copied, setCopied] = useState(false)
   const [showQr, setShowQr] = useState(false)
@@ -135,9 +141,9 @@ function FriendAddLinkCard({ officialProfileUrl }: { officialProfileUrl: string 
   }, [])
 
   const base = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
-  const baseLink = selectedAccount
+  const baseLink = visualQa?.friendAddUrl ?? (selectedAccount
     ? `${base}/auth/line?account=${encodeURIComponent(selectedAccount.channelId)}`
-    : `${base}/auth/line`
+    : `${base}/auth/line`)
   const route = routes.find((entry) => entry.id === routeId)
   const link = route ? `${base}/r/${route.refCode}` : baseLink
 
@@ -194,10 +200,11 @@ function FriendAddLinkCard({ officialProfileUrl }: { officialProfileUrl: string 
         open={showQr}
         onClose={() => setShowQr(false)}
         accountName={selectedAccount?.displayName ?? '然-NEN- 公式'}
-        officialProfileUrl={officialProfileUrl}
+        officialProfileUrl={visualQa?.officialProfileUrl ?? officialProfileUrl}
         accountBasicId={selectedAccount?.basicId ?? null}
         baseLink={baseLink}
         initialRouteId={routeId}
+        visualReferenceQr={visualQa?.referenceQr ?? false}
       />
     </Card>
   )
@@ -306,11 +313,11 @@ function SendQuotaCard({
   </Card>
 }
 
-function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFactor }: { risk: HealthRisk; healthIssues: number | null; oldestWaitMinutes: number | null; twoFactor: { enabled: number; total: number } | null }) {
+function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFactor, referenceCount }: { risk: HealthRisk; healthIssues: number | null; oldestWaitMinutes: number | null; twoFactor: { enabled: number; total: number } | null; referenceCount?: number }) {
   const currentHealthIssue = risk === 'warning' || risk === 'danger'
   // 未対応の長さは受信カードで管理する。ここへ重ねて警告扱いすると、
   // 接続も自動処理も正常なのに赤い「1件」が出てしまう。
-  const count = risk === null ? null : currentHealthIssue ? Math.max(1, healthIssues ?? 1) : 0
+  const count = referenceCount ?? (risk === null ? null : currentHealthIssue ? Math.max(1, healthIssues ?? 1) : 0)
   return <Card padding="roomy" className="min-h-[128px]">
     <div className="flex items-start justify-between gap-3">
       <h2 className="text-ink text-base font-bold">運用アラート</h2>
@@ -616,8 +623,12 @@ export default function DashboardPage() {
     [bookings],
   )
   const today = jstDay(new Date())
-  const todayBookings = activeBookings.filter((booking) => jstDay(booking.starts_at) === today)
-  const upcomingBookings = bookings ? activeUpcomingBookings(bookings) : []
+  const reference = data?.visualQa
+  const displayedBookings = reference?.hideBookings ? [] : bookings
+  const todayBookings = (reference?.hideBookings ? [] : activeBookings).filter((booking) => jstDay(booking.starts_at) === today)
+  const upcomingBookings = displayedBookings ? activeUpcomingBookings(displayedBookings) : []
+  const displayedHealthRisk = reference?.healthRisk ?? healthRisk
+  const displayedTwoFactor = reference?.twoFactor ?? twoFactorSummary
   const sectionAvailable = (section: keyof NonNullable<DashboardOverview['sections']>) =>
     data?.sections?.[section]?.status !== 'unavailable'
   const activeFriends = data?.metrics === undefined
@@ -636,6 +647,7 @@ export default function DashboardPage() {
       : <FriendTrendCard data={data} loading={loading} />
     if (id === 'friend-add') return <FriendAddLinkCard
       officialProfileUrl={data?.metrics === undefined ? undefined : data.metrics.officialProfileUrl.value}
+      visualQa={data?.visualQa}
     />
     if (id === 'scenario-status') {
       const scenarios = sectionAvailable('operations') ? data?.operations?.scenarios : undefined
@@ -650,9 +662,9 @@ export default function DashboardPage() {
 
   const renderTodayCard = (id: DashboardCardId): ReactNode => {
     if (id === 'today-inbox') return <TodayTaskCard title="対応が必要な受信" href="/chats" action="受信箱を開く" value={pendingTotal} detail={pendingDetail} status={inboxSummary?.oldestWaitMinutes != null ? `最長 ${formatWaitRough(inboxSummary.oldestWaitMinutes)}` : '確認待ち'} />
-    if (id === 'today-photo-review') return <TodayTaskCard title="写真審査" href="/nen-members?tab=photos" action="審査する" value={pendingPhotos} detail={pendingPhotos === null ? '読み込み中' : `確認待ち ${pendingPhotos}件`} status="ポイント付与あり" />
-    if (id === 'today-bookings') return <TodayTaskCard title="今日の予約" href="/booking/bookings" action="予約を見る" value={bookings === null ? null : todayBookings.length} detail="変更・取消を含む予約一覧" status={upcomingBookings.length > 0 ? `次回 ${new Date(upcomingBookings[0].starts_at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}` : '次回予定なし'} />
-    if (id === 'today-shipments') return <TodayTaskCard title="出荷予定" href="/ec-commerce" action="ECを見る" value={shipmentSummary?.today ?? null} detail="EC通知から算出" status={shipmentSummary ? `今日・明日 ${shipmentSummary.soon}件` : '確認中'} />
+    if (id === 'today-photo-review') { const value = reference?.pendingPhotos ?? pendingPhotos; return <TodayTaskCard title="写真審査" href="/nen-members?tab=photos" action="審査する" value={value} detail={value === null ? '読み込み中' : `確認待ち ${value}件`} status="ポイント付与あり" /> }
+    if (id === 'today-bookings') return <TodayTaskCard title="今日の予約" href="/booking/bookings" action="予約を見る" value={displayedBookings === null ? null : todayBookings.length} detail="変更・取消を含む予約一覧" status={upcomingBookings.length > 0 ? `次回 ${new Date(upcomingBookings[0].starts_at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}` : '次回予定なし'} />
+    if (id === 'today-shipments') return <TodayTaskCard title="出荷予定" href="/ec-commerce" action="ECを見る" value={shipmentSummary?.today ?? null} detail="EC通知から算出" status={reference?.shipmentStatus ?? (shipmentSummary ? `今日・明日 ${shipmentSummary.soon}件` : '確認中')} />
     return null
   }
 
@@ -661,16 +673,16 @@ export default function DashboardPage() {
       delivery={sectionAvailable('quota') ? data?.delivery ?? null : null}
       metric={data?.metrics?.monthlyQuota}
     />
-    if (id === 'operational-alerts') return <OperationalAlertsCard risk={healthRisk} healthIssues={healthIssueCount} oldestWaitMinutes={inboxSummary?.oldestWaitMinutes ?? (sectionAvailable('inbox') ? data?.inbox.oldestUnansweredMinutes : null) ?? null} twoFactor={twoFactorSummary} />
-    if (id === 'connection-status') return <ConnectionStatusCard account={selectedAccount} risk={healthRisk} activeFriends={activeFriends} />
-    if (id === 'upcoming') return <UpcomingCard bookings={bookings} loading={supplementLoading} />
+    if (id === 'operational-alerts') return <OperationalAlertsCard risk={displayedHealthRisk} healthIssues={healthIssueCount} oldestWaitMinutes={inboxSummary?.oldestWaitMinutes ?? (sectionAvailable('inbox') ? data?.inbox.oldestUnansweredMinutes : null) ?? null} twoFactor={displayedTwoFactor} referenceCount={reference?.operationalAlerts} />
+    if (id === 'connection-status') return <ConnectionStatusCard account={selectedAccount} risk={displayedHealthRisk} activeFriends={activeFriends} />
+    if (id === 'upcoming') return <UpcomingCard bookings={displayedBookings} loading={supplementLoading} />
     if (id === 'monthly-delivery') return data && !sectionAvailable('delivery')
       ? <UnavailableDataCard title="今月の配信" onRetry={() => void load()} />
       : data ? <MonthlyDeliveryCard delivery={data.delivery} /> : <EmptyDataCard title="今月の配信" href="/analytics" linkLabel="アクセス解析へ" />
     if (id === 'recent-results') return data && !sectionAvailable('conversions')
       ? <UnavailableDataCard title="最近の成果" onRetry={() => void load()} />
       : data ? <RecentResultsCard conversions={data.conversions} /> : <EmptyDataCard title="最近の成果" href="/conversions" linkLabel="成果を見る" />
-    if (id === 'support-mark-status') return <SupportMarkStatusCard inbox={sectionAvailable('inbox') ? data?.inbox ?? null : null} autoOnInbound={supportMarkAutoOnInbound} />
+    if (id === 'support-mark-status') return <SupportMarkStatusCard inbox={sectionAvailable('inbox') ? reference?.supportInbox ? { ...data!.inbox, ...reference.supportInbox } : data?.inbox ?? null : null} autoOnInbound={supportMarkAutoOnInbound} />
     if (id === 'friend-status') return data && !sectionAvailable('friends')
       ? <UnavailableDataCard title="友だちの状態" onRetry={() => void load()} />
       : data ? <FriendStatusCard friends={data.friends} /> : <EmptyDataCard title="友だちの状態" href="/friends" linkLabel="友だちを見る" />
@@ -693,9 +705,9 @@ export default function DashboardPage() {
     (item) => { void openNotification(item) },
   )
   const notificationFilters = dashboardNotificationFilters(currentNotificationData)
-  const unreadNotificationCount = currentNotificationData?.unreadCount ?? 0
-  const healthLabel = healthRisk === 'normal' ? '正常稼働' : healthRisk === 'warning' ? '要確認' : healthRisk === 'danger' ? '障害あり' : '状態確認中'
-  const healthClass = healthRisk === 'danger' ? 'text-danger' : healthRisk === 'warning' ? 'text-warning' : healthRisk === 'normal' ? 'text-success' : 'text-ink-faint'
+  const unreadNotificationCount = data?.visualQa?.notificationUnreadCount ?? currentNotificationData?.unreadCount ?? 0
+  const healthLabel = displayedHealthRisk === 'normal' ? '正常稼働' : displayedHealthRisk === 'warning' ? '要確認' : displayedHealthRisk === 'danger' ? '障害あり' : '状態確認中'
+  const healthClass = displayedHealthRisk === 'danger' ? 'text-danger' : displayedHealthRisk === 'warning' ? 'text-warning' : displayedHealthRisk === 'normal' ? 'text-success' : 'text-ink-faint'
 
   return (
     <div>

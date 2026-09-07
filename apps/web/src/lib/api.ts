@@ -2930,6 +2930,20 @@ export type DashboardOverview = {
     friendTrend: DashboardMetric<DashboardFriendTrendPoint[]>
     officialProfileUrl: DashboardMetric<string>
   }
+  /** 撮影モックだけが返す設計照合用の値。本番APIでは未返却。 */
+  visualQa?: {
+    referenceQr: boolean
+    friendAddUrl: string
+    officialProfileUrl: string
+    pendingPhotos: number
+    hideBookings: boolean
+    healthRisk: 'normal' | 'warning' | 'danger'
+    operationalAlerts: number
+    twoFactor: { enabled: number; total: number }
+    notificationUnreadCount: number
+    shipmentStatus: string
+    supportInbox: { unanswered: number; resolved: number }
+  }
 }
 
 export type DashboardPreferenceResponse = {

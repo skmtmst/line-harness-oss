@@ -41,9 +41,11 @@ export interface InsertToolbarProps {
   targetRef: React.RefObject<HTMLTextAreaElement | HTMLInputElement | null>
   value: string
   onChange: (next: string) => void
+  /** 一斉配信の本文編集で、設計上の回答フォーム差し込み口を表示する。 */
+  includeAnswerForm?: boolean
 }
 
-export default function InsertToolbar({ targetRef, value, onChange }: InsertToolbarProps) {
+export default function InsertToolbar({ targetRef, value, onChange, includeAnswerForm = false }: InsertToolbarProps) {
   const { selectedAccountId } = useAccount()
   const [open, setOpen] = useState<string | null>(null)
   const [fields, setFields] = useState<Option[]>([])
@@ -105,10 +107,10 @@ export default function InsertToolbar({ targetRef, value, onChange }: InsertTool
     })
   }
 
-  const menuButton = (key: string, label: string) => (
+  const menuButton = (key: string, label: string, token?: string) => (
     <button
       type="button"
-      onClick={() => setOpen(open === key ? null : key)}
+      onClick={() => token ? insert(token) : setOpen(open === key ? null : key)}
       aria-expanded={open === key}
       className={`border-hairline rounded-control h-8 border px-2.5 text-xs transition-colors ${
         open === key ? 'bg-accent-soft text-accent border-accent' : 'text-ink-secondary hover:bg-canvas-sunken'
@@ -160,6 +162,8 @@ export default function InsertToolbar({ targetRef, value, onChange }: InsertTool
         {menuButton('var', '共通情報')}
         {open === 'var' && list(vars, '共通情報がまだありません')}
       </div>
+
+      {includeAnswerForm && menuButton('answer-form', '回答フォーム', '{{answer_form}}')}
 
       <div className="relative">
         {menuButton('date', '配信日')}

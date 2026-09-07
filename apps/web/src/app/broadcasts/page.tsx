@@ -713,8 +713,10 @@ function BroadcastList() {
           名前で分かるので、種類を足すと読む語が増えるだけになる。
         */
         title={`「${deleteTarget?.title ?? ''}」を削除しますか？`}
+        titleIcon={<Trash2 size={18} aria-hidden="true"></Trash2>}
         description="削除すると配信設定と確認画面から消えます。予約中の配信は中止され、この操作は取り消せません。"
         confirmLabel="削除する"
+        designNode="EGMb1"
         destructive
         busy={deleting}
         error={deleteError}
@@ -741,6 +743,26 @@ function BroadcastList() {
           color: var(--color-accent);
         }
         .broadcast-filter-chip:disabled { cursor: not-allowed; opacity: .5; }
+        [data-design-node='EGMb1'][role='presentation'] {
+          align-items: flex-start;
+          padding-top: 280px;
+        }
+        [data-design-node='EGMb1'] [data-design-part='dialog'] {
+          width: min(720px, calc(100vw - 32px));
+          max-width: 720px;
+        }
+        [data-design-node='EGMb1'] [data-qa-dialog-callout] {
+          gap: 4px;
+          border: 0;
+          background: transparent;
+          padding: 0;
+        }
+        [data-design-node='EGMb1'] [data-qa-dialog-callout] h2 {
+          color: var(--color-ink);
+        }
+        [data-design-node='EGMb1'] [data-qa-dialog-callout] p {
+          color: var(--color-ink-faint);
+        }
       `}</style>
     </div>
   )

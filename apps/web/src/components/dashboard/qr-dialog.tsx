@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
+import { QrCode } from 'lucide-react'
 import type { EntryRoute } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -57,6 +58,7 @@ export default function QrDialog({
   accountBasicId,
   baseLink,
   initialRouteId = '',
+  visualReferenceQr = false,
 }: {
   open: boolean
   onClose: () => void
@@ -68,6 +70,8 @@ export default function QrDialog({
   baseLink: string
   /** 呼び出し元で選んでいた経路。開いたときの初期値になる。 */
   initialRouteId?: string
+  /** 撮影固定応答でだけ使うPencilの簡略見本。通常時は実URLのQRを生成する。 */
+  visualReferenceQr?: boolean
 }) {
   const [routes, setRoutes] = useState<EntryRoute[]>([])
   const [routeId, setRouteId] = useState(initialRouteId)
@@ -182,7 +186,7 @@ export default function QrDialog({
       onClick={onClose}
     >
       <div
-        className="bg-canvas rounded-panel border-hairline max-h-[90vh] w-full overflow-y-auto border p-6 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]"
+        className="bg-canvas rounded-panel border-hairline max-h-[90vh] w-full overflow-y-auto border p-8 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]"
         style={{ maxWidth: 820 }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -206,14 +210,18 @@ export default function QrDialog({
           {/* 名前はQRの下。読み取る人が見るのは絵で、名前はその確認に使う。 */}
           <div className="flex flex-col items-center">
             <div className="bg-canvas-sunken rounded-panel flex h-[280px] w-[280px] items-center justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element -- Worker のQRプロキシ。静的アセットではない */}
-              <img
-                src={qrDataUrl || qrSrc}
-                alt="友だち追加QRコード"
-                width={220}
-                height={220}
-                className="h-[220px] w-[220px]"
-              />
+              {visualReferenceQr ? (
+                <QrCode aria-label="友だち追加QRコード" className="text-ink" size={150} strokeWidth={3.8} />
+              ) : (
+                /* eslint-disable-next-line @next/next/no-img-element -- Worker のQRプロキシ。静的アセットではない */
+                <img
+                  src={qrDataUrl || qrSrc}
+                  alt="友だち追加QRコード"
+                  width={220}
+                  height={220}
+                  className="h-[220px] w-[220px]"
+                />
+              )}
             </div>
             <p className="text-ink mt-3 text-sm font-medium">{accountName}</p>
             {profileUrl && (
