@@ -1974,6 +1974,13 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     },
     freshness: 'available',
   }
+  if (pathname === '/api/automation-draft-resources') return {
+    success: true,
+    data: {
+      tags: [{ id: 'tag-trial', name: '体験申込' }, { id: 'tag-member', name: '会員' }],
+      scenarios: [{ id: 'scenario-trial', name: '体験前フォロー' }],
+    },
+  }
   if (pathname === '/api/automation-runs') return { success: true, data: AUTOMATION_RUNS }
   if (pathname === '/api/automation-templates') return { success: true, data: AUTOMATION_TEMPLATES }
   if (pathname === '/api/ec-commerce/settings') return { success: true, data: EC_NOTIFICATION_SETTINGS }
@@ -2507,6 +2514,52 @@ const server = createServer((req, res) => {
   // ただし画面側のエラー報告だけは 204 で受ける。405 を返すと、
   // 報告が失敗したこと自体が新しいエラーになって際限なく増える。
   if (method !== 'GET') {
+    if (method === 'POST' && /^\/api\/automation-runs\/[^/]+\/retry$/.test(url.pathname)) {
+      res.writeHead(202).end(JSON.stringify({
+        success: true,
+        data: { runId: url.pathname.split('/')[3], retryStepCount: 1, status: 'succeeded' },
+      }))
+      return
+    }
+    if (method === 'POST' && /^\/api\/automation-templates\/[^/]+\/drafts$/.test(url.pathname)) {
+      res.writeHead(201).end(JSON.stringify({
+        success: true,
+        data: { id: 'automation-visual-draft', draftVersionId: 'automation-visual-version' },
+      }))
+      return
+    }
+    if (method === 'PUT' && url.pathname === '/api/automation-drafts/automation-visual-draft') {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: { updated: true } }))
+      return
+    }
+    if (method === 'POST' && url.pathname === '/api/automations/automation-visual-draft/audience-preview') {
+      res.writeHead(200).end(JSON.stringify({
+        success: true,
+        data: {
+          automationId: 'automation-visual-draft',
+          versionId: 'automation-visual-version',
+          matched: 286,
+          total: 842,
+          freshness: 'available',
+          calculatedAt: '2026-09-07T03:00:00.000Z',
+        },
+      }))
+      return
+    }
+    if (method === 'POST' && url.pathname === '/api/automations/automation-visual-draft/test') {
+      res.writeHead(200).end(JSON.stringify({
+        success: true,
+        data: { runId: 'automation-visual-test', versionId: 'automation-visual-version', status: 'succeeded' },
+      }))
+      return
+    }
+    if (method === 'POST' && url.pathname === '/api/automation-drafts/automation-visual-draft/publish') {
+      res.writeHead(200).end(JSON.stringify({
+        success: true,
+        data: { id: 'automation-visual-draft', versionId: 'automation-visual-version', versionNumber: 1, status: 'active' },
+      }))
+      return
+    }
     if (method === 'POST' && url.pathname === '/api/media/upload-sessions') {
       let raw = ''
       req.on('data', (chunk) => { raw += chunk })

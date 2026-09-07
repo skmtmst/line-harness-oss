@@ -4454,7 +4454,7 @@ const automationRun = ({
   status,
   detail,
   durationMs,
-  canRetry: false,
+  canRetry: status === 'permanent_failed' && failedAction !== null,
   automationId,
   automationName,
   automationVersionId: `${automationId}-version-3`,

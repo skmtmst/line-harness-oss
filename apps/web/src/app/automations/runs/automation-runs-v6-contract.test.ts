@@ -33,8 +33,11 @@ describe('V6 オートメーションが動いた記録（DkPY0）', () => {
     expect(PAGE).toContain('動いた記録を読み込めませんでした')
   })
 
-  it('詳細を開き、安全な口が無い再実行・CSVだけを押せる形で出さない', () => {
-    expect(PAGE).not.toContain('もう一度やる')
+  it('詳細を開き、失敗した処理だけを安全な再実行口へ接続する', () => {
+    expect(PAGE).toContain('もう一度やる')
+    expect(PAGE).toContain('/api/automation-runs/${encodeURIComponent(run.id)}/retry')
+    expect(PAGE).toContain('成功済みの処理は二重に実行しません')
+    expect(PAGE).toContain('失敗した処理をもう一度やる')
     expect(PAGE).toContain('CSV書き出しは未接続')
     expect(PAGE).toContain('<Button disabled>CSVで書き出す</Button>')
     expect(PAGE).toContain('setSelectedRun(run)')

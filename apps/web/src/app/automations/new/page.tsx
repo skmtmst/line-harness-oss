@@ -4,7 +4,7 @@ import SelectField from '@/components/shared/select-field'
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import type { Automation, Tag } from '@line-crm/shared'
+import type { Automation } from '@line-crm/shared'
 import { api, ApiError, type AutomationDraftDetail } from '@/lib/api'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -119,7 +119,7 @@ export default function NewAutomationPage() {
   const [previewCount, setPreviewCount] = useState<number | null>(null)
   const [testFriendId, setTestFriendId] = useState('')
   const [actions, setActions] = useState<ActionDraft[]>([newActionDraft()])
-  const [tags, setTags] = useState<Tag[]>([])
+  const [tags, setTags] = useState<Array<{ id: string; name: string }>>([])
   const [tagsLoading, setTagsLoading] = useState(true)
   const [tagsFailed, setTagsFailed] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -131,11 +131,16 @@ export default function NewAutomationPage() {
     let cancelled = false
     setTagsLoading(true)
     setTagsFailed(false)
-    api.tags
-      .list()
+    if (!selectedAccountId) {
+      setTags([])
+      setTagsLoading(false)
+      return
+    }
+    api.automations
+      .draftResources(selectedAccountId)
       .then((res) => {
         if (cancelled) return
-        if (res.success) setTags(res.data)
+        if (res.success) setTags(res.data.tags)
         else setTagsFailed(true)
       })
       .catch(() => {
@@ -147,7 +152,7 @@ export default function NewAutomationPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [selectedAccountId])
 
   useEffect(() => {
     let cancelled = false
@@ -343,7 +348,7 @@ export default function NewAutomationPage() {
             title="どんなときに動かしますか"
             note="何が起きたら動かすか。ここで選んだ出来事が起きた人だけが対象になります。"
           >
-            <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 xl:grid-cols-6">
               {EVENTS.map((event) => (
                 <button
                   key={event.value}

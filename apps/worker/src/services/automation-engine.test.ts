@@ -5,6 +5,7 @@ import {
   AutomationActionError,
   processAutomationRun,
   processDueAutomationRuns,
+  retryAutomationRun,
   startAutomationRun,
   type ActionDefinition,
 } from './automation-engine';
@@ -241,6 +242,45 @@ describe('V6オートメーション実行エンジン', () => {
       `SELECT status, error_code FROM automation_run_steps
         WHERE automation_run_id = ? AND step_key = 'unknown'`,
     ).get(created.runId)).toEqual({ status: 'failed', error_code: 'unsupported_action_type' });
+  });
+
+  it('手動再実行は失敗した処理だけを新しい試行として動かす', async () => {
+    const setup = addPublishedAutomation(testDb.raw, {
+      actions: [action('already-done'), action('failed-once')],
+    });
+    const created = await start(testDb.db, setup);
+    const firstCalls: string[] = [];
+    expect(await processAutomationRun(testDb.db, created.runId!, {
+      now: T0,
+      executors: {
+        record: async ({ action: current }) => {
+          firstCalls.push(current.id);
+          if (current.id === 'failed-once') {
+            throw new AutomationActionError('permanent', '入力を直してください', false);
+          }
+        },
+      },
+    })).toBe('failed');
+    expect(firstCalls).toEqual(['already-done', 'failed-once']);
+
+    expect(await retryAutomationRun(testDb.db, {
+      runId: created.runId!,
+      allowedAccountIds: [setup.lineAccountId],
+      now: '2026-08-26T02:00:00.000Z',
+    })).toMatchObject({ retryStepCount: 1, status: 'waiting' });
+    const retryCalls: string[] = [];
+    expect(await processAutomationRun(testDb.db, created.runId!, {
+      now: '2026-08-26T02:00:00.000Z',
+      executors: { record: async ({ action: current }) => { retryCalls.push(current.id); } },
+    })).toBe('success');
+    expect(retryCalls).toEqual(['failed-once']);
+    expect(testDb.raw.prepare(
+      `SELECT step_key, attempt_number, status FROM automation_run_steps
+        WHERE automation_run_id = ? ORDER BY step_key`,
+    ).all(created.runId)).toEqual([
+      { step_key: 'already-done', attempt_number: 1, status: 'success' },
+      { step_key: 'failed-once', attempt_number: 2, status: 'success' },
+    ]);
   });
 
   it('実行開始時に共通アクション版を固定する', async () => {

@@ -2399,7 +2399,21 @@ export const SCREENS = [
     **同じ帯**に並ぶ。実装は `/automations` と `/common-actions` の別ページ。
   */
   { ...AUTOMATION, node: 'gief7', name: '25-1 オートメーション', route: '/automations', verdict: 'match', verdictNote: '**2026-09-07 Issue #377 / UI HEAD `bd900c36d` を3107/8794で再撮影し、★V6設計と同じ1920pxで比較。** 実API契約から18本（稼働14・停止4）、この30日8,420回・失敗6回・未実行3本、設計先頭6行の実行数と失敗表示、詳細導線を表示した。1440px・1920pxとも横はみ出し0で一致。', verdictSource: 'automations-v6/gief7.txt + automation-load-state-contract.test.ts', verdictHead: 'bd900c36d' },
-  { ...AUTOMATION, node: 'Rv8Jv', name: '25-1-A オートメーションをつくる', route: '/automations/new', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #421 で固定ポート3105/8792にて再撮影。** 名前・処理・15軸の条件入力・要約・注意・追従操作は1440px・1920pxで横はみ出し0。条件保存と見込み人数・1人テストのAPIは実装済みだが作成画面への接続は次段で、設計6種のきっかけとプレビュー値は未接続のため構造一致・データ未接続と判定する。', verdictSource: 'automations-v6/Rv8Jv.txt + automation-create-v6-contract.test.ts', verdictHead: 'd2ea91a4b' },
+  {
+    ...AUTOMATION, node: 'Rv8Jv', name: '25-1-A オートメーションをつくる', route: '/automations/new',
+    steps: [
+      { click: 'タグが付いた・外れたとき' },
+      { select: 'きっかけのタグ', label: '体験申込' },
+      { select: '付いたとき・外れたとき', label: '付いたとき' },
+      { fill: '#au-name', selector: true, text: '体験申込がついたらフォローを始める' },
+      { select: '条件の軸', label: 'タグを持っていない' },
+      { fill: '条件の値', text: '会員' },
+      { select: '自動化で付けるタグ', label: '体験申込' },
+      { click: '下書きに保存', after: 1000 },
+      { fill: '1人テストの友だちID', text: 'friend-visual-1' },
+    ],
+    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #421 で固定ポート3105/8792にて再撮影。** 名前・処理・15軸の条件入力・要約・注意・追従操作は1440px・1920pxで横はみ出し0。条件保存と見込み人数・1人テストのAPIは実装済みだが作成画面への接続は次段で、設計6種のきっかけとプレビュー値は未接続のため構造一致・データ未接続と判定する。', verdictSource: 'automations-v6/Rv8Jv.txt + automation-create-v6-contract.test.ts', verdictHead: 'd2ea91a4b',
+  },
   {
     /*
       **PR #502（head `75b010fc`）で `/automations/runs` が入った。**
