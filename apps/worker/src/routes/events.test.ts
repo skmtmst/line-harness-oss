@@ -35,6 +35,16 @@ const notifierMocks = {
 };
 vi.mock('../services/event-booking-notifier.js', () => notifierMocks);
 
+const waitlistMocks = {
+  createEventWaitlistOfferSender: vi.fn(() => vi.fn()),
+  enqueueEventWaitlistPromotion: vi.fn(async () => true),
+  getEventOccurrenceApplicants: vi.fn(),
+  getEventOccurrenceUsedSeats: vi.fn(),
+  promoteEventWaitlist: vi.fn(),
+  processEventWaitlistPromotionJobs: vi.fn(),
+};
+vi.mock('../services/event-waitlist.js', () => waitlistMocks);
+
 const { default: events } = await import('./events.js');
 
 type TestEnv = {
@@ -393,6 +403,9 @@ function makeEventDb(state: {
             return {
               id: b.id,
               status: b.status,
+              line_account_id: (b as Record<string, unknown>).line_account_id,
+              event_id: b.event_id,
+              slot_id: (b as Record<string, unknown>).slot_id,
               cancel_deadline_hours_before: e.cancel_deadline_hours_before,
               slot_starts_at: s.starts_at,
             } as T;
@@ -419,12 +432,31 @@ function makeEventDb(state: {
             const s = (state.slots ?? []).find((x) => x.id === id);
             return (s ?? null) as T | null;
           }
-          // SELECT COUNT(*) AS c FROM event_bookings WHERE slot_id = ? AND status IN ('requested','confirmed')
-          if (sql.includes('FROM event_bookings') && sql.includes('COUNT(*) AS c')) {
+          if (
+            sql.includes('SELECT COUNT(*) AS c FROM event_bookings')
+            && sql.includes("status = 'attended'")
+          ) {
+            const [friend_id, checked_at] = bound as [string, string];
+            const c = (state.bookings ?? []).filter((booking) => {
+              const row = booking as Record<string, unknown>;
+              return row.friend_id === friend_id
+                && booking.status === 'attended'
+                && String(row.requested_at ?? '') < checked_at;
+            }).length;
+            return { c } as T;
+          }
+          // 開催回の使用席数。複数人申込は party_size の合計で数える。
+          if (
+            sql.includes('FROM event_bookings')
+            && (sql.includes('COUNT(*) AS c') || sql.includes('SUM(party_size)'))
+            && sql.includes('slot_id = ?')
+          ) {
             const [slot_id] = bound as [string];
-            const c = (state.bookings ?? []).filter(
-              (b) => (b as BookingRow & { slot_id?: string }).slot_id === slot_id && (b.status === 'requested' || b.status === 'confirmed'),
-            ).length;
+            const c = (state.bookings ?? [])
+              .filter(
+                (b) => (b as BookingRow & { slot_id?: string }).slot_id === slot_id && (b.status === 'requested' || b.status === 'confirmed'),
+              )
+              .reduce((sum, booking) => sum + Number((booking as Record<string, unknown>).party_size ?? 1), 0);
             return { c } as T;
           }
           // Multi-account 対応の events lookup helper:
@@ -657,19 +689,31 @@ function makeEventDb(state: {
         },
         async run() {
           if (sql.includes('INSERT OR IGNORE INTO event_waitlist')) {
-            const [id, event_id, slot_id, friend_id, identity_key, created_at] = bound as string[];
+            const [
+              id, line_account_id, event_id, slot_id, friend_id, identity_key,
+              party_size, answer_snapshot_json, first_participation,
+              first_participation_attended_count, first_participation_checked_at,
+              created_at, updated_at,
+            ] = bound as string[];
             const dup = (state.waitlist ?? []).some(
               (w) => w.slot_id === slot_id && w.identity_key === identity_key,
             );
             if (dup) return { success: true, meta: { changes: 0 } };
             (state.waitlist ??= []).push({
               id,
+              line_account_id,
               event_id,
               slot_id,
               friend_id,
               identity_key,
               status: 'waiting',
+              party_size,
+              answer_snapshot_json,
+              first_participation,
+              first_participation_attended_count,
+              first_participation_checked_at,
               created_at,
+              updated_at,
             });
             return { success: true, meta: { changes: 1 } };
           }
@@ -728,14 +772,26 @@ function makeEventDb(state: {
           }
           if (sql.startsWith('INSERT INTO event_bookings')) {
             const [
-              id, line_account_id, event_id, slot_id, friend_id, status, customer_note, _requested_at, identity_key,
-            ] = bound as [string, string, string, string, string, string, string | null, string, string | undefined];
+              id, line_account_id, event_id, slot_id, friend_id, status, customer_note,
+              requested_at, identity_key, party_size, answer_snapshot_json,
+              first_participation, first_participation_attended_count,
+              first_participation_checked_at,
+            ] = bound as [
+              string, string, string, string, string, string, string | null,
+              string, string | undefined, number, string | null, number, number, string,
+            ];
             (state.bookings ?? []).push({
               id, event_id, status,
               slot_id, friend_id,
               line_account_id,
               customer_note,
               identity_key,
+              requested_at,
+              party_size,
+              answer_snapshot_json,
+              first_participation,
+              first_participation_attended_count,
+              first_participation_checked_at,
             } as BookingRow & Record<string, unknown>);
             return { success: true, meta: { changes: 1 } };
           }
@@ -880,6 +936,17 @@ function setupApp(state: Parameters<typeof makeEventDb>[0]) {
   }
   const app = new Hono<TestEnv>();
   const db = makeEventDb(state);
+  waitlistMocks.getEventOccurrenceUsedSeats.mockImplementation(
+    async (_db: D1Database, slotId: string) => {
+      const bookingSeats = (state.bookings ?? [])
+        .filter((booking) => booking.slot_id === slotId && (booking.status === 'requested' || booking.status === 'confirmed'))
+        .reduce((sum, booking) => sum + Number((booking as Record<string, unknown>).party_size ?? 1), 0);
+      const heldSeats = (state.waitlist ?? [])
+        .filter((entry) => entry.slot_id === slotId && (entry.status === 'offered' || entry.status === 'accepted'))
+        .reduce((sum, entry) => sum + Number(entry.party_size ?? 1), 0);
+      return bookingSeats + heldSeats;
+    },
+  );
   app.use('*', async (c, next) => {
     c.set('staff', { id: 'staff-1', role: 'owner', tenantId: 'tenant-a' } as never);
     c.env = { DB: db } as TestEnv['Bindings'];
@@ -896,7 +963,10 @@ beforeEach(() => {
   for (const fn of Object.values(idempotencyMocks)) fn.mockReset();
   for (const fn of Object.values(reminderMocks)) fn.mockReset();
   for (const fn of Object.values(notifierMocks)) fn.mockReset();
+  for (const fn of Object.values(waitlistMocks)) fn.mockReset();
   reminderMocks.computeRemindersForBooking.mockReturnValue([]);
+  waitlistMocks.createEventWaitlistOfferSender.mockReturnValue(vi.fn());
+  waitlistMocks.enqueueEventWaitlistPromotion.mockResolvedValue(true);
 });
 
 describe('admin account scope', () => {
@@ -2045,6 +2115,13 @@ describe('LIFF POST /api/liff/events/me/:bookingId/cancel', () => {
     expect(res.status).toBe(200);
     expect(state.bookings[0].status).toBe('cancelled');
     expect(reminderMocks.cancelPendingRemindersFor).toHaveBeenCalledWith(expect.anything(), 'b1');
+    expect(waitlistMocks.enqueueEventWaitlistPromotion).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        lineAccountId: 'la1', eventId: 'e1', occurrenceId: 's1',
+        sourceKey: 'booking:b1:cancelled',
+      }),
+    );
   });
 
   test('403 cancel_not_allowed when cancel_deadline_hours_before is null', async () => {
@@ -2215,6 +2292,10 @@ describe('admin bookings management', () => {
     expect(notifierMocks.sendEventBookingNotification).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'rejected' }),
     );
+    expect(waitlistMocks.enqueueEventWaitlistPromotion).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ sourceKey: 'booking:b1:rejected', occurrenceId: 's1' }),
+    );
   });
 
   test('POST decide returns 409 already_decided', async () => {
@@ -2252,6 +2333,10 @@ describe('admin bookings management', () => {
     expect(state.bookings[0].status).toBe('cancelled');
     expect((state.bookings[0] as Record<string, unknown>).cancelled_by).toBe('admin');
     expect(reminderMocks.cancelPendingRemindersFor).toHaveBeenCalled();
+    expect(waitlistMocks.enqueueEventWaitlistPromotion).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ sourceKey: 'booking:b1:cancelled', occurrenceId: 's1' }),
+    );
     expect(notifierMocks.sendEventBookingNotification).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'cancelled_by_admin' }),
     );
@@ -2326,6 +2411,78 @@ describe('admin bookings management', () => {
   });
 });
 
+describe('V6 occurrence applicants / waitlist promotion routes', () => {
+  const state = {
+    events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
+    accounts: [{ id: 'la1', liff_id: 'L1', is_active: 1 }],
+  };
+
+  test('normal / empty: 申込者データを包んで返し、空配列を成功として保つ', async () => {
+    waitlistMocks.getEventOccurrenceApplicants.mockResolvedValueOnce({
+      occurrence: { id: 's1', eventId: 'e1', startsAt: '2099-01-01', endsAt: '2099-01-02', capacity: 2, activeSeats: 1, version: 1 },
+      summary: { bookingCount: 1, waitingCount: 0, activeSeats: 1 },
+      applicants: [{ source: 'booking', id: 'b1', friendId: 'f1' }],
+    });
+    const app = setupApp(structuredClone(state));
+    const normal = await app.request('/api/events/admin/occurrences/s1/applicants?account_id=la1');
+    expect(normal.status).toBe(200);
+    await expect(normal.json()).resolves.toMatchObject({
+      success: true,
+      data: { occurrence: { id: 's1', version: 1 }, applicants: [{ id: 'b1' }] },
+    });
+    expect(waitlistMocks.getEventOccurrenceApplicants).toHaveBeenCalledWith(
+      expect.anything(),
+      { occurrenceId: 's1', lineAccountId: 'la1' },
+    );
+
+    waitlistMocks.getEventOccurrenceApplicants.mockResolvedValueOnce({
+      occurrence: { id: 's2', eventId: 'e1', startsAt: '2099-01-01', endsAt: '2099-01-02', capacity: 2, activeSeats: 0, version: 1 },
+      summary: { bookingCount: 0, waitingCount: 0, activeSeats: 0 },
+      applicants: [],
+    });
+    const empty = await app.request('/api/events/admin/occurrences/s2/applicants?account_id=la1');
+    expect(empty.status).toBe(200);
+    await expect(empty.json()).resolves.toMatchObject({ success: true, data: { applicants: [] } });
+  });
+
+  test('not found / forbidden: 所属外を404、認証なしを403にする', async () => {
+    waitlistMocks.getEventOccurrenceApplicants.mockResolvedValueOnce(null);
+    const app = setupApp(structuredClone(state));
+    const missing = await app.request('/api/events/admin/occurrences/other/applicants?account_id=la1');
+    expect(missing.status).toBe(404);
+
+    const unauthenticated = new Hono<TestEnv>();
+    unauthenticated.route('/', events);
+    const forbidden = await unauthenticated.request(
+      '/api/events/admin/occurrences/s1/applicants',
+      {},
+      { DB: makeEventDb({ events: [] }) },
+    );
+    expect(forbidden.status).toBe(403);
+  });
+
+  test('conflict: expectedVersionを必須にし、版違いを409で返す', async () => {
+    const app = setupApp(structuredClone(state));
+    const missingVersion = await app.request(
+      '/api/events/admin/occurrences/s1/waitlist/promote?account_id=la1',
+      { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' },
+    );
+    expect(missingVersion.status).toBe(422);
+
+    waitlistMocks.promoteEventWaitlist.mockResolvedValueOnce({ kind: 'conflict', currentVersion: 3 });
+    const conflict = await app.request(
+      '/api/events/admin/occurrences/s1/waitlist/promote?account_id=la1',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ expectedVersion: 2 }),
+      },
+    );
+    expect(conflict.status).toBe(409);
+    await expect(conflict.json()).resolves.toEqual({ error: 'version_conflict', currentVersion: 3 });
+  });
+});
+
 function baseEvent(over: Partial<EventRow>): EventRow {
   const now = new Date().toISOString();
   return {
@@ -2373,7 +2530,10 @@ describe('094 公開対象・申込締切・キャンセル待ち', () => {
     deleted_at: null,
   };
 
-  function book(app: ReturnType<typeof setupApp>) {
+  function book(
+    app: ReturnType<typeof setupApp>,
+    body: Record<string, unknown> = { slot_id: 's1' },
+  ) {
     return app.request('/api/liff/events/e1/bookings?liffId=L1', {
       method: 'POST',
       headers: {
@@ -2381,7 +2541,7 @@ describe('094 公開対象・申込締切・キャンセル待ち', () => {
         'Idempotency-Key': 'k1',
         Authorization: 'Bearer t',
       },
-      body: JSON.stringify({ slot_id: 's1' }),
+      body: JSON.stringify(body),
     });
   }
 
@@ -2486,5 +2646,46 @@ describe('094 公開対象・申込締切・キャンセル待ち', () => {
     expect(state.waitlist).toHaveLength(1);
     // 待ちは予約に入れない。定員の数え方に手を入れずに済ませるため。
     expect(state.bookings).toHaveLength(1);
+  });
+
+  test('複数人申込は人数分の席を使い、回答と初回判定を申込時点で固定する', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', is_published: 1 })],
+      slots: [{ ...futureSlot, capacity: 3 }],
+      bookings: [{
+        id: 'past', event_id: 'e1', slot_id: 'past-slot', friend_id: 'f1',
+        status: 'attended', requested_at: '2025-01-01T00:00:00.000Z', party_size: 1,
+      } as BookingRow & Record<string, unknown>],
+      accounts: [account],
+      friends: [friend],
+    };
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U1');
+    idempotencyMocks.reserveEventIdempotency.mockResolvedValue({ kind: 'inserted' });
+    const res = await book(setupApp(state), {
+      slot_id: 's1', party_size: 2, answers: { companion: '母', pet: 'ポチ' },
+    });
+    expect(res.status).toBe(201);
+    expect(state.bookings[1]).toMatchObject({
+      party_size: 2,
+      answer_snapshot_json: JSON.stringify({ companion: '母', pet: 'ポチ' }),
+      first_participation: 0,
+      first_participation_attended_count: 1,
+    });
+  });
+
+  test('期限付き案内で保留した席には新しい申込を割り込ませない', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', is_published: 1, waitlist_enabled: 0 })],
+      slots: [{ ...futureSlot, capacity: 2 }],
+      bookings: [],
+      waitlist: [{ slot_id: 's1', status: 'offered', party_size: 2 }],
+      accounts: [account],
+      friends: [friend],
+    };
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U1');
+    idempotencyMocks.reserveEventIdempotency.mockResolvedValue({ kind: 'inserted' });
+    const res = await book(setupApp(state));
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({ error: 'slot_full' });
   });
 });

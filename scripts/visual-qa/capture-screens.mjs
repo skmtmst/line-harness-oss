@@ -264,7 +264,7 @@ async function runSteps(page, steps = [], node = '') {
  * 起きない絵になる。`states.apis` に帯の口も並べるのは台帳側の仕事。
  */
 export function shouldApplyStateToMethod(state, method) {
-  return !state.postOnly || method === 'POST'
+  return !state.postOnly || method === (state.method ?? 'POST')
 }
 
 export function failureResponseForState(state) {
@@ -294,7 +294,7 @@ async function applyState(page, node, state) {
   for (const pattern of patterns) {
     await page.route(pattern, async (route) => {
       /*
-        変種の失敗応答は、保存を押したPOSTだけに当てる。
+        変種の失敗応答は、保存を押した書き込みだけに当てる。
         GETまで400/409へ替えると、入力画面を描く前に一覧取得が失敗し、
         本来見たい保存エラーへ到達できない。
       */

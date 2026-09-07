@@ -23,6 +23,58 @@ beforeAll(async () => {
   } = await import('./api'))
 })
 
+describe('api.friends のV6検索・本人照合契約', () => {
+  it('14軸のAND/ORを同じ条件JSONで一覧へ渡す', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: { items: [], total: 0 } }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+    const conditions = {
+      all: [{ kind: 'name' as const, op: 'contains', value: '田中' }],
+      any: [{ kind: 'reminder' as const, op: 'exists' }],
+      visibility: 'visible_only' as const,
+    }
+
+    await api.friends.list({ accountId: 'account/1', conditions })
+
+    const url = new URL(String(fetchSpy.mock.calls[0]?.[0]))
+    expect(url.pathname).toBe('/api/friends')
+    expect(url.searchParams.get('lineAccountId')).toBe('account/1')
+    expect(JSON.parse(String(url.searchParams.get('conditions')))).toEqual(conditions)
+  })
+
+  it('友だち用保存検索、採用値つき候補、統合解除を正規URLへ送る', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: { items: [], total: 0 } }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await api.friendSavedViews.list('account/1')
+    await api.identityCandidates.getFriendDuplicate('candidate/1')
+    await api.identityCandidates.decideFriendDuplicate('candidate/1', {
+      expectedVersion: 2,
+      decision: 'linked',
+      reason: '本人確認済み',
+      profileSelections: [{ fieldKey: 'display_name', sourceFriendId: 'friend-1', updateMode: 'fixed' }],
+    })
+    await api.mergedPeople.unlink('person/1', 'friend/1', { expectedRevision: 4, reason: '別人と確認' })
+
+    expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
+      'https://worker.example.com/api/friends/saved-views?lineAccountId=account%2F1',
+      'https://worker.example.com/api/friends/duplicates/candidate%2F1',
+      'https://worker.example.com/api/friends/duplicates/candidate%2F1',
+      'https://worker.example.com/api/friends/people/person%2F1/links/friend%2F1',
+    ])
+    expect(fetchSpy.mock.calls[2]?.[1]).toMatchObject({ method: 'PATCH' })
+    expect(fetchSpy.mock.calls[3]?.[1]).toMatchObject({
+      method: 'DELETE',
+      body: JSON.stringify({ expectedRevision: 4, reason: '別人と確認' }),
+    })
+  })
+})
+
 describe('api.autoReplies の V6 集計・下書き契約', () => {
   it('選択中のLINEアカウントを競合集計へ渡す', async () => {
     const fetchSpy = vi.fn(async () => new Response(

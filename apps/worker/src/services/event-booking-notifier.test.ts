@@ -41,6 +41,18 @@ describe('renderEventNotificationText', () => {
     expect(text).toContain('LINE にてご連絡');
   });
 
+  test('キャンセル待ちの空きは回答期限と本人用URLを案内する', () => {
+    const text = renderEventNotificationText('waitlist_offer', {
+      ...baseCtx,
+      offerExpiresAtJst: '2026-06-02 10:00',
+      offerUrl: 'https://liff.line.me/example?eventWaitlistToken=secret',
+    });
+    expect(text).toContain('キャンセル待ちの空きが出ました');
+    expect(text).toContain('回答期限: 2026-06-02 10:00');
+    expect(text).toContain('期限を過ぎると次の方へ');
+    expect(text).toContain('eventWaitlistToken=secret');
+  });
+
   test('前日リマインダ', () => {
     const text = renderEventNotificationText('reminder_day_before', baseCtx);
     expect(text).toContain('明日イベントが開催');

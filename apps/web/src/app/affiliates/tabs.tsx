@@ -707,7 +707,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                           {detailLoading ? (
                             <p className="text-sm text-gray-400">読み込み中...</p>
                           ) : (
-                            <div className="space-y-6">
+                            <div className="flex flex-col gap-6">
 
                               {/* 支払いの取り決め。報酬額そのものは案件側で持つが、
                                   連絡先と支払い条件は人に紐づく。 */}
@@ -718,7 +718,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                 }}
                               />
 
-                              <section className="rounded-card border-hairline bg-canvas border p-4" aria-label="次の支払い">
+                              <section className="rounded-card border-hairline order-first bg-canvas border p-4" aria-label="次の支払い">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div>
                                     <p className="text-ink text-sm font-bold">次の支払い</p>

@@ -324,6 +324,8 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
 
   const summaryUnavailable = error && !loading
   const closeDate = monthDay(preview?.periodTo ?? null)
+  const rowCountLabel = loading || error ? '—' : rows.length.toLocaleString('ja-JP')
+  const missingBankLabel = loading || error ? '—' : missingBanks.toLocaleString('ja-JP')
 
   return (
     <div className="space-y-4" data-payment-ledger="settlement-connected">
@@ -422,9 +424,9 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
         <select aria-label="支払い一覧の表示件数" className="border-hairline rounded-control border px-3 py-2 text-sm" defaultValue="20">
           <option value="20">20件表示</option>
         </select>
-        <Button onClick={() => setFilter(filter === 'all' ? 'ready' : 'all')} aria-pressed={filter === 'ready'}>今回の締め {rows.length}人</Button>
+        <Button onClick={() => setFilter(filter === 'all' ? 'ready' : 'all')} aria-pressed={filter === 'ready'}>今回の締め {rowCountLabel}人</Button>
         <Button disabled title="支払履歴APIが未接続です">過去の支払い —</Button>
-        <Button onClick={() => setFilter(filter === 'bank_missing' ? 'all' : 'bank_missing')} aria-pressed={filter === 'bank_missing'}>振込先が未登録 {missingBanks}人</Button>
+        <Button onClick={() => setFilter(filter === 'bank_missing' ? 'all' : 'bank_missing')} aria-pressed={filter === 'bank_missing'}>振込先が未登録 {missingBankLabel}人</Button>
       </div>
 
       {loading ? (

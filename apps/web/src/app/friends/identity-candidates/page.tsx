@@ -3,6 +3,7 @@
 import React from 'react'
 import Button from '@/components/shared/button'
 import PageHeader from '@/components/shared/page-header'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import IdentityDecisionDialog from '@/components/identity/identity-decision-dialog'
 import {
   IdentityAssurance,
@@ -36,6 +37,8 @@ export default function FriendIdentityCandidatesPage() {
   }, [review.state, first?.id])
 
   const detail = review.detail
+  const profileCandidates = detail && 'profileCandidates' in detail ? detail.profileCandidates : []
+  const tagCandidates = detail && 'tagCandidates' in detail ? detail.tagCandidates : []
 
   return (
     <div className={styles.screen}>
@@ -73,6 +76,41 @@ export default function FriendIdentityCandidatesPage() {
             <IdentitySubjectCard side="候補A" subject={detail.left} />
             <IdentitySubjectCard side="候補B" subject={detail.right} />
           </div>
+
+          {profileCandidates.length > 0 ? (
+            <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
+              <h2 className="text-sm font-bold text-ink">統合プロフィールに採用する値</h2>
+              <p className="mt-1 text-xs text-ink-faint">項目ごとに採用元を選び、判定と同じ履歴へ残します。</p>
+              <div className="mt-3 overflow-hidden rounded-control border border-hairline">
+                <DataTable className="table-fixed text-xs">
+                  <thead className="bg-canvas-sunken text-ink-secondary">
+                    <TableHeadRow><Th>項目</Th><Th>候補A</Th><Th>候補B</Th><Th>採用する値</Th></TableHeadRow>
+                  </thead>
+                  <tbody className="divide-y divide-hairline">
+                    {profileCandidates.map((field) => {
+                      const left = field.options.find((option) => option.sourceFriendId === detail.left.id)
+                      const right = field.options.find((option) => option.sourceFriendId === detail.right.id)
+                      return (
+                        <Tr key={field.fieldKey}>
+                          <Td><span className="font-semibold text-ink">{field.fieldLabel}</span></Td>
+                          <Td>{left?.valuePreview ?? '—'}</Td>
+                          <Td>{right?.valuePreview ?? '—'}</Td>
+                          <Td>判定時に選択</Td>
+                        </Tr>
+                      )
+                    })}
+                    {tagCandidates.length > 0 ? (
+                      <Tr>
+                        <Td><span className="font-semibold text-ink">タグ</span></Td>
+                        <Td colSpan={2}>{tagCandidates.map((tag) => tag.name).join('・')}</Td>
+                        <Td>元の友だちに保持</Td>
+                      </Tr>
+                    ) : null}
+                  </tbody>
+                </DataTable>
+              </div>
+            </section>
+          ) : null}
 
           <IdentityHistoryList history={detail.history} />
 
