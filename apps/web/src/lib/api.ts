@@ -1667,6 +1667,13 @@ export const CSRF_STORAGE_KEY = 'lh_csrf'
  */
 export const SESSION_LOST_EVENT = 'lh-session-lost'
 
+/** 機能設定でオフになっている API を開いたとき、共通 shell へ知らせる合図。 */
+export const FEATURE_DISABLED_EVENT = 'lh-feature-disabled'
+
+export type FeatureDisabledEventDetail = {
+  featureId?: string
+}
+
 export function getCsrfToken(): string {
   if (typeof window === 'undefined') return ''
   return localStorage.getItem(CSRF_STORAGE_KEY) || ''
@@ -1754,6 +1761,9 @@ export function extractApiErrorCode(raw: string): string | undefined {
   try {
     const body = JSON.parse(raw) as { code?: unknown; error?: unknown }
     const candidate = typeof body.code === 'string' ? body.code : body.error
+    // Worker の機能停止契約だけは大文字の固定コード。ほかの大文字文字列まで
+    // 機械コードとして許すと、内部エラー名を画面分岐へ流してしまう。
+    if (candidate === 'FEATURE_DISABLED') return candidate
     if (typeof candidate === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(candidate)) {
       return candidate
     }
@@ -1761,6 +1771,30 @@ export function extractApiErrorCode(raw: string): string | undefined {
     // JSONでなければ機械コードも無い。
   }
   return undefined
+}
+
+/** FEATURE_DISABLED の公開情報だけを共通 shell へ渡す。 */
+export function extractFeatureDisabledDetail(raw: string): FeatureDisabledEventDetail {
+  if (!raw) return {}
+  try {
+    const body = JSON.parse(raw) as { featureId?: unknown }
+    return typeof body.featureId === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(body.featureId)
+      ? { featureId: body.featureId }
+      : {}
+  } catch {
+    return {}
+  }
+}
+
+export function shouldAnnounceFeatureDisabled(status: number, code: string | undefined): boolean {
+  return status === 403 && code === 'FEATURE_DISABLED'
+}
+
+function announceFeatureDisabled(status: number, code: string | undefined, raw: string): void {
+  if (typeof window === 'undefined' || !shouldAnnounceFeatureDisabled(status, code)) return
+  window.dispatchEvent(new CustomEvent<FeatureDisabledEventDetail>(FEATURE_DISABLED_EVENT, {
+    detail: extractFeatureDisabledDetail(raw),
+  }))
 }
 
 /** エラー本文の `data` だけを機械処理用に保持する。本文の文言は表示契約と分ける。 */
@@ -1831,10 +1865,12 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
   if (res.status >= 500) reportServerFailure(path, res.status)
   if (!res.ok) {
     const raw = await res.text()
+    const code = extractApiErrorCode(raw)
+    announceFeatureDisabled(res.status, code, raw)
     throw new ApiError(
       res.status,
       extractApiErrorMessage(raw, res.status),
-      extractApiErrorCode(raw),
+      code,
       // 最新状態は409のときだけ保持する。500等の内部データは画面へ渡さない。
       res.status === 409 ? extractApiErrorData(raw) : undefined,
     )
@@ -1854,10 +1890,12 @@ async function fetchApiBlob(path: string): Promise<Blob> {
   if (res.status >= 500) reportServerFailure(path, res.status)
   if (!res.ok) {
     const raw = await res.text()
+    const code = extractApiErrorCode(raw)
+    announceFeatureDisabled(res.status, code, raw)
     throw new ApiError(
       res.status,
       extractApiErrorMessage(raw, res.status),
-      extractApiErrorCode(raw),
+      code,
     )
   }
   return res.blob()
