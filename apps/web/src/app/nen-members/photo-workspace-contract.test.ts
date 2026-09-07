@@ -34,6 +34,7 @@ describe('V6 写真審査の一枚表示と掲載管理', () => {
     expect(page).toContain('api.nenMembers.issuePhotoOriginalDownload(')
     expect(page).toContain('api.nenMembers.downloadPhotoOriginal(issued.data.downloadUrl)')
     expect(page).toContain('URL.createObjectURL(blob)')
+    expect(page).toContain("throw new Error('再認証コードを確認してください。')")
   })
 
   it('uses the review derivative when available and exposes its generation status', () => {

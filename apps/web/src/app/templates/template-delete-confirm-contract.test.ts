@@ -85,22 +85,25 @@ describe('テンプレート一覧の削除確認', () => {
     expect(body, '窓を開いていない').toContain('setPendingDelete({ id, name, usageCount })')
   })
 
-  // development (#433) が足した「使用中は消さない」も一緒に見張る。
-  it('使用中は消さず、使用先へ送る', () => {
+  it('使用中は消さず、使用先と差し替え導線を確認窓に出す', () => {
     const body = fnBody(PAGE, 'const handleDelete = (template:')
     expect(body, '使用中でも窓を開いてしまう').toMatch(
-      /if \(usageCount > 0\)[\s\S]*setDrawerId\(id\)[\s\S]*return/,
+      /if \(usageCount > 0\)[\s\S]*setBlockedDelete\(\{ id, name, usageCount \}\)[\s\S]*return/,
     )
     expect(PAGE, '使用中の行から使用先へ行けない').toContain('使用先を見る')
+    expect(PAGE).toContain('使用中のテンプレートは削除できません')
+    expect(PAGE).toContain('差し替える画面へ')
+    expect(PAGE).toContain('replacementDestinations.map')
   })
 })
 
 describe('テンプレート削除の本文', () => {
-  it('使われている数と、参照が外れることを言う', () => {
+  it('使われているときは削除せず差し替えることを言う', () => {
     const text = templateDeleteDescription(3)
     expect(text).toContain('3箇所で使われています')
-    expect(text).toContain('参照が外れ')
-    expect(text).toContain('この操作は取り消せません')
+    expect(text).toContain('使用中は削除できません')
+    expect(text).toContain('差し替えてください')
+    expect(text).not.toContain('参照が外れ')
   })
 
   it('0箇所のときは「N箇所で使われています」と言わない', () => {
