@@ -23,6 +23,7 @@ import styles from './list-state.module.css'
  * 専用の部品が描かれたら、ここを合わせ直す。
  */
 export type ListStateKind = 'loading' | 'empty' | 'error' | 'forbidden'
+export type EmptyListPreset = 'createable' | 'readonly'
 
 /** 設計 `hqTfD` / `u2ArlH` / `ZAkSe`。24px の線画。 */
 const ICONS: Record<ListStateKind, typeof Inbox> = {
@@ -47,6 +48,11 @@ export const PRESETS: Record<ListStateKind, { title: string; description: string
   forbidden: { title: '表示する権限がありません', description: '見るには権限が要ります。オーナーか管理者に追加を依頼してください。' },
 }
 
+export const EMPTY_PRESETS: Record<EmptyListPreset, { title: string; description: string }> = {
+  createable: PRESETS.empty,
+  readonly: { title: '記録はありません', description: '記録が増えると、ここに表示されます。' },
+}
+
 export default function ListState({
   kind,
   title,
@@ -54,6 +60,7 @@ export default function ListState({
   action,
   onRetry,
   retrying = false,
+  emptyPreset = 'createable',
   className,
 }: {
   kind: ListStateKind
@@ -66,9 +73,11 @@ export default function ListState({
   onRetry?: () => void
   /** 読み直している間。二度押しを止める。 */
   retrying?: boolean
+  /** 画面から作れない記録一覧では、作成を促さない文言にする。 */
+  emptyPreset?: EmptyListPreset
   className?: string
 }) {
-  const preset = PRESETS[kind]
+  const preset = kind === 'empty' ? EMPTY_PRESETS[emptyPreset] : PRESETS[kind]
   const danger = kind === 'error'
   const Icon = ICONS[kind]
 

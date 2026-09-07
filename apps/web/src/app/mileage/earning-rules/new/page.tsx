@@ -210,6 +210,7 @@ export default function NewMileageRulePage() {
           source: source || null,
           amount: value,
           initialStatus,
+          lineAccountId: selectedAccountId!,
           conditions: {
             ...(dailyCap ? { dailyCapActions: Number(dailyCap) } : {}),
             ...(uniqueMode === 'subject' ? { uniquePerSubject: true } : {}),

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Button from '@/components/shared/button'
 import PageHeader from '@/components/shared/page-header'
 import { useAccount } from '@/contexts/account-context'
-import { api, type AnalyticsUsageOverview } from '@/lib/api'
+import { api, ApiError, type AnalyticsUsageOverview } from '@/lib/api'
 import {
   DEFAULT_FEATURES,
   FEATURE_SETTINGS_UPDATED_EVENT,
@@ -319,6 +319,8 @@ export default function SettingsPage() {
   const [ordering, setOrdering] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  /** GET で受けた版。保存時に送り返し、競合(409)を検出する。 */
+  const [settingsVersion, setSettingsVersion] = useState(0)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
@@ -343,6 +345,7 @@ export default function SettingsPage() {
       setFeatures(next)
       const nextOrder = response.data.sidebarItemOrder ?? {}
       setSavedItemOrder(nextOrder)
+      setSettingsVersion(response.data.version ?? 0)
       setItemOrder(nextOrder)
       setSpecializedFeatureKeys(response.data.specializedFeatureKeys ?? [])
       setUsageCategories(usageResponse?.success ? usageResponse.data.data.categories : [])
@@ -451,17 +454,35 @@ export default function SettingsPage() {
       const response = await api.featureSettings.save(selectedAccountId, {
         features,
         sidebarItemOrder: currentOrder,
+        expectedVersion: settingsVersion,
       })
       if (!response.success) {
         setError(response.error)
         return
       }
+      setSettingsVersion(response.data.version)
       setSavedFeatures({ ...features })
       setSavedItemOrder(currentOrder)
       setItemOrder(currentOrder)
       setNotice('機能設定を保存しました。サイドメニューにも反映されています。')
       window.dispatchEvent(new CustomEvent(FEATURE_SETTINGS_UPDATED_EVENT, { detail: { accountId: selectedAccountId } }))
-    } catch {
+    } catch (error) {
+      // ほかの管理者が先に保存したときは、編集中身は残したまま
+      // 最新を読み直し、内容を確認してもう一度保存してもらう。
+      if (error instanceof ApiError && error.status === 409) {
+        try {
+          const latest = await api.featureSettings.get(selectedAccountId)
+          if (latest.success) {
+            setSavedFeatures({ ...DEFAULT_FEATURES, ...latest.data.features })
+            setSavedItemOrder(latest.data.sidebarItemOrder ?? {})
+            setSettingsVersion(latest.data.version ?? 0)
+          }
+        } catch {
+          // 読み直しに失敗しても編集中身は残す。
+        }
+        setError('ほかの管理者が先に保存しました。最新の状態を読み直したので、内容を確認してもう一度保存してください。')
+        return
+      }
       setError('保存できませんでした。通信状態を確認して、もう一度お試しください。')
     } finally {
       setSaving(false)

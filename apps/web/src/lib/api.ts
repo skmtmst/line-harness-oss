@@ -1703,14 +1703,28 @@ export class ApiError extends Error {
 /**
  * Statuses whose response body is safe to show the operator verbatim.
  *
- * 400 and 422 are the Worker rejecting input it validated itself — the
- * message names what to fix and contains nothing the operator should not
- * see (all 422 bodies are Japanese validation messages, audited 2026-09-08
- * for #496-11). Everything else (upstream LINE API failures, unhandled
- * exceptions, proxy pages) can carry internal detail, so those keep the
- * generic status message no matter what the body says.
+ * These are application-level validation or conflict responses whose message
+ * tells the operator how to recover. A separate content guard below keeps
+ * database, stack, HTML and other internal detail out of the screen.
+ * (422 の本文は日本語の検証文のみであることを #496-11 で監査済み。)
  */
-const BODY_MESSAGE_STATUSES = new Set([400, 422])
+const BODY_MESSAGE_STATUSES = new Set([400, 409, 422, 428])
+
+const INTERNAL_ERROR_MARKERS = [
+  /D1_ERROR/i,
+  /\b(?:SELECT|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER)\b.+\b(?:FROM|INTO|TABLE|SET)\b/is,
+  /(?:stack trace|node_modules|\.tsx?:\d+|\.mjs:\d+)/i,
+  /<\/?(?:html|script|body)\b/i,
+  /(?:api[_ -]?key|authorization|bearer|password|secret|token)\s*[:=]/i,
+]
+
+function safeOperatorMessage(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  const message = value.trim()
+  if (!message || message.length > 240 || /^[a-z][a-z0-9_]{0,63}$/.test(message)
+    || INTERNAL_ERROR_MARKERS.some((marker) => marker.test(message))) return ''
+  return message
+}
 
 /**
  * Pull the human-readable reason out of an error response body.
@@ -1723,8 +1737,7 @@ export function extractApiErrorMessage(raw: string, status: number): string {
   if (!raw || !BODY_MESSAGE_STATUSES.has(status)) return ''
   try {
     const body = JSON.parse(raw) as { error?: unknown; message?: unknown }
-    if (typeof body.error === 'string') return body.error
-    if (typeof body.message === 'string') return body.message
+    return safeOperatorMessage(body.error) || safeOperatorMessage(body.message)
   } catch {
     // Not JSON — fall through to the status-only message.
   }
@@ -2126,6 +2139,8 @@ export type MileageRule = {
     uniquePerReferredFriend?: boolean
     uniquePerReferredFriendPerSubject?: boolean
   }
+  /** #532: 帰属するLINEアカウント。旧い全店共通ルールは null。 */
+  lineAccountId: string | null
   isActive: boolean
   validFrom: string | null
   validUntil: string | null
@@ -4421,6 +4436,8 @@ export const api = {
         sidebarItemOrder: Record<string, string[]> | null
         parentChildMode: boolean
         specializedFeatureKeys: string[]
+        /** 保存時に送り返す版。一括保存の競合検出に使う。 */
+        version: number
       }>>(
         `/api/settings/features?account_id=${encodeURIComponent(accountId)}`,
       ),
@@ -4428,8 +4445,10 @@ export const api = {
       features?: Record<string, boolean>
       sidebarOrder?: string[]
       sidebarItemOrder?: Record<string, string[]>
+      /** GET で受けた版。付けると1行でまとめて保存し、古ければ409で返す。 */
+      expectedVersion: number
     }) =>
-      fetchApi<ApiResponse<null>>(
+      fetchApi<ApiResponse<{ version: number }>>(
         `/api/settings/features?account_id=${encodeURIComponent(accountId)}`,
         { method: 'PUT', body: JSON.stringify(data) },
       ),
@@ -7718,6 +7737,8 @@ export const api = {
       conditions?: MileageRule['conditions'] | null
       validFrom?: string | null
       validUntil?: string | null
+      /** #532(#521): 帰属するLINEアカウント。口で必須。 */
+      lineAccountId: string
     }) => fetchApi<ApiResponse<MileageRule>>('/api/mileage/rules', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -8521,11 +8542,13 @@ export const api = {
     list: (params: {
       kind: IdentityCandidateKind
       status?: IdentityCandidateStatus
+      lineAccountId?: string
       limit?: number
       offset?: number
     }) => {
       const query = new URLSearchParams({ kind: params.kind })
       if (params.status) query.set('status', params.status)
+      if (params.lineAccountId) query.set('lineAccountId', params.lineAccountId)
       if (params.limit !== undefined) query.set('limit', String(params.limit))
       if (params.offset !== undefined) query.set('offset', String(params.offset))
       return fetchApi<ApiResponse<IdentityCandidateList>>(`/api/identity-candidates?${query.toString()}`)
@@ -8748,6 +8771,10 @@ export interface BookingMenu {
   cancel_deadline_hours_before?: number | null;
   /** 予約時にお客様へ聞く質問。null なら質問しない */
   intake_question?: string | null;
+  /** 一覧と同じ応答で返す担当。メニュー件数ぶんの追加通信をしない。 */
+  assigned_staff?: Array<{ id: string; display_name: string }>;
+  /** 個人情報を含む予約明細ではなく、Workerで集計した直近30日の件数。 */
+  booking_count_30_days?: number;
   effectiveBookingRules?: {
     bookingWindowDays: number;
     cutoffMinutesBefore: number;
@@ -9134,6 +9161,15 @@ export const bookingApi = {
       method: 'PUT',
       body: JSON.stringify(body),
     }),
+  patchMenu: (
+    accountId: string,
+    id: string,
+    expectedVersion: number,
+    body: { is_active?: boolean },
+  ) => fetchApi<{ success: true; data: { id: string; version: number } }>(
+    withAccount(`/api/booking/admin/menus/${id}`, accountId),
+    { method: 'PATCH', body: JSON.stringify({ ...body, expectedVersion }) },
+  ),
   deleteMenu: (accountId: string, id: string) =>
     fetchApi<{ ok: true }>(withAccount(`/api/booking/admin/menus/${id}`, accountId), {
       method: 'DELETE',
