@@ -264,7 +264,7 @@ function RetroactiveDialog({ values, count, onCancel, onSave, referenceState = f
   const referralTotal = referralTargets * values.referralRewardMiles
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/45 p-4">
-      <section className="w-full max-w-[680px] rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
+      <section className="w-full max-w-[670px] -translate-y-10 rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
         <h2 className="text-xl font-bold text-ink">{count + referralTargets}人にさかのぼってマイルを積みますか？</h2>
         <p className="mt-2 text-sm leading-6 text-ink-secondary">保存と同時に、すでにこのタグが付いている人へ未反映分を積みます。</p>
         <div className="mt-5 overflow-hidden rounded-control border border-hairline">

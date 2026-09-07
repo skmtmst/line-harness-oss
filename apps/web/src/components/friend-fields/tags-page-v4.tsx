@@ -475,7 +475,7 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
 
   return (
     <div ref={dialogRef} className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/45 p-4" data-qa-dialog="tag-delete" data-impact={impactStatus}>
-      <section className="w-full max-w-[680px] rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
+      <section className="w-full max-w-[670px] -translate-y-6 rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
         <div className="flex items-start gap-3">
           {/* 設計 `iTwNX`/`lUbvQ`。赤いゴミ箱を22pxで見出しの左に置く。 */}
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control bg-danger-bg text-danger">
@@ -490,7 +490,7 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
         {/* 設計 `X3Lkr`。名前・値・結果の3列。 */}
         <dl className="mt-5 divide-y divide-hairline overflow-hidden rounded-control border border-hairline text-sm">
           {deleteImpactRows(tag, impact).map((row) => (
-            <div key={row.name} className="flex items-baseline gap-3 px-4 py-3">
+            <div key={row.name} className="flex items-baseline gap-3 px-4 py-2">
               <dt className="w-[130px] shrink-0 text-ink-secondary">{row.name}</dt>
               <dd className="min-w-0 flex-1 font-bold text-ink">{row.value}</dd>
               <span className="shrink-0 text-xs text-ink-faint">{row.result}</span>
@@ -500,19 +500,19 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
 
         {/* 設計 `WrDxu`。使用中で止まっているときだけ、その理由をここに出す。 */}
         {impactStatus === 'ready' && impact && !impact.canDelete && (
-          <div data-qa="tag-delete-blocked-warning" className="mt-4 rounded-control border border-danger/25 bg-danger-bg p-3 text-sm text-danger">
+          <div data-qa="tag-delete-blocked-warning" className="mt-4 rounded-control border border-danger/25 bg-danger-bg p-2 text-sm text-danger">
             <p className="font-bold">有効な公開参照があるタグは、完全に削除できません</p>
             <p className="mt-1 text-ink-secondary">参照中の設定はそのまま残し、新しく付ける操作だけを止める必要があります。過去のマイル履歴と配信ログは残ります。</p>
           </div>
         )}
 
         {/* 設計 `seGRS`。 */}
-        <label className="mt-5 block">
+        <label className="mt-4 block">
           <span className="mb-1.5 block text-xs font-semibold text-ink-secondary">確認のため、タグ名を入力してください</span>
           <input value={text} onChange={(event) => setText(event.target.value)} placeholder={tag.name} disabled={blocked} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm outline-none focus:border-danger disabled:bg-canvas-sunken" />
         </label>
         {/* 設計 `rHKRG`。左が「やめる」、右が「このタグを削除する」。 */}
-        <div className="mt-6 flex items-center justify-end gap-3">
+        <div className="mt-5 flex items-center justify-end gap-3">
           {blockedReason && <p className="min-w-0 flex-1 text-xs text-ink-faint">{blockedReason}</p>}
           <button type="button" onClick={onCancel} className="shrink-0 rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">やめる</button>
           {saveError ? <p role="alert" className="min-w-0 flex-1 text-xs text-danger">{saveError}</p> : null}

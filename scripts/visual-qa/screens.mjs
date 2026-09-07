@@ -3138,7 +3138,11 @@ export const SCREENS = [
   {
     node: 'VjXGX', feature: 4, name: '4-1-E 遡及反映の確認ダイアログ',
     dir: 'friend-attributes-v6', route: '/tags/edit?id=tag-0', mode: 'viewport', height: 1590,
-    steps: [{ click: '遡及反映', role: 'switch', onlyIfOff: true }, { click: 'タグを保存' }],
+    steps: [
+      { click: '遡及反映', role: 'switch', onlyIfOff: true },
+      { click: 'タグを保存' },
+      { click: '内容を確認し、既存の友だちへ反映することを了承しました', role: 'checkbox' },
+    ],
     verdict: "match",
     verdictNote: "**2026-09-07 Issue #297で修正・再判定。** 一致。設計と同じNEN会員（定期）の対象128人、紹介者34人、本人1,280mile、紹介者170mile、合計1,450mile、倍率、アクション、取り消せない注意、確認チェック、2つの保存方法を表示した。固定データ取り込み後に2幅で再比較し、横はみ出し0。",
     verdictSource: "friend-attributes-v6/VjXGX.txt + friend-attributes-v6/VjXGX-{1440,1920}.png",

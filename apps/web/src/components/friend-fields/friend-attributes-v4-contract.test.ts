@@ -22,6 +22,7 @@ describe('友だち属性 V4 contract', () => {
     expect(editor).toContain("useState(initialValues?.applyToExisting ?? initialApplyToExisting)")
     expect(editor).toContain('すでに付いている人への反映')
     expect(editor).toContain('さかのぼってマイルを積みますか？')
+    expect(editor).toContain('max-w-[670px] -translate-y-10')
     expect(page).toContain('applyToExisting: applyRetroactive && values.applyToExisting')
   })
 
@@ -275,6 +276,8 @@ describe('友だち属性 V4 contract', () => {
     expect(source).toContain('影響を確認しています')
     expect(source).toContain('影響を確認できませんでした')
     expect(source).toContain('api.tags.archive(tag.id, accountId')
+    expect(source).toContain('max-w-[670px] -translate-y-6')
+    expect(source).toContain('gap-3 px-4 py-2')
     expect(source).toContain('expectedVersion: impact.tag.version')
     expect(source).toContain('impactRevision: impact.revision')
     expect(source).toContain('crypto.randomUUID()')
