@@ -766,6 +766,8 @@ export async function getMileageEarningOpportunitiesForFriend(
           WHERE program_id = ?
             AND event_type IN ('friend_registered', ?, ?, ?, ?)
             AND is_active = 1
+            AND (line_account_id IS NULL
+                 OR line_account_id = (SELECT line_account_id FROM friends WHERE id = ?))
             AND (conditions IS NULL
                  OR COALESCE(json_extract(conditions, '$.beneficiary'), 'actor') = 'actor')
             AND (valid_from IS NULL OR valid_from <= ?)
@@ -775,6 +777,7 @@ export async function getMileageEarningOpportunitiesForFriend(
       .bind(
         DEFAULT_MILEAGE_PROGRAM_ID,
         ...eventTypes,
+        friendId,
         now,
         now,
       )
@@ -1009,6 +1012,8 @@ export interface MileageRuleRow {
   amount: number;
   initial_status: 'pending' | 'available';
   conditions: string | null;
+  /** 334(#521): 帰属アカウント。NULL=全店共通(従来どおり全店に効く)。 */
+  line_account_id?: string | null;
   is_active: number;
   valid_from: string | null;
   valid_until: string | null;
@@ -1068,6 +1073,8 @@ export async function createMileageRule(
     /** 期間限定のキャンペーン。列も突き合わせも前からあったが、書き込む口が無かった。 */
     validFrom?: string | null;
     validUntil?: string | null;
+    /** 334(#521): 帰属アカウント。省略・NULL=全店共通。 */
+    lineAccountId?: string | null;
   },
 ): Promise<MileageRuleRow> {
   if (!Number.isInteger(input.amount) || input.amount <= 0) {
@@ -1080,8 +1087,8 @@ export async function createMileageRule(
     .prepare(
       `INSERT INTO mileage_rules
          (id, program_id, name, event_type, source, amount, initial_status,
-          conditions, is_active, valid_from, valid_until, created_at, updated_at)
-       VALUES (?, 'default', ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
+          conditions, line_account_id, is_active, valid_from, valid_until, created_at, updated_at)
+       VALUES (?, 'default', ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -1091,6 +1098,7 @@ export async function createMileageRule(
       input.amount,
       input.initialStatus ?? 'available',
       input.conditions ? JSON.stringify(input.conditions) : null,
+      input.lineAccountId ?? null,
       input.validFrom ?? null,
       input.validUntil ?? null,
       now,
@@ -1259,9 +1267,9 @@ async function applyMileageRulesImmediately(
   input: ApplyMileageRulesInput,
 ): Promise<{ event: EngagementEvent; granted: MileageLedgerEntry[] }> {
   const friend = await db
-    .prepare(`SELECT id, user_id FROM friends WHERE id = ?`)
+    .prepare(`SELECT id, user_id, line_account_id FROM friends WHERE id = ?`)
     .bind(input.friendId)
-    .first<{ id: string; user_id: string | null }>();
+    .first<{ id: string; user_id: string | null; line_account_id: string | null }>();
   if (!friend) throw new Error(`Mileage friend not found: ${input.friendId}`);
 
   const occurredAt = input.occurredAt ?? jstNow();
@@ -1287,11 +1295,12 @@ async function applyMileageRulesImmediately(
           AND event_type = ?
           AND (source IS NULL OR source = ?)
           AND is_active = 1
+          AND (line_account_id IS NULL OR line_account_id = ?)
           AND (valid_from IS NULL OR valid_from <= ?)
           AND (valid_until IS NULL OR valid_until >= ?)
         ORDER BY created_at ASC, id ASC`,
     )
-    .bind(input.eventType, input.source, occurredAt, occurredAt)
+    .bind(input.eventType, input.source, friend.line_account_id, occurredAt, occurredAt)
     .all<MileageRuleRow>();
 
   const identityKey = friend.user_id ? `user:${friend.user_id}` : `friend:${friend.id}`;

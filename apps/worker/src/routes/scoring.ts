@@ -53,7 +53,7 @@ import type {
 import type { Env } from '../index.js';
 import { auditLog } from '../lib/audit-log.js';
 import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
-import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { deliverMileageReward } from '../services/mileage-reward-delivery.js';
@@ -104,6 +104,8 @@ function serializeMileageRule(rule: MileageRuleRow) {
     amount: rule.amount,
     initialStatus: rule.initial_status,
     conditions,
+    // 334(#521): 帰属アカウント。null=全店共通。
+    lineAccountId: rule.line_account_id ?? null,
     isActive: Boolean(rule.is_active),
     validFrom: rule.valid_from,
     validUntil: rule.valid_until,
@@ -908,9 +910,15 @@ scoring.post('/api/mileage/rules', requireRole('owner', 'admin'), async (c) => {
       } | null;
       validFrom?: string | null;
       validUntil?: string | null;
+      /** 334(#521): 帰属アカウント。省略・null=全店共通。 */
+      lineAccountId?: string | null;
     }>();
     if (!body.name?.trim() || !body.eventType?.trim() || !Number.isInteger(body.amount) || (body.amount ?? 0) <= 0) {
       return c.json({ success: false, error: 'name, eventType and a positive integer amount are required' }, 400);
+    }
+    if (body.lineAccountId
+      && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
     const rule = await createMileageRule(c.env.DB, {
       name: body.name.trim(),
@@ -921,6 +929,7 @@ scoring.post('/api/mileage/rules', requireRole('owner', 'admin'), async (c) => {
       conditions: body.conditions,
       validFrom: body.validFrom ?? null,
       validUntil: body.validUntil ?? null,
+      lineAccountId: body.lineAccountId ?? null,
     });
     return c.json({ success: true, data: serializeMileageRule(rule) }, 201);
   } catch (err) {
@@ -952,7 +961,13 @@ scoring.put('/api/mileage/rules/:id', requireRole('owner', 'admin'), async (c) =
     if (body.amount !== undefined && (!Number.isInteger(body.amount) || body.amount <= 0)) {
       return c.json({ success: false, error: 'amount must be a positive integer' }, 400);
     }
-    const updated = await updateMileageRule(c.env.DB, c.req.param('id'), body);
+    const existing = await getMileageRuleById(c.env.DB, c.req.param('id'));
+    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+    if (existing.line_account_id
+      && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [existing.line_account_id])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const updated = await updateMileageRule(c.env.DB, existing.id, body);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serializeMileageRule(updated) });
   } catch (err) {
@@ -966,6 +981,10 @@ scoring.delete('/api/mileage/rules/:id', requireRole('owner', 'admin'), async (c
   try {
     const existing = await getMileageRuleById(c.env.DB, c.req.param('id'));
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+    if (existing.line_account_id
+      && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [existing.line_account_id])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
     await deleteMileageRule(c.env.DB, existing.id);
     return c.json({ success: true, data: null });
   } catch (err) {

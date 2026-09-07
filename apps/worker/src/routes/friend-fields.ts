@@ -31,6 +31,7 @@ import {
 import { recordLoginAudit } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { requireVisibleFriend } from './friends.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 
 const friendFields = new Hono<Env>();
@@ -699,7 +700,7 @@ friendFields.delete('/api/friend-fields/:id', requireRole('owner', 'admin'), asy
 // GET /api/friends/:id/fields
 //
 // 個人情報の項目は役割で絞る。閲覧できる人が開いたときは記録を残す。
-friendFields.get('/api/friends/:id/fields', async (c) => {
+friendFields.get('/api/friends/:id/fields', requireVisibleFriend, async (c) => {
   try {
     const friendId = c.req.param('id');
     const staff = c.get('staff');
@@ -748,7 +749,7 @@ friendFields.get('/api/friends/:id/fields', async (c) => {
 //
 // まとめて更新する。EC を正としている項目は書き換えず、理由を warnings で返す。
 // 黙って無視すると「保存したのに戻る」という形で表に出る。
-friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin'), async (c) => {
+friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin'), requireVisibleFriend, async (c) => {
   try {
     const friendId = c.req.param('id');
     const staff = c.get('staff');

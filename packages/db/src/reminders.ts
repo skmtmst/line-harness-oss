@@ -582,6 +582,10 @@ export async function getReminderVersionSteps(
 
 // --- リマインダステップ ---
 
+export async function getReminderStepById(db: D1Database, id: string): Promise<ReminderStepRow | null> {
+  return db.prepare(`SELECT * FROM reminder_steps WHERE id = ?`).bind(id).first<ReminderStepRow>();
+}
+
 export async function getReminderSteps(db: D1Database, reminderId: string): Promise<ReminderStepRow[]> {
   const reminder = await getReminderById(db, reminderId);
   if (reminder?.current_published_version_id) {
