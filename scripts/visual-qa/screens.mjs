@@ -1870,7 +1870,7 @@ export const SCREENS = [
     **「使い道」「履歴」「行動スコア」はまるごと無い。**
   */
   { ...MILEAGE, node: 's98Vfw', name: '17-1 マイル', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 PR #1041（head `16e2331cb`）で再実装・再撮影。** Pencil実ノード `s98Vfw` と `/mileage?tab=balances` を同じ1920px入力で左右に並べ、1440pxも確認した。4つの集計帯、案内、検索・絞り込み札、固定幅の一覧、明細と手動調整、件数・ページ送りをV6構造へ揃えた。通常2枚（1440・1920）は横スクロール0。**残る未接続**：ランク、今月の増減、失効予定のAPI値はまだ無いため、設計サンプル値を作らず `— 未取得` と理由を表示する。これらの口が入るまで `structure_match_data_pending` が実態どおり。取得元：`mileage-v6/s98Vfw.txt`。', verdictSource: 'mileage-v6/s98Vfw.txt', verdictHead: '16e2331cb' },
-  { ...MILEAGE, node: 'N46cQ', name: '17-1-A たまる決めごと', route: '/mileage?tab=earning-rules', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 構造一致・データ未接続。「まだ決めごとがありません」の空の絵。枠で見ると、帯（止めているもの2つ／この30日で付いたマイル）、札（すべて9／動いている7／止めている2／ほかの機能から呼ばれている3）、「決めごと 9つのうち 8つを表示」の件数表示、CSVが無い。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像は `docs/design-reference/mileage-v6/` を撮り直した。**実装との突き合わせはこれから。** **P2 たまる決めごと。作りは設計に近い。** ルート `/mileage?tab=earning-rules`。決めごとごとに 名前・説明・停止/再開・稼働（動いています／止めています）・付与数・上限（対象ごとに1回／1日1回まで／紹介された人1人につき1回）が並ぶ。**良い点**：「付与数を変更すると、変更後に発生した行動から新しい値が使われます。」と**いつから効くかを書く**（さかのぼらないことが分かる）。**撮った本文で付与数が空に見えるのは撮影の都合**——付与数は `<input type="number">`（`mileage/page.tsx:339`）で、本文の書き出しに入力欄の値は入らない。**実装の不具合ではない。** **P2 残る差**：設計は決めごとの並び替えと、効いている範囲（どのアカウント・どの友だち）をその場で出す。実装は一覧まで。取得元：`mileage-v6/N46cQ.txt`。1440・1920とも横スクロール0 **推奨修正**：決めごとの並び替えと、効いている範囲（どのアカウント・どの友だち）を出す。**「付与数を変更すると、変更後に発生した行動から新しい値が使われます。」の断りはそのまま残す**（さかのぼらないことが分かる）。', verdictSource: 'mileage-v6/N46cQ.txt' , verdictHead: '31293424' },
+  { ...MILEAGE, node: 'N46cQ', name: '17-1-A たまる決めごと', route: '/mileage?tab=earning-rules', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #429 / UI HEAD 65390c132 で再判定。** 並び替えと `sortOrder` の保存、公開版の中身を見る導線、V6下書きの利用対象条件を実装し、3102/8789で1440/1920pxを撮影した。両幅とも横はみ出し0。設計の操作と一覧構造はそろった。**残る口**：現在の `/api/mileage/earning-rules` は行別の付与回数だけで、設計上段の「この30日で付いたマイル」「1人あたり平均」を返さない。Issue #418がこの集計契約を実装中のため、値を作らず `structure_match_data_pending` とする。', verdictSource: 'mileage-v6/N46cQ.txt', verdictHead: '65390c132' },
   {
     /*
       **#549 で「マイルの使い道」が入った。**
@@ -1909,7 +1909,7 @@ export const SCREENS = [
     // （`mileage/page.tsx:185` だけは `overview?.pagination?.total` と正しく書けている）
     // **今回は撮影側の口と固定データを足して撮れるようにしただけで、実装は直していない。**
   },
-  { ...MILEAGE, node: 'BmoGY', name: '17-1-D たまる決めごとをつくる', route: '/mileage/earning-rules/new', verdict: 'needs_fix', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正。**実装のほうが進んでいる部分がある**：倍率表（倍率なしの人1.0倍／EC顧客連携済み1.2倍／NEN会員1.5倍）と「倍率はタグ側の設定で決まります。優先度がいちばん高いタグ1枚だけが効きます。」——**これは残し、設計側にも足す**。実装に無いのは「付いてから1年」（有効期限）、**「予約が取り消されたら 300 マイルを引きます。残高が足りなければ 0」**（取り消しの扱い）、「条件を足す（15の軸から選べます）」、**LINEプレビュー**。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像は `docs/design-reference/mileage-v6/` を撮り直した。**実装との突き合わせはこれから。** **development `c275749d` で撮った。** 構造は設計とそろっており、残るのは実データの接続', verdictSource: 'mileage-v6/BmoGY.txt + mileage-v6/design-qa.md' , verdictHead: '31293424' },
+  { ...MILEAGE, node: 'BmoGY', name: '17-1-D たまる決めごとをつくる', route: '/mileage/earning-rules/new', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #429 / UI HEAD 65390c132 で再判定。** 一斉配信と同じ15軸の条件ビルダーを接続し、有効期限・取消時の減算・LINEプレビューとともにV6下書きへ保存する。3102/8789で1440/1920pxを撮影し、両幅とも横はみ出し0。**残る口**：取消でマイルを引いたときの友だち向け自動通知はIssue #418で実装中であり、現画面も未接続と明記している。条件や通知結果を偽らず、通知口の統合まで `structure_match_data_pending` とする。', verdictSource: 'mileage-v6/BmoGY.txt', verdictHead: '65390c132' },
   {
     /*
       **#441 で `/mileage/friends/detail` が入った。**
@@ -1953,18 +1953,18 @@ export const SCREENS = [
     verdictHead: '5e8f32d3',
     /* #863 合流後の実装を照合した現在の判定。 */
     ...{
-      verdict: 'needs_fix',
-      verdictNote: '**2026-09-04 S3 第2段で再照合。** 要修正。#863 合流後の実装には、名前・説明・必要マイル、渡す種類、在庫、1人あたり上限、期間、有効日数、公開版を直接変えない下書き、受け渡し失敗時の再試行・返却、顧客への案内、公開前確認がそろう。今回 `eb0a4fea8` で、既存の副作用なしテストAPIを「自分で交換をテスト」へ接続し、残高と在庫を動かさない結果を表示した。残る差は「だれが交換できるか」の条件、運用者が選べる共通アクション、画像・クーポンの選択、右側の作り方とつながる先。回答フォーム・品ものは保存契約に無いため、選べるふりをさせない。新規実装画像は実行環境の Chromium Mach port 拒否で未取得。**推奨修正**：次は共通条件と共通アクションの選択APIを接続し、1440/1920で撮り直す。',
+      verdict: 'structure_match_data_pending',
+      verdictNote: '**2026-09-07 Issue #429 / UI HEAD 65390c132 で再判定。** `mr-1` の詳細取得を正しい器で受け、一覧データへの安全なフォールバックも備えたため表示エラーを解消した。公開中の共通アクションと版をAPIから読み、交換後の処理として選択できる。3102/8789で1440/1920pxを撮影し、両幅とも横はみ出し0。**残る口**：`MileageRewardVersion` と `MileageRewardDraftInput` に交換対象条件 `targetConditions` が無く、保存APIも受け取らないため、設計の「だれが交換できますか」を永続化できない。選べるふりを足さず、契約追加まで `structure_match_data_pending` とする。',
       verdictSource: 'mileage-v6/p9CcEB.txt + apps/web/src/app/mileage/rewards/edit/page.tsx + apps/web/src/app/mileage/rewards/edit/reward-form.test.ts + docs/v6-requirements/v6-17-mileage-score-requirements-draft.md',
-      verdictHead: 'eb0a4fea8',
+      verdictHead: '65390c132',
     },
   },
   {
     ...MILEAGE, node: 'k8VCU', name: '17-1-H たまる決めごと・一覧の状態',
-    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 構造一致・データ未接続。`N46cQ` と同じ差。4状態は撮れている。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像は `docs/design-reference/mileage-v6/` を撮り直した。**実装との突き合わせはこれから。** **development `c275749d` で撮った。設計と一致。** 読込・空・失敗が分かれ、**実装が設計より2点足している**（未取得と実値0の言い分け、取れていない理由を言葉で出す）。1440・1920とも横スクロール0', verdictSource: 'mileage-v6/k8VCU-error.txt + mileage-v6/design-qa.md',
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #429 / UI HEAD 65390c132 で一致。** N46cQと同じ一覧に、通常・読込中・0件・取得失敗を分けて実装した。3102/8789で全4状態を1440/1920px撮影し、状態名、案内、再読込導線、件数表示をPencil正本と目視比較した。全画像で横はみ出し0。並び順保存・公開版確認・利用対象条件も通常状態から到達できる。', verdictSource: 'mileage-v6/k8VCU.txt + k8VCU-error.txt',
     route: '/mileage?tab=earning-rules',
     states: { apis: ['**/api/mileage/earning-rules*'], kinds: ['loading', 'empty', 'error'] },
-    verdictHead: '31293424',
+    verdictHead: '65390c132',
   },
   {
     /*
@@ -2687,21 +2687,29 @@ export const SCREENS = [
   },
   {
     ...STAFF, node: 'EOTS4', name: '30-1-A 見せる範囲を決める',
-    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#475 `15febf7f` で撮った。** 帯は 管理スタッフ 5人（管理者2・その他3）／二要素認証 **2 / 5**（未設定3人）／過去30日のログイン 2回（失敗1）／最終ログイン 09:02 佐々木 亮太。上に **「🔑 二段階認証が未設定のユーザーが 3人 います」** と、**数ではなく次にすることを出す帯**がある。表は ユーザー・役割・担当範囲・LINE連携・二段階認証・利用状態・操作。内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧は最後の操作と、権限の変更履歴への導線を持つ **ルート**：`/staff?tab=members`（見せる範囲）。**取得元**：`staff-v6/EOTS4.txt`。**推奨修正**：最後の操作と権限の変更履歴への導線を足す。**どちらも `jwVlo`（入った記録）が記録の一覧になってからでないと飛び先が無い**ので、そちらが先。**「二段階認証が未設定のユーザーが 3人 います」という、数ではなく次にすることを出す帯は維持する。**', verdictSource: 'staff-v6/EOTS4.txt',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #434 / 3101・8788で再撮影・再判定。** `access/roles` の機能30固定行を読み、管理者・運用・見るだけの3役割を横に、対象機能を縦に並べ、編集・閲覧・対象外を比較できる表として表示した。個人通知は比較表から分離し、ユーザー編集側へ残した。1440/1920pxとも対象画面へ到達し、横はみ出し0。',
+    verdictSource: 'staff-v6/EOTS4.txt + staff-v6/EOTS4-{1440,1920}.png + 2026-09-07 visual comparison',
     mode: 'viewport', height: 1080, /*
       **行の押し口は「範囲を編集」。** 人の名前は文字で、押せる役を持っていない。
       名前で探していたので、固定データを足したあとも0件のままだった
       （`page.tsx:142` の行末が `範囲を編集`）。
     */
     steps: [{ wait: 1500 }, { qaOpen: 'EOTS4' }],
-    verdictHead: '7b509106',
+    verdictHead: '54f1910a7',
   },
   { ...STAFF, node: 'jwVlo', name: '30-1-B 入った記録', route: '/staff?tab=audit',
     states: { apis: ['**/api/audit/events*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #243 / PR #1039 / UI HEAD 1b4774050 を3105/8792で再撮影。構造一致・共通監査API待ち。** 4指標、説明帯、検索、期間・表示件数、6つの絞り込み札、並び順、設計順の5列、CSV書き出し、取得範囲内のページ送りをそろえた。失敗・拒否は赤く表示し、通常・読込・空・失敗・権限不足を分ける。1440・1920pxとも横はみ出し0。残る差は全業務操作、総件数、対象詳細、変更前後、場所のrisk判定を返す共通監査APIで、現在のログイン監査5種類だけでは埋められない。未取得を作り値にしないため一致にはしない。',
     verdictSource: 'staff-v6/jwVlo-1920.png + staff-v6/jwVlo-{normal,loading,empty,error,forbidden}.txt + Pencil node jwVlo', verdictHead: '1b4774050',
   },
-  { ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new', verdict: 'unjudged', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** **撮れていないので判定しない。** `/staff/new` を開くとログイン画面になった。撮影の途中でモックが落ちたときと同じ症状なので、**モックを起こし直して撮り直す**。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **P2 人を招待する。段の作りは設計どおり。**#475 `15febf7f` で撮った。ルート `/staff/new`。段は 1 どなたを追加するか（名前・メールアドレス）→ 2 役割 → 3 最初に表示するLINEアカウント。**良い点**：役割を**できることの文で**説明する（管理者「すべての権限で設定・操作できます」／スタッフ「選択した機能だけを操作できます」／閲覧のみ「すべて閲覧できますが、操作はできません」）。「このアドレスに招待メールが届きます。」と**何が起きるかを書く**。3段目に「ログイン直後の表示だけを決めます。組織内のほかのアカウントにも切り替えて操作できます。」と、**この設定が何を縛らないか**まで書く。**P2 残る差**：設計 30-1-C は LINE連携での招待も選べるが、実装はメールだけ。担当範囲の割り当ても追加後の「範囲を編集」へ回している。内部語・壊れ値0件、1440・1920とも横スクロール0。取得元：`staff-v6/I3ZSrU.txt` **推奨修正**：LINE連携での招待と担当範囲割り当ては書き込み契約の追加後に接続する。', verdictSource: 'staff-v6/I3ZSrU.txt' , verdictHead: '31293424' },
+  {
+    ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #434 / 3101・8788で再撮影・再判定。** 認証済みセッションのまま `/staff/new` へ到達し、ログイン画面へ戻らないことを確認した。名前・メールアドレス・役割・最初に表示するLINEアカウント・スタッフの機能別担当範囲・通知先と、追加後の流れを表示。1440/1920pxとも横はみ出し0。',
+    verdictSource: 'staff-v6/I3ZSrU.txt + staff-v6/I3ZSrU-{1440,1920}.png + 2026-09-07 visual comparison',
+    verdictHead: '54f1910a7',
+  },
 
   // ── 機能31 機能設定 ─────────────────────────────────────
   { ...FEATURE_SET, node: 'c4R6F', name: '31-1 機能設定', verdict: 'match', verdictNote: '**2026-09-07 Issue #440 で再判定。** `/api/settings/features` と `/api/analytics/usage` を並行取得し、友だち属性22/101、シナリオ11/11、テンプレート0/0、リッチメニュー2/4、回答フォーム5/8、流入・成果9/16、オートメーション3/7の利用中／作成数を表示した。取得できない共通情報・登録メディアは0にせず「利用数は未取得」と明示する。説明、必須表示、切替、並び替え、初期値復元を設計画像と照合し、1440・1920とも横はみ出し0。', verdictSource: 'settings-v6/c4R6F.txt + settings-v6/c4R6F-1920.png', verdictHead: '3ddca80cc4' },
@@ -3039,22 +3047,10 @@ const feature30Judgments = {
     verdictSource: 'staff-v6/e3jz3.png + staff-v6/e3jz3-{normal,loading,empty,error,forbidden}.txt',
     verdictHead: '04057fb9da53',
   },
-  EOTS4: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-07 #405 / 3101・8788で正式撮影。** e3jz3の「中身を見る」から高田誠を開け、1440/1920pxで横はみ出し0。**要修正**：Pencilは役割bundleカード、3状態の権限比較表、担当範囲・変更履歴への導線を持つ全画面だが、実装は旧来の個人編集モーダル（3役割・通知・LINE連携）で、権限の3状態を保存する口もない。書き込み契約のない操作を見かけだけ追加せず、#405の対象外として残した。',
-    verdictSource: 'staff-v6/EOTS4.png + staff-v6/EOTS4.txt',
-    verdictHead: '04057fb9da53',
-  },
   jwVlo: {
     verdict: 'needs_fix',
     verdictNote: '**2026-09-07 #405 / 3101・8788で正式撮影。** audit/events の固定契約でsummary（4,286・削除12・配信18・変更46・ログイン286・要確認1）と通常7行、対象・変更前後・接続元・異常表示を1440/1920pxで確認し、横はみ出し0。**要修正**：設計にある都市名・個別詳細ボタンと実装契約にない位置情報の対応が未確定。実装はマスク済みIP・端末・riskLevelを表示し、存在しない位置情報を作っていない。',
     verdictSource: 'staff-v6/jwVlo.png + staff-v6/jwVlo-{normal,loading,empty,error,forbidden}.txt',
-    verdictHead: '04057fb9da53',
-  },
-  I3ZSrU: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-07 #405 / 3101・8788で正式撮影。** /staff/new を1440/1920pxで撮影し、横はみ出し0。名前・メール・役割・LINE認証後の流れ・担当アカウント・通知先を表示できた。**要修正**：Pencilの職位、4つのbundle、MFA必須・7日期限・初回通知、予約メニュー、メールプレビューが未接続。#352/#1170には招待作成の書き込み契約がないため、押しても保存できない入力欄は追加していない。設計画像の「パスワード」はV6要件（メール確認→LINE Login→TOTP）と矛盾するため採用しない。',
-    verdictSource: 'staff-v6/I3ZSrU.png + staff-v6/I3ZSrU.txt',
     verdictHead: '04057fb9da53',
   },
 }
@@ -3088,22 +3084,10 @@ const feature30Issue425Judgments = {
     verdictSource: 'staff-v6/e3jz3.png + staff-v6/e3jz3-{normal,loading,empty,error,forbidden}.txt + 2026-09-07 visual comparison',
     verdictHead: '5c9238525',
   },
-  EOTS4: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-07 #425 / 3101・8788で再撮影・再判定。** 権限を比べる導線から管理者・運用・見るだけの比較表を開き、機能ごとの権限値（編集・閲覧・対象外）を1440/1920pxで確認し、横はみ出し0。個人の通知設定は編集画面へ分離した。比較表の保存操作は書き込み契約が無いため表示せず、読み取り設計と契約値を一致させた。',
-    verdictSource: 'staff-v6/EOTS4.txt + staff-v6/EOTS4-{1440,1920}.png + 2026-09-07 visual comparison',
-    verdictHead: '5c9238525',
-  },
   jwVlo: {
     verdict: 'match',
     verdictNote: '**2026-09-07 #425 / 3101・8788で再撮影・再判定。** 通常・読込・空・失敗・権限不足を1440/1920pxで撮影し、横はみ出し0。監査イベント契約へ `regionLabel` を追加し、既知のIP接頭辞は地域名、契約が地域を返さない場合は「—」として確定した。各行に詳細ボタンを追加し、変更前後・対象・場所を確認できる。位置情報を推測していないため、契約値と表示が一致する。',
     verdictSource: 'staff-v6/jwVlo.png + staff-v6/jwVlo-{normal,loading,empty,error,forbidden}.txt + 2026-09-07 visual comparison',
-    verdictHead: '5c9238525',
-  },
-  I3ZSrU: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-07 #425 / 3101・8788で認証済み `/staff/new` を再撮影・再判定。** 1440/1920pxで横はみ出し0。メール招待フォーム、役割説明、初回表示アカウントを確認し、設計との差（LINE連携招待・担当範囲割り当て・通知設定）は書き込み契約未提供のため未接続と明記した。認証切れのログイン画面ではなく、対象画面を撮影できている。',
-    verdictSource: 'staff-v6/I3ZSrU.txt + staff-v6/I3ZSrU-{1440,1920}.png + 2026-09-07 visual comparison',
     verdictHead: '5c9238525',
   },
 }
@@ -3253,10 +3237,10 @@ const FEATURE_17_REVIEW = {
     verdictHead: '5e1ccd22d',
   },
   N46cQ: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-07、Issue #373 / HEAD 5e1ccd22d で新契約へ接続し確定撮影。** 1440・1920とも横スクロール0。9本の公開版・下書き版、30日の付与1,281回・対象外27回、有効期限と取消時の扱いを実値で表示。新契約の `friend_added` `broadcast_link_clicked` `inflow_return` も日本語化した。残る差は、公開版の中身を見る導線、利用対象条件の表示、並び順保存。`sortOrder` と `targetConditions` は口にあるので、画面側の修正が残る。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #429 / UI HEAD 65390c132 で再判定。** 並び替えと `sortOrder` の保存、公開版の中身を見る導線、V6下書きの利用対象条件を実装し、3102/8789で1440/1920pxを撮影した。両幅とも横はみ出し0。設計の操作と一覧構造はそろった。**残る口**：現在の `/api/mileage/earning-rules` は行別の付与回数だけで、設計上段の「この30日で付いたマイル」「1人あたり平均」を返さない。Issue #418がこの集計契約を実装中のため、値を作らず `structure_match_data_pending` とする。',
     verdictSource: 'mileage-v6/N46cQ.txt',
-    verdictHead: '5e1ccd22d',
+    verdictHead: '65390c132',
   },
   qlVLJ: {
     verdict: 'structure_match_data_pending',
@@ -3271,10 +3255,10 @@ const FEATURE_17_REVIEW = {
     verdictHead: '5e1ccd22d',
   },
   BmoGY: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-07、Issue #373 / HEAD 5e1ccd22d で新契約へ接続し確定撮影。** 1440・1920とも横スクロール0。有効期限、予約取消時の差し引き、タグ条件をV6下書きへ保存し、LINEプレビューも表示した。残る差は、15軸から選ぶ条件ビルダーと自動通知の送信口。`targetConditions` はAPIにあるが画面はタグ1軸のみのため、画面側の要修正とする。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #429 / UI HEAD 65390c132 で再判定。** 一斉配信と同じ15軸の条件ビルダーを接続し、有効期限・取消時の減算・LINEプレビューとともにV6下書きへ保存する。3102/8789で1440/1920pxを撮影し、両幅とも横はみ出し0。**残る口**：取消でマイルを引いたときの友だち向け自動通知はIssue #418で実装中であり、現画面も未接続と明記している。条件や通知結果を偽らず、通知口の統合まで `structure_match_data_pending` とする。',
     verdictSource: 'mileage-v6/BmoGY.txt',
-    verdictHead: '5e1ccd22d',
+    verdictHead: '65390c132',
   },
   HIU5O: {
     verdict: 'structure_match_data_pending',
@@ -3289,10 +3273,10 @@ const FEATURE_17_REVIEW = {
     verdictHead: '5e1ccd22d',
   },
   k8VCU: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-07、Issue #373 / HEAD 5e1ccd22d で通常・読込中・0件・取得失敗を確定撮影。** 4状態×2幅の8枚はすべて横スクロール0。取得中・0件・取得失敗を混同せず、通常時は30日実績や有効期限を実値で表示した。残る画面差は N46cQ と同じ、公開版の中身を見る導線、利用対象条件、並び順保存。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #429 / UI HEAD 65390c132 で一致。** N46cQと同じ一覧に、通常・読込中・0件・取得失敗を分けて実装した。3102/8789で全4状態を1440/1920px撮影し、状態名、案内、再読込導線、件数表示をPencil正本と目視比較した。全画像で横はみ出し0。並び順保存・公開版確認・利用対象条件も通常状態から到達できる。',
     verdictSource: 'mileage-v6/k8VCU.txt + k8VCU-error.txt',
-    verdictHead: '5e1ccd22d',
+    verdictHead: '65390c132',
   },
   z3PB2: {
     verdict: 'structure_match_data_pending',
@@ -3310,10 +3294,10 @@ const FEATURE_17_REVIEW = {
 
 // Issue #422（機能17/24/31/12）の再判定結果。
 const ISSUE_422_REVIEW = {
-  N46cQ: { verdict: 'needs_fix', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。9件の決めごと、30日実績、失効・取消の扱いを表示できた。並び順保存・公開版の中身を見る導線・利用対象条件が未実装のため要修正。', verdictSource: 'mileage-v6/N46cQ.txt', verdictHead: 'e98decafa' },
-  k8VCU: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で通常・読込中・0件・取得失敗を1440・1920pxで再撮影。** 全状態で横はみ出し0。状態を分け、未取得を0件に置き換えていない。並び順保存・対象条件・公開版導線は画面/API差が残るため構造一致・データ待ち。', verdictSource: 'mileage-v6/k8VCU.txt + k8VCU-error.txt', verdictHead: 'e98decafa' },
-  BmoGY: { verdict: 'needs_fix', verdictNote: '**2026-09-07 Issue #422 / HEAD e98decafa で1440・1920pxを再撮影。** 横はみ出し0。有効期限、取消時の差し引き、倍率表、LINEプレビュー、タグ条件を確認した。15軸条件ビルダーと自動通知の送信口が無いため要修正。', verdictSource: 'mileage-v6/BmoGY.txt', verdictHead: 'e98decafa' },
-  p9CcEB: { verdict: 'unjudged', verdictNote: '**2026-09-07 Issue #422。** 1440・1920pxとも「画面を表示できませんでした」で撮影が止まり比較画像を取得できなかった。「撮影が固まる(/mileage/rewards/edit?id=mr-1)」として判定保留。', verdictSource: 'mileage-v6/p9CcEB.txt', verdictHead: 'e98decafa' },
+  N46cQ: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #429 / PR #1215 / UI HEAD 65390c132 で再判定。** 並び替えと `sortOrder` の保存、公開版の中身を見る導線、V6下書きの利用対象条件を実装。残る口は30日付与マイルと1人あたり平均の集計契約（Issue #418）。', verdictSource: 'mileage-v6/N46cQ.txt', verdictHead: '65390c132' },
+  k8VCU: { verdict: 'match', verdictNote: '**2026-09-07 Issue #429 / PR #1215 / UI HEAD 65390c132 で一致。** 通常・読込中・0件・取得失敗の全4状態を1440/1920pxで照合し、全画像で横はみ出し0。並び順保存・公開版確認・利用対象条件にも到達できる。', verdictSource: 'mileage-v6/k8VCU.txt + k8VCU-error.txt', verdictHead: '65390c132' },
+  BmoGY: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #429 / PR #1215 / UI HEAD 65390c132 で再判定。** 15軸条件ビルダーをV6下書き保存へ接続。残る口は取消時の友だち向け自動通知（Issue #418）。', verdictSource: 'mileage-v6/BmoGY.txt', verdictHead: '65390c132' },
+  p9CcEB: { verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #429 / PR #1215 / UI HEAD 65390c132 で再判定。** 表示エラーを解消し、公開中の共通アクションと版を選べる。残る口は交換対象条件 `targetConditions` の保存契約。', verdictSource: 'mileage-v6/p9CcEB.txt + apps/web/src/app/mileage/rewards/edit/page.tsx + apps/web/src/app/mileage/rewards/edit/reward-form.test.ts', verdictHead: '65390c132' },
   Q55bb: { verdict: 'match', verdictNote: '**2026-09-07 Issue #440 で再判定。** 通知定義の公開版v2と下書きを実API固定応答から表示し、テスト送信の成功状態まで1440・1920で撮影した。公開前の下書きを公開版から分離し、横はみ出し0。', verdictSource: 'line-notify-v6/Q55bb.txt + line-notify-v6/Q55bb-1920.png + line-notify-v6/Q55bb-test-sent-1920.png', verdictHead: '3ddca80cc4' },
   c4R6F: { verdict: 'match', verdictNote: '**2026-09-07 Issue #440 で再判定。** 機能設定と利用状況を実API固定応答から読み、利用中／作成数を機能行へ表示した。取得不能の分類は0にせず未取得とし、1440・1920とも横はみ出し0。', verdictSource: 'settings-v6/c4R6F.txt + settings-v6/c4R6F-1920.png', verdictHead: '3ddca80cc4' },
   kQ1bs: { verdict: 'match', verdictNote: '**2026-09-07 Issue #440 で再判定。** 対象1,020人、重複180人、実配布840人、優先順位2を実API固定応答から表示し、STEP 2の構造を設計画像と照合した。1440・1920とも横はみ出し0。', verdictSource: 'rich-menus-v6/kQ1bs.txt + rich-menus-v6/kQ1bs-1920.png', verdictHead: '3ddca80cc4' },
@@ -4104,15 +4088,6 @@ const ISSUE_212_REVIEW = {
     note: '通常・読込中・取得失敗を2幅で撮影し、横はみ出し0。読込中だけは分かれるが、通常も「受付時間と休業日を取得できませんでした」になり、設計の曜日別受付時間、休業日、予約枠ルール、顧客向けカレンダープレビューを確認できない。**推奨修正**：通常応答を設定画面へ接続し、編集可能な通常状態と顧客向けプレビューを表示する。',
     source: 'booking-settings-v6/tksPc-{normal,loading,error}.txt + tksPc-{normal,loading,error}-{1440,1920}.png',
   },
-  EOTS4: {
-    note: '2幅とも横はみ出し0。設計は役割3種と機能ごとの権限を表で比較する全画面だが、実装は1ユーザーの基本情報・通知設定を含む縦長の編集窓で、比較表になっていない。**推奨修正**：役割ごとの閲覧・操作範囲を設計の表へ戻し、個人通知の設定とは画面を分ける。',
-    source: 'staff-v6/EOTS4.txt + EOTS4-1440.png + EOTS4-1920.png',
-  },
-  I3ZSrU: {
-    intro: '**2026-09-06 #212で判定。** 実装を1440/1920pxで2回撮影しようとしたが、対象画面へ到達できず未取得。',
-    note: 'mock APIが稼働している状態で2回撮り直したが、1440px・1920pxともログイン画面へ遷移し、設計の招待フォームを確認できなかった。**推奨修正**：撮影セッションで `/staff/new` を認証済みのまま開けるようにし、名前・メール・役割・LINEアカウント・担当範囲の全状態を再撮影する。',
-    source: 'capture-screens.mjs撮影結果（2026-09-06、ログイン画面へ遷移・実装画像なし）',
-  },
   DkPY0: {
     intro: '**2026-09-06 #212で判定。** 最新 development のルートと撮影定義を照合し、未実装を確認。',
     note: '最新 development に `/automations/runs` の画面が無く、通常・読込中・0件・取得失敗のどの状態も撮影できない。設計の実行記録、対象、結果、失敗理由、再実行導線を確認できない。**推奨修正**：実行記録画面を本流へ実装し、4状態を1440px・1920pxで撮影して設計と比較する。',
@@ -4467,6 +4442,55 @@ for (const screen of SCREENS) {
     screen.verdictHead = 'codex/kenta-r2-s2-b420'
   }
 }
+
+/**
+ * board #436。#1199 の機能5 APIと #1204 の固定応答を含む development
+ * ff97d4b46 を3104/8791で起動し、残っていた7 Nodeを再判定した。
+ * #420 の古い保留判定より後ろで適用し、台帳へ最新結果を反映する。
+ */
+const ISSUE_436_REVIEW = {
+  r6Gzsu: {
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #436で実API接続後に再判定。** 1通目の固定データからタグ「初回案内」と対応マーク「未対応」のAND条件を読み、現在条件2件、15軸、条件追加、解除、保存を表示した。1440/1920pxとも横はみ出し0。',
+    verdictSource: 'scenarios-v6/r6Gzsu.txt + scenarios-v6/r6Gzsu-{1440,1920}.png',
+  },
+  hz9ti: {
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #436で実API接続後に再判定。** 送信後アクションの取得とV6下書きの読み返しを並列で行い、下書き版3、選択できる全動作、設定済み3動作の順序・条件・再実行設定を表示した。1440/1920pxとも横はみ出し0。',
+    verdictSource: 'scenarios-v6/hz9ti.txt + scenarios-v6/hz9ti-{1440,1920}.png',
+  },
+  EvVO5: {
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #436で実API接続後に再判定。** 副作用のない試算APIをPOSTで読み、条件一致124人、購読中8人、新規開始予定116人、除外304人を表示した。開始条件6種のうち接続済み4種と、未接続の手動・Webhookの理由も区別した。1440/1920pxとも横はみ出し0。',
+    verdictSource: 'scenarios-v6/EvVO5.txt + scenarios-v6/EvVO5-{1440,1920}.png',
+  },
+  RUxNf: {
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #436で実API接続後に再判定。** 開始確認で試算と開始記録を並列取得し、新規開始予定116人、最新テスト送信4通、送信枠残り3,158通を表示した。戻せない影響と開始操作を設計順に確認し、1440/1920pxとも横はみ出し0。',
+    verdictSource: 'scenarios-v6/RUxNf.txt + scenarios-v6/RUxNf-{1440,1920}.png',
+  },
+  NrBkW: {
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #436で実API接続後に再判定。** 開始後の案内へ試算の新規開始予定116人を表示し、開始記録から配信中116人、完了312人、開始時刻、4通の到達数を読み返した。開始履歴への次の行動も確認し、1440/1920pxとも横はみ出し0。',
+    verdictSource: 'scenarios-v6/NrBkW.txt + scenarios-v6/NrBkW-{1440,1920}.png',
+  },
+  g2UNV: {
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #436で実API接続後に再判定。** 選んだ友だちへの全4通、配信日時、メッセージ種別、LINEへ実送信する注意、前回のテスト送信4通を開始記録APIから表示した。本番の購読と配信予定を変えないことも明示し、1440/1920pxとも横はみ出し0。',
+    verdictSource: 'scenarios-v6/g2UNV.txt + scenarios-v6/g2UNV-{1440,1920}.png',
+  },
+  M2b2B: {
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #436で実API接続後に再判定。** 開始428人、完了312人、参加中134人と4通の到達・クリック・失敗内訳を開始記録APIから表示した。LINEが提供しない個別開封率は「—」と未取得理由を残した。通常・読込中・取得失敗を1440/1920pxで撮影し、全画像で横はみ出し0。',
+    verdictSource: 'scenarios-v6/M2b2B.txt + scenarios-v6/M2b2B-{normal,loading,error}.txt + scenarios-v6/M2b2B-{normal,loading,error}-{1440,1920}.png',
+  },
+}
+for (const screen of SCREENS) {
+  if (screen.feature === 5 && ISSUE_436_REVIEW[screen.node]) {
+    Object.assign(screen, ISSUE_436_REVIEW[screen.node])
+    delete screen.verdictHead
+  }
+}
 for (const screen of SCREENS) {
   if (ISSUE_211_SCREENS.has(screen.node)) {
     screen.verdictNote = screen.verdictNote.replace('Issue #211 ', 'Issue #211 / PR #962 ')
@@ -4617,6 +4641,7 @@ export const CAPTURED_AT = {
     { pr: 1039, head: '1b4774050', on: '2026-09-07', screens: ['e3jz3','jwVlo'], note: 'Issue #243。3105/8792で通常・読込・空・失敗・権限不足の全24枚を1440/1920px撮影。全画像で横はみ出し0。残る集計・共通監査API差は各画面の判定注記へ記録した。' },
     { pr: 1182, head: '04057fb9da53', on: '2026-09-07', screens: ['e3jz3','EOTS4','jwVlo','I3ZSrU'], note: 'Issue #405。#1175後の access/users・roles・audit/events 固定契約へ接続し、3101/8788で4画面を1440・1920px撮影。横はみ出し0、設計との差は各画面の判定注記へ記録した。' },
     { pr: 1201, head: '5c9238525', on: '2026-09-07', screens: ['e3jz3','EOTS4','jwVlo','I3ZSrU'], note: 'Issue #425。職位・権限bundle・担当範囲・機能別権限の固定行を追加し、権限比較、6行ページ送りと注意札、監査記録の地域・詳細表示を3101/8788で4画面と全状態撮影。横はみ出し0、各画面を再判定した。' },
+    { pr: 1213, head: '54f1910a7', on: '2026-09-07', screens: ['EOTS4','I3ZSrU'], note: 'Issue #434。権限比較と認証済み招待フォームを3101/8788で1440・1920px再撮影し、旧Issueの上書きを外して2画面の実効判定をmatchへ更新した。横はみ出し0。' },
   ],
   31: [
     { pr: 1191, head: 'e98decafa', on: '2026-09-07', screens: ['c4R6F'], note: 'Issue #422 / PR #1191。機能設定を3102/8789で1440・1920px再撮影。説明・切替・並び替え・利用数表示を確認し、未取得の利用数はデータ待ちで記録した。' },
@@ -4799,6 +4824,7 @@ export const CAPTURED_AT = {
     { pr: 0, head: '4af43fb6', on: '2026-09-01', screens: ['festr'], note: 'Claudeが実装して撮った。**doctorが合格になったが、この3本はまだ push していない**' },
   ],
   17: [
+    { pr: 1215, head: '65390c132', on: '2026-09-07', screens: ['N46cQ', 'BmoGY', 'p9CcEB', 'k8VCU'], note: 'Issue #429 / PR #1215。決めごとの並び順・公開版・15軸条件と、使い道の共通アクション選択を実装し、3102/8789で1440/1920pxを撮影。全画像で横はみ出し0。k8VCUは一致、残るAPI契約は3画面の判定注記へ記録した。' },
     { pr: 1137, head: '5e1ccd22d', on: '2026-09-07', screens: ['s98Vfw', 'N46cQ', 'qlVLJ', 'MvZm5', 'BmoGY', 'HIU5O', 'vz0Ji', 'k8VCU', 'z3PB2'], note: 'Issue #373。機能17の新しい残高・付与ルール・使い道・履歴契約へ接続し、固定ポート3105/8792で通常と定義済みの全状態を1440/1920px撮影。全画像で横はみ出し0。友だち明細は全体履歴を友だちIDで絞り込んで表示するようにした。残差は画面とAPIに分けて各verdictNoteへ記録。' },
     { pr: 549, head: '0ae3e094', on: '2026-08-29', screens: ['qlVLJ', 'p9CcEB'], note: 'マイルの使い道を交換まで接続。公開版の固定・二重交換の防止・渡せなかったときの決めごとが入っている' },
     { pr: 441, head: '05c5b103', on: '2026-08-28', screens: ['MvZm5', 'BmoGY', 'HIU5O'] },
@@ -4846,6 +4872,9 @@ export const CAPTURED_AT = {
     { pr: 596, head: 'edb94936', on: '2026-08-30', screens: ['U9hzqH', 'g46ja', 'Yj6CQ', 'e6iJG'], note: 'Claudeが実装した。#595 の契約の上に公開までの4段。実装した本人が比較している' },
   ],
   5: [
+    { pr: 1218, head: '52cdb3fa6', on: '2026-09-07',
+      screens: ['r6Gzsu', 'hz9ti', 'EvVO5', 'RUxNf', 'NrBkW', 'g2UNV', 'M2b2B'],
+      note: 'Issue #436。#1199 のAPI契約と #1204 の固定データを使い、7画面を3104/8791で1440・1920px撮影した。試算、開始記録、V6下書き、通別結果を実API経由で表示し、7画面すべて一致。全画像で横はみ出し0。' },
     { pr: 1121, head: '1d9e8d36c', on: '2026-09-07',
       screens: ['kk8dz', 'r6Gzsu', 'hz9ti', 'EvVO5', 'RUxNf', 'g2UNV', 'NrBkW', 'M2b2B'],
       note: 'Issue #366 / PR #1121 の差し戻し対応。機能5の8画面を試算・開始記録・V6下書きAPIへ接続し、3104/8791で1440・1920pxと結果画面3状態を撮影。全22枚で横はみ出し0。1画面を一致、契約が返さない値だけを理由付き構造一致・データ待ちとして記録した。' },
