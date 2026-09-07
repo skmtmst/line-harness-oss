@@ -49,6 +49,13 @@ import {
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
 
+/*
+ * 一括削除の上限。1件ごとに使用先9種の走査が走るため、
+ * 件数に比例してWorker・D1が重くなる。上限を超えたら確認口を打たず、
+ * 絞り込みで分けるよう案内する。
+ */
+const MAX_BATCH_DELETE_COUNT = 20
+
 /** 一覧の更新日は、次回変更と同じセルに収まる短い形で出す。 */
 function formatListDate(value: string): string {
   const match = /^\d{4}-(\d{2})-(\d{2})/.exec(value)
@@ -66,6 +73,8 @@ function VarsPageInner() {
   const [folders, setFolders] = useState<Folder[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /** 一覧が件数上限で切られたときに絞り込み誘導を出す。 */
+  const [listLimited, setListLimited] = useState(false)
 
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
@@ -118,7 +127,10 @@ function VarsPageInner() {
         api.folders.list('common_var'),
       ])
       if (accountAtRequest !== latestAccountRef.current) return
-      if (vars.success) setItems(vars.data)
+      if (vars.success) {
+        setItems(vars.data)
+        setListLimited(vars.meta?.limited ?? false)
+      }
       if (folderList.success) setFolders(folderList.data)
     } catch {
       if (accountAtRequest === latestAccountRef.current) setError('読み込みに失敗しました')
@@ -156,6 +168,7 @@ function VarsPageInner() {
     setDeleteTargets([])
     setDeleting(false)
     setDeleteError('')
+    setListLimited(false)
   }, [selectedAccountId])
 
   const filtered = useMemo(
@@ -422,6 +435,10 @@ function VarsPageInner() {
 
   const prepareRemoveSelected = async () => {
     if (selected.size === 0 || !selectedAccountId) return
+    if (selected.size > MAX_BATCH_DELETE_COUNT) {
+      setError(`一度に削除できるのは${MAX_BATCH_DELETE_COUNT}件までです。フォルダや検索で絞り込んで分けて削除してください。`)
+      return
+    }
     const request = {
       accountId: selectedAccountId,
       generation: deleteRequestRef.current.generation + 1,
@@ -542,6 +559,12 @@ function VarsPageInner() {
       {emptyInUseCount > 0 ? (
         <div className="bg-status-warning-soft text-status-warning mb-4 rounded-control px-4 py-3 text-sm font-semibold" role="status">
           中身が空のまま使われているものが {emptyInUseCount.toLocaleString('ja-JP')}件あります。差し込んだところが空欄のまま送られます。
+        </div>
+      ) : null}
+
+      {listLimited ? (
+        <div className="bg-status-warning-soft text-status-warning mb-4 rounded-control px-4 py-3 text-sm font-semibold" role="status">
+          表示は最初の200件までです。フォルダや検索で絞り込んでください。
         </div>
       ) : null}
 

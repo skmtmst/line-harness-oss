@@ -3949,6 +3949,11 @@ export type MediaVersionResult = {
   createdAt: string
 }
 
+/** 共通情報の一覧。件数上限で切ったときは limited で絞り込み誘導を出す。 */
+export type CommonVarsListResponse = ApiResponse<CommonVar[]> & {
+  meta?: { total: number; limited: boolean; limit: number }
+}
+
 export const api = {
   system: {
     health: () =>
@@ -5087,7 +5092,7 @@ export const api = {
   /** 共通情報。営業時間などを1か所で直す。 */
   commonVars: {
     list: (accountId: string, params?: { folderId?: string }) =>
-      fetchApi<ApiResponse<CommonVar[]>>(
+      fetchApi<CommonVarsListResponse>(
         `/api/common-vars?accountId=${encodeURIComponent(accountId)}${params?.folderId ? `&folderId=${encodeURIComponent(params.folderId)}` : ''}`,
       ),
     detail: (id: string, accountId: string) =>
