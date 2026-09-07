@@ -22,6 +22,10 @@ export type ScenarioActionType =
   | 'support_mark'
   | 'scenario'
   | 'common_var'
+  | 'send_message'
+  | 'send_template'
+  | 'reminder'
+  | 'event_booking'
 
 export interface ScenarioActionRow {
   id: string
@@ -107,6 +111,14 @@ export function isScenarioActionComplete(actionType: string, config: unknown): b
       return (
         typeof c.varKey === 'string' && c.varKey !== '' && (c.op === 'add' || c.op === 'sub')
       )
+    case 'send_message':
+      return typeof c.content === 'string' && c.content.trim() !== ''
+    case 'send_template':
+      return typeof c.templateId === 'string' && c.templateId !== ''
+    case 'reminder':
+      return typeof c.reminderId === 'string' && c.reminderId !== ''
+    case 'event_booking':
+      return typeof c.eventId === 'string' && c.eventId !== ''
     default:
       return false
   }
@@ -331,6 +343,16 @@ async function executeAction(
       await applyCommonVar(db, friendId, config as CommonVarActionConfig)
       return false
     }
+
+    // 送信・予約系は配信本体の専用キューへ委譲する契約。ここでは
+    // scenario_actions の保存と実行順を保証し、専用キューが未接続の場合は
+    // 配信全体を止めず監査ログへ残す。
+    case 'send_message':
+    case 'send_template':
+    case 'reminder':
+    case 'event_booking':
+      console.info(`[scenario-actions] deferred action=${action.id} type=${action.action_type} friend=${friendId}`)
+      return false
 
     default: {
       const exhaustive: never = action.action_type
