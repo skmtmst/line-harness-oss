@@ -1,18 +1,18 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 254,
+  "compared": 258,
   "unimplemented": 0,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 18,
+  "missing": 14,
   "match": 268,
   "structureMatchDataPending": 0,
   "needsFix": 0,
   "unjudged": 0,
-  "pixelCompared": 250,
-  "pixelUnavailable": 22,
-  "pixelAboveThreshold": 36,
+  "pixelCompared": 272,
+  "pixelUnavailable": 0,
+  "pixelAboveThreshold": 40,
   "remaining": 0,
   "features": [
     {
@@ -212,17 +212,17 @@
       "feature": 3,
       "name": "友だち",
       "total": 12,
-      "compared": 7,
+      "compared": 8,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 5,
+      "missing": 4,
       "match": 12,
       "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "pixelCompared": 10,
-      "pixelUnavailable": 2,
+      "pixelCompared": 12,
+      "pixelUnavailable": 0,
       "pixelAboveThreshold": 0,
       "remaining": 0,
       "capturedAt": [
@@ -559,11 +559,11 @@
       "feature": 5,
       "name": "シナリオ配信",
       "total": 14,
-      "compared": 13,
+      "compared": 14,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 1,
+      "missing": 0,
       "match": 14,
       "structureMatchDataPending": 0,
       "needsFix": 0,
@@ -1319,9 +1319,9 @@
       "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "pixelCompared": 6,
-      "pixelUnavailable": 4,
-      "pixelAboveThreshold": 2,
+      "pixelCompared": 10,
+      "pixelUnavailable": 0,
+      "pixelAboveThreshold": 4,
       "remaining": 0,
       "capturedAt": [
         {
@@ -1410,9 +1410,9 @@
       "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "pixelCompared": 12,
-      "pixelUnavailable": 1,
-      "pixelAboveThreshold": 8,
+      "pixelCompared": 13,
+      "pixelUnavailable": 0,
+      "pixelAboveThreshold": 9,
       "remaining": 0,
       "capturedAt": [
         {
@@ -2198,9 +2198,9 @@
       "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "pixelCompared": 8,
-      "pixelUnavailable": 1,
-      "pixelAboveThreshold": 0,
+      "pixelCompared": 9,
+      "pixelUnavailable": 0,
+      "pixelAboveThreshold": 1,
       "remaining": 0,
       "capturedAt": [
         {
@@ -2303,8 +2303,8 @@
       "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "pixelCompared": 10,
-      "pixelUnavailable": 1,
+      "pixelCompared": 11,
+      "pixelUnavailable": 0,
       "pixelAboveThreshold": 0,
       "remaining": 0,
       "capturedAt": [
@@ -2709,8 +2709,8 @@
       "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "pixelCompared": 8,
-      "pixelUnavailable": 1,
+      "pixelCompared": 9,
+      "pixelUnavailable": 0,
       "pixelAboveThreshold": 0,
       "remaining": 0,
       "capturedAt": [
@@ -2912,17 +2912,17 @@
       "feature": 22,
       "name": "写真審査",
       "total": 4,
-      "compared": 2,
+      "compared": 4,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 2,
+      "missing": 0,
       "match": 4,
       "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "pixelCompared": 2,
-      "pixelUnavailable": 2,
+      "pixelCompared": 4,
+      "pixelUnavailable": 0,
       "pixelAboveThreshold": 1,
       "remaining": 0,
       "capturedAt": [
@@ -2986,8 +2986,8 @@
       "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "pixelCompared": 2,
-      "pixelUnavailable": 2,
+      "pixelCompared": 4,
+      "pixelUnavailable": 0,
       "pixelAboveThreshold": 0,
       "remaining": 0,
       "capturedAt": [
@@ -3680,8 +3680,8 @@
       "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "pixelCompared": 0,
-      "pixelUnavailable": 4,
+      "pixelCompared": 4,
+      "pixelUnavailable": 0,
       "pixelAboveThreshold": 0,
       "remaining": 0,
       "capturedAt": null
@@ -3699,8 +3699,8 @@
       "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "pixelCompared": 0,
-      "pixelUnavailable": 4,
+      "pixelCompared": 4,
+      "pixelUnavailable": 0,
       "pixelAboveThreshold": 0,
       "remaining": 0,
       "capturedAt": null
@@ -3708,10 +3708,10 @@
   ],
   "pixelDiff": {
     "thresholdPercent": 10,
-    "generatedAt": "2026-09-07T11:48:13.253Z",
-    "comparedCount": 250,
-    "unavailableCount": 22,
-    "aboveThresholdCount": 36
+    "generatedAt": "2026-09-07T12:13:25.459Z",
+    "comparedCount": 272,
+    "unavailableCount": 0,
+    "aboveThresholdCount": 40
   },
   "screens": [
     {
@@ -4826,10 +4826,37 @@
         "name": "3-1-C 友だち（一括操作）",
         "dir": "friends-v6",
         "declaredVerdict": "match",
-        "status": "unavailable",
-        "reason": "実装画像なし（1920px）",
-        "comparisons": [],
-        "pixelDiffPercent": null,
+        "status": "compared",
+        "reason": null,
+        "comparisons": [
+          {
+            "width": 1920,
+            "comparedHeight": 1080,
+            "designHeight": 1107,
+            "implementationHeight": 1080,
+            "heightDifferencePx": -27,
+            "widthDifferencePx": 0,
+            "mismatchedPixels": 56374,
+            "comparedPixels": 2073600,
+            "pixelDiffPercent": 2.7187,
+            "boundingBox": {
+              "left": 0,
+              "top": 0,
+              "right": 1913,
+              "bottom": 1079
+            },
+            "dominantRegion": "中央・右",
+            "designPath": "docs/design-reference/friends-v6/IAf7j.png",
+            "implementationPath": "docs/design-qa/friends-v6/IAf7j-1920.png",
+            "implementationSource": "docs",
+            "diffPath": "docs/design-qa/friends-v6/IAf7j-diff-1920.png"
+          }
+        ],
+        "pixelDiffPercent": 2.7187,
+        "heightDifferencePx": -27,
+        "dominantRegion": "中央・右",
+        "implementationSource": "docs",
+        "diffPath": "docs/design-qa/friends-v6/IAf7j-diff-1920.png",
         "aboveThreshold": false
       }
     },
@@ -7441,10 +7468,37 @@
         "name": "9-1-A 基本設定",
         "dir": "friend-add-v6",
         "declaredVerdict": "match",
-        "status": "unavailable",
-        "reason": "設計画像なし",
-        "comparisons": [],
-        "pixelDiffPercent": null,
+        "status": "compared",
+        "reason": null,
+        "comparisons": [
+          {
+            "width": 1920,
+            "comparedHeight": 1080,
+            "designHeight": 1080,
+            "implementationHeight": 1080,
+            "heightDifferencePx": 0,
+            "widthDifferencePx": 0,
+            "mismatchedPixels": 147931,
+            "comparedPixels": 2073600,
+            "pixelDiffPercent": 7.134,
+            "boundingBox": {
+              "left": 0,
+              "top": 0,
+              "right": 1881,
+              "bottom": 1079
+            },
+            "dominantRegion": "下部・右",
+            "designPath": "docs/design-reference/friend-add-v6/s9gAx.png",
+            "implementationPath": "docs/design-qa/friend-add-v6/s9gAx-1920.png",
+            "implementationSource": "docs",
+            "diffPath": "docs/design-qa/friend-add-v6/s9gAx-diff-1920.png"
+          }
+        ],
+        "pixelDiffPercent": 7.134,
+        "heightDifferencePx": 0,
+        "dominantRegion": "下部・右",
+        "implementationSource": "docs",
+        "diffPath": "docs/design-qa/friend-add-v6/s9gAx-diff-1920.png",
         "aboveThreshold": false
       }
     },
@@ -7460,10 +7514,37 @@
         "name": "9-1-B 流入条件",
         "dir": "friend-add-v6",
         "declaredVerdict": "match",
-        "status": "unavailable",
-        "reason": "設計画像なし",
-        "comparisons": [],
-        "pixelDiffPercent": null,
+        "status": "compared",
+        "reason": null,
+        "comparisons": [
+          {
+            "width": 1920,
+            "comparedHeight": 1080,
+            "designHeight": 1080,
+            "implementationHeight": 1080,
+            "heightDifferencePx": 0,
+            "widthDifferencePx": 0,
+            "mismatchedPixels": 142947,
+            "comparedPixels": 2073600,
+            "pixelDiffPercent": 6.8937,
+            "boundingBox": {
+              "left": 0,
+              "top": 0,
+              "right": 1881,
+              "bottom": 1079
+            },
+            "dominantRegion": "中央・右",
+            "designPath": "docs/design-reference/friend-add-v6/W1wzCa.png",
+            "implementationPath": "docs/design-qa/friend-add-v6/W1wzCa-1920.png",
+            "implementationSource": "docs",
+            "diffPath": "docs/design-qa/friend-add-v6/W1wzCa-diff-1920.png"
+          }
+        ],
+        "pixelDiffPercent": 6.8937,
+        "heightDifferencePx": 0,
+        "dominantRegion": "中央・右",
+        "implementationSource": "docs",
+        "diffPath": "docs/design-qa/friend-add-v6/W1wzCa-diff-1920.png",
         "aboveThreshold": false
       }
     },
@@ -7479,11 +7560,38 @@
         "name": "9-1-C 初回案内",
         "dir": "friend-add-v6",
         "declaredVerdict": "match",
-        "status": "unavailable",
-        "reason": "設計画像なし",
-        "comparisons": [],
-        "pixelDiffPercent": null,
-        "aboveThreshold": false
+        "status": "compared",
+        "reason": null,
+        "comparisons": [
+          {
+            "width": 1920,
+            "comparedHeight": 1080,
+            "designHeight": 1080,
+            "implementationHeight": 1080,
+            "heightDifferencePx": 0,
+            "widthDifferencePx": 0,
+            "mismatchedPixels": 214001,
+            "comparedPixels": 2073600,
+            "pixelDiffPercent": 10.3203,
+            "boundingBox": {
+              "left": 0,
+              "top": 0,
+              "right": 1881,
+              "bottom": 1079
+            },
+            "dominantRegion": "中央・右",
+            "designPath": "docs/design-reference/friend-add-v6/K0Dbr2.png",
+            "implementationPath": "docs/design-qa/friend-add-v6/K0Dbr2-1920.png",
+            "implementationSource": "docs",
+            "diffPath": "docs/design-qa/friend-add-v6/K0Dbr2-diff-1920.png"
+          }
+        ],
+        "pixelDiffPercent": 10.3203,
+        "heightDifferencePx": 0,
+        "dominantRegion": "中央・右",
+        "implementationSource": "docs",
+        "diffPath": "docs/design-qa/friend-add-v6/K0Dbr2-diff-1920.png",
+        "aboveThreshold": true
       }
     },
     {
@@ -7718,11 +7826,38 @@
         "name": "9-1-I 削除確認",
         "dir": "friend-add-v6",
         "declaredVerdict": "match",
-        "status": "unavailable",
-        "reason": "設計画像なし",
-        "comparisons": [],
-        "pixelDiffPercent": null,
-        "aboveThreshold": false
+        "status": "compared",
+        "reason": null,
+        "comparisons": [
+          {
+            "width": 1920,
+            "comparedHeight": 1080,
+            "designHeight": 1080,
+            "implementationHeight": 1080,
+            "heightDifferencePx": 0,
+            "widthDifferencePx": 0,
+            "mismatchedPixels": 296013,
+            "comparedPixels": 2073600,
+            "pixelDiffPercent": 14.2753,
+            "boundingBox": {
+              "left": 1,
+              "top": 11,
+              "right": 1881,
+              "bottom": 1078
+            },
+            "dominantRegion": "中央・中央",
+            "designPath": "docs/design-reference/friend-add-v6/Q3qP1r.png",
+            "implementationPath": "docs/design-qa/friend-add-v6/Q3qP1r-1920.png",
+            "implementationSource": "docs",
+            "diffPath": "docs/design-qa/friend-add-v6/Q3qP1r-diff-1920.png"
+          }
+        ],
+        "pixelDiffPercent": 14.2753,
+        "heightDifferencePx": 0,
+        "dominantRegion": "中央・中央",
+        "implementationSource": "docs",
+        "diffPath": "docs/design-qa/friend-add-v6/Q3qP1r-diff-1920.png",
+        "aboveThreshold": true
       }
     },
     {
@@ -8221,11 +8356,38 @@
         "name": "10-1-K アーカイブ確認",
         "dir": "webinars-v6",
         "declaredVerdict": "match",
-        "status": "unavailable",
-        "reason": "設計画像なし",
-        "comparisons": [],
-        "pixelDiffPercent": null,
-        "aboveThreshold": false
+        "status": "compared",
+        "reason": null,
+        "comparisons": [
+          {
+            "width": 1920,
+            "comparedHeight": 1080,
+            "designHeight": 1080,
+            "implementationHeight": 1080,
+            "heightDifferencePx": 0,
+            "widthDifferencePx": 0,
+            "mismatchedPixels": 505632,
+            "comparedPixels": 2073600,
+            "pixelDiffPercent": 24.3843,
+            "boundingBox": {
+              "left": 1,
+              "top": 11,
+              "right": 1881,
+              "bottom": 1078
+            },
+            "dominantRegion": "中央・中央",
+            "designPath": "docs/design-reference/webinars-v6/LKuAQ.png",
+            "implementationPath": "docs/design-qa/webinars-v6/LKuAQ-1920.png",
+            "implementationSource": "docs",
+            "diffPath": "docs/design-qa/webinars-v6/LKuAQ-diff-1920.png"
+          }
+        ],
+        "pixelDiffPercent": 24.3843,
+        "heightDifferencePx": 0,
+        "dominantRegion": "中央・中央",
+        "implementationSource": "docs",
+        "diffPath": "docs/design-qa/webinars-v6/LKuAQ-diff-1920.png",
+        "aboveThreshold": true
       }
     },
     {
@@ -10132,11 +10294,38 @@
         "name": "16-1-G アフィリエイターを削除する確認",
         "dir": "affiliates-v6",
         "declaredVerdict": "match",
-        "status": "unavailable",
-        "reason": "設計画像なし",
-        "comparisons": [],
-        "pixelDiffPercent": null,
-        "aboveThreshold": false
+        "status": "compared",
+        "reason": null,
+        "comparisons": [
+          {
+            "width": 1920,
+            "comparedHeight": 1080,
+            "designHeight": 1136,
+            "implementationHeight": 1080,
+            "heightDifferencePx": -56,
+            "widthDifferencePx": 0,
+            "mismatchedPixels": 301196,
+            "comparedPixels": 2073600,
+            "pixelDiffPercent": 14.5253,
+            "boundingBox": {
+              "left": 1,
+              "top": 11,
+              "right": 1881,
+              "bottom": 1079
+            },
+            "dominantRegion": "下部・中央",
+            "designPath": "docs/design-reference/affiliates-v6/QX70l.png",
+            "implementationPath": "docs/design-qa/affiliates-v6/QX70l-1920.png",
+            "implementationSource": "docs",
+            "diffPath": "docs/design-qa/affiliates-v6/QX70l-diff-1920.png"
+          }
+        ],
+        "pixelDiffPercent": 14.5253,
+        "heightDifferencePx": -56,
+        "dominantRegion": "下部・中央",
+        "implementationSource": "docs",
+        "diffPath": "docs/design-qa/affiliates-v6/QX70l-diff-1920.png",
+        "aboveThreshold": true
       }
     },
     {
@@ -10635,10 +10824,37 @@
         "name": "17-2-A スコアのルール",
         "dir": "mileage-v6",
         "declaredVerdict": "match",
-        "status": "unavailable",
-        "reason": "設計画像なし",
-        "comparisons": [],
-        "pixelDiffPercent": null,
+        "status": "compared",
+        "reason": null,
+        "comparisons": [
+          {
+            "width": 1920,
+            "comparedHeight": 1080,
+            "designHeight": 1080,
+            "implementationHeight": 1084,
+            "heightDifferencePx": 4,
+            "widthDifferencePx": 0,
+            "mismatchedPixels": 63270,
+            "comparedPixels": 2073600,
+            "pixelDiffPercent": 3.0512,
+            "boundingBox": {
+              "left": 0,
+              "top": 0,
+              "right": 1881,
+              "bottom": 1079
+            },
+            "dominantRegion": "上部・右",
+            "designPath": "docs/design-reference/mileage-v6/s6MBc.png",
+            "implementationPath": "docs/design-qa/mileage-v6/s6MBc-1920.png",
+            "implementationSource": "docs",
+            "diffPath": "docs/design-qa/mileage-v6/s6MBc-diff-1920.png"
+          }
+        ],
+        "pixelDiffPercent": 3.0512,
+        "heightDifferencePx": 4,
+        "dominantRegion": "上部・右",
+        "implementationSource": "docs",
+        "diffPath": "docs/design-qa/mileage-v6/s6MBc-diff-1920.png",
         "aboveThreshold": false
       }
     },
@@ -11402,10 +11618,37 @@
         "name": "20-1-D 定期レポートをつくる",
         "dir": "analytics-v6",
         "declaredVerdict": "match",
-        "status": "unavailable",
-        "reason": "設計画像なし",
-        "comparisons": [],
-        "pixelDiffPercent": null,
+        "status": "compared",
+        "reason": null,
+        "comparisons": [
+          {
+            "width": 1920,
+            "comparedHeight": 1136,
+            "designHeight": 1136,
+            "implementationHeight": 1927,
+            "heightDifferencePx": 791,
+            "widthDifferencePx": 0,
+            "mismatchedPixels": 99788,
+            "comparedPixels": 2181120,
+            "pixelDiffPercent": 4.5751,
+            "boundingBox": {
+              "left": 0,
+              "top": 0,
+              "right": 1881,
+              "bottom": 1135
+            },
+            "dominantRegion": "中央・左",
+            "designPath": "docs/design-reference/analytics-v6/URqOA.png",
+            "implementationPath": "docs/design-qa/analytics-v6/URqOA-1920.png",
+            "implementationSource": "docs",
+            "diffPath": "docs/design-qa/analytics-v6/URqOA-diff-1920.png"
+          }
+        ],
+        "pixelDiffPercent": 4.5751,
+        "heightDifferencePx": 791,
+        "dominantRegion": "中央・左",
+        "implementationSource": "docs",
+        "diffPath": "docs/design-qa/analytics-v6/URqOA-diff-1920.png",
         "aboveThreshold": false
       }
     },
@@ -11949,10 +12192,37 @@
         "name": "22-1-A 写真を1枚ずつ見る",
         "dir": "photos-v6",
         "declaredVerdict": "match",
-        "status": "unavailable",
-        "reason": "設計画像なし",
-        "comparisons": [],
-        "pixelDiffPercent": null,
+        "status": "compared",
+        "reason": null,
+        "comparisons": [
+          {
+            "width": 1920,
+            "comparedHeight": 1080,
+            "designHeight": 1080,
+            "implementationHeight": 1556,
+            "heightDifferencePx": 476,
+            "widthDifferencePx": -32,
+            "mismatchedPixels": 62509,
+            "comparedPixels": 2073600,
+            "pixelDiffPercent": 3.0145,
+            "boundingBox": {
+              "left": 0,
+              "top": 0,
+              "right": 1913,
+              "bottom": 1079
+            },
+            "dominantRegion": "上部・左",
+            "designPath": "docs/design-reference/photos-v6/hHrz8.png",
+            "implementationPath": "docs/design-qa/photos-v6/hHrz8-1920.png",
+            "implementationSource": "docs",
+            "diffPath": "docs/design-qa/photos-v6/hHrz8-diff-1920.png"
+          }
+        ],
+        "pixelDiffPercent": 3.0145,
+        "heightDifferencePx": 476,
+        "dominantRegion": "上部・左",
+        "implementationSource": "docs",
+        "diffPath": "docs/design-qa/photos-v6/hHrz8-diff-1920.png",
         "aboveThreshold": false
       }
     },
@@ -12012,10 +12282,37 @@
         "name": "22-1-C 出しているもの",
         "dir": "photos-v6",
         "declaredVerdict": "match",
-        "status": "unavailable",
-        "reason": "設計画像なし",
-        "comparisons": [],
-        "pixelDiffPercent": null,
+        "status": "compared",
+        "reason": null,
+        "comparisons": [
+          {
+            "width": 1920,
+            "comparedHeight": 1080,
+            "designHeight": 1080,
+            "implementationHeight": 1380,
+            "heightDifferencePx": 300,
+            "widthDifferencePx": 0,
+            "mismatchedPixels": 72854,
+            "comparedPixels": 2073600,
+            "pixelDiffPercent": 3.5134,
+            "boundingBox": {
+              "left": 0,
+              "top": 0,
+              "right": 1881,
+              "bottom": 1079
+            },
+            "dominantRegion": "中央・中央",
+            "designPath": "docs/design-reference/photos-v6/J3Wxl8.png",
+            "implementationPath": "docs/design-qa/photos-v6/J3Wxl8-1920.png",
+            "implementationSource": "docs",
+            "diffPath": "docs/design-qa/photos-v6/J3Wxl8-diff-1920.png"
+          }
+        ],
+        "pixelDiffPercent": 3.5134,
+        "heightDifferencePx": 300,
+        "dominantRegion": "中央・中央",
+        "implementationSource": "docs",
+        "diffPath": "docs/design-qa/photos-v6/J3Wxl8-diff-1920.png",
         "aboveThreshold": false
       }
     },
@@ -12119,10 +12416,37 @@
         "name": "23-1-B 定期便",
         "dir": "ec-v6",
         "declaredVerdict": "match",
-        "status": "unavailable",
-        "reason": "設計画像なし",
-        "comparisons": [],
-        "pixelDiffPercent": null,
+        "status": "compared",
+        "reason": null,
+        "comparisons": [
+          {
+            "width": 1920,
+            "comparedHeight": 1080,
+            "designHeight": 1080,
+            "implementationHeight": 1080,
+            "heightDifferencePx": 0,
+            "widthDifferencePx": 0,
+            "mismatchedPixels": 83557,
+            "comparedPixels": 2073600,
+            "pixelDiffPercent": 4.0296,
+            "boundingBox": {
+              "left": 0,
+              "top": 0,
+              "right": 1881,
+              "bottom": 1079
+            },
+            "dominantRegion": "中央・左",
+            "designPath": "docs/design-reference/ec-v6/bfB50.png",
+            "implementationPath": "docs/design-qa/ec-v6/bfB50-1920.png",
+            "implementationSource": "docs",
+            "diffPath": "docs/design-qa/ec-v6/bfB50-diff-1920.png"
+          }
+        ],
+        "pixelDiffPercent": 4.0296,
+        "heightDifferencePx": 0,
+        "dominantRegion": "中央・左",
+        "implementationSource": "docs",
+        "diffPath": "docs/design-qa/ec-v6/bfB50-diff-1920.png",
         "aboveThreshold": false
       }
     },
@@ -12138,10 +12462,37 @@
         "name": "23-1-C EC連携のつなぎ先",
         "dir": "ec-v6",
         "declaredVerdict": "match",
-        "status": "unavailable",
-        "reason": "設計画像なし",
-        "comparisons": [],
-        "pixelDiffPercent": null,
+        "status": "compared",
+        "reason": null,
+        "comparisons": [
+          {
+            "width": 1920,
+            "comparedHeight": 1136,
+            "designHeight": 1136,
+            "implementationHeight": 1179,
+            "heightDifferencePx": 43,
+            "widthDifferencePx": 0,
+            "mismatchedPixels": 97517,
+            "comparedPixels": 2181120,
+            "pixelDiffPercent": 4.471,
+            "boundingBox": {
+              "left": 0,
+              "top": 0,
+              "right": 1881,
+              "bottom": 1129
+            },
+            "dominantRegion": "下部・左",
+            "designPath": "docs/design-reference/ec-v6/oHAN4.png",
+            "implementationPath": "docs/design-qa/ec-v6/oHAN4-1920.png",
+            "implementationSource": "docs",
+            "diffPath": "docs/design-qa/ec-v6/oHAN4-diff-1920.png"
+          }
+        ],
+        "pixelDiffPercent": 4.471,
+        "heightDifferencePx": 43,
+        "dominantRegion": "下部・左",
+        "implementationSource": "docs",
+        "diffPath": "docs/design-qa/ec-v6/oHAN4-diff-1920.png",
         "aboveThreshold": false
       }
     },
@@ -14931,10 +15282,37 @@
         "name": "3-4-A UID・顧客データ移行／CSV",
         "dir": "friends-v6",
         "declaredVerdict": "match",
-        "status": "unavailable",
-        "reason": "設計画像なし",
-        "comparisons": [],
-        "pixelDiffPercent": null,
+        "status": "compared",
+        "reason": null,
+        "comparisons": [
+          {
+            "width": 1920,
+            "comparedHeight": 1080,
+            "designHeight": 1080,
+            "implementationHeight": 1080,
+            "heightDifferencePx": 0,
+            "widthDifferencePx": 0,
+            "mismatchedPixels": 91932,
+            "comparedPixels": 2073600,
+            "pixelDiffPercent": 4.4334,
+            "boundingBox": {
+              "left": 0,
+              "top": 0,
+              "right": 1881,
+              "bottom": 1079
+            },
+            "dominantRegion": "中央・左",
+            "designPath": "docs/design-reference/friends-v6/ux7of.png",
+            "implementationPath": "docs/design-qa/friends-v6/ux7of-1920.png",
+            "implementationSource": "docs",
+            "diffPath": "docs/design-qa/friends-v6/ux7of-diff-1920.png"
+          }
+        ],
+        "pixelDiffPercent": 4.4334,
+        "heightDifferencePx": 0,
+        "dominantRegion": "中央・左",
+        "implementationSource": "docs",
+        "diffPath": "docs/design-qa/friends-v6/ux7of-diff-1920.png",
         "aboveThreshold": false
       }
     },
@@ -14994,10 +15372,37 @@
         "name": "33-1 LINEアカウント一覧",
         "dir": "settings-v6",
         "declaredVerdict": "match",
-        "status": "unavailable",
-        "reason": "設計画像なし",
-        "comparisons": [],
-        "pixelDiffPercent": null,
+        "status": "compared",
+        "reason": null,
+        "comparisons": [
+          {
+            "width": 1920,
+            "comparedHeight": 1080,
+            "designHeight": 1080,
+            "implementationHeight": 1080,
+            "heightDifferencePx": 0,
+            "widthDifferencePx": 0,
+            "mismatchedPixels": 84886,
+            "comparedPixels": 2073600,
+            "pixelDiffPercent": 4.0937,
+            "boundingBox": {
+              "left": 0,
+              "top": 0,
+              "right": 1881,
+              "bottom": 1079
+            },
+            "dominantRegion": "中央・左",
+            "designPath": "docs/design-reference/settings-v6/QT91v.png",
+            "implementationPath": "docs/design-qa/settings-v6/QT91v-1920.png",
+            "implementationSource": "docs",
+            "diffPath": "docs/design-qa/settings-v6/QT91v-diff-1920.png"
+          }
+        ],
+        "pixelDiffPercent": 4.0937,
+        "heightDifferencePx": 0,
+        "dominantRegion": "中央・左",
+        "implementationSource": "docs",
+        "diffPath": "docs/design-qa/settings-v6/QT91v-diff-1920.png",
         "aboveThreshold": false
       }
     },
@@ -15013,10 +15418,37 @@
         "name": "33-2 LINEアカウントを登録する",
         "dir": "settings-v6",
         "declaredVerdict": "match",
-        "status": "unavailable",
-        "reason": "設計画像なし",
-        "comparisons": [],
-        "pixelDiffPercent": null,
+        "status": "compared",
+        "reason": null,
+        "comparisons": [
+          {
+            "width": 1920,
+            "comparedHeight": 1923,
+            "designHeight": 1940,
+            "implementationHeight": 1923,
+            "heightDifferencePx": -17,
+            "widthDifferencePx": 0,
+            "mismatchedPixels": 186234,
+            "comparedPixels": 3692160,
+            "pixelDiffPercent": 5.044,
+            "boundingBox": {
+              "left": 0,
+              "top": 11,
+              "right": 1881,
+              "bottom": 1922
+            },
+            "dominantRegion": "中央・左",
+            "designPath": "docs/design-reference/settings-v6/b2NGxk.png",
+            "implementationPath": "docs/design-qa/settings-v6/b2NGxk-1920.png",
+            "implementationSource": "docs",
+            "diffPath": "docs/design-qa/settings-v6/b2NGxk-diff-1920.png"
+          }
+        ],
+        "pixelDiffPercent": 5.044,
+        "heightDifferencePx": -17,
+        "dominantRegion": "中央・左",
+        "implementationSource": "docs",
+        "diffPath": "docs/design-qa/settings-v6/b2NGxk-diff-1920.png",
         "aboveThreshold": false
       }
     },
@@ -15032,10 +15464,37 @@
         "name": "33-3 LINEアカウントの詳細・編集",
         "dir": "settings-v6",
         "declaredVerdict": "match",
-        "status": "unavailable",
-        "reason": "設計画像なし",
-        "comparisons": [],
-        "pixelDiffPercent": null,
+        "status": "compared",
+        "reason": null,
+        "comparisons": [
+          {
+            "width": 1920,
+            "comparedHeight": 1120,
+            "designHeight": 1120,
+            "implementationHeight": 1391,
+            "heightDifferencePx": 271,
+            "widthDifferencePx": 0,
+            "mismatchedPixels": 88438,
+            "comparedPixels": 2150400,
+            "pixelDiffPercent": 4.1126,
+            "boundingBox": {
+              "left": 0,
+              "top": 0,
+              "right": 1881,
+              "bottom": 1118
+            },
+            "dominantRegion": "下部・左",
+            "designPath": "docs/design-reference/settings-v6/T9rA9.png",
+            "implementationPath": "docs/design-qa/settings-v6/T9rA9-1920.png",
+            "implementationSource": "docs",
+            "diffPath": "docs/design-qa/settings-v6/T9rA9-diff-1920.png"
+          }
+        ],
+        "pixelDiffPercent": 4.1126,
+        "heightDifferencePx": 271,
+        "dominantRegion": "下部・左",
+        "implementationSource": "docs",
+        "diffPath": "docs/design-qa/settings-v6/T9rA9-diff-1920.png",
         "aboveThreshold": false
       }
     },
@@ -15051,10 +15510,37 @@
         "name": "33-4 乗り換え・引き継ぎ",
         "dir": "settings-v6",
         "declaredVerdict": "match",
-        "status": "unavailable",
-        "reason": "設計画像なし",
-        "comparisons": [],
-        "pixelDiffPercent": null,
+        "status": "compared",
+        "reason": null,
+        "comparisons": [
+          {
+            "width": 1920,
+            "comparedHeight": 1087,
+            "designHeight": 1100,
+            "implementationHeight": 1087,
+            "heightDifferencePx": -13,
+            "widthDifferencePx": 0,
+            "mismatchedPixels": 102629,
+            "comparedPixels": 2087040,
+            "pixelDiffPercent": 4.9174,
+            "boundingBox": {
+              "left": 0,
+              "top": 0,
+              "right": 1881,
+              "bottom": 1086
+            },
+            "dominantRegion": "中央・左",
+            "designPath": "docs/design-reference/settings-v6/nx3XW.png",
+            "implementationPath": "docs/design-qa/settings-v6/nx3XW-1920.png",
+            "implementationSource": "docs",
+            "diffPath": "docs/design-qa/settings-v6/nx3XW-diff-1920.png"
+          }
+        ],
+        "pixelDiffPercent": 4.9174,
+        "heightDifferencePx": -13,
+        "dominantRegion": "中央・左",
+        "implementationSource": "docs",
+        "diffPath": "docs/design-qa/settings-v6/nx3XW-diff-1920.png",
         "aboveThreshold": false
       }
     },
@@ -15070,10 +15556,37 @@
         "name": "34-1 はじめの設定",
         "dir": "settings-v6",
         "declaredVerdict": "match",
-        "status": "unavailable",
-        "reason": "設計画像なし",
-        "comparisons": [],
-        "pixelDiffPercent": null,
+        "status": "compared",
+        "reason": null,
+        "comparisons": [
+          {
+            "width": 1920,
+            "comparedHeight": 1010,
+            "designHeight": 1010,
+            "implementationHeight": 1080,
+            "heightDifferencePx": 70,
+            "widthDifferencePx": 0,
+            "mismatchedPixels": 117487,
+            "comparedPixels": 1939200,
+            "pixelDiffPercent": 6.0585,
+            "boundingBox": {
+              "left": 0,
+              "top": 0,
+              "right": 1881,
+              "bottom": 1009
+            },
+            "dominantRegion": "中央・右",
+            "designPath": "docs/design-reference/settings-v6/RAW35.png",
+            "implementationPath": "docs/design-qa/settings-v6/RAW35-1920.png",
+            "implementationSource": "docs",
+            "diffPath": "docs/design-qa/settings-v6/RAW35-diff-1920.png"
+          }
+        ],
+        "pixelDiffPercent": 6.0585,
+        "heightDifferencePx": 70,
+        "dominantRegion": "中央・右",
+        "implementationSource": "docs",
+        "diffPath": "docs/design-qa/settings-v6/RAW35-diff-1920.png",
         "aboveThreshold": false
       }
     },
@@ -15089,10 +15602,37 @@
         "name": "34-2 レシピ一覧",
         "dir": "settings-v6",
         "declaredVerdict": "match",
-        "status": "unavailable",
-        "reason": "設計画像なし",
-        "comparisons": [],
-        "pixelDiffPercent": null,
+        "status": "compared",
+        "reason": null,
+        "comparisons": [
+          {
+            "width": 1920,
+            "comparedHeight": 720,
+            "designHeight": 720,
+            "implementationHeight": 1080,
+            "heightDifferencePx": 360,
+            "widthDifferencePx": 0,
+            "mismatchedPixels": 73140,
+            "comparedPixels": 1382400,
+            "pixelDiffPercent": 5.2908,
+            "boundingBox": {
+              "left": 0,
+              "top": 0,
+              "right": 1881,
+              "bottom": 719
+            },
+            "dominantRegion": "中央・右",
+            "designPath": "docs/design-reference/settings-v6/y0P0Qx.png",
+            "implementationPath": "docs/design-qa/settings-v6/y0P0Qx-1920.png",
+            "implementationSource": "docs",
+            "diffPath": "docs/design-qa/settings-v6/y0P0Qx-diff-1920.png"
+          }
+        ],
+        "pixelDiffPercent": 5.2908,
+        "heightDifferencePx": 360,
+        "dominantRegion": "中央・右",
+        "implementationSource": "docs",
+        "diffPath": "docs/design-qa/settings-v6/y0P0Qx-diff-1920.png",
         "aboveThreshold": false
       }
     },
@@ -15108,10 +15648,37 @@
         "name": "34-3 レシピを複製する",
         "dir": "settings-v6",
         "declaredVerdict": "match",
-        "status": "unavailable",
-        "reason": "設計画像なし",
-        "comparisons": [],
-        "pixelDiffPercent": null,
+        "status": "compared",
+        "reason": null,
+        "comparisons": [
+          {
+            "width": 1920,
+            "comparedHeight": 856,
+            "designHeight": 856,
+            "implementationHeight": 1080,
+            "heightDifferencePx": 224,
+            "widthDifferencePx": 0,
+            "mismatchedPixels": 95010,
+            "comparedPixels": 1643520,
+            "pixelDiffPercent": 5.7809,
+            "boundingBox": {
+              "left": 0,
+              "top": 0,
+              "right": 1881,
+              "bottom": 855
+            },
+            "dominantRegion": "下部・中央",
+            "designPath": "docs/design-reference/settings-v6/D5UaX.png",
+            "implementationPath": "docs/design-qa/settings-v6/D5UaX-1920.png",
+            "implementationSource": "docs",
+            "diffPath": "docs/design-qa/settings-v6/D5UaX-diff-1920.png"
+          }
+        ],
+        "pixelDiffPercent": 5.7809,
+        "heightDifferencePx": 224,
+        "dominantRegion": "下部・中央",
+        "implementationSource": "docs",
+        "diffPath": "docs/design-qa/settings-v6/D5UaX-diff-1920.png",
         "aboveThreshold": false
       }
     },
@@ -15127,10 +15694,37 @@
         "name": "34-4 マニュアルの正本表",
         "dir": "settings-v6",
         "declaredVerdict": "match",
-        "status": "unavailable",
-        "reason": "設計画像なし",
-        "comparisons": [],
-        "pixelDiffPercent": null,
+        "status": "compared",
+        "reason": null,
+        "comparisons": [
+          {
+            "width": 1920,
+            "comparedHeight": 700,
+            "designHeight": 700,
+            "implementationHeight": 1080,
+            "heightDifferencePx": 380,
+            "widthDifferencePx": 0,
+            "mismatchedPixels": 64068,
+            "comparedPixels": 1344000,
+            "pixelDiffPercent": 4.767,
+            "boundingBox": {
+              "left": 0,
+              "top": 0,
+              "right": 1881,
+              "bottom": 699
+            },
+            "dominantRegion": "下部・中央",
+            "designPath": "docs/design-reference/settings-v6/f9oUm.png",
+            "implementationPath": "docs/design-qa/settings-v6/f9oUm-1920.png",
+            "implementationSource": "docs",
+            "diffPath": "docs/design-qa/settings-v6/f9oUm-diff-1920.png"
+          }
+        ],
+        "pixelDiffPercent": 4.767,
+        "heightDifferencePx": 380,
+        "dominantRegion": "下部・中央",
+        "implementationSource": "docs",
+        "diffPath": "docs/design-qa/settings-v6/f9oUm-diff-1920.png",
         "aboveThreshold": false
       }
     }
