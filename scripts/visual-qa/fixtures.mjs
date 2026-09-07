@@ -4362,6 +4362,66 @@ export const BOOKING_PROXY_CREATE = {
   },
 }
 
+/** 機能34。サーバ判定を画面側で作り直さず、そのまま描く固定応答。 */
+export const GETTING_STARTED = {
+  accountId: 'visual-qa-account',
+  doneCount: 2,
+  total: 5,
+  allDone: false,
+  steps: [
+    { key: 'accounts', state: 'done', href: '/accounts', reason: null, webhook: [{ id: 'visual-qa-account', status: 'matched' }] },
+    { key: 'attributes', state: 'done', href: '/tags?tab=tags', reason: null },
+    { key: 'friendAdd', state: 'stalled', href: '/friend-add-settings', reason: '下書きのルールが1本ありますが、まだ公開していません。公開すると動きはじめます。' },
+    { key: 'scenario', state: 'todo', href: '/scenarios', reason: null },
+    { key: 'firstMessage', state: 'forbidden', href: null, reason: '管理者に頼んでください' },
+  ],
+}
+
+const SIGNUP_RECIPE_ITEMS = [
+  { kind: 'タグ', name: '新規', note: '友だち追加時のルールから付きます' },
+  { kind: '友だち追加時のルール', name: 'はじめて', note: 'タグを付けて、シナリオを開始します' },
+  { kind: 'シナリオ', name: '新規登録 7日間フォロー', note: '7通。0日目・1日目・3日目・5日目・7日目・質問1通・完了時のタグ付け' },
+  { kind: 'テンプレート', name: '1通目 はじめまして ほか6本', note: '本文は見本です。会社名などは共通情報から入ります' },
+  { kind: 'タグ', name: 'フォロー完了', note: 'シナリオを最後まで受け取った人に付きます' },
+]
+
+export const RECIPES = [
+  {
+    id: 'signup-7day-follow', name: '新規登録 7日間フォロー',
+    purpose: '友だちが増えたあと、7日かけて関係を作ります。',
+    creates: 'タグ1つ、友だち追加時のルール1本、シナリオ7通、テンプレート7本',
+    version: 1, origin: 'builtin',
+    requiredFeatures: ['friend_add_routing', 'scenarios', 'templates'], missingFeatures: [],
+    items: SIGNUP_RECIPE_ITEMS, itemCount: 16, cloneCount: 12,
+  },
+  {
+    id: 'booking-reminder', name: '予約のリマインド',
+    purpose: '前日と当日に、予約を思い出してもらいます。',
+    creates: 'タグ1つ、リマインダ2本、テンプレート2本',
+    version: 1, origin: 'builtin', requiredFeatures: ['reminders', 'templates'], missingFeatures: [],
+    items: null, itemCount: 5, cloneCount: 5,
+  },
+  {
+    id: 'webinar-guide', name: 'ウェビナーの案内と当日',
+    purpose: '申し込みから当日の入室まで、順に案内します。',
+    creates: 'タグ2つ、ウェビナー1件、リマインダ3本、テンプレート4本',
+    version: 1, origin: 'builtin', requiredFeatures: ['webinars', 'reminders', 'templates'], missingFeatures: ['webinars'],
+    items: null, itemCount: 10, cloneCount: 0,
+  },
+]
+
+export const MANUAL_LINKS = {
+  items: [
+    { key: '2-1', keyKind: 'screen', name: '受信箱', url: 'https://help.line-harness.example/inbox', status: 'ok', lastCheckedAt: '2026-08-27T19:00:00.000Z', lastHttpStatus: 200, lastError: null, version: 2 },
+    { key: '3-1', keyKind: 'screen', name: '友だち', url: 'https://help.line-harness.example/friends', status: 'ok', lastCheckedAt: '2026-08-27T19:00:00.000Z', lastHttpStatus: 200, lastError: null, version: 2 },
+    { key: '4-1', keyKind: 'screen', name: '友だち属性・タグ', url: 'https://help.line-harness.example/tags', status: 'broken', lastCheckedAt: '2026-08-27T19:00:00.000Z', lastHttpStatus: 404, lastError: 'HTTP_404', version: 3 },
+    { key: '5-1', keyKind: 'screen', name: 'シナリオ配信', url: 'https://help.line-harness.example/scenarios', status: 'ok', lastCheckedAt: '2026-08-27T19:00:00.000Z', lastHttpStatus: 200, lastError: null, version: 2 },
+    { key: '33-1', keyKind: 'screen', name: 'LINEアカウント', url: null, status: 'broken', lastCheckedAt: null, lastHttpStatus: null, lastError: 'URL_UNSET', version: 1 },
+  ],
+  total: 266,
+  brokenCount: 2,
+}
+
 /*
   予約。設計 `TV2DI`（予約管理）の台帳そのまま。
 

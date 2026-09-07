@@ -2954,30 +2954,30 @@ export const SCREENS = [
   {
     node: 'RAW35', feature: 34, name: '34-1 はじめの設定',
     dir: 'settings-v6', route: '/getting-started', mode: 'page',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 S0 が第2周で1920px設計と1440/1920px実装を再撮影。構造一致・順路判定API待ち。** 2幅とも横スクロール0。緑の進捗帯、5段の状態色、右寄せ操作、右欄の理由・つながる先・注意を設計と同じ骨格へそろえた。現在は `GET /api/getting-started` が無く既存APIを合成しているため、固定データでは段4が「止まっています」、最終段が「確かめられません」となり、設計の「まだです」「権限がありません」を再現できない。**残件**：5段の状態・次の行動・権限・最初の1通を返す固定応答を追加して同じ2幅で再判定する。',
-    verdictSource: 'settings-v6/RAW35.txt', verdictHead: 'e13c2e40c6',
+    verdict: 'match',
+    verdictNote: '**2026-09-07、Issue #391・`82f3dccf7c` を固定ポート3107/8794で1440・1920撮影し、設計と目視比較して一致。** `GET /api/getting-started` のサーバ判定を読み、完了2段・停止1段・未着手1段・権限不足1段、進捗帯、次の行動、右欄の停止理由を設計どおり表示する。両幅とも横はみ出し0。',
+    verdictSource: 'settings-v6/RAW35.txt + settings-v6/RAW35-{1440,1920}.png + 2026-09-07 visual comparison', verdictHead: '82f3dccf7c',
   },
   {
     node: 'y0P0Qx', feature: 34, name: '34-2 レシピ一覧',
     dir: 'settings-v6', route: '/recipes', mode: 'page',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 S0 が1920px設計と1440/1920px実装を撮って判定。構造一致・データ未接続。** 2幅とも横スクロール0。3つのレシピ、作られるもの、必要な機能、右側の操作は設計と同じ構造で、文字照合の差は空白だけ。実装は複製API未接続のため「このレシピで作る」を出せず、「まだ作れません」と理由を表示している。**接続条件**：レシピ複製APIが入ったら操作文言を設計へそろえ、同じ2幅で撮り直す。',
-    verdictSource: 'settings-v6/y0P0Qx.txt', verdictHead: '4c5708ace',
+    verdict: 'match',
+    verdictNote: '**2026-09-07、Issue #391・`82f3dccf7c` を固定ポート3107/8794で1440・1920撮影し、設計と目視比較して一致。** レシピ一覧APIの3件、必要機能、複製回数12・5・0回、機能オフ理由を読み、作成可能な2件だけ「このレシピで作る」を表示する。両幅とも横はみ出し0。',
+    verdictSource: 'settings-v6/y0P0Qx.txt + settings-v6/y0P0Qx-{1440,1920}.png + 2026-09-07 visual comparison', verdictHead: '82f3dccf7c',
   },
   {
     node: 'D5UaX', feature: 34, name: '34-3 レシピを複製する',
     dir: 'settings-v6', route: '/recipes/clone?id=signup-7day-follow', mode: 'page',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 S0 が第2周で1920px設計と1440/1920px実装を再撮影。構造一致・複製API待ち。** 2幅とも横スクロール0。名前と作成先を同じ主欄にまとめ、16件の内訳を続け、右390欄へ必要な機能・作ったあと・注意を設計順で配置した。画面名、パンくず、作成先選択、下部操作も設計の骨格へそろえた。**残件**：`POST /api/recipes/{id}/clone` が無いため作成操作は安全のため非活性で、設計の実行可能状態を再現していない。複製APIと成功/失敗固定応答が入ったら操作を接続して再判定する。',
-    verdictSource: 'settings-v6/D5UaX.txt', verdictHead: 'e13c2e40c6',
+    verdict: 'match',
+    verdictNote: '**2026-09-07、Issue #391・`82f3dccf7c` を固定ポート3107/8794で1440・1920撮影し、設計と目視比較して一致。** レシピ詳細APIの16件・内訳・必要機能・版を読み、作成先と接頭辞を冪等キー付き複製APIへ送る実行可能状態を表示する。主欄、右390欄、下部操作とも設計順で、両幅とも横はみ出し0。',
+    verdictSource: 'settings-v6/D5UaX.txt + settings-v6/D5UaX-{1440,1920}.png + 2026-09-07 visual comparison', verdictHead: '82f3dccf7c',
   },
   {
     node: 'f9oUm', feature: 34, name: '34-4 マニュアルの正本表',
     dir: 'settings-v6', route: '/settings/manual-links', mode: 'page',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 S0 が第2周で1920px設計と1440/1920px実装を再撮影。構造一致・正本表API待ち。** 2幅とも横スクロール0。運営向け案内、検索＋状態選択＋全件確認、画面ID・画面名・公式記事URL・確認日・状態・操作の6列へ設計どおり戻した。**残件**：`GET /api/manual-links` が無く、現在は店舗登録用の作業リンク4件しか読めないため、設計の266画面・URL・確認日・開ける/開けない状態は未再現。全画面の固定応答と確認APIが入ったら実値で再判定する。',
-    verdictSource: 'settings-v6/f9oUm.txt', verdictHead: 'e13c2e40c6',
+    verdict: 'match',
+    verdictNote: '**2026-09-07、Issue #391・`82f3dccf7c` を固定ポート3107/8794で1440・1920撮影し、設計と目視比較して一致。** マニュアル正本APIの総数266件、代表5行、開けない2件、URL、確認日時、状態を6列で表示し、全件確認もAPIへ接続した。検索・状態選択・残り261件の注記を含め、両幅とも横はみ出し0。',
+    verdictSource: 'settings-v6/f9oUm.txt + settings-v6/f9oUm-{1440,1920}.png + 2026-09-07 visual comparison', verdictHead: '82f3dccf7c',
   },
 ]
 
@@ -3247,15 +3247,15 @@ const FEATURE_18_AUDIT = {
 const FEATURE_19_AUDIT = {
   ZrpKn: {
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #232 / PR #981 / UI HEAD 83be84278を3107/8794で撮り、★V6設計と同じ1920pxで並べて確認。** 30日集計は486件・1,284,000円、直前30日は412件となり、6成果地点の名前・起点・件数・金額も設計の値で表示できた。1440px・1920pxとも横はみ出し0。ただし設計の12件内訳、説明帯、状態絞り込み、期間選択、利用先、詳細、CSVはAPIが無く、実装は6件と未接続の説明を表示しているため一致ではない。**推奨修正：利用先の取得・追加APIを先に接続し、「使う場所を足す」と利用先名を行ごとに出す。次に全件数・状態内訳・詳細・CSVの口を接続する。**',
+    verdictNote: '**2026-09-07 Issue #395 / UI HEAD 81af44a7fを3104/8791で再撮影・判定。** definitions・30日report・CSVの実API契約を接続し、成果地点12個、動作中10・停止2、30日486件・1,284,000円、6行の起点・件数・金額・利用先数、検索・状態絞り込み・並べ替え・詳細窓・利用先追加導線を確認した。1440px・1920pxとも横はみ出し0、コンソールエラー0。一覧とレポートのCSVも実際に取得できた。残る差は固定契約が12件中6件の代表行しか返さず、利用先は件数だけで設計の名前を返さないこと。値を作らず「Nか所で使用中」と示すため構造一致・データ未接続とする。**推奨修正：利用先の表示名と残り6件を返す固定データを追加し、設計と同じ利用先名・ページ送りを確認する。**',
     verdictSource: 'conversions-v6/ZrpKn.txt + conversions-v6/ZrpKn-1440.png + conversions-v6/ZrpKn-1920.png',
-    verdictHead: '83be84278',
+    verdictHead: '81af44a7f',
   },
   GUxsj: {
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #232 / PR #981 / UI HEAD 83be84278を3107/8794で撮り、★V6設計と同じ1920pxで並べて確認。** 7日・30日・90日の期間選択、現期間486件・1,284,000円、前期間412件・1,092,000円、単価2,642円、成果地点別の増減を実データで表示した。1440px・1920pxとも横はみ出し0。設計の日別積み上げグラフ、最も多い帰属経路、取消・純成果、CSVは集計APIが無く、未接続条件を本文に表示しているため `match` にはしない。**推奨修正：日付・成果地点別の集計APIを先に追加して日別グラフを埋め、次に帰属経路とCSVを接続する。**',
+    verdictNote: '**2026-09-07 Issue #395 / UI HEAD 81af44a7fを3104/8791で再撮影・判定。** 期間付きreport・CSVの実API契約を接続し、30日486件・1,284,000円・単価2,642円・前期間比較、最伸長62%、日別の成果地点別積み上げ、成果地点別の今期／前期／増減、帰属経路を表示した。1440px・1920pxとも横はみ出し0、コンソールエラー0。期間変更とCSV取得も実操作できる。残る差はbyRouteが全体集計だけで成果地点別経路を返さないため各行を「全体では」と明記していること、固定データが30日を8代表日にまとめていること、取消台帳が未接続で純成果の取消内訳を返さないこと。値を作らないため構造一致・データ未接続とする。**推奨修正：report契約に成果地点別の最多経路と取消内訳を追加し、30日分の日次固定データで再撮影する。**',
     verdictSource: 'conversions-v6/GUxsj.txt + conversions-v6/GUxsj-1440.png + conversions-v6/GUxsj-1920.png',
-    verdictHead: '83be84278',
+    verdictHead: '81af44a7f',
   },
   GtylA: {
     verdict: 'needs_fix',
@@ -4315,6 +4315,8 @@ export const CAPTURED_AT = {
       note: 'Issue #232。3 Nodeを1440px・1920pxで撮影し、★V6設計の1920px画像と並べて確認。全6枚で横はみ出し0。実数表示を接続し、残るAPI・保存契約の差を判定注記へ記録した。' },
     { pr: 1093, head: 'bfff7afa0', on: '2026-09-07', screens: ['GtylA','d8d3Mz'],
       note: 'Issue #296。入力済みの作成画面と停止確認を3104/8791で1440px・1920px撮影し、★V6設計1920pxと1枚に並べて確認。両幅とも横はみ出し0。既存契約で扱える操作を接続し、残るAPI差を理由付き構造一致として記録した。' },
+    { pr: 1172, head: '81af44a7f', on: '2026-09-07', screens: ['ZrpKn','GUxsj'],
+      note: 'Issue #395。definitions・report・CSVの実API契約を接続し、3104/8791で1440px・1920pxを再撮影。両幅とも横はみ出し0、コンソールエラー0。残る利用先名・成果地点別経路・取消内訳・代表日の差を理由付き構造一致として記録した。' },
   ],
   20: [
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['Zxezb','J6Inc','YBGtm','QQ1SR','f5HsX','C2I7ry','Fh2Qj','dfwD4'],
