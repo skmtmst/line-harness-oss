@@ -19,7 +19,6 @@ import FlexPreviewComponent from '@/components/flex-preview'
 import FriendInfoSidebar from '@/components/chats/friend-info-sidebar'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
 import { Suspense } from 'react'
-import { useMergedTab } from '@/components/layout/merged-tabs'
 import EmailThread from '@/components/support/email-thread'
 import Button from '@/components/shared/button'
 import { MoreAction } from '@/components/shared/row-actions'
@@ -382,11 +381,6 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
     </div>
   )
 }
-
-const MERGED_TABS = [
-  { key: 'line', label: 'LINE' },
-  { key: 'email', label: 'お問い合わせ（メール）' },
-]
 
 function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const router = useRouter()
