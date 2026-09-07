@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 7,
-  "match": 176,
-  "structureMatchDataPending": 74,
-  "needsFix": 14,
+  "match": 178,
+  "structureMatchDataPending": 70,
+  "needsFix": 16,
   "unjudged": 4,
-  "remaining": 92,
+  "remaining": 90,
   "features": [
     {
       "feature": 1,
@@ -1959,12 +1959,23 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 5,
-      "structureMatchDataPending": 4,
+      "match": 7,
+      "structureMatchDataPending": 2,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 4,
+      "remaining": 2,
       "capturedAt": [
+        {
+          "pr": 1180,
+          "head": "3721857fb",
+          "on": "2026-09-07",
+          "screens": [
+            "jwrbf",
+            "GqFTV",
+            "njLGA"
+          ],
+          "note": "Issue #394。締め・支払い台帳を実API契約へ接続し、3102/8789で3画面と支払い一覧の全状態を1440/1920px撮影。全画像で横はみ出し0。2画面を一致、設計PNGが無い確定画面だけ理由付き構造一致とした。"
+        },
         {
           "pr": 558,
           "head": "ef7b5773",
@@ -2349,6 +2360,16 @@
             "GtylA"
           ],
           "note": "development そのもので撮った"
+        },
+        {
+          "pr": 1183,
+          "head": "b5e3dd6a3",
+          "on": "2026-09-07",
+          "screens": [
+            "ZrpKn",
+            "GUxsj"
+          ],
+          "note": "Issue #408。利用先名・成果地点ごとの経路・取消内訳を反映し、3104/8791で1440・1920pxを撮影。横はみ出し0。固定モックが旧契約のためデータ未接続を判定注記に記録した。"
         }
       ]
     },
@@ -3066,8 +3087,8 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 2,
-      "needsFix": 2,
+      "structureMatchDataPending": 0,
+      "needsFix": 4,
       "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
@@ -3082,6 +3103,18 @@
             "jwVlo"
           ],
           "note": "ログインユーザーの一覧・追加・役割。development 直結"
+        },
+        {
+          "pr": 1182,
+          "head": "04057fb9da53",
+          "on": "2026-09-07",
+          "screens": [
+            "e3jz3",
+            "EOTS4",
+            "jwVlo",
+            "I3ZSrU"
+          ],
+          "note": "Issue #405。アクセスユーザー・権限bundle・共通監査の読み取り契約へ接続し、4画面を3101/8788で撮影・判定した。"
         }
       ]
     },
