@@ -548,21 +548,31 @@ export default function ScenarioDetailClient({
       })
       if (!created.success) throw new Error(created.error)
       // 通は順に足す。まとめて入れる口が無い。
+      // 時刻・絞り込み・質問・下書きの別まで写す。落とすと時刻指定の複製が
+      // 400 で失敗したり、別物の流れになる。
       for (const step of sortedSteps) {
-        await api.scenarios.addStep(created.data.id, {
+        const copied = await api.scenarios.addStep(created.data.id, {
           stepOrder: step.stepOrder,
+          delayMinutes: step.delayMinutes,
+          offsetDays: step.offsetDays ?? undefined,
           offsetMinutes: step.offsetMinutes ?? 0,
+          deliveryTime: step.deliveryTime ?? undefined,
           messageType: step.messageType,
           messageContent: step.messageContent,
           templateId: step.templateId ?? null,
           onReachTagId: step.onReachTagId ?? null,
           // 複製先でも同じところで止まる。止まる位置が変わると流れが別物になる。
           afterSend: step.afterSend ?? 'continue',
+          targetCondition: (step.targetCondition as SegmentCondition | null) ?? null,
+          question: (step.question as ScenarioQuestion | null) ?? null,
+          isDraft: step.isDraft === true,
         })
+        // 途中で止める。続けると通が欠けた別物の流れが残る。
+        if (!copied.success) throw new Error(copied.error)
       }
       router.push(`/scenarios/detail?id=${created.data.id}`)
-    } catch {
-      setError('複製に失敗しました')
+    } catch (e) {
+      setError(e instanceof Error && e.message ? e.message : '複製に失敗しました')
     } finally {
       setDuplicating(false)
     }
@@ -832,8 +842,28 @@ export default function ScenarioDetailClient({
   const handleDuplicateStep = async (step: ScenarioStep) => {
     if (duplicatingStepId) return
     setDuplicatingStepId(step.id)
+    setStepError('')
     try {
-      await api.scenarios.addStep(id, {
+      /*
+       * あいだに差し込むので、後ろの通を先に1つずつ送る。
+       * 送らずに同じ番号で足すと、並び順が重なってどちらが先か決まらない。
+       * 後ろから順に動かすのは、途中で番号がぶつからないようにするため。
+       * （handleSaveStep の insertAfter 経路と同じ）
+       */
+      const moving = sortedSteps
+        .filter((st) => st.stepOrder > step.stepOrder)
+        .sort((a, b) => b.stepOrder - a.stepOrder)
+      if (moving.length > 0) {
+        const moved = await api.scenarios.reorderSteps(
+          id,
+          moving.map((st) => ({ stepId: st.id, stepOrder: st.stepOrder + 1 })),
+        )
+        if (!moved.success) {
+          setStepError('あいだに入れるための並べ替えに失敗しました')
+          return
+        }
+      }
+      const res = await api.scenarios.addStep(id, {
         stepOrder: step.stepOrder + 1,
         messageType: step.messageType,
         messageContent: step.messageContent,
@@ -844,11 +874,18 @@ export default function ScenarioDetailClient({
         templateId: step.templateId ?? null,
         onReachTagId: step.onReachTagId ?? null,
         afterSend: step.afterSend,
+        targetCondition: (step.targetCondition as SegmentCondition | null) ?? null,
+        question: (step.question as ScenarioQuestion | null) ?? null,
+        isDraft: step.isDraft === true,
       })
+      if (!res.success) {
+        setStepError(res.error)
+        return
+      }
       loadScenario()
       reloadStats()
     } catch {
-      setError('この通を複製できませんでした')
+      setStepError('この通を複製できませんでした')
     } finally {
       setDuplicatingStepId(null)
     }
