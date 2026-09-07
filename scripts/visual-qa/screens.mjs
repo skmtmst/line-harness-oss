@@ -2647,7 +2647,7 @@ export const SCREENS = [
       名前で探していたので、固定データを足したあとも0件のままだった
       （`page.tsx:142` の行末が `範囲を編集`）。
     */
-    steps: [{ click: '範囲を編集' }],
+    steps: [{ qaOpen: 'EOTS4' }],
     verdictHead: '7b509106',
   },
   { ...STAFF, node: 'jwVlo', name: '30-1-B 入った記録', route: '/staff?tab=audit',
@@ -2984,6 +2984,38 @@ export const SCREENS = [
     verdictSource: 'settings-v6/f9oUm.txt + settings-v6/f9oUm-{1440,1920}.png + 2026-09-07 visual comparison', verdictHead: '82f3dccf7c',
   },
 ]
+
+/* 機能30は #406 の固定契約を取り込んだ正式撮影結果。設計との差を画面単位で残す。 */
+const feature30Judgments = {
+  e3jz3: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-07 #405 / 3101・8788で正式撮影。** access/users・access/roles の固定契約で4状態（通常・読込・空・失敗・権限不足）を1440/1920px撮影し、横はみ出し0。集計（8人・招待2・90日未ログイン1・MFA6/8）と5つの権限bundleを実値で表示できた。**要修正**：設計の1ページ6行＋ページ送り、役割・担当範囲・職位の表示順と行データが現在の固定契約と一致せず、設計の注意札も不足している。実装は取得値を推測せずそのまま表示しているため、契約側または設計側の確定が必要。',
+    verdictSource: 'staff-v6/e3jz3.png + staff-v6/e3jz3-{normal,loading,empty,error,forbidden}.txt',
+    verdictHead: '04057fb9da53',
+  },
+  EOTS4: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-07 #405 / 3101・8788で正式撮影。** e3jz3の「中身を見る」から高田誠を開け、1440/1920pxで横はみ出し0。**要修正**：Pencilは役割bundleカード、3状態の権限比較表、担当範囲・変更履歴への導線を持つ全画面だが、実装は旧来の個人編集モーダル（3役割・通知・LINE連携）で、権限の3状態を保存する口もない。書き込み契約のない操作を見かけだけ追加せず、#405の対象外として残した。',
+    verdictSource: 'staff-v6/EOTS4.png + staff-v6/EOTS4.txt',
+    verdictHead: '04057fb9da53',
+  },
+  jwVlo: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-07 #405 / 3101・8788で正式撮影。** audit/events の固定契約でsummary（4,286・削除12・配信18・変更46・ログイン286・要確認1）と通常7行、対象・変更前後・接続元・異常表示を1440/1920pxで確認し、横はみ出し0。**要修正**：設計にある都市名・個別詳細ボタンと実装契約にない位置情報の対応が未確定。実装はマスク済みIP・端末・riskLevelを表示し、存在しない位置情報を作っていない。',
+    verdictSource: 'staff-v6/jwVlo.png + staff-v6/jwVlo-{normal,loading,empty,error,forbidden}.txt',
+    verdictHead: '04057fb9da53',
+  },
+  I3ZSrU: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-07 #405 / 3101・8788で正式撮影。** /staff/new を1440/1920pxで撮影し、横はみ出し0。名前・メール・役割・LINE認証後の流れ・担当アカウント・通知先を表示できた。**要修正**：Pencilの職位、4つのbundle、MFA必須・7日期限・初回通知、予約メニュー、メールプレビューが未接続。#352/#1170には招待作成の書き込み契約がないため、押しても保存できない入力欄は追加していない。設計画像の「パスワード」はV6要件（メール確認→LINE Login→TOTP）と矛盾するため採用しない。',
+    verdictSource: 'staff-v6/I3ZSrU.png + staff-v6/I3ZSrU.txt',
+    verdictHead: '04057fb9da53',
+  },
+}
+for (const screen of SCREENS) {
+  const judgment = feature30Judgments[screen.node]
+  if (screen.feature === 30 && judgment) Object.assign(screen, judgment)
+}
 
 // Issue #245（機能32）。同じ実装headで4画面と全状態を撮り直した最新判定。
 const FEATURE_32_REVIEW = {
@@ -4368,6 +4400,7 @@ export const CAPTURED_AT = {
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['e3jz3','jwVlo'],
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
     { pr: 1039, head: '1b4774050', on: '2026-09-07', screens: ['e3jz3','jwVlo'], note: 'Issue #243。3105/8792で通常・読込・空・失敗・権限不足の全24枚を1440/1920px撮影。全画像で横はみ出し0。残る集計・共通監査API差は各画面の判定注記へ記録した。' },
+    { pr: 1182, head: '04057fb9da53', on: '2026-09-07', screens: ['e3jz3','EOTS4','jwVlo','I3ZSrU'], note: 'Issue #405。#1175後の access/users・roles・audit/events 固定契約へ接続し、3101/8788で4画面を1440・1920px撮影。横はみ出し0、設計との差は各画面の判定注記へ記録した。' },
   ],
   31: [
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['c4R6F'],
@@ -4688,6 +4721,7 @@ export const CAPTURED_AT = {
   ],
   30: [
     { pr: 475, head: '15febf7f', on: '2026-08-30', screens: ['EOTS4', 'I3ZSrU', 'e3jz3', 'jwVlo'], note: 'ログインユーザーの一覧・追加・役割。development 直結' },
+    { pr: 1182, head: '04057fb9da53', on: '2026-09-07', screens: ['e3jz3', 'EOTS4', 'jwVlo', 'I3ZSrU'], note: 'Issue #405。アクセスユーザー・権限bundle・共通監査の読み取り契約へ接続し、4画面を3101/8788で撮影・判定した。' },
   ],
   31: [
     { pr: 478, head: '66883866', on: '2026-08-30', screens: ['c4R6F'], note: '機能設定。オフにしても消えないことを先に書く' },
