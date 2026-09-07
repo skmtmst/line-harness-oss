@@ -173,7 +173,7 @@ export const SCREENS = [
     verdict: "match",
     verdictNote: "**2026-09-07 #454 再撮影で一致。** 設計画像と実装画像を上端から並べ、今日やること4枚の値と補足の間を8px、右カードの見出しと本文の間を10pxへ戻した。今月の送信枠は22px・1行（残り197 / 上限200通）、友だち追加リンクは発行中選択の外側にあった二重枠を除去。3104/8791で1440/1920pxを撮影し、両幅とも横はみ出し0。",
     verdictSource: "dashboard-v6/vUXKb.txt + vUXKb-{1440,1920}.png + 2026-09-07 #454 top-aligned visual/dimension comparison",
-    verdictHead: "d9cfe531d",
+    verdictHead: "088cea8a8",
   },
   {
     node: 'ZN0ov', feature: 1, name: '1-1-1 ダッシュボード編集',
