@@ -2223,7 +2223,7 @@ export const SCREENS = [
     だけで、**中身は「広告連携」タブに入っている。** 返した記録も、
     クリックの種類（fbclid）も、失敗の理由も出る。
   */
-  { ...INFLOW, node: 'BuVDB', name: '18-2 広告とのつなぎ（成果の対応付け）', route: '/inflow-links?tab=ads',
+  { ...INFLOW, node: 'BuVDB', name: '18-2 広告とのつなぎ（成果の対応付け）', route: '/inflow-links?tab=connections',
     verdict: "match",
     verdictNote: "**2026-09-06 Issue #231 / PR #951 / UI HEAD 43b3aae50で設計画像と実装画像を同じ幅で並べて再確認し、一致。** 4媒体の接続状態・操作、クリック目印、成果名の5行対応表、返した件数、操作、送信履歴への導線を実データで表示した。1440px・1920pxとも横はみ出し0。",
     verdictSource: "inflow-v6/BuVDB.txt + BuVDB-1440.png + BuVDB-1920.png",

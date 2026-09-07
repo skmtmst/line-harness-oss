@@ -313,34 +313,23 @@ export default function NewMileageRulePage() {
             <p className="mt-2 text-xs text-ink-faint">通知するかどうかと本文を、たまる決めごとの下書きへ一緒に保存します。</p>
           </AsideCard>
 
-          <AsideCard title="この下書きに保存する設定">
-            <ul className="space-y-2 text-xs leading-relaxed text-ink-secondary">
-              <li>・付いてからの有効期限</li>
-              <li>・予約取消や返品で、付けた分を引く決めごと</li>
-              <li>・15軸を組み合わせた利用対象条件</li>
-            </ul>
-            <p className="mt-3 text-xs text-ink-faint">公開中の版は直接書き換えず、V6の下書きとして保存します。</p>
-          </AsideCard>
-
-          <AsideCard title="気をつけること">
-            <ul className="text-ink-faint space-y-1.5 text-xs leading-relaxed">
-              <li>・付与マイルは1以上でないと保存できません。</li>
-              <li>
-                ・確定待ちにした分を確定させる操作は、まだ画面にありません。運用の仕方をあわせて決める必要があります。
-              </li>
-              <li>
-                ・同じ行動に複数のルールが当てはまると、それぞれが加算されます。重複させたくない場合は、出どころで分けてください。
-              </li>
-              {/* タグ付与でマイルを配る道筋が、どこからも呼ばれていない。 */}
-              <li>
-                ・「タグが付いた」は、まだきっかけに選べません。タグを付けたときにマイルを知らせる処理が、どこからも呼ばれていないためです。
-              </li>
-            </ul>
+          <AsideCard title="詳細設定と気をつけること">
+            <details>
+              <summary className="cursor-pointer text-xs font-semibold text-action">保存される内容と制限を見る</summary>
+              <ul className="mt-3 space-y-1.5 text-xs leading-relaxed text-ink-faint">
+                <li>・有効期限、取消時の差し引き、利用対象条件も下書きへ保存します。</li>
+                <li>・付与マイルは1以上でないと保存できません。</li>
+                <li>・確定待ちの確定操作は、まだ画面にありません。</li>
+                <li>・複数のルールが当たると、それぞれ加算されます。</li>
+                <li>・「タグが付いた」は、まだきっかけに選べません。</li>
+              </ul>
+            </details>
           </AsideCard>
         </>
       }
     >
       <FormSection step={1} label="どのルールか">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
         <Field
           label="ルール名"
           htmlFor="sc-name"
@@ -384,9 +373,11 @@ export default function NewMileageRulePage() {
             options={selected.sources.map(([value, label]) => ({ value, label }))}
           />
         </Field>
+        </div>
       </FormSection>
 
       <FormSection step={2} label="何マイル付けるか">
+        <div className="grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
         <Field label="付与マイル" htmlFor="sc-amount" required note="1以上で入力してください。">
           <input
             id="sc-amount"
@@ -414,21 +405,15 @@ export default function NewMileageRulePage() {
             />
           </div>
         </Field>
+        </div>
 
-        <label className="text-ink-secondary flex items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="mt-0.5"
-            checked={ignoreMultiplier}
-            onChange={(e) => setIgnoreMultiplier(e.target.checked)}
-          />
-          <span>
-            会員ランクの倍率をかけない
-            <span className="text-ink-faint block text-xs">
-              登録ボーナスのように、誰でも同じ額にしたいときに選びます。
-            </span>
-          </span>
-        </label>
+        <details className="rounded-control border border-hairline px-3 py-2">
+          <summary className="cursor-pointer text-xs font-semibold text-action">倍率の詳細設定</summary>
+          <label className="mt-3 flex items-start gap-2 text-sm text-ink-secondary">
+            <input type="checkbox" className="mt-0.5" checked={ignoreMultiplier} onChange={(e) => setIgnoreMultiplier(e.target.checked)} />
+            <span>会員ランクの倍率をかけない<span className="block text-xs text-ink-faint">誰でも同じ額にしたいときに選びます。</span></span>
+          </label>
+        </details>
       </FormSection>
 
       <FormSection
@@ -436,6 +421,7 @@ export default function NewMileageRulePage() {
         label="付けすぎを防ぐ"
         note="何も指定しないと、行動のたびに毎回付与されます。"
       >
+        <div className="grid gap-3 sm:grid-cols-2">
         <Field
           label="1日に数える回数"
           htmlFor="sc-cap"
@@ -454,9 +440,7 @@ export default function NewMileageRulePage() {
         <Field label="同じ対象の数えかた" htmlFor="sc-unique">
           <SelectField id="sc-unique" value={uniqueMode} onChange={(e) => setUniqueMode(e.target.value as typeof uniqueMode)} options={[{ value: "", label: "何度でも数える" }, { value: "subject", label: "同じ対象は1回だけ" }, { value: "subjectPerDay", label: "同じ対象は1日1回だけ" }]} className={inputClass} />
         </Field>
-        <p className="text-ink-faint text-xs leading-relaxed">
-          同じフォームやウェビナーを、何度でも1回として数えるかどうかです。1日1回にすると、日をまたげばまた対象になります。
-        </p>
+        </div>
       </FormSection>
 
       <FormSection step={4} label="受け取る人" note="紹介した人に付ける設定もできます。">
@@ -475,73 +459,45 @@ export default function NewMileageRulePage() {
           />
         </div>
 
-        <Field label="開始日・終了日" note="期間限定のキャンペーンに使えます。空欄なら期限なしです。">
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={validFrom}
-              onChange={(e) => setValidFrom(e.target.value)}
-              className={inputClass}
-              aria-label="開始日"
-            />
-            <span className="text-ink-faint text-sm">〜</span>
-            <input
-              type="date"
-              value={validUntil}
-              onChange={(e) => setValidUntil(e.target.value)}
-              className={inputClass}
-              aria-label="終了日"
-            />
+        <details className="rounded-control border border-hairline px-3 py-2">
+          <summary className="cursor-pointer text-xs font-semibold text-action">
+            {targetConditions ? '設定中の利用対象条件を編集' : '条件を足す（15の軸から組み合わせられます）'}
+          </summary>
+          <div className="mt-3">
+            <Field label="だれに付けるか（条件）" note="条件を付けない場合は全員が対象です。">
+              <ConditionBuilder value={targetConditions} onChange={setTargetConditions} label="利用対象の条件" />
+            </Field>
           </div>
-        </Field>
+        </details>
 
-        <Field label="付いたマイルの有効期限" htmlFor="sc-expiry" note="空欄なら、この決めごとで付いた分は期限なしです。">
-          <div className="flex items-center gap-2">
-            <TextInput
-              id="sc-expiry"
-              type="number"
-              min={1}
-              max={3650}
-              value={expiresAfterDays}
-              onChange={(e) => setExpiresAfterDays(e.target.value)}
-              className="max-w-32 tabular-nums"
-            />
-            <span className="whitespace-nowrap text-sm text-ink-secondary">日後</span>
+        <details className="rounded-control border border-hairline px-3 py-2">
+          <summary className="cursor-pointer text-xs font-semibold text-action">期間・失効・公開の詳細設定</summary>
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            <Field label="開始日・終了日" note="空欄なら期限なしです。">
+              <div className="flex items-center gap-2">
+                <input type="date" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} className={inputClass} aria-label="開始日" />
+                <span className="text-sm text-ink-faint">〜</span>
+                <input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className={inputClass} aria-label="終了日" />
+              </div>
+            </Field>
+            <Field label="付いたマイルの有効期限" htmlFor="sc-expiry" note="空欄なら期限なしです。">
+              <div className="flex items-center gap-2">
+                <TextInput id="sc-expiry" type="number" min={1} max={3650} value={expiresAfterDays} onChange={(e) => setExpiresAfterDays(e.target.value)} className="max-w-32 tabular-nums" />
+                <span className="whitespace-nowrap text-sm text-ink-secondary">日後</span>
+              </div>
+            </Field>
           </div>
-        </Field>
-
-        {cancellationEvent ? (
-          <label className="flex items-start gap-2 rounded-control border border-hairline p-3 text-sm text-ink-secondary">
-            <input type="checkbox" checked={reverseOnCancellation} onChange={(e) => setReverseOnCancellation(e.target.checked)} className="mt-0.5" />
-            <span>
-              取り消されたら、付けたぶんを引く
-              <span className="mt-1 block text-xs text-ink-faint">{eventType === 'booking_created' ? '予約の取り消し' : '注文の取り消し'}を同じ記録から追跡します。</span>
-            </span>
+          {cancellationEvent ? (
+            <label className="mt-3 flex items-start gap-2 text-sm text-ink-secondary">
+              <input type="checkbox" checked={reverseOnCancellation} onChange={(e) => setReverseOnCancellation(e.target.checked)} className="mt-0.5" />
+              <span>取り消されたら、付けたぶんを引く<span className="block text-xs text-ink-faint">{eventType === 'booking_created' ? '予約の取り消し' : '注文の取り消し'}を同じ記録から追跡します。</span></span>
+            </label>
+          ) : null}
+          <label className="mt-3 flex items-start gap-2 text-sm text-ink-secondary">
+            <input type="checkbox" className="mt-0.5" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
+            <span>作成したらすぐ動かす<span className="block text-xs text-ink-faint">オフにすると停止中で保存します。</span></span>
           </label>
-        ) : null}
-
-        <Field label="だれに付けるか（条件）" note="条件を付けない場合は全員が対象です。15の軸から組み合わせられます。">
-          <ConditionBuilder
-            value={targetConditions}
-            onChange={setTargetConditions}
-            label="利用対象の条件"
-          />
-        </Field>
-
-        <label className="text-ink-secondary flex items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="mt-0.5"
-            checked={isActive}
-            onChange={(e) => setIsActive(e.target.checked)}
-          />
-          <span>
-            作成したらすぐ動かす
-            <span className="text-ink-faint block text-xs">
-              オフにすると停止中として保存され、条件に合っても付与されません。
-            </span>
-          </span>
-        </label>
+        </details>
       </FormSection>
     </CreatePage>
   )
