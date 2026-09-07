@@ -486,7 +486,7 @@ export function IncomingOverview({
               <Button variant="secondary" onClick={() => onRotate(selected)}>合言葉を更新</Button>
               <Button variant="secondary" onClick={() => onDelete(selected)}>削除</Button>
             </div>
-          <div className="border-hairline mt-4 border-t pt-[14px]">
+          <div className="border-hairline mt-4 border-t pt-3.5">
             <h2 className="text-ink mb-3 text-lg font-bold">届いたらすること</h2>
             {detailStatus === 'loading' ? (
               <p className="text-ink-secondary text-sm">保存されている処理を読み込んでいます。</p>
