@@ -104,12 +104,8 @@ export default function StaffShiftsPage() {
       if (requestId !== requestRef.current) return
       if (!settingsResult.success) throw new Error(settingsResult.error)
       setSettings(settingsResult.data)
-      // 予約設定APIは {success,data} を返す。撮影用固定データの旧形式
-      // ({resources}) も安全に読み、受付枠全体をエラーにしない。
-      const resources = resourcesResult.data?.resources
-        ?? (resourcesResult as unknown as { resources?: BookingResource[] }).resources
-        ?? []
-      setResources(resources)
+      // 予約設定APIは {success,data:{resources}} を返す(撮影用APIも同じ器)。
+      setResources(resourcesResult.data.resources)
       setLoadStatus('ready')
 
       const menu = menuResult.menus.find((item) => item.is_active)
@@ -340,7 +336,7 @@ export default function StaffShiftsPage() {
                     <div className="flex gap-2"><dt className="text-danger font-semibold">×</dt><dd>満席です</dd></div>
                     <div className="flex gap-2"><dt className="font-semibold">休</dt><dd>お休み</dd></div>
                   </dl>
-                  <p className="text-ink-faint mt-3 text-xs">○・△・×は受付上限に対する残数を反映しています。</p>
+                  <p className="text-ink-faint mt-3 text-xs">○・×は受付上限に対する残数を反映しています。</p>
                   {slots.length > 0 ? (
                     <details className="mt-3 text-xs">
                       <summary className="text-accent cursor-pointer">空き枠の内訳を見る</summary>

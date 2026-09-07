@@ -18,6 +18,7 @@ import {
   dialogTitle,
   referenceKindText,
   referenceNameText,
+  summarizeBulkDeleteResult,
   usageText,
 } from './media-delete-impact'
 import Pagination from '@/components/shared/pagination'
@@ -164,6 +165,8 @@ export default function MediaLibraryPage() {
   /** まとめて削除の確認。ブラウザ標準の確認では戻せないことが伝わらない。 */
   const [bulkConfirm, setBulkConfirm] = useState<string[] | null>(null)
   const [bulkBusy, setBulkBusy] = useState(false)
+  /** まとめて削除の進み具合。件数が多いときに止まっているように見せない。 */
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null)
   /** 大きく出している札。押した札の中身を原寸で見せる。 */
   const [preview, setPreview] = useState<MediaItem | null>(null)
 
@@ -186,6 +189,7 @@ export default function MediaLibraryPage() {
     setDeleteError('')
     setBulkConfirm(null)
     setBulkBusy(false)
+    setBulkProgress(null)
   }, [selectedAccountId])
 
   const load = useCallback(async () => {
@@ -308,23 +312,44 @@ export default function MediaLibraryPage() {
     const accountAtRequest = selectedAccountId
     if (!accountAtRequest) return
     setBulkBusy(true)
+    setBulkProgress({ done: 0, total: ids.length })
     setError('')
+    setSuccessMessage('')
+    let deleted = 0
+    const failedNames: string[] = []
     for (const id of ids) {
+      const name = items.find((m) => m.id === id)?.filename ?? id
       try {
         await api.media.delete(id, accountAtRequest)
-        if (accountAtRequest !== latestAccountRef.current) return
-      } catch (e) {
-        if (e instanceof ApiError && e.status === 409) {
-          const name = items.find((m) => m.id === id)?.filename ?? id
-          setError(`${name}: ${e.message}`)
-          continue
-        }
-        setError('削除に失敗しました')
+      } catch {
+        /*
+          409（読み直したら使われ始めていた）も通信失敗も、ここでは
+          名前だけ残して次へ進む。件ごとに文を出すと最後の1件しか残らない。
+        */
+        failedNames.push(name)
+        setBulkProgress({ done: deleted + failedNames.length, total: ids.length })
+        continue
       }
+      if (accountAtRequest !== latestAccountRef.current) {
+        /*
+          アカウントが変わったら、前の窓のままにしない。処理中の表示を
+          戻して抜ける（結果文は古いアカウントのものになるので出さない）。
+        */
+        setBulkBusy(false)
+        setBulkConfirm(null)
+        setBulkProgress(null)
+        return
+      }
+      deleted += 1
+      setBulkProgress({ done: deleted + failedNames.length, total: ids.length })
     }
+    const result = summarizeBulkDeleteResult(deleted, failedNames)
     setSelected(new Set())
     setBulkConfirm(null)
     setBulkBusy(false)
+    setBulkProgress(null)
+    if (result.tone === 'success') setSuccessMessage(result.message)
+    else setError(result.message)
     void load()
   }
 
@@ -966,6 +991,11 @@ export default function MediaLibraryPage() {
         <p className="text-ink-secondary text-sm">
           使われている場所があるものは、はじめから選べません。消したあとは元に戻せません。
         </p>
+        {bulkBusy && bulkProgress ? (
+          <p className="text-ink-secondary mt-2 text-sm tabular-nums" aria-live="polite">
+            処理中…（{bulkProgress.done}/{bulkProgress.total}件）
+          </p>
+        ) : null}
       </Dialog>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">

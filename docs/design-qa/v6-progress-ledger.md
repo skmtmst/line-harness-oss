@@ -199,7 +199,7 @@
 | 13 | `gBp2J` | 13-1-E フォームの削除確認 | 6.9594% | 0px | 下部・中央 | docs | [差分画像](forms-v6/gBp2J-diff-1920.png) | **一致** |
 | 13 | `ZOPyc` | 13-1-F 一覧の状態（空・読込・エラー） | 2.9594% | 0px | 上部・左 | docs | [差分画像](forms-v6/ZOPyc-diff-1920.png) | **一致** |
 | 14 | `WuKzU` | 14-1 共通情報 | 3.1703% | 0px | 上部・左 | docs | [差分画像](common-vars-v6/WuKzU-diff-1920.png) | **一致** |
-| 14 | `gBtaK` | 14-1-A 共通情報を編集 | 4.9666% | 0px | 中央・左 | docs | [差分画像](common-vars-v6/gBtaK-diff-1920.png) | **一致** |
+| 14 | `gBtaK` | 14-1-A 共通情報を編集 | 5.4042% | 0px | 中央・左 | docs | [差分画像](common-vars-v6/gBtaK-diff-1920.png) | **一致** |
 | 14 | `uNBlA` | 14-1-B 変える前に影響を見る | 4.2428% | 0px | 中央・中央 | docs | [差分画像](common-vars-v6/uNBlA-diff-1920.png) | **一致** |
 | 14 | `yPkWe` | 14-1-C 共通情報の削除確認 | 4.4655% | 0px | 中央・中央 | docs | [差分画像](common-vars-v6/yPkWe-diff-1920.png) | **一致** |
 | 15 | `g89Tc` | 15-1 登録メディア | 4.0422% | 0px | 上部・左 | docs | [差分画像](media-v6/g89Tc-diff-1920.png) | **一致** |
