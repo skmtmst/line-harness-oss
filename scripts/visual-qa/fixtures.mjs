@@ -2126,12 +2126,13 @@ export const FRIEND_DETAILS = {
 
 /**
  * テンプレートの置き場。設計 `NWbuF`（2-6 全フォルダ展開）の件数そのまま。
- * 未分類3・お問い合わせ8・予約5・EC4 で計20件。
+ * 未分類3・お問い合わせ8・予約5・EC4・フォロー6で計26件。
  */
 export const TEMPLATE_FOLDERS = [
   ['tf-inquiry', 'お問い合わせ', 8],
   ['tf-booking', '予約', 5],
   ['tf-ec', 'EC', 4],
+  ['tf-follow', 'フォロー', 6],
 ].map(([id, name, count], index) => ({
   id: String(id),
   kind: 'template',
@@ -2145,7 +2146,7 @@ export const TEMPLATE_FOLDERS = [
 }))
 
 /**
- * テンプレート20件。**件数はフォルダの数に合わせる。**
+ * テンプレート26件。**件数はフォルダの数に合わせる。**
  * 合わないと、フォルダの脇に出る数と一覧の行数が食い違う。
  */
 export const TEMPLATES = (() => {
@@ -2163,16 +2164,22 @@ export const TEMPLATES = (() => {
     ['tf-inquiry', 'お問い合わせ', 8],
     ['tf-booking', '予約', 5],
     ['tf-ec', 'EC', 4],
+    ['tf-follow', 'フォロー', 6],
   ]
   let n = 0
   for (const [folderId, label, count] of plan) {
     for (let i = 0; i < count; i += 1) {
       rows.push({
         id: `template-${n}`,
-        name: n === 0 ? '予約確認'
-          : n === 1 ? 'お問い合わせフォロー'
-            : n === 2 ? 'EC購入のお礼'
-              : `${label}のひな形 ${i + 1}`,
+        name: n === 0 ? '初回お問い合わせへの返信'
+          : n === 1 ? '予約前日のご案内'
+            : n === 2 ? '発送完了のお知らせ'
+              : n === 3 ? '折り返しのご案内'
+                : n === 11 ? '予約前日のご案内'
+                  : n === 12 ? '予約確定のお知らせ'
+                    : n === 13 ? '予約変更のご案内'
+                      : n === 14 ? '来店後フォロー'
+                        : `${label}のひな形 ${i + 1}`,
         category: n === 0 ? '予約日時と注意事項を案内'
           : n === 1 ? '返信後の追加案内'
             : n === 2 ? '購入商品と配送予定を案内'
@@ -2184,8 +2191,8 @@ export const TEMPLATES = (() => {
         folderId,
         usageCount: n === 0 ? 38 : Math.max(0, 12 - n),
         tapCount: 0,
-        monthlySendCount: sendCounts[n][0],
-        totalSendCount: sendCounts[n][1],
+        monthlySendCount: sendCounts[n]?.[0] ?? 0,
+        totalSendCount: sendCounts[n]?.[1] ?? 0,
         createdAt: '2026-01-13T00:00:00.000Z',
         updatedAt: n === 0 ? '2026-08-22T09:20:00.000Z' : '2026-01-13T00:00:00.000Z',
       })

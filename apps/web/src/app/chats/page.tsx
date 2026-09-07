@@ -1381,6 +1381,16 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           }}
           onClose={() => setSaveDialogOpen(false)}
         />
+        {filterOpen || showTemplatePicker ? (
+          <style>{`
+            [aria-label="テンプレートを選択"] {
+              background-color: rgb(16 24 40 / 33%) !important;
+            }
+            div:has(> section[aria-label="絞り込み"]) > div[aria-hidden="true"] {
+              background-color: transparent !important;
+            }
+          `}</style>
+        ) : null}
         <InboxFilterPanel
           open={filterOpen}
           value={{ status: statusFilter === 'all' ? 'all' : statusFilter, assignee: assigneeFilter, channel, unreadOnly }}

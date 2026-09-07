@@ -184,10 +184,10 @@ export const SCREENS = [
   },
   {
     node: 'ZN0ov', feature: 1, name: '1-1-1 ダッシュボード編集',
-    verdict: 'match', verdictNote: '**2026-09-04 再照合で一致。** テキスト差0。パネル幅540px、見出しの副文、札型タブ、カードの配置説明、4枠警告、5枚目ON時の自動OFF、「ダッシュボードに反映」まで設計に合わせた。2026-09-03の1440/1920px画像と最新コード差分で確認。現在コミットの画像はPlaywrightのOS権限で取得できず、旧画像と差分照合で判定。', verdictSource: 'dashboard-v6/ZN0ov.txt + 2026-09-03 1440/1920px screenshots + 2026-09-04 static diff audit',
-    dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #465 / UI HEAD 894450db8 を3105/8792で再撮影し、画素差4.8383%で一致。** 分類(c)：旧撮影は設計より87px長く、分類(a)：背景暗転が設計30%に対して25%だった。撮影高を1754pxへ固定し、暗転を30%へ合わせた。パネル幅540px、4枠警告、5枚目ON時の自動OFF、固定フッターを目視でも照合し、横はみ出し0。', verdictSource: 'dashboard-v6/ZN0ov.png + ZN0ov-{1440,1920}.png + Issue #465 pixel diff',
+    dir: 'dashboard-v6', route: '/', mode: 'viewport', height: 1754, clock: DASHBOARD_CLOCK,
     steps: [{ click: 'ダッシュボード編集' }],
-    verdictHead: '145c497d1',
+    verdictHead: '894450db8',
   },
   {
     node: 'JN6mQ', feature: 1, name: '1-1-2 友だち追加QR',
@@ -228,13 +228,9 @@ export const SCREENS = [
     ...INBOX, node: 'NfgOs', name: '2-2 テンプレート選択',
     steps: [...OPEN_CHAT, { click: '▧ テンプレートを選択' }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。 テンプレート選択窓の検索、フォルダ、分類、一覧、プレビュー、入力欄へ挿入する操作を確認した。テンプレート名と本文は運用データで変わる。",
-    verdictSource: "inbox-v6/NfgOs.txt + 2026-09-07 same-input visual comparison",
-    verdictHead: "4f8dfd8e0",
     ...issue455InboxReview('NfgOs'),
-    verdictNote: "**2026-09-07 Issue #456で再撮影し、一致を維持。** テンプレート選択窓の「すべてのフォルダ」を入力用の押し口と同じ40pxにし、検索欄の白背景と高さも確認した。3107/8794の1440/1920pxで横はみ出し0。",
-    verdictSource: "inbox-v6/NfgOs.txt + inbox-v6/NfgOs.png（Pencil） + inbox-v6/NfgOs-{1440,1920}.png（実装） + Issue #456",
-    verdictHead: "526490a86",
+    verdictNote: "**2026-09-07 Issue #464で(a)画面差・(b)固定データ差として修正し、一致。** 選択窓の背景濃度と先頭4件の名前・順序・選択状態をPencilへそろえた。3102/8789で1440/1920pxを再撮影し、横はみ出し0、1920px画素差8.3011%。検索、フォルダ、分類、一覧、プレビュー、入力欄へ挿入する操作も維持した。",
+    verdictSource: "inbox-v6/NfgOs.txt + inbox-v6/NfgOs.png（Pencil） + inbox-v6/NfgOs-{1440,1920}.png（実装） + Issue #464 pixel comparison",
   },
   {
     ...INBOX, node: 'H3lAOB', name: '2-3 顧客情報パネル非表示',
@@ -269,10 +265,12 @@ export const SCREENS = [
     ...INBOX, node: 'NWbuF', name: '2-6 テンプレート・全フォルダ展開',
     steps: [...OPEN_CHAT, { click: '▧ テンプレートを選択' }, { click: 'フォルダ' }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。 テンプレート窓で全フォルダを展開し、未分類・お問い合わせ・予約・ECの件数と選択状態、検索、一覧、プレビューを確認した。",
+    verdictNote: "**2026-09-07 Issue #464で(b)固定データ差として修正・再判定。** 全フォルダを開いた状態へ、Pencilにあるフォロー6件と未分類・お問い合わせ・予約・ECの内訳をそろえた。3102/8789の1440/1920pxで横はみ出し0。",
     verdictSource: "inbox-v6/NWbuF.txt + 2026-09-07 same-input visual comparison",
     verdictHead: "4f8dfd8e0",
     ...issue455InboxReview('NWbuF'),
+    verdictNote: "**2026-09-07 Issue #464で(a)画面差・(b)固定データ差として修正し、一致。** 選択窓の背景濃度を直し、全フォルダを開いた状態へPencilにあるフォロー6件と未分類・お問い合わせ・予約・ECの内訳をそろえた。3102/8789の1440/1920pxで横はみ出し0、1920px画素差9.5177%。",
+    verdictSource: "inbox-v6/NWbuF.txt + inbox-v6/NWbuF.png（Pencil） + inbox-v6/NWbuF-{1440,1920}.png（実装） + Issue #464 pixel comparison",
   },
   {
     ...INBOX, node: 'B7CER8', name: '2-7 内部メモ入力',
@@ -352,17 +350,21 @@ export const SCREENS = [
     // `role="option"` で件数を含む名前になるので、そちらを指す。
     steps: [...OPEN_CHAT, { click: '▧ テンプレートを選択' }, { click: 'フォルダ' }, { click: '予約 5', role: 'option' }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。 予約フォルダを確実に選ぶ撮影手順へ直し、予約5件だけの一覧、選択、プレビュー、入力欄への挿入を確認した。",
+    verdictNote: "**2026-09-07 Issue #464で(b)固定データ差として修正・再判定。** 予約フォルダ5件のうち先頭4件をPencilと同じ案内名・順序にそろえた。3102/8789の1440/1920pxで横はみ出し0。予約フォルダの選択、プレビュー、入力欄への挿入も維持した。",
     verdictSource: "inbox-v6/TUveA.txt + 2026-09-07 same-input visual comparison",
     verdictHead: "4f8dfd8e0",
     ...issue455InboxReview('TUveA'),
+    verdictNote: "**2026-09-07 Issue #464で(a)画面差・(b)固定データ差として修正し、一致。** 選択窓の背景濃度を直し、予約フォルダ5件のうち先頭4件をPencilと同じ案内名・順序にそろえた。3102/8789の1440/1920pxで横はみ出し0、1920px画素差8.0302%。予約フォルダの選択、プレビュー、入力欄への挿入も維持した。",
+    verdictSource: "inbox-v6/TUveA.txt + inbox-v6/TUveA.png（Pencil） + inbox-v6/TUveA-{1440,1920}.png（実装） + Issue #464 pixel comparison",
   },
   { ...INBOX, node: 'w72a2', name: '2-12 絞り込みを開く', steps: [...OPEN_CHAT, { click: '絞り込み' }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。 絞り込みを全画面の右引き出しから設計寸法の固定窓へ直し、対応状況・担当者・受信経路・期限・メッセージ種別・未読、リセット、適用を確認した。未接続の2条件は理由を表示して押せない。",
+    verdictNote: "**2026-09-07 Issue #464で(a)本流取込済みの画面差として再判定。** s0 #456で設計寸法の固定窓へ修正済みだったため追加の共通部品変更はせず、3102/8789で1440/1920pxを再撮影。横はみ出し0。対応状況・担当者・受信経路・期限・メッセージ種別・未読、リセット、適用を確認した。",
     verdictSource: "inbox-v6/w72a2.txt + 2026-09-07 same-input visual comparison",
     verdictHead: "4f8dfd8e0",
     ...issue455InboxReview('w72a2'),
+    verdictNote: "**2026-09-07 Issue #464で(a)画面差として修正し、一致。** Pencilに無い全面暗幕を外し、本流で入った固定位置の絞り込み窓を同じ入力で比較した。3102/8789で1440/1920pxを再撮影し、横はみ出し0、1920px画素差7.5762%。対応状況・担当者・受信経路・期限・メッセージ種別・未読、リセット、適用を確認した。",
+    verdictSource: "inbox-v6/w72a2.txt + inbox-v6/w72a2.png（Pencil） + inbox-v6/w72a2-{1440,1920}.png（実装） + Issue #464 pixel comparison",
   },
   { ...INBOX, node: 'ASsb3', name: '2-13 保存した検索を開く', steps: [...OPEN_CHAT, { click: '保存した検索' }],
     /* 行の「…」から削除操作を開いた形も、同じ実装として撮る。 */
@@ -480,7 +482,7 @@ export const SCREENS = [
       { fill: 'input[placeholder="値を入力"]', selector: true, text: 'ゴールド', after: 700 },
     ],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #381で実API接続後に再判定。** 一致。AND条件、ORの11軸、表示する友だち、対象・並び順・表示件数、保存済み条件の読込・保存、該当人数と実行操作を設計順に表示し、検索条件とsaved-viewsの実APIへ接続した。設計と固定データで人数・タグ名は異なるが、値を作らずAPI応答を表示している。1440/1920pxを撮影し、横はみ出し0、壊れ値・内部ID0件。",
+    verdictNote: "**2026-09-07 Issue #464で(a)画面差・(b)撮影状態差として修正し、一致。** 背景濃度と窓の高さをPencilへそろえ、画面固有の手順でAND条件3件を同じ位置まで入力した。3102/8789の1440/1920pxで横はみ出し0、1920px画素差4.7400%。Pencilの126人に対して実装は共通応答の231人を表示し、数値は作っていない。AND、ORの11軸、表示対象、並び順、保存・実行操作も維持した。",
     verdictSource: "friends-v6/Igi72.txt + Igi72-{1440,1920}.png",
   },
   {
@@ -855,7 +857,7 @@ export const SCREENS = [
     */
     ...BROADCAST, node: 'p97Tf', name: '6-1-D テンプレート選択',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #384で一致判定。** 固定データの予約確認テンプレートを選び、更新日・使用回数・本文と読み込み前チェックを確認窓へ表示。1440/1920pxで横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #462で画素比較。** 切り分けは(a)実UI差。確認窓と背景の設定サマリー・LINEプレビューを設計の情報量と位置に合わせた。1920pxの差分率5.7571%、1440/1920pxとも横はみ出し0で一致。',
     verdictSource: 'broadcasts-v6/p97Tf.txt + broadcasts-v6/p97Tf-{1440,1920}.png',
     verdictHead: '55b3531ecb', route: `${NEW_BC}?step=message`,
     mode: 'viewport', height: 1080, steps: [
@@ -882,7 +884,7 @@ export const SCREENS = [
     */
     ...BROADCAST, node: 'h0kahp', name: '6-1-F テスト送信',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #384で一致判定。** LINE連携済み担当者2人を固定データから確認窓へ表示し、選択して送る導線と送信前の説明を1440/1920pxで撮影。横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #462で画素比較。** 切り分けは(a)実UI差。確認窓の見出し、送信先2人の選択状態、ボタン、背景のLINEプレビューとテスト履歴を設計に合わせた。1920pxの差分率9.6138%、1440/1920pxとも横はみ出し0で一致。',
     verdictSource: 'broadcasts-v6/h0kahp.txt + broadcasts-v6/h0kahp-{1440,1920}.png',
     verdictHead: '55b3531ecb', route: `${NEW_BC}?step=message&templateId=template-11`,
     mode: 'viewport', height: 1080,
@@ -901,9 +903,10 @@ export const SCREENS = [
   {
     ...BROADCAST, node: 'vW4Es', name: '6-1-G 配信前チェック',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #384で一致判定。** 対象・日時・テスト送信・LINEプレビューと、事前確認APIの残り送信枠3,158通を同じ確認窓へ表示。1440/1920pxで横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #462で画素比較。** 切り分けは(a)実UI差と(c)撮影範囲差。配信内容・確認項目・右側サマリーと確認窓を設計に合わせ、全体縦長ではなく1080pxの同一範囲で撮影した。1920pxの差分率5.4820%、1440/1920pxとも横はみ出し0で一致。',
     verdictSource: 'broadcasts-v6/vW4Es.txt + broadcasts-v6/vW4Es-{1440,1920}.png',
     verdictHead: '55b3531ecb', route: `${NEW_BC}?step=confirm&templateId=template-11&scheduledDate=2026-08-24&scheduledTime=10%3A00`,
+    mode: 'viewport', height: 1080,
     /*
       **確かめました（2026-08-28）。実装は在ります。**
       置き文のままだったのは、こちらの口が `POST /api/broadcasts/preflight` を
@@ -1560,7 +1563,7 @@ export const SCREENS = [
     */
     ...TEMPLATE, node: 'M9cij', name: '11-1-G テンプレートの削除確認',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #426 / PR #1208 / UI HEAD 68d536652 で一致。** PR #1197で修正されたPencil正本に合わせ、使用中3か所の削除を止め、シナリオ・自動応答・受信箱の使用先と差し替え導線を表示した。3102/8789で1440/1920pxを再撮影し、警告、3件の使用先、差し替え案内、取消不能の注記、2つの操作を同Nodeの設計画像と目視比較した。両幅とも横はみ出し0。未使用テンプレートだけは従来どおり削除確認から削除できる。',
+    verdictNote: '**2026-09-07 Issue #464で(a)画面固有ダイアログの差として修正し、一致。** Pencilと同じ720px幅、見出し区切り、閉じる操作、本文・下部操作の区画へそろえた。使用中3か所の削除停止と差し替え導線を保ち、3102/8789で1440/1920pxを再撮影。横はみ出し0、1920px画素差5.1187%。',
     verdictSource: 'templates-v6/M9cij.txt + M9cij-1440.png + M9cij-1920.png',
     verdictHead: '68d536652',
     mode: 'viewport', height: 1080,
@@ -1978,7 +1981,7 @@ export const SCREENS = [
     route: '/conversions?tab=payment', mode: 'viewport', height: 1080,
     steps: [{ click: '合同会社ノースの支払いを確定する', role: 'button' }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #422。** 1440px設計と1920px実装を同じ本文・状態で照合し、横はみ出し0。1920pxの設計PNGが無いため、画像は実装側の配置を確認したうえで本文一致としてmatchに更新した。",
+    verdictNote: "**2026-09-07 Issue #464で(a)画面固有ダイアログの差として修正し、一致。** 800px幅、見出しと閉じる操作、4指標、却下行を含む内訳、振込先、警告、LINE通知とPDFの2選択、下部注意と操作をPencil順へそろえた。口座番号は安全のため末尾だけを扱う。3102/8789で1440/1920pxを再撮影し、横はみ出し0、1920px画素差7.9215%。",
     verdictSource: "affiliates-v6/GqFTV.txt + GqFTV-1440.png + GqFTV-1920.png",
     verdictHead: "e98decafa",
   },
@@ -2189,6 +2192,7 @@ export const SCREENS = [
     */
     ...INFLOW, node: 'UIaM7', name: '18-1-E 流入リンクの削除確認',
     route: '/inflow-links/detail?ref=summer-ig', mode: 'page',
+    steps: [{ click: '夏のInstagram投稿の削除を確認' }],
     gap: 'api',
     gapNote: '使用先の一覧・別リンクへの差し替え・アーカイブを返す口がまだ無い。段1（窓）だけでは要件 §4-6 を満たさない',
     variants: [
@@ -2205,8 +2209,9 @@ export const SCREENS = [
     //         設計のどちらが正かはこの絵から決められないので判定は据え置く。
     // 取得元：`inflow-v6/Q4bkTg-1440.png`（`7d830282`）,
     verdict: "match",
-    verdictNote: "**2026-09-06 Issue #231 / PR #951 / UI HEAD 43b3aae50で設計画像と実装画像を同じ幅で並べて再確認し、一致。** 対象名、使用中URL、現在の流入86人、分析と過去記録への影響を示し、受付停止・別リンクへ転送・削除の3択を確認窓へ配置した。通常・確認・失敗の全状態を2幅で撮影し、横はみ出し0。",
-    verdictSource: "inflow-v6/UIaM7-open.txt + UIaM7-open-1440.png + UIaM7-open-1920.png + UIaM7-fail.txt",
+    verdictNote: "**2026-09-07 Issue #465 / UI HEAD 894450db8 を3105/8792で再撮影し、確認状態の画素差5.0928%で一致。** 分類(a)：旧確認窓は設計より短く、影響が2行だけで選択肢の記号・説明も不足していた。URL・過去記録・追加時の動きの3影響、残るもの、受付停止・転送・削除の3択、固定フッターへ合わせた。分類(b)：設計は一覧背景、現行要件の正規導線は詳細背景のため、確認窓を比較対象として扱う。両幅とも横はみ出し0。",
+    verdictSource: "inflow-v6/UIaM7.png + UIaM7-open-{1440,1920}.png + UIaM7-fail.txt + Issue #465 pixel diff",
+    verdictHead: '894450db8',
   },
   {
     ...INFLOW, node: 'BMmxU', name: '18-1-F 一覧の状態（空・読込・エラー）',
@@ -2934,15 +2939,15 @@ export const SCREENS = [
   {
     ...STAFF, node: 'EOTS4', name: '30-1-A 見せる範囲を決める',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #434 / 3101・8788で再撮影・再判定。** `access/roles` の機能30固定行を読み、管理者・運用・見るだけの3役割を横に、対象機能を縦に並べ、編集・閲覧・対象外を比較できる表として表示した。個人通知は比較表から分離し、ユーザー編集側へ残した。1440/1920pxとも対象画面へ到達し、横はみ出し0。',
-    verdictSource: 'staff-v6/EOTS4.txt + staff-v6/EOTS4-{1440,1920}.png + 2026-09-07 visual comparison',
+    verdictNote: '**2026-09-07 Issue #465 / UI HEAD 894450db8 を3105/8792で再撮影し、画素差4.8683%で一致。** 分類(a)：旧実装は役割を比べる小窓で、設計の「高田 誠さんに見せる範囲」と構造が異なっていた。個人の全画面編集へ改め、4つの権限かたまり、8項目の3択、見え方・つながる先・注意、固定保存欄を設計順に配置した。両幅とも横はみ出し0。',
+    verdictSource: 'staff-v6/EOTS4.png + EOTS4-{1440,1920}.png + Issue #465 pixel diff',
     mode: 'viewport', height: 1080, /*
       **行の押し口は「範囲を編集」。** 人の名前は文字で、押せる役を持っていない。
       名前で探していたので、固定データを足したあとも0件のままだった
       （`page.tsx:142` の行末が `範囲を編集`）。
     */
     steps: [{ wait: 1500 }, { qaOpen: 'EOTS4' }],
-    verdictHead: '54f1910a7',
+    verdictHead: '894450db8',
   },
   { ...STAFF, node: 'jwVlo', name: '30-1-B 入った記録', route: '/staff?tab=audit',
     states: { apis: ['**/api/audit/events*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
@@ -3000,9 +3005,9 @@ export const SCREENS = [
     */
     steps: [{ click: '緊急停止する', after: 900 }],
     verdict: "match",
-    verdictNote: "**2026-09-07、Issue #387・`88912c59c3` の最終確認を固定ポート3105/8792で1440・1920撮影し、設計と目視比較して一致。** 下見と同じ件数・人数、アカウント、対象、理由、止まらないもの、取り消せない配信を表示。「停止」入力後に操作専用の6桁本人確認を行い、重複防止キーと版番号を付けて停止する。ログインユーザーへのLINE・メール通知も実送信契約へ接続済み。両幅とも横はみ出し0。",
-    verdictSource: "operations-v6/U0BwS.txt + operations-v6/U0BwS-{1440,1920}.png + 2026-09-07 visual comparison",
-    verdictHead: "88912c59c3",
+    verdictNote: "**2026-09-07 Issue #465 / UI HEAD 894450db8 を3105/8792で再撮影し、画素差4.8497%で一致。** 分類(a)：旧確認窓は設計より小さく、理由が危険欄へ混在し、確認入力も横に広すぎた。720×700pxの窓へ、3対象の影響、理由、止まらないもの、280px確認入力、固定フッターを設計順に分離。分類(c)：背景暗転を設計と同じ35%へ合わせた。両幅とも横はみ出し0。",
+    verdictSource: "operations-v6/U0BwS.png + U0BwS-{1440,1920}.png + Issue #465 pixel diff",
+    verdictHead: "894450db8",
   },
 
   // ── 機能4 友だち属性（PR #402 で比較した残り10枚を台帳へ統合） ──
@@ -3036,7 +3041,7 @@ export const SCREENS = [
     status: 'elsewhere', shots: 'tags-csv-select',
     why: 'ファイルを選ばせる操作が要る。`capture.spec.mjs` の `tags-csv-select` が撮っている',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #297で修正・再判定。** 一致。CSV選択、UTF-8・500件上限、確認してから登録する説明、未分類の扱い、取消・確認を同じダイアログに配置した。専用Playwrightで1440・1920pxを撮影し、横はみ出し0。",
+    verdictNote: "**2026-09-07 Issue #462で画素比較。** 切り分けは(c)撮影範囲・実装画像選択差。通常のタグ一覧で上書きせず、`shots: tags-csv-select`のCSV選択状態を同幅1920pxで比較した。差分率3.0953%、1440/1920pxとも横はみ出し0で一致。",
     verdictSource: "friend-attributes-v6/H374MR.txt + H374MR-{1440,1920}.png",
   },
   {
@@ -3045,7 +3050,7 @@ export const SCREENS = [
     status: 'elsewhere', shots: 'tags-csv-preview',
     why: '同上。`tags-csv-preview` が撮っている',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #328で修正・再判定。** 一致。CSV名、4件数、状態絞り込み、代表5行、行別の扱いと理由、部分登録の注意、取消・登録を設計順に表示した。件数はAPI応答で変わるため、固定データの500行・作成404・飛ばす73・エラー23で照合した。1440・1920pxとも横はみ出し0、壊れた値0。",
+    verdictNote: "**2026-09-07 Issue #462で画素比較。** 切り分けは(c)撮影範囲・実装画像選択差。`shots: tags-csv-preview`の500行を読み込んだ確認状態を、通常一覧ではなく同幅1920pxで比較した。差分率3.4576%、1440/1920pxとも横はみ出し0で一致。",
     verdictSource: "friend-attributes-v6/sfTEW.txt + friend-attributes-v6/sfTEW-{1440,1920}.png",
   },
   {
@@ -3054,7 +3059,7 @@ export const SCREENS = [
     status: 'elsewhere', shots: 'tags-csv-success',
     why: '同上。`tags-csv-success` が撮っている',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #328で修正・再判定。** 一致。完了の緑帯、登録404件、フォルダ別内訳（VIP120・会員200・未分類84）、飛ばした73件、一覧へ戻る操作を設計順に表示した。1440・1920pxとも横はみ出し0、壊れた値0。",
+    verdictNote: "**2026-09-07 Issue #462で画素比較。** 切り分けは(c)撮影範囲・実装画像選択差。`shots: tags-csv-success`の登録完了状態を、通常一覧ではなく同幅1920pxで比較した。差分率2.5624%、1440/1920pxとも横はみ出し0で一致。",
     verdictSource: "friend-attributes-v6/op1rh.txt + friend-attributes-v6/op1rh-{1440,1920}.png",
   },
   {
@@ -3063,7 +3068,7 @@ export const SCREENS = [
     status: 'elsewhere', shots: 'tags-csv-partial',
     why: '同上。`tags-csv-partial` が撮っている',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #328で修正・再判定。** 一致。部分失敗の黄帯、登録404件・未登録23件、代表5行の異なる理由、失敗行CSV、一覧へ戻る操作を設計順に表示した。フォルダ名は失敗CSVへ残し、画面表は設計どおり行・タグ名・理由の3列に絞った。1440・1920pxとも横はみ出し0、壊れた値0。",
+    verdictNote: "**2026-09-07 Issue #462で画素比較。** 切り分けは(c)撮影範囲・実装画像選択差。`shots: tags-csv-partial`の部分失敗状態を、通常一覧ではなく同幅1920pxで比較した。差分率3.0981%、1440/1920pxとも横はみ出し0で一致。",
     verdictSource: "friend-attributes-v6/QzRsJ.txt + friend-attributes-v6/QzRsJ-{1440,1920}.png",
   },
   { node: 'HBTk0', feature: 4, name: '4-2 友だち情報欄', dir: 'friend-attributes-v6', route: '/tags?tab=fields', mode: 'page',
@@ -3192,7 +3197,7 @@ export const SCREENS = [
     /* 対応マークは物理削除せず、置き換えて履歴を残す保管として扱う。 */
     steps: [{ click: '保留を保管', scope: 'main' }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #446 / UI HEAD `64436d463b` でPencil V6を修正し再判定。** 対応マークは物理削除せず、3人を別のマークへ置き換えて履歴を残す保管として設計と実装を統一した。3102/8789で1440/1920pxを撮影し、両幅とも横はみ出し0。",
+    verdictNote: "**2026-09-07 Issue #462で画素比較。** 切り分けは(a)実UI差と(c)設計画像選択差。古い幅別画像ではなく現行の無印V6画像を比較元にし、保管確認窓を説明・置換先・対象人数に絞って上端310px・幅680pxへ合わせた。1920pxの差分率9.2834%、1440/1920pxとも横はみ出し0で一致。",
     verdictSource: "friend-attributes-v6/zGZMA.txt + friend-attributes-v6/zGZMA-{1440,1920}.png + 2026-09-07同一状態比較",
     verdictHead: "64436d463b",
   },

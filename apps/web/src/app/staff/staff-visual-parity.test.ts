@@ -79,4 +79,13 @@ describe('V6 30 ログインユーザーの画面契約', () => {
     expect(staffSource).toContain('api.access.roles')
     expect(auditSource).toContain('api.audit.events')
   })
+
+  it('EOTS4は役割比較の小窓ではなく個人の全画面編集として開く', () => {
+    expect(staffSource).toContain('function PermissionScopeView')
+    expect(staffSource).toContain('かたまりから選ぶ')
+    expect(staffSource).toContain('項目ごとに決める')
+    expect(staffSource).toContain('この決め方で、この人にはこう見えます')
+    expect(staffSource).toContain('見せる範囲を保存')
+    expect(staffSource).not.toContain('function RolePermissionMatrix')
+  })
 })
