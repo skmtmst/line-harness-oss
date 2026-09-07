@@ -184,10 +184,10 @@ export const SCREENS = [
   },
   {
     node: 'ZN0ov', feature: 1, name: '1-1-1 ダッシュボード編集',
-    verdict: 'match', verdictNote: '**2026-09-07 Issue #465 / UI HEAD 4f043e541 を3105/8792で再撮影し、画素差4.8383%で一致。** 分類(c)：旧撮影は設計より87px長く、分類(a)：背景暗転が設計30%に対して25%だった。撮影高を1754pxへ固定し、暗転を30%へ合わせた。パネル幅540px、4枠警告、5枚目ON時の自動OFF、固定フッターを目視でも照合し、横はみ出し0。', verdictSource: 'dashboard-v6/ZN0ov.png + ZN0ov-{1440,1920}.png + Issue #465 pixel diff',
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #465 / UI HEAD 894450db8 を3105/8792で再撮影し、画素差4.8383%で一致。** 分類(c)：旧撮影は設計より87px長く、分類(a)：背景暗転が設計30%に対して25%だった。撮影高を1754pxへ固定し、暗転を30%へ合わせた。パネル幅540px、4枠警告、5枚目ON時の自動OFF、固定フッターを目視でも照合し、横はみ出し0。', verdictSource: 'dashboard-v6/ZN0ov.png + ZN0ov-{1440,1920}.png + Issue #465 pixel diff',
     dir: 'dashboard-v6', route: '/', mode: 'viewport', height: 1754, clock: DASHBOARD_CLOCK,
     steps: [{ click: 'ダッシュボード編集' }],
-    verdictHead: '4f043e541',
+    verdictHead: '894450db8',
   },
   {
     node: 'JN6mQ', feature: 1, name: '1-1-2 友だち追加QR',
@@ -2204,9 +2204,9 @@ export const SCREENS = [
     //         設計のどちらが正かはこの絵から決められないので判定は据え置く。
     // 取得元：`inflow-v6/Q4bkTg-1440.png`（`7d830282`）,
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #465 / UI HEAD 4f043e541 を3105/8792で再撮影し、確認状態の画素差5.0928%で一致。** 分類(a)：旧確認窓は設計より短く、影響が2行だけで選択肢の記号・説明も不足していた。URL・過去記録・追加時の動きの3影響、残るもの、受付停止・転送・削除の3択、固定フッターへ合わせた。分類(b)：設計は一覧背景、現行要件の正規導線は詳細背景のため、確認窓を比較対象として扱う。両幅とも横はみ出し0。",
+    verdictNote: "**2026-09-07 Issue #465 / UI HEAD 894450db8 を3105/8792で再撮影し、確認状態の画素差5.0928%で一致。** 分類(a)：旧確認窓は設計より短く、影響が2行だけで選択肢の記号・説明も不足していた。URL・過去記録・追加時の動きの3影響、残るもの、受付停止・転送・削除の3択、固定フッターへ合わせた。分類(b)：設計は一覧背景、現行要件の正規導線は詳細背景のため、確認窓を比較対象として扱う。両幅とも横はみ出し0。",
     verdictSource: "inflow-v6/UIaM7.png + UIaM7-open-{1440,1920}.png + UIaM7-fail.txt + Issue #465 pixel diff",
-    verdictHead: '4f043e541',
+    verdictHead: '894450db8',
   },
   {
     ...INFLOW, node: 'BMmxU', name: '18-1-F 一覧の状態（空・読込・エラー）',
@@ -2934,7 +2934,7 @@ export const SCREENS = [
   {
     ...STAFF, node: 'EOTS4', name: '30-1-A 見せる範囲を決める',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #465 / UI HEAD 4f043e541 を3105/8792で再撮影し、画素差4.9030%で一致。** 分類(a)：旧実装は役割を比べる小窓で、設計の「高田 誠さんに見せる範囲」と構造が異なっていた。個人の全画面編集へ改め、4つの権限かたまり、8項目の3択、見え方・つながる先・注意、固定保存欄を設計順に配置した。両幅とも横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #465 / UI HEAD 894450db8 を3105/8792で再撮影し、画素差4.8683%で一致。** 分類(a)：旧実装は役割を比べる小窓で、設計の「高田 誠さんに見せる範囲」と構造が異なっていた。個人の全画面編集へ改め、4つの権限かたまり、8項目の3択、見え方・つながる先・注意、固定保存欄を設計順に配置した。両幅とも横はみ出し0。',
     verdictSource: 'staff-v6/EOTS4.png + EOTS4-{1440,1920}.png + Issue #465 pixel diff',
     mode: 'viewport', height: 1080, /*
       **行の押し口は「範囲を編集」。** 人の名前は文字で、押せる役を持っていない。
@@ -2942,7 +2942,7 @@ export const SCREENS = [
       （`page.tsx:142` の行末が `範囲を編集`）。
     */
     steps: [{ wait: 1500 }, { qaOpen: 'EOTS4' }],
-    verdictHead: '4f043e541',
+    verdictHead: '894450db8',
   },
   { ...STAFF, node: 'jwVlo', name: '30-1-B 入った記録', route: '/staff?tab=audit',
     states: { apis: ['**/api/audit/events*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
@@ -3000,9 +3000,9 @@ export const SCREENS = [
     */
     steps: [{ click: '緊急停止する', after: 900 }],
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #465 / UI HEAD 4f043e541 を3105/8792で再撮影し、画素差4.8497%で一致。** 分類(a)：旧確認窓は設計より小さく、理由が危険欄へ混在し、確認入力も横に広すぎた。720×700pxの窓へ、3対象の影響、理由、止まらないもの、280px確認入力、固定フッターを設計順に分離。分類(c)：背景暗転を設計と同じ35%へ合わせた。両幅とも横はみ出し0。",
+    verdictNote: "**2026-09-07 Issue #465 / UI HEAD 894450db8 を3105/8792で再撮影し、画素差4.8497%で一致。** 分類(a)：旧確認窓は設計より小さく、理由が危険欄へ混在し、確認入力も横に広すぎた。720×700pxの窓へ、3対象の影響、理由、止まらないもの、280px確認入力、固定フッターを設計順に分離。分類(c)：背景暗転を設計と同じ35%へ合わせた。両幅とも横はみ出し0。",
     verdictSource: "operations-v6/U0BwS.png + U0BwS-{1440,1920}.png + Issue #465 pixel diff",
-    verdictHead: "4f043e541",
+    verdictHead: "894450db8",
   },
 
   // ── 機能4 友だち属性（PR #402 で比較した残り10枚を台帳へ統合） ──
