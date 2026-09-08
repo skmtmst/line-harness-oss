@@ -98,24 +98,15 @@ function BookingsInner() {
   const dataReady = loadStatus === 'ready'
   usePageTitle(event?.name ? event.name + ' の申込者' : 'イベントの申込者')
 
-  const refresh = useCallback(async () => {
+  // タブ切替では申込一覧だけ取り直す(点検#520軽13)。詳細・待ち列はタブと無関係。
+  const refreshList = useCallback(async () => {
     if (!selectedAccountId || !eventId) return
     const requestId = ++loadRequestRef.current
     setLoadStatus('loading')
     setActionError(null)
     try {
       const filters = tab === 'all' ? {} : { status: tab }
-      /*
-        **前のイベントの控えを使い回さない。** `event` が入っていれば取りに
-        行かない作りだったので、アカウントやイベントを切り替えたあとも
-        **上の帯に前のイベント名と定員が残った。** どのイベントの
-        申込を見ているのか読み違える。毎回取り直す。
-      */
-      const [evRes, listRes, waitlistRes] = await Promise.all([
-        eventsApi.getEvent(selectedAccountId, eventId),
-        eventsApi.listBookings(selectedAccountId, eventId, filters),
-        eventsApi.listWaitlist(selectedAccountId, eventId).catch(() => null),
-      ])
+      const listRes = await eventsApi.listBookings(selectedAccountId, eventId, filters)
       if (requestId !== loadRequestRef.current) return
       /*
         **器の形を確かめてから入れる。** `items` が無い返事をそのまま
@@ -123,14 +114,8 @@ function BookingsInner() {
         同じ扱いにして、失敗の言葉を出す。
       */
       if (!Array.isArray(listRes?.items)) throw new Error('malformed')
-      setEvent((current) => (typeof evRes?.name === 'string' ? evRes : current))
       setItems(listRes.items)
       setBookingsTotal(typeof listRes.total === 'number' ? listRes.total : listRes.items.length)
-      setWaitlistCount(
-        Array.isArray(waitlistRes?.waitlist)
-          ? waitlistRes.waitlist.length
-          : listRes.items.filter((booking) => booking.status === 'waitlist').length,
-      )
       setLoadStatus('ready')
     } catch {
       if (requestId !== loadRequestRef.current) return
@@ -138,18 +123,52 @@ function BookingsInner() {
         **数を持ち越さない。** 前の絞り込みの行を残したまま失敗を出すと、
         古い数の上に「取れませんでした」が乗って、どちらが本当か読めない。
       */
-      setEvent(null)
       setItems([])
       setBookingsTotal(0)
-      setWaitlistCount(null)
       setLoadStatus('error')
     }
-    // 控えの `event` を読まなくなったので、依存の除外は要らない。
   }, [selectedAccountId, eventId, tab])
 
+  // 詳細・待ち列はイベント/アカウント変更時のみ取り直す(点検#520軽13)。
+  const refreshMeta = useCallback(async () => {
+    if (!selectedAccountId || !eventId) return
+    const requestId = ++loadRequestRef.current
+    try {
+      /*
+        **前のイベントの控えを使い回さない。** `event` が入っていれば取りに
+        行かない作りだったので、アカウントやイベントを切り替えたあとも
+        **上の帯に前のイベント名と定員が残った。** どのイベントの
+        申込を見ているのか読み違える。毎回取り直す。
+      */
+      const [evRes, waitlistRes] = await Promise.all([
+        eventsApi.getEvent(selectedAccountId, eventId),
+        eventsApi.listWaitlist(selectedAccountId, eventId).catch(() => null),
+      ])
+      if (requestId !== loadRequestRef.current) return
+      setEvent((current) => (typeof evRes?.name === 'string' ? evRes : current))
+      setWaitlistCount(
+        Array.isArray(waitlistRes?.waitlist) ? waitlistRes.waitlist.length : null,
+      )
+    } catch {
+      if (requestId !== loadRequestRef.current) return
+      setEvent(null)
+      setWaitlistCount(null)
+    }
+  }, [selectedAccountId, eventId])
+
+  const refresh = useCallback(async () => {
+    await refreshMeta()
+    await refreshList()
+    // 控えの `event` を読まなくなったので、依存の除外は要らない。
+  }, [refreshMeta, refreshList])
+
   useEffect(() => {
-    void refresh()
-  }, [refresh])
+    void refreshMeta()
+  }, [refreshMeta])
+
+  useEffect(() => {
+    void refreshList()
+  }, [refreshList])
 
   /*
     枠の合計＝定員。枠の一覧から数える(編集画面と同じ決め方)。
