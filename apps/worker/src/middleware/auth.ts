@@ -161,13 +161,16 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/tag-groups', '/tags'], ['/api/support-marks', '/tags'], ['/api/saved-searches', '/tags'], ['/api/folders', '/tags'],
   ['/api/scenarios', '/scenarios'], ['/api/broadcasts', '/broadcasts'], ['/api/reminders', '/reminders'],
   ['/api/auto-replies', '/auto-replies'], ['/api/auto-reply-runs', '/auto-replies'], ['/api/friend-add', '/friend-add-settings'], ['/api/webinars', '/webinars'],
-  ['/api/templates', '/templates'], ['/api/rich-menu', '/rich-menus'], ['/api/forms', '/form-submissions'], ['/api/contents', '/contents'],
+  ['/api/templates', '/templates'], ['/api/rich-menu', '/rich-menus'], ['/api/forms', '/form-submissions'], ['/api/contents', '/contents'], ['/api/media', '/contents'],
   ['/api/conversions', '/conversions'], ['/api/scoring', '/scoring'], ['/api/tracked-links', '/inflow-links'], ['/api/analytics', '/analytics'],
   ['/api/mileage', '/mileage'], ['/api/action-scores', '/mileage'],
   ['/api/automations', '/automations'], ['/api/automation-runs', '/automations'],
   ['/api/automation-templates', '/automations'], ['/api/automation-drafts', '/automations'],
   ['/api/automation-draft-resources', '/automations'], ['/api/common-actions', '/automations'],
   ['/api/webhooks', '/webhooks'], ['/api/booking', '/booking/bookings'], ['/api/events', '/events'],
+  // 個別相談の変更・取消は予約と同じ `/booking/bookings` 権限で守る
+  // (N-065 #623 司令塔裁定。`/api/meet-callback` は公開コールバックのため対象外)。
+  ['/api/meet-consultations', '/booking/bookings'],
   ['/api/nen-campaigns', '/nen-campaigns'], ['/api/nen-members', '/nen-members'], ['/api/ec-commerce', '/ec-commerce'],
 ];
 
@@ -187,7 +190,7 @@ const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
   [/^\/api\/friends\/support-mark\/bulk(?:\/|$)/, '/tags'],
 ];
 
-function permissionForApiPath(path: string): string | null {
+export function permissionForApiPath(path: string): string | null {
   const override = STAFF_API_PERMISSION_OVERRIDES.find(([pattern]) => pattern.test(path));
   if (override) return override[1];
   return STAFF_API_PERMISSIONS.find(([prefix]) => path === prefix || path.startsWith(`${prefix}/`))?.[1] ?? null;
