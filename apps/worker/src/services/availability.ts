@@ -244,12 +244,21 @@ function googleBusyForDate(
   const dayStart = zonedTimeToUtcMs(timeZone, date, '00:00');
   const dayEnd = zonedTimeToUtcMs(timeZone, addDays(date, 1), '00:00');
   return intervals.flatMap((interval) => {
-    const start = Math.max(new Date(interval.start).getTime(), dayStart);
-    const end = Math.min(new Date(interval.end).getTime(), dayEnd);
+    const start = new Date(interval.start).getTime();
+    const end = new Date(interval.end).getTime();
     if (!Number.isFinite(start) || !Number.isFinite(end) || start >= end) return [];
-    const startMin = Math.floor((start - dayStart) / 60_000);
-    const endMin = Math.ceil((end - dayStart) / 60_000);
-    return [{ start: fromMin(startMin), end: fromMin(endMin) }];
+    // その日の範囲で切り取り、端点を壁時刻へ直接直す。現地0時からの
+    // 実経過分で HH:MM 化すると、夏時間の切替日（存在しない 02:00 台や
+    // 25時まである日）にずれる。NY DST 開始の 07:00Z は 03:00 であり、
+    // 実経過 120 分の「02:00」ではない。
+    const clippedStart = Math.max(start, dayStart);
+    const clippedEnd = Math.min(end, dayEnd);
+    if (clippedStart >= clippedEnd) return [];
+    const busyStart = tzHHMM(timeZone, new Date(clippedStart));
+    // 日終端ちょうどは「24:00」と書く（toMin で 1440 になる）。
+    const busyEnd = clippedEnd === dayEnd ? '24:00' : tzHHMM(timeZone, new Date(clippedEnd));
+    if (toMin(busyStart) >= toMin(busyEnd)) return [];
+    return [{ start: busyStart, end: busyEnd }];
   });
 }
 
@@ -434,14 +443,13 @@ export async function getAvailability(
   );
   const minLeadAt = new Date(params.now.getTime() + cutoffMinutes * 60_000);
 
-  // 何日先まで受けるか。未設定なら制限しない。
-  // 期間の判定は「その日の終わり」ではなく開始時刻で行う。3日先まで、が
-  // 「3日後の23:59まで」ではなく「3日後の同時刻まで」だと分かりにくいため、
-  // 日付で切る。
+  // 何日先まで受けるか。未設定なら制限しない。日付で切る。
+  // 24 時間の倍数の加算では夏時間の切替日（23 時間・25 時間の日）に
+  // 暦日がずれるため、暦日で足す。
   const windowLastDate =
     menu.booking_window_days == null
       ? null
-      : tzDateStr(timeZone, new Date(params.now.getTime() + menu.booking_window_days * 24 * 60 * 60_000));
+      : addDays(tzDateStr(timeZone, params.now), menu.booking_window_days);
 
   const googleBusyByStaff = new Map<string, Array<{ start: string; end: string }> | null>();
   const calendarSync: CalendarSyncState[] = [];

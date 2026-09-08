@@ -141,6 +141,9 @@ interface StubData {
     buffer_after_minutes: number;
     override_duration: number | null;
     override_price: number | null;
+    concurrent_capacity?: number | null;
+    booking_window_days?: number | null;
+    cutoff_hours_before?: number | null;
   };
   staff?: Array<{ id: string; display_name: string; is_designation_optional: number }>;
   shifts?: Array<{ staff_id: string; work_date: string; start_time: string; end_time: string }>;
@@ -1194,5 +1197,111 @@ describe('getAvailability のタイムゾーン（非JST）', () => {
       minLeadTimeMinutes: 0,
     });
     expect(result.by_staff[0].slots.map((s) => s.start)).toEqual(['10:00', '12:00']);
+  });
+});
+
+describe('getAvailability の夏時間切替日（New York）', () => {
+  const MENU_60_HOURLY = { ...MENU_BASIC };
+
+  function googleDb(busy: Array<{ start: string; end: string }>, extra: Partial<StubData> = {}) {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      calendars: { 'cal@example.com': { busy } },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
+    return stubDB({
+      menu: MENU_60_HOURLY,
+      staff: STAFF_S1,
+      timezone: 'America/New_York',
+      bookings: [],
+      calendarConnection: { id: 'GC1', calendar_id: 'cal@example.com', auth_type: 'oauth', access_token: 'token' },
+      ...extra,
+    });
+  }
+
+  // 2026-03-08 は DST 開始（02:00 → 03:00、EST → EDT）。07:00Z は壁時刻 03:00。
+  test('DST 開始日：07:00Z の予定は 03:00 枠を塞ぐ（02:00 扱いにしない）', async () => {
+    const db = googleDb(
+      [{ start: '2026-03-08T07:00:00Z', end: '2026-03-08T07:30:00Z' }],
+      { shifts: [{ staff_id: 'S1', work_date: '2026-03-08', start_time: '03:00', end_time: '05:00' }] },
+    );
+    try {
+      const result = await getAvailability(db, {
+        lineAccountId: 'A1',
+        menuId: 'M1',
+        from: '2026-03-08',
+        to: '2026-03-08',
+        now: new Date('2026-03-07T00:00:00Z'),
+        minLeadTimeMinutes: 0,
+      });
+      expect(result.by_staff[0].slots.map((s) => s.start)).toEqual(['03:30', '04:00']);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  test('DST 開始日：切替をまたぐ予定は壁時刻の範囲で塞ぐ', async () => {
+    const db = googleDb(
+      // 壁 01:30(EST)〜03:30(EDT)。実経過では 90〜150 分で「01:30-02:30」になる。
+      [{ start: '2026-03-08T06:30:00Z', end: '2026-03-08T07:30:00Z' }],
+      { shifts: [{ staff_id: 'S1', work_date: '2026-03-08', start_time: '00:00', end_time: '05:00' }] },
+    );
+    try {
+      const result = await getAvailability(db, {
+        lineAccountId: 'A1',
+        menuId: 'M1',
+        from: '2026-03-08',
+        to: '2026-03-08',
+        now: new Date('2026-03-07T00:00:00Z'),
+        minLeadTimeMinutes: 0,
+      });
+      expect(result.by_staff[0].slots.map((s) => s.start)).toEqual(['00:00', '00:30', '03:30', '04:00']);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  // 2026-11-01 は DST 終了（02:00 → 01:00、EDT → EST、25 時間の日）。
+  test('DST 終了日：07:30Z の予定は 02:30 枠として塞ぐ', async () => {
+    const db = googleDb(
+      // 壁 02:30-03:30(EST)。実経過では 210〜270 分で「03:30-04:30」になる。
+      [{ start: '2026-11-01T07:30:00Z', end: '2026-11-01T08:30:00Z' }],
+      { shifts: [{ staff_id: 'S1', work_date: '2026-11-01', start_time: '01:00', end_time: '05:00' }] },
+    );
+    try {
+      const result = await getAvailability(db, {
+        lineAccountId: 'A1',
+        menuId: 'M1',
+        from: '2026-11-01',
+        to: '2026-11-01',
+        now: new Date('2026-10-31T00:00:00Z'),
+        minLeadTimeMinutes: 0,
+      });
+      expect(result.by_staff[0].slots.map((s) => s.start)).toEqual(['01:00', '01:30', '03:30', '04:00']);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  test('受付 window は暦日で足す（DST 開始でずらさない）', async () => {
+    const db = stubDB({
+      menu: { ...MENU_BASIC, booking_window_days: 1 },
+      staff: STAFF_S1,
+      timezone: 'America/New_York',
+      shifts: [
+        { staff_id: 'S1', work_date: '2026-03-08', start_time: '10:00', end_time: '12:00' },
+        { staff_id: 'S1', work_date: '2026-03-09', start_time: '10:00', end_time: '12:00' },
+      ],
+      bookings: [],
+    });
+    // 現在は現地 03-07 23:30。24 時間加算なら最終日は 03-09 になるが、暦日 +1 日は 03-08。
+    const result = await getAvailability(db, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-03-08',
+      to: '2026-03-09',
+      now: new Date('2026-03-08T04:30:00Z'),
+      minLeadTimeMinutes: 0,
+    });
+    const dates = new Set(result.by_staff[0].slots.map((s) => s.date));
+    expect(dates).toEqual(new Set(['2026-03-08']));
   });
 });
