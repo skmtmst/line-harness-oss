@@ -69,6 +69,30 @@ export default function MediaDetailDialog({
   const [versionPreview, setVersionPreview] = useState<MediaVersionPreview | null>(null)
   const [changeReason, setChangeReason] = useState('')
   const [versionError, setVersionError] = useState('')
+  const [downloading, setDownloading] = useState(false)
+  const [downloadError, setDownloadError] = useState('')
+
+  /** 保存URLへ直接行かず、権限確認と監査を通る口から受け取って保存させる。 */
+  const displaySrc = item && accountId ? api.media.contentUrl(item.id, accountId) : ''
+
+  async function downloadItem() {
+    if (!item || !accountId || downloading) return
+    setDownloading(true)
+    setDownloadError('')
+    try {
+      const blob = await api.media.download(item.id, accountId)
+      const href = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = href
+      anchor.download = item.filename
+      anchor.click()
+      URL.revokeObjectURL(href)
+    } catch (caught) {
+      setDownloadError(caught instanceof Error ? caught.message : 'ダウンロードできませんでした')
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   const loadImpact = useCallback(async () => {
     if (!item || !accountId) {
@@ -208,7 +232,10 @@ export default function MediaDetailDialog({
           <h2 className="text-ink mt-3 truncate text-xl font-bold" title={item.filename}>{item.filename}</h2>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button href={item.url} download={item.filename}>ダウンロード</Button>
+          <Button type="button" onClick={() => void downloadItem()} disabled={downloading}>
+            {downloading ? '取得中…' : 'ダウンロード'}
+          </Button>
+          {downloadError ? <p className="text-danger text-xs" role="alert">{downloadError}</p> : null}
           {impact && impact.usageCount > 0 ? (
             <Button type="button" variant="primary" onClick={() => onOpenReplacement(item)}>使用先を差し替える</Button>
           ) : null}
@@ -220,13 +247,13 @@ export default function MediaDetailDialog({
           <div className="bg-canvas-sunken rounded-card flex min-h-96 items-center justify-center overflow-hidden border border-hairline">
             {item.kind === 'image' ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={item.url} alt={item.filename} className="max-h-96 max-w-full object-contain" />
+              <img src={displaySrc} alt={item.filename} className="max-h-96 max-w-full object-contain" />
             ) : item.kind === 'video' ? (
-              <video src={item.url} controls className="max-h-96 max-w-full" />
+              <video src={displaySrc} controls className="max-h-96 max-w-full" />
             ) : item.kind === 'audio' ? (
-              <audio src={item.url} controls />
+              <audio src={displaySrc} controls />
             ) : (
-              <a href={item.url} target="_blank" rel="noreferrer" className="text-action text-sm font-semibold">PDFを開く</a>
+              <a href={displaySrc} target="_blank" rel="noreferrer" className="text-action text-sm font-semibold">PDFを開く</a>
             )}
           </div>
 
