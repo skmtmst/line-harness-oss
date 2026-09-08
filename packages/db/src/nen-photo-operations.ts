@@ -321,6 +321,18 @@ export async function applyBulkPhotoDecisions(
       return { kind: 'risk_not_low', photoId: decision.photoId };
     }
   }
+  // 単票と同じく、友だちの所属アカウントも審査確定の前に照合する。
+  // 写真行だけ見ると、他アカウントへ移った友だちの写真を確定してしまう。
+  {
+    const friendIds = [...new Set(subjects.map((subject) => subject!.friendId))];
+    const placeholders = friendIds.map(() => '?').join(',');
+    const rows = await db.prepare(
+      `SELECT id FROM friends WHERE id IN (${placeholders}) AND line_account_id = ?`,
+    ).bind(...friendIds, input.lineAccountId).all<{ id: string }>();
+    const visible = new Set(rows.results.map((row) => row.id));
+    const mismatchIndex = subjects.findIndex((subject) => !visible.has(subject!.friendId));
+    if (mismatchIndex >= 0) return { kind: 'not_found', photoId: input.decisions[mismatchIndex].photoId };
+  }
   const now = input.now ?? new Date().toISOString();
   const eventIds = input.decisions.map(() => crypto.randomUUID());
   const result: BulkPhotoDecisionResult = {
@@ -409,17 +421,32 @@ export async function recordBulkDecisionNotificationResult(
     idempotencyKey: string;
     result: BulkNotificationResult;
     now?: string;
+    /**
+     * 通知前の受付票だけ上書きするCAS。送達台帳からの復旧用。
+     * 並行する確定側の新しい結果を、古い復旧結果で上書きしない。
+     */
+    onlyIfPending?: boolean;
   },
 ): Promise<boolean> {
   const now = input.now ?? new Date().toISOString();
-  const updated = await db.prepare(
-    `UPDATE nen_photo_bulk_decision_receipts
-        SET result_json = ?, created_at = ?
-      WHERE id = ? AND line_account_id = ? AND requested_by = ? AND idempotency_key = ?`,
-  ).bind(
-    JSON.stringify(input.result), now,
-    input.receiptId, input.lineAccountId, input.actorId, input.idempotencyKey,
-  ).run();
+  const updated = input.onlyIfPending
+    ? await db.prepare(
+      `UPDATE nen_photo_bulk_decision_receipts
+          SET result_json = ?, created_at = ?
+        WHERE id = ? AND line_account_id = ? AND requested_by = ? AND idempotency_key = ?
+          AND json_extract(result_json, '$.items[0].notificationStatus') IS NULL`,
+    ).bind(
+      JSON.stringify(input.result), now,
+      input.receiptId, input.lineAccountId, input.actorId, input.idempotencyKey,
+    ).run()
+    : await db.prepare(
+      `UPDATE nen_photo_bulk_decision_receipts
+          SET result_json = ?, created_at = ?
+        WHERE id = ? AND line_account_id = ? AND requested_by = ? AND idempotency_key = ?`,
+    ).bind(
+      JSON.stringify(input.result), now,
+      input.receiptId, input.lineAccountId, input.actorId, input.idempotencyKey,
+    ).run();
   return Number(updated.meta?.changes ?? 0) === 1;
 }
 

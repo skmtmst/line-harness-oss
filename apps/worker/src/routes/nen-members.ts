@@ -199,12 +199,14 @@ export async function sendPhotoReviewNotification(
     { lineAccountId: photo.line_account_id, field: 'channel_access_token' },
   );
   const message = photoReviewMessage(status, reasonCode, reasonNote);
+  // X-Line-Retry-Key はLINE仕様でUUID形式が必須のため、UUIDのdecisionIdをそのまま使う。
+  // `nen-photo-review:` 接頭辞を付けると実送信が400で失敗する。
   await pushViaHarnessProxy(
     c.env.WORKER_PUBLIC_URL || new URL(c.req.url).origin,
     accessToken,
     photo.line_user_id,
     [{ type: 'text', text: message }],
-    `nen-photo-review:${decisionId}`,
+    decisionId,
     (request) => dispatchLineProxyLocally(request, c.env, c.executionCtx),
   );
 }

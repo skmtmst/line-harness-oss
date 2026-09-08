@@ -1,6 +1,8 @@
 import { Hono, type Context, type Next } from 'hono';
 import {
   applyBulkPhotoDecisions,
+  claimPhotoNotificationDelivery,
+  completePhotoNotificationDelivery,
   consumePhotoOriginalDownload,
   consumeStepUpGrant,
   getBulkDecisionReceipt,
@@ -397,6 +399,8 @@ async function healBulkDecisionReceipt(
       ? await recordBulkDecisionNotificationResult(c.env.DB, {
         receiptId: receipt.receiptId, lineAccountId: input.lineAccountId,
         actorId: c.get('staff')!.id, idempotencyKey: input.idempotencyKey, result: data,
+        // 復旧側は通知前の受付票だけ直す。確定側の新しい結果を古い復旧で上書きしない。
+        onlyIfPending: true,
       })
       : false;
     if (!recorded) console.error('heal bulk decision receipt failed', input.idempotencyKey);
@@ -432,6 +436,22 @@ async function notifyBulkPhotoDecisions(
     }).catch(() => null);
     if (!recipient) {
       const notificationError = '通知先が見つかりません';
+      // 送達台帳へ失敗として残す。pendingのままでは再送口の拾い上げ対象外になる。
+      try {
+        const claimed = await claimPhotoNotificationDelivery(c.env.DB, {
+          decisionId: item.decisionId, lineAccountId: input.lineAccountId,
+          leaseId: crypto.randomUUID(),
+          leaseExpiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+        });
+        if (claimed) {
+          await completePhotoNotificationDelivery(c.env.DB, {
+            decisionId: item.decisionId, lineAccountId: input.lineAccountId,
+            generation: claimed.generation, status: 'failed', error: notificationError,
+          });
+        }
+      } catch (error) {
+        console.error('bulk photo decision recipient failure record failed', item.decisionId, error);
+      }
       notified.push({ ...item, notificationStatus: 'failed', notificationError });
       notificationFailures.push({ photoId: item.photoId, error: notificationError });
       continue;
