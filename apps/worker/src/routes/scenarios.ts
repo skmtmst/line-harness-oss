@@ -679,7 +679,7 @@ scenarios.delete('/api/scenarios/:id', requireRole('owner', 'admin'), async (c) 
     return c.json({ success: true, data: null });
   } catch (err) {
     const code = err instanceof Error ? err.message : '';
-    if (code === 'SCENARIO_HAS_DEPENDENTS') {
+    if (code === 'SCENARIO_HAS_DEPENDENTS' || /FOREIGN KEY/i.test(code)) {
       return c.json({ success: false, error: '他の機能から使われているため削除できません。先に連携を外してください。' }, 409);
     }
     console.error('DELETE /api/scenarios/:id error:', err);
