@@ -27,6 +27,25 @@ let mfB: Miniflare;
 let dbA: RealD1;
 let dbB: RealD1;
 
+/**
+ * 別接続との書き込み競合(SQLITE_BUSY相当)は、本番のD1が中でさばく。
+ * ローカルの2台構成では表面化するため、呼び出し側の再試行で吸収する。
+ * 再試行しても勝敗の確定性(1件だけ送る)は変わらない。
+ */
+async function withBusyRetry<T>(fn: () => Promise<T>, tries = 15): Promise<T> {
+  let lastError: unknown = null;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (!/BUSY|locked|internal error/i.test(String(error))) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 25 * (i + 1)));
+    }
+  }
+  throw lastError;
+}
+
 async function applySchema(db: RealD1): Promise<void> {
   const statements = bootstrapSql
     .split('\n')
@@ -97,8 +116,8 @@ describe('独立2接続の送信権競合', () => {
       .prepare(`UPDATE ad_conversion_logs SET created_at = '2026-09-01T00:00:00+09:00' WHERE idempotency_key = 'evt-dual'`)
       .run();
     const [fromA, fromB] = await Promise.all([
-      claimAdConversionSend(dbA, base),
-      claimAdConversionSend(dbB, base),
+      withBusyRetry(() => claimAdConversionSend(dbA, base)),
+      withBusyRetry(() => claimAdConversionSend(dbB, base)),
     ]);
     const dispositions = [fromA.disposition, fromB.disposition].sort();
     expect(dispositions).toEqual(['send', 'skip-inflight']);
@@ -106,14 +125,14 @@ describe('独立2接続の送信権競合', () => {
     expect(winner.providerEventId).toBe('evt-dual:px');
 
     // 勝った証だけ確定が通る。
-    await finishAdConversionSend(dbB, {
+    await withBusyRetry(() => finishAdConversionSend(dbB, {
       platformId: 'px',
       friendId: 'f1',
       eventName: 'Purchase',
       idempotencyKey: 'evt-dual',
       lease: winner.lease ?? 'missing',
       status: 'sent',
-    });
+    }));
     const row = await dbA
       .prepare(`SELECT status FROM ad_conversion_logs WHERE idempotency_key = 'evt-dual'`)
       .first<{ status: string }>();
