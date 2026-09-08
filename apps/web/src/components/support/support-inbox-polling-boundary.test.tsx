@@ -173,21 +173,26 @@ function collectButtons(node: unknown, out: Array<() => void>): void {
   collectButtons(el.props?.children, out)
 }
 
-/** 一覧の先頭の行を押す(選択+詳細の即時取得)。 */
-function clickFirstItem(): void {
+/** 一覧の行を押す(選択+詳細の即時取得)。 */
+function clickItemAt(index: number): void {
   const buttons: Array<() => void> = []
   collectButtons(tree, buttons)
-  expect(buttons.length).toBeGreaterThan(0)
-  buttons[0]()
+  expect(buttons.length).toBeGreaterThan(index)
+  buttons[index]()
+}
+
+/** 一覧の先頭の行を押す(選択+詳細の即時取得)。 */
+function clickFirstItem(): void {
+  clickItemAt(0)
 }
 
 const flush = () => vi.advanceTimersByTimeAsync(0)
 
-function makeItem(status: string) {
+function makeItem(id: string, threadId: string, status: string) {
   const now = new Date().toISOString()
   return {
-    id: 'i1',
-    threadId: 't1',
+    id,
+    threadId,
     channel: 'email',
     customerName: '山田',
     customerIdentifier: 'a@example.com',
@@ -199,10 +204,10 @@ function makeItem(status: string) {
   }
 }
 
-function makeDetail(status: string) {
+function makeDetail(threadId: string, status: string) {
   return {
     thread: {
-      id: 't1',
+      id: threadId,
       customer_email: 'a@example.com',
       customer_name: '山田',
       subject: '件名',
@@ -248,7 +253,7 @@ afterEach(() => {
 
 describe('問い合わせ一覧の制御器は選択更新で作り直さない (#630)', () => {
   it('詳細Promise未解決でも5秒/10秒後の取得は1本のまま', async () => {
-    const item = makeItem('in_progress')
+    const item = makeItem('i1', 't1', 'in_progress')
     let resolveDetail!: (value: unknown) => void
     let detailCalls = 0
     fetchMock.setImpl(async (url: string) => {
@@ -271,7 +276,7 @@ describe('問い合わせ一覧の制御器は選択更新で作り直さない 
     clickFirstItem() // 選択+詳細d1
     await flush()
     expect(detailCalls).toBe(1)
-    resolveDetail({ success: true, data: makeDetail('in_progress') })
+    resolveDetail({ success: true, data: makeDetail('t1', 'in_progress') })
     await flush()
     render() // 選択・詳細の反映。制御器は作り直さない
     expect(doc.addEventListener).toHaveBeenCalledTimes(1)
@@ -289,7 +294,7 @@ describe('問い合わせ一覧の制御器は選択更新で作り直さない 
     expect(detailCalls).toBe(2)
 
     // d2が終わったら次の1本だけ進む。
-    resolveDetail({ success: true, data: makeDetail('in_progress') })
+    resolveDetail({ success: true, data: makeDetail('t1', 'in_progress') })
     await flush()
     render()
     await vi.advanceTimersByTimeAsync(5000)
@@ -297,7 +302,7 @@ describe('問い合わせ一覧の制御器は選択更新で作り直さない 
   })
 
   it('同じ状態更新を挟んでも失敗バックオフを維持する', async () => {
-    const item = makeItem('in_progress')
+    const item = makeItem('i1', 't1', 'in_progress')
     let detailCalls = 0
     fetchMock.setImpl(async (url: string) => {
       if (url.includes('/api/support/inbox')) {
@@ -330,5 +335,55 @@ describe('問い合わせ一覧の制御器は選択更新で作り直さない 
     expect(detailCalls).toBe(2)
     await vi.advanceTimersByTimeAsync(5000)
     expect(detailCalls).toBe(3)
+  })
+
+  it('resolved A→未解決Bへ切替え、B初回詳細失敗でも次pollでBを再取得する', async () => {
+    const itemA = makeItem('ia', 'ta', 'resolved')
+    const itemB = makeItem('ib', 'tb', 'unread')
+    const calls: Record<string, number> = { ta: 0, tb: 0 }
+    let resolveA!: (value: unknown) => void
+    let failB = false
+    fetchMock.setImpl(async (url: string) => {
+      if (url.includes('/api/support/inbox')) {
+        return { success: true, data: { items: [{ ...itemA }, { ...itemB }] } }
+      }
+      const m = url.match(/\/threads\/([^/]+)$/)
+      if (m) {
+        const id = m[1]
+        calls[id] = (calls[id] ?? 0) + 1
+        if (id === 'ta') {
+          return new Promise<unknown>((resolve) => {
+            resolveA = resolve
+          })
+        }
+        if (failB) throw new Error('no connection')
+        return { success: true, data: makeDetail('tb', 'unread') }
+      }
+      return { success: true, data: {} }
+    })
+
+    render()
+    await flush()
+    render()
+    // 対応済みAを選択し、詳細を受け取る。
+    clickItemAt(0)
+    await flush()
+    expect(calls.ta).toBe(1)
+    resolveA({ success: true, data: makeDetail('ta', 'resolved') })
+    await flush()
+    render()
+    expect(doc.addEventListener).toHaveBeenCalledTimes(1)
+
+    // 未解決Bへ切替え。初回の詳細取得は失敗する。
+    failB = true
+    clickItemAt(1)
+    await flush()
+    expect(calls.tb).toBe(1)
+    render()
+
+    // 旧詳細(Aのresolved)が残っていたら再取得しない。捨てていれば次pollでBを再取得する。
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(calls.tb).toBe(2)
+    expect(calls.ta).toBe(1)
   })
 })

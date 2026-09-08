@@ -69,4 +69,11 @@ describe('問い合わせ一覧の定期取得 (#630)', () => {
     expect(inbox).toContain('[loadDetail, loadInbox, status, inboxRetryKey]')
     expect(inbox).toContain('selectedRef.current')
   })
+
+  it('選択切替時は旧詳細を捨てる(前スレッドの対応済みを残さない)', () => {
+    const chooseBlock = inbox
+      .slice(inbox.indexOf('const choose = '))
+      .split('const updateStatus')[0]
+    expect(chooseBlock).toContain('setDetail(null)')
+  })
 })

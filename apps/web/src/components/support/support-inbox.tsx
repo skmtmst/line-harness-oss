@@ -184,8 +184,10 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
   const choose = (item: InboxItem) => {
     setSelected(item)
     setError('')
+    // 選択切替時は旧詳細を捨てる。残すと、前スレッドの対応済み状態が
+    // detailStatusRef に残り、未解決の新スレッドの再取得を止めてしまう(#630)。
+    setDetail(null)
     if (item.channel === 'email') void loadDetail(item.threadId)
-    else setDetail(null)
   }
 
   const updateStatus = async (next: ThreadStatus) => {
