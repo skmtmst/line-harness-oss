@@ -1188,13 +1188,16 @@ export class MileageRedemptionConfirmError extends Error {
  *
  * - 'send' … 自分が貸出を持った。送ってよいのはこの走者だけ。
  * - 'sent' … 送信済み。送らない(やり直しが再送しないための outbox の口)。
- * - 'reconcile' … 送達不明(送ったかもしれないが確定できなかった)。
- *   **送り直さない。** 同じ冪等キーで照合して確定だけ進める。
+ * - 'reconcile' … 照合待ち。「送るかもしれない」の証言が残っているが、
+ *   送ったか確かめられない。**送り直さないし、勝手に確定もしない。**
  *   受信先が冪等でなくても二重に届かないのはこのため。
  * - 'busy' … 別の走者が貸出を持っている。送らずに待つ。
  *
- * 期限切れの引き継ぎでは世代を進める。古い走者の遅い確定は
- * owner と fence が合わずに拒否される(取り違え防止の fence)。
+ * 証言は送る前に残す。送ったあとの確定書き込みが何度失敗しても、
+ * 証言は残るので回収は送り直さない。期限切れの引き継ぎでは世代を進め、
+ * 期限切れの旧持ち主が貸出を取り直しても 'reconcile' しか返らない
+ * (旧持ち主の再送は禁止)。古い走者の遅い確定は owner と fence が
+ * 合わずに拒否される(取り違え防止の fence)。
  */
 export type RedemptionStepClaim = 'send' | 'sent' | 'reconcile' | 'busy';
 
@@ -1238,12 +1241,17 @@ export async function claimRedemptionStep(
   let existing = await selectRedemptionStep(db, input.redemptionId, input.stepKey);
   if (!existing) {
     try {
+      /*
+       * 証言つきの確保。「送るかもしれない」を送る前に残す。
+       * この書き込みに失敗したら送らない。送ったあとの確定が
+       * 何度失敗しても証言は残るので、回収は送り直さない。
+       */
       await db.prepare(
         `INSERT INTO mileage_redemption_step_deliveries
            (redemption_id, step_key, idempotency_key, status,
             owner, lease_expires_at, generation, fence_token, needs_reconcile,
             created_at, updated_at)
-         VALUES (?, ?, ?, 'started', ?, ?, 1, ?, 0, ?, ?)`,
+         VALUES (?, ?, ?, 'started', ?, ?, 1, ?, 1, ?, ?)`,
       ).bind(
         input.redemptionId, input.stepKey, input.idempotencyKey,
         input.owner, input.leaseExpiresAt, input.fenceToken,
@@ -1257,16 +1265,16 @@ export async function claimRedemptionStep(
     }
   }
   if (existing.status === 'sent') return 'sent';
-  // 送達不明は送り直さない。確定だけ進める側の仕事。
+  // 証言がある行は、誰も送り直さないし勝手に確定もしない。照合待ち。
   if (existing.needsReconcile === 1) return 'reconcile';
   const leaseLive = existing.leaseExpiresAt !== null && existing.leaseExpiresAt > input.now;
   // 別の走者が貸出を持っている間は、送らずに待つ。
   if (leaseLive && existing.owner !== null && existing.owner !== input.owner) return 'busy';
   if (existing.owner === input.owner && leaseLive) {
-    // 同じ走者の取り直し：貸出を延ばし、fenceだけ新しくする。
+    // 同じ走者の取り直し：貸出を延ばし、証言と fence を新しくする。
     const refreshed = await db.prepare(
       `UPDATE mileage_redemption_step_deliveries
-          SET lease_expires_at = ?, fence_token = ?,
+          SET lease_expires_at = ?, fence_token = ?, needs_reconcile = 1,
               attempt_count = attempt_count + 1, updated_at = ?
         WHERE redemption_id = ? AND step_key = ?
           AND status = 'started' AND needs_reconcile = 0 AND owner = ?`,
@@ -1276,11 +1284,13 @@ export async function claimRedemptionStep(
     ).run();
     return (refreshed.meta?.changes ?? 0) === 1 ? 'send' : 'busy';
   }
-  // 期限切れの引き継ぎ：世代を進める。古い走者の遅い確定は通らない。
+  // 期限切れの引き継ぎ：世代を進め、証言つきで取り直す。
+  // 古い走者の遅い確定は通らない。
   const taken = await db.prepare(
     `UPDATE mileage_redemption_step_deliveries
         SET owner = ?, lease_expires_at = ?, generation = generation + 1,
-            fence_token = ?, attempt_count = attempt_count + 1, updated_at = ?
+            fence_token = ?, needs_reconcile = 1,
+            attempt_count = attempt_count + 1, updated_at = ?
       WHERE redemption_id = ? AND step_key = ?
         AND status = 'started' AND needs_reconcile = 0
         AND (lease_expires_at IS NULL OR lease_expires_at <= ?)`,
@@ -1292,9 +1302,10 @@ export async function claimRedemptionStep(
 }
 
 /**
- * 外部送信が終わった手順を sent にする。自分の貸出の確定だけ通す。
- * 古い走者の遅い確定・確保していない行の確定は投げる。
- * 呼び出し側はどちらも確定失敗として扱い、失敗には落とさない。
+ * 外部送信が終わった手順を sent にする。証言つきの自分の貸出だけ通す。
+ * 証言を消した行(送らなかったことが決まった行)・古い走者の遅い確定・
+ * 確保していない行の確定は投げる。呼び出し側は確定失敗として扱い、
+ * 失敗には落とさない(証言が残るので回収は送り直さない)。
  */
 export async function markRedemptionStepSent(
   db: D1Database,
@@ -1304,7 +1315,7 @@ export async function markRedemptionStepSent(
     `UPDATE mileage_redemption_step_deliveries
         SET status = 'sent', needs_reconcile = 0, updated_at = ?
       WHERE redemption_id = ? AND step_key = ?
-        AND status = 'started' AND needs_reconcile = 0
+        AND status = 'started' AND needs_reconcile = 1
         AND owner = ? AND fence_token = ?`,
   ).bind(input.now, input.redemptionId, input.stepKey, input.owner, input.fenceToken).run();
   if ((result.meta?.changes ?? 0) !== 1) {
@@ -1313,54 +1324,21 @@ export async function markRedemptionStepSent(
 }
 
 /**
- * 外部送信は終わったが確定に失敗した手順を、送達不明として残す。
- * 「送ったかもしれない」の証言。回収はこの行を送り直さず、
- * 同じ冪等キーの照合で確定だけ進める。貸出を失った古い走者の
- * 証言は受け付けない(今の持ち主が進める)。
+ * 送らなかった手順の証言を消す。実行器が送る前に失敗したときだけ使う。
+ * 消せたら回収は送り直してよい(送っていないことが決まった)。
+ * 消せなければ照合待ちのまま残し、送り直さない。
  */
-export async function markRedemptionStepUnknown(
+export async function clearRedemptionStepIntent(
   db: D1Database,
-  input: {
-    redemptionId: string; stepKey: string; idempotencyKey: string;
-    owner: string; fenceToken: string; now: string;
-  },
+  input: { redemptionId: string; stepKey: string; owner: string; fenceToken: string; now: string },
 ): Promise<void> {
   const result = await db.prepare(
     `UPDATE mileage_redemption_step_deliveries
-        SET needs_reconcile = 1, updated_at = ?
+        SET needs_reconcile = 0, updated_at = ?
       WHERE redemption_id = ? AND step_key = ?
-        AND status = 'started' AND needs_reconcile = 0
-        AND owner = ? AND fence_token = ? AND idempotency_key = ?`,
-  ).bind(
-    input.now, input.redemptionId, input.stepKey,
-    input.owner, input.fenceToken, input.idempotencyKey,
-  ).run();
-  if ((result.meta?.changes ?? 0) !== 1) {
-    throw new MileageRedemptionConfirmError();
-  }
-}
-
-/**
- * 送達不明の手順を、送り直さず確定だけ進める。同じ冪等キーであることを
- * 照合し、違う手順の確定には使えない。早い者勝ちで1走者だけ通る。
- */
-export async function confirmReconciledRedemptionStep(
-  db: D1Database,
-  input: {
-    redemptionId: string; stepKey: string; idempotencyKey: string;
-    owner: string; fenceToken: string; now: string;
-  },
-): Promise<void> {
-  const result = await db.prepare(
-    `UPDATE mileage_redemption_step_deliveries
-        SET status = 'sent', needs_reconcile = 0,
-            owner = ?, fence_token = ?, generation = generation + 1, updated_at = ?
-      WHERE redemption_id = ? AND step_key = ?
-        AND status = 'started' AND needs_reconcile = 1 AND idempotency_key = ?`,
-  ).bind(
-    input.owner, input.fenceToken, input.now,
-    input.redemptionId, input.stepKey, input.idempotencyKey,
-  ).run();
+        AND status = 'started' AND needs_reconcile = 1
+        AND owner = ? AND fence_token = ?`,
+  ).bind(input.now, input.redemptionId, input.stepKey, input.owner, input.fenceToken).run();
   if ((result.meta?.changes ?? 0) !== 1) {
     throw new MileageRedemptionConfirmError();
   }

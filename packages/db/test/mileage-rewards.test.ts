@@ -5,13 +5,12 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   claimRedemptionStep,
-  confirmReconciledRedemptionStep,
+  clearRedemptionStepIntent,
   createMileageRewardDraft,
   getMileageReward,
   importMileageRewardCodes,
   listMileageRedemptions,
   markRedemptionStepSent,
-  markRedemptionStepUnknown,
   publishMileageReward,
   recordMileageRedemptionAttempt,
   refundMileageRewardRedemption,
@@ -418,8 +417,8 @@ describe('V6 mileage rewards', () => {
       owner, fenceToken, leaseExpiresAt: '2026-09-09T00:05:00.000Z', now,
     });
     expect(await claimRedemptionStep(db, lease('owner-a', 'fence-a1', '2026-09-09T00:00:00.000Z'))).toBe('send');
-    // 貸出中の別走者は送らずに待つ。
-    expect(await claimRedemptionStep(db, lease('owner-b', 'fence-b1', '2026-09-09T00:01:00.000Z'))).toBe('busy');
+    // 証言つきの貸出中の別走者は、送らずに待つ(照合待ち)。
+    expect(await claimRedemptionStep(db, lease('owner-b', 'fence-b1', '2026-09-09T00:01:00.000Z'))).toBe('reconcile');
     await markRedemptionStepSent(db, {
       redemptionId: reserved.redemption.id, stepKey: '0:w1',
       owner: 'owner-a', fenceToken: 'fence-a1', now: '2026-09-09T00:02:00.000Z',
@@ -428,6 +427,48 @@ describe('V6 mileage rewards', () => {
     expect(await claimRedemptionStep(db, lease('owner-b', 'fence-b2', '2026-09-09T00:03:00.000Z'))).toBe('sent');
     await expect(markRedemptionStepSent(db, {
       redemptionId: reserved.redemption.id, stepKey: '0:missing',
+      owner: 'owner-a', fenceToken: 'fence-a1', now: '2026-09-09T00:03:00.000Z',
+    })).rejects.toMatchObject({ name: 'MileageRedemptionConfirmError' });
+  });
+
+  it('clears the intent only for a pre-send failure and blocks confirming it', async () => {
+    const draft = await createMileageRewardDraft(db, {
+      lineAccountId: 'account-1',
+      draft: { name: '500円引き', rewardKind: 'coupon', requiredMiles: 300 },
+    });
+    await importMileageRewardCodes(db, {
+      rewardId: draft.id, lineAccountId: 'account-1',
+      codes: [{ ciphertext: 'encrypted-code', fingerprint: 'fingerprint-4' }],
+    });
+    await publishMileageReward(db, { id: draft.id, lineAccountId: 'account-1' });
+    const reserved = await reserveMileageRewardRedemption(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', rewardId: draft.id,
+      idempotencyKey: 'redeem-step-clear', requestFingerprint: 'fp-step-clear',
+    });
+    const lease = (owner: string, fenceToken: string, now: string) => ({
+      redemptionId: reserved.redemption.id, stepKey: '0:w1', idempotencyKey: 'step-key-4',
+      owner, fenceToken, leaseExpiresAt: '2026-09-09T00:05:00.000Z', now,
+    });
+    // 確保と同時に証言が残る。送る前に失敗したら証言を消せる。
+    expect(await claimRedemptionStep(db, lease('owner-a', 'fence-a1', '2026-09-09T00:00:00.000Z'))).toBe('send');
+    expect(sqlite.prepare(
+      `SELECT needs_reconcile AS needsReconcile FROM mileage_redemption_step_deliveries
+        WHERE redemption_id = ? AND step_key = '0:w1'`,
+    ).get(reserved.redemption.id)).toEqual({ needsReconcile: 1 });
+    await clearRedemptionStepIntent(db, {
+      redemptionId: reserved.redemption.id, stepKey: '0:w1',
+      owner: 'owner-a', fenceToken: 'fence-a1', now: '2026-09-09T00:01:00.000Z',
+    });
+    // 証言なし・貸出中の別走者は、送らずに待つ(busy)。
+    expect(await claimRedemptionStep(db, lease('owner-b', 'fence-b1', '2026-09-09T00:02:00.000Z'))).toBe('busy');
+    // 証言を消した行の確定は通らない(送っていないので確定できない)。
+    await expect(markRedemptionStepSent(db, {
+      redemptionId: reserved.redemption.id, stepKey: '0:w1',
+      owner: 'owner-a', fenceToken: 'fence-a1', now: '2026-09-09T00:02:00.000Z',
+    })).rejects.toMatchObject({ name: 'MileageRedemptionConfirmError' });
+    // 証言消しは一度きり。二度目は通らない。
+    await expect(clearRedemptionStepIntent(db, {
+      redemptionId: reserved.redemption.id, stepKey: '0:w1',
       owner: 'owner-a', fenceToken: 'fence-a1', now: '2026-09-09T00:03:00.000Z',
     })).rejects.toMatchObject({ name: 'MileageRedemptionConfirmError' });
   });
@@ -451,6 +492,11 @@ describe('V6 mileage rewards', () => {
       owner, fenceToken, leaseExpiresAt: '2026-09-09T00:05:00.000Z', now,
     });
     expect(await claimRedemptionStep(db, lease('owner-a', 'fence-a1', '2026-09-09T00:00:00.000Z'))).toBe('send');
+    // 旧持ち主は送る前に失敗し、証言を消して倒れたとする。
+    await clearRedemptionStepIntent(db, {
+      redemptionId: reserved.redemption.id, stepKey: '0:w1',
+      owner: 'owner-a', fenceToken: 'fence-a1', now: '2026-09-09T00:01:00.000Z',
+    });
     // 貸出期限を過ぎたら別走者が引き継ぎ、世代が進む。
     expect(await claimRedemptionStep(db, {
       ...lease('owner-b', 'fence-b1', '2026-09-09T01:00:00.000Z'),
@@ -465,13 +511,18 @@ describe('V6 mileage rewards', () => {
       redemptionId: reserved.redemption.id, stepKey: '0:w1',
       owner: 'owner-a', fenceToken: 'fence-a1', now: '2026-09-09T01:01:00.000Z',
     })).rejects.toMatchObject({ name: 'MileageRedemptionConfirmError' });
+    // 期限切れの旧持ち主が貸出を取り直しても、送り直しは許さない。
+    expect(await claimRedemptionStep(db, {
+      ...lease('owner-a', 'fence-a2', '2026-09-09T01:01:00.000Z'),
+      leaseExpiresAt: '2026-09-09T01:06:00.000Z',
+    })).toBe('reconcile');
     await markRedemptionStepSent(db, {
       redemptionId: reserved.redemption.id, stepKey: '0:w1',
       owner: 'owner-b', fenceToken: 'fence-b1', now: '2026-09-09T01:02:00.000Z',
     });
   });
 
-  it('reconciles an unknown step without resending and rejects a mismatched key', async () => {
+  it('waits on an uncertain step without resending or confirming it', async () => {
     const draft = await createMileageRewardDraft(db, {
       lineAccountId: 'account-1',
       draft: { name: '500円引き', rewardKind: 'coupon', requiredMiles: 300 },
@@ -489,22 +540,22 @@ describe('V6 mileage rewards', () => {
       redemptionId: reserved.redemption.id, stepKey: '0:w1', idempotencyKey: 'step-key-3',
       owner, fenceToken, leaseExpiresAt: '2026-09-09T00:05:00.000Z', now,
     });
+    // 確保と同時に証言が残る。以降は誰も送り直さないし確定もしない。
     expect(await claimRedemptionStep(db, lease('owner-a', 'fence-a1', '2026-09-09T00:00:00.000Z'))).toBe('send');
-    await markRedemptionStepUnknown(db, {
-      ...lease('owner-a', 'fence-a1', '2026-09-09T00:01:00.000Z'),
-    });
-    // 送達不明は送り直さず、照合だけ求める。
     expect(await claimRedemptionStep(db, lease('owner-b', 'fence-b1', '2026-09-09T00:02:00.000Z'))).toBe('reconcile');
-    // 違う冪等キーでの確定は通らない。
-    await expect(confirmReconciledRedemptionStep(db, {
-      redemptionId: reserved.redemption.id, stepKey: '0:w1', idempotencyKey: 'wrong-key',
-      owner: 'owner-b', fenceToken: 'fence-b1', now: '2026-09-09T00:02:00.000Z',
-    })).rejects.toMatchObject({ name: 'MileageRedemptionConfirmError' });
-    await confirmReconciledRedemptionStep(db, {
-      redemptionId: reserved.redemption.id, stepKey: '0:w1', idempotencyKey: 'step-key-3',
-      owner: 'owner-b', fenceToken: 'fence-b1', now: '2026-09-09T00:02:00.000Z',
-    });
-    expect(await claimRedemptionStep(db, lease('owner-b', 'fence-b2', '2026-09-09T00:03:00.000Z'))).toBe('sent');
+    // 期限切れの旧持ち主が取り直しても、貸出は戻らず照合待ちのまま。
+    expect(await claimRedemptionStep(db, {
+      ...lease('owner-a', 'fence-a2', '2026-09-09T01:00:00.000Z'),
+      leaseExpiresAt: '2026-09-09T01:05:00.000Z',
+    })).toBe('reconcile');
+    expect(await claimRedemptionStep(db, {
+      ...lease('owner-b', 'fence-b2', '2026-09-09T01:00:00.000Z'),
+      leaseExpiresAt: '2026-09-09T01:05:00.000Z',
+    })).toBe('reconcile');
+    expect(sqlite.prepare(
+      `SELECT status, needs_reconcile AS needsReconcile, generation
+         FROM mileage_redemption_step_deliveries WHERE redemption_id = ? AND step_key = '0:w1'`,
+    ).get(reserved.redemption.id)).toEqual({ status: 'started', needsReconcile: 1, generation: 1 });
   });
 
   it('rejects unsupported or more than 15 reward target conditions', async () => {
