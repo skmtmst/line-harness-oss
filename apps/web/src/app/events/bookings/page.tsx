@@ -58,6 +58,8 @@ function BookingsInner() {
   const { selectedAccountId, accounts } = useAccount()
   const [event, setEvent] = useState<EventDetail | null>(null)
   const [items, setItems] = useState<EventBookingItem[]>([])
+  // 裏側は200件で切る。超えたら注意を出す(点検#520の中8)。
+  const [bookingsTotal, setBookingsTotal] = useState(0)
   const [waitlistCount, setWaitlistCount] = useState<number | null>(null)
   const [totalCapacity, setTotalCapacity] = useState<number | null>(null)
   const [capacityStatus, setCapacityStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -123,6 +125,7 @@ function BookingsInner() {
       if (!Array.isArray(listRes?.items)) throw new Error('malformed')
       setEvent((current) => (typeof evRes?.name === 'string' ? evRes : current))
       setItems(listRes.items)
+      setBookingsTotal(typeof listRes.total === 'number' ? listRes.total : listRes.items.length)
       setWaitlistCount(
         Array.isArray(waitlistRes?.waitlist)
           ? waitlistRes.waitlist.length
@@ -137,6 +140,7 @@ function BookingsInner() {
       */
       setEvent(null)
       setItems([])
+      setBookingsTotal(0)
       setWaitlistCount(null)
       setLoadStatus('error')
     }
@@ -148,7 +152,7 @@ function BookingsInner() {
   }, [refresh])
 
   /*
-    枠の合計＝定員。一覧APIからしか取れない。
+    枠の合計＝定員。枠の一覧から数える(編集画面と同じ決め方)。
 
     **「定員なし」と「定員を取れなかった」を分ける。** 前は失敗しても
     `totalCapacity` が null のままで「定員なし」と出た。**上限が無いのか、
@@ -159,22 +163,18 @@ function BookingsInner() {
     let alive = true
     setCapacityStatus('loading')
     setTotalCapacity(null)
+    // 定員は枠の一覧から数える。イベント一覧の全件取得はやめた。
+    // 編集画面と同じ決め方(定員なしの枠が混ざれば合計なし)にする。
     eventsApi
-      .listEvents(selectedAccountId)
+      .listSlots(selectedAccountId, eventId)
       .then((r) => {
         if (!alive) return
-        const summary = r.items.find((x) => x.id === eventId)
-        setTotalCapacity(summary?.total_capacity ?? null)
-        if (summary) {
-          setEvent((current) => current ?? ({
-            ...summary,
-            confirmation_message_extra: null,
-            reminder_message_extra: null,
-            og_title: null,
-            og_description: null,
-            og_image_url: null,
-          } satisfies EventDetail))
-        }
+        const slots = r.items
+        setTotalCapacity(
+          slots.some((slot) => slot.capacity == null)
+            ? null
+            : slots.reduce((sum, slot) => sum + (slot.capacity ?? 0), 0),
+        )
         setCapacityStatus('ready')
       })
       .catch(() => {
@@ -274,7 +274,7 @@ function BookingsInner() {
   const pending = items.filter((b) => b.status === 'requested').length
   const cancelled = items.filter((b) => b.status === 'cancelled').length
   const applied = confirmed + pending
-  // 定員は一覧APIが持っている（枠の合計）。詳細APIには入っていない。
+  // 定員は枠の一覧から数える(編集画面と同じ決め方)。詳細APIには入っていない。
   const capacity = totalCapacity ?? 0
 
   return (
@@ -421,6 +421,12 @@ function BookingsInner() {
               該当する予約はありません
             </div>
           ) : (
+            <>
+            {bookingsTotal > items.length && (
+              <p className="text-ink-secondary border-hairline border-b px-4 py-2 text-xs">
+                200件まで表示しています。状態の絞り込みを変えて探してください。
+              </p>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full min-w-full text-sm">
                 <thead className="bg-canvas-sunken text-ink-secondary">
@@ -527,6 +533,7 @@ function BookingsInner() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </div>
 

@@ -490,6 +490,17 @@ analytics.post('/api/analytics/cross/query', async (c) => {
     if (!account.ok) return account.response;
     const selectedAccount = await getLineAccountById(c.env.DB, account.accountId);
     if (!selectedAccount) return c.json({ success: false, error: 'Not found' }, 404);
+    // 実行は重い。終わっていない自分の集計がある間は受け付けない。
+    // 実行ボタンは運用担当にも出しているので、権限ではなく間隔で守る。
+    const busy = await c.env.DB
+      .prepare(
+        `SELECT id FROM analytics_cross_runs
+          WHERE line_account_id = ? AND state IN ('pending', 'running')
+          LIMIT 1`,
+      )
+      .bind(account.accountId)
+      .first<{ id: string }>();
+    if (busy) return c.json({ success: false, error: 'analytics_cross_busy' }, 429);
     const body = await c.req.json<unknown>();
     const result = await createAnalyticsCrossRun(c.env.DB, {
       lineAccountId: account.accountId,
@@ -794,6 +805,21 @@ analytics.post('/api/analytics/funnels/:id/run', async (c) => {
     if (!account.ok) return account.response;
     const selectedAccount = await getLineAccountById(c.env.DB, account.accountId);
     if (!selectedAccount) return c.json({ success: false, error: 'Not found' }, 404);
+    // 再集計はHTTPの中で時系列計算を同期実行する。連打がD1負荷に直結するので、
+    // 同一ファネルは前回から60秒は受け付けない。再集計ボタンは運用担当にも
+    // 出しているので、権限ではなく間隔で守る。
+    const lastRun = await c.env.DB
+      .prepare(
+        `SELECT created_at FROM analytics_funnel_runs
+          WHERE line_account_id = ? AND funnel_id = ?
+          ORDER BY created_at DESC, id DESC
+          LIMIT 1`,
+      )
+      .bind(account.accountId, c.req.param('id'))
+      .first<{ created_at: string }>();
+    if (lastRun && Date.now() - Date.parse(lastRun.created_at) < 60_000) {
+      return c.json({ success: false, error: 'analytics_funnel_too_soon' }, 429);
+    }
     const body = await c.req.json<{ cohortFrom?: unknown; cohortTo?: unknown }>();
     const result = await runChronologicalFunnel(c.env.DB, {
       lineAccountId: account.accountId,

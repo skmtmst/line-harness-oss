@@ -31,9 +31,14 @@ function BookingStatus({ accountId, eventId }: { accountId: string; eventId: str
   const [bookings, setBookings] = useState<EventBookingItem[]>([])
   const [waitlist, setWaitlist] = useState<EventWaitlistItem[]>([])
   const [loading, setLoading] = useState(true)
+  // どれか落ちても残りは出すが、黙って0件表示にしない。全部落ちたら
+  // 枠が0件に見え、申込なしと読み違えて定員判断を誤る(点検#520の中10)。
+  const [loadError, setLoadError] = useState(false)
+  const [reloadSeq, setReloadSeq] = useState(0)
 
   useEffect(() => {
     let cancelled = false
+    setLoadError(false)
     void (async () => {
       // どれか落ちても残りは出す。数えられなかったものは「—」になる。
       const [e, s, b, w] = await Promise.allSettled([
@@ -47,12 +52,13 @@ function BookingStatus({ accountId, eventId }: { accountId: string; eventId: str
       if (s.status === 'fulfilled') setSlots(s.value.items)
       if (b.status === 'fulfilled') setBookings(b.value.items)
       if (w.status === 'fulfilled') setWaitlist(w.value.waitlist)
+      if ([e, s, b, w].some((r) => r.status === 'rejected')) setLoadError(true)
       setLoading(false)
     })()
     return () => {
       cancelled = true
     }
-  }, [accountId, eventId])
+  }, [accountId, eventId, reloadSeq])
 
   const count = (status: string) => bookings.filter((x) => x.status === status).length
   /** 枠の定員の合計。定員なしの枠が混ざっていたら合計は出さない。 */
@@ -70,6 +76,12 @@ function BookingStatus({ accountId, eventId }: { accountId: string; eventId: str
 
   return (
     <div data-design="Status" className="mb-5">
+      {loadError && (
+        <p className="bg-warning-bg border-warning text-warning mb-3 rounded-control border px-4 py-3 text-xs" role="alert">
+          一部を取得できませんでした。数は実際より少なく見えます。
+          <button className="ml-2 font-semibold underline" onClick={() => { setLoading(true); setReloadSeq((n) => n + 1) }}>読み直す</button>
+        </p>
+      )}
       <div className="mb-2 flex items-center gap-2">
         <h2 className="text-ink text-sm font-bold">申込の状況</h2>
         {event && (

@@ -791,6 +791,10 @@ function SlotsStep({
       if (generated.length === 0) {
         throw new Error('条件に合う枠が0件でした。期間と曜日を確かめてください')
       }
+      // 下見の前に件数で止める。500件超は作る口も受け付けない(点検#520の中9)。
+      if (generated.length > 500) {
+        throw new Error('500件を超える一括作成はできません。期間や曜日を分けて追加してください')
+      }
       // 作る前に下見を出す。ここではまだ1件も作っていない。
       setBulkError('')
       setBulkPreview(generated)
