@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, fetchApi } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
+import { startVisiblePoll } from '@/lib/visible-polling'
 
 type Channel = 'all' | 'line' | 'email'
 type ThreadStatus = 'unread' | 'in_progress' | 'on_hold' | 'resolved'
@@ -90,7 +91,8 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
   const [error, setError] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  const loadInbox = useCallback(async (quiet = false) => {
+  // 静かな取り直しは成否を返す。失敗の数え直し・待ちの延長は startVisiblePoll が持つ。
+  const loadInbox = useCallback(async (quiet = false): Promise<boolean> => {
     if (!quiet) setLoading(true)
     try {
       const params = new URLSearchParams({ channel, status, limit: '200' })
@@ -102,34 +104,51 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
           const refreshed = response.data.items.find((item) => item.id === selected.id)
           if (refreshed) setSelected(refreshed)
         }
+        return true
       }
+      return false
     } catch {
-      setError('お問い合わせ一覧を読み込めませんでした')
+      if (!quiet) setError('お問い合わせ一覧を読み込めませんでした')
+      return false
     } finally {
       if (!quiet) setLoading(false)
     }
   }, [channel, query, selected, status])
 
-  const loadDetail = useCallback(async (threadId: string, quiet = false) => {
+  const loadDetail = useCallback(async (threadId: string, quiet = false): Promise<boolean> => {
     try {
       const response = await fetchApi<{ success: boolean; data: EmailDetail }>(`/api/support/email/threads/${encodeURIComponent(threadId)}`)
       if (response.success) {
         setDetail(response.data)
         if (!quiet) window.setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+        return true
       }
+      return false
     } catch {
-      setError('メールの会話を読み込めませんでした')
+      if (!quiet) setError('メールの会話を読み込めませんでした')
+      return false
     }
   }, [])
 
   useEffect(() => { void loadInbox() }, [channel, status, query]) // eslint-disable-line react-hooks/exhaustive-deps
+  // 未解決だけを5秒起点の1本で取り直す。非表示では止め、連続失敗は
+  // 待ちを延ばして上限後は再試行を出す(#630)。
+  const [inboxStalled, setInboxStalled] = useState(false)
+  const [inboxRetryKey, setInboxRetryKey] = useState(0)
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      void loadInbox(true)
-      if (selected?.channel === 'email') void loadDetail(selected.threadId, true)
-    }, 5_000)
-    return () => window.clearInterval(timer)
-  }, [loadDetail, loadInbox, selected])
+    setInboxStalled(false)
+    const stop = startVisiblePoll({
+      shouldPoll: () => status === 'open' || status === 'unread' || status === 'in_progress' || status === 'on_hold',
+      work: async () => {
+        const inboxOk = await loadInbox(true)
+        const detailOk = selected?.channel === 'email' ? await loadDetail(selected.threadId, true) : true
+        if (!inboxOk || !detailOk) throw new Error('お問い合わせ一覧を読み込めませんでした')
+      },
+      onGiveUp: () => setInboxStalled(true),
+      onRecovered: () => setInboxStalled(false),
+    })
+    return stop
+  }, [loadDetail, loadInbox, selected, status, inboxRetryKey])
 
 
   const choose = (item: InboxItem) => {
@@ -191,6 +210,18 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
       {error && (
         <div className="bg-danger-bg border-danger-bg text-danger rounded-card mb-4 border px-4 py-3 text-sm">
           {error}
+        </div>
+      )}
+      {inboxStalled && (
+        <div className="bg-danger-bg border-danger-bg text-danger rounded-card mb-4 border px-4 py-3 text-sm">
+          お問い合わせ一覧の更新を一時停止しています（接続できません）。
+          <button
+            type="button"
+            onClick={() => setInboxRetryKey((key) => key + 1)}
+            className="font-bold underline"
+          >
+            再試行する
+          </button>
         </div>
       )}
 
