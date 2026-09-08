@@ -30,7 +30,7 @@ export async function sendAdConversions(
   friendId: string,
   eventName: string,
   eventValue?: number,
-  opts?: { idempotencyKey?: string | null; lineAccountId?: string | null },
+  opts?: { idempotencyKey?: string | null; lineAccountId?: string | null; platformId?: string | null },
 ): Promise<void> {
   // 呼び出しをまたいだ重複送信を止める安定キー。無いときは今回限りの鍵にする。
   const idempotencyKey = opts?.idempotencyKey || crypto.randomUUID();
@@ -52,7 +52,10 @@ export async function sendAdConversions(
   const ref = await getRefTrackingWithClickIds(db, friendId);
   if (!ref) return;
 
-  const platforms = await getActiveAdPlatforms(db, lineAccountId);
+  // テスト送信など指定があるときはその媒体だけ送る(全媒体に広げない)。
+  const platforms = opts?.platformId
+    ? (await getActiveAdPlatforms(db, lineAccountId)).filter((p) => p.id === opts.platformId)
+    : await getActiveAdPlatforms(db, lineAccountId);
 
   for (const platform of platforms) {
     // 二重防御: 帰属が違う設定は送らない(DB側でも claim が弾く)。
@@ -79,7 +82,7 @@ export async function sendAdConversions(
           await sendXConversion(config, ref, eventName, eventValue, providerEventId);
           break;
         case 'google':
-          await sendGoogleConversion(config, ref, eventName, eventValue);
+          await sendGoogleConversion(config, ref, eventName, eventValue, providerEventId);
           break;
         case 'tiktok':
           await sendTikTokConversion(config, ref, eventName, eventValue, providerEventId);
@@ -205,17 +208,28 @@ async function sendXConversion(
   if (!config.api_key || !config.api_secret || !config.x_oauth_token || !config.x_oauth_token_secret) {
     throw new Error('X Conversion API credentials (api_key/api_secret/x_oauth_token/x_oauth_token_secret) are not configured');
   }
-  const url = 'https://ads-api.x.com/12/measurement/conversions';
+  if (!config.pixel_id) {
+    throw new Error('X Conversion API pixel_id is not configured');
+  }
+  // pixel_id はパスの一部。
+  const url = `https://ads-api.x.com/12/measurement/conversions/${encodeURIComponent(config.pixel_id)}`;
 
+  const identifiers: Array<Record<string, string>> = [{ twclid: ref.twclid ?? '' }];
+  if (ref.ip_address || ref.user_agent) {
+    identifiers.push({
+      ...(ref.ip_address ? { ip_address: ref.ip_address } : {}),
+      ...(ref.user_agent ? { user_agent: ref.user_agent } : {}),
+    });
+  }
   const body = {
     conversions: [{
       conversion_time: new Date().toISOString(),
       // 再試行では同じIDで送り、媒体側の重複計上を止める。
       event_id: providerEventId ?? crypto.randomUUID(),
-      identifiers: [{ twclid: ref.twclid }],
-      conversion_id: config.pixel_id,
-      event_name: eventName,
-      ...(eventValue && { value: { currency: 'JPY', amount: String(eventValue) } }),
+      identifiers,
+      // 金額は小数文字列、成果地点IDは設定が持つときだけ付ける。
+      ...(eventValue != null && { value: eventValue.toFixed(2), number_items: 1 }),
+      ...(config.conversion_id ? { conversion_id: config.conversion_id } : {}),
     }],
   };
 
@@ -246,6 +260,7 @@ async function sendGoogleConversion(
   ref: RefTracking,
   eventName: string,
   eventValue?: number,
+  providerEventId?: string,
 ): Promise<void> {
   const url = `https://googleads.googleapis.com/v17/customers/${config.customer_id}:uploadClickConversions`;
 
@@ -254,6 +269,8 @@ async function sendGoogleConversion(
       gclid: ref.gclid,
       conversion_action: `customers/${config.customer_id}/conversionActions/${config.conversion_action_id}`,
       conversion_date_time: new Date().toISOString().replace('Z', '+09:00'),
+      // 再送時の突き合わせ用。安定IDで送り、確定失敗後の重複を抑える。
+      ...(providerEventId ? { order_id: providerEventId } : {}),
       ...(eventValue && { conversion_value: eventValue, currency_code: 'JPY' }),
     }],
     partial_failure: true,
@@ -272,6 +289,19 @@ async function sendGoogleConversion(
   if (!response.ok) {
     const errorBody = await response.text();
     throw new Error(`Google Ads API error: ${response.status} ${errorBody}`);
+  }
+  // HTTP 200 でも conversions 単位の失敗が partialFailureError に入る。見落とさない。
+  let payload: unknown = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+  const partialFailure = payload !== null && typeof payload === 'object'
+    ? (payload as { partialFailureError?: unknown }).partialFailureError ?? null
+    : null;
+  if (partialFailure != null) {
+    throw new Error(`Google Ads partial failure: ${JSON.stringify(partialFailure).slice(0, 500)}`);
   }
 }
 

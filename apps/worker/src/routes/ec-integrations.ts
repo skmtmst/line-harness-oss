@@ -438,7 +438,7 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       await c.env.DB.prepare(
         `UPDATE ec_events SET friend_id = ?, status = 'processed', processed_at = ?, updated_at = ? WHERE id = ?`,
       ).bind(friend.id, now, now, row.id).run();
-      await fireEvent(c.env.DB, event.event_type, { sourceEventId: row.id, sourceKind: 'ec', friendId: friend.id, eventData: event }, accessToken, account.id);
+      await fireEvent(c.env.DB, event.event_type, { friendId: friend.id, eventData: event }, accessToken, account.id);
       await setEcActionExecutionStatus(c.env.DB, {
         eventId: row.id, lineAccountId, status: 'succeeded', now,
       });
@@ -475,7 +475,6 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
         `UPDATE ec_events SET friend_id = ?, status = 'skipped', error_message = 'notification_disabled', processed_at = ?, updated_at = ? WHERE id = ?`,
       ).bind(friend.id, now, now, row.id).run();
       await fireEvent(c.env.DB, event.event_type, {
-        sourceEventId: row.id, sourceKind: 'ec',
         friendId: friend.id,
         eventData: event,
       }, accessToken, account.id);
@@ -510,7 +509,6 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     ).bind(friend.id, now, now, row.id).run();
 
     await fireEvent(c.env.DB, event.event_type, {
-      sourceEventId: row.id, sourceKind: 'ec',
       friendId: friend.id,
       eventData: event,
     }, accessToken, account.id);

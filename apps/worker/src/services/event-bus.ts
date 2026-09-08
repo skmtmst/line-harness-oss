@@ -71,9 +71,14 @@ export function adConversionForEvent(
     return { eventName: 'Purchase', value: toAdConversionAmount(payload.eventData?.amount) };
   }
   if (eventType === 'ec.order.confirmed' || eventType === 'ec.order.payment_received') {
+    // 金額の読みどころを統一: 正規形 orderTotal → 互換 order.total → 旧 total。
+    // (#1472 の正規化と旧来の生受信体のどちらでも読める)
     const eventData = payload.eventData ?? {};
-    const order = (eventData.order as Record<string, unknown> | undefined) ?? eventData;
-    return { eventName: 'Purchase', value: toAdConversionAmount(order.total) };
+    const order = eventData.order as Record<string, unknown> | undefined;
+    return {
+      eventName: 'Purchase',
+      value: toAdConversionAmount(eventData.orderTotal ?? order?.total ?? eventData.total),
+    };
   }
   return null;
 }

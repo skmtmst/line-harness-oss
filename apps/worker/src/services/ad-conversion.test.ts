@@ -242,6 +242,70 @@ describe('sendAdConversions のアカウント境界(#638)', () => {
     ]);
   });
 
+  it('古い確保への並行再送は1件だけ送る', async () => {
+    const testDb = seedTwoAccounts();
+    mockFetchOk();
+
+    await sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { idempotencyKey: 'stripe:evt-8' });
+    // 確保したまま落ちた状態を再現する。
+    testDb.raw.prepare(`UPDATE ad_conversion_logs SET status = 'pending', created_at = '2000-01-01T00:00:00.000+09:00'`).run();
+
+    await Promise.all([
+      sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { idempotencyKey: 'stripe:evt-8' }),
+      sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { idempotencyKey: 'stripe:evt-8' }),
+    ]);
+
+    // 初回1件 + 取直し1件だけ送る。
+    expect(sentRequests).toHaveLength(2);
+    expect(logs(testDb)).toHaveLength(1);
+  });
+
+  it('Googleの部分失敗は失敗で残し、安定注文IDを付ける', async () => {
+    const testDb = seedTwoAccounts();
+    testDb.raw.prepare(`UPDATE ad_platforms SET name = 'google', line_account_id = 'a1' WHERE id = 'p1'`).run();
+    testDb.raw.prepare(`INSERT INTO ref_tracking (id, ref_code, friend_id, gclid, created_at)
+                        VALUES ('ref-g', 'ref-1', 'f1', 'g-1', '2026-09-09T00:00:00+09:00')`).run();
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: { body?: string }) => {
+      sentRequests.push({ url, body: init?.body ? JSON.parse(init.body) : null });
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ partialFailureError: { message: 'bad conversion' } }),
+        text: async () => 'partial',
+      };
+    }));
+
+    await sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { idempotencyKey: 'g:evt-1' });
+
+    expect(sentRequests).toHaveLength(1);
+    const googleBody = sentRequests[0].body as { conversions: Array<{ order_id: string; gclid: string }> };
+    expect(googleBody.conversions[0]).toMatchObject({ order_id: 'g:evt-1:p1', gclid: 'g-1' });
+    expect(logs(testDb)).toEqual([
+      { ad_platform_id: 'p1', friend_id: 'f1', line_account_id: 'a1', status: 'failed' },
+    ]);
+  });
+
+  it('Xはpixel入りパス・小数金額・安定IDで送る', async () => {
+    const testDb = seedTwoAccounts();
+    testDb.raw.prepare(`UPDATE ad_platforms SET name = 'x', line_account_id = 'a1',
+                        config = '{"pixel_id":"oka17","api_key":"k","api_secret":"s","x_oauth_token":"t","x_oauth_token_secret":"ts"}'
+                        WHERE id = 'p1'`).run();
+    testDb.raw.prepare(`INSERT INTO ref_tracking (id, ref_code, friend_id, twclid, created_at)
+                        VALUES ('ref-x2', 'ref-1', 'f1', 'tw-1', '2026-09-09T00:00:00+09:00')`).run();
+    mockFetchOk();
+
+    await sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { idempotencyKey: 'x:evt-2' });
+
+    expect(sentRequests).toHaveLength(1);
+    expect(sentRequests[0].url).toBe('https://ads-api.x.com/12/measurement/conversions/oka17');
+    const xBody = sentRequests[0].body as { conversions: Array<Record<string, unknown>> };
+    expect(xBody.conversions[0]).toMatchObject({
+      event_id: 'x:evt-2:p1',
+      value: '1000.00',
+    });
+    expect(xBody.conversions[0]).not.toHaveProperty('event_name');
+  });
+
   it('送信失敗は failed で記録し投げない。1回の呼び出しで1媒体へ1回だけ送る', async () => {
     const testDb = seedTwoAccounts();
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: { body?: string }) => {
