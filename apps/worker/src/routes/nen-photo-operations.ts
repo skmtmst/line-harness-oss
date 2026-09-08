@@ -7,10 +7,13 @@ import {
   getPhotoDerivatives,
   getPhotoReviewMetrics,
   issuePhotoOriginalDownload,
+  recordBulkDecisionNotificationResult,
   requestPhotoAssessment,
   requestPhotoAssetProcessing,
   type BulkPhotoDecision,
+  type BulkPhotoDecisionResult,
 } from '@line-crm/db';
+import { loadPhotoReviewRecipient, sendPhotoReviewNotification, type PhotoReviewReasonCode } from './nen-members.js';
 import type { Env } from '../index.js';
 import { auditLog } from '../lib/audit-log.js';
 import { sha256Hex } from '../middleware/auth.js';
@@ -231,12 +234,20 @@ nenPhotoOperations.post(
     auditLog(c, 'photo.review.bulk', { kind: 'nen-photo' });
     try {
       const requestFingerprint = await sha256Hex(JSON.stringify({ lineAccountId, decisions }));
+      const receiptId = crypto.randomUUID();
       const result = await applyBulkPhotoDecisions(c.env.DB, {
-        id: crypto.randomUUID(), lineAccountId, actorId: c.get('staff')!.id,
+        id: receiptId, lineAccountId, actorId: c.get('staff')!.id,
         actorName: c.get('staff')!.name, idempotencyKey: key, requestFingerprint, decisions,
       });
-      if (result.kind === 'created' || result.kind === 'duplicate') {
-        return c.json({ success: true, duplicate: result.kind === 'duplicate', data: result.result }, result.kind === 'created' ? 201 : 200);
+      if (result.kind === 'duplicate') {
+        // 保存済み結果を返すだけで、LINEは再送しない（重複通知防止）。
+        return c.json({ success: true, duplicate: true, data: result.result }, 200);
+      }
+      if (result.kind === 'created') {
+        const data = await notifyBulkPhotoDecisions(c, {
+          receiptId, lineAccountId, idempotencyKey: key, decisions, result: result.result,
+        });
+        return c.json({ success: true, duplicate: false, data }, 201);
       }
       if (result.kind === 'not_found') return c.json({ success: false, error: '写真が見つかりません', photoId: result.photoId }, 404);
       if (result.kind === 'risk_not_low') {
@@ -327,3 +338,111 @@ nenPhotoOperations.get(
     }
   },
 );
+
+type BulkNotificationItem = {
+  photoId: string;
+  decision: 'approve' | 'return' | 'reject';
+  reviewVersion: number;
+  decisionId: string;
+  notificationStatus: 'sent' | 'failed';
+  notificationError?: string;
+};
+
+function bulkNotificationItems(result: unknown): BulkNotificationItem[] {
+  if (!result || typeof result !== 'object') return [];
+  const items = (result as { items?: unknown }).items;
+  return Array.isArray(items) ? items as BulkNotificationItem[] : [];
+}
+
+/*
+ * 一括審査の各対象へ、単票と同じ文面のLINE通知を送る。
+ * 一部が失敗しても残りを続け、失敗分は審査イベントへ failed として残すので
+ * 既存の通知再送口（POST /:id/notification/retry）で再試行できる。
+ * 通知フェーズの成否は審査自体の確定（201）を覆さない。
+ */
+async function notifyBulkPhotoDecisions(
+  c: Context<Env>,
+  input: {
+    receiptId: string;
+    lineAccountId: string;
+    idempotencyKey: string;
+    decisions: BulkPhotoDecision[];
+    result: unknown;
+  },
+): Promise<BulkPhotoDecisionResult & {
+  items: BulkNotificationItem[];
+  notificationFailures: Array<{ photoId: string; error: string }>;
+}> {
+  const byPhoto = new Map(input.decisions.map((decision) => [decision.photoId, decision]));
+  const items = bulkNotificationItems(input.result);
+  const notified: BulkNotificationItem[] = [];
+  const notificationFailures: Array<{ photoId: string; error: string }> = [];
+  const now = new Date().toISOString();
+  for (const item of items) {
+    const decision = byPhoto.get(item.photoId);
+    const status = decision?.decision === 'approve' ? 'adopted' : 'rejected';
+    const reasonCode = decision?.decision === 'approve'
+      ? null
+      : (decision?.reasonCode ?? null) as PhotoReviewReasonCode | null;
+    const reasonNote = decision?.reasonNote ?? null;
+    let notificationStatus: 'sent' | 'failed' = 'sent';
+    let notificationError: string | null = null;
+    try {
+      const recipient = await loadPhotoReviewRecipient(c.env.DB, {
+        photoId: item.photoId, lineAccountId: input.lineAccountId,
+      });
+      if (!recipient) throw new Error('通知先が見つかりません');
+      await sendPhotoReviewNotification(
+        c, recipient, status as 'adopted' | 'rejected', reasonCode, reasonNote, item.decisionId,
+      );
+    } catch (error) {
+      notificationStatus = 'failed';
+      notificationError = error instanceof Error ? error.message : '審査結果をLINEで通知できませんでした';
+    }
+    try {
+      await c.env.DB.batch([
+        c.env.DB.prepare(
+          `UPDATE nen_photo_submissions SET review_notification_status = ?, updated_at = ?
+            WHERE id = ? AND line_account_id = ?`,
+        ).bind(notificationStatus, now, item.photoId, input.lineAccountId),
+        c.env.DB.prepare(
+          `UPDATE nen_photo_review_events
+              SET notification_status = ?, notification_error = ?,
+                  notification_attempt_count = 1,
+                  notification_first_failed_at = ?, notification_sent_at = ?, updated_at = ?
+            WHERE id = ?`,
+        ).bind(
+          notificationStatus, notificationError,
+          notificationStatus === 'failed' ? now : null,
+          notificationStatus === 'sent' ? now : null,
+          now, item.decisionId,
+        ),
+      ]);
+    } catch (error) {
+      notificationStatus = 'failed';
+      notificationError = error instanceof Error ? error.message : '送達記録を保存できませんでした';
+    }
+    notified.push({
+      photoId: item.photoId, decision: item.decision,
+      reviewVersion: item.reviewVersion, decisionId: item.decisionId,
+      notificationStatus,
+      ...(notificationError ? { notificationError } : {}),
+    });
+    if (notificationStatus === 'failed') {
+      notificationFailures.push({ photoId: item.photoId, error: notificationError ?? '通知できませんでした' });
+    }
+  }
+  const updatedCount = typeof (input.result as { updatedCount?: unknown }).updatedCount === 'number'
+    ? (input.result as { updatedCount: number }).updatedCount
+    : notified.length;
+  const data = { updatedCount, items: notified, notificationFailures };
+  try {
+    await recordBulkDecisionNotificationResult(c.env.DB, {
+      receiptId: input.receiptId, lineAccountId: input.lineAccountId,
+      actorId: c.get('staff')!.id, idempotencyKey: input.idempotencyKey, result: data, now,
+    });
+  } catch (error) {
+    console.error('POST bulk photo decisions notification record error:', error);
+  }
+  return data;
+}
