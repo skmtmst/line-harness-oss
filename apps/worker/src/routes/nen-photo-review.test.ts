@@ -25,7 +25,7 @@ vi.mock('../services/nen-tag-sync.js', () => ({
   syncNenPetTags: vi.fn(), syncNenPhotoTags: mocks.syncTags,
 }));
 
-const { nenMembers } = await import('./nen-members.js');
+const { nenMembers, loadPhotoReviewRecipient } = await import('./nen-members.js');
 
 type Entry = { query: string; bindings: unknown[] };
 
@@ -255,6 +255,29 @@ describe('NEN photo review', () => {
       [{ type: 'text', text: expect.stringContaining('人の顔や個人情報が写っている') }],
       expect.stringMatching(/^nen-photo-review:/), expect.any(Function),
     );
+  });
+
+  it('loads the notification recipient only inside the same LINE account', async () => {
+    const seen: Array<{ query: string; bindings: unknown[] }> = [];
+    const stubDb = {
+      prepare(query: string) {
+        const entry = { query, bindings: [] as unknown[] };
+        seen.push(entry);
+        return {
+          bind(...bindings: unknown[]) { entry.bindings = bindings; return this; },
+          async first() { return { id: 'photo-1', friend_id: 'friend-1' }; },
+        };
+      },
+    };
+    const row = await loadPhotoReviewRecipient(stubDb as unknown as D1Database, {
+      photoId: 'photo-1', lineAccountId: 'account-a',
+    });
+    expect(row).toMatchObject({ id: 'photo-1' });
+    expect(seen).toHaveLength(1);
+    // 写真・LINEアカウント・友だちの所属の3点を同じ値で絞る。
+    expect(seen[0].query).toContain('ps.id = ? AND ps.line_account_id = ? AND f.line_account_id = ?');
+    expect(seen[0].bindings).toEqual(['photo-1', 'account-a', 'account-a']);
+    expect(seen[0].query).not.toContain('r2_key');
   });
 
   it('does not review a photo owned by another account', async () => {

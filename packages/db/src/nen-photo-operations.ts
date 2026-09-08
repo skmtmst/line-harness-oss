@@ -270,6 +270,19 @@ export type BulkPhotoDecision = {
   reasonNote: string | null;
 };
 
+export type BulkPhotoDecisionItem = {
+  photoId: string;
+  decision: 'approve' | 'return' | 'reject';
+  reviewVersion: number;
+  /** 審査イベントのID。一括後のLINE通知の送達記録と再送に使う。 */
+  decisionId: string;
+};
+
+export type BulkPhotoDecisionResult = {
+  updatedCount: number;
+  items: BulkPhotoDecisionItem[];
+};
+
 export async function applyBulkPhotoDecisions(
   db: D1Database,
   input: {
@@ -309,12 +322,14 @@ export async function applyBulkPhotoDecisions(
     }
   }
   const now = input.now ?? new Date().toISOString();
-  const result = {
+  const eventIds = input.decisions.map(() => crypto.randomUUID());
+  const result: BulkPhotoDecisionResult = {
     updatedCount: input.decisions.length,
-    items: input.decisions.map((decision) => ({
+    items: input.decisions.map((decision, index) => ({
       photoId: decision.photoId,
       decision: decision.decision,
       reviewVersion: decision.expectedVersion + 1,
+      decisionId: eventIds[index],
     })),
   };
   const statements: D1PreparedStatement[] = [];
@@ -322,7 +337,7 @@ export async function applyBulkPhotoDecisions(
     const decision = input.decisions[index];
     const subject = subjects[index]!;
     const status = decision.decision === 'approve' ? 'adopted' : 'rejected';
-    const eventId = crypto.randomUUID();
+    const eventId = eventIds[index];
     statements.push(db.prepare(
       `INSERT INTO nen_photo_review_events
         (id, photo_id, line_account_id, from_status, to_status, reason_code, reason_note,
@@ -367,6 +382,33 @@ export async function applyBulkPhotoDecisions(
     throw error;
   }
   return { kind: 'created', result };
+}
+
+/**
+ * 一括審査の受付票へ通知後の結果を上書きする。
+ * 同じ再実行鍵の再送時はこの保存済み結果を返すだけで、LINEを再送しない。
+ */
+export async function recordBulkDecisionNotificationResult(
+  db: D1Database,
+  input: {
+    receiptId: string;
+    lineAccountId: string;
+    actorId: string;
+    idempotencyKey: string;
+    result: BulkPhotoDecisionResult & { notificationFailures: Array<{ photoId: string; error: string }> };
+    now?: string;
+  },
+): Promise<boolean> {
+  const now = input.now ?? new Date().toISOString();
+  const updated = await db.prepare(
+    `UPDATE nen_photo_bulk_decision_receipts
+        SET result_json = ?, created_at = ?
+      WHERE id = ? AND line_account_id = ? AND requested_by = ? AND idempotency_key = ?`,
+  ).bind(
+    JSON.stringify(input.result), now,
+    input.receiptId, input.lineAccountId, input.actorId, input.idempotencyKey,
+  ).run();
+  return Number(updated.meta?.changes ?? 0) === 1;
 }
 
 export async function issuePhotoOriginalDownload(

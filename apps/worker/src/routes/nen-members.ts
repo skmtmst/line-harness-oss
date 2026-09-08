@@ -146,7 +146,7 @@ async function pushPetCard(c: Context<Env>, friend: FriendRow, pet: Record<strin
   );
 }
 
-type ReviewPhotoRow = Record<string, unknown> & {
+export type ReviewPhotoRow = Record<string, unknown> & {
   id: string;
   friend_id: string;
   line_user_id: string;
@@ -177,7 +177,7 @@ function photoReviewMessage(
   ].join('\n');
 }
 
-async function sendPhotoReviewNotification(
+export async function sendPhotoReviewNotification(
   c: Context<Env>,
   photo: ReviewPhotoRow,
   status: 'adopted' | 'rejected',
@@ -200,6 +200,25 @@ async function sendPhotoReviewNotification(
     `nen-photo-review:${decisionId}`,
     (request) => dispatchLineProxyLocally(request, c.env, c.executionCtx),
   );
+}
+
+/**
+ * 通知先の1行を取る。単票・一括どちらも同じ絞り込み
+ *（写真ID＋LINEアカウント＋友だちの所属アカウント）で、他アカウントへは届けない。
+ */
+export async function loadPhotoReviewRecipient(
+  db: D1Database,
+  input: { photoId: string; lineAccountId: string },
+): Promise<ReviewPhotoRow | null> {
+  return db.prepare(
+    `SELECT ps.*, s.customer_id, f.line_user_id, f.line_account_id, f.is_following,
+            a.channel_access_token, a.channel_access_token_encrypted
+       FROM nen_photo_submissions ps
+       JOIN friends f ON f.id = ps.friend_id
+       JOIN line_accounts a ON a.id = f.line_account_id
+       LEFT JOIN nen_ec_member_snapshots s ON s.friend_id = ps.friend_id
+      WHERE ps.id = ? AND ps.line_account_id = ? AND f.line_account_id = ?`,
+  ).bind(input.photoId, input.lineAccountId, input.lineAccountId).first<ReviewPhotoRow>();
 }
 
 function mapPet(row: Record<string, unknown>) {
@@ -937,15 +956,9 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
   if (status === 'rejected' && reasonCode === 'other' && !reasonNote) {
     return c.json({ success: false, error: 'そのほかの理由を入力してください' }, 400);
   }
-  const photo = await c.env.DB.prepare(
-    `SELECT ps.*, s.customer_id, f.line_user_id, f.line_account_id, f.is_following,
-            a.channel_access_token, a.channel_access_token_encrypted
-       FROM nen_photo_submissions ps
-       JOIN friends f ON f.id = ps.friend_id
-       JOIN line_accounts a ON a.id = f.line_account_id
-       LEFT JOIN nen_ec_member_snapshots s ON s.friend_id = ps.friend_id
-      WHERE ps.id = ? AND ps.line_account_id = ? AND f.line_account_id = ?`,
-  ).bind(c.req.param('id'), accountId, accountId).first<ReviewPhotoRow>();
+  const photo = await loadPhotoReviewRecipient(
+    c.env.DB, { photoId: c.req.param('id'), lineAccountId: accountId },
+  );
   if (!photo) return c.json({ success: false, error: 'Not found' }, 404);
   if (photo.status !== 'pending' || Number(photo.review_version) !== body!.expectedVersion) {
     return c.json({ success: false, error: 'Already reviewed' }, 409);
