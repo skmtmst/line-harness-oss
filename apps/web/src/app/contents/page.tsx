@@ -135,6 +135,16 @@ export default function MediaLibraryPage() {
   // 名前変更の多重押し防ぎと、札のそばに出す失敗文。一覧全体の欄には出さない。
   const [renamingBusy, setRenamingBusy] = useState(false)
   const [renameError, setRenameError] = useState('')
+  /** 取得中の札。保存URLへ直接行かず、認証と監査を通る口から受け取る。 */
+  const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set())
+
+  /**
+   * 管理画面の表示は認証付きの口だけを使う。item.url は配信用の公開URL
+   * （配信本文に埋めてLINEが取りに行く）で、画面の表示には使わない。
+   * 札はアカウントを選んだときだけ並ぶので、空のときは出さない。
+   */
+  const displaySrc = (item: MediaItem): string =>
+    selectedAccountId ? api.media.contentUrl(item.id, selectedAccountId) : ''
   const [detailsFor, setDetailsFor] = useState<MediaItem | null>(null)
   const [replacementFor, setReplacementFor] = useState<MediaItem | null>(null)
   /*
@@ -352,6 +362,33 @@ export default function MediaLibraryPage() {
     if (result.tone === 'success') setSuccessMessage(result.message)
     else setError(result.message)
     void load()
+  }
+
+  /**
+   * 札のダウンロード。保存URL（認証なし）へ直接リンクせず、
+   * 権限確認と監査を通る口から受け取って保存させる。
+   */
+  async function downloadItem(item: MediaItem) {
+    const accountAtRequest = selectedAccountId
+    if (!accountAtRequest || downloadingIds.has(item.id)) return
+    setDownloadingIds((current) => new Set(current).add(item.id))
+    try {
+      const blob = await api.media.download(item.id, accountAtRequest)
+      const href = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = href
+      anchor.download = item.filename
+      anchor.click()
+      URL.revokeObjectURL(href)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'ダウンロードできませんでした')
+    } finally {
+      setDownloadingIds((current) => {
+        const next = new Set(current)
+        next.delete(item.id)
+        return next
+      })
+    }
   }
 
   async function openDelete(item: MediaItem) {
@@ -731,7 +768,7 @@ export default function MediaLibraryPage() {
                   // 静的書き出しのため next/image の最適化は使えない。
                   // 一覧20件の同時取得を避けるため遅延読み込みにする。
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={item.url} alt={item.filename} loading="lazy" decoding="async" className="h-full w-full object-contain" />
+                  <img src={displaySrc(item)} alt={item.filename} loading="lazy" decoding="async" className="h-full w-full object-contain" />
                 ) : (
                   <span className="text-ink-faint text-xs">
                     {item.kind === 'video' ? '動画' : item.kind === 'audio' ? '音声' : 'ファイル'}
@@ -845,15 +882,15 @@ export default function MediaLibraryPage() {
                   >
                     編集
                   </button>
-                  <a
-                    href={item.url}
-                    download={item.filename}
+                  <button
+                    onClick={() => void downloadItem(item)}
+                    disabled={downloadingIds.has(item.id)}
                     title="ダウンロード"
                     aria-label={`${item.filename}をダウンロード`}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-[11px]"
+                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-[11px] disabled:opacity-50"
                   >
-                    ダウンロード
-                  </a>
+                    {downloadingIds.has(item.id) ? '取得中…' : 'ダウンロード'}
+                  </button>
                   <Button
                     type="button"
                     onClick={() => void openDelete(item)}
@@ -1086,18 +1123,18 @@ export default function MediaLibraryPage() {
           {preview.kind === 'image' ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={preview.url}
+              src={displaySrc(preview)}
               alt={preview.filename}
               className="max-h-full max-w-full object-contain"
             />
           ) : preview.kind === 'video' ? (
-            <video src={preview.url} controls className="max-h-full max-w-full" />
+            <video src={displaySrc(preview)} controls className="max-h-full max-w-full" />
           ) : preview.kind === 'audio' ? (
-            <audio src={preview.url} controls />
+            <audio src={displaySrc(preview)} controls />
           ) : (
             <div className="rounded-card bg-canvas p-6 text-center text-sm">
               <p className="text-ink font-medium">{preview.filename}</p>
-              <a href={preview.url} target="_blank" rel="noreferrer" className="text-info mt-2 inline-block hover:underline">
+              <a href={displaySrc(preview)} target="_blank" rel="noreferrer" className="text-info mt-2 inline-block hover:underline">
                 別のタブで開く
               </a>
             </div>

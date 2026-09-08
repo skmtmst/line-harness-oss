@@ -5154,6 +5154,16 @@ export const api = {
       fetchApi<ApiResponse<null>>(`/api/media/${id}?accountId=${encodeURIComponent(accountId)}`, {
         method: 'DELETE',
       }),
+    /** 保存URLへ直接行かず、権限確認と監査を通る口から受け取る。 */
+    download: (id: string, accountId: string) =>
+      fetchApiBlob(`/api/media/${encodeURIComponent(id)}/download?accountId=${encodeURIComponent(accountId)}`),
+    /**
+     * 縮小表示・試し見・ファイル開きの参照先。Cookieで認証されるため
+     * img・video・audio の src や別タブ開きにそのまま使える。
+     * 保存URL（配信用の公開URL）は管理画面の表示に使わない。
+     */
+    contentUrl: (id: string, accountId: string) =>
+      `${API_URL}/api/media/${encodeURIComponent(id)}/content?accountId=${encodeURIComponent(accountId)}`,
   },
   /** 共通情報。営業時間などを1か所で直す。 */
   commonVars: {
