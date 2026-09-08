@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  checkWebhookUrlSafety,
   deliverWebhook,
+  isSafeWebhookUrl,
   retryDelayMs,
   shouldRetryStatus,
   type WebhookRow,
@@ -15,6 +17,9 @@ const WEBHOOK: WebhookRow = {
 
 /** 待ち時間は実際には待たない。テストを秒単位で遅くしないため。 */
 const noSleep = () => Promise.resolve();
+
+/** 名前引きは外へ出ない。公開IPだけ返す決め打ち。 */
+const publicOnlyLookup = async (_host: string) => ['93.184.216.34'];
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -64,14 +69,14 @@ describe('送り直す価値のある応答か', () => {
 describe('配送', () => {
   it('200 なら1回で終わる', async () => {
     const count = stubFetch([200]);
-    const res = await deliverWebhook({ ...WEBHOOK, max_retries: 3 }, '{}', { sleep: noSleep });
+    const res = await deliverWebhook({ ...WEBHOOK, max_retries: 3 }, '{}', { sleep: noSleep, lookupHost: publicOnlyLookup });
     expect(res).toMatchObject({ ok: true, attempts: 1, lastStatus: 200 });
     expect(count()).toBe(1);
   });
 
   it('500 は失敗として扱う（以前は成功扱いだった）', async () => {
     const count = stubFetch([500]);
-    const res = await deliverWebhook(WEBHOOK, '{}', { sleep: noSleep });
+    const res = await deliverWebhook(WEBHOOK, '{}', { sleep: noSleep, lookupHost: publicOnlyLookup });
     expect(res.ok).toBe(false);
     expect(res.lastStatus).toBe(500);
     // max_retries = 0 なので送り直さない。
@@ -80,7 +85,7 @@ describe('配送', () => {
 
   it('送り直しの回数だけ試す', async () => {
     const count = stubFetch([500]);
-    const res = await deliverWebhook({ ...WEBHOOK, max_retries: 2 }, '{}', { sleep: noSleep });
+    const res = await deliverWebhook({ ...WEBHOOK, max_retries: 2 }, '{}', { sleep: noSleep, lookupHost: publicOnlyLookup });
     expect(res.ok).toBe(false);
     expect(res.attempts).toBe(3); // 初回 + 2回
     expect(count()).toBe(3);
@@ -88,14 +93,14 @@ describe('配送', () => {
 
   it('途中で成功したらそこで止める', async () => {
     const count = stubFetch([500, 200]);
-    const res = await deliverWebhook({ ...WEBHOOK, max_retries: 3 }, '{}', { sleep: noSleep });
+    const res = await deliverWebhook({ ...WEBHOOK, max_retries: 3 }, '{}', { sleep: noSleep, lookupHost: publicOnlyLookup });
     expect(res).toMatchObject({ ok: true, attempts: 2 });
     expect(count()).toBe(2);
   });
 
   it('4xx なら残りの回数を使わずに諦める', async () => {
     const count = stubFetch([400]);
-    const res = await deliverWebhook({ ...WEBHOOK, max_retries: 5 }, '{}', { sleep: noSleep });
+    const res = await deliverWebhook({ ...WEBHOOK, max_retries: 5 }, '{}', { sleep: noSleep, lookupHost: publicOnlyLookup });
     expect(res).toMatchObject({ ok: false, attempts: 1, lastStatus: 400 });
     expect(count()).toBe(1);
   });
@@ -103,25 +108,25 @@ describe('配送', () => {
   it('接続そのものが失敗しても例外を投げない', async () => {
     // 送信の失敗でイベント処理そのものを止めたくない。
     stubFetch(['throw']);
-    const res = await deliverWebhook({ ...WEBHOOK, max_retries: 1 }, '{}', { sleep: noSleep });
+    const res = await deliverWebhook({ ...WEBHOOK, max_retries: 1 }, '{}', { sleep: noSleep, lookupHost: publicOnlyLookup });
     expect(res).toMatchObject({ ok: false, lastStatus: null });
   });
 
   it('送り直しの上限は5回まで', async () => {
     const count = stubFetch([500]);
-    await deliverWebhook({ ...WEBHOOK, max_retries: 99 }, '{}', { sleep: noSleep });
+    await deliverWebhook({ ...WEBHOOK, max_retries: 99 }, '{}', { sleep: noSleep, lookupHost: publicOnlyLookup });
     expect(count()).toBe(6); // 初回 + 5回
   });
 
   it('null の設定は送り直さないとして扱う', async () => {
     const count = stubFetch([500]);
-    await deliverWebhook({ ...WEBHOOK, max_retries: null }, '{}', { sleep: noSleep });
+    await deliverWebhook({ ...WEBHOOK, max_retries: null }, '{}', { sleep: noSleep, lookupHost: publicOnlyLookup });
     expect(count()).toBe(1);
   });
 
   it('シークレットがあれば署名を付ける', async () => {
     stubFetch([200]);
-    await deliverWebhook({ ...WEBHOOK, secret: 'a'.repeat(32) }, '{}', { sleep: noSleep });
+    await deliverWebhook({ ...WEBHOOK, secret: 'a'.repeat(32) }, '{}', { sleep: noSleep, lookupHost: publicOnlyLookup });
     const call = vi.mocked(fetch).mock.calls[0];
     const headers = (call[1] as RequestInit).headers as Record<string, string>;
     expect(headers['X-Webhook-Signature']).toMatch(/^[0-9a-f]{64}$/);
@@ -129,7 +134,7 @@ describe('配送', () => {
 
   it('シークレットが無ければ署名は付けない', async () => {
     stubFetch([200]);
-    await deliverWebhook(WEBHOOK, '{}', { sleep: noSleep });
+    await deliverWebhook(WEBHOOK, '{}', { sleep: noSleep, lookupHost: publicOnlyLookup });
     const call = vi.mocked(fetch).mock.calls[0];
     const headers = (call[1] as RequestInit).headers as Record<string, string>;
     expect(headers['X-Webhook-Signature']).toBeUndefined();
@@ -137,9 +142,172 @@ describe('配送', () => {
 
   it('同じ出来事を送り直しても受け手が二重処理を防げる配送IDを付ける', async () => {
     stubFetch([200]);
-    await deliverWebhook(WEBHOOK, '{}', { sleep: noSleep, idempotencyKey: 'delivery-1' });
+    await deliverWebhook(WEBHOOK, '{}', { sleep: noSleep, idempotencyKey: 'delivery-1', lookupHost: publicOnlyLookup });
     const call = vi.mocked(fetch).mock.calls[0];
     const headers = (call[1] as RequestInit).headers as Record<string, string>;
     expect(headers['X-Webhook-Delivery-Id']).toBe('delivery-1');
+  });
+});
+
+describe('送り先の文字面の検査', () => {
+  it('公開HTTPSの名前は通す(既存の送信契約を維持)', () => {
+    expect(isSafeWebhookUrl('https://hooks.example.com/events')).toBe(true);
+    expect(isSafeWebhookUrl('https://example.com/hook')).toBe(true);
+  });
+
+  it('非HTTPS・認証情報付き・壊れたURLは止める', () => {
+    expect(isSafeWebhookUrl('http://example.com/hook')).toBe(false);
+    expect(isSafeWebhookUrl('https://user:pass@example.com/hook')).toBe(false);
+    expect(isSafeWebhookUrl('not a url')).toBe(false);
+  });
+
+  it('loopback・private・link-local・metadataは止める', () => {
+    for (const url of [
+      'https://127.0.0.1/hook',
+      'https://10.0.0.9/hook',
+      'https://172.16.4.4/hook',
+      'https://172.31.255.1/hook',
+      'https://192.168.1.2/hook',
+      'https://0.0.0.0/hook',
+      'https://169.254.169.254/latest/meta-data/',
+      'https://100.64.0.1/hook',
+      'https://[::1]/hook',
+      'https://[::]/hook',
+      'https://[fd00::1]/hook',
+      'https://[fe80::1]/hook',
+      'https://[::ffff:127.0.0.1]/hook',
+      'https://localhost/hook',
+      'https://api.example.local/hook',
+      'https://api.example.internal/hook',
+      'https://metadata.google.internal/computeMetadata/v1/',
+    ]) {
+      expect(isSafeWebhookUrl(url)).toBe(false);
+    }
+  });
+
+  it('16進・8進・整数の書き方でも抜け道を作らない', () => {
+    expect(isSafeWebhookUrl('https://0x7f.0.0.1/hook')).toBe(false);
+    expect(isSafeWebhookUrl('https://0177.0.0.1/hook')).toBe(false);
+    expect(isSafeWebhookUrl('https://2130706433/hook')).toBe(false);
+    expect(isSafeWebhookUrl('https://0x7f000001/hook')).toBe(false);
+  });
+});
+
+describe('送信直前の再検査', () => {
+  it('安全でない送り先は1度も送らずに止める', async () => {
+    const count = stubFetch([200]);
+    const res = await deliverWebhook(
+      { ...WEBHOOK, url: 'https://169.254.169.254/x', max_retries: 2 },
+      '{}',
+      { sleep: noSleep, lookupHost: publicOnlyLookup },
+    );
+    expect(res).toMatchObject({ ok: false, lastStatus: null, blocked: true });
+    expect(count()).toBe(0);
+  });
+
+  it('DNSが内部IPに変わっていたら送らない(DNS切替)', async () => {
+    const count = stubFetch([200]);
+    const res = await deliverWebhook(WEBHOOK, '{}', {
+      sleep: noSleep,
+      lookupHost: async () => ['127.0.0.1'],
+    });
+    expect(res).toMatchObject({ ok: false, lastStatus: null, blocked: true });
+    expect(count()).toBe(0);
+  });
+
+  it('DNSに公開と内部が混ざっていたら送らない', async () => {
+    const count = stubFetch([200]);
+    const res = await deliverWebhook(WEBHOOK, '{}', {
+      sleep: noSleep,
+      lookupHost: async () => ['93.184.216.34', '10.1.2.3'],
+    });
+    expect(res.blocked).toBe(true);
+    expect(count()).toBe(0);
+  });
+
+  it('文字面で止まるときは名前を引かない', async () => {
+    const lookup = vi.fn(async (_host: string) => ['93.184.216.34']);
+    const verdict = await checkWebhookUrlSafety('https://127.0.0.1/x', { lookupHost: lookup });
+    expect(verdict).toEqual({ ok: false, reason: 'blocked_ip' });
+    expect(lookup).not.toHaveBeenCalled();
+  });
+
+  it('転送先が内部を向いたら辿らずに止める', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: unknown) => {
+        if (String(input) === 'https://example.com/hook') {
+          return new Response('', { status: 302, headers: { location: 'https://169.254.169.254/x' } });
+        }
+        throw new Error(`送ってはいけない先: ${String(input)}`);
+      }),
+    );
+    const res = await deliverWebhook(WEBHOOK, '{}', { sleep: noSleep, lookupHost: publicOnlyLookup });
+    expect(res).toMatchObject({ ok: false, lastStatus: null, blocked: true });
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it('非HTTPSへの転送は辿らずに止める', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('', { status: 307, headers: { location: 'http://example.com/plain' } })),
+    );
+    const res = await deliverWebhook(WEBHOOK, '{}', { sleep: noSleep, lookupHost: publicOnlyLookup });
+    expect(res.blocked).toBe(true);
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it('公開先への転送は辿って送る', async () => {
+    const seen: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: unknown) => {
+        seen.push(String(input));
+        if (String(input) === 'https://example.com/hook') {
+          return new Response('', { status: 302, headers: { location: '/next' } });
+        }
+        return new Response('', { status: 200 });
+      }),
+    );
+    const res = await deliverWebhook(WEBHOOK, '{}', { sleep: noSleep, lookupHost: publicOnlyLookup });
+    expect(res).toMatchObject({ ok: true, attempts: 1, lastStatus: 200 });
+    expect(seen).toEqual(['https://example.com/hook', 'https://example.com/next']);
+  });
+
+  it('送り直しのたびに引き直す(2回目に内部IPなら止まる)', async () => {
+    const count = stubFetch([500, 200]);
+    const lookup = vi.fn(async (_host: string) => ['93.184.216.34']);
+    lookup.mockResolvedValueOnce(['93.184.216.34']);
+    lookup.mockResolvedValueOnce(['10.9.9.9']);
+    const res = await deliverWebhook({ ...WEBHOOK, max_retries: 2 }, '{}', {
+      sleep: noSleep,
+      lookupHost: lookup,
+    });
+    // 1回目は公開IPで送って500、2回目は引き直して内部IPで止まる。
+    expect(res).toMatchObject({ ok: false, blocked: true, attempts: 2 });
+    expect(lookup).toHaveBeenCalledTimes(2);
+    expect(count()).toBe(1);
+  });
+
+  it('既定の名前引き(DoH)でも内部IPを止める', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: unknown) => {
+        const url = String(input);
+        if (url.startsWith('https://cloudflare-dns.com/dns-query')) {
+          const type = new URL(url).searchParams.get('type');
+          const qtype = type === 'A' ? 1 : 28;
+          const data = type === 'A' ? '10.0.0.5' : '::1';
+          return new Response(
+            JSON.stringify({ Answer: [{ name: 'example.com.', type: qtype, TTL: 60, data }] }),
+            { status: 200, headers: { 'content-type': 'application/dns-json' } },
+          );
+        }
+        throw new Error(`送ってはいけない先: ${url}`);
+      }),
+    );
+    // lookupHostを渡さない=本番と同じ既定の名前引きを使う。
+    const res = await deliverWebhook(WEBHOOK, '{}', { sleep: noSleep });
+    expect(res.blocked).toBe(true);
   });
 });
