@@ -191,7 +191,7 @@ export async function computeDedupBroadcastPreview(
 }
 
 import { LineClient } from '@line-crm/line-sdk';
-import { getLineAccountById, jstNow, updateBroadcastLineRequestId } from '@line-crm/db';
+import { getCommonVarMap, getLineAccountById, jstNow, updateBroadcastLineRequestId } from '@line-crm/db';
 import { calculateStaggerDelay, sleep } from './stealth.js';
 import { createBroadcastRetryKey } from './broadcast-retry-key.js';
 import {
@@ -378,15 +378,48 @@ export async function processMultiAccountDedupBroadcast(
     const remaining = recipients.filter((r) => !sentSet.has(r.identKey));
     if (remaining.length === 0) continue; // このアカに残作業なし
 
-    const client = lineClientFactory(account.channel_access_token);
     const sourceParts = broadcast.messageParts ?? parseBroadcastMessageParts({
       messageType: broadcast.message_type,
       messageContent: broadcast.message_content,
       messageBubblesJson: broadcast.message_bubbles_json,
       altText: broadcast.alt_text,
     });
+    // 共通情報 ({{var.*}}) は配信元アカウントごとに解決する。別アカウントの
+    // 値を混ぜない — 未定義があればそのアカウントだけ送らず失敗に記録する。
+    // 受信者ごとの差し込み ({{name}}) より先に置き換える。
+    let accountVars: Record<string, string> | undefined;
+    if (sourceParts.some((part) => /\{\{\s*var\./.test(part.messageContent))) {
+      try {
+        accountVars = await getCommonVarMap(db, account.id);
+      } catch (err) {
+        console.error(`[multi-account-dedup] account ${account.id} failed to load common vars:`, err);
+        failedAccountIds.push(account.id);
+        continue;
+      }
+      const missing = new Set<string>();
+      for (const part of sourceParts) {
+        for (const match of part.messageContent.matchAll(/\{\{\s*var\.([a-z][a-z0-9_]*)\s*\}\}/g)) {
+          // `in` は継承プロパティ (constructor 等) も存在扱いにするため使わない。
+          // 自前プロパティかつ文字列値のときだけ定義済みとし、旧 NULL 行は
+          // 未定義扱い (送信に使わない)。
+          const value: unknown = accountVars[match[1]];
+          if (!Object.hasOwn(accountVars, match[1]) || typeof value !== 'string') {
+            missing.add(match[1]);
+          }
+        }
+      }
+      if (missing.size > 0) {
+        console.error(
+          `[multi-account-dedup] account ${account.id} missing common vars: ${[...missing].join(', ')} — skipping without cross-account fallback`,
+        );
+        failedAccountIds.push(account.id);
+        continue;
+      }
+    }
+    const client = lineClientFactory(account.channel_access_token);
     const accountParts = renderMessageParts(sourceParts, {
       liffId: (account as unknown as { liff_id?: string | null }).liff_id ?? null,
+      ...(accountVars ? { vars: accountVars } : {}),
     });
     const personalized = hasRecipientVariablesInParts(accountParts);
     if (!personalized) assertMessagePartsResolved(accountParts);
