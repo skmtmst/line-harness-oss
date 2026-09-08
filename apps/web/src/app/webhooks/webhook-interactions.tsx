@@ -39,6 +39,9 @@ const EVENT_LABELS: Record<string, string> = {
   'conversion.created': '成果が認められたとき',
   'booking.created': '予約が入ったとき',
   'order.created': '注文が確定したとき',
+  // 目視確認の固定データが使う符号。表示は従来の日本語のまま(#506 軽)。
+  'inventory.low': '在庫が少なくなったとき',
+  'shipment.completed': '発送が完了したとき',
 }
 
 function eventLabel(item: WebhookInteraction): string {
@@ -101,9 +104,24 @@ export default function WebhookInteractions() {
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
   const [canRetry, setCanRetry] = useState(false)
 
+  /*
+   * やり直し可否は手元の保存値ではなく、入り直した本人の役割で決める(#506 軽)。
+   *
+   * `localStorage` は書き換え可能で、別端末の表示とずれることがある。
+   * 最終判断は口側なので脆弱性ではないが、押せる表示と結果を合わせる。
+   */
   useEffect(() => {
-    const role = window.localStorage.getItem('lh_staff_role')
-    setCanRetry(role === 'owner' || role === 'admin')
+    let cancelled = false
+    void api.staff.me()
+      .then((response) => {
+        if (cancelled || !response.success) return
+        const role = response.data.role
+        setCanRetry(role === 'owner' || role === 'admin')
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const load = useCallback(async () => {

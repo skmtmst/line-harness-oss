@@ -13,22 +13,10 @@ import SelectField from '@/components/shared/select-field'
 import WebhookInteractions from './webhook-interactions'
 import { IncomingOverview, OutgoingOverview } from './webhook-overviews'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 
 type Tab = 'incoming' | 'outgoing'
 type LoadStatus = 'loading' | 'ready' | 'error'
-
-const MIN_SECRET_LENGTH = 32
-
-// Generate a 32-char URL-safe random secret in the browser. 24 random bytes
-// produce exactly 32 base64 characters; remap +/ to -/_ instead of stripping
-// so we always end up with 32 chars (stripping would drop the count).
-function generateSecret(): string {
-  const buf = new Uint8Array(24)
-  crypto.getRandomValues(buf)
-  let s = ''
-  for (let i = 0; i < buf.length; i++) s += String.fromCharCode(buf[i])
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
-}
 
 function isHttpsUrl(value: string): boolean {
   try {
@@ -408,44 +396,42 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       {/* Rotate-secret modal — used to recover legacy webhooks or rotate. */}
       {rotateTarget && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <form onSubmit={handleRotateSubmit} className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">
+          <form onSubmit={handleRotateSubmit} className="bg-canvas rounded-lg shadow-xl max-w-lg w-full p-6">
+            <h2 className="text-lg font-semibold text-ink mb-2">
               「{rotateTarget.name}」のシークレットを{rotateTarget.activate ? '設定して有効化' : '更新'}
             </h2>
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-ink-secondary mb-4">
               新しいシークレットを設定します。
-              <strong className="text-red-600">設定後は今回限り画面に表示されません。</strong>
+              <strong className="text-danger">設定後は今回限り画面に表示されません。</strong>
               控えておいてから「保存」を押してください。
             </p>
             <div className="flex gap-2 mb-4">
               <input
                 value={rotateSecretValue}
                 onChange={(e) => setRotateSecretValue(e.target.value)}
-                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
+                className="flex-1 border border-hairline rounded-lg px-3 py-2 text-sm font-mono"
                 placeholder="ランダムな英数字32文字以上"
                 required
                 minLength={MIN_SECRET_LENGTH}
                 autoFocus
               />
-              <button
+              <Button
                 type="button"
                 onClick={() => setRotateSecretValue(generateSecret())}
-                className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 whitespace-nowrap"
               >
                 自動生成
-              </button>
+              </Button>
             </div>
             <div className="flex gap-2 justify-end">
-              <button
+              <Button
                 type="button"
                 onClick={() => {
                   setRotateTarget(null)
                   setRotateSecretValue('')
                 }}
-                className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
               >
                 キャンセル
-              </button>
+              </Button>
               <button
                 type="submit"
                 className="px-4 py-2 text-sm rounded-lg text-white font-medium"
@@ -461,25 +447,24 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       {/* Created-secret modal — shown ONCE after a successful create. */}
       {createdSecret && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">
+          <div className="bg-canvas rounded-lg shadow-xl max-w-lg w-full p-6">
+            <h2 className="text-lg font-semibold text-ink mb-2">
               シークレットを保存してください
             </h2>
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-ink-secondary mb-4">
               「{createdSecret.name}」を作成しました。
-              <strong className="text-red-600">このシークレットは今後二度と表示されません。</strong>
+              <strong className="text-danger">このシークレットは今後二度と表示されません。</strong>
               閉じる前に必ず安全な場所に保存してください。
             </p>
-            <div className="bg-gray-50 border border-gray-200 rounded p-3 mb-4">
+            <div className="bg-canvas-sunken border border-hairline rounded p-3 mb-4">
               <code className="text-sm break-all">{createdSecret.secret}</code>
             </div>
             <div className="flex gap-2 justify-end">
-              <button
+              <Button
                 onClick={() => copySecret(createdSecret.secret)}
-                className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
               >
                 {secretCopied ? 'コピー済み' : 'クリップボードにコピー'}
-              </button>
+              </Button>
               <button
                 onClick={() => {
                   setCreatedSecret(null)
@@ -497,28 +482,28 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
           {error}
         </div>
       )}
 
       {/* Create forms */}
       {showCreate && tab === 'incoming' && (
-        <form onSubmit={handleCreateIncoming} className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-          <h3 className="text-sm font-semibold text-gray-900 mb-4">受け取る設定を追加</h3>
+        <form onSubmit={handleCreateIncoming} className="bg-canvas rounded-lg border border-hairline p-6 mb-6">
+          <h3 className="text-sm font-semibold text-ink mb-4">受け取る設定を追加</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">名前</label>
+              <label className="block text-sm font-medium text-ink-secondary mb-1">名前</label>
               <input
                 value={inForm.name}
                 onChange={(e) => setInForm({ ...inForm, name: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
                 placeholder="LINE公式アカウント"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">どこから来るか</label>
+              <label className="block text-sm font-medium text-ink-secondary mb-1">どこから来るか</label>
               <SelectField
                 value={sourceIsOther ? SOURCE_OTHER : inForm.sourceType}
                 onChange={(e) => {
@@ -528,7 +513,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
                   setInForm({ ...inForm, sourceType: next })
                 }}
                 aria-label="受信元の種類"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
                 options={[
                   { value: '', label: '選んでください' },
                   ...SOURCE_PRESETS.map((preset) => ({ value: preset.value, label: preset.label })),
@@ -550,27 +535,26 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
               ) : null}
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-ink-secondary mb-1">
                 シークレット (最低{MIN_SECRET_LENGTH}文字)
               </label>
               <div className="flex gap-2">
                 <input
                   value={inForm.secret}
                   onChange={(e) => setInForm({ ...inForm, secret: e.target.value })}
-                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
+                  className="flex-1 border border-hairline rounded-lg px-3 py-2 text-sm font-mono"
                   placeholder="ランダムな英数字32文字以上"
                   required
                   minLength={MIN_SECRET_LENGTH}
                 />
-                <button
+                <Button
                   type="button"
                   onClick={() => setInForm({ ...inForm, secret: generateSecret() })}
-                  className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 whitespace-nowrap"
                 >
                   自動生成
-                </button>
+                </Button>
               </div>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-ink-faint mt-1">
                 外部システムが Webhook 受信時に X-Webhook-Signature ヘッダで HMAC-SHA256 署名する際に使用します。
               </p>
             </div>
@@ -586,67 +570,66 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       )}
 
       {showCreate && tab === 'outgoing' && (
-        <form onSubmit={handleCreateOutgoing} className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-          <h3 className="text-sm font-semibold text-gray-900 mb-4">送る設定を追加</h3>
+        <form onSubmit={handleCreateOutgoing} className="bg-canvas rounded-lg border border-hairline p-6 mb-6">
+          <h3 className="text-sm font-semibold text-ink mb-4">送る設定を追加</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">名前</label>
+              <label className="block text-sm font-medium text-ink-secondary mb-1">名前</label>
               <input
                 value={outForm.name}
                 onChange={(e) => setOutForm({ ...outForm, name: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
                 placeholder="外部CRM連携"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">URL (https:// 必須)</label>
+              <label className="block text-sm font-medium text-ink-secondary mb-1">URL (https:// 必須)</label>
               <input
                 type="url"
                 value={outForm.url}
                 onChange={(e) => setOutForm({ ...outForm, url: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
                 placeholder="https://example.com/webhook"
                 pattern="https://.*"
                 required
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">イベントタイプ (カンマ区切り、* で全イベント)</label>
+              <label className="block text-sm font-medium text-ink-secondary mb-1">イベントタイプ (カンマ区切り、* で全イベント)</label>
               <input
                 value={outForm.eventTypes}
                 onChange={(e) => setOutForm({ ...outForm, eventTypes: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
                 placeholder="friend.added, message.received"
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-ink-secondary mb-1">
                 シークレット (最低{MIN_SECRET_LENGTH}文字)
               </label>
               <div className="flex gap-2">
                 <input
                   value={outForm.secret}
                   onChange={(e) => setOutForm({ ...outForm, secret: e.target.value })}
-                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
+                  className="flex-1 border border-hairline rounded-lg px-3 py-2 text-sm font-mono"
                   placeholder="ランダムな英数字32文字以上"
                   required
                   minLength={MIN_SECRET_LENGTH}
                 />
-                <button
+                <Button
                   type="button"
                   onClick={() => setOutForm({ ...outForm, secret: generateSecret() })}
-                  className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 whitespace-nowrap"
                 >
                   自動生成
-                </button>
+                </Button>
               </div>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-ink-faint mt-1">
                 送信時に X-Webhook-Signature ヘッダで HMAC-SHA256 署名するために使われます。受信側で同じシークレットで検証してください。
               </p>
             </div>
             <div className="sm:col-span-2">
-              <label htmlFor="wh-retries" className="mb-1 block text-sm font-medium text-gray-700">
+              <label htmlFor="wh-retries" className="mb-1 block text-sm font-medium text-ink-secondary">
                 失敗したときの送り直し
               </label>
               <div className="flex items-center gap-1.5">
@@ -661,7 +644,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
                 />
                 <span className="text-ink-faint text-xs">回まで</span>
               </div>
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-ink-faint">
                 相手が 5xx を返したときや、つながらなかったときに送り直します。
                 0.5秒・1秒・2秒…と間隔を空け、上限は5回です。
                 相手が 4xx を返した場合は、同じものを送っても結果が変わらないので送り直しません。
