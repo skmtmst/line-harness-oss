@@ -214,6 +214,8 @@ CREATE TABLE IF NOT EXISTS messages_log (
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_log_broadcast_id ON messages_log(broadcast_id);
+CREATE INDEX IF NOT EXISTS idx_messages_log_broadcast_friend_direction
+  ON messages_log (broadcast_id, friend_id, direction);
 
 CREATE INDEX IF NOT EXISTS idx_messages_log_friend_id ON messages_log (friend_id);
 CREATE INDEX IF NOT EXISTS idx_messages_log_created_at ON messages_log (created_at);
