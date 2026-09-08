@@ -338,11 +338,15 @@ function webinarListWhere(
 export async function getWebinarList(
   db: D1Database,
   scope: WebinarListScope,
-  paging: WebinarListPaging,
+  paging?: WebinarListPaging,
   filters: WebinarListFilters = {},
 ): Promise<WebinarListRow[]> {
   const where = webinarListWhere(scope, filters);
   const sort = WEBINAR_LIST_SORT[filters.sort ?? 'updated'];
+  const bindings: Array<string | number> = [...where.bindings];
+  // paging省略時は全件(旧契約の呼び出し形を保つ)。一覧APIは必ずpagingを渡す。
+  const pageClause = paging ? 'LIMIT ? OFFSET ?' : '';
+  if (paging) bindings.push(paging.limit, paging.offset);
   const result = await db.prepare(
     `SELECT w.*,
             f.name AS folder_name,
@@ -358,8 +362,8 @@ export async function getWebinarList(
                             AND f.account_id = w.account_id
       WHERE ${where.sql}
       ORDER BY ${sort.order}
-      LIMIT ? OFFSET ?`,
-  ).bind(...where.bindings, paging.limit, paging.offset).all<WebinarListRow>();
+      ${pageClause}`,
+  ).bind(...bindings).all<WebinarListRow>();
   return result.results ?? [];
 }
 
