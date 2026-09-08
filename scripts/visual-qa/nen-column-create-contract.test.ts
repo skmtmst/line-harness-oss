@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const root = (...parts) => join(HERE, '..', '..', ...parts);
+const root = (...parts: string[]) => join(HERE, '..', '..', ...parts);
 const FIXTURES = readFileSync(join(HERE, 'fixtures.mjs'), 'utf8');
 const MOCK_API = readFileSync(join(HERE, 'mock-api.mjs'), 'utf8');
 const WORKER_ROUTE = readFileSync(root('apps', 'worker', 'src', 'routes', 'nen-campaigns.ts'), 'utf8');

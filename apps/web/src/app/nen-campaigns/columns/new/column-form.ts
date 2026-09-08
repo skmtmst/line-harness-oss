@@ -1,4 +1,16 @@
+import type { Tag } from '@line-crm/shared'
 import type { NenColumnCreateInput } from '@/lib/api'
+
+/**
+ * このアカウントのタグだけを候補にする(点検 #512 の中4)。
+ *
+ * `GET /api/tags` は見える範囲の全タグを返す。保存口はこのアカウントの
+ * タグしか受け付けないので、他アカウントのものを選べると400で失敗する。
+ * 所属なし(null)は保存口が断るため、候補に入れない。
+ */
+export function visibleAccountTags(tags: Tag[], accountId: string): Tag[] {
+  return tags.filter((tag) => tag.lineAccountId === accountId)
+}
 
 /**
  * NENコラムの下書き作成（設計 `ymXJK` 21-1-E／契約 #618）。
