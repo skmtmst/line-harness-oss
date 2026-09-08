@@ -53,7 +53,8 @@ describe('getAffiliatePaymentSummaries', () => {
         approval_status TEXT, approved_at TEXT, value_snapshot REAL
       );
       CREATE TABLE affiliate_reward_entries (
-        id TEXT PRIMARY KEY, conversion_event_id TEXT NOT NULL, entry_type TEXT NOT NULL
+        id TEXT PRIMARY KEY, conversion_event_id TEXT NOT NULL, entry_type TEXT NOT NULL,
+        affiliate_id TEXT, line_account_id TEXT, amount_minor INTEGER NOT NULL DEFAULT 0
       );
       INSERT INTO friends VALUES ('friend-1', 'account-1'), ('friend-2', 'account-2');
       INSERT INTO conversion_points VALUES ('purchase', 99999, 'account-1');
@@ -236,5 +237,64 @@ describe('紹介停止と支払い確定の追記台帳', () => {
       now: '2026-09-06T00:00:00Z',
     })).toEqual({ kind: 'changed' });
     expect(sqlite.prepare('SELECT COUNT(*) AS count FROM affiliate_settlements').get()).toEqual({ count: 0 });
+  });
+
+  test('確定済み表示は台帳を優先し、確定後の設定編集で変わらない', async () => {
+    sqlite.exec(`UPDATE conversion_events SET approval_status = 'pending', approved_at = NULL WHERE id = 'cv-2'`);
+    expect(await confirmAffiliateSettlement(db, {
+      tenantId: 'tenant-1', lineAccountId: 'account-1', affiliateId: 'affiliate-1',
+      actorId: 'staff-1', idempotencyKey: 'summary-key-1', expectedAmount: 5000,
+      now: '2026-09-06T00:00:00Z',
+    })).toMatchObject({ kind: 'created', amount: 5000 });
+    sqlite.exec(
+      `UPDATE conversion_events SET approval_status = 'approved', approved_at = '2026-08-02T00:00:00Z' WHERE id = 'cv-2'`,
+    );
+
+    let rows = await getAffiliatePaymentSummaries(db, 'account-1', '2026-09-06T00:00:00Z');
+    expect(rows.find((row) => row.affiliateId === 'affiliate-1')).toMatchObject({
+      settledConversions: 1, settledReward: 5000, unsettledConversions: 1, unsettledReward: 5000,
+    });
+
+    sqlite.exec(`UPDATE affiliate_offers SET reward_amount = 99999 WHERE id = 'offer-1'`);
+
+    rows = await getAffiliatePaymentSummaries(db, 'account-1', '2026-09-06T00:00:00Z');
+    expect(rows.find((row) => row.affiliateId === 'affiliate-1')).toMatchObject({
+      settledConversions: 1, settledReward: 5000, unsettledConversions: 1, unsettledReward: 99999,
+    });
+  });
+
+  test('別アカウントの確定分を確定済み表示へ混ぜない', async () => {
+    sqlite.exec(`
+      INSERT INTO line_accounts VALUES ('account-2');
+      INSERT INTO friends VALUES ('friend-2', 'account-2');
+      INSERT INTO affiliates
+        (id, tenant_id, line_account_id, name, code, commission_rate, is_active,
+         friend_id, hold_days, payout_cycle, created_at)
+      VALUES ('affiliate-2', 'tenant-1', 'account-2', '別店', 'other', 0, 1,
+              'friend-2', 0, NULL, '2026-08-01T00:00:00Z');
+      INSERT INTO conversion_points VALUES ('purchase-2', '購入', 0, 'account-2');
+      INSERT INTO affiliate_offers VALUES ('offer-2', '別店商品', 7000, 'account-2');
+      INSERT INTO affiliate_links VALUES ('link-2', 'affiliate-2', 'other', 'account-2', 'offer-2', 1);
+      INSERT INTO conversion_events VALUES
+        ('cv-other', 'purchase-2', 'friend-2', 'affiliate-2', NULL, 'other',
+         'approved', '2026-08-03T00:00:00Z', 20000, '購入');
+    `);
+    expect(await confirmAffiliateSettlement(db, {
+      tenantId: 'tenant-1', lineAccountId: 'account-2', affiliateId: 'affiliate-2',
+      actorId: 'staff-1', idempotencyKey: 'summary-key-other', expectedAmount: 7000,
+      now: '2026-09-06T00:00:00Z',
+    })).toMatchObject({ kind: 'created', amount: 7000 });
+
+    const rows1 = await getAffiliatePaymentSummaries(db, 'account-1', '2026-09-06T00:00:00Z');
+    expect(rows1.find((row) => row.affiliateId === 'affiliate-2')).toBeUndefined();
+    expect(rows1.find((row) => row.affiliateId === 'affiliate-1')).toMatchObject({
+      settledConversions: 0, settledReward: 0,
+    });
+
+    const rows2 = await getAffiliatePaymentSummaries(db, 'account-2', '2026-09-06T00:00:00Z');
+    expect(rows2.find((row) => row.affiliateId === 'affiliate-1')).toBeUndefined();
+    expect(rows2.find((row) => row.affiliateId === 'affiliate-2')).toMatchObject({
+      settledConversions: 1, settledReward: 7000,
+    });
   });
 });

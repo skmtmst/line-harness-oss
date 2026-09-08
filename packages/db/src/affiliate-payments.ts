@@ -20,7 +20,8 @@ export interface AffiliatePaymentSummary {
  *
  * 承認済み全体、保留中、支払い確定前、確定済みを分けて返す。
  * 割合方式は成果時点の金額×紹介者の率、定額方式は成果に結びついた
- * 案件の固定額を使う。
+ * 案件の固定額を使う。ただし確定済みだけは確定時に保存した台帳の金額を
+ * 優先し、確定後の率・固定額の編集で過去の支払額が変わらないようにする。
  */
 export async function getAffiliatePaymentSummaries(
   db: D1Database,
@@ -103,22 +104,8 @@ export async function getAffiliatePaymentSummaries(
            ELSE COALESCE(off.reward_amount, 0)
          END ELSE 0 END
        ), 0) AS unsettled_reward
-       , COALESCE(SUM(
-         CASE WHEN ce.id IS NOT NULL AND EXISTS (
-           SELECT 1 FROM affiliate_reward_entries re
-            WHERE re.conversion_event_id = ce.id AND re.entry_type = 'credit'
-         ) THEN 1 ELSE 0 END
-       ), 0) AS settled_conversions
-       , COALESCE(SUM(
-         CASE WHEN ce.id IS NOT NULL AND EXISTS (
-           SELECT 1 FROM affiliate_reward_entries re
-            WHERE re.conversion_event_id = ce.id AND re.entry_type = 'credit'
-         ) THEN CASE
-           WHEN a.commission_rate > 0
-             THEN COALESCE(ce.value_snapshot, cp.value, 0) * a.commission_rate / 100.0
-           ELSE COALESCE(off.reward_amount, 0)
-         END ELSE 0 END
-       ), 0) AS settled_reward
+       , COUNT(re.conversion_event_id) AS settled_conversions
+       , COALESCE(SUM(re.amount_minor), 0) AS settled_reward
      FROM affiliates a
      JOIN scoped_affiliate_ids scoped ON scoped.id = a.id
      LEFT JOIN conversion_events ce
@@ -140,6 +127,11 @@ export async function getAffiliatePaymentSummaries(
      LEFT JOIN affiliate_offers off
        ON off.id = al.offer_id
       AND off.line_account_id = ?
+     LEFT JOIN affiliate_reward_entries re
+       ON re.conversion_event_id = ce.id
+      AND re.entry_type = 'credit'
+      AND re.affiliate_id = a.id
+      AND re.line_account_id = ?
      GROUP BY a.id, a.name, a.code, a.hold_days, a.payout_cycle, a.commission_rate
      ORDER BY approved_reward DESC, a.name ASC`,
   ).bind(
@@ -148,6 +140,7 @@ export async function getAffiliatePaymentSummaries(
     now,
     now,
     now,
+    lineAccountId,
     lineAccountId,
     lineAccountId,
     lineAccountId,
