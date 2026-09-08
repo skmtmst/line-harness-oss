@@ -287,3 +287,55 @@ describe('conversion definition V6 routes', () => {
     expect(dbMocks.createConversionDefinition).not.toHaveBeenCalled();
   });
 });
+
+describe('点検・軽 第7便の口の整理(#585)', () => {
+  it('削除は本文が落ちてもクエリの版で受け付ける(#513 L11)', async () => {
+    const viaQuery = await app().request('/api/conversions/definitions/point-a?expectedVersion=1', { method: 'DELETE' });
+    expect(viaQuery.status).toBe(200);
+    expect(dbMocks.deleteUnusedConversionDefinition).toHaveBeenCalledWith(
+      expect.anything(), expect.objectContaining({ expectedVersion: 1 }),
+    );
+  });
+
+  it('削除は版がどこにも無ければ案内文で400にする(#513 L11)', async () => {
+    const response = await app().request('/api/conversions/definitions/point-a', { method: 'DELETE' });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      success: false, error: 'expectedVersionを正しく指定してください。本文が落ちる通信経路ではクエリでも指定できます',
+    });
+  });
+
+  it('イベントの日付は厳密な暦日だけ受け付ける(#513 L12)', async () => {
+    dbMocks.getConversionEvents.mockResolvedValue([]);
+    const ok = await app().request('/api/conversions/events?startDate=2026-09-01&endDate=2026-09-07');
+    expect(ok.status).toBe(200);
+    for (const bad of ['not-a-date', '2026-13-01', '2026-02-30', '2026-9-1']) {
+      const response = await app().request(`/api/conversions/events?startDate=${bad}`);
+      expect(response.status).toBe(400);
+    }
+    expect(dbMocks.getConversionEvents).toHaveBeenCalledTimes(1);
+  });
+
+  it('停止・差し替えの理由は200文字まで(#513 L14)', async () => {
+    const long = 'あ'.repeat(201);
+    const stopped = await app().request('/api/conversions/definitions/point-a/stop', json({ expectedVersion: 1, reason: long }));
+    expect(stopped.status).toBe(400);
+    const replaced = await app().request('/api/conversions/definitions/point-a/replace', json({
+      expectedVersion: 1, replacementId: 'point-b', replacementExpectedVersion: 2, reason: long,
+    }));
+    expect(replaced.status).toBe(400);
+    expect(dbMocks.stopConversionDefinition).not.toHaveBeenCalled();
+    expect(dbMocks.replaceConversionDefinitionUsages).not.toHaveBeenCalled();
+  });
+
+  it('定義作成の対象URLは2000文字まで(#513 L14)', async () => {
+    const response = await app().request('/api/conversions/definitions', json({
+      name: '長いURL', sourceType: 'url_reach', sourceConfig: {},
+      lineAccountId: 'account-a', deduplicationMode: 'once_per_friend',
+      valueMode: 'none', reversalPolicy: 'none',
+      targetUrl: `https://example.com/${'a'.repeat(2000)}`,
+    }));
+    expect(response.status).toBe(400);
+    expect(dbMocks.createConversionDefinition).not.toHaveBeenCalled();
+  });
+});

@@ -202,6 +202,24 @@ function positiveVersion(value: unknown): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+/**
+ * 操作理由の取り出し。台帳行を膨らませないよう200文字まで(#513 L14)。
+ *
+ * 画面は決まった短い文言しか送らないが、口を直接叩く巨大文字から
+ * 監査・履歴の行を守る。超えたら切り捨てず400で返す。
+ */
+function readReason(body: Record<string, unknown> | null):
+  | { ok: true; reason: string | null }
+  | { ok: false; error: string } {
+  const raw = body?.reason;
+  if (typeof raw !== 'string' || !raw.trim()) return { ok: true, reason: null };
+  const reason = raw.trim();
+  if (reason.length > 200) {
+    return { ok: false, error: '理由は200文字以内で入力してください' };
+  }
+  return { ok: true, reason };
+}
+
 function plainObject(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown> : null;
@@ -219,7 +237,7 @@ function readDefinitionInput(body: Record<string, unknown>) {
   const fixedValue = body.fixedValue == null || body.fixedValue === '' ? null : Number(body.fixedValue);
   const attributionDays = body.attributionDays == null || body.attributionDays === '' ? null : Number(body.attributionDays);
   const targetUrl = typeof body.targetUrl === 'string' && body.targetUrl.trim() ? body.targetUrl.trim() : null;
-  if (!name || name.length > 120 || !lineAccountId || !DEFINITION_SOURCE_TYPES.has(sourceType)
+  if (!name || name.length > 120 || !lineAccountId || (targetUrl && targetUrl.length > 2000) || !DEFINITION_SOURCE_TYPES.has(sourceType)
     || !DEDUPLICATION_MODES.has(deduplicationMode) || !VALUE_MODES.has(valueMode)
     || !REVERSAL_POLICIES.has(reversalPolicy)
     || (deduplicationMode === 'window' && (!Number.isInteger(windowDays) || windowDays! < 1 || windowDays! > 365))
@@ -313,6 +331,9 @@ function readMeasureOptions(
       targetUrl = null;
     } else if (typeof raw !== 'string' || !/^https?:\/\//.test(raw)) {
       return { ok: false, error: 'targetUrl must start with http:// or https://' };
+    } else if (raw.trim().length > 2000) {
+      // 巨大なURLで計測行・台帳行を膨らませない(#513 L14)。
+      return { ok: false, error: 'targetUrl must be 2000 characters or less' };
     } else {
       targetUrl = raw.trim();
     }
@@ -474,11 +495,13 @@ conversions.post('/api/conversions/definitions/:id/stop', conversionPermission('
     if (!body || expectedVersion === null) {
       return c.json({ success: false, error: 'expectedVersionを正しく指定してください' }, 400);
     }
+    const parsedReason = readReason(body);
+    if (!parsedReason.ok) return c.json({ success: false, error: parsedReason.error }, 400);
     const scope = await conversionDefinitionScope(c);
     if (!scope.ok) return scope.response;
     const data = await stopConversionDefinition(c.env.DB, {
       id: c.req.param('id'), scope: scope.value, expectedVersion,
-      reason: typeof body.reason === 'string' ? body.reason.trim() : null,
+      reason: parsedReason.reason,
       staffId: c.get('staff')!.id,
     });
     auditLog(c, 'conversion.definition.stop', { kind: 'conversion_definition', id: c.req.param('id') });
@@ -497,12 +520,14 @@ conversions.post('/api/conversions/definitions/:id/replace', conversionPermissio
     if (!body || expectedVersion === null || replacementExpectedVersion === null || !replacementId) {
       return c.json({ success: false, error: '差し替え先と版を正しく指定してください' }, 400);
     }
+    const parsedReason = readReason(body);
+    if (!parsedReason.ok) return c.json({ success: false, error: parsedReason.error }, 400);
     const scope = await conversionDefinitionScope(c);
     if (!scope.ok) return scope.response;
     const data = await replaceConversionDefinitionUsages(c.env.DB, {
       id: c.req.param('id'), replacementId, scope: scope.value,
       expectedVersion, replacementExpectedVersion,
-      reason: typeof body.reason === 'string' ? body.reason.trim() : null,
+      reason: parsedReason.reason,
       staffId: c.get('staff')!.id,
     });
     auditLog(c, 'conversion.definition.replace', { kind: 'conversion_definition', id: c.req.param('id') });
@@ -515,15 +540,22 @@ conversions.post('/api/conversions/definitions/:id/replace', conversionPermissio
 conversions.delete('/api/conversions/definitions/:id', conversionPermission('edit'), async (c) => {
   try {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-    const expectedVersion = positiveVersion(body?.expectedVersion);
-    if (!body || expectedVersion === null) {
-      return c.json({ success: false, error: 'expectedVersionを正しく指定してください' }, 400);
+    /*
+     * 版は本文が正本。代理やプロキシで本文が落ちたときだけクエリを見る
+     * (#513 L11)。どちらも無ければ案内文で400にする。
+     */
+    const expectedVersion = positiveVersion(body?.expectedVersion)
+      ?? positiveVersion(c.req.query('expectedVersion'));
+    if (expectedVersion === null) {
+      return c.json({ success: false, error: 'expectedVersionを正しく指定してください。本文が落ちる通信経路ではクエリでも指定できます' }, 400);
     }
+    const parsedReason = readReason(body);
+    if (!parsedReason.ok) return c.json({ success: false, error: parsedReason.error }, 400);
     const scope = await conversionDefinitionScope(c);
     if (!scope.ok) return scope.response;
     const data = await deleteUnusedConversionDefinition(c.env.DB, {
       id: c.req.param('id'), scope: scope.value, expectedVersion,
-      reason: typeof body.reason === 'string' ? body.reason.trim() : null,
+      reason: parsedReason.reason,
       staffId: c.get('staff')!.id,
     });
     auditLog(c, 'conversion.definition.delete', { kind: 'conversion_definition', id: c.req.param('id') });
@@ -657,6 +689,10 @@ conversions.post('/api/conversions/points', requireRole('owner', 'admin'), async
     if (!body.name || !body.eventType) {
       return c.json({ success: false, error: 'name and eventType are required' }, 400);
     }
+    // 定義作成と同じ120文字上限。一覧表示が崩れないため(#513 L14)。
+    if (String(body.name).trim().length > 120) {
+      return c.json({ success: false, error: 'name must be 120 characters or less' }, 400);
+    }
 
     const options = readMeasureOptions(body);
     if (!options.ok) return c.json({ success: false, error: options.error }, 400);
@@ -697,6 +733,7 @@ conversions.put('/api/conversions/points/:id', requireRole('owner', 'admin'), re
     if (body.name !== undefined) {
       const name = String(body.name).trim();
       if (!name) return c.json({ success: false, error: 'name must not be empty' }, 400);
+      if (name.length > 120) return c.json({ success: false, error: 'name must be 120 characters or less' }, 400);
       patch.name = name;
     }
     if (body.eventType !== undefined) patch.eventType = String(body.eventType);
@@ -803,6 +840,12 @@ conversions.post('/api/conversions/track', requireRole('owner', 'admin'), async 
 // で縛る(#513 M1)。アカウント境界の絞り込みはそのまま残す。
 conversions.get('/api/conversions/events', conversionPermission('view'), async (c) => {
   try {
+    // 日付は他口と同じ厳密な暦日で見る。不正値は辞書順比較にせず400にする(#513 L12)。
+    const rawStart = c.req.query('startDate') ?? undefined;
+    const rawEnd = c.req.query('endDate') ?? undefined;
+    if ((rawStart !== undefined && !parseDate(rawStart)) || (rawEnd !== undefined && !parseDate(rawEnd))) {
+      return c.json({ success: false, error: 'startDate と endDate は YYYY-MM-DD で正しく指定してください' }, 400);
+    }
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const events = await getConversionEvents(c.env.DB, {
       scope: { allowedAccountIds: scope.allowedAccountIds, includeUnassigned: scope.canSeeUnassigned },

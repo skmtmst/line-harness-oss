@@ -1,6 +1,8 @@
 'use client'
 
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ReactNode } from 'react'
+import Button, { type ButtonProps } from '@/components/shared/button'
+import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
 import styles from './reminder-v6-ui.module.css'
 
@@ -91,8 +93,8 @@ export function Choice({ selected, title, note, onClick }: { selected: boolean; 
   return <button type="button" className={selected ? styles.choiceActive : styles.choice} onClick={onClick}><span>{selected ? '●' : '○'}</span><strong>{title}</strong>{note ? <small>{note}</small> : null}</button>
 }
 
-export function ReminderButton({ children, type = 'button', className, ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
-  return <button type={type} className={[styles.smallButton, className].filter(Boolean).join(' ')} {...props}>{children}</button>
+export function ReminderButton(props: ButtonProps) {
+  return <Button {...props} className={[styles.smallButton, props.className].filter(Boolean).join(' ')} />
 }
 
 export function ReminderStepCard({ selected, number, timing, title, note }: { selected: boolean; number: number; timing: string; title: string; note: string }) {
@@ -104,7 +106,7 @@ export function Field({ label, note, children }: { label: string; note?: string;
 }
 
 export function Pill({ tone = 'neutral', children }: { tone?: 'neutral' | 'success' | 'warning' | 'danger'; children: ReactNode }) {
-  return <span className={`${styles.pill} ${styles[`pill_${tone}`]}`}>{children}</span>
+  return <StatusBadge tone={tone} size="compact" className={`${styles.pill} ${styles[`pill_${tone}`]}`}>{children}</StatusBadge>
 }
 
 export const reminderV6Styles = styles

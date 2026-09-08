@@ -2,7 +2,7 @@
 
 `scripts/visual-qa/screens.mjs` から機械で組み立てています。**手で書き写していません。**
 
-総数 **272** ／ 比較済み **255** ／ 未実装 **0** ／ 未確認 **0** ／ 別の仕掛けで撮影 **0** ／ 未撮影 **17**
+総数 **272** ／ 比較済み **256** ／ 未実装 **0** ／ 未確認 **0** ／ 別の仕掛けで撮影 **0** ／ 未撮影 **16**
 
 ## 判定
 
@@ -46,7 +46,7 @@
 | 19 | コンバージョン | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | #1230 `b62d7d070` 2026-09-07（GtylA・d8d3Mz）<br>#1207 `46a869f74` 2026-09-07（ZrpKn・GUxsj）<br>#444 `ccbd0975` 2026-08-28<br>#0 `c275749d` 2026-08-30（ZrpKn・GUxsj・GtylA）<br>#1183 `b5e3dd6a3` 2026-09-07（ZrpKn・GUxsj） |
 | 20 | 分析 | 9 | 9 | 9 | 0 | 0 | 0 | 0 | 9 | 0 | 0 | 0 | 0 | 0 | #445 `787a4b46` 2026-08-28<br>#0 `c275749d` 2026-08-30（Zxezb・J6Inc・YBGtm・QQ1SR・f5HsX・C2I7ry・Fh2Qj・dfwD4）<br>#584 `d0e62d59` 2026-08-30（QQ1SR）<br>#676 `a0bb3f44` 2026-09-02（Zxezb・J6Inc・YBGtm・QQ1SR・f5HsX・C2I7ry・dfwD4）<br>#924 `bd8f0482` 2026-09-06（Zxezb・J6Inc・YBGtm・QQ1SR・f5HsX・C2I7ry・Fh2Qj・dfwD4） |
 | 21 | NEN配信 | 7 | 1 | 7 | 0 | 0 | 0 | 0 | 7 | 0 | 0 | 0 | 0 | 6 | #1241 `64436d463b` 2026-09-07（VLMGH・WeXbL・ymXJK）<br>#1237 `c6dfe250c` 2026-09-07（HpKyF）<br>#1234 `78c19bea32` 2026-09-07（q4lajm）<br>#1217 `1c8055931` 2026-09-07（VLMGH・DEX0k・q4lajm・WeXbL・ymXJK）<br>#446 `4307088d` 2026-08-28<br>#525 `deff5ffb` 2026-08-29（DEX0k）<br>#526 `dfcc9a53` 2026-08-29（HpKyF）<br>#0 `c275749d` 2026-08-30（VLMGH・q4lajm・WeXbL・i9sQP）<br>#526 `1c91a7bc` 2026-08-30（HpKyF・VLMGH）<br>#620 `ed5c0932` 2026-08-31（ymXJK）<br>#1050 `8d3557ce0` 2026-09-07（VLMGH・DEX0k・q4lajm・WeXbL・ymXJK・i9sQP） |
-| 22 | 写真審査 | 4 | 3 | 4 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 1 | #1207 `46a869f74` 2026-09-07（hHrz8・N2J629）<br>#447 `65adbc59` 2026-08-28<br>#0 `c275749d` 2026-08-30（Qu6Vk・N2J629）<br>#1044 `98588d0275` 2026-09-07（Qu6Vk）<br>#1185 `c992fbd82` 2026-09-07（Qu6Vk・hHrz8・N2J629） |
+| 22 | 写真審査 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | #1207 `46a869f74` 2026-09-07（hHrz8・N2J629）<br>#447 `65adbc59` 2026-08-28<br>#0 `c275749d` 2026-08-30（Qu6Vk・N2J629）<br>#1044 `98588d0275` 2026-09-07（Qu6Vk）<br>#1185 `c992fbd82` 2026-09-07（Qu6Vk・hHrz8・N2J629） |
 | 23 | EC連携 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | #1301 `57fb09478` 2026-09-07（oHAN4）<br>#1224 `3ddca80cc4` 2026-09-07（bfB50・oHAN4）<br>#1190 `88673e254` 2026-09-07（bfB50・oHAN4）<br>#0 `c275749d` 2026-08-30（eI3gs）<br>#600 `484c0cd8` 2026-08-31（ELayY）<br>#1006 `f7623915e` 2026-09-06（bfB50・oHAN4） |
 | 24 | LINE通知 | 6 | 6 | 6 | 0 | 0 | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | #1301 `57fb09478` 2026-09-07（festr・N2gAza）<br>#1224 `3ddca80cc4` 2026-09-07（Q55bb）<br>#1076 `8e7c374991` 2026-09-07（festr・Q55bb・X8JCA5・Se65i）<br>#504 `806ed169` 2026-08-30（festr・Q55bb）<br>#545 `c9bb193d` 2026-08-30（X8JCA5・Se65i・DpxOK・N2gAza）<br>#564 `ad59fde6` 2026-08-29（DpxOK）<br>#0 `4af43fb6` 2026-09-01（festr） |
 | 25 | オートメーション | 8 | 8 | 8 | 0 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 | 0 | #0 `e20d921b8` 2026-09-07（Rv8Jv・DkPY0・py5CG）<br>#502 `75b010fc` 2026-08-28（DkPY0）<br>#552 `6ce43563` 2026-08-29（gief7・Rv8Jv・WjYAC・Vdbv5）<br>#0 `c275749d` 2026-08-30（xOpDs・py5CG・syWp4）<br>#0 `2d0ee180` 2026-08-30（xOpDs・py5CG・syWp4）<br>#594 `a389b70a` 2026-08-30（syWp4）<br>#989 `44e671b2c` 2026-09-06（gief7・Rv8Jv・WjYAC・Vdbv5・xOpDs・py5CG・syWp4）<br>#1055 `08369795c` 2026-09-07（gief7・Rv8Jv・DkPY0・WjYAC・py5CG）<br>#1151 `bd900c36d` 2026-09-07（gief7・Rv8Jv・DkPY0・WjYAC・Vdbv5・xOpDs・py5CG・syWp4） |
@@ -59,7 +59,7 @@
 | 32 | 運用状態 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | #482 `b346d467` 2026-08-29（b3HfZ・U0BwS）<br>#0 `c275749d` 2026-08-30（UgonK・UhC2O） |
 | 33 | LINEアカウント設定 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 |  |
 | 34 | はじめの設定と案内 | 4 | 4 | 4 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 |  |
-| | **合計** | **272** | **255** | **268** | **0** | **0** | **0** | **0** | **272** | **0** | **0** | **0** | **0** | **17** | |
+| | **合計** | **272** | **256** | **268** | **0** | **0** | **0** | **0** | **272** | **0** | **0** | **0** | **0** | **16** | |
 
 ## 画面ごとの画素差
 
@@ -127,17 +127,17 @@
 | 6 | `sqFXf` | 6-1-L 対象条件を編集 | 7.1272% | 0px | 下部・中央 | docs | [差分画像](broadcasts-v6/sqFXf-diff-1920.png) | **一致** |
 | 6 | `xkRDb` | 6-1-M フォルダ操作 | 3.2987% | 0px | 中央・左 | docs | [差分画像](broadcasts-v6/xkRDb-diff-1920.png) | **一致** |
 | 6 | `TmHjF` | 6-1-N 一覧の状態（空・読込・エラー） | 2.8644% | 0px | 中央・中央 | docs | [差分画像](broadcasts-v6/TmHjF-diff-1920.png) | **一致** |
-| 7 | `M1EXwB` | 7-1 リマインダ | 3.5255% | 0px | 上部・左 | docs | [差分画像](reminders-v6/M1EXwB-diff-1920.png) | **一致** |
-| 7 | `uJP22` | 7-1-A リマインダを作成 | 6.2993% | 0px | 中央・右 | docs | [差分画像](reminders-v6/uJP22-diff-1920.png) | **一致** |
-| 7 | `J64xI` | 7-1-B 通知ステップ編集 | 6.4522% | 0px | 中央・右 | docs | [差分画像](reminders-v6/J64xI-diff-1920.png) | **一致** |
-| 7 | `s7T2dz` | 7-1-C 対象と終了条件 | 4.2377% | 0px | 中央・左 | docs | [差分画像](reminders-v6/s7T2dz-diff-1920.png) | **一致** |
-| 7 | `JCz6J` | 7-1-D 配信予定プレビュー | 9.2315% | 0px | 下部・右 | docs | [差分画像](reminders-v6/JCz6J-diff-1920.png) | **一致** |
-| 7 | `W98zZQ` | 7-1-E テスト送信確認 | 9.2795% | 0px | 中央・右 | docs | [差分画像](reminders-v6/W98zZQ-diff-1920.png) | **一致** |
-| 7 | `s6Vvp` | 7-1-F 最終確認 | 8.5733% | 0px | 中央・右 | docs | [差分画像](reminders-v6/s6Vvp-diff-1920.png) | **一致** |
-| 7 | `PSmHo` | 7-1-G 有効化完了 | 8.3365% | 0px | 下部・右 | docs | [差分画像](reminders-v6/PSmHo-diff-1920.png) | **一致** |
-| 7 | `GC4St` | 7-1-H 実行結果 | 9.8670% | 0px | 下部・右 | docs | [差分画像](reminders-v6/GC4St-diff-1920.png) | **一致** |
-| 7 | `Y0Sn3` | 7-1-I 削除確認 | 3.5141% | 0px | 上部・左 | docs | [差分画像](reminders-v6/Y0Sn3-diff-1920.png) | **一致** |
-| 7 | `dC0yg` | 7-1-J 一覧の状態（空・読込・エラー） | 2.9622% | 0px | 中央・中央 | docs | [差分画像](reminders-v6/dC0yg-diff-1920.png) | **一致** |
+| 7 | `M1EXwB` | 7-1 リマインダ | 3.5258% | 0px | 上部・左 | docs | [差分画像](reminders-v6/M1EXwB-diff-1920.png) | **一致** |
+| 7 | `uJP22` | 7-1-A リマインダを作成 | 6.2984% | 0px | 中央・右 | docs | [差分画像](reminders-v6/uJP22-diff-1920.png) | **一致** |
+| 7 | `J64xI` | 7-1-B 通知ステップ編集 | 6.4674% | 0px | 中央・右 | docs | [差分画像](reminders-v6/J64xI-diff-1920.png) | **一致** |
+| 7 | `s7T2dz` | 7-1-C 対象と終了条件 | 4.0332% | 0px | 中央・左 | docs | [差分画像](reminders-v6/s7T2dz-diff-1920.png) | **一致** |
+| 7 | `JCz6J` | 7-1-D 配信予定プレビュー | 9.2302% | 0px | 下部・右 | docs | [差分画像](reminders-v6/JCz6J-diff-1920.png) | **一致** |
+| 7 | `W98zZQ` | 7-1-E テスト送信確認 | 9.2896% | 0px | 中央・右 | docs | [差分画像](reminders-v6/W98zZQ-diff-1920.png) | **一致** |
+| 7 | `s6Vvp` | 7-1-F 最終確認 | 8.5188% | 0px | 中央・右 | docs | [差分画像](reminders-v6/s6Vvp-diff-1920.png) | **一致** |
+| 7 | `PSmHo` | 7-1-G 有効化完了 | 8.2708% | 0px | 中央・右 | docs | [差分画像](reminders-v6/PSmHo-diff-1920.png) | **一致** |
+| 7 | `GC4St` | 7-1-H 実行結果 | 9.8313% | 0px | 下部・右 | docs | [差分画像](reminders-v6/GC4St-diff-1920.png) | **一致** |
+| 7 | `Y0Sn3` | 7-1-I 削除確認 | 2.9980% | 0px | 上部・左 | docs | [差分画像](reminders-v6/Y0Sn3-diff-1920.png) | **一致** |
+| 7 | `dC0yg` | 7-1-J 一覧の状態（空・読込・エラー） | 3.3852% | 0px | 上部・左 | docs | [差分画像](reminders-v6/dC0yg-diff-1920.png) | **一致** |
 | 8 | `cmDfJ` | 8-1 自動応答 | 3.8716% | 0px | 上部・左 | docs | [差分画像](auto-replies-v6/cmDfJ-diff-1920.png) | **一致** |
 | 8 | `K7vg2` | 8-1-A 自動応答ルール編集 | 6.3117% | +1px | 中央・右 | docs | [差分画像](auto-replies-v6/K7vg2-diff-1920.png) | **一致** |
 | 8 | `nzWIX` | 8-1-B 反応条件 | 5.1485% | 0px | 中央・左 | docs | [差分画像](auto-replies-v6/nzWIX-diff-1920.png) | **一致** |
@@ -256,10 +256,10 @@
 | 21 | `HpKyF` | 21-1-D NEN配信の中身を編集する | 5.7424% | 0px | 中央・右 | docs | [差分画像](nen-v6/HpKyF-diff-1920.png) | **一致** |
 | 21 | `ymXJK` | 21-1-E コラムを書く | 7.0357%（前回値） | 0px | 中央・右 | docs | [差分画像](nen-v6/ymXJK-diff-1920.png) | **一致** |
 | 21 | `i9sQP` | 21-1-F NENコラム・一覧の状態 | 4.2514%（前回値） | 0px | 上部・左 | docs | [差分画像](nen-v6/i9sQP-diff-1920.png) | **一致** |
-| 22 | `Qu6Vk` | 22-1 写真審査 | 6.2322% | 0px | 中央・中央 | docs | [差分画像](photos-v6/Qu6Vk-diff-1920.png) | **一致** |
-| 22 | `hHrz8` | 22-1-A 写真を1枚ずつ見る | 3.4986% | 0px | 上部・左 | docs | [差分画像](photos-v6/hHrz8-diff-1920.png) | **一致** |
-| 22 | `N2J629` | 22-1-B 写真を戻す理由をえらぶ | 9.9620% | 0px | 下部・中央 | docs | [差分画像](photos-v6/N2J629-diff-1920.png) | **一致** |
-| 22 | `J3Wxl8` | 22-1-C 出しているもの | 3.9021% | 0px | 中央・右 | docs | [差分画像](photos-v6/J3Wxl8-diff-1920.png) | **一致** |
+| 22 | `Qu6Vk` | 22-1 写真審査 | 6.2206%（前回値） | 0px | 中央・中央 | docs | [差分画像](photos-v6/Qu6Vk-diff-1920.png) | **一致** |
+| 22 | `hHrz8` | 22-1-A 写真を1枚ずつ見る | 3.5042%（前回値） | 0px | 上部・左 | docs | [差分画像](photos-v6/hHrz8-diff-1920.png) | **一致** |
+| 22 | `N2J629` | 22-1-B 写真を戻す理由をえらぶ | 9.9501%（前回値） | 0px | 下部・中央 | docs | [差分画像](photos-v6/N2J629-diff-1920.png) | **一致** |
+| 22 | `J3Wxl8` | 22-1-C 出しているもの | 3.8936%（前回値） | 0px | 中央・右 | docs | [差分画像](photos-v6/J3Wxl8-diff-1920.png) | **一致** |
 | 23 | `eI3gs` | 23-1 EC連携 | 5.0268% | 0px | 中央・左 | docs | [差分画像](ec-v6/eI3gs-diff-1920.png) | **一致** |
 | 23 | `ELayY` | 23-1-A 会員のつき合わせ | 3.9507% | 0px | 中央・左 | docs | [差分画像](ec-v6/ELayY-diff-1920.png) | **一致** |
 | 23 | `bfB50` | 23-1-B 定期便 | 4.7276% | 0px | 中央・左 | docs | [差分画像](ec-v6/bfB50-diff-1920.png) | **一致** |
@@ -282,13 +282,13 @@
 | 26 | `M0Gb7` | 26-1-A こちらで受け取る | 9.9849% | 0px | 下部・中央 | docs | [差分画像](webhooks-v6/M0Gb7-diff-1920.png) | **一致** |
 | 26 | `KNG00` | 26-1-B やり取りの記録 | 5.0129% | 0px | 中央・左 | docs | [差分画像](webhooks-v6/KNG00-diff-1920.png) | **一致** |
 | 26 | `f8SBSh` | 26-1-C 一覧の状態（空・読込・エラー） | 3.8223%（前回値） | 0px | 中央・中央 | docs | [差分画像](webhooks-v6/f8SBSh-diff-1920.png) | **一致** |
-| 27 | `TV2DI` | 27-1 予約管理 | 4.4558% | 0px | 中央・右 | docs | [差分画像](booking-v6/TV2DI-diff-1920.png) | **一致** |
-| 27 | `TnDbq` | 27-1-A 予約の詳細 | 5.5954% | 0px | 上部・右 | docs | [差分画像](booking-v6/TnDbq-diff-1920.png) | **一致** |
-| 27 | `cpdDi` | 27-1-B 電話の予約を入れる | 6.8421% | 0px | 上部・右 | docs | [差分画像](booking-v6/cpdDi-diff-1920.png) | **一致** |
-| 27 | `SbuUI` | 27-1-C 今週の予約 | 4.4693%（前回値） | 0px | 中央・左 | docs | [差分画像](booking-v6/SbuUI-diff-1920.png) | **一致** |
-| 27 | `GFDqW` | 27-1-D 代理予約・内容確認 | 7.6298% | 0px | 上部・右 | docs | [差分画像](booking-v6/GFDqW-diff-1920.png) | **一致** |
-| 27 | `GfceK` | 27-1-E 代理予約・登録完了 | 6.9745% | 0px | 中央・右 | docs | [差分画像](booking-v6/GfceK-diff-1920.png) | **一致** |
-| 27 | `Lg8ff` | 27-1-F 代理予約・予約枠の重なりと入力エラー | 4.8883% | 0px | 中央・左 | docs | [差分画像](booking-v6/Lg8ff-diff-1920.png) | **一致** |
+| 27 | `TV2DI` | 27-1 予約管理 | 4.4580%（前回値） | 0px | 中央・右 | docs | [差分画像](booking-v6/TV2DI-diff-1920.png) | **一致** |
+| 27 | `TnDbq` | 27-1-A 予約の詳細 | 5.5075%（前回値） | 0px | 上部・右 | docs | [差分画像](booking-v6/TnDbq-diff-1920.png) | **一致** |
+| 27 | `cpdDi` | 27-1-B 電話の予約を入れる | 6.8063%（前回値） | 0px | 上部・右 | docs | [差分画像](booking-v6/cpdDi-diff-1920.png) | **一致** |
+| 27 | `SbuUI` | 27-1-C 今週の予約 | 4.4369%（前回値） | 0px | 中央・左 | docs | [差分画像](booking-v6/SbuUI-diff-1920.png) | **一致** |
+| 27 | `GFDqW` | 27-1-D 代理予約・内容確認 | 7.7682%（前回値） | 0px | 上部・右 | docs | [差分画像](booking-v6/GFDqW-diff-1920.png) | **一致** |
+| 27 | `GfceK` | 27-1-E 代理予約・登録完了 | 6.9387%（前回値） | 0px | 中央・右 | docs | [差分画像](booking-v6/GfceK-diff-1920.png) | **一致** |
+| 27 | `Lg8ff` | 27-1-F 代理予約・予約枠の重なりと入力エラー | 5.0267% | 0px | 中央・左 | docs | [差分画像](booking-v6/Lg8ff-diff-1920.png) | **一致** |
 | 28 | `QSLEH` | 28-1 予約設定 | 3.4245% | 0px | 中央・左 | docs | [差分画像](booking-settings-v6/QSLEH-diff-1920.png) | **一致** |
 | 28 | `tksPc` | 28-1-A 受付枠と休業日 | 5.6757% | 0px | 中央・右 | docs | [差分画像](booking-settings-v6/tksPc-diff-1920.png) | **一致** |
 | 28 | `GhOb3` | 28-1-B 予約メニューをつくる | 6.7937% | 0px | 上部・右 | docs | [差分画像](booking-settings-v6/GhOb3-diff-1920.png) | **一致** |

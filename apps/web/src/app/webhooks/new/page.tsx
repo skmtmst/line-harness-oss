@@ -4,15 +4,7 @@ import { useState } from 'react'
 import { api } from '@/lib/api'
 import CreatePage, { Field, inputClass } from '@/components/shared/create-page'
 import { useAccount } from '@/contexts/account-context'
-
-const MIN_SECRET_LENGTH = 32
-
-/** 推測されない文字列を作る。手で決めさせると必ず短いものが混ざる。 */
-function generateSecret(): string {
-  const bytes = new Uint8Array(24)
-  crypto.getRandomValues(bytes)
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
-}
+import { MIN_SECRET_LENGTH, generateSecret } from '../secret'
 
 export default function NewWebhookPage() {
   const { selectedAccountId } = useAccount()

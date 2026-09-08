@@ -63,6 +63,7 @@ export default function FolderPanel({
   activeId,
   onSelect,
   total,
+  heading = 'フォルダ',
   onAddFolder,
   addFolderLabel = 'フォルダを追加',
   addFolderDisabled = false,
@@ -75,6 +76,8 @@ export default function FolderPanel({
   onSelect: (id: string) => void
   /** 見出しの右に出す総数。単位は画面ごとに違うので文字で受ける。 */
   total: string
+  /** 予約管理の「メニュー」など、分類の呼び名が異なる画面で使う。 */
+  heading?: string
   /** 一覧の下に置く追加操作。道具列へ重複して置かない。 */
   onAddFolder?: () => void
   addFolderLabel?: string
@@ -95,7 +98,7 @@ export default function FolderPanel({
     // **読み上げ名を持つ。** 帯が何の分類かを、見出しの外からも辿れるように。
     <aside aria-label="フォルダ" className="bg-canvas rounded-card border-hairline h-fit overflow-visible border">
       <div className="border-hairline flex items-center justify-between border-b px-4 py-3">
-        <p className="text-ink text-sm font-semibold">フォルダ</p>
+        <p className="text-ink text-sm font-semibold">{heading}</p>
         <span className="text-ink-faint text-xs tabular-nums">{total}</span>
       </div>
       <nav className="p-2">
