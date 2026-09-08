@@ -8,7 +8,7 @@ import { api, ApiError } from '@/lib/api'
 import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
 import type { RichMenuDeleteImpact, RichMenuTapStats } from '@/lib/api'
 import type { Folder } from '@line-crm/shared'
-import FolderPanel from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_GRID_CLASS, FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -609,11 +609,6 @@ export default function RichMenusListPage() {
         data-design="Bar"
         className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
       >
-        <Button
-          onClick={() => setFolderDialogOpen(true)}
-        >
-          フォルダを追加
-        </Button>
         <Link
           href="/rich-menus/new"
           className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control inline-flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors"
@@ -704,11 +699,12 @@ export default function RichMenusListPage() {
       )}
 
       {selectedAccount && (
-        <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+        <div style={FOLDER_RAIL_STYLE} className={`grid gap-4 ${FOLDER_RAIL_GRID_CLASS}`}>
           <FolderPanel
             total={`${folders.length + 1}`}
             activeId={folderFilter}
             onSelect={setFolderFilter}
+            onAddFolder={() => setFolderDialogOpen(true)}
             rows={[
               { id: '', label: 'すべて', count: groups.length },
               ...folders.map((f) => ({

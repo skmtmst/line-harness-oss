@@ -21,7 +21,7 @@ import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
-import FolderPanel from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_GRID_CLASS, FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -625,13 +625,14 @@ function InflowLinksPageInner() {
         ここで発行したURLをいったん通ってもらうことで、はじめて経路が分かります。QRコードも同じURLから作れます。
       </p>
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><div className="flex gap-2"><Button href="/inflow-links/new" variant="primary">＋ 流入リンクをつくる</Button><Button onClick={() => setEditingGenre('new')}>フォルダを追加</Button></div><div className="flex gap-2"><Button onClick={exportCurrentRows} disabled={sortedRows.length === 0}>CSVで書き出す</Button><Button variant="secondary">まとめて操作</Button></div></div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><Button href="/inflow-links/new" variant="primary">＋ 流入リンクをつくる</Button><div className="flex gap-2"><Button onClick={exportCurrentRows} disabled={sortedRows.length === 0}>CSVで書き出す</Button><Button variant="secondary">まとめて操作</Button></div></div>
 
-      <div className="grid gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
+      <div style={FOLDER_RAIL_STYLE} className={`grid gap-5 ${FOLDER_RAIL_GRID_CLASS}`}>
         <FolderPanel
           total={`${accountFilteredRows.length}件`}
           activeId={selectedGenre}
           onSelect={(id) => { setSelectedGenre(id); setPage(1) }}
+          onAddFolder={() => setEditingGenre('new')}
           rows={[
             { id: '', label: 'すべて', count: accountFilteredRows.length },
             ...availableGenres.map((genre) => ({
