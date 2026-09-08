@@ -302,19 +302,17 @@ export default function RichMenusListPage() {
     // 画面だけを基準にすると、隠れているメニューとの優先関係が壊れる。
     const reordered = moveTargetingGroup(groups, group.id, delta === -1 ? -1 : 1)
     if (!reordered) return
+    if (!selectedAccount) return
     setReorderBusy(true)
     try {
-      // 古いデータは同じ優先番号を持つことがある。変更した2件だけを交換すると
-      // 同順位が残るため、全件を0,1,2…へそろえる。displayOrder も同じ値へ寄せ、
-      // 以前の「自分で決めた順」を読む場所とも食い違わせない。
-      await Promise.all(
-        reordered.map((item) =>
-          api.richMenuGroups.update(item.id, {
-            targetingPriority: item.priority,
-            displayOrder: item.priority,
-          }),
-        ),
+      // #502中: 全件ぶん PATCH を並列に投げない。1口で 0,1,2…へそろえる。
+      // 途中失敗で順番が中途半端に残らない。古い同順位もこの1口で解消する。
+      // displayOrder も同じ値へ寄せ、以前の「自分で決めた順」と食い違わせない。
+      const res = await api.richMenuGroups.reorderPriorities(
+        selectedAccount.id,
+        reordered.map((item) => item.id),
       )
+      if (!res.success) throw new Error(res.error ?? '並び替え失敗')
       await reload()
     } catch (e) {
       // **`alert()` では出さない。** 見た目がブラウザ任せで、画像比較にも

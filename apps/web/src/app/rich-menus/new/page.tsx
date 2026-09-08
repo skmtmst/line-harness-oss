@@ -159,11 +159,14 @@ export default function NewRichMenuPage() {
     setSubmitting(true)
     setError(null)
     try {
+      // #502中: フォルダは作成口で一緒に決める。作成後の付け直し2口目を
+      // 握りつぶすと、フォルダ未分類になったことに利用者が気づけない。
       const res = await api.richMenuGroups.create({
         accountId: selectedAccount.id,
         name: name.trim(),
         chatBarText: chatBarText.trim(),
         size: tmpl.size,
+        folderId: folderId || null,
         pages: Array.from({ length: tabCount + 1 }, (_, index) => ({
           name: index === 0 ? 'トップ' : `タブ ${String.fromCharCode(65 + index - 1)}`,
           orderIndex: index,
@@ -171,7 +174,6 @@ export default function NewRichMenuPage() {
         })),
       })
       if (!res.success) throw new Error(res.error ?? '作成失敗')
-      if (folderId) await api.richMenuGroups.update(res.data.id, { folderId })
       router.push(`/rich-menus/edit?id=${res.data.id}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))

@@ -127,7 +127,8 @@ describe('V6 17-1-G の配線', () => {
 
   it('共通アクションの公開版を選択肢から保存する', () => {
     expect(PAGE).toContain('api.commonActions.resources(selectedAccountId)')
-    expect(PAGE).toContain('detail.data.currentPublishedVersionId')
+    expect(PAGE).toContain('item.currentPublishedVersionId')
+    expect(PAGE).not.toContain('api.commonActions.get(item.id')
     expect(PAGE).toContain('公開中の共通アクションを選ぶ')
     expect(PAGE).not.toContain('placeholder="共通アクションの版"')
   })

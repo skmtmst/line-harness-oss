@@ -5969,6 +5969,124 @@ export const ACTION_SCORE_RULES = {
   },
 }
 
+
+const fail = (status, error, code) => ({
+  status,
+  body: { success: false, error, ...(code ? { code } : {}) },
+})
+const ok = (status, data) => ({ status, body: { success: true, data } })
+
+/**
+ * 機能17の画面確認専用の書き込み応答。
+ * DBは変えず、本番口と同じ成功・入力不足・競合の器だけを再現する。
+ */
+export function mileageWriteResponse(method, pathname, body = {}, headers = {}) {
+  if (method === 'POST' && pathname === '/api/mileage/rules') {
+    if (!String(body.name ?? '').trim() || !String(body.eventType ?? '').trim()
+      || !Number.isInteger(body.amount) || body.amount <= 0 || !String(body.lineAccountId ?? '').trim()) {
+      return fail(400, 'name, eventType, lineAccountId and a positive integer amount are required')
+    }
+    return ok(201, { ...MILEAGE_RULES[0], ...body, id: 'mileage-rule-visual-new', isActive: true })
+  }
+
+  const mileageRule = /^\/api\/mileage\/rules\/([^/]+)$/.exec(pathname)
+  if (method === 'PUT' && mileageRule) {
+    if (body.amount !== undefined && (!Number.isInteger(body.amount) || body.amount <= 0)) {
+      return fail(400, 'amount must be a positive integer')
+    }
+    if (mileageRule[1] === 'mileage-rule-global') {
+      return fail(409, '全店共通の旧ルールは変更できません')
+    }
+    return ok(200, { ...MILEAGE_RULES[0], ...body, id: mileageRule[1] })
+  }
+
+  const rewardOperation = /^\/api\/mileage\/rewards\/([^/]+)\/(test|publish|stop)$/.exec(pathname)
+  if (method === 'POST' && rewardOperation) {
+    if (!String(body.accountId ?? '').trim()) return fail(400, 'accountId is required')
+    if (rewardOperation[1] === 'mr-conflict') {
+      return fail(409, '別の人が新版を作りました。再読み込みしてください', 'version_conflict')
+    }
+    const reward = MILEAGE_REWARDS.rewards.find((item) => item.id === rewardOperation[1])
+      ?? MILEAGE_REWARDS.rewards[0]
+    if (rewardOperation[2] === 'test') {
+      return ok(200, {
+        rewardId: reward.id,
+        versionId: reward.currentVersion.id,
+        requiredMiles: reward.currentVersion.requiredMiles,
+        canDeliver: true,
+        warning: null,
+        ledgerChanged: false,
+      })
+    }
+    return ok(200, {
+      ...reward,
+      status: rewardOperation[2] === 'stop' ? 'stopped' : 'published',
+    })
+  }
+
+  if (method === 'POST' && pathname === '/api/mileage/adjustments') {
+    const key = String(headers['idempotency-key'] ?? headers['Idempotency-Key'] ?? '')
+    if (!key || !String(body.accountId ?? '').trim() || !String(body.friendId ?? '').trim()
+      || !['increase', 'decrease'].includes(body.direction) || !Number.isInteger(body.amount)
+      || body.amount <= 0 || !String(body.reason ?? '').trim()) {
+      return fail(400, 'accountId, friendId, direction, reason and Idempotency-Key are required')
+    }
+    if (key === 'visual-conflict') {
+      return fail(409, '同じIdempotency-Keyが別の内容で使われています', 'idempotency_conflict')
+    }
+    const signed = body.direction === 'decrease' ? -body.amount : body.amount
+    return ok(201, {
+      entryId: 'mileage-adjustment-visual',
+      balanceBefore: 1240,
+      amount: signed,
+      balanceAfter: 1240 + signed,
+      replayed: false,
+      expiresAt: body.expiresAt ?? null,
+      notification: null,
+    })
+  }
+
+  if (method === 'PATCH' && pathname === '/api/action-scores/rules/draft') {
+    if (!String(body.accountId ?? '').trim() || !body.configuration) {
+      return fail(400, 'accountId and configuration are required')
+    }
+    if (body.expectedDraftVersionId === 'stale-version') {
+      return fail(409, '別の人が下書きを更新しました', 'version_conflict')
+    }
+    return ok(200, { ...ACTION_SCORE_RULES, status: 'draft' })
+  }
+
+  if (method === 'POST' && pathname === '/api/action-scores/rules/test') {
+    if (!String(body.accountId ?? '').trim() || !body.configuration || !String(body.eventType ?? '').trim()) {
+      return fail(400, 'accountId, configuration and eventType are required')
+    }
+    return ok(200, {
+      scoreBefore: Number(body.currentScore ?? 0),
+      scoreAfter: Number(body.currentScore ?? 0) + 4,
+      bandBefore: 'normal',
+      bandAfter: 'normal',
+      matched: [{ ruleId: 'asr-1', ruleName: 'メッセージに返信した', scoreBefore: 40, scoreAfter: 44 }],
+    })
+  }
+
+  if (method === 'POST' && pathname === '/api/action-scores/rules/publish') {
+    if (!String(body.accountId ?? '').trim() || !String(body.draftVersionId ?? '').trim()) {
+      return fail(400, 'accountId and draftVersionId are required')
+    }
+    if (body.draftVersionId === 'stale-version') {
+      return fail(409, '公開する下書きが変わりました', 'version_conflict')
+    }
+    return ok(200, { ...ACTION_SCORE_RULES, status: 'published' })
+  }
+
+  if (method === 'POST' && pathname === '/api/action-scores/rules/stop') {
+    if (!String(body.accountId ?? '').trim()) return fail(400, 'accountId is required')
+    return ok(200, { ...ACTION_SCORE_RULES, status: 'stopped' })
+  }
+
+  return null
+}
+
 /**
  * 機能10 ウェビナーのフォルダ。設計 `ZC13r` の名前と件数。
  * `count` は全18件を取得しなくても左の絞り込み件数を描ける一覧集計値。

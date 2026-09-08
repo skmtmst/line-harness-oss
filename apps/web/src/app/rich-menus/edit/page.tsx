@@ -446,8 +446,12 @@ function Editor({
     setError(null)
     setConfirmError('')
     setNotice('')
+    // #502中: 下書き保存の成否で文言を分ける。保存済みなのに
+    // 「保存されていません」と出すと、利用者が再入力してしまう。
+    let draftSaved = false
     try {
       await persistDraft()
+      draftSaved = true
       const res = await api.richMenuGroups.publish(groupId)
       // 失敗を握りつぶさない。返事を見ずに閉じると、登録できていないのに
       // 終わったように見える。
@@ -457,7 +461,11 @@ function Editor({
       await reload()
     } catch {
       // 生のAPIエラーは出さない。運用者が次にすることだけを窓に書く。
-      setConfirmError('LINEへ登録できませんでした。下書きは保存されていません。しばらくおいてから、もう一度お試しください。')
+      setConfirmError(
+        draftSaved
+          ? 'LINEへ登録できませんでした。下書きは保存済みです。LINEへの登録だけもう一度お試しください。'
+          : 'LINEへ登録できませんでした。下書きは保存されていません。しばらくおいてから、もう一度お試しください。',
+      )
     } finally {
       setPublishing(false)
     }

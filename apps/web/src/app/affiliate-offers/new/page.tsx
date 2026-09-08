@@ -52,7 +52,11 @@ export default function NewAffiliateOfferPage() {
           setScenarios(s.value.data as unknown as Scenario[])
         }
         if (a.status === 'fulfilled' && a.value.success) {
-          setAccounts(a.value.data as unknown as LineAccount[])
+          const list = a.value.data as unknown as LineAccount[]
+          setAccounts(list)
+          // 選べるアカウントが1つだけなら最初から選んでおく。
+          // 空のまま押すと口が 400 で落とす（#505 重大1）。
+          if (list.length === 1) setLineAccountId(list[0].id)
         }
       },
     )
@@ -74,6 +78,9 @@ export default function NewAffiliateOfferPage() {
       designNode="GPWzq"
       validate={() => {
         if (!name.trim()) return '案件名を入力してください'
+        // 「すべてのアカウント」のまま送ると口が 400 で落とす。
+        // 選べる先が複数あるときは、押す前に選ばせる（#505 重大1）。
+        if (!lineAccountId && accounts.length > 1) return 'LINEアカウントを選んでください'
         if (!rewardAmount && !rewardMiles) return '報酬（円かマイル）のどちらかを入れてください'
         if (rewardAmount && (!Number.isFinite(Number(rewardAmount)) || Number(rewardAmount) < 0)) {
           return '報酬額は0円以上で入力してください'
@@ -106,7 +113,7 @@ export default function NewAffiliateOfferPage() {
             tagId: tagId || null,
             scenarioId: scenarioId || null,
           })
-          if (!res.success) throw new Error('案件を作成できませんでした')
+          if (!res.success) throw new Error('案件を作成できませんでした。LINEアカウントを選び直してください')
           offerId = res.data.id
           setCreatedId(offerId)
         }
@@ -255,7 +262,11 @@ export default function NewAffiliateOfferPage() {
             id="of-account"
             value={lineAccountId}
             onChange={(e) => setLineAccountId(e.target.value)}
-            options={[{ value: '', label: 'すべてのアカウント' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
+            options={accounts.length > 1
+              // 複数あるときの空欄は「全部」ではなく「未選択」。
+              // そのまま送ると口が 400 で落とすので、選ばせる文言にする。
+              ? [{ value: '', label: '選んでください' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]
+              : [...accounts.map((a) => ({ value: a.id, label: a.name }))]}
           />
         </Field>
       </FormSection>

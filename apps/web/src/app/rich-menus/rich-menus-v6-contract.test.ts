@@ -73,10 +73,11 @@ describe('V6リッチメニューの画面契約', () => {
   })
 
   it('並び替えは見た目だけでなく実際の判定順を全件そろえる', () => {
-    expect(PAGE).toContain('targetingPriority: item.priority')
-    expect(PAGE).toContain('displayOrder: item.priority')
+    // #502中: 全件ぶんPATCHの並列投げは1口(reorderPriorities)に寄せた。
+    // 途中失敗で順番が中途半端に残らない。隠れているメニューも含めて全部送る。
+    expect(PAGE).toContain('api.richMenuGroups.reorderPriorities')
     expect(PAGE).toContain('moveTargetingGroup(groups, group.id')
-    expect(PAGE).toContain('reordered.map((item) =>')
+    expect(PAGE).toContain('reordered.map((item) => item.id)')
     expect(PAGE).not.toContain("setSortKey('manual')")
   })
 
