@@ -9,7 +9,13 @@
  * どちらが効いているのか読めなくなる。
  */
 
-import { enrollFriendInReminder } from '@line-crm/db';
+import {
+  cancelV6RemindersForSource,
+  enrollFriendInReminder,
+  rescheduleV6RemindersForSource,
+  type CancelV6RemindersResult,
+  type RescheduleV6RemindersResult,
+} from '@line-crm/db';
 
 export type ReminderTriggerType = 'manual' | 'booking' | 'event';
 
@@ -57,8 +63,10 @@ export function resolveAnchor(rule: ReminderTriggerRow, startsAtIso: string): st
 /**
  * このきっかけで動くリマインダを探して、友だちを登録する。
  *
- * 同じ friend + reminder + target_date が既に active なら何もしない。
+ * 同じ発生元 (source_kind + source_id + source_event_id) の行が
+ * friend + reminder + target_date で既に active なら何もしない。
  * 予約の状態が何度か変わっても、そのたびに登録が増えないようにするため。
+ * 同時刻の別予約は発生元が違うため別行で共存する。
  *
  * 失敗しても呼び出し側は止めない。リマインダが登録できなかったからといって
  * 予約そのものを失敗させるのは筋が違う。
@@ -71,17 +79,30 @@ export async function enrollByTrigger(
     startsAtIso: string;
     sourceId?: string | null;
     sourceEventId?: string | null;
+    /** 追跡用の発生元区分。未指定なら triggerType (個別相談は 'meet' を渡す)。 */
+    sourceKind?: string | null;
+    /** 必須。ルールと友だちがこの店舗のもの一致するときだけ登録する。 */
+    lineAccountId: string;
   },
 ): Promise<number> {
+  // 自動登録はテナント境界を越えない。友だちの所属と呼出元の店舗が違う
+  // ときは書かずに落とす (別店舗名義の誤送信を防ぐ)。
+  const friendAccount = await db
+    .prepare(`SELECT line_account_id FROM friends WHERE id = ?`)
+    .bind(input.friendId)
+    .first<{ line_account_id: string | null }>();
+  if (friendAccount?.line_account_id !== input.lineAccountId) {
+    throw new Error('REMINDER_ACCOUNT_MISMATCH');
+  }
   const rules = await db
     .prepare(
       `SELECT id, trigger_type, trigger_offset_minutes, send_at_time, target_tag_id,
               current_published_version_id
          FROM reminders
         WHERE is_active = 1 AND lifecycle_status = 'published'
-          AND deleted_at IS NULL AND trigger_type = ?`,
+          AND deleted_at IS NULL AND trigger_type = ? AND line_account_id = ?`,
     )
-    .bind(input.triggerType)
+    .bind(input.triggerType, input.lineAccountId)
     .all<ReminderTriggerRow>();
   if (!rules.results.length) return 0;
 
@@ -98,25 +119,342 @@ export async function enrollByTrigger(
     const anchor = resolveAnchor(rule, input.startsAtIso);
     if (!anchor) continue;
 
+    // 同じ発生元の再通知だけ重複排除する。source を見ないと、同時刻の
+    // 別予約の2件目を作らず捨ててしまう (別予約は共存させる)。
     const existing = await db
       .prepare(
         `SELECT 1 FROM friend_reminders
           WHERE friend_id = ? AND reminder_id = ? AND target_date = ? AND status = 'active'
+            AND source_kind IS ? AND source_id IS ? AND source_event_id IS ?
           LIMIT 1`,
       )
-      .bind(input.friendId, rule.id, anchor)
+      .bind(
+        input.friendId,
+        rule.id,
+        anchor,
+        input.sourceKind ?? input.triggerType,
+        input.sourceId ?? null,
+        input.sourceEventId ?? null,
+      )
       .first<{ 1: number }>();
     if (existing) continue;
 
-    await enrollFriendInReminder(db, {
-      friendId: input.friendId,
-      reminderId: rule.id,
-      targetDate: anchor,
-      sourceKind: input.triggerType,
-      sourceId: input.sourceId ?? null,
-      sourceEventId: input.sourceEventId ?? null,
-    });
+    try {
+      await enrollFriendInReminder(db, {
+        friendId: input.friendId,
+        reminderId: rule.id,
+        targetDate: anchor,
+        sourceKind: input.sourceKind ?? input.triggerType,
+        sourceId: input.sourceId ?? null,
+        sourceEventId: input.sourceEventId ?? null,
+      });
+    } catch (error) {
+      // 取消後に同じ発生元で作り直したとき、cancelled の行が一意鍵
+      // (reminder_id, friend_id, source_event_id) を塞いでいる。
+      // その行を起こして新しい起点へ移す。再送の重なりでも1行のまま。
+      if (!isUniqueViolation(error) || input.sourceEventId == null) throw error;
+      const revived = await db
+        .prepare(
+          `UPDATE friend_reminders
+              SET status = 'active', target_date = ?, cancel_reason = NULL,
+                  completed_at = NULL, updated_at = ?
+            WHERE reminder_id = ? AND friend_id = ? AND source_event_id = ?
+              AND status = 'cancelled'`,
+        )
+        .bind(anchor, new Date().toISOString(), rule.id, input.friendId, input.sourceEventId)
+        .run();
+      if ((revived.meta?.changes ?? 0) === 0) throw error;
+    }
     enrolled++;
   }
   return enrolled;
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /unique constraint failed/i.test(message);
+}
+
+export interface CancelByTriggerInput {
+  triggerType: Exclude<ReminderTriggerType, 'manual'>;
+  /** 追跡用の発生元区分。未指定なら triggerType。 */
+  sourceKind?: string | null;
+  sourceId?: string | null;
+  sourceEventId?: string | null;
+  friendId?: string | null;
+  /** 移行前の行を探すための旧開始時刻。source 連動が無いときの予備鍵。 */
+  startsAtIso?: string | null;
+  lineAccountId?: string | null;
+  /** 取消理由・元イベントID・実行者を残す (例: booking_cancel:bk-1:by:staff-9)。 */
+  cancelReason: string;
+  allowLegacyFallback?: boolean;
+  now?: Date;
+  /**
+   * true のとき送信権の貸出中は REMINDER_SEND_IN_FLIGHT を投げる
+   * (利用者操作の取消用。呼び出し側は 409 で再試行させる)。
+   */
+  failOnSendInFlight?: boolean;
+}
+
+/**
+ * 取消を V6 へ連動する。未送信だけを止め、送信済み履歴は残す。
+ *
+ * 同じ取消通知の再送は active が無いため 0 件で返す。
+ * 失敗は呼び出し側へ投げる。黙って握ると取消漏れ (N-065 そのもの) になる。
+ */
+export async function cancelByTrigger(
+  db: D1Database,
+  input: CancelByTriggerInput,
+): Promise<CancelV6RemindersResult> {
+  const targetDates = await anchorsForStartsAt(db, input.triggerType, input.friendId, input.startsAtIso);
+  return cancelV6RemindersForSource(db, {
+    sourceKind: input.sourceKind ?? input.triggerType,
+    sourceId: input.sourceId,
+    sourceEventId: input.sourceEventId,
+    friendId: input.friendId,
+    targetDates,
+    lineAccountId: input.lineAccountId,
+    cancelReason: input.cancelReason,
+    allowLegacyFallback: input.allowLegacyFallback,
+    now: input.now?.toISOString(),
+    failOnSendInFlight: input.failOnSendInFlight,
+  });
+}
+
+export interface RescheduleByTriggerInput {
+  triggerType: Exclude<ReminderTriggerType, 'manual'>;
+  /** 追跡用の発生元区分。未指定なら triggerType。 */
+  sourceKind?: string | null;
+  sourceId?: string | null;
+  sourceEventId?: string | null;
+  friendId?: string | null;
+  oldStartsAtIso: string;
+  newStartsAtIso: string;
+  lineAccountId?: string | null;
+  allowLegacyFallback?: boolean;
+  now?: Date;
+}
+
+/**
+ * 日程変更を V6 へ連動する。送信済みを残し、未来予定だけ新基準日へ移す。
+ *
+ * 同じ変更通知の再送は from の起点が既に無いため 0 件で返す。
+ */
+export async function rescheduleByTrigger(
+  db: D1Database,
+  input: RescheduleByTriggerInput,
+): Promise<RescheduleV6RemindersResult> {
+  const rules = await db
+    .prepare(
+      `SELECT id, trigger_type, trigger_offset_minutes, send_at_time, target_tag_id,
+              current_published_version_id
+         FROM reminders
+        WHERE is_active = 1 AND lifecycle_status = 'published'
+          AND deleted_at IS NULL AND trigger_type = ?`,
+    )
+    .bind(input.triggerType)
+    .all<ReminderTriggerRow>();
+  if (!rules.results.length) return { movedEnrollments: 0, cancelledRuns: 0 };
+
+  const moves: Array<{ reminderId: string; fromTargetDate: string; toTargetDate: string }> = [];
+  for (const rule of rules.results) {
+    if (rule.target_tag_id && input.friendId) {
+      const tagged = await db
+        .prepare(`SELECT 1 FROM friend_tags WHERE friend_id = ? AND tag_id = ? LIMIT 1`)
+        .bind(input.friendId, rule.target_tag_id)
+        .first<{ 1: number }>();
+      if (!tagged) continue;
+    }
+    const from = resolveAnchor(rule, input.oldStartsAtIso);
+    const to = resolveAnchor(rule, input.newStartsAtIso);
+    if (!from || !to || from === to) continue;
+    moves.push({ reminderId: rule.id, fromTargetDate: from, toTargetDate: to });
+  }
+  if (!moves.length) return { movedEnrollments: 0, cancelledRuns: 0 };
+  return rescheduleV6RemindersForSource(db, {
+    sourceKind: input.sourceKind ?? input.triggerType,
+    sourceId: input.sourceId,
+    sourceEventId: input.sourceEventId,
+    friendId: input.friendId,
+    targetDates: undefined,
+    lineAccountId: input.lineAccountId,
+    allowLegacyFallback: input.allowLegacyFallback,
+    moves,
+    now: input.now?.toISOString(),
+  });
+}
+
+export interface ReconcileV6Input {
+  triggerType: Exclude<ReminderTriggerType, 'manual'>;
+  /** 追跡用の発生元区分。未指定なら triggerType。 */
+  sourceKind?: string | null;
+  sourceId?: string | null;
+  sourceEventId?: string | null;
+  /** 現在の担当友だち。これ以外の友だちに残った active 行は置き忘れとして止める。 */
+  friendId: string;
+  /** 現在の業務開始時刻。この起点に合う target_date へ直す。 */
+  startsAtIso: string;
+  now?: Date;
+  /**
+   * true のとき他友だちの行を止めず、現担当の起点直しだけ行う。
+   * 友だち変更で「新規成功後に旧取消」の順序を作るための前段に使う。
+   */
+  leaveOtherFriends?: boolean;
+}
+
+export interface ReconcileV6Result {
+  healedEnrollments: number;
+  cancelledStale: number;
+  cancelledRuns: number;
+}
+
+/**
+ * 日程変更の途中失敗や友だち変更の取りこぼしを、再送で回復させる。
+ *
+ * 業務予定の更新は先に終わっていることがある (再送時は旧起点が分からない)。
+ * そのため旧起点ではなく、現在の業務開始時刻から期待される target_date を
+ * 求め、ずれている active 行を直す。友だちが変わった後に旧友だちへ残った
+ * 行もここで止める。何もずれていなければ 0 件で返す (冪等)。
+ */
+export async function reconcileV6ToStartsAt(
+  db: D1Database,
+  input: ReconcileV6Input,
+): Promise<ReconcileV6Result> {
+  const empty = { healedEnrollments: 0, cancelledStale: 0, cancelledRuns: 0 };
+  const kind = input.sourceKind ?? input.triggerType;
+  if (input.sourceId == null && input.sourceEventId == null) return empty;
+  const nowIso = (input.now ?? new Date()).toISOString();
+
+  // source 連動の active 行を友だち問わず拾う。友だち変更の置き忘れはここで見つかる。
+  const keyConds: string[] = [];
+  const keyBindings: unknown[] = [];
+  if (input.sourceId != null) {
+    keyConds.push(`fr.source_id = ?`);
+    keyBindings.push(input.sourceId);
+  }
+  if (input.sourceEventId != null) {
+    keyConds.push(`fr.source_event_id = ?`);
+    keyBindings.push(input.sourceEventId);
+  }
+  const found = await db.prepare(
+    `SELECT fr.id AS id, fr.friend_id AS friendId, fr.reminder_id AS reminderId,
+            fr.target_date AS targetDate
+       FROM friend_reminders fr
+      WHERE fr.status = 'active' AND fr.source_kind = ?
+        AND (${keyConds.join(' OR ')})`,
+  ).bind(kind, ...keyBindings).all<{
+    id: string;
+    friendId: string;
+    reminderId: string;
+    targetDate: string;
+  }>();
+  const rows = found.results ?? [];
+  if (rows.length === 0) return empty;
+
+  // 現起点で期待される target_date をルールごとに求める (タグ絞り込みあり)。
+  const rules = await db
+    .prepare(
+      `SELECT id, trigger_type, trigger_offset_minutes, send_at_time, target_tag_id,
+              current_published_version_id
+         FROM reminders
+        WHERE is_active = 1 AND lifecycle_status = 'published'
+          AND deleted_at IS NULL AND trigger_type = ?`,
+    )
+    .bind(input.triggerType)
+    .all<ReminderTriggerRow>();
+  const expected = new Map<string, string>();
+  for (const rule of rules.results ?? []) {
+    if (rule.target_tag_id) {
+      const tagged = await db
+        .prepare(`SELECT 1 FROM friend_tags WHERE friend_id = ? AND tag_id = ? LIMIT 1`)
+        .bind(input.friendId, rule.target_tag_id)
+        .first<{ 1: number }>();
+      if (!tagged) continue;
+    }
+    const anchor = resolveAnchor(rule, input.startsAtIso);
+    if (anchor) expected.set(rule.id, anchor);
+  }
+
+  const statements: D1PreparedStatement[] = [];
+  const healReason = `${kind}_heal:${input.sourceEventId ?? input.sourceId}:by:system`;
+  const staleIds = input.leaveOtherFriends
+    ? []
+    : rows.filter((row) => row.friendId !== input.friendId).map((row) => row.id);
+  for (let offset = 0; offset < staleIds.length; offset += 50) {
+    const chunk = staleIds.slice(offset, offset + 50);
+    const placeholders = chunk.map(() => '?').join(',');
+    statements.push(
+      db.prepare(
+        `UPDATE friend_reminders
+            SET status = 'cancelled', cancel_reason = ?, updated_at = ?
+          WHERE status = 'active' AND id IN (${placeholders})`,
+      ).bind(healReason, nowIso, ...chunk),
+    );
+  }
+  const movedIds: string[] = [];
+  for (const row of rows) {
+    if (row.friendId !== input.friendId) continue;
+    const to = expected.get(row.reminderId);
+    if (!to || to === row.targetDate) continue;
+    statements.push(
+      db.prepare(
+        `UPDATE friend_reminders
+            SET target_date = ?, updated_at = ?
+          WHERE status = 'active' AND id = ?`,
+      ).bind(to, nowIso, row.id),
+    );
+    movedIds.push(row.id);
+  }
+  const enrollmentStatementCount = statements.length;
+  const cancelIds = [...staleIds, ...movedIds];
+  for (let offset = 0; offset < cancelIds.length; offset += 50) {
+    const chunk = cancelIds.slice(offset, offset + 50);
+    const placeholders = chunk.map(() => '?').join(',');
+    statements.push(
+      db.prepare(
+        `UPDATE reminder_delivery_runs
+            SET status = 'cancelled', completed_at = ?, updated_at = ?
+          WHERE status IN ('queued', 'retry_wait', 'claimed') AND friend_reminder_id IN (${placeholders})`,
+      ).bind(nowIso, nowIso, ...chunk),
+    );
+  }
+  if (statements.length === 0) return empty;
+  const results = await db.batch(statements);
+  let healedEnrollments = 0;
+  let cancelledStale = 0;
+  let cancelledRuns = 0;
+  const staleStatementCount = Math.ceil(staleIds.length / 50);
+  results.forEach((result, index) => {
+    const changes = Number(result.meta?.changes ?? 0);
+    if (index < staleStatementCount) cancelledStale += changes;
+    else if (index < enrollmentStatementCount) healedEnrollments += changes;
+    else cancelledRuns += changes;
+  });
+  return { healedEnrollments, cancelledStale, cancelledRuns };
+}
+
+/** 移行前の行を探すため、全ルールの起点候補を列挙する (タグ絞り込みなし)。 */
+async function anchorsForStartsAt(
+  db: D1Database,
+  triggerType: Exclude<ReminderTriggerType, 'manual'>,
+  friendId: string | null | undefined,
+  startsAtIso: string | null | undefined,
+): Promise<string[]> {
+  if (!friendId || !startsAtIso) return [];
+  const rules = await db
+    .prepare(
+      `SELECT id, trigger_type, trigger_offset_minutes, send_at_time, target_tag_id,
+              current_published_version_id
+         FROM reminders
+        WHERE is_active = 1 AND lifecycle_status = 'published'
+          AND deleted_at IS NULL AND trigger_type = ?`,
+    )
+    .bind(triggerType)
+    .all<ReminderTriggerRow>();
+  const anchors: string[] = [];
+  for (const rule of rules.results ?? []) {
+    const anchor = resolveAnchor(rule, startsAtIso);
+    if (anchor && !anchors.includes(anchor)) anchors.push(anchor);
+  }
+  return anchors;
 }
