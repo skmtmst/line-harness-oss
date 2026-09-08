@@ -91,6 +91,7 @@ shared-button-importer app/rich-menus/page.tsx
 shared-button-importer app/scenarios/detail/scenario-detail-client.tsx
 shared-button-importer app/scenarios/page.tsx
 shared-button-importer app/scenarios/results/page.tsx
+shared-button-importer app/staff/invite/page.tsx
 shared-button-importer app/staff/page.tsx
 shared-button-importer app/settings/manual-links/page.tsx
 shared-button-importer app/settings/page.tsx
