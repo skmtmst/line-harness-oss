@@ -122,7 +122,7 @@ function formatKeys(keys: string[]): string {
  * - ALLOWLIST_MAX: 未記載負債はここより増やせない
  * 後続票で記載を増やしたら、実測に合わせて両方を同じ PR で更新する。
  */
-const DOCUMENTED_MIN = 83;
+const DOCUMENTED_MIN = 84;
 const ALLOWLIST_MAX = 777;
 
 /**
@@ -160,6 +160,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/friends/count',
   'GET /api/line-accounts',
   'GET /api/line-accounts/{id}',
+  'GET /api/mileage/redemptions',
   'GET /api/mileage/rules',
   'GET /api/nen-campaigns/deliveries',
   'GET /api/nen-campaigns/deliveries/{id}',
@@ -1195,7 +1196,7 @@ describe('OpenAPIと公開APIの同期', () => {
     ).toEqual([]);
   });
 
-  test('記載済みoperation数は83以上（後退禁止）', async () => {
+  test('記載済みoperation数は84以上（後退禁止）', async () => {
     const spec = await loadSpec();
     const count = documentedKeys(spec).size;
     expect(
