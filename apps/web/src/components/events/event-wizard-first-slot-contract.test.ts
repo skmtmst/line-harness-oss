@@ -28,4 +28,9 @@ describe('V6 イベント作成の最初の予約枠', () => {
     expect(SOURCE).toContain('previewDate')
     expect(SOURCE).toContain('previewCapacity')
   })
+
+  it('一括の作りすぎは下見の前に500件で止める(点検#520の中9)', () => {
+    expect(SOURCE).toContain('generated.length > 500')
+    expect(SOURCE).toContain('500件を超える一括作成はできません')
+  })
 })

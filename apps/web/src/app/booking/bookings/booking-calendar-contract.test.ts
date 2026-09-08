@@ -20,6 +20,13 @@ describe('V6 予約管理の時間台帳', () => {
     expect(CALENDAR).toContain('LINEからの予約（緑）と電話の予約（青）')
   })
 
+  test('格子ごとに走査せず辞書へ束ね、空き枠は目安と書く(点検#516の中1)', () => {
+    expect(CALENDAR).toContain('new Map<string, BookingRequest[]>()')
+    expect(CALENDAR).not.toContain('items.filter((booking) => booking.staff_name === name')
+    expect(CALENDAR).not.toContain('items.filter((booking) => jstDay(booking.starts_at) === day')
+    expect(CALENDAR).toContain('目安です。同時受付数は含みません')
+  })
+
   test('電話予約はLINE予約と同じ格子へ出し、未連携の理由も隠さない', () => {
     expect(CALENDAR).toContain('function isPhoneBooking')
     expect(CALENDAR).toContain("!booking.friend_id")

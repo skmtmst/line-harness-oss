@@ -631,13 +631,13 @@ describe('api.mileage V6 admin contract', () => {
 })
 
 describe('eventsApi.createSlots', () => {
-  const slots = Array.from({ length: 900 }, (_, index) => ({
+  const slots = Array.from({ length: 450 }, (_, index) => ({
     starts_at: new Date(Date.UTC(2099, 0, 1, 0, index)).toISOString(),
     ends_at: new Date(Date.UTC(2099, 0, 1, 0, index + 1)).toISOString(),
     capacity: null,
   }))
 
-  it('900 slots are posted sequentially in 400/400/100 chunks', async () => {
+  it('450 slots are posted sequentially in 400/50 chunks', async () => {
     const fetchSpy = vi.fn(async (_url: string, init?: RequestInit) => {
       const sent = JSON.parse(init?.body as string) as { slots: unknown[] }
       return new Response(JSON.stringify({ items: sent.slots }), { status: 201 })
@@ -646,9 +646,9 @@ describe('eventsApi.createSlots', () => {
 
     const response = await eventsApi.createSlots('account', 'event', slots)
 
-    expect(fetchSpy).toHaveBeenCalledTimes(3)
-    expect(fetchSpy.mock.calls.map((call) => JSON.parse(call[1]?.body as string).slots.length)).toEqual([400, 400, 100])
-    expect(response.items).toHaveLength(900)
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    expect(fetchSpy.mock.calls.map((call) => JSON.parse(call[1]?.body as string).slots.length)).toEqual([400, 50])
+    expect(response.items).toHaveLength(450)
   })
 
   it('reports how many slots were added when a later chunk fails', async () => {
@@ -659,6 +659,19 @@ describe('eventsApi.createSlots', () => {
 
     await expect(eventsApi.createSlots('account', 'event', slots)).rejects.toThrow('400件まで追加されました')
     expect(fetchSpy).toHaveBeenCalledTimes(2)
+  })
+
+  it('501 slots are rejected before posting anything (点検#520の中9)', async () => {
+    const fetchSpy = vi.fn(async () => new Response(JSON.stringify({ items: [] }), { status: 201 }))
+    vi.stubGlobal('fetch', fetchSpy)
+    const many = Array.from({ length: 501 }, (_, index) => ({
+      starts_at: new Date(Date.UTC(2099, 0, 1, 0, index)).toISOString(),
+      ends_at: new Date(Date.UTC(2099, 0, 1, 0, index + 1)).toISOString(),
+      capacity: null,
+    }))
+
+    await expect(eventsApi.createSlots('account', 'event', many)).rejects.toThrow('500件を超える一括作成はできません')
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 })
 

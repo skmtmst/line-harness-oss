@@ -934,9 +934,6 @@ const SHAPES = {
   '/api/media': { items: MEDIA_ITEMS, total: MEDIA_ITEMS.length, limit: 20, offset: 0 },
   '/api/media/quota': MEDIA_QUOTA,
 
-  /* 予約。`api.ts` を通らない口なので、読む側（`app/page.tsx`）に合わせる。 */
-  '/api/booking/admin/requests': { requests: [], total: 0, limit: 50, offset: 0 },
-
   /* EC の出荷予定（`EcShipmentList`）。`soon`/`later` は配列で要る。 */
   '/api/ec-commerce/shipments': {
     today: FIXED_TO,
@@ -1075,6 +1072,29 @@ function visualQaWriteBody(method, pathname) {
   if (method === 'POST' && pathname === '/api/saved-searches/preview') {
     return FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL
   }
+  /* 機能29の操作系。承認・拒否・取消・枠の増減を目視できるよう固定の返事を返す(点検#520の中7)。 */
+  if (method === 'POST' && /^\/api\/events\/admin\/events\/[^/]+\/bookings\/[^/]+\/decide$/.test(pathname)) {
+    const bookingId = pathname.split('/').pop()
+    const found = EVENT_BOOKINGS.find((booking) => booking.id === bookingId) ?? EVENT_BOOKINGS[0]
+    return { ...found, status: 'confirmed', decided_at: '2026-09-08T00:00:00.000Z' }
+  }
+  if (method === 'POST' && /^\/api\/events\/admin\/events\/[^/]+\/bookings\/[^/]+\/cancel$/.test(pathname)) {
+    return { ok: true }
+  }
+  if (method === 'PUT' && /^\/api\/events\/admin\/events\/[^/]+\/bookings\/[^/]+$/.test(pathname)) {
+    const bookingId = pathname.split('/').pop()
+    const found = EVENT_BOOKINGS.find((booking) => booking.id === bookingId) ?? EVENT_BOOKINGS[0]
+    return { ...found, status: 'confirmed' }
+  }
+  if (method === 'POST' && /^\/api\/events\/admin\/events\/[^/]+\/slots$/.test(pathname)) {
+    return { items: EVENT_SLOTS }
+  }
+  if (method === 'PUT' && /^\/api\/events\/admin\/events\/[^/]+\/slots\/[^/]+$/.test(pathname)) {
+    return EVENT_SLOTS[0]
+  }
+  if (method === 'DELETE' && /^\/api\/events\/admin\/events\/[^/]+\/slots\/[^/]+$/.test(pathname)) {
+    return {}
+  }
   return null
 }
 
@@ -1108,6 +1128,7 @@ const RAW = {
   '/api/booking/admin/alternatives': BOOKING_CONFLICT_ALTERNATIVES,
   '/api/events/admin/events': { items: ADMIN_EVENTS },
   // 予約メニューの帯は `requests` から件数を出す。包むと `.filter` で落ちる。
+  // 撮影用は BOOKING_REQUESTS(実APIと同じ器。動的な絞り込みは下の分岐が受ける)。
   '/api/booking/admin/requests': { requests: BOOKING_REQUESTS, total: BOOKING_REQUESTS.length, limit: 50, offset: 0 },
   '/api/booking/admin/requests-summary': {
     total: BOOKING_REQUESTS.length,
@@ -1142,6 +1163,7 @@ const RAW_PATTERNS = [
   [/^\/api\/events\/admin\/events\/[^/]+$/, EVENT_DETAIL],
   [/^\/api\/events\/admin\/events\/[^/]+\/slots$/, { items: EVENT_SLOTS }],
   [/^\/api\/events\/admin\/events\/[^/]+\/waitlist$/, { waitlist: EVENT_WAITLIST }],
+  [/^\/api\/events\/admin\/events\/notifications\/pending$/, { count: 2 }],
   [/^\/api\/events\/admin\/events\/[^/]+\/bookings$/, (url) => ({
     items: url.searchParams.get('status')
       ? EVENT_BOOKINGS.filter((booking) => booking.status === url.searchParams.get('status'))

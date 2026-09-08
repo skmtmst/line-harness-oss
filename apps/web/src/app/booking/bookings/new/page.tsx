@@ -50,6 +50,14 @@ function timeRangeLabel(date: string, time: string, minutes: number): string {
   })}`
 }
 
+// サーバ側 packages/db/src/booking-customers.ts の normalizeBookingCustomerPhone と
+// 同じ約束を先に確かめる。出す直前で落とすと入れ直しになる。
+function phoneDigitsError(phone: string): string | null {
+  const compact = phone.normalize('NFKC').trim().replace(/[\s()（）\-‐‑–—ー]/g, '')
+  if (!/^\+?\d{7,15}$/.test(compact)) return '電話番号は数字7〜15桁で入力してください'
+  return null
+}
+
 function scheduleLabel(value: string): string {
   return new Date(value).toLocaleString('ja-JP', {
     month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit',
@@ -233,6 +241,10 @@ export default function NewProxyBookingPage() {
     if (!selectedAccountId) return 'LINEアカウントを選択してください'
     if (!friend && !customer && !phoneCustomer) return '予約するお客様を選択してください'
     if (phoneCustomer && !customer && (!customerName.trim() || !customerPhone.trim())) return '電話客の名前と電話番号を入力してください'
+    if (phoneCustomer && !customer && customerPhone.trim()) {
+      const phoneError = phoneDigitsError(customerPhone)
+      if (phoneError) return phoneError
+    }
     if (!menu) return '予約メニューを選択してください'
     if (!selectedStaff) return '担当者を選択してください'
     if (!date || !time) return '空いている日時を選択してください'
@@ -695,9 +707,10 @@ function LinePreview({ friendName, menuName, staffName, date, time, deliveryStat
 }) {
   const deliveryLabel = deliveryStatus === 'succeeded' ? '送信済み・開封状況は受信箱で確認できます'
     : deliveryStatus === 'queued' ? '送信処理中です'
-      : deliveryStatus === 'permanent_failed' || deliveryStatus === 'failed' ? '送信に失敗しました'
-        : deliveryStatus === 'not_applicable' ? 'LINE未連携のため送信しません'
-          : '「予約を入れる」を押すと、すぐに届きます'
+      : deliveryStatus === 'scheduled' ? '送信予定です'
+        : deliveryStatus === 'permanent_failed' || deliveryStatus === 'failed' ? '送信に失敗しました'
+          : deliveryStatus === 'not_applicable' ? 'LINE未連携のため送信しません'
+            : '「予約を入れる」を押すと、すぐに届きます'
   return (
     <div className="bg-action rounded-card p-4">
       <p className="text-on-action text-center text-xs font-semibold">LINEプレビュー</p>
