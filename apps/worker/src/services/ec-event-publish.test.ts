@@ -4,6 +4,7 @@ import {
   buildEcEventData,
   buildEcV6Event,
   ecDispatchIdempotencyKey,
+  ecNotificationRetryKey,
   EC_V6_SOURCE_KIND,
   normalizeEcOccurredAt,
   normalizeEcOrderTotal,
@@ -122,6 +123,34 @@ describe('buildEcEventData', () => {
     const base = sourceEvent('ec.order.confirmed');
     expect(buildEcEventData({ ...base, order: { number: 'NEN-1001', total: 100 } }))
       .not.toHaveProperty('currency');
+  });
+
+  it('mirrors a legacy subscription amount into the compatible order total', () => {
+    const data = buildEcEventData({
+      event_id: 'event-legacy-1',
+      event_type: 'ec.subscription.payment_failed',
+      occurred_at: '2026-08-28T01:00:00+09:00',
+      subscription: { contract_number: 'NEN-SUB-57', amount: 3680 },
+    });
+    expect(data.orderTotal).toBe(3680);
+    expect((data.order as Record<string, unknown>).total).toBe(3680);
+  });
+});
+
+describe('ecNotificationRetryKey', () => {
+  const UUID_V5 = /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+  it('returns a stable UUID per logical notification', async () => {
+    const first = await ecNotificationRetryKey('account-a', 'event-12345678');
+    const second = await ecNotificationRetryKey('account-a', 'event-12345678');
+    expect(first).toMatch(UUID_V5);
+    expect(second).toBe(first);
+  });
+
+  it('separates accounts and events', async () => {
+    const base = await ecNotificationRetryKey('account-a', 'event-12345678');
+    expect(await ecNotificationRetryKey('account-b', 'event-12345678')).not.toBe(base);
+    expect(await ecNotificationRetryKey('account-a', 'event-87654321')).not.toBe(base);
   });
 });
 

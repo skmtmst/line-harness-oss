@@ -119,11 +119,16 @@ export function buildEcEventData(event: EcV6SourceEvent): Record<string, unknown
   const compat: EcV6OrderCompat = {};
   if (order) {
     if (order.number) compat.number = order.number;
-    if (finiteAmount(order.total) !== undefined || nonEmptyText(order.total) !== undefined) {
-      compat.total = order.total as number | string;
-    }
     if (order.currency) compat.currency = order.currency;
   }
+  // 同値: 注文側に金額がなく旧受信体が定期便側に持つ場合も互換側へ写す。
+  // 旧consumerが読む `order.total` を欠落させない。
+  const rawOrderTotal: unknown = order?.total;
+  const compatTotal = finiteAmount(rawOrderTotal) !== undefined
+    || nonEmptyText(rawOrderTotal) !== undefined
+    ? (rawOrderTotal as number | string)
+    : orderTotal;
+  if (compatTotal !== undefined) compat.total = compatTotal;
   if (Object.keys(compat).length > 0) data.order = compat;
   return data;
 }
@@ -155,4 +160,42 @@ export function ecDispatchIdempotencyKey(
   subscriber: string,
 ): string {
   return `eccube:${lineAccountId}:${externalEventId}:${subscriber}`;
+}
+
+/**
+ * 通知retry keyの名前空間。変えると既発行キーとの対応が切れるため固定。
+ * 値はこの用途専用の乱数UUID(初回生成時に固定。以後不変)。
+ */
+const EC_RETRY_KEY_NAMESPACE = 'c41a9e2b-7f3d-4a1c-9e5b-2d8f6a0c4e71';
+
+function parseUuidBytes(uuid: string): Uint8Array {
+  const hex = uuid.replace(/-/g, '');
+  const bytes = new Uint8Array(16);
+  for (let i = 0; i < 16; i++) bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  return bytes;
+}
+
+async function uuidV5(namespace: string, name: string): Promise<string> {
+  const namespaceBytes = parseUuidBytes(namespace);
+  const nameBytes = new TextEncoder().encode(name);
+  const material = new Uint8Array(namespaceBytes.length + nameBytes.length);
+  material.set(namespaceBytes);
+  material.set(nameBytes, namespaceBytes.length);
+  const hash = new Uint8Array(await crypto.subtle.digest('SHA-1', material));
+  hash[6] = (hash[6] & 0x0f) | 0x50;
+  hash[8] = (hash[8] & 0x3f) | 0x80;
+  const hex = Array.from(hash.slice(0, 16), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+/**
+ * 論理通知の固定retry key。同じ通知は何度送り直しても同じUUIDになり、
+ * LINE側がキーで重複送信を抑える(X-Line-Retry-Key、受理済みは409)。
+ * DBから作らないため、台帳の書込障害時も再送で同じキーになる。
+ */
+export async function ecNotificationRetryKey(
+  lineAccountId: string,
+  externalEventId: string,
+): Promise<string> {
+  return uuidV5(EC_RETRY_KEY_NAMESPACE, `${lineAccountId}:${externalEventId}:notification`);
 }
