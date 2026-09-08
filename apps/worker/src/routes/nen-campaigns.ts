@@ -1,5 +1,9 @@
 import { Hono, type Context } from 'hono';
 import { getLineAccountById, jstNow } from '@line-crm/db';
+import {
+  checkNenCampaignBodyLength,
+  NEN_CAMPAIGN_BODY_MAX_LENGTH,
+} from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import {
@@ -200,7 +204,16 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireRole('owner'
       && (!Array.isArray(body.afterActions) || afterActions.length !== body.afterActions.length)) {
     return c.json({ success: false, error: 'Invalid campaign actions' }, 400);
   }
-  if (!body.title.trim() || body.title.trim().length > 120 || body.bodyText.length > 1500
+  // 本文の上限は画面と同じ採用上限（NEN_CAMPAIGN_BODY_MAX_LENGTH）。数え方も
+  // 画面の残数表示と同じ関数で測り、超過時は字数を添えて理由を返す。
+  const bodyCheck = checkNenCampaignBodyLength(body.bodyText);
+  if (!bodyCheck.fits) {
+    return c.json({
+      success: false,
+      error: `本文は${NEN_CAMPAIGN_BODY_MAX_LENGTH.toLocaleString('ja-JP')}字以内で入力してください（現在${bodyCheck.length.toLocaleString('ja-JP')}字）`,
+    }, 400);
+  }
+  if (!body.title.trim() || body.title.trim().length > 120
       || !Number.isInteger(delayDays) || delayDays < 0 || delayDays > 365
       || !/^([01]\d|2[0-3]):[0-5]\d$/.test(body.deliveryTime)
       || buttonLabel.length > 20 || !isUrl(buttonUrl) || !isUrl(imageUrl)) {
