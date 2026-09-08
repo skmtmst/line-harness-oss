@@ -40,13 +40,16 @@ describe('#548-7 会話詳細の型は口の実応答に従う', () => {
   })
 
   it('chats.get はメッセージの型に ChatDetailMessage を使う', () => {
-    expect(chatsGet).toContain('messages?: ChatDetailMessage[]')
+    expect(API).toContain('messages: ChatDetailMessage[]')
+    expect(chatsGet).toContain('fetchApi<ApiResponse<ChatDetail>>')
     expect(chatsGet).not.toContain('senderType')
   })
 
   it('画面は独自のメッセージ型を持たず、共通の型に寄せる', () => {
-    expect(PAGE).toContain('type ChatMessage = ChatDetailMessage')
+    expect(PAGE).toContain('type ChatDetail = ApiChatDetail')
+    expect(PAGE).not.toContain('type ChatMessage')
     expect(PAGE).not.toContain('senderType')
+    expect(PAGE).not.toContain('as unknown as')
   })
 })
 

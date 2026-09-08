@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   createConversionPoint,
+  getConversionPoints,
   updateConversionPoint,
   getUrlReachConversionPoints,
   trackConversion,
@@ -101,6 +102,35 @@ describe('既定値', () => {
     expect(point.count_repeat).toBe(1); // 毎回数える = 従来どおり
     expect(point.attribution_days).toBeNull();
     expect(point.line_account_id).toBeNull();
+  });
+});
+
+describe('一覧のアカウント境界', () => {
+  test('許可アカウントと未割当だけをSQLで取得する', async () => {
+    sqlite.prepare(
+      `INSERT INTO line_accounts (id, name, channel_id, channel_secret, channel_access_token, created_at, updated_at)
+       VALUES ('acc-1', 'A店', 'scope-c1', 's1', 't1', '2024-01-01', '2024-01-01'),
+              ('acc-2', 'B店', 'scope-c2', 's2', 't2', '2024-01-01', '2024-01-01')`,
+    ).run();
+    const unassigned = await createConversionPoint(db, { name: '共通', eventType: 'purchase' });
+    const allowed = await createConversionPoint(db, {
+      name: 'A店', eventType: 'purchase', lineAccountId: 'acc-1',
+    });
+    await createConversionPoint(db, {
+      name: 'B店', eventType: 'purchase', lineAccountId: 'acc-2',
+    });
+
+    const visible = await getConversionPoints(db, {
+      allowedLineAccountIds: ['acc-1'], includeUnassigned: true,
+    });
+    expect(visible.map((point) => point.id).sort()).toEqual([allowed.id, unassigned.id].sort());
+  });
+
+  test('権限が無ければ全件取得してから絞らず0件を返す', async () => {
+    await createConversionPoint(db, { name: '共通', eventType: 'purchase' });
+    expect(await getConversionPoints(db, {
+      allowedLineAccountIds: [], includeUnassigned: false,
+    })).toEqual([]);
   });
 });
 

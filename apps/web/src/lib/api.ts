@@ -143,7 +143,7 @@ export type OutgoingWebhookOverview = OutgoingWebhook & {
     pending: number
     successRate: number | null
     lastResult: {
-      status: string
+      status: 'succeeded' | 'failed' | 'pending'
       responseStatus: number | null
       completedAt: string | null
       failureReason: string | null
@@ -568,6 +568,41 @@ export interface ChatDetailMessage {
   sentByStaffName: string | null
   scenarioName: string | null
   createdAt: string
+}
+
+/** `GET /api/chats` が返す、受信箱一覧専用の会話行。 */
+export type ChatListItem = Chat & {
+  friendName: string
+  friendPictureUrl: string | null
+  lastMessageContent: string | null
+  lastMessageDirection: 'incoming' | 'outgoing' | null
+  lastMessageType: string | null
+  /** ログイン中の担当者だけの未読。対応状況とは別。 */
+  isUnread: boolean
+}
+
+/** `GET /api/chats/:id` の実応答。一覧にだけある値は省略される。 */
+export type ChatDetail = Pick<ChatListItem,
+  'id' | 'friendId' | 'operatorId' | 'status' | 'notes' | 'revision' | 'lastMessageAt' | 'createdAt'
+> & {
+  friendName: string
+  friendRealName: string | null
+  friendPictureUrl: string | null
+  isAttention: boolean
+  lastMessageContent?: string | null
+  lastMessageDirection?: 'incoming' | 'outgoing' | null
+  lastMessageType?: string | null
+  updatedAt?: string
+  messages: ChatDetailMessage[]
+  hasMoreMessages: boolean
+}
+
+/** 受信箱の保存検索は友だち検索と条件JSONの形が違うため、ここでは未知値として受ける。 */
+export type InboxSavedViewApiItem = Omit<SavedSearch, 'conditions'> & {
+  conditions: unknown
+  isFavorite: boolean
+  matchCount: number | null
+  matchCountCapped: boolean
 }
 
 /** 緊急停止の対象、影響、停止状態をサーバーと共有する契約。 */
@@ -2474,6 +2509,14 @@ export type FriendListItem = FriendWithTags & Partial<{
   operator: { id: string; name: string } | null
   supportMark: { id: string; name: string; color: string } | null
 }>
+
+/**
+ * 停止の再送を同じ操作として扱うキー。
+ * 同じルール・版なら同じ値、版が進んだ後の停止なら別の値になる。
+ */
+export function friendAddStopIdempotencyKey(ruleId: string, version: number): string {
+  return `friend-add-rule-stop:${encodeURIComponent(ruleId)}:v${version}`
+}
 
 
 
@@ -6180,8 +6223,8 @@ export const api = {
       deduplicationWindowDays?: number | null
       valueMode: ConversionValueMode
       fixedValue?: number | null
-    }) => fetchApi<ApiResponse<ConversionDefinitionPreview>>('/api/conversions/definitions/preview', {
-      method: 'POST', body: JSON.stringify(data),
+    }, options?: { signal?: AbortSignal }) => fetchApi<ApiResponse<ConversionDefinitionPreview>>('/api/conversions/definitions/preview', {
+      method: 'POST', body: JSON.stringify(data), signal: options?.signal,
     }),
     definitionDeleteImpact: (id: string) =>
       fetchApi<ApiResponse<ConversionDefinitionDeleteImpact>>(
@@ -7291,7 +7334,7 @@ export const api = {
         `/api/friend-add-rules/${encodeURIComponent(ruleId)}/stop?account_id=${encodeURIComponent(accountId)}`,
         {
           method: 'POST',
-          headers: { 'Idempotency-Key': crypto.randomUUID() },
+          headers: { 'Idempotency-Key': friendAddStopIdempotencyKey(ruleId, version) },
           body: JSON.stringify({ version }),
         },
       ),
@@ -7505,7 +7548,7 @@ export const api = {
       // カーソルページング: (lastMessageAt, friendId) の複合カーソルより古い行を返す
       if (params?.beforeAt) query.beforeAt = params.beforeAt
       if (params?.beforeId) query.beforeId = params.beforeId
-      return fetchApi<ApiResponse<Chat[]>>(
+      return fetchApi<ApiResponse<ChatListItem[]>>(
         '/api/chats?' + new URLSearchParams(query),
       )
     },
@@ -7515,11 +7558,7 @@ export const api = {
       if (params?.beforeAt) query.set('beforeAt', params.beforeAt)
       if (params?.beforeId) query.set('beforeId', params.beforeId)
       const qs = query.toString()
-      return fetchApi<ApiResponse<Chat & {
-        messages?: ChatDetailMessage[]
-        /** 古い履歴が残っているか。画面は「前のメッセージ」で遡る。 */
-        hasMoreMessages?: boolean
-      }>>(
+      return fetchApi<ApiResponse<ChatDetail>>(
         `/api/chats/${id}${qs ? `?${qs}` : ''}`,
       )
     },
@@ -7560,7 +7599,7 @@ export const api = {
         createdAt: string
       }>>>(`/api/chats/${id}/events`),
     savedViews: {
-      list: (accountId: string) => fetchApi<ApiResponse<SavedSearch[]>>(`/api/inbox/saved-views?lineAccountId=${encodeURIComponent(accountId)}`),
+      list: (accountId: string) => fetchApi<ApiResponse<InboxSavedViewApiItem[]>>(`/api/inbox/saved-views?lineAccountId=${encodeURIComponent(accountId)}`),
       create: (accountId: string, data: { name: string; conditions: unknown; isShared?: boolean; isFavorite?: boolean }) =>
         fetchApi<ApiResponse<SavedSearch>>(`/api/inbox/saved-views?lineAccountId=${encodeURIComponent(accountId)}`, {
           method: 'POST',

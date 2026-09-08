@@ -124,6 +124,28 @@ describe('api.conversions の V6一覧・レポート契約', () => {
     ])
     expect(await csv.text()).toContain('成果地点名')
   })
+
+  it('重い試算へ中断シグナルを渡す', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: {} }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+    const controller = new AbortController()
+
+    await api.conversions.previewDefinition({
+      sourceType: 'ec.order.confirmed',
+      sourceConfig: {},
+      lineAccountId: 'account-1',
+      deduplicationMode: 'once_per_friend',
+      valueMode: 'source',
+    }, { signal: controller.signal })
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://worker.example.com/api/conversions/definitions/preview',
+      expect.objectContaining({ signal: controller.signal }),
+    )
+  })
 })
 
 describe('api.friends のV6検索・本人照合契約', () => {
@@ -681,7 +703,7 @@ describe('api.friendAddRules V6 data contract', () => {
     ])
   })
 
-  it('フォルダ作成と公開に操作識別キーを付ける', async () => {
+  it('フォルダ作成と公開に操作識別キーを付け、停止はルールと版から決定する', async () => {
     const spy = vi.fn(async () => new Response(
       JSON.stringify({ success: true, data: {} }),
       { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -691,6 +713,8 @@ describe('api.friendAddRules V6 data contract', () => {
     await api.friendAddRules.createFolder('account-1', '店頭', 'folder-key-00000001')
     await api.friendAddRules.publish('account-1', 'rule/1', 'publish-key-00000001')
     await api.friendAddRules.stop('account-1', 'rule/1', 7)
+    await api.friendAddRules.stop('account-1', 'rule/1', 7)
+    await api.friendAddRules.stop('account-1', 'rule/1', 8)
 
     expect(spy.mock.calls[0]).toEqual([
       'https://worker.example.com/api/friend-add-rules/folders',
@@ -712,7 +736,13 @@ describe('api.friendAddRules V6 data contract', () => {
     expect(spy.mock.calls[2]?.[1]).toEqual(expect.objectContaining({
       method: 'POST',
       body: JSON.stringify({ version: 7 }),
-      headers: expect.objectContaining({ 'Idempotency-Key': expect.any(String) }),
+      headers: expect.objectContaining({ 'Idempotency-Key': 'friend-add-rule-stop:rule%2F1:v7' }),
+    }))
+    expect(spy.mock.calls[3]?.[1]?.headers).toEqual(expect.objectContaining({
+      'Idempotency-Key': 'friend-add-rule-stop:rule%2F1:v7',
+    }))
+    expect(spy.mock.calls[4]?.[1]?.headers).toEqual(expect.objectContaining({
+      'Idempotency-Key': 'friend-add-rule-stop:rule%2F1:v8',
     }))
   })
 })

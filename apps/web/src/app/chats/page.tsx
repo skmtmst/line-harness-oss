@@ -5,7 +5,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { parseStickerMessageContent, stickerFallback } from '@line-crm/shared'
-import { api, ApiError, fetchApi, type ChatDetailMessage, type InboxStats } from '@/lib/api'
+import {
+  api,
+  ApiError,
+  fetchApi,
+  type ChatDetail as ApiChatDetail,
+  type ChatListItem,
+  type FriendListItem,
+  type InboxStats,
+} from '@/lib/api'
 import { buildSupportEmailInboxQuery } from './support-email-query'
 import { OperatorDropdown, StatusDropdown, type ChatStatus } from '@/components/chats/inbox-dropdown'
 import { unreadLookup } from '@/components/chats/assignee-unread'
@@ -24,39 +32,14 @@ import Button from '@/components/shared/button'
 import { MoreAction } from '@/components/shared/row-actions'
 import { CheckCircle2, Link2, NotebookPen, PanelRightClose, PanelRightOpen, Star, X } from 'lucide-react'
 
-interface Chat {
-  id: string
-  friendId: string
-  friendName: string
-  friendPictureUrl: string | null
-  operatorId: string | null
-  status: 'unread' | 'in_progress' | 'on_hold' | 'resolved'
-  revision: number
-  notes: string | null
-  lastMessageAt: string | null
-  lastMessageContent: string | null
-  lastMessageDirection: 'incoming' | 'outgoing' | null
-  lastMessageType: string | null
-  /** ログイン中の担当者だけの未読。対応状況とは別。 */
-  isUnread: boolean
-  createdAt: string
-  updatedAt: string
-}
+type Chat = ChatListItem
 
 /**
  * 会話のメッセージ1件。形は `api.ts` の `ChatDetailMessage`
  *（`GET /api/chats/:id` の実応答）に寄せる。画面が独自の型を持つと
  * 口の形が変わっても型検査が黙るため、ここでは別名にするだけ。
  */
-type ChatMessage = ChatDetailMessage
-
-interface ChatDetail extends Chat {
-  friendName: string
-  friendRealName: string | null
-  friendPictureUrl: string | null
-  isAttention: boolean
-  messages?: ChatMessage[]
-}
+type ChatDetail = ApiChatDetail
 
 type StatusFilter = 'all' | 'unread' | 'in_progress' | 'on_hold' | 'resolved'
 
@@ -207,12 +190,7 @@ function isOlderThanOneHour(iso: string | null): boolean {
   return Number.isFinite(time) && Date.now() - time >= 60 * 60 * 1000
 }
 
-interface FriendItem {
-  id: string
-  displayName: string
-  pictureUrl: string | null
-  isFollowing: boolean
-}
+type FriendItem = Pick<FriendListItem, 'id' | 'displayName' | 'pictureUrl' | 'isFollowing'>
 
 interface MessageLog {
   id: string
@@ -619,7 +597,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     try {
       const chatRes = await api.chats.list(buildListParams(null))
       if (chatRes.success) {
-        const rows = chatRes.data as unknown as Chat[]
+        const rows = chatRes.data
         setChats(rows)
         const last = rows[rows.length - 1]
         nextCursorRef.current = last?.lastMessageAt ? { at: last.lastMessageAt, id: last.id } : null
@@ -646,7 +624,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     try {
       const chatRes = await api.chats.list(buildListParams(cursor))
       if (chatRes.success) {
-        const rows = chatRes.data as unknown as Chat[]
+        const rows = chatRes.data
         setChats((prev) => {
           const seen = new Set(prev.map((c) => c.id))
           return [...prev, ...rows.filter((r) => !seen.has(r.id))]
@@ -669,7 +647,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       // The new-DM picker never renders tags, so avoid one tag query per friend.
       const friendRes = await api.friends.list({ accountId: selectedAccountId || undefined, limit: '800', includeTags: false })
       if (friendRes.success) {
-        setAllFriends((friendRes.data as unknown as { items: FriendItem[] }).items)
+        setAllFriends(friendRes.data.items)
       }
     } catch { /* silent */ }
   }, [selectedAccountId])
@@ -698,7 +676,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     }
     try {
       const response = await api.chats.savedViews.list(selectedAccountId)
-      if (response.success) setSavedViews(response.data as unknown as InboxSavedView[])
+      if (response.success) {
+        setSavedViews(response.data.map((view) => ({
+          ...view,
+          conditions: normalizeSavedViewConditions(view.conditions),
+        })))
+      }
     } catch {
       setSavedViewError('保存した検索を読み込めませんでした')
     }
@@ -803,7 +786,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       const res = await api.chats.get(chatId, { limit: CHAT_MESSAGE_PAGE_SIZE })
       if (requestId !== detailRequestIdRef.current) return
       if (res.success) {
-        const detail = res.data as unknown as ChatDetail & { hasMoreMessages?: boolean }
+        const detail = res.data
         setChatDetail(detail)
         setMessagesHasMore(detail.hasMoreMessages === true)
       } else {
@@ -837,7 +820,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         beforeId: oldest.id,
       })
       if (res.success) {
-        const detail = res.data as unknown as { messages?: ChatMessage[]; hasMoreMessages?: boolean }
+        const detail = res.data
         const rows = detail.messages ?? []
         setChatDetail((prev) => {
           if (!prev) return prev
@@ -943,7 +926,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         lastMessageType: chatDetail.lastMessageType ?? lastMsg?.messageType ?? null,
         isUnread: false,
         createdAt: chatDetail.createdAt,
-        updatedAt: chatDetail.updatedAt,
+        updatedAt: chatDetail.updatedAt ?? chatDetail.createdAt,
       }
       return [entry, ...prev]
     })
