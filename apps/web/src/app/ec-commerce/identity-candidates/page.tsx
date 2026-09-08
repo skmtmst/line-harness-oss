@@ -18,20 +18,34 @@ import {
 } from '@/components/identity/identity-parts'
 import { IdentityStateBlock } from '@/components/identity/identity-state'
 import { useIdentityReview } from '@/components/identity/identity-review'
-import { maskedText, NOT_AVAILABLE } from '@/components/identity/identity-view'
+import { impactText, maskedText, NOT_AVAILABLE } from '@/components/identity/identity-view'
 import styles from '@/components/identity/identity-review.module.css'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError, api, type EcIdentityCandidateOperationsList } from '@/lib/api'
+import type { IdentityCandidateImpactMetric } from '@line-crm/shared'
 import EcTabs from '../ec-tabs-view'
 import ecStyles from '../ec-commerce-v6.module.css'
 
+// #517 軽: 影響の計量は共有の型で受け、表示は `impactText` 系に寄せる。
+// 計量名の変更は型では守れないため、候補名の表はここに残す。
+const ORDER_IMPACT_KEYS = ['orders', 'order_count']
+const REVENUE_IMPACT_KEYS = ['sales', 'revenue', 'order_amount']
+
+const isImpactMetric = (value: unknown): value is IdentityCandidateImpactMetric => {
+  if (!value || typeof value !== 'object') return false
+  const metric = value as { key?: unknown; value?: unknown; unit?: unknown }
+  return typeof metric.key === 'string'
+    && (metric.value === null || typeof metric.value === 'number')
+    && typeof metric.unit === 'string'
+}
+
 function candidateImpactText(value: unknown): string {
   if (!Array.isArray(value)) return NOT_AVAILABLE
-  const metrics = value.filter((metric): metric is Record<string, unknown> => Boolean(metric) && typeof metric === 'object')
-  const orderCount = metrics.find((metric) => ['orders', 'order_count'].includes(String(metric.key)))?.value
-  const revenue = metrics.find((metric) => ['sales', 'revenue', 'order_amount'].includes(String(metric.key)))?.value
-  const countText = typeof orderCount === 'number' ? `注文 ${orderCount.toLocaleString('ja-JP')}件` : ''
-  const revenueText = typeof revenue === 'number' ? `¥${revenue.toLocaleString('ja-JP')}` : ''
+  const metrics = value.filter(isImpactMetric)
+  const order = metrics.find((metric) => ORDER_IMPACT_KEYS.includes(metric.key))
+  const revenue = metrics.find((metric) => REVENUE_IMPACT_KEYS.includes(metric.key))
+  const countText = order && order.value !== null ? `注文 ${impactText(order)}` : ''
+  const revenueText = revenue && revenue.value !== null ? impactText(revenue) : ''
   return countText || revenueText ? `${[countText, revenueText].filter(Boolean).join(' ')} が入る` : NOT_AVAILABLE
 }
 
@@ -194,7 +208,7 @@ export default function EcIdentityCandidatesPage() {
                       </span>
                       </span>
                     </Td>
-                    <Td>{item.evidenceSummary.join('／')}</Td>
+                    <Td>{Array.isArray(item.evidenceSummary) && item.evidenceSummary.length > 0 ? item.evidenceSummary.join('／') : NOT_AVAILABLE}</Td>
                     <Td>
                       <ConfidenceTag confidence={item.confidence} />
                     </Td>

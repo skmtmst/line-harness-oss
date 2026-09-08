@@ -74,27 +74,7 @@
   font-size: var(--text-body);
 }
 
-.filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.filter {
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-pill);
-  background: var(--color-canvas);
-  color: var(--color-ink-secondary);
-  padding: 7px 12px;
-  font-size: var(--text-caption);
-  font-weight: 600;
-}
-
-.filterCurrent {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
-  color: var(--color-accent-deep);
-}
+/* 2026-09-08（#580 軽）: 定期便の絞り込みは共有 Tabs へ寄せたため、独自ボタンの規則を削除。 */
 
 .cellStack {
   display: flex;

@@ -88,6 +88,7 @@ import type {
   FriendBulkRunSummary,
   FriendBulkRunDetail,
   IdentityCandidateDetail,
+  IdentityCandidateImpactMetric,
   IdentityCandidateKind,
   IdentityCandidateList,
   IdentityCandidateStatus,
@@ -3154,7 +3155,9 @@ export type EcIdentityCandidateOperationsList = {
     left: unknown
     right: unknown
     evidence: unknown
-    impact: unknown
+    // #580 軽: 影響は共有の計量型で受ける（DBは impact_json の配列を返す）。
+    // 形が違う応答は画面側のガードで「—（未取得）」に倒す。
+    impact: IdentityCandidateImpactMetric[]
     detectedAt: string
     reviewedAt: string | null
   }>
