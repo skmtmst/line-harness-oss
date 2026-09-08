@@ -127,7 +127,12 @@ export default function PendingInboxCard({
     <Card layout="vertical" overflow="hidden" className="h-fit min-w-0">
       <CardHeader
         size="roomy"
-        title="対応が必要な受信"
+        /*
+          この一覧は可視の全アカウントの合計。同じ画面の小カード
+          「対応が必要な受信」(選択中のアカウントの数)とは範囲が違うため、
+          範囲を題に書いて混同を防ぐ。
+        */
+        title="対応が必要な受信（全アカウント）"
         meta={summary && summary.total > 0 ? `${summary.total}件` : undefined}
         action={
           <span className="flex items-center gap-3">
