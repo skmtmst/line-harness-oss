@@ -44,9 +44,10 @@ describe('deploy-cloudflare-worker artifact path', () => {
     expect(workflow).toContain('exit 1');
   });
 
-  it('verifies nodejs_compat in the generated artifact before patching', () => {
+  it('verifies both compatibility flags in the generated artifact before patching', () => {
     expect(workflow).toContain('compatibility_flags');
     expect(workflow).toContain('nodejs_compat');
+    expect(workflow).toContain('global_fetch_strictly_public');
   });
 
   it('deploys only the derived artifact config', () => {

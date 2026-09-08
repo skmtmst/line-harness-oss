@@ -182,8 +182,10 @@ jobs:
             const target = `apps/worker/${process.env.WORKER_DEPLOY_CONFIG}`;
             const config = JSON.parse(fs.readFileSync(target, "utf8"));
             const flags = config.compatibility_flags ?? [];
-            if (!flags.includes("nodejs_compat")) {
-              console.error(`::error::${target} に nodejs_compat がありません: ${JSON.stringify(flags)}`);
+            const required = ["nodejs_compat", "global_fetch_strictly_public"];
+            const missing = required.filter((flag) => !flags.includes(flag));
+            if (missing.length > 0) {
+              console.error(`::error::${target} に ${missing.join(", ")} がありません: ${JSON.stringify(flags)}`);
               process.exit(1);
             }
             console.log(`互換flag: ${JSON.stringify(flags)}`);
