@@ -26,6 +26,7 @@ const dbMocks = {
   getFollowingLineUserIdsByTag: vi.fn(),
   listRichMenuSchedulesByGroup: vi.fn(),
   cancelRichMenuSchedule: vi.fn(),
+  findPublishedRestoreCandidate: vi.fn(),
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
@@ -424,6 +425,7 @@ describe('GET schedules and POST cancel (E-08 #621)', () => {
     dbMocks.getRichMenuGroupWithPages.mockResolvedValue({ id: 'g1', account_id: 'acc-1' });
     dbMocks.listRichMenuSchedulesByGroup.mockResolvedValue([{
       id: 's1', mode: 'scheduled', starts_at: '2026-09-10T01:00:00.000Z', ends_at: null,
+      restore_group_id: null,
       status: 'scheduled', attempt_count: 1, next_retry_at: '2026-09-10T01:01:00.000Z',
       last_error_code: 'fetch failed', created_at: '2026-09-06',
     }]);
@@ -431,7 +433,46 @@ describe('GET schedules and POST cancel (E-08 #621)', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({
       success: true,
-      data: [{ id: 's1', status: 'scheduled', attemptCount: 1 }],
+      data: [{ id: 's1', status: 'scheduled', attemptCount: 1, restoreGroupId: null }],
+    });
+  });
+
+  test('期間予約で前のメニュー未指定は予約時点の公開中メニューに確定する', async () => {
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue({
+      id: 'g1', account_id: 'acc-1', status: 'draft', pages: [],
+    });
+    dbMocks.findPublishedRestoreCandidate.mockResolvedValue({ id: 'prev-1' });
+    const db = makeMinimalDbStub();
+    // INSERT成功・重複なし
+    const app = setupApp({ db });
+    const res = await app.request('/api/rich-menu-groups/g1/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'period-resolve-1' },
+      body: JSON.stringify({ mode: 'period', startsAt: '2026-09-10T01:00:00.000Z', endsAt: '2026-09-11T01:00:00.000Z' }),
+    });
+    expect(res.status).toBe(201);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      data: { status: 'scheduled', restoreGroupId: 'prev-1' },
+    });
+    expect(dbMocks.findPublishedRestoreCandidate).toHaveBeenCalledWith(expect.anything(), 'acc-1', 'g1');
+  });
+
+  test('戻せるメニューが無い期間予約はdefault解除として保存する', async () => {
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue({
+      id: 'g1', account_id: 'acc-1', status: 'draft', pages: [],
+    });
+    dbMocks.findPublishedRestoreCandidate.mockResolvedValue(null);
+    const app = setupApp({ db: makeMinimalDbStub() });
+    const res = await app.request('/api/rich-menu-groups/g1/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'period-clear-1' },
+      body: JSON.stringify({ mode: 'period', startsAt: '2026-09-10T01:00:00.000Z', endsAt: '2026-09-11T01:00:00.000Z' }),
+    });
+    expect(res.status).toBe(201);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      data: { status: 'scheduled', restoreGroupId: null, restoreClearsDefault: true },
     });
   });
 

@@ -8370,6 +8370,7 @@ export const api = {
         mode: 'scheduled' | 'period'
         startsAt: string
         endsAt: string | null
+        restoreGroupId: string | null
         status: string
         attemptCount: number
         nextRetryAt: string | null

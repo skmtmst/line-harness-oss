@@ -1656,11 +1656,13 @@ async function scheduled(
     const {
       getRichMenuGroupWithPages,
       getLineAccountById,
+      getStaffById,
       getTrackedLinkById,
       setPageRichMenuId,
       markRichMenuGroupPublished,
       markRichMenuGroupUnpublished,
     } = await import('@line-crm/db');
+    const { canAccessAllLineAccounts } = await import('./services/account-access.js');
     const { publishRichMenuGroup } = await import('./lib/rich-menu-publisher.js');
     const r2Adapter = {
       async get(key: string) {
@@ -1736,8 +1738,25 @@ async function scheduled(
     const result = await processDueRichMenuSchedules(env.DB, {
       getGroupWithPages: (db, groupId) => getRichMenuGroupWithPages(db, groupId),
       getLineAccount: (db, accountId) => getLineAccountById(db, accountId) as Promise<{
-        id: string; channel_access_token: string | null;
+        id: string; channel_access_token: string | null; is_active: number; archived_at: string | null;
       } | null>,
+      getRequestingStaff: async (db, staffId) => {
+        const staff = await getStaffById(db, staffId);
+        return staff as unknown as {
+          id: string; role: 'owner' | 'admin' | 'staff'; is_active: number; access_level: string | null;
+        } | null;
+      },
+      isStaffAllowedForAccount: async (db, staffId, accountId) => {
+        const staff = await getStaffById(db, staffId);
+        if (!staff) return false;
+        return canAccessAllLineAccounts(db, {
+          id: staff.id,
+          name: staff.name,
+          role: staff.role,
+          readOnly: staff.access_level === 'read_only',
+          tenantId: staff.tenant_id,
+        } as never, [accountId]);
+      },
       publishSnapshot: async (snapshot, schedule) => {
         const built = await buildGroupInput(snapshot, schedule.group_id);
         if (!built.account) throw new Error('line account not found');
@@ -1841,7 +1860,44 @@ async function scheduled(
         await markRichMenuGroupPublished(env.DB, built.groupIdForDb);
       },
       restoreToGroup: async (restoreGroupId, schedule) => {
-        if (!restoreGroupId) return;
+        if (!restoreGroupId) {
+          // 「前のメニューに戻す」で戻し先が無かった場合の明示的default解除。
+          // 表示どおり何もしないで完了にせず、LINEのdefaultを外してDBも戻す。
+          const scheduled = await getRichMenuGroupWithPages(env.DB, schedule.group_id);
+          const account = await getLineAccountById(env.DB, schedule.account_id);
+          if (!scheduled || !account) throw new Error('schedule group not found');
+          const auth = `Bearer ${account.channel_access_token}`;
+          const ownIds = new Set(
+            scheduled.pages.map((page) => page.line_richmenu_id).filter((id): id is string => !!id),
+          );
+          try {
+            const res = await fetch('https://api.line.me/v2/bot/user/all/richmenu', {
+              method: 'GET',
+              headers: { Authorization: auth },
+            });
+            if (res.status !== 404) {
+              if (!res.ok) throw new Error(`LINE getCurrentDefaultRichMenu failed: ${res.status}`);
+              const body = (await res.json()) as { richMenuId?: string };
+              if (body.richMenuId && ownIds.has(body.richMenuId)) {
+                const clearRes = await fetch('https://api.line.me/v2/bot/user/all/richmenu', {
+                  method: 'DELETE',
+                  headers: { Authorization: auth },
+                });
+                if (!clearRes.ok && clearRes.status !== 404) {
+                  throw new Error(`LINE clearDefaultRichMenu failed: ${clearRes.status}`);
+                }
+              }
+            }
+          } catch (error) {
+            // 404はdefault未設定として正常扱い。それ以外は再試行させる。
+            if (error instanceof Error && /clearDefaultRichMenu failed|getCurrentDefaultRichMenu failed/.test(error.message)) {
+              throw error;
+            }
+            throw error;
+          }
+          await markRichMenuGroupUnpublished(env.DB, scheduled.id);
+          return;
+        }
         const restore = await getRichMenuGroupWithPages(env.DB, restoreGroupId);
         if (!restore) throw new Error('restoreGroupId must be a published menu');
         const account = await getLineAccountById(env.DB, restore.account_id);

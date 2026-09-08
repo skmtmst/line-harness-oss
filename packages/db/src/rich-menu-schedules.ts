@@ -6,6 +6,12 @@ import { boundedListLimit, jstNow } from './utils.js';
 
 export const RICH_MENU_SCHEDULE_MAX_ATTEMPTS = 5;
 
+/**
+ * claim後にWorkerが止まった場合の回収までの待ち時間。
+ * publishing/restoringのままupdated_atがこれより古ければstaleとして回収する。
+ */
+export const RICH_MENU_SCHEDULE_STALE_MS = 10 * 60_000;
+
 export type RichMenuScheduleRow = {
   id: string;
   group_id: string;
@@ -40,6 +46,8 @@ const PERMANENT_PATTERNS = [
   'must be', 'invalid', 'not found', 'permission', 'forbidden',
   'unauthorized', 'bad request', '400', '401', '403', '404',
   'snapshot', 'restoregroupid', 'restore_group',
+  'account_inactive', 'account_archived', 'account_stopped',
+  'staff_inactive', 'staff_forbidden', 'staff_revoked', 'no_restore_target',
 ];
 
 /** 失敗を「もう一度試す一時失敗」と「人に対応してほしい恒久失敗」に分ける。 */
@@ -150,10 +158,12 @@ export async function claimRichMenuScheduleRestore(
   accountId: string,
   runId: string,
 ): Promise<boolean> {
+  // started_run_idは開始runのまま残し、復元runはended_run_idへ書く。
+  // 開始runと復元runを別々に追跡するため。
   const result = await db
     .prepare(
       `UPDATE rich_menu_schedules
-          SET status = 'restoring', started_run_id = ?, updated_at = ?,
+          SET status = 'restoring', ended_run_id = ?, updated_at = ?,
               attempt_count = attempt_count + 1
         WHERE id = ? AND account_id = ? AND status = 'published'`,
     )
@@ -169,6 +179,21 @@ export async function recordRichMenuScheduleSuccess(
   runId: string,
   nextStatus: 'completed' | 'published',
 ): Promise<void> {
+  if (nextStatus === 'published') {
+    // 期間モードの開始成功。復元の再試行回数を開始と独立させるため
+    // attempt_countを0へ戻す。started_run_idは開始runのまま残し、
+    // ended_run_idは復元が終わるまで空けておく。
+    await db
+      .prepare(
+        `UPDATE rich_menu_schedules
+            SET status = 'published', ended_run_id = NULL, last_error_code = NULL,
+                attempt_count = 0, next_retry_at = NULL, updated_at = ?
+          WHERE id = ? AND account_id = ?`,
+      )
+      .bind(jstNow(), id, accountId)
+      .run();
+    return;
+  }
   await db
     .prepare(
       `UPDATE rich_menu_schedules
@@ -249,6 +274,102 @@ export async function recordRichMenuSchedulePermanentFailure(
     )
     .bind(runId, errorCode.slice(0, 120), jstNow(), id, accountId)
     .run();
+}
+
+/**
+ * claim後に止まった行を拾う。updated_atはjstNow形式(+09:00)でそろっているため
+ * 同じ形式のstaleBeforeと文字列比較できる。取得と回収は別にし、回収は
+ * 条件付きUPDATEで二重実行しない。
+ */
+export async function getStalePublishingSchedules(
+  db: D1Database,
+  staleBeforeJst: string,
+  limit = 20,
+): Promise<RichMenuScheduleRow[]> {
+  const result = await db
+    .prepare(
+      `SELECT * FROM rich_menu_schedules
+        WHERE status = 'publishing' AND updated_at <= ?
+        ORDER BY updated_at ASC LIMIT ?`,
+    )
+    .bind(staleBeforeJst, boundedListLimit(limit, 20))
+    .all<RichMenuScheduleRow>();
+  return result.results ?? [];
+}
+
+export async function getStaleRestoringSchedules(
+  db: D1Database,
+  staleBeforeJst: string,
+  limit = 20,
+): Promise<RichMenuScheduleRow[]> {
+  const result = await db
+    .prepare(
+      `SELECT * FROM rich_menu_schedules
+        WHERE status = 'restoring' AND updated_at <= ?
+        ORDER BY updated_at ASC LIMIT ?`,
+    )
+    .bind(staleBeforeJst, boundedListLimit(limit, 20))
+    .all<RichMenuScheduleRow>();
+  return result.results ?? [];
+}
+
+/** staleなpublishingをscheduledへ戻す。古いclaimのままなら1行だけ戻る。 */
+export async function reclaimStalePublishingSchedule(
+  db: D1Database,
+  id: string,
+  accountId: string,
+  staleBeforeJst: string,
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `UPDATE rich_menu_schedules
+          SET status = 'scheduled', updated_at = ?
+        WHERE id = ? AND account_id = ? AND status = 'publishing'
+          AND updated_at <= ?`,
+    )
+    .bind(jstNow(), id, accountId, staleBeforeJst)
+    .run();
+  return (result.meta?.changes ?? 0) > 0;
+}
+
+/** staleなrestoringをpublishedへ戻す。古いclaimのままなら1行だけ戻る。 */
+export async function reclaimStaleRestoringSchedule(
+  db: D1Database,
+  id: string,
+  accountId: string,
+  staleBeforeJst: string,
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `UPDATE rich_menu_schedules
+          SET status = 'published', updated_at = ?
+        WHERE id = ? AND account_id = ? AND status = 'restoring'
+          AND updated_at <= ?`,
+    )
+    .bind(jstNow(), id, accountId, staleBeforeJst)
+    .run();
+  return (result.meta?.changes ?? 0) > 0;
+}
+
+/**
+ * 「前のメニューに戻す」(restoreGroupId=null)の予約時点の戻し先を確定する。
+ * 同じアカウントで予約対象以外の公開中メニューを新しい順に1件返す。
+ * 無ければnullで、終了時はデフォルト解除として扱う。
+ */
+export async function findPublishedRestoreCandidate(
+  db: D1Database,
+  accountId: string,
+  excludeGroupId: string,
+): Promise<{ id: string } | null> {
+  const row = await db
+    .prepare(
+      `SELECT id FROM rich_menu_groups
+        WHERE account_id = ? AND id != ? AND status = 'published'
+        ORDER BY updated_at DESC LIMIT 1`,
+    )
+    .bind(accountId, excludeGroupId)
+    .first<{ id: string }>();
+  return row ?? null;
 }
 
 /** 実行前の取消だけ受け付ける。publishing/restoring の最中は 409 側で止める。 */

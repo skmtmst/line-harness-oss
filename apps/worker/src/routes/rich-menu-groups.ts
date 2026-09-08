@@ -1159,14 +1159,24 @@ richMenuGroups.post(
         return c.json({ success: false, error: 'endsAt must be later than startsAt' }, 400);
       }
     }
-    const restoreGroupId = typeof body.restoreGroupId === 'string' && body.restoreGroupId.length > 0
+    const requestedRestoreGroupId = typeof body.restoreGroupId === 'string' && body.restoreGroupId.length > 0
       ? body.restoreGroupId
       : null;
+    let restoreGroupId: string | null = requestedRestoreGroupId;
+    let resolvedRestoreGroupId: string | null = requestedRestoreGroupId;
     if (restoreGroupId) {
       const restore = await getRichMenuGroupById(c.env.DB, restoreGroupId);
       if (!restore || restore.account_id !== group.account_id || restore.status !== 'published') {
         return c.json({ success: false, error: 'restoreGroupId must be a published menu in the same account' }, 400);
       }
+    } else if (body.mode === 'period') {
+      // 「前のメニューに戻す」は予約時点の戻し先を確定して保存する。
+      // 同アカウントの公開中メニュー(予約対象以外)を新しい順に1件選ぶ。
+      // 無ければnullのまま保存し、終了時は明示的default解除として扱う。
+      const { findPublishedRestoreCandidate } = await import('@line-crm/db');
+      const candidate = await findPublishedRestoreCandidate(c.env.DB, group.account_id, group.id);
+      resolvedRestoreGroupId = candidate?.id ?? null;
+      restoreGroupId = resolvedRestoreGroupId;
     }
 
     const existing = await c.env.DB
@@ -1200,7 +1210,16 @@ richMenuGroups.post(
         now,
       )
       .run();
-    return c.json({ success: true, data: { id, status: 'scheduled' } }, 201);
+    return c.json({
+      success: true,
+      data: {
+        id,
+        status: 'scheduled',
+        restoreGroupId,
+        restoreResolved: body.mode === 'period' && !requestedRestoreGroupId,
+        restoreClearsDefault: body.mode === 'period' && !requestedRestoreGroupId && !resolvedRestoreGroupId,
+      },
+    }, 201);
   },
 );
 
@@ -1218,6 +1237,7 @@ richMenuGroups.get('/api/rich-menu-groups/:groupId/schedules', async (c) => {
       mode: row.mode,
       startsAt: row.starts_at,
       endsAt: row.ends_at,
+      restoreGroupId: row.restore_group_id,
       status: row.status,
       attemptCount: row.attempt_count,
       nextRetryAt: row.next_retry_at,
