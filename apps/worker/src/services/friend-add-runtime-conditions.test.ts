@@ -33,6 +33,7 @@ const FRI_23 = new Date('2026-09-11T23:00:00+09:00');
 const SAT_01 = new Date('2026-09-12T01:00:00+09:00');
 const SAT_03 = new Date('2026-09-12T03:00:00+09:00');
 const SAT_23 = new Date('2026-09-12T23:00:00+09:00');
+const SAT_00_45 = new Date('2026-09-12T00:45:00+09:00');
 
 describe('前提: テスト日付の曜日', () => {
   test('月・火・金・土の想定どおり', () => {
@@ -96,6 +97,37 @@ describe('JST時刻と時間帯の純粋関数', () => {
       new Date('2026-09-07T20:00:00+09:00'),
     )).toEqual({ matched: false, reason: 'outside_weekday' });
   });
+
+  test('不正な時間帯は「制限なし」に読み替えず送らない（fail-closed）', () => {
+    // 99:99 のような不正帯が混ざったら、その設定では送らない
+    expect(evaluateFriendAddSchedule(
+      { weekdays: [], timeWindows: [{ start: '09:00', end: '99:99' }] },
+      MON_10,
+    )).toEqual({ matched: false, reason: 'invalid_time_window' });
+    // 曜日指定があっても不正帯を優先する（送らない）
+    expect(evaluateFriendAddSchedule(
+      { weekdays: [1], timeWindows: [{ start: '09:00', end: '99:99' }] },
+      MON_10,
+    )).toEqual({ matched: false, reason: 'invalid_time_window' });
+  });
+
+  test('複数帯の日跨ぎは帯ごとに曜日を見る', () => {
+    const windows = [{ start: '22:00', end: '02:00' }, { start: '00:30', end: '01:00' }];
+    // 土曜00:45は土曜の帯（00:30〜01:00）にいるので土曜指定で送る。
+    // 別の帯の日跨ぎに引きずられて金曜扱いにしない。
+    expect(evaluateFriendAddSchedule({ weekdays: [6], timeWindows: windows }, SAT_00_45))
+      .toEqual({ matched: true, reason: null });
+    // 金曜指定でも金曜夜の帯（22:00〜02:00）にいるので送る
+    expect(evaluateFriendAddSchedule({ weekdays: [5], timeWindows: windows }, SAT_00_45))
+      .toEqual({ matched: true, reason: null });
+    // 単一帯の日跨ぎは従来どおり（土曜01:00は金曜の夜）
+    expect(evaluateFriendAddSchedule(
+      { weekdays: [5], timeWindows: [{ start: '22:00', end: '02:00' }] }, SAT_01,
+    )).toEqual({ matched: true, reason: null });
+    expect(evaluateFriendAddSchedule(
+      { weekdays: [6], timeWindows: [{ start: '22:00', end: '02:00' }] }, SAT_01,
+    )).toEqual({ matched: false, reason: 'outside_weekday' });
+  });
 });
 
 describe('競合確認と本番で同じ重なり関数', () => {
@@ -147,9 +179,9 @@ describe('競合確認と本番で同じ重なり関数', () => {
       ],
     });
     expect(areFriendAddConditionsOverlapping(ordered, reordered)).toBe(true);
-    // 意味が違うJSONは競合にしない
+    // 意味が違うJSONでも両方持つ人がいれば競合にする（tag-1 対 tag-2）
     const other = JSON.stringify({ operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-2' }] });
-    expect(areFriendAddConditionsOverlapping(compact, other)).toBe(false);
+    expect(areFriendAddConditionsOverlapping(compact, other)).toBe(true);
     // 空の構造化JSONは絞りなしとして競合にしない
     expect(areFriendAddConditionsOverlapping('{"operator":"AND","rules":[]}', compact)).toBe(false);
     expect(areFriendAddConditionsOverlapping('', compact)).toBe(false);
@@ -200,14 +232,17 @@ describe('競合確認と本番で同じ重なり関数', () => {
       ],
     });
     expect(areFriendAddConditionsOverlapping(grandLeft, grandRight)).toBe(true);
-    // 入れ子の絞り込みを1つも共有しないものは競合にしない
+    // どの枝も両立しない入れ子は競合にしない
     const different = JSON.stringify({
       operator: 'AND',
       rules: [],
       groups: [
         {
-          operator: 'OR',
-          rules: [{ type: 'tag_exists', value: 'tag-2' }, { type: 'tag_exists', value: 'tag-9' }],
+          operator: 'AND',
+          rules: [
+            { type: 'tag_not_exists', value: 'tag-1' },
+            { type: 'is_following', value: false },
+          ],
         },
       ],
     });
@@ -235,22 +270,68 @@ describe('競合確認と本番で同じ重なり関数', () => {
     expect(areFriendAddConditionsOverlapping(onlyTag1, nested)).toBe(true);
   });
 
+  test('充足可能性で判定する（反例つき）', () => {
+    const tag1 = { type: 'tag_exists', value: 'tag-1' };
+    const tag2 = { type: 'tag_exists', value: 'tag-2' };
+    const following = { type: 'is_following', value: true };
+    const notFollowing = { type: 'is_following', value: false };
+    // 反例: tag-1 対 tag-2 は両方持つ人がいるので重なる
+    const onlyTag1 = JSON.stringify({ operator: 'AND', rules: [tag1] });
+    const onlyTag2 = JSON.stringify({ operator: 'AND', rules: [tag2] });
+    expect(areFriendAddConditionsOverlapping(onlyTag1, onlyTag2)).toBe(true);
+    // 反例: 矛盾AND（following かつ not following）は誰にも一致しないので重ならない
+    const contradiction = JSON.stringify({ operator: 'AND', rules: [following, notFollowing] });
+    expect(areFriendAddConditionsOverlapping(contradiction, onlyTag1)).toBe(false);
+    // 向こう側のANDの中で矛盾しても重ならない
+    const tag1AndFollowing = JSON.stringify({ operator: 'AND', rules: [tag1, following] });
+    const tag2AndNotFollowing = JSON.stringify({ operator: 'AND', rules: [tag2, notFollowing] });
+    expect(areFriendAddConditionsOverlapping(tag1AndFollowing, tag2AndNotFollowing)).toBe(false);
+    // 入れ子のORをほぐして両立する枝があれば重なる
+    const nestedOr = JSON.stringify({
+      operator: 'AND',
+      rules: [tag1],
+      groups: [{ operator: 'OR', rules: [following, tag2] }],
+    });
+    const tag2AndFollowing = JSON.stringify({ operator: 'AND', rules: [tag2, following] });
+    expect(areFriendAddConditionsOverlapping(nestedOr, tag2AndFollowing)).toBe(true);
+    // 区間が重ならないスコアは重ならない、重なれば重なる
+    const lowScore = JSON.stringify({ operator: 'AND', rules: [{ type: 'score_range', value: { min: 0, max: 10 } }] });
+    const highScore = JSON.stringify({ operator: 'AND', rules: [{ type: 'score_range', value: { min: 20, max: 30 } }] });
+    const midScore = JSON.stringify({ operator: 'AND', rules: [{ type: 'score_range', value: { min: 10, max: 30 } }] });
+    expect(areFriendAddConditionsOverlapping(lowScore, highScore)).toBe(false);
+    expect(areFriendAddConditionsOverlapping(lowScore, midScore)).toBe(true);
+  });
+
   test('重ならない条件・演算子違いを取り違えない', () => {
     const tag1 = { type: 'tag_exists', value: 'tag-1' };
     const tag2 = { type: 'tag_exists', value: 'tag-2' };
-    const tag9 = { type: 'tag_exists', value: 'tag-9' };
     const following = { type: 'is_following', value: true };
-    // 非重複: 絞り込みを1つも共有しない
-    const onlyTag1 = JSON.stringify({ operator: 'AND', rules: [tag1] });
-    const onlyTag2 = JSON.stringify({ operator: 'AND', rules: [tag2] });
-    expect(areFriendAddConditionsOverlapping(onlyTag1, onlyTag2)).toBe(false);
-    // 演算子が違っても中身が重ならなければ競合にしない
+    const notFollowing = { type: 'is_following', value: false };
+    // 非重複: 両立しない絞り同士
+    const onlyFollowing = JSON.stringify({ operator: 'AND', rules: [following] });
+    const onlyNotFollowing = JSON.stringify({ operator: 'AND', rules: [notFollowing] });
+    expect(areFriendAddConditionsOverlapping(onlyFollowing, onlyNotFollowing)).toBe(false);
+    // 演算子が違っても両立しなければ競合にしない
     const tag1AndFollowing = JSON.stringify({ operator: 'AND', rules: [tag1, following] });
-    const tag2OrTag9 = JSON.stringify({ operator: 'OR', rules: [tag2, tag9] });
-    expect(areFriendAddConditionsOverlapping(tag1AndFollowing, tag2OrTag9)).toBe(false);
-    // 演算子が違っても共有があれば競合にする（演算子だけ見て false にしない）
+    const notFollowingOrBoth = JSON.stringify({
+      operator: 'OR',
+      rules: [notFollowing],
+      groups: [{ operator: 'AND', rules: [notFollowing, tag2] }],
+    });
+    expect(areFriendAddConditionsOverlapping(tag1AndFollowing, notFollowingOrBoth)).toBe(false);
+    // 演算子が違っても両立すれば競合にする（演算子だけ見て false にしない）
     const tag1OrTag2 = JSON.stringify({ operator: 'OR', rules: [tag1, tag2] });
     expect(areFriendAddConditionsOverlapping(tag1AndFollowing, tag1OrTag2)).toBe(true);
+    // 紹介コードが違えば同じ人ではない
+    const refA = JSON.stringify({ operator: 'AND', rules: [{ type: 'ref_code', value: 'AAA' }] });
+    const refB = JSON.stringify({ operator: 'AND', rules: [{ type: 'ref_code', value: 'BBB' }] });
+    expect(areFriendAddConditionsOverlapping(refA, refB)).toBe(false);
+    // 反応なしと返信ありは両立しない。反応なしと「なんでも」は両立する
+    const noReaction = JSON.stringify({ operator: 'AND', rules: [{ type: 'reaction_state', value: 'none' }] });
+    const replied = JSON.stringify({ operator: 'AND', rules: [{ type: 'reaction_state', value: 'reply' }] });
+    const anyReaction = JSON.stringify({ operator: 'AND', rules: [{ type: 'reaction_state', value: 'any' }] });
+    expect(areFriendAddConditionsOverlapping(noReaction, replied)).toBe(false);
+    expect(areFriendAddConditionsOverlapping(noReaction, anyReaction)).toBe(true);
   });
 
   test('旧形式の字面はそのまま比べ、JSONは正規化できる', () => {
@@ -659,6 +740,36 @@ describe('本番の振り分け: 曜日・時間帯・条件・再送制限', ()
     );
     expect(second).toMatchObject({ suppressed: true, suppressReason: 'resend_suppressed' });
     expect(second.enrollments).toEqual([]);
+  });
+
+  test('送信権なし: 選ぶだけ選んで登録も送信もしない', async () => {
+    seedRule({ routeIds: ['route-1'], resendSuppressionHours: 0 });
+    const result = await applyFriendAddRouting(
+      db, 'acc-1', { id: 'friend-1', unfollow_count: 0 }, undefined,
+      { entryRouteId: 'route-1', now: MON_10, sendRight: false },
+    );
+    expect(result).toMatchObject({
+      routed: true, suppressed: true, suppressReason: 'duplicate_in_flight',
+    });
+    expect(result.enrollments).toEqual([]);
+    // 勝った側の cron が拾う登録を残さない
+    expect(raw.prepare(`SELECT COUNT(*) AS n FROM friend_scenarios`).get()).toEqual({ n: 0 });
+  });
+
+  test('再送可能: 送れなかった実行（partial_failed）は再送制限に数えない', async () => {
+    seedRule({ kind: 'returning', routeIds: ['route-1'], resendSuppressionHours: 24 });
+    insertFriend(raw, 'friend-r', { line_account_id: 'acc-1', unfollow_count: 1 });
+    // 送れなかった実行が残っていても、次の追加では選び直す（抑止しない）
+    seedCompletedEvent({
+      id: 'evt-partial', friendId: 'friend-r', occurredAt: '2026-09-07T10:00:00.000',
+      status: 'partial_failed',
+    });
+    const retry = await applyFriendAddRouting(
+      db, 'acc-1', { id: 'friend-r', unfollow_count: 1 }, undefined,
+      { entryRouteId: 'route-1', now: new Date('2026-09-07T10:30:00+09:00') },
+    );
+    expect(retry.suppressed).toBe(false);
+    expect(retry.suppressReason).not.toBe('resend_suppressed');
   });
 
   test('経路不明は受け皿へ（通常ルールがある経路の条件外とは別）', async () => {

@@ -33,7 +33,7 @@ import {
 import { toJstString } from '@line-crm/db';
 import { attachTagAndFireSideEffects } from './friend-tag-attach.js';
 import type { ImmediatePushContext } from './immediate-first-step.js';
-import { matchesCondition, parseCondition } from './segment-query.js';
+import { matchesCondition, parseCondition, type SegmentCondition } from './segment-query.js';
 
 export const FRIEND_ADD_ROUTING_KEY = 'friend_add_routing';
 
@@ -218,10 +218,12 @@ export function classifyFriend(
 export type FriendAddSuppressReason =
   | 'outside_weekday'
   | 'outside_time_window'
+  | 'invalid_time_window'
   | 'friend_condition_not_met'
   | 'friend_condition_unreadable'
   | 'resend_suppressed'
-  | 'delivery_disabled';
+  | 'delivery_disabled'
+  | 'duplicate_in_flight';
 
 /** JSTの現在時刻を "HH:MM" で返す。WorkersはUTCで動くので自前でずらす。 */
 export function friendAddJstHhmm(at: Date): string {
@@ -252,7 +254,25 @@ export interface FriendAddTimeWindow {
   end: string;
 }
 
-/** 読める時間帯だけ残す。読めない帯は無いものとして飛ばす（保存側で弾くのが本筋）。 */
+/** "HH:MM"（00:00〜23:59）として読めるか。保存側の入力拒否と実行時の検査で共有する。 */
+export function isValidFriendAddHhmm(value: unknown): boolean {
+  return parseHhMmToMinutes(value) != null;
+}
+
+/**
+ * 読めない時間帯が混ざっているか。不正な帯は「制限なし」に読み替えず、
+ * 送らない側（fail-closed）に倒すため、判定の前にこれを見る。
+ */
+export function hasInvalidFriendAddTimeWindows(value: unknown): boolean {
+  if (!Array.isArray(value)) return false;
+  return value.some((item) => {
+    if (!item || typeof item !== 'object') return true;
+    const { start, end } = item as { start?: unknown; end?: unknown };
+    return !isValidFriendAddHhmm(start) || !isValidFriendAddHhmm(end);
+  });
+}
+
+/** 読める時間帯だけ残す。読めない帯の扱いは hasInvalidFriendAddTimeWindows が決める。 */
 export function normalizeFriendAddTimeWindows(value: unknown): FriendAddTimeWindow[] {
   if (!Array.isArray(value)) return [];
   const out: FriendAddTimeWindow[] = [];
@@ -312,16 +332,41 @@ export function isOnFriendAddWeekday(at: Date, weekdays: unknown, windows: Frien
   return days.includes(effectiveFriendAddWeekday(at, windows));
 }
 
+/**
+ * その帯の「いま」が属する曜日を返す。日跨ぎの帯の翌日側
+ * （金曜22:00〜02:00の土曜01:00）は始まった側（金曜）で見る。
+ * 帯ごとに判定するため、複数帯があっても別の帯の判定をずらさない。
+ */
+function windowImpliedFriendAddWeekday(at: Date, window: FriendAddTimeWindow, nowMinutes: number): number {
+  const start = parseHhMmToMinutes(window.start);
+  const end = parseHhMmToMinutes(window.end);
+  if (start != null && end != null && start > end && nowMinutes < end) {
+    return toJstParts(new Date(at.getTime() - 24 * 60 * 60 * 1000)).weekday;
+  }
+  return toJstParts(at).weekday;
+}
+
 /** 曜日・時間帯の両方を見る。曜日を先に報告する（Issueの完了条件の順番）。 */
 export function evaluateFriendAddSchedule(
   definition: Pick<FriendAddRuleDefinition, 'weekdays' | 'timeWindows'>,
   at: Date,
-): { matched: boolean; reason: Extract<FriendAddSuppressReason, 'outside_weekday' | 'outside_time_window'> | null } {
-  const windows = normalizeFriendAddTimeWindows(definition.timeWindows);
-  if (!isOnFriendAddWeekday(at, definition.weekdays, windows)) {
-    return { matched: false, reason: 'outside_weekday' };
+): { matched: boolean; reason: Extract<FriendAddSuppressReason, 'outside_weekday' | 'outside_time_window' | 'invalid_time_window'> | null } {
+  // 不正な時間帯が混ざった設定は送らない（fail-closed）。保存側で弾くのが
+  // 本筋だが、既に入った値はここで止める。「制限なし」には読み替えない。
+  if (hasInvalidFriendAddTimeWindows(definition.timeWindows)) {
+    return { matched: false, reason: 'invalid_time_window' };
   }
-  if (!isInFriendAddTimeWindows(friendAddJstHhmm(at), windows)) {
+  const windows = normalizeFriendAddTimeWindows(definition.timeWindows);
+  const days = normalizeFriendAddWeekdays(definition.weekdays);
+  const nowMinutes = toJstParts(at).minutes;
+  const timeHit = (window: FriendAddTimeWindow): boolean => isTimeInFriendAddWindow(nowMinutes, window);
+  if (days.length > 0) {
+    const dayHit = windows.length === 0
+      ? days.includes(toJstParts(at).weekday)
+      : windows.some((window) => timeHit(window) && days.includes(windowImpliedFriendAddWeekday(at, window, nowMinutes)));
+    if (!dayHit) return { matched: false, reason: 'outside_weekday' };
+  }
+  if (windows.length > 0 && !windows.some(timeHit)) {
     return { matched: false, reason: 'outside_time_window' };
   }
   return { matched: true, reason: null };
@@ -434,74 +479,360 @@ function matchesEmptyCondition(raw: string): boolean {
   return (condition.rules?.length ?? 0) === 0 && (condition.groups?.length ?? 0) === 0;
 }
 
-/** JSONとして読める条件を素朴な入れ物として取り出す。読めなければ null。 */
-function parseJsonObject(raw: string): Record<string, unknown> | null {
+/**
+ * 原子ルール1つの正規形。実行時の SQL 組み立て（segment-query.ts の
+ * buildSegmentWhere）と同じ読み方で充足可能性を見るための材料。
+ * オブジェクトでないゴミは null（実行時は例外→抑止＝誰にも一致しない）。
+ */
+function ruleAtom(rule: unknown): string | null {
+  if (!rule || typeof rule !== 'object' || Array.isArray(rule)) return null;
+  return JSON.stringify(sortRecordKeys(rule));
+}
+
+interface FriendAddRuleShape {
+  type?: unknown;
+  value?: unknown;
+}
+
+function parseRuleShape(atom: string): FriendAddRuleShape | null {
   try {
-    const parsed: unknown = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(atom);
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-    return parsed as Record<string, unknown>;
+    return parsed as FriendAddRuleShape;
   } catch {
     return null;
   }
 }
 
-/**
- * 条件ツリーの中の原子ルール（1つ1つの絞り込み）を集める。
- * groups の入れ子もたどる。演算子は見ない。
- */
-function collectFriendAddConditionAtoms(node: unknown, out: Set<string>): void {
-  if (!node || typeof node !== 'object' || Array.isArray(node)) return;
-  const record = node as Record<string, unknown>;
-  const rules = record.rules;
-  if (Array.isArray(rules)) {
-    for (const rule of rules) {
-      if (rule && typeof rule === 'object' && !Array.isArray(rule)) {
-        out.add(JSON.stringify(sortRecordKeys(rule)));
-      }
-    }
-  }
-  const groups = record.groups;
-  if (Array.isArray(groups)) {
-    for (const group of groups) collectFriendAddConditionAtoms(group, out);
-  }
+/** DNF が大きくなりすぎたら調べ切れない。Condition Builder の条件は小さい想定。 */
+const FRIEND_ADD_DNF_CAP = 128;
+
+interface FriendAddDnf {
+  conjunctions: Array<Array<string | null>>;
+  overflow: boolean;
 }
 
 /**
- * 2つの条件が同じ原子ルールを1つでも共有するか。
- * ANDの包含（tag-1 と tag-1 AND following）、ORの共有枝、
- * 入れ子を含む部分重複をここで拾う。
+ * 条件を選言標準形（OR of ANDs）にほぐす。空グループの扱いは
+ * buildSegmentWhere と同じ（中身が空のグループは足さない）。
+ * operator が 'AND' でない階層は OR として読む（実行時と同じ）。
  */
-function shareFriendAddConditionAtom(a: unknown, b: unknown): boolean {
-  const leftObj = parseJsonObject(normalizeFriendAddCondition(a));
-  const rightObj = parseJsonObject(normalizeFriendAddCondition(b));
-  if (leftObj == null || rightObj == null) return false;
-  const leftAtoms = new Set<string>();
-  const rightAtoms = new Set<string>();
-  collectFriendAddConditionAtoms(leftObj, leftAtoms);
-  collectFriendAddConditionAtoms(rightObj, rightAtoms);
-  for (const atom of leftAtoms) {
-    if (rightAtoms.has(atom)) return true;
+function conditionDnf(node: { operator?: unknown; rules?: unknown; groups?: unknown }): FriendAddDnf {
+  const parts: Array<Array<Array<string | null>>> = [];
+  const rules = Array.isArray(node.rules) ? node.rules : [];
+  for (const rule of rules) parts.push([[ruleAtom(rule)]]);
+  const groups = Array.isArray(node.groups) ? node.groups : [];
+  for (const group of groups) {
+    if (!group || typeof group !== 'object' || Array.isArray(group)) {
+      parts.push([[null]]);
+      continue;
+    }
+    const g = group as { operator?: unknown; rules?: unknown; groups?: unknown };
+    const gRules = Array.isArray(g.rules) ? g.rules : [];
+    const gGroups = Array.isArray(g.groups) ? g.groups : [];
+    if (gRules.length === 0 && gGroups.length === 0) continue;
+    const sub = conditionDnf({ operator: g.operator, rules: gRules, groups: gGroups });
+    if (sub.overflow) return { conjunctions: [], overflow: true };
+    parts.push(sub.conjunctions);
+  }
+  if (node.operator !== 'AND') {
+    const out = parts.flat();
+    if (out.length > FRIEND_ADD_DNF_CAP) return { conjunctions: [], overflow: true };
+    return { conjunctions: out.length > 0 ? out : [[]], overflow: false };
+  }
+  let acc: Array<Array<string | null>> = [[]];
+  for (const part of parts) {
+    const next: Array<Array<string | null>> = [];
+    for (const left of acc) {
+      for (const right of part) {
+        next.push([...left, ...right]);
+        if (next.length > FRIEND_ADD_DNF_CAP) return { conjunctions: [], overflow: true };
+      }
+    }
+    acc = next;
+  }
+  return { conjunctions: acc, overflow: false };
+}
+
+function asStringList(value: unknown): string[] | null {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) return null;
+  return value as string[];
+}
+
+function asRuleRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+/** スコア・数値の区間。下が上より大きければ空（実行時も例外→抑止）。 */
+function parseScoreInterval(value: unknown): { lo: number; hi: number } | null {
+  const record = asRuleRecord(value);
+  if (!record) return null;
+  const min = typeof record.min === 'number' && Number.isInteger(record.min) ? record.min : null;
+  const max = typeof record.max === 'number' && Number.isInteger(record.max) ? record.max : null;
+  if (min == null && max == null) return null;
+  return { lo: min ?? Number.NEGATIVE_INFINITY, hi: max ?? Number.POSITIVE_INFINITY };
+}
+
+/**
+ * 日付の区間。to が日付だけ（YYYY-MM-DD）のときはその日の終わりまでを
+ * 含める（buildDateRange と同じ）。from・to の空文字は開放端。
+ */
+function parseDateInterval(value: unknown): { lo: string | null; hi: string | null } | null {
+  const record = asRuleRecord(value);
+  if (!record) return null;
+  const from = typeof record.from === 'string' && record.from !== '' ? record.from : null;
+  let to = typeof record.to === 'string' && record.to !== '' ? record.to : null;
+  if (to != null && /^\d{4}-\d{2}-\d{2}$/.test(to)) to = `${to}T23:59:59.999`;
+  if (from == null && to == null) return null;
+  return { lo: from, hi: to };
+}
+
+/** 同じ欄の数値比較（gte/gt/lte/lt）の下限・上限。読めない値は開放端に寄せる。 */
+function friendFieldNumberBound(
+  op: string,
+  text: string,
+): { lo: number; loOpen: boolean; hi: number; hiOpen: boolean } | null {
+  const num = Number(text);
+  if (!Number.isFinite(num)) return null;
+  const bound = { lo: Number.NEGATIVE_INFINITY, loOpen: false, hi: Number.POSITIVE_INFINITY, hiOpen: false };
+  if (op === 'gte') bound.lo = num;
+  else if (op === 'gt') { bound.lo = num; bound.loOpen = true; }
+  else if (op === 'lte') bound.hi = num;
+  else if (op === 'lt') { bound.hi = num; bound.hiOpen = true; }
+  else return null;
+  return bound;
+}
+
+function friendFieldContradicts(
+  first: { op: string; text: string },
+  second: { op: string; text: string },
+): boolean {
+  const ops = [first.op, second.op];
+  if (ops.includes('not_exists')) {
+    const other = first.op === 'not_exists' ? second : first;
+    // not_exists（空でない値の行が無い）と両立しないのは「空でない値が要る」条件。
+    // not_equals / not_contains は空（NULL）でも成り立つので両立する。
+    return other.op !== 'not_exists' && other.op !== 'not_equals' && other.op !== 'not_contains';
+  }
+  if (first.op === 'equals' && second.op === 'equals') return first.text !== second.text;
+  if (first.op === 'equals' && second.op === 'not_equals') return first.text === second.text;
+  if (second.op === 'equals' && first.op === 'not_equals') return first.text === second.text;
+  if (first.op === 'equals' && second.op === 'contains') return !first.text.includes(second.text);
+  if (second.op === 'equals' && first.op === 'contains') return !second.text.includes(first.text);
+  if (first.op === 'equals' && second.op === 'not_contains') return first.text.includes(second.text);
+  if (second.op === 'equals' && first.op === 'not_contains') return second.text.includes(first.text);
+  if (first.op === 'contains' && second.op === 'not_contains') return first.text === second.text;
+  if (first.op === 'equals' && (second.op === 'gte' || second.op === 'gt' || second.op === 'lte' || second.op === 'lt')) {
+    const bound = friendFieldNumberBound(second.op, second.text);
+    if (!bound) return false;
+    const num = Number(first.text);
+    if (!Number.isFinite(num)) return false;
+    if (num < bound.lo || (num === bound.lo && bound.loOpen)) return true;
+    if (num > bound.hi || (num === bound.hi && bound.hiOpen)) return true;
+    return false;
+  }
+  if (second.op === 'equals' && (first.op === 'gte' || first.op === 'gt' || first.op === 'lte' || first.op === 'lt')) {
+    return friendFieldContradicts(second, first);
+  }
+  const firstBound = friendFieldNumberBound(first.op, first.text);
+  const secondBound = friendFieldNumberBound(second.op, second.text);
+  if (firstBound && secondBound) {
+    const lo = Math.max(firstBound.lo, secondBound.lo);
+    const hi = Math.min(firstBound.hi, secondBound.hi);
+    if (lo > hi) return true;
+    if (lo === hi) {
+      const open = (lo === firstBound.lo && firstBound.loOpen) || (lo === secondBound.lo && secondBound.loOpen)
+        || (hi === firstBound.hi && firstBound.hiOpen) || (hi === secondBound.hi && secondBound.hiOpen);
+      if (open) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * 2つの原子ルールが両立し得ないか。実行時の SQL の意味で見る。
+ * 迷ったら両立扱い（false）にする。見逃し（警告しすぎ）は無害だが、
+ * 誤って矛盾扱いすると本当の競合を見逃すため。
+ */
+function friendAddRulesContradict(first: FriendAddRuleShape, second: FriendAddRuleShape): boolean {
+  if (typeof first.type !== 'string' || typeof second.type !== 'string') return false;
+  if (first.type === second.type) {
+    const type = first.type;
+    const a = first.value;
+    const b = second.value;
+    if (JSON.stringify(sortRecordKeys(a)) === JSON.stringify(sortRecordKeys(b))) return false;
+    switch (type) {
+      case 'is_following':
+      case 'is_hidden':
+        // 真偽が割れたら両立しない。真偽でないゴミは実行時に例外→抑止だが、
+        // ここでは警告側に倒して両立扱いにする。
+        return typeof a === 'boolean' && typeof b === 'boolean' && a !== b;
+      case 'ref_code':
+        return typeof a === 'string' && typeof b === 'string';
+      case 'tag_exists':
+      case 'tag_not_exists':
+      case 'scenario_subscribed':
+      case 'name':
+      case 'private_memo':
+      case 'status_message':
+      case 'form_answered':
+        // タグは複数持てるし、名前・メモ・回答は重ねられる。同じ値なら上で両立。
+        return false;
+      case 'tag_all':
+      case 'tag_not_all': {
+        // tag_all A（Aを全部持つ）と tag_not_all B（Bを全部は持たない）。
+        // B が A に含まれるときだけ両立しない。
+        const leftIds = asStringList(a);
+        const rightIds = asStringList(b);
+        if (!leftIds || !rightIds) return false;
+        if (type === 'tag_all' && second.type === 'tag_all') return false;
+        if (type === 'tag_not_all' && second.type === 'tag_not_all') return false;
+        const required = type === 'tag_all' ? leftIds : rightIds;
+        const forbidden = type === 'tag_all' ? rightIds : leftIds;
+        return forbidden.every((id) => required.includes(id));
+      }
+      case 'score_range': {
+        const left = parseScoreInterval(a);
+        const right = parseScoreInterval(b);
+        if (!left || !right) return false;
+        return left.hi < right.lo || right.hi < left.lo;
+      }
+      case 'registered_at':
+      case 'last_reaction_at': {
+        const left = parseDateInterval(a);
+        const right = parseDateInterval(b);
+        if (!left || !right) return false;
+        if (left.hi != null && right.lo != null && left.hi < right.lo) return true;
+        if (right.hi != null && left.lo != null && right.hi < left.lo) return true;
+        return false;
+      }
+      case 'reaction_state': {
+        // 'any' は 1=1（何も縛らない）なので何とでも両立する。
+        if (a === 'any' || b === 'any') return false;
+        if (a === 'none' || b === 'none') return true;
+        // reply（返信あり）と postback（postback のみ＝返信なし）は両立しない。
+        return (a === 'reply' && b === 'postback') || (a === 'postback' && b === 'reply');
+      }
+      case 'metadata_equals':
+      case 'metadata_not_equals': {
+        const left = asRuleRecord(a);
+        const right = asRuleRecord(b);
+        if (!left || !right || left.key !== right.key) return false;
+        if (type === 'metadata_equals' && second.type === 'metadata_equals') {
+          return left.value !== right.value;
+        }
+        if (type === 'metadata_not_equals' && second.type === 'metadata_not_equals') return false;
+        return left.value === right.value;
+      }
+      case 'scenario_state': {
+        const left = asRuleRecord(a);
+        const right = asRuleRecord(b);
+        if (!left || !right || left.scenarioId !== right.scenarioId) return false;
+        return (left.state === 'subscribed' && right.state === 'not_subscribed')
+          || (left.state === 'not_subscribed' && right.state === 'subscribed');
+      }
+      case 'support_mark': {
+        const left = asRuleRecord(a);
+        const right = asRuleRecord(b);
+        if (!left || !right) return false;
+        const leftIds = asStringList(left.markIds);
+        const rightIds = asStringList(right.markIds);
+        if (!leftIds || !rightIds) return false;
+        const leftPositive = left.exclude !== true;
+        const rightPositive = right.exclude !== true;
+        if (leftPositive && rightPositive) {
+          return !leftIds.some((id) => rightIds.includes(id));
+        }
+        if (!leftPositive && !rightPositive) return false;
+        const positive = leftPositive ? leftIds : rightIds;
+        const excluded = leftPositive ? rightIds : leftIds;
+        return !positive.some((id) => !excluded.includes(id));
+      }
+      case 'friend_field': {
+        const left = asRuleRecord(a);
+        const right = asRuleRecord(b);
+        if (!left || !right || left.fieldId !== right.fieldId) return false;
+        return friendFieldContradicts(
+          { op: typeof left.op === 'string' ? left.op : 'contains', text: typeof left.text === 'string' ? left.text : '' },
+          { op: typeof right.op === 'string' ? right.op : 'contains', text: typeof right.text === 'string' ? right.text : '' },
+        );
+      }
+      default:
+        return false;
+    }
+  }
+  // 型が違う肯定同士は基本的に両立する。否定との組み合わせだけ見る。
+  if (first.type === 'tag_exists' && second.type === 'tag_not_exists') return first.value === second.value;
+  if (first.type === 'tag_not_exists' && second.type === 'tag_exists') return first.value === second.value;
+  if (first.type === 'tag_all' && second.type === 'tag_not_exists') {
+    const ids = asStringList(first.value);
+    return ids != null && typeof second.value === 'string' && ids.includes(second.value);
+  }
+  if (first.type === 'tag_not_exists' && second.type === 'tag_all') {
+    const ids = asStringList(second.value);
+    return ids != null && typeof first.value === 'string' && ids.includes(first.value);
+  }
+  if (first.type === 'scenario_subscribed' && second.type === 'scenario_state') {
+    const state = asRuleRecord(second.value);
+    return typeof first.value === 'string' && first.value !== ''
+      && !!state && state.scenarioId === first.value && state.state === 'not_subscribed';
+  }
+  if (first.type === 'scenario_state' && second.type === 'scenario_subscribed') {
+    return friendAddRulesContradict(second, first);
+  }
+  return false;
+}
+
+/** 連言（AND の塊）が成り立つ人がいるか。矛盾ペアが1つでもあればいない。 */
+function friendAddConjunctionSatisfiable(atoms: Array<string | null>): boolean {
+  const rules: FriendAddRuleShape[] = [];
+  for (const atom of atoms) {
+    if (atom == null) return false;
+    const rule = parseRuleShape(atom);
+    if (!rule) return false;
+    rules.push(rule);
+  }
+  for (let i = 0; i < rules.length; i += 1) {
+    for (let j = i + 1; j < rules.length; j += 1) {
+      if (friendAddRulesContradict(rules[i], rules[j])) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * 2つの条件を両方満たす人がいるか。DNF 同士を総当たりし、矛盾のない
+ * 組み合わせが1つでもあれば重なる。大きすぎて調べ切れないときは
+ * 警告側（重なる）に倒す。
+ */
+function friendAddConditionsShareAudience(first: SegmentCondition, second: SegmentCondition): boolean {
+  const left = conditionDnf({ operator: first.operator, rules: first.rules, groups: first.groups });
+  const right = conditionDnf({ operator: second.operator, rules: second.rules, groups: second.groups });
+  if (left.overflow || right.overflow) return true;
+  for (const leftBranch of left.conjunctions) {
+    for (const rightBranch of right.conjunctions) {
+      if (friendAddConjunctionSatisfiable([...leftBranch, ...rightBranch])) return true;
+    }
   }
   return false;
 }
 
 /**
  * 友だち条件の重なり（競合確認用）。どちらかが空なら報告しない。
- * 構造化JSONは整形・キー順・rules/groups の並びを吸収して比べ、
- * 完全一致でなくても同じ原子ルールを共有すれば競合にする。
- * 本番は友だち1人ずつ条件を評価するため、絞り込みを共有する条件同士は
- * 同じ人に届く可能性があり、競合確認もその意味で揃えている。
- * 原子ルールを1つも共有しない条件同士は競合にしない。
- * JSONでない旧形式は字面の一致だけで見る。
+ * 構造化JSONは「両方を満たす人がいるか」（充足可能性）で判定する。
+ * 本番は友だち1人ずつ条件を評価するため、同じ人に届き得る条件同士を
+ * 競合にする。完全一致・ANDの包含・ORの共有枝・入れ子の部分重複は
+ * すべてこの1つの意味に含まれる。tag-1 対 tag-2 のように違う絞りでも、
+ * 両方持つ人にはどちらも届くので競合にする。逆に両立しない絞りの
+ * 組み合わせ（矛盾AND）は誰にも届かないので競合にしない。
+ * JSONでない旧形式・壊れたJSONは実行時も評価しないため字面の一致だけで見る。
  */
 export function areFriendAddConditionsOverlapping(a: unknown, b: unknown): boolean {
   if (isEmptyFriendAddCondition(a) || isEmptyFriendAddCondition(b)) return false;
-  const leftCanonical = canonicalizeFriendAddCondition(a);
-  const rightCanonical = canonicalizeFriendAddCondition(b);
-  if (leftCanonical != null && rightCanonical != null) {
-    if (leftCanonical === rightCanonical) return true;
-    return shareFriendAddConditionAtom(a, b);
-  }
+  const first = parseCondition(normalizeFriendAddCondition(a));
+  const second = parseCondition(normalizeFriendAddCondition(b));
+  if (first && second) return friendAddConditionsShareAudience(first, second);
   const left = normalizeFriendAddCondition(a);
   const right = normalizeFriendAddCondition(b);
   return Boolean(left) && left === right;
@@ -870,7 +1201,7 @@ export async function applyFriendAddRouting(
   accountId: string | null,
   friend: FriendAddSubject,
   push?: ImmediatePushContext,
-  routingContext?: { entryRouteId?: string | null; now?: Date },
+  routingContext?: { entryRouteId?: string | null; now?: Date; sendRight?: boolean },
 ): Promise<FriendAddRoutingResult> {
   const none: FriendAddRoutingResult = {
     routed: false,
@@ -894,6 +1225,23 @@ export async function applyFriendAddRouting(
     entryRouteId: routingContext?.entryRouteId ?? null,
     now,
   });
+  /*
+   * 送信権を取れなかった実行は、選ぶだけ選んで登録も送信もしない。
+   * 並行する勝った側が送るため、ここで enrollment を作ると cron が
+   * 拾って二重に届いてしまう。追跡用に抑止として残す。
+   */
+  if (routingContext?.sendRight === false && selection.evaluated) {
+    return {
+      routed: true,
+      kind,
+      enrollments: [],
+      timing: selection.evaluated.definition.timing,
+      suppressed: true,
+      suppressReason: 'duplicate_in_flight',
+      ruleId: selection.evaluated.ruleId,
+      ruleVersionId: selection.evaluated.versionId,
+    };
+  }
   const matchedRule = selection.selected;
   /*
    * 経路は合うが曜日・時間帯・友だち条件・再送制限に止まった。

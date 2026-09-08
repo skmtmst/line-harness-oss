@@ -35,6 +35,8 @@ vi.mock('@line-crm/db', () => ({
   recordFriendAddEvent: vi.fn().mockResolvedValue('friend-add-event-1'),
   captureFriendAddEventAttribution: vi.fn().mockResolvedValue(null),
   markFriendAddEventRouting: vi.fn().mockResolvedValue(undefined),
+  claimFriendAddSendRight: vi.fn().mockResolvedValue(true),
+  releaseFriendAddSendRight: vi.fn().mockResolvedValue(undefined),
   recordAnalyticsEvent: vi.fn().mockResolvedValue({ id: 'analytics-event-1' }),
   recordAutoReplyHit: vi.fn().mockResolvedValue(undefined),
   reserveAutoReplyEvaluation: vi.fn().mockImplementation(async (_db, input) => ({
@@ -111,6 +113,8 @@ import {
   recordFriendAddEvent,
   captureFriendAddEventAttribution,
   markFriendAddEventRouting,
+  claimFriendAddSendRight,
+  releaseFriendAddSendRight,
   recordAnalyticsEvent,
 } from '@line-crm/db';
 import { fireEvent } from '../services/event-bus.js';
@@ -192,8 +196,8 @@ describe('POST /webhook — V6 friend-add ledger', () => {
       eventId: 'friend-add-event-1', lineAccountId: 'account-main', friendId: 'friend-1',
     });
     expect(markFriendAddEventRouting).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
-      eventId: 'friend-add-event-1', lineAccountId: 'account-main', status: 'completed',
-      errorCode: null, scenarioEnrollmentId: null, deliveryCount: 0,
+      eventId: 'friend-add-event-1', lineAccountId: 'account-main', status: 'partial_failed',
+      errorCode: 'send_failed', scenarioEnrollmentId: null, deliveryCount: 0,
     }));
   });
 });
@@ -777,22 +781,51 @@ describe('POST /webhook — friend-add抑止理由の台帳記録 (#622)', () =>
     }));
   });
 
-  test('送信時は status=completed と errorCode=null を記録する', async () => {
+  test('送れなかったときは completed にせず partial_failed と send_failed を記録する', async () => {
     await sendFollowWithRouting({
       routed: true, kind: 'returning', enrollments: [], timing: 'immediate',
       suppressed: false, suppressReason: null, ruleId: 'rule-1', ruleVersionId: 'rule-1-v1',
     });
     expect(markFriendAddEventRouting).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
       eventId: 'friend-add-event-1', lineAccountId: 'account-main',
-      status: 'completed', errorCode: null,
+      status: 'partial_failed', errorCode: 'send_failed', deliveryCount: 0,
     }));
   });
 
-  test('設定なしの受け皿経路は completed のまま壊さない', async () => {
+  test('設定なしの受け皿経路で送れなかったときも partial_failed にする', async () => {
     await sendFollowWithRouting({ routed: false, suppressed: false, enrollments: [] });
     expect(markFriendAddEventRouting).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
       eventId: 'friend-add-event-1', lineAccountId: 'account-main',
-      status: 'completed', errorCode: null,
+      status: 'partial_failed', errorCode: 'send_failed', deliveryCount: 0,
+    }));
+  });
+
+  test('送信権を取れなかった実行は送らず duplicate_in_flight で引く', async () => {
+    vi.mocked(claimFriendAddSendRight).mockResolvedValueOnce(false);
+    await sendFollowWithRouting({
+      routed: true, kind: 'first_time',
+      enrollments: [{ scenarioId: 'scenario-1', enrollment: { id: 'enrollment-1' }, resumed: false }],
+      timing: 'immediate', suppressed: false, suppressReason: null,
+      ruleId: 'rule-1', ruleVersionId: 'rule-1-v1',
+    });
+    expect(markFriendAddEventRouting).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
+      eventId: 'friend-add-event-1', lineAccountId: 'account-main',
+      status: 'partial_failed', errorCode: 'duplicate_in_flight', deliveryCount: 0,
+    }));
+    expect(releaseFriendAddSendRight).not.toHaveBeenCalled();
+  });
+
+  test('送信権の予約に失敗しても従来どおり送る側に倒す', async () => {
+    vi.mocked(claimFriendAddSendRight).mockRejectedValueOnce(new Error('db down'));
+    await sendFollowWithRouting({
+      routed: true, kind: 'returning',
+      enrollments: [{ scenarioId: 'scenario-1', enrollment: { id: 'enrollment-1' }, resumed: false }],
+      timing: 'immediate', suppressed: false, suppressReason: null,
+      ruleId: 'rule-1', ruleVersionId: 'rule-1-v1',
+    });
+    expect(markFriendAddEventRouting).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
+      eventId: 'friend-add-event-1', lineAccountId: 'account-main',
+      status: 'partial_failed', errorCode: 'send_failed', deliveryCount: 0,
     }));
   });
 });

@@ -160,6 +160,19 @@ describe('friend add rules API', () => {
     }, makeEnv())).status).toBe(403);
   });
 
+  test('不正な時間帯（99:99など）は保存させない', async () => {
+    const response = await app.request('/api/friend-add-rules/drafts', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'Idempotency-Key': 'friend-rule-create-0002' },
+      body: JSON.stringify({
+        accountId: 'account-1', friendKind: 'first_time', name: '紹介QR', priority: 1,
+        definition: { ...definition, timeWindows: [{ start: '09:00', end: '99:99' }] },
+      }),
+    }, makeEnv());
+    expect(response.status).toBe(400);
+    expect(db.createFriendAddRuleDraft).not.toHaveBeenCalled();
+  });
+
   test('公開は冪等キーをDB処理へ渡す', async () => {
     const response = await app.request('/api/friend-add-rules/rule-1/publish?account_id=account-1', {
       method: 'POST', headers: { 'Idempotency-Key': 'friend-rule-publish-0001' },

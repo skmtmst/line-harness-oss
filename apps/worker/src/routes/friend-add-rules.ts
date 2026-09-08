@@ -22,6 +22,7 @@ import {
   areFriendAddConditionsOverlapping,
   doFriendAddTimeWindowsOverlap,
   doFriendAddWeekdaySetsOverlap,
+  isValidFriendAddHhmm,
 } from '../services/friend-add-routing.js';
 
 const friendAddRules = new Hono<Env>();
@@ -105,10 +106,16 @@ function normalizeDefinition(raw: Partial<FriendAddRuleDefinition> | undefined):
   const weekdays = Array.isArray(definition.weekdays)
     ? [...new Set(definition.weekdays.filter((day): day is number => Number.isInteger(day) && day >= 0 && day <= 6))]
     : [];
+  /*
+   * 時間帯は「文字の組」まで残し、範囲の正しさは残さない（落とさない）。
+   * 99:99 のような不正値をここで落とすと「制限なし」に読み替わり、
+   * 送ってはいけない相手に送ってしまう。保存側の validateInput が
+   * 新規の不正値を拒否し、既に入った不正値は実行時が fail-closed で止める。
+   */
   const timeWindows = Array.isArray(definition.timeWindows)
     ? definition.timeWindows.filter((window): window is { start: string; end: string } => (
-        Boolean(window) && typeof window.start === 'string' && /^\d{2}:\d{2}$/.test(window.start)
-        && typeof window.end === 'string' && /^\d{2}:\d{2}$/.test(window.end)
+        Boolean(window) && typeof (window as { start?: unknown }).start === 'string'
+        && typeof (window as { end?: unknown }).end === 'string'
       ))
     : [];
   return {
@@ -212,6 +219,19 @@ function validateInput(body: RuleInput): string | null {
   if (body.name.trim().length > 60) return '設定名は60文字以内で入力してください';
   if (!body.friendKind || !KINDS.has(body.friendKind)) return '判定する人が正しくありません';
   if (!Number.isInteger(body.priority) || Number(body.priority) < 1) return '優先順位は1以上の整数で入力してください';
+  // 不正な時間帯（99:99 など）は保存させない。落として保存すると
+  // 「制限なし」に読み替わり、送ってはいけない相手に送ってしまう。
+  const timeWindows = body.definition?.timeWindows;
+  if (timeWindows != null) {
+    if (!Array.isArray(timeWindows)) return '時間帯の指定が正しくありません';
+    for (const window of timeWindows) {
+      const start = (window as { start?: unknown } | null)?.start;
+      const end = (window as { end?: unknown } | null)?.end;
+      if (!isValidFriendAddHhmm(start) || !isValidFriendAddHhmm(end)) {
+        return '時間帯は00:00〜23:59の形で入力してください';
+      }
+    }
+  }
   return null;
 }
 

@@ -22,6 +22,8 @@ import {
   recordFriendAddEvent,
   captureFriendAddEventAttribution,
   markFriendAddEventRouting,
+  claimFriendAddSendRight,
+  releaseFriendAddSendRight,
   toJstString,
   recordAnalyticsEvent,
 } from '@line-crm/db';
@@ -386,6 +388,27 @@ async function handleEvent(
     // **保存されていないアカウントは routed:false が返る。** そのときは下の
     // いままでどおりの経路（有効な friend_add シナリオを全部流す）に落ちる。
     // ここを既定で絞ると、設定していないアカウントで配信が止まる。
+    /*
+     * 送信権の予約。別webhook IDで並行に届いたfollowは、先に予約を取った
+     * 実行だけが振り分け・登録・送信まで進む。取れなかった側は登録自体を
+     * 作らず抑止として残す（勝った側が送るため二重にならない）。
+     * 予約は振り分けの再送確認より先に取る。確認と登録の間に別の実行が
+     * 入ると、送った直後の完了に2件目が被って二重に送ってしまう。
+     */
+    let sendRight = true;
+    let claimedSendRight = false;
+    if (friendAddEventId && lineAccountId) {
+      try {
+        claimedSendRight = await claimFriendAddSendRight(db, {
+          lineAccountId,
+          friendId: friend.id,
+          eventId: friendAddEventId,
+        });
+        sendRight = claimedSendRight;
+      } catch (err) {
+        logWebhookStepFailure('friend_add_send_claim', err, lineAccountId, event);
+      }
+    }
     let routing: Awaited<ReturnType<typeof applyFriendAddRouting>> | null = null;
     try {
       routing = runAccountScenarios
@@ -394,6 +417,7 @@ async function handleEvent(
             workerUrl,
           }, {
             entryRouteId: currentAttribution?.entryRouteId ?? referralRoute?.id ?? null,
+            sendRight,
           })
         : null;
     } catch (err) {
@@ -414,7 +438,8 @@ async function handleEvent(
     let friendAddDeliveryCount = 0;
 
     if (routing?.routed) {
-      for (const { scenarioId, enrollment, resumed } of routing.enrollments) {
+      // 送信権を取れなかった実行は送らずに引く（予約を取った側が送る）。
+      for (const { scenarioId, enrollment, resumed } of (sendRight ? routing.enrollments : [])) {
         try {
           // 「前回読んだところから」で再開したぶんは、ここで1通目を出さない。
           // 出すと続きではなく最初の1通がもう一度届く。次の通は
@@ -455,7 +480,8 @@ async function handleEvent(
      * scenarios.trigger_type は判断に使わない。
      */
     const friendAddIds = scenarios.length > 0 ? new Set(await getFriendAddScenarioIds(db)) : new Set<string>();
-    for (const scenario of scenarios) {
+    // 送信権を取れなかった実行は送らずに引く（予約を取った側が送る）。
+    for (const scenario of (sendRight ? scenarios : [])) {
       // Only trigger scenarios belonging to this account (or unassigned for backward compat)
       const scenarioAccountMatch = !scenario.line_account_id || !lineAccountId || scenario.line_account_id === lineAccountId;
       if (friendAddIds.has(scenario.id) && scenarioAccountMatch) {
@@ -495,15 +521,35 @@ async function handleEvent(
       }
     }
 
+    // 使い終わった送信権の予約を消す。消せなくても古くなれば奪い直せる。
+    if (claimedSendRight && friendAddEventId && lineAccountId) {
+      try {
+        await releaseFriendAddSendRight(db, {
+          lineAccountId,
+          friendId: friend.id,
+          eventId: friendAddEventId,
+        });
+      } catch (err) {
+        logWebhookStepFailure('friend_add_send_release', err, lineAccountId, event);
+      }
+    }
+
     if (friendAddEventId && lineAccountId) {
       try {
+        /*
+         * 送れなかった実行を completed にしない。completed は「送った」印で、
+         * 再送制限が数える。送っていないのに completed にすると、送れなかった
+         * 人が再送制限に数えられて永久に送れなくなる。再送可能にするため
+         * partial_failed にし、理由を残す。
+         */
+        const delivered = friendAddDeliveryCount > 0;
         await markFriendAddEventRouting(db, {
           eventId: friendAddEventId,
           lineAccountId,
-          status: routing?.suppressed ? 'suppressed' : 'completed',
+          status: routing?.suppressed ? 'suppressed' : (delivered ? 'completed' : 'partial_failed'),
           routingRuleId: routing?.ruleId ?? null,
           winningRuleVersionId: routing?.ruleVersionId ?? null,
-          errorCode: routing?.suppressReason ?? null,
+          errorCode: routing?.suppressReason ?? (!sendRight ? 'duplicate_in_flight' : (delivered ? null : 'send_failed')),
           scenarioEnrollmentId,
           deliveryCount: friendAddDeliveryCount,
         });

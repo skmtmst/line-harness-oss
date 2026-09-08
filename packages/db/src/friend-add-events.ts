@@ -4,7 +4,7 @@ export type FriendAddKind = 'first_time' | 'returning';
 export type FriendAddAttributionStatus = 'captured' | 'unavailable';
 export type FriendAddCandidateSource = 'line_login' | 'liff' | 'short_link';
 export type FriendAddCandidateStatus = 'pending' | 'consumed' | 'expired' | 'late';
-export type FriendAddRoutingStatus = 'pending' | 'completed' | 'failed' | 'suppressed';
+export type FriendAddRoutingStatus = 'pending' | 'completed' | 'failed' | 'suppressed' | 'partial_failed';
 
 export interface FriendAddAttributionCandidate {
   id: string;
@@ -201,6 +201,60 @@ export async function captureFriendAddEventAttribution(
     input.eventId, input.lineAccountId, input.friendId,
   ).run();
   return { refCode: candidate.ref_code, entryRouteId: candidate.entry_route_id };
+}
+
+/**
+ * 送信権の予約の有効期間（分）。処理が終われば予約を消すので、残るのは
+ * 処理中に落ちたときだけ。その予約は古くなれば奪い直せる。
+ * 通常の処理は数秒で終わるため、2分でも余裕がある。
+ */
+export const FRIEND_ADD_SEND_CLAIM_TTL_MINUTES = 2;
+
+/**
+ * 別webhook IDで並行に届いたfollowの二重送信を防ぐ送信権の予約。
+ * (line_account_id, friend_id) に1行だけ置き、先に置いた実行だけが送る。
+ * true＝送ってよい。false＝別の実行が送るので送らずに引く。
+ */
+export async function claimFriendAddSendRight(
+  db: D1Database,
+  input: { lineAccountId: string; friendId: string; eventId: string; now?: string },
+): Promise<boolean> {
+  const now = input.now ?? jstNow();
+  try {
+    const inserted = await db.prepare(
+      `INSERT OR IGNORE INTO friend_add_send_claims (line_account_id, friend_id, event_id, claimed_at)
+       VALUES (?, ?, ?, ?)`,
+    ).bind(input.lineAccountId, input.friendId, input.eventId, now).run();
+    if ((inserted.meta?.changes ?? 0) === 1) return true;
+  } catch (error) {
+    // 移行が遅れて表が無い短い時間は、従来どおり送る（予約なし）。
+    if (error instanceof Error && error.message.includes('no such table: friend_add_send_claims')) return true;
+    throw error;
+  }
+  // 既に誰かの予約がある。古い予約（処理中に落ちた残り）だけ奪い直す。
+  const cutoff = addMinutes(now, -FRIEND_ADD_SEND_CLAIM_TTL_MINUTES);
+  const stolen = await db.prepare(
+    `UPDATE friend_add_send_claims
+        SET event_id = ?, claimed_at = ?
+      WHERE line_account_id = ? AND friend_id = ? AND claimed_at < ?`,
+  ).bind(input.eventId, now, input.lineAccountId, input.friendId, cutoff).run();
+  return (stolen.meta?.changes ?? 0) === 1;
+}
+
+/** 使い終わった予約を消す。自分の予約だけ消す。 */
+export async function releaseFriendAddSendRight(
+  db: D1Database,
+  input: { lineAccountId: string; friendId: string; eventId: string },
+): Promise<void> {
+  try {
+    await db.prepare(
+      `DELETE FROM friend_add_send_claims
+        WHERE line_account_id = ? AND friend_id = ? AND event_id = ?`,
+    ).bind(input.lineAccountId, input.friendId, input.eventId).run();
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('no such table: friend_add_send_claims')) return;
+    throw error;
+  }
 }
 
 export async function markFriendAddEventRouting(
