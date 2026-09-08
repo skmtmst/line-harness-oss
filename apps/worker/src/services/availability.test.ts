@@ -148,6 +148,7 @@ interface StubData {
   bookings?: Array<{ staff_id: string; starts_at: string; block_ends_at: string }>;
   menuResources?: Array<{ id: string; capacity: number; quantity: number }>;
   exceptions?: StubException[];
+  timezone?: string | null;
   calendarConnection?: {
     id: string;
     calendar_id: string;
@@ -165,6 +166,9 @@ function stubDB(data: StubData, seen?: Array<{ sql: string; args: unknown[] }>):
           return this;
         },
         async first() {
+          if (sql.includes('FROM booking_settings')) {
+            return data.timezone === undefined ? null : { timezone: data.timezone };
+          }
           if (sql.includes('FROM menus')) return data.menu ?? null;
           if (sql.includes('FROM google_calendar_connections')) return data.calendarConnection ?? null;
           return null;
@@ -988,5 +992,207 @@ describe('getAvailability の例外日・差し戻し対応（3範囲×3種）',
     expect(byDate.get('2026-05-09')).toBe(3);
     expect(byDate.get('2026-05-10')).toBe(3);
     expect(byDate.get('2026-05-11')).toBeUndefined();
+  });
+
+  test('closed＋部分 open は open 区間だけ再開する（通常勤務は足さない）', async () => {
+    const db = stubDB({
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      shifts: [{ staff_id: 'S1', work_date: '2026-05-09', start_time: '09:00', end_time: '17:00' }],
+      exceptions: [closedException(), timeException({ kind: 'open' })],
+    });
+    const result = await getAvailability(db, PARAMS);
+    // open 10-12 だけ。09-17 の通常勤務は出ない。
+    expect(result.by_staff[0].slots.map((s) => s.start)).toEqual(['10:00', '10:30', '11:00']);
+  });
+
+  test('複数資源の時間は資源ごとに union・資源間で intersection', async () => {
+    const base: StubData = {
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      shifts: [{ staff_id: 'S1', work_date: '2026-05-09', start_time: '09:00', end_time: '17:00' }],
+      menuResources: [
+        { id: 'R1', capacity: 2, quantity: 1 },
+        { id: 'R2', capacity: 2, quantity: 1 },
+      ],
+    };
+    // R1 10-12 × R2 14-16 → 共通部分なし → 枠 0
+    const disjoint = stubDB({
+      ...base,
+      exceptions: [
+        timeException({ kind: 'custom_hours', scope_kind: 'resource', scope_id: 'R1' }),
+        timeException({
+          kind: 'custom_hours',
+          scope_kind: 'resource',
+          scope_id: 'R2',
+          hours_json: JSON.stringify([{ start: '14:00', end: '16:00' }]),
+        }),
+      ],
+    });
+    expect((await getAvailability(disjoint, PARAMS)).by_staff[0].slots).toEqual([]);
+    // R1 10-12 × R2 09-17 → 共通部分 10-12
+    const overlap = stubDB({
+      ...base,
+      exceptions: [
+        timeException({ kind: 'custom_hours', scope_kind: 'resource', scope_id: 'R1' }),
+        timeException({
+          kind: 'custom_hours',
+          scope_kind: 'resource',
+          scope_id: 'R2',
+          hours_json: JSON.stringify([{ start: '09:00', end: '17:00' }]),
+        }),
+      ],
+    });
+    expect((await getAvailability(overlap, PARAMS)).by_staff[0].slots.map((s) => s.start)).toEqual(
+      ['10:00', '10:30', '11:00'],
+    );
+  });
+
+  test('空 custom_hours の資源が1つでもあれば fail-closed', async () => {
+    const db = stubDB({
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      shifts: [{ staff_id: 'S1', work_date: '2026-05-09', start_time: '09:00', end_time: '17:00' }],
+      menuResources: [
+        { id: 'R1', capacity: 2, quantity: 1 },
+        { id: 'R2', capacity: 2, quantity: 1 },
+      ],
+      exceptions: [
+        timeException({
+          kind: 'custom_hours',
+          scope_kind: 'resource',
+          scope_id: 'R1',
+          hours_json: '[]',
+        }),
+        timeException({ kind: 'custom_hours', scope_kind: 'resource', scope_id: 'R2' }),
+      ],
+    });
+    expect((await getAvailability(db, PARAMS)).by_staff[0].slots).toEqual([]);
+  });
+});
+
+describe('getAvailability のタイムゾーン（非JST）', () => {
+  test('既存予約は店舗TZの日付へ帰属する（日またぎ境界）', async () => {
+    const db = stubDB({
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      // New York (EDT, UTC-4)。13:30Z-14:30Z = 現地 09:30-10:30。
+      timezone: 'America/New_York',
+      shifts: [{ staff_id: 'S1', work_date: '2026-05-09', start_time: '10:00', end_time: '18:00' }],
+      bookings: [
+        // 現地 05-08 の予約。JST なら 05-09 12:30-13:30 になり 12:00 枠を塞ぐ。
+        { staff_id: 'S1', starts_at: '2026-05-09T03:30:00Z', block_ends_at: '2026-05-09T04:30:00Z' },
+        // 現地 05-09 09:30-10:30。10:00 枠を塞ぐ。
+        { staff_id: 'S1', starts_at: '2026-05-09T13:30:00Z', block_ends_at: '2026-05-09T14:30:00Z' },
+      ],
+    });
+    const result = await getAvailability(db, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-05-09',
+      to: '2026-05-09',
+      now: new Date('2026-05-08T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+    });
+    const starts = result.by_staff[0].slots.map((s) => s.start);
+    expect(starts[0]).toBe('10:30');
+    expect(starts).toContain('12:00');
+    expect(starts).toContain('12:30');
+    expect(starts).not.toContain('10:00');
+  });
+
+  test('例外日と締切は店舗TZで判定する（Honolulu）', async () => {
+    const db = stubDB({
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      // Honolulu (UTC-10, 夏時間なし)。01:30Z-02:30Z = 現地 05-08 15:30-16:30。
+      timezone: 'Pacific/Honolulu',
+      shifts: [{ staff_id: 'S1', work_date: '2026-05-09', start_time: '10:00', end_time: '12:00' }],
+      // JST なら 05-09 10:30-11:30 になり 05-09 を全滅させる。
+      bookings: [{ staff_id: 'S1', starts_at: '2026-05-09T01:30:00Z', block_ends_at: '2026-05-09T02:30:00Z' }],
+      exceptions: [closedException({ date_from: '2026-05-10', date_to: '2026-05-10' })],
+    });
+    const result = await getAvailability(db, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-05-09',
+      to: '2026-05-10',
+      now: new Date('2026-05-08T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+    });
+    const byDate = new Map<string, string[]>();
+    for (const slot of result.by_staff[0].slots) {
+      byDate.set(slot.date, [...(byDate.get(slot.date) ?? []), slot.start]);
+    }
+    expect(byDate.get('2026-05-09')).toEqual(['10:00', '10:30', '11:00']);
+    expect(byDate.get('2026-05-10')).toBeUndefined();
+  });
+
+  test('締切境界は店舗TZの瞬間で切る（Honolulu）', async () => {
+    const db = stubDB({
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      timezone: 'Pacific/Honolulu',
+      shifts: [{ staff_id: 'S1', work_date: '2026-05-09', start_time: '10:00', end_time: '12:00' }],
+      bookings: [],
+    });
+    // 現在 19:30Z = 現地 09:30。リード 60 分 → 現地 10:30 以降だけ残る。
+    const result = await getAvailability(db, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-05-09',
+      to: '2026-05-09',
+      now: new Date('2026-05-09T19:30:00Z'),
+      minLeadTimeMinutes: 60,
+    });
+    expect(result.by_staff[0].slots.map((s) => s.start)).toEqual(['10:30', '11:00']);
+  });
+
+  test('Google 予定は店舗TZの日へ落とす（New York）', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      calendars: { 'cal@example.com': { busy: [{ start: '2026-05-09T14:00:00Z', end: '2026-05-09T15:00:00Z' }] } },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
+    try {
+      const db = stubDB({
+        menu: MENU_BASIC,
+        staff: STAFF_S1,
+        // 14:00Z-15:00Z = 現地 10:00-11:00。JST なら 23:00-24:00 で枠に当たらない。
+        timezone: 'America/New_York',
+        shifts: [{ staff_id: 'S1', work_date: '2026-05-09', start_time: '10:00', end_time: '12:00' }],
+        bookings: [],
+        calendarConnection: { id: 'GC1', calendar_id: 'cal@example.com', auth_type: 'oauth', access_token: 'token' },
+      });
+      const result = await getAvailability(db, {
+        lineAccountId: 'A1',
+        menuId: 'M1',
+        from: '2026-05-09',
+        to: '2026-05-09',
+        now: new Date('2026-05-08T00:00:00Z'),
+        minLeadTimeMinutes: 0,
+      });
+      expect(result.by_staff[0].slots.map((s) => s.start)).toEqual(['11:00']);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  test('壊れた timezone は Asia/Tokyo に寄せる', async () => {
+    const db = stubDB({
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      timezone: 'Not/AZone',
+      shifts: [{ staff_id: 'S1', work_date: '2026-05-09', start_time: '10:00', end_time: '13:00' }],
+      // JST 11:00-12:00。10:00 枠だけ残るはず（JST 換算どおり）。
+      bookings: [{ staff_id: 'S1', starts_at: '2026-05-09T02:00:00Z', block_ends_at: '2026-05-09T03:00:00Z' }],
+    });
+    const result = await getAvailability(db, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-05-09',
+      to: '2026-05-09',
+      now: new Date('2026-05-08T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+    });
+    expect(result.by_staff[0].slots.map((s) => s.start)).toEqual(['10:00', '12:00']);
   });
 });

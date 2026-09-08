@@ -133,14 +133,73 @@ export function computeSlots(input: ComputeSlotsInput): Interval[] {
 // ----------------------------------------------------------------
 // DB layer
 
-const JST_OFFSET_MS = 9 * 60 * 60_000;
+const FALLBACK_TIME_ZONE = 'Asia/Tokyo';
 
-function jstDateStr(d: Date): string {
-  return new Date(d.getTime() + JST_OFFSET_MS).toISOString().slice(0, 10);
+/** booking_settings.timezone を読む。壊れた値は Asia/Tokyo に寄せる。 */
+function normalizeTimeZone(raw: unknown): string {
+  const candidate = typeof raw === 'string' && raw.trim() ? raw.trim() : FALLBACK_TIME_ZONE;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: candidate });
+    return candidate;
+  } catch {
+    console.error('booking availability: invalid timezone, falling back to Asia/Tokyo');
+    return FALLBACK_TIME_ZONE;
+  }
 }
 
-function jstHHMM(d: Date): string {
-  return new Date(d.getTime() + JST_OFFSET_MS).toISOString().slice(11, 16);
+function tzParts(tz: string, d: Date): { y: number; mo: number; day: number; h: number; mi: number } {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).formatToParts(d);
+  const get = (type: string): number => Number(parts.find((p) => p.type === type)?.value ?? NaN);
+  return { y: get('year'), mo: get('month'), day: get('day'), h: get('hour') % 24, mi: get('minute') };
+}
+
+function pad2(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+/** そのタイムゾーンでの日付（例外日・予約帰属の突合に使う）。 */
+function tzDateStr(tz: string, d: Date): string {
+  const p = tzParts(tz, d);
+  return `${p.y}-${pad2(p.mo)}-${pad2(p.day)}`;
+}
+
+/** そのタイムゾーンでの時刻。 */
+function tzHHMM(tz: string, d: Date): string {
+  const p = tzParts(tz, d);
+  return `${pad2(p.h)}:${pad2(p.mi)}`;
+}
+
+/** UTC 瞬間におけるそのタイムゾーンのずれ（分未満切り捨て）。 */
+function tzOffsetMs(tz: string, utcMs: number): number {
+  const floored = utcMs - (utcMs % 60_000);
+  const p = tzParts(tz, new Date(floored));
+  return Date.UTC(p.y, p.mo - 1, p.day, p.h, p.mi) - floored;
+}
+
+/** 「そのタイムゾーンの日付+時刻」を UTC 瞬間へ直す（枠・締切の比較用）。 */
+function zonedTimeToUtcMs(tz: string, date: string, hhmm: string): number {
+  const [y, mo, d] = date.split('-').map(Number);
+  const [h, mi] = hhmm.split(':').map(Number);
+  // 壁時刻を UTC と見なした値からずれを引く。ずれは推定値に依存する
+  //（夏時間）ため、壁時刻を起点に2回求め直す。差分を積むと2重にずれる。
+  const wall = Date.UTC(y, mo - 1, d, h, mi);
+  let guess = wall - tzOffsetMs(tz, wall);
+  guess = wall - tzOffsetMs(tz, guess);
+  return guess;
+}
+
+function addDays(date: string, n: number): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
 }
 
 function eachDate(from: string, to: string): string[] {
@@ -173,15 +232,17 @@ export interface CalendarSyncState {
 }
 
 function weekdayForDate(date: string): number {
+  // 暦日の曜日はタイムゾーンに依らない。00:00Z の曜日＝その日付の曜日。
   return new Date(`${date}T00:00:00Z`).getUTCDay();
 }
 
-function googleBusyForJstDate(
+function googleBusyForDate(
   intervals: Array<{ start: string; end: string }>,
   date: string,
+  timeZone: string,
 ): Interval[] {
-  const dayStart = new Date(`${date}T00:00:00+09:00`).getTime();
-  const dayEnd = dayStart + 24 * 60 * 60_000;
+  const dayStart = zonedTimeToUtcMs(timeZone, date, '00:00');
+  const dayEnd = zonedTimeToUtcMs(timeZone, addDays(date, 1), '00:00');
   return intervals.flatMap((interval) => {
     const start = Math.max(new Date(interval.start).getTime(), dayStart);
     const end = Math.min(new Date(interval.end).getTime(), dayEnd);
@@ -287,7 +348,7 @@ export async function getAvailability(
   const dates = eachDate(params.from, params.to);
   const placeholders = staffIds.map(() => '?').join(',');
 
-  const [businessHours, menuResources, exceptionsResult] = await Promise.all([
+  const [businessHours, menuResources, exceptionsResult, settingsRow] = await Promise.all([
     db.prepare(`SELECT bh.weekday, bh.start_time, bh.end_time, bh.capacity
       FROM booking_business_hours bh
       INNER JOIN booking_settings bs ON bs.id = bh.booking_settings_id
@@ -309,7 +370,12 @@ export async function getAvailability(
         AND date_to >= ?`)
       .bind(params.lineAccountId, params.to, params.from)
       .all<AvailabilityExceptionRow>(),
+    db.prepare(`SELECT timezone FROM booking_settings WHERE line_account_id = ?`)
+      .bind(params.lineAccountId)
+      .first<{ timezone: string | null }>(),
   ]);
+  // 店舗のタイムゾーンで日付・時刻を読む。未設定・壊れた値は Asia/Tokyo。
+  const timeZone = normalizeTimeZone(settingsRow?.timezone ?? FALLBACK_TIME_ZONE);
   const resourceCapacity = (menuResources.results ?? []).reduce(
     (min, row) => Math.min(min, Math.floor(Number(row.capacity) / Math.max(1, Number(row.quantity)))),
     Number.POSITIVE_INFINITY,
@@ -375,7 +441,7 @@ export async function getAvailability(
   const windowLastDate =
     menu.booking_window_days == null
       ? null
-      : jstDateStr(new Date(params.now.getTime() + menu.booking_window_days * 24 * 60 * 60_000));
+      : tzDateStr(timeZone, new Date(params.now.getTime() + menu.booking_window_days * 24 * 60 * 60_000));
 
   const googleBusyByStaff = new Map<string, Array<{ start: string; end: string }> | null>();
   const calendarSync: CalendarSyncState[] = [];
@@ -384,8 +450,8 @@ export async function getAvailability(
       const busy = await getStaffGoogleBusy(db, params.googleCredentials ?? {}, {
         lineAccountId: params.lineAccountId,
         staffId: staff.id,
-        timeMin: new Date(`${params.from}T00:00:00+09:00`).toISOString(),
-        timeMax: new Date(new Date(`${params.to}T00:00:00+09:00`).getTime() + 24 * 60 * 60_000).toISOString(),
+        timeMin: new Date(zonedTimeToUtcMs(timeZone, params.from, '00:00')).toISOString(),
+        timeMax: new Date(zonedTimeToUtcMs(timeZone, addDays(params.to, 1), '00:00')).toISOString(),
       });
       googleBusyByStaff.set(staff.id, busy);
       calendarSync.push({ staff_id: staff.id, configured: busy !== null, ok: true });
@@ -412,11 +478,13 @@ export async function getAvailability(
       // 毎週ルール・シフトより例外日を優先する。優先順位は下の通り。
       //
       // 塞ぐ（closed）: 担当・資源（このメニューが使うもの）は絶対に塞ぐ。
-      //   店舗 closed は、店舗 open（臨時営業）が同日にあれば開ける。
-      // 時間: 担当 custom が稼働を置き換え、担当・店舗 open が足す。
-      //   店舗 custom と資源の時間（custom/open）は共通部分に絞る。
-      //   資源に稼働の基準が無いため、資源 open も custom と同じ絞り込みに
-      //   なる（基準が常時可のため、開ける方向には働かない）。
+      //   店舗 closed は、店舗 open（臨時営業）が同日にあれば open 区間だけ開ける。
+      // 時間: 担当 custom が稼働を置き換え、担当 open が足す。店舗 open は
+      //   平日には足し、closed 日には open 区間だけ再開する。
+      //   店舗 custom と資源の時間（custom/open）は共通部分に絞る。資源は
+      //   資源ごとに union し、資源の間で intersection する（全資源が同時
+      //   に要るため）。資源に稼働の基準が無いため、資源 open も custom と
+      //   同じ絞り込みになる（基準が常時可のため、開ける方向には働かない）。
       // 壊れた時間・空の時間は fail-closed（枠 0）。
       const dayExceptions = exceptions.filter(
         (e) => e.date_from <= date && date <= e.date_to,
@@ -450,17 +518,25 @@ export async function getAvailability(
       const staffOpenHours = readHours(staffRows, 'open');
       const storeOpenHours = readHours(storeRows, 'open');
       const storeCustomHours = readHours(storeRows, 'custom_hours');
-      const resourceTimeHours = mergeIntervals([
-        ...readHours(resourceRows, 'custom_hours'),
-        ...readHours(resourceRows, 'open'),
-      ]);
+      // 資源は資源ごとに union する。予約には全ての資源が同時に要るため、
+      // 資源の間は後で intersection する。空の資源が1つでもあれば枠0。
+      const resourceHoursById = new Map<string, Interval[]>();
+      for (const row of resourceRows) {
+        if (row.kind !== 'custom_hours' && row.kind !== 'open') continue;
+        const hours = parseExceptionHours(row.hours_json);
+        if (hours === null) {
+          brokenTime = true;
+          break;
+        }
+        const key = row.scope_id as string;
+        const list = resourceHoursById.get(key) ?? [];
+        list.push(...hours);
+        resourceHoursById.set(key, list);
+      }
       const hasStaffCustom = staffRows.some((e) => e.kind === 'custom_hours');
       const hasStaffOpen = staffRows.some((e) => e.kind === 'open');
       const hasStoreOpen = storeRows.some((e) => e.kind === 'open');
       const hasStoreCustom = storeRows.some((e) => e.kind === 'custom_hours');
-      const hasResourceTime = resourceRows.some(
-        (e) => e.kind === 'custom_hours' || e.kind === 'open',
-      );
       if (brokenTime) continue;
       const staffClosed = staffRows.some((e) => e.kind === 'closed');
       const resourceClosed = resourceRows.some((e) => e.kind === 'closed');
@@ -476,28 +552,40 @@ export async function getAvailability(
         (r) => r.staff_id === s.id && r.weekday === weekdayForDate(date),
       );
       const base = shift ?? rule;
-      let workingList: Interval[] = hasStaffCustom
+      const coreWorking: Interval[] = hasStaffCustom
         ? staffCustomHours
         : base
           ? [{ start: base.start_time, end: base.end_time }]
           : [];
-      workingList = mergeIntervals([...workingList, ...staffOpenHours, ...storeOpenHours]);
+      let workingList = mergeIntervals([...coreWorking, ...staffOpenHours]);
+      if (!storeClosed) {
+        workingList = mergeIntervals([...workingList, ...storeOpenHours]);
+      } else {
+        // 店舗 closed を open が切り抜く日は、open 区間だけ再開する。
+        // 通常勤務は足さない（09-17 勤務＋10-12 open なら 10-12 だけ）。
+        workingList = workingList.length === 0
+          ? storeOpenHours
+          : intersectIntervals(workingList, storeOpenHours);
+      }
       // 空の custom 行との共通部分は空になる（fail-closed）。
       if (hasStoreCustom) workingList = intersectIntervals(workingList, storeCustomHours);
-      if (hasResourceTime) workingList = intersectIntervals(workingList, resourceTimeHours);
+      for (const hours of resourceHoursById.values()) {
+        workingList = intersectIntervals(workingList, mergeIntervals(hours));
+        if (workingList.length === 0) break;
+      }
       if (workingList.length === 0) continue;
       const dayBookings: BusyInterval[] = bookings.results
         .filter((b) => b.staff_id === s.id)
-        .filter((b) => jstDateStr(new Date(b.starts_at)) === date)
+        .filter((b) => tzDateStr(timeZone, new Date(b.starts_at)) === date)
         .map((b) => ({
-          start: jstHHMM(new Date(b.starts_at)),
-          end: jstHHMM(new Date(b.block_ends_at)),
+          start: tzHHMM(timeZone, new Date(b.starts_at)),
+          end: tzHHMM(timeZone, new Date(b.block_ends_at)),
           // 同じメニューの予約だけが定員まで重ねられる。
           sameMenu: b.menu_id === params.menuId,
         }));
       const googleBusy = googleBusyByStaff.get(s.id);
       // 外の予定は定員に関係なく塞ぐ（sameMenu を付けない）。
-      if (googleBusy) dayBookings.push(...googleBusyForJstDate(googleBusy, date));
+      if (googleBusy) dayBookings.push(...googleBusyForDate(googleBusy, date, timeZone));
       const dayHours = (businessHours.results ?? [])
         .filter((hour) => hour.weekday === weekdayForDate(date));
       const storeCapacity = workingList.reduce(
@@ -519,7 +607,7 @@ export async function getAvailability(
         capacity: effectiveCapacity,
       });
       for (const slot of daySlots) {
-        const slotStartUtc = new Date(`${date}T${slot.start}:00+09:00`);
+        const slotStartUtc = new Date(zonedTimeToUtcMs(timeZone, date, slot.start));
         if (slotStartUtc < minLeadAt) continue;
         const sameMenuCount = dayBookings.filter((booking) => booking.sameMenu === true
           && overlaps(toMin(slot.start), toMin(slot.end), toMin(booking.start), toMin(booking.end))).length;
