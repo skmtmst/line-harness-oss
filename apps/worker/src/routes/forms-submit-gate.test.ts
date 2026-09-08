@@ -31,6 +31,13 @@ const mocks = vi.hoisted(() => ({
   saveFormSubmitClaimWebhook: vi.fn(),
   completeFormSubmitClaim: vi.fn(),
   failFormSubmitClaim: vi.fn(),
+  ensureFormSubmitOutboxEvent: vi.fn(),
+  getFormSubmitOutbox: vi.fn(),
+  markFormSubmitOutboxDelivered: vi.fn(),
+  readFormSubmitOutboxPayload: vi.fn(),
+  readFormSubmitClaimEffectStats: vi.fn(),
+  saveFormSubmitClaimEffectStats: vi.fn(),
+  findUnfinishedFormSubmitClaimByHash: vi.fn(),
   getFormSubmissionById: vi.fn(),
   applyMileageRulesForEvent: vi.fn(),
   updateFormSubmissionDestinationWriteResult: vi.fn(),
@@ -65,6 +72,13 @@ vi.mock('@line-crm/db', () => ({
   saveFormSubmitClaimWebhook: mocks.saveFormSubmitClaimWebhook,
   completeFormSubmitClaim: mocks.completeFormSubmitClaim,
   failFormSubmitClaim: mocks.failFormSubmitClaim,
+  ensureFormSubmitOutboxEvent: mocks.ensureFormSubmitOutboxEvent,
+  getFormSubmitOutbox: mocks.getFormSubmitOutbox,
+  markFormSubmitOutboxDelivered: mocks.markFormSubmitOutboxDelivered,
+  readFormSubmitOutboxPayload: mocks.readFormSubmitOutboxPayload,
+  readFormSubmitClaimEffectStats: mocks.readFormSubmitClaimEffectStats,
+  saveFormSubmitClaimEffectStats: mocks.saveFormSubmitClaimEffectStats,
+  findUnfinishedFormSubmitClaimByHash: mocks.findUnfinishedFormSubmitClaimByHash,
   getFormSubmissionById: mocks.getFormSubmissionById,
   applyMileageRulesForEvent: mocks.applyMileageRulesForEvent,
   updateFormSubmissionDestinationWriteResult: mocks.updateFormSubmissionDestinationWriteResult,
@@ -218,6 +232,17 @@ beforeEach(() => {
   mocks.saveFormSubmitClaimWebhook.mockResolvedValue(true);
   mocks.completeFormSubmitClaim.mockResolvedValue(true);
   mocks.failFormSubmitClaim.mockResolvedValue(true);
+  mocks.findUnfinishedFormSubmitClaimByHash.mockResolvedValue(null);
+  mocks.readFormSubmitClaimEffectStats.mockReturnValue({});
+  mocks.saveFormSubmitClaimEffectStats.mockResolvedValue(true);
+  mocks.ensureFormSubmitOutboxEvent.mockImplementation(async (_db, _scope, _kind, eventId) => ({
+    event_id: eventId,
+    status: 'pending',
+    payload: null,
+  }));
+  mocks.getFormSubmitOutbox.mockResolvedValue(null);
+  mocks.markFormSubmitOutboxDelivered.mockResolvedValue(true);
+  mocks.readFormSubmitOutboxPayload.mockReturnValue(null);
   const answer = {
     id: 'submission-1',
     form_id: 'form-1',

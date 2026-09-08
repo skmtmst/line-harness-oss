@@ -204,7 +204,8 @@ describe('フォーム回答の冪等化(実DB)', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(pushCalls.length).toBe(1);
     const answerId = answerIdOf(KEY, 'friend-1');
-    expect(pushCalls[0].retryKey).toBe(`form-submit:${answerId}:reply`);
+    // LINE 再送キーは UUID 形の固定値。
+    expect(pushCalls[0].retryKey).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
     expect(count('engagement_events', `source = 'form' AND source_event_id = '${answerId}'`)).toBe(1);
     expect((sqlite.prepare(`SELECT submit_count AS n FROM forms WHERE id = 'form-webhook'`).get() as { n: number }).n).toBe(1);
     const claim = sqlite.prepare(
@@ -233,10 +234,10 @@ describe('フォーム回答の冪等化(実DB)', () => {
     const answerId = answerIdOf(KEY, 'friend-1');
     expect(count('engagement_events', `source = 'form' AND source_event_id = '${answerId}'`)).toBe(1);
     expect(pushCalls.length).toBe(1);
-    expect(pushCalls[0].retryKey).toBe(`form-submit:${answerId}:reply`);
+    expect(pushCalls[0].retryKey).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
   });
 
-  test('マイル付与のDB失敗は201のまま未完に残し、再送で付け直す', async () => {
+  test('マイル付与のDB失敗は202で未完を返し、再送で付け直す', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ eligible: true }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -244,7 +245,12 @@ describe('フォーム回答の冪等化(実DB)', () => {
 
     injected.current = { match: 'INTO engagement_events', error: new Error('D1 INSERT failed') };
     const first = await app().fetch(submitRequest('form-webhook', { full_name: '山田' }, KEY, 'user-1'), env());
-    expect(first.status).toBe(201);
+    expect(first.status).toBe(202);
+    const firstBody = (await first.json()) as {
+      data: { complete: boolean; pendingEffects: string[] };
+    };
+    expect(firstBody.data.complete).toBe(false);
+    expect(firstBody.data.pendingEffects).toContain('mileage');
     expect(claimStatus(KEY, 'friend-1')).toBe('failed');
 
     const resumed = await app().fetch(submitRequest('form-webhook', { full_name: '山田' }, KEY, 'user-1'), env());
@@ -259,7 +265,7 @@ describe('フォーム回答の冪等化(実DB)', () => {
   test('レイアウトの部分失敗は欠落を固定せず、再送で補完する', async () => {
     injected.current = { match: 'INTO friend_tags', error: new Error('D1 INSERT failed') };
     const first = await app().fetch(submitRequest('form-tag', { full_name: '山田', pet: '犬' }, KEY, 'user-1'), env());
-    expect(first.status).toBe(201);
+    expect(first.status).toBe(202);
     expect(claimStatus(KEY, 'friend-1')).toBe('failed');
     expect(count('friend_tags', `friend_id = 'friend-1'`)).toBe(0);
 
@@ -292,5 +298,163 @@ describe('フォーム回答の冪等化(実DB)', () => {
     }), env());
     expect(res.status).toBe(400);
     expect(count('form_submissions')).toBe(0);
+  });
+
+  test('実DBの2接続でも真の並行2要求は回答・副作用1回だけ', async () => {
+    // 単一 :memory: 接続ではなく、同じファイル DB への2接続で競合させる。
+    // (D1 の並行に近い形。better-sqlite3 は同期実行なので、文単位の原子性と
+    // 主キー調停・接続をまたいだ可視性を見る)
+    const { mkdtempSync, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dir = mkdtempSync(join(tmpdir(), 'form-2conn-'));
+    const file = join(dir, 'test.sqlite');
+    const primary = new Database(file);
+    primary.exec(BOOTSTRAP);
+    primary.exec(`PRAGMA journal_mode=WAL;`);
+    primary.exec(`
+    INSERT OR IGNORE INTO tenants (id, name) VALUES ('tenant-1', 'T1');
+    INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, tenant_id)
+    VALUES ('account-a', 'ch-a', 'A', 'tok-a', 'sec-a', 'tenant-1');
+    INSERT INTO friends (id, line_user_id, line_account_id, display_name)
+    VALUES ('friend-1', 'U-1', 'account-a', '一郎');
+    INSERT INTO forms (id, name, fields, layout, save_to_metadata, is_active, submit_count)
+    VALUES ('form-2conn', 'C', '[]', '${TEXT_LAYOUT}', 0, 1, 0);
+    INSERT INTO form_accounts (form_id, line_account_id)
+    VALUES ('form-2conn', 'account-a');
+    `);
+    const secondary = new Database(file);
+    secondary.exec(`PRAGMA journal_mode=WAL;`);
+    const injected2: { current: Inject } = { current: null };
+    const env1 = { ...env(), DB: asD1(primary, injected) };
+    const env2 = { ...env(), DB: asD1(secondary, injected2) };
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ eligible: true }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const [res1, res2] = await Promise.all([
+        app().fetch(submitRequest('form-2conn', { full_name: '山田' }, KEY, 'user-1'), env1),
+        app().fetch(submitRequest('form-2conn', { full_name: '山田' }, KEY, 'user-1'), env2),
+      ]);
+      const statuses = [res1.status, res2.status];
+      expect(statuses).toContain(201);
+      const other = statuses.find((status) => status !== 201);
+      expect(other === 200 || other === 429).toBe(true);
+      const answers = primary.prepare(`SELECT COUNT(*) AS n FROM form_submissions`).get() as { n: number };
+      expect(answers.n).toBe(1);
+      // 別接続からも1行に見える。
+      const seen = secondary.prepare(`SELECT COUNT(*) AS n FROM form_submissions`).get() as { n: number };
+      expect(seen.n).toBe(1);
+      expect(pushCalls.length).toBe(1);
+      const claim = primary.prepare(
+        `SELECT status, version, lease_generation FROM form_submit_claims WHERE idempotency_key = ?`,
+      ).get(KEY) as { status: string; version: number; lease_generation: number };
+      expect(claim.status).toBe('completed');
+    } finally {
+      primary.close();
+      secondary.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('Webhook送達後の記録失敗は実DBの再送で呼び直さない', async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => new Response(
+      JSON.stringify({ eligible: true }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+
+    // 配達はできたが結果の記録だけ落ちた(送達後の停止)。
+    injected.current = { match: 'SET webhook = ?', error: new Error('D1 UPDATE failed') };
+    const lost = await app().fetch(submitRequest('form-webhook', { full_name: '山田' }, KEY, 'user-1'), env());
+    expect(lost.status).toBe(500);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(claimStatus(KEY, 'friend-1')).toBe('failed');
+
+    const resumed = await app().fetch(submitRequest('form-webhook', { full_name: '山田' }, KEY, 'user-1'), env());
+    expect(resumed.status).toBe(200);
+    // outbox に配達済みの結果があるので呼び直さない。
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(count('form_submissions')).toBe(1);
+    expect(claimStatus(KEY, 'friend-1')).toBe('completed');
+    expect(pushCalls.length).toBe(1);
+  });
+
+  test('配達の記録が落ちた再開は実DBでも同じ event id で呼び直す', async () => {
+    const seenEvents: Array<unknown> = [];
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      seenEvents.push((init?.headers as Record<string, string> | undefined)?.['X-Form-Event-Id']);
+      return new Response(JSON.stringify({ eligible: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    injected.current = { match: 'UPDATE form_submit_outbox', error: new Error('D1 UPDATE failed') };
+    const lost = await app().fetch(submitRequest('form-webhook', { full_name: '山田' }, KEY, 'user-1'), env());
+    expect(lost.status).toBe(500);
+
+    const resumed = await app().fetch(submitRequest('form-webhook', { full_name: '山田' }, KEY, 'user-1'), env());
+    expect(resumed.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(seenEvents[0]).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(seenEvents[1]).toBe(seenEvents[0]);
+    expect(claimStatus(KEY, 'friend-1')).toBe('completed');
+  });
+
+  test('キーが変わっても同じ内容の未完があれば元のキーへ誘導する(実DB)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ eligible: true }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })));
+
+    injected.current = { match: 'submit_count = (SELECT', error: new Error('D1 UPDATE failed') };
+    const failed = await app().fetch(submitRequest('form-webhook', { full_name: '山田' }, KEY, 'user-1'), env());
+    expect(failed.status).toBe(500);
+
+    const guided = await app().fetch(
+      submitRequest('form-webhook', { full_name: '山田' }, 'bbbbbbbb-2222-4333-8444-666666666666', 'user-1'),
+      env(),
+    );
+    expect(guided.status).toBe(409);
+    const guidedBody = (await guided.json()) as { code: string; retryable: boolean; idempotencyKey: string };
+    expect(guidedBody.code).toBe('idempotency_recovery_pending');
+    expect(guidedBody.retryable).toBe(true);
+    expect(guidedBody.idempotencyKey).toBe(KEY);
+    expect(count('form_submissions')).toBe(1);
+
+    const resumed = await app().fetch(submitRequest('form-webhook', { full_name: '山田' }, KEY, 'user-1'), env());
+    expect(resumed.status).toBe(200);
+    expect(count('form_submissions')).toBe(1);
+    expect(claimStatus(KEY, 'friend-1')).toBe('completed');
+  });
+
+  test('形の違う回答・リンク指定は実DBに触れる前に400', async () => {
+    const arrayBody = await app().fetch(new Request('https://worker.example.test/api/forms/form-webhook/submit', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer user-1',
+        'Idempotency-Key': KEY,
+      },
+      body: JSON.stringify({ data: ['山田'] }),
+    }), env());
+    expect(arrayBody.status).toBe(400);
+
+    const badLink = await app().fetch(new Request('https://worker.example.test/api/forms/form-webhook/submit', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer user-1',
+        'Idempotency-Key': KEY,
+      },
+      body: JSON.stringify({ data: { full_name: '山田' }, trackedLinkId: 'x'.repeat(129) }),
+    }), env());
+    expect(badLink.status).toBe(400);
+    expect(count('form_submissions')).toBe(0);
+    expect(count('form_submit_claims')).toBe(0);
   });
 });
