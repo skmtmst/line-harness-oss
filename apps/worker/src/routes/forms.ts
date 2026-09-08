@@ -3,6 +3,8 @@ import {
   getForms,
   getFormsWithStats,
   getFormById,
+  type FormSubmitClaim,
+  type FormSubmitClaimScope,
   getFormAccountIds,
   getFormDeleteImpact,
   formBelongsToLineAccount,
@@ -16,11 +18,22 @@ import {
   getLatestFormSubmission,
   getFormSubmissionById,
   createFormSubmission,
+  insertFormSubmissionRecord,
+  resyncFormSubmitCount,
+  createFormSubmitClaim,
+  getFormSubmitClaim,
+  takeoverFormSubmitClaim,
+  readFormSubmitClaimSteps,
+  appendFormSubmitClaimStep,
+  saveFormSubmitClaimWebhook,
+  completeFormSubmitClaim,
+  failFormSubmitClaim,
   updateFormSubmissionDestinationWriteResult,
   getFriendByLineUserIdForAccount,
   getFriendById,
   getLineAccountById,
   jstNow,
+  toJstString,
 } from '@line-crm/db';
 import { enrollFriendInScenario } from '@line-crm/db';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
@@ -82,6 +95,11 @@ const NON_PAGINATED_SUBMISSIONS_MAX = 500;
 const FORM_IDEMPOTENCY_KEY_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 /** 同じキーの再送を受け付ける期間。通信の再送や連打はこの中に収まる。 */
 const FORM_IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
+/**
+ * 処理中の予約を止まったとみなす期間。Webhook の待ち時間(10秒)や副作用の
+ * 実行を覆う余裕を持たせ、生きている処理の横取りはしない。
+ */
+const FORM_SUBMIT_CLAIM_STALE_MS = 60 * 1000;
 
 class FormArchiveBodyError extends Error {
   constructor(readonly status: 400 | 413, message: string) {
@@ -323,26 +341,16 @@ async function hashIdempotentSubmission(canonical: string): Promise<string> {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-/** 期限切れのキー。再送は受け付けず、新しいキーでの送り直しを求める。 */
-function idempotencyKeyExpired(row: DbFormSubmission): boolean {
-  if (!row.idempotency_expires_at) return false;
-  const expiresAt = Date.parse(row.idempotency_expires_at);
+/** 期限切れの予約。再送は受け付けず、新しいキーでの送り直しを求める。 */
+function formSubmitClaimExpired(claim: Pick<FormSubmitClaim, 'expires_at'>): boolean {
+  if (!claim.expires_at) return false;
+  const expiresAt = Date.parse(claim.expires_at);
   return Number.isFinite(expiresAt) && expiresAt < Date.now();
 }
 
-/**
- * 同じキーの再送が、同じフォーム・同じ友だち・同じ回答か。
- * ハッシュを持たない行(冪等化より前の回答)の使い回しも、ここで断る。
- */
-function sameIdempotentSubmission(
-  row: DbFormSubmission,
-  formId: string,
-  friendId: string,
-  hash: string,
-): boolean {
-  if (row.form_id !== formId || row.friend_id !== friendId) return false;
-  if (!row.idempotency_hash) return false;
-  return row.idempotency_hash === hash;
+/** 止まったとみなす基準時刻(JST 文字列で比較する)。 */
+function formSubmitClaimStaleBefore(): string {
+  return toJstString(new Date(Date.now() - FORM_SUBMIT_CLAIM_STALE_MS));
 }
 
 /**
@@ -360,6 +368,14 @@ function serializeIdempotentReplay(row: DbFormSubmission): Record<string, unknow
     // 壊れた回答は基本形のまま返す
   }
   return base;
+}
+
+/**
+ * 処理の途中で予約の所有者を失った合図。横取りした試行と副作用を重ねない
+ * よう、その場で止めて送り直しの応答を持ち帰る。
+ */
+class ClaimOwnershipLost {
+  constructor(readonly response: Response) {}
 }
 
 function dateFieldsOfForm(form: DbForm): Array<{ key: string; label: string }> {
@@ -1127,36 +1143,38 @@ forms.post('/api/forms/:id/submit', async (c) => {
     }
     const friendId = friend.id;
 
-    // 同じキーの再送は、判定・保存・副作用のすべてを飛ばして保存済みを返す。
-    // アカウントの確認(404)を先に済ませているので、別アカウントのキーで
-    // 他人の回答の有無は分からない。期限後の再送も最初の結果のまま返す。
-    let idempotencyHash: string | null = null;
-    let idempotencyExpiresAt: string | null = null;
+    // キーあり送信の照合材料。読み取りだけに使い、予約の書き込みは判定の後。
+    let peekScope: FormSubmitClaimScope | null = null;
+    let peekHash: string | null = null;
     if (idempotencyKey) {
       const hashSource: Record<string, unknown> = { ...submissionData };
       delete hashSource._webhookVerified;
       delete hashSource._skipWebhook;
-      idempotencyHash = await hashIdempotentSubmission(canonicalizeIdempotencyInput({
+      peekHash = await hashIdempotentSubmission(canonicalizeIdempotencyInput({
         data: hashSource,
         trackedLinkId: body.trackedLinkId ?? null,
       }));
-      idempotencyExpiresAt = new Date(Date.now() + FORM_IDEMPOTENCY_TTL_MS).toISOString();
-      const existing = await getFormSubmissionById(c.env.DB, idempotencyKey);
-      if (existing) {
-        if (idempotencyKeyExpired(existing)) {
-          return c.json(
-            { success: false, error: 'Idempotency-Key の有効期限が切れました。新しいキーで送り直してください' },
-            409,
-          );
+      const lineAccount = await getLineAccountById(c.env.DB, identity.lineAccountId);
+      peekScope = {
+        tenantId: lineAccount?.tenant_id ?? '',
+        lineAccountId: identity.lineAccountId,
+        formId,
+        friendId,
+        key: idempotencyKey,
+      };
+      // 完了済みの再送は判定より先に返す(回答期限後も最初の結果のまま)。
+      const peeked = await getFormSubmitClaim(c.env.DB, peekScope);
+      if (peeked
+        && peeked.status === 'completed'
+        && peeked.request_hash === peekHash
+        && !formSubmitClaimExpired(peeked)) {
+        const saved = peeked.submission_id
+          ? await getFormSubmissionById(c.env.DB, peeked.submission_id)
+          : null;
+        if (saved) {
+          c.header('Idempotency-Replayed', 'true');
+          return c.json({ success: true, data: serializeIdempotentReplay(saved) }, 200);
         }
-        if (!sameIdempotentSubmission(existing, formId, friendId, idempotencyHash)) {
-          return c.json(
-            { success: false, error: 'Idempotency-Key was already used with a different request' },
-            409,
-          );
-        }
-        c.header('Idempotency-Replayed', 'true');
-        return c.json({ success: true, data: serializeIdempotentReplay(existing) }, 200);
       }
     }
 
@@ -1208,35 +1226,224 @@ forms.post('/api/forms/:id/submit', async (c) => {
     delete submissionData._webhookVerified;
     delete submissionData._skipWebhook;
 
-    // 同時送信で両方が保存まで進んだとき、主キーで片方だけが残る。
-    // 負けた側は保存済みの行を返し、マイル・通知・タグを重ねない。
-    // (一斉配信の同時送信と同じ流儀)
-    const replayConcurrentSubmission = async (createError: unknown): Promise<Response | null> => {
-      const raced = idempotencyKey ? await getFormSubmissionById(c.env.DB, idempotencyKey) : null;
-      if (!raced || !idempotencyHash) throw createError;
-      if (idempotencyKeyExpired(raced)) {
-        return c.json(
-          { success: false, error: 'Idempotency-Key の有効期限が切れました。新しいキーで送り直してください' },
-          409,
-        );
-      }
-      if (!sameIdempotentSubmission(raced, formId, friendId, idempotencyHash)) {
-        return c.json(
-          { success: false, error: 'Idempotency-Key was already used with a different request' },
-          409,
-        );
-      }
-      c.header('Idempotency-Replayed', 'true');
-      return c.json({ success: true, data: serializeIdempotentReplay(raced) }, 200);
+    // 冪等予約(キーありのみ)。外部副作用(Webhook・LINE通知)より前に予約行を
+    // 原子的に確保し、同時送信の片方だけが処理を進める。scope は
+    // (テナント・LINEアカウント・フォーム・友だち・キー)。
+    type ClaimContext = {
+      scope: FormSubmitClaimScope;
+      owner: string;
+      submissionId: string;
+      steps: Set<string>;
+      resumed: boolean;
     };
+    // 生きている処理と重なったときの送り直し案内。
+    const claimBusyResponse = () => c.json(
+      {
+        success: false,
+        error: '同じキーの送信を処理中です。少し待って同じキーで送り直してください',
+        retryable: true,
+      },
+      409,
+    );
+    let claimCtx: ClaimContext | null = null;
+    if (idempotencyKey && peekScope && peekHash) {
+      const scope = peekScope;
+      const requestHash = peekHash;
+      const owner = crypto.randomUUID();
+      const submissionId = crypto.randomUUID();
+      const acquired = await createFormSubmitClaim(c.env.DB, {
+        ...scope,
+        requestHash,
+        submissionId,
+        owner,
+        expiresAt: new Date(Date.now() + FORM_IDEMPOTENCY_TTL_MS).toISOString(),
+      });
+      if (acquired.claimed) {
+        claimCtx = { scope, owner, submissionId, steps: new Set(), resumed: false };
+      } else {
+        const existing = acquired.claim;
+        if (existing.request_hash !== requestHash) {
+          return c.json(
+            { success: false, error: 'Idempotency-Key was already used with a different request' },
+            409,
+          );
+        }
+        if (existing.status === 'completed') {
+          if (formSubmitClaimExpired(existing)) {
+            return c.json(
+              { success: false, error: 'Idempotency-Key の有効期限が切れました。新しいキーで送り直してください' },
+              409,
+            );
+          }
+          const saved = existing.submission_id
+            ? await getFormSubmissionById(c.env.DB, existing.submission_id)
+            : null;
+          if (!saved) {
+            console.error('form submit claim is completed without an answer row');
+            return c.json({ success: false, error: 'Internal server error' }, 500);
+          }
+          c.header('Idempotency-Replayed', 'true');
+          return c.json({ success: true, data: serializeIdempotentReplay(saved) }, 200);
+        }
+        // failed は即時、in_progress は止まっているものだけ横取りして再開する。
+        // 生きている処理とは重ねず、送り直しを求める。
+        const staleBefore = existing.status === 'failed' || formSubmitClaimExpired(existing)
+          ? toJstString(new Date())
+          : formSubmitClaimStaleBefore();
+        if (!await takeoverFormSubmitClaim(c.env.DB, scope, owner, staleBefore)) {
+          return claimBusyResponse();
+        }
+        const taken = (await getFormSubmitClaim(c.env.DB, scope))!;
+        claimCtx = {
+          scope,
+          owner,
+          submissionId: taken.submission_id ?? submissionId,
+          steps: new Set(readFormSubmitClaimSteps(taken)),
+          resumed: true,
+        };
+      }
+    }
+
+    // 工程の記録。キーなし送信では何もしない。
+    const claimDone = (step: string): boolean => claimCtx?.steps.has(step) ?? false;
+    const claimCheckpoint = async (step: string): Promise<Response | null> => {
+      if (!claimCtx) return null;
+      const ok = await appendFormSubmitClaimStep(c.env.DB, claimCtx.scope, claimCtx.owner, step);
+      if (ok) {
+        claimCtx.steps.add(step);
+        return null;
+      }
+      return claimBusyResponse();
+    };
+    const settleClaim = async (required: string[]): Promise<void> => {
+      if (!claimCtx) return;
+      try {
+        const missing = required.filter((step) => !claimCtx!.steps.has(step));
+        if (missing.length === 0) {
+          await completeFormSubmitClaim(c.env.DB, claimCtx.scope, claimCtx.owner);
+        } else {
+          await failFormSubmitClaim(c.env.DB, claimCtx.scope, claimCtx.owner);
+        }
+      } catch (error) {
+        console.error('form submit claim finalize failed:', error);
+      }
+    };
+    // 再開で終わらせた処理は 200 で返す(初回だけ 201)。
+    const settleResponse = (data: unknown, status: 200 | 201) => {
+      if (claimCtx?.resumed) {
+        c.header('Idempotency-Replayed', 'true');
+        return c.json({ success: true, data }, 200);
+      }
+      return c.json({ success: true, data }, status);
+    };
+
+    // 回答の保存。キーありでは予約時に確保した id で保存・読み返しし、
+    // 二重保存しない。保存に失敗したら予約を failed に残して同じキーでの
+    // 再開に託し、回答失敗として 500 を返す。
+    const ensureAnswer = async (data: string): Promise<DbFormSubmission> => {
+      if (!claimCtx) {
+        return createFormSubmission(c.env.DB, { formId, friendId, data });
+      }
+      if (!claimDone('answer')) {
+        const linked = await getFormSubmissionById(c.env.DB, claimCtx.submissionId);
+        if (!linked) {
+          try {
+            await insertFormSubmissionRecord(c.env.DB, {
+              id: claimCtx.submissionId,
+              formId,
+              friendId,
+              data,
+            });
+          } catch (error) {
+            await failFormSubmitClaim(c.env.DB, claimCtx.scope, claimCtx.owner).catch(() => {});
+            throw error;
+          }
+        }
+        const lost = await claimCheckpoint('answer');
+        if (lost) throw new ClaimOwnershipLost(lost);
+      }
+      return (await getFormSubmissionById(c.env.DB, claimCtx.submissionId))!;
+    };
+    // 受付数の再計算は何度実行しても同じ値になる。再開時に重ねても狂わない。
+    const ensureSubmitCount = async (): Promise<void> => {
+      if (!claimCtx || claimDone('submit_count')) return;
+      try {
+        await resyncFormSubmitCount(c.env.DB, formId);
+      } catch (error) {
+        await failFormSubmitClaim(c.env.DB, claimCtx.scope, claimCtx.owner).catch(() => {});
+        throw error;
+      }
+      const lost = await claimCheckpoint('submit_count');
+      if (lost) throw new ClaimOwnershipLost(lost);
+    };
+
+    let submission: DbFormSubmission;
     let webhookData: Record<string, unknown> | null = null;
-    if (form.on_submit_webhook_url) {
-      const webhookResult = await callFormWebhook(form, submissionData);
-      webhookData = webhookResult.data as Record<string, unknown> | null;
-      if (!webhookResult.passed) {
-        // Webhook rejected — send fail message and stop
-        if (form.on_submit_webhook_fail_message) {
-          if (friend.line_user_id) {
+    // 配分結果の記録。キーありの再開時に記録済みなら上書きせず、集計値を残す。
+    const updateDestinationWriteResult = async (result: FormDestinationWriteResult): Promise<void> => {
+      if (claimCtx && claimDone('destination_status')) {
+        const current = await getFormSubmissionById(c.env.DB, submission.id);
+        if (current && current.destination_write_status !== 'pending') return;
+      }
+      try {
+        const status = await updateFormSubmissionDestinationWriteResult(c.env.DB, submission.id, result);
+        submission.destination_write_status = status;
+        submission.destination_write_attempted = result.attempted;
+        submission.destination_write_succeeded = result.succeeded;
+        submission.destination_write_failed = result.failed;
+      } catch (error) {
+        // 回答自体は保存済み。記録失敗を回答失敗へ見せず、再開時に残す。
+        console.error('form destination write result failed:', error);
+        return;
+      }
+      if (claimCtx) {
+        const lost = await claimCheckpoint('destination_status');
+        if (lost) throw new ClaimOwnershipLost(lost);
+      }
+    };
+    try {
+      if (form.on_submit_webhook_url) {
+        let webhookPassed: boolean;
+        let webhookOutcome: unknown;
+        if (claimDone('webhook')) {
+          // 再開時は呼び直さず、残した結果を使う。
+          let savedOutcome: { passed: boolean; data: unknown } | null = null;
+          try {
+            const saved = await getFormSubmitClaim(c.env.DB, claimCtx!.scope);
+            savedOutcome = saved?.webhook
+              ? JSON.parse(saved.webhook) as { passed: boolean; data: unknown }
+              : null;
+          } catch {
+            savedOutcome = null;
+          }
+          if (!savedOutcome || typeof savedOutcome.passed !== 'boolean') {
+            // 結果が壊れているときだけ呼び直す。
+            const called = await callFormWebhook(form, submissionData);
+            savedOutcome = { passed: called.passed, data: called.data };
+          }
+          webhookPassed = savedOutcome.passed;
+          webhookOutcome = savedOutcome.data;
+        } else {
+          const called = await callFormWebhook(form, submissionData);
+          webhookPassed = called.passed;
+          webhookOutcome = called.data;
+          if (claimCtx) {
+            const kept = await saveFormSubmitClaimWebhook(
+              c.env.DB,
+              claimCtx.scope,
+              claimCtx.owner,
+              { passed: webhookPassed, data: webhookOutcome },
+            );
+            if (kept) claimCtx.steps.add('webhook');
+            else throw new ClaimOwnershipLost(claimBusyResponse());
+          }
+        }
+        webhookData = webhookOutcome as Record<string, unknown> | null;
+        if (!webhookPassed) {
+          // Webhook rejected — send fail message and stop
+          const needsFailMessage = Boolean(form.on_submit_webhook_fail_message)
+            && Boolean(friend.line_user_id);
+          if (needsFailMessage && !claimDone('fail_message')) {
             try {
               const accessToken = await resolveFriendAccessToken(
                 c.env.DB,
@@ -1247,78 +1454,56 @@ forms.post('/api/forms/:id/submit', async (c) => {
               await pushViaHarnessProxy(
                 new URL(c.req.url).origin,
                 accessToken,
-                friend.line_user_id,
-                [{ type: 'text', text: form.on_submit_webhook_fail_message }],
+                friend.line_user_id!,
+                [{ type: 'text', text: form.on_submit_webhook_fail_message! }],
                 crypto.randomUUID(),
                 (request) => dispatchLineProxyLocally(request, c.env, optionalExecutionCtx(c)),
               );
-            } catch (e) {
-              console.error('Failed to send webhook fail message:', e);
+              const lost = await claimCheckpoint('fail_message');
+              if (lost) throw new ClaimOwnershipLost(lost);
+            } catch (error) {
+              if (error instanceof ClaimOwnershipLost) throw error;
+              // 届かなくても回答の保存へ進む。再開時に送り直す。
+              console.error('Failed to send webhook fail message:', error);
             }
           }
+          // Still save the submission for records
+          submission = await ensureAnswer(JSON.stringify({ ...submissionData, _webhookResult: webhookOutcome }));
+          await ensureSubmitCount();
+          await updateDestinationWriteResult({ attempted: 0, succeeded: 0, failed: 0 });
+          await settleClaim([
+            'webhook',
+            ...(needsFailMessage ? ['fail_message'] : []),
+            'answer',
+            'submit_count',
+            'destination_status',
+          ]);
+          return settleResponse(
+            { ...serializeSubmission(submission), webhookPassed: false, webhookData: webhookOutcome },
+            201,
+          );
         }
-        // Still save the submission for records
-        let submission: DbFormSubmission;
-        try {
-          submission = await createFormSubmission(c.env.DB, {
-            formId,
-            friendId,
-            data: JSON.stringify({ ...submissionData, _webhookResult: webhookResult.data }),
-            // キーなし送信の引数は従来どおり(契約テストが厳密に見る)
-            ...(idempotencyKey
-              ? { id: idempotencyKey, idempotencyHash, idempotencyExpiresAt }
-              : {}),
-          });
-        } catch (createError) {
-          const replayed = await replayConcurrentSubmission(createError);
-          if (replayed) return replayed;
-          throw createError;
-        }
-        try {
-          const status = await updateFormSubmissionDestinationWriteResult(c.env.DB, submission.id, {
-            attempted: 0,
-            succeeded: 0,
-            failed: 0,
-          });
-          submission.destination_write_status = status;
-          submission.destination_write_attempted = 0;
-          submission.destination_write_succeeded = 0;
-          submission.destination_write_failed = 0;
-        } catch (error) {
-          console.error('form destination write result failed:', error);
-        }
-        return c.json({ success: true, data: { ...serializeSubmission(submission), webhookPassed: false, webhookData: webhookResult.data } }, 201);
+      }
+
+      // Save submission against the authenticated caller only.
+      submission = await ensureAnswer(JSON.stringify(submissionData));
+      await ensureSubmitCount();
+
+    if (!claimDone('mileage')) {
+      await awardActivityMileage(c.env.DB, {
+        eventType: 'form_submitted',
+        source: 'form',
+        sourceEventId: submission.id,
+        friendId,
+        subjectKey: formId,
+        metadata: { formId, formName: form.name },
+        occurredAt: submission.created_at,
+      });
+      if (claimCtx) {
+        const lost = await claimCheckpoint('mileage');
+        if (lost) throw new ClaimOwnershipLost(lost);
       }
     }
-
-    // Save submission against the authenticated caller only.
-    // 同じキーの同時送信は主キーで片方だけが残り、負けた側は保存済みを返す。
-    let submission: DbFormSubmission;
-    try {
-      submission = await createFormSubmission(c.env.DB, {
-        formId,
-        friendId,
-        data: JSON.stringify(submissionData),
-        // キーなし送信の引数は従来どおり(契約テストが厳密に見る)
-        ...(idempotencyKey
-          ? { id: idempotencyKey, idempotencyHash, idempotencyExpiresAt }
-          : {}),
-      });
-    } catch (createError) {
-      const replayed = await replayConcurrentSubmission(createError);
-      if (replayed) return replayed;
-      throw createError;
-    }
-
-    await awardActivityMileage(c.env.DB, {
-      eventType: 'form_submitted',
-      source: 'form',
-      sourceEventId: submission.id,
-      friendId,
-      subjectKey: formId,
-      metadata: { formId, formName: form.name },
-      occurredAt: submission.created_at,
-    });
 
     const executionCtx = optionalExecutionCtx(c);
     if (executionCtx && identity.lineAccountId) executionCtx.waitUntil(
@@ -1380,7 +1565,9 @@ forms.post('/api/forms/:id/submit', async (c) => {
         );
       }
 
-      const sideEffects: Promise<unknown>[] = [];
+      // 副作用は工程つきで実行する。キーありの再開時は終わった工程を飛ばし、
+      // 未完の工程だけを補完する。キーなし送信は従来どおりすべて実行する。
+      const effectRuns: Array<{ step: string; run: () => Promise<unknown> }> = [];
       let destinationWriteResult: FormDestinationWriteResult = {
         attempted: 0,
         succeeded: 0,
@@ -1389,8 +1576,9 @@ forms.post('/api/forms/:id/submit', async (c) => {
 
       // Save response data to friend's metadata
       if (form.save_to_metadata) {
-        sideEffects.push(
-          (async () => {
+        effectRuns.push({
+          step: 'metadata',
+          run: async () => {
             const friend = await getFriendById(db, friendId!);
             if (!friend) return;
             const existing = JSON.parse(friend.metadata || '{}') as Record<string, unknown>;
@@ -1399,8 +1587,8 @@ forms.post('/api/forms/:id/submit', async (c) => {
               .prepare(`UPDATE friends SET metadata = ?, updated_at = ? WHERE id = ?`)
               .bind(JSON.stringify(merged), now, friendId)
               .run();
-          })(),
-        );
+          },
+        });
       }
 
       // layout を持つフォームは、こちらで回答を配る。
@@ -1409,8 +1597,9 @@ forms.post('/api/forms/:id/submit', async (c) => {
       // タグ／情報欄／動作、日付から動かすリマインダ、回答後の動作までを
       // まとめて実行する。失敗しても送信は成功のまま（保存は済んでいる）。
       if (layout) {
-        sideEffects.push(
-          applyFormLayoutEffects({
+        effectRuns.push({
+          step: 'layout_effects',
+          run: () => applyFormLayoutEffects({
             db,
             layout,
             friendId: friendId!,
@@ -1440,7 +1629,7 @@ forms.post('/api/forms/:id/submit', async (c) => {
           }).then((result) => {
             destinationWriteResult = result.destinationWrites;
           }).catch((err) => console.error('form layout effects failed:', err)),
-        );
+        });
       }
 
       // 回答を友だち情報欄へ書く。
@@ -1452,32 +1641,40 @@ forms.post('/api/forms/:id/submit', async (c) => {
       // metadata への保存とは別に持つ。metadata は形が決まっていない
       // 置き場で、情報欄は型と差し込み名を持つ。両方に入れておけば、
       // 既存の {{metadata.KEY}} を使っているテンプレートも壊れない。
-      sideEffects.push(
-        layout
-          ? Promise.resolve()
-          : writeLegacyFriendFields(db, form, submissionData, friendId!).then((result) => {
-              destinationWriteResult = result;
-            }),
-      );
+      if (!layout) {
+        effectRuns.push({
+          step: 'legacy_fields',
+          run: () => writeLegacyFriendFields(db, form, submissionData, friendId!).then((result) => {
+            destinationWriteResult = result;
+          }),
+        });
+      }
 
       // Add tag — guarded attach so a tag_added-triggered scenario fires on
       // first-time submit (and never re-fires on duplicate submits).
       if (form.on_submit_tag_id) {
-        sideEffects.push(attachTagAndFireSideEffects(db, friendId, form.on_submit_tag_id, {
-          defaultAccessToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
-          workerUrl: c.env.WORKER_URL,
-        }));
+        effectRuns.push({
+          step: 'tag',
+          run: () => attachTagAndFireSideEffects(db, friendId, form.on_submit_tag_id!, {
+            defaultAccessToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
+            workerUrl: c.env.WORKER_URL,
+          }),
+        });
       }
 
       // Enroll in scenario
       if (form.on_submit_scenario_id) {
-        sideEffects.push(enrollFriendInScenario(db, friendId, form.on_submit_scenario_id));
+        effectRuns.push({
+          step: 'scenario',
+          run: () => enrollFriendInScenario(db, friendId, form.on_submit_scenario_id!),
+        });
       }
 
       // If webhook returned a join_url (e.g. Meet Harness), send a Flex button to the user
       if (webhookData?.join_url) {
-        sideEffects.push(
-          (async () => {
+        effectRuns.push({
+          step: 'meet_link',
+          run: async () => {
             const friend = await getFriendById(db, friendId!);
             if (!friend?.line_user_id) return;
             const accessToken = await resolveFriendAccessToken(
@@ -1522,13 +1719,14 @@ forms.post('/api/forms/:id/submit', async (c) => {
               crypto.randomUUID(),
               (request) => dispatchLineProxyLocally(request, c.env, optionalExecutionCtx(c)),
             );
-          })(),
-        );
+          },
+        });
       }
 
       // Send confirmation message with submitted data back to user
-      sideEffects.push(
-        (async () => {
+      effectRuns.push({
+        step: 'reply',
+        run: async () => {
           // 運用ログに内部ID（friendId）は残さない。開始の事実だけ出す。
           console.log('Form reply: starting');
           const friend = await getFriendById(db, friendId!);
@@ -1619,32 +1817,47 @@ forms.post('/api/forms/:id/submit', async (c) => {
             crypto.randomUUID(),
             (request) => dispatchLineProxyLocally(request, c.env, optionalExecutionCtx(c)),
           );
-        })(),
-      );
+        },
+      });
 
-      if (sideEffects.length > 0) {
-        const results = await Promise.allSettled(sideEffects);
-        for (const r of results) {
-          if (r.status === 'rejected') console.error('Form side-effect failed:', r.reason);
+    if (claimCtx) {
+      // 予約ありは1件ずつ記録しながら進め、未完だけを残す。
+      // (この分岐は副作用ブロックの中で動く)
+      for (const effect of effectRuns) {
+        if (claimDone(effect.step)) continue;
+        try {
+          await effect.run();
+        } catch (error) {
+          console.error('Form side-effect failed:', error);
+          continue;
         }
+        const lost = await claimCheckpoint(effect.step);
+        if (lost) throw new ClaimOwnershipLost(lost);
       }
-      try {
-        const status = await updateFormSubmissionDestinationWriteResult(
-          db,
-          submission.id,
-          destinationWriteResult,
-        );
-        submission.destination_write_status = status;
-        submission.destination_write_attempted = destinationWriteResult.attempted;
-        submission.destination_write_succeeded = destinationWriteResult.succeeded;
-        submission.destination_write_failed = destinationWriteResult.failed;
-      } catch (error) {
-        // 回答自体は保存済み。記録失敗を回答失敗へ見せず pending のまま残す。
-        console.error('form destination write result failed:', error);
+    } else {
+      const results = await Promise.allSettled(effectRuns.map((effect) => effect.run()));
+      for (const r of results) {
+        if (r.status === 'rejected') console.error('Form side-effect failed:', r.reason);
       }
     }
-
-    return c.json({ success: true, data: serializeSubmission(submission) }, 201);
+    await updateDestinationWriteResult(destinationWriteResult);
+    await settleClaim([
+      ...(form.on_submit_webhook_url ? ['webhook'] : []),
+      'answer',
+      'submit_count',
+      'mileage',
+      ...effectRuns.map((effect) => effect.step),
+      'destination_status',
+    ]);
+      return settleResponse(serializeSubmission(submission), 201);
+    }
+  } catch (err) {
+    if (err instanceof ClaimOwnershipLost) return err.response;
+    if (claimCtx) {
+      await failFormSubmitClaim(c.env.DB, claimCtx.scope, claimCtx.owner).catch(() => {});
+    }
+    throw err;
+  }
   } catch (err) {
     console.error('POST /api/forms/:id/submit error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
