@@ -273,12 +273,80 @@ function webinarScopeWhere(scope: WebinarListScope, alias = 'w'): {
   };
 }
 
+export interface WebinarListFilters {
+  q?: string;
+  folderId?: string | null;
+  status?: 'active' | 'draft';
+  sort?: 'updated' | 'created' | 'name';
+}
+
+export interface WebinarListPaging {
+  limit: number;
+  offset: number;
+}
+
+const WEBINAR_LIST_SORT: Record<
+  NonNullable<WebinarListFilters['sort']>,
+  { order: string; field: string; direction: 'asc' | 'desc' }
+> = {
+  updated: { order: 'w.updated_at DESC, w.id DESC', field: 'updatedAt', direction: 'desc' },
+  created: { order: 'w.created_at DESC, w.id DESC', field: 'createdAt', direction: 'desc' },
+  /* 日本語の見出し順とは並びが違うことがある(SQLite のバイト順)。画面の名前順と完全一致はしない。 */
+  name: { order: 'w.title ASC, w.id ASC', field: 'title', direction: 'asc' },
+};
+
+function webinarListFilterWhere(
+  filters: WebinarListFilters,
+  alias = 'w',
+): { sql: string; bindings: string[] } {
+  const conditions: string[] = [];
+  const bindings: string[] = [];
+  const q = filters.q?.trim();
+  if (q) {
+    const like = `%${q.toLowerCase().replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+    conditions.push(`(LOWER(${alias}.title) LIKE ? ESCAPE '\\' OR LOWER(${alias}.slug) LIKE ? ESCAPE '\\')`);
+    bindings.push(like, like);
+  }
+  if (filters.folderId !== undefined) {
+    if (filters.folderId === null) {
+      conditions.push(`${alias}.folder_id IS NULL`);
+    } else {
+      conditions.push(`${alias}.folder_id = ?`);
+      bindings.push(filters.folderId);
+    }
+  }
+  if (filters.status) {
+    conditions.push(`${alias}.status = ?`);
+    bindings.push(filters.status);
+  }
+  return { sql: conditions.length > 0 ? conditions.join(' AND ') : '1 = 1', bindings };
+}
+
+function webinarListWhere(
+  scope: WebinarListScope,
+  filters: WebinarListFilters,
+): { sql: string; bindings: string[] } {
+  const where = webinarScopeWhere(scope);
+  const filter = webinarListFilterWhere(filters);
+  return {
+    sql: `${where.sql} AND ${filter.sql} AND w.status <> 'archived'`,
+    bindings: [...where.bindings, ...filter.bindings],
+  };
+}
+
 /** V6一覧用。人数は予約枠数ではなく、ウェビナーごとの重複しない友だち数。 */
 export async function getWebinarList(
   db: D1Database,
   scope: WebinarListScope,
+  paging?: WebinarListPaging,
+  filters: WebinarListFilters = {},
 ): Promise<WebinarListRow[]> {
-  const where = webinarScopeWhere(scope);
+  const where = webinarListWhere(scope, filters);
+  const sort = WEBINAR_LIST_SORT[filters.sort ?? 'updated'];
+  const bindings: Array<string | number> = [...where.bindings];
+  // paging省略時は全件(旧契約の呼び出し形を保つ)。一覧APIは必ずpagingを渡す。
+  const pageClause = paging ? 'LIMIT ? OFFSET ?' : '';
+  if (paging) bindings.push(paging.limit, paging.offset);
   const result = await db.prepare(
     `SELECT w.*,
             f.name AS folder_name,
@@ -292,10 +360,30 @@ export async function getWebinarList(
        LEFT JOIN folders f ON f.id = w.folder_id
                             AND f.kind = 'webinar'
                             AND f.account_id = w.account_id
-      WHERE ${where.sql} AND w.status <> 'archived'
-      ORDER BY w.created_at DESC`,
-  ).bind(...where.bindings).all<WebinarListRow>();
+      WHERE ${where.sql}
+      ORDER BY ${sort.order}
+      ${pageClause}`,
+  ).bind(...bindings).all<WebinarListRow>();
   return result.results ?? [];
+}
+
+/** V6一覧の総件数。絞りは `getWebinarList` と同じ条件。 */
+export async function countWebinarList(
+  db: D1Database,
+  scope: WebinarListScope,
+  filters: WebinarListFilters = {},
+): Promise<number> {
+  const where = webinarListWhere(scope, filters);
+  const row = await db.prepare(
+    `SELECT COUNT(*) AS total FROM webinars w WHERE ${where.sql}`,
+  ).bind(...where.bindings).first<{ total: number }>();
+  return Number(row?.total ?? 0);
+}
+
+/** 一覧の並び順の応答表示。共通一覧契約の `sort` に入れる。 */
+export function webinarListSort(filters: WebinarListFilters): Array<{ field: string; direction: 'asc' | 'desc' }> {
+  const sort = WEBINAR_LIST_SORT[filters.sort ?? 'updated'];
+  return [{ field: sort.field, direction: sort.direction }];
 }
 
 /** GET /api/folders?kind=webinar の各フォルダに表示する、権限内の件数。 */

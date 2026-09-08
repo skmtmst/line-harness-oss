@@ -54,6 +54,8 @@ function LegacyNewTagPage() {
       saveLabel="タグを作る"
       validate={() => {
         if (!name.trim()) return 'タグ名を入力してください'
+        if (name.trim().length > 80) return 'タグ名は80文字までで入力してください'
+        if ([...name].some((ch) => { const code = ch.charCodeAt(0); return code < 32 || code === 127 })) return 'タグ名に使えない文字が含まれています'
         if (!Number.isInteger(Number(reward)) || Number(reward) < 0) {
           return '本人へ付与するマイルは0以上の整数で入力してください'
         }

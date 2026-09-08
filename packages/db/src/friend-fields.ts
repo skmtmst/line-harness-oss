@@ -395,6 +395,35 @@ export async function countFriendFieldValuesForScope(
   return Number(row?.c ?? 0);
 }
 
+/**
+ * withUsage 一覧用。項目ごとの件数を1クエリでまとめて数える。
+ *
+ * 項目ごとに `countFriendFieldValuesForScope` を呼ぶと項目数ぶんの
+ * クエリが走る(N+1)。`GROUP BY` で一括集計し、値は単体版と同じ条件。
+ */
+export async function countFriendFieldValuesForScopes(
+  db: D1Database,
+  fieldIds: string[],
+  scope: FriendFieldScope,
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  if (fieldIds.length === 0) return counts;
+  const placeholders = fieldIds.map(() => '?').join(',');
+  const result = await db
+    .prepare(
+      `SELECT v.field_id AS field_id, COUNT(*) AS c
+         FROM friend_field_values v
+         JOIN friends f ON f.id = v.friend_id
+        WHERE v.field_id IN (${placeholders}) AND f.line_account_id = ?
+          AND v.value IS NOT NULL AND v.value != ''
+        GROUP BY v.field_id`,
+    )
+    .bind(...fieldIds, scope.lineAccountId)
+    .all<{ field_id: string; c: number }>();
+  for (const row of result.results ?? []) counts.set(row.field_id, Number(row.c ?? 0));
+  return counts;
+}
+
 /** dry-run用。選択中アカウントの値だけを読み、値そのものは変更しない。 */
 export async function getFriendFieldValuesForMigration(
   db: D1Database,

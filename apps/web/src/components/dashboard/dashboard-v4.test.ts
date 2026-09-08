@@ -350,6 +350,6 @@ describe('ダッシュボード通知', () => {
     expect(dashboardNotificationDestination({
       ...data.items[1],
       eventType: 'unknown',
-    })).toBeNull()
+    })).toBe('/updates')
   })
 })

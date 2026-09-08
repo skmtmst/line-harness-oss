@@ -71,6 +71,11 @@ function dashboardStorageKey(accountId: string | null): string {
 
 function jstDay(iso: string | number | Date): string {
   const date = iso instanceof Date ? iso : new Date(iso)
+  /*
+    壊れた日付は空にする。そのまま toISOString() すると RangeError で
+    画面全体が落ち、今日の数にも入らない。空は今日と一致しない。
+  */
+  if (Number.isNaN(date.getTime())) return ''
   return new Date(date.getTime() + 9 * 3600_000).toISOString().slice(0, 10)
 }
 
@@ -204,6 +209,7 @@ function FriendAddLinkCard({
         accountBasicId={selectedAccount?.basicId ?? null}
         baseLink={baseLink}
         initialRouteId={routeId}
+        routes={routes}
         visualReferenceQr={visualQa?.referenceQr ?? false}
       />
     </Card>
@@ -545,11 +551,10 @@ export default function DashboardPage() {
         return
       }
     }
+    /* 行き先は必ずある(知らない種類はお知らせ一覧)。押して何も起きない tap にしない。 */
     const destination = dashboardNotificationDestination(item)
-    if (destination) {
-      setNotificationsOpen(false)
-      router.push(destination)
-    }
+    setNotificationsOpen(false)
+    router.push(destination)
   }
 
   const markAllNotificationsRead = async () => {
@@ -583,16 +588,29 @@ export default function DashboardPage() {
     }
     let cancelled = false
     setSupplementLoading(true)
+    /*
+      予約の明細は今日以降だけ100件に区切って取る。終わった予約まで
+      全部取ると、件数が増えたときに遅くなる。今日の数と直近の予定は
+      この範囲でまかなえる。件数の表示は運用の集計(overview)を使う。
+    */
+    const now = new Date()
+    const jstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000)
+    const jstMidnightUtc = Date.UTC(jstNow.getUTCFullYear(), jstNow.getUTCMonth(), jstNow.getUTCDate()) - 9 * 60 * 60 * 1000
+    const todayStartIso = new Date(jstMidnightUtc).toISOString()
     void Promise.allSettled([
       needsPhotos ? api.nenMembers.overview() : Promise.resolve(null),
-      needsBookings ? bookingApi.listRequests(selectedAccountId, 'all') : Promise.resolve(null),
+      needsBookings ? bookingApi.listRequests(selectedAccountId, 'all', { from: todayStartIso, limit: 100 }) : Promise.resolve(null),
       needsHealth ? api.health.getHealth(selectedAccountId) : Promise.resolve(null),
       needsTwoFactor ? api.staff.list() : Promise.resolve(null),
       needsSupportMarks ? api.supportMarks.list(selectedAccountId) : Promise.resolve(null),
     ]).then(([photoResult, bookingResult, healthResult, staffResult, supportMarkResult]) => {
       if (cancelled) return
       setPendingPhotos(photoResult.status === 'fulfilled' && photoResult.value?.success ? photoResult.value.data.pendingPhotos : null)
-      setBookings(bookingResult.status === 'fulfilled' && bookingResult.value ? bookingResult.value.requests : null)
+      /*
+        器が違う返事(障害時の HTML など)が来ても、`undefined.requests` で
+        落ちない。読めなかったら「確認待ち」に出す。
+      */
+      setBookings(bookingResult.status === 'fulfilled' && bookingResult.value && Array.isArray(bookingResult.value.requests) ? bookingResult.value.requests : null)
       setHealthRisk(
         healthResult.status === 'fulfilled' && healthResult.value?.success
           ? (healthResult.value.data.riskLevel as HealthRisk)
