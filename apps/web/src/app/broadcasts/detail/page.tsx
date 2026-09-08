@@ -11,6 +11,7 @@ import { messageTypeLabel } from '@/lib/broadcast-summary'
 import { broadcastBelongsToSelectedAccount } from './broadcast-detail-account'
 import { clickInsightDetail, formatBroadcastDateTime, openInsightDetail } from './broadcast-insight-display'
 import { broadcastDetailCsv } from './broadcast-detail-export'
+import { broadcastCsvFilename } from '@/components/broadcasts/broadcast-csv-filename'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
 const STATUS_LABELS: Record<string, string> = {
@@ -50,7 +51,7 @@ function BroadcastDetailInner() {
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
     const link = document.createElement('a')
     link.href = url
-    link.download = `broadcast-${broadcast.id}.csv`
+    link.download = broadcastCsvFilename(broadcast.title, broadcast.id)
     link.click()
     URL.revokeObjectURL(url)
   }

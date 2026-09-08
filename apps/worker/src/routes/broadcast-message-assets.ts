@@ -15,6 +15,75 @@ import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../service
 
 const broadcastMessageAssets = new Hono<Env>();
 const ASSET_KINDS = new Set<BroadcastMessageAssetKind>(['rich_message', 'card_message', 'coupon', 'research']);
+const BROADCAST_MEDIA_TYPES = {
+  'image/jpeg': { extensions: ['jpg', 'jpeg'], storedExtension: 'jpg' },
+  'image/png': { extensions: ['png'], storedExtension: 'png' },
+  'video/mp4': { extensions: ['mp4'], storedExtension: 'mp4' },
+} as const;
+
+type BroadcastMediaType = keyof typeof BROADCAST_MEDIA_TYPES;
+
+function safeDecodeFilename(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function detectedMediaType(bytes: Uint8Array): BroadcastMediaType | null {
+  if (bytes.length >= 8
+    && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47
+    && bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a) {
+    return 'image/png';
+  }
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return 'image/jpeg';
+  }
+  if (bytes.length >= 12
+    && bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) {
+    return 'video/mp4';
+  }
+  return null;
+}
+
+export function validateBroadcastMediaUpload(
+  bytes: Uint8Array,
+  declaredType: string,
+  encodedFilename: string | undefined,
+): { ok: true; mimeType: BroadcastMediaType; filename: string } | { ok: false; error: string } {
+  if (!(declaredType in BROADCAST_MEDIA_TYPES)) {
+    return { ok: false, error: 'JPEG・PNG・MP4のみアップロードできます' };
+  }
+  const actualType = detectedMediaType(bytes);
+  if (!actualType || actualType !== declaredType) {
+    return { ok: false, error: 'ファイルの内容と形式が一致しません' };
+  }
+  const filename = safeDecodeFilename(encodedFilename ?? '').trim();
+  const extension = filename.match(/\.([^.]+)$/)?.[1]?.toLowerCase();
+  if (
+    !extension ||
+    !(BROADCAST_MEDIA_TYPES[actualType].extensions as readonly string[]).includes(extension)
+  ) {
+    return { ok: false, error: 'ファイル名の拡張子と内容が一致しません' };
+  }
+  return { ok: true, mimeType: actualType, filename };
+}
+
+async function readPrefix(stream: ReadableStream<Uint8Array>, length: number): Promise<Uint8Array> {
+  const reader = stream.getReader();
+  const bytes: number[] = [];
+  try {
+    while (bytes.length < length) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      bytes.push(...chunk.value.slice(0, length - bytes.length));
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+  return Uint8Array.from(bytes);
+}
 
 async function adminAccountScope(c: Context<Env>) {
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
@@ -113,30 +182,68 @@ broadcastMessageAssets.delete('/api/broadcast-message-assets/:id', requireRole('
     : c.json({ success: false, error: 'Not found' }, 404);
 });
 
+// LINEが取得する素材は認証外の経路で返す。保存時に検証した拡張子だけを許し、
+// R2メタデータを信用せず安全なContent-Typeを固定する。
+broadcastMessageAssets.get('/broadcast-media/:filename', async (c) => {
+  const filename = c.req.param('filename');
+  const match = filename.match(/^([0-9a-f-]{36})\.(jpg|png|mp4)$/i);
+  if (!match) return c.json({ success: false, error: 'Not found' }, 404);
+  const contentType = match[2].toLowerCase() === 'jpg'
+    ? 'image/jpeg'
+    : match[2].toLowerCase() === 'png'
+      ? 'image/png'
+      : 'video/mp4';
+  const object = await c.env.IMAGES.get(`broadcast-media/${filename}`);
+  if (!object) return c.json({ success: false, error: 'Not found' }, 404);
+  return new Response(object.body, {
+    headers: {
+      'Content-Type': contentType,
+      'Content-Disposition': `inline; filename="${filename}"`,
+      'X-Content-Type-Options': 'nosniff',
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      ETag: object.etag,
+    },
+  });
+});
+
 broadcastMessageAssets.post('/api/broadcast-message-assets/upload', requireRole('owner', 'admin'), async (c) => {
-  const mimeType = (c.req.header('Content-Type') ?? '').split(';')[0];
+  const declaredType = (c.req.header('Content-Type') ?? '').split(';')[0];
   const contentLength = Number(c.req.header('Content-Length'));
-  const maxBytes = mimeType === 'video/mp4' ? 200 * 1024 * 1024 : 10 * 1024 * 1024;
-  if (!['image/jpeg', 'image/png', 'video/mp4'].includes(mimeType)) {
+  const maxBytes = declaredType === 'video/mp4' ? 200 * 1024 * 1024 : 10 * 1024 * 1024;
+  if (!(declaredType in BROADCAST_MEDIA_TYPES)) {
     return c.json({ success: false, error: 'JPEG・PNG・MP4のみアップロードできます' }, 400);
   }
   if (!Number.isFinite(contentLength) || contentLength <= 0) {
     return c.json({ success: false, error: 'Content-Length is required' }, 411);
   }
   if (contentLength > maxBytes) {
-    return c.json({ success: false, error: mimeType === 'video/mp4' ? '動画は200MB以下にしてください' : '画像は10MB以下にしてください' }, 400);
+    return c.json({ success: false, error: declaredType === 'video/mp4' ? '動画は200MB以下にしてください' : '画像は10MB以下にしてください' }, 400);
   }
   if (!c.req.raw.body) return c.json({ success: false, error: 'File body is required' }, 400);
+  const [inspectionBody, storageBody] = c.req.raw.body.tee();
+  const validation = validateBroadcastMediaUpload(
+    await readPrefix(inspectionBody, 16),
+    declaredType,
+    c.req.header('X-Filename'),
+  );
+  if (!validation.ok) {
+    await storageBody.cancel().catch(() => undefined);
+    return c.json({ success: false, error: validation.error }, 400);
+  }
   const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
   const stored = await storeBroadcastMedia({
     bucket: c.env.IMAGES,
-    body: c.req.raw.body,
+    body: storageBody,
     contentLength,
-    mimeType,
-    originalFilename: c.req.header('X-Filename'),
+    mimeType: validation.mimeType,
+    originalFilename: validation.filename,
     publicBaseUrl: workerUrl,
   });
-  return c.json({ success: true, data: stored }, 201);
+  const filename = stored.key.slice('broadcast-media/'.length);
+  return c.json({
+    success: true,
+    data: { ...stored, url: `${workerUrl}/broadcast-media/${filename}` },
+  }, 201);
 });
 
 export { broadcastMessageAssets, validatePayload };

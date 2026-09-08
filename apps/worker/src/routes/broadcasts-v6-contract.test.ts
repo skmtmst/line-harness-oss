@@ -73,6 +73,26 @@ describe('V6 broadcast data contracts', () => {
     vi.unstubAllGlobals();
   });
 
+  it('更新口もLINE送信口と同じ最大5通を受け、6通目を拒否する', async () => {
+    seedBroadcast(testDb, 'draft-five', { status: 'draft', sent_at: null });
+    const bubbles = Array.from({ length: 5 }, (_, index) => ({
+      id: `bubble-${index + 1}`,
+      type: 'text',
+      content: { text: `${index + 1}通目` },
+    }));
+
+    const accepted = await app(testDb.db).request('/api/broadcasts/draft-five', json('PUT', {
+      messageBubbles: bubbles,
+    }));
+    expect(accepted.status).toBe(200);
+
+    const rejected = await app(testDb.db).request('/api/broadcasts/draft-five', json('PUT', {
+      messageBubbles: [...bubbles, bubbles[0]],
+    }));
+    expect(rejected.status).toBe(400);
+    await expect(rejected.json()).resolves.toMatchObject({ error: 'messageBubbles must contain 1 to 5 items' });
+  });
+
   it('通常: 対象3人・除外理由・送信枠・同時刻配信・21条件軸を実データで返す', async () => {
     insertFriend(testDb.raw, 'friend-ready', {
       line_account_id: 'account-1', display_name: '山田 太郎', updated_at: '2026-09-07T10:00:00.000Z',
