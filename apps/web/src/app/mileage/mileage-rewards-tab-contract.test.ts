@@ -75,6 +75,49 @@ describe('マイルのタブ', () => {
     expect(PAGE).toMatch(/<MileageRewardsTab[\s\S]{0,120}accountId=/)
   })
 })
+describe('届かなかった交換', () => {
+  const code = withoutComments(TAB)
+
+  it('店ごとに失敗中の一覧を読む', () => {
+    // アカウントを渡さないと、ほかの店の交換まで混ざる。
+    expect(code).toMatch(/\/api\/mileage\/redemptions\?accountId=/)
+    expect(code).toContain('encodeURIComponent(accountId)')
+  })
+
+  it('理由・回数・最終日時を出す', () => {
+    expect(code).toMatch(/failureMessage\s*\|\|\s*item\.failureCode/)
+    expect(code).toMatch(/attemptCount\.toLocaleString/)
+    expect(code).toMatch(/formatMileageDate\(item\.updatedAt\)/)
+  })
+
+  it('失敗中だけを並べる', () => {
+    // 成功済み・返金済みを並べると、やり直しの押し間違いの素になる。
+    expect(code).toMatch(/item\.status\s*===\s*'delivery_failed'/)
+  })
+
+  it('無いとき・取れないときに欄ごと出さない', () => {
+    // 0件・失敗を「0件」と書くと、届いていない交換が無いことになる。
+    expect(code).toMatch(/setRedemptionsVisible\(false\)/)
+    expect(code).toMatch(/redemptionsVisible && failedRedemptions\.length > 0/)
+  })
+
+  it('やり直しは失敗中の口へ店と一緒に送る', () => {
+    expect(code).toMatch(/\/retry-fulfillment/)
+    expect(code).toMatch(/JSON\.stringify\(\{\s*accountId\s*\}\)/)
+  })
+
+  it('同時クリック・再送を1回にまとめる', () => {
+    // 先に立てた旗でボタンも関数も止める。
+    expect(code).toMatch(/disabled=\{retryingId !== null\}/)
+    expect(code).toMatch(/if\s*\(!accountId \|\| retryingId\) return/)
+    expect(code).toMatch(/setRetryingId\(redemption\.id\)/)
+  })
+
+  it('やり直しのあとは一覧を読み直す', () => {
+    expect(code).toMatch(/await loadFailedRedemptions\(\)/)
+  })
+})
+
 describe('いちばん使われた', () => {
   const code = withoutComments(TAB)
 

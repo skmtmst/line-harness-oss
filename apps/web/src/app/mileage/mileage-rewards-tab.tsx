@@ -6,13 +6,15 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
-import { formatMileageNumber } from './mileage-display'
+import { formatMileageDate, formatMileageNumber } from './mileage-display'
 import {
   api,
+  fetchApi,
   type MileageRewardAdminOverview,
   type MileageRewardKind,
   type MileageRewardSummary,
 } from '@/lib/api'
+import type { ApiResponse } from '@line-crm/shared'
 
 /** ★V6 `qlVLJ` 17-1-B マイルの使い道。 */
 
@@ -50,6 +52,26 @@ function miles(value: number | null | undefined): string {
 }
 
 /**
+ * 届かなかった交換（`GET /api/mileage/redemptions` の行）。
+ * **残高の再減算はしない**ことが口の約束なので、画面は理由・回数・最終日時と
+ * やり直しだけ出す。金額は出さない（減っていないものを減ったように見せる）。
+ */
+interface FailedRedemption {
+  id: string
+  rewardName: string
+  status: string
+  attemptCount: number
+  failureCode: string | null
+  failureMessage: string | null
+  updatedAt: string
+}
+
+interface RedemptionHistory {
+  items: FailedRedemption[]
+  pagination: { total: number; limit: number; offset: number }
+}
+
+/**
  * 数に限りがあるかどうかの一行。
  *
  * **`null` は「限りなし」で、0 ではない。** 0 と書くと「品切れ」に読める。
@@ -72,6 +94,10 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [busyRewardId, setBusyRewardId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
+  const [failedRedemptions, setFailedRedemptions] = useState<FailedRedemption[]>([])
+  const [redemptionsVisible, setRedemptionsVisible] = useState(false)
+  const [retryingId, setRetryingId] = useState<string | null>(null)
+  const [retryError, setRetryError] = useState('')
 
   const load = useCallback(async () => {
     if (!accountId) {
@@ -97,6 +123,59 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
   }, [accountId])
 
   useEffect(() => { void load() }, [load])
+
+  /*
+   * 届かなかった交換の一覧。**使い道の一覧とは別に読む。**
+   * こちらが取れなくても使い道は出す。取れないときに「0件」と書くと、
+   * 届いていない交換が無いことになってしまうので、欄ごと出さない。
+   */
+  const loadFailedRedemptions = useCallback(async () => {
+    if (!accountId) {
+      setFailedRedemptions([])
+      setRedemptionsVisible(false)
+      return
+    }
+    try {
+      const response = await fetchApi<ApiResponse<RedemptionHistory>>(
+        `/api/mileage/redemptions?accountId=${encodeURIComponent(accountId)}`,
+      )
+      if (!response.success) throw new Error(response.error)
+      if (!Array.isArray(response.data?.items)) throw new Error('malformed')
+      setFailedRedemptions(
+        response.data.items.filter((item) => item.status === 'delivery_failed'),
+      )
+      setRedemptionsVisible(true)
+    } catch {
+      setFailedRedemptions([])
+      setRedemptionsVisible(false)
+    }
+  }, [accountId])
+
+  useEffect(() => { void loadFailedRedemptions() }, [loadFailedRedemptions])
+
+  /*
+   * 届かなかった交換のやり直し。**押した指が離れる前に止める。**
+   * `retryingId` を先に立ててボタンを無効化するので、同時クリック・再送は
+   * 1回にまとまる。口も失敗中だけ受け付け、同じ交換IDを続ける。
+   */
+  const retryRedemption = async (redemption: FailedRedemption) => {
+    if (!accountId || retryingId) return
+    setRetryingId(redemption.id)
+    setRetryError('')
+    try {
+      const response = await fetchApi<ApiResponse<unknown>>(
+        `/api/mileage/redemptions/${encodeURIComponent(redemption.id)}/retry-fulfillment`,
+        { method: 'POST', body: JSON.stringify({ accountId }) },
+      )
+      if (!response.success) throw new Error(response.error)
+      await loadFailedRedemptions()
+      await load()
+    } catch {
+      setRetryError('やり直せませんでした。時間をおいてもう一度お試しください。')
+    } finally {
+      setRetryingId(null)
+    }
+  }
 
   const changePublishedState = async (reward: MileageRewardSummary) => {
     if (!accountId || (reward.status !== 'published' && reward.status !== 'draft')) return
@@ -273,6 +352,57 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
         <p className="text-ink-faint mt-3 text-xs">
           使い道 {rewards.length}つをすべて表示
         </p>
+      )}
+
+      {/*
+        届かなかった交換。**マイルは減ったまま、特典だけ届いていないもの。**
+        やり直してもマイルはもう減らない（口が同じ交換IDを続ける）。
+        取れなかったときは欄ごと出さない。「0件」と書くと見落とす。
+      */}
+      {redemptionsVisible && failedRedemptions.length > 0 && (
+        <section aria-label="届かなかった交換" className="mt-6">
+          <h2 className="text-ink text-sm font-bold">届かなかった交換</h2>
+          <p className="text-ink-faint mt-1 text-xs leading-5">
+            マイルは減ったまま、特典だけ届いていない交換です。やり直してもマイルはもう減りません。
+          </p>
+          {retryError ? <div className="mt-3 rounded-control border border-danger/30 bg-danger-bg px-4 py-3 text-sm text-danger">{retryError}</div> : null}
+          <div className="mt-3">
+            <DataTable>
+              <thead>
+                <TableHeadRow>
+                  <Th>使い道</Th>
+                  <Th>届かなかった理由</Th>
+                  <Th align="right">試した回数</Th>
+                  <Th>最後の更新</Th>
+                  <Th align="right">操作</Th>
+                </TableHeadRow>
+              </thead>
+              <tbody className="divide-hairline divide-y">
+                {failedRedemptions.map((item) => (
+                  <Tr key={item.id}>
+                    <Td>
+                      <p className="text-ink font-semibold">{item.rewardName}</p>
+                    </Td>
+                    <Td>{item.failureMessage || item.failureCode || '理由を確認できませんでした'}</Td>
+                    <Td align="right" className="tabular-nums">{item.attemptCount.toLocaleString('ja-JP')}回</Td>
+                    <Td>{formatMileageDate(item.updatedAt)}</Td>
+                    <Td align="right">
+                      <Button
+                        disabled={retryingId !== null}
+                        onClick={() => void retryRedemption(item)}
+                      >
+                        {retryingId === item.id ? 'やり直しています' : 'もう一度届ける'}
+                      </Button>
+                    </Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </DataTable>
+            <p className="text-ink-faint mt-3 text-xs">
+              届かなかった交換 {failedRedemptions.length}つをすべて表示
+            </p>
+          </div>
+        </section>
       )}
     </div>
   )
