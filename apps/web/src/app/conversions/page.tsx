@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   api,
   type ConversionDefinitionList,
@@ -146,6 +146,20 @@ const SORT_OPTIONS: Array<{ value: PointSort; label: string }> = [
 
 const PAGE_SIZE = 6
 
+/**
+ * 画面の並びと言葉を、口の並びに写す(#513 M3)。
+ *
+ * 口の `sort` は `count_desc`・`value_desc`・`updated_desc`・`name_asc`
+ * の4つで、同値時は更新日・IDまで固定されている(共通一覧契約§3)。
+ * 画面の3つの並びはその先頭3つに対応する。`unused`(使われていない)は
+ * 口に無い絞りなので、完全に読み込んだあと画面で絞る。
+ */
+const SORT_TO_API: Record<PointSort, 'count_desc' | 'value_desc' | 'name_asc'> = {
+  'cv-desc': 'count_desc',
+  'value-desc': 'value_desc',
+  'name': 'name_asc',
+}
+
 function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [definitions, setDefinitions] = useState<ConversionDefinitionList | null>(null)
   const [summaryReport, setSummaryReport] = useState<ConversionDefinitionReport | null>(null)
@@ -157,6 +171,19 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [loadFailed, setLoadFailed] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
+  /**
+   * 読み込みの世代番号(#513 M6)。
+   *
+   * アカウントの高速切替や検索の連打で古い応答が残っていると、新しい
+   * 表示を上書きしてしまう。応答が返った時点で番号が変わっていたら捨てる。
+   */
+  const loadSeq = useRef(0)
+  /** 検索は1文字ごとに口を叩かず、少し待ってから読み直す。 */
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300)
+    return () => window.clearTimeout(timer)
+  }, [query])
   /*
    * **ブラウザの `confirm()` を使わない。**
    *
@@ -177,19 +204,51 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [stopping, setStopping] = useState(false)
   const [stopError, setStopError] = useState('')
 
+  /**
+   * 一覧は検索・並びを口へ渡し、続く頁をすべて読む(#513 M2・M3)。
+   *
+   * 以前は先頭100件だけ読んで画面内で探していたので、101件目以降が
+   * 「すべて N」と出ながら見えず、検索にも掛からなかった。口は
+   * `q`・`sort`・`cursor/nextCursor` を受け付けるので、条件に合うものを
+   * 残らず読む(`limit` は口の上限200)。状態の絞り(`active`・`stopped`・
+   * `unused`)は口に `unused` が無いため、完全な一覧のあと画面で絞る。
+   * そうしても件数は狂わない(1頁の切り取りを再加工しない)。
+   */
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current
     setLoading(true)
     setLoadFailed(false)
     setDefinitions(null)
     setSummaryReport(null)
     const range = definitionRange(30)
+    const listParams = {
+      ...range,
+      lineAccountId: accountId ?? undefined,
+      q: debouncedQuery || undefined,
+      sort: SORT_TO_API[sort],
+      limit: 200,
+    }
+    const fetchAllDefinitions = async (): Promise<ConversionDefinitionList | null> => {
+      const items: ConversionDefinitionList['items'] = []
+      let cursor: string | undefined
+      for (;;) {
+        const response = await api.conversions.definitions({ ...listParams, cursor })
+        if (!response.success || !Array.isArray(response.data.items)) return null
+        items.push(...response.data.items)
+        const next = response.data.pagination.nextCursor
+        if (!next) return { ...response.data, items }
+        cursor = next
+      }
+    }
     const [listResult, reportResult] = await Promise.allSettled([
-      api.conversions.definitions({ ...range, lineAccountId: accountId ?? undefined, limit: 100 }),
+      fetchAllDefinitions(),
       api.conversions.definitionReport({ ...range, lineAccountId: accountId ?? undefined }),
     ])
-    if (listResult.status === 'fulfilled' && listResult.value.success
-      && Array.isArray(listResult.value.data.items)) {
-      setDefinitions(listResult.value.data)
+    // 古い読み込みの応答は捨てる(#513 M6)。アカウント切替や検索連打で
+    // 先に叩いた方が後に返っても、新しい表示を上書きしない。
+    if (loadSeq.current !== seq) return
+    if (listResult.status === 'fulfilled' && listResult.value !== null) {
+      setDefinitions(listResult.value)
     } else {
       setLoadFailed(true)
     }
@@ -198,7 +257,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       setSummaryReport(reportResult.value.data)
     }
     setLoading(false)
-  }, [accountId])
+  }, [accountId, debouncedQuery, sort])
 
   useEffect(() => { void load() }, [load])
 
@@ -228,9 +287,19 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
     }
   }
 
+  /**
+   * 影響が読めていないまま確定を押しても、黙って終わらない(#513 M4)。
+   *
+   * 読み込み中は確定ボタンを `busy` で止め、読み込み失敗時は窓の中に
+   * 理由を出す。閉じて開き直すと `openStop` が影響を読み直す。
+   */
   const runStop = async () => {
     if (!stopTarget || stopping) return
-    if (!stopImpact) return
+    if (stopImpactLoading) return
+    if (!stopImpact) {
+      setStopError('利用先と停止の影響を読み込めませんでした。画面を閉じて、もう一度お試しください。')
+      return
+    }
     setStopping(true)
     setStopError('')
     try {
@@ -299,20 +368,18 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
     }
   }, [points, summaryReport])
 
+  /**
+   * 画面で絞るのは状態だけ(#513 M3)。探す言葉と並びは口が済ませているので、
+   * ここで探し直し・並べ直しはしない(口の `name_asc` はバイナリ順で、
+   * 画面の `localeCompare` と順がずれるため)。
+   */
   const shown = useMemo(() => {
-    const q = query.trim()
-    const searched = q ? points.filter((p) => p.name.includes(q)) : points
-    const matched = searched.filter((point) => {
+    return points.filter((point) => {
       if (status === 'all') return true
       if (status === 'unused') return point.usageCount === 0
       return point.status === status
     })
-    return matched.toSorted((left, right) => {
-      if (sort === 'name') return left.name.localeCompare(right.name, 'ja')
-      if (sort === 'value-desc') return right.metrics.netValue - left.metrics.netValue
-      return right.metrics.netCount - left.metrics.netCount
-    })
-  }, [points, query, sort, status])
+  }, [points, status])
 
   const pageCount = Math.max(1, Math.ceil(shown.length / PAGE_SIZE))
   const current = useMemo(
@@ -564,7 +631,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         confirmLabel={stopAction === 'replace'
           ? '差し替えて数えるのをやめる'
           : stopAction === 'delete' ? 'この成果地点を削除する' : '数えるのをやめる'}
-        busy={stopping}
+        busy={stopping || stopImpactLoading}
         error={stopError}
         onConfirm={() => void runStop()}
         onCancel={() => {
@@ -789,7 +856,7 @@ function ReportTab({ accountId }: { accountId: string | null }) {
           onChange={(value) => setPeriodDays(Number(value))}
         />
         <Button onClick={() => void exportCsv()} disabled={exporting}>
-          {exporting ? '書き出しています' : 'この画面をCSVで書き出す'}
+          {exporting ? '書き出しています' : '成果地点の一覧をCSVで書き出す'}
         </Button>
       </div>
       {exportError ? <p className="text-danger text-sm" role="alert">{exportError}</p> : null}
