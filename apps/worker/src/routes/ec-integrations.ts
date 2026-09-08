@@ -12,7 +12,74 @@ import type { Message } from '@line-crm/line-sdk';
 import { EC_EVENT_TYPES } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { fireEvent, logOutgoingMessage } from '../services/event-bus.js';
-import { buildEcV6Event } from '../services/ec-event-publish.js';
+import { buildEcV6Event, ecDispatchIdempotencyKey } from '../services/ec-event-publish.js';
+
+export type EcDispatchSubscriber = 'notification' | 'v6';
+
+async function getEcDispatchStatus(
+  db: D1Database, eventId: string, subscriber: EcDispatchSubscriber,
+): Promise<string | null> {
+  const row = await db.prepare(
+    `SELECT status FROM ec_v6_dispatches WHERE event_id = ? AND subscriber = ?`,
+  ).bind(eventId, subscriber).first<{ status: string }>();
+  return row?.status ?? null;
+}
+
+async function markEcDispatch(
+  db: D1Database,
+  input: {
+    eventId: string; subscriber: EcDispatchSubscriber; status: 'sent' | 'failed';
+    error?: string | null; idempotencyKey: string; now: string;
+  },
+): Promise<void> {
+  await db.prepare(
+    `INSERT INTO ec_v6_dispatches
+       (event_id, subscriber, status, attempt_count, last_error, idempotency_key, updated_at)
+     VALUES (?, ?, ?, 1, ?, ?, ?)
+     ON CONFLICT(event_id, subscriber) DO UPDATE SET
+       status = excluded.status,
+       attempt_count = ec_v6_dispatches.attempt_count + 1,
+       last_error = excluded.last_error,
+       idempotency_key = excluded.idempotency_key,
+       updated_at = excluded.updated_at`,
+  ).bind(
+    input.eventId, input.subscriber, input.status,
+    input.error ?? null, input.idempotencyKey, input.now,
+  ).run();
+}
+
+/**
+ * V6へ1回分の連携を行い、購読台帳へ結果を残す。V6側の失敗は台帳へ
+ * `failed` として残してから投げ直す(呼び出し側は再試行へ回す)。
+ * 送信済みの記録自体に失敗したときは黙殺せず、そのまま投げる。
+ */
+async function fireEcV6Event(
+  db: D1Database,
+  input: {
+    eventId: string; lineAccountId: string; externalEventId: string;
+    event: EcEvent; friendId: string; accessToken: string; now: string;
+  },
+): Promise<void> {
+  const idempotencyKey = ecDispatchIdempotencyKey(input.lineAccountId, input.externalEventId, 'v6');
+  const v6Event = buildEcV6Event(input.event, input.friendId);
+  try {
+    await fireEvent(db, v6Event.eventType, v6Event.payload, input.accessToken, input.lineAccountId);
+  } catch (error) {
+    try {
+      await markEcDispatch(db, {
+        eventId: input.eventId, subscriber: 'v6', status: 'failed',
+        error: error instanceof Error ? error.message.slice(0, 500) : 'Unknown error',
+        idempotencyKey, now: input.now,
+      });
+    } catch (markError) {
+      console.error(`[ec-event] v6 dispatch ledger failed event=${input.externalEventId}`, markError);
+    }
+    throw error;
+  }
+  await markEcDispatch(db, {
+    eventId: input.eventId, subscriber: 'v6', status: 'sent', idempotencyKey, now: input.now,
+  });
+}
 import { enqueuePostShippingFollowUps } from '../services/nen-engagement.js';
 import { ecFlexMessage } from '../services/ec-notification-message.js';
 import { syncNenEcTags, syncNenPetTags } from '../services/nen-tag-sync.js';
@@ -439,8 +506,10 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       await c.env.DB.prepare(
         `UPDATE ec_events SET friend_id = ?, status = 'processed', processed_at = ?, updated_at = ? WHERE id = ?`,
       ).bind(friend.id, now, now, row.id).run();
-      const profileV6Event = buildEcV6Event(event, friend.id);
-      await fireEvent(c.env.DB, profileV6Event.eventType, profileV6Event.payload, accessToken, account.id);
+      await fireEcV6Event(c.env.DB, {
+        eventId: row.id, lineAccountId, externalEventId: event.event_id,
+        event, friendId: friend.id, accessToken, now,
+      });
       await setEcActionExecutionStatus(c.env.DB, {
         eventId: row.id, lineAccountId, status: 'succeeded', now,
       });
@@ -476,8 +545,10 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       await c.env.DB.prepare(
         `UPDATE ec_events SET friend_id = ?, status = 'skipped', error_message = 'notification_disabled', processed_at = ?, updated_at = ? WHERE id = ?`,
       ).bind(friend.id, now, now, row.id).run();
-      const skippedV6Event = buildEcV6Event(event, friend.id);
-      await fireEvent(c.env.DB, skippedV6Event.eventType, skippedV6Event.payload, accessToken, account.id);
+      await fireEcV6Event(c.env.DB, {
+        eventId: row.id, lineAccountId, externalEventId: event.event_id,
+        event, friendId: friend.id, accessToken, now,
+      });
       await setEcActionExecutionStatus(c.env.DB, {
         eventId: row.id, lineAccountId, status: 'skipped',
         errorCode: 'notification_disabled', errorMessageSafe: 'この通知は設定で停止されています', now,
@@ -493,23 +564,34 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       buttonUrl: setting?.button_url,
       imageUrl: setting?.image_url,
     });
+    // 通知は購読先別の台帳で管理する。V6連携の失敗で再試行になっても、
+    // 送信済みの通知を二重送信しない。
     const lineClient = new LineClient(accessToken);
-    await lineClient.pushMessage(event.line_user_id, [message]);
-    await logOutgoingMessage(c.env.DB, {
-      friendId: friend.id,
-      messageType: message.type,
-      content: message.type === 'text' ? message.text : JSON.stringify(message),
-      deliveryType: 'push',
-      source: 'ec_transactional',
-      lineAccountId: account.id,
-    });
+    if (await getEcDispatchStatus(c.env.DB, row.id, 'notification') !== 'sent') {
+      await lineClient.pushMessage(event.line_user_id, [message]);
+      await markEcDispatch(c.env.DB, {
+        eventId: row.id, subscriber: 'notification', status: 'sent',
+        idempotencyKey: ecDispatchIdempotencyKey(lineAccountId, event.event_id, 'notification'),
+        now,
+      });
+      await logOutgoingMessage(c.env.DB, {
+        friendId: friend.id,
+        messageType: message.type,
+        content: message.type === 'text' ? message.text : JSON.stringify(message),
+        deliveryType: 'push',
+        source: 'ec_transactional',
+        lineAccountId: account.id,
+      });
+    }
 
     await c.env.DB.prepare(
       `UPDATE ec_events SET friend_id = ?, status = 'processed', processed_at = ?, updated_at = ? WHERE id = ?`,
     ).bind(friend.id, now, now, row.id).run();
 
-    const v6Event = buildEcV6Event(event, friend.id);
-    await fireEvent(c.env.DB, v6Event.eventType, v6Event.payload, accessToken, account.id);
+    await fireEcV6Event(c.env.DB, {
+      eventId: row.id, lineAccountId, externalEventId: event.event_id,
+      event, friendId: friend.id, accessToken, now,
+    });
 
     await setEcActionExecutionStatus(c.env.DB, {
       eventId: row.id, lineAccountId, status: 'succeeded', now,

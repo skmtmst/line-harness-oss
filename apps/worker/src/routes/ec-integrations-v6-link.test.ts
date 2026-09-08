@@ -41,8 +41,11 @@ const { ecIntegrations } = await import('./ec-integrations.js');
 
 type EcRow = { id: string; status: string };
 
+type DispatchRow = { status: string; attempt_count: number; last_error: string | null; idempotency_key: string };
+
 function harness(opts: { notificationEnabled?: boolean } = {}) {
   const events = new Map<string, EcRow>();
+  const dispatches = new Map<string, DispatchRow>();
   const app = new Hono<any>();
   app.route('/', ecIntegrations);
   const db = {
@@ -51,6 +54,20 @@ function harness(opts: { notificationEnabled?: boolean } = {}) {
       const statement = {
         bind(...bindings: unknown[]) { entry.bindings = bindings; return statement; },
         async run() {
+          if (query.includes('INSERT INTO ec_v6_dispatches')) {
+            const [eventId, subscriber, status, lastError, idempotencyKey] = entry.bindings as [
+              string, string, string, string | null, string,
+            ];
+            const key = `${eventId}:${subscriber}`;
+            const prev = dispatches.get(key);
+            dispatches.set(key, {
+              status,
+              attempt_count: (prev?.attempt_count ?? 0) + 1,
+              last_error: status === 'failed' ? lastError : null,
+              idempotency_key: idempotencyKey,
+            });
+            return { success: true, meta: { changes: 1 } };
+          }
           if (query.includes('INSERT OR IGNORE INTO ec_events')) {
             const [id, source, externalEventId] = entry.bindings as string[];
             const key = `${source}:${externalEventId}`;
@@ -84,6 +101,10 @@ function harness(opts: { notificationEnabled?: boolean } = {}) {
           return { success: true, meta: { changes: 1 } };
         },
         async first() {
+          if (query.includes('FROM ec_v6_dispatches WHERE event_id = ?')) {
+            const [eventId, subscriber] = entry.bindings as string[];
+            return dispatches.get(`${eventId}:${subscriber}`) ?? null;
+          }
           if (query.includes('FROM ec_events WHERE source = ?')) {
             const [source, externalEventId] = entry.bindings as string[];
             return events.get(`${source}:${externalEventId}`) ?? null;
@@ -104,7 +125,7 @@ function harness(opts: { notificationEnabled?: boolean } = {}) {
       return statement;
     },
   } as unknown as D1Database;
-  return { app, db, events };
+  return { app, db, events, dispatches };
 }
 
 async function signature(secret: string, timestamp: string, accountId: string, body: string) {
@@ -219,6 +240,44 @@ describe('EC receipt links one normalized event to V6', () => {
     expect(mocks.fireEvent).toHaveBeenCalledWith(
       db, 'ec.order.confirmed', expect.objectContaining({ sourceEventId: 'event-12345678' }), 'account-token', 'account-a',
     );
+  });
+
+  it('records notification and V6 rows with stable keys', async () => {
+    const { app, db, dispatches, events } = harness();
+    const response = await signedRequest(app, db, baseEvent);
+    expect(response.status).toBe(200);
+    const rowId = events.get('eccube:account-a:event-12345678')?.id;
+    expect(rowId).toBeTruthy();
+    expect(dispatches.get(`${rowId}:notification`)).toMatchObject({
+      status: 'sent',
+      attempt_count: 1,
+      idempotency_key: 'eccube:account-a:event-12345678:notification',
+    });
+    expect(dispatches.get(`${rowId}:v6`)).toMatchObject({
+      status: 'sent',
+      attempt_count: 1,
+      idempotency_key: 'eccube:account-a:event-12345678:v6',
+    });
+  });
+
+  it('does not resend LINE when only V6 failed before the retry', async () => {
+    const { app, db, dispatches, events } = harness();
+    mocks.fireEvent.mockRejectedValueOnce(new Error('V6 store is busy'));
+    const failed = await signedRequest(app, db, baseEvent);
+    expect(failed.status).toBe(503);
+    expect(mocks.pushMessage).toHaveBeenCalledTimes(1);
+    const rowId = events.get('eccube:account-a:event-12345678')?.id;
+    expect(dispatches.get(`${rowId}:notification`)).toMatchObject({ status: 'sent' });
+    expect(dispatches.get(`${rowId}:v6`)).toMatchObject({
+      status: 'failed', attempt_count: 1, last_error: 'V6 store is busy',
+    });
+
+    const retried = await signedRequest(app, db, baseEvent);
+    expect(retried.status).toBe(200);
+    expect(mocks.pushMessage).toHaveBeenCalledTimes(1);
+    expect(mocks.fireEvent).toHaveBeenCalledTimes(2);
+    expect(dispatches.get(`${rowId}:notification`)).toMatchObject({ status: 'sent', attempt_count: 1 });
+    expect(dispatches.get(`${rowId}:v6`)).toMatchObject({ status: 'sent', attempt_count: 2 });
   });
 
   it('publishes a profile update to V6 with the source identity', async () => {
