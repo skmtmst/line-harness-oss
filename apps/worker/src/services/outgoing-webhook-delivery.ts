@@ -65,7 +65,9 @@ export type WebhookBlockReason =
   | 'non_https'
   | 'credentials_in_url'
   | 'blocked_host'
-  | 'blocked_ip';
+  | 'blocked_ip'
+  | 'dns_unresolved'
+  | 'unsafe_redirect';
 
 function parseIpv4Parts(host: string): number[] | null {
   // 10進のほか、0始まりの8進・0x始まりの16進の書き方もIPとして読む。
@@ -123,28 +125,56 @@ function isBlockedIpv4Bytes(b: number[]): boolean {
   return false;
 }
 
+function expandIpv6(host: string): number[] | null {
+  // 8群の数値列へ展開する。書式が崩れていたら null(送らない側に倒す)。
+  const halves = host.split('::');
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(':') : [];
+  const tail = halves.length === 2 ? (halves[1] ? halves[1].split(':') : []) : [];
+  const parts = [...head, ...tail];
+  if (parts.some((g) => !/^[0-9a-f]{1,4}$/.test(g))) return null;
+  const nums = parts.map((g) => parseInt(g, 16));
+  if (halves.length === 1) return nums.length === 8 ? nums : null;
+  if (nums.length > 7) return null;
+  return [...nums.slice(0, head.length), ...new Array(8 - nums.length).fill(0), ...nums.slice(head.length)];
+}
+
+function isBlockedIpv6Groups(g: number[]): boolean {
+  const [g0, g1, g2, g3, g4, g5, g6, g7] = g;
+  if (g.every((n) => n === 0)) return true;
+  if (g.slice(0, 7).every((n) => n === 0) && g7 === 1) return true;
+  // link-local fe80::/10。fe80〜febf の全範囲を止める。
+  if ((g0 & 0xffc0) === 0xfe80) return true;
+  if ((g0 & 0xffc0) === 0xfec0) return true;
+  if ((g0 & 0xfe00) === 0xfc00) return true;
+  if ((g0 & 0xff00) === 0xff00) return true;
+  if (g0 === 0x2001 && g1 === 0x0db8) return true;
+  if (g0 === 0x0064 && g1 === 0xff9b && g2 === 0 && g3 === 0 && g4 === 0 && g5 === 0) return true;
+  const v4bytes = (hi: number, lo: number) => [(hi >> 8) & 255, hi & 255, (lo >> 8) & 255, lo & 255];
+  // ::ffff:0:0/96 の IPv4 射影は中の IPv4 で判断する。
+  if (g0 === 0 && g1 === 0 && g2 === 0 && g3 === 0 && g4 === 0 && g5 === 0xffff) {
+    return isBlockedIpv4Bytes(v4bytes(g6, g7));
+  }
+  // 6to4 (2002::/16) は中に IPv4 を埋め込むので同じく判断する。
+  if (g0 === 0x2002) return isBlockedIpv4Bytes(v4bytes(g1, g2));
+  // Teredo (2001::/32) は判別が複雑なため送らない。ISATAP は中の IPv4 で判断する。
+  if (g0 === 0x2001 && g1 === 0x0000) return true;
+  if (g4 === 0 && g5 === 0x5efe) return isBlockedIpv4Bytes(v4bytes(g6, g7));
+  return false;
+}
+
 function isBlockedIpv6Literal(host: string): boolean {
   const h = host.toLowerCase();
-  if (h === '::1' || h === '::') return true;
-  if (h.startsWith('fe80:') || h.startsWith('fec0:')) return true;
-  if (h.startsWith('fc') || h.startsWith('fd')) return true;
-  if (h.startsWith('ff')) return true;
-  if (h.startsWith('64:ff9b:')) return true;
-  if (h === '2001:db8::' || h.startsWith('2001:db8:')) return true;
-  // ::ffff:127.0.0.1 のような IPv4 射影は中の IPv4 で判断する。
-  if (h.startsWith('::ffff:')) {
-    const tail = h.slice('::ffff:'.length);
-    if (tail.includes('.')) {
-      const bytes = ipv4ToBytes(parseIpv4Parts(tail) ?? []);
-      if (!bytes) return true;
-      return isBlockedIpv4Bytes(bytes);
-    }
-    const groups = tail.split(':').filter((g) => g.length > 0);
-    if (groups.length !== 2 || groups.some((g) => !/^[0-9a-f]{1,4}$/.test(g))) return true;
-    const v = (parseInt(groups[0], 16) << 16) | parseInt(groups[1], 16);
-    return isBlockedIpv4Bytes([(v >>> 24) & 255, (v >>> 16) & 255, (v >>> 8) & 255, v & 255]);
+  if (h.includes('.')) {
+    // ::ffff:127.0.0.1 形式だけ受け付け、中のIPv4で判断する。
+    if (!h.startsWith('::ffff:')) return true;
+    const bytes = ipv4ToBytes(parseIpv4Parts(h.slice('::ffff:'.length)) ?? []);
+    if (!bytes) return true;
+    return isBlockedIpv4Bytes(bytes);
   }
-  return false;
+  const groups = expandIpv6(h);
+  if (!groups) return true;
+  return isBlockedIpv6Groups(groups);
 }
 
 function normalizeHostname(value: string): string | null {
@@ -227,6 +257,7 @@ async function dohQuery(host: string, type: 'A' | 'AAAA', fetchImpl: typeof fetc
 }
 
 async function defaultLookupHost(host: string, fetchImpl: typeof fetch): Promise<string[]> {
+  // 例外時は空を返し、呼び出し側で fail-closed(送らない) にする。
   try {
     const [a, aaaa] = await Promise.all([
       dohQuery(host, 'A', fetchImpl),
@@ -234,8 +265,6 @@ async function defaultLookupHost(host: string, fetchImpl: typeof fetch): Promise
     ]);
     return [...a, ...aaaa];
   } catch {
-    // 名前を引けないときは文字面の検査だけにする。送ってみて繋がらなければ
-    // 接続失敗として台帳に残る。
     return [];
   }
 }
@@ -250,6 +279,10 @@ export type WebhookSafetyVerdict = { ok: true } | { ok: false; reason: WebhookBl
 /**
  * 送信直前の再検査。文字面の検査に加え、名前はその場で引き直して
  * 1件でも内部・private 側のIPが混ざっていたら止める。
+ *
+ * 名前が引けない・空のときは送らない(fail-closed)。
+ * 検査したIPへ接続を固定する手段が実行環境にないため、引き直しは
+ * 送る直前・送り直し・転送の各段で毎回行い、結果を使い回さない。
  */
 export async function checkWebhookUrlSafety(
   value: string,
@@ -265,8 +298,9 @@ export async function checkWebhookUrlSafety(
   try {
     addresses = await lookup(host);
   } catch {
-    return { ok: true };
+    return { ok: false, reason: 'dns_unresolved' };
   }
+  if (addresses.length === 0) return { ok: false, reason: 'dns_unresolved' };
   for (const address of addresses) {
     const reason = ipAddressBlockReason(address);
     if (reason) return { ok: false, reason };
@@ -284,9 +318,45 @@ export type SafePostOutcome = { response: Response } | { blocked: WebhookBlockRe
 
 const REDIRECT_STATUS = new Set([301, 302, 303, 307, 308]);
 
+function sameWebhookOrigin(a: string, b: string): boolean {
+  try {
+    const x = new URL(a);
+    const y = new URL(b);
+    const port = (u: URL) => u.port || (u.protocol === 'https:' ? '443' : u.protocol === 'http:' ? '80' : '');
+    return (
+      x.protocol === y.protocol
+      && x.hostname.toLowerCase() === y.hostname.toLowerCase()
+      && port(x) === port(y)
+    );
+  } catch {
+    return false;
+  }
+}
+
+// 別の送り先へ持ち越さない頭。署名・冪等・本文に関するものだけ落とす。
+const CROSS_ORIGIN_DROPPED_HEADERS = new Set([
+  'content-type',
+  'content-length',
+  'x-webhook-signature',
+  'x-webhook-delivery-id',
+  'idempotency-key',
+  'authorization',
+  'cookie',
+]);
+
+function stripCrossOriginHeaders(headers: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [name, value] of Object.entries(headers)) {
+    if (!CROSS_ORIGIN_DROPPED_HEADERS.has(name.toLowerCase())) out[name] = value;
+  }
+  return out;
+}
+
 /**
  * 転送を1段ずつ手で辿りながら送る。転送先も送る前に再検査する。
  * 転送の段数が上限を超えたら最後の応答をそのまま返す(3xxは失敗扱い)。
+ * 別の origin への転送では署名・冪等・本文の頭を持ち越さない。
+ * 本文を保ったまま別 origin へ転送する応答(307/308)は送らずに止める。
  */
 export async function postWebhookSafely(
   url: string,
@@ -297,6 +367,7 @@ export async function postWebhookSafely(
   const maxRedirects = opts.maxRedirects ?? 5;
   let current = url;
   let method = 'POST';
+  let headers = { ...init.headers };
   let body: string | undefined = init.body;
   let hop = 0;
   for (;;) {
@@ -307,7 +378,7 @@ export async function postWebhookSafely(
     if (!safety.ok) return { blocked: safety.reason };
     const response = await fetchImpl(current, {
       method,
-      headers: init.headers,
+      headers,
       body,
       redirect: 'manual',
       signal: init.signal,
@@ -315,11 +386,18 @@ export async function postWebhookSafely(
     if (!REDIRECT_STATUS.has(response.status) || hop >= maxRedirects) return { response };
     const location = response.headers?.get?.('location');
     if (!location) return { response };
+    let next: string;
     try {
-      current = new URL(location, current).toString();
+      next = new URL(location, current).toString();
     } catch {
       return { response };
     }
+    if (!sameWebhookOrigin(current, next)) {
+      // 本文付きのまま別 origin へは送らない(再署名の材料がここに無いため)。
+      if (response.status === 307 || response.status === 308) return { blocked: 'unsafe_redirect' };
+      headers = stripCrossOriginHeaders(headers);
+    }
+    current = next;
     if (response.status === 303 || ((response.status === 301 || response.status === 302) && method === 'POST')) {
       method = 'GET';
       body = undefined;

@@ -191,6 +191,25 @@ describe('送り先の文字面の検査', () => {
     expect(isSafeWebhookUrl('https://2130706433/hook')).toBe(false);
     expect(isSafeWebhookUrl('https://0x7f000001/hook')).toBe(false);
   });
+
+  it('IPv6 link-localはfe80〜febfの全範囲を止める', () => {
+    for (const url of [
+      'https://[fe80::1]/hook',
+      'https://[fe90::1]/hook',
+      'https://[fea0::1]/hook',
+      'https://[febf:ffff::1]/hook',
+      'https://[0:0:0:0:0:0:0:1]/hook',
+      'https://[0:0:0:0:0:0:0:0]/hook',
+      'https://[2002:0a00:0001::1]/hook',
+    ]) {
+      expect(isSafeWebhookUrl(url)).toBe(false);
+    }
+  });
+
+  it('公開IPv6は通す', () => {
+    expect(isSafeWebhookUrl('https://[2606:4700:4700::1111]/hook')).toBe(true);
+    expect(isSafeWebhookUrl('https://[::ffff:93.184.216.34]/hook')).toBe(true);
+  });
 });
 
 describe('送信直前の再検査', () => {
@@ -287,6 +306,88 @@ describe('送信直前の再検査', () => {
     expect(res).toMatchObject({ ok: false, blocked: true, attempts: 2 });
     expect(lookup).toHaveBeenCalledTimes(2);
     expect(count()).toBe(1);
+  });
+
+  it('名前が引けない・空のときは送らない(fail-closed)', async () => {
+    const throwing = stubFetch([200]);
+    const failed = await deliverWebhook(WEBHOOK, '{}', {
+      sleep: noSleep,
+      lookupHost: async () => { throw new Error('dns down'); },
+    });
+    expect(failed).toMatchObject({ ok: false, lastStatus: null, blocked: true, blockReason: 'dns_unresolved' });
+    expect(throwing()).toBe(0);
+
+    const empty = stubFetch([200]);
+    const noAnswer = await deliverWebhook(WEBHOOK, '{}', {
+      sleep: noSleep,
+      lookupHost: async () => [],
+    });
+    expect(noAnswer).toMatchObject({ ok: false, blocked: true, blockReason: 'dns_unresolved' });
+    expect(empty()).toBe(0);
+  });
+
+  it('別originへの転送では署名・冪等・本文の頭を持ち越さない', async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: unknown, init?: RequestInit) => {
+        calls.push({ url: String(input), init: init ?? {} });
+        if (String(input) === 'https://example.com/hook') {
+          return new Response('', { status: 302, headers: { location: 'https://other.example/next' } });
+        }
+        return new Response('', { status: 200 });
+      }),
+    );
+    const res = await deliverWebhook(
+      { ...WEBHOOK, secret: 'a'.repeat(32) },
+      '{"a":1}',
+      { sleep: noSleep, idempotencyKey: 'delivery-9', lookupHost: publicOnlyLookup },
+    );
+    expect(res).toMatchObject({ ok: true, lastStatus: 200 });
+    expect(calls.map((c) => c.url)).toEqual(['https://example.com/hook', 'https://other.example/next']);
+    const first = calls[0].init.headers as Record<string, string>;
+    const second = calls[1].init.headers as Record<string, string>;
+    expect(first['X-Webhook-Signature']).toMatch(/^[0-9a-f]{64}$/);
+    expect(second['X-Webhook-Signature']).toBeUndefined();
+    expect(second['X-Webhook-Delivery-Id']).toBeUndefined();
+    expect(second['Content-Type']).toBeUndefined();
+  });
+
+  it('本文付きのまま別originへ転送する応答は止める', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: unknown) => {
+        if (String(input) === 'https://example.com/hook') {
+          return new Response('', { status: 307, headers: { location: 'https://other.example/next' } });
+        }
+        throw new Error(`送ってはいけない先: ${String(input)}`);
+      }),
+    );
+    const res = await deliverWebhook(WEBHOOK, '{}', { sleep: noSleep, lookupHost: publicOnlyLookup });
+    expect(res).toMatchObject({ ok: false, blocked: true, blockReason: 'unsafe_redirect' });
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it('同じoriginの307転送は署名を保って辿る', async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: unknown, init?: RequestInit) => {
+        calls.push({ url: String(input), init: init ?? {} });
+        if (String(input) === 'https://example.com/hook') {
+          return new Response('', { status: 307, headers: { location: '/next2' } });
+        }
+        return new Response('', { status: 200 });
+      }),
+    );
+    const res = await deliverWebhook(
+      { ...WEBHOOK, secret: 'a'.repeat(32) },
+      '{"a":1}',
+      { sleep: noSleep, lookupHost: publicOnlyLookup },
+    );
+    expect(res).toMatchObject({ ok: true, lastStatus: 200 });
+    const second = calls[1].init.headers as Record<string, string>;
+    expect(second['X-Webhook-Signature']).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it('既定の名前引き(DoH)でも内部IPを止める', async () => {
