@@ -27,6 +27,7 @@ import {
   type FormSection,
   type FormTheme,
 } from '@line-crm/shared'
+import { normalizeSectionName } from '@/components/forms/section-name'
 import { api, fetchApi } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { Field, inputClass } from '@/components/shared/form-controls'
@@ -342,11 +343,14 @@ function FormEditInner() {
 
   const renameSection = (index: number) => {
     const current = layout.sections[index]
+    if (!current) return
     const next = window.prompt('ページの名前', current.name)
-    if (next === null) return
+    // 空のページ名は作らせない。取り消し・空白だけも元のままにする。
+    const name = normalizeSectionName(next)
+    if (name === null) return
     setLayout((prev) => ({
       ...prev,
-      sections: prev.sections.map((s, i) => (i === index ? { ...s, name: next } : s)),
+      sections: prev.sections.map((s, i) => (i === index ? { ...s, name } : s)),
     }))
   }
 

@@ -104,7 +104,9 @@ export function CanvasEditor({
   const [limitNotice, setLimitNotice] = useState('')
 
   function toImageCoord(clientX: number, clientY: number) {
-    const rect = canvasRef.current!.getBoundingClientRect()
+    // 描画前は ref がまだ無い。非null断言の代わりに原点へ倒す。
+    const rect = canvasRef.current?.getBoundingClientRect()
+    if (!rect) return { x: 0, y: 0 }
     return {
       x: Math.round((clientX - rect.left) / scale),
       y: Math.round((clientY - rect.top) / scale),
@@ -254,7 +256,7 @@ export function CanvasEditor({
   useEffect(() => {
     if (!selectedAreaId || preview) return
     function onKey(e: KeyboardEvent) {
-      const target = e.target as HTMLElement | null
+      const target = e.target instanceof HTMLElement ? e.target : null
       const tag = target?.tagName
       // INPUT/TEXTAREA/SELECT に focus がある間は area 操作を無効化
       // (右パネルの action-type / target-page select で矢印キーが奪われる事故防止)

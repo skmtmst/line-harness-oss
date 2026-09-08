@@ -24,6 +24,23 @@ function displayText(value: string): string {
     .replace(/\{\{var\.[^}]+\}\}/g, '共通情報')
 }
 
+/*
+ * 口から来た質問が編集器の形かを確かめる（#497 軽7）。
+ * `as` で通すと、項目が増えたときのずれに気づけない。
+ * 形が違うものは読み込まず、読込エラーにする。
+ */
+function isEditableQuestion(value: unknown): value is ScenarioQuestion {
+  if (!value || typeof value !== 'object') return false
+  const question = value as Record<string, unknown>
+  if (typeof question.text !== 'string') return false
+  if (question.tapMode !== 'single' && question.tapMode !== 'multiple') return false
+  if (!Array.isArray(question.choices)) return false
+  return question.choices.every((choice) =>
+    !!choice
+    && typeof choice === 'object'
+    && typeof (choice as Record<string, unknown>).label === 'string')
+}
+
 function questionSummary(question: ScenarioQuestion): string[] {
   const tags = question.choices.reduce((count, choice) => count + (choice.addTagIds?.length ?? 0), 0)
   const fields = question.choices.filter((choice) => choice.field?.fieldId).length
@@ -82,7 +99,11 @@ function QuestionTemplatePageInner() {
         setName(template.data.name)
         setCategory(template.data.category || '未分類')
         setFolderId(template.data.folderId ?? null)
-        setQuestion(template.data.question as ScenarioQuestion)
+        if (!isEditableQuestion(template.data.question)) {
+          setError('質問テンプレートを読み込めませんでした。')
+          return
+        }
+        setQuestion(template.data.question)
         setUsageCount(Object.values(template.data.usedBy).reduce((total, items) => total + items.length, 0))
       })
       .catch(() => {

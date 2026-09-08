@@ -5,8 +5,10 @@ import Link from 'next/link'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import SummaryCard from '@/components/shared/summary-card'
+import { Tabs } from '@/components/shared/tabs'
 import { ActionCell, DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 import { ApiError, api, type EcSubscription, type EcSubscriptionList } from '@/lib/api'
+import { formatEcShortDate as shortDate } from './ec-datetime'
 import styles from './ec-commerce-v6.module.css'
 
 const FILTERS = [
@@ -23,13 +25,6 @@ const STATUS_TONE: Record<EcSubscription['status'], string> = {
   paused: styles.statusMuted,
   at_risk: styles.statusWarn,
   cancelled: styles.statusMuted,
-}
-
-function shortDate(value: string | null) {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.valueOf())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric' }).format(date)
 }
 
 export default function SubscriptionsPanel({ accountId }: { accountId: string | null }) {
@@ -91,13 +86,12 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
       {(summary?.monthlyStats ?? []).length > 0 ? <div className="my-4 rounded-card border border-hairline bg-canvas p-4"><p className="text-sm font-semibold text-ink">月別の定期便</p><div className="mt-3 grid gap-2 sm:grid-cols-3">{summary?.monthlyStats.slice(-6).map((item) => <div key={item.month} className="rounded-control bg-canvas-sunken px-3 py-2"><p className="text-xs text-ink-faint">{item.month}</p><p className="mt-1 text-sm font-semibold text-ink">{item.count.toLocaleString('ja-JP')}件</p><p className="text-xs text-ink-secondary">¥{item.amount.toLocaleString('ja-JP')}</p></div>)}</div></div> : null}
       <div className={styles.toolbar}>
         <input className={styles.search} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="お客様の名前・注文番号で検索" aria-label="定期便を検索" />
-        <div className={styles.filters}>
-          {FILTERS.map((item) => (
-            <button key={item.key} type="button" className={`${styles.filter} ${filter === item.key ? styles.filterCurrent : ''}`} onClick={() => setFilter(item.key)}>
-              {item.label} {item.key === 'all' ? summary?.total : item.key === 'at_risk' ? summary?.atRisk : summary?.[item.key]}
-            </button>
-          ))}
-        </div>
+        <Tabs items={FILTERS.map((item) => ({
+          label: item.label,
+          count: item.key === 'all' ? summary?.total : item.key === 'at_risk' ? summary?.atRisk : summary?.[item.key],
+          current: filter === item.key,
+          onClick: () => setFilter(item.key),
+        }))} />
       </div>
       {shown.length === 0 ? <ListState kind="empty" title="条件に合う定期便はありません" description="検索する言葉か表示条件を変えてください。" /> : (
         <DataTable>

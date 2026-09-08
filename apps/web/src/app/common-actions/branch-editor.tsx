@@ -1,13 +1,13 @@
 'use client'
 
 import type { CommonActionResources, CommonActionStep } from '@/lib/api'
-import { newCommonActionStep } from '@/components/automations/common-action-editor'
+import { newCommonActionStep, newStepId } from '@/components/automations/common-action-editor'
 import Button from '@/components/shared/button'
 import SelectField from '@/components/shared/select-field'
 
 export function newBranchStep(): CommonActionStep {
   return {
-    id: crypto.randomUUID(),
+    id: newStepId(),
     type: 'branch',
     params: {
       condition: { operator: 'AND', rules: [{ type: 'tag_exists', value: '' }] },

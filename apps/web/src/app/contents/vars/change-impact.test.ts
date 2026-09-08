@@ -18,6 +18,7 @@ import {
   impactStateFromError,
   impactStateText,
   saveErrorText,
+  scheduleErrorText,
 } from './change-impact'
 
 const EDIT = readFileSync(new URL('./edit/page.tsx', import.meta.url), 'utf8')
@@ -190,6 +191,23 @@ describe('共通情報編集（uNBlA）の画面', () => {
     expect(SAVE_FN).not.toContain("setError('保存に失敗しました')")
   })
 
+  it('予約の catch は生文言を出さず、予約用の変換を通す（#578 L7）', () => {
+    expect(EDIT).toContain('setError(scheduleErrorText(e))')
+    expect(EDIT).not.toContain("e.message : '予約に失敗しました'")
+  })
+
+  it('入力を変えたら古い「保存しました。」を消す（#578 L9）', () => {
+    expect(EDIT).toContain('{saved &&')
+    expect(EDIT).toContain('setSaved(false); setName')
+    expect(EDIT).toContain('setSaved(false); setValue')
+  })
+
+  it('一覧の読み込み失敗は権限なしと通信障害で分ける（#578 L8）', () => {
+    const LIST = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+    expect(LIST).toContain('見る権限がありません')
+    expect(LIST).toContain('接続を確かめて')
+  })
+
   it('影響確認の節を必ず出す。読めないときも節ごと消さない', () => {
     expect(IMPACT_SECTION).toContain('影響確認')
     expect(IMPACT_SECTION).toContain(': NOT_AVAILABLE')
@@ -213,6 +231,12 @@ describe('共通情報編集（uNBlA）の画面', () => {
     expect(IMPACT_REVIEW).toContain('characterCountText(item)')
   })
 
+  it('状態の語彙は口とそろえる。「公開中」は出さない（#578 L12）', () => {
+    expect(IMPACT_REVIEW).not.toContain('公開中')
+    expect(IMPACT_REVIEW).toContain('配信予約中')
+    expect(EDIT).toContain('配信予約中・配信中の設定にも反映されます')
+  })
+
   it('読み込めなかったときだけ再読み込みを出す', () => {
     expect(IMPACT_SECTION).toContain("impactState === 'error'")
     expect(IMPACT_SECTION).toContain('{STATE_TEXT.retry}')
@@ -228,7 +252,7 @@ describe('変更前確認（#773 の口）', () => {
     kind: 'template' as const,
     kindLabel: 'テンプレート',
     name: '来店お礼',
-    status: '公開中',
+    status: '配信中',
     href: '/templates/1',
     blocksDeletion: true,
     currentPreview: 'ありがとうございます',
@@ -290,7 +314,28 @@ describe('変更前確認（#773 の口）', () => {
     expect(isChangeItem(item())).toBe(true)
     expect(isChangeItem({
       kind: 'template', kindLabel: 'テンプレート', name: '来店お礼',
-      status: '公開中', href: '/templates/1', blocksDeletion: true, currentPreview: 'a',
+      status: '配信中', href: '/templates/1', blocksDeletion: true, currentPreview: 'a',
     })).toBe(false)
+  })
+})
+
+describe('予約の登録失敗（#578 L7）', () => {
+  it('400の日本語はそのまま返す', () => {
+    expect(scheduleErrorText(new ApiError(400, '過去の日時は指定できません')))
+      .toBe('過去の日時は指定できません')
+  })
+
+  it('500の生文言は出さず予約用の定型文にする', () => {
+    const text = scheduleErrorText(new ApiError(500, 'Internal server error'))
+    expect(text).not.toContain('Internal server error')
+    expect(text).toContain('予約を登録できませんでした')
+  })
+
+  it('403は権限の文にする', () => {
+    expect(scheduleErrorText(new ApiError(403, 'API error: 403'))).toContain('管理者だけです')
+  })
+
+  it('通信失敗は予約用の文にする', () => {
+    expect(scheduleErrorText(new TypeError('Failed to fetch'))).toContain('予約を登録できませんでした')
   })
 })

@@ -649,7 +649,7 @@ function CarouselEditorInner() {
               <div className="flex gap-2">
                 {panels.map((panel, i) => (
                   <div key={i} className="w-56 shrink-0 overflow-hidden rounded-2xl bg-white">
-                    {panel.thumbnailImageUrl ? (
+                    {typeof panel.thumbnailImageUrl === 'string' && /^https?:\/\//.test(panel.thumbnailImageUrl) ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={panel.thumbnailImageUrl} alt="" className="h-28 w-full object-cover" />
                     ) : (

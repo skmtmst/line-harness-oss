@@ -142,6 +142,14 @@ interface StepFormState {
   isDraft: boolean
 }
 
+/*
+ * 次の通番号。通を足す3箇所（直書き・質問・テンプレ）で同じ式にすると、
+ * 片方だけ直って番号がずれる（#495 軽18）。
+ */
+function nextStepOrder(steps: ReadonlyArray<{ stepOrder: number }>): number {
+  return steps.length > 0 ? Math.max(...steps.map((s) => s.stepOrder)) + 1 : 1
+}
+
 function emptyStepForm(stepOrder: number): StepFormState {
   return {
     stepOrder,
@@ -621,7 +629,7 @@ export default function ScenarioDetailClient({
   }
 
   const openAddStep = () => {
-    const nextOrder = scenario ? (scenario.steps.length > 0 ? Math.max(...scenario.steps.map(s => s.stepOrder)) + 1 : 1) : 1
+    const nextOrder = nextStepOrder(scenario?.steps ?? [])
     setStepForm(emptyStepForm(nextOrder))
     setEditingStepId(null)
     setShowStepForm(true)
@@ -643,11 +651,7 @@ export default function ScenarioDetailClient({
    * question_json があればそちらを組み立てる。
    */
   const openAddQuestionStep = () => {
-    const nextOrder = scenario
-      ? scenario.steps.length > 0
-        ? Math.max(...scenario.steps.map((s) => s.stepOrder)) + 1
-        : 1
-      : 1
+    const nextOrder = nextStepOrder(scenario?.steps ?? [])
     setStepForm({ ...emptyStepForm(nextOrder), question: emptyQuestion() })
     setEditingStepId(null)
     setShowStepForm(true)
@@ -656,11 +660,7 @@ export default function ScenarioDetailClient({
   }
 
   const openAddTemplateStep = () => {
-    const nextOrder = scenario
-      ? scenario.steps.length > 0
-        ? Math.max(...scenario.steps.map(s => s.stepOrder)) + 1
-        : 1
-      : 1
+    const nextOrder = nextStepOrder(scenario?.steps ?? [])
     setStepForm({ ...emptyStepForm(nextOrder), inputMode: 'template' })
     setEditingStepId(null)
     setShowStepForm(true)

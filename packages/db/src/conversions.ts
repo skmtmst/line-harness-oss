@@ -50,10 +50,28 @@ export interface ConversionEvent {
 
 // ── Conversion Points CRUD ──────────────────────────────────────────────────
 
-export async function getConversionPoints(db: D1Database): Promise<ConversionPoint[]> {
-  const result = await db
-    .prepare(`SELECT * FROM conversion_points ORDER BY created_at DESC`)
-    .all<ConversionPoint>();
+export interface ConversionPointAccountScope {
+  allowedLineAccountIds: string[];
+  includeUnassigned: boolean;
+}
+
+export async function getConversionPoints(
+  db: D1Database,
+  scope?: ConversionPointAccountScope,
+): Promise<ConversionPoint[]> {
+  const accountWhere = !scope
+    ? ''
+    : scope.allowedLineAccountIds.length > 0
+      ? `WHERE (line_account_id IN (${scope.allowedLineAccountIds.map(() => '?').join(',')})${scope.includeUnassigned ? ' OR line_account_id IS NULL' : ''})`
+      : scope.includeUnassigned
+        ? 'WHERE line_account_id IS NULL'
+        : 'WHERE 1 = 0';
+  const statement = db.prepare(
+    `SELECT * FROM conversion_points ${accountWhere} ORDER BY created_at DESC`,
+  );
+  const result = scope?.allowedLineAccountIds.length
+    ? await statement.bind(...scope.allowedLineAccountIds).all<ConversionPoint>()
+    : await statement.all<ConversionPoint>();
   return result.results;
 }
 

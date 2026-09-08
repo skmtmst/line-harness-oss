@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 const SETTINGS = fs.readFileSync(path.join(__dirname, '..', 'page.tsx'), 'utf8')
+const HOOK = fs.readFileSync(path.join(__dirname, '..', 'use-cursor-stack.ts'), 'utf8')
 
 describe('V6 友だち追加時配信・実行結果の契約', () => {
   it('実ノードと実行結果への往復導線を持つ', () => {
@@ -63,9 +64,12 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
   })
 
   it('カーソルを積んだページ送りで前後へ移動できる', () => {
-    expect(PAGE).toContain('setCursorStack((current) => current.length > 1 ? current.slice(0, -1) : current)')
-    expect(PAGE).toContain('setCursorStack((current) => [...current, data.nextCursor])')
+    expect(PAGE).toContain('useCursorStack()')
+    expect(PAGE).toContain('onClick={() => goPrev()}')
+    expect(PAGE).toContain('onClick={() => goNext(data.nextCursor)}')
     expect(PAGE).toContain('disabled={!data.nextCursor || loading}')
+    expect(HOOK).toContain('current.length > 1 ? current.slice(0, -1) : current')
+    expect(HOOK).toContain('setStack((current) => [...current, nextCursor])')
   })
 
   it('V6の実行結果をCSV・最近の結果・流入内訳・右欄で確認できる', () => {

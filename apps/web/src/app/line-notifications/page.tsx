@@ -80,7 +80,7 @@ const TABS = [
 ] as const
 
 function Toggle({ setting, busy, onToggle }: { setting: EcNotificationSetting; busy: boolean; onToggle: () => void }) {
-  return <button type="button" role="switch" aria-checked={setting.isEnabled} disabled={busy} onClick={onToggle}
+  return <button type="button" role="switch" aria-checked={setting.isEnabled} aria-label={`${setting.label}のお知らせを出す・止める`} disabled={busy} onClick={onToggle}
     className={`inline-flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition-colors disabled:opacity-50 ${setting.isEnabled ? 'bg-accent' : 'bg-hairline'}`}>
     <span className={`h-5 w-5 rounded-full bg-canvas shadow-sm transition-transform ${setting.isEnabled ? 'translate-x-5' : ''}`} />
   </button>
@@ -235,17 +235,24 @@ export default function LineNotificationsPage() {
       setLoadState('ready')
       return
     }
+    // 顧客タブだけが定義・集計を読む。運用者・記録タブは子部品が自前で取る（#509 軽1）。
+    // 設定口は列車側で店別になったため、持ち回しはしない。
+    const needCustomer = tab === 'customer'
     try {
       const [settingRes, overviewRes, definitionRes, metricRes] = await Promise.all([
         api.ecCommerce.settings(selectedAccountId), api.ecCommerce.overview(selectedAccountId),
-        api.lineNotifications.definitions(selectedAccountId).catch((error: unknown) => {
-          if (error instanceof ApiError && error.status === 403) throw error
-          return null
-        }),
-        api.lineNotifications.metrics(selectedAccountId).catch((error: unknown) => {
-          if (error instanceof ApiError && error.status === 403) throw error
-          return null
-        }),
+        needCustomer
+          ? api.lineNotifications.definitions(selectedAccountId).catch((error: unknown) => {
+              if (error instanceof ApiError && error.status === 403) throw error
+              return null
+            })
+          : Promise.resolve(null),
+        needCustomer
+          ? api.lineNotifications.metrics(selectedAccountId).catch((error: unknown) => {
+              if (error instanceof ApiError && error.status === 403) throw error
+              return null
+            })
+          : Promise.resolve(null),
       ])
       if (generation !== loadGeneration.current) return
       if (!settingRes.success || !overviewRes.success) throw new Error('load failed')
@@ -283,7 +290,7 @@ export default function LineNotificationsPage() {
         setNotice({ tone: 'error', text: 'LINE通知の設定を読み込めませんでした。' })
       }
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, tab])
   useEffect(() => { void load() }, [load])
 
   const visible = useMemo(() => settings.filter((setting) => {

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import type { Folder, ReminderDraftSettings, ReminderTriggerType } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -22,6 +23,7 @@ const templateRows = [
 
 export default function NewReminderPage() {
   usePageTitle('リマインダを作成・基本設定')
+  const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -62,7 +64,7 @@ export default function NewReminderPage() {
       }
       const res = await api.reminders.createDraft(settings)
       if (!res.success) throw new Error(res.error)
-      window.location.href = `/reminders/edit?id=${encodeURIComponent(String(res.data.reminderId))}&stage=target`
+      router.push(`/reminders/edit?id=${encodeURIComponent(String(res.data.reminderId))}&stage=target`)
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : '下書きを保存できませんでした')
     } finally { setSaving(false) }

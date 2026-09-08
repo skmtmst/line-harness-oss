@@ -168,6 +168,20 @@ describe('photo review operations API', () => {
     expect(await risk.json()).toMatchObject({ photoId: 'photo-1' });
   });
 
+  it('一括の戻し理由は単体と同じく補足を素で保存する(#500 軽)', async () => {
+    const response = await harness().request('/api/nen-members/photos/decisions/bulk', {
+      method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'bulk-key-note' },
+      body: JSON.stringify({
+        lineAccountId: 'account-a',
+        decisions: [{ photoId: 'photo-1', decision: 'return', expectedVersion: 2, reasonCode: 'privacy', reasonNote: '補足' }],
+      }),
+    });
+    expect(response.status).toBe(201);
+    expect(mocks.bulk).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      decisions: [expect.objectContaining({ reasonCode: 'privacy', reasonNote: '補足' })],
+    }));
+  });
+
   it('原本URL発行は専用権限・再認証・版を要求し、取得は一回限りにする', async () => {
     const body = JSON.stringify({ lineAccountId: 'account-a', expectedVersion: 1 });
     const withoutStepUp = await harness().request('/api/nen-members/photos/photo-1/original-download', {

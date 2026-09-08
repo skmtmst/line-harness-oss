@@ -172,6 +172,11 @@ const ACTION_TYPE_BY_INTENT: Record<RichMenuAreaIntent, RichMenuAreaInput['actio
 };
 const VALID_INTENTS = new Set<string>(Object.keys(ACTION_TYPE_BY_INTENT));
 
+/** 受けたJSONが `{...}` の形かを確かめる（`as` 断定の代わり）。 */
+function isJsonRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
 
 function parseAreaInput(raw: unknown): Parsed<RichMenuAreaInput> {
@@ -1268,7 +1273,7 @@ richMenuGroups.post(
     } catch {
       return c.json({ success: false, error: 'invalid JSON body' }, 400);
     }
-    const r = (body ?? {}) as { accountId?: unknown; orderedIds?: unknown };
+    const r = isJsonRecord(body) ? body : {};
     if (typeof r.accountId !== 'string' || r.accountId.length === 0) {
       return c.json({ success: false, error: 'accountId required' }, 400);
     }
@@ -1360,6 +1365,12 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/pages/:pageId/image', requir
 
   const exists = await pageBelongsToGroup(c.env.DB, groupId, pageId);
   if (!exists) return c.json({ success: false, error: 'page not found in group' }, 404);
+
+  // 巨大ファイルは全量読む前に断る（上限1MBは image-validator と同じ）。
+  const declaredBytes = Number.parseInt(c.req.header('content-length') ?? '', 10);
+  if (Number.isFinite(declaredBytes) && declaredBytes > 1024 * 1024) {
+    return c.json({ success: false, error: '画像が大きすぎます。1MB以下の画像を選んでください' }, 413);
+  }
 
   const buf = new Uint8Array(await c.req.arrayBuffer());
   const validation = validateRichMenuImage(buf, buf.byteLength);
@@ -1694,8 +1705,8 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/apply-to-tag', requireRole('
   } catch {
     return c.json({ success: false, error: 'invalid JSON body' }, 400);
   }
-  const r = (body as { tagId?: unknown; mode?: unknown }) ?? {};
-  const mode = (r.mode as string | undefined) ?? 'bulk-link';
+  const r = isJsonRecord(body) ? body : {};
+  const mode = typeof r.mode === 'string' ? r.mode : 'bulk-link';
   if (mode !== 'bulk-link' && mode !== 'set-default') {
     return c.json({ success: false, error: "mode must be 'bulk-link' or 'set-default'" }, 400);
   }

@@ -108,7 +108,9 @@ export default function ActionScoreRulesPage() {
   usePageTitle('スコアのルール')
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const latestAccountRef = useRef(selectedAccountId)
-  latestAccountRef.current = selectedAccountId
+  useEffect(() => {
+    latestAccountRef.current = selectedAccountId
+  }, [selectedAccountId])
   const [configuration, setConfiguration] = useState<ActionScoreRuleConfiguration | null>(null)
   const [bundle, setBundle] = useState<ActionScoreRuleBundle | null>(null)
   const [loading, setLoading] = useState(true)
@@ -126,12 +128,14 @@ export default function ActionScoreRulesPage() {
   const [testResult, setTestResult] = useState<ActionScoreRuleTestResult | null>(null)
 
   useEffect(() => {
-    try {
-      const role = localStorage.getItem('lh_staff_role')
-      setCanEdit(role === 'owner' || role === 'admin')
-    } catch {
-      setCanEdit(false)
-    }
+    let current = true
+    void api.staff.me().then((response) => {
+      if (!current || !response.success) return
+      setCanEdit(response.data.role === 'owner' || response.data.role === 'admin')
+    }).catch(() => {
+      if (current) setCanEdit(false)
+    })
+    return () => { current = false }
   }, [])
 
   const load = useCallback(async () => {

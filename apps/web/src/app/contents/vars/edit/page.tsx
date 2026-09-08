@@ -30,6 +30,7 @@ import {
   impactStateFromError,
   impactStateText,
   saveErrorText,
+  scheduleErrorText,
   type ChangeImpactState,
 } from '../change-impact'
 import ImpactReview from '../impact-review'
@@ -330,7 +331,8 @@ function EditCommonVarInner() {
       setDraft(null)
       void load()
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : '予約に失敗しました')
+      // サーバの生文言（500の'Internal server error'など）は出さない。
+      setError(scheduleErrorText(e))
     }
   }
 
@@ -397,7 +399,7 @@ function EditCommonVarInner() {
                       type="text"
                       maxLength={200}
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      onChange={(e) => { setSaved(false); setName(e.target.value) }}
                       className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
                     />
                     <p className="text-ink-faint mt-1 text-xs">管理画面の中で探すときの名前</p>
@@ -414,7 +416,7 @@ function EditCommonVarInner() {
                     <SelectField
                       id="cv-folder"
                       value={folderId}
-                      onChange={(e) => setFolderId(e.target.value)}
+                      onChange={(e) => { setSaved(false); setFolderId(e.target.value) }}
                       options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
                     />
                   </div>
@@ -430,7 +432,7 @@ function EditCommonVarInner() {
                     type={item.type === 'number' ? 'number' : 'text'}
                     maxLength={item.type === 'number' ? undefined : 200}
                     value={value}
-                    onChange={(e) => setValue(e.target.value)}
+                    onChange={(e) => { setSaved(false); setValue(e.target.value) }}
                     className="border-hairline rounded-control w-full border px-3 py-3 text-sm"
                   />
                 </div>
@@ -441,7 +443,7 @@ function EditCommonVarInner() {
                       保存すると、この値を差し込んでいる{impact.total.toLocaleString('ja-JP')}か所が変わります
                     </p>
                     <p className="mt-1 text-xs">
-                      「{item.value || '（空）'}」→「{value || '（空）'}」。予約中・公開中の設定にも反映されます。
+                      「{item.value || '（空）'}」→「{value || '（空）'}」。配信予約中・配信中の設定にも反映されます。
                     </p>
                   </div>
                 ) : null}
@@ -451,7 +453,7 @@ function EditCommonVarInner() {
                   <input
                     type="text"
                     value={memo}
-                    onChange={(event) => setMemo(event.target.value)}
+                    onChange={(event) => { setSaved(false); setMemo(event.target.value) }}
                     maxLength={1000}
                     className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
                     placeholder="運用上の注意や、この値の使い方を書きます"

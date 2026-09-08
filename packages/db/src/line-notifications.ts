@@ -120,7 +120,9 @@ export async function createCustomerNotificationDefinition(
     }
     throw error;
   }
-  return (await getCustomerNotificationDefinition(db, id, input.lineAccountId))!;
+  const saved = await getCustomerNotificationDefinition(db, id, input.lineAccountId);
+  if (!saved) throw new LineNotificationError('not_found', 'お知らせが見つかりません');
+  return saved;
 }
 
 export async function updateCustomerNotificationDraft(
@@ -157,7 +159,9 @@ export async function updateCustomerNotificationDraft(
   if (!Number(result.meta.changes ?? 0)) {
     throw new LineNotificationError('version_conflict', 'ほかの担当者が先に変更しました');
   }
-  return (await getCustomerNotificationDefinition(db, input.id, input.lineAccountId))!;
+  const saved = await getCustomerNotificationDefinition(db, input.id, input.lineAccountId);
+  if (!saved) throw new LineNotificationError('not_found', 'お知らせが見つかりません');
+  return saved;
 }
 
 export async function publishCustomerNotificationDefinition(
@@ -214,7 +218,9 @@ export async function publishCustomerNotificationDefinition(
   if (!Number(results[1]?.meta.changes ?? 0)) {
     throw new LineNotificationError('version_conflict', 'ほかの担当者が先に変更しました');
   }
-  return (await getCustomerNotificationDefinition(db, input.id, input.lineAccountId))!;
+  const saved = await getCustomerNotificationDefinition(db, input.id, input.lineAccountId);
+  if (!saved) throw new LineNotificationError('not_found', 'お知らせが見つかりません');
+  return saved;
 }
 
 export async function stopCustomerNotificationDefinition(
@@ -237,7 +243,9 @@ export async function stopCustomerNotificationDefinition(
   if (!Number(result.meta.changes ?? 0)) {
     throw new LineNotificationError('version_conflict', 'ほかの担当者が先に変更しました');
   }
-  return (await getCustomerNotificationDefinition(db, input.id, input.lineAccountId))!;
+  const saved = await getCustomerNotificationDefinition(db, input.id, input.lineAccountId);
+  if (!saved) throw new LineNotificationError('not_found', 'お知らせが見つかりません');
+  return saved;
 }
 
 export interface NotificationDeliveryListRow {

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { MediaDeleteImpact, MediaDeleteImpactReference, MediaItem } from '@line-crm/shared'
 import { ApiError, api, type MediaVersionPreview } from '@/lib/api'
 import Button from './media-button'
+import { formatMediaSize } from './media-usage-display'
 import { checkedAtText, referenceKindText, referenceNameText } from './media-delete-impact'
 import {
   fileMatchesMediaKind,
@@ -11,12 +12,6 @@ import {
   putMediaFile,
   validateMediaFile,
 } from './media-direct-upload'
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-}
 
 function formatDate(value: string): string {
   const date = new Date(value)
@@ -305,7 +300,7 @@ export default function MediaDetailDialog({
               {[
                 ['種類', mediaKind(item)],
                 ['大きさ', mediaDimensions(item)],
-                ['容量', formatSize(item.sizeBytes)],
+                ['容量', formatMediaSize(item.sizeBytes)],
                 ['入れた日', formatDate(item.createdAt)],
                 ['入れた人', item.uploadedBy || '—（未取得）'],
                 ['LINEの上限', mediaLimit(item)],
