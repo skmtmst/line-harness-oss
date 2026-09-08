@@ -2628,14 +2628,6 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
     return c.json({ error: 'concurrent_update' }, 409);
   }
 
-  if (next === 'cancelled' || next === 'expired') {
-    // Calendar 削除の台帳行を状態更新の直後に先行登録する。実行側の
-    // 作成・検索が初期 DB 失敗すると行が残らず cron が回収できないため、
-    // ここでは失敗を落とさず投げる (取消再試行で回復できる)。
-    // 却下では Calendar 予定を作らないため登録しない。
-    await enqueueCalendarDeleteOperation(c.env.DB, { bookingId: id, lineAccountId: accountId });
-  }
-
   if (next === 'confirmed') {
     await insertConfirmationReminders(c.env.DB, {
       bookingId: id,
@@ -2735,8 +2727,13 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
       }
       throw error;
     }
-    // Calendar 削除は台帳駆動 (安定キーで1行)。一時失敗は retry_wait に残し、
-    // 次の取消再試行で同じ鍵で再実行する。取消処理自体は壊さない。
+    // Calendar 削除は台帳駆動 (安定キーで1行)。V6 の fence 成功後に登録する:
+    // 送信権の貸出中で巻き戻した 409 の後に queued 行が残ると、cron が確定
+    // ずみの予約の予定を消してしまう。登録の失敗は落とさず投げる
+    // (取消再試行で回復できる)。一時失敗は retry_wait に残し、
+    // 次の取消再試行で同じ鍵で再実行する。
+    // 却下では Calendar 予定を作らないため登録しない。
+    await enqueueCalendarDeleteOperation(c.env.DB, { bookingId: id, lineAccountId: accountId });
     c.executionCtx.waitUntil(
       runCalendarDeleteOperation(c.env.DB, {
         bookingId: id,

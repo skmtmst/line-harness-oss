@@ -837,9 +837,9 @@ export async function getFriendReminderStatus(
 //   active を再確認し (reminder-delivery 側)、取消済みなら送らない。
 // - 取消理由・元イベントID・実行者を cancel_reason に残す (移行なしで追跡するため)。
 // - 同じ取消・変更通知の再送は何も変えない (active が無ければ 0 件で返す)。
-//   ただし failOnSendInFlight 指定で対象があるのに 0 件のときは、確認後の
-//   割込み貸出が残っていないか書換え後にも確かめ、残っていれば投げる
-//   (0 件成功にしない。呼び出し側は状態を巻き戻して再試行させる)。
+//   ただし failOnSendInFlight 指定では、書換え後に最初に選んだ全 ID が
+//   非 active か確かめ、1件でも残れば投げる (部分割込みの 0 件成功にしない。
+//   呼び出し側は状態を巻き戻して再試行させる)。
 // - lineAccountId を渡したときは、そのアカウントの友だちの登録だけを見る。
 // - 移行前の行 (source 未記録) を探すときは、同時刻の別予約・手動登録を
 //   巻き込まないよう source 未記録かつ同じきっかけ種別の行だけを見る。
@@ -1063,13 +1063,16 @@ export async function cancelV6RemindersForSource(
     (sum, result, index) => (index % 2 === 1 ? sum + Number(result.meta?.changes ?? 0) : sum),
     0,
   );
-  if (input.failOnSendInFlight && ids.length > 0 && cancelledEnrollments === 0) {
-    // 確認と取消 UPDATE の間に貸出が割り込むと、登録 UPDATE は行単位の
-    // 除外で 0 件になり、黙って成功すると取消確定後の送信が起きる。
-    // 書換え後に貸出の残りを確かめ、残っていれば拒否して呼び出し側に
-    // 状態の巻き戻しと再試行をさせる (0 件成功にしない)。
-    // 貸出が無ければ、同時確定の別処理が先に止めた冪等な再送として返す。
-    if ((await countLiveClaims()) > 0) throw new Error('REMINDER_SEND_IN_FLIGHT');
+  if (input.failOnSendInFlight && ids.length > 0) {
+    // 確認と取消 UPDATE の間に貸出が割り込むと、行単位の除外でその行だけ
+    // 残る。1件でも残れば黙って成功にせず拒否し、呼び出し側に状態の
+    // 巻き戻しと再試行をさせる (部分割込みの取消確定後送信を起こさない)。
+    // 残りが無ければ止め切ったか、同時確定の別処理が先に止めた冪等な再送。
+    const remaining = await db.prepare(
+      `SELECT id FROM friend_reminders
+        WHERE status = 'active' AND id IN (${chunkPlaceholders(ids)})`,
+    ).bind(...ids).all<{ id: string }>();
+    if ((remaining.results ?? []).length > 0) throw new Error('REMINDER_SEND_IN_FLIGHT');
   }
   return { cancelledEnrollments, cancelledRuns };
 }

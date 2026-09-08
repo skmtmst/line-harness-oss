@@ -154,13 +154,15 @@ export function calendarDeleteIdempotencyKey(bookingId: string): string {
 }
 
 /**
- * 取消の状態更新の直後に台帳行を残す (先行登録)。
+ * V6 の fence 成功後に台帳行を残す。
  *
  * 実行側 (runCalendarDeleteOperation) の作成・検索が初期 DB 失敗すると
  * retry_wait を返すだけで行が残らず、cron が回収できない。行さえあれば
  * 再送・cron のどちらでも拾えるため、取消フローはここで失敗を落とさず
  * 投げる (呼び出し側の取消再試行で回復できる)。INSERT OR IGNORE のため
  * 二重登録にならない。schema 変更は要らない。
+ * 状態更新の直後ではなく fence 成功後に置く: 巻き戻した 409 の後に
+ * queued 行が残ると cron が確定ずみの予定を消してしまう。
  */
 export async function enqueueCalendarDeleteOperation(
   db: D1Database,
@@ -202,14 +204,25 @@ export async function runCalendarDeleteOperation(
       result: { direction: 'delete' },
     });
     const booking = await db.prepare(
-      `SELECT external_event_id FROM bookings WHERE id = ?`,
-    ).bind(input.bookingId).first<{ external_event_id: string | null }>();
+      `SELECT external_event_id, status FROM bookings WHERE id = ?`,
+    ).bind(input.bookingId).first<{ external_event_id: string | null; status: string | null }>();
     if (!booking?.external_event_id) {
       await finishBookingOperation(db, {
         id: operationId,
         status: 'skipped',
         completedAt: now,
         result: { direction: 'delete', reason: 'no_external_event' },
+      });
+      return 'skipped';
+    }
+    // 実行の直前に予約の状態を再確認する。409 で巻き戻した確定ずみの予約や、
+    // 残留した古い queued 行の予定を消さない (原子的無効化の受け皿)。
+    if (booking.status !== 'cancelled' && booking.status !== 'expired') {
+      await finishBookingOperation(db, {
+        id: operationId,
+        status: 'skipped',
+        completedAt: now,
+        result: { direction: 'delete', reason: 'booking_not_cancelled' },
       });
       return 'skipped';
     }

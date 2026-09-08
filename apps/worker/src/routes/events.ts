@@ -1060,17 +1060,35 @@ events.post('/api/liff/events/me/:bookingId/cancel', async (c) => {
       slot_starts_at: string;
     }>();
   if (!row) return bad(c, 'not_found', 404);
-  // 再試行の受付: V6 取消が投げた直後の再送は V6 だけ直す (409 にしない)。
+  const nowIso = new Date().toISOString();
+  const waitlistParams = {
+    lineAccountId: row.line_account_id,
+    eventId: row.event_id,
+    occurrenceId: row.slot_id,
+    sourceKey: `booking:${row.id}:cancelled`,
+  };
+  // 再試行の受付: V6 取消が投げた直後の再送は V6 だけ直す。
+  // 送信権の貸出中は 409 で再試行させる (strict fence。live claim を残して
+  // 成功にしない)。待機者ジョブの再登録も受け付ける (二重登録なし)。
   if (row.status === 'cancelled') {
-    await cancelByTrigger(c.env.DB, {
-      triggerType: 'event',
-      sourceId: row.id,
-      sourceEventId: row.id,
-      friendId: friend.id,
-      startsAtIso: row.slot_starts_at,
-      lineAccountId: row.line_account_id,
-      cancelReason: `event_cancel:${row.id}:by:friend-retry`,
-    });
+    try {
+      await cancelByTrigger(c.env.DB, {
+        triggerType: 'event',
+        sourceId: row.id,
+        sourceEventId: row.id,
+        friendId: friend.id,
+        startsAtIso: row.slot_starts_at,
+        lineAccountId: row.line_account_id,
+        cancelReason: `event_cancel:${row.id}:by:friend-retry`,
+        failOnSendInFlight: true,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
+        return bad(c, 'send_in_flight_retry', 409);
+      }
+      throw error;
+    }
+    await enqueueEventWaitlistPromotion(c.env.DB, waitlistParams);
     return c.json({ ok: true });
   }
   if (row.status !== 'requested' && row.status !== 'confirmed') return bad(c, 'invalid_state', 409);
@@ -1079,32 +1097,47 @@ events.post('/api/liff/events/me/:bookingId/cancel', async (c) => {
     new Date(row.slot_starts_at).getTime() - row.cancel_deadline_hours_before * 3600_000;
   if (deadlineMs <= Date.now()) return bad(c, 'cancel_deadline_passed', 409);
 
-  const nowIso = new Date().toISOString();
-  await c.env.DB
+  // 条件付き状態更新: 同時取消の race を防ぐ。0 件なら相手に任せて再試行させる。
+  const priorStatus = row.status;
+  const upd = await c.env.DB
     .prepare(
       `UPDATE event_bookings
           SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'friend', updated_at = ?
-        WHERE id = ?`,
+        WHERE id = ? AND status IN ('requested', 'confirmed')`,
     )
     .bind(nowIso, nowIso, row.id)
     .run();
+  if ((upd.meta?.changes ?? 0) === 0) return bad(c, 'invalid_state', 409);
   await cancelPendingRemindersFor(c.env.DB, row.id);
   // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
-  await cancelByTrigger(c.env.DB, {
-    triggerType: 'event',
-    sourceId: row.id,
-    sourceEventId: row.id,
-    friendId: friend.id,
-    startsAtIso: row.slot_starts_at,
-    lineAccountId: row.line_account_id,
-    cancelReason: `event_cancel:${row.id}:by:friend`,
-  });
-  await enqueueEventWaitlistPromotion(c.env.DB, {
-    lineAccountId: row.line_account_id,
-    eventId: row.event_id,
-    occurrenceId: row.slot_id,
-    sourceKey: `booking:${row.id}:cancelled`,
-  });
+  // 送信権の貸出中は状態更新を巻き戻して 409 にする (完全 rollback。
+  // 取消確定後の送信を起こさない)。
+  try {
+    await cancelByTrigger(c.env.DB, {
+      triggerType: 'event',
+      sourceId: row.id,
+      sourceEventId: row.id,
+      friendId: friend.id,
+      startsAtIso: row.slot_starts_at,
+      lineAccountId: row.line_account_id,
+      cancelReason: `event_cancel:${row.id}:by:friend`,
+      failOnSendInFlight: true,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
+      await c.env.DB
+        .prepare(
+          `UPDATE event_bookings
+              SET status = ?, cancelled_at = NULL, cancelled_by = NULL, updated_at = ?
+            WHERE id = ? AND status = 'cancelled'`,
+        )
+        .bind(priorStatus, nowIso, row.id)
+        .run();
+      return bad(c, 'send_in_flight_retry', 409);
+    }
+    throw error;
+  }
+  await enqueueEventWaitlistPromotion(c.env.DB, waitlistParams);
   return c.json({ ok: true });
 });
 

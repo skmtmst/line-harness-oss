@@ -46,6 +46,9 @@ vi.mock('../services/booking-notifier.js', () => notifierMocks);
 const eventNotifierMocks = vi.hoisted(() => ({ sendEventBookingNotification: vi.fn(async () => {}) }));
 vi.mock('../services/event-booking-notifier.js', () => eventNotifierMocks);
 
+const liffAuthMocks = vi.hoisted(() => ({ verifyCallerLineUserId: vi.fn(async () => 'U9') }));
+vi.mock('../services/liff-auth.js', () => liffAuthMocks);
+
 const { default: booking } = await import('./booking.js');
 const { default: events } = await import('./events.js');
 
@@ -204,6 +207,54 @@ describe('取消と送信claimの原子化 (#654-1)', () => {
     }
   });
 
+  it('複数登録の1件割込みは成功にせず投げる (部分残留)', async () => {
+    const dual = openDualDb();
+    try {
+      seedAccountsAndFriends(dual.raw1);
+      dual.raw1.exec(`
+        INSERT INTO friend_reminders
+          (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
+        VALUES ('FR-1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','EV-a'),
+               ('FR-2','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','EV-b');
+      `);
+      // 1件だけに割込みclaimが入る。旧実装は1件止まった成功 (1件>0) で
+      // 事後確認を飛ばし、残るactive+claimedを抱えたまま成功した。
+      const attempt = cancelV6RemindersForSource(dual.db1, {
+        sourceId: 'B1',
+        cancelReason: 'test',
+        now: '2026-09-10T00:00:00.000Z',
+        failOnSendInFlight: true,
+        beforeFlip: async () => {
+          seedDeliveryRun(dual.raw2, { id: 'RUN-2', friend_reminder_id: 'FR-2' });
+        },
+      });
+      await expect(attempt).rejects.toThrow('REMINDER_SEND_IN_FLIGHT');
+      // 止まった行は止まったまま、割込み行は active のまま (再試行が正当)。
+      expect(dual.raw1.prepare(
+        `SELECT status FROM friend_reminders WHERE id = 'FR-1'`,
+      ).get()).toEqual({ status: 'cancelled' });
+      expect(dual.raw1.prepare(
+        `SELECT status FROM friend_reminders WHERE id = 'FR-2'`,
+      ).get()).toEqual({ status: 'active' });
+      // 貸出完了後の再試行で残りも止まる。
+      dual.raw1.prepare(
+        `UPDATE reminder_delivery_runs SET status = 'succeeded', lease_expires_at = NULL WHERE id = 'RUN-2'`,
+      ).run();
+      const done = await cancelV6RemindersForSource(dual.db1, {
+        sourceId: 'B1',
+        cancelReason: 'test',
+        now: '2026-09-10T00:00:00.000Z',
+        failOnSendInFlight: true,
+      });
+      expect(done.cancelledEnrollments).toBe(1);
+      expect(dual.raw1.prepare(
+        `SELECT status FROM friend_reminders WHERE id = 'FR-2'`,
+      ).get()).toEqual({ status: 'cancelled' });
+    } finally {
+      dual.cleanup();
+    }
+  });
+
   it('対象が無い再送は投げず0件で返す (冪等)', async () => {
     const dual = openDualDb();
     try {
@@ -259,7 +310,7 @@ function makeBookingApp(db: D1Database) {
 }
 
 describe('Calendar台帳の初期DB失敗の永続回復 (#654-2)', () => {
-  it('先行登録の失敗は落とさず、取消再送で回復する', async () => {
+  it('fence成功後の登録の失敗は落とさず、取消再送で回復する', async () => {
     const dual = openDualDb();
     try {
       seedBookingCancelTarget(dual.raw1);
@@ -314,11 +365,70 @@ describe('Calendar台帳の初期DB失敗の永続回復 (#654-2)', () => {
     }
   });
 
+  it('409で巻き戻した確定予約の予定をcronが消さない', async () => {
+    const dual = openDualDb();
+    try {
+      seedBookingCancelTarget(dual.raw1);
+      dual.raw1.exec(`
+        INSERT INTO friend_reminders
+          (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
+        VALUES ('FR-9','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','RB9','RB9');
+      `);
+      seedDeliveryRun(dual.raw1, {
+        id: 'RUN-9', friend_reminder_id: 'FR-9', reminder_step_id: 'rb-step',
+      });
+      const execCtx = {
+        waitUntil: () => undefined,
+        passThroughOnException: () => undefined,
+      } as unknown as ExecutionContext;
+      const { app, env } = makeBookingApp(dual.db1);
+      // 貸出中は巻き戻して409。台帳行は残さない (fence成功後に移した)。
+      const conflicted = await app.request(
+        '/api/booking/admin/requests/RB9?account_id=acc1',
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ action: 'cancel' }),
+          headers: { 'Content-Type': 'application/json' },
+        },
+        env,
+        execCtx,
+      );
+      expect(conflicted.status).toBe(409);
+      expect(dual.raw1.prepare(`SELECT status FROM bookings WHERE id = 'RB9'`).get()).toEqual({
+        status: 'confirmed',
+      });
+      expect(dual.raw1.prepare(
+        `SELECT COUNT(*) AS c FROM booking_operation_runs WHERE booking_id = 'RB9'`,
+      ).get()).toEqual({ c: 0 });
+      // 残留した古い queued 行があっても、確定ずみの予定は消さない。
+      const { enqueueCalendarDeleteOperation } = await import(
+        '../services/booking-calendar-sync.js'
+      );
+      await enqueueCalendarDeleteOperation(dual.db1, { bookingId: 'RB9', lineAccountId: 'acc1' });
+      const removed: string[] = [];
+      const drained = await processPendingCalendarDeleteOperations(dual.db2, {
+        now: new Date('2026-09-10T00:00:00.000Z'),
+        remove: async (bookingId) => {
+          removed.push(bookingId);
+        },
+      });
+      expect(removed).toEqual([]);
+      expect(drained).toEqual({ processed: 1, succeeded: 0, retrying: 0, skipped: 1 });
+      expect(dual.raw1.prepare(
+        `SELECT status FROM booking_operation_runs WHERE booking_id = 'RB9'`,
+      ).get()).toEqual({ status: 'skipped' });
+    } finally {
+      dual.cleanup();
+    }
+  });
+
   it('別接続のcronが先行登録ずみの行を拾って直す', async () => {
     const dual = openDualDb();
     try {
       seedBookingCancelTarget(dual.raw1);
-      // route側の接続で先行登録 (取消の状態更新の直後に残る想定)。
+      // fence成功後の取消ずみ予約を想定する (実行側は取消ずみだけ消す)。
+      dual.raw1.prepare(`UPDATE bookings SET status = 'cancelled' WHERE id = 'RB10'`).run();
+      // route側の接続で登録 (V6 fence成功後に残る想定)。
       const { enqueueCalendarDeleteOperation } = await import(
         '../services/booking-calendar-sync.js'
       );
@@ -423,6 +533,132 @@ describe('event却下再送の待機者再登録 (#654-3)', () => {
       expect(dual.raw1.prepare(
         `SELECT COUNT(*) AS c FROM event_waitlist_promotion_jobs WHERE source_key = 'booking:eb-r1:rejected'`,
       ).get()).toEqual({ c: 1 });
+    } finally {
+      dual.cleanup();
+    }
+  });
+});
+
+function seedLiffCancelTarget(raw: Database.Database) {
+  raw.exec(`
+    INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, liff_id, is_active)
+    VALUES ('account-9','channel-9','9店','token9','secret9','L9',1);
+    INSERT INTO friends (id, line_user_id, display_name, line_account_id, is_following)
+    VALUES ('friend-9','U9','本人','account-9',1);
+    INSERT INTO events (id, line_account_id, name, target_type, cancel_deadline_hours_before)
+    VALUES ('ev-9','account-9','体験会','single',24);
+    INSERT INTO event_slots (id, event_id, starts_at, ends_at)
+    VALUES ('slot-9','ev-9','2099-06-01T10:00:00.000Z','2099-06-01T12:00:00.000Z');
+    INSERT INTO event_bookings
+      (id, line_account_id, event_id, slot_id, friend_id, status, requested_at)
+    VALUES ('eb-l1','account-9','ev-9','slot-9','friend-9','requested','2026-09-01T00:00:00.000Z');
+    INSERT INTO reminders
+      (id, name, line_account_id, is_active, trigger_type, delivery_mode, lifecycle_status)
+    VALUES ('rule-event-9','rule','account-9',1,'event','countdown','published');
+    INSERT INTO reminder_steps
+      (id, reminder_id, offset_minutes, message_type, message_content)
+    VALUES ('step-rule-event-9','rule-event-9',-60,'text','お待ちしています');
+    INSERT INTO friend_reminders
+      (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
+    VALUES ('FR-l1','friend-9','rule-event-9','2099-06-01T10:00:00.000Z','active','event','eb-l1','eb-l1');
+  `);
+}
+
+describe('LIFF本人取消の両分岐strict fence (再審査-2)', () => {
+  it('初回も再送も貸出中は409で巻き戻し、再試行で取消せる', async () => {
+    const dual = openDualDb();
+    try {
+      seedLiffCancelTarget(dual.raw1);
+      seedDeliveryRun(dual.raw1, {
+        id: 'RUN-l1',
+        line_account_id: 'account-9',
+        reminder_id: 'rule-event-9',
+        friend_reminder_id: 'FR-l1',
+        friend_id: 'friend-9',
+        reminder_step_id: 'step-rule-event-9',
+        scheduled_at: '2099-06-01T09:00:00.000Z',
+      });
+      const cancel = (db: D1Database) => {
+        const { app, env } = makeEventsApp(db);
+        return app.request('/api/liff/events/me/eb-l1/cancel?liffId=L9', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer test' },
+        }, env);
+      };
+      // 初回: 貸出中は取消を確定させず 409。状態は巻き戻る。
+      const conflicted = await cancel(dual.db1);
+      expect(conflicted.status).toBe(409);
+      expect(dual.raw1.prepare(`SELECT status FROM event_bookings WHERE id = 'eb-l1'`).get()).toEqual({
+        status: 'requested',
+      });
+      expect(dual.raw1.prepare(`SELECT status FROM friend_reminders WHERE id = 'FR-l1'`).get()).toEqual({
+        status: 'active',
+      });
+      // 送信が終われば再試行で取消せる。待機者ジョブも残る。
+      dual.raw1.prepare(
+        `UPDATE reminder_delivery_runs SET status = 'succeeded', lease_expires_at = NULL WHERE id = 'RUN-l1'`,
+      ).run();
+      const retried = await cancel(dual.db1);
+      expect(retried.status).toBe(200);
+      expect(dual.raw1.prepare(`SELECT status FROM event_bookings WHERE id = 'eb-l1'`).get()).toEqual({
+        status: 'cancelled',
+      });
+      expect(dual.raw1.prepare(`SELECT status FROM friend_reminders WHERE id = 'FR-l1'`).get()).toEqual({
+        status: 'cancelled',
+      });
+      expect(dual.raw1.prepare(
+        `SELECT COUNT(*) AS c FROM event_waitlist_promotion_jobs WHERE source_key = 'booking:eb-l1:cancelled'`,
+      ).get()).toEqual({ c: 1 });
+      // 再送: V6も待機者も冪等 (二重登録なし)。
+      const again = await cancel(dual.db1);
+      expect(again.status).toBe(200);
+      expect(dual.raw1.prepare(
+        `SELECT COUNT(*) AS c FROM event_waitlist_promotion_jobs WHERE source_key = 'booking:eb-l1:cancelled'`,
+      ).get()).toEqual({ c: 1 });
+    } finally {
+      dual.cleanup();
+    }
+  });
+
+  it('再送の貸出中も409にし、状態を変えない', async () => {
+    const dual = openDualDb();
+    try {
+      seedLiffCancelTarget(dual.raw1);
+      // 取消ずみ・V6未処理の残り (初回の V6 失敗相当) + 新しい貸出。
+      dual.raw1.prepare(`UPDATE event_bookings SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'friend' WHERE id = 'eb-l1'`)
+        .run('2026-09-02T00:00:00.000Z');
+      seedDeliveryRun(dual.raw1, {
+        id: 'RUN-l2',
+        line_account_id: 'account-9',
+        reminder_id: 'rule-event-9',
+        friend_reminder_id: 'FR-l1',
+        friend_id: 'friend-9',
+        reminder_step_id: 'step-rule-event-9',
+        scheduled_at: '2099-06-01T09:00:00.000Z',
+      });
+      const cancel = (db: D1Database) => {
+        const { app, env } = makeEventsApp(db);
+        return app.request('/api/liff/events/me/eb-l1/cancel?liffId=L9', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer test' },
+        }, env);
+      };
+      const conflicted = await cancel(dual.db1);
+      expect(conflicted.status).toBe(409);
+      expect(dual.raw1.prepare(`SELECT status FROM event_bookings WHERE id = 'eb-l1'`).get()).toEqual({
+        status: 'cancelled',
+      });
+      expect(dual.raw1.prepare(`SELECT status FROM friend_reminders WHERE id = 'FR-l1'`).get()).toEqual({
+        status: 'active',
+      });
+      dual.raw1.prepare(
+        `UPDATE reminder_delivery_runs SET status = 'succeeded', lease_expires_at = NULL WHERE id = 'RUN-l2'`,
+      ).run();
+      const retried = await cancel(dual.db1);
+      expect(retried.status).toBe(200);
+      expect(dual.raw1.prepare(`SELECT status FROM friend_reminders WHERE id = 'FR-l1'`).get()).toEqual({
+        status: 'cancelled',
+      });
     } finally {
       dual.cleanup();
     }
