@@ -55,6 +55,8 @@ export default function EventsListPage() {
   usePageTitle('イベント予約')
   const { selectedAccountId } = useAccount()
   const [items, setItems] = useState<EventListItem[]>([])
+  // 裏側は200件で切る。超えたら注意を出す(点検#520の中8)。
+  const [listTotal, setListTotal] = useState(0)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<'all' | 'open' | 'pending' | 'full'>('all')
@@ -71,14 +73,17 @@ export default function EventsListPage() {
     }
     setLoadStatus('loading')
     setItems([])
+    setListTotal(0)
     try {
       const res = await eventsApi.listEvents(selectedAccountId)
       if (requestId !== loadRequestRef.current) return
       setItems(res.items)
+      setListTotal(res.total ?? res.items.length)
       setLoadStatus('ready')
     } catch {
       if (requestId !== loadRequestRef.current) return
       setItems([])
+      setListTotal(0)
       setLoadStatus('error')
     }
   }, [selectedAccountId])
@@ -418,6 +423,7 @@ export default function EventsListPage() {
               : filtered.length === 0
                 ? '0件'
                 : `${(current - 1) * PAGE_SIZE + 1}〜${Math.min(current * PAGE_SIZE, filtered.length)}件 / 全${filtered.length}件`}
+          {listTotal > items.length ? '（200件まで表示しています）' : ''}
         </span>
         {/*
           **送る先が無いページ送りを出さない。** 取れていないときに

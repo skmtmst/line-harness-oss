@@ -119,6 +119,9 @@ export default function BookingsPage() {
     byMenu: [] as Array<{ name: string; total: number }>,
   })
   const [menus, setMenus] = useState<BookingMenu[]>([])
+  // 集計の読み込み失敗は0表示と分ける。黙って0のままだと運用者が気づけない。
+  const [summaryError, setSummaryError] = useState(false)
+  const [summarySeq, setSummarySeq] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   // copied 状態は URL 単位で持つ。アカウント切替で shareUrl が変わると
@@ -194,6 +197,7 @@ export default function BookingsPage() {
   useEffect(() => {
     if (!selectedAccountId) return
     let alive = true
+    setSummaryError(false)
     void (async () => {
       try {
         const today = jstDay(new Date().toISOString())
@@ -209,12 +213,14 @@ export default function BookingsPage() {
         setMenus(menuList.menus)
       } catch {
         // KPI が出ないだけで一覧は使える。ここで画面全体を止めない。
+        // ただし0のまま黙ると気づけないので、KPI欄の上に理由と再試行を出す。
+        if (alive) setSummaryError(true)
       }
     })()
     return () => {
       alive = false
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, summarySeq])
 
   // カレンダーは今日/今週の範囲だけをページごとに読み、200件を越えても欠落させない。
   useEffect(() => {
@@ -384,6 +390,13 @@ export default function BookingsPage() {
       {error && (
         <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
           {error}
+        </div>
+      )}
+
+      {summaryError && (
+        <div className="bg-warning-bg border-warning text-warning mb-4 rounded-lg border p-4 text-sm">
+          集計を読み込めませんでした。一覧はそのまま使えます。
+          <button className="ml-2 font-semibold underline" onClick={() => setSummarySeq((n) => n + 1)}>もう一度読み込む</button>
         </div>
       )}
 
@@ -698,6 +711,12 @@ function Kpi({
   )
 }
 
+/*
+  メニュー棚の行。共通 FolderPanel には寄せていない(点検#516の中8)。
+  理由: FolderPanel は見出し「フォルダ」・行にフォルダ図・文字が一回り大きい。
+  ここは設計どおり見出し「メニュー」・図なし・小さめの字で、寄せると見た目が
+  変わる。共通側に見出しや図の有無を選べる口ができたら寄せ直す。
+*/
 function FolderRow({
   label,
   count,
