@@ -29,6 +29,7 @@ function setup() {
   `)
   sqlite.exec(readFileSync(join(import.meta.dirname, '../migrations/291_rich_menu_schedules.sql'), 'utf8'))
   sqlite.exec(readFileSync(join(import.meta.dirname, '../migrations/342_rich_menu_schedule_execution.sql'), 'utf8'))
+  sqlite.exec(readFileSync(join(import.meta.dirname, '../migrations/355_rich_menu_schedule_lease.sql'), 'utf8'))
   return sqlite
 }
 
@@ -230,7 +231,7 @@ describe('342 remand: attempt独立・run追跡・stale回収・戻し先確定'
 
   test('開始成功(期間)はattemptを0へ戻しendedを空ける', async () => {
     insertFullSchedule(sqlite, { id: 'period-1', mode: 'period', ends_at: '2026-09-30T14:59:00.000Z', restore_group_id: 'restore-1', status: 'publishing', attempt_count: 4 } as never)
-    sqlite.prepare(`UPDATE rich_menu_schedules SET attempt_count = 4, started_run_id = 'run-start' WHERE id = 'period-1'`).run()
+    sqlite.prepare(`UPDATE rich_menu_schedules SET attempt_count = 4, started_run_id = 'run-start', lease_expires_at = '2026-09-10T02:00:00.000Z' WHERE id = 'period-1'`).run()
     await recordRichMenuScheduleSuccess(db, 'period-1', 'account-1', 'run-start', 'published')
     const row = sqlite.prepare(`SELECT status, attempt_count, ended_run_id, started_run_id FROM rich_menu_schedules WHERE id = 'period-1'`).get() as Record<string, unknown>
     expect(row).toMatchObject({ status: 'published', attempt_count: 0, ended_run_id: null, started_run_id: 'run-start' })
@@ -240,7 +241,7 @@ describe('342 remand: attempt独立・run追跡・stale回収・戻し先確定'
     insertFullSchedule(sqlite, { id: 'period-2', mode: 'period', ends_at: '2026-09-30T14:59:00.000Z', restore_group_id: 'restore-1', status: 'published', attempt_count: 0 } as never)
     sqlite.prepare(`UPDATE rich_menu_schedules SET attempt_count = 0, started_run_id = 'run-start' WHERE id = 'period-2'`).run()
     // 復元claimで+1されても上限5まで余裕がある。
-    const claimed = await claimRichMenuScheduleRestore(db, 'period-2', 'account-1', 'run-restore')
+    const claimed = await claimRichMenuScheduleRestore(db, 'period-2', 'account-1', 'run-restore', '2026-09-10T01:00:00.000Z')
     expect(claimed).toBe(true)
     const row = sqlite.prepare(`SELECT attempt_count, started_run_id, ended_run_id, status FROM rich_menu_schedules WHERE id = 'period-2'`).get() as Record<string, unknown>
     expect(row).toMatchObject({ attempt_count: 1, started_run_id: 'run-start', status: 'restoring' })
@@ -249,16 +250,17 @@ describe('342 remand: attempt独立・run追跡・stale回収・戻し先確定'
 
   test('復元claimはstartedを上書きせずendedへ書く', async () => {
     insertFullSchedule(sqlite, { id: 'period-3', mode: 'period', ends_at: '2026-09-30T14:59:00.000Z', status: 'published', started_run_id: 'run-start' })
-    await claimRichMenuScheduleRestore(db, 'period-3', 'account-1', 'run-restore')
+    await claimRichMenuScheduleRestore(db, 'period-3', 'account-1', 'run-restore', '2026-09-10T01:00:00.000Z')
     const row = sqlite.prepare(`SELECT started_run_id, ended_run_id FROM rich_menu_schedules WHERE id = 'period-3'`).get() as Record<string, unknown>
     expect(row).toEqual({ started_run_id: 'run-start', ended_run_id: 'run-restore' })
   })
 
   test('staleなpublishingはscheduledへ戻り再試行できる', async () => {
     insertFullSchedule(sqlite, { id: 'stale-1', status: 'publishing', updated_at: '2026-09-10T00:00:00+09:00' })
-    const stale = await getStalePublishingSchedules(db, '2026-09-10T00:30:00+09:00', 20)
+    sqlite.prepare(`UPDATE rich_menu_schedules SET lease_expires_at = '2026-09-10T00:20:00.000Z' WHERE id = 'stale-1'`).run()
+    const stale = await getStalePublishingSchedules(db, '2026-09-10T00:30:00.000Z', 20)
     expect(stale.map((row) => row.id)).toContain('stale-1')
-    const reclaimed = await reclaimStalePublishingSchedule(db, 'stale-1', 'account-1', '2026-09-10T00:30:00+09:00')
+    const reclaimed = await reclaimStalePublishingSchedule(db, 'stale-1', 'account-1', '2026-09-10T00:30:00.000Z')
     expect(reclaimed).toBe(true)
     const row = sqlite.prepare(`SELECT status FROM rich_menu_schedules WHERE id = 'stale-1'`).get() as { status: string }
     expect(row.status).toBe('scheduled')
@@ -269,17 +271,19 @@ describe('342 remand: attempt独立・run追跡・stale回収・戻し先確定'
 
   test('新しいpublishingはstale回収されない', async () => {
     insertFullSchedule(sqlite, { id: 'fresh-1', status: 'publishing', updated_at: '2026-09-10T00:29:00+09:00' })
-    const stale = await getStalePublishingSchedules(db, '2026-09-10T00:10:00+09:00', 20)
+    sqlite.prepare(`UPDATE rich_menu_schedules SET lease_expires_at = '2026-09-10T01:00:00.000Z' WHERE id = 'fresh-1'`).run()
+    const stale = await getStalePublishingSchedules(db, '2026-09-10T00:10:00.000Z', 20)
     expect(stale.map((row) => row.id)).not.toContain('fresh-1')
-    const reclaimed = await reclaimStalePublishingSchedule(db, 'fresh-1', 'account-1', '2026-09-10T00:10:00+09:00')
+    const reclaimed = await reclaimStalePublishingSchedule(db, 'fresh-1', 'account-1', '2026-09-10T00:10:00.000Z')
     expect(reclaimed).toBe(false)
   })
 
   test('staleなrestoringはpublishedへ戻る', async () => {
     insertFullSchedule(sqlite, { id: 'stale-r', status: 'restoring', updated_at: '2026-09-10T00:00:00+09:00' })
-    const stale = await getStaleRestoringSchedules(db, '2026-09-10T00:30:00+09:00', 20)
+    sqlite.prepare(`UPDATE rich_menu_schedules SET lease_expires_at = '2026-09-10T00:20:00.000Z' WHERE id = 'stale-r'`).run()
+    const stale = await getStaleRestoringSchedules(db, '2026-09-10T00:30:00.000Z', 20)
     expect(stale.map((row) => row.id)).toContain('stale-r')
-    expect(await reclaimStaleRestoringSchedule(db, 'stale-r', 'account-1', '2026-09-10T00:30:00+09:00')).toBe(true)
+    expect(await reclaimStaleRestoringSchedule(db, 'stale-r', 'account-1', '2026-09-10T00:30:00.000Z')).toBe(true)
     const row = sqlite.prepare(`SELECT status FROM rich_menu_schedules WHERE id = 'stale-r'`).get() as { status: string }
     expect(row.status).toBe('published')
   })

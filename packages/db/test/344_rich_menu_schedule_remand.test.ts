@@ -37,6 +37,7 @@ function setup() {
   sqlite.exec(readFileSync(join(import.meta.dirname, '../migrations/291_rich_menu_schedules.sql'), 'utf8'))
   sqlite.exec(readFileSync(join(import.meta.dirname, '../migrations/342_rich_menu_schedule_execution.sql'), 'utf8'))
   sqlite.exec(readFileSync(join(import.meta.dirname, '../migrations/344_rich_menu_schedule_publications.sql'), 'utf8'))
+  sqlite.exec(readFileSync(join(import.meta.dirname, '../migrations/355_rich_menu_schedule_lease.sql'), 'utf8'))
   return sqlite
 }
 
@@ -114,12 +115,14 @@ describe('344 remand: lease fencing・journal・冪等・drift（実D1）', () =
     insertFullSchedule(sqlite, { id: 'stale-crash' })
     // run Aがclaim直後に停止（publishingのまま）。
     expect(await claimRichMenuSchedule(db, 'stale-crash', 'account-1', 'run-A', '2026-09-10T01:00:00.000Z')).toBe(true)
-    // stale回収でscheduledへ戻る（run IDは残る）。
-    sqlite.prepare(`UPDATE rich_menu_schedules SET updated_at = '2026-09-10T00:00:00+09:00' WHERE id = 'stale-crash'`).run()
+    // lease期限内は回収されない。
     const { reclaimStalePublishingSchedule } = await import('../src/rich-menu-schedules.js')
-    expect(await reclaimStalePublishingSchedule(db, 'stale-crash', 'account-1', '2026-09-10T00:30:00+09:00')).toBe(true)
+    expect(await reclaimStalePublishingSchedule(db, 'stale-crash', 'account-1', '2026-09-10T01:00:00.000Z')).toBe(false)
+    // lease期限切れ（11分後）でscheduledへ戻る（run IDは残る）。
+    const expired = '2026-09-10T01:11:00.000Z'
+    expect(await reclaimStalePublishingSchedule(db, 'stale-crash', 'account-1', expired)).toBe(true)
     // run Bが新しくclaimできる。古いrun Aのまま完成させない。
-    expect(await claimRichMenuSchedule(db, 'stale-crash', 'account-1', 'run-B', '2026-09-10T01:00:00.000Z')).toBe(true)
+    expect(await claimRichMenuSchedule(db, 'stale-crash', 'account-1', 'run-B', expired)).toBe(true)
     const fresh = await getRichMenuScheduleById(db, 'stale-crash', 'account-1')
     expect(fresh?.started_run_id).toBe('run-B')
     expect(fresh?.status).toBe('publishing')
@@ -128,10 +131,9 @@ describe('344 remand: lease fencing・journal・冪等・drift（実D1）', () =
   test('stale run Aはrun B claim後に成功・失敗を書けない', async () => {
     insertFullSchedule(sqlite, { id: 'fence-1' })
     await claimRichMenuSchedule(db, 'fence-1', 'account-1', 'run-A', '2026-09-10T01:00:00.000Z')
-    sqlite.prepare(`UPDATE rich_menu_schedules SET updated_at = '2026-09-10T00:00:00+09:00' WHERE id = 'fence-1'`).run()
     const { reclaimStalePublishingSchedule } = await import('../src/rich-menu-schedules.js')
-    await reclaimStalePublishingSchedule(db, 'fence-1', 'account-1', '2026-09-10T00:30:00+09:00')
-    await claimRichMenuSchedule(db, 'fence-1', 'account-1', 'run-B', '2026-09-10T01:00:00.000Z')
+    await reclaimStalePublishingSchedule(db, 'fence-1', 'account-1', '2026-09-10T01:11:00.000Z')
+    await claimRichMenuSchedule(db, 'fence-1', 'account-1', 'run-B', '2026-09-10T01:11:00.000Z')
     // 古いrun Aの成功記録は失敗する。
     expect(await recordRichMenuScheduleSuccess(db, 'fence-1', 'account-1', 'run-A', 'completed')).toBe(false)
     expect(await recordRichMenuScheduleTransientFailure(db, 'fence-1', 'account-1', 'run-A', 'fetch failed', '2026-09-10T01:01:00.000Z')).toBe(false)
@@ -144,11 +146,10 @@ describe('344 remand: lease fencing・journal・冪等・drift（実D1）', () =
 
   test('復元のstale runもfencingで弾く', async () => {
     insertFullSchedule(sqlite, { id: 'fence-r', mode: 'period', ends_at: '2026-09-30T00:00:00.000Z', restore_group_id: 'restore-1', status: 'published', started_run_id: 'run-start' })
-    await claimRichMenuScheduleRestore(db, 'fence-r', 'account-1', 'run-A')
-    sqlite.prepare(`UPDATE rich_menu_schedules SET updated_at = '2026-09-10T00:00:00+09:00' WHERE id = 'fence-r'`).run()
+    await claimRichMenuScheduleRestore(db, 'fence-r', 'account-1', 'run-A', '2026-09-10T01:00:00.000Z')
     const { reclaimStaleRestoringSchedule } = await import('../src/rich-menu-schedules.js')
-    await reclaimStaleRestoringSchedule(db, 'fence-r', 'account-1', '2026-09-10T00:30:00+09:00')
-    await claimRichMenuScheduleRestore(db, 'fence-r', 'account-1', 'run-B')
+    await reclaimStaleRestoringSchedule(db, 'fence-r', 'account-1', '2026-09-10T01:11:00.000Z')
+    await claimRichMenuScheduleRestore(db, 'fence-r', 'account-1', 'run-B', '2026-09-10T01:11:00.000Z')
     expect(await recordRichMenuScheduleRestoreSuccess(db, 'fence-r', 'account-1', 'run-A')).toBe(false)
     expect(await recordRichMenuScheduleRestoreTransientFailure(db, 'fence-r', 'account-1', 'run-A', 'fetch failed', '2026-09-10T01:01:00.000Z')).toBe(false)
     expect(await recordRichMenuScheduleRestoreSuccess(db, 'fence-r', 'account-1', 'run-B')).toBe(true)

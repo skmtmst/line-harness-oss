@@ -305,7 +305,8 @@
     "341_ec_notification_settings_account_scope.sql",
     "342_rich_menu_schedule_execution.sql",
     "343_messages_log_broadcast_recipient_index.sql",
-    "344_rich_menu_schedule_publications.sql"
+    "344_rich_menu_schedule_publications.sql",
+    "355_rich_menu_schedule_lease.sql"
   ],
-  "migrationCount": 306
+  "migrationCount": 307
 }

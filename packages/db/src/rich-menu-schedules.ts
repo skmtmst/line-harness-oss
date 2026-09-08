@@ -1,16 +1,35 @@
 import { boundedListLimit, jstNow } from './utils.js';
 
 // E-08 (#621): 公開予約の実行状態を DB で持つための最小ヘルパー。
-// 342 で足した attempt_count / next_retry_at だけを使い、
+// 342 で足した attempt_count / next_retry_at、344 の journal、355 の lease を使う。
 // 上限回数はコード定数で持つ (列は増やさない)。
 
 export const RICH_MENU_SCHEDULE_MAX_ATTEMPTS = 5;
 
 /**
  * claim後にWorkerが止まった場合の回収までの待ち時間。
- * publishing/restoringのままupdated_atがこれより古ければstaleとして回収する。
+ * 所有runのlease期限 (lease_expires_at、UTCのISO8601) を過ぎた
+ * publishing/restoringだけをstaleとして回収する。
  */
 export const RICH_MENU_SCHEDULE_STALE_MS = 10 * 60_000;
+
+/**
+ * 予約・再試行の時刻入力をUTCのISO8601('Z')へ正規化する。
+ * オフセット付き('+09:00'等)のまま保存すると、due判定の文字列比較で
+ * 順序が崩れるため、書き込み境界で必ずここを通す。
+ */
+export function normalizeScheduleTimestamp(value: string): string {
+  const time = Date.parse(value);
+  if (!Number.isFinite(time)) throw new Error('schedule timestamp must be ISO 8601');
+  return new Date(time).toISOString();
+}
+
+/** claim時刻(UTC ISO)からそのrunのlease期限を作る。 */
+export function scheduleLeaseExpiresAt(nowIso: string): string {
+  const time = Date.parse(nowIso);
+  if (!Number.isFinite(time)) throw new Error('schedule timestamp must be ISO 8601');
+  return new Date(time + RICH_MENU_SCHEDULE_STALE_MS).toISOString();
+}
 
 export type RichMenuScheduleRow = {
   id: string;
@@ -29,6 +48,7 @@ export type RichMenuScheduleRow = {
   last_error_code: string | null;
   attempt_count: number;
   next_retry_at: string | null;
+  lease_expires_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -142,12 +162,13 @@ export async function claimRichMenuSchedule(
     .prepare(
       `UPDATE rich_menu_schedules
           SET status = 'publishing', started_run_id = ?, updated_at = ?,
-              attempt_count = attempt_count + 1
+              attempt_count = attempt_count + 1,
+              lease_expires_at = ?
         WHERE id = ? AND account_id = ? AND status = 'scheduled'
           AND starts_at <= ?
           AND (next_retry_at IS NULL OR next_retry_at <= ?)`,
     )
-    .bind(runId, jstNow(), id, accountId, nowIso, nowIso)
+    .bind(runId, jstNow(), scheduleLeaseExpiresAt(nowIso), id, accountId, nowIso, nowIso)
     .run();
   return (result.meta?.changes ?? 0) > 0;
 }
@@ -157,17 +178,19 @@ export async function claimRichMenuScheduleRestore(
   id: string,
   accountId: string,
   runId: string,
+  nowIso: string,
 ): Promise<boolean> {
   // started_run_idは開始runのまま残し、復元runはended_run_idへ書く。
-  // 開始runと復元runを別々に追跡するため。
+  // 開始runと復元runを別々に追跡するため。lease期限もこのrunへ付け替える。
   const result = await db
     .prepare(
       `UPDATE rich_menu_schedules
           SET status = 'restoring', ended_run_id = ?, updated_at = ?,
-              attempt_count = attempt_count + 1
+              attempt_count = attempt_count + 1,
+              lease_expires_at = ?
         WHERE id = ? AND account_id = ? AND status = 'published'`,
     )
-    .bind(runId, jstNow(), id, accountId)
+    .bind(runId, jstNow(), scheduleLeaseExpiresAt(nowIso), id, accountId)
     .run();
   return (result.meta?.changes ?? 0) > 0;
 }
@@ -198,12 +221,13 @@ export async function recordRichMenuScheduleSuccess(
   if (nextStatus === 'published') {
     // 期間モードの開始成功。復元の再試行回数を開始と独立させるため
     // attempt_countを0へ戻す。started_run_idは開始runのまま残し、
-    // ended_run_idは復元が終わるまで空けておく。
+    // ended_run_idは復元が終わるまで空けておく。確定したのでleaseは空ける。
     const result = await db
       .prepare(
         `UPDATE rich_menu_schedules
             SET status = 'published', ended_run_id = NULL, last_error_code = NULL,
-                attempt_count = 0, next_retry_at = NULL, updated_at = ?
+                attempt_count = 0, next_retry_at = NULL, lease_expires_at = NULL,
+                updated_at = ?
           WHERE id = ? AND account_id = ? AND status = 'publishing'
             AND started_run_id = ?`,
       )
@@ -215,7 +239,7 @@ export async function recordRichMenuScheduleSuccess(
     .prepare(
       `UPDATE rich_menu_schedules
           SET status = ?, ended_run_id = ?, last_error_code = NULL,
-              next_retry_at = NULL, updated_at = ?
+              next_retry_at = NULL, lease_expires_at = NULL, updated_at = ?
         WHERE id = ? AND account_id = ? AND status = 'publishing'
           AND started_run_id = ?`,
     )
@@ -234,7 +258,7 @@ export async function recordRichMenuScheduleRestoreSuccess(
     .prepare(
       `UPDATE rich_menu_schedules
           SET status = 'completed', ended_run_id = ?, last_error_code = NULL,
-              next_retry_at = NULL, updated_at = ?
+              next_retry_at = NULL, lease_expires_at = NULL, updated_at = ?
         WHERE id = ? AND account_id = ? AND status = 'restoring'
           AND ended_run_id = ?`,
     )
@@ -255,7 +279,7 @@ export async function recordRichMenuScheduleTransientFailure(
     .prepare(
       `UPDATE rich_menu_schedules
           SET status = 'scheduled', last_error_code = ?, next_retry_at = ?,
-              updated_at = ?
+              lease_expires_at = NULL, updated_at = ?
         WHERE id = ? AND account_id = ? AND status = 'publishing'
           AND started_run_id = ?`,
     )
@@ -276,7 +300,7 @@ export async function recordRichMenuScheduleRestoreTransientFailure(
     .prepare(
       `UPDATE rich_menu_schedules
           SET status = 'published', last_error_code = ?, next_retry_at = ?,
-              updated_at = ?
+              lease_expires_at = NULL, updated_at = ?
         WHERE id = ? AND account_id = ? AND status = 'restoring'
           AND ended_run_id = ?`,
     )
@@ -294,13 +318,15 @@ export async function recordRichMenuSchedulePermanentFailure(
 ): Promise<boolean> {
   // 恒久失敗もlease付き。stale runが新しいclaimをfailedで潰さない。
   // 開始側(publishing/scheduled)か復元側(restoring/published)のどちらかで
-  // 自分のrunが残っている場合だけ書ける。
+  // 自分のrunが残っている場合だけ書ける。completed/cancelled/failedの
+  // 確定済みは反転させない (成功後の通信エラーでfailedに戻さない)。
   const result = await db
     .prepare(
       `UPDATE rich_menu_schedules
           SET status = 'failed', ended_run_id = ?, last_error_code = ?,
-              next_retry_at = NULL, updated_at = ?
+              next_retry_at = NULL, lease_expires_at = NULL, updated_at = ?
         WHERE id = ? AND account_id = ?
+          AND status IN ('scheduled', 'publishing', 'published', 'restoring')
           AND (started_run_id = ? OR ended_run_id = ?)`,
     )
     .bind(runId, errorCode.slice(0, 120), jstNow(), id, accountId, runId, runId)
@@ -309,76 +335,82 @@ export async function recordRichMenuSchedulePermanentFailure(
 }
 
 /**
- * claim後に止まった行を拾う。updated_atはjstNow形式(+09:00)でそろっているため
- * 同じ形式のstaleBeforeと文字列比較できる。取得と回収は別にし、回収は
- * 条件付きUPDATEで二重実行しない。
+ * claim後に止まった行を拾う。所有runのlease期限(UTCのISO8601)を過ぎた行だけ
+ * 対象にし、取得と回収は別にする。回収は条件付きUPDATEで二重実行しない。
+ * nowIsoはUTCのISO8601で渡す (claimと同じ形式にそろえる)。
  */
 export async function getStalePublishingSchedules(
   db: D1Database,
-  staleBeforeJst: string,
+  nowIso: string,
   limit = 20,
 ): Promise<RichMenuScheduleRow[]> {
   const result = await db
     .prepare(
       `SELECT * FROM rich_menu_schedules
-        WHERE status = 'publishing' AND updated_at <= ?
-        ORDER BY updated_at ASC LIMIT ?`,
+        WHERE status = 'publishing'
+          AND lease_expires_at IS NOT NULL
+          AND lease_expires_at <= ?
+        ORDER BY lease_expires_at ASC LIMIT ?`,
     )
-    .bind(staleBeforeJst, boundedListLimit(limit, 20))
+    .bind(nowIso, boundedListLimit(limit, 20))
     .all<RichMenuScheduleRow>();
   return result.results ?? [];
 }
 
 export async function getStaleRestoringSchedules(
   db: D1Database,
-  staleBeforeJst: string,
+  nowIso: string,
   limit = 20,
 ): Promise<RichMenuScheduleRow[]> {
   const result = await db
     .prepare(
       `SELECT * FROM rich_menu_schedules
-        WHERE status = 'restoring' AND updated_at <= ?
-        ORDER BY updated_at ASC LIMIT ?`,
+        WHERE status = 'restoring'
+          AND lease_expires_at IS NOT NULL
+          AND lease_expires_at <= ?
+        ORDER BY lease_expires_at ASC LIMIT ?`,
     )
-    .bind(staleBeforeJst, boundedListLimit(limit, 20))
+    .bind(nowIso, boundedListLimit(limit, 20))
     .all<RichMenuScheduleRow>();
   return result.results ?? [];
 }
 
-/** staleなpublishingをscheduledへ戻す。古いclaimのままなら1行だけ戻る。 */
+/** staleなpublishingをscheduledへ戻す。lease期限切れのままなら1行だけ戻る。 */
 export async function reclaimStalePublishingSchedule(
   db: D1Database,
   id: string,
   accountId: string,
-  staleBeforeJst: string,
+  nowIso: string,
 ): Promise<boolean> {
   const result = await db
     .prepare(
       `UPDATE rich_menu_schedules
-          SET status = 'scheduled', updated_at = ?
+          SET status = 'scheduled', lease_expires_at = NULL, updated_at = ?
         WHERE id = ? AND account_id = ? AND status = 'publishing'
-          AND updated_at <= ?`,
+          AND lease_expires_at IS NOT NULL
+          AND lease_expires_at <= ?`,
     )
-    .bind(jstNow(), id, accountId, staleBeforeJst)
+    .bind(jstNow(), id, accountId, nowIso)
     .run();
   return (result.meta?.changes ?? 0) > 0;
 }
 
-/** staleなrestoringをpublishedへ戻す。古いclaimのままなら1行だけ戻る。 */
+/** staleなrestoringをpublishedへ戻す。lease期限切れのままなら1行だけ戻る。 */
 export async function reclaimStaleRestoringSchedule(
   db: D1Database,
   id: string,
   accountId: string,
-  staleBeforeJst: string,
+  nowIso: string,
 ): Promise<boolean> {
   const result = await db
     .prepare(
       `UPDATE rich_menu_schedules
-          SET status = 'published', updated_at = ?
+          SET status = 'published', lease_expires_at = NULL, updated_at = ?
         WHERE id = ? AND account_id = ? AND status = 'restoring'
-          AND updated_at <= ?`,
+          AND lease_expires_at IS NOT NULL
+          AND lease_expires_at <= ?`,
     )
-    .bind(jstNow(), id, accountId, staleBeforeJst)
+    .bind(jstNow(), id, accountId, nowIso)
     .run();
   return (result.meta?.changes ?? 0) > 0;
 }
@@ -402,6 +434,32 @@ export async function findPublishedRestoreCandidate(
     .bind(accountId, excludeGroupId)
     .first<{ id: string }>();
   return row ?? null;
+}
+
+export type ScheduleIndividualLink = { friendId: string; lineUserId: string };
+
+/**
+ * 期間終了で外す個別割当の対象。期限切れメニューを指す友だちの
+ * LINEユーザーIDを返す。LINE側の個別link解除に使う。
+ * D1行の削除は解除が終わってから行う (解除にIDが要るため)。
+ */
+export async function listScheduleGroupIndividualLinks(
+  db: D1Database,
+  accountId: string,
+  groupId: string,
+): Promise<ScheduleIndividualLink[]> {
+  const result = await db
+    .prepare(
+      `SELECT a.friend_id AS friend_id, f.line_user_id AS line_user_id
+         FROM rich_menu_assignments a
+         JOIN friends f ON f.id = a.friend_id AND f.line_account_id = a.line_account_id
+        WHERE a.line_account_id = ? AND a.group_id = ?`,
+    )
+    .bind(accountId, groupId)
+    .all<{ friend_id: string; line_user_id: string }>();
+  return (result.results ?? [])
+    .filter((row) => typeof row.line_user_id === 'string' && row.line_user_id.length > 0)
+    .map((row) => ({ friendId: row.friend_id, lineUserId: row.line_user_id }));
 }
 
 /** 実行前の取消だけ受け付ける。publishing/restoring の最中は 409 側で止める。 */
@@ -494,6 +552,8 @@ export type CreateScheduleInput = {
  * 予約作成を原子的に行う。SELECT→INSERTの2段階にしない。
  * INSERT OR IGNORE相当で競合を吸収し、同keyの既存行と内容を比べる。
  * 同内容なら既存を返し、異内容ならconflictを返す（成功扱いにしない）。
+ * 時刻はUTCのISO8601へ正規化して保存する。オフセット付きのままだと
+ * due判定の文字列比較で順序が崩れるため、ここでそろえる。
  */
 export async function createRichMenuScheduleAtomic(
   db: D1Database,
@@ -503,6 +563,8 @@ export async function createRichMenuScheduleAtomic(
   | { outcome: 'existing'; id: string; status: string }
   | { outcome: 'conflict'; id: string; status: string }
 > {
+  const startsAt = normalizeScheduleTimestamp(input.startsAt);
+  const endsAt = input.endsAt === null ? null : normalizeScheduleTimestamp(input.endsAt);
   const insert = await db
     .prepare(
       `INSERT INTO rich_menu_schedules
@@ -517,8 +579,8 @@ export async function createRichMenuScheduleAtomic(
       input.groupId,
       input.accountId,
       input.mode,
-      input.startsAt,
-      input.endsAt,
+      startsAt,
+      endsAt,
       input.restoreGroupId,
       input.definitionSnapshot,
       input.idempotencyKey,
@@ -555,8 +617,8 @@ export async function createRichMenuScheduleAtomic(
   const same =
     existing.group_id === input.groupId &&
     existing.mode === input.mode &&
-    existing.starts_at === input.startsAt &&
-    (existing.ends_at ?? null) === (input.endsAt ?? null) &&
+    existing.starts_at === startsAt &&
+    (existing.ends_at ?? null) === (endsAt ?? null) &&
     (existing.restore_group_id ?? null) === (input.restoreGroupId ?? null) &&
     existing.definition_snapshot === input.definitionSnapshot;
   if (same) {
