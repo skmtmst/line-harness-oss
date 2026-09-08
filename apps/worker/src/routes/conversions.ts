@@ -3,6 +3,7 @@ import {
   getConversionPoints,
   getConversionPointById,
   createConversionPoint,
+  hasConversionPointActivity,
   updateConversionPoint,
   stopConversionPoint,
   trackConversion,
@@ -301,7 +302,23 @@ interface ConversionPointBody {
   countRepeat?: unknown;
   attributionDays?: unknown;
   lineAccountId?: unknown;
+  expectedVersion?: unknown;
 }
+
+/**
+ * 数え方を変える項目。稼働中または成果・利用先のある地点では
+ * 旧PUTで触らせず、新版作成か停止後の手順へ案内する(N-254)。
+ * 名前だけは表示用で数え方に影響しないため対象外。
+ */
+const CONVERSION_MEASURE_PATCH_KEYS = new Set([
+  'eventType',
+  'value',
+  'measureMethod',
+  'targetUrl',
+  'countRepeat',
+  'attributionDays',
+  'lineAccountId',
+]);
 
 /**
  * 計測に関する項目を検証して取り出す。
@@ -724,6 +741,9 @@ conversions.post('/api/conversions/points', requireRole('owner', 'admin'), async
 
 // PUT /api/conversions/points/:id - update
 // 送られた項目だけを触る。画面が「計測方法だけ変える」ような部分更新をするため。
+// ただし旧口のまま版・利用先確認を通さず上書きすると、稼働中の数え方が
+// 後から変わる(N-254)。定義系と同じく版の一致を求め、稼働中または
+// 成果・利用先のある地点の数え方は新版作成か停止後の手順へ案内する。
 conversions.put('/api/conversions/points/:id', requireRole('owner', 'admin'), requireVisibleConversionPoint, async (c) => {
   try {
     const id = c.req.param('id');
@@ -731,6 +751,23 @@ conversions.put('/api/conversions/points/:id', requireRole('owner', 'admin'), re
     if (!current) return c.json({ success: false, error: 'Not found' }, 404);
 
     const body = await c.req.json<ConversionPointBody>();
+    /*
+     * 版は本文が正本。代理やプロキシで本文が落ちたときだけクエリを見る
+     * (#513 L11)。定義系の stop / replace / delete と同じ約束にする。
+     */
+    const expectedVersion = positiveVersion(body.expectedVersion)
+      ?? positiveVersion(c.req.query('expectedVersion'));
+    if (expectedVersion === null) {
+      return c.json({ success: false, error: 'expectedVersionを正しく指定してください。本文が落ちる通信経路ではクエリでも指定できます' }, 400);
+    }
+    if (current.version !== expectedVersion) {
+      return c.json({
+        success: false,
+        error: '成果地点が更新されています。読み直してください',
+        currentVersion: current.version,
+      }, 409);
+    }
+
     const options = readMeasureOptions(body, current);
     if (!options.ok) return c.json({ success: false, error: options.error }, 400);
     if ('lineAccountId' in options.value
@@ -750,7 +787,30 @@ conversions.put('/api/conversions/points/:id', requireRole('owner', 'admin'), re
       patch.value = body.value === null || body.value === '' ? null : Number(body.value);
     }
 
-    const point = await updateConversionPoint(c.env.DB, id, patch);
+    const touchesMeasure = Object.keys(patch).some((key) => CONVERSION_MEASURE_PATCH_KEYS.has(key));
+    if (touchesMeasure
+      && (current.status === 'active' || await hasConversionPointActivity(c.env.DB, id))) {
+      return c.json({
+        success: false,
+        error: '稼働中または成果・利用先のある地点の数え方は、この口では変えられません。新しい成果地点を作るか、停止してから変えてください',
+      }, 409);
+    }
+
+    let point;
+    try {
+      point = await updateConversionPoint(c.env.DB, id, patch, { expectedVersion });
+    } catch (error) {
+      // 読み取りから書込みの間に別操作が版を進めたときだけここに来る。
+      if (error instanceof Error && error.message === 'conversion_point_version_conflict') {
+        const latest = await getConversionPointById(c.env.DB, id);
+        return c.json({
+          success: false,
+          error: '成果地点が更新されています。読み直してください',
+          currentVersion: latest?.version ?? current.version,
+        }, 409);
+      }
+      throw error;
+    }
     if (!point) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serializeConversionPoint(point) });
   } catch (err) {
@@ -838,6 +898,10 @@ conversions.post('/api/conversions/track', requireRole('owner', 'admin'), async 
       },
     }, 201);
   } catch (err) {
+    // 同じ冪等キーの別内容の使い回しは409。同じ再送は上で200/201相当を返している。
+    if (err instanceof Error && err.message === 'conversion_idempotency_key_conflict') {
+      return c.json({ success: false, error: 'このキーは別の内容で既に使われています' }, 409);
+    }
     console.error('POST /api/conversions/track error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
