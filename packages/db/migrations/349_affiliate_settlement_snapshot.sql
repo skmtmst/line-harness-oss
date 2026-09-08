@@ -31,3 +31,18 @@ SELECT 'calc-legacy:' || re.id, re.organization_id, re.line_account_id, re.affil
   re.conversion_event_id, re.offer_id, 'legacy', '', re.amount_minor, re.currency, re.created_at
 FROM affiliate_reward_entries re
 WHERE re.entry_type = 'credit';
+
+-- 既存entryを対応するlegacy版へ決定的に紐付ける。entryと版は成果ごとに
+-- 1対1のはずだが、対応が1件に定まらない曖昧な行はNULLのまま残し、
+-- 後から監査できる状態にする(偽の紐付けを作らない)。既に版がある行は触らない。
+UPDATE affiliate_reward_entries
+SET reward_calculation_id = (
+  SELECT c.id FROM affiliate_reward_calculations c
+  WHERE c.conversion_event_id = affiliate_reward_entries.conversion_event_id
+    AND c.formula = 'legacy'
+)
+WHERE entry_type = 'credit'
+  AND reward_calculation_id IS NULL
+  AND (SELECT COUNT(*) FROM affiliate_reward_calculations c
+       WHERE c.conversion_event_id = affiliate_reward_entries.conversion_event_id
+         AND c.formula = 'legacy') = 1;
