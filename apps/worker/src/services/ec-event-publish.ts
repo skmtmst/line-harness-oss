@@ -1,12 +1,20 @@
 import type { EventPayload } from './event-bus.js';
 
 /**
- * EC受信イベントのV6連携用正規化。
+ * EC受信イベントのV6連携用正規化(共通互換形式 v1)。
  *
- * EC-CUBE側の出来事(EcEvent)をV6イベント基盤(fireEvent)が受け付けられる形へ
- * 寄せる。V6側の自動化・分析・スコアは `sourceEventId` を冪等キーにするため、
+ * EC-CUBE側の出来事をV6イベント基盤(fireEvent)が受け付けられる形へ寄せる。
+ * V6側の自動化・分析・スコアは `sourceEventId` を冪等キーにするため、
  * ここで発生元の不変ID・台帳名・発生時刻をそろえて1回だけ渡す。
  * 再送・再試行の二重実行は下流の冪等キーで抑える(この層では落とさない)。
+ *
+ * 互換の約束(#1460との共通形式):
+ * - `sourceEventId` はEC側の `event_id`(発生元の不変ID)。台帳の行IDではない。
+ * - `sourceKind` は `'eccube'`(受信口・台帳の `eccube:` にそろえる)。
+ * - `eventData` は標準フラット項目に加え、`order` の互換subset
+ *   (`{ number, total, currency }`)を必ず含める。広告成果の対応表は
+ *   `eventData.order.total`(なければ `eventData.total`)を読むため、
+ *   フラット化でこの形を落としてはならない。
  */
 
 /** V6側に渡す発生元の台帳名。受信口・台帳の `eccube:` にそろえる。 */
@@ -28,6 +36,7 @@ export interface EcV6SourceEvent {
   subscription?: {
     id?: string;
     contract_number?: string;
+    amount?: number;
     status?: string;
     status_code?: string;
   } | null;
@@ -36,6 +45,21 @@ export interface EcV6SourceEvent {
 export interface EcV6Event {
   eventType: string;
   payload: EventPayload;
+}
+
+/** 互換subsetとして残す注文の最小形。広告成果の対応表が `total` を読む。 */
+export interface EcV6OrderCompat {
+  number?: string;
+  total?: number | string;
+  currency?: string;
+}
+
+function nonEmptyText(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function finiteAmount(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
 /**
@@ -49,8 +73,27 @@ export function normalizeEcOccurredAt(value: string): string {
 }
 
 /**
- * 下流へ渡す出来事データをフラットなスカラーだけにする。生の受信体は
- * 入れない(明細50件・ペット情報まで自動化ログや送信Webhookへ流れ込むため)。
+ * 金額の正規形。注文明細の合計を先にし、旧EC-CUBEのように定期便側だけが
+ * 金額を持つ受信体では `subscription.amount` を拾う。推測はしない。
+ */
+export function normalizeEcOrderTotal(event: EcV6SourceEvent): number | undefined {
+  return finiteAmount(event.order?.total) ?? finiteAmount(event.subscription?.amount);
+}
+
+/**
+ * 状態の正規形。発生元が持つ符号をありのまま写す
+ * (`status_code` 優先、なければ `status`)。注文系に状態項目はないため、
+ * ない受信体では書かない(作らない)。
+ */
+export function normalizeEcStatus(event: EcV6SourceEvent): string | undefined {
+  return nonEmptyText(event.subscription?.status_code)
+    ?? nonEmptyText(event.subscription?.status);
+}
+
+/**
+ * 下流へ渡す出来事データ。標準フラット項目と `order` 互換subsetの両方を
+ * 持つ。生の受信体は入れない(明細50件・ペット情報まで自動化ログや
+ * 送信Webhookへ流れ込むため)。未定義の項目は書かない。
  */
 export function buildEcEventData(event: EcV6SourceEvent): Record<string, unknown> {
   const data: Record<string, unknown> = {};
@@ -58,11 +101,12 @@ export function buildEcEventData(event: EcV6SourceEvent): Record<string, unknown
   const order = event.order;
   if (order) {
     if (order.number) data.orderNumber = order.number;
-    if (typeof order.total === 'number' && Number.isFinite(order.total)) data.orderTotal = order.total;
     if (order.currency) data.currency = order.currency;
     if (Array.isArray(order.items)) data.itemCount = order.items.length;
     if (order.payment_method) data.paymentMethod = order.payment_method;
   }
+  const orderTotal = normalizeEcOrderTotal(event);
+  if (orderTotal !== undefined) data.orderTotal = orderTotal;
   const subscription = event.subscription;
   if (subscription) {
     if (subscription.id) data.subscriptionId = subscription.id;
@@ -70,6 +114,17 @@ export function buildEcEventData(event: EcV6SourceEvent): Record<string, unknown
     if (subscription.status) data.subscriptionStatus = subscription.status;
     if (subscription.status_code) data.subscriptionStatusCode = subscription.status_code;
   }
+  const status = normalizeEcStatus(event);
+  if (status !== undefined) data.status = status;
+  const compat: EcV6OrderCompat = {};
+  if (order) {
+    if (order.number) compat.number = order.number;
+    if (finiteAmount(order.total) !== undefined || nonEmptyText(order.total) !== undefined) {
+      compat.total = order.total as number | string;
+    }
+    if (order.currency) compat.currency = order.currency;
+  }
+  if (Object.keys(compat).length > 0) data.order = compat;
   return data;
 }
 
@@ -88,4 +143,16 @@ export function buildEcV6Event(event: EcV6SourceEvent, friendId: string): EcV6Ev
       eventData: buildEcEventData(event),
     },
   };
+}
+
+/**
+ * 冪等キーの安定形。購読先ごとに1本で、再送・再試行で変わらない。
+ * アカウントを含む(同じ出来事IDが別アカウントへ届く場合の混線を防ぐ)。
+ */
+export function ecDispatchIdempotencyKey(
+  lineAccountId: string,
+  externalEventId: string,
+  subscriber: string,
+): string {
+  return `eccube:${lineAccountId}:${externalEventId}:${subscriber}`;
 }

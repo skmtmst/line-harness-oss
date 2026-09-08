@@ -3,8 +3,11 @@ import { EC_EVENT_TYPES } from '@line-crm/shared';
 import {
   buildEcEventData,
   buildEcV6Event,
+  ecDispatchIdempotencyKey,
   EC_V6_SOURCE_KIND,
   normalizeEcOccurredAt,
+  normalizeEcOrderTotal,
+  normalizeEcStatus,
   type EcV6SourceEvent,
 } from './ec-event-publish.js';
 
@@ -63,8 +66,18 @@ describe('buildEcV6Event', () => {
       contractNumber: 'NEN-SUB-57',
       subscriptionStatus: '契約中',
       subscriptionStatusCode: 'active',
+      status: 'active',
+      order: { number: 'NEN-1001', total: 2860, currency: 'JPY' },
     });
     expect(() => JSON.parse(JSON.stringify(built.payload.eventData))).not.toThrow();
+  });
+
+  it('keeps the order subset readable for the ad-conversion mapping (#1460 compatible)', () => {
+    const built = buildEcV6Event(sourceEvent('ec.order.confirmed'), 'friend-1');
+    const eventData = (built.payload.eventData ?? {}) as Record<string, unknown>;
+    // #1460 adConversionForEvent と同じ読み方: order.total、なければeventData直下。
+    const order = (eventData.order as Record<string, unknown> | undefined) ?? eventData;
+    expect(order.total).toBe(2860);
   });
 
   it('omits missing blocks instead of writing undefined', () => {
@@ -80,5 +93,45 @@ describe('buildEcV6Event', () => {
 describe('buildEcEventData', () => {
   it('stringifies a numeric customer id', () => {
     expect(buildEcEventData({ ...sourceEvent('ec.order.confirmed'), customer_id: 42 }).customerId).toBe('42');
+  });
+
+  it('prefers the order total and falls back to a legacy subscription amount', () => {
+    const base = sourceEvent('ec.order.confirmed');
+    expect(normalizeEcOrderTotal(base)).toBe(2860);
+    expect(normalizeEcOrderTotal({ ...base, order: null })).toBeUndefined();
+    // 旧EC-CUBEのように定期便側だけが金額を持つ受信体も拾う。
+    expect(normalizeEcOrderTotal({
+      ...base,
+      order: { number: 'NEN-1001' },
+      subscription: { contract_number: 'NEN-SUB-57', amount: 3680 },
+    })).toBe(3680);
+    expect(normalizeEcOrderTotal({ ...base, order: null, subscription: null })).toBeUndefined();
+  });
+
+  it('copies the source status code without inventing one', () => {
+    const base = sourceEvent('ec.order.confirmed');
+    expect(normalizeEcStatus(base)).toBe('active');
+    expect(normalizeEcStatus({
+      ...base, subscription: { contract_number: 'NEN-SUB-57', status: '契約中' },
+    })).toBe('契約中');
+    expect(normalizeEcStatus({ ...base, subscription: null })).toBeUndefined();
+    expect(buildEcEventData({ ...base, subscription: null })).not.toHaveProperty('status');
+  });
+
+  it('does not guess a currency the source did not send', () => {
+    const base = sourceEvent('ec.order.confirmed');
+    expect(buildEcEventData({ ...base, order: { number: 'NEN-1001', total: 100 } }))
+      .not.toHaveProperty('currency');
+  });
+});
+
+describe('ecDispatchIdempotencyKey', () => {
+  it('stays stable per account, event, and subscriber', () => {
+    expect(ecDispatchIdempotencyKey('account-a', 'event-12345678', 'notification'))
+      .toBe('eccube:account-a:event-12345678:notification');
+    expect(ecDispatchIdempotencyKey('account-a', 'event-12345678', 'v6'))
+      .toBe('eccube:account-a:event-12345678:v6');
+    expect(ecDispatchIdempotencyKey('account-b', 'event-12345678', 'notification'))
+      .not.toBe(ecDispatchIdempotencyKey('account-a', 'event-12345678', 'notification'));
   });
 });
