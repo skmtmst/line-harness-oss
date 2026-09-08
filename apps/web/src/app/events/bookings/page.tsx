@@ -8,8 +8,11 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
-import { eventsApi, type EventBookingItem, type EventDetail } from '@/lib/api'
+import Pagination from '@/components/shared/pagination'
+import { eventsApi, type EventBookingItem, type EventBookingSummary, type EventDetail } from '@/lib/api'
 import { describeBookingCapacity } from '../event-attention'
+
+const PAGE_SIZE = 20
 
 const STATUS_TABS: Array<{ key: string; label: string }> = [
   { key: 'requested', label: '承認待ち' },
@@ -58,12 +61,11 @@ function BookingsInner() {
   const { selectedAccountId, accounts } = useAccount()
   const [event, setEvent] = useState<EventDetail | null>(null)
   const [items, setItems] = useState<EventBookingItem[]>([])
-  // 裏側は200件で切る。超えたら注意を出す(点検#520の中8)。
   const [bookingsTotal, setBookingsTotal] = useState(0)
-  const [waitlistCount, setWaitlistCount] = useState<number | null>(null)
-  const [totalCapacity, setTotalCapacity] = useState<number | null>(null)
-  const [capacityStatus, setCapacityStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [summary, setSummary] = useState<EventBookingSummary | null>(null)
+  const [summaryStatus, setSummaryStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [tab, setTab] = useState<string>('requested')
+  const [page, setPage] = useState(1)
   /*
    * **読めなかったのか、0件なのかを分ける。**
    *
@@ -76,6 +78,7 @@ function BookingsInner() {
   const [actionError, setActionError] = useState<string | null>(null)
   /** 切り替え前の遅い応答を、次のイベント・次の絞り込みの一覧へ混ぜない。 */
   const loadRequestRef = useRef(0)
+  const summaryRequestRef = useRef(0)
   /*
    * **ブラウザの `confirm()` を使わない。**
    *
@@ -95,7 +98,7 @@ function BookingsInner() {
   const [rejectTarget, setRejectTarget] = useState<EventBookingItem | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [rejectError, setRejectError] = useState('')
-  const dataReady = loadStatus === 'ready'
+  const dataReady = summaryStatus === 'ready' && summary !== null
   usePageTitle(event?.name ? event.name + ' の申込者' : 'イベントの申込者')
 
   const refresh = useCallback(async () => {
@@ -105,17 +108,12 @@ function BookingsInner() {
     setActionError(null)
     try {
       const filters = tab === 'all' ? {} : { status: tab }
-      /*
-        **前のイベントの控えを使い回さない。** `event` が入っていれば取りに
-        行かない作りだったので、アカウントやイベントを切り替えたあとも
-        **上の帯に前のイベント名と定員が残った。** どのイベントの
-        申込を見ているのか読み違える。毎回取り直す。
-      */
-      const [evRes, listRes, waitlistRes] = await Promise.all([
-        eventsApi.getEvent(selectedAccountId, eventId),
-        eventsApi.listBookings(selectedAccountId, eventId, filters),
-        eventsApi.listWaitlist(selectedAccountId, eventId).catch(() => null),
-      ])
+      // タブとページの切替では、この一覧だけを取り直す。
+      const listRes = await eventsApi.listBookings(selectedAccountId, eventId, {
+        ...filters,
+        page,
+        limit: PAGE_SIZE,
+      })
       if (requestId !== loadRequestRef.current) return
       /*
         **器の形を確かめてから入れる。** `items` が無い返事をそのまま
@@ -123,14 +121,8 @@ function BookingsInner() {
         同じ扱いにして、失敗の言葉を出す。
       */
       if (!Array.isArray(listRes?.items)) throw new Error('malformed')
-      setEvent((current) => (typeof evRes?.name === 'string' ? evRes : current))
       setItems(listRes.items)
       setBookingsTotal(typeof listRes.total === 'number' ? listRes.total : listRes.items.length)
-      setWaitlistCount(
-        Array.isArray(waitlistRes?.waitlist)
-          ? waitlistRes.waitlist.length
-          : listRes.items.filter((booking) => booking.status === 'waitlist').length,
-      )
       setLoadStatus('ready')
     } catch {
       if (requestId !== loadRequestRef.current) return
@@ -138,52 +130,46 @@ function BookingsInner() {
         **数を持ち越さない。** 前の絞り込みの行を残したまま失敗を出すと、
         古い数の上に「取れませんでした」が乗って、どちらが本当か読めない。
       */
-      setEvent(null)
       setItems([])
       setBookingsTotal(0)
-      setWaitlistCount(null)
       setLoadStatus('error')
     }
-    // 控えの `event` を読まなくなったので、依存の除外は要らない。
-  }, [selectedAccountId, eventId, tab])
+  }, [selectedAccountId, eventId, tab, page])
 
   useEffect(() => {
     void refresh()
   }, [refresh])
 
-  /*
-    枠の合計＝定員。枠の一覧から数える(編集画面と同じ決め方)。
-
-    **「定員なし」と「定員を取れなかった」を分ける。** 前は失敗しても
-    `totalCapacity` が null のままで「定員なし」と出た。**上限が無いのか、
-    読めなかったのかが分からず、締め切りの判断を誤る。**
-  */
-  useEffect(() => {
+  const refreshSummary = useCallback(async () => {
     if (!selectedAccountId || !eventId) return
-    let alive = true
-    setCapacityStatus('loading')
-    setTotalCapacity(null)
-    // 定員は枠の一覧から数える。イベント一覧の全件取得はやめた。
-    // 編集画面と同じ決め方(定員なしの枠が混ざれば合計なし)にする。
-    eventsApi
-      .listSlots(selectedAccountId, eventId)
-      .then((r) => {
-        if (!alive) return
-        const slots = r.items
-        setTotalCapacity(
-          slots.some((slot) => slot.capacity == null)
-            ? null
-            : slots.reduce((sum, slot) => sum + (slot.capacity ?? 0), 0),
-        )
-        setCapacityStatus('ready')
-      })
-      .catch(() => {
-        // 定員が出ないだけ。一覧と操作はできる。
-        if (alive) setCapacityStatus('error')
-      })
-    return () => {
-      alive = false
+    const requestId = ++summaryRequestRef.current
+    setSummaryStatus('loading')
+    try {
+      const [eventRes, summaryRes] = await Promise.all([
+        eventsApi.getEvent(selectedAccountId, eventId),
+        eventsApi.getBookingSummary(selectedAccountId, eventId),
+      ])
+      if (requestId !== summaryRequestRef.current) return
+      setEvent(eventRes)
+      setSummary(summaryRes)
+      setSummaryStatus('ready')
+    } catch {
+      if (requestId !== summaryRequestRef.current) return
+      setEvent(null)
+      setSummary(null)
+      setSummaryStatus('error')
     }
+  }, [selectedAccountId, eventId])
+
+  useEffect(() => {
+    void refreshSummary()
+    return () => {
+      summaryRequestRef.current += 1
+    }
+  }, [refreshSummary])
+
+  useEffect(() => {
+    setPage(1)
   }, [selectedAccountId, eventId])
 
   if (!eventId) {
@@ -209,7 +195,7 @@ function BookingsInner() {
         setRejectReason('')
         setRejectError('')
       }
-      await refresh()
+      await Promise.all([refresh(), refreshSummary()])
     } catch {
       /*
         **内部の文字をそのまま出さない。** `e.message` は
@@ -246,7 +232,7 @@ function BookingsInner() {
       )
       if (!res?.ok) throw new Error('cancel_not_applied')
       setCancelTarget(null)
-      await refresh()
+      await Promise.all([refresh(), refreshSummary()])
     } catch {
       setCancelError(
         'この予約をキャンセルできませんでした。ほかの操作で状態が変わっている場合があります。一覧を読み直してから、もう一度お試しください。',
@@ -262,7 +248,7 @@ function BookingsInner() {
     setBusy(true)
     try {
       await eventsApi.updateBooking(selectedAccountId, eventId, id, { status })
-      await refresh()
+      await Promise.all([refresh(), refreshSummary()])
     } catch {
       setActionError('来場・不参加の記録を変えられませんでした。一覧を読み直してから、もう一度お試しください。')
     } finally {
@@ -270,12 +256,13 @@ function BookingsInner() {
     }
   }
 
-  const confirmed = items.filter((b) => b.status === 'confirmed').length
-  const pending = items.filter((b) => b.status === 'requested').length
-  const cancelled = items.filter((b) => b.status === 'cancelled').length
+  const confirmed = summary?.confirmed ?? 0
+  const pending = summary?.requested ?? 0
+  const cancelled = summary?.cancelled ?? 0
   const applied = confirmed + pending
-  // 定員は枠の一覧から数える(編集画面と同じ決め方)。詳細APIには入っていない。
-  const capacity = totalCapacity ?? 0
+  const capacity = summary?.totalCapacity ?? 0
+  const pageCount = Math.max(1, Math.ceil(bookingsTotal / PAGE_SIZE))
+  const currentPage = Math.min(page, pageCount)
 
   return (
     <div>
@@ -325,14 +312,12 @@ function BookingsInner() {
           unit={dataReady ? '人' : ''}
           detail={!dataReady
             ? '取得できませんでした'
-            : capacityStatus === 'error'
-              ? '定員は取得できませんでした'
-              /*
+            : /*
                 残りの席数を出すだけだと、**あと2席なのか20席なのかで
                 同じ言い方**になる。一覧の「あと少しで満席」と同じ
                 目安（残り1〜3席）で、声をかける回だけ言い方を変える。
               */
-              : describeBookingCapacity(applied, capacity)}
+              describeBookingCapacity(applied, capacity)}
         />
         {/*
           **数の下に「次にすること」を書く。** 「対応が必要」だけだと、
@@ -351,8 +336,8 @@ function BookingsInner() {
             行が無いときは設定だけを示し、人数を推測しない。 */}
         <EventKpi
           title="キャンセル待ち"
-          value={dataReady && waitlistCount !== null ? String(waitlistCount) : '—'}
-          unit={dataReady && waitlistCount !== null ? '人' : ''}
+          value={dataReady ? String(summary?.waitlist ?? 0) : '—'}
+          unit={dataReady ? '人' : ''}
           /*
             **読めていない設定を言い切らない。** `event` が取れていないと
             `waitlist_enabled` は undefined で、前は必ず「受け付けない設定です」
@@ -360,9 +345,7 @@ function BookingsInner() {
           */
           detail={!dataReady
             ? '取得できませんでした'
-            : waitlistCount === null
-              ? '人数は未取得です'
-            : waitlistCount > 0
+            : (summary?.waitlist ?? 0) > 0
               ? '取り消しが出たら順に案内します'
               : event?.waitlist_enabled ? '空きが出たら順に案内' : '受け付けない設定です'}
         />
@@ -392,7 +375,10 @@ function BookingsInner() {
             {STATUS_TABS.map((t) => (
               <button
                 key={t.key}
-                onClick={() => setTab(t.key)}
+                onClick={() => {
+                  setPage(1)
+                  setTab(t.key)
+                }}
                 className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                   tab === t.key
                     ? 'border-accent text-accent bg-accent-soft'
@@ -414,7 +400,7 @@ function BookingsInner() {
             <ListState
               kind="error"
               description="受け付けた予約は消えていません。再読み込みしても直らない場合はエラー報告へ。"
-              action={<Button onClick={() => void refresh()}>予約を再読み込み</Button>}
+              action={<Button onClick={() => void Promise.all([refresh(), refreshSummary()])}>予約を再読み込み</Button>}
             />
           ) : items.length === 0 ? (
             <div className="text-ink-faint p-12 text-center text-sm">
@@ -422,11 +408,6 @@ function BookingsInner() {
             </div>
           ) : (
             <>
-            {bookingsTotal > items.length && (
-              <p className="text-ink-secondary border-hairline border-b px-4 py-2 text-xs">
-                200件まで表示しています。状態の絞り込みを変えて探してください。
-              </p>
-            )}
             <div className="overflow-x-auto">
               <table className="w-full min-w-full text-sm">
                 <thead className="bg-canvas-sunken text-ink-secondary">
@@ -532,6 +513,12 @@ function BookingsInner() {
                   })}
                 </tbody>
               </table>
+            </div>
+            <div className="border-hairline flex items-center justify-between border-t px-4 py-3">
+              <span className="text-ink-faint text-xs">
+                {(currentPage - 1) * PAGE_SIZE + 1}〜{Math.min(currentPage * PAGE_SIZE, bookingsTotal)}件 / 全{bookingsTotal}件
+              </span>
+              <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} />
             </div>
             </>
           )}

@@ -1,7 +1,7 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
 import Pagination from '@/components/shared/pagination'
@@ -13,6 +13,7 @@ import { webinarLoadFailure, type WebinarLoadFailure } from './webinar-load-fail
 import { useAccount } from '@/contexts/account-context'
 import { ApiError, webinarApi, type Webinar, type WebinarFolder, type WebinarListItem, type WebinarOverview } from '@/lib/api'
 import { overviewCards } from './overview-view'
+import { publicationStateLabel } from '@/components/webinars/publication-label'
 
 const STATUS_LABEL: Record<Webinar['status'], string> = {
   draft: '下書き', active: '公開中', archived: 'アーカイブ',
@@ -111,28 +112,10 @@ function measuredCount(value: number | null | undefined): string {
     : '—'
 }
 
-function compactPublicationDate(value: string | null | undefined, withTime = false): string | null {
-  if (!value) return null
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return null
-  const month = date.toLocaleString('ja-JP', { month: 'numeric', timeZone: 'Asia/Tokyo' })
-  const day = date.toLocaleString('ja-JP', { day: 'numeric', timeZone: 'Asia/Tokyo' })
-  if (!withTime) return `${month}/${day}`
-  const time = date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Tokyo' })
-  return `${month}/${day} ${time}`
-}
-
 function publicationSummary(webinar: WebinarListItem): string {
-  if (webinar.publicationState === 'always') return '常時公開'
-  if (webinar.publicationState === 'scheduled') return compactPublicationDate(webinar.publicationStartsAt, true) ?? '—'
-  if (webinar.publicationState === 'ended') return '公開終了'
-  if (webinar.publicationState === 'unset') return '未設定'
-  if (webinar.publicationState === 'period') {
-    const start = compactPublicationDate(webinar.publicationStartsAt)
-    const end = compactPublicationDate(webinar.publicationEndsAt)
-    if (start && end) return `${start}〜${end}`
-  }
-  return scheduleSummary(webinar)
+  /* 5枝の決まりは共有(`components/webinars/publication-label`)。ここは一覧だけの落としどころ。 */
+  return publicationStateLabel(webinar.publicationState, webinar.publicationStartsAt, webinar.publicationEndsAt)
+    ?? scheduleSummary(webinar)
 }
 
 function displayStatus(webinar: WebinarListItem): string {
@@ -147,6 +130,9 @@ export default function WebinarsPage() {
   const overviewRequestGeneration = useRef(0)
   const folderRequestGeneration = useRef(0)
   const [items, setItems] = useState<WebinarListItem[]>([])
+  const [total, setTotal] = useState(0)
+  const [grandTotal, setGrandTotal] = useState(0)
+  const [grandAccountId, setGrandAccountId] = useState<string | null>(null)
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
   const [overview, setOverview] = useState<WebinarOverview | null>(null)
   const [loadedOverviewAccountId, setLoadedOverviewAccountId] = useState<string | null>(null)
@@ -177,6 +163,7 @@ export default function WebinarsPage() {
     const generation = ++requestGeneration.current
     if (!selectedAccountId) {
       setItems([])
+      setTotal(0)
       setLoadedAccountId(null)
       setLoadFailure(null)
       setLoading(false)
@@ -188,25 +175,37 @@ export default function WebinarsPage() {
     setLoadedAccountId(null)
     setLoadFailure(null)
     try {
-      const res = await webinarApi.list(accountId)
+      /*
+        絞り・並び・頁はサーバーで行う(共通一覧契約の offset 方式)。
+        取った1頁を画面で絞り直すと件数や頁数が変わるので、来たまま出す。
+      */
+      const res = await webinarApi.list(accountId, {
+        page,
+        limit: pageSize,
+        q: query.trim() || undefined,
+        folder: selectedFolder || undefined,
+        status: savedFilter || undefined,
+        sort: sortKey,
+      })
       if (requestGeneration.current !== generation) return
       /*
-        **配列で来なかったら、そこで止める。**
-        口の契約は配列（`apps/worker/src/routes/webinars.ts` は
-        `data: items.results.map(serializeWebinar)` を返す）だが、器だけが
-        違う返事（`{items:[],total:0}` など）が来ると `[...narrowed]` で
-        `narrowed is not iterable` になり、**一覧が白い画面になる**。
-        読めなかったこととして扱えば、理由と読み直しの口が出る。
+        **頁の器で来なかったら、そこで止める。**
+        器だけ違う返事が来ると `items.map is not a function` で
+        **一覧が白い画面になる**。読めなかったこととして扱えば、
+        理由と読み直しの口が出る。
       */
-      if (!Array.isArray(res.data)) throw new ApiError(500, 'ウェビナーの一覧が読めない形で返りました')
-      setItems(res.data)
+      if (!res.data || !Array.isArray(res.data.items) || typeof res.data.total !== 'number') {
+        throw new ApiError(500, 'ウェビナーの一覧が読めない形で返りました')
+      }
+      setItems(res.data.items)
+      setTotal(res.data.total)
       setLoadedAccountId(accountId)
     } catch (err) {
       if (requestGeneration.current === generation) setLoadFailure(webinarLoadFailure(err))
     } finally {
       if (requestGeneration.current === generation) setLoading(false)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, page, pageSize, query, selectedFolder, savedFilter, sortKey])
 
   const refreshOverview = useCallback(async () => {
     const generation = ++overviewRequestGeneration.current
@@ -236,6 +235,31 @@ export default function WebinarsPage() {
   useEffect(() => {
     void refreshOverview()
   }, [refreshOverview])
+
+  /*
+    フォルダ欄の「すべて」「未分類」の件数。検索・絞りとは独立した
+    全体数なので、一覧とは別に1件だけ取って総件数だけ使う。
+  */
+  const refreshGrandTotal = useCallback(async () => {
+    if (!selectedAccountId) {
+      setGrandTotal(0)
+      setGrandAccountId(null)
+      return
+    }
+    const accountId = selectedAccountId
+    try {
+      const res = await webinarApi.list(accountId, { limit: 1 })
+      if (!res.data || typeof res.data.total !== 'number') return
+      setGrandTotal(res.data.total)
+      setGrandAccountId(accountId)
+    } catch {
+      /* 欄の件数だけの補助取得。失敗時は前値を残す。 */
+    }
+  }, [selectedAccountId])
+
+  useEffect(() => {
+    void refreshGrandTotal()
+  }, [refreshGrandTotal])
 
   const refreshFolders = useCallback(async () => {
     const generation = ++folderRequestGeneration.current
@@ -269,6 +293,7 @@ export default function WebinarsPage() {
       setEditingFolder(null)
       setFolderDialogOpen(false)
       await refreshFolders()
+      await refreshGrandTotal()
     } catch {
       setFolderError('フォルダを保存できませんでした。もう一度お試しください。')
     } finally {
@@ -290,6 +315,7 @@ export default function WebinarsPage() {
         webinarApi.updateFolder(selectedAccountId, other.id, { displayOrder: current.displayOrder }),
       ])
       await refreshFolders()
+      await refreshGrandTotal()
     } catch {
       setFolderError('並び順を保存できませんでした。もう一度お試しください。')
     } finally {
@@ -305,7 +331,7 @@ export default function WebinarsPage() {
       await webinarApi.deleteFolder(selectedAccountId, deletingFolder.id)
       if (selectedFolder === deletingFolder.id) setSelectedFolder('')
       setDeletingFolder(null)
-      await Promise.all([refresh(), refreshFolders()])
+      await Promise.all([refresh(), refreshFolders(), refreshGrandTotal()])
     } catch {
       setFolderError('フォルダを削除できませんでした。もう一度お試しください。')
     } finally {
@@ -316,35 +342,26 @@ export default function WebinarsPage() {
   /** 数を出してよいのは、読めたときだけ。 */
   const hasListData = !accountLoading && !loading && loadFailure === null && Boolean(selectedAccountId)
 
-  const filtered = useMemo(() => {
-    // タイトルと slug の両方を見る。URLで探すこともあるため。
-    const q = query.trim()
-    const searched = q
-      ? visibleItems.filter((w) => w.title.includes(q) || w.slug.includes(q))
-      : visibleItems
-    const foldered = selectedFolder === UNFILED
-      ? searched.filter((w) => !w.folderId)
-      : selectedFolder
-        ? searched.filter((w) => w.folderId === selectedFolder)
-        : searched
-    const narrowed = savedFilter
-      ? foldered.filter((w) => w.status === savedFilter)
-      : foldered
-    return [...narrowed].sort((a, b) => {
-      if (sortKey === 'name') return a.title.localeCompare(b.title, 'ja')
-      if (sortKey === 'created') return b.createdAt.localeCompare(a.createdAt)
-      return b.updatedAt.localeCompare(a.updatedAt)
-    })
-  }, [visibleItems, query, selectedFolder, savedFilter, sortKey])
+  /*
+    絞り・並びはサーバー済み。取った1頁をそのまま出す。
+    総件数はサーバーの total を使う。
+  */
+  const visibleTotal = loadedAccountId === selectedAccountId ? total : 0
 
   useEffect(() => {
     setPage(1)
   }, [query, selectedFolder, savedFilter, sortKey, pageSize, selectedAccountId])
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const pageCount = Math.max(1, Math.ceil(visibleTotal / pageSize))
   const currentPage = Math.min(page, pageCount)
-  const visibleStart = (currentPage - 1) * pageSize
-  const visible = filtered.slice(visibleStart, visibleStart + pageSize)
+  const visible = visibleItems
+  /* 欄の全体数。検索・絞りで変わらない。 */
+  const panelGrand = grandAccountId === selectedAccountId ? grandTotal : 0
+  const unfiledCount = Math.max(0, panelGrand - folders.reduce((sum, folder) => sum + folder.count, 0))
+
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount)
+  }, [page, pageCount])
 
   const archiveSelected = async () => {
     if (!archiveTarget || archiving) return
@@ -353,7 +370,7 @@ export default function WebinarsPage() {
     try {
       await webinarApi.archive(archiveTarget.id)
       setArchiveTarget(null)
-      await Promise.all([refresh(), refreshOverview()])
+      await Promise.all([refresh(), refreshOverview(), refreshGrandTotal()])
     } catch (error) {
       setArchiveError(error instanceof ApiError && error.status === 409
         ? '公開中のウェビナーは、先に公開を停止してください。'
@@ -403,13 +420,13 @@ export default function WebinarsPage() {
 
         <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
           <FolderPanel
-            total={hasListData ? `${visibleItems.length}件` : '—'}
+            total={hasListData ? `${panelGrand}件` : '—'}
             activeId={selectedFolder}
             onSelect={setSelectedFolder}
             onAddFolder={() => { setFolderError(''); setFolderDialogOpen(true) }}
             addFolderDisabled={!selectedAccountId}
             rows={[
-              { id: '', label: 'すべて', count: visibleItems.length },
+              { id: '', label: 'すべて', count: panelGrand },
               ...folders.map((folder, index) => ({
                 id: folder.id,
                 label: folder.name,
@@ -421,7 +438,7 @@ export default function WebinarsPage() {
                 onDelete: () => { setFolderError(''); setDeletingFolder(folder) },
                 deleteNote: '削除しても、中のウェビナーは未分類に残ります。',
               })),
-              { id: UNFILED, label: '未分類', count: visibleItems.filter((item) => !item.folderId).length },
+              { id: UNFILED, label: '未分類', count: unfiledCount },
             ]}
           />
 
@@ -449,9 +466,11 @@ export default function WebinarsPage() {
               ) : loadFailure ? (
                 <ListState kind={loadFailure.kind} title={loadFailure.title} description={loadFailure.description} action={loadFailure.retryable ? <Button onClick={() => void refresh()}>もう一度読み込む</Button> : undefined} />
               ) : visibleItems.length === 0 ? (
-                <ListState kind="empty" title="まだウェビナーがありません" description="動画セミナーの申込と視聴を、ここで管理します。" action={<Button variant="primary" href="/webinars/new">ウェビナーを作る</Button>} />
-              ) : filtered.length === 0 ? (
-                <ListState kind="empty" title="条件に合うウェビナーはありません" description="検索文字か保存した条件を変えてください。" />
+                panelGrand === 0 ? (
+                  <ListState kind="empty" title="まだウェビナーがありません" description="動画セミナーの申込と視聴を、ここで管理します。" action={<Button variant="primary" href="/webinars/new">ウェビナーを作る</Button>} />
+                ) : (
+                  <ListState kind="empty" title="条件に合うウェビナーはありません" description="検索文字か保存した条件を変えてください。" />
+                )
               ) : (
                 <>
                   <div className="bg-canvas-sunken text-ink-faint hidden grid-cols-12 gap-3 px-4 py-3 text-xs font-semibold md:grid">
@@ -473,8 +492,8 @@ export default function WebinarsPage() {
               )}
             </div>
 
-            {hasListData && filtered.length > 0 && (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3"><p className="text-ink-faint text-xs tabular-nums">{visibleStart + 1}〜{Math.min(visibleStart + pageSize, filtered.length)}件 / 全{filtered.length}件</p><Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り" /></div>
+            {hasListData && visibleTotal > 0 && (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3"><p className="text-ink-faint text-xs tabular-nums">{(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + visible.length}件 / 全{visibleTotal}件</p><Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り" /></div>
             )}
           </section>
         </div>

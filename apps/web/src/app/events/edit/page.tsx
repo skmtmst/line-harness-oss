@@ -7,10 +7,8 @@ import EventForm from '@/components/events/event-form'
 import { useAccount } from '@/contexts/account-context'
 import {
   eventsApi,
-  type EventBookingItem,
+  type EventBookingSummary,
   type EventDetail,
-  type EventSlot,
-  type EventWaitlistItem,
 } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
@@ -27,9 +25,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 
 function BookingStatus({ accountId, eventId }: { accountId: string; eventId: string }) {
   const [event, setEvent] = useState<EventDetail | null>(null)
-  const [slots, setSlots] = useState<EventSlot[]>([])
-  const [bookings, setBookings] = useState<EventBookingItem[]>([])
-  const [waitlist, setWaitlist] = useState<EventWaitlistItem[]>([])
+  const [summary, setSummary] = useState<EventBookingSummary | null>(null)
   const [loading, setLoading] = useState(true)
   // どれか落ちても残りは出すが、黙って0件表示にしない。全部落ちたら
   // 枠が0件に見え、申込なしと読み違えて定員判断を誤る(点検#520の中10)。
@@ -38,21 +34,20 @@ function BookingStatus({ accountId, eventId }: { accountId: string; eventId: str
 
   useEffect(() => {
     let cancelled = false
+    setLoading(true)
     setLoadError(false)
+    setEvent(null)
+    setSummary(null)
     void (async () => {
       // どれか落ちても残りは出す。数えられなかったものは「—」になる。
-      const [e, s, b, w] = await Promise.allSettled([
+      const [e, s] = await Promise.allSettled([
         eventsApi.getEvent(accountId, eventId),
-        eventsApi.listSlots(accountId, eventId),
-        eventsApi.listBookings(accountId, eventId),
-        eventsApi.listWaitlist(accountId, eventId),
+        eventsApi.getBookingSummary(accountId, eventId),
       ])
       if (cancelled) return
       if (e.status === 'fulfilled') setEvent(e.value)
-      if (s.status === 'fulfilled') setSlots(s.value.items)
-      if (b.status === 'fulfilled') setBookings(b.value.items)
-      if (w.status === 'fulfilled') setWaitlist(w.value.waitlist)
-      if ([e, s, b, w].some((r) => r.status === 'rejected')) setLoadError(true)
+      if (s.status === 'fulfilled') setSummary(s.value)
+      if ([e, s].some((r) => r.status === 'rejected')) setLoadError(true)
       setLoading(false)
     })()
     return () => {
@@ -60,25 +55,19 @@ function BookingStatus({ accountId, eventId }: { accountId: string; eventId: str
     }
   }, [accountId, eventId, reloadSeq])
 
-  const count = (status: string) => bookings.filter((x) => x.status === status).length
-  /** 枠の定員の合計。定員なしの枠が混ざっていたら合計は出さない。 */
-  const capacity = slots.some((s) => s.capacity == null)
-    ? null
-    : slots.reduce((sum, s) => sum + (s.capacity ?? 0), 0)
-
   const cells: Array<[string, string]> = [
-    ['予約 / 定員', `${count('confirmed')} / ${capacity ?? '—'}`],
+    ['予約 / 定員', `${summary?.confirmed ?? '—'} / ${summary?.totalCapacity ?? '—'}`],
     // 承認待ちは requested。confirmed になるまで枠は確保されない。
-    ['承認待ち', `${count('requested')} 件`],
-    ['キャンセル待ち', `${waitlist.length} 件`],
-    ['キャンセル', `${count('cancelled')} 件`],
+    ['承認待ち', `${summary?.requested ?? '—'} 件`],
+    ['キャンセル待ち', `${summary?.waitlist ?? '—'} 件`],
+    ['キャンセル', `${summary?.cancelled ?? '—'} 件`],
   ]
 
   return (
     <div data-design="Status" className="mb-5">
       {loadError && (
         <p className="bg-warning-bg border-warning text-warning mb-3 rounded-control border px-4 py-3 text-xs" role="alert">
-          一部を取得できませんでした。数は実際より少なく見えます。
+          一部を取得できませんでした。取得できなかった数は「—」で表示しています。
           <button className="ml-2 font-semibold underline" onClick={() => { setLoading(true); setReloadSeq((n) => n + 1) }}>読み直す</button>
         </p>
       )}

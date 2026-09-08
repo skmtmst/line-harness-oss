@@ -45,9 +45,12 @@ export default function ShipmentPanel({
   const [bucket, setBucket] = useState<Bucket>('soon')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let cancelled = false
+    setLoading(true)
+    setError(null)
     api.ecCommerce
       .shipments({ limit: 10 })
       .then((r) => {
@@ -60,9 +63,10 @@ export default function ShipmentPanel({
           later: r.data.laterCount,
         })
       })
-      .catch((e: unknown) => {
+      .catch(() => {
         if (cancelled) return
-        setError(e instanceof Error ? e.message : String(e))
+        /* 生の例外文(通信機器の応答など)を出さない。決まった文と読み直しを出す。 */
+        setError('出荷予定を取得できませんでした')
         onSummaryChange?.(null)
       })
       .finally(() => {
@@ -71,7 +75,7 @@ export default function ShipmentPanel({
     return () => {
       cancelled = true
     }
-  }, [onSummaryChange])
+  }, [onSummaryChange, attempt])
 
   const rows = data ? (bucket === 'soon' ? data.soon : data.later) : []
 
@@ -88,7 +92,8 @@ export default function ShipmentPanel({
           <p className="py-6 text-center text-sm text-gray-500">読み込み中…</p>
         ) : error ? (
           <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs text-red-700">
-            出荷予定を読み込めませんでした。{error}
+            <p>出荷予定を読み込めませんでした。{error}</p>
+            <button type="button" onClick={() => setAttempt((count) => count + 1)} className="mt-1 font-medium underline">もう一度読み込む</button>
           </div>
         ) : !data || (data.soonCount === 0 && data.laterCount === 0) ? (
           <p className="py-6 text-center text-sm text-gray-500">
