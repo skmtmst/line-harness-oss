@@ -17,6 +17,7 @@ vi.mock('@line-crm/db', () => ({
     if (token === 'auto-replies-key') return { id: 'auto-replies-1', name: 'Auto Replies Staff', role: 'staff', permission_keys: '["/auto-replies"]' };
     if (token === 'automations-key') return { id: 'automations-1', name: 'Automations Staff', role: 'staff', permission_keys: '["/automations"]' };
     if (token === 'booking-key') return { id: 'booking-1', name: 'Booking Staff', role: 'staff', permission_keys: '["/booking/bookings"]' };
+    if (token === 'events-key') return { id: 'events-1', name: 'Events Staff', role: 'staff', permission_keys: '["/events"]' };
     if (token === 'contents-key') return { id: 'contents-1', name: 'Contents Staff', role: 'staff', permission_keys: '["/contents"]' };
     if (token === 'photo-view-key') return { id: 'photo-view-1', name: 'Photo Viewer', role: 'staff', permission_keys: '["photo.submission.view"]' };
     if (token === 'photo-review-key') return { id: 'photo-review-1', name: 'Photo Reviewer', role: 'staff', permission_keys: '["photo.submission.review"]' };
@@ -123,6 +124,11 @@ function app() {
   a.get('/api/action-scores/rules', (c) => c.json({ success: true }));
   a.get('/api/booking/admin/customers', (c) => c.json({ success: true }));
   a.post('/api/booking/admin/customers', (c) => c.json({ success: true }));
+  a.patch('/api/booking/admin/requests/:id', (c) => c.json({ success: true }));
+  a.get('/api/meet-consultations', (c) => c.json({ success: true }));
+  a.post('/api/meet-consultations', (c) => c.json({ success: true }));
+  a.delete('/api/meet-consultations/:externalEventId', (c) => c.json({ success: true }));
+  a.put('/api/events/admin/events/:id/slots/:slotId', (c) => c.json({ success: true }));
   a.get('/api/nen-members/photos', (c) => c.json({ success: true }));
   a.get('/api/nen-members/photos/photo-1/assets/status', (c) => c.json({ success: true }));
   a.post('/api/nen-members/photos/photo-1/review', (c) => c.json({ success: true }));
@@ -474,6 +480,50 @@ describe('staff feature permissions', () => {
       expect((await app().request(path, { ...bearer('friends-key'), method }, crossSiteEnv())).status)
         .toBe(403);
     }
+  });
+
+  test('booking permission protects change/cancel (N-065 #623)', async () => {
+    const path = '/api/booking/admin/requests/bk-1';
+    expect((await app().request(path, { ...bearer('booking-key'), method: 'PATCH' }, crossSiteEnv())).status)
+      .toBe(200);
+    expect((await app().request(path, { ...bearer('friends-key'), method: 'PATCH' }, crossSiteEnv())).status)
+      .toBe(403);
+    expect((await app().request(path, { ...bearer('no-permissions-key'), method: 'PATCH' }, crossSiteEnv())).status)
+      .toBe(403);
+  });
+
+  test('meet consultations require the booking permission (N-065 #623)', async () => {
+    const paths = [
+      ['GET', '/api/meet-consultations'],
+      ['POST', '/api/meet-consultations'],
+      ['DELETE', '/api/meet-consultations/google-event-1'],
+    ] as const;
+    for (const [method, path] of paths) {
+      // owner/admin は従来どおり通る。
+      expect((await app().request(path, { ...bearer('staff-key'), method }, crossSiteEnv())).status)
+        .toBe(200);
+      // 予約権限つき staff は通る。
+      expect((await app().request(path, { ...bearer('booking-key'), method }, crossSiteEnv())).status)
+        .toBe(200);
+      // 権限なし staff は 403。
+      expect((await app().request(path, { ...bearer('friends-key'), method }, crossSiteEnv())).status)
+        .toBe(403);
+      expect((await app().request(path, { ...bearer('no-permissions-key'), method }, crossSiteEnv())).status)
+        .toBe(403);
+    }
+    // read_only は書込み不可。
+    expect((await app().request('/api/meet-consultations', { ...bearer('viewer-key'), method: 'POST' }, crossSiteEnv())).status)
+      .toBe(403);
+  });
+
+  test('events permission protects slot time changes (N-065 #623)', async () => {
+    const path = '/api/events/admin/events/ev-1/slots/slot-1';
+    expect((await app().request(path, { ...bearer('events-key'), method: 'PUT' }, crossSiteEnv())).status)
+      .toBe(200);
+    expect((await app().request(path, { ...bearer('friends-key'), method: 'PUT' }, crossSiteEnv())).status)
+      .toBe(403);
+    expect((await app().request(path, { ...bearer('no-permissions-key'), method: 'PUT' }, crossSiteEnv())).status)
+      .toBe(403);
   });
 
   test('写真審査は閲覧・判断・一括判断・原本取得の専用権限を分離する', async () => {
