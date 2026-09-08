@@ -56,6 +56,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
   { name: 'scenario deliveries', classification: { kind: 'feature', featureId: 'scenarios' } },
   { name: 'broadcast deliveries', classification: { kind: 'feature', featureId: 'broadcasts' } },
   { name: 'reminder deliveries', classification: { kind: 'feature', featureId: 'reminders' } },
+  { name: 'booking calendar delete retry', classification: { kind: 'feature', featureId: 'booking' } },
 ];
 
 export async function accountFeatureIsEnabled(
