@@ -19,28 +19,11 @@
     "arbitrary-value": 13,
     "direct-th": 20
   },
-  "app/analytics/tabs/analytics-shared.tsx": {
-    "direct-primary-button": 1
-  },
-  "app/analytics/tabs/cross-tab.tsx": {
-    "arbitrary-value": 1,
-    "direct-th": 3
-  },
-  "app/analytics/tabs/friends-tab.tsx": {
-    "arbitrary-value": 2
-  },
-  "app/analytics/tabs/funnel-tab.tsx": {
-    "direct-secondary-button": 2,
-    "arbitrary-value": 2
-  },
-  "app/analytics/tabs/reactions-tab.tsx": {
-    "arbitrary-value": 1
-  },
-  "app/analytics/tabs/saved-tab.tsx": {
-    "arbitrary-value": 1
-  },
-  "app/analytics/tabs/url-clicks-tab.tsx": {
-    "arbitrary-value": 1
+  "app/analytics/page.tsx": {
+    "direct-primary-button": 1,
+    "arbitrary-value": 8,
+    "direct-th": 3,
+    "direct-secondary-button": 2
   },
   "app/auto-replies/page.tsx": {
     "arbitrary-value": 14,

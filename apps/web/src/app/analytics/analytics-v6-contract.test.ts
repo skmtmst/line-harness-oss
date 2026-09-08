@@ -1,16 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL('./tabs/analytics-shared.tsx', import.meta.url), 'utf8')
-  + readFileSync(new URL('./tabs/cross-tab.tsx', import.meta.url), 'utf8')
-  + readFileSync(new URL('./tabs/funnel-tab.tsx', import.meta.url), 'utf8')
-  + readFileSync(new URL('./tabs/friends-tab.tsx', import.meta.url), 'utf8')
-  + readFileSync(new URL('./tabs/reactions-tab.tsx', import.meta.url), 'utf8')
-  + readFileSync(new URL('./tabs/routes-tab.tsx', import.meta.url), 'utf8')
-  + readFileSync(new URL('./tabs/usage-tab.tsx', import.meta.url), 'utf8')
-  + readFileSync(new URL('./tabs/url-clicks-tab.tsx', import.meta.url), 'utf8')
-  + readFileSync(new URL('./tabs/saved-tab.tsx', import.meta.url), 'utf8')
-  + readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 
 describe('V6 機能20 分析', () => {

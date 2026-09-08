@@ -7,11 +7,8 @@ shared-button-importer app/accounts/page.tsx
 shared-button-importer app/affiliates/action-dialogs.tsx
 shared-button-importer app/affiliates/payment-tab.tsx
 shared-button-importer app/affiliates/tabs.tsx
+shared-button-importer app/analytics/page.tsx
 shared-button-importer app/analytics/reports/new/page.tsx
-shared-button-importer app/analytics/tabs/analytics-shared.tsx
-shared-button-importer app/analytics/tabs/cross-tab.tsx
-shared-button-importer app/analytics/tabs/funnel-tab.tsx
-shared-button-importer app/analytics/tabs/usage-tab.tsx
 shared-button-importer app/auto-replies/page.tsx
 shared-button-importer app/auto-replies/publish/page.tsx
 shared-button-importer app/auto-replies/runs/page.tsx
@@ -163,10 +160,7 @@ shared-button-importer components/webinars/webinar-notifications.tsx
 
 # 標準Buttonへ移行済みとして、見た目と主要導線を監視する画面本体。
 button-migration-target app/affiliates/tabs.tsx
-button-migration-target app/analytics/tabs/analytics-shared.tsx
-button-migration-target app/analytics/tabs/cross-tab.tsx
-button-migration-target app/analytics/tabs/funnel-tab.tsx
-button-migration-target app/analytics/tabs/usage-tab.tsx
+button-migration-target app/analytics/page.tsx
 button-migration-target app/conversions/page.tsx
 button-migration-target app/inflow-links/page.tsx
 button-migration-target app/reminders/page.tsx
