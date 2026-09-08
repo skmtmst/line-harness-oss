@@ -31,7 +31,7 @@ describe('一斉配信素材の実ファイル検査', () => {
     })
     app.route('/', broadcastMessageAssets)
 
-    const response = await app.request('/broadcast-media/123e4567-e89b-42d3-a456-426614174000.png')
+    const response = await app.request('/images/broadcast-media/123e4567-e89b-42d3-a456-426614174000.png')
     expect(response.status).toBe(200)
     expect(response.headers.get('Content-Type')).toBe('image/png')
     expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff')

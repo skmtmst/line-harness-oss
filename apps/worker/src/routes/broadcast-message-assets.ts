@@ -184,7 +184,7 @@ broadcastMessageAssets.delete('/api/broadcast-message-assets/:id', requireRole('
 
 // LINEが取得する素材は認証外の経路で返す。保存時に検証した拡張子だけを許し、
 // R2メタデータを信用せず安全なContent-Typeを固定する。
-broadcastMessageAssets.get('/broadcast-media/:filename', async (c) => {
+broadcastMessageAssets.get('/images/broadcast-media/:filename', async (c) => {
   const filename = c.req.param('filename');
   const match = filename.match(/^([0-9a-f-]{36})\.(jpg|png|mp4)$/i);
   if (!match) return c.json({ success: false, error: 'Not found' }, 404);
@@ -239,10 +239,9 @@ broadcastMessageAssets.post('/api/broadcast-message-assets/upload', requireRole(
     originalFilename: validation.filename,
     publicBaseUrl: workerUrl,
   });
-  const filename = stored.key.slice('broadcast-media/'.length);
   return c.json({
     success: true,
-    data: { ...stored, url: `${workerUrl}/broadcast-media/${filename}` },
+    data: stored,
   }, 201);
 });
 
