@@ -2970,11 +2970,11 @@ export const SCREENS = [
     verdictHead: "5c9238525",
   },
   {
-    ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new',
+    ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new', mode: 'viewport', height: 1136,
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #434 / 3101・8788で再撮影・再判定。** 認証済みセッションのまま `/staff/new` へ到達し、ログイン画面へ戻らないことを確認した。名前・メールアドレス・役割・最初に表示するLINEアカウント・スタッフの機能別担当範囲・通知先と、追加後の流れを表示。1440/1920pxとも横はみ出し0。',
-    verdictSource: 'staff-v6/I3ZSrU.txt + staff-v6/I3ZSrU-{1440,1920}.png + 2026-09-07 visual comparison',
-    verdictHead: '54f1910a7',
+    verdictNote: '**2026-09-08 Issue #573 / 3111・8809で設計高1136pxに再撮影し、一致を維持。** 初期ビューポートを設計高へそろえ、高さ差を0pxへ解消した。1920px画素差4.8618%、1440/1920pxとも横はみ出し0。認証済みセッションのまま `/staff/new` へ到達し、名前・メールアドレス・役割・最初に表示するLINEアカウント・スタッフの機能別担当範囲・通知先と、追加後の流れを確認した。',
+    verdictSource: 'staff-v6/I3ZSrU.png + staff-v6/I3ZSrU-{1440,1920}.png + staff-v6/I3ZSrU-diff-1920.png + Issue #573',
+    verdictHead: '023739c1df',
   },
 
   // ── 機能31 機能設定 ─────────────────────────────────────
