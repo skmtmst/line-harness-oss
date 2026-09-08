@@ -586,9 +586,11 @@ function FirstStepContent() {
               targetMode === 'all'
                 ? 'シナリオ購読中の全員'
                 : targetMode === 'tag'
-                  ? (tags.find(t => t.id === targetTagId)?.name
-                      ? `タグ「${tags.find(t => t.id === targetTagId)!.name}」がある人`
-                      : 'タグで絞り込む（未選択）')
+                  ? (() => {
+                      // 2回探すと間に変わる余地がある。1回探して使い回す（#495 軽17）。
+                      const tagName = tags.find(t => t.id === targetTagId)?.name
+                      return tagName ? `タグ「${tagName}」がある人` : 'タグで絞り込む（未選択）'
+                    })()
                   : targetCondition
                     ? describeCondition(targetCondition)
                     : '詳細条件で絞り込む（未設定）'
