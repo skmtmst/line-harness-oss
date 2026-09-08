@@ -3,10 +3,11 @@ import { describe, expect, it } from 'vitest'
 import { impactBreakdown, impactCsv, overLimitCount, urgentImpactCount } from './impact-review'
 
 const impact = {
+  // 状態の語彙は口（commonVarUsageStatus）とそろえる。「公開中」を返す口は無い。
   byKind: { template: 2, form: 1 },
   items: [
-    { name: '予約配信', kindLabel: '一斉配信', status: '予約中 9/10 10:00', blocksDeletion: true, changesOnSave: true, currentPreview: '前', nextPreview: '後', exceedsCharacterLimit: false },
-    { name: '公開フォーム', kindLabel: '回答フォーム', status: '公開中', blocksDeletion: true, changesOnSave: true, currentPreview: '前', nextPreview: '後', exceedsCharacterLimit: true },
+    { name: '予約配信', kindLabel: '一斉配信', status: '配信予約中 9/10 10:00', blocksDeletion: true, changesOnSave: true, currentPreview: '前', nextPreview: '後', exceedsCharacterLimit: false },
+    { name: '配信中フォーム', kindLabel: '回答フォーム', status: '配信中', blocksDeletion: true, changesOnSave: true, currentPreview: '前', nextPreview: '後', exceedsCharacterLimit: true },
     { name: '送信済み', kindLabel: '一斉配信', status: '送信済み', blocksDeletion: false, changesOnSave: false, currentPreview: '前', nextPreview: '後', exceedsCharacterLimit: false },
   ],
 } as CommonVarChangeImpact
@@ -25,7 +26,14 @@ describe('共通情報の変更影響', () => {
     } as CommonVarChangeImpact)).toBeNull()
   })
 
-  it('APIが返した予約中・公開中の件数を優先する', () => {
+  it('種別の呼び名は口とそろえる（シナリオ→シナリオ配信）', () => {
+    expect(impactBreakdown({
+      ...impact,
+      byKind: { scenario: 1 },
+    } as CommonVarChangeImpact)).toBe('シナリオ配信1')
+  })
+
+  it('APIが返した配信予約中・配信中の件数を優先する', () => {
     expect(urgentImpactCount({
       ...impact,
       scheduledUsageCount: 2,

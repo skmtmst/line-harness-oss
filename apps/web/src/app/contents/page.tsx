@@ -10,6 +10,7 @@ import type {
 import { LayoutGrid, List as ListIcon } from 'lucide-react'
 import { api, ApiError, type MediaQuota } from '@/lib/api'
 import Button from './media-button'
+import { formatMediaSize } from './media-usage-display'
 import Dialog from '@/components/shared/dialog'
 import {
   blockedReason,
@@ -73,12 +74,6 @@ const KINDS: Array<{ key: MediaItem['kind']; label: string }> = [
   { key: 'file', label: 'PDF' },
 ]
 
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-}
-
 function formatStorage(bytes: number): string {
   if (bytes < 1024 * 1024 * 1024) return `${Math.round(bytes / 1024 / 1024)}MB`
   return `${(bytes / 1024 / 1024 / 1024).toFixed(1)}GB`
@@ -92,7 +87,7 @@ function formatMediaDetails(item: MediaItem): string {
   } else if (item.durationMs != null) {
     details.push(`${Math.round(item.durationMs / 1000)}秒`)
   }
-  details.push(formatSize(item.sizeBytes))
+  details.push(formatMediaSize(item.sizeBytes))
   return details.filter(Boolean).join(' ／ ')
 }
 
@@ -137,6 +132,9 @@ export default function MediaLibraryPage() {
 
   /** 名前を直している札。null なら誰も直していない。 */
   const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null)
+  // 名前変更の多重押し防ぎと、札のそばに出す失敗文。一覧全体の欄には出さない。
+  const [renamingBusy, setRenamingBusy] = useState(false)
+  const [renameError, setRenameError] = useState('')
   const [detailsFor, setDetailsFor] = useState<MediaItem | null>(null)
   const [replacementFor, setReplacementFor] = useState<MediaItem | null>(null)
   /*
@@ -251,22 +249,25 @@ export default function MediaLibraryPage() {
   }, [accountLoading, load])
 
   const rename = async () => {
-    if (!renaming || !selectedAccountId) return
+    if (!renaming || !selectedAccountId || renamingBusy) return
     const accountAtRequest = selectedAccountId
     const filename = renaming.value.trim()
     if (!filename) return
-    setError('')
+    setRenamingBusy(true)
+    setRenameError('')
     try {
       const res = await api.media.update(renaming.id, accountAtRequest, { filename })
       if (accountAtRequest !== latestAccountRef.current) return
       if (!res.success) {
-        setError(res.error)
+        setRenameError(`「${renaming.value}」に変更できませんでした。${res.error}`)
         return
       }
       setRenaming(null)
       void load()
     } catch {
-      setError('名前の変更に失敗しました')
+      setRenameError('名前の変更に失敗しました。もう一度お試しください。')
+    } finally {
+      setRenamingBusy(false)
     }
   }
 
@@ -728,8 +729,9 @@ export default function MediaLibraryPage() {
               >
                 {item.kind === 'image' ? (
                   // 静的書き出しのため next/image の最適化は使えない。
+                  // 一覧20件の同時取得を避けるため遅延読み込みにする。
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={item.url} alt={item.filename} className="h-full w-full object-contain" />
+                  <img src={item.url} alt={item.filename} loading="lazy" decoding="async" className="h-full w-full object-contain" />
                 ) : (
                   <span className="text-ink-faint text-xs">
                     {item.kind === 'video' ? '動画' : item.kind === 'audio' ? '音声' : 'ファイル'}
@@ -752,18 +754,23 @@ export default function MediaLibraryPage() {
                       aria-label="ファイル名"
                       className="border-accent rounded-control w-full border px-2 py-1 text-xs"
                     />
+                    {renameError && (
+                      <p className="text-danger text-xs" role="alert">{renameError}</p>
+                    )}
                     <div className="flex justify-end gap-1">
                       <button
                         onClick={() => setRenaming(null)}
+                        disabled={renamingBusy}
                         className="border-hairline text-ink-secondary rounded border px-2 py-1 text-[11px]"
                       >
                         キャンセル
                       </button>
                       <button
                         onClick={() => void rename()}
-                        className="bg-accent-deep text-on-accent rounded px-2 py-1 text-[11px]"
+                        disabled={renamingBusy}
+                        className="bg-accent-deep text-on-accent rounded px-2 py-1 text-[11px] disabled:opacity-50"
                       >
-                        保存
+                        {renamingBusy ? '保存中…' : '保存'}
                       </button>
                     </div>
                   </div>
@@ -831,7 +838,7 @@ export default function MediaLibraryPage() {
                     使用箇所
                   </button>
                   <button
-                    onClick={() => setRenaming({ id: item.id, value: item.filename })}
+                    onClick={() => { setRenameError(''); setRenaming({ id: item.id, value: item.filename }) }}
                     title="名前を変える"
                     aria-label={`${item.filename}の名前を変える`}
                     className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-[11px]"

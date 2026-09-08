@@ -95,7 +95,8 @@ export default function NewCommonVarPage() {
       })
   }, [])
 
-  const spec = TYPES.find((t) => t.key === type)!
+  // 種別は内部stateからのみ選ぶが、見つからないときは先頭へ倒す（非null断言を使わない）。
+  const spec = TYPES.find((t) => t.key === type) ?? TYPES[0]
 
   const save = async () => {
     if (saving) return
