@@ -326,13 +326,13 @@ export default function ScenarioList({
                   </select>
                 </td>
                 <td className="text-ink px-4 py-3 text-sm tabular-nums whitespace-nowrap">
-                  {(s.subscriberCount ?? 0).toLocaleString('ja-JP')}
+                  {s.subscriberCount === undefined ? '—' : s.subscriberCount.toLocaleString('ja-JP')}
                   <span className="text-ink-faint ml-0.5 text-xs">人</span>
                   {/*
                     0人のとき、作っただけでは配信されないことに気づけない。
                     始め方への導線をその場に出す。
                   */}
-                  {(s.subscriberCount ?? 0) === 0 && (
+                  {s.subscriberCount === 0 && (
                     <Link
                       href={`/scenarios/detail?id=${s.id}`}
                       className="text-info mt-0.5 block text-xs font-normal hover:underline"

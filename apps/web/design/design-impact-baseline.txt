@@ -116,6 +116,7 @@ shared-button-importer components/automations/common-action-editor.tsx
 shared-button-importer components/broadcasts/broadcast-asset-manager.tsx
 shared-button-importer components/broadcasts/broadcast-detail.tsx
 shared-button-importer components/broadcasts/broadcast-form.tsx
+shared-button-importer components/broadcasts/segment-builder.tsx
 shared-button-importer components/broadcasts/segment-preset-controls.tsx
 shared-button-importer components/chats/friend-info-sidebar.tsx
 shared-button-importer components/chats/template-folder-select.tsx

@@ -1603,6 +1603,21 @@ CREATE TABLE ec_identity_links (
   unlink_reason TEXT
 );
 
+CREATE TABLE ec_notification_account_settings (
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL REFERENCES ec_notification_settings(event_type) ON DELETE CASCADE,
+  is_enabled INTEGER NOT NULL DEFAULT 1 CHECK (is_enabled IN (0, 1)),
+  title_override TEXT,
+  intro_text TEXT,
+  outro_text TEXT,
+  button_label TEXT,
+  button_url TEXT,
+  image_url TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (line_account_id, event_type)
+);
+
 CREATE TABLE ec_notification_settings (
   event_type TEXT PRIMARY KEY,
   is_enabled INTEGER NOT NULL DEFAULT 1 CHECK (is_enabled IN (0, 1)),
