@@ -171,7 +171,7 @@
 | 10 | `Q8sHa` | 10-1-I 参加者管理 | 3.9349% | 0px | 中央・右 | docs | [差分画像](webinars-v6/Q8sHa-diff-1920.png) | **一致** |
 | 10 | `yxyzQ` | 10-1-J 分析 | 7.7084% | 0px | 中央・右 | docs | [差分画像](webinars-v6/yxyzQ-diff-1920.png) | **一致** |
 | 10 | `LKuAQ` | 10-1-K アーカイブ確認 | 8.8348% | 0px | 中央・右 | docs | [差分画像](webinars-v6/LKuAQ-diff-1920.png) | **一致** |
-| 10 | `zCQXe` | 10-1-L 一覧の状態（空・読込・エラー） | 3.0090% | 0px | 中央・中央 | docs | [差分画像](webinars-v6/zCQXe-diff-1920.png) | **一致** |
+| 10 | `zCQXe` | 10-1-L 一覧の状態（空・読込・エラー） | 3.1184% | 0px | 上部・左 | docs | [差分画像](webinars-v6/zCQXe-diff-1920.png) | **一致** |
 | 11 | `W7LBc` | 11-1 テンプレート | 5.1143% | 0px | 上部・左 | docs | [差分画像](templates-v6/W7LBc-diff-1920.png) | **一致** |
 | 11 | `GFlD7` | 11-1-A メッセージを作る | 7.7695%（前回値） | 0px | 中央・右 | docs | [差分画像](templates-v6/GFlD7-diff-1920.png) | **一致** |
 | 11 | `FRkls` | 11-1-B カルーセルを作る | 6.6401%（前回値） | 0px | 中央・右 | docs | [差分画像](templates-v6/FRkls-diff-1920.png) | **一致** |
