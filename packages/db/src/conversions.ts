@@ -46,6 +46,8 @@ export interface ConversionEvent {
   event_type_snapshot: string | null;
   value_snapshot: number | null;
   idempotency_key: string | null;
+  /** 1人1回地点の行だけに入る重複防止キー。NULLの行は制約の対象外。 */
+  once_key: string | null;
 }
 
 // ── Conversion Points CRUD ──────────────────────────────────────────────────
@@ -144,11 +146,39 @@ export interface UpdateConversionPointInput extends ConversionPointOptions {
  * ような部分更新をするため。既存値を読んでから丸ごと書き戻すと、
  * 同時に別の項目を変えた分を巻き戻してしまう。
  */
+/**
+ * この成果地点に成果・利用先が付いているか。旧PUTの直接上書きを
+ * 止めるための確認で、定義系の版ガードと同じ役割を持つ。
+ */
+export async function hasConversionPointActivity(
+  db: D1Database,
+  id: string,
+): Promise<boolean> {
+  const event = await db
+    .prepare(`SELECT 1 AS hit FROM conversion_events WHERE conversion_point_id = ? LIMIT 1`)
+    .bind(id)
+    .first<{ hit: number }>();
+  if (event) return true;
+  const usage = await db
+    .prepare(`SELECT 1 AS hit FROM conversion_definition_usages WHERE conversion_point_id = ? LIMIT 1`)
+    .bind(id)
+    .first<{ hit: number }>();
+  return usage !== null;
+}
+
 export async function updateConversionPoint(
   db: D1Database,
   id: string,
   input: UpdateConversionPointInput,
+  opts?: { expectedVersion?: number },
 ): Promise<ConversionPoint | null> {
+  if (opts?.expectedVersion !== undefined) {
+    const current = await getConversionPointById(db, id);
+    if (!current) return null;
+    if (current.version !== opts.expectedVersion) {
+      throw new Error('conversion_point_version_conflict');
+    }
+  }
   const sets: string[] = [];
   const values: unknown[] = [];
   const put = (column: string, value: unknown) => {
@@ -166,11 +196,26 @@ export async function updateConversionPoint(
   if (sets.length === 0) return getConversionPointById(db, id);
   sets.push('version = version + 1');
   put('updated_at', jstNow());
-  values.push(id);
-  await db
-    .prepare(`UPDATE conversion_points SET ${sets.join(', ')} WHERE id = ?`)
-    .bind(...values)
+  // 版の確認は読み取り時だけでなく書込み時にも行う。同時に更新した
+  // 側の片方を必ず弾くため、条件に版を含めた1文で書き換える。
+  // 版の指定が無い従来の呼び出しは、以前どおり条件なしで書き換える。
+  if (opts?.expectedVersion === undefined) {
+    values.push(id);
+    await db
+      .prepare(`UPDATE conversion_points SET ${sets.join(', ')} WHERE id = ?`)
+      .bind(...values)
+      .run();
+    return getConversionPointById(db, id);
+  }
+  const result = await db
+    .prepare(`UPDATE conversion_points SET ${sets.join(', ')} WHERE id = ? AND version = ?`)
+    .bind(...values, id, opts.expectedVersion)
     .run();
+  if ((result.meta.changes ?? 0) === 0) {
+    const current = await getConversionPointById(db, id);
+    if (!current) return null;
+    throw new Error('conversion_point_version_conflict');
+  }
   return getConversionPointById(db, id);
 }
 
@@ -235,6 +280,55 @@ export interface TrackConversionInput {
  * ここの責任にしている。呼び出し口が複数あるため、各所で同じ判定を
  * 書くと必ずどこかで漏れる。
  */
+function isUniqueViolation(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /UNIQUE constraint failed/i.test(message);
+}
+
+/**
+ * 同じ冪等キーで送られた中身が同じか。同じ再送は同じ結果を返し、
+ * 別内容の使い回しは409で弾く(N-255)。中身の比較は呼び出し側で
+ * 文字列化済みの metadata まで含めて行う。
+ */
+function isSameIdempotencyContent(existing: ConversionEvent, input: TrackConversionInput): boolean {
+  return existing.friend_id === input.friendId
+    && (existing.user_id ?? null) === (input.userId ?? null)
+    && (existing.affiliate_code ?? null) === (input.affiliateCode ?? null)
+    && (existing.metadata ?? null) === (input.metadata ?? null);
+}
+
+function requireSameIdempotencyContent(existing: ConversionEvent, input: TrackConversionInput): void {
+  if (!isSameIdempotencyContent(existing, input)) {
+    throw new Error('conversion_idempotency_key_conflict');
+  }
+}
+
+async function findEventByIdempotencyKey(
+  db: D1Database,
+  conversionPointId: string,
+  idempotencyKey: string,
+): Promise<ConversionEvent | null> {
+  return db
+    .prepare(`SELECT * FROM conversion_events WHERE conversion_point_id = ? AND idempotency_key = ?`)
+    .bind(conversionPointId, idempotencyKey)
+    .first<ConversionEvent>();
+}
+
+async function findFirstFriendEvent(
+  db: D1Database,
+  conversionPointId: string,
+  friendId: string,
+): Promise<ConversionEvent | null> {
+  return db
+    .prepare(
+      `SELECT * FROM conversion_events
+        WHERE conversion_point_id = ? AND friend_id = ?
+        ORDER BY created_at ASC LIMIT 1`,
+    )
+    .bind(conversionPointId, friendId)
+    .first<ConversionEvent>();
+}
+
 export async function trackConversion(
   db: D1Database,
   input: TrackConversionInput,
@@ -247,25 +341,20 @@ export async function trackConversion(
   if (point.status === 'stopped') throw new Error('conversion_point_stopped');
 
   if (input.idempotencyKey) {
-    const existing = await db
-      .prepare(`SELECT * FROM conversion_events WHERE conversion_point_id = ? AND idempotency_key = ?`)
-      .bind(input.conversionPointId, input.idempotencyKey)
-      .first<ConversionEvent>();
-    if (existing) return existing;
+    const existing = await findEventByIdempotencyKey(db, input.conversionPointId, input.idempotencyKey);
+    if (existing) {
+      requireSameIdempotencyContent(existing, input);
+      return existing;
+    }
   }
 
   // 一人一回だけ数える地点で、すでに記録があるなら、それを返して終わる。
   // 例外にしないのは、二重に踏むのは利用者にとって普通の行動で、
   // 呼び出し側に異常として扱わせるとログが埋まるため。
-  if (point.count_repeat === 0) {
-    const existing = await db
-      .prepare(
-        `SELECT * FROM conversion_events
-          WHERE conversion_point_id = ? AND friend_id = ?
-          ORDER BY created_at ASC LIMIT 1`,
-      )
-      .bind(input.conversionPointId, input.friendId)
-      .first<ConversionEvent>();
+  // 読み取り後の同時到着は once_key のUNIQUE制約で片方を弾く(N-255)。
+  const onceOnly = point.count_repeat === 0;
+  if (onceOnly) {
+    const existing = await findFirstFriendEvent(db, input.conversionPointId, input.friendId);
     if (existing) return existing;
   }
 
@@ -280,14 +369,17 @@ export async function trackConversion(
   // CVs leave approval_status NULL (the approval flow only applies to attributed rows).
   const approvalStatus = attr ? 'pending' : null;
 
+  // 1人1回の地点だけ重複防止キーを付ける。繰返し数える地点は
+  // NULLのまま制約の対象外にする(050号の dedup_key と同じ流儀)。
+  const onceKey = onceOnly ? `${input.conversionPointId}|${input.friendId}` : null;
   try {
     await db
       .prepare(
         `INSERT INTO conversion_events
        (id, conversion_point_id, friend_id, user_id, affiliate_code, metadata, created_at,
         affiliate_id, attributed_ref_code, approval_status, point_name_snapshot,
-        event_type_snapshot, value_snapshot, idempotency_key)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        event_type_snapshot, value_snapshot, idempotency_key, once_key)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         id,
@@ -304,15 +396,24 @@ export async function trackConversion(
         point.event_type,
         point.value,
         input.idempotencyKey ?? null,
+        onceKey,
       )
       .run();
   } catch (error) {
-    if (input.idempotencyKey) {
-      const existing = await db
-        .prepare(`SELECT * FROM conversion_events WHERE conversion_point_id = ? AND idempotency_key = ?`)
-        .bind(input.conversionPointId, input.idempotencyKey)
-        .first<ConversionEvent>();
-      if (existing) return existing;
+    // 同時到着で制約に当たった側は、先に書けた1件を返して終わる。
+    // 制約以外の失敗(接続切れなど)はそのまま投げて再試行させる。
+    if (isUniqueViolation(error)) {
+      if (input.idempotencyKey) {
+        const existing = await findEventByIdempotencyKey(db, input.conversionPointId, input.idempotencyKey);
+        if (existing) {
+          requireSameIdempotencyContent(existing, input);
+          return existing;
+        }
+      }
+      if (onceOnly) {
+        const existing = await findFirstFriendEvent(db, input.conversionPointId, input.friendId);
+        if (existing) return existing;
+      }
     }
     throw error;
   }
