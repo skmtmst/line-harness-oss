@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { createScenario, enrollFriendInScenario, updateScenario } from '../src/scenarios.js';
+import { createScenario, enrollFriendInScenario, publishScenarioVersion, updateScenario } from '../src/scenarios.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = join(__dirname, '..');
@@ -74,6 +74,8 @@ async function withStep(name: string, allowConcurrent?: boolean) {
        VALUES (?, ?, 0, 60, 'text', 'こんにちは')`,
     )
     .run(crypto.randomUUID(), scenario.id);
+  // 参加には明示公開が要る（351）。購読の条件ではなく場の準備。
+  await publishScenarioVersion(db, scenario.id, { staffId: null, idempotencyKey: `conc-${name}` });
   return scenario;
 }
 

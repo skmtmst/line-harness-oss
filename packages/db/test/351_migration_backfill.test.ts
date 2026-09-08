@@ -1,0 +1,212 @@
+import { describe, expect, test, beforeEach } from 'vitest';
+import Database from 'better-sqlite3';
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const PKG_ROOT = join(__dirname, '..');
+
+/**
+ * migration 351 本体の実D1テスト。
+ *
+ * 351適用前の形（published_version_id 列なし）から作り、ファイルの中身を
+ * そのまま流して、既存の稼働中購読が公開版 v1 へ寄ることを確かめる。
+ * better-sqlite3 は外部キー制約を有効のままにする（本番D1と無効環境の
+ * どちらでも同じ終状態になることが、このPRの契約）。
+ */
+function setupPre351Db(): Database.Database {
+  const db = new Database(':memory:');
+  db.exec(`
+    CREATE TABLE scenarios (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      delivery_mode TEXT NOT NULL DEFAULT 'relative',
+      audience_condition_json TEXT,
+      on_complete_mode TEXT NOT NULL DEFAULT 'pause',
+      on_complete_scenario_id TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE TABLE scenario_steps (
+      id TEXT PRIMARY KEY,
+      scenario_id TEXT NOT NULL REFERENCES scenarios (id) ON DELETE CASCADE,
+      step_order INTEGER NOT NULL,
+      delay_minutes INTEGER NOT NULL DEFAULT 0,
+      message_type TEXT NOT NULL,
+      message_content TEXT NOT NULL,
+      condition_type TEXT,
+      condition_value TEXT,
+      next_step_on_false INTEGER,
+      offset_days INTEGER,
+      offset_minutes INTEGER,
+      delivery_time TEXT,
+      template_id TEXT,
+      on_reach_tag_id TEXT,
+      after_send TEXT NOT NULL DEFAULT 'continue',
+      target_condition_json TEXT,
+      question_json TEXT,
+      is_draft INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+    CREATE TABLE templates (
+      id TEXT PRIMARY KEY,
+      message_type TEXT NOT NULL,
+      message_content TEXT NOT NULL,
+      question_json TEXT
+    );
+    CREATE TABLE friends (id TEXT PRIMARY KEY);
+    CREATE TABLE friend_scenarios (
+      id TEXT PRIMARY KEY,
+      friend_id TEXT NOT NULL REFERENCES friends (id) ON DELETE CASCADE,
+      scenario_id TEXT NOT NULL REFERENCES scenarios (id) ON DELETE CASCADE,
+      current_step_order INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'active',
+      started_at TEXT NOT NULL,
+      next_delivery_at TEXT,
+      updated_at TEXT NOT NULL
+    );
+    CREATE TABLE messages_log (
+      id TEXT PRIMARY KEY,
+      friend_id TEXT NOT NULL,
+      direction TEXT NOT NULL,
+      message_type TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+  `);
+
+  // 稼働中のシナリオ：1通目は template 参照、2通目は直接文。
+  db.prepare(
+    `INSERT INTO scenarios (id, name, delivery_mode, created_at) VALUES ('scn-1', '案内', 'relative', '2026-08-16')`,
+  ).run();
+  db.prepare(
+    `INSERT INTO templates (id, message_type, message_content, question_json)
+     VALUES ('tpl-1', 'text', '公開時の文面', NULL)`,
+  ).run();
+  db.prepare(
+    `INSERT INTO scenario_steps
+       (id, scenario_id, step_order, delay_minutes, message_type, message_content, template_id, created_at)
+     VALUES
+       ('live-step-1', 'scn-1', 0, 0, 'text', '下書きの控え', 'tpl-1', '2026-08-16'),
+       ('live-step-2', 'scn-1', 1, 60, 'text', '2通目', NULL, '2026-08-16')`,
+  ).run();
+  db.prepare(`INSERT INTO friends VALUES ('f-active'), ('f-done')`).run();
+  db.prepare(
+    `INSERT INTO friend_scenarios (id, friend_id, scenario_id, current_step_order, status, started_at, updated_at)
+     VALUES
+       ('enr-active', 'f-active', 'scn-1', -1, 'active', '2026-08-16', '2026-08-16'),
+       ('enr-done', 'f-done', 'scn-1', 1, 'completed', '2026-08-16', '2026-08-16')`,
+  ).run();
+  return db;
+}
+
+let sqlite: Database.Database;
+
+beforeEach(() => {
+  sqlite = setupPre351Db();
+});
+
+function apply351(): void {
+  // 実運用の移行実行系と同じく、文ごとに流して良性エラー
+  //（duplicate column / already exists）は飛ばす。
+  const sql = readFileSync(join(PKG_ROOT, 'migrations', '351_scenario_published_versions.sql'), 'utf8');
+  for (const statement of sql.split(/;\s*(?:\r?\n|$)/).map((s) => s.trim()).filter(Boolean)) {
+    try {
+      sqlite.exec(statement);
+    } catch (error) {
+      if (!(error instanceof Error) || !/duplicate column name|already exists/i.test(error.message)) {
+        throw error;
+      }
+    }
+  }
+}
+
+describe('migration 351 の適用（#644）', () => {
+  test('既存シナリオに公開版 v1 ができ、指針が v1 を指す', () => {
+    apply351();
+
+    const version = sqlite
+      .prepare(`SELECT * FROM scenario_versions WHERE scenario_id = 'scn-1'`)
+      .get() as Record<string, unknown>;
+    expect(version.version_number).toBe(0 + 1);
+    expect(version.status).toBe('published');
+    const pointer = sqlite
+      .prepare(`SELECT current_published_version_id AS pointer FROM scenarios WHERE id = 'scn-1'`)
+      .get() as { pointer: string };
+    expect(pointer.pointer).toBe(version.id);
+  });
+
+  test('v1 の写しは template 解決済み・版所有の通IDを持つ', () => {
+    apply351();
+
+    const version = sqlite
+      .prepare(`SELECT steps_snapshot FROM scenario_versions WHERE scenario_id = 'scn-1'`)
+      .get() as { steps_snapshot: string };
+    const steps = JSON.parse(version.steps_snapshot) as Array<Record<string, unknown>>;
+    expect(steps).toHaveLength(2);
+    // template を使う1通目は、公開時の文面が写っている（下書きの控えではない）。
+    expect(steps[0].message_content).toBe('公開時の文面');
+    expect(steps[0].template_id).toBe('tpl-1');
+    expect(steps[0].template_id_at_send).toBe('tpl-1');
+    // 通の正体は版所有のID。live の通IDは控えにだけ残る。
+    expect(steps[0].version_step_id).toBe(`${(sqlite.prepare(`SELECT id FROM scenario_versions WHERE scenario_id = 'scn-1'`).get() as { id: string }).id}:0`);
+    expect(steps[0].live_step_id).toBe('live-step-1');
+    expect(steps[1].message_content).toBe('2通目');
+  });
+
+  test('既存の購読（稼働中・完了済み）は v1 へ寄り、live 読みに残らない', () => {
+    apply351();
+
+    const rows = sqlite
+      .prepare(`SELECT id, published_version_id AS v FROM friend_scenarios ORDER BY id`)
+      .all() as Array<{ id: string; v: string | null }>;
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      expect(row.v).toMatch(/^scenario-version-v1-scn-1$/);
+    }
+  });
+
+  test('版への参照整合が効く（宙に浮いた購読は書けない）', () => {
+    apply351();
+
+    expect(() =>
+      sqlite.prepare(
+        `INSERT INTO friend_scenarios (id, friend_id, scenario_id, current_step_order, status, started_at, updated_at, published_version_id)
+         VALUES ('enr-bad', 'f-active', 'scn-1', -1, 'active', '2026-08-16', '2026-08-16', 'version-missing')`,
+      ).run(),
+    ).toThrow(/FOREIGN KEY/i);
+  });
+
+  test('確定版の直接削除は止まり、親ごとの削除は通る', () => {
+    apply351();
+    const versionId = (
+      sqlite.prepare(`SELECT id FROM scenario_versions WHERE scenario_id = 'scn-1'`).get() as { id: string }
+    ).id;
+
+    // 直接の DELETE は止まる。
+    expect(() => sqlite.prepare(`DELETE FROM scenario_versions WHERE id = ?`).run(versionId)).toThrow(
+      /cannot be deleted/,
+    );
+    // 親シナリオごとの削除は通る（CASCADE。購読の版参照も親子で消える）。
+    sqlite.prepare(`DELETE FROM scenarios WHERE id = 'scn-1'`).run();
+    expect(
+      (sqlite.prepare(`SELECT COUNT(*) AS n FROM scenario_versions`).get() as { n: number }).n,
+    ).toBe(0);
+    expect(
+      (sqlite.prepare(`SELECT COUNT(*) AS n FROM friend_scenarios`).get() as { n: number }).n,
+    ).toBe(0);
+  });
+
+  test('再適用しても増えない（冪等）', () => {
+    apply351();
+    apply351();
+
+    expect(
+      (sqlite.prepare(`SELECT COUNT(*) AS n FROM scenario_versions`).get() as { n: number }).n,
+    ).toBe(1);
+    const rows = sqlite
+      .prepare(`SELECT published_version_id AS v FROM friend_scenarios`)
+      .all() as Array<{ v: string }>;
+    expect(new Set(rows.map((r) => r.v)).size).toBe(1);
+  });
+});

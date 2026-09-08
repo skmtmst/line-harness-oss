@@ -2269,7 +2269,7 @@ CREATE TABLE "friend_scenarios" (
   started_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   next_delivery_at   TEXT,
   updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, previous_scenario_id TEXT, published_version_id TEXT);
+, previous_scenario_id TEXT, published_version_id TEXT REFERENCES scenario_versions (id));
 
 CREATE TABLE friend_scores (
   id              TEXT PRIMARY KEY,
@@ -2767,7 +2767,7 @@ CREATE TABLE messages_log (
   line_account_id  TEXT,
   sent_by_staff_id TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, origin_kind TEXT, origin_id TEXT);
+, origin_kind TEXT, origin_id TEXT, scenario_version_step_id TEXT);
 
 CREATE TABLE mileage_adjustment_notifications (
   id                TEXT PRIMARY KEY,
@@ -4334,6 +4334,14 @@ CREATE TABLE scenario_drafts (
   updated_at         TEXT NOT NULL
 );
 
+CREATE TABLE scenario_publish_keys (
+  publish_idempotency_key   TEXT PRIMARY KEY,
+  scenario_id               TEXT NOT NULL REFERENCES scenarios (id) ON DELETE CASCADE,
+  version_id                TEXT NOT NULL,
+  content_snapshot          TEXT NOT NULL,
+  created_at                TEXT NOT NULL
+);
+
 CREATE TABLE "scenario_steps" (
   id              TEXT PRIMARY KEY,
   scenario_id     TEXT NOT NULL REFERENCES scenarios (id) ON DELETE CASCADE,
@@ -4379,7 +4387,6 @@ CREATE TABLE scenario_versions (
     CHECK (status IN ('published', 'retired')),
   published_at              TEXT NOT NULL,
   published_by_staff_id     TEXT,
-  publish_idempotency_key   TEXT,
   created_at                TEXT NOT NULL,
   updated_at                TEXT NOT NULL,
   UNIQUE (scenario_id, version_number)
@@ -5883,6 +5890,10 @@ CREATE INDEX idx_messages_log_friend_source ON messages_log (friend_id, source);
 CREATE INDEX idx_messages_log_origin
   ON messages_log (origin_kind, created_at);
 
+CREATE INDEX idx_messages_log_version_step
+  ON messages_log (friend_id, scenario_version_step_id)
+  WHERE scenario_version_step_id IS NOT NULL;
+
 CREATE INDEX idx_mileage_adjustment_notifications_retry
   ON mileage_adjustment_notifications(status, updated_at)
   WHERE status = 'failed';
@@ -6245,16 +6256,15 @@ CREATE INDEX idx_scenario_actions_lookup
 CREATE INDEX idx_scenario_drafts_account_updated
   ON scenario_drafts(line_account_id, updated_at DESC, scenario_id);
 
+CREATE INDEX idx_scenario_publish_keys_scenario
+  ON scenario_publish_keys (scenario_id);
+
 CREATE INDEX idx_scenario_steps_scenario_lookup ON scenario_steps (scenario_id);
 
 CREATE INDEX idx_scenario_triggers_lookup ON scenario_triggers (kind, tag_id);
 
 CREATE UNIQUE INDEX idx_scenario_triggers_unique
   ON scenario_triggers (scenario_id, kind, COALESCE(tag_id, ''));
-
-CREATE UNIQUE INDEX idx_scenario_versions_publish_key
-  ON scenario_versions (publish_idempotency_key)
-  WHERE publish_idempotency_key IS NOT NULL;
 
 CREATE INDEX idx_scenario_versions_scenario
   ON scenario_versions (scenario_id, status, version_number DESC);
@@ -6859,21 +6869,22 @@ BEGIN SELECT RAISE(ABORT, 'published reminder version status cannot move backwar
 
 CREATE TRIGGER trg_scenario_versions_immutable_delete
 BEFORE DELETE ON scenario_versions
-WHEN OLD.status = 'published'
+WHEN OLD.status IN ('published', 'retired')
+ AND EXISTS (SELECT 1 FROM scenarios WHERE id = OLD.scenario_id)
 BEGIN SELECT RAISE(ABORT, 'published scenario versions cannot be deleted'); END;
 
 CREATE TRIGGER trg_scenario_versions_immutable_update
 BEFORE UPDATE OF scenario_id, version_number, delivery_mode, audience_condition_json,
   on_complete_mode, on_complete_scenario_id, steps_snapshot
 ON scenario_versions
-WHEN OLD.status = 'published'
+WHEN OLD.status IN ('published', 'retired')
 BEGIN SELECT RAISE(ABORT, 'published scenario versions are immutable'); END;
 
 CREATE TRIGGER trg_scenario_versions_status_transition
 BEFORE UPDATE OF status ON scenario_versions
-WHEN OLD.status = 'published'
+WHEN OLD.status IN ('published', 'retired')
  AND NEW.status <> OLD.status
- AND NEW.status <> 'retired'
+ AND NOT (OLD.status = 'published' AND NEW.status = 'retired')
 BEGIN SELECT RAISE(ABORT, 'published scenario version status cannot move backwards'); END;
 
 -- Seed data required by tenant-aware inserts on a fresh database.

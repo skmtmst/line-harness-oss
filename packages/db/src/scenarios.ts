@@ -1,5 +1,6 @@
 import { jstNow } from './utils.js';
 import { computeNextDeliveryAt } from './scenario-schedule.js';
+import { resolveStepContent } from './scenario-resolve.js';
 import {
   buildFriendScenariosDueForDeliveryQuery,
   normalizeScenarioDeliveryTimestamp,
@@ -75,7 +76,7 @@ export interface FriendScenario {
   next_delivery_at: string | null;
   /** 割り込む前に読んでいたシナリオ（123）。「1つ前のシナリオを再開」で使う。 */
   previous_scenario_id: string | null;
-  /** 開始時に固定した公開版（351）。null は版より前の購読で live の表を読む。 */
+  /** 開始時に固定した公開版（351）。配信はこの版だけを読む。 */
   published_version_id: string | null;
   updated_at: string;
 }
@@ -97,9 +98,34 @@ export interface ScenarioVersion {
   status: 'published' | 'retired';
   published_at: string;
   published_by_staff_id: string | null;
-  publish_idempotency_key: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * 公開操作の冪等キー台帳（351）。同じキーの再実行は同じ版を返し、
+ * 別内容・別シナリオでの使い回しは SCENARIO_PUBLISH_KEY_CONFLICT（409）に
+ * する。同内容の公開でもキーを残すので、あとから別内容で再利用したら
+ * 必ず検出できる。
+ */
+export interface ScenarioPublishKey {
+  publish_idempotency_key: string;
+  scenario_id: string;
+  version_id: string;
+  content_snapshot: string;
+  created_at: string;
+}
+
+/**
+ * 版に固定された通。`id` は版所有の通ID（`<版ID>:<通番>`）で、live の
+ * scenario_steps.id ではない。配信の同一性・二重送信防止はこのIDで見る。
+ * live 側のIDは履歴づけの控え（live_step_id）にだけ残す。通が消された
+ * あとは null になることがある。配信の判断には使わない。
+ */
+export interface PinnedScenarioStep extends ScenarioStep {
+  live_step_id: string | null;
+  /** 公開時に確定した template。配信時に templates 表を読まない。 */
+  template_id_at_send: string | null;
 }
 
 // ============================================================
@@ -302,8 +328,43 @@ export async function updateScenario(
     .first<Scenario>();
 }
 
+/**
+ * シナリオの親削除。子は明示順序で消す。
+ *
+ * - 他の機能から参照されている（アフィリエイト案件の completion 連携など）
+ *   ときは黙って切らず SCENARIO_HAS_DEPENDENTS（409）にする。勝手に
+ *   切ると報酬の支払い条件が静かに壊れる。
+ * - 版の削除禁止トリガーは「親が残っている間の削除」だけを止めるので、
+ *   親→子の順に消す。外部キー制約が有効な環境では親削除で CASCADE が
+ *   走り、無効な環境では残るので後段で明示削除する。どちらでも同じ
+ *   終状態になり、500 にならない。
+ */
 export async function deleteScenario(db: D1Database, id: string): Promise<void> {
+  const dependent = await db.prepare(
+    `SELECT id FROM affiliate_offers WHERE scenario_id = ? LIMIT 1`,
+  ).bind(id).first<{ id: string }>();
+  if (dependent) throw new Error('SCENARIO_HAS_DEPENDENTS');
+
   await db.prepare(`DELETE FROM scenarios WHERE id = ?`).bind(id).run();
+  const childDeletes = [
+    db.prepare(`DELETE FROM scenario_publish_keys WHERE scenario_id = ?`).bind(id),
+    db.prepare(`DELETE FROM scenario_versions WHERE scenario_id = ?`).bind(id),
+    db.prepare(
+      `DELETE FROM scenario_action_fires WHERE action_id IN (
+         SELECT a.id FROM scenario_actions a WHERE a.scenario_id = ?
+       )`,
+    ).bind(id),
+    db.prepare(`DELETE FROM scenario_actions WHERE scenario_id = ?`).bind(id),
+    db.prepare(`DELETE FROM scenario_steps WHERE scenario_id = ?`).bind(id),
+    db.prepare(`DELETE FROM friend_scenarios WHERE scenario_id = ?`).bind(id),
+    db.prepare(`DELETE FROM scenario_triggers WHERE scenario_id = ?`).bind(id),
+    db.prepare(`DELETE FROM scenario_drafts WHERE scenario_id = ?`).bind(id),
+  ];
+  if (typeof db.batch === 'function') {
+    await db.batch(childDeletes);
+  } else {
+    for (const statement of childDeletes) await statement.run();
+  }
 }
 
 // ============================================================
@@ -521,36 +582,105 @@ export async function getScenarioSteps(
 // ============================================================
 
 /**
- * 通1件ぶんのスナップショット。キーの順序は migration 351 の
- * json_object と同じにする。順序まで含めて文字列比較するので、
- * どちらか片方だけ変えると「内容が同じなのに別版」が増える。
+ * 版に写す通1件ぶん。キーの順序は migration 351 の json_object と同じに
+ * する。template を使う通は公開時の文面・質問を解決して写すので、公開後の
+ * template 編集は固定済みの版へ混入しない。`id` には版所有の通IDを入れ、
+ * live の通IDは live_step_id の控えにだけ残す。
  */
-function canonicalScenarioStepSnapshot(s: ScenarioStep): Record<string, unknown> {
+async function buildVersionSnapshotSteps(
+  db: D1Database,
+  versionId: string,
+  steps: ScenarioStep[],
+): Promise<Array<Record<string, unknown>>> {
+  const out: Array<Record<string, unknown>> = [];
+  for (const s of steps) {
+    const resolved = await resolveStepContent(db, s);
+    out.push({
+      version_step_id: `${versionId}:${s.step_order}`,
+      step_order: s.step_order,
+      delay_minutes: s.delay_minutes,
+      message_type: resolved.messageType,
+      message_content: resolved.messageContent,
+      condition_type: s.condition_type,
+      condition_value: s.condition_value,
+      next_step_on_false: s.next_step_on_false,
+      offset_days: s.offset_days,
+      offset_minutes: s.offset_minutes,
+      delivery_time: s.delivery_time,
+      template_id: s.template_id,
+      template_id_at_send: resolved.templateIdAtSend,
+      on_reach_tag_id: s.on_reach_tag_id,
+      after_send: s.after_send,
+      target_condition_json: s.target_condition_json,
+      question_json: resolved.questionJson,
+      is_draft: s.is_draft,
+      live_step_id: s.id,
+      created_at: s.created_at,
+    });
+  }
+  return out;
+}
+
+/**
+ * 内容比較用の正規形。版の正体（version_step_id）は同一性の判断から外す。
+ * 版IDが決まる前に作った下書きの写しと、保存済みの版の写しを同じ形で
+ * 比べられる。live_step_id・created_at は残す（通の差し替えは別内容）。
+ */
+function normalizeVersionStepSnapshot(
+  entry: Record<string, unknown>,
+): Record<string, unknown> {
   return {
-    id: s.id,
-    scenario_id: s.scenario_id,
-    step_order: s.step_order,
-    delay_minutes: s.delay_minutes,
-    message_type: s.message_type,
-    message_content: s.message_content,
-    condition_type: s.condition_type,
-    condition_value: s.condition_value,
-    next_step_on_false: s.next_step_on_false,
-    offset_days: s.offset_days,
-    offset_minutes: s.offset_minutes,
-    delivery_time: s.delivery_time,
-    template_id: s.template_id,
-    on_reach_tag_id: s.on_reach_tag_id,
-    after_send: s.after_send,
-    target_condition_json: s.target_condition_json,
-    question_json: s.question_json,
-    is_draft: s.is_draft,
-    created_at: s.created_at,
+    step_order: entry['step_order'] ?? null,
+    delay_minutes: entry['delay_minutes'] ?? 0,
+    message_type: entry['message_type'] ?? 'text',
+    message_content: entry['message_content'] ?? '',
+    condition_type: entry['condition_type'] ?? null,
+    condition_value: entry['condition_value'] ?? null,
+    next_step_on_false: entry['next_step_on_false'] ?? null,
+    offset_days: entry['offset_days'] ?? null,
+    offset_minutes: entry['offset_minutes'] ?? null,
+    delivery_time: entry['delivery_time'] ?? null,
+    template_id: entry['template_id'] ?? null,
+    template_id_at_send: entry['template_id_at_send'] ?? null,
+    on_reach_tag_id: entry['on_reach_tag_id'] ?? null,
+    after_send: entry['after_send'] ?? 'continue',
+    target_condition_json: entry['target_condition_json'] ?? null,
+    question_json: entry['question_json'] ?? null,
+    is_draft: entry['is_draft'] ?? 0,
+    live_step_id: entry['live_step_id'] ?? null,
+    created_at: entry['created_at'] ?? null,
   };
 }
 
-function buildScenarioStepsSnapshot(steps: ScenarioStep[]): string {
-  return JSON.stringify(steps.map(canonicalScenarioStepSnapshot));
+/**
+ * 公開内容の指紋。配信条件と通の写しを1本の文字列にする。同じ文字列なら
+ * 同じものが届くので、版の増減と冪等キーの照合はこれで行う。
+ */
+function canonicalPublishPayload(
+  scenario: Pick<
+    Scenario,
+    'delivery_mode' | 'audience_condition_json' | 'on_complete_mode' | 'on_complete_scenario_id'
+  >,
+  snapshotSteps: Array<Record<string, unknown>>,
+): string {
+  return JSON.stringify({
+    delivery_mode: scenario.delivery_mode ?? 'relative',
+    audience_condition_json: scenario.audience_condition_json ?? null,
+    on_complete_mode: scenario.on_complete_mode ?? 'pause',
+    on_complete_scenario_id: scenario.on_complete_scenario_id ?? null,
+    steps: snapshotSteps.map(normalizeVersionStepSnapshot),
+  });
+}
+
+function canonicalPayloadOfVersion(version: ScenarioVersion): string | null {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(version.steps_snapshot);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(raw)) return null;
+  return canonicalPublishPayload(version, raw as Array<Record<string, unknown>>);
 }
 
 export async function getScenarioVersionById(
@@ -575,10 +705,10 @@ export async function getScenarioPublishedVersion(
 }
 
 /**
- * 版のスナップショットを通の配列に戻す。壊れていたら空にする
- * （呼ぶ側は「通が無い」と同じく購読を完了させる）。
+ * 版のスナップショットを通の配列に戻す。通の正体は版所有の通ID。
+ * 壊れていたら空にする（呼ぶ側は「通が無い」と同じく購読を完了させる）。
  */
-export function parseScenarioVersionSteps(version: ScenarioVersion): ScenarioStep[] {
+export function parseScenarioVersionSteps(version: ScenarioVersion): PinnedScenarioStep[] {
   let raw: unknown;
   try {
     raw = JSON.parse(version.steps_snapshot);
@@ -586,14 +716,14 @@ export function parseScenarioVersionSteps(version: ScenarioVersion): ScenarioSte
     return [];
   }
   if (!Array.isArray(raw)) return [];
-  const steps: ScenarioStep[] = [];
+  const steps: PinnedScenarioStep[] = [];
   for (const item of raw) {
     if (!item || typeof item !== 'object') return [];
     const r = item as Record<string, unknown>;
-    if (typeof r['id'] !== 'string' || typeof r['step_order'] !== 'number') return [];
+    if (typeof r['version_step_id'] !== 'string' || typeof r['step_order'] !== 'number') return [];
     steps.push({
-      id: r['id'] as string,
-      scenario_id: (r['scenario_id'] as string) ?? version.scenario_id,
+      id: r['version_step_id'] as string,
+      scenario_id: version.scenario_id,
       step_order: r['step_order'] as number,
       delay_minutes: (r['delay_minutes'] as number) ?? 0,
       message_type: (r['message_type'] as ScenarioStep['message_type']) ?? 'text',
@@ -605,58 +735,100 @@ export function parseScenarioVersionSteps(version: ScenarioVersion): ScenarioSte
       offset_minutes: (r['offset_minutes'] as number | null) ?? null,
       delivery_time: (r['delivery_time'] as string | null) ?? null,
       template_id: (r['template_id'] as string | null) ?? null,
+      template_id_at_send: (r['template_id_at_send'] as string | null) ?? null,
       on_reach_tag_id: (r['on_reach_tag_id'] as string | null) ?? null,
       after_send: (r['after_send'] as string) ?? 'continue',
       target_condition_json: (r['target_condition_json'] as string | null) ?? null,
       question_json: (r['question_json'] as string | null) ?? null,
       is_draft: (r['is_draft'] as number) ?? 0,
+      live_step_id: (r['live_step_id'] as string | null) ?? null,
       created_at: (r['created_at'] as string) ?? version.created_at,
     });
   }
   return steps;
 }
 
-function scenarioVersionMatchesDraft(
-  version: ScenarioVersion,
-  scenario: Scenario,
-  steps: ScenarioStep[],
-): boolean {
-  return (
-    (version.delivery_mode ?? 'relative') === (scenario.delivery_mode ?? 'relative') &&
-    (version.audience_condition_json ?? null) === (scenario.audience_condition_json ?? null) &&
-    (version.on_complete_mode ?? 'pause') === (scenario.on_complete_mode ?? 'pause') &&
-    (version.on_complete_scenario_id ?? null) === (scenario.on_complete_scenario_id ?? null) &&
-    version.steps_snapshot === buildScenarioStepsSnapshot(steps)
-  );
+/**
+ * 冪等キーを台帳に残す。同内容の公開でも残すので、あとから別内容で
+ * 使い回したら必ず SCENARIO_PUBLISH_KEY_CONFLICT になる。競合で残せな
+ * かったら残っている行を読み直し、同内容ならその版、別内容なら衝突に
+ * する（同時公開の両勝ちを作らない）。
+ */
+async function recordScenarioPublishKey(
+  db: D1Database,
+  idempotencyKey: string,
+  scenarioId: string,
+  versionId: string,
+  contentPayload: string,
+): Promise<ScenarioVersion> {
+  const now = jstNow();
+  await db.prepare(
+    `INSERT OR IGNORE INTO scenario_publish_keys
+       (publish_idempotency_key, scenario_id, version_id, content_snapshot, created_at)
+     VALUES (?, ?, ?, ?, ?)`,
+  ).bind(idempotencyKey, scenarioId, versionId, contentPayload, now).run();
+  const row = await db.prepare(
+    `SELECT * FROM scenario_publish_keys WHERE publish_idempotency_key = ?`,
+  ).bind(idempotencyKey).first<ScenarioPublishKey>();
+  if (!row || row.scenario_id !== scenarioId || row.content_snapshot !== contentPayload) {
+    throw new Error('SCENARIO_PUBLISH_KEY_CONFLICT');
+  }
+  const version = await getScenarioVersionById(db, row.version_id);
+  if (!version || version.scenario_id !== scenarioId) throw new Error('SCENARIO_NOT_PUBLISHED');
+  return version;
 }
 
 /**
- * いまの下書きを公開版として固定する。内容が現行の公開版と同じなら
- * 新しい行を作らず現行版を返す（連打・再試行で二重版を作らない）。
- * 同時公開で版番号が競合したら取り直す（最大3回）。
+ * いまの下書きを公開版として固定する。
+ *
+ * - 内容が現行の公開版と同じなら版を増やさず現行版を返すが、冪等キーは
+ *   残す（連打・再試行で二重版を作らないし、あとの使い回しも検出する）。
+ * - 同じキーで別内容が来たら SCENARIO_PUBLISH_KEY_CONFLICT（409）。
+ * - 版INSERT→指針CAS→旧版引退の順に進める。指針のCASに負けたら勝った側の
+ *   版を読み直し、同内容ならそれを返し、別内容なら取り直す（最大3回）。
+ *   指針が指す版以外で published のまま残った版は、入口で引退へ寄せる
+ *   ので「公開版なし」「引退版を指す指針」を作らない。
  */
 export async function publishScenarioVersion(
   db: D1Database,
   scenarioId: string,
   input: { staffId: string | null; idempotencyKey: string },
 ): Promise<ScenarioVersion> {
-  const replay = await db.prepare(
-    `SELECT * FROM scenario_versions WHERE publish_idempotency_key = ?`,
-  ).bind(input.idempotencyKey).first<ScenarioVersion>();
-  if (replay) {
-    if (replay.scenario_id !== scenarioId) throw new Error('SCENARIO_PUBLISH_KEY_CONFLICT');
-    return replay;
-  }
   const scenario = await db.prepare(`SELECT * FROM scenarios WHERE id = ?`)
     .bind(scenarioId)
     .first<Scenario>();
   if (!scenario) throw new Error('SCENARIO_NOT_FOUND');
-  const steps = await getScenarioSteps(db, scenarioId);
-  const current = await getScenarioPublishedVersion(db, scenarioId);
-  if (current && scenarioVersionMatchesDraft(current, scenario, steps)) return current;
-
   const now = jstNow();
-  const snapshot = buildScenarioStepsSnapshot(steps);
+  // 壊れた残骸の自己修復。指針が指す版以外に published が残っていたら引退へ
+  // 寄せる（途中失敗・同時公開の負け側の残骸）。冪等なので何度でも安全。
+  await db.prepare(
+    `UPDATE scenario_versions SET status = 'retired', updated_at = ?
+      WHERE scenario_id = ? AND status = 'published'
+        AND id != COALESCE((SELECT current_published_version_id FROM scenarios WHERE id = ?), '')`,
+  ).bind(now, scenarioId, scenarioId).run();
+
+  const steps = await getScenarioSteps(db, scenarioId);
+  const draftSteps = await buildVersionSnapshotSteps(db, '', steps);
+  const draftPayload = canonicalPublishPayload(scenario, draftSteps);
+
+  // 同じキーの再実行。同内容なら同じ版を返し、別内容・別シナリオなら 409。
+  const replay = await db.prepare(
+    `SELECT * FROM scenario_publish_keys WHERE publish_idempotency_key = ?`,
+  ).bind(input.idempotencyKey).first<ScenarioPublishKey>();
+  if (replay) {
+    if (replay.scenario_id !== scenarioId || replay.content_snapshot !== draftPayload) {
+      throw new Error('SCENARIO_PUBLISH_KEY_CONFLICT');
+    }
+    const replayed = await getScenarioVersionById(db, replay.version_id);
+    if (!replayed || replayed.scenario_id !== scenarioId) throw new Error('SCENARIO_NOT_PUBLISHED');
+    return replayed;
+  }
+
+  const current = await getScenarioPublishedVersion(db, scenarioId);
+  if (current && canonicalPayloadOfVersion(current) === draftPayload) {
+    return recordScenarioPublishKey(db, input.idempotencyKey, scenarioId, current.id, draftPayload);
+  }
+
   for (let attempt = 0; attempt < 3; attempt++) {
     const next = await db.prepare(
       `SELECT COALESCE(MAX(version_number), 0) + 1 AS version_number
@@ -664,13 +836,14 @@ export async function publishScenarioVersion(
     ).bind(scenarioId).first<{ version_number: number }>();
     const versionNumber = Number(next?.version_number ?? 1);
     const id = crypto.randomUUID();
+    const snapshotSteps = await buildVersionSnapshotSteps(db, id, steps);
     const inserted = await db.prepare(
       `INSERT OR IGNORE INTO scenario_versions
          (id, scenario_id, version_number, delivery_mode, audience_condition_json,
           on_complete_mode, on_complete_scenario_id, steps_snapshot,
-          status, published_at, published_by_staff_id, publish_idempotency_key,
+          status, published_at, published_by_staff_id,
           created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?, ?)`,
     ).bind(
       id,
       scenarioId,
@@ -679,88 +852,48 @@ export async function publishScenarioVersion(
       scenario.audience_condition_json ?? null,
       scenario.on_complete_mode ?? 'pause',
       scenario.on_complete_scenario_id ?? null,
-      snapshot,
+      JSON.stringify(snapshotSteps),
       now,
       input.staffId,
-      input.idempotencyKey,
       now,
       now,
     ).run();
     // 同時公開で同じ版番号を取られたら取り直す。
     if ((inserted.meta.changes ?? 0) === 0) continue;
-    // D1 の batch はトランザクションではないので、順に実行する。
-    // テストの D1 模擬に batch が無い環境でも動く。
-    await db.prepare(
-      `UPDATE scenario_versions SET status = 'retired', updated_at = ?
-        WHERE scenario_id = ? AND status = 'published' AND id != ?`,
-    ).bind(now, scenarioId, id).run();
-    await db.prepare(
+    // 指針の CAS。負けたら勝った側を読み直す。別内容なら取り直す。
+    const expectedPointer = current?.id ?? null;
+    const pointed = await db.prepare(
       `UPDATE scenarios SET current_published_version_id = ?, updated_at = ?
-        WHERE id = ?`,
-    ).bind(id, now, scenarioId).run();
+        WHERE id = ? AND COALESCE(current_published_version_id, '') = COALESCE(?, '')`,
+    ).bind(id, now, scenarioId, expectedPointer).run();
+    if ((pointed.meta.changes ?? 0) === 0) {
+      const latest = await getScenarioPublishedVersion(db, scenarioId);
+      if (latest && canonicalPayloadOfVersion(latest) === draftPayload) {
+        return recordScenarioPublishKey(db, input.idempotencyKey, scenarioId, latest.id, draftPayload);
+      }
+      continue;
+    }
+    // 末尾の2件は1往復にまとめる (D1 の batch は原子)。指針が指す版だけを
+    // 残し、ほかは引退へ寄せる。キーの記録もここで行う。
+    const tailStatements = [
+      db.prepare(
+        `UPDATE scenario_versions SET status = 'retired', updated_at = ?
+          WHERE scenario_id = ? AND status = 'published' AND id != ?`,
+      ).bind(now, scenarioId, id),
+      db.prepare(
+        `INSERT OR IGNORE INTO scenario_publish_keys
+           (publish_idempotency_key, scenario_id, version_id, content_snapshot, created_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      ).bind(input.idempotencyKey, scenarioId, id, draftPayload, now),
+    ];
+    if (typeof db.batch === 'function') {
+      await db.batch(tailStatements);
+    } else {
+      for (const statement of tailStatements) await statement.run();
+    }
     const saved = await getScenarioVersionById(db, id);
     if (!saved || saved.status !== 'published') throw new Error('SCENARIO_NOT_PUBLISHED');
-    return saved;
-  }
-  throw new Error('SCENARIO_PUBLISH_CONFLICT');
-}
-
-/**
- * 実行時の定義を不変の版として確保する。公開済みで内容が同じなら
- * 作り直さず現行版を返す。登録口は必ずここを通し、開始時の版へ固定する。
- */
-export async function ensureScenarioPublishedVersion(
-  db: D1Database,
-  scenarioId: string,
-): Promise<ScenarioVersion> {
-  const scenario = await db.prepare(`SELECT * FROM scenarios WHERE id = ?`)
-    .bind(scenarioId)
-    .first<Scenario>();
-  if (!scenario) throw new Error('SCENARIO_NOT_FOUND');
-  const steps = await getScenarioSteps(db, scenarioId);
-  const current = await getScenarioPublishedVersion(db, scenarioId);
-  if (current && scenarioVersionMatchesDraft(current, scenario, steps)) return current;
-
-  const now = jstNow();
-  const snapshot = buildScenarioStepsSnapshot(steps);
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const next = await db.prepare(
-      `SELECT COALESCE(MAX(version_number), 0) + 1 AS version_number
-         FROM scenario_versions WHERE scenario_id = ?`,
-    ).bind(scenarioId).first<{ version_number: number }>();
-    const versionNumber = Number(next?.version_number ?? 1);
-    const id = crypto.randomUUID();
-    const inserted = await db.prepare(
-      `INSERT OR IGNORE INTO scenario_versions
-         (id, scenario_id, version_number, delivery_mode, audience_condition_json,
-          on_complete_mode, on_complete_scenario_id, steps_snapshot,
-          status, published_at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?)`,
-    ).bind(
-      id,
-      scenarioId,
-      versionNumber,
-      scenario.delivery_mode ?? 'relative',
-      scenario.audience_condition_json ?? null,
-      scenario.on_complete_mode ?? 'pause',
-      scenario.on_complete_scenario_id ?? null,
-      snapshot,
-      now,
-      now,
-      now,
-    ).run();
-    if ((inserted.meta.changes ?? 0) === 0) continue;
-    await db.prepare(
-      `UPDATE scenario_versions SET status = 'retired', updated_at = ?
-        WHERE scenario_id = ? AND status = 'published' AND id != ?`,
-    ).bind(now, scenarioId, id).run();
-    await db.prepare(
-      `UPDATE scenarios SET current_published_version_id = ?, updated_at = ?
-        WHERE id = ?`,
-    ).bind(id, now, scenarioId).run();
-    const saved = await getScenarioVersionById(db, id);
-    if (!saved || saved.status !== 'published') throw new Error('SCENARIO_NOT_PUBLISHED');
-    return saved;
+    return recordScenarioPublishKey(db, input.idempotencyKey, scenarioId, saved.id, draftPayload);
   }
   throw new Error('SCENARIO_PUBLISH_CONFLICT');
 }
@@ -770,52 +903,49 @@ export interface ScenarioDeliverySource {
   audienceConditionJson: string | null;
   onCompleteMode: string | null;
   onCompleteScenarioId: string | null;
-  steps: ScenarioStep[];
-  /** 版に固定した読み。null は版より前の購読で live の表を読む。 */
-  pinnedVersionId: string | null;
+  steps: PinnedScenarioStep[];
+  /** 購読開始時に固定した公開版。配信はこの版だけを読む。 */
+  pinnedVersionId: string;
 }
 
 /**
- * 配信が読む通と条件を1箇所で決める。購読に版が付いていたら版から読み、
- * 無い（351 以前の購読）か版が見つからなければ live の表を読む。
+ * 配信が読む通と条件を1箇所で決める。購読に固定された公開版だけを読む。
+ *
+ * 版が無い（未公開）・版の行が見つからない（欠損参照）ときは null を返す。
+ * live の下書き表へは戻らない。呼ぶ側は送らずに止める（購読の一時停止・
+ * 再開の見送り）。下書きの編集中身が配信へ混入しないための安全停止。
  */
 export async function getStepsForDelivery(
   db: D1Database,
   scenarioId: string,
   publishedVersionId: string | null,
-): Promise<ScenarioDeliverySource> {
-  if (publishedVersionId) {
-    const version = await db.prepare(
-      `SELECT * FROM scenario_versions WHERE id = ? AND scenario_id = ?`,
-    ).bind(publishedVersionId, scenarioId).first<ScenarioVersion>();
-    if (version) {
-      return {
-        deliveryMode: (version.delivery_mode ?? 'relative') as DeliveryMode,
-        audienceConditionJson: version.audience_condition_json ?? null,
-        onCompleteMode: version.on_complete_mode ?? null,
-        onCompleteScenarioId: version.on_complete_scenario_id ?? null,
-        steps: parseScenarioVersionSteps(version),
-        pinnedVersionId: version.id,
-      };
-    }
-  }
-  const scenario = await db.prepare(
-    `SELECT delivery_mode, audience_condition_json, on_complete_mode, on_complete_scenario_id
-       FROM scenarios WHERE id = ?`,
-  ).bind(scenarioId).first<{
-    delivery_mode: DeliveryMode;
-    audience_condition_json: string | null;
-    on_complete_mode: string | null;
-    on_complete_scenario_id: string | null;
-  }>();
+): Promise<ScenarioDeliverySource | null> {
+  if (!publishedVersionId) return null;
+  const version = await db.prepare(
+    `SELECT * FROM scenario_versions WHERE id = ? AND scenario_id = ?`,
+  ).bind(publishedVersionId, scenarioId).first<ScenarioVersion>();
+  if (!version) return null;
   return {
-    deliveryMode: (scenario?.delivery_mode ?? 'relative') as DeliveryMode,
-    audienceConditionJson: scenario?.audience_condition_json ?? null,
-    onCompleteMode: scenario?.on_complete_mode ?? null,
-    onCompleteScenarioId: scenario?.on_complete_scenario_id ?? null,
-    steps: await getScenarioSteps(db, scenarioId),
-    pinnedVersionId: null,
+    deliveryMode: (version.delivery_mode ?? 'relative') as DeliveryMode,
+    audienceConditionJson: version.audience_condition_json ?? null,
+    onCompleteMode: version.on_complete_mode ?? null,
+    onCompleteScenarioId: version.on_complete_scenario_id ?? null,
+    steps: parseScenarioVersionSteps(version),
+    pinnedVersionId: version.id,
   };
+}
+
+/**
+ * live の通がまだ残っているか。配信ログの scenario_step_id には、残って
+ * いるときだけ live の通IDを入れ、消されたあとは NULL にする（外部キー
+ * を壊さない）。ダッシュボードの集計は残っている分だけ付く。
+ */
+export async function scenarioStepExists(db: D1Database, stepId: string | null): Promise<boolean> {
+  if (!stepId) return false;
+  const row = await db.prepare(`SELECT 1 AS ok FROM scenario_steps WHERE id = ?`)
+    .bind(stepId)
+    .first<{ ok: number }>();
+  return row !== null;
 }
 
 // ============================================================
@@ -832,10 +962,30 @@ export async function enrollFriendInScenario(
 
   // delivery_mode を取得（migration 037 適用前の DB では 'relative' が DEFAULT で既に入っている）
   const scenarioRow = await db
-    .prepare(`SELECT delivery_mode, allow_concurrent FROM scenarios WHERE id = ?`)
+    .prepare(`SELECT delivery_mode, allow_concurrent, is_active FROM scenarios WHERE id = ?`)
     .bind(scenarioId)
-    .first<{ delivery_mode: DeliveryMode; allow_concurrent: number | null }>();
+    .first<{ delivery_mode: DeliveryMode; allow_concurrent: number | null; is_active: number }>();
   if (!scenarioRow) return null;
+
+  // 止めているシナリオは受け付けない。cron も止めたシナリオには配らないので、
+  // ここで購読だけ作ると「入ったのに届かない」行が残る。
+  if (scenarioRow.is_active === 0) return null;
+
+  // 重複は副作用の前に弾く。版の読み・予定計算の前に返すので、重複登録の
+  // たびに公開側の状態を触らない。
+  //
+  // null を返す。例外にしないのは、呼び出し口が「友だち追加」や
+  // 「タグが付いた」といった副作用の中にあり、そこで throw すると
+  // 本来の処理まで巻き添えで失敗するため。
+  const duplicate = await db
+    .prepare(
+      `SELECT id FROM friend_scenarios
+        WHERE friend_id = ? AND scenario_id = ? AND status != 'completed'
+        LIMIT 1`,
+    )
+    .bind(friendId, scenarioId)
+    .first<{ id: string }>();
+  if (duplicate) return null;
 
   // 並行を許さないシナリオは、他のシナリオが動いている人には登録しない。
   //
@@ -843,7 +993,7 @@ export async function enrollFriendInScenario(
   // ここを既定で塞ぐと、いま複数のシナリオに入っている人への配信が
   // 止まってしまう。止めたい人だけが画面から 0 にする。
   //
-  // 同じシナリオへの二重登録は、これとは別に部分UNIQUE索引が防いでいる
+  // 同じシナリオへの二重登録は、上の重複検査と部分UNIQUE索引が防いでいる
   // （idx_friend_scenarios_unique）。ここで見るのは「他のシナリオ」だけ。
   if (scenarioRow.allow_concurrent === 0) {
     const other = await db
@@ -854,29 +1004,15 @@ export async function enrollFriendInScenario(
       )
       .bind(friendId, scenarioId)
       .first<{ 1: number }>();
-    // null を返す。例外にしないのは、呼び出し口が「友だち追加」や
-    // 「タグが付いた」といった副作用の中にあり、そこで throw すると
-    // 本来の処理まで巻き添えで失敗するため。
     if (other) return null;
   }
 
-  const firstStep = await db
-    .prepare(
-      `SELECT step_order, delay_minutes, offset_days, offset_minutes, delivery_time
-       FROM scenario_steps WHERE scenario_id = ? ORDER BY step_order ASC LIMIT 1`,
-    )
-    .bind(scenarioId)
-    .first<{
-      step_order: number;
-      delay_minutes: number;
-      offset_days: number | null;
-      offset_minutes: number | null;
-      delivery_time: string | null;
-    }>();
-
-  // 開始時の公開版へ固定する（351）。版が無ければいまの下書きから作る。
-  // 版があるのに作り直さないのは、同時登録で二重版を作らないため。
-  const version = await ensureScenarioPublishedVersion(db, scenarioId);
+  // 開始時の公開版へ固定する（351）。明示公開された版だけを選び、未公開の
+  // 下書きを自動公開しない。未公開のときは受け付けない（null）。
+  const version = await getScenarioPublishedVersion(db, scenarioId);
+  if (!version) return null;
+  const pinnedSteps = parseScenarioVersionSteps(version).filter((s) => (s.is_draft ?? 0) === 0);
+  const firstStep = pinnedSteps.length > 0 ? pinnedSteps[0] : null;
 
   // A scenario with no steps is immediately completed — no stuck active enrollment.
   if (!firstStep) {
@@ -897,8 +1033,10 @@ export async function enrollFriendInScenario(
   }
 
   const enrolledAtDate = new Date(Date.now() + 9 * 60 * 60_000);
+  // 予定の組み立ては固定した版の値で行う。開始後に配信方式を変えても、
+  // 既存の購読の予定は変わらない。
   const nextDeliveryDate = computeNextDeliveryAt(
-    { delivery_mode: scenarioRow.delivery_mode },
+    { delivery_mode: (version.delivery_mode ?? 'relative') as DeliveryMode },
     firstStep,
     { enrolledAt: enrolledAtDate, previousDeliveredAt: enrolledAtDate, now: enrolledAtDate },
   );
@@ -1099,8 +1237,16 @@ export async function resumeFriendScenario(
   if (!existing) return null;
   if (existing.status === 'active' || existing.status === 'delivering') return null;
 
-  // 固定した版があれば版から次を探す（351）。版より前の購読は live の表を読む。
+  // 止めているシナリオは再開しない。起こすと cron が拾って配り始める。
+  const scenarioState = await db.prepare(`SELECT is_active FROM scenarios WHERE id = ?`)
+    .bind(scenarioId)
+    .first<{ is_active: number }>();
+  if (!scenarioState || scenarioState.is_active === 0) return null;
+
+  // 固定した版だけから次を探す（351）。版が無い・欠損しているときは
+  // live の表へ戻らず見送る（null）。
   const source = await getStepsForDelivery(db, scenarioId, existing.published_version_id ?? null);
+  if (!source) return null;
   const nextStep = source.steps.find(s => s.step_order > existing.current_step_order);
   if (!nextStep) return null;
 

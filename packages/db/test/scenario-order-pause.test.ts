@@ -9,6 +9,7 @@ import {
   createScenarioStep,
   enrollFriendInScenario,
   pauseFriendScenario,
+  publishScenarioVersion,
   reorderScenarios,
   getScenarios,
 } from '../src/scenarios.js';
@@ -115,6 +116,8 @@ describe('送信後 一時停止（113）', () => {
     // 再開したときに続きから流せるよう、どこまで送ったかは残す。
     const sc = await createScenario(db, { name: 'S', triggerType: 'manual' });
     insertFriend('f-1');
+    // 参加には明示公開が要る（351）。
+    await publishScenarioVersion(db, sc.id, { staffId: null, idempotencyKey: 'pause-s' });
     const fs = await enrollFriendInScenario(db, 'f-1', sc.id);
     expect(fs).not.toBeNull();
 
