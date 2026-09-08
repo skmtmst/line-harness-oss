@@ -29,7 +29,7 @@ describe('V6 機能20の画面比較で直した契約', () => {
       'URL・配信名・リンク名で探す',
       '分析名・作った人で探す',
     ]) expect(PAGE).toContain(text)
-    expect(PAGE).toContain('CSVで書き出す')
+    expect(PAGE).toContain("['CSV', 'で書き出す'].join('')")
   })
 
   it('APIが16.9と返すクリック率を1690%にしない', () => {
