@@ -23,4 +23,25 @@ describe('予約管理の一覧上限', () => {
     expect(DETAIL).toContain('booking.friend_id ? (')
     expect(LIST).toContain('b.friend_id ? <Button')
   })
+
+  it('集計の失敗は0表示と分け、理由と再試行を出す(点検#516の中2)', () => {
+    expect(LIST).toContain('summaryError')
+    expect(LIST).toContain('集計を読み込めませんでした。一覧はそのまま使えます。')
+    expect(LIST).toContain('もう一度読み込む')
+    expect(LIST).toContain('setSummarySeq')
+  })
+
+  it('承認文面はWorkerの送信文面と同じ要素を持つ(点検#516の中7)', () => {
+    // 実際に送るのは booking-notifier.ts の renderNotificationText('approved')。
+    // 6要素(確定文・メニュー・担当・日時・空行・変更案内)がずれると二重管理になる。
+    expect(DETAIL).toContain("'予約が確定しました。'")
+    expect(DETAIL).toContain('`メニュー: ${b.menu_name}`')
+    expect(DETAIL).toContain('`担当: ${b.staff_name}`')
+    expect(DETAIL).toContain('`日時: ${jst}`')
+    expect(DETAIL).toContain("'変更・キャンセルはお店に直接ご連絡ください。'")
+    expect(DETAIL).toContain("renderNotificationText('approved'")
+  })
+
+  // 点検#516の中8(メニュー棚のFolderPanel寄せ)は列車側で移行済みのため、
+  // このPRでは重複して扱わない。移行の契約は booking-folder-panel-contract.test.ts が持つ。
 })

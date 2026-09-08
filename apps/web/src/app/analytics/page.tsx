@@ -30,6 +30,13 @@ import { csvCell } from '@/lib/presentation'
 import { formatAnalyticsDateTime } from './analytics-time'
 import { canTidyUsage, summarizeMenuFeatures, usageObservation } from './analytics-usage'
 
+// 実行間隔ガード(点検#508の中4)の符号を、運用の言葉に言い換える。
+function explainStartError(code: string, fallback: string): string {
+  if (code === 'analytics_cross_busy') return '他の集計が動いています。終わってからもう一度押してください'
+  if (code === 'analytics_funnel_too_soon') return 'さきほど集計したばかりです。少し待ってから押してください'
+  return fallback
+}
+
 const TABS = [
   { key: 'friends', label: '友だちの増減' },
   { key: 'reactions', label: '配信の反応' },
@@ -194,6 +201,8 @@ function SaveAnalysisAction({
 
 function CrossTab({ accountId, canManage }: { accountId: string; canManage: boolean }) {
   const [fields, setFields] = useState<FriendField[]>([])
+  // 友だち情報欄が取れないのに空表示のままにすると、項目を作り直す事故になる。
+  const [fieldsError, setFieldsError] = useState('')
   const [fieldId, setFieldId] = useState('')
   const [rowKind, setRowKind] = useState<'tag' | 'route' | 'score_band' | 'conversion_point' | 'booking_status' | 'purchase_status'>('tag')
   const [crossResult, setCrossResult] = useState<AnalyticsCrossResult | null>(null)
@@ -212,12 +221,22 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
   } | null>(null)
 
   useEffect(() => {
+    let active = true
+    setFieldsError('')
     void api.friendFields.list(accountId).then((res) => {
+      if (!active) return
       if (res.success) {
         setFields(res.data)
         if (res.data.length > 0) setFieldId(res.data[0].id)
+      } else {
+        setFieldsError(res.error || '友だち情報欄を読み込めませんでした')
       }
+    }).catch(() => {
+      if (active) setFieldsError('友だち情報欄を読み込めませんでした')
     })
+    return () => {
+      active = false
+    }
   }, [accountId])
 
   useEffect(() => {
@@ -229,10 +248,15 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
     setError('')
   }, [accountId])
 
+  // 結果待ちの読み直し。終わらない集計があると無限に叩き続け、端末の電池と
+  // 回線、D1の読み取り枠を消費する。40回で打ち切り、間隔は段階的に延ばす。
   useEffect(() => {
     if (!crossRunId) return
     let active = true
+    let timer: number | undefined
+    let attempts = 0
     const check = async () => {
+      attempts += 1
       try {
         const response = await api.analytics.crossResult(accountId, crossRunId)
         if (!active) return
@@ -241,23 +265,34 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
           setCrossResult(response.data.result)
           setCrossRunId('')
           setLoading(false)
-        } else if (response.data.state === 'failed') {
+          return
+        }
+        if (response.data.state === 'failed') {
           setError(response.data.errorCode || 'クロス分析に失敗しました')
           setCrossRunId('')
           setLoading(false)
+          return
         }
       } catch (caught) {
         if (!active) return
         setError(caught instanceof Error ? caught.message : 'クロス分析を確認できませんでした')
         setCrossRunId('')
         setLoading(false)
+        return
       }
+      if (!active) return
+      if (attempts >= 40) {
+        setError('時間切れです。条件をゆるめて集計し直してください')
+        setCrossRunId('')
+        setLoading(false)
+        return
+      }
+      timer = window.setTimeout(() => void check(), attempts < 10 ? 1500 : attempts < 30 ? 3000 : 5000)
     }
     void check()
-    const timer = window.setInterval(() => void check(), 1500)
     return () => {
       active = false
-      window.clearInterval(timer)
+      if (timer !== undefined) window.clearTimeout(timer)
     }
   }, [accountId, crossRunId])
 
@@ -284,7 +319,8 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
       setCrossResultId(response.data.id)
       setCrossRunId(response.data.id)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'クロス分析を開始できませんでした')
+      const code = caught instanceof Error ? caught.message : ''
+      setError(explainStartError(code, code || 'クロス分析を開始できませんでした'))
       setLoading(false)
     }
   }
@@ -401,6 +437,14 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
       ]),
       ['合計', ...cols.map((column) => colTotals.get(column.key) ?? 0), grandTotal],
     ])
+  }
+
+  if (fieldsError) {
+    return (
+      <p className="text-danger bg-danger-bg border-danger rounded-card border p-8 text-center text-sm" role="alert">
+        友だち情報欄を読み込めませんでした。開き直してください。
+      </p>
+    )
   }
 
   if (fields.length === 0) {
@@ -653,6 +697,9 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
   const [runError, setRunError] = useState('')
+  // 一覧の取得失敗は空表示と分ける。失敗したまま「まだありません」と出すと、
+  // あるものを無いと勘違いして作り直す(点検#508の中3)。
+  const [listError, setListError] = useState('')
   const [creating, setCreating] = useState(false)
   const [picked, setPicked] = useState<number | null>(null)
   const [funnelAudience, setFunnelAudience] = useState<{ id: string; memberCount: number; expiresAt: string } | null>(null)
@@ -660,6 +707,7 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
   useEffect(() => {
     let active = true
     setLoading(true)
+    setListError('')
     setFunnels([])
     setSelected('')
     setRun(null)
@@ -669,10 +717,16 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
     void api.analytics.v6Funnels
       .list(accountId)
       .then((res) => {
-        if (active && res.success) {
+        if (!active) return
+        if (res.success) {
           setFunnels(res.data)
           if (res.data.length > 0) setSelected(res.data[0].id)
+        } else {
+          setListError(res.error || 'ファネルを読み込めませんでした')
         }
+      })
+      .catch(() => {
+        if (active) setListError('ファネルを読み込めませんでした')
       })
       .finally(() => {
         if (active) setLoading(false)
@@ -717,7 +771,8 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
       setRun(response.data)
       setGroupKey(response.data.groups[0]?.key ?? 'all')
     } catch (error) {
-      setRunError(error instanceof Error ? error.message : '再集計できませんでした')
+      const code = error instanceof Error ? error.message : ''
+      setRunError(explainStartError(code, code || '再集計できませんでした'))
     } finally {
       setRunning(false)
     }
@@ -825,6 +880,10 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
             setSelected(id)
           }}
         />
+      ) : listError ? (
+        <p className="text-danger bg-danger-bg rounded-card border-danger border p-8 text-center text-sm" role="alert">
+          ファネルを読み込めませんでした。開き直してください。
+        </p>
       ) : funnels.length === 0 ? (
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           ファネルがまだありません。段を2つ以上つないで、どこで離れているかを見られます。
@@ -1590,6 +1649,7 @@ function UrlClicksOverviewTab({ accountId }: { accountId: string }) {
     </div>
     <AnalyticsNotice>数えているのは、こちらで作った中継URLだけです。直接貼ったURLは数えられません。同じURLを同じ人が何度押しても「押した人」は1人と数えます。</AnalyticsNotice>
     {overview.stateReason && <div className="bg-warning-bg border-warning rounded-card border px-4 py-3 text-sm">{overview.stateReason}</div>}
+    {overview.hasMore && <AnalyticsNotice>200件まで表示しています。探す言葉を足して絞ってください。CSVの書き出しも、表示している範囲だけが入ります。</AnalyticsNotice>}
     <div className="flex flex-wrap items-center gap-2">
       <label htmlFor="url-click-search" className="sr-only">URL・配信名・リンク名で探す</label>
       <input id="url-click-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="URL・配信名・リンク名で探す" className="h-10 min-w-64 flex-1 rounded-control border border-hairline bg-canvas px-3 text-sm" />

@@ -23,6 +23,7 @@ import {
 import { getSlotsWithRemaining } from '../services/event-availability.js';
 import { verifyCallerLineUserId } from '../services/liff-auth.js';
 import { computeIdentityKey } from '../lib/identity-key.js';
+import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import {
   reserveEventIdempotency,
   finalizeEventIdempotencyResponse,
@@ -149,6 +150,17 @@ function validateEventInput(
     const d = body.description;
     if (typeof d !== 'string' || d.length > EVENT_DESCRIPTION_MAX) {
       return { ok: false, code: 'invalid_description' };
+    }
+  }
+  // LIFF側はURLをそのまま出している。空は許すが、中身があるときは
+  // http(s)だけにする。javascript: などが保存されると友だち側で
+  // 想定外の動きになる。LIFF側の表示がわりは別票の範囲。
+  for (const key of ['venue_url', 'image_url', 'og_image_url'] as const) {
+    if (has(key) && body[key] != null && body[key] !== '') {
+      const v = body[key];
+      if (typeof v !== 'string' || !/^https?:\/\//i.test(v)) {
+        return { ok: false, code: `invalid_${key}` };
+      }
     }
   }
   for (const key of ['confirmation_message_extra', 'reminder_message_extra'] as const) {
@@ -281,6 +293,22 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
 events.get('/api/events/admin/events', async (c) => {
   const account_id = getAccountId(c);
   if (!account_id) return bad(c, 'account_id_required', 400);
+  // 1行ごとに副問い合わせが4つ走る。件数が増えても一覧が重くならないよう、
+  // 共通一覧契約(offset方式)で件数を切る。並びは固定のままにする。
+  const paging = parseOffsetPaging(
+    { page: c.req.query('page'), limit: c.req.query('limit') },
+    { defaultLimit: 200, maxLimit: 200 },
+  );
+  const where = `FROM events e
+       WHERE e.deleted_at IS NULL AND (
+         (e.target_type = 'single' AND e.line_account_id = ?)
+         OR (e.target_type = 'multi-account-dedup'
+             AND EXISTS (SELECT 1 FROM json_each(e.account_ids) WHERE value = ?))
+       )`;
+  const counted = await c.env.DB
+    .prepare(`SELECT COUNT(*) AS c ${where}`)
+    .bind(account_id, account_id)
+    .first<{ c: number }>();
   const { results } = await c.env.DB
     .prepare(
       `SELECT
@@ -292,9 +320,18 @@ events.get('/api/events/admin/events', async (c) => {
              AND s.is_active = 1
              AND s.starts_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now')
          ) AS next_slot_starts_at,
-         (SELECT COALESCE(SUM(s.capacity), NULL)
-            FROM event_slots s
-           WHERE s.event_id = e.id AND s.deleted_at IS NULL AND s.is_active = 1
+         -- 定員なしの枠が1つでも混ざっていたら合計は出さない(null)。
+         -- 編集画面は同じ決め方で「—」と出している。一覧だけ数を出すと、
+         -- 残りの判断がずれる。全部が定員なしのときも SUM は null になる。
+         (CASE WHEN EXISTS (
+            SELECT 1 FROM event_slots s
+             WHERE s.event_id = e.id AND s.deleted_at IS NULL AND s.is_active = 1
+               AND s.capacity IS NULL
+          ) THEN NULL ELSE (
+            SELECT COALESCE(SUM(s.capacity), NULL)
+              FROM event_slots s
+             WHERE s.event_id = e.id AND s.deleted_at IS NULL AND s.is_active = 1
+          ) END
          ) AS total_capacity,
          ((SELECT COALESCE(SUM(b.party_size), 0)
              FROM event_bookings b
@@ -311,17 +348,21 @@ events.get('/api/events/admin/events', async (c) => {
          -- タグが消されていると NULL になるので、ID の有無と名前の有無は
          -- 呼び出し側で別に見ること。
          (SELECT t.name FROM tags t WHERE t.id = e.visible_tag_id) AS visible_tag_name
-       FROM events e
-       WHERE e.deleted_at IS NULL AND (
-         (e.target_type = 'single' AND e.line_account_id = ?)
-         OR (e.target_type = 'multi-account-dedup'
-             AND EXISTS (SELECT 1 FROM json_each(e.account_ids) WHERE value = ?))
-       )
-       ORDER BY e.sort_order ASC, e.created_at DESC`,
+       ${where}
+       ORDER BY e.sort_order ASC, e.created_at DESC, e.id DESC
+       LIMIT ? OFFSET ?`,
     )
-    .bind(account_id, account_id)
+    .bind(account_id, account_id, paging.limit, paging.offset)
     .all();
-  return c.json({ items: results ?? [] });
+  return c.json(buildOffsetListResponse({
+    items: results ?? [],
+    total: counted?.c ?? 0,
+    paging,
+    sort: [
+      { field: 'sort_order', direction: 'asc' },
+      { field: 'created_at', direction: 'desc' },
+    ],
+  }));
 });
 
 events.get('/api/events/admin/events/:id', async (c) => {
@@ -764,6 +805,14 @@ events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'a
   };
   const v = validateSlotInput(merged, false);
   if (!v.ok) return bad(c, v.code, 422);
+
+  // 申込が入った枠の定員は、使われている席より小さくできない。
+  // 削除側は slot_has_bookings で止めている。ここも同じ約束にする。
+  // ウィザードの右欄の説明どおりにする。null(定員なし)への変更は許す。
+  if (Object.prototype.hasOwnProperty.call(body, 'capacity') && body.capacity != null) {
+    const usedSeats = await getEventOccurrenceUsedSeats(c.env.DB, slot_id);
+    if (body.capacity < usedSeats) return bad(c, 'slot_capacity_below_bookings', 409);
+  }
 
   const updatable = ['starts_at', 'ends_at', 'capacity', 'is_active', 'sort_order'] as const;
   const setClauses: string[] = [];
@@ -1537,20 +1586,40 @@ events.get('/api/events/admin/events/:id/bookings', async (c) => {
     conditions.push('b.slot_id = ?');
     params.push(slot_id);
   }
+  // 申込が増えても一覧が重くならないよう、共通一覧契約(offset方式)で切る。
+  // 並びは固定し、同刻は id で一意にする。
+  const paging = parseOffsetPaging(
+    { page: c.req.query('page'), limit: c.req.query('limit') },
+    { defaultLimit: 200, maxLimit: 200 },
+  );
+  const fromWhere = `FROM event_bookings b
+         JOIN event_slots s ON s.id = b.slot_id
+         LEFT JOIN friends f ON f.id = b.friend_id
+        WHERE ${conditions.join(' AND ')}`;
+  const counted = await c.env.DB
+    .prepare(`SELECT COUNT(*) AS c ${fromWhere}`)
+    .bind(...params)
+    .first<{ c: number }>();
   const { results } = await c.env.DB
     .prepare(
       `SELECT b.*,
               s.starts_at AS slot_starts_at, s.ends_at AS slot_ends_at,
               f.display_name AS friend_display_name, f.line_user_id AS friend_line_user_id
-         FROM event_bookings b
-         JOIN event_slots s ON s.id = b.slot_id
-         LEFT JOIN friends f ON f.id = b.friend_id
-        WHERE ${conditions.join(' AND ')}
-        ORDER BY b.requested_at DESC`,
+         ${fromWhere}
+        ORDER BY b.requested_at DESC, b.id DESC
+        LIMIT ? OFFSET ?`,
     )
-    .bind(...params)
+    .bind(...params, paging.limit, paging.offset)
     .all();
-  return c.json({ items: results ?? [] });
+  return c.json(buildOffsetListResponse({
+    items: results ?? [],
+    total: counted?.c ?? 0,
+    paging,
+    sort: [
+      { field: 'requested_at', direction: 'desc' },
+      { field: 'id', direction: 'desc' },
+    ],
+  }));
 });
 
 interface BookingActionRow {
@@ -1658,6 +1727,20 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
   const action: EventBookingAction = body.action;
   if (!canTransition(booking.status as never, action)) return bad(c, 'invalid_state', 409);
   const next = nextStatus(booking.status as never, action);
+
+  // 承認する前に枠の残席を確かめる。使われている席の数には、この承認待ち
+  // 自身が入っている。LIFFの即時予約側は同じ数え方で締めている。管理者が
+  // 待ちを全部承認しても定員を超えた確定を作らない。条件付き更新は残す。
+  if (action === 'confirm') {
+    const slotRow = await c.env.DB
+      .prepare(`SELECT capacity FROM event_slots WHERE id = ?`)
+      .bind(booking.slot_id)
+      .first<{ capacity: number | null }>();
+    if (slotRow?.capacity != null) {
+      const usedSeats = await getEventOccurrenceUsedSeats(c.env.DB, booking.slot_id);
+      if (usedSeats > slotRow.capacity) return bad(c, 'slot_full', 409);
+    }
+  }
 
   const nowIso = new Date().toISOString();
   const staff = c.get('staff');
