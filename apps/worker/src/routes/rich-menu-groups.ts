@@ -10,8 +10,9 @@ import {
   deleteRichMenuGroup,
   setRichMenuPageImage,
   pageBelongsToGroup,
-  acquirePublishLock,
-  releasePublishLock,
+  acquirePublishLease,
+  releasePublishLease,
+  isPublishLeaseHeld,
   setPageRichMenuId,
   markRichMenuGroupPublished,
   markRichMenuGroupUnpublished,
@@ -1162,21 +1163,15 @@ richMenuGroups.post(
     const requestedRestoreGroupId = typeof body.restoreGroupId === 'string' && body.restoreGroupId.length > 0
       ? body.restoreGroupId
       : null;
-    let restoreGroupId: string | null = requestedRestoreGroupId;
-    let resolvedRestoreGroupId: string | null = requestedRestoreGroupId;
+    // 明示の指定があれば検証して保存する。指定なし(「前のメニューに戻す」)は
+    // nullのまま保存し、実行開始直前・切替前に実LINE defaultを固定する(365)。
+    // 予約時点では確定しない(期間中の管理画面外の変更にずれないようにする)。
+    const restoreGroupId: string | null = requestedRestoreGroupId;
     if (restoreGroupId) {
       const restore = await getRichMenuGroupById(c.env.DB, restoreGroupId);
       if (!restore || restore.account_id !== group.account_id || restore.status !== 'published') {
         return c.json({ success: false, error: 'restoreGroupId must be a published menu in the same account' }, 400);
       }
-    } else if (body.mode === 'period') {
-      // 「前のメニューに戻す」は予約時点の戻し先を確定して保存する。
-      // 同アカウントの公開中メニュー(予約対象以外)を新しい順に1件選ぶ。
-      // 無ければnullのまま保存し、終了時は明示的default解除として扱う。
-      const { findPublishedRestoreCandidate } = await import('@line-crm/db');
-      const candidate = await findPublishedRestoreCandidate(c.env.DB, group.account_id, group.id);
-      resolvedRestoreGroupId = candidate?.id ?? null;
-      restoreGroupId = resolvedRestoreGroupId;
     }
 
     // 同時2要求でも片方だけ作るため atomic にINSERTし、同key異内容は成功扱いにしない。
@@ -1212,8 +1207,8 @@ richMenuGroups.post(
         id,
         status: 'scheduled',
         restoreGroupId,
-        restoreResolved: body.mode === 'period' && !requestedRestoreGroupId,
-        restoreClearsDefault: body.mode === 'period' && !requestedRestoreGroupId && !resolvedRestoreGroupId,
+        // 戻し先の固定は実行開始直前に行う。予約時点では未確定。
+        restoreDefaultState: null,
       },
     }, 201);
   },
@@ -1234,6 +1229,9 @@ richMenuGroups.get('/api/rich-menu-groups/:groupId/schedules', async (c) => {
       startsAt: row.starts_at,
       endsAt: row.ends_at,
       restoreGroupId: row.restore_group_id,
+      // 実行開始直前に固定した切替前defaultの状態。capturedは固定メニューへ
+      // 戻し、no_defaultは明示解除する。nullは未固定(未実行)。
+      restoreDefaultState: row.restore_default_state,
       status: row.status,
       attemptCount: row.attempt_count,
       nextRetryAt: row.next_retry_at,
@@ -1623,12 +1621,17 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
     return c.json({ success: false, error: 'not found' }, 404);
   }
-  if (group.publishing_at) return c.json({ success: false, error: 'already publishing' }, 409);
+  // 有効なlease保持中だけ409。期限切れ・旧形式の残留は取得時に回収される。
+  if (await isPublishLeaseHeld(c.env.DB, groupId, new Date().toISOString())) {
+    return c.json({ success: false, error: 'already publishing' }, 409);
+  }
 
   const account = await getLineAccountById(c.env.DB, group.account_id);
   if (!account) return c.json({ success: false, error: 'line account not found' }, 500);
 
-  const locked = await acquirePublishLock(c.env.DB, groupId);
+  // 手動公開も予約実行と同じlease取得関数を使う(所有者付き・期限付き)。
+  const publishOwner = `manual-${crypto.randomUUID()}`;
+  const locked = await acquirePublishLease(c.env.DB, groupId, publishOwner, new Date().toISOString());
   if (!locked) return c.json({ success: false, error: 'failed to acquire publish lock' }, 409);
 
   try {
@@ -1687,10 +1690,11 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner
     for (const r of result.pages) {
       await setPageRichMenuId(c.env.DB, r.pageId, r.newRichMenuId);
     }
+    // 確定と同時にleaseも空く(mark側で掃除)。失敗時は下のcatchで所有者付き解放。
     await markRichMenuGroupPublished(c.env.DB, groupId);
     return c.json({ success: true, data: result });
   } catch (e) {
-    await releasePublishLock(c.env.DB, groupId);
+    await releasePublishLease(c.env.DB, groupId, publishOwner);
     const message = e instanceof Error ? e.message : String(e);
     if (e instanceof RichMenuValidationError) {
       return c.json({ success: false, error: message }, 400);

@@ -1,22 +1,25 @@
 import {
   RICH_MENU_SCHEDULE_MAX_ATTEMPTS,
-  acquirePublishLock,
+  acquirePublishLease,
   cancelRichMenuSchedule,
   claimRichMenuSchedule,
   claimRichMenuScheduleRestore,
   classifyRichMenuScheduleError,
   clearRichMenuAssignmentsForGroup,
+  clearSchedulePublications,
   detectSnapshotPageDrift,
   getDueRichMenuScheduleRestores,
   getDueRichMenuSchedules,
   getRichMenuScheduleById,
   getSchedulePublications,
+  getScheduleRestoreDefaultPin,
   getStalePublishingSchedules,
   getStaleRestoringSchedules,
   listRichMenuSchedulesByGroup,
   markRichMenuGroupPublished,
   markRichMenuGroupUnpublished,
   nextRichMenuScheduleRetryAt,
+  pinScheduleRestoreDefault,
   reclaimStalePublishingSchedule,
   reclaimStaleRestoringSchedule,
   recordRichMenuSchedulePermanentFailure,
@@ -25,8 +28,10 @@ import {
   recordRichMenuScheduleSuccess,
   recordRichMenuScheduleTransientFailure,
   recordSchedulePublications,
-  releasePublishLock,
+  releasePublishLease,
+  renewPublishLease,
   setPageRichMenuId,
+  type RestoreDefaultPin,
   type RichMenuScheduleRow,
   type RichMenuGroupWithPages,
 } from '@line-crm/db';
@@ -35,10 +40,14 @@ import {
 // 読むcronが無かったため時刻を過ぎても公開されなかった問題を直す。
 // 二重実行は claim の UPDATE 条件 (status + account_id) で防ぐ。
 // staleになったpublishing/restoringは所有runのlease期限で回収し永久停止させない。
-// 独立レビュー再修正: lease fencing(run ID付き)・durable journal・snapshot drift・
-// 個別割当のLINE復元・group lockを足し、group.statusだけでの完成判定をやめた。
-// 再審査対応: journal前のD1失敗は作ったLINEを消してから失敗に戻す (補償削除)、
-// journal再開もlockを取り、確定済み(completed等)への反転を禁じる。
+// 案A(共有publisher段階化): create/upload → DB journal確定 → alias/default切替 →
+// 旧メニュー削除。journal確定前の失敗はまだliveでない新メニューだけ消し、
+// 既存alias/defaultを変えない。切替途中失敗は保存した切替前LINE状態へ補償する。
+// journalを残したまま新メニューを消さない(再試行が消えたIDへ切替えて壊すため)。
+// publish lockはowner token+期限付きleaseで、旧holderはrenew失敗後に
+// live切替もDB確定もしない。手動公開も同じ取得関数を使う。
+// 「前のメニューへ戻す」は実行開始直前・切替前の実LINE defaultを365へ固定し、
+// 終了時は固定値へ戻す。captured対象が消えていたら解除せず恒久失敗に残す。
 
 export type ScheduleLineAccount = {
   id: string;
@@ -54,7 +63,19 @@ export type ScheduleStaff = {
   access_level?: string | null;
 };
 
-export type PublishedPageMapping = { pageId: string; newRichMenuId: string };
+/** 新規作成したLINEメニュー1枚。切替前の旧IDも付けて運ぶ。 */
+export type ScheduleShell = {
+  pageId: string;
+  orderIndex: number;
+  newRichMenuId: string;
+  oldLineRichMenuId: string | null;
+};
+
+/** 切替前のLINE状態。切替失敗の補償でここへ戻す。 */
+export type SchedulePreSwitchState = {
+  oldIds: Array<{ pageId: string; orderIndex: number; lineRichMenuId: string | null }>;
+  previousDefaultId: string | null;
+};
 
 export type RichMenuScheduleExecutorDeps = {
   getGroupWithPages: (db: D1Database, groupId: string) => Promise<RichMenuGroupWithPages | null>;
@@ -72,28 +93,60 @@ export type RichMenuScheduleExecutorDeps = {
     accountId: string,
   ) => Promise<boolean>;
   /**
-   * 予約時のスナップショットをLINEへ出す。新しいLINE IDの一覧を返す。
-   * journal未記録の場合だけLINEを呼び、既存journalがある場合は呼ばない。
-   * 本番は publishRichMenuGroup を呼ぶ。テストはモックで件数を数える。
+   * 第一段: 予約スナップショットからLINEへ新規作成だけ行う。
+   * alias/defaultは触らない。失敗時は作った分を消して投げる。
+   * 本番は createRichMenuShells を呼ぶ。テストはモックで件数を数える。
    */
-  publishSnapshot: (
+  createLineShells: (
     snapshot: unknown,
     schedule: RichMenuScheduleRow,
-  ) => Promise<PublishedPageMapping[] | void>;
+  ) => Promise<ScheduleShell[]>;
   /**
-   * 期間終了時の復元。restoreGroupId=nullは「前のメニューに戻す」で戻し先が
-   * 無かった場合の明示的default解除として扱う。本番はLINEのdefault解除を行う。
-   * 非null時は新しいLINE IDの一覧を返す。
+   * 明示の戻し先がある期間復元用: 戻し先groupの現内容から新規作成だけ行う。
+   * alias/defaultは触らない。失敗時は作った分を消して投げる。
    */
-  restoreToGroup: (
-    restoreGroupId: string | null,
+  createRestoreShells: (
+    restoreGroup: RichMenuGroupWithPages,
     schedule: RichMenuScheduleRow,
-  ) => Promise<PublishedPageMapping[] | void>;
+  ) => Promise<ScheduleShell[]>;
+  /** 切替直前の実LINE defaultを読む。固定(pin)の材料にする。 */
+  readCurrentDefaultId: (schedule: RichMenuScheduleRow) => Promise<string | null>;
   /**
-   * 作ったLINEメニューの補償削除。journal保存前のD1失敗で呼ぶ。
-   * 消さずに再試行すると二重公開になるため、失敗扱いに戻す前に掃除する。
+   * 第二段: alias切替+default設定/解除。失敗時は投げるだけで補償しない。
+   * 呼び出し側が journal を消してから compensateSwitchToPrevious で戻す。
    */
-  deleteLineMenus: (schedule: RichMenuScheduleRow, menus: PublishedPageMapping[]) => Promise<void>;
+  switchLiveTo: (input: {
+    schedule: RichMenuScheduleRow;
+    groupId: string;
+    setDefault: boolean;
+    shells: ScheduleShell[];
+  }) => Promise<void>;
+  /**
+   * 切替失敗の補償: aliasを旧へ戻し、defaultを切替前へ戻す。
+   * 決して投げない。戻せなかった pageId の集合を返す。
+   */
+  compensateSwitchToPrevious: (input: {
+    schedule: RichMenuScheduleRow;
+    groupId: string;
+    prev: SchedulePreSwitchState;
+    newIds: string[];
+  }) => Promise<Set<string>>;
+  /**
+   * 作った分・旧分の削除。404許容で決して投げない(後片付け用)。
+   * 本番は deleteRichMenuShells を呼ぶ。
+   */
+  deleteLineShells: (schedule: RichMenuScheduleRow, lineRichMenuIds: string[]) => Promise<void>;
+  /**
+   * 固定した切替前defaultへ戻す。すでに固定値なら何もしない。
+   * 固定メニューがLINEから消えていたら no_restore_target を投げ、
+   * 勝手に解除せず恒久失敗に残す。
+   */
+  restoreCapturedDefault: (schedule: RichMenuScheduleRow, lineId: string) => Promise<void>;
+  /**
+   * no_default の明示解除。このgroupのものが現在defaultのときだけ外す。
+   * 別メニューのdefaultまで壊さない。何もなければ成功扱い。
+   */
+  clearAccountDefault: (schedule: RichMenuScheduleRow) => Promise<void>;
   /**
    * 期限切れメニューを指す個別割当をLINE側で外す (既定へ戻す)。
    * D1行の削除より先に呼ぶ。解除済み・対象なしは何もしない。
@@ -126,39 +179,16 @@ function snapshotHasPublishablePages(snapshot: unknown): boolean {
   return Array.isArray(pages) && pages.length > 0;
 }
 
-function toJournalPages(mappings: PublishedPageMapping[] | void): Array<{ pageId: string; lineRichMenuId: string }> {
-  return ((mappings ?? []) as PublishedPageMapping[]).map((mapping) => ({
-    pageId: mapping.pageId,
-    lineRichMenuId: mapping.newRichMenuId,
+function toJournalPages(shells: ScheduleShell[]): Array<{ pageId: string; lineRichMenuId: string }> {
+  return shells.map((shell) => ({
+    pageId: shell.pageId,
+    lineRichMenuId: shell.newRichMenuId,
   }));
 }
 
-/**
- * LINE成功直後のjournal保存。ここでD1が失敗したら、作ったLINEを
- * 消してから呼び出し元へ投げる。消さずに失敗扱いへ戻すと、再試行が
- * journalなしでLINEを作り直し二重公開になる。
- */
-async function journalPublishPages(
-  db: D1Database,
-  schedule: RichMenuScheduleRow,
-  kind: 'publish' | 'restore',
-  runId: string,
-  mappings: PublishedPageMapping[] | void,
-  deps: RichMenuScheduleExecutorDeps,
-): Promise<Array<{ pageId: string; lineRichMenuId: string }>> {
-  const pages = toJournalPages(mappings);
-  try {
-    await recordSchedulePublications(db, schedule.id, kind, runId, pages);
-  } catch (error) {
-    try {
-      await deps.deleteLineMenus(schedule, (mappings ?? []) as PublishedPageMapping[]);
-    } catch {
-      // 補償削除の失敗は元のjournal失敗を隠さない。残留は次回publishの
-      // alias上書きで無害化されるか、運用の要対応表示で拾う。
-    }
-    throw error;
-  }
-  return pages;
+/** leaseを取れなかった・失ったときの一時失敗。'try again'入りで再試行分類になる。 */
+function publishLeaseTakenError(groupId: string): Error {
+  return new Error(`publish_lease_taken: group ${groupId} is publishing, try again`);
 }
 
 async function checkAccountAndStaff(
@@ -187,6 +217,214 @@ async function checkAccountAndStaff(
   return null;
 }
 
+type FailRecorder = (error: unknown) => Promise<'retried' | 'failed' | 'skipped'>;
+
+function makeFailRecorder(
+  db: D1Database,
+  schedule: RichMenuScheduleRow,
+  runId: string,
+  now: Date,
+  attemptCount: number,
+  recordTransient: (db: D1Database, id: string, accountId: string, runId: string, code: string, retryAt: string) => Promise<boolean>,
+  recordPermanent: (db: D1Database, id: string, accountId: string, runId: string, code: string) => Promise<boolean>,
+  leaseGroupId?: string,
+): FailRecorder {
+  return async (error: unknown) => {
+    try {
+      // leaseを持っていたら開ける。持っていなければ何も起きない。
+      // 開けずに帰ると停止時の残留lockになり、再試行と手動公開を塞ぐ。
+      if (leaseGroupId) {
+        await releasePublishLease(db, leaseGroupId, runId);
+      }
+    } catch {
+      // 解放の失敗は元の失敗を隠さない。期限切れで回収される。
+    }
+    const classified = classifyRichMenuScheduleError(error);
+    if (classified.retryable && attemptCount < RICH_MENU_SCHEDULE_MAX_ATTEMPTS) {
+      const recorded = await recordTransient(
+        db,
+        schedule.id,
+        schedule.account_id,
+        runId,
+        classified.code,
+        nextRichMenuScheduleRetryAt(now, attemptCount),
+      );
+      return recorded ? 'retried' : 'skipped';
+    }
+    const recorded = await recordPermanent(db, schedule.id, schedule.account_id, runId, classified.code);
+    return recorded ? 'failed' : 'skipped';
+  };
+}
+
+/**
+ * 切替前defaultの固定(pin)。初回の切替前だけ書き、再試行は保存値を再利用する。
+ * 予約時ではなく実行時に読むため、期間中の管理画面外の変更に影響されない。
+ */
+async function ensureRestoreDefaultPin(
+  db: D1Database,
+  schedule: RichMenuScheduleRow,
+  deps: RichMenuScheduleExecutorDeps,
+): Promise<RestoreDefaultPin | null> {
+  const existing = await getScheduleRestoreDefaultPin(db, schedule.id, schedule.account_id);
+  if (existing) return existing;
+  const currentDefault = await deps.readCurrentDefaultId(schedule);
+  const pin: RestoreDefaultPin = currentDefault
+    ? { state: 'captured', lineId: currentDefault }
+    : { state: 'no_default', lineId: null };
+  const pinned = await pinScheduleRestoreDefault(db, schedule.id, schedule.account_id, pin);
+  if (!pinned) {
+    // 同時実行の狭間で先に固定された。保存値を読み直して使う。
+    return getScheduleRestoreDefaultPin(db, schedule.id, schedule.account_id);
+  }
+  return pin;
+}
+
+/**
+ * 段階公開の本体。create/upload → pin → journal確定 → 切替 → DB反映 →
+ * 旧削除 → 成功記録。開始公開と明示戻し先の復元で共用する。
+ * journal確定前の失敗はまだliveでない新メニューだけ消す。
+ * 切替失敗は journal を消してから旧LINE状態へ補償し、新メニューを片付ける。
+ * journalを残したまま新メニューを消す順番は禁止(再試行が消えたIDへ切替える)。
+ */
+async function runPhasedPublish(input: {
+  db: D1Database;
+  schedule: RichMenuScheduleRow;
+  now: Date;
+  deps: RichMenuScheduleExecutorDeps;
+  runId: string;
+  kind: 'publish' | 'restore';
+  /** 切替対象のgroup。leaseとaliasの持ち主。 */
+  targetGroupId: string;
+  /** defaultに設定するか(そのgroupのisDefaultForAll相当)。 */
+  setDefault: boolean;
+  /** 第一段: 新規作成だけ行う。 */
+  createShells: () => Promise<ScheduleShell[]>;
+  /** 切替対象の現在page(旧IDとorderIndexの材料)。DB反映前のため旧値のまま。 */
+  loadTargetPages: () => Promise<Array<{ id: string; orderIndex: number; lineRichMenuId: string | null }>>;
+  /** DB反映: journalのIDをpageへ書き、group状態を進める。 */
+  reflect: (shells: ScheduleShell[]) => Promise<void>;
+  recordSuccess: () => Promise<boolean>;
+  fail: FailRecorder;
+}): Promise<'succeeded' | 'retried' | 'failed' | 'skipped'> {
+  const { db, schedule, now, deps, runId, kind, targetGroupId } = input;
+  const nowIso = now.toISOString();
+
+  const locked = await acquirePublishLease(db, targetGroupId, runId, nowIso);
+  if (!locked) return input.fail(publishLeaseTakenError(targetGroupId));
+
+  const loadPrev = async (): Promise<SchedulePreSwitchState> => {
+    const pages = await input.loadTargetPages();
+    const pin = await getScheduleRestoreDefaultPin(db, schedule.id, schedule.account_id);
+    return {
+      oldIds: pages.map((page) => ({
+        pageId: page.id,
+        orderIndex: page.orderIndex,
+        lineRichMenuId: page.lineRichMenuId,
+      })),
+      previousDefaultId: pin?.state === 'captured' ? (pin.lineId ?? null) : null,
+    };
+  };
+
+  try {
+    let journal = await getSchedulePublications(db, schedule.id, kind);
+    if (journal.length === 0) {
+      // journal未確定の新規実行: 作って→固定して→journalへ残す。
+      const created = await input.createShells();
+      // pinはjournalより先に固定する。journalあり・pinなしの再開は
+      // 切替後の値で固定し直す危険があるため、この順番を守る。
+      await ensureRestoreDefaultPin(db, schedule, deps);
+      try {
+        await recordSchedulePublications(db, schedule.id, kind, runId, toJournalPages(created));
+      } catch (error) {
+        // まだliveでない新メニューだけ消す。alias/defaultは触っていない。
+        try {
+          await deps.deleteLineShells(schedule, created.map((shell) => shell.newRichMenuId));
+        } catch {
+          // 片付けの失敗は元のjournal失敗を隠さない。残留は無害(参照されない)。
+        }
+        throw error;
+      }
+      journal = await getSchedulePublications(db, schedule.id, kind);
+    }
+
+    // journal確定済み(journal再開を含む): 作り直さず切替えへ進む。
+    // journalのIDへ切替えるため、外部成功後DB記録前の停止でも二重作成しない。
+    const targetPages = await input.loadTargetPages();
+    const byPageId = new Map(targetPages.map((page) => [page.id, page]));
+    const shells: ScheduleShell[] = [];
+    for (const entry of journal) {
+      const current = byPageId.get(entry.page_id);
+      if (!current) {
+        return input.fail(
+          new Error(`snapshot drift: journal page ${entry.page_id} was deleted, restore target lost`),
+        );
+      }
+      shells.push({
+        pageId: entry.page_id,
+        orderIndex: current.orderIndex,
+        newRichMenuId: entry.line_richmenu_id,
+        oldLineRichMenuId: current.lineRichMenuId,
+      });
+    }
+
+    // 外部工程の直前にleaseを延ばす。失っていたら旧holderとして手を引く。
+    const renewed = await renewPublishLease(db, targetGroupId, runId, nowIso);
+    if (!renewed) return input.fail(publishLeaseTakenError(targetGroupId));
+
+    try {
+      await deps.switchLiveTo({ schedule, groupId: targetGroupId, setDefault: input.setDefault, shells });
+    } catch (error) {
+      // 切替途中失敗の補償。journalを先に消してから旧へ戻し、新メニューを片付ける。
+      // journalを消せなければ補償自体をやめ、journalありの再開に任せる
+      // (journalを残して新メニューを消すと再試行が壊れる)。
+      try {
+        await clearSchedulePublications(db, schedule.id, kind);
+      } catch {
+        throw error;
+      }
+      const prev = await loadPrev();
+      const unrestored = await deps.compensateSwitchToPrevious({
+        schedule,
+        groupId: targetGroupId,
+        prev,
+        newIds: shells.map((shell) => shell.newRichMenuId),
+      });
+      await deps.deleteLineShells(
+        schedule,
+        shells.filter((shell) => !unrestored.has(shell.pageId)).map((shell) => shell.newRichMenuId),
+      );
+      throw error;
+    }
+
+    // 切替済み。DB反映の直前にもう一度所有を確認する。
+    // 失っていたら手を引く(journalありの再開が反映を終わらせる)。
+    const renewedForReflect = await renewPublishLease(db, targetGroupId, runId, nowIso);
+    if (!renewedForReflect) return input.fail(publishLeaseTakenError(targetGroupId));
+
+    try {
+      await input.reflect(shells);
+    } catch (error) {
+      // aliasは正しく新IDを向いている。反映だけやり直せばよいので補償しない。
+      // 再試行はjournalありの再開で反映を終わらせる。
+      throw error;
+    }
+
+    // DB確定のあとで旧メニューを消す。残っても参照されず、次回の清掃対象。
+    const prev = await loadPrev();
+    const oldIds = prev.oldIds
+      .map((old) => old.lineRichMenuId)
+      .filter((id): id is string => !!id)
+      // journalの新IDと重なるものは消さない(同ID再利用の安全弁)。
+      .filter((id) => !shells.some((shell) => shell.newRichMenuId === id));
+    await deps.deleteLineShells(schedule, oldIds);
+
+    const recorded = await input.recordSuccess();
+    return recorded ? 'succeeded' : 'skipped';
+  } catch (error) {
+    return input.fail(error);
+  }
+}
+
 async function handleOneSchedule(
   db: D1Database,
   schedule: RichMenuScheduleRow,
@@ -203,23 +441,16 @@ async function handleOneSchedule(
   if (!fresh || fresh.status !== 'publishing' || fresh.started_run_id !== runId) {
     return 'skipped';
   }
-  const attemptCount = fresh.attempt_count;
-  const fail = async (error: unknown): Promise<'retried' | 'failed' | 'skipped'> => {
-    const classified = classifyRichMenuScheduleError(error);
-    if (classified.retryable && attemptCount < RICH_MENU_SCHEDULE_MAX_ATTEMPTS) {
-      const recorded = await recordRichMenuScheduleTransientFailure(
-        db,
-        schedule.id,
-        schedule.account_id,
-        runId,
-        classified.code,
-        nextRichMenuScheduleRetryAt(now, attemptCount),
-      );
-      return recorded ? 'retried' : 'skipped';
-    }
-    const recorded = await recordRichMenuSchedulePermanentFailure(db, schedule.id, schedule.account_id, runId, classified.code);
-    return recorded ? 'failed' : 'skipped';
-  };
+  const fail = makeFailRecorder(
+    db,
+    schedule,
+    runId,
+    now,
+    fresh.attempt_count,
+    recordRichMenuScheduleTransientFailure,
+    recordRichMenuSchedulePermanentFailure,
+    schedule.group_id,
+  );
 
   try {
     // 実行直前の安全再評価。予約時と変わっていたら出さない。
@@ -237,78 +468,50 @@ async function handleOneSchedule(
       (group.pages ?? []).map((page) => page.id),
     );
     if (drift) return fail(new Error(drift));
-    if (fresh.mode === 'period' && fresh.restore_group_id) {
-      const restore = await deps.getGroupWithPages(db, fresh.restore_group_id);
-      if (!restore || restore.account_id !== fresh.account_id || restore.status !== 'published') {
-        return fail(new Error('restoreGroupId must be a published menu'));
-      }
-    }
 
-    // journal再開もlockを迂回しない。DB反映は所有lockの下で行う。
-    const lockedForJournal = async (): Promise<boolean> => acquirePublishLock(db, fresh.group_id);
-    // durable journalがあり、LINE作成まで終わっていたら作り直さない。
-    // journalのIDをDBへ反映して成功記録だけ行う（LINE呼び出し0回で完了はこの場合だけ正しい）。
-    const journal = await getSchedulePublications(db, fresh.id, 'publish');
-    if (journal.length > 0) {
-      if (!await lockedForJournal()) {
-        return fail(new Error('publish_locked: group is publishing, try again'));
-      }
-      try {
-        for (const entry of journal) {
-          await setPageRichMenuId(db, entry.page_id, entry.line_richmenu_id);
+    const outcome = await runPhasedPublish({
+      db,
+      schedule,
+      now,
+      deps,
+      runId,
+      kind: 'publish',
+      targetGroupId: fresh.group_id,
+      setDefault: isGroupDefaultForAll(group),
+      createShells: () => deps.createLineShells(parsed.value, fresh),
+      loadTargetPages: async () => {
+        const current = await deps.getGroupWithPages(db, fresh.group_id);
+        return (current?.pages ?? []).map((page) => ({
+          id: page.id,
+          orderIndex: page.order_index,
+          lineRichMenuId: page.line_richmenu_id,
+        }));
+      },
+      reflect: async (shells) => {
+        for (const shell of shells) {
+          await setPageRichMenuId(db, shell.pageId, shell.newRichMenuId);
         }
         await markRichMenuGroupPublished(db, fresh.group_id);
-      } catch (error) {
-        try {
-          await releasePublishLock(db, fresh.group_id);
-        } catch {
-          // ロック解除の失敗は元のエラーを隠さない。
-        }
-        return fail(error);
-      }
-      const recorded = await recordRichMenuScheduleSuccess(
-        db,
-        fresh.id,
-        fresh.account_id,
-        runId,
-        fresh.mode === 'period' ? 'published' : 'completed',
-      );
-      return recorded ? 'succeeded' : 'skipped';
-    }
-
-    // 手動公開との競合を防ぐためgroup lockを取る。取れなければ一時失敗で再試行。
-    const locked = await acquirePublishLock(db, fresh.group_id);
-    if (!locked) {
-      return fail(new Error('publish_locked: group is publishing, try again'));
-    }
-    try {
-      const mappings = await deps.publishSnapshot(parsed.value, fresh);
-      // LINE成功を先にjournalへ残す。journal保存前のD1失敗は作ったLINEを
-      // 消してから失敗に戻し、再実行の二重公開を防ぐ。
-      const pages = await journalPublishPages(db, fresh, 'publish', runId, mappings, deps);
-      for (const page of pages) {
-        await setPageRichMenuId(db, page.pageId, page.lineRichMenuId);
-      }
-      await markRichMenuGroupPublished(db, fresh.group_id);
-    } catch (error) {
-      try {
-        await releasePublishLock(db, fresh.group_id);
-      } catch {
-        // ロック解除の失敗は元のエラーを隠さない。
-      }
-      return fail(error);
-    }
-    const recorded = await recordRichMenuScheduleSuccess(
-      db,
-      fresh.id,
-      fresh.account_id,
-      runId,
-      fresh.mode === 'period' ? 'published' : 'completed',
-    );
-    return recorded ? 'succeeded' : 'skipped';
+      },
+      recordSuccess: () =>
+        recordRichMenuScheduleSuccess(
+          db,
+          fresh.id,
+          fresh.account_id,
+          runId,
+          fresh.mode === 'period' ? 'published' : 'completed',
+        ),
+      fail,
+    });
+    return outcome;
   } catch (error) {
     return fail(error);
   }
+}
+
+function isGroupDefaultForAll(group: RichMenuGroupWithPages): boolean {
+  const value = (group as { is_default_for_all?: unknown }).is_default_for_all;
+  return value === 1 || value === true;
 }
 
 async function handleOneRestore(
@@ -325,23 +528,6 @@ async function handleOneRestore(
   if (!fresh || fresh.status !== 'restoring' || fresh.ended_run_id !== runId) {
     return 'skipped';
   }
-  const attemptCount = fresh.attempt_count;
-  const fail = async (error: unknown): Promise<'retried' | 'failed' | 'skipped'> => {
-    const classified = classifyRichMenuScheduleError(error);
-    if (classified.retryable && attemptCount < RICH_MENU_SCHEDULE_MAX_ATTEMPTS) {
-      const recorded = await recordRichMenuScheduleRestoreTransientFailure(
-        db,
-        schedule.id,
-        schedule.account_id,
-        runId,
-        classified.code,
-        nextRichMenuScheduleRetryAt(now, attemptCount),
-      );
-      return recorded ? 'retried' : 'skipped';
-    }
-    const recorded = await recordRichMenuSchedulePermanentFailure(db, schedule.id, schedule.account_id, runId, classified.code);
-    return recorded ? 'failed' : 'skipped';
-  };
 
   // 期限切れメニューの個別割当をLINE側で外してからD1行を消す。
   // 解除は404許容でidempotentのため、再試行の重ね掛けも安全。
@@ -352,86 +538,151 @@ async function handleOneRestore(
 
   try {
     const preconditionError = await checkAccountAndStaff(db, fresh, deps);
-    if (preconditionError) return fail(new Error(preconditionError));
+    if (preconditionError) {
+      return makeFailRecorder(
+        db, schedule, runId, now, fresh.attempt_count,
+        recordRichMenuScheduleRestoreTransientFailure,
+        recordRichMenuSchedulePermanentFailure,
+        fresh.group_id,
+      )(new Error(preconditionError));
+    }
     const scheduledGroup = await deps.getGroupWithPages(db, fresh.group_id);
     if (!scheduledGroup || scheduledGroup.account_id !== fresh.account_id) {
-      return fail(new Error('schedule group not found'));
+      return makeFailRecorder(
+        db, schedule, runId, now, fresh.attempt_count,
+        recordRichMenuScheduleRestoreTransientFailure,
+        recordRichMenuSchedulePermanentFailure,
+        fresh.group_id,
+      )(new Error('schedule group not found'));
     }
+
+    // 明示の戻し先がある場合は、そのgroupを段階公開で戻す。
+    // 戻し先が消える・非公開化は恒久失敗(要対応)に残し、勝手に解除しない。
     if (fresh.restore_group_id) {
-      const restore = await deps.getGroupWithPages(db, fresh.restore_group_id);
-      if (!restore || restore.account_id !== fresh.account_id || restore.status !== 'published') {
-        return fail(new Error('restoreGroupId must be a published menu'));
-      }
-      // journal済みならLINEを作り直さずDB反映だけ行う。lockは迂回しない。
-      const journal = await getSchedulePublications(db, fresh.id, 'restore');
-      if (journal.length > 0) {
-        if (!await acquirePublishLock(db, fresh.restore_group_id)) {
-          return fail(new Error('publish_locked: group is publishing, try again'));
+      return handleExplicitRestore(db, fresh, now, deps, runId, unlinkAndClearAssignments);
+    }
+    return handlePinnedRestore(db, fresh, now, deps, runId, unlinkAndClearAssignments);
+  } catch (error) {
+    return makeFailRecorder(
+      db, schedule, runId, now, fresh.attempt_count,
+      recordRichMenuScheduleRestoreTransientFailure,
+      recordRichMenuSchedulePermanentFailure,
+      fresh.group_id,
+    )(error);
+  }
+}
+
+/**
+ * 明示の戻し先への復元。戻し先groupの現内容を段階公開で出し直す。
+ * 戻し先の消失・非公開化は恒久失敗(要対応)で残す。
+ */
+async function handleExplicitRestore(
+  db: D1Database,
+  fresh: RichMenuScheduleRow,
+  now: Date,
+  deps: RichMenuScheduleExecutorDeps,
+  runId: string,
+  unlinkAndClearAssignments: () => Promise<void>,
+): Promise<'restored' | 'retried' | 'failed' | 'skipped'> {
+  const restoreGroupId = fresh.restore_group_id as string;
+  const fail = makeFailRecorder(
+    db, fresh, runId, now, fresh.attempt_count,
+    recordRichMenuScheduleRestoreTransientFailure,
+    recordRichMenuSchedulePermanentFailure,
+    restoreGroupId,
+  );
+  try {
+    const restore = await deps.getGroupWithPages(db, restoreGroupId);
+    if (!restore || restore.account_id !== fresh.account_id || restore.status !== 'published') {
+      return fail(new Error('restoreGroupId must be a published menu'));
+    }
+    const outcome = await runPhasedPublish({
+      db,
+      schedule: fresh,
+      now,
+      deps,
+      runId,
+      kind: 'restore',
+      targetGroupId: restoreGroupId,
+      setDefault: isGroupDefaultForAll(restore),
+      createShells: () => deps.createRestoreShells(restore, fresh),
+      loadTargetPages: async () => {
+        const current = await deps.getGroupWithPages(db, restoreGroupId);
+        return (current?.pages ?? []).map((page) => ({
+          id: page.id,
+          orderIndex: page.order_index,
+          lineRichMenuId: page.line_richmenu_id,
+        }));
+      },
+      reflect: async (shells) => {
+        for (const shell of shells) {
+          await setPageRichMenuId(db, shell.pageId, shell.newRichMenuId);
         }
-        try {
-          for (const entry of journal) {
-            await setPageRichMenuId(db, entry.page_id, entry.line_richmenu_id);
-          }
-          await markRichMenuGroupPublished(db, fresh.restore_group_id);
-          if (fresh.restore_group_id !== fresh.group_id) {
-            await markRichMenuGroupUnpublished(db, fresh.group_id);
-          }
-          await unlinkAndClearAssignments();
-        } catch (error) {
-          try {
-            await releasePublishLock(db, fresh.restore_group_id);
-          } catch {
-            // ロック解除の失敗は元のエラーを隠さない。
-          }
-          return fail(error);
-        }
-        const recorded = await recordRichMenuScheduleRestoreSuccess(db, fresh.id, fresh.account_id, runId);
-        return recorded ? 'restored' : 'skipped';
-      }
-      const locked = await acquirePublishLock(db, fresh.restore_group_id);
-      if (!locked) {
-        return fail(new Error('publish_locked: group is publishing, try again'));
-      }
-      try {
-        const mappings = await deps.restoreToGroup(fresh.restore_group_id, fresh);
-        const pages = await journalPublishPages(db, fresh, 'restore', runId, mappings, deps);
-        for (const page of pages) {
-          await setPageRichMenuId(db, page.pageId, page.lineRichMenuId);
-        }
-        await markRichMenuGroupPublished(db, fresh.restore_group_id);
-        if (fresh.restore_group_id !== fresh.group_id) {
+        await markRichMenuGroupPublished(db, restoreGroupId);
+        if (restoreGroupId !== fresh.group_id) {
           await markRichMenuGroupUnpublished(db, fresh.group_id);
         }
         // 終了時に期限切れメニューの個別割当をLINE側で外してからD1を消す。
-        // 残すと古いメニューを指し続ける。
         await unlinkAndClearAssignments();
-      } catch (error) {
-        try {
-          await releasePublishLock(db, fresh.restore_group_id);
-        } catch {
-          // ロック解除の失敗は元のエラーを隠さない。
-        }
-        return fail(error);
+      },
+      recordSuccess: () => recordRichMenuScheduleRestoreSuccess(db, fresh.id, fresh.account_id, runId),
+      fail,
+    });
+    return outcome === 'succeeded' ? 'restored' : outcome;
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+/**
+ * 固定した切替前defaultへの復元(365)。
+ * capturedは固定メニューへ戻し、消えていたら解除せず恒久失敗に残す。
+ * no_defaultだけ明示解除する。両者を混ぜない。
+ */
+async function handlePinnedRestore(
+  db: D1Database,
+  fresh: RichMenuScheduleRow,
+  now: Date,
+  deps: RichMenuScheduleExecutorDeps,
+  runId: string,
+  unlinkAndClearAssignments: () => Promise<void>,
+): Promise<'restored' | 'retried' | 'failed' | 'skipped'> {
+  const nowIso = now.toISOString();
+  const fail = makeFailRecorder(
+    db, fresh, runId, now, fresh.attempt_count,
+    recordRichMenuScheduleRestoreTransientFailure,
+    recordRichMenuSchedulePermanentFailure,
+    fresh.group_id,
+  );
+  try {
+    const pin: RestoreDefaultPin | null =
+      fresh.restore_default_state === 'captured' || fresh.restore_default_state === 'no_default'
+        ? { state: fresh.restore_default_state, lineId: fresh.restore_default_line_id }
+        : await getScheduleRestoreDefaultPin(db, fresh.id, fresh.account_id);
+    if (!pin) {
+      return fail(new Error('no_default_pin: restore default was never pinned, needs attention'));
+    }
+    const locked = await acquirePublishLease(db, fresh.group_id, runId, nowIso);
+    if (!locked) return fail(publishLeaseTakenError(fresh.group_id));
+    const renewed = await renewPublishLease(db, fresh.group_id, runId, nowIso);
+    if (!renewed) return fail(publishLeaseTakenError(fresh.group_id));
+    if (pin.state === 'captured') {
+      if (!pin.lineId) {
+        return fail(new Error('no_default_pin: pinned default id is missing, needs attention'));
       }
+      // 固定メニューが消えていたら解除せず恒久失敗。公開中の表示を壊さない。
+      await deps.restoreCapturedDefault(fresh, pin.lineId);
     } else {
-      // restoreGroupId=nullは予約時点に戻し先が無かった場合の明示的default解除。
-      // LINEのdefault解除はidempotentのためjournalなしで再試行できる。
-      const locked = await acquirePublishLock(db, fresh.group_id);
-      if (!locked) {
-        return fail(new Error('publish_locked: group is publishing, try again'));
-      }
-      try {
-        await deps.restoreToGroup(null, fresh);
-        await markRichMenuGroupUnpublished(db, fresh.group_id);
-        await unlinkAndClearAssignments();
-      } catch (error) {
-        try {
-          await releasePublishLock(db, fresh.group_id);
-        } catch {
-          // ロック解除の失敗は元のエラーを隠さない。
-        }
-        return fail(error);
-      }
+      await deps.clearAccountDefault(fresh);
+    }
+    const renewedForReflect = await renewPublishLease(db, fresh.group_id, runId, nowIso);
+    if (!renewedForReflect) return fail(publishLeaseTakenError(fresh.group_id));
+    await markRichMenuGroupUnpublished(db, fresh.group_id);
+    await unlinkAndClearAssignments();
+    try {
+      await releasePublishLease(db, fresh.group_id, runId);
+    } catch {
+      // 解放の失敗は成功を隠さない。期限切れで回収される。
     }
     const recorded = await recordRichMenuScheduleRestoreSuccess(db, fresh.id, fresh.account_id, runId);
     return recorded ? 'restored' : 'skipped';

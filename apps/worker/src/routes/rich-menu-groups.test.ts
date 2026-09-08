@@ -18,15 +18,15 @@ const dbMocks = {
   deleteRichMenuGroup: vi.fn(),
   setRichMenuPageImage: vi.fn(),
   pageBelongsToGroup: vi.fn(),
-  acquirePublishLock: vi.fn(),
-  releasePublishLock: vi.fn(),
+  acquirePublishLease: vi.fn(),
+  releasePublishLease: vi.fn(),
+  isPublishLeaseHeld: vi.fn(),
   setPageRichMenuId: vi.fn(),
   markRichMenuGroupPublished: vi.fn(),
   getLineAccountById: vi.fn(),
   getFollowingLineUserIdsByTag: vi.fn(),
   listRichMenuSchedulesByGroup: vi.fn(),
   cancelRichMenuSchedule: vi.fn(),
-  findPublishedRestoreCandidate: vi.fn(),
   createRichMenuScheduleAtomic: vi.fn((): Promise<any> => Promise.resolve({ outcome: 'created', id: 'new-schedule' })),
 };
 vi.mock('@line-crm/db', () => dbMocks);
@@ -426,24 +426,23 @@ describe('GET schedules and POST cancel (E-08 #621)', () => {
   test('予約一覧は状態と再試行時刻を返す', async () => {
     dbMocks.getRichMenuGroupWithPages.mockResolvedValue({ id: 'g1', account_id: 'acc-1' });
     dbMocks.listRichMenuSchedulesByGroup.mockResolvedValue([{
-      id: 's1', mode: 'scheduled', starts_at: '2026-09-10T01:00:00.000Z', ends_at: null,
-      restore_group_id: null,
-      status: 'scheduled', attempt_count: 1, next_retry_at: '2026-09-10T01:01:00.000Z',
-      last_error_code: 'fetch failed', created_at: '2026-09-06',
+      id: 's1', mode: 'period', starts_at: '2026-09-10T01:00:00.000Z', ends_at: '2026-09-11T01:00:00.000Z',
+      restore_group_id: null, restore_default_state: 'captured',
+      status: 'published', attempt_count: 0, next_retry_at: null,
+      last_error_code: null, created_at: '2026-09-06',
     }]);
     const res = await setupApp().request('/api/rich-menu-groups/g1/schedules');
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({
       success: true,
-      data: [{ id: 's1', status: 'scheduled', attemptCount: 1, restoreGroupId: null }],
+      data: [{ id: 's1', status: 'published', attemptCount: 0, restoreGroupId: null, restoreDefaultState: 'captured' }],
     });
   });
 
-  test('期間予約で前のメニュー未指定は予約時点の公開中メニューに確定する', async () => {
+  test('期間予約で前のメニュー未指定は予約時に確定せずnullで保存する', async () => {
     dbMocks.getRichMenuGroupWithPages.mockResolvedValue({
       id: 'g1', account_id: 'acc-1', status: 'draft', pages: [],
     });
-    dbMocks.findPublishedRestoreCandidate.mockResolvedValue({ id: 'prev-1' });
     const db = makeMinimalDbStub();
     // INSERT成功・重複なし
     const app = setupApp({ db });
@@ -453,28 +452,32 @@ describe('GET schedules and POST cancel (E-08 #621)', () => {
       body: JSON.stringify({ mode: 'period', startsAt: '2026-09-10T01:00:00.000Z', endsAt: '2026-09-11T01:00:00.000Z' }),
     });
     expect(res.status).toBe(201);
+    // 戻し先は実行開始直前に実LINE defaultから固定するため、予約時点では未確定。
     expect(await res.json()).toMatchObject({
       success: true,
-      data: { status: 'scheduled', restoreGroupId: 'prev-1' },
+      data: { status: 'scheduled', restoreGroupId: null, restoreDefaultState: null },
     });
-    expect(dbMocks.findPublishedRestoreCandidate).toHaveBeenCalledWith(expect.anything(), 'acc-1', 'g1');
+    expect(dbMocks.createRichMenuScheduleAtomic).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ restoreGroupId: null }),
+    );
   });
 
-  test('戻せるメニューが無い期間予約はdefault解除として保存する', async () => {
+  test('明示の戻し先指定は検証してそのまま保存する', async () => {
     dbMocks.getRichMenuGroupWithPages.mockResolvedValue({
       id: 'g1', account_id: 'acc-1', status: 'draft', pages: [],
     });
-    dbMocks.findPublishedRestoreCandidate.mockResolvedValue(null);
+    dbMocks.getRichMenuGroupById.mockResolvedValue({ id: 'prev-1', account_id: 'acc-1', status: 'published' });
     const app = setupApp({ db: makeMinimalDbStub() });
     const res = await app.request('/api/rich-menu-groups/g1/schedule', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'period-clear-1' },
-      body: JSON.stringify({ mode: 'period', startsAt: '2026-09-10T01:00:00.000Z', endsAt: '2026-09-11T01:00:00.000Z' }),
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'period-explicit-1' },
+      body: JSON.stringify({ mode: 'period', startsAt: '2026-09-10T01:00:00.000Z', endsAt: '2026-09-11T01:00:00.000Z', restoreGroupId: 'prev-1' }),
     });
     expect(res.status).toBe(201);
     expect(await res.json()).toMatchObject({
       success: true,
-      data: { status: 'scheduled', restoreGroupId: null, restoreClearsDefault: true },
+      data: { status: 'scheduled', restoreGroupId: 'prev-1' },
     });
   });
 
@@ -1132,9 +1135,13 @@ describe('POST /api/rich-menu-groups/:groupId/publish', () => {
       default_page_id: null, is_default_for_all: 0, status: 'draft',
       created_at: '', updated_at: '',
     });
+    // 有効なlease保持中だけ409。旧形式の残留だけでは塞がない。
+    dbMocks.isPublishLeaseHeld.mockResolvedValue(true);
     const app = setupApp();
     const res = await app.request('/api/rich-menu-groups/g1/publish', { method: 'POST' });
     expect(res.status).toBe(409);
+    // 期限切れでない他人所有は取りに行かない。
+    expect(dbMocks.acquirePublishLease).not.toHaveBeenCalled();
   });
 
   test('400 with actionable message when an area action is incomplete — releases lock', async () => {
@@ -1157,7 +1164,8 @@ describe('POST /api/rich-menu-groups/:groupId/publish', () => {
       }],
     });
     dbMocks.getLineAccountById.mockResolvedValue({ channel_access_token: 'tk' });
-    dbMocks.acquirePublishLock.mockResolvedValue(true);
+    dbMocks.isPublishLeaseHeld.mockResolvedValue(false);
+    dbMocks.acquirePublishLease.mockResolvedValue(true);
 
     const app = setupApp();
     const res = await app.request('/api/rich-menu-groups/gid12345-aaaa/publish', { method: 'POST' });
@@ -1166,7 +1174,8 @@ describe('POST /api/rich-menu-groups/:groupId/publish', () => {
       success: false,
       error: 'ページ「基本メニュー」のタップ領域1: 送信テキストを入力してください',
     });
-    expect(dbMocks.releasePublishLock).toHaveBeenCalledWith(expect.anything(), 'gid12345-aaaa');
+    // 所有者付きで解放する。
+    expect(dbMocks.releasePublishLease).toHaveBeenCalledWith(expect.anything(), 'gid12345-aaaa', expect.stringMatching(/^manual-/));
   });
 
   test('500 when LINE fetch throws — releases lock', async () => {
@@ -1183,12 +1192,13 @@ describe('POST /api/rich-menu-groups/:groupId/publish', () => {
       }],
     });
     dbMocks.getLineAccountById.mockResolvedValue({ channel_access_token: 'tk' });
-    dbMocks.acquirePublishLock.mockResolvedValue(true);
+    dbMocks.isPublishLeaseHeld.mockResolvedValue(false);
+    dbMocks.acquirePublishLease.mockResolvedValue(true);
 
     const app = setupApp();
     const res = await app.request('/api/rich-menu-groups/gid12345-aaaa/publish', { method: 'POST' });
     expect(res.status).toBe(500);
-    expect(dbMocks.releasePublishLock).toHaveBeenCalledWith(expect.anything(), 'gid12345-aaaa');
+    expect(dbMocks.releasePublishLease).toHaveBeenCalledWith(expect.anything(), 'gid12345-aaaa', expect.stringMatching(/^manual-/));
   });
 });
 
