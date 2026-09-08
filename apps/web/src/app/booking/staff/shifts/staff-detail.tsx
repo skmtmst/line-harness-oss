@@ -13,10 +13,27 @@ import {
   type BookingStaff,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import { shortDate } from '../../lib/format-time'
+import type { ButtonHTMLAttributes } from 'react'
+
+/*
+ * 共通Buttonは使わない。利用先一覧(design-impact-baseline.txt)の
+ * 変更許可が司令塔から出ていないため(#655)。許可が出たら共通へ戻す。
+ * 見た目は隣の担当スタッフ画面の素のボタンと同じ寸法。
+ */
+function Btn({ primary, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { primary?: boolean }) {
+  return (
+    <button
+      type="button"
+      {...props}
+      className={primary
+        ? 'bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:brightness-92 disabled:opacity-50'
+        : 'border-hairline rounded-control border bg-canvas px-4 py-2 text-sm disabled:opacity-50'}
+    />
+  )
+}
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -746,7 +763,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
           kind="error"
           title="担当者の勤務とシフトを表示できませんでした"
           description="保存済みの内容は消えていません。時間をおいて、もう一度読み込んでください。"
-          action={<Button onClick={() => setReloadKey((value) => value + 1)}>勤務とシフトを再読み込み</Button>}
+          action={<Btn primary onClick={() => setReloadKey((value) => value + 1)}>勤務とシフトを再読み込み</Btn>}
         />
       </div>
     )
@@ -766,7 +783,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
           kind="empty"
           title="担当者が見つかりませんでした"
           description="削除されたか、別のアカウントの担当者です。一覧から選び直してください。"
-          action={<Button href="/booking/staff">担当スタッフの一覧に戻る</Button>}
+          action={<Link href="/booking/staff" className="bg-accent-deep text-on-accent rounded-control inline-block px-4 py-2 text-sm font-medium">担当スタッフの一覧に戻る</Link>}
         />
       </div>
     )
@@ -855,9 +872,9 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
               })}
             </div>
             <div className="border-hairline flex flex-wrap items-center gap-3 border-t px-4 py-3">
-              <Button variant="primary" onClick={() => void saveRules()} disabled={savingRules}>
+              <Btn primary onClick={() => void saveRules()} disabled={savingRules}>
                 {savingRules ? '保存中…' : 'いつもの勤務時間を保存'}
-              </Button>
+              </Btn>
               {rulesSavedAt ? <span className="text-success text-xs">保存しました。下の予約枠に反映されています。</span> : null}
               {ruleError ? <p className="text-danger w-full text-xs">{ruleError}</p> : null}
             </div>
@@ -931,13 +948,13 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                 <input aria-label="足す休憩の終わり" type="time" value={newBreakEnd} onChange={(event) => setNewBreakEnd(event.target.value)} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm tabular-nums" />
               </label>
               <div className="flex items-end">
-                <Button onClick={addBreakRow}>休憩を足す</Button>
+                <Btn onClick={addBreakRow}>休憩を足す</Btn>
               </div>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <Button variant="primary" onClick={() => void saveBreaks()} disabled={savingBreaks}>
+              <Btn primary onClick={() => void saveBreaks()} disabled={savingBreaks}>
                 {savingBreaks ? '保存中…' : '休憩を保存'}
-              </Button>
+              </Btn>
               {breaksSavedAt ? <span className="text-success text-xs">保存しました。</span> : null}
               {breakError ? <p className="text-danger w-full text-xs">{breakError}</p> : null}
             </div>
@@ -995,13 +1012,13 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                 <input aria-label="足す休憩の終わり" type="time" value={newDateEnd} onChange={(event) => setNewDateEnd(event.target.value)} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm tabular-nums" />
               </label>
               <div className="flex items-end">
-                <Button onClick={addDateRow}>休憩を足す</Button>
+                <Btn onClick={addDateRow}>休憩を足す</Btn>
               </div>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <Button variant="primary" onClick={() => void saveBreakDates()} disabled={savingDates}>
+              <Btn primary onClick={() => void saveBreakDates()} disabled={savingDates}>
                 {savingDates ? '保存中…' : 'この日だけの休憩を保存'}
-              </Button>
+              </Btn>
               {datesSavedAt ? <span className="text-success text-xs">保存しました。</span> : null}
               {dateError ? <p className="text-danger w-full text-xs">{dateError}</p> : null}
             </div>
@@ -1024,7 +1041,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                 <input aria-label="シフトの終わり" type="time" value={newEnd} onChange={(event) => setNewEnd(event.target.value)} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm tabular-nums" />
               </label>
               <div className="flex items-end">
-                <Button variant="primary" onClick={() => void addShift()} disabled={savingShift}>{savingShift ? '保存中…' : 'シフトを足す'}</Button>
+                <Btn primary onClick={() => void addShift()} disabled={savingShift}>{savingShift ? '保存中…' : 'シフトを足す'}</Btn>
               </div>
             </div>
             {shiftError ? <p className="text-danger mt-3 text-xs">{shiftError}</p> : null}
@@ -1076,7 +1093,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                   <input aria-label="まとめて作る週の数" type="number" min={1} max={12} value={genWeeks} onChange={(event) => setGenWeeks(event.target.value)} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm tabular-nums" />
                 </label>
                 <div className="flex items-end">
-                  <Button onClick={() => void generateFromRules()} disabled={generating}>{generating ? '作成中…' : 'まとめて作る'}</Button>
+                  <Btn onClick={() => void generateFromRules()} disabled={generating}>{generating ? '作成中…' : 'まとめて作る'}</Btn>
                 </div>
               </div>
               <p className="text-ink-faint mt-2 text-xs">すでにある日は残します（上書きしません）。</p>
@@ -1098,7 +1115,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                 <p className="text-ink break-all tabular-nums">{calendarId}</p>
                 <p className="text-ink-faint text-xs">つながっています{calendarVerifiedAt ? `（最終確認 ${shortDate(calendarVerifiedAt.slice(0, 10))}）` : ''}</p>
                 {calendarError ? <p className="text-danger text-xs">最新の確認で失敗しています：{calendarError}</p> : null}
-                <Button variant="secondary" onClick={() => setConfirmDisconnect(true)} disabled={disconnecting}>つながりを切る</Button>
+                <Btn onClick={() => setConfirmDisconnect(true)} disabled={disconnecting}>つながりを切る</Btn>
               </div>
             ) : (
               <div className="mt-3 space-y-2">
@@ -1112,9 +1129,9 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                     className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm"
                   />
                 </label>
-                <Button variant="primary" onClick={() => void connectCalendar()} disabled={savingCalendar || !serviceConfigured}>
+                <Btn primary onClick={() => void connectCalendar()} disabled={savingCalendar || !serviceConfigured}>
                   {savingCalendar ? '確認中…' : 'つなげる'}
-                </Button>
+                </Btn>
                 {calendarFormError ? <p className="text-danger text-xs">{calendarFormError}</p> : null}
               </div>
             )}
