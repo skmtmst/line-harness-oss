@@ -4,7 +4,6 @@ import {
   countMedia,
   getMediaById,
   getFolderById,
-  createMedia,
   updateMedia,
   deleteMedia,
   getMediaUsages,
@@ -676,118 +675,6 @@ contents.get('/api/media', async (c) => {
   }
 });
 
-contents.post('/api/media', requireRole('owner', 'admin', 'staff'), async (c) => {
-  try {
-    const staff = c.get('staff');
-    const body = await c.req.json<{
-      accountId?: string;
-      data?: string;
-      filename?: string;
-      mimeType?: string;
-      folderId?: string | null;
-      width?: number;
-      height?: number;
-      durationMs?: number;
-    }>();
-
-    const accountId = body.accountId?.trim() ?? '';
-    if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
-    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-      return c.json({ success: false, error: 'Not found' }, 404);
-    }
-
-    const filename = (body.filename ?? '').trim();
-    if (!filename) return c.json({ success: false, error: 'ファイル名がありません' }, 400);
-    if (!body.data) return c.json({ success: false, error: 'ファイルの中身がありません' }, 400);
-
-    // data: URL 形式で来た場合は、そこに書かれた種別を優先する。
-    let base64 = body.data;
-    let mimeType = body.mimeType ?? '';
-    const dataUrl = /^data:([^;]+);base64,(.+)$/.exec(base64);
-    if (dataUrl) {
-      mimeType = dataUrl[1];
-      base64 = dataUrl[2];
-    }
-
-    const spec = ALLOWED[mimeType];
-    if (!spec) {
-      return c.json(
-        {
-          success: false,
-          error: `この形式は受け付けていません（${mimeType || '不明'}）。対応: ${Object.keys(ALLOWED).join(', ')}`,
-        },
-        400,
-      );
-    }
-    const ext = extensionOf(filename);
-    if (!spec.ext.includes(ext)) {
-      // 中身と名前が食い違っている。どちらかが間違っているので保存しない。
-      return c.json(
-        {
-          success: false,
-          error: `ファイル名の拡張子（.${ext || 'なし'}）が中身の形式（${mimeType}）と合いません`,
-        },
-        400,
-      );
-    }
-
-    let bytes: Uint8Array;
-    try {
-      bytes = Uint8Array.from(atob(base64), (ch) => ch.charCodeAt(0));
-    } catch {
-      return c.json({ success: false, error: 'ファイルの中身を読み取れませんでした' }, 400);
-    }
-    if (bytes.byteLength > spec.maxBytes) {
-      return c.json(
-        {
-          success: false,
-          error: `ファイルが大きすぎます（上限 ${Math.round(spec.maxBytes / 1024 / 1024)}MB）`,
-        },
-        413,
-      );
-    }
-    if (!hasMediaSignature(bytes, mimeType)) {
-      return c.json(
-        { success: false, error: 'ファイルの実際の形式が、選択された形式と一致しません' },
-        400,
-      );
-    }
-
-    const r2Key = `media/${crypto.randomUUID()}.${ext}`;
-    await c.env.IMAGES.put(r2Key, bytes, {
-      httpMetadata: { contentType: mimeType },
-      customMetadata: { originalFilename: filename },
-    });
-
-    let media: Media;
-    try {
-      media = await createMedia(c.env.DB, {
-        lineAccountId: accountId,
-        kind: spec.kind,
-        filename,
-        mimeType,
-        sizeBytes: bytes.byteLength,
-        r2Key,
-        folderId: body.folderId ?? null,
-        width: body.width ?? null,
-        height: body.height ?? null,
-        durationMs: body.durationMs ?? null,
-        uploadedBy: staff?.id ?? null,
-      });
-    } catch (error) {
-      // DBに行が無い実体は画面から消せない。登録失敗時に同じ場で片付ける。
-      await c.env.IMAGES.delete(r2Key).catch((cleanupError) =>
-        console.error('media orphan cleanup failed:', cleanupError));
-      throw error;
-    }
-    const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
-    return c.json({ success: true, data: serializeMedia(media, workerUrl) }, 201);
-  } catch (err) {
-    console.error('POST /api/media error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
-  }
-});
-
 contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
@@ -829,26 +716,6 @@ contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
     return c.json({ success: true, data: serializeMedia(media!, workerUrl) });
   } catch (err) {
     console.error('PATCH /api/media/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
-  }
-});
-
-contents.get('/api/media/:id/usages', async (c) => {
-  try {
-    const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
-    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-      return c.json({ success: false, error: 'Not found' }, 404);
-    }
-    const existing = await getMediaById(c.env.DB, c.req.param('id'), accountId);
-    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
-    const usages = await getMediaUsages(c.env.DB, c.req.param('id'));
-    return c.json({
-      success: true,
-      data: usages.map((u) => ({ refKind: u.ref_kind, refId: u.ref_id, scannedAt: u.scanned_at })),
-    });
-  } catch (err) {
-    console.error('GET /api/media/:id/usages error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

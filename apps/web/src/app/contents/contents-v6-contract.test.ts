@@ -170,7 +170,7 @@ describe('V6 登録メディア一覧の契約', () => {
   })
 
   it('ブラウザ申告だけでなく実ファイル形式を確認する', () => {
-    expect(WORKER).toContain('hasMediaSignature(bytes, mimeType)')
-    expect(WORKER).toContain('media orphan cleanup failed')
+    expect(WORKER).toContain('hasMediaSignature(signatureBytes, session.expected_mime)')
+    expect(WORKER).toContain('failMediaUploadSession')
   })
 })

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { MediaItem, MediaReplacementImpact } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
-import Button from './media-button'
+import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
 import { checkedAtText, referenceKindText, referenceNameText } from './media-delete-impact'

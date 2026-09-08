@@ -14,6 +14,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { RICH_MENU_DIMENSIONS } from '@line-crm/shared'
 
 /**
  * 保存されている条件を読む。
@@ -64,8 +65,8 @@ type Group = {
 type PickerOption = { id: string; name: string }
 
 const SIZE_LABEL: Record<Group['size'], string> = {
-  large: '2500×1686',
-  compact: '2500×843',
+  large: `${RICH_MENU_DIMENSIONS.large.width}×${RICH_MENU_DIMENSIONS.large.height}`,
+  compact: `${RICH_MENU_DIMENSIONS.compact.width}×${RICH_MENU_DIMENSIONS.compact.height}`,
 }
 
 /**
@@ -87,7 +88,7 @@ function imageUploadErrorText(err: unknown): string {
     return '画像が大きすぎます。1MB以下の画像を選んでください。'
   }
   if (message.includes('dimensions ')) {
-    return '画像の大きさが合いません。2500×1686（大）か2500×843（小）の画像を選んでください。'
+    return `画像の大きさが合いません。${SIZE_LABEL.large}（大）か${SIZE_LABEL.compact}（小）の画像を選んでください。`
   }
   if (message.includes('does not match group size')) {
     return 'このページの大きさと画像の大きさが合いません。ページの大きさに合わせた画像を選んでください。'

@@ -34,13 +34,13 @@ const SIZE_TABS: { value: 'large' | 'compact'; label: string; dims: string; hint
   {
     value: 'large',
     label: '大',
-    dims: '2500 × 1686px',
+    dims: `${SIZE_DIMENSIONS.large.width} × ${SIZE_DIMENSIONS.large.height}px`,
     hint: '画面をしっかり使う。ボタンを6つまで置ける',
   },
   {
     value: 'compact',
     label: '小',
-    dims: '2500 × 843px',
+    dims: `${SIZE_DIMENSIONS.compact.width} × ${SIZE_DIMENSIONS.compact.height}px`,
     hint: 'トークが隠れにくい。横に並べる形',
   },
 ]
@@ -436,7 +436,9 @@ export default function NewRichMenuPage() {
           <section>
             <h2 className="text-ink-secondary text-sm font-medium">画像</h2>
             <Button href="/contents" className="mt-2">登録メディアから選ぶ</Button>
-            <p className="text-ink-faint mt-2 text-xs">2500 × 1686px ／ 1MBまで・JPG・PNG</p>
+            <p className="text-ink-faint mt-2 text-xs">
+              {SIZE_DIMENSIONS.large.width} × {SIZE_DIMENSIONS.large.height}px ／ 1MBまで・JPG・PNG
+            </p>
             <p className="text-ink-faint mt-1 text-micro">選んだ画像は下書き保存後の編集画面で登録します。</p>
           </section>
         </div>

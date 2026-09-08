@@ -32,7 +32,6 @@ import type {
   SavedSegmentPreset,
   SavedSegmentConditions,
   MediaItem,
-  MediaUsage,
   MediaDeleteImpact,
   MediaReplacementImpact,
   MediaReplacementResult,
@@ -95,7 +94,10 @@ import type {
   DetectIdentityCandidatesResult,
   DecideIdentityCandidateRequest,
   UndoIdentityCandidateRequest,
+  RichMenuAreaIntent,
 } from '@line-crm/shared'
+
+export type { RichMenuAreaIntent } from '@line-crm/shared'
 
 export type OperatorNotificationRule = NotificationRule & {
   status: 'draft' | 'published'
@@ -2678,15 +2680,6 @@ export type TemplateQuestion = {
  * 「電話をかける」「テンプレートを送る」「回答フォームを開く」はその上に乗せた
  * 言い換えで、LINE に登録するときに4つのどれかへ変換される。
  */
-export type RichMenuAreaIntent =
-  | 'url'
-  | 'tel'
-  | 'text'
-  | 'template'
-  | 'form'
-  | 'switch'
-  | 'postback'
-
 /** 押された回数（148）。 */
 export type RichMenuAreaTapCount = {
   areaId: string
@@ -5104,18 +5097,6 @@ export const api = {
         `/api/media${query ? `?${query}` : ''}`,
       )
     },
-    /** data は base64。data: URL 形式でも受け付ける。 */
-    upload: (data: {
-      accountId: string
-      filename: string
-      mimeType: string
-      data: string
-      folderId?: string | null
-    }) =>
-      fetchApi<ApiResponse<MediaItem>>('/api/media', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
     quota: (accountId: string) =>
       fetchApi<ApiResponse<MediaQuota>>(
         `/api/media/quota?accountId=${encodeURIComponent(accountId)}`,
@@ -5157,7 +5138,6 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
-    usages: (id: string, accountId: string) => fetchApi<ApiResponse<MediaUsage[]>>(`/api/media/${id}/usages?accountId=${encodeURIComponent(accountId)}`),
     /** 削除確認を開くたびに、現在の使用先と削除可否を読み直す。 */
     deleteImpact: (id: string, accountId: string) =>
       fetchApi<ApiResponse<MediaDeleteImpact>>(
@@ -8577,11 +8557,9 @@ export const api = {
       return body;
     },
 
-    // 注: <img src> では Authorization ヘッダを送れないため、Worker 側で
-    //   この path のみ auth ミドルウェアの除外パスに加えるか、
-    //   あるいは将来的に署名付き URL を発行する仕組みに切り替える必要がある。
-    //   v1 ではドラフト編集中のプレビュー用 = 認証バイパスでも実害は低いので、
-    //   後続 PR で worker 側を whitelist 化する想定。
+    // 認証必須の管理画面でだけ使う画像URL。ブラウザは同一セッションのCookieを
+    // 送るため、Worker側も通常の認証・アカウント境界を通す。外部共有が必要に
+    // なった場合は認証除外にせず、短命な署名付きURLを別途発行する。
     imageUrl: (key: string) =>
       `${API_URL}/api/rich-menu-images/${encodeURIComponent(key)}`,
   },

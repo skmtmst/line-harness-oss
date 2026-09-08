@@ -2,7 +2,7 @@
 
 import SelectField from '@/components/shared/select-field'
 import type { Area } from './canvas-editor'
-import type { RichMenuAreaIntent } from '@/lib/api'
+import { RICH_MENU_ACTION_TYPE_BY_INTENT, type RichMenuAreaIntent } from '@line-crm/shared'
 
 type Option = { id: string; name: string }
 
@@ -49,19 +49,7 @@ const INTENT_OPTIONS: { value: RichMenuAreaIntent; label: string; hint: string }
 
 /** intent から、LINE に登録するときの種類を決める。 */
 export function actionTypeForIntent(intent: RichMenuAreaIntent): Area['actionType'] {
-  switch (intent) {
-    case 'url':
-    case 'tel':
-    case 'form':
-      return 'uri'
-    case 'text':
-      return 'message'
-    case 'switch':
-      return 'richmenuswitch'
-    case 'template':
-    case 'postback':
-      return 'postback'
-  }
+  return RICH_MENU_ACTION_TYPE_BY_INTENT[intent]
 }
 
 /** 種類を変えたときの、入力欄の初期値。 */
