@@ -54,6 +54,7 @@ import {
 import type { CommonVarDeleteImpact, CommonVarUsageKind } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { auditLog } from '../lib/audit-log.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { scanSingleMediaUsage } from '../services/media-usage-scan.js';
 import { createR2PresignedPutUrl } from '../services/r2-presigned-upload.js';
@@ -671,6 +672,44 @@ contents.get('/api/media', async (c) => {
     });
   } catch (err) {
     console.error('GET /api/media error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * 登録メディアのダウンロード。
+ *
+ * 一覧が返す `url` は認証なしの保存URL（GET /images/* はLINE配信など
+ * 公開系も使うため公開のまま）なので、管理画面のダウンロード操作は
+ * こちらを通す。担当者の役割とLINEアカウントの可視範囲を確認し、
+ * 成功・拒否のどちらもURLや秘密値なしで監査へ残す。
+ */
+contents.get('/api/media/:id/download', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const id = c.req.param('id');
+    const accountId = c.req.query('accountId')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const media = await getMediaById(c.env.DB, id, accountId);
+    if (!media) {
+      auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const object = await c.env.IMAGES.get(media.r2_key);
+    if (!object) return c.json({ success: false, error: 'Not found' }, 404);
+    auditLog(c, 'media.download', { kind: 'media', id }, { result: 'success', lineAccountId: accountId });
+    return new Response(object.body, {
+      headers: {
+        'Content-Type': media.mime_type,
+        'Content-Disposition': `attachment; filename="download"; filename*=UTF-8''${encodeURIComponent(media.filename)}`,
+        'Cache-Control': 'private, no-store',
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/media/:id/download error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

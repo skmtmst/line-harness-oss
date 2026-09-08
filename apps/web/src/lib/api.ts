@@ -5147,6 +5147,9 @@ export const api = {
       fetchApi<ApiResponse<null>>(`/api/media/${id}?accountId=${encodeURIComponent(accountId)}`, {
         method: 'DELETE',
       }),
+    /** 保存URLへ直接行かず、権限確認と監査を通る口から受け取る。 */
+    download: (id: string, accountId: string) =>
+      fetchApiBlob(`/api/media/${encodeURIComponent(id)}/download?accountId=${encodeURIComponent(accountId)}`),
   },
   /** 共通情報。営業時間などを1か所で直す。 */
   commonVars: {

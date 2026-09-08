@@ -135,6 +135,8 @@ export default function MediaLibraryPage() {
   // 名前変更の多重押し防ぎと、札のそばに出す失敗文。一覧全体の欄には出さない。
   const [renamingBusy, setRenamingBusy] = useState(false)
   const [renameError, setRenameError] = useState('')
+  /** 取得中の札。保存URLへ直接行かず、認証と監査を通る口から受け取る。 */
+  const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set())
   const [detailsFor, setDetailsFor] = useState<MediaItem | null>(null)
   const [replacementFor, setReplacementFor] = useState<MediaItem | null>(null)
   /*
@@ -352,6 +354,33 @@ export default function MediaLibraryPage() {
     if (result.tone === 'success') setSuccessMessage(result.message)
     else setError(result.message)
     void load()
+  }
+
+  /**
+   * 札のダウンロード。保存URL（認証なし）へ直接リンクせず、
+   * 権限確認と監査を通る口から受け取って保存させる。
+   */
+  async function downloadItem(item: MediaItem) {
+    const accountAtRequest = selectedAccountId
+    if (!accountAtRequest || downloadingIds.has(item.id)) return
+    setDownloadingIds((current) => new Set(current).add(item.id))
+    try {
+      const blob = await api.media.download(item.id, accountAtRequest)
+      const href = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = href
+      anchor.download = item.filename
+      anchor.click()
+      URL.revokeObjectURL(href)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'ダウンロードできませんでした')
+    } finally {
+      setDownloadingIds((current) => {
+        const next = new Set(current)
+        next.delete(item.id)
+        return next
+      })
+    }
   }
 
   async function openDelete(item: MediaItem) {
@@ -845,15 +874,15 @@ export default function MediaLibraryPage() {
                   >
                     編集
                   </button>
-                  <a
-                    href={item.url}
-                    download={item.filename}
+                  <button
+                    onClick={() => void downloadItem(item)}
+                    disabled={downloadingIds.has(item.id)}
                     title="ダウンロード"
                     aria-label={`${item.filename}をダウンロード`}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-[11px]"
+                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-[11px] disabled:opacity-50"
                   >
-                    ダウンロード
-                  </a>
+                    {downloadingIds.has(item.id) ? '取得中…' : 'ダウンロード'}
+                  </button>
                   <Button
                     type="button"
                     onClick={() => void openDelete(item)}

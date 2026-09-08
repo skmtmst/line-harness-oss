@@ -71,6 +71,7 @@ export type AuditAction =
   | 'photo.assessment.request'
   | 'photo.asset.request'
   | 'photo.review.bulk'
+  | 'media.download'
   | 'photo.original.issue'
   | 'photo.original.download'
   | 'webinar.archive'
@@ -92,6 +93,7 @@ export function auditLog(
   c: Context<Env>,
   action: AuditAction,
   target?: { id?: string | null; kind?: string },
+  opts?: { result?: 'success' | 'denied' | 'failed'; lineAccountId?: string | null },
 ): void {
   const staff = c.get('staff');
   // 認証前に呼ばれることはない想定だが、ログのために例外を投げたくない。
@@ -113,7 +115,8 @@ export function auditLog(
   const db = c.env?.DB;
   const writer = commonAuditWriter();
   if (!db || typeof db.prepare !== 'function' || !writer) return;
-  const lineAccountId = c.req.query('lineAccountId') ?? c.req.query('account_id') ?? null;
+  const lineAccountId = opts?.lineAccountId
+    ?? c.req.query('lineAccountId') ?? c.req.query('account_id') ?? null;
   const task = writer(db, {
     tenantId: staff?.tenantId,
     lineAccountId,
@@ -123,7 +126,7 @@ export function auditLog(
     action,
     targetKind: target?.kind ?? null,
     targetId: target?.id ?? null,
-    result: 'success',
+    result: opts?.result ?? 'success',
     requestTraceId: c.req.header('cf-ray') ?? c.req.header('x-request-id') ?? null,
     ipPrefix: maskAuditIp(c.req.header('cf-connecting-ip')),
     deviceFamily: auditDeviceFamily(c.req.header('user-agent')),

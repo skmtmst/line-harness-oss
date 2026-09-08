@@ -685,6 +685,49 @@ describe('#550 M6 メディアの名前・フォルダ変更の検証', () => {
   });
 });
 
+describe('#637 N-195 メディアのダウンロードは認証済み口だけ', () => {
+  it('有効な利用者は実体を受け取れる', async () => {
+    get.mockResolvedValueOnce({
+      body: 'PNGDATA',
+      httpMetadata: { contentType: 'image/png' },
+    });
+    const res = await req('/api/media/md-1/download?accountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Type')).toBe('image/png');
+    expect(res.headers.get('Content-Disposition')).toContain('attachment');
+    expect(res.headers.get('Content-Disposition')).toContain(encodeURIComponent('a.png'));
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
+    expect(await res.text()).toBe('PNGDATA');
+    expect(mocks.getMediaById).toHaveBeenCalledWith(env.DB, 'md-1', 'account-1');
+    expect(get).toHaveBeenCalledWith('media/xxx.png');
+  });
+
+  it('権限のない担当者は403で止める', async () => {
+    const res = await req('/api/media/md-1/download?accountId=account-1', 'GET', undefined, null);
+    expect(res.status).toBe(403);
+    expect(mocks.getMediaById).not.toHaveBeenCalled();
+  });
+
+  it('他アカウントのメディアは存在も返さない', async () => {
+    accessMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
+    const res = await req('/api/media/md-1/download?accountId=account-2', 'GET');
+    expect(res.status).toBe(404);
+    expect(mocks.getMediaById).not.toHaveBeenCalled();
+  });
+
+  it('存在しないメディアは404にする', async () => {
+    mocks.getMediaById.mockResolvedValueOnce(null);
+    const res = await req('/api/media/gone/download?accountId=account-1', 'GET');
+    expect(res.status).toBe(404);
+  });
+
+  it('R2実体がなければ404にする', async () => {
+    get.mockResolvedValueOnce(null);
+    const res = await req('/api/media/md-1/download?accountId=account-1', 'GET');
+    expect(res.status).toBe(404);
+  });
+});
+
 describe('メディア使用先の一括差し替え', () => {
   async function currentRevision(): Promise<string> {
     const response = await req(
