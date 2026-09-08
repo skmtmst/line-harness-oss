@@ -9633,6 +9633,26 @@ export interface EventBookingItem {
   line_account_name?: string | null;
 }
 
+export interface EventBookingSummary {
+  total: number;
+  requested: number;
+  confirmed: number;
+  rejected: number;
+  cancelled: number;
+  expired: number;
+  attended: number;
+  noShow: number;
+  waitlist: number;
+  totalCapacity: number | null;
+}
+
+type EventListResponse<T> = {
+  items: T[];
+  total: number;
+  limit: number;
+  sort: Array<{ field: string; direction: 'asc' | 'desc' }>;
+};
+
 export interface EventWaitlistItem {
   id: string;
   slot_id: string;
@@ -9646,11 +9666,23 @@ export interface EventWaitlistItem {
 }
 
 export const eventsApi = {
-  listEvents: (accountId: string) =>
-    // 共通一覧契約の offset 方式。裏側は既定200件・上限200件で total を返す。
-    fetchApi<{ items: EventListItem[]; total: number; limit: number }>(
-      withAccount('/api/events/admin/events', accountId),
-    ),
+  listEvents: (
+    accountId: string,
+    options: { page?: number; limit?: number; q?: string; filter?: 'all' | 'open' | 'pending' | 'full'; sort?: 'soon' | 'name' } = {},
+    request?: { signal?: AbortSignal },
+  ) => {
+    const params = new URLSearchParams();
+    if (options.page) params.set('page', String(options.page));
+    if (options.limit) params.set('limit', String(options.limit));
+    if (options.q) params.set('q', options.q);
+    if (options.filter) params.set('filter', options.filter);
+    if (options.sort) params.set('sort', options.sort);
+    const tail = params.size > 0 ? `?${params}` : '';
+    return fetchApi<EventListResponse<EventListItem>>(
+      withAccount(`/api/events/admin/events${tail}`, accountId),
+      { signal: request?.signal },
+    );
+  },
   getEvent: (accountId: string, id: string) =>
     fetchApi<EventDetail>(
       withAccount(`/api/events/admin/events/${id}`, accountId),
@@ -9720,17 +9752,25 @@ export const eventsApi = {
   listBookings: (
     accountId: string,
     eventId: string,
-    filters: { status?: string; slot_id?: string } = {},
+    filters: { status?: string; slot_id?: string; page?: number; limit?: number } = {},
+    request?: { signal?: AbortSignal },
   ) => {
     const qs: string[] = [];
     if (filters.status) qs.push(`status=${encodeURIComponent(filters.status)}`);
     if (filters.slot_id) qs.push(`slot_id=${encodeURIComponent(filters.slot_id)}`);
+    if (filters.page) qs.push(`page=${filters.page}`);
+    if (filters.limit) qs.push(`limit=${filters.limit}`);
     const tail = qs.length > 0 ? `?${qs.join('&')}` : '';
-    // 共通一覧契約の offset 方式。裏側は既定200件・上限200件で total を返す。
-    return fetchApi<{ items: EventBookingItem[]; total: number; limit: number }>(
+    return fetchApi<EventListResponse<EventBookingItem>>(
       withAccount(`/api/events/admin/events/${eventId}/bookings${tail}`, accountId),
+      { signal: request?.signal },
     );
   },
+  getBookingSummary: (accountId: string, eventId: string, request?: { signal?: AbortSignal }) =>
+    fetchApi<EventBookingSummary>(
+      withAccount(`/api/events/admin/events/${eventId}/bookings/summary`, accountId),
+      { signal: request?.signal },
+    ),
   decideBooking: (
     accountId: string,
     eventId: string,

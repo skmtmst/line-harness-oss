@@ -135,6 +135,34 @@ function makeEventDb(state: {
   state.friendTags ??= [];
   state.tags ??= [];
   state.waitlist ??= [];
+  const eventMatchesAccount = (event: EventRow, account: string): boolean => {
+    if (event.target_type === 'multi-account-dedup') {
+      try {
+        return (JSON.parse(event.account_ids ?? '[]') as string[]).includes(account);
+      } catch {
+        return false;
+      }
+    }
+    return event.line_account_id === account;
+  };
+  const filterAdminEvents = (sql: string, bound: unknown[]): EventRow[] => {
+    const account = bound[0] as string;
+    const query = sql.includes('e.name LIKE ?') ? String(bound[2] ?? '').replace(/^%|%$/g, '').replace(/\\([\\%_])/g, '$1') : '';
+    return state.events.filter((event) => {
+      if (event.deleted_at != null || !eventMatchesAccount(event, account)) return false;
+      if (query && !event.name.includes(query)) return false;
+      if (sql.includes('e.is_published = 1') && event.is_published !== 1) return false;
+      if (sql.includes('pending.event_id = e.id') && !(state.bookings ?? []).some((booking) => booking.event_id === event.id && booking.status === 'requested')) return false;
+      if (sql.includes('NOT EXISTS (SELECT 1 FROM event_slots cap')) {
+        const slots = (state.slots ?? []).filter((slot) => slot.event_id === event.id && slot.deleted_at == null && slot.is_active === 1);
+        if (slots.length === 0 || slots.some((slot) => slot.capacity == null)) return false;
+        const capacity = slots.reduce((sum, slot) => sum + (slot.capacity ?? 0), 0);
+        const active = (state.bookings ?? []).filter((booking) => booking.event_id === event.id && ['requested', 'confirmed'].includes(booking.status)).length;
+        if (active < capacity) return false;
+      }
+      return true;
+    });
+  };
   const db = {
     prepare(sql: string) {
       let bound: unknown[] = [];
@@ -299,7 +327,7 @@ function makeEventDb(state: {
             } : null) as T | null;
           }
           // notifications/pending count: SELECT COUNT(*) AS c FROM event_bookings WHERE line_account_id = ? AND status = 'requested'
-          if (sql.includes('FROM event_bookings') && sql.includes("status = 'requested'")) {
+          if (sql.includes('COUNT(*) AS c') && sql.includes('FROM event_bookings') && sql.includes("status = 'requested'")) {
             const [account_id] = bound as [string];
             const c = (state.bookings ?? []).filter(
               (b) =>
@@ -445,6 +473,39 @@ function makeEventDb(state: {
             }).length;
             return { c } as T;
           }
+          if (sql.includes('AS requested_count') && sql.includes('FROM event_bookings WHERE event_id = ?')) {
+            const [event_id] = bound as [string];
+            const rows = (state.bookings ?? []).filter((booking) => booking.event_id === event_id);
+            const count = (status: string) => rows.filter((booking) => booking.status === status).length;
+            return {
+              total: rows.length,
+              requested_count: count('requested'),
+              confirmed_count: count('confirmed'),
+              rejected_count: count('rejected'),
+              cancelled_count: count('cancelled'),
+              expired_count: count('expired'),
+              attended_count: count('attended'),
+              no_show_count: count('no_show'),
+            } as T;
+          }
+          if (sql.startsWith('SELECT COUNT(*) AS c FROM event_waitlist WHERE event_id = ?')) {
+            const [event_id] = bound as [string];
+            const active = new Set(['waiting', 'offered', 'accepted']);
+            return {
+              c: (state.waitlist ?? []).filter((row) => row.event_id === event_id && active.has(String(row.status))).length,
+            } as T;
+          }
+          if (sql.includes('AS slot_count') && sql.includes('FROM event_slots WHERE event_id = ?')) {
+            const [event_id] = bound as [string];
+            const slots = (state.slots ?? []).filter(
+              (slot) => slot.event_id === event_id && slot.deleted_at == null && slot.is_active === 1,
+            );
+            return {
+              slot_count: slots.length,
+              uncapped_count: slots.filter((slot) => slot.capacity == null).length,
+              total_capacity: slots.reduce((sum, slot) => sum + (slot.capacity ?? 0), 0),
+            } as T;
+          }
           // 申込一覧の総数(点検#520の中8)。使用席数の枝より前に置く。
           // 絞りがあるときは bound が [event_id, status?, slot_id?] の順に積まれる。
           if (sql.startsWith('SELECT COUNT(*) AS c FROM event_bookings b')) {
@@ -475,15 +536,6 @@ function makeEventDb(state: {
           // Multi-account 対応の events lookup helper:
           // single モード → line_account_id 一致、multi-account-dedup モード
           // → account_ids JSON 配列に含まれる、のどちらか。
-          const eventMatchesAccount = (e: EventRow, account: string): boolean => {
-            if (e.target_type === 'multi-account-dedup') {
-              const ids = e.account_ids
-                ? (() => { try { return JSON.parse(e.account_ids as string) as string[]; } catch { return [] } })()
-                : [];
-              return ids.includes(account);
-            }
-            return e.line_account_id === account;
-          };
           // LIFF SELECT id FROM events ... AND is_published = 1
           if (sql.includes('SELECT id FROM events') && sql.includes('is_published')) {
             const [id, account, account2] = bound as [string, string, string?];
@@ -528,11 +580,7 @@ function makeEventDb(state: {
           }
           // イベント一覧の総数(点検#520の中8)。
           if (sql.startsWith('SELECT COUNT(*) AS c FROM events e')) {
-            const [account] = bound as [string];
-            const c = state.events.filter((e) => {
-              if (e.deleted_at != null) return false;
-              return eventMatchesAccount(e, account);
-            }).length;
+            const c = filterAdminEvents(sql, bound).length;
             return { c } as T;
           }
           return null;
@@ -562,18 +610,7 @@ function makeEventDb(state: {
           // admin events list (must come before event_slots branch since
           // its sub-queries also reference event_slots s)
           if (sql.startsWith('SELECT\n         e.*') || (sql.includes('FROM events e') && (sql.includes('e.line_account_id') || sql.includes('e.target_type')))) {
-            const [account] = bound as [string];
-            const items = state.events
-              .filter((e) => {
-                if (e.deleted_at != null) return false;
-                if (e.target_type === 'multi-account-dedup') {
-                  const ids = e.account_ids
-                    ? (() => { try { return JSON.parse(e.account_ids as string) as string[]; } catch { return [] } })()
-                    : [];
-                  return ids.includes(account);
-                }
-                return e.line_account_id === account;
-              })
+            const items = filterAdminEvents(sql, bound)
               .map((e) => {
                 const slots = (state.slots ?? []).filter(
                   (s) => s.event_id === e.id && s.deleted_at == null && s.is_active === 1,
@@ -612,11 +649,9 @@ function makeEventDb(state: {
                   visible_tag_name,
                 };
               })
-              .sort((a, b) =>
-                a.sort_order !== b.sort_order
-                  ? a.sort_order - b.sort_order
-                  : b.created_at.localeCompare(a.created_at),
-              );
+              .sort((a, b) => sql.includes('e.name COLLATE NOCASE')
+                ? a.name.localeCompare(b.name) || a.id.localeCompare(b.id)
+                : (a.next_slot_starts_at == null ? 1 : b.next_slot_starts_at == null ? -1 : a.next_slot_starts_at.localeCompare(b.next_slot_starts_at)) || a.id.localeCompare(b.id));
             // 本番は LIMIT/OFFSET を付ける(点検#520の中8)。bound の末尾2つ。
             const limit = typeof bound[bound.length - 2] === 'number' ? (bound[bound.length - 2] as number) : items.length;
             const offset = typeof bound[bound.length - 1] === 'number' ? (bound[bound.length - 1] as number) : 0;
@@ -1361,6 +1396,32 @@ describe('GET /api/events/admin/events', () => {
     expect(clamped.limit).toBe(200);
     expect(clamped.items).toHaveLength(3);
     expect(clamped.total).toBe(3);
+  });
+
+  test('applies search, filter, sort, and page before returning the list', async () => {
+    const state = {
+      events: [
+        baseEvent({ id: 'e1', line_account_id: 'la1', name: 'Bravo meeting', is_published: 1 }),
+        baseEvent({ id: 'e2', line_account_id: 'la1', name: 'Hidden meeting', is_published: 0 }),
+        baseEvent({ id: 'e3', line_account_id: 'la1', name: 'Alpha meeting', is_published: 1 }),
+      ],
+      slots: [],
+      bookings: [],
+    };
+    const app = setupApp(state);
+    const res = await app.request('/api/events/admin/events?account_id=la1&q=meeting&filter=open&sort=name&page=2&limit=1');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { items: EventRow[]; total: number; limit: number; sort: Array<{ field: string }> };
+    expect(body.items.map((event) => event.id)).toEqual(['e1']);
+    expect(body.total).toBe(2);
+    expect(body.limit).toBe(1);
+    expect(body.sort.map((item) => item.field)).toEqual(['name', 'id']);
+  });
+
+  test('rejects unsupported list filters', async () => {
+    const app = setupApp({ events: [] });
+    expect((await app.request('/api/events/admin/events?account_id=la1&filter=unknown')).status).toBe(400);
+    expect((await app.request('/api/events/admin/events?account_id=la1&sort=unknown')).status).toBe(400);
   });
 });
 
@@ -2390,6 +2451,59 @@ describe('admin bookings management', () => {
     expect(body.items).toHaveLength(1);
     expect(body.total).toBe(2);
     expect(body.limit).toBe(1);
+  });
+
+  test('GET /:id/bookings returns the requested page', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
+      slots: [{ id: 's1', event_id: 'e1', starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T12:00:00Z', capacity: 2, is_active: 1, sort_order: 0, deleted_at: null }],
+      bookings: [
+        { id: 'b1', event_id: 'e1', slot_id: 's1', friend_id: 'f1', line_account_id: 'la1', status: 'requested' } as BookingRow & Record<string, unknown>,
+        { id: 'b2', event_id: 'e1', slot_id: 's1', friend_id: 'f2', line_account_id: 'la1', status: 'requested' } as BookingRow & Record<string, unknown>,
+      ],
+      friends: [],
+    };
+    const body = (await (await setupApp(state).request('/api/events/admin/events/e1/bookings?account_id=la1&page=2&limit=1')).json()) as { items: Array<{ id: string }>; total: number };
+    expect(body.items).toHaveLength(1);
+    expect(body.total).toBe(2);
+  });
+
+  test('GET /:id/bookings/summary returns all-status counts and capacity without list rows', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
+      slots: [
+        { id: 's1', event_id: 'e1', starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T12:00:00Z', capacity: 3, is_active: 1, sort_order: 0, deleted_at: null },
+        { id: 's2', event_id: 'e1', starts_at: '2099-06-02T10:00:00Z', ends_at: '2099-06-02T12:00:00Z', capacity: 2, is_active: 1, sort_order: 1, deleted_at: null },
+      ],
+      bookings: [
+        { id: 'b1', event_id: 'e1', status: 'requested' },
+        { id: 'b2', event_id: 'e1', status: 'confirmed' },
+        { id: 'b3', event_id: 'e1', status: 'cancelled' },
+      ],
+      waitlist: [
+        { id: 'w1', event_id: 'e1', status: 'waiting' },
+        { id: 'w2', event_id: 'e1', status: 'cancelled' },
+      ],
+    };
+    const res = await setupApp(state).request('/api/events/admin/events/e1/bookings/summary?account_id=la1');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      total: 3,
+      requested: 1,
+      confirmed: 1,
+      cancelled: 1,
+      waitlist: 1,
+      totalCapacity: 5,
+    });
+  });
+
+  test('GET /:id/bookings/summary returns zeros for no applications and hides another account event', async () => {
+    const state = { events: [baseEvent({ id: 'e1', line_account_id: 'la1' })], slots: [], bookings: [] };
+    const app = setupApp(state);
+    const empty = await app.request('/api/events/admin/events/e1/bookings/summary?account_id=la1');
+    expect(await empty.json()).toMatchObject({ total: 0, requested: 0, confirmed: 0, waitlist: 0, totalCapacity: null });
+    const hidden = await app.request('/api/events/admin/events/e1/bookings/summary?account_id=la2');
+    expect(hidden.status).toBe(403);
   });
 
   test('POST decide confirm transitions to confirmed and creates reminders', async () => {
