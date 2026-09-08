@@ -192,6 +192,21 @@ export default function Form() {
     window.scrollTo({ top: 0 });
   };
 
+  // 論理送信単位の安定した冪等キー。この画面を開いている間は同じ値を
+  // 使い続け、連打・通信再送を同じ回答としてまとめる
+  // (イベント予約の確認画面と同じ流儀)。
+  const [idemKey, setIdemKey] = useState(() => crypto.randomUUID());
+
+  const submitErrorText = (err: unknown): string => {
+    const status = (err as { status?: number }).status;
+    const body = (err as { body?: { error?: string; code?: string } }).body;
+    if (status === 429 || body?.code === 'idempotent_in_progress') {
+      return '送信を処理中です。少し待って送り直してください。';
+    }
+    // サーバが断った理由（期限切れ・1人1回・定員）はそのまま出す
+    return body?.error ?? '送信できませんでした。時間をおいて試してください。';
+  };
+
   const submit = async () => {
     if (!id || !layout) return;
     const message = validateCurrent();
@@ -207,11 +222,11 @@ export default function Form() {
     setConfirming(false);
     setSending(true);
     setError(null);
-    try {
+    const sendOnce = async (key: string) => {
       await api.submitForm(id, {
         data: answers,
         trackedLinkId: search.get('ref') ?? undefined,
-      });
+      }, key);
       const url = layout.options?.thanksUrl;
       if (url) {
         window.location.href = url;
@@ -219,10 +234,28 @@ export default function Form() {
       }
       setDone(true);
       window.scrollTo({ top: 0 });
+    };
+    try {
+      await sendOnce(idemKey);
     } catch (err) {
-      // サーバが断った理由（期限切れ・1人1回・定員）はそのまま出す
-      const body = (err as { body?: { error?: string } }).body;
-      setError(body?.error ?? '送信できませんでした。時間をおいて試してください。');
+      // 内容違い・期限切れの使い回しは新しいキーで1回だけ送り直す
+      // (直して送り直した回答が古いキーで弾かれ続けるのを防ぐ)。
+      const status = (err as { status?: number }).status;
+      const code = (err as { body?: { code?: string } }).body?.code;
+      if (status === 409 && (code === 'idempotency_content_mismatch' || code === 'idempotency_expired')) {
+        const fresh = crypto.randomUUID();
+        setIdemKey(fresh);
+        try {
+          await sendOnce(fresh);
+          return;
+        } catch (retryErr) {
+          setError(submitErrorText(retryErr));
+          return;
+        } finally {
+          setSending(false);
+        }
+      }
+      setError(submitErrorText(err));
     } finally {
       setSending(false);
     }

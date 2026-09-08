@@ -17,7 +17,6 @@ import {
   getFormSubmissionAnalytics,
   getLatestFormSubmission,
   getFormSubmissionById,
-  createFormSubmission,
   insertFormSubmissionRecord,
   resyncFormSubmitCount,
   createFormSubmitClaim,
@@ -52,7 +51,7 @@ import type { Env } from '../index.js';
 import { resolveLineToken } from '../services/line-token.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
-import { awardActivityMileage } from '../services/activity-mileage.js';
+import { applyMileageRulesForEvent } from '@line-crm/db';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
 import {
@@ -1106,8 +1105,13 @@ forms.get('/api/forms/:id/my-latest', async (c) => {
 forms.post('/api/forms/:id/submit', async (c) => {
   try {
     const formId = c.req.param('id');
+    // 送信には Idempotency-Key(UUID)が必須。キーなしの連打・再送は
+    // 二重回答になるため受け付けない(イベント予約と同じ流儀)。
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim() || null;
-    if (idempotencyKey && !FORM_IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
+    if (!idempotencyKey) {
+      return c.json({ success: false, error: 'idempotency_key_required' }, 400);
+    }
+    if (!FORM_IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
       return c.json({ success: false, error: 'Idempotency-Key must be a UUID' }, 400);
     }
     const form = await getFormById(c.env.DB, formId);
@@ -1237,15 +1241,21 @@ forms.post('/api/forms/:id/submit', async (c) => {
       resumed: boolean;
     };
     // 生きている処理と重なったときの送り直し案内。
+    // error は LIFF が判別する符号、retryable は送り直してよい合図。
     const claimBusyResponse = () => c.json(
       {
         success: false,
-        error: '同じキーの送信を処理中です。少し待って同じキーで送り直してください',
+        error: 'idempotent_in_progress',
         retryable: true,
       },
-      409,
+      429,
     );
     let claimCtx: ClaimContext | null = null;
+    // LINE 送信の再送キー。予約時に確保した回答idと工程から決まる固定値にし、
+    // 再開時の送り直しを LINE 側の重複除去にかけさせる。randomUUID にすると
+    // 停止と再実行の間で二重送信になる。回答の保存より前(失敗通知)でも使える。
+    let retryAnswerId: string | null = null;
+    const lineRetryKey = (step: string) => `form-submit:${retryAnswerId ?? submission.id}:${step}`;
     if (idempotencyKey && peekScope && peekHash) {
       const scope = peekScope;
       const requestHash = peekHash;
@@ -1260,18 +1270,27 @@ forms.post('/api/forms/:id/submit', async (c) => {
       });
       if (acquired.claimed) {
         claimCtx = { scope, owner, submissionId, steps: new Set(), resumed: false };
+        retryAnswerId = submissionId;
       } else {
         const existing = acquired.claim;
         if (existing.request_hash !== requestHash) {
           return c.json(
-            { success: false, error: 'Idempotency-Key was already used with a different request' },
+            {
+              success: false,
+              error: 'Idempotency-Key was already used with a different request',
+              code: 'idempotency_content_mismatch',
+            },
             409,
           );
         }
         if (existing.status === 'completed') {
           if (formSubmitClaimExpired(existing)) {
             return c.json(
-              { success: false, error: 'Idempotency-Key の有効期限が切れました。新しいキーで送り直してください' },
+              {
+                success: false,
+                error: 'Idempotency-Key の有効期限が切れました。新しいキーで送り直してください',
+                code: 'idempotency_expired',
+              },
               409,
             );
           }
@@ -1301,6 +1320,7 @@ forms.post('/api/forms/:id/submit', async (c) => {
           steps: new Set(readFormSubmitClaimSteps(taken)),
           resumed: true,
         };
+        retryAnswerId = claimCtx.submissionId;
       }
     }
 
@@ -1341,28 +1361,26 @@ forms.post('/api/forms/:id/submit', async (c) => {
     // 二重保存しない。保存に失敗したら予約を failed に残して同じキーでの
     // 再開に託し、回答失敗として 500 を返す。
     const ensureAnswer = async (data: string): Promise<DbFormSubmission> => {
-      if (!claimCtx) {
-        return createFormSubmission(c.env.DB, { formId, friendId, data });
-      }
+      const ctx = claimCtx!;
       if (!claimDone('answer')) {
-        const linked = await getFormSubmissionById(c.env.DB, claimCtx.submissionId);
+        const linked = await getFormSubmissionById(c.env.DB, ctx.submissionId);
         if (!linked) {
           try {
             await insertFormSubmissionRecord(c.env.DB, {
-              id: claimCtx.submissionId,
+              id: ctx.submissionId,
               formId,
               friendId,
               data,
             });
           } catch (error) {
-            await failFormSubmitClaim(c.env.DB, claimCtx.scope, claimCtx.owner).catch(() => {});
+            await failFormSubmitClaim(c.env.DB, ctx.scope, ctx.owner).catch(() => {});
             throw error;
           }
         }
         const lost = await claimCheckpoint('answer');
         if (lost) throw new ClaimOwnershipLost(lost);
       }
-      return (await getFormSubmissionById(c.env.DB, claimCtx.submissionId))!;
+      return (await getFormSubmissionById(c.env.DB, ctx.submissionId))!;
     };
     // 受付数の再計算は何度実行しても同じ値になる。再開時に重ねても狂わない。
     const ensureSubmitCount = async (): Promise<void> => {
@@ -1379,6 +1397,7 @@ forms.post('/api/forms/:id/submit', async (c) => {
 
     let submission: DbFormSubmission;
     let webhookData: Record<string, unknown> | null = null;
+    let layoutPushIndex = 0;
     // 配分結果の記録。キーありの再開時に記録済みなら上書きせず、集計値を残す。
     const updateDestinationWriteResult = async (result: FormDestinationWriteResult): Promise<void> => {
       if (claimCtx && claimDone('destination_status')) {
@@ -1456,7 +1475,7 @@ forms.post('/api/forms/:id/submit', async (c) => {
                 accessToken,
                 friend.line_user_id!,
                 [{ type: 'text', text: form.on_submit_webhook_fail_message! }],
-                crypto.randomUUID(),
+                lineRetryKey('fail-message'),
                 (request) => dispatchLineProxyLocally(request, c.env, optionalExecutionCtx(c)),
               );
               const lost = await claimCheckpoint('fail_message');
@@ -1490,16 +1509,25 @@ forms.post('/api/forms/:id/submit', async (c) => {
       await ensureSubmitCount();
 
     if (!claimDone('mileage')) {
-      await awardActivityMileage(c.env.DB, {
-        eventType: 'form_submitted',
-        source: 'form',
-        sourceEventId: submission.id,
-        friendId,
-        subjectKey: formId,
-        metadata: { formId, formName: form.name },
-        occurredAt: submission.created_at,
-      });
-      if (claimCtx) {
+      // 付与の呼び出しは失敗を握らない。DB が落ちていれば投げて、
+      // 工程未完のまま回答は返し、同じキーでの再送で付け直す。
+      // (台帳は program+key の一意性で二重付与しない)
+      let awarded = false;
+      try {
+        await applyMileageRulesForEvent(c.env.DB, {
+          eventType: 'form_submitted',
+          source: 'form',
+          sourceEventId: submission.id,
+          friendId,
+          subjectKey: formId,
+          metadata: { formId, formName: form.name },
+          occurredAt: submission.created_at,
+        });
+        awarded = true;
+      } catch (error) {
+        console.error('form_submitted mileage failed:', error);
+      }
+      if (awarded && claimCtx) {
         const lost = await claimCheckpoint('mileage');
         if (lost) throw new ClaimOwnershipLost(lost);
       }
@@ -1604,6 +1632,7 @@ forms.post('/api/forms/:id/submit', async (c) => {
             layout,
             friendId: friendId!,
             answers: submissionData,
+            idempotencyPrefix: `form-submit:${submission.id}`,
             push: {
               defaultAccessToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
               workerUrl: c.env.WORKER_URL,
@@ -1622,13 +1651,17 @@ forms.post('/api/forms/:id/submit', async (c) => {
                 accessToken,
                 target.line_user_id,
                 [{ type: 'text', text }],
-                crypto.randomUUID(),
+                lineRetryKey(`layout:${layoutPushIndex++}`),
                 (request) => dispatchLineProxyLocally(request, c.env, optionalExecutionCtx(c)),
               );
             },
           }).then((result) => {
             destinationWriteResult = result.destinationWrites;
-          }).catch((err) => console.error('form layout effects failed:', err)),
+            // 欠落した工程があれば完了にせず、再送で補完する。
+            if (result.failedEffects.length > 0) {
+              throw new Error(`form layout effects partial failure: ${result.failedEffects.join(',')}`);
+            }
+          }),
         });
       }
 
@@ -1716,7 +1749,7 @@ forms.post('/api/forms/:id/submit', async (c) => {
               accessToken,
               friend.line_user_id,
               [{ type: 'flex', altText: 'ヒアリングの準備ができました', contents: meetFlex }],
-              crypto.randomUUID(),
+              lineRetryKey('meet-link'),
               (request) => dispatchLineProxyLocally(request, c.env, optionalExecutionCtx(c)),
             );
           },
@@ -1814,31 +1847,23 @@ forms.post('/api/forms/:id/submit', async (c) => {
             accessToken,
             friend.line_user_id,
             messages,
-            crypto.randomUUID(),
+            lineRetryKey('reply'),
             (request) => dispatchLineProxyLocally(request, c.env, optionalExecutionCtx(c)),
           );
         },
       });
 
-    if (claimCtx) {
-      // 予約ありは1件ずつ記録しながら進め、未完だけを残す。
-      // (この分岐は副作用ブロックの中で動く)
-      for (const effect of effectRuns) {
-        if (claimDone(effect.step)) continue;
-        try {
-          await effect.run();
-        } catch (error) {
-          console.error('Form side-effect failed:', error);
-          continue;
-        }
-        const lost = await claimCheckpoint(effect.step);
-        if (lost) throw new ClaimOwnershipLost(lost);
+    // 1件ずつ記録しながら進め、未完だけを残す。再開時は終わった工程を飛ばす。
+    for (const effect of effectRuns) {
+      if (claimDone(effect.step)) continue;
+      try {
+        await effect.run();
+      } catch (error) {
+        console.error('Form side-effect failed:', error);
+        continue;
       }
-    } else {
-      const results = await Promise.allSettled(effectRuns.map((effect) => effect.run()));
-      for (const r of results) {
-        if (r.status === 'rejected') console.error('Form side-effect failed:', r.reason);
-      }
+      const lost = await claimCheckpoint(effect.step);
+      if (lost) throw new ClaimOwnershipLost(lost);
     }
     await updateDestinationWriteResult(destinationWriteResult);
     await settleClaim([

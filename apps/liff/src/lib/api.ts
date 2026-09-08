@@ -234,10 +234,17 @@ export const api = {
     get<{ answers: Record<string, unknown>; createdAt: string } | null>(
       `/api/forms/${id}/my-latest`,
     ),
+  /**
+   * フォーム回答の送信。Idempotency-Key は呼び出し側が1回答ぶん安定した
+   * UUID を作って必ず渡す(連打・再送の二重回答を防ぐ。イベント予約と同じ)。
+   */
   submitForm: (
     id: string,
     body: { data: Record<string, unknown>; trackedLinkId?: string },
-  ) => post<{ id: string }>(`/api/forms/${id}/submit`, body),
+    idempotencyKey: string,
+  ) => post<{ id: string }>(`/api/forms/${id}/submit`, body, {
+    'Idempotency-Key': idempotencyKey,
+  }),
   /** 回答に添付する画像を預ける。返ってきたURLを回答に入れる */
   uploadFormFile: (id: string, file: File) =>
     postBinary<{ success: true; data: { key: string; url: string; mimeType: string; size: number } }>(

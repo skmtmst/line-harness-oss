@@ -166,6 +166,11 @@ export interface FormEffectInput {
   push?: { defaultAccessToken: string; workerUrl?: string };
   /** テキスト送信・テンプレート送信で使う。無ければその動作は飛ばす */
   pushText?: PushText;
+  /**
+   * 回答送信の再開時に二重登録を避ける接頭辞。例: `form-submit:<answerId>`。
+   * 付けるとリマインダ登録に安定した sourceEventId を付けて重複を避ける。
+   */
+  idempotencyPrefix?: string;
 }
 
 export interface FormDestinationWriteStats {
@@ -176,6 +181,11 @@ export interface FormDestinationWriteStats {
 
 export interface FormEffectResult {
   destinationWrites: FormDestinationWriteStats;
+  /**
+   * 失敗して欠落した工程の名前。空ならすべて完了。
+   * route は空でないとき工程完了にせず、同じ送信の再送で補完する。
+   */
+  failedEffects: string[];
 }
 
 /**
@@ -183,17 +193,18 @@ export interface FormEffectResult {
  *
  * 途中で失敗しても後ろを続ける。1つの動作の失敗が、他の動作を巻き込んで
  * 全部落とすのが一番困る（タグは付いたのにシナリオが動かない、が
- * 分からなくなる）。
+ * 分からなくなる）。失敗した工程の名前は failedEffects に残す。
  */
 export async function applyFormLayoutEffects(input: FormEffectInput): Promise<FormEffectResult> {
   const { db, layout, friendId, answers } = input;
   const destinationWrites: FormDestinationWriteStats = { attempted: 0, succeeded: 0, failed: 0 };
+  const failedEffects: string[] = [];
 
   for (const block of collectInputs(layout)) {
     const value = answers[block.name];
     if (value === undefined) continue;
 
-    await runSafely('destinations', () => writeDestinations(
+    await runTracked(failedEffects, `destinations:${block.id}`, () => writeDestinations(
       db,
       block,
       value,
@@ -202,33 +213,65 @@ export async function applyFormLayoutEffects(input: FormEffectInput): Promise<Fo
     ));
 
     if (hasChoices(block)) {
-      await runSafely('choices', () => runChoiceEffects(input, block, value, destinationWrites));
+      await runTracked(failedEffects, `choices:${block.id}`, () =>
+        runChoiceEffects(input, block, value, destinationWrites, failedEffects));
     }
 
     if (block.type === 'date' && block.reminder?.reminderId) {
-      await runSafely('reminder', () =>
-        enrollFriendInReminder(db, {
-          friendId,
-          reminderId: block.reminder!.reminderId,
-          targetDate: toText(value),
-        }).then(() => undefined),
-      );
+      await runTracked(failedEffects, `reminder:${block.id}`, () =>
+        enrollFormReminderOnce(input, block.reminder!.reminderId, toText(value)));
     }
   }
 
-  for (const action of layout.options?.afterActions ?? []) {
-    await runSafely('afterAction', () => runFormAction(input, action, destinationWrites));
+  const afterActions = layout.options?.afterActions ?? [];
+  for (let index = 0; index < afterActions.length; index += 1) {
+    const action = afterActions[index];
+    await runTracked(failedEffects, `afterAction:${index}`, () =>
+      runFormAction(input, action, destinationWrites, index));
   }
 
-  return { destinationWrites };
+  return { destinationWrites, failedEffects };
 }
 
-async function runSafely(label: string, run: () => Promise<unknown>): Promise<void> {
+async function runTracked(failed: string[], label: string, run: () => Promise<unknown>): Promise<void> {
   try {
     await run();
   } catch (err) {
+    failed.push(label);
     console.error(`form effect (${label}) failed:`, err);
   }
+}
+
+/**
+ * リマインダの登録。二重登録を避けるため、接頭辞があるときは安定した
+ * 登録元idを付けて既存を確認してから登録する(再開時の再実行に備える)。
+ */
+async function enrollFormReminderOnce(
+  input: FormEffectInput,
+  reminderId: string,
+  targetDate: string,
+  keySuffix?: string,
+): Promise<void> {
+  const { db, friendId } = input;
+  const sourceEventId = input.idempotencyPrefix
+    ? `${input.idempotencyPrefix}:${keySuffix ?? `reminder:${reminderId}`}`
+    : null;
+  if (sourceEventId) {
+    const existing = await db
+      .prepare(
+        `SELECT 1 AS found FROM friend_reminders
+         WHERE friend_id = ? AND reminder_id = ? AND source_event_id = ? LIMIT 1`,
+      )
+      .bind(friendId, reminderId, sourceEventId)
+      .first<{ found: number }>();
+    if (existing?.found) return;
+  }
+  await enrollFriendInReminder(db, {
+    friendId,
+    reminderId,
+    targetDate,
+    sourceEventId,
+  }).then(() => undefined);
 }
 
 /**
@@ -308,6 +351,7 @@ async function runChoiceEffects(
   block: FormInputBlock,
   value: unknown,
   stats: FormDestinationWriteStats,
+  failed: string[],
 ): Promise<void> {
   const selected = toLabels(value);
   if (selected.length === 0) return;
@@ -323,7 +367,8 @@ async function runChoiceEffects(
         break;
       case 'action':
         for (const action of choice.actions ?? []) {
-          await runSafely('choiceAction', () => runFormAction(input, action, stats));
+          await runTracked(failed, `choiceAction:${block.id}:${choice.id}`, () =>
+            runFormAction(input, action, stats));
         }
         break;
       default:
@@ -373,6 +418,7 @@ export async function runFormAction(
   input: FormEffectInput,
   action: FormAction,
   destinationWrites?: FormDestinationWriteStats,
+  actionIndex?: number,
 ): Promise<void> {
   const { db, friendId } = input;
 
@@ -447,15 +493,20 @@ export async function runFormAction(
       await enrollFriendInScenario(db, friendId, action.scenarioId);
       return;
 
-    case 'reminder':
+    case 'reminder': {
       if (!action.reminderId) return;
-      await enrollFriendInReminder(db, {
-        friendId,
-        reminderId: action.reminderId,
-        // 起点の日付を持たない動作なので、今日から動かす
-        targetDate: jstNow().slice(0, 10),
-      });
+      const reminderLabel = actionIndex === undefined
+        ? `reminder:action:${action.reminderId}`
+        : `reminder:afterAction:${actionIndex}`;
+      // 起点の日付を持たない動作なので、今日から動かす
+      await enrollFormReminderOnce(
+        input,
+        action.reminderId,
+        jstNow().slice(0, 10),
+        reminderLabel,
+      );
       return;
+    }
 
     default:
       return;

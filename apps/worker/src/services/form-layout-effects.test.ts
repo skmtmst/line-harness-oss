@@ -32,7 +32,7 @@ vi.mock('./friend-tag-attach.js', () => ({
 import { applyFormLayoutEffects, checkFormGates } from './form-layout-effects.js';
 
 /** UPDATE 文を覚えるだけの D1 の身代わり。 */
-function fakeDb() {
+function fakeDb(firstResult: unknown = null) {
   const calls: { sql: string; binds: unknown[] }[] = [];
   const db = {
     prepare(sql: string) {
@@ -43,6 +43,8 @@ function fakeDb() {
               calls.push({ sql, binds });
               return { meta: { changes: 1 } };
             },
+            first: async () => firstResult,
+            all: async () => ({ results: [] }),
           };
         },
       };
@@ -379,6 +381,7 @@ describe('回答を配る', () => {
       friendId: 'f1',
       reminderId: 'rm-1',
       targetDate: '2026-09-01',
+      sourceEventId: null,
     });
   });
 
@@ -421,6 +424,7 @@ describe('回答を配る', () => {
       }),
     ).resolves.toEqual({
       destinationWrites: { attempted: 1, succeeded: 1, failed: 0 },
+      failedEffects: [expect.stringMatching(/^choices:/)],
     });
 
     expect(mocks.setFriendFieldValue).toHaveBeenCalled();
@@ -444,6 +448,7 @@ describe('回答を配る', () => {
       answers: { full_name: '山田' },
     })).resolves.toEqual({
       destinationWrites: { attempted: 1, succeeded: 0, failed: 1 },
+      failedEffects: [],
     });
   });
 
@@ -484,5 +489,72 @@ describe('回答を配る', () => {
 
     await applyFormLayoutEffects({ db, layout, friendId: 'f1', answers: {} });
     expect(mocks.attachTag).not.toHaveBeenCalled();
+  });
+
+  test('失敗した工程の名前を残し、欠落を固定しない', async () => {
+    mocks.attachTag.mockRejectedValueOnce(new Error('タグの付与に失敗'));
+    const pet = input({
+      name: 'pet',
+      label: '飼っている子',
+      type: 'checkbox',
+      choiceMode: 'tag',
+      choices: [{ id: 'c1', label: '犬', tagId: 'tag-dog' }],
+    });
+    const layout = layoutWith([pet]);
+    const { db } = fakeDb();
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { pet: ['犬'] },
+    });
+    expect(result.failedEffects).toEqual([`choices:${pet.id}`]);
+  });
+
+  test('接頭辞つきのリマインダ登録は安定した登録元idを付ける', async () => {
+    const day = input({
+      name: 'day',
+      label: '希望日',
+      type: 'date',
+      reminder: { reminderId: 'rm-1', time: '09:00' },
+    });
+    const layout = layoutWith([day]);
+    const { db } = fakeDb();
+
+    await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { day: '2026-09-01' },
+      idempotencyPrefix: 'form-submit:answer-1',
+    });
+    expect(mocks.enrollFriendInReminder).toHaveBeenCalledWith(db, {
+      friendId: 'f1',
+      reminderId: 'rm-1',
+      targetDate: '2026-09-01',
+      sourceEventId: 'form-submit:answer-1:reminder:rm-1',
+    });
+  });
+
+  test('登録済みのリマインダは再開時に重ねない', async () => {
+    const day = input({
+      name: 'day',
+      label: '希望日',
+      type: 'date',
+      reminder: { reminderId: 'rm-1', time: '09:00' },
+    });
+    const layout = layoutWith([day]);
+    const { db } = fakeDb({ found: 1 });
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { day: '2026-09-01' },
+      idempotencyPrefix: 'form-submit:answer-1',
+    });
+    expect(mocks.enrollFriendInReminder).not.toHaveBeenCalled();
+    expect(result.failedEffects).toEqual([]);
   });
 });
