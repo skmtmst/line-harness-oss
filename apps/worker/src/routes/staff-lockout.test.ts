@@ -17,6 +17,7 @@ const dbMocks = {
   deleteStaffMember: vi.fn(),
   countLoginAudit: vi.fn(),
   getStaffAccountScopeIds: vi.fn(),
+  getStaffAccountScopeMap: vi.fn(async () => new Map()),
   replaceStaffAccountScopes: vi.fn(),
   revokeStaffAuthentication: vi.fn(),
 };
@@ -293,7 +294,7 @@ describe('スタッフ経路の統括分離', () => {
     dbMocks.getStaffById.mockResolvedValue(self);
 
     const res = await send('/api/staff/tenant-b-staff', 'PATCH', {
-      email: 'self@example.test', notificationPreferences: { login: { email: true, line: false } },
+      email: 'self@example.test', notificationPreferences: { security: { email: true, line: false } },
     }, 'tenant-b-staff-key');
 
     expect(res.status).toBe(200);
