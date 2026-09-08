@@ -687,18 +687,20 @@ export async function stopConversionDefinition(
   const now = jstNow();
   const usageRow = await db.prepare('SELECT COUNT(*) AS total FROM conversion_definition_usages WHERE conversion_point_id = ?')
     .bind(input.id).first<{ total: number }>();
-  const [result] = await db.batch([
-    db.prepare(`UPDATE conversion_points SET status = 'stopped', stopped_at = ?,
-      updated_at = ?, version = version + 1 WHERE id = ? AND version = ? AND status = 'active'`)
-      .bind(now, now, input.id, input.expectedVersion),
-    db.prepare(`INSERT INTO conversion_definition_operations
-      (id, conversion_point_id, action, replacement_id, affected_usages, reason, performed_by, created_at)
-      VALUES (?, ?, 'stop', NULL, ?, ?, ?, ?)`)
-      .bind(crypto.randomUUID(), input.id, Number(usageRow?.total ?? 0), input.reason ?? null, input.staffId, now),
-  ]);
-  if ((result.meta.changes ?? 0) !== 1) {
+  // 版の確定を先に行う。不一致なら操作ログも書かずに409にする。
+  // 副作用(ログ)を先に書くと、競合時に記録だけが残る。
+  const stopped = await db.prepare(`UPDATE conversion_points SET status = 'stopped', stopped_at = ?,
+    updated_at = ?, version = version + 1 WHERE id = ? AND version = ? AND status = 'active'`)
+    .bind(now, now, input.id, input.expectedVersion)
+    .run();
+  if ((stopped.meta.changes ?? 0) !== 1) {
     throw new ConversionDefinitionError('version_conflict', '成果地点が更新されています。読み直してください', 409);
   }
+  await db.prepare(`INSERT INTO conversion_definition_operations
+    (id, conversion_point_id, action, replacement_id, affected_usages, reason, performed_by, created_at)
+    VALUES (?, ?, 'stop', NULL, ?, ?, ?, ?)`)
+    .bind(crypto.randomUUID(), input.id, Number(usageRow?.total ?? 0), input.reason ?? null, input.staffId, now)
+    .run();
   return { id: input.id, status: 'stopped' as const, version: input.expectedVersion + 1, stoppedAt: now };
 }
 
@@ -722,7 +724,15 @@ export async function replaceConversionDefinitionUsages(
     .bind(input.id).first<{ total: number }>();
   const affectedUsages = Number(usageRow?.total ?? 0);
   const now = jstNow();
-  const results = await db.batch([
+  // 版の確定を先に行う。不一致なら利用先の移動も操作ログも書かずに409にする。
+  const stopped = await db.prepare(`UPDATE conversion_points SET status = 'stopped', stopped_at = ?,
+    updated_at = ?, version = version + 1 WHERE id = ? AND version = ? AND status = 'active'`)
+    .bind(now, now, input.id, input.expectedVersion)
+    .run();
+  if ((stopped.meta.changes ?? 0) !== 1) {
+    throw new ConversionDefinitionError('version_conflict', '成果地点が更新されています。読み直してください', 409);
+  }
+  await db.batch([
     db.prepare(`DELETE FROM conversion_definition_usages AS source
       WHERE source.conversion_point_id = ? AND EXISTS (
         SELECT 1 FROM conversion_definition_usages target
@@ -733,17 +743,11 @@ export async function replaceConversionDefinitionUsages(
     db.prepare(`UPDATE conversion_definition_usages SET conversion_point_id = ?,
       definition_version = ?, updated_at = ? WHERE conversion_point_id = ?`)
       .bind(input.replacementId, input.replacementExpectedVersion, now, input.id),
-    db.prepare(`UPDATE conversion_points SET status = 'stopped', stopped_at = ?,
-      updated_at = ?, version = version + 1 WHERE id = ? AND version = ? AND status = 'active'`)
-      .bind(now, now, input.id, input.expectedVersion),
     db.prepare(`INSERT INTO conversion_definition_operations
       (id, conversion_point_id, action, replacement_id, affected_usages, reason, performed_by, created_at)
       VALUES (?, ?, 'replace', ?, ?, ?, ?, ?)`)
       .bind(crypto.randomUUID(), input.id, input.replacementId, affectedUsages, input.reason ?? null, input.staffId, now),
   ]);
-  if ((results[2].meta.changes ?? 0) !== 1) {
-    throw new ConversionDefinitionError('version_conflict', '成果地点が更新されています。読み直してください', 409);
-  }
   return {
     id: input.id,
     replacementId: input.replacementId,
@@ -764,20 +768,21 @@ export async function deleteUnusedConversionDefinition(
     throw new ConversionDefinitionError('definition_in_use', '成果または利用先があるため、削除せず停止してください', 409);
   }
   const now = jstNow();
-  const results = await db.batch([
-    db.prepare(`INSERT INTO conversion_definition_operations
-      (id, conversion_point_id, action, replacement_id, affected_usages, reason, performed_by, created_at)
-      VALUES (?, ?, 'delete', NULL, 0, ?, ?, ?)`)
-      .bind(crypto.randomUUID(), input.id, input.reason ?? null, input.staffId, now),
-    db.prepare(`DELETE FROM conversion_points
-      WHERE id = ? AND version = ?
-        AND NOT EXISTS (SELECT 1 FROM conversion_events WHERE conversion_point_id = ?)
-        AND NOT EXISTS (SELECT 1 FROM conversion_definition_usages WHERE conversion_point_id = ?)`)
-      .bind(input.id, input.expectedVersion, input.id, input.id),
-  ]);
-  if ((results[1].meta.changes ?? 0) !== 1) {
+  // 版と利用先の確定を先に行う。不一致なら操作ログも書かずに409にする。
+  const removed = await db.prepare(`DELETE FROM conversion_points
+    WHERE id = ? AND version = ?
+      AND NOT EXISTS (SELECT 1 FROM conversion_events WHERE conversion_point_id = ?)
+      AND NOT EXISTS (SELECT 1 FROM conversion_definition_usages WHERE conversion_point_id = ?)`)
+    .bind(input.id, input.expectedVersion, input.id, input.id)
+    .run();
+  if ((removed.meta.changes ?? 0) !== 1) {
     throw new ConversionDefinitionError('version_conflict', '成果地点が更新されています。読み直してください', 409);
   }
+  await db.prepare(`INSERT INTO conversion_definition_operations
+    (id, conversion_point_id, action, replacement_id, affected_usages, reason, performed_by, created_at)
+    VALUES (?, ?, 'delete', NULL, 0, ?, ?, ?)`)
+    .bind(crypto.randomUUID(), input.id, input.reason ?? null, input.staffId, now)
+    .run();
   return { id: input.id, deleted: true as const };
 }
 
