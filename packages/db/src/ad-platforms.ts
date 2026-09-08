@@ -6,8 +6,18 @@ export interface AdPlatform {
   display_name: string | null;
   config: string;
   is_active: number;
+  /** 所有するLINEアカウント。NULLは帰属不明の旧行(送信対象にしない)。 */
+  line_account_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** プラットフォームと友だちの所属が食い違う記録を残そうとしたときの誤り。 */
+export class AdPlatformAccountMismatchError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AdPlatformAccountMismatchError';
+  }
 }
 
 export interface AdPlatformConfig {
@@ -31,6 +41,7 @@ export interface AdConversionLog {
   id: string;
   ad_platform_id: string;
   friend_id: string;
+  line_account_id: string | null;
   conversion_point_id: string | null;
   event_name: string;
   click_id: string | null;
@@ -42,9 +53,18 @@ export interface AdConversionLog {
   created_at: string;
 }
 
-export async function getActiveAdPlatforms(db: D1Database): Promise<AdPlatform[]> {
+/**
+ * 有効な広告設定のうち、指定アカウントのものだけ返す。
+ * アカウントが空のときは空配列を返す(帰属不明の旧行へは送信しない)。
+ */
+export async function getActiveAdPlatforms(
+  db: D1Database,
+  lineAccountId?: string | null,
+): Promise<AdPlatform[]> {
+  if (!lineAccountId) return [];
   const result = await db
-    .prepare(`SELECT * FROM ad_platforms WHERE is_active = 1`)
+    .prepare(`SELECT * FROM ad_platforms WHERE is_active = 1 AND line_account_id = ?`)
+    .bind(lineAccountId)
     .all<AdPlatform>();
   return result.results;
 }
@@ -78,17 +98,17 @@ export async function getAdPlatformById(
 
 export async function createAdPlatform(
   db: D1Database,
-  input: { name: string; displayName?: string | null; config: Record<string, unknown> },
+  input: { name: string; displayName?: string | null; config: Record<string, unknown>; lineAccountId?: string | null },
 ): Promise<AdPlatform> {
   const id = crypto.randomUUID();
   const now = jstNow();
 
   await db
     .prepare(
-      `INSERT INTO ad_platforms (id, name, display_name, config, is_active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 1, ?, ?)`,
+      `INSERT INTO ad_platforms (id, name, display_name, config, is_active, line_account_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 1, ?, ?, ?)`,
     )
-    .bind(id, input.name, input.displayName ?? null, JSON.stringify(input.config), now, now)
+    .bind(id, input.name, input.displayName ?? null, JSON.stringify(input.config), input.lineAccountId ?? null, now, now)
     .run();
 
   return (await db
@@ -125,11 +145,16 @@ export async function deleteAdPlatform(db: D1Database, id: string): Promise<void
   await db.prepare(`DELETE FROM ad_platforms WHERE id = ?`).bind(id).run();
 }
 
+/**
+ * 送信記録を残す。プラットフォームの帰属と友だちの所属が違うときは残さず
+ * AdPlatformAccountMismatchError を投げる(DB側の境界強制)。
+ */
 export async function logAdConversion(
   db: D1Database,
   opts: {
     platformId: string;
     friendId: string;
+    lineAccountId?: string | null;
     eventName: string;
     clickId: string;
     clickIdType: string;
@@ -139,19 +164,36 @@ export async function logAdConversion(
     errorMessage?: string | null;
   },
 ): Promise<void> {
+  const platform = await db
+    .prepare(`SELECT line_account_id FROM ad_platforms WHERE id = ?`)
+    .bind(opts.platformId)
+    .first<{ line_account_id: string | null }>();
+  const friend = await db
+    .prepare(`SELECT line_account_id FROM friends WHERE id = ?`)
+    .bind(opts.friendId)
+    .first<{ line_account_id: string | null }>();
+  const platformAccount = platform?.line_account_id ?? null;
+  const friendAccount = friend?.line_account_id ?? opts.lineAccountId ?? null;
+  if (!platform || !friend || platformAccount !== friendAccount) {
+    throw new AdPlatformAccountMismatchError(
+      `ad_conversion_logs の境界違反: platform=${opts.platformId} account=${platformAccount} friend=${opts.friendId} account=${friendAccount}`,
+    );
+  }
+
   const id = crypto.randomUUID();
   const now = jstNow();
 
   await db
     .prepare(
       `INSERT INTO ad_conversion_logs
-       (id, ad_platform_id, friend_id, event_name, click_id, click_id_type, status, request_body, response_body, error_message, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, ad_platform_id, friend_id, line_account_id, event_name, click_id, click_id_type, status, request_body, response_body, error_message, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
       opts.platformId,
       opts.friendId,
+      friendAccount,
       opts.eventName,
       opts.clickId,
       opts.clickIdType,

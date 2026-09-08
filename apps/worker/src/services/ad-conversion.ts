@@ -19,12 +19,23 @@ export async function sendAdConversions(
   eventName: string,
   eventValue?: number,
 ): Promise<void> {
+  // 友だちの所属アカウントを確定し、そのアカウントの広告設定だけ使う。
+  // 所属が分からない友だちの行動・金額は外部へ送らない。
+  const friend = await db
+    .prepare(`SELECT line_account_id FROM friends WHERE id = ?`)
+    .bind(friendId)
+    .first<{ line_account_id: string | null }>();
+  const lineAccountId = friend?.line_account_id ?? null;
+  if (!lineAccountId) return;
+
   const ref = await getRefTrackingWithClickIds(db, friendId);
   if (!ref) return;
 
-  const platforms = await getActiveAdPlatforms(db);
+  const platforms = await getActiveAdPlatforms(db, lineAccountId);
 
   for (const platform of platforms) {
+    // 二重防御: 帰属が違う設定は送らない(DB側でも logAdConversion が弾く)。
+    if (platform.line_account_id !== lineAccountId) continue;
     const config: AdPlatformConfig = JSON.parse(platform.config);
 
     try {
@@ -33,7 +44,7 @@ export async function sendAdConversions(
           if (ref.fbclid) {
             await sendMetaConversion(config, ref, eventName, eventValue);
             await logAdConversion(db, {
-              platformId: platform.id, friendId, eventName,
+              platformId: platform.id, friendId, lineAccountId, eventName,
               clickId: ref.fbclid, clickIdType: 'fbclid', status: 'sent',
             });
           }
@@ -42,7 +53,7 @@ export async function sendAdConversions(
           if (ref.twclid) {
             await sendXConversion(config, ref, eventName, eventValue);
             await logAdConversion(db, {
-              platformId: platform.id, friendId, eventName,
+              platformId: platform.id, friendId, lineAccountId, eventName,
               clickId: ref.twclid, clickIdType: 'twclid', status: 'sent',
             });
           }
@@ -51,7 +62,7 @@ export async function sendAdConversions(
           if (ref.gclid) {
             await sendGoogleConversion(config, ref, eventName, eventValue);
             await logAdConversion(db, {
-              platformId: platform.id, friendId, eventName,
+              platformId: platform.id, friendId, lineAccountId, eventName,
               clickId: ref.gclid, clickIdType: 'gclid', status: 'sent',
             });
           }
@@ -60,7 +71,7 @@ export async function sendAdConversions(
           if (ref.ttclid) {
             await sendTikTokConversion(config, ref, eventName, eventValue);
             await logAdConversion(db, {
-              platformId: platform.id, friendId, eventName,
+              platformId: platform.id, friendId, lineAccountId, eventName,
               clickId: ref.ttclid, clickIdType: 'ttclid', status: 'sent',
             });
           }
@@ -70,6 +81,7 @@ export async function sendAdConversions(
       await logAdConversion(db, {
         platformId: platform.id,
         friendId,
+        lineAccountId,
         eventName,
         clickId: ref.fbclid || ref.twclid || ref.gclid || ref.ttclid || '',
         clickIdType: platform.name,
