@@ -587,6 +587,8 @@ export default function DashboardPage() {
     }
     let cancelled = false
     setSupplementLoading(true)
+    /* 勘定を切り替えたら前の勘定の件数を消す。新しい件数が来るまで古い数を出さない。 */
+    setPendingPhotos(null)
     /*
       予約の明細は今日以降だけ100件に区切って取る。終わった予約まで
       全部取ると、件数が増えたときに遅くなる。今日の数と直近の予定は
@@ -597,14 +599,14 @@ export default function DashboardPage() {
     const jstMidnightUtc = Date.UTC(jstNow.getUTCFullYear(), jstNow.getUTCMonth(), jstNow.getUTCDate()) - 9 * 60 * 60 * 1000
     const todayStartIso = new Date(jstMidnightUtc).toISOString()
     void Promise.allSettled([
-      needsPhotos ? api.nenMembers.overview() : Promise.resolve(null),
+      needsPhotos ? api.nenMembers.photoReviewMetrics(selectedAccountId) : Promise.resolve(null),
       needsBookings ? bookingApi.listRequests(selectedAccountId, 'all', { from: todayStartIso, limit: 100 }) : Promise.resolve(null),
       needsHealth ? api.health.getHealth(selectedAccountId) : Promise.resolve(null),
       needsTwoFactor ? api.staff.list() : Promise.resolve(null),
       needsSupportMarks ? api.supportMarks.list(selectedAccountId) : Promise.resolve(null),
     ]).then(([photoResult, bookingResult, healthResult, staffResult, supportMarkResult]) => {
       if (cancelled) return
-      setPendingPhotos(photoResult.status === 'fulfilled' && photoResult.value?.success ? photoResult.value.data.pendingPhotos : null)
+      setPendingPhotos(photoResult.status === 'fulfilled' && photoResult.value?.success ? photoResult.value.data.pendingCount : null)
       /*
         器が違う返事(障害時の HTML など)が来ても、`undefined.requests` で
         落ちない。読めなかったら「確認待ち」に出す。
@@ -679,7 +681,7 @@ export default function DashboardPage() {
 
   const renderTodayCard = (id: DashboardCardId): ReactNode => {
     if (id === 'today-inbox') return <TodayTaskCard title="対応が必要な受信" href="/chats" action="受信箱を開く" value={pendingTotal} detail={pendingDetail} status={inboxSummary?.oldestWaitMinutes != null ? `最長 ${formatWaitRough(inboxSummary.oldestWaitMinutes)}` : '確認待ち'} />
-    if (id === 'today-photo-review') { const value = reference?.pendingPhotos ?? pendingPhotos; return <TodayTaskCard title="写真審査" href="/nen-members?tab=photos" action="審査する" value={value} detail={value === null ? '読み込み中' : `確認待ち ${value}件`} status="ポイント付与あり" /> }
+    if (id === 'today-photo-review') { const value = reference?.pendingPhotos ?? pendingPhotos; return <TodayTaskCard title="写真審査" href="/nen-members?tab=photos&status=pending_review" action="審査する" value={value} detail={value === null ? '読み込み中' : `確認待ち ${value}件`} status="ポイント付与あり" /> }
     if (id === 'today-bookings') return <TodayTaskCard title="今日の予約" href="/booking/bookings" action="予約を見る" value={displayedBookings === null ? null : todayBookings.length} detail="変更・取消を含む予約一覧" status={upcomingBookings.length > 0 ? `次回 ${new Date(upcomingBookings[0].starts_at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}` : '次回予定なし'} />
     if (id === 'today-shipments') return <TodayTaskCard title="出荷予定" href="/ec-commerce" action="ECを見る" value={shipmentSummary?.today ?? null} detail="EC通知から算出" status={reference?.shipmentStatus ?? (shipmentSummary ? `今日・明日 ${shipmentSummary.soon}件` : '確認中')} />
     return null
