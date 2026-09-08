@@ -1144,6 +1144,8 @@ function commonVarUsageHref(item: CommonVarUsageItem): string {
     case 'automation': return '/automations';
     case 'friend_add': return '/friend-add-settings';
     case 'common_action': return `/common-actions/versions?id=${id}`;
+    // 新しい種別が増えても画面のLinkを壊さない。一覧へ戻す。
+    default: return '/contents/vars';
   }
 }
 
@@ -1209,9 +1211,11 @@ function serializeCommonVarChangeImpact(
   const items = impact.items.map((item, index) => {
     const safeSource = readableCommonVarUsage(item.source_content, token);
     const previewAvailable = safeSource.includes(token);
+    // base.items は impact.items と同じ順で作る。同じ位置の要素を使う前提を
+    // 型で守れないので、無いときは安全な文へ倒す（非null断言を使わない）。
     const currentPreview = previewAvailable
       ? safeSource.replaceAll(token, variable.value)
-      : base.items[index]!.currentPreview;
+      : (base.items.at(index)?.currentPreview ?? safeSource);
     const changesOnSave = item.is_historical !== 1;
     const nextPreview = !changesOnSave
       ? currentPreview
@@ -1776,9 +1780,11 @@ contents.post('/api/common-vars/:id/schedules', requireRole('owner', 'admin'), a
     const existing = await getCommonVarById(c.env.DB, varId, accountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
 
-    const body = await c.req.json<{ effectiveFrom?: unknown; value?: unknown }>();
-    const effectiveFrom = String(body.effectiveFrom ?? '');
-    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(effectiveFrom)) {
+    // 同じ画面の impact-preview・replace と同じ16KB制限にする。
+    const body = await readBoundedJson(c.req.raw);
+    const effectiveFrom = typeof body.effectiveFrom === 'string' ? body.effectiveFrom : '';
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(effectiveFrom)
+      || !isValidScheduleDateTime(effectiveFrom)) {
       return c.json(
         { success: false, error: '切り替える日時は 2026-09-01T10:00 の形で指定してください' },
         400,
@@ -1794,14 +1800,34 @@ contents.post('/api/common-vars/:id/schedules', requireRole('owner', 'admin'), a
     const created = await createCommonVarSchedule(c.env.DB, {
       varId,
       effectiveFrom,
-      value: String(body.value ?? ''),
+      value: typeof body.value === 'string' ? body.value : '',
     });
     return c.json({ success: true, data: serializeSchedule(created) }, 201);
   } catch (err) {
+    if (err instanceof RequestBodyError) {
+      return c.json({ success: false, error: err.message }, err.status);
+    }
     console.error('POST /api/common-vars/:id/schedules error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
+
+/**
+ * 切替日時の実在検査。正規表現だけでは月13・99日が通る。
+ * JSTの壁時計として組み立て直し、月日時刻の範囲を確かめる。
+ */
+export function isValidScheduleDateTime(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  if (month < 1 || month > 12 || hour > 23 || minute > 59) return false;
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return day >= 1 && day <= lastDay;
+}
 
 contents.delete(
   '/api/common-vars/:id/schedules/:scheduleId',

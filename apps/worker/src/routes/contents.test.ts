@@ -1110,6 +1110,27 @@ describe('共通情報', () => {
     );
   });
 
+  it('未知の種別の使用先リンクは一覧へ戻し、画面を壊さない（#578 L6）', async () => {
+    mocks.getCommonVarUsageImpact.mockResolvedValue({
+      ...EMPTY_COMMON_VAR_IMPACT,
+      total: 1,
+      blockingTotal: 1,
+      items: [{
+        kind: 'future_kind',
+        source_id: 'x-1',
+        source_parent_id: null,
+        source_name: '将来の機能',
+        source_status: 'active',
+        source_content: '{{var.shop_hours}}',
+        is_historical: 0,
+      }],
+    });
+    const res = await req('/api/common-vars/cv-1/delete-impact?accountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: { items: Array<{ href: string }> } };
+    expect(body.data.items[0]?.href).toBe('/contents/vars');
+  });
+
   it('共通情報を変更する操作は内部JSONを表示しない', async () => {
     mocks.getCommonVarUsageImpact.mockResolvedValue({
       ...EMPTY_COMMON_VAR_IMPACT,
@@ -1465,5 +1486,34 @@ describe('日付での切り替え', () => {
       value: 'x',
     });
     expect(res.status).toBe(400);
+  });
+
+  it.each(['2099-13-01T00:00', '2099-02-30T10:00', '2099-01-01T24:00'])(
+    '実在しない日時は受け付けない（%s）',
+    async (effectiveFrom) => {
+      const res = await req('/api/common-vars/cv-1/schedules?accountId=account-1', 'POST', {
+        effectiveFrom,
+        value: 'x',
+      });
+      expect(res.status).toBe(400);
+      expect(mocks.createCommonVarSchedule).not.toHaveBeenCalled();
+    },
+  );
+
+  it('うるう日の2月29日は受け付ける', async () => {
+    const res = await req('/api/common-vars/cv-1/schedules?accountId=account-1', 'POST', {
+      effectiveFrom: '2096-02-29T10:00',
+      value: 'x',
+    });
+    expect(res.status).toBe(201);
+  });
+
+  it('大きすぎる送信は読む前に413で断る（#578 L10）', async () => {
+    const res = await req('/api/common-vars/cv-1/schedules?accountId=account-1', 'POST', {
+      effectiveFrom: '2099-01-01T00:00',
+      value: 'x'.repeat(20 * 1024),
+    });
+    expect(res.status).toBe(413);
+    expect(mocks.createCommonVarSchedule).not.toHaveBeenCalled();
   });
 });
