@@ -3,12 +3,14 @@
 import type { BookingNotificationSender } from './booking-notifier.js';
 import { purgeExpiredIdempotency } from './booking-idempotency.js';
 import { REQUEST_TTL_HOURS } from './booking-types.js';
+import { cancelByTrigger } from './reminder-trigger.js';
 import { resolveLineCredential } from '@line-crm/db';
 import { featureJobCanRun } from './feature-enforcement.js';
 
 interface StaleRow {
   id: string;
   line_account_id: string;
+  friend_id: string;
   starts_at: string;
   menu_name: string;
   staff_name: string;
@@ -36,7 +38,7 @@ export async function runExpirer(
   const cutoff = new Date(params.now.getTime() - REQUEST_TTL_HOURS * 3600_000).toISOString();
   const stale = await db
     .prepare(
-      `SELECT b.id, b.line_account_id, b.starts_at,
+      `SELECT b.id, b.line_account_id, b.friend_id, b.starts_at,
               m.name AS menu_name,
               s.display_name AS staff_name,
               la.channel_access_token,
@@ -74,6 +76,21 @@ export async function runExpirer(
       )
       .bind(row.id)
       .run();
+    // N-065: 期限切れも取消と同じく V6 の未送信予定だけを止める。送信済み履歴は残す。
+    // 1件の失敗で残り200件を止めないよう行単位で握る。失敗行は末尾の修復走査で拾い直す。
+    try {
+      await cancelByTrigger(db, {
+        triggerType: 'booking',
+        sourceId: row.id,
+        sourceEventId: row.id,
+        friendId: row.friend_id,
+        startsAtIso: row.starts_at,
+        lineAccountId: row.line_account_id,
+        cancelReason: `booking_expired:${row.id}:by:system`,
+      });
+    } catch (error) {
+      console.error('reminder cancel (booking expired) failed:', error);
+    }
     try {
       const accessToken = await resolveLineCredential(
         row.channel_access_token_encrypted,
@@ -95,6 +112,45 @@ export async function runExpirer(
       // 通知失敗は許容、expirer 自体は完了
     }
     expired++;
+  }
+
+  // 部分失敗の回復: 業務は終わっているのに V6 が active のまま残った行を止める。
+  // V6 取消が投げた行は次回 cron で拾い直す。手動取消・却下の取りこぼしも
+  // source 連動に限って拾う。legacy・手動登録には触れない。
+  // 修復自体の失敗で期限切れを壊さないよう外側でも握る。
+  try {
+    const leftovers = await db
+      .prepare(
+        `SELECT b.id, b.line_account_id, b.friend_id, b.starts_at
+           FROM bookings b
+          WHERE b.status IN ('expired', 'cancelled', 'rejected')
+            AND EXISTS (
+              SELECT 1 FROM friend_reminders fr
+               WHERE fr.status = 'active' AND fr.source_kind = 'booking'
+                 AND (fr.source_id = b.id OR fr.source_event_id = b.id)
+            )
+          LIMIT 50`,
+      )
+      .all<StaleRow>();
+    for (const row of leftovers.results ?? []) {
+      try {
+        await cancelByTrigger(db, {
+          triggerType: 'booking',
+          sourceKind: 'booking',
+          sourceId: row.id,
+          sourceEventId: row.id,
+          friendId: row.friend_id,
+          startsAtIso: row.starts_at,
+          lineAccountId: row.line_account_id,
+          cancelReason: `booking_repair:${row.id}:by:system`,
+          allowLegacyFallback: false,
+        });
+      } catch (error) {
+        console.error('reminder repair (booking leftover) failed:', error);
+      }
+    }
+  } catch (error) {
+    console.error('reminder repair (booking leftover scan) failed:', error);
   }
 
   const idempotencyPurged = await purgeExpiredIdempotency(db, params.now);
