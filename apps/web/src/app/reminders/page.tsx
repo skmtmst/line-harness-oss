@@ -12,7 +12,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import ListKpis from '@/components/shared/list-kpis'
 import { PRESETS as LIST_STATE_PRESETS } from '@/components/shared/list-state'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
-import FolderPanel, { FOLDER_RAIL_GRID_CLASS, FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import Button from '@/components/shared/button'
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -149,7 +149,7 @@ export default function RemindersPage() {
     <div className="mb-3 flex gap-2"><Button href="/reminders/new" variant="primary">リマインダを作成</Button></div>
     {error ? <div className="bg-danger-bg text-danger mb-3 rounded-lg p-3 text-sm">{LIST_STATE_PRESETS.error.title}。{LIST_STATE_PRESETS.error.description}</div> : null}
     {moveError ? <div className="bg-danger-bg text-danger mb-3 rounded-lg p-3 text-sm">{moveError}</div> : null}
-    <div data-design="Body" style={FOLDER_RAIL_STYLE} className={`grid gap-4 ${FOLDER_RAIL_GRID_CLASS}`}>
+    <div data-design="Body" style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
       {foldersError ? <div className="bg-danger-bg text-danger rounded-lg p-3 text-sm lg:col-span-2">フォルダを読み込めませんでした。<Button className="ml-2" onClick={() => void loadFolders()}>フォルダを再読み込み</Button></div> : null}
       <FolderPanel
         total={loading || error ? '—' : `${listTotal}件`}

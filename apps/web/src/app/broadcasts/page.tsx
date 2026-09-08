@@ -10,7 +10,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import BroadcastKpis from '@/components/broadcasts/broadcast-kpis'
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
 import BroadcastDetail from '@/components/broadcasts/broadcast-detail'
-import FolderPanel, { FOLDER_RAIL_GRID_CLASS, FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import ListState from '@/components/shared/list-state'
 import { audienceSummary, rowExcerpt } from '@/lib/broadcast-summary'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
@@ -435,7 +435,7 @@ function BroadcastList() {
       {/* 一覧本体（設計 `Body`）。 */}
       <div data-design="Body">
           {/* 設計はフォルダを左の縦パネルに置く。タグ・シナリオと同じ形。 */}
-          <div style={FOLDER_RAIL_STYLE} className={`grid gap-4 ${FOLDER_RAIL_GRID_CLASS}`}>
+          <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
             {/*
               件数は読み込んだ範囲での数。まだ奥があるときだけ口の total を
               総数に出す(読み込んだ分だけを総数に見せない)。全部読めていれば

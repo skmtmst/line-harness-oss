@@ -21,7 +21,7 @@ import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
-import FolderPanel, { FOLDER_RAIL_GRID_CLASS, FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -627,7 +627,7 @@ function InflowLinksPageInner() {
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><Button href="/inflow-links/new" variant="primary">＋ 流入リンクをつくる</Button><div className="flex gap-2"><Button onClick={exportCurrentRows} disabled={sortedRows.length === 0}>CSVで書き出す</Button><Button variant="secondary">まとめて操作</Button></div></div>
 
-      <div style={FOLDER_RAIL_STYLE} className={`grid gap-5 ${FOLDER_RAIL_GRID_CLASS}`}>
+      <div style={FOLDER_RAIL_STYLE} className="grid gap-5 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
           total={`${accountFilteredRows.length}件`}
           activeId={selectedGenre}

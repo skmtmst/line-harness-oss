@@ -3,7 +3,7 @@
 import SelectField from '@/components/shared/select-field'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Trash2, TriangleAlert } from 'lucide-react'
-import FolderPanel, { FOLDER_RAIL_GRID_CLASS, FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import { toDraft } from '@/components/auto-replies/edit-dialog'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import type { Folder } from '@line-crm/shared'
@@ -632,7 +632,7 @@ export default function AutoRepliesPage() {
         />
       )}
 
-      <div style={FOLDER_RAIL_STYLE} className={`grid gap-4 ${FOLDER_RAIL_GRID_CLASS}`}>
+      <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
           total={ready ? `${visualTotal} 件` : '—'}
           activeId={folderFilter}

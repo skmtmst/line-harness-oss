@@ -13,7 +13,7 @@ import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import type { FormLayout } from '@line-crm/shared'
 import { hasStoredDestination, summarizeFormDestinations } from './form-destination-summary'
-import FolderPanel, { FOLDER_RAIL_GRID_CLASS, FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import './form-submissions.css'
 
@@ -259,7 +259,7 @@ export default function FormSubmissionsPage() {
         )}
       </div>
 
-      <div style={FOLDER_RAIL_STYLE} className={`grid items-start gap-4 ${FOLDER_RAIL_GRID_CLASS}`}>
+      <div style={FOLDER_RAIL_STYLE} className="grid items-start gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
           total={loading || loadError ? '— 件' : `${formTotal} 件`}
           activeId={activeFolderId}

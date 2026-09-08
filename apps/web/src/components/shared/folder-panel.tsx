@@ -8,7 +8,6 @@ export const FOLDER_RAIL_WIDTH = '15.75rem'
 export const FOLDER_RAIL_STYLE = {
   '--folder-rail-width': FOLDER_RAIL_WIDTH,
 } as CSSProperties
-export const FOLDER_RAIL_GRID_CLASS = 'lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]'
 
 /**
  * 一覧の左に置くフォルダの縦パネル。

@@ -8,7 +8,7 @@ import { api, ApiError } from '@/lib/api'
 import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
 import type { RichMenuDeleteImpact, RichMenuTapStats } from '@/lib/api'
 import type { Folder } from '@line-crm/shared'
-import FolderPanel, { FOLDER_RAIL_GRID_CLASS, FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -699,7 +699,7 @@ export default function RichMenusListPage() {
       )}
 
       {selectedAccount && (
-        <div style={FOLDER_RAIL_STYLE} className={`grid gap-4 ${FOLDER_RAIL_GRID_CLASS}`}>
+        <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
           <FolderPanel
             total={`${folders.length + 1}`}
             activeId={folderFilter}

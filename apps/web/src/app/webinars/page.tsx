@@ -8,7 +8,7 @@ import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import './webinars.css'
-import FolderPanel, { FOLDER_RAIL_GRID_CLASS, FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import { webinarLoadFailure, type WebinarLoadFailure } from './webinar-load-failure'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError, webinarApi, type Webinar, type WebinarFolder, type WebinarListItem, type WebinarOverview } from '@/lib/api'
@@ -401,7 +401,7 @@ export default function WebinarsPage() {
           <Button variant="primary" href="/webinars/new">ウェビナーを作成</Button>
         </div>
 
-        <div style={FOLDER_RAIL_STYLE} className={`grid gap-4 ${FOLDER_RAIL_GRID_CLASS}`}>
+        <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
           <FolderPanel
             total={hasListData ? `${visibleItems.length}件` : '—'}
             activeId={selectedFolder}

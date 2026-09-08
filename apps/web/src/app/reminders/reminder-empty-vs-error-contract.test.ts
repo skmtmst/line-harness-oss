@@ -23,7 +23,7 @@ const LIST_STATE = readFileSync(
  */
 describe('リマインダ一覧の空と失敗', () => {
   it('一覧のフォルダ欄を共通パネルの統一幅で表示する', () => {
-    expect(PAGE).toContain('FOLDER_RAIL_GRID_CLASS')
+    expect(PAGE).toContain('lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]')
     expect(PAGE).toContain('style={FOLDER_RAIL_STYLE}')
     expect(PAGE).toContain('onAddFolder={() => setFolderDialogOpen(true)}')
     expect(PAGE).not.toContain('lg:grid-cols-[13rem_minmax(0,1fr)]')

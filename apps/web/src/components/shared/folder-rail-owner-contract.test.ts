@@ -20,7 +20,7 @@ const GRID_PAGES = [
 describe('オーナー指示 #582 のフォルダ欄', () => {
   it.each(GRID_PAGES)('%s は共通幅を使う', (relativePath) => {
     const page = readFileSync(resolve(APP, relativePath), 'utf8')
-    expect(page).toContain('FOLDER_RAIL_GRID_CLASS')
+    expect(page).toContain('lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]')
     expect(page).toContain('style={FOLDER_RAIL_STYLE}')
     expect(page).not.toContain('lg:grid-cols-[16rem_minmax(0,1fr)]')
   })

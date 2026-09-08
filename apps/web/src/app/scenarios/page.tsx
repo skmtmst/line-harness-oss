@@ -16,7 +16,7 @@ function scenarioCompletionDetail(active: number, completed: number): string {
 import type { Folder } from '@line-crm/shared'
 import ListKpis from '@/components/shared/list-kpis'
 import ListToolbar from '@/components/shared/list-toolbar'
-import FolderPanel, { FOLDER_RAIL_GRID_CLASS, FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -455,7 +455,7 @@ export default function ScenariosPage() {
         いないので（列が無い）、いまは「すべて」だけ。分類できるように
         なったらここに並ぶ。
       */}
-      <div style={FOLDER_RAIL_STYLE} className={`grid gap-4 ${FOLDER_RAIL_GRID_CLASS}`}>
+      <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
           total={`${scenarioList.total} 件`}
           activeId={folderFilter}

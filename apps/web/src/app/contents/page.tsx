@@ -23,7 +23,7 @@ import {
 } from './media-delete-impact'
 import Pagination from '@/components/shared/pagination'
 import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel, { FOLDER_RAIL_GRID_CLASS, FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import SearchField from '@/components/shared/search-field'
@@ -523,7 +523,7 @@ export default function MediaLibraryPage() {
         </div>
       </div>
 
-      <div style={FOLDER_RAIL_STYLE} className={`grid gap-4 ${FOLDER_RAIL_GRID_CLASS}`}>
+      <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <div className="min-w-0">
         <FolderPanel
           total={`${folders.length + 1}`}

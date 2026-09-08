@@ -10,7 +10,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import IconButton from '@/components/shared/icon-button'
 import ListToolbar from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
-import FolderPanel, { FOLDER_RAIL_GRID_CLASS, FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import StatusBadge from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
 import { Tabs } from '@/components/shared/tabs'
@@ -232,7 +232,7 @@ function FriendAddSettingsList() {
       </div>
       <p className="text-ink-faint my-2 text-xs">この2つを分けないと、以前からのお客さまに「はじめまして」が届きます。</p>
 
-      <div style={FOLDER_RAIL_STYLE} className={`grid items-start gap-4 ${FOLDER_RAIL_GRID_CLASS}`}>
+      <div style={FOLDER_RAIL_STYLE} className="grid items-start gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
           total={`${data?.total ?? data?.items.length ?? 0}件`}
           activeId={folder ?? ''}

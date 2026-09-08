@@ -15,7 +15,7 @@ const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
  */
 describe('V6 流入経路一覧の契約', () => {
   it('共通フォルダ欄の統一幅を使い、追加ボタンを欄内だけに置く', () => {
-    expect(PAGE).toContain('FOLDER_RAIL_GRID_CLASS')
+    expect(PAGE).toContain('lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]')
     expect(PAGE).toContain('style={FOLDER_RAIL_STYLE}')
     expect(PAGE).not.toContain('選ぶと右側のリンクが切り替わります')
     expect(PAGE).toContain("onAddFolder={() => setEditingGenre('new')}")
