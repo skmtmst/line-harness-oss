@@ -177,6 +177,25 @@ export default function MediaLibraryPage() {
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null)
   /** 大きく出している札。押した札の中身を原寸で見せる。 */
   const [preview, setPreview] = useState<MediaItem | null>(null)
+  /*
+    名前変更・削除・フォルダ追加は管理者（owner/admin）だけ（N-197）。
+    staff には押して失敗する口を見せず、理由を添えて無効化する。
+    一覧・ダウンロード・登録・版追加は staff も使えるので混同しない。
+  */
+  const [canManageMedia, setCanManageMedia] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    void api.staff.me().then((response) => {
+      if (!active || !response.success) return
+      setCanManageMedia(response.data.role === 'owner' || response.data.role === 'admin')
+    }).catch(() => {
+      if (active) setCanManageMedia(false)
+    })
+    return () => {
+      active = false
+    }
+  }, [])
 
   useEffect(() => {
     /*
@@ -571,6 +590,11 @@ export default function MediaLibraryPage() {
             setPage(1)
           }}
           onAddFolder={() => setAddingFolder(true)}
+          addFolderDisabled={!canManageMedia}
+          addFolderTitle={canManageMedia ? undefined : 'フォルダの追加は管理者だけができます'}
+          addFolderNote={canManageMedia ? undefined : (
+            <p className="text-ink-faint text-xs">フォルダの追加は管理者だけができます。</p>
+          )}
           rows={[
             { id: '', label: 'すべて', count: total },
             ...folders.map((folder) => ({
@@ -874,6 +898,7 @@ export default function MediaLibraryPage() {
                   >
                     使用箇所
                   </button>
+                  {canManageMedia ? (
                   <button
                     onClick={() => { setRenameError(''); setRenaming({ id: item.id, value: item.filename }) }}
                     title="名前を変える"
@@ -882,6 +907,7 @@ export default function MediaLibraryPage() {
                   >
                     編集
                   </button>
+                  ) : null}
                   <button
                     onClick={() => void downloadItem(item)}
                     disabled={downloadingIds.has(item.id)}
@@ -891,6 +917,7 @@ export default function MediaLibraryPage() {
                   >
                     {downloadingIds.has(item.id) ? '取得中…' : 'ダウンロード'}
                   </button>
+                  {canManageMedia ? (
                   <Button
                     type="button"
                     onClick={() => void openDelete(item)}
@@ -899,6 +926,7 @@ export default function MediaLibraryPage() {
                   >
                     削除
                   </Button>
+                  ) : null}
                 </div>
 
               </div>
@@ -1067,6 +1095,7 @@ export default function MediaLibraryPage() {
             />
             すべてのメディアを選択
           </label>
+          {canManageMedia ? (
           <button
             onClick={() => void removeSelected()}
             disabled={selected.size === 0}
@@ -1075,6 +1104,9 @@ export default function MediaLibraryPage() {
             選択したメディアを削除
             {selected.size > 0 && <span className="tabular-nums">（{selected.size}）</span>}
           </button>
+          ) : (
+            <p className="text-ink-faint text-xs">名前の変更・削除は管理者だけができます。</p>
+          )}
         </div>
       </div>
         </div>
