@@ -45,6 +45,15 @@ export default function NewTagPageV4() {
       setError('タグ名を入力してください')
       return
     }
+    // 旧画面にあった作る前の検査を、実際に表示するこの画面へ移した。
+    if (values.name.trim().length > 80) {
+      setError('タグ名は80文字までで入力してください')
+      return
+    }
+    if ([...values.name].some((ch) => { const code = ch.charCodeAt(0); return code < 32 || code === 127 })) {
+      setError('タグ名に使えない文字が含まれています')
+      return
+    }
     if (!selectedAccountId) {
       setError('LINE公式アカウントを選んでください')
       return

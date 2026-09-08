@@ -37,6 +37,7 @@ import {
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { WEBINAR_SAKURA_COMMENTS_MAX } from '@/components/webinars/webinar-limits'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
+import { webinarErrorText } from '@/components/webinars/webinar-error-text'
 
 function fmtSec(sec: number): string {
   // 負 = 開始前 (待機ルーム) の相対時刻。-330 → -5:30
@@ -179,7 +180,7 @@ function CommentsTab({ webinarId }: { webinarId: string }) {
       setMessage(`${res.data.count}件保存しました`)
     } catch (err) {
       setIsErrorMessage(true)
-      setMessage(`保存に失敗しました: ${err instanceof Error ? err.message : String(err)}`)
+      setMessage(`保存に失敗しました: ${webinarErrorText(err, '保存できませんでした。入力を見直してください。')}`)
     }
   }
 
@@ -344,26 +345,29 @@ function ParticipantAvatar({
   size?: 'sm' | 'md' | 'lg'
 }) {
   const sizeClass = size === 'lg' ? 'h-11 w-11 text-sm' : size === 'sm' ? 'h-7 w-7 text-[10px]' : 'h-9 w-9 text-xs'
-  if (pictureUrl) {
+  // 外部 URL は https だけ読み、http 等は頭文字表示に落とす。
+  if (pictureUrl && pictureUrl.startsWith('https://')) {
     return (
       <img
         src={pictureUrl}
         alt=""
-        className={`${sizeClass} shrink-0 rounded-full bg-slate-100 object-cover ring-2 ring-white`}
+        referrerPolicy="no-referrer"
+        className={`${sizeClass} shrink-0 rounded-full bg-canvas-sunken object-cover ring-2 ring-canvas`}
       />
     )
   }
   return (
-    <span className={`${sizeClass} flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 font-bold text-blue-700 ring-2 ring-white`}>
+    <span className={`${sizeClass} flex shrink-0 items-center justify-center rounded-full bg-info-bg font-bold text-info ring-2 ring-canvas`}>
       {name.trim().charAt(0) || '?'}
     </span>
   )
 }
 
-function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytics, analyticsState }: { webinarId: string; durationSeconds: number; view?: 'participants' | 'analytics' | 'legacy'; analytics: WebinarAnalytics | null; analyticsState: 'idle' | 'loading' | 'ready' | 'error' }) {
+function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytics, analyticsState, onRetry }: { webinarId: string; durationSeconds: number; view?: 'participants' | 'analytics' | 'legacy'; analytics: WebinarAnalytics | null; analyticsState: 'idle' | 'loading' | 'ready' | 'error'; onRetry: () => void }) {
   const [userComments, setUserComments] = useState<WebinarUserComment[]>([])
   const [participantPage, setParticipantPage] = useState<WebinarParticipantPage | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
 
   /*
     集計(`analytics`)は親が1回だけ取る。ここで取ると、分析の段を開くたびに
@@ -371,18 +375,20 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
   */
   useEffect(() => {
     setError(null)
-    Promise.all([webinarApi.userComments(webinarId), webinarApi.participants(webinarId)])
+    // 参加者は8件だけ表示するので、初回は8件取得に抑える。
+    Promise.all([webinarApi.userComments(webinarId), webinarApi.participants(webinarId, undefined, 8)])
       .then(([commentsRes, participantsRes]) => {
         setUserComments(commentsRes.data)
         setParticipantPage(participantsRes.data)
       })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)))
-  }, [webinarId])
+  }, [webinarId, attempt])
 
   if (error || analyticsState === 'error') {
     return (
       <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
-        分析データを読み込めませんでした。ページを再読み込みしてください。
+        <p>分析データを読み込めませんでした。</p>
+        <button type="button" onClick={() => { setAttempt((count) => count + 1); onRetry() }} className="mt-1 font-medium underline">もう一度読み込む</button>
       </div>
     )
   }
@@ -447,7 +453,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
             ['CTAクリック', `${summary.ctaClicks.toLocaleString('ja-JP')}人`],
             ['申込転換', percent(summary.ctaClicks, summary.reservations)],
           ]} previewBody={analytics.measurement?.state === 'available' ? 'もっとも視聴された区間を分析できます。' : analytics.measurement?.reason ?? '視聴区間の集計はまだ取得できていません。'}>
-            <div className="flex gap-2"><Button disabled>テスト送信</Button><Button disabled>公開ページを見る</Button></div>
+            <div className="flex gap-2"><Button disabled title="分析の段では実行できません">テスト送信</Button><Button disabled title="分析の段では実行できません">公開ページを見る</Button></div>
           </SummaryAside>
         </div>
       </div>
@@ -919,14 +925,14 @@ function VideoDesignStep({ webinar, editor, registrations }: { webinar: Webinar;
             <div className="border-hairline flex items-center justify-between gap-4 rounded-control border bg-canvas-sunken px-4 py-4"><div><p className="text-ink text-sm font-bold">視聴条件</p><p className="text-ink-faint mt-1 text-xs">{editor.viewingCondition.label}</p></div><span className="text-action">›</span></div>
           </div>
         </section>
-        <EditorDetails label="動画・公開の詳細を編集する"><WebinarForm initial={webinar} /></EditorDetails>
+        <EditorDetails label="動画・公開の詳細を編集する"><WebinarForm key={`${webinar.id}-${webinar.updatedAt}`} initial={webinar} /></EditorDetails>
       </div>
       <SummaryAside rows={[
         ['動画', webinar.videoPrefix ? 'アップロード済み' : '未設定'],
         ['公開', webinarStatusLabel(webinar.status)],
         ['申込', registrations === null ? '—（未取得）' : `${registrations.toLocaleString('ja-JP')}人`],
       ]} previewBody={videoPreview(webinar).body ?? videoPreview(webinar).empty}>
-        <div className="flex gap-2"><Button disabled>テスト送信</Button><Button disabled={!webinar.videoPrefix}>公開ページを見る</Button></div>
+        <div className="flex gap-2"><Button disabled title="確認の段で実行します">テスト送信</Button><Button disabled={!webinar.videoPrefix} title={webinar.videoPrefix ? undefined : '動画をアップロードすると見られます'}>公開ページを見る</Button></div>
       </SummaryAside>
     </div>
   )
@@ -936,6 +942,7 @@ function NotificationDesignStep({ webinarId, registrations }: { webinarId: strin
   const [settings, setSettings] = useState<WebinarNotificationSettings | null>(null)
   const [settingsReady, setSettingsReady] = useState(false)
   const [settingsFailed, setSettingsFailed] = useState(false)
+  const [notifAttempt, setNotifAttempt] = useState(0)
   const [editor, setEditor] = useState<WebinarEditor | null>(null)
 
   /*
@@ -986,7 +993,16 @@ function NotificationDesignStep({ webinarId, registrations }: { webinarId: strin
             <div className="px-4 py-4"><dt className="text-ink text-sm font-bold">見逃し案内</dt><dd className="text-ink-faint mt-1 text-xs">未視聴者へ翌日{settings?.missedTime ?? '—'}に送信</dd></div>
           </dl>
         </section>
-        <EditorDetails label="通知ごとの送信設定を編集する"><WebinarNotifications webinarId={webinarId} onLoaded={handleNotificationsLoaded} /></EditorDetails>
+        {settingsFailed && (
+          <button
+            type="button"
+            onClick={() => { setSettingsReady(false); setSettingsFailed(false); setNotifAttempt((count) => count + 1) }}
+            className="text-accent text-xs font-medium underline"
+          >
+            通知の設定をもう一度読み込む
+          </button>
+        )}
+        <EditorDetails label="通知ごとの送信設定を編集する"><WebinarNotifications key={notifAttempt} webinarId={webinarId} onLoaded={handleNotificationsLoaded} /></EditorDetails>
       </div>
       <SummaryAside rows={[
         ['申込完了', enabled(settings?.registrationEnabled)],
@@ -1087,7 +1103,14 @@ function CtasTab({ webinarId, accountId, onCtasLoaded }: { webinarId: string; ac
         指定時間にチャット欄へ CTA カードが流れます。「フォーム」はウェビナー内でそのまま回答でき、
         フォーム機能のタグ付与・シナリオ発火が自動で動きます。「URL」は外部ページを開きます。
       </p>
-      {message && <p className="rounded bg-blue-50 p-2 text-sm">{message}</p>}
+      {message && (
+        <p className="rounded bg-blue-50 p-2 text-sm">
+          {message}
+          {!loaded && (
+            <button type="button" onClick={() => void loadCtas()} className="ml-2 font-medium underline">もう一度読み込む</button>
+          )}
+        </p>
+      )}
       {ctas.map((c, i) => (
         <div key={i} className="space-y-2 rounded border border-gray-200 p-3">
           <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -1221,7 +1244,7 @@ function CtaDesignStep({ webinarId, accountId, editor, registrations }: { webina
         ['フォーム', primary?.formId ? '公開中' : '未設定'],
         ['申込', registrations === null ? '—（未取得）' : `${registrations.toLocaleString('ja-JP')}人`],
       ]} previewBody={primary?.body || 'CTAの説明文はまだ設定されていません。'} previewButton={primary?.buttonLabel || null}>
-        <div className="flex gap-2"><Button disabled>テスト送信</Button><Button disabled>公開ページを見る</Button></div>
+        <div className="flex gap-2"><Button disabled title="確認の段で実行します">テスト送信</Button><Button disabled title="この段では実行できません">公開ページを見る</Button></div>
       </SummaryAside>
     </div>
   )
@@ -1398,7 +1421,7 @@ function PublicPreviewStep({
       onEditorChange(response.data)
       setTestNotice(response.data.publicPage.test?.status === 'passed' ? '公開ページを確認しました。' : '公開ページに未設定があります。')
     } catch (cause) {
-      setTestNotice(cause instanceof Error ? cause.message : '公開ページを確認できませんでした。')
+      setTestNotice(webinarErrorText(cause, '公開ページを確認できませんでした。'))
     } finally {
       setTesting(false)
     }
@@ -1465,7 +1488,7 @@ function ReviewStep({ webinar, editor, registrations, onBack }: { webinar: Webin
       await webinarApi.publish(webinar.id, editor.version)
       window.location.assign(`/webinars/published?id=${encodeURIComponent(webinar.id)}`)
     } catch (cause) {
-      setPublishError(cause instanceof Error ? cause.message : '公開できませんでした')
+      setPublishError(webinarErrorText(cause, '公開できませんでした'))
       setPublishing(false)
     }
   }
@@ -1570,7 +1593,7 @@ function EditWebinarInner() {
         setWebinar(webinarResponse.data)
         setEditor(editorResponse.data)
       })
-      .catch((err) => setLoadError(err instanceof Error ? err.message : String(err)))
+      .catch((err) => setLoadError(webinarErrorText(err, '読み込めませんでした。開き直してください。')))
       .finally(() => setLoading(false))
   }, [id])
 
@@ -1612,7 +1635,7 @@ function EditWebinarInner() {
     return (
       <>
 
-        <div className="p-6 text-red-700">id クエリが必要です</div>
+        <div className="p-6 text-red-700">開き直してください。一覧から選び直すと表示できます。</div>
       </>
     )
   }
@@ -1715,7 +1738,7 @@ function EditWebinarInner() {
         </ol>
       ) : null}
 
-      {pane === 'basic' && <WebinarForm initial={webinar} />}
+      {pane === 'basic' && <WebinarForm key={`${webinar.id}-${webinar.updatedAt}`} initial={webinar} />}
       {pane === 'video' && <VideoDesignStep webinar={webinar} editor={editor} registrations={registrations} />}
       {pane === 'cta' && <CtaDesignStep webinarId={webinar.id} accountId={webinar.accountId} editor={editor} registrations={registrations} />}
       {pane === 'notifications' && <NotificationDesignStep webinarId={webinar.id} registrations={registrations} />}
@@ -1723,8 +1746,8 @@ function EditWebinarInner() {
       {pane === 'comments' && <CommentsTab webinarId={webinar.id} />}
       {pane === 'actions' && <WebinarActionsTab webinarId={webinar.id} editor={editor} onEditorChange={setEditor} />}
       {pane === 'preview' && <PublicPreviewStep webinar={webinar} editor={editor} publicUrl={publicUrl} registrations={registrations} publicPageReason={publicPageReason} onEditorChange={setEditor} />}
-      {pane === 'participants' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} view="participants" analytics={analytics} analyticsState={analyticsState} />}
-      {pane === 'analytics' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} analytics={analytics} analyticsState={analyticsState} />}
+      {pane === 'participants' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} view="participants" analytics={analytics} analyticsState={analyticsState} onRetry={() => { setAnalytics(null); setAnalyticsId(null); setAnalyticsState('idle') }} />}
+      {pane === 'analytics' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} analytics={analytics} analyticsState={analyticsState} onRetry={() => { setAnalytics(null); setAnalyticsId(null); setAnalyticsState('idle') }} />}
 
       {showSteps && nextPane && nextPaneLabel ? (
         <div className="border-hairline bg-canvas fixed inset-x-0 bottom-0 z-20 flex justify-end border-t px-8 py-3 shadow-card"><div className="flex gap-2"><Button disabled>下書き保存</Button><Button variant="primary" onClick={() => setPane(nextPane)}>{nextPaneLabel}</Button></div></div>

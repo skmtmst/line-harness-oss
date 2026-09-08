@@ -208,9 +208,14 @@ function ConditionGroup({
       <h2 className="text-base font-bold text-ink">{title}（{operator}）</h2>
       {items.length === 0 ? <p className="mt-2 text-xs text-ink-faint">条件はまだありません。必要な場合だけ追加します。</p> : null}
       <div className="mt-3 space-y-2">
+        {/*
+          行のキーは位置で固定する。種類＋添字にすると、種類を変えた
+          行が作り直されて入力内容・フォーカスが飛ぶ。保存する条件の
+          形は変えていない(並び替え操作は無い)。
+        */}
         {items.map((condition, index) => (
           <ConditionEditor
-            key={`${condition.kind}-${index}`}
+            key={`condition-${index}`}
             condition={condition}
             tags={tags}
             marks={marks}

@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = fs.readFileSync(path.join(process.cwd(), 'src/app/tags/new/page.tsx'), 'utf8')
+const PAGE = fs.readFileSync(path.join(process.cwd(), 'src/components/friend-fields/new-tag-page-v4.tsx'), 'utf8')
 const API = fs.readFileSync(path.join(process.cwd(), 'src/lib/api.ts'), 'utf8')
 
 describe('タグ作成の名前検査の契約', () => {
