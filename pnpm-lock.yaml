@@ -265,6 +265,9 @@ importers:
       better-sqlite3:
         specifier: ^12.9.0
         version: 12.11.1
+      miniflare:
+        specifier: 4.20260317.2
+        version: 4.20260317.2(@types/node@25.5.0)
       tailwindcss:
         specifier: ^4.0.0
         version: 4.2.2
@@ -280,6 +283,9 @@ importers:
       vitest:
         specifier: ^3.2.6
         version: 3.2.7(@types/debug@4.1.13)(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.23.0)(yaml@2.9.0)
+      workerd:
+        specifier: 1.20260903.1
+        version: 1.20260903.1
       wrangler:
         specifier: 4.77.0
         version: 4.77.0(@cloudflare/workers-types@4.20260317.1)(@types/node@25.5.0)
@@ -10764,7 +10770,6 @@ snapshots:
       '@cloudflare/workerd-linux-64': 1.20260903.1
       '@cloudflare/workerd-linux-arm64': 1.20260903.1
       '@cloudflare/workerd-windows-64': 1.20260903.1
-    optional: true
 
   wrangler@4.77.0(@cloudflare/workers-types@4.20260317.1)(@types/node@22.19.15):
     dependencies:

@@ -302,8 +302,18 @@ describe('sendAdConversions のアカウント境界(#638)', () => {
     expect(xBody.conversions[0]).toMatchObject({
       event_id: 'x:evt-2:p1',
       value: '1000.00',
+      number_items: 1,
     });
     expect(xBody.conversions[0]).not.toHaveProperty('event_name');
+    // Xのサーバー側Conversion APIのevent項目に通貨は無い。公式手順書の例は
+    // value(小数文字列)/number_itemsのみで、通貨相当はWebピクセル側の
+    // price_currencyに分離されている。余計な項目を送らないよう鍵集合を固定する。
+    // (docs.x.com/x-ads-api/measurement/web-conversions.md の例と
+    //  stape-io/twitter-tag の対応表で確認。2026-09-09)
+    expect(Object.keys(xBody.conversions[0]).sort()).toEqual(
+      ['conversion_time', 'event_id', 'identifiers', 'number_items', 'value'],
+    );
+    expect(xBody.conversions[0]).not.toHaveProperty('currency');
   });
 
   it('送信失敗は failed で記録し投げない。1回の呼び出しで1媒体へ1回だけ送る', async () => {
