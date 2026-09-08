@@ -28,6 +28,8 @@ export interface AdPlatformConfig {
   // X
   api_key?: string;
   api_secret?: string;
+  x_oauth_token?: string;
+  x_oauth_token_secret?: string;
   // Google
   customer_id?: string;
   conversion_action_id?: string;
@@ -73,10 +75,17 @@ export async function getActiveAdPlatforms(
 export async function getAdPlatformByName(
   db: D1Database,
   name: string,
+  lineAccountId?: string | null,
 ): Promise<AdPlatform | null> {
+  if (lineAccountId === undefined) {
+    return db
+      .prepare(`SELECT * FROM ad_platforms WHERE name = ? AND is_active = 1`)
+      .bind(name)
+      .first<AdPlatform>();
+  }
   return db
-    .prepare(`SELECT * FROM ad_platforms WHERE name = ? AND is_active = 1`)
-    .bind(name)
+    .prepare(`SELECT * FROM ad_platforms WHERE name = ? AND is_active = 1 AND line_account_id = ?`)
+    .bind(name, lineAccountId)
     .first<AdPlatform>();
 }
 
@@ -101,6 +110,10 @@ export async function createAdPlatform(
   db: D1Database,
   input: { name: string; displayName?: string | null; config: Record<string, unknown>; lineAccountId?: string | null },
 ): Promise<AdPlatform> {
+  // 帰属のない設定は送信対象にならない。DBトリガと二重で必須化する。
+  if (!input.lineAccountId) {
+    throw new AdPlatformAccountMismatchError('ad_platforms の作成には lineAccountId が必須です');
+  }
   const id = crypto.randomUUID();
   const now = jstNow();
 
@@ -109,7 +122,7 @@ export async function createAdPlatform(
       `INSERT INTO ad_platforms (id, name, display_name, config, is_active, line_account_id, created_at, updated_at)
        VALUES (?, ?, ?, ?, 1, ?, ?, ?)`,
     )
-    .bind(id, input.name, input.displayName ?? null, JSON.stringify(input.config), input.lineAccountId ?? null, now, now)
+    .bind(id, input.name, input.displayName ?? null, JSON.stringify(input.config), input.lineAccountId, now, now)
     .run();
 
   return (await db
@@ -127,6 +140,11 @@ export async function updateAdPlatform(
   const fields: string[] = ['updated_at = ?'];
   const values: unknown[] = [now];
 
+  // 帰属を null へ戻す変更は受け付けない(DBトリガと二重で必須化する)。
+  if (input.lineAccountId !== undefined && !input.lineAccountId) {
+    throw new AdPlatformAccountMismatchError('ad_platforms の lineAccountId を空にはできません');
+  }
+
   if (input.name !== undefined) { fields.push('name = ?'); values.push(input.name); }
   if (input.displayName !== undefined) { fields.push('display_name = ?'); values.push(input.displayName); }
   if (input.config !== undefined) { fields.push('config = ?'); values.push(JSON.stringify(input.config)); }
@@ -141,6 +159,82 @@ export async function updateAdPlatform(
     .run();
 
   return db.prepare(`SELECT * FROM ad_platforms WHERE id = ?`).bind(id).first<AdPlatform>();
+}
+
+/** 書き込み時の所属条件。認可済みのアカウントだけを1文で絞る(TOCTOU対策)。 */
+export interface AdPlatformWriteScope {
+  accountIds: string[];
+  includeUnassigned: boolean;
+}
+
+export function adPlatformAccountCondition(
+  column: string,
+  scope: AdPlatformWriteScope,
+): { clause: string; bindings: unknown[] } {
+  if (scope.accountIds.length) {
+    const list = scope.accountIds.map(() => '?').join(',');
+    return scope.includeUnassigned
+      ? { clause: `(${column} IN (${list}) OR ${column} IS NULL)`, bindings: [...scope.accountIds] }
+      : { clause: `${column} IN (${list})`, bindings: [...scope.accountIds] };
+  }
+  return scope.includeUnassigned
+    ? { clause: `${column} IS NULL`, bindings: [] }
+    : { clause: '1 = 0', bindings: [] };
+}
+
+function updateFieldClauses(input: {
+  name?: string; displayName?: string | null; config?: Record<string, unknown>; isActive?: boolean; lineAccountId?: string | null;
+}): { fields: string[]; values: unknown[] } {
+  if (input.lineAccountId !== undefined && !input.lineAccountId) {
+    throw new AdPlatformAccountMismatchError('ad_platforms の lineAccountId を空にはできません');
+  }
+  const fields: string[] = ['updated_at = ?'];
+  const values: unknown[] = [jstNow()];
+  if (input.name !== undefined) { fields.push('name = ?'); values.push(input.name); }
+  if (input.displayName !== undefined) { fields.push('display_name = ?'); values.push(input.displayName); }
+  if (input.config !== undefined) { fields.push('config = ?'); values.push(JSON.stringify(input.config)); }
+  if (input.isActive !== undefined) { fields.push('is_active = ?'); values.push(input.isActive ? 1 : 0); }
+  if (input.lineAccountId !== undefined) { fields.push('line_account_id = ?'); values.push(input.lineAccountId); }
+  return { fields, values };
+}
+
+/**
+ * 認可済み所属を WHERE に含めた条件付き更新。読み取りと書き込みの間に
+ * 帰属が変わっても、認可外の行には当たらない。適用行数を返す。
+ */
+export async function updateAdPlatformCAS(
+  db: D1Database,
+  id: string,
+  scope: AdPlatformWriteScope,
+  input: { name?: string; displayName?: string | null; config?: Record<string, unknown>; isActive?: boolean; lineAccountId?: string | null },
+): Promise<{ applied: boolean; platform: AdPlatform | null }> {
+  const { fields, values } = updateFieldClauses(input);
+  const cond = adPlatformAccountCondition('line_account_id', scope);
+  const result = await db
+    .prepare(`UPDATE ad_platforms SET ${fields.join(', ')} WHERE id = ? AND ${cond.clause}`)
+    .bind(...values, id, ...cond.bindings)
+    .run<{ success: boolean; meta?: { changes?: number } }>();
+  const changes = (result as unknown as { meta?: { changes?: number } }).meta?.changes ?? 0;
+  if (changes === 0) {
+    return { applied: false, platform: null };
+  }
+  const platform = await db.prepare(`SELECT * FROM ad_platforms WHERE id = ?`).bind(id).first<AdPlatform>();
+  return { applied: true, platform };
+}
+
+/** 認可済み所属を WHERE に含めた条件付き削除。削除行数を返す。 */
+export async function deleteAdPlatformCAS(
+  db: D1Database,
+  id: string,
+  scope: AdPlatformWriteScope,
+): Promise<boolean> {
+  const cond = adPlatformAccountCondition('line_account_id', scope);
+  const result = await db
+    .prepare(`DELETE FROM ad_platforms WHERE id = ? AND ${cond.clause}`)
+    .bind(id, ...cond.bindings)
+    .run<{ success: boolean; meta?: { changes?: number } }>();
+  const changes = (result as unknown as { meta?: { changes?: number } }).meta?.changes ?? 0;
+  return changes > 0;
 }
 
 export async function deleteAdPlatform(db: D1Database, id: string): Promise<void> {
@@ -168,13 +262,33 @@ export async function assertAdConversionAccountBoundary(
     .bind(opts.friendId)
     .first<{ line_account_id: string | null }>();
   const platformAccount = platform?.line_account_id ?? null;
-  const friendAccount = friend?.line_account_id ?? opts.lineAccountId ?? null;
+  // 呼び出しが確定した所属(再送時は初回確保分)を正とし、友だちの現所属は問わない。
+  // 友だちが移動した後に旧イベントを新所属へ誤送信しないため。
+  const friendAccount = opts.lineAccountId ?? friend?.line_account_id ?? null;
   if (!platform || !friend || platformAccount !== friendAccount) {
     throw new AdPlatformAccountMismatchError(
       `ad_conversion_logs の境界違反: platform=${opts.platformId} account=${platformAccount} friend=${opts.friendId} account=${friendAccount}`,
     );
   }
   return friendAccount;
+}
+
+/**
+ * 同じ(友だち・出来事・冪等キー)で初回に確保した所属を返す。
+ * 再送時は友だちの現所属ではなく、ここで固定した所属で送る。
+ */
+export async function getPinnedAdConversionAccount(
+  db: D1Database,
+  opts: { friendId: string; eventName: string; idempotencyKey: string },
+): Promise<string | null> {
+  const row = await db
+    .prepare(
+      `SELECT line_account_id FROM ad_conversion_logs
+       WHERE friend_id = ? AND event_name = ? AND idempotency_key = ? LIMIT 1`,
+    )
+    .bind(opts.friendId, opts.eventName, opts.idempotencyKey)
+    .first<{ line_account_id: string | null }>();
+  return row?.line_account_id ?? null;
 }
 
 export async function logAdConversion(
@@ -220,7 +334,20 @@ export async function logAdConversion(
     .run();
 }
 
-export type AdConversionClaim = 'send' | 'skip-sent' | 'skip-inflight';
+export type AdConversionClaim = 'send' | 'skip-sent' | 'skip-inflight' | 'mismatch';
+
+/** 送信中と見なす上限。超えた pending は落ちた確保と見て取り直せる。 */
+export const AD_CONVERSION_PENDING_TAKEOVER_MS = 30 * 60 * 1000;
+
+function conversionFingerprint(input: { clickId: string; clickIdType: string; eventValue?: number | null }): string {
+  return JSON.stringify({ c: `${input.clickIdType}:${input.clickId}`, v: input.eventValue ?? null });
+}
+
+function fingerprintMatches(stored: string | null, expected: string): boolean {
+  // 指紋のない旧行は比較できないので、状態の判定に任せる。
+  if (stored == null || stored === '') return true;
+  return stored === expected;
+}
 
 function isUniqueViolation(error: unknown): boolean {
   const message = error instanceof Error ? `${error.name} ${error.message}` : String(error);
@@ -241,18 +368,20 @@ export async function claimAdConversionSend(
     eventName: string;
     clickId: string;
     clickIdType: string;
+    eventValue?: number | null;
     idempotencyKey: string;
   },
 ): Promise<AdConversionClaim> {
   const friendAccount = await assertAdConversionAccountBoundary(db, opts);
   const now = jstNow();
+  const fingerprint = conversionFingerprint({ clickId: opts.clickId, clickIdType: opts.clickIdType, eventValue: opts.eventValue });
 
   try {
     await db
       .prepare(
         `INSERT INTO ad_conversion_logs
-         (id, ad_platform_id, friend_id, line_account_id, event_name, click_id, click_id_type, status, idempotency_key, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+         (id, ad_platform_id, friend_id, line_account_id, event_name, click_id, click_id_type, status, idempotency_key, request_body, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
       )
       .bind(
         crypto.randomUUID(),
@@ -263,6 +392,7 @@ export async function claimAdConversionSend(
         opts.clickId,
         opts.clickIdType,
         opts.idempotencyKey,
+        fingerprint,
         now,
       )
       .run();
@@ -273,22 +403,28 @@ export async function claimAdConversionSend(
 
   const existing = await db
     .prepare(
-      `SELECT status FROM ad_conversion_logs
+      `SELECT status, click_id, click_id_type, request_body, created_at FROM ad_conversion_logs
        WHERE ad_platform_id = ? AND friend_id = ? AND event_name = ? AND idempotency_key = ?`,
     )
     .bind(opts.platformId, opts.friendId, opts.eventName, opts.idempotencyKey)
-    .first<{ status: string }>();
+    .first<{ status: string; click_id: string | null; click_id_type: string | null; request_body: string | null; created_at: string }>();
   if (!existing) return 'send';
+  // 同じ鍵で金額・クリックID等が変われば別内容。再送ではなく拒否する。
+  if (!fingerprintMatches(existing.request_body, fingerprint)) return 'mismatch';
   if (existing.status === 'sent') return 'skip-sent';
-  if (existing.status === 'pending') return 'skip-inflight';
-  // 失敗済みは1回だけ取り直す。同時に取り合ったら勝った1件だけ送る。
+  if (existing.status === 'pending') {
+    // 確保したまま落ちた分は永久に止めない。古い pending だけ取り直す。
+    const ageMs = Date.now() - Date.parse(existing.created_at);
+    if (!Number.isFinite(ageMs) || ageMs <= AD_CONVERSION_PENDING_TAKEOVER_MS) return 'skip-inflight';
+  }
+  // 失敗済み・古い pending は1回だけ取り直す。同時に取り合ったら勝った1件だけ送る。
   const took = await db
     .prepare(
-      `UPDATE ad_conversion_logs SET status = 'pending'
+      `UPDATE ad_conversion_logs SET status = 'pending', request_body = ?
        WHERE ad_platform_id = ? AND friend_id = ? AND event_name = ? AND idempotency_key = ?
-         AND status = 'failed'`,
+         AND status IN ('failed', 'pending')`,
     )
-    .bind(opts.platformId, opts.friendId, opts.eventName, opts.idempotencyKey)
+    .bind(fingerprint, opts.platformId, opts.friendId, opts.eventName, opts.idempotencyKey)
     .run<{ success: boolean; meta?: { changes?: number } }>();
   const changes = (took as unknown as { meta?: { changes?: number } }).meta?.changes ?? 0;
   return changes > 0 ? 'send' : 'skip-inflight';
