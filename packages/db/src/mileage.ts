@@ -1156,6 +1156,17 @@ export async function deleteMileageRule(db: D1Database, id: string): Promise<voi
   await db.prepare(`DELETE FROM mileage_rules WHERE id = ?`).bind(id).run();
 }
 
+/**
+ * 決めごとを消してよいかを見る。台帳に1件でも参照があれば履歴あり。
+ * void の行も参照の意味を残すため数える。N-232 の物理削除防止用。
+ */
+export async function hasMileageRuleHistory(db: D1Database, id: string): Promise<boolean> {
+  const row = await db.prepare(
+    `SELECT 1 AS one FROM mileage_ledger WHERE mileage_rule_id = ? LIMIT 1`,
+  ).bind(id).first<{ one: number }>();
+  return row != null;
+}
+
 export interface ApplyMileageRulesInput {
   eventType: string;
   source: string;

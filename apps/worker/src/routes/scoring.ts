@@ -14,6 +14,7 @@ import {
   createMileageRule,
   updateMileageRule,
   deleteMileageRule,
+  hasMileageRuleHistory,
   getMileageAdminOverview,
   getMileageAdminHistory,
   getMileageEarningRulesV6,
@@ -1008,6 +1009,10 @@ scoring.delete('/api/mileage/rules/:id', requireRole('owner', 'admin'), async (c
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [existing.line_account_id])) {
       return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    // N-232: 付与履歴がある決めごとは物理削除しない。停止(PUT isActive=false)へ誘導する。
+    if (await hasMileageRuleHistory(c.env.DB, existing.id)) {
+      return c.json({ success: false, error: '付与履歴があるため削除できません。先に停止してください' }, 409);
     }
     await deleteMileageRule(c.env.DB, existing.id);
     return c.json({ success: true, data: null });
