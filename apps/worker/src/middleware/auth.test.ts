@@ -17,6 +17,7 @@ vi.mock('@line-crm/db', () => ({
     if (token === 'auto-replies-key') return { id: 'auto-replies-1', name: 'Auto Replies Staff', role: 'staff', permission_keys: '["/auto-replies"]' };
     if (token === 'automations-key') return { id: 'automations-1', name: 'Automations Staff', role: 'staff', permission_keys: '["/automations"]' };
     if (token === 'booking-key') return { id: 'booking-1', name: 'Booking Staff', role: 'staff', permission_keys: '["/booking/bookings"]' };
+    if (token === 'contents-key') return { id: 'contents-1', name: 'Contents Staff', role: 'staff', permission_keys: '["/contents"]' };
     if (token === 'photo-view-key') return { id: 'photo-view-1', name: 'Photo Viewer', role: 'staff', permission_keys: '["photo.submission.view"]' };
     if (token === 'photo-review-key') return { id: 'photo-review-1', name: 'Photo Reviewer', role: 'staff', permission_keys: '["photo.submission.review"]' };
     if (token === 'photo-bulk-key') return { id: 'photo-bulk-1', name: 'Photo Bulk Reviewer', role: 'staff', permission_keys: '["photo.submission.bulk_review"]' };
@@ -129,6 +130,9 @@ function app() {
   a.post('/api/nen-members/photos/decisions/bulk', (c) => c.json({ success: true }));
   a.post('/api/nen-members/photos/photo-1/original-download', (c) => c.json({ success: true }));
   a.get('/api/nen-members/photos/original-download/token', (c) => c.json({ success: true }));
+  a.get('/api/media', (c) => c.json({ success: true }));
+  a.get('/api/media/md-1/download', (c) => c.json({ success: true }));
+  a.get('/api/media/md-1/content', (c) => c.json({ success: true }));
   return a;
 }
 
@@ -491,6 +495,15 @@ describe('staff feature permissions', () => {
   test.each(['/api/support', '/api/friends/friend-1', '/api/support-marks'])(
     'missing feature permission fails closed for %s',
     async (path) => {
+      expect((await app().request(path, bearer('no-permissions-key'), crossSiteEnv())).status).toBe(403);
+    },
+  );
+
+  test.each(['/api/media', '/api/media/md-1/download', '/api/media/md-1/content'])(
+    'contents permission protects %s (fail-closed)',
+    async (path) => {
+      expect((await app().request(path, bearer('contents-key'), crossSiteEnv())).status).toBe(200);
+      expect((await app().request(path, bearer('friends-key'), crossSiteEnv())).status).toBe(403);
       expect((await app().request(path, bearer('no-permissions-key'), crossSiteEnv())).status).toBe(403);
     },
   );
