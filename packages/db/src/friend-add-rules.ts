@@ -55,6 +55,8 @@ export interface FriendAddRuleRow {
   definition_snapshot: string | null;
   last_test_status: 'succeeded' | 'failed' | null;
   last_tested_at: string | null;
+  last_tested_by_staff_id: string | null;
+  last_tested_by_staff_name: string | null;
   published_at: string | null;
   matched_last_7_days: number | null;
   lock_version: number;
@@ -133,6 +135,9 @@ const RULE_SELECT = `
          v.definition_snapshot,
          v.last_test_status,
          v.last_tested_at,
+         v.last_tested_by_staff_id,
+         (SELECT s.name FROM staff_members s WHERE s.id = v.last_tested_by_staff_id)
+           AS last_tested_by_staff_name,
          v.published_at,
          CASE
            WHEN r.current_version_id IS NULL THEN NULL

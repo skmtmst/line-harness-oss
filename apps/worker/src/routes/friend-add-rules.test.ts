@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
+import type { AuthenticatedStaff } from '../middleware/auth.js';
 
 const db = vi.hoisted(() => ({
   archiveFriendAddRule: vi.fn(),
@@ -22,15 +23,20 @@ vi.mock('../services/account-access.js', () => access);
 
 const { friendAddRules } = await import('./friend-add-rules.js');
 
-const app = new Hono<Env>();
-app.use('*', async (c, next) => {
-  c.set('staff', {
-    id: 'staff-1', name: '担当者', role: 'admin', readOnly: false,
-    tenantId: 'tenant-1', permissionKeys: ['/friend-add-settings'],
+function makeApp(staff: AuthenticatedStaff) {
+  const result = new Hono<Env>();
+  result.use('*', async (c, next) => {
+    c.set('staff', staff);
+    await next();
   });
-  await next();
+  result.route('/', friendAddRules);
+  return result;
+}
+
+const app = makeApp({
+  id: 'staff-1', name: '担当者', role: 'admin', readOnly: false,
+  tenantId: 'tenant-1', permissionKeys: ['/friend-add-settings'],
 });
-app.route('/', friendAddRules);
 
 const definition = {
   routeIds: ['route-1'],
@@ -51,7 +57,8 @@ const rule = {
   created_at: '2026-09-06T00:00:00', updated_at: '2026-09-06T00:00:00',
   version_id: 'version-1', version_number: 1, version_status: 'draft' as const,
   definition_snapshot: JSON.stringify(definition), last_test_status: null,
-  last_tested_at: null, published_at: null, matched_last_7_days: null,
+  last_tested_at: null, last_tested_by_staff_id: null, last_tested_by_staff_name: null,
+  published_at: null, matched_last_7_days: null,
   lock_version: 1,
 };
 
@@ -122,8 +129,35 @@ describe('friend add rules API', () => {
     const body = await response.json() as { data: { stateChanged: boolean; matched: boolean } };
     expect(body.data).toMatchObject({ stateChanged: false, matched: true });
     expect(db.recordFriendAddRuleTest).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-      lineAccountId: 'account-1', ruleId: 'rule-1', succeeded: true,
+      lineAccountId: 'account-1', ruleId: 'rule-1', staffId: 'staff-1', succeeded: true,
     }));
+  });
+
+  test('スタッフは機能権限があるときだけテストでき、実施者を記録する', async () => {
+    const allowed = makeApp({
+      id: 'staff-allowed', name: 'テスト担当', role: 'staff', readOnly: false,
+      tenantId: 'tenant-1', permissionKeys: ['/friend-add-settings'],
+    });
+    const denied = makeApp({
+      id: 'staff-denied', name: '権限なし', role: 'staff', readOnly: false,
+      tenantId: 'tenant-1', permissionKeys: [],
+    });
+    const request = {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ accountId: 'account-1', ruleId: 'rule-1' }),
+    };
+
+    expect((await allowed.request('/api/friend-add-rules/test', request, makeEnv())).status).toBe(200);
+    expect(db.recordFriendAddRuleTest).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({
+      staffId: 'staff-allowed',
+    }));
+
+    db.recordFriendAddRuleTest.mockClear();
+    expect((await denied.request('/api/friend-add-rules/test', request, makeEnv())).status).toBe(403);
+    expect(db.recordFriendAddRuleTest).not.toHaveBeenCalled();
+    expect((await allowed.request('/api/friend-add-rules/rule-1/publish?account_id=account-1', {
+      method: 'POST', headers: { 'Idempotency-Key': 'friend-rule-publish-0001' },
+    }, makeEnv())).status).toBe(403);
   });
 
   test('公開は冪等キーをDB処理へ渡す', async () => {

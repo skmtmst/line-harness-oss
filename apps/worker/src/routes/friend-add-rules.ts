@@ -188,6 +188,8 @@ function toRule(row: FriendAddRuleRow, routeNames: Map<string, string>, scenario
     versionStatus: row.version_status,
     lastTestStatus: row.last_test_status,
     lastTestedAt: row.last_tested_at,
+    lastTestedByStaffId: row.last_tested_by_staff_id,
+    lastTestedByStaffName: row.last_tested_by_staff_name,
     publishedAt: row.published_at,
     matchedLast7Days: row.matched_last_7_days,
     version: row.lock_version,
@@ -285,6 +287,10 @@ async function validateReferences(
 }
 
 async function ruleTestResponse(c: Context<Env>, accountId: string, ruleId: string) {
+  const staff = c.get('staff');
+  if (staff.role === 'staff' && !staff.permissionKeys?.includes('/friend-add-settings')) {
+    return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
+  }
   const row = await getFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId });
   if (!row) return c.json({ success: false, error: '設定が見つかりません' }, 404);
   const definition = parseSnapshot(row.definition_snapshot);
@@ -293,7 +299,7 @@ async function ruleTestResponse(c: Context<Env>, accountId: string, ruleId: stri
     await recordFriendAddRuleTest(c.env.DB, {
       lineAccountId: accountId,
       ruleId: row.id,
-      staffId: c.get('staff').id,
+      staffId: staff.id,
       succeeded: errors.length === 0,
     });
   }

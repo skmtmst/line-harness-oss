@@ -15,3 +15,4 @@ export * from "./template-message";
 export * from "./feature-catalog";
 export * from "./rich-menu";
 export * from "./automation-labels";
+export * from "./ec-events";

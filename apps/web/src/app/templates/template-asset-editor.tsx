@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { api, type BroadcastAssetKind } from '@/lib/api'
-import Button from './template-button'
+import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TextField } from '@/components/shared/text-field'
 import { useAccount } from '@/contexts/account-context'

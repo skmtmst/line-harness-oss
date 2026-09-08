@@ -73,6 +73,8 @@ describe('友だち追加時配信の公開画面', () => {
     // 最後の試験は、下書きが持っている記録から読む。
     expect(PAGE).toContain('draft.lastTestStatus')
     expect(PAGE).toContain('draft.lastTestedAt')
+    expect(PAGE).toContain('ruleDetail?.rule.lastTestedByStaffId')
+    expect(PAGE).toContain('ruleDetail.rule.lastTestedByStaffName')
   })
 
   it('アカウントを変えたら前の結果を捨てる', () => {

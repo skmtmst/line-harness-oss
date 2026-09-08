@@ -9,6 +9,7 @@ import {
 } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
+import { EC_EVENT_TYPES } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { fireEvent, logOutgoingMessage } from '../services/event-bus.js';
 import { enqueuePostShippingFollowUps } from '../services/nen-engagement.js';
@@ -18,19 +19,7 @@ import { syncNenEcTags, syncNenPetTags } from '../services/nen-tag-sync.js';
 const ecIntegrations = new Hono<Env>();
 const MAX_BODY_BYTES = 256 * 1024;
 const MAX_CLOCK_SKEW_SECONDS = 5 * 60;
-export const EC_EVENT_TYPES = [
-  'ec.order.confirmed',
-  'ec.order.payment_received',
-  'ec.order.bank_transfer_reminder',
-  'ec.order.shipped',
-  'ec.order.cancelled',
-  'ec.order.refunded',
-  'ec.subscription.upcoming',
-  'ec.subscription.payment_failed',
-  'ec.subscription.card_updated',
-  'ec.subscription.cancelled',
-  'ec.customer.profile_updated',
-] as const;
+export { EC_EVENT_TYPES } from '@line-crm/shared';
 const EVENT_TYPES = new Set<string>(EC_EVENT_TYPES);
 
 type EcItem = {

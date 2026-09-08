@@ -363,6 +363,12 @@ function FriendAddPublishInner() {
                 value={draft.lastTestStatus === 'succeeded' ? '成功' : draft.lastTestStatus === 'failed' ? '失敗' : NOT_AVAILABLE}
               />
               <Row label="実施日時" value={draft.lastTestedAt ? draft.lastTestedAt.slice(0, 16).replace('T', ' ') : NOT_AVAILABLE} />
+              <Row
+                label="実施者"
+                value={ruleDetail?.rule.lastTestedByStaffId
+                  ? ruleDetail.rule.lastTestedByStaffName ?? '削除済みの担当者'
+                  : NOT_AVAILABLE}
+              />
             </div>
             <p className={styles.note}>
               テスト送信は編集画面から実行します。実際の送信・登録・タグ付けはしません。

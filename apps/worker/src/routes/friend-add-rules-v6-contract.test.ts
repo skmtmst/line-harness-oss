@@ -120,6 +120,10 @@ describe('V6 friend-add rule data contracts', () => {
        VALUES ('account-1', 'channel-1', '店舗1', 'token-1', 'secret-1', 1, 'tenant-1'),
               ('account-2', 'channel-2', '店舗2', 'token-2', 'secret-2', 1, 'tenant-2')`,
     ).run();
+    testDb.raw.prepare(
+      `INSERT INTO staff_members (id, name, role, api_key, tenant_id)
+       VALUES ('owner-1', 'オーナー', 'owner', 'owner-key', 'tenant-1')`,
+    ).run();
   });
 
   afterEach(() => testDb.raw.close());
@@ -280,6 +284,14 @@ describe('V6 friend-add rule data contracts', () => {
     await expect(failed.json()).resolves.toMatchObject({
       success: false,
       data: { matched: false, reasons: ['実際に配信するシナリオを決めてください。'] },
+    });
+    expect(testDb.raw.prepare(
+      "SELECT last_tested_by_staff_id FROM friend_add_rule_versions WHERE id = 'version-3'",
+    ).get()).toMatchObject({ last_tested_by_staff_id: 'owner-1' });
+    const detail = await app(testDb.db).request('/api/friend-add-rules/rule-3?account_id=account-1');
+    expect(detail.status).toBe(200);
+    await expect(detail.json()).resolves.toMatchObject({
+      data: { rule: { lastTestedByStaffId: 'owner-1', lastTestedByStaffName: 'オーナー' } },
     });
 
     const succeeded = await app(testDb.db).request('/api/friend-add-rules/test', json(
