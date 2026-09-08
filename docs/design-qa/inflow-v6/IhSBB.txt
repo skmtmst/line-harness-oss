@@ -94,7 +94,7 @@ Kenta Kawano
 
 あなたのアカウントで使うコード
 
-<script async src="http://127.0.0.1:8795/api/site/script.js" data-key="hk_d1ef89e503d398ce9e0931984858ebc1"></script>
+<script async src="http://127.0.0.1:8809/api/site/script.js" data-key="hk_d1ef89e503d398ce9e0931984858ebc1"></script>
 コピー
 貼るとできるようになること
 どのページを見て来たか
@@ -113,11 +113,11 @@ Kenta Kawano
 
 コードを貼ったページの届き具合です。
 
-ページ	この30日のページ表示	友だち追加
-/	12,480	186人
-/shop/	8,120	94人
-/lp/summer/	2,403	2人
-/blog/unknown-page/	620	0人
+サイト	ページ	この30日のページ表示	友だち追加
+shop.example.com	/	12,480	186人
+shop.example.com	/shop/	8,120	94人
+campaign.example.com	/lp/summer/	2,403	2人
+以前の記録	/blog/old-page/	620	0人
 貼りかたが分からないときは
 WordPress をお使いなら
 テーマの header.php か、コードを貼るプラグインに入れます

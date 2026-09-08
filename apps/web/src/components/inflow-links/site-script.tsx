@@ -7,7 +7,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { TableHeadRow, Th } from '@/components/shared/table'
 
-type PageRow = { path: string; views: number; visitors: number }
+type PageRow = { host: string | null; path: string; views: number; visitors: number }
 type TrackingSummary = {
   todayEvents: number
   todayPageViews: number
@@ -40,8 +40,8 @@ export default function SiteScript() {
     setLoading(true)
     setFailed(false)
     const [pagesResult, summaryResult] = await Promise.allSettled([
-      api.siteTracking.pages(),
-      api.siteTracking.summary(),
+      api.siteTracking.pages({ accountId: selectedAccountId ?? undefined }),
+      api.siteTracking.summary(selectedAccountId ?? undefined),
     ])
     if (pagesResult.status === 'fulfilled' && pagesResult.value.success) {
       setPages(pagesResult.value.data)
@@ -53,7 +53,7 @@ export default function SiteScript() {
       setFailed(true)
     }
     setLoading(false)
-  }, [])
+  }, [selectedAccountId])
 
   useEffect(() => {
     void load()
@@ -170,12 +170,6 @@ export default function SiteScript() {
             </div>
           </section>
 
-          {/*
-            #514-14: 口はパスだけ返す(ホスト列は無い)。`new URL(path)` の
-            抜き出しと「知らないドメイン」判定は本番で死んでいるので削り、
-            届いたパスをそのまま出す。ドメイン混入の検知はホスト列の口が
-            できたら戻す(司令塔へ依頼)。
-          */}
           <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
             <div className="border-b border-hairline px-4 py-3">
               <h2 className="text-base font-bold text-ink">いま届いているページ</h2>
@@ -185,10 +179,11 @@ export default function SiteScript() {
               <ListState kind="empty" title="まだ記録がありません" description="コードを貼ったあと、サイトを開くと数分で表示されます。" />
             ) : (
               <table className="w-full table-fixed text-xs">
-                <thead className="border-b border-hairline bg-canvas-sunken text-ink-faint"><TableHeadRow><Th>ページ</Th><Th align="right">この30日のページ表示</Th><Th align="right">友だち追加</Th></TableHeadRow></thead>
+                <thead className="border-b border-hairline bg-canvas-sunken text-ink-faint"><TableHeadRow><Th>サイト</Th><Th>ページ</Th><Th align="right">この30日のページ表示</Th><Th align="right">友だち追加</Th></TableHeadRow></thead>
                 <tbody className="divide-y divide-hairline">
                   {pages.map((page) => {
-                    return <tr key={page.path}>
+                    return <tr key={`${page.host ?? ''}:${page.path}`}>
+                      <td className="truncate px-4 py-3 text-ink-secondary" title={page.host ?? '以前の記録'}>{page.host ?? '以前の記録'}</td>
                       <td className="truncate px-4 py-3 font-semibold text-ink" title={page.path}>{page.path}</td>
                       <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">{page.views.toLocaleString('ja-JP')}</td>
                       <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">{page.visitors.toLocaleString('ja-JP')}人</td>

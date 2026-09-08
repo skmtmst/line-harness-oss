@@ -20,10 +20,12 @@ describe('点検・中: 機能18 流入と計測(#514 の中 10 件、#565)', ()
     expect(PAGE).toContain('poolMemberNames={poolMemberNames}')
   })
 
-  it('#514-6: 送信履歴は20件ずつに区切って描く', () => {
+  it('#514-6: 媒体横断の送信履歴を共通一覧口から20件ずつ取得する', () => {
     expect(ADS).toContain('LOG_PAGE_SIZE')
     expect(ADS).toContain('Pagination')
-    expect(ADS).toContain('.slice((safeLogPage - 1) * LOG_PAGE_SIZE')
+    expect(ADS).toContain('api.adPlatforms.logsPage')
+    expect(ADS).toContain('setLogTotal(logResponse.data.total)')
+    expect(ADS).not.toContain('response.data.map((platform) => api.adPlatforms.logs')
   })
 
   it('#514-7: 存在しない短縮 URL(/s/)を出さない', () => {
@@ -92,12 +94,12 @@ describe('点検・中: 機能18 流入と計測(#514 の中 10 件、#565)', ()
     expect(ADS).toContain('未接続のため表示できません')
   })
 
-  it('#514-14: 届いたパスをそのまま出し、死んだドメイン判定は削る', () => {
+  it('#514-14: 計測先ホストとパスを口から受け取って表示する', () => {
     expect(SITE).not.toContain('new URL(page.path)')
     expect(SITE).not.toContain('unknown-')
+    expect(SITE).toContain('{page.host ?? \'以前の記録\'}')
     expect(SITE).toContain('{page.path}')
-    // 固定値の計測ページはパス形にする。
-    expect(FIXTURES).toContain("{ path: '/', views:")
+    expect(FIXTURES).toContain("{ host: 'shop.example.com', path: '/', views:")
     expect(FIXTURES).not.toContain("path: 'https")
   })
 })

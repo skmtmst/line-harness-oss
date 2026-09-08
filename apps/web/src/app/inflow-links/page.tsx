@@ -215,23 +215,24 @@ function InflowLinksPageInner() {
         )
       }
 
-      // Load pool→accounts mapping after we know the pool list. Done in a 2nd
-      // round-trip so the table can render with summary stats immediately; the
-      // filter just doesn't apply the pool-membership rule until this resolves
-      // (zero-inflow rows still pass through friendCount > 0 path).
+      // Load pool→accounts mapping in one request after the pool ids are known.
+      // This is a second round-trip, but it stays one request regardless of how
+      // many pools exist.
       if (p.success) {
-        const entries = await Promise.all(
-          p.data.map(async (pool) => {
-            const res = await api.pools.accounts.list(pool.id)
-            const members = res.success ? res.data.filter((a) => a.isActive) : []
-            const ids = new Set(members.map((a) => a.lineAccountId))
-            const names = members.map((a) => a.accountName ?? '—')
-            return [pool.id, { ids, names }] as const
-          }),
-        )
+        const batch = p.data.length > 0
+          ? await api.pools.listAccounts(p.data.map((pool) => pool.id))
+          : { success: true as const, data: [] }
         if (!isCurrent()) return
-        setPoolMembers(Object.fromEntries(entries.map(([id, value]) => [id, value.ids])))
-        setPoolMemberNames(Object.fromEntries(entries.map(([id, value]) => [id, value.names])))
+        if (batch.success) {
+          setPoolMembers(Object.fromEntries(batch.data.map(({ poolId, accounts }) => [
+            poolId,
+            new Set(accounts.filter((account) => account.isActive).map((account) => account.lineAccountId)),
+          ])))
+          setPoolMemberNames(Object.fromEntries(batch.data.map(({ poolId, accounts }) => [
+            poolId,
+            accounts.filter((account) => account.isActive).map((account) => account.accountName ?? '—'),
+          ])))
+        }
       }
     } catch {
       if (!isCurrent()) return

@@ -8,10 +8,25 @@ import {
   getAdConversionLogs,
   getAdPlatformByName,
 } from '@line-crm/db';
+import type { AdConversionLog } from '@line-crm/db';
 import { sendAdConversions } from '../services/ad-conversion.js';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
-import { listLimit } from './list-pagination.js';
+import { listLimit, listPage } from './list-pagination.js';
+
+function serializeLog(log: AdConversionLog) {
+  return {
+    id: log.id,
+    adPlatformId: log.ad_platform_id,
+    friendId: log.friend_id,
+    eventName: log.event_name,
+    clickId: log.click_id,
+    clickIdType: log.click_id_type,
+    status: log.status,
+    errorMessage: log.error_message,
+    createdAt: log.created_at,
+  };
+}
 
 function maskConfig(config: Record<string, unknown>): Record<string, unknown> {
   const masked: Record<string, unknown> = {};
@@ -171,6 +186,61 @@ adPlatforms.delete('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
   }
 });
 
+// GET /api/ad-platforms/logs — conversion send logs across every platform
+adPlatforms.get('/api/ad-platforms/logs', async (c) => {
+  try {
+    const page = listPage(c.req.query('page'));
+    const limit = listLimit(c.req.query('limit'), 50);
+    const status = c.req.query('status')?.trim();
+    const query = c.req.query('query')?.trim();
+    const clauses: string[] = [];
+    const bindings: unknown[] = [];
+
+    if (status && status !== 'all') {
+      if (!['sent', 'pending', 'failed'].includes(status)) {
+        return c.json({ success: false, error: 'status is invalid' }, 400);
+      }
+      if (status === 'sent') {
+        clauses.push("status IN ('sent', 'success')");
+      } else {
+        clauses.push('status = ?');
+        bindings.push(status);
+      }
+    }
+    if (query) {
+      clauses.push("(event_name LIKE ? ESCAPE '\\' OR COALESCE(click_id_type, '') LIKE ? ESCAPE '\\')");
+      const escaped = query.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_');
+      bindings.push(`%${escaped}%`, `%${escaped}%`);
+    }
+
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+    const count = await c.env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM ad_conversion_logs ${where}`,
+    ).bind(...bindings).first<{ total: number }>();
+    const logs = await c.env.DB.prepare(
+      `SELECT * FROM ad_conversion_logs ${where}
+       ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`,
+    ).bind(...bindings, limit, (page - 1) * limit).all<AdConversionLog>();
+
+    return c.json({
+      success: true,
+      data: {
+        items: logs.results.map(serializeLog),
+        total: Number(count?.total ?? 0),
+        page,
+        limit,
+        sort: [
+          { field: 'createdAt', direction: 'desc' },
+          { field: 'id', direction: 'desc' },
+        ],
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/ad-platforms/logs error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // GET /api/ad-platforms/:id/logs - conversion send logs
 adPlatforms.get('/api/ad-platforms/:id/logs', async (c) => {
   try {
@@ -180,17 +250,7 @@ adPlatforms.get('/api/ad-platforms/:id/logs', async (c) => {
 
     return c.json({
       success: true,
-      data: logs.map((l) => ({
-        id: l.id,
-        adPlatformId: l.ad_platform_id,
-        friendId: l.friend_id,
-        eventName: l.event_name,
-        clickId: l.click_id,
-        clickIdType: l.click_id_type,
-        status: l.status,
-        errorMessage: l.error_message,
-        createdAt: l.created_at,
-      })),
+      data: logs.map(serializeLog),
     });
   } catch (err) {
     console.error('GET /api/ad-platforms/:id/logs error:', err);

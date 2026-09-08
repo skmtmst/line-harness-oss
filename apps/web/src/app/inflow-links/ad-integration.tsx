@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import type { AdConversionLog, AdPlatform } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -99,44 +99,41 @@ function safeCsv(logs: AdConversionLog[]): string {
 export default function AdIntegration({ view }: { view: AdView }) {
   const [platforms, setPlatforms] = useState<AdPlatform[]>([])
   const [logs, setLogs] = useState<AdConversionLog[]>([])
+  const [logTotal, setLogTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
-  // #514-6: 履歴は画面側で20件ずつに区切って描く(描画の際限ない増大を止める)。
-  // 媒体横断の limit/offset 口は口側の追加待ち(司令塔へ依頼)。
+  // #514-6: 媒体横断の共通一覧口から20件ずつ取得する。
   const [logPage, setLogPage] = useState(1)
   // #514-13: 失敗理由は口の errorMessage を開いて見せる(「理由を見る」を効かせる)。
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     setFailed(false)
     try {
-      const response = await api.adPlatforms.list()
-      if (!response.success) {
+      const [platformResponse, logResponse] = await Promise.all([
+        api.adPlatforms.list(),
+        api.adPlatforms.logsPage({ page: logPage, limit: LOG_PAGE_SIZE, status, query }),
+      ])
+      if (!platformResponse.success || !logResponse.success) {
         setFailed(true)
         return
       }
-      setPlatforms(response.data)
-      const logResponses = await Promise.all(
-        response.data.map((platform) => api.adPlatforms.logs(platform.id, 100).catch(() => null)),
-      )
-      setLogs(
-        logResponses
-          .flatMap((result) => result?.success ? result.data : [])
-          .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-      )
+      setPlatforms(platformResponse.data)
+      setLogs(logResponse.data.items)
+      setLogTotal(logResponse.data.total)
     } catch {
       setFailed(true)
     } finally {
       setLoading(false)
     }
-  }
+  }, [logPage, query, status])
 
   useEffect(() => {
     void load()
-  }, [])
+  }, [load])
 
   const connected = platforms.filter((platform) => platform.isActive)
   const sentCount = configNumber(platforms, 'sent_count') ?? logs.filter((log) => matchesStatus(log, 'sent')).length
@@ -144,17 +141,8 @@ export default function AdIntegration({ view }: { view: AdView }) {
   const failedCount = configNumber(platforms, 'failed_count') ?? logs.filter((log) => log.status === 'failed').length
   // #514-13: 取れない数を 0 と書かない。retry_success_count が無ければ「—」。
   const retrySuccessCount = configNumber(platforms, 'retry_success_count')
-  const normalizedQuery = query.trim().toLocaleLowerCase('ja')
-  const visibleLogs = useMemo(
-    () => logs.filter((log) => matchesStatus(log, status)).filter((log) => {
-      if (!normalizedQuery) return true
-      return [log.eventName, log.clickIdType ?? '', STATUS_LABEL[log.status] ?? '']
-        .some((value) => value.toLocaleLowerCase('ja').includes(normalizedQuery))
-    }),
-    [logs, normalizedQuery, status],
-  )
-  // 絞り込みで件数が減ったとき、存在しないページに残さない。
-  const logPageCount = Math.max(1, Math.ceil(visibleLogs.length / LOG_PAGE_SIZE))
+  const visibleLogs = logs
+  const logPageCount = Math.max(1, Math.ceil(logTotal / LOG_PAGE_SIZE))
   const safeLogPage = Math.min(logPage, logPageCount)
 
   const exportLogs = () => {
@@ -244,7 +232,7 @@ export default function AdIntegration({ view }: { view: AdView }) {
                 </TableHeadRow>
               </thead>
               <tbody className="divide-y divide-hairline">
-                {visibleLogs.slice((safeLogPage - 1) * LOG_PAGE_SIZE, safeLogPage * LOG_PAGE_SIZE).map((log) => {
+                {visibleLogs.map((log) => {
                   const platform = platforms.find((item) => item.id === log.adPlatformId)
                   const expanded = expandedLogId === log.id
                   return (
@@ -283,7 +271,7 @@ export default function AdIntegration({ view }: { view: AdView }) {
               </tbody>
             </table>
             <div className="flex items-center justify-end gap-2 border-t border-hairline px-4 py-3 text-xs">
-              <span className="text-ink-faint tabular-nums">全 {visibleLogs.length} 件</span>
+              <span className="text-ink-faint tabular-nums">全 {logTotal} 件</span>
               <Pagination page={safeLogPage} pageCount={logPageCount} onPageChange={setLogPage} />
             </div>
           </section>

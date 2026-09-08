@@ -71,6 +71,7 @@ siteTracking.post('/api/site/collect', async (c) => {
     const body = await c.req.json<{
       visitorId?: unknown;
       eventType?: unknown;
+      host?: unknown;
       path?: unknown;
       label?: unknown;
       valueNum?: unknown;
@@ -95,6 +96,7 @@ siteTracking.post('/api/site/collect', async (c) => {
       visitorId,
       lineAccountId,
       eventType: eventType as SiteEventType,
+      host: body.host,
       // クエリ文字列の除去は recordSiteEvent の中で行う。
       // 受け口ごとに書くと、必ずどこかで忘れる。
       path: body.path,
@@ -157,20 +159,20 @@ siteTracking.get('/api/site/script.js', (c) => {
     fetch(ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true }).catch(function () {});
   }
 
-  // 訪問。パスだけを送る。クエリ文字列はサーバー側でも落とすが、
+  // 訪問。ホストとパスだけを送る。クエリ文字列はサーバー側でも落とすが、
   // 送らないに越したことはない。
-  send({ eventType: 'page_view', path: location.pathname, referrer: document.referrer || null });
+  send({ eventType: 'page_view', host: location.hostname, path: location.pathname, referrer: document.referrer || null });
 
   // data-lh-event を付けた要素のクリック。
   document.addEventListener('click', function (e) {
     var el = e.target && e.target.closest ? e.target.closest('[data-lh-event]') : null;
     if (!el) return;
-    send({ eventType: 'click', path: location.pathname, label: el.getAttribute('data-lh-event') });
+    send({ eventType: 'click', host: location.hostname, path: location.pathname, label: el.getAttribute('data-lh-event') });
   }, true);
 
   // 外から呼べるようにしておく。購入完了などをページ側から送れる。
   window.lhTrack = function (label, valueNum) {
-    send({ eventType: 'custom', path: location.pathname, label: label, valueNum: valueNum });
+    send({ eventType: 'custom', host: location.hostname, path: location.pathname, label: label, valueNum: valueNum });
   };
 })();`;
 
@@ -279,6 +281,7 @@ siteTracking.get('/api/friends/:id/site-events', requireRole('owner', 'admin', '
       data: items.map((e) => ({
         id: e.id,
         eventType: e.event_type,
+        host: e.host,
         path: e.path,
         label: e.label,
         occurredAt: e.occurred_at,
