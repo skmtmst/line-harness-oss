@@ -2023,6 +2023,46 @@ async function scheduled(
         // DB反映は実行役が行う。ここでは新IDだけ返す。
         return published.pages;
       },
+      deleteLineMenus: async (schedule, menus) => {
+        // journal保存前のD1失敗で作った分を消す補償削除。再試行の二重公開を防ぐ。
+        const account = await getLineAccountById(env.DB, schedule.account_id);
+        if (!account) return;
+        const auth = `Bearer ${account.channel_access_token}`;
+        for (const menu of menus) {
+          try {
+            const res = await fetch(`https://api.line.me/v2/bot/richmenu/${menu.newRichMenuId}`, {
+              method: 'DELETE',
+              headers: { Authorization: auth },
+            });
+            if (!res.ok && res.status !== 404) {
+              console.warn(`[rich-menu schedule] compensate delete failed: ${res.status}`);
+            }
+          } catch (error) {
+            console.warn('[rich-menu schedule] compensate delete error:', error);
+          }
+        }
+      },
+      unlinkIndividualLinks: async (schedule) => {
+        // 期限切れメニューを指す個別割当をLINE側で外し、既定へ戻す。
+        // 解除済み・対象なしは何もしない。D1行の削除より先に呼ぶ。
+        const { listScheduleGroupIndividualLinks } = await import('@line-crm/db');
+        const targets = await listScheduleGroupIndividualLinks(env.DB, schedule.account_id, schedule.group_id);
+        if (targets.length === 0) return 0;
+        const account = await getLineAccountById(env.DB, schedule.account_id);
+        if (!account) throw new Error('line account not found');
+        const auth = `Bearer ${account.channel_access_token}`;
+        let unlinked = 0;
+        for (const target of targets) {
+          const res = await fetch(
+            `https://api.line.me/v2/bot/user/${encodeURIComponent(target.lineUserId)}/richmenu`,
+            { method: 'DELETE', headers: { Authorization: auth } },
+          );
+          if (res.status === 404) continue;
+          if (!res.ok) throw new Error(`LINE unlinkRichMenu failed: ${res.status}`);
+          unlinked += 1;
+        }
+        return unlinked;
+      },
     }, { now: new Date(event.scheduledTime) });
     if (result.processed > 0) {
       console.log(JSON.stringify({ event: 'rich_menu_schedule_tick', ...result }));

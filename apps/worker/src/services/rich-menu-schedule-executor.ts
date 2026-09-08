@@ -1,6 +1,5 @@
 import {
   RICH_MENU_SCHEDULE_MAX_ATTEMPTS,
-  RICH_MENU_SCHEDULE_STALE_MS,
   acquirePublishLock,
   cancelRichMenuSchedule,
   claimRichMenuSchedule,
@@ -31,14 +30,15 @@ import {
   type RichMenuScheduleRow,
   type RichMenuGroupWithPages,
 } from '@line-crm/db';
-import { toJstString } from '@line-crm/db';
 
 // E-08 (#621): 保存済み公開予約を時刻到来時に実行する。
 // 読むcronが無かったため時刻を過ぎても公開されなかった問題を直す。
 // 二重実行は claim の UPDATE 条件 (status + account_id) で防ぐ。
-// staleになったpublishing/restoringはlease期限で回収し永久停止させない。
+// staleになったpublishing/restoringは所有runのlease期限で回収し永久停止させない。
 // 独立レビュー再修正: lease fencing(run ID付き)・durable journal・snapshot drift・
-// 個別割当復元・group lockを足し、group.statusだけでの完成判定をやめた。
+// 個別割当のLINE復元・group lockを足し、group.statusだけでの完成判定をやめた。
+// 再審査対応: journal前のD1失敗は作ったLINEを消してから失敗に戻す (補償削除)、
+// journal再開もlockを取り、確定済み(completed等)への反転を禁じる。
 
 export type ScheduleLineAccount = {
   id: string;
@@ -89,6 +89,17 @@ export type RichMenuScheduleExecutorDeps = {
     restoreGroupId: string | null,
     schedule: RichMenuScheduleRow,
   ) => Promise<PublishedPageMapping[] | void>;
+  /**
+   * 作ったLINEメニューの補償削除。journal保存前のD1失敗で呼ぶ。
+   * 消さずに再試行すると二重公開になるため、失敗扱いに戻す前に掃除する。
+   */
+  deleteLineMenus: (schedule: RichMenuScheduleRow, menus: PublishedPageMapping[]) => Promise<void>;
+  /**
+   * 期限切れメニューを指す個別割当をLINE側で外す (既定へ戻す)。
+   * D1行の削除より先に呼ぶ。解除済み・対象なしは何もしない。
+   * 戻り値は解除した人数。
+   */
+  unlinkIndividualLinks: (schedule: RichMenuScheduleRow) => Promise<number>;
 };
 
 export type RichMenuScheduleProcessResult = {
@@ -113,6 +124,41 @@ function snapshotHasPublishablePages(snapshot: unknown): boolean {
   if (typeof snapshot !== 'object' || snapshot === null) return false;
   const pages = (snapshot as { pages?: unknown }).pages;
   return Array.isArray(pages) && pages.length > 0;
+}
+
+function toJournalPages(mappings: PublishedPageMapping[] | void): Array<{ pageId: string; lineRichMenuId: string }> {
+  return ((mappings ?? []) as PublishedPageMapping[]).map((mapping) => ({
+    pageId: mapping.pageId,
+    lineRichMenuId: mapping.newRichMenuId,
+  }));
+}
+
+/**
+ * LINE成功直後のjournal保存。ここでD1が失敗したら、作ったLINEを
+ * 消してから呼び出し元へ投げる。消さずに失敗扱いへ戻すと、再試行が
+ * journalなしでLINEを作り直し二重公開になる。
+ */
+async function journalPublishPages(
+  db: D1Database,
+  schedule: RichMenuScheduleRow,
+  kind: 'publish' | 'restore',
+  runId: string,
+  mappings: PublishedPageMapping[] | void,
+  deps: RichMenuScheduleExecutorDeps,
+): Promise<Array<{ pageId: string; lineRichMenuId: string }>> {
+  const pages = toJournalPages(mappings);
+  try {
+    await recordSchedulePublications(db, schedule.id, kind, runId, pages);
+  } catch (error) {
+    try {
+      await deps.deleteLineMenus(schedule, (mappings ?? []) as PublishedPageMapping[]);
+    } catch {
+      // 補償削除の失敗は元のjournal失敗を隠さない。残留は次回publishの
+      // alias上書きで無害化されるか、運用の要対応表示で拾う。
+    }
+    throw error;
+  }
+  return pages;
 }
 
 async function checkAccountAndStaff(
@@ -198,14 +244,28 @@ async function handleOneSchedule(
       }
     }
 
+    // journal再開もlockを迂回しない。DB反映は所有lockの下で行う。
+    const lockedForJournal = async (): Promise<boolean> => acquirePublishLock(db, fresh.group_id);
     // durable journalがあり、LINE作成まで終わっていたら作り直さない。
     // journalのIDをDBへ反映して成功記録だけ行う（LINE呼び出し0回で完了はこの場合だけ正しい）。
     const journal = await getSchedulePublications(db, fresh.id, 'publish');
     if (journal.length > 0) {
-      for (const entry of journal) {
-        await setPageRichMenuId(db, entry.page_id, entry.line_richmenu_id);
+      if (!await lockedForJournal()) {
+        return fail(new Error('publish_locked: group is publishing, try again'));
       }
-      await markRichMenuGroupPublished(db, fresh.group_id);
+      try {
+        for (const entry of journal) {
+          await setPageRichMenuId(db, entry.page_id, entry.line_richmenu_id);
+        }
+        await markRichMenuGroupPublished(db, fresh.group_id);
+      } catch (error) {
+        try {
+          await releasePublishLock(db, fresh.group_id);
+        } catch {
+          // ロック解除の失敗は元のエラーを隠さない。
+        }
+        return fail(error);
+      }
       const recorded = await recordRichMenuScheduleSuccess(
         db,
         fresh.id,
@@ -222,13 +282,10 @@ async function handleOneSchedule(
       return fail(new Error('publish_locked: group is publishing, try again'));
     }
     try {
-      const mappings = (await deps.publishSnapshot(parsed.value, fresh)) ?? [];
-      const pages = (mappings as PublishedPageMapping[]).map((mapping) => ({
-        pageId: mapping.pageId,
-        lineRichMenuId: mapping.newRichMenuId,
-      }));
-      // LINE成功を先にjournalへ残す。以後のD1失敗は再実行でjournal照合し作り直さない。
-      await recordSchedulePublications(db, fresh.id, 'publish', runId, pages);
+      const mappings = await deps.publishSnapshot(parsed.value, fresh);
+      // LINE成功を先にjournalへ残す。journal保存前のD1失敗は作ったLINEを
+      // 消してから失敗に戻し、再実行の二重公開を防ぐ。
+      const pages = await journalPublishPages(db, fresh, 'publish', runId, mappings, deps);
       for (const page of pages) {
         await setPageRichMenuId(db, page.pageId, page.lineRichMenuId);
       }
@@ -261,7 +318,7 @@ async function handleOneRestore(
   deps: RichMenuScheduleExecutorDeps,
   runId: string,
 ): Promise<'restored' | 'retried' | 'failed' | 'skipped'> {
-  const claimed = await claimRichMenuScheduleRestore(db, schedule.id, schedule.account_id, runId);
+  const claimed = await claimRichMenuScheduleRestore(db, schedule.id, schedule.account_id, runId, now.toISOString());
   if (!claimed) return 'skipped';
 
   const fresh = await getRichMenuScheduleById(db, schedule.id, schedule.account_id);
@@ -286,6 +343,13 @@ async function handleOneRestore(
     return recorded ? 'failed' : 'skipped';
   };
 
+  // 期限切れメニューの個別割当をLINE側で外してからD1行を消す。
+  // 解除は404許容でidempotentのため、再試行の重ね掛けも安全。
+  const unlinkAndClearAssignments = async (): Promise<void> => {
+    await deps.unlinkIndividualLinks(fresh);
+    await clearRichMenuAssignmentsForGroup(db, fresh.group_id);
+  };
+
   try {
     const preconditionError = await checkAccountAndStaff(db, fresh, deps);
     if (preconditionError) return fail(new Error(preconditionError));
@@ -298,17 +362,29 @@ async function handleOneRestore(
       if (!restore || restore.account_id !== fresh.account_id || restore.status !== 'published') {
         return fail(new Error('restoreGroupId must be a published menu'));
       }
-      // journal済みならLINEを作り直さずDB反映だけ行う。
+      // journal済みならLINEを作り直さずDB反映だけ行う。lockは迂回しない。
       const journal = await getSchedulePublications(db, fresh.id, 'restore');
       if (journal.length > 0) {
-        for (const entry of journal) {
-          await setPageRichMenuId(db, entry.page_id, entry.line_richmenu_id);
+        if (!await acquirePublishLock(db, fresh.restore_group_id)) {
+          return fail(new Error('publish_locked: group is publishing, try again'));
         }
-        await markRichMenuGroupPublished(db, fresh.restore_group_id);
-        if (fresh.restore_group_id !== fresh.group_id) {
-          await markRichMenuGroupUnpublished(db, fresh.group_id);
+        try {
+          for (const entry of journal) {
+            await setPageRichMenuId(db, entry.page_id, entry.line_richmenu_id);
+          }
+          await markRichMenuGroupPublished(db, fresh.restore_group_id);
+          if (fresh.restore_group_id !== fresh.group_id) {
+            await markRichMenuGroupUnpublished(db, fresh.group_id);
+          }
+          await unlinkAndClearAssignments();
+        } catch (error) {
+          try {
+            await releasePublishLock(db, fresh.restore_group_id);
+          } catch {
+            // ロック解除の失敗は元のエラーを隠さない。
+          }
+          return fail(error);
         }
-        await clearRichMenuAssignmentsForGroup(db, fresh.group_id);
         const recorded = await recordRichMenuScheduleRestoreSuccess(db, fresh.id, fresh.account_id, runId);
         return recorded ? 'restored' : 'skipped';
       }
@@ -317,12 +393,8 @@ async function handleOneRestore(
         return fail(new Error('publish_locked: group is publishing, try again'));
       }
       try {
-        const mappings = (await deps.restoreToGroup(fresh.restore_group_id, fresh)) ?? [];
-        const pages = (mappings as PublishedPageMapping[]).map((mapping) => ({
-          pageId: mapping.pageId,
-          lineRichMenuId: mapping.newRichMenuId,
-        }));
-        await recordSchedulePublications(db, fresh.id, 'restore', runId, pages);
+        const mappings = await deps.restoreToGroup(fresh.restore_group_id, fresh);
+        const pages = await journalPublishPages(db, fresh, 'restore', runId, mappings, deps);
         for (const page of pages) {
           await setPageRichMenuId(db, page.pageId, page.lineRichMenuId);
         }
@@ -330,8 +402,9 @@ async function handleOneRestore(
         if (fresh.restore_group_id !== fresh.group_id) {
           await markRichMenuGroupUnpublished(db, fresh.group_id);
         }
-        // 終了時に期限切れメニューの個別割当を外す。残すと古いメニューを指し続ける。
-        await clearRichMenuAssignmentsForGroup(db, fresh.group_id);
+        // 終了時に期限切れメニューの個別割当をLINE側で外してからD1を消す。
+        // 残すと古いメニューを指し続ける。
+        await unlinkAndClearAssignments();
       } catch (error) {
         try {
           await releasePublishLock(db, fresh.restore_group_id);
@@ -350,7 +423,7 @@ async function handleOneRestore(
       try {
         await deps.restoreToGroup(null, fresh);
         await markRichMenuGroupUnpublished(db, fresh.group_id);
-        await clearRichMenuAssignmentsForGroup(db, fresh.group_id);
+        await unlinkAndClearAssignments();
       } catch (error) {
         try {
           await releasePublishLock(db, fresh.group_id);
@@ -372,16 +445,17 @@ async function reclaimStaleClaims(
   now: Date,
   limit: number,
 ): Promise<number> {
-  const staleBeforeJst = toJstString(new Date(now.getTime() - RICH_MENU_SCHEDULE_STALE_MS));
+  // lease期限(UTCのISO8601)で回収する。形式違いの文字列比較はしない。
+  const nowIso = now.toISOString();
   let reclaimed = 0;
-  const publishing = await getStalePublishingSchedules(db, staleBeforeJst, limit);
+  const publishing = await getStalePublishingSchedules(db, nowIso, limit);
   for (const row of publishing) {
-    const ok = await reclaimStalePublishingSchedule(db, row.id, row.account_id, staleBeforeJst);
+    const ok = await reclaimStalePublishingSchedule(db, row.id, row.account_id, nowIso);
     if (ok) reclaimed += 1;
   }
-  const restoring = await getStaleRestoringSchedules(db, staleBeforeJst, limit);
+  const restoring = await getStaleRestoringSchedules(db, nowIso, limit);
   for (const row of restoring) {
-    const ok = await reclaimStaleRestoringSchedule(db, row.id, row.account_id, staleBeforeJst);
+    const ok = await reclaimStaleRestoringSchedule(db, row.id, row.account_id, nowIso);
     if (ok) reclaimed += 1;
   }
   return reclaimed;

@@ -88,6 +88,8 @@ function deps(overrides = {}) {
     isStaffAllowedForAccount: vi.fn().mockResolvedValue(true),
     publishSnapshot: vi.fn().mockResolvedValue([{ pageId: 'p1', newRichMenuId: 'line-p1' }]),
     restoreToGroup: vi.fn().mockResolvedValue([{ pageId: 'r1', newRichMenuId: 'line-r1' }]),
+    deleteLineMenus: vi.fn().mockResolvedValue(undefined),
+    unlinkIndividualLinks: vi.fn().mockResolvedValue(0),
     ...overrides,
   };
 }
@@ -316,6 +318,7 @@ describe('rich menu schedule executor', () => {
 
     const result = await processDueRichMenuSchedules(db, d, { now });
     expect(d.restoreToGroup).toHaveBeenCalledWith(null, expect.objectContaining({ id: 'period-clear' }));
+    expect(d.unlinkIndividualLinks).toHaveBeenCalledWith(expect.objectContaining({ id: 'period-clear' }));
     expect(dbMocks.recordRichMenuScheduleRestoreSuccess).toHaveBeenCalled();
     expect(dbMocks.clearRichMenuAssignmentsForGroup).toHaveBeenCalledWith(db, 'menu-1');
     expect(result).toMatchObject({ restored: 1 });
@@ -382,6 +385,7 @@ describe('rich menu schedule executor', () => {
 
     const result = await processDueRichMenuSchedules(db, d, { now });
     expect(d.restoreToGroup).not.toHaveBeenCalled();
+    expect(d.unlinkIndividualLinks).toHaveBeenCalledWith(expect.objectContaining({ id: 'crash-restore' }));
     expect(dbMocks.recordRichMenuScheduleRestoreSuccess).toHaveBeenCalled();
     expect(result).toMatchObject({ restored: 1 });
   });
@@ -445,6 +449,37 @@ describe('rich menu schedule executor', () => {
     expect(result).toMatchObject({ succeeded: 1 });
   });
 
+  test('journal保存前のD1失敗は作ったLINEを消してから一時失敗に戻す', async () => {
+    dbMocks.getDueRichMenuSchedules.mockResolvedValue([schedule({ id: 'comp-1' })]);
+    dbMocks.recordSchedulePublications.mockRejectedValueOnce(new Error('D1 unavailable'));
+    const d = deps();
+    const deleteSpy = d.deleteLineMenus as ReturnType<typeof vi.fn>;
+
+    const result = await processDueRichMenuSchedules(db, d, { now });
+    // LINEは1回だけ呼び、journal失敗後は作った分を消して再試行にする。
+    expect(d.publishSnapshot).toHaveBeenCalledTimes(1);
+    expect(deleteSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'comp-1' }),
+      [{ pageId: 'p1', newRichMenuId: 'line-p1' }],
+    );
+    expect(result).toMatchObject({ retried: 1, succeeded: 0 });
+  });
+
+  test('journal再開もlockを迂回しない（取れなければ再試行）', async () => {
+    dbMocks.getDueRichMenuSchedules.mockResolvedValue([schedule({ id: 'journal-lock' })]);
+    dbMocks.getSchedulePublications.mockResolvedValue([
+      { schedule_id: 'journal-lock', kind: 'publish', page_id: 'p1', line_richmenu_id: 'line-p1', run_id: 'old-run', created_at: '2026-09-10' },
+    ]);
+    dbMocks.acquirePublishLock.mockResolvedValue(false);
+    const d = deps();
+
+    const result = await processDueRichMenuSchedules(db, d, { now });
+    expect(d.publishSnapshot).not.toHaveBeenCalled();
+    expect(dbMocks.setPageRichMenuId).not.toHaveBeenCalled();
+    expect(dbMocks.recordRichMenuScheduleTransientFailure).toHaveBeenCalled();
+    expect(result).toMatchObject({ retried: 1 });
+  });
+
   test('group lock取得失敗は一時失敗で再試行する', async () => {
     dbMocks.getDueRichMenuSchedules.mockResolvedValue([schedule({ id: 'locked-1' })]);
     dbMocks.getRichMenuScheduleById.mockImplementation(async () => ({ ...(schedule({ id: 'locked-1' }) as unknown as Record<string, unknown>), status: 'publishing', started_run_id: claimedStartRuns.get('locked-1'), attempt_count: 1 } as never));
@@ -471,6 +506,7 @@ describe('rich menu schedule executor', () => {
     });
 
     const result = await processDueRichMenuSchedules(db, d, { now });
+    expect(d.unlinkIndividualLinks).toHaveBeenCalledWith(expect.objectContaining({ id: 'restore-assign' }));
     expect(dbMocks.clearRichMenuAssignmentsForGroup).toHaveBeenCalledWith(db, 'menu-1');
     expect(result).toMatchObject({ restored: 1 });
   });
