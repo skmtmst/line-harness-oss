@@ -3,8 +3,13 @@ import {
   checkWebhookUrlSafety,
   deliverWebhook,
   isSafeWebhookUrl,
+  retryAfterDelayMs,
   retryDelayMs,
   shouldRetryStatus,
+  WEBHOOK_FETCH_TIMEOUT_MS,
+  WEBHOOK_FETCH_TIMEOUT_MS_MAX,
+  WEBHOOK_RETRY_AFTER_MAX_MS,
+  webhookFetchTimeoutMs,
   type WebhookRow,
 } from './outgoing-webhook-delivery.js';
 
@@ -516,5 +521,179 @@ describe('送信直前の再検査', () => {
     // lookupHostを渡さない=本番と同じ既定の名前引きを使う。
     const res = await deliverWebhook(WEBHOOK, '{}', { sleep: noSleep });
     expect(res.blocked).toBe(true);
+  });
+});
+
+describe('送信の打ち切り(N-373)', () => {
+  it('既定は10秒・上限は30秒', () => {
+    expect(WEBHOOK_FETCH_TIMEOUT_MS).toBe(10_000);
+    expect(WEBHOOK_FETCH_TIMEOUT_MS_MAX).toBe(30_000);
+    expect(webhookFetchTimeoutMs(undefined)).toBe(10_000);
+    expect(webhookFetchTimeoutMs(5_000)).toBe(5_000);
+    expect(webhookFetchTimeoutMs(60_000)).toBe(30_000);
+    expect(webhookFetchTimeoutMs(0)).toBe(10_000);
+    expect(webhookFetchTimeoutMs(-1)).toBe(10_000);
+    expect(webhookFetchTimeoutMs(Number.NaN)).toBe(10_000);
+  });
+
+  it('無応答の送り先は打ち切って送り直す（再試行可能な失敗）', async () => {
+    // 本物の fetch と同じく、打ち切りで AbortError を投げるふりをする。
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_input: unknown, init?: RequestInit) => {
+        const signal = init?.signal as AbortSignal | undefined;
+        expect(signal).toBeInstanceOf(AbortSignal);
+        await new Promise((_resolve, reject) => {
+          if (signal?.aborted) {
+            reject(new DOMException('The operation was aborted.', 'AbortError'));
+          } else {
+            signal?.addEventListener(
+              'abort',
+              () => reject(new DOMException('The operation was aborted.', 'AbortError')),
+              { once: true },
+            );
+          }
+        });
+        throw new Error('ここには来ない');
+      }),
+    );
+    const res = await deliverWebhook({ ...WEBHOOK, max_retries: 2 }, '{}', {
+      sleep: noSleep,
+      lookupHost: publicOnlyLookup,
+      timeoutMs: 20,
+    });
+    // 打ち切りは接続失敗と同じく送り直し、最後まで駄目なら失敗として残る。
+    expect(res).toMatchObject({ ok: false, lastStatus: null, attempts: 3 });
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(3);
+  });
+
+  it('打ち切り前に返事があれば成功する', async () => {
+    const count = stubFetch([200]);
+    const res = await deliverWebhook(WEBHOOK, '{}', {
+      sleep: noSleep,
+      lookupHost: publicOnlyLookup,
+      timeoutMs: 5_000,
+    });
+    expect(res).toMatchObject({ ok: true, attempts: 1, lastStatus: 200 });
+    expect(count()).toBe(1);
+  });
+});
+
+describe('Retry-After の読み取り(N-374)', () => {
+  it('秒数形式はそのまま待つ', () => {
+    expect(retryAfterDelayMs('2', 500)).toBe(2000);
+    expect(retryAfterDelayMs('0', 500)).toBe(0);
+    expect(retryAfterDelayMs(' 3 ', 500)).toBe(3000);
+  });
+
+  it('HTTP-date 形式はその時刻まで待つ', () => {
+    const now = Date.now();
+    const at = new Date(now + 3000).toUTCString();
+    const wait = retryAfterDelayMs(at, 500, now);
+    expect(wait).toBeGreaterThan(1000);
+    expect(wait).toBeLessThanOrEqual(3000);
+  });
+
+  it('読めない・過去・上限超えは既定の待ちへ丸める', () => {
+    expect(retryAfterDelayMs(null, 500)).toBe(500);
+    expect(retryAfterDelayMs('', 500)).toBe(500);
+    expect(retryAfterDelayMs('soon', 500)).toBe(500);
+    expect(retryAfterDelayMs('-5', 500)).toBe(500);
+    // 上限（8秒）を超える指定は待たない。
+    expect(retryAfterDelayMs('3600', 500)).toBe(500);
+    expect(retryAfterDelayMs('9', 500)).toBe(500);
+    expect(retryAfterDelayMs(new Date(Date.now() - 60_000).toUTCString(), 500)).toBe(500);
+    expect(retryAfterDelayMs(new Date(Date.now() + 3_600_000).toUTCString(), 500)).toBe(500);
+    expect(WEBHOOK_RETRY_AFTER_MAX_MS).toBe(8_000);
+  });
+
+  /** 1回目に429・2回目に200を返す応答の組み立て。 */
+  function respond429Then200(retryAfter: string | null) {
+    const headers: Record<string, string> = retryAfter == null ? {} : { 'retry-after': retryAfter };
+    let calls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        calls++;
+        if (calls === 1) return new Response('', { status: 429, headers });
+        return new Response('', { status: 200 });
+      }),
+    );
+  }
+
+  it('429 の秒数指定どおりに待って送り直す', async () => {
+    respond429Then200('2');
+    const waits: number[] = [];
+    const res = await deliverWebhook({ ...WEBHOOK, max_retries: 1 }, '{}', {
+      sleep: (ms: number) => { waits.push(ms); return Promise.resolve(); },
+      lookupHost: publicOnlyLookup,
+    });
+    expect(res).toMatchObject({ ok: true, attempts: 2, lastStatus: 200 });
+    expect(waits).toEqual([2000]);
+  });
+
+  it('429 の日付指定どおりに待って送り直す', async () => {
+    respond429Then200(new Date(Date.now() + 3000).toUTCString());
+    const waits: number[] = [];
+    const res = await deliverWebhook({ ...WEBHOOK, max_retries: 1 }, '{}', {
+      sleep: (ms: number) => { waits.push(ms); return Promise.resolve(); },
+      lookupHost: publicOnlyLookup,
+    });
+    expect(res).toMatchObject({ ok: true, attempts: 2 });
+    expect(waits).toHaveLength(1);
+    expect(waits[0]).toBeGreaterThan(1000);
+    expect(waits[0]).toBeLessThanOrEqual(3000);
+  });
+
+  it('429 の過大な指定は既定の指数待ちへ丸める（回数は増やさない）', async () => {
+    respond429Then200('3600');
+    const waits: number[] = [];
+    const res = await deliverWebhook({ ...WEBHOOK, max_retries: 1 }, '{}', {
+      sleep: (ms: number) => { waits.push(ms); return Promise.resolve(); },
+      lookupHost: publicOnlyLookup,
+    });
+    expect(res).toMatchObject({ ok: true, attempts: 2 });
+    expect(waits).toEqual([retryDelayMs(0)]);
+  });
+
+  it('429 で指定がなければ従来どおり指数待ち', async () => {
+    respond429Then200(null);
+    const waits: number[] = [];
+    const res = await deliverWebhook({ ...WEBHOOK, max_retries: 1 }, '{}', {
+      sleep: (ms: number) => { waits.push(ms); return Promise.resolve(); },
+      lookupHost: publicOnlyLookup,
+    });
+    expect(res).toMatchObject({ ok: true, attempts: 2 });
+    expect(waits).toEqual([retryDelayMs(0)]);
+  });
+
+  it('決定表どおりに扱う（2xx・429・5xx・打ち切り・接続失敗・4xx）', async () => {
+    // 2xx は1回で成功。
+    let count = stubFetch([200]);
+    let res = await deliverWebhook({ ...WEBHOOK, max_retries: 2 }, '{}', { sleep: noSleep, lookupHost: publicOnlyLookup });
+    expect(res).toMatchObject({ ok: true, attempts: 1, lastStatus: 200 });
+    expect(count()).toBe(1);
+
+    // 5xx は指数待ちで送り直す。
+    count = stubFetch([503, 503, 200]);
+    const waits: number[] = [];
+    res = await deliverWebhook({ ...WEBHOOK, max_retries: 2 }, '{}', {
+      sleep: (ms: number) => { waits.push(ms); return Promise.resolve(); },
+      lookupHost: publicOnlyLookup,
+    });
+    expect(res).toMatchObject({ ok: true, attempts: 3 });
+    expect(waits).toEqual([retryDelayMs(0), retryDelayMs(1)]);
+    expect(count()).toBe(3);
+
+    // 接続失敗は送り直し、最後まで駄目なら失敗として残る（二重送信は増やさない）。
+    stubFetch(['throw']);
+    res = await deliverWebhook({ ...WEBHOOK, max_retries: 1 }, '{}', { sleep: noSleep, lookupHost: publicOnlyLookup });
+    expect(res).toMatchObject({ ok: false, lastStatus: null, attempts: 2 });
+
+    // その他の 4xx は残りの回数を使わずに諦める。
+    count = stubFetch([400]);
+    res = await deliverWebhook({ ...WEBHOOK, max_retries: 5 }, '{}', { sleep: noSleep, lookupHost: publicOnlyLookup });
+    expect(res).toMatchObject({ ok: false, attempts: 1, lastStatus: 400 });
+    expect(count()).toBe(1);
   });
 });
