@@ -2060,7 +2060,7 @@ export const CHATS = [
   isUnread: Boolean(isUnread),
   lastMessageAt: String(lastMessageAt),
   lastMessageContent: String(lastMessageContent),
-  lastMessageDirection: 'inbound',
+  lastMessageDirection: 'incoming',
   lastMessageType: 'text',
   sendMode: 'line',
   createdAt: '2026-08-13T00:00:00.000Z',
