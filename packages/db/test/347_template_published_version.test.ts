@@ -25,74 +25,165 @@ function openMigratedDb(): D1Database {
   return asD1(sqlite);
 }
 
-function createLiveTemplate(db: D1Database, messageContent = '公開中の本文') {
+function createUnpublishedTemplate(db: D1Database, messageContent = '最初の本文') {
   return createTemplate(db, { name: 'あいさつ', messageType: 'text', messageContent });
 }
 
-describe('migration 347 テンプレートの公開版固定(#645 / N-131)', () => {
-  it('作った直後は公開版として読める(送信側が読む live 列に入る)', async () => {
+describe('migration 347 テンプレートの公開版固定(#645 / N-131・差し戻し6要件)', () => {
+  it('作った直後は未公開の下書きで始まり、初回の明示公開で版1になる(要件4)', async () => {
     const db = openMigratedDb();
-    const created = await createLiveTemplate(db);
+    const created = await createUnpublishedTemplate(db);
 
-    expect(created.published_version).toBe(1);
-    expect(created.published_at).not.toBeNull();
-    expect(hasTemplateDraft(created)).toBe(false);
-    // 送信側(auto_reply / step_delivery / event_bus / reminder_delivery)は
-    // getTemplateById の live 列を読む。作った直後から読める。
-    const live = await getTemplateById(db, created.id);
-    expect(live?.message_content).toBe('公開中の本文');
+    // 未公開: 版0・公開日時なし・下書きあり。送信候補の目印。
+    expect(created.published_version).toBe(0);
+    expect(created.published_at).toBeNull();
+    expect(hasTemplateDraft(created)).toBe(true);
+    expect(created.draft_revision).toBe(1);
+    expect(created.draft_message_content).toBe('最初の本文');
+
+    const result = await publishTemplate(db, created.id, { idempotencyKey: 'first-publish-0001' });
+    expect(result.published).toBe(true);
+    expect(result.replayed).toBe(false);
+    expect(result.row.published_version).toBe(1);
+    expect(result.row.published_at).not.toBeNull();
+    expect(result.row.message_content).toBe('最初の本文');
+    expect(hasTemplateDraft(result.row)).toBe(false);
   });
 
   it('下書き保存だけでは公開版が変わらず、2回目の保存が残る', async () => {
     const db = openMigratedDb();
-    const created = await createLiveTemplate(db);
+    const created = await createUnpublishedTemplate(db);
 
     await saveTemplateDraft(db, created.id, { messageContent: '1回目の編集' });
+    const mid = (await getTemplateById(db, created.id))!;
+    expect(mid.draft_revision).toBe(2);
     await saveTemplateDraft(db, created.id, { messageContent: '2回目の編集' });
 
     const row = (await getTemplateById(db, created.id))!;
     // 公開版は不変。
-    expect(row.message_content).toBe('公開中の本文');
-    expect(row.published_version).toBe(1);
+    expect(row.message_content).toBe('最初の本文');
+    expect(row.published_version).toBe(0);
     // 下書きには2回目の内容が残る。
     expect(row.draft_message_content).toBe('2回目の編集');
     expect(row.draft_message_type).toBe('text');
+    expect(row.draft_revision).toBe(3);
     expect(hasTemplateDraft(row)).toBe(true);
   });
 
   it('公開すると下書きが公開版になり、版が1つ進んで下書きが消える', async () => {
     const db = openMigratedDb();
-    const created = await createLiveTemplate(db);
+    const created = await createUnpublishedTemplate(db);
     await saveTemplateDraft(db, created.id, { messageContent: '公開したい本文' });
 
     const result = await publishTemplate(db, created.id, {
-      expectedVersion: 1,
+      expectedVersion: 0,
       idempotencyKey: 'publish-key-0001',
     });
 
     expect(result.published).toBe(true);
     expect(result.replayed).toBe(false);
     expect(result.row.message_content).toBe('公開したい本文');
-    expect(result.row.published_version).toBe(2);
+    expect(result.row.published_version).toBe(1);
+    expect(result.row.draft_revision).toBe(0);
     expect(hasTemplateDraft(result.row)).toBe(false);
   });
 
-  it('下書きがない公開は何もせず成功する(再試行は何度でも同じ)', async () => {
+  it('質問・カルーセル・制限超過文の削除は、公開で消えたままになり旧値が復活しない(要件2)', async () => {
     const db = openMigratedDb();
-    const created = await createLiveTemplate(db);
+    const questionJson = JSON.stringify({
+      text: '続けますか?',
+      tapMode: 'single',
+      choices: [{ label: 'はい', behavior: 'none' }],
+    });
+    const carouselActions = { 0: { 0: [{ type: 'text', text: '押した' }] } };
+    const created = await createTemplate(db, {
+      name: '質問つき',
+      messageType: 'text',
+      messageContent: '最初の本文',
+      questionJson,
+      carouselActions,
+      carouselTapLimitMode: 'once',
+      carouselTapLimitText: 'もう押せません',
+    });
+    // 公開して旧値を公開版にする。
+    await publishTemplate(db, created.id, { idempotencyKey: 'delete-test-publish-1' });
+    const live = (await getTemplateById(db, created.id))!;
+    expect(live.question_json).toBe(questionJson);
+    expect(live.carousel_tap_limit_text).toBe('もう押せません');
+
+    // 3つを消す。
+    await saveTemplateDraft(db, created.id, {
+      questionJson: null,
+      carouselActions: null,
+      carouselTapLimitText: null,
+    });
+    const draft = (await getTemplateById(db, created.id))!;
+    expect(hasTemplateDraft(draft)).toBe(true);
+
+    // 別の項目だけ足しても、消した3つは復活しない。
+    await saveTemplateDraft(db, created.id, { messageContent: '本文だけ直す' });
+    const redraft = (await getTemplateById(db, created.id))!;
+    expect(redraft.draft_question_json).toBeNull();
+    expect(redraft.draft_carousel_actions_json).toBeNull();
+    expect(redraft.draft_carousel_tap_limit_text).toBeNull();
+
+    // 公開しても旧値は戻らない。
+    const result = await publishTemplate(db, created.id, { idempotencyKey: 'delete-test-publish-2' });
+    expect(result.published).toBe(true);
+    expect(result.row.question_json).toBeNull();
+    expect(result.row.carousel_actions_json).toBeNull();
+    expect(result.row.carousel_tap_limit_text).toBeNull();
+    expect(result.row.message_content).toBe('本文だけ直す');
+  });
+
+  it('検査後に下書きが書き換わったら、古い下書き版での公開を止める(要件3)', async () => {
+    const db = openMigratedDb();
+    const created = await createUnpublishedTemplate(db);
+    await saveTemplateDraft(db, created.id, { messageContent: '確認した本文' });
+    const seen = (await getTemplateById(db, created.id))!;
+
+    // 別人がその後に書き換えた。
+    await saveTemplateDraft(db, created.id, { messageContent: '確認していない本文' });
+
+    await expect(
+      publishTemplate(db, created.id, {
+        expectedDraftRevision: seen.draft_revision,
+        idempotencyKey: 'draft-cas-stale',
+      }),
+    ).rejects.toThrow('TEMPLATE_DRAFT_CONFLICT');
+
+    const kept = (await getTemplateById(db, created.id))!;
+    expect(kept.message_content).toBe('最初の本文');
+    expect(kept.published_version).toBe(0);
+
+    // 開き直した版なら公開できる。
+    const fresh = (await getTemplateById(db, created.id))!;
+    const result = await publishTemplate(db, created.id, {
+      expectedDraftRevision: fresh.draft_revision,
+      idempotencyKey: 'draft-cas-fresh',
+    });
+    expect(result.published).toBe(true);
+    expect(result.row.message_content).toBe('確認していない本文');
+  });
+
+  it('下書きがない公開も確認キーを記録し、再試行は同じ結果になる(要件5)', async () => {
+    const db = openMigratedDb();
+    const created = await createUnpublishedTemplate(db);
 
     const first = await publishTemplate(db, created.id, { idempotencyKey: 'retry-key-0002' });
-    expect(first.published).toBe(false);
+    expect(first.published).toBe(true);
     expect(first.row.published_version).toBe(1);
 
+    // 下書きなしの成功を同キーで再試行しても、何も起きない。
     const second = await publishTemplate(db, created.id, { idempotencyKey: 'retry-key-0002' });
     expect(second.published).toBe(false);
+    expect(second.replayed).toBe(true);
     expect(second.row.published_version).toBe(1);
   });
 
   it('同じ確認キーでの再試行は公開済みの結果をそのまま返す', async () => {
     const db = openMigratedDb();
-    const created = await createLiveTemplate(db);
+    const created = await createUnpublishedTemplate(db);
     await saveTemplateDraft(db, created.id, { messageContent: '公開したい本文' });
 
     await publishTemplate(db, created.id, { idempotencyKey: 'publish-key-0003' });
@@ -101,36 +192,76 @@ describe('migration 347 テンプレートの公開版固定(#645 / N-131)', () 
     expect(replay.published).toBe(false);
     expect(replay.replayed).toBe(true);
     expect(replay.row.message_content).toBe('公開したい本文');
-    expect(replay.row.published_version).toBe(2);
+    expect(replay.row.published_version).toBe(1);
   });
 
-  it('公開済みの確認キーを新しい下書きに使い回すと断る', async () => {
+  it('後日の同キー再試行では、別の下書きを公開しない(要件5)', async () => {
     const db = openMigratedDb();
-    const created = await createLiveTemplate(db);
-    await saveTemplateDraft(db, created.id, { messageContent: '公開したい本文' });
+    const created = await createUnpublishedTemplate(db);
+    await saveTemplateDraft(db, created.id, { messageContent: '最初の公開' });
     await publishTemplate(db, created.id, { idempotencyKey: 'publish-key-0004' });
 
+    // 後日、新しい下書きができても、同キーでは公開しない。
     await saveTemplateDraft(db, created.id, { messageContent: '次の編集' });
-    await expect(
-      publishTemplate(db, created.id, { idempotencyKey: 'publish-key-0004' }),
-    ).rejects.toThrow('TEMPLATE_PUBLISH_KEY_CONFLICT');
+    const retry = await publishTemplate(db, created.id, { idempotencyKey: 'publish-key-0004' });
+
+    expect(retry.published).toBe(false);
+    expect(retry.replayed).toBe(true);
+    expect(retry.row.message_content).toBe('最初の公開');
+    expect(retry.row.published_version).toBe(1);
+    expect(hasTemplateDraft(retry.row)).toBe(true);
+  });
+
+  it('古い複数の成功キーはどれも再試行でき、版を進めない(要件5)', async () => {
+    const db = openMigratedDb();
+    const created = await createUnpublishedTemplate(db);
+    await publishTemplate(db, created.id, { idempotencyKey: 'old-key-1' });
+    await saveTemplateDraft(db, created.id, { messageContent: '2回目の公開' });
+    await publishTemplate(db, created.id, { idempotencyKey: 'old-key-2' });
+
+    const before = (await getTemplateById(db, created.id))!;
+    expect(before.published_version).toBe(2);
+
+    for (const key of ['old-key-1', 'old-key-2']) {
+      const replay = await publishTemplate(db, created.id, { idempotencyKey: key });
+      expect(replay.published).toBe(false);
+      expect(replay.replayed).toBe(true);
+      expect(replay.row.published_version).toBe(2);
+    }
+    const after = (await getTemplateById(db, created.id))!;
+    expect(after.message_content).toBe('2回目の公開');
+  });
+
+  it('同じ確認キーの同時公開は1回だけ通り、版は1つだけ進む(要件5)', async () => {
+    const db = openMigratedDb();
+    const created = await createUnpublishedTemplate(db);
+
+    const [first, second] = await Promise.all([
+      publishTemplate(db, created.id, { idempotencyKey: 'race-key' }),
+      publishTemplate(db, created.id, { idempotencyKey: 'race-key' }),
+    ]);
+    const publishedCount = [first, second].filter((r) => r.published).length;
+    expect(publishedCount).toBeLessThanOrEqual(1);
+
+    const row = (await getTemplateById(db, created.id))!;
+    // 初回公開なので版は最大でも1。重複公開はない。
+    expect(row.published_version).toBeLessThanOrEqual(1);
   });
 
   it('古い版番号での公開は同時更新の負けとして断る', async () => {
     const db = openMigratedDb();
-    const created = await createLiveTemplate(db);
-    await saveTemplateDraft(db, created.id, { messageContent: '先に勝った公開' });
-    await publishTemplate(db, created.id, { expectedVersion: 1 });
+    const created = await createUnpublishedTemplate(db);
+    await publishTemplate(db, created.id, { expectedVersion: 0 });
 
-    // 版は2へ進んだ。古い版1を指定した同時更新は通さない。
+    // 版は1へ進んだ。古い版0を指定した同時更新は通さない。
     await saveTemplateDraft(db, created.id, { messageContent: '遅れてきた公開' });
     await expect(
-      publishTemplate(db, created.id, { expectedVersion: 1 }),
+      publishTemplate(db, created.id, { expectedVersion: 0 }),
     ).rejects.toThrow('TEMPLATE_VERSION_CONFLICT');
 
     const row = (await getTemplateById(db, created.id))!;
-    expect(row.message_content).toBe('先に勝った公開');
-    expect(row.published_version).toBe(2);
+    expect(row.message_content).toBe('最初の本文');
+    expect(row.published_version).toBe(1);
   });
 
   it('ないテンプレートの下書き保存・公開は見つからないと返す', async () => {
@@ -175,6 +306,7 @@ describe('migration 347 テンプレートの公開版固定(#645 / N-131)', () 
     expect(row['published_version']).toBe(1);
     expect(row['published_at']).toBe('2026-09-02T00:00:00+09:00');
     expect(row['draft_message_content']).toBeNull();
+    expect(row['draft_revision']).toBe(0);
     expect(hasTemplateDraft(row as unknown as TemplateRow)).toBe(false);
   });
 });

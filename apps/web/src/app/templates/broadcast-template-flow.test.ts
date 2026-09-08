@@ -26,7 +26,9 @@ describe('コンテンツテンプレートから一斉配信への引用導線'
   })
 
   it('loads both message and content templates into the broadcast picker', () => {
-    expect(formSource).toContain('api.templates.list()')
+    // #645 差し戻し: 選んでいるアカウントを必ず渡し、未公開・他アカウントを候補にしない。
+    expect(formSource).toContain('api.templates.list(undefined, selectedAccountId || undefined)')
+    expect(formSource).toContain('filterSendableTemplates(templateResult.data')
     expect(formSource).toContain('api.broadcastMessageAssets.list')
     expect(formSource).toContain('テンプレートから選ぶ')
   })

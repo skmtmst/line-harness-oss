@@ -6523,6 +6523,14 @@ export const api = {
         /** Monthly and lifetime delivery totals. null when unavailable. */
         monthlySendCount: number | null;
         totalSendCount: number | null;
+        /** 347: 公開待ちの下書きがあるか。 */
+        hasDraft: boolean;
+        /** 347: 公開版の版番号。未公開は0。 */
+        publishedVersion: number;
+        /** 347: 最後に公開した日時。未公開はnull。 */
+        publishedAt: string | null;
+        /** 347: いまの下書き版。公開で0に戻る。 */
+        draftRevision: number;
         createdAt: string;
         updatedAt: string;
       }>>>(

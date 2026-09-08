@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Folder, Template } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import { filterSendableTemplates } from '@/lib/template-send-scope'
 import { useAccount } from '@/contexts/account-context'
 import TemplateFolderSelect, {
   type TemplateFolderOption,
@@ -70,10 +71,16 @@ export default function TemplatePicker({
     setTemplatesStatus('loading')
     setFoldersStatus('loading')
     setLoadedAccountId(selectedAccountId)
-    void api.templates.list().then((res) => {
+    // #645 差し戻し: 選んでいるアカウントを必ず渡し、未公開・他アカウントは候補にしない。
+    // 口の主 messageType/messageContent は公開版だけが返る。
+    const requestAccountId = selectedAccountId
+    void api.templates.list(undefined, requestAccountId ?? undefined).then((res) => {
       if (cancelled) return
       if (res.success) {
-        setTemplates(res.data as unknown as Template[])
+        setTemplates(filterSendableTemplates(
+          res.data as unknown as Array<Template & { accountId?: string | null; publishedVersion?: number | null; publishedAt?: string | null }>,
+          requestAccountId,
+        ) as unknown as Template[])
         setTemplatesStatus('ready')
       } else {
         setTemplatesStatus('error')

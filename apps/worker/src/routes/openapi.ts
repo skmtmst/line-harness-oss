@@ -1086,17 +1086,23 @@ const spec = {
       post: {
         tags: ['Templates'],
         summary: 'テンプレートの下書きを公開版へ写す',
-        description: '下書きがなければ何もせず成功。同じ確認キーの再試行は公開済みの結果を返す。版が進んでいたら409。',
-        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        description: 'Idempotency-Key ヘッダ(必須)で再試行を見分ける。下書きがなくても成功し、その確認キーを版と下書き版つきで記録する。同じ確認キーの再試行は成功済みの結果をそのまま返し、別の下書きを公開しない。公開版(expectedVersion)・下書き版(expectedDraftRevision)が進んでいたら409。新規作成は未公開(版0)で始まり、初回の公開で版1になる。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', minLength: 8, maxLength: 200 }, description: '公開操作の確認キー。必須。同じキーの再試行は同じ結果を返す。' },
+        ],
         requestBody: { content: { 'application/json': { schema: {
           type: 'object',
-          properties: { expectedVersion: { type: 'integer', minimum: 1 } },
+          properties: {
+            expectedVersion: { type: 'integer', minimum: 0, description: '確認したときの公開版。進んでいたら409。' },
+            expectedDraftRevision: { type: 'integer', minimum: 0, description: '確認したときの下書き版。書き換わっていたら409。' },
+          },
         } } } },
         responses: {
-          '200': { description: 'Published or replayed' },
-          '400': { description: 'Missing idempotency key or bad version' },
+          '200': { description: '公開成功 { published: true }・再試行 { published: false, replayed: true }・下書きなし成功 { published: false, replayed: false }。data に publishedVersion・publishedAt・hasDraft・draftRevision を返す。' },
+          '400': { description: '確認キー不足・版の番号が数でない' },
           '404': { description: 'Not found in account scope' },
-          '409': { description: 'Version conflict or key reuse' },
+          '409': { description: '公開版の同時更新の負け・下書きの書き換わり' },
         },
       },
     },

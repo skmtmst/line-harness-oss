@@ -4623,6 +4623,15 @@ CREATE TABLE tags (
   CHECK (linked_enabled IN (0, 1)), status TEXT NOT NULL DEFAULT 'active'
   CHECK (status IN ('active', 'archived')), version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0), created_by TEXT, updated_by TEXT, updated_at TEXT, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id));
 
+CREATE TABLE template_publish_keys (
+  template_id TEXT NOT NULL REFERENCES templates(id) ON DELETE CASCADE,
+  idempotency_key TEXT NOT NULL,
+  published_version INTEGER NOT NULL,
+  draft_revision INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (template_id, idempotency_key)
+);
+
 CREATE TABLE templates (
   id              TEXT PRIMARY KEY,
   name            TEXT NOT NULL,
@@ -4643,7 +4652,7 @@ CREATE TABLE templates (
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, line_account_id TEXT REFERENCES line_accounts(id), created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id), published_version INTEGER NOT NULL DEFAULT 1, published_at TEXT, draft_message_type TEXT, draft_message_content TEXT, draft_carousel_actions_json TEXT, draft_carousel_tap_limit_mode TEXT, draft_carousel_tap_limit_text TEXT, draft_question_json TEXT
   CHECK (draft_question_json IS NULL OR json_valid(draft_question_json)), draft_question_status TEXT
-  CHECK (draft_question_status IS NULL OR draft_question_status IN ('draft', 'published')), publish_idempotency_key TEXT);
+  CHECK (draft_question_status IS NULL OR draft_question_status IN ('draft', 'published')), publish_idempotency_key TEXT, draft_revision INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE tenants (
   id TEXT PRIMARY KEY,
