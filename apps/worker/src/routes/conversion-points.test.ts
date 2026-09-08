@@ -250,6 +250,10 @@ describe('一覧', () => {
       targetUrl: 'https://example.com/a',
       countRepeat: false,
     });
+    expect(mocks.getConversionPoints).toHaveBeenCalledWith(env.DB, {
+      allowedLineAccountIds: [],
+      includeUnassigned: true,
+    });
   });
 });
 

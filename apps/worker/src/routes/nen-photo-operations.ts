@@ -215,10 +215,12 @@ nenPhotoOperations.post(
         || (reasonCode === 'other' && !reasonNote)) {
         return c.json({ success: false, error: '写真、判断、理由、版を確認してください' }, 400);
       }
+      // 単体審査と同じく補足は素で保存する（#500 軽）。
+      // 一括だけ `[差し戻し]` を付けると「見送った理由」の表示が単体とずれる。
       decisions.push({
         photoId: raw.photoId.trim(), decision: decision as BulkPhotoDecision['decision'],
         expectedVersion: raw.expectedVersion, reasonCode,
-        reasonNote: decision === 'return' ? `[差し戻し] ${reasonNote}`.trim() : reasonNote || null,
+        reasonNote: reasonNote || null,
       });
     }
     if (new Set(decisions.map((decision) => decision.photoId)).size !== decisions.length) {

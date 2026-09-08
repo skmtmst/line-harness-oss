@@ -1113,6 +1113,17 @@ const WEEKDAY_JA = ['日', '月', '火', '水', '木', '金', '土'] as const;
 
 scenarios.get('/api/scenarios/:id/preview', scenarioPermission('view'), async (c) => {
   try {
+    // simulate と同じく開始日の正しさを見る。無いと NaN 時刻の予定が
+    // 返るか 500 になる（#495 軽15）。
+    const startParam = c.req.query('startAt');
+    if (startParam && !Number.isFinite(new Date(startParam).getTime())) {
+      return c.json({
+        success: false,
+        code: 'start_at_invalid',
+        error: '開始日時が正しくありません',
+        field: 'startAt',
+      }, 400);
+    }
     const scenarioId = c.req.param('id');
     const scenarioRow = await c.env.DB
       .prepare(`SELECT delivery_mode FROM scenarios WHERE id = ?`)
@@ -1153,7 +1164,7 @@ scenarios.get('/api/scenarios/:id/preview', scenarioPermission('view'), async (c
     // computeNextDeliveryAt は「JST clock-time を UTC として表現する Date」前提。
     // クエリの startParam は "+09:00" 付き ISO で本物の UTC instant として parse されるため、
     // +9h ずらして JST clock-time 表現に揃える。default の now も同様にずらして表現する。
-    const startParam = c.req.query('startAt');
+    // （正しさは入口で見ているので、ここでは読むだけ。）
     const startAt = startParam
       ? new Date(new Date(startParam).getTime() + 9 * 60 * 60_000)
       : new Date(Date.now() + 9 * 60 * 60_000);

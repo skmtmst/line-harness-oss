@@ -115,30 +115,36 @@ function ReservedBroadcastContent() {
       }
 
       setBroadcast(result.data)
-      if (result.data.lineAccountId) {
-        try {
-          const notifications = await api.broadcasts.notificationSettings(result.data.lineAccountId)
-          if (isCurrent() && notifications.success) setNotificationText(notifications.data.displayText)
-        } catch {
-          if (isCurrent()) setNotificationText('')
-        }
-      }
+      /*
+       * 通知設定と人数の再集計は互いに待たない。直列に待つと予約完了の
+       * 表示が遅い。片方だけ取れないときも、もう片方は出す（#490 軽4）。
+       */
+      const notifyTask = result.data.lineAccountId
+        ? api.broadcasts.notificationSettings(result.data.lineAccountId)
+          .then((notifications) => {
+            if (isCurrent() && notifications.success) setNotificationText(notifications.data.displayText)
+          })
+          .catch(() => {
+            if (isCurrent()) setNotificationText('')
+          })
+        : Promise.resolve()
       // 完了した予約の取得と、現在人数の再集計は別の結果として扱う。
       // 人数だけ取れないときに予約そのものまで「表示できない」に戻さない。
-      try {
-        const preflight = await api.broadcasts.preflight({
-          targetType: result.data.targetType,
-          targetTagId: result.data.targetTagId,
-          segmentConditions: result.data.segmentConditions ?? null,
-          lineAccountId: result.data.lineAccountId,
-          accountIds: result.data.accountIds ?? undefined,
-          messageContent: result.data.messageContent,
+      const estimateTask = api.broadcasts.preflight({
+        targetType: result.data.targetType,
+        targetTagId: result.data.targetTagId,
+        segmentConditions: result.data.segmentConditions ?? null,
+        lineAccountId: result.data.lineAccountId,
+        accountIds: result.data.accountIds ?? undefined,
+        messageContent: result.data.messageContent,
+      })
+        .then((preflight) => {
+          if (isCurrent() && preflight.success) setEstimate(preflight.data)
         })
-        if (!isCurrent()) return
-        if (preflight.success) setEstimate(preflight.data)
-      } catch {
-        if (isCurrent()) setEstimate(null)
-      }
+        .catch(() => {
+          if (isCurrent()) setEstimate(null)
+        })
+      await Promise.all([notifyTask, estimateTask])
     } catch {
       if (!isCurrent()) return
       setBroadcast(null)

@@ -11,7 +11,8 @@ const EDIT = read('edit', 'page.tsx')
 const BRANCH_EDITOR = read('branch-editor.tsx')
 const VERSIONS = read('versions', 'page.tsx')
 const EDITOR = read('..', '..', 'components', 'automations', 'common-action-editor.tsx')
-const PERMISSION = read('..', '..', 'components', 'automations', 'use-common-action-permission.ts')
+// #580: 権限の実体は use-can-manage.ts へ1本化。旧2ファイルは互換の再送出。
+const PERMISSION = read('..', '..', 'components', 'automations', 'use-can-manage.ts')
 const API = read('..', '..', 'lib', 'api.ts')
 const WORKER = read('..', '..', '..', '..', 'worker', 'src', 'services', 'common-actions.ts')
 const ENGINE = read('..', '..', '..', '..', 'worker', 'src', 'services', 'automation-engine.ts')
@@ -87,6 +88,26 @@ describe('V6共通アクションの画面契約', () => {
     expect(PERMISSION).toContain("role === 'owner' || role === 'admin'")
     expect(CREATE + EDIT).toContain('共通アクションは閲覧のみです')
     expect(LIST + VERSIONS).toContain('canManage')
+  })
+
+  it('版操作は店が外れていたら実行しない (#580)', () => {
+    expect(VERSIONS).toContain('if (!selectedAccountId) {')
+    expect(VERSIONS).toContain('LINEアカウントを選び直してください')
+  })
+
+  it('手順IDは1本の採番で非HTTPSにも落ちる (#580)', () => {
+    expect(EDITOR).toContain('export function newStepId()')
+    expect(BRANCH_EDITOR).toContain('newStepId()')
+    expect(BRANCH_EDITOR).not.toContain('crypto.randomUUID()')
+  })
+
+  it('権限フックの実体は1本で旧名は再送出する (#580)', () => {
+    const automation = read('..', '..', 'components', 'automations', 'use-automation-permission.ts')
+    const commonAction = read('..', '..', 'components', 'automations', 'use-common-action-permission.ts')
+    expect(automation).toContain("from './use-can-manage'")
+    expect(commonAction).toContain("from './use-can-manage'")
+    expect(automation).not.toContain('localStorage')
+    expect(commonAction).not.toContain('localStorage')
   })
 
   it('ヘッダーの最後をマニュアルにする', () => {

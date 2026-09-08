@@ -30,4 +30,9 @@ describe('V6 流入リンク詳細の数字の契約', () => {
     expect(PAGE).toContain('シナリオは始めない')
     expect(PAGE).toContain('タグは付けない')
   })
+
+  it('記号入り ref でも URL を壊さない', () => {
+    expect(PAGE).toContain('encodeURIComponent(route.refCode)')
+    expect(PAGE).toContain('encodeURIComponent(redirectTarget.refCode)')
+  })
 })

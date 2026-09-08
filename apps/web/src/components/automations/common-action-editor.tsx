@@ -28,9 +28,24 @@ function defaultParams(type: CommonActionStep['type']): Record<string, unknown> 
   return {}
 }
 
+/**
+ * 手順IDの採番1本化（#519 軽）。`crypto.randomUUID` は非HTTPS環境で
+ * 例外になるため、使えないときは乱数+時刻へ落とす。
+ */
+export function newStepId(): string {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID()
+    }
+  } catch {
+    // 下の代替へ落とす。
+  }
+  return `step-${Date.now().toString(36)}-${Math.floor(Math.random() * 0xffff_ffff).toString(36)}`
+}
+
 export function newCommonActionStep(type: CommonActionStep['type'] = 'add_tag'): CommonActionStep {
   return {
-    id: crypto.randomUUID(),
+    id: newStepId(),
     type,
     params: defaultParams(type),
     onFailure: 'stop',

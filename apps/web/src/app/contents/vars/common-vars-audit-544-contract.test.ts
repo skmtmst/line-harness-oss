@@ -42,7 +42,7 @@ describe('#544 N7/L1 CSVの数式インジェクション対策と共通化', ()
     const csv = impactCsv({
       byKind: { template: 1 },
       items: [{
-        name: '予約配信', kindLabel: '一斉配信', status: '予約中', blocksDeletion: true,
+        name: '予約配信', kindLabel: '一斉配信', status: '配信予約中', blocksDeletion: true,
         changesOnSave: true, currentPreview: '前', nextPreview: '@evil', exceedsCharacterLimit: false,
       }],
     } as never)

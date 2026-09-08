@@ -1,12 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { fetchApi } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import MergedTabs from '@/components/layout/merged-tabs'
-import SelectField from '@/components/shared/select-field'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import FilterChip from '@/components/shared/filter-chip'
 
@@ -82,8 +81,13 @@ export default function AutomationRunsPage() {
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [retryNotice, setRetryNotice] = useState('')
 
+  // 検索の連打で古い応答が新しい表示を上書きしないよう世代で守る（#519 軽）。
+  const loadGeneration = useRef(0)
+
   const load = useCallback(async () => {
     if (accountLoading) return
+    const generation = loadGeneration.current + 1
+    loadGeneration.current = generation
     setStatus('loading')
     try {
       const params = new URLSearchParams({ limit: '20', offset: '0' })
@@ -91,6 +95,7 @@ export default function AutomationRunsPage() {
       if (query.trim()) params.set('search', query.trim())
       if (resultFilter !== 'all') params.set('status', resultFilter)
       const response = await fetchApi<ApiResponse<RunsResponse>>(`/api/automation-runs?${params}`)
+      if (generation !== loadGeneration.current) return
       if (!response.success) throw new Error(response.error)
       if (!response.data || !response.data.summary || !Array.isArray(response.data.items) || !response.data.pagination) {
         throw new Error('実行記録の応答形式が正しくありません')
@@ -98,13 +103,14 @@ export default function AutomationRunsPage() {
       setData(response.data)
       setStatus('ready')
     } catch {
+      if (generation !== loadGeneration.current) return
       setData(null)
       setStatus('error')
     }
   }, [accountLoading, query, resultFilter, selectedAccountId])
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void load(), 200)
+    const timer = window.setTimeout(() => void load(), 400)
     return () => window.clearTimeout(timer)
   }, [load])
 
@@ -153,9 +159,8 @@ export default function AutomationRunsPage() {
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="友だちの名前・オートメーションの名前で検索" className="h-10 w-full max-w-lg rounded-control border border-hairline bg-canvas px-3 text-sm outline-none focus:border-info" />
-        <div className="flex gap-2">
-          <SelectField aria-label="表示期間" value="30" onChange={() => undefined} options={[{ value: '30', label: 'この30日' }]} className="h-10 min-w-32" />
-          <SelectField aria-label="表示件数" value="20" onChange={() => undefined} options={[{ value: '20', label: '20件表示' }]} className="h-10 min-w-32" />
+        <div className="flex items-center gap-2">
+          <p className="text-sm text-ink-secondary">この30日・20件表示</p>
         </div>
       </div>
 

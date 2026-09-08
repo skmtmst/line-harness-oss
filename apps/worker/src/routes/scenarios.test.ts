@@ -453,3 +453,17 @@ describe('シナリオ通の本文契約', () => {
     expect(dbMocks.createScenarioStep).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('GET /api/scenarios/:id/preview', () => {
+  test('軽15: 壊れた開始日時は simulate と同じく 400 で断る', async () => {
+    // 前段の可視確認を通す（存在する扱い）。検証はその後ろで動く。
+    dbMocks.getScenarioById.mockResolvedValue({ id: 's-1', line_account_id: 'acc-1' });
+    const { db } = makeScenarioDb([]);
+    const res = await setupApp(db).request(
+      `/api/scenarios/s-1/preview?startAt=${encodeURIComponent('壊れた日時')}`,
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { success: boolean; code: string; field: string };
+    expect(body).toMatchObject({ success: false, code: 'start_at_invalid', field: 'startAt' });
+  });
+});

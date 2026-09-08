@@ -64,16 +64,16 @@ export function describeStepAudience(
   tags: readonly AudienceTagName[],
 ): string {
   const condition = pruneCondition(asCondition(raw))
-  if (isEmptyCondition(condition)) return '購読中の全員'
+  if (condition === null || isEmptyCondition(condition)) return '購読中の全員'
 
-  const tagId = soleTagId(condition!)
+  const tagId = soleTagId(condition)
   if (tagId) {
     const name = tags.find((t) => t.id === tagId)?.name
     if (name) return `タグ：${name}`
   }
 
-  const rules = condition!.rules.length
-  const groups = (condition!.groups ?? []).filter((g) => g.rules.length > 0).length
+  const rules = condition.rules.length
+  const groups = (condition.groups ?? []).filter((g) => g.rules.length > 0).length
   return groups === 0 ? `詳細条件 ${rules}件` : `詳細条件 ${rules}件 ＋ or条件 ${groups}組`
 }
 

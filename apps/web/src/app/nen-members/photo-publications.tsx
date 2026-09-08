@@ -12,8 +12,8 @@ import { FeatureLinkCard } from '@/components/shared/side-cards'
 import { Tabs } from '@/components/shared/tabs'
 import { safePhotoSrc } from './photo-src'
 import { photoPetDisplayName } from '@/components/shared/photo-display-name'
+import { text } from './photo-text'
 
-const text = (value: unknown) => String(value ?? '')
 const views = (value: unknown) => value == null ? '—（未取得）' : `${Number(value).toLocaleString('ja-JP')}回`
 const PLACEMENT_CHOICES = [
   { type: 'rich_menu', label: 'リッチメニュー' },

@@ -18,8 +18,9 @@ describe('V6 外部連携の運用者向け文言', () => {
 
   it('作成画面と空状態から同じ操作名へ進める', () => {
     expect(PAGE).toContain('受け取る設定を追加')
-    expect(PAGE).toContain('送る設定を追加')
-    expect(PAGE).toContain("tab === 'incoming' ? '受け取り口を追加' : '送り先を追加'")
+    expect(PAGE).toContain("{showCreate ? 'キャンセル' : '受け取り口を追加'}")
+    expect(PAGE).toContain('href="/webhooks/new">送り先を追加')
+    expect(PAGE).not.toContain('送る設定を追加')
     expect(OVERVIEWS).toContain('右上の「受け取り口を追加」から作成してください。')
     expect(OVERVIEWS).toContain('右上の「送り先を追加」から作成してください。')
     expect(SCREEN).not.toContain('新規Webhook')

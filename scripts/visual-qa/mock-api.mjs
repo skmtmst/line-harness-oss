@@ -934,9 +934,6 @@ const SHAPES = {
   '/api/media': { items: MEDIA_ITEMS, total: MEDIA_ITEMS.length, limit: 20, offset: 0 },
   '/api/media/quota': MEDIA_QUOTA,
 
-  /* 予約。`api.ts` を通らない口なので、読む側（`app/page.tsx`）に合わせる。 */
-  '/api/booking/admin/requests': { requests: [], total: 0, limit: 50, offset: 0 },
-
   /* EC の出荷予定（`EcShipmentList`）。`soon`/`later` は配列で要る。 */
   '/api/ec-commerce/shipments': {
     today: FIXED_TO,
@@ -1006,9 +1003,27 @@ function visualQaWriteBody(method, pathname) {
     return LINE_ACCOUNT_VERIFY_CONNECTION
   }
   if (method === 'POST' && /^\/api\/friend-add-rules\/[^/]+\/validate$/.test(pathname)) {
+    // 失敗系は visualState=error で切り替える。固定成功だけだと公開不可の
+    // 状態を確かめられない (#501-軽)。器は本物の失敗応答と同じ形。
+    if (query.get('visualState') === 'error') {
+      return {
+        success: false,
+        data: {
+          stateChanged: false, ruleId: FRIEND_ADD_RULE.id, matched: false,
+          reasons: ['送るシナリオが見つかりません。'],
+          scenarioId: FRIEND_ADD_RULE.definition.scenarioId,
+          message: FRIEND_ADD_RULE.definition.messageText,
+          actions: FRIEND_ADD_RULE.definition.actions,
+        },
+        error: 'テスト条件を確認してください',
+      }
+    }
     return FRIEND_ADD_RULE_VALIDATE
   }
   if (method === 'POST' && /^\/api\/friend-add-rules\/[^/]+\/publish$/.test(pathname)) {
+    if (query.get('visualState') === 'error') {
+      return { success: false, error: '公開前にテストを成功させてください' }
+    }
     return FRIEND_ADD_RULE_PUBLISH
   }
   if (method === 'POST' && /^\/api\/friend-fields\/[^/]+\/migration-preview$/.test(pathname)) {
@@ -1029,14 +1044,18 @@ function visualQaWriteBody(method, pathname) {
   if (method === 'POST' && pathname === '/api/analytics/cross/query') {
     return { id: 'visual-cross-result-1', state: 'pending' }
   }
+  /*
+   * 本番の口は `{success,data}` で包む。素値のままだと `api.ts` の
+   * 応答期待と形が違い、目視環境でテスト成功の絵を再現できない（#494 軽14）。
+   */
   if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/test$/.test(pathname)) {
-    return AUTO_REPLY_PUBLISH_TEST
+    return { success: true, data: AUTO_REPLY_PUBLISH_TEST }
   }
   if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/validate$/.test(pathname)) {
-    return AUTO_REPLY_PUBLISH_VALIDATION
+    return { success: true, data: AUTO_REPLY_PUBLISH_VALIDATION }
   }
   if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/publish$/.test(pathname)) {
-    return AUTO_REPLY_PUBLISH_RESULT
+    return { success: true, data: AUTO_REPLY_PUBLISH_RESULT }
   }
   if (method === 'POST' && /^\/api\/rich-menu-groups\/[^/]+\/preview-targets$/.test(pathname)) {
     return {
@@ -1071,6 +1090,29 @@ function visualQaWriteBody(method, pathname) {
   if (method === 'POST' && pathname === '/api/saved-searches/preview') {
     return FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL
   }
+  /* 機能29の操作系。承認・拒否・取消・枠の増減を目視できるよう固定の返事を返す(点検#520の中7)。 */
+  if (method === 'POST' && /^\/api\/events\/admin\/events\/[^/]+\/bookings\/[^/]+\/decide$/.test(pathname)) {
+    const bookingId = pathname.split('/').pop()
+    const found = EVENT_BOOKINGS.find((booking) => booking.id === bookingId) ?? EVENT_BOOKINGS[0]
+    return { ...found, status: 'confirmed', decided_at: '2026-09-08T00:00:00.000Z' }
+  }
+  if (method === 'POST' && /^\/api\/events\/admin\/events\/[^/]+\/bookings\/[^/]+\/cancel$/.test(pathname)) {
+    return { ok: true }
+  }
+  if (method === 'PUT' && /^\/api\/events\/admin\/events\/[^/]+\/bookings\/[^/]+$/.test(pathname)) {
+    const bookingId = pathname.split('/').pop()
+    const found = EVENT_BOOKINGS.find((booking) => booking.id === bookingId) ?? EVENT_BOOKINGS[0]
+    return { ...found, status: 'confirmed' }
+  }
+  if (method === 'POST' && /^\/api\/events\/admin\/events\/[^/]+\/slots$/.test(pathname)) {
+    return { items: EVENT_SLOTS }
+  }
+  if (method === 'PUT' && /^\/api\/events\/admin\/events\/[^/]+\/slots\/[^/]+$/.test(pathname)) {
+    return EVENT_SLOTS[0]
+  }
+  if (method === 'DELETE' && /^\/api\/events\/admin\/events\/[^/]+\/slots\/[^/]+$/.test(pathname)) {
+    return {}
+  }
   return null
 }
 
@@ -1104,6 +1146,7 @@ const RAW = {
   '/api/booking/admin/alternatives': BOOKING_CONFLICT_ALTERNATIVES,
   '/api/events/admin/events': { items: ADMIN_EVENTS },
   // 予約メニューの帯は `requests` から件数を出す。包むと `.filter` で落ちる。
+  // 撮影用は BOOKING_REQUESTS(実APIと同じ器。動的な絞り込みは下の分岐が受ける)。
   '/api/booking/admin/requests': { requests: BOOKING_REQUESTS, total: BOOKING_REQUESTS.length, limit: 50, offset: 0 },
   '/api/booking/admin/requests-summary': {
     total: BOOKING_REQUESTS.length,
@@ -1138,6 +1181,7 @@ const RAW_PATTERNS = [
   [/^\/api\/events\/admin\/events\/[^/]+$/, EVENT_DETAIL],
   [/^\/api\/events\/admin\/events\/[^/]+\/slots$/, { items: EVENT_SLOTS }],
   [/^\/api\/events\/admin\/events\/[^/]+\/waitlist$/, { waitlist: EVENT_WAITLIST }],
+  [/^\/api\/events\/admin\/events\/notifications\/pending$/, { count: 2 }],
   [/^\/api\/events\/admin\/events\/[^/]+\/bookings$/, (url) => ({
     items: url.searchParams.get('status')
       ? EVENT_BOOKINGS.filter((booking) => booking.status === url.searchParams.get('status'))
@@ -1560,10 +1604,15 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     }
   }
   if (/^\/api\/friend-add-rules\/[^/]+$/.test(pathname)) {
+    // 未知IDは本物と同じく404にする。何を渡しても同一設定を返すと、
+    // 存在しない設定の画面が空にならず実機差異に気づけない (#501-軽)。
+    const ruleId = pathname.split('/').pop()
+    const found = FRIEND_ADD_RULES.items.find((item) => item.id === ruleId)
+    if (!found) return { success: false, error: 'Not found' }
     return {
       success: true,
       data: {
-        rule: FRIEND_ADD_RULE,
+        rule: found,
         options: FRIEND_ADD_RULE_OPTIONS,
         staffNotification: { status: 'connected', reason: null },
       },
@@ -1681,6 +1730,29 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: query.get('with_list_summary') === '1' ? FORM_LIST : FORMS }
   }
   if (pathname === `/api/forms/${FORM_DETAIL.id}`) return { success: true, data: FORM_DETAIL }
+  // 管理画面の保存・保管・削除の流れ（#503 L5）。絵の検証用に成功だけ返す。
+  if (method === 'POST' && pathname === '/api/forms/drafts') {
+    return { success: true, data: { id: 'form-draft-qa', isActive: false } }
+  }
+  if (method === 'PUT' && pathname === `/api/forms/${FORM_DETAIL.id}`) {
+    return { success: true, data: { id: FORM_DETAIL.id } }
+  }
+  if (method === 'POST' && pathname === `/api/forms/${FORM_DETAIL.id}/archive`) {
+    return {
+      success: true,
+      data: {
+        status: 'archived',
+        archivedAt: '2026-08-26T00:00:00.000Z',
+        retainedSubmissionCount: 0,
+        retainedOpenCount: 0,
+        retainedReferenceCount: 0,
+        answerUrlUnavailable: true,
+      },
+    }
+  }
+  if (method === 'DELETE' && pathname === `/api/forms/${FORM_DETAIL.id}`) {
+    return { success: true, data: null }
+  }
   const formSubmissions = new RegExp(`^/api/forms/${FORM_DETAIL.id}/submissions$`).test(pathname)
   if (formSubmissions) {
     // 互換用の古い形（ページ分けなし）は配列だけを返す。実口と同じく上限500件。
@@ -2193,7 +2265,33 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       scenarios: [{ id: 'scenario-trial', name: '体験前フォロー' }],
     },
   }
-  if (pathname === '/api/automation-runs') return { success: true, data: AUTOMATION_RUNS }
+  if (pathname === '/api/automation-runs') {
+    // #519 軽: 本番口と同じく search・status・limit で絞る（固定7件を返さない）。
+    const runStatus = query.get('status')
+    const runSearch = (query.get('search') ?? '').trim().toLocaleLowerCase('ja')
+    const runLimit = Math.max(1, Number.parseInt(query.get('limit') ?? '', 10) || 20)
+    const statusDomains = runStatus === 'executed'
+      ? ['success', 'partial', 'failed']
+      : runStatus === 'problems'
+        ? ['partial', 'failed']
+        : runStatus === 'skipped'
+          ? ['skipped_condition']
+          : null
+    const runItems = AUTOMATION_RUNS.items.filter((item) => {
+      if (statusDomains && !statusDomains.includes(item.domainStatus)) return false
+      if (!runSearch) return true
+      return [item.subject, item.automationName].some((value) =>
+        String(value ?? '').toLocaleLowerCase('ja').includes(runSearch))
+    })
+    return {
+      success: true,
+      data: {
+        ...AUTOMATION_RUNS,
+        items: runItems.slice(0, runLimit),
+        pagination: { total: runItems.length, limit: runLimit, offset: 0 },
+      },
+    }
+  }
   if (pathname === '/api/automation-templates') return { success: true, data: AUTOMATION_TEMPLATES }
   if (pathname === '/api/ec-commerce/settings') return { success: true, data: EC_NOTIFICATION_SETTINGS }
   if (pathname === '/api/line-notifications/customer-definitions') {

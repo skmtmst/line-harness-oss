@@ -2060,7 +2060,7 @@ export const CHATS = [
   isUnread: Boolean(isUnread),
   lastMessageAt: String(lastMessageAt),
   lastMessageContent: String(lastMessageContent),
-  lastMessageDirection: 'inbound',
+  lastMessageDirection: 'incoming',
   lastMessageType: 'text',
   sendMode: 'line',
   createdAt: '2026-08-13T00:00:00.000Z',
@@ -2251,15 +2251,16 @@ export const TEMPLATES = (() => {
                     : n === 13 ? '予約変更のご案内'
                       : n === 14 ? '来店後フォロー'
                         : `${label}のひな形 ${i + 1}`,
-        category: n === 0 ? '予約日時と注意事項を案内'
-          : n === 1 ? '返信後の追加案内'
-            : n === 2 ? '購入商品と配送予定を案内'
-              : 'text',
+        /* 分類は分類名にする。説明文を入れると画面の分類欄が説明文になる。 */
+        category: label,
         messageType: 'text',
         messageContent: n === 0
           ? 'ご予約ありがとうございます。以下の内容をご確認ください。'
           : `${label}のご連絡です。内容をご確認ください。`,
         folderId,
+        /* 本物の口は質問・質問状態・置き場を必ず返す。無いと絞り・バッジの確認ができない。 */
+        question: null,
+        questionStatus: 'published',
         usageCount: n === 0 ? 38 : Math.max(0, 12 - n),
         tapCount: 0,
         monthlySendCount: sendCounts[n]?.[0] ?? 0,
@@ -4423,9 +4424,9 @@ export const CONVERSION_DEFINITIONS = {
       updatedAt: point.isActive ? '2026-08-25T09:00:00.000Z' : '2026-08-20T09:00:00.000Z',
     }
   }),
-  stateCounts: { active: 10, draft: 0, stopped: 2, invalid: 0, sourceStopped: 0 },
+  stateCounts: { active: 5, draft: 0, stopped: 1, invalid: 0, sourceStopped: 0 },
   range: CONVERSION_RANGE,
-  pagination: { total: 12, limit: 20, cursor: '0', nextCursor: null },
+  pagination: { total: 6, limit: 20, cursor: '0', nextCursor: null },
 }
 
 /* 機能19 GtylA: 入力中の条件だけで行う保存前試算。保存・成果追加はしない。 */
@@ -5025,11 +5026,12 @@ export const BOOKING_AVAILABILITY = {
 /* #414 の availability 契約。予約枠ごとの定員・残数・状態を固定する。 */
 for (const staff of BOOKING_AVAILABILITY.by_staff) {
   for (const slot of staff.slots) {
+    // resources は実APIも画面も使わない(点検#516の中5)。あると本番との差に気づけない。
+    delete slot.resources
     Object.assign(slot, {
       capacity: 2,
       remaining: slot.start === '14:00' ? 0 : 1,
       state: slot.start === '14:00' ? 'full' : 'limited',
-      resources: ['resource-room-a'],
     })
   }
 }
@@ -5108,11 +5110,11 @@ export const BOOKING_PROXY_CREATE = {
       data: {
         conflict: { from: '2026-09-03T05:00:00.000Z', to: '2026-09-03T06:45:00.000Z', count: 1, source: 'internal_booking' },
         nearbySlots: [
-          { date: '2026-09-03', start: '10:00', end: '11:45', capacity: 2, remaining: 1, state: 'limited', resources: ['resource-room-a'] },
-          { date: '2026-09-03', start: '13:00', end: '14:45', capacity: 2, remaining: 1, state: 'limited', resources: ['resource-room-a'] },
+          { date: '2026-09-03', start: '10:00', end: '11:45', capacity: 2, remaining: 1, state: 'limited' },
+          { date: '2026-09-03', start: '13:00', end: '14:45', capacity: 2, remaining: 1, state: 'limited' },
         ],
         alternateStaff: [
-          { staffId: 'bs-3', displayName: '高田', slot: { date: '2026-09-03', start: '15:00', end: '16:45', capacity: 2, remaining: 1, state: 'limited', resources: ['resource-room-a'] } },
+          { staffId: 'bs-3', displayName: '高田', slot: { date: '2026-09-03', start: '15:00', end: '16:45', capacity: 2, remaining: 1, state: 'limited' } },
         ],
       },
     },
@@ -5493,13 +5495,29 @@ export const EVENT_WAITLIST = [
   イベントの申込者。設計 `i5SN2j` の「申し込み12／キャンセル待ち3／取り消した2」。
   **同伴のペット**も入れる（設計は「ももちゃん（犬・4歳）」のように出す）。
 */
+/*
+  実APIの申込一覧と同じ器にする(点検#520の中7)。JOIN列がないと、画面の
+  「予約枠は未取得」「友だちは未取得」が出たままになり、本番との差に気づけない。
+  eb-4 は実DBのCHECK制約に無い 'waitlist' だったので 'requested' に直した。
+  キャンセル待ちの札は待ち列(EVENT_WAITLIST)の画面で撮る。
+*/
+const eventBookingRow = (row) => ({
+  slot_id: 'event-slot-1',
+  line_account_id: 'visual-qa-account',
+  slot_starts_at: '2026-09-25T05:00:00.000Z',
+  slot_ends_at: '2026-09-25T06:30:00.000Z',
+  friend_line_user_id: `Uev${row.id}`,
+  requested_at: row.created_at,
+  ...row,
+  friend_display_name: row.friend_name,
+})
 export const EVENT_BOOKINGS = [
-  { id: 'eb-requested', event_id: 'ev-1', friend_id: 'friend-requested', friend_name: '山本 京平', status: 'requested', companion_count: 1, companion_note: 'ももちゃん（犬・4歳）', is_first_time: 1, requested_at: '2026-09-03T01:30:00.000Z', decided_at: null, decided_by_staff_id: null, cancelled_at: null, created_at: '2026-09-03T01:30:00.000Z', updated_at: '2026-09-03T01:30:00.000Z' },
-  { id: 'eb-1', event_id: 'ev-1', friend_id: 'friend-1', friend_name: '高橋 直人', status: 'confirmed', companion_count: 1, companion_note: 'ももちゃん（犬・4歳）', is_first_time: 1, created_at: '2026-09-01T02:00:00.000Z' },
-  { id: 'eb-2', event_id: 'ev-1', friend_id: 'friend-2', friend_name: '前田 さくら', status: 'confirmed', companion_count: 1, companion_note: 'そらくん（猫・2歳）', is_first_time: 0, created_at: '2026-09-01T03:00:00.000Z' },
-  { id: 'eb-3', event_id: 'ev-1', friend_id: 'friend-3', friend_name: '木村 亮', status: 'confirmed', companion_count: 1, companion_note: 'こむぎちゃん（犬・7歳）', is_first_time: 1, created_at: '2026-09-01T04:00:00.000Z' },
-  { /* キャンセル待ち。全部が確定だと、その札が撮れない。 */ id: 'eb-4', event_id: 'ev-1', friend_id: 'friend-4', friend_name: '中村 彩', status: 'waitlist', companion_count: 1, companion_note: 'ぷりんちゃん（うさぎ・3歳）', is_first_time: 1, created_at: '2026-09-02T01:00:00.000Z' },
-  { /* 取り消した1件。 */ id: 'eb-5', event_id: 'ev-1', friend_id: 'friend-5', friend_name: '石田 未来', status: 'cancelled', companion_count: 1, companion_note: 'レオくん（犬・1歳）', is_first_time: 0, created_at: '2026-09-01T05:00:00.000Z' },
+  eventBookingRow({ id: 'eb-requested', event_id: 'ev-1', friend_id: 'friend-requested', friend_name: '山本 京平', status: 'requested', companion_count: 1, companion_note: 'ももちゃん（犬・4歳）', is_first_time: 1, requested_at: '2026-09-03T01:30:00.000Z', decided_at: null, decided_by_staff_id: null, cancelled_at: null, created_at: '2026-09-03T01:30:00.000Z', updated_at: '2026-09-03T01:30:00.000Z' }),
+  eventBookingRow({ id: 'eb-1', event_id: 'ev-1', friend_id: 'friend-1', friend_name: '高橋 直人', status: 'confirmed', companion_count: 1, companion_note: 'ももちゃん（犬・4歳）', is_first_time: 1, created_at: '2026-09-01T02:00:00.000Z' }),
+  eventBookingRow({ id: 'eb-2', event_id: 'ev-1', friend_id: 'friend-2', friend_name: '前田 さくら', status: 'confirmed', companion_count: 1, companion_note: 'そらくん（猫・2歳）', is_first_time: 0, created_at: '2026-09-01T03:00:00.000Z' }),
+  eventBookingRow({ id: 'eb-3', event_id: 'ev-1', friend_id: 'friend-3', friend_name: '木村 亮', status: 'confirmed', companion_count: 1, companion_note: 'こむぎちゃん（犬・7歳）', is_first_time: 1, created_at: '2026-09-01T04:00:00.000Z' }),
+  eventBookingRow({ id: 'eb-4', event_id: 'ev-1', friend_id: 'friend-4', friend_name: '中村 彩', status: 'requested', companion_count: 1, companion_note: 'ぷりんちゃん（うさぎ・3歳）', is_first_time: 1, created_at: '2026-09-02T01:00:00.000Z' }),
+  eventBookingRow({ /* 取り消した1件。 */ id: 'eb-5', event_id: 'ev-1', friend_id: 'friend-5', friend_name: '石田 未来', status: 'cancelled', companion_count: 1, companion_note: 'レオくん（犬・1歳）', is_first_time: 0, created_at: '2026-09-01T05:00:00.000Z' }),
 ]
 
 const lineAccount = (id, channelId, name, displayOrder, options = {}) => ({
@@ -5707,9 +5725,11 @@ const publicationPhoto = (id, photoId, petName, ownerName, count, label, type = 
 })
 
 export const NEN_PHOTO_PUBLICATIONS = {
+  // #580 軽: 概要は現物8件と一致させる（実APIは items.length を数える）。
+  // 掲載先は type:label の重なりなし5か所（pub-6は掲載先なし）。
   summary: {
-    publishedCount: 62, placementCount: 4,
-    topPhoto: { pet_name: 'ももちゃん', view_count: 1240 }, consentedCount: 62,
+    publishedCount: 8, placementCount: 5,
+    topPhoto: { pet_name: 'ももちゃん', view_count: 1240 }, consentedCount: 8,
   },
   items: [
     publicationPhoto('pub-1', 'ph-11', 'ももちゃん', '高橋 直人 さま', 1240, 'リッチメニュー', 'rich_menu'),

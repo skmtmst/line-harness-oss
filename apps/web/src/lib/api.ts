@@ -88,6 +88,7 @@ import type {
   FriendBulkRunSummary,
   FriendBulkRunDetail,
   IdentityCandidateDetail,
+  IdentityCandidateImpactMetric,
   IdentityCandidateKind,
   IdentityCandidateList,
   IdentityCandidateStatus,
@@ -143,7 +144,7 @@ export type OutgoingWebhookOverview = OutgoingWebhook & {
     pending: number
     successRate: number | null
     lastResult: {
-      status: string
+      status: 'succeeded' | 'failed' | 'pending'
       responseStatus: number | null
       completedAt: string | null
       failureReason: string | null
@@ -568,6 +569,41 @@ export interface ChatDetailMessage {
   sentByStaffName: string | null
   scenarioName: string | null
   createdAt: string
+}
+
+/** `GET /api/chats` が返す、受信箱一覧専用の会話行。 */
+export type ChatListItem = Chat & {
+  friendName: string
+  friendPictureUrl: string | null
+  lastMessageContent: string | null
+  lastMessageDirection: 'incoming' | 'outgoing' | null
+  lastMessageType: string | null
+  /** ログイン中の担当者だけの未読。対応状況とは別。 */
+  isUnread: boolean
+}
+
+/** `GET /api/chats/:id` の実応答。一覧にだけある値は省略される。 */
+export type ChatDetail = Pick<ChatListItem,
+  'id' | 'friendId' | 'operatorId' | 'status' | 'notes' | 'revision' | 'lastMessageAt' | 'createdAt'
+> & {
+  friendName: string
+  friendRealName: string | null
+  friendPictureUrl: string | null
+  isAttention: boolean
+  lastMessageContent?: string | null
+  lastMessageDirection?: 'incoming' | 'outgoing' | null
+  lastMessageType?: string | null
+  updatedAt?: string
+  messages: ChatDetailMessage[]
+  hasMoreMessages: boolean
+}
+
+/** 受信箱の保存検索は友だち検索と条件JSONの形が違うため、ここでは未知値として受ける。 */
+export type InboxSavedViewApiItem = Omit<SavedSearch, 'conditions'> & {
+  conditions: unknown
+  isFavorite: boolean
+  matchCount: number | null
+  matchCountCapped: boolean
 }
 
 /** 緊急停止の対象、影響、停止状態をサーバーと共有する契約。 */
@@ -2475,6 +2511,14 @@ export type FriendListItem = FriendWithTags & Partial<{
   supportMark: { id: string; name: string; color: string } | null
 }>
 
+/**
+ * 停止の再送を同じ操作として扱うキー。
+ * 同じルール・版なら同じ値、版が進んだ後の停止なら別の値になる。
+ */
+export function friendAddStopIdempotencyKey(ruleId: string, version: number): string {
+  return `friend-add-rule-stop:${encodeURIComponent(ruleId)}:v${version}`
+}
+
 
 
 /** 一覧画面の上部に出す数（タグ・テンプレート・シナリオ・リマインダ）。 */
@@ -3197,7 +3241,9 @@ export type EcIdentityCandidateOperationsList = {
     left: unknown
     right: unknown
     evidence: unknown
-    impact: unknown
+    // #580 軽: 影響は共有の計量型で受ける（DBは impact_json の配列を返す）。
+    // 形が違う応答は画面側のガードで「—（未取得）」に倒す。
+    impact: IdentityCandidateImpactMetric[]
     detectedAt: string
     reviewedAt: string | null
   }>
@@ -6181,8 +6227,8 @@ export const api = {
       deduplicationWindowDays?: number | null
       valueMode: ConversionValueMode
       fixedValue?: number | null
-    }) => fetchApi<ApiResponse<ConversionDefinitionPreview>>('/api/conversions/definitions/preview', {
-      method: 'POST', body: JSON.stringify(data),
+    }, options?: { signal?: AbortSignal }) => fetchApi<ApiResponse<ConversionDefinitionPreview>>('/api/conversions/definitions/preview', {
+      method: 'POST', body: JSON.stringify(data), signal: options?.signal,
     }),
     definitionDeleteImpact: (id: string) =>
       fetchApi<ApiResponse<ConversionDefinitionDeleteImpact>>(
@@ -7292,7 +7338,7 @@ export const api = {
         `/api/friend-add-rules/${encodeURIComponent(ruleId)}/stop?account_id=${encodeURIComponent(accountId)}`,
         {
           method: 'POST',
-          headers: { 'Idempotency-Key': crypto.randomUUID() },
+          headers: { 'Idempotency-Key': friendAddStopIdempotencyKey(ruleId, version) },
           body: JSON.stringify({ version }),
         },
       ),
@@ -7506,7 +7552,7 @@ export const api = {
       // カーソルページング: (lastMessageAt, friendId) の複合カーソルより古い行を返す
       if (params?.beforeAt) query.beforeAt = params.beforeAt
       if (params?.beforeId) query.beforeId = params.beforeId
-      return fetchApi<ApiResponse<Chat[]>>(
+      return fetchApi<ApiResponse<ChatListItem[]>>(
         '/api/chats?' + new URLSearchParams(query),
       )
     },
@@ -7516,11 +7562,7 @@ export const api = {
       if (params?.beforeAt) query.set('beforeAt', params.beforeAt)
       if (params?.beforeId) query.set('beforeId', params.beforeId)
       const qs = query.toString()
-      return fetchApi<ApiResponse<Chat & {
-        messages?: ChatDetailMessage[]
-        /** 古い履歴が残っているか。画面は「前のメッセージ」で遡る。 */
-        hasMoreMessages?: boolean
-      }>>(
+      return fetchApi<ApiResponse<ChatDetail>>(
         `/api/chats/${id}${qs ? `?${qs}` : ''}`,
       )
     },
@@ -7561,7 +7603,7 @@ export const api = {
         createdAt: string
       }>>>(`/api/chats/${id}/events`),
     savedViews: {
-      list: (accountId: string) => fetchApi<ApiResponse<SavedSearch[]>>(`/api/inbox/saved-views?lineAccountId=${encodeURIComponent(accountId)}`),
+      list: (accountId: string) => fetchApi<ApiResponse<InboxSavedViewApiItem[]>>(`/api/inbox/saved-views?lineAccountId=${encodeURIComponent(accountId)}`),
       create: (accountId: string, data: { name: string; conditions: unknown; isShared?: boolean; isFavorite?: boolean }) =>
         fetchApi<ApiResponse<SavedSearch>>(`/api/inbox/saved-views?lineAccountId=${encodeURIComponent(accountId)}`, {
           method: 'POST',
@@ -9135,7 +9177,8 @@ export interface ProxyBookingResult {
   booking_id: string;
   status: string;
   calendar_sync: 'not_configured' | 'synced' | 'failed' | 'pending';
-  line_notification: 'queued' | 'succeeded' | 'failed' | 'not_applicable';
+  // 再送時は裏側が 'scheduled' を返す(booking.ts)。無いと完了画面の文言が既定に落ちる。
+  line_notification: 'queued' | 'scheduled' | 'succeeded' | 'failed' | 'not_applicable';
   reminders: BookingReminderResult[];
   operations: BookingOperationResult[];
   customer_context: BookingCustomerContext | null;
@@ -9647,7 +9690,8 @@ export interface EventWaitlistItem {
 
 export const eventsApi = {
   listEvents: (accountId: string) =>
-    fetchApi<{ items: EventListItem[] }>(
+    // 共通一覧契約の offset 方式。裏側は既定200件・上限200件で total を返す。
+    fetchApi<{ items: EventListItem[]; total: number; limit: number }>(
       withAccount('/api/events/admin/events', accountId),
     ),
   getEvent: (accountId: string, id: string) =>
@@ -9679,6 +9723,11 @@ export const eventsApi = {
     eventId: string,
     slots: Array<{ starts_at: string; ends_at: string; capacity: number | null; is_active?: number; sort_order?: number }>,
   ) => (async () => {
+    // 誤指定で何千件も作らないよう、総数に上限を置く(点検#520の中9)。
+    // 1口400件の分割は裏側の上限に合わせたままにする。
+    if (slots.length > 500) {
+      throw new Error('500件を超える一括作成はできません。期間や曜日を分けて追加してください')
+    }
     const items: EventSlot[] = []
     for (let offset = 0; offset < slots.length; offset += 400) {
       const chunk = slots.slice(offset, offset + 400)
@@ -9720,7 +9769,8 @@ export const eventsApi = {
     if (filters.status) qs.push(`status=${encodeURIComponent(filters.status)}`);
     if (filters.slot_id) qs.push(`slot_id=${encodeURIComponent(filters.slot_id)}`);
     const tail = qs.length > 0 ? `?${qs.join('&')}` : '';
-    return fetchApi<{ items: EventBookingItem[] }>(
+    // 共通一覧契約の offset 方式。裏側は既定200件・上限200件で total を返す。
+    return fetchApi<{ items: EventBookingItem[]; total: number; limit: number }>(
       withAccount(`/api/events/admin/events/${eventId}/bookings${tail}`, accountId),
     );
   },

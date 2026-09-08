@@ -39,3 +39,12 @@ export const UNKNOWN_USAGE_KIND = '種類を判別できない使用先'
 export function mediaUsageKindText(refKind: string): string {
   return USAGE_KIND_LABELS[refKind] ?? UNKNOWN_USAGE_KIND
 }
+
+/**
+ * 容量の短い表示。一覧と詳細で同じ書き方にする（2か所のコピペをここへ寄せた）。
+ */
+export function formatMediaSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}

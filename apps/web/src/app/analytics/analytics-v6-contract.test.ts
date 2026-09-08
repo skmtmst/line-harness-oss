@@ -71,4 +71,25 @@ describe('V6 機能20 分析', () => {
     expect(PAGE).toContain('canManage && <Button onClick={() => void prepareCrossAudience()}')
     expect(PAGE).toContain('canManage && <Button onClick={() => void prepareFunnelAudience()}')
   })
+
+  it('結果待ちは打ち切りと間隔延長があり、無限に叩かない(点検#508の中2)', () => {
+    expect(PAGE).not.toContain('setInterval')
+    expect(PAGE).toContain('attempts >= 40')
+    expect(PAGE).toContain('時間切れです。条件をゆるめて集計し直してください')
+    expect(PAGE).toContain('attempts < 10 ? 1500 : attempts < 30 ? 3000 : 5000')
+  })
+
+  it('一覧の取得失敗は空表示と分け、実行制限は運用の言葉で出す(点検#508の中3・中4)', () => {
+    expect(PAGE).toContain('友だち情報欄を読み込めませんでした。開き直してください。')
+    expect(PAGE).toContain('ファネルを読み込めませんでした。開き直してください。')
+    expect(PAGE).toContain('analytics_cross_busy')
+    expect(PAGE).toContain('他の集計が動いています。終わってからもう一度押してください')
+    expect(PAGE).toContain('analytics_funnel_too_soon')
+    expect(PAGE).toContain('さきほど集計したばかりです。少し待ってから押してください')
+  })
+
+  it('200件で切れるときは注意を出し、CSVも範囲内と書く(点検#508の中5)', () => {
+    expect(PAGE).toContain('overview.hasMore')
+    expect(PAGE).toContain('200件まで表示しています。探す言葉を足して絞ってください。CSVの書き出しも、表示している範囲だけが入ります。')
+  })
 })

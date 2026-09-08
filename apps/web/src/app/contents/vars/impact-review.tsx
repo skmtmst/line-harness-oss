@@ -11,10 +11,12 @@ import SummaryCard from '@/components/shared/summary-card'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { characterCountText } from './change-impact'
 
+// 呼び名は口（COMMON_VAR_USAGE_KIND_LABELS）とそろえる。ずれると
+// 同じものを別物に読み違える。口側を変えたらここも変える。
 const KIND_LABELS: Record<string, string> = {
   template: 'テンプレート',
   broadcast: '一斉配信',
-  scenario: 'シナリオ',
+  scenario: 'シナリオ配信',
   reminder: 'リマインダ',
   auto_reply: '自動応答',
   form: '回答フォーム',
@@ -40,7 +42,8 @@ export function urgentImpactCount(impact: CommonVarChangeImpact): number | null 
   }
   const items = impact.items.filter((item) => item.changesOnSave)
   if (items.some((item) => item.status === '使われています')) return null
-  return items.filter((item) => /予約中|公開中/.test(item.status)).length
+  // 状態の語彙は口（commonVarUsageStatus）とそろえる。口が返さない呼び名は使わない。
+  return items.filter((item) => /配信予約中|配信中/.test(item.status)).length
 }
 
 export function overLimitCount(impact: CommonVarChangeImpact): number {
@@ -115,8 +118,8 @@ export default function ImpactReview({
           value={urgent}
           unit="件"
           detail={urgent === null
-            ? '予約中・公開中の内訳は未取得です'
-            : '予約中の配信・公開中のフォーム'}
+            ? '配信予約中・配信中の内訳は未取得です'
+            : '配信予約中・配信中のもの'}
           badgeTone="neutral"
           variant="v6"
         />

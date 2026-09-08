@@ -15,8 +15,12 @@ import styles from './scenario-results.module.css'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
+/*
+ * 到達率。分母が 0（まだ誰も参加していない）ときは「0.0%」にしない。
+ * 測って 0 なのか、測れていないのか区別できなくなる（#495 軽19）。
+ */
 function percentLabel(value: number, total: number): string {
-  if (total === 0) return '0.0%'
+  if (total === 0) return '—'
   return `${((value / total) * 100).toFixed(1)}%`
 }
 
@@ -106,6 +110,11 @@ function ResultsInner() {
 
   const exportCsv = () => {
     if (!scenario || !stats) return
+    /*
+     * 到達率の分母は集計（stats）の参加人数で統一する。画面の人数表示は
+     * 実行記録（runs）を優先する箇所があるが、CSV は runs が取れない
+     * 環境でも同じ数になるよう stats 基準にする（#495 軽19）。
+     */
     const rows = [
       ['ステップ', '配信時期', '到達人数', '到達率', '開封率', 'クリック率'],
       ...sortedSteps.map((step) => {

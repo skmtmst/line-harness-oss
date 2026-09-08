@@ -6,6 +6,7 @@ import CreatePage, { Field, inputClass } from '@/components/shared/create-page'
 import { useAccount } from '@/contexts/account-context'
 import { MIN_SECRET_LENGTH, generateSecret } from '../secret'
 
+/** 送信Webhookを作る唯一のフォーム。一覧の追加導線もこの画面へ集約する。 */
 export default function NewWebhookPage() {
   const { selectedAccountId } = useAccount()
   const [name, setName] = useState('')
@@ -36,7 +37,7 @@ export default function NewWebhookPage() {
           url: url.trim(),
           eventTypes: eventTypes
             .split(',')
-            .map((s) => s.trim())
+            .map((value) => value.trim())
             .filter(Boolean),
           secret,
           maxRetries: Number(maxRetries) || 0,
@@ -45,11 +46,9 @@ export default function NewWebhookPage() {
         return res.data.id
       }}
     >
-      {/* 設計は受け取る（Incoming）／送り出す（Outgoing）を選ばせるが、
-          この画面は送り出す専用。受け取る側は一覧の別の導線で作る。 */}
       <p className="text-ink text-sm font-semibold">1. どちら向きの連携か</p>
       <p className="text-ink-faint text-xs">
-        この画面で作れるのは「送り出す（Outgoing）」だけです。外部から受け取る場合は一覧から追加してください。
+        この画面で作れるのは「送り出す（Outgoing）」だけです。「受け取る（Incoming）」は外部連携の一覧から追加してください。
       </p>
 
       <p className="text-ink mt-2 text-sm font-semibold">2. 基本の設定</p>
@@ -59,7 +58,7 @@ export default function NewWebhookPage() {
           id="wh-name"
           type="text"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(event) => setName(event.target.value)}
           placeholder="例: 外部CRM連携"
           className={inputClass}
         />
@@ -70,22 +69,18 @@ export default function NewWebhookPage() {
           id="wh-url"
           type="url"
           value={url}
-          onChange={(e) => setUrl(e.target.value)}
+          onChange={(event) => setUrl(event.target.value)}
           placeholder="https://example.com/webhook"
           className={inputClass}
         />
       </Field>
 
-      <Field
-        label="送るイベント"
-        htmlFor="wh-events"
-        note="カンマ区切り。* を入れると全部のイベントを送ります。"
-      >
+      <Field label="送るイベント" htmlFor="wh-events" note="カンマ区切り。* を入れると全部のイベントを送ります。">
         <input
           id="wh-events"
           type="text"
           value={eventTypes}
-          onChange={(e) => setEventTypes(e.target.value)}
+          onChange={(event) => setEventTypes(event.target.value)}
           placeholder="friend.added, message.received"
           className={inputClass}
         />
@@ -102,7 +97,7 @@ export default function NewWebhookPage() {
             id="wh-secret"
             type="text"
             value={secret}
-            onChange={(e) => setSecret(e.target.value)}
+            onChange={(event) => setSecret(event.target.value)}
             className={`${inputClass} font-mono`}
           />
           <button
@@ -127,7 +122,7 @@ export default function NewWebhookPage() {
             min={0}
             max={5}
             value={maxRetries}
-            onChange={(e) => setMaxRetries(e.target.value)}
+            onChange={(event) => setMaxRetries(event.target.value)}
             className={`${inputClass} w-24 tabular-nums`}
           />
           <span className="text-ink-faint text-xs">回まで</span>
