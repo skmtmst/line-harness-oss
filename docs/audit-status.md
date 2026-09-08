@@ -496,12 +496,12 @@
 | 軽 | L5 | apps/web/src/app/co… | 済 #1396 |
 | 軽 | L6 | レポートタブ失敗時に再試行ボタンなし(… | 済 #1396 |
 | 軽 | L7 | apps/web/src/app/co… | 済 #1396 |
-| 軽 | L8 | apps/web/src/app/co… | 別票 #595 |
+| 軽 | L8 | apps/web/src/app/co… | 別票 #597 |
 | 軽 | L9 | apps/web/src/app/co… | 済 #1396 |
-| 軽 | L10 | apps/web/src/app/co… | 別票 #595 |
+| 軽 | L10 | apps/web/src/app/co… | 別票 #597 |
 | 軽 | L11 | apps/worker/src/rou… | 済 #1396 |
 | 軽 | L12 | apps/worker/src/rou… | 済 #1396 |
-| 軽 | L13 | apps/worker/src/rou… | 別票 #595 |
+| 軽 | L13 | apps/worker/src/rou… | 別票 #597 |
 | 軽 | L14 | 定義作成・更新のreasonとtarg… | 済 #1396 |
 | 共通依頼 | 1 | apps/web/src/app/co… | 済 #1311 |
 
@@ -665,8 +665,8 @@
 | 中 | 4 | 受信詳細だけ staff.permis… | 別票 #567 |
 | 中 | 5 | 照合方法・実行処理の編集口を呼ぶ画面が… | 別票 #567 |
 | 軽 | 1 | 秘密値の自動生成が2実装(btoa方式… | 済 #1396 |
-| 軽 | 2 | 送信作成フォームが一覧内蔵版と /we… | 別票 #596 |
-| 軽 | 3 | deliverySummary.las… | 別票 #596 |
+| 軽 | 2 | 送信作成フォームが一覧内蔵版と /we… | 別票 #597 |
+| 軽 | 3 | deliverySummary.las… | 別票 #597 |
 | 軽 | 4 | やり直し可否の表示判定を localS… | 済 #1396 |
 | 軽 | 5 | mockのやり取り記録の eventT… | 済 #1396 |
 | 軽 | 6 | 作成時の name・eventType… | 済 #1396 |
