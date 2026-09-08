@@ -15,4 +15,11 @@ describe('共通フォルダ欄', () => {
     expect(PANEL.indexOf('{rows.map')).toBeLessThan(PANEL.indexOf('onClick={onAddFolder}'))
     expect(PANEL).toContain('className="w-full"')
   })
+
+  it('分類の呼び名が異なる画面は見出しと読み上げ名を指定できる', () => {
+    expect(PANEL).toContain("heading = 'フォルダ'")
+    expect(PANEL).toContain('heading?: string')
+    expect(PANEL).toContain('aria-label={heading}')
+    expect(PANEL).toContain('>{heading}</p>')
+  })
 })
