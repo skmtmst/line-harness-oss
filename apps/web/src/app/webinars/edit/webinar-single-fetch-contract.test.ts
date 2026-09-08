@@ -15,7 +15,7 @@ describe('V6 ウェビナー通知・CTAの取得一本化の契約', () => {
     expect(PAGE).not.toContain('webinarApi.notifications(')
     expect(NOTIFICATIONS.match(/webinarApi\.notifications\(/g)).toHaveLength(1)
     expect(NOTIFICATIONS).toContain('onLoaded?.({ settings:')
-    expect(PAGE).toContain('<WebinarNotifications webinarId={webinarId} onLoaded={handleNotificationsLoaded} />')
+    expect(PAGE).toContain('<WebinarNotifications key={notifAttempt} webinarId={webinarId} onLoaded={handleNotificationsLoaded} />')
   })
 
   it('CTAの取得口は子の編集タブの1か所だけ', () => {

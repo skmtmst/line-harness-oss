@@ -17,6 +17,6 @@ describe('V6 ウェビナー編集の集計の遅延読み込みの契約', () =
   })
 
   it('子の独自取得はコメントと参加者だけ', () => {
-    expect(PAGE).toContain('Promise.all([webinarApi.userComments(webinarId), webinarApi.participants(webinarId)])')
+    expect(PAGE).toContain('Promise.all([webinarApi.userComments(webinarId), webinarApi.participants(webinarId, undefined, 8)])')
   })
 })
