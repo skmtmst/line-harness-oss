@@ -1415,6 +1415,52 @@ function PublishStep({
     })
   }, [group.accountId, group.id])
 
+  const [schedules, setSchedules] = useState<Array<{
+    id: string
+    mode: 'scheduled' | 'period'
+    startsAt: string
+    endsAt: string | null
+    status: string
+    attemptCount: number
+    nextRetryAt: string | null
+    lastErrorCode: string | null
+    createdAt: string
+  }>>([])
+  const [schedulesNotice, setSchedulesNotice] = useState('')
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void api.richMenuGroups.listSchedules(group.id).then((response) => {
+      if (cancelled || !response.success) return
+      setSchedules(response.data)
+    })
+    return () => { cancelled = true }
+  }, [group.id])
+
+  const refreshSchedules = useCallback(() => {
+    void api.richMenuGroups.listSchedules(group.id).then((response) => {
+      if (!response.success) return
+      setSchedules(response.data)
+    })
+  }, [group.id])
+
+  const cancelSchedule = useCallback(async (scheduleId: string) => {
+    setCancellingId(scheduleId)
+    setSchedulesNotice('')
+    try {
+      const response = await api.richMenuGroups.cancelSchedule(group.id, scheduleId)
+      if (!response.success) throw new Error(response.error)
+      setSchedulesNotice('予約を取り消しました。')
+      refreshSchedules()
+    } catch {
+      setSchedulesNotice('予約を取り消せませんでした。実行が始まっている可能性があります。')
+      refreshSchedules()
+    } finally {
+      setCancellingId(null)
+    }
+  }, [group.id, refreshSchedules])
+
   const unconfiguredAreas = pages.reduce((count, page) => count + page.areas.filter((area) => !area.label).length, 0)
   const imageReady = pages.length > 0 && pages.every((page) => page.imageR2Key)
   const submit = () => {
@@ -1428,7 +1474,7 @@ function PublishStep({
       startsAt: new Date(startsAt).toISOString(),
       endsAt: mode === 'period' ? new Date(endsAt).toISOString() : null,
       restoreGroupId: mode === 'period' ? restoreGroupId || null : null,
-    })
+    }).then(() => refreshSchedules()).catch(() => refreshSchedules())
   }
 
   return (
@@ -1474,6 +1520,42 @@ function PublishStep({
           <section className="bg-status-info-soft text-status-info rounded-card p-5 text-xs leading-5"><h2 className="text-sm font-bold">公開すると何が変わるか</h2><p className="mt-2"><MetricValue metric={preview?.effective} /> のトーク画面のメニューが入れ替わります。</p><p className="mt-2">LINEへの反映は数分かかることがあります。</p></section>
         </aside>
       </div>
+      <section aria-label="公開予約の一覧" className="border-hairline bg-canvas rounded-card mt-5 border p-6">
+        <h2 className="text-ink text-sm font-bold">公開予約の一覧</h2>
+        {schedulesNotice ? <p role="status" className="text-ink mt-2 text-xs">{schedulesNotice}</p> : null}
+        {schedules.length === 0 ? (
+          <p className="text-ink-faint mt-2 text-xs">まだ公開予約はありません。日時を決めて予約するとここに出ます。</p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {schedules.map((item) => (
+              <li key={item.id} className="border-hairline flex flex-wrap items-center justify-between gap-2 rounded border px-3 py-2 text-xs">
+                <span className="text-ink">
+                  {new Date(item.startsAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })} 開始
+                  {item.mode === 'period' && item.endsAt ? ` 〜 ${new Date(item.endsAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}` : ''}
+                  {' ・ '}
+                  {item.status === 'scheduled' ? '予約中'
+                    : item.status === 'publishing' ? '公開処理中'
+                    : item.status === 'published' ? '期間公開中'
+                    : item.status === 'restoring' ? '復元処理中'
+                    : item.status === 'completed' ? '完了'
+                    : item.status === 'cancelled' ? '取消済み'
+                    : item.status === 'failed' ? '失敗・要対応' : item.status}
+                  {item.status === 'failed' && item.lastErrorCode ? `（${item.lastErrorCode.slice(0, 40)}）` : ''}
+                  {item.nextRetryAt ? ` ・ 次回 ${new Date(item.nextRetryAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}` : ''}
+                </span>
+                {item.status === 'scheduled' ? (
+                  <Button
+                    onClick={() => void cancelSchedule(item.id)}
+                    disabled={cancellingId === item.id}
+                  >
+                    {cancellingId === item.id ? '取消中…' : '予約を取り消す'}
+                  </Button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
       <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><Button href={`/rich-menus/edit?id=${group.id}&step=targeting`}>前へ：誰に出すか</Button><div className="flex gap-2"><Button onClick={onSave} disabled={saving || publishing}>下書きに保存</Button><Button variant="primary" onClick={submit} disabled={saving || publishing || (mode !== 'now' && !startsAt) || (mode === 'period' && !endsAt)}>{publishing ? '公開中…' : mode === 'now' ? 'この内容で公開する' : 'この内容で予約する'}</Button></div></div>} />
     </main>
   )

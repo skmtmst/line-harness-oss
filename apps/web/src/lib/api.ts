@@ -8364,6 +8364,25 @@ export const api = {
         },
       ),
 
+    listSchedules: (groupId: string) =>
+      fetchApi<ApiResponse<Array<{
+        id: string
+        mode: 'scheduled' | 'period'
+        startsAt: string
+        endsAt: string | null
+        status: string
+        attemptCount: number
+        nextRetryAt: string | null
+        lastErrorCode: string | null
+        createdAt: string
+      }>>>(`/api/rich-menu-groups/${groupId}/schedules`),
+
+    cancelSchedule: (groupId: string, scheduleId: string) =>
+      fetchApi<ApiResponse<{ id: string; status: string }>>(
+        `/api/rich-menu-groups/${groupId}/schedules/${scheduleId}/cancel`,
+        { method: 'POST' },
+      ),
+
     create: (input: {
       accountId: string;
       name: string;
