@@ -20,6 +20,7 @@ import {
 } from '@line-crm/db';
 import {
   FRIEND_ADD_ROUTING_DEFAULT,
+  toJstParts,
   type FriendAddRouting,
   type FriendAddAction,
   type FriendAddBranch,
@@ -29,8 +30,10 @@ import {
   type FriendAddStartPosition,
   type FriendAddTiming,
 } from '@line-crm/shared';
+import { toJstString } from '@line-crm/db';
 import { attachTagAndFireSideEffects } from './friend-tag-attach.js';
 import type { ImmediatePushContext } from './immediate-first-step.js';
+import { matchesCondition, parseCondition } from './segment-query.js';
 
 export const FRIEND_ADD_ROUTING_KEY = 'friend_add_routing';
 
@@ -206,6 +209,266 @@ export function classifyFriend(
   return (friend.unfollow_count ?? 0) === 0 ? 'first_time' : 'returning';
 }
 
+// ── 実行時条件（曜日・時間帯・友だち条件・再送制限） ─────────────────────────
+// N-101: 公開版に保存できる曜日・時間帯・友だち条件・再送制限を、
+// 本番の振り分けでも実際に効かせる。競合確認（routes/friend-add-rules.ts）
+// と同じ関数・同じ意味で判定する。
+
+/** 配信しなかった理由。実行結果（friend_add_events.error_code）へ載せる想定。 */
+export type FriendAddSuppressReason =
+  | 'outside_weekday'
+  | 'outside_time_window'
+  | 'friend_condition_not_met'
+  | 'friend_condition_unreadable'
+  | 'resend_suppressed'
+  | 'delivery_disabled';
+
+/** JSTの現在時刻を "HH:MM" で返す。WorkersはUTCで動くので自前でずらす。 */
+export function friendAddJstHhmm(at: Date): string {
+  const { minutes } = toJstParts(at);
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+}
+
+/** 曜日指定を正規化する。空は「すべての曜日」。 */
+export function normalizeFriendAddWeekdays(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(
+    value.filter((day): day is number => Number.isInteger(day) && (day as number) >= 0 && (day as number) <= 6),
+  )];
+}
+
+function parseHhMmToMinutes(value: unknown): number | null {
+  if (typeof value !== 'string') return null;
+  const matched = /^(\d{2}):(\d{2})$/.exec(value);
+  if (!matched) return null;
+  const hours = Number(matched[1]);
+  const mins = Number(matched[2]);
+  if (hours > 23 || mins > 59) return null;
+  return hours * 60 + mins;
+}
+
+export interface FriendAddTimeWindow {
+  start: string;
+  end: string;
+}
+
+/** 読める時間帯だけ残す。読めない帯は無いものとして飛ばす（保存側で弾くのが本筋）。 */
+export function normalizeFriendAddTimeWindows(value: unknown): FriendAddTimeWindow[] {
+  if (!Array.isArray(value)) return [];
+  const out: FriendAddTimeWindow[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object') continue;
+    const { start, end } = item as { start?: unknown; end?: unknown };
+    if (parseHhMmToMinutes(start) == null || parseHhMmToMinutes(end) == null) continue;
+    out.push({ start: start as string, end: end as string });
+  }
+  return out;
+}
+
+/**
+ * 1つの時間帯の中かどうか。終わりは含まない（自動応答と同じ規則）。
+ * 開始と終了が同じ（09:00〜09:00）は24時間と読む。日跨ぎ（22:00〜02:00）は
+ * 夜から翌朝までと読む。どちらも自動応答の判定とそろえてある。
+ */
+export function isTimeInFriendAddWindow(nowMinutes: number, window: FriendAddTimeWindow): boolean {
+  const start = parseHhMmToMinutes(window.start);
+  const end = parseHhMmToMinutes(window.end);
+  if (start == null || end == null) return true;
+  if (start === end) return true;
+  if (start < end) return nowMinutes >= start && nowMinutes < end;
+  return nowMinutes >= start || nowMinutes < end;
+}
+
+/** いずれかの時間帯の中かどうか。帯が無ければいつでもよい。 */
+export function isInFriendAddTimeWindows(nowHhmm: string, windows: FriendAddTimeWindow[]): boolean {
+  const valid = normalizeFriendAddTimeWindows(windows);
+  if (valid.length === 0) return true;
+  const now = parseHhMmToMinutes(nowHhmm);
+  if (now == null) return true;
+  return valid.some((window) => isTimeInFriendAddWindow(now, window));
+}
+
+/**
+ * 判定に使う曜日。日跨ぎの帯の「翌日側」（金曜22:00〜02:00の土曜01:00）に
+ * いるときは、始まった側（金曜）で見る。店主の頭の中の「金曜の夜」に合わせる。
+ * 自動応答の isOnRespondingDay と同じ考え。
+ */
+export function effectiveFriendAddWeekday(at: Date, windows: FriendAddTimeWindow[]): number {
+  const { weekday } = toJstParts(at);
+  const now = toJstParts(at).minutes;
+  const inCarryOver = normalizeFriendAddTimeWindows(windows).some((window) => {
+    const start = parseHhMmToMinutes(window.start);
+    const end = parseHhMmToMinutes(window.end);
+    return start != null && end != null && start > end && now < end;
+  });
+  if (!inCarryOver) return weekday;
+  return toJstParts(new Date(at.getTime() - 24 * 60 * 60 * 1000)).weekday;
+}
+
+/** 応答する曜日かどうか。指定が無ければいつでもよい。 */
+export function isOnFriendAddWeekday(at: Date, weekdays: unknown, windows: FriendAddTimeWindow[]): boolean {
+  const days = normalizeFriendAddWeekdays(weekdays);
+  if (days.length === 0) return true;
+  return days.includes(effectiveFriendAddWeekday(at, windows));
+}
+
+/** 曜日・時間帯の両方を見る。曜日を先に報告する（Issueの完了条件の順番）。 */
+export function evaluateFriendAddSchedule(
+  definition: Pick<FriendAddRuleDefinition, 'weekdays' | 'timeWindows'>,
+  at: Date,
+): { matched: boolean; reason: Extract<FriendAddSuppressReason, 'outside_weekday' | 'outside_time_window'> | null } {
+  const windows = normalizeFriendAddTimeWindows(definition.timeWindows);
+  if (!isOnFriendAddWeekday(at, definition.weekdays, windows)) {
+    return { matched: false, reason: 'outside_weekday' };
+  }
+  if (!isInFriendAddTimeWindows(friendAddJstHhmm(at), windows)) {
+    return { matched: false, reason: 'outside_time_window' };
+  }
+  return { matched: true, reason: null };
+}
+
+function splitFriendAddWindow(window: FriendAddTimeWindow): Array<{ start: number; end: number }> {
+  const start = parseHhMmToMinutes(window.start);
+  const end = parseHhMmToMinutes(window.end);
+  if (start == null || end == null) return [];
+  if (start === end) return [{ start: 0, end: 24 * 60 }];
+  if (start < end) return [{ start, end }];
+  return [{ start, end: 24 * 60 }, { start: 0, end }];
+}
+
+/**
+ * 2つの時間帯リストが重なるか（競合確認用）。終わりを含まない半開区間で見て、
+ * 日跨ぎは2つに割ってから突き合わせる。どちらかが空なら重なりは報告しない
+ * （絞っていないもの同士・片方だけの絞りは競合ではない）。
+ */
+export function doFriendAddTimeWindowsOverlap(
+  a: unknown,
+  b: unknown,
+): boolean {
+  const left = normalizeFriendAddTimeWindows(a).flatMap(splitFriendAddWindow);
+  const right = normalizeFriendAddTimeWindows(b).flatMap(splitFriendAddWindow);
+  if (left.length === 0 || right.length === 0) return false;
+  return left.some((l) => right.some((r) => l.start < r.end && r.start < l.end));
+}
+
+/** 曜日の重なり（競合確認用）。どちらかが空なら報告しない。 */
+export function doFriendAddWeekdaySetsOverlap(a: unknown, b: unknown): boolean {
+  const left = normalizeFriendAddWeekdays(a);
+  const right = normalizeFriendAddWeekdays(b);
+  if (left.length === 0 || right.length === 0) return false;
+  return right.some((day) => left.includes(day));
+}
+
+/** 友だち条件の字面をそろえる。前後の空白だけ落とし、中身の意味は変えない。 */
+export function normalizeFriendAddCondition(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+/**
+ * 友だち条件の重なり（競合確認用）。どちらかが空なら報告しない。
+ * 本番と同じく字面の一致で見る。構造化JSONと自由文を区別しない。
+ */
+export function areFriendAddConditionsOverlapping(a: unknown, b: unknown): boolean {
+  const left = normalizeFriendAddCondition(a);
+  const right = normalizeFriendAddCondition(b);
+  return Boolean(left) && left === right;
+}
+
+/**
+ * 友だち条件を実データで評価する。
+ *
+ * - 空は制限なし（通す）。
+ * - Segment条件JSONとして読める値は friends 実データで評価する。
+ *   読めないJSON（`{` `[` で始まるのに壊れている）は通さない。
+ *   絞ったつもりが全員に届くほうが、届かないより取り返しがつかない
+ *   （自動応答の友だち条件と同じ倒し方）。
+ * - JSON以外の自由文は社内メモとして通す。ここで止めると、メモを書いた
+ *   既存ルールがすべて止まる。構造化したい場合は別Issueで入力欄の分離と
+ *   移行が必要（残した点としてIssueへ報告する）。
+ */
+export async function evaluateFriendAddFriendCondition(
+  db: D1Database,
+  definition: Pick<FriendAddRuleDefinition, 'friendCondition'>,
+  friendId: string,
+): Promise<{
+  matched: boolean;
+  reason: Extract<FriendAddSuppressReason, 'friend_condition_not_met' | 'friend_condition_unreadable'> | null;
+}> {
+  const raw = normalizeFriendAddCondition(definition.friendCondition);
+  if (!raw) return { matched: true, reason: null };
+  const condition = parseCondition(raw);
+  if (!condition) {
+    if (raw.startsWith('{') || raw.startsWith('[')) {
+      console.error('[friend-add-routing] unreadable friendCondition — skipped the rule');
+      return { matched: false, reason: 'friend_condition_unreadable' };
+    }
+    return { matched: true, reason: null };
+  }
+  const matches = await matchesCondition(db, friendId, condition);
+  return matches
+    ? { matched: true, reason: null }
+    : { matched: false, reason: 'friend_condition_not_met' };
+}
+
+/**
+ * 再送制限にかかっているか。直近に「送信済み（completed）」の実行があれば抑止する。
+ * 抑止された実行（suppressed）・失敗・処理中は数えない。送っていないものを
+ * 数えると、送れなかった人が永久に送れなくなる。
+ * 時間数は公開版の値を使い、未設定は24時間（保存側の既定と同じ）に倒す。
+ */
+export async function isFriendAddResendSuppressed(
+  db: D1Database,
+  input: { lineAccountId: string; friendId: string; resendSuppressionHours: unknown; now: Date },
+): Promise<boolean> {
+  const hours = input.resendSuppressionHours == null
+    ? 24
+    : Math.max(0, Math.min(720, Math.floor(Number(input.resendSuppressionHours))));
+  if (!Number.isFinite(hours) || hours <= 0) return false;
+  // 文字列比較が崩れないよう、DBのJST書式（+09:00無し）にそろえる。
+  const threshold = toJstString(new Date(input.now.getTime() - hours * 60 * 60 * 1000)).slice(0, 23);
+  try {
+    const row = await db.prepare(
+      `SELECT 1 AS ok FROM friend_add_events
+        WHERE line_account_id = ? AND friend_id = ?
+          AND occurred_at >= ? AND routing_status = 'completed'
+        LIMIT 1`,
+    ).bind(input.lineAccountId, input.friendId, threshold).first<{ ok: number }>();
+    return row != null;
+  } catch (error) {
+    // DB更新より先にWorkerだけが切り替わった短い時間は、旧設定へ安全に戻す。
+    if (error instanceof Error && error.message.includes('no such table: friend_add_events')) return false;
+    throw error;
+  }
+}
+
+/**
+ * 1つの公開版が「いま・この人」に動くか。安い順（曜日・時間帯→友だち条件→
+ * 再送制限）に見て、最初に止めた理由だけを返す。競合確認の表示と本番の
+ * 判定で意味がずれないよう、どちらもこの関数群を通す。
+ */
+export async function evaluateFriendAddRuleConditions(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    friendId: string;
+    definition: FriendAddRuleDefinition;
+    now: Date;
+  },
+): Promise<{ matched: boolean; reason: FriendAddSuppressReason | null }> {
+  const schedule = evaluateFriendAddSchedule(input.definition, input.now);
+  if (!schedule.matched) return { matched: false, reason: schedule.reason };
+  const condition = await evaluateFriendAddFriendCondition(db, input.definition, input.friendId);
+  if (!condition.matched) return { matched: false, reason: condition.reason };
+  const suppressed = await isFriendAddResendSuppressed(db, {
+    lineAccountId: input.lineAccountId,
+    friendId: input.friendId,
+    resendSuppressionHours: input.definition.resendSuppressionHours,
+    now: input.now,
+  });
+  if (suppressed) return { matched: false, reason: 'resend_suppressed' };
+  return { matched: true, reason: null };
+}
+
 // ── 実行 ────────────────────────────────────────────────────────────────────
 
 async function runActions(
@@ -295,6 +558,11 @@ export interface FriendAddRoutingResult {
   timing: FriendAddTiming;
   /** 「配信しない」を選んでいて何も流さなかった場合 true */
   suppressed: boolean;
+  /**
+   * 抑止した理由。送信したとき・設定が無いときは null。
+   * 呼ぶ側は実行結果（friend_add_events.error_code）へ載せて追跡できる。
+   */
+  suppressReason: FriendAddSuppressReason | null;
   /** V6の複数ルールで選ばれた設定と公開版。旧設定ではどちらもnull。 */
   ruleId: string | null;
   ruleVersionId: string | null;
@@ -338,17 +606,21 @@ function ruleActions(value: unknown[]): FriendAddAction[] {
   return actions;
 }
 
-async function loadPublishedFriendAddRule(
-  db: D1Database,
-  input: { accountId: string; kind: FriendKind; entryRouteId: string | null },
-): Promise<{
+interface PublishedFriendAddCandidate {
   ruleId: string;
   versionId: string;
+  isFallback: boolean;
   definition: FriendAddRuleDefinition;
-} | null> {
+}
+
+async function loadPublishedFriendAddCandidates(
+  db: D1Database,
+  input: { accountId: string; kind: FriendKind; entryRouteId: string | null },
+): Promise<PublishedFriendAddCandidate[]> {
   try {
-    const row = await db.prepare(
-      `SELECT r.id AS rule_id, v.id AS version_id, v.definition_snapshot
+    const result = await db.prepare(
+      `SELECT r.id AS rule_id, v.id AS version_id, r.is_unknown_route_fallback AS is_fallback,
+              v.definition_snapshot
          FROM friend_add_rules r
          JOIN friend_add_rule_versions v ON v.id = r.current_version_id AND v.status = 'published'
         WHERE r.line_account_id = ? AND r.friend_kind = ?
@@ -363,24 +635,95 @@ async function loadPublishedFriendAddRule(
                OR json_extract(v.definition_snapshot, '$.activeFrom') <= strftime('%Y-%m-%dT%H:%M', 'now', '+9 hours'))
           AND (json_extract(v.definition_snapshot, '$.activeUntil') IS NULL
                OR json_extract(v.definition_snapshot, '$.activeUntil') >= strftime('%Y-%m-%dT%H:%M', 'now', '+9 hours'))
-        ORDER BY r.is_unknown_route_fallback ASC, r.priority ASC, r.created_at ASC
-        LIMIT 1`,
-    ).bind(input.accountId, input.kind, input.entryRouteId, input.entryRouteId).first<{
+        ORDER BY r.is_unknown_route_fallback ASC, r.priority ASC, r.created_at ASC`,
+    ).bind(input.accountId, input.kind, input.entryRouteId, input.entryRouteId).all<{
       rule_id: string;
       version_id: string;
+      is_fallback: number;
       definition_snapshot: string;
     }>();
-    if (!row) return null;
-    return {
+    return (result.results ?? []).map((row) => ({
       ruleId: row.rule_id,
       versionId: row.version_id,
+      isFallback: row.is_fallback === 1,
       definition: JSON.parse(row.definition_snapshot) as FriendAddRuleDefinition,
-    };
+    }));
   } catch (error) {
     // DB更新より先にWorkerだけが切り替わった短い時間は、旧設定へ安全に戻す。
-    if (error instanceof Error && error.message.includes('no such table: friend_add_rules')) return null;
+    if (error instanceof Error && error.message.includes('no such table: friend_add_rules')) return [];
     throw error;
   }
+}
+
+interface PublishedFriendAddSelection {
+  /** 条件をすべて通った公開版。無ければ null。 */
+  selected: PublishedFriendAddCandidate | null;
+  /** 抑止したときに評価していた公開版（理由の追跡用）。送信時・設定無しは null。 */
+  evaluated: PublishedFriendAddCandidate | null;
+  reason: FriendAddSuppressReason | null;
+}
+
+/**
+ * 優先順位どおりに公開版を選び、曜日・時間帯・友だち条件・再送制限も見る。
+ *
+ * 2段階で選ぶ。受け皿は「経路が分からなかった人」のためだけに残す。
+ *
+ * 1. 流入経路に合う通常ルールを優先順位順に見る。条件をすべて通った最初の
+ *    1件が勝ち。経路は合うが条件に合わないものしか無いときは、受け皿へ
+ *    落とさず抑止する（経路が分かっている人に「経路不明の人用」を届けない）。
+ * 2. 通常ルールが経路に1件も合わないときだけ、受け皿を見る。
+ *
+ * 再送制限で止まったときは下の順位を試さない。送ったばかりの人に別の
+ * シナリオを送ると、制限を付けた意味が無くなる。
+ */
+async function selectPublishedFriendAddRule(
+  db: D1Database,
+  input: {
+    accountId: string;
+    friendId: string;
+    kind: FriendKind;
+    entryRouteId: string | null;
+    now: Date;
+  },
+): Promise<PublishedFriendAddSelection> {
+  const none = { selected: null, evaluated: null, reason: null } as PublishedFriendAddSelection;
+  const candidates = await loadPublishedFriendAddCandidates(db, input);
+  if (candidates.length === 0) return none;
+  const check = async (
+    candidate: PublishedFriendAddCandidate,
+  ): Promise<{ matched: boolean; reason: FriendAddSuppressReason | null }> =>
+    evaluateFriendAddRuleConditions(db, {
+      lineAccountId: input.accountId,
+      friendId: input.friendId,
+      definition: candidate.definition,
+      now: input.now,
+    });
+
+  const routed = candidates.filter((candidate) => !candidate.isFallback);
+  let firstFailure: { candidate: PublishedFriendAddCandidate; reason: FriendAddSuppressReason } | null = null;
+  for (const candidate of routed) {
+    const result = await check(candidate);
+    if (result.matched) return { selected: candidate, evaluated: candidate, reason: null };
+    if (result.reason === 'resend_suppressed') {
+      return { selected: null, evaluated: candidate, reason: result.reason };
+    }
+    firstFailure ??= { candidate, reason: result.reason ?? 'outside_time_window' };
+  }
+  if (firstFailure) {
+    return { selected: null, evaluated: firstFailure.candidate, reason: firstFailure.reason };
+  }
+  for (const candidate of candidates.filter((candidate) => candidate.isFallback)) {
+    const result = await check(candidate);
+    if (result.matched) return { selected: candidate, evaluated: candidate, reason: null };
+    if (result.reason === 'resend_suppressed') {
+      return { selected: null, evaluated: candidate, reason: result.reason };
+    }
+    firstFailure ??= { candidate, reason: result.reason ?? 'outside_time_window' };
+  }
+  if (firstFailure) {
+    return { selected: null, evaluated: firstFailure.candidate, reason: firstFailure.reason };
+  }
+  return none;
 }
 
 /**
@@ -394,7 +737,7 @@ export async function applyFriendAddRouting(
   accountId: string | null,
   friend: FriendAddSubject,
   push?: ImmediatePushContext,
-  routingContext?: { entryRouteId?: string | null },
+  routingContext?: { entryRouteId?: string | null; now?: Date },
 ): Promise<FriendAddRoutingResult> {
   const none: FriendAddRoutingResult = {
     routed: false,
@@ -402,18 +745,40 @@ export async function applyFriendAddRouting(
     enrollments: [],
     timing: FRIEND_ADD_ROUTING_DEFAULT.firstTime.timing,
     suppressed: false,
+    suppressReason: null,
     ruleId: null,
     ruleVersionId: null,
   };
   if (!accountId) return none;
 
+  const now = routingContext?.now ?? new Date();
   const kind = classifyFriend(friend, FRIEND_ADD_ROUTING_DEFAULT.criteria.firstTime);
   await ensureFriendAddFallbackRules(db, accountId);
-  const matchedRule = await loadPublishedFriendAddRule(db, {
+  const selection = await selectPublishedFriendAddRule(db, {
     accountId,
+    friendId: friend.id,
     kind,
     entryRouteId: routingContext?.entryRouteId ?? null,
+    now,
   });
+  const matchedRule = selection.selected;
+  /*
+   * 経路は合うが曜日・時間帯・友だち条件・再送制限に止まった。
+   * 送らず、どの公開版のどの理由かだけ残す。送信済みにはしない
+   * （enrollment を作らず deliveryCount も上げないのは呼ぶ側の仕事）。
+   */
+  if (!matchedRule && selection.evaluated && selection.reason) {
+    return {
+      routed: true,
+      kind,
+      enrollments: [],
+      timing: selection.evaluated.definition.timing,
+      suppressed: true,
+      suppressReason: selection.reason,
+      ruleId: selection.evaluated.ruleId,
+      ruleVersionId: selection.evaluated.versionId,
+    };
+  }
   const routing = matchedRule
     ? {
         firstTime: {
@@ -444,6 +809,7 @@ export async function applyFriendAddRouting(
       enrollments: [],
       timing,
       suppressed: true,
+      suppressReason: 'delivery_disabled',
       ruleId: matchedRule?.ruleId ?? null,
       ruleVersionId: matchedRule?.versionId ?? null,
     };
@@ -477,6 +843,7 @@ export async function applyFriendAddRouting(
         enrollments: [],
         timing,
         suppressed: true,
+        suppressReason: 'delivery_disabled',
         ruleId: matchedRule.ruleId,
         ruleVersionId: matchedRule.versionId,
       };
@@ -493,6 +860,7 @@ export async function applyFriendAddRouting(
         enrollments: [],
         timing,
         suppressed: true,
+        suppressReason: 'delivery_disabled',
         ruleId: null,
         ruleVersionId: null,
       };
@@ -540,6 +908,7 @@ export async function applyFriendAddRouting(
     enrollments,
     timing,
     suppressed: false,
+    suppressReason: null,
     ruleId: matchedRule?.ruleId ?? null,
     ruleVersionId: matchedRule?.versionId ?? null,
   };

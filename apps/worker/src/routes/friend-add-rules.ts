@@ -18,6 +18,11 @@ import {
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
+import {
+  areFriendAddConditionsOverlapping,
+  doFriendAddTimeWindowsOverlap,
+  doFriendAddWeekdaySetsOverlap,
+} from '../services/friend-add-routing.js';
 
 const friendAddRules = new Hono<Env>();
 const KINDS = new Set<FriendAddRuleKind>(['first_time', 'returning']);
@@ -732,15 +737,14 @@ friendAddRules.get('/api/friend-add-rules/conflicts', requireRole('owner', 'admi
         if (bDefinition.routeIds.some((id) => aRoutes.has(id))) {
           pushConflict('same_route', a, b, '同じ流入リンクを使う設定があります。優先順位が小さい設定だけが動きます。');
         }
-        if (aDefinition.weekdays?.length && bDefinition.weekdays?.some((day) => aDefinition.weekdays?.includes(day))) {
+        // 重なりの見方は本番の実行時評価と同じ関数。片方だけの絞り・空は競合にしない。
+        if (doFriendAddWeekdaySetsOverlap(aDefinition.weekdays, bDefinition.weekdays)) {
           pushConflict('overlapping_weekday', a, b, '同じ曜日に動く設定があります。');
         }
-        if (aDefinition.timeWindows?.length && bDefinition.timeWindows?.some((rightWindow) => (
-          aDefinition.timeWindows?.some((leftWindow) => leftWindow.start < rightWindow.end && rightWindow.start < leftWindow.end)
-        ))) {
+        if (doFriendAddTimeWindowsOverlap(aDefinition.timeWindows, bDefinition.timeWindows)) {
           pushConflict('overlapping_time', a, b, '同じ時間帯に動く設定があります。');
         }
-        if (aDefinition.friendCondition && aDefinition.friendCondition === bDefinition.friendCondition) {
+        if (areFriendAddConditionsOverlapping(aDefinition.friendCondition, bDefinition.friendCondition)) {
           pushConflict('same_friend_condition', a, b, '同じ友だち条件を使う設定があります。');
         }
       }
