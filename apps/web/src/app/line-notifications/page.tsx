@@ -231,21 +231,21 @@ export default function LineNotificationsPage() {
     setDefinitions([])
     setMetrics([])
     setNotice(null)
+    if (!selectedAccountId) {
+      setLoadState('ready')
+      return
+    }
     try {
       const [settingRes, overviewRes, definitionRes, metricRes] = await Promise.all([
-        api.ecCommerce.settings(), api.ecCommerce.overview(selectedAccountId ?? undefined),
-        selectedAccountId
-          ? api.lineNotifications.definitions(selectedAccountId).catch((error: unknown) => {
-              if (error instanceof ApiError && error.status === 403) throw error
-              return null
-            })
-          : Promise.resolve(null),
-        selectedAccountId
-          ? api.lineNotifications.metrics(selectedAccountId).catch((error: unknown) => {
-              if (error instanceof ApiError && error.status === 403) throw error
-              return null
-            })
-          : Promise.resolve(null),
+        api.ecCommerce.settings(selectedAccountId), api.ecCommerce.overview(selectedAccountId),
+        api.lineNotifications.definitions(selectedAccountId).catch((error: unknown) => {
+          if (error instanceof ApiError && error.status === 403) throw error
+          return null
+        }),
+        api.lineNotifications.metrics(selectedAccountId).catch((error: unknown) => {
+          if (error instanceof ApiError && error.status === 403) throw error
+          return null
+        }),
       ])
       if (generation !== loadGeneration.current) return
       if (!settingRes.success || !overviewRes.success) throw new Error('load failed')
@@ -328,6 +328,7 @@ export default function LineNotificationsPage() {
 
   const save = async (setting: EcNotificationSetting, enabled = setting.isEnabled) => {
     if (!setting.title?.trim()) { setNotice({ tone: 'error', text: '通知の見出しを入力してください。' }); return }
+    if (!selectedAccountId) { setNotice({ tone: 'error', text: 'LINEアカウントを選択してください。' }); return }
     setBusy(setting.eventType)
     try {
       const definition = definitionByEvent.get(setting.eventType)
@@ -357,7 +358,7 @@ export default function LineNotificationsPage() {
         if (!result.success) throw new Error('status failed')
         setDefinitions((current) => current.map((item) => item.id === result.data.id ? result.data : item))
       } else {
-        await api.ecCommerce.updateSetting(setting.eventType, {
+        await api.ecCommerce.updateSetting(selectedAccountId, setting.eventType, {
           isEnabled: enabled, title: setting.title, introText: setting.introText, outroText: setting.outroText,
           buttonLabel: setting.buttonLabel, buttonUrl: setting.buttonUrl, imageUrl: setting.imageUrl,
         })

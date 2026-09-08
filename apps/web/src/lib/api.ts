@@ -7105,10 +7105,10 @@ export const api = {
         `/api/ec-commerce/notification-runs?${query}`,
       )
     },
-    settings: () =>
-      fetchApi<ApiResponse<EcNotificationSetting[]>>('/api/ec-commerce/settings'),
-    updateSetting: (eventType: string, data: { isEnabled: boolean; title: string; introText: string; outroText: string; buttonLabel: string; buttonUrl: string; imageUrl: string }) =>
-      fetchApi<{ success: boolean }>(`/api/ec-commerce/settings/${encodeURIComponent(eventType)}`, {
+    settings: (lineAccountId: string) =>
+      fetchApi<ApiResponse<EcNotificationSetting[]>>(`/api/ec-commerce/settings?lineAccountId=${encodeURIComponent(lineAccountId)}`),
+    updateSetting: (lineAccountId: string, eventType: string, data: { isEnabled: boolean; title: string; introText: string; outroText: string; buttonLabel: string; buttonUrl: string; imageUrl: string }) =>
+      fetchApi<{ success: boolean }>(`/api/ec-commerce/settings/${encodeURIComponent(eventType)}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
