@@ -51,6 +51,38 @@ function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number): b
   return aStart < bEnd && bStart < aEnd;
 }
 
+function isHhmm(value: string): boolean {
+  return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+/** 重なる稼働区間をまとめる。例外日が複数ある日の union 用。 */
+function mergeIntervals(intervals: Interval[]): Interval[] {
+  const sorted = intervals
+    .map((i) => ({ s: toMin(i.start), e: toMin(i.end) }))
+    .filter((v) => Number.isFinite(v.s) && Number.isFinite(v.e) && v.s < v.e)
+    .sort((a, b) => a.s - b.s || a.e - b.e);
+  const merged: Array<{ s: number; e: number }> = [];
+  for (const cur of sorted) {
+    const last = merged[merged.length - 1];
+    if (last && cur.s <= last.e) last.e = Math.max(last.e, cur.e);
+    else merged.push({ ...cur });
+  }
+  return merged.map((m) => ({ start: fromMin(m.s), end: fromMin(m.e) }));
+}
+
+/** 稼働区間と店舗例外時間の共通部分だけを残す（短縮営業用）。 */
+function intersectIntervals(a: Interval[], b: Interval[]): Interval[] {
+  const out: Interval[] = [];
+  for (const x of a) {
+    for (const y of b) {
+      const s = Math.max(toMin(x.start), toMin(y.start));
+      const e = Math.min(toMin(x.end), toMin(y.end));
+      if (s < e) out.push({ start: fromMin(s), end: fromMin(e) });
+    }
+  }
+  return mergeIntervals(out);
+}
+
 /**
  * 勤務時間から、予約を入れられる開始時刻を並べる。
  *
@@ -160,6 +192,40 @@ function googleBusyForJstDate(
   });
 }
 
+interface AvailabilityExceptionRow {
+  scope_kind: string;
+  scope_id: string | null;
+  date_from: string;
+  date_to: string;
+  kind: string;
+  hours_json: string;
+}
+
+/**
+ * 例外日の時間を読む。壊れた行は null（呼び出し側で fail-closed 扱い）。
+ *
+ * 書き込み口（POST/PATCH /api/booking/admin/exceptions）が形を検証済み
+ * だが、手編集の DB でも予約を受けてしまわないよう、ここでも見直す。
+ */
+function parseExceptionHours(raw: string): Interval[] | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(parsed)) return null;
+  const out: Interval[] = [];
+  for (const item of parsed) {
+    if (!item || typeof item !== 'object') return null;
+    const value = item as Record<string, unknown>;
+    if (typeof value.start !== 'string' || typeof value.end !== 'string') return null;
+    if (!isHhmm(value.start) || !isHhmm(value.end) || !(value.start < value.end)) return null;
+    out.push({ start: value.start, end: value.end });
+  }
+  return out;
+}
+
 export async function getAvailability(
   db: D1Database,
   params: GetAvailabilityParams,
@@ -220,24 +286,37 @@ export async function getAvailability(
   const dates = eachDate(params.from, params.to);
   const placeholders = staffIds.map(() => '?').join(',');
 
-  const [businessHours, menuResources] = await Promise.all([
+  const [businessHours, menuResources, exceptionsResult] = await Promise.all([
     db.prepare(`SELECT bh.weekday, bh.start_time, bh.end_time, bh.capacity
       FROM booking_business_hours bh
       INNER JOIN booking_settings bs ON bs.id = bh.booking_settings_id
       WHERE bs.line_account_id = ? ORDER BY bh.weekday, bh.start_time`)
       .bind(params.lineAccountId)
       .all<{ weekday: number; start_time: string; end_time: string; capacity: number }>(),
-    db.prepare(`SELECT r.capacity, mr.quantity
+    db.prepare(`SELECT r.id, r.capacity, mr.quantity
       FROM booking_menu_resources mr
       INNER JOIN booking_resources r ON r.id = mr.resource_id
       WHERE mr.menu_id = ? AND r.line_account_id = ? AND r.is_active = 1`)
       .bind(params.menuId, params.lineAccountId)
-      .all<{ capacity: number; quantity: number }>(),
+      .all<{ id: string; capacity: number; quantity: number }>(),
+    // 休業日・例外日。要求アカウントのものだけ読む（他アカウントの休業を見ない）。
+    // 期間が要求範囲と重なる行だけに絞る。変更直後に読むため結果を溜め置かない。
+    db.prepare(`SELECT scope_kind, scope_id, date_from, date_to, kind, hours_json
+      FROM booking_availability_exceptions
+      WHERE line_account_id = ?
+        AND date_from <= ?
+        AND date_to >= ?`)
+      .bind(params.lineAccountId, params.to, params.from)
+      .all<AvailabilityExceptionRow>(),
   ]);
   const resourceCapacity = (menuResources.results ?? []).reduce(
     (min, row) => Math.min(min, Math.floor(Number(row.capacity) / Math.max(1, Number(row.quantity)))),
     Number.POSITIVE_INFINITY,
   );
+  const menuResourceIds = new Set(
+    (menuResources.results ?? []).map((row) => String(row.id)),
+  );
+  const exceptions = exceptionsResult.results ?? [];
 
   const shifts = await db
     .prepare(
@@ -328,12 +407,63 @@ export async function getAvailability(
     }
     for (const date of dates) {
       if (windowLastDate && date > windowLastDate) continue;
+      // その日の例外日（JST 日付で突合）。毎週ルール・シフトより例外日を優先する。
+      const dayExceptions = exceptions.filter(
+        (e) => e.date_from <= date && date <= e.date_to,
+      );
+      // 終日休業。店舗・担当・このメニューが使う資源のどれかが閉まっていれば
+      // 枠を出さない。custom_hours/open と重なっても closed を勝たせる
+      //（迷ったら受けない fail-closed）。
+      const closedAllDay = dayExceptions.some((e) => {
+        if (e.kind !== 'closed') return false;
+        if (e.scope_kind === 'store') return true;
+        if (e.scope_kind === 'staff') return e.scope_id === s.id;
+        if (e.scope_kind === 'resource') {
+          return e.scope_id != null && menuResourceIds.has(e.scope_id);
+        }
+        return false;
+      });
+      if (closedAllDay) continue;
       const shift = shifts.results.find((r) => r.staff_id === s.id && r.work_date === date);
       const rule = rules.results.find(
         (r) => r.staff_id === s.id && r.weekday === weekdayForDate(date),
       );
-      const working = shift ?? rule;
-      if (!working) continue;
+      const base = shift ?? rule;
+      // 時間帯例外。担当の custom_hours はその日の稼働を置き換え（短縮・延長）、
+      // 担当の open は臨時営業として足す。店舗の custom_hours は全員の稼働との
+      // 共通部分に絞る（短縮営業）。店舗の open・資源の時間変更は枠を変えない。
+      const staffCustom: Interval[] = [];
+      const staffOpen: Interval[] = [];
+      const storeCustom: Interval[] = [];
+      let brokenException = false;
+      for (const e of dayExceptions) {
+        if (e.kind !== 'custom_hours' && e.kind !== 'open') continue;
+        if (e.scope_kind === 'resource') continue;
+        const hours = parseExceptionHours(e.hours_json);
+        if (hours === null) {
+          brokenException = true;
+          break;
+        }
+        if (e.scope_kind === 'staff' && e.scope_id === s.id) {
+          (e.kind === 'custom_hours' ? staffCustom : staffOpen).push(...hours);
+        } else if (e.scope_kind === 'store' && e.kind === 'custom_hours') {
+          storeCustom.push(...hours);
+        }
+      }
+      // 壊れた例外日がある日は fail-closed（予約を受けない）。
+      if (brokenException) continue;
+      let workingList: Interval[] = staffCustom.length > 0
+        ? mergeIntervals(staffCustom)
+        : base
+          ? [{ start: base.start_time, end: base.end_time }]
+          : [];
+      if (staffOpen.length > 0) {
+        workingList = mergeIntervals([...workingList, ...staffOpen]);
+      }
+      if (storeCustom.length > 0) {
+        workingList = intersectIntervals(workingList, mergeIntervals(storeCustom));
+      }
+      if (workingList.length === 0) continue;
       const dayBookings: BusyInterval[] = bookings.results
         .filter((b) => b.staff_id === s.id)
         .filter((b) => jstDateStr(new Date(b.starts_at)) === date)
@@ -346,17 +476,21 @@ export async function getAvailability(
       const googleBusy = googleBusyByStaff.get(s.id);
       // 外の予定は定員に関係なく塞ぐ（sameMenu を付けない）。
       if (googleBusy) dayBookings.push(...googleBusyForJstDate(googleBusy, date));
-      const storeCapacity = (businessHours.results ?? [])
-        .filter((hour) => hour.weekday === weekdayForDate(date))
-        .filter((hour) => hour.start_time <= working.start_time && hour.end_time >= working.end_time)
-        .reduce((min, hour) => Math.min(min, Number(hour.capacity ?? 1)), Number.POSITIVE_INFINITY);
+      const dayHours = (businessHours.results ?? [])
+        .filter((hour) => hour.weekday === weekdayForDate(date));
+      const storeCapacity = workingList.reduce(
+        (min, working) => dayHours
+          .filter((hour) => hour.start_time <= working.start && hour.end_time >= working.end)
+          .reduce((inner, hour) => Math.min(inner, Number(hour.capacity ?? 1)), min),
+        Number.POSITIVE_INFINITY,
+      );
       const effectiveCapacity = Math.max(1, Math.min(
         Number(menu.concurrent_capacity ?? 1),
         Number.isFinite(storeCapacity) ? storeCapacity : Number.POSITIVE_INFINITY,
         resourceCapacity,
       ));
       const daySlots = computeSlots({
-        working: [{ start: working.start_time, end: working.end_time }],
+        working: workingList,
         busy: dayBookings,
         menu: menuForCalc,
         granularityMinutes: SLOT_GRANULARITY_MINUTES,

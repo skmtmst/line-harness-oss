@@ -126,6 +126,15 @@ describe('computeSlots', () => {
 // getAvailability (DB 層 + リードタイム + 仮想スタッフ)
 // ----------------------------------------------------------------
 
+interface StubException {
+  scope_kind: string;
+  scope_id: string | null;
+  date_from: string;
+  date_to: string;
+  kind: string;
+  hours_json: string;
+}
+
 interface StubData {
   menu?: {
     duration_minutes: number;
@@ -137,6 +146,8 @@ interface StubData {
   shifts?: Array<{ staff_id: string; work_date: string; start_time: string; end_time: string }>;
   rules?: Array<{ staff_id: string; weekday: number; start_time: string; end_time: string }>;
   bookings?: Array<{ staff_id: string; starts_at: string; block_ends_at: string }>;
+  menuResources?: Array<{ id: string; capacity: number; quantity: number }>;
+  exceptions?: StubException[];
   calendarConnection?: {
     id: string;
     calendar_id: string;
@@ -145,17 +156,26 @@ interface StubData {
   };
 }
 
-function stubDB(data: StubData): D1Database {
+function stubDB(data: StubData, seen?: Array<{ sql: string; args: unknown[] }>): D1Database {
   return {
     prepare(sql: string) {
       return {
-        bind() { return this; },
+        bind(...args: unknown[]) {
+          seen?.push({ sql, args });
+          return this;
+        },
         async first() {
           if (sql.includes('FROM menus')) return data.menu ?? null;
           if (sql.includes('FROM google_calendar_connections')) return data.calendarConnection ?? null;
           return null;
         },
         async all() {
+          if (sql.includes('booking_availability_exceptions')) {
+            return { results: data.exceptions ?? [] };
+          }
+          if (sql.includes('booking_menu_resources')) {
+            return { results: data.menuResources ?? [] };
+          }
           if (sql.includes('FROM staff') && sql.includes('staff_menus')) {
             return { results: data.staff ?? [] };
           }
@@ -174,6 +194,26 @@ function stubDB(data: StubData): D1Database {
       };
     },
   } as unknown as D1Database;
+}
+
+const STAFF_S1 = [{ id: 'S1', display_name: '山田', is_designation_optional: 0 }];
+const MENU_BASIC = {
+  duration_minutes: 60,
+  buffer_after_minutes: 0,
+  override_duration: null,
+  override_price: null,
+};
+
+function closedException(over: Partial<StubException> = {}): StubException {
+  return {
+    scope_kind: 'store',
+    scope_id: null,
+    date_from: '2026-05-09',
+    date_to: '2026-05-09',
+    kind: 'closed',
+    hours_json: '[]',
+    ...over,
+  };
 }
 
 describe('getAvailability', () => {
@@ -352,5 +392,330 @@ describe('getAvailability', () => {
       minLeadTimeMinutes: 60,
     });
     expect(result.by_staff).toEqual([]);
+  });
+});
+
+describe('getAvailability の例外日（休業日・終日・時間帯）', () => {
+  test('店舗の休業日はシフトがあっても枠を出さない', async () => {
+    const db = stubDB({
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      shifts: [{ staff_id: 'S1', work_date: '2026-05-09', start_time: '10:00', end_time: '12:00' }],
+      exceptions: [closedException()],
+    });
+    const result = await getAvailability(db, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-05-09',
+      to: '2026-05-09',
+      now: new Date('2026-05-08T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+    });
+    expect(result.by_staff[0].slots).toEqual([]);
+  });
+
+  test('担当者の終日例外はその人だけ塞ぎ、別担当は残る', async () => {
+    const db = stubDB({
+      menu: MENU_BASIC,
+      staff: [
+        ...STAFF_S1,
+        { id: 'S2', display_name: '佐藤', is_designation_optional: 0 },
+      ],
+      shifts: [
+        { staff_id: 'S1', work_date: '2026-05-09', start_time: '10:00', end_time: '12:00' },
+        { staff_id: 'S2', work_date: '2026-05-09', start_time: '10:00', end_time: '12:00' },
+      ],
+      exceptions: [closedException({ scope_kind: 'staff', scope_id: 'S1' })],
+    });
+    const result = await getAvailability(db, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-05-09',
+      to: '2026-05-09',
+      now: new Date('2026-05-08T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+    });
+    expect(result.by_staff.find((s) => s.staff_id === 'S1')?.slots).toEqual([]);
+    expect(
+      result.by_staff.find((s) => s.staff_id === 'S2')?.slots.map((s) => s.start),
+    ).toEqual(['10:00', '10:30', '11:00']);
+  });
+
+  test('担当の時間帯例外（短縮）はその日の稼働を置き換える', async () => {
+    const db = stubDB({
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      shifts: [{ staff_id: 'S1', work_date: '2026-05-09', start_time: '10:00', end_time: '18:00' }],
+      exceptions: [{
+        scope_kind: 'staff',
+        scope_id: 'S1',
+        date_from: '2026-05-09',
+        date_to: '2026-05-09',
+        kind: 'custom_hours',
+        hours_json: JSON.stringify([{ start: '13:00', end: '15:00' }]),
+      }],
+    });
+    const result = await getAvailability(db, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-05-09',
+      to: '2026-05-09',
+      now: new Date('2026-05-08T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+    });
+    expect(result.by_staff[0].slots.map((s) => s.start)).toEqual(['13:00', '13:30', '14:00']);
+  });
+
+  test('店舗の時間帯例外（短縮）は稼働との共通部分に絞る', async () => {
+    const db = stubDB({
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      shifts: [{ staff_id: 'S1', work_date: '2026-05-09', start_time: '10:00', end_time: '18:00' }],
+      exceptions: [{
+        scope_kind: 'store',
+        scope_id: null,
+        date_from: '2026-05-09',
+        date_to: '2026-05-09',
+        kind: 'custom_hours',
+        hours_json: JSON.stringify([{ start: '10:00', end: '12:00' }]),
+      }],
+    });
+    const result = await getAvailability(db, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-05-09',
+      to: '2026-05-09',
+      now: new Date('2026-05-08T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+    });
+    expect(result.by_staff[0].slots.map((s) => s.start)).toEqual(['10:00', '10:30', '11:00']);
+  });
+
+  test('担当の臨時営業はシフトの無い日に枠を作る', async () => {
+    const db = stubDB({
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      shifts: [],
+      exceptions: [{
+        scope_kind: 'staff',
+        scope_id: 'S1',
+        date_from: '2026-05-10',
+        date_to: '2026-05-10',
+        kind: 'open',
+        hours_json: JSON.stringify([{ start: '10:00', end: '12:00' }]),
+      }],
+    });
+    const result = await getAvailability(db, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-05-10',
+      to: '2026-05-10',
+      now: new Date('2026-05-08T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+    });
+    expect(result.by_staff[0].slots.map((s) => s.start)).toEqual(['10:00', '10:30', '11:00']);
+  });
+
+  test('重複例外は closed が勝ち、時間帯の重なりは union になる', async () => {
+    const customA: StubException = {
+      scope_kind: 'staff',
+      scope_id: 'S1',
+      date_from: '2026-05-09',
+      date_to: '2026-05-09',
+      kind: 'custom_hours',
+      hours_json: JSON.stringify([{ start: '10:00', end: '11:00' }]),
+    };
+    const customB: StubException = {
+      ...customA,
+      hours_json: JSON.stringify([{ start: '11:00', end: '12:00' }]),
+    };
+    const unionDb = stubDB({
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      shifts: [{ staff_id: 'S1', work_date: '2026-05-09', start_time: '10:00', end_time: '18:00' }],
+      exceptions: [customA, customB],
+    });
+    const unionResult = await getAvailability(unionDb, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-05-09',
+      to: '2026-05-09',
+      now: new Date('2026-05-08T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+    });
+    expect(unionResult.by_staff[0].slots.map((s) => s.start)).toEqual(['10:00', '10:30', '11:00']);
+
+    const closedWinsDb = stubDB({
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      shifts: [{ staff_id: 'S1', work_date: '2026-05-09', start_time: '10:00', end_time: '18:00' }],
+      exceptions: [customA, closedException({ scope_kind: 'staff', scope_id: 'S1' })],
+    });
+    const closedWins = await getAvailability(closedWinsDb, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-05-09',
+      to: '2026-05-09',
+      now: new Date('2026-05-08T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+    });
+    expect(closedWins.by_staff[0].slots).toEqual([]);
+  });
+
+  test('日跨ぎの期間休業は範囲内の各日を塞ぎ、範囲外は残す', async () => {
+    const db = stubDB({
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      shifts: [
+        { staff_id: 'S1', work_date: '2026-05-09', start_time: '10:00', end_time: '12:00' },
+        { staff_id: 'S1', work_date: '2026-05-10', start_time: '10:00', end_time: '12:00' },
+        { staff_id: 'S1', work_date: '2026-05-11', start_time: '10:00', end_time: '12:00' },
+        { staff_id: 'S1', work_date: '2026-05-12', start_time: '10:00', end_time: '12:00' },
+      ],
+      exceptions: [closedException({ date_from: '2026-05-09', date_to: '2026-05-11' })],
+    });
+    const result = await getAvailability(db, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-05-09',
+      to: '2026-05-12',
+      now: new Date('2026-05-08T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+    });
+    const byDate = new Map<string, number>();
+    for (const slot of result.by_staff[0].slots) {
+      byDate.set(slot.date, (byDate.get(slot.date) ?? 0) + 1);
+    }
+    expect(byDate.get('2026-05-09')).toBeUndefined();
+    expect(byDate.get('2026-05-10')).toBeUndefined();
+    expect(byDate.get('2026-05-11')).toBeUndefined();
+    expect(byDate.get('2026-05-12')).toBe(3);
+  });
+
+  test('JST の日付で突合する（前日・翌日には波及しない）', async () => {
+    const db = stubDB({
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      shifts: [
+        { staff_id: 'S1', work_date: '2026-05-09', start_time: '10:00', end_time: '12:00' },
+        { staff_id: 'S1', work_date: '2026-05-10', start_time: '10:00', end_time: '12:00' },
+      ],
+      exceptions: [closedException({ date_from: '2026-05-09', date_to: '2026-05-09' })],
+    });
+    const result = await getAvailability(db, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-05-09',
+      to: '2026-05-10',
+      now: new Date('2026-05-08T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+    });
+    const dates = result.by_staff[0].slots.map((s) => s.date);
+    expect(dates.length).toBeGreaterThan(0);
+    expect(new Set(dates)).toEqual(new Set(['2026-05-10']));
+  });
+
+  test('例外日の取得は要求アカウントに絞る（他アカウントの休業を見ない）', async () => {
+    const seen: Array<{ sql: string; args: unknown[] }> = [];
+    const db = stubDB(
+      {
+        menu: MENU_BASIC,
+        staff: STAFF_S1,
+        shifts: [{ staff_id: 'S1', work_date: '2026-05-09', start_time: '10:00', end_time: '12:00' }],
+        exceptions: [],
+      },
+      seen,
+    );
+    const result = await getAvailability(db, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-05-09',
+      to: '2026-05-09',
+      now: new Date('2026-05-08T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+    });
+    const query = seen.find((s) => s.sql.includes('booking_availability_exceptions'));
+    expect(query?.sql).toContain('line_account_id = ?');
+    expect(query?.args[0]).toBe('A1');
+    // 他アカウントの休業行が混ざらない前提では枠が出る
+    expect(result.by_staff[0].slots.map((s) => s.start)).toEqual(['10:00', '10:30', '11:00']);
+  });
+
+  test('例外日の変更直後に空きへ反映される', async () => {
+    const data: StubData = {
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      shifts: [{ staff_id: 'S1', work_date: '2026-05-09', start_time: '10:00', end_time: '12:00' }],
+      exceptions: [],
+    };
+    const db = stubDB(data);
+    const params = {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-05-09',
+      to: '2026-05-09',
+      now: new Date('2026-05-08T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+    };
+    const before = await getAvailability(db, params);
+    expect(before.by_staff[0].slots).not.toEqual([]);
+    data.exceptions = [closedException()];
+    const after = await getAvailability(db, params);
+    expect(after.by_staff[0].slots).toEqual([]);
+    data.exceptions = [];
+    const reopened = await getAvailability(db, params);
+    expect(reopened.by_staff[0].slots).not.toEqual([]);
+  });
+
+  test('使う資源の休業日は枠を塞ぎ、使わない資源の休業は塞がない', async () => {
+    const base: StubData = {
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      shifts: [{ staff_id: 'S1', work_date: '2026-05-09', start_time: '10:00', end_time: '12:00' }],
+      menuResources: [{ id: 'R1', capacity: 2, quantity: 1 }],
+    };
+    const params = {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-05-09',
+      to: '2026-05-09',
+      now: new Date('2026-05-08T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+    };
+    const usedClosed = await getAvailability(
+      stubDB({ ...base, exceptions: [closedException({ scope_kind: 'resource', scope_id: 'R1' })] }),
+      params,
+    );
+    expect(usedClosed.by_staff[0].slots).toEqual([]);
+    const unusedClosed = await getAvailability(
+      stubDB({ ...base, exceptions: [closedException({ scope_kind: 'resource', scope_id: 'R9' })] }),
+      params,
+    );
+    expect(unusedClosed.by_staff[0].slots.map((s) => s.start)).toEqual(['10:00', '10:30', '11:00']);
+  });
+
+  test('壊れた例外日の時間はその日を fail-closed にする', async () => {
+    const db = stubDB({
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      shifts: [{ staff_id: 'S1', work_date: '2026-05-09', start_time: '10:00', end_time: '12:00' }],
+      exceptions: [{
+        scope_kind: 'store',
+        scope_id: null,
+        date_from: '2026-05-09',
+        date_to: '2026-05-09',
+        kind: 'custom_hours',
+        hours_json: 'not-json',
+      }],
+    });
+    const result = await getAvailability(db, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-05-09',
+      to: '2026-05-09',
+      now: new Date('2026-05-08T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+    });
+    expect(result.by_staff[0].slots).toEqual([]);
   });
 });
