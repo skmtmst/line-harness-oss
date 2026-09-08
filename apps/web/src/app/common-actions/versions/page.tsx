@@ -109,6 +109,11 @@ function CommonActionVersionsInner() {
 
   const run = async (key: string, task: () => Promise<unknown>): Promise<boolean> => {
     if (working) return false
+    // 押下と実行の間に店が外れたら何もしない（#519 軽）。`selectedAccountId!` の3箇所を守る。
+    if (!selectedAccountId) {
+      setError('LINEアカウントを選び直してください。')
+      return false
+    }
     setWorking(key)
     setError('')
     try {

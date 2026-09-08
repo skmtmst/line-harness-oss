@@ -426,14 +426,8 @@ export default function AutomationsPage() {
           placeholder="ルール名・きっかけ・することで検索"
           className="h-10 w-full max-w-lg rounded-control border border-hairline bg-canvas px-3 text-sm text-ink outline-none focus:border-info"
         />
-        <div className="flex gap-2">
-          <SelectField
-            aria-label="表示期間"
-            value="30"
-            onChange={() => undefined}
-            options={[{ value: '30', label: 'この30日' }]}
-            className="h-10 min-w-32"
-          />
+        <div className="flex items-center gap-2">
+          <p className="text-sm text-ink-secondary">この30日</p>
           <SelectField
             aria-label="並び順"
             value={sortOrder}

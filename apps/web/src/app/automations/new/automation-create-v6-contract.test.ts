@@ -209,4 +209,11 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
     expect(PAGE).toContain('api.automations.publishDraft')
     expect(PAGE).toContain('つくって動かす')
   })
+
+  it('同じきっかけ注意はこの店だけ見て選べない分岐を持たない (#580)', () => {
+    expect(PAGE).toContain('api.automations.list({ accountId: selectedAccountId })')
+    expect(PAGE).not.toContain('triggerConfig.trackedLinkId')
+    expect(PAGE).not.toContain('triggerConfig.bookingType')
+    expect(PAGE).toContain('保存した時点の内容で試します')
+  })
 })

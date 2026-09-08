@@ -2208,7 +2208,33 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       scenarios: [{ id: 'scenario-trial', name: '体験前フォロー' }],
     },
   }
-  if (pathname === '/api/automation-runs') return { success: true, data: AUTOMATION_RUNS }
+  if (pathname === '/api/automation-runs') {
+    // #519 軽: 本番口と同じく search・status・limit で絞る（固定7件を返さない）。
+    const runStatus = query.get('status')
+    const runSearch = (query.get('search') ?? '').trim().toLocaleLowerCase('ja')
+    const runLimit = Math.max(1, Number.parseInt(query.get('limit') ?? '', 10) || 20)
+    const statusDomains = runStatus === 'executed'
+      ? ['success', 'partial', 'failed']
+      : runStatus === 'problems'
+        ? ['partial', 'failed']
+        : runStatus === 'skipped'
+          ? ['skipped_condition']
+          : null
+    const runItems = AUTOMATION_RUNS.items.filter((item) => {
+      if (statusDomains && !statusDomains.includes(item.domainStatus)) return false
+      if (!runSearch) return true
+      return [item.subject, item.automationName].some((value) =>
+        String(value ?? '').toLocaleLowerCase('ja').includes(runSearch))
+    })
+    return {
+      success: true,
+      data: {
+        ...AUTOMATION_RUNS,
+        items: runItems.slice(0, runLimit),
+        pagination: { total: runItems.length, limit: runLimit, offset: 0 },
+      },
+    }
+  }
   if (pathname === '/api/automation-templates') return { success: true, data: AUTOMATION_TEMPLATES }
   if (pathname === '/api/ec-commerce/settings') return { success: true, data: EC_NOTIFICATION_SETTINGS }
   if (pathname === '/api/line-notifications/customer-definitions') {
