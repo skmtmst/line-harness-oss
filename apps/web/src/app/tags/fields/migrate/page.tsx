@@ -96,7 +96,7 @@ function MigrateFriendField() {
       </div>
 
       <div className="mb-4 rounded-control border border-info/25 bg-info-bg p-4 text-sm leading-6 text-info">
-        まず事前確認だけを行います。友だちの値や既存の項目は変更しません。確認が必要な値を直してから、移行を実行してください。
+        まず事前確認だけを行います。友だちの値や既存の項目は変更しません。確認が必要な値を直してから、移行を実行してください。なお、新しい項目名の重複は事前確認では分からず、実行時に確認します。
       </div>
       {error ? <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
 
