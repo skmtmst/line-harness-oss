@@ -198,6 +198,29 @@ function SaveAnalysisAction({
   )
 }
 
+type CrossQueueStatus = {
+  state: string
+  queuePosition: number | null
+  pendingAhead: number
+  estimatedWaitMs: number | null
+  nextTickAt: string | null
+}
+
+function formatCrossNextTick(nextTickAt: string): string {
+  const parsed = new Date(nextTickAt)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return new Intl.DateTimeFormat('ja-JP', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'Asia/Tokyo',
+  }).format(parsed)
+}
+
+function formatCrossWaitMinutes(estimatedWaitMs: number): string {
+  return String(Math.max(1, Math.round(estimatedWaitMs / 60_000)))
+}
+
 function CrossTab({ accountId, canManage }: { accountId: string; canManage: boolean }) {
   const [fields, setFields] = useState<FriendField[]>([])
   // 友だち情報欄が取れないのに空表示のままにすると、項目を作り直す事故になる。
@@ -207,6 +230,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
   const [crossResult, setCrossResult] = useState<AnalyticsCrossResult | null>(null)
   const [crossRunId, setCrossRunId] = useState('')
   const [crossResultId, setCrossResultId] = useState('')
+  const [crossQueue, setCrossQueue] = useState<CrossQueueStatus | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [crossDays, setCrossDays] = useState(30)
@@ -242,6 +266,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
     setCrossResult(null)
     setCrossRunId('')
     setCrossResultId('')
+    setCrossQueue(null)
     setPicked(null)
     setAudience(null)
     setError('')
@@ -260,15 +285,24 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
         const response = await api.analytics.crossResult(accountId, crossRunId)
         if (!active) return
         if (!response.success) throw new Error(response.error)
+        setCrossQueue({
+          state: response.data.state,
+          queuePosition: response.data.queuePosition ?? null,
+          pendingAhead: response.data.pendingAhead ?? 0,
+          estimatedWaitMs: response.data.estimatedWaitMs ?? null,
+          nextTickAt: response.data.nextTickAt ?? null,
+        })
         if (response.data.result) {
           setCrossResult(response.data.result)
           setCrossRunId('')
+          setCrossQueue(null)
           setLoading(false)
           return
         }
         if (response.data.state === 'failed') {
-          setError(response.data.errorCode || 'クロス分析に失敗しました')
+          setError(response.data.errorCode || 'クロス分析に失敗しました。条件を変えずにもう一度集計できます')
           setCrossRunId('')
+          setCrossQueue(null)
           setLoading(false)
           return
         }
@@ -276,6 +310,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
         if (!active) return
         setError(caught instanceof Error ? caught.message : 'クロス分析を確認できませんでした')
         setCrossRunId('')
+        setCrossQueue(null)
         setLoading(false)
         return
       }
@@ -283,6 +318,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
       if (attempts >= 40) {
         setError('時間切れです。条件をゆるめて集計し直してください')
         setCrossRunId('')
+        setCrossQueue(null)
         setLoading(false)
         return
       }
@@ -302,6 +338,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
     setPicked(null)
     setAudience(null)
     setCrossResult(null)
+    setCrossQueue(null)
     const now = new Date()
     const from = new Date(now.getTime() - crossDays * 24 * 3600_000)
     const rowAxis: AnalyticsCrossAxis = { kind: rowKind }
@@ -524,8 +561,30 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
       </div>
 
       {loading ? (
-        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-          集計を受け付けました。終わるまでこの画面で確認しています。
+        <div className="bg-canvas rounded-card border-hairline border p-8 text-center text-sm" role="status">
+          <p className="text-ink font-medium">集計を受け付けました。終わるまでこの画面で確認しています。</p>
+          <p className="text-ink-secondary mt-2">
+            現在の状態: {crossQueue?.state === 'running' ? '処理中です' : '待ち順に並んでいます'}
+          </p>
+          {crossQueue?.queuePosition != null && (
+            <p className="text-ink-secondary mt-1">
+              待ち順は{crossQueue.queuePosition}番目です
+              {crossQueue.pendingAhead === 0 ? '（あなたの前にはありません）' : `（あなたの前に${crossQueue.pendingAhead}件あります）`}
+            </p>
+          )}
+          {crossQueue?.estimatedWaitMs != null && crossQueue.estimatedWaitMs > 0 && (
+            <p className="text-ink-secondary mt-1">
+              目安は約{formatCrossWaitMinutes(crossQueue.estimatedWaitMs)}分です
+              {crossQueue.nextTickAt && formatCrossNextTick(crossQueue.nextTickAt)
+                ? `（次回処理は${formatCrossNextTick(crossQueue.nextTickAt)}ごろ）`
+                : ''}
+            </p>
+          )}
+          {crossQueue?.estimatedWaitMs === 0 && (
+            <p className="text-ink-secondary mt-1">まもなく終わります。</p>
+          )}
+          <p className="text-ink-faint mt-2 text-xs">同じ分析をもう一度押す必要はありません。このままお待ちください。</p>
+          <p className="text-ink-faint mt-1 text-xs">結果が出た後はこの画面で確認でき、失敗・時間切れのときも集計し直せます。</p>
         </div>
       ) : !crossResult ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">

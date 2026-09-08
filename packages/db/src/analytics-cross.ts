@@ -5,6 +5,32 @@ const MAX_AXIS_VALUES_PER_FRIEND = 20;
 const MAX_MEMBER_ROWS = 200_000;
 const MAX_ACCOUNT_FRIENDS = 50_000;
 
+// クロス分析の実行間隔(表示用の目安だけ)。処理頻度そのものは変えない。
+// frequentHeavy Cron '1-56/5 * * * *'(5分ごと)が1件ずつ処理する前提の概算。
+export const ANALYTICS_CROSS_QUEUE_INTERVAL_MS = 5 * 60_000;
+
+export interface AnalyticsCrossQueueStatus {
+  queuePosition: number | null;
+  pendingAhead: number;
+  estimatedWaitMs: number | null;
+  nextTickAt: string | null;
+}
+
+// 次回の処理目安(UTCで分が1 mod 5の時刻)。Cron式の表示用で、実行頻度は変えない。
+export function nextAnalyticsCrossTick(now: Date = new Date()): string {
+  const base = new Date(now.getTime());
+  base.setUTCSeconds(0, 0);
+  for (let step = 0; step <= 6; step += 1) {
+    const candidate = new Date(base.getTime() + step * 60_000);
+    if (candidate.getTime() > now.getTime() && candidate.getUTCMinutes() % 5 === 1) {
+      return candidate.toISOString();
+    }
+  }
+  const fallback = new Date(base.getTime() + 6 * 60_000);
+  fallback.setUTCSeconds(0, 0);
+  return fallback.toISOString();
+}
+
 export type AnalyticsCrossAxis =
   | { kind: 'route' }
   | { kind: 'tag' }
@@ -957,19 +983,60 @@ export async function recoverStalledAnalyticsCrossRuns(
   return Number(result.meta?.changes ?? 0);
 }
 
+export async function getAnalyticsCrossQueueStatus(
+  db: D1Database,
+  lineAccountId: string,
+  runId: string,
+  now: Date = new Date(),
+): Promise<AnalyticsCrossQueueStatus> {
+  const row = await loadRunRow(db, runId, lineAccountId);
+  if (!row) {
+    return { queuePosition: null, pendingAhead: 0, estimatedWaitMs: null, nextTickAt: null };
+  }
+  if (row.state === 'running') {
+    return { queuePosition: 1, pendingAhead: 0, estimatedWaitMs: 0, nextTickAt: null };
+  }
+  if (row.state === 'pending') {
+    const running = await db.prepare(
+      `SELECT COUNT(*) AS count FROM analytics_cross_runs
+        WHERE line_account_id = ? AND state = 'running' AND id != ?`,
+    ).bind(lineAccountId, runId).first<{ count: number }>();
+    const earlier = await db.prepare(
+      `SELECT COUNT(*) AS count FROM analytics_cross_runs
+        WHERE line_account_id = ? AND state = 'pending'
+          AND (created_at < ? OR (created_at = ? AND id < ?))`,
+    ).bind(lineAccountId, row.created_at, row.created_at, row.id).first<{ count: number }>();
+    const pendingAhead = Number(running?.count ?? 0) + Number(earlier?.count ?? 0);
+    const queuePosition = pendingAhead + 1;
+    return {
+      queuePosition,
+      pendingAhead,
+      estimatedWaitMs: queuePosition * ANALYTICS_CROSS_QUEUE_INTERVAL_MS,
+      nextTickAt: nextAnalyticsCrossTick(now),
+    };
+  }
+  return { queuePosition: null, pendingAhead: 0, estimatedWaitMs: null, nextTickAt: null };
+}
+
 export async function getAnalyticsCrossRun(
   db: D1Database,
   lineAccountId: string,
   runId: string,
+  now: Date = new Date(),
 ): Promise<{
   id: string;
   state: string;
   errorCode: string | null;
   result: AnalyticsCrossResult | null;
   createdAt: string;
+  queuePosition: number | null;
+  pendingAhead: number;
+  estimatedWaitMs: number | null;
+  nextTickAt: string | null;
 } | null> {
   const row = await loadRunRow(db, runId, lineAccountId);
   if (!row) return null;
+  const queue = await getAnalyticsCrossQueueStatus(db, lineAccountId, runId, now);
   return {
     id: row.id,
     state: row.state,
@@ -978,6 +1045,7 @@ export async function getAnalyticsCrossRun(
       ? JSON.parse(row.result_json) as AnalyticsCrossResult
       : null,
     createdAt: row.created_at,
+    ...queue,
   };
 }
 

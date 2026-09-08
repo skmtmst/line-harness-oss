@@ -4739,6 +4739,10 @@ export const api = {
         errorCode: string | null
         result: AnalyticsCrossResult | null
         createdAt: string
+        queuePosition: number | null
+        pendingAhead: number
+        estimatedWaitMs: number | null
+        nextTickAt: string | null
       }>>(`/api/analytics/cross/results/${id}?account_id=${encodeURIComponent(accountId)}`),
     createResultAudience: (accountId: string, resultId: string, data: {
       sourceKind: 'cross' | 'funnel'
