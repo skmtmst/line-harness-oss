@@ -363,10 +363,31 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
   )
 }
 
+/**
+ * URL状態の友だちIDが口へ渡せる形か。
+ *
+ * `api.chats.get` はIDを素のまま path へ入れるため、`/ ? #`
+ * 空白を含む値はここで弾く。弾いた値は口を呼ばず、別人も開かない(#673)。
+ */
+function isSafeFriendIdForInbox(value: string): boolean {
+  if (!value || value.length > 128) return false
+  return /^[A-Za-z0-9_-]+$/.test(value)
+}
+
 function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { selectedAccountId, selectedAccount } = useAccount()
   const [chats, setChats] = useState<Chat[]>([])
+  /**
+   * URLで指定された会話が開けなかったときの案内。
+   *
+   * 不正・存在しない・別アカウントのIDでも別人を開かず、
+   * 空のまま理由と戻り先を出す(#673)。
+   */
+  const [deepLinkNotice, setDeepLinkNotice] = useState('')
+  /** URL由来で開こうとしているID。手選びと区別するための目印。 */
+  const deepLinkIdRef = useRef<string | null>(null)
   /**
    * メールの問い合わせ。LINEのトークと同じ一覧に混ぜる。
    *
@@ -789,16 +810,26 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         const detail = res.data
         setChatDetail(detail)
         setMessagesHasMore(detail.hasMoreMessages === true)
+        // URL指定の会話が開けた。案内は消す(#673)。
+        if (deepLinkIdRef.current === chatId) setDeepLinkNotice('')
       } else {
         setChatDetail(null)
         setMessagesHasMore(false)
         setError('会話を読み込めませんでした。時間を置いてもう一度お試しください。')
+        // 存在しない・別アカウントのIDでも別人を開かず、案内を出す(#673)。
+        // 口は存在の有無を404に倒すので、ここでは区別しない。
+        if (deepLinkIdRef.current === chatId) {
+          setDeepLinkNotice('指定の会話を開けませんでした。存在しないか、見る権限がありません。URLを確かめるか、友だち詳細の「受信箱で開く」から開き直してください。')
+        }
       }
     } catch {
       if (requestId !== detailRequestIdRef.current) return
       setChatDetail(null)
       setMessagesHasMore(false)
       setError('会話を読み込めませんでした。時間を置いてもう一度お試しください。')
+      if (deepLinkIdRef.current === chatId) {
+        setDeepLinkNotice('指定の会話を開けませんでした。存在しないか、見る権限がありません。URLを確かめるか、友だち詳細の「受信箱で開く」から開き直してください。')
+      }
     } finally {
       if (requestId === detailRequestIdRef.current) setDetailLoading(false)
     }
@@ -862,23 +893,40 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     return () => window.removeEventListener(UNANSWERED_REFRESH_EVENT, refresh)
   }, [loadChats, loadEmails])
 
-  // Deep-link from other pages. LINE is ?friend=<friendId>, email is
-  // ?thread=<threadId>. Selecting one side always clears the other so the
-  // center panel has exactly one conversation to show.
+  // Deep-link from other pages. LINE is ?friend=<friendId> (?friendId= is
+  // the old form kept for shared URLs), email is ?thread=<threadId>.
+  // Selecting one side always clears the other so the center panel has
+  // exactly one conversation to show. Re-runs on URL change so back/forward
+  // and shared URLs keep the target; reload works because the target lives
+  // in the URL (#673). Manual selection never rewrites the URL, so a
+  // state-only change never triggers this.
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const params = new URLSearchParams(window.location.search)
-    const friendId = params.get('friend')
-    const threadId = params.get('thread')
+    const threadId = (searchParams.get('thread') ?? '').trim()
+    const rawFriend = (searchParams.get('friend') ?? searchParams.get('friendId') ?? '').trim()
     if (threadId) {
+      deepLinkIdRef.current = null
+      setDeepLinkNotice('')
       setSelectedChatId(null)
       setSelectedFriendId(null)
       setSelectedThreadId(threadId)
-    } else if (friendId) {
-      setSelectedThreadId(null)
-      setSelectedChatId(friendId)
+      return
     }
-  }, [])
+    // URLに対象が無いときは何もしない。手で選んだ会話を消さない。
+    if (!rawFriend) return
+    if (!isSafeFriendIdForInbox(rawFriend)) {
+      // 不正なIDは口へ渡さず、別人も開かない。案内だけ出す。
+      deepLinkIdRef.current = rawFriend
+      setSelectedThreadId(null)
+      setSelectedFriendId(null)
+      setSelectedChatId(null)
+      setDeepLinkNotice('指定の会話を開けませんでした。URLの指定が正しくありません。友だち詳細の「受信箱で開く」から開き直してください。')
+      return
+    }
+    deepLinkIdRef.current = rawFriend
+    setDeepLinkNotice('')
+    setSelectedThreadId(null)
+    setSelectedChatId(rawFriend)
+  }, [searchParams])
 
   useEffect(() => {
     if (selectedChatId) {
@@ -969,7 +1017,19 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`
   }, [messageContent])
 
+  // 案内付きの空状態から一覧へ戻る。URLの指定も外す。
+  // 外さないと再読込で同じ指定が復活する(#673)。
+  const clearDeepLink = () => {
+    deepLinkIdRef.current = null
+    setDeepLinkNotice('')
+    setSelectedChatId(null)
+    router.replace(channel === 'all' ? '/chats' : `/chats?channel=${channel}`)
+  }
+
   const handleSelectChat = (chatId: string) => {
+    // 手選びはURL指定を上書きする。古い案内を残さない(#673)。
+    deepLinkIdRef.current = null
+    setDeepLinkNotice('')
     setSelectedChatId(chatId)
     // 既読はログイン中の担当者だけに反映する。対応状況は変えない。
     setChats((prev) => prev.map((chat) => (
@@ -1623,7 +1683,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       key={item.id}
                       onClick={() => {
                         // LINEの選択を外す。両方開いていると中央に何を
-                        // 出すのか決まらない。
+                        // 出すのか決まらない。URL指定の案内も外す(#673)。
+                        deepLinkIdRef.current = null
+                        setDeepLinkNotice('')
                         setSelectedChatId(null)
                         setSelectedFriendId(null)
                         setSelectedThreadId(item.threadId)
@@ -2367,6 +2429,18 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 </div>
               </div>
             </>
+          ) : deepLinkNotice ? (
+            // URL指定の会話が開けなかったときの空状態。別人は開かず、
+            // 理由と戻り先だけ出す(#673)。
+            <div className="flex flex-1 items-center justify-center p-8">
+              <div className="max-w-md text-center">
+                <p className="text-ink text-sm font-semibold">会話を開けませんでした</p>
+                <p className="text-ink-secondary mt-2 text-sm leading-relaxed">{deepLinkNotice}</p>
+                <Button onClick={clearDeepLink} className="mt-4">
+                  受信箱の一覧へ戻る
+                </Button>
+              </div>
+            </div>
           ) : null}
         </div>
 
