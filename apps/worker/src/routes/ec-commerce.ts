@@ -4,6 +4,7 @@ import { addDays, resolveShipDate, toJstMoment } from '@line-crm/shared';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { requireEcPermission } from './ec-operations.js';
 import { logOutgoingMessage } from '../services/event-bus.js';
 import { EC_EVENT_TYPES, type EcEvent } from './ec-integrations.js';
 import { ecFlexMessage } from '../services/ec-notification-message.js';
@@ -141,7 +142,11 @@ function testEvent(eventType: string): EcEvent {
   return base;
 }
 
-ecCommerce.get('/api/ec-commerce/overview', async (c) => {
+ecCommerce.get(
+  '/api/ec-commerce/overview',
+  requireRole('owner', 'admin', 'staff'),
+  requireEcPermission('ec.event.view'),
+  async (c) => {
   const lineAccountId = c.req.query('lineAccountId')?.trim();
   if (lineAccountId && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);

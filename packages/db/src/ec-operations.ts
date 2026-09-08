@@ -7,6 +7,10 @@ export type EcActionExecutionStatus =
   | 'retryable_failed'
   | 'permanent_failed';
 
+export const EC_ACTION_EXECUTION_STATUSES: ReadonlySet<EcActionExecutionStatus> = new Set([
+  'pending', 'processing', 'succeeded', 'skipped', 'retryable_failed', 'permanent_failed',
+]);
+
 export interface EcReadModelEvent {
   eventId: string;
   sourceKey: string;
@@ -345,6 +349,7 @@ export interface EcActionExecutionReadModel {
   receivedAt: string;
   orderNumber: string | null;
   customerName: string | null;
+  friendId: string | null;
   retryAvailable: boolean;
 }
 
@@ -360,6 +365,7 @@ function actionReadModel(row: Record<string, unknown>): EcActionExecutionReadMod
     version: Number(row.version), receivedAt: String(row.received_at),
     orderNumber: row.order_number == null ? null : String(row.order_number),
     customerName: row.customer_name == null ? null : String(row.customer_name),
+    friendId: row.friend_id == null ? null : String(row.friend_id),
     retryAvailable: row.status === 'retryable_failed' && Number(row.attempt_count) < Number(row.max_attempts),
   };
 }
@@ -370,6 +376,7 @@ export async function listEcActionExecutions(
     lineAccountId: string;
     eventId?: string | null;
     status?: EcActionExecutionStatus | null;
+    statuses?: EcActionExecutionStatus[] | null;
     limit: number;
     offset: number;
   },
@@ -382,10 +389,15 @@ export async function listEcActionExecutions(
   const bindings: Array<string | number> = [input.lineAccountId];
   if (input.eventId) { clauses.push('a.event_id = ?'); bindings.push(input.eventId); }
   if (input.status) { clauses.push('a.status = ?'); bindings.push(input.status); }
+  const statuses = (input.statuses ?? []).filter((status) => EC_ACTION_EXECUTION_STATUSES.has(status));
+  if (statuses.length > 0) {
+    clauses.push(`a.status IN (${statuses.map(() => '?').join(',')})`);
+    bindings.push(...statuses);
+  }
   const where = clauses.join(' AND ');
   const [rows, count, summaryRows] = await Promise.all([
     db.prepare(
-      `SELECT a.*, e.event_type, e.received_at,
+      `SELECT a.*, e.event_type, e.received_at, e.friend_id AS friend_id,
               json_extract(e.payload, '$.order.number') AS order_number,
               f.display_name AS customer_name
          FROM ec_action_executions a
@@ -423,7 +435,7 @@ async function getActionExecutionForResult(
   id: string,
 ): Promise<EcActionExecutionReadModel | null> {
   const row = await db.prepare(
-    `SELECT a.*, e.event_type, e.received_at,
+    `SELECT a.*, e.event_type, e.received_at, e.friend_id AS friend_id,
             json_extract(e.payload, '$.order.number') AS order_number,
             f.display_name AS customer_name
        FROM ec_action_executions a

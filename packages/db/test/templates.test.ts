@@ -50,6 +50,7 @@ describe('テンプレートの使用先', () => {
     const db = {
       prepare: (sql: string) => ({
         bind: () => ({
+          first: async () => ({ total: 1 }),
           all: async () => ({ results: [{
             id: 'tpl-1', name: '案内', category: 'general', message_type: 'text',
             message_content: '本文', folder_id: null, carousel_actions_json: null,
@@ -57,6 +58,7 @@ describe('テンプレートの使用先', () => {
             created_at: '2026-08-27', updated_at: '2026-08-27',
           }] }),
         }),
+        first: async () => ({ total: 1 }),
         all: async () => {
           if (sql.includes('SUM(cnt)')) return { results: [{ template_id: 'tpl-1', cnt: 5 }] };
           if (sql.includes('FROM automations')) {
@@ -73,7 +75,8 @@ describe('テンプレートの使用先', () => {
     } as unknown as D1Database;
 
     const templates = await getTemplatesWithUsageCount(db);
-    expect(templates[0]?.usage_count).toBe(6);
+    expect(templates.items[0]?.usage_count).toBe(6);
+    expect(templates.total).toBe(1);
   });
 
   it('選択したLINEアカウントだけを一覧SQLへ渡す', async () => {
@@ -81,6 +84,10 @@ describe('テンプレートの使用先', () => {
     const db = {
       prepare: (sql: string) => ({
         bind: (...values: unknown[]) => ({
+          first: async () => {
+            calls.push({ sql, values });
+            return { total: 0 };
+          },
           all: async () => {
             calls.push({ sql, values });
             return { results: [] };

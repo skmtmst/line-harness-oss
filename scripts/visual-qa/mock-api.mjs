@@ -1298,10 +1298,15 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
     const status = query.get('status')
     const eventId = query.get('eventId')
+    const statusGroup = query.get('statusGroup')
+    const groupStatuses = { processing: ['pending', 'processing'], failed: ['retryable_failed', 'permanent_failed'] }
+    const grouped = statusGroup ? (groupStatuses[statusGroup] ?? null) : null
     const filtered = EC_ACTION_EXECUTIONS.items.filter((execution) => (
-      (!status || execution.status === status) && (!eventId || execution.eventId === eventId)
+      (!status || execution.status === status)
+      && (!grouped || grouped.includes(execution.status))
+      && (!eventId || execution.eventId === eventId)
     ))
-    const total = status || eventId ? filtered.length : EC_ACTION_EXECUTIONS.total
+    const total = status || grouped || eventId ? filtered.length : EC_ACTION_EXECUTIONS.total
     return {
       success: true,
       data: { ...EC_ACTION_EXECUTIONS, items: filtered.slice(offset, offset + limit), total },
@@ -2066,6 +2071,29 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: { accountId, trackingKey } }
   }
   if (pathname === '/api/ad-platforms') return { success: true, data: AD_PLATFORMS }
+  if (pathname === '/api/ad-platforms/logs') {
+    const page = Math.max(1, Number(query.get('page')) || 1)
+    const limit = Math.min(200, Math.max(1, Number(query.get('limit')) || 20))
+    const status = query.get('status')
+    const search = (query.get('query') ?? '').trim().toLocaleLowerCase('ja')
+    const filtered = AD_CONVERSION_LOGS.filter((log) => {
+      const statusMatches = !status || status === 'all'
+        || (status === 'sent' ? ['sent', 'success'].includes(log.status) : log.status === status)
+      const queryMatches = !search
+        || [log.eventName, log.clickIdType ?? ''].some((value) => value.toLocaleLowerCase('ja').includes(search))
+      return statusMatches && queryMatches
+    })
+    return {
+      success: true,
+      data: {
+        items: filtered.slice((page - 1) * limit, page * limit),
+        total: filtered.length,
+        page,
+        limit,
+        sort: [{ field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'desc' }],
+      },
+    }
+  }
   const adPlatformLogs = /^\/api\/ad-platforms\/([^/]+)\/logs$/.exec(pathname)
   if (adPlatformLogs) {
     return { success: true, data: AD_CONVERSION_LOGS.filter((log) => log.adPlatformId === adPlatformLogs[1]) }

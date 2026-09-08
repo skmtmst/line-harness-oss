@@ -76,11 +76,12 @@ describe('収集の受け口', () => {
       visitorId: VALID_ID,
       trackingKey: 'hk_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       eventType: 'page_view',
+      host: 'shop.example.com',
       path: '/thanks',
     });
     expect(res.status).toBe(204);
     expect(mocks.recordSiteEvent).toHaveBeenCalledWith(env.DB, expect.objectContaining({
-      visitorId: VALID_ID, lineAccountId: 'account-a', eventType: 'page_view',
+      visitorId: VALID_ID, lineAccountId: 'account-a', eventType: 'page_view', host: 'shop.example.com',
     }));
   });
 
@@ -176,6 +177,7 @@ describe('埋め込むJS', () => {
     const body = await res.text();
     // location.search を読んでいないこと。送らないに越したことはない。
     expect(body).toContain('location.pathname');
+    expect(body).toContain('host: location.hostname');
     expect(body).not.toContain('location.search');
   });
 });
@@ -281,5 +283,27 @@ describe('管理画面のアカウント境界', () => {
     expect(mocks.getPageViewSummary).toHaveBeenCalledWith(env.DB, {
       lineAccountId: 'account-a', from: '2026-09-01', to: '2026-09-07T23:59:59.999',
     });
+  });
+
+  it('ページ一覧と友だち詳細に計測先ホストを返す', async () => {
+    mocks.getPageViewSummary.mockResolvedValueOnce([
+      { host: 'shop.example.com', path: '/thanks', views: 4, visitors: 3 },
+    ]);
+    const pages = await app.fetch(
+      new Request('https://example.com/api/site/pages?accountId=account-a'),
+      env as unknown as Env['Bindings'],
+    );
+    expect(await pages.json()).toMatchObject({ data: [{ host: 'shop.example.com', path: '/thanks' }] });
+
+    mocks.getFriendSiteEvents.mockResolvedValueOnce([{
+      id: 'event-1', visitor_id: 'visitor-1', line_account_id: 'account-a', friend_id: 'friend-1',
+      event_type: 'page_view', host: 'shop.example.com', path: '/thanks', label: null,
+      value_num: null, referrer: null, occurred_at: '2026-09-08T10:00:00.000',
+    }]);
+    const detail = await app.fetch(
+      new Request('https://example.com/api/friends/friend-1/site-events'),
+      env as unknown as Env['Bindings'],
+    );
+    expect(await detail.json()).toMatchObject({ data: [{ host: 'shop.example.com', path: '/thanks' }] });
   });
 });

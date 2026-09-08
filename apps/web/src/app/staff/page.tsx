@@ -254,6 +254,7 @@ function StaffPageHost() {
   const { selectedAccountId } = useAccount()
   const [members, setMembers] = useState<StaffMember[]>([])
   const [accessUsers, setAccessUsers] = useState<AccessUserItem[]>([])
+  const [usersTotal, setUsersTotal] = useState(0)
   const [accessSummary, setAccessSummary] = useState<AccessUserSummary>(EMPTY_ACCESS_SUMMARY)
   const [accessRoles, setAccessRoles] = useState<AccessRoleItem[]>([])
   const [accountNames, setAccountNames] = useState<Record<string, string>>({})
@@ -276,13 +277,12 @@ function StaffPageHost() {
     setError('')
     try {
       const scope = selectedAccountId ?? undefined
-      const [staffResult, meResult, accountsResult, usersResult, rolesResult, auditResult] = await Promise.all([
+      const [staffResult, meResult, accountsResult, usersResult, rolesResult] = await Promise.all([
         api.staff.list(),
         api.staff.me(),
         api.lineAccounts.list(),
         api.access.users({ lineAccountId: scope, limit: 200 }),
         api.access.roles(scope),
-        api.audit.events({ lineAccountId: scope, limit: 200 }).catch(() => null),
       ])
       if (!staffResult.success || !meResult.success || !accountsResult.success || !usersResult.success || !rolesResult.success) {
         throw new Error('必要な情報を取得できませんでした')
@@ -291,9 +291,9 @@ function StaffPageHost() {
       setMe(meResult.data)
       setAccountNames(Object.fromEntries(accountsResult.data.map((account) => [account.id, account.name])))
       setAccessUsers(usersResult.data.items)
+      setUsersTotal(usersResult.data.pagination?.total ?? usersResult.data.items.length)
       setAccessSummary(usersResult.data.summary)
       setAccessRoles(rolesResult.data.items)
-      setAudits(auditResult?.success ? auditResult.data.items : [])
     } catch {
       setError('ログインユーザーを読み込めませんでした。時間をおいて、もう一度お試しください。')
     } finally {
@@ -301,6 +301,19 @@ function StaffPageHost() {
     }
   }, [selectedAccountId])
   useEffect(() => { void load() }, [load])
+  /*
+   * 入った記録は「入った記録」タブでだけ読む。最初に全部のタブぶんを
+   * 先読みすると、表の中身(LoginAudit)が別に読み直す二重取りになる。
+   */
+  useEffect(() => {
+    if (tab !== 'audit') return
+    let alive = true
+    setAudits([])
+    void api.audit.events({ lineAccountId: selectedAccountId ?? undefined, limit: 200 })
+      .then((result) => { if (alive && result.success) setAudits(result.data.items) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [tab, selectedAccountId])
   const memberById = useMemo(() => {
     const map = new Map(members.map((member) => [member.id, member]))
     for (const user of accessUsers) {
@@ -353,7 +366,7 @@ function StaffPageHost() {
     <div className="mb-3 flex flex-wrap items-center gap-3"><SearchField value={query} onChange={setQuery} onClear={() => setQuery('')} placeholder="人の名前・メールで検索" className="min-w-64 flex-1" /><Select aria-label="並び順" value={sort} onChange={setSort} options={LIST_SORT_OPTIONS} /></div>
     <div className="mb-3"><Tabs items={[{ label: 'すべて', count: tabUsers.length, current: roleFilter === 'all', onClick: () => setRoleFilter('all') }, ...(['administrator', 'operations', 'reception', 'view_only', 'custom'] as const).map((role) => ({ label: ACCESS_ROLE_LABEL[role], count: tabUsers.filter((user) => user.roleBundle === role).length, current: roleFilter === role, onClick: () => setRoleFilter(role) }))]} /></div>
     <div id="staff-list" className="overflow-hidden rounded-card border border-hairline bg-canvas"><table className="w-full table-fixed text-sm"><thead><TableHeadRow><Th className="w-1/4">人</Th><Th>役わり</Th><Th>職位</Th><Th className="w-1/5">見せる範囲</Th><Th>最後に入った</Th><Th>2段階の確認</Th><Th align="right">操作</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{loading ? <tr><td colSpan={7} className="p-10 text-center text-ink-faint">ログインユーザーを読み込んでいます…</td></tr> : shown.length === 0 ? <tr><td colSpan={7} className="p-10 text-center text-ink-faint">条件に合うログインユーザーはいません。条件を変えてお試しください。</td></tr> : shown.map((user) => { const member = memberById.get(user.id); const editable = member ? canEdit(member) : false; const scope = accessScopeLabel(user, accountNames); const twoFactorLabel = user.mfaEnabled ? '入れています' : user.status === 'active' ? '入れていません' : '—'; const warning = !user.mfaEnabled || user.status === 'expired' || user.status === 'suspended'; return <tr key={user.id} className="hover:bg-canvas-sunken"><td className="min-w-0 px-3 py-3"><p className="truncate font-semibold" title={user.name}>{user.name}</p><p className="truncate text-xs text-ink-faint" title={user.email ?? ''}>{user.email ?? 'メール未登録'}</p>{warning && <span className="mt-1 inline-block rounded-full bg-warning-bg px-2 py-0.5 text-xs font-semibold text-warning">確認が必要</span>}</td><td className="px-3 py-3"><span className={`whitespace-nowrap font-semibold ${user.roleBundle === 'administrator' ? 'text-success' : 'text-ink-secondary'}`}>{ACCESS_ROLE_LABEL[user.roleBundle]}</span></td><td className="truncate px-3 py-3 text-xs text-ink-secondary" title={user.jobTitle ?? ''}>{user.jobTitle ?? '—'}</td><td className="px-3 py-3"><p className="truncate text-xs font-medium" title={`${accessFeatureLabel(user)}：${scope}`}>{accessFeatureLabel(user)}</p><p className="mt-1 truncate text-xs text-ink-faint" title={scope}>{scope}</p></td><td className="px-3 py-3"><p className="whitespace-nowrap text-ink-secondary">{formatStaffDate(user.lastLoginAt ?? undefined)}</p><p className="mt-1 truncate text-xs text-ink-faint" title={user.lastActionAt ? '操作記録あり' : '操作記録なし'}>{user.lastActionAt ? `最後の操作：${formatStaffDate(user.lastActionAt)}` : '操作記録なし'}</p></td><td className="px-3 py-3">{editable && member ? <Button onClick={() => openTwoFactor(member)}>{twoFactorLabel}</Button> : <span className="whitespace-nowrap text-xs text-ink-faint">{twoFactorLabel}</span>}</td><td className="px-3 py-3"><div className="flex flex-wrap justify-end gap-1">{editable && member ? <><RowActionButton label="中身を見る" onClick={() => openPermissions(user)} /><RowActionButton label="この人を外す" onClick={() => setEditing(member)} /></> : member || !administrator ? <span className="text-xs text-ink-faint">操作できません</span> : <span className="text-xs font-semibold text-warning" title="スタッフ情報と結び付いていないため操作できません。名前とメールを確認してください。">要確認</span>}</div></td></tr> })}</tbody></table><p className="border-t border-hairline bg-info-bg px-4 py-3 text-xs text-ink-secondary">権限・担当範囲・職位・最終ログイン・2段階認証はアクセス API の最新状態です。確認が必要な人には注意札を表示します。</p></div>
-    {!loading && !error && <div className="mt-3 flex items-center justify-between text-xs text-ink-faint"><p>ログインユーザー {filteredUsers.length}人中 {shown.length}人を表示</p>{pageCount > 1 && <div className="flex items-center gap-2"><Button disabled={userPage === 1} onClick={() => setUserPage(userPage - 1)}>前へ</Button><span>{userPage} / {pageCount}</span><Button disabled={userPage === pageCount} onClick={() => setUserPage(userPage + 1)}>次へ</Button></div>}</div>}
+    {!loading && !error && <div className="mt-3 flex items-center justify-between text-xs text-ink-faint"><p>ログインユーザー {filteredUsers.length}人中 {shown.length}人を表示{usersTotal > accessUsers.length ? `（全${usersTotal}人中${accessUsers.length}人まで読み込み）` : ''}</p>{pageCount > 1 && <div className="flex items-center gap-2"><Button disabled={userPage === 1} onClick={() => setUserPage(userPage - 1)}>前へ</Button><span>{userPage} / {pageCount}</span><Button disabled={userPage === pageCount} onClick={() => setUserPage(userPage + 1)}>次へ</Button></div>}</div>}
     {editing && <EditModal member={editing} administrator={Boolean(administrator)} currentUserId={me?.id ?? null} activeAdministratorCount={activeAdministratorCount} onClose={() => setEditing(null)} onSaved={load} />}{settingTwoFactor && <TwoFactorModal member={settingTwoFactor} onClose={() => setSettingTwoFactor(null)} onSaved={load} />}</>}
     {/* 設定し直せる操作なので赤にしない。赤は本当に戻せない操作のために空けておく。 */}
     <ConfirmDialog

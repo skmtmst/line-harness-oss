@@ -3126,6 +3126,7 @@ export type EcActionExecution = {
   receivedAt: string
   orderNumber: string | null
   customerName: string | null
+  friendId: string | null
   retryAvailable: boolean
 }
 
@@ -4913,7 +4914,7 @@ export const api = {
   /** サイトスクリプト。自社サイトの行動を友だちに紐づける。 */
   siteTracking: {
     /** 計測が動いているかと、その内訳 */
-    summary: () =>
+    summary: (accountId?: string) =>
       fetchApi<
         ApiResponse<{
           todayEvents: number
@@ -4924,9 +4925,9 @@ export const api = {
           eventTypeCount: number
           lastEventAt: string | null
         }>
-      >('/api/site/summary'),
-    pages: (params?: { from?: string; to?: string }) =>
-      fetchApi<ApiResponse<Array<{ path: string; views: number; visitors: number }>>>(
+      >(`/api/site/summary${rangeQuery({ accountId })}`),
+    pages: (params?: { from?: string; to?: string; accountId?: string }) =>
+      fetchApi<ApiResponse<Array<{ host: string | null; path: string; views: number; visitors: number }>>>(
         `/api/site/pages${rangeQuery(params)}`,
       ),
     /**
@@ -4946,6 +4947,7 @@ export const api = {
           Array<{
             id: string
             eventType: string
+            host: string | null
             path: string | null
             label: string | null
             occurredAt: string
@@ -7039,10 +7041,11 @@ export const api = {
         `/api/ec-commerce/orders?${query}`,
       )
     },
-    actionExecutions: (params: { lineAccountId: string; eventId?: string; status?: EcActionExecutionStatus; limit?: number; offset?: number }) => {
+    actionExecutions: (params: { lineAccountId: string; eventId?: string; status?: EcActionExecutionStatus; statusGroup?: 'processing' | 'failed'; limit?: number; offset?: number }) => {
       const query = new URLSearchParams({ lineAccountId: params.lineAccountId })
       if (params.eventId) query.set('eventId', params.eventId)
       if (params.status) query.set('status', params.status)
+      if (params.statusGroup) query.set('statusGroup', params.statusGroup)
       if (params.limit !== undefined) query.set('limit', String(params.limit))
       if (params.offset !== undefined) query.set('offset', String(params.offset))
       return fetchApi<ApiResponse<EcActionExecutionList> & { pagination: { total: number; limit: number; offset: number } }>(
@@ -8574,6 +8577,10 @@ export const api = {
   },
   pools: {
     list: () => fetchApi<ApiResponse<TrafficPool[]>>('/api/traffic-pools'),
+    listAccounts: (ids: string[]) =>
+      fetchApi<ApiResponse<Array<{ poolId: string; accounts: PoolAccount[] }>>>(
+        `/api/traffic-pools/accounts?ids=${encodeURIComponent(ids.join(','))}`,
+      ),
     get: (id: string) => fetchApi<ApiResponse<TrafficPool>>(`/api/traffic-pools/${id}`),
     create: (data: { slug: string; name: string; activeAccountId: string }) =>
       fetchApi<ApiResponse<TrafficPool>>('/api/traffic-pools', {
@@ -8864,6 +8871,20 @@ export const api = {
   adPlatforms: {
     list: () =>
       fetchApi<ApiResponse<AdPlatform[]>>('/api/ad-platforms'),
+    logsPage: (params?: { page?: number; limit?: number; status?: string; query?: string }) => {
+      const query = new URLSearchParams()
+      query.set('page', String(params?.page ?? 1))
+      query.set('limit', String(params?.limit ?? 20))
+      if (params?.status && params.status !== 'all') query.set('status', params.status)
+      if (params?.query?.trim()) query.set('query', params.query.trim())
+      return fetchApi<ApiResponse<{
+        items: AdConversionLog[]
+        total: number
+        page: number
+        limit: number
+        sort: Array<{ field: string; direction: 'asc' | 'desc' }>
+      }>>(`/api/ad-platforms/logs?${query.toString()}`)
+    },
     logs: (id: string, limit = 20) =>
       fetchApi<ApiResponse<AdConversionLog[]>>(`/api/ad-platforms/${id}/logs?limit=${limit}`),
   },
