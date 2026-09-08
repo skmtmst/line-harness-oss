@@ -13,7 +13,7 @@ describe('問い合わせ一覧の定期取得 (#630)', () => {
     expect(inbox).not.toContain('setInterval')
     // 一覧と会話は同じ1本の中で取り直す(同時1本)。
     expect(inbox).toContain('loadInbox(true)')
-    expect(inbox).toContain('loadDetail(selected.threadId, true)')
+    expect(inbox).toContain('loadDetail(current.threadId, true)')
   })
 
   it('未解決の間だけ動かし、対応済み・すべて表示では回さない', () => {
@@ -60,6 +60,13 @@ describe('問い合わせ一覧の定期取得 (#630)', () => {
 
   it('詳細の状態はループを止めずに読む(refで追う)', () => {
     expect(inbox).toContain('detailStatusRef')
-    expect(inbox).toContain('shouldRefetchSelectedDetail(selected, detailStatusRef.current)')
+    expect(inbox).toContain('shouldRefetchSelectedDetail(current, detailStatusRef.current)')
+  })
+
+  it('選択更新で制御器を作り直さない(refで読み、depsにselectedを入れない)', () => {
+    expect(inbox).toContain('selectedRef.current = selected')
+    expect(inbox).toContain('}, [channel, query, status])')
+    expect(inbox).toContain('[loadDetail, loadInbox, status, inboxRetryKey]')
+    expect(inbox).toContain('selectedRef.current')
   })
 })

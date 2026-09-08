@@ -100,6 +100,10 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
   const [query, setQuery] = useState('')
   const [items, setItems] = useState<InboxItem[]>([])
   const [selected, setSelected] = useState<InboxItem | null>(null)
+  // 選択の最新値はrefで読む。選択オブジェクトの更新で polling effect を
+  // 作り直すと、旧取得の実行中に新制御器が次取得を始めて二重になる(#630)。
+  const selectedRef = useRef(selected)
+  selectedRef.current = selected
   const [detail, setDetail] = useState<EmailDetail | null>(null)
   const [reply, setReply] = useState('')
   const [loading, setLoading] = useState(true)
@@ -116,8 +120,9 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
       const response = await fetchApi<{ success: boolean; data: { items: InboxItem[] } }>(`/api/support/inbox?${params}`)
       if (response.success) {
         setItems(response.data.items)
-        if (selected) {
-          const refreshed = response.data.items.find((item) => item.id === selected.id)
+        const current = selectedRef.current
+        if (current) {
+          const refreshed = response.data.items.find((item) => item.id === current.id)
           if (refreshed) setSelected(refreshed)
         }
         return true
@@ -129,7 +134,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
     } finally {
       if (!quiet) setLoading(false)
     }
-  }, [channel, query, selected, status])
+  }, [channel, query, status])
 
   const loadDetail = useCallback(async (threadId: string, quiet = false): Promise<boolean> => {
     try {
@@ -162,9 +167,10 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
       work: async () => {
         const inboxOk = await loadInbox(true)
         // 未解決フィルターでも、選んでいるスレッド自体が対応済みなら
-        // 詳細は取り直さない(#630)。
-        const detailOk = selected && shouldRefetchSelectedDetail(selected, detailStatusRef.current)
-          ? await loadDetail(selected.threadId, true)
+        // 詳細は取り直さない(#630)。選択はrefで読む(effectを作り直さない)。
+        const current = selectedRef.current
+        const detailOk = current && shouldRefetchSelectedDetail(current, detailStatusRef.current)
+          ? await loadDetail(current.threadId, true)
           : true
         if (!inboxOk || !detailOk) throw new Error('お問い合わせ一覧を読み込めませんでした')
       },
@@ -172,7 +178,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
       onRecovered: () => setInboxStalled(false),
     })
     return stop
-  }, [loadDetail, loadInbox, selected, status, inboxRetryKey])
+  }, [loadDetail, loadInbox, status, inboxRetryKey])
 
 
   const choose = (item: InboxItem) => {
