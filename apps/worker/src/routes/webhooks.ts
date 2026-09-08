@@ -18,6 +18,7 @@ import {
   getOutgoingWebhookDeliverySummaries,
   updateIncomingWebhookConfig,
   updateIncomingWebhookMaskedSample,
+  backfillWebhookSecrets,
   hasWebhookSecret,
   resolveWebhookSecret,
   WEBHOOK_SECRET_MIN_LENGTH as MIN_SECRET_LENGTH,
@@ -253,6 +254,19 @@ function isEncryptionKeyError(err: unknown): boolean {
   return err instanceof Error && err.name === 'CredentialEncryptionKeyError';
 }
 
+/**
+ * 送受信 secret 用の鍵束。現行鍵に加え、併用期間の旧鍵を
+ * LINE_CREDENTIAL_PREVIOUS_KEYS(カンマ区切り)で渡せる(#650 再審査)。
+ */
+function webhookKeysOf(c: Context<Env>): { current?: string; previous?: string } {
+  const env = c.env as unknown as Record<string, unknown>;
+  const previous = env.LINE_CREDENTIAL_PREVIOUS_KEYS;
+  return {
+    current: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+    previous: typeof previous === 'string' ? previous : undefined,
+  };
+}
+
 // Constant-time hex-string compare to avoid timing oracles.
 function safeEqualHex(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -428,7 +442,7 @@ webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
       sourceType: body.sourceType,
       secret: body.secret as string,
       lineAccountId,
-    }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+    }, webhookKeysOf(c));
     return c.json(
       {
         success: true,
@@ -489,7 +503,7 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
       let effectiveSecret = body.secret;
       if (effectiveSecret === undefined) {
         try {
-          effectiveSecret = await resolveWebhookSecret(existing, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY) ?? undefined;
+          effectiveSecret = await resolveWebhookSecret(existing, webhookKeysOf(c)) ?? undefined;
         } catch {
           return c.json({ success: false, error: 'secret を確認できませんでした。secret を入れ直してください' }, 503);
         }
@@ -504,7 +518,7 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
         );
       }
     }
-    await updateIncomingWebhook(c.env.DB, id, lineAccountId, body, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+    await updateIncomingWebhook(c.env.DB, id, lineAccountId, body, webhookKeysOf(c));
     const updated = await getIncomingWebhookById(c.env.DB, id, lineAccountId);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
@@ -651,7 +665,7 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
       secret: body.secret as string,
       maxRetries,
       lineAccountId,
-    }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+    }, webhookKeysOf(c));
     return c.json(
       {
         success: true,
@@ -741,7 +755,7 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
       let effectiveSecret = body.secret;
       if (effectiveSecret === undefined) {
         try {
-          effectiveSecret = await resolveWebhookSecret(existing, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY) ?? undefined;
+          effectiveSecret = await resolveWebhookSecret(existing, webhookKeysOf(c)) ?? undefined;
         } catch {
           return c.json({ success: false, error: 'secret を確認できませんでした。secret を入れ直してください' }, 503);
         }
@@ -764,7 +778,7 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
         );
       }
     }
-    await updateOutgoingWebhook(c.env.DB, id, lineAccountId, { ...body, maxRetries }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+    await updateOutgoingWebhook(c.env.DB, id, lineAccountId, { ...body, maxRetries }, webhookKeysOf(c));
     const updated = await getOutgoingWebhookById(c.env.DB, id, lineAccountId);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
@@ -805,7 +819,7 @@ webhooks.post('/api/webhooks/outgoing/:id/test', requireRole('owner', 'admin'), 
     let sendSecret: string | null = null;
     if (webhook.secret_encrypted || webhook.secret) {
       try {
-        sendSecret = await resolveWebhookSecret(webhook, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+        sendSecret = await resolveWebhookSecret(webhook, webhookKeysOf(c));
       } catch {
         sendSecret = null;
       }
@@ -924,7 +938,7 @@ webhooks.post('/api/webhooks/interactions/:id/retry', requireRole('owner', 'admi
     if ('error' in access) return access.error;
     const original = await getWebhookInteractionById(c.env.DB, c.req.param('id'), access.lineAccountId);
     if (!original) return c.json({ success: false, error: 'Not found' }, 404);
-    const retried = await retryWebhookInteraction(c.env.DB, original, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+    const retried = await retryWebhookInteraction(c.env.DB, original, webhookKeysOf(c));
     return c.json({ success: true, data: serializeInteraction(retried) });
   } catch (err) {
     const code = err instanceof Error ? err.message : 'retry_failed';
@@ -954,7 +968,7 @@ webhooks.post('/api/webhooks/interactions/retry-failed', requireRole('owner', 'a
     let skipped = 0;
     await Promise.all(failed.map(async (item) => {
       try {
-        const result = await retryWebhookInteraction(c.env.DB, item, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+        const result = await retryWebhookInteraction(c.env.DB, item, webhookKeysOf(c));
         if (result.status === 'succeeded') succeeded++;
         else failedAgain++;
       } catch {
@@ -971,6 +985,53 @@ webhooks.post('/api/webhooks/interactions/retry-failed', requireRole('owner', 'a
   }
 });
 
+// ========== secret の移行(所有者専用) ==========
+
+/**
+ * 既存の平文・旧鍵暗号文を現行鍵へ寄せる(#650 再審査)。
+ *
+ * - dryRun=true(既定)は件数だけ数えて書かない。先にこれで見積もりを取る。
+ * - dryRun=false は batchSize 件ずつ移す。べき等なので中断したら呼び直す。
+ * - 1行ごとに復号照合してから平文を消す。失敗行は残して報告に積む。
+ * - 秘密値は要求にも応答にもログにも出さない。件数と成否だけ返す。
+ */
+webhooks.post('/api/webhooks/maintenance/secret-backfill', requireRole('owner'), async (c) => {
+  try {
+    const body = await c.req.json<{
+      lineAccountId?: string; dryRun?: boolean; batchSize?: unknown;
+    }>().catch(() => null);
+    const lineAccountId = body?.lineAccountId?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
+    }
+    let batchSize = 50;
+    if (body?.batchSize !== undefined) {
+      const parsed = Number(body.batchSize);
+      if (!Number.isInteger(parsed) || parsed < 1 || parsed > 500) {
+        return c.json({ success: false, error: 'batchSize must be an integer between 1 and 500' }, 400);
+      }
+      batchSize = parsed;
+    }
+    const report = await backfillWebhookSecrets(c.env.DB, {
+      lineAccountId,
+      dryRun: body?.dryRun ?? true,
+      batchSize,
+      keys: webhookKeysOf(c),
+    });
+    return c.json({ success: true, data: report });
+  } catch (err) {
+    if (isEncryptionKeyError(err)) {
+      return c.json({ success: false, error: 'secret の移行に必要な鍵がありません' }, 503);
+    }
+    console.error(JSON.stringify({
+      event: 'webhook_secret_backfill_failed',
+      path: c.req.path,
+    }));
+    return c.json({ success: false, error: 'secret の移行に失敗しました' }, 500);
+  }
+});
+
 // ========== 受信Webhookエンドポイント (外部システムからの受信) ==========
 
 webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
@@ -983,7 +1044,7 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
     // 照合の直前に復号する。鍵不足・復号失敗は fail-closed(#650)。
     let verifySecret: string | null;
     try {
-      verifySecret = await resolveWebhookSecret(wh, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+      verifySecret = await resolveWebhookSecret(wh, webhookKeysOf(c));
     } catch {
       verifySecret = null;
     }

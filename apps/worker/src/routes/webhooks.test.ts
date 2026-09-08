@@ -20,6 +20,7 @@ vi.mock('@line-crm/db', () => ({
   getOutgoingWebhookDeliverySummaries: vi.fn(),
   updateIncomingWebhookConfig: vi.fn(),
   updateIncomingWebhookMaskedSample: vi.fn(),
+  backfillWebhookSecrets: vi.fn(),
   hasWebhookSecret: vi.fn((row: { secret?: unknown; secret_encrypted?: unknown }) =>
     Boolean(row?.secret_encrypted) ||
     (typeof row?.secret === 'string' && row.secret.length >= 32)),
@@ -78,6 +79,7 @@ import {
   getOutgoingWebhookDeliverySummaries,
   updateIncomingWebhookConfig,
   updateIncomingWebhookMaskedSample,
+  backfillWebhookSecrets,
   hasWebhookSecret,
   resolveWebhookSecret,
 } from '@line-crm/db';
@@ -305,7 +307,7 @@ describe('POST /api/webhooks/outgoing — validation', () => {
     expect(body.success).toBe(true);
     expect(body.data.secret).toBe(VALID_SECRET);
     expect(body.data.id).toBe('wh-1');
-    expect(createOutgoingWebhook).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({ lineAccountId: ACCOUNT_ID }), undefined);
+    expect(createOutgoingWebhook).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({ lineAccountId: ACCOUNT_ID }), { current: undefined, previous: undefined });
   });
 
   test('既定でない統括はLINEアカウントを省略できない', async () => {
@@ -694,7 +696,7 @@ describe('POST /api/webhooks/incoming — validation', () => {
     );
     expect(res.status).toBe(201);
     expect(createIncomingWebhook).toHaveBeenCalledOnce();
-    expect(createIncomingWebhook).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({ lineAccountId: ACCOUNT_ID }), undefined);
+    expect(createIncomingWebhook).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({ lineAccountId: ACCOUNT_ID }), { current: undefined, previous: undefined });
     const body = (await res.json()) as { data: { id: string; secret: string } };
     expect(body.data.secret).toBe(VALID_SECRET);
   });
@@ -1168,7 +1170,7 @@ describe('Webhookやり取り記録', () => {
     );
     expect(res.status).toBe(200);
     expect(getWebhookInteractionById).toHaveBeenCalledWith(baseEnv.DB, 'run-a', ACCOUNT_ID);
-    expect(retryWebhookInteraction).toHaveBeenCalledWith(baseEnv.DB, failedRow, undefined);
+    expect(retryWebhookInteraction).toHaveBeenCalledWith(baseEnv.DB, failedRow, { current: undefined, previous: undefined });
   });
 
   test('secretを読めない送り直しは503にし、秘密値を出さない(#650)', async () => {
@@ -1180,7 +1182,7 @@ describe('Webhookやり取り記録', () => {
       keyedEnv,
     );
     expect(res.status).toBe(503);
-    expect(retryWebhookInteraction).toHaveBeenCalledWith(keyedEnv.DB, failedRow, TEST_KEY);
+    expect(retryWebhookInteraction).toHaveBeenCalledWith(keyedEnv.DB, failedRow, { current: TEST_KEY, previous: undefined });
     const retryBody = (await res.json()) as { error: string };
     expect(retryBody.error).toBe('secret を確認できないため送り直しを止めました');
   });
@@ -1322,6 +1324,96 @@ describe('名前・種別の上限 (#506 軽)', () => {
 });
 
 // =====================================================
+// #650 再審査: secret-backfill口の契約
+// =====================================================
+
+describe('#650 POST /api/webhooks/maintenance/secret-backfill', () => {
+  const report = {
+    dryRun: true, batchSize: 50, legacyTotal: 2, rekeyTotal: 0,
+    processed: 0, migrated: 0, failed: [], remainingLegacy: 2, remainingRekey: 0, done: false,
+  };
+
+  test('既定はdry-runで件数だけ返し、鍵束を渡す', async () => {
+    vi.mocked(backfillWebhookSecrets).mockResolvedValueOnce(report);
+    const res = await setupApp().request(
+      '/api/webhooks/maintenance/secret-backfill',
+      {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lineAccountId: ACCOUNT_ID }),
+      },
+      keyedEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(backfillWebhookSecrets).toHaveBeenCalledWith(keyedEnv.DB, {
+      lineAccountId: ACCOUNT_ID, dryRun: true, batchSize: 50,
+      keys: { current: TEST_KEY, previous: undefined },
+    });
+    const body = (await res.json()) as { data: typeof report };
+    expect(body.data.legacyTotal).toBe(2);
+    expect(body.data.done).toBe(false);
+  });
+
+  test('dryRun=falseとbatchSizeを通し、不正値は400にする', async () => {
+    vi.mocked(backfillWebhookSecrets).mockResolvedValueOnce({ ...report, dryRun: false });
+    const res = await setupApp().request(
+      '/api/webhooks/maintenance/secret-backfill',
+      {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lineAccountId: ACCOUNT_ID, dryRun: false, batchSize: 10 }),
+      },
+      keyedEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(backfillWebhookSecrets).toHaveBeenCalledWith(keyedEnv.DB, expect.objectContaining({
+      dryRun: false, batchSize: 10,
+    }));
+
+    const bad = await setupApp().request(
+      '/api/webhooks/maintenance/secret-backfill',
+      {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lineAccountId: ACCOUNT_ID, batchSize: 0 }),
+      },
+      keyedEnv,
+    );
+    expect(bad.status).toBe(400);
+    const missing = await setupApp().request(
+      '/api/webhooks/maintenance/secret-backfill',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) },
+      keyedEnv,
+    );
+    expect(missing.status).toBe(400);
+  });
+
+  test('他アカウントは403にし、鍵なしは503にする', async () => {
+    vi.mocked(canAccessAllLineAccounts).mockResolvedValueOnce(false);
+    const forbidden = await setupApp().request(
+      '/api/webhooks/maintenance/secret-backfill',
+      {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lineAccountId: 'account-b' }),
+      },
+      keyedEnv,
+    );
+    expect(forbidden.status).toBe(403);
+    expect(backfillWebhookSecrets).not.toHaveBeenCalled();
+
+    const keyError = new Error('LINE_CREDENTIAL_ENCRYPTION_KEY is not configured');
+    keyError.name = 'CredentialEncryptionKeyError';
+    vi.mocked(backfillWebhookSecrets).mockRejectedValueOnce(keyError);
+    const noKey = await setupApp().request(
+      '/api/webhooks/maintenance/secret-backfill',
+      {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lineAccountId: ACCOUNT_ID }),
+      },
+      baseEnv,
+    );
+    expect(noKey.status).toBe(503);
+  });
+});
+
+// =====================================================
 // #650 secret の暗号化保存 — secret-safe と fail-closed の契約
 // =====================================================
 
@@ -1354,7 +1446,7 @@ describe('#650 secret-safe: 平文を保存・表示しない', () => {
     expect(createOutgoingWebhook).toHaveBeenCalledWith(
       keyedEnv.DB,
       expect.objectContaining({ secret: VALID_SECRET }),
-      TEST_KEY,
+      { current: TEST_KEY, previous: undefined },
     );
     const body = (await res.json()) as { data: { secret: string } };
     expect(body.data.secret).toBe(VALID_SECRET);
@@ -1405,7 +1497,7 @@ describe('#650 secret-safe: 平文を保存・表示しない', () => {
     );
     expect(first.status).toBe(200);
     expect(updateOutgoingWebhook).toHaveBeenCalledWith(
-      keyedEnv.DB, 'wh-1', ACCOUNT_ID, expect.objectContaining({ secret: rotated }), TEST_KEY,
+      keyedEnv.DB, 'wh-1', ACCOUNT_ID, expect.objectContaining({ secret: rotated }), { current: TEST_KEY, previous: undefined },
     );
     const second = await setupApp().request(
       `/api/webhooks/outgoing/wh-1?lineAccountId=${ACCOUNT_ID}`,
@@ -1477,7 +1569,7 @@ describe('#650 fail-closed: 鍵不足・復号失敗は安全に止める', () =
       keyedEnv,
     );
     expect(res.status).toBe(200);
-    expect(resolveWebhookSecret).toHaveBeenCalledWith(expect.objectContaining({ id: 'wh-1' }), TEST_KEY);
+    expect(resolveWebhookSecret).toHaveBeenCalledWith(expect.objectContaining({ id: 'wh-1' }), { current: TEST_KEY, previous: undefined });
     expect(deliverWebhook).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'wh-1', secret: 'r'.repeat(32) }),
       expect.stringContaining('webhook.test'),

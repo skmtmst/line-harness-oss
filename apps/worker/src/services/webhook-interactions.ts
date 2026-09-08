@@ -7,6 +7,7 @@ import {
   restoreWebhookInteractionFailure,
   type WebhookInteractionFailureReason,
   type WebhookInteractionRow,
+  type WebhookKeyInput,
 } from '@line-crm/db';
 
 import { deliverWebhook, recordDeliveryOutcome } from './outgoing-webhook-delivery.js';
@@ -48,7 +49,7 @@ function failureReason(status: number | null): WebhookInteractionFailureReason {
 export async function retryWebhookInteraction(
   db: D1Database,
   original: WebhookInteractionRow,
-  credentialEncryptionKey?: string,
+  keys?: WebhookKeyInput | string,
 ): Promise<WebhookInteractionRow> {
   if (original.direction !== 'outgoing' || original.status !== 'failed' || !original.webhook_id) {
     throw new Error('not_retryable');
@@ -62,7 +63,7 @@ export async function retryWebhookInteraction(
   let sendSecret: string | null = null;
   if (webhook.secret_encrypted || webhook.secret) {
     try {
-      sendSecret = await resolveWebhookSecret(webhook, credentialEncryptionKey);
+      sendSecret = await resolveWebhookSecret(webhook, keys);
     } catch {
       throw new Error('webhook_secret_unavailable');
     }
