@@ -474,6 +474,36 @@ const spec = {
         },
       },
     },
+    '/api/media/{id}/download': {
+      get: {
+        tags: ['Contents'],
+        summary: '登録メディアを認証付きでダウンロード',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Media file bytes with Content-Disposition: attachment' },
+          '403': { description: 'Staff role required' },
+          '404': { description: 'Media not found in account scope' },
+        },
+      },
+    },
+    '/api/media/{id}/content': {
+      get: {
+        tags: ['Contents'],
+        summary: '登録メディアの表示用中身を認証付きで取得',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Media file bytes with Content-Disposition: inline' },
+          '403': { description: 'Staff role required' },
+          '404': { description: 'Media not found in account scope' },
+        },
+      },
+    },
     '/api/common-actions/resources': {
       get: {
         tags: ['Common actions'],
