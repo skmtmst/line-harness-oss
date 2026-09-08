@@ -1,11 +1,10 @@
 import {
   claimRedemptionStep,
-  confirmReconciledRedemptionStep,
+  clearRedemptionStepIntent,
   decryptCredential,
   getMileageRewardDeliveryPlan,
   getReservedMileageRewardCode,
   markRedemptionStepSent,
-  markRedemptionStepUnknown,
   MileageRedemptionConfirmError,
   recordMileageRedemptionAttempt,
   refundMileageRewardRedemption,
@@ -97,9 +96,53 @@ function nextRetry(now: string, attemptCount: number): string | null {
 
 /**
  * 取り残し配送の貸出期限。確定書き込みに失敗した交換は `delivering` のまま
- * 残し、この期限を過ぎたら別の試行が引き継いで確定まで進める。
+ * 残し、この期限を過ぎたら別の試行が引き継ぐ。証言つきの手順は
+ * 引き継いでも送り直さず、照合待ちに残す。
  */
 const STALE_DELIVERY_LEASE_MS = 5 * 60 * 1000;
+
+/** 一瞬の書き込み失敗は、その場で数回だけやり直す。長引く障害は待つ。 */
+const CONFIRM_RETRIES = 3;
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * 証言つき確定を数回試す。通らなければ照合待ちとして投げる。
+ * DB障害の生エラーはここで確定失敗に包む。包まないと「失敗」扱いになり、
+ * やり直しで送り直して二重に届く。
+ */
+async function confirmStepSentWithRetry(
+  db: D1Database,
+  input: { redemptionId: string; stepKey: string; owner: string; fenceToken: string; now: string },
+): Promise<void> {
+  for (let attempt = 0; attempt < CONFIRM_RETRIES; attempt += 1) {
+    try {
+      await markRedemptionStepSent(db, input);
+      return;
+    } catch {
+      if (attempt + 1 < CONFIRM_RETRIES) await sleep(50 * (attempt + 1));
+    }
+  }
+  throw new MileageRedemptionConfirmError();
+}
+
+/** 証言消しを数回試す。消せなければ照合待ちとして投げる(同上)。 */
+async function clearStepIntentWithRetry(
+  db: D1Database,
+  input: { redemptionId: string; stepKey: string; owner: string; fenceToken: string; now: string },
+): Promise<void> {
+  for (let attempt = 0; attempt < CONFIRM_RETRIES; attempt += 1) {
+    try {
+      await clearRedemptionStepIntent(db, input);
+      return;
+    } catch {
+      if (attempt + 1 < CONFIRM_RETRIES) await sleep(50 * (attempt + 1));
+    }
+  }
+  throw new MileageRedemptionConfirmError();
+}
 
 export async function deliverMileageReward(
   db: D1Database,
@@ -175,58 +218,55 @@ export async function deliverMileageReward(
         };
         /*
          * 送り直さない：送信済みの手順は飛ばす。貸出中の手順は待つ。
-         * 送達不明は同じ冪等キーの照合で確定だけ進める。
+         * 証言つき(照合待ち)の手順は、送らず勝手に確定もせず待つ。
          * 受け手側にも同じ冪等キーを渡す。
          */
         const step = await claimRedemptionStep(db, stepLease);
         if (step === 'sent') continue;
-        if (step === 'busy') {
-          // 別の走者が送信中。送らずに待ち、貸出期限の回収に任せる。
+        if (step === 'busy' || step === 'reconcile') {
+          // 別の走者が送信中か、送ったか確かめられない行。
+          // 送らずに待ち、貸出期限の回収も送り直さない。
           throw new MileageRedemptionConfirmError();
         }
-        if (step === 'reconcile') {
+        const stepConfirmation = {
+          redemptionId, stepKey, owner: stepOwner, fenceToken: stepFence, now,
+        };
+        try {
+          await executor({
+            db,
+            runId: redemptionId,
+            lineAccountId: plan.redemption.lineAccountId,
+            automationId: `mileage-reward:${plan.redemption.rewardId}`,
+            automationVersionId: plan.redemption.rewardVersionId,
+            friendId: plan.redemption.beneficiaryFriendId,
+            sourceEventId: redemptionId,
+            inputEvent: { kind: 'mileage_reward_redeemed', rewardId: plan.redemption.rewardId },
+            action,
+            stepExecutionId,
+            idempotencyKey: stepExecutionId,
+            attemptNumber: plan.redemption.attemptCount + 1,
+            commonActionVersionId: plan.commonActionVersionId,
+            isTest: false,
+          });
+        } catch (error) {
+          if (error instanceof AutomationActionError && error.code === 'delivery_unconfirmed') {
+            // 外部送信は終わっている。証言は送る前に残してあるので、
+            // そのまま照合待ちに残し、送り直さない。
+            throw new MileageRedemptionConfirmError();
+          }
+          /*
+           * 送る前の失敗：証言を消して、やり直し可能に戻す。
+           * 消せなければ送ったか分からないので、照合待ちに残す。
+           */
           try {
-            await confirmReconciledRedemptionStep(db, stepLease);
+            await clearStepIntentWithRetry(db, stepConfirmation);
           } catch {
             throw new MileageRedemptionConfirmError();
           }
-          continue;
+          throw error;
         }
-        await executor({
-          db,
-          runId: redemptionId,
-          lineAccountId: plan.redemption.lineAccountId,
-          automationId: `mileage-reward:${plan.redemption.rewardId}`,
-          automationVersionId: plan.redemption.rewardVersionId,
-          friendId: plan.redemption.beneficiaryFriendId,
-          sourceEventId: redemptionId,
-          inputEvent: { kind: 'mileage_reward_redeemed', rewardId: plan.redemption.rewardId },
-          action,
-          stepExecutionId,
-          idempotencyKey: stepExecutionId,
-          attemptNumber: plan.redemption.attemptCount + 1,
-          commonActionVersionId: plan.commonActionVersionId,
-          isTest: false,
-        });
-        try {
-          await markRedemptionStepSent(db, {
-            redemptionId, stepKey, owner: stepOwner, fenceToken: stepFence, now,
-          });
-        } catch {
-          /*
-           * 外部送信は終わっているかもしれない。送達不明として残し、
-           * 送り直さない。貸出を失っていたら今の持ち主に任せる。
-           */
-          try {
-            await markRedemptionStepUnknown(db, {
-              redemptionId, stepKey, idempotencyKey: stepExecutionId,
-              owner: stepOwner, fenceToken: stepFence, now,
-            });
-          } catch {
-            // 今の持ち主が進める。ここでは何もしない。
-          }
-          throw new MileageRedemptionConfirmError();
-        }
+        // 証言つき確定を数回試す。通らなければ照合待ちに残す。
+        await confirmStepSentWithRetry(db, stepConfirmation);
       }
     }
     try {
@@ -284,8 +324,8 @@ export async function deliverMileageReward(
 
 /**
  * Cronから、再試行時刻を過ぎた交換と、確定されず残った交換を処理する。
- * 後者は貸出期限切れの `delivering` で、引き継いだ試行が outbox を見て
- * 送り直さず確定まで進める。claimはdeliver側で行う。
+ * 後者は貸出期限切れの `delivering` で、引き継いだ試行が outbox を見る。
+ * 証言つきの手順は送り直さず、照合待ちに残す。claimはdeliver側で行う。
  */
 export async function processDueMileageRewardDeliveries(
   db: D1Database,

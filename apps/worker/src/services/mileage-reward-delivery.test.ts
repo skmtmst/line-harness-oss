@@ -6,8 +6,7 @@ const dbMocks = {
   getReservedMileageRewardCode: vi.fn(),
   claimRedemptionStep: vi.fn().mockResolvedValue('send'),
   markRedemptionStepSent: vi.fn().mockResolvedValue(undefined),
-  markRedemptionStepUnknown: vi.fn().mockResolvedValue(undefined),
-  confirmReconciledRedemptionStep: vi.fn().mockResolvedValue(undefined),
+  clearRedemptionStepIntent: vi.fn().mockResolvedValue(undefined),
   MileageRedemptionConfirmError: class MileageRedemptionConfirmError extends Error {},
   recordMileageRedemptionAttempt: vi.fn(),
   refundMileageRewardRedemption: vi.fn(),
@@ -19,7 +18,15 @@ vi.mock('./automation-action-executors.js', () => ({
   createAutomationActionExecutors: () => ({ add_tag: execute }),
 }));
 vi.mock('./automation-engine.js', () => ({
-  AutomationActionError: class AutomationActionError extends Error {},
+  AutomationActionError: class AutomationActionError extends Error {
+    code: string;
+    retryable: boolean;
+    constructor(code: string, message: string, retryable: boolean) {
+      super(message);
+      this.code = code;
+      this.retryable = retryable;
+    }
+  },
 }));
 
 const { deliverMileageReward } = await import('./mileage-reward-delivery.js');
@@ -137,7 +144,7 @@ describe('mileage reward delivery', () => {
     }));
   });
 
-  it('reconciles an unknown step without sending again', async () => {
+  it('waits without sending or confirming an uncertain step', async () => {
     dbMocks.getMileageRewardDeliveryPlan.mockResolvedValueOnce(plan({
       rewardKind: 'tag',
       actionConfig: JSON.stringify([{
@@ -148,14 +155,17 @@ describe('mileage reward delivery', () => {
     const result = await deliverMileageReward(db, 'redemption-1', {
       now: () => '2026-08-29T00:00:00.000Z',
     });
-    expect(result.status).toBe('succeeded');
+    // 送ったか確かめられない行は、送らず勝手に確定もせず待つ。
+    expect(result).toMatchObject({ status: 'delivery_failed' });
+    expect(result.message ?? '').toContain('確認しています');
     expect(execute).not.toHaveBeenCalled();
-    expect(dbMocks.confirmReconciledRedemptionStep).toHaveBeenCalledWith(db, expect.objectContaining({
-      redemptionId: 'redemption-1', stepKey: '0:step-1',
+    expect(dbMocks.markRedemptionStepSent).not.toHaveBeenCalled();
+    expect(dbMocks.recordMileageRedemptionAttempt).not.toHaveBeenCalledWith(db, expect.objectContaining({
+      status: 'failed',
     }));
   });
 
-  it('marks unknown delivery when the sent confirmation fails', async () => {
+  it('retries a transient confirmation and succeeds without resending', async () => {
     dbMocks.getMileageRewardDeliveryPlan.mockResolvedValueOnce(plan({
       rewardKind: 'tag',
       actionConfig: JSON.stringify([{
@@ -163,6 +173,24 @@ describe('mileage reward delivery', () => {
       }]),
     }));
     dbMocks.markRedemptionStepSent.mockRejectedValueOnce(
+      new dbMocks.MileageRedemptionConfirmError('transient confirm failure'),
+    );
+    const result = await deliverMileageReward(db, 'redemption-1', {
+      now: () => '2026-08-29T00:00:00.000Z',
+    });
+    expect(result.status).toBe('succeeded');
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(dbMocks.markRedemptionStepSent).toHaveBeenCalledTimes(2);
+  });
+
+  it('waits when confirmations keep failing instead of resending', async () => {
+    dbMocks.getMileageRewardDeliveryPlan.mockResolvedValueOnce(plan({
+      rewardKind: 'tag',
+      actionConfig: JSON.stringify([{
+        id: 'step-1', type: 'add_tag', params: { tagId: 'tag-1' }, onFailure: 'stop',
+      }]),
+    }));
+    dbMocks.markRedemptionStepSent.mockRejectedValue(
       new dbMocks.MileageRedemptionConfirmError('confirm failed'),
     );
     const result = await deliverMileageReward(db, 'redemption-1', {
@@ -170,15 +198,57 @@ describe('mileage reward delivery', () => {
     });
     expect(result).toMatchObject({ status: 'delivery_failed' });
     expect(result.message ?? '').toContain('確認しています');
-    expect(dbMocks.markRedemptionStepUnknown).toHaveBeenCalledWith(db, expect.objectContaining({
-      redemptionId: 'redemption-1', stepKey: '0:step-1',
-    }));
+    expect(execute).toHaveBeenCalledTimes(1);
     expect(dbMocks.recordMileageRedemptionAttempt).not.toHaveBeenCalledWith(db, expect.objectContaining({
       status: 'failed',
     }));
   });
 
+  it('waits without recording failure when the send is unconfirmed', async () => {
+    const { AutomationActionError } = await import('./automation-engine.js');
+    dbMocks.getMileageRewardDeliveryPlan.mockResolvedValueOnce(plan({
+      rewardKind: 'tag',
+      actionConfig: JSON.stringify([{
+        id: 'step-1', type: 'add_tag', params: { tagId: 'tag-1' }, onFailure: 'stop',
+      }]),
+    }));
+    execute.mockRejectedValueOnce(new AutomationActionError('delivery_unconfirmed', 'unlogged', false));
+    const result = await deliverMileageReward(db, 'redemption-1', {
+      now: () => '2026-08-29T00:00:00.000Z',
+    });
+    // 外部送信は終わっている。証言は送る前に残してあるので触らない。
+    expect(result).toMatchObject({ status: 'delivery_failed' });
+    expect(result.message ?? '').toContain('確認しています');
+    expect(dbMocks.clearRedemptionStepIntent).not.toHaveBeenCalled();
+    expect(dbMocks.recordMileageRedemptionAttempt).not.toHaveBeenCalledWith(db, expect.objectContaining({
+      status: 'failed',
+    }));
+  });
+
+  it('clears the intent and records failure when the send itself fails', async () => {
+    dbMocks.getMileageRewardDeliveryPlan.mockResolvedValueOnce(plan({
+      rewardKind: 'tag',
+      actionConfig: JSON.stringify([{
+        id: 'step-1', type: 'add_tag', params: { tagId: 'tag-1' }, onFailure: 'stop',
+      }]),
+    }));
+    execute.mockRejectedValueOnce(new Error('webhook exploded before sending'));
+    const result = await deliverMileageReward(db, 'redemption-1', {
+      now: () => '2026-08-29T00:00:00.000Z',
+    });
+    // 送っていないことが決まったので、証言を消してやり直し可能に戻す。
+    expect(dbMocks.clearRedemptionStepIntent).toHaveBeenCalledWith(db, expect.objectContaining({
+      redemptionId: 'redemption-1', stepKey: '0:step-1',
+    }));
+    expect(dbMocks.recordMileageRedemptionAttempt).toHaveBeenCalledWith(db, expect.objectContaining({
+      redemptionId: 'redemption-1', status: 'failed',
+    }));
+    expect(result).toMatchObject({ status: 'delivery_failed', retryAt: '2026-08-29T00:01:00.000Z' });
+  });
+
   it('executes a pinned common-action version instead of the mutable owner', async () => {
+    // 前の試験で確定を失敗させ続けているので、既定に戻す。
+    dbMocks.markRedemptionStepSent.mockResolvedValue(undefined);
     dbMocks.getMileageRewardDeliveryPlan.mockResolvedValueOnce(plan({
       rewardKind: 'tag',
       commonActionVersionId: 'common-version-7',
