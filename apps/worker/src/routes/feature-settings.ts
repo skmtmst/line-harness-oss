@@ -104,6 +104,292 @@ export function specializedCatalog(raw: string | null): string[] {
 }
 
 /**
+ * オフ前の影響確認(#643)。
+ *
+ * 公開・予約・稼働中の仕事を壊さずにオフできるよう、オフにしようと
+ * している機能ごとに「公開中」「予約中」「依存機能」の件数と対象種別を
+ * 数える。数えるだけでは保存しない。影響がある保存には確認トークンが
+ * 要り、状態が変わったら取り直しになる。
+ *
+ * 数え先はこのアカウントに結び付く行だけにする。アカウント列が空の行は
+ * 全アカウント共有(自動応答などと同じ扱い)として数える。アカウントに
+ * 結び付けられない表(流入計測・メディアなど)は対象外とし、数えない。
+ * 対象外を 0 件と混ぜないよう、数え先はここに列挙したものだけにする。
+ */
+export type FeatureImpactKind = 'published' | 'scheduled' | 'dependent';
+
+export type FeatureImpactItem = {
+  kind: FeatureImpactKind;
+  /** 運用者に見せる対象の呼び名。表名や内部IDは出さない。 */
+  targetType: string;
+  count: number;
+};
+
+export type FeatureImpact = {
+  feature: ToggleableFeature;
+  items: FeatureImpactItem[];
+  /** 確認トークンなしでは保存できない影響があるか。 */
+  blocking: boolean;
+};
+
+/** 確認トークンの置き場。汎用設定表の1行で足り、移行は要らない。 */
+const OFF_CONFIRM_KEY = 'feature.off_confirm';
+/** 確認から保存までの持ち時間。稼働中は変わるため短めにする。 */
+const OFF_CONFIRM_TTL_MS = 10 * 60 * 1000;
+
+type OffConfirmation = {
+  token: string;
+  impactHash: string;
+  version: number;
+  expiresAt: number;
+};
+
+async function countRows(db: D1Database, sql: string, ...params: unknown[]): Promise<number> {
+  const row = await db.prepare(sql).bind(...params).first<{ total: number | string | null }>();
+  return Number(row?.total ?? 0);
+}
+
+/**
+ * 一斉配信のアカウント結び付け。複数アカウント宛て(重複除き)は
+ * account_ids の JSON 配列にも対象が入る。一覧取得と同じ条件。
+ */
+const BROADCAST_ACCOUNT_SCOPE = `(b.line_account_id = ?
+  OR (b.target_type = 'multi-account-dedup' AND b.account_ids IS NOT NULL
+    AND EXISTS (SELECT 1 FROM json_each(b.account_ids) WHERE value = ?)))`;
+
+/** 回答フォームの表示先。結び付けが無いフォームは全アカウントに表示する。 */
+const FORM_ACCOUNT_SCOPE = `(NOT EXISTS (SELECT 1 FROM form_accounts fa WHERE fa.form_id = f.id)
+  OR EXISTS (SELECT 1 FROM form_accounts fa WHERE fa.form_id = f.id AND fa.line_account_id = ?))`;
+
+async function collectFeatureImpact(
+  db: D1Database,
+  accountId: string,
+  feature: ToggleableFeature,
+): Promise<FeatureImpactItem[]> {
+  const items: FeatureImpactItem[] = [];
+  const add = async (kind: FeatureImpactKind, targetType: string, sql: string, ...params: unknown[]) => {
+    const count = await countRows(db, sql, ...params);
+    if (count > 0) items.push({ kind, targetType, count });
+  };
+  switch (feature) {
+    case 'broadcasts':
+      await add('scheduled', '予約済みの配信',
+        `SELECT COUNT(*) AS total FROM broadcasts b WHERE b.status = 'scheduled' AND ${BROADCAST_ACCOUNT_SCOPE}`,
+        accountId, accountId);
+      await add('published', '送信中の配信',
+        `SELECT COUNT(*) AS total FROM broadcasts b WHERE b.status = 'sending' AND ${BROADCAST_ACCOUNT_SCOPE}`,
+        accountId, accountId);
+      break;
+    case 'scenarios':
+      await add('published', '公開中のシナリオ',
+        `SELECT COUNT(*) AS total FROM scenarios WHERE is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)`,
+        accountId);
+      await add('dependent', '回答後にシナリオへつなぐフォーム',
+        `SELECT COUNT(*) AS total FROM forms f WHERE f.on_submit_scenario_id IS NOT NULL AND f.is_active = 1 AND ${FORM_ACCOUNT_SCOPE}`,
+        accountId);
+      await add('dependent', 'シナリオを使う紹介オファー',
+        `SELECT COUNT(*) AS total FROM affiliate_offers WHERE scenario_id IS NOT NULL AND is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)`,
+        accountId);
+      break;
+    case 'auto_replies':
+      await add('published', '有効な自動応答',
+        `SELECT COUNT(*) AS total FROM auto_replies WHERE is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)`,
+        accountId);
+      break;
+    case 'reminders':
+      await add('published', '有効なリマインド設定',
+        `SELECT COUNT(*) AS total FROM reminders WHERE is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)`,
+        accountId);
+      await add('scheduled', '送信待ちのリマインド',
+        `SELECT COUNT(*) AS total FROM friend_reminders fr
+         JOIN reminders r ON r.id = fr.reminder_id AND (r.line_account_id IS NULL OR r.line_account_id = ?)
+         WHERE fr.status = 'active'`,
+        accountId);
+      break;
+    case 'rich_menus':
+      await add('published', '利用中のリッチメニュー',
+        `SELECT COUNT(*) AS total FROM rich_menu_assignments WHERE line_account_id IS NULL OR line_account_id = ?`,
+        accountId);
+      break;
+    case 'forms':
+      await add('published', '公開中の回答フォーム',
+        `SELECT COUNT(*) AS total FROM forms f WHERE f.is_active = 1 AND ${FORM_ACCOUNT_SCOPE}`,
+        accountId);
+      break;
+    case 'events':
+      await add('published', '公開中のイベント',
+        `SELECT COUNT(*) AS total FROM events WHERE is_published = 1 AND deleted_at IS NULL AND line_account_id = ?`,
+        accountId);
+      await add('scheduled', '受付中のイベント予約',
+        `SELECT COUNT(*) AS total FROM event_bookings WHERE status IN ('requested', 'confirmed') AND line_account_id = ?`,
+        accountId);
+      await add('scheduled', '送信待ちのイベントリマインド',
+        `SELECT COUNT(*) AS total FROM event_booking_reminders ebr
+         JOIN event_bookings eb ON eb.id = ebr.booking_id AND eb.line_account_id = ?
+         WHERE ebr.status = 'pending'`,
+        accountId);
+      break;
+    case 'webinars':
+      await add('published', '公開中のウェビナー',
+        `SELECT COUNT(*) AS total FROM webinars WHERE status = 'active' AND (account_id IS NULL OR account_id = ?)`,
+        accountId);
+      await add('scheduled', '送信待ちのウェビナー通知',
+        `SELECT COUNT(*) AS total FROM webinar_notification_jobs j
+         JOIN webinars w ON w.id = j.webinar_id AND (w.account_id IS NULL OR w.account_id = ?)
+         WHERE j.status IN ('queued', 'claimed', 'retry_wait')`,
+        accountId);
+      break;
+    case 'booking':
+      await add('scheduled', '受付中の予約',
+        `SELECT COUNT(*) AS total FROM bookings WHERE status IN ('requested', 'confirmed') AND line_account_id = ?`,
+        accountId);
+      await add('scheduled', '送信待ちの予約リマインド',
+        `SELECT COUNT(*) AS total FROM booking_reminders br
+         JOIN bookings b ON b.id = br.booking_id AND b.line_account_id = ?
+         WHERE br.status = 'pending'`,
+        accountId);
+      break;
+    case 'automations':
+      await add('scheduled', '実行待ち・実行中の自動処理',
+        `SELECT COUNT(*) AS total FROM automation_runs
+         WHERE status IN ('queued', 'running', 'waiting') AND is_test = 0 AND line_account_id = ?`,
+        accountId);
+      break;
+    case 'line_notifications':
+      await add('published', '有効な通知ルール',
+        `SELECT COUNT(*) AS total FROM notification_rules WHERE is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)`,
+        accountId);
+      await add('scheduled', '送信待ちの通知',
+        `SELECT COUNT(*) AS total FROM notification_deliveries
+         WHERE status IN ('pending', 'provider_accepted', 'retry_wait')
+         AND execution_mode != 'test' AND (line_account_id IS NULL OR line_account_id = ?)`,
+        accountId);
+      break;
+    case 'nen_campaigns':
+      await add('scheduled', '送信待ちのNEN配信',
+        `SELECT COUNT(*) AS total FROM nen_delivery_jobs
+         WHERE status IN ('pending', 'processing') AND (line_account_id IS NULL OR line_account_id = ?)`,
+        accountId);
+      break;
+    case 'common_vars':
+      await add('scheduled', '反映待ちの共通変数変更',
+        `SELECT COUNT(*) AS total FROM common_var_schedules s
+         JOIN common_vars v ON v.id = s.var_id AND v.archived_at IS NULL
+         AND (v.line_account_id IS NULL OR v.line_account_id = ?)
+         WHERE s.applied_at IS NULL`,
+        accountId);
+      break;
+    case 'friend_add_routing':
+      await add('published', '公開中の振り分けルール',
+        `SELECT COUNT(*) AS total FROM friend_add_rules WHERE status = 'published' AND line_account_id = ?`,
+        accountId);
+      break;
+    case 'mileage':
+      await add('scheduled', '処理中のマイル交換',
+        `SELECT COUNT(*) AS total FROM mileage_redemptions
+         WHERE status IN ('reserved', 'delivering') AND (line_account_id IS NULL OR line_account_id = ?)`,
+        accountId);
+      await add('dependent', 'マイル特典を使う紹介オファー',
+        `SELECT COUNT(*) AS total FROM affiliate_offers
+         WHERE mileage_program_id IS NOT NULL AND is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)`,
+        accountId);
+      break;
+    case 'affiliates':
+      await add('published', '受付中の紹介オファー',
+        `SELECT COUNT(*) AS total FROM affiliate_offers WHERE is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)`,
+        accountId);
+      await add('scheduled', '精算待ちの支払い',
+        `SELECT COUNT(*) AS total FROM affiliate_payout_batches
+         WHERE state IN ('created', 'approved') AND (line_account_id IS NULL OR line_account_id = ?)`,
+        accountId);
+      break;
+    case 'ec_commerce':
+      await add('scheduled', '処理中のEC注文',
+        `SELECT COUNT(*) AS total FROM ec_orders
+         WHERE normalized_status = 'current' AND (line_account_id IS NULL OR line_account_id = ?)`,
+        accountId);
+      break;
+    case 'templates':
+      await add('dependent', 'テンプレートを使う自動応答',
+        `SELECT COUNT(*) AS total FROM auto_replies
+         WHERE template_id IS NOT NULL AND is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)`,
+        accountId);
+      break;
+    default:
+      break;
+  }
+  return items;
+}
+
+/** 保存案の実効値。無効環境の飲食店テストは保存時と同じく無効に倒す。 */
+function effectiveFeatures(
+  current: Record<string, boolean>,
+  incoming: Record<string, unknown> | undefined,
+  restaurantEnabled: boolean,
+): Record<string, boolean> {
+  const next = { ...current };
+  for (const [key, value] of Object.entries(incoming ?? {})) {
+    next[key] = key === 'restaurant_test' && !restaurantEnabled ? false : (value as boolean);
+  }
+  return next;
+}
+
+/** 有効→無効に変わる機能だけが影響確認の対象。 */
+function offTransitions(
+  current: Record<string, boolean>,
+  next: Record<string, boolean>,
+): ToggleableFeature[] {
+  return (Object.keys(next) as ToggleableFeature[]).filter(
+    (key) => isToggleable(key) && current[key] === true && next[key] === false,
+  );
+}
+
+async function impactFingerprint(input: unknown): Promise<string> {
+  const bytes = new TextEncoder().encode(JSON.stringify(input));
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function readOffConfirmation(db: D1Database, accountId: string): Promise<OffConfirmation | null> {
+  const raw = await getAccountSetting(db, accountId, OFF_CONFIRM_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<OffConfirmation>;
+    if (typeof parsed.token !== 'string' || typeof parsed.impactHash !== 'string'
+      || typeof parsed.version !== 'number' || typeof parsed.expiresAt !== 'number') {
+      return null;
+    }
+    if (parsed.expiresAt <= Date.now()) {
+      await db.prepare('DELETE FROM account_settings WHERE line_account_id = ? AND key = ?')
+        .bind(accountId, OFF_CONFIRM_KEY).run();
+      return null;
+    }
+    return parsed as OffConfirmation;
+  } catch {
+    return null;
+  }
+}
+
+async function deleteOffConfirmation(db: D1Database, accountId: string): Promise<void> {
+  await db.prepare('DELETE FROM account_settings WHERE line_account_id = ? AND key = ?')
+    .bind(accountId, OFF_CONFIRM_KEY).run();
+}
+
+/** 変更案の影響を数える。保存はしない。 */
+async function buildImpacts(
+  db: D1Database,
+  accountId: string,
+  offs: ToggleableFeature[],
+): Promise<FeatureImpact[]> {
+  const impacts: FeatureImpact[] = [];
+  for (const feature of offs) {
+    const items = await collectFeatureImpact(db, accountId, feature);
+    impacts.push({ feature, items, blocking: items.length > 0 });
+  }
+  return impacts;
+}
+
+/**
  * アカウントを決める。
  *
  * 機能のオン／オフはアカウントごとに持つ。店舗ごとに使う機能が違うため。
@@ -236,6 +522,101 @@ featureSettings.get('/api/settings/features', async (c) => {
   }
 });
 
+/**
+ * 変更案の影響確認。保存はしない。
+ *
+ * 有効→無効に変わる機能ごとに公開中・予約中・依存機能の件数と対象種別を
+ * 返す。止まる仕事があるときだけ確認トークンを発行し、保存時に求める。
+ * 影響がなければトークンは要らない(通常保存)。
+ */
+featureSettings.post('/api/settings/features/impact', async (c) => {
+  try {
+    const accountId = getAccountId(c);
+    if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
+
+    const body = await c.req.json<{
+      features?: Record<string, unknown>;
+      expectedVersion?: unknown;
+    }>();
+
+    if (body.features !== undefined && (typeof body.features !== 'object' || body.features === null || Array.isArray(body.features))) {
+      return c.json({ success: false, error: 'features はオブジェクトで指定してください' }, 400);
+    }
+    const unknownKeys = Object.keys(body.features ?? {}).filter((k) => !isToggleable(k));
+    if (unknownKeys.length > 0) {
+      return c.json(
+        { success: false, error: `知らない機能です: ${unknownKeys.join(', ')}` },
+        400,
+      );
+    }
+    const invalidFeature = Object.entries(body.features ?? {})
+      .find(([, value]) => typeof value !== 'boolean');
+    if (invalidFeature) {
+      return c.json({
+        success: false,
+        error: `${invalidFeature[0]} はtrueまたはfalseで指定してください`,
+      }, 400);
+    }
+    if (body.expectedVersion !== undefined
+      && (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 0)) {
+      return c.json({
+        success: false,
+        error: 'expectedVersion は0以上の整数で指定してください',
+      }, 400);
+    }
+
+    const restaurantEnabled = restaurantTestEnabled(c.env);
+    const current = await loadFeatureSettings(c.env.DB, accountId, restaurantEnabled);
+    if (body.expectedVersion !== undefined && Number(body.expectedVersion) !== current.version) {
+      return c.json({
+        success: false,
+        error: '別の管理者が先に変更しました。最新の設定を読み直してください。',
+        data: { currentVersion: current.version },
+      }, 409);
+    }
+
+    const next = effectiveFeatures(current.features, body.features, restaurantEnabled);
+    const offs = offTransitions(current.features, next);
+    const impacts = await buildImpacts(c.env.DB, accountId, offs);
+    const requiresConfirmation = impacts.some((impact) => impact.blocking);
+
+    let impactToken: string | null = null;
+    if (requiresConfirmation) {
+      impactToken = crypto.randomUUID();
+      const impactHash = await impactFingerprint({
+        accountId,
+        version: current.version,
+        features: next,
+        impacts,
+      });
+      await setAccountSetting(
+        c.env.DB,
+        accountId,
+        OFF_CONFIRM_KEY,
+        JSON.stringify({
+          token: impactToken,
+          impactHash,
+          version: current.version,
+          expiresAt: Date.now() + OFF_CONFIRM_TTL_MS,
+        } satisfies OffConfirmation),
+      );
+    } else if (offs.length > 0) {
+      await deleteOffConfirmation(c.env.DB, accountId);
+    }
+
+    return c.json({
+      success: true,
+      data: { version: current.version, impacts, requiresConfirmation, impactToken },
+    });
+  } catch (err) {
+    console.error('POST /api/settings/features/impact error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), async (c) => {
   try {
     const accountId = getAccountId(c);
@@ -250,6 +631,7 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
       sidebarItemOrder?: unknown;
       catalog?: unknown;
       expectedVersion?: unknown;
+      impactToken?: unknown;
     }>();
 
     let catalog: ToggleableFeature[] | undefined;
@@ -317,6 +699,58 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
         success: false,
         error: 'expectedVersion は0以上の整数で指定してください',
       }, 400);
+    }
+    if (body.impactToken !== undefined && typeof body.impactToken !== 'string') {
+      return c.json({
+        success: false,
+        error: 'impactToken は文字列で指定してください',
+      }, 400);
+    }
+
+    /**
+     * オフ前の影響確認(#643)。有効→無効に変わる機能に止まる仕事が
+     * あるのに、有効な確認トークンが無ければ保存しない。直接PUTでの
+     * 迂回もここで止める。影響が無ければ通常保存する。
+     */
+    const restaurantEnabledForImpact = restaurantTestEnabled(c.env);
+    let presentedToken: string | null = null;
+    if (body.features !== undefined) {
+      const impactCurrent = await loadFeatureSettings(
+        c.env.DB,
+        accountId,
+        restaurantEnabledForImpact,
+      );
+      const impactNext = effectiveFeatures(
+        impactCurrent.features,
+        body.features,
+        restaurantEnabledForImpact,
+      );
+      const impactOffs = offTransitions(impactCurrent.features, impactNext);
+      if (impactOffs.length > 0) {
+        const impacts = await buildImpacts(c.env.DB, accountId, impactOffs);
+        if (impacts.some((impact) => impact.blocking)) {
+          const fingerprint = await impactFingerprint({
+            accountId,
+            version: impactCurrent.version,
+            features: impactNext,
+            impacts,
+          });
+          const saved = await readOffConfirmation(c.env.DB, accountId);
+          if (typeof body.impactToken !== 'string'
+            || !saved
+            || saved.token !== body.impactToken
+            || saved.impactHash !== fingerprint
+            || saved.version !== impactCurrent.version) {
+            return c.json({
+              success: false,
+              error: 'オフにしようとしている機能に、公開中・予約中・依存中のものがあります。内容を確認してから保存してください。',
+              code: 'IMPACT_CONFIRMATION_REQUIRED',
+              data: { impacts, currentVersion: impactCurrent.version },
+            }, 409);
+          }
+          presentedToken = body.impactToken;
+        }
+      }
     }
 
     const hasBundleUpdate = body.features !== undefined
@@ -392,6 +826,11 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
         SPECIALIZED_CATALOG_KEY,
         JSON.stringify(catalog),
       );
+    }
+
+    // 確認トークンは使い切り。同じトークンの使い回しは受け付けない。
+    if (presentedToken !== null) {
+      await deleteOffConfirmation(c.env.DB, accountId);
     }
 
     return c.json({
