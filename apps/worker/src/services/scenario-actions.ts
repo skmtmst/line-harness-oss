@@ -546,34 +546,65 @@ export async function resumePreviousScenario(
   return (updated.meta?.changes ?? 0) > 0
 }
 
-/** 共通情報の加算・減算。在庫や残席のような、店ぜんたいで1つの数に使う。 */
+/**
+ * 共通情報の加算・減算。在庫や残席のような、店ぜんたいで1つの数に使う。
+ *
+ * 読み→計算→書き込みを分けると、同時実行で片方の増減が消える。
+ * 読み直しの再試行で吸収する作りも、上限を使い切ると失敗として
+ * 握りつぶされ、加減算が永久に消える。そこで値・版番号・履歴を
+ * 1つの batch で書き、計算は SQL の中で今の値に足す。D1 の batch は
+ * 原子的なので、並んだ更新は必ず1件ずつ順に当たり、負けも再試行も
+ * 上限もない。版番号と履歴を進めるのは画面編集・予約適用と同じ契約
+ * にするためで、古い版のままの上書きを防ぐ。
+ *
+ * 数の読み方は SQLite の数値化に従う。整数・小数・空・ただの文字は
+ * 従来どおり（文字は0とみなす）。'12abc' のような先頭数字つき文字列は
+ * 先頭の数として読む点だけ、従来の Number 扱いと違う。
+ */
 async function applyCommonVar(
   db: D1Database,
   friendId: string,
   c: CommonVarActionConfig,
 ): Promise<void> {
   if (!c.varKey) throw new Error('common_var action requires varKey')
-  const row = await db
-    .prepare(
-      `SELECT cv.value
-         FROM common_vars cv
-         JOIN friends f ON f.line_account_id = cv.line_account_id
-        WHERE f.id = ? AND cv.var_key = ?`,
-    )
-    .bind(friendId, c.varKey)
-    .first<{ value: string | null }>()
-  if (!row) throw new Error(`common_var not found: ${c.varKey}`)
-  const base = Number(row.value ?? 0)
   const delta = Number(c.value ?? 0)
-  const safeBase = Number.isFinite(base) ? base : 0
   const safeDelta = Number.isFinite(delta) ? delta : 0
-  const next = c.op === 'add' ? safeBase + safeDelta : safeBase - safeDelta
-  await db
-    .prepare(
-      `UPDATE common_vars SET value = ?, updated_at = ?
+  const signed = c.op === 'add' ? safeDelta : -safeDelta
+  const now = jstNow()
+  const results = await db.batch([
+    db.prepare(
+      `UPDATE common_vars
+          SET value = CASE
+                WHEN (COALESCE(CAST(value AS REAL), 0.0) + ?)
+                   = CAST(COALESCE(CAST(value AS REAL), 0.0) + ? AS INTEGER)
+                THEN CAST(CAST(COALESCE(CAST(value AS REAL), 0.0) + ? AS INTEGER) AS TEXT)
+                ELSE CAST(COALESCE(CAST(value AS REAL), 0.0) + ? AS TEXT)
+              END,
+              version = version + 1,
+              updated_at = ?
         WHERE var_key = ?
-          AND line_account_id = (SELECT line_account_id FROM friends WHERE id = ?)`,
-    )
-    .bind(String(next), jstNow(), c.varKey, friendId)
-    .run()
+          AND line_account_id = (SELECT line_account_id FROM friends WHERE id = ?)
+          AND archived_at IS NULL`,
+    ).bind(signed, signed, signed, signed, now, c.varKey, friendId),
+    // 履歴は更新後の行から取るので、版・値・名前が今の行と必ず一致する。
+    // 既存の履歴に欠番があっても、負けた側が誤った行を補うことはない。
+    // batch が原子的なので、敗者がいることもない。
+    db.prepare(
+      `INSERT INTO common_var_versions
+         (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
+       SELECT ?, cv.id, cv.version, cv.name, cv.value, cv.memo, ?, NULL, ?
+         FROM common_vars cv
+        WHERE cv.var_key = ?
+          AND cv.line_account_id = (SELECT line_account_id FROM friends WHERE id = ?)
+          AND cv.archived_at IS NULL`,
+    ).bind(
+      crypto.randomUUID(),
+      c.op === 'add' ? 'シナリオ加算' : 'シナリオ減算',
+      now,
+      c.varKey,
+      friendId,
+    ),
+  ])
+  // 競合で当たらないことはない。当たらなければ行が無い。
+  if ((results[0]?.meta?.changes ?? 0) === 0) throw new Error(`common_var not found: ${c.varKey}`)
 }
