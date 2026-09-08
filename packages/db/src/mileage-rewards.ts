@@ -1163,6 +1163,11 @@ export interface MileageRedemptionStepDelivery {
   idempotencyKey: string;
   status: MileageRedemptionStepStatus;
   attemptCount: number;
+  owner: string | null;
+  leaseExpiresAt: string | null;
+  generation: number;
+  fenceToken: string | null;
+  needsReconcile: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -1179,49 +1184,183 @@ export class MileageRedemptionConfirmError extends Error {
 }
 
 /**
- * 手順の送信予約。未送信なら started で確保して 'send' を返す。
- * 送信済みなら 'sent' を返す(送らない)。やり直しが同じ手順を
- * 再送しないための outbox の口。
+ * 手順の貸出予約。返すのは次の4つのどれか。
+ *
+ * - 'send' … 自分が貸出を持った。送ってよいのはこの走者だけ。
+ * - 'sent' … 送信済み。送らない(やり直しが再送しないための outbox の口)。
+ * - 'reconcile' … 送達不明(送ったかもしれないが確定できなかった)。
+ *   **送り直さない。** 同じ冪等キーで照合して確定だけ進める。
+ *   受信先が冪等でなくても二重に届かないのはこのため。
+ * - 'busy' … 別の走者が貸出を持っている。送らずに待つ。
+ *
+ * 期限切れの引き継ぎでは世代を進める。古い走者の遅い確定は
+ * owner と fence が合わずに拒否される(取り違え防止の fence)。
  */
+export type RedemptionStepClaim = 'send' | 'sent' | 'reconcile' | 'busy';
+
+export interface RedemptionStepLease {
+  redemptionId: string;
+  stepKey: string;
+  idempotencyKey: string;
+  owner: string;
+  fenceToken: string;
+  leaseExpiresAt: string;
+  now: string;
+}
+
+interface RedemptionStepRow {
+  status: MileageRedemptionStepStatus;
+  owner: string | null;
+  leaseExpiresAt: string | null;
+  idempotencyKey: string;
+  needsReconcile: number;
+}
+
+async function selectRedemptionStep(
+  db: D1Database,
+  redemptionId: string,
+  stepKey: string,
+): Promise<RedemptionStepRow | null> {
+  return db.prepare(
+    `SELECT status, owner,
+            lease_expires_at AS leaseExpiresAt,
+            idempotency_key AS idempotencyKey,
+            needs_reconcile AS needsReconcile
+       FROM mileage_redemption_step_deliveries
+      WHERE redemption_id = ? AND step_key = ?`,
+  ).bind(redemptionId, stepKey).first<RedemptionStepRow>();
+}
+
 export async function claimRedemptionStep(
   db: D1Database,
-  input: { redemptionId: string; stepKey: string; idempotencyKey: string },
-): Promise<'send' | 'sent'> {
-  const now = new Date().toISOString();
-  const existing = await db.prepare(
-    `SELECT status FROM mileage_redemption_step_deliveries
-      WHERE redemption_id = ? AND step_key = ?`,
-  ).bind(input.redemptionId, input.stepKey).first<{ status: MileageRedemptionStepStatus }>();
-  if (existing?.status === 'sent') return 'sent';
-  if (existing) {
-    await db.prepare(
-      `UPDATE mileage_redemption_step_deliveries
-          SET attempt_count = attempt_count + 1, updated_at = ?
-        WHERE redemption_id = ? AND step_key = ?`,
-    ).bind(now, input.redemptionId, input.stepKey).run();
-    return 'send';
+  input: RedemptionStepLease,
+): Promise<RedemptionStepClaim> {
+  let existing = await selectRedemptionStep(db, input.redemptionId, input.stepKey);
+  if (!existing) {
+    try {
+      await db.prepare(
+        `INSERT INTO mileage_redemption_step_deliveries
+           (redemption_id, step_key, idempotency_key, status,
+            owner, lease_expires_at, generation, fence_token, needs_reconcile,
+            created_at, updated_at)
+         VALUES (?, ?, ?, 'started', ?, ?, 1, ?, 0, ?, ?)`,
+      ).bind(
+        input.redemptionId, input.stepKey, input.idempotencyKey,
+        input.owner, input.leaseExpiresAt, input.fenceToken,
+        input.now, input.now,
+      ).run();
+      return 'send';
+    } catch {
+      // 同時確保の負け：相手の行を既存として扱う。行が無ければ投げ直す。
+      existing = await selectRedemptionStep(db, input.redemptionId, input.stepKey);
+      if (!existing) throw new MileageRedemptionConfirmError();
+    }
   }
-  await db.prepare(
-    `INSERT INTO mileage_redemption_step_deliveries
-       (redemption_id, step_key, idempotency_key, status, created_at, updated_at)
-     VALUES (?, ?, ?, 'started', ?, ?)`,
-  ).bind(input.redemptionId, input.stepKey, input.idempotencyKey, now, now).run();
-  return 'send';
+  if (existing.status === 'sent') return 'sent';
+  // 送達不明は送り直さない。確定だけ進める側の仕事。
+  if (existing.needsReconcile === 1) return 'reconcile';
+  const leaseLive = existing.leaseExpiresAt !== null && existing.leaseExpiresAt > input.now;
+  // 別の走者が貸出を持っている間は、送らずに待つ。
+  if (leaseLive && existing.owner !== null && existing.owner !== input.owner) return 'busy';
+  if (existing.owner === input.owner && leaseLive) {
+    // 同じ走者の取り直し：貸出を延ばし、fenceだけ新しくする。
+    const refreshed = await db.prepare(
+      `UPDATE mileage_redemption_step_deliveries
+          SET lease_expires_at = ?, fence_token = ?,
+              attempt_count = attempt_count + 1, updated_at = ?
+        WHERE redemption_id = ? AND step_key = ?
+          AND status = 'started' AND needs_reconcile = 0 AND owner = ?`,
+    ).bind(
+      input.leaseExpiresAt, input.fenceToken, input.now,
+      input.redemptionId, input.stepKey, input.owner,
+    ).run();
+    return (refreshed.meta?.changes ?? 0) === 1 ? 'send' : 'busy';
+  }
+  // 期限切れの引き継ぎ：世代を進める。古い走者の遅い確定は通らない。
+  const taken = await db.prepare(
+    `UPDATE mileage_redemption_step_deliveries
+        SET owner = ?, lease_expires_at = ?, generation = generation + 1,
+            fence_token = ?, attempt_count = attempt_count + 1, updated_at = ?
+      WHERE redemption_id = ? AND step_key = ?
+        AND status = 'started' AND needs_reconcile = 0
+        AND (lease_expires_at IS NULL OR lease_expires_at <= ?)`,
+  ).bind(
+    input.owner, input.leaseExpiresAt, input.fenceToken, input.now,
+    input.redemptionId, input.stepKey, input.now,
+  ).run();
+  return (taken.meta?.changes ?? 0) === 1 ? 'send' : 'busy';
 }
 
 /**
- * 外部送信が終わった手順を sent にする。確保していない行の確定は投げる。
+ * 外部送信が終わった手順を sent にする。自分の貸出の確定だけ通す。
+ * 古い走者の遅い確定・確保していない行の確定は投げる。
  * 呼び出し側はどちらも確定失敗として扱い、失敗には落とさない。
  */
 export async function markRedemptionStepSent(
   db: D1Database,
-  input: { redemptionId: string; stepKey: string },
+  input: { redemptionId: string; stepKey: string; owner: string; fenceToken: string; now: string },
 ): Promise<void> {
   const result = await db.prepare(
     `UPDATE mileage_redemption_step_deliveries
-        SET status = 'sent', updated_at = ?
-      WHERE redemption_id = ? AND step_key = ? AND status = 'started'`,
-  ).bind(new Date().toISOString(), input.redemptionId, input.stepKey).run();
+        SET status = 'sent', needs_reconcile = 0, updated_at = ?
+      WHERE redemption_id = ? AND step_key = ?
+        AND status = 'started' AND needs_reconcile = 0
+        AND owner = ? AND fence_token = ?`,
+  ).bind(input.now, input.redemptionId, input.stepKey, input.owner, input.fenceToken).run();
+  if ((result.meta?.changes ?? 0) !== 1) {
+    throw new MileageRedemptionConfirmError();
+  }
+}
+
+/**
+ * 外部送信は終わったが確定に失敗した手順を、送達不明として残す。
+ * 「送ったかもしれない」の証言。回収はこの行を送り直さず、
+ * 同じ冪等キーの照合で確定だけ進める。貸出を失った古い走者の
+ * 証言は受け付けない(今の持ち主が進める)。
+ */
+export async function markRedemptionStepUnknown(
+  db: D1Database,
+  input: {
+    redemptionId: string; stepKey: string; idempotencyKey: string;
+    owner: string; fenceToken: string; now: string;
+  },
+): Promise<void> {
+  const result = await db.prepare(
+    `UPDATE mileage_redemption_step_deliveries
+        SET needs_reconcile = 1, updated_at = ?
+      WHERE redemption_id = ? AND step_key = ?
+        AND status = 'started' AND needs_reconcile = 0
+        AND owner = ? AND fence_token = ? AND idempotency_key = ?`,
+  ).bind(
+    input.now, input.redemptionId, input.stepKey,
+    input.owner, input.fenceToken, input.idempotencyKey,
+  ).run();
+  if ((result.meta?.changes ?? 0) !== 1) {
+    throw new MileageRedemptionConfirmError();
+  }
+}
+
+/**
+ * 送達不明の手順を、送り直さず確定だけ進める。同じ冪等キーであることを
+ * 照合し、違う手順の確定には使えない。早い者勝ちで1走者だけ通る。
+ */
+export async function confirmReconciledRedemptionStep(
+  db: D1Database,
+  input: {
+    redemptionId: string; stepKey: string; idempotencyKey: string;
+    owner: string; fenceToken: string; now: string;
+  },
+): Promise<void> {
+  const result = await db.prepare(
+    `UPDATE mileage_redemption_step_deliveries
+        SET status = 'sent', needs_reconcile = 0,
+            owner = ?, fence_token = ?, generation = generation + 1, updated_at = ?
+      WHERE redemption_id = ? AND step_key = ?
+        AND status = 'started' AND needs_reconcile = 1 AND idempotency_key = ?`,
+  ).bind(
+    input.owner, input.fenceToken, input.now,
+    input.redemptionId, input.stepKey, input.idempotencyKey,
+  ).run();
   if ((result.meta?.changes ?? 0) !== 1) {
     throw new MileageRedemptionConfirmError();
   }

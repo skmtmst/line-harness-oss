@@ -5,11 +5,13 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   claimRedemptionStep,
+  confirmReconciledRedemptionStep,
   createMileageRewardDraft,
   getMileageReward,
   importMileageRewardCodes,
   listMileageRedemptions,
   markRedemptionStepSent,
+  markRedemptionStepUnknown,
   publishMileageReward,
   recordMileageRedemptionAttempt,
   refundMileageRewardRedemption,
@@ -411,14 +413,98 @@ describe('V6 mileage rewards', () => {
       lineAccountId: 'account-1', friendId: 'friend-1', rewardId: draft.id,
       idempotencyKey: 'redeem-step', requestFingerprint: 'fp-step',
     });
-    const step = { redemptionId: reserved.redemption.id, stepKey: '0:w1', idempotencyKey: 'step-key-1' };
-    expect(await claimRedemptionStep(db, step)).toBe('send');
-    await markRedemptionStepSent(db, step);
+    const lease = (owner: string, fenceToken: string, now: string) => ({
+      redemptionId: reserved.redemption.id, stepKey: '0:w1', idempotencyKey: 'step-key-1',
+      owner, fenceToken, leaseExpiresAt: '2026-09-09T00:05:00.000Z', now,
+    });
+    expect(await claimRedemptionStep(db, lease('owner-a', 'fence-a1', '2026-09-09T00:00:00.000Z'))).toBe('send');
+    // 貸出中の別走者は送らずに待つ。
+    expect(await claimRedemptionStep(db, lease('owner-b', 'fence-b1', '2026-09-09T00:01:00.000Z'))).toBe('busy');
+    await markRedemptionStepSent(db, {
+      redemptionId: reserved.redemption.id, stepKey: '0:w1',
+      owner: 'owner-a', fenceToken: 'fence-a1', now: '2026-09-09T00:02:00.000Z',
+    });
     // 送り済みは二度目を送らない。確保していない確定は投げる。
-    expect(await claimRedemptionStep(db, step)).toBe('sent');
+    expect(await claimRedemptionStep(db, lease('owner-b', 'fence-b2', '2026-09-09T00:03:00.000Z'))).toBe('sent');
     await expect(markRedemptionStepSent(db, {
       redemptionId: reserved.redemption.id, stepKey: '0:missing',
+      owner: 'owner-a', fenceToken: 'fence-a1', now: '2026-09-09T00:03:00.000Z',
     })).rejects.toMatchObject({ name: 'MileageRedemptionConfirmError' });
+  });
+
+  it('takes over an expired lease with a new generation and rejects the slow old owner', async () => {
+    const draft = await createMileageRewardDraft(db, {
+      lineAccountId: 'account-1',
+      draft: { name: '500円引き', rewardKind: 'coupon', requiredMiles: 300 },
+    });
+    await importMileageRewardCodes(db, {
+      rewardId: draft.id, lineAccountId: 'account-1',
+      codes: [{ ciphertext: 'encrypted-code', fingerprint: 'fingerprint-2' }],
+    });
+    await publishMileageReward(db, { id: draft.id, lineAccountId: 'account-1' });
+    const reserved = await reserveMileageRewardRedemption(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', rewardId: draft.id,
+      idempotencyKey: 'redeem-step-takeover', requestFingerprint: 'fp-step-takeover',
+    });
+    const lease = (owner: string, fenceToken: string, now: string) => ({
+      redemptionId: reserved.redemption.id, stepKey: '0:w1', idempotencyKey: 'step-key-2',
+      owner, fenceToken, leaseExpiresAt: '2026-09-09T00:05:00.000Z', now,
+    });
+    expect(await claimRedemptionStep(db, lease('owner-a', 'fence-a1', '2026-09-09T00:00:00.000Z'))).toBe('send');
+    // 貸出期限を過ぎたら別走者が引き継ぎ、世代が進む。
+    expect(await claimRedemptionStep(db, {
+      ...lease('owner-b', 'fence-b1', '2026-09-09T01:00:00.000Z'),
+      leaseExpiresAt: '2026-09-09T01:05:00.000Z',
+    })).toBe('send');
+    expect(sqlite.prepare(
+      `SELECT owner, generation FROM mileage_redemption_step_deliveries
+        WHERE redemption_id = ? AND step_key = '0:w1'`,
+    ).get(reserved.redemption.id)).toEqual({ owner: 'owner-b', generation: 2 });
+    // 遅れてきた旧持ち主の確定は通らない。
+    await expect(markRedemptionStepSent(db, {
+      redemptionId: reserved.redemption.id, stepKey: '0:w1',
+      owner: 'owner-a', fenceToken: 'fence-a1', now: '2026-09-09T01:01:00.000Z',
+    })).rejects.toMatchObject({ name: 'MileageRedemptionConfirmError' });
+    await markRedemptionStepSent(db, {
+      redemptionId: reserved.redemption.id, stepKey: '0:w1',
+      owner: 'owner-b', fenceToken: 'fence-b1', now: '2026-09-09T01:02:00.000Z',
+    });
+  });
+
+  it('reconciles an unknown step without resending and rejects a mismatched key', async () => {
+    const draft = await createMileageRewardDraft(db, {
+      lineAccountId: 'account-1',
+      draft: { name: '500円引き', rewardKind: 'coupon', requiredMiles: 300 },
+    });
+    await importMileageRewardCodes(db, {
+      rewardId: draft.id, lineAccountId: 'account-1',
+      codes: [{ ciphertext: 'encrypted-code', fingerprint: 'fingerprint-3' }],
+    });
+    await publishMileageReward(db, { id: draft.id, lineAccountId: 'account-1' });
+    const reserved = await reserveMileageRewardRedemption(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', rewardId: draft.id,
+      idempotencyKey: 'redeem-step-unknown', requestFingerprint: 'fp-step-unknown',
+    });
+    const lease = (owner: string, fenceToken: string, now: string) => ({
+      redemptionId: reserved.redemption.id, stepKey: '0:w1', idempotencyKey: 'step-key-3',
+      owner, fenceToken, leaseExpiresAt: '2026-09-09T00:05:00.000Z', now,
+    });
+    expect(await claimRedemptionStep(db, lease('owner-a', 'fence-a1', '2026-09-09T00:00:00.000Z'))).toBe('send');
+    await markRedemptionStepUnknown(db, {
+      ...lease('owner-a', 'fence-a1', '2026-09-09T00:01:00.000Z'),
+    });
+    // 送達不明は送り直さず、照合だけ求める。
+    expect(await claimRedemptionStep(db, lease('owner-b', 'fence-b1', '2026-09-09T00:02:00.000Z'))).toBe('reconcile');
+    // 違う冪等キーでの確定は通らない。
+    await expect(confirmReconciledRedemptionStep(db, {
+      redemptionId: reserved.redemption.id, stepKey: '0:w1', idempotencyKey: 'wrong-key',
+      owner: 'owner-b', fenceToken: 'fence-b1', now: '2026-09-09T00:02:00.000Z',
+    })).rejects.toMatchObject({ name: 'MileageRedemptionConfirmError' });
+    await confirmReconciledRedemptionStep(db, {
+      redemptionId: reserved.redemption.id, stepKey: '0:w1', idempotencyKey: 'step-key-3',
+      owner: 'owner-b', fenceToken: 'fence-b1', now: '2026-09-09T00:02:00.000Z',
+    });
+    expect(await claimRedemptionStep(db, lease('owner-b', 'fence-b2', '2026-09-09T00:03:00.000Z'))).toBe('sent');
   });
 
   it('rejects unsupported or more than 15 reward target conditions', async () => {
