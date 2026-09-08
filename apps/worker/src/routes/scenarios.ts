@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
-  getScenarios,
   getScenarioById,
   createScenario,
   updateScenario,
@@ -44,7 +43,7 @@ import {
   ScenarioContractError,
   simulateScenario,
 } from '../services/scenario-v6-contract.js';
-import { listLimit } from './list-pagination.js';
+import { listLimit, listPage } from './list-pagination.js';
 
 const scenarios = new Hono<Env>();
 
@@ -359,35 +358,63 @@ scenarios.patch('/api/scenarios/reorder', requireRole('owner', 'admin'), async (
 scenarios.get('/api/scenarios', scenarioPermission('view'), async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId');
+    const limit = listLimit(c.req.query('limit'), 50, 200);
+    const page = listPage(c.req.query('page'));
+    const offset = (page - 1) * limit;
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-    let items: DbScenarioWithStepCount[];
+    if (lineAccountId && !scope.allowedAccountIds.includes(lineAccountId)) {
+      return c.json({ success: false, error: 'シナリオが見つかりません' }, 404);
+    }
+
+    const clauses: string[] = [];
+    const binds: unknown[] = [];
     if (lineAccountId) {
-      if (!scope.allowedAccountIds.includes(lineAccountId)) {
-        return c.json({ success: false, error: 'シナリオが見つかりません' }, 404);
+      const accountClauses = ['s.line_account_id = ?'];
+      binds.push(lineAccountId);
+      if (scope.canSeeUnassigned) accountClauses.push('s.line_account_id IS NULL');
+      clauses.push(`(${accountClauses.join(' OR ')})`);
+    } else {
+      const accountClauses: string[] = [];
+      if (scope.allowedAccountIds.length > 0) {
+        accountClauses.push(`s.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})`);
+        binds.push(...scope.allowedAccountIds);
       }
-      // NULL line_account_id = global scenario (webhook.ts:211 / liff.ts:878 fire it for every
-      // account). Include both account-bound and global rows so the list mirrors the engine.
-      const result = await c.env.DB
-        .prepare(
-          `SELECT s.*, COUNT(ss.id) as step_count
+      if (scope.canSeeUnassigned) accountClauses.push('s.line_account_id IS NULL');
+      clauses.push(accountClauses.length > 0 ? `(${accountClauses.join(' OR ')})` : '0 = 1');
+    }
+    const query = c.req.query('query')?.trim();
+    if (query) {
+      clauses.push(`s.name LIKE ? ESCAPE '\\'`);
+      binds.push(`%${query.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`);
+    }
+    if (c.req.query('active') === '0') clauses.push('s.is_active = 0');
+    const createdFrom = c.req.query('createdFrom')?.trim();
+    if (createdFrom) {
+      clauses.push('s.created_at >= ?');
+      binds.push(createdFrom);
+    }
+    const folderId = c.req.query('folderId');
+    if (folderId === '__unfiled__') clauses.push('s.folder_id IS NULL');
+    else if (folderId) {
+      clauses.push('s.folder_id = ?');
+      binds.push(folderId);
+    }
+    const where = `WHERE ${clauses.join(' AND ')}`;
+    const [rows, count] = await Promise.all([
+      c.env.DB.prepare(
+        `SELECT s.*, COUNT(ss.id) as step_count
            FROM scenarios s
            LEFT JOIN scenario_steps ss ON s.id = ss.scenario_id
-           WHERE s.line_account_id = ?${scope.canSeeUnassigned ? ' OR s.line_account_id IS NULL' : ''}
-           GROUP BY s.id
-           ORDER BY s.created_at DESC`,
-        )
-        .bind(lineAccountId)
-        .all<DbScenarioWithStepCount>();
-      items = result.results;
-    } else {
-      const rows = await getScenarios(c.env.DB);
-      items = rows.filter((row) => {
-        const accountId = (row as { line_account_id?: string | null }).line_account_id ?? null;
-        return accountId == null
-          ? scope.canSeeUnassigned
-          : scope.allowedAccountIds.includes(accountId);
-      });
-    }
+           ${where}
+          GROUP BY s.id
+          ORDER BY s.created_at DESC, s.id DESC
+          LIMIT ? OFFSET ?`,
+      ).bind(...binds, limit, offset).all<DbScenarioWithStepCount>(),
+      c.env.DB.prepare(`SELECT COUNT(*) AS total FROM scenarios s ${where}`)
+        .bind(...binds).first<{ total: number }>(),
+    ]);
+    const items = rows.results;
+    const total = Number(count?.total ?? 0);
 
     /*
      * 購読中と読了済の人数。
@@ -399,20 +426,30 @@ scenarios.get('/api/scenarios', scenarioPermission('view'), async (c) => {
      */
     const counts = new Map<string, { active: number; completed: number }>();
     try {
-      const rows = await c.env.DB
-        .prepare(
+      const scenarioIds = items.map((item) => item.id);
+      const accountIds = lineAccountId ? [lineAccountId] : scope.allowedAccountIds;
+      if (scenarioIds.length > 0 && accountIds.length > 0) {
+        const scenarioPlaceholders = scenarioIds.map(() => '?').join(',');
+        const accountPlaceholders = accountIds.map(() => '?').join(',');
+        const rows = await c.env.DB
+          .prepare(
           `SELECT scenario_id,
                   SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active_count,
                   SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_count
-             FROM friend_scenarios
+             FROM friend_scenarios fs
+             INNER JOIN friends f ON f.id = fs.friend_id
+            WHERE fs.scenario_id IN (${scenarioPlaceholders})
+              AND f.line_account_id IN (${accountPlaceholders})
             GROUP BY scenario_id`,
-        )
-        .all<{ scenario_id: string; active_count: number; completed_count: number }>();
-      for (const r of rows.results) {
-        counts.set(r.scenario_id, {
-          active: Number(r.active_count ?? 0),
-          completed: Number(r.completed_count ?? 0),
-        });
+          )
+          .bind(...scenarioIds, ...accountIds)
+          .all<{ scenario_id: string; active_count: number; completed_count: number }>();
+        for (const r of rows.results) {
+          counts.set(r.scenario_id, {
+            active: Number(r.active_count ?? 0),
+            completed: Number(r.completed_count ?? 0),
+          });
+        }
       }
     } catch {
       // 数えられなくても一覧は出す。人数だけ 0 になる。
@@ -420,12 +457,20 @@ scenarios.get('/api/scenarios', scenarioPermission('view'), async (c) => {
 
     return c.json({
       success: true,
-      data: items.map((row) => ({
-        ...serializeScenario(row),
-        stepCount: row.step_count,
-        subscriberCount: counts.get(row.id)?.active ?? 0,
-        completedCount: counts.get(row.id)?.completed ?? 0,
-      })),
+      data: {
+        items: items.map((row) => ({
+          ...serializeScenario(row),
+          stepCount: row.step_count,
+          subscriberCount: counts.get(row.id)?.active ?? 0,
+          completedCount: counts.get(row.id)?.completed ?? 0,
+        })),
+        total,
+        limit,
+        sort: [
+          { field: 'createdAt', direction: 'desc' },
+          { field: 'id', direction: 'desc' },
+        ],
+      },
     });
   } catch (err) {
     console.error('GET /api/scenarios error:', err);

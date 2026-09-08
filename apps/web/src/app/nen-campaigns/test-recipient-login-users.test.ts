@@ -54,9 +54,10 @@ describe('NEN配信のテスト送信先', () => {
   });
 
   test('一覧の読込失敗を0件や空状態として表示しない', () => {
-    expect(page).toContain("const [loadError, setLoadError] = useState('')");
-    expect(page).toContain('if (loadError)');
-    expect(page).toContain('kind="error"');
-    expect(page).toContain('フォロー配信を再読み込み');
+    // 1件の失敗で画面全体をエラーにしない(点検 #512 の中3)。失敗はそのタブの帯で示す。
+    expect(page).toContain('tabErrors');
+    expect(page).toContain('tone="danger"');
+    expect(page).toContain('もう一度読み込む');
+    expect(page).not.toContain('loadError');
   });
 });

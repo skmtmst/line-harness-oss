@@ -139,7 +139,7 @@ describe('question templates', () => {
   })
 
   it('returns question and publication state in the list contract', async () => {
-    mocks.getTemplatesWithUsageCount.mockResolvedValue([{
+    mocks.getTemplatesWithUsageCount.mockResolvedValue({ items: [{
       id: 'question-1',
       name: '継続の意思をうかがう',
       category: '定期便',
@@ -152,7 +152,7 @@ describe('question templates', () => {
       created_at: '2026-08-29T12:00:00+09:00',
       updated_at: '2026-08-29T12:00:00+09:00',
       line_account_id: 'account-1',
-    }])
+    }], total: 1 })
 
     const response = await app().request('/api/templates', {}, bindings)
     expect(response.status).toBe(200)

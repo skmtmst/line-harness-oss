@@ -11,7 +11,9 @@ import QuestionEditor, {
 import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
 import ListState from '@/components/shared/list-state'
+import SelectField from '@/components/shared/select-field'
 import { TextField } from '@/components/shared/text-field'
+import type { Folder } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 
@@ -41,6 +43,8 @@ function QuestionTemplatePageInner() {
   const id = params.get('id')
   const [name, setName] = useState('')
   const [category, setCategory] = useState('未分類')
+  const [folderId, setFolderId] = useState<string | null>(null)
+  const [folders, setFolders] = useState<Folder[]>([])
   const [question, setQuestion] = useState<ScenarioQuestion>(() => emptyQuestion())
   const [categories, setCategories] = useState<string[]>([])
   const [usageCount, setUsageCount] = useState(0)
@@ -48,15 +52,17 @@ function QuestionTemplatePageInner() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  // 分類名の候補は置き場の一覧から取る。テンプレ全件を引くと件数が増えるほど重くなる。
   useEffect(() => {
     if (!selectedAccountId) {
       setCategories([])
       return
     }
     let cancelled = false
-    void api.templates.list(undefined, selectedAccountId).then((res) => {
+    void api.folders.list('template').then((res) => {
       if (cancelled || !res.success) return
-      setCategories([...new Set(res.data.map((item) => item.category).filter(Boolean))])
+      setFolders(res.data)
+      setCategories([...new Set(res.data.map((item) => item.name).filter(Boolean))])
     })
     return () => { cancelled = true }
   }, [selectedAccountId])
@@ -75,6 +81,7 @@ function QuestionTemplatePageInner() {
         }
         setName(template.data.name)
         setCategory(template.data.category || '未分類')
+        setFolderId(template.data.folderId ?? null)
         setQuestion(template.data.question as ScenarioQuestion)
         setUsageCount(Object.values(template.data.usedBy).reduce((total, items) => total + items.length, 0))
       })
@@ -116,6 +123,7 @@ function QuestionTemplatePageInner() {
       messageContent: question.intro?.trim() || question.text,
       question,
       questionStatus,
+      folderId,
     }
     try {
       const result = id
@@ -177,6 +185,16 @@ function QuestionTemplatePageInner() {
               <datalist id="question-template-folders">
                 {categories.map((item) => <option key={item} value={item} />)}
               </datalist>
+            </label>
+            <label className="text-label font-semibold text-ink-secondary">
+              置き場
+              <SelectField
+                aria-label="置き場"
+                value={folderId ?? ''}
+                onChange={(event) => setFolderId(event.target.value || null)}
+                options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
+                className="mt-2"
+              />
             </label>
           </section>
 

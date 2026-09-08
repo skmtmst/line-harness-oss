@@ -27,6 +27,11 @@ interface Props {
   initialGenre?: string
   /** Pre-filled ref_code for "register an unregistered inflow ref" flow. */
   initialRefCode?: string
+  /**
+   * #514-5: 親が一覧表示のために既に引いたプール別の所属名。渡されたら
+   * 取り直さない。編集窓を開くたびの N+1 を無くす。
+   */
+  poolMemberNames?: Record<string, string[]>
   onClose: () => void
   onSaved: (savedRoute: EntryRoute, created: boolean) => void
 }
@@ -40,13 +45,18 @@ export default function EditRouteModal({
   existingGenres,
   initialGenre,
   initialRefCode,
+  poolMemberNames,
   onClose,
   onSaved,
 }: Props) {
   // Per-pool member account names, loaded lazily so the dropdown can show
   // "Pool 名 — アカA, アカB" instead of just the pool name.
-  const [poolMembers, setPoolMembers] = useState<Record<string, string[]>>({})
+  const [poolMembers, setPoolMembers] = useState<Record<string, string[]>>(poolMemberNames ?? {})
   useEffect(() => {
+    if (poolMemberNames) {
+      setPoolMembers(poolMemberNames)
+      return
+    }
     let cancelled = false
     ;(async () => {
       const entries = await Promise.all(
@@ -61,7 +71,7 @@ export default function EditRouteModal({
     return () => {
       cancelled = true
     }
-  }, [pools])
+  }, [pools, poolMemberNames])
   const isNew = !route
   const mainPool = pools.find((p) => p.slug === 'main')
   // Unregistered-ref registration flow: refCode is fixed (the actual ref code

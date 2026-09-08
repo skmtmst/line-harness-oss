@@ -688,6 +688,7 @@ export default function EditDialog({
                     <input
                       type="text"
                       value={rule.keyword}
+                      maxLength={200}
                       aria-label={`キーワード${index + 1}`}
                       onChange={(event) => {
                         const next = keywordRules.map((item, itemIndex) =>
@@ -1090,6 +1091,7 @@ export default function EditDialog({
                 <textarea
                   rows={5}
                   value={responseContent}
+                  maxLength={5000}
                   onChange={(event) => setResponseContent(event.target.value)}
                   placeholder="返信する内容を入力"
                   className="border-hairline rounded-control mt-2 w-full resize-y border bg-canvas px-3 py-3 text-sm leading-relaxed"

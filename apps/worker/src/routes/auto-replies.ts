@@ -28,6 +28,7 @@ import type {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { currentMonthRange } from '../lib/jst-range.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import {
@@ -290,7 +291,7 @@ function readExtras(body: Record<string, unknown>):
   if ('keywords' in body) {
     const parsed = readKeywords(body.keywords);
     if (!parsed.ok) {
-      return { ok: false, error: 'keywords must be an array of { keyword, matchType?, minLength?, caseSensitive? }' };
+      return { ok: false, error: `keywords must be an array of { keyword, matchType?, minLength?, caseSensitive? } (at most ${AUTO_REPLY_KEYWORDS_MAX} items, ${AUTO_REPLY_KEYWORD_MAX} characters each)` };
     }
     value.keywords = parsed.value;
   }
@@ -397,13 +398,20 @@ function readHolidayRule(raw: unknown): Read<string | null> {
 }
 
 /** キーワードの複数行。1行ずつ言葉と当て方を持つ。 */
+/** 保存できる言葉の上限。際限なく足すと一覧の描画と送信判定が重くなる。 */
+export const AUTO_REPLY_KEYWORD_MAX = 200;
+export const AUTO_REPLY_KEYWORDS_MAX = 100;
+export const AUTO_REPLY_RESPONSE_MAX = 5000;
+
 function readKeywords(raw: unknown): Read<unknown[] | null> {
   if (raw === undefined || raw === null) return { ok: true, value: null };
   if (!Array.isArray(raw)) return { ok: false };
+  if (raw.length > AUTO_REPLY_KEYWORDS_MAX) return { ok: false };
   for (const item of raw) {
     if (!item || typeof item !== 'object') return { ok: false };
     const r = item as Record<string, unknown>;
     if (typeof r.keyword !== 'string' || r.keyword === '') return { ok: false };
+    if ([...r.keyword].length > AUTO_REPLY_KEYWORD_MAX) return { ok: false };
     if (r.matchType !== undefined && r.matchType !== 'exact' && r.matchType !== 'contains') {
       return { ok: false };
     }
@@ -508,6 +516,9 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
   if (!respondToAll && !keyword) {
     return { ok: false, error: '応答する言葉を入力してください' };
   }
+  if ([...keyword].length > AUTO_REPLY_KEYWORD_MAX) {
+    return { ok: false, error: `応答する言葉は${AUTO_REPLY_KEYWORD_MAX}文字までです` };
+  }
   if (body.matchType !== 'exact' && body.matchType !== 'contains') {
     return { ok: false, error: '言葉の一致方法を選んでください' };
   }
@@ -534,6 +545,13 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
   }
   const extras = readExtras(body);
   if (!extras.ok) return { ok: false, error: extras.error };
+  // 絞り込みと後続処理は小さな設定のはず。際限なく大きいとDB肥大と描画肥大を招く。
+  for (const [key, label] of [['friendConditions', '絞り込み条件'], ['actions', '応答したあとの処理']] as const) {
+    const raw = extras.value[key];
+    if (raw !== undefined && raw !== null && JSON.stringify(raw).length > 20000) {
+      return { ok: false, error: `${label}が大きすぎます` };
+    }
+  }
   const folderError = await validateAutoReplyFolder(db, extras.value.folderId);
   if (folderError) return { ok: false, error: folderError };
   if (extras.value.actions) {
@@ -554,6 +572,10 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
   }
   if (responseType !== 'silent' && !templateId && !responseContent) {
     return { ok: false, error: '返信する内容を入力してください' };
+  }
+  // LINEのテキスト上限と同じ基準。試し文の2000字より緩いが、保存文の上限として見る。
+  if ([...responseContent].length > AUTO_REPLY_RESPONSE_MAX) {
+    return { ok: false, error: `返信する内容は${AUTO_REPLY_RESPONSE_MAX.toLocaleString('ja-JP')}文字までです` };
   }
 
   return {
@@ -915,7 +937,9 @@ autoReplies.get('/api/auto-replies', requireRole('owner', 'admin', 'staff'), asy
     // 当たった回数（152）。今月と累計を並べて出す。
     // 数が取れなくても一覧は出す。付随情報なので、落ちても本体は止めない。
     const range = currentMonthRange(jstNow());
-    let hitsById = new Map<string, { period: number; total: number }>();
+    // 集計が取れないときは hits を付けない。0 で埋めると画面の
+    // 「未取得は —」判定が常に真になり、数え損ないが「未ヒット 0 回」に見える。
+    let hitsById: Map<string, { period: number; total: number }> | null = null;
     try {
       const counts = await getAutoReplyHitCounts(
         c.env.DB,
@@ -939,7 +963,7 @@ autoReplies.get('/api/auto-replies', requireRole('owner', 'admin', 'staff'), asy
       items.map(async (row) => {
         const base: SerializedAutoReply = {
           ...serializeAutoReply(row),
-          hits: hitsById.get(row.id) ?? { period: 0, total: 0 },
+          ...(hitsById ? { hits: hitsById.get(row.id) ?? { period: 0, total: 0 } } : {}),
           actionExecutionCount: actionsById?.get(row.id) ?? (actionsById ? 0 : null),
           conflictAttentionCount: row.is_active === 1 ? conflictsById.get(row.id) ?? 0 : 0,
         };
@@ -948,6 +972,23 @@ autoReplies.get('/api/auto-replies', requireRole('owner', 'admin', 'staff'), asy
       }),
     );
 
+    // 共通一覧契約。page/limit を付けたときだけ新形（items/total/limit/sort）で返す。
+    // 画面はまだ旧形（配列）を読むため、付けない限り形を変えない。
+    if (c.req.query('page') !== undefined || c.req.query('limit') !== undefined) {
+      const paging = parseOffsetPaging({ page: c.req.query('page'), limit: c.req.query('limit') });
+      return c.json({
+        success: true,
+        data: buildOffsetListResponse({
+          items: data.slice(paging.offset, paging.offset + paging.limit),
+          total: data.length,
+          paging,
+          sort: [
+            { field: 'priority', direction: 'asc' },
+            { field: 'created_at', direction: 'asc' },
+          ],
+        }),
+      });
+    }
     return c.json({ success: true, data });
   } catch (err) {
     console.error('GET /api/auto-replies error:', err);
@@ -1086,7 +1127,9 @@ autoReplies.put('/api/auto-replies/:id/draft', requireRole('owner', 'admin'), as
   }
 });
 
-autoReplies.post('/api/auto-replies/:id/validate', async (c) => {
+// 下書きの確認・試運転は、下書きを書ける人だけ。test は成功・失敗どちらの
+// 経路でも版の最終テスト状態を書き換える（DB 書込）ため、閲覧権限では叩けない。
+autoReplies.post('/api/auto-replies/:id/validate', requireRole('owner', 'admin'), async (c) => {
   try {
     const version = await getAutoReplyDraftVersion(c.env.DB, c.req.param('id'));
     if (!version) return c.json({ success: false, error: '公開する下書きがありません' }, 404);
@@ -1097,7 +1140,7 @@ autoReplies.post('/api/auto-replies/:id/validate', async (c) => {
   }
 });
 
-autoReplies.get('/api/auto-replies/:id/conflicts', async (c) => {
+autoReplies.get('/api/auto-replies/:id/conflicts', requireRole('owner', 'admin'), async (c) => {
   try {
     const version = await getAutoReplyDraftVersion(c.env.DB, c.req.param('id'));
     if (!version) return c.json({ success: false, error: '確認する下書きがありません' }, 404);
@@ -1112,7 +1155,7 @@ autoReplies.get('/api/auto-replies/:id/conflicts', async (c) => {
   }
 });
 
-autoReplies.post('/api/auto-replies/:id/test', async (c) => {
+autoReplies.post('/api/auto-replies/:id/test', requireRole('owner', 'admin'), async (c) => {
   let version: AutoReplyVersionRow | null = null;
   try {
     const id = c.req.param('id');
@@ -1278,6 +1321,11 @@ autoReplies.post('/api/auto-replies/:id/publish', requireRole('owner', 'admin'),
 });
 
 // POST /api/auto-replies — create
+// 用途: 一覧の編集ダイアログからの新規作成と、既存ルールの直接更新（PUT :id）。
+// 下書き経由（PUT :id/draft → validate/conflicts/test → publish）に寄せていない
+// 理由: 新規作成時は下書きが存在せず、版の取得・テスト必須の公開フローに
+// 乗せられない。公開前のテスト・競合確認は公開画面のフローで担保する。
+// いずれも owner/admin 専用で、本文の長さ上限は下書きと同じ基準を見る。
 autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<{
@@ -1303,6 +1351,12 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
     // ただし列は NOT NULL なので、空文字を入れておく。
     if (!body.keyword && body.respondToAll !== true) {
       return c.json({ success: false, error: 'keyword is required' }, 400);
+    }
+    if (typeof body.keyword === 'string' && [...body.keyword].length > AUTO_REPLY_KEYWORD_MAX) {
+      return c.json({ success: false, error: `keyword must be ${AUTO_REPLY_KEYWORD_MAX} characters or fewer` }, 400);
+    }
+    if (typeof body.responseContent === 'string' && [...body.responseContent].length > AUTO_REPLY_RESPONSE_MAX) {
+      return c.json({ success: false, error: `responseContent must be ${AUTO_REPLY_RESPONSE_MAX} characters or fewer` }, 400);
     }
     if (body.lineAccountId !== null && body.lineAccountId !== undefined
       && (!body.lineAccountId
@@ -1402,10 +1456,20 @@ autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c
     }>();
 
     const input: Record<string, unknown> = {};
-    if (body.keyword !== undefined) input.keyword = body.keyword;
+    if (body.keyword !== undefined) {
+      if (typeof body.keyword === 'string' && [...body.keyword].length > AUTO_REPLY_KEYWORD_MAX) {
+        return c.json({ success: false, error: `keyword must be ${AUTO_REPLY_KEYWORD_MAX} characters or fewer` }, 400);
+      }
+      input.keyword = body.keyword;
+    }
     if (body.matchType !== undefined) input.matchType = body.matchType;
     if (body.responseType !== undefined) input.responseType = body.responseType;
-    if (body.responseContent !== undefined) input.responseContent = body.responseContent;
+    if (body.responseContent !== undefined) {
+      if (typeof body.responseContent === 'string' && [...body.responseContent].length > AUTO_REPLY_RESPONSE_MAX) {
+        return c.json({ success: false, error: `responseContent must be ${AUTO_REPLY_RESPONSE_MAX} characters or fewer` }, 400);
+      }
+      input.responseContent = body.responseContent;
+    }
     if ('templateId' in body) input.templateId = body.templateId;
     if ('lineAccountId' in body) {
       if (body.lineAccountId !== null && body.lineAccountId !== undefined) {

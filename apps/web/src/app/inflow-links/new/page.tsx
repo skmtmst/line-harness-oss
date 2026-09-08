@@ -16,8 +16,12 @@ import SelectField from '@/components/shared/select-field'
 
 /** 流入元の情報と、友だち追加時の動きをまとめて設定する。 */
 
-/** ref コードはURLに出る。日本語や記号を許すと /r/xxx が壊れる。 */
-const REF_PATTERN = /^[a-z0-9][a-z0-9-]{1,63}$/
+/**
+ * ref コードはURLに出る。口(entry-routes.ts)と同じ `[A-Za-z0-9_-]{1,64}`
+ * に寄せる(#514-10)。画面だけ狭い(小文字・ハイフン・2文字以上)と、
+ * 口が許す正規の ref を作れない。
+ */
+const REF_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
 
 /** 名前から ref コードの候補を作る。日本語からは作れないので空にする。 */
 function suggestRef(name: string): string {
@@ -84,7 +88,8 @@ export default function NewInflowLinkPage() {
   const validRef = REF_PATTERN.test(refCode)
   const workerBase = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
   const issuedUrl = `${workerBase}/r/${refCode || 'summer-ig'}`
-  const shortUrl = `${workerBase}/s/${(refCode || 'summer-ig').slice(0, 6)}`
+  // #514-7: 短縮 URL(/s/xxxx)は Worker に経路が無い。開けない URL を
+  // 印刷物・SMS に載せないよう、表示しない。
   useEffect(() => {
     void QRCode.toDataURL(issuedUrl, { width: 180, margin: 1, color: { dark: '#171717', light: '#ffffff' } }).then(setQrDataUrl)
   }, [issuedUrl])
@@ -102,7 +107,7 @@ export default function NewInflowLinkPage() {
       validate={() => {
         if (!name.trim()) return 'リンク名を入力してください'
         if (!validRef) {
-          return 'refコードは、半角英小文字・数字・ハイフンで2〜64文字にしてください'
+          return 'refコードは、半角英数字・_・ハイフンで1〜64文字にしてください'
         }
         return null
       }}
@@ -184,11 +189,10 @@ export default function NewInflowLinkPage() {
       </FormSection>
 
       <FormSection step={2} label="発行されるURL">
-        <p className="text-xs text-ink-faint">この2つは同じ場所に飛びます。紙にはQRコード、Webにはリンクを使ってください。</p>
+        <p className="text-xs text-ink-faint">紙にはQRコード、Webにはリンクを使ってください。</p>
         <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-4">
           <div className="space-y-2 sm:col-span-3">
             <div className="rounded-control border border-hairline bg-canvas-sunken px-3 py-3 text-sm text-ink-secondary"><span className="font-semibold">{issuedUrl}</span></div>
-            <div className="rounded-control border border-hairline bg-canvas-sunken px-3 py-3 text-sm text-ink-secondary"><span className="font-semibold">{shortUrl}</span><span className="ml-2 text-xs text-ink-faint">短いほうは文字数の少ない場所（SMS・印刷）向け</span></div>
           </div>
           <div className="text-center">
             {/* eslint-disable-next-line @next/next/no-img-element -- Workerが撮影用QRを生成する */}

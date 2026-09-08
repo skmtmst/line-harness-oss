@@ -377,7 +377,13 @@ lineNotifications.get(
           notificationName: item.definition_name,
           accepted: { value: Number(item.accepted_count) },
           displayed: {
-            state: item.state,
+            // DBの4状態を画面の3状態へ寄せる。waiting のまま返すと画面が
+            // 「— 未取得」を出し、集計待ちが壊れたように見える。
+            state: item.state === 'ready'
+              ? 'available'
+              : item.state === 'waiting'
+                ? 'pending'
+                : 'unavailable',
             value: item.display_count == null ? null : Number(item.display_count),
             reason: item.reason,
           },

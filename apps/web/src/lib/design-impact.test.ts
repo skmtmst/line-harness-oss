@@ -75,6 +75,8 @@ describe('共通部品の影響範囲', () => {
       'app/events/page.tsx',
       // #543: 一覧の到達不能な回答表（M2削除）と共に共通Paginationの利用を外した。
       'app/form-submissions/responses/page.tsx',
+      // #565: 送信履歴が増えても描画を際限なく重くしないよう、20件ずつのページ送りに寄せた。
+      'app/inflow-links/ad-integration.tsx',
       'app/inflow-links/page.tsx',
       // #291: 顧客へのお知らせ9種類を、設計どおり1ページ6件に区切る。
       'app/line-notifications/page.tsx',

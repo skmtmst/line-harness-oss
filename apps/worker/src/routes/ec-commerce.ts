@@ -13,6 +13,11 @@ import { auditLog } from '../lib/audit-log.js';
 import { notificationDeliveriesResponse } from './line-notifications.js';
 
 const ecCommerce = new Hono<Env>();
+// テスト送信の連打防止。同一の店・種別は30秒に1回だけ。全体の rateLimit とは
+// 別に、LINE API へ直接届く口だけ短いクールダウンを置く。
+// in-memory のため isolate ごとに数え直し、厳密な回数制限ではない（連打の抑止用）。
+const TEST_SEND_COOLDOWN_MS = 30_000;
+const testSendAt = new Map<string, number>();
 const EVENT_TYPE_SET = new Set<string>(EC_EVENT_TYPES);
 const STATUS_SET = new Set(['received', 'identity_pending', 'processing', 'processed', 'skipped', 'failed']);
 const CONNECTOR_PROVIDERS = new Set(['ec_cube', 'shopify']);
@@ -634,6 +639,16 @@ ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), asy
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
+  const cooldownKey = `${body.accountId}:${body.eventType}`;
+  const lastSent = testSendAt.get(cooldownKey) ?? 0;
+  const waitMs = lastSent + TEST_SEND_COOLDOWN_MS - Date.now();
+  if (waitMs > 0) {
+    return c.json({
+      success: false,
+      error: `テスト送信は${Math.ceil(waitMs / 1000)}秒待ってからもう一度お試しください`,
+    }, 429);
+  }
+  testSendAt.set(cooldownKey, Date.now());
   const account = await getLineAccountById(c.env.DB, body.accountId);
   if (!account?.channel_access_token) return c.json({ success: false, error: 'LINE account is not configured' }, 400);
 
