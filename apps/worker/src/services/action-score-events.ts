@@ -1,6 +1,7 @@
 import { applyPublishedActionScoreRules } from '@line-crm/db';
 import type { ActionScoreApplication } from '@line-crm/db';
 import { dispatchAutomationEventWithLogging } from './automation-triggers.js';
+import { featureJobCanRun } from './feature-enforcement.js';
 
 const BAND_RANK = { low: 0, normal: 1, high: 2 } as const;
 
@@ -53,6 +54,10 @@ export async function dispatchActionScoreApplications(
     lineAccessToken?: string;
   },
 ): Promise<void> {
+  // 機能オフ中は適用も自動化への受け渡しもしない。
+  if (!await featureJobCanRun(db, { accountId: input.lineAccountId, featureId: 'mileage', job: 'action score applications' })) {
+    return;
+  }
   for (const application of input.applications) {
     if (application.replayed || application.bandBefore === application.bandAfter) continue;
     const eventData = {

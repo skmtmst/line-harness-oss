@@ -9,6 +9,7 @@ const pushViaHarnessProxy = vi.hoisted(() => vi.fn().mockResolvedValue(undefined
 const logOutgoingMessage = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 
 vi.mock('@line-crm/db', () => dbMocks);
+vi.mock('./feature-enforcement.js', () => ({ featureJobCanRun: async () => true }));
 vi.mock('./line-proxy-send.js', () => ({ pushViaHarnessProxy }));
 vi.mock('./event-bus.js', () => ({ logOutgoingMessage }));
 

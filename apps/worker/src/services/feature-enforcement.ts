@@ -125,3 +125,28 @@ export async function featureJobCanRun(
   await recordFeatureExecutionSkipped(db, input);
   return false;
 }
+
+/**
+ * 1 tick内で使い回す判定器。友だち単位など件数が多い処理で、
+ * 同じアカウントの判定を繰り返さない。tickをまたいで持たないこと。
+ */
+export function createFeatureJobGate() {
+  const cache = new Map<string, boolean>();
+  return {
+    async canRun(
+      db: D1Database,
+      accountId: string | null,
+      featureId: FeatureId,
+      job: string,
+    ): Promise<boolean> {
+      // 持ち主不明の旧行は従来どおり進める。止めるのは持ち主が分かる行だけ。
+      if (!accountId) return true;
+      const key = `${featureId}:${accountId}`;
+      const cached = cache.get(key);
+      if (cached !== undefined) return cached;
+      const ok = await featureJobCanRun(db, { accountId, featureId, job });
+      cache.set(key, ok);
+      return ok;
+    },
+  };
+}

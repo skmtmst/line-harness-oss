@@ -2,6 +2,7 @@ import { getFriendById, getLineAccountById, jstNow } from '@line-crm/db';
 import type { Message } from '@line-crm/line-sdk';
 import type { EcEvent } from '../routes/ec-integrations.js';
 import { logOutgoingMessage } from './event-bus.js';
+import { featureJobCanRun } from './feature-enforcement.js';
 import { createEccubeCoupon } from './eccube-coupon.js';
 import { pushViaHarnessProxy, type HarnessProxyDispatch } from './line-proxy-send.js';
 
@@ -593,6 +594,11 @@ export async function processNenDeliveries(
   let failed = 0;
   let skipped = 0;
   for (const job of jobs.results) {
+    // 機能オフ中はclaimせずpendingのまま残す。再オンで再開する。
+    if (job.line_account_id && !await featureJobCanRun(db, { accountId: job.line_account_id, featureId: 'nen_campaigns', job: 'NEN campaign deliveries' })) {
+      skipped += 1;
+      continue;
+    }
     const claim = await db.prepare(
       `UPDATE nen_delivery_jobs SET status = 'processing', attempts = attempts + 1, updated_at = ?
         WHERE id = ? AND status IN ('pending', 'failed')`,

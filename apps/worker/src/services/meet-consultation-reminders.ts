@@ -1,6 +1,7 @@
 import type { HarnessProxyDispatch } from './line-proxy-send.js';
 import { pushViaHarnessProxy } from './line-proxy-send.js';
 import { resolveLineCredential } from '@line-crm/db';
+import { featureJobCanRun } from './feature-enforcement.js';
 
 export type MeetReminderKind = 'day_before' | 'hour_before';
 
@@ -272,6 +273,10 @@ export async function processDueMeetConsultationReminders(
   let sent = 0;
   let failed = 0;
   for (const row of due.results ?? []) {
+    // 機能オフ中は送らずpendingのまま残す。再オンで再開する。
+    if (row.line_account_id && !await featureJobCanRun(db, { accountId: row.line_account_id, featureId: 'booking', job: 'meet consultation reminders' })) {
+      continue;
+    }
     try {
       const text = renderMeetReminderText(row.kind, row.starts_at, row.meet_url);
       const accessToken = await resolveLineCredential(

@@ -7,6 +7,7 @@ import {
   type MileageRewardFailurePolicy,
 } from '@line-crm/db';
 import { createAutomationActionExecutors } from './automation-action-executors.js';
+import { featureJobCanRun } from './feature-enforcement.js';
 import { AutomationActionError, type ActionDefinition } from './automation-engine.js';
 
 export interface MileageRewardDeliveryOptions {
@@ -217,6 +218,15 @@ export async function processDueMileageRewardDeliveries(
   let succeeded = 0;
   let failed = 0;
   for (const item of due.results) {
+    // 機能オフ中は再試行せずdelivery_failedのまま残す。再オンで再開する。
+    const ownerRow = await db
+      .prepare(`SELECT line_account_id FROM mileage_redemptions WHERE id = ?`)
+      .bind(item.id)
+      .first<{ line_account_id: string | null }>();
+    if (ownerRow?.line_account_id && !await featureJobCanRun(db, { accountId: ownerRow.line_account_id, featureId: 'mileage', job: 'mileage reward delivery retry' })) {
+      failed += 1;
+      continue;
+    }
     const result = await deliverMileageReward(db, item.id, {
       credentialEncryptionKey: options.credentialEncryptionKey,
       fetch: options.fetch,
