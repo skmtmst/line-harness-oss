@@ -297,14 +297,15 @@ describe('送信直前の再検査', () => {
     const count = stubFetch([500, 200]);
     const lookup = vi.fn(async (_host: string) => ['93.184.216.34']);
     lookup.mockResolvedValueOnce(['93.184.216.34']);
+    lookup.mockResolvedValueOnce(['93.184.216.34']);
     lookup.mockResolvedValueOnce(['10.9.9.9']);
     const res = await deliverWebhook({ ...WEBHOOK, max_retries: 2 }, '{}', {
       sleep: noSleep,
       lookupHost: lookup,
     });
-    // 1回目は公開IPで送って500、2回目は引き直して内部IPで止まる。
+    // 1回目は合意のうえ送って500、2回目は引き直して内部IPで止まる。
     expect(res).toMatchObject({ ok: false, blocked: true, attempts: 2 });
-    expect(lookup).toHaveBeenCalledTimes(2);
+    expect(lookup).toHaveBeenCalledTimes(3);
     expect(count()).toBe(1);
   });
 
@@ -390,7 +391,20 @@ describe('送信直前の再検査', () => {
     expect(second['X-Webhook-Signature']).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it('検査時と接続時でDNS応答が異なれば送らない(分岐の再現)', async () => {
+  it('同一hopでpeerが分岐すれば送らない(分岐の再現)', async () => {
+    // 検査時は公開IP、接続直前の引き直しでは内部IPに変わっていた場合。
+    // 接続は発生しない。
+    const count = stubFetch([200]);
+    const lookup = vi.fn(async (_host: string) => ['93.184.216.34']);
+    lookup.mockResolvedValueOnce(['93.184.216.34']);
+    lookup.mockResolvedValueOnce(['10.9.9.9']);
+    const res = await deliverWebhook(WEBHOOK, '{}', { sleep: noSleep, lookupHost: lookup });
+    expect(res).toMatchObject({ ok: false, blocked: true, blockReason: 'dns_changed' });
+    expect(count()).toBe(0);
+    expect(lookup).toHaveBeenCalledTimes(2);
+  });
+
+  it('転送先の段でDNS応答が異なれば送らない(分岐の再現)', async () => {
     // 検査時は公開IP、転送先を辿る段で引き直したら内部IPに変わっていた場合。
     // 転送先への接続は発生しない。
     const calls: string[] = [];
@@ -403,12 +417,34 @@ describe('送信直前の再検査', () => {
     );
     const lookup = vi.fn(async (_host: string) => ['93.184.216.34']);
     lookup.mockResolvedValueOnce(['93.184.216.34']);
+    lookup.mockResolvedValueOnce(['93.184.216.34']);
     lookup.mockResolvedValueOnce(['10.9.9.9']);
     const res = await deliverWebhook(WEBHOOK, '{}', { sleep: noSleep, lookupHost: lookup });
     expect(res).toMatchObject({ ok: false, blocked: true });
     // 転送元への1回だけ。転送先へは送らない。
     expect(calls).toEqual(['https://example.com/hook']);
-    expect(lookup).toHaveBeenCalledTimes(2);
+    expect(lookup).toHaveBeenCalledTimes(3);
+  });
+
+  it('A/AAAAの片系だけ失敗しても通さない', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: unknown) => {
+        const url = String(input);
+        if (url.startsWith('https://cloudflare-dns.com/dns-query')) {
+          const type = new URL(url).searchParams.get('type');
+          if (type === 'A') return new Response('error', { status: 500 });
+          return new Response(
+            JSON.stringify({ Answer: [{ name: 'example.com.', type: 28, TTL: 60, data: '2606:4700:4700::1111' }] }),
+            { status: 200, headers: { 'content-type': 'application/dns-json' } },
+          );
+        }
+        throw new Error(`送ってはいけない先: ${url}`);
+      }),
+    );
+    // lookupHostを渡さない=本番と同じ既定の名前引きを使う。
+    const res = await deliverWebhook(WEBHOOK, '{}', { sleep: noSleep });
+    expect(res).toMatchObject({ ok: false, blocked: true, blockReason: 'dns_unresolved' });
   });
 
   it('既定の名前引き(DoH)でも内部IPを止める', async () => {

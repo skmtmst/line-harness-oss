@@ -58,9 +58,11 @@ async function sign(secret: string, body: string): Promise<string> {
  * を確かめてから送る。DNS は送るたびに引き直し、結果は使い回さない。
  *
  * 配送の境界は2層である。アプリ層(このファイル)は fail-closed の検査で
- * 非公開宛てを送る前に止め、秘密値なしで台帳へ残す。基盤層(Cloudflare)側は
- * 次の公式仕様が非公開宛てへの到達そのものを断つ。検査と接続で見え方が
- * 食い違っても、非公開側へ接続は成立しない設計である。
+ * 非公開宛てを送る前に止め、秘密値なしで台帳へ残す。同一 hop 内では
+ * 接続直前にもう一度引いて検査時との一致を確かめ、違えば送らない。
+ * 基盤層(Cloudflare)側は次の公式仕様が非公開宛てへの到達そのものを断つ。
+ * staging/prod 両方の wrangler には global_fetch_strictly_public を適用し、
+ * subrequest を公開インターネット経路に限定している。
  * - 自分以外のゾーンへ cf.resolveOverride は効かない(接続の固定化は不可)。
  *   https://developers.cloudflare.com/workers/runtime-apis/request/
  * - Cloudflare 所有IPへの subrequest は 1024 で拒否される。
@@ -80,6 +82,7 @@ export type WebhookBlockReason =
   | 'blocked_host'
   | 'blocked_ip'
   | 'dns_unresolved'
+  | 'dns_changed'
   | 'unsafe_redirect';
 
 function parseIpv4Parts(host: string): number[] | null {
@@ -258,7 +261,9 @@ async function dohQuery(host: string, type: 'A' | 'AAAA', fetchImpl: typeof fetc
     `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(host)}&type=${type}`,
     { headers: { accept: 'application/dns-json' }, redirect: 'manual', signal: AbortSignal.timeout(5000) },
   );
-  if (!res.ok) return [];
+  // 片系だけ失敗して他方が公開でも通さない。接続時は両系とも引けるため、
+  // 見えていない系が非公開かもしれない状態で送らない(fail-closed)。
+  if (!res.ok) throw new Error(`dns query failed: ${type} ${res.status}`);
   const data = (await res.json()) as { Answer?: Array<{ type: number; data: string }> };
   const want = type === 'A' ? 1 : 28;
   const out: string[] = [];
@@ -287,7 +292,29 @@ export interface WebhookSafetyOptions {
   fetchImpl?: typeof fetch;
 }
 
-export type WebhookSafetyVerdict = { ok: true } | { ok: false; reason: WebhookBlockReason };
+export type WebhookSafetyVerdict = { ok: true; addresses: string[] } | { ok: false; reason: WebhookBlockReason };
+
+async function resolveHostAddresses(
+  host: string,
+  opts: WebhookSafetyOptions,
+): Promise<{ ok: true; addresses: string[] } | { ok: false; reason: 'dns_unresolved' }> {
+  const lookup = opts.lookupHost ?? ((h) => defaultLookupHost(h, opts.fetchImpl ?? fetch));
+  try {
+    const addresses = await lookup(host);
+    if (addresses.length === 0) return { ok: false, reason: 'dns_unresolved' };
+    return { ok: true, addresses };
+  } catch {
+    return { ok: false, reason: 'dns_unresolved' };
+  }
+}
+
+function checkResolvedAddresses(addresses: string[]): WebhookBlockReason | null {
+  for (const address of addresses) {
+    const reason = ipAddressBlockReason(address);
+    if (reason) return reason;
+  }
+  return null;
+}
 
 /**
  * 送信直前の再検査。文字面の検査に加え、名前はその場で引き直して
@@ -296,6 +323,7 @@ export type WebhookSafetyVerdict = { ok: true } | { ok: false; reason: WebhookBl
  * 名前が引けない・空のときは送らない(fail-closed)。
  * 検査したIPへ接続を固定する手段が実行環境にないため、引き直しは
  * 送る直前・送り直し・転送の各段で毎回行い、結果を使い回さない。
+ * 同一 hop 内では接続直前にもう一度引いて一致を確かめる(後述)。
  */
 export async function checkWebhookUrlSafety(
   value: string,
@@ -305,20 +333,12 @@ export async function checkWebhookUrlSafety(
   if (literal) return { ok: false, reason: literal };
   const host = normalizeHostname(value);
   if (!host) return { ok: false, reason: 'invalid_url' };
-  if (host.includes(':') || ipv4ToBytes(parseIpv4Parts(host) ?? [])) return { ok: true };
-  const lookup = opts.lookupHost ?? ((h) => defaultLookupHost(h, opts.fetchImpl ?? fetch));
-  let addresses: string[];
-  try {
-    addresses = await lookup(host);
-  } catch {
-    return { ok: false, reason: 'dns_unresolved' };
-  }
-  if (addresses.length === 0) return { ok: false, reason: 'dns_unresolved' };
-  for (const address of addresses) {
-    const reason = ipAddressBlockReason(address);
-    if (reason) return { ok: false, reason };
-  }
-  return { ok: true };
+  if (host.includes(':') || ipv4ToBytes(parseIpv4Parts(host) ?? [])) return { ok: true, addresses: [] };
+  const resolved = await resolveHostAddresses(host, opts);
+  if (!resolved.ok) return resolved;
+  const reason = checkResolvedAddresses(resolved.addresses);
+  if (reason) return { ok: false, reason };
+  return { ok: true, addresses: resolved.addresses };
 }
 
 export interface SafePostOptions {
@@ -389,6 +409,18 @@ export async function postWebhookSafely(
       fetchImpl,
     });
     if (!safety.ok) return { blocked: safety.reason };
+    // 同一 hop の分岐対策: 接続の直前にもう一度引き、検査時と1件でも
+    // 違えば送らない。差し替えはこの2回の引きの間に収まらないと通らない。
+    if (safety.addresses.length > 0) {
+      const host = normalizeHostname(current);
+      const again = host
+        ? await resolveHostAddresses(host, { lookupHost: opts.lookupHost, fetchImpl })
+        : null;
+      if (!again || !again.ok) return { blocked: 'dns_unresolved' };
+      const before = [...safety.addresses].sort().join(',');
+      const now = [...again.addresses].sort().join(',');
+      if (before !== now) return { blocked: 'dns_changed' };
+    }
     const response = await fetchImpl(current, {
       method,
       headers,
