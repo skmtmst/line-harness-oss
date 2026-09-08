@@ -9,6 +9,7 @@ import {
   claimAdConversionSend,
   finishAdConversionSend,
   getActiveAdPlatforms,
+  getPinnedAdConversionAccount,
   getRefTrackingWithClickIds,
   type AdPlatformConfig,
   type RefTracking,
@@ -29,23 +30,29 @@ export async function sendAdConversions(
   friendId: string,
   eventName: string,
   eventValue?: number,
-  opts?: { idempotencyKey?: string | null },
+  opts?: { idempotencyKey?: string | null; lineAccountId?: string | null },
 ): Promise<void> {
-  // 友だちの所属アカウントを確定し、そのアカウントの広告設定だけ使う。
-  // 所属が分からない友だちの行動・金額は外部へ送らない。
+  // 呼び出しをまたいだ重複送信を止める安定キー。無いときは今回限りの鍵にする。
+  const idempotencyKey = opts?.idempotencyKey || crypto.randomUUID();
+  const hasStableKey = Boolean(opts?.idempotencyKey);
+
+  // 再送時は初回に確保した所属で送る。友だちが移動した後に旧イベントを
+  // 新所属へ誤送信しないため。初回は呼び出しの確定分、なければ現所属。
   const friend = await db
     .prepare(`SELECT line_account_id FROM friends WHERE id = ?`)
     .bind(friendId)
     .first<{ line_account_id: string | null }>();
-  const lineAccountId = friend?.line_account_id ?? null;
+  if (!friend) return;
+  const pinned = hasStableKey
+    ? await getPinnedAdConversionAccount(db, { friendId, eventName, idempotencyKey })
+    : null;
+  const lineAccountId = pinned ?? opts?.lineAccountId ?? friend.line_account_id;
   if (!lineAccountId) return;
 
   const ref = await getRefTrackingWithClickIds(db, friendId);
   if (!ref) return;
 
   const platforms = await getActiveAdPlatforms(db, lineAccountId);
-  // 呼び出しをまたいだ重複送信を止める安定キー。無いときは今回限りの鍵にする。
-  const idempotencyKey = opts?.idempotencyKey || crypto.randomUUID();
 
   for (const platform of platforms) {
     // 二重防御: 帰属が違う設定は送らない(DB側でも claim が弾く)。
@@ -53,26 +60,29 @@ export async function sendAdConversions(
     const click = clickIdForPlatform(platform.name, ref);
     if (!click) continue;
     const config: AdPlatformConfig = JSON.parse(platform.config);
+    // 媒体側の重複排除ID。再試行では同じIDになるよう鍵から決める。
+    const providerEventId = hasStableKey ? `${idempotencyKey}:${platform.id}` : crypto.randomUUID();
 
     const claim = await claimAdConversionSend(db, {
       platformId: platform.id, friendId, lineAccountId, eventName,
-      clickId: click.clickId, clickIdType: click.clickIdType, idempotencyKey,
+      clickId: click.clickId, clickIdType: click.clickIdType, eventValue: eventValue ?? null, idempotencyKey,
     });
+    // mismatch: 同じ鍵で内容が変わった再送は送らない。
     if (claim !== 'send') continue;
 
     try {
       switch (platform.name) {
         case 'meta':
-          await sendMetaConversion(config, ref, eventName, eventValue);
+          await sendMetaConversion(config, ref, eventName, eventValue, providerEventId);
           break;
         case 'x':
-          await sendXConversion(config, ref, eventName, eventValue);
+          await sendXConversion(config, ref, eventName, eventValue, providerEventId);
           break;
         case 'google':
           await sendGoogleConversion(config, ref, eventName, eventValue);
           break;
         case 'tiktok':
-          await sendTikTokConversion(config, ref, eventName, eventValue);
+          await sendTikTokConversion(config, ref, eventName, eventValue, providerEventId);
           break;
         default:
           await finishAdConversionSend(db, {
@@ -98,11 +108,14 @@ async function sendMetaConversion(
   ref: RefTracking,
   eventName: string,
   eventValue?: number,
+  providerEventId?: string,
 ): Promise<void> {
   const url = `https://graph.facebook.com/v21.0/${config.pixel_id}/events`;
 
   const eventData: Record<string, unknown> = {
     event_name: eventName,
+    // 媒体側の重複排除ID。再送時は同じIDで送り、二重計上を止める。
+    event_id: providerEventId ?? crypto.randomUUID(),
     event_time: Math.floor(Date.now() / 1000),
     action_source: 'website',
     user_data: {
@@ -137,18 +150,68 @@ async function sendMetaConversion(
   }
 }
 
+function oauthPercentEncode(value: string): string {
+  return encodeURIComponent(value).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+
+/**
+ * X Ads API 用の OAuth 1.0a Authorization ヘッダを作る(RFC 5849)。
+ * JSON の本文は署名対象に含めない(フォーム形式でないため)。
+ */
+export async function buildXOAuth1Header(
+  method: string,
+  url: string,
+  credentials: { consumerKey: string; consumerSecret: string; token?: string; tokenSecret?: string },
+  opts?: { nonce?: string; timestamp?: string },
+): Promise<string> {
+  const nonce = opts?.nonce ?? crypto.randomUUID().replaceAll('-', '');
+  const timestamp = opts?.timestamp ?? String(Math.floor(Date.now() / 1000));
+  const oauthParams: Record<string, string> = {
+    oauth_consumer_key: credentials.consumerKey,
+    oauth_nonce: nonce,
+    oauth_signature_method: 'HMAC-SHA1',
+    oauth_timestamp: timestamp,
+    oauth_version: '1.0',
+  };
+  if (credentials.token) oauthParams.oauth_token = credentials.token;
+
+  const sorted = Object.keys(oauthParams).sort()
+    .map((key) => `${oauthPercentEncode(key)}=${oauthPercentEncode(oauthParams[key])}`)
+    .join('&');
+  const baseUrl = url.split('?')[0];
+  const baseString = `${method.toUpperCase()}&${oauthPercentEncode(baseUrl)}&${oauthPercentEncode(sorted)}`;
+  const signingKey = `${oauthPercentEncode(credentials.consumerSecret)}&${oauthPercentEncode(credentials.tokenSecret ?? '')}`;
+
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(signingKey), { name: 'HMAC', hash: 'SHA-1' }, false, ['sign'],
+  );
+  const signature = await crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(baseString));
+  const signatureBase64 = Buffer.from(signature).toString('base64');
+
+  const headerParams: Record<string, string> = { ...oauthParams, oauth_signature: signatureBase64 };
+  return `OAuth ${Object.keys(headerParams).sort()
+    .map((key) => `${oauthPercentEncode(key)}="${oauthPercentEncode(headerParams[key])}"`)
+    .join(', ')}`;
+}
+
 async function sendXConversion(
   config: AdPlatformConfig,
   ref: RefTracking,
   eventName: string,
   eventValue?: number,
+  providerEventId?: string,
 ): Promise<void> {
+  // 資格情報がそろわない媒体へは送らず失敗で残す。署名なしの送信はしない。
+  if (!config.api_key || !config.api_secret || !config.x_oauth_token || !config.x_oauth_token_secret) {
+    throw new Error('X Conversion API credentials (api_key/api_secret/x_oauth_token/x_oauth_token_secret) are not configured');
+  }
   const url = 'https://ads-api.x.com/12/measurement/conversions';
 
   const body = {
     conversions: [{
       conversion_time: new Date().toISOString(),
-      event_id: crypto.randomUUID(),
+      // 再試行では同じIDで送り、媒体側の重複計上を止める。
+      event_id: providerEventId ?? crypto.randomUUID(),
       identifiers: [{ twclid: ref.twclid }],
       conversion_id: config.pixel_id,
       event_name: eventName,
@@ -156,11 +219,18 @@ async function sendXConversion(
     }],
   };
 
+  const authorization = await buildXOAuth1Header('POST', url, {
+    consumerKey: config.api_key,
+    consumerSecret: config.api_secret,
+    token: config.x_oauth_token,
+    tokenSecret: config.x_oauth_token_secret,
+  });
+
   const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      // OAuth 1.0a signature required — placeholder for production implementation
+      'Authorization': authorization,
     },
     body: JSON.stringify(body),
   });
@@ -210,13 +280,15 @@ async function sendTikTokConversion(
   ref: RefTracking,
   eventName: string,
   eventValue?: number,
+  providerEventId?: string,
 ): Promise<void> {
   const url = 'https://business-api.tiktok.com/open_api/v1.3/event/track/';
 
   const body = {
     pixel_code: config.pixel_code,
     event: eventName,
-    event_id: crypto.randomUUID(),
+    // 再試行では同じIDで送り、媒体側の重複計上を止める。
+    event_id: providerEventId ?? crypto.randomUUID(),
     timestamp: new Date().toISOString(),
     context: {
       user_agent: ref.user_agent || '',

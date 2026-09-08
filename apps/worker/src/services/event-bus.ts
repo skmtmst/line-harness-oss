@@ -116,6 +116,8 @@ export async function fireEvent(
         idempotencyKey: payload.sourceEventId
           ? `${payload.sourceKind ?? eventType}:${payload.sourceEventId}`
           : undefined,
+        // イベント確定時の所属を渡す。友だち移動後の再送でも旧所属で送る。
+        lineAccountId: lineAccountId ?? outgoingWebhookLineAccountId ?? undefined,
       }),
     );
   }

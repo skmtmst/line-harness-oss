@@ -456,7 +456,7 @@ describe('fireEvent — 広告成果の配線(#638)', () => {
     }, undefined, 'a1');
 
     expect(await adConversionMock()).toHaveBeenCalledWith(
-      db, 'friend-1', 'Purchase', 1000, { idempotencyKey: 'stripe:evt-1' },
+      db, 'friend-1', 'Purchase', 1000, { idempotencyKey: 'stripe:evt-1', lineAccountId: 'a1' },
     );
   });
 
@@ -470,7 +470,7 @@ describe('fireEvent — 広告成果の配線(#638)', () => {
     }, 'token', 'a1');
 
     expect(await adConversionMock()).toHaveBeenCalledWith(
-      db, 'friend-1', 'Purchase', 2860, { idempotencyKey: 'ec:row-1' },
+      db, 'friend-1', 'Purchase', 2860, { idempotencyKey: 'ec:row-1', lineAccountId: 'a1' },
     );
   });
 
@@ -490,7 +490,7 @@ describe('fireEvent — 広告成果の配線(#638)', () => {
     }, undefined, 'a1');
 
     expect(await adConversionMock()).toHaveBeenCalledWith(
-      db, 'friend-1', 'Trial', 100, { idempotencyKey: undefined },
+      db, 'friend-1', 'Trial', 100, { idempotencyKey: undefined, lineAccountId: 'a1' },
     );
   });
 });

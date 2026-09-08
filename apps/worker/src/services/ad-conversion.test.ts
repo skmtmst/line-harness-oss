@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import { sendAdConversions } from './ad-conversion.js';
+import { buildXOAuth1Header, sendAdConversions } from './ad-conversion.js';
 
 const sentRequests: Array<{ url: string; body: unknown }> = [];
 
@@ -52,6 +52,8 @@ function seedTwoAccounts(): SqliteD1 {
   seedRef(testDb, 'ref-2', 'f2');
   seedPlatform(testDb, 'p1', 'a1');
   seedPlatform(testDb, 'p2', 'a2');
+  // 359以前の帰属不明行を再現する(トリガ導入後は新規作成できない)。
+  testDb.raw.exec('DROP TRIGGER trg_ad_platforms_account_required_insert');
   seedPlatform(testDb, 'p-legacy', null);
   return testDb;
 }
@@ -157,6 +159,86 @@ describe('sendAdConversions のアカウント境界(#638)', () => {
     expect(sentRequests).toHaveLength(2);
     expect(logs(testDb)).toEqual([
       { ad_platform_id: 'p1', friend_id: 'f1', line_account_id: 'a1', status: 'sent' },
+    ]);
+  });
+
+  it('同じ鍵で内容が変われば拒否し、最初の記録を残す', async () => {
+    const testDb = seedTwoAccounts();
+    mockFetchOk();
+
+    await sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { idempotencyKey: 'stripe:evt-5' });
+    await sendAdConversions(testDb.db, 'f1', 'Purchase', 2000, { idempotencyKey: 'stripe:evt-5' });
+
+    expect(sentRequests).toHaveLength(1);
+    expect(logs(testDb)).toEqual([
+      { ad_platform_id: 'p1', friend_id: 'f1', line_account_id: 'a1', status: 'sent' },
+    ]);
+  });
+
+  it('友だち移動後の再送は初回の所属で送り、新所属へ誤送信しない', async () => {
+    const testDb = seedTwoAccounts();
+    mockFetchOk();
+
+    await sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { idempotencyKey: 'stripe:evt-6', lineAccountId: 'a1' });
+    expect(sentRequests).toHaveLength(1);
+
+    // 友だちが a2 へ移動した後に同じ出来事を再送しても、新所属(a2)では送らない。
+    testDb.raw.prepare(`UPDATE friends SET line_account_id = 'a2' WHERE id = 'f1'`).run();
+    await sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { idempotencyKey: 'stripe:evt-6' });
+
+    expect(sentRequests).toHaveLength(1);
+    expect(logs(testDb)).toEqual([
+      { ad_platform_id: 'p1', friend_id: 'f1', line_account_id: 'a1', status: 'sent' },
+    ]);
+  });
+
+  it('媒体側の重複排除IDは鍵から決まり、再送でも同じになる', async () => {
+    const testDb = seedTwoAccounts();
+    mockFetchOk();
+
+    await sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { idempotencyKey: 'stripe:evt-7' });
+
+    expect(sentRequests).toHaveLength(1);
+    const metaBody = sentRequests[0].body as { data: Array<{ event_id: string; event_name: string }> };
+    expect(metaBody.data[0]).toMatchObject({ event_id: 'stripe:evt-7:p1', event_name: 'Purchase' });
+  });
+
+  it('Xの署名はRFC 5849方式の独立計算と一致する', async () => {
+    const { createHmac } = await import('node:crypto');
+    // RFC 5849 §3.4.1 の手順をテスト側で素朴に再現した期待値。実装とは別経路。
+    const baseString = 'GET&http%3A%2F%2Fphotos.example.net%2Fphotos'
+      + '&oauth_consumer_key%3Ddpf43f3p2l4k3l03'
+      + '%26oauth_nonce%3Dkllo9940pd9333jh'
+      + '%26oauth_signature_method%3DHMAC-SHA1'
+      + '%26oauth_timestamp%3D1191242096'
+      + '%26oauth_token%3Dnnch734d00sl2jdk'
+      + '%26oauth_version%3D1.0';
+    const expected = createHmac('sha1', 'kd94hf93k423kf44&pfkkdhi9sl3r4s00').update(baseString).digest('base64');
+
+    const header = await buildXOAuth1Header('GET', 'http://photos.example.net/photos', {
+      consumerKey: 'dpf43f3p2l4k3l03',
+      consumerSecret: 'kd94hf93k423kf44',
+      token: 'nnch734d00sl2jdk',
+      tokenSecret: 'pfkkdhi9sl3r4s00',
+    }, { nonce: 'kllo9940pd9333jh', timestamp: '1191242096' });
+
+    expect(header).toContain(`oauth_signature="${encodeURIComponent(expected)}"`);
+    expect(header).toContain('oauth_consumer_key="dpf43f3p2l4k3l03"');
+    expect(header.startsWith('OAuth ')).toBe(true);
+  });
+
+  it('Xは資格情報がそろわなければ送らず失敗で残す', async () => {
+    const testDb = seedTwoAccounts();
+    testDb.raw.prepare(`UPDATE ad_platforms SET name = 'x', line_account_id = 'a1' WHERE id = 'p1'`).run();
+    testDb.raw.prepare(`INSERT INTO ref_tracking (id, ref_code, friend_id, twclid, created_at)
+                        VALUES ('ref-x', 'ref-1', 'f1', 'tw-1', '2026-09-09T00:00:00+09:00')`).run();
+    mockFetchOk();
+
+    await sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { idempotencyKey: 'x:evt-1' });
+
+    expect(sentRequests).toHaveLength(0);
+    expect(logs(testDb)).toEqual([
+      { ad_platform_id: 'p1', friend_id: 'f1', line_account_id: 'a1', status: 'failed' },
     ]);
   });
 
