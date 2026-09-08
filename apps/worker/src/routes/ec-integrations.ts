@@ -12,6 +12,7 @@ import type { Message } from '@line-crm/line-sdk';
 import { EC_EVENT_TYPES } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { fireEvent, logOutgoingMessage } from '../services/event-bus.js';
+import { buildEcV6Event } from '../services/ec-event-publish.js';
 import { enqueuePostShippingFollowUps } from '../services/nen-engagement.js';
 import { ecFlexMessage } from '../services/ec-notification-message.js';
 import { syncNenEcTags, syncNenPetTags } from '../services/nen-tag-sync.js';
@@ -438,7 +439,8 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       await c.env.DB.prepare(
         `UPDATE ec_events SET friend_id = ?, status = 'processed', processed_at = ?, updated_at = ? WHERE id = ?`,
       ).bind(friend.id, now, now, row.id).run();
-      await fireEvent(c.env.DB, event.event_type, { friendId: friend.id, eventData: event }, accessToken, account.id);
+      const profileV6Event = buildEcV6Event(event, friend.id);
+      await fireEvent(c.env.DB, profileV6Event.eventType, profileV6Event.payload, accessToken, account.id);
       await setEcActionExecutionStatus(c.env.DB, {
         eventId: row.id, lineAccountId, status: 'succeeded', now,
       });
@@ -474,10 +476,8 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       await c.env.DB.prepare(
         `UPDATE ec_events SET friend_id = ?, status = 'skipped', error_message = 'notification_disabled', processed_at = ?, updated_at = ? WHERE id = ?`,
       ).bind(friend.id, now, now, row.id).run();
-      await fireEvent(c.env.DB, event.event_type, {
-        friendId: friend.id,
-        eventData: event,
-      }, accessToken, account.id);
+      const skippedV6Event = buildEcV6Event(event, friend.id);
+      await fireEvent(c.env.DB, skippedV6Event.eventType, skippedV6Event.payload, accessToken, account.id);
       await setEcActionExecutionStatus(c.env.DB, {
         eventId: row.id, lineAccountId, status: 'skipped',
         errorCode: 'notification_disabled', errorMessageSafe: 'この通知は設定で停止されています', now,
@@ -508,10 +508,8 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       `UPDATE ec_events SET friend_id = ?, status = 'processed', processed_at = ?, updated_at = ? WHERE id = ?`,
     ).bind(friend.id, now, now, row.id).run();
 
-    await fireEvent(c.env.DB, event.event_type, {
-      friendId: friend.id,
-      eventData: event,
-    }, accessToken, account.id);
+    const v6Event = buildEcV6Event(event, friend.id);
+    await fireEvent(c.env.DB, v6Event.eventType, v6Event.payload, accessToken, account.id);
 
     await setEcActionExecutionStatus(c.env.DB, {
       eventId: row.id, lineAccountId, status: 'succeeded', now,
