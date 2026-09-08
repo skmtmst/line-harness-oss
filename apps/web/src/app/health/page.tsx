@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import SelectField from '@/components/shared/select-field'
-import Button from '@/components/shared/button'
 
 interface LineAccount {
   id: string
@@ -52,8 +51,8 @@ const riskConfig = {
   normal: { label: '正常', color: 'bg-green-500', textColor: 'text-green-700', bgColor: 'bg-green-100' },
   warning: { label: '警告', color: 'bg-yellow-500', textColor: 'text-yellow-700', bgColor: 'bg-yellow-100' },
   danger: { label: '危険', color: 'bg-red-500', textColor: 'text-red-700', bgColor: 'bg-red-100' },
-  unknown: { label: '未確認', color: 'bg-gray-400', textColor: 'text-gray-700', bgColor: 'bg-gray-100' },
-  error: { label: '取得失敗', color: 'bg-red-500', textColor: 'text-red-700', bgColor: 'bg-red-100' },
+  unknown: { label: '未確認', color: 'bg-ink-faint', textColor: 'text-ink-faint', bgColor: 'bg-canvas-sunken' },
+  error: { label: '取得失敗', color: 'bg-danger', textColor: 'text-danger', bgColor: 'bg-danger-bg' },
 } satisfies Record<AccountHealthState, { label: string; color: string; textColor: string; bgColor: string }>
 
 function isRiskLevel(value: unknown): value is AccountHealthLog['riskLevel'] {
@@ -268,21 +267,20 @@ export default function HealthPage() {
                   {isExpanded && (
                     <div className="border-t border-gray-200 p-4">
                       {healthUnavailable && (
-                        <div className="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+                        <div className="border-hairline bg-canvas-sunken text-ink-secondary mb-3 rounded-lg border p-3 text-sm">
                           <p>
                             {risk === 'error'
                               ? 'ヘルス情報を取得できませんでした。'
                               : 'まだ確認結果がありません。'}
                           </p>
-                          <Button
-                            variant="secondary"
-                            size="field"
+                          <button
+                            type="button"
                             onClick={() => void retryAccountHealth(account.id)}
                             disabled={retryingHealthIds.has(account.id)}
-                            className="mt-2"
+                            className="text-action mt-2 text-sm font-medium underline underline-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             {retryingHealthIds.has(account.id) ? '再取得中...' : '再試行'}
-                          </Button>
+                          </button>
                         </div>
                       )}
 
