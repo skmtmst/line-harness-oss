@@ -963,6 +963,14 @@ const spec = {
       put: { tags: ['LINE Accounts'], summary: 'LINEアカウント更新', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Updated' } } },
       delete: { tags: ['LINE Accounts'], summary: 'LINEアカウント削除', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Deleted' } } },
     },
+    '/api/accounts/health-summary': {
+      get: {
+        tags: ['LINE Accounts'],
+        summary: 'アカウントヘルス要約',
+        description: 'staff可視範囲のアカウントの最新riskLevelだけを1回で返す。ログ本文は含めない(サイドバーのN+1解消用 #630)。',
+        responses: { '200': { description: 'Health summary' } },
+      },
+    },
     // ── Conversions ─────────────────────────────────────────────────────────
     '/api/conversions/points': {
       get: { tags: ['Conversions'], summary: 'CV ポイント一覧', responses: { '200': { description: 'All conversion points' } } },
