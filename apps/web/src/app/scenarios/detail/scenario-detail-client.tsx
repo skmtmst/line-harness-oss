@@ -57,6 +57,7 @@ import {
 } from './scenario-reach-display'
 import { describeAfterSend, describeStepAudience } from './scenario-step-audience'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -384,11 +385,11 @@ export default function ScenarioDetailClient({
       }).format(new Date(latestStartedAt))
     : null
 
-  const loadScenario = useCallback(async () => {
+  const loadScenario = useCallback(async (fresh = false) => {
     setLoading(true)
     setError('')
     try {
-      const res = await api.scenarios.get(id)
+      const res = await scenarioReferenceData.scenario(id, fresh)
       if (res.success) {
         setScenario(res.data)
         setEditForm({
@@ -415,12 +416,12 @@ export default function ScenarioDetailClient({
 
   // 並列で stats / templates / tags を取得（リグレッションを起こさないよう失敗は無視）
   useEffect(() => {
-    if (!id) return
+    if (!id || !scenario) return
     let cancelled = false
     Promise.all([
-      api.scenarios.stats(id).catch(() => null),
-      api.templates.list().catch(() => null),
-      api.tags.list().catch(() => null),
+      scenarioReferenceData.stats(id).catch(() => null),
+      scenarioReferenceData.templates(scenario?.lineAccountId).catch(() => null),
+      scenarioReferenceData.tags(scenario?.lineAccountId).catch(() => null),
     ]).then(([statsRes, tplRes, tagRes]) => {
       if (cancelled) return
       if (statsRes && statsRes.success) setStats(statsRes.data)
@@ -441,7 +442,7 @@ export default function ScenarioDetailClient({
       }
     })
     return () => { cancelled = true }
-  }, [id])
+  }, [id, scenario?.lineAccountId])
 
   /**
    * 通ごとのアクション件数。行に「アクション 2」と出すために引く。
@@ -503,7 +504,7 @@ export default function ScenarioDetailClient({
   }, [id])
 
   const reloadStats = useCallback(() => {
-    api.scenarios.stats(id).then((r) => { if (r.success) setStats(r.data) }).catch(() => {})
+    scenarioReferenceData.stats(id, true).then((r) => { if (r.success) setStats(r.data) }).catch(() => {})
   }, [id])
 
   /**
@@ -517,7 +518,7 @@ export default function ScenarioDetailClient({
     setError('')
     try {
       const res = await api.scenarios.update(id, { allowConcurrent: allow })
-      if (res.success) loadScenario()
+      if (res.success) loadScenario(true)
       else setError(res.error)
     } catch {
       setError('重複購読の設定を変更できませんでした')
@@ -608,7 +609,7 @@ export default function ScenarioDetailClient({
       })
       if (res.success) {
         setEditing(false)
-        loadScenario()
+        loadScenario(true)
       } else {
         setError(res.error)
       }
@@ -824,7 +825,7 @@ export default function ScenarioDetailClient({
         }
       }
       closeStepForm()
-      loadScenario()
+      loadScenario(true)
       reloadStats()
     } catch {
       setStepError('ステップの保存に失敗しました')
@@ -882,7 +883,7 @@ export default function ScenarioDetailClient({
         setStepError(res.error)
         return
       }
-      loadScenario()
+      loadScenario(true)
       reloadStats()
     } catch {
       setStepError('この通を複製できませんでした')
@@ -901,7 +902,7 @@ export default function ScenarioDetailClient({
       if (!result.success) throw new Error(result.error)
       if (editingStepId === stepId) closeStepForm()
       setDeleteStepTarget(null)
-      void loadScenario()
+      void loadScenario(true)
       void reloadStats()
     } catch {
       setDeleteStepError('この通を削除できませんでした。状態を読み直してから、もう一度お試しください。')
@@ -923,7 +924,7 @@ export default function ScenarioDetailClient({
         { stepId: a.id, stepOrder: b.stepOrder },
         { stepId: b.id, stepOrder: a.stepOrder },
       ])
-      loadScenario()
+      loadScenario(true)
       // 到達率バッジは stepOrder ベースでマッチングするので、並び替え後は stats も再取得
       reloadStats()
     } catch {
@@ -2160,7 +2161,7 @@ export default function ScenarioDetailClient({
           value={(scenario.audienceCondition as SegmentCondition | null) ?? null}
           onSave={async (next) => {
             const res = await api.scenarios.update(id, { audienceCondition: next } as never)
-            if (res.success) await loadScenario()
+            if (res.success) await loadScenario(true)
           }}
           onClose={() => setAudienceOpen(false)}
         />
@@ -2178,7 +2179,7 @@ export default function ScenarioDetailClient({
               onCompleteScenarioId: target,
             } as never)
             if (!res.success) return res.error
-            await loadScenario()
+            await loadScenario(true)
             return null
           }}
           onClose={() => setOnCompleteOpen(false)}

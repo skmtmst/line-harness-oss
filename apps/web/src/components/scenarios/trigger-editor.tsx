@@ -16,6 +16,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, type ScenarioTriggerItem } from '@/lib/api'
 import { pruneCondition, type SegmentCondition } from '@/lib/segment-condition'
 import Button from '@/components/shared/button'
+import { scenarioReferenceData } from './scenario-reference-data'
 
 interface TagOption {
   id: string
@@ -140,10 +141,10 @@ export default function TriggerEditor({
   }, [load])
 
   useEffect(() => {
-    void api.tags.list().then((res) => {
+    void scenarioReferenceData.tags(lineAccountId).then((res) => {
       if (res.success) setTags(res.data.map((t) => ({ id: t.id, name: t.name })))
     })
-  }, [])
+  }, [lineAccountId])
 
   const add = async (kind: 'friend_add' | 'tag_added', tagId?: string) => {
     setError('')
