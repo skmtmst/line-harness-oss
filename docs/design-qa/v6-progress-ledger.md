@@ -212,7 +212,7 @@
 | 16 | `n5VVTb` | 16-1-B 成果承認 | 6.4431% | 0px | 中央・右 | docs | [差分画像](affiliates-v6/n5VVTb-diff-1920.png) | **一致** |
 | 16 | `njLGA` | 16-1-C 支払い | 4.1592%（前回値） | 0px | 中央・左 | docs | [差分画像](affiliates-v6/njLGA-diff-1920.png) | **一致** |
 | 16 | `xqT1Z` | 16-1-D アフィリエイターを登録する | 5.3374% | 0px | 中央・左 | docs | [差分画像](affiliates-v6/xqT1Z-diff-1920.png) | **一致** |
-| 16 | `jwrbf` | 16-1-E アフィリエイターの成果内訳 | 5.1253% | 0px | 中央・右 | docs | [差分画像](affiliates-v6/jwrbf-diff-1920.png) | **一致** |
+| 16 | `jwrbf` | 16-1-E アフィリエイターの成果内訳 | 5.1253%（前回値） | 0px | 中央・右 | docs | [差分画像](affiliates-v6/jwrbf-diff-1920.png) | **一致** |
 | 16 | `GPWzq` | 16-1-F 案件をつくる | 5.0036% | 0px | 中央・左 | docs | [差分画像](affiliates-v6/GPWzq-diff-1920.png) | **一致** |
 | 16 | `QX70l` | 16-1-G アフィリエイターを削除する確認 | 6.9617% | 0px | 中央・左 | docs | [差分画像](affiliates-v6/QX70l-diff-1920.png) | **一致** |
 | 16 | `GqFTV` | 16-1-H 支払いを確定する | 7.9215% | -1px | 下部・中央 | docs | [差分画像](affiliates-v6/GqFTV-diff-1920.png) | **一致** |
@@ -252,7 +252,7 @@
 | 21 | `VLMGH` | 21-1 NEN配信 | 4.9576%（前回値） | 0px | 下部・右 | docs | [差分画像](nen-v6/VLMGH-diff-1920.png) | **一致** |
 | 21 | `DEX0k` | 21-1-A NENコラム | 5.0110%（前回値） | 0px | 中央・右 | docs | [差分画像](nen-v6/DEX0k-diff-1920.png) | **一致** |
 | 21 | `q4lajm` | 21-1-B ペット・記念日 | 7.5896%（前回値） | 0px | 中央・右 | docs | [差分画像](nen-v6/q4lajm-diff-1920.png) | **一致** |
-| 21 | `WeXbL` | 21-1-C NEN配信の履歴 | 4.9609% | 0px | 中央・左 | docs | [差分画像](nen-v6/WeXbL-diff-1920.png) | **一致** |
+| 21 | `WeXbL` | 21-1-C NEN配信の履歴 | 4.9609%（前回値） | 0px | 中央・左 | docs | [差分画像](nen-v6/WeXbL-diff-1920.png) | **一致** |
 | 21 | `HpKyF` | 21-1-D NEN配信の中身を編集する | 5.7424% | 0px | 中央・右 | docs | [差分画像](nen-v6/HpKyF-diff-1920.png) | **一致** |
 | 21 | `ymXJK` | 21-1-E コラムを書く | 7.0357%（前回値） | 0px | 中央・右 | docs | [差分画像](nen-v6/ymXJK-diff-1920.png) | **一致** |
 | 21 | `i9sQP` | 21-1-F NENコラム・一覧の状態 | 4.2514%（前回値） | 0px | 上部・左 | docs | [差分画像](nen-v6/i9sQP-diff-1920.png) | **一致** |
@@ -270,9 +270,9 @@
 | 24 | `Se65i` | 24-1-C お知らせの記録 | 4.0349%（前回値） | 0px | 中央・左 | docs | [差分画像](line-notify-v6/Se65i-diff-1920.png) | **一致** |
 | 24 | `DpxOK` | 24-2 運用者へのお知らせ | 4.7706%（前回値） | 0px | 中央・左 | docs | [差分画像](line-notify-v6/DpxOK-diff-1920.png) | **一致** |
 | 24 | `N2gAza` | 24-2-A 運用者へのお知らせをつくる | 4.1880%（前回値） | 0px | 中央・左 | docs | [差分画像](line-notify-v6/N2gAza-diff-1920.png) | **一致** |
-| 25 | `gief7` | 25-1 オートメーション | 5.0401% | 0px | 中央・左 | docs | [差分画像](automations-v6/gief7-diff-1920.png) | **一致** |
+| 25 | `gief7` | 25-1 オートメーション | 5.0401%（前回値） | 0px | 中央・左 | docs | [差分画像](automations-v6/gief7-diff-1920.png) | **一致** |
 | 25 | `Rv8Jv` | 25-1-A オートメーションをつくる | 6.0808% | 0px | 中央・左 | docs | [差分画像](automations-v6/Rv8Jv-diff-1920.png) | **一致** |
-| 25 | `DkPY0` | 25-1-B オートメーションが動いた記録 | 5.3198% | 0px | 中央・左 | docs | [差分画像](automations-v6/DkPY0-diff-1920.png) | **一致** |
+| 25 | `DkPY0` | 25-1-B オートメーションが動いた記録 | 5.3198%（前回値） | 0px | 中央・左 | docs | [差分画像](automations-v6/DkPY0-diff-1920.png) | **一致** |
 | 25 | `WjYAC` | 25-1-C 見本から作る | 5.1685%（前回値） | 0px | 中央・中央 | docs | [差分画像](automations-v6/WjYAC-diff-1920.png) | **一致** |
 | 25 | `Vdbv5` | 25-1-D 一覧の状態（空・読込・エラー） | 4.4432%（前回値） | 0px | 中央・左 | docs | [差分画像](automations-v6/Vdbv5-diff-1920.png) | **一致** |
 | 25 | `xOpDs` | 25-2 共通アクション | 5.2763%（前回値） | 0px | 中央・左 | docs | [差分画像](automations-v6/xOpDs-diff-1920.png) | **一致** |
