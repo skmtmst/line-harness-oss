@@ -12,8 +12,19 @@ describe('問い合わせ一覧の定期取得 (#630)', () => {
     expect(inbox).toContain('startVisiblePoll')
     expect(inbox).not.toContain('setInterval')
     // 一覧と会話は同じ1本の中で取り直す(同時1本)。
-    expect(inbox).toContain('loadInbox(true)')
+    expect(inbox).toContain('loadInbox(!loud)')
     expect(inbox).toContain('loadDetail(current.threadId, true)')
+  })
+
+  it('初回も同じ1本に載せ、別の effect で外に走らせない', () => {
+    expect(inbox).toContain('immediate: true')
+    expect(inbox).not.toContain('void loadInbox()')
+  })
+
+  it('全取得に世代ID(古い絞り込み・選択の遅い応答は捨てる)', () => {
+    expect(inbox).toContain('createPollGeneration')
+    expect(inbox).toContain('genRef.current.isStale(mySeq)')
+    expect(inbox).toContain('selectedRef.current?.threadId !== threadId')
   })
 
   it('未解決の間だけ動かし、対応済み・すべて表示では回さない', () => {

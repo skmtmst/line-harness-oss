@@ -24,4 +24,15 @@ describe('メール会話の定期取得 (#630)', () => {
     expect(thread).toContain('会話の更新を一時停止しています')
     expect(thread).toContain('再試行する')
   })
+
+  it('初回も同じ1本に載せ、外で別に走らせない', () => {
+    expect(thread).toContain('immediate: true')
+    expect(thread).not.toContain('void load()')
+  })
+
+  it('全取得に世代ID(別スレッドの遅い応答は捨てる)', () => {
+    expect(thread).toContain('createPollGeneration')
+    expect(thread).toContain('latestThreadRef')
+    expect(thread).toContain('genRef.current.isStale(mySeq)')
+  })
 })

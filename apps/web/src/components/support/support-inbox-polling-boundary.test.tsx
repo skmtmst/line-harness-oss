@@ -337,6 +337,54 @@ describe('問い合わせ一覧の制御器は選択更新で作り直さない 
     expect(detailCalls).toBe(3)
   })
 
+  it('遅いAの対応済み詳細が後から戻ってもBの再取得を止めない(順序逆転防止)', async () => {
+    const itemA = makeItem('ia', 'ta', 'resolved')
+    const itemB = makeItem('ib', 'tb', 'unread')
+    const calls: Record<string, number> = { ta: 0, tb: 0 }
+    let resolveA!: (value: unknown) => void
+    fetchMock.setImpl(async (url: string) => {
+      if (url.includes('/api/support/inbox')) {
+        return { success: true, data: { items: [{ ...itemA }, { ...itemB }] } }
+      }
+      const m = url.match(/\/threads\/([^/]+)$/)
+      if (m) {
+        const id = m[1]
+        calls[id] = (calls[id] ?? 0) + 1
+        // Aの詳細だけ遅い。Bはすぐ未解決で返る。
+        if (id === 'ta') {
+          return new Promise<unknown>((resolve) => {
+            resolveA = resolve
+          })
+        }
+        return { success: true, data: makeDetail('tb', 'unread') }
+      }
+      return { success: true, data: {} }
+    })
+
+    render()
+    await flush()
+    render()
+    // 対応済みAを選択し、詳細が戻る前に未解決Bへ切り替える。
+    clickItemAt(0)
+    await flush()
+    expect(calls.ta).toBe(1)
+    clickItemAt(1)
+    await flush()
+    expect(calls.tb).toBe(1)
+    render()
+
+    // 遅いAの対応済み詳細が後から戻る。Bを上書きしていたら
+    // 詳細の状態が対応済みになり、次pollでBを再取得しなくなる。
+    resolveA({ success: true, data: makeDetail('ta', 'resolved') })
+    await flush()
+    render()
+
+    // Bは未解決のままなので、次pollでBを再取得する。Aは取り直さない。
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(calls.tb).toBe(2)
+    expect(calls.ta).toBe(1)
+  })
+
   it('resolved A→未解決Bへ切替え、B初回詳細失敗でも次pollでBを再取得する', async () => {
     const itemA = makeItem('ia', 'ta', 'resolved')
     const itemB = makeItem('ib', 'tb', 'unread')

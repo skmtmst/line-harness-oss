@@ -52,6 +52,8 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
   const [showSegmentBuilder, setShowSegmentBuilder] = useState(false)
 
   const load = useCallback(async () => {
+    // 別 broadcast へ移動後の遅い応答は捨てる(順序逆転防止、#630)。
+    const requestId = id
     setLoading(true)
     // SPA routing で別 broadcast を開いた時に前回の breakdown / per-account stats / insight が
     // 残ると confirm modal や本文に別 broadcast の数値が表示されてしまう。draft データを
@@ -62,14 +64,18 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
     setTargetCount(null)
     try {
       const res = await api.broadcasts.get(id)
+      if (requestId !== latestIdRef.current) return
       if (res.success && res.data) {
-        setBroadcast(res.data)
+        const fresh = res.data
+        // 進捗が先に送信完了を見ていたら、古い全文で戻さない。
+        setBroadcast((prev) =>
+          prev && prev.status === 'sent' && fresh.status !== 'sent' ? prev : fresh,
+        )
         if (res.data.totalCount > 0) {
           setTargetCount(res.data.totalCount)
         } else if (res.data.status === 'draft' || res.data.status === 'scheduled') {
           // draft 中は totalCount=0 のまま。送信前の対象人数を preview-count API で取りに行く。
           // confirm modal の「対象 X人」表示と「送信ボタンの (X人)」表示で使う。
-          const requestId = id
           api.broadcasts.previewCount(id).then((r) => {
             // race guard: 古い id の応答は無視する。
             if (requestId !== latestIdRef.current) return
@@ -83,9 +89,11 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
         setError('配信が見つかりません')
       }
     } catch {
+      if (requestId !== latestIdRef.current) return
       setError('読み込みに失敗しました')
     } finally {
-      setLoading(false)
+      // 新しい取得が走っている間のスピナーを古い取得で消さない。
+      if (requestId === latestIdRef.current) setLoading(false)
     }
   }, [id])
 
@@ -102,7 +110,10 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
     const stop = startVisiblePoll({
       shouldPoll: () => !finished,
       work: async () => {
+        // 別 broadcast へ移動後の遅い応答は捨て、失敗にも数えない。
+        const requestId = id
         const res = await api.broadcasts.getProgress(id)
+        if (requestId !== latestIdRef.current) return
         if (!res.success || !res.data) throw new Error('進捗を読み込めませんでした')
         // 閉じ込めた関数の中では絞り込みが外れるので、先に取り出す。
         const data = res.data
@@ -127,9 +138,12 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
   // Load insight for sent broadcasts
   useEffect(() => {
     if (broadcast?.status !== 'sent') return
+    // 別 broadcast へ移動後の遅い応答は捨てる(順序逆転防止、#630)。
+    const requestId = id
     api.broadcasts.getInsight(id).then(res => {
+      if (requestId !== latestIdRef.current) return
       if (res.success && res.data) setInsight(res.data)
-    })
+    }).catch(() => {/* ignore */})
   }, [broadcast?.status, id])
 
   // Load per-account stats — 送信中 (進捗) + 送信完了 (実績) どちらでも取得する。

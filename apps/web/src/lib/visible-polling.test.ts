@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  createPollGeneration,
   startVisiblePoll,
   visiblePollDelayMs,
   VISIBLE_POLL_BASE_MS,
@@ -89,17 +90,78 @@ describe('startVisiblePoll', () => {
     expect(work).toHaveBeenCalledTimes(3)
   })
 
-  it('対象が処理中/未解決でない間は取得せず、戻ったら再開する', async () => {
-    let active = false
+  it('対象が終わっていたら始めから回さず、表示に戻っても起こさない', async () => {
+    const doc = stubDocument(false)
+    const work = vi.fn(async () => undefined)
+    startVisiblePoll({ shouldPoll: () => false, work })
+
+    // 始めないし、表示の往復でも起きない(完了後の空回り防止)。
+    await vi.advanceTimersByTimeAsync(VISIBLE_POLL_BASE_MS * 3)
+    expect(work).not.toHaveBeenCalled()
+    doc.hidden = true
+    doc.dispatch('visibilitychange')
+    doc.hidden = false
+    doc.dispatch('visibilitychange')
+    await vi.advanceTimersByTimeAsync(VISIBLE_POLL_BASE_MS * 3)
+    expect(work).not.toHaveBeenCalled()
+  })
+
+  it('対象が終わったら止まり、次を予約しない', async () => {
+    let active = true
     const work = vi.fn(async () => undefined)
     startVisiblePoll({ shouldPoll: () => active, work })
 
-    await vi.advanceTimersByTimeAsync(VISIBLE_POLL_BASE_MS * 3)
-    expect(work).not.toHaveBeenCalled()
-
-    active = true
     await vi.advanceTimersByTimeAsync(VISIBLE_POLL_BASE_MS)
     expect(work).toHaveBeenCalledTimes(1)
+
+    // 対象が終わったら、その回の後はもう回さない。
+    active = false
+    await vi.advanceTimersByTimeAsync(VISIBLE_POLL_BASE_MS)
+    expect(work).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(60000)
+    expect(work).toHaveBeenCalledTimes(1)
+  })
+
+  it('immediateは初回も同じ1本に載せ、5秒後に次を1本だけ進める', async () => {
+    const work = vi.fn(async () => undefined)
+    startVisiblePoll({ work, immediate: true })
+
+    // 待ちなしで初回が走る。
+    await vi.advanceTimersByTimeAsync(0)
+    expect(work).toHaveBeenCalledTimes(1)
+    // 次は5秒後に1本だけ。
+    await vi.advanceTimersByTimeAsync(VISIBLE_POLL_BASE_MS)
+    expect(work).toHaveBeenCalledTimes(2)
+  })
+
+  it('immediateでも対象が終わっていたら走らせない', async () => {
+    const work = vi.fn(async () => undefined)
+    startVisiblePoll({ shouldPoll: () => false, work, immediate: true })
+
+    await vi.advanceTimersByTimeAsync(VISIBLE_POLL_BASE_MS * 3)
+    expect(work).not.toHaveBeenCalled()
+  })
+
+  it('immediateの初回が遅くても5秒後のtickと二重にならない', async () => {
+    let resolveWork!: () => void
+    const work = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveWork = resolve
+        }),
+    )
+    startVisiblePoll({ work, immediate: true })
+
+    // 初回が終わらないまま5秒・10秒たっても1本のまま。
+    await vi.advanceTimersByTimeAsync(0)
+    expect(work).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(10000)
+    expect(work).toHaveBeenCalledTimes(1)
+
+    // 初回が終わったら次の1本だけ進む。
+    resolveWork()
+    await vi.advanceTimersByTimeAsync(VISIBLE_POLL_BASE_MS)
+    expect(work).toHaveBeenCalledTimes(2)
   })
 
   it('連続失敗は待ちを延ばし、上限後は止まって理由を1回だけ返す', async () => {
@@ -220,5 +282,17 @@ describe('startVisiblePoll', () => {
     expect(doc.removeEventListener).toHaveBeenCalledWith('visibilitychange', expect.any(Function))
     await vi.advanceTimersByTimeAsync(60000)
     expect(work).not.toHaveBeenCalled()
+  })
+})
+
+describe('createPollGeneration', () => {
+  it('新しい取得が始まると古い番号は古くなる(順序逆転の捨て判定)', () => {
+    const gen = createPollGeneration()
+    const oldSeq = gen.next()
+    expect(gen.isStale(oldSeq)).toBe(false)
+    // 新しい取得(画面切替・選択切替)が始まった。
+    const newSeq = gen.next()
+    expect(gen.isStale(oldSeq)).toBe(true)
+    expect(gen.isStale(newSeq)).toBe(false)
   })
 })

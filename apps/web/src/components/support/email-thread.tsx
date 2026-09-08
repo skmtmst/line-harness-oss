@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ApiError, fetchApi } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
-import { startVisiblePoll } from '@/lib/visible-polling'
+import { createPollGeneration, startVisiblePoll } from '@/lib/visible-polling'
 import TemplatePicker from '@/components/chats/template-picker'
 
 /**
@@ -128,13 +128,25 @@ export default function EmailThread({
     }
   }, [])
 
+  // 世代で古い応答を捨てる。threadIdが変わった後の遅い応答が
+  // 新しい会話を上書きしない(順序逆転防止、#630)。
+  const genRef = useRef(createPollGeneration())
+  const latestThreadRef = useRef(threadId)
+  latestThreadRef.current = threadId
+
   // 静かな取り直しは成否を返す。失敗の数え直し・待ちの延長は startVisiblePoll が持つ。
+  // 古い取得の応答は捨て、失敗にも数えない(新しい取得が届ける)。
   const load = useCallback(
     async (quiet = false): Promise<boolean> => {
+      const myThread = threadId
+      const mySeq = genRef.current.next()
+      const isStale = () =>
+        genRef.current.isStale(mySeq) || myThread !== latestThreadRef.current
       try {
         const res = await fetchApi<{ success: boolean; data: EmailDetail }>(
           `/api/support/email/threads/${encodeURIComponent(threadId)}`,
         )
+        if (isStale()) return true
         if (res.success) {
           setDetail(res.data)
           if (!quiet) {
@@ -144,6 +156,7 @@ export default function EmailThread({
         }
         return false
       } catch {
+        if (isStale()) return true
         if (!quiet) setError('メールの会話を読み込めませんでした')
         return false
       }
@@ -152,8 +165,8 @@ export default function EmailThread({
   )
 
   // 相手からの返信が届いたら出したい。未解決の間だけ5秒起点の1本で
-  // 静かに取り直す。非表示では止め、連続失敗は待ちを延ばして
-  // 上限後は再試行を出す(#630)。
+  // 取り直す。非表示では止め、連続失敗は待ちを延ばして
+  // 上限後は再試行を出す。対応済みになったら止める(#630)。
   const [threadStalled, setThreadStalled] = useState(false)
   const [threadRetryKey, setThreadRetryKey] = useState(0)
   const threadStatusRef = useRef(detail?.thread.status)
@@ -162,11 +175,16 @@ export default function EmailThread({
     setDetail(null)
     setReply('')
     setThreadStalled(false)
-    void load()
+    // 初回も同じ1本に載せる。初回だけ外に別走させると
+    // 初回と5秒後の取得が重複する。初回だけ表示あり、2回目から静かに。
+    let first = true
     const stop = startVisiblePoll({
+      immediate: true,
       shouldPoll: () => threadStatusRef.current !== 'resolved',
       work: async () => {
-        const ok = await load(true)
+        const loud = first
+        first = false
+        const ok = await load(!loud)
         if (!ok) throw new Error('メールの会話を読み込めませんでした')
       },
       onGiveUp: () => setThreadStalled(true),
