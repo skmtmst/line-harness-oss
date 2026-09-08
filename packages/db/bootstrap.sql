@@ -5845,6 +5845,9 @@ CREATE INDEX idx_menus_account_sort ON menus (line_account_id, sort_order);
 
 CREATE INDEX idx_messages_account_direction_created ON messages_log(line_account_id, direction, created_at);
 
+CREATE INDEX idx_messages_log_broadcast_friend_direction
+  ON messages_log (broadcast_id, friend_id, direction);
+
 CREATE INDEX idx_messages_log_broadcast_id ON messages_log(broadcast_id);
 
 CREATE INDEX idx_messages_log_created_at ON messages_log (created_at);
