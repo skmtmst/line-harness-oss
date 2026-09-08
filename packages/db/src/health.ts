@@ -48,6 +48,36 @@ export async function getLatestRiskLevel(db: D1Database, lineAccountId: string):
   return row?.risk_level ?? null;
 }
 
+export interface LatestAccountRiskRow {
+  line_account_id: string;
+  risk_level: string;
+}
+
+/**
+ * 複数アカウントの最新リスクレベルを1クエリで取得する(サイドバーの N+1 解消用)。
+ * ログ本文は返さない。呼び出し側が staff 可視範囲の ID だけを渡すこと。
+ */
+export async function getLatestRiskLevels(
+  db: D1Database,
+  lineAccountIds: readonly string[],
+): Promise<LatestAccountRiskRow[]> {
+  if (lineAccountIds.length === 0) return [];
+  const result = await db.prepare(
+    `SELECT ahl.line_account_id AS line_account_id, ahl.risk_level AS risk_level
+       FROM account_health_logs ahl
+       INNER JOIN (
+         SELECT line_account_id AS aid, MAX(created_at) AS max_created
+           FROM account_health_logs
+          WHERE line_account_id IN (SELECT value FROM json_each(?))
+          GROUP BY line_account_id
+       ) latest
+          ON ahl.line_account_id = latest.aid
+         AND ahl.created_at = latest.max_created
+      GROUP BY ahl.line_account_id`,
+  ).bind(JSON.stringify([...lineAccountIds])).all<LatestAccountRiskRow>();
+  return result.results;
+}
+
 // --- マイグレーション ---
 
 export async function getAccountMigrations(db: D1Database): Promise<AccountMigrationRow[]> {
