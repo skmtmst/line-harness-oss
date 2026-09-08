@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -8,6 +8,7 @@ import PageHeader from '@/components/shared/page-header'
 import Toggle from '@/components/shared/toggle'
 import { useAccount } from '@/contexts/account-context'
 import { api, ApiError, fetchApi, type AnalyticsUsageOverview } from '@/lib/api'
+import { createAccountRequestGuard } from './account-request-guard'
 import {
   FEATURE_SETTINGS_UPDATED_EVENT,
   groupEnabledCount,
@@ -360,6 +361,18 @@ export default function SettingsPage() {
   const [impactGroups, setImpactGroups] = useState<FeatureImpactGroup[]>([])
   const [impactBusy, setImpactBusy] = useState(false)
   const [impactError, setImpactError] = useState('')
+  /**
+   * 世代guard。アカウントが変わったら古い応答を捨てる。
+   * Aの応答をBの画面へ混ぜないし、Aの版でBへ保存しない。
+   */
+  const accountGuard = useMemo(() => createAccountRequestGuard(), [])
+  const accountRef = useRef(selectedAccountId)
+  useEffect(() => {
+    if (accountRef.current !== selectedAccountId) {
+      accountRef.current = selectedAccountId
+      accountGuard.advance()
+    }
+  }, [selectedAccountId, accountGuard])
 
   /**
    * 利用数だけ後から読む。設定の表示を重い集計で待たせない。
@@ -370,28 +383,33 @@ export default function SettingsPage() {
    */
   const loadUsage = useCallback(async () => {
     if (!selectedAccountId) return
+    const ticket = accountGuard.issue(selectedAccountId)
     setUsageFailed(false)
     try {
       const usageResponse = await api.analytics.usageOverview(selectedAccountId)
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
       if (usageResponse?.success) {
         setUsageCategories(usageResponse.data.data.categories)
       } else {
         setUsageFailed(true)
       }
     } catch {
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
       setUsageFailed(true)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, accountGuard])
 
   const load = useCallback(async () => {
     if (!selectedAccountId) {
       setLoading(false)
       return
     }
+    const ticket = accountGuard.issue(selectedAccountId)
     setLoading(true)
     setError('')
     try {
       const response = await api.featureSettings.get(selectedAccountId)
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
       if (!response.success) {
         setError(response.error)
         return
@@ -407,11 +425,12 @@ export default function SettingsPage() {
       // 設定を先に出し、利用数は後から足す（表示を集計で待たせない）。
       void loadUsage()
     } catch (error) {
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
       setError(featureSettingsErrorMessage(error instanceof ApiError ? error.status : undefined, 'load'))
     } finally {
-      setLoading(false)
+      if (accountGuard.isCurrent(ticket, selectedAccountId)) setLoading(false)
     }
-  }, [selectedAccountId, loadUsage])
+  }, [selectedAccountId, loadUsage, accountGuard])
 
   useEffect(() => { void load() }, [load])
 
@@ -499,8 +518,10 @@ export default function SettingsPage() {
   /** 最新の保存済み状態を読み直す。編集中身は残す。 */
   const reloadSaved = useCallback(async () => {
     if (!selectedAccountId) return
+    const ticket = accountGuard.issue(selectedAccountId)
     try {
       const latest = await api.featureSettings.get(selectedAccountId)
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
       if (latest.success) {
         setSavedFeatures(normalizeFeatureSettings(latest.data.features))
         setSavedItemOrder(latest.data.sidebarItemOrder ?? {})
@@ -509,14 +530,16 @@ export default function SettingsPage() {
     } catch {
       // 読み直しに失敗しても編集中身は残す。
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, accountGuard])
 
   /**
    * オフ前の影響確認(票643)。変更案だけ送り、保存はしない。
    * 版が古ければ読み直して null を返す(呼び出し側は保存へ進まない)。
+   * 途中でアカウントが変わったら捨てて null を返す。
    */
   const checkImpact = useCallback(async () => {
     if (!selectedAccountId) return null
+    const ticket = accountGuard.issue(selectedAccountId)
     try {
       const impact = await fetchApi<FeatureImpactResponse>(
         `/api/settings/features/impact?account_id=${encodeURIComponent(selectedAccountId)}`,
@@ -525,12 +548,14 @@ export default function SettingsPage() {
           body: JSON.stringify({ features, expectedVersion: settingsVersion }),
         },
       )
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return null
       if (!impact.success) {
         setError(impact.error)
         return null
       }
       return impact.data
     } catch (error) {
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return null
       // ほかの管理者が先に保存したときは、編集中身は残したまま
       // 最新を読み直し、内容を確認してもう一度保存してもらう。
       if (error instanceof ApiError && error.status === 409) {
@@ -541,10 +566,11 @@ export default function SettingsPage() {
       setError(featureSettingsErrorMessage(error instanceof ApiError ? error.status : undefined, 'save'))
       return null
     }
-  }, [selectedAccountId, features, settingsVersion, reloadSaved])
+  }, [selectedAccountId, features, settingsVersion, reloadSaved, accountGuard])
 
   const persist = async (impactToken?: string): Promise<boolean> => {
     if (!selectedAccountId) return false
+    const ticket = accountGuard.issue(selectedAccountId)
     setSaving(true)
     setError('')
     setNotice('')
@@ -561,6 +587,8 @@ export default function SettingsPage() {
           }),
         },
       )
+      // 途中でアカウントが変わったら、応答を捨てて保存へ進まない。
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return false
       if (!response.success) {
         setError(response.error)
         return false
@@ -572,6 +600,7 @@ export default function SettingsPage() {
        */
       try {
         const latest = await api.featureSettings.get(selectedAccountId)
+        if (!accountGuard.isCurrent(ticket, selectedAccountId)) return false
         if (latest.success) {
           const serverFeatures = normalizeFeatureSettings(latest.data.features)
           setSavedFeatures(serverFeatures)
@@ -597,6 +626,7 @@ export default function SettingsPage() {
       window.dispatchEvent(new CustomEvent(FEATURE_SETTINGS_UPDATED_EVENT, { detail: { accountId: selectedAccountId } }))
       return true
     } catch (error) {
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return false
       // 確認後に稼働中が変わったときは、最新の影響で確認し直す。
       // 編集中身は残したまま、ダイアログを開き直す。
       if (error instanceof ApiError && error.status === 409
