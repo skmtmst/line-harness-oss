@@ -7,7 +7,7 @@ const spec = {
   openapi: '3.1.0',
   info: {
     title: 'LINE OSS CRM API',
-    version: '0.2.0',
+    version: '0.24.0',
     description: 'Open-source LINE Official Account CRM/marketing automation API. API-first design for Claude Code / AI agent integration.',
     license: { name: 'MIT' },
   },
@@ -471,6 +471,36 @@ const spec = {
           '200': { description: 'Tag dependency impact', content: { 'application/json': { schema: { $ref: '#/components/schemas/TagDependencyImpact' } } } },
           '403': { description: 'Owner or admin role required' },
           '404': { description: 'Not found in account scope' },
+        },
+      },
+    },
+    '/api/media/{id}/download': {
+      get: {
+        tags: ['Contents'],
+        summary: '登録メディアを認証付きでダウンロード',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Media file bytes with Content-Disposition: attachment' },
+          '403': { description: 'Staff role required' },
+          '404': { description: 'Media not found in account scope' },
+        },
+      },
+    },
+    '/api/media/{id}/content': {
+      get: {
+        tags: ['Contents'],
+        summary: '登録メディアの表示用中身を認証付きで取得',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Media file bytes with Content-Disposition: inline' },
+          '403': { description: 'Staff role required' },
+          '404': { description: 'Media not found in account scope' },
         },
       },
     },
@@ -1045,6 +1075,8 @@ const spec = {
       post: {
         tags: ['Affiliates'],
         summary: 'クリック記録',
+        description: '紹介コードからの公開クリック記録。認証なしで呼べる。',
+        security: [],
         requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { code: { type: 'string' }, url: { type: 'string' } }, required: ['code'] } } } },
         responses: { '201': { description: 'Recorded' } },
       },
