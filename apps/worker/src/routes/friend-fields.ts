@@ -23,6 +23,7 @@ import {
   getFriendById,
   setFriendFieldValue,
   validateFieldKey,
+  validateFriendFieldValue,
   FRIEND_FIELD_TYPES,
   getFolderById,
   type FriendField,
@@ -766,8 +767,11 @@ friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin'), requi
     const fields = await getFriendFields(c.env.DB);
     const byId = new Map(fields.map((f) => [f.id, f]));
     const warnings: string[] = [];
-    let updated = 0;
+    const pending: Array<{ fieldId: string; value: string | null }> = [];
+    const errors: Array<{ fieldId: string; name: string; message: string }> = [];
 
+    // N-042: 型に合わない値は1件も保存しない。先に全部を検証し、
+    // 1つでも通らなければ422で返して書き込まない（部分保存なし）。
     for (const [fieldId, raw] of Object.entries(values)) {
       const field = byId.get(fieldId);
       if (!field) {
@@ -778,16 +782,30 @@ friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin'), requi
         warnings.push(`「${field.name}」はEC側が正のため、管理画面からは変更できません`);
         continue;
       }
-      await setFriendFieldValue(c.env.DB, {
-        friendId,
-        fieldId,
-        value: raw == null ? null : String(raw),
-        updatedBy: staff?.id ?? 'unknown',
-      });
-      updated++;
+      const checked = validateFriendFieldValue(field, raw);
+      if (!checked.ok) {
+        errors.push({ fieldId, name: field.name, message: checked.error });
+        continue;
+      }
+      pending.push({ fieldId, value: checked.value });
+    }
+    if (errors.length > 0) {
+      return c.json(
+        { success: false, code: 'FIELD_VALUE_INVALID', error: '項目の値を確認してください', errors },
+        422,
+      );
     }
 
-    return c.json({ success: true, data: { updated }, warnings });
+    for (const item of pending) {
+      await setFriendFieldValue(c.env.DB, {
+        friendId,
+        fieldId: item.fieldId,
+        value: item.value,
+        updatedBy: staff?.id ?? 'unknown',
+      });
+    }
+
+    return c.json({ success: true, data: { updated: pending.length }, warnings });
   } catch (err) {
     console.error('PUT /api/friends/:id/fields error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -832,6 +850,21 @@ friendFields.post('/api/friend-fields/bulk', requireRole('owner', 'admin'), asyn
       );
     }
 
+    // N-042: 型に合わない値は誰にも保存しない。所属検査の前に検証し、
+    // 通らなければ422で返して書き込まない（部分保存なし）。
+    const checked = validateFriendFieldValue(field, body.value);
+    if (!checked.ok) {
+      return c.json(
+        {
+          success: false,
+          code: 'FIELD_VALUE_INVALID',
+          error: checked.error,
+          errors: [{ fieldId: field.id, name: field.name, message: checked.error }],
+        },
+        422,
+      );
+    }
+
     // N-043: 書込み前に全friendIdsの所属が要求lineAccountIdと完全一致するか検査する。
     // owner/adminが複数アカウントへアクセスできても、指定外の混在は部分更新せず404で拒否する。
     // 存在の有無・値が分からない汎用404を返す。
@@ -846,7 +879,7 @@ friendFields.post('/api/friend-fields/bulk', requireRole('owner', 'admin'), asyn
       await setFriendFieldValue(c.env.DB, {
         friendId,
         fieldId: field.id,
-        value: body.value == null ? null : String(body.value),
+        value: checked.value,
         updatedBy: staff?.id ?? 'unknown',
       });
     }
