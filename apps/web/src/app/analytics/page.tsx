@@ -228,6 +228,8 @@ function formatCrossWaitMinutes(estimatedWaitMs: number): string {
 const CROSS_AUTO_POLL_MIN_MS = 6 * 60_000
 const CROSS_AUTO_POLL_MARGIN_MS = 3 * 60_000
 const CROSS_AUTO_POLL_MAX_MS = 15 * 60_000
+// 一時的な確認失敗の後の待ち時間。run IDを消さず間隔を空けて続け、実行中の集計へ再接続できるようにする。
+const CROSS_POLL_ERROR_BACKOFF_MS = 10_000
 
 function CrossTab({ accountId, canManage }: { accountId: string; canManage: boolean }) {
   const [fields, setFields] = useState<FriendField[]>([])
@@ -287,12 +289,14 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
   // 回線、D1の読み取り枠を消費するため、打ち切り時刻を過ぎたら自動確認は止める。
   // 打ち切りは最低6分(5分cronの最初の処理機会をまたぐ)で、観測した最短目安+3分
   // まで延ばす(上限15分)。集計自体は5分cronで続く。run IDは保持し、
-  // 「結果をもう一度確認」で同じrunへ再接続する。
+  // 「結果をもう一度確認」で同じrunへ再接続する。一時的な確認失敗でもrun IDを
+  // 消さず、順番表示を残したまま間隔を空けて確認を続ける。
   useEffect(() => {
     if (!crossRunId) return
     let active = true
     let timer: number | undefined
     let attempts = 0
+    let pollErrors = 0
     const pollStart = Date.now()
     let deadline = pollStart + CROSS_AUTO_POLL_MIN_MS
     const check = async () => {
@@ -301,6 +305,8 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
         const response = await api.analytics.crossResult(accountId, crossRunId)
         if (!active) return
         if (!response.success) throw new Error(response.error)
+        pollErrors = 0
+        setError('')
         setCrossQueue({
           state: response.data.state,
           queuePosition: response.data.queuePosition ?? null,
@@ -329,12 +335,17 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
           setLoading(false)
           return
         }
-      } catch (caught) {
+      } catch {
         if (!active) return
-        setError(caught instanceof Error ? caught.message : 'クロス分析を確認できませんでした')
-        setCrossRunId('')
-        setCrossQueue(null)
-        setLoading(false)
+        // 一時的な確認失敗でrun IDを消すと、実行中の集計へ再接続できなくなる。
+        // 順番表示は残し、間隔を空けて確認を続ける。打ち切り時刻はそのまま。
+        pollErrors += 1
+        setError('クロス分析を確認できませんでした。確認を続けています')
+        // 失敗が続くほど間隔を空ける(10秒→20秒→30秒まで)。打ち切り時刻はそのまま。
+        timer = window.setTimeout(
+          () => void check(),
+          CROSS_POLL_ERROR_BACKOFF_MS * Math.min(pollErrors, 3),
+        )
         return
       }
       if (!active) return
@@ -613,9 +624,6 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
                 ? `（次回処理は${formatCrossNextTick(crossQueue.nextTickAt)}ごろ）`
                 : ''}
             </p>
-          )}
-          {crossQueue?.estimatedWaitMs === 0 && (
-            <p className="text-ink-secondary mt-1">まもなく終わります。</p>
           )}
           <p className="text-ink-faint mt-2 text-xs">同じ分析をもう一度押す必要はありません。このままお待ちください。</p>
           <p className="text-ink-faint mt-1 text-xs">結果が出た後はこの画面で確認でき、失敗・時間切れのときも集計し直せます。</p>

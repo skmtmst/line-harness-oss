@@ -9,7 +9,9 @@ const MAX_ACCOUNT_FRIENDS = 50_000;
 // 実行器は全テナントFIFOで5分ごと(frequentHeavy Cron '1-56/5 * * * *')に進むが、
 // 他アカウントの件数・存在は漏らせないため、待ち順・目安は同一アカウント内だけで数える。
 // queuePosition/pendingAheadは「このLINEアカウント内の順番」であり、全体の絶対順位ではない。
-// estimatedWaitMsは正確な全体値ではなく最短目安(次回cronまでの残り + 同一アカウント内先行件数×5分)。
+// estimatedWaitMsは正確な全体値ではなく最短目安(次回cronまでの残り + 同一アカウント内
+// 待機件数×5分)。実行中の1件はその場で処理中のため未来の枠に数えない。実行中は
+// 目安を出さずnullにする(実行中と待機中で分ける)。
 export const ANALYTICS_CROSS_QUEUE_INTERVAL_MS = 5 * 60_000;
 
 export interface AnalyticsCrossQueueStatus {
@@ -823,6 +825,21 @@ export async function claimAnalyticsCrossRun(
   return { leaseGeneration: Number(row.lease_generation ?? 0) };
 }
 
+export async function touchAnalyticsCrossRunLease(
+  db: D1Database,
+  runId: string,
+  leaseGeneration: number,
+): Promise<void> {
+  // 長時間の集計中に実行権が生きていることを示す。started_atを「最後の生存確認」
+  // として延ばすため、期限回収(10分無応答)は誤回収しない。世代が奪われていたら
+  // 旧実行はここで止まる(lease_stolen)。完了・失敗の世代条件と対になる。
+  const touched = await db.prepare(
+    `UPDATE analytics_cross_runs SET started_at = ?
+      WHERE id = ? AND state = 'running' AND lease_generation = ?`,
+  ).bind(new Date().toISOString(), runId, leaseGeneration).run();
+  if (Number(touched.meta?.changes ?? 0) !== 1) throw new Error('analytics_cross_run_lease_stolen');
+}
+
 export async function completeAnalyticsCrossRun(
   db: D1Database,
   runId: string,
@@ -856,6 +873,17 @@ export async function processAnalyticsCrossRun(
   const { leaseGeneration } = await claimAnalyticsCrossRun(db, runId);
   const row = await loadRunRow(db, runId);
   if (!row) throw new Error('analytics_cross_run_not_found');
+  // 再実行の安全: クラッシュした前世代の途中書き込みが残っていても、同じ
+  // 主キー(run_id, row_key, col_key, friend_id)で重複失敗しないよう、書き直し
+  // の前にこのrunの対象者行を消す。claim済み(この世代が実行権を持つ)の後のため、
+  // 他の実行の行を消すことはない。
+  await db.prepare(
+    `DELETE FROM analytics_cross_run_members WHERE run_id = ?`,
+  ).bind(runId).run();
+  // 長時間の集計でも期限回収に誤って戻されないよう、重い工程の合間で生存確認する。
+  const heartbeat = async (): Promise<void> => {
+    await touchAnalyticsCrossRunLease(db, runId, leaseGeneration);
+  };
   try {
     const query = validateAnalyticsCrossQuery(JSON.parse(row.query_json));
     const before = previousRange(query);
@@ -897,6 +925,7 @@ export async function processAnalyticsCrossRun(
       return result;
     }
     const loadedFriends = await loadFriendIds(db, row.line_account_id);
+    await heartbeat();
     if (loadedFriends.exceedsLimit) {
       const result: AnalyticsCrossResult = {
         lineAccountId: row.line_account_id, timeZone: query.timeZone,
@@ -941,12 +970,15 @@ export async function processAnalyticsCrossRun(
       previousRow, previousColumn, previousFilters,
       measureByFriend: measure, previousMeasureByFriend: previousMeasure,
     });
+    await heartbeat();
     for (let index = 0; index < evaluated.memberRows.length; index += 90) {
       await db.batch(evaluated.memberRows.slice(index, index + 90).map((member) => db.prepare(
         `INSERT INTO analytics_cross_run_members (
            run_id, line_account_id, row_key, col_key, friend_id
          ) VALUES (?, ?, ?, ?, ?)`,
       ).bind(runId, row.line_account_id, member.rowKey, member.columnKey, member.friendId)));
+      // 対象者が多い集計ほど書き込みが長引くため、10束ごとに生存確認する。
+      if ((index / 90) % 10 === 0) await heartbeat();
     }
     const result: AnalyticsCrossResult = {
       lineAccountId: row.line_account_id,
@@ -1033,7 +1065,8 @@ export async function getAnalyticsCrossQueueStatus(
     return { queuePosition: null, pendingAhead: 0, estimatedWaitMs: null, nextTickAt: null };
   }
   if (row.state === 'running') {
-    return { queuePosition: 1, pendingAhead: 0, estimatedWaitMs: 0, nextTickAt: null };
+    // 実行中はその場で処理しているため、待ち時間の目安は出さない(待機中と分ける)。
+    return { queuePosition: 1, pendingAhead: 0, estimatedWaitMs: null, nextTickAt: null };
   }
   if (row.state === 'pending') {
     const running = await db.prepare(
@@ -1045,16 +1078,18 @@ export async function getAnalyticsCrossQueueStatus(
         WHERE line_account_id = ? AND state = 'pending'
           AND (created_at < ? OR (created_at = ? AND id < ?))`,
     ).bind(lineAccountId, row.created_at, row.created_at, row.id).first<{ count: number }>();
-    const pendingAhead = Number(running?.count ?? 0) + Number(earlier?.count ?? 0);
+    const waitingAhead = Number(earlier?.count ?? 0);
+    const pendingAhead = Number(running?.count ?? 0) + waitingAhead;
     const queuePosition = pendingAhead + 1;
-    // 最短目安 = 次回cronまでの残り + 同一アカウント内先行件数×5分。
+    // 最短目安 = 次回cronまでの残り + 同一アカウント内待機件数×5分。
+    // 実行中の1件はその場で処理中のため未来の枠に足さない(足すと最短を過大表示する)。
     // 全体の混雑(他アカウント)は含めないため、延びることがある。
     const nextTickAt = nextAnalyticsCrossTick(now);
     const remainMs = Math.max(0, new Date(nextTickAt).getTime() - now.getTime());
     return {
       queuePosition,
       pendingAhead,
-      estimatedWaitMs: remainMs + pendingAhead * ANALYTICS_CROSS_QUEUE_INTERVAL_MS,
+      estimatedWaitMs: remainMs + waitingAhead * ANALYTICS_CROSS_QUEUE_INTERVAL_MS,
       nextTickAt,
     };
   }

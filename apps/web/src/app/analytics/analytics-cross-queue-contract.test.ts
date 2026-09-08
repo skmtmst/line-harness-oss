@@ -55,6 +55,20 @@ describe('クロス分析の待ち順と処理目安 (Issue #633)', () => {
     expect(PAGE).not.toContain('setInterval')
   })
 
+  it('一時的な確認失敗でもrun IDを保持し、間隔を空けて確認を続ける', () => {
+    // 失敗でrun IDを消すと実行中の集計へ再接続できない。順番表示を残したまま続ける。
+    expect(PAGE).toContain('確認を続けています')
+    expect(PAGE).toContain('pollErrors')
+    expect(PAGE).toContain('CROSS_POLL_ERROR_BACKOFF_MS')
+    expect(PAGE).toContain('Math.min(pollErrors')
+  })
+
+  it('実行中は待ち目安を出さず、待機中は実行中分を加算しない', () => {
+    // 実行中は「処理中です」のみ。裏は実行中をnull、待機中は次回cronまでの残り+待機件数×5分を返す。
+    expect(PAGE).toContain('処理中です')
+    expect(PAGE).not.toContain('まもなく終わります')
+  })
+
   it('API型に待ち順の4項目がある', () => {
     for (const field of ['queuePosition', 'pendingAhead', 'estimatedWaitMs', 'nextTickAt']) {
       expect(API).toContain(field)
