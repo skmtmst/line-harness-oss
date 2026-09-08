@@ -30,6 +30,7 @@ export interface AdPlatformConfig {
   api_secret?: string;
   x_oauth_token?: string;
   x_oauth_token_secret?: string;
+  conversion_id?: string;
   // Google
   customer_id?: string;
   conversion_action_id?: string;
@@ -412,19 +413,20 @@ export async function claimAdConversionSend(
   // 同じ鍵で金額・クリックID等が変われば別内容。再送ではなく拒否する。
   if (!fingerprintMatches(existing.request_body, fingerprint)) return 'mismatch';
   if (existing.status === 'sent') return 'skip-sent';
-  if (existing.status === 'pending') {
+  if (existing.status !== 'failed') {
     // 確保したまま落ちた分は永久に止めない。古い pending だけ取り直す。
     const ageMs = Date.now() - Date.parse(existing.created_at);
     if (!Number.isFinite(ageMs) || ageMs <= AD_CONVERSION_PENDING_TAKEOVER_MS) return 'skip-inflight';
   }
-  // 失敗済み・古い pending は1回だけ取り直す。同時に取り合ったら勝った1件だけ送る。
+  // 失敗済み・古い pending を取り直す。見た状態・時刻を条件に入れ、
+  // 同時に取り合っても勝った1件だけ送る。時刻も更新して連鎖を止める。
   const took = await db
     .prepare(
-      `UPDATE ad_conversion_logs SET status = 'pending', request_body = ?
+      `UPDATE ad_conversion_logs SET status = 'pending', request_body = ?, created_at = ?
        WHERE ad_platform_id = ? AND friend_id = ? AND event_name = ? AND idempotency_key = ?
-         AND status IN ('failed', 'pending')`,
+         AND status = ? AND created_at = ?`,
     )
-    .bind(fingerprint, opts.platformId, opts.friendId, opts.eventName, opts.idempotencyKey)
+    .bind(fingerprint, now, opts.platformId, opts.friendId, opts.eventName, opts.idempotencyKey, existing.status, existing.created_at)
     .run<{ success: boolean; meta?: { changes?: number } }>();
   const changes = (took as unknown as { meta?: { changes?: number } }).meta?.changes ?? 0;
   return changes > 0 ? 'send' : 'skip-inflight';

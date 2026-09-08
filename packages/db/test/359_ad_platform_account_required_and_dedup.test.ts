@@ -111,7 +111,7 @@ describe('359 帰属必須・重複禁止・履歴訂正(#638)', () => {
     expect(other.line_account_id).toBe('a1');
   });
 
-  it('履歴の帰属は媒体設定を優先して直す', () => {
+  it('履歴の帰属は媒体設定に寄せる。媒体不明は不明に戻す', () => {
     const raw = new Database(':memory:');
     raw.pragma('foreign_keys = ON');
     raw.exec(BASE_SCHEMA);
@@ -131,9 +131,37 @@ describe('359 帰属必須・重複禁止・履歴訂正(#638)', () => {
       id: string; line_account_id: string | null;
     }>;
     expect(rows).toEqual([
-      { id: 'legacy', line_account_id: 'a2' },
+      { id: 'legacy', line_account_id: null },
       { id: 'moved', line_account_id: 'a1' },
       { id: 'unmoved', line_account_id: 'a1' },
+    ]);
+  });
+
+  it('重複設定は新しい方を残し、記録を付け替える', () => {
+    const raw = new Database(':memory:');
+    raw.pragma('foreign_keys = ON');
+    raw.exec(BASE_SCHEMA);
+    raw.exec(migration346);
+    raw.exec(`INSERT INTO line_accounts (id) VALUES ('a1')`);
+    raw.exec(`INSERT INTO friends (id, line_account_id) VALUES ('f1', 'a1')`);
+    raw.exec(`INSERT INTO ad_platforms (id, name, line_account_id, created_at, updated_at)
+              VALUES ('old', 'meta', 'a1', '2026-01-01T00:00:00.000+09:00', '2026-01-02T00:00:00.000+09:00'),
+                     ('new', 'meta', 'a1', '2026-02-01T00:00:00.000+09:00', '2026-03-01T00:00:00.000+09:00')`);
+    raw.exec(`INSERT INTO ad_conversion_logs
+              (id, ad_platform_id, friend_id, line_account_id, event_name, status, idempotency_key, created_at)
+              VALUES ('log-old', 'old', 'f1', 'a1', 'Purchase', 'sent', 'k:1', '2026-04-01T00:00:00.000+09:00'),
+                     ('log-new', 'new', 'f1', 'a1', 'Purchase', 'failed', 'k:1', '2026-05-01T00:00:00.000+09:00'),
+                     ('log solo', 'old', 'f1', 'a1', 'Lead', 'sent', 'k:2', '2026-04-01T00:00:00.000+09:00')`);
+    raw.exec(migration);
+
+    expect(raw.prepare(`SELECT id FROM ad_platforms ORDER BY id`).all()).toEqual([{ id: 'new' }]);
+    const logs = raw.prepare(
+      `SELECT id, ad_platform_id FROM ad_conversion_logs ORDER BY id`,
+    ).all() as Array<{ id: string; ad_platform_id: string }>;
+    // ぶつかった同じ鍵は新しい方だけ残し、単独の記録は付け替える。
+    expect(logs).toEqual([
+      { id: 'log solo', ad_platform_id: 'new' },
+      { id: 'log-new', ad_platform_id: 'new' },
     ]);
   });
 
