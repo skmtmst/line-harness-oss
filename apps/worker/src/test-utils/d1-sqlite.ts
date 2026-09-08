@@ -47,12 +47,14 @@ function wrap(raw: Database.Database, sql: string, args: unknown[]) {
 }
 
 /** bootstrap.sql を流した空のDBを作る。 */
-export function createTestD1(): SqliteD1 {
+export function createTestD1(options?: { foreignKeys?: boolean }): SqliteD1 {
   const raw = new Database(':memory:')
   raw.exec(readFileSync(join(DB_PKG_ROOT, 'bootstrap.sql'), 'utf8'))
   // 参照整合性は本番の D1 と同じく既定で切っておく。ここだけ厳しくすると
   // テストのためだけに余分な行を用意することになり、読みにくくなる。
-  raw.pragma('foreign_keys = OFF')
+  // ただし外部キーに関わる不整合 (誤った通 ID の保存など) は OFF では隠れる。
+  // その種の回帰テストは { foreignKeys: true } で作り、実 D1 と同じ制約で確かめる。
+  raw.pragma(`foreign_keys = ${options?.foreignKeys ? 'ON' : 'OFF'}`)
 
   const db = {
     prepare: (sql: string) => ({
