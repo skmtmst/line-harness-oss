@@ -10,6 +10,11 @@ const mocks = vi.hoisted(() => ({
   derivatives: vi.fn(),
   bulk: vi.fn(),
   recordBulk: vi.fn(),
+  receipt: vi.fn(),
+  reconcile: vi.fn(),
+  claim: vi.fn(),
+  complete: vi.fn(),
+  getState: vi.fn(),
   resolveCredential: vi.fn(),
   push: vi.fn(),
   consumeStepUp: vi.fn(),
@@ -26,6 +31,11 @@ vi.mock('@line-crm/db', () => ({
   getPhotoDerivatives: mocks.derivatives,
   applyBulkPhotoDecisions: mocks.bulk,
   recordBulkDecisionNotificationResult: mocks.recordBulk,
+  getBulkDecisionReceipt: mocks.receipt,
+  reconcileBulkNotificationOutcomes: mocks.reconcile,
+  claimPhotoNotificationDelivery: mocks.claim,
+  completePhotoNotificationDelivery: mocks.complete,
+  getPhotoNotificationState: mocks.getState,
   resolveLineCredential: mocks.resolveCredential,
   consumeStepUpGrant: mocks.consumeStepUp,
   issuePhotoOriginalDownload: mocks.issueDownload,
@@ -55,8 +65,9 @@ function harness(options: { permissions?: string[]; role?: 'owner' | 'admin' | '
 
 type BulkEntry = { query: string; bindings: unknown[] };
 
-function bulkHarness(options: { recipients?: string[] } = {}) {
+function bulkHarness(options: { recipients?: string[]; failRun?: (query: string) => boolean } = {}) {
   const batches: BulkEntry[][] = [];
+  const runs: BulkEntry[] = [];
   const known = new Set(options.recipients ?? []);
   const db = {
     prepare(query: string) {
@@ -75,7 +86,11 @@ function bulkHarness(options: { recipients?: string[] } = {}) {
             channel_access_token: 'token', channel_access_token_encrypted: null,
           };
         },
-        async run() { return { success: true, meta: { changes: 1 } }; },
+        async run() {
+          runs.push({ query, bindings: [...entry.bindings] });
+          if (options.failRun?.(query)) throw new Error('D1 unavailable');
+          return { success: true, meta: { changes: 1 } };
+        },
       };
       return statement;
     },
@@ -95,7 +110,7 @@ function bulkHarness(options: { recipients?: string[] } = {}) {
     await next();
   });
   app.route('/', nenPhotoOperations);
-  return { app, batches };
+  return { app, batches, runs };
 }
 
 beforeEach(() => {
@@ -115,6 +130,11 @@ beforeEach(() => {
   mocks.derivatives.mockResolvedValue({ reviewVersion: 1, items: [], knownUrls: [] });
   mocks.bulk.mockResolvedValue({ kind: 'created', result: { updatedCount: 1 } });
   mocks.recordBulk.mockResolvedValue(true);
+  mocks.receipt.mockResolvedValue(null);
+  mocks.reconcile.mockResolvedValue({ items: [], notificationFailures: [] });
+  mocks.claim.mockResolvedValue({ generation: 1 });
+  mocks.complete.mockResolvedValue(true);
+  mocks.getState.mockResolvedValue(null);
   mocks.resolveCredential.mockResolvedValue('resolved-token');
   mocks.push.mockResolvedValue(undefined);
   mocks.consumeStepUp.mockResolvedValue(true);
@@ -247,7 +267,7 @@ describe('photo review operations API', () => {
         ],
       },
     });
-    const { app, batches } = bulkHarness({ recipients: ['photo-1', 'photo-2'] });
+    const { app, runs } = bulkHarness({ recipients: ['photo-1', 'photo-2'] });
     const response = await app.request('/api/nen-members/photos/decisions/bulk', {
       method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'bulk-notify-1' },
       body: JSON.stringify({
@@ -275,12 +295,16 @@ describe('photo review operations API', () => {
       [{ type: 'text', text: expect.stringContaining('人の顔や個人情報が写っている') }],
       'nen-photo-review:decision-2', expect.any(Function),
     );
-    const submissions = batches.flat().filter((entry) => entry.query.includes('review_notification_status'));
-    expect(submissions).toHaveLength(2);
-    expect(submissions[0].bindings[0]).toBe('sent');
-    const events = batches.flat().filter((entry) => entry.query.includes('nen_photo_review_events'));
-    expect(events).toHaveLength(2);
-    expect(events[0].bindings[0]).toBe('sent');
+    expect(mocks.claim).toHaveBeenCalledTimes(2);
+    expect(mocks.claim).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      decisionId: 'decision-1', lineAccountId: 'account-a',
+    }));
+    expect(mocks.complete).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      decisionId: 'decision-2', generation: 1, status: 'sent',
+    }));
+    const mirrors = runs.filter((entry) => entry.query.includes('review_notification_status'));
+    expect(mirrors).toHaveLength(2);
+    expect(mirrors[0].bindings[0]).toBe('sent');
     expect(mocks.recordBulk).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       lineAccountId: 'account-a', actorId: 'staff-a', idempotencyKey: 'bulk-notify-1',
     }));
@@ -301,7 +325,7 @@ describe('photo review operations API', () => {
     mocks.push.mockImplementation(async (...args: unknown[]) => {
       if (args[4] === 'nen-photo-review:decision-2') throw new Error('LINE unavailable');
     });
-    const { app, batches } = bulkHarness({ recipients: ['photo-1', 'photo-2'] });
+    const { app } = bulkHarness({ recipients: ['photo-1', 'photo-2'] });
     const response = await app.request('/api/nen-members/photos/decisions/bulk', {
       method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'bulk-notify-2' },
       body: JSON.stringify({
@@ -325,8 +349,114 @@ describe('photo review operations API', () => {
       { photoId: 'photo-2', error: 'LINE unavailable' },
       { photoId: 'photo-9', error: '通知先が見つかりません' },
     ]);
-    const events = batches.flat().filter((entry) => entry.query.includes('nen_photo_review_events'));
-    expect(events.map((entry) => entry.bindings[0])).toEqual(['sent', 'failed', 'failed']);
+    expect(mocks.complete).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      decisionId: 'decision-1', status: 'sent',
+    }));
+    expect(mocks.complete).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      decisionId: 'decision-2', status: 'failed', error: 'LINE unavailable',
+    }));
+  });
+
+  it('送信成功後の記録失敗は送達不明で残し、審査自体は確定する', async () => {
+    mocks.bulk.mockResolvedValue({
+      kind: 'created',
+      result: {
+        updatedCount: 1,
+        items: [{ photoId: 'photo-1', decision: 'approve', reviewVersion: 2, decisionId: 'decision-1' }],
+      },
+    });
+    // 確定の書き込みが落ちても、送信は終わっている。
+    mocks.complete.mockRejectedValueOnce(new Error('D1 unavailable'));
+    const { app } = bulkHarness({ recipients: ['photo-1'] });
+    const response = await app.request('/api/nen-members/photos/decisions/bulk', {
+      method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'bulk-unknown-1' },
+      body: JSON.stringify({
+        lineAccountId: 'account-a',
+        decisions: [{ photoId: 'photo-1', decision: 'approve', expectedVersion: 1 }],
+      }),
+    });
+    expect(response.status).toBe(201);
+    const body = await response.json() as {
+      data: {
+        items: Array<{ notificationStatus: string; notificationError?: string }>;
+        notificationFailures: Array<{ photoId: string; error: string }>;
+      };
+    };
+    expect(body.data.items.map((item) => item.notificationStatus)).toEqual(['failed']);
+    expect(body.data.items[0].notificationError).toContain('確定できません');
+    expect(body.data.notificationFailures).toHaveLength(1);
+    expect(mocks.push).toHaveBeenCalledTimes(1);
+    // 受付票への記録は試みる（失敗しても次の同じ再実行鍵で復旧する）。
+    expect(mocks.recordBulk).toHaveBeenCalledTimes(1);
+  });
+
+  it('記録失敗後の同じ再実行鍵では送達台帳から結果を作り直す', async () => {
+    const preNotification = {
+      updatedCount: 1,
+      items: [{ photoId: 'photo-1', decision: 'approve', reviewVersion: 2, decisionId: 'decision-1' }],
+    };
+    mocks.bulk.mockResolvedValue({ kind: 'duplicate', result: preNotification });
+    mocks.receipt.mockResolvedValue({ receiptId: 'bulk-old', result: preNotification });
+    mocks.reconcile.mockResolvedValue({
+      items: [{ ...preNotification.items[0], notificationStatus: 'sent' as const }],
+      notificationFailures: [],
+    });
+    const { app } = bulkHarness({ recipients: ['photo-1'] });
+    const response = await app.request('/api/nen-members/photos/decisions/bulk', {
+      method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'bulk-unknown-1' },
+      body: JSON.stringify({
+        lineAccountId: 'account-a',
+        decisions: [{ photoId: 'photo-1', decision: 'approve', expectedVersion: 1 }],
+      }),
+    });
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      duplicate: boolean;
+      data: { items: Array<{ notificationStatus: string }>; reconciled?: boolean };
+    };
+    expect(body.duplicate).toBe(true);
+    expect(body.data.items.map((item) => item.notificationStatus)).toEqual(['sent']);
+    expect(body.data.reconciled).toBe(true);
+    expect(mocks.push).not.toHaveBeenCalled();
+    expect(mocks.reconcile).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      lineAccountId: 'account-a',
+    }));
+    expect(mocks.recordBulk).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      receiptId: 'bulk-old', idempotencyKey: 'bulk-unknown-1',
+    }));
+  });
+
+  it('ほかの処理が通知中の対象は実行中文言で残し、残りを続ける', async () => {
+    mocks.bulk.mockResolvedValue({
+      kind: 'created',
+      result: {
+        updatedCount: 1,
+        items: [{ photoId: 'photo-1', decision: 'approve', reviewVersion: 2, decisionId: 'decision-1' }],
+      },
+    });
+    mocks.claim.mockResolvedValueOnce(null);
+    mocks.getState.mockResolvedValueOnce({
+      decisionId: 'decision-1', status: 'sending', error: null, generation: 1,
+      leaseId: 'lease-other', leaseExpiresAt: '2099-01-01T00:00:00.000Z', attemptCount: 1,
+    });
+    const { app } = bulkHarness({ recipients: ['photo-1'] });
+    const response = await app.request('/api/nen-members/photos/decisions/bulk', {
+      method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'bulk-busy-1' },
+      body: JSON.stringify({
+        lineAccountId: 'account-a',
+        decisions: [{ photoId: 'photo-1', decision: 'approve', expectedVersion: 1 }],
+      }),
+    });
+    expect(response.status).toBe(201);
+    const body = await response.json() as {
+      data: {
+        items: Array<{ notificationStatus: string; notificationError?: string }>;
+        notificationFailures: Array<{ photoId: string; error: string }>;
+      };
+    };
+    expect(body.data.items.map((item) => item.notificationStatus)).toEqual(['failed']);
+    expect(body.data.items[0].notificationError).toContain('実行中');
+    expect(mocks.push).not.toHaveBeenCalled();
   });
 
   it('重複鍵の再送では保存済み結果を返すだけでLINEを再送しない', async () => {
@@ -348,6 +478,8 @@ describe('photo review operations API', () => {
     expect(await response.json()).toMatchObject({ duplicate: true, data: stored });
     expect(mocks.push).not.toHaveBeenCalled();
     expect(mocks.recordBulk).not.toHaveBeenCalled();
+    expect(mocks.reconcile).not.toHaveBeenCalled();
+    expect(mocks.receipt).not.toHaveBeenCalled();
   });
 
   it('一括は権限なし403と0件400で審査も通知もしない', async () => {

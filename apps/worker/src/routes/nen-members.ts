@@ -1,6 +1,13 @@
 import { Hono, type Context } from 'hono';
 import type { Message } from '@line-crm/line-sdk';
-import { getFriendByLineUserIdForAccount, jstNow, resolveLineCredential } from '@line-crm/db';
+import {
+  claimPhotoNotificationDelivery,
+  completePhotoNotificationDelivery,
+  getFriendByLineUserIdForAccount,
+  getPhotoNotificationState,
+  jstNow,
+  resolveLineCredential,
+} from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { requirePhotoPermission } from './nen-photo-operations.js';
@@ -219,6 +226,114 @@ export async function loadPhotoReviewRecipient(
        LEFT JOIN nen_ec_member_snapshots s ON s.friend_id = ps.friend_id
       WHERE ps.id = ? AND ps.line_account_id = ? AND f.line_account_id = ?`,
   ).bind(input.photoId, input.lineAccountId, input.lineAccountId).first<ReviewPhotoRow>();
+}
+
+/**
+ * 通知leaseの有効期間。確定に失敗した送信中は、切れた後に同じ安定keyで
+ * 再送・再照合できる（送達状態機械）。
+ */
+export const PHOTO_NOTIFICATION_LEASE_TTL_MS = 5 * 60 * 1000;
+
+export async function mirrorReviewNotificationStatus(
+  db: D1Database,
+  input: { photoId: string; lineAccountId: string; status: 'pending' | 'sent' | 'failed'; now?: string },
+): Promise<void> {
+  try {
+    await db.prepare(
+      `UPDATE nen_photo_submissions SET review_notification_status = ?, updated_at = ?
+        WHERE id = ? AND line_account_id = ?`,
+    ).bind(
+      input.status, input.now ?? new Date().toISOString(), input.photoId, input.lineAccountId,
+    ).run();
+  } catch (error) {
+    console.error('mirror review notification status failed', input.photoId, error);
+  }
+}
+
+/*
+ * 通知の送達オーケストレーション。claim→送信（安定key）→世代条件付き確定。
+ * 確定に失敗したら送達不明のまま残し、lease切れ後の再送で復旧できる。
+ * relayed は今回の呼び出しが実際に送信したかどうか。
+ */
+export async function deliverPhotoReviewNotification(
+  db: D1Database,
+  c: Context<Env>,
+  recipient: ReviewPhotoRow,
+  input: {
+    lineAccountId: string;
+    photoId: string;
+    status: 'adopted' | 'rejected';
+    reasonCode: PhotoReviewReasonCode | null;
+    reasonNote: string | null;
+    decisionId: string;
+  },
+): Promise<{ notificationStatus: 'sent' | 'failed'; notificationError: string | null; busy: boolean; relayed: boolean }> {
+  const now = new Date().toISOString();
+  const claimed = await claimPhotoNotificationDelivery(db, {
+    decisionId: input.decisionId, lineAccountId: input.lineAccountId,
+    leaseId: crypto.randomUUID(),
+    leaseExpiresAt: new Date(Date.now() + PHOTO_NOTIFICATION_LEASE_TTL_MS).toISOString(),
+    now,
+  });
+  if (!claimed) {
+    const state = await getPhotoNotificationState(db, {
+      decisionId: input.decisionId, lineAccountId: input.lineAccountId,
+    }).catch(() => null);
+    if (state?.status === 'sent') {
+      await mirrorReviewNotificationStatus(db, {
+        photoId: input.photoId, lineAccountId: input.lineAccountId, status: 'sent',
+      });
+      return { notificationStatus: 'sent', notificationError: null, busy: false, relayed: false };
+    }
+    if (state?.status === 'sending') {
+      return {
+        notificationStatus: 'failed', busy: true, relayed: false,
+        notificationError: 'ほかの処理が通知を実行中です。しばらくしてから再送してください。',
+      };
+    }
+    return {
+      notificationStatus: 'failed', busy: false, relayed: false,
+      notificationError: '通知の送信権を確保できませんでした。再送してください。',
+    };
+  }
+  let sendError: string | null = null;
+  let relayed = false;
+  try {
+    await sendPhotoReviewNotification(
+      c, recipient, input.status, input.reasonCode, input.reasonNote, input.decisionId,
+    );
+    relayed = true;
+  } catch (error) {
+    sendError = error instanceof Error ? error.message : '審査結果をLINEで通知できませんでした';
+  }
+  try {
+    const completed = await completePhotoNotificationDelivery(db, {
+      decisionId: input.decisionId, lineAccountId: input.lineAccountId,
+      generation: claimed.generation, status: sendError ? 'failed' : 'sent', error: sendError,
+    });
+    if (completed) {
+      const finalStatus = sendError ? 'failed' : 'sent';
+      await mirrorReviewNotificationStatus(db, {
+        photoId: input.photoId, lineAccountId: input.lineAccountId, status: finalStatus,
+      });
+      return { notificationStatus: finalStatus, notificationError: sendError, busy: false, relayed };
+    }
+  } catch (error) {
+    console.error('complete photo notification failed', input.decisionId, error);
+  }
+  const state = await getPhotoNotificationState(db, {
+    decisionId: input.decisionId, lineAccountId: input.lineAccountId,
+  }).catch(() => null);
+  if (state?.status === 'sent') {
+    await mirrorReviewNotificationStatus(db, {
+      photoId: input.photoId, lineAccountId: input.lineAccountId, status: 'sent',
+    });
+    return { notificationStatus: 'sent', notificationError: null, busy: false, relayed };
+  }
+  return {
+    notificationStatus: 'failed', busy: false, relayed,
+    notificationError: '送達の記録を確定できませんでした。しばらくしてから再送してください。',
+  };
 }
 
 function mapPet(row: Record<string, unknown>) {
@@ -1013,47 +1128,21 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
     return c.json({ success: false, error: '同じ写真がほかの担当者により更新されました' }, 409);
   }
   await syncNenPhotoTags(c.env.DB, String(photo.friend_id));
-  let notificationStatus: 'sent' | 'failed' = 'sent';
-  let notificationError: string | null = null;
-  try {
-    await sendPhotoReviewNotification(
-      c,
-      photo,
-      status as 'adopted' | 'rejected',
-      reasonCode ? reasonCode as PhotoReviewReasonCode : null,
-      reasonNote || null,
-      decisionId,
-    );
-  } catch (error) {
-    notificationStatus = 'failed';
-    notificationError = error instanceof Error ? error.message : '審査結果をLINEで通知できませんでした';
-  }
-  const notificationUpdatedAt = jstNow();
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      `UPDATE nen_photo_submissions SET review_notification_status = ?, updated_at = ? WHERE id = ?`,
-    ).bind(notificationStatus, notificationUpdatedAt, photo.id),
-    c.env.DB.prepare(
-      `UPDATE nen_photo_review_events
-          SET notification_status = ?, notification_error = ?, notification_attempt_count = 1,
-              notification_first_failed_at = ?, notification_sent_at = ?, updated_at = ?
-        WHERE id = ?`,
-    ).bind(
-      notificationStatus,
-      notificationError,
-      notificationStatus === 'failed' ? notificationUpdatedAt : null,
-      notificationStatus === 'sent' ? notificationUpdatedAt : null,
-      notificationUpdatedAt,
-      decisionId,
-    ),
-  ]);
+  const delivery = await deliverPhotoReviewNotification(c.env.DB, c, photo, {
+    lineAccountId: accountId,
+    photoId: photo.id,
+    status: status as 'adopted' | 'rejected',
+    reasonCode: reasonCode ? reasonCode as PhotoReviewReasonCode : null,
+    reasonNote: reasonNote || null,
+    decisionId,
+  });
   return c.json({
     success: true,
     data: {
       awardedPoints: awarded,
       pointBalance: null,
       pointSync,
-      notificationStatus,
+      notificationStatus: delivery.notificationStatus,
     },
   });
 });
@@ -1065,6 +1154,7 @@ nenMembers.post('/api/nen-members/photos/:id/notification/retry', requireRole('o
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
+  const now = new Date().toISOString();
   const row = await c.env.DB.prepare(
     `SELECT ps.id, ps.friend_id, f.line_user_id, f.line_account_id, f.is_following,
             a.channel_access_token, a.channel_access_token_encrypted,
@@ -1074,46 +1164,43 @@ nenMembers.post('/api/nen-members/photos/:id/notification/retry', requireRole('o
        JOIN line_accounts a ON a.id = f.line_account_id
        JOIN nen_photo_review_events e ON e.photo_id = ps.id
       WHERE ps.id = ? AND ps.line_account_id = ? AND f.line_account_id = ?
-        AND e.notification_status = 'failed'
+        AND (e.notification_status = 'failed'
+          OR (e.notification_status = 'sending'
+            AND (e.notification_lease_expires_at IS NULL OR e.notification_lease_expires_at <= ?)))
       ORDER BY e.created_at DESC LIMIT 1`,
-  ).bind(c.req.param('id'), accountId, accountId).first<ReviewPhotoRow & {
+  ).bind(c.req.param('id'), accountId, accountId, now).first<ReviewPhotoRow & {
     decision_id: string;
     to_status: 'adopted' | 'rejected';
     reason_code: PhotoReviewReasonCode | null;
     reason_note: string | null;
   }>();
-  if (!row) return c.json({ success: false, error: '再送する通知がありません' }, 409);
-  try {
-    await sendPhotoReviewNotification(
-      c, row, row.to_status, row.reason_code, row.reason_note, row.decision_id,
-    );
-  } catch (error) {
-    const message = error instanceof Error ? error.message : '審査結果をLINEで通知できませんでした';
-    const failedAt = jstNow();
-    await c.env.DB.prepare(
-      `UPDATE nen_photo_review_events
-          SET notification_status = 'failed', notification_error = ?,
-              notification_attempt_count = notification_attempt_count + 1,
-              notification_first_failed_at = COALESCE(notification_first_failed_at, ?),
-              updated_at = ?
-        WHERE id = ?`,
-    ).bind(message, failedAt, failedAt, row.decision_id).run();
-    return c.json({ success: false, error: message }, 502);
+  if (!row) {
+    const settled = await c.env.DB.prepare(
+      `SELECT e.notification_status AS notification_status
+         FROM nen_photo_review_events e
+        WHERE e.photo_id = ? AND e.line_account_id = ?
+        ORDER BY e.created_at DESC LIMIT 1`,
+    ).bind(c.req.param('id'), accountId).first<{ notification_status: string }>();
+    if (settled?.notification_status === 'sent') {
+      return c.json({ success: true, data: { notificationStatus: 'sent', resent: false } });
+    }
+    return c.json({ success: false, error: '再送する通知がありません' }, 409);
   }
-  const now = jstNow();
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      `UPDATE nen_photo_submissions SET review_notification_status = 'sent', updated_at = ? WHERE id = ?`,
-    ).bind(now, row.id),
-    c.env.DB.prepare(
-      `UPDATE nen_photo_review_events
-          SET notification_status = 'sent',
-              notification_attempt_count = notification_attempt_count + 1,
-              notification_sent_at = ?, updated_at = ?
-        WHERE id = ?`,
-    ).bind(now, now, row.decision_id),
-  ]);
-  return c.json({ success: true, data: { notificationStatus: 'sent' } });
+  const delivery = await deliverPhotoReviewNotification(c.env.DB, c, row, {
+    lineAccountId: accountId,
+    photoId: row.id,
+    status: row.to_status,
+    reasonCode: row.reason_code,
+    reasonNote: row.reason_note,
+    decisionId: row.decision_id,
+  });
+  if (delivery.notificationStatus === 'sent') {
+    return c.json({ success: true, data: { notificationStatus: 'sent', resent: delivery.relayed } });
+  }
+  if (delivery.busy) {
+    return c.json({ success: false, error: delivery.notificationError }, 409);
+  }
+  return c.json({ success: false, error: delivery.notificationError }, 502);
 });
 
 nenMembers.post('/api/nen-members/tags/resync', requireRole('owner', 'admin'), async (c) => {
