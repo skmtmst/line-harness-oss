@@ -941,3 +941,224 @@ describe('PATCH /api/booking/admin/requests/:id の再試行 (N-065)', () => {
     }
   });
 });
+
+describe('staff breaks API (N-405 #655)', () => {
+  function seedBreaks(sqlite: Database.Database) {
+    sqlite.exec(readFileSync(join(process.cwd(), '../../packages/db/bootstrap.sql'), 'utf8'));
+    sqlite.exec(`
+      INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+      VALUES ('acc1','channel-1','A店','token','secret'),
+             ('acc2','channel-2','B店','token2','secret2');
+      INSERT INTO staff (id, line_account_id, name, display_name)
+      VALUES ('s1','acc1','担当A','担当A'),
+             ('s2','acc2','担当B','担当B'),
+             ('owner-1','acc1','Owner','Owner');
+      INSERT INTO booking_settings (id, line_account_id, timezone)
+      VALUES ('bs1','acc1','Asia/Tokyo');
+      INSERT INTO staff_availability_rules (id, staff_id, weekday, start_time, end_time, is_active)
+      VALUES ('r1','s1',1,'09:00','19:00',1),
+             ('r2','s1',2,'09:00','19:00',1);
+      INSERT INTO staff_shifts (id, staff_id, work_date, start_time, end_time)
+      VALUES ('sh1','s1','2026-09-23','10:00','17:00');
+    `);
+  }
+
+  const getVersion = async (app: ReturnType<typeof makeApp>['app'], env: unknown, kind: 'breaks' | 'break-dates') => {
+    const res = await app.request(
+      `/api/booking/admin/staff/s1/${kind}?account_id=acc1`, {}, env as never,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as { version: string; breaks: Array<{ id: string }> };
+    return body;
+  };
+
+  const putKind = (
+    app: ReturnType<typeof makeApp>['app'],
+    env: unknown,
+    kind: 'breaks' | 'break-dates',
+    body: unknown,
+  ) => app.request(
+    `/api/booking/admin/staff/s1/${kind}?account_id=acc1`,
+    { method: 'PUT', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } },
+    env as never,
+    execCtx,
+  );
+
+  test('実SQLiteで保存し、読み直しに残る(2回目の保存も残る)', async () => {
+    const sqlite = new Database(':memory:');
+    try {
+      seedBreaks(sqlite);
+      const { app, env } = makeApp(sqliteAsD1(sqlite));
+      const first = await getVersion(app, env, 'breaks');
+      const saved = await putKind(app, env, 'breaks', {
+        expectedVersion: first.version,
+        breaks: [{ weekday: 1, start_time: '12:00', end_time: '13:00' }],
+      });
+      expect(saved.status).toBe(200);
+      const savedBody = await saved.json() as { ok: boolean; count: number; version: string };
+      expect(savedBody).toMatchObject({ ok: true, count: 1 });
+      expect(savedBody.version).not.toBe(first.version);
+
+      const second = await putKind(app, env, 'breaks', {
+        expectedVersion: savedBody.version,
+        breaks: [
+          { weekday: 1, start_time: '12:00', end_time: '13:00' },
+          { weekday: 2, start_time: '12:00', end_time: '13:00' },
+        ],
+      });
+      expect(second.status).toBe(200);
+
+      const got = await getVersion(app, env, 'breaks');
+      expect(got.breaks).toHaveLength(2);
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  test('古い版での保存は409で最新を返す', async () => {
+    const sqlite = new Database(':memory:');
+    try {
+      seedBreaks(sqlite);
+      const { app, env } = makeApp(sqliteAsD1(sqlite));
+      const first = await getVersion(app, env, 'breaks');
+      const saved = await putKind(app, env, 'breaks', {
+        expectedVersion: first.version,
+        breaks: [{ weekday: 1, start_time: '12:00', end_time: '13:00' }],
+      });
+      expect(saved.status).toBe(200);
+
+      const stale = await putKind(app, env, 'breaks', {
+        expectedVersion: first.version,
+        breaks: [{ weekday: 1, start_time: '15:00', end_time: '16:00' }],
+      });
+      expect(stale.status).toBe(409);
+      const staleBody = await stale.json() as {
+        error: string;
+        data: { version: string; breaks: Array<{ start_time: string }> };
+      };
+      expect(staleBody.error).toBe('version_conflict');
+      expect(staleBody.data.breaks).toHaveLength(1);
+      expect(staleBody.data.breaks[0].start_time).toBe('12:00');
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  test('重なり・勤務外・逆転は422、形の誤りは400', async () => {
+    const sqlite = new Database(':memory:');
+    try {
+      seedBreaks(sqlite);
+      const { app, env } = makeApp(sqliteAsD1(sqlite));
+      const { version } = await getVersion(app, env, 'breaks');
+
+      const overlap = await putKind(app, env, 'breaks', {
+        expectedVersion: version,
+        breaks: [
+          { weekday: 1, start_time: '12:00', end_time: '13:00' },
+          { weekday: 1, start_time: '12:30', end_time: '13:30' },
+        ],
+      });
+      expect(overlap.status).toBe(422);
+      await expect(overlap.json()).resolves.toEqual({ error: 'break_overlap' });
+
+      const outside = await putKind(app, env, 'breaks', {
+        expectedVersion: version,
+        breaks: [{ weekday: 3, start_time: '12:00', end_time: '13:00' }],
+      });
+      expect(outside.status).toBe(422);
+      await expect(outside.json()).resolves.toEqual({ error: 'break_outside_working_hours' });
+
+      const inverted = await putKind(app, env, 'breaks', {
+        expectedVersion: version,
+        breaks: [{ weekday: 1, start_time: '13:00', end_time: '12:00' }],
+      });
+      expect(inverted.status).toBe(422);
+      await expect(inverted.json()).resolves.toEqual({ error: 'invalid_time_range' });
+
+      const noVersion = await putKind(app, env, 'breaks', {
+        breaks: [{ weekday: 1, start_time: '12:00', end_time: '13:00' }],
+      });
+      expect(noVersion.status).toBe(400);
+      await expect(noVersion.json()).resolves.toEqual({ error: 'invalid_version' });
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  test('別のアカウントの担当者は404、範囲外のアカウントは403', async () => {
+    const sqlite = new Database(':memory:');
+    try {
+      seedBreaks(sqlite);
+      const { app, env } = makeApp(sqliteAsD1(sqlite));
+      const other = await app.request(
+        '/api/booking/admin/staff/s2/breaks?account_id=acc1', {}, env as never,
+      );
+      expect(other.status).toBe(404);
+      await expect(other.json()).resolves.toEqual({ error: 'staff_not_found_in_account' });
+
+      accountAccessMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
+      const forbidden = await app.request(
+        '/api/booking/admin/staff/s1/breaks?account_id=other', {}, env as never,
+      );
+      expect(forbidden.status).toBe(403);
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  test('日付指定の休憩はシフト内なら保存でき、DSTのgapは拒否する', async () => {
+    const sqlite = new Database(':memory:');
+    try {
+      seedBreaks(sqlite);
+      sqlite.exec(`
+        UPDATE booking_settings SET timezone = 'America/New_York' WHERE id = 'bs1';
+      `);
+      const { app, env } = makeApp(sqliteAsD1(sqlite));
+      const { version } = await getVersion(app, env, 'break-dates');
+
+      // 2026-09-23 はシフト(10:00〜17:00)がある日。通常の休憩は通る。
+      const ok = await putKind(app, env, 'break-dates', {
+        expectedVersion: version,
+        breaks: [{ work_date: '2026-09-23', start_time: '12:00', end_time: '13:00' }],
+      });
+      expect(ok.status).toBe(200);
+      const okBody = await ok.json() as {
+        ok: boolean;
+        breaks: Array<{ start_utc_offset: string; end_utc_offset: string; time_zone: string }>;
+      };
+      expect(okBody.ok).toBe(true);
+      expect(okBody.breaks[0].time_zone).toBe('America/New_York');
+      expect(okBody.breaks[0].start_utc_offset).toBe('-04:00');
+
+      // 2026-03-08 02:30 は New York の春のgap(存在しない時刻)。
+      const gapVersion = (await getVersion(app, env, 'break-dates')).version;
+      const gap = await putKind(app, env, 'break-dates', {
+        expectedVersion: gapVersion,
+        breaks: [{ work_date: '2026-03-08', start_time: '02:30', end_time: '03:30' }],
+      });
+      expect(gap.status).toBe(422);
+      await expect(gap.json()).resolves.toEqual({ error: 'dst_gap' });
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  test('日付指定の休憩はシフトが無い日は通常勤務で判定し、無い日は拒否する', async () => {
+    const sqlite = new Database(':memory:');
+    try {
+      seedBreaks(sqlite);
+      const { app, env } = makeApp(sqliteAsD1(sqlite));
+      const { version } = await getVersion(app, env, 'break-dates');
+
+      // 2026-09-24(木曜)に勤務もシフトも無い → 拒否。
+      const noWork = await putKind(app, env, 'break-dates', {
+        expectedVersion: version,
+        breaks: [{ work_date: '2026-09-24', start_time: '12:00', end_time: '13:00' }],
+      });
+      expect(noWork.status).toBe(422);
+      await expect(noWork.json()).resolves.toEqual({ error: 'break_outside_working_hours' });
+    } finally {
+      sqlite.close();
+    }
+  });
+});

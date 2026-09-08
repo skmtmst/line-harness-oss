@@ -1091,6 +1091,49 @@ const spec = {
         responses: { '200': { description: 'OK' } },
       },
     },
+    // ── Booking staff breaks (N-405 #655) ────────────────────────────────────
+    '/api/booking/admin/staff/{id}/breaks': {
+      get: {
+        tags: ['Booking'],
+        summary: '担当者の休憩一覧取得',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Breaks with version' }, '404': { description: 'Staff not in account' } },
+      },
+      put: {
+        tags: ['Booking'],
+        summary: '担当者の休憩を週全体で置き換え',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { expectedVersion: { type: 'string' }, breaks: { type: 'array', maxItems: 28, items: { type: 'object', properties: { id: { type: 'string' }, weekday: { type: 'integer', minimum: 0, maximum: 6 }, start_time: { type: 'string' }, end_time: { type: 'string' } }, required: ['weekday', 'start_time', 'end_time'] } } }, required: ['breaks', 'expectedVersion'] } } } },
+        responses: { '200': { description: 'Replaced with version' }, '400': { description: 'Invalid request' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Staff not in account' }, '409': { description: 'Version conflict' }, '422': { description: 'Invalid weekday, overlap, outside hours, or time range' } },
+      },
+    },
+    '/api/booking/admin/staff/{id}/break-dates': {
+      get: {
+        tags: ['Booking'],
+        summary: '担当者の日付指定の休憩一覧取得',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Date breaks with version' }, '404': { description: 'Staff not in account' } },
+      },
+      put: {
+        tags: ['Booking'],
+        summary: '担当者の日付指定の休憩を全体で置き換え',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { expectedVersion: { type: 'string' }, breaks: { type: 'array', maxItems: 366, items: { type: 'object', properties: { id: { type: 'string' }, work_date: { type: 'string' }, start_time: { type: 'string' }, end_time: { type: 'string' } }, required: ['work_date', 'start_time', 'end_time'] } } }, required: ['breaks', 'expectedVersion'] } } } },
+        responses: { '200': { description: 'Replaced with version' }, '400': { description: 'Invalid request' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Staff not in account' }, '409': { description: 'Version conflict' }, '422': { description: 'Invalid date, DST gap, overlap, outside hours, or time range' } },
+      },
+    },
   },
   tags: [
     { name: 'Friends', description: '友だち管理' },
@@ -1102,6 +1145,7 @@ const spec = {
     { name: 'LINE Accounts', description: 'マルチLINEアカウント管理' },
     { name: 'Conversions', description: 'コンバージョン計測' },
     { name: 'Affiliates', description: 'アフィリエイト管理' },
+    { name: 'Booking', description: '予約設定' },
     { name: 'Webhook', description: 'LINE Webhook' },
   ],
 };
