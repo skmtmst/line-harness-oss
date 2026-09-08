@@ -5,6 +5,11 @@ import type { Env } from '../index.js';
 const mocks = {
   getConversionPoints: vi.fn(),
   getConversionPointById: vi.fn(),
+  // 配線試験用に本物と同じ1行規則。規則自体は packages/db の単体試験が固定する。
+  canRecordConversion: vi.fn(
+    (pointLineAccountId: string | null, friendLineAccountId: string | null) =>
+      pointLineAccountId === null || pointLineAccountId === friendLineAccountId,
+  ),
   createConversionPoint: vi.fn(),
   hasConversionPointActivity: vi.fn(),
   updateConversionPoint: vi.fn(),
@@ -325,9 +330,32 @@ describe('一覧', () => {
 describe('成果地点の停止', () => {
   it('削除操作は履歴を消さず停止処理を呼ぶ', async () => {
     mocks.getConversionPointById.mockResolvedValue(POINT);
-    const res = await req('/api/conversions/points/cp-1', 'DELETE');
+    mocks.stopConversionPoint.mockResolvedValue({ ...POINT, status: 'stopped', version: 2 });
+    const res = await req('/api/conversions/points/cp-1', 'DELETE', { expectedVersion: 1 });
     expect(res.status).toBe(200);
-    expect(mocks.stopConversionPoint).toHaveBeenCalledWith(env.DB, 'cp-1');
+    expect(mocks.stopConversionPoint).toHaveBeenCalledWith(env.DB, 'cp-1', 1);
+  });
+
+  it('版が無ければ400', async () => {
+    mocks.getConversionPointById.mockResolvedValue(POINT);
+    const res = await req('/api/conversions/points/cp-1', 'DELETE');
+    expect(res.status).toBe(400);
+    expect(mocks.stopConversionPoint).not.toHaveBeenCalled();
+  });
+
+  it('版がずれれば409で今の版を返す', async () => {
+    mocks.getConversionPointById.mockResolvedValue(POINT);
+    mocks.stopConversionPoint.mockRejectedValueOnce(new Error('conversion_point_version_conflict'));
+    const res = await req('/api/conversions/points/cp-1', 'DELETE', { expectedVersion: 2 });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ success: false, currentVersion: 1 });
+  });
+
+  it('停止済みなら409', async () => {
+    mocks.getConversionPointById.mockResolvedValue(STOPPED_POINT);
+    mocks.stopConversionPoint.mockRejectedValueOnce(new Error('conversion_point_already_stopped'));
+    const res = await req('/api/conversions/points/cp-1', 'DELETE', { expectedVersion: 1 });
+    expect(res.status).toBe(409);
   });
 });
 
@@ -342,10 +370,10 @@ describe('成果の受付の境界(N-255)', () => {
     created_at: '2026-09-01',
   };
 
-  function mockTrackAccounts() {
+  function mockTrackAccounts(pointAccount: string | null = 'acc-1', friendAccount: string | null = 'acc-1') {
     const first = vi.fn()
-      .mockResolvedValueOnce({ line_account_id: 'acc-1', status: 'active' })
-      .mockResolvedValueOnce({ line_account_id: 'acc-1' });
+      .mockResolvedValueOnce({ line_account_id: pointAccount, status: 'active' })
+      .mockResolvedValueOnce({ line_account_id: friendAccount });
     (env.DB.prepare as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
       bind: vi.fn(() => ({ first })),
     });
@@ -360,7 +388,7 @@ describe('成果の受付の境界(N-255)', () => {
     expect(res.status).toBe(201);
   });
 
-  it('別アカウントの友だちは403', async () => {
+  it('見られないアカウントが混ざれば403', async () => {
     mockTrackAccounts();
     vi.mocked(accountAccess.canAccessAllLineAccounts).mockResolvedValueOnce(false);
     const res = await req('/api/conversions/track', 'POST', {
@@ -368,6 +396,26 @@ describe('成果の受付の境界(N-255)', () => {
     });
     expect(res.status).toBe(403);
     expect(mocks.trackConversion).not.toHaveBeenCalled();
+  });
+
+  it('両方を見られても地点と友だちの交差記録は403', async () => {
+    // 職員は両アカウントを見られるが、組み合わせ自体が禁じられる。
+    mockTrackAccounts('acc-a', 'acc-b');
+    const res = await req('/api/conversions/track', 'POST', {
+      conversionPointId: 'cp-1', friendId: 'friend-a',
+    });
+    expect(res.status).toBe(403);
+    expect(mocks.trackConversion).not.toHaveBeenCalled();
+  });
+
+  it('全アカウント対象の地点なら交差して記録できる', async () => {
+    mockTrackAccounts(null, 'acc-b');
+    mocks.trackConversion.mockResolvedValue(EVENT);
+    const res = await req('/api/conversions/track', 'POST', {
+      conversionPointId: 'cp-1', friendId: 'friend-a',
+    });
+    expect(res.status).toBe(201);
+    expect(mocks.trackConversion).toHaveBeenCalled();
   });
 
   it('同じ冪等キーの別内容の使い回しは409', async () => {

@@ -2,6 +2,7 @@ import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getConversionPoints,
   getConversionPointById,
+  canRecordConversion,
   createConversionPoint,
   hasConversionPointActivity,
   updateConversionPoint,
@@ -820,9 +821,37 @@ conversions.put('/api/conversions/points/:id', requireRole('owner', 'admin'), re
 });
 
 // DELETE /api/conversions/points/:id - stop tracking and preserve history
+//
+// 停止も版を進める操作のため、旧PUTと同じく版の一致を必須にする(N-254)。
+// 版は本文が正本。代理やプロキシで本文が落ちたときだけクエリを見る(#513 L11)。
 conversions.delete('/api/conversions/points/:id', requireRole('owner', 'admin'), requireVisibleConversionPoint, async (c) => {
   try {
-    await stopConversionPoint(c.env.DB, c.req.param('id'));
+    const id = c.req.param('id');
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    const expectedVersion = positiveVersion(body?.expectedVersion)
+      ?? positiveVersion(c.req.query('expectedVersion'));
+    if (expectedVersion === null) {
+      return c.json({ success: false, error: 'expectedVersionを正しく指定してください。本文が落ちる通信経路ではクエリでも指定できます' }, 400);
+    }
+    try {
+      await stopConversionPoint(c.env.DB, id, expectedVersion);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'conversion_point_not_found') {
+        return c.json({ success: false, error: 'Not found' }, 404);
+      }
+      if (error instanceof Error && error.message === 'conversion_point_already_stopped') {
+        return c.json({ success: false, error: 'この成果地点はすでに停止しています' }, 409);
+      }
+      if (error instanceof Error && error.message === 'conversion_point_version_conflict') {
+        const latest = await getConversionPointById(c.env.DB, id);
+        return c.json({
+          success: false,
+          error: '成果地点が更新されています。読み直してください',
+          currentVersion: latest?.version ?? expectedVersion,
+        }, 409);
+      }
+      throw error;
+    }
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/conversions/points/:id error:', err);
@@ -863,6 +892,11 @@ conversions.post('/api/conversions/track', requireRole('owner', 'admin'), async 
       [pointAccount.line_account_id, friendAccount.line_account_id],
     )) {
       return c.json({ success: false, error: 'このコンバージョンを記録する権限がありません' }, 403);
+    }
+    // 地点と友だちのアカウントの組み合わせも見る。両方を見られる職員でも
+    // 交差記録はできない。地点が全アカウント対象(NULL)のときだけ交差を許可する。
+    if (!canRecordConversion(pointAccount.line_account_id, friendAccount.line_account_id)) {
+      return c.json({ success: false, error: '地点と友だちのアカウントが違うため記録できません' }, 403);
     }
     if (pointAccount.status === 'stopped') {
       return c.json({ success: false, error: 'この成果地点は計測を停止しています' }, 409);
