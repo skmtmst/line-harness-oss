@@ -1,7 +1,7 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
-import { createElement, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import type { FriendField } from '@line-crm/shared'
 import {
@@ -21,7 +21,6 @@ import {
 import KpiCard from '@/components/shared/kpi-card'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
-import type { ButtonProps } from '@/components/shared/button'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Chip, { type ChipTone } from '@/components/shared/chip'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -67,10 +66,10 @@ function AnalyticsNotice({ children }: { children: ReactNode }) {
 }
 
 function AnalyticsExportButton({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
-  return createElement(
-    Button,
-    { onClick, disabled, variant: 'secondary' } as unknown as ButtonProps,
-    ['CSV', 'で書き出す'].join(''),
+  return (
+    <Button onClick={onClick} disabled={disabled} variant="secondary">
+      CSVで書き出す
+    </Button>
   )
 }
 
