@@ -11,7 +11,7 @@ const dbMocks = {
   getRichMenuTapStats: vi.fn(),
   recordRichMenuAssignmentsByLineUserIds: vi.fn(),
   clearRichMenuAssignmentsForGroup: vi.fn(),
-  getSendableTemplate: vi.fn(),
+  getAssociableTemplate: vi.fn(),
   jstNow: vi.fn(),
   createRichMenuGroup: vi.fn(),
   updateRichMenuGroupMeta: vi.fn(),
@@ -486,7 +486,7 @@ describe('POST /api/rich-menu-groups', () => {
 
   test('未公開・別アカウントのテンプレートはボタンに結びつけられない(再審査2・3)', async () => {
     accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(true);
-    dbMocks.getSendableTemplate.mockResolvedValue(null);
+    dbMocks.getAssociableTemplate.mockResolvedValue(null);
     const app = setupApp();
     const res = await app.request('/api/rich-menu-groups', {
       method: 'POST',
