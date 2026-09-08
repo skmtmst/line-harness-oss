@@ -8,6 +8,7 @@ import type { DeliveryMode, Folder, Scenario } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import SelectField from '@/components/shared/select-field'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import './scenario-mode.css'
 
 /**
@@ -65,6 +66,7 @@ function ScenarioModeContent() {
           return false
         }
         setScenario(res.data)
+        scenarioReferenceData.invalidateScenario(id)
         setName(res.data.name)
         setFolderId(res.data.folderId ?? '')
         return true
@@ -87,7 +89,7 @@ function ScenarioModeContent() {
     if (!id) return
     let active = true
     setScenarioState('loading')
-    void api.scenarios.get(id)
+    void scenarioReferenceData.scenario(id)
       .then((res) => {
         if (!active) return
         if (res.success) {
@@ -149,6 +151,7 @@ function ScenarioModeContent() {
         setSaving(null)
         return
       }
+      scenarioReferenceData.invalidateScenario(id)
       // 3段目へ。設計の帯が3段なので、2段で編集画面へ放り出さない。
       router.push(`/scenarios/first-step?id=${encodeURIComponent(id)}`)
     } catch (cause) {

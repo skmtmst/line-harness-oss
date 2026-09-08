@@ -301,7 +301,8 @@
     "337_step_up_attempt_limit.sql",
     "338_common_vars_account_scoped_key_and_archive.sql",
     "339_site_event_host.sql",
-    "340_staff_two_factor_setup_attempts.sql"
+    "340_staff_two_factor_setup_attempts.sql",
+    "341_ec_notification_settings_account_scope.sql"
   ],
-  "migrationCount": 302
+  "migrationCount": 303
 }

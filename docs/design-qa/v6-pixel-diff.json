@@ -1,6 +1,6 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
-  "generatedAt": "2026-09-08T03:23:41.419Z",
+  "generatedAt": "2026-09-08T04:05:52.971Z",
   "thresholdPercent": 10,
   "heightDiffThresholdPx": 24,
   "screenCount": 272,
@@ -181,7 +181,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 1,
@@ -225,7 +225,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 2,
@@ -353,7 +353,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 2,
@@ -395,7 +395,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 2,
@@ -437,7 +437,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 2,
@@ -522,7 +522,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 2,
@@ -865,7 +865,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 2,
@@ -1036,7 +1036,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 3,
@@ -1166,7 +1166,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 3,
@@ -1208,7 +1208,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 3,
@@ -1252,7 +1252,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 3,
@@ -1296,7 +1296,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 3,
@@ -1468,8 +1468,7 @@
       "diffPath": "docs/design-qa/scenarios-v6/TC1b1-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:56:11.870Z"
+      "aboveThreshold": false
     },
     {
       "feature": 5,
@@ -1769,7 +1768,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 5,
@@ -2070,8 +2069,7 @@
       "diffPath": "docs/design-qa/broadcasts-v6/q76C35-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:56:11.870Z"
+      "aboveThreshold": false
     },
     {
       "feature": 6,
@@ -2716,8 +2714,7 @@
       "diffPath": "docs/design-qa/reminders-v6/M1EXwB-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:56:11.870Z"
+      "aboveThreshold": false
     },
     {
       "feature": 7,
@@ -3190,8 +3187,7 @@
       "diffPath": "docs/design-qa/auto-replies-v6/cmDfJ-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:56:11.870Z"
+      "aboveThreshold": false
     },
     {
       "feature": 8,
@@ -3405,7 +3401,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 8,
@@ -3447,7 +3443,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 8,
@@ -3489,7 +3485,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 8,
@@ -3661,8 +3657,7 @@
       "diffPath": "docs/design-qa/friend-add-v6/uLQQc-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:56:11.870Z"
+      "aboveThreshold": false
     },
     {
       "feature": 9,
@@ -3962,7 +3957,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 9,
@@ -4694,7 +4689,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 11,
@@ -4736,7 +4731,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 11,
@@ -4821,7 +4816,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 11,
@@ -4863,7 +4858,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 11,
@@ -4905,7 +4900,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 11,
@@ -5077,8 +5072,7 @@
       "diffPath": "docs/design-qa/rich-menus-v6/GO8RQ-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:56:11.870Z"
+      "aboveThreshold": false
     },
     {
       "feature": 12,
@@ -5206,7 +5200,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 12,
@@ -5464,8 +5458,7 @@
       "diffPath": "docs/design-qa/forms-v6/EMBIK-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:56:11.870Z"
+      "aboveThreshold": false
     },
     {
       "feature": 13,
@@ -5766,8 +5759,7 @@
       "diffPath": "docs/design-qa/common-vars-v6/WuKzU-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:56:11.870Z"
+      "aboveThreshold": false
     },
     {
       "feature": 14,
@@ -5939,8 +5931,7 @@
       "diffPath": "docs/design-qa/media-v6/g89Tc-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:56:11.870Z"
+      "aboveThreshold": false
     },
     {
       "feature": 15,
@@ -6283,7 +6274,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 16,
@@ -6368,7 +6359,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 16,
@@ -6584,7 +6575,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 17,
@@ -6714,7 +6705,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 17,
@@ -6799,7 +6790,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 17,
@@ -6886,7 +6877,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 17,
@@ -6971,7 +6962,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 18,
@@ -7961,7 +7952,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 21,
@@ -8005,7 +7996,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 21,
@@ -8049,7 +8040,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 21,
@@ -8093,7 +8084,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 21,
@@ -8180,7 +8171,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 21,
@@ -8224,7 +8215,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 22,
@@ -8612,7 +8603,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 24,
@@ -8697,7 +8688,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 24,
@@ -8739,7 +8730,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 24,
@@ -8781,7 +8772,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 24,
@@ -8825,7 +8816,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 25,
@@ -8867,7 +8858,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 25,
@@ -8952,7 +8943,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 25,
@@ -8994,7 +8985,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 25,
@@ -9036,7 +9027,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 25,
@@ -9078,7 +9069,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 25,
@@ -9335,7 +9326,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 27,
@@ -9506,7 +9497,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 27,
@@ -9849,7 +9840,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 29,
@@ -9934,7 +9925,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 29,
@@ -9976,7 +9967,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 30,
@@ -10235,7 +10226,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 32,
@@ -10279,7 +10270,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 32,
@@ -10323,7 +10314,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 32,
@@ -10666,7 +10657,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 4,
@@ -10751,7 +10742,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 4,
@@ -10793,7 +10784,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 4,
@@ -10880,7 +10871,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 4,
@@ -10922,7 +10913,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 4,
@@ -11138,7 +11129,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 4,
@@ -11180,7 +11171,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 4,
@@ -11267,7 +11258,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-08T02:54:42.413Z"
+      "retainedFrom": "2026-09-08T03:23:41.419Z"
     },
     {
       "feature": 3,

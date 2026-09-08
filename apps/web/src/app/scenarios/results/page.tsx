@@ -12,6 +12,7 @@ import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import SummaryCard from '@/components/shared/summary-card'
 import styles from './scenario-results.module.css'
+import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 function percentLabel(value: number, total: number): string {
@@ -69,8 +70,8 @@ function ResultsInner() {
     setRuns(null)
     try {
       const [scenarioResponse, statsResponse, runsResponse] = await Promise.all([
-        api.scenarios.get(id),
-        api.scenarios.stats(id),
+        scenarioReferenceData.scenario(id),
+        scenarioReferenceData.stats(id),
         selectedAccountId
           ? api.scenarios.runs(id, selectedAccountId, { limit: 50 }).catch(() => null)
           : Promise.resolve(null),

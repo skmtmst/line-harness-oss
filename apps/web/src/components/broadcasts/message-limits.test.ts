@@ -14,10 +14,8 @@ describe('本文の上限', () => {
     expect(SPLIT_HINT_LENGTH).toBe(4500)
   })
 
-  it('吹き出しはWorkerが受け取れる数までにする', () => {
-    // `routes/broadcasts.ts:494,679` が 3 を超えると400を返す。
-    // 画面だけ5通に上げると、書けるのに保存で失敗する。
-    expect(MAX_BUBBLES).toBe(3)
+  it('吹き出しは設計とLINE送信口の上限5通にそろえる', () => {
+    expect(MAX_BUBBLES).toBe(5)
   })
 
   it('帯には上限を添えて出す', () => {
