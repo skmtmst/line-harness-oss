@@ -4898,7 +4898,7 @@ export const api = {
   /** 回答フォーム。 */
   forms: {
     list: (accountId: string) =>
-      fetchApi<ApiResponse<Array<{ id: string; name: string; description: string | null }>>>(
+      fetchApi<ApiResponse<Array<{ id: string; name: string; description: string | null; isActive: boolean }>>>(
         `/api/forms?account_id=${encodeURIComponent(accountId)}`,
       ),
     get: (id: string, accountId: string) =>
