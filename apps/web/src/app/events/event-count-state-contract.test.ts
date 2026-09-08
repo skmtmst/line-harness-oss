@@ -32,6 +32,12 @@ describe('V6 イベント予約の件数状態', () => {
     expect(PAGE).not.toContain('title="定員の充足"')
   })
 
+  it('終わった回は端末時計で数えず「—」にする(点検#520軽16)', () => {
+    // 端末時計がずれると件数が合わない。サーバー時刻の口が無いので出さない。
+    expect(PAGE).toContain('終わった回 —')
+    expect(PAGE).not.toContain('endedCount')
+  })
+
   it('席が空いたあとの自動案内を、実際の定期処理があるときだけ案内する', () => {
     expect(PAGE).toContain('キャンセルが出たら、キャンセル待ちの人に自動で順番が回ります。')
     expect(WORKER).toContain('processEventWaitlistPromotionJobs')

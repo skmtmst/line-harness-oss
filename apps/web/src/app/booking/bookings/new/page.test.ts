@@ -91,6 +91,14 @@ describe('V6 代理予約の接続契約', () => {
     expect(PAGE).toContain('automaticOperations.map')
   })
 
+  test('客の特定は断言せず束ね、空の重複防止キーは作り直す(点検#516軽5)', () => {
+    // `customer!` では将来の分岐変更でnullが紛れ込む。空キーで送ると400になる。
+    expect(PAGE).not.toContain('customer!.id')
+    expect(PAGE).toContain('bookingCustomerId: customer.id')
+    expect(PAGE).toContain('booking_customer_id: customer.id')
+    expect(PAGE).toContain('idempotencyKey || crypto.randomUUID()')
+  })
+
   test('電話番号は桁を先に確かめ、再送中の通知状態を取りこぼさない(点検#516の中3・中4)', () => {
     // サーバと同じ約束。出す直前で落とすと入れ直しになる。
     expect(PAGE).toContain('phoneDigitsError')
