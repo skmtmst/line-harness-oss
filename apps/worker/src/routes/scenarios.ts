@@ -10,6 +10,7 @@ import {
   deleteScenarioStep,
   enrollFriendInScenario,
   getFriendById,
+  publishScenarioVersion,
   computeNextDeliveryAt,
 } from '@line-crm/db';
 import { reorderScenarios } from '@line-crm/db';
@@ -327,8 +328,15 @@ function serializeFriendScenario(row: DbFriendScenario) {
     status: row.status,
     startedAt: row.started_at,
     nextDeliveryAt: row.next_delivery_at,
+    // 開始時に固定した公開版。null は版より前の購読。
+    publishedVersionId: row.published_version_id ?? null,
     updatedAt: row.updated_at,
   };
+}
+
+/** 公開操作の確認キー。自動応答の公開口と同じ基準。 */
+function validScenarioPublishKey(value: string | undefined): value is string {
+  return Boolean(value && value.length >= 8 && value.length <= 200 && /^[A-Za-z0-9._:-]+$/.test(value));
 }
 
 /**
@@ -1357,6 +1365,46 @@ scenarios.post('/api/scenarios/:id/enroll/:friendId', requireRole('owner', 'admi
   } catch (err) {
     console.error('POST /api/scenarios/:id/enroll/:friendId error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// POST /api/scenarios/:id/publish — いまの下書きを公開版として固定する。
+//
+// 下書きの編集は公開するまで配信へ混入しない。購読は開始時の版へ固定され、
+// 開始後の編集は次に公開した版の購読から使う（N-050 / #644）。
+// アカウント境界は /api/scenarios/:id 系の共通ミドルウェアで 404 にする。
+scenarios.post('/api/scenarios/:id/publish', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const requestKey = c.req.header('Idempotency-Key');
+    if (!validScenarioPublishKey(requestKey)) {
+      return c.json({ success: false, error: '公開操作の確認キーが必要です' }, 400);
+    }
+    const published = await publishScenarioVersion(c.env.DB, c.req.param('id'), {
+      staffId: c.get('staff')?.id ?? null,
+      idempotencyKey: requestKey,
+    });
+    return c.json({
+      success: true,
+      data: {
+        scenarioId: c.req.param('id'),
+        versionId: published.id,
+        versionNumber: Number(published.version_number),
+        publishedAt: published.published_at,
+      },
+    });
+  } catch (err) {
+    const code = err instanceof Error ? err.message : '';
+    if (code === 'SCENARIO_NOT_FOUND') {
+      return c.json({ success: false, error: 'シナリオが見つかりません' }, 404);
+    }
+    if (code === 'SCENARIO_PUBLISH_KEY_CONFLICT') {
+      return c.json({ success: false, error: '同じ確認キーが別の公開操作で使われています' }, 409);
+    }
+    if (code === 'SCENARIO_PUBLISH_CONFLICT') {
+      return c.json({ success: false, error: '同時公開が競合しました。もう一度公開してください' }, 409);
+    }
+    console.error('POST /api/scenarios/:id/publish error:', err);
+    return c.json({ success: false, error: 'シナリオを公開できませんでした' }, 500);
   }
 });
 

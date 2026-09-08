@@ -5,7 +5,7 @@ export { buildMessage };
 import { resolveInterpolationExtra } from './interpolation-context.js';
 import {
   getFriendScenariosDueForDelivery,
-  getScenarioSteps,
+  getStepsForDelivery,
   advanceFriendScenario,
   completeFriendScenario,
   pauseFriendScenario,
@@ -275,6 +275,7 @@ async function processSingleDelivery(
     current_step_order: number;
     status: string;
     next_delivery_at: string | null;
+    published_version_id?: string | null;
     started_at: string;
   },
   workerUrl?: string,
@@ -329,10 +330,14 @@ async function processSingleDelivery(
 
   // Get all steps for this scenario.
   //
+  // 購読に固定した公開版があれば版から読む（351）。開始後の下書き編集は
+  // 既存配信へ混入しない。版が無い購読（351 以前）は live の表を読む。
+  //
   // 下書き (is_draft) はここで落とす。落としておけば「次の通」を探す処理が
   // そのまま次の公開ぶんを選ぶ。あとから条件で弾く作りにすると、下書きに
   // 到達した時点で止まって見える。
-  const steps = (await getScenarioSteps(db, fs.scenario_id)).filter((s) => (s.is_draft ?? 0) === 0);
+  const source = await getStepsForDelivery(db, fs.scenario_id, fs.published_version_id ?? null);
+  const steps = source.steps.filter((s) => (s.is_draft ?? 0) === 0);
   if (steps.length === 0) {
     await completeFriendScenario(db, fs.id);
     return false;
@@ -345,8 +350,8 @@ async function processSingleDelivery(
    * 変わった等）。外れた人には**送らずに止める**。完了にしないのは、
    * 条件に戻ったときに人が再開できるようにするため。
    */
-  const audience = parseCondition(scenarioRow.audience_condition_json);
-  if (scenarioRow.audience_condition_json && !audience) {
+  const audience = parseCondition(source.audienceConditionJson);
+  if (source.audienceConditionJson && !audience) {
     console.error(
       `[step-delivery] unreadable audience condition scenario=${fs.scenario_id} — paused enrollment=${fs.id}`,
     );
@@ -366,17 +371,22 @@ async function processSingleDelivery(
   const nowJstDate = new Date(Date.now() + 9 * 60 * 60_000);
   const nextDeliveryFor = (step: { delay_minutes: number; offset_days: number | null; offset_minutes: number | null; delivery_time: string | null }): Date =>
     computeNextDeliveryAt(
-      { delivery_mode: scenarioRow.delivery_mode },
+      { delivery_mode: source.deliveryMode },
       step,
       { enrolledAt: enrolledAtDate, previousDeliveredAt: nowJstDate, now: nowJstDate },
     );
+  // 終了後の処理も固定した版の値で決める。開始後に変えた値は次版の購読から使う。
+  const onComplete = {
+    on_complete_mode: source.onCompleteMode,
+    on_complete_scenario_id: source.onCompleteScenarioId,
+  };
 
   // Steps are sorted by step_order but may not be contiguous (e.g., 1, 3, 5 after deletions).
   // Find the next step whose step_order > current_step_order.
   const currentStep = steps.find((s) => s.step_order > fs.current_step_order);
 
   if (!currentStep) {
-    await finishScenario(db, fs.id, fs.scenario_id, fs.friend_id, scenarioRow);
+    await finishScenario(db, fs.id, fs.scenario_id, fs.friend_id, onComplete);
     return false;
   }
 
@@ -437,7 +447,7 @@ async function processSingleDelivery(
         jitteredDate.toISOString().slice(0, -1) + '+09:00',
       );
     } else {
-      await finishScenario(db, fs.id, fs.scenario_id, fs.friend_id, scenarioRow);
+      await finishScenario(db, fs.id, fs.scenario_id, fs.friend_id, onComplete);
     }
     return false;
   }
@@ -546,7 +556,7 @@ async function processSingleDelivery(
     await advanceFriendScenario(db, fs.id, currentStep.step_order, jitteredDate.toISOString().slice(0, -1) + '+09:00');
   } else {
     // This was the last step
-    await finishScenario(db, fs.id, fs.scenario_id, fs.friend_id, scenarioRow);
+    await finishScenario(db, fs.id, fs.scenario_id, fs.friend_id, onComplete);
   }
 
   // 到達タグ付与 (advance / complete の後 = 再送が起きてもタグ付与は影響しない順序)
