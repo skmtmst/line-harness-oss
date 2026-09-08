@@ -206,12 +206,12 @@ describe('公開口の契約', () => {
       replayed: false,
     });
 
-    const response = await publish({ expectedVersion: 1 });
+    const response = await publish({ expectedVersion: 1, expectedDraftRevision: 0 });
 
     expect(response.status).toBe(200);
     expect(mocks.publishTemplate).toHaveBeenCalledWith(bindings.DB, 'tpl-1', {
       expectedVersion: 1,
-      expectedDraftRevision: undefined,
+      expectedDraftRevision: 0,
       idempotencyKey: 'publish-key-0001',
     });
     expect(await response.json()).toMatchObject({
@@ -236,7 +236,7 @@ describe('公開口の契約', () => {
       replayed: true,
     });
 
-    const response = await publish();
+    const response = await publish({ expectedVersion: 2, expectedDraftRevision: 0 });
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
@@ -251,7 +251,7 @@ describe('公開口の契約', () => {
     );
     mocks.publishTemplate.mockRejectedValue(new Error('TEMPLATE_VERSION_CONFLICT'));
 
-    const response = await publish({ expectedVersion: 1 });
+    const response = await publish({ expectedVersion: 1, expectedDraftRevision: 0 });
 
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({
@@ -281,7 +281,7 @@ describe('公開口の契約', () => {
       replayed: true,
     });
 
-    const response = await publish();
+    const response = await publish({ expectedVersion: 1, expectedDraftRevision: 0 });
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
@@ -306,7 +306,7 @@ describe('公開口の契約', () => {
     );
     mocks.publishTemplate.mockRejectedValue(new Error('TEMPLATE_PUBLISH_KEY_CONFLICT'));
 
-    const response = await publish();
+    const response = await publish({ expectedVersion: 1, expectedDraftRevision: 0 });
 
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({
@@ -329,6 +329,16 @@ describe('公開口の契約', () => {
     const response = await publish({ expectedDraftRevision: '最新' });
 
     expect(response.status).toBe(400);
+    expect(mocks.publishTemplate).not.toHaveBeenCalled();
+  });
+
+  it('版の確認がなければ400で止める(独立審査P2)', async () => {
+    mocks.getTemplateById.mockResolvedValue(liveRow({ draft_message_content: '編集中' }));
+
+    for (const body of [{}, { expectedVersion: 1 }, { expectedDraftRevision: 0 }]) {
+      const response = await publish(body);
+      expect(response.status).toBe(400);
+    }
     expect(mocks.publishTemplate).not.toHaveBeenCalled();
   });
 });

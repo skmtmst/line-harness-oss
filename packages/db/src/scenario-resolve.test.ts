@@ -6,8 +6,9 @@ function mockDb(tplRow: {
   published_version?: number; line_account_id?: string | null;
 } | null): D1Database {
   const row = tplRow && !('published_version' in tplRow)
-    // 既存の公開済み行と同じ扱いにする(公開版あり・持ち主なし)。
-    ? { ...tplRow, published_version: 1, line_account_id: null }
+    // 独立審査(指摘3): 公開版あり・送り先と同じ持ち主の行と同じ扱いにする。
+    // 持ち主不明は送らない(fail-close)。
+    ? { ...tplRow, published_version: 1, line_account_id: 'account-1' }
     : tplRow;
   return {
     prepare: () => ({
@@ -41,6 +42,7 @@ describe('resolveStepContent', () => {
         message_type: 'text',
         message_content: 'fallback',
       },
+      'account-1',
     );
     expect(result).toEqual({
       messageType: 'flex',
@@ -72,6 +74,7 @@ describe('resolveStepContent', () => {
         message_type: 'text',
         message_content: 'fallback',
       },
+      'account-1',
     );
     expect(result.messageType).toBe('flex');
     expect(result.templateIdAtSend).toBe('tpl-carousel');
@@ -87,6 +90,7 @@ describe('resolveStepContent', () => {
         message_content: '古い質問',
         question_json: JSON.stringify({ text: '古い質問', tapMode: 'single', choices: [{ label: 'はい', behavior: 'none' }] }),
       },
+      'account-1',
     );
     expect(result.questionJson).toBe(question);
     expect(result.templateIdAtSend).toBe('tpl-question');

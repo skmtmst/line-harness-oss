@@ -35,9 +35,13 @@ describe('実DB: 未公開・別アカウントは step の控えに落とす', 
   });
 
   it('公開版は解決し、template_id を送った記録に残す', async () => {
-    const { db } = openDb();
+    const { db, sqlite } = openDb();
+    sqlite.prepare(
+      `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+       VALUES ('account-1', 'channel-1', '店舗1', 'token', 'secret')`,
+    ).run();
     const created = await createTemplate(db, {
-      name: '公開する', messageType: 'text', messageContent: '公開版の本文',
+      name: '公開する', messageType: 'text', messageContent: '公開版の本文', lineAccountId: 'account-1',
     });
     await publishTemplate(db, created.id, { idempotencyKey: 'resolve-publish-1' });
 
@@ -45,7 +49,7 @@ describe('実DB: 未公開・別アカウントは step の控えに落とす', 
       template_id: created.id,
       message_type: 'text',
       message_content: 'step の控え',
-    });
+    }, 'account-1');
     expect(resolved.messageContent).toBe('公開版の本文');
     expect(resolved.templateIdAtSend).toBe(created.id);
   });

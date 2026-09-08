@@ -83,17 +83,17 @@ export async function getTemplateById(db: D1Database, id: string): Promise<Templ
 }
 
 /**
- * 再審査対応: 下書き全文の指紋。同じ内容なら同じ値になり、
- * 1文字でも違えば(削除も含めて)変わる。同キー再試行が別操作かどうかの
- * 見分けに使う(成功時の控えと比べる)。
+ * 独立審査対応(P1): 下書き全文の指紋(SHA-256 hex)。同じ内容なら同じ値に
+ * なり、1文字でも違えば(削除も含めて)変わる。同キー再試行が別操作か
+ * どうかの見分けに使う(成功時の控えと比べる)。32bit 非暗号ハッシュは不可。
  */
-export function templateDraftFingerprint(
+export async function templateDraftFingerprint(
   draft: Pick<TemplateRow,
     'draft_message_type' | 'draft_message_content' |
     'draft_carousel_actions_json' | 'draft_carousel_tap_limit_mode' |
     'draft_carousel_tap_limit_text' | 'draft_question_json' |
     'draft_question_status'>,
-): string {
+): Promise<string> {
   const canonical = JSON.stringify([
     draft.draft_message_type ?? null,
     draft.draft_message_content ?? null,
@@ -103,20 +103,15 @@ export function templateDraftFingerprint(
     draft.draft_question_json ?? null,
     draft.draft_question_status ?? null,
   ]);
-  // FNV-1a 32bit。変更検出用であり、暗号用途ではない。
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < canonical.length; i++) {
-    hash ^= canonical.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(16).padStart(8, '0');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 /**
- * 再審査対応: いま送ってよいテンプレートかどうか。
- * 公開版があること(版1以上)。持ち主が分かる行は、送る側のアカウントと
- * 同じ持ち主であること。持ち主なしの古い行は通す(関連付け口の reminders
- * と同じ約束)。未公開・別アカウントは送らない。
+ * 独立審査P2相当(指摘3): いま送ってよいテンプレートかどうか。
+ * 公開版があること(版1以上)に加え、送る側と持ち主の両方が分かり、
+ * 完全一致すること。どちらかが null の wildcard 照合はしない(fail-close)。
+ * 未公開・別アカウント・持ち主不明は送らない。
  */
 export function isTemplateSendable(
   row: Pick<TemplateRow, 'published_version' | 'line_account_id'> | null | undefined,
@@ -124,13 +119,11 @@ export function isTemplateSendable(
 ): boolean {
   if (!row) return false;
   if (Number(row.published_version ?? 0) < 1) return false;
-  if (lineAccountId != null && row.line_account_id != null && row.line_account_id !== lineAccountId) {
-    return false;
-  }
-  return true;
+  if (lineAccountId == null || row.line_account_id == null) return false;
+  return row.line_account_id === lineAccountId;
 }
 
-/** 送ってよいテンプレートだけを返す。未公開・別アカウントは null。 */
+/** 送ってよいテンプレートだけを返す。未公開・別アカウント・持ち主不明は null。 */
 export async function getSendableTemplate(
   db: D1Database,
   id: string,
@@ -138,6 +131,32 @@ export async function getSendableTemplate(
 ): Promise<TemplateRow | null> {
   const row = await getTemplateById(db, id);
   return row && isTemplateSendable(row, lineAccountId) ? row : null;
+}
+
+/**
+ * 独立審査P2相当(指摘3): 結びつけてよいテンプレートかどうか。
+ * 公開版があり、結びつける側と完全一致すること。持ち主不明は通さない
+ * (fail-close)。持ち主未定のシナリオに結ぶと、送る側で別アカウントの
+ * 公開版が混ざる。送信時と同じ条件にする。
+ */
+export function isTemplateAssociable(
+  row: Pick<TemplateRow, 'published_version' | 'line_account_id'> | null | undefined,
+  lineAccountId?: string | null,
+): boolean {
+  if (!row) return false;
+  if (Number(row.published_version ?? 0) < 1) return false;
+  if (lineAccountId == null || row.line_account_id == null) return false;
+  return row.line_account_id === lineAccountId;
+}
+
+/** 結びつけてよいテンプレートだけを返す。 */
+export async function getAssociableTemplate(
+  db: D1Database,
+  id: string,
+  lineAccountId?: string | null,
+): Promise<TemplateRow | null> {
+  const row = await getTemplateById(db, id);
+  return row && isTemplateAssociable(row, lineAccountId) ? row : null;
 }
 
 export interface CarouselOptions {
@@ -383,7 +402,7 @@ interface TemplatePublishKeyRecord {
  * 347: 下書きを公開版(live 列)へ写す。送信側は live 列だけを読むので、
  * この関数を通らない編集が実送信文へ混入することはない。
  *
- * 差し戻し対応(#645 6要件 + 再審査5点):
+ * 差し戻し対応(#645 6要件 + 再審査5点 + 独立審査P1):
  * - 下書きは全文スナップショットなので、下書き列をそのまま写す。
  *   `COALESCE(下書き, 公開版)` にしない。NULL は「削除した」であり、
  *   削除したはずの古い公開値が復活してはいけない(要件2)。
@@ -393,10 +412,13 @@ interface TemplatePublishKeyRecord {
  *   版を入れ、確認と書き込みの間に挟まった保存から守る(再審査1)。
  * - `expectedVersion` がいまの公開版と違えば 'TEMPLATE_VERSION_CONFLICT'。
  *   同時更新は版番号付きの UPDATE 1文で直列化し、負けた側は落とす。
- * - 同じ `idempotencyKey` の再試行は、成功時の記録と下書き指紋を比べる。
- *   指紋が違えば別操作の使い回しとして 'TEMPLATE_PUBLISH_KEY_CONFLICT'。
- *   同じ内容なら記録時の版・本文をそのまま返す(固定応答)(再審査5)。
+ * - 同じ `idempotencyKey` の再試行は、成功時の記録と下書き指紋(SHA-256)を
+ *   比べる。指紋が違えば別操作の使い回しとして
+ *   'TEMPLATE_PUBLISH_KEY_CONFLICT'。同じ内容なら記録時の版・本文を
+ *   そのまま返す(固定応答)(再審査5)。
  *   下書きなしの成功も記録し、古い複数の成功キーも残る(要件5)。
+ * - 公開版の更新とキー記録は `db.batch` の単一原子操作で行う。
+ *   途中障害・並行要求で版だけ進むことはない(独立審査P1)。
  */
 export async function publishTemplate(
   db: D1Database,
@@ -416,7 +438,7 @@ export async function publishTemplate(
       // 成功済みの操作。新しい下書きがあり、その指紋が記録と違えば、
       // 別操作の使い回しとして409。下書きがなければ同じ操作の再試行。
       if (hasTemplateDraft(current)
-        && templateDraftFingerprint(current) !== (prior.draft_fingerprint ?? '')) {
+        && (await templateDraftFingerprint(current)) !== (prior.draft_fingerprint ?? '')) {
         throw new Error('TEMPLATE_PUBLISH_KEY_CONFLICT');
       }
       // 同じ内容の再試行。記録時の版・本文をそのまま返す(固定応答)。
@@ -463,38 +485,63 @@ export async function publishTemplate(
   }
   const now = jstNow();
   const publishedDraftRevision = Number(current.draft_revision ?? 0);
-  const publishedFingerprint = templateDraftFingerprint(current);
-  const updated = await db.prepare(
-    `UPDATE templates
-        SET message_type = draft_message_type,
-            message_content = draft_message_content,
-            carousel_actions_json = draft_carousel_actions_json,
-            carousel_tap_limit_mode = draft_carousel_tap_limit_mode,
-            carousel_tap_limit_text = draft_carousel_tap_limit_text,
-            question_json = draft_question_json,
-            question_status = draft_question_status,
-            draft_message_type = NULL,
-            draft_message_content = NULL,
-            draft_carousel_actions_json = NULL,
-            draft_carousel_tap_limit_mode = NULL,
-            draft_carousel_tap_limit_text = NULL,
-            draft_question_json = NULL,
-            draft_question_status = NULL,
-            draft_revision = 0,
-            published_version = published_version + 1,
-            published_at = ?,
-            publish_idempotency_key = ?,
-            updated_at = ?
-      WHERE id = ? AND published_version = ? AND draft_revision = ?`,
-  ).bind(
-    now,
-    options.idempotencyKey ?? current.publish_idempotency_key,
-    now,
-    id,
-    current.published_version,
-    current.draft_revision ?? 0,
-  ).run();
-  if ((updated.meta?.changes ?? 0) === 0) {
+  const publishedFingerprint = await templateDraftFingerprint(current);
+  const nextVersion = Number(current.published_version) + 1;
+  /*
+   * 独立審査P1: 公開版の更新とキー記録は単一の原子操作にする。
+   * 記録に載せる版・本文は、下書き(成功すれば消える)から先に決める。
+   * 2文の間で落ちても版だけ進むことはない。
+   */
+  const publishBatch = [
+    db.prepare(
+      `UPDATE templates
+          SET message_type = draft_message_type,
+              message_content = draft_message_content,
+              carousel_actions_json = draft_carousel_actions_json,
+              carousel_tap_limit_mode = draft_carousel_tap_limit_mode,
+              carousel_tap_limit_text = draft_carousel_tap_limit_text,
+              question_json = draft_question_json,
+              question_status = draft_question_status,
+              draft_message_type = NULL,
+              draft_message_content = NULL,
+              draft_carousel_actions_json = NULL,
+              draft_carousel_tap_limit_mode = NULL,
+              draft_carousel_tap_limit_text = NULL,
+              draft_question_json = NULL,
+              draft_question_status = NULL,
+              draft_revision = 0,
+              published_version = published_version + 1,
+              published_at = ?,
+              publish_idempotency_key = ?,
+              updated_at = ?
+        WHERE id = ? AND published_version = ? AND draft_revision = ?`,
+    ).bind(
+      now,
+      options.idempotencyKey ?? current.publish_idempotency_key,
+      now,
+      id,
+      current.published_version,
+      current.draft_revision ?? 0,
+    ),
+  ];
+  if (options.idempotencyKey) {
+    /*
+     * 同じ原子操作の中で、UPDATE が1行に当たったときだけ記録する。
+     * `changes()` は直前文の更新行数。無条件 INSERT にすると、
+     * 同時負けの側まで記録が残り、再試行の見分けが壊れる。
+     */
+    publishBatch.push(
+      db.prepare(
+        `INSERT OR IGNORE INTO template_publish_keys
+           (template_id, idempotency_key, published_version, draft_revision, created_at,
+            draft_fingerprint, message_type, message_content)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE changes() = 1`,
+      ).bind(id, options.idempotencyKey, nextVersion, publishedDraftRevision, now,
+        publishedFingerprint, current.draft_message_type, current.draft_message_content),
+    );
+  }
+  const [updated] = await db.batch(publishBatch) as Array<{ meta?: { changes?: number } }>;
+  if ((updated?.meta?.changes ?? 0) === 0) {
     // 同時公開の負け。同じ確認キーで相手が勝っていたら再試行として返す。
     // 履歴表への記録より先に相手の UPDATE が終わっている場合があるので、
     // 行の確認キー列も見る(同じ UPDATE 文で書かれるため順序が保証される)。
@@ -520,18 +567,10 @@ export async function publishTemplate(
     }
     throw new Error('TEMPLATE_VERSION_CONFLICT');
   }
+  // 原子操作で版が1つ進んだことが確定している。読み直して返す。
   const next = await getTemplateById(db, id);
-  if (!next || Number(next.published_version) !== Number(current.published_version) + 1) {
+  if (!next || Number(next.published_version) !== nextVersion) {
     throw new Error('TEMPLATE_VERSION_CONFLICT');
-  }
-  if (options.idempotencyKey) {
-    await db.prepare(
-      `INSERT OR IGNORE INTO template_publish_keys
-         (template_id, idempotency_key, published_version, draft_revision, created_at,
-          draft_fingerprint, message_type, message_content)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(id, options.idempotencyKey, Number(next.published_version), publishedDraftRevision, now,
-      publishedFingerprint, next.message_type, next.message_content).run();
   }
   return { row: next, published: true, replayed: false };
 }

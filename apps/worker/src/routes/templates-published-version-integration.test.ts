@@ -98,7 +98,7 @@ describe('実DB: 新規は未公開で始まり、初回公開で版1になる',
     expect(before?.message_content).toBe('最初の本文');
     expect(before?.published_version).toBe(0);
 
-    const published = await json('POST', `/api/templates/${id}/publish`, { expectedVersion: 0 }, 'e2e-key-0001');
+    const published = await json('POST', `/api/templates/${id}/publish`, { expectedVersion: 0, expectedDraftRevision: 2 }, 'e2e-key-0001');
     expect(published.status).toBe(200);
     expect(await published.json()).toMatchObject({
       success: true,
@@ -116,7 +116,7 @@ describe('実DB: 新規は未公開で始まり、初回公開で版1になる',
     expect(after?.published_version).toBe(1);
 
     // 同じ確認キーの再試行は同じ版を返す。
-    const replayed = await json('POST', `/api/templates/${id}/publish`, {}, 'e2e-key-0001');
+    const replayed = await json('POST', `/api/templates/${id}/publish`, { expectedVersion: 1, expectedDraftRevision: 0 }, 'e2e-key-0001');
     expect(await replayed.json()).toMatchObject({
       success: true,
       data: { publishedVersion: 1, published: false, replayed: true },
@@ -127,7 +127,7 @@ describe('実DB: 新規は未公開で始まり、初回公開で版1になる',
     const id = await createTemplateOnDb();
     accountAccess.canAccessAllLineAccounts.mockResolvedValue(false);
 
-    const response = await json('POST', `/api/templates/${id}/publish`, {}, 'e2e-key-0002');
+    const response = await json('POST', `/api/templates/${id}/publish`, { expectedVersion: 0, expectedDraftRevision: 1 }, 'e2e-key-0002');
     expect(response.status).toBe(404);
   });
 });
@@ -177,10 +177,10 @@ describe('実DB: 削除・同時編集・冪等の保証', () => {
       question: { text: '続けますか?', tapMode: 'single', choices: [{ label: 'はい', behavior: 'none' }] },
     });
     const id = ((await created.json()) as { data: { id: string } }).data.id;
-    await json('POST', `/api/templates/${id}/publish`, {}, 'e2e-question-1');
+    await json('POST', `/api/templates/${id}/publish`, { expectedVersion: 0, expectedDraftRevision: 1 }, 'e2e-question-1');
 
     await json('PUT', `/api/templates/${id}`, { question: null });
-    const published = await json('POST', `/api/templates/${id}/publish`, {}, 'e2e-question-2');
+    const published = await json('POST', `/api/templates/${id}/publish`, { expectedVersion: 1, expectedDraftRevision: 1 }, 'e2e-question-2');
     expect(published.status).toBe(200);
 
     const row = await getTemplateById(store.db, id);
@@ -196,7 +196,7 @@ describe('実DB: 削除・同時編集・冪等の保証', () => {
     await json('PUT', `/api/templates/${id}`, { messageContent: '確認していない本文' });
     const stale = await json(
       'POST', `/api/templates/${id}/publish`,
-      { expectedDraftRevision: seen.draftRevision }, 'e2e-draft-cas',
+      { expectedVersion: 0, expectedDraftRevision: seen.draftRevision }, 'e2e-draft-cas',
     );
     expect(stale.status).toBe(409);
 
@@ -207,10 +207,10 @@ describe('実DB: 削除・同時編集・冪等の保証', () => {
   it('後日の同キー再試行で別の下書きを出す使い回しは409', async () => {
     const id = await createTemplateOnDb();
     await json('PUT', `/api/templates/${id}`, { messageContent: '最初の公開' });
-    await json('POST', `/api/templates/${id}/publish`, {}, 'e2e-reuse-key');
+    await json('POST', `/api/templates/${id}/publish`, { expectedVersion: 0, expectedDraftRevision: 2 }, 'e2e-reuse-key');
 
     await json('PUT', `/api/templates/${id}`, { messageContent: '次の編集' });
-    const retry = await json('POST', `/api/templates/${id}/publish`, {}, 'e2e-reuse-key');
+    const retry = await json('POST', `/api/templates/${id}/publish`, { expectedVersion: 1, expectedDraftRevision: 1 }, 'e2e-reuse-key');
     expect(retry.status).toBe(409);
     expect(await retry.json()).toMatchObject({
       success: false,
@@ -224,12 +224,12 @@ describe('実DB: 削除・同時編集・冪等の保証', () => {
   it('同じ内容の同キー再試行は記録時の版・本文をそのまま返す(固定応答)', async () => {
     const id = await createTemplateOnDb();
     await json('PUT', `/api/templates/${id}`, { messageContent: '最初の公開' });
-    await json('POST', `/api/templates/${id}/publish`, {}, 'e2e-fixed-key');
+    await json('POST', `/api/templates/${id}/publish`, { expectedVersion: 0, expectedDraftRevision: 2 }, 'e2e-fixed-key');
 
     await json('PUT', `/api/templates/${id}`, { messageContent: '2回目の公開' });
-    await json('POST', `/api/templates/${id}/publish`, {}, 'e2e-fixed-key-2');
+    await json('POST', `/api/templates/${id}/publish`, { expectedVersion: 1, expectedDraftRevision: 1 }, 'e2e-fixed-key-2');
 
-    const retry = await json('POST', `/api/templates/${id}/publish`, {}, 'e2e-fixed-key');
+    const retry = await json('POST', `/api/templates/${id}/publish`, { expectedVersion: 2, expectedDraftRevision: 0 }, 'e2e-fixed-key');
     expect(await retry.json()).toMatchObject({
       success: true,
       data: {
@@ -248,8 +248,8 @@ describe('実DB: 削除・同時編集・冪等の保証', () => {
   it('別キーの同時公開は1つだけ通り、負けは409で版は1つだけ進む', async () => {
     const id = await createTemplateOnDb();
     const [first, second] = await Promise.all([
-      json('POST', `/api/templates/${id}/publish`, { expectedVersion: 0 }, 'e2e-race-a'),
-      json('POST', `/api/templates/${id}/publish`, { expectedVersion: 0 }, 'e2e-race-b'),
+      json('POST', `/api/templates/${id}/publish`, { expectedVersion: 0, expectedDraftRevision: 1 }, 'e2e-race-a'),
+      json('POST', `/api/templates/${id}/publish`, { expectedVersion: 0, expectedDraftRevision: 1 }, 'e2e-race-b'),
     ]);
     const statuses = [first.status, second.status].sort();
     expect(statuses).toEqual([200, 409]);

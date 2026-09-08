@@ -7,6 +7,7 @@ import {
   getSendableTemplate,
   getTemplateById,
   hasTemplateDraft,
+  isTemplateAssociable,
   isTemplateSendable,
   publishTemplate,
   saveTemplateDraft,
@@ -362,6 +363,31 @@ describe('migration 347 テンプレートの公開版固定(#645 / N-131・差�
     expect(row.message_content).toBe('最初の本文');
   });
 
+  it('キー記録の途中で落ちても版だけ進まない(独立審査P1・途中障害)', async () => {
+    const sqlite = new Database(':memory:');
+    sqlite.exec(readFileSync(join(packageRoot, 'bootstrap.sql'), 'utf8'));
+    const db = asD1(sqlite);
+    const created = await createTemplate(db, {
+      name: 'あいさつ', messageType: 'text', messageContent: '最初の本文',
+    });
+    await saveTemplateDraft(db, created.id, { messageContent: '公開したい本文' });
+    // キー記録だけを落とす。版更新と記録が別SQLなら版だけ進んでしまう。
+    sqlite.exec(
+      `CREATE TRIGGER fail_key_insert BEFORE INSERT ON template_publish_keys
+       BEGIN SELECT RAISE(ABORT, 'mid-failure'); END;`,
+    );
+
+    await expect(
+      publishTemplate(db, created.id, { idempotencyKey: 'mid-failure-key' }),
+    ).rejects.toThrow();
+
+    const row = (await getTemplateById(db, created.id))!;
+    expect(row.published_version).toBe(0);
+    expect(row.message_content).toBe('最初の本文');
+    expect(hasTemplateDraft(row)).toBe(true);
+    expect(row.draft_message_content).toBe('公開したい本文');
+  });
+
   it('347 適用前の行は公開済みになり、参照先なしを作らない', () => {
     const sqlite = new Database(':memory:');
     // 347 より前の templates の形だけ作る。
@@ -403,8 +429,16 @@ describe('migration 347 テンプレートの公開版固定(#645 / N-131・差�
 
 describe('送ってよいテンプレートの見分け(再審査2・3)', () => {
   it('未公開・別アカウントは送れず、公開版の同一アカウントは送れる', async () => {
-    const db = openMigratedDb();
-    const created = await createUnpublishedTemplate(db);
+    const sqlite = new Database(':memory:');
+    sqlite.exec(readFileSync(join(packageRoot, 'bootstrap.sql'), 'utf8'));
+    sqlite.prepare(
+      `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+       VALUES ('account-1', 'channel-1', '店舗1', 'token', 'secret')`,
+    ).run();
+    const db = asD1(sqlite);
+    const created = await createTemplate(db, {
+      name: 'あいさつ', messageType: 'text', messageContent: '最初の本文', lineAccountId: 'account-1',
+    });
 
     // 未公開(版0)は送れない。
     expect(isTemplateSendable(created, 'account-1')).toBe(false);
@@ -416,14 +450,27 @@ describe('送ってよいテンプレートの見分け(再審査2・3)', () => 
     expect(await getSendableTemplate(db, created.id, 'account-1')).not.toBeNull();
   });
 
-  it('持ち主なしの古い行は通し、持ち主違いは止める', () => {
-    expect(isTemplateSendable({ published_version: 1, line_account_id: null }, 'account-1')).toBe(true);
+  it('送信は両方が分かり完全一致のときだけ通す(fail-close・独立審査指摘3)', () => {
+    expect(isTemplateSendable({ published_version: 1, line_account_id: 'account-1' }, 'account-1')).toBe(true);
     expect(isTemplateSendable({ published_version: 1, line_account_id: 'account-2' }, 'account-1')).toBe(false);
+    expect(isTemplateSendable({ published_version: 1, line_account_id: null }, 'account-1')).toBe(false);
+    expect(isTemplateSendable({ published_version: 1, line_account_id: 'account-1' }, null)).toBe(false);
     expect(isTemplateSendable({ published_version: 0, line_account_id: 'account-1' }, 'account-1')).toBe(false);
     expect(isTemplateSendable(null, 'account-1')).toBe(false);
   });
 
-  it('指紋は同じ内容で同じ値、1文字の違いや削除で変わる', () => {
+  it('関連付けも送信と同じく両方が分かり完全一致のときだけ通す(fail-close・独立審査指摘3)', () => {
+    expect(isTemplateAssociable({ published_version: 1, line_account_id: 'account-1' }, 'account-1')).toBe(true);
+    expect(isTemplateAssociable({ published_version: 1, line_account_id: 'account-2' }, 'account-1')).toBe(false);
+    expect(isTemplateAssociable({ published_version: 1, line_account_id: null }, 'account-1')).toBe(false);
+    // 持ち主未定の結びつけは通さない。通すと送る側で別アカウントの公開版が混ざる。
+    expect(isTemplateAssociable({ published_version: 1, line_account_id: 'account-1' }, null)).toBe(false);
+    expect(isTemplateAssociable({ published_version: 1, line_account_id: 'account-1' }, undefined)).toBe(false);
+    expect(isTemplateAssociable({ published_version: 0, line_account_id: 'account-1' }, null)).toBe(false);
+    expect(isTemplateAssociable(null, 'account-1')).toBe(false);
+  });
+
+  it('指紋は同じ内容で同じ値、1文字の違いや削除で変わる(SHA-256・独立審査P1)', async () => {
     const base = {
       draft_message_type: 'text',
       draft_message_content: '本文',
@@ -433,12 +480,10 @@ describe('送ってよいテンプレートの見分け(再審査2・3)', () => 
       draft_question_json: null,
       draft_question_status: 'published' as const,
     };
-    expect(templateDraftFingerprint(base)).toBe(templateDraftFingerprint({ ...base }));
-    expect(templateDraftFingerprint(base)).not.toBe(
-      templateDraftFingerprint({ ...base, draft_message_content: '本文!' }),
-    );
-    expect(templateDraftFingerprint(base)).not.toBe(
-      templateDraftFingerprint({ ...base, draft_question_json: '{"text":"q"}' }),
-    );
+    const fingerprint = await templateDraftFingerprint(base);
+    expect(fingerprint).toMatch(/^[0-9a-f]{64}$/);
+    expect(await templateDraftFingerprint({ ...base })).toBe(fingerprint);
+    expect(await templateDraftFingerprint({ ...base, draft_message_content: '本文!' })).not.toBe(fingerprint);
+    expect(await templateDraftFingerprint({ ...base, draft_question_json: '{"text":"q"}' })).not.toBe(fingerprint);
   });
 });
