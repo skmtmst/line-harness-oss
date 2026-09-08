@@ -24,6 +24,10 @@ const availabilityMocks = {
       slots: availabilityMocks.computeSlots().map((slot) => ({ date: params.from, ...slot })),
     }],
   })),
+  // 競合代替候補の日付・時刻換算。JST 店舗として振る舞う（旧 +09:00 固定と同値）。
+  getAccountTimeZone: vi.fn(async () => 'Asia/Tokyo'),
+  tzDateStr: vi.fn((_tz: string, d: Date) => new Date(d.getTime() + 9 * 3600_000).toISOString().slice(0, 10)),
+  tzHHMM: vi.fn((_tz: string, d: Date) => new Date(d.getTime() + 9 * 3600_000).toISOString().slice(11, 16)),
 };
 vi.mock('../services/availability.js', () => availabilityMocks);
 

@@ -166,13 +166,13 @@ function pad2(n: number): string {
 }
 
 /** そのタイムゾーンでの日付（例外日・予約帰属の突合に使う）。 */
-function tzDateStr(tz: string, d: Date): string {
+export function tzDateStr(tz: string, d: Date): string {
   const p = tzParts(tz, d);
   return `${p.y}-${pad2(p.mo)}-${pad2(p.day)}`;
 }
 
 /** そのタイムゾーンでの時刻。 */
-function tzHHMM(tz: string, d: Date): string {
+export function tzHHMM(tz: string, d: Date): string {
   const p = tzParts(tz, d);
   return `${pad2(p.h)}:${pad2(p.mi)}`;
 }
@@ -200,6 +200,18 @@ function addDays(date: string, n: number): string {
   const d = new Date(`${date}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
+}
+
+/** 店舗のタイムゾーン。booking.ts の競合代替候補でも使う。 */
+export async function getAccountTimeZone(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<string> {
+  const row = await db
+    .prepare(`SELECT timezone FROM booking_settings WHERE line_account_id = ?`)
+    .bind(lineAccountId)
+    .first<{ timezone: string | null }>();
+  return normalizeTimeZone(row?.timezone ?? FALLBACK_TIME_ZONE);
 }
 
 function eachDate(from: string, to: string): string[] {
@@ -308,11 +320,11 @@ export async function getAvailability(
               sm.override_duration_minutes AS override_duration,
               sm.override_price AS override_price
          FROM menus m
-         LEFT JOIN staff_menus sm ON sm.menu_id = m.id AND sm.staff_id = ?2
-        WHERE m.id = ?1 AND m.line_account_id = ?3
+         LEFT JOIN staff_menus sm ON sm.menu_id = m.id AND sm.staff_id = ?
+        WHERE m.id = ? AND m.line_account_id = ?
           AND m.deleted_at IS NULL AND m.is_active = 1`,
     )
-    .bind(params.menuId, params.staffId ?? '', params.lineAccountId)
+    .bind(params.staffId ?? '', params.menuId, params.lineAccountId)
     .first<{
       duration_minutes: number;
       buffer_after_minutes: number;
@@ -326,26 +338,27 @@ export async function getAvailability(
   }
 
   // SQL とパラメータ数を一致させる。staffId 未指定時の no-WHERE バリアントは
-  // ?1 と ?2 だけを参照するので bind() も 2 引数に留める。多いと D1 が
-  // "Wrong number of parameter bindings" で 500 を返す（本番再現確認済）。
+  // 2 引数に留める。多いと D1 が "Wrong number of parameter bindings" で
+  // 500 を返す（本番再現確認済）。番号付き ?NN は D1 と better-sqlite3 で
+  // 数え方が違うため、ここでは無名 ? を文の順に並べる。
   const staffStmt = params.staffId
     ? db
         .prepare(
           `SELECT s.id, s.display_name, s.is_designation_optional
              FROM staff s
-             INNER JOIN staff_menus sm ON sm.staff_id = s.id AND sm.menu_id = ?2 AND sm.is_offered = 1
-            WHERE s.line_account_id = ?1 AND s.is_active = 1 AND s.deleted_at IS NULL AND s.id = ?3`,
+             INNER JOIN staff_menus sm ON sm.staff_id = s.id AND sm.menu_id = ? AND sm.is_offered = 1
+            WHERE s.line_account_id = ? AND s.is_active = 1 AND s.deleted_at IS NULL AND s.id = ?`,
         )
-        .bind(params.lineAccountId, params.menuId, params.staffId)
+        .bind(params.menuId, params.lineAccountId, params.staffId)
     : db
         .prepare(
           `SELECT s.id, s.display_name, s.is_designation_optional
              FROM staff s
-             INNER JOIN staff_menus sm ON sm.staff_id = s.id AND sm.menu_id = ?2 AND sm.is_offered = 1
-            WHERE s.line_account_id = ?1 AND s.is_active = 1 AND s.deleted_at IS NULL
+             INNER JOIN staff_menus sm ON sm.staff_id = s.id AND sm.menu_id = ? AND sm.is_offered = 1
+            WHERE s.line_account_id = ? AND s.is_active = 1 AND s.deleted_at IS NULL
             ORDER BY s.is_designation_optional DESC, s.sort_order ASC`,
         )
-        .bind(params.lineAccountId, params.menuId);
+        .bind(params.menuId, params.lineAccountId);
   const staffRows = await staffStmt.all<{
     id: string;
     display_name: string;
