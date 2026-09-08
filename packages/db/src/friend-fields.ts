@@ -608,11 +608,23 @@ function isExistingCalendarDate(value: string): boolean {
  * 空（null・undefined・空文字）は「消す」扱いで value: null を返す。
  * setFriendFieldValue が空文字で行を消す動きと合わせている。
  */
+/**
+ * 保存値を受け付ける種類をここに列挙する。載っていない種類は fail-closed で止める。
+ *
+ * 項目の種類は作成時に FRIEND_FIELD_TYPES からしか選べないが、古い行や
+ * 直接書き込みで想定外の種類が残っている可能性がある。未知の種類を
+ * 無条件で通すと、不正値の波及という N-042 の問題が残る。
+ */
+const VALUE_CHECKABLE_TYPES = new Set<string>(FRIEND_FIELD_TYPES);
+
 export function validateFriendFieldValue(
   field: FriendFieldValueCheckTarget,
   raw: unknown,
 ): { ok: true; value: string | null } | { ok: false; error: string } {
   const type = typeof field.type === 'string' ? field.type : '';
+  if (!VALUE_CHECKABLE_TYPES.has(type)) {
+    return { ok: false, error: 'この項目の種類では値を保存できません' };
+  }
   if (raw === null || raw === undefined) return { ok: true, value: null };
   if (typeof raw === 'string' && raw.trim() === '') return { ok: true, value: null };
 
@@ -708,7 +720,7 @@ export function validateFriendFieldValue(
     }
     return { ok: true, value: raw.trim() };
   }
-  if (type === 'text' || type === 'textarea' || type === '') {
+  if (type === 'text' || type === 'textarea') {
     if (typeof raw === 'number' && Number.isFinite(raw)) return { ok: true, value: String(raw) };
     if (typeof raw !== 'string') return { ok: false, error: '文字で入力してください' };
     const limit = type === 'textarea' ? 2000 : 200;
@@ -716,22 +728,34 @@ export function validateFriendFieldValue(
     if (text.length > limit) return { ok: false, error: `${limit}文字以内で入力してください` };
     return { ok: true, value: text === '' ? null : text };
   }
-  // 未知の種類は通す。作り直し前の古い行を、新しい検証で書けなくしない。
-  if (typeof raw === 'string') return { ok: true, value: raw.trim() === '' ? null : raw };
-  return { ok: false, error: '文字で入力してください' };
+  return { ok: false, error: 'この項目の種類では値を保存できません' };
 }
 
 /**
- * 値を書き込む。
+ * 値を書き込む中央の口。
+ *
+ * field（種類と選択肢）を渡すと、保存前に validateFriendFieldValue で
+ * 検証・正規化し、正規化した値を保存する。通らない値は例外で止める。
+ * 口（単票・一括など）は事前に検証して項目単位の422を返すのが役目で、
+ * ここは「検証済みのはず」の安全網として働く。
+ *
+ * field が無い呼び出しは従来どおり素通しする。フォーム・シナリオ系の
+ * 接続が終わるまでの暫定で、新しい接続は必ず field を渡す。
  *
  * 空文字は行を消す。「空欄にした」と「一度も入れていない」を分けても
  * 画面上は同じ見え方になり、分けた分だけ判定が増えるため。
  */
 export async function setFriendFieldValue(
   db: D1Database,
-  input: { friendId: string; fieldId: string; value: string | null; updatedBy: string },
+  input: { friendId: string; fieldId: string; value: string | null; updatedBy: string; field?: FriendFieldValueCheckTarget },
 ): Promise<void> {
-  if (input.value === null || input.value === '') {
+  let value = input.value;
+  if (input.field) {
+    const checked = validateFriendFieldValue(input.field, value);
+    if (!checked.ok) throw new Error(`invalid friend field value: ${checked.error}`);
+    value = checked.value;
+  }
+  if (value === null || value === '') {
     await db
       .prepare(`DELETE FROM friend_field_values WHERE friend_id = ? AND field_id = ?`)
       .bind(input.friendId, input.fieldId)
@@ -746,7 +770,7 @@ export async function setFriendFieldValue(
        DO UPDATE SET value = excluded.value, updated_by = excluded.updated_by,
                      updated_at = excluded.updated_at`,
     )
-    .bind(input.friendId, input.fieldId, input.value, input.updatedBy, jstNow())
+    .bind(input.friendId, input.fieldId, value, input.updatedBy, jstNow())
     .run();
 }
 

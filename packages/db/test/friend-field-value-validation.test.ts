@@ -6,10 +6,16 @@ import Database from 'better-sqlite3';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  createFriendField,
   getFriendFieldMap,
   setFriendFieldValue,
   validateFriendFieldValue,
 } from '../src/friend-fields.js';
+import {
+  createFieldMigrationPreview,
+  executeFieldMigration,
+  queueFieldMigration,
+} from '../src/field-migrations.js';
 import { asD1 } from './d1-test-helper.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -83,6 +89,12 @@ describe('validateFriendFieldValue', () => {
     expect(validateFriendFieldValue(field('multi_select', options), 5).ok).toBe(false);
   });
 
+  it('未知の種類は無条件通過させず止める', () => {
+    expect(validateFriendFieldValue({ type: 'mystery', options_json: null }, '値').ok).toBe(false);
+    expect(validateFriendFieldValue({ type: '', options_json: null }, '値').ok).toBe(false);
+    expect(validateFriendFieldValue({ type: 'mystery', options_json: null }, null).ok).toBe(false);
+  });
+
   it('email・tel・urlは形を見て、メールは小文字へ直す', () => {
     expect(validateFriendFieldValue(field('email'), 'Taro@Example.JP'))
       .toEqual({ ok: true, value: 'taro@example.jp' });
@@ -151,6 +163,54 @@ describe('正規化値の後段利用（N-042 結合）', () => {
       .bind('friend-1', 'field-num', 500)
       .first<{ c: number }>();
     expect(Number(row?.c)).toBe(1);
+  });
+
+  it('中央の口は項目定義があれば正規化して保存し、通らない値は例外で止める', async () => {
+    await setFriendFieldValue(db, {
+      friendId: 'friend-1', fieldId: 'field-num', value: '1,000', updatedBy: 'u-1',
+      field: { type: 'number', options_json: null },
+    });
+    const stored = sqlite.prepare(
+      `SELECT value FROM friend_field_values WHERE friend_id = 'friend-1' AND field_id = 'field-num'`,
+    ).get() as { value: string };
+    expect(stored).toEqual({ value: '1000' });
+
+    await expect(setFriendFieldValue(db, {
+      friendId: 'friend-1', fieldId: 'field-num', value: 'たくさん', updatedBy: 'u-1',
+      field: { type: 'number', options_json: null },
+    })).rejects.toThrow();
+    // 失敗した書き込みは残さない。
+    expect(sqlite.prepare(
+      `SELECT value FROM friend_field_values WHERE friend_id = 'friend-1' AND field_id = 'field-num'`,
+    ).get()).toEqual({ value: '1000' });
+  });
+
+  it('移行実行は変換済みでも検証を通し、通らない値は書かず失敗に倒す', async () => {
+    sqlite.prepare(`INSERT INTO friends (id, line_user_id, line_account_id) VALUES ('friend-2', 'U002', 'account-1')`).run();
+    const source = await createFriendField(db, { name: '年齢（旧）', fieldKey: 'age_tamper_old', type: 'text' });
+    const target = await createFriendField(db, { name: '年齢', fieldKey: 'age_tamper', type: 'number' });
+    const scope = { tenantId: '00000000-0000-4000-8000-000000000001', lineAccountId: 'account-1' };
+    await createFieldMigrationPreview(db, {
+      runId: 'run-tamper', scope, sourceFieldId: source.id, targetFieldId: target.id,
+      sourceVersion: 1, targetVersion: 1, previewTokenHash: 'tamper-token', snapshotHash: 'tamper-snapshot',
+      expiresAt: '2999-01-01T00:00:00.000Z', usageTargets: [], createdBy: 'staff-1',
+      items: [
+        { friendId: 'friend-1', sourceValue: '12', convertedValue: '12', status: 'convertible', reason: null },
+        // 事前確認後に書き換えられた想定。数値項目へ文字列は書かせない。
+        { friendId: 'friend-2', sourceValue: 'xx', convertedValue: 'たくさん', status: 'convertible', reason: null },
+      ],
+    });
+    expect(await queueFieldMigration(db, 'run-tamper', 'tamper-request')).toBe(true);
+    await executeFieldMigration(db, 'run-tamper', 'number', 'staff-1');
+
+    const rows = sqlite.prepare(
+      `SELECT friend_id, value FROM friend_field_values WHERE field_id = ?`,
+    ).all(target.id);
+    expect(rows).toEqual([{ friend_id: 'friend-1', value: '12' }]);
+    const items = sqlite.prepare(
+      `SELECT status FROM field_migration_items WHERE run_id = 'run-tamper' ORDER BY source_value`,
+    ).all() as Array<{ status: string }>;
+    expect(items.map((item) => item.status).sort()).toEqual(['failed', 'succeeded']);
   });
 
   it('自動化の加算は正規化値を数として読める', async () => {
