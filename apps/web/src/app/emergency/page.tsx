@@ -8,6 +8,7 @@ import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import PageHeader from '@/components/shared/page-header'
 import {
   api,
+  ApiError,
   type OperationCapability,
   type OperationControl,
   type OperationHealthCheckKey,
@@ -58,6 +59,24 @@ const CAPABILITY_LABEL: Record<OperationCapability, string> = {
   auto_reply_dispatch: '自動応答',
   webhook_outgoing: '外部への通知',
   ad_postback: '広告への成果通知',
+}
+
+/*
+ * N-453/N-455: 止められない理由と競合後の再読込。
+ *
+ * 止められない理由はサーバーが返す機械コード(`code`)で受け取り、運用者向けの
+ * 文言と次の行動は画面側が持つ。理由の中身を固定の作り置きで捏造しない。
+ * コードは `apps/worker/src/routes/operations.ts` の応答と1対1に対応する。
+ */
+const OPERATION_BLOCKED_CODES = {
+  controlForbidden: 'EMERGENCY_CONTROL_FORBIDDEN',
+  scopeForbidden: 'EMERGENCY_SCOPE_FORBIDDEN',
+} as const
+
+function operationBlockedText(code: string | null | undefined): string | null {
+  if (code === OPERATION_BLOCKED_CODES.scopeForbidden) return 'この範囲を操作する権限がありません。対象アカウントを選び直すか、オーナーに確認してください。'
+  if (code === OPERATION_BLOCKED_CODES.controlForbidden) return '緊急停止を実行する権限がありません。オーナーに権限付与を依頼してください。'
+  return null
 }
 type ConfirmMode = 'stop' | 'restore' | null
 
@@ -346,6 +365,15 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
   const [control, setControl] = useState<OperationControl | null>(null)
   const [canControl, setCanControl] = useState(false)
   const [calculatedAt, setCalculatedAt] = useState<string | null>(null)
+  /*
+   * N-453: 停止できない理由の機械コード。口の `preview` が返す
+   * `permissions.reasonCode` をそのまま保持し、文言への変換は
+   * `operationBlockedText` で行う。口が古い版で欄が無いときは null。
+   */
+  const [previewBlockedCode, setPreviewBlockedCode] = useState<string | null>(null)
+  // N-455: 競合(409)後に最新状態の読み直しが必要な合図。成功後は消す。
+  const [needsReload, setNeedsReload] = useState(false)
+  const [reloading, setReloading] = useState(false)
 
   /*
     **止める前に、何本止まって何人に関わるかを実測で出す。**
@@ -358,24 +386,50 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
   */
   const [impact, setImpact] = useState<OperationImpactPreview | null>(null)
   const [impactFailed, setImpactFailed] = useState(false)
+  /*
+   * N-455: 最新状態の読み直しは、対象切替の自動取得と競合後の手動取得で
+   * 同じ口(`preview`)を使う。成功すれば競合の合図は消える。
+   */
+  const loadPreview = useCallback(async () => {
+    const accountId = targetAccountId === 'all' ? null : targetAccountId
+    const response = await api.operations.preview(accountId)
+    if (!response.success) throw new Error(response.error)
+    if (response.data?.impact && response.data?.control && response.data?.permissions) {
+      setImpact(response.data.impact)
+      setImpactFailed(false)
+      setControl(response.data.control)
+      setCanControl(response.data.permissions.canControl)
+      setPreviewBlockedCode((response.data.permissions as { canControl: boolean; reasonCode?: string | null }).reasonCode ?? null)
+      setCalculatedAt(response.data.calculatedAt)
+      return
+    }
+    throw new Error('invalid preview')
+  }, [targetAccountId])
   useEffect(() => {
     let cancelled = false
     setImpact(null); setImpactFailed(false)
-    const accountId = targetAccountId === 'all' ? null : targetAccountId
-    api.operations.preview(accountId)
-      .then((response) => {
+    loadPreview()
+      .then(() => { if (!cancelled) setNeedsReload(false) })
+      .catch((error: unknown) => {
         if (cancelled) return
-        if (response.success && response.data?.impact && response.data?.control && response.data?.permissions) {
-          setImpact(response.data.impact)
-          setControl(response.data.control)
-          setCanControl(response.data.permissions.canControl)
-          setCalculatedAt(response.data.calculatedAt)
-        }
-        else setImpactFailed(true)
+        setImpactFailed(true)
+        setPreviewBlockedCode(error instanceof ApiError ? (error.code ?? null) : null)
       })
-      .catch(() => { if (!cancelled) setImpactFailed(true) })
     return () => { cancelled = true }
-  }, [targetAccountId])
+  }, [loadPreview])
+  const reloadControl = useCallback(async () => {
+    setReloading(true)
+    try {
+      await loadPreview()
+      setNeedsReload(false)
+      setMessage({ tone: 'success', text: '最新の状態を読み直しました。内容を確認して、もう一度実行してください。' })
+    } catch (error) {
+      if (error instanceof ApiError && error.code) setPreviewBlockedCode(error.code)
+      setMessage({ tone: 'danger', text: '最新の状態を読み直せませんでした。時間をおいてもう一度読み直してください。' })
+    } finally {
+      setReloading(false)
+    }
+  }, [loadPreview])
 
   const selectedTargets = (Object.keys(targets) as StopTarget[]).filter((key) => targets[key])
   const selectedCapabilities = selectedTargets.flatMap((key) => TARGET_CAPABILITIES[key])
@@ -418,10 +472,18 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
       }, grant.data.token, requestKey)
       if (!response.success) throw new Error(response.error)
       setControl(response.data.control)
+      setNeedsReload(false)
       setMessage({ tone: 'success', text: 'サーバー共通の停止状態を更新しました。別の端末にも同じ状態が表示されます。' })
       setStepUpMode(null); setStepUpCode(''); setRequestKey('')
-    } catch {
-      setMessage({ tone: 'danger', text: '緊急停止を保存できませんでした。最新の停止状態を読み直して、もう一度確認してください。' })
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        setNeedsReload(true)
+        setMessage({ tone: 'warning', text: '別の管理者が先に変更しました。最新の状態を読み直してから、もう一度確認してください。' })
+      } else if (error instanceof ApiError && error.status === 403) {
+        setMessage({ tone: 'warning', text: operationBlockedText(error.code) ?? 'この操作を行う権限がありません。オーナーに確認してください。' })
+      } else {
+        setMessage({ tone: 'danger', text: '緊急停止を保存できませんでした。最新の停止状態を読み直して、もう一度確認してください。' })
+      }
     } finally { setRunning(false) }
   }
 
@@ -437,16 +499,40 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
       }, grant.data.token, requestKey)
       if (!response.success) throw new Error(response.error)
       setControl(response.data.control)
+      setNeedsReload(false)
       setMessage({ tone: 'success', text: 'サーバー共通の停止状態を復旧しました。期限を過ぎた予約は自動では送りません。' })
       setStepUpMode(null); setStepUpCode(''); setRequestKey('')
-    } catch {
-      setMessage({ tone: 'danger', text: '復旧できませんでした。最新の停止状態を読み直して、もう一度確認してください。' })
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        setNeedsReload(true)
+        setMessage({ tone: 'warning', text: '別の管理者が先に変更しました。最新の状態を読み直してから、もう一度確認してください。' })
+      } else if (error instanceof ApiError && error.status === 403) {
+        setMessage({ tone: 'warning', text: operationBlockedText(error.code) ?? 'この操作を行う権限がありません。オーナーに確認してください。' })
+      } else {
+        setMessage({ tone: 'danger', text: '復旧できませんでした。最新の停止状態を読み直して、もう一度確認してください。' })
+      }
     } finally { setRunning(false) }
+  }
+
+  /*
+   * N-453: 止められない理由は黙ってボタンを薄くするだけにしない。
+   * 理由ごとに運用者向け文言と次の行動を出す。口の機械コードがあるときは
+   * それを優先し、古い口で欄が無いときは画面の状態から文言を出す。
+   * 初回の取得が終わるまでは出さない。取得失敗時も `control` が空でも出す。
+   */
+  const previewSettled = impact !== null || impactFailed
+  const stopBlockers: Array<'unavailable' | 'forbidden' | 'scope' | 'empty' | 'stopped'> = []
+  if (previewSettled) {
+    if (impactFailed) stopBlockers.push(previewBlockedCode === OPERATION_BLOCKED_CODES.scopeForbidden ? 'scope' : 'unavailable')
+    else if (!canControl) stopBlockers.push(previewBlockedCode === OPERATION_BLOCKED_CODES.scopeForbidden ? 'scope' : 'forbidden')
+    if (!impactFailed && selectedTargets.length === 0) stopBlockers.push('empty')
+    if (isStopped) stopBlockers.push('stopped')
   }
 
   return (
     <div className="space-y-4" data-design="V3 Emergency control">
-      {message && <div className={`rounded-control px-4 py-3 text-xs font-bold ${message.tone === 'success' ? 'bg-success-bg text-success' : message.tone === 'warning' ? 'bg-warning-bg text-warning' : 'bg-danger-bg text-danger'}`}>{message.text}</div>}
+      {message && <div className={`rounded-control flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-xs font-bold ${message.tone === 'success' ? 'bg-success-bg text-success' : message.tone === 'warning' ? 'bg-warning-bg text-warning' : 'bg-danger-bg text-danger'}`}><p>{message.text}</p>{needsReload && <button type="button" onClick={() => void reloadControl()} disabled={reloading} className="rounded-control border border-current px-3 py-1.5 font-bold hover:opacity-80 disabled:opacity-50">{reloading ? '読み直しています…' : '最新の状態を読み直す'}</button>}</div>}
+      {previewSettled && stopBlockers.length > 0 && <div className="border-warning rounded-card border bg-warning-bg px-4 py-3 text-xs leading-relaxed text-warning" role="status"><p className="font-bold">いまは緊急停止できません</p><ul className="mt-1 list-disc space-y-1 pl-5">{stopBlockers.includes('unavailable') && <li>停止状態を確認できないため、停止・復旧を実行できません。<button type="button" onClick={() => void reloadControl()} disabled={reloading} className="font-bold underline disabled:opacity-50">{reloading ? '読み直しています…' : 'もう一度読む'}</button></li>}{stopBlockers.includes('forbidden') && <li>緊急停止を実行する権限がありません。オーナーに権限付与を依頼してください。</li>}{stopBlockers.includes('scope') && <li>この範囲を操作する権限がありません。対象アカウントを選び直すか、オーナーに確認してください。</li>}{stopBlockers.includes('empty') && <li>停止する配信を1つ以上選んでください。</li>}{stopBlockers.includes('stopped') && <li>停止中です。新しい停止は復旧のあとに行えます。</li>}</ul></div>}
       <div className="flex flex-col items-start gap-4 xl:flex-row">
         <div className="min-w-0 flex-1 space-y-4">
           <section className={`border-hairline rounded-card overflow-hidden border bg-canvas ${isStopped ? 'pointer-events-none opacity-50' : ''}`}>
