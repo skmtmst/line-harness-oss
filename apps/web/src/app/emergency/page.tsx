@@ -173,6 +173,7 @@ function HealthPanel({
   const [checkedAt, setCheckedAt] = useState<string | null>(null)
   const [nextCheckedAt, setNextCheckedAt] = useState<string | null>(null)
   const [snapshotStatus, setSnapshotStatus] = useState<OperationHealthSnapshot['overallStatus']>('unknown')
+  const [controlSummary, setControlSummary] = useState({ value: '確認中', note: '停止状態を確認しています' })
 
   const applySnapshot = useCallback((snapshot: OperationHealthSnapshot) => {
     const results = snapshot.latestRun?.results ?? []
@@ -202,15 +203,21 @@ function HealthPanel({
       setCheckedAt(null)
       setNextCheckedAt(null)
       setSnapshotStatus('unknown')
+      setControlSummary({ value: '未確認', note: 'LINEアカウントを選択してください' })
       setLoading(false)
       return
     }
     try {
-      const response = manual
-        ? await api.operations.runHealth(accountId)
-        : await api.operations.health(accountId)
+      const [response, preview] = await Promise.all([
+        manual ? api.operations.runHealth(accountId) : api.operations.health(accountId),
+        api.operations.preview(accountId),
+      ])
       if (!response.success) throw new Error(response.error)
+      if (!preview.success) throw new Error(preview.error)
       applySnapshot(response.data)
+      setControlSummary(preview.data.control.activeIncidentId
+        ? { value: '停止中', note: preview.data.control.reason || '停止理由は未入力です' }
+        : { value: '通常運用', note: '停止なし' })
     } catch {
       setChecks(CHECK_DEFINITIONS.map((definition) => ({
         ...definition,
@@ -221,6 +228,7 @@ function HealthPanel({
       setCheckedAt(null)
       setNextCheckedAt(null)
       setSnapshotStatus('unknown')
+      setControlSummary({ value: '未確認', note: '停止状態を取得できませんでした' })
     } finally {
       setLoading(false)
     }
@@ -255,7 +263,7 @@ function HealthPanel({
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <SummaryCard label="全体の状態" value={resultTitle} note={loading ? '確認中' : '最新結果'} />
         <SummaryCard label="最後の確認" value={formatOperationDate(checkedAt)} note="5分ごとに自動確認" />
-        <SummaryCard label="緊急停止状態" value="通常運用" note="停止なし" />
+        <SummaryCard label="緊急停止状態" value={controlSummary.value} note={controlSummary.note} />
       </div>
       <div className="rounded-control bg-info-bg text-info px-4 py-3 text-xs font-semibold">
         LINEとのつながりや配信の詰まりを、5分ごとに自動で確かめています。赤が出たら「緊急コントロール」で止められます。
