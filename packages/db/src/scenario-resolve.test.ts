@@ -1,11 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import { resolveStepContent } from './scenario-resolve.js';
 
-function mockDb(tplRow: { message_type: string; message_content: string; question_json?: string | null } | null): D1Database {
+function mockDb(tplRow: {
+  message_type: string; message_content: string; question_json?: string | null;
+  published_version?: number; line_account_id?: string | null;
+} | null): D1Database {
+  const row = tplRow && !('published_version' in tplRow)
+    // 既存の公開済み行と同じ扱いにする(公開版あり・持ち主なし)。
+    ? { ...tplRow, published_version: 1, line_account_id: null }
+    : tplRow;
   return {
     prepare: () => ({
       bind: () => ({
-        first: async () => tplRow,
+        first: async () => row,
       }),
     }),
   } as unknown as D1Database;

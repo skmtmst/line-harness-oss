@@ -443,7 +443,10 @@ async function processSingleDelivery(
   }
 
   // Resolve template_id → templates table (参照型). template_id 未設定なら step 値そのまま。
-  const resolved = await resolveStepContent(db, currentStep);
+  // 再審査対応(#645): 未公開・別アカウントは step の控えに落とす。
+  const resolved = await resolveStepContent(
+    db, currentStep, scenarioRow.line_account_id ?? friend.line_account_id,
+  );
 
   // Expand template variables ({{name}}, {{uid}}, {{auth_url:CHANNEL_ID}}, {{metadata.KEY}}, etc.)
   const resolvedMeta = await resolveMetadata(db, { user_id: (friend as unknown as Record<string, string | null>).user_id, metadata: (friend as unknown as Record<string, string | null>).metadata });

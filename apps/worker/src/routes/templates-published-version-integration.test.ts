@@ -204,19 +204,57 @@ describe('実DB: 削除・同時編集・冪等の保証', () => {
     expect(row?.published_version).toBe(0);
   });
 
-  it('後日の同キー再試行では別の下書きを公開しない', async () => {
+  it('後日の同キー再試行で別の下書きを出す使い回しは409', async () => {
     const id = await createTemplateOnDb();
     await json('PUT', `/api/templates/${id}`, { messageContent: '最初の公開' });
     await json('POST', `/api/templates/${id}/publish`, {}, 'e2e-reuse-key');
 
     await json('PUT', `/api/templates/${id}`, { messageContent: '次の編集' });
     const retry = await json('POST', `/api/templates/${id}/publish`, {}, 'e2e-reuse-key');
+    expect(retry.status).toBe(409);
     expect(await retry.json()).toMatchObject({
-      success: true,
-      data: { published: false, replayed: true, publishedVersion: 1 },
+      success: false,
+      error: '同じ確認キーが別の公開操作で使われています',
     });
 
     const row = await getTemplateById(store.db, id);
     expect(row?.message_content).toBe('最初の公開');
+  });
+
+  it('同じ内容の同キー再試行は記録時の版・本文をそのまま返す(固定応答)', async () => {
+    const id = await createTemplateOnDb();
+    await json('PUT', `/api/templates/${id}`, { messageContent: '最初の公開' });
+    await json('POST', `/api/templates/${id}/publish`, {}, 'e2e-fixed-key');
+
+    await json('PUT', `/api/templates/${id}`, { messageContent: '2回目の公開' });
+    await json('POST', `/api/templates/${id}/publish`, {}, 'e2e-fixed-key-2');
+
+    const retry = await json('POST', `/api/templates/${id}/publish`, {}, 'e2e-fixed-key');
+    expect(await retry.json()).toMatchObject({
+      success: true,
+      data: {
+        published: false,
+        replayed: true,
+        publishedVersion: 1,
+        messageContent: '最初の公開',
+      },
+    });
+
+    const row = await getTemplateById(store.db, id);
+    expect(row?.published_version).toBe(2);
+    expect(row?.message_content).toBe('2回目の公開');
+  });
+
+  it('別キーの同時公開は1つだけ通り、負けは409で版は1つだけ進む', async () => {
+    const id = await createTemplateOnDb();
+    const [first, second] = await Promise.all([
+      json('POST', `/api/templates/${id}/publish`, { expectedVersion: 0 }, 'e2e-race-a'),
+      json('POST', `/api/templates/${id}/publish`, { expectedVersion: 0 }, 'e2e-race-b'),
+    ]);
+    const statuses = [first.status, second.status].sort();
+    expect(statuses).toEqual([200, 409]);
+
+    const row = await getTemplateById(store.db, id);
+    expect(row?.published_version).toBe(1);
   });
 });

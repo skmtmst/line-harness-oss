@@ -27,9 +27,16 @@ describe('コンテンツテンプレートから一斉配信への引用導線'
 
   it('loads both message and content templates into the broadcast picker', () => {
     // #645 差し戻し: 選んでいるアカウントを必ず渡し、未公開・他アカウントを候補にしない。
-    expect(formSource).toContain('api.templates.list(undefined, selectedAccountId || undefined)')
+    expect(formSource).toContain('api.templates.list(undefined, requestAccountId)')
     expect(formSource).toContain('filterSendableTemplates(templateResult.data')
     expect(formSource).toContain('api.broadcastMessageAssets.list')
     expect(formSource).toContain('テンプレートから選ぶ')
+  })
+
+  it('ignores stale template responses after switching accounts (generation check)', () => {
+    // 再審査4: アカウント切替で古い応答が混ざらないよう世代で照合する。
+    expect(formSource).toContain('templateLoadGenerationRef')
+    expect(formSource).toContain('if (!isCurrent()) return')
+    expect(formSource).toContain('selectedAccountIdRef')
   })
 })

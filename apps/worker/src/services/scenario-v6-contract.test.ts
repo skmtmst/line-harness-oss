@@ -2,6 +2,7 @@ import type Database from 'better-sqlite3';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite';
+import { createTemplate, publishTemplate } from '@line-crm/db';
 import {
   getScenarioRuns,
   saveScenarioDraft,
@@ -150,6 +151,34 @@ describe('scenario V6 API contract service', () => {
         params: { tagId: 'tag-other' }, onFailure: 'stop',
       }],
     })).rejects.toMatchObject({ code: 'resource_not_found' });
+  });
+
+  it('未公開・別アカウントのテンプレートは下書き保存で結びつけられない(再審査2・3)', async () => {
+    const messageAction = (templateId: string) => ({
+      id: 'msg-1', hook: 'step_sent', stepId: 'step-1', type: 'send_message',
+      params: { templateId }, onFailure: 'stop',
+    });
+    const save = (templateId: string) => saveScenarioDraft(testDb.db, {
+      scenarioId: 'scenario-1', lineAccountId: 'account-1', expectedVersion: 0,
+      staffId: 'owner-1', afterActions: [messageAction(templateId)],
+    });
+    const unpublished = await createTemplate(testDb.db, {
+      name: '未公開', messageType: 'text', messageContent: '未公開の本文', lineAccountId: 'account-1',
+    });
+    await expect(save(unpublished.id)).rejects.toMatchObject({ code: 'resource_not_found' });
+
+    const other = await createTemplate(testDb.db, {
+      name: '別持ち主', messageType: 'text', messageContent: '別の本文', lineAccountId: 'account-2',
+    });
+    await publishTemplate(testDb.db, other.id, { idempotencyKey: 'contract-other-publish' });
+    await expect(save(other.id)).rejects.toMatchObject({ code: 'resource_not_found' });
+
+    const mine = await createTemplate(testDb.db, {
+      name: '公開済み', messageType: 'text', messageContent: '公開版の本文', lineAccountId: 'account-1',
+    });
+    await publishTemplate(testDb.db, mine.id, { idempotencyKey: 'contract-mine-publish' });
+    const saved = await save(mine.id);
+    expect(saved.version).toBe(1);
   });
 
   it('runsは購読・テスト送信・枠・通別実績を実データから返す', async () => {

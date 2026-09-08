@@ -179,9 +179,10 @@ async function resolveMessage(
     await requireScopedResource(context, {
       table: 'templates', id, code: 'template_not_found', label: 'テンプレート',
     });
+    // 再審査対応(#645): 同一アカウントに加え、公開版があること。
     const template = await context.db.prepare(
       `SELECT message_type, message_content FROM templates
-        WHERE id = ? AND line_account_id = ?`,
+        WHERE id = ? AND line_account_id = ? AND published_version > 0`,
     ).bind(id, context.lineAccountId).first<{ message_type: string; message_content: string }>();
     if (!template) throw invalid('template_not_found', 'テンプレートが見つかりません');
     return {

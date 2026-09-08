@@ -8,6 +8,7 @@ import { toDraft } from '@/components/auto-replies/edit-dialog'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
+import { filterSendableTemplates } from '@/lib/template-send-scope'
 import { useAccount } from '@/contexts/account-context'
 import EditDialog, { type AutoReplyDraft } from '@/components/auto-replies/edit-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -203,7 +204,8 @@ export default function AutoRepliesPage() {
     try {
       const [arRes, tplRes, summaryRes] = await Promise.all([
         api.autoReplies.list({ accountId: selectedAccountId || undefined }),
-        api.templates.list(),
+        // 再審査対応(#645): 選んでいるアカウントを必ず渡し、未公開・他アカウントを候補にしない。
+        api.templates.list(undefined, selectedAccountId || undefined),
         selectedAccountId
           ? api.autoReplies.summary(selectedAccountId).catch(() => null)
           : Promise.resolve(null),
@@ -224,7 +226,7 @@ export default function AutoRepliesPage() {
       setConflictCount(summaryRes?.success ? summaryRes.data.conflictCount : null)
       setTemplateListAvailable(tplRes.success)
       setTemplates(tplRes.success
-        ? tplRes.data.map((t) => ({
+        ? filterSendableTemplates(tplRes.data, requestAccountId).map((t) => ({
             id: t.id,
             name: t.name,
             messageType: t.messageType,

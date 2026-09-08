@@ -1,5 +1,5 @@
 import {
-  getTemplateById,
+  getSendableTemplate,
   recordCarouselTap,
   hasCarouselTap,
 } from '@line-crm/db';
@@ -64,7 +64,8 @@ export async function handleCarouselTap(
   tap: CarouselTapPostback,
   options: { lineAccountId?: string | null; replyToken?: string },
 ): Promise<CarouselTapResult> {
-  const template = await getTemplateById(db, tap.templateId);
+  // 再審査対応(#645): 未公開・別アカウントのタップ応答は送らない。
+  const template = await getSendableTemplate(db, tap.templateId, options.lineAccountId);
   if (!template) return { kind: 'not_found' };
 
   const lineAccountId = options.lineAccountId ?? null;

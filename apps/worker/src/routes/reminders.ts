@@ -348,9 +348,11 @@ async function validateReminderDraftReferences(
   }
   for (const step of settings.steps) {
     if (!step.templateId) continue;
+    // 再審査対応(#645): 同一アカウントに加え、公開版があること。
     const template = await db.prepare(
       `SELECT id FROM templates
-        WHERE id = ? AND (line_account_id = ? OR line_account_id IS NULL)`,
+        WHERE id = ? AND (line_account_id = ? OR line_account_id IS NULL)
+          AND published_version > 0`,
     ).bind(step.templateId, settings.lineAccountId).first<{ id: string }>();
     if (!template) return '通知に使うテンプレートが見つかりません';
   }

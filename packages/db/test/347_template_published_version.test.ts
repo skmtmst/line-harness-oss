@@ -4,10 +4,13 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   createTemplate,
+  getSendableTemplate,
   getTemplateById,
   hasTemplateDraft,
+  isTemplateSendable,
   publishTemplate,
   saveTemplateDraft,
+  templateDraftFingerprint,
   type TemplateRow,
 } from '../src/templates.js';
 import { asD1 } from './d1-test-helper.js';
@@ -26,6 +29,7 @@ function openMigratedDb(): D1Database {
 }
 
 function createUnpublishedTemplate(db: D1Database, messageContent = '最初の本文') {
+  // 持ち主なし(関連付け口の reminders と同じ約束で通す古い形)。
   return createTemplate(db, { name: 'あいさつ', messageType: 'text', messageContent });
 }
 
@@ -195,7 +199,7 @@ describe('migration 347 テンプレートの公開版固定(#645 / N-131・差�
     expect(replay.row.published_version).toBe(1);
   });
 
-  it('後日の同キー再試行では、別の下書きを公開しない(要件5)', async () => {
+  it('後日の同キー再試行で別の下書きを出す使い回しは409(再審査5)', async () => {
     const db = openMigratedDb();
     const created = await createUnpublishedTemplate(db);
     await saveTemplateDraft(db, created.id, { messageContent: '最初の公開' });
@@ -203,13 +207,35 @@ describe('migration 347 テンプレートの公開版固定(#645 / N-131・差�
 
     // 後日、新しい下書きができても、同キーでは公開しない。
     await saveTemplateDraft(db, created.id, { messageContent: '次の編集' });
-    const retry = await publishTemplate(db, created.id, { idempotencyKey: 'publish-key-0004' });
+    await expect(
+      publishTemplate(db, created.id, { idempotencyKey: 'publish-key-0004' }),
+    ).rejects.toThrow('TEMPLATE_PUBLISH_KEY_CONFLICT');
 
+    const row = (await getTemplateById(db, created.id))!;
+    expect(row.message_content).toBe('最初の公開');
+    expect(row.published_version).toBe(1);
+    expect(hasTemplateDraft(row)).toBe(true);
+  });
+
+  it('同じ内容の同キー再試行は記録時の版・本文をそのまま返す(固定応答・再審査5)', async () => {
+    const db = openMigratedDb();
+    const created = await createUnpublishedTemplate(db);
+    await saveTemplateDraft(db, created.id, { messageContent: '最初の公開' });
+    await publishTemplate(db, created.id, { idempotencyKey: 'fixed-key' });
+
+    // 別キーで版が進んでも、同キーの再試行は記録時の結果を変えない。
+    await saveTemplateDraft(db, created.id, { messageContent: '2回目の公開' });
+    await publishTemplate(db, created.id, { idempotencyKey: 'fixed-key-2' });
+
+    const retry = await publishTemplate(db, created.id, { idempotencyKey: 'fixed-key' });
     expect(retry.published).toBe(false);
     expect(retry.replayed).toBe(true);
-    expect(retry.row.message_content).toBe('最初の公開');
     expect(retry.row.published_version).toBe(1);
-    expect(hasTemplateDraft(retry.row)).toBe(true);
+    expect(retry.row.message_content).toBe('最初の公開');
+
+    const row = (await getTemplateById(db, created.id))!;
+    expect(row.published_version).toBe(2);
+    expect(row.message_content).toBe('2回目の公開');
   });
 
   it('古い複数の成功キーはどれも再試行でき、版を進めない(要件5)', async () => {
@@ -222,12 +248,15 @@ describe('migration 347 テンプレートの公開版固定(#645 / N-131・差�
     const before = (await getTemplateById(db, created.id))!;
     expect(before.published_version).toBe(2);
 
-    for (const key of ['old-key-1', 'old-key-2']) {
-      const replay = await publishTemplate(db, created.id, { idempotencyKey: key });
-      expect(replay.published).toBe(false);
-      expect(replay.replayed).toBe(true);
-      expect(replay.row.published_version).toBe(2);
-    }
+    // 古いキーはそれぞれ記録時の結果を返す(固定応答)。版は進めない。
+    const replay1 = await publishTemplate(db, created.id, { idempotencyKey: 'old-key-1' });
+    expect(replay1.published).toBe(false);
+    expect(replay1.replayed).toBe(true);
+    expect(replay1.row.published_version).toBe(1);
+    const replay2 = await publishTemplate(db, created.id, { idempotencyKey: 'old-key-2' });
+    expect(replay2.published).toBe(false);
+    expect(replay2.replayed).toBe(true);
+    expect(replay2.row.published_version).toBe(2);
     const after = (await getTemplateById(db, created.id))!;
     expect(after.message_content).toBe('2回目の公開');
   });
@@ -272,6 +301,67 @@ describe('migration 347 テンプレートの公開版固定(#645 / N-131・差�
     await expect(publishTemplate(db, 'tpl-ない')).rejects.toThrow('TEMPLATE_NOT_FOUND');
   });
 
+  it('確認と書き込みの間に挟まった保存は、下書き版の条件で落とす(再審査1・割込競合)', async () => {
+    const sqlite = new Database(':memory:');
+    sqlite.exec(readFileSync(join(packageRoot, 'bootstrap.sql'), 'utf8'));
+    const raw = sqlite;
+    // 公開 UPDATE の直前に別人の PUT が割り込んだことにする。
+    const interrupting = {
+      ...asD1(sqlite),
+      prepare: (query: string) => {
+        if (query.includes('published_version = published_version + 1')) {
+          raw.prepare(
+            `UPDATE templates
+                SET draft_message_content = '確認していない本文',
+                    draft_revision = draft_revision + 1
+              WHERE id = ?`,
+          ).run(raceId);
+        }
+        return asD1(sqlite).prepare(query);
+      },
+    } as unknown as D1Database;
+    const created = await createTemplate(asD1(sqlite), {
+      name: 'あいさつ', messageType: 'text', messageContent: '最初の本文',
+    });
+    const raceId = created.id;
+    await saveTemplateDraft(asD1(sqlite), raceId, { messageContent: '確認した本文' });
+
+    await expect(
+      publishTemplate(interrupting, raceId, { idempotencyKey: 'interrupt-key' }),
+    ).rejects.toThrow('TEMPLATE_DRAFT_CONFLICT');
+
+    const row = (await getTemplateById(asD1(sqlite), raceId))!;
+    expect(row.message_content).toBe('最初の本文');
+    expect(row.published_version).toBe(0);
+    expect(hasTemplateDraft(row)).toBe(true);
+  });
+
+  it('確認と書き込みの間に挟まった公開は、公開版の条件で落とす(再審査1・割込競合)', async () => {
+    const sqlite = new Database(':memory:');
+    sqlite.exec(readFileSync(join(packageRoot, 'bootstrap.sql'), 'utf8'));
+    const raw = sqlite;
+    const created = await createTemplate(asD1(sqlite), {
+      name: 'あいさつ', messageType: 'text', messageContent: '最初の本文',
+    });
+    const raceId = created.id;
+    const interrupting = {
+      ...asD1(sqlite),
+      prepare: (query: string) => {
+        if (query.includes('published_version = published_version + 1')) {
+          raw.prepare(`UPDATE templates SET published_version = published_version + 1 WHERE id = ?`).run(raceId);
+        }
+        return asD1(sqlite).prepare(query);
+      },
+    } as unknown as D1Database;
+
+    await expect(
+      publishTemplate(interrupting, raceId, { idempotencyKey: 'interrupt-version-key' }),
+    ).rejects.toThrow('TEMPLATE_VERSION_CONFLICT');
+
+    const row = (await getTemplateById(asD1(sqlite), raceId))!;
+    expect(row.message_content).toBe('最初の本文');
+  });
+
   it('347 適用前の行は公開済みになり、参照先なしを作らない', () => {
     const sqlite = new Database(':memory:');
     // 347 より前の templates の形だけ作る。
@@ -308,5 +398,47 @@ describe('migration 347 テンプレートの公開版固定(#645 / N-131・差�
     expect(row['draft_message_content']).toBeNull();
     expect(row['draft_revision']).toBe(0);
     expect(hasTemplateDraft(row as unknown as TemplateRow)).toBe(false);
+  });
+});
+
+describe('送ってよいテンプレートの見分け(再審査2・3)', () => {
+  it('未公開・別アカウントは送れず、公開版の同一アカウントは送れる', async () => {
+    const db = openMigratedDb();
+    const created = await createUnpublishedTemplate(db);
+
+    // 未公開(版0)は送れない。
+    expect(isTemplateSendable(created, 'account-1')).toBe(false);
+    expect(await getSendableTemplate(db, created.id, 'account-1')).toBeNull();
+
+    await publishTemplate(db, created.id, { idempotencyKey: 'sendable-key' });
+    const live = (await getTemplateById(db, created.id))!;
+    expect(isTemplateSendable(live, 'account-1')).toBe(true);
+    expect(await getSendableTemplate(db, created.id, 'account-1')).not.toBeNull();
+  });
+
+  it('持ち主なしの古い行は通し、持ち主違いは止める', () => {
+    expect(isTemplateSendable({ published_version: 1, line_account_id: null }, 'account-1')).toBe(true);
+    expect(isTemplateSendable({ published_version: 1, line_account_id: 'account-2' }, 'account-1')).toBe(false);
+    expect(isTemplateSendable({ published_version: 0, line_account_id: 'account-1' }, 'account-1')).toBe(false);
+    expect(isTemplateSendable(null, 'account-1')).toBe(false);
+  });
+
+  it('指紋は同じ内容で同じ値、1文字の違いや削除で変わる', () => {
+    const base = {
+      draft_message_type: 'text',
+      draft_message_content: '本文',
+      draft_carousel_actions_json: null,
+      draft_carousel_tap_limit_mode: 'none',
+      draft_carousel_tap_limit_text: null,
+      draft_question_json: null,
+      draft_question_status: 'published' as const,
+    };
+    expect(templateDraftFingerprint(base)).toBe(templateDraftFingerprint({ ...base }));
+    expect(templateDraftFingerprint(base)).not.toBe(
+      templateDraftFingerprint({ ...base, draft_message_content: '本文!' }),
+    );
+    expect(templateDraftFingerprint(base)).not.toBe(
+      templateDraftFingerprint({ ...base, draft_question_json: '{"text":"q"}' }),
+    );
   });
 });

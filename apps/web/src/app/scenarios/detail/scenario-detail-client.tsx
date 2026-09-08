@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, DeliveryMode, Folder } from '@line-crm/shared'
 import { api, type ScenarioRuns, type ScenarioSimulation } from '@/lib/api'
+import { filterSendableTemplates } from '@/lib/template-send-scope'
 import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 import FlexPreviewComponent from '@/components/flex-preview'
@@ -434,7 +435,8 @@ export default function ScenarioDetailClient({
       if (cancelled) return
       if (statsRes && statsRes.success) setStats(statsRes.data)
       if (tplRes && tplRes.success) {
-        setTemplates(tplRes.data
+        // 再審査対応(#645): 公開版だけを候補にする。
+        setTemplates(filterSendableTemplates(tplRes.data, scenario?.lineAccountId)
           .filter((t) => !t.question || t.questionStatus === 'published')
           .map((t) => ({
           id: t.id,
@@ -1114,6 +1116,7 @@ export default function ScenarioDetailClient({
               // カルーセルはテンプレートを指す形。中身はそちらが持つ。
               <CarouselPicker
                 value={stepForm.templateId ?? ''}
+                accountId={scenario?.lineAccountId}
                 onChange={(id, tpl) =>
                   setStepForm((prev) => ({
                     ...prev,

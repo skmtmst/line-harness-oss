@@ -168,7 +168,8 @@ async function validateActionResources(
   } else if (action.type === 'send_message') {
     if (params.templateId !== undefined) {
       const templateId = requiredString(params.templateId, `${field}.templateId`, 'テンプレート');
-      await requireResource(db, 'SELECT id FROM templates WHERE id = ? AND line_account_id = ?', [templateId, lineAccountId], `${field}.templateId`, 'テンプレート');
+      // 再審査対応(#645): 同一アカウントに加え、公開版があること。
+      await requireResource(db, 'SELECT id FROM templates WHERE id = ? AND line_account_id = ? AND published_version > 0', [templateId, lineAccountId], `${field}.templateId`, 'テンプレート');
     } else {
       requiredString(params.content, `${field}.content`, '送信内容');
     }

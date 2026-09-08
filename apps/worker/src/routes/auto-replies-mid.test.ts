@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+import { createTemplate, publishTemplate } from '@line-crm/db';
 import { autoReplies } from './auto-replies.js';
 
 const admin: AuthenticatedStaff = {
@@ -193,6 +194,49 @@ describe('点検・中: 自動応答の下書き確認・上限・ページ送�
     const legacyBody = await legacy.json() as { data: unknown };
     expect(legacy.status).toBe(200);
     expect(Array.isArray(legacyBody.data)).toBe(true);
+  });
+
+  it('実DB: 未公開・別アカウントのテンプレートは結びつけられない(再審査2・3)', async () => {
+    const target = app(testDb.db);
+    const post = (body: Record<string, unknown>) => target.instance.request('/api/auto-replies', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }, target.bindings);
+
+    // 未公開は400。
+    const unpublished = await createTemplate(testDb.db, {
+      name: '未公開', messageType: 'text', messageContent: '未公開の本文', lineAccountId: 'account-1',
+    });
+    const rejectedUnpublished = await post({
+      keyword: '未公開', lineAccountId: 'account-1', templateId: unpublished.id,
+    });
+    expect(rejectedUnpublished.status).toBe(400);
+
+    // 別アカウントの公開版も400。
+    testDb.raw.prepare(
+      `INSERT INTO line_accounts
+         (id, channel_id, name, channel_access_token, channel_secret, is_active, tenant_id)
+       VALUES ('account-2', 'channel-2', '店舗2', '', '', 1, 'tenant-1')`,
+    ).run();
+    const other = await createTemplate(testDb.db, {
+      name: '別持ち主', messageType: 'text', messageContent: '別の本文', lineAccountId: 'account-2',
+    });
+    await publishTemplate(testDb.db, other.id, { idempotencyKey: 'mid-other-publish' });
+    const rejectedOther = await post({
+      keyword: '別持ち主', lineAccountId: 'account-1', templateId: other.id,
+    });
+    expect(rejectedOther.status).toBe(400);
+
+    // 同一アカウントの公開版は201。
+    const mine = await createTemplate(testDb.db, {
+      name: '公開済み', messageType: 'text', messageContent: '公開版の本文', lineAccountId: 'account-1',
+    });
+    await publishTemplate(testDb.db, mine.id, { idempotencyKey: 'mid-mine-publish' });
+    const accepted = await post({
+      keyword: '公開済み', lineAccountId: 'account-1', templateId: mine.id,
+    });
+    expect(accepted.status).toBe(201);
   });
 
   it('中4: 直接更新はowner/adminだけが使え、一時停止に使える', async () => {

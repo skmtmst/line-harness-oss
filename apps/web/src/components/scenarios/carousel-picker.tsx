@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { filterSendableTemplates } from '@/lib/template-send-scope'
 import { scenarioReferenceData } from './scenario-reference-data'
 
 export interface CarouselTemplate {
@@ -34,6 +35,8 @@ export interface CarouselPickerProps {
   /** 選んでいるテンプレートID。 */
   value: string
   onChange: (templateId: string, template: CarouselTemplate | null) => void
+  /** 選んでいるLINEアカウント。渡すとその持ち主の公開版だけを候補にする。 */
+  accountId?: string | null
 }
 
 /** テンプレートの中身から、枚数と1枚目の題を読む。 */
@@ -54,15 +57,17 @@ function summarize(content: string): { panels: number; firstTitle: string } {
   }
 }
 
-export default function CarouselPicker({ value, onChange }: CarouselPickerProps) {
+export default function CarouselPicker({ value, onChange, accountId }: CarouselPickerProps) {
   const [items, setItems] = useState<CarouselTemplate[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    void scenarioReferenceData.templates().then((res) => {
+    // 再審査対応(#645): 持ち主の公開版だけを候補にする。
+    setLoading(true)
+    void scenarioReferenceData.templates(accountId ?? undefined).then((res) => {
       if (res.success) {
         setItems(
-          res.data
+          filterSendableTemplates(res.data, accountId)
             .filter((t) => t.messageType === 'carousel')
             .map((t) => ({
               id: t.id,
@@ -74,7 +79,7 @@ export default function CarouselPicker({ value, onChange }: CarouselPickerProps)
       }
       setLoading(false)
     })
-  }, [])
+  }, [accountId])
 
   if (loading) {
     return <p className="text-ink-faint py-6 text-center text-sm">読み込み中…</p>

@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
+import { createTemplate, publishTemplate } from '@line-crm/db';
 import {
   CommonActionValidationError,
   createCommonAction,
@@ -101,6 +102,44 @@ describe('V6共通アクション', () => {
     expect(testDb.raw.prepare(
       `SELECT status FROM common_action_versions WHERE id = ?`,
     ).get(created.draftVersionId)).toEqual({ status: 'draft' });
+  });
+
+  it('未公開・別アカウントのテンプレートは結びつけられない(再審査2・3)', async () => {
+    const messageAction = (templateId: string) => [{
+      id: 'msg-step',
+      type: 'send_message',
+      params: { templateId },
+      onFailure: 'stop',
+    }];
+    const tryPublish = async (name: string, templateId: string) => {
+      const created = await createCommonAction(testDb.db, {
+        lineAccountId: 'account-1', name, actions: messageAction(templateId),
+      });
+      return publishCommonActionDraft(testDb.db, {
+        id: created.id, lineAccountId: 'account-1', draftVersionId: created.draftVersionId,
+      });
+    };
+    const unpublished = await createTemplate(testDb.db, {
+      name: '未公開', messageType: 'text', messageContent: '未公開の本文', lineAccountId: 'account-1',
+    });
+    await expect(tryPublish('未公開を使う', unpublished.id)).rejects.toMatchObject(
+      { code: 'resource_not_found', field: 'actions.0.params.templateId' },
+    );
+
+    const other = await createTemplate(testDb.db, {
+      name: '別持ち主', messageType: 'text', messageContent: '別の本文', lineAccountId: 'account-2',
+    });
+    await publishTemplate(testDb.db, other.id, { idempotencyKey: 'common-other-publish' });
+    await expect(tryPublish('別持ち主を使う', other.id)).rejects.toMatchObject(
+      { code: 'resource_not_found', field: 'actions.0.params.templateId' },
+    );
+
+    const mine = await createTemplate(testDb.db, {
+      name: '公開済み', messageType: 'text', messageContent: '公開版の本文', lineAccountId: 'account-1',
+    });
+    await publishTemplate(testDb.db, mine.id, { idempotencyKey: 'common-mine-publish' });
+    const published = await tryPublish('公開済みを使う', mine.id);
+    expect(published.versionNumber).toBe(1);
   });
 
   it('未知の処理を保存も公開もしない', async () => {
