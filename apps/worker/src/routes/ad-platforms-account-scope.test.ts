@@ -122,10 +122,10 @@ describe('広告設定ルートのアカウント境界(#638)', () => {
     const testDb = createTestD1();
     seed(testDb);
     mockFetchOk();
-    // 既存の a1 設定を止め、新規作成だけが選ばれる状態にする。
-    testDb.raw.prepare(`UPDATE ad_platforms SET is_active = 0 WHERE id = 'p1'`).run();
+    // 既存の a1 設定を消し、新規作成だけが選ばれる状態にする。
     const target = app(staff('owner-1', 'tenant-1'));
     const env = { DB: testDb.db } as Env['Bindings'];
+    expect((await target.request('/api/ad-platforms/p1', { method: 'DELETE' }, env)).status).toBe(200);
     const created = await target.request('/api/ad-platforms', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: 'meta', config: { pixel_id: 'NEW', access_token: 'token-1234567890' }, lineAccountId: 'a1' }),
@@ -138,6 +138,77 @@ describe('広告設定ルートのアカウント境界(#638)', () => {
     expect(sentUrls).toHaveLength(1);
     const logRows = testDb.raw.prepare(`SELECT ad_platform_id FROM ad_conversion_logs`).all() as Array<{ ad_platform_id: string }>;
     expect(logRows).toEqual([{ ad_platform_id: createdBody.data.id }]);
+  });
+
+  it('帰属を空に戻す更新は400。同一アカウント・同一媒体の重複作成は409', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const target = app(staff('owner-1', 'tenant-1'));
+    const env = { DB: testDb.db } as Env['Bindings'];
+
+    const cleared = await target.request('/api/ad-platforms/p1', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lineAccountId: null }),
+    }, env);
+    expect(cleared.status).toBe(400);
+
+    const dup = await target.request('/api/ad-platforms', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'meta', config: {}, lineAccountId: 'a1' }),
+    }, env);
+    expect(dup.status).toBe(409);
+
+    // 別アカウントの同名は作れる。
+    const other = await target.request('/api/ad-platforms', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'google', config: {}, lineAccountId: 'a1' }),
+    }, env);
+    expect(other.status).toBe(201);
+  });
+
+  it('テスト送信は友だち所属の設定を使い、認可対象と一致する', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    testDb.raw.prepare(`INSERT INTO ref_tracking (id, ref_code, friend_id, fbclid, created_at)
+                        VALUES ('ref-2', 'ref-1', 'f2', 'fb-2', ?)`).run(NOW);
+    mockFetchOk();
+    const target = app(staff('owner-1', 'tenant-1'));
+    const env = { DB: testDb.db } as Env['Bindings'];
+
+    const res = await target.request('/api/ad-platforms/test', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ platform: 'meta', eventName: 'Purchase', friendId: 'f2' }),
+    }, env);
+    expect(res.status).toBe(200);
+    const logRows = testDb.raw.prepare(`SELECT ad_platform_id, line_account_id FROM ad_conversion_logs`).all() as Array<{
+      ad_platform_id: string; line_account_id: string | null;
+    }>;
+    // a1 の同名設定ではなく、友だち所属(a2)の p2 で送る。
+    expect(logRows).toEqual([{ ad_platform_id: 'p2', line_account_id: 'a2' }]);
+  });
+
+  it('アカウント限定の担当者は認可外の更新・削除が当たらない', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const scoped = app(staff('scoped-1', 'tenant-1'));
+    const env = { DB: testDb.db } as Env['Bindings'];
+
+    const denied = await scoped.request('/api/ad-platforms/pb', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ displayName: '変' }),
+    }, env);
+    expect(denied.status).toBe(403);
+    const deniedDel = await scoped.request('/api/ad-platforms/pb', { method: 'DELETE' }, env);
+    expect(deniedDel.status).toBe(403);
+    expect(testDb.raw.prepare(`SELECT display_name FROM ad_platforms WHERE id = 'pb'`).get()).toMatchObject({
+      display_name: 'Meta広告',
+    });
+
+    const allowed = await scoped.request('/api/ad-platforms/p1', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ displayName: '変' }),
+    }, env);
+    expect(allowed.status).toBe(200);
   });
 
   it('更新・削除は他統括・他組織の管理者でも403', async () => {

@@ -3,10 +3,11 @@ import {
   getAdPlatforms,
   getAdPlatformById,
   createAdPlatform,
-  updateAdPlatform,
-  deleteAdPlatform,
+  updateAdPlatformCAS,
+  deleteAdPlatformCAS,
   getAdConversionLogs,
   getAdPlatformByName,
+  type AdPlatformWriteScope,
 } from '@line-crm/db';
 import type { AdConversionLog } from '@line-crm/db';
 import { sendAdConversions } from '../services/ad-conversion.js';
@@ -103,19 +104,35 @@ adPlatforms.post('/api/ad-platforms', requireRole('owner'), async (c) => {
       return c.json({ success: false, error: `name must be one of: ${validNames.join(', ')}` }, 400);
     }
 
-    const platform = await createAdPlatform(c.env.DB, {
-      name: body.name,
-      displayName: body.displayName,
-      config: body.config,
-      lineAccountId: body.lineAccountId,
-    });
-
-    return c.json({ success: true, data: serializePlatform(platform) }, 201);
+    try {
+      const platform = await createAdPlatform(c.env.DB, {
+        name: body.name,
+        displayName: body.displayName,
+        config: body.config,
+        lineAccountId: body.lineAccountId,
+      });
+      return c.json({ success: true, data: serializePlatform(platform) }, 201);
+    } catch (err) {
+      // 同一アカウント・同一媒体の重複は409で返す。
+      if (err instanceof Error && /unique/i.test(`${err.name} ${err.message}`)) {
+        return c.json({ success: false, error: '同じLINEアカウントに同じ媒体の設定が既にあります' }, 409);
+      }
+      throw err;
+    }
   } catch (err) {
     console.error('POST /api/ad-platforms error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
+
+/** 呼び出しの認可済み所属を、書き込み1文の条件にする。 */
+async function adPlatformWriteScope(
+  db: D1Database,
+  staff: Parameters<typeof getVisibleLineAccountScope>[1],
+): Promise<AdPlatformWriteScope> {
+  const scope = await getVisibleLineAccountScope(db, staff);
+  return { accountIds: scope.allowedAccountIds, includeUnassigned: scope.canSeeUnassigned };
+}
 
 // PUT /api/ad-platforms/:id - update
 adPlatforms.put('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
@@ -129,6 +146,10 @@ adPlatforms.put('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
       lineAccountId?: string | null;
     }>();
 
+    // 帰属を空に戻す変更は受け付けない。
+    if (body.lineAccountId !== undefined && !body.lineAccountId) {
+      return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+    }
     const existing = await getAdPlatformById(c.env.DB, id);
     if (!existing) {
       return c.json({ success: false, error: 'Not found' }, 404);
@@ -141,12 +162,24 @@ adPlatforms.put('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
 
-    const platform = await updateAdPlatform(c.env.DB, id, body);
-    if (!platform) {
-      return c.json({ success: false, error: 'Not found' }, 404);
+    // 読み取り後の帰属変更に当たらないよう、認可済み所属を条件に含めて1文で書く。
+    const writeScope = await adPlatformWriteScope(c.env.DB, c.get('staff'));
+    try {
+      const { applied, platform } = await updateAdPlatformCAS(c.env.DB, id, writeScope, body);
+      if (!applied || !platform) {
+        const current = await getAdPlatformById(c.env.DB, id);
+        if (!current) {
+          return c.json({ success: false, error: 'Not found' }, 404);
+        }
+        return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+      }
+      return c.json({ success: true, data: serializePlatform(platform) });
+    } catch (err) {
+      if (err instanceof Error && /unique/i.test(`${err.name} ${err.message}`)) {
+        return c.json({ success: false, error: '同じLINEアカウントに同じ媒体の設定が既にあります' }, 409);
+      }
+      throw err;
     }
-
-    return c.json({ success: true, data: serializePlatform(platform) });
   } catch (err) {
     console.error('PUT /api/ad-platforms/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -166,17 +199,9 @@ adPlatforms.post('/api/ad-platforms/test', requireRole('owner'), async (c) => {
       return c.json({ success: false, error: 'platform and eventName are required' }, 400);
     }
 
-    const platform = await getAdPlatformByName(c.env.DB, body.platform);
-    if (!platform) {
-      return c.json({ success: false, error: `Platform "${body.platform}" not found or inactive` }, 404);
-    }
-    // 設定の帰属が呼び出しに見える範囲か確かめる。
-    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [platform.line_account_id])) {
-      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
-    }
-
     if (body.friendId) {
-      // 友だちの所属が呼び出しに見える範囲か確かめてから、その所属の資格情報だけで送る。
+      // 友だちの所属が呼び出しに見える範囲か確かめてから、その所属の設定だけで送る。
+      // 認可対象と実送信対象がずれないよう、設定も友だちの所属で選ぶ。
       const friend = await c.env.DB.prepare(`SELECT line_account_id FROM friends WHERE id = ?`)
         .bind(body.friendId)
         .first<{ line_account_id: string | null }>();
@@ -186,8 +211,26 @@ adPlatforms.post('/api/ad-platforms/test', requireRole('owner'), async (c) => {
       if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [friend.line_account_id])) {
         return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
       }
+      if (!friend.line_account_id) {
+        return c.json({ success: false, error: `Platform "${body.platform}" not found or inactive` }, 404);
+      }
+      const platform = await getAdPlatformByName(c.env.DB, body.platform, friend.line_account_id);
+      if (!platform) {
+        return c.json({ success: false, error: `Platform "${body.platform}" not found or inactive` }, 404);
+      }
+      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [platform.line_account_id])) {
+        return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+      }
       await sendAdConversions(c.env.DB, body.friendId, body.eventName);
       return c.json({ success: true, data: { message: 'Test conversion sent via full pipeline' } });
+    }
+
+    const platform = await getAdPlatformByName(c.env.DB, body.platform);
+    if (!platform) {
+      return c.json({ success: false, error: `Platform "${body.platform}" not found or inactive` }, 404);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [platform.line_account_id])) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
 
     return c.json({
@@ -212,7 +255,16 @@ adPlatforms.delete('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [existing.line_account_id])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
-    await deleteAdPlatform(c.env.DB, c.req.param('id'));
+    // 読み取り後の帰属変更に当たらないよう、認可済み所属を条件に含めて1文で消す。
+    const writeScope = await adPlatformWriteScope(c.env.DB, c.get('staff'));
+    const deleted = await deleteAdPlatformCAS(c.env.DB, c.req.param('id'), writeScope);
+    if (!deleted) {
+      const current = await getAdPlatformById(c.env.DB, c.req.param('id'));
+      if (!current) {
+        return c.json({ success: false, error: 'Not found' }, 404);
+      }
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+    }
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/ad-platforms/:id error:', err);
