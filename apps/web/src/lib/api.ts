@@ -3241,7 +3241,8 @@ export type EcNotificationRun = {
   friendId: string | null
   friendName: string | null
   orderNumber: string | null
-  channel: 'line' | 'email'
+  /** 実応答は migration 304 の CHECK どおり 'in_app' も返す。 */
+  channel: 'line' | 'email' | 'in_app'
   status: 'pending' | 'accepted' | 'excluded' | 'failed'
   reason: string | null
   receivedAt: string
@@ -3250,7 +3251,8 @@ export type EcNotificationRun = {
   nextRetryAt: string | null
   clickedAt: string | null
   version: number | null
-  executionMode: 'automatic' | 'manual'
+  /** 実応答は 'retry' / 'resend' / 'test' も返す。想定外値はそのまま扱う。 */
+  executionMode: 'automatic' | 'manual' | 'retry' | 'resend' | 'test'
   retryAvailable: boolean
   recordVersion: number
   providerStatus: string | null
