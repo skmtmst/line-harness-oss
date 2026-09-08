@@ -6,6 +6,7 @@
  */
 
 import {
+  AdConversionLeaseError,
   claimAdConversionSend,
   finishAdConversionSend,
   getActiveAdPlatforms,
@@ -63,45 +64,51 @@ export async function sendAdConversions(
     const click = clickIdForPlatform(platform.name, ref);
     if (!click) continue;
     const config: AdPlatformConfig = JSON.parse(platform.config);
-    // 媒体側の重複排除ID。再試行では同じIDになるよう鍵から決める。
+    // 媒体側の重複排除ID。初回確保時に決めて行に残し、再送・付け替え後も同じ値を使う。
     const providerEventId = hasStableKey ? `${idempotencyKey}:${platform.id}` : crypto.randomUUID();
 
     const claim = await claimAdConversionSend(db, {
       platformId: platform.id, friendId, lineAccountId, eventName,
-      clickId: click.clickId, clickIdType: click.clickIdType, eventValue: eventValue ?? null, idempotencyKey,
+      clickId: click.clickId, clickIdType: click.clickIdType, eventValue: eventValue ?? null,
+      idempotencyKey, providerEventId,
     });
     // mismatch: 同じ鍵で内容が変わった再送は送らない。
-    if (claim !== 'send') continue;
+    if (claim.disposition !== 'send' || !claim.lease) continue;
+    const lease = claim.lease;
+    const stableProviderEventId = claim.providerEventId ?? providerEventId;
+    // 確定は確保証付き。奪われた後の確定は通らず、送り直しは次の再送に任せる。
+    const settle = async (status: 'sent' | 'failed', errorMessage?: string): Promise<void> => {
+      try {
+        await finishAdConversionSend(db, {
+          platformId: platform.id, friendId, eventName, idempotencyKey, lease,
+          status, errorMessage: errorMessage ?? null,
+        });
+      } catch (settleError) {
+        if (!(settleError instanceof AdConversionLeaseError)) throw settleError;
+      }
+    };
 
     try {
       switch (platform.name) {
         case 'meta':
-          await sendMetaConversion(config, ref, eventName, eventValue, providerEventId);
+          await sendMetaConversion(config, ref, eventName, eventValue, stableProviderEventId);
           break;
         case 'x':
-          await sendXConversion(config, ref, eventName, eventValue, providerEventId);
+          await sendXConversion(config, ref, eventName, eventValue, stableProviderEventId);
           break;
         case 'google':
-          await sendGoogleConversion(config, ref, eventName, eventValue, providerEventId);
+          await sendGoogleConversion(config, ref, eventName, eventValue, stableProviderEventId);
           break;
         case 'tiktok':
-          await sendTikTokConversion(config, ref, eventName, eventValue, providerEventId);
+          await sendTikTokConversion(config, ref, eventName, eventValue, stableProviderEventId);
           break;
         default:
-          await finishAdConversionSend(db, {
-            platformId: platform.id, friendId, eventName, idempotencyKey,
-            status: 'failed', errorMessage: `unsupported platform: ${platform.name}`,
-          });
+          await settle('failed', `unsupported platform: ${platform.name}`);
           continue;
       }
-      await finishAdConversionSend(db, {
-        platformId: platform.id, friendId, eventName, idempotencyKey, status: 'sent',
-      });
+      await settle('sent');
     } catch (error) {
-      await finishAdConversionSend(db, {
-        platformId: platform.id, friendId, eventName, idempotencyKey,
-        status: 'failed', errorMessage: String(error),
-      });
+      await settle('failed', String(error));
     }
   }
 }
