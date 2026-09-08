@@ -24,8 +24,9 @@ import { routeClassification } from '../middleware/feature-enforcement.js';
  * - `/auth/*`、`/book`、`/setup`、`/t/*`、`/r/*` などのページ・転送 … 公開APIではない
  *
  * 運用: 新しい route を足したら OpenAPI（openapi.ts）へ記載する。
- * 記載しない分は ALLOWLIST へ `METHOD path` で足し、理由の見出しの下へ置く。
- * 記載済みにした分は ALLOWLIST から消す（残っているとテストが落とす）。
+ * ALLOWLIST への追加は原則禁止。新 route は OpenAPI 記載が必要。
+ * 後続票で記載を増やしたら ALLOWLIST から消し、DOCUMENTED_MIN・
+ * ALLOWLIST_MAX・BASELINE_DOCUMENTED の基準値も同じ PR で更新する。
  * version は repo の package.json と一致させる（自動取得ではなく検査で同期）。
  * request/response の中身までは見ない。本文の parity は順次対応。
  */
@@ -109,10 +110,113 @@ function formatKeys(keys: string[]): string {
 }
 
 /**
- * OpenAPI 未記載の公開API。理由ごとに見出しで分けている。
- * 記載済みにしたらここから消す（残っているとテストが落とす）。
- * 理由は feature-enforcement の route manifest の分類から付けた。
+ * 未記載負債の基準一覧（「例外」ではない）。OpenAPI 未記載の公開 API を
+ * 理由ごとに見出しで分けている。理由は feature-enforcement の
+ * route manifest の分類から付けた。
+ * 追加は原則禁止。新 route は openapi.ts へ記載する。
+ * 後続票で記載済みにした分はここから消す（残っているとテストが落とす）。
  */
+/**
+ * 網羅率の後退防止ゲートの基準値（PR #1456 時点の実測）。
+ * - DOCUMENTED_MIN: 記載済み operation 数はここ未満へ減らせない
+ * - ALLOWLIST_MAX: 未記載負債はここより増やせない
+ * 後続票で記載を増やしたら、実測に合わせて両方を同じ PR で更新する。
+ */
+const DOCUMENTED_MIN = 83;
+const ALLOWLIST_MAX = 777;
+
+/**
+ * PR #1456 時点の記載済み 83 件の基準一覧。
+ * 既存仕様を ALLOWLIST へ移して後退させる変更を落とすためのもの。
+ * 件数が変わらなくても、ここにある1件が消えたら落ちる。
+ * 後続票で記載を増やしたら、増えた分をここへ足す。
+ */
+const BASELINE_DOCUMENTED = new Set<string>([
+  'DELETE /api/affiliates/{id}',
+  'DELETE /api/broadcasts/{id}',
+  'DELETE /api/conversions/points/{id}',
+  'DELETE /api/friends/{id}/tags/{tagId}',
+  'DELETE /api/line-accounts/{id}',
+  'DELETE /api/mileage/rules/{id}',
+  'DELETE /api/reminders/{id}/steps/{stepId}',
+  'DELETE /api/scenarios/{id}',
+  'DELETE /api/scenarios/{id}/steps/{stepId}',
+  'DELETE /api/tags/{id}',
+  'DELETE /api/users/{id}',
+  'GET /api/affiliates',
+  'GET /api/affiliates/{id}',
+  'GET /api/affiliates/{id}/report',
+  'GET /api/auto-replies',
+  'GET /api/broadcasts',
+  'GET /api/broadcasts/{id}',
+  'GET /api/common-actions/resources',
+  'GET /api/conversions/events',
+  'GET /api/conversions/points',
+  'GET /api/conversions/report',
+  'GET /api/friends',
+  'GET /api/friends/{friendId}/reminders',
+  'GET /api/friends/{id}',
+  'GET /api/friends/{id}/fields',
+  'GET /api/friends/count',
+  'GET /api/line-accounts',
+  'GET /api/line-accounts/{id}',
+  'GET /api/mileage/rules',
+  'GET /api/nen-campaigns/deliveries',
+  'GET /api/nen-campaigns/deliveries/{id}',
+  'GET /api/nen-campaigns/metrics/columns',
+  'GET /api/nen-campaigns/metrics/flows',
+  'GET /api/nen-campaigns/metrics/pets',
+  'GET /api/reminders',
+  'GET /api/scenarios',
+  'GET /api/scenarios/{id}',
+  'GET /api/scenarios/{id}/actions',
+  'GET /api/scenarios/{id}/preview',
+  'GET /api/scenarios/{id}/runs',
+  'GET /api/scenarios/{id}/stats',
+  'GET /api/scenarios/{id}/triggers',
+  'GET /api/tags',
+  'GET /api/tags/{id}',
+  'GET /api/tags/{id}/delete-impact',
+  'GET /api/tags/{id}/dependencies',
+  'GET /api/users',
+  'GET /api/users/{id}',
+  'GET /api/users/{id}/accounts',
+  'PATCH /api/line-accounts/{id}',
+  'PATCH /api/line-accounts/order',
+  'PATCH /api/tags/{id}',
+  'POST /api/affiliates',
+  'POST /api/affiliates/click',
+  'POST /api/broadcasts',
+  'POST /api/broadcasts/{id}/send',
+  'POST /api/broadcasts/dedup-preview',
+  'POST /api/conversions/points',
+  'POST /api/conversions/track',
+  'POST /api/friends/{id}/tags',
+  'POST /api/line-accounts',
+  'POST /api/mileage/rules',
+  'POST /api/nen-campaigns/deliveries/{id}/retry',
+  'POST /api/scenarios',
+  'POST /api/scenarios/{id}/enroll/{friendId}',
+  'POST /api/scenarios/{id}/simulate',
+  'POST /api/scenarios/{id}/steps',
+  'POST /api/tags',
+  'POST /api/tags/import',
+  'POST /api/tags/import/preview',
+  'POST /api/users',
+  'POST /api/users/{id}/link',
+  'POST /api/users/match',
+  'POST /webhook',
+  'PUT /api/affiliates/{id}',
+  'PUT /api/broadcasts/{id}',
+  'PUT /api/friends/{id}/fields',
+  'PUT /api/line-accounts/{id}',
+  'PUT /api/mileage/rules/{id}',
+  'PUT /api/scenarios/{id}',
+  'PUT /api/scenarios/{id}/draft',
+  'PUT /api/scenarios/{id}/steps/{stepId}',
+  'PUT /api/users/{id}',
+]);
+
 const ALLOWLIST = new Set<string>([
   // 機能「booking」の管理画面用API（OpenAPI未記載・順次記載）（42件）
   'DELETE /api/booking/admin/menus/{id}',
@@ -1088,6 +1192,35 @@ describe('OpenAPIと公開APIの同期', () => {
       stale,
       `ALLOWLISTのうち ${stale.length} 件は記載済みか廃止済みです:\n${formatKeys(stale)}\n` +
         'ALLOWLISTから消してください。残っていると次の追加漏れを見逃します。',
+    ).toEqual([]);
+  });
+
+  test('記載済みoperation数は83以上（後退禁止）', async () => {
+    const spec = await loadSpec();
+    const count = documentedKeys(spec).size;
+    expect(
+      count >= DOCUMENTED_MIN,
+      `記載済みが ${count} 件で基準 ${DOCUMENTED_MIN} 件を下回っています。` +
+        '既存仕様を消す・ALLOWLISTへ移す変更は禁止です。後続票で記載を増やした場合は基準値を同じPRで更新してください。',
+    ).toBe(true);
+  });
+
+  test('暫定allowlistは777件以下（増加禁止）', async () => {
+    expect(
+      ALLOWLIST.size <= ALLOWLIST_MAX,
+      `ALLOWLISTが ${ALLOWLIST.size} 件で基準 ${ALLOWLIST_MAX} 件を超えています。` +
+        'ALLOWLISTへの追加は原則禁止です。新routeはopenapi.tsへ記載してください。',
+    ).toBe(true);
+  });
+
+  test('基準の記載83件が残っている（allowlistへの移し替え検出）', async () => {
+    const spec = await loadSpec();
+    const documented = documentedKeys(spec);
+    const lost = [...BASELINE_DOCUMENTED].filter((key) => !documented.has(key)).sort();
+    expect(
+      lost,
+      `基準の記載 ${BASELINE_DOCUMENTED.size} 件のうち ${lost.length} 件が消えています:\n${formatKeys(lost)}\n` +
+        '既存仕様をALLOWLISTへ移す変更は禁止です。routeが本当に消えた場合は基準一覧も同じPRで更新してください。',
     ).toEqual([]);
   });
 
