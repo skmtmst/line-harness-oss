@@ -32,6 +32,15 @@ describe('V6 URqOA 定期レポート作成', () => {
     expect(PAGE).not.toContain("|| 0")
   })
 
+  it('名前を変えられ、保存した分析を添えられる(点検#508軽12)', () => {
+    // 固定名だと複数作ったときに区別できない。空のままは作れない。
+    expect(PAGE).toContain("useState('週次まとめ')")
+    expect(PAGE).toContain('レポートの名前を入力してください')
+    expect(PAGE).toContain('保存した分析を添えます')
+    expect(PAGE).toContain('options.savedAnalyses')
+    expect(PAGE).toContain('savedAnalysisIds')
+  })
+
   it('宛先の初期値は空で、0件のときは作れない(点検#508の中1)', () => {
     // 例のアドレスが最初から入っていると、選んでいない相手へ送られる。
     expect(PAGE).not.toContain("useState(['report@example.com'])")

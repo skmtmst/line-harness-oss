@@ -34,9 +34,10 @@ export default function AnalyticsReportNewPage() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [saving, setSaving] = useState(false)
-  const name = '週次まとめ'
+  // レポート名は変えられるようにする(点検#508軽12)。固定だと複数作ったときに区別できない。
+  const [name, setName] = useState('週次まとめ')
   const [sections, setSections] = useState<AnalyticsReportSection[]>(['friends', 'reactions', 'routes', 'usage'])
-  const savedAnalysisIds: string[] = []
+  const [savedAnalysisIds, setSavedAnalysisIds] = useState<string[]>([])
   const [cadence, setCadence] = useState<'weekly' | 'monthly'>('weekly')
   const [weekday, setWeekday] = useState('1')
   const [monthDay, setMonthDay] = useState('1')
@@ -56,6 +57,9 @@ export default function AnalyticsReportNewPage() {
     })
     return () => { active = false }
   }, [])
+
+  // 読み直し用の数え直し。入力の状態には触らない(点検#508軽8)。
+  const [reloadSeq, setReloadSeq] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -79,7 +83,7 @@ export default function AnalyticsReportNewPage() {
       if (active) { setError('定期レポートの設定を読み込めませんでした'); setLoading(false) }
     })
     return () => { active = false }
-  }, [selectedAccountId])
+  }, [selectedAccountId, reloadSeq])
 
   const nextLabel = useMemo(() => cadence === 'weekly'
     ? `${['日', '月', '火', '水', '木', '金', '土'][Number(weekday)]}曜 ${sendTime}`
@@ -94,6 +98,10 @@ export default function AnalyticsReportNewPage() {
 
   const submit = async (sendOnce: boolean) => {
     if (!selectedAccountId || !options || !canManage || !hasRecipient) return
+    if (!name.trim()) {
+      setError('レポートの名前を入力してください')
+      return
+    }
     setSaving(true)
     setError('')
     setNotice('')
@@ -129,7 +137,7 @@ export default function AnalyticsReportNewPage() {
 
   if (accountLoading || loading) return <ListState kind="loading" title="定期レポートを読み込んでいます" />
   if (!selectedAccountId) return <ListState kind="empty" title="LINE公式アカウントを選んでください" description="上のバーで、レポートを作るLINE公式アカウントを選んでください。" />
-  if (error && !options) return <ListState kind="error" title="定期レポートを表示できませんでした" description={error} onRetry={() => location.reload()} />
+  if (error && !options) return <ListState kind="error" title="定期レポートを表示できませんでした" description={error} onRetry={() => setReloadSeq((n) => n + 1)} />
   if (!options || options.recipients.length === 0) return (
     <ListState
       kind="empty"
@@ -153,6 +161,20 @@ export default function AnalyticsReportNewPage() {
       <div className="grid items-start gap-6 xl:grid-cols-3">
         <main className="grid gap-4 xl:col-span-2">
           <section className="border-hairline bg-canvas rounded-card border p-6">
+            <h2 className="text-lg font-semibold">名前を付けます</h2>
+            <p className="text-ink-secondary mb-4 mt-1 text-sm">複数作るときに区別できる名前を付けてください。</p>
+            <label className="text-ink-secondary grid gap-2 text-xs font-semibold">レポートの名前
+              <input
+                className="border-hairline text-ink bg-canvas h-10 max-w-md rounded-control border px-3 text-sm"
+                type="text"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="例: 週次まとめ"
+              />
+            </label>
+          </section>
+
+          <section className="border-hairline bg-canvas rounded-card border p-6">
             <h2 className="text-lg font-semibold">何を入れますか</h2>
             <p className="text-ink-secondary mb-4 mt-1 text-sm">チェックしたものが、この順にレポートへ並びます。</p>
             <div className="grid gap-x-8 gap-y-3 md:grid-cols-2">
@@ -164,6 +186,26 @@ export default function AnalyticsReportNewPage() {
               ))}
             </div>
           </section>
+
+          {options.savedAnalyses.length > 0 && (
+            <section className="border-hairline bg-canvas rounded-card border p-6">
+              <h2 className="text-lg font-semibold">保存した分析を添えます</h2>
+              <p className="text-ink-secondary mb-4 mt-1 text-sm">チェックした分析の最新の結果を、レポートに添えます。無くても作れます。</p>
+              <div className="grid gap-x-8 gap-y-3 md:grid-cols-2">
+                {options.savedAnalyses.map((item) => (
+                  <label className="flex cursor-pointer items-start gap-3" key={item.id}>
+                    <input
+                      className="accent-accent mt-0.5 size-5"
+                      type="checkbox"
+                      checked={savedAnalysisIds.includes(item.id)}
+                      onChange={() => setSavedAnalysisIds((current) => current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id])}
+                    />
+                    <span className="grid gap-1"><strong className="text-sm">{item.name}</strong><small className="text-ink-secondary text-xs font-normal">{item.kind === 'cross' ? 'クロス分析' : 'ファネル'}</small></span>
+                  </label>
+                ))}
+              </div>
+            </section>
+          )}
 
           <section className="border-hairline bg-canvas rounded-card border p-6">
             <h2 className="mb-4 text-lg font-semibold">いつ送りますか</h2>
@@ -225,9 +267,10 @@ export default function AnalyticsReportNewPage() {
 
         <aside className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
           <section className="border-success bg-success-bg rounded-card border p-5 md:col-span-2 xl:col-span-1">
-            <h2 className="mb-3 text-sm font-semibold">{nextLabel} に、こう届きます</h2>
+            <h2 className="mb-3 text-sm font-semibold">{nextLabel} に、こう届きます(見本)</h2>
             <div className="border-success rounded-card bg-canvas p-4 shadow-sm">
               <strong className="text-sm">【週次】8/18〜8/24 のまとめ</strong>
+              <p className="text-ink-faint mt-1 text-xs">数字はイメージです。</p>
               <div className="mt-3 grid grid-cols-3 gap-2"><span className="bg-canvas-sunken rounded-control text-ink-secondary grid gap-1 p-2 text-xs">友だち<b className="text-ink text-base">＋112</b></span><span className="bg-canvas-sunken rounded-control text-ink-secondary grid gap-1 p-2 text-xs">成果<b className="text-ink text-base">118件</b></span><span className="bg-canvas-sunken rounded-control text-ink-secondary grid gap-1 p-2 text-xs">売上<b className="text-ink text-base">¥312,400</b></span></div>
               <p className="text-ink-secondary my-3 text-xs leading-relaxed">先週いちばん効いたのは「店頭POPのQRコード」でした（38件）。Facebookフィードは費用のほうが多くなっています（－¥36,000）。</p>
               <span className="text-accent text-xs font-semibold">くわしく見る</span>
