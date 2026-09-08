@@ -102,6 +102,19 @@ export async function finishBookingOperation(
   ).run();
 }
 
+export async function findBookingOperation(
+  db: D1Database,
+  input: { lineAccountId: string; idempotencyKey: string },
+): Promise<{ id: string; status: BookingOperationStatus } | null> {
+  return db.prepare(
+    `SELECT id, status FROM booking_operation_runs
+      WHERE line_account_id = ? AND idempotency_key = ?`,
+  ).bind(input.lineAccountId, input.idempotencyKey).first<{
+    id: string;
+    status: BookingOperationStatus;
+  }>();
+}
+
 export async function listBookingOperations(
   db: D1Database,
   input: { bookingId: string; lineAccountId: string },

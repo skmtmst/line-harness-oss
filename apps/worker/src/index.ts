@@ -1167,6 +1167,26 @@ async function runFrequentHeavyJobs(
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const jobs: ScheduledJob[] = [
     {
+      // 取消時の Calendar 削除の残り (retry_wait) を自動回収する。
+      // 初回 200 の後に残っても次の tick で直る。安定キーで二重実行なし。
+      name: 'booking calendar delete retry',
+      run: async () => {
+        const { processPendingCalendarDeleteOperations, removeBookingFromGoogle } = await import(
+          './services/booking-calendar-sync.js'
+        );
+        const result = await processPendingCalendarDeleteOperations(env.DB, {
+          now: new Date(event.scheduledTime),
+          remove: (bookingId) => removeBookingFromGoogle(env.DB, {
+            email: env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+            privateKey: env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
+          }, bookingId),
+        });
+        if (result.processed > 0) {
+          console.log(JSON.stringify({ event: 'booking_calendar_delete_retry', ...result }));
+        }
+      },
+    },
+    {
       name: 'friend bulk runs',
       run: async () => {
         const result = await processDueFriendBulkRuns(env.DB, {
