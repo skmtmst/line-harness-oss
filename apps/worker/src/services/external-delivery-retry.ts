@@ -1,6 +1,12 @@
 // V6 共通基盤 §6-2: 外部APIは初回後に1分・5分・30分の最大3回だけ再試行する。
 export const EXTERNAL_DELIVERY_MAX_ATTEMPTS = 4;
 const EXTERNAL_DELIVERY_RETRY_DELAYS_MINUTES = [1, 5, 30] as const;
+/**
+ * Retry-After の指定をそのまま信じる上限（分）。§6-2 の再試行間隔の
+ * 最大30分にそろえる。N-374: 上限のない指定は遠すぎる未来に飛ぶため、
+ * 超える指定・読めない指定は既定の間隔へ丸める（安全側に倒す）。
+ */
+export const EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES = 30;
 
 export type SafeExternalDeliveryError = {
   code: string;
@@ -77,12 +83,25 @@ export function externalDeliveryRetryAt(
   const status = statusOf(error);
   const retryAfter = (error as { retryAfter?: unknown } | null)?.retryAfter;
   if (status === 429 && typeof retryAfter === 'string' && retryAfter.trim()) {
-    const seconds = Number(retryAfter);
-    if (Number.isFinite(seconds) && seconds >= 0) {
-      return new Date(now.getTime() + seconds * 1_000);
+    const text = retryAfter.trim();
+    const capMs = EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES * 60_000;
+    // 秒数形式と HTTP-date 形式の両方を受け付ける。上限超え・不正な指定は
+    // そのまま信じず、下の既定の間隔へ落とす。
+    if (/^\d+(\.\d+)?$/.test(text)) {
+      const waitMs = Number(text) * 1_000;
+      if (Number.isFinite(waitMs) && waitMs >= 0 && waitMs <= capMs) {
+        return new Date(now.getTime() + waitMs);
+      }
+    } else {
+      const retryDate = Date.parse(text);
+      if (
+        Number.isFinite(retryDate)
+        && retryDate >= now.getTime()
+        && retryDate - now.getTime() <= capMs
+      ) {
+        return new Date(retryDate);
+      }
     }
-    const retryDate = Date.parse(retryAfter);
-    if (Number.isFinite(retryDate) && retryDate >= now.getTime()) return new Date(retryDate);
   }
   const delay = EXTERNAL_DELIVERY_RETRY_DELAYS_MINUTES[
     Math.max(0, completedAttempts - 1)
