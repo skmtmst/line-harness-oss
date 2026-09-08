@@ -53,6 +53,24 @@ function safeJson<T>(raw: string | null | undefined, fallback: T): T {
   }
 }
 
+/**
+ * 送り先の `event_types` を読む(#506 中)。
+ *
+ * 1行でも壊れていると一覧全体が例外→500になっていた。壊れた行は空に
+ * 落とし、IDを構造化ログに残して一覧は返す。配列でないJSON(文字列など)
+ * も同じ扱いにする。
+ */
+function outgoingEventTypes(raw: string | null | undefined, webhookId: string): string[] {
+  try {
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) throw new Error('event_types is not an array');
+    return parsed.map((entry) => String(entry));
+  } catch {
+    console.error(JSON.stringify({ event: 'outgoing_webhook_event_types_broken', webhookId }));
+    return [];
+  }
+}
+
 async function incomingActionDisplayName(db: D1Database, action: IncomingWebhookActionRef): Promise<string> {
   const table = ({
     common_action: 'common_actions', tag: 'tags', friend_field: 'friend_fields',
@@ -227,6 +245,12 @@ webhooks.get('/api/webhooks/incoming', requireRole('owner', 'admin', 'staff'), a
   try {
     const lineAccountId = c.req.query('lineAccountId')?.trim();
     if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    // 詳細口と同じ境界に寄せる(#506 中)。以前は一覧だけ権限キーを見て
+    // おらず、権限なし職員が一覧は見られるちぐはぐな状態だった。
+    const incomingStaff = c.get('staff');
+    if (incomingStaff?.role === 'staff' && !incomingStaff.permissionKeys?.includes('/webhooks')) {
+      return c.json({ success: false, error: 'この機能を表示する権限がありません' }, 403);
+    }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
@@ -465,6 +489,11 @@ webhooks.get('/api/webhooks/outgoing', requireRole('owner', 'admin', 'staff'), a
   try {
     const lineAccountId = c.req.query('lineAccountId')?.trim();
     if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    // 受信の詳細口と同じ境界に寄せる(#506 中)。
+    const outgoingStaff = c.get('staff');
+    if (outgoingStaff?.role === 'staff' && !outgoingStaff.permissionKeys?.includes('/webhooks')) {
+      return c.json({ success: false, error: 'この機能を表示する権限がありません' }, 403);
+    }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
@@ -483,7 +512,7 @@ webhooks.get('/api/webhooks/outgoing', requireRole('owner', 'admin', 'staff'), a
           id: w.id,
           name: w.name,
           url: w.url,
-          eventTypes: JSON.parse(w.event_types),
+          eventTypes: outgoingEventTypes(w.event_types, w.id),
           hasSecret: Boolean(w.secret && w.secret.length >= MIN_SECRET_LENGTH),
           isActive: Boolean(w.is_active),
           maxRetries: w.max_retries ?? 0,
@@ -564,7 +593,7 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
           id: item.id,
           name: item.name,
           url: item.url,
-          eventTypes: JSON.parse(item.event_types),
+          eventTypes: outgoingEventTypes(item.event_types, item.id),
           // Returned exactly once on create.
           secret: item.secret,
           isActive: Boolean(item.is_active),
@@ -656,7 +685,7 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
         id: updated.id,
         name: updated.name,
         url: updated.url,
-        eventTypes: JSON.parse(updated.event_types),
+        eventTypes: outgoingEventTypes(updated.event_types, updated.id),
         hasSecret: Boolean(updated.secret && updated.secret.length >= MIN_SECRET_LENGTH),
         isActive: Boolean(updated.is_active),
         maxRetries: updated.max_retries ?? 0,
