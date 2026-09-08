@@ -804,15 +804,56 @@ export async function createAnalyticsCrossRun(
   return { id, state: 'pending' };
 }
 
+export async function claimAnalyticsCrossRun(
+  db: D1Database,
+  runId: string,
+): Promise<{ leaseGeneration: number }> {
+  // 実行権の付与は世代を1つ進める。期限切れ回収でpendingへ戻るときも世代を
+  // 進めるため、旧実行の世代では完了・失敗を書き込めない。
+  const claimed = await db.prepare(
+    `UPDATE analytics_cross_runs
+        SET state = 'running', started_at = ?, lease_generation = lease_generation + 1
+      WHERE id = ? AND state = 'pending'`,
+  ).bind(new Date().toISOString(), runId).run();
+  if (Number(claimed.meta?.changes ?? 0) !== 1) throw new Error('analytics_cross_run_not_pending');
+  const row = await db.prepare(
+    `SELECT lease_generation FROM analytics_cross_runs WHERE id = ?`,
+  ).bind(runId).first<{ lease_generation: number }>();
+  if (!row) throw new Error('analytics_cross_run_not_found');
+  return { leaseGeneration: Number(row.lease_generation ?? 0) };
+}
+
+export async function completeAnalyticsCrossRun(
+  db: D1Database,
+  runId: string,
+  leaseGeneration: number,
+  result: AnalyticsCrossResult,
+): Promise<void> {
+  const done = await db.prepare(
+    `UPDATE analytics_cross_runs SET state = ?, result_json = ?, error_code = NULL, completed_at = ?
+      WHERE id = ? AND state = 'running' AND lease_generation = ?`,
+  ).bind(result.state, JSON.stringify(result), new Date().toISOString(), runId, leaseGeneration).run();
+  if (Number(done.meta?.changes ?? 0) !== 1) throw new Error('analytics_cross_run_lease_stolen');
+}
+
+export async function failAnalyticsCrossRun(
+  db: D1Database,
+  runId: string,
+  leaseGeneration: number,
+  errorCode: string,
+): Promise<void> {
+  const done = await db.prepare(
+    `UPDATE analytics_cross_runs SET state = 'failed', error_code = ?, completed_at = ?
+      WHERE id = ? AND state = 'running' AND lease_generation = ?`,
+  ).bind(errorCode, new Date().toISOString(), runId, leaseGeneration).run();
+  if (Number(done.meta?.changes ?? 0) !== 1) throw new Error('analytics_cross_run_lease_stolen');
+}
+
 export async function processAnalyticsCrossRun(
   db: D1Database,
   runId: string,
 ): Promise<AnalyticsCrossResult> {
-  const claimed = await db.prepare(
-    `UPDATE analytics_cross_runs SET state = 'running', started_at = ?
-      WHERE id = ? AND state = 'pending'`,
-  ).bind(new Date().toISOString(), runId).run();
-  if (Number(claimed.meta?.changes ?? 0) !== 1) throw new Error('analytics_cross_run_not_pending');
+  const { leaseGeneration } = await claimAnalyticsCrossRun(db, runId);
   const row = await loadRunRow(db, runId);
   if (!row) throw new Error('analytics_cross_run_not_found');
   try {
@@ -827,10 +868,7 @@ export async function processAnalyticsCrossRun(
         dataCutoffAt: row.data_cutoff_at, state: 'unavailable',
         stateReason: '集計時点が対象期間より前です',
       };
-      await db.prepare(
-        `UPDATE analytics_cross_runs SET state = 'unavailable', result_json = ?, completed_at = ?
-          WHERE id = ? AND state = 'running'`,
-      ).bind(JSON.stringify(result), new Date().toISOString(), runId).run();
+      await completeAnalyticsCrossRun(db, runId, leaseGeneration, result);
       return result;
     }
     const cutoffPartial = row.data_cutoff_at < query.periodTo;
@@ -855,10 +893,7 @@ export async function processAnalyticsCrossRun(
         previousPeriodFrom: before.from, previousPeriodTo: before.to,
         dataCutoffAt: row.data_cutoff_at, state: 'unavailable', stateReason: coverage.reason,
       };
-      await db.prepare(
-        `UPDATE analytics_cross_runs SET state = 'unavailable', result_json = ?, completed_at = ?
-          WHERE id = ? AND state = 'running'`,
-      ).bind(JSON.stringify(result), new Date().toISOString(), runId).run();
+      await completeAnalyticsCrossRun(db, runId, leaseGeneration, result);
       return result;
     }
     const loadedFriends = await loadFriendIds(db, row.line_account_id);
@@ -871,10 +906,7 @@ export async function processAnalyticsCrossRun(
         dataCutoffAt: row.data_cutoff_at, state: 'unavailable',
         stateReason: `対象人数が上限${MAX_ACCOUNT_FRIENDS.toLocaleString('ja-JP')}人を超えています（${loadedFriends.total.toLocaleString('ja-JP')}人）`,
       };
-      await db.prepare(
-        `UPDATE analytics_cross_runs SET state = 'unavailable', result_json = ?, completed_at = ?
-          WHERE id = ? AND state = 'running'`,
-      ).bind(JSON.stringify(result), new Date().toISOString(), runId).run();
+      await completeAnalyticsCrossRun(db, runId, leaseGeneration, result);
       return result;
     }
     const friendIds = loadedFriends.ids;
@@ -936,19 +968,13 @@ export async function processAnalyticsCrossRun(
         cutoffPartial ? `対象期間の途中です（${row.data_cutoff_at} まで）` : null,
       ].filter(Boolean).join(' / ') || null,
     };
-    await db.prepare(
-      `UPDATE analytics_cross_runs SET state = ?, result_json = ?, completed_at = ?
-        WHERE id = ? AND state = 'running'`,
-    ).bind(result.state, JSON.stringify(result), new Date().toISOString(), runId).run();
+    await completeAnalyticsCrossRun(db, runId, leaseGeneration, result);
     return result;
   } catch (error) {
-    await db.prepare(
-      `UPDATE analytics_cross_runs SET state = 'failed', error_code = ?, completed_at = ?
-        WHERE id = ? AND state = 'running'`,
-    ).bind(
+    await failAnalyticsCrossRun(
+      db, runId, leaseGeneration,
       error instanceof Error ? error.message.slice(0, 160) : 'analytics_cross_failed',
-      new Date().toISOString(), runId,
-    ).run();
+    );
     throw error;
   }
 }
@@ -969,7 +995,12 @@ export async function processPendingAnalyticsCrossRuns(
       await processAnalyticsCrossRun(db, row.id);
       processed += 1;
     } catch (error) {
-      if (error instanceof Error && error.message === 'analytics_cross_run_not_pending') continue;
+      // 他の実行が先にclaimした・世代を奪った場合は取りこぼしに数えない。
+      if (
+        error instanceof Error &&
+        (error.message === 'analytics_cross_run_not_pending' ||
+          error.message === 'analytics_cross_run_lease_stolen')
+      ) continue;
       failed += 1;
     }
   }
@@ -981,9 +1012,11 @@ export async function recoverStalledAnalyticsCrossRuns(
   now: Date,
 ): Promise<number> {
   const cutoff = new Date(now.getTime() - 10 * 60_000).toISOString();
+  // 回収も世代を1つ進める。旧実行の完了・失敗は古い世代では書き込めない。
   const result = await db.prepare(
     `UPDATE analytics_cross_runs
-        SET state = 'pending', started_at = NULL, error_code = NULL
+        SET state = 'pending', started_at = NULL, error_code = NULL,
+            lease_generation = lease_generation + 1
       WHERE state = 'running' AND started_at < ?`,
   ).bind(cutoff).run();
   return Number(result.meta?.changes ?? 0);

@@ -412,7 +412,7 @@ CREATE TABLE analytics_cross_runs (
   created_at        TEXT NOT NULL,
   started_at        TEXT,
   completed_at      TEXT
-);
+, lease_generation INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE analytics_daily_metrics (
   line_account_id  TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,

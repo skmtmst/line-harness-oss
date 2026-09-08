@@ -7,9 +7,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   ANALYTICS_CROSS_QUEUE_INTERVAL_MS,
+  claimAnalyticsCrossRun,
+  completeAnalyticsCrossRun,
   createAnalyticsCrossAudience,
   createAnalyticsCrossRun,
   evaluateAnalyticsCross,
+  failAnalyticsCrossRun,
   getAnalyticsCrossQueueStatus,
   getAnalyticsCrossRun,
   nextAnalyticsCrossTick,
@@ -506,6 +509,47 @@ describe('V6クロス分析', () => {
     expect(reswept).toEqual({ processed: 0, failed: 0 });
     const done = sqlite.prepare(`SELECT state FROM analytics_cross_runs WHERE id = ?`).get(first.id) as { state: string };
     expect(['available', 'partial', 'unavailable', 'failed']).toContain(done.state);
+  });
+
+  it('期限回収後の旧実行は完了も失敗も書き込めず、新実行だけが確定する', async () => {
+    // A取得→期限回収→B再取得→A完了拒否→Bだけ確定。10分超えの集計でも
+    // 旧実行の古い結果で上書きしない。
+    const queued = await createAnalyticsCrossRun(db, {
+      lineAccountId: 'account-a', query: BASE_QUERY, timeZone: 'Asia/Tokyo',
+      dataCutoffAt: '2026-08-08T00:00:00.000Z',
+    });
+    const leaseA = await claimAnalyticsCrossRun(db, queued.id);
+    // Aが10分超えで止まったことにする。
+    sqlite.prepare(
+      `UPDATE analytics_cross_runs SET started_at = '2026-08-08T00:00:00.000Z' WHERE id = ?`,
+    ).run(queued.id);
+    expect(await recoverStalledAnalyticsCrossRuns(
+      db, new Date('2026-08-08T00:11:00.000Z'),
+    )).toBe(1);
+    const leaseB = await claimAnalyticsCrossRun(db, queued.id);
+    expect(leaseB.leaseGeneration).not.toBe(leaseA.leaseGeneration);
+    const staleResult = {
+      lineAccountId: 'account-a', timeZone: 'Asia/Tokyo',
+      rowValues: [], columnValues: [], cells: [], totalValue: 1, totalFriends: 1,
+      previousTotalValue: 0, periodFrom: '2026-08-01T00:00:00.000Z',
+      periodTo: '2026-08-07T23:59:59.999Z', previousPeriodFrom: '2026-07-25T00:00:00.000Z',
+      previousPeriodTo: '2026-07-31T23:59:59.999Z', dataCutoffAt: '2026-08-08T00:00:00.000Z',
+      state: 'available', stateReason: null,
+    } as const;
+    const freshResult = { ...staleResult, totalValue: 2, totalFriends: 2 };
+    await expect(completeAnalyticsCrossRun(db, queued.id, leaseA.leaseGeneration, {
+      ...staleResult, state: 'available',
+    })).rejects.toThrow('analytics_cross_run_lease_stolen');
+    await expect(failAnalyticsCrossRun(db, queued.id, leaseA.leaseGeneration, 'stale'))
+      .rejects.toThrow('analytics_cross_run_lease_stolen');
+    await completeAnalyticsCrossRun(db, queued.id, leaseB.leaseGeneration, {
+      ...freshResult, state: 'available',
+    });
+    const row = sqlite.prepare(
+      `SELECT state, result_json FROM analytics_cross_runs WHERE id = ?`,
+    ).get(queued.id) as { state: string; result_json: string };
+    expect(row.state).toBe('available');
+    expect(JSON.parse(row.result_json)).toEqual({ ...freshResult, state: 'available' });
   });
 
   it('次回処理目安は5分刻みの分01・06・11…を指す', () => {
