@@ -91,6 +91,38 @@ function bodyDraft(value: unknown): CustomerDraft | null {
     : null;
 }
 
+function validateCustomerDraft(draft: CustomerDraft): string | null {
+  const text = (key: string): string | null => {
+    const value = draft[key];
+    return value === undefined || typeof value === 'string' ? value ?? null : null;
+  };
+  const hasInvalidText = (key: string): boolean => draft[key] !== undefined && typeof draft[key] !== 'string';
+  if (hasInvalidText('title') || hasInvalidText('introText') || hasInvalidText('outroText')
+      || hasInvalidText('buttonLabel') || hasInvalidText('buttonUrl') || hasInvalidText('imageUrl')) {
+    return '通知文面は文字列で入力してください';
+  }
+  const title = text('title')?.trim();
+  if (title !== undefined && title !== null && (!title || title.length > 80)) {
+    return '通知の見出しは1〜80文字で入力してください';
+  }
+  if ((text('introText')?.trim().length ?? 0) > 800 || (text('outroText')?.trim().length ?? 0) > 800) {
+    return '通知の本文は800文字以内で入力してください';
+  }
+  if ((text('buttonLabel')?.trim().length ?? 0) > 20) {
+    return 'ボタン名は20文字以内で入力してください';
+  }
+  for (const key of ['buttonUrl', 'imageUrl']) {
+    const value = text(key)?.trim() ?? '';
+    if (!value) continue;
+    try {
+      if (new URL(value).protocol !== 'https:') return 'URLはhttpsで始まるものを入力してください';
+    } catch {
+      return 'URLはhttpsで始まるものを入力してください';
+    }
+  }
+  return null;
+}
+
 async function requireAccount(c: Context<Env>, lineAccountId: string): Promise<Response | null> {
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
@@ -154,6 +186,8 @@ lineNotifications.post(
     if (!lineAccountId || !key || !name || !category || !sourceEventType || !draft) {
       return c.json({ success: false, error: 'LINEアカウント、キー、名前、区分、きっかけ、下書きは必須です' }, 400);
     }
+    const draftError = validateCustomerDraft(draft);
+    if (draftError) return c.json({ success: false, error: draftError }, 400);
     const denied = await requireAccount(c, lineAccountId);
     if (denied) return denied;
     try {
@@ -190,6 +224,8 @@ lineNotifications.patch(
     if (!lineAccountId || !expectedVersion || !name || !category || !sourceEventType || !draft) {
       return c.json({ success: false, error: 'LINEアカウント、現在の版、名前、区分、きっかけ、下書きは必須です' }, 400);
     }
+    const draftError = validateCustomerDraft(draft);
+    if (draftError) return c.json({ success: false, error: draftError }, 400);
     const denied = await requireAccount(c, lineAccountId);
     if (denied) return denied;
     try {
@@ -228,6 +264,8 @@ lineNotifications.post(
     const current = await getCustomerNotificationDefinition(c.env.DB, c.req.param('id'), lineAccountId);
     if (!current) return c.json({ success: false, error: 'お知らせが見つかりません' }, 404);
     const draft = jsonObject(current.definition.draft_config_json) as CustomerDraft;
+    const draftError = validateCustomerDraft(draft);
+    if (draftError) return c.json({ success: false, error: draftError }, 400);
     if (!Array.isArray(draft.lineTemplate) || draft.lineTemplate.length === 0) {
       return c.json({ success: false, code: 'incomplete_draft', error: 'LINEで送る内容を設定してください' }, 409);
     }
