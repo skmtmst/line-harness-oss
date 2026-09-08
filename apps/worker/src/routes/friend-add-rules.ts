@@ -125,6 +125,9 @@ function normalizeDefinition(raw: Partial<FriendAddRuleDefinition> | undefined):
     friendCondition: typeof definition.friendCondition === 'string'
       ? definition.friendCondition.slice(0, 1000)
       : '',
+    internalMemo: typeof definition.internalMemo === 'string'
+      ? definition.internalMemo.slice(0, 2000)
+      : undefined,
     activeFrom: typeof definition.activeFrom === 'string' && definition.activeFrom ? definition.activeFrom : null,
     activeUntil: typeof definition.activeUntil === 'string' && definition.activeUntil ? definition.activeUntil : null,
     returningMode: definition.returningMode === 'none' || definition.returningMode === 'same' || definition.returningMode === 'other'

@@ -13,11 +13,13 @@ import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqli
 import {
   applyFriendAddRouting,
   areFriendAddConditionsOverlapping,
+  canonicalizeFriendAddCondition,
   doFriendAddTimeWindowsOverlap,
   doFriendAddWeekdaySetsOverlap,
   effectiveFriendAddWeekday,
   evaluateFriendAddSchedule,
   friendAddJstHhmm,
+  isEmptyFriendAddCondition,
   isInFriendAddTimeWindows,
   isTimeInFriendAddWindow,
 } from './friend-add-routing.js';
@@ -124,6 +126,47 @@ describe('競合確認と本番で同じ重なり関数', () => {
     expect(areFriendAddConditionsOverlapping('', 'x')).toBe(false);
     expect(areFriendAddConditionsOverlapping('  x  ', 'x')).toBe(true);
   });
+
+  test('同義JSONは整形・キー順・並びが違っても競合を見逃さない', () => {
+    const compact = JSON.stringify({ operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-1' }] });
+    const spaced = '{ "rules": [ { "value": "tag-1", "type": "tag_exists" } ], "operator": "AND" }';
+    expect(areFriendAddConditionsOverlapping(compact, spaced)).toBe(true);
+    // rules の並びが違っても AND の意味は同じ
+    const ordered = JSON.stringify({
+      operator: 'AND',
+      rules: [
+        { type: 'tag_exists', value: 'tag-1' },
+        { type: 'is_following', value: true },
+      ],
+    });
+    const reordered = JSON.stringify({
+      operator: 'AND',
+      rules: [
+        { type: 'is_following', value: true },
+        { type: 'tag_exists', value: 'tag-1' },
+      ],
+    });
+    expect(areFriendAddConditionsOverlapping(ordered, reordered)).toBe(true);
+    // 意味が違うJSONは競合にしない
+    const other = JSON.stringify({ operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-2' }] });
+    expect(areFriendAddConditionsOverlapping(compact, other)).toBe(false);
+    // 空の構造化JSONは絞りなしとして競合にしない
+    expect(areFriendAddConditionsOverlapping('{"operator":"AND","rules":[]}', compact)).toBe(false);
+    expect(areFriendAddConditionsOverlapping('', compact)).toBe(false);
+  });
+
+  test('旧形式の字面はそのまま比べ、JSONは正規化できる', () => {
+    expect(areFriendAddConditionsOverlapping('メモA', 'メモA')).toBe(true);
+    expect(areFriendAddConditionsOverlapping('メモA', 'メモB')).toBe(false);
+    expect(canonicalizeFriendAddCondition('  ')).toBe(null);
+    expect(canonicalizeFriendAddCondition('購入回数が1回以上')).toBe(null);
+    expect(canonicalizeFriendAddCondition('{"operator":')).toBe(null);
+    expect(canonicalizeFriendAddCondition('{"operator":"AND","rules":[]}'))
+      .toBe(canonicalizeFriendAddCondition('{ "rules": [], "operator": "AND" }'));
+    expect(isEmptyFriendAddCondition('')).toBe(true);
+    expect(isEmptyFriendAddCondition('{"operator":"AND","rules":[]}')).toBe(true);
+    expect(isEmptyFriendAddCondition('購入回数が1回以上')).toBe(false);
+  });
 });
 
 describe('本番の振り分け: 曜日・時間帯・条件・再送制限', () => {
@@ -153,6 +196,7 @@ describe('本番の振り分け: 曜日・時間帯・条件・再送制限', ()
     weekdays?: number[];
     timeWindows?: Array<{ start: string; end: string }>;
     friendCondition?: string;
+    internalMemo?: string;
     resendSuppressionHours?: number | null;
     returningMode?: 'none' | 'same' | 'other';
   } = {}): { ruleId: string; versionId: string } {
@@ -174,6 +218,9 @@ describe('本番の振り分け: 曜日・時間帯・条件・再送制限', ()
     };
     if (options.resendSuppressionHours !== undefined) {
       definition.resendSuppressionHours = options.resendSuppressionHours;
+    }
+    if (options.internalMemo !== undefined) {
+      definition.internalMemo = options.internalMemo;
     }
     if (options.returningMode) definition.returningMode = options.returningMode;
     raw.prepare(
@@ -422,14 +469,17 @@ describe('本番の振り分け: 曜日・時間帯・条件・再送制限', ()
     expect(result.suppressed).toBe(false);
   });
 
-  test('友だち条件: 社内メモの自由文は通す', async () => {
-    // 公開版は不変トリガのため、メモ付きで新規に作る
+  test('友だち条件: JSONでない旧形式は安全側に抑止する（全員一致にしない）', async () => {
+    // 旧形式の社内メモ混じりは通さない。社内メモは internalMemo へ分離する。
     seedRule({ friendCondition: '購入回数が1回以上', resendSuppressionHours: 0 });
     const result = await applyFriendAddRouting(
       db, 'acc-1', { id: 'friend-1', unfollow_count: 0 }, undefined,
       { entryRouteId: 'route-1', now: MON_10 },
     );
-    expect(result.suppressed).toBe(false);
+    expect(result).toMatchObject({
+      routed: true, suppressed: true, suppressReason: 'friend_condition_unreadable',
+    });
+    expect(result.enrollments).toEqual([]);
   });
 
   test('友だち条件: タグの有無で分け、条件外は送らない', async () => {
@@ -453,6 +503,31 @@ describe('本番の振り分け: 曜日・時間帯・条件・再送制限', ()
       routed: true, suppressed: true, suppressReason: 'friend_condition_not_met',
     });
     expect(notMatched.enrollments).toEqual([]);
+  });
+
+  test('友だち条件: 社内メモだけのルールは条件なしとして送る', async () => {
+    seedRule({ friendCondition: '', internalMemo: '店頭QRの人へ送る', resendSuppressionHours: 0 });
+    const result = await applyFriendAddRouting(
+      db, 'acc-1', { id: 'friend-1', unfollow_count: 0 }, undefined,
+      { entryRouteId: 'route-1', now: MON_10 },
+    );
+    expect(result.suppressed).toBe(false);
+    expect(result.enrollments).toHaveLength(1);
+  });
+
+  test('友だち条件: 未完成の行を含むJSONは安全側に抑止する', async () => {
+    seedRule({
+      friendCondition: JSON.stringify({ operator: 'AND', rules: [{ type: 'tag_exists', value: '' }] }),
+      resendSuppressionHours: 0,
+    });
+    const result = await applyFriendAddRouting(
+      db, 'acc-1', { id: 'friend-1', unfollow_count: 0 }, undefined,
+      { entryRouteId: 'route-1', now: MON_10 },
+    );
+    expect(result).toMatchObject({
+      routed: true, suppressed: true, suppressReason: 'friend_condition_unreadable',
+    });
+    expect(result.enrollments).toEqual([]);
   });
 
   test('友だち条件: 壊れたJSONは通さない', async () => {

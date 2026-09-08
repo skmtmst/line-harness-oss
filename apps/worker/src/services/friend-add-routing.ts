@@ -364,11 +364,73 @@ export function normalizeFriendAddCondition(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function sortRecordKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortRecordKeys);
+  if (value && typeof value === 'object') {
+    const sorted: Record<string, unknown> = {};
+    for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+      sorted[key] = sortRecordKeys((value as Record<string, unknown>)[key]);
+    }
+    return sorted;
+  }
+  return value;
+}
+
+/**
+ * 友だち条件JSONを意味で比べられる形に直す。整形・キー順の違いを吸収する。
+ * rules / groups の並びは AND・OR のどちらでも意味を変えないため、
+ * 並べ替えてから比べる。読めない値は null を返す。
+ */
+export function canonicalizeFriendAddCondition(value: unknown): string | null {
+  const raw = normalizeFriendAddCondition(value);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as { rules?: unknown[]; groups?: unknown[] } & Record<string, unknown>;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    const sorted = sortRecordKeys(parsed) as { rules?: unknown[]; groups?: unknown[] } & Record<string, unknown>;
+    if (Array.isArray(sorted.rules)) {
+      sorted.rules = [...sorted.rules]
+        .map((rule) => JSON.stringify(sortRecordKeys(rule)))
+        .sort()
+        .map((item) => JSON.parse(item) as unknown);
+    }
+    if (Array.isArray(sorted.groups)) {
+      sorted.groups = [...sorted.groups]
+        .map((group) => JSON.stringify(sortRecordKeys(group)))
+        .sort()
+        .map((item) => JSON.parse(item) as unknown);
+    }
+    return JSON.stringify(sortRecordKeys(sorted));
+  } catch {
+    return null;
+  }
+}
+
+/** 条件が実質「絞り込みなし」か。空文字と、空の構造化JSONを同じ扱いにする。 */
+export function isEmptyFriendAddCondition(value: unknown): boolean {
+  const raw = normalizeFriendAddCondition(value);
+  if (!raw) return true;
+  const canonical = canonicalizeFriendAddCondition(value);
+  if (canonical == null) return false;
+  return parseCondition(raw) != null && matchesEmptyCondition(raw);
+}
+
+function matchesEmptyCondition(raw: string): boolean {
+  const condition = parseCondition(raw);
+  if (!condition) return false;
+  return (condition.rules?.length ?? 0) === 0 && (condition.groups?.length ?? 0) === 0;
+}
+
 /**
  * 友だち条件の重なり（競合確認用）。どちらかが空なら報告しない。
- * 本番と同じく字面の一致で見る。構造化JSONと自由文を区別しない。
+ * 構造化JSONは整形・キー順・rules/groups の並びを吸収して比べる。
+ * JSONでない旧形式は字面の一致だけで見る。
  */
 export function areFriendAddConditionsOverlapping(a: unknown, b: unknown): boolean {
+  if (isEmptyFriendAddCondition(a) || isEmptyFriendAddCondition(b)) return false;
+  const leftCanonical = canonicalizeFriendAddCondition(a);
+  const rightCanonical = canonicalizeFriendAddCondition(b);
+  if (leftCanonical != null && rightCanonical != null) return leftCanonical === rightCanonical;
   const left = normalizeFriendAddCondition(a);
   const right = normalizeFriendAddCondition(b);
   return Boolean(left) && left === right;
@@ -379,12 +441,10 @@ export function areFriendAddConditionsOverlapping(a: unknown, b: unknown): boole
  *
  * - 空は制限なし（通す）。
  * - Segment条件JSONとして読める値は friends 実データで評価する。
- *   読めないJSON（`{` `[` で始まるのに壊れている）は通さない。
- *   絞ったつもりが全員に届くほうが、届かないより取り返しがつかない
- *   （自動応答の友だち条件と同じ倒し方）。
- * - JSON以外の自由文は社内メモとして通す。ここで止めると、メモを書いた
- *   既存ルールがすべて止まる。構造化したい場合は別Issueで入力欄の分離と
- *   移行が必要（残した点としてIssueへ報告する）。
+ * - JSON以外の自由文（旧形式の社内メモ混じり）は安全側に抑止する。
+ *   通すと「絞ったつもりが全員に届く」事故になる。社内メモは
+ *   `internalMemo` へ分離し、画面で再設定を促す。
+ * - 読めないJSON（`{` `[` で始まるのに壊れている）も通さない。
  */
 export async function evaluateFriendAddFriendCondition(
   db: D1Database,
@@ -398,16 +458,18 @@ export async function evaluateFriendAddFriendCondition(
   if (!raw) return { matched: true, reason: null };
   const condition = parseCondition(raw);
   if (!condition) {
-    if (raw.startsWith('{') || raw.startsWith('[')) {
-      console.error('[friend-add-routing] unreadable friendCondition — skipped the rule');
-      return { matched: false, reason: 'friend_condition_unreadable' };
-    }
-    return { matched: true, reason: null };
+    console.error('[friend-add-routing] unreadable friendCondition — skipped the rule');
+    return { matched: false, reason: 'friend_condition_unreadable' };
   }
-  const matches = await matchesCondition(db, friendId, condition);
-  return matches
-    ? { matched: true, reason: null }
-    : { matched: false, reason: 'friend_condition_not_met' };
+  try {
+    const matches = await matchesCondition(db, friendId, condition);
+    return matches
+      ? { matched: true, reason: null }
+      : { matched: false, reason: 'friend_condition_not_met' };
+  } catch {
+    console.error('[friend-add-routing] unreadable friendCondition — skipped the rule');
+    return { matched: false, reason: 'friend_condition_unreadable' };
+  }
 }
 
 /**
