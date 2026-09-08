@@ -194,3 +194,12 @@ describe('V6回答フォームの中項目(#503 M3・M9)', () => {
     expect(EDIT_PAGE).toContain('savedSnapshot.current = currentSnapshot')
   })
 })
+
+describe('#578 ページ名の変更（#503 L3）', () => {
+  it('空のページ名は作らせず、無い頁は触らない', () => {
+    expect(EDIT_PAGE).toContain("from '@/components/forms/section-name'")
+    expect(EDIT_PAGE).toContain('if (!current) return')
+    expect(EDIT_PAGE).toContain('normalizeSectionName(next)')
+    expect(EDIT_PAGE).toContain('空のページ名は作らせない')
+  })
+})
