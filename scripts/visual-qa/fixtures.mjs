@@ -5268,17 +5268,17 @@ const ecNotification = (eventType, label, category, order, isEnabled = true, tit
 })
 
 export const EC_NOTIFICATION_SETTINGS = [
-  ecNotification('ec_order.confirmed', '注文が確定した', 'order', 1),
-  ecNotification('ec_payment.received', '入金を確認した', 'payment', 2),
-  ecNotification('ec_shipping.shipped', '発送した', 'shipping', 3),
-  ecNotification('ec_shipping.delivered', 'お届けした', 'shipping', 4),
-  ecNotification('ec_subscription.renewed', '定期便が続いた', 'subscription', 5),
-  ecNotification('ec_subscription.paused', '定期便を止めた', 'subscription', 6),
-  ecNotification('ec_support.cancelled', 'キャンセルした', 'support', 7),
+  ecNotification('ec.order.confirmed', '注文が確定した', 'order', 1),
+  ecNotification('ec.order.payment_received', '入金を確認した', 'payment', 2),
+  ecNotification('ec.order.shipped', '発送した', 'shipping', 3),
+  ecNotification('ec.order.bank_transfer_reminder', 'お届けした', 'shipping', 4),
+  ecNotification('ec.subscription.upcoming', '定期便が続いた', 'subscription', 5),
+  ecNotification('ec.subscription.payment_failed', '定期便を止めた', 'subscription', 6),
+  ecNotification('ec.order.cancelled', 'キャンセルした', 'support', 7),
   /* 設計の「止めている 2」。 */
-  ecNotification('ec_support.refunded', '返金した', 'support', 8, false),
+  ecNotification('ec.order.refunded', '返金した', 'support', 8, false),
   /* 設計の「文面が未設定 1」。**空文字は「まだ決めていない」で、0件ではない。** */
-  { ...ecNotification('ec_order.backordered', '入荷待ちになった', 'order', 9, false), title: null, introText: '', outroText: '' },
+  { ...ecNotification('ec.subscription.card_updated', '入荷待ちになった', 'order', 9, false), title: null, introText: '', outroText: '' },
 ]
 
 export const LINE_NOTIFICATION_DEFINITIONS = EC_NOTIFICATION_SETTINGS.map((setting, index) => ({
