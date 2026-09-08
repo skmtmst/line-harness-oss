@@ -797,6 +797,21 @@ export async function cancelFriendReminder(db: D1Database, id: string): Promise<
     .bind(jstNow(), id).run();
 }
 
+/**
+ * 外部送信直前の再確認用: 登録が active のままかを見る。
+ *
+ * 取消と配信 cron が競合すると、claimed 済みの実行行が残る。送る直前に
+ * ここで active を確かめ、取消済みなら送らず実行行を止める。
+ */
+export async function getFriendReminderStatus(
+  db: D1Database,
+  id: string,
+): Promise<string | null> {
+  const row = await db.prepare(`SELECT status FROM friend_reminders WHERE id = ?`)
+    .bind(id).first<{ status: string }>();
+  return row?.status ?? null;
+}
+
 // =============================================================================
 // N-065: 予約・イベント・Meet の取消/日程変更を V6 リマインダへ同期
 // =============================================================================
@@ -807,10 +822,14 @@ export async function cancelFriendReminder(db: D1Database, id: string): Promise<
 //
 // 約束:
 // - 未送信 (active な登録と queued / retry_wait の実行行) だけを止める。
-//   送信済み履歴 (succeeded / friend_reminder_deliveries) と送信中の claimed は残す。
+//   送信済み履歴 (succeeded / friend_reminder_deliveries) は残す。
+//   claimed は送信中だが、取消後に送らないよう止める。送信直前にも登録の
+//   active を再確認し (reminder-delivery 側)、取消済みなら送らない。
 // - 取消理由・元イベントID・実行者を cancel_reason に残す (移行なしで追跡するため)。
 // - 同じ取消・変更通知の再送は何も変えない (active が無ければ 0 件で返す)。
 // - lineAccountId を渡したときは、そのアカウントの友だちの登録だけを見る。
+// - 移行前の行 (source 未記録) を探すときは、同時刻の別予約・手動登録を
+//   巻き込まないよう source 未記録かつ同じきっかけ種別の行だけを見る。
 
 export interface V6SourceMatcher {
   sourceKind?: string | null;
@@ -889,6 +908,18 @@ async function selectV6LegacyIds(
   const placeholders = matcher.targetDates.map(() => '?').join(',');
   conditions.push(`fr.target_date IN (${placeholders})`);
   bindings.push(...matcher.targetDates);
+  // 同時刻の別予約・手動登録を巻き込まない。source を持つ行 (別予約の現行行や
+  // 手動で作り直した行) は source 連動側でだけ触り、ここでは見ない。
+  // 移行前のきっかけ登録は source_kind が 'manual' のまま残っているため、
+  // 種別の絞り込みは登録先ルールの trigger_type で行う。
+  conditions.push(`fr.source_id IS NULL AND fr.source_event_id IS NULL`);
+  const legacyTrigger = matcher.sourceKind === 'meet' ? 'booking' : matcher.sourceKind;
+  if (legacyTrigger != null) {
+    conditions.push(
+      `EXISTS (SELECT 1 FROM reminders r WHERE r.id = fr.reminder_id AND r.trigger_type = ?)`,
+    );
+    bindings.push(legacyTrigger);
+  }
   conditions.push(`(${extra})`);
   const rows = await db.prepare(
     `SELECT fr.id AS id FROM friend_reminders fr WHERE ${conditions.join(' AND ')}`,
@@ -932,11 +963,12 @@ export async function cancelV6RemindersForSource(
             SET status = 'cancelled', cancel_reason = ?, updated_at = ?
           WHERE status = 'active' AND id IN (${placeholders})`,
       ).bind(input.cancelReason, now, ...chunk),
-      // 送信済み・送信中の claimed は残す。queued / retry_wait だけ止める。
+      // 送信済みは残す。claimed は送信中だが、取消後に送らないよう止める。
+      // 送信直前の再確認 (reminder-delivery 側) と合わせて二重に防ぐ。
       db.prepare(
         `UPDATE reminder_delivery_runs
             SET status = 'cancelled', completed_at = ?, updated_at = ?
-          WHERE status IN ('queued', 'retry_wait') AND friend_reminder_id IN (${placeholders})`,
+          WHERE status IN ('queued', 'retry_wait', 'claimed') AND friend_reminder_id IN (${placeholders})`,
       ).bind(now, now, ...chunk),
     );
   }
@@ -1006,27 +1038,30 @@ export async function rescheduleV6RemindersForSource(
     }
   }
   if (statements.length === 0) return { movedEnrollments: 0, cancelledRuns: 0 };
-  const results = await db.batch(statements);
-  const movedEnrollments = results.reduce((sum, result) => sum + Number(result.meta?.changes ?? 0), 0);
-  if (movedIds.length === 0) return { movedEnrollments, cancelledRuns: 0 };
-
   // 旧基準日で積んだ未来の実行行は時刻がずれているので止める。
-  // 次の cron が新基準日で作り直す。送信済み・送信中は残す。
-  let cancelledRuns = 0;
-  const runStatements: D1PreparedStatement[] = [];
+  // 次の cron が新基準日で作り直す。送信済みは残し、claimed も止める。
+  // 登録の移動と実行行の停止は同じ batch (原子的) に入れる。途中で落ちても
+  // 「登録だけ新日・実行行だけ旧日」の半端な状態を残さない。
+  const enrollmentStatementCount = statements.length;
   for (let offset = 0; offset < movedIds.length; offset += 50) {
     const chunk = movedIds.slice(offset, offset + 50);
     const placeholders = chunkPlaceholders(chunk);
-    runStatements.push(
+    statements.push(
       db.prepare(
         `UPDATE reminder_delivery_runs
             SET status = 'cancelled', completed_at = ?, updated_at = ?
-          WHERE status IN ('queued', 'retry_wait') AND friend_reminder_id IN (${placeholders})`,
+          WHERE status IN ('queued', 'retry_wait', 'claimed') AND friend_reminder_id IN (${placeholders})`,
       ).bind(now, now, ...chunk),
     );
   }
-  const runResults = await db.batch(runStatements);
-  cancelledRuns = runResults.reduce((sum, result) => sum + Number(result.meta?.changes ?? 0), 0);
+  const results = await db.batch(statements);
+  let movedEnrollments = 0;
+  let cancelledRuns = 0;
+  results.forEach((result, index) => {
+    const changes = Number(result.meta?.changes ?? 0);
+    if (index < enrollmentStatementCount) movedEnrollments += changes;
+    else cancelledRuns += changes;
+  });
   return { movedEnrollments, cancelledRuns };
 }
 
@@ -1127,8 +1162,12 @@ export async function completeReminderIfDone(db: D1Database, friendReminderId: s
 
   if (totalSteps && deliveredSteps && deliveredSteps.count >= totalSteps.count) {
     const now = jstNow();
-    await db.prepare(`UPDATE friend_reminders SET status = 'completed', completed_at = ?, updated_at = ? WHERE id = ?`)
-      .bind(now, now, friendReminderId).run();
+    // 取消ずみの登録を完了で上書きしない (取消と cron の競合対策)。
+    await db.prepare(
+      `UPDATE friend_reminders
+          SET status = 'completed', completed_at = ?, updated_at = ?
+        WHERE id = ? AND status = 'active'`,
+    ).bind(now, now, friendReminderId).run();
   }
 }
 
