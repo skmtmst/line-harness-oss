@@ -23,6 +23,10 @@ export interface ConversionPoint {
   line_account_id: string | null;
   /** 画面からの更新・利用先追加で使う楽観ロック版。 */
   version: number;
+  /** 重複の数え方。window のときだけ deduplication_window_days を見る。 */
+  deduplication_mode: string | null;
+  /** window のときの期間日数。NULL なら期間が決まっていない扱い。 */
+  deduplication_window_days: number | null;
   status: 'active' | 'stopped';
   stopped_at: string | null;
   updated_at: string;
@@ -249,15 +253,28 @@ export async function getUrlReachConversionPoints(
   return result.results;
 }
 
+/**
+ * 旧口の停止。版の一致を必須にし、稼働中の1文だけを止める。
+ * 停止も版を進めるため、続く操作は新しい版でやり直す。
+ */
 export async function stopConversionPoint(
   db: D1Database,
   id: string,
-): Promise<void> {
+  expectedVersion: number,
+): Promise<ConversionPoint> {
   const now = jstNow();
-  await db
-    .prepare(`UPDATE conversion_points SET status = 'stopped', stopped_at = ?, updated_at = ? WHERE id = ?`)
-    .bind(now, now, id)
+  const result = await db
+    .prepare(`UPDATE conversion_points SET status = 'stopped', stopped_at = ?,
+      updated_at = ?, version = version + 1 WHERE id = ? AND version = ? AND status = 'active'`)
+    .bind(now, now, id, expectedVersion)
     .run();
+  if ((result.meta.changes ?? 0) === 0) {
+    const current = await getConversionPointById(db, id);
+    if (!current) throw new Error('conversion_point_not_found');
+    if (current.status !== 'active') throw new Error('conversion_point_already_stopped');
+    throw new Error('conversion_point_version_conflict');
+  }
+  return (await getConversionPointById(db, id))!;
 }
 
 // ── Conversion Events ───────────────────────────────────────────────────────
@@ -283,6 +300,80 @@ export interface TrackConversionInput {
 function isUniqueViolation(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return /UNIQUE constraint failed/i.test(message);
+}
+
+/**
+ * 重複の数え方(lifetime / window / every)。定義作成時の対応
+ * (every だけ count_repeat = 1、それ以外は 0)と合わせる。
+ * 旧口で作った1人1回地点(count_repeat = 0、every のまま)は lifetime。
+ * window で期間が決まっていない行は、厳しい側(lifetime)に倒す。
+ */
+export type ConversionDedupPolicy =
+  | { kind: 'every' }
+  | { kind: 'lifetime' }
+  | { kind: 'window'; windowDays: number };
+
+export function resolveDedupPolicy(point: {
+  count_repeat: number;
+  deduplication_mode?: string | null;
+  deduplication_window_days?: number | null;
+}): ConversionDedupPolicy {
+  if ((point.deduplication_mode ?? 'every') === 'window') {
+    const days = point.deduplication_window_days;
+    if (Number.isInteger(days) && (days as number) >= 1 && (days as number) <= 365) {
+      return { kind: 'window', windowDays: days as number };
+    }
+    return { kind: 'lifetime' };
+  }
+  if (point.deduplication_mode === 'once_per_friend' || point.count_repeat === 0) {
+    return { kind: 'lifetime' };
+  }
+  return { kind: 'every' };
+}
+
+const JST_DAY_MS = 86_400_000;
+
+/** 日本日の通日を期間日数で区切った番号。同時刻の同時到着は必ず同じ区切りになる。 */
+export function dedupWindowBucket(windowDays: number, at = Date.now()): number {
+  return Math.floor(Math.floor((at + 9 * 3_600_000) / JST_DAY_MS) / windowDays);
+}
+
+/**
+ * 同時到着の片方を弾く鍵。every は鍵なし(何件でも数える)。
+ * 期間を変えたら鍵も変わるよう、window は日数を含める。
+ */
+export function dedupKeyFor(
+  policy: ConversionDedupPolicy,
+  conversionPointId: string,
+  friendId: string,
+  at = Date.now(),
+): string | null {
+  if (policy.kind === 'lifetime') return `${conversionPointId}|${friendId}`;
+  if (policy.kind === 'window') {
+    return `${conversionPointId}|${friendId}|w${policy.windowDays}:${dedupWindowBucket(policy.windowDays, at)}`;
+  }
+  return null;
+}
+
+/** 記録日時が期間内か。読めない日時は厳しい側(期間内=重複扱い)に倒す。 */
+export function createdWithinWindowDays(createdAt: string, windowDays: number, now: number): boolean {
+  const at = Date.parse(createdAt);
+  if (Number.isNaN(at)) return true;
+  return now - at <= windowDays * JST_DAY_MS;
+}
+
+/**
+ * 成果の記録先アカウントの一致条件。地点のアカウントが NULL
+ * (全アカウント対象)のときだけ交差を許可する。それ以外は地点と
+ * 友だちが同じアカウントのときだけ記録できる。両方を見られる職員でも
+ * 交差記録はできない。
+ */
+export function canRecordConversion(
+  pointLineAccountId: string | null,
+  friendLineAccountId: string | null,
+): boolean {
+  if (pointLineAccountId === null) return true;
+  return pointLineAccountId === friendLineAccountId;
 }
 
 /**
@@ -329,6 +420,45 @@ async function findFirstFriendEvent(
     .first<ConversionEvent>();
 }
 
+async function findLatestFriendEvent(
+  db: D1Database,
+  conversionPointId: string,
+  friendId: string,
+): Promise<ConversionEvent | null> {
+  return db
+    .prepare(
+      `SELECT * FROM conversion_events
+        WHERE conversion_point_id = ? AND friend_id = ?
+        ORDER BY created_at DESC, id DESC LIMIT 1`,
+    )
+    .bind(conversionPointId, friendId)
+    .first<ConversionEvent>();
+}
+
+/**
+ * 数え方に合った既存の1件を探す。lifetime は最初の1件、window は
+ * 期間内の最新の1件、every は探さない(何件でも数える)。
+ */
+async function findDedupedEvent(
+  db: D1Database,
+  policy: ConversionDedupPolicy,
+  conversionPointId: string,
+  friendId: string,
+  now: number,
+): Promise<ConversionEvent | null> {
+  if (policy.kind === 'lifetime') {
+    return findFirstFriendEvent(db, conversionPointId, friendId);
+  }
+  if (policy.kind === 'window') {
+    const latest = await findLatestFriendEvent(db, conversionPointId, friendId);
+    if (latest && createdWithinWindowDays(latest.created_at, policy.windowDays, now)) {
+      return latest;
+    }
+    return null;
+  }
+  return null;
+}
+
 export async function trackConversion(
   db: D1Database,
   input: TrackConversionInput,
@@ -348,15 +478,14 @@ export async function trackConversion(
     }
   }
 
-  // 一人一回だけ数える地点で、すでに記録があるなら、それを返して終わる。
+  // 数え方に合った既存の1件があれば、それを返して終わる。
   // 例外にしないのは、二重に踏むのは利用者にとって普通の行動で、
   // 呼び出し側に異常として扱わせるとログが埋まるため。
   // 読み取り後の同時到着は once_key のUNIQUE制約で片方を弾く(N-255)。
-  const onceOnly = point.count_repeat === 0;
-  if (onceOnly) {
-    const existing = await findFirstFriendEvent(db, input.conversionPointId, input.friendId);
-    if (existing) return existing;
-  }
+  const nowMs = Date.now();
+  const policy = resolveDedupPolicy(point);
+  const deduped = await findDedupedEvent(db, policy, input.conversionPointId, input.friendId, nowMs);
+  if (deduped) return deduped;
 
   // Resolve last-touch affiliate attribution before inserting the event.
   // 地点ごとに期間を狭めたい場合があるので attribution_days を渡す
@@ -369,9 +498,9 @@ export async function trackConversion(
   // CVs leave approval_status NULL (the approval flow only applies to attributed rows).
   const approvalStatus = attr ? 'pending' : null;
 
-  // 1人1回の地点だけ重複防止キーを付ける。繰返し数える地点は
-  // NULLのまま制約の対象外にする(050号の dedup_key と同じ流儀)。
-  const onceKey = onceOnly ? `${input.conversionPointId}|${input.friendId}` : null;
+  // lifetime と window の地点だけ重複防止キーを付ける。繰返し数える
+  // 地点は NULL のまま制約の対象外にする(050号の dedup_key と同じ流儀)。
+  const onceKey = dedupKeyFor(policy, input.conversionPointId, input.friendId, nowMs);
   try {
     await db
       .prepare(
@@ -410,8 +539,8 @@ export async function trackConversion(
           return existing;
         }
       }
-      if (onceOnly) {
-        const existing = await findFirstFriendEvent(db, input.conversionPointId, input.friendId);
+      if (policy.kind !== 'every') {
+        const existing = await findDedupedEvent(db, policy, input.conversionPointId, input.friendId, Date.now());
         if (existing) return existing;
       }
     }
