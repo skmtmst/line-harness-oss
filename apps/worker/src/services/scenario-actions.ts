@@ -549,17 +549,18 @@ export async function resumePreviousScenario(
 /**
  * 共通情報の加算・減算。在庫や残席のような、店ぜんたいで1つの数に使う。
  *
- * 読み→計算→書き込みをそのまま書くと、同時に2件動いたときに両方が
- * 同じ古い値を読んで上書きし、片方の増減が消える。値・版番号・履歴を
- * 同じ batch で書き、版番号が進んでいたら読み直して計算し直す。D1 の
- * batch は原子的なので、勝った更新だけが通り、並んだ更新は1件ずつ
- * 順に反映される。版番号と履歴を進めるのは、画面編集・予約適用と同じ
- * 契約にするため。進めないと、古い版番号のままの画面保存・予約適用が
- * 通って加減算の結果を上書きできてしまう。
+ * 読み→計算→書き込みを分けると、同時実行で片方の増減が消える。
+ * 読み直しの再試行で吸収する作りも、上限を使い切ると失敗として
+ * 握りつぶされ、加減算が永久に消える。そこで値・版番号・履歴を
+ * 1つの batch で書き、計算は SQL の中で今の値に足す。D1 の batch は
+ * 原子的なので、並んだ更新は必ず1件ずつ順に当たり、負けも再試行も
+ * 上限もない。版番号と履歴を進めるのは画面編集・予約適用と同じ契約
+ * にするためで、古い版のままの上書きを防ぐ。
+ *
+ * 数の読み方は SQLite の数値化に従う。整数・小数・空・ただの文字は
+ * 従来どおり（文字は0とみなす）。'12abc' のような先頭数字つき文字列は
+ * 先頭の数として読む点だけ、従来の Number 扱いと違う。
  */
-
-/** 同時更新のぶつかりで読み直す回数の上限。 */
-const COMMON_VAR_UPDATE_RETRIES = 8
 async function applyCommonVar(
   db: D1Database,
   friendId: string,
@@ -569,45 +570,41 @@ async function applyCommonVar(
   const delta = Number(c.value ?? 0)
   const safeDelta = Number.isFinite(delta) ? delta : 0
   const signed = c.op === 'add' ? safeDelta : -safeDelta
-  for (let attempt = 0; attempt < COMMON_VAR_UPDATE_RETRIES; attempt++) {
-    const row = await db
-      .prepare(
-        `SELECT cv.id, cv.name, cv.value, cv.memo, cv.version
-           FROM common_vars cv
-           JOIN friends f ON f.line_account_id = cv.line_account_id
-          WHERE f.id = ? AND cv.var_key = ? AND cv.archived_at IS NULL`,
-      )
-      .bind(friendId, c.varKey)
-      .first<{ id: string; name: string; value: string | null; memo: string | null; version: number }>()
-    if (!row) throw new Error(`common_var not found: ${c.varKey}`)
-    const base = Number(row.value ?? 0)
-    const safeBase = Number.isFinite(base) ? base : 0
-    const next = String(safeBase + signed)
-    const nextVersion = row.version + 1
-    const now = jstNow()
-    const results = await db.batch([
-      db.prepare(
-        `UPDATE common_vars SET value = ?, version = ?, updated_at = ?
-          WHERE id = ? AND version = ? AND archived_at IS NULL`,
-      ).bind(next, nextVersion, now, row.id, row.version),
-      // 先に別更新が版を進めていたら、同じ版番号の履歴が既にある。
-      // OR IGNORE で重複を捨て、1文目の更新件数で勝敗を見る。
-      db.prepare(
-        `INSERT OR IGNORE INTO common_var_versions
-           (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
-         SELECT ?, ?, ?, ?, ?, ?, ?, NULL, ?
-          WHERE EXISTS (
-            SELECT 1 FROM common_vars
-             WHERE id = ? AND version = ? AND archived_at IS NULL
-          )`,
-      ).bind(
-        crypto.randomUUID(), row.id, nextVersion,
-        row.name, next, row.memo ?? '',
-        c.op === 'add' ? 'シナリオ加算' : 'シナリオ減算',
-        now, row.id, nextVersion,
-      ),
-    ])
-    if ((results[0]?.meta?.changes ?? 0) > 0) return
-  }
-  throw new Error(`common_var update conflict: ${c.varKey}`)
+  const now = jstNow()
+  const results = await db.batch([
+    db.prepare(
+      `UPDATE common_vars
+          SET value = CASE
+                WHEN (COALESCE(CAST(value AS REAL), 0.0) + ?)
+                   = CAST(COALESCE(CAST(value AS REAL), 0.0) + ? AS INTEGER)
+                THEN CAST(CAST(COALESCE(CAST(value AS REAL), 0.0) + ? AS INTEGER) AS TEXT)
+                ELSE CAST(COALESCE(CAST(value AS REAL), 0.0) + ? AS TEXT)
+              END,
+              version = version + 1,
+              updated_at = ?
+        WHERE var_key = ?
+          AND line_account_id = (SELECT line_account_id FROM friends WHERE id = ?)
+          AND archived_at IS NULL`,
+    ).bind(signed, signed, signed, signed, now, c.varKey, friendId),
+    // 履歴は更新後の行から取るので、版・値・名前が今の行と必ず一致する。
+    // 既存の履歴に欠番があっても、負けた側が誤った行を補うことはない。
+    // batch が原子的なので、敗者がいることもない。
+    db.prepare(
+      `INSERT INTO common_var_versions
+         (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
+       SELECT ?, cv.id, cv.version, cv.name, cv.value, cv.memo, ?, NULL, ?
+         FROM common_vars cv
+        WHERE cv.var_key = ?
+          AND cv.line_account_id = (SELECT line_account_id FROM friends WHERE id = ?)
+          AND cv.archived_at IS NULL`,
+    ).bind(
+      crypto.randomUUID(),
+      c.op === 'add' ? 'シナリオ加算' : 'シナリオ減算',
+      now,
+      c.varKey,
+      friendId,
+    ),
+  ])
+  // 競合で当たらないことはない。当たらなければ行が無い。
+  if ((results[0]?.meta?.changes ?? 0) === 0) throw new Error(`common_var not found: ${c.varKey}`)
 }

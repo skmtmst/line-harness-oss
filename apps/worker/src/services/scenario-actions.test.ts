@@ -437,24 +437,37 @@ describe('共通情報', () => {
     expect(history[2]?.value).toBe('12')
   })
 
-  it('ぶつかり続けたら上限で失敗として数える（配信は止めない）', async () => {
+  it('10件の連続した並行更新がすべて最終値・版・履歴に残る', async () => {
+    seedV1History()
+    addAction('a1', 'common_var', { varKey: 'stock', op: 'add', value: '1' })
+    const sdb = serializedDb()
+    const input = { scenarioId: SCENARIO, hook: 'step_sent' as const, friendId: 'f1', stepId: STEP }
+    // 再試行も上限もない。競合は起きず、10件すべてが順に当たる。
+    const results = await Promise.all(
+      Array.from({ length: 10 }, () => runScenarioActions(sdb, input)),
+    )
+    for (const result of results) {
+      expect(result.failed).toBe(0)
+      expect(result.executed).toBe(1)
+    }
+    expect(commonVarValue('account-1', 'stock')).toBe('20')
+    expect(commonVarVersion('v1')).toBe(11)
+    assertVersionHistoryConsistent('v1')
+  })
+
+  it('先頭に数字がある文字列は先頭の数として読む（SQL数値化）', async () => {
+    // 計算を SQL の中で行うため、数の読み方は SQLite に従う。
+    // '12abc' は従来の Number 扱いだと0だが、ここでは12として足す。
+    raw.prepare(`UPDATE common_vars SET value = '12abc' WHERE id = 'v1'`).run()
     addAction('a1', 'common_var', { varKey: 'stock', op: 'add', value: '3' })
-    const result = await runScenarioActions(conflictingDb(), {
+    const result = await runScenarioActions(db, {
       scenarioId: SCENARIO,
       hook: 'step_sent',
       friendId: 'f1',
       stepId: STEP,
     })
-    expect(result.failed).toBe(1)
-    expect(result.executed).toBe(0)
-    // 邪魔がなければ次は通る。
-    const retry = await runScenarioActions(db, {
-      scenarioId: SCENARIO,
-      hook: 'step_sent',
-      friendId: 'f1',
-      stepId: STEP,
-    })
-    expect(retry.failed).toBe(0)
+    expect(result.failed).toBe(0)
+    expect(commonVarValue('account-1', 'stock')).toBe('15')
   })
 
   it('画面編集と並行しても版契約が壊れない', async () => {
@@ -573,8 +586,7 @@ function assertVersionHistoryConsistent(varId: string): void {
  *
  * テスト用の D1 は接続が1つなので、2つの batch が重なると BEGIN が
  * 入れ子になって落ちる。本物の D1 では batch は原子単位で直列に確定
- * されるので、その動きをここで再現する。SELECT→batch の隙間は残るため、
- * 「両方が古い版を読んでから書き込む」という競合そのものは起きる。
+ * されるので、その動きをここで再現する。
  */
 function serializedDb(): D1Database {
   let tail: Promise<unknown> = Promise.resolve()
@@ -591,47 +603,7 @@ function serializedDb(): D1Database {
   } as unknown as D1Database
 }
 
-/**
- * 共通情報の更新のたびに横から版を進める D1。
- *
- * 競合の上限のテスト用。書き込みの直前に別更新が割り込んだことにする。
- */
-function conflictingDb(): D1Database {
-  const prepare = db.prepare.bind(db)
-  return {
-    prepare: (sql: string) => {
-      const statement = prepare(sql) as unknown as {
-        bind: (...args: unknown[]) => {
-          first: (...args: unknown[]) => Promise<unknown>
-          all: (...args: unknown[]) => Promise<unknown>
-          run: (...args: unknown[]) => Promise<unknown>
-        }
-      }
-      return {
-        bind: (...args: unknown[]) => {
-          const bound = statement.bind(...args)
-          return {
-            first: (...a: unknown[]) => bound.first(...a),
-            all: (...a: unknown[]) => bound.all(...a),
-            run: async (...a: unknown[]) => {
-              if (/^\s*UPDATE\s+common_vars\b/i.test(sql)) {
-                raw
-                  .prepare(
-                    `UPDATE common_vars SET value = value || '!', version = version + 1
-                      WHERE var_key = 'stock'`,
-                  )
-                  .run()
-              }
-              return bound.run(...a)
-            },
-          }
-        },
-      }
-    },
-    batch: ((statements: D1PreparedStatement[]) =>
-      (db as unknown as { batch: (s: D1PreparedStatement[]) => unknown }).batch(statements)) as unknown as D1Database['batch'],
-  } as unknown as D1Database
-}
+
 
 describe('シナリオ操作', () => {
   it('購読を始める', async () => {
