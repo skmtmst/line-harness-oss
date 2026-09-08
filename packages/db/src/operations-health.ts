@@ -287,6 +287,51 @@ export async function reserveStepUpAttempt(
   } : null;
 }
 
+/** 二段階認証の初回設定確認について、10分間に5回までの試行枠を確保する。 */
+export async function reserveTwoFactorSetupAttempt(
+  db: D1Database,
+  staffId: string,
+  now = new Date().toISOString(),
+): Promise<StepUpAttemptReservation | null> {
+  const windowCutoff = new Date(Date.parse(now) - STEP_UP_ATTEMPT_WINDOW_MS).toISOString();
+  const row = await db.prepare(
+    `INSERT INTO staff_two_factor_setup_attempts
+       (staff_id, attempts, window_started_at, updated_at)
+     VALUES (?, 1, ?, ?)
+     ON CONFLICT(staff_id) DO UPDATE SET
+       attempts = CASE
+         WHEN staff_two_factor_setup_attempts.window_started_at <= ? THEN 1
+         ELSE staff_two_factor_setup_attempts.attempts + 1
+       END,
+       window_started_at = CASE
+         WHEN staff_two_factor_setup_attempts.window_started_at <= ? THEN excluded.window_started_at
+         ELSE staff_two_factor_setup_attempts.window_started_at
+       END,
+       updated_at = excluded.updated_at
+     WHERE staff_two_factor_setup_attempts.window_started_at <= ?
+        OR staff_two_factor_setup_attempts.attempts < ?
+     RETURNING attempts, window_started_at`,
+  ).bind(
+    staffId, now, now,
+    windowCutoff, windowCutoff, windowCutoff, STEP_UP_MAX_ATTEMPTS,
+  ).first<{ attempts: number; window_started_at: string }>();
+  return row ? {
+    attempts: Number(row.attempts),
+    maxAttempts: STEP_UP_MAX_ATTEMPTS,
+    windowStartedAt: row.window_started_at,
+  } : null;
+}
+
+/** 設定確認に成功したときだけ、失敗を含む試行枠を解放する。 */
+export async function clearTwoFactorSetupAttempts(
+  db: D1Database,
+  staffId: string,
+): Promise<void> {
+  await db.prepare(
+    `DELETE FROM staff_two_factor_setup_attempts WHERE staff_id = ?`,
+  ).bind(staffId).run();
+}
+
 export async function consumeStepUpGrant(
   db: D1Database,
   input: { tokenHash: string; staffId: string; purpose: string; now?: string },
