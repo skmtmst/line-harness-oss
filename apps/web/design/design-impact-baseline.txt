@@ -143,6 +143,7 @@ shared-button-importer components/merged-person/merged-person-detail.tsx
 shared-button-importer components/merged-person/merged-person-sections.tsx
 shared-button-importer components/merged-person/merged-profile-dialog.tsx
 shared-button-importer components/reminders/reminder-publish-flow.tsx
+shared-button-importer components/reminders/reminder-v6-ui.tsx
 shared-button-importer components/scenarios/action-editor.tsx
 shared-button-importer components/scenarios/scenario-dialogs.tsx
 shared-button-importer components/scenarios/scenario-list.tsx
