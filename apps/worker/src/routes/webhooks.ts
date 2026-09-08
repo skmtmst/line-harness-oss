@@ -18,6 +18,9 @@ import {
   getOutgoingWebhookDeliverySummaries,
   updateIncomingWebhookConfig,
   updateIncomingWebhookMaskedSample,
+  hasWebhookSecret,
+  resolveWebhookSecret,
+  WEBHOOK_SECRET_MIN_LENGTH as MIN_SECRET_LENGTH,
   type WebhookInteractionRow,
   type IncomingWebhookIdentityMatch,
   type IncomingWebhookActionRef,
@@ -189,8 +192,6 @@ function readMaxRetries(raw: unknown): { ok: true; value: number } | { ok: false
 }
 
 
-const MIN_SECRET_LENGTH = 32;
-
 const MAX_WEBHOOK_NAME_LENGTH = 120;
 const MAX_EVENT_TYPES = 20;
 const MAX_EVENT_TYPE_LENGTH = 100;
@@ -242,6 +243,16 @@ function validateHttpsUrl(url: unknown): string | null {
   return null;
 }
 
+/**
+ * 暗号化の鍵がない・壊れているときの保存失敗を見分ける(#650)。
+ *
+ * secret を平文で書き残さないため、鍵なしの新規・更新は止める。
+ * 判定は名前で行う(DB層はモック差し替えのため型では縛らない)。
+ */
+function isEncryptionKeyError(err: unknown): boolean {
+  return err instanceof Error && err.name === 'CredentialEncryptionKeyError';
+}
+
 // Constant-time hex-string compare to avoid timing oracles.
 function safeEqualHex(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -289,7 +300,7 @@ webhooks.get('/api/webhooks/incoming', requireRole('owner', 'admin', 'staff'), a
         id: w.id,
         name: w.name,
         sourceType: w.source_type,
-        hasSecret: Boolean(w.secret && w.secret.length >= MIN_SECRET_LENGTH),
+        hasSecret: hasWebhookSecret(w),
         isActive: Boolean(w.is_active),
         createdAt: w.created_at,
         updatedAt: w.updated_at,
@@ -331,7 +342,7 @@ webhooks.get('/api/webhooks/incoming/:id', requireRole('owner', 'admin', 'staff'
         id: item.id,
         name: item.name,
         sourceType: item.source_type,
-        hasSecret: Boolean(item.secret && item.secret.length >= MIN_SECRET_LENGTH),
+        hasSecret: hasWebhookSecret(item),
         isActive: Boolean(item.is_active),
         version: Number(item.version ?? 1),
         identityMatching,
@@ -417,7 +428,7 @@ webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
       sourceType: body.sourceType,
       secret: body.secret as string,
       lineAccountId,
-    });
+    }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
     return c.json(
       {
         success: true,
@@ -426,8 +437,8 @@ webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
           name: item.name,
           sourceType: item.source_type,
           // secret is returned exactly once on create so the operator can copy it.
-          // Subsequent GETs never expose it.
-          secret: item.secret,
+          // Subsequent GETs never expose it. The row itself holds only ciphertext.
+          secret: body.secret,
           isActive: Boolean(item.is_active),
           createdAt: item.created_at,
         },
@@ -435,6 +446,9 @@ webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
       201,
     );
   } catch (err) {
+    if (isEncryptionKeyError(err)) {
+      return c.json({ success: false, error: 'secret を安全に保存できませんでした' }, 503);
+    }
     console.error('POST /api/webhooks/incoming error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
@@ -469,8 +483,17 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
     // Activation gate: never re-enable a webhook whose post-update secret
     // would still be invalid. Otherwise migration 034 can be bypassed by
     // toggling isActive without touching the legacy null/short secret.
+    // Encrypted rows are decrypted for the length check; undecryptable rows
+    // stay stopped until the secret is re-entered (#650).
     if (body.isActive === true) {
-      const effectiveSecret = body.secret ?? existing.secret;
+      let effectiveSecret = body.secret;
+      if (effectiveSecret === undefined) {
+        try {
+          effectiveSecret = await resolveWebhookSecret(existing, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY) ?? undefined;
+        } catch {
+          return c.json({ success: false, error: 'secret を確認できませんでした。secret を入れ直してください' }, 503);
+        }
+      }
       if (!effectiveSecret || effectiveSecret.length < MIN_SECRET_LENGTH) {
         return c.json(
           {
@@ -481,7 +504,7 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
         );
       }
     }
-    await updateIncomingWebhook(c.env.DB, id, lineAccountId, body);
+    await updateIncomingWebhook(c.env.DB, id, lineAccountId, body, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
     const updated = await getIncomingWebhookById(c.env.DB, id, lineAccountId);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
@@ -490,11 +513,14 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
         id: updated.id,
         name: updated.name,
         sourceType: updated.source_type,
-        hasSecret: Boolean(updated.secret && updated.secret.length >= MIN_SECRET_LENGTH),
+        hasSecret: hasWebhookSecret(updated),
         isActive: Boolean(updated.is_active),
       },
     });
   } catch (err) {
+    if (isEncryptionKeyError(err)) {
+      return c.json({ success: false, error: 'secret を安全に保存できませんでした' }, 503);
+    }
     console.error('PUT /api/webhooks/incoming/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
@@ -548,7 +574,7 @@ webhooks.get('/api/webhooks/outgoing', requireRole('owner', 'admin', 'staff'), a
           name: w.name,
           url: w.url,
           eventTypes: outgoingEventTypes(w.event_types, w.id),
-          hasSecret: Boolean(w.secret && w.secret.length >= MIN_SECRET_LENGTH),
+          hasSecret: hasWebhookSecret(w),
           isActive: Boolean(w.is_active),
           maxRetries: w.max_retries ?? 0,
           consecutiveFailures: w.consecutive_failures ?? 0,
@@ -625,7 +651,7 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
       secret: body.secret as string,
       maxRetries,
       lineAccountId,
-    });
+    }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
     return c.json(
       {
         success: true,
@@ -634,8 +660,8 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
           name: item.name,
           url: item.url,
           eventTypes: outgoingEventTypes(item.event_types, item.id),
-          // Returned exactly once on create.
-          secret: item.secret,
+          // Returned exactly once on create. The row itself holds only ciphertext.
+          secret: body.secret,
           isActive: Boolean(item.is_active),
           maxRetries: item.max_retries ?? 0,
           createdAt: item.created_at,
@@ -644,6 +670,9 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
       201,
     );
   } catch (err) {
+    if (isEncryptionKeyError(err)) {
+      return c.json({ success: false, error: 'secret を安全に保存できませんでした' }, 503);
+    }
     console.error('POST /api/webhooks/outgoing error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
@@ -706,8 +735,17 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
     // the row with both a valid secret AND an https url even after the
     // partial update. Without this, migration 034 can be bypassed by
     // sending {isActive:true} on a legacy http:// or secret-less row.
+    // Encrypted rows are decrypted for the length check; undecryptable rows
+    // stay stopped until the secret is re-entered (#650).
     if (body.isActive === true) {
-      const effectiveSecret = body.secret ?? existing.secret;
+      let effectiveSecret = body.secret;
+      if (effectiveSecret === undefined) {
+        try {
+          effectiveSecret = await resolveWebhookSecret(existing, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY) ?? undefined;
+        } catch {
+          return c.json({ success: false, error: 'secret を確認できませんでした。secret を入れ直してください' }, 503);
+        }
+      }
       const effectiveUrl = body.url ?? existing.url;
       if (!effectiveSecret || effectiveSecret.length < MIN_SECRET_LENGTH) {
         return c.json(
@@ -726,7 +764,7 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
         );
       }
     }
-    await updateOutgoingWebhook(c.env.DB, id, lineAccountId, { ...body, maxRetries });
+    await updateOutgoingWebhook(c.env.DB, id, lineAccountId, { ...body, maxRetries }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
     const updated = await getOutgoingWebhookById(c.env.DB, id, lineAccountId);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
@@ -736,7 +774,7 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
         name: updated.name,
         url: updated.url,
         eventTypes: outgoingEventTypes(updated.event_types, updated.id),
-        hasSecret: Boolean(updated.secret && updated.secret.length >= MIN_SECRET_LENGTH),
+        hasSecret: hasWebhookSecret(updated),
         isActive: Boolean(updated.is_active),
         maxRetries: updated.max_retries ?? 0,
         consecutiveFailures: updated.consecutive_failures ?? 0,
@@ -744,6 +782,9 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
       },
     });
   } catch (err) {
+    if (isEncryptionKeyError(err)) {
+      return c.json({ success: false, error: 'secret を安全に保存できませんでした' }, 503);
+    }
     console.error('PUT /api/webhooks/outgoing/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
@@ -759,6 +800,19 @@ webhooks.post('/api/webhooks/outgoing/:id/test', requireRole('owner', 'admin'), 
     const webhook = await getOutgoingWebhookById(c.env.DB, c.req.param('id'), lineAccountId);
     if (!webhook) return c.json({ success: false, error: 'Not found' }, 404);
     if (!webhook.is_active) return c.json({ success: false, error: '止めている送り先は試せません' }, 409);
+    // 署名は送信直前に復号した値で付ける。secretが設定済みで読めない
+    // (鍵不足・復号失敗)ときだけ送らずに止める(#650)。未設定の旧行は従来どおり試す。
+    let sendSecret: string | null = null;
+    if (webhook.secret_encrypted || webhook.secret) {
+      try {
+        sendSecret = await resolveWebhookSecret(webhook, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+      } catch {
+        sendSecret = null;
+      }
+      if (!sendSecret) {
+        return c.json({ success: false, error: 'secret を確認できないため試し送信を止めました' }, 503);
+      }
+    }
     const body = JSON.stringify({
       event: 'webhook.test',
       timestamp: new Date().toISOString(),
@@ -769,7 +823,7 @@ webhooks.post('/api/webhooks/outgoing/:id/test', requireRole('owner', 'admin'), 
       eventType: 'webhook.test', triggerSummary: '管理画面から1回試した', requestBodyJson: body,
     });
     const started = Date.now();
-    const result = await deliverWebhook(webhook, body, { idempotencyKey: interaction.id });
+    const result = await deliverWebhook({ ...webhook, secret: sendSecret }, body, { idempotencyKey: interaction.id });
     await finishWebhookInteraction(c.env.DB, interaction.id, lineAccountId, {
       status: result.ok ? 'succeeded' : 'failed',
       responseStatus: result.lastStatus ?? null,
@@ -870,12 +924,15 @@ webhooks.post('/api/webhooks/interactions/:id/retry', requireRole('owner', 'admi
     if ('error' in access) return access.error;
     const original = await getWebhookInteractionById(c.env.DB, c.req.param('id'), access.lineAccountId);
     if (!original) return c.json({ success: false, error: 'Not found' }, 404);
-    const retried = await retryWebhookInteraction(c.env.DB, original);
+    const retried = await retryWebhookInteraction(c.env.DB, original, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
     return c.json({ success: true, data: serializeInteraction(retried) });
   } catch (err) {
     const code = err instanceof Error ? err.message : 'retry_failed';
     if (code === 'not_retryable' || code === 'already_retried') {
       return c.json({ success: false, error: code }, 409);
+    }
+    if (code === 'webhook_secret_unavailable') {
+      return c.json({ success: false, error: 'secret を確認できないため送り直しを止めました' }, 503);
     }
     if (code === 'webhook_not_found') return c.json({ success: false, error: code }, 404);
     if (code === 'webhook_inactive' || code === 'payload_unavailable') {
@@ -897,7 +954,7 @@ webhooks.post('/api/webhooks/interactions/retry-failed', requireRole('owner', 'a
     let skipped = 0;
     await Promise.all(failed.map(async (item) => {
       try {
-        const result = await retryWebhookInteraction(c.env.DB, item);
+        const result = await retryWebhookInteraction(c.env.DB, item, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
         if (result.status === 'succeeded') succeeded++;
         else failedAgain++;
       } catch {
@@ -923,7 +980,14 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
     if (!wh || !wh.is_active) {
       return c.json({ success: false, error: 'Webhook not found or inactive' }, 404);
     }
-    if (!wh.secret || wh.secret.length < MIN_SECRET_LENGTH) {
+    // 照合の直前に復号する。鍵不足・復号失敗は fail-closed(#650)。
+    let verifySecret: string | null;
+    try {
+      verifySecret = await resolveWebhookSecret(wh, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+    } catch {
+      verifySecret = null;
+    }
+    if (!verifySecret || verifySecret.length < MIN_SECRET_LENGTH) {
       // Should never happen post-migration, but fail closed.
       return c.json({ success: false, error: 'Webhook is not configured for secure delivery' }, 503);
     }
@@ -934,7 +998,7 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
     }
 
     const rawBody = await c.req.text();
-    const expected = await computeHmacSha256Hex(wh.secret, rawBody);
+    const expected = await computeHmacSha256Hex(verifySecret, rawBody);
     if (!safeEqualHex(signatureHeader.toLowerCase(), expected)) {
       return c.json({ success: false, error: 'Invalid signature' }, 401);
     }
