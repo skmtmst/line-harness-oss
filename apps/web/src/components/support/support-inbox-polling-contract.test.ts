@@ -1,7 +1,11 @@
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+vi.mock('next/link', () => ({ default: () => null }))
 
 const inbox = readFileSync(new URL('./support-inbox.tsx', import.meta.url), 'utf8')
+
+import { shouldRefetchSelectedDetail } from './support-inbox'
 
 describe('問い合わせ一覧の定期取得 (#630)', () => {
   it('5秒起点の1本だけで一覧と会話を更新し、自前の setInterval は持たない', () => {
@@ -34,5 +38,28 @@ describe('問い合わせ一覧の定期取得 (#630)', () => {
     expect(inbox).toContain('inboxStalled')
     expect(inbox).toContain('お問い合わせ一覧の更新を一時停止しています')
     expect(inbox).toContain('再試行する')
+  })
+
+  it('未解決一覧でも、選択中メールが対応済みなら詳細を取り直さない', () => {
+    const unresolved = { channel: 'email', status: 'in_progress' } as const
+    // どちらも未解決のときだけ取り直す。
+    expect(shouldRefetchSelectedDetail(unresolved, 'in_progress')).toBe(true)
+    expect(shouldRefetchSelectedDetail(unresolved, undefined)).toBe(true)
+    // 一覧側が対応済みと言っている(詳細より先に変わることがある)。
+    expect(
+      shouldRefetchSelectedDetail({ channel: 'email', status: 'resolved' }, 'in_progress'),
+    ).toBe(false)
+    // 詳細側が対応済みと言っている(一覧より先に変わることがある)。
+    expect(shouldRefetchSelectedDetail(unresolved, 'resolved')).toBe(false)
+    // メール以外・未選択は詳細を持たない。
+    expect(shouldRefetchSelectedDetail({ channel: 'line', status: 'in_progress' }, 'in_progress')).toBe(
+      false,
+    )
+    expect(shouldRefetchSelectedDetail(null, 'in_progress')).toBe(false)
+  })
+
+  it('詳細の状態はループを止めずに読む(refで追う)', () => {
+    expect(inbox).toContain('detailStatusRef')
+    expect(inbox).toContain('shouldRefetchSelectedDetail(selected, detailStatusRef.current)')
   })
 })

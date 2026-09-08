@@ -48,6 +48,22 @@ type EmailDetail = {
   messages: EmailMessage[]
 }
 
+/**
+ * 選択中メールの詳細を取り直すか(#630)。
+ *
+ * 一覧が未解決フィルターで回っていても、選んでいるスレッド自体が
+ * 対応済みなら詳細は変わらないので取り直さない。`selected`(一覧の
+ * 取り直しで更新)と `detail`(詳細の取り直しで更新)のどちらかが
+ * 対応済みと言っていれば対応済みとみなす(更新の順番が前後するため)。
+ */
+export function shouldRefetchSelectedDetail(
+  selected: Pick<InboxItem, 'channel' | 'status'> | null,
+  detailStatus: ThreadStatus | null | undefined,
+): boolean {
+  if (selected?.channel !== 'email') return false
+  return selected.status !== 'resolved' && detailStatus !== 'resolved'
+}
+
 const statusLabel: Record<ThreadStatus, string> = {
   unread: '未対応',
   in_progress: '対応中',
@@ -135,13 +151,21 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
   // 待ちを延ばして上限後は再試行を出す(#630)。
   const [inboxStalled, setInboxStalled] = useState(false)
   const [inboxRetryKey, setInboxRetryKey] = useState(0)
+  // 詳細の状態はループを止めずに読む。deps に入れると取り直すたびに
+  // 待ちが振り出しに戻り、失敗の数え直しが壊れる。
+  const detailStatusRef = useRef(detail?.thread.status)
+  detailStatusRef.current = detail?.thread.status
   useEffect(() => {
     setInboxStalled(false)
     const stop = startVisiblePoll({
       shouldPoll: () => status === 'open' || status === 'unread' || status === 'in_progress' || status === 'on_hold',
       work: async () => {
         const inboxOk = await loadInbox(true)
-        const detailOk = selected?.channel === 'email' ? await loadDetail(selected.threadId, true) : true
+        // 未解決フィルターでも、選んでいるスレッド自体が対応済みなら
+        // 詳細は取り直さない(#630)。
+        const detailOk = selected && shouldRefetchSelectedDetail(selected, detailStatusRef.current)
+          ? await loadDetail(selected.threadId, true)
+          : true
         if (!inboxOk || !detailOk) throw new Error('お問い合わせ一覧を読み込めませんでした')
       },
       onGiveUp: () => setInboxStalled(true),
