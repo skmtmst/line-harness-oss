@@ -1658,9 +1658,6 @@ async function scheduled(
       getLineAccountById,
       getStaffById,
       getTrackedLinkById,
-      setPageRichMenuId,
-      markRichMenuGroupPublished,
-      markRichMenuGroupUnpublished,
     } = await import('@line-crm/db');
     const { canAccessAllLineAccounts } = await import('./services/account-access.js');
     const { publishRichMenuGroup } = await import('./lib/rich-menu-publisher.js');
@@ -1853,16 +1850,15 @@ async function scheduled(
             if (!res.ok) throw new Error(`LINE linkRichMenuBulk failed: ${res.status}`);
           },
         };
+        // DB反映（journal・page ID・group状態・個別割当）は実行役が行う。
+        // ここではLINE作成だけ行い、新IDを返す。二重作成防止はjournal照合で行う。
         const published = await publishRichMenuGroup(built.input as never, line, r2Adapter);
-        for (const page of published.pages) {
-          await setPageRichMenuId(env.DB, page.pageId, page.newRichMenuId);
-        }
-        await markRichMenuGroupPublished(env.DB, built.groupIdForDb);
+        return published.pages;
       },
       restoreToGroup: async (restoreGroupId, schedule) => {
         if (!restoreGroupId) {
           // 「前のメニューに戻す」で戻し先が無かった場合の明示的default解除。
-          // 表示どおり何もしないで完了にせず、LINEのdefaultを外してDBも戻す。
+          // LINEのdefault解除だけ行い、DB反映は実行役が行う。
           const scheduled = await getRichMenuGroupWithPages(env.DB, schedule.group_id);
           const account = await getLineAccountById(env.DB, schedule.account_id);
           if (!scheduled || !account) throw new Error('schedule group not found');
@@ -1895,8 +1891,7 @@ async function scheduled(
             }
             throw error;
           }
-          await markRichMenuGroupUnpublished(env.DB, scheduled.id);
-          return;
+          return [];
         }
         const restore = await getRichMenuGroupWithPages(env.DB, restoreGroupId);
         if (!restore) throw new Error('restoreGroupId must be a published menu');
@@ -2025,13 +2020,8 @@ async function scheduled(
             })),
           })),
         } as never, line, r2Adapter);
-        for (const page of published.pages) {
-          await setPageRichMenuId(env.DB, page.pageId, page.newRichMenuId);
-        }
-        await markRichMenuGroupPublished(env.DB, restore.id);
-        if (restore.id !== schedule.group_id) {
-          await markRichMenuGroupUnpublished(env.DB, schedule.group_id);
-        }
+        // DB反映は実行役が行う。ここでは新IDだけ返す。
+        return published.pages;
       },
     }, { now: new Date(event.scheduledTime) });
     if (result.processed > 0) {

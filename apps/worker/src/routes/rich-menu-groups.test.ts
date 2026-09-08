@@ -27,6 +27,7 @@ const dbMocks = {
   listRichMenuSchedulesByGroup: vi.fn(),
   cancelRichMenuSchedule: vi.fn(),
   findPublishedRestoreCandidate: vi.fn(),
+  createRichMenuScheduleAtomic: vi.fn((): Promise<any> => Promise.resolve({ outcome: 'created', id: 'new-schedule' })),
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
@@ -125,6 +126,7 @@ beforeEach(() => {
   dbMocks.recordRichMenuAssignmentsByLineUserIds.mockResolvedValue(undefined);
   dbMocks.clearRichMenuAssignmentsForGroup.mockResolvedValue(undefined);
   dbMocks.jstNow.mockReturnValue('2026-09-07T12:00:00.000');
+  dbMocks.createRichMenuScheduleAtomic.mockResolvedValue({ outcome: 'created', id: 'new-schedule' });
 });
 
 // ----- GET /api/rich-menu-groups -----
@@ -474,6 +476,37 @@ describe('GET schedules and POST cancel (E-08 #621)', () => {
       success: true,
       data: { status: 'scheduled', restoreGroupId: null, restoreClearsDefault: true },
     });
+  });
+
+  test('同じIdempotency-Key・同じ内容の同時2要求は同じ予約を返す', async () => {
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue({
+      id: 'g1', account_id: 'acc-1', status: 'draft', pages: [],
+    });
+    dbMocks.createRichMenuScheduleAtomic
+      .mockResolvedValueOnce({ outcome: 'created', id: 's-first' })
+      .mockResolvedValueOnce({ outcome: 'existing', id: 's-first', status: 'scheduled' });
+    const app = setupApp({ db: makeMinimalDbStub() });
+    const body = JSON.stringify({ mode: 'scheduled', startsAt: '2026-09-10T01:00:00.000Z' });
+    const headers = { 'Content-Type': 'application/json', 'Idempotency-Key': 'same-key-2req' };
+    const first = await app.request('/api/rich-menu-groups/g1/schedule', { method: 'POST', headers, body });
+    const second = await app.request('/api/rich-menu-groups/g1/schedule', { method: 'POST', headers, body });
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(200);
+    expect(await second.json()).toMatchObject({ success: true, data: { id: 's-first', status: 'scheduled' } });
+  });
+
+  test('同じkey・異なる内容は成功扱いにせず409を返す', async () => {
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue({
+      id: 'g1', account_id: 'acc-1', status: 'draft', pages: [],
+    });
+    dbMocks.createRichMenuScheduleAtomic.mockResolvedValue({ outcome: 'conflict', id: 's-orig', status: 'scheduled' });
+    const res = await setupApp({ db: makeMinimalDbStub() }).request('/api/rich-menu-groups/g1/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'dup-key' },
+      body: JSON.stringify({ mode: 'scheduled', startsAt: '2026-09-11T01:00:00.000Z' }),
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ success: false });
   });
 
   test('見えないアカウントの予約一覧は404で隠す', async () => {

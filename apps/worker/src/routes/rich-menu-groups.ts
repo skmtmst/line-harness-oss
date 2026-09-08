@@ -1179,37 +1179,33 @@ richMenuGroups.post(
       restoreGroupId = resolvedRestoreGroupId;
     }
 
-    const existing = await c.env.DB
-      .prepare('SELECT id, status FROM rich_menu_schedules WHERE account_id = ? AND idempotency_key = ?')
-      .bind(group.account_id, idempotencyKey)
-      .first<{ id: string; status: string }>();
-    if (existing) return c.json({ success: true, data: existing });
-
+    // 同時2要求でも片方だけ作るため atomic にINSERTし、同key異内容は成功扱いにしない。
+    const { createRichMenuScheduleAtomic } = await import('@line-crm/db');
     const now = jstNow();
     const id = crypto.randomUUID();
-    await c.env.DB
-      .prepare(
-        `INSERT INTO rich_menu_schedules
-           (id, group_id, account_id, mode, starts_at, ends_at, restore_group_id,
-            definition_snapshot, status, idempotency_key, requested_by_staff_id,
-            created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', ?, ?, ?, ?)`,
-      )
-      .bind(
-        id,
-        group.id,
-        group.account_id,
-        body.mode,
-        body.startsAt,
-        endsAt,
-        restoreGroupId,
-        JSON.stringify(serializeGroupWithPages(group)),
-        idempotencyKey,
-        c.get('staff').id,
-        now,
-        now,
-      )
-      .run();
+    const definitionSnapshot = JSON.stringify(serializeGroupWithPages(group));
+    const created = await createRichMenuScheduleAtomic(c.env.DB, {
+      id,
+      groupId: group.id,
+      accountId: group.account_id,
+      mode: body.mode,
+      startsAt: body.startsAt as string,
+      endsAt,
+      restoreGroupId,
+      definitionSnapshot,
+      idempotencyKey,
+      requestedByStaffId: c.get('staff').id,
+      now,
+    });
+    if (created.outcome === 'conflict') {
+      return c.json(
+        { success: false, error: 'Idempotency-Key is already used with different content', id: created.id, status: created.status },
+        409,
+      );
+    }
+    if (created.outcome === 'existing') {
+      return c.json({ success: true, data: { id: created.id, status: created.status } });
+    }
     return c.json({
       success: true,
       data: {
