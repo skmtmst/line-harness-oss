@@ -79,19 +79,43 @@ function parseArray(raw: string, label: string): unknown[] {
 export async function listAutomationDefinitions(
   db: D1Database,
   lineAccountIds: string[],
+  paging?: { limit?: number; offset?: number },
 ): Promise<{
   items: AutomationDefinitionSummary[];
+  total: number;
   summary: { active: number; stopped: number; executionCount30d: number; failureCount30d: number };
   freshness: 'available';
 }> {
+  const emptySummary = { active: 0, stopped: 0, executionCount30d: 0, failureCount30d: 0 };
   if (lineAccountIds.length === 0) {
-    return {
-      items: [],
-      summary: { active: 0, stopped: 0, executionCount30d: 0, failureCount30d: 0 },
-      freshness: 'available',
-    };
+    return { items: [], total: 0, summary: emptySummary, freshness: 'available' };
   }
   const placeholders = lineAccountIds.map(() => '?').join(', ');
+  // 集計はページ送りに依らず対象アカウント全体で数える（一覧のKPIと一致させる）。
+  const [totalRow, statusRows, runTotals] = await Promise.all([
+    db.prepare(
+      `SELECT COUNT(*) AS count FROM automation_definitions d
+        WHERE d.line_account_id IN (${placeholders}) AND d.status <> 'archived'`,
+    ).bind(...lineAccountIds).first<{ count: number }>(),
+    db.prepare(
+      `SELECT d.status AS status, COUNT(*) AS count FROM automation_definitions d
+        WHERE d.line_account_id IN (${placeholders}) AND d.status <> 'archived'
+        GROUP BY d.status`,
+    ).bind(...lineAccountIds).all<{ status: string; count: number }>(),
+    db.prepare(
+      `SELECT COUNT(*) AS executions,
+              SUM(CASE WHEN r.status IN ('partial', 'failed') THEN 1 ELSE 0 END) AS failures
+         FROM automation_runs r
+         JOIN automation_definitions d ON d.id = r.automation_id
+        WHERE d.line_account_id IN (${placeholders}) AND d.status <> 'archived'
+          AND r.is_test = 0 AND r.status IN ('success', 'partial', 'failed')
+          AND datetime(r.created_at) >= datetime('now', '-30 days')`,
+    ).bind(...lineAccountIds).first<{ executions: number; failures: number | null }>(),
+  ]);
+  const limit = paging?.limit === undefined ? null
+    : Math.max(1, Math.min(Math.floor(paging.limit), 200));
+  const offset = paging?.offset === undefined ? 0
+    : Math.max(0, Math.floor(paging.offset));
   const result = await db.prepare(
     `SELECT d.id, d.line_account_id, d.name, d.description, d.status, d.priority,
             v.id AS version_id, v.version_number, v.trigger_type, v.trigger_config,
@@ -115,8 +139,8 @@ export async function listAutomationDefinitions(
             END
         AND v.automation_id = d.id
       WHERE d.line_account_id IN (${placeholders}) AND d.status <> 'archived'
-      ORDER BY d.priority DESC, d.updated_at DESC, d.id DESC`,
-  ).bind(...lineAccountIds).all<DefinitionListRow>();
+      ORDER BY d.priority DESC, d.updated_at DESC, d.id DESC${limit === null ? '' : ' LIMIT ? OFFSET ?'}`,
+  ).bind(...lineAccountIds, ...(limit === null ? [] : [limit, offset])).all<DefinitionListRow>();
   const items = (result.results ?? []).map((row): AutomationDefinitionSummary => ({
     id: row.id,
     name: row.name,
@@ -137,13 +161,15 @@ export async function listAutomationDefinitions(
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }));
+  const statusCount = new Map((statusRows.results ?? []).map((row) => [row.status, Number(row.count)]));
   return {
     items,
+    total: Number(totalRow?.count ?? items.length),
     summary: {
-      active: items.filter((item) => item.status === 'active').length,
-      stopped: items.filter((item) => item.status === 'stopped').length,
-      executionCount30d: items.reduce((sum, item) => sum + item.executionCount30d, 0),
-      failureCount30d: items.reduce((sum, item) => sum + item.failureCount30d, 0),
+      active: statusCount.get('active') ?? 0,
+      stopped: statusCount.get('stopped') ?? 0,
+      executionCount30d: Number(runTotals?.executions ?? 0),
+      failureCount30d: Number(runTotals?.failures ?? 0),
     },
     freshness: 'available',
   };

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const TABS = readFileSync(new URL('./tabs.tsx', import.meta.url), 'utf8')
+const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 const NEW_AFFILIATE = readFileSync(new URL('./new/page.tsx', import.meta.url), 'utf8')
 const NEW_OFFER = readFileSync(new URL('../affiliate-offers/new/page.tsx', import.meta.url), 'utf8')
 const ACTION_DIALOGS = readFileSync(new URL('./action-dialogs.tsx', import.meta.url), 'utf8')
@@ -102,5 +103,34 @@ describe('機能16 V6の作成画面', () => {
       expect(NEW_OFFER).toContain(`label="${label}"`)
     }
     expect(NEW_OFFER).toContain('案件と成果地点の紐づけAPIが接続されると選べます')
+  })
+})
+
+describe('機能16 V6の内訳と報酬率（#554 点検#505中2・中7）', () => {
+  it('内訳の読込失敗は空と区別し、再試行を出す', () => {
+    expect(TABS).toContain('detailError')
+    expect(TABS).toContain('journeyError')
+    expect(TABS).toContain('もう一度読み込む')
+    expect(TABS).toContain('動線を読み込めませんでした')
+    expect(TABS).toContain('setDetailError(true)')
+    expect(TABS).toContain('setJourneyError(true)')
+    expect(TABS).not.toContain('silent — detail is optional')
+  })
+
+  it('報酬率の範囲は画面の両方で同じ文言にする', () => {
+    expect(TABS).toContain('報酬率は0から100の間で入力してください')
+    expect(NEW_AFFILIATE).toContain('売上に対する割合は0から100の間で入力してください')
+  })
+
+  it('CSV書出しは共通のセル関数に寄せる', () => {
+    expect(TABS).toContain('csvCell')
+    expect(TABS).not.toContain('const escape = (value: string | number)')
+  })
+
+  it('旧い成績口の包みは消し、v2だけ使う（#554 点検#505中6）', () => {
+    expect(TABS).toContain('api.affiliates.reportV2(id)')
+    expect(TABS).not.toContain('api.affiliates.report(')
+    expect(API).toContain('reportV2: (id: string')
+    expect(API).not.toContain('totalConversions: number; totalRevenue: number')
   })
 })

@@ -2,7 +2,6 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
   getAutomationById,
-  createAutomation,
   updateAutomation,
   deleteAutomation,
   getAutomationLogs,
@@ -382,15 +381,30 @@ automations.get(
     if (requestedAccountId && !scope.allowedAccountIds.includes(requestedAccountId)) {
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
+    const rawLimit = c.req.query('limit');
+    const rawOffset = c.req.query('offset');
+    const limit = rawLimit === undefined ? undefined : boundedInteger(rawLimit, -1, 200);
+    const offset = rawOffset === undefined ? undefined : boundedInteger(rawOffset, -1, 1_000_000);
+    if ((rawLimit !== undefined && limit === -1) || (rawOffset !== undefined && offset === -1)) {
+      return c.json({ success: false, error: 'ページ指定を確認してください' }, 400);
+    }
     const result = await listAutomationDefinitions(
       c.env.DB,
       requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
+      limit === undefined && offset === undefined
+        ? undefined
+        : { limit, offset },
     );
     return c.json({
       success: true,
       data: result.items,
       summary: result.summary,
       freshness: result.freshness,
+      pagination: {
+        total: result.total,
+        limit: limit ?? null,
+        offset: offset ?? 0,
+      },
     });
   } catch (err) {
     console.error('GET /api/automations error:', err);
@@ -436,7 +450,11 @@ automations.post(
 );
 
 /** V6 25-1-B: 既存automation_runsを、共通実行記録契約で読む。 */
-automations.get('/api/automation-runs', async (c) => {
+automations.get(
+  '/api/automation-runs',
+  requireAutomationPermission,
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
   try {
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const requestedAccountId = (
@@ -571,7 +589,13 @@ automations.post(
 
 automations.use('/api/automations/:id', requireVisibleAutomation);
 automations.use('/api/automations/:id/*', requireVisibleAutomation);
-automations.get('/api/automations/:id', async (c) => {
+// 詳細・ログは一覧より機微度が高い（friendId・eventDataを含む）ため、
+// アカウント範囲の検査に加えて機能の権限キー検査も直接付ける。
+automations.get(
+  '/api/automations/:id',
+  requireAutomationPermission,
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
   try {
     const item = await getAutomationById(c.env.DB, c.req.param('id'));
     if (!item) return c.json({ success: false, error: 'Automation not found' }, 404);
@@ -609,54 +633,11 @@ automations.get('/api/automations/:id', async (c) => {
   }
 });
 
-automations.post('/api/automations', requireRole('owner', 'admin'), async (c) => {
-  try {
-    const body = await c.req.json<{
-      name: string;
-      description?: string;
-      eventType: string;
-      conditions?: Record<string, unknown>;
-      actions: unknown[];
-      priority?: number;
-      lineAccountId?: string | null;
-    }>();
-    if (!body.name || !body.eventType || !body.actions) {
-      return c.json({ success: false, error: 'name, eventType, actions are required' }, 400);
-    }
-    if (body.lineAccountId !== null && body.lineAccountId !== undefined
-      && (!body.lineAccountId
-        || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId]))) {
-      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
-    }
-    let item = await createAutomation(c.env.DB, body);
-    // Save line_account_id if provided
-    if (body.lineAccountId) {
-      await c.env.DB.prepare(`UPDATE automations SET line_account_id = ? WHERE id = ?`)
-        .bind(body.lineAccountId, item.id).run();
-      // Re-read so the response reports the persisted scope; the createAutomation
-      // helper does not accept line_account_id, so item still has the pre-UPDATE value.
-      const refreshed = await getAutomationById(c.env.DB, item.id);
-      if (refreshed) item = refreshed;
-    }
-    return c.json({
-      success: true,
-      data: {
-        id: item.id,
-        name: item.name,
-        eventType: item.event_type,
-        actions: JSON.parse(item.actions),
-        isActive: Boolean(item.is_active),
-        priority: item.priority,
-        lineAccountId: item.line_account_id ?? null,
-        createdAt: item.created_at,
-      },
-    }, 201);
-  } catch (err) {
-    console.error('POST /api/automations error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
-  }
-});
-
+// 旧CRUDの作成口は削除済み（#554 点検#519中6）。
+// 旧 `automations` 表へ検証なしで直書きし、一覧・実行基盤が読む
+// `automation_definitions` 系と不整合を起こすうえ、唯一の呼び元だった
+// 画面内蔵フォームは到達不能だった。作成は下書き→公開の流れを使う。
+// 稼働切替・削除で使う PUT・DELETE は残す。
 automations.put('/api/automations/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
@@ -695,7 +676,11 @@ automations.delete('/api/automations/:id', requireRole('owner', 'admin'), async 
 
 // ========== 自動化ログ ==========
 
-automations.get('/api/automations/:id/logs', async (c) => {
+automations.get(
+  '/api/automations/:id/logs',
+  requireAutomationPermission,
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
   try {
     const automationId = c.req.param('id');
     const limit = listLimit(c.req.query('limit'), 100);
