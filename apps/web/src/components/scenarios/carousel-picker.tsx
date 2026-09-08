@@ -10,9 +10,9 @@
  * 1枚も無いときに選択欄だけ出しても進めないので、作りに行く導線を出す。
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { filterSendableTemplates } from '@/lib/template-send-scope'
+import { createLoadGeneration, filterSendableTemplates } from '@/lib/template-send-scope'
 import { scenarioReferenceData } from './scenario-reference-data'
 
 export interface CarouselTemplate {
@@ -60,11 +60,14 @@ function summarize(content: string): { panels: number; firstTitle: string } {
 export default function CarouselPicker({ value, onChange, accountId }: CarouselPickerProps) {
   const [items, setItems] = useState<CarouselTemplate[]>([])
   const [loading, setLoading] = useState(true)
+  const generationRef = useRef(createLoadGeneration())
 
   useEffect(() => {
-    // 再審査対応(#645): 持ち主の公開版だけを候補にする。
+    // 独立審査(指摘4): 持ち主の公開版だけを候補にし、古い応答は世代で捨てる。
+    const generation = generationRef.current.next()
     setLoading(true)
     void scenarioReferenceData.templates(accountId ?? undefined).then((res) => {
+      if (!generationRef.current.isCurrent(generation)) return
       if (res.success) {
         setItems(
           filterSendableTemplates(res.data, accountId)

@@ -17,6 +17,8 @@ export interface BroadcastTemplateOption {
   messageContent: string
   usageCount?: number
   updatedAt?: string
+  /** 結びつけた持ち主。切替で別持ち主の残留を落とす目印。 */
+  accountId?: string | null
 }
 
 function bubbleId(): string {
@@ -24,11 +26,13 @@ function bubbleId(): string {
 }
 
 export function messageTemplateToBubble(template: BroadcastTemplateOption): BroadcastBubble | null {
+  // 独立審査(指摘4): 持ち主も吹き出しに刻む。アカウント切替で残留を落とす目印。
+  const source = { templateId: template.id, templateName: template.name, templateAccountId: template.accountId ?? null }
   if (template.messageType === 'text') {
     return {
       id: bubbleId(),
       type: 'text',
-      content: { text: template.messageContent, templateId: template.id, templateName: template.name },
+      content: { text: template.messageContent, ...source },
     }
   }
 
@@ -45,8 +49,7 @@ export function messageTemplateToBubble(template: BroadcastTemplateOption): Broa
         content: {
           originalContentUrl: image.originalContentUrl,
           previewImageUrl: image.previewImageUrl ?? image.originalContentUrl,
-          templateId: template.id,
-          templateName: template.name,
+          ...source,
         },
       }
     } catch {
@@ -62,8 +65,7 @@ export function messageTemplateToBubble(template: BroadcastTemplateOption): Broa
         type: 'flex',
         content: {
           flexJson: template.messageContent,
-          templateId: template.id,
-          templateName: template.name,
+          ...source,
         },
       }
     } catch {

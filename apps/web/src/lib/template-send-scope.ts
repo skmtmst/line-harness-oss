@@ -47,3 +47,26 @@ export function filterSendableTemplates<T extends SendableTemplateCandidate>(
 ): T[] {
   return templates.filter((template) => isSendableTemplate(template, selectedAccountId))
 }
+
+/**
+ * 読み込みの世代照合(独立審査指摘4)。
+ * アカウント切替などで読み直すたびに世代を進め、古い応答の描画を止める。
+ * 遅延Promiseが順不同で返っても、最新の世代だけが生かされる。
+ */
+export interface LoadGeneration {
+  /** 新しい読み込みを始める。返った番号がこの読み込みの世代。 */
+  next: () => number
+  /** その世代が最新かどうか。最新でなければ描画しない。 */
+  isCurrent: (generation: number) => boolean
+}
+
+export function createLoadGeneration(): LoadGeneration {
+  let current = 0
+  return {
+    next: () => {
+      current += 1
+      return current
+    },
+    isCurrent: (generation: number) => generation === current,
+  }
+}
