@@ -20,6 +20,7 @@ import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
 import {
+  ApiError,
   fetchApi,
   webinarApi,
   type WebinarCtaCard,
@@ -1207,9 +1208,21 @@ function CtasTab({ webinarId, accountId, onCtasLoaded }: { webinarId: string; ac
   )
 }
 
-function CtaDesignStep({ webinarId, accountId, editor, registrations }: { webinarId: string; accountId: string | null; editor: WebinarEditor; registrations: number | null }) {
+type RegistrationFormOption = { id: string; name: string; isActive: boolean }
+
+function CtaDesignStep({ webinarId, accountId, editor, registrations, onEditorChange }: { webinarId: string; accountId: string | null; editor: WebinarEditor; registrations: number | null; onEditorChange: (editor: WebinarEditor) => void }) {
   const [ctas, setCtas] = useState<WebinarCtaCard[]>([])
   const [forms, setForms] = useState<Array<{ id: string; name: string }>>([])
+  /*
+    申込フォームの候補。CTA内で使うフォームとは別の選択肢。
+    公開中のものだけを候補にし、停止・削除・別アカウントは選ばせない。
+  */
+  const [registrationForms, setRegistrationForms] = useState<RegistrationFormOption[]>([])
+  const [registrationFormState, setRegistrationFormState] = useState<'loading' | 'ready' | 'error' | 'forbidden'>('loading')
+  const [selectedRegistrationFormId, setSelectedRegistrationFormId] = useState<string>(editor.registrationFormId ?? '')
+  const [savingRegistrationForm, setSavingRegistrationForm] = useState(false)
+  const [registrationNotice, setRegistrationNotice] = useState('')
+  const [registrationError, setRegistrationError] = useState('')
 
   /*
     CTA の取得は子の編集タブ(`CtasTab`)に一本化し、親は報告を受けて
@@ -1218,6 +1231,25 @@ function CtaDesignStep({ webinarId, accountId, editor, registrations }: { webina
   const handleCtasLoaded = useCallback((next: WebinarCtaCard[] | null) => {
     setCtas(next ?? [])
   }, [])
+
+  const loadRegistrationForms = useCallback(() => {
+    if (!accountId) {
+      setRegistrationForms([])
+      return
+    }
+    setRegistrationFormState('loading')
+    fetchApi<{ success: boolean; data: Array<{ id: string; name: string; isActive?: boolean }> }>(`/api/forms?account_id=${encodeURIComponent(accountId)}`)
+      .then((response) => {
+        const items = Array.isArray(response.data) ? response.data : []
+        setRegistrationForms(items.map((form) => ({ id: form.id, name: form.name, isActive: form.isActive === true })))
+        setRegistrationFormState('ready')
+      })
+      .catch((cause) => {
+        setRegistrationForms([])
+        /* 口自体は同一アカウントに絞っている。403・404 は権限不足、それ以外は取得失敗。 */
+        setRegistrationFormState(cause instanceof ApiError && (cause.status === 403 || cause.status === 404) ? 'forbidden' : 'error')
+      })
+  }, [accountId])
 
   useEffect(() => {
     if (!accountId) {
@@ -1229,14 +1261,85 @@ function CtaDesignStep({ webinarId, accountId, editor, registrations }: { webina
       .catch(() => setForms([]))
   }, [accountId])
 
+  useEffect(() => {
+    loadRegistrationForms()
+  }, [loadRegistrationForms])
+
+  const saveRegistrationForm = async () => {
+    setSavingRegistrationForm(true)
+    setRegistrationNotice('')
+    setRegistrationError('')
+    try {
+      const response = await webinarApi.saveEditor(webinarId, {
+        expectedVersion: editor.version,
+        registrationFormId: selectedRegistrationFormId || null,
+      })
+      onEditorChange(response.data)
+      setRegistrationNotice('申込フォームを保存しました。公開前確認で申込フォームが公開中か確認してください。')
+    } catch (cause) {
+      if (cause instanceof ApiError && (cause.code === 'form_inactive_or_missing' || cause.code === 'form_account_mismatch')) {
+        /* 停止・削除・別アカウントはサーバーが拒否する。候補を取り直して選び直しを促す。 */
+        loadRegistrationForms()
+      }
+      setRegistrationError(webinarErrorText(cause, '申込フォームを保存できませんでした。開き直して試してください。'))
+    } finally {
+      setSavingRegistrationForm(false)
+    }
+  }
+
   const primary = ctas[0]
   const selectedForm = forms.find((form) => form.id === primary?.formId)
+  /* 候補は公開中だけ。停止中は一覧に混ぜない。 */
+  const publishedRegistrationForms = registrationForms.filter((form) => form.isActive)
+  /* 保存済みだが候補に無い = 停止・削除・別アカウント。拒否理由と選び直しを出す。 */
+  const savedRegistrationFormMissing = Boolean(
+    editor.registrationFormId && !publishedRegistrationForms.some((form) => form.id === editor.registrationFormId),
+  )
 
   return (
     <div className="flex flex-col gap-4 xl:flex-row" data-design-node="d3rFGD">
       <div className="min-w-0 flex-1 space-y-3">
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-base font-bold">CTA設定</h2><p className="text-ink-faint mt-1 text-xs">動画内に表示するボタンとタイミングを設定します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">表示タイミング</dt><dd className="text-ink text-sm font-bold">{primary ? `動画の${Math.floor(primary.atSeconds / 60)}分${String(primary.atSeconds % 60).padStart(2, '0')}秒` : '—（未設定）'}</dd></div><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">ボタン文言</dt><dd className="text-ink text-sm font-bold">{primary?.buttonLabel || '—（未設定）'}</dd></div></dl></section>
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-base font-bold">申込フォーム</h2><p className="text-ink-faint mt-1 text-xs">申込情報の保存先と完了アクションを設定します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">入力項目</dt><dd className="text-ink max-w-2xl text-right text-sm font-bold">{editor.publicPage.form?.fields.join('・') || selectedForm?.name || '—（未設定）'}</dd></div><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">完了アクション</dt><dd className="text-ink max-w-2xl text-right text-sm font-bold">{editor.publicPage.form?.completionActions.join('・') || '設定なし'}</dd></div></dl></section>
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
+          <h2 className="text-ink text-base font-bold">申込フォームの選択</h2>
+          <p className="text-ink-faint mt-1 text-xs">公開前の確認で使う申込フォームを選びます。動画内のCTAボタンで使うフォームとは別です。同じLINE公式アカウントの公開中の回答フォームだけが候補に出ます。</p>
+          <dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">保存済み</dt><dd className="text-ink max-w-2xl text-right text-sm font-bold">{editor.publicPage.form ? `${editor.publicPage.form.name}（${editor.publicPage.form.fields.length}項目）` : '—（未設定）'}</dd></div></dl>
+          <div className="mt-4 space-y-3">
+            {!accountId ? <p className="text-ink-faint text-sm">このウェビナーのLINE公式アカウントを確認できません。</p> : null}
+            {accountId && registrationFormState === 'loading' ? <p className="text-ink-faint text-sm">回答フォームを読み込んでいます。</p> : null}
+            {accountId && registrationFormState === 'forbidden' ? (
+              <div className="space-y-2"><p className="text-danger text-sm">回答フォームを見る権限がありません。アカウントの権限を確認してください。</p><Button onClick={loadRegistrationForms}>もう一度読み込む</Button></div>
+            ) : null}
+            {accountId && registrationFormState === 'error' ? (
+              <div className="space-y-2"><p className="text-danger text-sm">回答フォームを読み込めませんでした。</p><Button onClick={loadRegistrationForms}>もう一度読み込む</Button></div>
+            ) : null}
+            {accountId && registrationFormState === 'ready' && publishedRegistrationForms.length === 0 ? (
+              <p className="text-ink-faint text-sm">公開中の回答フォームがありません。フォーム機能で公開中のフォームを作ってください。</p>
+            ) : null}
+            {accountId && registrationFormState === 'ready' && publishedRegistrationForms.length > 0 ? (
+              <div className="max-w-md">
+                <SelectField
+                  value={selectedRegistrationFormId}
+                  onChange={(event) => setSelectedRegistrationFormId(event.target.value)}
+                  aria-label="申込に使う回答フォーム"
+                  options={[{ value: '', label: '申込フォームを選ぶ' }, ...publishedRegistrationForms.map((form) => ({ value: form.id, label: form.name }))]}
+                />
+              </div>
+            ) : null}
+            {registrationFormState === 'ready' && selectedRegistrationFormId && !publishedRegistrationForms.some((form) => form.id === selectedRegistrationFormId) ? (
+              <p className="text-warning text-sm">前に選んだフォームは使えなくなりました（停止・削除・別アカウント）。公開中のフォームを選び直して保存してください。</p>
+            ) : null}
+            {savedRegistrationFormMissing && registrationFormState === 'ready' ? (
+              <p className="text-warning text-sm">保存済みの申込フォームは公開中ではありません（停止・削除・別アカウント）。このままでは公開前確認を通りません。</p>
+            ) : null}
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="primary" onClick={() => void saveRegistrationForm()} disabled={savingRegistrationForm || registrationFormState !== 'ready' || !accountId}>{savingRegistrationForm ? '保存中…' : '申込フォームを保存'}</Button>
+            </div>
+            {registrationNotice ? <p className="text-ink-secondary text-sm">{registrationNotice}</p> : null}
+            {registrationError ? <p className="text-danger text-sm" role="alert">{registrationError}</p> : null}
+          </div>
+        </section>
         <EditorDetails label="CTAカードとフォームの詳細を編集する"><CtasTab webinarId={webinarId} accountId={accountId} onCtasLoaded={handleCtasLoaded} /></EditorDetails>
       </div>
       <SummaryAside rows={[
@@ -1740,7 +1843,7 @@ function EditWebinarInner() {
 
       {pane === 'basic' && <WebinarForm key={`${webinar.id}-${webinar.updatedAt}`} initial={webinar} />}
       {pane === 'video' && <VideoDesignStep webinar={webinar} editor={editor} registrations={registrations} />}
-      {pane === 'cta' && <CtaDesignStep webinarId={webinar.id} accountId={webinar.accountId} editor={editor} registrations={registrations} />}
+      {pane === 'cta' && <CtaDesignStep webinarId={webinar.id} accountId={webinar.accountId} editor={editor} registrations={registrations} onEditorChange={setEditor} />}
       {pane === 'notifications' && <NotificationDesignStep webinarId={webinar.id} registrations={registrations} />}
       {pane === 'review' && <ReviewStep webinar={webinar} editor={editor} registrations={registrations} onBack={setPane} />}
       {pane === 'comments' && <CommentsTab webinarId={webinar.id} />}
