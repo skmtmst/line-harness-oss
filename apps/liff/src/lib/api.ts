@@ -188,6 +188,16 @@ export interface PublicForm {
   isActive: boolean;
 }
 
+/** フォーム回答の送信結果。未完のとき data.complete が false で返る。 */
+export interface FormSubmitResponse {
+  success: boolean;
+  data?: Record<string, unknown> & { complete?: boolean; pendingEffects?: string[] };
+  retryable?: boolean;
+  error?: string;
+  code?: string;
+  idempotencyKey?: string;
+}
+
 export const api = {
   menus: () => get<{ menus: MenuItem[] }>('/api/liff/booking/menus'),
   staffOf: (menuId: string) =>
@@ -237,14 +247,32 @@ export const api = {
   /**
    * フォーム回答の送信。Idempotency-Key は呼び出し側が1回答ぶん安定した
    * UUID を作って必ず渡す(連打・再送の二重回答を防ぐ。イベント予約と同じ)。
+   * 未完のときは data.complete が false で返るので、同じキーで送り直す。
+   *
+   * HTTP の失敗では投げず、状態と本文をそのまま返す。送り直すかどうかの
+   * 判定は lib/form-submit-flow.ts の判定表が行う(投げると 409 の符号が
+   * 例外の形に埋もれて、自動送り直しの誤りを見逃しやすくなる)。
    */
-  submitForm: (
+  submitForm: async (
     id: string,
     body: { data: Record<string, unknown>; trackedLinkId?: string },
     idempotencyKey: string,
-  ) => post<{ id: string }>(`/api/forms/${id}/submit`, body, {
-    'Idempotency-Key': idempotencyKey,
-  }),
+  ): Promise<{ status: number; body: FormSubmitResponse | null }> => {
+    const url = new URL(`${BASE}/api/forms/${id}/submit`, window.location.origin);
+    url.searchParams.set('liffId', getLiffId());
+    const res = await fetch(url.toString(), {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey }),
+      body: JSON.stringify(body),
+    });
+    let parsed: FormSubmitResponse | null = null;
+    try {
+      parsed = (await res.json()) as FormSubmitResponse;
+    } catch {
+      parsed = null;
+    }
+    return { status: res.status, body: parsed };
+  },
   /** 回答に添付する画像を預ける。返ってきたURLを回答に入れる */
   uploadFormFile: (id: string, file: File) =>
     postBinary<{ success: true; data: { key: string; url: string; mimeType: string; size: number } }>(
