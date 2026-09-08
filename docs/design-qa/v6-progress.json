@@ -12,9 +12,9 @@
   "unjudged": 0,
   "pixelCompared": 272,
   "pixelUnavailable": 0,
-  "pixelAboveThreshold": 0,
+  "pixelAboveThreshold": 1,
   "pixelDiffAboveThreshold": 0,
-  "heightDiffAboveThreshold": 0,
+  "heightDiffAboveThreshold": 1,
   "remaining": 0,
   "features": [
     {
@@ -3908,9 +3908,9 @@
       "unjudged": 0,
       "pixelCompared": 4,
       "pixelUnavailable": 0,
-      "pixelAboveThreshold": 0,
+      "pixelAboveThreshold": 1,
       "pixelDiffAboveThreshold": 0,
-      "heightDiffAboveThreshold": 0,
+      "heightDiffAboveThreshold": 1,
       "remaining": 0,
       "capturedAt": [
         {
@@ -3981,12 +3981,12 @@
   "pixelDiff": {
     "thresholdPercent": 10,
     "heightDiffThresholdPx": 24,
-    "generatedAt": "2026-09-08T04:24:07.751Z",
+    "generatedAt": "2026-09-08T05:20:23.160Z",
     "comparedCount": 272,
     "unavailableCount": 0,
     "pixelAboveThresholdCount": 0,
-    "heightAboveThresholdCount": 0,
-    "aboveThresholdCount": 0
+    "heightAboveThresholdCount": 1,
+    "aboveThresholdCount": 1
   },
   "screens": [
     {
@@ -4187,7 +4187,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -4238,7 +4238,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -4387,7 +4387,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -4436,7 +4436,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -4485,7 +4485,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -4584,7 +4584,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -4983,7 +4983,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -5182,7 +5182,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -5333,7 +5333,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -5382,7 +5382,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -5433,7 +5433,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -5484,7 +5484,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -6033,7 +6033,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -7932,7 +7932,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -7981,7 +7981,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -8030,7 +8030,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -8579,7 +8579,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -9430,7 +9430,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -9479,7 +9479,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -9578,7 +9578,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -9627,7 +9627,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -9676,7 +9676,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -10025,7 +10025,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -11274,7 +11274,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -11373,7 +11373,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -11624,7 +11624,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -11775,7 +11775,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -11874,7 +11874,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -11975,7 +11975,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -12074,7 +12074,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -12549,9 +12549,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 135598,
+            "mismatchedPixels": 135155,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 6.5393,
+            "pixelDiffPercent": 6.5179,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -12566,7 +12566,7 @@
             "diffPath": "docs/design-qa/conversions-v6/ZrpKn-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 6.5393,
+        "pixelDiffPercent": 6.5179,
         "heightDifferencePx": 0,
         "heightReason": null,
         "dominantRegion": "下部・右",
@@ -12599,9 +12599,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 174699,
+            "mismatchedPixels": 174758,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 8.4249,
+            "pixelDiffPercent": 8.4278,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -12616,7 +12616,7 @@
             "diffPath": "docs/design-qa/conversions-v6/GUxsj-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 8.4249,
+        "pixelDiffPercent": 8.4278,
         "heightDifferencePx": 0,
         "heightReason": null,
         "dominantRegion": "中央・中央",
@@ -13225,7 +13225,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -13276,7 +13276,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -13327,7 +13327,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -13378,7 +13378,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -13479,7 +13479,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -13530,7 +13530,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -13580,8 +13580,7 @@
         "diffPath": "docs/design-qa/photos-v6/Qu6Vk-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:16:00.699Z"
+        "aboveThreshold": false
       }
     },
     {
@@ -13631,8 +13630,7 @@
         "diffPath": "docs/design-qa/photos-v6/hHrz8-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:16:00.699Z"
+        "aboveThreshold": false
       }
     },
     {
@@ -13682,8 +13680,7 @@
         "diffPath": "docs/design-qa/photos-v6/N2J629-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:16:00.699Z"
+        "aboveThreshold": false
       }
     },
     {
@@ -13733,8 +13730,7 @@
         "diffPath": "docs/design-qa/photos-v6/J3Wxl8-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:16:00.699Z"
+        "aboveThreshold": false
       }
     },
     {
@@ -13985,7 +13981,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -14084,7 +14080,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -14133,7 +14129,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -14182,7 +14178,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -14233,7 +14229,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -14282,7 +14278,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -14381,7 +14377,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -14430,7 +14426,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -14479,7 +14475,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -14528,7 +14524,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -14753,9 +14749,9 @@
             "implementationHeight": 1080,
             "heightDifferencePx": 0,
             "widthDifferencePx": 0,
-            "mismatchedPixels": 103948,
+            "mismatchedPixels": 103338,
             "comparedPixels": 2073600,
-            "pixelDiffPercent": 5.0129,
+            "pixelDiffPercent": 4.9835,
             "boundingBox": {
               "left": 0,
               "top": 0,
@@ -14770,7 +14766,7 @@
             "diffPath": "docs/design-qa/webhooks-v6/KNG00-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 5.0129,
+        "pixelDiffPercent": 4.9835,
         "heightDifferencePx": 0,
         "heightReason": null,
         "dominantRegion": "中央・左",
@@ -14827,7 +14823,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -14877,8 +14873,7 @@
         "diffPath": "docs/design-qa/booking-v6/TV2DI-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:16:00.699Z"
+        "aboveThreshold": false
       }
     },
     {
@@ -14928,8 +14923,7 @@
         "diffPath": "docs/design-qa/booking-v6/TnDbq-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:16:00.699Z"
+        "aboveThreshold": false
       }
     },
     {
@@ -14979,8 +14973,7 @@
         "diffPath": "docs/design-qa/booking-v6/cpdDi-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:16:00.699Z"
+        "aboveThreshold": false
       }
     },
     {
@@ -15030,8 +15023,7 @@
         "diffPath": "docs/design-qa/booking-v6/SbuUI-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:16:00.699Z"
+        "aboveThreshold": false
       }
     },
     {
@@ -15081,8 +15073,7 @@
         "diffPath": "docs/design-qa/booking-v6/GFDqW-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:16:00.699Z"
+        "aboveThreshold": false
       }
     },
     {
@@ -15132,8 +15123,7 @@
         "diffPath": "docs/design-qa/booking-v6/GfceK-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:16:00.699Z"
+        "aboveThreshold": false
       }
     },
     {
@@ -15432,7 +15422,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -15531,7 +15521,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -15580,7 +15570,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -15881,7 +15871,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -15901,38 +15891,37 @@
         "comparisons": [
           {
             "width": 1920,
-            "comparedHeight": 1136,
+            "comparedHeight": 1080,
             "designHeight": 1136,
-            "implementationHeight": 1136,
-            "heightDifferencePx": 0,
+            "implementationHeight": 1080,
+            "heightDifferencePx": -56,
             "widthDifferencePx": -28,
-            "mismatchedPixels": 113320,
-            "comparedPixels": 2181120,
-            "pixelDiffPercent": 5.1955,
+            "mismatchedPixels": 110911,
+            "comparedPixels": 2073600,
+            "pixelDiffPercent": 5.3487,
             "boundingBox": {
               "left": 0,
               "top": 0,
               "right": 1909,
-              "bottom": 1135
+              "bottom": 1079
             },
             "dominantRegion": "中央・右",
-            "heightReason": null,
+            "heightReason": "実装",
             "designPath": "docs/design-reference/operations-v6/b3HfZ.png",
-            "implementationPath": "docs/design-qa/operations-v6/b3HfZ-1920.png",
+            "implementationPath": "docs/design-qa/operations-v6/b3HfZ-normal-1920.png",
             "implementationSource": "docs",
             "diffPath": "docs/design-qa/operations-v6/b3HfZ-diff-1920.png"
           }
         ],
-        "pixelDiffPercent": 5.1955,
-        "heightDifferencePx": 0,
-        "heightReason": null,
+        "pixelDiffPercent": 5.3487,
+        "heightDifferencePx": -56,
+        "heightReason": "実装",
         "dominantRegion": "中央・右",
         "implementationSource": "docs",
         "diffPath": "docs/design-qa/operations-v6/b3HfZ-diff-1920.png",
         "pixelAboveThreshold": false,
-        "heightAboveThreshold": false,
-        "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T03:23:41.419Z"
+        "heightAboveThreshold": true,
+        "aboveThreshold": true
       }
     },
     {
@@ -15983,7 +15972,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -16382,7 +16371,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -16481,7 +16470,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -16530,7 +16519,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -16631,7 +16620,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -16680,7 +16669,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -16931,7 +16920,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -16980,7 +16969,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
@@ -17081,7 +17070,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T04:05:52.971Z"
+        "retainedFrom": "2026-09-08T04:24:07.751Z"
       }
     },
     {
