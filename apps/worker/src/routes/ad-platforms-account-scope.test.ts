@@ -253,6 +253,31 @@ describe('広告設定ルートのアカウント境界(#638)', () => {
     expect((await app(staff('owner-1', 'tenant-1')).request('/api/ad-platforms/p1/logs', {}, env)).status).toBe(200);
   });
 
+  it('テスト送信は指定媒体だけ送り、全媒体に広げない', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    testDb.raw.prepare(
+      `INSERT INTO ad_platforms (id, name, display_name, config, is_active, line_account_id, created_at, updated_at)
+       VALUES ('pg', 'google', 'Google広告', '{"customer_id":"1","conversion_action_id":"2","oauth_token":"t"}', 1, 'a1', ?, ?)`,
+    ).run(NOW, NOW);
+    testDb.raw.prepare(`INSERT INTO ref_tracking (id, ref_code, friend_id, fbclid, gclid, created_at)
+                        VALUES ('ref-both', 'ref-1', 'f1', 'fb-1', 'g-1', '2026-09-10T00:00:00+09:00')`).run();
+    mockFetchOk();
+    const target = app(staff('owner-1', 'tenant-1'));
+    const env = { DB: testDb.db } as Env['Bindings'];
+
+    const res = await target.request('/api/ad-platforms/test', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ platform: 'meta', eventName: 'Purchase', friendId: 'f1' }),
+    }, env);
+    expect(res.status).toBe(200);
+    expect(sentUrls).toHaveLength(1);
+    const logRows = testDb.raw.prepare(`SELECT ad_platform_id FROM ad_conversion_logs`).all() as Array<{
+      ad_platform_id: string;
+    }>;
+    expect(logRows).toEqual([{ ad_platform_id: 'p1' }]);
+  });
+
   it('テスト送信は友だちの所属で境界を切る。他統括は送らず403', async () => {
     const testDb = createTestD1();
     seed(testDb);

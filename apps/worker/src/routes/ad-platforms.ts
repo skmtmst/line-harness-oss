@@ -221,7 +221,7 @@ adPlatforms.post('/api/ad-platforms/test', requireRole('owner'), async (c) => {
       if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [platform.line_account_id])) {
         return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
       }
-      await sendAdConversions(c.env.DB, body.friendId, body.eventName);
+      await sendAdConversions(c.env.DB, body.friendId, body.eventName, undefined, { platformId: platform.id });
       return c.json({ success: true, data: { message: 'Test conversion sent via full pipeline' } });
     }
 
