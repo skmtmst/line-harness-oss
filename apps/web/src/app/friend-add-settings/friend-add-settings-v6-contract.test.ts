@@ -103,7 +103,8 @@ describe('V6 友だち追加時配信の点検・中の再発防止(#501)', () =
     expect(LIST_PAGE).toContain('q: appliedSearch.trim() || undefined')
     expect(LIST_PAGE).toContain('folder: folder ?? undefined')
     expect(LIST_PAGE).toContain('folderCounts')
-    expect(LIST_PAGE).toContain('aria-pressed={folder === null}')
+    expect(LIST_PAGE).toContain("activeId={folder ?? ''}")
+    expect(LIST_PAGE).toContain('onSelect={(id) => selectFolder(id || null)}')
     expect(LIST_PAGE).not.toContain('toLocaleLowerCase')
   })
 

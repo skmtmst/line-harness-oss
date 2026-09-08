@@ -148,6 +148,7 @@ shared-button-importer components/scenarios/scenario-list.tsx
 shared-button-importer components/scenarios/trigger-editor.tsx
 shared-button-importer components/staff/login-audit.tsx
 shared-button-importer components/shared/create-page.tsx
+shared-button-importer components/shared/folder-panel.tsx
 shared-button-importer components/shared/list-state.tsx
 shared-button-importer components/shared/not-connected.tsx
 shared-button-importer components/store-selection-gate.tsx
