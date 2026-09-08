@@ -734,6 +734,7 @@ function Editor({
               style={active ? { backgroundColor: 'var(--color-accent)' } : undefined}
             >
               {p.name}
+              {active && <span className="ml-1 text-xs opacity-80">編集中</span>}
               {p.id.startsWith('tmp-') && (
                 <span className="ml-1 text-xs opacity-70">(未保存)</span>
               )}
