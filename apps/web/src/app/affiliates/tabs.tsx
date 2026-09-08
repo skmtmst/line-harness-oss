@@ -745,7 +745,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                       <tr key={`${row.id}-detail`}>
                         <td colSpan={6} className="bg-canvas-sunken border-hairline border-t px-6 py-5">
                           {detailLoading ? (
-                            <p className="text-sm text-gray-400">読み込み中...</p>
+                            <p className="text-sm text-ink-faint">読み込み中...</p>
                           ) : (
                             <div className="flex flex-col gap-6">
 
@@ -805,22 +805,22 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                               {/* v2 summary cards */}
                               {report && (
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                  <div className="bg-white rounded-lg p-4 border border-gray-100">
-                                    <p className="text-xs text-gray-500">{CLICK_SUMMARY_LABEL}</p>
-                                    <p className="text-2xl font-bold text-gray-900 mt-1">{report.clicks.toLocaleString()}</p>
+                                  <div className="bg-canvas rounded-lg p-4 border border-hairline">
+                                    <p className="text-xs text-ink-secondary">{CLICK_SUMMARY_LABEL}</p>
+                                    <p className="text-2xl font-bold text-ink mt-1">{report.clicks.toLocaleString()}</p>
                                   </div>
-                                  <div className="bg-white rounded-lg p-4 border border-gray-100">
-                                    <p className="text-xs text-gray-500">友だち追加</p>
-                                    <p className="text-2xl font-bold text-blue-600 mt-1">{report.friendAdds.toLocaleString()}</p>
+                                  <div className="bg-canvas rounded-lg p-4 border border-hairline">
+                                    <p className="text-xs text-ink-secondary">友だち追加</p>
+                                    <p className="text-2xl font-bold text-status-info mt-1">{report.friendAdds.toLocaleString()}</p>
                                   </div>
-                                  <div className="bg-white rounded-lg p-4 border border-gray-100">
-                                    <p className="text-xs text-gray-500">CV 件数（却下除く）</p>
-                                    <p className="text-2xl font-bold text-gray-900 mt-1">{report.conversions.toLocaleString()}</p>
+                                  <div className="bg-canvas rounded-lg p-4 border border-hairline">
+                                    <p className="text-xs text-ink-secondary">CV 件数（却下除く）</p>
+                                    <p className="text-2xl font-bold text-ink mt-1">{report.conversions.toLocaleString()}</p>
                                   </div>
-                                  <div className="bg-white rounded-lg p-4 border border-emerald-100 bg-emerald-50/40">
-                                    <p className="text-xs text-gray-500">確定報酬</p>
-                                    <p className="text-2xl font-bold text-emerald-600 mt-1">{formatYen(report.confirmedReward)}</p>
-                                    <p className="text-[11px] text-gray-500 mt-1">
+                                  <div className="bg-success-bg rounded-lg p-4 border border-hairline">
+                                    <p className="text-xs text-ink-secondary">確定報酬</p>
+                                    <p className="text-2xl font-bold text-success mt-1">{formatYen(report.confirmedReward)}</p>
+                                    <p className="text-[11px] text-ink-secondary mt-1">
                                       承認済み {report.conversionsApproved.toLocaleString()}件 / 審査中 {report.conversionsPending.toLocaleString()}件 / 却下 {report.conversionsRejected.toLocaleString()}件
                                     </p>
                                   </div>
@@ -830,11 +830,11 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                               {/* Per-offer breakdown */}
                               {report && report.byOffer.length > 0 && (
                                 <div>
-                                  <p className="text-xs font-semibold text-gray-500 uppercase mb-2">案件別内訳</p>
+                                  <p className="text-xs font-semibold text-ink-secondary uppercase mb-2">案件別内訳</p>
                                   <div className="overflow-x-auto">
                                     <table className="min-w-[560px] text-sm">
                                       <thead>
-                                        <tr className="text-left text-xs text-gray-400">
+                                        <tr className="text-left text-xs text-ink-faint">
                                           <th className="pb-1 pr-4">案件</th>
                                           <th className="pb-1 pr-4 text-right">報酬単価</th>
                                           <th className="pb-1 pr-4 text-right">承認済み</th>
@@ -842,14 +842,14 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                           <th className="pb-1 text-right">確定報酬</th>
                                         </tr>
                                       </thead>
-                                      <tbody className="divide-y divide-gray-100">
+                                      <tbody className="divide-y divide-hairline">
                                         {report.byOffer.map((o) => (
                                           <tr key={o.offerId}>
-                                            <td className="py-1 pr-4 text-gray-700">{o.offerName}</td>
-                                            <td className="py-1 pr-4 text-right text-gray-500">{formatYen(o.rewardAmount)}</td>
-                                            <td className="py-1 pr-4 text-right font-semibold text-gray-900">{o.conversionsApproved.toLocaleString()}</td>
-                                            <td className="py-1 pr-4 text-right text-gray-500">{o.conversionsPending.toLocaleString()}</td>
-                                            <td className="py-1 text-right font-semibold text-emerald-600">{formatYen(o.confirmedReward)}</td>
+                                            <td className="py-1 pr-4 text-ink">{o.offerName}</td>
+                                            <td className="py-1 pr-4 text-right text-ink-secondary">{formatYen(o.rewardAmount)}</td>
+                                            <td className="py-1 pr-4 text-right font-semibold text-ink">{o.conversionsApproved.toLocaleString()}</td>
+                                            <td className="py-1 pr-4 text-right text-ink-secondary">{o.conversionsPending.toLocaleString()}</td>
+                                            <td className="py-1 text-right font-semibold text-success">{formatYen(o.confirmedReward)}</td>
                                           </tr>
                                         ))}
                                       </tbody>
@@ -880,22 +880,22 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                               {/* CV by point */}
                               {report && report.conversionsByPoint.length > 0 && (
                                 <div>
-                                  <p className="text-xs font-semibold text-gray-500 uppercase mb-2">CV ポイント別内訳</p>
+                                  <p className="text-xs font-semibold text-ink-secondary uppercase mb-2">CV ポイント別内訳</p>
                                   <div className="overflow-x-auto">
                                     <table className="min-w-[400px] text-sm">
                                       <thead>
-                                        <tr className="text-left text-xs text-gray-400">
+                                        <tr className="text-left text-xs text-ink-faint">
                                           <th className="pb-1 pr-4">ポイント名</th>
                                           <th className="pb-1 pr-4 text-right">件数</th>
                                           <th className="pb-1 text-right">売上合計</th>
                                         </tr>
                                       </thead>
-                                      <tbody className="divide-y divide-gray-100">
+                                      <tbody className="divide-y divide-hairline">
                                         {report.conversionsByPoint.map((p) => (
                                           <tr key={p.conversionPointId}>
-                                            <td className="py-1 pr-4 text-gray-700">{p.name}</td>
-                                            <td className="py-1 pr-4 text-right font-semibold text-gray-900">{p.count}</td>
-                                            <td className="py-1 text-right text-gray-700">{formatYen(p.value)}</td>
+                                            <td className="py-1 pr-4 text-ink">{p.name}</td>
+                                            <td className="py-1 pr-4 text-right font-semibold text-ink">{p.count}</td>
+                                            <td className="py-1 text-right text-ink-secondary">{formatYen(p.value)}</td>
                                           </tr>
                                         ))}
                                       </tbody>
@@ -907,13 +907,13 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                               {/* Links table */}
                               {links.length > 0 && (
                                 <div>
-                                  <p className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                                  <p className="text-xs font-semibold text-ink-secondary uppercase mb-2">
                                     リンク別クリック ({links.length} 本)
                                   </p>
                                   <div className="overflow-x-auto">
                                     <table className="min-w-[560px] text-sm">
                                       <thead>
-                                        <tr className="text-left text-xs text-gray-400">
+                                        <tr className="text-left text-xs text-ink-faint">
                                           <th className="pb-1 pr-4">{LINK_CODE_HEADING}</th>
                                           <th className="pb-1 pr-4">ラベル</th>
                                           <th className="pb-1 pr-4">案件</th>
@@ -921,23 +921,23 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                           <th className="pb-1">状態</th>
                                         </tr>
                                       </thead>
-                                      <tbody className="divide-y divide-gray-100">
+                                      <tbody className="divide-y divide-hairline">
                                         {links.map((link) => (
                                           <tr key={link.id}>
-                                            <td className="py-1 pr-4 font-mono text-blue-600">{link.ref_code}</td>
-                                            <td className="py-1 pr-4 text-gray-600">{link.label ?? '—'}</td>
+                                            <td className="py-1 pr-4 font-mono text-status-info">{link.ref_code}</td>
+                                            <td className="py-1 pr-4 text-ink-secondary">{link.label ?? '—'}</td>
                                             <td className="py-1 pr-4">
                                               {link.offer_name ? (
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-status-info-soft text-status-info">
                                                   {link.offer_name}
                                                 </span>
-                                              ) : <span className="text-gray-400">—</span>}
+                                              ) : <span className="text-ink-faint">—</span>}
                                             </td>
-                                            <td className="py-1 pr-4 text-right font-semibold text-gray-900">{link.click_count.toLocaleString()}</td>
+                                            <td className="py-1 pr-4 text-right font-semibold text-ink">{link.click_count.toLocaleString()}</td>
                                             <td className="py-1">
                                               {link.is_active
                                                 ? <span className="text-xs text-green-600">有効</span>
-                                                : <span className="text-xs text-gray-400">無効</span>
+                                                : <span className="text-xs text-ink-faint">無効</span>
                                               }
                                             </td>
                                           </tr>
@@ -950,11 +950,11 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
 
                               {/* Journeys */}
                               <div>
-                                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                                <p className="text-xs font-semibold text-ink-secondary uppercase mb-2">
                                   帰属ジャーニー ({journeys.length} 件{journeyMore ? '+' : ''})
                                 </p>
                                 {journeyLoading ? (
-                                  <p className="text-sm text-gray-400">読み込み中...</p>
+                                  <p className="text-sm text-ink-faint">読み込み中...</p>
                                 ) : journeyError && journeys.length === 0 ? (
                                   <div>
                                     <p className="text-sm text-danger">動線を読み込めませんでした。記録は消えていません。</p>
@@ -963,13 +963,13 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                     </AffiliateButton>
                                   </div>
                                 ) : journeys.length === 0 ? (
-                                  <p className="text-sm text-gray-400">帰属された友だちがまだいません</p>
+                                  <p className="text-sm text-ink-faint">帰属された友だちがまだいません</p>
                                 ) : (
                                   <>
                                     <div className="overflow-x-auto">
                                       <table className="min-w-[640px] text-sm">
                                         <thead>
-                                          <tr className="text-left text-xs text-gray-400">
+                                          <tr className="text-left text-xs text-ink-faint">
                                             <th className="pb-1 pr-4">友だち</th>
                                             <th className="pb-1 pr-4">追加日</th>
                                             <th className="pb-1 pr-4">{LINK_CODE_HEADING}</th>
@@ -979,21 +979,21 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                             <th className="pb-1">最終行動</th>
                                           </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-gray-100">
+                                        <tbody className="divide-y divide-hairline">
                                           {journeys.map((j) => {
                                             const isDup = report?.duplicateFlags.some((f) => f.friendId === j.friendId)
                                             return (
                                               <tr key={j.friendId} className={isDup ? 'bg-amber-50' : ''}>
-                                                <td className={`py-1 pr-4 ${j.displayName ? 'text-gray-800' : 'text-gray-400 italic'}`}>
+                                                <td className={`py-1 pr-4 ${j.displayName ? 'text-ink' : 'text-ink-faint italic'}`}>
                                                   {isDup && <span className="mr-1">⚠</span>}
                                                   {personNameText(j.displayName)}
                                                 </td>
-                                                <td className="py-1 pr-4 text-gray-500">{formatDate(j.addedAt)}</td>
-                                                <td className="py-1 pr-4 font-mono text-xs text-blue-500">{j.refCode ?? '—'}</td>
-                                                <td className="py-1 pr-4 text-right text-gray-700">{j.touchCount}</td>
-                                                <td className="py-1 pr-4 text-right text-gray-700">{j.formCount}</td>
-                                                <td className="py-1 pr-4 text-right font-semibold text-gray-900">{j.conversionCount}</td>
-                                                <td className="py-1 text-gray-400 text-xs">{formatDate(j.lastEventAt)}</td>
+                                                <td className="py-1 pr-4 text-ink-secondary">{formatDate(j.addedAt)}</td>
+                                                <td className="py-1 pr-4 font-mono text-xs text-status-info">{j.refCode ?? '—'}</td>
+                                                <td className="py-1 pr-4 text-right text-ink-secondary">{j.touchCount}</td>
+                                                <td className="py-1 pr-4 text-right text-ink-secondary">{j.formCount}</td>
+                                                <td className="py-1 pr-4 text-right font-semibold text-ink">{j.conversionCount}</td>
+                                                <td className="py-1 text-ink-faint text-xs">{formatDate(j.lastEventAt)}</td>
                                               </tr>
                                             )
                                           })}

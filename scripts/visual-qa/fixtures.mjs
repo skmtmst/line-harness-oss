@@ -4423,9 +4423,9 @@ export const CONVERSION_DEFINITIONS = {
       updatedAt: point.isActive ? '2026-08-25T09:00:00.000Z' : '2026-08-20T09:00:00.000Z',
     }
   }),
-  stateCounts: { active: 10, draft: 0, stopped: 2, invalid: 0, sourceStopped: 0 },
+  stateCounts: { active: 5, draft: 0, stopped: 1, invalid: 0, sourceStopped: 0 },
   range: CONVERSION_RANGE,
-  pagination: { total: 12, limit: 20, cursor: '0', nextCursor: null },
+  pagination: { total: 6, limit: 20, cursor: '0', nextCursor: null },
 }
 
 /* 機能19 GtylA: 入力中の条件だけで行う保存前試算。保存・成果追加はしない。 */

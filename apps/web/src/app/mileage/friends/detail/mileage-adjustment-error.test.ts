@@ -1,6 +1,9 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '@/lib/api'
 import { mileageAdjustmentErrorMessage } from './mileage-adjustment-dialog'
+
+const DIALOG = readFileSync(new URL('./mileage-adjustment-dialog.tsx', import.meta.url), 'utf8')
 
 describe('手動マイル調整の失敗案内', () => {
   it('入力不備だけはWorkerが返した直し方を表示する', () => {
@@ -16,6 +19,11 @@ describe('手動マイル調整の失敗案内', () => {
     [428, '確認手順が完了していません。画面を閉じずに、もう一度内容を確認してください。'],
   ])('HTTP %iを運用者向けの言葉へ置き換える', (status, expected) => {
     expect(mileageAdjustmentErrorMessage(new ApiError(status))).toBe(expected)
+  })
+
+  it('承認境界の未設定は設定できる人とできない人で案内を分ける', () => {
+    expect(DIALOG).toContain('オーナーへ設定を依頼してください')
+    expect(DIALOG).toContain('下の欄で承認境界を設定してください')
   })
 
   it('サーバー内部の文と通信エラーをそのまま表示しない', () => {

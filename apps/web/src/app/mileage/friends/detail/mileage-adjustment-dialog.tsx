@@ -103,10 +103,14 @@ export default function MileageAdjustmentDialog({
     if (sourceReferenceId.trim().length > 128) return '調整元IDは128文字以内で入力してください'
     if (expiresOn && direction !== 'increase') return '有効期限はマイルを増やすときだけ指定できます'
     if (expiresOn && new Date(`${expiresOn}T23:59:59+09:00`).getTime() <= Date.now()) return '有効期限は明日以降を選んでください'
-    if (!policyLoading && !policy?.configured) return '高額調整の承認境界が未設定です。オーナーが先に設定してください。'
+    if (!policyLoading && !policy?.configured) {
+      return canConfigurePolicy
+        ? '高額調整の承認境界が未設定です。下の欄で承認境界を設定してください。'
+        : '高額調整の承認境界が未設定です。オーナーへ設定を依頼してください。'
+    }
     if (highValue) return `${policy?.approvalThreshold?.toLocaleString('ja-JP')} マイル以上は別のオーナー承認が必要です。`
     return null
-  }, [amount, currentBalance, direction, expiresOn, highValue, policy, policyLoading, reason, sourceReferenceId])
+  }, [amount, canConfigurePolicy, currentBalance, direction, expiresOn, highValue, policy, policyLoading, reason, sourceReferenceId])
 
   const submit = async () => {
     if (step === 'input') {

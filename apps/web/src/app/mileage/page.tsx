@@ -22,7 +22,7 @@ import {
   type MileageFriendsV6Overview,
 } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
-import { formatMileageDate } from './mileage-display'
+import { formatMileageDate, formatMileageNumber } from './mileage-display'
 import { mileagePaginationTotal } from './mileage-response-state'
 import { ruleEventLabel } from './earning-rule-view'
 import MileageHistoryTab from './mileage-history-tab'
@@ -69,10 +69,6 @@ const EVENT_LABELS: Record<string, string> = {
   purchase_completed: '購入完了',
 }
 
-
-function formatNumber(value: number) {
-  return new Intl.NumberFormat('ja-JP').format(value)
-}
 
 function dateOnlyDaysAgo(days: number) {
   const date = new Date()
@@ -143,7 +139,9 @@ function MileagePageInner() {
   const tab = useMergedTab(TABS, 'tab', 'balances')
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const latestAccountRef = useRef(selectedAccountId)
-  latestAccountRef.current = selectedAccountId
+  useEffect(() => {
+    latestAccountRef.current = selectedAccountId
+  }, [selectedAccountId])
   const [overview, setOverview] = useState<MileageFriendsV6Overview | null>(null)
   const [ruleOverview, setRuleOverview] = useState<MileageEarningRulesV6Overview | null>(null)
   const [ruleSummary, setRuleSummary] = useState<EarningRuleSummary | null>(null)
@@ -153,6 +151,7 @@ function MileagePageInner() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [savingRuleId, setSavingRuleId] = useState<string | null>(null)
+  const [ruleActionError, setRuleActionError] = useState('')
   const [savingRuleOrder, setSavingRuleOrder] = useState(false)
   const [ruleOrder, setRuleOrder] = useState<string[]>([])
   const [ruleOrderDirty, setRuleOrderDirty] = useState(false)
@@ -287,12 +286,13 @@ function MileagePageInner() {
 
   const toggleRule = async (rule: MileageEarningRuleV6) => {
     setSavingRuleId(rule.id)
+    setRuleActionError('')
     try {
       const res = await api.mileage.updateRule(rule.id, { isActive: rule.published.status !== 'published' })
       if (!res.success) throw new Error(res.error)
       await loadRules()
     } catch {
-      setLoadError('たまる決めごとを更新できませんでした。もう一度お試しください。')
+      setRuleActionError('たまる決めごとを更新できませんでした。もう一度お試しください。')
     } finally {
       setSavingRuleId(null)
     }
@@ -385,7 +385,7 @@ function MileagePageInner() {
       : item.key === 'earning-rules' ? tabCounts.rules
         : item.key === 'rewards' ? tabCounts.rewards
           : null
-    return { ...item, label: count === null ? item.label : `${item.label} ${formatNumber(count)}` }
+    return { ...item, label: count === null ? item.label : `${item.label} ${formatMileageNumber(count)}` }
   }), [tabCounts])
 
   const exportBalancesCsv = () => {
@@ -479,16 +479,16 @@ function MileagePageInner() {
       </div>
       <div className="mb-4 flex flex-wrap items-center gap-2" aria-label="残高の絞り込み状況">
         <span className="rounded-full border border-accent bg-accent-soft px-3 py-2 text-xs font-semibold text-accent-hover">
-          すべて {overviewTotal === null ? '—' : formatNumber(overviewTotal)}
+          すべて {overviewTotal === null ? '—' : formatMileageNumber(overviewTotal)}
         </span>
         {(summary?.rankCounts ?? []).map((rank) => (
           <span key={rank.rewardId} className="rounded-full border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-ink-secondary">
-            {rank.rankName} {formatNumber(rank.friendCount)}人
+            {rank.rankName} {formatMileageNumber(rank.friendCount)}人
           </span>
         ))}
         {summary && summary.rankCounts.length === 0 ? <span className="rounded-full border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-ink-faint">公開中のランクなし</span> : null}
         <span className="rounded-full border border-status-warn bg-status-warn-soft px-3 py-2 text-xs font-semibold text-status-warn-deep">
-          30日以内に消える {summary?.expiringMiles30d == null ? '0' : formatNumber(summary.expiringMiles30d)} マイル
+          30日以内に消える {summary?.expiringMiles30d == null ? '0' : formatMileageNumber(summary.expiringMiles30d)} マイル
         </span>
         <span className="ml-auto rounded-control border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-ink-secondary">
           残高が多い順
@@ -501,9 +501,9 @@ function MileagePageInner() {
             ここで見出しをもう一度書かない。 */}
         {!loading && !loadError ? <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <SummaryCard variant="v6" title="動いている決めごと" value={activeRules.length} unit="つ" detail={`止めているもの ${rules.length - activeRules.length}つ`} />
-          <SummaryCard variant="v6" title="この30日で付いたマイル" value={ruleSummary?.grantedMiles ?? null} unit="マイル" detail={`のべ ${formatNumber(ruleSummary?.grantedCount ?? 0)}回`} />
-          <SummaryCard variant="v6" title="いちばん付いている" value={topRule ? grantedMiles30d(topRule) : null} unit="マイル" detail={topRule ? `${topRule.draft.name}・${formatNumber(topRule.metrics30d.granted)}回` : 'まだ付与記録はありません'} />
-          <SummaryCard variant="v6" title="1人あたりの平均" value={ruleSummary?.averageBalance ?? null} unit="マイル" detail={`持っている人 ${formatNumber(tabCounts.balances ?? 0)}人で割った数`} />
+          <SummaryCard variant="v6" title="この30日で付いたマイル" value={ruleSummary?.grantedMiles ?? null} unit="マイル" detail={`のべ ${formatMileageNumber(ruleSummary?.grantedCount ?? 0)}回`} />
+          <SummaryCard variant="v6" title="いちばん付いている" value={topRule ? grantedMiles30d(topRule) : null} unit="マイル" detail={topRule ? `${topRule.draft.name}・${formatMileageNumber(topRule.metrics30d.granted)}回` : 'まだ付与記録はありません'} />
+          <SummaryCard variant="v6" title="1人あたりの平均" value={ruleSummary?.averageBalance ?? null} unit="マイル" detail={`持っている人 ${formatMileageNumber(tabCounts.balances ?? 0)}人で割った数`} />
         </div> : null}
         <NoteBar>
           どんなことをしたら何マイル付けるかを決めます。付与数を変えると、変更後に起きた行動から新しい値を使います。
@@ -555,6 +555,12 @@ function MileagePageInner() {
             CSVで書き出す
           </Button>
         </div>
+
+        {ruleActionError ? (
+          <p role="alert" className="border-status-danger bg-status-danger-soft text-status-danger mb-3 rounded-control border px-3 py-2 text-sm">
+            {ruleActionError}
+          </p>
+        ) : null}
 
         <div className="mb-3 flex flex-wrap items-center gap-2">
           {RULE_FILTERS.map((f) => (
@@ -611,8 +617,8 @@ function MileagePageInner() {
                       </span>
                       <details className="relative shrink-0 text-ink-secondary">
                         <summary className="cursor-pointer font-semibold text-accent">公開版の中身を見る</summary>
-                        <p className="absolute left-0 top-full z-10 mt-1 w-72 rounded-control border border-hairline bg-canvas p-2 shadow-card" title={`${rule.published.name} / ${ruleEventLabel(rule.published.eventType, EVENT_LABELS)} / ${formatNumber(rule.published.amount)}マイル`}>
-                          {rule.published.name}・{ruleEventLabel(rule.published.eventType, EVENT_LABELS)}・{formatNumber(rule.published.amount)}マイル
+                        <p className="absolute left-0 top-full z-10 mt-1 w-72 rounded-control border border-hairline bg-canvas p-2 shadow-card" title={`${rule.published.name} / ${ruleEventLabel(rule.published.eventType, EVENT_LABELS)} / ${formatMileageNumber(rule.published.amount)}マイル`}>
+                          {rule.published.name}・{ruleEventLabel(rule.published.eventType, EVENT_LABELS)}・{formatMileageNumber(rule.published.amount)}マイル
                         </p>
                       </details>
                     </div>
@@ -621,15 +627,15 @@ function MileagePageInner() {
                     {ruleEventLabel(rule.draft.eventType, EVENT_LABELS)}
                   </td>
                   <td className="px-4 py-3 text-right font-semibold tabular-nums">
-                    {formatNumber(rule.draft.amount)} <span className="text-xs font-normal text-ink-faint">マイル</span>
+                    {formatMileageNumber(rule.draft.amount)} <span className="text-xs font-normal text-ink-faint">マイル</span>
                   </td>
                   <td className="px-4 py-3 text-xs text-ink-secondary">
                     <p>{rule.draft.validFrom || rule.draft.validUntil ? `${rule.draft.validFrom ? formatMileageDate(rule.draft.validFrom) : '開始指定なし'} 〜 ${rule.draft.validUntil ? formatMileageDate(rule.draft.validUntil) : '終了指定なし'}` : '期間の指定なし'}</p>
                     <p className="mt-1 text-ink-faint">{rule.draft.expiresAfterDays == null ? '失効なし' : `付いてから${rule.draft.expiresAfterDays}日`}</p>
                   </td>
                   <td className="px-4 py-3 text-right text-sm tabular-nums">
-                    <p className="font-semibold text-ink">{formatNumber(grantedMiles30d(rule))}</p>
-                    <p className="mt-1 text-xs text-ink-faint">対象外 {formatNumber(rule.metrics30d.excluded)}回</p>
+                    <p className="font-semibold text-ink">{formatMileageNumber(grantedMiles30d(rule))}</p>
+                    <p className="mt-1 text-xs text-ink-faint">対象外 {formatMileageNumber(rule.metrics30d.excluded)}回</p>
                   </td>
                   <td className="px-4 py-3 text-center">
                     {rule.published.status === 'published' ? <Chip tone="ok">動いています</Chip> : <Chip>止めています</Chip>}
@@ -709,11 +715,11 @@ function MileagePageInner() {
                       </td>
                       <td className="px-4 py-4 text-sm text-ink-secondary" title={member.rankReason}>{displayRank ?? <><span>—</span><span className="ml-1 text-xs text-ink-faint">未設定</span></>}</td>
                       <td className="px-4 py-4 text-right">
-                        <p className="font-bold text-accent-hover">{formatNumber(member.available)}</p>
-                        {member.pending > 0 && <p className="text-[10px] text-amber-600">保留 {formatNumber(member.pending)}</p>}
+                        <p className="font-bold text-accent-hover">{formatMileageNumber(member.available)}</p>
+                        {member.pending > 0 && <p className="text-[10px] text-amber-600">保留 {formatMileageNumber(member.pending)}</p>}
                       </td>
-                      <td className={`px-4 py-4 text-right text-sm font-semibold tabular-nums ${member.monthChange < 0 ? 'text-danger' : 'text-accent-hover'}`}>{member.monthChange > 0 ? '+' : ''}{formatNumber(member.monthChange)}</td>
-                      <td className="px-4 py-4 text-sm text-ink-secondary">{member.expiringMiles30d == null ? 'なし' : `${formatNumber(member.expiringMiles30d)} マイル`}</td>
+                      <td className={`px-4 py-4 text-right text-sm font-semibold tabular-nums ${member.monthChange < 0 ? 'text-danger' : 'text-accent-hover'}`}>{member.monthChange > 0 ? '+' : ''}{formatMileageNumber(member.monthChange)}</td>
+                      <td className="px-4 py-4 text-sm text-ink-secondary">{member.expiringMiles30d == null ? 'なし' : `${formatMileageNumber(member.expiringMiles30d)} マイル`}</td>
                       <td className="px-4 py-4 text-xs text-ink-secondary">{formatMileageDate(member.lastChangedAt)}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-2">
@@ -734,7 +740,7 @@ function MileagePageInner() {
             <span className="text-xs text-gray-500">
               {overviewTotal === null
                 ? '表示件数は未取得'
-                : `${formatNumber(overviewTotal)}人中 ${formatNumber(offset + 1)}〜${formatNumber(Math.min(offset + members.length, overviewTotal))}人を表示`}
+                : `${formatMileageNumber(overviewTotal)}人中 ${formatMileageNumber(offset + 1)}〜${formatMileageNumber(Math.min(offset + members.length, overviewTotal))}人を表示`}
             </span>
             <Pagination
               page={currentPage}

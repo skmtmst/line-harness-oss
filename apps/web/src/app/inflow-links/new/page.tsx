@@ -91,7 +91,18 @@ export default function NewInflowLinkPage() {
   // #514-7: 短縮 URL(/s/xxxx)は Worker に経路が無い。開けない URL を
   // 印刷物・SMS に載せないよう、表示しない。
   useEffect(() => {
-    void QRCode.toDataURL(issuedUrl, { width: 180, margin: 1, color: { dark: '#171717', light: '#ffffff' } }).then(setQrDataUrl)
+    // キー入力ごとに作り直すと、遅れて届いた古い QR が表示とずれて残る。
+    // 少し待ってから作り、古い解決は捨てる。
+    let stale = false
+    const timer = window.setTimeout(() => {
+      void QRCode.toDataURL(issuedUrl, { width: 180, margin: 1, color: { dark: '#171717', light: '#ffffff' } }).then((url) => {
+        if (!stale) setQrDataUrl(url)
+      })
+    }, 250)
+    return () => {
+      stale = true
+      window.clearTimeout(timer)
+    }
   }, [issuedUrl])
 
   return (

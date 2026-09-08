@@ -136,7 +136,7 @@ function InflowLinkDetailPageContent() {
   }, [selectedId, funnelAttempt])
 
   const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
-  const url = route ? `${workerBase}/r/${route.refCode}` : null
+  const url = route ? `${workerBase}/r/${encodeURIComponent(route.refCode)}` : null
 
   async function copyUrl() {
     if (!url) return
@@ -162,7 +162,7 @@ function InflowLinkDetailPageContent() {
           return
         }
         const result = await api.entryRoutes.update(route.id, {
-          redirectUrl: `${workerBase}/r/${redirectTarget.refCode}`,
+          redirectUrl: `${workerBase}/r/${encodeURIComponent(redirectTarget.refCode)}`,
         })
         if (!result.success) throw new Error(result.error)
       } else {
