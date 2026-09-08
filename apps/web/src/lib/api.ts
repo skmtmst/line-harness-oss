@@ -4372,7 +4372,7 @@ export const api = {
         `/api/friends/${friendId}/fields`,
         { method: 'PUT', body: JSON.stringify({ values }) },
       ),
-    bulk: (data: { friendIds: string[]; fieldId: string; value: string | null }) =>
+    bulk: (data: { friendIds: string[]; fieldId: string; value: string | null; lineAccountId: string }) =>
       fetchApi<ApiResponse<{ updated: number }>>('/api/friend-fields/bulk', {
         method: 'POST',
         body: JSON.stringify(data),
@@ -4898,7 +4898,7 @@ export const api = {
   /** 回答フォーム。 */
   forms: {
     list: (accountId: string) =>
-      fetchApi<ApiResponse<Array<{ id: string; name: string; description: string | null }>>>(
+      fetchApi<ApiResponse<Array<{ id: string; name: string; description: string | null; isActive: boolean }>>>(
         `/api/forms?account_id=${encodeURIComponent(accountId)}`,
       ),
     get: (id: string, accountId: string) =>

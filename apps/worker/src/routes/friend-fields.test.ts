@@ -550,8 +550,19 @@ describe('値のまとめて更新', () => {
 });
 
 describe('一括変更', () => {
+  it('対象アカウントの指定がなければ400', async () => {
+    const res = await req(makeApp(), '/api/friend-fields/bulk', 'POST', {
+      friendIds: ['f-1'],
+      fieldId: 'ff-1',
+      value: 'x',
+    });
+    expect(res.status).toBe(400);
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+  });
+
   it('対象が空なら400', async () => {
     const res = await req(makeApp(), '/api/friend-fields/bulk', 'POST', {
+      lineAccountId: 'account-1',
       friendIds: [],
       fieldId: 'ff-1',
       value: 'x',
@@ -561,6 +572,7 @@ describe('一括変更', () => {
 
   it('1000人を超えたら422', async () => {
     const res = await req(makeApp(), '/api/friend-fields/bulk', 'POST', {
+      lineAccountId: 'account-1',
       friendIds: Array.from({ length: 1001 }, (_, i) => `f-${i}`),
       fieldId: 'ff-1',
       value: 'x',
@@ -569,8 +581,9 @@ describe('一括変更', () => {
   });
 
   it('EC が正の項目は一括でも変えられない', async () => {
-    mocks.getFriendFieldById.mockResolvedValue({ ...FIELD, ec_is_master: 1 });
+    mocks.getFriendFieldByIdForScope.mockResolvedValue({ ...FIELD, ec_is_master: 1 });
     const res = await req(makeApp(), '/api/friend-fields/bulk', 'POST', {
+      lineAccountId: 'account-1',
       friendIds: ['f-1'],
       fieldId: 'ff-1',
       value: 'x',
@@ -580,11 +593,152 @@ describe('一括変更', () => {
 
   it('通常の項目は人数ぶん書き込む', async () => {
     const res = await req(makeApp(), '/api/friend-fields/bulk', 'POST', {
+      lineAccountId: 'account-1',
       friendIds: ['f-1', 'f-2'],
       fieldId: 'ff-1',
       value: 'ポチ',
     });
     expect(res.status).toBe(200);
     expect(mocks.setFriendFieldValue).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('一括変更のアカウント境界（N-043）', () => {
+  const FRIEND_OF = (id: string, line_account_id: string | null) => ({ id, line_account_id });
+
+  function useAccountBoundary(allowedAccountIds: string[] = ['account-1']) {
+    mocks.getFriendById.mockImplementation(async (_db: unknown, id: string) => {
+      if (id === 'f-ghost') return null;
+      if (id === 'f-other' || id === 'f-other-2') return FRIEND_OF(id, 'account-2');
+      return FRIEND_OF(id, 'account-1');
+    });
+    accountMocks.getVisibleLineAccountScope.mockResolvedValue({ allowedAccountIds });
+  }
+
+  it('同一アカウントのみなら成功する', async () => {
+    useAccountBoundary();
+    const res = await req(makeApp(), '/api/friend-fields/bulk', 'POST', {
+      lineAccountId: 'account-1',
+      friendIds: ['f-1', 'f-2'],
+      fieldId: 'ff-1',
+      value: 'ポチ',
+    });
+    expect(res.status).toBe(200);
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledTimes(2);
+    expect(accountMocks.getVisibleLineAccountScope).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({ id: 'u-1' }),
+    );
+    expect(mocks.getFriendFieldByIdForScope).toHaveBeenCalledWith(
+      env.DB,
+      'ff-1',
+      { tenantId: 'tenant-1', lineAccountId: 'account-1' },
+    );
+  });
+
+  it('同一・他アカウント混在は部分更新せず404で、存在と値を漏らさない', async () => {
+    useAccountBoundary();
+    const res = await req(makeApp(), '/api/friend-fields/bulk', 'POST', {
+      lineAccountId: 'account-1',
+      friendIds: ['f-1', 'f-other'],
+      fieldId: 'ff-1',
+      value: '秘密の値',
+    });
+    expect(res.status).toBe(404);
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    const text = await res.text();
+    expect(text).not.toContain('account-2');
+    expect(text).not.toContain('秘密の値');
+  });
+
+  it('双方のアカウントへアクセスできても指定外の混在は404で拒否する', async () => {
+    useAccountBoundary(['account-1', 'account-2']);
+    const res = await req(makeApp(), '/api/friend-fields/bulk', 'POST', {
+      lineAccountId: 'account-1',
+      friendIds: ['f-1', 'f-other'],
+      fieldId: 'ff-1',
+      value: '秘密の値',
+    });
+    expect(res.status).toBe(404);
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    const text = await res.text();
+    expect(text).not.toContain('account-2');
+    expect(text).not.toContain('秘密の値');
+  });
+
+  it('双方のアカウントへアクセスできても指定と完全一致なら成功する', async () => {
+    useAccountBoundary(['account-1', 'account-2']);
+    const res = await req(makeApp(), '/api/friend-fields/bulk', 'POST', {
+      lineAccountId: 'account-1',
+      friendIds: ['f-1', 'f-2'],
+      fieldId: 'ff-1',
+      value: 'ポチ',
+    });
+    expect(res.status).toBe(200);
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledTimes(2);
+  });
+
+  it('全部が他アカウントでも404で更新しない', async () => {
+    useAccountBoundary();
+    const res = await req(makeApp(), '/api/friend-fields/bulk', 'POST', {
+      lineAccountId: 'account-1',
+      friendIds: ['f-other', 'f-other-2'],
+      fieldId: 'ff-1',
+      value: '秘密の値',
+    });
+    expect(res.status).toBe(404);
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    const text = await res.text();
+    expect(text).not.toContain('account-2');
+  });
+
+  it('対象アカウントの権限がなければ404で更新しない', async () => {
+    useAccountBoundary(['account-1']);
+    const res = await req(makeApp(), '/api/friend-fields/bulk', 'POST', {
+      lineAccountId: 'account-2',
+      friendIds: ['f-other'],
+      fieldId: 'ff-1',
+      value: '秘密の値',
+    });
+    expect(res.status).toBe(404);
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.getFriendFieldByIdForScope).not.toHaveBeenCalled();
+  });
+
+  it('対象スコープ外の項目は404で更新しない', async () => {
+    useAccountBoundary();
+    mocks.getFriendFieldByIdForScope.mockResolvedValue(null);
+    const res = await req(makeApp(), '/api/friend-fields/bulk', 'POST', {
+      lineAccountId: 'account-1',
+      friendIds: ['f-1'],
+      fieldId: 'ff-ghost',
+      value: 'ポチ',
+    });
+    expect(res.status).toBe(404);
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+  });
+
+  it('存在しない友だち混じりは404で更新しない', async () => {
+    useAccountBoundary();
+    const res = await req(makeApp(), '/api/friend-fields/bulk', 'POST', {
+      lineAccountId: 'account-1',
+      friendIds: ['f-1', 'f-ghost'],
+      fieldId: 'ff-1',
+      value: 'ポチ',
+    });
+    expect(res.status).toBe(404);
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    const text = await res.text();
+    expect(text).not.toContain('f-ghost');
+  });
+
+  it('同じ一括更新を二重実行しても可視なら2回とも成功する', async () => {
+    useAccountBoundary();
+    const body = { lineAccountId: 'account-1', friendIds: ['f-1', 'f-2'], fieldId: 'ff-1', value: 'ポチ' };
+    const first = await req(makeApp(), '/api/friend-fields/bulk', 'POST', body);
+    const second = await req(makeApp(), '/api/friend-fields/bulk', 'POST', body);
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledTimes(4);
   });
 });
