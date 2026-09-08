@@ -134,7 +134,7 @@ export async function saveAffiliateBankProfile(
   return { kind: existing ? 'updated' : 'created', profile };
 }
 
-type EligibleRewardRow = {
+export type EligibleRewardRow = {
   conversion_event_id: string;
   affiliate_id: string;
   affiliate_name: string;
@@ -214,6 +214,21 @@ async function eligibleRewards(
   return result.results.filter((row) => Math.round(Number(row.reward_amount)) > 0);
 }
 
+/**
+ * プレビュー版の算出。プレビュー表示と全体締めで同じ行集合から同じ版を
+ * 作るための共通関数。締めはこの版の照合に使った行集合をそのまま明細へ
+ * 書き込む(照合後に取り直さない = TOCTOU排除)。
+ */
+export async function accountPreviewVersion(rows: EligibleRewardRow[]): Promise<string> {
+  const versionSource = rows.map((row) => [
+    row.conversion_event_id,
+    row.affiliate_id,
+    Math.round(Number(row.reward_amount)),
+    row.approved_at,
+  ].join(':')).join('|');
+  return sha256(versionSource);
+}
+
 export async function previewAffiliateAccountSettlement(
   db: D1Database,
   input: { tenantId: string; lineAccountId: string; periodFrom: string; periodTo: string },
@@ -233,12 +248,6 @@ export async function previewAffiliateAccountSettlement(
     current.conversionCount += 1;
     grouped.set(row.affiliate_id, current);
   }
-  const versionSource = rows.map((row) => [
-    row.conversion_event_id,
-    row.affiliate_id,
-    Math.round(Number(row.reward_amount)),
-    row.approved_at,
-  ].join(':')).join('|');
   return {
     lineAccountId: input.lineAccountId,
     periodFrom: input.periodFrom,
@@ -247,7 +256,7 @@ export async function previewAffiliateAccountSettlement(
     totalAmount: rows.reduce((sum, row) => sum + Math.round(Number(row.reward_amount)), 0),
     conversionCount: rows.length,
     affiliates: Array.from(grouped.values()),
-    previewVersion: await sha256(versionSource),
+    previewVersion: await accountPreviewVersion(rows),
   };
 }
 
@@ -286,10 +295,12 @@ export async function closeAffiliateAccountSettlement(
       version: Number(existing.version), closedAt: existing.closed_at,
     };
   }
-  const preview = await previewAffiliateAccountSettlement(db, input);
-  if (preview.conversionCount === 0) return { kind: 'empty' };
-  if (preview.previewVersion !== input.expectedPreviewVersion) return { kind: 'changed' };
+  // 行集合は1回だけ取得し、版照合と明細書込みの両方に使う。
+  // 照合後に取り直すと、その隙に承認・締めが変わってheaderと明細がずれる。
   const rows = await eligibleRewards(db, input);
+  if (rows.length === 0) return { kind: 'empty' };
+  if (await accountPreviewVersion(rows) !== input.expectedPreviewVersion) return { kind: 'changed' };
+  const totalAmount = rows.reduce((sum, row) => sum + Math.round(Number(row.reward_amount)), 0);
   const now = input.now ?? new Date().toISOString();
   const settlementId = crypto.randomUUID();
   const statements: D1PreparedStatement[] = [db.prepare(
@@ -300,7 +311,7 @@ export async function closeAffiliateAccountSettlement(
      VALUES (?, ?, ?, NULL, ?, ?, 'Asia/Tokyo', 'JPY', ?, 'closed', ?, 1, ?, ?, ?, ?)`,
   ).bind(
     settlementId, input.tenantId, input.lineAccountId, input.periodFrom, input.periodTo,
-    preview.totalAmount, input.actorId, input.idempotencyKey, now, now, input.requestFingerprint,
+    totalAmount, input.actorId, input.idempotencyKey, now, now, input.requestFingerprint,
   )];
   for (const row of rows) {
     const entryId = crypto.randomUUID();
@@ -354,7 +365,7 @@ export async function closeAffiliateAccountSettlement(
     return { kind: 'changed' };
   }
   return {
-    kind: 'created', settlementId, totalAmount: preview.totalAmount,
+    kind: 'created', settlementId, totalAmount,
     conversionCount: rows.length, version: 1, closedAt: now,
   };
 }

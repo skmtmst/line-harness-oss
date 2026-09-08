@@ -16,9 +16,17 @@ function asD1(sqlite: Database.Database): D1Database {
     prepare(query: string) {
       return {
         bind(...params: unknown[]) {
+          const stmt = sqlite.prepare(query);
           return {
             async all<T>() {
-              return { results: sqlite.prepare(query).all(...params) as T[], success: true, meta: {} };
+              return { results: stmt.all(...params) as T[], success: true, meta: {} };
+            },
+            async first<T>() {
+              return (stmt.get(...params) as T | undefined) ?? null;
+            },
+            async run<T>() {
+              const info = stmt.run(...params);
+              return { success: true, meta: { changes: info.changes }, results: [] } as T;
             },
           };
         },
@@ -40,9 +48,9 @@ describe('getAffiliatePaymentSummaries', () => {
         commission_rate REAL NOT NULL, friend_id TEXT, hold_days INTEGER, payout_cycle TEXT,
         line_account_id TEXT, tenant_id TEXT
       );
-      CREATE TABLE conversion_points (id TEXT PRIMARY KEY, value INTEGER, line_account_id TEXT);
+      CREATE TABLE conversion_points (id TEXT PRIMARY KEY, name TEXT, value INTEGER, line_account_id TEXT);
       CREATE TABLE affiliate_offers (
-        id TEXT PRIMARY KEY, reward_amount INTEGER NOT NULL, line_account_id TEXT
+        id TEXT PRIMARY KEY, name TEXT, reward_amount INTEGER NOT NULL, line_account_id TEXT
       );
       CREATE TABLE affiliate_links (
         id TEXT PRIMARY KEY, affiliate_id TEXT NOT NULL, ref_code TEXT NOT NULL UNIQUE,
@@ -51,14 +59,21 @@ describe('getAffiliatePaymentSummaries', () => {
       CREATE TABLE conversion_events (
         id TEXT PRIMARY KEY, conversion_point_id TEXT NOT NULL, friend_id TEXT NOT NULL,
         affiliate_id TEXT, affiliate_code TEXT, attributed_ref_code TEXT,
-        approval_status TEXT, approved_at TEXT, value_snapshot REAL
+        approval_status TEXT, approved_at TEXT, value_snapshot REAL, point_name_snapshot TEXT
       );
       CREATE TABLE affiliate_reward_entries (
         id TEXT PRIMARY KEY, conversion_event_id TEXT NOT NULL, entry_type TEXT NOT NULL,
         affiliate_id TEXT, line_account_id TEXT, amount_minor INTEGER NOT NULL DEFAULT 0
       );
+      CREATE TABLE affiliate_reward_calculations (
+        id TEXT PRIMARY KEY, organization_id TEXT, line_account_id TEXT, affiliate_id TEXT,
+        conversion_event_id TEXT NOT NULL, offer_id TEXT, formula TEXT,
+        commission_rate_snapshot REAL, base_amount_snapshot REAL, fixed_reward_snapshot INTEGER,
+        offer_name_snapshot TEXT, amount_minor INTEGER, currency TEXT, created_at TEXT,
+        UNIQUE (conversion_event_id)
+      );
       INSERT INTO friends VALUES ('friend-1', 'account-1'), ('friend-2', 'account-2');
-      INSERT INTO conversion_points VALUES ('purchase', 99999, 'account-1');
+      INSERT INTO conversion_points VALUES ('purchase', '購入', 99999, 'account-1');
     `);
     db = asD1(sqlite);
   });
@@ -68,13 +83,16 @@ describe('getAffiliatePaymentSummaries', () => {
       INSERT INTO affiliates VALUES
         ('rate', '割合さん', 'rate-code', 10, NULL, 0, '月末締め', 'account-1', 'tenant-1'),
         ('fixed', '定額さん', 'fixed-code', 0, NULL, 0, NULL, 'account-1', 'tenant-1');
-      INSERT INTO affiliate_offers VALUES ('offer-fixed', 3000, 'account-1');
+      INSERT INTO affiliate_offers VALUES ('offer-fixed', '定期便', 3000, 'account-1');
       INSERT INTO affiliate_links VALUES ('link-fixed', 'fixed', 'fixed-ref', 'account-1', 'offer-fixed');
       INSERT INTO conversion_events VALUES
-        ('rate-approved', 'purchase', 'friend-1', 'rate', NULL, NULL, 'approved', '2026-09-01T00:00:00Z', 10000),
-        ('rate-pending', 'purchase', 'friend-1', 'rate', NULL, NULL, 'pending', NULL, 10000),
-        ('fixed-approved', 'purchase', 'friend-1', 'fixed', NULL, 'fixed-ref', 'approved', '2026-09-01T00:00:00Z', 10000);
+        ('rate-approved', 'purchase', 'friend-1', 'rate', NULL, NULL, 'approved', '2026-09-01T00:00:00Z', 10000, NULL),
+        ('rate-pending', 'purchase', 'friend-1', 'rate', NULL, NULL, 'pending', NULL, 10000, NULL),
+        ('fixed-approved', 'purchase', 'friend-1', 'fixed', NULL, 'fixed-ref', 'approved', '2026-09-01T00:00:00Z', 10000, NULL);
     `);
+    // 承認済みは承認時に版がある状態にする(集計は版正本)。
+    await ensureConversionRewardSnapshot(db, 'rate-approved', '2026-09-01T00:00:00Z');
+    await ensureConversionRewardSnapshot(db, 'fixed-approved', '2026-09-01T00:00:00Z');
 
     const rows = await getAffiliatePaymentSummaries(db, 'account-1', 'tenant-1', '2026-09-04T00:00:00Z');
     expect(rows.find((row) => row.affiliateId === 'rate')).toMatchObject({
@@ -93,13 +111,40 @@ describe('getAffiliatePaymentSummaries', () => {
         ('mine', '自店', 'mine-code', 10, 'friend-1', 0, NULL, 'account-1', 'tenant-1'),
         ('other', '他店', 'other-code', 10, 'friend-2', 0, NULL, 'account-2', 'tenant-1');
       INSERT INTO conversion_events VALUES
-        ('mine-cv', 'purchase', 'friend-1', 'mine', NULL, NULL, 'approved', '2026-09-01T00:00:00Z', 1000),
-        ('other-cv', 'purchase', 'friend-2', 'other', NULL, NULL, 'approved', '2026-09-01T00:00:00Z', 50000);
+        ('mine-cv', 'purchase', 'friend-1', 'mine', NULL, NULL, 'approved', '2026-09-01T00:00:00Z', 1000, NULL),
+        ('other-cv', 'purchase', 'friend-2', 'other', NULL, NULL, 'approved', '2026-09-01T00:00:00Z', 50000, NULL);
     `);
+    await ensureConversionRewardSnapshot(db, 'mine-cv', '2026-09-01T00:00:00Z');
 
     const rows = await getAffiliatePaymentSummaries(db, 'account-1', 'tenant-1', '2026-09-04T00:00:00Z');
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ affiliateId: 'mine', approvedReward: 100 });
+  });
+
+  test('承認後の設定編集で承認/保留/未確定の表示が変わらない', async () => {
+    sqlite.exec(`
+      INSERT INTO affiliates VALUES
+        ('rate', '割合さん', 'rate-code', 10, NULL, 0, '月末締め', 'account-1', 'tenant-1'),
+        ('fixed', '定額さん', 'fixed-code', 0, NULL, 0, NULL, 'account-1', 'tenant-1');
+      INSERT INTO affiliate_offers VALUES ('offer-fixed', '定期便', 3000, 'account-1');
+      INSERT INTO affiliate_links VALUES ('link-fixed', 'fixed', 'fixed-ref', 'account-1', 'offer-fixed');
+      INSERT INTO conversion_events VALUES
+        ('rate-approved', 'purchase', 'friend-1', 'rate', NULL, NULL, 'approved', '2026-09-01T00:00:00Z', 10000, NULL),
+        ('fixed-approved', 'purchase', 'friend-1', 'fixed', NULL, 'fixed-ref', 'approved', '2026-09-01T00:00:00Z', 10000, NULL);
+    `);
+    await ensureConversionRewardSnapshot(db, 'rate-approved', '2026-09-01T00:00:00Z');
+    await ensureConversionRewardSnapshot(db, 'fixed-approved', '2026-09-01T00:00:00Z');
+    const now = '2026-09-04T00:00:00Z';
+    expect((await getAffiliatePaymentSummaries(db, 'account-1', 'tenant-1', now))
+      .find((row) => row.affiliateId === 'rate')).toMatchObject({ approvedReward: 1000, unsettledReward: 1000 });
+    sqlite.exec(`
+      UPDATE affiliates SET commission_rate = 50;
+      UPDATE affiliate_offers SET reward_amount = 99999;
+      UPDATE conversion_points SET value = 1;
+    `);
+    const rows = await getAffiliatePaymentSummaries(db, 'account-1', 'tenant-1', now);
+    expect(rows.find((row) => row.affiliateId === 'rate')).toMatchObject({ approvedReward: 1000, unsettledReward: 1000 });
+    expect(rows.find((row) => row.affiliateId === 'fixed')).toMatchObject({ approvedReward: 3000, unsettledReward: 3000 });
   });
 
   test('保留期間内と承認日時が無い成果を区別し、成果なしは実値0を返す', async () => {
@@ -108,10 +153,13 @@ describe('getAffiliatePaymentSummaries', () => {
         ('held', '保留あり', 'held-code', 10, 'friend-1', 7, '毎月末締め', 'account-1', 'tenant-1'),
         ('empty', '成果なし', 'empty-code', 0, 'friend-1', NULL, NULL, 'account-1', 'tenant-1');
       INSERT INTO conversion_events VALUES
-        ('recent', 'purchase', 'friend-1', 'held', NULL, NULL, 'approved', '2026-09-03T00:00:00Z', 10000),
-        ('old', 'purchase', 'friend-1', 'held', NULL, NULL, 'approved', '2026-08-01T00:00:00Z', 10000),
-        ('unknown', 'purchase', 'friend-1', 'held', NULL, NULL, 'approved', NULL, 10000);
+        ('recent', 'purchase', 'friend-1', 'held', NULL, NULL, 'approved', '2026-09-03T00:00:00Z', 10000, NULL),
+        ('old', 'purchase', 'friend-1', 'held', NULL, NULL, 'approved', '2026-08-01T00:00:00Z', 10000, NULL),
+        ('unknown', 'purchase', 'friend-1', 'held', NULL, NULL, 'approved', NULL, 10000, NULL);
     `);
+    await ensureConversionRewardSnapshot(db, 'recent', '2026-09-03T00:00:00Z');
+    await ensureConversionRewardSnapshot(db, 'old', '2026-08-01T00:00:00Z');
+    await ensureConversionRewardSnapshot(db, 'unknown', '2026-09-04T00:00:00Z');
 
     const rows = await getAffiliatePaymentSummaries(db, 'account-1', 'tenant-1', '2026-09-04T00:00:00Z');
     expect(rows.find((row) => row.affiliateId === 'held')).toMatchObject({
@@ -265,7 +313,7 @@ describe('紹介停止と支払い確定の追記台帳', () => {
 
     rows = await getAffiliatePaymentSummaries(db, 'account-1', 'tenant-1', '2026-09-06T00:00:00Z');
     expect(rows.find((row) => row.affiliateId === 'affiliate-1')).toMatchObject({
-      settledConversions: 1, settledReward: 5000, unsettledConversions: 1, unsettledReward: 99999,
+      settledConversions: 1, settledReward: 5000, unsettledConversions: 1, unsettledReward: 5000,
     });
   });
 

@@ -19,9 +19,9 @@ export interface AffiliatePaymentSummary {
  * 選択中のLINE公式アカウントについて、支払い画面で安全に表示できる範囲だけを集計する。
  *
  * 承認済み全体、保留中、支払い確定前、確定済みを分けて返す。
- * 割合方式は成果時点の金額×紹介者の率、定額方式は成果に結びついた
- * 案件の固定額を使う。ただし確定済みだけは確定時に保存した台帳の金額を
- * 優先し、確定後の率・固定額の編集で過去の支払額が変わらないようにする。
+ * 金額はすべて承認時の計算版(affiliate_reward_calculations)を正本にし、
+ * 現在の率・売上・固定額では再計算しない。版が無い行は0として扱い、
+ * 約束できない金額を盛らない。確定後の設定編集で表示が変わらない。
  */
 export async function getAffiliatePaymentSummaries(
   db: D1Database,
@@ -45,9 +45,7 @@ export async function getAffiliatePaymentSummaries(
        COALESCE(SUM(
          CASE
            WHEN ce.id IS NULL THEN 0
-           WHEN a.commission_rate > 0
-             THEN COALESCE(ce.value_snapshot, cp.value, 0) * a.commission_rate / 100.0
-           ELSE COALESCE(off.reward_amount, 0)
+           ELSE COALESCE(snap.amount_minor, 0)
          END
        ), 0) AS approved_reward,
        COALESCE(SUM(
@@ -63,11 +61,7 @@ export async function getAffiliatePaymentSummaries(
            WHEN COALESCE(a.hold_days, 0) > 0
             AND ce.approved_at IS NOT NULL
             AND julianday(ce.approved_at) > julianday(?, '-' || a.hold_days || ' days')
-           THEN CASE
-             WHEN a.commission_rate > 0
-               THEN COALESCE(ce.value_snapshot, cp.value, 0) * a.commission_rate / 100.0
-             ELSE COALESCE(off.reward_amount, 0)
-           END
+           THEN COALESCE(snap.amount_minor, 0)
            ELSE 0
          END
        ), 0) AS held_reward,
@@ -99,11 +93,7 @@ export async function getAffiliatePaymentSummaries(
           AND NOT EXISTS (
            SELECT 1 FROM affiliate_reward_entries re
             WHERE re.conversion_event_id = ce.id AND re.entry_type = 'credit'
-         ) THEN CASE
-           WHEN a.commission_rate > 0
-             THEN COALESCE(ce.value_snapshot, cp.value, 0) * a.commission_rate / 100.0
-           ELSE COALESCE(off.reward_amount, 0)
-         END ELSE 0 END
+         ) THEN COALESCE(snap.amount_minor, 0) ELSE 0 END
        ), 0) AS unsettled_reward
        , COUNT(re.conversion_event_id) AS settled_conversions
        , COALESCE(SUM(re.amount_minor), 0) AS settled_reward
@@ -133,6 +123,11 @@ export async function getAffiliatePaymentSummaries(
       AND re.entry_type = 'credit'
       AND re.affiliate_id = a.id
       AND re.line_account_id = ?
+     -- 承認/保留/未確定の金額は現在値で再計算せず、承認時の版を正本にする。
+     -- 版が無い行は0(約束できない金額は盛らない)。
+     LEFT JOIN affiliate_reward_calculations snap
+       ON snap.conversion_event_id = ce.id
+      AND snap.formula IN ('rate', 'fixed', 'legacy')
      GROUP BY a.id, a.name, a.code, a.hold_days, a.payout_cycle, a.commission_rate
      ORDER BY approved_reward DESC, a.name ASC`,
   ).bind(

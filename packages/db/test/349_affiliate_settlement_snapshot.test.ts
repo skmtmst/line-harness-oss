@@ -1,7 +1,8 @@
 import Database from 'better-sqlite3';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   confirmAffiliateSettlement,
   ensureConversionRewardSnapshot,
@@ -321,6 +322,27 @@ describe('migration 349 承認済み報酬の版固定', () => {
     ).get()).toEqual({ c: 1 });
   });
 
+  it('真の同時全体締めでも二重計上せず同一操作は回収する', async () => {
+    const { previewAffiliateAccountSettlement, closeAffiliateAccountSettlement } =
+      await import('../src/affiliate-payouts.js');
+    const period = {
+      tenantId: TENANT_ID, lineAccountId: 'account-1',
+      periodFrom: '2026-01-01T00:00:00.000Z', periodTo: '2099-01-01T00:00:00.000Z',
+    };
+    const preview = await previewAffiliateAccountSettlement(db, period);
+    const input = {
+      ...period, actorId: 'staff-1', expectedPreviewVersion: preview.previewVersion,
+      idempotencyKey: 'close-race-1', requestFingerprint: 'close-fp-1',
+    };
+    const [a, b] = await Promise.all([
+      closeAffiliateAccountSettlement(db, input),
+      closeAffiliateAccountSettlement(db, input),
+    ]);
+    expect([a.kind, b.kind].sort()).toEqual(['created', 'duplicate']);
+    const ids = [a, b].map((r) => (r as { settlementId: string }).settlementId);
+    expect(ids[0]).toBe(ids[1]);
+  });
+
   it('移行前の確定分は金額だけを引き継ぎ、根拠なしと分かる形にする', async () => {
     const legacy = new Database(':memory:');
     legacy.exec(`
@@ -382,5 +404,119 @@ describe('migration 349 承認済み報酬の版固定', () => {
     expect(legacy.prepare(
       `SELECT reward_calculation_id AS c FROM affiliate_reward_entries WHERE id = 'entry-legacy-2'`,
     ).get()).toEqual({ c: 'calc-kept' });
+  });
+});
+
+describe('複数接続の競合 — 共有ファイルDBで直列化と回収を実検査', () => {
+  const TENANT_ID = '00000000-0000-4000-8000-000000000001';
+  let dir: string;
+  let conns: Database.Database[];
+
+  async function setupShared(): Promise<{ a: D1Database; b: D1Database }> {
+    dir = mkdtempSync(join(tmpdir(), 'lh-349-race-'));
+    const path = join(dir, 'shared.db');
+    const setup = new Database(path);
+    setup.exec(readFileSync(join(import.meta.dirname, '..', 'bootstrap.sql'), 'utf8'));
+    setup.prepare(
+      `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, tenant_id)
+       VALUES (?, ?, ?, 'token', 'secret', ?)`,
+    ).run('account-1', 'channel-1', '本店', TENANT_ID);
+    setup.exec(`
+      INSERT INTO friends (id, line_user_id, display_name, line_account_id)
+      VALUES ('friend-1', 'U1', '田中', 'account-1');
+      INSERT INTO affiliates
+        (id, name, code, commission_rate, friend_id, tenant_id, line_account_id, hold_days)
+      VALUES ('affiliate-rate', '割合さん', 'rate-code', 10, 'friend-1', '${TENANT_ID}', 'account-1', 0);
+      INSERT INTO conversion_points (id, name, event_type, value, line_account_id)
+      VALUES ('point-1', '購入', 'purchase', 10000, 'account-1');
+      INSERT INTO conversion_events
+        (id, conversion_point_id, friend_id, affiliate_id, attributed_ref_code,
+         approval_status, approved_at, value_snapshot)
+      VALUES ('conversion-race-1', 'point-1', 'friend-1', 'affiliate-rate', NULL,
+        'pending', NULL, 10000),
+        ('conversion-race-2', 'point-1', 'friend-1', 'affiliate-rate', NULL,
+        'pending', NULL, 10000);
+    `);
+    setup.close();
+    // busy_timeoutで直列化し、本番D1と同じく後勝ちをUNIQUE違反で検出する。
+    const open = () => {
+      const conn = new Database(path);
+      conn.pragma('busy_timeout = 5000');
+      conns.push(conn);
+      return asD1(conn);
+    };
+    const seeder = open();
+    const { setConversionApproval } = await import('../src/affiliate-offers.js');
+    expect(await setConversionApproval(seeder, 'conversion-race-1', 'approved')).toBe(true);
+    return { a: open(), b: open() };
+  }
+
+  beforeEach(() => {
+    conns = [];
+  });
+
+  afterEach(() => {
+    for (const conn of conns) {
+      try { conn.close(); } catch { /* already closed */ }
+    }
+    if (dir) rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('別接続の同時確定でも二重計上せず同一操作は回収する', async () => {
+    const { a, b } = await setupShared();
+    const input = (db: D1Database) => confirmAffiliateSettlement(db, {
+      tenantId: TENANT_ID, lineAccountId: 'account-1', affiliateId: 'affiliate-rate',
+      actorId: 'staff-1', idempotencyKey: 'shared-race-key', expectedAmount: 1000,
+    });
+    const [ra, rb] = await Promise.all([input(a), input(b)]);
+    expect([ra.kind, rb.kind].sort()).toEqual(['created', 'duplicate']);
+    const probe = new Database(join(dir, 'shared.db'));
+    try {
+      expect(probe.prepare(`SELECT COUNT(*) AS c FROM affiliate_settlements`).get()).toEqual({ c: 1 });
+      expect(probe.prepare(`SELECT COUNT(*) AS c FROM affiliate_reward_entries`).get()).toEqual({ c: 1 });
+    } finally {
+      probe.close();
+    }
+  });
+
+  it('別接続の同時全体締めでも二重計上せず同一操作は回収する', async () => {
+    const { a, b } = await setupShared();
+    const { previewAffiliateAccountSettlement, closeAffiliateAccountSettlement } =
+      await import('../src/affiliate-payouts.js');
+    const period = {
+      tenantId: TENANT_ID, lineAccountId: 'account-1',
+      periodFrom: '2026-01-01T00:00:00.000Z', periodTo: '2099-01-01T00:00:00.000Z',
+    };
+    const preview = await previewAffiliateAccountSettlement(a, period);
+    const input = (db: D1Database) => closeAffiliateAccountSettlement(db, {
+      ...period, actorId: 'staff-1', expectedPreviewVersion: preview.previewVersion,
+      idempotencyKey: 'shared-close-key', requestFingerprint: 'shared-close-fp',
+    });
+    const [ra, rb] = await Promise.all([input(a), input(b)]);
+    expect([ra.kind, rb.kind].sort()).toEqual(['created', 'duplicate']);
+    const probe = new Database(join(dir, 'shared.db'));
+    try {
+      expect(probe.prepare(`SELECT COUNT(*) AS c FROM affiliate_settlements`).get()).toEqual({ c: 1 });
+    } finally {
+      probe.close();
+    }
+  });
+
+  it('別接続の同時承認でも版は1つで失敗しない', async () => {
+    const { a, b } = await setupShared();
+    const { setConversionApproval } = await import('../src/affiliate-offers.js');
+    const [ra, rb] = await Promise.all([
+      setConversionApproval(a, 'conversion-race-2', 'approved'),
+      setConversionApproval(b, 'conversion-race-2', 'approved'),
+    ]);
+    expect([ra, rb].sort()).toEqual(['already_set', true]);
+    const probe = new Database(join(dir, 'shared.db'));
+    try {
+      expect(probe.prepare(
+        `SELECT COUNT(*) AS c FROM affiliate_reward_calculations WHERE conversion_event_id = 'conversion-race-2'`,
+      ).get()).toEqual({ c: 1 });
+    } finally {
+      probe.close();
+    }
   });
 });

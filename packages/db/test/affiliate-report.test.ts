@@ -760,6 +760,24 @@ describe('report confirmedReward — 承認時の版を確定額に使う', () =
     `);
   });
 
+  test('案件なしrateの版も確定額に含み、編集で変わらない', async () => {
+    const { setConversionApproval } = await import('../src/affiliate-offers.js');
+    sqlite.exec(`
+      INSERT INTO affiliates (id, name, code, commission_rate, is_active, created_at, tenant_id, line_account_id)
+      VALUES ('aff-offerless', 'L', 'code-l', 10, 1, '2026-01-01T00:00:00.000+09:00', '${TENANT_ID}', 'account-1');
+      INSERT INTO friends (id, line_user_id, display_name, line_account_id, created_at, updated_at)
+      VALUES ('fr-2', 'U0002', 'S', 'account-1', '2026-01-01T00:00:00.000+09:00', '2026-01-01T00:00:00.000+09:00');
+      INSERT INTO conversion_events (id, conversion_point_id, friend_id, affiliate_id, created_at, approval_status, value_snapshot)
+      VALUES ('cv-less', 'cp-r', 'fr-2', 'aff-offerless', '2026-02-02T00:00:00.000+09:00', 'pending', 20000);
+    `);
+    expect(await setConversionApproval(db, 'cv-less', 'approved')).toBe(true);
+    const before = await getAffiliateReportV2(db, 'aff-offerless', { identityKeySql: IDENTITY_KEY_SQL, lineAccountId: 'account-1' });
+    expect(before).toMatchObject({ confirmedReward: 2000, unlinkedReward: 2000, unlinkedConversions: 1, byOffer: [] });
+    sqlite.exec(`UPDATE affiliates SET commission_rate = 50 WHERE id = 'aff-offerless'`);
+    const after = await getAffiliateReportV2(db, 'aff-offerless', { identityKeySql: IDENTITY_KEY_SQL, lineAccountId: 'account-1' });
+    expect(after).toMatchObject({ confirmedReward: 2000, unlinkedReward: 2000, unlinkedConversions: 1 });
+  });
+
   test('v1/v2の確定額は承認後の案件編集で変わらない', async () => {
     const { setConversionApproval } = await import('../src/affiliate-offers.js');
     expect(await setConversionApproval(db, 'cv-r', 'approved')).toBe(true);

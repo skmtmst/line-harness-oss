@@ -82,9 +82,16 @@ export interface AffiliateReportV2 {
    * approval-time snapshot (affiliate_reward_calculations) when present,
    * else the offer reward_amount resolved via
    * attributed_ref_code → affiliate_links.offer_id → affiliate_offers.
-   * Approved CVs through offer-less links contribute 0 (no reward configured).
+   * 案件に結びつかない承認済み(CV)の版は unlinkedReward に集めて含める。
    */
   confirmedReward: number;
+  /**
+   * 案件に結びつかない承認済みCVの確定額(版の合計)。byOfferに出ない分。
+   * 後から案件設定を変えても変わらない。
+   */
+  unlinkedReward: number;
+  /** 案件に結びつかない承認済みCVの件数。 */
+  unlinkedConversions: number;
   /** Per-offer breakdown for approved/pending CVs + confirmed reward. */
   byOffer: Array<{
     offerId: string;
@@ -278,10 +285,9 @@ export async function getAffiliateReportV2(
   // headline conversions excludes rejected.
   const conversions = conversionsPending + conversionsApproved;
 
-  // confirmedReward + byOffer: JOIN approved CVs → link → offer, SUM reward_amount.
-  // JOIN-based (no IN fan-out). Approved CVs whose link has no offer resolve to a
-  // NULL offer row → contribute 0 and never appear in byOffer (LEFT JOIN would
-  // add an off.id IS NULL bucket we don't want).
+  // confirmedReward + byOffer: JOIN approved CVs → link → offer.
+  // JOIN-based (no IN fan-out). Approved CVs whose link has no offer never
+  // appear in byOffer; 凍結した版の分は unlinkedReward に集める。
   //
   // 金額だけは承認時の版を優先する: 確定額(confirmed)は承認後に案件の
   // 固定額を編集しても変わらない。件数と1件あたりの表示額(rewardAmount)は
@@ -301,7 +307,7 @@ export async function getAffiliateReportV2(
          JOIN affiliate_offers off ON off.id = al.offer_id
          LEFT JOIN affiliate_reward_calculations calc
            ON calc.conversion_event_id = ce.id
-          AND calc.formula IN ('rate', 'fixed')
+          AND calc.formula IN ('rate', 'fixed', 'legacy')
         WHERE ${cvWhere}
           AND al.line_account_id IS ?
           AND off.line_account_id IS ?
@@ -320,7 +326,32 @@ export async function getAffiliateReportV2(
     conversionsPending: r.pending,
     confirmedReward: r.confirmed,
   }));
-  const confirmedReward = byOffer.reduce((s, o) => s + o.confirmedReward, 0);
+  // 案件に結びつかない承認済みCVの版(主にlinkなしrate)。byOfferに出ない
+  // 分をここで拾い、確定額へ足す。版が無い行は0(約束できない金額は盛らない)。
+  const unlinkedRow = await db
+    .prepare(
+      `SELECT COUNT(*) AS n,
+              COALESCE(SUM(calc.amount_minor), 0) AS amt
+         FROM conversion_events ce
+         JOIN affiliate_reward_calculations calc
+           ON calc.conversion_event_id = ce.id
+          AND calc.formula IN ('rate', 'fixed', 'legacy')
+        WHERE ${cvWhere}
+          AND ${STATUS_EXPR} = 'approved'
+          AND NOT EXISTS (
+            SELECT 1
+              FROM affiliate_links al
+              JOIN affiliate_offers off ON off.id = al.offer_id
+             WHERE al.ref_code = ce.attributed_ref_code
+               AND al.line_account_id IS ?
+               AND off.line_account_id IS ?
+          )`,
+    )
+    .bind(...cvBinds, lineAccountId, lineAccountId)
+    .first<{ n: number; amt: number }>();
+  const unlinkedReward = Math.round(Number(unlinkedRow?.amt ?? 0));
+  const unlinkedConversions = Number(unlinkedRow?.n ?? 0);
+  const confirmedReward = byOffer.reduce((s, o) => s + o.confirmedReward, 0) + unlinkedReward;
 
   // ── duplicateFlags: attributed friends sharing an identity_key ─────────────
   // "Attributed friend" here = friend whose add-time last-touch is this
@@ -382,6 +413,8 @@ export async function getAffiliateReportV2(
     revenue,
     estimatedCommission,
     confirmedReward,
+    unlinkedReward,
+    unlinkedConversions,
     byOffer,
     duplicateFlags,
   };
