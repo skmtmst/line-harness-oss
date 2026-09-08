@@ -1041,7 +1041,8 @@ export const NEN_COLUMN_CREATE = {
   },
   success: {
     status: 201,
-    body: { success: true, data: { id: 'nen-column-draft-1' } },
+    // 本番口は `data: { id, queued }` を返す(点検 #512 の中8)。数は固定値。
+    body: { success: true, data: { id: 'nen-column-draft-1', queued: 0 } },
   },
   inputError: {
     status: 400,
