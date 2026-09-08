@@ -67,11 +67,22 @@ describe('V6 21 NEN配信の画面契約', () => {
 
   it('読込失敗と空状態を共通状態部品で示す', () => {
     expect(PAGE).toContain('kind="loading"')
-    expect(PAGE).toContain('kind="error"')
-    expect(PAGE).toContain('再読み込みしても直らないときは、エラー報告へお知らせください。')
     expect(PAGE).toContain('もう一度読み込む')
     expect(OVERVIEW).toContain('kind="empty"')
     expect(OVERVIEW).toContain('売らない配信です。ここで信用がたまると、売る配信が届きやすくなります。')
+  })
+
+  it('タブごとに取り、失敗はそのタブだけの帯で示す(点検 #512 の中3)', () => {
+    // 8件同時取得・1件失敗で画面全体エラーをやめる。
+    expect(PAGE).toContain('loadTab')
+    expect(PAGE).toContain('tabErrors')
+    expect(PAGE).toContain('tone="danger"')
+    expect(PAGE).not.toContain('loadError')
+    // 操作後は関係するタブだけ読み直す。
+    expect(PAGE).toContain("await loadTab('columns')")
+    expect(PAGE).toContain("await loadTab('pets')")
+    expect(PAGE).toContain("await loadTab('history')")
+    expect(PAGE).not.toContain('await load()')
   })
 
   it('コラム作成で対象・予約・読了後の操作を実APIへ接続する', () => {
@@ -81,5 +92,33 @@ describe('V6 21 NEN配信の画面契約', () => {
     expect(NEW_COLUMN).toContain('配信日時（日本時間）')
     expect(NEW_COLUMN).toContain('読了イベント名')
     expect(NEW_COLUMN).toContain('読了後に付けるタグ')
+  })
+
+  it('一覧側の配信日時も新規作成と同じく日本時間で送る(点検 #512 の中5)', () => {
+    // 端末の時差で解釈する new Date(...).toISOString() を使わない。
+    expect(OVERVIEW).toContain('publishedAtIso')
+    expect(OVERVIEW).not.toContain('new Date(event.target.value).toISOString()')
+  })
+
+  it('コラム作成のタグ候補はこのアカウントのものだけ(点検 #512 の中4)', () => {
+    expect(NEW_COLUMN).toContain('visibleAccountTags')
+    expect(NEW_COLUMN).toContain('accountTags')
+  })
+
+  it('今すぐ送る件数は口と同じ決めごとの数を使う(点検 #512 の中2)', () => {
+    // 一覧の窓付き集計(summary.pending)を送ると、変わっていないのに409になる。
+    expect(PAGE).toContain('overviewRes.data.jobs.pending')
+    expect(PAGE).not.toContain('deliveryList.summary.pending')
+  })
+
+  it('削除と配信予約は確認ダイアログを挟む(点検 #512 の中9)', () => {
+    expect(OVERVIEW).toContain('ConfirmDialog')
+    expect(OVERVIEW).toContain('confirmDeliver')
+    expect(OVERVIEW).toContain('confirmPet')
+    expect(OVERVIEW).toContain('を配信予約しますか？')
+    expect(OVERVIEW).toContain('の登録を外しますか？')
+    // ボタン直結のワンクリック実行は残さない。
+    expect(OVERVIEW).not.toContain('onClick={() => onDeliver(column)}')
+    expect(OVERVIEW).not.toContain('onClick={() => onDeletePet(pet)}')
   })
 })

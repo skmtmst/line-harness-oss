@@ -513,8 +513,6 @@ export default function BroadcastForm({
    * 気づけない。取らなくてよい配信では切れるようにしておく。
    */
   const [measureOpens, setMeasureOpens] = useState(true)
-  const [targetCount, setTargetCount] = useState<number | null>(null)
-  const [counting, setCounting] = useState(false)
   // 送る前の確認。押すまで走らせない。入力のたびに投げると、
   // 書いている途中の本文で「二重送信では」と言われ続ける。
   const [preflight, setPreflight] = useState<BroadcastPreflight | null>(null)
@@ -580,7 +578,7 @@ export default function BroadcastForm({
 
   // 「シナリオ購読中の全員」で選ぶ相手。名前だけ使う。
   useEffect(() => {
-    api.scenarios.list({ accountId: selectedAccountId || undefined })
+    api.scenarios.list({ accountId: selectedAccountId || undefined, limit: 200 })
       .then((res) => { if (res.success) setScenarios(res.data.map((item) => ({ id: item.id, name: item.name }))) })
       .catch(() => undefined)
   }, [selectedAccountId])
@@ -623,15 +621,13 @@ export default function BroadcastForm({
       return
     }
     api.commonActions.resources(selectedAccountId)
-      .then(async (result) => {
+      .then((result) => {
         if (!result.success) return
-        const details = await Promise.all((result.data.commonActions ?? []).map(async (action) => {
-          const detail = await api.commonActions.get(action.id, selectedAccountId)
-          return detail.success && detail.data.currentPublishedVersionId
-            ? { versionId: detail.data.currentPublishedVersionId, name: action.name, version: action.version }
-            : null
-        }))
-        setPublishedActions(details.filter((item): item is NonNullable<typeof item> => item !== null))
+        setPublishedActions((result.data.commonActions ?? []).flatMap((action) => (
+          action.currentPublishedVersionId
+            ? [{ versionId: action.currentPublishedVersionId, name: action.name, version: action.version }]
+            : []
+        )))
       })
       .catch(() => setPublishedActions([]))
   }, [selectedAccountId])
@@ -663,13 +659,6 @@ export default function BroadcastForm({
       segmentConditions: audience,
     }
   }, [audience, tagId, targetMode])
-  const refreshCount = useCallback(async () => {
-    setCounting(true)
-    try { const res = await api.segments.count(audience, selectedAccountId || undefined); setTargetCount(res.success ? (res.count ?? 0) : null) }
-    catch { setTargetCount(null) } finally { setCounting(false) }
-  }, [audience, selectedAccountId])
-  useEffect(() => { const timer = setTimeout(() => void refreshCount(), 350); return () => clearTimeout(timer) }, [refreshCount])
-
   /*
    * 宛先か本文が変わったら、少し待ってから自動で確かめる。
    *
@@ -677,10 +666,15 @@ export default function BroadcastForm({
    * 1回で足りるので、手が止まって 600ms 経ってから走らせる。
    */
   useEffect(() => {
-    const first = bubbles[0]
-    const text = first?.type === 'text' ? String(first.content.text ?? '') : ''
     // 本文が空のうちは走らせない。何も書いていない状態で「文字数が足りません」
     // と出しても、直しようがない。
+    if (
+      audienceError(targetMode, { scenarioId, tagId, condition })
+      || bubblesError(bubbles)
+    ) {
+      setPreflight(null)
+      return
+    }
     const timer = setTimeout(() => void runPreflight(true), 600)
     return () => clearTimeout(timer)
     // runPreflight は毎回作り直されるので依存に入れない。見たいのは中身の変化。
@@ -908,12 +902,8 @@ export default function BroadcastForm({
     送らせない。「たぶんこのくらい」を書くと、その数を根拠に押される。
   */
   const audienceCount = preflight?.audienceCount ?? null
-  /*
-   * 対象画面の人数も、事前確認まで済んだら同じ確定値を使う。
-   * `segments/count` だけが失敗しても `preflight` が数え終えているなら、
-   * 本文の3枚と右側要約で「1,213人 / —人」と食い違わせない。
-   */
-  const audienceDisplayCount = audienceCount ?? targetCount
+  /** 対象画面の人数も、事前確認が返した同じ確定値だけを使う。 */
+  const audienceDisplayCount = audienceCount
   const targetModeLabel = TARGET_MODES.find((mode) => mode.value === targetMode)?.label ?? '未設定'
   /*
     除外の人数。**数としての口がまだ無い。**
@@ -1167,7 +1157,7 @@ export default function BroadcastForm({
             <div className="rounded-card bg-accent-soft px-5 py-3 text-right">
               <p className="text-xs font-bold text-accent">送信対象</p>
               <p className="text-2xl font-black text-accent">
-                {counting && audienceDisplayCount === null ? '…' : audienceDisplayCount?.toLocaleString('ja-JP') ?? '—'}
+                {audienceDisplayCount?.toLocaleString('ja-JP') ?? '—'}
                 <span className="ml-1 text-sm">人</span>
               </p>
             </div>

@@ -15,6 +15,9 @@ const MAX_JOBS_PER_TICK = 30;
 // 送信に失敗した job を何回まで試すか。これを超えた job は拾われなくなり、
 // status='failed' のまま残る（last_error に理由が入る）。
 const MAX_DELIVERY_ATTEMPTS = 5;
+// コラム配信予約の1回のまとめ書き件数。D1 の batch は文が多すぎると
+// 1 回の呼び出しが重くなるため、100件ずつに区切る。
+const COLUMN_QUEUE_BATCH_SIZE = 100;
 
 export type CampaignRow = {
   campaign_key: string;
@@ -421,18 +424,24 @@ export async function queueColumnDelivery(
         ))`,
   ).bind(lineAccountId, column.target_mode, column.target_tag_id).all<{ id: string }>();
   const now = jstNow();
+  // 友だち1人ずつ順番に書き込むと千人規模で千回超の書き込みになる(点検 #512 の中1)。
+  // 100件ずつまとめて送る。INSERT OR IGNORE なので入り直しても重複しない。
+  const articlePayload = JSON.stringify({ article: column });
+  const snapshot = campaignSnapshot(campaign);
+  const sourceKey = `column:${columnId}`;
   let queued = 0;
-  for (const friend of friends.results) {
-    const result = await db.prepare(
+  for (let offset = 0; offset < friends.results.length; offset += COLUMN_QUEUE_BATCH_SIZE) {
+    const chunk = friends.results.slice(offset, offset + COLUMN_QUEUE_BATCH_SIZE);
+    const results = await db.batch(chunk.map((friend) => db.prepare(
       `INSERT OR IGNORE INTO nen_delivery_jobs
         (id, campaign_key, friend_id, line_account_id, source_key, payload, campaign_snapshot,
          scheduled_at, status, attempts, created_at, updated_at)
        VALUES (?, 'column', ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?)`,
     ).bind(
-      crypto.randomUUID(), friend.id, lineAccountId, `column:${columnId}`,
-      JSON.stringify({ article: column }), campaignSnapshot(campaign), scheduledAt, now, now,
-    ).run();
-    queued += result.meta.changes ?? 0;
+      crypto.randomUUID(), friend.id, lineAccountId, sourceKey,
+      articlePayload, snapshot, scheduledAt, now, now,
+    )));
+    for (const result of results) queued += result.meta.changes ?? 0;
   }
   await db.prepare(
     `UPDATE nen_columns SET delivery_status = ?, delivery_at = ?, updated_at = ?

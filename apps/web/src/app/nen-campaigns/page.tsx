@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import NoteBar from '@/components/shared/note-bar'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import {
@@ -66,38 +67,84 @@ export default function NenCampaignsPage() {
   const [testFriendId, setTestFriendId] = useState('')
   const [notice, setNotice] = useState<Notice | null>(null)
   const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState('')
+  const [tabErrors, setTabErrors] = useState<Record<NenTab, string>>({ flow: '', columns: '', pets: '', history: '' })
   const [petDraft, setPetDraft] = useState({ friendId: '', name: '', animalType: 'dog', gender: 'unknown', birthday: '' })
   const loadSequence = useRef(0)
+  const loadedTabs = useRef<Set<NenTab>>(new Set())
+  const tabRef = useRef<NenTab>(tab)
+  tabRef.current = tab
 
-  const load = useCallback(async () => {
+  /*
+    開いたタブのぶんだけ取る(点検 #512 の中3)。8件同時取得だと遅く、
+    1件の失敗で画面全体がエラーになる。失敗はそのタブだけの帯で示し、
+    操作後は関係するタブだけ読み直す。
+  */
+  const loadTab = useCallback(async (next: NenTab) => {
     const sequence = ++loadSequence.current
-    setLoading(true); setLoadError('')
+    setLoading(true)
     if (!selectedAccountId) {
       setSettings([]); setColumns([]); setPets([])
       setFlowMetrics(null); setColumnMetrics(null); setPetMetrics(null); setDeliveryList(null); setDeliveryDetail(null)
+      setTabErrors({ flow: '', columns: '', pets: '', history: '' })
+      loadedTabs.current.clear()
       setLoading(false); return
     }
-    try {
-      const [settingRes, columnRes, petRes, couponRes, flowRes, columnMetricRes, petMetricRes, deliveryRes] = await Promise.all([
-        api.nenCampaigns.settings(selectedAccountId), api.nenCampaigns.columns(selectedAccountId), api.nenCampaigns.pets(selectedAccountId),
-        api.nenCampaigns.birthdayCoupon(selectedAccountId),
-        api.nenCampaigns.flowMetrics(selectedAccountId), api.nenCampaigns.columnMetrics(selectedAccountId, 90),
-        api.nenCampaigns.petMetrics(selectedAccountId), api.nenCampaigns.deliveries(selectedAccountId, { limit: 20 }),
-      ])
+    const fail = (message: string) => {
       if (sequence !== loadSequence.current) return
-      if (!settingRes.success || !columnRes.success || !petRes.success || !couponRes.success
-        || !flowRes.success || !columnMetricRes.success || !petMetricRes.success || !deliveryRes.success) throw new Error()
-      setSettings(settingRes.data); setColumns(columnRes.data); setPets(petRes.data); setCoupon(couponRes.data)
-      setFlowMetrics(flowRes.data); setColumnMetrics(columnMetricRes.data); setPetMetrics(petMetricRes.data); setDeliveryList(deliveryRes.data)
-    } catch { if (sequence === loadSequence.current) setLoadError('フォロー配信の情報を読み込めませんでした。') }
-    finally { if (sequence === loadSequence.current) setLoading(false) }
+      setTabErrors((current) => ({ ...current, [next]: message }))
+      setLoading(false)
+    }
+    const done = () => {
+      if (sequence !== loadSequence.current) return
+      setTabErrors((current) => ({ ...current, [next]: '' }))
+      loadedTabs.current.add(next)
+      setLoading(false)
+    }
+    try {
+      if (next === 'flow') {
+        const [settingRes, flowRes] = await Promise.all([
+          api.nenCampaigns.settings(selectedAccountId), api.nenCampaigns.flowMetrics(selectedAccountId),
+        ])
+        if (sequence !== loadSequence.current) return
+        if (!settingRes.success || !flowRes.success) return fail('フォロー配信の情報を読み込めませんでした。')
+        setSettings(settingRes.data); setFlowMetrics(flowRes.data); done()
+      } else if (next === 'columns') {
+        const [columnRes, columnMetricRes] = await Promise.all([
+          api.nenCampaigns.columns(selectedAccountId), api.nenCampaigns.columnMetrics(selectedAccountId, 90),
+        ])
+        if (sequence !== loadSequence.current) return
+        if (!columnRes.success || !columnMetricRes.success) return fail('コラムの情報を読み込めませんでした。')
+        setColumns(columnRes.data); setColumnMetrics(columnMetricRes.data); done()
+      } else if (next === 'pets') {
+        const [petRes, petMetricRes, couponRes] = await Promise.all([
+          api.nenCampaigns.pets(selectedAccountId),
+          api.nenCampaigns.petMetrics(selectedAccountId), api.nenCampaigns.birthdayCoupon(selectedAccountId),
+        ])
+        if (sequence !== loadSequence.current) return
+        if (!petRes.success || !petMetricRes.success || !couponRes.success) return fail('ペットの情報を読み込めませんでした。')
+        setPets(petRes.data); setPetMetrics(petMetricRes.data); setCoupon(couponRes.data); done()
+      } else {
+        const deliveryRes = await api.nenCampaigns.deliveries(selectedAccountId, { limit: 20 })
+        if (sequence !== loadSequence.current) return
+        if (!deliveryRes.success) return fail('配信履歴を読み込めませんでした。')
+        setDeliveryList(deliveryRes.data); done()
+      }
+    } catch { fail('情報を読み込めませんでした。通信を確認してください。') }
   }, [selectedAccountId])
 
-  useEffect(() => { void load() }, [load])
+  const loadTabRef = useRef(loadTab)
+  loadTabRef.current = loadTab
+  useEffect(() => {
+    loadedTabs.current.clear()
+    void loadTab(tabRef.current)
+  }, [loadTab])
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get('tab')
-    if (requested === 'columns' || requested === 'pets' || requested === 'history') setTab(requested)
+    if (requested === 'columns' || requested === 'pets' || requested === 'history') {
+      setTab(requested)
+      void loadTabRef.current(requested)
+    }
+    // 初回だけURLの指定タブを開く。loadTabはref経由で最新のものを使う。
   }, [])
   useEffect(() => {
     setFriends([]); setTestFriendId('')
@@ -131,7 +178,7 @@ export default function NenCampaignsPage() {
   }
   const deliverColumn = async (column: NenColumn, scheduledAt?: string) => {
     if (!selectedAccountId) return
-    try { const result = await api.nenCampaigns.deliverColumn(column.id, { accountId: selectedAccountId, scheduledAt }); if (!result.success) throw new Error(result.error); setNotice({ tone: 'success', text: `${result.data.queued}人分のコラム配信を予約しました。` }); await load() }
+    try { const result = await api.nenCampaigns.deliverColumn(column.id, { accountId: selectedAccountId, scheduledAt }); if (!result.success) throw new Error(result.error); setNotice({ tone: 'success', text: `${result.data.queued}人分のコラム配信を予約しました。` }); await loadTab('columns') }
     catch { setNotice({ tone: 'error', text: 'コラムを配信予約できませんでした。' }) }
   }
   const saveColumnMessage = async (column: NenColumn) => {
@@ -142,7 +189,7 @@ export default function NenCampaignsPage() {
   }
   const duplicateColumn = async (column: NenColumn) => {
     if (!selectedAccountId) return
-    try { const result = await api.nenCampaigns.duplicateColumn(column.id, selectedAccountId); if (!result.success) throw new Error(); setNotice({ tone: 'success', text: `「${column.title}」を下書きへ複製しました。` }); await load() }
+    try { const result = await api.nenCampaigns.duplicateColumn(column.id, selectedAccountId); if (!result.success) throw new Error(); setNotice({ tone: 'success', text: `「${column.title}」を下書きへ複製しました。` }); await loadTab('columns') }
     catch { setNotice({ tone: 'error', text: 'コラムを複製できませんでした。' }) }
   }
   const testColumn = async (column: NenColumn) => {
@@ -151,19 +198,29 @@ export default function NenCampaignsPage() {
     catch { setNotice({ tone: 'error', text: 'コラムをテスト送信できませんでした。' }) }
   }
   const sendPendingNow = async () => {
-    if (!selectedAccountId || !deliveryList) return
-    const expectedCount = deliveryList.summary.pending
-    try { const result = await api.nenCampaigns.sendPendingNow(selectedAccountId, expectedCount); if (!result.success) throw new Error(); setNotice({ tone: 'success', text: `${result.data.queued}件を今すぐ送る待ち行列へ移しました。` }); await load() }
+    if (!selectedAccountId) return
+    /*
+      送る件数は一覧の窓付き集計(summary.pending)ではなく、口と同じ決めごとの
+      overview.jobs.pending(未来ぶん)を使う(点検 #512 の中2)。窓が違う数を
+      送ると、変わっていないのに409で失敗する。
+    */
+    try {
+      const overviewRes = await api.nenCampaigns.overview(selectedAccountId)
+      if (!overviewRes.success) throw new Error()
+      const result = await api.nenCampaigns.sendPendingNow(selectedAccountId, overviewRes.data.jobs.pending)
+      if (!result.success) throw new Error()
+      setNotice({ tone: 'success', text: `${result.data.queued}件を今すぐ送る待ち行列へ移しました。` }); await loadTab('history')
+    }
     catch { setNotice({ tone: 'error', text: '待っている配信の件数が変わりました。読み直して確認してください。' }) }
   }
   const addPet = async () => {
     if (!selectedAccountId || !petDraft.friendId || !petDraft.name.trim()) { setNotice({ tone: 'error', text: 'LINEユーザーとペットのお名前を入力してください。' }); return }
-    try { await api.nenCampaigns.createPet(selectedAccountId, { ...petDraft, birthday: petDraft.birthday || undefined }); setPetDraft((current) => ({ ...current, name: '', birthday: '', gender: 'unknown' })); setNotice({ tone: 'success', text: 'ペット情報を登録しました。' }); await load() }
+    try { await api.nenCampaigns.createPet(selectedAccountId, { ...petDraft, birthday: petDraft.birthday || undefined }); setPetDraft((current) => ({ ...current, name: '', birthday: '', gender: 'unknown' })); setNotice({ tone: 'success', text: 'ペット情報を登録しました。' }); await loadTab('pets') }
     catch { setNotice({ tone: 'error', text: 'ペット情報を登録できませんでした。' }) }
   }
   const deletePet = async (pet: NenPetProfile) => {
     if (!selectedAccountId) return
-    try { await api.nenCampaigns.deletePet(selectedAccountId, pet.id); setNotice({ tone: 'success', text: `${pet.name}の登録を外しました。` }); await load() }
+    try { await api.nenCampaigns.deletePet(selectedAccountId, pet.id); setNotice({ tone: 'success', text: `${pet.name}の登録を外しました。` }); await loadTab('pets') }
     catch { setNotice({ tone: 'error', text: 'ペット情報を外せませんでした。' }) }
   }
   const saveCoupon = async () => {
@@ -193,13 +250,16 @@ export default function NenCampaignsPage() {
     try {
       const result = await api.nenCampaigns.retryDelivery(id, { lineAccountId: selectedAccountId, expectedVersion, reason: reason.trim() })
       if (!result.success) throw new Error()
-      setNotice({ tone: 'success', text: '配信を再送待ちへ戻しました。' }); setDeliveryDetail(null); await load()
+      setNotice({ tone: 'success', text: '配信を再送待ちへ戻しました。' }); setDeliveryDetail(null); await loadTab('history')
     } catch { setNotice({ tone: 'error', text: '配信を再送待ちへ戻せませんでした。状態を更新して確認してください。' }) }
   }
-  const changeTab = (next: NenTab) => { setTab(next); window.history.replaceState(window.history.state, '', next === 'flow' ? '/nen-campaigns' : `/nen-campaigns?tab=${next}`) }
+  const changeTab = (next: NenTab) => {
+    setTab(next)
+    window.history.replaceState(window.history.state, '', next === 'flow' ? '/nen-campaigns' : `/nen-campaigns?tab=${next}`)
+    void loadTab(next)
+  }
 
-  if (loading) return <main className="p-6"><ListState kind="loading" /></main>
-  if (loadError) return <main className="p-6"><ListState kind="error" description={tab === 'columns' ? '再読み込みしても直らないときは、エラー報告へお知らせください。' : loadError} action={<Button variant="primary" onClick={() => void load()}>{tab === 'columns' ? 'もう一度読み込む' : 'フォロー配信を再読み込み'}</Button>} /></main>
+  if (loading && loadedTabs.current.size === 0) return <main className="p-6"><ListState kind="loading" /></main>
 
   const headerAction = tab === 'columns' ? <Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button>
     : tab === 'pets' ? <Button href="/form-submissions" variant="primary">聞きとりフォームを開く</Button>
@@ -208,6 +268,16 @@ export default function NenCampaignsPage() {
 
   return (
     <>
+      {tabErrors[tab] ? (
+        <div className="mx-auto w-full px-4 pt-4 sm:px-6" style={{ maxWidth: 1600 }}>
+          <NoteBar
+            tone="danger"
+            action={<Button onClick={() => void loadTab(tab)}>もう一度読み込む</Button>}
+          >
+            {tabErrors[tab]}
+          </NoteBar>
+        </div>
+      ) : null}
       <NenOverview
         topAction={headerAction}
         tab={tab} onTabChange={changeTab} settings={settings} columns={columns} pets={pets} friends={friends} coupon={coupon}

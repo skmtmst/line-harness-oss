@@ -5,24 +5,24 @@ const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 
 describe('V6 シナリオ一覧の読込状態', () => {
   it('読込・成功・失敗を別の状態として持つ', () => {
-    expect(PAGE).toContain("type LoadStatus = 'loading' | 'ready' | 'error'")
-    expect(PAGE).toContain("setLoadStatus('loading')")
-    expect(PAGE).toContain("setLoadStatus('ready')")
-    expect(PAGE).toContain("setLoadStatus('error')")
+    expect(PAGE).toContain('useOffsetServerList<ScenarioWithCount>')
+    expect(PAGE).toContain('scenarioList.loading')
+    expect(PAGE).toContain('scenarioList.error')
+    expect(PAGE).toContain('scenarioList.items')
   })
 
   it('読込失敗を空のシナリオ一覧として表示しない', () => {
-    expect(PAGE).toContain("loadStatus === 'error'")
+    expect(PAGE).toContain('scenarioList.error')
     expect(PAGE).toContain('登録したシナリオは消えていません。')
     expect(PAGE).toContain('onRetry={() => void loadScenarios()}')
     expect(PAGE).not.toContain("setError(res.error)")
   })
 
   it('アカウント切替前の遅い応答と古い一覧を採用しない', () => {
-    expect(PAGE).toContain('const loadRequestRef = useRef(0)')
-    expect(PAGE).toContain('if (requestId !== loadRequestRef.current) return')
-    expect(PAGE).toContain('loadRequestRef.current += 1')
-    expect(PAGE).toContain('setScenarios([])')
+    expect(PAGE).toContain('requestKey: JSON.stringify({')
+    expect(PAGE).toContain("accountId: selectedAccountId ?? ''")
+    expect(PAGE).toContain('}, signal)')
+    expect(PAGE).toContain('page: request.page')
   })
 
   it('操作失敗は内部エラーを出さず一覧読込失敗と分ける', () => {

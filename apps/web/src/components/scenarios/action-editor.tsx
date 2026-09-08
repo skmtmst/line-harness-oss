@@ -273,7 +273,7 @@ export default function ActionEditor({
         api.tags.list(),
         api.friendFields.list(selectedAccountId),
         api.supportMarks.list(selectedAccountId),
-        api.scenarios.list(),
+        api.scenarios.list({ limit: 200 }),
         api.commonVars.list(selectedAccountId),
       ])
       if (tagRes.success) setTags(tagRes.data.map((t) => ({ id: t.id, name: t.name })))

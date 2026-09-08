@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { api, fetchApi } from '@/lib/api'
 import Button from '@/components/shared/button'
+import EditRouteModal from '../_components/edit-route-modal'
 import Select from '@/components/shared/select'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import type {
@@ -17,10 +18,19 @@ import type {
 
 /** 選んだ流入元の人数、成果、友だち、追加時の動きをまとめて表示する。 */
 
+interface MessageTemplate {
+  id: string
+  name: string
+  messageType: string
+  messageContent: string
+}
+
 interface AttributedFriend {
   id: string
   displayName: string
   trackedAt: string | null
+  // #514-8: 口が返すのは currentStatus(いまの状態)だけ。はじめて見た
+  // ページ・成果・マイルの集計口は無いので、無い欄は「—」にする。
   firstPage?: string
   currentStatus?: string
   conversion?: string
@@ -36,10 +46,16 @@ function InflowLinkDetailPageContent() {
   const [routes, setRoutes] = useState<EntryRoute[]>([])
   const [route, setRoute] = useState<EntryRoute | null>(null)
   const [funnel, setFunnel] = useState<EntryRouteFunnel | null>(null)
+  // #514-12: 段階の取得失敗を読込中と混ぜない。失敗したら文と再読み込みを出す。
+  const [funnelError, setFunnelError] = useState(false)
+  const [funnelAttempt, setFunnelAttempt] = useState(0)
   const [friends, setFriends] = useState<AttributedFriend[]>([])
   const [tags, setTags] = useState<Tag[]>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [pools, setPools] = useState<TrafficPool[]>([])
+  const [templates, setTemplates] = useState<MessageTemplate[]>([])
+  // #514-13: 「この経路を編集」は編集窓を開く(押しても何も起きない状態を直す)。
+  const [editingRoute, setEditingRoute] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
@@ -60,12 +76,17 @@ function InflowLinkDetailPageContent() {
       api.tags.list(),
       api.scenarios.list(),
       api.pools.list(),
-    ]).then(([r, t, sc, p]) => {
+      // 編集窓の「追加直後に送るメッセージ」選択肢に使う。
+      api.templates.list(),
+    ]).then(([r, t, sc, p, tp]) => {
       if (cancelled) return
       if (r.status === 'fulfilled' && r.value.success) setRoutes(r.value.data)
       if (t.status === 'fulfilled' && t.value.success) setTags(t.value.data)
       if (sc.status === 'fulfilled' && sc.value.success) setScenarios(sc.value.data)
       if (p.status === 'fulfilled' && p.value.success) setPools(p.value.data)
+      if (tp.status === 'fulfilled' && tp.value.success) {
+        setTemplates(tp.value.data as unknown as MessageTemplate[])
+      }
       setLoading(false)
     })
     return () => {
@@ -78,11 +99,15 @@ function InflowLinkDetailPageContent() {
     if (!selectedId) {
       setRoute(null)
       setFunnel(null)
+      setFunnelError(false)
       setFriends([])
       return
     }
     let cancelled = false
     setError('')
+    // #514-12: 段階の失敗を読込中のままにしない。再読み込みは funnelAttempt で引き直す。
+    setFunnel(null)
+    setFunnelError(false)
     void Promise.allSettled([
       api.entryRoutes.get(selectedId),
       api.entryRoutes.funnel(selectedId),
@@ -103,11 +128,12 @@ function InflowLinkDetailPageContent() {
         }
       } else setError('リンクの取得に失敗しました')
       if (f.status === 'fulfilled' && f.value.success) setFunnel(f.value.data)
+      else if (!cancelled) setFunnelError(true)
     })
     return () => {
       cancelled = true
     }
-  }, [selectedId])
+  }, [selectedId, funnelAttempt])
 
   const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
   const url = route ? `${workerBase}/r/${route.refCode}` : null
@@ -181,7 +207,7 @@ function InflowLinkDetailPageContent() {
       {!route ? <div className="rounded-card border border-hairline bg-canvas p-12 text-center text-sm text-ink-faint">{loading ? '読み込み中…' : '流入元を表示できませんでした。'}</div> : <>
         <div data-design="Head" className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div><div className="flex items-center gap-2"><span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold"># {route.refCode}</span><span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold">{route.genre || '未分類'}</span></div><p className="mt-2 text-sm text-ink-faint">{route.createdAt.slice(5, 10).replace('-', '/')} に発行。{url} を通った人の記録です。</p></div>
-          <div className="flex gap-2"><Button onClick={copyUrl}>{copied ? 'コピーしました' : 'URLをコピー'}</Button><Button variant="secondary">この経路を編集</Button><Button variant="secondary" aria-label={`${route.name}の削除を確認`} onClick={() => { setDeleteError(''); setDeleteChoice('stop'); setRedirectTargetId(''); setDeleteOpen(true) }}>この経路を削除</Button></div>
+          <div className="flex gap-2"><Button onClick={copyUrl}>{copied ? 'コピーしました' : 'URLをコピー'}</Button><Button variant="secondary" onClick={() => setEditingRoute(true)}>この経路を編集</Button><Button variant="secondary" aria-label={`${route.name}の削除を確認`} onClick={() => { setDeleteError(''); setDeleteChoice('stop'); setRedirectTargetId(''); setDeleteOpen(true) }}>この経路を削除</Button></div>
         </div>
         {/*
           口から取れない数は書かない（#514 重大3）。funnel の4数は累計。
@@ -190,8 +216,8 @@ function InflowLinkDetailPageContent() {
         <div className="grid grid-cols-2 gap-4 xl:grid-cols-4"><MetricCard label="クリック" value={funnel?.click_count} unit="回" detail="累計" /><MetricCard label="友だちになった" value={funnel?.friend_add_count} unit="人" detail={`追加率 ${addRate ?? '—'}%`} /><MetricCard label="いま残っている" value={null} unit="人" detail="残数とブロック数の集計は未接続です" /><MetricCard label="成果" value={funnel?.cv_count} unit="件" detail="1人あたりの金額は未接続です" /></div>
         <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-4">
           <main data-design="Left" className="space-y-4 xl:col-span-3">
-            <section><h2 className="text-lg font-bold text-ink">この経路から来た人の、その後</h2><p className="text-xs text-ink-faint">来ただけで終わっていないかを見ます。</p><div className="mt-3 rounded-card border border-hairline bg-canvas p-4">{funnel ? <FunnelView funnel={funnel} /> : <p className="text-xs text-ink-faint">読み込み中…</p>}</div></section>
-            <section><h2 className="text-lg font-bold text-ink">この経路から来た友だち</h2><p className="text-xs text-ink-faint">新しい順</p>{friends.length === 0 ? <p className="mt-3 text-xs text-ink-faint">この経路から来た友だちは、まだ記録されていません。</p> : <div className="mt-3 overflow-hidden rounded-card border border-hairline bg-canvas"><table className="w-full table-fixed text-xs"><thead className="border-b border-hairline bg-canvas-sunken text-ink-faint"><TableHeadRow><Th>友だち</Th><Th>いつ来たか</Th><Th>いまの状態</Th><Th>この人の成果</Th><Th>マイル</Th><Th align="right">確認</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{friends.slice(0, 5).map((friend) => <tr key={friend.id}><td className="px-3 py-3 font-semibold text-ink"><span className="block">{friend.displayName}</span><span className="block truncate font-normal text-ink-faint">はじめて見たページ {friend.firstPage ?? '—'}</span></td><td className="px-3 py-3 text-ink-secondary">{friend.trackedAt ? friend.trackedAt.slice(5, 16).replace('T', ' ').replaceAll('-', '/') : '日時不明'}</td><td className="px-3 py-3 font-semibold text-ink-secondary">{friend.currentStatus ?? '取得できません'}</td><td className="px-3 py-3 text-ink-secondary">{friend.conversion ?? '取得できません'}</td><td className="px-3 py-3 font-semibold text-ink">{friend.miles ?? '—'}</td><td className="px-3 py-3 text-right"><Link href={`/friends/detail?id=${encodeURIComponent(friend.id)}`} className="text-action hover:underline">友だちを見る</Link></td></tr>)}</tbody></table></div>}</section>
+            <section><h2 className="text-lg font-bold text-ink">この経路から来た人の、その後</h2><p className="text-xs text-ink-faint">来ただけで終わっていないかを見ます。</p><div className="mt-3 rounded-card border border-hairline bg-canvas p-4">{funnel ? <FunnelView funnel={funnel} /> : funnelError ? <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-ink-secondary">段階を取得できませんでした。集計データは消えていません。</p><Button variant="secondary" onClick={() => setFunnelAttempt((n) => n + 1)}>段階を再読み込み</Button></div> : <p className="text-xs text-ink-faint">読み込み中…</p>}</div></section>
+            <section><h2 className="text-lg font-bold text-ink">この経路から来た友だち</h2><p className="text-xs text-ink-faint">新しい順</p>{friends.length === 0 ? <p className="mt-3 text-xs text-ink-faint">この経路から来た友だちは、まだ記録されていません。</p> : <div className="mt-3 overflow-hidden rounded-card border border-hairline bg-canvas"><table className="w-full table-fixed text-xs"><thead className="border-b border-hairline bg-canvas-sunken text-ink-faint"><TableHeadRow><Th>友だち</Th><Th>いつ来たか</Th><Th>いまの状態</Th><Th>この人の成果</Th><Th>マイル</Th><Th align="right">確認</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{friends.slice(0, 5).map((friend) => <tr key={friend.id}><td className="px-3 py-3 font-semibold text-ink"><span className="block">{friend.displayName}</span><span className="block truncate font-normal text-ink-faint">はじめて見たページ {friend.firstPage ?? '—'}</span></td><td className="px-3 py-3 text-ink-secondary">{friend.trackedAt ? friend.trackedAt.slice(5, 16).replace('T', ' ').replaceAll('-', '/') : '日時不明'}</td><td className="px-3 py-3 font-semibold text-ink-secondary">{friend.currentStatus ?? '—'}</td><td className="px-3 py-3 text-ink-secondary">{friend.conversion ?? '—'}</td><td className="px-3 py-3 font-semibold text-ink">{friend.miles ?? '—'}</td><td className="px-3 py-3 text-right"><Link href={`/friends/detail?id=${encodeURIComponent(friend.id)}`} className="text-action hover:underline">友だちを見る</Link></td></tr>)}</tbody></table></div>}</section>
           </main>
           <aside data-design="Right" className="space-y-4">
             {/*
@@ -205,6 +231,20 @@ function InflowLinkDetailPageContent() {
           </aside>
         </div>
       </>}
+      {editingRoute && route && <EditRouteModal
+        route={route}
+        pools={pools}
+        scenarios={scenarios}
+        templates={templates}
+        tags={tags}
+        existingGenres={[...new Set(routes.map((entryRoute) => entryRoute.genre).filter((genre): genre is string => !!genre))]}
+        onClose={() => setEditingRoute(false)}
+        onSaved={(savedRoute) => {
+          setRoutes((current) => current.map((entryRoute) => entryRoute.id === savedRoute.id ? savedRoute : entryRoute))
+          setRoute(savedRoute)
+          setEditingRoute(false)
+        }}
+      />}
       {deleteOpen && route && <div className="fixed inset-0 z-70 flex items-center justify-center bg-ink/35 p-4" data-design-node="UIaM7" role="dialog" aria-modal="true">
         <div className="w-full overflow-hidden rounded-card bg-canvas shadow-2xl" style={{ maxWidth: 840 }}>
           <div className="flex items-start gap-3 border-b border-hairline px-6 py-5" style={{ minHeight: 96 }}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-danger-bg text-xl font-bold text-danger">!</span><div><h2 className="text-xl font-bold text-ink">「{route.name}」を削除しますか？</h2><p className="mt-1 text-sm text-ink-faint">このURLは {route.createdAt.slice(5, 10).replace('-', '/')} から使われています。消すと同じURLは開けなくなります。</p></div></div>

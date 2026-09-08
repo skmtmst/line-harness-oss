@@ -210,6 +210,8 @@ function AutoReplyPublishInner() {
   const [draft, setDraft] = useState<AutoReplyDraftVersion | null>(null)
   const [conflicts, setConflicts] = useState<AutoReplyConflict[]>([])
   const [friends, setFriends] = useState<FriendListItem[]>([])
+  const [friendTotal, setFriendTotal] = useState(0)
+  const [friendQuery, setFriendQuery] = useState('')
   const [selectedFriendId, setSelectedFriendId] = useState('')
   const [testMessage, setTestMessage] = useState('予約変更したい')
   const [validation, setValidation] = useState<AutoReplyValidationResult | null>(null)
@@ -220,20 +222,26 @@ function AutoReplyPublishInner() {
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState('')
 
-  const loadFriends = useCallback(async (accountId: string) => {
+  // 送信者候補は先頭20件だけ。21件目以降は名前で探す。失敗時は選び直せるよう
+  // 再読込ボタンを出す（無いとテスト実行ボタンまで詰む）。
+  const loadFriends = useCallback(async (accountId: string, search?: string) => {
     setFriendLoadState('loading')
     try {
       const res = await api.friends.list({
         accountId,
         includeChatStatus: true,
         limit: 20,
+        search: search?.trim() || undefined,
       })
-      const items = res.success && Array.isArray(res.data?.items) ? res.data.items : []
+      if (!res.success) throw new Error(res.error)
+      const items = Array.isArray(res.data?.items) ? res.data.items : []
       setFriends(items)
+      setFriendTotal(typeof res.data?.total === 'number' ? res.data.total : items.length)
       setSelectedFriendId((current) => current || items[0]?.id || '')
       setFriendLoadState('ready')
     } catch {
       setFriends([])
+      setFriendTotal(0)
       setSelectedFriendId('')
       setFriendLoadState('error')
     }
@@ -472,6 +480,35 @@ function AutoReplyPublishInner() {
                         ? friends.map((friend) => ({ value: friend.id, label: senderLabel(friend) }))
                         : [{ value: '', label: friendLoadState === 'error' ? '—（未取得）送信者を確認できません' : '読み込み中' }]}
                     />
+                    <span className="text-caption text-ink-faint">
+                      {friendLoadState === 'ready'
+                        ? `候補 ${friendTotal.toLocaleString('ja-JP')}人中 ${friends.length}人を表示`
+                        : friendLoadState === 'error'
+                          ? '送信者を確認できませんでした'
+                          : '送信者を読み込み中'}
+                    </span>
+                    <div className="arp-senderTools">
+                      <input
+                        aria-label="送信者を名前で探す"
+                        value={friendQuery}
+                        onChange={(event) => setFriendQuery(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' && draft?.settings.lineAccountId) {
+                            event.preventDefault()
+                            void loadFriends(draft.settings.lineAccountId, friendQuery)
+                          }
+                        }}
+                        placeholder="名前で探す"
+                      />
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={friendLoadState === 'loading' || !draft?.settings.lineAccountId}
+                        onClick={() => draft?.settings.lineAccountId && void loadFriends(draft.settings.lineAccountId, friendQuery)}
+                      >
+                        {friendLoadState === 'error' ? '送信者を読み直す' : '探す'}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </section>

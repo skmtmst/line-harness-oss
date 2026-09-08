@@ -23,6 +23,7 @@ import {
   toCreateInput,
   titleNotice,
   validateDraft,
+  visibleAccountTags,
   type ColumnDraft,
   type Failure,
 } from './column-form'
@@ -74,6 +75,8 @@ function NewNenColumnInner() {
   const errors = validateDraft(draft)
   const errorFor = (field: keyof ColumnDraft) =>
     touched ? errors.find((e) => e.field === field)?.message : undefined
+  /* 他アカウントのタグは選べると保存で400になるため、候補に出さない(点検 #512 の中4)。 */
+  const accountTags = selectedAccountId ? visibleAccountTags(tags, selectedAccountId) : []
 
   const save = async () => {
     setBusy(true)
@@ -221,7 +224,7 @@ function NewNenColumnInner() {
                   error={errorFor('targetTagId')}
                   options={[
                     { value: '', label: 'タグを選択' },
-                    ...tags.map((tag) => ({ value: tag.id, label: tag.name })),
+                    ...accountTags.map((tag) => ({ value: tag.id, label: tag.name })),
                   ]}
                   onChange={(value) => setDraft((current) => ({ ...current, targetTagId: value }))}
                 />
@@ -238,7 +241,7 @@ function NewNenColumnInner() {
                 value={draft.completionTagId}
                 options={[
                   { value: '', label: '付けない' },
-                  ...tags.map((tag) => ({ value: tag.id, label: tag.name })),
+                  ...accountTags.map((tag) => ({ value: tag.id, label: tag.name })),
                 ]}
                 onChange={(value) => setDraft((current) => ({ ...current, completionTagId: value }))}
               />

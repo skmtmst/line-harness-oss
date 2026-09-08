@@ -30,7 +30,11 @@ describe('V6 機能18の画面契約', () => {
     expect(CREATE).toContain('designNode="TEVk8"')
     expect(DETAIL).toContain('data-design-node="JupxW"')
     expect(ADS).toContain('成果地点と、広告に返す名前の対応')
-    expect(SITE).toContain('知らないドメインが1つあります')
+    // #514-14: 口はパスだけ返すため、死んでいる「知らないドメイン」判定と
+    // 直書きの警告は出さない。届いたパスをそのまま出す。
+    expect(SITE).not.toContain('知らないドメインが1つあります')
+    expect(SITE).not.toContain("includes('unknown-')")
+    expect(SITE).toContain('いま届いているページ')
   })
 
   it('押せない準備中UIを機能18から除く', () => {

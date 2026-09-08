@@ -61,6 +61,7 @@ export default function NewOperatorNotificationPage() {
   const [savedRuleId, setSavedRuleId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
 
   useEffect(() => {
     let active = true
@@ -99,8 +100,7 @@ export default function NewOperatorNotificationPage() {
     setError('')
     try {
       const scheduleLabel = SCHEDULE_OPTIONS.find((option) => option.value === schedule)?.label ?? 'いつでも'
-      const result = await api.notifications.rules.create({
-        lineAccountId: selectedAccountId,
+      const payload = {
         name: name.trim(),
         eventType,
         conditions: {
@@ -117,7 +117,11 @@ export default function NewOperatorNotificationPage() {
           lifecycle: 'draft',
         },
         channels: emailFallback ? ['dashboard', 'line', 'email'] : ['dashboard', 'line'],
-      })
+      }
+      // 2回目以降は作り直さず書き換える。作り直すと同じお知らせが増える。
+      const result = savedRuleId
+        ? await api.notifications.rules.update(savedRuleId, selectedAccountId, payload)
+        : await api.notifications.rules.create({ lineAccountId: selectedAccountId, ...payload })
       if (!result.success) throw new Error('save failed')
       setSavedRuleId(result.data.id)
       setError('')
@@ -138,7 +142,8 @@ export default function NewOperatorNotificationPage() {
 
   const publish = async () => {
     if (!selectedAccountId || saving) return
-    const ruleId = savedRuleId ?? await saveDraft()
+    // 保存後に直した分も出す。古い内容のまま出さない。
+    const ruleId = await saveDraft()
     if (!ruleId) return
     setSaving(true); setError('')
     try {
@@ -151,13 +156,14 @@ export default function NewOperatorNotificationPage() {
 
   const testSend = async () => {
     if (!selectedAccountId || saving) return
-    const ruleId = savedRuleId ?? await saveDraft()
+    const ruleId = await saveDraft()
     if (!ruleId) return
-    setSaving(true); setError('')
+    setSaving(true); setError(''); setNotice('')
     try {
       const result = await api.notifications.operatorRules.test(ruleId, selectedAccountId)
       if (!result.success) throw new Error(result.error)
-      setError(result.data.accepted > 0 ? '自分へのテスト送信を受け付けました。' : '受け取れる通知方法がありません。受信設定を確認してください。')
+      // 成功は緑の枠で出す。赤い失敗枠には入れない。
+      setNotice(result.data.accepted > 0 ? '自分へのテスト送信を受け付けました。' : '受け取れる通知方法がありません。受信設定を確認してください。')
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'テスト送信できませんでした。')
     } finally { setSaving(false) }
@@ -224,6 +230,7 @@ export default function NewOperatorNotificationPage() {
           </section>
 
           {error ? <p role="alert" className="border-danger bg-danger-bg text-danger rounded-control border px-4 py-3 text-sm">{error}</p> : null}
+          {notice ? <p role="status" className="border-success bg-success-bg text-success rounded-control border px-4 py-3 text-sm">{notice}</p> : null}
         </main>
 
         <aside className="space-y-4">
@@ -257,7 +264,7 @@ export default function NewOperatorNotificationPage() {
         status={savedRuleId ? '下書きを保存しました。テスト後に公開できます。' : '下書きです。保存しても通知は始まりません。'}
         actions={<>
           <Button href="/line-notifications?tab=operator" variant="secondary">やめる</Button>
-          <Button onClick={() => void saveDraft()} disabled={saving || Boolean(savedRuleId)}>{saving ? '保存中…' : savedRuleId ? '保存済み' : '下書きに保存'}</Button>
+          <Button onClick={() => void saveDraft()} disabled={saving}>{saving ? '保存中…' : savedRuleId ? '保存し直す' : '下書きに保存'}</Button>
           <Button onClick={() => void publish()} disabled={saving} variant="primary">出す</Button>
         </>}
       />
