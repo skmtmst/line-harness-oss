@@ -14,6 +14,7 @@ import {
   getFormSubmissionsPage,
   getFormSubmissionAnalytics,
   getLatestFormSubmission,
+  getFormSubmissionById,
   createFormSubmission,
   updateFormSubmissionDestinationWriteResult,
   getFriendByLineUserIdForAccount,
@@ -74,6 +75,13 @@ const FORM_ARCHIVE_BODY_MAX_BYTES = 16 * 1024;
 const PARTIAL_MERGED_MAX_BYTES = 32 * 1024;
 /** ページ分けなし回答取得の上限。互換用の古い形だけに適用する。 */
 const NON_PAGINATED_SUBMISSIONS_MAX = 500;
+/**
+ * 冪等キーは UUID。回答行の id そのものとして使い、同じキーの再送・同時
+ * 送信を 1 行にまとめる(一斉配信の Idempotency-Key と同じ流儀)。
+ */
+const FORM_IDEMPOTENCY_KEY_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+/** 同じキーの再送を受け付ける期間。通信の再送や連打はこの中に収まる。 */
+const FORM_IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 
 class FormArchiveBodyError extends Error {
   constructor(readonly status: 400 | 413, message: string) {
@@ -291,6 +299,67 @@ function serializeSubmission(row: DbFormSubmission & { friend_name?: string | nu
     },
     createdAt: row.created_at,
   };
+}
+
+/**
+ * 回答内容を決まった形の文にする。再送の照合に使い、キーの順番が違っても
+ * 同じ回答は同じ文になる。
+ */
+function canonicalizeIdempotencyInput(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalizeIdempotencyInput).join(',')}]`;
+  }
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return `{${entries.map(([key, entry]) => `${JSON.stringify(key)}:${canonicalizeIdempotencyInput(entry)}`).join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+
+/** 回答内容のハッシュ。同じキーの再送が同じ回答かを照合する。 */
+async function hashIdempotentSubmission(canonical: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/** 期限切れのキー。再送は受け付けず、新しいキーでの送り直しを求める。 */
+function idempotencyKeyExpired(row: DbFormSubmission): boolean {
+  if (!row.idempotency_expires_at) return false;
+  const expiresAt = Date.parse(row.idempotency_expires_at);
+  return Number.isFinite(expiresAt) && expiresAt < Date.now();
+}
+
+/**
+ * 同じキーの再送が、同じフォーム・同じ友だち・同じ回答か。
+ * ハッシュを持たない行(冪等化より前の回答)の使い回しも、ここで断る。
+ */
+function sameIdempotentSubmission(
+  row: DbFormSubmission,
+  formId: string,
+  friendId: string,
+  hash: string,
+): boolean {
+  if (row.form_id !== formId || row.friend_id !== friendId) return false;
+  if (!row.idempotency_hash) return false;
+  return row.idempotency_hash === hash;
+}
+
+/**
+ * 再送の応答。保存時と同じ形を返し、連携の成否も再現する。
+ * 連携で弾かれた回答の再送は、弾かれたときの結果のまま返す。
+ */
+function serializeIdempotentReplay(row: DbFormSubmission): Record<string, unknown> {
+  const base = serializeSubmission(row) as Record<string, unknown>;
+  try {
+    const data = JSON.parse(row.data || '{}') as Record<string, unknown>;
+    if ('_webhookResult' in data) {
+      return { ...base, webhookPassed: false, webhookData: data._webhookResult };
+    }
+  } catch {
+    // 壊れた回答は基本形のまま返す
+  }
+  return base;
 }
 
 function dateFieldsOfForm(form: DbForm): Array<{ key: string; label: string }> {
@@ -1014,9 +1083,17 @@ forms.get('/api/forms/:id/my-latest', async (c) => {
 });
 
 // POST /api/forms/:id/submit — submit form (public, used by LIFF)
+//
+// 再送・連打の二重受理を防ぐため、Idempotency-Key ヘッダ(UUID)を受け付ける。
+// キーは回答行の id そのものになり、同じキーの再送は保存済みの行を返す。
+// 同じキーで内容が違う使い回しは 409 で断る。キーが無い送信は従来どおり。
 forms.post('/api/forms/:id/submit', async (c) => {
   try {
     const formId = c.req.param('id');
+    const idempotencyKey = c.req.header('Idempotency-Key')?.trim() || null;
+    if (idempotencyKey && !FORM_IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
+      return c.json({ success: false, error: 'Idempotency-Key must be a UUID' }, 400);
+    }
     const form = await getFormById(c.env.DB, formId);
     if (!form) {
       return c.json({ success: false, error: 'Form not found' }, 404);
@@ -1049,6 +1126,39 @@ forms.post('/api/forms/:id/submit', async (c) => {
       return c.json({ success: false, error: 'Friend not found' }, 404);
     }
     const friendId = friend.id;
+
+    // 同じキーの再送は、判定・保存・副作用のすべてを飛ばして保存済みを返す。
+    // アカウントの確認(404)を先に済ませているので、別アカウントのキーで
+    // 他人の回答の有無は分からない。期限後の再送も最初の結果のまま返す。
+    let idempotencyHash: string | null = null;
+    let idempotencyExpiresAt: string | null = null;
+    if (idempotencyKey) {
+      const hashSource: Record<string, unknown> = { ...submissionData };
+      delete hashSource._webhookVerified;
+      delete hashSource._skipWebhook;
+      idempotencyHash = await hashIdempotentSubmission(canonicalizeIdempotencyInput({
+        data: hashSource,
+        trackedLinkId: body.trackedLinkId ?? null,
+      }));
+      idempotencyExpiresAt = new Date(Date.now() + FORM_IDEMPOTENCY_TTL_MS).toISOString();
+      const existing = await getFormSubmissionById(c.env.DB, idempotencyKey);
+      if (existing) {
+        if (idempotencyKeyExpired(existing)) {
+          return c.json(
+            { success: false, error: 'Idempotency-Key の有効期限が切れました。新しいキーで送り直してください' },
+            409,
+          );
+        }
+        if (!sameIdempotentSubmission(existing, formId, friendId, idempotencyHash)) {
+          return c.json(
+            { success: false, error: 'Idempotency-Key was already used with a different request' },
+            409,
+          );
+        }
+        c.header('Idempotency-Replayed', 'true');
+        return c.json({ success: true, data: serializeIdempotentReplay(existing) }, 200);
+      }
+    }
 
     // 受け付けてよいかを見る。
     //
@@ -1097,6 +1207,28 @@ forms.post('/api/forms/:id/submit', async (c) => {
     // authoritative webhook check; client-supplied skip flags are discarded.
     delete submissionData._webhookVerified;
     delete submissionData._skipWebhook;
+
+    // 同時送信で両方が保存まで進んだとき、主キーで片方だけが残る。
+    // 負けた側は保存済みの行を返し、マイル・通知・タグを重ねない。
+    // (一斉配信の同時送信と同じ流儀)
+    const replayConcurrentSubmission = async (createError: unknown): Promise<Response | null> => {
+      const raced = idempotencyKey ? await getFormSubmissionById(c.env.DB, idempotencyKey) : null;
+      if (!raced || !idempotencyHash) throw createError;
+      if (idempotencyKeyExpired(raced)) {
+        return c.json(
+          { success: false, error: 'Idempotency-Key の有効期限が切れました。新しいキーで送り直してください' },
+          409,
+        );
+      }
+      if (!sameIdempotentSubmission(raced, formId, friendId, idempotencyHash)) {
+        return c.json(
+          { success: false, error: 'Idempotency-Key was already used with a different request' },
+          409,
+        );
+      }
+      c.header('Idempotency-Replayed', 'true');
+      return c.json({ success: true, data: serializeIdempotentReplay(raced) }, 200);
+    };
     let webhookData: Record<string, unknown> | null = null;
     if (form.on_submit_webhook_url) {
       const webhookResult = await callFormWebhook(form, submissionData);
@@ -1126,11 +1258,22 @@ forms.post('/api/forms/:id/submit', async (c) => {
           }
         }
         // Still save the submission for records
-        const submission = await createFormSubmission(c.env.DB, {
-          formId,
-          friendId,
-          data: JSON.stringify({ ...submissionData, _webhookResult: webhookResult.data }),
-        });
+        let submission: DbFormSubmission;
+        try {
+          submission = await createFormSubmission(c.env.DB, {
+            formId,
+            friendId,
+            data: JSON.stringify({ ...submissionData, _webhookResult: webhookResult.data }),
+            // キーなし送信の引数は従来どおり(契約テストが厳密に見る)
+            ...(idempotencyKey
+              ? { id: idempotencyKey, idempotencyHash, idempotencyExpiresAt }
+              : {}),
+          });
+        } catch (createError) {
+          const replayed = await replayConcurrentSubmission(createError);
+          if (replayed) return replayed;
+          throw createError;
+        }
         try {
           const status = await updateFormSubmissionDestinationWriteResult(c.env.DB, submission.id, {
             attempted: 0,
@@ -1149,11 +1292,23 @@ forms.post('/api/forms/:id/submit', async (c) => {
     }
 
     // Save submission against the authenticated caller only.
-    const submission = await createFormSubmission(c.env.DB, {
-      formId,
-      friendId,
-      data: JSON.stringify(submissionData),
-    });
+    // 同じキーの同時送信は主キーで片方だけが残り、負けた側は保存済みを返す。
+    let submission: DbFormSubmission;
+    try {
+      submission = await createFormSubmission(c.env.DB, {
+        formId,
+        friendId,
+        data: JSON.stringify(submissionData),
+        // キーなし送信の引数は従来どおり(契約テストが厳密に見る)
+        ...(idempotencyKey
+          ? { id: idempotencyKey, idempotencyHash, idempotencyExpiresAt }
+          : {}),
+      });
+    } catch (createError) {
+      const replayed = await replayConcurrentSubmission(createError);
+      if (replayed) return replayed;
+      throw createError;
+    }
 
     await awardActivityMileage(c.env.DB, {
       eventType: 'form_submitted',
