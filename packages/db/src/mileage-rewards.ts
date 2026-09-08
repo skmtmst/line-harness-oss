@@ -779,6 +779,53 @@ export async function getMileageRedemption(
   return row ? mapRedemption(row) : null;
 }
 
+export type MileageRedemptionListStatus = MileageRedemptionStatus | 'all';
+
+export interface MileageRedemptionListItem extends MileageRewardRedemption {
+  rewardName: string;
+}
+
+/**
+ * 交換履歴の一覧。管理画面で「残高を減らしたのに特典が届かなかった交換」を
+ * 見つけるための口。失敗理由・試行回数・最終日時は行がそのまま持つ。
+ * アカウントの絞り込みは呼び出し側ではなくここで掛ける。
+ */
+export async function listMileageRedemptions(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    status?: MileageRedemptionListStatus;
+    limit: number;
+    offset: number;
+  },
+): Promise<{
+  items: MileageRedemptionListItem[];
+  pagination: { total: number; limit: number; offset: number };
+}> {
+  const limit = Math.min(100, Math.max(1, Math.floor(input.limit)));
+  const offset = Math.max(0, Math.floor(input.offset));
+  const status = input.status ?? 'delivery_failed';
+  const statusClause = status === 'all' ? '' : 'AND r.status = ?';
+  const binds: unknown[] = [input.lineAccountId];
+  if (status !== 'all') binds.push(status);
+  const totalRow = await db.prepare(
+    `SELECT COUNT(*) AS count FROM mileage_redemptions r
+      WHERE r.line_account_id = ? ${statusClause}`,
+  ).bind(...binds).first<{ count: number }>();
+  const rows = await db.prepare(
+    `SELECT r.*, reward.name AS reward_name
+       FROM mileage_redemptions r
+       JOIN mileage_rewards reward ON reward.id = r.reward_id
+      WHERE r.line_account_id = ? ${statusClause}
+      ORDER BY r.updated_at DESC, r.id
+      LIMIT ? OFFSET ?`,
+  ).bind(...binds, limit, offset).all<RedemptionRow & { reward_name: string }>();
+  return {
+    items: rows.results.map((row) => ({ ...mapRedemption(row), rewardName: row.reward_name })),
+    pagination: { total: totalRow?.count ?? 0, limit, offset },
+  };
+}
+
 export async function reserveMileageRewardRedemption(
   db: D1Database,
   input: {

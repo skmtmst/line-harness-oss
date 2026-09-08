@@ -7,6 +7,7 @@ import {
   createMileageRewardDraft,
   getMileageReward,
   importMileageRewardCodes,
+  listMileageRedemptions,
   publishMileageReward,
   recordMileageRedemptionAttempt,
   refundMileageRewardRedemption,
@@ -304,6 +305,94 @@ describe('V6 mileage rewards', () => {
       required_miles: 300,
       target_conditions: '{"operator":"AND","rules":[{"type":"tag_exists","value":"会員"}]}',
     });
+  });
+
+  it('lists failed redemptions with reason, attempts, and timestamps, isolated by account', async () => {
+    const draft = await createMileageRewardDraft(db, {
+      lineAccountId: 'account-1',
+      draft: { name: '500円引き', rewardKind: 'coupon', requiredMiles: 300 },
+    });
+    await importMileageRewardCodes(db, {
+      rewardId: draft.id, lineAccountId: 'account-1',
+      codes: [{ ciphertext: 'encrypted-code', fingerprint: 'fingerprint-1' }],
+    });
+    await publishMileageReward(db, { id: draft.id, lineAccountId: 'account-1' });
+    const reserved = await reserveMileageRewardRedemption(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', rewardId: draft.id,
+      idempotencyKey: 'redeem-list', requestFingerprint: 'fp-list',
+    });
+    // 失敗を注入する。本物と同じく残高は減ったまま、特典だけ届いていない。
+    await recordMileageRedemptionAttempt(db, {
+      redemptionId: reserved.redemption.id,
+      status: 'failed',
+      errorCode: 'reward_delivery_failed',
+      errorMessage: '特典を渡せませんでした',
+    });
+
+    const failed = await listMileageRedemptions(db, { lineAccountId: 'account-1', limit: 20, offset: 0 });
+    expect(failed.pagination).toMatchObject({ total: 1, limit: 20, offset: 0 });
+    expect(failed.items).toHaveLength(1);
+    expect(failed.items[0]).toMatchObject({
+      id: reserved.redemption.id,
+      status: 'delivery_failed',
+      attemptCount: 1,
+      failureCode: 'reward_delivery_failed',
+      failureMessage: '特典を渡せませんでした',
+      rewardName: '500円引き',
+    });
+    expect(typeof failed.items[0].updatedAt).toBe('string');
+
+    // 別の店からは見えない。成功の絞り込みにも出ない。全件には出る。
+    sqlite.prepare(
+      `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+       VALUES ('account-2', 'channel-2', '公式B', 'token', 'secret')`,
+    ).run();
+    const hidden = await listMileageRedemptions(db, { lineAccountId: 'account-2', limit: 20, offset: 0 });
+    expect(hidden).toMatchObject({ items: [], pagination: { total: 0 } });
+    const succeeded = await listMileageRedemptions(db, {
+      lineAccountId: 'account-1', status: 'succeeded', limit: 20, offset: 0,
+    });
+    expect(succeeded).toMatchObject({ items: [], pagination: { total: 0 } });
+    const all = await listMileageRedemptions(db, {
+      lineAccountId: 'account-1', status: 'all', limit: 20, offset: 0,
+    });
+    expect(all.pagination.total).toBe(1);
+  });
+
+  it('continues the same redemption on retry without deducting mileage again', async () => {
+    const draft = await createMileageRewardDraft(db, {
+      lineAccountId: 'account-1',
+      draft: { name: '500円引き', rewardKind: 'coupon', requiredMiles: 300 },
+    });
+    await importMileageRewardCodes(db, {
+      rewardId: draft.id, lineAccountId: 'account-1',
+      codes: [{ ciphertext: 'encrypted-code', fingerprint: 'fingerprint-1' }],
+    });
+    await publishMileageReward(db, { id: draft.id, lineAccountId: 'account-1' });
+    const reserved = await reserveMileageRewardRedemption(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', rewardId: draft.id,
+      idempotencyKey: 'redeem-retry', requestFingerprint: 'fp-retry',
+    });
+    // 1回目の配送が失敗する。
+    await recordMileageRedemptionAttempt(db, {
+      redemptionId: reserved.redemption.id,
+      status: 'failed',
+      errorCode: 'reward_delivery_failed',
+      errorMessage: '特典を渡せませんでした',
+    });
+    // やり直しの配送が成功する。同じ交換IDのまま、残高はもう減らない。
+    const retried = await recordMileageRedemptionAttempt(db, {
+      redemptionId: reserved.redemption.id, status: 'succeeded',
+    });
+    expect(retried).toMatchObject({ id: reserved.redemption.id, status: 'succeeded', attemptCount: 2 });
+    expect(sqlite.prepare(
+      `SELECT available FROM mileage_wallets WHERE program_id = 'default' AND beneficiary_key = 'user:user-1'`,
+    ).get()).toEqual({ available: 700 });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM mileage_ledger WHERE entry_type = 'spend'`).get())
+      .toEqual({ count: 1 });
+    // 成功した交換は失敗の一覧から消える。
+    const failed = await listMileageRedemptions(db, { lineAccountId: 'account-1', limit: 20, offset: 0 });
+    expect(failed).toMatchObject({ items: [], pagination: { total: 0 } });
   });
 
   it('rejects unsupported or more than 15 reward target conditions', async () => {
