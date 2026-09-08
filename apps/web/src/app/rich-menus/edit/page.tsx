@@ -15,6 +15,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { RICH_MENU_DIMENSIONS } from '@line-crm/shared'
+import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 
 /**
  * 保存されている条件を読む。
@@ -1428,21 +1429,35 @@ function PublishStep({
     createdAt: string
   }>>([])
   const [schedulesNotice, setSchedulesNotice] = useState('')
+  const [schedulesError, setSchedulesError] = useState('')
   const [cancellingId, setCancellingId] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
     void api.richMenuGroups.listSchedules(group.id).then((response) => {
-      if (cancelled || !response.success) return
+      if (cancelled) return
+      if (!response.success) {
+        setSchedulesError('予約一覧を取得できませんでした。時間をおいて開き直してください。')
+        return
+      }
+      setSchedulesError('')
       setSchedules(response.data)
+    }).catch(() => {
+      if (!cancelled) setSchedulesError('予約一覧を取得できませんでした。時間をおいて開き直してください。')
     })
     return () => { cancelled = true }
   }, [group.id])
 
   const refreshSchedules = useCallback(() => {
     void api.richMenuGroups.listSchedules(group.id).then((response) => {
-      if (!response.success) return
+      if (!response.success) {
+        setSchedulesError('予約一覧を取得できませんでした。時間をおいて開き直してください。')
+        return
+      }
+      setSchedulesError('')
       setSchedules(response.data)
+    }).catch(() => {
+      setSchedulesError('予約一覧を取得できませんでした。時間をおいて開き直してください。')
     })
   }, [group.id])
 
@@ -1472,8 +1487,8 @@ function PublishStep({
     if (!startsAt || (mode === 'period' && !endsAt)) return
     void onSchedule({
       mode,
-      startsAt: new Date(startsAt).toISOString(),
-      endsAt: mode === 'period' ? new Date(endsAt).toISOString() : null,
+      startsAt: datetimeLocalJstToUtcIso(startsAt),
+      endsAt: mode === 'period' ? datetimeLocalJstToUtcIso(endsAt) : null,
       restoreGroupId: mode === 'period' ? restoreGroupId || null : null,
     }).then(() => refreshSchedules()).catch(() => refreshSchedules())
   }
@@ -1524,7 +1539,8 @@ function PublishStep({
       <section aria-label="公開予約の一覧" className="border-hairline bg-canvas rounded-card mt-5 border p-6">
         <h2 className="text-ink text-sm font-bold">公開予約の一覧</h2>
         {schedulesNotice ? <p role="status" className="text-ink mt-2 text-xs">{schedulesNotice}</p> : null}
-        {schedules.length === 0 ? (
+        {schedulesError ? <p role="alert" className="text-danger mt-2 text-xs">{schedulesError}</p> : null}
+        {!schedulesError ? (schedules.length === 0 ? (
           <p className="text-ink-faint mt-2 text-xs">まだ公開予約はありません。日時を決めて予約するとここに出ます。</p>
         ) : (
           <ul className="mt-3 space-y-2">
@@ -1556,7 +1572,7 @@ function PublishStep({
               </li>
             ))}
           </ul>
-        )}
+        )) : null}
       </section>
       <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><Button href={`/rich-menus/edit?id=${group.id}&step=targeting`}>前へ：誰に出すか</Button><div className="flex gap-2"><Button onClick={onSave} disabled={saving || publishing}>下書きに保存</Button><Button variant="primary" onClick={submit} disabled={saving || publishing || (mode !== 'now' && !startsAt) || (mode === 'period' && !endsAt)}>{publishing ? '公開中…' : mode === 'now' ? 'この内容で公開する' : 'この内容で予約する'}</Button></div></div>} />
     </main>
