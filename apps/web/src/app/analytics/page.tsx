@@ -221,6 +221,14 @@ function formatCrossWaitMinutes(estimatedWaitMs: number): string {
   return String(Math.max(1, Math.round(estimatedWaitMs / 60_000)))
 }
 
+// 自動確認は5分cronの最初の処理機会をまたいで続ける。打ち切りは「観測した
+// 最短目安+3分」と「開始から15分」の早い方(点検#508の中2: 打ち切りと間隔延長
+// があり、無限に叩かない)。run IDは保持し、打ち切り後は「結果をもう一度確認」
+// で同じrunへ再接続する。
+const CROSS_AUTO_POLL_MIN_MS = 6 * 60_000
+const CROSS_AUTO_POLL_MARGIN_MS = 3 * 60_000
+const CROSS_AUTO_POLL_MAX_MS = 15 * 60_000
+
 function CrossTab({ accountId, canManage }: { accountId: string; canManage: boolean }) {
   const [fields, setFields] = useState<FriendField[]>([])
   // 友だち情報欄が取れないのに空表示のままにすると、項目を作り直す事故になる。
@@ -276,13 +284,17 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
   }, [accountId])
 
   // 結果待ちの読み直し。終わらない集計があると無限に叩き続け、端末の電池と
-  // 回線、D1の読み取り枠を消費する。40回(約2分)で自動確認は止めるが、集計自体は
-  // 5分cronで続く。run IDは保持し、「結果をもう一度確認」で同じrunへ再接続する。
+  // 回線、D1の読み取り枠を消費するため、打ち切り時刻を過ぎたら自動確認は止める。
+  // 打ち切りは最低6分(5分cronの最初の処理機会をまたぐ)で、観測した最短目安+3分
+  // まで延ばす(上限15分)。集計自体は5分cronで続く。run IDは保持し、
+  // 「結果をもう一度確認」で同じrunへ再接続する。
   useEffect(() => {
     if (!crossRunId) return
     let active = true
     let timer: number | undefined
     let attempts = 0
+    const pollStart = Date.now()
+    let deadline = pollStart + CROSS_AUTO_POLL_MIN_MS
     const check = async () => {
       attempts += 1
       try {
@@ -296,6 +308,13 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
           estimatedWaitMs: response.data.estimatedWaitMs ?? null,
           nextTickAt: response.data.nextTickAt ?? null,
         })
+        const waitMs = response.data.estimatedWaitMs
+        if (waitMs != null) {
+          deadline = Math.min(
+            pollStart + CROSS_AUTO_POLL_MAX_MS,
+            Math.max(deadline, Date.now() + waitMs + CROSS_AUTO_POLL_MARGIN_MS),
+          )
+        }
         if (response.data.result) {
           setCrossResult(response.data.result)
           setCrossRunId('')
@@ -319,15 +338,15 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
         return
       }
       if (!active) return
-      if (attempts >= 40) {
-        // 自動確認は約2分で止めるが、5分cronの集計は続いている。run IDと順番表示は
+      if (Date.now() >= deadline) {
+        // 自動確認の打ち切り。5分cronの集計自体は続いている。run IDと順番表示は
         // 保持し、手動の再確認で同じrunへ戻る。新規の送り直しは促さない(送り直すと
         // 元の集計がpendingの間は429になるため)。
         setCrossAutoStopped(true)
         setLoading(false)
         return
       }
-      timer = window.setTimeout(() => void check(), attempts < 10 ? 1500 : attempts < 30 ? 3000 : 5000)
+      timer = window.setTimeout(() => void check(), attempts < 10 ? 3000 : 10000)
     }
     void check()
     return () => {

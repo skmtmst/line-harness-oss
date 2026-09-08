@@ -75,12 +75,14 @@ describe('V6 機能20 分析', () => {
 
   it('結果待ちは打ち切りと間隔延長があり、無限に叩かない(点検#508の中2)', () => {
     expect(PAGE).not.toContain('setInterval')
-    expect(PAGE).toContain('attempts >= 40')
+    // board #633独立差し戻し: 2分で止めず5分cronを待つ。打ち切りは最短目安+余裕(上限あり)。
+    expect(PAGE).toContain('Date.now() >= deadline')
+    expect(PAGE).toContain('CROSS_AUTO_POLL_MAX_MS')
     // board #633独立再審査: 打ち切り後もrunを保持し再接続する。新規の送り直しは促さない。
     expect(PAGE).toContain('自動の確認を止めました')
     expect(PAGE).toContain('結果をもう一度確認')
     expect(PAGE).not.toContain('時間切れです。条件をゆるめて集計し直してください')
-    expect(PAGE).toContain('attempts < 10 ? 1500 : attempts < 30 ? 3000 : 5000')
+    expect(PAGE).toContain('attempts < 10 ? 3000 : 10000')
   })
 
   it('一覧の取得失敗は空表示と分け、実行制限は運用の言葉で出す(点検#508の中3・中4)', () => {

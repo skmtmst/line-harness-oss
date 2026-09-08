@@ -28,7 +28,7 @@ describe('クロス分析の待ち順と処理目安 (Issue #633)', () => {
   })
 
   it('時間切れ後もrun IDを保持し、同じ集計へ再接続できる', () => {
-    // 自動確認は約2分で止めるが、集計は続く。新規の送り直しは促さない。
+    // 打ち切り後も集計は続く。新規の送り直しは促さない。
     expect(PAGE).toContain('自動の確認を止めました')
     expect(PAGE).toContain('集計はこのまま続いています')
     expect(PAGE).toContain('結果をもう一度確認')
@@ -39,9 +39,20 @@ describe('クロス分析の待ち順と処理目安 (Issue #633)', () => {
     expect(PAGE).not.toContain('時間切れです')
   })
 
-  it('ポーリングは40回上限と段階的な間隔を保つ', () => {
-    expect(PAGE).toContain('attempts >= 40')
-    expect(PAGE).toContain('attempts < 10 ? 1500 : attempts < 30 ? 3000 : 5000')
+  it('ポーリングは2分で止めず5分cronを待ち、打ち切りと間隔延長がある', () => {
+    // 最低6分(5分cronの最初の処理機会をまたぐ)。観測した最短目安+3分まで延ばす(上限15分)。
+    expect(PAGE).toContain('CROSS_AUTO_POLL_MIN_MS')
+    expect(PAGE).toContain('6 * 60_000')
+    expect(PAGE).toContain('CROSS_AUTO_POLL_MARGIN_MS')
+    expect(PAGE).toContain('3 * 60_000')
+    expect(PAGE).toContain('CROSS_AUTO_POLL_MAX_MS')
+    expect(PAGE).toContain('15 * 60_000')
+    expect(PAGE).toContain('Date.now() >= deadline')
+    expect(PAGE).toContain('waitMs + CROSS_AUTO_POLL_MARGIN_MS')
+    // 間隔は後半ほど空ける(点検#508の中2)。40回・約2分の旧上限は残さない。
+    expect(PAGE).toContain('attempts < 10 ? 3000 : 10000')
+    expect(PAGE).not.toContain('attempts >= 40')
+    expect(PAGE).not.toContain('setInterval')
   })
 
   it('API型に待ち順の4項目がある', () => {
