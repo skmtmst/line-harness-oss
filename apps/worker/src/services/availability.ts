@@ -202,6 +202,21 @@ function addDays(date: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * instant をそのタイムゾーンの offset 付き ISO へ直す（候補の一意識別子）。
+ * 同じ壁時刻が2回現れる fold 日でも offset で区別できる
+ *（01:30-04:00 と 01:30-05:00）。
+ */
+function tzInstantIso(tz: string, utcMs: number): string {
+  const p = tzParts(tz, new Date(utcMs));
+  const offset = tzOffsetMs(tz, utcMs);
+  const sign = offset < 0 ? '-' : '+';
+  const abs = Math.abs(offset);
+  const sec = new Date(utcMs).getUTCSeconds();
+  return `${p.y}-${pad2(p.mo)}-${pad2(p.day)}T${pad2(p.h)}:${pad2(p.mi)}:${pad2(sec)}`
+    + `${sign}${pad2(Math.floor(abs / 3_600_000))}:${pad2(Math.floor((abs % 3_600_000) / 60_000))}`;
+}
+
 /** 店舗のタイムゾーン。booking.ts の競合代替候補でも使う。 */
 export async function getAccountTimeZone(
   db: D1Database,
@@ -485,6 +500,18 @@ export async function getAvailability(
     }
   }
 
+  // 既存予約の instant 一覧（担当ごと）。壁日付ではなく instant の重なりで
+  // 当日分を拾う。fold を跨ぐ予約が壁日付では別日に落ちるため。
+  const bookingMsByStaff = new Map<string, Array<{ startMs: number; endMs: number; sameMenu: boolean }>>();
+  for (const b of bookings.results ?? []) {
+    const startMs = new Date(b.starts_at).getTime();
+    const endMs = new Date(b.block_ends_at).getTime();
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || startMs >= endMs) continue;
+    const list = bookingMsByStaff.get(b.staff_id) ?? [];
+    list.push({ startMs, endMs, sameMenu: b.menu_id === params.menuId });
+    bookingMsByStaff.set(b.staff_id, list);
+  }
+
   const by_staff: AvailabilityByStaff[] = [];
   for (const s of staffRows.results) {
     const slots: AvailabilityByStaff['slots'] = [];
@@ -627,16 +654,70 @@ export async function getAvailability(
         granularityMinutes: SLOT_GRANULARITY_MINUTES,
         capacity: effectiveCapacity,
       });
+      // instant 側の busy。当日の範囲と重なるものを instant のまま集める。
+      // fold を跨ぐ予約・予定は壁時刻へ潰すと消える（01:30→01:30）ため、
+      // 壁とは別に instant の重なりを見る。
+      const dayStartMs = zonedTimeToUtcMs(timeZone, date, '00:00');
+      const dayEndMs = zonedTimeToUtcMs(timeZone, addDays(date, 1), '00:00');
+      const busyMs: Array<{ startMs: number; endMs: number; sameMenu: boolean }> = [];
+      for (const b of bookingMsByStaff.get(s.id) ?? []) {
+        if (b.startMs < dayEndMs && dayStartMs < b.endMs) {
+          busyMs.push({
+            startMs: Math.max(b.startMs, dayStartMs),
+            endMs: Math.min(b.endMs, dayEndMs),
+            sameMenu: b.sameMenu,
+          });
+        }
+      }
+      if (googleBusy) {
+        for (const interval of googleBusy) {
+          const startMs = new Date(interval.start).getTime();
+          const endMs = new Date(interval.end).getTime();
+          if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || startMs >= endMs) continue;
+          if (startMs < dayEndMs && dayStartMs < endMs) {
+            busyMs.push({
+              startMs: Math.max(startMs, dayStartMs),
+              endMs: Math.min(endMs, dayEndMs),
+              sameMenu: false,
+            });
+          }
+        }
+      }
+      const occupyMs = (menuForCalc.duration_minutes + menuForCalc.buffer_after_minutes) * 60_000;
       for (const slot of daySlots) {
-        const slotStartUtc = new Date(zonedTimeToUtcMs(timeZone, date, slot.start));
-        if (slotStartUtc < minLeadAt) continue;
-        const sameMenuCount = dayBookings.filter((booking) => booking.sameMenu === true
+        // gap（存在しない壁時刻。DST 開始日の 02:00 台）は候補にしない。
+        // 壁→instant→壁が往復一致するものだけ出す。
+        const slotStartMs = zonedTimeToUtcMs(timeZone, date, slot.start);
+        const roundTripped = new Date(slotStartMs);
+        if (tzDateStr(timeZone, roundTripped) !== date
+          || tzHHMM(timeZone, roundTripped) !== slot.start) continue;
+        if (new Date(slotStartMs) < minLeadAt) continue;
+        const slotEndMs = slotStartMs + occupyMs;
+        const wallSameCount = dayBookings.filter((booking) => booking.sameMenu === true
           && overlaps(toMin(slot.start), toMin(slot.end), toMin(booking.start), toMin(booking.end))).length;
+        // instant 側の重なり。壁側が見落とす fold 跨ぎを拾う。
+        // 重なりは真の時間衝突なので、壁で空いていても塞ぐ。
+        let instantBlocked = false;
+        let instantSameCount = 0;
+        for (const busy of busyMs) {
+          if (slotStartMs < busy.endMs && busy.startMs < slotEndMs) {
+            if (!busy.sameMenu) {
+              instantBlocked = true;
+              break;
+            }
+            instantSameCount++;
+          }
+        }
+        if (instantBlocked) continue;
+        const sameMenuCount = Math.max(wallSameCount, instantSameCount);
         const remaining = Math.max(0, effectiveCapacity - sameMenuCount);
         slots.push({
           date,
           start: slot.start,
           end: slot.end,
+          timeZone,
+          startUtc: tzInstantIso(timeZone, slotStartMs),
+          endUtc: tzInstantIso(timeZone, slotStartMs + menuForCalc.duration_minutes * 60_000),
           capacity: effectiveCapacity,
           remaining,
           state: remaining === 0 ? 'full' : remaining < effectiveCapacity ? 'limited' : 'available',

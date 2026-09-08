@@ -1281,6 +1281,99 @@ describe('getAvailability の夏時間切替日（New York）', () => {
     }
   });
 
+  test('候補は店舗timezone＋offset付きinstantを持つ', async () => {
+    const db = stubDB({
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      timezone: 'America/New_York',
+      shifts: [{ staff_id: 'S1', work_date: '2026-10-10', start_time: '10:00', end_time: '11:00' }],
+      bookings: [],
+    });
+    const result = await getAvailability(db, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-10-10',
+      to: '2026-10-10',
+      now: new Date('2026-10-09T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+    });
+    expect(result.by_staff[0].slots[0]).toMatchObject({
+      date: '2026-10-10',
+      start: '10:00',
+      timeZone: 'America/New_York',
+      startUtc: '2026-10-10T10:00:00-04:00',
+      endUtc: '2026-10-10T11:00:00-04:00',
+    });
+  });
+
+  test('fold を跨ぐ Google 予定は instant で塞ぐ（壁 01:30→01:30 でも消えない）', async () => {
+    // 05:30Z-06:30Z = 壁 01:30(EDT)→01:30(EST)。壁だけ見ると長さ 0 で消える。
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      calendars: { 'cal@example.com': { busy: [{ start: '2026-11-01T05:30:00Z', end: '2026-11-01T06:30:00Z' }] } },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
+    try {
+      const db = stubDB({
+        menu: MENU_BASIC,
+        staff: STAFF_S1,
+        timezone: 'America/New_York',
+        shifts: [{ staff_id: 'S1', work_date: '2026-11-01', start_time: '01:00', end_time: '03:00' }],
+        bookings: [],
+        calendarConnection: { id: 'GC1', calendar_id: 'cal@example.com', auth_type: 'oauth', access_token: 'token' },
+      });
+      const result = await getAvailability(db, {
+        lineAccountId: 'A1',
+        menuId: 'M1',
+        from: '2026-11-01',
+        to: '2026-11-01',
+        now: new Date('2026-10-31T00:00:00Z'),
+        minLeadTimeMinutes: 0,
+      });
+      expect(result.by_staff[0].slots.map((s) => s.start)).toEqual(['02:00']);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  test('fold を跨ぐ保存済み予約は instant で塞ぐ', async () => {
+    const db = stubDB({
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      timezone: 'America/New_York',
+      shifts: [{ staff_id: 'S1', work_date: '2026-11-01', start_time: '01:00', end_time: '03:00' }],
+      bookings: [{ staff_id: 'S1', starts_at: '2026-11-01T05:30:00Z', block_ends_at: '2026-11-01T06:30:00Z' }],
+    });
+    const result = await getAvailability(db, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-11-01',
+      to: '2026-11-01',
+      now: new Date('2026-10-31T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+    });
+    expect(result.by_staff[0].slots.map((s) => s.start)).toEqual(['02:00']);
+  });
+
+  test('busy なし DST 開始日は gap（02:00 台）を候補にしない', async () => {
+    const db = stubDB({
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      timezone: 'America/New_York',
+      shifts: [{ staff_id: 'S1', work_date: '2026-03-08', start_time: '00:00', end_time: '05:00' }],
+      bookings: [],
+    });
+    const result = await getAvailability(db, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-03-08',
+      to: '2026-03-08',
+      now: new Date('2026-03-07T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+    });
+    expect(result.by_staff[0].slots.map((s) => s.start)).toEqual([
+      '00:00', '00:30', '01:00', '01:30', '03:00', '03:30', '04:00',
+    ]);
+  });
+
   test('受付 window は暦日で足す（DST 開始でずらさない）', async () => {
     const db = stubDB({
       menu: { ...MENU_BASIC, booking_window_days: 1 },
