@@ -398,6 +398,7 @@ CREATE TABLE IF NOT EXISTS conversion_events (
   event_type_snapshot  TEXT,
   value_snapshot       REAL,
   idempotency_key      TEXT,
+  once_key             TEXT,
   created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
@@ -408,6 +409,8 @@ CREATE INDEX IF NOT EXISTS idx_conversion_events_affiliate ON conversion_events 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_conversion_events_point_idempotency
   ON conversion_events(conversion_point_id, idempotency_key)
   WHERE idempotency_key IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_conversion_events_once_key
+  ON conversion_events(once_key) WHERE once_key IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_conversion_points_status ON conversion_points(status, created_at DESC);
 
 CREATE TRIGGER IF NOT EXISTS conversion_points_prevent_delete

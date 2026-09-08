@@ -1436,6 +1436,7 @@ CREATE TABLE conversion_events (
   event_type_snapshot  TEXT,
   value_snapshot       REAL,
   idempotency_key      TEXT,
+  once_key             TEXT,
   created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
@@ -5439,6 +5440,9 @@ CREATE INDEX idx_conversion_events_affiliate ON conversion_events (affiliate_cod
 CREATE INDEX idx_conversion_events_created_friend ON conversion_events(created_at, friend_id);
 
 CREATE INDEX idx_conversion_events_friend ON conversion_events (friend_id);
+
+CREATE UNIQUE INDEX idx_conversion_events_once_key
+  ON conversion_events(once_key) WHERE once_key IS NOT NULL;
 
 CREATE INDEX idx_conversion_events_point ON conversion_events (conversion_point_id);
 
