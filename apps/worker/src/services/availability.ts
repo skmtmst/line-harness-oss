@@ -208,6 +208,7 @@ interface AvailabilityExceptionRow {
  * だが、手編集の DB でも予約を受けてしまわないよう、ここでも見直す。
  */
 function parseExceptionHours(raw: string): Interval[] | null {
+  if (typeof raw !== 'string') return null;
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw) as unknown;
@@ -407,62 +408,83 @@ export async function getAvailability(
     }
     for (const date of dates) {
       if (windowLastDate && date > windowLastDate) continue;
-      // その日の例外日（JST 日付で突合）。毎週ルール・シフトより例外日を優先する。
+      // その日の例外日（JST 日付で突合。YYYY-MM-DD の辞書式比較でよい）。
+      // 毎週ルール・シフトより例外日を優先する。優先順位は下の通り。
+      //
+      // 塞ぐ（closed）: 担当・資源（このメニューが使うもの）は絶対に塞ぐ。
+      //   店舗 closed は、店舗 open（臨時営業）が同日にあれば開ける。
+      // 時間: 担当 custom が稼働を置き換え、担当・店舗 open が足す。
+      //   店舗 custom と資源の時間（custom/open）は共通部分に絞る。
+      //   資源に稼働の基準が無いため、資源 open も custom と同じ絞り込みに
+      //   なる（基準が常時可のため、開ける方向には働かない）。
+      // 壊れた時間・空の時間は fail-closed（枠 0）。
       const dayExceptions = exceptions.filter(
         (e) => e.date_from <= date && date <= e.date_to,
       );
-      // 終日休業。店舗・担当・このメニューが使う資源のどれかが閉まっていれば
-      // 枠を出さない。custom_hours/open と重なっても closed を勝たせる
-      //（迷ったら受けない fail-closed）。
-      const closedAllDay = dayExceptions.some((e) => {
-        if (e.kind !== 'closed') return false;
-        if (e.scope_kind === 'store') return true;
-        if (e.scope_kind === 'staff') return e.scope_id === s.id;
-        if (e.scope_kind === 'resource') {
-          return e.scope_id != null && menuResourceIds.has(e.scope_id);
+      // 適用範囲だけを集める。適用外（別担当・使わない資源）の行は読まない。
+      const storeRows = dayExceptions.filter((e) => e.scope_kind === 'store');
+      const staffRows = dayExceptions.filter(
+        (e) => e.scope_kind === 'staff' && e.scope_id === s.id,
+      );
+      const resourceRows = dayExceptions.filter(
+        (e) => e.scope_kind === 'resource'
+          && e.scope_id != null
+          && menuResourceIds.has(e.scope_id),
+      );
+      // 適用される時間行を読む。壊れた行が 1 つでもあれば fail-closed。
+      let brokenTime = false;
+      const readHours = (rows: AvailabilityExceptionRow[], kind: string): Interval[] => {
+        const out: Interval[] = [];
+        for (const row of rows) {
+          if (row.kind !== kind) continue;
+          const hours = parseExceptionHours(row.hours_json);
+          if (hours === null) {
+            brokenTime = true;
+            return [];
+          }
+          out.push(...hours);
         }
-        return false;
-      });
-      if (closedAllDay) continue;
+        return mergeIntervals(out);
+      };
+      const staffCustomHours = readHours(staffRows, 'custom_hours');
+      const staffOpenHours = readHours(staffRows, 'open');
+      const storeOpenHours = readHours(storeRows, 'open');
+      const storeCustomHours = readHours(storeRows, 'custom_hours');
+      const resourceTimeHours = mergeIntervals([
+        ...readHours(resourceRows, 'custom_hours'),
+        ...readHours(resourceRows, 'open'),
+      ]);
+      const hasStaffCustom = staffRows.some((e) => e.kind === 'custom_hours');
+      const hasStaffOpen = staffRows.some((e) => e.kind === 'open');
+      const hasStoreOpen = storeRows.some((e) => e.kind === 'open');
+      const hasStoreCustom = storeRows.some((e) => e.kind === 'custom_hours');
+      const hasResourceTime = resourceRows.some(
+        (e) => e.kind === 'custom_hours' || e.kind === 'open',
+      );
+      if (brokenTime) continue;
+      const staffClosed = staffRows.some((e) => e.kind === 'closed');
+      const resourceClosed = resourceRows.some((e) => e.kind === 'closed');
+      const storeClosed = storeRows.some((e) => e.kind === 'closed');
+      if (staffClosed || resourceClosed) continue;
+      // 店舗 open（臨時営業）は店舗 closed を切り抜く。担当・資源 closed は越えない。
+      if (storeClosed && storeOpenHours.length === 0) continue;
+      // 空の open 行は fail-closed（足す時間が無いのに開けない）。
+      if ((hasStaffOpen && staffOpenHours.length === 0)
+        || (hasStoreOpen && storeOpenHours.length === 0)) continue;
       const shift = shifts.results.find((r) => r.staff_id === s.id && r.work_date === date);
       const rule = rules.results.find(
         (r) => r.staff_id === s.id && r.weekday === weekdayForDate(date),
       );
       const base = shift ?? rule;
-      // 時間帯例外。担当の custom_hours はその日の稼働を置き換え（短縮・延長）、
-      // 担当の open は臨時営業として足す。店舗の custom_hours は全員の稼働との
-      // 共通部分に絞る（短縮営業）。店舗の open・資源の時間変更は枠を変えない。
-      const staffCustom: Interval[] = [];
-      const staffOpen: Interval[] = [];
-      const storeCustom: Interval[] = [];
-      let brokenException = false;
-      for (const e of dayExceptions) {
-        if (e.kind !== 'custom_hours' && e.kind !== 'open') continue;
-        if (e.scope_kind === 'resource') continue;
-        const hours = parseExceptionHours(e.hours_json);
-        if (hours === null) {
-          brokenException = true;
-          break;
-        }
-        if (e.scope_kind === 'staff' && e.scope_id === s.id) {
-          (e.kind === 'custom_hours' ? staffCustom : staffOpen).push(...hours);
-        } else if (e.scope_kind === 'store' && e.kind === 'custom_hours') {
-          storeCustom.push(...hours);
-        }
-      }
-      // 壊れた例外日がある日は fail-closed（予約を受けない）。
-      if (brokenException) continue;
-      let workingList: Interval[] = staffCustom.length > 0
-        ? mergeIntervals(staffCustom)
+      let workingList: Interval[] = hasStaffCustom
+        ? staffCustomHours
         : base
           ? [{ start: base.start_time, end: base.end_time }]
           : [];
-      if (staffOpen.length > 0) {
-        workingList = mergeIntervals([...workingList, ...staffOpen]);
-      }
-      if (storeCustom.length > 0) {
-        workingList = intersectIntervals(workingList, mergeIntervals(storeCustom));
-      }
+      workingList = mergeIntervals([...workingList, ...staffOpenHours, ...storeOpenHours]);
+      // 空の custom 行との共通部分は空になる（fail-closed）。
+      if (hasStoreCustom) workingList = intersectIntervals(workingList, storeCustomHours);
+      if (hasResourceTime) workingList = intersectIntervals(workingList, resourceTimeHours);
       if (workingList.length === 0) continue;
       const dayBookings: BusyInterval[] = bookings.results
         .filter((b) => b.staff_id === s.id)
