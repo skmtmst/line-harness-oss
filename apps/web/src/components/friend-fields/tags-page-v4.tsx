@@ -77,7 +77,7 @@ function TrashIcon() {
  * フォルダの選び直し。設計 `SgpDb` は「色の丸 ＋ 名前 ＋ ▾」の小さな札で、
  * 素の `select` ではない。見た目は札が持ち、操作と読み上げは `select` が持つ。
  */
-function FolderSelect({ tag, groups, onChanged }: { tag: Tag; groups: TagGroup[]; onChanged: () => void }) {
+function FolderSelect({ tag, groups, onItemsChange, onError }: { tag: Tag; groups: TagGroup[]; onItemsChange: (update: (current: Tag[]) => Tag[]) => void; onError: (message: string) => void }) {
   const group = groups.find((item) => item.id === tag.groupId)
   return (
     <span className="relative inline-flex h-7 items-center gap-1.5 rounded-mini border border-hairline bg-canvas px-2">
@@ -87,7 +87,18 @@ function FolderSelect({ tag, groups, onChanged }: { tag: Tag; groups: TagGroup[]
       <select
         aria-label={`${tag.name} のフォルダ`}
         value={tag.groupId ?? ''}
-        onChange={async (event) => { await api.tags.setGroup(tag.id, event.target.value || null); onChanged() }}
+        onChange={async (event) => {
+          const groupId = event.target.value || null
+          try {
+            const result = await api.tags.setGroup(tag.id, groupId)
+            if (!result.success) throw new Error(result.error)
+            /* 成功は手元だけ直す。withCounts 付き全件の取り直しは要らない。 */
+            onItemsChange((current) => current.map((item) => item.id === tag.id ? { ...item, groupId } : item))
+          } catch (reason) {
+            /* 失敗は再読込で隠さず、理由を出す。 */
+            onError(reason instanceof ApiError ? reason.message : 'フォルダを変更できませんでした')
+          }
+        }}
         className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
       >
         <option value="">未分類</option>
@@ -661,11 +672,15 @@ export default function TagsPageV4({
 
   /** 友だち一覧への表示（★）。設計 `zMlMX`。押した瞬間に切り替える。 */
   const toggleStar = async (tag: Tag) => {
+    const next = !tag.isStarred
+    /* 成功は手元だけ直す。withCounts 付き全件の取り直しは要らない。 */
+    setItems((current) => current.map((item) => item.id === tag.id ? { ...item, isStarred: next } : item))
     try {
-      const res = await api.tags.update(tag.id, { isStarred: !tag.isStarred })
+      const res = await api.tags.update(tag.id, { isStarred: next })
       if (!res.success) throw new Error(res.error)
-      void load()
     } catch (reason) {
+      /* 失敗は元に戻して理由を出す。全面再取得は失敗時のみ。 */
+      setItems((current) => current.map((item) => item.id === tag.id ? { ...item, isStarred: tag.isStarred } : item))
       setError(reason instanceof ApiError ? reason.message : '表示の切り替えに失敗しました')
     }
   }
@@ -871,7 +886,7 @@ export default function TagsPageV4({
                           </div>
                         </td>
                         <td className="px-3 py-3">
-                          <FolderSelect tag={tag} groups={groups} onChanged={() => void load()} />
+                          <FolderSelect tag={tag} groups={groups} onItemsChange={setItems} onError={setError} />
                         </td>
                         <td className="px-3 py-3 text-label tabular-nums">{tag.friendCount ?? 0}人</td>
                         <td className="truncate px-3 py-3 text-label text-ink" title={sourceLabel(tag)}>{sourceLabel(tag)}</td>

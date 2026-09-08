@@ -19,7 +19,7 @@ describe('V6 イベント予約の件数状態', () => {
   })
 
   it('取得成功後の実値0は0件として表示できる', () => {
-    expect(PAGE).toContain("filtered.length === 0")
+    expect(PAGE).toContain("listTotal === 0")
     expect(PAGE).toContain("? '0件'")
   })
 

@@ -39,6 +39,9 @@ import {
   getWebinarFormFunnelStats,
   getWebinarOverview,
   getWebinarList,
+  countWebinarList,
+  webinarListSort,
+  type WebinarListFilters,
   getWebinarEditorSettings,
   saveWebinarEditorSettings,
   publishWebinarEditorVersion,
@@ -83,6 +86,7 @@ import {
   awardWebinarPositionMileage,
 } from '../services/webinar-mileage.js';
 import type { Env } from '../index.js';
+import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { auditLog } from '../lib/audit-log.js';
@@ -90,6 +94,9 @@ import { auditLog } from '../lib/audit-log.js';
 const webinarRoutes = new Hono<Env>();
 
 const COMMENT_MAX = 500;
+/* さくらコメント一括置換の件数上限。CTA の 20 件と違い演出行は多いが、
+   上限なしだと巨大配列で D1 batch 上限超過→500 になる。 */
+const SAKURA_COMMENTS_MAX = 200;
 const SESSION_COMMENT_LIMIT = 60;
 const TOKEN_GRACE_SECONDS = 3600;
 // 開始後もこの秒数までは、その回を予約して途中参加できる。
@@ -1044,12 +1051,37 @@ webinarRoutes.get('/api/webinars', async (c) => {
     if (requestedAccountId && !scope.allowedAccountIds.includes(requestedAccountId)) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
-    const items = await getWebinarList(c.env.DB, {
+    /*
+      共通一覧契約の offset 方式。以前は件数制限が無く全件転送だった。
+      絞り(検索・フォルダ・状態・並び順)はサーバーで行い、頁を切る。
+    */
+    const paging = parseOffsetPaging({ page: c.req.query('page'), limit: c.req.query('limit') });
+    const rawSort = c.req.query('sort');
+    const sort = rawSort === 'created' || rawSort === 'name' ? rawSort : 'updated';
+    const rawStatus = c.req.query('status');
+    const status = rawStatus === 'active' || rawStatus === 'draft' ? rawStatus : undefined;
+    const rawFolder = c.req.query('folder');
+    const folderId = !rawFolder ? undefined : rawFolder === '__unfiled__' ? null : rawFolder;
+    const q = (c.req.query('q') || '').trim() || undefined;
+    const filters: WebinarListFilters = { q, folderId, status, sort };
+    const listScope = {
       allowedAccountIds: scope.allowedAccountIds,
       canSeeUnassigned: scope.canSeeUnassigned,
       accountId: requestedAccountId || undefined,
+    };
+    const [items, total] = await Promise.all([
+      getWebinarList(c.env.DB, listScope, { limit: paging.limit, offset: paging.offset }, filters),
+      countWebinarList(c.env.DB, listScope, filters),
+    ]);
+    return c.json({
+      success: true as const,
+      data: buildOffsetListResponse({
+        items: items.map(serializeWebinarList),
+        total,
+        paging,
+        sort: webinarListSort(filters),
+      }),
     });
-    return c.json({ success: true, data: items.map(serializeWebinarList) });
   } catch (err) {
     console.error('GET /api/webinars error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -1574,6 +1606,9 @@ webinarRoutes.put('/api/webinars/:id/comments', requireRole('owner', 'admin'), a
     const body = await c.req.json<{ comments?: unknown }>();
     if (!Array.isArray(body.comments)) {
       return c.json({ success: false, error: 'comments_required' }, 400);
+    }
+    if (body.comments.length > SAKURA_COMMENTS_MAX) {
+      return c.json({ success: false, error: 'too_many_comments' }, 400);
     }
     const cleaned: Array<{ atSeconds: number; authorName: string; body: string }> = [];
     for (const raw of body.comments as Array<Record<string, unknown>>) {

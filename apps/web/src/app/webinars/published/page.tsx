@@ -10,6 +10,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import { useAccount } from '@/contexts/account-context'
+import { publicationStateLabel } from '@/components/webinars/publication-label'
 
 type PublishedWebinar = Webinar & {
   publicationState?: 'period' | 'always' | 'scheduled' | 'ended' | 'unset' | null
@@ -18,24 +19,9 @@ type PublishedWebinar = Webinar & {
 }
 
 function publicationWindow(webinar: PublishedWebinar): string {
-  if (webinar.publicationState === 'always') return '常時公開'
-  if (webinar.publicationState === 'ended') return '公開終了'
-  if (webinar.publicationState === 'unset') return '未設定'
-  const format = (value: string | null | undefined, withTime = false) => {
-    if (!value) return null
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return null
-    const dateText = date.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' })
-    if (!withTime) return dateText
-    const time = date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Tokyo' })
-    return `${dateText} ${time}`
-  }
-  if (webinar.publicationState === 'scheduled') return format(webinar.publicationStartsAt, true) ?? '—'
-  if (webinar.publicationState === 'period') {
-    const start = format(webinar.publicationStartsAt)
-    const end = format(webinar.publicationEndsAt)
-    if (start && end) return `${start}〜${end}`
-  }
+  /* 5枝の決まりは共有(`components/webinars/publication-label`)。ここは完了画面だけの落としどころ。 */
+  const shared = publicationStateLabel(webinar.publicationState, webinar.publicationStartsAt, webinar.publicationEndsAt)
+  if (shared !== null) return shared
   const dailyTime = webinar.schedule.find((rule) => rule.type === 'daily')?.time
   return dailyTime ? `毎日 ${dailyTime}` : '—（公開期間は未接続）'
 }
