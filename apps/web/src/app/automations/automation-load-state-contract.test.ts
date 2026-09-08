@@ -21,7 +21,7 @@ describe('V6 オートメーション一覧の状態', () => {
 
   it('失敗を0件や作成誘導に見せず、再読み込みできる', () => {
     const errorBranch = PAGE.indexOf("loadStatus === 'error'")
-    const emptyBranch = PAGE.indexOf("visibleAutomations.length === 0 && !showCreate")
+    const emptyBranch = PAGE.indexOf('visibleAutomations.length === 0 ? (')
     expect(errorBranch).toBeGreaterThan(-1)
     expect(emptyBranch).toBeGreaterThan(errorBranch)
     expect(PAGE).toContain('登録したルールは消えていません。')
@@ -57,5 +57,29 @@ describe('V6 オートメーション一覧の状態', () => {
     expect(PAGE).toContain('const loadRequestRef = useRef(0)')
     expect(PAGE).toContain('if (requestId !== loadRequestRef.current) return')
     expect(PAGE).toContain('loadRequestRef.current += 1')
+  })
+
+  it('到達不能だった旧作成フォームを持たない（#554 点検#519中6）', () => {
+    expect(PAGE).not.toContain('showCreate')
+    expect(PAGE).not.toContain('handleCreate')
+    expect(PAGE).not.toContain('automations.create(')
+    expect(PAGE).not.toContain('新規オートメーションを作成')
+    // 稼働切替・削除で使う更新・削除は残す
+    expect(PAGE).toContain('api.automations.update(')
+    expect(PAGE).toContain('api.automations.delete(')
+  })
+
+  it('「動いた回数が多い順」は30日実績で並べる（#554 点検#519中8）', () => {
+    expect(PAGE).toContain('b.executionCount30d - a.executionCount30d')
+  })
+
+  it('ページ送りは操作でき、7件目以降へ行ける（#554 点検#519中1・中9）', () => {
+    expect(PAGE).toContain('pagedAutomations')
+    expect(PAGE).toContain('aria-label="ページ送り"')
+    expect(PAGE).toContain('setPage(currentPage - 1)')
+    expect(PAGE).toContain('setPage(currentPage + 1)')
+    expect(PAGE).toContain('本中')
+    expect(PAGE).not.toContain('slice(0, 6)')
+    expect(PAGE).not.toContain('2　3　次へ')
   })
 })

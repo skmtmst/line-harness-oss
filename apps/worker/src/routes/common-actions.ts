@@ -9,6 +9,7 @@ import {
   createCommonActionDraft,
   duplicateCommonAction,
   getCommonActionDetail,
+  getCommonActionsSummary,
   listCommonActionResources,
   listCommonActions,
   publishCommonActionDraft,
@@ -112,12 +113,17 @@ commonActions.get('/api/common-actions', requireRole('owner', 'admin', 'staff'),
     const requestedLimit = nonNegativeInteger(c.req.query('limit'), 'limit');
     const limit = requestedLimit === undefined ? undefined : Math.max(1, Math.min(requestedLimit, 500));
     const offset = nonNegativeInteger(c.req.query('offset'), 'offset') ?? 0;
-    const result = await listCommonActions(c.env.DB, {
-      lineAccountId: id,
-      status: c.req.query('status'),
-      query: c.req.query('query'),
-      ...(format === 'csv' ? {} : { limit, offset }),
-    });
+    const [result, summary] = await Promise.all([
+      listCommonActions(c.env.DB, {
+        lineAccountId: id,
+        status: c.req.query('status'),
+        query: c.req.query('query'),
+        ...(format === 'csv' ? {} : { limit, offset }),
+      }),
+      // 札・KPI用の集計。絞り込みに依らずアカウント全体で数える。
+      // 画面が全件取得を2回投げないための口（#554 点検#519中2）。
+      format === 'csv' ? null : getCommonActionsSummary(c.env.DB, id),
+    ]);
     if (format === 'csv') {
       return c.body(commonActionsCsv(result.items), 200, {
         'Content-Type': 'text/csv; charset=utf-8',
@@ -128,6 +134,7 @@ commonActions.get('/api/common-actions', requireRole('owner', 'admin', 'staff'),
       success: true,
       data: result.items,
       pagination: { total: result.total, limit: limit ?? null, offset },
+      summary,
       freshness: 'available',
     });
   } catch (error) {

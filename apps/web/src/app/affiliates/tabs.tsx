@@ -42,6 +42,7 @@ import {
   OFFER_FILTERS,
   OFFER_PAGE_SIZES,
   OFFER_SORTS,
+  csvCell,
   offersCsv,
   pageCountOf,
   pageOf,
@@ -271,6 +272,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
   // ── selected affiliate (detail panel) ─────────────────────────────────────
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState(false)
   const [report, setReport] = useState<ReportV2 | null>(null)
   const [links, setLinks] = useState<AffiliateLink[]>([])
 
@@ -281,6 +283,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
   // ── journeys (cursor-paginated) ────────────────────────────────────────────
   const [journeys, setJourneys] = useState<JourneySummary[]>([])
   const [journeyLoading, setJourneyLoading] = useState(false)
+  const [journeyError, setJourneyError] = useState(false)
   const [journeyMore, setJourneyMore] = useState(false)
   const [journeyLoadingMore, setJourneyLoadingMore] = useState(false)
   const journeyCursorRef = useRef<{ beforeAt: string; beforeId: string } | null>(null)
@@ -380,9 +383,11 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
   // ── load detail (report v2 + links) ────────────────────────────────────────
   const loadDetail = useCallback(async (id: string) => {
     setDetailLoading(true)
+    setDetailError(false)
     setReport(null)
     setLinks([])
     setJourneys([])
+    setJourneyError(false)
     setJourneyMore(false)
     journeyCursorRef.current = null
     try {
@@ -393,21 +398,30 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
       /* **形を確かめてから入れる。** 読めない返事を入れると、描くときに落ちる。 */
       setReport(reportRes.success ? asReportV2(reportRes.data) : null)
       if (linksRes.success) setLinks(linksRes.data as unknown as AffiliateLink[])
-    } catch { /* silent — detail is optional */ }
+      // 失敗は握りつぶさず、内訳面に再試行を出す（#554 点検#505中7）。
+      if (!reportRes.success || !linksRes.success) setDetailError(true)
+    } catch {
+      setDetailError(true)
+    }
     setDetailLoading(false)
   }, [])
 
   // ── load first page of journeys ────────────────────────────────────────────
   const loadJourneys = useCallback(async (id: string) => {
     setJourneyLoading(true)
+    setJourneyError(false)
     try {
       const res = await api.affiliates.journeys(id, { limit: JOURNEY_PAGE_SIZE })
       if (res.success) {
         setJourneys(res.data)
         journeyCursorRef.current = res.nextCursor ?? null
         setJourneyMore(Boolean(res.nextCursor))
+      } else {
+        setJourneyError(true)
       }
-    } catch { /* silent */ }
+    } catch {
+      setJourneyError(true)
+    }
     setJourneyLoading(false)
   }, [])
 
@@ -430,8 +444,13 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
         })
         journeyCursorRef.current = res.nextCursor ?? null
         setJourneyMore(Boolean(res.nextCursor))
+        setJourneyError(false)
+      } else {
+        setJourneyError(true)
       }
-    } catch { /* silent */ }
+    } catch {
+      setJourneyError(true)
+    }
     setJourneyLoadingMore(false)
   }, [journeyLoadingMore])
 
@@ -495,11 +514,8 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
       row.totalConversions,
       Math.round(row.rewardAmount),
     ])
-    const escape = (value: string | number) => {
-      const text = String(value)
-      return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
-    }
-    const csv = [header, ...cells].map((line) => line.map(escape).join(',')).join('\r\n')
+    // 数式対策は共通の csvCell に寄せる（`offer-list-view.ts`）。
+    const csv = [header, ...cells].map((line) => line.map(csvCell).join(',')).join('\r\n')
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
@@ -778,6 +794,11 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                     選んだ期間にこの方の成果が1件も無いか、集計が読めませんでした。
                                     リンクと成果の記録は消えていません。期間を広げて確かめてください。
                                   </p>
+                                  {detailError ? (
+                                    <AffiliateButton onClick={() => { void loadDetail(row.id) }} className="mt-3">
+                                      もう一度読み込む
+                                    </AffiliateButton>
+                                  ) : null}
                                 </div>
                               )}
 
@@ -934,6 +955,13 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                 </p>
                                 {journeyLoading ? (
                                   <p className="text-sm text-gray-400">読み込み中...</p>
+                                ) : journeyError && journeys.length === 0 ? (
+                                  <div>
+                                    <p className="text-sm text-danger">動線を読み込めませんでした。記録は消えていません。</p>
+                                    <AffiliateButton onClick={() => { void loadJourneys(row.id) }} className="mt-3">
+                                      もう一度読み込む
+                                    </AffiliateButton>
+                                  </div>
                                 ) : journeys.length === 0 ? (
                                   <p className="text-sm text-gray-400">帰属された友だちがまだいません</p>
                                 ) : (
@@ -972,6 +1000,9 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                         </tbody>
                                       </table>
                                     </div>
+                                    {journeyError && !journeyLoadingMore ? (
+                                      <p className="text-danger mt-3 text-xs">続きを読み込めませんでした。「さらに読み込む」で試し直せます。</p>
+                                    ) : null}
                                     {journeyMore && (
                                       <button
                                         onClick={() => { void loadMoreJourneys(row.id) }}
@@ -1068,8 +1099,8 @@ function CreateAffiliateModal({
       return
     }
     const rate = commissionRate.trim() === '' ? undefined : Number(commissionRate)
-    if (rate !== undefined && (Number.isNaN(rate) || rate < 0)) {
-      setFormError('報酬率は0以上の数値で入力してください')
+    if (rate !== undefined && (!Number.isFinite(rate) || rate < 0 || rate > 100)) {
+      setFormError('報酬率は0から100の間で入力してください')
       return
     }
     setSubmitting(true)
@@ -1688,11 +1719,8 @@ export function ApprovalQueue() {
       item.value ?? '',
       item.duplicateFlag ? '確認が必要' : '問題なし',
     ])
-    const escape = (value: string | number) => {
-      const text = String(value)
-      return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
-    }
-    const csv = [header, ...lines].map((line) => line.map(escape).join(',')).join('\r\n')
+    // 数式対策は共通の csvCell に寄せる（`offer-list-view.ts`）。
+    const csv = [header, ...lines].map((line) => line.map(csvCell).join(',')).join('\r\n')
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url

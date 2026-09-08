@@ -1,7 +1,6 @@
 # 30-1 ログインユーザー
 # /staff?tab=members
 
-カスタマイズ版で動作中です（v2.6.4）。そのままお使いいただけます。 更新したい場合は 手動アップデートガイド をご覧ください。
 然
 株式会社 然
 Ver. 2.6.4
@@ -20,7 +19,6 @@ Ver. 2.6.4
 リマインダ
 自動応答
 友だち追加時の配信
-ウェビナー
 
 コンテンツ
 
@@ -32,10 +30,8 @@ Ver. 2.6.4
 
 成果と分析
 
-成果とアフィリエイト
 マイル
 流入と計測
-コンバージョン
 分析
 
 自動化
@@ -139,7 +135,7 @@ Kenta Kawano
 
 佐々木 亮太
 
-access-user-1@example.invalid
+sasaki@example.com
 
 	管理者	統括責任者
 
@@ -161,7 +157,7 @@ access-user-1@example.invalid
 
 中川 由美
 
-access-user-3@example.invalid
+nakagawa@example.com
 
 	運用	運用担当
 
@@ -183,7 +179,7 @@ access-user-3@example.invalid
 
 高田 誠
 
-access-user-4@example.invalid
+takada@example.com
 
 	運用	配信担当
 
@@ -205,7 +201,7 @@ access-user-4@example.invalid
 
 森 涼太
 
-access-user-5@example.invalid
+mori@example.com
 
 	受付	受付担当
 
@@ -227,7 +223,7 @@ access-user-5@example.invalid
 
 新井 千夏
 
-access-user-6@example.invalid
+arai@example.com
 
 	受付	予約担当
 
@@ -249,7 +245,7 @@ access-user-6@example.invalid
 
 山本 京子
 
-access-user-2@example.invalid
+yamamoto@example.com
 
 	管理者	管理責任者
 
