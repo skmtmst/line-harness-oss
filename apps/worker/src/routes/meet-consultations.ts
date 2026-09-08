@@ -85,8 +85,18 @@ meetConsultations.delete('/api/meet-consultations/:externalEventId', requireRole
   )) {
     return c.json({ success: false, error: 'consultation not found' }, 404);
   }
-  const cancelled = await cancelMeetConsultation(c.env.DB, externalEventId);
-  if (!cancelled) return c.json({ success: false, error: 'consultation not found' }, 404);
+  try {
+    const cancelled = await cancelMeetConsultation(c.env.DB, externalEventId, new Date(), {
+      failOnSendInFlight: true,
+    });
+    if (!cancelled) return c.json({ success: false, error: 'consultation not found' }, 404);
+  } catch (error) {
+    // 送信権の貸出中は確定させず 409 で再試行させる (取消確定後の送信を起こさない)。
+    if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
+      return c.json({ success: false, error: 'send_in_flight_retry' }, 409);
+    }
+    throw error;
+  }
   return c.json({ success: true, data: null });
 });
 
