@@ -200,13 +200,57 @@ describe('競合確認と本番で同じ重なり関数', () => {
       ],
     });
     expect(areFriendAddConditionsOverlapping(grandLeft, grandRight)).toBe(true);
-    // 入れ子の中身が違うものは競合にしない
+    // 入れ子の絞り込みを1つも共有しないものは競合にしない
     const different = JSON.stringify({
       operator: 'AND',
       rules: [],
-      groups: [{ operator: 'OR', rules: [ruleA, { type: 'tag_exists', value: 'tag-9' }] }],
+      groups: [
+        {
+          operator: 'OR',
+          rules: [{ type: 'tag_exists', value: 'tag-2' }, { type: 'tag_exists', value: 'tag-9' }],
+        },
+      ],
     });
     expect(areFriendAddConditionsOverlapping(left, different)).toBe(false);
+  });
+
+  test('部分重複は共有する絞り込みで競合にする', () => {
+    const tag1 = { type: 'tag_exists', value: 'tag-1' };
+    const following = { type: 'is_following', value: true };
+    const tag2 = { type: 'tag_exists', value: 'tag-2' };
+    // AND条件の包含関係: tag-1 と tag-1 AND following
+    const onlyTag1 = JSON.stringify({ operator: 'AND', rules: [tag1] });
+    const tag1AndFollowing = JSON.stringify({ operator: 'AND', rules: [tag1, following] });
+    expect(areFriendAddConditionsOverlapping(onlyTag1, tag1AndFollowing)).toBe(true);
+    // OR条件の共有枝: tag-1 OR following と tag-1 OR tag-2
+    const tag1OrFollowing = JSON.stringify({ operator: 'OR', rules: [tag1, following] });
+    const tag1OrTag2 = JSON.stringify({ operator: 'OR', rules: [tag1, tag2] });
+    expect(areFriendAddConditionsOverlapping(tag1OrFollowing, tag1OrTag2)).toBe(true);
+    // 入れ子を含む部分重複: 表の rules が空でも groups の中をたどる
+    const nested = JSON.stringify({
+      operator: 'AND',
+      rules: [tag2],
+      groups: [{ operator: 'OR', rules: [tag1, following] }],
+    });
+    expect(areFriendAddConditionsOverlapping(onlyTag1, nested)).toBe(true);
+  });
+
+  test('重ならない条件・演算子違いを取り違えない', () => {
+    const tag1 = { type: 'tag_exists', value: 'tag-1' };
+    const tag2 = { type: 'tag_exists', value: 'tag-2' };
+    const tag9 = { type: 'tag_exists', value: 'tag-9' };
+    const following = { type: 'is_following', value: true };
+    // 非重複: 絞り込みを1つも共有しない
+    const onlyTag1 = JSON.stringify({ operator: 'AND', rules: [tag1] });
+    const onlyTag2 = JSON.stringify({ operator: 'AND', rules: [tag2] });
+    expect(areFriendAddConditionsOverlapping(onlyTag1, onlyTag2)).toBe(false);
+    // 演算子が違っても中身が重ならなければ競合にしない
+    const tag1AndFollowing = JSON.stringify({ operator: 'AND', rules: [tag1, following] });
+    const tag2OrTag9 = JSON.stringify({ operator: 'OR', rules: [tag2, tag9] });
+    expect(areFriendAddConditionsOverlapping(tag1AndFollowing, tag2OrTag9)).toBe(false);
+    // 演算子が違っても共有があれば競合にする（演算子だけ見て false にしない）
+    const tag1OrTag2 = JSON.stringify({ operator: 'OR', rules: [tag1, tag2] });
+    expect(areFriendAddConditionsOverlapping(tag1AndFollowing, tag1OrTag2)).toBe(true);
   });
 
   test('旧形式の字面はそのまま比べ、JSONは正規化できる', () => {

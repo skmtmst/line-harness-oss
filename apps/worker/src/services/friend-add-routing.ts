@@ -434,16 +434,74 @@ function matchesEmptyCondition(raw: string): boolean {
   return (condition.rules?.length ?? 0) === 0 && (condition.groups?.length ?? 0) === 0;
 }
 
+/** JSONとして読める条件を素朴な入れ物として取り出す。読めなければ null。 */
+function parseJsonObject(raw: string): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 条件ツリーの中の原子ルール（1つ1つの絞り込み）を集める。
+ * groups の入れ子もたどる。演算子は見ない。
+ */
+function collectFriendAddConditionAtoms(node: unknown, out: Set<string>): void {
+  if (!node || typeof node !== 'object' || Array.isArray(node)) return;
+  const record = node as Record<string, unknown>;
+  const rules = record.rules;
+  if (Array.isArray(rules)) {
+    for (const rule of rules) {
+      if (rule && typeof rule === 'object' && !Array.isArray(rule)) {
+        out.add(JSON.stringify(sortRecordKeys(rule)));
+      }
+    }
+  }
+  const groups = record.groups;
+  if (Array.isArray(groups)) {
+    for (const group of groups) collectFriendAddConditionAtoms(group, out);
+  }
+}
+
+/**
+ * 2つの条件が同じ原子ルールを1つでも共有するか。
+ * ANDの包含（tag-1 と tag-1 AND following）、ORの共有枝、
+ * 入れ子を含む部分重複をここで拾う。
+ */
+function shareFriendAddConditionAtom(a: unknown, b: unknown): boolean {
+  const leftObj = parseJsonObject(normalizeFriendAddCondition(a));
+  const rightObj = parseJsonObject(normalizeFriendAddCondition(b));
+  if (leftObj == null || rightObj == null) return false;
+  const leftAtoms = new Set<string>();
+  const rightAtoms = new Set<string>();
+  collectFriendAddConditionAtoms(leftObj, leftAtoms);
+  collectFriendAddConditionAtoms(rightObj, rightAtoms);
+  for (const atom of leftAtoms) {
+    if (rightAtoms.has(atom)) return true;
+  }
+  return false;
+}
+
 /**
  * 友だち条件の重なり（競合確認用）。どちらかが空なら報告しない。
- * 構造化JSONは整形・キー順・rules/groups の並びを吸収して比べる。
+ * 構造化JSONは整形・キー順・rules/groups の並びを吸収して比べ、
+ * 完全一致でなくても同じ原子ルールを共有すれば競合にする。
+ * 本番は友だち1人ずつ条件を評価するため、絞り込みを共有する条件同士は
+ * 同じ人に届く可能性があり、競合確認もその意味で揃えている。
+ * 原子ルールを1つも共有しない条件同士は競合にしない。
  * JSONでない旧形式は字面の一致だけで見る。
  */
 export function areFriendAddConditionsOverlapping(a: unknown, b: unknown): boolean {
   if (isEmptyFriendAddCondition(a) || isEmptyFriendAddCondition(b)) return false;
   const leftCanonical = canonicalizeFriendAddCondition(a);
   const rightCanonical = canonicalizeFriendAddCondition(b);
-  if (leftCanonical != null && rightCanonical != null) return leftCanonical === rightCanonical;
+  if (leftCanonical != null && rightCanonical != null) {
+    if (leftCanonical === rightCanonical) return true;
+    return shareFriendAddConditionAtom(a, b);
+  }
   const left = normalizeFriendAddCondition(a);
   const right = normalizeFriendAddCondition(b);
   return Boolean(left) && left === right;
