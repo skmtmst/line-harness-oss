@@ -152,7 +152,7 @@ CREATE TABLE ad_conversion_logs (
   response_body       TEXT,
   error_message       TEXT,
   created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL);
 
 CREATE TABLE ad_platforms (
   id           TEXT PRIMARY KEY,
@@ -162,7 +162,7 @@ CREATE TABLE ad_platforms (
   is_active    INTEGER DEFAULT 1,
   created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE);
 
 CREATE TABLE admin_sessions (
   token_hash TEXT PRIMARY KEY,
@@ -5097,11 +5097,15 @@ CREATE INDEX idx_action_score_rule_sets_account_status
 CREATE INDEX idx_action_score_rule_versions_set_status
   ON action_score_rule_versions(rule_set_id, status, version_number DESC);
 
+CREATE INDEX idx_ad_conversion_logs_account ON ad_conversion_logs(line_account_id);
+
 CREATE INDEX idx_ad_conversion_logs_friend ON ad_conversion_logs (friend_id);
 
 CREATE INDEX idx_ad_conversion_logs_platform ON ad_conversion_logs (ad_platform_id);
 
 CREATE INDEX idx_ad_conversion_logs_status ON ad_conversion_logs (status);
+
+CREATE INDEX idx_ad_platforms_account ON ad_platforms(line_account_id);
 
 CREATE INDEX idx_admin_sessions_expires_at ON admin_sessions(expires_at);
 

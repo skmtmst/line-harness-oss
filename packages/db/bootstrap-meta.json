@@ -302,7 +302,8 @@
     "338_common_vars_account_scoped_key_and_archive.sql",
     "339_site_event_host.sql",
     "340_staff_two_factor_setup_attempts.sql",
-    "341_ec_notification_settings_account_scope.sql"
+    "341_ec_notification_settings_account_scope.sql",
+    "345_ad_platform_account_scope.sql"
   ],
-  "migrationCount": 303
+  "migrationCount": 304
 }
