@@ -6087,6 +6087,9 @@ export const OPERATION_HISTORY = [
   },
 ].map((incident) => ({
   ...incident,
+  // サーバーの履歴口が付ける項目(#518 中5)。無いと配備分岐の目視ができない。
+  historyKind: 'incident',
+  occurredAt: incident.createdAt,
   beforeSnapshot: operationControlSnapshot({
     version: incident.controlVersion - 2, activeIncidentId: null, reason: null,
     actorId: null, stoppedAt: null, capturedAt: incident.createdAt,
@@ -6100,7 +6103,41 @@ export const OPERATION_HISTORY = [
     version: incident.controlVersion, activeIncidentId: null, reason: null,
     actorId: incident.resolvedByActorId, stoppedAt: null, capturedAt: incident.resolvedAt,
   }),
-}))
+})).concat([
+  // サーバーが返す配備要素の形(#518 中5)。更新履歴タブの「管理画面の更新」
+  // 欄(`historyKind === 'deployment'` 分岐)の目視確認用。
+  {
+    id: 'deployment:deploy-20260825-0800',
+    historyKind: 'deployment',
+    occurredAt: '2026-08-25T08:00:00+09:00',
+    scopeKey: '*',
+    lineAccountId: null,
+    status: 'resolved',
+    capabilities: [],
+    reason: '管理画面の更新 v0.14.1',
+    detail: 'v0.14.1',
+    actorId: '自動配備',
+    resolvedByActorId: null,
+    controlVersion: null,
+    beforeSnapshot: null,
+    stoppedSnapshot: null,
+    restoredSnapshot: null,
+    errorMessage: null,
+    stoppedAt: null,
+    resolvedAt: '2026-08-25T08:00:00+09:00',
+    createdAt: '2026-08-25T08:00:00+09:00',
+    updatedAt: '2026-08-25T08:05:00+09:00',
+    deployment: {
+      deploymentId: 'deploy-20260825-0800',
+      phase: 'succeeded',
+      environment: 'staging',
+      version: 'v0.14.1',
+      pullRequest: 1234,
+      actor: '自動配備',
+      occurredAt: '2026-08-25T08:00:00+09:00',
+    },
+  },
+])
 
 /**
  * 機能10 ウェビナー。Pencil `ZC13r` の5行を一覧契約の値だけで表す。

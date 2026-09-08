@@ -3245,6 +3245,57 @@ const server = createServer((req, res) => {
       res.writeHead(201).end(JSON.stringify({ success: true, data: FRIEND_SAVED_VIEWS.items[0] }))
       return
     }
+    // #518 中5: 目視 QA で確認窓・復旧フローが検証できるよう、停止・復旧・
+    // 手動チェックの POST に本物と同じ形の成功応答を返す(DBへは書かない)。
+    if (method === 'POST' && url.pathname === '/api/operations/health/runs') {
+      res.writeHead(200).end(JSON.stringify({ success: true, duplicate: false, data: OPERATION_HEALTH }))
+      return
+    }
+    if (method === 'POST' && url.pathname === '/api/operations/incidents') {
+      const incident = {
+        ...OPERATION_HISTORY[0],
+        id: 'operation-incident-manual',
+        status: 'resolved',
+        stoppedAt: '2026-08-25T12:00:00+09:00',
+        resolvedAt: null,
+        createdAt: '2026-08-25T12:00:00+09:00',
+        updatedAt: '2026-08-25T12:00:00+09:00',
+      }
+      res.writeHead(200).end(JSON.stringify({
+        success: true,
+        data: {
+          status: 'changed',
+          control: {
+            ...OPERATION_CONTROL_PREVIEW.control,
+            version: OPERATION_CONTROL_PREVIEW.control.version + 1,
+            activeIncidentId: incident.id,
+            reason: '障害対応',
+            actorId: '目視確認',
+            stoppedAt: incident.stoppedAt,
+            updatedAt: incident.stoppedAt,
+          },
+          incident,
+        },
+      }))
+      return
+    }
+    const operationRestore = /^\/api\/operations\/incidents\/([^/]+)\/restore$/.exec(url.pathname)
+    if (method === 'POST' && operationRestore) {
+      res.writeHead(200).end(JSON.stringify({
+        success: true,
+        data: {
+          status: 'changed',
+          control: OPERATION_CONTROL_PREVIEW.control,
+          incident: {
+            ...OPERATION_HISTORY[0],
+            id: operationRestore[1],
+            status: 'resolved',
+            resolvedAt: '2026-08-25T12:30:00+09:00',
+          },
+        },
+      }))
+      return
+    }
     const fixedResult = visualQaWriteBody(method, url.pathname)
     if (fixedResult) {
       res.writeHead(200).end(JSON.stringify({ success: true, data: fixedResult }))
