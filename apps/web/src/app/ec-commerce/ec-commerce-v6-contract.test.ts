@@ -66,7 +66,7 @@ describe('V6 EC integration screens', () => {
 
   it('shows connector impact and retry policy from the API contract', () => {
     expect(connector).toContain('Object.values(data?.impact ?? {})')
-    expect(connector).toContain('このつなぎ先を止めると影響する設定・集計です。')
+    expect(connector).toContain('このつなぎ先を止めると影響する設定・集計です。NEN配信・マイル・友だち属性は全体の件数です。')
     expect(connector).toContain('data?.retryPolicy')
     expect(connector).not.toContain('いま影響件数を数える口は未接続です')
   })
@@ -80,5 +80,37 @@ describe('V6 EC integration screens', () => {
     expect(page).toContain('expectedVersion: action.version')
     expect(page).toContain('crypto.randomUUID()')
     expect(page).not.toContain('失敗だけを再試行する受け口は未接続')
+  })
+
+  it('filters action executions on the server and pages through old failures', () => {
+    // 21件目以降の失敗に届かない(#517 中1)。絞りはサーバへ渡し、手元で再絞りしない。
+    expect(page).toContain('actionServerFilter(status)')
+    expect(page).toContain("statusGroup: status")
+    expect(page).toContain('offset: (page - 1) * ACTION_PAGE_SIZE')
+    expect(page).toContain('setActionTotal(actionsResponse.data.total)')
+    expect(page).toContain('pageCount > 1 ? <Pagination')
+    expect(page).not.toContain("return action.status === status")
+    expect(api).toContain("statusGroup?: 'processing' | 'failed'")
+    expect(api).toContain("query.set('statusGroup', params.statusGroup)")
+  })
+
+  it('keeps EC fixture event types in the dotted production form', () => {
+    // fixtures のアンダースコア形だと画面の出来事名が「ECの出来事」に落ちる(#517 中5)。
+    const fixtures = readFileSync(join(import.meta.dirname, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'fixtures.mjs'), 'utf8')
+    const start = fixtures.indexOf('export const EC_EVENTS')
+    const end = fixtures.indexOf('export const EC_IDENTITY_CANDIDATES')
+    expect(start).toBeGreaterThan(-1)
+    expect(end).toBeGreaterThan(start)
+    const section = fixtures.slice(start, end)
+    const types = [...section.matchAll(/eventType: '([^']+)'/g)].map((match) => match[1])
+    expect(types.length).toBeGreaterThan(0)
+    for (const eventType of types) {
+      expect(eventType).toMatch(/^ec\.[a-z]+\.[a-z_]+$/)
+    }
+    expect(section).not.toContain('ec_order.')
+    expect(section).not.toContain('ec_payment.')
+    expect(section).not.toContain('ec_shipping.')
+    expect(section).not.toContain('ec_subscription.')
+    expect(section).not.toContain('ec_support.')
   })
 })

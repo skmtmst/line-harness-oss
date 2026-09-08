@@ -174,7 +174,7 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
             <h2 className={styles.cardTitle}>つながる先</h2>
             <p className={styles.cardNote}>
               {Object.values(data?.impact ?? {}).every((value) => typeof value === 'number')
-                ? 'このつなぎ先を止めると影響する設定・集計です。'
+                ? 'このつなぎ先を止めると影響する設定・集計です。NEN配信・マイル・友だち属性は全体の件数です。'
                 : '取得できない影響件数は「未取得」と表示します。0件とは限りません。'}
               {data?.retryPolicy ? <><br />やり直しの決めごと：{data.retryPolicy}</> : null}
             </p>

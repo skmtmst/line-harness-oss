@@ -5741,14 +5741,14 @@ const ecEvent = (id, type, label, order, friendId, friendName, status, minutes, 
 })
 
 export const EC_EVENTS = [
-  ecEvent('ece-1', 'ec_order.confirmed', '注文が確定した', 'NEN-12492', 'friend-1', '高橋 直人', 'processed', 12),
-  ecEvent('ece-2', 'ec_payment.received', '入金を確認した', 'NEN-12488', 'friend-2', '前田 さくら', 'processed', 40),
-  ecEvent('ece-3', 'ec_shipping.shipped', '発送した', 'NEN-12471', 'friend-3', '木村 亮', 'processed', 90),
+  ecEvent('ece-1', 'ec.order.confirmed', '注文が確定した', 'NEN-12492', 'friend-1', '高橋 直人', 'processed', 12),
+  ecEvent('ece-2', 'ec.order.payment_received', '入金を確認した', 'NEN-12488', 'friend-2', '前田 さくら', 'processed', 40),
+  ecEvent('ece-3', 'ec.order.shipped', '発送した', 'NEN-12471', 'friend-3', '木村 亮', 'processed', 90),
   /* LINEの友だちが見つからない。**取り込めたが送れていない**、を分けて出すため。 */
-  ecEvent('ece-4', 'ec_order.confirmed', '注文が確定した', 'NEN-12486', null, null, 'identity_pending', 20),
-  ecEvent('ece-5', 'ec_subscription.renewed', '定期便が続いた', 'NEN-12480', 'friend-4', '中村 彩', 'processing', 5),
+  ecEvent('ece-4', 'ec.order.confirmed', '注文が確定した', 'NEN-12486', null, null, 'identity_pending', 20),
+  ecEvent('ece-5', 'ec.subscription.payment_failed', '定期便の支払いを確認', 'NEN-12480', 'friend-4', '中村 彩', 'processing', 5),
   /* 失敗。理由を空にしない。 */
-  ecEvent('ece-6', 'ec_support.refunded', '返金した', 'NEN-12402', 'friend-5', '石田 未来', 'failed', 180, 'LINEへの送信が拒否されました（ブロック済み）'),
+  ecEvent('ece-6', 'ec.order.refunded', '返金した', 'NEN-12402', 'friend-5', '石田 未来', 'failed', 180, 'LINEへの送信が拒否されました（ブロック済み）'),
 ]
 
 /** 取り込みの帯。設計 `eI3gs` の「注文96・入金32・発送20」。 */
@@ -5756,9 +5756,9 @@ export const EC_OVERVIEW = {
   total: 2486, processed: 2412, identityPending: 24, failed: 2, skipped: 48,
   last24h: 148, lastReceivedAt: '2026-08-25T08:48:00.000Z',
   byType: [
-    { eventType: 'ec_order.confirmed', label: '注文', count: 96 },
-    { eventType: 'ec_payment.received', label: '入金', count: 32 },
-    { eventType: 'ec_shipping.shipped', label: '発送', count: 20 },
+    { eventType: 'ec.order.confirmed', label: '注文', count: 96 },
+    { eventType: 'ec.order.payment_received', label: '入金', count: 32 },
+    { eventType: 'ec.order.shipped', label: '発送', count: 20 },
   ],
   monthlyStats: [
     { month: '2026-06', count: 158, amount: 1248000 },
@@ -5823,12 +5823,12 @@ export const EC_ORDERS = {
 
 export const EC_ACTION_EXECUTIONS = {
   items: [
-    { id: 'ec-action-1', eventId: 'ece-1', eventType: 'ec_order.confirmed', actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'succeeded', attemptCount: 1, maxAttempts: 3, errorCode: null, errorMessage: null, lastAttemptedAt: '2026-08-25T08:49:00.000Z', nextRetryAt: null, version: 2, receivedAt: '2026-08-25T08:48:00.000Z', orderNumber: 'NEN-12492', customerName: '高橋 直人', retryAvailable: false },
-    { id: 'ec-action-2', eventId: 'ece-2', eventType: 'ec_payment.received', actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'processing', attemptCount: 1, maxAttempts: 3, errorCode: null, errorMessage: null, lastAttemptedAt: '2026-08-25T08:21:00.000Z', nextRetryAt: null, version: 1, receivedAt: '2026-08-25T08:20:00.000Z', orderNumber: 'NEN-12488', customerName: '前田 さくら', retryAvailable: false },
-    { id: 'ec-action-3', eventId: 'ece-3', eventType: 'ec_shipping.shipped', actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'succeeded', attemptCount: 1, maxAttempts: 3, errorCode: null, errorMessage: null, lastAttemptedAt: '2026-08-25T07:31:00.000Z', nextRetryAt: null, version: 1, receivedAt: '2026-08-25T07:30:00.000Z', orderNumber: 'NEN-12471', customerName: '木村 亮', retryAvailable: false },
-    { id: 'ec-action-4', eventId: 'ece-4', eventType: 'ec_order.confirmed', actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'skipped', attemptCount: 0, maxAttempts: 3, errorCode: 'IDENTITY_PENDING', errorMessage: 'LINEの友だちとのつき合わせが必要です', lastAttemptedAt: null, nextRetryAt: null, version: 1, receivedAt: '2026-08-25T08:40:00.000Z', orderNumber: 'NEN-12486', customerName: null, retryAvailable: false },
-    { id: 'ec-action-5', eventId: 'ece-5', eventType: 'ec_subscription.renewed', actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'pending', attemptCount: 0, maxAttempts: 3, errorCode: null, errorMessage: null, lastAttemptedAt: null, nextRetryAt: '2026-08-25T09:05:00.000Z', version: 1, receivedAt: '2026-08-25T08:55:00.000Z', orderNumber: 'NEN-12480', customerName: '中村 彩', retryAvailable: false },
-    { id: 'ec-action-6', eventId: 'ece-6', eventType: 'ec_support.refunded', actionType: 'conversion_mileage_adjustment', ruleVersion: 'ec-rule-v4', status: 'retryable_failed', attemptCount: 1, maxAttempts: 3, errorCode: 'LINE_REJECTED', errorMessage: 'LINEが送信を受け付けませんでした', lastAttemptedAt: '2026-08-25T06:01:00.000Z', nextRetryAt: '2026-08-25T09:10:00.000Z', version: 2, receivedAt: '2026-08-25T06:00:00.000Z', orderNumber: 'NEN-12402', customerName: '石田 未来', retryAvailable: true },
+    { id: 'ec-action-1', eventId: 'ece-1', eventType: 'ec.order.confirmed', actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'succeeded', attemptCount: 1, maxAttempts: 3, errorCode: null, errorMessage: null, lastAttemptedAt: '2026-08-25T08:49:00.000Z', nextRetryAt: null, version: 2, receivedAt: '2026-08-25T08:48:00.000Z', orderNumber: 'NEN-12492', customerName: '高橋 直人', retryAvailable: false },
+    { id: 'ec-action-2', eventId: 'ece-2', eventType: 'ec.order.payment_received', actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'processing', attemptCount: 1, maxAttempts: 3, errorCode: null, errorMessage: null, lastAttemptedAt: '2026-08-25T08:21:00.000Z', nextRetryAt: null, version: 1, receivedAt: '2026-08-25T08:20:00.000Z', orderNumber: 'NEN-12488', customerName: '前田 さくら', retryAvailable: false },
+    { id: 'ec-action-3', eventId: 'ece-3', eventType: 'ec.order.shipped', actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'succeeded', attemptCount: 1, maxAttempts: 3, errorCode: null, errorMessage: null, lastAttemptedAt: '2026-08-25T07:31:00.000Z', nextRetryAt: null, version: 1, receivedAt: '2026-08-25T07:30:00.000Z', orderNumber: 'NEN-12471', customerName: '木村 亮', retryAvailable: false },
+    { id: 'ec-action-4', eventId: 'ece-4', eventType: 'ec.order.confirmed', actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'skipped', attemptCount: 0, maxAttempts: 3, errorCode: 'IDENTITY_PENDING', errorMessage: 'LINEの友だちとのつき合わせが必要です', lastAttemptedAt: null, nextRetryAt: null, version: 1, receivedAt: '2026-08-25T08:40:00.000Z', orderNumber: 'NEN-12486', customerName: null, retryAvailable: false },
+    { id: 'ec-action-5', eventId: 'ece-5', eventType: 'ec.subscription.payment_failed', actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'pending', attemptCount: 0, maxAttempts: 3, errorCode: null, errorMessage: null, lastAttemptedAt: null, nextRetryAt: '2026-08-25T09:05:00.000Z', version: 1, receivedAt: '2026-08-25T08:55:00.000Z', orderNumber: 'NEN-12480', customerName: '中村 彩', retryAvailable: false },
+    { id: 'ec-action-6', eventId: 'ece-6', eventType: 'ec.order.refunded', actionType: 'conversion_mileage_adjustment', ruleVersion: 'ec-rule-v4', status: 'retryable_failed', attemptCount: 1, maxAttempts: 3, errorCode: 'LINE_REJECTED', errorMessage: 'LINEが送信を受け付けませんでした', lastAttemptedAt: '2026-08-25T06:01:00.000Z', nextRetryAt: '2026-08-25T09:10:00.000Z', version: 2, receivedAt: '2026-08-25T06:00:00.000Z', orderNumber: 'NEN-12402', customerName: '石田 未来', retryAvailable: true },
   ],
   total: 2486,
   summary: { pending: 24, processing: 48, succeeded: 2394, skipped: 18, retryable_failed: 2, permanent_failed: 0 },

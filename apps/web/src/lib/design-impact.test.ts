@@ -67,6 +67,9 @@ describe('共通部品の影響範囲', () => {
       'app/contents/vars/impact-review.tsx',
       'app/contents/vars/page.tsx',
       'app/conversions/page.tsx',
+      // #572: EC連携の取り込み記録が先頭20件しか出ず、21件目以降の失敗に
+      // 届かなかった。状態絞りをサーバへ移し、共通へ寄せた。
+      'app/ec-commerce/page.tsx',
       // 2026-09-04: イベント一覧も自前のページ送りをやめて共通へ寄せた。
       // 取れていないときに「1 / 1」と出て、1ページぶんは取れたように見えていた。
       'app/events/page.tsx',

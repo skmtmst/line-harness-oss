@@ -18,7 +18,7 @@ export const ecOperations = new Hono<Env>();
 
 type EcPermission = 'ec.event.view' | 'ec.action.retry';
 
-function requireEcPermission(permission: EcPermission) {
+export function requireEcPermission(permission: EcPermission) {
   return async (c: Context<Env>, next: Next) => {
     const staff = c.get('staff');
     if (!staff || (staff.role === 'staff' && !staff.permissionKeys?.includes(permission))) {
@@ -94,8 +94,18 @@ ecOperations.get(
   async (c) => {
     const accountId = lineAccountId(c);
     const status = c.req.query('status')?.trim() || null;
+    const statusGroup = c.req.query('statusGroup')?.trim() || null;
     if (!accountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
     if (status && !ACTION_STATES.has(status as EcActionExecutionStatus)) {
+      return c.json({ success: false, error: '処理の状態が正しくありません' }, 400);
+    }
+    // 画面のタブは「処理中=pending+processing」「失敗=retryable+permanent」の
+    // まとめ表示なので、1件ずつの status とは別にまとめ名も受ける。
+    const groupStatuses: Record<string, EcActionExecutionStatus[]> = {
+      processing: ['pending', 'processing'],
+      failed: ['retryable_failed', 'permanent_failed'],
+    };
+    if (statusGroup && !(statusGroup in groupStatuses)) {
       return c.json({ success: false, error: '処理の状態が正しくありません' }, 400);
     }
     if (!await visible(c, accountId)) {
@@ -105,7 +115,8 @@ ecOperations.get(
       const page = pagination(c);
       const data = await listEcActionExecutions(c.env.DB, {
         lineAccountId: accountId, eventId: c.req.query('eventId')?.trim() || null,
-        status: status as EcActionExecutionStatus | null, ...page,
+        status: status as EcActionExecutionStatus | null,
+        statuses: statusGroup ? groupStatuses[statusGroup] : null, ...page,
       });
       return c.json({ success: true, data, pagination: { total: data.total, ...page } });
     } catch (error) {
