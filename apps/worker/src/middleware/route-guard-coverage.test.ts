@@ -1,7 +1,14 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('@line-crm/db', () => ({
+  getStaffByAdminSession: async () => null,
+  getStaffByApiKey: async () => null,
+}));
+
+import { isPublicApiBoundary, isStaffSelfEndpoint, permissionForApiPath } from './auth.js';
 
 /**
  * 更新系の経路に、役割の指定が付いているかを機械的に確かめる。
@@ -107,5 +114,273 @@ describe('更新系の権限ガードの網羅', () => {
     const remaining = new Set(collectUnguarded().map((f) => f.file)).size;
     // 0 になったら ALLOWLIST ごと削除してよい。
     expect(remaining).toBeLessThanOrEqual(ALLOWLIST.size);
+  });
+});
+
+/**
+ * N-423 (#670): staff 権限の deny-by-default の網羅。
+ *
+ * authMiddleware は staff に対して、公開境界・本人系・権限表の
+ * いずれにも入らない管理 API を 403 にする。新しい管理 API を足して
+ * 権限の帰属を決め忘れると、下のテストが落ちて気づける。
+ * 意図的な owner/admin 専用だけを SNAPSHOT に列挙する。
+ * 追加・削除の際は権限の帰属を決めてから直す。追記で回避しないこと。
+ */
+const API_ROUTE_CALL = /\.(get|post|put|patch|delete|options|all)\(\s*['"](\/api\/[^'"]+)['"]/g;
+
+function collectStaffApiClassification(): { all: string[]; failClosed: string[] } {
+  const srcDir = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const files = readdirSync(join(srcDir, 'routes'))
+    .filter((entry) => entry.endsWith('.ts') && !entry.includes('.test.'))
+    .map((entry) => join(srcDir, 'routes', entry));
+  files.push(join(srcDir, 'index.ts'));
+  const seen = new Set<string>();
+  for (const file of files) {
+    const source = readFileSync(file, 'utf8');
+    for (const match of source.matchAll(API_ROUTE_CALL)) {
+      seen.add(`${match[1].toUpperCase()} ${match[2]}`);
+    }
+  }
+  const all = [...seen].sort();
+  const failClosed = all.filter((entry) => {
+    const space = entry.indexOf(' ');
+    const method = entry.slice(0, space);
+    const path = entry.slice(space + 1);
+    if (isPublicApiBoundary(method, path)) return false;
+    if (isStaffSelfEndpoint(method, path)) return false;
+    if (permissionForApiPath(path) !== null) return false;
+    return true;
+  });
+  return { all, failClosed };
+}
+
+/**
+ * fail-closed (staff 403) が意図どおりの一覧。
+ *
+ * 新しい管理 API はここに入るとテストが落ちる。権限の帰属を決めて
+ * auth.ts の対応表か本人系に足すか、owner/admin 専用が正しければ
+ * この一覧へ足す。どちらも PR の差分に残る。
+ */
+const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
+    'DELETE /api/ad-platforms/:id',
+    'DELETE /api/affiliates/:id',
+    'DELETE /api/broadcast-message-assets/:id',
+    'DELETE /api/images/:key',
+    'DELETE /api/integrations/google-calendar/:id',
+    'DELETE /api/line-accounts/:id',
+    'DELETE /api/notifications/rules/:id',
+    'DELETE /api/staff/:id',
+    'DELETE /api/traffic-pools/:id',
+    'DELETE /api/traffic-pools/:id/accounts/:accountId',
+    'DELETE /api/users/:id',
+    'GET /api/access/roles',
+    'GET /api/access/users',
+    'GET /api/account-handovers/:id',
+    'GET /api/account-settings/link-base-url',
+    'GET /api/account-settings/test-recipient-login-users',
+    'GET /api/account-settings/test-recipients',
+    'GET /api/account-settings/tracked-link-base-url',
+    'GET /api/accounts/:id/health',
+    'GET /api/accounts/migrations',
+    'GET /api/accounts/migrations/:migrationId',
+    'GET /api/ad-platforms',
+    'GET /api/ad-platforms/:id/logs',
+    'GET /api/ad-platforms/logs',
+    'GET /api/admin/auto-reply-stats',
+    'GET /api/admin/automations-summary',
+    'GET /api/admin/friend-debug/:id',
+    'GET /api/admin/recent-messages',
+    'GET /api/affiliate-offers',
+    'GET /api/affiliate-offers/:id',
+    'GET /api/affiliate-payments',
+    'GET /api/affiliate-payments/:id/preview',
+    'GET /api/affiliate-payout-batches/:id/download',
+    'GET /api/affiliate-settlements/preview',
+    'GET /api/affiliates',
+    'GET /api/affiliates-report',
+    'GET /api/affiliates/:id',
+    'GET /api/affiliates/:id/archive-impact',
+    'GET /api/affiliates/:id/journeys',
+    'GET /api/affiliates/:id/links',
+    'GET /api/affiliates/:id/report',
+    'GET /api/audit/events',
+    'GET /api/broadcast-message-assets',
+    'GET /api/duplicates/stats',
+    'GET /api/field-migrations/:runId',
+    'GET /api/friend-fields-stats',
+    'GET /api/identity-candidates',
+    'GET /api/identity-candidates/:id',
+    'GET /api/integrations/codex-monitor/status',
+    'GET /api/integrations/google-calendar',
+    'GET /api/integrations/google-calendar/bookings',
+    'GET /api/integrations/google-calendar/slots',
+    'GET /api/integrations/stripe/events',
+    'GET /api/line-accounts/:id',
+    'GET /api/line-accounts/:id/credential-health',
+    'GET /api/line-accounts/:id/follower-import',
+    'GET /api/line-accounts/:id/follower-insight',
+    'GET /api/line-accounts/:id/handovers',
+    'GET /api/line-webhook-events',
+    'GET /api/list-stats',
+    'GET /api/login-audit',
+    'GET /api/manual-links',
+    'GET /api/manual-links/lookup',
+    'GET /api/notifications',
+    'GET /api/notifications/center',
+    'GET /api/notifications/operator-deliveries.csv',
+    'GET /api/notifications/operator-rules',
+    'GET /api/notifications/rules',
+    'GET /api/notifications/rules/:id',
+    'GET /api/operations/control',
+    'GET /api/operations/control/preview',
+    'GET /api/operations/health',
+    'GET /api/operations/history',
+    'GET /api/operations/incidents/:id',
+    'GET /api/recipes',
+    'GET /api/recipes/:id',
+    'GET /api/recipes/clone-runs/:runId',
+    'GET /api/restaurant-test/intake-addresses',
+    'GET /api/restaurant-test/snapshot',
+    'GET /api/restaurant-test/store-context',
+    'GET /api/restaurant-test/stores',
+    'GET /api/restaurant-test/terms-agreement',
+    'GET /api/search-console/performance',
+    'GET /api/site/pages',
+    'GET /api/site/summary',
+    'GET /api/site/tracking-key',
+    'GET /api/staff',
+    'GET /api/staff/:id/login-summary',
+    'GET /api/tenants',
+    'GET /api/tenants/boundary-preview',
+    'GET /api/traffic-pools',
+    'GET /api/traffic-pools/:id/accounts',
+    'GET /api/traffic-pools/accounts',
+    'GET /api/users',
+    'GET /api/users-grouped',
+    'GET /api/users/:id',
+    'GET /api/users/:id/accounts',
+    'PATCH /api/line-accounts/:id',
+    'PATCH /api/line-accounts/hierarchy',
+    'PATCH /api/line-accounts/order',
+    'PATCH /api/restaurant-test/approvals/:id',
+    'PATCH /api/restaurant-test/stores/:id',
+    'PATCH /api/tenants/:id/feature-packs',
+    'PATCH /api/tenants/:id/status',
+    'PATCH /api/tenants/me',
+    'POST /api/account-handovers',
+    'POST /api/account-handovers/:id/cancel',
+    'POST /api/account-handovers/:id/execute',
+    'POST /api/account-handovers/:id/preview',
+    'POST /api/account-handovers/link',
+    'POST /api/accounts/:id/migrate',
+    'POST /api/ad-platforms',
+    'POST /api/ad-platforms/test',
+    'POST /api/admin/broadcast-coverage',
+    'POST /api/admin/broadcasts/:id/reset-to-draft',
+    'POST /api/admin/content-leak-check',
+    'POST /api/admin/refresh-profiles',
+    'POST /api/admin/tag-leak-check',
+    'POST /api/admin/tag-remove-content-dups',
+    'POST /api/affiliate-offers',
+    'POST /api/affiliate-payments/:id/confirm',
+    'POST /api/affiliate-payout-batches',
+    'POST /api/affiliate-payout-batches/:id/export',
+    'POST /api/affiliate-settlements',
+    'POST /api/affiliate-statements',
+    'POST /api/affiliates',
+    'POST /api/affiliates/:id/archive',
+    'POST /api/broadcast-message-assets',
+    'POST /api/broadcast-message-assets/upload',
+    'POST /api/identity-candidates/:id/decide',
+    'POST /api/identity-candidates/:id/undo',
+    'POST /api/identity-candidates/detect',
+    'POST /api/integrations/google-calendar/book',
+    'POST /api/integrations/google-calendar/connect',
+    'POST /api/integrations/ig-harness/engagement',
+    'POST /api/line-accounts',
+    'POST /api/line-accounts/:id/archive',
+    'POST /api/line-accounts/:id/connection-checks',
+    'POST /api/line-accounts/:id/follower-import/detect',
+    'POST /api/line-accounts/:id/follower-import/start',
+    'POST /api/line-accounts/:id/follower-import/step',
+    'POST /api/line-accounts/:id/restore',
+    'POST /api/line-accounts/verify-connection',
+    'POST /api/line-webhook-events/:id/retry',
+    'POST /api/links/wrap',
+    'POST /api/manual-links/check',
+    'POST /api/notifications/center/:id/read',
+    'POST /api/notifications/center/read-all',
+    'POST /api/notifications/operator-events',
+    'POST /api/notifications/operator-rules/:id/publish',
+    'POST /api/notifications/operator-rules/:id/test',
+    'POST /api/notifications/operator-rules/recipients-preview',
+    'POST /api/notifications/rules',
+    'POST /api/operations/health/runs',
+    'POST /api/operations/incidents',
+    'POST /api/operations/incidents/:id/restore',
+    'POST /api/recipes/:id/clone',
+    'POST /api/restaurant-test/gbp/posts',
+    'POST /api/restaurant-test/inbound/reservations',
+    'POST /api/restaurant-test/intake-addresses',
+    'POST /api/restaurant-test/memberships',
+    'POST /api/restaurant-test/menu',
+    'POST /api/restaurant-test/reservations/manual',
+    'POST /api/restaurant-test/stores',
+    'POST /api/restaurant-test/stores/:id/select',
+    'POST /api/restaurant-test/stores/connect',
+    'POST /api/restaurant-test/stores/selection/clear',
+    'POST /api/restaurant-test/tables',
+    'POST /api/restaurant-test/terms-agreement',
+    'POST /api/segments/count',
+    'POST /api/site/link',
+    'POST /api/staff',
+    'POST /api/tenants',
+    'POST /api/traffic-pools',
+    'POST /api/traffic-pools/:id/accounts',
+    'POST /api/users',
+    'POST /api/users/:id/link',
+    'POST /api/users/match',
+    'PUT /api/account-handovers/:id/decisions',
+    'PUT /api/account-settings/link-base-url',
+    'PUT /api/account-settings/test-recipients',
+    'PUT /api/account-settings/tracked-link-base-url',
+    'PUT /api/ad-platforms/:id',
+    'PUT /api/affiliate-offers/:id',
+    'PUT /api/affiliates/:id',
+    'PUT /api/broadcast-message-assets/:id',
+    'PUT /api/integrations/google-calendar/bookings/:id/status',
+    'PUT /api/line-accounts/:id',
+    'PUT /api/line-accounts/default',
+    'PUT /api/manual-links',
+    'PUT /api/manual-links/:key',
+    'PUT /api/notifications/rules/:id',
+    'PUT /api/restaurant-test/gbp/reviews/:id/draft',
+    'PUT /api/restaurant-test/inventory/:id',
+    'PUT /api/restaurant-test/line-flows/:id',
+    'PUT /api/settings/features',
+    'PUT /api/traffic-pools/:id',
+    'PUT /api/traffic-pools/:id/accounts/:accountId',
+    'PUT /api/users/:id',
+];
+
+describe('staff 権限の deny-by-default の網羅 (N-423 #670)', () => {
+  it('新しい管理 API は公開・本人・権限表のいずれかに入るか fail-closed で止まること', () => {
+    const { failClosed } = collectStaffApiClassification();
+    expect(
+      failClosed,
+      '権限表に無い管理 API が増えています。' +
+        '権限の帰属を決めて auth.ts の対応表か本人系に足すか、' +
+        '意図的な owner/admin 専用なら SNAPSHOT へ足してください。',
+    ).toEqual(STAFF_FAIL_CLOSED_SNAPSHOT);
+  });
+
+  it('fail-closed の一覧に残骸が無いこと', () => {
+    const { all } = collectStaffApiClassification();
+    const routes = new Set(all);
+    const stale = STAFF_FAIL_CLOSED_SNAPSHOT.filter((entry) => !routes.has(entry));
+    expect(
+      stale,
+      `消えた経路が SNAPSHOT に残っています: ${stale.join(', ')}`,
+    ).toEqual([]);
   });
 });
