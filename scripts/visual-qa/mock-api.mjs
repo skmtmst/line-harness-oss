@@ -1298,10 +1298,15 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
     const status = query.get('status')
     const eventId = query.get('eventId')
+    const statusGroup = query.get('statusGroup')
+    const groupStatuses = { processing: ['pending', 'processing'], failed: ['retryable_failed', 'permanent_failed'] }
+    const grouped = statusGroup ? (groupStatuses[statusGroup] ?? null) : null
     const filtered = EC_ACTION_EXECUTIONS.items.filter((execution) => (
-      (!status || execution.status === status) && (!eventId || execution.eventId === eventId)
+      (!status || execution.status === status)
+      && (!grouped || grouped.includes(execution.status))
+      && (!eventId || execution.eventId === eventId)
     ))
-    const total = status || eventId ? filtered.length : EC_ACTION_EXECUTIONS.total
+    const total = status || grouped || eventId ? filtered.length : EC_ACTION_EXECUTIONS.total
     return {
       success: true,
       data: { ...EC_ACTION_EXECUTIONS, items: filtered.slice(offset, offset + limit), total },

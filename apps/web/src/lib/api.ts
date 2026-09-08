@@ -3126,6 +3126,7 @@ export type EcActionExecution = {
   receivedAt: string
   orderNumber: string | null
   customerName: string | null
+  friendId: string | null
   retryAvailable: boolean
 }
 
@@ -6989,10 +6990,11 @@ export const api = {
         `/api/ec-commerce/orders?${query}`,
       )
     },
-    actionExecutions: (params: { lineAccountId: string; eventId?: string; status?: EcActionExecutionStatus; limit?: number; offset?: number }) => {
+    actionExecutions: (params: { lineAccountId: string; eventId?: string; status?: EcActionExecutionStatus; statusGroup?: 'processing' | 'failed'; limit?: number; offset?: number }) => {
       const query = new URLSearchParams({ lineAccountId: params.lineAccountId })
       if (params.eventId) query.set('eventId', params.eventId)
       if (params.status) query.set('status', params.status)
+      if (params.statusGroup) query.set('statusGroup', params.statusGroup)
       if (params.limit !== undefined) query.set('limit', String(params.limit))
       if (params.offset !== undefined) query.set('offset', String(params.offset))
       return fetchApi<ApiResponse<EcActionExecutionList> & { pagination: { total: number; limit: number; offset: number } }>(
