@@ -35,7 +35,8 @@ describe('V6リッチメニューの画面契約', () => {
     expect(PAGE).toContain('activeAccountRef.current !== accountId')
     expect(PAGE).toContain("import Pagination from '@/components/shared/pagination'")
     expect(PAGE).toContain('pageCount={pageCount}')
-    expect(PAGE).toContain('const shownGroups = sorted.slice')
+    expect(PAGE).toContain('api.richMenuGroups.listPage(accountId')
+    expect(PAGE).toContain('setGroupTotal(groupsRes.value.data.total)')
     expect(PAGE).not.toContain('「表示」を増やすと出ます')
   })
 
@@ -43,7 +44,7 @@ describe('V6リッチメニューの画面契約', () => {
     expect(PAGE).toContain("const groupKpiState = !selectedAccount?.id")
     expect(PAGE).toContain("const groupKpiReady = groupKpiState === 'ready'")
     expect(PAGE).toContain('data-group-kpi-state={groupKpiState}')
-    expect(PAGE).toContain("groupKpiReady ? groups.length : '—'")
+    expect(PAGE).toContain("groupKpiReady ? (groupFacets?.total ?? groupTotal) : '—'")
     expect(PAGE).toContain("groupKpiReady ? targetingCount : '—'")
     expect(PAGE).toContain('公開中 —・${groupKpiUnavailableText}')
     expect(PAGE).toContain("'一覧を取得できませんでした'")
@@ -68,7 +69,7 @@ describe('V6リッチメニューの画面契約', () => {
     expect(PAGE).toContain('出す順番（自分で決めた順）')
     expect(PAGE).toContain('上にあるものが優先されます。')
     expect(PAGE).toContain('いちばん上の1つだけが出ます。')
-    expect(PAGE).toContain('return compareTargetingGroups(a, b)')
+    expect(PAGE).toContain("sort: reordering ? 'priority' : sortKey")
     expect(TARGETING_DB).toContain('ORDER BY g.targeting_priority ASC, g.created_at ASC')
   })
 

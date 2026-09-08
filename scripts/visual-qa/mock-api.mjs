@@ -2395,6 +2395,65 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: impact }
   }
   if (pathname === '/api/rich-menu-groups') {
+    if (query.has('page') || query.has('limit')) {
+      const page = Math.max(1, Number(query.get('page')) || 1)
+      const limit = Math.max(1, Math.min(200, Number(query.get('limit')) || 50))
+      const search = (query.get('query') ?? '').trim().toLocaleLowerCase('ja')
+      const folderId = query.get('folderId')
+      const filter = query.get('filter')
+      const sort = query.get('sort') ?? 'priority'
+      const narrowed = RICH_MENU_GROUPS.filter((group) => {
+        if (search && !group.name.toLocaleLowerCase('ja').includes(search)) return false
+        if (folderId === '__unfiled__' && group.folderId !== null) return false
+        if (folderId && folderId !== '__unfiled__' && group.folderId !== folderId) return false
+        if (filter === 'published' && group.status !== 'published') return false
+        if (filter === 'scheduled' && !group.publishingAt) return false
+        if (filter === 'draft' && group.status !== 'draft') return false
+        if (filter === 'targeting' && !group.targetingEnabled) return false
+        return true
+      }).sort((a, b) => {
+        if (sort === 'name') return a.name.localeCompare(b.name, 'ja') || a.id.localeCompare(b.id)
+        if (sort === 'updated') return b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id)
+        if (sort === 'taps') {
+          return (b.monthlyStats?.taps ?? -1) - (a.monthlyStats?.taps ?? -1) || a.id.localeCompare(b.id)
+        }
+        return a.targetingPriority - b.targetingPriority || a.id.localeCompare(b.id)
+      })
+      const total = narrowed.length
+      const offset = (page - 1) * limit
+      const appliedSort = sort === 'taps'
+        ? [{ field: 'monthlyStats.taps', direction: 'desc' }, { field: 'id', direction: 'asc' }]
+        : sort === 'updated'
+          ? [{ field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }]
+          : sort === 'name'
+            ? [{ field: 'name', direction: 'asc' }, { field: 'id', direction: 'asc' }]
+            : [
+                { field: 'targetingPriority', direction: 'asc' },
+                { field: 'createdAt', direction: 'asc' },
+                { field: 'id', direction: 'asc' },
+              ]
+      return {
+        success: true,
+        data: {
+          items: narrowed.slice(offset, offset + limit),
+          total,
+          limit,
+          sort: appliedSort,
+          facets: {
+            total: RICH_MENU_GROUPS.length,
+            published: RICH_MENU_GROUPS.filter((group) => group.status === 'published').length,
+            targeting: RICH_MENU_GROUPS.filter((group) => group.targetingEnabled).length,
+            folderCounts: Object.fromEntries(
+              RICH_MENU_GROUPS.reduce((counts, group) => {
+                const key = group.folderId ?? '__unfiled__'
+                counts.set(key, (counts.get(key) ?? 0) + 1)
+                return counts
+              }, new Map()),
+            ),
+          },
+        },
+      }
+    }
     return { success: true, data: RICH_MENU_GROUPS }
   }
   if (pathname === '/api/rich-menu-groups/external') {
