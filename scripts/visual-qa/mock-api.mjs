@@ -2622,7 +2622,47 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       ],
     }
   }
-  if (pathname === '/api/webinars') return { success: true, data: WEBINARS }
+  if (pathname === '/api/webinars') {
+    /*
+      本物と同じ offset 方式(page/limit・total・sort)。全件配列を返すと、
+      頁ごと取得の新コードが撮影で壊れる。絞り無しの既定は従来どおり
+      全件が1頁に入る(5件・total 5)で、既定の撮影は変わらない。
+    */
+    const rawPage = Number(query.get('page') ?? '')
+    const rawLimit = Number(query.get('limit') ?? '')
+    const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1
+    const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 200) : 50
+    const sort = query.get('sort') === 'created' ? 'created' : query.get('sort') === 'name' ? 'name' : 'updated'
+    const status = query.get('status') === 'active' || query.get('status') === 'draft' ? query.get('status') : ''
+    const folder = query.get('folder') ?? ''
+    const needle = (query.get('q') ?? '').trim().toLowerCase()
+    let rows = WEBINARS.filter((webinar) => webinar.status !== 'archived')
+    if (status) rows = rows.filter((webinar) => webinar.status === status)
+    if (folder === '__unfiled__') rows = rows.filter((webinar) => !webinar.folderId)
+    else if (folder) rows = rows.filter((webinar) => webinar.folderId === folder)
+    if (needle) {
+      rows = rows.filter((webinar) => webinar.title.toLowerCase().includes(needle) || webinar.slug.toLowerCase().includes(needle))
+    }
+    rows = [...rows].sort((left, right) => {
+      if (sort === 'name') return left.title < right.title ? -1 : left.title > right.title ? 1 : 0
+      const key = sort === 'created' ? 'createdAt' : 'updatedAt'
+      return left[key] > right[key] ? -1 : left[key] < right[key] ? 1 : 0
+    })
+    const sorts = {
+      updated: { field: 'updatedAt', direction: 'desc' },
+      created: { field: 'createdAt', direction: 'desc' },
+      name: { field: 'title', direction: 'asc' },
+    }
+    return {
+      success: true,
+      data: {
+        items: rows.slice((page - 1) * limit, page * limit),
+        total: rows.length,
+        limit,
+        sort: [sorts[sort]],
+      },
+    }
+  }
   if (pathname === '/api/webinars/overview') return { success: true, data: WEBINAR_OVERVIEW }
   if (/^\/api\/webinars\/[^/]+\/editor$/.test(pathname)) return { success: true, data: WEBINAR_EDITOR }
   if (/^\/api\/webinars\/[^/]+\/publish-validation$/.test(pathname)) return { success: true, data: WEBINAR_PUBLISH_VALIDATION }
@@ -2920,7 +2960,16 @@ const server = createServer((req, res) => {
       res.writeHead(200).end(JSON.stringify({ success: true, data: WEBINAR_EDITOR }))
       return
     }
-    if (method === 'POST' && /^\/api\/webinars\/[^/]+\/(publish|pause|duplicate)$/.test(url.pathname)) {
+    /*
+      本物の公開応答は `{ webinar, validation }`（`apps/worker/src/routes/webinars.ts`
+      の publish）。単体を返すと、公開結果を読む新コードがモックで動いて
+      本番で壊れる契約の穴になる。停止・複製は単体のまま。
+    */
+    if (method === 'POST' && /^\/api\/webinars\/[^/]+\/publish$/.test(url.pathname)) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: { webinar: WEBINARS[0], validation: WEBINAR_PUBLISH_VALIDATION } }))
+      return
+    }
+    if (method === 'POST' && /^\/api\/webinars\/[^/]+\/(pause|duplicate)$/.test(url.pathname)) {
       res.writeHead(200).end(JSON.stringify({ success: true, data: WEBINARS[0] }))
       return
     }

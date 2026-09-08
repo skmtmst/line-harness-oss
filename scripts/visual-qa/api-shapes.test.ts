@@ -39,15 +39,14 @@ describe('画面確認モックの口の形', () => {
     }
   });
 
-  it('`ApiResponse` を通さず `{ data: X[] }` と書いた口も拾う', () => {
+  it('頁形式へ移した口は配列の既定器に落とさない', () => {
     /*
-      ウェビナーの4つの口は `fetchApi<{ data: Webinar[] }>` と書いてある。
-      中身は `ApiResponse<Webinar[]>` と同じなのに、読み取りが名前しか
-      見ていなかったので拾えず、既定の器 `{items:[],total:0}` が返っていた。
-      `/webinars` は `[...narrowed]` で `narrowed is not iterable` を投げ、
-      **画面が丸ごと「画面を表示できませんでした」になっていた。**
+      `/api/webinars` は頁形式(`{items,total,limit,sort}`)へ移したので、
+      配列の口としては拾わない。代わりにモック内の専用処理が同じ器を返す。
+      配列のまま拾うと、頁の器が既定の `{items:[],total:0}` で潰れて
+      **画面が丸ごと「画面を表示できませんでした」になる。**
     */
-    expect(paths.has('/api/webinars'), '/api/webinars を配列の口として拾えていない').toBe(true);
+    expect(paths.has('/api/webinars'), '/api/webinars を配列の口として拾ってしまっている').toBe(false);
   });
 
   it('交差型で書かれた一覧の口も拾う', () => {

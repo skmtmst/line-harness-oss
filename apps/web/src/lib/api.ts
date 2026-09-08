@@ -4149,7 +4149,8 @@ export const api = {
         body: JSON.stringify(data),
       }),
     /** 名前・色・一覧に出すかを変える。分類とマイルは別の受け口が持っている。 */
-    update: (id: string, data: { name?: string; color?: string; isStarred?: boolean }) =>
+    /* タグ自身は色を持たない。色は分類(フォルダ)に付ける。 */
+    update: (id: string, data: { name?: string; isStarred?: boolean }) =>
       fetchApi<ApiResponse<Tag>>(`/api/tags/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -9900,10 +9901,36 @@ export type WebinarParticipantPage = {
   nextCursor: string | null
 }
 
+export type WebinarListParams = {
+  page?: number
+  limit?: number
+  q?: string
+  folder?: string
+  status?: 'active' | 'draft'
+  sort?: 'updated' | 'created' | 'name'
+}
+
+export type WebinarListResponse = {
+  items: WebinarListItem[]
+  total: number
+  limit: number
+  sort: Array<{ field: string; direction: 'asc' | 'desc' }>
+}
+
 export const webinarApi = {
-  list: (accountId?: string) => fetchApi<{ data: WebinarListItem[] }>(
-    `/api/webinars${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`,
-  ),
+  /* 共通一覧契約の offset 方式。頁・件数・絞りはサーバーで行う。 */
+  list: (accountId?: string, params?: WebinarListParams) => {
+    const query = new URLSearchParams()
+    if (accountId) query.set('account_id', accountId)
+    if (params?.page) query.set('page', String(params.page))
+    if (params?.limit) query.set('limit', String(params.limit))
+    if (params?.q) query.set('q', params.q)
+    if (params?.folder) query.set('folder', params.folder)
+    if (params?.status) query.set('status', params.status)
+    if (params?.sort) query.set('sort', params.sort)
+    const suffix = query.size ? `?${query}` : ''
+    return fetchApi<{ data: WebinarListResponse }>(`/api/webinars${suffix}`)
+  },
   folders: (accountId: string) => fetchApi<ApiResponse<WebinarFolder[]>>(
     `/api/folders?kind=webinar&account_id=${encodeURIComponent(accountId)}`,
   ),
