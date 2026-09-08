@@ -1041,7 +1041,8 @@ export const NEN_COLUMN_CREATE = {
   },
   success: {
     status: 201,
-    body: { success: true, data: { id: 'nen-column-draft-1' } },
+    // 本番口は `data: { id, queued }` を返す(点検 #512 の中8)。数は固定値。
+    body: { success: true, data: { id: 'nen-column-draft-1', queued: 0 } },
   },
   inputError: {
     status: 400,
@@ -3560,7 +3561,7 @@ export const AUTO_REPLIES = [
     ...AR_BASE, id: 'ar-2', name: '予約変更のお問い合わせ', keyword: '予約変更', matchType: 'contains',
     responseType: 'text', responseContent: '予約変更を承ります。ご希望の日時をこのトークでお知らせください。',
     isActive: true, priority: 2, folderId: 'arf-booking', templateId: 'template-1',
-    keywords: [{ word: '予約変更' }, { word: '日程変更' }, { word: 'キャンセル' }],
+    keywords: [{ keyword: '予約変更', matchType: 'contains' }, { keyword: '日程変更', matchType: 'contains' }, { keyword: 'キャンセル', matchType: 'contains' }],
     actions: [{ actionType: 'support_mark' }],
     hits: { period: 186, total: 942 }, actionExecutionCount: 64, conflictAttentionCount: 1,
     createdAt: '2026-04-18T00:00:00.000Z',
@@ -3569,7 +3570,7 @@ export const AUTO_REPLIES = [
     ...AR_BASE, id: 'ar-3', name: '商品についての質問', keyword: '商品', matchType: 'contains',
     responseType: 'text', responseContent: '商品についてのご質問ありがとうございます。',
     isActive: true, priority: 3, folderId: 'arf-inquiry',
-    keywords: [{ word: '商品' }, { word: '価格' }, { word: '在庫' }, { word: 'サイズ' }, { word: '送料' }],
+    keywords: [{ keyword: '商品', matchType: 'contains' }, { keyword: '価格', matchType: 'contains' }, { keyword: '在庫', matchType: 'contains' }, { keyword: 'サイズ', matchType: 'contains' }, { keyword: '送料', matchType: 'contains' }],
     actions: [{ actionType: 'tag' }],
     hits: { period: 152, total: 733 }, actionExecutionCount: 64, conflictAttentionCount: 1,
     createdAt: '2026-05-06T00:00:00.000Z',
@@ -3580,7 +3581,7 @@ export const AUTO_REPLIES = [
     ...AR_BASE, id: 'ar-4', name: 'キャンセル受付', keyword: 'キャンセル', matchType: 'contains',
     responseType: 'text', responseContent: 'キャンセルを承りました。',
     isActive: false, priority: 4, folderId: 'arf-booking',
-    keywords: [{ word: 'キャンセル' }, { word: '取り消し' }],
+    keywords: [{ keyword: 'キャンセル', matchType: 'contains' }, { keyword: '取り消し', matchType: 'contains' }],
     actions: [], hits: { period: 0, total: 0 }, actionExecutionCount: 0, conflictAttentionCount: 0,
     createdAt: '2026-08-12T00:00:00.000Z',
   },
@@ -3588,7 +3589,7 @@ export const AUTO_REPLIES = [
     ...AR_BASE, id: 'ar-5', name: '旧キーワードルール', keyword: '営業時間', matchType: 'exact',
     responseType: 'text', responseContent: '平日 09:00〜18:00 です。',
     isActive: false, priority: 5, folderId: 'arf-keyword',
-    keywords: [{ word: '営業時間' }],
+    keywords: [{ keyword: '営業時間', matchType: 'exact' }],
     actions: [], hits: { period: 0, total: 411 }, actionExecutionCount: 0, conflictAttentionCount: 0,
     createdAt: '2026-01-20T00:00:00.000Z',
   },
@@ -3934,7 +3935,7 @@ export const INFLOW_SUMMARY = {
     { refCode: 'shop-pop', name: '店頭POPのQRコード', friendCount: 124, clickCount: 640, latestAt: '2026-08-25T11:30:00.000Z' },
     { refCode: 'g-ads-summer', name: 'Google広告 夏キャンペーン', friendCount: 142, clickCount: 3120, latestAt: '2026-08-25T08:04:00.000Z' },
     { refCode: 'mail-sign', name: 'メール署名', friendCount: 12, clickCount: 210, latestAt: '2026-08-19T16:02:00.000Z' },
-    { refCode: 'flyer-spring', name: 'チラシ（2026春）', friendCount: 0, clickCount: 12, latestAt: '2026-06-28T14:10:00.000Z' },
+    { refCode: 'flyer-spring', name: 'チラシ（2026春）', friendCount: 12, clickCount: 12, latestAt: '2026-06-28T14:10:00.000Z' },
   ],
   totalFriends: 312,
   friendsWithRef: 289,
@@ -3954,11 +3955,12 @@ export const SITE_TRACKING_SUMMARY = {
   lastEventAt: '2026-08-25T11:17:00.000Z',
 }
 
+/* #514-14: 口(DB)はパスだけ保存する。完全URLの固定値は撮影でずれを隠すのでパス形にする。 */
 export const SITE_TRACKING_PAGES = [
-  { path: 'https://example.com/', views: 12480, visitors: 186 },
-  { path: 'https://shop.example.com/', views: 8120, visitors: 94 },
-  { path: 'https://lp.example.com/', views: 2403, visitors: 2 },
-  { path: 'https://unknown-site.net/', views: 620, visitors: 0 },
+  { path: '/', views: 12480, visitors: 186 },
+  { path: '/shop/', views: 8120, visitors: 94 },
+  { path: '/lp/summer/', views: 2403, visitors: 2 },
+  { path: '/blog/unknown-page/', views: 620, visitors: 0 },
 ]
 
 export const AD_PLATFORMS = [
@@ -3967,13 +3969,26 @@ export const AD_PLATFORMS = [
   { id: 'ad-x', name: 'x', displayName: 'X（旧Twitter）', config: { connection_error: '権限が足りません' }, isActive: false, createdAt: '2026-01-10T00:00:00.000Z', updatedAt: '2026-08-22T09:00:00.000Z' },
 ]
 
+/*
+  #514-8: 本番の口が返す形だけにする。friendName・conversionName・nextRetryAt は
+  口が返さない(画面も読まない)。豊富な形を返すとずれを隠す。
+*/
 export const AD_CONVERSION_LOGS = [
-  { id: 'adlog-1', adPlatformId: 'ad-meta', friendId: 'friend-inflow-1', friendName: '木村 亮', eventName: '体験申込フォームの送信', conversionName: 'Lead', clickId: 'fixed-fbclid-1', clickIdType: 'fbclid', status: 'sent', errorMessage: null, createdAt: '2026-08-25T11:32:00.000Z' },
-  { id: 'adlog-2', adPlatformId: 'ad-google', friendId: 'friend-inflow-2', friendName: '中村 さくら', eventName: '初回のご購入', conversionName: 'purchase', clickId: 'fixed-gclid-1', clickIdType: 'gclid', status: 'sent', errorMessage: null, createdAt: '2026-08-25T11:18:00.000Z' },
-  { id: 'adlog-3', adPlatformId: 'ad-meta', friendId: 'friend-inflow-3', friendName: '田口 みなみ', eventName: '予約が入った', conversionName: 'Schedule', clickId: 'fixed-fbclid-2', clickIdType: 'fbclid', status: 'pending', errorMessage: null, createdAt: '2026-08-25T10:54:00.000Z', nextRetryAt: '2026-08-25T11:35:00.000Z' },
-  { id: 'adlog-4', adPlatformId: 'ad-meta', friendId: 'friend-inflow-4', friendName: '佐藤 健', eventName: '体験申込フォームの送信', conversionName: 'Lead', clickId: 'fixed-fbclid-3', clickIdType: 'fbclid', status: 'failed', errorMessage: '接続設定を確認してください', createdAt: '2026-08-25T09:41:00.000Z' },
-  { id: 'adlog-5', adPlatformId: 'ad-google', friendId: 'friend-inflow-5', friendName: '山本 あおい', eventName: '初回のご購入', conversionName: 'purchase', clickId: 'fixed-gclid-2', clickIdType: 'gclid', status: 'failed', errorMessage: '広告アカウントをつなぎ直してください', createdAt: '2026-08-25T08:20:00.000Z', nextRetryAt: 'reconnect' },
-  { id: 'adlog-6', adPlatformId: 'ad-meta', friendId: '', friendName: '', eventName: '定期便のお申し込み', conversionName: '—', clickId: null, clickIdType: null, status: 'skipped', errorMessage: '対応が付いていないため送っていません', createdAt: '2026-08-24T22:05:00.000Z' },
+  { id: 'adlog-1', adPlatformId: 'ad-meta', friendId: 'friend-inflow-1', eventName: '体験申込フォームの送信', clickId: 'fixed-fbclid-1', clickIdType: 'fbclid', status: 'sent', errorMessage: null, createdAt: '2026-08-25T11:32:00.000Z' },
+  { id: 'adlog-2', adPlatformId: 'ad-google', friendId: 'friend-inflow-2', eventName: '初回のご購入', clickId: 'fixed-gclid-1', clickIdType: 'gclid', status: 'sent', errorMessage: null, createdAt: '2026-08-25T11:18:00.000Z' },
+  { id: 'adlog-3', adPlatformId: 'ad-meta', friendId: 'friend-inflow-3', eventName: '予約が入った', clickId: 'fixed-fbclid-2', clickIdType: 'fbclid', status: 'pending', errorMessage: null, createdAt: '2026-08-25T10:54:00.000Z' },
+  { id: 'adlog-4', adPlatformId: 'ad-meta', friendId: 'friend-inflow-4', eventName: '体験申込フォームの送信', clickId: 'fixed-fbclid-3', clickIdType: 'fbclid', status: 'failed', errorMessage: '接続設定を確認してください', createdAt: '2026-08-25T09:41:00.000Z' },
+  { id: 'adlog-5', adPlatformId: 'ad-google', friendId: 'friend-inflow-5', eventName: '初回のご購入', clickId: 'fixed-gclid-2', clickIdType: 'gclid', status: 'failed', errorMessage: '広告アカウントをつなぎ直してください', createdAt: '2026-08-25T08:20:00.000Z' },
+  { id: 'adlog-6', adPlatformId: 'ad-meta', friendId: '', eventName: '定期便のお申し込み', clickId: null, clickIdType: null, status: 'skipped', errorMessage: '対応が付いていないため送っていません', createdAt: '2026-08-24T22:05:00.000Z' },
+]
+
+/*
+  #514-9: 撮影環境で tracked_link 行と展開行を確認するための計測リンク。
+  本番の GET /api/tracked-links と同じ形。flyer-spring は entry_route が
+  停止中のため tracked_link 行として出て、停止中譲りの分岐も写る。
+*/
+export const TRACKED_LINKS = [
+  { id: 'flyer-spring', name: 'チラシ計測リンク（2026春）', originalUrl: 'https://example.com/lp/spring/', trackingUrl: 'https://example.com/t/flyer-spring', shortCode: null, tagId: null, scenarioId: null, introTemplateId: null, rewardTemplateId: null, lineAccountId: null, isActive: true, clickCount: 12, ogTitle: null, ogDescription: null, ogImageUrl: null, createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-06-28T16:02:00.000Z' },
 ]
 
 /*
@@ -5287,7 +5302,10 @@ export const LINE_NOTIFICATION_METRICS = {
     definitionId: definition.id,
     notificationName: definition.name,
     accepted: { value: [148, 132, 96, 88, 74, 51, 23, 3, 0][index] },
-    displayed: { state: 'unavailable', value: null, reason: 'LINE側の個人開封は取得できません' },
+    // 8件目は集計待ち。本番の waiting が画面の pending に寄ることを撮る。
+    displayed: index === 7
+      ? { state: 'pending', value: null, reason: '集計中です' }
+      : { state: 'unavailable', value: null, reason: 'LINE側の個人開封は取得できません' },
     clicked: { value: [42, 31, 18, 16, 12, 9, 4, 0, 0][index] },
   })),
   coverage: { individualOpenAvailable: false, lineAggregateOnly: true, unavailableIsNull: true },
@@ -5339,7 +5357,7 @@ export const EC_NOTIFICATION_RUNS = {
 }
 
 export const LINE_NOTIFICATION_DELIVERIES = {
-  items: EC_NOTIFICATION_RUNS.items.map((run) => ({
+  items: [...EC_NOTIFICATION_RUNS.items.map((run) => ({
     ...run,
     attemptCount: run.status === 'failed' ? 3 : 1,
     nextRetryAt: run.status === 'failed' ? '2026-08-25T11:14:00+09:00' : null,
@@ -5348,6 +5366,19 @@ export const LINE_NOTIFICATION_DELIVERIES = {
     retryAvailable: run.status === 'failed',
     attemptHistory: [{ attempt: 1, status: run.status === 'failed' ? 'failed' : run.status, occurredAt: run.receivedAt }],
   })),
+  // 再試行待ち。本番の failures 絞り込み（excluded / retry_wait / failed）の3つ目を撮る。
+  {
+    id: 'ec-run-5', recipientType: 'customer', notificationName: '発送のお知らせ', source: 'EC連携',
+    sourceEventId: 'ec-event-1005', friendId: 'friend-5', friendName: '石田 未来', orderNumber: 'NEN-10478',
+    channel: 'line', status: 'retry_wait', reason: 'LINEが混み合っているため、後でもう一度送ります',
+    receivedAt: '2026-08-25T10:09:00+09:00', acceptedAt: null,
+    attemptCount: 2, nextRetryAt: '2026-08-25T11:09:00+09:00', clickedAt: null, version: 2,
+    executionMode: 'retry', retryAvailable: true,
+    attemptHistory: [
+      { attempt: 1, status: 'failed', occurredAt: '2026-08-25T10:09:00+09:00' },
+      { attempt: 2, status: 'retry_wait', occurredAt: '2026-08-25T10:39:00+09:00' },
+    ],
+  }],
   summary: EC_NOTIFICATION_RUNS.summary,
   coverage: { source: 'notification_delivery_ledger', unassignedHistoricalRowsExcluded: true, attemptHistoryAvailable: true, retryAvailable: true },
 }

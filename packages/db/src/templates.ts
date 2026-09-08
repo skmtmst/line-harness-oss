@@ -359,7 +359,8 @@ export async function getTemplatesWithUsageCount(
   db: D1Database,
   category?: string,
   scope?: TemplateListScope,
-): Promise<TemplateRowWithUsage[]> {
+  paging?: { limit: number; offset: number },
+): Promise<{ items: TemplateRowWithUsage[]; total: number }> {
   // 1. templates 本体
   const filters: string[] = [];
   const values: unknown[] = [];
@@ -377,8 +378,15 @@ export async function getTemplatesWithUsageCount(
       filters.push(scope.includeUnassigned ? 'line_account_id IS NULL' : '1 = 0');
     }
   }
-  const tplSql = `SELECT * FROM templates${filters.length ? ` WHERE ${filters.join(' AND ')}` : ''} ORDER BY created_at DESC`;
-  const tplStmt = values.length > 0 ? db.prepare(tplSql).bind(...values) : db.prepare(tplSql);
+  const where = filters.length ? ` WHERE ${filters.join(' AND ')}` : '';
+  const totalStmt = values.length > 0
+    ? db.prepare(`SELECT COUNT(*) AS total FROM templates${where}`).bind(...values)
+    : db.prepare(`SELECT COUNT(*) AS total FROM templates${where}`);
+  const totalRow = await totalStmt.first<{ total: number }>();
+  const pageSql = `SELECT * FROM templates${where} ORDER BY created_at DESC, id ASC`
+    + (paging ? ' LIMIT ? OFFSET ?' : '');
+  const pageValues = paging ? [...values, paging.limit, paging.offset] : values;
+  const tplStmt = pageValues.length > 0 ? db.prepare(pageSql).bind(...pageValues) : db.prepare(pageSql);
   const templates = await tplStmt.all<TemplateRow>();
 
   // 2. 列で参照している設定は1回の問い合わせでまとめて数える。
@@ -417,8 +425,11 @@ export async function getTemplatesWithUsageCount(
     }
   }
 
-  return (templates.results ?? []).map((t) => ({
-    ...t,
-    usage_count: (relationalCount.get(t.id) ?? 0) + (automationCount.get(t.id) ?? 0),
-  }));
+  return {
+    items: (templates.results ?? []).map((t) => ({
+      ...t,
+      usage_count: (relationalCount.get(t.id) ?? 0) + (automationCount.get(t.id) ?? 0),
+    })),
+    total: Number(totalRow?.total ?? 0),
+  };
 }

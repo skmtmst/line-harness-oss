@@ -112,7 +112,7 @@ export default function QuestionEditor({
       const [tagRes, fieldRes, scenarioRes] = await Promise.all([
         api.tags.list(),
         api.friendFields.list(selectedAccountId),
-        api.scenarios.list(),
+        api.scenarios.list({ limit: 200 }),
       ])
       if (tagRes.success) setTags(tagRes.data.map((t) => ({ id: t.id, name: t.name })))
       if (fieldRes.success) setFields(fieldRes.data.map((f) => ({ id: f.id, name: f.name })))

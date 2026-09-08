@@ -33,10 +33,11 @@ import { WEBINAR_FOLDERS } from './fixtures.mjs';
 describe('画面確認モックの口の形', () => {
   const paths: Set<string> = readArrayGetPaths();
 
-  it('一覧が配列で返る口を拾う', () => {
-    for (const path of ['/api/tags', '/api/tag-groups', '/api/chats', '/api/scenarios', '/api/broadcasts', '/api/automations', '/api/rich-menu-groups']) {
+  it('一覧が配列で返る口を拾い、共通一覧契約の口は配列扱いしない', () => {
+    for (const path of ['/api/tags', '/api/tag-groups', '/api/chats', '/api/broadcasts', '/api/automations', '/api/rich-menu-groups']) {
       expect(paths.has(path), `${path} を配列の口として拾えていない`).toBe(true);
     }
+    expect(paths.has('/api/scenarios'), '/api/scenarios を共通一覧契約ではなく配列として拾っている').toBe(false);
   });
 
   it('頁形式へ移した口は配列の既定器に落とさない', () => {

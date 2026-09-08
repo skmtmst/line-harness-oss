@@ -72,7 +72,7 @@ import {
   ACTION_SCORE_RULES,
   SUPPORT_MARKS, SUPPORT_MARK_ARCHIVE_IMPACT, SUPPORT_MARK_AUTOMATION_RULES,
   OUTGOING_WEBHOOKS, OUTGOING_WEBHOOK_TEST_RESULT, INCOMING_WEBHOOKS, INCOMING_WEBHOOK_DETAILS, ENTRY_ROUTES, INFLOW_SUMMARY,
-  SITE_TRACKING_SUMMARY, SITE_TRACKING_PAGES, AD_PLATFORMS, AD_CONVERSION_LOGS,
+  SITE_TRACKING_SUMMARY, SITE_TRACKING_PAGES, AD_PLATFORMS, AD_CONVERSION_LOGS, TRACKED_LINKS,
   STAFF_MEMBERS, LOGIN_AUDIT,
   AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS,
   AFFILIATE_SETTLEMENT_PREVIEW, AFFILIATE_SETTLEMENT_CREATED, AFFILIATE_PAYOUT_BATCH, AFFILIATE_STATEMENT,
@@ -1839,6 +1839,35 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       .slice(0, limit)
     return { success: true, data: { ...FRIEND_ADD_RUNS, items } }
   }
+  if (pathname === '/api/scenarios') {
+    const requestedPage = Number.parseInt(query.get('page') ?? '', 10)
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 200) : 50
+    const offset = (page - 1) * limit
+    const nameQuery = (query.get('query') ?? '').trim().toLocaleLowerCase('ja-JP')
+    const active = query.get('active')
+    const createdFrom = query.get('createdFrom')
+    const folderId = query.get('folderId')
+    const filtered = FRIEND_SCENARIOS
+      .filter((item) => !nameQuery || item.name.toLocaleLowerCase('ja-JP').includes(nameQuery))
+      .filter((item) => active !== '0' || !item.isActive)
+      .filter((item) => !createdFrom || item.createdAt >= createdFrom)
+      .filter((item) => !folderId
+        || (folderId === '__unfiled__' ? !item.folderId : item.folderId === folderId))
+    return {
+      success: true,
+      data: {
+        items: filtered.slice(offset, offset + limit),
+        total: filtered.length,
+        limit,
+        sort: [
+          { field: 'createdAt', direction: 'desc' },
+          { field: 'id', direction: 'desc' },
+        ],
+      },
+    }
+  }
   if (/^\/api\/scenarios\/[^/]+\/stats$/.test(pathname)) return { success: true, data: SCENARIO_STATS }
   if (/^\/api\/scenarios\/[^/]+\/simulate$/.test(pathname)) return { success: true, data: SCENARIO_SIMULATION }
   if (/^\/api\/scenarios\/[^/]+\/runs$/.test(pathname)) return { success: true, data: SCENARIO_RUNS }
@@ -2074,16 +2103,28 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/analytics/ref-summary') {
     return { success: true, data: INFLOW_SUMMARY }
   }
+  // #514-9: 計測リンクの一覧。本番の GET /api/tracked-links と同じ形で返す。
+  if (pathname === '/api/tracked-links') {
+    return { success: true, data: TRACKED_LINKS }
+  }
   if (/^\/api\/analytics\/ref\/[^/]+$/.test(pathname)) {
+    /*
+      #514-8・9: 本番の GET /api/analytics/ref/:refCode と同じ形
+      (refCode・name・friends[id・displayName・trackedAt・currentStatus])で返す。
+      firstPage・conversion・miles の豊富な形は本番に無いので持たせない。
+    */
+    const refCode = decodeURIComponent(pathname.split('/').pop())
     return {
       success: true,
       data: {
+        refCode,
+        name: (ENTRY_ROUTES.find((item) => item.refCode === refCode) ?? {}).name ?? null,
         friends: [
-          { id: 'friend-inflow-1', displayName: '石田 未来', trackedAt: '2026-08-25T09:12:00.000Z', firstPage: '/summer-campaign', currentStatus: 'やりとり中', conversion: 'まだありません', miles: 100 },
-          { id: 'friend-inflow-2', displayName: '新田 遥', trackedAt: '2026-08-24T21:40:00.000Z', firstPage: '/summer-campaign', currentStatus: 'シナリオ2通目', conversion: 'まだありません', miles: 100 },
-          { id: 'friend-inflow-3', displayName: '松本 圭', trackedAt: '2026-08-22T12:05:00.000Z', firstPage: '/profile', currentStatus: '体験を申し込んだ', conversion: '¥3,000 の成果', miles: 600 },
-          { id: 'friend-inflow-4', displayName: '林 里佳', trackedAt: '2026-08-20T18:22:00.000Z', firstPage: '/summer-campaign', currentStatus: 'ブロックされました', conversion: 'まだありません', miles: 100 },
-          { id: 'friend-inflow-5', displayName: '大村 真', trackedAt: '2026-08-18T10:44:00.000Z', firstPage: '/summer-campaign', currentStatus: '読んでいない', conversion: 'まだありません', miles: 100 },
+          { id: 'friend-inflow-1', displayName: '石田 未来', trackedAt: '2026-08-25T09:12:00.000Z', currentStatus: '友だち中' },
+          { id: 'friend-inflow-2', displayName: '新田 遥', trackedAt: '2026-08-24T21:40:00.000Z', currentStatus: '友だち中' },
+          { id: 'friend-inflow-3', displayName: '松本 圭', trackedAt: '2026-08-22T12:05:00.000Z', currentStatus: '友だち中' },
+          { id: 'friend-inflow-4', displayName: '林 里佳', trackedAt: '2026-08-20T18:22:00.000Z', currentStatus: 'ブロック済み' },
+          { id: 'friend-inflow-5', displayName: '大村 真', trackedAt: '2026-08-18T10:44:00.000Z', currentStatus: '友だち中' },
         ],
       },
     }
@@ -2153,9 +2194,13 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
     const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 100) : 20
     const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
-    const items = query.get('view') === 'failures'
-      ? LINE_NOTIFICATION_DELIVERIES.items.filter((item) => item.status === 'failed')
+    // 本番の view=failures は excluded / retry_wait / failed の3状態。failed だけにすると件数が合わない。
+    // 本番口は retry_wait を failed に寄せて返す（publicDeliveryStatus）ので、見本も同じ寄せ方をする。
+    const toPublic = (item) => item.status === 'retry_wait' ? { ...item, status: 'failed' } : item
+    const items = (query.get('view') === 'failures'
+      ? LINE_NOTIFICATION_DELIVERIES.items.filter((item) => item.status === 'failed' || item.status === 'excluded' || item.status === 'retry_wait')
       : LINE_NOTIFICATION_DELIVERIES.items
+    ).map(toPublic)
     return { success: true, data: { ...LINE_NOTIFICATION_DELIVERIES, items: items.slice(offset, offset + limit) }, pagination: { total: items.length, limit, offset } }
   }
   if (pathname === '/api/notifications/operator-rules') {

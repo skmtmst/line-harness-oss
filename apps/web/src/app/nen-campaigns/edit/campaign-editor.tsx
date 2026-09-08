@@ -139,11 +139,16 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
 
   const searchFriends = async () => {
     const query = testSearch.trim()
-    const response = await api.friends.list({ search: query, accountId: selectedAccountId ?? undefined, limit: 5 })
-    if (!response.success) return
-    const loginUsers = testLoginUsers.filter((candidate) => candidate.displayName.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
-    const friends = response.data.items.map((friend) => ({ id: friend.id, displayName: friend.displayName }))
-    setTestCandidates([...new Map([...loginUsers, ...friends].map((candidate) => [candidate.id, candidate])).values()])
+    setNotice('')
+    try {
+      const response = await api.friends.list({ search: query, accountId: selectedAccountId ?? undefined, limit: 5 })
+      if (!response.success) throw new Error('failed')
+      const loginUsers = testLoginUsers.filter((candidate) => candidate.displayName.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
+      const friends = response.data.items.map((friend) => ({ id: friend.id, displayName: friend.displayName }))
+      setTestCandidates([...new Map([...loginUsers, ...friends].map((candidate) => [candidate.id, candidate])).values()])
+    } catch {
+      setNotice('相手を探せませんでした。通信を確認してもう一度お試しください。')
+    }
   }
 
   const sendTest = async (friendId: string) => {

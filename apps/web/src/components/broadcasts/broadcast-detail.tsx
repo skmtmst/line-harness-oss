@@ -95,10 +95,11 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
 
   useEffect(() => { load() }, [load])
 
-  // Poll progress while sending
+  // 送信中は進捗とアカウント別内訳を同じ応答で読む。タブを隠した間は止める。
   useEffect(() => {
     if (broadcast?.status !== 'sending') return
-    const interval = setInterval(async () => {
+    let interval: ReturnType<typeof setInterval> | null = null
+    const poll = async () => {
       const res = await api.broadcasts.getProgress(id)
       if (res.success && res.data) {
         setBroadcast(prev => prev ? {
@@ -107,13 +108,28 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
           totalCount: res.data!.totalCount,
           successCount: res.data!.successCount,
         } : prev)
+        setPerAccountStats(res.data.perAccountStats)
         if (res.data.status === 'sent') {
-          clearInterval(interval)
+          if (interval) clearInterval(interval)
+          interval = null
           load()
         }
       }
-    }, 3000)
-    return () => clearInterval(interval)
+    }
+    const syncPolling = () => {
+      if (document.hidden) {
+        if (interval) clearInterval(interval)
+        interval = null
+        return
+      }
+      if (!interval) interval = setInterval(() => void poll(), 5000)
+    }
+    syncPolling()
+    document.addEventListener('visibilitychange', syncPolling)
+    return () => {
+      document.removeEventListener('visibilitychange', syncPolling)
+      if (interval) clearInterval(interval)
+    }
   }, [broadcast?.status, id, load])
 
   // Load insight for sent broadcasts
@@ -130,7 +146,7 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
   // each account token で fetch されるので時間かかる (3-5 秒/アカ) — fire-and-forget。
   useEffect(() => {
     const status = broadcast?.status
-    if (status !== 'sending' && status !== 'sent') return
+    if (status !== 'sent') return
 
     let cancelled = false
     const requestId = id
@@ -145,15 +161,6 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
 
     fetchStats()
 
-    // 送信中は 3s ごとに再 fetch して per-account 進捗を更新する。
-    // 既存の successCount poll と同期させる目的。送信完了 (sent) では再 fetch 不要。
-    if (status === 'sending') {
-      const interval = setInterval(fetchStats, 3000)
-      return () => {
-        cancelled = true
-        clearInterval(interval)
-      }
-    }
     return () => { cancelled = true }
   }, [broadcast?.status, id])
 
