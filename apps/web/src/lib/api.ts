@@ -4372,7 +4372,7 @@ export const api = {
         `/api/friends/${friendId}/fields`,
         { method: 'PUT', body: JSON.stringify({ values }) },
       ),
-    bulk: (data: { friendIds: string[]; fieldId: string; value: string | null }) =>
+    bulk: (data: { friendIds: string[]; fieldId: string; value: string | null; lineAccountId: string }) =>
       fetchApi<ApiResponse<{ updated: number }>>('/api/friend-fields/bulk', {
         method: 'POST',
         body: JSON.stringify(data),

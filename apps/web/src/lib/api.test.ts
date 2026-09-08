@@ -1311,3 +1311,31 @@ describe('fetchApi error response', () => {
     expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json')
   })
 })
+
+describe('api.friendFields.bulk のアカウント境界契約 (#624)', () => {
+  it('一括更新を選択中アカウントIDと一緒に送る', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: { updated: 2 } }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await api.friendFields.bulk({
+      friendIds: ['friend-1', 'friend-2'],
+      fieldId: 'field-1',
+      value: 'テスト',
+      lineAccountId: 'account-1',
+    })
+
+    expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
+      'https://worker.example.com/api/friend-fields/bulk',
+    ])
+    expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({ method: 'POST' })
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body))).toMatchObject({
+      friendIds: ['friend-1', 'friend-2'],
+      fieldId: 'field-1',
+      value: 'テスト',
+      lineAccountId: 'account-1',
+    })
+  })
+})
