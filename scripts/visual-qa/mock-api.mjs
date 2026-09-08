@@ -1029,14 +1029,18 @@ function visualQaWriteBody(method, pathname) {
   if (method === 'POST' && pathname === '/api/analytics/cross/query') {
     return { id: 'visual-cross-result-1', state: 'pending' }
   }
+  /*
+   * 本番の口は `{success,data}` で包む。素値のままだと `api.ts` の
+   * 応答期待と形が違い、目視環境でテスト成功の絵を再現できない（#494 軽14）。
+   */
   if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/test$/.test(pathname)) {
-    return AUTO_REPLY_PUBLISH_TEST
+    return { success: true, data: AUTO_REPLY_PUBLISH_TEST }
   }
   if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/validate$/.test(pathname)) {
-    return AUTO_REPLY_PUBLISH_VALIDATION
+    return { success: true, data: AUTO_REPLY_PUBLISH_VALIDATION }
   }
   if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/publish$/.test(pathname)) {
-    return AUTO_REPLY_PUBLISH_RESULT
+    return { success: true, data: AUTO_REPLY_PUBLISH_RESULT }
   }
   if (method === 'POST' && /^\/api\/rich-menu-groups\/[^/]+\/preview-targets$/.test(pathname)) {
     return {
