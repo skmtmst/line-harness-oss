@@ -1272,7 +1272,7 @@ function nenMetricsBody(data, query) {
   return { ...data, range: nenRangeFor(query) }
 }
 
-function bodyFor(pathname, query = new URLSearchParams()) {
+function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/auth/session') {
     return { success: true, data: STAFF, csrfToken: 'visual-qa-csrf' }
   }
@@ -1726,10 +1726,6 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/account-settings/test-recipients') {
     return { success: true, data: TEMPLATE_TEST_RECIPIENTS }
   }
-  if (pathname === '/api/forms') {
-    return { success: true, data: query.get('with_list_summary') === '1' ? FORM_LIST : FORMS }
-  }
-  if (pathname === `/api/forms/${FORM_DETAIL.id}`) return { success: true, data: FORM_DETAIL }
   // 管理画面の保存・保管・削除の流れ（#503 L5）。絵の検証用に成功だけ返す。
   if (method === 'POST' && pathname === '/api/forms/drafts') {
     return { success: true, data: { id: 'form-draft-qa', isActive: false } }
@@ -1753,6 +1749,10 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (method === 'DELETE' && pathname === `/api/forms/${FORM_DETAIL.id}`) {
     return { success: true, data: null }
   }
+  if (pathname === '/api/forms') {
+    return { success: true, data: query.get('with_list_summary') === '1' ? FORM_LIST : FORMS }
+  }
+  if (pathname === `/api/forms/${FORM_DETAIL.id}`) return { success: true, data: FORM_DETAIL }
   const formSubmissions = new RegExp(`^/api/forms/${FORM_DETAIL.id}/submissions$`).test(pathname)
   if (formSubmissions) {
     // 互換用の古い形（ページ分けなし）は配列だけを返す。実口と同じく上限500件。
@@ -3073,6 +3073,16 @@ const server = createServer((req, res) => {
   // ただし画面側のエラー報告だけは 204 で受ける。405 を返すと、
   // 報告が失敗したこと自体が新しいエラーになって際限なく増える。
   if (method !== 'GET') {
+    const formWriteRequest = (
+      (method === 'POST' && (url.pathname === '/api/forms/drafts'
+        || url.pathname === `/api/forms/${FORM_DETAIL.id}/archive`))
+      || (method === 'PUT' && url.pathname === `/api/forms/${FORM_DETAIL.id}`)
+      || (method === 'DELETE' && url.pathname === `/api/forms/${FORM_DETAIL.id}`)
+    )
+    if (formWriteRequest) {
+      res.writeHead(200).end(JSON.stringify(bodyFor(method, url.pathname, url.searchParams)))
+      return
+    }
     if (/^\/api\/(mileage\/(rules|rewards|adjustments)|action-scores\/rules)/.test(url.pathname)) {
       let raw = ''
       req.on('data', (chunk) => { raw += chunk })
@@ -3680,7 +3690,7 @@ const server = createServer((req, res) => {
     res.writeHead(200).end(JSON.stringify(fixed))
     return
   }
-  res.writeHead(200).end(JSON.stringify(bodyFor(url.pathname, url.searchParams)))
+  res.writeHead(200).end(JSON.stringify(bodyFor(method, url.pathname, url.searchParams)))
 })
 
 /*

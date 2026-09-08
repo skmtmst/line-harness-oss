@@ -1,4 +1,5 @@
 import { beforeAll, afterEach, describe, expect, it, vi } from 'vitest'
+import type { AutoReplyConflictPair } from './api'
 
 let fetchApi: typeof import('./api').fetchApi
 let ApiError: typeof import('./api').ApiError
@@ -222,17 +223,28 @@ describe('api.friends のV6検索・本人照合契約', () => {
 
 describe('api.autoReplies の V6 集計・下書き契約', () => {
   it('選択中のLINEアカウントを競合集計へ渡す', async () => {
+    const conflict: AutoReplyConflictPair = {
+      leftAutoReplyId: 'auto-reply-1',
+      rightAutoReplyId: 'auto-reply-2',
+      winnerAutoReplyId: 'auto-reply-1',
+      certainty: 'certain',
+      reason: '同じ言葉に一致します',
+    }
     const fetchSpy = vi.fn(async () => new Response(
-      JSON.stringify({ success: true, data: { conflicts: [], conflictCount: 0 } }),
+      JSON.stringify({ success: true, data: { conflicts: [conflict], conflictCount: 1 } }),
       { status: 200, headers: { 'content-type': 'application/json' } },
     ))
     vi.stubGlobal('fetch', fetchSpy)
 
-    await api.autoReplies.summary('account/a')
+    const response = await api.autoReplies.summary('account/a')
 
     expect(fetchSpy.mock.calls[0]?.[0]).toBe(
       'https://worker.example.com/api/auto-replies/conflicts?accountId=account%2Fa',
     )
+    expect(response).toMatchObject({
+      success: true,
+      data: { conflicts: [conflict], conflictCount: 1 },
+    })
   })
 
   it('下書き保存に現在の版と追加設定を含める', async () => {
@@ -279,6 +291,24 @@ describe('api.autoReplies の V6 集計・下書き契約', () => {
       method: 'PUT',
       body: JSON.stringify(input),
     })
+  })
+})
+
+describe('api.scenarios の一括プレビュー', () => {
+  it('古い取得を止めるAbortSignalを渡す', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: { startAt: '', steps: [] } }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+    const controller = new AbortController()
+
+    await api.scenarios.preview('scenario/a', '2026-09-08T10:00:00+09:00', controller.signal)
+
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+      'https://worker.example.com/api/scenarios/scenario/a/preview?startAt=2026-09-08T10%3A00%3A00%2B09%3A00',
+    )
+    expect(fetchSpy.mock.calls[0]?.[1]?.signal).toBe(controller.signal)
   })
 })
 
@@ -352,6 +382,30 @@ describe('api.nenCampaigns.createColumn', () => {
       imageUrl: null,
       publishedAt: null,
     })
+  })
+
+  it('紹介文保存はnenCampaignsの1経路だけで成功と失敗を返す', async () => {
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({ success: true }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ))
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({ success: false, error: '保存できませんでした' }),
+        { status: 400, headers: { 'content-type': 'application/json' } },
+      ))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await expect(api.nenCampaigns.updateColumnMessage('account/a', 'column/a', '紹介文'))
+      .resolves.toEqual({ success: true })
+    await expect(api.nenCampaigns.updateColumnMessage('account/a', 'column/a', ''))
+      .rejects.toThrow('保存できませんでした')
+
+    expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
+      'https://worker.example.com/api/nen-campaigns/columns/column%2Fa/message?lineAccountId=account%2Fa',
+      'https://worker.example.com/api/nen-campaigns/columns/column%2Fa/message?lineAccountId=account%2Fa',
+    ])
+    expect(fetchSpy.mock.calls.every(([, init]) => init?.method === 'PUT')).toBe(true)
   })
 })
 

@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
+import { isCurrentPreviewRequest } from './bulk-preview-request'
 
 interface Props {
   open: boolean
@@ -28,6 +29,7 @@ export default function BulkPreviewModal({ open, scenarioId, onClose }: Props) {
   const [steps, setSteps] = useState<PreviewStep[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const requestGenerationRef = useRef(0)
 
   useEffect(() => {
     if (!open) return
@@ -40,26 +42,33 @@ export default function BulkPreviewModal({ open, scenarioId, onClose }: Props) {
      * 待ちの間に次の入力が来たら古い応答は捨てる（#495 軽14）。
      * 友だち検索も 300ms 待ちが流儀。
      */
-    let alive = true
+    const requestGeneration = ++requestGenerationRef.current
+    const controller = new AbortController()
     const timer = setTimeout(() => {
       const iso = startAt + ':00+09:00'
       api.scenarios
-        .preview(scenarioId, iso)
+        .preview(scenarioId, iso, controller.signal)
         .then((res) => {
-          if (!alive) return
+          if (!isCurrentPreviewRequest(requestGeneration, requestGenerationRef.current)) return
           if (res.success) setSteps(res.data.steps)
           else setError(res.error)
         })
-        .catch(() => {
-          if (alive) setError('プレビューの読み込みに失敗しました')
+        .catch((cause: unknown) => {
+          if (cause instanceof Error && cause.name === 'AbortError') return
+          if (isCurrentPreviewRequest(requestGeneration, requestGenerationRef.current)) {
+            setError('プレビューの読み込みに失敗しました')
+          }
         })
         .finally(() => {
-          if (alive) setLoading(false)
+          if (isCurrentPreviewRequest(requestGeneration, requestGenerationRef.current)) setLoading(false)
         })
     }, 300)
     return () => {
-      alive = false
+      if (isCurrentPreviewRequest(requestGeneration, requestGenerationRef.current)) {
+        requestGenerationRef.current += 1
+      }
       clearTimeout(timer)
+      controller.abort()
     }
   }, [open, scenarioId, startAt])
 
