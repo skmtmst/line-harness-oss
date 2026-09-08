@@ -8381,6 +8381,7 @@ export const api = {
         startsAt: string
         endsAt: string | null
         restoreGroupId: string | null
+        restoreDefaultState: 'captured' | 'no_default' | null
         status: string
         attemptCount: number
         nextRetryAt: string | null
