@@ -3,6 +3,7 @@ import {
   getStaffMembers, getStaffById, getStaffByInviteTokenHash,
   createStaffMember, updateStaffMember, deleteStaffMember, countLoginAudit,
   getStaffAccountScopeIds, getStaffAccountScopeMap, replaceStaffAccountScopes, revokeStaffAuthentication,
+  reserveTwoFactorSetupAttempt, clearTwoFactorSetupAttempts,
 } from '@line-crm/db';
 import type { StaffMember } from '@line-crm/db';
 import { requireRole } from '../middleware/role-guard.js';
@@ -16,6 +17,15 @@ import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
 const staff = new Hono<Env>();
 const INVITE_TTL_MS = 48 * 60 * 60 * 1000;
+const TWO_FACTOR_ATTEMPT_LIMIT_ERROR = '入力回数を超えました。しばらく待ってからやり直してください';
+
+function invitationConfirmationUrl(c: { env: Env['Bindings']; req: { url: string } }, token: string): string {
+  const base = c.env.ADMIN_PUBLIC_URL?.trim() || new URL(c.req.url).origin;
+  const url = new URL('/staff/invite', base);
+  // fragment はHTTPリクエストやアクセスログへ送られない。確認画面が読み取ったら即座に消す。
+  url.hash = new URLSearchParams({ invite: token }).toString();
+  return url.toString();
+}
 
 function safeJson<T>(value: string | null | undefined, fallback: T): T {
   try { return value ? JSON.parse(value) as T : fallback; } catch { return fallback; }
@@ -325,7 +335,7 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
       await replaceStaffAccountScopes(c.env.DB, member.id, accountScope.scopedLineAccountIds);
       await sendStaffInviteEmail(c.env, {
         name, email,
-        verifyUrl: `${new URL(c.req.url).origin}/api/staff/invitations/${encodeURIComponent(token)}/verify`,
+        verifyUrl: invitationConfirmationUrl(c, token),
       });
     } catch (error) {
       await deleteStaffMember(c.env.DB, member.id);
@@ -340,9 +350,18 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
 
 staff.get('/api/staff/invitations/:token/verify', async (c) => {
   const token = c.req.param('token');
+  return c.redirect(invitationConfirmationUrl(c, token), 302);
+});
+
+staff.post('/api/staff/invitations/confirm/verify', async (c) => {
+  const body = await c.req.json<{ token?: string }>().catch(() => ({} as { token?: string }));
+  const token = body.token?.trim() ?? '';
+  if (!token || token.length > 512) {
+    return c.json({ success: false, error: '招待情報が正しくありません' }, 400);
+  }
   const member = await getStaffByInviteTokenHash(c.env.DB, await sha256Hex(token));
   if (!member || !member.email || !member.invite_expires_at || Date.parse(member.invite_expires_at) < Date.now()) {
-    return c.html('<!doctype html><meta charset="utf-8"><title>招待の有効期限切れ</title><p>この招待は無効または期限切れです。管理者へ再発行を依頼してください。</p>', 410);
+    return c.json({ success: false, error: 'この招待は無効または期限切れです。管理者へ再発行を依頼してください。' }, 410);
   }
   if (member.invite_status === 'pending_email') {
     await updateStaffMember(c.env.DB, member.id, { invite_status: 'pending_line', email_verified_at: new Date().toISOString() });
@@ -351,7 +370,7 @@ staff.get('/api/staff/invitations/:token/verify', async (c) => {
       lineUrl: `${new URL(c.req.url).origin}/api/auth/line?invite=${encodeURIComponent(token)}`,
     });
   }
-  return c.html('<!doctype html><meta charset="utf-8"><title>メール確認完了</title><main style="font-family:sans-serif;max-width:560px;margin:80px auto;padding:24px"><h1>メールアドレスを確認しました</h1><p>続けて届くメールからLINE連携を完了してください。</p></main>');
+  return c.json({ success: true, data: { status: 'pending_line' } });
 });
 
 staff.patch('/api/staff/:id', async (c) => {
@@ -496,16 +515,26 @@ staff.post('/api/staff/:id/two-factor/confirm', async (c) => {
   if (!key) return c.json({ success: false, error: '二段階認証の暗号鍵が設定されていません' }, 503);
   if (!member?.totp_pending_secret_enc) return c.json({ success: false, error: '先にQRコードを表示してください' }, 400);
   const body = await c.req.json<{ code?: string }>().catch(() => ({} as { code?: string }));
+  const attempt = await reserveTwoFactorSetupAttempt(c.env.DB, id);
+  if (!attempt) return c.json({ success: false, error: TWO_FACTOR_ATTEMPT_LIMIT_ERROR }, 429);
   const encrypted = member.totp_pending_secret_enc;
   const result = await verifyTotp(await decryptTotpSecret(encrypted, key), body.code ?? '');
-  if (!result.valid) return c.json({ success: false, error: '認証コードが正しくありません' }, 400);
+  if (!result.valid) {
+    return c.json(
+      { success: false, error: attempt.attempts >= attempt.maxAttempts ? TWO_FACTOR_ATTEMPT_LIMIT_ERROR : '認証コードが正しくありません' },
+      attempt.attempts >= attempt.maxAttempts ? 429 : 400,
+    );
+  }
   const updated = await updateStaffMember(c.env.DB, id, {
     totp_secret_enc: encrypted,
     totp_pending_secret_enc: null,
     totp_enabled_at: new Date().toISOString(),
     totp_last_used_step: null,
   });
-  if (updated) await revokeStaffAuthentication(c.env.DB, id);
+  if (updated) {
+    await clearTwoFactorSetupAttempts(c.env.DB, id);
+    await revokeStaffAuthentication(c.env.DB, id);
+  }
   return c.json({ success: true, data: await serializeStaff(c.env.DB, updated!) });
 });
 

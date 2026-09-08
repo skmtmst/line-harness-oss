@@ -1998,22 +1998,7 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (/^\/api\/support-marks\/[^/]+\/automation-rules$/.test(pathname)) {
     return { success: true, data: SUPPORT_MARK_AUTOMATION_RULES }
   }
-  /*
-    いま入っている人。34-1「はじめの設定」の最終確認が役割で言い分けるので、
-    一覧の形（items/total）ではなく 1 人ぶんを返す。
-  */
-  if (pathname === '/api/staff/me')
-    return {
-      success: true,
-      data: {
-        id: 'visual-qa-staff',
-        name: 'Kenta Kawano',
-        email: null,
-        role: 'owner',
-        permissionKeys: [],
-        isActive: true,
-      },
-    }
+  /* `/api/staff/me` は下の1か所だけ(STAFFの固定データ)。ここに書くと下が死にコードになる。 */
   const formDeleteImpact = /^\/api\/forms\/([^/]+)\/delete-impact$/.exec(pathname)
   if (formDeleteImpact) {
     const data = formDeleteImpact[1] === 'form-empty'
@@ -2421,6 +2406,65 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: impact }
   }
   if (pathname === '/api/rich-menu-groups') {
+    if (query.has('page') || query.has('limit')) {
+      const page = Math.max(1, Number(query.get('page')) || 1)
+      const limit = Math.max(1, Math.min(200, Number(query.get('limit')) || 50))
+      const search = (query.get('query') ?? '').trim().toLocaleLowerCase('ja')
+      const folderId = query.get('folderId')
+      const filter = query.get('filter')
+      const sort = query.get('sort') ?? 'priority'
+      const narrowed = RICH_MENU_GROUPS.filter((group) => {
+        if (search && !group.name.toLocaleLowerCase('ja').includes(search)) return false
+        if (folderId === '__unfiled__' && group.folderId !== null) return false
+        if (folderId && folderId !== '__unfiled__' && group.folderId !== folderId) return false
+        if (filter === 'published' && group.status !== 'published') return false
+        if (filter === 'scheduled' && !group.publishingAt) return false
+        if (filter === 'draft' && group.status !== 'draft') return false
+        if (filter === 'targeting' && !group.targetingEnabled) return false
+        return true
+      }).sort((a, b) => {
+        if (sort === 'name') return a.name.localeCompare(b.name, 'ja') || a.id.localeCompare(b.id)
+        if (sort === 'updated') return b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id)
+        if (sort === 'taps') {
+          return (b.monthlyStats?.taps ?? -1) - (a.monthlyStats?.taps ?? -1) || a.id.localeCompare(b.id)
+        }
+        return a.targetingPriority - b.targetingPriority || a.id.localeCompare(b.id)
+      })
+      const total = narrowed.length
+      const offset = (page - 1) * limit
+      const appliedSort = sort === 'taps'
+        ? [{ field: 'monthlyStats.taps', direction: 'desc' }, { field: 'id', direction: 'asc' }]
+        : sort === 'updated'
+          ? [{ field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }]
+          : sort === 'name'
+            ? [{ field: 'name', direction: 'asc' }, { field: 'id', direction: 'asc' }]
+            : [
+                { field: 'targetingPriority', direction: 'asc' },
+                { field: 'createdAt', direction: 'asc' },
+                { field: 'id', direction: 'asc' },
+              ]
+      return {
+        success: true,
+        data: {
+          items: narrowed.slice(offset, offset + limit),
+          total,
+          limit,
+          sort: appliedSort,
+          facets: {
+            total: RICH_MENU_GROUPS.length,
+            published: RICH_MENU_GROUPS.filter((group) => group.status === 'published').length,
+            targeting: RICH_MENU_GROUPS.filter((group) => group.targetingEnabled).length,
+            folderCounts: Object.fromEntries(
+              RICH_MENU_GROUPS.reduce((counts, group) => {
+                const key = group.folderId ?? '__unfiled__'
+                counts.set(key, (counts.get(key) ?? 0) + 1)
+                return counts
+              }, new Map()),
+            ),
+          },
+        },
+      }
+    }
     return { success: true, data: RICH_MENU_GROUPS }
   }
   if (pathname === '/api/rich-menu-groups/external') {
@@ -2591,49 +2635,49 @@ function bodyFor(pathname, query = new URLSearchParams()) {
         items: [
           {
             id: 'wi-1', direction: 'outgoing', webhookName: 'Slack ／ #注文チャンネル',
-            eventType: '注文が確定したとき', triggerSummary: '注文 #12492・¥12,800・石田 未来',
+            eventType: 'order.created', triggerSummary: '注文 #12492・¥12,800・石田 未来',
             status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
             attemptCount: 1, durationMs: 300, failureReason: null, canRetry: false,
             startedAt: '2026-08-25T02:42:00.000Z', completedAt: '2026-08-25T02:42:00.300Z', retryOfId: null,
           },
           {
             id: 'wi-2', direction: 'outgoing', webhookName: 'Slack ／ #アラート',
-            eventType: '在庫が少なくなったとき', triggerSummary: '定期便パンフ 残り 3',
+            eventType: 'inventory.low', triggerSummary: '定期便パンフ 残り 3',
             status: 'failed', responseLabel: '503 Service Unavailable', responseStatus: 503,
             attemptCount: 3, durationMs: 10_000, failureReason: '相手が応答しませんでした', canRetry: true,
             startedAt: '2026-08-24T05:10:00.000Z', completedAt: '2026-08-24T05:10:10.000Z', retryOfId: null,
           },
           {
             id: 'wi-3', direction: 'incoming', webhookName: '予約サービス',
-            eventType: '予約が入ったとき', triggerSummary: '8/26 14:00 トリミング（小型犬）',
+            eventType: 'incoming_webhook.reservation', triggerSummary: '8/26 14:00 トリミング（小型犬）',
             status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
             attemptCount: 1, durationMs: 180, failureReason: null, canRetry: false,
             startedAt: '2026-08-24T01:05:00.000Z', completedAt: '2026-08-24T01:05:00.180Z', retryOfId: null,
           },
           {
             id: 'wi-4', direction: 'outgoing', webhookName: 'Google スプレッドシート ／ 注文一覧',
-            eventType: '注文が確定したとき', triggerSummary: '注文 #12491・¥8,400・佐藤 陽子',
+            eventType: 'order.created', triggerSummary: '注文 #12491・¥8,400・佐藤 陽子',
             status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
             attemptCount: 1, durationMs: 520, failureReason: null, canRetry: false,
             startedAt: '2026-08-23T09:30:00.000Z', completedAt: '2026-08-23T09:30:00.520Z', retryOfId: null,
           },
           {
             id: 'wi-5', direction: 'outgoing', webhookName: 'kintone ／ 顧客管理',
-            eventType: '友だちが追加されたとき', triggerSummary: '友だち U9a81…・流入 QRコード',
+            eventType: 'friend.added', triggerSummary: '友だち U9a81…・流入 QRコード',
             status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
             attemptCount: 1, durationMs: 260, failureReason: null, canRetry: false,
             startedAt: '2026-08-22T07:15:00.000Z', completedAt: '2026-08-22T07:15:00.260Z', retryOfId: null,
           },
           {
             id: 'wi-6', direction: 'incoming', webhookName: 'アンケートツール',
-            eventType: 'アンケートに回答されたとき', triggerSummary: '回答 #A-1842・満足度 5',
+            eventType: 'incoming_webhook.survey', triggerSummary: '回答 #A-1842・満足度 5',
             status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
             attemptCount: 1, durationMs: 140, failureReason: null, canRetry: false,
             startedAt: '2026-08-21T03:20:00.000Z', completedAt: '2026-08-21T03:20:00.140Z', retryOfId: null,
           },
           {
             id: 'wi-7', direction: 'outgoing', webhookName: 'Chatwork ／ 発送連絡',
-            eventType: '発送が完了したとき', triggerSummary: '注文 #12480・追跡 1234…',
+            eventType: 'shipment.completed', triggerSummary: '注文 #12480・追跡 1234…',
             status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
             attemptCount: 1, durationMs: 390, failureReason: null, canRetry: false,
             startedAt: '2026-08-20T11:05:00.000Z', completedAt: '2026-08-20T11:05:00.390Z', retryOfId: null,
@@ -3358,6 +3402,57 @@ const server = createServer((req, res) => {
     // 機能3の保存した検索。DBへは書かず、本番契約と同じ201と保存済みの器を返す。
     if (method === 'POST' && url.pathname === '/api/friends/saved-views') {
       res.writeHead(201).end(JSON.stringify({ success: true, data: FRIEND_SAVED_VIEWS.items[0] }))
+      return
+    }
+    // #518 中5: 目視 QA で確認窓・復旧フローが検証できるよう、停止・復旧・
+    // 手動チェックの POST に本物と同じ形の成功応答を返す(DBへは書かない)。
+    if (method === 'POST' && url.pathname === '/api/operations/health/runs') {
+      res.writeHead(200).end(JSON.stringify({ success: true, duplicate: false, data: OPERATION_HEALTH }))
+      return
+    }
+    if (method === 'POST' && url.pathname === '/api/operations/incidents') {
+      const incident = {
+        ...OPERATION_HISTORY[0],
+        id: 'operation-incident-manual',
+        status: 'resolved',
+        stoppedAt: '2026-08-25T12:00:00+09:00',
+        resolvedAt: null,
+        createdAt: '2026-08-25T12:00:00+09:00',
+        updatedAt: '2026-08-25T12:00:00+09:00',
+      }
+      res.writeHead(200).end(JSON.stringify({
+        success: true,
+        data: {
+          status: 'changed',
+          control: {
+            ...OPERATION_CONTROL_PREVIEW.control,
+            version: OPERATION_CONTROL_PREVIEW.control.version + 1,
+            activeIncidentId: incident.id,
+            reason: '障害対応',
+            actorId: '目視確認',
+            stoppedAt: incident.stoppedAt,
+            updatedAt: incident.stoppedAt,
+          },
+          incident,
+        },
+      }))
+      return
+    }
+    const operationRestore = /^\/api\/operations\/incidents\/([^/]+)\/restore$/.exec(url.pathname)
+    if (method === 'POST' && operationRestore) {
+      res.writeHead(200).end(JSON.stringify({
+        success: true,
+        data: {
+          status: 'changed',
+          control: OPERATION_CONTROL_PREVIEW.control,
+          incident: {
+            ...OPERATION_HISTORY[0],
+            id: operationRestore[1],
+            status: 'resolved',
+            resolvedAt: '2026-08-25T12:30:00+09:00',
+          },
+        },
+      }))
       return
     }
     /*

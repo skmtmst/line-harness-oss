@@ -59,10 +59,11 @@ describe('点検・中: LINE通知の画面契約', () => {
 describe('点検・軽: LINE通知の画面契約(#580)', () => {
   const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 
-  it('軽1: 顧客タブだけ定義・集計を取り、全店共通の設定は持ち回す', () => {
+  it('軽1: 顧客タブだけ定義・集計を取る', () => {
     expect(PAGE).toContain("tab === 'customer'")
-    expect(PAGE).toContain('needCustomer && selectedAccountId')
-    expect(PAGE).toContain('settingsCache')
+    expect(PAGE).toContain('needCustomer')
+    expect(PAGE).toContain('? api.lineNotifications.definitions(selectedAccountId)')
+    expect(PAGE).toContain('? api.lineNotifications.metrics(selectedAccountId)')
     expect(PAGE).toContain('[selectedAccountId, tab]')
   })
 

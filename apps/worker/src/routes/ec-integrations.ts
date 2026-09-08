@@ -457,10 +457,18 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     }
 
     const setting = await c.env.DB.prepare(
-      `SELECT is_enabled, title_override, intro_text, outro_text,
-              button_label, button_url, image_url
-         FROM ec_notification_settings WHERE event_type = ?`,
-    ).bind(event.event_type).first<{
+      `SELECT COALESCE(a.is_enabled, s.is_enabled) AS is_enabled,
+              CASE WHEN a.line_account_id IS NULL THEN s.title_override ELSE a.title_override END AS title_override,
+              CASE WHEN a.line_account_id IS NULL THEN s.intro_text ELSE a.intro_text END AS intro_text,
+              CASE WHEN a.line_account_id IS NULL THEN s.outro_text ELSE a.outro_text END AS outro_text,
+              CASE WHEN a.line_account_id IS NULL THEN s.button_label ELSE a.button_label END AS button_label,
+              CASE WHEN a.line_account_id IS NULL THEN s.button_url ELSE a.button_url END AS button_url,
+              CASE WHEN a.line_account_id IS NULL THEN s.image_url ELSE a.image_url END AS image_url
+         FROM ec_notification_settings s
+         LEFT JOIN ec_notification_account_settings a
+           ON a.event_type = s.event_type AND a.line_account_id = ?
+        WHERE s.event_type = ?`,
+    ).bind(lineAccountId, event.event_type).first<{
       is_enabled: number; title_override: string | null; intro_text: string | null; outro_text: string | null;
       button_label: string | null; button_url: string | null; image_url: string | null;
     }>();

@@ -13,7 +13,7 @@ import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import type { FormLayout } from '@line-crm/shared'
 import { hasStoredDestination, summarizeFormDestinations } from './form-destination-summary'
-import FolderPanel from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import './form-submissions.css'
 
@@ -246,7 +246,6 @@ export default function FormSubmissionsPage() {
     <div data-design-node="EMBIK">
       <div data-design="Bar" className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2">
-          <Button disabled title="フォームのフォルダ保存先は未接続です">フォルダを追加</Button>
           <Button variant="primary" onClick={createDraft} disabled={creating}>
             {creating ? '下書きを作成中' : 'フォームを作る'}
           </Button>
@@ -260,11 +259,13 @@ export default function FormSubmissionsPage() {
         )}
       </div>
 
-      <div className="grid items-start gap-4 lg:grid-cols-4">
+      <div style={FOLDER_RAIL_STYLE} className="grid items-start gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
           total={loading || loadError ? '— 件' : `${formTotal} 件`}
           activeId={activeFolderId}
           onSelect={setActiveFolderId}
+          addFolderDisabled
+          addFolderTitle="フォームのフォルダ保存先は未接続です"
           rows={[
             { id: 'all', label: 'すべて', count: loading || loadError ? 0 : formTotal },
             ...folders.map((folder) => ({ id: folder.id, label: folder.name, count: folder.formCount })),
@@ -272,7 +273,7 @@ export default function FormSubmissionsPage() {
           ]}
         />
 
-        <section className="min-w-0 lg:col-span-3">
+        <section className="min-w-0">
           <div className="border-hairline rounded-card mb-3 flex flex-wrap items-center gap-2 border bg-white p-3">
             <input
               type="search"

@@ -23,11 +23,12 @@ describe('V6リッチメニューの画面契約', () => {
     expect(PAGE).not.toContain('トーク画面の下に表示されるメニューを作ります。')
   })
 
-  it('作る・足す操作を一覧の左、扱う操作を右に置く', () => {
+  it('作成操作を道具列に置き、フォルダ追加は左欄へ置く', () => {
     const bar = PAGE.slice(PAGE.indexOf('data-design="Bar"'), PAGE.indexOf('data-design="Saved"'))
-    expect(bar.indexOf('フォルダを追加')).toBeLessThan(bar.indexOf('メニューを作る'))
+    expect(bar).not.toContain('フォルダを追加')
     expect(bar.indexOf('メニューを作る')).toBeLessThan(bar.indexOf('出す順番を変える'))
     expect(bar.indexOf('出す順番を変える')).toBeLessThan(bar.indexOf('メニュー名・ボタン名で検索'))
+    expect(PAGE).toContain('onAddFolder={() => setFolderDialogOpen(true)}')
     expect(PAGE).not.toContain('準備中')
   })
 
@@ -35,7 +36,8 @@ describe('V6リッチメニューの画面契約', () => {
     expect(PAGE).toContain('activeAccountRef.current !== accountId')
     expect(PAGE).toContain("import Pagination from '@/components/shared/pagination'")
     expect(PAGE).toContain('pageCount={pageCount}')
-    expect(PAGE).toContain('const shownGroups = sorted.slice')
+    expect(PAGE).toContain('api.richMenuGroups.listPage(accountId')
+    expect(PAGE).toContain('setGroupTotal(groupsRes.value.data.total)')
     expect(PAGE).not.toContain('「表示」を増やすと出ます')
   })
 
@@ -43,7 +45,7 @@ describe('V6リッチメニューの画面契約', () => {
     expect(PAGE).toContain("const groupKpiState = !selectedAccount?.id")
     expect(PAGE).toContain("const groupKpiReady = groupKpiState === 'ready'")
     expect(PAGE).toContain('data-group-kpi-state={groupKpiState}')
-    expect(PAGE).toContain("groupKpiReady ? groups.length : '—'")
+    expect(PAGE).toContain("groupKpiReady ? (groupFacets?.total ?? groupTotal) : '—'")
     expect(PAGE).toContain("groupKpiReady ? targetingCount : '—'")
     expect(PAGE).toContain('公開中 —・${groupKpiUnavailableText}')
     expect(PAGE).toContain("'一覧を取得できませんでした'")
@@ -68,7 +70,7 @@ describe('V6リッチメニューの画面契約', () => {
     expect(PAGE).toContain('出す順番（自分で決めた順）')
     expect(PAGE).toContain('上にあるものが優先されます。')
     expect(PAGE).toContain('いちばん上の1つだけが出ます。')
-    expect(PAGE).toContain('return compareTargetingGroups(a, b)')
+    expect(PAGE).toContain("sort: reordering ? 'priority' : sortKey")
     expect(TARGETING_DB).toContain('ORDER BY g.targeting_priority ASC, g.created_at ASC')
   })
 

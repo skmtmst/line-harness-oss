@@ -227,6 +227,47 @@ describe('V6 LINE notification APIs', () => {
     expect(body.data.versions[1].config.lineTemplate[0].text).toBe('発送しました');
   });
 
+  it('顧客通知の見出し80文字・本文800文字・https URLをサーバー側でも検証する', async () => {
+    const tooLongTitle = await app(testDb.db).request(
+      '/api/line-notifications/customer-definitions',
+      json('POST', {
+        lineAccountId: 'account-1', key: 'shipping', name: '発送のお知らせ',
+        category: 'shipping', sourceEventType: 'ec.order.shipped',
+        draft: { title: '長'.repeat(81), lineTemplate: [{ type: 'text', text: '発送しました' }] },
+      }),
+    );
+    expect(tooLongTitle.status).toBe(400);
+
+    const tooLongBody = await app(testDb.db).request(
+      '/api/line-notifications/customer-definitions',
+      json('POST', {
+        lineAccountId: 'account-1', key: 'shipping', name: '発送のお知らせ',
+        category: 'shipping', sourceEventType: 'ec.order.shipped',
+        draft: { introText: '本'.repeat(801), lineTemplate: [{ type: 'text', text: '発送しました' }] },
+      }),
+    );
+    expect(tooLongBody.status).toBe(400);
+
+    const unsafeUrl = await app(testDb.db).request(
+      '/api/line-notifications/customer-definitions',
+      json('POST', {
+        lineAccountId: 'account-1', key: 'shipping', name: '発送のお知らせ',
+        category: 'shipping', sourceEventType: 'ec.order.shipped',
+        draft: { buttonUrl: 'http://example.com/order', lineTemplate: [{ type: 'text', text: '発送しました' }] },
+      }),
+    );
+    expect(unsafeUrl.status).toBe(400);
+
+    seedDefinition(testDb);
+    testDb.raw.prepare(`UPDATE customer_notification_definitions SET draft_config_json = ? WHERE id = 'definition-1'`)
+      .run(JSON.stringify({ title: '長'.repeat(81), lineTemplate: [{ type: 'text', text: '注文を受け付けました' }] }));
+    const publishLegacyDraft = await app(testDb.db).request(
+      '/api/line-notifications/customer-definitions/definition-1/publish',
+      json('POST', { lineAccountId: 'account-1', expectedVersion: 1 }),
+    );
+    expect(publishLegacyDraft.status).toBe(400);
+  });
+
   it('一時失敗だけを同じ retry key で再試行し、版違いの二重操作を409にする', async () => {
     seedDefinition(testDb);
     seedDelivery(testDb, 'delivery-retry', 'retry_wait', { retryable: 1 });

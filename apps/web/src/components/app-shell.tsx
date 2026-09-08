@@ -17,7 +17,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const isFriendAttributesV2 = pathname === '/tags-v2' || pathname === '/visual-qa/friend-attributes-v2'
   const isFriendAttributesV3 = pathname === '/tags-v3' || pathname === '/visual-qa/friend-attributes-v3'
 
-  if (pathname === '/login' || pathname === '/login/two-factor') {
+  if (pathname === '/login' || pathname === '/login/two-factor' || pathname === '/staff/invite') {
     return <>{children}</>
   }
 

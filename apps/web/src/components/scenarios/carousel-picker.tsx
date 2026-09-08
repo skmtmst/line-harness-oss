@@ -12,7 +12,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { api } from '@/lib/api'
+import { scenarioReferenceData } from './scenario-reference-data'
 
 export interface CarouselTemplate {
   id: string
@@ -59,7 +59,7 @@ export default function CarouselPicker({ value, onChange }: CarouselPickerProps)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    void api.templates.list().then((res) => {
+    void scenarioReferenceData.templates().then((res) => {
       if (res.success) {
         setItems(
           res.data

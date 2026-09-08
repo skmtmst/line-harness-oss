@@ -7,14 +7,11 @@
  */
 export const text = (value: unknown): string => String(value ?? '')
 
-/**
- * ペットの呼び方を一覧・詳細・確認窓でそろえる（#500 軽）。
- * 既に「ちゃん／くん／さん」で終わる名前はそのままにする。
+/*
+ * 呼び方の統一（#500 軽）は列車側で共有の `photoPetDisplayName` へ
+ * 一本化されたため、ここには置かない。機能内の表示補助は `text` と
+ * `reviewVersionOf` のみ。
  */
-export function photoPetName(photo: Record<string, unknown>): string {
-  const name = text(photo.pet_name) || 'ペット'
-  return /(?:ちゃん|くん|さん)$/.test(name) ? name : `${name}ちゃん`
-}
 
 /**
  * 楽観ロックの版を整数で取り出す（#500 軽）。

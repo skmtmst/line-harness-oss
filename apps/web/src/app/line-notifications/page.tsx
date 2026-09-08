@@ -220,9 +220,6 @@ export default function LineNotificationsPage() {
   const [busy, setBusy] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
   const loadGeneration = useRef(0)
-  // 全店共通の設定は店を切り替えても取り直さない（#509 軽1）。
-  // 保存操作は局所 state へ直接反映するため、ここで持ち回してよい。
-  const settingsCache = useRef<EcNotificationSetting[] | null>(null)
 
   const load = useCallback(async () => {
     const generation = loadGeneration.current + 1
@@ -234,21 +231,23 @@ export default function LineNotificationsPage() {
     setDefinitions([])
     setMetrics([])
     setNotice(null)
-    // 顧客タブだけが定義・集計を読む。運用者・記録タブは子部品が自前で取る。
+    if (!selectedAccountId) {
+      setLoadState('ready')
+      return
+    }
+    // 顧客タブだけが定義・集計を読む。運用者・記録タブは子部品が自前で取る（#509 軽1）。
+    // 設定口は列車側で店別になったため、持ち回しはしない。
     const needCustomer = tab === 'customer'
     try {
       const [settingRes, overviewRes, definitionRes, metricRes] = await Promise.all([
-        settingsCache.current
-          ? { success: true as const, data: settingsCache.current }
-          : api.ecCommerce.settings(),
-        api.ecCommerce.overview(selectedAccountId ?? undefined),
-        needCustomer && selectedAccountId
+        api.ecCommerce.settings(selectedAccountId), api.ecCommerce.overview(selectedAccountId),
+        needCustomer
           ? api.lineNotifications.definitions(selectedAccountId).catch((error: unknown) => {
               if (error instanceof ApiError && error.status === 403) throw error
               return null
             })
           : Promise.resolve(null),
-        needCustomer && selectedAccountId
+        needCustomer
           ? api.lineNotifications.metrics(selectedAccountId).catch((error: unknown) => {
               if (error instanceof ApiError && error.status === 403) throw error
               return null
@@ -257,7 +256,6 @@ export default function LineNotificationsPage() {
       ])
       if (generation !== loadGeneration.current) return
       if (!settingRes.success || !overviewRes.success) throw new Error('load failed')
-      if (!settingsCache.current) settingsCache.current = settingRes.data
       const loadedDefinitions = definitionRes?.success ? definitionRes.data : []
       const loadedDefinitionByEvent = new Map(loadedDefinitions.map((definition) => [definition.sourceEventType, definition]))
       const mergedSettings = settingRes.data.map((setting) => {
@@ -337,6 +335,7 @@ export default function LineNotificationsPage() {
 
   const save = async (setting: EcNotificationSetting, enabled = setting.isEnabled) => {
     if (!setting.title?.trim()) { setNotice({ tone: 'error', text: '通知の見出しを入力してください。' }); return }
+    if (!selectedAccountId) { setNotice({ tone: 'error', text: 'LINEアカウントを選択してください。' }); return }
     setBusy(setting.eventType)
     try {
       const definition = definitionByEvent.get(setting.eventType)
@@ -366,7 +365,7 @@ export default function LineNotificationsPage() {
         if (!result.success) throw new Error('status failed')
         setDefinitions((current) => current.map((item) => item.id === result.data.id ? result.data : item))
       } else {
-        await api.ecCommerce.updateSetting(setting.eventType, {
+        await api.ecCommerce.updateSetting(selectedAccountId, setting.eventType, {
           isEnabled: enabled, title: setting.title, introText: setting.introText, outroText: setting.outroText,
           buttonLabel: setting.buttonLabel, buttonUrl: setting.buttonUrl, imageUrl: setting.imageUrl,
         })
