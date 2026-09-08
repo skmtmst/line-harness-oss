@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   api,
   type ConversionDefinitionList,
@@ -76,6 +76,19 @@ function definitionRange(days: number): { from: string; to: string } {
   return { from: format(start), to: format(end) }
 }
 
+/**
+ * 受け取ったCSVをそのまま保存させる。一覧とレポートで二重に書いていた
+ * 範囲再計算とファイル名違いだけの重複をここに寄せる(#513 L2)。
+ */
+function downloadCsvBlob(blob: Blob, filename: string): void {
+  const href = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = href
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(href)
+}
+
 function rangeLabel(days: number): string {
   const { from, to } = definitionRange(days)
   const format = (value: string) => {
@@ -146,6 +159,20 @@ const SORT_OPTIONS: Array<{ value: PointSort; label: string }> = [
 
 const PAGE_SIZE = 6
 
+/**
+ * 画面の並びと言葉を、口の並びに写す(#513 M3)。
+ *
+ * 口の `sort` は `count_desc`・`value_desc`・`updated_desc`・`name_asc`
+ * の4つで、同値時は更新日・IDまで固定されている(共通一覧契約§3)。
+ * 画面の3つの並びはその先頭3つに対応する。`unused`(使われていない)は
+ * 口に無い絞りなので、完全に読み込んだあと画面で絞る。
+ */
+const SORT_TO_API: Record<PointSort, 'count_desc' | 'value_desc' | 'name_asc'> = {
+  'cv-desc': 'count_desc',
+  'value-desc': 'value_desc',
+  'name': 'name_asc',
+}
+
 function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [definitions, setDefinitions] = useState<ConversionDefinitionList | null>(null)
   const [summaryReport, setSummaryReport] = useState<ConversionDefinitionReport | null>(null)
@@ -159,6 +186,19 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [loadFailed, setLoadFailed] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
+  /**
+   * 読み込みの世代番号(#513 M6)。
+   *
+   * アカウントの高速切替や検索の連打で古い応答が残っていると、新しい
+   * 表示を上書きしてしまう。応答が返った時点で番号が変わっていたら捨てる。
+   */
+  const loadSeq = useRef(0)
+  /** 検索は1文字ごとに口を叩かず、少し待ってから読み直す。 */
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300)
+    return () => window.clearTimeout(timer)
+  }, [query])
   /*
    * **ブラウザの `confirm()` を使わない。**
    *
@@ -179,32 +219,55 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [stopping, setStopping] = useState(false)
   const [stopError, setStopError] = useState('')
 
+  /**
+   * 一覧は検索・並びを口へ渡し、続く頁をすべて読む(#513 M2・M3)。
+   *
+   * 以前は先頭100件だけ読んで画面内で探していたので、101件目以降が
+   * 「すべて N」と出ながら見えず、検索にも掛からなかった。口は
+   * `q`・`sort`・`cursor/nextCursor` を受け付けるので、条件に合うものを
+   * 残らず読む(50頁・5000件で止め、切れたら断る)。状態の絞り(`active`・`stopped`・
+   * `unused`)は口に `unused` が無いため、完全な一覧のあと画面で絞る。
+   * そうしても件数は狂わない(1頁の切り取りを再加工しない)。
+   */
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current
     setLoading(true)
     setLoadFailed(false)
     setDefinitions(null)
     setSummaryReport(null)
     setListTruncated(false)
     const range = definitionRange(30)
+    const listParams = {
+      ...range,
+      lineAccountId: accountId ?? undefined,
+      q: debouncedQuery || undefined,
+      sort: SORT_TO_API[sort],
+      limit: 100,
+    }
+    // cursor を辿って条件に合うものを残らず読む。安全弁として 50 頁
+    // (5000 件)で止め、切れたら `truncated` で本文に断る(#505 重大2の流儀)。
+    const fetchAllDefinitions = async (): Promise<{ data: ConversionDefinitionList; truncated: boolean } | null> => {
+      const items: ConversionDefinitionList['items'] = []
+      let cursor: string | undefined
+      let first: ConversionDefinitionList | null = null
+      for (let page = 0; page < 50; page += 1) {
+        const response = await api.conversions.definitions({ ...listParams, cursor })
+        if (!response.success || !Array.isArray(response.data.items)) return null
+        if (!first) first = response.data
+        items.push(...response.data.items)
+        cursor = response.data.pagination.nextCursor ?? undefined
+        if (!cursor) return { data: { ...response.data, items }, truncated: false }
+      }
+      return first ? { data: { ...first, items }, truncated: true } : null
+    }
     const [listResult, reportResult] = await Promise.allSettled([
-      (async () => {
-        // 成果地点が 100 件を超えても数え落とさないよう、cursor を辿って
-        // 全件取る（#505 重大2）。安全弁として 50 頁（5000 件）で止める。
-        const first = await api.conversions.definitions({ ...range, lineAccountId: accountId ?? undefined, limit: 100 })
-        if (!first.success || !Array.isArray(first.data.items)) throw new Error('definitions fetch failed')
-        const items = [...first.data.items]
-        let cursor = first.data.pagination.nextCursor
-        for (let page = 0; page < 49 && cursor; page += 1) {
-          const next = await api.conversions.definitions({ ...range, lineAccountId: accountId ?? undefined, limit: 100, cursor })
-          if (!next.success || !Array.isArray(next.data.items)) throw new Error('definitions fetch failed')
-          items.push(...next.data.items)
-          cursor = next.data.pagination.nextCursor
-        }
-        return { data: { ...first.data, items }, truncated: Boolean(cursor) }
-      })(),
+      fetchAllDefinitions(),
       api.conversions.definitionReport({ ...range, lineAccountId: accountId ?? undefined }),
     ])
-    if (listResult.status === 'fulfilled' && Array.isArray(listResult.value.data.items)) {
+    // 古い読み込みの応答は捨てる(#513 M6)。アカウント切替や検索連打で
+    // 先に叩いた方が後に返っても、新しい表示を上書きしない。
+    if (loadSeq.current !== seq) return
+    if (listResult.status === 'fulfilled' && listResult.value !== null) {
       setDefinitions(listResult.value.data)
       setListTruncated(listResult.value.truncated)
     } else {
@@ -215,7 +278,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       setSummaryReport(reportResult.value.data)
     }
     setLoading(false)
-  }, [accountId])
+  }, [accountId, debouncedQuery, sort])
 
   useEffect(() => { void load() }, [load])
 
@@ -245,9 +308,19 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
     }
   }
 
+  /**
+   * 影響が読めていないまま確定を押しても、黙って終わらない(#513 M4)。
+   *
+   * 読み込み中は確定ボタンを `busy` で止め、読み込み失敗時は窓の中に
+   * 理由を出す。閉じて開き直すと `openStop` が影響を読み直す。
+   */
   const runStop = async () => {
     if (!stopTarget || stopping) return
-    if (!stopImpact) return
+    if (stopImpactLoading) return
+    if (!stopImpact) {
+      setStopError('利用先と停止の影響を読み込めませんでした。画面を閉じて、もう一度お試しください。')
+      return
+    }
     setStopping(true)
     setStopError('')
     try {
@@ -292,12 +365,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       const blob = await api.conversions.exportDefinitions({
         ...definitionRange(30), lineAccountId: accountId ?? undefined,
       })
-      const href = URL.createObjectURL(blob)
-      const anchor = document.createElement('a')
-      anchor.href = href
-      anchor.download = `conversion-definitions-${definitionRange(1).to}.csv`
-      anchor.click()
-      URL.revokeObjectURL(href)
+      downloadCsvBlob(blob, `conversion-definitions-${definitionRange(1).to}.csv`)
     } catch {
       setExportError('CSVを書き出せませんでした。権限を確認して、もう一度お試しください。')
     } finally {
@@ -316,20 +384,18 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
     }
   }, [points, summaryReport])
 
+  /**
+   * 画面で絞るのは状態だけ(#513 M3)。探す言葉と並びは口が済ませているので、
+   * ここで探し直し・並べ直しはしない(口の `name_asc` はバイナリ順で、
+   * 画面の `localeCompare` と順がずれるため)。
+   */
   const shown = useMemo(() => {
-    const q = query.trim()
-    const searched = q ? points.filter((p) => p.name.includes(q)) : points
-    const matched = searched.filter((point) => {
+    return points.filter((point) => {
       if (status === 'all') return true
       if (status === 'unused') return point.usageCount === 0
       return point.status === status
     })
-    return matched.toSorted((left, right) => {
-      if (sort === 'name') return left.name.localeCompare(right.name, 'ja')
-      if (sort === 'value-desc') return right.metrics.netValue - left.metrics.netValue
-      return right.metrics.netCount - left.metrics.netCount
-    })
-  }, [points, query, sort, status])
+  }, [points, status])
 
   const pageCount = Math.max(1, Math.ceil(shown.length / PAGE_SIZE))
   const current = useMemo(
@@ -415,13 +481,6 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           />
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-ink-secondary text-sm tabular-nums">{rangeLabel(30)}</p>
-            <Select
-              aria-label="表示件数"
-              value="6"
-              size="page-size"
-              options={[{ value: '6', label: '6件表示' }]}
-              onChange={() => undefined}
-            />
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -581,7 +640,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         confirmLabel={stopAction === 'replace'
           ? '差し替えて数えるのをやめる'
           : stopAction === 'delete' ? 'この成果地点を削除する' : '数えるのをやめる'}
-        busy={stopping}
+        busy={stopping || stopImpactLoading}
         error={stopError}
         onConfirm={() => void runStop()}
         onCancel={() => {
@@ -693,6 +752,8 @@ function ReportTab({ accountId }: { accountId: string | null }) {
   const [loadFailed, setLoadFailed] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
+  /** 失敗時の「もう一度読む」用。一覧タブと同じ導線(#513 L6)。 */
+  const [reloadSeq, setReloadSeq] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -720,7 +781,7 @@ function ReportTab({ accountId }: { accountId: string | null }) {
     return () => {
       cancelled = true
     }
-  }, [accountId, periodDays])
+  }, [accountId, periodDays, reloadSeq])
 
   const exportCsv = async () => {
     if (exporting) return
@@ -730,12 +791,7 @@ function ReportTab({ accountId }: { accountId: string | null }) {
       const blob = await api.conversions.exportDefinitions({
         ...definitionRange(periodDays), lineAccountId: accountId ?? undefined,
       })
-      const href = URL.createObjectURL(blob)
-      const anchor = document.createElement('a')
-      anchor.href = href
-      anchor.download = `conversion-report-${definitionRange(1).to}.csv`
-      anchor.click()
-      URL.revokeObjectURL(href)
+      downloadCsvBlob(blob, `conversion-report-${definitionRange(1).to}.csv`)
     } catch {
       setExportError('CSVを書き出せませんでした。権限を確認して、もう一度お試しください。')
     } finally {
@@ -772,17 +828,22 @@ function ReportTab({ accountId }: { accountId: string | null }) {
         kind="error"
         title="成果レポートを読み込めませんでした"
         description="成果地点の一覧はそのまま使えます。時間を置いて、このタブを開き直してください。"
+        action={
+          <Button variant="secondary" onClick={() => setReloadSeq((current) => current + 1)}>
+            成果レポートを再読み込み
+          </Button>
+        }
       />
     )
   }
 
   if (!report) return null
 
-  const fastest = report.byDefinition
-    .filter((row) => row.previousNetCount > 0)
-    .toSorted((left, right) =>
-      (right.countChange / right.previousNetCount) - (left.countChange / left.previousNetCount),
-    )[0] ?? report.kpis.fastestGrowing
+  /*
+   * 「いちばん伸びた」は口の `kpis.fastestGrowing`(増分数順)をそのまま使う。
+   * 画面で率順に再計算すると、口の選び方と食い違う(#513 L7)。
+   */
+  const fastest = report.kpis.fastestGrowing
   const fastestRate = fastest && fastest.previousNetCount > 0
     ? Math.round((fastest.countChange / fastest.previousNetCount) * 100)
     : fastest?.netCount ? 100 : 0
@@ -806,7 +867,7 @@ function ReportTab({ accountId }: { accountId: string | null }) {
           onChange={(value) => setPeriodDays(Number(value))}
         />
         <Button onClick={() => void exportCsv()} disabled={exporting}>
-          {exporting ? '書き出しています' : 'この画面をCSVで書き出す'}
+          {exporting ? '書き出しています' : '成果地点の一覧をCSVで書き出す'}
         </Button>
       </div>
       {exportError ? <p className="text-danger text-sm" role="alert">{exportError}</p> : null}
@@ -855,7 +916,18 @@ function ReportTab({ accountId }: { accountId: string | null }) {
             <p className="text-ink-faint mt-1 text-xs">棒の色は成果地点です。日ごとの実績を積み上げています。</p>
           </div>
           {daily && daily.names.length > 0 ? (
-            <p className="text-ink-faint text-xs">{daily.names.join(' ／ ')} ／ そのほか</p>
+            <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-faint" aria-label="棒の色と成果地点の対応">
+              {daily.names.map((name, index) => (
+                <li key={name} className="flex items-center gap-1">
+                  <span aria-hidden="true" className={`inline-block h-2.5 w-2.5 rounded-sm ${index === 0 ? 'bg-success' : index === 1 ? 'bg-action' : index === 2 ? 'bg-info' : 'bg-canvas-sunken'}`} />
+                  {name}
+                </li>
+              ))}
+              <li className="flex items-center gap-1">
+                <span aria-hidden="true" className="bg-canvas-sunken inline-block h-2.5 w-2.5 rounded-sm" />
+                そのほか
+              </li>
+            </ul>
           ) : null}
         </div>
         {daily && daily.days.length > 0 ? (
@@ -929,7 +1001,7 @@ function ReportTab({ accountId }: { accountId: string | null }) {
                       <p className="text-ink-faint mt-1 text-xs">取消: {row.cancellationCount == null ? '台帳未接続' : `${row.cancellationCount}件・¥${(row.cancellationValue ?? 0).toLocaleString('ja-JP')}`}</p>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <Button href={`/conversions?tab=points&point=${encodeURIComponent(row.conversionPointId)}`}>中身を見る</Button>
+                      <Button href="/conversions?tab=points">中身を見る</Button>
                     </td>
                   </tr>
                 )

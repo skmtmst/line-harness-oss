@@ -1,14 +1,14 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useDeferredValue, useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useAccount } from '@/contexts/account-context'
 import { api, ApiError } from '@/lib/api'
 import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
 import type { RichMenuDeleteImpact, RichMenuTapStats } from '@/lib/api'
 import type { Folder } from '@line-crm/shared'
-import FolderPanel from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -30,7 +30,6 @@ import {
   type DeleteImpactRequest,
 } from './delete-impact'
 import {
-  compareTargetingGroups,
   moveTargetingGroup,
 } from './targeting-order'
 
@@ -185,6 +184,13 @@ export default function RichMenusListPage() {
   const [savedFilter, setSavedFilter] = useState('')
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
+  const [groupTotal, setGroupTotal] = useState(0)
+  const [groupFacets, setGroupFacets] = useState<{
+    total: number
+    published: number
+    targeting: number
+    folderCounts: Record<string, number>
+  } | null>(null)
   const [reordering, setReordering] = useState(false)
   const [tapStats, setTapStats] = useState<RichMenuTapStats | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
@@ -205,11 +211,14 @@ export default function RichMenusListPage() {
   const [importedMenuName, setImportedMenuName] = useState<string | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const deferredQuery = useDeferredValue(query.trim())
 
   useEffect(() => {
     activeAccountRef.current = selectedAccount?.id ?? null
     importRequestGenerationRef.current += 1
     setGroups([])
+    setGroupTotal(0)
+    setGroupFacets(null)
     setExternal(null)
     setTapStats(null)
     setError(null)
@@ -246,7 +255,14 @@ export default function RichMenusListPage() {
     try {
       // 並列に: D1 管理 group の一覧と、LINE 上の現状
       const [groupsRes, externalRes, tapRes] = await Promise.allSettled([
-        api.richMenuGroups.list(accountId),
+        api.richMenuGroups.listPage(accountId, {
+          page: reordering ? 1 : page,
+          limit: reordering ? 200 : pageSize,
+          query: reordering ? '' : deferredQuery,
+          folderId: reordering ? '' : folderFilter,
+          filter: reordering ? '' : savedFilter,
+          sort: reordering ? 'priority' : sortKey,
+        }),
         api.richMenuGroups.external(accountId),
         api.richMenuGroups.tapStats(accountId),
       ])
@@ -257,7 +273,9 @@ export default function RichMenusListPage() {
       )
       if (groupsRes.status === 'fulfilled') {
         if (!groupsRes.value.success) throw new Error('load_failed')
-        setGroups(groupsRes.value.data)
+        setGroups(groupsRes.value.data.items)
+        setGroupTotal(groupsRes.value.data.total)
+        setGroupFacets(groupsRes.value.data.facets ?? null)
       } else {
         throw groupsRes.reason
       }
@@ -280,7 +298,7 @@ export default function RichMenusListPage() {
     } finally {
       if (activeAccountRef.current === accountId) setLoading(false)
     }
-  }, [selectedAccount?.id])
+  }, [deferredQuery, folderFilter, page, pageSize, reordering, savedFilter, selectedAccount?.id, sortKey])
 
   const loadFolders = useCallback(async () => {
     const res = await api.folders.list('rich_menu')
@@ -472,7 +490,7 @@ export default function RichMenusListPage() {
   // 集計は多い順に並んでいる。先頭がいちばん押されたボタン。
   const topArea = tapStats?.byArea[0] ?? null
   const tapsByGroup = new Map((tapStats?.byGroup ?? []).map((g) => [g.groupId, g.taps]))
-  const targetingCount = groups.filter((g) => g.targetingEnabled && g.targetingCondition).length
+  const targetingCount = groupFacets?.targeting ?? 0
   const groupKpiState = !selectedAccount?.id
     ? 'unselected'
     : loading
@@ -488,49 +506,18 @@ export default function RichMenusListPage() {
         ? '読み込んでいます'
         : '一覧を取得できませんでした'
 
-  const q = query.trim()
-  const byQuery = !reordering && q
-    ? groups.filter((g) => g.name.includes(q) || g.chatBarText.includes(q))
-    : groups
-  const inFolder = byQuery.filter((g) => {
-    if (reordering) return true
-    if (folderFilter === UNFILED) return !g.folderId
-    if (folderFilter) return g.folderId === folderFilter
-    return true
-  })
-
-  const inSaved = inFolder.filter((g) => {
-    if (reordering) return true
-    if (savedFilter === 'published') return g.status === 'published'
-    if (savedFilter === 'scheduled') return Boolean(g.publishingAt)
-    if (savedFilter === 'draft') return g.status === 'draft' && !g.publishingAt
-    if (savedFilter === 'targeting') return g.targetingEnabled && Boolean(g.targetingCondition)
-    return true
-  })
-
-  // 並び替えは元の配列を壊さないよう写してから。
-  const sorted = [...inSaved].sort((a, b) => {
-    switch (sortKey) {
-      case 'taps':
-        return (b.monthlyStats?.taps ?? tapsByGroup.get(b.id) ?? 0)
-          - (a.monthlyStats?.taps ?? tapsByGroup.get(a.id) ?? 0)
-      case 'name':
-        return a.name.localeCompare(b.name, 'ja')
-      case 'updated':
-        return b.updatedAt.localeCompare(a.updatedAt)
-      case 'priority':
-        // Worker が友だちへ出すメニューを選ぶ順番と同じ。
-        return compareTargetingGroups(a, b)
-    }
-  })
-
-  const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize))
+  const effectivePageSize = reordering ? 200 : pageSize
+  const pageCount = Math.max(1, Math.ceil(groupTotal / effectivePageSize))
   const currentPage = Math.min(page, pageCount)
-  const shownGroups = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const shownGroups = groups
 
   useEffect(() => {
     setPage(1)
   }, [folderFilter, pageSize, query, savedFilter, sortKey])
+
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount)
+  }, [page, pageCount])
 
   return (
     <main data-design-node="GO8RQ" className="mx-auto max-w-[1584px] p-6">
@@ -556,12 +543,12 @@ export default function RichMenusListPage() {
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">メニュー</p>
           <p className={`${groupKpiReady ? 'text-ink' : 'text-ink-faint'} mt-1 text-2xl font-bold tabular-nums`}>
-            {groupKpiReady ? groups.length : '—'}
+            {groupKpiReady ? (groupFacets?.total ?? groupTotal) : '—'}
             {groupKpiReady && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
             {groupKpiReady
-              ? `公開中 ${groups.filter((g) => g.status === 'published').length}`
+              ? `公開中 ${groupFacets?.published ?? '—'}`
               : `公開中 —・${groupKpiUnavailableText}`}
           </p>
         </div>
@@ -609,11 +596,6 @@ export default function RichMenusListPage() {
         data-design="Bar"
         className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
       >
-        <Button
-          onClick={() => setFolderDialogOpen(true)}
-        >
-          フォルダを追加
-        </Button>
         <Link
           href="/rich-menus/new"
           className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control inline-flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors"
@@ -704,23 +686,24 @@ export default function RichMenusListPage() {
       )}
 
       {selectedAccount && (
-        <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+        <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
           <FolderPanel
             total={`${folders.length + 1}`}
             activeId={folderFilter}
             onSelect={setFolderFilter}
+            onAddFolder={() => setFolderDialogOpen(true)}
             rows={[
-              { id: '', label: 'すべて', count: groups.length },
+              { id: '', label: 'すべて', count: groupFacets?.total ?? groupTotal },
               ...folders.map((f) => ({
                 id: f.id,
                 label: f.name,
-                count: groups.filter((g) => g.folderId === f.id).length,
+                count: groupFacets?.folderCounts[f.id] ?? 0,
                 color: f.color,
               })),
               {
                 id: UNFILED,
                 label: '未分類',
-                count: groups.filter((g) => !g.folderId).length,
+                count: groupFacets?.folderCounts[UNFILED] ?? 0,
               },
             ]}
           >
@@ -823,10 +806,10 @@ export default function RichMenusListPage() {
               </section>
             )}
 
-            {!loading && !error && sorted.length > 0 ? (
+            {!loading && !error && groupTotal > 0 ? (
               <div className="mt-4 flex items-center justify-between gap-4">
                 <p className="text-ink-faint text-xs">
-                  {sorted.length}件中 {(currentPage - 1) * pageSize + 1}〜{Math.min(currentPage * pageSize, sorted.length)}件を表示
+                  {groupTotal}件中 {(currentPage - 1) * effectivePageSize + 1}〜{Math.min(currentPage * effectivePageSize, groupTotal)}件を表示
                 </p>
                 <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="リッチメニューのページ送り" />
               </div>

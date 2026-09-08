@@ -83,4 +83,9 @@ describe('V6 顧客へのお知らせの寸法', () => {
     expect(PAGE).toContain('notice={notice}')
     expect(PAGE).toContain('テスト受信者 ${result.data.sent}名へ送信しました。')
   })
+
+  it('EC通知の既定設定も選択中のLINEアカウントに限定して読み書きする', () => {
+    expect(PAGE).toContain('api.ecCommerce.settings(selectedAccountId)')
+    expect(PAGE).toContain('api.ecCommerce.updateSetting(selectedAccountId, setting.eventType')
+  })
 })

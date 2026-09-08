@@ -47,7 +47,8 @@ describe('V6 成果地点一覧の契約', () => {
 
   it('一覧でない返事を成功扱いせず、前の一覧を残さない', () => {
     expect(PAGE).toContain('setDefinitions(null)')
-    expect(PAGE).toContain('Array.isArray(listResult.value.data.items)')
+    expect(PAGE).toContain('Array.isArray(response.data.items)')
+    expect(PAGE).toContain('listResult.value !== null')
     expect(PAGE).toContain('setLoadFailed(true)')
   })
 
@@ -70,7 +71,7 @@ describe('V6 成果地点一覧の契約', () => {
     expect(PAGE).toContain('api.conversions.definitionReport({')
     expect(PAGE).toContain('api.conversions.exportDefinitions({')
     expect(PAGE).toContain("{ value: '30', label: 'この30日' }")
-    expect(PAGE).toContain('この画面をCSVで書き出す')
+    expect(PAGE).toContain('成果地点の一覧をCSVで書き出す')
     expect(PAGE).not.toContain('書き出しはまだ繋がっていません。')
     expect(PAGE).not.toContain('CSVの書き出し口は未接続です。')
     expect(PAGE).not.toContain('準備中')

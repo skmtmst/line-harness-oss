@@ -137,6 +137,41 @@ describe('GET /api/rich-menu-groups', () => {
     expect(dbMocks.getRichMenuGroups).toHaveBeenCalledWith(expect.anything(), 'acc-1');
   });
 
+  test('共通一覧契約で絞り込み後にページを切り、件数と固定順を返す', async () => {
+    const row = (id: string, name: string, priority: number) => ({
+      id, account_id: 'acc-1', name, chat_bar_text: 'メニュー',
+      size: 'large', default_page_id: null, is_default_for_all: 0,
+      status: 'draft', publishing_at: null, targeting_condition: null,
+      targeting_priority: priority, targeting_enabled: 0, folder_id: null,
+      display_order: priority,
+      created_at: `2026-09-0${priority + 1}T00:00:00.000`,
+      updated_at: `2026-09-0${priority + 1}T00:00:00.000`,
+    });
+    dbMocks.getRichMenuGroups.mockResolvedValue([
+      row('g3', '対象C', 2),
+      row('g1', '対象A', 0),
+      row('g2', '対象B', 1),
+    ]);
+
+    const res = await setupApp().request(
+      '/api/rich-menu-groups?accountId=acc-1&page=2&limit=1&query=%E5%AF%BE%E8%B1%A1',
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      data: {
+        items: [{ id: 'g2' }],
+        total: 3,
+        limit: 1,
+        sort: [
+          { field: 'targetingPriority', direction: 'asc' },
+          { field: 'createdAt', direction: 'asc' },
+          { field: 'id', direction: 'asc' },
+        ],
+      },
+    });
+  });
+
   test('400 when accountId missing', async () => {
     const app = setupApp();
     const res = await app.request('/api/rich-menu-groups');

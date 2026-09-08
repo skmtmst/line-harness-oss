@@ -60,16 +60,17 @@ describe('一覧の状態（設計 6-1-N `TmHjF`）', () => {
 })
 
 describe('フォルダ操作（設計 6-1-M `xkRDb`）', () => {
-  it('画面名は上部バーだけに出し、設計順にKPIと操作を置く', () => {
+  it('画面名は上部バーだけに出し、フォルダ追加を左欄へ置く', () => {
     expect(PAGE).toContain("usePageTitle('一斉配信')")
     expect(PAGE).not.toContain('<Header')
     expect(PAGE).not.toContain('<h1')
-    expect(PAGE.indexOf('<BroadcastKpis')).toBeLessThan(PAGE.indexOf('フォルダを追加'))
-    expect(PAGE.indexOf('フォルダを追加')).toBeLessThan(PAGE.indexOf('data-design="Body"'))
+    expect(PAGE.indexOf('<BroadcastKpis')).toBeLessThan(PAGE.indexOf('data-design="Body"'))
+    expect(PAGE).toContain('onAddFolder={() => setFolderDialogOpen(true)}')
+    expect(PAGE.indexOf('data-design="Body"')).toBeLessThan(PAGE.indexOf('onAddFolder={() => setFolderDialogOpen(true)}'))
   })
 
   it('追加と配信作成は実際の処理へつなぐ', () => {
-    expect(PAGE).toContain('onClick={() => setFolderDialogOpen(true)}')
+    expect(PAGE).toContain('onAddFolder={() => setFolderDialogOpen(true)}')
     expect(PAGE).toContain('onClick={() => { setOpenTemplatePicker(false); setShowCreate(true) }}')
     expect(PAGE).toContain('openTemplatePickerInitially={openTemplatePicker}')
     expect(PAGE).not.toContain('テンプレートから作成')

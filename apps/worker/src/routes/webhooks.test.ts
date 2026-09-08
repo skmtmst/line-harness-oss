@@ -1144,3 +1144,137 @@ describe('Webhookやり取り記録', () => {
     expect(retryWebhookInteraction).toHaveBeenCalledWith(baseEnv.DB, failedRow);
   });
 });
+
+// =====================================================
+// #506 中: 壊れた event_types の1行で一覧全体を500にしない (W2)
+// =====================================================
+
+describe('GET /api/webhooks/outgoing — broken event_types (#506 W2)', () => {
+  const brokenRow = {
+    id: 'wh-broken', name: '壊れた送り先', url: 'https://example.com/hook',
+    event_types: '{broken-json', secret: VALID_SECRET, is_active: 1,
+    max_retries: 0, consecutive_failures: 0, last_failed_at: null,
+    created_at: '2026-08-01', updated_at: '2026-08-01',
+  };
+
+  test('壊れた行は空の種類で返し、一覧は 200 のまま', async () => {
+    vi.mocked(getOutgoingWebhooks).mockResolvedValue([brokenRow]);
+    const res = await setupApp().request(
+      `/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'GET' },
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: Array<{ id: string; eventTypes: unknown; name: string }> };
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0].eventTypes).toEqual([]);
+    expect(body.data[0].name).toBe('壊れた送り先');
+  });
+});
+
+// =====================================================
+// #506 中: 一覧にも受信詳細と同じ権限境界を適用する (W4)
+// =====================================================
+
+describe('webhook 一覧の権限統一 (#506 W4)', () => {
+  test('権限キーのないスタッフは受信一覧を読めない', async () => {
+    const res = await setupApp(undefined, 'staff', []).request(
+      `/api/webhooks/incoming?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'GET' },
+      baseEnv,
+    );
+    expect(res.status).toBe(403);
+    expect(getIncomingWebhooks).not.toHaveBeenCalled();
+  });
+
+  test('権限キーのないスタッフは送信一覧を読めない', async () => {
+    const res = await setupApp(undefined, 'staff', []).request(
+      `/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'GET' },
+      baseEnv,
+    );
+    expect(res.status).toBe(403);
+    expect(getOutgoingWebhooks).not.toHaveBeenCalled();
+  });
+
+  test('/webhooks 権限ありスタッフは両方の一覧を読める', async () => {
+    vi.mocked(getIncomingWebhooks).mockResolvedValue([]);
+    vi.mocked(getOutgoingWebhooks).mockResolvedValue([]);
+    for (const path of [
+      `/api/webhooks/incoming?lineAccountId=${ACCOUNT_ID}`,
+      `/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`,
+    ]) {
+      const res = await setupApp(undefined, 'staff', ['/webhooks']).request(
+        path, { method: 'GET' }, baseEnv,
+      );
+      expect(res.status).toBe(200);
+    }
+  });
+});
+
+// =====================================================
+// #506 中: 使われない受信設定口は API 単体テストで担保する (W5)
+// =====================================================
+
+describe('PATCH /api/webhooks/incoming/:id/config (#506 W5)', () => {
+  const validBody = {
+    expectedVersion: 3,
+    identityMatching: {
+      methods: [{ kind: 'harness_friend_id', path: '$.friend.id' }],
+      onNotFound: 'do_nothing',
+    },
+    actions: [{ refKind: 'scenario', refId: 'scenario-a', refVersionId: 'version-a' }],
+  };
+  const patchConfig = (body: unknown) => setupApp().request(
+    `/api/webhooks/incoming/iwh-1/config?lineAccountId=${ACCOUNT_ID}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+    baseEnv,
+  );
+
+  test('版の不一致は 409 と現在の版を返す', async () => {
+    vi.mocked(updateIncomingWebhookConfig).mockResolvedValue({ status: 'conflict', currentVersion: 5 });
+    const res = await patchConfig(validBody);
+    expect(res.status).toBe(409);
+    const body = await res.json() as { code: string; data: { currentVersion: number } };
+    expect(body.code).toBe('version_conflict');
+    expect(body.data.currentVersion).toBe(5);
+  });
+
+  test('入力不備は保存せず 400', async () => {
+    const res = await patchConfig({ ...validBody, expectedVersion: 0 });
+    expect(res.status).toBe(400);
+    expect(updateIncomingWebhookConfig).not.toHaveBeenCalled();
+  });
+});
+
+describe('名前・種別の上限 (#506 軽)', () => {
+  const post = (path: string, body: unknown) => setupApp().request(
+    path,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+    baseEnv,
+  );
+  const validOutgoing = {
+    name: 'test', url: 'https://example.com/hook', eventTypes: ['order.created'],
+    secret: VALID_SECRET, lineAccountId: ACCOUNT_ID,
+  };
+
+  test('送り先の作成は名前121文字・種別21件・種別101文字を400で拒否する', async () => {
+    for (const body of [
+      { ...validOutgoing, name: 'あ'.repeat(121) },
+      { ...validOutgoing, eventTypes: Array.from({ length: 21 }, (_, i) => `type-${i}`) },
+      { ...validOutgoing, eventTypes: [`${'a'.repeat(101)}`] },
+    ]) {
+      const res = await post('/api/webhooks/outgoing', body);
+      expect(res.status).toBe(400);
+    }
+    expect(createOutgoingWebhook).not.toHaveBeenCalled();
+  });
+
+  test('受け取り口の作成は名前121文字を400で拒否する', async () => {
+    const res = await post('/api/webhooks/incoming', {
+      name: 'あ'.repeat(121), secret: VALID_SECRET, lineAccountId: ACCOUNT_ID,
+    });
+    expect(res.status).toBe(400);
+    expect(createIncomingWebhook).not.toHaveBeenCalled();
+  });
+});
