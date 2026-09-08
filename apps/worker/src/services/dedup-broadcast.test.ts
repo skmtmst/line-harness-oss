@@ -318,6 +318,7 @@ vi.mock('./stealth.js', () => ({
 
 // Import the mocked module's symbols AFTER vi.mock declarations
 import { getLineAccountById } from '@line-crm/db';
+import * as dbModule from '@line-crm/db';
 import { processMultiAccountDedupBroadcast } from './dedup-broadcast.js';
 import type { LineClient, Message } from '@line-crm/line-sdk';
 
@@ -1011,5 +1012,88 @@ describe('processMultiAccountDedupBroadcast per-account common vars (N-184)', ()
       `SELECT content FROM messages_log WHERE broadcast_id = 'b-n184'`,
     ).all() as Array<{ content: string }>;
     expect(contents).toEqual([{ content: '本日の営業時間は11:00〜20:00です' }]);
+  });
+
+  it('継承プロパティ名は未定義扱い: B店だけconstructorを定義、A店は送らない', async () => {
+    const seed = createTestD1();
+    seedTwoShops(seed);
+    seed.raw.prepare(
+      `INSERT INTO common_vars (id, name, var_key, value, line_account_id)
+       VALUES ('cv-b2', '合言葉', 'constructor', 'B店の合言葉', 'shop-b')`,
+    ).run();
+    mockTwoShopsActive();
+    const clients: MockLineClient[] = [];
+    const factory = (token: string) => {
+      const c = new MockLineClient(token);
+      clients.push(c);
+      return c as unknown as LineClient;
+    };
+
+    const result = await processMultiAccountDedupBroadcast(
+      seed.db,
+      {
+        id: 'b-n184',
+        account_ids: '["shop-a","shop-b"]',
+        dedup_priority: '["shop-a","shop-b"]',
+        message_type: 'text',
+        message_content: '合言葉は{{var.constructor}}です',
+      },
+      factory,
+    );
+
+    // A店は未定義のため送らず失敗に記録。継承プロパティを拾って
+    // 関数の中身のような文字列を送ることはない。
+    expect(result.failedAccountIds).toEqual(['shop-a']);
+    expect(clients.find((c) => c.token === 'tokA')).toBeUndefined();
+    // B店は自分の定義値で送る。
+    const clientB = clients.find((c) => c.token === 'tokB');
+    const callB = clientB?.calls.find((c) => c.method === 'multicast');
+    expect((callB?.args[1] as Array<{ text: string }>)[0].text).toBe('合言葉はB店の合言葉です');
+    const contents = seed.raw.prepare(
+      `SELECT content FROM messages_log WHERE broadcast_id = 'b-n184'`,
+    ).all() as Array<{ content: string }>;
+    expect(contents).toEqual([{ content: '合言葉はB店の合言葉です' }]);
+  });
+
+  it('旧NULL行は送信に使わない: 値がNULLなら未定義扱いで送らない', async () => {
+    const seed = createTestD1();
+    seedTwoShops(seed);
+    mockTwoShopsActive();
+    // 現行スキーマは value NOT NULL のため、制約前の旧行 (value NULL) を
+    // 読み取り境界で再現する。2回目以降の呼び出し (B店) は実実装を使う。
+    const spy = vi.spyOn(dbModule, 'getCommonVarMap')
+      .mockResolvedValueOnce({ hours: null as unknown as string });
+    const clients: MockLineClient[] = [];
+    const factory = (token: string) => {
+      const c = new MockLineClient(token);
+      clients.push(c);
+      return c as unknown as LineClient;
+    };
+
+    try {
+      const result = await processMultiAccountDedupBroadcast(
+        seed.db,
+        {
+          id: 'b-n184',
+          account_ids: '["shop-a","shop-b"]',
+          dedup_priority: '["shop-a","shop-b"]',
+          message_type: 'text',
+          message_content: '本日の営業時間は{{var.hours}}です',
+        },
+        factory,
+      );
+
+      // NULL値は未定義扱い: A店は送らず失敗に記録し、空文字での送信もしない。
+      expect(result.failedAccountIds).toEqual(['shop-a']);
+      expect(clients.find((c) => c.token === 'tokA')).toBeUndefined();
+      // B店は実データの自分の値で送る。
+      expect(sentText(clients.find((c) => c.token === 'tokB'))).toBe('本日の営業時間は11:00〜20:00です');
+      const contents = seed.raw.prepare(
+        `SELECT content FROM messages_log WHERE broadcast_id = 'b-n184'`,
+      ).all() as Array<{ content: string }>;
+      expect(contents).toEqual([{ content: '本日の営業時間は11:00〜20:00です' }]);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
