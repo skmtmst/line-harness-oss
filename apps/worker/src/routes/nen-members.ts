@@ -28,7 +28,7 @@ const PHOTO_REVIEW_REASON_LABELS = {
   duplicate: '同じ写真がすでに投稿されている',
   other: 'そのほか',
 } as const;
-type PhotoReviewReasonCode = keyof typeof PHOTO_REVIEW_REASON_LABELS;
+export type PhotoReviewReasonCode = keyof typeof PHOTO_REVIEW_REASON_LABELS;
 
 function detectedImageMime(bytes: Uint8Array): keyof typeof IMAGE_TYPES | null {
   if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
