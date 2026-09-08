@@ -2663,6 +2663,49 @@ export type RichMenuTapStats = {
   total: number
 }
 
+export type RichMenuGroupListItem = {
+  id: string
+  accountId: string
+  name: string
+  chatBarText: string
+  size: 'large' | 'compact'
+  defaultPageId: string | null
+  isDefaultForAll: boolean
+  status: 'draft' | 'published'
+  publishingAt: string | null
+  targetingCondition: string | null
+  targetingPriority: number
+  targetingEnabled: boolean
+  folderId: string | null
+  displayOrder: number
+  thumbnailR2Key: string | null
+  monthlyStats?: {
+    from: string
+    to: string
+    taps: number
+    uniqueAudience: {
+      value: number | null
+      state: 'available' | 'partial' | 'unavailable'
+      reason: 'preexisting_assignments_not_backfilled' | null
+    }
+  }
+  createdAt: string
+  updatedAt: string
+}
+
+export type RichMenuGroupListPage = {
+  items: RichMenuGroupListItem[]
+  total: number
+  limit: number
+  sort: Array<{ field: string; direction: 'asc' | 'desc' }>
+  facets?: {
+    total: number
+    published: number
+    targeting: number
+    folderCounts: Record<string, number>
+  }
+}
+
 /** 保存するときに送るボタン1つぶん。 */
 export type RichMenuAreaPayload = {
   /** 既存ボタンの id。渡すと引き継がれる（押された回数の集計が途切れない）。 */
@@ -7105,10 +7148,10 @@ export const api = {
         `/api/ec-commerce/notification-runs?${query}`,
       )
     },
-    settings: () =>
-      fetchApi<ApiResponse<EcNotificationSetting[]>>('/api/ec-commerce/settings'),
-    updateSetting: (eventType: string, data: { isEnabled: boolean; title: string; introText: string; outroText: string; buttonLabel: string; buttonUrl: string; imageUrl: string }) =>
-      fetchApi<{ success: boolean }>(`/api/ec-commerce/settings/${encodeURIComponent(eventType)}`, {
+    settings: (lineAccountId: string) =>
+      fetchApi<ApiResponse<EcNotificationSetting[]>>(`/api/ec-commerce/settings?lineAccountId=${encodeURIComponent(lineAccountId)}`),
+    updateSetting: (lineAccountId: string, eventType: string, data: { isEnabled: boolean; title: string; introText: string; outroText: string; buttonLabel: string; buttonUrl: string; imageUrl: string }) =>
+      fetchApi<{ success: boolean }>(`/api/ec-commerce/settings/${encodeURIComponent(eventType)}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
@@ -8238,38 +8281,31 @@ export const api = {
     },
   },
   richMenuGroups: {
-    list: (accountId: string) =>
-      fetchApi<ApiResponse<Array<{
-        id: string;
-        accountId: string;
-        name: string;
-        chatBarText: string;
-        size: 'large' | 'compact';
-        defaultPageId: string | null;
-        isDefaultForAll: boolean;
-        status: 'draft' | 'published';
-        publishingAt: string | null;
-        targetingCondition: string | null;
-        targetingPriority: number;
-        targetingEnabled: boolean;
-        /** 159: フォルダ。分けていなければ null。 */
-        folderId: string | null;
-        /** 160: 自分で決める並び順。 */
-        displayOrder: number;
-        thumbnailR2Key: string | null;
-        monthlyStats?: {
-          from: string;
-          to: string;
-          taps: number;
-          uniqueAudience: {
-            value: number | null;
-            state: 'available' | 'partial' | 'unavailable';
-            reason: 'preexisting_assignments_not_backfilled' | null;
-          };
-        };
-        createdAt: string;
-        updatedAt: string;
-      }>>>(`/api/rich-menu-groups?accountId=${encodeURIComponent(accountId)}`),
+    listPage: (accountId: string, input: {
+      page?: number
+      limit?: number
+      query?: string
+      folderId?: string
+      filter?: string
+      sort?: 'priority' | 'taps' | 'updated' | 'name'
+    } = {}) => {
+      const query = new URLSearchParams({ accountId })
+      query.set('page', String(input.page ?? 1))
+      query.set('limit', String(input.limit ?? 50))
+      if (input.query) query.set('query', input.query)
+      if (input.folderId) query.set('folderId', input.folderId)
+      if (input.filter) query.set('filter', input.filter)
+      if (input.sort && input.sort !== 'priority') query.set('sort', input.sort)
+      return fetchApi<ApiResponse<RichMenuGroupListPage>>(`/api/rich-menu-groups?${query}`)
+    },
+    list: async (accountId: string): Promise<ApiResponse<RichMenuGroupListItem[]>> => {
+      const response = await fetchApi<ApiResponse<RichMenuGroupListPage>>(
+        `/api/rich-menu-groups?accountId=${encodeURIComponent(accountId)}&page=1&limit=200`,
+      )
+      return response.success
+        ? { success: true, data: response.data.items }
+        : response
+    },
 
     get: (groupId: string) =>
       fetchApi<ApiResponse<{

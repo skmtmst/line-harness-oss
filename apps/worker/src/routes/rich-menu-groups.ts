@@ -37,6 +37,7 @@ import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { validateRichMenuImage } from '../lib/image-validator.js';
 import { resolveTrackedLinkBaseUrl } from '../lib/link-base-url.js';
 import { currentMonthRange } from '../lib/jst-range.js';
+import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import {
   buildSegmentWhere,
   parseCondition,
@@ -820,6 +821,10 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
     return c.json({ success: false, error: 'line account not found' }, 404);
   }
   try {
+    const wantsPaging = c.req.query('page') !== undefined || c.req.query('limit') !== undefined;
+    const paging = wantsPaging
+      ? parseOffsetPaging({ page: c.req.query('page'), limit: c.req.query('limit') })
+      : undefined;
     const groups = await getRichMenuGroups(c.env.DB, accountId);
     const range = currentMonthRange(jstNow());
     const [audienceStats, tapStats] = groups.length > 0
@@ -830,11 +835,60 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
       : [[], { byGroup: [] }];
     const audienceByGroup = new Map(audienceStats.map((item) => [item.groupId, item]));
     const tapsByGroup = new Map(tapStats.byGroup.map((item) => [item.groupId, item.taps]));
+    const query = (c.req.query('query') ?? '').trim();
+    const folderId = c.req.query('folderId') ?? '';
+    const savedFilter = c.req.query('filter') ?? '';
+    const sortKey = c.req.query('sort') ?? 'priority';
+    const allItems = groups.map((g) => ({
+      ...serializeGroup(g),
+      thumbnailR2Key: null as string | null,
+      monthlyStats: {
+        from: range.from,
+        to: range.to,
+        taps: tapsByGroup.get(g.id) ?? 0,
+        uniqueAudience: {
+          value: audienceByGroup.get(g.id)?.monthlyUniqueAudience ?? 0,
+          state: 'partial' as const,
+          reason: 'preexisting_assignments_not_backfilled' as const,
+        },
+      },
+    }));
+    const facets = {
+      total: allItems.length,
+      published: allItems.filter((item) => item.status === 'published').length,
+      targeting: allItems.filter((item) => item.targetingEnabled && item.targetingCondition).length,
+      folderCounts: allItems.reduce<Record<string, number>>((counts, item) => {
+        const key = item.folderId ?? '__unfiled__';
+        counts[key] = (counts[key] ?? 0) + 1;
+        return counts;
+      }, {}),
+    };
+    const filtered = wantsPaging
+      ? allItems.filter((item) => {
+          if (query && !item.name.includes(query) && !item.chatBarText.includes(query)) return false;
+          if (folderId === '__unfiled__' && item.folderId) return false;
+          if (folderId && folderId !== '__unfiled__' && item.folderId !== folderId) return false;
+          if (savedFilter === 'published' && item.status !== 'published') return false;
+          if (savedFilter === 'scheduled' && !item.publishingAt) return false;
+          if (savedFilter === 'draft' && (item.status !== 'draft' || item.publishingAt)) return false;
+          if (savedFilter === 'targeting' && (!item.targetingEnabled || !item.targetingCondition)) return false;
+          return true;
+        })
+      : allItems;
+    const sorted = wantsPaging ? [...filtered].sort((a, b) => {
+      if (sortKey === 'taps') return b.monthlyStats.taps - a.monthlyStats.taps || a.id.localeCompare(b.id);
+      if (sortKey === 'updated') return b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id);
+      if (sortKey === 'name') return a.name.localeCompare(b.name, 'ja') || a.id.localeCompare(b.id);
+      return a.targetingPriority - b.targetingPriority
+        || a.createdAt.localeCompare(b.createdAt)
+        || a.id.localeCompare(b.id);
+    }) : filtered;
+    const pageItems = paging ? sorted.slice(paging.offset, paging.offset + paging.limit) : sorted;
     // 各 group の代表画像 (default_page_id の image_r2_key、なければ order_index=0 の page) を取得。
     // 一覧カードでサムネを出すために 1 クエリで JOIN する。
     const imageByGroupId = new Map<string, { key: string; contentType: string | null }>();
-    if (groups.length > 0) {
-      const placeholders = groups.map(() => '?').join(',');
+    if (pageItems.length > 0) {
+      const placeholders = pageItems.map(() => '?').join(',');
       const result = await c.env.DB
         .prepare(
           `SELECT
@@ -850,7 +904,7 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
            FROM rich_menu_groups g
           WHERE g.id IN (${placeholders})`,
         )
-        .bind(...groups.map((g) => g.id))
+        .bind(...pageItems.map((g) => g.id))
         .all<{ group_id: string; image_r2_key: string | null; image_content_type: string | null }>();
       for (const r of result.results ?? []) {
         if (r.image_r2_key) {
@@ -861,23 +915,31 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
         }
       }
     }
-    return c.json({
-      success: true,
-      data: groups.map((g) => ({
-        ...serializeGroup(g),
+    const items = pageItems.map((g) => ({
+        ...g,
         thumbnailR2Key: imageByGroupId.get(g.id)?.key ?? null,
-        monthlyStats: {
-          from: range.from,
-          to: range.to,
-          taps: tapsByGroup.get(g.id) ?? 0,
-          uniqueAudience: {
-            value: audienceByGroup.get(g.id)?.monthlyUniqueAudience ?? 0,
-            state: 'partial',
-            reason: 'preexisting_assignments_not_backfilled',
-          },
+      }));
+    if (paging) {
+      const sort = sortKey === 'taps'
+        ? [{ field: 'monthlyStats.taps', direction: 'desc' as const }, { field: 'id', direction: 'asc' as const }]
+        : sortKey === 'updated'
+          ? [{ field: 'updatedAt', direction: 'desc' as const }, { field: 'id', direction: 'asc' as const }]
+          : sortKey === 'name'
+            ? [{ field: 'name', direction: 'asc' as const }, { field: 'id', direction: 'asc' as const }]
+            : [
+                { field: 'targetingPriority', direction: 'asc' as const },
+                { field: 'createdAt', direction: 'asc' as const },
+                { field: 'id', direction: 'asc' as const },
+              ];
+      return c.json({
+        success: true,
+        data: {
+          ...buildOffsetListResponse({ items, total: filtered.length, paging, sort }),
+          facets,
         },
-      })),
-    });
+      });
+    }
+    return c.json({ success: true, data: items });
   } catch (error) {
     console.error('GET /api/rich-menu-groups error:', error);
     return c.json({ success: false, error: 'リッチメニュー一覧を取得できませんでした' }, 503);
