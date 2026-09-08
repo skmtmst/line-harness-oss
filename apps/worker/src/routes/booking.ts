@@ -36,6 +36,7 @@ import { canTransition, nextStatus, type BookingAction } from '../services/booki
 import { getAvailability } from '../services/availability.js';
 import {
   removeBookingFromGoogle,
+  runCalendarDeleteOperation,
   syncConfirmedBookingToGoogle,
   verifyStaffCalendarConnection,
 } from '../services/booking-calendar-sync.js';
@@ -2573,6 +2574,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
     }>();
   if (!row) return c.json({ error: 'not_found' }, 404);
   // 再試行の受付: V6 取消が投げた直後の再送は、業務が済みでも V6 だけ直す (409 にしない)。
+  // Calendar 削除も同じ鍵の台帳で再試行する (ずみなら触らず、一時失敗なら再実行)。
   if (
     (b.action === 'cancel' || b.action === 'expire') &&
     (row.status === 'cancelled' || row.status === 'expired')
@@ -2585,6 +2587,11 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
       startsAtIso: row.starts_at,
       lineAccountId: accountId,
       cancelReason: `booking_${row.status}:${id}:by:${c.get('staff')?.id ?? 'admin'}-retry`,
+    });
+    await runCalendarDeleteOperation(c.env.DB, {
+      bookingId: id,
+      lineAccountId: accountId,
+      remove: () => removeBookingFromGoogle(c.env.DB, googleCredentials(c.env), id),
     });
     return c.json({ status: row.status });
   }
@@ -2657,10 +2664,14 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
       lineAccountId: accountId,
       cancelReason: `booking_${next}:${id}:by:${c.get('staff')?.id ?? 'admin'}`,
     });
+    // Calendar 削除は台帳駆動 (安定キーで1行)。一時失敗は retry_wait に残し、
+    // 次の取消再試行で同じ鍵で再実行する。取消処理自体は壊さない。
     c.executionCtx.waitUntil(
-      removeBookingFromGoogle(c.env.DB, googleCredentials(c.env), id).catch((error) =>
-        console.error('Google Calendar delete failed:', error),
-      ),
+      runCalendarDeleteOperation(c.env.DB, {
+        bookingId: id,
+        lineAccountId: accountId,
+        remove: () => removeBookingFromGoogle(c.env.DB, googleCredentials(c.env), id),
+      }).catch((error) => console.error('Google Calendar delete failed:', error)),
     );
   }
 

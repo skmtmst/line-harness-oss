@@ -43,6 +43,11 @@ export interface ReminderDeliveryOptions {
   now?: Date;
   pause?: (milliseconds: number) => Promise<void>;
   resolveClient?: (accountId: string | null, fallback: PushClient) => Promise<PushClient>;
+  /**
+   * 送信権の取得後にだけ走る試験用の割り込み口。本番では未指定 (待たない)。
+   * この後の再検証がシーム中の取消を拾うため、検証後注入テストで使う。
+   */
+  beforePush?: (run: { id: string; friendReminderId: string }) => Promise<void>;
 }
 
 export interface ReminderDeliveryResult {
@@ -209,6 +214,20 @@ export async function processReminderDeliveries(
         const built = await buildReminderStepMessage(db, step, friend, sendAt);
         // 取消と送信の競合対策: push の直前に送る権利を1文で確かめる。
         // この後 push まで待たない (間に取消が入る余地を残さない)。
+        // 外部送信は巻き戻せないため、権利取得と取消確定の順序は DB の1文で
+        // 直列化し、確定後の送信は成功にできない (後段で検出・記録する)。
+        if (!await verifyClaimedRunBeforeSend(db, {
+          id: run.id,
+          friendReminderId: enrollment.id,
+          now: nowIso,
+          leaseExpiresAt,
+        })) {
+          result.skipped++;
+          continue;
+        }
+        await options.beforePush?.({ id: run.id, friendReminderId: enrollment.id });
+        // シーム (試験割り込み) の後に取り直す。シーム中の取消をここで拾う。
+        // 本番で beforePush は無く、この2文の間に待たない。
         if (!await verifyClaimedRunBeforeSend(db, {
           id: run.id,
           friendReminderId: enrollment.id,

@@ -648,6 +648,45 @@ describe('日程変更の途中失敗', () => {
     });
   });
 
+  it('日程変更で送信ずみは履歴のまま残し、未来分だけ再設定する', async () => {
+    const { db, raw } = createTestD1();
+    seedAccount(raw, ACCOUNT_1);
+    insertFriend(raw, 'friend-1', { line_account_id: ACCOUNT_1 });
+    seedTriggerRule(raw, 'rule-booking-1', 'booking');
+
+    const now = new Date('2026-09-01T00:00:00.000Z');
+    await registerMeetConsultation(
+      db,
+      meetInput('google-event-a', '2026-09-20T01:00:00.000Z', '2026-09-20T01:30:00.000Z'),
+      now,
+    );
+    // 前日通知は送りずみ (履歴)、1時間前はまだ未来。
+    raw.prepare(
+      `UPDATE meet_consultation_reminders
+          SET status = 'sent', sent_at = ?, updated_at = ?
+        WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)
+          AND kind = 'day_before'`,
+    ).run('2026-09-19T01:00:00.000Z', '2026-09-19T01:00:00.000Z', 'google-event-a');
+
+    await registerMeetConsultation(
+      db,
+      meetInput('google-event-a', '2026-09-27T01:00:00.000Z', '2026-09-27T01:30:00.000Z'),
+      now,
+    );
+
+    // 送りずみは pending に戻さず sent_at も消さない (二重送信・履歴欠け防止)。
+    expect(
+      raw.prepare(
+        `SELECT status, sent_at, scheduled_at FROM meet_consultation_reminders
+          WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)
+          ORDER BY kind`,
+      ).all('google-event-a'),
+    ).toEqual([
+      { status: 'sent', sent_at: '2026-09-19T01:00:00.000Z', scheduled_at: '2026-09-19T01:00:00.000Z' },
+      { status: 'pending', sent_at: null, scheduled_at: '2026-09-27T00:00:00.000Z' },
+    ]);
+  });
+
   it('reconcile は整合済みなら何もしない (冪等)', async () => {
     const { db, raw } = createTestD1();
     seedAccount(raw, ACCOUNT_1);

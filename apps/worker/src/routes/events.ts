@@ -871,25 +871,66 @@ events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'a
       )
       .bind(slot_id)
       .all<{ id: string; friend_id: string; line_account_id: string }>();
-    for (const bookingRow of confirmed.results ?? []) {
-      if (oldStartsAt !== newStartsAt) {
-        await rescheduleByTrigger(c.env.DB, {
+    const bookings = confirmed.results ?? [];
+    if (oldStartsAt !== newStartsAt) {
+      // 複数予約を1件ずつ移す。途中で落ちると一部だけ新日時になるため、
+      // (1) 各件の前に旧起点へ戻して同じ形からやり直し (heal-first)、
+      // (2) 失敗時は動かし終えた分を旧起点へ戻して (補償)、
+      // 枠 untouched のまま 500 にする。再送はそのまま回復になる。
+      const moved: typeof bookings = [];
+      try {
+        for (const bookingRow of bookings) {
+          const v6Base = {
+            triggerType: 'event' as const,
+            sourceId: bookingRow.id,
+            sourceEventId: bookingRow.id,
+            friendId: bookingRow.friend_id,
+            lineAccountId: bookingRow.line_account_id,
+          };
+          await reconcileV6ToStartsAt(c.env.DB, { ...v6Base, startsAtIso: oldStartsAt });
+          await rescheduleByTrigger(c.env.DB, {
+            ...v6Base,
+            oldStartsAtIso: oldStartsAt,
+            newStartsAtIso: newStartsAt,
+          });
+          await reconcileV6ToStartsAt(c.env.DB, { ...v6Base, startsAtIso: newStartsAt });
+          moved.push(bookingRow);
+        }
+      } catch (error) {
+        for (const bookingRow of moved) {
+          try {
+            await rescheduleByTrigger(c.env.DB, {
+              triggerType: 'event',
+              sourceId: bookingRow.id,
+              sourceEventId: bookingRow.id,
+              friendId: bookingRow.friend_id,
+              oldStartsAtIso: newStartsAt,
+              newStartsAtIso: oldStartsAt,
+              lineAccountId: bookingRow.line_account_id,
+            });
+            await reconcileV6ToStartsAt(c.env.DB, {
+              triggerType: 'event',
+              sourceId: bookingRow.id,
+              sourceEventId: bookingRow.id,
+              friendId: bookingRow.friend_id,
+              startsAtIso: oldStartsAt,
+            });
+          } catch (compensationError) {
+            console.error('slot reminder compensation failed:', compensationError);
+          }
+        }
+        throw error;
+      }
+    } else {
+      for (const bookingRow of bookings) {
+        await reconcileV6ToStartsAt(c.env.DB, {
           triggerType: 'event',
           sourceId: bookingRow.id,
           sourceEventId: bookingRow.id,
           friendId: bookingRow.friend_id,
-          oldStartsAtIso: oldStartsAt,
-          newStartsAtIso: newStartsAt,
-          lineAccountId: bookingRow.line_account_id,
+          startsAtIso: newStartsAt,
         });
       }
-      await reconcileV6ToStartsAt(c.env.DB, {
-        triggerType: 'event',
-        sourceId: bookingRow.id,
-        sourceEventId: bookingRow.id,
-        friendId: bookingRow.friend_id,
-        startsAtIso: newStartsAt,
-      });
     }
   }
   setClauses.push(`updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`);

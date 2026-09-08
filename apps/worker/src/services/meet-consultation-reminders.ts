@@ -190,12 +190,14 @@ export async function registerMeetConsultation(
         .bind(crypto.randomUUID(), consultationId, item.kind, item.scheduledAt, nowIso, nowIso)
         .run();
     } else if (scheduleChanged || reminder.status === 'cancelled') {
+      // 送信ずみは履歴として残し、未来分だけ再設定する。sent を pending に
+      // 戻すと二重送信になり、sent_at を消すと履歴が欠ける。
       await db
         .prepare(
           `UPDATE meet_consultation_reminders
-              SET scheduled_at=?, status='pending', retry_count=0, sent_at=NULL,
+              SET scheduled_at=?, status='pending', retry_count=0,
                   last_error=NULL, updated_at=?
-            WHERE id=?`,
+            WHERE id=? AND status IN ('pending','failed','cancelled')`,
         )
         .bind(item.scheduledAt, nowIso, reminder.id)
         .run();

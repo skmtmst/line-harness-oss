@@ -3,6 +3,11 @@ import {
   getGoogleServiceAccountToken,
   type GoogleServiceAccountCredentials,
 } from './google-service-account.js';
+import {
+  findBookingOperation,
+  finishBookingOperation,
+  queueBookingOperation,
+} from './booking-operation-runs.js';
 
 export interface StaffCalendarConnection {
   id: string;
@@ -127,6 +132,81 @@ export async function syncConfirmedBookingToGoogle(
     .bind(created.eventId, row.calendar_id, bookingId)
     .run();
   return { synced: true, eventId: created.eventId, calendarId: row.calendar_id };
+}
+
+/**
+ * 取消時の Calendar 削除を台帳駆動で1回だけ確実に行う。
+ *
+ * 安定キー (`<bookingId>:google-calendar:delete`) で台帳行を1行に保つ。
+ * - ずみ (succeeded/skipped) なら外部へ触らず返す (二重削除なし)。
+ * - 消す物が無ければ skipped で閉じる (外部へ出ない)。
+ * - 一時失敗は retry_wait で残し、次の取消再試行で同じ鍵で再実行する。
+ * - 外部成功→台帳失敗の間は queued のまま残るため、再実行は相手先の
+ *   410 (削除ずみ) を成功として回収する (deleteEvent が吸収する)。
+ * 投げない (取消処理を壊さない)。DB自体が使えないときだけ投げる。
+ */
+export async function runCalendarDeleteOperation(
+  db: D1Database,
+  input: {
+    bookingId: string;
+    lineAccountId: string;
+    now?: Date;
+    remove: () => Promise<void>;
+  },
+): Promise<'succeeded' | 'skipped' | 'retry_wait'> {
+  const now = (input.now ?? new Date()).toISOString();
+  const idempotencyKey = `${input.bookingId}:google-calendar:delete`;
+  try {
+    const existing = await findBookingOperation(db, {
+      lineAccountId: input.lineAccountId,
+      idempotencyKey,
+    });
+    if (existing && (existing.status === 'succeeded' || existing.status === 'skipped')) {
+      return existing.status;
+    }
+    const operationId = existing?.id ?? await queueBookingOperation(db, {
+      bookingId: input.bookingId,
+      lineAccountId: input.lineAccountId,
+      kind: 'google_calendar',
+      idempotencyKey,
+      result: { direction: 'delete' },
+    });
+    const booking = await db.prepare(
+      `SELECT external_event_id FROM bookings WHERE id = ?`,
+    ).bind(input.bookingId).first<{ external_event_id: string | null }>();
+    if (!booking?.external_event_id) {
+      await finishBookingOperation(db, {
+        id: operationId,
+        status: 'skipped',
+        completedAt: now,
+        result: { direction: 'delete', reason: 'no_external_event' },
+      });
+      return 'skipped';
+    }
+    try {
+      await input.remove();
+    } catch (error) {
+      await finishBookingOperation(db, {
+        id: operationId,
+        status: 'retry_wait',
+        completedAt: now,
+        errorCode: error instanceof Error ? error.name : 'calendar_delete_failed',
+        result: { direction: 'delete' },
+      });
+      console.error('Google Calendar delete (cancel) failed:', error);
+      return 'retry_wait';
+    }
+    await finishBookingOperation(db, {
+      id: operationId,
+      status: 'succeeded',
+      completedAt: now,
+      result: { direction: 'delete' },
+    });
+    return 'succeeded';
+  } catch (error) {
+    console.error('Google Calendar delete operation failed:', error);
+    return 'retry_wait';
+  }
 }
 
 export async function removeBookingFromGoogle(

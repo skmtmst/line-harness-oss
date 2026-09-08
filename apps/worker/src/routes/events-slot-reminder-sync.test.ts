@@ -66,6 +66,23 @@ function seed(raw: import('better-sqlite3').Database): void {
   ).run(OLD_STARTS_AT);
 }
 
+function seedTwoBookings(raw: import('better-sqlite3').Database): void {
+  seed(raw);
+  raw.prepare(
+    `INSERT INTO friends (id, line_user_id, display_name, line_account_id, is_following)
+     VALUES ('friend-2', 'U-friend-2', '佐藤たろう', 'account-1', 1)`,
+  ).run();
+  raw.prepare(
+    `INSERT INTO event_bookings
+       (id, line_account_id, event_id, slot_id, friend_id, status, requested_at)
+     VALUES ('eb-2', 'account-1', 'ev-1', 'slot-1', 'friend-2', 'confirmed', '2026-09-01T00:00:00.000Z')`,
+  ).run();
+  raw.prepare(
+    `INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status)
+     VALUES ('legacy-2', 'friend-2', 'rule-event-1', ?, 'active')`,
+  ).run(OLD_STARTS_AT);
+}
+
 function makeApp(db: D1Database) {
   const app = new Hono<Env>();
   app.use('*', async (c, next) => {
@@ -116,5 +133,45 @@ describe('イベント枠の日程変更の再送可能性', () => {
     expect(
       raw.prepare(`SELECT target_date, status FROM friend_reminders WHERE id = 'legacy-1'`).get(),
     ).toEqual({ target_date: NEW_STARTS_AT, status: 'active' });
+  });
+
+  it('2件目の失敗では1件目を旧起点へ戻し、枠は変えず再送で全件直る', async () => {
+    const { db, raw } = createTestD1();
+    seedTwoBookings(raw);
+    const { app, env } = makeApp(db);
+
+    // 2件目の行だけ落とす失敗注入 (1件目は通る)。
+    raw.exec(
+      `CREATE TRIGGER v6_second_fail BEFORE UPDATE ON friend_reminders
+       WHEN OLD.id = 'legacy-2'
+       BEGIN SELECT RAISE(ABORT, 'injected-second-failure'); END;`,
+    );
+    const failed = await putSlot(app, env);
+    expect(failed.status).toBe(500);
+
+    // 枠は untouched、1件目は補償で旧起点へ戻り、2件目も旧日のまま。
+    expect(
+      raw.prepare(`SELECT starts_at FROM event_slots WHERE id = 'slot-1'`).get(),
+    ).toEqual({ starts_at: OLD_STARTS_AT });
+    expect(
+      raw.prepare(`SELECT target_date, status FROM friend_reminders WHERE id = 'legacy-1'`).get(),
+    ).toEqual({ target_date: OLD_STARTS_AT, status: 'active' });
+    expect(
+      raw.prepare(`SELECT target_date, status FROM friend_reminders WHERE id = 'legacy-2'`).get(),
+    ).toEqual({ target_date: OLD_STARTS_AT, status: 'active' });
+
+    // 同じリクエストの再送で両件とも新日時へ直る。
+    raw.exec(`DROP TRIGGER v6_second_fail`);
+    const retried = await putSlot(app, env);
+    expect(retried.status).toBe(200);
+    expect(
+      raw.prepare(`SELECT starts_at FROM event_slots WHERE id = 'slot-1'`).get(),
+    ).toEqual({ starts_at: NEW_STARTS_AT });
+    expect(
+      raw.prepare(`SELECT target_date FROM friend_reminders WHERE id IN ('legacy-1', 'legacy-2') ORDER BY id`).all(),
+    ).toEqual([
+      { target_date: NEW_STARTS_AT },
+      { target_date: NEW_STARTS_AT },
+    ]);
   });
 });
