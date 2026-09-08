@@ -1998,22 +1998,7 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (/^\/api\/support-marks\/[^/]+\/automation-rules$/.test(pathname)) {
     return { success: true, data: SUPPORT_MARK_AUTOMATION_RULES }
   }
-  /*
-    いま入っている人。34-1「はじめの設定」の最終確認が役割で言い分けるので、
-    一覧の形（items/total）ではなく 1 人ぶんを返す。
-  */
-  if (pathname === '/api/staff/me')
-    return {
-      success: true,
-      data: {
-        id: 'visual-qa-staff',
-        name: 'Kenta Kawano',
-        email: null,
-        role: 'owner',
-        permissionKeys: [],
-        isActive: true,
-      },
-    }
+  /* `/api/staff/me` は下の1か所だけ(STAFFの固定データ)。ここに書くと下が死にコードになる。 */
   const formDeleteImpact = /^\/api\/forms\/([^/]+)\/delete-impact$/.exec(pathname)
   if (formDeleteImpact) {
     const data = formDeleteImpact[1] === 'form-empty'

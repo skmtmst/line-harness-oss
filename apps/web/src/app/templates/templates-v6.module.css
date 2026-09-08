@@ -10,8 +10,8 @@
 }
 
 .folderRail {
-  width: 252px;
-  flex: 0 0 252px;
+  width: var(--folder-rail-width);
+  flex: 0 0 var(--folder-rail-width);
 }
 
 @media (max-width: 900px) {
