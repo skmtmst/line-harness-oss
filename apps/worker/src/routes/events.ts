@@ -1108,10 +1108,10 @@ events.post('/api/liff/events/me/:bookingId/cancel', async (c) => {
     .bind(nowIso, nowIso, row.id)
     .run();
   if ((upd.meta?.changes ?? 0) === 0) return bad(c, 'invalid_state', 409);
-  await cancelPendingRemindersFor(c.env.DB, row.id);
   // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
-  // 送信権の貸出中は状態更新を巻き戻して 409 にする (完全 rollback。
-  // 取消確定後の送信を起こさない)。
+  // 旧表の取消は V6 fence 成功の後に回す (409 では旧表も含めて完全 rollback)。
+  // 送信権の貸出中は状態更新を巻き戻して 409 にする
+  // (取消確定後の送信を起こさない)。
   try {
     await cancelByTrigger(c.env.DB, {
       triggerType: 'event',
@@ -1137,6 +1137,8 @@ events.post('/api/liff/events/me/:bookingId/cancel', async (c) => {
     }
     throw error;
   }
+  // 旧表の取消は V6 fence 成功の後 (409 では旧表も含めて完全 rollback)。
+  await cancelPendingRemindersFor(c.env.DB, row.id);
   await enqueueEventWaitlistPromotion(c.env.DB, waitlistParams);
   return c.json({ ok: true });
 });
@@ -2194,12 +2196,12 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRo
     .bind(nowIso, nowIso, booking.id, booking.status)
     .run();
   if ((upd.meta?.changes ?? 0) === 0) return bad(c, 'invalid_state', 409);
-  await cancelPendingRemindersFor(c.env.DB, booking.id);
   const slot = await c.env.DB
     .prepare(`SELECT starts_at FROM event_slots WHERE id = ?`)
     .bind(booking.slot_id)
     .first<{ starts_at: string }>();
   // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
+  // 旧表の取消は V6 fence 成功の後に回す (409 の完全 rollback のため)。
   // 送信権の貸出中は状態更新を巻き戻して 409 にする (取消確定後の送信を起こさない)。
   try {
     await cancelByTrigger(c.env.DB, {
@@ -2226,6 +2228,8 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRo
     }
     throw error;
   }
+  // 旧表の取消は V6 fence 成功の後 (409 では触らない)。
+  await cancelPendingRemindersFor(c.env.DB, booking.id);
   await enqueueEventWaitlistPromotion(c.env.DB, {
     lineAccountId: booking.line_account_id,
     eventId: booking.event_id,

@@ -1012,11 +1012,14 @@ export async function cancelV6RemindersForSource(
   // 取消が先なら貸出側の active 確認が失敗して送らない。
   // lease 無し (NULL) は貸出取得前の行のため対象にする。
   const countLiveClaims = async (): Promise<number> => {
+    // lease (UTC Z 書き) と now (+09:00 書き) を TEXT 比較すると、実時間で
+    // live でも偽になり fence を抜ける。UTC epoch で比べる。
     const live = await db.prepare(
       `SELECT COUNT(*) AS c FROM reminder_delivery_runs
         WHERE friend_reminder_id IN (${chunkPlaceholders(ids)})
           AND status = 'claimed'
-          AND lease_expires_at IS NOT NULL AND lease_expires_at > ?`,
+          AND lease_expires_at IS NOT NULL
+          AND strftime('%s', lease_expires_at) > strftime('%s', ?)`,
     ).bind(...ids, now).first<{ c: number }>();
     return live?.c ?? 0;
   };
@@ -1030,19 +1033,30 @@ export async function cancelV6RemindersForSource(
   for (let offset = 0; offset < ids.length; offset += 50) {
     const chunk = ids.slice(offset, offset + 50);
     const placeholders = chunkPlaceholders(chunk);
+    // strict fence (利用者操作) では選んだ行を無条件で止める (all-or-none)。
+    // 貸出中を除外して残すと、確認後の割込みが取消確定後の送信になる。
+    // 事前確認で貸出が無ければ書く。割込み貸出は claim 時・送信直前の
+    // active 確認で止まる (止めた後には送らない)。
+    // 最善努力 (cron 等) では従来どおり貸出中を残し、次回で収束させる。
+    const liveGuard = input.failOnSendInFlight
+      ? ''
+      : `AND NOT EXISTS (
+           SELECT 1 FROM reminder_delivery_runs r
+            WHERE r.friend_reminder_id = friend_reminders.id
+              AND r.status = 'claimed'
+              AND r.lease_expires_at IS NOT NULL
+              AND strftime('%s', r.lease_expires_at) > strftime('%s', ?))`;
+    const enrollmentBindings = input.failOnSendInFlight
+      ? [input.cancelReason, now, ...chunk]
+      : [input.cancelReason, now, ...chunk, now];
     statements.push(
       db.prepare(
         `UPDATE friend_reminders
             SET status = 'cancelled', cancel_reason = ?, updated_at = ?
           WHERE status = 'active' AND id IN (${placeholders})
-            AND NOT EXISTS (
-              SELECT 1 FROM reminder_delivery_runs r
-               WHERE r.friend_reminder_id = friend_reminders.id
-                 AND r.status = 'claimed'
-                 AND r.lease_expires_at IS NOT NULL AND r.lease_expires_at > ?)`,
-      ).bind(input.cancelReason, now, ...chunk, now),
+          ${liveGuard}`,
+      ).bind(...enrollmentBindings),
       // 送信済みは残す。止めるのは active でなくなった登録の行だけ。
-      // 貸出中の行は残し、送信直前の再確認と確定時 active 確認で守る。
       db.prepare(
         `UPDATE reminder_delivery_runs
             SET status = 'cancelled', completed_at = ?, updated_at = ?
@@ -1064,10 +1078,10 @@ export async function cancelV6RemindersForSource(
     0,
   );
   if (input.failOnSendInFlight && ids.length > 0) {
-    // 確認と取消 UPDATE の間に貸出が割り込むと、行単位の除外でその行だけ
-    // 残る。1件でも残れば黙って成功にせず拒否し、呼び出し側に状態の
-    // 巻き戻しと再試行をさせる (部分割込みの取消確定後送信を起こさない)。
-    // 残りが無ければ止め切ったか、同時確定の別処理が先に止めた冪等な再送。
+    // 書換え後に最初に選んだ全 ID が止まったか確かめる。1件でも残れば
+    // 黙って成功にせず拒否し、呼び出し側に状態の巻き戻しと再試行をさせる
+    // (取消確定後の送信を起こさない)。残りが無ければ止め切ったか、
+    // 同時確定の別処理が先に止めた冪等な再送。
     const remaining = await db.prepare(
       `SELECT id FROM friend_reminders
         WHERE status = 'active' AND id IN (${chunkPlaceholders(ids)})`,
