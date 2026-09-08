@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 
 const page = readFileSync(join(import.meta.dirname, 'page.tsx'), 'utf8');
 const api = readFileSync(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8');
+const helper = readFileSync(join(import.meta.dirname, 'photo-text.ts'), 'utf8');
+const detail = readFileSync(join(import.meta.dirname, 'photo-review-detail.tsx'), 'utf8');
 
 describe('V6 photo review contract', () => {
   it('uses only the common top bar for the page title', () => {
@@ -102,5 +104,20 @@ describe('V6 photo review contract', () => {
     expect(page).toContain('（通知は順次送信）');
     expect(page).not.toContain('notificationFailures');
     expect(page).not.toContain('LINE通知も送信しました');
+  });
+
+  it('sends an integer review version so a broken value does not become a 400 (#580)', () => {
+    // 版が読めない値は初版に倒し、サーバの版競合フローに載せる。
+    expect(page).toContain('reviewVersionOf(');
+    expect(page).not.toContain('Number(photo.review_version ?? 1)');
+    expect(page).not.toContain('Number(detailPhoto.review_version ?? 1)');
+    expect(helper).toContain('Number.isInteger(version)');
+  });
+
+  it('lets the user reload derivative status after a quiet failure (#580)', () => {
+    expect(page).toContain('assetsFailed={detailAssetsFailed}');
+    expect(page).toContain('onReloadAssets={() => {');
+    expect(detail).toContain('assetsFailed');
+    expect(detail).toContain('状態を読み直す');
   });
 });

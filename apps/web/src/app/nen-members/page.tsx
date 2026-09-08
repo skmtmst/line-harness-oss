@@ -19,6 +19,7 @@ import { PhotoReviewDetail } from './photo-review-detail'
 import { PhotoPublications } from './photo-publications'
 import { safePhotoSrc } from './photo-src'
 import { photoNoticeFor } from './photo-notice'
+import { photoPetName, reviewVersionOf, text } from './photo-text'
 import styles from './photo-review.module.css'
 
 type PhotoStatus = 'pending' | 'adopted' | 'rejected'
@@ -36,8 +37,6 @@ const STATUS_TABS: ReadonlyArray<[PhotoStatus, string]> = [
   ['adopted', '通したもの'],
   ['rejected', '戻したもの'],
 ]
-const text = (value: unknown) => String(value ?? '')
-
 export default function PhotoReviewsPage() {
   const { selectedAccountId } = useAccount()
   const [photos, setPhotos] = useState<Array<Record<string, unknown>>>([])
@@ -49,6 +48,7 @@ export default function PhotoReviewsPage() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailAssetStatus, setDetailAssetStatus] = useState<PhotoAssetStatus | null>(null)
   const [detailDerivatives, setDetailDerivatives] = useState<PhotoDerivatives | null>(null)
+  const [detailAssetsFailed, setDetailAssetsFailed] = useState(false)
   const [assetProcessing, setAssetProcessing] = useState(false)
   const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(true)
@@ -119,6 +119,7 @@ export default function PhotoReviewsPage() {
     setDetailPhoto(null)
     setDetailAssetStatus(null)
     setDetailDerivatives(null)
+    setDetailAssetsFailed(false)
     setSelectedPhotoIds([])
     setBulkApproveOpen(false)
     setBulkReturnOpen(false)
@@ -165,19 +166,24 @@ export default function PhotoReviewsPage() {
   const selectedReasonLabel = selectedReason?.label ?? ''
   const selectedReasonMessage = selectedReason?.message ?? ''
 
+  // 派生画像の状態取得に失敗しても詳細は開いたままにし、再読込ボタンで
+  // 回復できるようにする（#500 軽: 無言の `null` 化けの解消）。
   const refreshDetailAssets = async (id: string, accountId: string) => {
     const [statusResult, derivativesResult] = await Promise.allSettled([
       api.nenMembers.photoAssetStatus(id, accountId),
       api.nenMembers.photoDerivatives(id, accountId),
     ])
-    setDetailAssetStatus(statusResult.status === 'fulfilled' && statusResult.value.success
+    const status = statusResult.status === 'fulfilled' && statusResult.value.success
       && isPhotoAssetStatus(statusResult.value.data)
       ? statusResult.value.data
-      : null)
-    setDetailDerivatives(derivativesResult.status === 'fulfilled' && derivativesResult.value.success
+      : null
+    const derivatives = derivativesResult.status === 'fulfilled' && derivativesResult.value.success
       && isPhotoDerivatives(derivativesResult.value.data)
       ? derivativesResult.value.data
-      : null)
+      : null
+    setDetailAssetStatus(status)
+    setDetailDerivatives(derivatives)
+    setDetailAssetsFailed(status === null || derivatives === null)
   }
 
   // 詳細表示の世代。一覧の loadSequence と同じく、「前・次」を連打したとき
@@ -190,6 +196,7 @@ export default function PhotoReviewsPage() {
     setDetailPhoto(null)
     setDetailAssetStatus(null)
     setDetailDerivatives(null)
+    setDetailAssetsFailed(false)
     setDetailLoading(true)
     try {
       const [response] = await Promise.all([
@@ -251,9 +258,9 @@ export default function PhotoReviewsPage() {
       const response = await api.nenMembers.reviewPhoto(id, {
         accountId: selectedAccountId,
         status: nextStatus,
-        expectedVersion: Number(
-          photos.find((photo) => text(photo.id) === id)?.review_version
-          ?? (text(detailPhoto?.id) === id ? detailPhoto?.review_version : 1),
+        expectedVersion: reviewVersionOf(
+          photos.find((photo) => text(photo.id) === id)
+          ?? (text(detailPhoto?.id) === id ? detailPhoto : null),
         ),
         ...(rejection ?? {}),
       })
@@ -287,7 +294,7 @@ export default function PhotoReviewsPage() {
         decisions: selectedPendingPhotos.map((photo) => ({
           photoId: text(photo.id),
           decision,
-          expectedVersion: Number(photo.review_version ?? 1),
+          expectedVersion: reviewVersionOf(photo),
           reasonCode: rejection?.reasonCode ?? null,
           reasonNote: rejection?.reasonNote || null,
         })),
@@ -322,7 +329,7 @@ export default function PhotoReviewsPage() {
     try {
       const response = await api.nenMembers.processPhotoAssets(id, {
         lineAccountId: selectedAccountId,
-        expectedVersion: Number(detailPhoto.review_version ?? 1),
+        expectedVersion: reviewVersionOf(detailPhoto),
         operation: 'review',
       }, crypto.randomUUID())
       if (!response.success) throw new Error(response.error)
@@ -351,7 +358,7 @@ export default function PhotoReviewsPage() {
     if (!grant.success) throw new Error(grant.error)
     const issued = await api.nenMembers.issuePhotoOriginalDownload(
       text(detailPhoto.id),
-      { lineAccountId: selectedAccountId, expectedVersion: Number(detailPhoto.review_version ?? 1) },
+      { lineAccountId: selectedAccountId, expectedVersion: reviewVersionOf(detailPhoto) },
       grant.data.token,
       crypto.randomUUID(),
     )
@@ -380,6 +387,10 @@ export default function PhotoReviewsPage() {
       notice={notice}
       assetStatus={detailAssetStatus}
       derivatives={detailDerivatives}
+      assetsFailed={detailAssetsFailed}
+      onReloadAssets={() => {
+        if (selectedAccountId && detailPhoto) void refreshDetailAssets(text(detailPhoto.id), selectedAccountId)
+      }}
       assetProcessing={assetProcessing}
       onBack={() => setView('list')}
       onMove={(direction) => {
@@ -485,7 +496,7 @@ export default function PhotoReviewsPage() {
           <span className="text-xs text-ink-faint">審査待ちの写真だけをまとめて処理します</span>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" disabled>▦ 並べて見る</Button>
+          <Button variant="secondary" disabled title="並べて見るは一覧の表示形式の追加口を接続後に使えます">▦ 並べて見る</Button>
           <Button
             data-qa-open="hHrz8"
             variant="secondary"
@@ -631,11 +642,6 @@ function photoRiskLabel(flag: string) {
   if (flag === 'logo') return '他社ロゴらしきもの'
   if (flag === 'duplicate') return '重複らしきもの'
   return flag
-}
-
-function photoPetName(photo: Record<string, unknown>) {
-  const name = text(photo.pet_name) || 'ペット'
-  return /(?:ちゃん|くん|さん)$/.test(name) ? name : `${name}ちゃん`
 }
 
 function isPhotoReviewMetrics(value: unknown): value is PhotoReviewMetrics {

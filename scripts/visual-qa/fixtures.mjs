@@ -5707,9 +5707,11 @@ const publicationPhoto = (id, photoId, petName, ownerName, count, label, type = 
 })
 
 export const NEN_PHOTO_PUBLICATIONS = {
+  // #580 軽: 概要は現物8件と一致させる（実APIは items.length を数える）。
+  // 掲載先は type:label の重なりなし5か所（pub-6は掲載先なし）。
   summary: {
-    publishedCount: 62, placementCount: 4,
-    topPhoto: { pet_name: 'ももちゃん', view_count: 1240 }, consentedCount: 62,
+    publishedCount: 8, placementCount: 5,
+    topPhoto: { pet_name: 'ももちゃん', view_count: 1240 }, consentedCount: 8,
   },
   items: [
     publicationPhoto('pub-1', 'ph-11', 'ももちゃん', '高橋 直人 さま', 1240, 'リッチメニュー', 'rich_menu'),
