@@ -33,6 +33,7 @@ import {
 } from '../services/automation-engine.js';
 import { createAutomationActionExecutors } from '../services/automation-action-executors.js';
 import { listLimit } from './list-pagination.js';
+import { automationActionLabel, automationTriggerLabel } from '@line-crm/shared';
 
 const automations = new Hono<Env>();
 
@@ -200,37 +201,9 @@ const DOMAIN_STATUS_TO_COMMON: Record<AutomationRunDomainStatus, ExecutionRunSta
   skipped_condition: 'skipped',
 };
 
-const TRIGGER_LABELS: Record<string, string> = {
-  friend_add: '友だちが追加されたとき',
-  message_received: 'メッセージが届いたとき',
-  tag_change: 'タグが変わったとき',
-  score_threshold: '行動スコアが条件に達したとき',
-  cv_fire: '成果が記録されたとき',
-  postback_received: 'メニューが押されたとき',
-  calendar_booked: '予約が確定したとき',
-  'ec.order.confirmed': '注文が確定したとき',
-  'ec.order.shipped': '発送が完了したとき',
-  'ec.subscription.upcoming': '定期便の予定が近づいたとき',
-  'ec.subscription.payment_failed': '定期便の決済に失敗したとき',
-  'ec.subscription.cancelled': '定期便が解約されたとき',
-};
-
-const ACTION_LABELS: Record<string, string> = {
-  add_tag: 'タグを追加',
-  remove_tag: 'タグを外す',
-  start_scenario: 'シナリオを開始',
-  send_message: 'メッセージを送信',
-  send_webhook: '外部連携へ送信',
-  switch_rich_menu: 'メニューを切り替え',
-  update_support_mark: '対応マークを変更',
-  add_mileage: 'マイルを追加',
-  common_action: '共通アクションを実行',
-  wait: '指定時間まで待機',
-};
-
 function actionLabels(value: string | null): string[] {
   if (!value) return [];
-  return value.split(' / ').filter(Boolean).map((item) => ACTION_LABELS[item] ?? '登録した処理');
+  return value.split(' / ').filter(Boolean).map(automationActionLabel);
 }
 
 function safeFailureReason(code: string | null, failedAction: string | null): string {
@@ -491,7 +464,7 @@ automations.get(
     const items: AutomationExecutionRun[] = result.rows.map((row) => {
       const successfulActions = actionLabels(row.successful_actions);
       const skippedActions = actionLabels(row.skipped_actions);
-      const failedAction = row.failed_action ? (ACTION_LABELS[row.failed_action] ?? '登録した処理') : null;
+      const failedAction = row.failed_action ? automationActionLabel(row.failed_action) : null;
       const failureReason = safeFailureReason(row.failure_code, failedAction);
       const statusLabel = DOMAIN_STATUS_TO_COMMON[row.status];
       const detail = row.status === 'skipped_condition'
@@ -509,7 +482,7 @@ automations.get(
         occurredAt: row.completed_at ?? row.started_at ?? row.created_at,
         subject: row.friend_name,
         accountLabel: row.account_name,
-        triggerLabel: TRIGGER_LABELS[row.trigger_type] ?? '登録したきっかけ',
+        triggerLabel: automationTriggerLabel(row.trigger_type),
         reference: null,
         status: statusLabel,
         detail,

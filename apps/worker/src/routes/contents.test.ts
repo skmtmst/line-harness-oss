@@ -31,7 +31,6 @@ const mocks = {
   countMedia: vi.fn(),
   getMediaById: vi.fn(),
   getFolderById: vi.fn(),
-  createMedia: vi.fn(),
   updateMedia: vi.fn(),
   deleteMedia: vi.fn(),
   getMediaUsages: vi.fn(),
@@ -282,7 +281,6 @@ beforeEach(() => {
   mocks.countMedia.mockResolvedValue(1);
   mocks.getMediaById.mockResolvedValue(MEDIA);
   mocks.getFolderById.mockResolvedValue({ id: 'folder-1', kind: 'media', name: '配信用' });
-  mocks.createMedia.mockResolvedValue(MEDIA);
   mocks.updateMedia.mockResolvedValue(MEDIA);
   mocks.countMediaUsages.mockResolvedValue(0);
   mocks.getMediaUsages.mockResolvedValue([]);
@@ -396,93 +394,18 @@ describe('メディアのアップロード', () => {
     expect(mocks.getMedia).not.toHaveBeenCalled();
   });
 
-  it('形式と拡張子が揃っていれば通る', async () => {
+  it('未使用のbase64登録口は閉じ、直接アップロード口だけを残す', async () => {
     const res = await req('/api/media', 'POST', {
-      accountId: 'account-1',
-      filename: 'a.png',
-      mimeType: 'image/png',
-      data: TINY_PNG,
+      accountId: 'account-1', filename: 'a.png', mimeType: 'image/png', data: TINY_PNG,
     });
-    expect(res.status).toBe(201);
-    expect(put).toHaveBeenCalled();
-  });
-
-  it('対応していない形式は弾く', async () => {
-    const res = await req('/api/media', 'POST', {
-      accountId: 'account-1',
-      filename: 'a.exe',
-      mimeType: 'application/x-msdownload',
-      data: TINY_PNG,
-    });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(404);
     expect(put).not.toHaveBeenCalled();
   });
 
-  it('中身と拡張子が食い違えば弾く', async () => {
-    // MIMEだけだと送る側が名乗った値をそのまま信じることになり、
-    // 拡張子だけだと中身が違うものを .png と名付けるだけで通る。
-    const res = await req('/api/media', 'POST', {
-      accountId: 'account-1',
-      filename: 'a.txt',
-      mimeType: 'image/png',
-      data: TINY_PNG,
-    });
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toContain('拡張子');
-    expect(put).not.toHaveBeenCalled();
-  });
-
-  it('ブラウザがPNGと申告しても実ファイルが違えば弾く', async () => {
-    const res = await req('/api/media', 'POST', {
-      accountId: 'account-1',
-      filename: 'a.png',
-      mimeType: 'image/png',
-      data: btoa('not png'),
-    });
-    expect(res.status).toBe(400);
-    expect(await res.json()).toMatchObject({ error: expect.stringContaining('実際の形式') });
-    expect(put).not.toHaveBeenCalled();
-  });
-
-  it('data: URL の種別を優先する', async () => {
-    const res = await req('/api/media', 'POST', {
-      accountId: 'account-1',
-      filename: 'a.png',
-      data: `data:image/png;base64,${TINY_PNG}`,
-    });
-    expect(res.status).toBe(201);
-  });
-
-  it('大きすぎるファイルは 413', async () => {
-    // 11MB ぶんの base64。上限は画像 10MB。
-    const big = 'A'.repeat(11 * 1024 * 1024 * 2);
-    const res = await req('/api/media', 'POST', {
-      accountId: 'account-1',
-      filename: 'a.png',
-      mimeType: 'image/png',
-      data: big,
-    });
-    expect(res.status).toBe(413);
-    expect(put).not.toHaveBeenCalled();
-  });
-
-  it('ファイル名が無ければ弾く', async () => {
-    const res = await req('/api/media', 'POST', { accountId: 'account-1', mimeType: 'image/png', data: TINY_PNG });
-    expect(res.status).toBe(400);
-  });
-
-  it('R2保存後にDB登録が失敗したら孤児ファイルを消す', async () => {
-    mocks.createMedia.mockRejectedValueOnce(new Error('D1 unavailable'));
-    const res = await req('/api/media', 'POST', {
-      accountId: 'account-1',
-      filename: 'a.png',
-      mimeType: 'image/png',
-      data: TINY_PNG,
-    });
-    expect(res.status).toBe(500);
-    expect(put).toHaveBeenCalled();
-    expect(del).toHaveBeenCalledWith(expect.stringMatching(/^media\/.+\.png$/));
+  it('未使用の単独使用先口は閉じ、削除影響口へ一本化する', async () => {
+    const res = await req('/api/media/md-1/usages?accountId=account-1', 'GET');
+    expect(res.status).toBe(404);
+    expect(mocks.getMediaUsages).not.toHaveBeenCalled();
   });
 });
 

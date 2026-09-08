@@ -7,7 +7,7 @@ import { useAccount } from '@/contexts/account-context'
 import { api, ApiError } from '@/lib/api'
 import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
 import type { RichMenuDeleteImpact, RichMenuTapStats } from '@/lib/api'
-import type { Folder } from '@line-crm/shared'
+import { RICH_MENU_DIMENSIONS, type Folder } from '@line-crm/shared'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import Button from '@/components/shared/button'
@@ -763,7 +763,9 @@ export default function RichMenusListPage() {
                             <div className="min-w-0">
                               <Link href={`/rich-menus/edit?id=${g.id}`} className="text-ink block truncate font-semibold hover:underline" title={g.name}>{g.name}</Link>
                               <p className="text-ink-faint mt-1 truncate text-xs" title={g.chatBarText}>
-                                {g.size === 'large' ? '大 2500 × 1686px' : '小 2500 × 843px'}・ボタン「{g.chatBarText}」
+                                {g.size === 'large'
+                                  ? `大 ${RICH_MENU_DIMENSIONS.large.width} × ${RICH_MENU_DIMENSIONS.large.height}px`
+                                  : `小 ${RICH_MENU_DIMENSIONS.compact.width} × ${RICH_MENU_DIMENSIONS.compact.height}px`}・ボタン「{g.chatBarText}」
                               </p>
                             </div>
                           </div>

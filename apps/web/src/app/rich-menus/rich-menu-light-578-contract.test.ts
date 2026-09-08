@@ -33,7 +33,7 @@ describe('#578 リッチメニューの軽整理', () => {
   it('画像エラーの英語原文をそのまま出さない', () => {
     expect(EDIT).toContain('imageUploadErrorText(e)')
     expect(EDIT).toContain('1MB以下の画像を選んでください')
-    expect(EDIT).toContain('2500×1686')
+    expect(EDIT).toContain('RICH_MENU_DIMENSIONS.large.width')
   })
 
   it('取り下げの部分的失敗を日本語の定型文に写す', () => {

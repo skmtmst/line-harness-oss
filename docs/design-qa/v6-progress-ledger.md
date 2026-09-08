@@ -183,7 +183,7 @@
 | 11 | `CzndJ` | 11-1-H フォルダ操作 | 5.1869% | 0px | 上部・左 | docs | [差分画像](templates-v6/CzndJ-diff-1920.png) | **一致** |
 | 11 | `NKyoA` | 11-1-I 一覧の状態（空・読込・エラー） | 2.6943% | 0px | 上部・左 | docs | [差分画像](templates-v6/NKyoA-diff-1920.png) | **一致** |
 | 12 | `GO8RQ` | 12-1 リッチメニュー | 3.6893% | 0px | 上部・左 | docs | [差分画像](rich-menus-v6/GO8RQ-diff-1920.png) | **一致** |
-| 12 | `XtfO3` | 12-1-A メニューを作る・形とボタン | 7.8355% | 0px | 上部・右 | docs | [差分画像](rich-menus-v6/XtfO3-diff-1920.png) | **一致** |
+| 12 | `XtfO3` | 12-1-A メニューを作る・形とボタン | 7.8855% | 0px | 上部・右 | docs | [差分画像](rich-menus-v6/XtfO3-diff-1920.png) | **一致** |
 | 12 | `kQ1bs` | 12-1-B メニューを作る・誰に出すか | 4.1634% | 0px | 中央・中央 | docs | [差分画像](rich-menus-v6/kQ1bs-diff-1920.png) | **一致** |
 | 12 | `DIUbO` | 12-1-C 切替メニューのつながり | 6.8123%（前回値） | 0px | 上部・右 | docs | [差分画像](rich-menus-v6/DIUbO-diff-1920.png) | **一致** |
 | 12 | `NXdDk` | 12-1-C-A つながりなし | 4.0928% | 0px | 上部・右 | docs | [差分画像](rich-menus-v6/NXdDk-diff-1920.png) | **一致** |

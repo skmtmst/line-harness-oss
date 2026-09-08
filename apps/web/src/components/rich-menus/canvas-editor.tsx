@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { RichMenuAreaIntent } from '@/lib/api'
+import { RICH_MENU_DIMENSIONS, type RichMenuAreaIntent } from '@line-crm/shared'
 
 export type Area = {
   id: string
@@ -24,11 +24,6 @@ export type Area = {
   formId?: string | null
   trackedLinkId?: string | null
 }
-
-const SIZE_DIMS = {
-  large: { width: 2500, height: 1686 },
-  compact: { width: 2500, height: 843 },
-} as const
 
 const SNAP_PX = 4
 const MIN_AREA = 20
@@ -97,7 +92,7 @@ export function CanvasEditor({
   onPreviewAction,
 }: Props) {
   const canvasRef = useRef<HTMLDivElement>(null)
-  const dims = SIZE_DIMS[size]
+  const dims = RICH_MENU_DIMENSIONS[size]
   const [scale, setScale] = useState(0.3)
   const [drag, setDrag] = useState<DragState>(null)
   /** 上限に当たったときの知らせ。**`alert()` の代わりに画面へ残す。** */

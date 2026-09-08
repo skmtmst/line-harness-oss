@@ -27,10 +27,14 @@ import {
   type RichMenuGroupWithPages,
   type RichMenuPageInput,
   type RichMenuAreaInput,
-  type RichMenuAreaIntent,
   type CreateRichMenuGroupInput,
   type UpdateRichMenuGroupMetaInput,
 } from '@line-crm/db';
+import {
+  RICH_MENU_ACTION_TYPE_BY_INTENT,
+  RICH_MENU_DIMENSIONS,
+  type RichMenuAreaIntent,
+} from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
@@ -161,16 +165,7 @@ const VALID_ACTION_TYPES = new Set(['uri', 'message', 'postback', 'richmenuswitc
 // 取りこぼしがあればここでコンパイルが落ちる。
 // （db 側の定数をそのまま使わないのは、この経路を試験するとき db 全体を
 //   差し替えることがあり、実行時の値が消えるため）
-const ACTION_TYPE_BY_INTENT: Record<RichMenuAreaIntent, RichMenuAreaInput['actionType']> = {
-  url: 'uri',
-  tel: 'uri',
-  form: 'uri',
-  text: 'message',
-  template: 'postback',
-  switch: 'richmenuswitch',
-  postback: 'postback',
-};
-const VALID_INTENTS = new Set<string>(Object.keys(ACTION_TYPE_BY_INTENT));
+const VALID_INTENTS = new Set<string>(Object.keys(RICH_MENU_ACTION_TYPE_BY_INTENT));
 
 /** 受けたJSONが `{...}` の形かを確かめる（`as` 断定の代わり）。 */
 function isJsonRecord(value: unknown): value is Record<string, unknown> {
@@ -239,7 +234,7 @@ function parseAreaInput(raw: unknown): Parsed<RichMenuAreaInput> {
   // 「切り替え先の解決」などが素通りして LINE 側が 400 を返す。
   const intent = (typeof r.intent === 'string' ? r.intent : null) as RichMenuAreaIntent | null;
   const actionType = intent
-    ? ACTION_TYPE_BY_INTENT[intent]
+    ? RICH_MENU_ACTION_TYPE_BY_INTENT[intent]
     : (r.actionType as RichMenuAreaInput['actionType']);
 
   return {
@@ -539,16 +534,18 @@ richMenuGroups.post('/api/rich-menu-groups/import', requireRole('owner', 'admin'
 
   // 2. size 判定
   const size: 'large' | 'compact' | null =
-    detail.size.width === 2500 && detail.size.height === 1686
+    detail.size.width === RICH_MENU_DIMENSIONS.large.width
+      && detail.size.height === RICH_MENU_DIMENSIONS.large.height
       ? 'large'
-      : detail.size.width === 2500 && detail.size.height === 843
+      : detail.size.width === RICH_MENU_DIMENSIONS.compact.width
+        && detail.size.height === RICH_MENU_DIMENSIONS.compact.height
         ? 'compact'
         : null;
   if (!size) {
     return c.json(
       {
         success: false,
-        error: `非対応サイズ ${detail.size.width}x${detail.size.height}。管理画面は 2500×1686 (Large) と 2500×843 (Compact) のみ対応しています。`,
+        error: `非対応サイズ ${detail.size.width}x${detail.size.height}。管理画面は ${RICH_MENU_DIMENSIONS.large.width}×${RICH_MENU_DIMENSIONS.large.height} (Large) と ${RICH_MENU_DIMENSIONS.compact.width}×${RICH_MENU_DIMENSIONS.compact.height} (Compact) のみ対応しています。`,
       },
       400,
     );

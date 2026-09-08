@@ -10,6 +10,8 @@
 // ここに無い形にしたいときは「自由に配置」を選び、編集画面で画像の上を
 // ドラッグして区切る。ボタンは1ページあたり20個まで置ける。
 
+import { RICH_MENU_DIMENSIONS } from '@line-crm/shared';
+
 export type RichMenuTemplate = {
   key: string;
   label: string;
@@ -18,10 +20,10 @@ export type RichMenuTemplate = {
   areas: { x: number; y: number; w: number; h: number }[];
 };
 
-const LARGE = { width: 2500, height: 1686 };
-const COMPACT = { width: 2500, height: 843 };
+const LARGE = RICH_MENU_DIMENSIONS.large;
+const COMPACT = RICH_MENU_DIMENSIONS.compact;
 
-export const SIZE_DIMENSIONS = { large: LARGE, compact: COMPACT } as const;
+export const SIZE_DIMENSIONS = RICH_MENU_DIMENSIONS;
 
 /** 縦 rows × 横 cols に等しく割る。**設計 `XtfO3` は「面」と呼ぶ。** */
 function grid(
