@@ -3987,7 +3987,7 @@ CREATE TABLE rich_menu_schedules (
   ended_run_id          TEXT,
   last_error_code       TEXT,
   created_at            TEXT NOT NULL,
-  updated_at            TEXT NOT NULL,
+  updated_at            TEXT NOT NULL, attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0), next_retry_at TEXT,
   CHECK (mode = 'scheduled' OR ends_at IS NOT NULL),
   UNIQUE (account_id, idempotency_key)
 );
@@ -6143,6 +6143,9 @@ CREATE INDEX idx_rich_menu_schedules_due
 
 CREATE INDEX idx_rich_menu_schedules_group
   ON rich_menu_schedules (group_id, created_at DESC);
+
+CREATE INDEX idx_rich_menu_schedules_retry
+  ON rich_menu_schedules (status, next_retry_at);
 
 CREATE INDEX idx_rt_approvals_queue ON rt_approval_requests(organization_id, status, created_at DESC);
 
