@@ -503,6 +503,7 @@ async function handleEvent(
           status: routing?.suppressed ? 'suppressed' : 'completed',
           routingRuleId: routing?.ruleId ?? null,
           winningRuleVersionId: routing?.ruleVersionId ?? null,
+          errorCode: routing?.suppressReason ?? null,
           scenarioEnrollmentId,
           deliveryCount: friendAddDeliveryCount,
         });

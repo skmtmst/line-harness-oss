@@ -115,6 +115,7 @@ import {
 } from '@line-crm/db';
 import { fireEvent } from '../services/event-bus.js';
 import { handleCarouselTap } from '../services/carousel-tap.js';
+import { applyFriendAddRouting } from '../services/friend-add-routing.js';
 import { webhook } from './webhook.js';
 
 function setupApp() {
@@ -192,7 +193,7 @@ describe('POST /webhook — V6 friend-add ledger', () => {
     });
     expect(markFriendAddEventRouting).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
       eventId: 'friend-add-event-1', lineAccountId: 'account-main', status: 'completed',
-      scenarioEnrollmentId: null, deliveryCount: 0,
+      errorCode: null, scenarioEnrollmentId: null, deliveryCount: 0,
     }));
   });
 });
@@ -721,5 +722,77 @@ describe('POST /webhook — first-contact existing friends', () => {
     expect(addTagToFriend).not.toHaveBeenCalled();
     expect(getEntryRouteByRefCode).not.toHaveBeenCalled();
     expect(getMessageTemplateById).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /webhook — friend-add抑止理由の台帳記録 (#622)', () => {
+  async function sendFollowWithRouting(routing: unknown) {
+    vi.mocked(verifySignature).mockResolvedValue(true);
+    vi.mocked(getLineAccounts).mockResolvedValue([{
+      id: 'account-main', channel_secret: 'env-default-secret',
+      channel_access_token: 'account-token', is_active: 1,
+    } as never]);
+    lineClientMocks.getProfile.mockResolvedValue({ displayName: '田中さん' });
+    vi.mocked(upsertFriend).mockResolvedValue({
+      id: 'friend-1', line_user_id: 'U-1', line_account_id: 'account-main',
+      unfollow_count: 1, created_at: '2026-01-01T00:00:00.000+09:00',
+      first_followed_at: '2026-01-01T00:00:00.000+09:00',
+    } as never);
+    vi.mocked(captureFriendAddEventAttribution).mockResolvedValue(null);
+    vi.mocked(getEntryRouteByRefCode).mockResolvedValue(null);
+    vi.mocked(getScenarios).mockResolvedValue([]);
+    vi.mocked(applyFriendAddRouting).mockResolvedValue(routing as never);
+
+    const waitUntil = vi.fn();
+    const response = await setupApp().request('/webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Line-Signature': 'x'.repeat(44) },
+      body: JSON.stringify({ events: [{
+        type: 'follow', webhookEventId: 'webhook-follow-1', timestamp: 1787530800000,
+        source: { type: 'user', userId: 'U-1' }, replyToken: 'reply-1',
+        follow: { isUnblocked: false },
+      }] }),
+    }, baseEnv, { ...baseExecutionCtx, waitUntil } as ExecutionContext);
+    expect(response.status).toBe(200);
+    await (waitUntil.mock.calls[0]?.[0] as Promise<void>);
+  }
+
+  const suppressedCases = [
+    'outside_weekday',
+    'outside_time_window',
+    'friend_condition_not_met',
+    'friend_condition_unreadable',
+    'resend_suppressed',
+    'delivery_disabled',
+  ] as const;
+
+  test.each(suppressedCases)('抑止時は status=suppressed と理由 %s を error_code へ記録する', async (reason) => {
+    await sendFollowWithRouting({
+      routed: true, kind: 'returning', enrollments: [], timing: 'immediate',
+      suppressed: true, suppressReason: reason, ruleId: 'rule-1', ruleVersionId: 'rule-1-v1',
+    });
+    expect(markFriendAddEventRouting).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
+      eventId: 'friend-add-event-1', lineAccountId: 'account-main',
+      status: 'suppressed', errorCode: reason,
+    }));
+  });
+
+  test('送信時は status=completed と errorCode=null を記録する', async () => {
+    await sendFollowWithRouting({
+      routed: true, kind: 'returning', enrollments: [], timing: 'immediate',
+      suppressed: false, suppressReason: null, ruleId: 'rule-1', ruleVersionId: 'rule-1-v1',
+    });
+    expect(markFriendAddEventRouting).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
+      eventId: 'friend-add-event-1', lineAccountId: 'account-main',
+      status: 'completed', errorCode: null,
+    }));
+  });
+
+  test('設定なしの受け皿経路は completed のまま壊さない', async () => {
+    await sendFollowWithRouting({ routed: false, suppressed: false, enrollments: [] });
+    expect(markFriendAddEventRouting).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
+      eventId: 'friend-add-event-1', lineAccountId: 'account-main',
+      status: 'completed', errorCode: null,
+    }));
   });
 });
