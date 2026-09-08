@@ -337,4 +337,35 @@ describe('runEventBookingExpirer の V6 連動', () => {
       error.mockRestore();
     }
   });
+
+  test('期限切れ・取消ずみの取りこぼしは修復走査で止める', async () => {
+    const { db, raw } = createTestD1();
+    seedBase(raw);
+    // 業務は終わっているのに V6 が active のまま (部分失敗・手動取消の残り)。
+    seedEventBooking(raw, 'v6ev-leftover', {
+      accountId: ACCOUNT_1, eventId: 'v6ev-event-1', slotId: 'v6ev-slot-a',
+      friendId: 'v6ev-f1', requestedAt: STALE_AT, status: 'expired',
+    });
+    seedEventBooking(raw, 'v6ev-cancelled', {
+      accountId: ACCOUNT_1, eventId: 'v6ev-event-1', slotId: 'v6ev-slot-b',
+      friendId: 'v6ev-f1', requestedAt: STALE_AT, status: 'cancelled',
+    });
+    for (const [id, startsAt] of [['v6ev-leftover', STARTS_A], ['v6ev-cancelled', STARTS_B]] as const) {
+      await enrollByTrigger(db, {
+        triggerType: 'event', friendId: 'v6ev-f1', startsAtIso: startsAt,
+        sourceId: id, sourceEventId: id,
+      });
+    }
+    const leftoverId = enrollmentBySource(raw, 'v6ev-leftover').id;
+    const cancelledId = enrollmentBySource(raw, 'v6ev-cancelled').id;
+
+    const result = await runEventBookingExpirer(db, { now: NOW_V6 });
+    expect(result.expired).toBe(0);
+    expect(enrollmentBySource(raw, 'v6ev-leftover')).toEqual({
+      id: leftoverId, status: 'cancelled', cancel_reason: 'event_repair:v6ev-leftover:by:system',
+    });
+    expect(enrollmentBySource(raw, 'v6ev-cancelled')).toEqual({
+      id: cancelledId, status: 'cancelled', cancel_reason: 'event_repair:v6ev-cancelled:by:system',
+    });
+  });
 });

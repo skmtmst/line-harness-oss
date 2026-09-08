@@ -51,6 +51,11 @@ describe('processDueMeetConsultationReminders', () => {
         return {
           bind(...args: unknown[]) {
             return {
+              async first() {
+                // 送信直前の再確認用。confirmed なら送る。
+                if (sql.includes('FROM meet_consultations')) return { status: 'confirmed' };
+                return null;
+              },
               async all() {
                 if (!sql.includes('FROM meet_consultation_reminders r')) return { results: [] };
                 return {
@@ -100,6 +105,58 @@ describe('processDueMeetConsultationReminders', () => {
       '2026-08-09T00:00:00.000Z',
       '2026-08-09T00:00:00.000Z',
       '6db37bc2-f0c4-4fa8-baa6-5ec7069e1165',
+    ]);
+  });
+
+  it('取消ずみの相談は送らず、予定を止める (送信直前の再確認)', async () => {
+    const updates: unknown[][] = [];
+    const db = {
+      prepare(sql: string) {
+        return {
+          bind(...args: unknown[]) {
+            return {
+              async first() {
+                if (sql.includes('FROM meet_consultations')) return { status: 'cancelled' };
+                return null;
+              },
+              async all() {
+                if (!sql.includes('FROM meet_consultation_reminders r')) return { results: [] };
+                return {
+                  results: [{
+                    id: 'reminder-cancelled-1',
+                    consultation_id: 'consultation-9',
+                    kind: 'hour_before',
+                    retry_count: 0,
+                    title: 'AI導入 個別相談',
+                    starts_at: '2026-08-09T01:00:00.000Z',
+                    meet_url: 'https://meet.google.com/abc-defg-hij',
+                    line_user_id: 'U00000000000000000000000000000000',
+                    channel_access_token: 'channel-token',
+                  }],
+                };
+              },
+              async run() {
+                updates.push(args);
+                return { success: true };
+              },
+            };
+          },
+        };
+      },
+    } as unknown as D1Database;
+
+    const dispatch = vi.fn(async () => new Response('{}', { status: 200 }));
+    const result = await processDueMeetConsultationReminders(db, {
+      now: new Date('2026-08-09T00:00:00.000Z'),
+      proxyBaseUrl: 'https://proxy.example.com',
+      proxyDispatch: dispatch,
+    });
+
+    expect(result).toEqual({ sent: 0, failed: 0 });
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(updates).toContainEqual([
+      '2026-08-09T00:00:00.000Z',
+      'reminder-cancelled-1',
     ]);
   });
 });

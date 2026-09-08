@@ -2358,7 +2358,7 @@ describe('LIFF POST /api/liff/events/me/:bookingId/cancel', () => {
     expect(res.status).toBe(409);
   });
 
-  test('409 invalid_state for already-cancelled booking', async () => {
+  test('200 retry for already-cancelled booking repairs V6 instead of 409 (N-065)', async () => {
     const futureMs = Date.now() + 7 * 24 * 3600_000;
     const state = {
       events: [baseEvent({ id: 'e1', line_account_id: 'la1', is_published: 1, cancel_deadline_hours_before: 24 })],
@@ -2373,7 +2373,8 @@ describe('LIFF POST /api/liff/events/me/:bookingId/cancel', () => {
       method: 'POST',
       headers: { 'Authorization': 'Bearer t' },
     });
-    expect(res.status).toBe(409);
+    // N-065: V6 取消が投げた直後の再送は、業務が済みでも V6 だけ直して 200 を返す。
+    expect(res.status).toBe(200);
   });
 
   test('404 cross-friend cancel', async () => {

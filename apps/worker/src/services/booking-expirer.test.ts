@@ -329,4 +329,72 @@ describe('runExpirer の V6 連動', () => {
       error.mockRestore();
     }
   });
+
+  test('期限切れずみの取りこぼしは修復走査で止める', async () => {
+    const { db, raw } = createTestD1();
+    seedBase(raw);
+    // 業務は期限切れずみだが V6 が active のまま (部分失敗の残り)。
+    seedBooking(raw, 'v6ex-leftover', {
+      accountId: ACCOUNT_1, friendId: 'v6ex-f1', menuId: 'v6ex-menu-1',
+      staffId: 'v6ex-staff-1', startsAt: STARTS_A, requestedAt: STALE_AT, status: 'expired',
+    });
+    await enrollByTrigger(db, {
+      triggerType: 'booking', friendId: 'v6ex-f1', startsAtIso: STARTS_A,
+      sourceId: 'v6ex-leftover', sourceEventId: 'v6ex-leftover',
+    });
+
+    const sender = vi.fn().mockResolvedValue(undefined);
+    const before = enrollmentBySource(raw, 'v6ex-leftover');
+    const result = await runExpirer(db, { now: NOW_V6, sender });
+    expect(result.expired).toBe(0);
+    expect(sender).not.toHaveBeenCalled();
+    expect(enrollmentBySource(raw, 'v6ex-leftover')).toEqual({
+      id: before.id,
+      status: 'cancelled',
+      cancel_reason: 'booking_repair:v6ex-leftover:by:system',
+    });
+  });
+
+  test('V6 失敗の行は次回 cron の修復走査で回復する (失敗注入)', async () => {
+    const { db, raw } = createTestD1();
+    seedBase(raw);
+    seedBooking(raw, 'v6ex-stale', {
+      accountId: ACCOUNT_1, friendId: 'v6ex-f1', menuId: 'v6ex-menu-1',
+      staffId: 'v6ex-staff-1', startsAt: STARTS_A, requestedAt: STALE_AT, status: 'requested',
+    });
+    await enrollByTrigger(db, {
+      triggerType: 'booking', friendId: 'v6ex-f1', startsAtIso: STARTS_A,
+      sourceId: 'v6ex-stale', sourceEventId: 'v6ex-stale',
+    });
+    // 1回目: V6 層だけ壊す。業務は進み、V6 が残る。
+    const flaky = {
+      ...db,
+      prepare: (sql: string) => {
+        if (sql.includes('friend_reminders')) throw new Error('injected V6 failure');
+        return (db as unknown as Record<string, (sql: string) => unknown>).prepare(sql);
+      },
+    } as unknown as D1Database;
+    const sender = vi.fn().mockResolvedValue(undefined);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const first = await runExpirer(flaky, { now: NOW_V6, sender });
+      expect(first.expired).toBe(1);
+      expect(raw.prepare(`SELECT status FROM bookings WHERE id = 'v6ex-stale'`).get()).toEqual({
+        status: 'expired',
+      });
+      expect(enrollmentBySource(raw, 'v6ex-stale').status).toBe('active');
+
+      // 2回目: 層を直して再実行。期限切れは0件だが修復走査が V6 を止める。
+      const staleId = enrollmentBySource(raw, 'v6ex-stale').id;
+      const second = await runExpirer(db, { now: NOW_V6, sender });
+      expect(second.expired).toBe(0);
+      expect(enrollmentBySource(raw, 'v6ex-stale')).toEqual({
+        id: staleId,
+        status: 'cancelled',
+        cancel_reason: 'booking_repair:v6ex-stale:by:system',
+      });
+    } finally {
+      error.mockRestore();
+    }
+  });
 });

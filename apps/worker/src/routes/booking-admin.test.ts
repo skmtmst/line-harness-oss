@@ -729,3 +729,79 @@ describe('jstDayWindowUtc', () => {
     expect(jstDayWindowUtc('2026-11-09').startUtc).toBe('2026-11-08T15:00:00.000Z');
   });
 });
+
+describe('PATCH /api/booking/admin/requests/:id の再試行 (N-065)', () => {
+  test('取消ずみへの再送は409にせずV6だけ止める', async () => {
+    const sqlite = new Database(':memory:');
+    try {
+      sqlite.exec(readFileSync(join(process.cwd(), '../../packages/db/bootstrap.sql'), 'utf8'));
+      sqlite.exec(`
+        INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+        VALUES ('acc1','channel-1','A店','token','secret');
+        INSERT INTO staff (id, line_account_id, name, display_name)
+        VALUES ('s1','acc1','担当A','担当A'), ('owner-1','acc1','Owner','Owner');
+        INSERT INTO friends (id, line_user_id, display_name, line_account_id, is_following, created_at, updated_at)
+        VALUES ('f1','U1','花子','acc1',1,'2026-01-01T00:00:00.000','2026-01-01T00:00:00.000');
+        INSERT INTO menus (
+          id, line_account_id, name, duration_minutes, buffer_after_minutes,
+          base_price, concurrent_capacity
+        ) VALUES ('m1','acc1','相談',60,10,8000,1);
+        INSERT INTO reminders
+          (id, name, line_account_id, is_active, trigger_type, delivery_mode, lifecycle_status)
+        VALUES ('rb-rule','rule','acc1',1,'booking','countdown','published');
+        INSERT INTO reminder_steps (id, reminder_id, offset_minutes, message_type, message_content)
+        VALUES ('rb-step','rb-rule',-60,'text','ご来店をお待ちしています');
+        INSERT INTO bookings (
+          id, line_account_id, friend_id, staff_id, menu_id,
+          starts_at, ends_at, block_ends_at, status, price_at_booking, requested_at
+        ) VALUES (
+          'RB1','acc1','f1','s1','m1',
+          '2026-09-20T01:00:00.000Z','2026-09-20T02:00:00.000Z','2026-09-20T02:00:00.000Z',
+          'cancelled',8000,'2026-09-01T00:00:00.000Z'
+        );
+        INSERT INTO friend_reminders (
+          id, friend_id, reminder_id, target_date, status,
+          source_kind, source_id, source_event_id
+        ) VALUES (
+          'FR1','f1','rb-rule','2026-09-20T01:00:00.000Z','active',
+          'booking','RB1','RB1'
+        );
+        INSERT INTO reminder_delivery_runs (
+          id, line_account_id, reminder_id, friend_reminder_id, friend_id,
+          reminder_step_id, scheduled_at, idempotency_key, line_retry_key,
+          status, created_at, updated_at
+        ) VALUES (
+          'RUN1','acc1','rb-rule','FR1','f1',
+          'rb-step','2026-09-20T00:00:00.000Z','idem-1','retry-1',
+          'queued','2026-09-01T00:00:00.000Z','2026-09-01T00:00:00.000Z'
+        );
+      `);
+      const { app, env } = makeApp(sqliteAsD1(sqlite));
+      const send = () => app.request(
+        '/api/booking/admin/requests/RB1?account_id=acc1',
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ action: 'cancel' }),
+          headers: { 'Content-Type': 'application/json' },
+        },
+        env,
+        execCtx,
+      );
+      // 業務は取消ずみだが V6 が残っている (部分失敗の残り)。再送で V6 を止める。
+      const res = await send();
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toEqual({ status: 'cancelled' });
+      expect(sqlite.prepare(`SELECT status FROM friend_reminders WHERE id = 'FR1'`).get()).toEqual({
+        status: 'cancelled',
+      });
+      expect(sqlite.prepare(`SELECT status FROM reminder_delivery_runs WHERE id = 'RUN1'`).get()).toEqual({
+        status: 'cancelled',
+      });
+      // 2回目は無変更でも200 (冪等)。
+      const again = await send();
+      expect(again.status).toBe(200);
+    } finally {
+      sqlite.close();
+    }
+  });
+});

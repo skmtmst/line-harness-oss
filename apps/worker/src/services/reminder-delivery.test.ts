@@ -303,4 +303,44 @@ describe('リマインダ配信の実行記録', () => {
       next_retry_at: '2026-08-28T09:02:00.000Z',
     })
   })
+
+  it('取消と競合した通は送らず止める (claimed 後の取消も送らない)', async () => {
+    const { db, raw } = createTestD1()
+    seedReminder(raw)
+    insertFriend(raw, 'friend-2', {
+      line_user_id: 'U-friend-2',
+      line_account_id: 'account-1',
+      display_name: '佐藤たろう',
+    })
+    raw.prepare(
+      `INSERT INTO friend_reminders
+         (id, friend_id, reminder_id, target_date, status)
+       VALUES ('enrollment-2', 'friend-2', 'reminder-1', '2026-08-28T10:00:00.000Z', 'active')`,
+    ).run()
+    const pushes: string[] = []
+    const client = makeClient(async (userId) => {
+      pushes.push(userId)
+      return { requestId: null }
+    })
+
+    const result = await processReminderDeliveries(db, client, {
+      now: new Date('2026-08-28T09:00:00.000Z'),
+      // 2件目の claim と送信の割り込みで取消が入った想定。再確認で止める。
+      pause: async () => {
+        await db.prepare(
+          `UPDATE friend_reminders SET status = 'cancelled', updated_at = ? WHERE id = 'enrollment-2'`,
+        ).bind('2026-08-28T09:00:00.000Z').run()
+      },
+      resolveClient: async () => client,
+    })
+
+    expect(pushes).toEqual(['U-friend-1'])
+    expect(result).toEqual({ succeeded: 1, skipped: 1, retrying: 0, failed: 0 })
+    expect(raw.prepare(
+      `SELECT status FROM reminder_delivery_runs WHERE friend_reminder_id = 'enrollment-2'`,
+    ).get()).toEqual({ status: 'cancelled' })
+    expect(raw.prepare(
+      `SELECT status FROM friend_reminders WHERE id = 'enrollment-2'`,
+    ).get()).toEqual({ status: 'cancelled' })
+  })
 })

@@ -8,7 +8,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js';
-import { cancelByTrigger, enrollByTrigger, rescheduleByTrigger } from './reminder-trigger.js';
+import { getFriendReminderStatus } from '@line-crm/db';
+import { cancelByTrigger, enrollByTrigger, reconcileV6ToStartsAt, rescheduleByTrigger } from './reminder-trigger.js';
 import {
   cancelMeetConsultation,
   registerMeetConsultation,
@@ -49,13 +50,24 @@ function enrollmentId(raw: import('better-sqlite3').Database, friendId: string):
   return row.id;
 }
 
+function seedRule(
+  raw: import('better-sqlite3').Database,
+  id: string,
+  triggerType: 'booking' | 'event' | 'manual',
+): void {
+  seedTriggerRule(raw, id, triggerType as 'booking' | 'event');
+  if (triggerType === 'manual') {
+    raw.prepare(`UPDATE reminders SET trigger_type = 'manual' WHERE id = ?`).run(id);
+  }
+}
+
 function seedRun(
   raw: import('better-sqlite3').Database,
   id: string,
   enrollmentIdValue: string,
   friendId: string,
   reminderId: string,
-  status: 'queued' | 'succeeded',
+  status: 'queued' | 'claimed' | 'retry_wait' | 'succeeded',
   scheduledAt: string,
 ): void {
   raw.prepare(
@@ -411,5 +423,293 @@ describe('個別相談の取消・日程変更', () => {
   it('存在しない相談の取消は false で何もしない', async () => {
     const { db } = createTestD1();
     expect(await cancelMeetConsultation(db, 'no-such-event', new Date())).toBe(false);
+  });
+});
+
+describe('取消と配信の競合', () => {
+  it('claimed の実行行も止め、送信直前の再確認で送らない', async () => {
+    const { db, raw } = createTestD1();
+    seedAccount(raw, ACCOUNT_1);
+    insertFriend(raw, 'friend-1', { line_account_id: ACCOUNT_1 });
+    seedTriggerRule(raw, 'rule-booking-1', 'booking');
+
+    await enrollByTrigger(db, {
+      triggerType: 'booking',
+      friendId: 'friend-1',
+      startsAtIso: '2026-09-20T01:00:00.000Z',
+      sourceId: 'bk-1',
+      sourceEventId: 'bk-1',
+    });
+    const enrollment = enrollmentId(raw, 'friend-1');
+    // 送信中 (claimed) と再試行待ちの行が残っていても取消で止める。
+    seedRun(raw, 'run-claimed', enrollment, 'friend-1', 'rule-booking-1', 'claimed', '2026-09-20T00:00:00.000Z');
+    seedRun(raw, 'run-wait', enrollment, 'friend-1', 'rule-booking-1', 'retry_wait', '2026-09-20T00:01:00.000Z');
+
+    const result = await cancelByTrigger(db, {
+      triggerType: 'booking',
+      sourceId: 'bk-1',
+      sourceEventId: 'bk-1',
+      friendId: 'friend-1',
+      startsAtIso: '2026-09-20T01:00:00.000Z',
+      lineAccountId: ACCOUNT_1,
+      cancelReason: 'booking_cancel:bk-1:by:staff-9',
+    });
+    expect(result).toEqual({ cancelledEnrollments: 1, cancelledRuns: 2 });
+    expect(raw.prepare(`SELECT status FROM reminder_delivery_runs WHERE id = 'run-claimed'`).get()).toEqual({
+      status: 'cancelled',
+    });
+    expect(raw.prepare(`SELECT status FROM reminder_delivery_runs WHERE id = 'run-wait'`).get()).toEqual({
+      status: 'cancelled',
+    });
+    // 配信側の送信直前の再確認も取消を見る (配信は送らない)。
+    expect(await getFriendReminderStatus(db, enrollment)).toBe('cancelled');
+  });
+});
+
+describe('部分失敗後の再試行', () => {
+  it('業務ずみでも V6 取消を再実行できる (booking)', async () => {
+    const { db, raw } = createTestD1();
+    seedAccount(raw, ACCOUNT_1);
+    insertFriend(raw, 'friend-1', { line_account_id: ACCOUNT_1 });
+    seedTriggerRule(raw, 'rule-booking-1', 'booking');
+
+    // 1回目で業務だけ終わり V6 が残った想定。2回目の取消は V6 を止める。
+    await enrollByTrigger(db, {
+      triggerType: 'booking',
+      friendId: 'friend-1',
+      startsAtIso: '2026-09-20T01:00:00.000Z',
+      sourceId: 'bk-1',
+      sourceEventId: 'bk-1',
+    });
+    const input = {
+      triggerType: 'booking' as const,
+      sourceId: 'bk-1',
+      sourceEventId: 'bk-1',
+      friendId: 'friend-1',
+      startsAtIso: '2026-09-20T01:00:00.000Z',
+      lineAccountId: ACCOUNT_1,
+      cancelReason: 'booking_cancel:bk-1:by:staff-9-retry',
+    };
+    expect(await cancelByTrigger(db, input)).toEqual({ cancelledEnrollments: 1, cancelledRuns: 0 });
+    // 3回目は無変更 (冪等)。
+    expect(await cancelByTrigger(db, input)).toEqual({ cancelledEnrollments: 0, cancelledRuns: 0 });
+    expect(raw.prepare(`SELECT COUNT(*) AS c FROM friend_reminders`).get()).toEqual({ c: 1 });
+  });
+
+  it('業務ずみでも V6 取消を再実行できる (event)', async () => {
+    const { db, raw } = createTestD1();
+    seedAccount(raw, ACCOUNT_1);
+    insertFriend(raw, 'friend-1', { line_account_id: ACCOUNT_1 });
+    seedTriggerRule(raw, 'rule-event-1', 'event');
+
+    await enrollByTrigger(db, {
+      triggerType: 'event',
+      friendId: 'friend-1',
+      startsAtIso: '2026-09-20T01:00:00.000Z',
+      sourceId: 'eb-1',
+      sourceEventId: 'eb-1',
+    });
+    const input = {
+      triggerType: 'event' as const,
+      sourceId: 'eb-1',
+      sourceEventId: 'eb-1',
+      friendId: 'friend-1',
+      startsAtIso: '2026-09-20T01:00:00.000Z',
+      lineAccountId: ACCOUNT_1,
+      cancelReason: 'event_reject:eb-1:by:admin-retry',
+    };
+    expect(await cancelByTrigger(db, input)).toEqual({ cancelledEnrollments: 1, cancelledRuns: 0 });
+    expect(await cancelByTrigger(db, input)).toEqual({ cancelledEnrollments: 0, cancelledRuns: 0 });
+  });
+});
+
+describe('Meet の友だち変更', () => {
+  it('旧 friend の active 登録/run を残さない', async () => {
+    const { db, raw } = createTestD1();
+    seedAccount(raw, ACCOUNT_1);
+    insertFriend(raw, 'friend-1', { line_account_id: ACCOUNT_1 });
+    insertFriend(raw, 'friend-2', { line_account_id: ACCOUNT_1 });
+    seedTriggerRule(raw, 'rule-booking-1', 'booking');
+
+    const now = new Date('2026-09-01T00:00:00.000Z');
+    await registerMeetConsultation(
+      db,
+      meetInput('google-event-a', '2026-09-20T01:00:00.000Z', '2026-09-20T01:30:00.000Z', 'friend-1'),
+      now,
+    );
+    const oldEnrollment = enrollmentId(raw, 'friend-1');
+    seedRun(raw, 'run-old', oldEnrollment, 'friend-1', 'rule-booking-1', 'queued', '2026-09-20T00:00:00.000Z');
+
+    // 同じ相談を別 friend へ変える。
+    await registerMeetConsultation(
+      db,
+      meetInput('google-event-a', '2026-09-20T01:00:00.000Z', '2026-09-20T01:30:00.000Z', 'friend-2'),
+      now,
+    );
+
+    // 旧 friend 側は止まり、新 friend 側だけ active。
+    expect(raw.prepare(`SELECT status FROM friend_reminders WHERE id = ?`).get(oldEnrollment)).toEqual({
+      status: 'cancelled',
+    });
+    expect(raw.prepare(`SELECT status FROM reminder_delivery_runs WHERE id = 'run-old'`).get()).toEqual({
+      status: 'cancelled',
+    });
+    expect(
+      raw.prepare(
+        `SELECT friend_id, status FROM friend_reminders WHERE status = 'active'`,
+      ).all(),
+    ).toEqual([{ friend_id: 'friend-2', status: 'active' }]);
+  });
+
+  it('取りこぼしの旧 friend 行は再送で直る', async () => {
+    const { db, raw } = createTestD1();
+    seedAccount(raw, ACCOUNT_1);
+    insertFriend(raw, 'friend-1', { line_account_id: ACCOUNT_1 });
+    insertFriend(raw, 'friend-2', { line_account_id: ACCOUNT_1 });
+    seedTriggerRule(raw, 'rule-booking-1', 'booking');
+
+    const now = new Date('2026-09-01T00:00:00.000Z');
+    await registerMeetConsultation(
+      db,
+      meetInput('google-event-a', '2026-09-20T01:00:00.000Z', '2026-09-20T01:30:00.000Z', 'friend-1'),
+      now,
+    );
+    // 途中失敗を再現: 業務だけ新 friend へ進み、V6 が旧 friend のまま残る。
+    raw.prepare(`UPDATE meet_consultations SET friend_id = 'friend-2' WHERE external_event_id = ?`)
+      .run('google-event-a');
+
+    await registerMeetConsultation(
+      db,
+      meetInput('google-event-a', '2026-09-20T01:00:00.000Z', '2026-09-20T01:30:00.000Z', 'friend-2'),
+      now,
+    );
+
+    expect(
+      raw.prepare(`SELECT friend_id, status FROM friend_reminders WHERE friend_id = 'friend-1'`).get(),
+    ).toEqual({ friend_id: 'friend-1', status: 'cancelled' });
+    expect(
+      raw.prepare(`SELECT friend_id, status FROM friend_reminders WHERE friend_id = 'friend-2'`).get(),
+    ).toEqual({ friend_id: 'friend-2', status: 'active' });
+  });
+});
+
+describe('日程変更の途中失敗', () => {
+  it('再送で V6 が新起点へ直る (Meet)', async () => {
+    const { db, raw } = createTestD1();
+    seedAccount(raw, ACCOUNT_1);
+    insertFriend(raw, 'friend-1', { line_account_id: ACCOUNT_1 });
+    seedTriggerRule(raw, 'rule-booking-1', 'booking');
+
+    const now = new Date('2026-09-01T00:00:00.000Z');
+    await registerMeetConsultation(
+      db,
+      meetInput('google-event-a', '2026-09-20T01:00:00.000Z', '2026-09-20T01:30:00.000Z'),
+      now,
+    );
+    const enrollment = enrollmentId(raw, 'friend-1');
+    seedRun(raw, 'run-old', enrollment, 'friend-1', 'rule-booking-1', 'queued', '2026-09-20T00:00:00.000Z');
+    // 途中失敗を再現: 業務だけ新日へ進み、V6 が旧日のまま残る。
+    raw.prepare(`UPDATE meet_consultations SET starts_at = ?, ends_at = ? WHERE external_event_id = ?`)
+      .run('2026-09-27T01:00:00.000Z', '2026-09-27T01:30:00.000Z', 'google-event-a');
+
+    await registerMeetConsultation(
+      db,
+      meetInput('google-event-a', '2026-09-27T01:00:00.000Z', '2026-09-27T01:30:00.000Z'),
+      now,
+    );
+
+    // 行を増やさず新起点へ直り、旧 run は止まる。
+    expect(raw.prepare(`SELECT COUNT(*) AS c FROM friend_reminders`).get()).toEqual({ c: 1 });
+    expect(raw.prepare(`SELECT target_date, status FROM friend_reminders WHERE id = ?`).get(enrollment)).toEqual({
+      target_date: '2026-09-27T01:00:00.000Z',
+      status: 'active',
+    });
+    expect(raw.prepare(`SELECT status FROM reminder_delivery_runs WHERE id = 'run-old'`).get()).toEqual({
+      status: 'cancelled',
+    });
+  });
+
+  it('reconcile は整合済みなら何もしない (冪等)', async () => {
+    const { db, raw } = createTestD1();
+    seedAccount(raw, ACCOUNT_1);
+    insertFriend(raw, 'friend-1', { line_account_id: ACCOUNT_1 });
+    seedTriggerRule(raw, 'rule-booking-1', 'booking');
+
+    const now = new Date('2026-09-01T00:00:00.000Z');
+    const registered = await registerMeetConsultation(
+      db,
+      meetInput('google-event-b', '2026-09-20T01:00:00.000Z', '2026-09-20T01:30:00.000Z'),
+      now,
+    );
+    const healed = await reconcileV6ToStartsAt(db, {
+      triggerType: 'booking',
+      sourceKind: 'meet',
+      sourceId: registered.id,
+      sourceEventId: 'google-event-b',
+      friendId: 'friend-1',
+      startsAtIso: '2026-09-20T01:00:00.000Z',
+    });
+    expect(healed).toEqual({ healedEnrollments: 0, cancelledStale: 0, cancelledRuns: 0 });
+  });
+});
+
+describe('同時刻の曖昧さ', () => {
+  it('取消は同時刻の手動登録・別ルールの別予約へ触れない。再送も同様', async () => {
+    const { db, raw } = createTestD1();
+    seedAccount(raw, ACCOUNT_1);
+    insertFriend(raw, 'friend-1', { line_account_id: ACCOUNT_1 });
+    seedTriggerRule(raw, 'rule-booking-1', 'booking');
+    seedTriggerRule(raw, 'rule-booking-2', 'booking');
+    seedRule(raw, 'rule-manual-1', 'manual');
+
+    const startsAt = '2026-09-20T01:00:00.000Z';
+    // 移行前の行 (source 未記録): booking ルールのものだけ止める。
+    raw.prepare(
+      `INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status)
+       VALUES ('legacy-booking', 'friend-1', 'rule-booking-1', ?, 'active')`,
+    ).run(startsAt);
+    // 同時刻の手動登録は残す。
+    raw.prepare(
+      `INSERT INTO friend_reminders
+         (id, friend_id, reminder_id, target_date, status, source_kind)
+       VALUES ('manual-1', 'friend-1', 'rule-manual-1', ?, 'active', 'manual')`,
+    ).run(startsAt);
+    // 同時刻の別ルールの別予約 (source あり) は残す。
+    raw.prepare(
+      `INSERT INTO friend_reminders
+         (id, friend_id, reminder_id, target_date, status,
+          source_kind, source_id, source_event_id)
+       VALUES ('other-booking', 'friend-1', 'rule-booking-2', ?, 'active',
+               'booking', 'bk-9', 'bk-9')`,
+    ).run(startsAt);
+
+    const input = {
+      triggerType: 'booking' as const,
+      sourceId: 'bk-1',
+      sourceEventId: 'bk-1',
+      friendId: 'friend-1',
+      startsAtIso: startsAt,
+      lineAccountId: ACCOUNT_1,
+      cancelReason: 'booking_cancel:bk-1:by:staff-9',
+    };
+    expect(await cancelByTrigger(db, input)).toEqual({ cancelledEnrollments: 1, cancelledRuns: 0 });
+    expect(raw.prepare(`SELECT status FROM friend_reminders WHERE id = 'legacy-booking'`).get()).toEqual({
+      status: 'cancelled',
+    });
+    expect(raw.prepare(`SELECT status FROM friend_reminders WHERE id = 'manual-1'`).get()).toEqual({
+      status: 'active',
+    });
+    expect(raw.prepare(`SELECT status FROM friend_reminders WHERE id = 'other-booking'`).get()).toEqual({
+      status: 'active',
+    });
+
+    // 同じ取消通知の再送でも別予約・手動登録へ触れない。
+    expect(await cancelByTrigger(db, input)).toEqual({ cancelledEnrollments: 0, cancelledRuns: 0 });
+    expect(raw.prepare(`SELECT status FROM friend_reminders WHERE id = 'manual-1'`).get()).toEqual({
+      status: 'active',
+    });
+    expect(raw.prepare(`SELECT status FROM friend_reminders WHERE id = 'other-booking'`).get()).toEqual({
+      status: 'active',
+    });
   });
 });
