@@ -128,7 +128,10 @@ function app() {
   a.get('/api/meet-consultations', (c) => c.json({ success: true }));
   a.post('/api/meet-consultations', (c) => c.json({ success: true }));
   a.delete('/api/meet-consultations/:externalEventId', (c) => c.json({ success: true }));
-  a.put('/api/events/admin/events/:id/slots/:slotId', (c) => c.json({ success: true }));
+  // 本番で staff 到達可な予約口だけを載せる (枠の作成・変更・削除は owner/admin 専用のため除外)。
+  a.put('/api/events/admin/events/:id/bookings/:bookingId', (c) => c.json({ success: true }));
+  a.post('/api/events/admin/events/:id/bookings/:bookingId/decide', (c) => c.json({ success: true }));
+  a.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', (c) => c.json({ success: true }));
   a.get('/api/nen-members/photos', (c) => c.json({ success: true }));
   a.get('/api/nen-members/photos/photo-1/assets/status', (c) => c.json({ success: true }));
   a.post('/api/nen-members/photos/photo-1/review', (c) => c.json({ success: true }));
@@ -516,14 +519,33 @@ describe('staff feature permissions', () => {
       .toBe(403);
   });
 
-  test('events permission protects slot time changes (N-065 #623)', async () => {
-    const path = '/api/events/admin/events/ev-1/slots/slot-1';
-    expect((await app().request(path, { ...bearer('events-key'), method: 'PUT' }, crossSiteEnv())).status)
-      .toBe(200);
-    expect((await app().request(path, { ...bearer('friends-key'), method: 'PUT' }, crossSiteEnv())).status)
-      .toBe(403);
-    expect((await app().request(path, { ...bearer('no-permissions-key'), method: 'PUT' }, crossSiteEnv())).status)
-      .toBe(403);
+  test('events permission protects booking decide/cancel/update (N-065 #623)', async () => {
+    const paths = [
+      ['PUT', '/api/events/admin/events/ev-1/bookings/bk-1'],
+      ['POST', '/api/events/admin/events/ev-1/bookings/bk-1/decide'],
+      ['POST', '/api/events/admin/events/ev-1/bookings/bk-1/cancel'],
+    ] as const;
+    for (const [method, path] of paths) {
+      expect((await app().request(path, { ...bearer('events-key'), method }, crossSiteEnv())).status)
+        .toBe(200);
+      expect((await app().request(path, { ...bearer('friends-key'), method }, crossSiteEnv())).status)
+        .toBe(403);
+      expect((await app().request(path, { ...bearer('no-permissions-key'), method }, crossSiteEnv())).status)
+        .toBe(403);
+    }
+  });
+
+  test('permission mapping matches the production routes (N-065 #623)', async () => {
+    const { permissionForApiPath } = await import('./auth.js');
+    // 予約の変更・取消と個別相談は予約権限、イベント口はイベント権限。
+    expect(permissionForApiPath('/api/booking/admin/requests/bk-1')).toBe('/booking/bookings');
+    expect(permissionForApiPath('/api/meet-consultations')).toBe('/booking/bookings');
+    expect(permissionForApiPath('/api/meet-consultations/google-event-1')).toBe('/booking/bookings');
+    expect(permissionForApiPath('/api/events/admin/events/ev-1/bookings/bk-1')).toBe('/events');
+    expect(permissionForApiPath('/api/events/admin/events/ev-1/bookings/bk-1/decide')).toBe('/events');
+    expect(permissionForApiPath('/api/events/admin/events/ev-1/bookings/bk-1/cancel')).toBe('/events');
+    // 公開コールバックは権限の対象外。
+    expect(permissionForApiPath('/api/meet-callback')).toBeNull();
   });
 
   test('写真審査は閲覧・判断・一括判断・原本取得の専用権限を分離する', async () => {

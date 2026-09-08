@@ -986,7 +986,10 @@ function makeEventDb(state: {
   return db;
 }
 
-function setupApp(state: Parameters<typeof makeEventDb>[0]) {
+function setupApp(
+  state: Parameters<typeof makeEventDb>[0],
+  staffRole: 'owner' | 'admin' | 'staff' = 'owner',
+) {
   state.accounts ??= [];
   for (const account of state.accounts) {
     account.tenant_id ??= 'tenant-a';
@@ -1013,7 +1016,7 @@ function setupApp(state: Parameters<typeof makeEventDb>[0]) {
     },
   );
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'staff-1', role: 'owner', tenantId: 'tenant-a' } as never);
+    c.set('staff', { id: 'staff-1', role: staffRole, tenantId: 'tenant-a' } as never);
     c.env = { DB: db } as TestEnv['Bindings'];
     await next();
   });
@@ -1032,6 +1035,45 @@ beforeEach(() => {
   reminderMocks.computeRemindersForBooking.mockReturnValue([]);
   waitlistMocks.createEventWaitlistOfferSender.mockReturnValue(vi.fn());
   waitlistMocks.enqueueEventWaitlistPromotion.mockResolvedValue(true);
+});
+
+describe('admin role guards (N-065 #623)', () => {
+  const guardState = () => ({
+    events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
+    slots: [{ id: 's1', event_id: 'e1', starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T12:00:00Z', capacity: null, is_active: 1, sort_order: 0, deleted_at: null }],
+    bookings: [
+      { id: 'b1', event_id: 'e1', slot_id: 's1', friend_id: 'f1', line_account_id: 'la1', status: 'requested' } as BookingRow & Record<string, unknown>,
+    ],
+    friends: [{ id: 'f1', line_account_id: 'la1', line_user_id: 'U1' }],
+  });
+
+  test('slot time change is owner/admin only (staff cannot reach it)', async () => {
+    const body = { starts_at: '2099-06-03T10:00:00Z', ends_at: '2099-06-03T12:00:00Z' };
+    const init = { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } as RequestInit;
+    const denied = await setupApp(guardState(), 'staff')
+      .request('/api/events/admin/events/e1/slots/s1?account_id=la1', init);
+    expect(denied.status).toBe(403);
+    expect(await denied.json()).toMatchObject({ success: false });
+    const allowed = await setupApp(guardState(), 'owner')
+      .request('/api/events/admin/events/e1/slots/s1?account_id=la1', init);
+    expect(allowed.status).not.toBe(403);
+  });
+
+  test('booking decide/cancel/update allow staff (permission layer gates)', async () => {
+    const staffApp = () => setupApp(guardState(), 'staff');
+    const decide = await staffApp().request('/api/events/admin/events/e1/bookings/b1/decide?account_id=la1', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'confirm' }),
+    });
+    expect(decide.status).not.toBe(403);
+    const cancel = await staffApp().request('/api/events/admin/events/e1/bookings/b1/cancel?account_id=la1', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+    });
+    expect(cancel.status).not.toBe(403);
+    const update = await staffApp().request('/api/events/admin/events/e1/bookings/b1?account_id=la1', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ internal_note: 'x' }),
+    });
+    expect(update.status).not.toBe(403);
+  });
 });
 
 describe('admin account scope', () => {

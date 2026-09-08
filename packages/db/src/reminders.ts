@@ -894,7 +894,12 @@ async function selectV6ActiveIds(
   extraBindings: unknown[],
 ): Promise<string[]> {
   const bindings: unknown[] = [];
-  const conditions = v6BaseConditions(matcher, bindings);
+  // source 経路は店舗で絞らない。source 鍵は全体で一意であり、登録時に
+  // 友だちと店舗の一致を検証ずみのため、鍵だけで正確に特定できる。
+  // 店舗跨ぎの友だち変更の失敗後に取消すとき、相談行は新店舗を向くが
+  // 旧店舗の行を止める必要があり、店舗絞り込みは残留を起こす。
+  // 店舗境界は source 未記録の legacy 経路でだけ見る。
+  const conditions = [`fr.status = 'active'`];
   const source = v6SourceCondition(matcher, bindings);
   if (!source) return [];
   conditions.push(source, `(${extra})`);
@@ -930,6 +935,15 @@ async function selectV6LegacyIds(
     );
     bindings.push(legacyTrigger);
   }
+  // 店舗が分かるときはその店舗のルールの行だけ見る。別店舗のルールに載った
+  // 行まで止めない (店舗境界)。所属不明の古いルールは従来どおり対象にする。
+  if (matcher.lineAccountId != null) {
+    conditions.push(
+      `EXISTS (SELECT 1 FROM reminders r WHERE r.id = fr.reminder_id
+         AND (r.line_account_id = ? OR r.line_account_id IS NULL))`,
+    );
+    bindings.push(matcher.lineAccountId);
+  }
   conditions.push(`(${extra})`);
   // 移行前の行に予約の手がかりは無い。呼び出し側で候補が1件のときだけ扱い、
   // 複数あるときは対象を特定できないため触らない (fail closed)。
@@ -958,7 +972,17 @@ export interface CancelV6RemindersResult {
  */
 export async function cancelV6RemindersForSource(
   db: D1Database,
-  input: V6SourceMatcher & { cancelReason: string; now?: string },
+  input: V6SourceMatcher & {
+    cancelReason: string;
+    now?: string;
+    /**
+     * true のとき、送信権の貸出中 (claimed + lease 有効) の登録があると
+     * 何も書かず REMINDER_SEND_IN_FLIGHT を投げる。利用者操作の取消で使い、
+     * 取消確定後の外部送信を起こさない。呼び出し側は 409 で再試行させる。
+     * 未指定時は従来どおり最善努力で止める (貸出中は残し、cron 等の次回で収束)。
+     */
+    failOnSendInFlight?: boolean;
+  },
 ): Promise<CancelV6RemindersResult> {
   const now = input.now ?? jstNow();
   const ids = await selectV6ActiveIds(db, input, '1 = 1', []);
@@ -973,6 +997,20 @@ export async function cancelV6RemindersForSource(
   }
   if (ids.length === 0) return { cancelledEnrollments: 0, cancelledRuns: 0 };
 
+  // 送信権の貸出中は取消を確定させない。貸出 (claim/再検証) と取消確定の
+  // 順序はこの確認と各1文で直列化される: 貸出が先なら取消は拒否・残置し、
+  // 取消が先なら貸出側の active 確認が失敗して送らない。
+  // lease 無し (NULL) は貸出取得前の行のため対象にする。
+  if (input.failOnSendInFlight) {
+    const live = await db.prepare(
+      `SELECT COUNT(*) AS c FROM reminder_delivery_runs
+        WHERE friend_reminder_id IN (${chunkPlaceholders(ids)})
+          AND status = 'claimed'
+          AND lease_expires_at IS NOT NULL AND lease_expires_at > ?`,
+    ).bind(...ids, now).first<{ c: number }>();
+    if ((live?.c ?? 0) > 0) throw new Error('REMINDER_SEND_IN_FLIGHT');
+  }
+
   const statements: D1PreparedStatement[] = [];
   for (let offset = 0; offset < ids.length; offset += 50) {
     const chunk = ids.slice(offset, offset + 50);
@@ -981,14 +1019,22 @@ export async function cancelV6RemindersForSource(
       db.prepare(
         `UPDATE friend_reminders
             SET status = 'cancelled', cancel_reason = ?, updated_at = ?
-          WHERE status = 'active' AND id IN (${placeholders})`,
-      ).bind(input.cancelReason, now, ...chunk),
-      // 送信済みは残す。claimed は送信中だが、取消後に送らないよう止める。
-      // 送信直前の再確認 (reminder-delivery 側) と合わせて二重に防ぐ。
+          WHERE status = 'active' AND id IN (${placeholders})
+            AND NOT EXISTS (
+              SELECT 1 FROM reminder_delivery_runs r
+               WHERE r.friend_reminder_id = friend_reminders.id
+                 AND r.status = 'claimed'
+                 AND r.lease_expires_at IS NOT NULL AND r.lease_expires_at > ?)`,
+      ).bind(input.cancelReason, now, ...chunk, now),
+      // 送信済みは残す。止めるのは active でなくなった登録の行だけ。
+      // 貸出中の行は残し、送信直前の再確認と確定時 active 確認で守る。
       db.prepare(
         `UPDATE reminder_delivery_runs
             SET status = 'cancelled', completed_at = ?, updated_at = ?
-          WHERE status IN ('queued', 'retry_wait', 'claimed') AND friend_reminder_id IN (${placeholders})`,
+          WHERE status IN ('queued', 'retry_wait', 'claimed') AND friend_reminder_id IN (${placeholders})
+            AND NOT EXISTS (
+              SELECT 1 FROM friend_reminders fr
+               WHERE fr.id = reminder_delivery_runs.friend_reminder_id AND fr.status = 'active')`,
       ).bind(now, now, ...chunk),
     );
   }

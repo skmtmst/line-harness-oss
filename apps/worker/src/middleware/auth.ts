@@ -190,7 +190,7 @@ const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
   [/^\/api\/friends\/support-mark\/bulk(?:\/|$)/, '/tags'],
 ];
 
-function permissionForApiPath(path: string): string | null {
+export function permissionForApiPath(path: string): string | null {
   const override = STAFF_API_PERMISSION_OVERRIDES.find(([pattern]) => pattern.test(path));
   if (override) return override[1];
   return STAFF_API_PERMISSIONS.find(([prefix]) => path === prefix || path.startsWith(`${prefix}/`))?.[1] ?? null;

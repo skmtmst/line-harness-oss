@@ -189,6 +189,11 @@ export interface CancelByTriggerInput {
   cancelReason: string;
   allowLegacyFallback?: boolean;
   now?: Date;
+  /**
+   * true のとき送信権の貸出中は REMINDER_SEND_IN_FLIGHT を投げる
+   * (利用者操作の取消用。呼び出し側は 409 で再試行させる)。
+   */
+  failOnSendInFlight?: boolean;
 }
 
 /**
@@ -212,6 +217,7 @@ export async function cancelByTrigger(
     cancelReason: input.cancelReason,
     allowLegacyFallback: input.allowLegacyFallback,
     now: input.now?.toISOString(),
+    failOnSendInFlight: input.failOnSendInFlight,
   });
 }
 
