@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import { buildXOAuth1Header, googleConversionDateTime, sendAdConversions } from './ad-conversion.js';
+import { buildXOAuth1Header, drainAdConversionOutbox, googleConversionDateTime, sendAdConversions } from './ad-conversion.js';
 
 const sentRequests: Array<{ url: string; body: unknown }> = [];
 
@@ -384,6 +384,37 @@ describe('sendAdConversions のアカウント境界(#638)', () => {
     expect(logs(testDb)).toEqual([
       { ad_platform_id: 'p1', friend_id: 'f1', line_account_id: 'a1', status: 'failed' },
     ]);
+  });
+
+  it('待ち行列に残し、失敗分は取り出しで送り直す。安定IDは変わらない', async () => {
+    const testDb = seedTwoAccounts();
+    let fail = true;
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: { body?: string }) => {
+      sentRequests.push({ url, body: init?.body ? JSON.parse(init.body) : null });
+      if (fail) return { ok: false, status: 500, text: async (): Promise<string> => 'down' };
+      return { ok: true, text: async (): Promise<string> => 'ok' };
+    }));
+    const outboxStatus = () => testDb.raw.prepare(
+      `SELECT status, attempt_count FROM ad_conversion_outbox WHERE idempotency_key = 'o:evt-1'`,
+    ).get() as { status: string; attempt_count: number };
+
+    await sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { idempotencyKey: 'o:evt-1' });
+
+    expect(sentRequests).toHaveLength(1);
+    expect(outboxStatus()).toMatchObject({ status: 'failed', attempt_count: 1 });
+    // 待ち時間の間は取り出さない。
+    expect(await drainAdConversionOutbox(testDb.db)).toMatchObject({ claimed: 0, sent: 0, failed: 0 });
+    expect(sentRequests).toHaveLength(1);
+
+    // 送り時が来たら送り直す。媒体側の重複排除IDは初回のまま。
+    fail = false;
+    testDb.raw.prepare(`UPDATE ad_conversion_outbox SET next_attempt_at = '2000-01-01T00:00:00.000+09:00'`).run();
+    expect(await drainAdConversionOutbox(testDb.db)).toMatchObject({ claimed: 1, sent: 1, failed: 0 });
+    expect(sentRequests).toHaveLength(2);
+    expect(outboxStatus()).toMatchObject({ status: 'sent' });
+    const bodies = sentRequests.map((r) => r.body as { data: Array<{ event_id: string }> });
+    expect(bodies[0]?.data[0]?.event_id).toBe('o:evt-1:p1');
+    expect(bodies[1]?.data[0]?.event_id).toBe('o:evt-1:p1');
   });
 
   it('送信失敗は failed で記録し投げない。1回の呼び出しで1媒体へ1回だけ送る', async () => {

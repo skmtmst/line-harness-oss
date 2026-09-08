@@ -1,4 +1,4 @@
-import { boundedListLimit, jstNow } from './utils.js';
+import { boundedListLimit, jstNow, toJstString } from './utils.js';
 
 export interface AdPlatform {
   id: string;
@@ -522,6 +522,183 @@ export async function finishAdConversionSend(
       `ad_conversion_logs の確定拒否: platform=${opts.platformId} friend=${opts.friendId} event=${opts.eventName}`,
     );
   }
+}
+
+/** 取り出し回数の上限。超えた行は failed のまま残し、人の手で送り直す。 */
+export const AD_CONVERSION_OUTBOX_MAX_ATTEMPTS = 5;
+
+/** 失敗時の待ち時間の基準(分)。回数ごとに倍にし、12時間で頭打ちにする。 */
+export const AD_CONVERSION_OUTBOX_RETRY_BASE_MINUTES = 30;
+
+export interface AdConversionOutboxRow {
+  id: string;
+  ad_platform_id: string;
+  friend_id: string;
+  line_account_id: string | null;
+  event_name: string;
+  event_value: number | null;
+  currency: string;
+  amount_in_minor_unit: number;
+  idempotency_key: string;
+  status: string;
+  attempt_count: number;
+  next_attempt_at: string | null;
+  lease_token: string | null;
+  provider_event_id: string | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * 送信要求を待ち行列へ残す。同じ(設定・友だち・出来事・冪等キー)は
+ * 初回の1行にまとめ、二重に残さない。行のIDを返す。
+ */
+export async function enqueueAdConversionOutbox(
+  db: D1Database,
+  opts: {
+    platformId: string;
+    friendId: string;
+    lineAccountId?: string | null;
+    eventName: string;
+    eventValue?: number | null;
+    currency?: string | null;
+    amountInMinorUnit?: boolean;
+    idempotencyKey: string;
+    providerEventId?: string | null;
+  },
+): Promise<string> {
+  const now = jstNow();
+  await db
+    .prepare(
+      `INSERT OR IGNORE INTO ad_conversion_outbox
+       (id, ad_platform_id, friend_id, line_account_id, event_name, event_value, currency,
+        amount_in_minor_unit, idempotency_key, provider_event_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      crypto.randomUUID(),
+      opts.platformId,
+      opts.friendId,
+      opts.lineAccountId ?? null,
+      opts.eventName,
+      opts.eventValue ?? null,
+      (opts.currency ?? 'JPY').toUpperCase(),
+      opts.amountInMinorUnit ? 1 : 0,
+      opts.idempotencyKey,
+      opts.providerEventId ?? null,
+      now,
+      now,
+    )
+    .run();
+  const row = await db
+    .prepare(
+      `SELECT id FROM ad_conversion_outbox
+       WHERE ad_platform_id = ? AND friend_id = ? AND event_name = ? AND idempotency_key = ?`,
+    )
+    .bind(opts.platformId, opts.friendId, opts.eventName, opts.idempotencyKey)
+    .first<{ id: string }>();
+  if (!row) throw new Error('ad_conversion_outbox の登録に失敗した');
+  return row.id;
+}
+
+/**
+ * 送り時が来た行を取り出す。古い sending (落ちた取り出し)も取り直す。
+ * 同時に取り合っても、状態遷移の1文で勝った分だけ持ち帰る。
+ */
+export async function claimAdConversionOutboxDue(
+  db: D1Database,
+  opts: { limit?: number; maxAttempts?: number; now?: Date; staleMs?: number } = {},
+): Promise<AdConversionOutboxRow[]> {
+  const now = opts.now ?? new Date();
+  const nowStr = toJstString(now);
+  const staleBefore = toJstString(new Date(now.getTime() - (opts.staleMs ?? AD_CONVERSION_PENDING_TAKEOVER_MS)));
+  const lease = crypto.randomUUID();
+  const limit = Math.max(1, Math.min(opts.limit ?? 50, 200));
+  await db
+    .prepare(
+      `UPDATE ad_conversion_outbox SET status = 'sending', lease_token = ?, attempt_count = attempt_count + 1, updated_at = ?
+       WHERE id IN (
+         SELECT id FROM ad_conversion_outbox
+         WHERE attempt_count < ?
+           AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
+           AND (status IN ('pending', 'failed')
+                OR (status = 'sending' AND updated_at < ?))
+         ORDER BY next_attempt_at NULLS FIRST, created_at
+         LIMIT ?
+       )`,
+    )
+    .bind(lease, nowStr, opts.maxAttempts ?? AD_CONVERSION_OUTBOX_MAX_ATTEMPTS, nowStr, staleBefore, limit)
+    .run();
+  const result = await db
+    .prepare(`SELECT * FROM ad_conversion_outbox WHERE lease_token = ?`)
+    .bind(lease)
+    .all<AdConversionOutboxRow>();
+  return result.results;
+}
+
+/**
+ * 取り出し分の結果を残す。持ち主の証が合う行だけ書き換える。
+ * 失敗時は待ち時間を延ばす。成功時はそのまま sent で残す。
+ */
+/**
+ * 1行だけ取り出す。生きている送信が自分の番として掴むためのもの。
+ * 送り中の行は奪えず null を返して譲る。送り直しの要否は送信記録の
+ * 確保が決めるため、済みの行も掴み直せる(送り中だけが譲る条件)。
+ */
+export async function takeAdConversionOutboxRow(db: D1Database, id: string): Promise<string | null> {
+  const lease = crypto.randomUUID();
+  const result = await db
+    .prepare(
+      `UPDATE ad_conversion_outbox SET status = 'sending', lease_token = ?, attempt_count = attempt_count + 1, updated_at = ?
+       WHERE id = ? AND status IN ('pending', 'failed', 'sent')`,
+    )
+    .bind(lease, jstNow(), id)
+    .run<{ success: boolean; meta?: { changes?: number } }>();
+  const changes = (result as unknown as { meta?: { changes?: number } }).meta?.changes ?? 0;
+  return changes > 0 ? lease : null;
+}
+
+export async function finishAdConversionOutbox(
+  db: D1Database,
+  opts: { id: string; lease: string; status: 'sent' | 'failed' | 'pending'; errorMessage?: string | null; now?: Date },
+): Promise<void> {
+  const nowStr = toJstString(opts.now ?? new Date());
+  if (opts.status === 'pending') {
+    // 送らずに戻す(他が送り中・内容不一致の確定待ち)。待ち時間は付けない。
+    await db
+      .prepare(`UPDATE ad_conversion_outbox SET status = 'pending', lease_token = NULL, updated_at = ? WHERE id = ? AND lease_token = ?`)
+      .bind(nowStr, opts.id, opts.lease)
+      .run();
+    return;
+  }
+  if (opts.status === 'sent') {
+    await db
+      .prepare(
+        `UPDATE ad_conversion_outbox SET status = 'sent', last_error = NULL, updated_at = ?
+         WHERE id = ? AND lease_token = ?`,
+      )
+      .bind(nowStr, opts.id, opts.lease)
+      .run();
+    return;
+  }
+  const row = await db
+    .prepare(`SELECT attempt_count FROM ad_conversion_outbox WHERE id = ? AND lease_token = ?`)
+    .bind(opts.id, opts.lease)
+    .first<{ attempt_count: number }>();
+  if (!row) return;
+  const waitMinutes = Math.min(
+    AD_CONVERSION_OUTBOX_RETRY_BASE_MINUTES * 2 ** Math.max(0, row.attempt_count - 1),
+    12 * 60,
+  );
+  const nextAttemptAt = toJstString(new Date(Date.now() + waitMinutes * 60 * 1000));
+  await db
+    .prepare(
+      `UPDATE ad_conversion_outbox SET status = 'failed', last_error = ?, next_attempt_at = ?, updated_at = ?
+       WHERE id = ? AND lease_token = ?`,
+    )
+    .bind(opts.errorMessage ?? null, nextAttemptAt, nowStr, opts.id, opts.lease)
+    .run();
 }
 
 export async function getAdConversionLogs(

@@ -8,10 +8,16 @@
 import {
   AdConversionLeaseError,
   claimAdConversionSend,
+  claimAdConversionOutboxDue,
+  enqueueAdConversionOutbox,
   finishAdConversionSend,
+  finishAdConversionOutbox,
   getActiveAdPlatforms,
+  getAdPlatformById,
   getPinnedAdConversionAccount,
   getRefTrackingWithClickIds,
+  takeAdConversionOutboxRow,
+  type AdPlatform,
   type AdPlatformConfig,
   type RefTracking,
 } from '@line-crm/db';
@@ -76,9 +82,6 @@ export async function sendAdConversions(
   const lineAccountId = pinned ?? opts?.lineAccountId ?? friend.line_account_id;
   if (!lineAccountId) return;
 
-  const ref = await getRefTrackingWithClickIds(db, friendId);
-  if (!ref) return;
-
   // テスト送信など指定があるときはその媒体だけ送る(全媒体に広げない)。
   const platforms = opts?.platformId
     ? (await getActiveAdPlatforms(db, lineAccountId)).filter((p) => p.id === opts.platformId)
@@ -87,59 +90,138 @@ export async function sendAdConversions(
   for (const platform of platforms) {
     // 二重防御: 帰属が違う設定は送らない(DB側でも claim が弾く)。
     if (platform.line_account_id !== lineAccountId) continue;
-    const click = clickIdForPlatform(platform.name, ref);
-    if (!click) continue;
-    const config: AdPlatformConfig = JSON.parse(platform.config);
     // 媒体側の重複排除ID。初回確保時に決めて行に残し、再送・付け替え後も同じ値を使う。
     const providerEventId = hasStableKey ? `${idempotencyKey}:${platform.id}` : crypto.randomUUID();
-    // 金額は主単位・通貨付きに正規化してから確保・送信する。通貨が変われば別内容。
-    const currency = toCurrencyCode(opts?.currency);
-    const majorValue = eventValue != null ? toMajorAmount(eventValue, opts?.currency, opts?.amountInMinorUnit) : null;
-
-    const claim = await claimAdConversionSend(db, {
+    // 要求を先に残す。落ちても取り出し側が送る。同じ鍵は初回の1行。
+    const outboxId = await enqueueAdConversionOutbox(db, {
       platformId: platform.id, friendId, lineAccountId, eventName,
-      clickId: click.clickId, clickIdType: click.clickIdType, eventValue: majorValue,
-      currency, idempotencyKey, providerEventId,
+      eventValue, currency: opts?.currency, amountInMinorUnit: opts?.amountInMinorUnit,
+      idempotencyKey, providerEventId,
     });
-    // mismatch: 同じ鍵で内容が変わった再送は送らない。
-    if (claim.disposition !== 'send' || !claim.lease) continue;
-    const lease = claim.lease;
-    const stableProviderEventId = claim.providerEventId ?? providerEventId;
-    // 確定は確保証付き。奪われた後の確定は通らず、送り直しは次の再送に任せる。
-    const settle = async (status: 'sent' | 'failed', errorMessage?: string): Promise<void> => {
-      try {
-        await finishAdConversionSend(db, {
-          platformId: platform.id, friendId, eventName, idempotencyKey, lease,
-          status, errorMessage: errorMessage ?? null,
-        });
-      } catch (settleError) {
-        if (!(settleError instanceof AdConversionLeaseError)) throw settleError;
-      }
-    };
+    const outboxLease = await takeAdConversionOutboxRow(db, outboxId);
+    if (!outboxLease) continue; // 他が送り中・送り済み
+    await attemptPlatformSend(db, {
+      platform, friendId, lineAccountId, eventName,
+      eventValue, currency: opts?.currency, amountInMinorUnit: opts?.amountInMinorUnit,
+      idempotencyKey, providerEventId,
+    }, { id: outboxId, lease: outboxLease });
+  }
+}
 
+/** 1媒体への送信試行。待ち行列の証を持っていることが前提。 */
+async function attemptPlatformSend(
+  db: D1Database,
+  args: {
+    platform: AdPlatform; friendId: string; lineAccountId: string; eventName: string;
+    eventValue?: number; currency?: string | null; amountInMinorUnit?: boolean;
+    idempotencyKey: string; providerEventId: string;
+  },
+  outbox: { id: string; lease: string },
+): Promise<void> {
+  const finishOutbox = (status: 'sent' | 'failed' | 'pending', errorMessage?: string): Promise<void> =>
+    finishAdConversionOutbox(db, { id: outbox.id, lease: outbox.lease, status, errorMessage: errorMessage ?? null });
+
+  const ref = await getRefTrackingWithClickIds(db, args.friendId);
+  if (!ref) { await finishOutbox('failed', 'ref tracking not found'); return; }
+  const click = clickIdForPlatform(args.platform.name, ref);
+  if (!click) { await finishOutbox('failed', `no click id for platform: ${args.platform.name}`); return; }
+  const config: AdPlatformConfig = JSON.parse(args.platform.config);
+  // 金額は主単位・通貨付きに正規化してから確保・送信する。通貨が変われば別内容。
+  const currency = toCurrencyCode(args.currency);
+  const majorValue = args.eventValue != null ? toMajorAmount(args.eventValue, args.currency, args.amountInMinorUnit) : null;
+
+  const claim = await claimAdConversionSend(db, {
+    platformId: args.platform.id, friendId: args.friendId, lineAccountId: args.lineAccountId,
+    eventName: args.eventName,
+    clickId: click.clickId, clickIdType: click.clickIdType, eventValue: majorValue,
+    currency, idempotencyKey: args.idempotencyKey, providerEventId: args.providerEventId,
+  });
+  if (claim.disposition === 'skip-sent') { await finishOutbox('sent'); return; }
+  if (claim.disposition !== 'send' || !claim.lease) {
+    // skip-inflightは他が送り中のため戻す。mismatchは同じ内容では送れないため失敗で残す。
+    if (claim.disposition === 'mismatch') { await finishOutbox('failed', 'idempotency key content mismatch'); return; }
+    await finishOutbox('pending'); return;
+  }
+  const lease = claim.lease;
+  const stableProviderEventId = claim.providerEventId ?? args.providerEventId;
+  // 確定は確保証付き。奪われた後の確定は通らず、送り直しは次の再送に任せる。
+  const settle = async (status: 'sent' | 'failed', errorMessage?: string): Promise<void> => {
     try {
-      switch (platform.name) {
-        case 'meta':
-          await sendMetaConversion(config, ref, eventName, majorValue ?? undefined, stableProviderEventId, currency);
-          break;
-        case 'x':
-          await sendXConversion(config, ref, eventName, majorValue ?? undefined, stableProviderEventId);
-          break;
-        case 'google':
-          await sendGoogleConversion(config, ref, eventName, majorValue ?? undefined, stableProviderEventId, currency);
-          break;
-        case 'tiktok':
-          await sendTikTokConversion(config, ref, eventName, majorValue ?? undefined, stableProviderEventId, currency);
-          break;
-        default:
-          await settle('failed', `unsupported platform: ${platform.name}`);
-          continue;
+      await finishAdConversionSend(db, {
+        platformId: args.platform.id, friendId: args.friendId, eventName: args.eventName,
+        idempotencyKey: args.idempotencyKey, lease,
+        status, errorMessage: errorMessage ?? null,
+      });
+    } catch (settleError) {
+      if (!(settleError instanceof AdConversionLeaseError)) throw settleError;
+    }
+  };
+  const markDone = async (status: 'sent' | 'failed', errorMessage?: string): Promise<void> => {
+    await settle(status, errorMessage);
+    await finishOutbox(status, errorMessage);
+  };
+
+  try {
+    switch (args.platform.name) {
+      case 'meta':
+        await sendMetaConversion(config, ref, args.eventName, majorValue ?? undefined, stableProviderEventId, currency);
+        break;
+      case 'x':
+        await sendXConversion(config, ref, args.eventName, majorValue ?? undefined, stableProviderEventId);
+        break;
+      case 'google':
+        await sendGoogleConversion(config, ref, args.eventName, majorValue ?? undefined, stableProviderEventId, currency);
+        break;
+      case 'tiktok':
+        await sendTikTokConversion(config, ref, args.eventName, majorValue ?? undefined, stableProviderEventId, currency);
+        break;
+      default:
+        await markDone('failed', `unsupported platform: ${args.platform.name}`);
+        return;
+    }
+    await markDone('sent');
+  } catch (error) {
+    await markDone('failed', String(error));
+  }
+}
+
+/**
+ * 送り時が来た待ち行列を取り出して送る。定期実行と手動の両方から呼ぶ。
+ * 同じ冪等キーで送るため、生きている送信との二重送信は起きない。
+ */
+export async function drainAdConversionOutbox(
+  db: D1Database,
+  opts?: { limit?: number },
+): Promise<{ claimed: number; sent: number; failed: number }> {
+  const rows = await claimAdConversionOutboxDue(db, { limit: opts?.limit });
+  let sent = 0;
+  let failed = 0;
+  for (const row of rows) {
+    try {
+      const platform = await getAdPlatformById(db, row.ad_platform_id);
+      if (!platform || platform.is_active !== 1 || !row.line_account_id) {
+        throw new Error(`platform unavailable: ${row.ad_platform_id}`);
       }
-      await settle('sent');
+      // 取り出し後に帰属が変わった設定へは送らない。
+      if (platform.line_account_id !== row.line_account_id) {
+        throw new Error(`platform account changed: ${row.ad_platform_id}`);
+      }
+      await attemptPlatformSend(db, {
+        platform, friendId: row.friend_id, lineAccountId: row.line_account_id,
+        eventName: row.event_name, eventValue: row.event_value ?? undefined,
+        currency: row.currency, amountInMinorUnit: row.amount_in_minor_unit === 1,
+        idempotencyKey: row.idempotency_key,
+        providerEventId: row.provider_event_id ?? `${row.idempotency_key}:${row.ad_platform_id}`,
+      }, { id: row.id, lease: row.lease_token ?? '' });
+      sent++;
     } catch (error) {
-      await settle('failed', String(error));
+      await finishAdConversionOutbox(db, {
+        id: row.id, lease: row.lease_token ?? '', status: 'failed', errorMessage: String(error),
+      });
+      failed++;
     }
   }
+  return { claimed: rows.length, sent, failed };
 }
 
 async function sendMetaConversion(

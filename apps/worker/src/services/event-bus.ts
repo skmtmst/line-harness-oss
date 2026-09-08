@@ -48,6 +48,10 @@ export interface EventPayload {
   eventData?: Record<string, unknown>;
   conversionEventName?: string;
   conversionValue?: number;
+  /** ISO通貨(例 USD)。無いときは円扱い。 */
+  conversionCurrency?: string;
+  /** 金額が補助単位(セント等)のとき true。通貨不明のときは換算しない。 */
+  conversionAmountInMinorUnit?: boolean;
   replyToken?: string;
 }
 
@@ -63,16 +67,21 @@ function toAdConversionAmount(value: unknown): number | undefined {
 export function adConversionForEvent(
   eventType: string,
   payload: EventPayload,
-): { eventName: string; value?: number } | null {
+): { eventName: string; value?: number; currency?: string; amountInMinorUnit?: boolean } | null {
   if (payload.conversionEventName) {
-    return { eventName: payload.conversionEventName, value: payload.conversionValue };
+    return {
+      eventName: payload.conversionEventName,
+      value: payload.conversionValue,
+      currency: payload.conversionCurrency,
+      amountInMinorUnit: payload.conversionAmountInMinorUnit,
+    };
   }
   if (eventType === 'cv_fire' && payload.eventData?.type === 'purchase') {
     return { eventName: 'Purchase', value: toAdConversionAmount(payload.eventData?.amount) };
   }
   if (eventType === 'ec.order.confirmed' || eventType === 'ec.order.payment_received') {
     // 金額の読みどころを統一: 正規形 orderTotal → 互換 order.total → 旧 total。
-    // (#1472 の正規化と旧来の生受信体のどちらでも読める)
+    // (EC側の通貨・単位の正規化は#1472の結合時に渡す。今は値だけ通す)
     const eventData = payload.eventData ?? {};
     const order = eventData.order as Record<string, unknown> | undefined;
     return {
@@ -123,6 +132,9 @@ export async function fireEvent(
           : undefined,
         // イベント確定時の所属を渡す。友だち移動後の再送でも旧所属で送る。
         lineAccountId: lineAccountId ?? outgoingWebhookLineAccountId ?? undefined,
+        // 通貨・単位が分かるときだけ渡す。無いときは円・主単位扱い。
+        currency: adConversion.currency,
+        amountInMinorUnit: adConversion.amountInMinorUnit,
       }),
     );
   }

@@ -463,7 +463,7 @@ describe('fireEvent — 広告成果の配線(#638)', () => {
     }, undefined, 'a1');
 
     expect(await adConversionMock()).toHaveBeenCalledWith(
-      db, 'friend-1', 'Purchase', 1000, { idempotencyKey: 'stripe:evt-1', lineAccountId: 'a1' },
+      db, 'friend-1', 'Purchase', 1000, { idempotencyKey: 'stripe:evt-1', lineAccountId: 'a1', currency: undefined, amountInMinorUnit: undefined },
     );
   });
 
@@ -477,7 +477,7 @@ describe('fireEvent — 広告成果の配線(#638)', () => {
     }, 'token', 'a1');
 
     expect(await adConversionMock()).toHaveBeenCalledWith(
-      db, 'friend-1', 'Purchase', 2860, { idempotencyKey: 'eccube:ev-1', lineAccountId: 'a1' },
+      db, 'friend-1', 'Purchase', 2860, { idempotencyKey: 'eccube:ev-1', lineAccountId: 'a1', currency: undefined, amountInMinorUnit: undefined },
     );
 
     (await adConversionMock()).mockClear();
@@ -489,7 +489,7 @@ describe('fireEvent — 広告成果の配線(#638)', () => {
     }, 'token', 'a1');
 
     expect(await adConversionMock()).toHaveBeenCalledWith(
-      db, 'friend-1', 'Purchase', 1000, { idempotencyKey: 'eccube:ev-2', lineAccountId: 'a1' },
+      db, 'friend-1', 'Purchase', 1000, { idempotencyKey: 'eccube:ev-2', lineAccountId: 'a1', currency: undefined, amountInMinorUnit: undefined },
     );
   });
 
@@ -509,7 +509,23 @@ describe('fireEvent — 広告成果の配線(#638)', () => {
     }, undefined, 'a1');
 
     expect(await adConversionMock()).toHaveBeenCalledWith(
-      db, 'friend-1', 'Trial', 100, { idempotencyKey: undefined, lineAccountId: 'a1' },
+      db, 'friend-1', 'Trial', 100, { idempotencyKey: undefined, lineAccountId: 'a1', currency: undefined, amountInMinorUnit: undefined },
+    );
+  });
+
+  it('明示の通貨・単位はそのまま渡す', async () => {
+    const db = fakeDb({ friend: { line_user_id: 'U1', line_account_id: 'a1' }, capturedInserts: [] });
+    await fireEvent(db, 'custom_event', {
+      friendId: 'friend-1',
+      conversionEventName: 'Purchase',
+      conversionValue: 1000,
+      conversionCurrency: 'USD',
+      conversionAmountInMinorUnit: true,
+    }, undefined, 'a1');
+
+    expect(await adConversionMock()).toHaveBeenCalledWith(
+      db, 'friend-1', 'Purchase', 1000,
+      { idempotencyKey: undefined, lineAccountId: 'a1', currency: 'USD', amountInMinorUnit: true },
     );
   });
 });

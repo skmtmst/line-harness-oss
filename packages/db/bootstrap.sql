@@ -154,6 +154,28 @@ CREATE TABLE ad_conversion_logs (
   created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, idempotency_key TEXT, lease_token TEXT, provider_event_id TEXT);
 
+CREATE TABLE ad_conversion_outbox (
+  id                TEXT PRIMARY KEY,
+  ad_platform_id    TEXT NOT NULL REFERENCES ad_platforms(id) ON DELETE CASCADE,
+  friend_id         TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  line_account_id   TEXT REFERENCES line_accounts(id) ON DELETE SET NULL,
+  event_name        TEXT NOT NULL,
+  event_value       REAL,
+  currency          TEXT NOT NULL DEFAULT 'JPY',
+  amount_in_minor_unit INTEGER NOT NULL DEFAULT 0,
+  idempotency_key   TEXT NOT NULL,
+  status            TEXT NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending', 'sending', 'sent', 'failed')),
+  attempt_count     INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  next_attempt_at   TEXT,
+  lease_token       TEXT,
+  provider_event_id TEXT,
+  last_error        TEXT,
+  created_at        TEXT NOT NULL,
+  updated_at        TEXT NOT NULL,
+  UNIQUE (ad_platform_id, friend_id, event_name, idempotency_key)
+);
+
 CREATE TABLE ad_platforms (
   id           TEXT PRIMARY KEY,
   name         TEXT NOT NULL,
@@ -5110,6 +5132,12 @@ CREATE UNIQUE INDEX idx_ad_conversion_logs_idempotency
 CREATE INDEX idx_ad_conversion_logs_platform ON ad_conversion_logs (ad_platform_id);
 
 CREATE INDEX idx_ad_conversion_logs_status ON ad_conversion_logs (status);
+
+CREATE INDEX idx_ad_conversion_outbox_due
+  ON ad_conversion_outbox(status, next_attempt_at);
+
+CREATE INDEX idx_ad_conversion_outbox_friend
+  ON ad_conversion_outbox(friend_id);
 
 CREATE INDEX idx_ad_platforms_account ON ad_platforms(line_account_id);
 

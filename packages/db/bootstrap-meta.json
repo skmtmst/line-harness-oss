@@ -307,7 +307,8 @@
     "345_ad_platform_account_scope.sql",
     "346_ad_conversion_idempotency_and_backfill.sql",
     "359_ad_platform_account_required_and_dedup.sql",
-    "363_ad_conversion_lease_and_provider_id.sql"
+    "363_ad_conversion_lease_and_provider_id.sql",
+    "366_ad_conversion_outbox.sql"
   ],
-  "migrationCount": 308
+  "migrationCount": 309
 }

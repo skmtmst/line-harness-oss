@@ -27,6 +27,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
   { name: 'mileage reward delivery retry', classification: { kind: 'feature', featureId: 'mileage' } },
   { name: 'analytics cross', classification: { kind: 'feature', featureId: 'analytics' } },
   { name: 'mileage projection', classification: { kind: 'feature', featureId: 'mileage' } },
+  { name: 'ad conversion outbox retry', classification: { kind: 'core', reason: '広告成果の送信再試行' } },
   { name: 'analytics url exposure projection', classification: { kind: 'feature', featureId: 'analytics' } },
   { name: 'analytics projection', classification: { kind: 'feature', featureId: 'analytics' } },
   { name: 'analytics scheduled reports', classification: { kind: 'feature', featureId: 'analytics' } },

@@ -1238,6 +1238,16 @@ async function runFrequentHeavyJobs(
       },
     },
     {
+      name: 'ad conversion outbox retry',
+      run: async () => {
+        const { drainAdConversionOutbox } = await import('./services/ad-conversion.js');
+        const result = await drainAdConversionOutbox(env.DB, { limit: 50 });
+        if (result.claimed > 0) {
+          console.log(JSON.stringify({ event: 'ad_conversion_outbox_tick', ...result }));
+        }
+      },
+    },
+    {
       name: 'analytics url exposure projection',
       run: async () => {
         const { processPendingAnalyticsUrlExposures } = await import('@line-crm/db');
