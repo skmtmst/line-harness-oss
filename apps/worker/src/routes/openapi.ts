@@ -1081,6 +1081,25 @@ const spec = {
         responses: { '201': { description: 'Recorded' } },
       },
     },
+    // ── Templates (#645 公開版固定) ─────────────────────────────────────────
+    '/api/templates/{id}/publish': {
+      post: {
+        tags: ['Templates'],
+        summary: 'テンプレートの下書きを公開版へ写す',
+        description: '下書きがなければ何もせず成功。同じ確認キーの再試行は公開済みの結果を返す。版が進んでいたら409。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { content: { 'application/json': { schema: {
+          type: 'object',
+          properties: { expectedVersion: { type: 'integer', minimum: 1 } },
+        } } } },
+        responses: {
+          '200': { description: 'Published or replayed' },
+          '400': { description: 'Missing idempotency key or bad version' },
+          '404': { description: 'Not found in account scope' },
+          '409': { description: 'Version conflict or key reuse' },
+        },
+      },
+    },
     // ── Webhook ─────────────────────────────────────────────────────────────
     '/webhook': {
       post: {
@@ -1102,6 +1121,7 @@ const spec = {
     { name: 'LINE Accounts', description: 'マルチLINEアカウント管理' },
     { name: 'Conversions', description: 'コンバージョン計測' },
     { name: 'Affiliates', description: 'アフィリエイト管理' },
+    { name: 'Templates', description: 'テンプレート公開版' },
     { name: 'Webhook', description: 'LINE Webhook' },
   ],
 };
