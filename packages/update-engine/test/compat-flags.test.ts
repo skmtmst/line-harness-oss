@@ -27,4 +27,11 @@ describe('WORKER_COMPATIBILITY_FLAGS', () => {
       }
     }
   });
+
+  it('release の成果物ビルド設定とも一致する', () => {
+    const text = readFileSync(join(REPO_ROOT, '.github/workflows/release.yml'), 'utf8');
+    for (const flag of WORKER_COMPATIBILITY_FLAGS) {
+      expect(text).toContain(`"${flag}"`);
+    }
+  });
 });

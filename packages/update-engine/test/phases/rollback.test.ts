@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { runRollback } from '../../src/phases/rollback.js';
+import { WORKER_COMPATIBILITY_FLAGS } from '../../src/compat-flags.js';
 import type { RollbackSnapshot } from '../../src/phases/rollback.js';
 import { createEventEmitter } from '../../src/events.js';
 import type {
@@ -175,6 +176,7 @@ describe('runRollback', () => {
       { type: 'd1', name: 'DB', database_id: D1_ID },
     ]);
     expect(metadata.keep_bindings).toEqual(['secret_text', 'secret_key']);
+    expect(metadata.compatibility_flags).toEqual(WORKER_COMPATIBILITY_FLAGS);
 
     // Both Pages rollbacks were invoked.
     const adminRb = calls.find(([url]) =>

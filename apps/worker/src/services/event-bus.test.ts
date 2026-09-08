@@ -491,6 +491,7 @@ describe('fireEvent — 旧式 send_webhook は共通の安全送信へ通す', 
           const type = new URL(url).searchParams.get('type');
           return new Response(
             JSON.stringify({
+              Status: 0,
               Answer: [{
                 name: 'hooks.example.com.',
                 type: type === 'A' ? 1 : 28,

@@ -435,7 +435,7 @@ describe('送信直前の再検査', () => {
           const type = new URL(url).searchParams.get('type');
           if (type === 'A') return new Response('error', { status: 500 });
           return new Response(
-            JSON.stringify({ Answer: [{ name: 'example.com.', type: 28, TTL: 60, data: '2606:4700:4700::1111' }] }),
+            JSON.stringify({ Status: 0, Answer: [{ name: 'example.com.', type: 28, TTL: 60, data: '2606:4700:4700::1111' }] }),
             { status: 200, headers: { 'content-type': 'application/dns-json' } },
           );
         }
@@ -470,6 +470,32 @@ describe('送信直前の再検査', () => {
     expect(res).toMatchObject({ ok: false, blocked: true, blockReason: 'dns_unresolved' });
   });
 
+  it('公開IP付きでもStatus異常なら送らない', async () => {
+    for (const dnsBody of [
+      // Status 欠落
+      { Answer: [{ name: 'example.com.', type: 1, TTL: 60, data: '93.184.216.34' }] },
+      // Status が文字列
+      { Status: '0', Answer: [{ name: 'example.com.', type: 1, TTL: 60, data: '93.184.216.34' }] },
+      // Status が null
+      { Status: null, Answer: [{ name: 'example.com.', type: 1, TTL: 60, data: '93.184.216.34' }] },
+    ]) {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: unknown) => {
+          const url = String(input);
+          if (url.startsWith('https://cloudflare-dns.com/dns-query')) {
+            return new Response(JSON.stringify(dnsBody), { status: 200 });
+          }
+          throw new Error(`送ってはいけない先: ${url}`);
+        }),
+      );
+      // lookupHostを渡さない=本番と同じ既定の名前引きを使う。
+      const res = await deliverWebhook(WEBHOOK, '{}', { sleep: noSleep });
+      expect(res).toMatchObject({ ok: false, blocked: true, blockReason: 'dns_unresolved' });
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('既定の名前引き(DoH)でも内部IPを止める', async () => {
     vi.stubGlobal(
       'fetch',
@@ -480,7 +506,7 @@ describe('送信直前の再検査', () => {
           const qtype = type === 'A' ? 1 : 28;
           const data = type === 'A' ? '10.0.0.5' : '::1';
           return new Response(
-            JSON.stringify({ Answer: [{ name: 'example.com.', type: qtype, TTL: 60, data }] }),
+            JSON.stringify({ Status: 0, Answer: [{ name: 'example.com.', type: qtype, TTL: 60, data }] }),
             { status: 200, headers: { 'content-type': 'application/dns-json' } },
           );
         }

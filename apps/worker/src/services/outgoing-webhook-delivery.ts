@@ -265,10 +265,11 @@ async function dohQuery(host: string, type: 'A' | 'AAAA', fetchImpl: typeof fetc
   // 見えていない系が非公開かもしれない状態で送らない(fail-closed)。
   if (!res.ok) throw new Error(`dns query failed: ${type} ${res.status}`);
   const data = (await res.json()) as { Status?: number; Answer?: Array<{ type: number; data: string }> };
-  // DNS側の失敗(SERVFAIL等)はHTTP200でも送らない。片系だけ見えている
-  // 状態で通すと、見えていない系の非公開宛てに繋がる恐れがある。
-  if (data.Status !== undefined && data.Status !== 0) {
-    throw new Error(`dns status: ${data.Status}`);
+  // DNS側の成功(Status===0)だけ受け付ける。失敗・欠落・非数値は
+  // 送らない。片系だけ見えている状態で通すと、見えていない系の
+  // 非公開宛てに繋がる恐れがある。
+  if (data.Status !== 0) {
+    throw new Error(`dns status: ${String(data.Status)}`);
   }
   const want = type === 'A' ? 1 : 28;
   const out: string[] = [];
