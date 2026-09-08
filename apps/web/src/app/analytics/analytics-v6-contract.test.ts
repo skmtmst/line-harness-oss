@@ -1,7 +1,16 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const PAGE = readFileSync(new URL('./tabs/analytics-shared.tsx', import.meta.url), 'utf8')
+  + readFileSync(new URL('./tabs/cross-tab.tsx', import.meta.url), 'utf8')
+  + readFileSync(new URL('./tabs/funnel-tab.tsx', import.meta.url), 'utf8')
+  + readFileSync(new URL('./tabs/friends-tab.tsx', import.meta.url), 'utf8')
+  + readFileSync(new URL('./tabs/reactions-tab.tsx', import.meta.url), 'utf8')
+  + readFileSync(new URL('./tabs/routes-tab.tsx', import.meta.url), 'utf8')
+  + readFileSync(new URL('./tabs/usage-tab.tsx', import.meta.url), 'utf8')
+  + readFileSync(new URL('./tabs/url-clicks-tab.tsx', import.meta.url), 'utf8')
+  + readFileSync(new URL('./tabs/saved-tab.tsx', import.meta.url), 'utf8')
+  + readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 
 describe('V6 機能20 分析', () => {
@@ -91,5 +100,10 @@ describe('V6 機能20 分析', () => {
   it('200件で切れるときは注意を出し、CSVも範囲内と書く(点検#508の中5)', () => {
     expect(PAGE).toContain('overview.hasMore')
     expect(PAGE).toContain('200件まで表示しています。探す言葉を足して絞ってください。CSVの書き出しも、表示している範囲だけが入ります。')
+  })
+
+  it('未集計のファネルは壊れた表示にせず案内を出す(点検#508軽13)', () => {
+    expect(PAGE).toContain('setNoRun')
+    expect(PAGE).toContain('まだ集計がありません。「この30日を再集計」を押してください')
   })
 })

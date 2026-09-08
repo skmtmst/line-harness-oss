@@ -3,7 +3,18 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const PAGE = [
+  'tabs/analytics-shared.tsx',
+  'tabs/cross-tab.tsx',
+  'tabs/funnel-tab.tsx',
+  'tabs/friends-tab.tsx',
+  'tabs/reactions-tab.tsx',
+  'tabs/routes-tab.tsx',
+  'tabs/usage-tab.tsx',
+  'tabs/url-clicks-tab.tsx',
+  'tabs/saved-tab.tsx',
+  'page.tsx',
+].map((name) => fs.readFileSync(path.join(__dirname, name), 'utf8')).join('\n')
 
 /** 帯の1枚ぶんだけを切り出す。ファイル全体を見ると別の帯に当たって素通りする。 */
 function kpiCard(title: string): string {
@@ -18,8 +29,10 @@ function kpiCard(title: string): string {
 function bodyOf(header: string): string {
   const at = PAGE.indexOf(header)
   if (at < 0) return ''
-  const next = PAGE.indexOf('\nfunction ', at + header.length)
-  return PAGE.slice(at, next < 0 ? PAGE.length : next)
+  const plain = PAGE.indexOf('\nfunction ', at + header.length)
+  const exported = PAGE.indexOf('\nexport function ', at + header.length)
+  const next = [plain, exported].filter((i) => i >= 0)
+  return PAGE.slice(at, next.length > 0 ? Math.min(...next) : PAGE.length)
 }
 
 /**
