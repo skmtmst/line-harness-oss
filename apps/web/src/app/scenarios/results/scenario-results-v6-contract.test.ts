@@ -7,8 +7,8 @@ const DETAIL = readFileSync(new URL('../detail/scenario-detail-client.tsx', impo
 describe('V6 5-1-L シナリオ配信結果', () => {
   it('実Node IDとシナリオ・統計・開始記録APIを使う', () => {
     expect(PAGE).toContain('data-design-node="M2b2B"')
-    expect(PAGE).toContain('api.scenarios.get(id)')
-    expect(PAGE).toContain('api.scenarios.stats(id)')
+    expect(PAGE).toContain('scenarioReferenceData.scenario(id)')
+    expect(PAGE).toContain('scenarioReferenceData.stats(id)')
     expect(PAGE).toContain('api.scenarios.runs(id, selectedAccountId, { limit: 50 })')
     expect(DETAIL).toContain('href={`/scenarios/results?id=${id}`}')
   })

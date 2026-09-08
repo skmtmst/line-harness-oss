@@ -10,6 +10,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import IconButton from '@/components/shared/icon-button'
 import ListToolbar from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import StatusBadge from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
 import { Tabs } from '@/components/shared/tabs'
@@ -231,21 +232,22 @@ function FriendAddSettingsList() {
       </div>
       <p className="text-ink-faint my-2 text-xs">この2つを分けないと、以前からのお客さまに「はじめまして」が届きます。</p>
 
-      <div className="grid items-start gap-4 xl:grid-cols-[190px_minmax(0,1fr)]">
-        <aside className="bg-canvas rounded-card border-hairline overflow-hidden border" aria-label="流入の束">
-          <div className="border-hairline flex justify-between border-b px-4 py-3 text-xs font-bold"><span>流入の束</span><span>{data?.total ?? data?.items.length ?? 0}件</span></div>
-          <button type="button" onClick={() => selectFolder(null)} aria-pressed={folder === null} className={`${folder === null ? 'bg-accent-soft text-accent-deep' : 'text-ink-secondary'} flex w-full justify-between px-4 py-3 text-xs font-bold`}><span>すべて</span><span>{data?.total ?? data?.items.length ?? 0}</span></button>
-          {folders.map((entry) => (
-            <button type="button" key={entry.key} onClick={() => selectFolder(entry.key)} aria-pressed={folder === entry.key} className={`${folder === entry.key ? 'bg-accent-soft text-accent-deep' : 'text-ink-secondary'} flex w-full justify-between px-4 py-3 text-xs`}>
-              <span>{entry.name}</span><span>{entry.count}</span>
-            </button>
-          ))}
-        </aside>
+      <div style={FOLDER_RAIL_STYLE} className="grid items-start gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
+        <FolderPanel
+          total={`${data?.total ?? data?.items.length ?? 0}件`}
+          activeId={folder ?? ''}
+          onSelect={(id) => selectFolder(id || null)}
+          onAddFolder={() => setFolderDialogOpen(true)}
+          addFolderDisabled={folderBusy}
+          rows={[
+            { id: '', label: 'すべて', count: data?.total ?? data?.items.length ?? 0 },
+            ...folders.map((entry) => ({ id: entry.key, label: entry.name, count: entry.count })),
+          ]}
+        />
 
         <section data-design="Rule" aria-label={`${KIND_LABELS[kind]}の設定`}>
           <span className="sr-only">判定の基準。はじめての人の判定。ブロック解除の判定。ブロック解除の回数が1回以上。</span>
           <ListToolbar searchPlaceholder="設定名で検索" searchValue={search} onSearchChange={setSearch}>
-            <Button variant="secondary" onClick={() => setFolderDialogOpen(true)} disabled={folderBusy}><Plus size={14} />フォルダを追加</Button>
             <span className="text-ink-faint text-xs whitespace-nowrap">20件表示</span>
           </ListToolbar>
           {!data || data.items.length === 0 ? (

@@ -12,6 +12,7 @@ import {
   type Template,
 } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
 import MessageTypeTabs, { type StepMessageKind } from '@/components/scenarios/message-type-tabs'
 import MessageKindFields, {
@@ -110,7 +111,7 @@ function FirstStepContent() {
 
   useEffect(() => {
     if (!id) return
-    void api.scenarios.get(id).then(res => {
+    void scenarioReferenceData.scenario(id).then(res => {
       if (!res.success) {
         setError(res.error)
         return
@@ -146,10 +147,10 @@ function FirstStepContent() {
         }
       }
     })
-    void api.tags.list().then(res => {
+    void scenarioReferenceData.tags().then(res => {
       if (res.success) setTags(res.data)
     })
-    void api.templates.list().then(res => {
+    void scenarioReferenceData.templates().then(res => {
       if (res.success) setTemplates(res.data as unknown as Template[])
     })
   }, [id])
@@ -278,6 +279,7 @@ function FirstStepContent() {
       setSaving(false)
       return
     }
+    scenarioReferenceData.invalidateScenario(id)
     goDetail()
   }
 

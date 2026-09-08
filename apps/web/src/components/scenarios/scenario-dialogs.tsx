@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/api'
+import { scenarioReferenceData } from './scenario-reference-data'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ConditionBuilder, {
@@ -185,7 +186,7 @@ export function OnCompleteDialog({
 
   useEffect(() => {
     void (async () => {
-      const res = await api.scenarios.list({ limit: 200 })
+      const res = await scenarioReferenceData.scenarios()
       if (res.success) {
         setScenarios(res.data.filter((s) => s.id !== scenarioId).map((s) => ({ id: s.id, name: s.name })))
       }

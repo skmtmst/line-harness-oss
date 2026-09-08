@@ -5268,17 +5268,17 @@ const ecNotification = (eventType, label, category, order, isEnabled = true, tit
 })
 
 export const EC_NOTIFICATION_SETTINGS = [
-  ecNotification('ec_order.confirmed', '注文が確定した', 'order', 1),
-  ecNotification('ec_payment.received', '入金を確認した', 'payment', 2),
-  ecNotification('ec_shipping.shipped', '発送した', 'shipping', 3),
-  ecNotification('ec_shipping.delivered', 'お届けした', 'shipping', 4),
-  ecNotification('ec_subscription.renewed', '定期便が続いた', 'subscription', 5),
-  ecNotification('ec_subscription.paused', '定期便を止めた', 'subscription', 6),
-  ecNotification('ec_support.cancelled', 'キャンセルした', 'support', 7),
+  ecNotification('ec.order.confirmed', '注文が確定した', 'order', 1),
+  ecNotification('ec.order.payment_received', '入金を確認した', 'payment', 2),
+  ecNotification('ec.order.shipped', '発送した', 'shipping', 3),
+  ecNotification('ec.order.bank_transfer_reminder', 'お届けした', 'shipping', 4),
+  ecNotification('ec.subscription.upcoming', '定期便が続いた', 'subscription', 5),
+  ecNotification('ec.subscription.payment_failed', '定期便を止めた', 'subscription', 6),
+  ecNotification('ec.order.cancelled', 'キャンセルした', 'support', 7),
   /* 設計の「止めている 2」。 */
-  ecNotification('ec_support.refunded', '返金した', 'support', 8, false),
+  ecNotification('ec.order.refunded', '返金した', 'support', 8, false),
   /* 設計の「文面が未設定 1」。**空文字は「まだ決めていない」で、0件ではない。** */
-  { ...ecNotification('ec_order.backordered', '入荷待ちになった', 'order', 9, false), title: null, introText: '', outroText: '' },
+  { ...ecNotification('ec.subscription.card_updated', '入荷待ちになった', 'order', 9, false), title: null, introText: '', outroText: '' },
 ]
 
 export const LINE_NOTIFICATION_DEFINITIONS = EC_NOTIFICATION_SETTINGS.map((setting, index) => ({
@@ -6245,6 +6245,9 @@ export const OPERATION_HISTORY = [
   },
 ].map((incident) => ({
   ...incident,
+  // サーバーの履歴口が付ける項目(#518 中5)。無いと配備分岐の目視ができない。
+  historyKind: 'incident',
+  occurredAt: incident.createdAt,
   beforeSnapshot: operationControlSnapshot({
     version: incident.controlVersion - 2, activeIncidentId: null, reason: null,
     actorId: null, stoppedAt: null, capturedAt: incident.createdAt,
@@ -6258,7 +6261,41 @@ export const OPERATION_HISTORY = [
     version: incident.controlVersion, activeIncidentId: null, reason: null,
     actorId: incident.resolvedByActorId, stoppedAt: null, capturedAt: incident.resolvedAt,
   }),
-}))
+})).concat([
+  // サーバーが返す配備要素の形(#518 中5)。更新履歴タブの「管理画面の更新」
+  // 欄(`historyKind === 'deployment'` 分岐)の目視確認用。
+  {
+    id: 'deployment:deploy-20260825-0800',
+    historyKind: 'deployment',
+    occurredAt: '2026-08-25T08:00:00+09:00',
+    scopeKey: '*',
+    lineAccountId: null,
+    status: 'resolved',
+    capabilities: [],
+    reason: '管理画面の更新 v0.14.1',
+    detail: 'v0.14.1',
+    actorId: '自動配備',
+    resolvedByActorId: null,
+    controlVersion: null,
+    beforeSnapshot: null,
+    stoppedSnapshot: null,
+    restoredSnapshot: null,
+    errorMessage: null,
+    stoppedAt: null,
+    resolvedAt: '2026-08-25T08:00:00+09:00',
+    createdAt: '2026-08-25T08:00:00+09:00',
+    updatedAt: '2026-08-25T08:05:00+09:00',
+    deployment: {
+      deploymentId: 'deploy-20260825-0800',
+      phase: 'succeeded',
+      environment: 'staging',
+      version: 'v0.14.1',
+      pullRequest: 1234,
+      actor: '自動配備',
+      occurredAt: '2026-08-25T08:00:00+09:00',
+    },
+  },
+])
 
 /**
  * 機能10 ウェビナー。Pencil `ZC13r` の5行を一覧契約の値だけで表す。

@@ -54,7 +54,7 @@ describe('成果地点の削除確認', () => {
     const dialog = dialogWith(PAGE, 'open={stopTarget !== null}')
     expect(dialog, '物理削除の赤い確認に戻っている').not.toContain('destructive')
     expect(dialog, '設計の重ね画面のNodeが無い').toContain('designNode="d8d3Mz"')
-    expect(dialog, '処理中を窓へ渡していない').toContain('busy={stopping}')
+    expect(dialog, '処理中を窓へ渡していない').toContain('busy={stopping || stopImpactLoading}')
     expect(dialog, '失敗を窓の中に出していない').toContain('error={stopError}')
     for (const label of ['数えるのをやめる', '差し替えて数えるのをやめる', 'この成果地点を削除する']) {
       expect(dialog).toContain(label)
