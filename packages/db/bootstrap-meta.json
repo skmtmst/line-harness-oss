@@ -303,7 +303,8 @@
     "339_site_event_host.sql",
     "340_staff_two_factor_setup_attempts.sql",
     "341_ec_notification_settings_account_scope.sql",
-    "343_messages_log_broadcast_recipient_index.sql"
+    "343_messages_log_broadcast_recipient_index.sql",
+    "353_mileage_redemption_step_outbox.sql"
   ],
-  "migrationCount": 304
+  "migrationCount": 305
 }

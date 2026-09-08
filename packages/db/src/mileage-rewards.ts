@@ -1155,6 +1155,78 @@ export async function refundMileageRewardRedemption(
   return (await getMileageRedemption(db, current.id))!;
 }
 
+export type MileageRedemptionStepStatus = 'started' | 'sent';
+
+export interface MileageRedemptionStepDelivery {
+  redemptionId: string;
+  stepKey: string;
+  idempotencyKey: string;
+  status: MileageRedemptionStepStatus;
+  attemptCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * 確定書き込みの失敗印。外部送信は終わっているかもしれないので、
+ * deliver 側はこれを delivery_failed に落とさず、回収に任せる。
+ */
+export class MileageRedemptionConfirmError extends Error {
+  constructor(message = '特典の送信後の確定に失敗しました') {
+    super(message);
+    this.name = 'MileageRedemptionConfirmError';
+  }
+}
+
+/**
+ * 手順の送信予約。未送信なら started で確保して 'send' を返す。
+ * 送信済みなら 'sent' を返す(送らない)。やり直しが同じ手順を
+ * 再送しないための outbox の口。
+ */
+export async function claimRedemptionStep(
+  db: D1Database,
+  input: { redemptionId: string; stepKey: string; idempotencyKey: string },
+): Promise<'send' | 'sent'> {
+  const now = new Date().toISOString();
+  const existing = await db.prepare(
+    `SELECT status FROM mileage_redemption_step_deliveries
+      WHERE redemption_id = ? AND step_key = ?`,
+  ).bind(input.redemptionId, input.stepKey).first<{ status: MileageRedemptionStepStatus }>();
+  if (existing?.status === 'sent') return 'sent';
+  if (existing) {
+    await db.prepare(
+      `UPDATE mileage_redemption_step_deliveries
+          SET attempt_count = attempt_count + 1, updated_at = ?
+        WHERE redemption_id = ? AND step_key = ?`,
+    ).bind(now, input.redemptionId, input.stepKey).run();
+    return 'send';
+  }
+  await db.prepare(
+    `INSERT INTO mileage_redemption_step_deliveries
+       (redemption_id, step_key, idempotency_key, status, created_at, updated_at)
+     VALUES (?, ?, ?, 'started', ?, ?)`,
+  ).bind(input.redemptionId, input.stepKey, input.idempotencyKey, now, now).run();
+  return 'send';
+}
+
+/**
+ * 外部送信が終わった手順を sent にする。確保していない行の確定は投げる。
+ * 呼び出し側はどちらも確定失敗として扱い、失敗には落とさない。
+ */
+export async function markRedemptionStepSent(
+  db: D1Database,
+  input: { redemptionId: string; stepKey: string },
+): Promise<void> {
+  const result = await db.prepare(
+    `UPDATE mileage_redemption_step_deliveries
+        SET status = 'sent', updated_at = ?
+      WHERE redemption_id = ? AND step_key = ? AND status = 'started'`,
+  ).bind(new Date().toISOString(), input.redemptionId, input.stepKey).run();
+  if ((result.meta?.changes ?? 0) !== 1) {
+    throw new MileageRedemptionConfirmError();
+  }
+}
+
 export async function getReservedMileageRewardCode(
   db: D1Database,
   redemptionId: string,

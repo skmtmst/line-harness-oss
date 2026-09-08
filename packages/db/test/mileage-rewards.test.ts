@@ -4,10 +4,12 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  claimRedemptionStep,
   createMileageRewardDraft,
   getMileageReward,
   importMileageRewardCodes,
   listMileageRedemptions,
+  markRedemptionStepSent,
   publishMileageReward,
   recordMileageRedemptionAttempt,
   refundMileageRewardRedemption,
@@ -393,6 +395,30 @@ describe('V6 mileage rewards', () => {
     // 成功した交換は失敗の一覧から消える。
     const failed = await listMileageRedemptions(db, { lineAccountId: 'account-1', limit: 20, offset: 0 });
     expect(failed).toMatchObject({ items: [], pagination: { total: 0 } });
+  });
+
+  it('marks a sent step so a retry skips it instead of resending', async () => {
+    const draft = await createMileageRewardDraft(db, {
+      lineAccountId: 'account-1',
+      draft: { name: '500円引き', rewardKind: 'coupon', requiredMiles: 300 },
+    });
+    await importMileageRewardCodes(db, {
+      rewardId: draft.id, lineAccountId: 'account-1',
+      codes: [{ ciphertext: 'encrypted-code', fingerprint: 'fingerprint-1' }],
+    });
+    await publishMileageReward(db, { id: draft.id, lineAccountId: 'account-1' });
+    const reserved = await reserveMileageRewardRedemption(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', rewardId: draft.id,
+      idempotencyKey: 'redeem-step', requestFingerprint: 'fp-step',
+    });
+    const step = { redemptionId: reserved.redemption.id, stepKey: '0:w1', idempotencyKey: 'step-key-1' };
+    expect(await claimRedemptionStep(db, step)).toBe('send');
+    await markRedemptionStepSent(db, step);
+    // 送り済みは二度目を送らない。確保していない確定は投げる。
+    expect(await claimRedemptionStep(db, step)).toBe('sent');
+    await expect(markRedemptionStepSent(db, {
+      redemptionId: reserved.redemption.id, stepKey: '0:missing',
+    })).rejects.toMatchObject({ name: 'MileageRedemptionConfirmError' });
   });
 
   it('rejects unsupported or more than 15 reward target conditions', async () => {
