@@ -12,7 +12,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import ListKpis from '@/components/shared/list-kpis'
 import { PRESETS as LIST_STATE_PRESETS } from '@/components/shared/list-state'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
-import FolderPanel from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import Button from '@/components/shared/button'
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -146,15 +146,16 @@ export default function RemindersPage() {
       const reminderStats = stats.reminders as typeof stats.reminders & { failed?: number }
       return [{ title: 'リマインダ数', value: reminderStats.total, unit: '件', detail: `有効 ${reminderStats.active}件` }, { title: '送信予定', value: reminderStats.waiting, unit: '通', detail: '今後7日' }, { title: '今月の送信', value: reminderStats.sentThisMonth, unit: '通', detail: '正常送信' }, { title: '失敗', value: reminderStats.failed ?? null, unit: '通', detail: '要確認' }]
     }} /></div>
-    <div className="mb-3 flex gap-2"><Button onClick={() => setFolderDialogOpen(true)}>フォルダを追加</Button><Button href="/reminders/new" variant="primary">リマインダを作成</Button></div>
+    <div className="mb-3 flex gap-2"><Button href="/reminders/new" variant="primary">リマインダを作成</Button></div>
     {error ? <div className="bg-danger-bg text-danger mb-3 rounded-lg p-3 text-sm">{LIST_STATE_PRESETS.error.title}。{LIST_STATE_PRESETS.error.description}</div> : null}
     {moveError ? <div className="bg-danger-bg text-danger mb-3 rounded-lg p-3 text-sm">{moveError}</div> : null}
-    <div data-design="Body" className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+    <div data-design="Body" style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
       {foldersError ? <div className="bg-danger-bg text-danger rounded-lg p-3 text-sm lg:col-span-2">フォルダを読み込めませんでした。<Button className="ml-2" onClick={() => void loadFolders()}>フォルダを再読み込み</Button></div> : null}
       <FolderPanel
         total={loading || error ? '—' : `${listTotal}件`}
         activeId={folderFilter}
         onSelect={setFolderFilter}
+        onAddFolder={() => setFolderDialogOpen(true)}
         rows={[
           { id: '', label: 'すべて', count: listTotal },
           ...folders.map((folder) => ({

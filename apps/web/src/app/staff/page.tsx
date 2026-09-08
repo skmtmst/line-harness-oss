@@ -26,6 +26,7 @@ import {
 import type { StaffMember } from '@line-crm/shared'
 import { csvCell } from '@/lib/presentation'
 import { isActiveAdministrator, matchStaffMember, scopeBundleToStaffRole, staffActionPolicy } from './staff-actions'
+import { PERMISSION_LABELS, permissionLabel } from './permission-labels'
 
 type Channel = { email: boolean; line: boolean }
 const ROLE_LABEL: Record<string, string> = { owner: '管理者', admin: '管理者', staff: '運用', viewer: '見るだけ' }
@@ -49,9 +50,13 @@ const NOTIFICATIONS = [
   ['operations', '運用状態のエラー', '異常を検知したとき'], ['emergency', '緊急停止・復旧', '停止または復旧したとき'],
   ['security', 'ログイン・権限変更', 'ログインや権限が変わったとき'], ['updates', 'システム更新', '更新が完了したとき'],
 ] as const
-const PERMISSIONS = [
-  ['/', 'ダッシュボード'], ['/chats', '受信箱'], ['/friends', '友だち'], ['/tags', '友だち属性'], ['/scenarios', 'シナリオ配信'], ['/broadcasts', '一斉配信'], ['/reminders', 'リマインダ'], ['/auto-replies', '自動応答'], ['/templates', 'テンプレート'], ['/rich-menus', 'リッチメニュー'], ['/form-submissions', '回答フォーム'], ['/contents/vars', '共通情報'], ['/contents', '登録メディア一覧'], ['/analytics', '分析'], ['/automations', 'オートメーション'], ['/webhooks', '外部連携'], ['/booking/bookings', '予約管理'], ['/ec-commerce', 'ECデータ連携'], ['/line-notifications', 'LINE通知'], ['/nen-campaigns', 'フォロー配信'], ['/nen-members', '投稿写真審査'],
-] as const
+/*
+ * 編集窓で付け外しできる顔ぶれはこの21件のまま。追加画面の分類表とは
+ * 載せる顔ぶれが違うが、表示名は `permission-labels.ts` が正本。
+ * 載せる顔ぶれ自体をそろえるかは仕様判断が要るので変えない(#581)。
+ */
+const EDIT_PERMISSION_PATHS = ['/', '/chats', '/friends', '/tags', '/scenarios', '/broadcasts', '/reminders', '/auto-replies', '/templates', '/rich-menus', '/form-submissions', '/contents/vars', '/contents', '/analytics', '/automations', '/webhooks', '/booking/bookings', '/ec-commerce', '/line-notifications', '/nen-campaigns', '/nen-members'] as const
+const PERMISSIONS: Array<readonly [string, string]> = EDIT_PERMISSION_PATHS.map((path) => [path, PERMISSION_LABELS[path]] as const)
 const STAFF_TAB_KEYS = [
   { key: 'members', label: 'いまいる人' }, { key: 'invited', label: '招待中' },
   { key: 'audit', label: '入った記録' }, { key: 'roles', label: '権限のかたまり' },
@@ -63,6 +68,7 @@ const LIST_SORT_OPTIONS = [
 ]
 
 function messageOf(error: unknown): string { return error instanceof ApiError || error instanceof Error ? error.message : '通信に失敗しました' }
+/* KPI札の高さ105px・角丸18pxは固定値のまま。変えるときは設計の確認が要る(#581)。 */
 function Kpi({ label, value, unit, note }: { label: string; value: string; unit?: string; note: string }) { return <div className="flex h-[105px] flex-col gap-[5px] rounded-[18px] border border-hairline bg-canvas p-[15px]"><p className="text-xs font-semibold leading-[1.45] text-ink-faint">{label}</p><div className="flex h-[29px] items-start gap-1"><p className="text-xl font-bold leading-[1.45] tabular-nums text-ink">{value}</p>{unit && <span className="mt-3 text-xs font-medium leading-[1.45] text-ink-faint">{unit}</span>}</div><p className="text-[11px] leading-[1.45] text-ink-faint">{note}</p></div> }
 function auditActionLabel(action: string): string {
   const normalized = action.toLowerCase()
@@ -74,7 +80,7 @@ function auditActionLabel(action: string): string {
   return '操作記録'
 }
 function formatStaffDate(value: string | undefined): string { if (!value) return 'まだ入っていません'; const date = new Date(value); return Number.isNaN(date.getTime()) ? '日時を取得できませんでした' : date.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }
-function permissionSummary(member: StaffMember): string { if (member.role === 'owner' || member.role === 'admin') return 'すべての画面'; if (member.permissionKeys.length === 0) return member.role === 'viewer' ? '閲覧できる画面は未設定' : '表示する機能は未設定'; const labels = member.permissionKeys.map((key) => PERMISSIONS.find(([path]) => path === key)?.[1] ?? '').filter(Boolean); return labels.length > 0 ? labels.join('・') : `${member.permissionKeys.length}機能` }
+function permissionSummary(member: StaffMember): string { if (member.role === 'owner' || member.role === 'admin') return 'すべての画面'; if (member.permissionKeys.length === 0) return member.role === 'viewer' ? '閲覧できる画面は未設定' : '表示する機能は未設定'; const labels = member.permissionKeys.map((key) => permissionLabel(key)).filter(Boolean); return labels.length > 0 ? labels.join('・') : `${member.permissionKeys.length}機能` }
 function downloadAuditCsv(rows: AuditEventItem[]): void {
   const body = [
     ['日時', 'ユーザー', '操作', '対象', '結果', '接続元'],
@@ -168,6 +174,7 @@ function PermissionScopeView({ user, memberId, canSave, onClose, onSaved }: {
   ] as const
   return <div data-design-node="EOTS4" className="pb-24">
     <div className="mb-4 flex items-center justify-between"><nav className="text-xs text-ink-faint"><span className="font-bold text-action">ログインユーザー</span>　›　<span className="font-bold text-action">{user.name}</span>　›　見せる範囲</nav><Button variant="secondary">ほかの人と同じにする</Button></div>
+    {/* 右欄390pxは固定値のまま。変えるときは設計の確認が要る(#581)。 */}
     <div className="grid items-start gap-4" style={{ gridTemplateColumns: 'minmax(0, 1fr) 390px' }}>
       <main className="space-y-3">
         <section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-base font-bold text-ink">かたまりから選ぶ</h2><p className="mt-1 text-xs text-ink-faint">よく使う組み合わせを用意しています。選んでから、下で細かく直せます。</p><div className="mt-3 grid grid-cols-4 gap-3">{bundles.map(([value, label, count, note]) => <button key={value} type="button" onClick={() => setBundle(value)} className={`rounded-control border p-3 text-left ${bundle === value ? 'border-accent bg-accent-soft' : 'border-divider-soft bg-canvas'}`}><span className="flex items-center justify-between"><span className="text-sm font-bold text-ink">{label}</span><span className="text-xs text-ink-faint">{count}</span></span><span className={`mt-2 block text-xs ${bundle === value ? 'font-semibold text-success' : 'text-ink-faint'}`}>{note}</span></button>)}</div></section>
@@ -202,7 +209,7 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
     return () => { active = false }
   }, [administrator, member.id])
   const toggleNotification = (key: string, channel: keyof Channel) => setNotifications((current) => ({ ...current, [key]: { ...current[key], [channel]: !current[key][channel] } }))
-  const save = async () => { if (!email.trim()) return setError('メールアドレスを入力してください'); setSaving(true); setError(''); try { await api.staff.update(member.id, { name: administrator ? name.trim() : undefined, email: email.trim(), role: administrator ? role : undefined, permissionKeys: administrator && role === 'staff' ? permissions : undefined, notificationPreferences: notifications }); await onSaved(); onClose() } catch (caught) { setError(messageOf(caught)) } finally { setSaving(false) } }
+  const save = async () => { if (!email.trim()) return setError('メールアドレスを入力してください'); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setError('正しいメールアドレスを入力してください'); setSaving(true); setError(''); try { await api.staff.update(member.id, { name: administrator ? name.trim() : undefined, email: email.trim(), role: administrator ? role : undefined, permissionKeys: administrator && role === 'staff' ? permissions : undefined, notificationPreferences: notifications }); await onSaved(); onClose() } catch (caught) { setError(messageOf(caught)) } finally { setSaving(false) } }
   /**
    * LINE連携を外す。
    *
