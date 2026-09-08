@@ -68,7 +68,10 @@ describe('V6 一斉配信詳細の、取れない数の断り', () => {
     expect(PAGE).toContain('まだ送っていません')
   })
 
-  it('押せない操作の理由を吹き出しだけに置かない', () => {
-    expect(PAGE).toContain('種にして作り直す口がまだないため押せません')
+  it('作り直しは押せる操作として置き、押せない言い訳を残さない', () => {
+    // #605 で実動作へ接続。押せない前提の文言は消す。
+    expect(PAGE).toContain('/broadcasts/new?duplicateFrom=')
+    expect(PAGE).toContain('同じ設定で作り直す')
+    expect(PAGE).not.toContain('種にして作り直す口がまだないため押せません')
   })
 })

@@ -530,7 +530,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
         </div>
       ) : !crossResult ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-          たて・よこの軸を選び、「この30日を集計」を押してください。
+          たて・よこの軸を選び、「この{crossDays}日を集計」を押してください。
         </div>
       ) : cells.length === 0 ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
@@ -697,6 +697,8 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
   const [runError, setRunError] = useState('')
+  // まだ1度も集計していない状態。壊れているのか未集計なのか分ける(点検#508軽13)。
+  const [noRun, setNoRun] = useState(false)
   // 一覧の取得失敗は空表示と分ける。失敗したまま「まだありません」と出すと、
   // あるものを無いと勘違いして作り直す(点検#508の中3)。
   const [listError, setListError] = useState('')
@@ -743,13 +745,15 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
     setFunnelAudience(null)
     setRun(null)
     setRunError('')
+    setNoRun(false)
     void api.analytics.v6Funnels.latestRun(accountId, selected).then((res) => {
       if (!active) return
       if (res.success) {
         setRun(res.data)
         setGroupKey(res.data.groups[0]?.key ?? 'all')
       }
-      else if (res.error !== 'Not found') setRunError(res.error)
+      else if (res.error === 'Not found') setNoRun(true)
+      else setRunError(res.error)
     })
     return () => {
       active = false
@@ -965,6 +969,7 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
               ／データ締切 {formatAnalyticsDateTime(run.dataCutoffAt)}
             </p>}
             {runError && <p className="text-danger mt-2 text-xs">{runError}</p>}
+            {noRun && !run && <p className="text-ink-faint mt-2 text-xs">まだ集計がありません。「この30日を再集計」を押してください</p>}
             {run?.stateReason && <p className="text-warning mt-2 text-xs">{run.stateReason}</p>}
             {run && run.groups.length > 1 && (
               <div className="mt-3 max-w-xs">
@@ -1153,6 +1158,8 @@ function FunnelForm({
   ]
 
   const [name, setName] = useState('')
+  // 何日以内の通過で数えるか(点検#508軽11)。裏は1〜365日を受け付ける。
+  const [windowDays, setWindowDays] = useState('30')
   const [steps, setSteps] = useState([
     { label: '', kind: 'tag', value: '' },
     { label: '', kind: 'conversion', value: '' },
@@ -1194,7 +1201,7 @@ function FunnelForm({
     try {
       const res = await api.analytics.v6Funnels.create(accountId, {
         name: name.trim(),
-        windowDays: 30,
+        windowDays: Number(windowDays),
         steps: steps.map((s) => ({
           label: s.label.trim(),
           kind: s.kind,
@@ -1226,6 +1233,23 @@ function FunnelForm({
           onChange={(e) => setName(e.target.value)}
           placeholder="例: 友だち追加から購入まで"
           className="border-hairline rounded-control w-full max-w-md border px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div>
+        <label htmlFor="fn-window" className="text-ink-secondary mb-1 block text-sm font-medium">
+          何日以内の通過で数えるか
+        </label>
+        <SelectField
+          id="fn-window"
+          value={windowDays}
+          onChange={(e) => setWindowDays(e.target.value)}
+          options={[
+            { value: '7', label: '7日以内' },
+            { value: '30', label: '30日以内' },
+            { value: '90', label: '90日以内' },
+          ]}
+          className="max-w-md"
         />
       </div>
 
@@ -1348,6 +1372,7 @@ function useOverview<T>(load: () => Promise<OverviewResult<T>>, key: string) {
         if (active) setLoading(false)
       })
     return () => { active = false }
+    // 契約: loaderはkeyに含まれる値だけに依存すること。キーに含まれない値をloaderが読んだらキーを足す。
     // loaderはkeyが表すアカウント・期間が変わった時だけ実行する。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
@@ -1407,16 +1432,24 @@ function OverviewState({ loading, error }: { loading: boolean; error: string }) 
   return null
 }
 
+// 経路の内訳だけを後から読む(点検#508軽10)。概要と同時に2つの重い集計を走らせない。
+// 概要が出てから描かれるので、この関数の読み込みは概要の後に始まる。
+// 取得中は表の場所だけ読み込み表示にする。
+function RouteBreakdown({ accountId, from, to }: { accountId: string; from: string; to: string }) {
+  const routeState = useOverview<AnalyticsRoutesOverview>(
+    () => api.analytics.routesOverview(accountId, { from, to }),
+    `${accountId}:${from}:${to}:friends-routes`,
+  )
+  if (!routeState.data) return <OverviewState loading={routeState.loading} error={routeState.error} />
+  return <table className="w-full table-fixed"><thead><TableHeadRow><Th>経路</Th><Th align="right">増えた友だち</Th><Th align="right">現在つながっている</Th><Th align="right">1人追加あたり費用</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{routeState.data.data.routes.map((route) => <tr key={route.id} className="text-sm"><td className="px-4 py-3"><p className="truncate font-medium" title={route.name}>{route.name}</p><p className="mt-1 truncate text-xs text-ink-faint">{route.refCode ? `ref=${route.refCode}` : '参照コードなし'}</p></td><td className="px-4 py-3 text-right"><MetricCell metric={route.friendAdds} /></td><td className="px-4 py-3 text-right"><MetricCell metric={route.currentFriends} /></td><td className="px-4 py-3 text-right"><MetricCell metric={route.costPerFriend} currency /></td></tr>)}</tbody></table>
+}
+
 function FriendsOverviewTab({ accountId }: { accountId: string }) {
   const range = useMemo(() => rangeFor(29), [])
   const [selectedDate, setSelectedDate] = useState('')
   const state = useOverview<AnalyticsFriendsOverview>(
     () => api.analytics.friendsOverview(accountId, range),
     `${accountId}:${range.from}:${range.to}:friends`,
-  )
-  const routeState = useOverview<AnalyticsRoutesOverview>(
-    () => api.analytics.routesOverview(accountId, range),
-    `${accountId}:${range.from}:${range.to}:friends-routes`,
   )
   if (!state.data) return <OverviewState loading={state.loading} error={state.error} />
   const overview = state.data.data
@@ -1467,7 +1500,7 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
     </section>
     <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
       <div className="border-b border-hairline px-4 py-3"><h2 className="font-semibold text-ink">どこから増えたか</h2><p className="mt-1 text-xs text-ink-faint">「経路と成果」に接続された経路ごとの、この30日の実測です。</p></div>
-      {routeState.data ? <table className="w-full table-fixed"><thead><TableHeadRow><Th>経路</Th><Th align="right">増えた友だち</Th><Th align="right">現在つながっている</Th><Th align="right">1人追加あたり費用</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{routeState.data.data.routes.map((route) => <tr key={route.id} className="text-sm"><td className="px-4 py-3"><p className="truncate font-medium" title={route.name}>{route.name}</p><p className="mt-1 truncate text-xs text-ink-faint">{route.refCode ? `ref=${route.refCode}` : '参照コードなし'}</p></td><td className="px-4 py-3 text-right"><MetricCell metric={route.friendAdds} /></td><td className="px-4 py-3 text-right"><MetricCell metric={route.currentFriends} /></td><td className="px-4 py-3 text-right"><MetricCell metric={route.costPerFriend} currency /></td></tr>)}</tbody></table> : <OverviewState loading={routeState.loading} error={routeState.error} />}
+      <RouteBreakdown accountId={accountId} from={range.from} to={range.to} />
     </section>
   </div>
 }
@@ -1678,7 +1711,7 @@ const SAVED_STATE_TONES: Record<SavedAnalyticsSnapshot['state'], ChipTone> = {
   failed: 'danger',
 }
 
-function SavedAnalyticsTab({ accountId }: { accountId: string }) {
+function SavedAnalyticsTab({ accountId, onCountChange }: { accountId: string; onCountChange?: (count: number | null) => void }) {
   const [items, setItems] = useState<SavedAnalyticsSummary[]>([])
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState('')
@@ -1701,9 +1734,13 @@ function SavedAnalyticsTab({ accountId }: { accountId: string }) {
         if (!response.success) throw new Error(response.error)
         setItems(response.data)
         setSelectedId(response.data[0]?.id ?? '')
+        // 件数表示はこの取得結果を使い回す(点検#508軽9)。タブ名のためだけにもう1回叩かない。
+        onCountChange?.(response.data.length)
       })
       .catch((caught: unknown) => {
-        if (active) setError(caught instanceof Error ? caught.message : '保存した分析を確認できませんでした')
+        if (!active) return
+        setError(caught instanceof Error ? caught.message : '保存した分析を確認できませんでした')
+        onCountChange?.(null)
       })
       .finally(() => {
         if (active) setLoading(false)
@@ -1902,14 +1939,9 @@ function AnalyticsInner() {
       active = false
     }
   }, [])
+  // 保存件数は保存タブの取得結果を使い回す(点検#508軽9)。開く前は件数を出さない。
   useEffect(() => {
-    let active = true
     setSavedCount(null)
-    if (!selectedAccountId) return () => { active = false }
-    void api.analytics.saved.list(selectedAccountId).then((response) => {
-      if (active && response.success) setSavedCount(response.data.length)
-    })
-    return () => { active = false }
   }, [selectedAccountId])
   if (accountLoading) {
     return <div className="text-ink-faint p-8 text-center text-sm">分析を読み込んでいます</div>
@@ -1937,7 +1969,7 @@ function AnalyticsInner() {
       {tab === 'cross' && <CrossTab accountId={selectedAccountId} canManage={canManage} />}
       {tab === 'funnel' && <FunnelTab accountId={selectedAccountId} canManage={canManage} />}
       {tab === 'url-clicks' && <UrlClicksOverviewTab accountId={selectedAccountId} />}
-      {tab === 'saved' && <SavedAnalyticsTab accountId={selectedAccountId} />}
+      {tab === 'saved' && <SavedAnalyticsTab accountId={selectedAccountId} onCountChange={setSavedCount} />}
     </div>
   )
 }

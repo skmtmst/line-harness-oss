@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { bookingApi, type BookingAdminDetail, type BookingMenu, type BookingRequest } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -36,8 +36,8 @@ const statusBadgeColor: Record<string, string> = {
   rejected: 'bg-canvas-sunken text-ink-secondary',
   expired: 'bg-canvas-sunken text-ink-secondary',
   cancelled: 'bg-canvas-sunken text-ink-secondary',
-  completed: 'bg-blue-100 text-blue-800',
-  no_show: 'bg-red-100 text-red-800',
+  completed: 'bg-info-bg text-info',
+  no_show: 'bg-danger-bg text-danger',
 }
 
 const statusLabel: Record<string, string> = {
@@ -62,6 +62,8 @@ const actionLabel: Record<string, string> = {
 const PAGE_SIZE = 20
 
 function formatJpDateTime(iso: string): string {
+  // 不正な日時が来たら Invalid Date を出さず「—」に逃がす(点検#516軽6)。
+  if (Number.isNaN(new Date(iso).getTime())) return '—'
   return new Date(iso).toLocaleString('ja-JP', {
     year: 'numeric',
     month: '2-digit',
@@ -74,6 +76,7 @@ function formatJpDateTime(iso: string): string {
 
 /** 表の日時。設計は年を出していない（08/18 14:00）。 */
 function formatShort(iso: string): string {
+  if (Number.isNaN(new Date(iso).getTime())) return '—'
   return new Date(iso).toLocaleString('ja-JP', {
     month: '2-digit',
     day: '2-digit',
@@ -84,6 +87,7 @@ function formatShort(iso: string): string {
 }
 
 function formatJpTime(iso: string): string {
+  if (Number.isNaN(new Date(iso).getTime())) return '—'
   return new Date(iso).toLocaleTimeString('ja-JP', {
     hour: '2-digit',
     minute: '2-digit',
@@ -129,6 +133,11 @@ export default function BookingsPage() {
   // 自動で「コピー済」が消えるので、A の URL をコピーしたまま B 画面で
   // 「B フォームと思い込んで送信」する事故を防ぐ。
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null)
+  // コピー済み表示を消すタイマー。外したままにすると警告の元になる(点検#516軽6)。
+  const copyTimer = useRef<number | null>(null)
+  useEffect(() => () => {
+    if (copyTimer.current !== null) window.clearTimeout(copyTimer.current)
+  }, [])
   const [decideTarget, setDecideTarget] = useState<{ id: string; action: 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete' } | null>(null)
   const [deciding, setDeciding] = useState(false)
   const [decideError, setDecideError] = useState('')
@@ -153,7 +162,8 @@ export default function BookingsPage() {
     try {
       await navigator.clipboard.writeText(url)
       setCopiedUrl(url)
-      setTimeout(() => {
+      if (copyTimer.current !== null) window.clearTimeout(copyTimer.current)
+      copyTimer.current = window.setTimeout(() => {
         setCopiedUrl((cur) => (cur === url ? null : cur))
       }, 2000)
     } catch {
@@ -590,7 +600,7 @@ export default function BookingsPage() {
                           <div className="inline-flex items-center gap-1">
                             <button
                               onClick={() => setDetailId(b.id)}
-                              className="text-ink-secondary bg-canvas-sunken rounded-md px-3 py-1 text-xs font-medium hover:bg-gray-200"
+                              className="text-ink-secondary bg-canvas-sunken rounded-md px-3 py-1 text-xs font-medium hover:bg-hairline"
                             >
                               詳細
                             </button>
@@ -630,6 +640,11 @@ export default function BookingsPage() {
                 </button>
                 <span className="text-ink-faint text-xs">予約履歴URLは準備中です</span>
               </div>
+            ) : !workerBase ? (
+              // 配信先のURLが作れないのは、LIFF未設定ではなくAPI接続先の欠落(点検#516軽4)。
+              <p className="text-warning mt-2 text-xs">
+                予約URLを作れません。APIの接続先が設定されていません。管理者に連絡してください。
+              </p>
             ) : (
               <p className="text-warning mt-2 text-xs">
                 このアカウントには LIFF ID が未設定です。
@@ -873,19 +888,19 @@ function ActionButtons({
       <div className="inline-flex gap-1">
         <button
           onClick={() => onAction('complete')}
-          className="rounded-md bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
+          className="bg-info-bg text-info rounded-md px-3 py-1 text-xs font-medium hover:bg-hairline"
         >
           完了
         </button>
         <button
           onClick={() => onAction('no_show')}
-          className="rounded-md bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100"
+          className="bg-warning-bg text-warning rounded-md px-3 py-1 text-xs font-medium hover:bg-hairline"
         >
           無断
         </button>
         <button
           onClick={() => onAction('cancel')}
-          className="text-ink-secondary bg-canvas-sunken rounded-md px-3 py-1 text-xs font-medium hover:bg-gray-200"
+          className="text-ink-secondary bg-canvas-sunken rounded-md px-3 py-1 text-xs font-medium hover:bg-hairline"
         >
           取消
         </button>
