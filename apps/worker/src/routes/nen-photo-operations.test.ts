@@ -288,12 +288,13 @@ describe('photo review operations API', () => {
     expect(mocks.push).toHaveBeenNthCalledWith(
       1, 'https://worker.example', 'resolved-token', 'U1',
       [{ type: 'text', text: expect.stringContaining('5ポイント') }],
-      'nen-photo-review:decision-1', expect.any(Function),
+      // X-Line-Retry-Key はUUID形式が必須のため、UUIDの審査イベントIDをそのまま使う。
+      'decision-1', expect.any(Function),
     );
     expect(mocks.push).toHaveBeenNthCalledWith(
       2, 'https://worker.example', 'resolved-token', 'U1',
       [{ type: 'text', text: expect.stringContaining('人の顔や個人情報が写っている') }],
-      'nen-photo-review:decision-2', expect.any(Function),
+      'decision-2', expect.any(Function),
     );
     expect(mocks.claim).toHaveBeenCalledTimes(2);
     expect(mocks.claim).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
@@ -323,7 +324,7 @@ describe('photo review operations API', () => {
       },
     });
     mocks.push.mockImplementation(async (...args: unknown[]) => {
-      if (args[4] === 'nen-photo-review:decision-2') throw new Error('LINE unavailable');
+      if (args[4] === 'decision-2') throw new Error('LINE unavailable');
     });
     const { app } = bulkHarness({ recipients: ['photo-1', 'photo-2'] });
     const response = await app.request('/api/nen-members/photos/decisions/bulk', {
@@ -354,6 +355,13 @@ describe('photo review operations API', () => {
     }));
     expect(mocks.complete).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       decisionId: 'decision-2', status: 'failed', error: 'LINE unavailable',
+    }));
+    // 宛先不明分も送達台帳へ失敗として残す。再送口の拾い上げ対象になる。
+    expect(mocks.claim).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      decisionId: 'decision-9', lineAccountId: 'account-a',
+    }));
+    expect(mocks.complete).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      decisionId: 'decision-9', generation: 1, status: 'failed', error: '通知先が見つかりません',
     }));
   });
 
@@ -421,8 +429,9 @@ describe('photo review operations API', () => {
     expect(mocks.reconcile).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       lineAccountId: 'account-a',
     }));
+    // 復旧側は通知前の受付票だけ直す（受付票CAS）。確定側の新しい結果を上書きしない。
     expect(mocks.recordBulk).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-      receiptId: 'bulk-old', idempotencyKey: 'bulk-unknown-1',
+      receiptId: 'bulk-old', idempotencyKey: 'bulk-unknown-1', onlyIfPending: true,
     }));
   });
 

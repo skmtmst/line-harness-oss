@@ -272,7 +272,9 @@ describe('NEN photo review', () => {
     expect(mocks.push).toHaveBeenCalledWith(
       'https://worker.example', 'resolved-token', 'U1',
       [{ type: 'text', text: expect.stringContaining('人の顔や個人情報が写っている') }],
-      expect.stringMatching(/^nen-photo-review:/), expect.any(Function),
+      // X-Line-Retry-Key はLINE仕様でUUID形式が必須。接頭辞付きは実送信で失敗する。
+      expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
+      expect.any(Function),
     );
   });
 
@@ -374,7 +376,8 @@ describe('NEN photo review', () => {
     expect(mocks.push).toHaveBeenCalledWith(
       'https://worker.example', 'resolved-token', 'U1',
       [{ type: 'text', text: expect.stringContaining('人の顔や個人情報が写っている') }],
-      'nen-photo-review:decision-1', expect.any(Function),
+      // 再送も安定したUUID鍵（審査イベントID）で送る。
+      'decision-1', expect.any(Function),
     );
     const mirror = runs.find((entry) => entry.query.includes('review_notification_status'));
     expect(mirror?.bindings[0]).toBe('sent');
