@@ -4,7 +4,6 @@ import {
   getLinkClickSummary,
   getTrackedLinkStats,
   getBroadcastSummary,
-  getTagFieldCross,
   buildFunnelResult,
   getFunnelsWithCurrentVersions,
   getLegacyFunnels,
@@ -464,21 +463,6 @@ analytics.get('/api/analytics/broadcasts', async (c) => {
     return c.json({ success: true, data: items });
   } catch (err) {
     console.error('GET /api/analytics/broadcasts error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
-  }
-});
-
-// GET /api/analytics/cross?fieldId=... — タグ × 情報欄の値
-analytics.get('/api/analytics/cross', async (c) => {
-  try {
-    const account = await resolveAccount(c);
-    if (!account.ok) return account.response;
-    const fieldId = c.req.query('fieldId');
-    if (!fieldId) return c.json({ success: false, error: 'fieldId が必要です' }, 400);
-    const cells = await getTagFieldCross(c.env.DB, account.accountId, fieldId);
-    return c.json({ success: true, data: cells });
-  } catch (err) {
-    console.error('GET /api/analytics/cross error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

@@ -3981,7 +3981,7 @@
   "pixelDiff": {
     "thresholdPercent": 10,
     "heightDiffThresholdPx": 24,
-    "generatedAt": "2026-09-08T08:00:49.719Z",
+    "generatedAt": "2026-09-08T08:29:32.157Z",
     "comparedCount": 272,
     "unavailableCount": 0,
     "pixelAboveThresholdCount": 0,
@@ -4286,8 +4286,7 @@
         "diffPath": "docs/design-qa/inbox-v6/xGLVe-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:39:55.039Z"
+        "aboveThreshold": false
       }
     },
     {
@@ -4386,7 +4385,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -4435,7 +4434,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -4484,7 +4483,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -4583,7 +4582,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -4982,7 +4981,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -5181,7 +5180,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -5332,7 +5331,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -5381,7 +5380,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -5432,7 +5431,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -5483,7 +5482,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -6032,7 +6031,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -7132,8 +7131,7 @@
         "diffPath": "docs/design-qa/reminders-v6/M1EXwB-diff-1920.png",
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
-        "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:39:55.039Z"
+        "aboveThreshold": false
       }
     },
     {
@@ -7932,7 +7930,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -7981,7 +7979,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -8030,7 +8028,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -8579,7 +8577,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -9430,7 +9428,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -9479,7 +9477,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -9578,7 +9576,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -9627,7 +9625,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -9676,7 +9674,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -10025,7 +10023,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -11274,7 +11272,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -11373,7 +11371,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -11624,7 +11622,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -11775,7 +11773,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -11874,7 +11872,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -11975,7 +11973,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -12074,7 +12072,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -13225,7 +13223,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -13276,7 +13274,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -13327,7 +13325,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -13378,7 +13376,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -13479,7 +13477,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -13530,7 +13528,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -13981,7 +13979,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -14080,7 +14078,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -14129,7 +14127,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -14178,7 +14176,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -14229,7 +14227,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -14278,7 +14276,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -14377,7 +14375,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -14426,7 +14424,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -14475,7 +14473,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -14524,7 +14522,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -14823,7 +14821,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -15422,7 +15420,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -15571,7 +15569,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -15872,7 +15870,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -15973,7 +15971,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -16372,7 +16370,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -16471,7 +16469,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -16520,7 +16518,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -16621,7 +16619,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -16670,7 +16668,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -16921,7 +16919,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -16970,7 +16968,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {
@@ -17071,7 +17069,7 @@
         "pixelAboveThreshold": false,
         "heightAboveThreshold": false,
         "aboveThreshold": false,
-        "retainedFrom": "2026-09-08T07:34:04.503Z"
+        "retainedFrom": "2026-09-08T08:00:49.719Z"
       }
     },
     {

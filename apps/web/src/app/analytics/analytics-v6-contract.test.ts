@@ -27,6 +27,7 @@ describe('V6 機能20 分析', () => {
     ]) expect(API).toContain(path)
     expect(PAGE).toContain('api.analytics.v6Funnels.list')
     expect(PAGE).toContain('api.analytics.runCross')
+    expect(API).not.toContain('`/api/analytics/cross?account_id=')
     expect(PAGE).not.toContain('api.funnels.create')
     expect(PAGE).not.toContain('api.funnels.result')
   })

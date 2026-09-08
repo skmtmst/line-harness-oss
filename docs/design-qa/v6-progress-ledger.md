@@ -70,7 +70,7 @@
 | 1 | `JN6mQ` | 1-1-2 友だち追加QR | 5.5518% | 0px | 中央・中央 | docs | [差分画像](dashboard-v6/JN6mQ-diff-1920.png) | **一致** |
 | 1 | `NjK9q` | 1-1-3 対応受信の表示件数を開く | 5.3371% | +13px | 中央・右 | docs | [差分画像](dashboard-v6/NjK9q-diff-1920.png) | **一致** |
 | 1 | `Alekb` | 1-1-4 通知パネルを開く | 5.3306% | +13px | 下部・右 | docs | [差分画像](dashboard-v6/Alekb-diff-1920.png) | **一致** |
-| 2 | `xGLVe` | 2-1 受信箱 | 5.6072%（前回値） | 0px | 下部・中央 | docs | [差分画像](inbox-v6/xGLVe-diff-1920.png) | **一致** |
+| 2 | `xGLVe` | 2-1 受信箱 | 5.6072% | 0px | 下部・中央 | docs | [差分画像](inbox-v6/xGLVe-diff-1920.png) | **一致** |
 | 2 | `NfgOs` | 2-2 テンプレート選択 | 8.3011% | 0px | 中央・中央 | docs | [差分画像](inbox-v6/NfgOs-diff-1920.png) | **一致** |
 | 2 | `H3lAOB` | 2-3 顧客情報パネル非表示 | 5.7926%（前回値） | 0px | 下部・右 | docs | [差分画像](inbox-v6/H3lAOB-diff-1920.png) | **一致** |
 | 2 | `Xi4x9` | 2-4 右パネル表示設定 | 7.6287%（前回値） | 0px | 上部・中央 | docs | [差分画像](inbox-v6/Xi4x9-diff-1920.png) | **一致** |
@@ -127,7 +127,7 @@
 | 6 | `sqFXf` | 6-1-L 対象条件を編集 | 7.1272% | 0px | 下部・中央 | docs | [差分画像](broadcasts-v6/sqFXf-diff-1920.png) | **一致** |
 | 6 | `xkRDb` | 6-1-M フォルダ操作 | 3.2987% | 0px | 中央・左 | docs | [差分画像](broadcasts-v6/xkRDb-diff-1920.png) | **一致** |
 | 6 | `TmHjF` | 6-1-N 一覧の状態（空・読込・エラー） | 2.8644% | 0px | 中央・中央 | docs | [差分画像](broadcasts-v6/TmHjF-diff-1920.png) | **一致** |
-| 7 | `M1EXwB` | 7-1 リマインダ | 3.5255%（前回値） | 0px | 上部・左 | docs | [差分画像](reminders-v6/M1EXwB-diff-1920.png) | **一致** |
+| 7 | `M1EXwB` | 7-1 リマインダ | 3.5255% | 0px | 上部・左 | docs | [差分画像](reminders-v6/M1EXwB-diff-1920.png) | **一致** |
 | 7 | `uJP22` | 7-1-A リマインダを作成 | 6.2984% | 0px | 中央・右 | docs | [差分画像](reminders-v6/uJP22-diff-1920.png) | **一致** |
 | 7 | `J64xI` | 7-1-B 通知ステップ編集 | 6.4674% | 0px | 中央・右 | docs | [差分画像](reminders-v6/J64xI-diff-1920.png) | **一致** |
 | 7 | `s7T2dz` | 7-1-C 対象と終了条件 | 4.0332% | 0px | 中央・左 | docs | [差分画像](reminders-v6/s7T2dz-diff-1920.png) | **一致** |
