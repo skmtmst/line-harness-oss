@@ -137,6 +137,14 @@ export default function MediaLibraryPage() {
   const [renameError, setRenameError] = useState('')
   /** 取得中の札。保存URLへ直接行かず、認証と監査を通る口から受け取る。 */
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set())
+
+  /**
+   * 管理画面の表示は認証付きの口だけを使う。item.url は配信用の公開URL
+   * （配信本文に埋めてLINEが取りに行く）で、画面の表示には使わない。
+   * 札はアカウントを選んだときだけ並ぶので、空のときは出さない。
+   */
+  const displaySrc = (item: MediaItem): string =>
+    selectedAccountId ? api.media.contentUrl(item.id, selectedAccountId) : ''
   const [detailsFor, setDetailsFor] = useState<MediaItem | null>(null)
   const [replacementFor, setReplacementFor] = useState<MediaItem | null>(null)
   /*
@@ -760,7 +768,7 @@ export default function MediaLibraryPage() {
                   // 静的書き出しのため next/image の最適化は使えない。
                   // 一覧20件の同時取得を避けるため遅延読み込みにする。
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={item.url} alt={item.filename} loading="lazy" decoding="async" className="h-full w-full object-contain" />
+                  <img src={displaySrc(item)} alt={item.filename} loading="lazy" decoding="async" className="h-full w-full object-contain" />
                 ) : (
                   <span className="text-ink-faint text-xs">
                     {item.kind === 'video' ? '動画' : item.kind === 'audio' ? '音声' : 'ファイル'}
@@ -1115,18 +1123,18 @@ export default function MediaLibraryPage() {
           {preview.kind === 'image' ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={preview.url}
+              src={displaySrc(preview)}
               alt={preview.filename}
               className="max-h-full max-w-full object-contain"
             />
           ) : preview.kind === 'video' ? (
-            <video src={preview.url} controls className="max-h-full max-w-full" />
+            <video src={displaySrc(preview)} controls className="max-h-full max-w-full" />
           ) : preview.kind === 'audio' ? (
-            <audio src={preview.url} controls />
+            <audio src={displaySrc(preview)} controls />
           ) : (
             <div className="rounded-card bg-canvas p-6 text-center text-sm">
               <p className="text-ink font-medium">{preview.filename}</p>
-              <a href={preview.url} target="_blank" rel="noreferrer" className="text-info mt-2 inline-block hover:underline">
+              <a href={displaySrc(preview)} target="_blank" rel="noreferrer" className="text-info mt-2 inline-block hover:underline">
                 別のタブで開く
               </a>
             </div>

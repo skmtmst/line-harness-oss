@@ -215,6 +215,12 @@ function hasMediaSignature(bytes: Uint8Array, mimeType: string): boolean {
   }
 }
 
+/**
+ * `url` は配信用の公開URLとして返す。配信本文に文字列として埋まり、
+ * LINEのサーバーが認証なしで取りに行くため、公開のままにしている。
+ * 管理画面の表示・ダウンロードには使わず、認証付きの
+ * `/api/media/:id/content`・`/api/media/:id/download` を使う。
+ */
 function serializeMedia(row: Media, workerUrl: string) {
   return {
     id: row.id,
@@ -677,39 +683,74 @@ contents.get('/api/media', async (c) => {
 });
 
 /**
- * 登録メディアのダウンロード。
+ * 管理画面がメディアの中身を読むための共通処理。
  *
- * 一覧が返す `url` は認証なしの保存URL（GET /images/* はLINE配信など
- * 公開系も使うため公開のまま）なので、管理画面のダウンロード操作は
- * こちらを通す。担当者の役割とLINEアカウントの可視範囲を確認し、
+ * 一覧が返す `url` は配信用の公開URL（配信本文に文字列として埋まり、
+ * LINEが取りに行くため公開のまま）で、管理画面の表示には使わない。
+ * こちらは担当者の役割とLINEアカウントの可視範囲を毎回確認する。
+ * 監査行は download の成功・拒否だけに絞り、一覧の縮小表示のような
+ * 閲覧のたびには残さない。
+ */
+async function serveMediaFile(
+  c: Context<Env>,
+  opts: { auditDownload: boolean; disposition: 'attachment' | 'inline' },
+) {
+  const id = c.req.param('id');
+  const accountId = c.req.query('accountId')?.trim();
+  if (!id) return c.json({ success: false, error: 'Not found' }, 404);
+  if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    if (opts.auditDownload) {
+      auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
+    }
+    return c.json({ success: false, error: 'Not found' }, 404);
+  }
+  const media = await getMediaById(c.env.DB, id, accountId);
+  if (!media) {
+    if (opts.auditDownload) {
+      auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
+    }
+    return c.json({ success: false, error: 'Not found' }, 404);
+  }
+  const object = await c.env.IMAGES.get(media.r2_key);
+  if (!object) return c.json({ success: false, error: 'Not found' }, 404);
+  if (opts.auditDownload) {
+    auditLog(c, 'media.download', { kind: 'media', id }, { result: 'success', lineAccountId: accountId });
+  }
+  const disposition = opts.disposition === 'attachment'
+    ? `attachment; filename="download"; filename*=UTF-8''${encodeURIComponent(media.filename)}`
+    : `inline; filename="view"; filename*=UTF-8''${encodeURIComponent(media.filename)}`;
+  return new Response(object.body, {
+    headers: {
+      'Content-Type': media.mime_type,
+      'Content-Disposition': disposition,
+      'Cache-Control': 'private, no-store',
+    },
+  });
+}
+
+/**
+ * 登録メディアのダウンロード。添付ファイルとして受け渡し、
  * 成功・拒否のどちらもURLや秘密値なしで監査へ残す。
  */
 contents.get('/api/media/:id/download', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
-    const id = c.req.param('id');
-    const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
-    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-      auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
-      return c.json({ success: false, error: 'Not found' }, 404);
-    }
-    const media = await getMediaById(c.env.DB, id, accountId);
-    if (!media) {
-      auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
-      return c.json({ success: false, error: 'Not found' }, 404);
-    }
-    const object = await c.env.IMAGES.get(media.r2_key);
-    if (!object) return c.json({ success: false, error: 'Not found' }, 404);
-    auditLog(c, 'media.download', { kind: 'media', id }, { result: 'success', lineAccountId: accountId });
-    return new Response(object.body, {
-      headers: {
-        'Content-Type': media.mime_type,
-        'Content-Disposition': `attachment; filename="download"; filename*=UTF-8''${encodeURIComponent(media.filename)}`,
-        'Cache-Control': 'private, no-store',
-      },
-    });
+    return await serveMediaFile(c, { auditDownload: true, disposition: 'attachment' });
   } catch (err) {
     console.error('GET /api/media/:id/download error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * 登録メディアの表示用中身。縮小表示・試し見・ファイル開きが使う。
+ * 認可は download と同じだが、閲覧のたびに監査行は残さない。
+ */
+contents.get('/api/media/:id/content', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    return await serveMediaFile(c, { auditDownload: false, disposition: 'inline' });
+  } catch (err) {
+    console.error('GET /api/media/:id/content error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

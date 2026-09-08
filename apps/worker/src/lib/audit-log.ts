@@ -89,6 +89,35 @@ function commonAuditWriter(): typeof recordAuditEvent | null {
   }
 }
 
+/**
+ * 統括の境界で止めた要求のうち、routeまで届かずとも正規の操作名で
+ * 残すべきもの。route側の監査は上流で止まると動かないため、境界自身が
+ * 同じ操作名・同じ結果で1件だけ残す。二重記録にしないよう、ここに載った
+ * 操作の拒否は境界側が持ち、route側の同じ記録は直接掛けの場合の
+ * 予備として残す。本番の順序では境界で止まるため二重にはならない。
+ */
+const CANONICAL_DENY_AUDITS: Array<{
+  method: string;
+  pattern: RegExp;
+  action: AuditAction;
+  kind: string;
+}> = [
+  { method: 'GET', pattern: /^\/api\/media\/([^/]+)\/download(?:\/|$)/, action: 'media.download', kind: 'media' },
+];
+
+export function canonicalDenyAuditFor(
+  method: string,
+  path: string,
+): { action: AuditAction; kind: string; id: string | null } | null {
+  for (const entry of CANONICAL_DENY_AUDITS) {
+    if (method.toUpperCase() !== entry.method) continue;
+    const match = entry.pattern.exec(path);
+    if (!match) continue;
+    return { action: entry.action, kind: entry.kind, id: match[1] ?? null };
+  }
+  return null;
+}
+
 export function auditLog(
   c: Context<Env>,
   action: AuditAction,

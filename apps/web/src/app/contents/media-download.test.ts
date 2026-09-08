@@ -40,4 +40,34 @@ describe('登録メディアの認証付きダウンロード', () => {
 
     await expect(api.media.download('md-1', 'account-2')).rejects.toThrow()
   })
+
+  it('表示用URLは認証付きの口を指す', () => {
+    expect(api.media.contentUrl('md/1', 'account/1')).toBe(
+      'https://worker.example.com/api/media/md%2F1/content?accountId=account%2F1',
+    )
+  })
+})
+
+/**
+ * #637 指摘2 管理画面は保存URL（配信用の公開URL）を直接表示しない。
+ * 縮小表示・試し見・ファイル開き・ダウンロードはすべて認証付きの口を使う。
+ */
+describe('登録メディア画面の直接参照の排除', () => {
+  it('page と詳細窓に item.url / preview.url の直接表示が残っていない', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { dirname, join } = await import('node:path')
+    const { fileURLToPath } = await import('node:url')
+    const dir = dirname(fileURLToPath(import.meta.url))
+    const directRefs: string[] = []
+    for (const file of ['page.tsx', 'media-detail-dialog.tsx']) {
+      const source = readFileSync(join(dir, file), 'utf8')
+      for (const [index, line] of source.split('\n').entries()) {
+        if (/^\s*\/\//.test(line) || /^\s*\*/.test(line)) continue
+        if (/(src|href)=\{[^}]*(item|preview)\.url/.test(line)) {
+          directRefs.push(`${file}:${index + 1}:${line.trim()}`)
+        }
+      }
+    }
+    expect(directRefs).toEqual([])
+  })
 })
