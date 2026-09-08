@@ -183,8 +183,17 @@ describe('runEventBookingExpirer の V6 連動', () => {
        VALUES ('v6ev-rule-1', 'rule', ?, 1, 'event', 'countdown', 'published')`,
     ).run(ACCOUNT_1);
     raw.prepare(
+      `INSERT INTO reminders
+         (id, name, line_account_id, is_active, trigger_type, delivery_mode, lifecycle_status)
+       VALUES ('v6ev-rule-2', 'rule-2', ?, 1, 'event', 'countdown', 'published')`,
+    ).run(ACCOUNT_2);
+    raw.prepare(
       `INSERT INTO reminder_steps (id, reminder_id, offset_minutes, message_type, message_content)
        VALUES ('v6ev-step-1', 'v6ev-rule-1', -60, 'text', 'お待ちしています')`,
+    ).run();
+    raw.prepare(
+      `INSERT INTO reminder_steps (id, reminder_id, offset_minutes, message_type, message_content)
+       VALUES ('v6ev-step-2', 'v6ev-rule-2', -60, 'text', 'お待ちしています')`,
     ).run();
   }
 
@@ -220,7 +229,7 @@ describe('runEventBookingExpirer の V6 連動', () => {
     for (const [id, startsAt] of [['v6ev-stale', STARTS_A], ['v6ev-fresh', STARTS_B]] as const) {
       await enrollByTrigger(db, {
         triggerType: 'event', friendId: 'v6ev-f1', startsAtIso: startsAt,
-        sourceId: id, sourceEventId: id,
+        sourceId: id, sourceEventId: id, lineAccountId: ACCOUNT_1,
       });
     }
     const staleEnrollment = enrollmentBySource(raw, 'v6ev-stale');
@@ -293,15 +302,15 @@ describe('runEventBookingExpirer の V6 連動', () => {
     });
     await enrollByTrigger(db, {
       triggerType: 'event', friendId: 'v6ev-f1', startsAtIso: STARTS_A,
-      sourceId: 'v6ev-stale', sourceEventId: 'v6ev-stale',
+      sourceId: 'v6ev-stale', sourceEventId: 'v6ev-stale', lineAccountId: ACCOUNT_1,
     });
     await enrollByTrigger(db, {
       triggerType: 'event', friendId: 'v6ev-f2', startsAtIso: STARTS_A,
-      sourceId: 'v6ev-other-account', sourceEventId: 'v6ev-other-account',
+      sourceId: 'v6ev-other-account', sourceEventId: 'v6ev-other-account', lineAccountId: ACCOUNT_2,
     });
     await enrollByTrigger(db, {
       triggerType: 'event', friendId: 'v6ev-f1', startsAtIso: STARTS_C,
-      sourceId: 'v6ev-confirmed', sourceEventId: 'v6ev-confirmed',
+      sourceId: 'v6ev-confirmed', sourceEventId: 'v6ev-confirmed', lineAccountId: ACCOUNT_1,
     });
 
     const result = await runEventBookingExpirer(db, { now: NOW_V6 });
@@ -353,7 +362,7 @@ describe('runEventBookingExpirer の V6 連動', () => {
     for (const [id, startsAt] of [['v6ev-leftover', STARTS_A], ['v6ev-cancelled', STARTS_B]] as const) {
       await enrollByTrigger(db, {
         triggerType: 'event', friendId: 'v6ev-f1', startsAtIso: startsAt,
-        sourceId: id, sourceEventId: id,
+        sourceId: id, sourceEventId: id, lineAccountId: ACCOUNT_1,
       });
     }
     const leftoverId = enrollmentBySource(raw, 'v6ev-leftover').id;

@@ -81,17 +81,28 @@ export async function enrollByTrigger(
     sourceEventId?: string | null;
     /** 追跡用の発生元区分。未指定なら triggerType (個別相談は 'meet' を渡す)。 */
     sourceKind?: string | null;
+    /** 必須。ルールと友だちがこの店舗のもの一致するときだけ登録する。 */
+    lineAccountId: string;
   },
 ): Promise<number> {
+  // 自動登録はテナント境界を越えない。友だちの所属と呼出元の店舗が違う
+  // ときは書かずに落とす (別店舗名義の誤送信を防ぐ)。
+  const friendAccount = await db
+    .prepare(`SELECT line_account_id FROM friends WHERE id = ?`)
+    .bind(input.friendId)
+    .first<{ line_account_id: string | null }>();
+  if (friendAccount?.line_account_id !== input.lineAccountId) {
+    throw new Error('REMINDER_ACCOUNT_MISMATCH');
+  }
   const rules = await db
     .prepare(
       `SELECT id, trigger_type, trigger_offset_minutes, send_at_time, target_tag_id,
               current_published_version_id
          FROM reminders
         WHERE is_active = 1 AND lifecycle_status = 'published'
-          AND deleted_at IS NULL AND trigger_type = ?`,
+          AND deleted_at IS NULL AND trigger_type = ? AND line_account_id = ?`,
     )
-    .bind(input.triggerType)
+    .bind(input.triggerType, input.lineAccountId)
     .all<ReminderTriggerRow>();
   if (!rules.results.length) return 0;
 
@@ -278,6 +289,11 @@ export interface ReconcileV6Input {
   /** 現在の業務開始時刻。この起点に合う target_date へ直す。 */
   startsAtIso: string;
   now?: Date;
+  /**
+   * true のとき他友だちの行を止めず、現担当の起点直しだけ行う。
+   * 友だち変更で「新規成功後に旧取消」の順序を作るための前段に使う。
+   */
+  leaveOtherFriends?: boolean;
 }
 
 export interface ReconcileV6Result {
@@ -355,7 +371,9 @@ export async function reconcileV6ToStartsAt(
 
   const statements: D1PreparedStatement[] = [];
   const healReason = `${kind}_heal:${input.sourceEventId ?? input.sourceId}:by:system`;
-  const staleIds = rows.filter((row) => row.friendId !== input.friendId).map((row) => row.id);
+  const staleIds = input.leaveOtherFriends
+    ? []
+    : rows.filter((row) => row.friendId !== input.friendId).map((row) => row.id);
   for (let offset = 0; offset < staleIds.length; offset += 50) {
     const chunk = staleIds.slice(offset, offset + 50);
     const placeholders = chunk.map(() => '?').join(',');

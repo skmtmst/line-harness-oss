@@ -1563,6 +1563,7 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
       startsAtIso: slot.starts_at as string,
       sourceId: id,
       sourceEventId: id,
+      lineAccountId: account_id,
     }).catch((err) => console.error('reminder enroll (event) failed:', err));
     optionalExecutionCtx(c)?.waitUntil(
       dispatchAutomationEventWithLogging(c.env.DB, {
@@ -1960,6 +1961,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
         startsAtIso: slot.starts_at,
         sourceId: booking.id,
         sourceEventId: booking.id,
+        lineAccountId: booking.line_account_id,
       }).catch((err) => console.error('reminder enroll (event decide) failed:', err));
     }
     optionalExecutionCtx(c)?.waitUntil(

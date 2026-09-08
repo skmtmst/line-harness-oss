@@ -140,8 +140,17 @@ describe('runExpirer の V6 連動', () => {
        VALUES ('v6ex-rule-1', 'rule', ?, 1, 'booking', 'countdown', 'published')`,
     ).run(ACCOUNT_1);
     raw.prepare(
+      `INSERT INTO reminders
+         (id, name, line_account_id, is_active, trigger_type, delivery_mode, lifecycle_status)
+       VALUES ('v6ex-rule-2', 'rule-2', ?, 1, 'booking', 'countdown', 'published')`,
+    ).run(ACCOUNT_2);
+    raw.prepare(
       `INSERT INTO reminder_steps (id, reminder_id, offset_minutes, message_type, message_content)
        VALUES ('v6ex-step-1', 'v6ex-rule-1', -60, 'text', 'ご来店をお待ちしています')`,
+    ).run();
+    raw.prepare(
+      `INSERT INTO reminder_steps (id, reminder_id, offset_minutes, message_type, message_content)
+       VALUES ('v6ex-step-2', 'v6ex-rule-2', -60, 'text', 'ご来店をお待ちしています')`,
     ).run();
   }
 
@@ -211,7 +220,7 @@ describe('runExpirer の V6 連動', () => {
     for (const [id, startsAt] of [['v6ex-stale', STARTS_A], ['v6ex-fresh', STARTS_B]] as const) {
       await enrollByTrigger(db, {
         triggerType: 'booking', friendId: 'v6ex-f1', startsAtIso: startsAt,
-        sourceId: id, sourceEventId: id,
+        sourceId: id, sourceEventId: id, lineAccountId: ACCOUNT_1,
       });
     }
     const staleEnrollment = enrollmentBySource(raw, 'v6ex-stale');
@@ -280,15 +289,15 @@ describe('runExpirer の V6 連動', () => {
     });
     await enrollByTrigger(db, {
       triggerType: 'booking', friendId: 'v6ex-f1', startsAtIso: STARTS_A,
-      sourceId: 'v6ex-stale', sourceEventId: 'v6ex-stale',
+      sourceId: 'v6ex-stale', sourceEventId: 'v6ex-stale', lineAccountId: ACCOUNT_1,
     });
     await enrollByTrigger(db, {
       triggerType: 'booking', friendId: 'v6ex-f2', startsAtIso: STARTS_A,
-      sourceId: 'v6ex-other-account', sourceEventId: 'v6ex-other-account',
+      sourceId: 'v6ex-other-account', sourceEventId: 'v6ex-other-account', lineAccountId: ACCOUNT_2,
     });
     await enrollByTrigger(db, {
       triggerType: 'booking', friendId: 'v6ex-f1', startsAtIso: STARTS_C,
-      sourceId: 'v6ex-confirmed', sourceEventId: 'v6ex-confirmed',
+      sourceId: 'v6ex-confirmed', sourceEventId: 'v6ex-confirmed', lineAccountId: ACCOUNT_1,
     });
 
     const sender = vi.fn().mockResolvedValue(undefined);
@@ -340,7 +349,7 @@ describe('runExpirer の V6 連動', () => {
     });
     await enrollByTrigger(db, {
       triggerType: 'booking', friendId: 'v6ex-f1', startsAtIso: STARTS_A,
-      sourceId: 'v6ex-leftover', sourceEventId: 'v6ex-leftover',
+      sourceId: 'v6ex-leftover', sourceEventId: 'v6ex-leftover', lineAccountId: ACCOUNT_1,
     });
 
     const sender = vi.fn().mockResolvedValue(undefined);
@@ -364,7 +373,7 @@ describe('runExpirer の V6 連動', () => {
     });
     await enrollByTrigger(db, {
       triggerType: 'booking', friendId: 'v6ex-f1', startsAtIso: STARTS_A,
-      sourceId: 'v6ex-stale', sourceEventId: 'v6ex-stale',
+      sourceId: 'v6ex-stale', sourceEventId: 'v6ex-stale', lineAccountId: ACCOUNT_1,
     });
     // 1回目: V6 層だけ壊す。業務は進み、V6 が残る。
     const flaky = {

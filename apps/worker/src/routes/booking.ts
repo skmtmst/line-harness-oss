@@ -664,6 +664,7 @@ booking.post('/api/liff/booking/requests', async (c) => {
       startsAtIso: startsAt.toISOString(),
       sourceId: bookingId,
       sourceEventId: bookingId,
+      lineAccountId: accountId,
     }).catch((err) => console.error('reminder enroll (booking) failed:', err)),
   );
 
@@ -1887,6 +1888,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
         startsAtIso: startsAt.toISOString(),
         sourceId: bookingId,
         sourceEventId: bookingId,
+        lineAccountId: accountId,
       }).catch((err) => console.error('reminder enroll (proxy-create) failed:', err)),
     );
     confirmationOperationId = await queueBookingOperation(c.env.DB, {

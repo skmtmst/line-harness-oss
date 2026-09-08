@@ -125,6 +125,8 @@ export async function registerMeetConsultation(
     .bind(input.friendId)
     .first<{ id: string; line_account_id: string | null }>();
   if (!friend) throw new Error('friend not found or not following');
+  // V6 登録は店舗境界の中でだけ行う。所属不明では書かずに落とす。
+  if (!friend.line_account_id) throw new Error('friend line account unknown');
 
   const existing = await db
     .prepare('SELECT * FROM meet_consultations WHERE external_event_id = ?')
@@ -227,11 +229,30 @@ export async function registerMeetConsultation(
     lineAccountId: friend.line_account_id,
     allowLegacyFallback: false,
   };
-  const friendChanged = Boolean(existing && existing.friend_id !== input.friendId);
-  if (friendChanged) {
-    // 友だち変更は新規成功後に旧取消: 先に新 friend へ登録する。
-    // 登録失敗は投げる (成功扱いにすると新旧どちらの通知も消える)。
-    // 旧 friend の行には触っていないため、旧通知が残り再送で回復できる。
+  const oldFriendId = existing?.friend_id ?? null;
+  const friendChanged = oldFriendId !== null && oldFriendId !== input.friendId;
+  // 新 friend 側にこの相談の active 行があるか。再送の判定に使う。
+  // 初回も再送も V6 登録に失敗した再送では、相談行だけ新 friend へ進み
+  // (friendChanged=false)、旧取消を先にすると新旧どちらの通知も消える。
+  const newActive = await db.prepare(
+    `SELECT COUNT(*) AS c FROM friend_reminders
+      WHERE status = 'active' AND source_kind = 'meet' AND friend_id = ?
+        AND (source_id = ? OR source_event_id = ?)`,
+  ).bind(input.friendId, consultationId, input.externalEventId).first<{ c: number }>();
+  // 新規成功後に旧取消: 新 friend 側の行が無いときは登録を先に行い、
+  // 失敗は投げる (旧行に触る前に終えるため旧通知が残り、再送で回復できる)。
+  const mustEnrollFirst = friendChanged || (oldFriendId !== null && (newActive?.c ?? 0) === 0);
+  if (mustEnrollFirst) {
+    // 新側の日付ずれだけ先に直す (旧側には触れない)。無いときは何もしない。
+    await reconcileV6ToStartsAt(db, {
+      triggerType: v6Base.triggerType,
+      sourceKind: v6Base.sourceKind,
+      sourceId: v6Base.sourceId,
+      sourceEventId: v6Base.sourceEventId,
+      friendId: v6Base.friendId,
+      startsAtIso: normalizedStart,
+      leaveOtherFriends: true,
+    });
     await enrollByTrigger(db, {
       ...v6Base,
       startsAtIso: normalizedStart,
@@ -245,7 +266,7 @@ export async function registerMeetConsultation(
     friendId: v6Base.friendId,
     startsAtIso: normalizedStart,
   });
-  if (!friendChanged) {
+  if (!mustEnrollFirst) {
     // 登録失敗で相談登録自体を壊さない。二重登録は enroll 側で吸収する。
     await enrollByTrigger(db, {
       ...v6Base,
@@ -380,7 +401,7 @@ export async function processDueMeetConsultationReminders(
         options.proxyDispatch,
       );
       // 同時取消で止められた行を sent で上書きしない (状態だけ守る。送信数は数える)。
-      await db
+      const marked = await db
         .prepare(
           `UPDATE meet_consultation_reminders
               SET status='sent', sent_at=?, last_error=NULL, updated_at=?
@@ -389,6 +410,14 @@ export async function processDueMeetConsultationReminders(
         .bind(nowIso, nowIso, row.id)
         .run();
       sent++;
+      // push と確定の間に取消が確定したときは送り直さず、追跡用に記録する。
+      if (Number(marked.meta?.changes ?? 0) !== 1) {
+        console.error(JSON.stringify({
+          event: 'meet_reminder_sent_after_cancel',
+          consultationId: row.consultation_id,
+          reminderId: row.id,
+        }));
+      }
     } catch (error) {
       const retryCount = row.retry_count + 1;
       await db

@@ -224,6 +224,7 @@ describe('リマインダ実行記録', () => {
       ).bind('2026-08-28T09:00:02.000Z'),
       completeReminderDeliveryRunStatement(db, {
         id: run!.id,
+        friendReminderId: 'enrollment-1',
         lineRequestId: 'line-request-1',
         messageLogId: 'message-log-1',
         now: '2026-08-28T09:00:02.000Z',

@@ -74,7 +74,7 @@ describe('processDueMeetConsultationReminders', () => {
               },
               async run() {
                 updates.push(args);
-                return { success: true };
+                return { success: true, meta: { changes: 1 } };
               },
             };
           },
@@ -137,7 +137,7 @@ describe('processDueMeetConsultationReminders', () => {
               },
               async run() {
                 updates.push(args);
-                return { success: true };
+                return { success: true, meta: { changes: 1 } };
               },
             };
           },

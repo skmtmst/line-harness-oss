@@ -762,6 +762,16 @@ export async function enrollFriendInReminder(
   if (!reminder || reminder.lifecycle_status !== 'published') {
     throw new Error('REMINDER_NOT_PUBLISHED');
   }
+  // 友だちとルールの所属が両方分かる不一致は書かずに落とす (別店舗への混入防止)。
+  // 片方が未所属のときは運用者の明示選択として許す (所属不明は配信側で止める)。
+  const friendAccount = await db.prepare(
+    `SELECT line_account_id FROM friends WHERE id = ?`,
+  ).bind(input.friendId).first<{ line_account_id: string | null }>();
+  const ruleAccount = reminder.line_account_id ?? null;
+  const friendAcc = friendAccount?.line_account_id ?? null;
+  if (ruleAccount !== null && friendAcc !== null && ruleAccount !== friendAcc) {
+    throw new Error('REMINDER_ACCOUNT_MISMATCH');
+  }
   const versionId = await ensureReminderPublishedVersion(db, reminder);
   const id = crypto.randomUUID();
   const now = jstNow();
@@ -921,11 +931,12 @@ async function selectV6LegacyIds(
     bindings.push(legacyTrigger);
   }
   conditions.push(`(${extra})`);
-  // 移行前の行に予約の手がかりは無い。同時刻の別予約が2件あると区別できない
-  // ため、古い1件だけを安定して扱い、一括取消しない (日時順・id順で決定的)。
+  // 移行前の行に予約の手がかりは無い。呼び出し側で候補が1件のときだけ扱い、
+  // 複数あるときは対象を特定できないため触らない (fail closed)。
+  // 日時順・id順に並べ、同じ入力では同じ順で返す (決定的)。
   const rows = await db.prepare(
     `SELECT fr.id AS id FROM friend_reminders fr WHERE ${conditions.join(' AND ')}
-     ORDER BY fr.created_at ASC, fr.id ASC LIMIT 1`,
+     ORDER BY fr.created_at ASC, fr.id ASC`,
   ).bind(...bindings, ...extraBindings).all<{ id: string }>();
   return (rows.results ?? []).map((row) => row.id);
 }
@@ -952,10 +963,12 @@ export async function cancelV6RemindersForSource(
   const now = input.now ?? jstNow();
   const ids = await selectV6ActiveIds(db, input, '1 = 1', []);
   if (ids.length === 0 && input.allowLegacyFallback !== false) {
-    // 起点ごとに古い1件だけ拾う。1予約が複数ルールで複数行を持つときは
-    // 起点が違うため各行が止まる。同時刻の別予約は古い側の1件だけに留める。
+    // 起点ごとに候補が1件のときだけ止める。1予約が複数ルールで複数行を
+    // 持つときは起点が違うため各行が止まる。同時刻の別予約が2件以上ある
+    // ときはどれが対象か分からないため止めない (fail closed: 誤取消しより残存)。
     for (const targetDate of new Set(input.targetDates ?? [])) {
-      ids.push(...await selectV6LegacyIds(db, { ...input, targetDates: [targetDate] }, '1 = 1', []));
+      const legacy = await selectV6LegacyIds(db, { ...input, targetDates: [targetDate] }, '1 = 1', []);
+      if (legacy.length === 1) ids.push(legacy[0]);
     }
   }
   if (ids.length === 0) return { cancelledEnrollments: 0, cancelledRuns: 0 };
@@ -1023,8 +1036,13 @@ export async function rescheduleV6RemindersForSource(
   for (const move of effective) {
     const extra = move.reminderId != null ? 'fr.reminder_id = ?' : '1 = 1';
     const extraBindings = move.reminderId != null ? [move.reminderId] : [];
-    const ids = useLegacy
+    // 移行前の行は候補1件のときだけ移す。複数は対象不明のため置いていく。
+    const legacyIds = useLegacy
       ? await selectV6LegacyIds(db, { ...input, targetDates: [move.fromTargetDate] }, extra, extraBindings)
+      : [];
+    if (useLegacy && legacyIds.length !== 1) continue;
+    const ids = useLegacy
+      ? legacyIds
       : await selectV6ActiveIds(
         db,
         input,
@@ -1309,18 +1327,38 @@ export async function verifyClaimedRunBeforeSend(
   return false;
 }
 
-/** 成功記録を、配信済み印・messages_logと同じD1 batchへ入れる。 */
+/**
+ * 成功記録を、配信済み印・messages_logと同じD1 batchへ入れる。
+ *
+ * 登録が active のままのときだけ成功にする (原子的)。push と確定の間に
+ * 取消が確定すると 0 件になり、取消後の送信として検出できる。
+ * 検出時は送り直さない (外部送信の有無が曖昧なため再送は二重送信になり得る)。
+ */
 export function completeReminderDeliveryRunStatement(
   db: D1Database,
-  input: { id: string; lineRequestId: string | null; messageLogId: string; now: string },
+  input: {
+    id: string;
+    friendReminderId: string;
+    lineRequestId: string | null;
+    messageLogId: string;
+    now: string;
+  },
 ): D1PreparedStatement {
   return db.prepare(
     `UPDATE reminder_delivery_runs
         SET status = 'succeeded', line_request_id = ?, message_log_id = ?, completed_at = ?,
             lease_expires_at = NULL, next_retry_at = NULL,
             last_error_code = NULL, last_error_message = NULL, updated_at = ?
-      WHERE id = ? AND status = 'claimed'`,
-  ).bind(input.lineRequestId, input.messageLogId, input.now, input.now, input.id);
+      WHERE id = ? AND status = 'claimed'
+        AND EXISTS (SELECT 1 FROM friend_reminders WHERE id = ? AND status = 'active')`,
+  ).bind(
+    input.lineRequestId,
+    input.messageLogId,
+    input.now,
+    input.now,
+    input.id,
+    input.friendReminderId,
+  );
 }
 
 export async function skipReminderDeliveryRun(

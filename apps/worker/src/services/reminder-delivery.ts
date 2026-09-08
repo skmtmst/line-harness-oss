@@ -226,7 +226,7 @@ export async function processReminderDeliveries(
 
         const deliveredId = crypto.randomUUID();
         const logId = crypto.randomUUID();
-        await db.batch([
+        const completed = await db.batch([
           db.prepare(
             `INSERT OR IGNORE INTO friend_reminder_deliveries
                (id, friend_reminder_id, reminder_step_id, delivered_at)
@@ -248,12 +248,24 @@ export async function processReminderDeliveries(
           ),
           completeReminderDeliveryRunStatement(db, {
             id: run.id,
+            friendReminderId: enrollment.id,
             lineRequestId: response.requestId,
             messageLogId: logId,
             now: nowIso,
           }),
         ]);
         result.succeeded++;
+        // push と確定の間に取消が確定すると成功にできない (0 件)。
+        // 外部送信の有無が曖昧なため送り直さず、運用の追跡用に記録する。
+        if (Number(completed[2]?.meta?.changes ?? 0) !== 1) {
+          console.error(JSON.stringify({
+            event: 'reminder_delivery_completed_after_cancel',
+            reminderId: enrollment.reminder_id,
+            friendReminderId: enrollment.id,
+            runId: run.id,
+            messageLogId: logId,
+          }));
+        }
       } catch (error) {
         const safe = classifyReminderDeliveryError(error);
         const retryAt = externalDeliveryRetryAt(
