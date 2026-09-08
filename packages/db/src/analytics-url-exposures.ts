@@ -1,3 +1,5 @@
+import { isAccountFeatureEnabled } from './account-settings.js';
+
 const MAX_LINKS_PER_MESSAGE = 50;
 
 export interface AnalyticsUrlExposureQueueResult {
@@ -147,6 +149,11 @@ export async function processPendingAnalyticsUrlExposures(
     claimed: 0, processed: 0, failed: 0, exposures: 0,
   };
   for (const item of due.results) {
+    // 機能オフ中はclaim(状態更新)も計測もしない。pendingのまま残し、
+    // 再オンで再開する。
+    if (!await isAccountFeatureEnabled(db, item.line_account_id, 'analytics')) {
+      continue;
+    }
     const claim = await db.prepare(
       `UPDATE analytics_url_exposure_queue
           SET status = 'processing', attempts = attempts + 1,

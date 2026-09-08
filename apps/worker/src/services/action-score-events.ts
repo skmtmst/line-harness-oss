@@ -35,6 +35,12 @@ export async function applyActionScoreEvent(
     lineAccessToken?: string;
   },
 ) {
+  // 機能オフ中は適用(状態更新)も自動化への受け渡しもしない。
+  // dispatch側のgateだけでは適用が先に進むため、ここで止める。
+  // OFF中は不変で、再ON後の新しい元イベントから再開する。
+  if (!await featureJobCanRun(db, { accountId: input.lineAccountId, featureId: 'mileage', job: 'action score event application' })) {
+    return { configured: false, status: 'legacy' as const, applications: [] };
+  }
   const result = await applyPublishedActionScoreRules(db, input);
   await dispatchActionScoreApplications(db, {
     lineAccountId: input.lineAccountId,

@@ -97,6 +97,23 @@ export async function deliverMileageReward(
   options: MileageRewardDeliveryOptions = {},
 ): Promise<MileageRewardDeliveryResult> {
   const plan = await getMileageRewardDeliveryPlan(db, redemptionId);
+  // 機能オフ中はclaim・attempt・付与・状態戻しのいずれもしない。
+  // 状態は不変のまま残し、再ON後の再試行で再開する。
+  if (plan.redemption.lineAccountId && !await featureJobCanRun(db, {
+    accountId: plan.redemption.lineAccountId,
+    featureId: 'mileage',
+    job: 'mileage reward delivery',
+  })) {
+    return {
+      status: 'delivery_failed',
+      rewardName: plan.rewardName,
+      customerMessage: plan.customerMessage,
+      rewardCode: null,
+      retryAt: plan.redemption.nextRetryAt,
+      failurePolicy: plan.failurePolicy,
+      message: 'マイル機能がオフのため保留しています。再開後に処理します。',
+    };
+  }
   if (plan.redemption.status === 'succeeded') {
     const code = await getReservedMileageRewardCode(db, redemptionId);
     return {

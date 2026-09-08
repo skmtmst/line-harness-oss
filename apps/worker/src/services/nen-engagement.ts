@@ -488,6 +488,10 @@ export async function enqueueBirthdayCoupons(
   let queued = 0;
   for (const pet of pets.results) {
     if (!pet.line_account_id) continue;
+    // 機能オフ中は発行も予約もしない。再オン後の誕生日から再開する。
+    if (!await featureJobCanRun(db, { accountId: pet.line_account_id, featureId: 'nen_campaigns', job: 'birthday coupon enqueue' })) {
+      continue;
+    }
     if (!accountConfiguration.has(pet.line_account_id)) {
       const [setting, campaign] = await Promise.all([
         getNenBirthdayCouponSetting(db, pet.line_account_id),

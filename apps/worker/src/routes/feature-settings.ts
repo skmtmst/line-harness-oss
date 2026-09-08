@@ -3,7 +3,6 @@ import type { Context } from 'hono';
 import {
   getAccountSetting,
   getVersionedAccountSetting,
-  saveVersionedAccountSetting,
   setAccountSetting,
 } from '@line-crm/db';
 import {
@@ -190,14 +189,22 @@ export type FeatureImpactSource = {
   params: 1 | 2;
 };
 
-/** 1項目あたりの対象IDの上限。超えた分は件数だけ見る。 */
+/**
+ * 1項目あたりの応答に載せる対象IDの上限。照合用の fingerprintIds は
+ * 上限なしの全IDで、101件目以降の入れ替えも検出する。
+ */
 const IMPACT_IDS_LIMIT = 100;
 
 export type FeatureImpactItemWithIds = FeatureImpactItem & {
-  /** 対象行ID(並び替え済み)。上限を超えたら先頭分だけ。 */
+  /** 対象行ID(並び替え済み)。応答用で上限を超えたら先頭分だけ。 */
   ids: string[];
-  /** 上限を超えてIDが欠けているか。 */
+  /** 上限を超えて応答のIDが欠けているか。 */
   truncated: boolean;
+  /**
+   * 照合用の全対象ID(並び替え済み、上限なし)。確認トークンの
+   * fingerprintにだけ使い、応答には含めない。
+   */
+  fingerprintIds: string[];
 };
 
 export type FeatureImpactCoverageEntry =
@@ -650,17 +657,18 @@ async function collectFeatureImpact(
     if (count === 0) continue;
     const rows = await db
       .prepare(
-        `SELECT ${source.idColumn} AS id ${source.fromWhere} ORDER BY ${source.idColumn} LIMIT ${IMPACT_IDS_LIMIT + 1}`,
+        `SELECT ${source.idColumn} AS id ${source.fromWhere} ORDER BY ${source.idColumn}`,
       )
       .bind(...params)
       .all<{ id: string }>();
-    const ids = [...new Set(rows.results.map((row) => row.id))].sort().slice(0, IMPACT_IDS_LIMIT);
+    const fingerprintIds = [...new Set(rows.results.map((row) => row.id))].sort();
     items.push({
       kind: source.kind,
       targetType: source.targetType,
       count,
-      ids,
-      truncated: rows.results.length > IMPACT_IDS_LIMIT,
+      ids: fingerprintIds.slice(0, IMPACT_IDS_LIMIT),
+      truncated: fingerprintIds.length > IMPACT_IDS_LIMIT,
+      fingerprintIds,
     });
   }
   return items;
@@ -719,6 +727,32 @@ async function deleteOffConfirmation(db: D1Database, accountId: string): Promise
   await db.prepare('DELETE FROM account_settings WHERE line_account_id = ? AND key = ?')
     .bind(accountId, OFF_CONFIRM_KEY).run();
 }
+
+/**
+ * 応答用の影響表示。fingerprintIds は照合専用のため落とす。
+ * 全IDを応答に載せると件数が多いときに巨大になる。
+ */
+function toPublicImpacts(impacts: FeatureImpact[]): PublicImpact[] {
+  return impacts.map((impact) => ({
+    feature: impact.feature,
+    blocking: impact.blocking,
+    items: impact.items.map((item) => ({
+      kind: item.kind,
+      targetType: item.targetType,
+      count: item.count,
+      ids: item.ids,
+      truncated: item.truncated,
+    })),
+  }));
+}
+
+type FeatureImpactItemPublic = Omit<FeatureImpactItemWithIds, 'fingerprintIds'>;
+
+type PublicImpact = {
+  feature: ToggleableFeature;
+  blocking: boolean;
+  items: FeatureImpactItemPublic[];
+};
 
 /** 変更案の影響を数える。保存はしない。 */
 async function buildImpacts(
@@ -954,7 +988,12 @@ featureSettings.post('/api/settings/features/impact', requireRole('owner', 'admi
 
     return c.json({
       success: true,
-      data: { version: current.version, impacts, requiresConfirmation, impactToken },
+      data: {
+        version: current.version,
+        impacts: toPublicImpacts(impacts),
+        requiresConfirmation,
+        impactToken,
+      },
     });
   } catch (err) {
     console.error('POST /api/settings/features/impact error:', err);
@@ -1038,6 +1077,17 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
       }
     }
 
+    const hasBundleUpdate = body.features !== undefined
+      || body.sidebarOrder !== undefined
+      || body.sidebarItemOrder !== undefined;
+    // 機能・順序の保存は版なしでは受け付けない。版なし逐次保存は
+    // 途中失敗で部分反映になり、版付きGETとの不整合を起こすため。
+    if (hasBundleUpdate && body.expectedVersion === undefined) {
+      return c.json({
+        success: false,
+        error: 'expectedVersion が必要です。最新の設定を読み直してください。',
+      }, 400);
+    }
     if (body.expectedVersion !== undefined
       && (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 0)) {
       return c.json({
@@ -1090,7 +1140,7 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
               success: false,
               error: 'オフにしようとしている機能に、公開中・予約中・依存中のものがあります。内容を確認してから保存してください。',
               code: 'IMPACT_CONFIRMATION_REQUIRED',
-              data: { impacts, currentVersion: impactCurrent.version },
+              data: { impacts: toPublicImpacts(impacts), currentVersion: impactCurrent.version },
             }, 409);
           }
           presentedToken = body.impactToken;
@@ -1098,25 +1148,34 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
       }
     }
 
-    const hasBundleUpdate = body.features !== undefined
-      || body.sidebarOrder !== undefined
-      || body.sidebarItemOrder !== undefined;
     let savedVersion: number | null = null;
 
-    if (hasBundleUpdate && body.expectedVersion !== undefined) {
+    /**
+     * 一括保存(#643)。一括設定・専用カタログ・確認トークン消費を
+     * 単一batch(本番D1では1トランザクション)で書き、途中失敗の
+     * 部分反映を起こさない。失敗時は例外か409で、版も実効値も
+     * 変わらない。
+     */
+    if (hasBundleUpdate) {
       const current = await loadFeatureSettings(
         c.env.DB,
         accountId,
         restaurantTestEnabled(c.env),
       );
+      if (Number(body.expectedVersion) !== current.version) {
+        return c.json({
+          success: false,
+          error: '別の管理者が先に変更しました。最新の設定を読み直してください。',
+          data: { currentVersion: current.version },
+        }, 409);
+      }
       const incomingFeatures = { ...(body.features ?? {}) } as Record<string, boolean>;
       if (!restaurantTestEnabled(c.env) && 'restaurant_test' in incomingFeatures) {
         incomingFeatures.restaurant_test = false;
       }
-      const result = await saveVersionedAccountSetting(c.env.DB, {
-        accountId,
-        key: FEATURE_SETTINGS_BUNDLE_KEY,
-        expectedVersion: Number(body.expectedVersion),
+      const nextVersion = current.version + 1;
+      const bundleValue = JSON.stringify({
+        version: nextVersion,
         data: {
           features: { ...current.features, ...incomingFeatures },
           sidebarOrder: sidebarOrder === undefined ? current.sidebarOrder : sidebarOrder,
@@ -1125,60 +1184,73 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
             : sidebarItemOrder,
         },
       });
-      if (result.status === 'conflict') {
-        return c.json({
-          success: false,
-          error: '別の管理者が先に変更しました。最新の設定を読み直してください。',
-          data: { currentVersion: result.current?.version ?? 0 },
-        }, 409);
-      }
-      savedVersion = result.setting.version;
-    } else if (hasBundleUpdate) {
-      // 版付き一括設定があるアカウントでは、版なし保存は版付きGETに
-      // 反映されず成功偽装になるため受け付けない。旧クライアント互換の
-      // 個別保存は、一括設定が無いアカウントにだけ残す。
-      const legacyBundle = await getVersionedAccountSetting(
+      const now = new Date(Date.now() + 9 * 60 * 60_000)
+        .toISOString()
+        .replace('Z', '+09:00');
+      const bundleExists = await getVersionedAccountSetting(
         c.env.DB,
         accountId,
         FEATURE_SETTINGS_BUNDLE_KEY,
-      );
-      if (legacyBundle) {
+      ) !== null;
+      const statements: D1PreparedStatement[] = [
+        bundleExists
+          ? c.env.DB.prepare(
+            `UPDATE account_settings
+                SET value = ?, updated_at = ?
+              WHERE line_account_id = ? AND key = ?
+                AND json_valid(value)
+                AND CAST(json_extract(value, '$.version') AS INTEGER) = ?`,
+          ).bind(bundleValue, now, accountId, FEATURE_SETTINGS_BUNDLE_KEY, current.version)
+          : c.env.DB.prepare(
+            `INSERT OR IGNORE INTO account_settings
+              (id, line_account_id, key, value, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+          ).bind(
+            crypto.randomUUID(),
+            accountId,
+            FEATURE_SETTINGS_BUNDLE_KEY,
+            bundleValue,
+            now,
+            now,
+          ),
+      ];
+      if (catalog !== undefined) {
+        statements.push(c.env.DB.prepare(
+          `INSERT INTO account_settings (id, line_account_id, key, value, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT (line_account_id, key) DO UPDATE SET value = ?, updated_at = ?`,
+        ).bind(
+          crypto.randomUUID(),
+          accountId,
+          SPECIALIZED_CATALOG_KEY,
+          JSON.stringify(catalog),
+          now,
+          now,
+          JSON.stringify(catalog),
+          now,
+        ));
+      }
+      if (presentedToken !== null) {
+        statements.push(c.env.DB.prepare(
+          'DELETE FROM account_settings WHERE line_account_id = ? AND key = ?',
+        ).bind(accountId, OFF_CONFIRM_KEY));
+      }
+      const results = await c.env.DB.batch(statements);
+      if (((results[0] as D1Result | undefined)?.meta?.changes ?? 0) !== 1) {
+        const reread = await loadFeatureSettings(
+          c.env.DB,
+          accountId,
+          restaurantTestEnabled(c.env),
+        );
         return c.json({
           success: false,
           error: '別の管理者が先に変更しました。最新の設定を読み直してください。',
-          data: { currentVersion: legacyBundle.version },
+          data: { currentVersion: reread.version },
         }, 409);
       }
-      for (const [key, value] of Object.entries(body.features ?? {})) {
-        const enabled = key === 'restaurant_test' && !restaurantTestEnabled(c.env)
-          ? false
-          : value;
-        await setAccountSetting(
-          c.env.DB,
-          accountId,
-          `${SETTING_PREFIX}${key}`,
-          JSON.stringify({ enabled }),
-        );
-      }
-      if (sidebarOrder !== undefined) {
-        await setAccountSetting(
-          c.env.DB,
-          accountId,
-          SIDEBAR_ORDER_KEY,
-          JSON.stringify(sidebarOrder),
-        );
-      }
-      if (sidebarItemOrder !== undefined) {
-        await setAccountSetting(
-          c.env.DB,
-          accountId,
-          SIDEBAR_ITEM_ORDER_KEY,
-          JSON.stringify(sidebarItemOrder),
-        );
-      }
-    }
-
-    if (catalog !== undefined) {
+      savedVersion = nextVersion;
+    } else if (catalog !== undefined) {
+      // 専用カタログだけの変更は単独1行の保存で、部分反映は起きない。
       await setAccountSetting(
         c.env.DB,
         accountId,
@@ -1187,11 +1259,8 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
       );
     }
 
-    // 確認トークンは使い切り。同じトークンの使い回しは受け付けない。
-    if (presentedToken !== null) {
-      await deleteOffConfirmation(c.env.DB, accountId);
-    }
-
+    // 確認トークンの使い切り消費は保存と同じbatchに含めた。
+    // batchが失敗したら版も実効値もトークンも変わらない。
     return c.json({
       success: true,
       data: savedVersion === null ? null : { version: savedVersion },

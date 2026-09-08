@@ -4,6 +4,7 @@
  * The table stores arbitrary key/value pairs keyed by (line_account_id, key).
  * Each setting is a JSON-encoded string so the column type never changes.
  */
+import { featureCatalogEntry, type FeatureId } from '@line-crm/shared';
 
 /**
  * Retrieve a raw setting value (JSON string) for an account.
@@ -112,6 +113,62 @@ export async function saveVersionedAccountSetting<T>(
   }
 
   return { status: 'saved', setting: next };
+}
+
+/**
+ * このアカウントで機能が有効か。worker の accountFeatureIsEnabled と
+ * 同じ順序(一括設定→個別設定→カタログ初期値)で読む。正本は worker 側に
+ * あり、ここは cron 処理が db 層だけで止めるための最小複製。
+ */
+export async function isAccountFeatureEnabled(
+  db: D1Database,
+  accountId: string,
+  featureId: string,
+): Promise<boolean> {
+  const bundle = await getVersionedAccountSetting<{ features?: Record<string, unknown> }>(
+    db,
+    accountId,
+    'feature.settings_bundle_v1',
+  );
+  const bundled = bundle?.data.features?.[featureId];
+  if (typeof bundled === 'boolean') return bundled;
+
+  const legacy = await getAccountSetting(db, accountId, `feature.${featureId}`);
+  if (legacy) {
+    try {
+      const parsed = JSON.parse(legacy) as boolean | { enabled?: unknown };
+      if (typeof parsed === 'boolean') return parsed;
+      if (typeof parsed.enabled === 'boolean') return parsed.enabled;
+    } catch {
+      // 壊れた旧値はカタログの既定値へ戻す。設定画面の読取と同じ扱い。
+    }
+  }
+  const entry = featureCatalogEntry(featureId as FeatureId);
+  return entry?.defaultEnabled ?? true;
+}
+
+/**
+ * 機能オフ中のアカウントかをSQL内で判定する条件式。
+ * 一括設定・個別設定のどちらかで明示オフなら真。使う側で
+ * `AND NOT (...)` の形で足す。持ち主不明(NULL)は偽になる。
+ * featureとaccountColumnは呼び出し側の固定文字列にすること。
+ */
+export function accountFeatureOffExclusionSql(
+  accountColumn: string,
+  feature: string,
+): string {
+  return `(
+    EXISTS (SELECT 1 FROM account_settings s
+      WHERE s.line_account_id = ${accountColumn}
+        AND s.key = 'feature.settings_bundle_v1'
+        AND json_valid(s.value)
+        AND json_extract(s.value, '$.data.features.${feature}') = 0)
+    OR EXISTS (SELECT 1 FROM account_settings s
+      WHERE s.line_account_id = ${accountColumn}
+        AND s.key = 'feature.${feature}'
+        AND json_valid(s.value)
+        AND (json_extract(s.value, '$.enabled') = 0 OR json_extract(s.value, '$') = 0))
+  )`;
 }
 
 export async function getVersionedAccountSetting<T>(

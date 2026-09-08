@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import { FEATURE_IDS } from '@line-crm/shared';
+import { DEFAULT_TENANT_ID, FEATURE_IDS } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import type { StaffRole } from '../middleware/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
@@ -20,7 +20,7 @@ function app(role: StaffRole = 'owner') {
       name: 'Owner',
       role,
       readOnly: false,
-      tenantId: 'tenant-a',
+      tenantId: DEFAULT_TENANT_ID,
     });
     await next();
   });
@@ -420,18 +420,17 @@ describe('feature off impact check', () => {
     }
   });
 
-  it('版付き設定があると版なし保存は成功偽装にならず409で読み直しになる', async () => {
+  it('版なしの機能・順序保存は400で拒否され、何も保存されない', async () => {
     const testDb = createTestD1();
     try {
       const first = await putFeatures(testDb, { expectedVersion: 0, features: { media: false } });
       expect(first.status).toBe(200);
 
-      // 版なしの保存は版付きGETに反映されないため受け付けない。
+      // 版なしの逐次保存は途中失敗で部分反映になるため受け付けない。
       const legacy = await putFeatures(testDb, { features: { scenarios: false } });
-      expect(legacy.status).toBe(409);
-      expect(legacy.body.data).toMatchObject({ currentVersion: 1 });
+      expect(legacy.status).toBe(400);
 
-      // 実効値は変わっていない。
+      // 実効値も版も変わっていない。
       const loaded = await app().request(
         '/api/settings/features?account_id=account-1',
         {},
@@ -440,6 +439,62 @@ describe('feature off impact check', () => {
       expect(await loaded.json()).toMatchObject({
         success: true,
         data: { version: 1, features: { scenarios: true, media: false } },
+      });
+    } finally {
+      testDb.raw.close();
+    }
+  });
+
+  it('一括設定・カタログ・トークン消費は一括で反映され、失敗時は部分反映しない', async () => {
+    const testDb = createTestD1();
+    try {
+      seedLiveWork(testDb);
+      const impact = await postImpact(testDb, { expectedVersion: 0, features: { broadcasts: false } });
+      const token = impact.body.data.impactToken as string;
+
+      // 機能オフと専用カタログを同時に保存する。
+      const saved = await putFeatures(testDb, {
+        expectedVersion: 0,
+        features: { broadcasts: false },
+        catalog: ['nen_campaigns'],
+        impactToken: token,
+      });
+      expect(saved.status).toBe(200);
+      expect(saved.body).toMatchObject({ success: true, data: { version: 1 } });
+
+      const loaded = await app().request(
+        '/api/settings/features?account_id=account-1',
+        {},
+        { DB: testDb.db, ...ENV },
+      );
+      expect(await loaded.json()).toMatchObject({
+        success: true,
+        data: {
+          version: 1,
+          features: { broadcasts: false },
+          specializedFeatureKeys: ['nen_campaigns'],
+        },
+      });
+
+      // 版が古い保存は全体が409で、一括設定もカタログも変わらない。
+      const stale = await putFeatures(testDb, {
+        expectedVersion: 0,
+        features: { media: false },
+        catalog: ['photo_review'],
+      });
+      expect(stale.status).toBe(409);
+      const reread = await app().request(
+        '/api/settings/features?account_id=account-1',
+        {},
+        { DB: testDb.db, ...ENV },
+      );
+      expect(await reread.json()).toMatchObject({
+        success: true,
+        data: {
+          version: 1,
+          features: { broadcasts: false, media: true },
+          specializedFeatureKeys: ['nen_campaigns'],
+        },
       });
     } finally {
       testDb.raw.close();
@@ -473,6 +528,50 @@ describe('feature off impact check', () => {
       expect(saved.status).toBe(409);
       expect(saved.body.code).toBe('IMPACT_CONFIRMATION_REQUIRED');
       expect(saved.body.data.impacts[0].items[0]).toMatchObject({ count: 1, ids: ['b-new'] });
+    } finally {
+      testDb.raw.close();
+    }
+  });
+
+  it('101件目以降の入れ替えも全ID照合で検出する', async () => {
+    const testDb = createTestD1();
+    try {
+      const values = Array.from(
+        { length: 105 },
+        (_, index) => {
+          const id = `b-${String(index + 1).padStart(3, '0')}`;
+          return `('${id}', '予約${id}', 'text', '本文', 'all', 'scheduled', 'account-1')`;
+        },
+      ).join(',');
+      testDb.raw.exec(`
+        INSERT INTO broadcasts (id, title, message_type, message_content, target_type, status, line_account_id)
+        VALUES ${values};
+      `);
+      const impact = await postImpact(testDb, { expectedVersion: 0, features: { broadcasts: false } });
+      expect(impact.status).toBe(200);
+      const item = impact.body.data.impacts[0].items[0];
+      // 応答に載るのは先頭100件だけだが、件数は105件。
+      expect(item).toMatchObject({ count: 105, truncated: true });
+      expect(item.ids).toHaveLength(100);
+      expect(item.ids[0]).toBe('b-001');
+      // 照合用の全IDは応答に出さない。
+      expect(item.fingerprintIds).toBeUndefined();
+      const token = impact.body.data.impactToken as string;
+
+      // 応答に載らない101件目以降を同数で入れ替える。
+      testDb.raw.exec(`
+        DELETE FROM broadcasts WHERE id = 'b-105';
+        INSERT INTO broadcasts (id, title, message_type, message_content, target_type, status, line_account_id)
+        VALUES ('b-106', '新しい予約', 'text', '本文', 'all', 'scheduled', 'account-1');
+      `);
+
+      const saved = await putFeatures(testDb, {
+        expectedVersion: 0,
+        features: { broadcasts: false },
+        impactToken: token,
+      });
+      expect(saved.status).toBe(409);
+      expect(saved.body.code).toBe('IMPACT_CONFIRMATION_REQUIRED');
     } finally {
       testDb.raw.close();
     }
