@@ -231,6 +231,8 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
   const [crossRunId, setCrossRunId] = useState('')
   const [crossResultId, setCrossResultId] = useState('')
   const [crossQueue, setCrossQueue] = useState<CrossQueueStatus | null>(null)
+  const [crossAutoStopped, setCrossAutoStopped] = useState(false)
+  const [crossRecheck, setCrossRecheck] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [crossDays, setCrossDays] = useState(30)
@@ -267,13 +269,15 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
     setCrossRunId('')
     setCrossResultId('')
     setCrossQueue(null)
+    setCrossAutoStopped(false)
     setPicked(null)
     setAudience(null)
     setError('')
   }, [accountId])
 
   // 結果待ちの読み直し。終わらない集計があると無限に叩き続け、端末の電池と
-  // 回線、D1の読み取り枠を消費する。40回で打ち切り、間隔は段階的に延ばす。
+  // 回線、D1の読み取り枠を消費する。40回(約2分)で自動確認は止めるが、集計自体は
+  // 5分cronで続く。run IDは保持し、「結果をもう一度確認」で同じrunへ再接続する。
   useEffect(() => {
     if (!crossRunId) return
     let active = true
@@ -316,9 +320,10 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
       }
       if (!active) return
       if (attempts >= 40) {
-        setError('時間切れです。条件をゆるめて集計し直してください')
-        setCrossRunId('')
-        setCrossQueue(null)
+        // 自動確認は約2分で止めるが、5分cronの集計は続いている。run IDと順番表示は
+        // 保持し、手動の再確認で同じrunへ戻る。新規の送り直しは促さない(送り直すと
+        // 元の集計がpendingの間は429になるため)。
+        setCrossAutoStopped(true)
         setLoading(false)
         return
       }
@@ -329,7 +334,16 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
       active = false
       if (timer !== undefined) window.clearTimeout(timer)
     }
-  }, [accountId, crossRunId])
+  }, [accountId, crossRunId, crossRecheck])
+
+  // 時間切れ後もrun IDを保持しているため、同じ集計へ再接続できる。
+  const recheckCross = () => {
+    if (!crossRunId) return
+    setCrossAutoStopped(false)
+    setError('')
+    setLoading(true)
+    setCrossRecheck((n) => n + 1)
+  }
 
   const runCross = async () => {
     if (!fieldId) return
@@ -339,6 +353,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
     setAudience(null)
     setCrossResult(null)
     setCrossQueue(null)
+    setCrossAutoStopped(false)
     const now = new Date()
     const from = new Date(now.getTime() - crossDays * 24 * 3600_000)
     const rowAxis: AnalyticsCrossAxis = { kind: rowKind }
@@ -585,6 +600,22 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
           )}
           <p className="text-ink-faint mt-2 text-xs">同じ分析をもう一度押す必要はありません。このままお待ちください。</p>
           <p className="text-ink-faint mt-1 text-xs">結果が出た後はこの画面で確認でき、失敗・時間切れのときも集計し直せます。</p>
+        </div>
+      ) : !crossResult && crossAutoStopped && crossRunId ? (
+        <div className="bg-canvas rounded-card border-hairline border p-8 text-center text-sm" role="status">
+          <p className="text-ink font-medium">自動の確認を止めました。集計はこのまま続いています。</p>
+          {crossQueue?.queuePosition != null && (
+            <p className="text-ink-secondary mt-1">
+              このLINEアカウント内の順番は{crossQueue.queuePosition}番目です
+            </p>
+          )}
+          <p className="text-ink-secondary mt-1">
+            「結果をもう一度確認」を押すと同じ集計の続きを確認できます。もう一度集計を送り直す必要はありません。
+          </p>
+          <div className="mt-3 flex justify-center">
+            <Button onClick={() => recheckCross()} variant="primary">結果をもう一度確認</Button>
+          </div>
+          <p className="text-ink-faint mt-2 text-xs">結果が出た後はこの画面で確認でき、失敗のときも集計し直せます。</p>
         </div>
       ) : !crossResult ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">

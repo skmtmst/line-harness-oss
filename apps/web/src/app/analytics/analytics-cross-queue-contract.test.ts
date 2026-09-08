@@ -22,10 +22,21 @@ describe('クロス分析の待ち順と処理目安 (Issue #633)', () => {
     expect(PAGE).not.toContain('目安は約')
   })
 
-  it('完了・失敗・時間切れ後も結果確認と集計し直しの導線を残す', () => {
+  it('完了・失敗後も結果確認と集計し直しの導線を残す', () => {
     expect(PAGE).toContain('結果が出た後はこの画面で確認でき、失敗・時間切れのときも集計し直せます')
-    expect(PAGE).toContain('時間切れです。条件をゆるめて集計し直してください')
     expect(PAGE).toContain('もう一度集計できます')
+  })
+
+  it('時間切れ後もrun IDを保持し、同じ集計へ再接続できる', () => {
+    // 自動確認は約2分で止めるが、集計は続く。新規の送り直しは促さない。
+    expect(PAGE).toContain('自動の確認を止めました')
+    expect(PAGE).toContain('集計はこのまま続いています')
+    expect(PAGE).toContain('結果をもう一度確認')
+    expect(PAGE).toContain('送り直す必要はありません')
+    expect(PAGE).toContain('setCrossAutoStopped')
+    expect(PAGE).toContain('crossRecheck')
+    // 古い時間切れ文言(送り直しを促す)は残さない
+    expect(PAGE).not.toContain('時間切れです')
   })
 
   it('ポーリングは40回上限と段階的な間隔を保つ', () => {

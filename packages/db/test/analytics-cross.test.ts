@@ -483,6 +483,31 @@ describe('V6クロス分析', () => {
       .toBe('pending');
   });
 
+  it('並行processorが同じrunを二重実行しない', async () => {
+    // 2つのprocessorが同じpending runを拾っても、claimはUPDATEの1行更新で
+    // 先着1つだけがrunningにできる。負け側はnot_pendingで取りこぼさない。
+    const queued = await createAnalyticsCrossRun(db, {
+      lineAccountId: 'account-a', query: BASE_QUERY, timeZone: 'Asia/Tokyo',
+      dataCutoffAt: '2026-08-08T00:00:00.000Z',
+    });
+    const winner = await processAnalyticsCrossRun(db, queued.id);
+    expect(['available', 'partial', 'unavailable', 'failed']).toContain(winner.state);
+    await expect(processAnalyticsCrossRun(db, queued.id)).rejects.toThrow(
+      'analytics_cross_run_not_pending',
+    );
+    // 一括処理も取りこぼしを失敗に数えず、同じrunを重ねて処理しない。
+    const first = await createAnalyticsCrossRun(db, {
+      lineAccountId: 'account-a', query: BASE_QUERY, timeZone: 'Asia/Tokyo',
+      dataCutoffAt: '2026-08-08T00:00:00.000Z',
+    });
+    const swept = await processPendingAnalyticsCrossRuns(db, 5);
+    expect(swept.processed + swept.failed).toBe(1);
+    const reswept = await processPendingAnalyticsCrossRuns(db, 5);
+    expect(reswept).toEqual({ processed: 0, failed: 0 });
+    const done = sqlite.prepare(`SELECT state FROM analytics_cross_runs WHERE id = ?`).get(first.id) as { state: string };
+    expect(['available', 'partial', 'unavailable', 'failed']).toContain(done.state);
+  });
+
   it('次回処理目安は5分刻みの分01・06・11…を指す', () => {
     expect(nextAnalyticsCrossTick(new Date('2026-08-08T00:00:00.000Z')))
       .toBe('2026-08-08T00:01:00.000Z');
