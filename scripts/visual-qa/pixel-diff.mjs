@@ -22,6 +22,7 @@ import pixelmatch from 'pixelmatch'
 import { PNG } from 'pngjs'
 
 import { SCREENS } from './screens.mjs'
+import { summarizePixelDiffEntries } from './pixel-diff-summary.mjs'
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 export const DEFAULT_PIXEL_DIFF_THRESHOLD_PERCENT = 10
@@ -310,21 +311,13 @@ export function buildPixelDiffReport(screens = SCREENS, options = {}) {
     }
     return compared
   })
-  const pixelAbove = (entry) => entry.pixelAboveThreshold
-    ?? entry.pixelDiffPercent > thresholdPercent
-  const heightAbove = (entry) => entry.heightAboveThreshold
-    ?? Math.abs(entry.heightDifferencePx ?? 0) > heightDiffThresholdPx
+  const summary = summarizePixelDiffEntries(entries, { thresholdPercent, heightDiffThresholdPx })
   return {
     generatedFrom: 'scripts/visual-qa/screens.mjs',
     generatedAt: options.generatedAt ?? new Date().toISOString(),
     thresholdPercent,
     heightDiffThresholdPx,
-    screenCount: allScreens.length,
-    comparedCount: entries.filter((entry) => entry.status === 'compared').length,
-    unavailableCount: entries.filter((entry) => entry.status === 'unavailable').length,
-    pixelAboveThresholdCount: entries.filter(pixelAbove).length,
-    heightAboveThresholdCount: entries.filter(heightAbove).length,
-    aboveThresholdCount: entries.filter((entry) => pixelAbove(entry) || heightAbove(entry)).length,
+    ...summary,
     entries,
   }
 }
