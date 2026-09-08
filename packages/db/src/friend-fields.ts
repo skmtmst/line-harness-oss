@@ -554,6 +554,173 @@ export async function getFriendFieldsWithValues(
   return result.results.map(normalizeFriendField);
 }
 
+export interface FriendFieldValueCheckTarget {
+  type: string;
+  options_json?: string | null;
+}
+
+/** 選択肢の持ち方は2通りある。文字列のままか、ID付きの形か。 */
+function parseValueCheckOptions(optionsJson: string | null | undefined): Array<{ id: string; label: string }> {
+  if (!optionsJson) return [];
+  try {
+    const parsed = JSON.parse(optionsJson) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const out: Array<{ id: string; label: string }> = [];
+    for (const option of parsed) {
+      const id = typeof option === 'string'
+        ? option.trim()
+        : option && typeof option === 'object'
+          ? String((option as { id?: unknown }).id ?? (option as { label?: unknown }).label ?? '').trim()
+          : '';
+      const label = typeof option === 'string'
+        ? option.trim()
+        : option && typeof option === 'object'
+          ? String((option as { label?: unknown }).label ?? (option as { id?: unknown }).id ?? '').trim()
+          : '';
+      if (id && label) out.push({ id, label });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+/** YYYY-MM-DDの形に加え、暦に存在する日かまで見る。 */
+function isExistingCalendarDate(value: string): boolean {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime())
+    && date.getUTCFullYear() === Number(match[1])
+    && date.getUTCMonth() + 1 === Number(match[2])
+    && date.getUTCDate() === Number(match[3]);
+}
+
+/**
+ * 項目の型に合わせて保存値を検証・正規化する。
+ *
+ * 単票更新・一括更新・フォーム回答・自動化など、値の書き込み口は複数ある。
+ * どれか1つでも型に合わない値を許すと、絞り込み配信の数値比較や
+ * テンプレートの差し込みで矛盾・失敗が起きる。書き込む前にこの関数へ通し、
+ * 通らなければ保存せず項目単位の422で返す。正規化した値を保存することで、
+ * 後段（配信条件・差し込み・自動化）は同じ形の値だけを読む。
+ *
+ * 空（null・undefined・空文字）は「消す」扱いで value: null を返す。
+ * setFriendFieldValue が空文字で行を消す動きと合わせている。
+ */
+export function validateFriendFieldValue(
+  field: FriendFieldValueCheckTarget,
+  raw: unknown,
+): { ok: true; value: string | null } | { ok: false; error: string } {
+  const type = typeof field.type === 'string' ? field.type : '';
+  if (raw === null || raw === undefined) return { ok: true, value: null };
+  if (typeof raw === 'string' && raw.trim() === '') return { ok: true, value: null };
+
+  if (type === 'checkbox') {
+    if (raw === true || raw === '1' || (typeof raw === 'string' && raw.trim().toLowerCase() === 'true')) {
+      return { ok: true, value: '1' };
+    }
+    if (raw === false || raw === '0' || (typeof raw === 'string' && raw.trim().toLowerCase() === 'false')) {
+      return { ok: true, value: '0' };
+    }
+    return { ok: false, error: 'チェック項目ははい・いいえで入力してください' };
+  }
+  if (type === 'multi_select') {
+    let items: unknown[];
+    if (Array.isArray(raw)) {
+      items = raw;
+    } else if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw) as unknown;
+        items = Array.isArray(parsed) ? parsed : [raw];
+      } catch {
+        items = [raw];
+      }
+    } else {
+      return { ok: false, error: '複数選択は選択肢から選んでください' };
+    }
+    const options = parseValueCheckOptions(field.options_json);
+    const ids: string[] = [];
+    for (const item of items) {
+      const text = String(item ?? '').trim();
+      if (!text) continue;
+      const option = options.find((o) => o.id === text || o.label === text);
+      if (!option) return { ok: false, error: '登録済みの選択肢から選んでください' };
+      if (!ids.includes(option.id)) ids.push(option.id);
+    }
+    if (ids.length === 0) return { ok: true, value: null };
+    return { ok: true, value: JSON.stringify(ids) };
+  }
+  if (type === 'select') {
+    if (typeof raw !== 'string') return { ok: false, error: '登録済みの選択肢から選んでください' };
+    const text = raw.trim();
+    const option = parseValueCheckOptions(field.options_json).find((o) => o.id === text || o.label === text);
+    return option
+      ? { ok: true, value: option.id }
+      : { ok: false, error: '登録済みの選択肢から選んでください' };
+  }
+  if (type === 'number') {
+    const text = typeof raw === 'number' ? String(raw) : typeof raw === 'string' ? raw.trim().replace(/,/g, '') : '';
+    if (!text || !/^[-+]?(\d+(\.\d+)?|\.\d+)$/.test(text) || !Number.isFinite(Number(text))) {
+      return { ok: false, error: '数値で入力してください' };
+    }
+    return { ok: true, value: text.startsWith('+') ? text.slice(1) : text };
+  }
+  if (type === 'date') {
+    if (typeof raw !== 'string' || !isExistingCalendarDate(raw.trim())) {
+      return { ok: false, error: 'YYYY-MM-DDの存在する日付で入力してください' };
+    }
+    return { ok: true, value: raw.trim() };
+  }
+  if (type === 'datetime') {
+    if (typeof raw !== 'string' || Number.isNaN(Date.parse(raw.trim()))) {
+      return { ok: false, error: '日時形式で入力してください' };
+    }
+    return { ok: true, value: new Date(raw.trim()).toISOString() };
+  }
+  if (type === 'email') {
+    if (typeof raw !== 'string') return { ok: false, error: 'メールアドレス形式で入力してください' };
+    const text = raw.trim().toLowerCase();
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)
+      ? { ok: true, value: text }
+      : { ok: false, error: 'メールアドレス形式で入力してください' };
+  }
+  if (type === 'tel') {
+    if (typeof raw !== 'string') return { ok: false, error: '電話番号形式で入力してください' };
+    const text = raw.trim();
+    return /^\+?[0-9() -]{8,20}$/.test(text)
+      ? { ok: true, value: text }
+      : { ok: false, error: '電話番号形式で入力してください' };
+  }
+  if (type === 'url') {
+    if (typeof raw !== 'string') return { ok: false, error: 'httpまたはhttpsのURLで入力してください' };
+    const text = raw.trim();
+    try {
+      if (!['http:', 'https:'].includes(new URL(text).protocol)) throw new Error();
+    } catch {
+      return { ok: false, error: 'httpまたはhttpsのURLで入力してください' };
+    }
+    return { ok: true, value: text };
+  }
+  if (type === 'image' || type === 'pdf') {
+    if (typeof raw !== 'string' || !raw.trim() || raw.trim().length > 2000) {
+      return { ok: false, error: '画像・PDFの指定を確認してください' };
+    }
+    return { ok: true, value: raw.trim() };
+  }
+  if (type === 'text' || type === 'textarea' || type === '') {
+    if (typeof raw === 'number' && Number.isFinite(raw)) return { ok: true, value: String(raw) };
+    if (typeof raw !== 'string') return { ok: false, error: '文字で入力してください' };
+    const limit = type === 'textarea' ? 2000 : 200;
+    const text = raw.trim();
+    if (text.length > limit) return { ok: false, error: `${limit}文字以内で入力してください` };
+    return { ok: true, value: text === '' ? null : text };
+  }
+  // 未知の種類は通す。作り直し前の古い行を、新しい検証で書けなくしない。
+  if (typeof raw === 'string') return { ok: true, value: raw.trim() === '' ? null : raw };
+  return { ok: false, error: '文字で入力してください' };
+}
+
 /**
  * 値を書き込む。
  *
