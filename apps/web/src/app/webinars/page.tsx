@@ -49,7 +49,7 @@ function scheduleSummary(w: Webinar): string {
   }
   otherRules.forEach((rule) => {
     if (rule.type === 'weekly') parts.push(`毎週${(rule.days ?? []).map((day) => DAYS[day]).join('・')} ${rule.time}`)
-    if (rule.type === 'once') parts.push(rule.at ? new Date(rule.at).toLocaleString('ja-JP') : '単発・日時未設定')
+    if (rule.type === 'once') parts.push(rule.at ? new Date(rule.at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '単発・日時未設定')
   })
   return parts.join(' / ')
 }

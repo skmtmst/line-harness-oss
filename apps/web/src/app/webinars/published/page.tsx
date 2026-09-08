@@ -11,6 +11,7 @@ import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import { useAccount } from '@/contexts/account-context'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
+import { webinarErrorText } from '@/components/webinars/webinar-error-text'
 
 type PublishedWebinar = Webinar & {
   publicationState?: 'period' | 'always' | 'scheduled' | 'ended' | 'unset' | null
@@ -109,7 +110,7 @@ function PublishedWebinarContent() {
         window.location.assign(`/webinars/edit?id=${encodeURIComponent(response.data.id)}`)
       }
     } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : '操作を完了できませんでした。')
+      setNotice(webinarErrorText(cause, '操作を完了できませんでした。'))
     } finally {
       setBusy(false)
     }

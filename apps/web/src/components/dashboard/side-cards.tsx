@@ -200,7 +200,7 @@ export function RecentResultsCard({
   )
 }
 
-const inactiveBookingStatuses = new Set(['rejected', 'cancelled', 'canceled', 'completed', 'no_show'])
+export const inactiveBookingStatuses = new Set(['rejected', 'cancelled', 'canceled', 'completed', 'no_show'])
 
 export function activeUpcomingBookings(bookings: BookingRequest[], now = Date.now()): BookingRequest[] {
   return bookings

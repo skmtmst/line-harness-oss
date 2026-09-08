@@ -10208,8 +10208,11 @@ export const webinarApi = {
       }),
     }),
   analytics: (id: string) => fetchApi<{ data: WebinarAnalytics }>(`/api/webinars/${id}/analytics`),
-  participants: (id: string, cursor?: string) => fetchApi<{ data: WebinarParticipantPage }>(
-    `/api/webinars/${id}/participants${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
+  participants: (id: string, cursor?: string, limit?: number) => fetchApi<{ data: WebinarParticipantPage }>(
+    `/api/webinars/${id}/participants${cursor || limit ? `?${[
+      cursor ? `cursor=${encodeURIComponent(cursor)}` : '',
+      limit ? `limit=${encodeURIComponent(String(limit))}` : '',
+    ].filter(Boolean).join('&')}` : ''}`,
   ),
   userComments: (id: string) =>
     fetchApi<{ data: WebinarUserComment[] }>(`/api/webinars/${id}/user-comments`),
