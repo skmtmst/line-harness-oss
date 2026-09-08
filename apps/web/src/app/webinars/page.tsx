@@ -8,7 +8,7 @@ import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import './webinars.css'
-import FolderPanel from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import { webinarLoadFailure, type WebinarLoadFailure } from './webinar-load-failure'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError, webinarApi, type Webinar, type WebinarFolder, type WebinarListItem, type WebinarOverview } from '@/lib/api'
@@ -398,15 +398,16 @@ export default function WebinarsPage() {
       )}
       <div data-design-node="ZC13r" className="mx-auto max-w-[1600px] px-6 pb-10">
         <div data-design="Head" className="mb-4 flex flex-wrap gap-2">
-          <Button onClick={() => { setFolderError(''); setFolderDialogOpen(true) }} disabled={!selectedAccountId}>フォルダを追加</Button>
           <Button variant="primary" href="/webinars/new">ウェビナーを作成</Button>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+        <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
           <FolderPanel
             total={hasListData ? `${visibleItems.length}件` : '—'}
             activeId={selectedFolder}
             onSelect={setSelectedFolder}
+            onAddFolder={() => { setFolderError(''); setFolderDialogOpen(true) }}
+            addFolderDisabled={!selectedAccountId}
             rows={[
               { id: '', label: 'すべて', count: visibleItems.length },
               ...folders.map((folder, index) => ({

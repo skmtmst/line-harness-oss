@@ -1086,8 +1086,11 @@ broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) =
     if (body.messageBubbles !== undefined
         && (!Array.isArray(body.messageBubbles)
           || body.messageBubbles.length < 1
-          || body.messageBubbles.length > 3)) {
-      return c.json({ success: false, error: 'messageBubbles must contain 1 to 3 items' }, 400);
+          || body.messageBubbles.length > MAX_BROADCAST_MESSAGES)) {
+      return c.json({
+        success: false,
+        error: `messageBubbles must contain 1 to ${MAX_BROADCAST_MESSAGES} items`,
+      }, 400);
     }
 
     let segmentConditions: string | null | undefined;

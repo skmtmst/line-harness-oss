@@ -53,6 +53,24 @@ function safeJson<T>(raw: string | null | undefined, fallback: T): T {
   }
 }
 
+/**
+ * 送り先の `event_types` を読む(#506 中)。
+ *
+ * 1行でも壊れていると一覧全体が例外→500になっていた。壊れた行は空に
+ * 落とし、IDを構造化ログに残して一覧は返す。配列でないJSON(文字列など)
+ * も同じ扱いにする。
+ */
+function outgoingEventTypes(raw: string | null | undefined, webhookId: string): string[] {
+  try {
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) throw new Error('event_types is not an array');
+    return parsed.map((entry) => String(entry));
+  } catch {
+    console.error(JSON.stringify({ event: 'outgoing_webhook_event_types_broken', webhookId }));
+    return [];
+  }
+}
+
 async function incomingActionDisplayName(db: D1Database, action: IncomingWebhookActionRef): Promise<string> {
   const table = ({
     common_action: 'common_actions', tag: 'tags', friend_field: 'friend_fields',
@@ -173,6 +191,34 @@ function readMaxRetries(raw: unknown): { ok: true; value: number } | { ok: false
 
 const MIN_SECRET_LENGTH = 32;
 
+const MAX_WEBHOOK_NAME_LENGTH = 120;
+const MAX_EVENT_TYPES = 20;
+const MAX_EVENT_TYPE_LENGTH = 100;
+
+/**
+ * 名前と種別の上限。極端な値で一覧表示が崩れる・DBが膨らむのを防ぐ(#506 軽)。
+ */
+function validateWebhookName(name: unknown): string | null {
+  if (typeof name !== 'string' || !name.trim()) return 'name is required';
+  if (name.trim().length > MAX_WEBHOOK_NAME_LENGTH) {
+    return `name must be ${MAX_WEBHOOK_NAME_LENGTH} characters or less`;
+  }
+  return null;
+}
+
+function validateEventTypes(eventTypes: unknown): string | null {
+  if (eventTypes === undefined) return null;
+  if (!Array.isArray(eventTypes) || eventTypes.length > MAX_EVENT_TYPES) {
+    return `eventTypes must be an array of at most ${MAX_EVENT_TYPES} items`;
+  }
+  for (const item of eventTypes) {
+    if (typeof item !== 'string' || !item.trim() || item.trim().length > MAX_EVENT_TYPE_LENGTH) {
+      return `each eventType must be 1-${MAX_EVENT_TYPE_LENGTH} characters`;
+    }
+  }
+  return null;
+}
+
 function validateSecret(secret: unknown): string | null {
   if (typeof secret !== 'string' || secret.length < MIN_SECRET_LENGTH) {
     return `secret must be at least ${MIN_SECRET_LENGTH} characters`;
@@ -227,6 +273,12 @@ webhooks.get('/api/webhooks/incoming', requireRole('owner', 'admin', 'staff'), a
   try {
     const lineAccountId = c.req.query('lineAccountId')?.trim();
     if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    // 詳細口と同じ境界に寄せる(#506 中)。以前は一覧だけ権限キーを見て
+    // おらず、権限なし職員が一覧は見られるちぐはぐな状態だった。
+    const incomingStaff = c.get('staff');
+    if (incomingStaff?.role === 'staff' && !incomingStaff.permissionKeys?.includes('/webhooks')) {
+      return c.json({ success: false, error: 'この機能を表示する権限がありません' }, 403);
+    }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
@@ -347,8 +399,9 @@ webhooks.patch('/api/webhooks/incoming/:id/config', requireRole('owner'), async 
 webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
   try {
     const body = await c.req.json<{ name: string; sourceType?: string; secret?: string; lineAccountId: string }>();
-    if (!body.name) {
-      return c.json({ success: false, error: 'name is required' }, 400);
+    const nameError = validateWebhookName(body.name);
+    if (nameError) {
+      return c.json({ success: false, error: nameError }, 400);
     }
     const secretError = validateSecret(body.secret);
     if (secretError) {
@@ -398,6 +451,12 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
     const existing = await getIncomingWebhookById(c.env.DB, id, lineAccountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
     const body = await c.req.json<{ name?: string; sourceType?: string; secret?: string; isActive?: boolean }>();
+    if (body.name !== undefined) {
+      const nameError = validateWebhookName(body.name);
+      if (nameError) {
+        return c.json({ success: false, error: nameError }, 400);
+      }
+    }
     if (body.isActive !== undefined && typeof body.isActive !== 'boolean') {
       return c.json({ success: false, error: 'isActive must be a boolean' }, 400);
     }
@@ -465,6 +524,11 @@ webhooks.get('/api/webhooks/outgoing', requireRole('owner', 'admin', 'staff'), a
   try {
     const lineAccountId = c.req.query('lineAccountId')?.trim();
     if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    // 受信の詳細口と同じ境界に寄せる(#506 中)。
+    const outgoingStaff = c.get('staff');
+    if (outgoingStaff?.role === 'staff' && !outgoingStaff.permissionKeys?.includes('/webhooks')) {
+      return c.json({ success: false, error: 'この機能を表示する権限がありません' }, 403);
+    }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
@@ -483,7 +547,7 @@ webhooks.get('/api/webhooks/outgoing', requireRole('owner', 'admin', 'staff'), a
           id: w.id,
           name: w.name,
           url: w.url,
-          eventTypes: JSON.parse(w.event_types),
+          eventTypes: outgoingEventTypes(w.event_types, w.id),
           hasSecret: Boolean(w.secret && w.secret.length >= MIN_SECRET_LENGTH),
           isActive: Boolean(w.is_active),
           maxRetries: w.max_retries ?? 0,
@@ -525,8 +589,13 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
       maxRetries?: unknown;
       lineAccountId: string;
     }>();
-    if (!body.name) {
-      return c.json({ success: false, error: 'name is required' }, 400);
+    const nameError = validateWebhookName(body.name);
+    if (nameError) {
+      return c.json({ success: false, error: nameError }, 400);
+    }
+    const eventTypesError = validateEventTypes(body.eventTypes);
+    if (eventTypesError) {
+      return c.json({ success: false, error: eventTypesError }, 400);
     }
     const urlError = validateHttpsUrl(body.url);
     if (urlError) {
@@ -564,7 +633,7 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
           id: item.id,
           name: item.name,
           url: item.url,
-          eventTypes: JSON.parse(item.event_types),
+          eventTypes: outgoingEventTypes(item.event_types, item.id),
           // Returned exactly once on create.
           secret: item.secret,
           isActive: Boolean(item.is_active),
@@ -607,6 +676,16 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
         return c.json({ success: false, error: 'maxRetries must be an integer between 0 and 5' }, 400);
       }
       maxRetries = parsed.value;
+    }
+    if (body.name !== undefined) {
+      const nameError = validateWebhookName(body.name);
+      if (nameError) {
+        return c.json({ success: false, error: nameError }, 400);
+      }
+    }
+    const eventTypesError = validateEventTypes(body.eventTypes);
+    if (eventTypesError) {
+      return c.json({ success: false, error: eventTypesError }, 400);
     }
     if (body.isActive !== undefined && typeof body.isActive !== 'boolean') {
       return c.json({ success: false, error: 'isActive must be a boolean' }, 400);
@@ -656,7 +735,7 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
         id: updated.id,
         name: updated.name,
         url: updated.url,
-        eventTypes: JSON.parse(updated.event_types),
+        eventTypes: outgoingEventTypes(updated.event_types, updated.id),
         hasSecret: Boolean(updated.secret && updated.secret.length >= MIN_SECRET_LENGTH),
         isActive: Boolean(updated.is_active),
         maxRetries: updated.max_retries ?? 0,

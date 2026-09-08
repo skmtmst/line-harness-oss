@@ -6,7 +6,8 @@ const page = readFileSync(join(import.meta.dirname, 'page.tsx'), 'utf8')
 
 describe('V6 緊急停止の最終確認 U0BwS', () => {
   it('設計の720px幅と影響・理由・止まらないものの3区画を持つ', () => {
-    expect(page).toContain('style={{ height: 700, maxWidth: 720 }}')
+    // 低い画面ではみ出さないよう、高さ700に上限を併せる(#518 8)。
+    expect(page).toContain("style={{ height: 700, maxHeight: 'calc(100vh - 32px)', maxWidth: 720 }}")
     expect(page).toContain('停止前にすでにLINEへ渡したものは取り消せません。')
     expect(page).toContain('<p className="text-xs font-bold text-ink">理由</p>')
     expect(page).toContain('<p className="text-xs font-bold text-success">止まらないもの</p>')

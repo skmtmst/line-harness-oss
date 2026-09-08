@@ -15,8 +15,8 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { scenarioReferenceData } from './scenario-reference-data'
 
 /** 日付の書き方。worker の interpolation-date.ts と同じ並び。 */
 const DATE_FORMATS: { token: string; label: string; example: string }[] = [
@@ -60,8 +60,8 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
     }
     void (async () => {
       const [fieldRes, varRes] = await Promise.all([
-        api.friendFields.list(selectedAccountId),
-        api.commonVars.list(selectedAccountId),
+        scenarioReferenceData.friendFields(selectedAccountId),
+        scenarioReferenceData.commonVars(selectedAccountId),
       ])
       if (fieldRes.success) {
         setFields(fieldRes.data.map((f) => ({ token: `{{field.${f.fieldKey}}}`, label: f.name })))

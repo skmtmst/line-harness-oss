@@ -16,7 +16,7 @@ function scenarioCompletionDetail(active: number, completed: number): string {
 import type { Folder } from '@line-crm/shared'
 import ListKpis from '@/components/shared/list-kpis'
 import ListToolbar from '@/components/shared/list-toolbar'
-import FolderPanel from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -441,15 +441,7 @@ export default function ScenariosPage() {
 
       {/* 一覧本体（設計 `Body`）。 */}
       <div data-design="Body">
-      {/*
-        「フォルダを追加」と「＋ シナリオを作成」は、設計では KPI の下・
-        フォルダ欄と表の上に置く。見出しの操作欄に入れていたので、
-        絵と位置が違っていた。
-      */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Button onClick={() => setFolderDialogOpen(true)}>
-          フォルダを追加
-        </Button>
         <button
           onClick={() => void handleCreate()}
           disabled={creating}
@@ -463,11 +455,12 @@ export default function ScenariosPage() {
         いないので（列が無い）、いまは「すべて」だけ。分類できるように
         なったらここに並ぶ。
       */}
-      <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+      <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
           total={`${scenarioList.total} 件`}
           activeId={folderFilter}
           onSelect={setFolderFilter}
+          onAddFolder={() => setFolderDialogOpen(true)}
           rows={[
             { id: '', label: 'すべて', count: scenarios.length },
             ...folders.map((f) => ({

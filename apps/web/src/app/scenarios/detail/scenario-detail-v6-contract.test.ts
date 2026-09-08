@@ -40,7 +40,7 @@ describe('V6 シナリオ編集の契約', () => {
 
   it('一覧のフォルダ追加を既存の共通ダイアログへ接続する', () => {
     expect(LIST).toContain("import FolderAddDialog from '@/components/shared/folder-add-dialog'")
-    expect(LIST).toContain('<Button onClick={() => setFolderDialogOpen(true)}>')
+    expect(LIST).toContain('onAddFolder={() => setFolderDialogOpen(true)}')
     expect(LIST).toContain('kind="scenario"')
     expect(LIST).not.toContain('title="準備中です"\n          className="border-hairline text-ink-faint rounded-control border px-4')
   })

@@ -7,6 +7,7 @@ import { api, type IncomingWebhookDetail, type OutgoingWebhookOverview } from '@
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import ListToolbar from '@/components/shared/list-toolbar'
+import Notice, { type NoticeTone } from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SelectField from '@/components/shared/select-field'
 import StatusBadge from '@/components/shared/status-badge'
@@ -169,6 +170,42 @@ export function OutgoingOverview({
   const [page, setPage] = useState(1)
   const [settingsId, setSettingsId] = useState<string | null>(null)
   const [testingId, setTestingId] = useState<string | null>(null)
+  /**
+   * 「1回 試してみる」の結果(#506 中)。
+   *
+   * 以前は口の戻り値を読まず、成功も失敗も画面に何も出なかった。
+   * 成功は届いた旨、失敗は「やり取りの記録」タブへの案内を出す。
+   */
+  const [testNotice, setTestNotice] = useState<{ tone: NoticeTone; message: string } | null>(null)
+
+  const runTest = async (item: OutgoingWebhookOverview) => {
+    if (!lineAccountId || testingId !== null) return
+    setTestingId(item.id)
+    setTestNotice(null)
+    try {
+      const response = await api.webhooks.outgoing.test(item.id, lineAccountId)
+      if (response.success && response.data.delivered) {
+        const status = response.data.responseStatus
+        setTestNotice({
+          tone: 'success',
+          message: `「${item.name}」への試し送信が届きました${status === null ? '' : `(相手の応答 ${status})`}。`,
+        })
+      } else {
+        const status = response.success ? response.data.responseStatus : null
+        setTestNotice({
+          tone: 'error',
+          message: `「${item.name}」への試し送信は届きませんでした${status === null ? '' : `(相手の応答 ${status})`}。「やり取りの記録」タブで詳しく確認できます。`,
+        })
+      }
+    } catch {
+      setTestNotice({
+        tone: 'error',
+        message: `「${item.name}」への試し送信に失敗しました。「やり取りの記録」タブで詳しく確認できます。`,
+      })
+    } finally {
+      setTestingId(null)
+    }
+  }
 
   const filtered = useMemo(() => {
     const rows = items.filter((item) => matchesOutgoing(item, filter, query))
@@ -202,6 +239,12 @@ export function OutgoingOverview({
       <p className="bg-accent-soft text-ink-secondary rounded-card mb-3 px-4 py-3 text-sm leading-6">
         「こちらから送る」は、うちで起きたことを相手に知らせます。「こちらで受け取る」は、相手で起きたことをうちに取り込みます。受け取る側のURLは、相手のサービスに貼ってください。
       </p>
+
+      {testNotice ? (
+        <div className="mb-3">
+          <Notice tone={testNotice.tone} message={testNotice.message} onClose={() => setTestNotice(null)} />
+        </div>
+      ) : null}
 
       <ListToolbar
         searchPlaceholder="つなぎ先・送るタイミングで検索"
@@ -301,11 +344,7 @@ export function OutgoingOverview({
                       <Button
                         variant="secondary"
                         disabled={!lineAccountId || testingId !== null || !item.isActive}
-                        onClick={async () => {
-                          if (!lineAccountId) return
-                          setTestingId(item.id)
-                          try { await api.webhooks.outgoing.test(item.id, lineAccountId) } finally { setTestingId(null) }
-                        }}
+                        onClick={() => void runTest(item)}
                       >{testingId === item.id ? '試しています…' : '1回 試してみる'}</Button>
                       <div className="relative">
                         <Button
