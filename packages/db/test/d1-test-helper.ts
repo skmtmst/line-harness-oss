@@ -30,12 +30,29 @@ export function asD1(sqlite: Database.Database): D1Database {
   }
   return {
     prepare,
+    // D1 の batch は原子（一文でも失敗したら全体を巻き戻す）。SAVEPOINT で
+    // 同じにする。await せず transaction() に投げると、失敗時に部分適用が
+    // 残るのでやらない。
     async batch<T>(statements: D1PreparedStatement[]) {
+      sqlite.exec('SAVEPOINT d1_test_batch');
       const results: unknown[] = [];
-      sqlite.transaction(() => {
-        for (const statement of statements) results.push(statement.run());
-      })();
-      return Promise.all(results) as T;
+      try {
+        for (const statement of statements) results.push(await statement.run());
+      } catch (error) {
+        try {
+          sqlite.exec('ROLLBACK TO d1_test_batch');
+        } catch {
+          /* 既に閉じている */
+        }
+        try {
+          sqlite.exec('RELEASE d1_test_batch');
+        } catch {
+          /* 既に閉じている */
+        }
+        throw error;
+      }
+      sqlite.exec('RELEASE d1_test_batch');
+      return results as T;
     },
   } as unknown as D1Database;
 }

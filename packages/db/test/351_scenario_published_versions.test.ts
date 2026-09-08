@@ -11,12 +11,14 @@ import {
   deleteScenarioStep,
   enrollFriendInScenario,
   getScenarioPublishedVersion,
+  getScenarioVersionById,
   getStepsForDelivery,
   publishScenarioVersion,
   resumeFriendScenario,
   updateScenario,
   updateScenarioStep,
 } from '../src/scenarios.js';
+import { asD1 } from './d1-test-helper.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = join(__dirname, '..');
@@ -25,35 +27,6 @@ function setupDb(): Database.Database {
   const db = new Database(':memory:');
   db.exec(readFileSync(join(PKG_ROOT, 'bootstrap.sql'), 'utf8'));
   return db;
-}
-
-function asD1(sqlite: Database.Database): D1Database {
-  return {
-    prepare(query: string) {
-      return {
-        bind(...params: unknown[]) {
-          const stmt = sqlite.prepare(query);
-          return {
-            async run() {
-              const info = stmt.run(...params);
-              return { results: [], success: true, meta: { changes: info.changes } };
-            },
-            async first<T>() {
-              return (stmt.get(...params) as T) ?? null;
-            },
-            async all<T>() {
-              return { results: stmt.all(...params) as T[], success: true, meta: {} };
-            },
-          };
-        },
-      };
-    },
-    async batch(statements: Array<{ run(): Promise<unknown> }>) {
-      const out: unknown[] = [];
-      for (const statement of statements) out.push(await statement.run());
-      return out;
-    },
-  } as unknown as D1Database;
 }
 
 let sqlite: Database.Database;
@@ -302,10 +275,10 @@ describe('シナリオ公開版の固定（#644）', () => {
     ).toBe('retired');
   });
 
-  test('指針の版以外に残った published は次回公開で引退へ寄る（部分失敗の自己修復）', async () => {
+  test('指針の版以外に残った published は次回公開の原子 batch で引退へ寄る', async () => {
     const { scenario, step1 } = await seedScenarioWithSteps();
     const v1 = await publish(scenario.id, 'key-heal-1');
-    // 途中失敗の残骸：指針を動かさず published を直接足す。
+    // 昔の残骸：指針を動かさず published を直接足す。
     sqlite
       .prepare(
         `INSERT INTO scenario_versions
@@ -327,31 +300,163 @@ describe('シナリオ公開版の固定（#644）', () => {
     expect(v1.id).not.toBe(v2.id);
   });
 
-  test('親削除は版・購読ごと消え、ログは残して500にしない', async () => {
+  test('真の競合：同時公開が版番号で衝突しても敗者版は残らない', async () => {
     const { scenario, step1 } = await seedScenarioWithSteps();
-    insertFriend('f-1');
-    await publish(scenario.id, 'key-parent-1');
-    const enrollment = await enrollFriendInScenario(db, 'f-1', scenario.id);
-    sqlite
-      .prepare(
-        `INSERT INTO messages_log (id, friend_id, direction, message_type, content, scenario_step_id, source, created_at)
-         VALUES ('log-1', 'f-1', 'outgoing', 'text', '1通目', ?, 'scenario', '2026-08-16')`,
-      )
-      .run(step1.id);
+    await publish(scenario.id, 'key-race-1');
+    await updateScenarioStep(db, step1.id, { message_content: 'Aの編集' });
 
-    await deleteScenario(db, scenario.id);
+    // A が版番号を読んで batch を投げた瞬間、B が先に公開を終える（真の
+    // interleave）。A の batch は版番号 UNIQUE で巻き戻り、期待値を
+    // 取り直して再試行する。
+    let injected = false;
+    const racingDb = {
+      ...db,
+      batch: async (statements: D1PreparedStatement[]) => {
+        if (!injected) {
+          injected = true;
+          await updateScenarioStep(db, step1.id, { message_content: 'Bの編集' });
+          await publish(scenario.id, 'key-race-B');
+          await updateScenarioStep(db, step1.id, { message_content: 'Aの編集' });
+        }
+        return db.batch(statements);
+      },
+    } as unknown as D1Database;
+    const vA = await publishScenarioVersion(racingDb, scenario.id, { staffId: null, idempotencyKey: 'key-race-A' });
 
-    expect(sqlite.prepare(`SELECT COUNT(*) AS n FROM scenarios WHERE id = ?`).get(scenario.id)).toEqual({ n: 0 });
-    expect(
-      (sqlite.prepare(`SELECT COUNT(*) AS n FROM scenario_versions WHERE scenario_id = ?`).get(scenario.id) as { n: number }).n,
-    ).toBe(0);
-    expect(
-      (sqlite.prepare(`SELECT COUNT(*) AS n FROM friend_scenarios WHERE id = ?`).get(enrollment!.id) as { n: number }).n,
-    ).toBe(0);
-    // ログは残り、通の参照は外れる。
-    expect(sqlite.prepare(`SELECT COUNT(*) AS n FROM messages_log WHERE id = 'log-1'`).get()).toEqual({ n: 1 });
-    expect(
-      sqlite.prepare(`SELECT scenario_step_id AS ref FROM messages_log WHERE id = 'log-1'`).get(),
-    ).toEqual({ ref: null });
+    const rows = sqlite
+      .prepare(`SELECT id, version_number AS n, status FROM scenario_versions WHERE scenario_id = ? ORDER BY version_number`)
+      .all(scenario.id) as Array<{ id: string; n: number; status: string }>;
+    // v1・Bのv2・Aのv3 が1件ずつ。敗者の残骸（指針外の published）は無い。
+    expect(rows.map((r) => r.n)).toEqual([1, 2, 3]);
+    expect(rows.filter((r) => r.status === 'published')).toHaveLength(1);
+    expect(rows.find((r) => r.status === 'published')!.id).toBe(vA.id);
+    const pointer = sqlite
+      .prepare(`SELECT current_published_version_id AS pointer FROM scenarios WHERE id = ?`)
+      .get(scenario.id) as { pointer: string };
+    expect(pointer.pointer).toBe(vA.id);
+    expect(countVersions(scenario.id)).toBe(3);
   });
+
+  test('キー競合の batch は巻き戻る：409 後に版の残骸も指針の移動もない', async () => {
+    const { scenario, step1 } = await seedScenarioWithSteps();
+    const v1 = await publish(scenario.id, 'key-atomic-1');
+
+    await updateScenarioStep(db, step1.id, { message_content: '別内容' });
+    await expect(publish(scenario.id, 'key-atomic-1')).rejects.toThrow('SCENARIO_PUBLISH_KEY_CONFLICT');
+
+    // 版は増えず、指針は v1 のまま、v1 は published のまま。
+    expect(countVersions(scenario.id)).toBe(1);
+    const pointer = sqlite
+      .prepare(`SELECT current_published_version_id AS pointer FROM scenarios WHERE id = ?`)
+      .get(scenario.id) as { pointer: string };
+    expect(pointer.pointer).toBe(v1.id);
+    expect((await getScenarioPublishedVersion(db, scenario.id))?.id).toBe(v1.id);
+  });
+
+  test('同キー同内容の同時公開は1版に収まる（片方の batch が巻き戻る）', async () => {
+    const { scenario } = await seedScenarioWithSteps();
+
+    let injected = false;
+    const racingDb = {
+      ...db,
+      batch: async (statements: D1PreparedStatement[]) => {
+        if (!injected) {
+          injected = true;
+          await publish(scenario.id, 'key-same-1');
+        }
+        return db.batch(statements);
+      },
+    } as unknown as D1Database;
+    const vA = await publishScenarioVersion(racingDb, scenario.id, { staffId: null, idempotencyKey: 'key-same-1' });
+
+    expect(countVersions(scenario.id)).toBe(1);
+    const pointer = sqlite
+      .prepare(`SELECT current_published_version_id AS pointer FROM scenarios WHERE id = ?`)
+      .get(scenario.id) as { pointer: string };
+    expect(pointer.pointer).toBe(vA.id);
+  });
+
+  test('よそのシナリオの版は読めない（帰属 query guard）', async () => {
+    const first = await seedScenarioWithSteps();
+    const second = await seedScenarioWithSteps();
+    const v1 = await publish(first.scenario.id, 'key-guard-1');
+
+    expect(await getScenarioVersionById(db, second.scenario.id, v1.id)).toBeNull();
+    expect(await getStepsForDelivery(db, second.scenario.id, v1.id)).toBeNull();
+  });
+
+  test('よそのシナリオの版への指針・購読固定は止まる（帰属 trigger）', async () => {
+    const first = await seedScenarioWithSteps();
+    const second = await seedScenarioWithSteps();
+    const v1 = await publish(first.scenario.id, 'key-own-1');
+    await publish(second.scenario.id, 'key-own-2');
+
+    // 指針をよその版へ向けようとすると止まる。
+    expect(() =>
+      sqlite.prepare(`UPDATE scenarios SET current_published_version_id = ? WHERE id = ?`).run(v1.id, second.scenario.id),
+    ).toThrow(/belongs to another scenario/);
+    // 購読をよその版へ固定しようとすると止まる。
+    insertFriend('f-1');
+    expect(() =>
+      sqlite.prepare(
+        `INSERT INTO friend_scenarios (id, friend_id, scenario_id, current_step_order, status, started_at, updated_at, published_version_id)
+         VALUES ('enr-x', 'f-1', ?, -1, 'active', '2026-08-16', '2026-08-16', ?)`,
+      ).run(second.scenario.id, v1.id),
+    ).toThrow(/belongs to another scenario/);
+    // 指針は動いていない。
+    const pointer = sqlite
+      .prepare(`SELECT current_published_version_id AS pointer FROM scenarios WHERE id = ?`)
+      .get(second.scenario.id) as { pointer: string };
+    expect(pointer.pointer).not.toBe(v1.id);
+  });
+
+  for (const fk of ['ON', 'OFF'] as const) {
+    test(`親削除は版・購読ごと消え、参照を外して500にしない（FK ${fk}）`, async () => {
+      sqlite.exec(`PRAGMA foreign_keys = ${fk}`);
+      const { scenario, step1 } = await seedScenarioWithSteps();
+      insertFriend('f-1');
+      await publish(scenario.id, `key-parent-${fk}`);
+      const enrollment = await enrollFriendInScenario(db, 'f-1', scenario.id);
+      sqlite
+        .prepare(
+          `INSERT INTO messages_log (id, friend_id, direction, message_type, content, scenario_step_id, source, created_at)
+           VALUES ('log-1', 'f-1', 'outgoing', 'text', '1通目', ?, 'scenario', '2026-08-16')`,
+        )
+        .run(step1.id);
+      // 他の口からの参照（FK OFF では CASCADE も SET NULL も走らない）。
+      sqlite.prepare(`INSERT INTO entry_routes (id, ref_code, name, scenario_id) VALUES ('er-1', 'R1', '入口', ?)`).run(scenario.id);
+      sqlite.prepare(`INSERT INTO tracked_links (id, name, original_url, scenario_id) VALUES ('tl-1', '計測', 'https://example.com', ?)`).run(scenario.id);
+      sqlite.prepare(`INSERT INTO forms (id, name, on_submit_scenario_id) VALUES ('fm-1', '申込', ?)`).run(scenario.id);
+      const follower = await createScenario(db, { name: '後継', triggerType: 'manual' });
+      await updateScenario(db, follower.id, { on_complete_scenario_id: scenario.id });
+
+      await deleteScenario(db, scenario.id);
+
+      expect(sqlite.prepare(`SELECT COUNT(*) AS n FROM scenarios WHERE id = ?`).get(scenario.id)).toEqual({ n: 0 });
+      expect(
+        (sqlite.prepare(`SELECT COUNT(*) AS n FROM scenario_versions WHERE scenario_id = ?`).get(scenario.id) as { n: number }).n,
+      ).toBe(0);
+      expect(
+        (sqlite.prepare(`SELECT COUNT(*) AS n FROM scenario_steps WHERE scenario_id = ?`).get(scenario.id) as { n: number }).n,
+      ).toBe(0);
+      expect(
+        (sqlite.prepare(`SELECT COUNT(*) AS n FROM friend_scenarios WHERE id = ?`).get(enrollment!.id) as { n: number }).n,
+      ).toBe(0);
+      expect(
+        (sqlite.prepare(`SELECT COUNT(*) AS n FROM scenario_publish_keys WHERE scenario_id = ?`).get(scenario.id) as { n: number }).n,
+      ).toBe(0);
+      // ログは残り、通の参照は外れる。
+      expect(sqlite.prepare(`SELECT COUNT(*) AS n FROM messages_log WHERE id = 'log-1'`).get()).toEqual({ n: 1 });
+      expect(
+        sqlite.prepare(`SELECT scenario_step_id AS ref FROM messages_log WHERE id = 'log-1'`).get(),
+      ).toEqual({ ref: null });
+      // 参照はすべて外れる（行は残る）。
+      expect(sqlite.prepare(`SELECT scenario_id AS ref FROM entry_routes WHERE id = 'er-1'`).get()).toEqual({ ref: null });
+      expect(sqlite.prepare(`SELECT scenario_id AS ref FROM tracked_links WHERE id = 'tl-1'`).get()).toEqual({ ref: null });
+      expect(sqlite.prepare(`SELECT on_submit_scenario_id AS ref FROM forms WHERE id = 'fm-1'`).get()).toEqual({ ref: null });
+      expect(
+        sqlite.prepare(`SELECT on_complete_scenario_id AS ref FROM scenarios WHERE id = ?`).get(follower.id),
+      ).toEqual({ ref: null });
+    });
+  }
 });

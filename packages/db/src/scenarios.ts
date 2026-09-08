@@ -329,15 +329,18 @@ export async function updateScenario(
 }
 
 /**
- * シナリオの親削除。子は明示順序で消す。
+ * シナリオの親削除。親子削除と全参照解除を1回の batch（原子）で行う。
  *
  * - 他の機能から参照されている（アフィリエイト案件の completion 連携など）
  *   ときは黙って切らず SCENARIO_HAS_DEPENDENTS（409）にする。勝手に
  *   切ると報酬の支払い条件が静かに壊れる。
  * - 版の削除禁止トリガーは「親が残っている間の削除」だけを止めるので、
- *   親→子の順に消す。外部キー制約が有効な環境では親削除で CASCADE が
- *   走り、無効な環境では残るので後段で明示削除する。どちらでも同じ
- *   終状態になり、500 にならない。
+ *   親の DELETE を先頭に置く。外部キー制約が有効な環境では親削除で
+ *   CASCADE/SET NULL が走り、無効な環境では残るので後段で明示削除・
+ *   参照解除する。どちらでも同じ終状態になり、500 にならない。
+ * - 参照解除（entry_routes / tracked_links / forms の送信後シナリオ・
+ *   他シナリオ完了時の遷移先）も同じ batch に入れる。FK OFF の環境では
+ *   CASCADE も SET NULL も走らないので、明示で NULL に寄せる。
  */
 export async function deleteScenario(db: D1Database, id: string): Promise<void> {
   const dependent = await db.prepare(
@@ -345,8 +348,8 @@ export async function deleteScenario(db: D1Database, id: string): Promise<void> 
   ).bind(id).first<{ id: string }>();
   if (dependent) throw new Error('SCENARIO_HAS_DEPENDENTS');
 
-  await db.prepare(`DELETE FROM scenarios WHERE id = ?`).bind(id).run();
-  const childDeletes = [
+  await db.batch([
+    db.prepare(`DELETE FROM scenarios WHERE id = ?`).bind(id),
     db.prepare(`DELETE FROM scenario_publish_keys WHERE scenario_id = ?`).bind(id),
     db.prepare(`DELETE FROM scenario_versions WHERE scenario_id = ?`).bind(id),
     db.prepare(
@@ -355,16 +358,19 @@ export async function deleteScenario(db: D1Database, id: string): Promise<void> 
        )`,
     ).bind(id),
     db.prepare(`DELETE FROM scenario_actions WHERE scenario_id = ?`).bind(id),
+    db.prepare(
+      `UPDATE messages_log SET scenario_step_id = NULL
+        WHERE scenario_step_id IN (SELECT id FROM scenario_steps WHERE scenario_id = ?)`,
+    ).bind(id),
     db.prepare(`DELETE FROM scenario_steps WHERE scenario_id = ?`).bind(id),
     db.prepare(`DELETE FROM friend_scenarios WHERE scenario_id = ?`).bind(id),
     db.prepare(`DELETE FROM scenario_triggers WHERE scenario_id = ?`).bind(id),
     db.prepare(`DELETE FROM scenario_drafts WHERE scenario_id = ?`).bind(id),
-  ];
-  if (typeof db.batch === 'function') {
-    await db.batch(childDeletes);
-  } else {
-    for (const statement of childDeletes) await statement.run();
-  }
+    db.prepare(`UPDATE entry_routes SET scenario_id = NULL WHERE scenario_id = ?`).bind(id),
+    db.prepare(`UPDATE tracked_links SET scenario_id = NULL WHERE scenario_id = ?`).bind(id),
+    db.prepare(`UPDATE forms SET on_submit_scenario_id = NULL WHERE on_submit_scenario_id = ?`).bind(id),
+    db.prepare(`UPDATE scenarios SET on_complete_scenario_id = NULL WHERE on_complete_scenario_id = ?`).bind(id),
+  ]);
 }
 
 // ============================================================
@@ -683,12 +689,17 @@ function canonicalPayloadOfVersion(version: ScenarioVersion): string | null {
   return canonicalPublishPayload(version, raw as Array<Record<string, unknown>>);
 }
 
+/**
+ * 版を1件読む。持ち主のシナリオも必ず付けて読む（364）。よそのシナリオの
+ * 版IDを渡されても null に倒し、文面の混入を拒否する。
+ */
 export async function getScenarioVersionById(
   db: D1Database,
+  scenarioId: string,
   versionId: string,
 ): Promise<ScenarioVersion | null> {
-  return db.prepare(`SELECT * FROM scenario_versions WHERE id = ?`)
-    .bind(versionId)
+  return db.prepare(`SELECT * FROM scenario_versions WHERE id = ? AND scenario_id = ?`)
+    .bind(versionId, scenarioId)
     .first<ScenarioVersion>();
 }
 
@@ -749,45 +760,29 @@ export function parseScenarioVersionSteps(version: ScenarioVersion): PinnedScena
 }
 
 /**
- * 冪等キーを台帳に残す。同内容の公開でも残すので、あとから別内容で
- * 使い回したら必ず SCENARIO_PUBLISH_KEY_CONFLICT になる。競合で残せな
- * かったら残っている行を読み直し、同内容ならその版、別内容なら衝突に
- * する（同時公開の両勝ちを作らない）。
+ * 公開 batch が制約で巻き戻ったときの分類。版番号の UNIQUE 違反は同時公開
+ * の競合（取り直す）。キー台帳の PRIMARY KEY 違反はキーの競合（読み直して
+ * 同内容ならその版、別内容なら 409）。どちらでも書いた分は残らない。
  */
-async function recordScenarioPublishKey(
-  db: D1Database,
-  idempotencyKey: string,
-  scenarioId: string,
-  versionId: string,
-  contentPayload: string,
-): Promise<ScenarioVersion> {
-  const now = jstNow();
-  await db.prepare(
-    `INSERT OR IGNORE INTO scenario_publish_keys
-       (publish_idempotency_key, scenario_id, version_id, content_snapshot, created_at)
-     VALUES (?, ?, ?, ?, ?)`,
-  ).bind(idempotencyKey, scenarioId, versionId, contentPayload, now).run();
-  const row = await db.prepare(
-    `SELECT * FROM scenario_publish_keys WHERE publish_idempotency_key = ?`,
-  ).bind(idempotencyKey).first<ScenarioPublishKey>();
-  if (!row || row.scenario_id !== scenarioId || row.content_snapshot !== contentPayload) {
-    throw new Error('SCENARIO_PUBLISH_KEY_CONFLICT');
-  }
-  const version = await getScenarioVersionById(db, row.version_id);
-  if (!version || version.scenario_id !== scenarioId) throw new Error('SCENARIO_NOT_PUBLISHED');
-  return version;
+function classifyPublishBatchError(error: unknown): 'version-number' | 'idempotency-key' | 'unknown' {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/scenario_publish_keys/i.test(message)) return 'idempotency-key';
+  if (/scenario_versions/i.test(message)) return 'version-number';
+  return 'unknown';
 }
 
 /**
- * いまの下書きを公開版として固定する。
+ * いまの下書きを公開版として固定する。単一原子 protocol。
  *
- * - 内容が現行の公開版と同じなら版を増やさず現行版を返すが、冪等キーは
- *   残す（連打・再試行で二重版を作らないし、あとの使い回しも検出する）。
- * - 同じキーで別内容が来たら SCENARIO_PUBLISH_KEY_CONFLICT（409）。
- * - 版INSERT→指針CAS→旧版引退の順に進める。指針のCASに負けたら勝った側の
- *   版を読み直し、同内容ならそれを返し、別内容なら取り直す（最大3回）。
- *   指針が指す版以外で published のまま残った版は、入口で引退へ寄せる
- *   ので「公開版なし」「引退版を指す指針」を作らない。
+ * - 書き込み前の判定では何も書かない。同キーの再実行は同版を返し、
+ *   別内容・別シナリオの使い回しは SCENARIO_PUBLISH_KEY_CONFLICT（409）。
+ * - 書き込みは1回の batch にまとめる（版INSERT・指針・旧版引退・キー予約）。
+ *   D1 の batch は原子なので、失敗したら指針だけ進む・版だけ残る・キーの
+ *   だけ残る、の途中状態を作らない。CAS の敗者版も残らない。
+ * - 同時公開の競合は制約違反で検出する。版番号の重なりは期待値（版番号・
+ *   指針・キー台帳）を取り直して再試行し（最大5回）、キーの重なりは
+ *   残っている行を読み直して同内容ならその版・別内容なら 409 にする。
+ * - 内容が現行の公開版と同じなら版を増やさず、キーだけ残して現行版を返す。
  */
 export async function publishScenarioVersion(
   db: D1Database,
@@ -798,20 +793,13 @@ export async function publishScenarioVersion(
     .bind(scenarioId)
     .first<Scenario>();
   if (!scenario) throw new Error('SCENARIO_NOT_FOUND');
-  const now = jstNow();
-  // 壊れた残骸の自己修復。指針が指す版以外に published が残っていたら引退へ
-  // 寄せる（途中失敗・同時公開の負け側の残骸）。冪等なので何度でも安全。
-  await db.prepare(
-    `UPDATE scenario_versions SET status = 'retired', updated_at = ?
-      WHERE scenario_id = ? AND status = 'published'
-        AND id != COALESCE((SELECT current_published_version_id FROM scenarios WHERE id = ?), '')`,
-  ).bind(now, scenarioId, scenarioId).run();
 
   const steps = await getScenarioSteps(db, scenarioId);
   const draftSteps = await buildVersionSnapshotSteps(db, '', steps);
   const draftPayload = canonicalPublishPayload(scenario, draftSteps);
 
-  // 同じキーの再実行。同内容なら同じ版を返し、別内容・別シナリオなら 409。
+  // 同じキーの再実行・使い回しの判定。ここでは何も書かないので、409 の
+  // 経路で公開側の状態は変わらない。
   const replay = await db.prepare(
     `SELECT * FROM scenario_publish_keys WHERE publish_idempotency_key = ?`,
   ).bind(input.idempotencyKey).first<ScenarioPublishKey>();
@@ -819,17 +807,33 @@ export async function publishScenarioVersion(
     if (replay.scenario_id !== scenarioId || replay.content_snapshot !== draftPayload) {
       throw new Error('SCENARIO_PUBLISH_KEY_CONFLICT');
     }
-    const replayed = await getScenarioVersionById(db, replay.version_id);
-    if (!replayed || replayed.scenario_id !== scenarioId) throw new Error('SCENARIO_NOT_PUBLISHED');
+    const replayed = await getScenarioVersionById(db, scenarioId, replay.version_id);
+    if (!replayed) throw new Error('SCENARIO_NOT_PUBLISHED');
     return replayed;
   }
 
-  const current = await getScenarioPublishedVersion(db, scenarioId);
-  if (current && canonicalPayloadOfVersion(current) === draftPayload) {
-    return recordScenarioPublishKey(db, input.idempotencyKey, scenarioId, current.id, draftPayload);
-  }
+  for (let attempt = 0; attempt < 5; attempt++) {
+    // 期待値の再読込。毎回いまの指針と版番号を取り直す。
+    const current = await getScenarioPublishedVersion(db, scenarioId);
+    if (current && canonicalPayloadOfVersion(current) === draftPayload) {
+      await db.batch([
+        db.prepare(
+          `INSERT OR IGNORE INTO scenario_publish_keys
+             (publish_idempotency_key, scenario_id, version_id, content_snapshot, created_at)
+           VALUES (?, ?, ?, ?, ?)`,
+        ).bind(input.idempotencyKey, scenarioId, current.id, draftPayload, jstNow()),
+      ]);
+      const row = await db.prepare(
+        `SELECT * FROM scenario_publish_keys WHERE publish_idempotency_key = ?`,
+      ).bind(input.idempotencyKey).first<ScenarioPublishKey>();
+      if (!row || row.scenario_id !== scenarioId || row.content_snapshot !== draftPayload) {
+        throw new Error('SCENARIO_PUBLISH_KEY_CONFLICT');
+      }
+      const version = await getScenarioVersionById(db, scenarioId, row.version_id);
+      if (!version) throw new Error('SCENARIO_NOT_PUBLISHED');
+      return version;
+    }
 
-  for (let attempt = 0; attempt < 3; attempt++) {
     const next = await db.prepare(
       `SELECT COALESCE(MAX(version_number), 0) + 1 AS version_number
          FROM scenario_versions WHERE scenario_id = ?`,
@@ -837,63 +841,66 @@ export async function publishScenarioVersion(
     const versionNumber = Number(next?.version_number ?? 1);
     const id = crypto.randomUUID();
     const snapshotSteps = await buildVersionSnapshotSteps(db, id, steps);
-    const inserted = await db.prepare(
-      `INSERT OR IGNORE INTO scenario_versions
-         (id, scenario_id, version_number, delivery_mode, audience_condition_json,
-          on_complete_mode, on_complete_scenario_id, steps_snapshot,
-          status, published_at, published_by_staff_id,
-          created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?, ?)`,
-    ).bind(
-      id,
-      scenarioId,
-      versionNumber,
-      scenario.delivery_mode ?? 'relative',
-      scenario.audience_condition_json ?? null,
-      scenario.on_complete_mode ?? 'pause',
-      scenario.on_complete_scenario_id ?? null,
-      JSON.stringify(snapshotSteps),
-      now,
-      input.staffId,
-      now,
-      now,
-    ).run();
-    // 同時公開で同じ版番号を取られたら取り直す。
-    if ((inserted.meta.changes ?? 0) === 0) continue;
-    // 指針の CAS。負けたら勝った側を読み直す。別内容なら取り直す。
-    const expectedPointer = current?.id ?? null;
-    const pointed = await db.prepare(
-      `UPDATE scenarios SET current_published_version_id = ?, updated_at = ?
-        WHERE id = ? AND COALESCE(current_published_version_id, '') = COALESCE(?, '')`,
-    ).bind(id, now, scenarioId, expectedPointer).run();
-    if ((pointed.meta.changes ?? 0) === 0) {
-      const latest = await getScenarioPublishedVersion(db, scenarioId);
-      if (latest && canonicalPayloadOfVersion(latest) === draftPayload) {
-        return recordScenarioPublishKey(db, input.idempotencyKey, scenarioId, latest.id, draftPayload);
+    const now = jstNow();
+    try {
+      // 単一原子。INSERT は素直な形にし、競合は制約違反で検出する
+      // （OR IGNORE で飲むと、書けた分だけ残る分離実行に戻る）。
+      await db.batch([
+        db.prepare(
+          `INSERT INTO scenario_versions
+             (id, scenario_id, version_number, delivery_mode, audience_condition_json,
+              on_complete_mode, on_complete_scenario_id, steps_snapshot,
+              status, published_at, published_by_staff_id,
+              created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?, ?)`,
+        ).bind(
+          id,
+          scenarioId,
+          versionNumber,
+          scenario.delivery_mode ?? 'relative',
+          scenario.audience_condition_json ?? null,
+          scenario.on_complete_mode ?? 'pause',
+          scenario.on_complete_scenario_id ?? null,
+          JSON.stringify(snapshotSteps),
+          now,
+          input.staffId,
+          now,
+          now,
+        ),
+        db.prepare(
+          `UPDATE scenarios SET current_published_version_id = ?, updated_at = ?
+            WHERE id = ?`,
+        ).bind(id, now, scenarioId),
+        db.prepare(
+          `UPDATE scenario_versions SET status = 'retired', updated_at = ?
+            WHERE scenario_id = ? AND status = 'published' AND id != ?`,
+        ).bind(now, scenarioId, id),
+        db.prepare(
+          `INSERT INTO scenario_publish_keys
+             (publish_idempotency_key, scenario_id, version_id, content_snapshot, created_at)
+           VALUES (?, ?, ?, ?, ?)`,
+        ).bind(input.idempotencyKey, scenarioId, id, draftPayload, now),
+      ]);
+    } catch (error) {
+      const kind = classifyPublishBatchError(error);
+      if (kind === 'idempotency-key') {
+        // 同じキーを誰かが先に残した。batch は巻き戻っているので版の残骸は
+        // ない。残っている行を読み直して同内容ならその版、別内容なら 409。
+        const row = await db.prepare(
+          `SELECT * FROM scenario_publish_keys WHERE publish_idempotency_key = ?`,
+        ).bind(input.idempotencyKey).first<ScenarioPublishKey>();
+        if (row && row.scenario_id === scenarioId && row.content_snapshot === draftPayload) {
+          const version = await getScenarioVersionById(db, scenarioId, row.version_id);
+          if (version) return version;
+        }
+        throw new Error('SCENARIO_PUBLISH_KEY_CONFLICT');
       }
-      continue;
+      if (kind === 'version-number') continue;
+      throw error;
     }
-    // 末尾の2件は1往復にまとめる (D1 の batch は原子)。指針が指す版だけを
-    // 残し、ほかは引退へ寄せる。キーの記録もここで行う。
-    const tailStatements = [
-      db.prepare(
-        `UPDATE scenario_versions SET status = 'retired', updated_at = ?
-          WHERE scenario_id = ? AND status = 'published' AND id != ?`,
-      ).bind(now, scenarioId, id),
-      db.prepare(
-        `INSERT OR IGNORE INTO scenario_publish_keys
-           (publish_idempotency_key, scenario_id, version_id, content_snapshot, created_at)
-         VALUES (?, ?, ?, ?, ?)`,
-      ).bind(input.idempotencyKey, scenarioId, id, draftPayload, now),
-    ];
-    if (typeof db.batch === 'function') {
-      await db.batch(tailStatements);
-    } else {
-      for (const statement of tailStatements) await statement.run();
-    }
-    const saved = await getScenarioVersionById(db, id);
+    const saved = await getScenarioVersionById(db, scenarioId, id);
     if (!saved || saved.status !== 'published') throw new Error('SCENARIO_NOT_PUBLISHED');
-    return recordScenarioPublishKey(db, input.idempotencyKey, scenarioId, saved.id, draftPayload);
+    return saved;
   }
   throw new Error('SCENARIO_PUBLISH_CONFLICT');
 }

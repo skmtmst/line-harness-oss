@@ -6737,6 +6737,24 @@ ON friend_add_rule_versions
 WHEN OLD.status IN ('published', 'retired')
 BEGIN SELECT RAISE(ABORT, 'published friend-add rule versions are immutable'); END;
 
+CREATE TRIGGER trg_friend_scenarios_version_ownership_insert
+BEFORE INSERT ON friend_scenarios
+WHEN NEW.published_version_id IS NOT NULL
+ AND NOT EXISTS (
+   SELECT 1 FROM scenario_versions
+   WHERE id = NEW.published_version_id AND scenario_id = NEW.scenario_id
+ )
+BEGIN SELECT RAISE(ABORT, 'published version belongs to another scenario'); END;
+
+CREATE TRIGGER trg_friend_scenarios_version_ownership_update
+BEFORE UPDATE OF published_version_id ON friend_scenarios
+WHEN NEW.published_version_id IS NOT NULL
+ AND NOT EXISTS (
+   SELECT 1 FROM scenario_versions
+   WHERE id = NEW.published_version_id AND scenario_id = NEW.scenario_id
+ )
+BEGIN SELECT RAISE(ABORT, 'published version belongs to another scenario'); END;
+
 CREATE TRIGGER trg_friend_scores_v6_snapshot
 AFTER INSERT ON friend_scores
 WHEN NEW.line_account_id IS NOT NULL
@@ -6886,6 +6904,15 @@ WHEN OLD.status IN ('published', 'retired')
  AND NEW.status <> OLD.status
  AND NOT (OLD.status = 'published' AND NEW.status = 'retired')
 BEGIN SELECT RAISE(ABORT, 'published scenario version status cannot move backwards'); END;
+
+CREATE TRIGGER trg_scenarios_pointer_ownership
+BEFORE UPDATE OF current_published_version_id ON scenarios
+WHEN NEW.current_published_version_id IS NOT NULL
+ AND NOT EXISTS (
+   SELECT 1 FROM scenario_versions
+   WHERE id = NEW.current_published_version_id AND scenario_id = NEW.id
+ )
+BEGIN SELECT RAISE(ABORT, 'published version belongs to another scenario'); END;
 
 -- Seed data required by tenant-aware inserts on a fresh database.
 INSERT OR IGNORE INTO tenants (id, name) VALUES
