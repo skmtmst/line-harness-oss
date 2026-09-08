@@ -353,6 +353,25 @@ jobs:
       - run: pnpm --filter web typecheck
       - run: pnpm --filter web test
 
+  mcp-checks:
+    name: MCP contract tests, typecheck and build
+    needs: changes
+    if: needs.changes.outputs.full_suite == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build MCP dependencies
+        run: pnpm --filter @line-harness/sdk build
+      - run: pnpm --filter @line-harness/mcp-server typecheck
+      - run: pnpm --filter @line-harness/mcp-server test
+      - run: pnpm --filter @line-harness/mcp-server build
+
   web-build:
     name: Admin build and design verification
     needs: changes
@@ -392,6 +411,7 @@ jobs:
       - worker-build
       - web-checks
       - web-build
+      - mcp-checks
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -403,6 +423,7 @@ jobs:
           WORKER_BUILD_RESULT: ${{ needs.worker-build.result }}
           WEB_CHECKS_RESULT: ${{ needs.web-checks.result }}
           WEB_BUILD_RESULT: ${{ needs.web-build.result }}
+          MCP_CHECKS_RESULT: ${{ needs.mcp-checks.result }}
         run: |
           failed=0
           for result in \
@@ -411,7 +432,8 @@ jobs:
             "$WORKER_CHECKS_RESULT" \
             "$WORKER_BUILD_RESULT" \
             "$WEB_CHECKS_RESULT" \
-            "$WEB_BUILD_RESULT"; do
+            "$WEB_BUILD_RESULT" \
+            "$MCP_CHECKS_RESULT"; do
             case "$result" in
               success|skipped) ;;
               *) failed=1 ;;

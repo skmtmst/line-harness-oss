@@ -14,6 +14,9 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "pretypecheck": "pnpm --filter @line-harness/sdk build",
+    "pretest": "pnpm --filter @line-harness/sdk build",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [
@@ -47,6 +50,7 @@
   "devDependencies": {
     "@types/node": "^25.5.0",
     "tsup": "^8.4.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.6"
   }
 }
