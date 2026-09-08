@@ -290,7 +290,7 @@ function stubWebhookOncePending() {
 }
 
 function stubWebhookPassing() {
-  const fetchMock = vi.fn(async () => new Response(
+  const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response(
     JSON.stringify({ eligible: true }),
     { status: 200, headers: { 'Content-Type': 'application/json' } },
   ));
