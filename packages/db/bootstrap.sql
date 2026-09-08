@@ -311,6 +311,24 @@ CREATE TABLE affiliate_payout_results (
   imported_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE affiliate_reward_calculations (
+  id TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL REFERENCES tenants(id),
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  affiliate_id TEXT NOT NULL REFERENCES affiliates(id),
+  conversion_event_id TEXT NOT NULL REFERENCES conversion_events(id),
+  offer_id TEXT REFERENCES affiliate_offers(id),
+  formula TEXT NOT NULL CHECK (formula IN ('rate', 'fixed', 'legacy')),
+  commission_rate_snapshot REAL,
+  base_amount_snapshot REAL,
+  fixed_reward_snapshot INTEGER,
+  offer_name_snapshot TEXT NOT NULL DEFAULT '',
+  amount_minor INTEGER NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'JPY' CHECK (currency = 'JPY'),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (conversion_event_id)
+);
+
 CREATE TABLE affiliate_reward_entries (
   id TEXT PRIMARY KEY,
   organization_id TEXT NOT NULL REFERENCES tenants(id),
@@ -5129,6 +5147,9 @@ CREATE INDEX idx_affiliate_links_offer ON affiliate_links (offer_id);
 CREATE UNIQUE INDEX idx_affiliate_payout_batches_idempotency
   ON affiliate_payout_batches(organization_id, line_account_id, idempotency_key)
   WHERE idempotency_key IS NOT NULL;
+
+CREATE INDEX idx_affiliate_reward_calculations_scope
+  ON affiliate_reward_calculations(organization_id, line_account_id, affiliate_id);
 
 CREATE INDEX idx_affiliate_reward_entries_scope_status
   ON affiliate_reward_entries(organization_id, line_account_id, affiliate_id, status, created_at DESC);
