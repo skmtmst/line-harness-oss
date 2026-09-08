@@ -26,13 +26,14 @@ export interface AffiliatePaymentSummary {
 export async function getAffiliatePaymentSummaries(
   db: D1Database,
   lineAccountId: string,
+  tenantId: string,
   now = new Date().toISOString(),
 ): Promise<AffiliatePaymentSummary[]> {
   const result = await db.prepare(
     `WITH scoped_affiliate_ids AS (
        SELECT id
          FROM affiliates
-        WHERE line_account_id = ?
+        WHERE line_account_id = ? AND tenant_id = ?
      )
      SELECT
        a.id AS affiliate_id,
@@ -136,6 +137,7 @@ export async function getAffiliatePaymentSummaries(
      ORDER BY approved_reward DESC, a.name ASC`,
   ).bind(
     lineAccountId,
+    tenantId,
     now,
     now,
     now,

@@ -108,7 +108,7 @@ describe('GET /api/affiliate-payments', () => {
   it('選択中アカウントを再認可して支払い集計を返す', async () => {
     const res = await get('/api/affiliate-payments?lineAccountId=account-1');
     expect(res.status).toBe(200);
-    expect(dbMocks.getAffiliatePaymentSummaries).toHaveBeenCalledWith(env.DB, 'account-1');
+    expect(dbMocks.getAffiliatePaymentSummaries).toHaveBeenCalledWith(env.DB, 'account-1', 'tenant-1');
     expect(await res.json()).toMatchObject({
       success: true,
       data: [{ affiliateId: 'affiliate-1' }],

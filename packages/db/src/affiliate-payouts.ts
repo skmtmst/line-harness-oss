@@ -143,16 +143,7 @@ type EligibleRewardRow = {
   approved_at: string;
   reward_amount: number;
   bank_profile_version: number | null;
-  calculation_id: string | null;
-  calc_formula: 'rate' | 'fixed' | null;
-  calc_rate: number | null;
-  calc_base: number | null;
-  calc_fixed: number | null;
-  commission_rate: number | null;
-  value_snapshot: number | null;
-  point_value: number | null;
-  fixed_reward: number | null;
-  offer_name: string;
+  calculation_id: string;
 };
 
 export interface AffiliateSettlementPreviewRow {
@@ -184,40 +175,24 @@ async function eligibleRewards(
   db: D1Database,
   input: { tenantId: string; lineAccountId: string; periodFrom: string; periodTo: string },
 ): Promise<EligibleRewardRow[]> {
+  // 全体締めも承認時の版だけを使う。版が無い承認済み行は対象外にして
+  // 安全に止める(現在値での再計算はしない)。版は承認時と移行で作られる。
   const result = await db.prepare(
     `SELECT ce.id AS conversion_event_id,
             a.id AS affiliate_id,
             a.name AS affiliate_name,
             a.code AS affiliate_code,
-            COALESCE(calc.offer_id, off.id) AS offer_id,
+            calc.offer_id AS offer_id,
             ce.approved_at,
-            COALESCE(calc.amount_minor, ROUND(CASE
-              WHEN a.commission_rate > 0
-                THEN COALESCE(ce.value_snapshot, cp.value, 0) * a.commission_rate / 100.0
-              ELSE COALESCE(off.reward_amount, 0)
-            END)) AS reward_amount,
+            calc.amount_minor AS reward_amount,
             bp.version AS bank_profile_version,
-            calc.id AS calculation_id,
-            calc.formula AS calc_formula,
-            calc.commission_rate_snapshot AS calc_rate,
-            calc.base_amount_snapshot AS calc_base,
-            calc.fixed_reward_snapshot AS calc_fixed,
-            a.commission_rate AS commission_rate,
-            ce.value_snapshot AS value_snapshot,
-            cp.value AS point_value,
-            off.reward_amount AS fixed_reward,
-            COALESCE(calc.offer_name_snapshot, off.name, ce.point_name_snapshot, cp.name, '') AS offer_name
+            calc.id AS calculation_id
        FROM conversion_events ce
        JOIN friends f ON f.id = ce.friend_id AND f.line_account_id = ?
        JOIN affiliates a
          ON a.tenant_id = ? AND a.line_account_id = ?
         AND (ce.affiliate_id = a.id OR (ce.affiliate_id IS NULL AND ce.affiliate_code = a.code))
-       LEFT JOIN conversion_points cp ON cp.id = ce.conversion_point_id AND cp.line_account_id = ?
-       LEFT JOIN affiliate_links al
-         ON al.ref_code = ce.attributed_ref_code
-        AND al.affiliate_id = a.id AND al.line_account_id = ?
-       LEFT JOIN affiliate_offers off ON off.id = al.offer_id AND off.line_account_id = ?
-       LEFT JOIN affiliate_reward_calculations calc
+       JOIN affiliate_reward_calculations calc
          ON calc.conversion_event_id = ce.id
         AND calc.formula IN ('rate', 'fixed')
        LEFT JOIN affiliate_bank_profiles bp
@@ -233,8 +208,8 @@ async function eligibleRewards(
         )
       ORDER BY a.id, ce.approved_at, ce.id`,
   ).bind(
-    input.lineAccountId, input.tenantId, input.lineAccountId, input.lineAccountId,
-    input.lineAccountId, input.lineAccountId, input.periodFrom, input.periodTo, input.periodTo,
+    input.lineAccountId, input.tenantId, input.lineAccountId,
+    input.periodFrom, input.periodTo, input.periodTo,
   ).all<EligibleRewardRow>();
   return result.results.filter((row) => Math.round(Number(row.reward_amount)) > 0);
 }
@@ -330,27 +305,7 @@ export async function closeAffiliateAccountSettlement(
   for (const row of rows) {
     const entryId = crypto.randomUUID();
     const amount = Math.round(Number(row.reward_amount));
-    // 承認時の版があればそれへ紐付け、無い(旧データ)ときだけ全体締めで作る。
-    // reward_entryへreward_calculation_idを必ず紐付ける。
-    const calculationId = row.calculation_id ?? `calc:${settlementId}:${row.conversion_event_id}`;
-    if (!row.calculation_id) {
-      const rate = row.commission_rate === null ? 0 : Number(row.commission_rate);
-      const formula = rate > 0 ? 'rate' : 'fixed';
-      statements.push(db.prepare(
-        `INSERT INTO affiliate_reward_calculations
-           (id, organization_id, line_account_id, affiliate_id, conversion_event_id,
-            offer_id, formula, commission_rate_snapshot, base_amount_snapshot,
-            fixed_reward_snapshot, offer_name_snapshot, amount_minor, currency, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'JPY', ?)`,
-      ).bind(
-        calculationId, input.tenantId, input.lineAccountId, row.affiliate_id,
-        row.conversion_event_id, row.offer_id, formula,
-        formula === 'rate' ? rate : null,
-        formula === 'rate' ? Number(row.value_snapshot ?? row.point_value ?? 0) : null,
-        formula === 'fixed' ? Math.round(Number(row.fixed_reward ?? 0)) : null,
-        row.offer_name, amount, now,
-      ));
-    }
+    // 版は承認時と移行で作り済みのため、ここでは紐付けるだけ(作らない)。
     statements.push(
       db.prepare(
         `INSERT INTO affiliate_reward_entries
@@ -360,7 +315,7 @@ export async function closeAffiliateAccountSettlement(
          VALUES (?, ?, ?, ?, ?, ?, ?, 'credit', ?, 'JPY', 'settled', ?, ?, ?, ?)`,
       ).bind(
         entryId, input.tenantId, input.lineAccountId, row.affiliate_id,
-        row.conversion_event_id, row.offer_id, calculationId, amount,
+        row.conversion_event_id, row.offer_id, row.calculation_id, amount,
         row.approved_at, now, `settlement:${settlementId}:${row.conversion_event_id}`, now,
       ),
       db.prepare(
@@ -376,10 +331,27 @@ export async function closeAffiliateAccountSettlement(
   try {
     await db.batch(statements);
   } catch (error) {
-    if (/UNIQUE|constraint/i.test(error instanceof Error ? error.message : String(error))) {
-      return { kind: 'changed' };
+    // 並行する締めが先に書いた場合は読み直して回収する。同一操作は冪等な
+    // duplicateへ、別内容だけ409相当へ。勝者が無い制約違反は投げ直す。
+    if (!/UNIQUE|constraint/i.test(error instanceof Error ? error.message : String(error))) throw error;
+    const winner = await db.prepare(
+      `SELECT id, total_amount_minor, version, closed_at, request_fingerprint,
+              (SELECT COUNT(*) FROM affiliate_settlement_lines sl WHERE sl.settlement_id = s.id) AS line_count
+         FROM affiliate_settlements s
+        WHERE organization_id = ? AND line_account_id = ? AND idempotency_key = ?`,
+    ).bind(input.tenantId, input.lineAccountId, input.idempotencyKey).first<{
+      id: string; total_amount_minor: number; version: number; closed_at: string;
+      request_fingerprint: string; line_count: number;
+    }>();
+    if (winner) {
+      if (winner.request_fingerprint !== input.requestFingerprint) return { kind: 'idempotency_conflict' };
+      return {
+        kind: 'duplicate', settlementId: winner.id,
+        totalAmount: Number(winner.total_amount_minor), conversionCount: Number(winner.line_count),
+        version: Number(winner.version), closedAt: winner.closed_at,
+      };
     }
-    throw error;
+    return { kind: 'changed' };
   }
   return {
     kind: 'created', settlementId, totalAmount: preview.totalAmount,

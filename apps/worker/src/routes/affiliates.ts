@@ -188,7 +188,8 @@ affiliates.get('/api/affiliate-payments', requireRole('owner', 'admin'), async (
     if (!scope.allowedAccountIds.includes(lineAccountId)) {
       return c.json({ success: false, error: '支払い履歴が見つかりません' }, 404);
     }
-    const items = await getAffiliatePaymentSummaries(c.env.DB, lineAccountId);
+    const tenantId = c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
+    const items = await getAffiliatePaymentSummaries(c.env.DB, lineAccountId, tenantId);
     return c.json({
       success: true,
       data: items,
