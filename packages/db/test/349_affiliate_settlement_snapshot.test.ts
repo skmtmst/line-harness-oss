@@ -1,0 +1,174 @@
+import Database from 'better-sqlite3';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { beforeEach, describe, expect, it } from 'vitest';
+import {
+  confirmAffiliateSettlement,
+  previewAffiliateSettlement,
+} from '../src/affiliate-settlements.js';
+import { asD1 } from './d1-test-helper.js';
+
+const TENANT_ID = '00000000-0000-4000-8000-000000000001';
+let sqlite: Database.Database;
+let db: D1Database;
+
+beforeEach(() => {
+  sqlite = new Database(':memory:');
+  sqlite.exec(readFileSync(join(import.meta.dirname, '..', 'bootstrap.sql'), 'utf8'));
+  sqlite.prepare(
+    `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, tenant_id)
+     VALUES (?, ?, ?, 'token', 'secret', ?)`,
+  ).run('account-1', 'channel-1', '本店', TENANT_ID);
+  sqlite.exec(`
+    INSERT INTO friends (id, line_user_id, display_name, line_account_id)
+    VALUES ('friend-1', 'U1', '田中', 'account-1'), ('friend-2', 'U2', '佐藤', 'account-1');
+    INSERT INTO affiliates
+      (id, name, code, commission_rate, friend_id, tenant_id, line_account_id, hold_days)
+    VALUES
+      ('affiliate-rate', '割合さん', 'rate-code', 10, 'friend-1', '${TENANT_ID}', 'account-1', 0),
+      ('affiliate-fixed', '定額さん', 'fixed-code', 0, 'friend-2', '${TENANT_ID}', 'account-1', 0);
+    INSERT INTO conversion_points (id, name, event_type, value, line_account_id)
+    VALUES ('point-1', '購入', 'purchase', 10000, 'account-1');
+    INSERT INTO mileage_programs (id, code, name, created_at, updated_at)
+    VALUES ('default', 'default', 'Harnessマイル', '2026-08-01', '2026-08-01');
+    INSERT INTO affiliate_offers (id, name, reward_amount, line_account_id, created_at)
+    VALUES ('offer-1', '定期便', 3000, 'account-1', '2026-08-01');
+    INSERT INTO affiliate_links (id, affiliate_id, ref_code, line_account_id, offer_id, created_at)
+    VALUES ('link-1', 'affiliate-fixed', 'ref-1', 'account-1', 'offer-1', '2026-08-01');
+    INSERT INTO conversion_events
+      (id, conversion_point_id, friend_id, affiliate_id, attributed_ref_code,
+       approval_status, approved_at, value_snapshot)
+    VALUES
+      ('conversion-rate-1', 'point-1', 'friend-1', 'affiliate-rate', NULL,
+       'approved', '2026-08-10T00:00:00.000Z', 10000),
+      ('conversion-fixed-1', 'point-1', 'friend-1', 'affiliate-fixed', 'ref-1',
+       'approved', '2026-08-10T00:00:00.000Z', 10000);
+  `);
+  db = asD1(sqlite);
+});
+
+function confirmRate(key: string, expectedAmount = 1000) {
+  return confirmAffiliateSettlement(db, {
+    tenantId: TENANT_ID, lineAccountId: 'account-1', affiliateId: 'affiliate-rate',
+    actorId: 'staff-1', idempotencyKey: key, expectedAmount,
+    now: '2026-09-01T00:00:00.000Z',
+  });
+}
+
+describe('migration 349 承認済み報酬の版固定', () => {
+  it('確定時に金額と計算根拠を保存し、entryへ紐付ける', async () => {
+    const created = await confirmRate('settle-rate-1');
+    expect(created).toMatchObject({ kind: 'created', amount: 1000, conversionCount: 1 });
+
+    const calc = sqlite.prepare('SELECT * FROM affiliate_reward_calculations').get() as Record<string, unknown>;
+    expect(calc).toMatchObject({
+      formula: 'rate', commission_rate_snapshot: 10, base_amount_snapshot: 10000,
+      fixed_reward_snapshot: null, amount_minor: 1000, currency: 'JPY',
+    });
+    const entry = sqlite.prepare('SELECT * FROM affiliate_reward_entries').get() as Record<string, unknown>;
+    expect(entry).toMatchObject({ amount_minor: 1000, reward_calculation_id: calc.id });
+
+    const fixed = await confirmAffiliateSettlement(db, {
+      tenantId: TENANT_ID, lineAccountId: 'account-1', affiliateId: 'affiliate-fixed',
+      actorId: 'staff-1', idempotencyKey: 'settle-fixed-1', expectedAmount: 3000,
+      now: '2026-09-01T00:00:00.000Z',
+    });
+    expect(fixed).toMatchObject({ kind: 'created', amount: 3000 });
+    const fixedCalc = sqlite.prepare(
+      "SELECT * FROM affiliate_reward_calculations WHERE affiliate_id = 'affiliate-fixed'",
+    ).get() as Record<string, unknown>;
+    expect(fixedCalc).toMatchObject({
+      formula: 'fixed', commission_rate_snapshot: null, base_amount_snapshot: null,
+      fixed_reward_snapshot: 3000, offer_name_snapshot: '定期便', amount_minor: 3000,
+    });
+  });
+
+  it('確定後の設定編集で台帳の金額と根拠が変わらない', async () => {
+    const created = await confirmRate('settle-rate-1');
+    if (created.kind !== 'created') throw new Error('settlement was not created');
+    await confirmAffiliateSettlement(db, {
+      tenantId: TENANT_ID, lineAccountId: 'account-1', affiliateId: 'affiliate-fixed',
+      actorId: 'staff-1', idempotencyKey: 'settle-fixed-1', expectedAmount: 3000,
+      now: '2026-09-01T00:00:00.000Z',
+    });
+
+    sqlite.exec(`
+      UPDATE affiliates SET commission_rate = 50 WHERE id = 'affiliate-rate';
+      UPDATE affiliate_offers SET reward_amount = 99999, name = '改名後' WHERE id = 'offer-1';
+    `);
+
+    expect(sqlite.prepare('SELECT total_amount_minor AS t FROM affiliate_settlements').all())
+      .toEqual([{ t: 1000 }, { t: 3000 }]);
+    expect(sqlite.prepare('SELECT amount_minor AS a FROM affiliate_reward_entries').all())
+      .toEqual([{ a: 1000 }, { a: 3000 }]);
+    const rateCalc = sqlite.prepare(
+      "SELECT * FROM affiliate_reward_calculations WHERE affiliate_id = 'affiliate-rate'",
+    ).get() as Record<string, unknown>;
+    expect(rateCalc).toMatchObject({ commission_rate_snapshot: 10, base_amount_snapshot: 10000, amount_minor: 1000 });
+    const fixedCalc = sqlite.prepare(
+      "SELECT * FROM affiliate_reward_calculations WHERE affiliate_id = 'affiliate-fixed'",
+    ).get() as Record<string, unknown>;
+    expect(fixedCalc).toMatchObject({ fixed_reward_snapshot: 3000, offer_name_snapshot: '定期便' });
+  });
+
+  it('同じ冪等キーの再試行は二重計上せず同じ確定を返す', async () => {
+    const first = await confirmRate('settle-rate-retry');
+    if (first.kind !== 'created') throw new Error('settlement was not created');
+    const second = await confirmRate('settle-rate-retry');
+    expect(second).toMatchObject({ kind: 'duplicate', settlementId: first.settlementId, amount: 1000 });
+    expect(sqlite.prepare('SELECT COUNT(*) AS c FROM affiliate_reward_entries').get()).toEqual({ c: 1 });
+    expect(sqlite.prepare('SELECT COUNT(*) AS c FROM affiliate_settlement_lines').get()).toEqual({ c: 1 });
+    expect(sqlite.prepare('SELECT COUNT(*) AS c FROM affiliate_reward_calculations').get()).toEqual({ c: 1 });
+  });
+
+  it('確定済みを別キーで再確定しても空になり、二重計上しない', async () => {
+    expect((await confirmRate('settle-rate-1')).kind).toBe('created');
+    expect(await confirmRate('settle-rate-2')).toEqual({ kind: 'empty' });
+    expect(sqlite.prepare('SELECT COUNT(*) AS c FROM affiliate_settlements').get()).toEqual({ c: 1 });
+  });
+
+  it('他アカウントからは確定も参照も届かない', async () => {
+    expect(await previewAffiliateSettlement(db, { affiliateId: 'affiliate-rate', lineAccountId: 'account-2' }))
+      .toBeNull();
+    expect(await confirmAffiliateSettlement(db, {
+      tenantId: TENANT_ID, lineAccountId: 'account-2', affiliateId: 'affiliate-rate',
+      actorId: 'staff-1', idempotencyKey: 'settle-other-account', expectedAmount: 1000,
+    })).toEqual({ kind: 'not_found' });
+    expect(sqlite.prepare('SELECT COUNT(*) AS c FROM affiliate_settlements').get()).toEqual({ c: 0 });
+  });
+
+  it('移行前の確定分は金額だけを引き継ぎ、根拠なしと分かる形にする', async () => {
+    const legacy = new Database(':memory:');
+    legacy.exec(`
+      CREATE TABLE tenants (id TEXT PRIMARY KEY);
+      CREATE TABLE line_accounts (id TEXT PRIMARY KEY);
+      CREATE TABLE affiliates (id TEXT PRIMARY KEY);
+      CREATE TABLE conversion_events (id TEXT PRIMARY KEY);
+      CREATE TABLE affiliate_offers (id TEXT PRIMARY KEY);
+      INSERT INTO tenants VALUES ('${TENANT_ID}');
+      INSERT INTO line_accounts VALUES ('account-1');
+      INSERT INTO affiliates VALUES ('affiliate-rate');
+      INSERT INTO conversion_events VALUES ('conversion-legacy-1');
+      INSERT INTO affiliate_offers VALUES ('offer-1');
+      CREATE TABLE affiliate_reward_entries (
+        id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, line_account_id TEXT NOT NULL,
+        affiliate_id TEXT NOT NULL, conversion_event_id TEXT NOT NULL, offer_id TEXT,
+        entry_type TEXT NOT NULL, amount_minor INTEGER NOT NULL,
+        currency TEXT NOT NULL DEFAULT 'JPY', created_at TEXT NOT NULL
+      );
+      INSERT INTO affiliate_reward_entries
+        (id, organization_id, line_account_id, affiliate_id, conversion_event_id,
+         offer_id, entry_type, amount_minor, currency, created_at)
+      VALUES ('entry-legacy-1', '${TENANT_ID}', 'account-1', 'affiliate-rate',
+        'conversion-legacy-1', 'offer-1', 'credit', 1000, 'JPY', '2026-08-20T00:00:00.000Z');
+    `);
+    legacy.exec(readFileSync(
+      join(import.meta.dirname, '..', 'migrations', '349_affiliate_settlement_snapshot.sql'), 'utf8'));
+    const row = legacy.prepare('SELECT * FROM affiliate_reward_calculations').get() as Record<string, unknown>;
+    expect(row).toMatchObject({
+      conversion_event_id: 'conversion-legacy-1', formula: 'legacy', amount_minor: 1000,
+      commission_rate_snapshot: null, base_amount_snapshot: null, fixed_reward_snapshot: null,
+    });
+    expect(legacy.prepare('SELECT COUNT(*) AS c FROM affiliate_reward_entries').get()).toEqual({ c: 1 });
+  });
+});

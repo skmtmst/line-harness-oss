@@ -166,6 +166,7 @@ describe('紹介停止と支払い確定の追記台帳', () => {
       INSERT INTO line_accounts VALUES ('account-1');
     `);
     sqlite.exec(readFileSync(new URL('../migrations/293_affiliate_settlements.sql', import.meta.url), 'utf8'));
+    sqlite.exec(readFileSync(new URL('../migrations/349_affiliate_settlement_snapshot.sql', import.meta.url), 'utf8'));
     sqlite.exec(`
       INSERT INTO friends VALUES ('friend-1', 'account-1');
       INSERT INTO affiliates

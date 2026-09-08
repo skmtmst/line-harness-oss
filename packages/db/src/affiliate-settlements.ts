@@ -32,12 +32,35 @@ export interface AffiliateSettlementPreview {
   breakdown: AffiliateSettlementBreakdown[];
 }
 
+export type AffiliateRewardFormula = 'rate' | 'fixed';
+
+export interface AffiliateRewardCalculation {
+  id: string;
+  organizationId: string;
+  lineAccountId: string;
+  affiliateId: string;
+  conversionEventId: string;
+  offerId: string | null;
+  formula: AffiliateRewardFormula | 'legacy';
+  commissionRateSnapshot: number | null;
+  baseAmountSnapshot: number | null;
+  fixedRewardSnapshot: number | null;
+  offerNameSnapshot: string;
+  amountMinor: number;
+  currency: 'JPY';
+  createdAt: string;
+}
+
 interface SettlementEntry {
   conversionEventId: string;
   offerId: string | null;
   offerName: string;
   approvedAt: string;
   amount: number;
+  formula: AffiliateRewardFormula;
+  commissionRate: number | null;
+  baseAmount: number | null;
+  fixedReward: number | null;
 }
 
 interface SettlementPreviewInternal extends AffiliateSettlementPreview {
@@ -68,6 +91,10 @@ async function settlementEntries(
             off.id AS offer_id,
             COALESCE(off.name, ce.point_name_snapshot, cp.name, '成果地点を取得できませんでした') AS offer_name,
             ce.approved_at,
+            a.commission_rate AS commission_rate,
+            ce.value_snapshot AS value_snapshot,
+            cp.value AS point_value,
+            off.reward_amount AS fixed_reward,
             ${REWARD_SQL} AS reward_amount
        FROM conversion_events ce
        JOIN affiliates a ON a.id = ? AND a.line_account_id = ?
@@ -104,6 +131,10 @@ async function settlementEntries(
     offer_id: string | null;
     offer_name: string;
     approved_at: string;
+    commission_rate: number | null;
+    value_snapshot: number | null;
+    point_value: number | null;
+    fixed_reward: number | null;
     reward_amount: number;
   }>();
 
@@ -111,13 +142,25 @@ async function settlementEntries(
     affiliateName: affiliate.name,
     code: affiliate.code,
     entries: result.results
-      .map((row) => ({
-        conversionEventId: row.conversion_event_id,
-        offerId: row.offer_id,
-        offerName: row.offer_name,
-        approvedAt: row.approved_at,
-        amount: Math.round(Number(row.reward_amount)),
-      }))
+      .map((row) => {
+        const rate = row.commission_rate === null ? 0 : Number(row.commission_rate);
+        const formula: AffiliateRewardFormula = rate > 0 ? 'rate' : 'fixed';
+        return {
+          conversionEventId: row.conversion_event_id,
+          offerId: row.offer_id,
+          offerName: row.offer_name,
+          approvedAt: row.approved_at,
+          amount: Math.round(Number(row.reward_amount)),
+          formula,
+          commissionRate: formula === 'rate' ? rate : null,
+          baseAmount: formula === 'rate'
+            ? Number(row.value_snapshot ?? row.point_value ?? 0)
+            : null,
+          fixedReward: formula === 'fixed'
+            ? Math.round(Number(row.fixed_reward ?? 0))
+            : null,
+        };
+      })
       .filter((entry) => entry.amount > 0),
   };
 }
@@ -299,13 +342,35 @@ export async function confirmAffiliateSettlement(
 
   for (const entry of preview.entries) {
     const entryId = crypto.randomUUID();
+    const calculationId = `calc:${settlementId}:${entry.conversionEventId}`;
     statements.push(
+      db.prepare(
+        `INSERT INTO affiliate_reward_calculations
+           (id, organization_id, line_account_id, affiliate_id, conversion_event_id,
+            offer_id, formula, commission_rate_snapshot, base_amount_snapshot,
+            fixed_reward_snapshot, offer_name_snapshot, amount_minor, currency, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'JPY', ?)`,
+      ).bind(
+        calculationId,
+        input.tenantId,
+        input.lineAccountId,
+        input.affiliateId,
+        entry.conversionEventId,
+        entry.offerId,
+        entry.formula,
+        entry.commissionRate,
+        entry.baseAmount,
+        entry.fixedReward,
+        entry.offerName,
+        entry.amount,
+        now,
+      ),
       db.prepare(
         `INSERT INTO affiliate_reward_entries
            (id, organization_id, line_account_id, affiliate_id, conversion_event_id,
-            offer_id, entry_type, amount_minor, currency, status, approved_at,
+            offer_id, reward_calculation_id, entry_type, amount_minor, currency, status, approved_at,
             payable_at, idempotency_key, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'credit', ?, 'JPY', 'settled', ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'credit', ?, 'JPY', 'settled', ?, ?, ?, ?)`,
       ).bind(
         entryId,
         input.tenantId,
@@ -313,6 +378,7 @@ export async function confirmAffiliateSettlement(
         input.affiliateId,
         entry.conversionEventId,
         entry.offerId,
+        calculationId,
         entry.amount,
         entry.approvedAt,
         now,
