@@ -5,7 +5,7 @@ import Button from '@/components/shared/button'
 import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { CanvasEditor, type Area } from '@/components/rich-menus/canvas-editor'
 import { AreaProperties, intentOf } from '@/components/rich-menus/area-properties'
 import type { RichMenuAreaTapCount, RichMenuTargetPreview, RichMenuScheduleInput } from '@/lib/api'
@@ -66,6 +66,55 @@ type PickerOption = { id: string; name: string }
 const SIZE_LABEL: Record<Group['size'], string> = {
   large: '2500×1686',
   compact: '2500×843',
+}
+
+/**
+ * 画像エラーのサーバ原文（英語）を日本語に写す。利用者が次の一手を
+ * 分かるように、形式・寸法・容量不足だけを定型文にする。
+ */
+function imageUploadErrorText(err: unknown): string {
+  const fallback = '画像を読み込めませんでした。もう一度お試しください。'
+  if (!(err instanceof ApiError)) return fallback
+  const message = err.status === 400 && err.message && !/^API error: /.test(err.message)
+    ? err.message
+    : ''
+  if (!message) return fallback
+  if (message.includes('content-type must be image/png or image/jpeg')
+    || message.includes('unrecognized image format')) {
+    return '画像の形式はPNGかJPEGにしてください。'
+  }
+  if (message.includes('exceeds 1MB limit')) {
+    return '画像が大きすぎます。1MB以下の画像を選んでください。'
+  }
+  if (message.includes('dimensions ')) {
+    return '画像の大きさが合いません。2500×1686（大）か2500×843（小）の画像を選んでください。'
+  }
+  if (message.includes('does not match group size')) {
+    return 'このページの大きさと画像の大きさが合いません。ページの大きさに合わせた画像を選んでください。'
+  }
+  return message
+}
+
+/**
+ * 取り下げの部分的失敗文（英語の原文）を日本語の定型文に写す。
+ * IDなどの内部語は出さず、種類ごとに1行へまとめる。
+ */
+function unpublishWarningText(warning: string): string {
+  if (warning.startsWith('delete alias ')) return '切り替え設定の一部を取り下げきれていません'
+  if (warning.startsWith('delete richmenu ')) return 'メニュー本体の一部を取り下げきれていません'
+  if (warning.startsWith('default lookup/clear')) return '標準表示の解除を確認できませんでした'
+  return '一部を取り下げきれていません'
+}
+
+/**
+ * 取得結果の形を確かめる。形違いの応答をそのまま `Group` に断定すると、
+ * 後の `pages.map` などで落ちる。
+ */
+function isGroupResponse(value: unknown): value is Group {
+  if (!value || typeof value !== 'object') return false
+  return 'id' in value && typeof value.id === 'string'
+    && 'name' in value && typeof value.name === 'string'
+    && 'pages' in value && Array.isArray(value.pages)
 }
 
 export default function RichMenuEditPage() {
@@ -190,7 +239,8 @@ function Editor({
     try {
       const res = await api.richMenuGroups.get(groupId)
       if (!res.success) throw new Error(res.error ?? '取得失敗')
-      const g = res.data as Group
+      if (!isGroupResponse(res.data)) throw new Error('取得失敗')
+      const g = res.data
       setGroup(g)
       setName(g.name)
       setChatBarText(g.chatBarText)
@@ -482,9 +532,11 @@ function Editor({
       if (!res.success) throw new Error(res.error ?? 'unpublish failed')
       const warnings = res.data?.warnings ?? []
       setConfirmKind(null)
+      // 原文（英語・IDつき）をそのまま出さず、日本語の定型文へ写して重複をまとめる。
+      const warningTexts = [...new Set(warnings.map(unpublishWarningText))]
       setNotice(
-        warnings.length > 0
-          ? `LINE上のメニュー登録を取り下げました。ただし、一部は取り下げきれていません: ${warnings.join(' / ')}`
+        warningTexts.length > 0
+          ? `LINE上のメニュー登録を取り下げました。ただし、${warningTexts.join(' / ')}。`
           : 'LINE上のメニュー登録を取り下げました。もう一度「LINEに登録」すれば元に戻せます。',
       )
       await reload()
@@ -548,7 +600,7 @@ function Editor({
       })
       setImageVersion((v) => v + 1)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '画像を読み込めませんでした。もう一度お試しください。')
+      setError(imageUploadErrorText(e))
     } finally {
       setBusy(false)
     }

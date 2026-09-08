@@ -30,6 +30,25 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
     setMode(next)
     setIdempotencyKey(crypto.randomUUID())
   }
+  // タグが読めない理由を黙らせない。失敗時は注記と再試しを出す。
+  const [tagsLoadError, setTagsLoadError] = useState(false)
+  const [tagsLoading, setTagsLoading] = useState(true)
+  const loadTags = () => {
+    setTagsLoading(true)
+    setTagsLoadError(false)
+    api.tags
+      .list()
+      .then((r) => {
+        if (r.success) setTags(r.data ?? [])
+        else setTagsLoadError(true)
+      })
+      .catch(() => {
+        setTagsLoadError(true)
+      })
+      .finally(() => {
+        setTagsLoading(false)
+      })
+  }
   const [phase, setPhase] = useState<'config' | 'running' | 'done' | 'error'>(
     'config',
   )
@@ -44,15 +63,9 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
   const [defaultBusy, setDefaultBusy] = useState(false)
   const [defaultError, setDefaultError] = useState('')
 
+  // 初回だけ読む。再試しは失敗注記のボタンから loadTags を直接呼ぶ。
   useEffect(() => {
-    api.tags
-      .list()
-      .then((r) => {
-        if (r.success) setTags(r.data ?? [])
-      })
-      .catch(() => {
-        // タグ取得失敗 = 一覧空のまま
-      })
+    loadTags()
   }, [])
 
   /*
@@ -142,23 +155,39 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
                   disabled={tags.length === 0}
                 >
                   {mode.kind === 'tag' && (
-                    <select
-                      value={mode.tagId}
-                      onChange={(e) =>
-                        pickMode({ kind: 'tag', tagId: e.target.value })
-                      }
-                      className="mt-2 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                    >
-                      {tags.length === 0 ? (
-                        <option value="">タグがありません</option>
-                      ) : (
-                        tags.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.name}
+                    <>
+                      <select
+                        value={mode.tagId}
+                        onChange={(e) =>
+                          pickMode({ kind: 'tag', tagId: e.target.value })
+                        }
+                        className="mt-2 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      >
+                        {tags.length === 0 ? (
+                          <option value="">
+                            {tagsLoading ? 'タグを読み込んでいます' : 'タグがありません'}
                           </option>
-                        ))
+                        ) : (
+                          tags.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                      {tagsLoadError && (
+                        <p className="text-ink-faint mt-2 text-xs">
+                          タグを読み込めませんでした。タグの絞り込みは使えません。
+                          <button
+                            type="button"
+                            onClick={loadTags}
+                            className="text-action ml-1 font-medium underline"
+                          >
+                            もう一度読み込む
+                          </button>
+                        </p>
                       )}
-                    </select>
+                    </>
                   )}
                 </RadioOption>
                 <RadioOption

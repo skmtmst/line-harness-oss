@@ -21,6 +21,7 @@ import {
 import ImageUploader from '@/components/shared/image-uploader'
 import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
+import { MESSAGE_KIND_WORDS, messageKindWord } from '@/app/auto-replies/auto-reply-words'
 
 export interface AutoReplyDraft {
   id?: string
@@ -173,21 +174,11 @@ export function toVersionDraft(
   }
 }
 
-/** 画面に出すメッセージ種別。LINE から届くもののうち、実務で使うものだけ。 */
-const MESSAGE_KIND_LABELS: Array<{ key: string; label: string }> = [
-  { key: 'text', label: 'テキスト' },
-  { key: 'image', label: '画像' },
-  { key: 'video', label: '動画' },
-  { key: 'audio', label: '音声' },
-  { key: 'file', label: 'ファイル' },
-  { key: 'location', label: '位置情報' },
-  { key: 'sticker', label: 'スタンプ' },
-  { key: 'postback', label: 'ボタンのタップ' },
-]
-
-function messageKindLabel(source: string): string {
-  return MESSAGE_KIND_LABELS.find((item) => item.key === source)?.label ?? source
-}
+/*
+ * 対象にするメッセージの種類の呼び方は `auto-reply-words` に一本化した。
+ * ここで別に持つと、片方だけ増えて「一覧では英語、編集では日本語」に
+ * なる（#494 軽13）。知らない値は内部値を出さず「その他のメッセージ」。
+ */
 
 interface Props {
   draft: AutoReplyDraft
@@ -359,7 +350,7 @@ export default function EditDialog({
         priority: Number(priority) || 0,
         // 全部選ぶことと、1つも選ばないことは同じ意味。null に寄せる。
         messageKinds:
-          messageKinds.length === 0 || messageKinds.length === MESSAGE_KIND_LABELS.length
+          messageKinds.length === 0 || messageKinds.length === MESSAGE_KIND_WORDS.length
             ? null
             : messageKinds,
         receiveSources,
@@ -881,7 +872,7 @@ export default function EditDialog({
             {!page && <div>
               <p className="text-ink-faint mb-1.5 text-xs">対象にするメッセージ</p>
               <div className="flex flex-wrap gap-1.5">
-                {MESSAGE_KIND_LABELS.map(({ key, label }) => {
+                {MESSAGE_KIND_WORDS.map(({ key, label }) => {
                   const on = messageKinds.length === 0 || messageKinds.includes(key)
                   return (
                     <button
@@ -891,7 +882,7 @@ export default function EditDialog({
                         setMessageKinds((prev) => {
                           // 何も選んでいない状態は「全部」を意味する。そこから
                           // 1つ外すには、いったん全部を入れてから外す。
-                          const base = prev.length === 0 ? MESSAGE_KIND_LABELS.map((m) => m.key) : prev
+                          const base = prev.length === 0 ? MESSAGE_KIND_WORDS.map((m) => m.key) : prev
                           return base.includes(key)
                             ? base.filter((k) => k !== key)
                             : [...base, key]
@@ -947,7 +938,7 @@ export default function EditDialog({
                       ? <span className="text-ink-faint">受信なし</span>
                       : draft.receiveSourceCounts.map((item) => (
                         <span key={item.source} className="bg-canvas-sunken rounded-pill px-2 py-1 text-xs">
-                          {messageKindLabel(item.source)} {item.count.toLocaleString()}件
+                          {messageKindWord(item.source)} {item.count.toLocaleString()}件
                         </span>
                       ))}
                 </div>

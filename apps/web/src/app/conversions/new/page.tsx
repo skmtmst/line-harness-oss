@@ -1,7 +1,7 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   api,
   type ConversionDeduplicationMode,
@@ -28,6 +28,7 @@ import CreatePage, {
   inputClass,
 } from '@/components/shared/create-page'
 import { useAccount } from '@/contexts/account-context'
+import { createLatestPreviewRequestGate, type LatestPreviewRequest } from './latest-preview-request'
 
 /**
  * 成果地点を作る（設計 V6 19-1-B）。
@@ -89,6 +90,7 @@ export default function NewConversionPointPage() {
   const [preview, setPreview] = useState<ConversionDefinitionPreview | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewFailed, setPreviewFailed] = useState(false)
+  const previewRequests = useRef(createLatestPreviewRequestGate())
 
   // 右の「同種の成果地点」に要る。作る前に、似たものが既にあるか分かるように。
   useEffect(() => {
@@ -126,8 +128,9 @@ export default function NewConversionPointPage() {
 
   useEffect(() => {
     if (!lineAccountId) return
-    let cancelled = false
+    let request: LatestPreviewRequest | null = null
     const timer = window.setTimeout(() => {
+      request = previewRequests.current.start()
       setPreviewLoading(true)
       setPreviewFailed(false)
       void api.conversions.previewDefinition({
@@ -139,19 +142,19 @@ export default function NewConversionPointPage() {
         deduplicationWindowDays: deduplicationMode === 'window' ? 30 : null,
         valueMode,
         fixedValue: valueMode === 'fixed' && Number.isFinite(yen) ? yen : null,
-      }).then((response) => {
-        if (cancelled) return
+      }, { signal: request.signal }).then((response) => {
+        if (!request?.isCurrent()) return
         if (response.success) setPreview(response.data)
         else setPreviewFailed(true)
       }).catch(() => {
-        if (!cancelled) setPreviewFailed(true)
+        if (request?.isCurrent()) setPreviewFailed(true)
       }).finally(() => {
-        if (!cancelled) setPreviewLoading(false)
+        if (request?.isCurrent()) setPreviewLoading(false)
       })
     }, 250)
     return () => {
-      cancelled = true
       window.clearTimeout(timer)
+      request?.abort()
     }
   }, [deduplicationMode, eventType, excludedCondition, lineAccountId, measureMethod, targetUrl, triggerKind, valueMode, yen])
 

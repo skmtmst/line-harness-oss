@@ -56,7 +56,11 @@ const UNGROUPED = '__ungrouped__'
  */
 const MAX_BATCH_DELETE_COUNT = 20
 
-/** 一覧の更新日は、次回変更と同じセルに収まる短い形で出す。 */
+/*
+ * 一覧の更新日は、次回変更と同じセルに収まる短い形で出す。
+ * `formatStamp`（`@/lib/common-vars`）とは別物。あちらは履歴・予定の
+ * 「いつ」を読ませる長い形。用途が違うので統一せず、名前で使い分ける。
+ */
 function formatListDate(value: string): string {
   const match = /^\d{4}-(\d{2})-(\d{2})/.exec(value)
   return match ? `${match[1]}/${match[2]}` : value
@@ -132,8 +136,14 @@ function VarsPageInner() {
         setListLimited(vars.meta?.limited ?? false)
       }
       if (folderList.success) setFolders(folderList.data)
-    } catch {
-      if (accountAtRequest === latestAccountRef.current) setError('読み込みに失敗しました')
+    } catch (e) {
+      // 権限なしと通信障害で文言を分ける。同じ文言だと運用者が接続を
+      // 確かめ続け、権限申請に気づけない。
+      if (accountAtRequest === latestAccountRef.current) {
+        setError(e instanceof ApiError && e.status === 403
+          ? 'この一覧を見る権限がありません。管理者に権限を申請してください。'
+          : '読み込みに失敗しました。接続を確かめて、もう一度お試しください。')
+      }
     } finally {
       if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }

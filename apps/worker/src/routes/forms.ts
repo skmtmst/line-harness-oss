@@ -376,16 +376,22 @@ forms.get('/api/forms', requireRole('owner', 'admin', 'staff'), async (c) => {
     }
     const items = await getFormsWithStats(c.env.DB, { lineAccountIds: [accountId] });
     const redactSecrets = c.get('staff')?.role === 'staff';
-    return c.json({
-      success: true,
-      data: items.map((row) =>
-        serializeForm(row, {
-          lastSubmittedAt: row.last_submitted_at,
-          usedByAccounts: row.used_by_accounts,
-          accountScopeReviewRequired: row.account_scope_review_required,
-        }, { redactSecrets }),
-      ),
-    });
+    const data = items.map((row) =>
+      serializeForm(row, {
+        lastSubmittedAt: row.last_submitted_at,
+        usedByAccounts: row.used_by_accounts,
+        accountScopeReviewRequired: row.account_scope_review_required,
+      }, { redactSecrets }),
+    );
+    // 一覧画面は `with_list_summary=1` で件数つきの形を要求する。
+    // 付けない呼び出しは従来どおり配列のまま返す。
+    if (c.req.query('with_list_summary') === '1') {
+      return c.json({
+        success: true,
+        data: { items: data, total: data.length, page: 1, limit: data.length },
+      });
+    }
+    return c.json({ success: true, data });
   } catch (err) {
     console.error('GET /api/forms error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -1368,7 +1374,8 @@ forms.post('/api/forms/:id/submit', async (c) => {
       // Send confirmation message with submitted data back to user
       sideEffects.push(
         (async () => {
-          console.log('Form reply: starting for friendId', friendId);
+          // 運用ログに内部ID（friendId）は残さない。開始の事実だけ出す。
+          console.log('Form reply: starting');
           const friend = await getFriendById(db, friendId!);
           if (!friend?.line_user_id) { console.log('Form reply: no LINE recipient'); return; }
           console.log('Form reply: sending');

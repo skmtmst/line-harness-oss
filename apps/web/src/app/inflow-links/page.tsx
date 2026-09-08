@@ -11,7 +11,7 @@ import type { EntryRoute, EntryRouteGenre, TrafficPool, Scenario, Tag } from '@l
 import EditRouteModal from './_components/edit-route-modal'
 import GenreModal from './_components/create-genre-modal'
 import { shouldShowReferralRow } from './visibility'
-import { exportFileName, toCsv } from './inflow-export'
+import { exportFileName, jstTodayString, toCsv } from './inflow-export'
 import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import AdIntegration from './ad-integration'
@@ -143,6 +143,7 @@ function InflowLinksPageInner() {
     EntryRoute | 'new' | { register: string } | null
   >(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [copyFailedId, setCopyFailedId] = useState<string | null>(null)
   const [selectedGenre, setSelectedGenre] = useState('')
   const [search, setSearch] = useState('')
   const [editingGenre, setEditingGenre] = useState<EntryRouteGenre | 'new' | null>(null)
@@ -153,6 +154,9 @@ function InflowLinksPageInner() {
   const [expandedRef, setExpandedRef] = useState<string | null>(null)
   const [refDetail, setRefDetail] = useState<RefDetail | null>(null)
   const [refDetailLoading, setRefDetailLoading] = useState(false)
+  // 開いた行の取得の世代。すばやく別行へ移ったとき、遅れて届いた古い応答を
+  // 捨てるために使う。更新関数の内側で副作用を呼ばないための番号。
+  const expandRequestRef = useRef(0)
   // poolMembers[poolId] = lineAccountId のセット。pool_accounts を真実として
   // 「この pool が選択中アカウントに配信するか」を判定するために使う。
   // pool.activeAccountId はレガシーシングル所属。マルチアカ pool では不十分。
@@ -267,6 +271,7 @@ function InflowLinksPageInner() {
     // 持ち越さない (アカ A の友だちリストがアカ B の同じ ref 行に残ってしまう
     // クロスアカウントの情報漏れ防止)。stale-response guard だけでは閉じる側を
     // 担保できないので明示的に reset する。
+    expandRequestRef.current += 1
     setExpandedRef(null)
     setRefDetail(null)
     setRefDetailLoading(false)
@@ -280,9 +285,12 @@ function InflowLinksPageInner() {
     try {
       await navigator.clipboard.writeText(url)
       setCopiedId(id)
+      setCopyFailedId(null)
       setTimeout(() => setCopiedId(null), 1200)
     } catch {
-      // silent
+      // 失敗に気づかず URL 未コピーのまま配布作業が進むのを防ぐ。
+      setCopyFailedId(id)
+      setTimeout(() => setCopyFailedId(null), 3000)
     }
   }
 
@@ -298,43 +306,31 @@ function InflowLinksPageInner() {
   // the currently-expanded row.
   const toggleExpand = async (refCode: string) => {
     if (expandedRef === refCode) {
+      expandRequestRef.current += 1
       setExpandedRef(null)
       setRefDetail(null)
       setRefDetailLoading(false)
       return
     }
+    const requestId = expandRequestRef.current + 1
+    expandRequestRef.current = requestId
     setExpandedRef(refCode)
     setRefDetail(null)
     setRefDetailLoading(true)
-    const requestedFor = refCode
     const accountAtRequest = selectedAccountId
     const query = accountAtRequest ? `?lineAccountId=${accountAtRequest}` : ''
     const res = await fetchApi<{ success: boolean; data: RefDetail }>(
       `/api/analytics/ref/${encodeURIComponent(refCode)}${query}`,
     ).catch(() => ({ success: false, data: null }))
-    // Skip stale updates: only commit if we are still looking at the same
-    // ref AND the sidebar account hasn't changed since the request started.
-    setExpandedRef((current) => {
-      if (current !== requestedFor || accountAtRequest !== selectedAccountId) return current
-      if ('success' in res && res.success && res.data) setRefDetail(res.data)
-      setRefDetailLoading(false)
-      return current
-    })
+    // Skip stale updates: only commit if no newer expand/collapse happened
+    // AND the sidebar account hasn't changed since the request started.
+    // (StrictMode は更新関数を二重実行するため、副作用は外側で番号を見て捨てる。)
+    if (expandRequestRef.current !== requestId) return
+    if (accountAtRequest !== latestAccountRef.current) return
+    if ('success' in res && res.success && res.data) setRefDetail(res.data)
+    setRefDetailLoading(false)
   }
 
-  // Index summary stats by ref_code for cheap lookup per row.
-  const statsByRef = new Map<string, RefRouteStats>()
-  summary?.routes?.forEach((r) => statsByRef.set(r.refCode, r))
-
-  // Merge entry_routes (CRUD 対象), tracked_links (modern path), と
-  // summary.routes (実流入のあった refs)。優先順位 = worker の applyRefAttribution
-  // と同じ: entry_routes → tracked_links → orphan。
-  //
-  // tracked_links は entry_routes と別テーブルで管理されている。Worker は両方を
-  // フォールバック検索するので tracked_links 登録済み ref も「設定済み」扱いに
-  // すべき (Pool は仕様上持たないため "—" 表示)。これがないと「(未登録)」と
-  // 表示されるが裏では tracked_links のシナリオが発火している、という UI の嘘
-  // になる。
   type Row = {
     source: 'entry_route' | 'tracked_link' | 'orphan'
     /** entry_routes に登録があれば id。tracked_link / orphan は null。 */
@@ -349,76 +345,95 @@ function InflowLinksPageInner() {
     runAccountFriendAddScenarios: boolean | null
     stats: RefRouteStats | undefined
   }
-  const rowsByRef = new Map<string, Row>()
-  // 「inactive entry_route を譲るべき相手」の refCode 集合。entry_routes と
-  // tracked_links の両方に同じ refCode があった場合、worker の
-  // getEntryRouteByRefCode は is_active=1 のみ拾うので、inactive な entry_route
-  // は applyRefAttribution で通過されず tracked_links にフォールバックされる。
-  // 判定軸は「active tracked_link が存在するか」だけ。実流入 (statsByRef) の
-  // 有無に依存させると、最初のクリック前は衝突判定が空回りして UI が嘘の
-  // entry_route データを見せてしまう (worker は初回クリックでもう tracked_link
-  // を使う)。
-  const activeTrackedLinkRefCodes = new Set(
-    trackedLinks.filter((tl) => tl.isActive).map((tl) => tl.id),
-  )
-  for (const r of routes) {
-    // Inactive entry_route + active tracked_link が同 refCode に共存する場合、
-    // 実際に発火するのは tracked_link。停止中 entry_route の Pool/scenario を
-    // 表示すると「設定されてるのに違う挙動」の謎が生まれるのでこのケースだけ
-    // 譲る。tracked_link が無ければ inactive でも従来通り表示する。
-    if (!r.isActive && activeTrackedLinkRefCodes.has(r.refCode)) continue
-    rowsByRef.set(r.refCode, {
-      source: 'entry_route',
-      entryRouteId: r.id,
-      refCode: r.refCode,
-      genre: r.genre,
-      name: r.name,
-      poolId: r.poolId,
-      tagId: r.tagId,
-      scenarioId: r.scenarioId,
-      runAccountFriendAddScenarios: r.runAccountFriendAddScenarios,
-      stats: statsByRef.get(r.refCode),
-    })
-  }
-  for (const tl of trackedLinks) {
-    if (rowsByRef.has(tl.id)) continue // entry_routes が優先
-    // /inflow-links は「友だち獲得経路」のページ。tracked_links は /t/:id クリック
-    // 計測用にも大量に作られるので、実際に友だちの ref_code に焼かれたもの
-    // (= summary に出現するもの) のみ表示する。それ以外は無関係なノイズ。
-    if (!statsByRef.has(tl.id)) continue
-    // worker の applyRefAttribution は isActive=false の tracked_link を skip する
-    // ので UI も合わせて非表示。これがないと「Tracked Link 登録済み」緑バッジ +
-    // シナリオ名が出ているのにシナリオが流れない、という嘘になる。inactive で
-    // 実流入だけある ref は orphan 行 (「未登録」アンバー) として正しく表示される。
-    if (!tl.isActive) continue
-    rowsByRef.set(tl.id, {
-      source: 'tracked_link',
-      entryRouteId: null,
-      refCode: tl.id,
-      genre: null,
-      name: tl.name,
-      poolId: null, // tracked_links は pool を持たない
-      tagId: null,
-      scenarioId: tl.scenarioId,
-      runAccountFriendAddScenarios: null,
-      stats: statsByRef.get(tl.id),
-    })
-  }
-  for (const s of summary?.routes ?? []) {
-    if (rowsByRef.has(s.refCode)) continue
-    rowsByRef.set(s.refCode, {
-      source: 'orphan',
-      entryRouteId: null,
-      refCode: s.refCode,
-      genre: null,
-      name: s.name ?? '(未登録)',
-      poolId: null,
-      tagId: null,
-      scenarioId: null,
-      runAccountFriendAddScenarios: null,
-      stats: s,
-    })
-  }
+
+  // Merge entry_routes (CRUD 対象), tracked_links (modern path), と
+  // summary.routes (実流入のあった refs)。優先順位 = worker の applyRefAttribution
+  // と同じ: entry_routes → tracked_links → orphan。
+  //
+  // tracked_links は entry_routes と別テーブルで管理されている。Worker は両方を
+  // フォールバック検索するので tracked_links 登録済み ref も「設定済み」扱いに
+  // すべき (Pool は仕様上持たないため "—" 表示)。これがないと「(未登録)」と
+  // 表示されるが裏では tracked_links のシナリオが発火している、という UI の嘘
+  // になる。
+  //
+  // ref が数千件になると描画ごとの再構築が重くなるので、一覧の入力が変わった
+  // ときだけ作り直す。
+  const rowsByRef = useMemo(() => {
+    // Index summary stats by ref_code for cheap lookup per row.
+    const statsByRef = new Map<string, RefRouteStats>()
+    summary?.routes?.forEach((r) => statsByRef.set(r.refCode, r))
+    const built = new Map<string, Row>()
+    // 「inactive entry_route を譲るべき相手」の refCode 集合。entry_routes と
+    // tracked_links の両方に同じ refCode があった場合、worker の
+    // getEntryRouteByRefCode は is_active=1 のみ拾うので、inactive な entry_route
+    // は applyRefAttribution で通過されず tracked_links にフォールバックされる。
+    // 判定軸は「active tracked_link が存在するか」だけ。実流入 (statsByRef) の
+    // 有無に依存させると、最初のクリック前は衝突判定が空回りして UI が嘘の
+    // entry_route データを見せてしまう (worker は初回クリックでもう tracked_link
+    // を使う)。
+    const activeTrackedLinkRefCodes = new Set(
+      trackedLinks.filter((tl) => tl.isActive).map((tl) => tl.id),
+    )
+    for (const r of routes) {
+      // Inactive entry_route + active tracked_link が同 refCode に共存する場合、
+      // 実際に発火するのは tracked_link。停止中 entry_route の Pool/scenario を
+      // 表示すると「設定されてるのに違う挙動」の謎が生まれるのでこのケースだけ
+      // 譲る。tracked_link が無ければ inactive でも従来通り表示する。
+      if (!r.isActive && activeTrackedLinkRefCodes.has(r.refCode)) continue
+      built.set(r.refCode, {
+        source: 'entry_route',
+        entryRouteId: r.id,
+        refCode: r.refCode,
+        genre: r.genre,
+        name: r.name,
+        poolId: r.poolId,
+        tagId: r.tagId,
+        scenarioId: r.scenarioId,
+        runAccountFriendAddScenarios: r.runAccountFriendAddScenarios,
+        stats: statsByRef.get(r.refCode),
+      })
+    }
+    for (const tl of trackedLinks) {
+      if (built.has(tl.id)) continue // entry_routes が優先
+      // /inflow-links は「友だち獲得経路」のページ。tracked_links は /t/:id クリック
+      // 計測用にも大量に作られるので、実際に友だちの ref_code に焼かれたもの
+      // (= summary に出現するもの) のみ表示する。それ以外は無関係なノイズ。
+      if (!statsByRef.has(tl.id)) continue
+      // worker の applyRefAttribution は isActive=false の tracked_link を skip する
+      // ので UI も合わせて非表示。これがないと「Tracked Link 登録済み」緑バッジ +
+      // シナリオ名が出ているのにシナリオが流れない、という嘘になる。inactive で
+      // 実流入だけある ref は orphan 行 (「未登録」アンバー) として正しく表示される。
+      if (!tl.isActive) continue
+      built.set(tl.id, {
+        source: 'tracked_link',
+        entryRouteId: null,
+        refCode: tl.id,
+        genre: null,
+        name: tl.name,
+        poolId: null, // tracked_links は pool を持たない
+        tagId: null,
+        scenarioId: tl.scenarioId,
+        runAccountFriendAddScenarios: null,
+        stats: statsByRef.get(tl.id),
+      })
+    }
+    for (const s of summary?.routes ?? []) {
+      if (built.has(s.refCode)) continue
+      built.set(s.refCode, {
+        source: 'orphan',
+        entryRouteId: null,
+        refCode: s.refCode,
+        genre: null,
+        name: s.name ?? '(未登録)',
+        poolId: null,
+        tagId: null,
+        scenarioId: null,
+        runAccountFriendAddScenarios: null,
+        stats: s,
+      })
+    }
+    return built
+  }, [routes, summary, trackedLinks])
 
   // Filter by sidebar's selected account.
   //   - 全アカウント表示: entry_routes 全件 + 未登録 ref 全件
@@ -434,7 +449,7 @@ function InflowLinksPageInner() {
   // ルーティングの真実は pool_accounts (worker の getRandomPoolAccount が
   // ここから抽選する) なので、poolMembers を見て所属判定する。
   // マルチアカウント pool でも正しく動く。
-  const allRows = Array.from(rowsByRef.values())
+  const allRows = useMemo(() => Array.from(rowsByRef.values()), [rowsByRef])
   const mainPool = pools.find((p) => p.slug === 'main')
   const poolRoutesToAccount = (poolId: string | null, accountId: string): boolean => {
     const targetPoolId = poolId ?? mainPool?.id
@@ -558,7 +573,7 @@ function InflowLinksPageInner() {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = exportFileName(sortedRows.length, new Date().toISOString().slice(0, 10))
+    link.download = exportFileName(sortedRows.length, jstTodayString())
     link.click()
     URL.revokeObjectURL(url)
   }
@@ -939,7 +954,7 @@ function InflowLinksPageInner() {
                           className="text-[11px] font-medium text-action hover:underline"
                           aria-label={`${r.name}のURLをコピー`}
                         >
-                          {copiedId === r.refCode ? '済み' : 'コピー'}
+                          {copyFailedId === r.refCode ? 'コピー失敗' : copiedId === r.refCode ? '済み' : 'コピー'}
                         </button>
                         <button
                           onClick={() => setQrRoute({ refCode: r.refCode, name: r.name, genre: r.genre })}

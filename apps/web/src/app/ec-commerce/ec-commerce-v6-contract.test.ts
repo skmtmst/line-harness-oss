@@ -113,4 +113,23 @@ describe('V6 EC integration screens', () => {
     expect(section).not.toContain('ec_subscription.')
     expect(section).not.toContain('ec_support.')
   })
+
+  it('shares one date formatter across the three EC screens (#580)', () => {
+    expect(page).toContain("from './ec-datetime'")
+    expect(connector).toContain("from './ec-datetime'")
+    expect(subscriptions).toContain("from './ec-datetime'")
+    expect(page).not.toContain('function dateTime(')
+    expect(connector).not.toContain('function dateTime(')
+    expect(subscriptions).not.toContain('function shortDate(')
+  })
+
+  it('filters subscriptions with the shared Tabs and types impact metrics (#580)', () => {
+    expect(subscriptions).toContain("from '@/components/shared/tabs'")
+    expect(subscriptions).toContain('<Tabs items={FILTERS.map(')
+    expect(subscriptions).not.toContain('styles.filterCurrent')
+    expect(identity).toContain('impactText(order)')
+    expect(identity).toContain('isImpactMetric')
+    expect(identity).toContain('NOT_AVAILABLE')
+    expect(api).toContain('impact: IdentityCandidateImpactMetric[]')
+  })
 })

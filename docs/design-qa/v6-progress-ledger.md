@@ -244,7 +244,7 @@
 | 20 | `J6Inc` | 20-1-A 配信の反応 | 6.0785% | 0px | 中央・中央 | docs | [差分画像](analytics-v6/J6Inc-diff-1920.png) | **一致** |
 | 20 | `YBGtm` | 20-1-B 経路と成果 | 3.2928% | 0px | 中央・右 | docs | [差分画像](analytics-v6/YBGtm-diff-1920.png) | **一致** |
 | 20 | `QQ1SR` | 20-1-C 使われ方 | 3.4144% | 0px | 中央・右 | docs | [差分画像](analytics-v6/QQ1SR-diff-1920.png) | **一致** |
-| 20 | `URqOA` | 20-1-D 定期レポートをつくる | 4.9993% | 0px | 下部・左 | docs | [差分画像](analytics-v6/URqOA-diff-1920.png) | **一致** |
+| 20 | `URqOA` | 20-1-D 定期レポートをつくる | 4.7371% | 0px | 中央・左 | docs | [差分画像](analytics-v6/URqOA-diff-1920.png) | **一致** |
 | 20 | `f5HsX` | 20-2 クロス分析 | 6.6983% | 0px | 下部・中央 | docs | [差分画像](analytics-v6/f5HsX-diff-1920.png) | **一致** |
 | 20 | `C2I7ry` | 20-2-A ファネル分析 | 8.4200% | 0px | 下部・左 | docs | [差分画像](analytics-v6/C2I7ry-diff-1920.png) | **一致** |
 | 20 | `Fh2Qj` | 20-2-B URLクリック | 3.1944% | 0px | 中央・左 | docs | [差分画像](analytics-v6/Fh2Qj-diff-1920.png) | **一致** |
@@ -295,7 +295,7 @@
 | 28 | `W6465r` | 28-1-C 一覧の状態（空・読込・エラー） | 2.8410% | 0px | 中央・中央 | docs | [差分画像](booking-settings-v6/W6465r-diff-1920.png) | **一致** |
 | 29 | `ugP5y` | 29-1 イベント予約 | 4.4000%（前回値） | 0px | 中央・左 | docs | [差分画像](events-v6/ugP5y-diff-1920.png) | **一致** |
 | 29 | `MKrPY` | 29-1-A イベントをつくる | 6.3529% | 0px | 中央・右 | docs | [差分画像](events-v6/MKrPY-diff-1920.png) | **一致** |
-| 29 | `i5SN2j` | 29-1-B 申込者の一覧 | 3.3306%（前回値） | 0px | 上部・左 | docs | [差分画像](events-v6/i5SN2j-diff-1920.png) | **一致** |
+| 29 | `i5SN2j` | 29-1-B 申込者の一覧 | 3.5969% | 0px | 上部・左 | docs | [差分画像](events-v6/i5SN2j-diff-1920.png) | **一致** |
 | 29 | `k5m5Bc` | 29-1-C 一覧の状態（空・読込・エラー） | 3.7226%（前回値） | 0px | 上部・左 | docs | [差分画像](events-v6/k5m5Bc-diff-1920.png) | **一致** |
 | 30 | `e3jz3` | 30-1 ログインユーザー | 4.4908% | 0px | 中央・左 | docs | [差分画像](staff-v6/e3jz3-diff-1920.png) | **一致** |
 | 30 | `EOTS4` | 30-1-A 見せる範囲を決める | 4.9048% | 0px | 中央・左 | docs | [差分画像](staff-v6/EOTS4-diff-1920.png) | **一致** |

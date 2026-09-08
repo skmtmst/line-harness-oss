@@ -43,10 +43,9 @@ describe('点検・軽 第7便コンバージョン(#585)', () => {
     expect(PAGE).not.toContain('countChange / right.previousNetCount')
   })
 
-  it('空状態の案内は設計の言葉を変えない(#513 L8見送り)', () => {
-    // 設計原本(txt)は「つくる」、設計JSONは「追加」で割れている。
-    // コードだけ直さず設計の判断を待つため、現状の「追加」を保つ。
-    expect(PAGE).toContain('右上の「成果地点を追加」から登録すると、ここに出ます。')
+  it('空状態の案内はPencil V6実ノードのボタン名と一致する(#513 L8)', () => {
+    expect(PAGE).toContain('右上の「成果地点をつくる」から登録すると、ここに出ます。')
+    expect(PAGE).not.toContain('右上の「成果地点を追加」')
   })
 
   it('読まれない深掘り受け渡しを付けない(#513 L9)', () => {

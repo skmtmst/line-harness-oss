@@ -1,7 +1,7 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Trash2, TriangleAlert } from 'lucide-react'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import { toDraft } from '@/components/auto-replies/edit-dialog'
@@ -254,8 +254,9 @@ export default function AutoRepliesPage() {
   useEffect(() => { load() }, [load])
   useEffect(() => { void loadFolders() }, [loadFolders])
 
-  const templateById = new Map(templates.map((t) => [t.id, t]))
-  const accountById = new Map(accounts.map((a) => [a.id, a]))
+  /* 行ごとに作り直さない。描画のたびの小さな無駄を消す（#494 軽16）。 */
+  const templateById = useMemo(() => new Map(templates.map((t) => [t.id, t])), [templates])
+  const accountById = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts])
 
   const renderEffectiveCell = (r: AutoReply) => {
     if (!r.effectiveAccounts || r.effectiveAccounts.length === 0) {
@@ -295,17 +296,17 @@ export default function AutoRepliesPage() {
             return (
               <span
                 key={ea.accountId}
-                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-success-bg text-green-700 font-medium"
+                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-success-bg text-success font-medium"
                 title={title}
               >
-                {word.mark} {label}{ea.via === 'automation' && <span className="text-green-500">⚙</span>}
+                {word.mark} {label}{ea.via === 'automation' && <span className="text-success">⚙</span>}
               </span>
             )
           }
           return (
             <span
               key={ea.accountId}
-              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-amber-50 text-amber-700"
+              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-warning-bg text-warning"
               title={title}
             >
               {word.mark} {label}
@@ -325,9 +326,9 @@ export default function AutoRepliesPage() {
           r.responseType === 'silent'
             ? 'text-ink-faint text-xs'
             : r.responseType === 'flex'
-              ? 'px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 text-[10px] font-medium'
+              ? 'px-1.5 py-0.5 rounded bg-chip-alt-soft text-chip-alt text-[10px] font-medium'
               : r.responseType === 'image'
-                ? 'px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px] font-medium'
+                ? 'px-1.5 py-0.5 rounded bg-info-bg text-info text-[10px] font-medium'
                 : 'px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-secondary text-[10px] font-medium'
         }
         title={word.note}

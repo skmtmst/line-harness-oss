@@ -90,6 +90,20 @@ describe('V6 流入経路一覧の契約', () => {
     }
   })
 
+  it('行一覧の組み立ては描画ごとに作り直さない', () => {
+    expect(PAGE).toContain('const rowsByRef = useMemo(')
+  })
+
+  it('行の開閉は更新関数の内側で副作用を呼ばない', () => {
+    expect(PAGE).toContain('expandRequestRef')
+    expect(PAGE).not.toContain('setExpandedRef((current)')
+  })
+
+  it('コピーの失敗を無言にしない', () => {
+    expect(PAGE).toContain('コピー失敗')
+    expect(PAGE).not.toContain('// silent')
+  })
+
   it('素のTailwind色を残さず、V6トークンで塗る', () => {
     for (const raw of [
       'emerald-600',

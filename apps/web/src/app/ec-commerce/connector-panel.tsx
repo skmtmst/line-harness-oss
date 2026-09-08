@@ -6,6 +6,7 @@ import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import SummaryCard from '@/components/shared/summary-card'
 import { ApiError, api, type EcConnector, type EcConnectorOverview } from '@/lib/api'
+import { formatEcDateTimeWithYear as dateTime } from './ec-datetime'
 import styles from './ec-commerce-v6.module.css'
 
 const EVENT_TYPES = [
@@ -49,13 +50,6 @@ function toForm(connector: EcConnector | null): Form {
     identityRules: connector.identityRules,
     expectedVersion: connector.version,
   }
-}
-
-function dateTime(value: string | null) {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.valueOf())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date)
 }
 
 export default function ConnectorPanel({ accountId }: { accountId: string | null }) {

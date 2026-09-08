@@ -154,9 +154,17 @@ export default function NewAutomationPage() {
     }
   }, [selectedAccountId])
 
+  // 「同じきっかけ」の注意はこの店の分だけ見れば足りる（#519 軽）。
+  // 未選択のときは全件に戻さず空にして、他店の名前で脅かさない。
   useEffect(() => {
     let cancelled = false
-    api.automations.list({})
+    if (!selectedAccountId) {
+      setExistingAutomations([])
+      return () => {
+        cancelled = true
+      }
+    }
+    api.automations.list({ accountId: selectedAccountId })
       .then((response) => {
         if (!cancelled && response.success) setExistingAutomations(response.data)
       })
@@ -166,7 +174,7 @@ export default function NewAutomationPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [selectedAccountId])
 
   const selectedEvent = EVENTS.find((event) => event.value === eventType) ?? EVENTS[0]
   const usesKeyword = KEYWORD_EVENTS.includes(eventType)
@@ -186,17 +194,14 @@ export default function NewAutomationPage() {
     setTriggerConfig({})
   }, [eventType])
 
+  // #519 軽: EVENTS から選べないきっかけの分岐は持たない。追加時に足す。
   const triggerConfigSummary = eventType === 'datetime'
     ? String(triggerConfig.at ?? '日時を指定')
     : eventType === 'daily' || eventType === 'weekly'
       ? String(triggerConfig.time ?? '時刻を指定')
       : eventType === 'form_submitted'
         ? String(triggerConfig.formId ?? 'すべてのフォーム')
-        : eventType === 'link_clicked'
-          ? String(triggerConfig.trackedLinkId ?? 'すべての計測リンク')
-          : eventType === 'calendar_booked'
-            ? String(triggerConfig.bookingType ?? 'すべての予約')
-            : ''
+        : ''
 
   const draftEventType: AutomationDraftDetail['eventType'] = eventType === 'datetime'
     ? scheduleType
@@ -563,6 +568,7 @@ export default function NewAutomationPage() {
             <div className="mt-3 space-y-2">
               <TextField aria-label="1人テストの友だちID" value={testFriendId} onChange={(event) => setTestFriendId(event.target.value)} placeholder="試す友だちID" />
               <Button onClick={() => void runOnePersonTest()} disabled={saving || !savedDraft || !testFriendId.trim()}>1人で試す</Button>
+              <p className="mt-1 text-xs font-medium leading-relaxed text-ink-faint">保存した時点の内容で試します。変えた後は保存し直してから試してください。</p>
             </div>
           </section>
 

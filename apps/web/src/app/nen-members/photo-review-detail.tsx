@@ -12,12 +12,12 @@ import type { PhotoAssetStatus, PhotoDerivatives } from '@/lib/api'
 import { formatPhotoReceivedAt } from './photo-review-time'
 import { safePhotoSrc } from './photo-src'
 import { photoPetDisplayName } from '@/components/shared/photo-display-name'
+import { text } from './photo-text'
 
-const text = (value: unknown) => String(value ?? '')
 const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? Number(value).toLocaleString('ja-JP') : '—'
 
 export function PhotoReviewDetail({
-  photo, position, total, loading, loadKind, reviewing, notice, assetStatus, derivatives, assetProcessing,
+  photo, position, total, loading, loadKind, reviewing, notice, assetStatus, derivatives, assetsFailed, onReloadAssets, assetProcessing,
   onBack, onMove, onApprove, onReturn, onProcessReviewAsset, onDownloadOriginal,
 }: {
   photo: Record<string, unknown> | null
@@ -29,6 +29,8 @@ export function PhotoReviewDetail({
   notice: string
   assetStatus: PhotoAssetStatus | null
   derivatives: PhotoDerivatives | null
+  assetsFailed: boolean
+  onReloadAssets: () => void
   assetProcessing: boolean
   onBack: () => void
   onMove: (direction: -1 | 1) => void
@@ -91,6 +93,7 @@ export function PhotoReviewDetail({
           <Button onClick={() => { setDownloadOpen(true); setDownloadCode(''); setDownloadError('') }}>もとの画像を保存</Button>
         </div>
         <p className="px-4 pb-4 pt-1 text-xs text-ink-faint">{numberOrDash(reviewDerivative?.width ?? photo.image_width)} × {numberOrDash(reviewDerivative?.height ?? photo.image_height)} ／ {(reviewDerivative?.byteSize ?? photo.image_byte_size) == null ? '—（未取得）' : `${(Number(reviewDerivative?.byteSize ?? photo.image_byte_size) / 1024 / 1024).toFixed(1)}MB`} ／ {text(photo.captured_device) || '—（未取得）'}　派生画像：{reviewDerivative ? `審査用 v${reviewDerivative.sourceVersion}` : latestAssetJob ? `${assetStatusLabel(latestAssetJob.status)}（v${latestAssetJob.requestedVersion}）` : '未取得'}</p>
+        {assetsFailed ? <div className="flex items-center gap-2 px-4 pb-4"><p className="text-xs text-ink-faint">審査用画像の状態を読み込めませんでした。</p><Button onClick={onReloadAssets}>状態を読み直す</Button></div> : null}
       </Card>
 
       <aside className="flex flex-col gap-3">

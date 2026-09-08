@@ -11,6 +11,7 @@ import { useAccount } from '@/contexts/account-context'
 import { api, type FriendAddRunList } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { csvCell } from './csv'
+import { useCursorStack } from '../use-cursor-stack'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
@@ -75,7 +76,7 @@ export default function FriendAddRunsPage() {
   const [kind, setKind] = useState<KindFilter>('all')
   const [attribution, setAttribution] = useState<AttributionFilter>('all')
   const [routing, setRouting] = useState<RoutingFilter>('all')
-  const [cursorStack, setCursorStack] = useState<Array<string | null>>([null])
+  const { cursor, page: cursorPage, canPrev, reset: resetCursor, goPrev, goNext } = useCursorStack()
   const [data, setData] = useState<FriendAddRunList | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -84,7 +85,6 @@ export default function FriendAddRunsPage() {
   const [stopMessage, setStopMessage] = useState('')
   const [ruleState, setRuleState] = useState<{ status: string; resendSuppressionHours: number | null } | null>(null)
   const requestSequence = useRef(0)
-  const cursor = cursorStack[cursorStack.length - 1]
 
   const load = useCallback(async () => {
     const requestId = ++requestSequence.current
@@ -128,8 +128,8 @@ export default function FriendAddRunsPage() {
 
   // アカウントを変えたら古いカーソルで読まないよう巻き戻す。
   useEffect(() => {
-    setCursorStack([null])
-  }, [selectedAccountId])
+    resetCursor()
+  }, [selectedAccountId, resetCursor])
 
   /*
    * 絞りの変更はカーソルの巻き戻しと同時に1回だけ読み直す。巻き戻しと取得を
@@ -139,7 +139,7 @@ export default function FriendAddRunsPage() {
     if (patch.kind !== undefined) setKind(patch.kind)
     if (patch.attribution !== undefined) setAttribution(patch.attribution)
     if (patch.routing !== undefined) setRouting(patch.routing)
-    setCursorStack([null])
+    resetCursor()
   }
 
   const summary = data?.summary ?? null
@@ -372,17 +372,17 @@ export default function FriendAddRunsPage() {
             <p className="mt-3 text-xs text-ink-faint">通常URLや公式QRから追加された記録は0件にせず「経路は取得できません」と表示します。</p>
           </section>
 
-          {(cursorStack.length > 1 || Boolean(data.nextCursor)) && <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-ink-faint">{cursorStack.length}ページ目・このページは{data.items.length}件</p>
+          {(canPrev || Boolean(data.nextCursor)) && <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-ink-faint">{cursorPage}ページ目・このページは{data.items.length}件</p>
             <div className="flex gap-2">
               <Button
-                onClick={() => setCursorStack((current) => current.length > 1 ? current.slice(0, -1) : current)}
-                disabled={cursorStack.length === 1 || loading}
+                onClick={() => goPrev()}
+                disabled={!canPrev || loading}
               >
                 前へ
               </Button>
               <Button
-                onClick={() => data.nextCursor && setCursorStack((current) => [...current, data.nextCursor])}
+                onClick={() => goNext(data.nextCursor)}
                 disabled={!data.nextCursor || loading}
               >
                 次へ

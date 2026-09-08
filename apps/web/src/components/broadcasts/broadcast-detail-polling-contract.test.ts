@@ -12,7 +12,9 @@ describe('送信中の進捗取得', () => {
     expect(progressBlock.match(/= setInterval/g)).toHaveLength(1)
     expect(progressBlock).toContain('5000')
     expect(progressBlock).toContain('document.hidden')
-    expect(progressBlock).toContain('setPerAccountStats(res.data.perAccountStats)')
+    /* 成功時の応答を変数に取り出してから両方を更新する（#490 軽3）。 */
+    expect(progressBlock).toContain('const data = res.data')
+    expect(progressBlock).toContain('setPerAccountStats(data.perAccountStats)')
     expect(progressBlock).not.toContain('api.broadcasts.perAccountStats')
   })
 })

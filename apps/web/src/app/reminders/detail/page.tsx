@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   api,
   type ReminderDeliveryRun,
@@ -33,19 +33,21 @@ const STATUS_VIEW: Record<ReminderDeliveryRunStatus, { label: string; tone: Stat
   cancelled: { label: '取り消し', tone: 'neutral' },
 }
 
+/** 呼ぶたびに作ると行数分だけ重いため、外で1回作って使い回す (#489-19)。 */
+const jstFormat = new Intl.DateTimeFormat('ja-JP', {
+  timeZone: 'Asia/Tokyo',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+})
 function formatJst(value: string | null): string {
   if (!value) return '—'
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(parsed)
+  return jstFormat.format(parsed)
 }
 
 function timingLabel(offsetMinutes: number): string {
@@ -96,6 +98,7 @@ function Fact({ label, value }: { label: string; value: string }) {
 }
 
 export default function ReminderRunsPage() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const reminderId = searchParams.get('id') ?? ''
   const isPlannedView = searchParams.get('status') === 'planned'
@@ -411,7 +414,7 @@ export default function ReminderRunsPage() {
         status={loading ? '読み込み中' : error ? '状態を取得できません' : data?.reminder.isActive ? '稼働中' : '停止中'}
         secondary={data?.reminder.isActive ? { label: 'リマインダを一時停止', onClick: () => void pauseReminder() } : undefined}
         primary="リマインダの設定を編集"
-        onPrimary={() => { window.location.href = `/reminders/edit?id=${reminderId}` }}
+        onPrimary={() => { router.push(`/reminders/edit?id=${reminderId}`) }}
       />
     </div>
   )

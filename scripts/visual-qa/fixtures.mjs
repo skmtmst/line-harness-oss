@@ -2060,7 +2060,7 @@ export const CHATS = [
   isUnread: Boolean(isUnread),
   lastMessageAt: String(lastMessageAt),
   lastMessageContent: String(lastMessageContent),
-  lastMessageDirection: 'inbound',
+  lastMessageDirection: 'incoming',
   lastMessageType: 'text',
   sendMode: 'line',
   createdAt: '2026-08-13T00:00:00.000Z',
@@ -2251,15 +2251,16 @@ export const TEMPLATES = (() => {
                     : n === 13 ? '予約変更のご案内'
                       : n === 14 ? '来店後フォロー'
                         : `${label}のひな形 ${i + 1}`,
-        category: n === 0 ? '予約日時と注意事項を案内'
-          : n === 1 ? '返信後の追加案内'
-            : n === 2 ? '購入商品と配送予定を案内'
-              : 'text',
+        /* 分類は分類名にする。説明文を入れると画面の分類欄が説明文になる。 */
+        category: label,
         messageType: 'text',
         messageContent: n === 0
           ? 'ご予約ありがとうございます。以下の内容をご確認ください。'
           : `${label}のご連絡です。内容をご確認ください。`,
         folderId,
+        /* 本物の口は質問・質問状態・置き場を必ず返す。無いと絞り・バッジの確認ができない。 */
+        question: null,
+        questionStatus: 'published',
         usageCount: n === 0 ? 38 : Math.max(0, 12 - n),
         tapCount: 0,
         monthlySendCount: sendCounts[n]?.[0] ?? 0,
@@ -4423,9 +4424,9 @@ export const CONVERSION_DEFINITIONS = {
       updatedAt: point.isActive ? '2026-08-25T09:00:00.000Z' : '2026-08-20T09:00:00.000Z',
     }
   }),
-  stateCounts: { active: 10, draft: 0, stopped: 2, invalid: 0, sourceStopped: 0 },
+  stateCounts: { active: 5, draft: 0, stopped: 1, invalid: 0, sourceStopped: 0 },
   range: CONVERSION_RANGE,
-  pagination: { total: 12, limit: 20, cursor: '0', nextCursor: null },
+  pagination: { total: 6, limit: 20, cursor: '0', nextCursor: null },
 }
 
 /* 機能19 GtylA: 入力中の条件だけで行う保存前試算。保存・成果追加はしない。 */
@@ -5724,9 +5725,11 @@ const publicationPhoto = (id, photoId, petName, ownerName, count, label, type = 
 })
 
 export const NEN_PHOTO_PUBLICATIONS = {
+  // #580 軽: 概要は現物8件と一致させる（実APIは items.length を数える）。
+  // 掲載先は type:label の重なりなし5か所（pub-6は掲載先なし）。
   summary: {
-    publishedCount: 62, placementCount: 4,
-    topPhoto: { pet_name: 'ももちゃん', view_count: 1240 }, consentedCount: 62,
+    publishedCount: 8, placementCount: 5,
+    topPhoto: { pet_name: 'ももちゃん', view_count: 1240 }, consentedCount: 8,
   },
   items: [
     publicationPhoto('pub-1', 'ph-11', 'ももちゃん', '高橋 直人 さま', 1240, 'リッチメニュー', 'rich_menu'),

@@ -12,6 +12,7 @@ describe('V6 外部連携の接続別集計と受信口詳細', () => {
   it('送信一覧を接続別集計つきの型で受け取る', () => {
     expect(API).toContain('export type OutgoingWebhookOverview = OutgoingWebhook &')
     expect(API).toContain('deliverySummary: {')
+    expect(API).toContain("status: 'succeeded' | 'failed' | 'pending'")
     expect(API).toContain('fetchApi<ApiResponse<OutgoingWebhookOverview[]>>')
     expect(PAGE).toContain('useState<OutgoingWebhookOverview[]>([])')
   })
@@ -20,6 +21,8 @@ describe('V6 外部連携の接続別集計と受信口詳細', () => {
     expect(OVERVIEWS).toContain('item.deliverySummary.total.toLocaleString')
     expect(OVERVIEWS).toContain('item.deliverySummary.failed > 0')
     expect(OVERVIEWS).toContain('item.deliverySummary.canRetry')
+    expect(OVERVIEWS).toContain("item.deliverySummary.lastResult?.status === 'pending'")
+    expect(OVERVIEWS).toContain("pending ? '送信中'")
     expect(OVERVIEWS).toContain("const [sort, setSort] = useState<OutgoingSort>('volume')")
     expect(OVERVIEWS).toContain('送った回数が多い順')
     expect(OVERVIEWS).not.toContain('接続別集計待ち')

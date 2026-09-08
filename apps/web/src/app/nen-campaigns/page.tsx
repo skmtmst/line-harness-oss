@@ -223,10 +223,26 @@ export default function NenCampaignsPage() {
     try { await api.nenCampaigns.deletePet(selectedAccountId, pet.id); setNotice({ tone: 'success', text: `${pet.name}の登録を外しました。` }); await loadTab('pets') }
     catch { setNotice({ tone: 'error', text: 'ペット情報を外せませんでした。' }) }
   }
+  const [savingCoupon, setSavingCoupon] = useState(false)
   const saveCoupon = async () => {
-    if (!selectedAccountId) return
+    if (!selectedAccountId || savingCoupon) return
+    // 空欄は 0 になるので、汎用エラー(400)になる前に具体的な直し方を出す。
+    if (!Number.isInteger(coupon.discountAmount) || coupon.discountAmount < 1 || coupon.discountAmount > 100000) {
+      setNotice({ tone: 'error', text: '割引の額は1〜100,000円の整数で入力してください。' })
+      return
+    }
+    if (!Number.isInteger(coupon.validityDays) || coupon.validityDays < 1 || coupon.validityDays > 365) {
+      setNotice({ tone: 'error', text: '使える日数は1〜365日の整数で入力してください。' })
+      return
+    }
+    if (!/^[A-Z0-9-]{3,10}$/.test(coupon.codePrefix)) {
+      setNotice({ tone: 'error', text: 'クーポンの頭の文字は半角大文字・数字・-で3〜10文字にしてください。' })
+      return
+    }
+    setSavingCoupon(true)
     try { await api.nenCampaigns.updateBirthdayCoupon(selectedAccountId, coupon); setNotice({ tone: 'success', text: 'お誕生日クーポン設定を保存しました。' }) }
     catch { setNotice({ tone: 'error', text: 'クーポン設定を保存できませんでした。' }) }
+    finally { setSavingCoupon(false) }
   }
   const showDelivery = async (id: string) => {
     if (!selectedAccountId) return
@@ -289,7 +305,7 @@ export default function NenCampaignsPage() {
         onSaveColumn={(column) => void saveColumnMessage(column)} onDeliverColumn={(column, scheduledAt) => void deliverColumn(column, scheduledAt)}
         onDuplicateColumn={(column) => void duplicateColumn(column)} onTestColumn={(column) => void testColumn(column)}
         onToggleSetting={(setting) => void saveSetting(setting, { isEnabled: !setting.isEnabled })} onTestSend={(setting) => void testSend(setting)}
-        onPetDraftChange={setPetDraft} onAddPet={() => void addPet()} onDeletePet={(pet) => void deletePet(pet)} onCouponChange={setCoupon} onSaveCoupon={() => void saveCoupon()}
+        onPetDraftChange={setPetDraft} onAddPet={() => void addPet()} onDeletePet={(pet) => void deletePet(pet)} onCouponChange={setCoupon} onSaveCoupon={() => void saveCoupon()} savingCoupon={savingCoupon}
         onShowDelivery={(id) => void showDelivery(id)} onRetryDelivery={(id, version, reason) => void retryDelivery(id, version, reason)}
         onChangeDeliveryView={(status, cursor) => void changeDeliveryView(status, cursor)}
         renderCampaignPreview={(setting) => <CampaignLinePreview setting={setting} onClose={() => setPreviewCampaignKey(null)} />}

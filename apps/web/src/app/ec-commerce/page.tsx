@@ -26,6 +26,7 @@ import ConnectorPanel from './connector-panel'
 import EcTabs from './ec-tabs-view'
 import SubscriptionsPanel from './subscriptions-panel'
 import { EC_TABS } from './ec-tabs'
+import { formatEcDateTime as dateTime } from './ec-datetime'
 import styles from './ec-commerce-v6.module.css'
 
 const ACTION_STATUS: Record<EcActionExecutionStatus, { label: string; tone: string }> = {
@@ -55,15 +56,6 @@ const ACTION_LABEL: Record<string, string> = {
   'ec.order.cancelled': '注文の取り消しを反映',
   'ec.order.refunded': '成果を取り消し・マイルを調整',
   'ec.customer.profile_updated': '会員情報を更新',
-}
-
-function dateTime(value: string | null) {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.valueOf())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', {
-    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
-  }).format(date)
 }
 
 const ACTION_PAGE_SIZE = 20

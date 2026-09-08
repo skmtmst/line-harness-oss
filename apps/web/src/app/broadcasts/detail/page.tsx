@@ -156,7 +156,13 @@ function BroadcastDetailInner() {
         </div>
       ) : loadState === 'not-found' || !broadcast ? (
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          このLINEアカウントで確認できる配信は見つかりませんでした。
+          {/*
+            未選択と対象外を書き分ける。未選択のまま「確認できる配信は
+            見つかりません」と出すと、権限の問題に読み違える（#490 軽6）。
+          */}
+          {!selectedAccountId
+            ? 'LINE公式アカウントを選んでください。選ぶと配信を確認できます。'
+            : 'このLINEアカウントで確認できる配信は見つかりませんでした。'}
         </p>
       ) : String(broadcast.status) === 'sent' ? (
         <SentResult broadcast={broadcast} insight={insight} insightState={insightState} contentRef={contentRef} />

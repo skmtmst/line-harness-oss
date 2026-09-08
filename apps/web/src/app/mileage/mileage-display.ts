@@ -72,6 +72,13 @@ export function formatMileageChange(value: number): string {
   return '0'
 }
 
+/** 数を日本語の桁区切りで出す。取れていない数・壊れた数は「—」にする。 */
+export function formatMileageNumber(value: number | null | undefined): string {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? new Intl.NumberFormat('ja-JP').format(value)
+    : '—'
+}
+
 export function formatMileageDate(value: string | null): string {
   if (!value) return '—'
   const date = new Date(value)

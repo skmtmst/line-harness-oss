@@ -38,7 +38,7 @@ describe('V6 登録メディア一覧の契約', () => {
   it('既存の寸法・長さ・容量をカードへ出し、作り物の値で埋めない', () => {
     expect(PAGE).toContain('item.width != null && item.height != null')
     expect(PAGE).toContain('item.durationMs != null')
-    expect(PAGE).toContain('formatSize(item.sizeBytes)')
+    expect(PAGE).toContain('formatMediaSize(item.sizeBytes)')
     expect(PAGE).not.toContain("details.push('—')")
   })
 

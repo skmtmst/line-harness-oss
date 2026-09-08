@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { UNKNOWN_USAGE_KIND, mediaUsageKindText } from './media-usage-display'
+import { UNKNOWN_USAGE_KIND, formatMediaSize, mediaUsageKindText } from './media-usage-display'
 
 describe('登録メディアの使用箇所の言葉づかい', () => {
   it('走査が記録する7種類を運用者の言葉にする', () => {
@@ -31,5 +31,13 @@ describe('登録メディアの使用箇所の言葉づかい', () => {
     for (const kind of kinds) {
       expect(mediaUsageKindText(kind)).not.toMatch(/[a-z]+_[a-z]+/)
     }
+  })
+})
+
+describe('容量の短い表示（一覧と詳細で同じ）', () => {
+  it('B・KB・MBを使い分ける', () => {
+    expect(formatMediaSize(512)).toBe('512 B')
+    expect(formatMediaSize(2048)).toBe('2 KB')
+    expect(formatMediaSize(3 * 1024 * 1024)).toBe('3.0 MB')
   })
 })

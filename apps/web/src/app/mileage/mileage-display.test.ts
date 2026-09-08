@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   formatMileageChange,
   formatMileageDate,
+  formatMileageNumber,
   mileageEntryTypeLabel,
   mileageSourceLabel,
   mileageSourceNoteText,
@@ -36,5 +37,13 @@ describe('マイル履歴の表示', () => {
     expect(formatMileageChange(-50)).toBe('−50')
     expect(formatMileageDate('2026-08-25T11:00:00.000Z')).toContain('20:00')
     expect(formatMileageDate('invalid')).toBe('—')
+  })
+
+  it('取れていない数・壊れた数を0にせず「—」で表示する', () => {
+    expect(formatMileageNumber(1234567)).toBe('1,234,567')
+    expect(formatMileageNumber(0)).toBe('0')
+    expect(formatMileageNumber(null)).toBe('—')
+    expect(formatMileageNumber(undefined)).toBe('—')
+    expect(formatMileageNumber(Number.NaN)).toBe('—')
   })
 })
