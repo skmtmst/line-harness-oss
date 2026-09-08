@@ -112,9 +112,8 @@ export default function EventsListPage() {
   const nearest = attention.upcoming[0]
   const nearestLow = attention.lowApplications[0]
   const unpublishedCount = items.filter((event) => event.is_published !== 1).length
-  const endedCount = items.filter(
-    (event) => event.next_slot_starts_at && new Date(event.next_slot_starts_at).getTime() < Date.now(),
-  ).length
+  // 「終わった回」は端末時計で数えると、時計のずれで件数が合わない(点検#520軽16)。
+  // サーバー時刻の口が無いので、件数は出さず「—」にする。
 
   const pageCount = Math.max(1, Math.ceil(listTotal / PAGE_SIZE))
   const current = Math.min(page, pageCount)
@@ -154,7 +153,7 @@ export default function EventsListPage() {
           受付前 {dataReady ? unpublishedCount : '—'}
         </span>
         <span className="text-ink-secondary px-1 pb-3 text-sm font-medium">
-          終わった回 {dataReady ? endedCount : '—'}
+          終わった回 —
         </span>
         <span className="text-ink-secondary px-1 pb-3 text-sm font-medium">申込者</span>
       </div>

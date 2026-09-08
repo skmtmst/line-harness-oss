@@ -1126,6 +1126,23 @@ describe('POST /api/events/admin/events', () => {
     expect(body.error).toBe('invalid_name');
   });
 
+  test('422 for blank name, waitlist_enabled=2, negative sort_order (点検#520軽14)', async () => {
+    // 空白だけの名前は画面とDBの読みがずれる。waitlist_enabledは画面が `=== 1` で読む。
+    for (const payload of [
+      { name: '   ' },
+      { name: 'X', waitlist_enabled: 2 },
+      { name: 'X', sort_order: -1 },
+    ]) {
+      const app = setupApp({ events: [] });
+      const res = await app.request('/api/events/admin/events?account_id=la1', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      expect(res.status).toBe(422);
+    }
+  });
+
   test('422 when venue_url is not http(s) (点検#520の中5)', async () => {
     const app = setupApp({ events: [] });
     const res = await app.request('/api/events/admin/events?account_id=la1', {

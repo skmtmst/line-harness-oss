@@ -137,14 +137,14 @@ export default function NewProxyBookingPage() {
   }, [selectedAccountId])
 
   useEffect(() => {
-    if (!selectedAccountId || (!friend && !customer)) {
+    // どちらの客かを先に束ねる(点検#516軽5)。`customer!` の断言では、将来の分岐変更でnullが紛れ込む。
+    const target = friend ? { friendId: friend.id } : customer ? { bookingCustomerId: customer.id } : null
+    if (!selectedAccountId || !target) {
       setCustomerContext(null)
       return
     }
     let active = true
-    void bookingApi.getCustomerContext(selectedAccountId, friend
-      ? { friendId: friend.id }
-      : { bookingCustomerId: customer!.id })
+    void bookingApi.getCustomerContext(selectedAccountId, target)
       .then((response) => { if (active) setCustomerContext(response.customer) })
       .catch(() => { if (active) setCustomerContext(null) })
     return () => { active = false }
@@ -316,18 +316,22 @@ export default function NewProxyBookingPage() {
   }
 
   async function createBooking() {
-    if (!selectedAccountId || (!friend && !customer) || !menu || !selectedStaff || !date || !time) return
+    const customerPart = friend ? { friend_id: friend.id } : customer ? { booking_customer_id: customer.id } : null
+    if (!selectedAccountId || !customerPart || !menu || !selectedStaff || !date || !time) return
+    // 空キーで送ると400になる(点検#516軽5)。無ければここで作る。
+    const key = idempotencyKey || crypto.randomUUID()
+    if (!idempotencyKey) setIdempotencyKey(key)
     const requestKey = selectionKey
     setLoading(true)
     setError('')
     try {
       const created = await bookingApi.createProxyBooking(selectedAccountId, {
-        ...(friend ? { friend_id: friend.id } : { booking_customer_id: customer!.id }),
+        ...customerPart,
         menu_id: menu.id,
         staff_id: selectedStaff.id,
         starts_at: toUtcIso(date, time),
         customer_note: customerNote.trim() || undefined,
-      }, idempotencyKey)
+      }, key)
       if (latestSelectionKey.current !== requestKey) return
       setResult(created)
       setCustomerContext(created.customer_context)

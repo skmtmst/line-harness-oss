@@ -101,7 +101,8 @@ function BookingsInner() {
   const dataReady = summaryStatus === 'ready' && summary !== null
   usePageTitle(event?.name ? event.name + ' の申込者' : 'イベントの申込者')
 
-  const refresh = useCallback(async () => {
+  // タブ切替では申込一覧だけ取り直す(点検#520軽13)。詳細・待ち列はタブと無関係。
+  const refreshList = useCallback(async () => {
     if (!selectedAccountId || !eventId) return
     const requestId = ++loadRequestRef.current
     setLoadStatus('loading')
@@ -136,9 +137,40 @@ function BookingsInner() {
     }
   }, [selectedAccountId, eventId, tab, page])
 
+  // 詳細はイベント/アカウント変更時のみ取り直す(点検#520軽13)。
+  // 待ち列の件数は概要(summary)から取るようになったため、ここでは読まない。
+  const refreshMeta = useCallback(async () => {
+    if (!selectedAccountId || !eventId) return
+    const requestId = ++loadRequestRef.current
+    try {
+      /*
+        **前のイベントの控えを使い回さない。** `event` が入っていれば取りに
+        行かない作りだったので、アカウントやイベントを切り替えたあとも
+        **上の帯に前のイベント名と定員が残った。** どのイベントの
+        申込を見ているのか読み違える。毎回取り直す。
+      */
+      const evRes = await eventsApi.getEvent(selectedAccountId, eventId)
+      if (requestId !== loadRequestRef.current) return
+      setEvent((current) => (typeof evRes?.name === 'string' ? evRes : current))
+    } catch {
+      if (requestId !== loadRequestRef.current) return
+      setEvent(null)
+    }
+  }, [selectedAccountId, eventId])
+
+  const refresh = useCallback(async () => {
+    await refreshMeta()
+    await refreshList()
+    // 控えの `event` を読まなくなったので、依存の除外は要らない。
+  }, [refreshMeta, refreshList])
+
   useEffect(() => {
-    void refresh()
-  }, [refresh])
+    void refreshMeta()
+  }, [refreshMeta])
+
+  useEffect(() => {
+    void refreshList()
+  }, [refreshList])
 
   const refreshSummary = useCallback(async () => {
     if (!selectedAccountId || !eventId) return

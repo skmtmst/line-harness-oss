@@ -285,18 +285,15 @@ function BroadcastDetailInner() {
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-ink text-sm font-semibold">この配信の設定</p>
-              <button
-                disabled
-                title="同じ設定での作り直しは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-3 py-1 text-xs opacity-50"
+              <Link
+                href={`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`}
+                className="border-hairline text-accent rounded-control border px-3 py-1 text-xs hover:underline"
               >
                 同じ設定で作り直す
-              </button>
+              </Link>
             </div>
-            {/* 押せない理由は吹き出しだけでなく本文にも置く。触って初めて
-                分かる形にすると、押せないことしか伝わらない。 */}
             <p className="text-ink-faint mt-2 text-xs leading-relaxed">
-              「複製して作る」「同じ設定で作り直す」は、既にある配信を種にして作り直す口がまだないため押せません。作成は空から始まります。
+              複製して作る操作です。題名と本文を引き継いで新規作成を開きます。宛先・予約日時は引き継がないので、送る前に確かめてください。
             </p>
             <dl className="mt-3 space-y-2 text-sm">
               <Row label="宛先の条件" value={broadcast.targetType === 'all' ? 'すべての友だち' : '絞り込みあり'} />

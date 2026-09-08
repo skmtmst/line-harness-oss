@@ -92,4 +92,9 @@ describe('V6 機能20 分析', () => {
     expect(PAGE).toContain('overview.hasMore')
     expect(PAGE).toContain('200件まで表示しています。探す言葉を足して絞ってください。CSVの書き出しも、表示している範囲だけが入ります。')
   })
+
+  it('未集計のファネルは壊れた表示にせず案内を出す(点検#508軽13)', () => {
+    expect(PAGE).toContain('setNoRun')
+    expect(PAGE).toContain('まだ集計がありません。「この30日を再集計」を押してください')
+  })
 })

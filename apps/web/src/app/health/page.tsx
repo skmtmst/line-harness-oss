@@ -47,6 +47,8 @@ interface AccountMigration {
   completedAt: string | null
 }
 
+type MigrationLoadState = 'loading' | 'ready' | 'error'
+
 const riskConfig = {
   normal: { label: '正常', color: 'bg-green-500', textColor: 'text-green-700', bgColor: 'bg-green-100' },
   warning: { label: '警告', color: 'bg-yellow-500', textColor: 'text-yellow-700', bgColor: 'bg-yellow-100' },
@@ -103,6 +105,7 @@ export default function HealthPage() {
   const [healthLogs, setHealthLogs] = useState<Record<string, AccountHealthLog[]>>({})
   const [latestRisk, setLatestRisk] = useState<Record<string, AccountHealthState>>({})
   const [migrations, setMigrations] = useState<AccountMigration[]>([])
+  const [migrationLoadState, setMigrationLoadState] = useState<MigrationLoadState>('loading')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -156,13 +159,17 @@ export default function HealthPage() {
   }, [])
 
   const loadMigrations = useCallback(async () => {
+    setMigrationLoadState('loading')
     try {
       const res = await api.health.migrations()
-      if (res.success) {
-        setMigrations(res.data as unknown as AccountMigration[])
+      if (res.success && Array.isArray(res.data)) {
+        setMigrations(res.data as AccountMigration[])
+        setMigrationLoadState('ready')
+      } else {
+        setMigrationLoadState('error')
       }
     } catch {
-      // Non-blocking
+      setMigrationLoadState('error')
     }
   }, [])
 
@@ -398,7 +405,22 @@ export default function HealthPage() {
           {/* Migrations Table */}
           <div>
             <h2 className="text-lg font-bold text-gray-900 mb-4">移行履歴</h2>
-            {migrations.length === 0 ? (
+            {migrationLoadState === 'loading' ? (
+              <div className="border-hairline bg-canvas text-ink-faint rounded-lg border p-8 text-center">
+                移行履歴を読み込んでいます...
+              </div>
+            ) : migrationLoadState === 'error' ? (
+              <div className="border-danger bg-danger-bg text-danger rounded-lg border p-8 text-center">
+                <p>移行履歴を取得できませんでした。</p>
+                <button
+                  type="button"
+                  onClick={() => void loadMigrations()}
+                  className="text-action mt-3 text-sm font-medium underline underline-offset-2"
+                >
+                  再読み込み
+                </button>
+              </div>
+            ) : migrations.length === 0 ? (
               <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
                 移行履歴はありません
               </div>
