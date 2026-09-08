@@ -42,8 +42,6 @@ describe('予約管理の一覧上限', () => {
     expect(DETAIL).toContain("renderNotificationText('approved'")
   })
 
-  it('メニュー棚は共通FolderPanelに寄せず理由を残す(点検#516の中8)', () => {
-    expect(LIST).toContain('共通 FolderPanel には寄せていない(点検#516の中8)')
-    expect(LIST).not.toContain('from \'@/components/shared/folder-panel\'')
-  })
+  // 点検#516の中8(メニュー棚のFolderPanel寄せ)は列車側で移行済みのため、
+  // このPRでは重複して扱わない。移行の契約は booking-folder-panel-contract.test.ts が持つ。
 })

@@ -12,11 +12,23 @@ import { api } from '@/lib/api'
 import {
   TEMPLATES,
   SIZE_DIMENSIONS,
-  templateToAreas,
   type RichMenuTemplate,
 } from '@/lib/rich-menu-templates'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { AreaProperties } from '@/components/rich-menus/area-properties'
+import type { Area } from '@/components/rich-menus/canvas-editor'
 import type { Folder } from '@line-crm/shared'
+import {
+  areaDraftsForCreate,
+  createAreaDrafts,
+  isAreaActionConfigured,
+  saveAreaDraft,
+  unsetAreaLabels,
+} from './action-drafts'
+
+type Option = { id: string; name: string }
+
+const NEW_MENU_INTENTS = ['url', 'text', 'template', 'form', 'tel', 'postback'] as const
 
 const SIZE_TABS: { value: 'large' | 'compact'; label: string; dims: string; hint: string }[] = [
   {
@@ -121,6 +133,13 @@ export default function NewRichMenuPage() {
   const [templateKey, setTemplateKey] = useState(TEMPLATES[0].key)
   const [folderId, setFolderId] = useState('')
   const [folders, setFolders] = useState<Folder[]>([])
+  const [tags, setTags] = useState<Option[]>([])
+  const [templates, setTemplates] = useState<Option[]>([])
+  const [forms, setForms] = useState<Option[]>([])
+  const [trackedLinks, setTrackedLinks] = useState<Option[]>([])
+  const [areaDraftsByTemplate, setAreaDraftsByTemplate] = useState<Record<string, Area[]>>({})
+  const [editingAreaIndex, setEditingAreaIndex] = useState<number | null>(null)
+  const [editingArea, setEditingArea] = useState<Area | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -132,18 +151,78 @@ export default function NewRichMenuPage() {
       .filter((template): template is RichMenuTemplate => Boolean(template))
   }, [size])
   const tmpl = shownTemplates.find((t) => t.key === templateKey) ?? shownTemplates[0]
+  const initialAreas = useMemo(() => createAreaDrafts(tmpl), [tmpl])
+  const currentAreas = areaDraftsByTemplate[tmpl.key] ?? initialAreas
+  const unsetLabels = unsetAreaLabels(currentAreas)
 
   useEffect(() => {
-    void api.folders.list('rich_menu').then((response) => {
-      if (response.success) setFolders(response.data)
-    })
-  }, [])
+    let cancelled = false
+    void (async () => {
+      const [folderRes, tagRes, templateRes, formRes, linkRes] = await Promise.allSettled([
+        api.folders.list('rich_menu'),
+        api.tags.list(),
+        api.templates.list(),
+        selectedAccount
+          ? api.forms.list(selectedAccount.id)
+          : Promise.resolve({ success: true as const, data: [] }),
+        api.trackedLinks.list(),
+      ])
+      if (cancelled) return
+      if (folderRes.status === 'fulfilled' && folderRes.value.success) {
+        setFolders(folderRes.value.data)
+      }
+      if (tagRes.status === 'fulfilled' && tagRes.value.success) {
+        setTags(tagRes.value.data.map((item) => ({ id: item.id, name: item.name })))
+      }
+      if (templateRes.status === 'fulfilled' && templateRes.value.success) {
+        setTemplates(templateRes.value.data.map((item) => ({ id: item.id, name: item.name })))
+      }
+      if (formRes.status === 'fulfilled' && formRes.value.success) {
+        setForms(formRes.value.data.map((item) => ({ id: item.id, name: item.name })))
+      }
+      if (linkRes.status === 'fulfilled' && linkRes.value.success) {
+        setTrackedLinks(linkRes.value.data.map((item) => ({ id: item.id, name: item.name })))
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedAccount])
 
   function changeSize(next: 'large' | 'compact') {
     setSize(next)
     // 大きさを変えると選べる形も変わる。先頭を選び直す。
     const first = TEMPLATES.find((t) => t.size === next)
     if (first) setTemplateKey(first.key)
+    setEditingAreaIndex(null)
+    setEditingArea(null)
+  }
+
+  function selectTemplate(nextTemplateKey: string) {
+    setTemplateKey(nextTemplateKey)
+    setEditingAreaIndex(null)
+    setEditingArea(null)
+  }
+
+  function openAreaEditor(index: number) {
+    const area = currentAreas[index]
+    if (!area) return
+    setEditingAreaIndex(index)
+    setEditingArea({
+      ...area,
+      actionData: { ...area.actionData },
+      tagIds: [...(area.tagIds ?? [])],
+    })
+  }
+
+  function saveEditingArea() {
+    if (editingAreaIndex === null || !editingArea) return
+    setAreaDraftsByTemplate((previous) => ({
+      ...previous,
+      [tmpl.key]: saveAreaDraft(previous[tmpl.key] ?? initialAreas, editingAreaIndex, editingArea),
+    }))
+    setEditingAreaIndex(null)
+    setEditingArea(null)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -170,7 +249,7 @@ export default function NewRichMenuPage() {
         pages: Array.from({ length: tabCount + 1 }, (_, index) => ({
           name: index === 0 ? 'トップ' : `タブ ${String.fromCharCode(65 + index - 1)}`,
           orderIndex: index,
-          areas: templateToAreas(tmpl),
+          areas: areaDraftsForCreate(currentAreas),
         })),
       })
       if (!res.success) throw new Error(res.error ?? '作成失敗')
@@ -336,7 +415,7 @@ export default function NewRichMenuPage() {
                     name="template"
                     value={t.key}
                     checked={active}
-                    onChange={(e) => setTemplateKey(e.target.value)}
+                    onChange={(e) => selectTemplate(e.target.value)}
                     className="sr-only"
                   />
                   <TemplatePreview template={t} />
@@ -365,18 +444,66 @@ export default function NewRichMenuPage() {
           <section className="border-hairline bg-canvas-sunken rounded-card border p-4">
             <h2 className="text-ink mb-3 text-sm font-bold">押した面ごとの動き</h2>
             <div className="space-y-2">
-              {tmpl.areas.map((_, index) => (
-                <div key={index} className="border-hairline bg-canvas flex items-center gap-3 rounded-control border px-3 py-2 text-xs">
-                  <strong className="text-ink flex h-6 w-6 items-center justify-center rounded-control border border-hairline">{String.fromCharCode(65 + index)}</strong>
-                  <span className="text-ink-secondary">アクションを実行</span>
-                  <span className="text-danger ml-auto font-semibold">アクションを設定する</span>
+              {currentAreas.map((area, index) => (
+                <div key={area.id}>
+                  <div className="border-hairline bg-canvas flex items-center gap-3 rounded-control border px-3 py-2 text-xs">
+                    <strong className="text-ink flex h-6 w-6 items-center justify-center rounded-control border border-hairline">{String.fromCharCode(65 + index)}</strong>
+                    <span className="text-ink-secondary">
+                      {isAreaActionConfigured(area) ? area.label || 'アクション設定済み' : 'アクションを実行'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => openAreaEditor(index)}
+                      className={`ml-auto font-semibold ${isAreaActionConfigured(area) ? 'text-accent' : 'text-danger'}`}
+                    >
+                      {isAreaActionConfigured(area) ? '設定を変更する' : 'アクションを設定する'}
+                    </button>
+                  </div>
+                  {editingAreaIndex === index && editingArea ? (
+                    <div className="border-hairline bg-canvas mt-2 rounded-control border p-4">
+                      <AreaProperties
+                        area={editingArea}
+                        pages={[]}
+                        tags={tags}
+                        templates={templates}
+                        forms={forms}
+                        trackedLinks={trackedLinks}
+                        taps={null}
+                        showManagementDetails={false}
+                        allowedIntents={[...NEW_MENU_INTENTS]}
+                        onUpdate={(patch) =>
+                          setEditingArea((current) =>
+                            current ? { ...current, ...patch } : current,
+                          )
+                        }
+                      />
+                      <div className="mt-4 flex justify-end gap-2">
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            setEditingAreaIndex(null)
+                            setEditingArea(null)
+                          }}
+                        >
+                          キャンセル
+                        </Button>
+                        <Button type="button" variant="primary" onClick={saveEditingArea}>
+                          この面の設定を保存
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>
-            <p className="text-danger mt-3 text-xs font-semibold">
-              {tmpl.areas.length > 0
-                ? `面 ${String.fromCharCode(64 + tmpl.areas.length)} のアクションが未設定です。公開すると、その場所を押しても何も起きません。`
-                : '面を追加し、公開前にそれぞれのアクションを設定してください。'}
+            <p
+              className={`mt-3 text-xs font-semibold ${unsetLabels.length > 0 ? 'text-danger' : 'text-success'}`}
+            >
+              {currentAreas.length === 0
+                ? '面を追加し、公開前にそれぞれのアクションを設定してください。'
+                : unsetLabels.length > 0
+                  ? `面 ${unsetLabels.join('、')} のアクションが未設定です。公開すると、その場所を押しても何も起きません。`
+                  : 'すべての面にアクションが設定されています。'}
             </p>
           </section>
         </div>
@@ -389,7 +516,7 @@ export default function NewRichMenuPage() {
             </section>
             <section className="bg-warning-bg text-warning rounded-card p-4 text-xs leading-6">
               <h2 className="font-bold">公開前に見ておくところ</h2>
-              <p>・アクションが未設定の面が {tmpl.areas.length}つあります</p>
+              <p>・アクションが未設定の面が {unsetLabels.length}つあります</p>
               <p>・画像は1MBまで。超えると登録できません</p>
               <p>・切替メニューの移動先は、公開してからでないと動きません</p>
             </section>

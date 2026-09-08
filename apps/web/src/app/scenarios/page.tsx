@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Scenario } from '@line-crm/shared'
 import { api, type ScenarioRuns, type ScenarioSimulation } from '@/lib/api'
+import { useOffsetServerList } from '@/lib/use-server-list'
 import { useAccount } from '@/contexts/account-context'
 
 function scenarioCompletionDetail(active: number, completed: number): string {
@@ -15,7 +16,7 @@ function scenarioCompletionDetail(active: number, completed: number): string {
 import type { Folder } from '@line-crm/shared'
 import ListKpis from '@/components/shared/list-kpis'
 import ListToolbar from '@/components/shared/list-toolbar'
-import FolderPanel from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -28,7 +29,6 @@ type ScenarioWithCount = Scenario & {
   subscriberCount?: number
   completedCount?: number
 }
-type LoadStatus = 'loading' | 'ready' | 'error'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -170,26 +170,25 @@ function StartScenarioDialog({
   )
 }
 
-/** 作成日時が、運用画面の基準である日本時間の今月か。 */
-function isCreatedThisMonth(createdAt: string, now = new Date()): boolean {
+/** 運用画面の基準である日本時間の今月初日。 */
+function currentMonthStart(now = new Date()): string {
   const month = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Tokyo',
     year: 'numeric',
     month: '2-digit',
   })
-  return month.format(new Date(createdAt)) === month.format(now)
+  return `${month.format(now)}-01T00:00:00+09:00`
 }
 
 export default function ScenariosPage() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const router = useRouter()
-  const [scenarios, setScenarios] = useState<ScenarioWithCount[]>([])
   // 名前の絞り込み（設計 `Body` の検索）。手元で絞る。
   const [nameQuery, setNameQuery] = useState('')
+  const [serverQuery, setServerQuery] = useState('')
   /** よく使う絞り込み。いま数えられるのは「停止中のみ」だけ。 */
   const [stoppedOnly, setStoppedOnly] = useState(false)
   const [createdThisMonthOnly, setCreatedThisMonthOnly] = useState(false)
-  const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [actionError, setActionError] = useState('')
   const [creating, setCreating] = useState(false)
   const [folders, setFolders] = useState<Folder[]>([])
@@ -198,7 +197,6 @@ export default function ScenariosPage() {
   const [toggleTarget, setToggleTarget] = useState<ScenarioWithCount | null>(null)
   const [toggleBusy, setToggleBusy] = useState(false)
   const [toggleError, setToggleError] = useState('')
-  const loadRequestRef = useRef(0)
 
   const loadFolders = useCallback(async () => {
     const res = await api.folders.list('scenario')
@@ -209,35 +207,41 @@ export default function ScenariosPage() {
     void loadFolders()
   }, [loadFolders])
 
-  const loadScenarios = useCallback(async () => {
-    const requestId = ++loadRequestRef.current
-    setLoadStatus('loading')
-    setActionError('')
-    setScenarios([])
-    try {
-      const res = await api.scenarios.list({ accountId: selectedAccountId || undefined })
-      if (requestId !== loadRequestRef.current) return
-      if (res.success) {
-        setScenarios(res.data)
-        setLoadStatus('ready')
-      } else {
-        setScenarios([])
-        setLoadStatus('error')
-      }
-    } catch {
-      if (requestId !== loadRequestRef.current) return
-      setScenarios([])
-      setLoadStatus('error')
-    }
-  }, [selectedAccountId])
-
   useEffect(() => {
-    if (accountLoading) return
-    void loadScenarios()
-    return () => {
-      loadRequestRef.current += 1
-    }
-  }, [accountLoading, loadScenarios])
+    const timer = setTimeout(() => setServerQuery(nameQuery.trim()), 300)
+    return () => clearTimeout(timer)
+  }, [nameQuery])
+
+  const loadScenarioPage = useCallback(async (
+    request: { page: number; limit: number },
+    signal: AbortSignal,
+  ) => {
+    if (accountLoading) return { items: [], total: 0, limit: request.limit, sort: [] }
+    const res = await api.scenarios.listPage({
+      accountId: selectedAccountId || undefined,
+      page: request.page,
+      limit: request.limit,
+      query: serverQuery || undefined,
+      active: stoppedOnly ? 0 : undefined,
+      createdFrom: createdThisMonthOnly ? currentMonthStart() : undefined,
+      folderId: folderFilter || undefined,
+    }, signal)
+    if (!res.success) throw new Error(res.error)
+    return res.data
+  }, [accountLoading, createdThisMonthOnly, folderFilter, selectedAccountId, serverQuery, stoppedOnly])
+  const scenarioList = useOffsetServerList<ScenarioWithCount>({
+    requestKey: JSON.stringify({
+      ready: !accountLoading,
+      accountId: selectedAccountId ?? '',
+      query: serverQuery,
+      stoppedOnly,
+      createdThisMonthOnly,
+      folderFilter,
+    }),
+    load: loadScenarioPage,
+  })
+  const scenarios = scenarioList.items
+  const loadScenarios = scenarioList.retry
 
   /**
    * シナリオを作って、配信方式の選択へ送る。
@@ -281,13 +285,10 @@ export default function ScenariosPage() {
    */
   const handleReorder = async (ids: string[]) => {
     setActionError('')
-    const rank = new Map(ids.map((id, i) => [id, i]))
-    setScenarios((prev) =>
-      [...prev].sort((a, b) => (rank.get(a.id) ?? 1e9) - (rank.get(b.id) ?? 1e9)),
-    )
     try {
       const res = await api.scenarios.reorder(ids)
       if (!res.success) throw new Error(res.error)
+      void loadScenarios()
     } catch {
       setActionError('並び順を保存できませんでした。最新の並び順を読み直しました。')
       void loadScenarios()
@@ -440,15 +441,7 @@ export default function ScenariosPage() {
 
       {/* 一覧本体（設計 `Body`）。 */}
       <div data-design="Body">
-      {/*
-        「フォルダを追加」と「＋ シナリオを作成」は、設計では KPI の下・
-        フォルダ欄と表の上に置く。見出しの操作欄に入れていたので、
-        絵と位置が違っていた。
-      */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Button onClick={() => setFolderDialogOpen(true)}>
-          フォルダを追加
-        </Button>
         <button
           onClick={() => void handleCreate()}
           disabled={creating}
@@ -462,11 +455,12 @@ export default function ScenariosPage() {
         いないので（列が無い）、いまは「すべて」だけ。分類できるように
         なったらここに並ぶ。
       */}
-      <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+      <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
-          total={`${scenarios.length} 件`}
+          total={`${scenarioList.total} 件`}
           activeId={folderFilter}
           onSelect={setFolderFilter}
+          onAddFolder={() => setFolderDialogOpen(true)}
           rows={[
             { id: '', label: 'すべて', count: scenarios.length },
             ...folders.map((f) => ({
@@ -553,9 +547,9 @@ export default function ScenariosPage() {
         </div>
       )}
 
-      {loadStatus === 'loading' ? (
+      {scenarioList.loading && scenarios.length === 0 ? (
         <ListState kind="loading" title="読み込んでいます" />
-      ) : loadStatus === 'error' ? (
+      ) : scenarioList.error ? (
         <ListState
           kind="error"
           title="表示できませんでした"
@@ -564,21 +558,7 @@ export default function ScenariosPage() {
         />
       ) : (
         <ScenarioList
-          scenarios={scenarios
-            .filter((sc) =>
-              nameQuery.trim() === ''
-                ? true
-                : sc.name.toLowerCase().includes(nameQuery.trim().toLowerCase()),
-            )
-            .filter((sc) => (stoppedOnly ? !sc.isActive : true))
-            .filter((sc) => (createdThisMonthOnly ? isCreatedThisMonth(sc.createdAt) : true))
-            .filter((sc) =>
-              folderFilter === ''
-                ? true
-                : folderFilter === UNFILED
-                  ? !sc.folderId
-                  : sc.folderId === folderFilter,
-            )}
+          scenarios={scenarios}
           onReorder={handleReorder}
           folders={folders}
           onMoveFolder={handleMoveFolder}
@@ -587,6 +567,17 @@ export default function ScenariosPage() {
           onCreate={() => void handleCreate()}
         />
       )}
+      {scenarioList.pageCount > 1 ? (
+        <div className="mt-4 flex items-center justify-end gap-3 text-sm">
+          <Button disabled={scenarioList.page <= 1 || scenarioList.loading} onClick={() => scenarioList.setPage(scenarioList.page - 1)}>
+            前へ
+          </Button>
+          <span className="text-ink-secondary">{scenarioList.page} / {scenarioList.pageCount}ページ</span>
+          <Button disabled={scenarioList.page >= scenarioList.pageCount || scenarioList.loading} onClick={() => scenarioList.setPage(scenarioList.page + 1)}>
+            次へ
+          </Button>
+        </div>
+      ) : null}
         </div>
       </div>
       </div>

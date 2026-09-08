@@ -2663,6 +2663,49 @@ export type RichMenuTapStats = {
   total: number
 }
 
+export type RichMenuGroupListItem = {
+  id: string
+  accountId: string
+  name: string
+  chatBarText: string
+  size: 'large' | 'compact'
+  defaultPageId: string | null
+  isDefaultForAll: boolean
+  status: 'draft' | 'published'
+  publishingAt: string | null
+  targetingCondition: string | null
+  targetingPriority: number
+  targetingEnabled: boolean
+  folderId: string | null
+  displayOrder: number
+  thumbnailR2Key: string | null
+  monthlyStats?: {
+    from: string
+    to: string
+    taps: number
+    uniqueAudience: {
+      value: number | null
+      state: 'available' | 'partial' | 'unavailable'
+      reason: 'preexisting_assignments_not_backfilled' | null
+    }
+  }
+  createdAt: string
+  updatedAt: string
+}
+
+export type RichMenuGroupListPage = {
+  items: RichMenuGroupListItem[]
+  total: number
+  limit: number
+  sort: Array<{ field: string; direction: 'asc' | 'desc' }>
+  facets?: {
+    total: number
+    published: number
+    targeting: number
+    folderCounts: Record<string, number>
+  }
+}
+
 /** 保存するときに送るボタン1つぶん。 */
 export type RichMenuAreaPayload = {
   /** 既存ボタンの id。渡すと引き継がれる（押された回数の集計が途切れない）。 */
@@ -2772,10 +2815,10 @@ export type ScenarioSimulation = {
   }>
 }
 
-export type ScenarioUnavailableMetric = {
-  value: null
-  state: 'unavailable'
-  reason: string
+export type ScenarioMeasuredMetric = {
+  value: number | null
+  state: 'available' | 'unavailable'
+  reason?: string
 }
 
 /** 購読・テスト送信・送信枠・通別結果をまとめた機能5 V6の読取結果。 */
@@ -2813,9 +2856,9 @@ export type ScenarioRuns = {
     id: string
     stepOrder: number
     delivered: number
-    opened: ScenarioUnavailableMetric
-    clicked: ScenarioUnavailableMetric
-    failed: ScenarioUnavailableMetric
+    opened: ScenarioMeasuredMetric
+    clicked: ScenarioMeasuredMetric
+    failed: ScenarioMeasuredMetric
   }>
 }
 
@@ -3126,6 +3169,7 @@ export type EcActionExecution = {
   receivedAt: string
   orderNumber: string | null
   customerName: string | null
+  friendId: string | null
   retryAvailable: boolean
 }
 
@@ -3246,7 +3290,8 @@ export type EcNotificationRun = {
   friendId: string | null
   friendName: string | null
   orderNumber: string | null
-  channel: 'line' | 'email'
+  /** 実応答は migration 304 の CHECK どおり 'in_app' も返す。 */
+  channel: 'line' | 'email' | 'in_app'
   status: 'pending' | 'accepted' | 'excluded' | 'failed'
   reason: string | null
   receivedAt: string
@@ -3255,7 +3300,8 @@ export type EcNotificationRun = {
   nextRetryAt: string | null
   clickedAt: string | null
   version: number | null
-  executionMode: 'automatic' | 'manual'
+  /** 実応答は 'retry' / 'resend' / 'test' も返す。想定外値はそのまま扱う。 */
+  executionMode: 'automatic' | 'manual' | 'retry' | 'resend' | 'test'
   retryAvailable: boolean
   recordVersion: number
   providerStatus: string | null
@@ -4910,7 +4956,7 @@ export const api = {
   /** サイトスクリプト。自社サイトの行動を友だちに紐づける。 */
   siteTracking: {
     /** 計測が動いているかと、その内訳 */
-    summary: () =>
+    summary: (accountId?: string) =>
       fetchApi<
         ApiResponse<{
           todayEvents: number
@@ -4921,9 +4967,9 @@ export const api = {
           eventTypeCount: number
           lastEventAt: string | null
         }>
-      >('/api/site/summary'),
-    pages: (params?: { from?: string; to?: string }) =>
-      fetchApi<ApiResponse<Array<{ path: string; views: number; visitors: number }>>>(
+      >(`/api/site/summary${rangeQuery({ accountId })}`),
+    pages: (params?: { from?: string; to?: string; accountId?: string }) =>
+      fetchApi<ApiResponse<Array<{ host: string | null; path: string; views: number; visitors: number }>>>(
         `/api/site/pages${rangeQuery(params)}`,
       ),
     /**
@@ -4943,6 +4989,7 @@ export const api = {
           Array<{
             id: string
             eventType: string
+            host: string | null
             path: string | null
             label: string | null
             occurredAt: string
@@ -5205,19 +5252,54 @@ export const api = {
       fetchApi<ApiResponse<null>>(`/api/tag-groups/${id}`, { method: 'DELETE' }),
   },
   scenarios: {
-    list: (params?: { accountId?: string }) => {
-      const query = params?.accountId ? '?lineAccountId=' + params.accountId : ''
+    listPage: (params?: {
+      accountId?: string
+      page?: number
+      limit?: number
+      query?: string
+      active?: 0 | 1
+      createdFrom?: string
+      folderId?: string
+    }, signal?: AbortSignal) => {
+      const query = new URLSearchParams()
+      if (params?.accountId) query.set('lineAccountId', params.accountId)
+      if (params?.page !== undefined) query.set('page', String(params.page))
+      if (params?.limit !== undefined) query.set('limit', String(params.limit))
+      if (params?.query) query.set('query', params.query)
+      if (params?.active !== undefined) query.set('active', String(params.active))
+      if (params?.createdFrom) query.set('createdFrom', params.createdFrom)
+      if (params?.folderId) query.set('folderId', params.folderId)
       return fetchApi<
         ApiResponse<
-          (Scenario & {
-            stepCount?: number
-            /** いま流れている人 */
-            subscriberCount?: number
-            /** 最後まで届いた人 */
-            completedCount?: number
-          })[]
+          {
+            items: (Scenario & {
+              stepCount?: number
+              /** いま流れている人 */
+              subscriberCount?: number
+              /** 最後まで届いた人 */
+              completedCount?: number
+            })[]
+            total: number
+            limit: number
+            sort: Array<{ field: string; direction: 'asc' | 'desc' }>
+          }
         >
-      >('/api/scenarios' + query)
+      >(`/api/scenarios${query.size ? `?${query}` : ''}`, { signal })
+    },
+    /** 選択肢など既存の全件利用は配列のまま読み替える。新しい一覧画面は listPage を使う。 */
+    list: async (params?: { accountId?: string; limit?: number }) => {
+      const query = new URLSearchParams()
+      if (params?.accountId) query.set('lineAccountId', params.accountId)
+      query.set('limit', String(params?.limit ?? 200))
+      const response = await fetchApi<ApiResponse<{
+        items: (Scenario & { stepCount?: number; subscriberCount?: number; completedCount?: number })[]
+        total: number
+        limit: number
+        sort: Array<{ field: string; direction: 'asc' | 'desc' }>
+      }>>(`/api/scenarios?${query}`)
+      return response.success
+        ? { success: true as const, data: response.data.items }
+        : response
     },
     get: (id: string) =>
       fetchApi<ApiResponse<Scenario & { steps: ScenarioStep[] }>>(`/api/scenarios/${id}`),
@@ -5573,7 +5655,19 @@ export const api = {
     testSend: (id: string) =>
       fetchApi<{ success: boolean; sent?: number; failed?: number; error?: string }>(`/api/broadcasts/${id}/test-send`, { method: 'POST' }),
     getProgress: (id: string) =>
-      fetchApi<{ success: boolean; data?: { status: string; totalCount: number; successCount: number; batchOffset: number } }>(`/api/broadcasts/${id}/progress`),
+      fetchApi<{ success: boolean; data?: {
+        status: string
+        totalCount: number
+        successCount: number
+        batchOffset: number
+        perAccountStats: Array<{
+          accountId: string
+          accountName: string
+          sent: number
+          uniqueImpression: number | null
+          uniqueClick: number | null
+        }>
+      } }>(`/api/broadcasts/${id}/progress`),
     previewCount: (id: string) =>
       fetchApi<{
         success: boolean;
@@ -6989,10 +7083,11 @@ export const api = {
         `/api/ec-commerce/orders?${query}`,
       )
     },
-    actionExecutions: (params: { lineAccountId: string; eventId?: string; status?: EcActionExecutionStatus; limit?: number; offset?: number }) => {
+    actionExecutions: (params: { lineAccountId: string; eventId?: string; status?: EcActionExecutionStatus; statusGroup?: 'processing' | 'failed'; limit?: number; offset?: number }) => {
       const query = new URLSearchParams({ lineAccountId: params.lineAccountId })
       if (params.eventId) query.set('eventId', params.eventId)
       if (params.status) query.set('status', params.status)
+      if (params.statusGroup) query.set('statusGroup', params.statusGroup)
       if (params.limit !== undefined) query.set('limit', String(params.limit))
       if (params.offset !== undefined) query.set('offset', String(params.offset))
       return fetchApi<ApiResponse<EcActionExecutionList> & { pagination: { total: number; limit: number; offset: number } }>(
@@ -7053,10 +7148,10 @@ export const api = {
         `/api/ec-commerce/notification-runs?${query}`,
       )
     },
-    settings: () =>
-      fetchApi<ApiResponse<EcNotificationSetting[]>>('/api/ec-commerce/settings'),
-    updateSetting: (eventType: string, data: { isEnabled: boolean; title: string; introText: string; outroText: string; buttonLabel: string; buttonUrl: string; imageUrl: string }) =>
-      fetchApi<{ success: boolean }>(`/api/ec-commerce/settings/${encodeURIComponent(eventType)}`, {
+    settings: (lineAccountId: string) =>
+      fetchApi<ApiResponse<EcNotificationSetting[]>>(`/api/ec-commerce/settings?lineAccountId=${encodeURIComponent(lineAccountId)}`),
+    updateSetting: (lineAccountId: string, eventType: string, data: { isEnabled: boolean; title: string; introText: string; outroText: string; buttonLabel: string; buttonUrl: string; imageUrl: string }) =>
+      fetchApi<{ success: boolean }>(`/api/ec-commerce/settings/${encodeURIComponent(eventType)}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
@@ -8087,8 +8182,11 @@ export const api = {
       fetchApi<ApiResponse<{ loginCount: number }>>(`/api/staff/${id}/login-summary`),
     delete: (id: string) =>
       fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}`, { method: 'DELETE' }),
-    regenerateKey: (id: string) =>
-      fetchApi<ApiResponse<{ apiKey: string }>>(`/api/staff/${id}/regenerate-key`, { method: 'POST' }),
+    acceptInvitation: (token: string) =>
+      fetchApi<ApiResponse<{ status: 'pending_line' }>>('/api/staff/invitations/confirm/verify', {
+        method: 'POST',
+        body: JSON.stringify({ token }),
+      }),
     beginTwoFactorSetup: (id: string) =>
       fetchApi<ApiResponse<{ provisioningUri: string; manualKey: string }>>(`/api/staff/${id}/two-factor/setup`, { method: 'POST' }),
     confirmTwoFactorSetup: (id: string, code: string) =>
@@ -8183,38 +8281,31 @@ export const api = {
     },
   },
   richMenuGroups: {
-    list: (accountId: string) =>
-      fetchApi<ApiResponse<Array<{
-        id: string;
-        accountId: string;
-        name: string;
-        chatBarText: string;
-        size: 'large' | 'compact';
-        defaultPageId: string | null;
-        isDefaultForAll: boolean;
-        status: 'draft' | 'published';
-        publishingAt: string | null;
-        targetingCondition: string | null;
-        targetingPriority: number;
-        targetingEnabled: boolean;
-        /** 159: フォルダ。分けていなければ null。 */
-        folderId: string | null;
-        /** 160: 自分で決める並び順。 */
-        displayOrder: number;
-        thumbnailR2Key: string | null;
-        monthlyStats?: {
-          from: string;
-          to: string;
-          taps: number;
-          uniqueAudience: {
-            value: number | null;
-            state: 'available' | 'partial' | 'unavailable';
-            reason: 'preexisting_assignments_not_backfilled' | null;
-          };
-        };
-        createdAt: string;
-        updatedAt: string;
-      }>>>(`/api/rich-menu-groups?accountId=${encodeURIComponent(accountId)}`),
+    listPage: (accountId: string, input: {
+      page?: number
+      limit?: number
+      query?: string
+      folderId?: string
+      filter?: string
+      sort?: 'priority' | 'taps' | 'updated' | 'name'
+    } = {}) => {
+      const query = new URLSearchParams({ accountId })
+      query.set('page', String(input.page ?? 1))
+      query.set('limit', String(input.limit ?? 50))
+      if (input.query) query.set('query', input.query)
+      if (input.folderId) query.set('folderId', input.folderId)
+      if (input.filter) query.set('filter', input.filter)
+      if (input.sort && input.sort !== 'priority') query.set('sort', input.sort)
+      return fetchApi<ApiResponse<RichMenuGroupListPage>>(`/api/rich-menu-groups?${query}`)
+    },
+    list: async (accountId: string): Promise<ApiResponse<RichMenuGroupListItem[]>> => {
+      const response = await fetchApi<ApiResponse<RichMenuGroupListPage>>(
+        `/api/rich-menu-groups?accountId=${encodeURIComponent(accountId)}&page=1&limit=200`,
+      )
+      return response.success
+        ? { success: true, data: response.data.items }
+        : response
+    },
 
     get: (groupId: string) =>
       fetchApi<ApiResponse<{
@@ -8524,6 +8615,10 @@ export const api = {
   },
   pools: {
     list: () => fetchApi<ApiResponse<TrafficPool[]>>('/api/traffic-pools'),
+    listAccounts: (ids: string[]) =>
+      fetchApi<ApiResponse<Array<{ poolId: string; accounts: PoolAccount[] }>>>(
+        `/api/traffic-pools/accounts?ids=${encodeURIComponent(ids.join(','))}`,
+      ),
     get: (id: string) => fetchApi<ApiResponse<TrafficPool>>(`/api/traffic-pools/${id}`),
     create: (data: { slug: string; name: string; activeAccountId: string }) =>
       fetchApi<ApiResponse<TrafficPool>>('/api/traffic-pools', {
@@ -8814,6 +8909,20 @@ export const api = {
   adPlatforms: {
     list: () =>
       fetchApi<ApiResponse<AdPlatform[]>>('/api/ad-platforms'),
+    logsPage: (params?: { page?: number; limit?: number; status?: string; query?: string }) => {
+      const query = new URLSearchParams()
+      query.set('page', String(params?.page ?? 1))
+      query.set('limit', String(params?.limit ?? 20))
+      if (params?.status && params.status !== 'all') query.set('status', params.status)
+      if (params?.query?.trim()) query.set('query', params.query.trim())
+      return fetchApi<ApiResponse<{
+        items: AdConversionLog[]
+        total: number
+        page: number
+        limit: number
+        sort: Array<{ field: string; direction: 'asc' | 'desc' }>
+      }>>(`/api/ad-platforms/logs?${query.toString()}`)
+    },
     logs: (id: string, limit = 20) =>
       fetchApi<ApiResponse<AdConversionLog[]>>(`/api/ad-platforms/${id}/logs?limit=${limit}`),
   },

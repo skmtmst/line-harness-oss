@@ -227,6 +227,47 @@ describe('V6 LINE notification APIs', () => {
     expect(body.data.versions[1].config.lineTemplate[0].text).toBe('発送しました');
   });
 
+  it('顧客通知の見出し80文字・本文800文字・https URLをサーバー側でも検証する', async () => {
+    const tooLongTitle = await app(testDb.db).request(
+      '/api/line-notifications/customer-definitions',
+      json('POST', {
+        lineAccountId: 'account-1', key: 'shipping', name: '発送のお知らせ',
+        category: 'shipping', sourceEventType: 'ec.order.shipped',
+        draft: { title: '長'.repeat(81), lineTemplate: [{ type: 'text', text: '発送しました' }] },
+      }),
+    );
+    expect(tooLongTitle.status).toBe(400);
+
+    const tooLongBody = await app(testDb.db).request(
+      '/api/line-notifications/customer-definitions',
+      json('POST', {
+        lineAccountId: 'account-1', key: 'shipping', name: '発送のお知らせ',
+        category: 'shipping', sourceEventType: 'ec.order.shipped',
+        draft: { introText: '本'.repeat(801), lineTemplate: [{ type: 'text', text: '発送しました' }] },
+      }),
+    );
+    expect(tooLongBody.status).toBe(400);
+
+    const unsafeUrl = await app(testDb.db).request(
+      '/api/line-notifications/customer-definitions',
+      json('POST', {
+        lineAccountId: 'account-1', key: 'shipping', name: '発送のお知らせ',
+        category: 'shipping', sourceEventType: 'ec.order.shipped',
+        draft: { buttonUrl: 'http://example.com/order', lineTemplate: [{ type: 'text', text: '発送しました' }] },
+      }),
+    );
+    expect(unsafeUrl.status).toBe(400);
+
+    seedDefinition(testDb);
+    testDb.raw.prepare(`UPDATE customer_notification_definitions SET draft_config_json = ? WHERE id = 'definition-1'`)
+      .run(JSON.stringify({ title: '長'.repeat(81), lineTemplate: [{ type: 'text', text: '注文を受け付けました' }] }));
+    const publishLegacyDraft = await app(testDb.db).request(
+      '/api/line-notifications/customer-definitions/definition-1/publish',
+      json('POST', { lineAccountId: 'account-1', expectedVersion: 1 }),
+    );
+    expect(publishLegacyDraft.status).toBe(400);
+  });
+
   it('一時失敗だけを同じ retry key で再試行し、版違いの二重操作を409にする', async () => {
     seedDefinition(testDb);
     seedDelivery(testDb, 'delivery-retry', 'retry_wait', { retryable: 1 });
@@ -293,11 +334,52 @@ describe('V6 LINE notification APIs', () => {
       data: {
         items: [{
           accepted: { value: 12 },
-          displayed: { state: 'unavailable_privacy', value: null, reason: expect.any(String) },
+          displayed: { state: 'unavailable', value: null, reason: expect.any(String) },
           clicked: { value: 2 },
         }],
         coverage: { individualOpenAvailable: false, lineAggregateOnly: true, unavailableIsNull: true },
       },
+    });
+  });
+
+  it('中1: 集計待ちはpendingに寄せて返し、DBの生値は出さない', async () => {
+    seedDefinition(testDb);
+    testDb.raw.prepare(`
+      INSERT INTO notification_aggregate_metrics
+        (id, line_account_id, definition_id, metric_date, aggregation_unit,
+         accepted_count, display_count, click_count, state, reason, updated_at)
+      VALUES ('metric-waiting', 'account-1', 'definition-1', '2026-09-07', 'order_20260907',
+              5, NULL, 0, 'waiting', '集計中です', '2026-09-07T12:00:00+09:00')
+    `).run();
+    const response = await app(testDb.db).request(
+      '/api/line-notifications/metrics?lineAccountId=account-1&from=2026-09-01&to=2026-09-07',
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        items: [{ displayed: { state: 'pending', value: null } }],
+      },
+    });
+  });
+
+  it('中2: 記録の実行モードは実応答のまま返す', async () => {
+    seedDefinition(testDb);
+    seedDelivery(testDb, 'delivery-mode', 'retry_wait', { retryable: 1 });
+    const retried = await app(testDb.db).request(
+      '/api/line-notifications/deliveries/delivery-mode/retry',
+      json('POST', { lineAccountId: 'account-1', expectedVersion: 1 }),
+    );
+    expect(retried.status).toBe(200);
+    const listed = await app(testDb.db).request(
+      '/api/line-notifications/deliveries?lineAccountId=account-1&view=all&limit=20&offset=0',
+    );
+    expect(listed.status).toBe(200);
+    const body = await listed.json() as {
+      data: { items: Array<{ id: string; executionMode: string; channel: string }> };
+    };
+    expect(body.data.items.find((item) => item.id === 'delivery-mode')).toMatchObject({
+      executionMode: 'retry',
+      channel: 'line',
     });
   });
 });

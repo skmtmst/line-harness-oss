@@ -1613,6 +1613,7 @@ liffRoutes.get('/api/analytics/ref/:refCode', requireRole('owner', 'admin', 'sta
           f.id,
           f.display_name,
           f.ref_code,
+          f.is_following,
           rt.created_at as tracked_at
         FROM friends f
         LEFT JOIN ref_tracking rt ON f.id = rt.friend_id AND rt.ref_code = ?
@@ -1624,6 +1625,7 @@ liffRoutes.get('/api/analytics/ref/:refCode', requireRole('owner', 'admin', 'sta
         id: string;
         display_name: string;
         ref_code: string | null;
+        is_following: number | null;
         tracked_at: string | null;
       }>();
 
@@ -1632,10 +1634,14 @@ liffRoutes.get('/api/analytics/ref/:refCode', requireRole('owner', 'admin', 'sta
       data: {
         refCode: routeRow?.ref_code ?? refCode,
         name: routeRow?.name ?? null,
+        // #514-8: 画面が読む欄のうち口が返せるのはいまの状態だけ
+        // (is_following を運用文言に寄せる)。はじめて見たページ・成果・
+        // マイルの集計口は無いので返さず、画面は「—」にする。
         friends: (friends.results ?? []).map((f) => ({
           id: f.id,
           displayName: f.display_name,
           trackedAt: f.tracked_at,
+          currentStatus: f.is_following === 0 ? 'ブロック済み' : '友だち中',
         })),
       },
     });

@@ -4,6 +4,7 @@ import { addDays, resolveShipDate, toJstMoment } from '@line-crm/shared';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { requireEcPermission } from './ec-operations.js';
 import { logOutgoingMessage } from '../services/event-bus.js';
 import { EC_EVENT_TYPES, type EcEvent } from './ec-integrations.js';
 import { ecFlexMessage } from '../services/ec-notification-message.js';
@@ -12,6 +13,11 @@ import { auditLog } from '../lib/audit-log.js';
 import { notificationDeliveriesResponse } from './line-notifications.js';
 
 const ecCommerce = new Hono<Env>();
+// テスト送信の連打防止。同一の店・種別は30秒に1回だけ。全体の rateLimit とは
+// 別に、LINE API へ直接届く口だけ短いクールダウンを置く。
+// in-memory のため isolate ごとに数え直し、厳密な回数制限ではない（連打の抑止用）。
+const TEST_SEND_COOLDOWN_MS = 30_000;
+const testSendAt = new Map<string, number>();
 const EVENT_TYPE_SET = new Set<string>(EC_EVENT_TYPES);
 const STATUS_SET = new Set(['received', 'identity_pending', 'processing', 'processed', 'skipped', 'failed']);
 const CONNECTOR_PROVIDERS = new Set(['ec_cube', 'shopify']);
@@ -136,7 +142,11 @@ function testEvent(eventType: string): EcEvent {
   return base;
 }
 
-ecCommerce.get('/api/ec-commerce/overview', async (c) => {
+ecCommerce.get(
+  '/api/ec-commerce/overview',
+  requireRole('owner', 'admin', 'staff'),
+  requireEcPermission('ec.event.view'),
+  async (c) => {
   const lineAccountId = c.req.query('lineAccountId')?.trim();
   if (lineAccountId && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
@@ -524,12 +534,29 @@ ecCommerce.get(
   notificationDeliveriesResponse,
 );
 
-ecCommerce.get('/api/ec-commerce/settings', async (c) => {
+ecCommerce.get('/api/ec-commerce/settings', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const lineAccountId = c.req.query('lineAccountId')?.trim();
+  if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+  }
   const rows = await c.env.DB.prepare(
-    `SELECT event_type, is_enabled, title_override, intro_text, outro_text,
-            category, button_label, button_url, image_url, display_order, updated_at
-       FROM ec_notification_settings ORDER BY display_order, rowid`,
-  ).all<{
+    `SELECT s.event_type,
+            COALESCE(a.is_enabled, s.is_enabled) AS is_enabled,
+            CASE WHEN a.line_account_id IS NULL THEN s.title_override ELSE a.title_override END AS title_override,
+            CASE WHEN a.line_account_id IS NULL THEN s.intro_text ELSE a.intro_text END AS intro_text,
+            CASE WHEN a.line_account_id IS NULL THEN s.outro_text ELSE a.outro_text END AS outro_text,
+            s.category,
+            CASE WHEN a.line_account_id IS NULL THEN s.button_label ELSE a.button_label END AS button_label,
+            CASE WHEN a.line_account_id IS NULL THEN s.button_url ELSE a.button_url END AS button_url,
+            CASE WHEN a.line_account_id IS NULL THEN s.image_url ELSE a.image_url END AS image_url,
+            s.display_order,
+            COALESCE(a.updated_at, s.updated_at) AS updated_at
+       FROM ec_notification_settings s
+       LEFT JOIN ec_notification_account_settings a
+         ON a.event_type = s.event_type AND a.line_account_id = ?
+      ORDER BY s.display_order, s.rowid`,
+  ).bind(lineAccountId).all<{
     event_type: string; is_enabled: number; title_override: string | null;
     intro_text: string | null; outro_text: string | null; category: string;
     button_label: string | null; button_url: string | null; image_url: string | null;
@@ -564,6 +591,11 @@ ecCommerce.get('/api/ec-commerce/settings', async (c) => {
 ecCommerce.put('/api/ec-commerce/settings/:eventType', requireRole('owner', 'admin'), async (c) => {
   const eventType = c.req.param('eventType');
   if (!EVENT_TYPE_SET.has(eventType)) return c.json({ success: false, error: 'Invalid eventType' }, 400);
+  const lineAccountId = c.req.query('lineAccountId')?.trim();
+  if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+  }
   const body = await c.req.json<{
     isEnabled?: unknown; title?: unknown; introText?: unknown; outroText?: unknown;
     buttonLabel?: unknown; buttonUrl?: unknown; imageUrl?: unknown;
@@ -589,16 +621,16 @@ ecCommerce.put('/api/ec-commerce/settings/:eventType', requireRole('owner', 'adm
   }
   const now = jstNow();
   await c.env.DB.prepare(
-    `INSERT INTO ec_notification_settings
-       (event_type, is_enabled, title_override, intro_text, outro_text,
+    `INSERT INTO ec_notification_account_settings
+       (line_account_id, event_type, is_enabled, title_override, intro_text, outro_text,
         button_label, button_url, image_url, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(event_type) DO UPDATE SET is_enabled = excluded.is_enabled,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(line_account_id, event_type) DO UPDATE SET is_enabled = excluded.is_enabled,
        title_override = excluded.title_override, intro_text = excluded.intro_text,
        outro_text = excluded.outro_text, button_label = excluded.button_label,
        button_url = excluded.button_url, image_url = excluded.image_url,
        updated_at = excluded.updated_at`,
-  ).bind(eventType, body.isEnabled ? 1 : 0, title, introText, outroText,
+  ).bind(lineAccountId, eventType, body.isEnabled ? 1 : 0, title, introText, outroText,
     buttonLabel || null, buttonUrl || null, imageUrl || null, now, now).run();
   return c.json({ success: true });
 });
@@ -629,6 +661,16 @@ ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), asy
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
+  const cooldownKey = `${body.accountId}:${body.eventType}`;
+  const lastSent = testSendAt.get(cooldownKey) ?? 0;
+  const waitMs = lastSent + TEST_SEND_COOLDOWN_MS - Date.now();
+  if (waitMs > 0) {
+    return c.json({
+      success: false,
+      error: `テスト送信は${Math.ceil(waitMs / 1000)}秒待ってからもう一度お試しください`,
+    }, 429);
+  }
+  testSendAt.set(cooldownKey, Date.now());
   const account = await getLineAccountById(c.env.DB, body.accountId);
   if (!account?.channel_access_token) return c.json({ success: false, error: 'LINE account is not configured' }, 400);
 

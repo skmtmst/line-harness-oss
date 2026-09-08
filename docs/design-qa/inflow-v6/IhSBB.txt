@@ -19,7 +19,6 @@ Ver. 2.6.4
 リマインダ
 自動応答
 友だち追加時の配信
-ウェビナー
 
 コンテンツ
 
@@ -31,10 +30,8 @@ Ver. 2.6.4
 
 成果と分析
 
-成果とアフィリエイト
 マイル
 流入と計測
-コンバージョン
 分析
 
 自動化
@@ -97,7 +94,7 @@ Kenta Kawano
 
 あなたのアカウントで使うコード
 
-<script async src="http://127.0.0.1:8789/api/site/script.js" data-key="hk_d1ef89e503d398ce9e0931984858ebc1"></script>
+<script async src="http://127.0.0.1:8809/api/site/script.js" data-key="hk_d1ef89e503d398ce9e0931984858ebc1"></script>
 コピー
 貼るとできるようになること
 どのページを見て来たか
@@ -114,13 +111,13 @@ Kenta Kawano
 
 いま届いているページ
 
-知らないドメインが並んでいたら、コードが別のサイトにコピーされています。
+コードを貼ったページの届き具合です。
 
-ドメイン	この30日のページ表示	友だち追加	状態
-example.com	12,480	186人	許可しています
-shop.example.com	8,120	94人	許可しています
-lp.example.com	2,403	2人	許可しています
-unknown-site.net	620	0人	知らないドメインです
+サイト	ページ	この30日のページ表示	友だち追加
+shop.example.com	/	12,480	186人
+shop.example.com	/shop/	8,120	94人
+campaign.example.com	/lp/summer/	2,403	2人
+以前の記録	/blog/old-page/	620	0人
 貼りかたが分からないときは
 WordPress をお使いなら
 テーマの header.php か、コードを貼るプラグインに入れます
@@ -139,4 +136,3 @@ Shopify をお使いなら
 3. 結びつかない場合 個人を推測せず経路不明として数えます。
 気をつけること
 個人が特定できる情報は送りません
-知らないドメインが1つあります

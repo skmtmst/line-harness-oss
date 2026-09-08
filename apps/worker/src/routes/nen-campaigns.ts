@@ -42,7 +42,7 @@ import {
   retryNenDelivery,
 } from '../services/nen-campaign-metrics.js';
 import { auditLog } from '../lib/audit-log.js';
-import { listLimit } from './list-pagination.js';
+import { listLimit, listOffset } from './list-pagination.js';
 
 const nenCampaigns = new Hono<Env>();
 const CAMPAIGN_KEYS = new Set([
@@ -130,7 +130,7 @@ nenCampaigns.get('/api/nen-campaigns/overview', async (c) => {
     Promise.all([...CAMPAIGN_KEYS].map((key) => getNenCampaign(c.env.DB, key, accountId))),
     c.env.DB.prepare(
       `SELECT COUNT(*) AS total,
-              SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
+              SUM(CASE WHEN status = 'pending' AND datetime(scheduled_at) > datetime('now') THEN 1 ELSE 0 END) AS pending,
               SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) AS sent,
               SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed
          FROM nen_delivery_jobs WHERE line_account_id = ?`,
@@ -143,6 +143,8 @@ nenCampaigns.get('/api/nen-campaigns/overview', async (c) => {
       `SELECT COUNT(*) AS count FROM nen_coupon_issues c JOIN friends f ON f.id = c.friend_id WHERE f.line_account_id = ?`,
     ).bind(accountId).first<{ count: number }>(),
   ]);
+  // jobs.pending は「これから送る未来ぶん」の件数。pending-now 口の数え方と
+  // 同じ決めごとにする(点検 #512 の中2)。一覧の窓付き集計とは別物。
   return c.json({ success: true, data: {
     activeCampaigns: settings.filter((setting) => setting?.is_enabled === 1).length,
     jobs: { total: jobs?.total ?? 0, pending: jobs?.pending ?? 0, sent: jobs?.sent ?? 0, failed: jobs?.failed ?? 0 },
@@ -369,9 +371,16 @@ nenCampaigns.post('/api/nen-campaigns/deliveries/:id/retry', requireRole('owner'
 nenCampaigns.get('/api/nen-campaigns/columns', async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
+  // 件数制限なしの全件取得は件数が増えると重い(点検 #512 の中6)。上限200・page送り付き。
+  const limit = listLimit(c.req.query('limit'), 200);
+  const offset = listOffset(c.req.query('offset'));
+  const totalRow = await c.env.DB.prepare(
+    `SELECT COUNT(*) AS total FROM nen_columns WHERE line_account_id = ?`,
+  ).bind(accountId).first<{ total: number }>();
+  const total = Number(totalRow?.total ?? 0);
   const rows = await c.env.DB.prepare(
-    `SELECT * FROM nen_columns WHERE line_account_id = ? ORDER BY published_at DESC, created_at DESC`,
-  ).bind(accountId).all<Record<string, unknown>>();
+    `SELECT * FROM nen_columns WHERE line_account_id = ? ORDER BY published_at DESC, created_at DESC LIMIT ? OFFSET ?`,
+  ).bind(accountId, limit, offset).all<Record<string, unknown>>();
   return c.json({ success: true, data: rows.results.map((row) => ({
     id: row.id, externalId: row.external_id, slug: row.slug, title: row.title, category: row.category,
     excerpt: row.excerpt, introText: typeof row.intro_text === 'string' && row.intro_text.trim()
@@ -383,7 +392,9 @@ nenCampaigns.get('/api/nen-campaigns/columns', async (c) => {
     targetMode: row.target_mode === 'tag' ? 'tag' : 'all', targetTagId: row.target_tag_id ?? null,
     completionEventName: row.completion_event_name ?? null, completionTagId: row.completion_tag_id ?? null,
     sourceColumnId: row.source_column_id ?? null,
-  })) });
+  })),
+  pagination: { total, limit, offset },
+  });
 });
 
 nenCampaigns.get('/api/nen-campaigns/columns-preview', requireRole('owner', 'admin', 'staff'), async (c) => {

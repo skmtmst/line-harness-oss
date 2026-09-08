@@ -5,6 +5,7 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
+import type { Folder } from '@line-crm/shared'
 import { Field, inputClass } from '@/components/shared/create-page'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -27,6 +28,8 @@ function TemplateEditInner() {
 
   const [name, setName] = useState(visual ? '定期便 初回のご案内' : '')
   const [category, setCategory] = useState(visual ? '01_定期便' : '')
+  const [folderId, setFolderId] = useState<string | null>(null)
+  const [folders, setFolders] = useState<Folder[]>([])
   const [messageType, setMessageType] = useState('text')
   const [messageContent, setMessageContent] = useState(
     visual
@@ -36,6 +39,17 @@ function TemplateEditInner() {
   const [loading, setLoading] = useState(Boolean(id))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // 読み込めていない本文のまま保存すると、空で上書きする危険がある。
+  const [loadFailed, setLoadFailed] = useState(false)
+
+  // 置き場の選択肢。category 文字列とは別に folderId で保存する。
+  useEffect(() => {
+    let cancelled = false
+    void api.folders.list('template').then((res) => {
+      if (!cancelled && res.success) setFolders(res.data)
+    })
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     if (!id) return
@@ -45,9 +59,17 @@ function TemplateEditInner() {
         if (res.success) {
           setName(res.data.name)
           setCategory(res.data.category ?? '')
+          setFolderId(res.data.folderId ?? null)
           setMessageType(res.data.messageType)
           setMessageContent(res.data.messageContent)
+        } else {
+          setLoadFailed(true)
+          setError('読み込めませんでした。開き直してください。')
         }
+      })
+      .catch(() => {
+        setLoadFailed(true)
+        setError('読み込めませんでした。開き直してください。')
       })
       .finally(() => setLoading(false))
   }, [id])
@@ -84,6 +106,10 @@ function TemplateEditInner() {
   const previewContent = messageContent.replaceAll('{{name}}', '山田 太郎')
 
   const save = async () => {
+    if (loadFailed) {
+      setError('読み込めませんでした。開き直してください。')
+      return
+    }
     if (!id && !selectedAccountId) {
       setError('上のバーでLINE公式アカウントを選んでください')
       return
@@ -100,13 +126,14 @@ function TemplateEditInner() {
     setError('')
     try {
       const res = id
-        ? await api.templates.update(id, { name: name.trim(), category, messageType, messageContent })
+        ? await api.templates.update(id, { name: name.trim(), category, messageType, messageContent, folderId })
         : await api.templates.create({
             accountId: selectedAccountId!,
             name: name.trim(),
             category,
             messageType,
             messageContent,
+            folderId,
           })
       if (!res.success) {
         setError(res.error)
@@ -158,6 +185,15 @@ function TemplateEditInner() {
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               className={inputClass}
+            />
+          </Field>
+
+          <Field label="置き場" htmlFor="tp-folder" note="フォルダで絞ると、ここで選んだ置き場に入ります。">
+            <SelectField
+              id="tp-folder"
+              value={folderId ?? ''}
+              onChange={(e) => setFolderId(e.target.value || null)}
+              options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
             />
           </Field>
 
@@ -272,7 +308,7 @@ function TemplateEditInner() {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={save}
-              disabled={saving}
+              disabled={saving || loadFailed}
               className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
             >
               {saving ? '保存中...' : '保存'}

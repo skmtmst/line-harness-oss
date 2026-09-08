@@ -10,8 +10,8 @@ import TestSendSection from '@/components/broadcasts/test-send-section'
 import ProgressBar from '@/components/broadcasts/progress-bar'
 import SendConfirmDialog from '@/components/broadcasts/send-confirm-dialog'
 import SegmentBuilder from '@/components/broadcasts/segment-builder'
-import type { Tag } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import { broadcastCsvFilename } from './broadcast-csv-filename'
 
 interface BroadcastDetailProps {
   broadcastId: string
@@ -48,7 +48,6 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
     uniqueImpression: number | null;
     uniqueClick: number | null;
   }> | null>(null)
-  const [tags, setTags] = useState<Tag[]>([])
   const [showSegmentBuilder, setShowSegmentBuilder] = useState(false)
 
   const load = useCallback(async () => {
@@ -61,10 +60,7 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
     setInsight(null)
     setTargetCount(null)
     try {
-      const [res, tagsRes] = await Promise.all([
-        api.broadcasts.get(id),
-        api.tags.list(),
-      ])
+      const res = await api.broadcasts.get(id)
       if (res.success && res.data) {
         setBroadcast(res.data)
         if (res.data.totalCount > 0) {
@@ -85,7 +81,6 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
       } else {
         setError('配信が見つかりません')
       }
-      if (tagsRes.success) setTags(tagsRes.data)
     } catch {
       setError('読み込みに失敗しました')
     } finally {
@@ -95,10 +90,11 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
 
   useEffect(() => { load() }, [load])
 
-  // Poll progress while sending
+  // 送信中は進捗とアカウント別内訳を同じ応答で読む。タブを隠した間は止める。
   useEffect(() => {
     if (broadcast?.status !== 'sending') return
-    const interval = setInterval(async () => {
+    let interval: ReturnType<typeof setInterval> | null = null
+    const poll = async () => {
       const res = await api.broadcasts.getProgress(id)
       if (res.success && res.data) {
         setBroadcast(prev => prev ? {
@@ -107,13 +103,28 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
           totalCount: res.data!.totalCount,
           successCount: res.data!.successCount,
         } : prev)
+        setPerAccountStats(res.data.perAccountStats)
         if (res.data.status === 'sent') {
-          clearInterval(interval)
+          if (interval) clearInterval(interval)
+          interval = null
           load()
         }
       }
-    }, 3000)
-    return () => clearInterval(interval)
+    }
+    const syncPolling = () => {
+      if (document.hidden) {
+        if (interval) clearInterval(interval)
+        interval = null
+        return
+      }
+      if (!interval) interval = setInterval(() => void poll(), 5000)
+    }
+    syncPolling()
+    document.addEventListener('visibilitychange', syncPolling)
+    return () => {
+      document.removeEventListener('visibilitychange', syncPolling)
+      if (interval) clearInterval(interval)
+    }
   }, [broadcast?.status, id, load])
 
   // Load insight for sent broadcasts
@@ -130,7 +141,7 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
   // each account token で fetch されるので時間かかる (3-5 秒/アカ) — fire-and-forget。
   useEffect(() => {
     const status = broadcast?.status
-    if (status !== 'sending' && status !== 'sent') return
+    if (status !== 'sent') return
 
     let cancelled = false
     const requestId = id
@@ -145,15 +156,6 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
 
     fetchStats()
 
-    // 送信中は 3s ごとに再 fetch して per-account 進捗を更新する。
-    // 既存の successCount poll と同期させる目的。送信完了 (sent) では再 fetch 不要。
-    if (status === 'sending') {
-      const interval = setInterval(fetchStats, 3000)
-      return () => {
-        cancelled = true
-        clearInterval(interval)
-      }
-    }
     return () => { cancelled = true }
   }, [broadcast?.status, id])
 
@@ -221,7 +223,7 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
       const url = URL.createObjectURL(new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `${broadcast.title}-配信結果.csv`
+      anchor.download = broadcastCsvFilename(broadcast.title, broadcast.id)
       anchor.click()
       URL.revokeObjectURL(url)
     }
@@ -404,10 +406,9 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
             </button>
           ) : (
             <SegmentBuilder
-              tags={tags}
-              accountId={accountId}
+              initialConditions={broadcast.segmentConditions}
               onApply={async (conditions) => {
-                await api.broadcasts.update(id, { segmentConditions: JSON.stringify(conditions) } as unknown as Parameters<typeof api.broadcasts.update>[1])
+                await api.broadcasts.update(id, { segmentConditions: conditions })
                 setShowSegmentBuilder(false)
                 load()
               }}

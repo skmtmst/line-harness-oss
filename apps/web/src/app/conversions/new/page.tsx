@@ -106,13 +106,21 @@ export default function NewConversionPointPage() {
     else if (!lineAccountId && accounts[0]) setLineAccountId(accounts[0].id)
   }, [accounts, lineAccountId, selectedAccountId])
 
+  /*
+   * 同じ名前の警告は、同じ集計対象の中だけで出す(#513 L4)。
+   *
+   * 以前はアカウントを見ずに探していたので、別のアカウントの同名にまで
+   * 反応して作れず、保存時の口(アカウント単位の判定)と食い違っていた。
+   * 対象が「すべて」(null)の既存行はどの対象にも当たり得るので残す。
+   */
   const duplicateName = useMemo(() => {
     const normalized = name.trim().normalize('NFKC').toLocaleLowerCase('ja')
     if (!normalized) return null
     return points.find(
-      (point) => point.name.trim().normalize('NFKC').toLocaleLowerCase('ja') === normalized,
+      (point) => point.name.trim().normalize('NFKC').toLocaleLowerCase('ja') === normalized
+        && (point.lineAccountId == null || point.lineAccountId === lineAccountId),
     ) ?? null
-  }, [name, points])
+  }, [name, points, lineAccountId])
 
   const yen = value ? Number(value) : null
 
@@ -177,6 +185,16 @@ export default function NewConversionPointPage() {
           return '指定ページへの到達で数えるときは、対象のURLが要ります'
         }
         if (!lineAccountId) return '集計対象のLINEアカウントを選んでください'
+        // 保存側(400)と同じ条件を先に言う。素通りすると汎用失敗文になる(#513 L3)。
+        if (valueMode === 'fixed' && (yen === null || !Number.isFinite(yen) || yen < 0)) {
+          return '固定で付ける金額は0以上の数値で入力してください'
+        }
+        if (attributionDays) {
+          const days = Number(attributionDays)
+          if (!Number.isInteger(days) || days < 1 || days > 365) {
+            return '成果を紐づける日数は1〜365日で入力してください'
+          }
+        }
         return null
       }}
       onReset={() => {

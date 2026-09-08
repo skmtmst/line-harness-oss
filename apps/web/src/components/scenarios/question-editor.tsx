@@ -11,8 +11,8 @@
  */
 
 import { useEffect, useState } from 'react'
-import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { scenarioReferenceData } from './scenario-reference-data'
 
 export type ChoiceBehavior = 'none' | 'url' | 'tel' | 'add_friend' | 'mail' | 'form' | 'scenario'
 
@@ -110,9 +110,9 @@ export default function QuestionEditor({
     }
     void (async () => {
       const [tagRes, fieldRes, scenarioRes] = await Promise.all([
-        api.tags.list(),
-        api.friendFields.list(selectedAccountId),
-        api.scenarios.list(),
+        scenarioReferenceData.tags(selectedAccountId),
+        scenarioReferenceData.friendFields(selectedAccountId),
+        scenarioReferenceData.scenarios(selectedAccountId),
       ])
       if (tagRes.success) setTags(tagRes.data.map((t) => ({ id: t.id, name: t.name })))
       if (fieldRes.success) setFields(fieldRes.data.map((f) => ({ id: f.id, name: f.name })))

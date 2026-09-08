@@ -1086,8 +1086,11 @@ broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) =
     if (body.messageBubbles !== undefined
         && (!Array.isArray(body.messageBubbles)
           || body.messageBubbles.length < 1
-          || body.messageBubbles.length > 3)) {
-      return c.json({ success: false, error: 'messageBubbles must contain 1 to 3 items' }, 400);
+          || body.messageBubbles.length > MAX_BROADCAST_MESSAGES)) {
+      return c.json({
+        success: false,
+        error: `messageBubbles must contain 1 to ${MAX_BROADCAST_MESSAGES} items`,
+      }, 400);
     }
 
     let segmentConditions: string | null | undefined;
@@ -1985,6 +1988,35 @@ broadcasts.post('/api/broadcasts/:id/test-send', requireRole('owner', 'admin'), 
 
     const friendIds: string[] = JSON.parse(setting.value);
     if (friendIds.length === 0) return c.json({ success: false, error: 'No test recipients configured' }, 400);
+    if (friendIds.length > 5) {
+      return c.json({ success: false, error: 'テスト送信の送信先は5件までにしてください' }, 400);
+    }
+
+    const staffId = c.get('staff')!.id;
+    const recentAttempt = await c.env.DB.prepare(
+      `SELECT 1 AS found
+         FROM operation_audit
+        WHERE target_kind = 'broadcast' AND target_id = ?
+          AND action = 'test_send' AND actor_id = ?
+          AND datetime(created_at) >= datetime('now', '+9 hours', '-10 seconds')
+        LIMIT 1`,
+    ).bind(id, staffId).first<{ found: number }>();
+    if (recentAttempt) {
+      return c.json(
+        { success: false, error: '短時間に繰り返し送信しています。10秒待ってからやり直してください' },
+        { status: 429, headers: { 'Retry-After': '10' } },
+      );
+    }
+    // 外部送信より先に試行を記録し、二度押しや並行リクエストを早い段階で止める。
+    await c.env.DB.prepare(
+      `INSERT INTO operation_audit (id, target_kind, target_id, action, actor_id, detail_json)
+       VALUES (?, 'broadcast', ?, 'test_send', ?, ?)`,
+    ).bind(
+      crypto.randomUUID(),
+      id,
+      staffId,
+      JSON.stringify({ recipientCount: friendIds.length }),
+    ).run();
 
     const placeholders = friendIds.map(() => '?').join(',');
     const friends = await c.env.DB.prepare(
@@ -2079,6 +2111,42 @@ broadcasts.get('/api/broadcasts/:id/progress', async (c) => {
   }
 
   const raw = broadcast as unknown as Record<string, unknown>;
+  const accountIds = broadcast.target_type === 'multi-account-dedup'
+    ? parseJsonArray(raw.account_ids) ?? []
+    : typeof raw.line_account_id === 'string' && raw.line_account_id
+      ? [raw.line_account_id]
+      : [];
+  let perAccountStats: Array<{
+    accountId: string;
+    accountName: string;
+    sent: number;
+    uniqueImpression: null;
+    uniqueClick: null;
+  }> = [];
+  if (accountIds.length > 0) {
+    const placeholders = accountIds.map(() => '?').join(',');
+    const [sentRows, accountRows] = await Promise.all([
+      c.env.DB.prepare(
+        `SELECT COALESCE(ml.line_account_id, f.line_account_id) AS account_id, COUNT(*) AS sent
+           FROM messages_log ml
+           INNER JOIN friends f ON f.id = ml.friend_id
+          WHERE ml.broadcast_id = ? AND ml.direction = 'outgoing'
+            AND COALESCE(ml.line_account_id, f.line_account_id) IN (${placeholders})
+          GROUP BY COALESCE(ml.line_account_id, f.line_account_id)`,
+      ).bind(id, ...accountIds).all<{ account_id: string; sent: number }>(),
+      c.env.DB.prepare(`SELECT id, name FROM line_accounts WHERE id IN (${placeholders})`)
+        .bind(...accountIds).all<{ id: string; name: string }>(),
+    ]);
+    const sentByAccount = new Map(sentRows.results.map((row) => [row.account_id, Number(row.sent)]));
+    const nameByAccount = new Map(accountRows.results.map((row) => [row.id, row.name]));
+    perAccountStats = accountIds.map((accountId) => ({
+      accountId,
+      accountName: nameByAccount.get(accountId) ?? accountId,
+      sent: sentByAccount.get(accountId) ?? 0,
+      uniqueImpression: null,
+      uniqueClick: null,
+    }));
+  }
   return c.json({
     success: true,
     data: {
@@ -2086,6 +2154,7 @@ broadcasts.get('/api/broadcasts/:id/progress', async (c) => {
       totalCount: broadcast.total_count,
       successCount: broadcast.success_count,
       batchOffset: raw.batch_offset as number,
+      perAccountStats,
     },
   });
 });

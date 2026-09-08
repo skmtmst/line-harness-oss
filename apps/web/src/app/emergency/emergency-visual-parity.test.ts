@@ -70,6 +70,13 @@ describe('V6 機能32 運用状態の表示確認', () => {
     expect(source).toContain('aria-label="判定の見方"')
   })
 
+  it('緊急停止状態は実APIの停止IDと理由を表示し、取得失敗を通常運用にしない', () => {
+    expect(source).toContain('api.operations.preview(accountId)')
+    expect(source).toContain('operationControlSummary(preview.data.control)')
+    expect(source).toContain("value: '未確認'")
+    expect(source).not.toContain('label="緊急停止状態" value="通常運用"')
+  })
+
   it('5分ごとに実データを再確認する', () => {
     expect(source).toContain('window.setInterval')
     expect(source).toContain('5 * 60 * 1000')

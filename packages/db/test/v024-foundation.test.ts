@@ -42,8 +42,11 @@ import {
 import {
   getOrCreateSiteTrackingKey,
   getSiteTrackingAccountId,
+  getFriendSiteEvents,
+  getPageViewSummary,
   linkVisitorToFriend,
   recordSiteEvent,
+  sanitizeHost,
   sanitizePath,
   sanitizeReferrer,
 } from '../src/site-tracking.js';
@@ -742,6 +745,12 @@ describe('サイトの記録', () => {
     expect(sanitizePath(undefined)).toBeNull();
   });
 
+  test('計測先ホストだけを正規化して保存できる形にする', () => {
+    expect(sanitizeHost(' Shop.Example.COM ')).toBe('shop.example.com');
+    expect(sanitizeHost('shop.example.com/path')).toBeNull();
+    expect(sanitizeHost('')).toBeNull();
+  });
+
   test('リファラも同じ扱い', () => {
     expect(sanitizeReferrer('https://google.com/search?q=secret')).toBe(
       'https://google.com/search',
@@ -762,6 +771,22 @@ describe('サイトの記録', () => {
       .prepare(`SELECT COUNT(*) AS c FROM site_events WHERE friend_id = 'f-1'`)
       .get() as { c: number };
     expect(c).toBe(2);
+  });
+
+  test('一覧と友だち詳細が計測先ホストを返す', async () => {
+    insertFriend('f-host');
+    await recordSiteEvent(db, {
+      visitorId: 'v-host', lineAccountId: 'account-1', eventType: 'page_view',
+      host: 'shop.example.com', path: '/thanks',
+    });
+    await linkVisitorToFriend(db, 'v-host', 'account-1', 'f-host', 'liff');
+
+    const pages = await getPageViewSummary(db, {
+      lineAccountId: 'account-1', from: '2000-01-01', to: '2999-12-31',
+    });
+    expect(pages).toContainEqual({ host: 'shop.example.com', path: '/thanks', views: 1, visitors: 1 });
+    const events = await getFriendSiteEvents(db, 'f-host', 'account-1');
+    expect(events[0]).toMatchObject({ host: 'shop.example.com', path: '/thanks' });
   });
 
   test('一度結びついたら上書きしない', async () => {

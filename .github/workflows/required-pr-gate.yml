@@ -21,6 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       full_suite: ${{ steps.scope.outputs.full_suite }}
+      db_tests: ${{ steps.scope.outputs.db_tests }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -62,11 +63,20 @@ jobs:
         run: |
           if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
             echo "full_suite=true" >> "$GITHUB_OUTPUT"
+            echo "db_tests=true" >> "$GITHUB_OUTPUT"
             echo "PR差分がない手動実行のため、全検査を行います。"
             exit 0
           fi
 
           changed=$(git diff --name-only "$BASE_SHA...$HEAD_SHA")
+          if printf '%s\n' "$changed" \
+            | grep -qE '^packages/db/(src/|test/|migrations/)'; then
+            echo "db_tests=true" >> "$GITHUB_OUTPUT"
+            echo "DBの実装・テスト・マイグレーション変更があるため、DBテストを行います。"
+          else
+            echo "db_tests=false" >> "$GITHUB_OUTPUT"
+          fi
+
           if [ -n "$changed" ] && printf '%s\n' "$changed" \
             | grep -qvE '^(docs/|\.github/|README\.md$|AGENTS\.md$)'; then
             echo "full_suite=true" >> "$GITHUB_OUTPUT"
@@ -250,6 +260,9 @@ jobs:
           --filter @line-harness/update-engine
           build
       - run: pnpm --filter @line-crm/db check:bootstrap
+      - name: Test database package
+        if: needs.changes.outputs.db_tests == 'true'
+        run: pnpm --filter @line-crm/db test
       - run: pnpm test:scripts
       - name: Typecheck repository scripts
         run: |

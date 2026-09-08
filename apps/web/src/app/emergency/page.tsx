@@ -2,7 +2,7 @@
 
 import SelectField from '@/components/shared/select-field'
 import Link from 'next/link'
-import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import PageHeader from '@/components/shared/page-header'
@@ -17,6 +17,7 @@ import {
 } from '@/lib/api'
 import { formatOperationDate, type OperationSeverity } from '@/lib/operation-status'
 import { operationImpactText, type EmergencyStopTarget } from '@/lib/operation-impact'
+import { operationControlSummary } from './control-summary'
 import releaseLog from '@/generated/release-log.json'
 import { useAccount } from '@/contexts/account-context'
 
@@ -169,10 +170,20 @@ function HealthPanel({
   const [checks, setChecks] = useState<HealthCheckItem[]>(() =>
     CHECK_DEFINITIONS.map((item) => ({ ...item, detail: '確認しています…', severity: 'unknown', observedAt: null })),
   )
+  /**
+   * 初回と2回目以降を分ける(#518 中2)。
+   *
+   * 以前は5分ごとの自動更新のたびに `loading` が立ち、バナーと概要が
+   * 「確認できない項目があります」へ瞬間的に変わっていた(オオカミ少年化)。
+   * 2回目以降は `refreshing` にして、前回の結果を表示したままにする。
+   */
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const hasLoaded = useRef(false)
   const [checkedAt, setCheckedAt] = useState<string | null>(null)
   const [nextCheckedAt, setNextCheckedAt] = useState<string | null>(null)
   const [snapshotStatus, setSnapshotStatus] = useState<OperationHealthSnapshot['overallStatus']>('unknown')
+  const [controlSummary, setControlSummary] = useState({ value: '確認中', note: '停止状態を確認しています' })
 
   const applySnapshot = useCallback((snapshot: OperationHealthSnapshot) => {
     const results = snapshot.latestRun?.results ?? []
@@ -191,7 +202,8 @@ function HealthPanel({
   }, [])
 
   const load = useCallback(async (manual: boolean) => {
-    setLoading(true)
+    if (hasLoaded.current) setRefreshing(true)
+    else setLoading(true)
     if (!accountId) {
       setChecks(CHECK_DEFINITIONS.map((definition) => ({
         ...definition,
@@ -202,15 +214,22 @@ function HealthPanel({
       setCheckedAt(null)
       setNextCheckedAt(null)
       setSnapshotStatus('unknown')
+      setControlSummary({ value: '未確認', note: 'LINEアカウントを選択してください' })
       setLoading(false)
+      setRefreshing(false)
+      hasLoaded.current = true
       return
     }
     try {
-      const response = manual
-        ? await api.operations.runHealth(accountId)
-        : await api.operations.health(accountId)
+      const [response, preview] = await Promise.all([
+        manual ? api.operations.runHealth(accountId) : api.operations.health(accountId),
+        api.operations.preview(accountId).catch(() => null),
+      ])
       if (!response.success) throw new Error(response.error)
       applySnapshot(response.data)
+      setControlSummary(preview?.success
+        ? operationControlSummary(preview.data.control)
+        : { value: '未確認', note: '停止状態を取得できませんでした' })
     } catch {
       setChecks(CHECK_DEFINITIONS.map((definition) => ({
         ...definition,
@@ -221,8 +240,11 @@ function HealthPanel({
       setCheckedAt(null)
       setNextCheckedAt(null)
       setSnapshotStatus('unknown')
+      setControlSummary({ value: '未確認', note: '停止状態を取得できませんでした' })
     } finally {
       setLoading(false)
+      setRefreshing(false)
+      hasLoaded.current = true
     }
   }, [accountId, applySnapshot])
 
@@ -248,14 +270,16 @@ function HealthPanel({
   const statusIcon = isNormal ? '✓' : '!'
   const statusIconClass = isNormal ? 'text-success' : displayedSeverity === 'warning' ? 'text-warning' : displayedSeverity === 'danger' ? 'text-danger' : 'text-ink-faint'
 
-  useEffect(() => { onSeverity(displayedSeverity) }, [displayedSeverity, onSeverity])
+  // 深刻度の通知は初回の確定後だけ送る(#518 中2)。読み込み中の `unknown`
+  // や自動更新のたびに送ると、親の表示が警告へちらつく。
+  useEffect(() => { if (hasLoaded.current) onSeverity(displayedSeverity) }, [displayedSeverity, onSeverity])
 
   return (
     <div className="space-y-4" data-design="V3 Health">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <SummaryCard label="全体の状態" value={resultTitle} note={loading ? '確認中' : '最新結果'} />
+        <SummaryCard label="全体の状態" value={resultTitle} note={loading ? '確認中' : refreshing ? '更新中' : '最新結果'} />
         <SummaryCard label="最後の確認" value={formatOperationDate(checkedAt)} note="5分ごとに自動確認" />
-        <SummaryCard label="緊急停止状態" value="通常運用" note="停止なし" />
+        <SummaryCard label="緊急停止状態" value={controlSummary.value} note={controlSummary.note} />
       </div>
       <div className="rounded-control bg-info-bg text-info px-4 py-3 text-xs font-semibold">
         LINEとのつながりや配信の詰まりを、5分ごとに自動で確かめています。赤が出たら「緊急コントロール」で止められます。
@@ -436,8 +460,11 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
           </section>
 
           <section className={`border-hairline rounded-card border bg-canvas p-4 ${isStopped ? 'pointer-events-none opacity-50' : ''}`}>
-            <label className="text-base font-bold text-ink" htmlFor="emergency-detail">補足（任意）</label>
-            <textarea id="emergency-detail" value={reasonDetail} onChange={(event) => setReasonDetail(event.target.value)} rows={2} placeholder="発生していることを短く入力" className="border-hairline rounded-control mt-3 w-full border px-3 py-2 text-sm" />
+            <div className="flex items-baseline justify-between gap-2">
+              <label className="text-base font-bold text-ink" htmlFor="emergency-detail">補足（任意）</label>
+              <p className="text-xs tabular-nums text-ink-faint">あと{1000 - reasonDetail.length}文字</p>
+            </div>
+            <textarea id="emergency-detail" value={reasonDetail} onChange={(event) => setReasonDetail(event.target.value)} rows={2} maxLength={1000} placeholder="発生していることを短く入力" className="border-hairline rounded-control mt-3 w-full border px-3 py-2 text-sm" />
           </section>
 
           <section className={`rounded-card border p-4 ${isStopped ? 'border-info bg-info-bg' : impactFailed ? 'border-warning bg-warning-bg' : 'border-info bg-info-bg'}`}>
@@ -470,7 +497,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
       </div>
 
       {confirmMode && <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-confirm-title">
-        <div className="flex w-full flex-col overflow-hidden rounded-card bg-canvas shadow-2xl" style={{ height: 700, maxWidth: 720 }}>
+        <div className="flex w-full flex-col overflow-hidden rounded-card bg-canvas shadow-2xl" style={{ height: 700, maxHeight: 'calc(100vh - 32px)', maxWidth: 720 }}>
           <div className="flex items-start gap-3 border-b border-hairline px-6 py-6" style={{ minHeight: 112 }}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-danger-bg text-xl font-bold text-danger">!</span><div><h2 id="emergency-confirm-title" className="text-xl font-bold text-ink">{confirmMode === 'stop' ? '緊急停止の最終確認' : '復旧の最終確認'}</h2><p className="mt-1 text-sm text-ink-faint">{confirmMode === 'stop' ? 'この内容で止めます。止めた瞬間から、自動で送るものが出なくなります。' : '停止前に動いていたものだけを戻します。'}</p></div></div>
           <div className="flex-1 space-y-3 overflow-y-auto p-6">{confirmMode === 'stop' ? <>
             <section className="rounded-control border border-danger bg-danger-bg p-4 text-danger"><p className="text-sm font-bold">{accountName}</p><div className="mt-3 divide-y divide-danger/15">{selectedTargets.map((key) => <div key={key} className="flex items-center justify-between gap-4 py-2" style={{ minHeight: 58 }}><div className="flex items-center gap-3"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-canvas text-danger">■</span><div><p className="text-sm font-bold">{targetLabels[key].label}</p><p className="mt-0.5 text-xs">{targetLabels[key].note}</p></div></div><strong className="text-right text-sm">{impactText(key)}</strong></div>)}</div><p className="mt-3 text-xs font-bold">停止前にすでにLINEへ渡したものは取り消せません。</p></section>
@@ -507,6 +534,14 @@ function HistoryPanel() {
   const cutoff = Date.now() - (period === '30days' ? 30 : 365) * 24 * 60 * 60 * 1000
   const operations = history.filter((item) => item.historyKind !== 'deployment')
   const deployments = history.filter((item) => item.historyKind === 'deployment' && item.deployment)
+  /*
+   * 日付が読めない記録は期間外と別に数える(#518 10)。
+   *
+   * 以前は `NaN >= cutoff` が偽になり、黙って一覧から落ちていた。
+   * 「履歴なし」と「記録が壊れて見えない」の区別が付かないのは、
+   * 監査の記録では見逃せない。
+   */
+  const unreadableEntries = operations.filter((item) => Number.isNaN(Date.parse(item.createdAt)))
   const entries = operations.filter((item) => Date.parse(item.createdAt) >= cutoff)
   const longestMinutes = operations.reduce((longest, item) => {
     if (!item.stoppedAt || !item.resolvedAt) return longest
@@ -537,7 +572,18 @@ function HistoryPanel() {
     .slice(0, 4)
 
   const downloadCsv = () => {
-    const quote = (value: unknown) => `"${String(value ?? '').replaceAll('"', '""')}"`
+    /**
+     * 数式インジェクション対策(#518 中3)。
+     *
+     * 停止理由・補足・担当者は運用者の自由文で、先頭が `= + - @` のまま
+     * Excel で開くと数式として実行され得る。先頭に `'` を付けて無害化する
+     * (成果地点の書き出し `csvCell` と同じ約束)。
+     */
+    const quote = (value: unknown) => {
+      const raw = String(value ?? '')
+      const safe = /^[=+\-@]/.test(raw) ? `'${raw}` : raw
+      return `"${safe.replaceAll('"', '""')}"`
+    }
     const rows = entries.map((item) => [
       item.createdAt,
       item.actorId,
@@ -568,7 +614,7 @@ function HistoryPanel() {
       <div className="flex flex-col items-start gap-4 xl:flex-row">
         <div className="min-w-0 flex-1 space-y-4">
           <section className="border-hairline rounded-card overflow-hidden border bg-canvas">
-            <div className="border-hairline border-b px-4 py-3"><h2 className="text-base font-bold text-ink">止めた・戻した記録</h2><p className="mt-0.5 text-xs text-ink-faint">だれが・いつ・何を・なぜ。サーバーに追記して残します</p></div>
+            <div className="border-hairline border-b px-4 py-3"><h2 className="text-base font-bold text-ink">止めた・戻した記録</h2><p className="mt-0.5 text-xs text-ink-faint">だれが・いつ・何を・なぜ。サーバーに追記して残します</p>{unreadableEntries.length > 0 ? <p className="mt-1 text-xs font-medium text-warning">日付が読めない記録が{unreadableEntries.length}件あり、期間の絞り込みから外しています。履歴なしとは扱いません。</p> : null}</div>
             {state === 'loading' ? <p className="p-8 text-center text-xs text-ink-faint">記録を読み込んでいます…</p> : state === 'error' ? <p className="bg-warning-bg px-4 py-4 text-xs font-medium text-warning">緊急操作の履歴を取得できませんでした。履歴なしとは扱いません。</p> : entries.length === 0 ? <p className="p-8 text-center text-xs text-ink-faint">この期間の記録はありません。</p> : <><div className="hidden grid-cols-[170px_1.2fr_1fr_1fr_100px] gap-3 bg-canvas-sunken px-4 py-3 text-[11px] font-bold text-ink-faint md:grid"><span>いつ・だれが</span><span>止めたもの</span><span>対象</span><span>理由</span><span>戻した</span></div><div className="divide-y divide-hairline">{entries.map((entry) => <div key={entry.id} className="grid gap-3 px-4 py-4 md:grid-cols-[170px_1.2fr_1fr_1fr_100px] md:items-center"><div><time className="text-sm font-bold text-ink">{formatOperationDate(entry.createdAt)}</time><p className="mt-1 truncate text-xs text-ink-faint" title={entry.actorId}>{entry.actorId}</p></div><p className="text-xs font-bold text-ink-secondary">{entry.capabilities.map((capability) => CAPABILITY_LABEL[capability]).join('・')}</p><p className="text-xs text-ink-secondary">{entry.lineAccountId ?? 'すべてのアカウント'}</p><div><p className="text-xs font-bold text-ink-secondary">{entry.reason}</p>{entry.detail && <p className="mt-1 text-xs text-ink-faint">{entry.detail}</p>}</div><p className={`text-xs font-bold ${entry.resolvedAt ? 'text-success' : entry.status === 'failed' ? 'text-danger' : 'text-ink-faint'}`}>{entry.resolvedAt ? formatOperationDate(entry.resolvedAt) : entry.status === 'failed' ? '失敗' : '停止中'}</p></div>)}</div></>}
           </section>
           <section className="border-hairline rounded-card overflow-hidden border bg-canvas">
@@ -603,7 +649,23 @@ function EmergencyPageInner() {
   const [severity, setSeverity] = useState<OperationSeverity>('unknown')
   const [manualRunRequest, setManualRunRequest] = useState(0)
   const [accounts, setAccounts] = useState<LineAccount[]>([])
-  useEffect(() => { api.health.accounts().then((response) => { if (response.success) setAccounts(response.data) }).catch(() => undefined) }, [])
+  const [accountsFailed, setAccountsFailed] = useState(false)
+  /*
+   * 対象アカウント欄の元。失敗しても黙らせない(#518 9)。
+   *
+   * 以前は失敗時に何も出さず、選択肢が「すべてのアカウント」だけになり、
+   * 個別停止したいのに全体停止を選ばざるを得なくなる恐れがあった。
+   */
+  const loadAccounts = useCallback(() => {
+    setAccountsFailed(false)
+    api.health.accounts()
+      .then((response) => {
+        if (response.success) setAccounts(response.data)
+        else setAccountsFailed(true)
+      })
+      .catch(() => setAccountsFailed(true))
+  }, [])
+  useEffect(() => { loadAccounts() }, [loadAccounts])
   const description = tab === 'health'
     ? '問題がないか自動で確認し、エラーがあれば内容と次の行動を表示します。'
     : tab === 'control'
@@ -612,7 +674,7 @@ function EmergencyPageInner() {
   const headerAction = tab === 'health'
     ? <button type="button" onClick={() => setManualRunRequest((current) => current + 1)} disabled={!selectedAccountId} className="rounded-control min-h-9 bg-accent-deep px-3 text-xs font-bold text-on-accent disabled:opacity-50">↻ いますぐ確かめる</button>
     : severity === 'danger' || severity === 'warning' ? <StatusPill severity={severity} /> : undefined
-  return <div><OperationPageHeader description={tab === 'history' ? '' : description} action={headerAction} /><MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel accountId={selectedAccountId} manualRunRequest={manualRunRequest} onSeverity={setSeverity} />}{tab === 'control' && <EmergencyControlPanel accounts={accounts} />}{tab === 'history' && <HistoryPanel />}</div>
+  return <div><OperationPageHeader description={tab === 'history' ? '' : description} action={headerAction} />{accountsFailed ? <div className="bg-warning-bg mt-3 flex flex-wrap items-center justify-between gap-2 rounded-control px-4 py-3 text-xs font-medium text-warning" role="alert"><p>アカウント一覧を取得できませんでした。個別のアカウントを選べず、全体が対象になります。</p><button type="button" onClick={() => loadAccounts()} className="rounded-control border border-warning px-3 py-1.5 font-bold hover:opacity-80">もう一度読む</button></div> : null}<MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel accountId={selectedAccountId} manualRunRequest={manualRunRequest} onSeverity={setSeverity} />}{tab === 'control' && <EmergencyControlPanel accounts={accounts} />}{tab === 'history' && <HistoryPanel />}</div>
 }
 
 export default function EmergencyPage() {

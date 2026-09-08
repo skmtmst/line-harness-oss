@@ -40,7 +40,7 @@ describe('V6 シナリオ編集の契約', () => {
 
   it('一覧のフォルダ追加を既存の共通ダイアログへ接続する', () => {
     expect(LIST).toContain("import FolderAddDialog from '@/components/shared/folder-add-dialog'")
-    expect(LIST).toContain('<Button onClick={() => setFolderDialogOpen(true)}>')
+    expect(LIST).toContain('onAddFolder={() => setFolderDialogOpen(true)}')
     expect(LIST).toContain('kind="scenario"')
     expect(LIST).not.toContain('title="準備中です"\n          className="border-hairline text-ink-faint rounded-control border px-4')
   })
@@ -64,10 +64,11 @@ describe('V6 シナリオ編集の契約', () => {
     expect(LIST_TABLE).toContain("onMoveFolder?.(s.id, event.target.value)")
   })
 
-  it('「今月作成」は日本時間の作成日時で実際に絞り込む', () => {
+  it('「今月作成」は日本時間の月初を共通一覧APIへ渡して絞り込む', () => {
     expect(LIST).toContain("timeZone: 'Asia/Tokyo'")
     expect(LIST).toContain('active: createdThisMonthOnly')
     expect(LIST).toContain('aria-pressed={filter.disabled ? undefined : filter.active}')
-    expect(LIST).toContain('createdThisMonthOnly ? isCreatedThisMonth(sc.createdAt) : true')
+    expect(LIST).toContain('createdFrom: createdThisMonthOnly ? currentMonthStart() : undefined')
+    expect(LIST).not.toContain('createdThisMonthOnly ? isCreatedThisMonth(sc.createdAt) : true')
   })
 })

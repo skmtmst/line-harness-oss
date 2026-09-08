@@ -15,4 +15,10 @@ describe('V6 リッチメニュー作成 XtfO3', () => {
     expect(page).toContain("{ label: '誰に出すか', state: 'todo' }")
     expect(page).toContain("{ label: '公開のしかた', state: 'todo' }")
   })
+
+  it('面ごとの設定ボタンでその面の編集を開く', () => {
+    expect(page).toContain('onClick={() => openAreaEditor(index)}')
+    expect(page).toContain('setEditingAreaIndex(index)')
+    expect(page).toContain('editingAreaIndex === index')
+  })
 })

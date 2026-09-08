@@ -8,7 +8,7 @@ import Select from '@/components/shared/select'
 import { Tabs } from '@/components/shared/tabs'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
-import { api, type AuditEventItem, type AuditEventSummary } from '@/lib/api'
+import { api, ApiError, type AuditEventItem, type AuditEventSummary } from '@/lib/api'
 
 const EMPTY_SUMMARY: AuditEventSummary = {
   periodDays: 30,
@@ -154,9 +154,19 @@ export default function LoginAudit({ userId }: { userId?: string }) {
         setRows(auditResult.data.items)
         setSummary(auditResult.data.summary)
         setTotal(auditResult.data.pagination.total)
+      } else {
+        setRows([])
+        setSummary(EMPTY_SUMMARY)
+        setTotal(0)
+        setError(auditResult.error || '入った記録を読み込めませんでした。時間をおいて、もう一度お試しください。')
       }
-    } catch {
-      setError('入った記録を読み込めませんでした。時間をおいて、もう一度お試しください。')
+    } catch (caught) {
+      setRows([])
+      setSummary(EMPTY_SUMMARY)
+      setTotal(0)
+      setError(caught instanceof ApiError && caught.status === 403
+        ? '入った記録を見る権限がありません。管理者へ確認してください。'
+        : '入った記録を読み込めませんでした。時間をおいて、もう一度お試しください。')
     } finally {
       setLoading(false)
     }

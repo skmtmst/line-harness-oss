@@ -115,6 +115,17 @@ describe('entry route tenant scope', () => {
     expect(mocks.updateEntryRoute).not.toHaveBeenCalled();
   });
 
+  it('rejects changing ref_code after creation', async () => {
+    mocks.getEntryRouteById.mockResolvedValue({ ...otherRoute, tenant_id: 'tenant-a' });
+    const response = await app.fetch(new Request('https://example.com/api/entry-routes/route-b', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refCode: 'changed-ref' }),
+    }), env);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: 'ref_code は作成後に変更できません' });
+    expect(mocks.updateEntryRoute).not.toHaveBeenCalled();
+  });
+
   it('returns 404 without deleting another tenant route', async () => {
     mocks.getEntryRouteById.mockResolvedValue(otherRoute);
     const response = await app.fetch(new Request('https://example.com/api/entry-routes/route-b', {

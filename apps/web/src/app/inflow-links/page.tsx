@@ -21,7 +21,7 @@ import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
-import FolderPanel from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -157,6 +157,8 @@ function InflowLinksPageInner() {
   // 「この pool が選択中アカウントに配信するか」を判定するために使う。
   // pool.activeAccountId はレガシーシングル所属。マルチアカ pool では不十分。
   const [poolMembers, setPoolMembers] = useState<Record<string, Set<string>>>({})
+  // #514-5: 同じ取得から作るプール別の所属名。編集窓へ渡して取り直しを無くす。
+  const [poolMemberNames, setPoolMemberNames] = useState<Record<string, string[]>>({})
 
   const load = async () => {
     const requestGeneration = ++loadRequestRef.current
@@ -213,22 +215,24 @@ function InflowLinksPageInner() {
         )
       }
 
-      // Load pool→accounts mapping after we know the pool list. Done in a 2nd
-      // round-trip so the table can render with summary stats immediately; the
-      // filter just doesn't apply the pool-membership rule until this resolves
-      // (zero-inflow rows still pass through friendCount > 0 path).
+      // Load pool→accounts mapping in one request after the pool ids are known.
+      // This is a second round-trip, but it stays one request regardless of how
+      // many pools exist.
       if (p.success) {
-        const entries = await Promise.all(
-          p.data.map(async (pool) => {
-            const res = await api.pools.accounts.list(pool.id)
-            const ids = res.success
-              ? new Set(res.data.filter((a) => a.isActive).map((a) => a.lineAccountId))
-              : new Set<string>()
-            return [pool.id, ids] as const
-          }),
-        )
+        const batch = p.data.length > 0
+          ? await api.pools.listAccounts(p.data.map((pool) => pool.id))
+          : { success: true as const, data: [] }
         if (!isCurrent()) return
-        setPoolMembers(Object.fromEntries(entries))
+        if (batch.success) {
+          setPoolMembers(Object.fromEntries(batch.data.map(({ poolId, accounts }) => [
+            poolId,
+            new Set(accounts.filter((account) => account.isActive).map((account) => account.lineAccountId)),
+          ])))
+          setPoolMemberNames(Object.fromEntries(batch.data.map(({ poolId, accounts }) => [
+            poolId,
+            accounts.filter((account) => account.isActive).map((account) => account.accountName ?? '—'),
+          ])))
+        }
       }
     } catch {
       if (!isCurrent()) return
@@ -254,6 +258,7 @@ function InflowLinksPageInner() {
     setSummary(null)
     setSummaryAvailable(false)
     setPoolMembers({})
+    setPoolMemberNames({})
     setEditing(null)
     setQrRoute(null)
     setPage(1)
@@ -620,13 +625,14 @@ function InflowLinksPageInner() {
         ここで発行したURLをいったん通ってもらうことで、はじめて経路が分かります。QRコードも同じURLから作れます。
       </p>
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><div className="flex gap-2"><Button href="/inflow-links/new" variant="primary">＋ 流入リンクをつくる</Button><Button onClick={() => setEditingGenre('new')}>フォルダを追加</Button></div><div className="flex gap-2"><Button onClick={exportCurrentRows} disabled={sortedRows.length === 0}>CSVで書き出す</Button><Button variant="secondary">まとめて操作</Button></div></div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><Button href="/inflow-links/new" variant="primary">＋ 流入リンクをつくる</Button><div className="flex gap-2"><Button onClick={exportCurrentRows} disabled={sortedRows.length === 0}>CSVで書き出す</Button><Button variant="secondary">まとめて操作</Button></div></div>
 
-      <div className="grid gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
+      <div style={FOLDER_RAIL_STYLE} className="grid gap-5 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
           total={`${accountFilteredRows.length}件`}
           activeId={selectedGenre}
           onSelect={(id) => { setSelectedGenre(id); setPage(1) }}
+          onAddFolder={() => setEditingGenre('new')}
           rows={[
             { id: '', label: 'すべて', count: accountFilteredRows.length },
             ...availableGenres.map((genre) => ({
@@ -1004,6 +1010,7 @@ function InflowLinksPageInner() {
           templates={templates}
           tags={tags}
           existingGenres={genreOptions}
+          poolMemberNames={poolMemberNames}
           onClose={() => setEditing(null)}
           onSaved={(savedRoute, created) => {
             setEditing(null)
