@@ -109,6 +109,18 @@ describe('JST時刻と時間帯の純粋関数', () => {
       { weekdays: [1], timeWindows: [{ start: '09:00', end: '99:99' }] },
       MON_10,
     )).toEqual({ matched: false, reason: 'invalid_time_window' });
+    // 配列でない・中身が壊れた既存値も「制限なし」に読み替えない
+    expect(evaluateFriendAddSchedule(
+      { weekdays: [], timeWindows: 'oops' as unknown as { start: string; end: string }[] },
+      MON_10,
+    )).toEqual({ matched: false, reason: 'invalid_time_window' });
+    expect(evaluateFriendAddSchedule(
+      { weekdays: [], timeWindows: [null] as unknown as { start: string; end: string }[] },
+      MON_10,
+    )).toEqual({ matched: false, reason: 'invalid_time_window' });
+    // 欄自体がない昔の設定は制限なしのまま送る
+    expect(evaluateFriendAddSchedule({ weekdays: [], timeWindows: undefined }, MON_10))
+      .toEqual({ matched: true, reason: null });
   });
 
   test('複数帯の日跨ぎは帯ごとに曜日を見る', () => {
@@ -332,6 +344,32 @@ describe('競合確認と本番で同じ重なり関数', () => {
     const anyReaction = JSON.stringify({ operator: 'AND', rules: [{ type: 'reaction_state', value: 'any' }] });
     expect(areFriendAddConditionsOverlapping(noReaction, replied)).toBe(false);
     expect(areFriendAddConditionsOverlapping(noReaction, anyReaction)).toBe(true);
+  });
+
+  test('種類が違う否定の組み合わせも充足不能にする', () => {
+    const hasA = JSON.stringify({ operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-A' }] });
+    // tag-A を持つ条件と「tag-Aだけを持たない」条件は両立しない
+    const missOnlyA = JSON.stringify({ operator: 'AND', rules: [{ type: 'tag_not_all', value: ['tag-A'] }] });
+    expect(areFriendAddConditionsOverlapping(hasA, missOnlyA)).toBe(false);
+    // 「tag-Aかtag-Bのどちらかを持たない」なら tag-B を持たずに両立する
+    const missAorB = JSON.stringify({ operator: 'AND', rules: [{ type: 'tag_not_all', value: ['tag-A', 'tag-B'] }] });
+    expect(areFriendAddConditionsOverlapping(hasA, missAorB)).toBe(true);
+    // 同じ欄・同じ値の equals と not_equals は両立しない
+    const equalsTokyo = JSON.stringify({
+      operator: 'AND', rules: [{ type: 'metadata_equals', value: { key: 'area', value: 'tokyo' } }],
+    });
+    const notEqualsTokyo = JSON.stringify({
+      operator: 'AND', rules: [{ type: 'metadata_not_equals', value: { key: 'area', value: 'tokyo' } }],
+    });
+    const notEqualsOsaka = JSON.stringify({
+      operator: 'AND', rules: [{ type: 'metadata_not_equals', value: { key: 'area', value: 'osaka' } }],
+    });
+    const notEqualsGenre = JSON.stringify({
+      operator: 'AND', rules: [{ type: 'metadata_not_equals', value: { key: 'genre', value: 'tokyo' } }],
+    });
+    expect(areFriendAddConditionsOverlapping(equalsTokyo, notEqualsTokyo)).toBe(false);
+    expect(areFriendAddConditionsOverlapping(equalsTokyo, notEqualsOsaka)).toBe(true);
+    expect(areFriendAddConditionsOverlapping(equalsTokyo, notEqualsGenre)).toBe(true);
   });
 
   test('旧形式の字面はそのまま比べ、JSONは正規化できる', () => {
@@ -754,6 +792,18 @@ describe('本番の振り分け: 曜日・時間帯・条件・再送制限', ()
     expect(result.enrollments).toEqual([]);
     // 勝った側の cron が拾う登録を残さない
     expect(raw.prepare(`SELECT COUNT(*) AS n FROM friend_scenarios`).get()).toEqual({ n: 0 });
+  });
+
+  test('送信権なし（予約失敗）: 理由を残して抑止する', async () => {
+    seedRule({ routeIds: ['route-1'], resendSuppressionHours: 0 });
+    const result = await applyFriendAddRouting(
+      db, 'acc-1', { id: 'friend-1', unfollow_count: 0 }, undefined,
+      { entryRouteId: 'route-1', now: MON_10, sendRight: false, claimError: true },
+    );
+    expect(result).toMatchObject({
+      routed: true, suppressed: true, suppressReason: 'send_claim_unavailable',
+    });
+    expect(result.enrollments).toEqual([]);
   });
 
   test('再送可能: 送れなかった実行（partial_failed）は再送制限に数えない', async () => {

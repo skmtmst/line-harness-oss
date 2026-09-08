@@ -57,8 +57,8 @@ describe('357 friend_add_events partial_failed', () => {
     ).run();
     db.prepare(
       `INSERT INTO friend_add_events
-        (id, line_account_id, friend_id, webhook_event_id, friend_kind, routing_status, occurred_at)
-       VALUES ('event-old', 'account-1', 'friend-1', 'webhook-old', 'first_time', 'completed', '2026-09-01T10:00:00.000+09:00')`,
+        (id, line_account_id, friend_id, webhook_event_id, friend_kind, routing_status, occurred_at, delivery_count)
+       VALUES ('event-old', 'account-1', 'friend-1', 'webhook-old', 'first_time', 'completed', '2026-09-01T10:00:00.000+09:00', 1)`,
     ).run();
     db.prepare(
       `INSERT INTO friend_add_action_runs
@@ -84,6 +84,36 @@ describe('357 friend_add_events partial_failed', () => {
     expect(
       db.prepare(`SELECT routing_status FROM friend_add_events WHERE id = 'event-old'`).get(),
     ).toEqual({ routing_status: 'completed' });
+  });
+
+  it('旧completed かつ未送信の行を partial_failed へ移して再送可能にする', () => {
+    db.prepare(
+      `INSERT INTO friend_add_events
+        (id, line_account_id, friend_id, webhook_event_id, friend_kind, routing_status, occurred_at, delivery_count, error_code)
+       VALUES ('event-unsent', 'account-1', 'friend-1', 'webhook-unsent', 'first_time', 'completed', '2026-09-01T10:00:00.000+09:00', 0, NULL)`,
+    ).run();
+    db.prepare(
+      `INSERT INTO friend_add_events
+        (id, line_account_id, friend_id, webhook_event_id, friend_kind, routing_status, occurred_at, delivery_count, error_code)
+       VALUES ('event-sent', 'account-1', 'friend-1', 'webhook-sent', 'first_time', 'completed', '2026-09-01T10:00:00.000+09:00', 1, NULL)`,
+    ).run();
+    db.prepare(
+      `INSERT INTO friend_add_events
+        (id, line_account_id, friend_id, webhook_event_id, friend_kind, routing_status, occurred_at, delivery_count, error_code)
+       VALUES ('event-coded', 'account-1', 'friend-1', 'webhook-coded', 'first_time', 'completed', '2026-09-01T10:00:00.000+09:00', 0, 'resend_suppressed')`,
+    ).run();
+    execSafe(
+      db,
+      readFileSync(join(MIGRATIONS_DIR, '357_friend_add_events_partial_failed.sql'), 'utf8'),
+    );
+    // 送っていない行だけ partial_failed へ。理由が無い行だけ補う
+    expect(db.prepare(`SELECT routing_status, error_code FROM friend_add_events WHERE id = 'event-unsent'`).get())
+      .toEqual({ routing_status: 'partial_failed', error_code: 'send_failed' });
+    expect(db.prepare(`SELECT routing_status, error_code FROM friend_add_events WHERE id = 'event-coded'`).get())
+      .toEqual({ routing_status: 'partial_failed', error_code: 'resend_suppressed' });
+    // 送った行は触らない
+    expect(db.prepare(`SELECT routing_status FROM friend_add_events WHERE id = 'event-sent'`).get())
+      .toEqual({ routing_status: 'completed' });
   });
 
   it('partial_failed を受け付け、未知の状態は拒否する', () => {

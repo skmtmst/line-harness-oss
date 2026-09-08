@@ -35,7 +35,8 @@ vi.mock('@line-crm/db', () => ({
   recordFriendAddEvent: vi.fn().mockResolvedValue('friend-add-event-1'),
   captureFriendAddEventAttribution: vi.fn().mockResolvedValue(null),
   markFriendAddEventRouting: vi.fn().mockResolvedValue(undefined),
-  claimFriendAddSendRight: vi.fn().mockResolvedValue(true),
+  claimFriendAddSendRight: vi.fn().mockResolvedValue({ held: true, generation: 1 }),
+  isFriendAddSendRightHolder: vi.fn().mockResolvedValue(true),
   releaseFriendAddSendRight: vi.fn().mockResolvedValue(undefined),
   recordAnalyticsEvent: vi.fn().mockResolvedValue({ id: 'analytics-event-1' }),
   recordAutoReplyHit: vi.fn().mockResolvedValue(undefined),
@@ -114,6 +115,7 @@ import {
   captureFriendAddEventAttribution,
   markFriendAddEventRouting,
   claimFriendAddSendRight,
+  isFriendAddSendRightHolder,
   releaseFriendAddSendRight,
   recordAnalyticsEvent,
 } from '@line-crm/db';
@@ -801,7 +803,7 @@ describe('POST /webhook — friend-add抑止理由の台帳記録 (#622)', () =>
   });
 
   test('送信権を取れなかった実行は送らず duplicate_in_flight で引く', async () => {
-    vi.mocked(claimFriendAddSendRight).mockResolvedValueOnce(false);
+    vi.mocked(claimFriendAddSendRight).mockResolvedValueOnce({ held: false, generation: 0 });
     await sendFollowWithRouting({
       routed: true, kind: 'first_time',
       enrollments: [{ scenarioId: 'scenario-1', enrollment: { id: 'enrollment-1' }, resumed: false }],
@@ -815,7 +817,7 @@ describe('POST /webhook — friend-add抑止理由の台帳記録 (#622)', () =>
     expect(releaseFriendAddSendRight).not.toHaveBeenCalled();
   });
 
-  test('送信権の予約に失敗しても従来どおり送る側に倒す', async () => {
+  test('送信権の予約に失敗したら送らず send_claim_unavailable で残す', async () => {
     vi.mocked(claimFriendAddSendRight).mockRejectedValueOnce(new Error('db down'));
     await sendFollowWithRouting({
       routed: true, kind: 'returning',
@@ -825,7 +827,19 @@ describe('POST /webhook — friend-add抑止理由の台帳記録 (#622)', () =>
     });
     expect(markFriendAddEventRouting).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
       eventId: 'friend-add-event-1', lineAccountId: 'account-main',
-      status: 'partial_failed', errorCode: 'send_failed', deliveryCount: 0,
+      status: 'partial_failed', errorCode: 'send_claim_unavailable', deliveryCount: 0,
     }));
+  });
+
+  test('回収で旧持ち主になったら送信も確定もしない', async () => {
+    vi.mocked(isFriendAddSendRightHolder).mockResolvedValueOnce(false);
+    await sendFollowWithRouting({
+      routed: true, kind: 'returning',
+      enrollments: [{ scenarioId: 'scenario-1', enrollment: { id: 'enrollment-1' }, resumed: false }],
+      timing: 'immediate', suppressed: false, suppressReason: null,
+      ruleId: 'rule-1', ruleVersionId: 'rule-1-v1',
+    });
+    expect(markFriendAddEventRouting).not.toHaveBeenCalled();
+    expect(releaseFriendAddSendRight).not.toHaveBeenCalled();
   });
 });

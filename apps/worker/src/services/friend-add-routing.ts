@@ -223,7 +223,8 @@ export type FriendAddSuppressReason =
   | 'friend_condition_unreadable'
   | 'resend_suppressed'
   | 'delivery_disabled'
-  | 'duplicate_in_flight';
+  | 'duplicate_in_flight'
+  | 'send_claim_unavailable';
 
 /** JSTの現在時刻を "HH:MM" で返す。WorkersはUTCで動くので自前でずらす。 */
 export function friendAddJstHhmm(at: Date): string {
@@ -264,7 +265,9 @@ export function isValidFriendAddHhmm(value: unknown): boolean {
  * 送らない側（fail-closed）に倒すため、判定の前にこれを見る。
  */
 export function hasInvalidFriendAddTimeWindows(value: unknown): boolean {
-  if (!Array.isArray(value)) return false;
+  // 欄自体がない（昔の設定）は制限なし。あるのに配列でない壊れた値は不正。
+  if (value == null) return false;
+  if (!Array.isArray(value)) return true;
   return value.some((item) => {
     if (!item || typeof item !== 'object') return true;
     const { start, end } = item as { start?: unknown; end?: unknown };
@@ -773,6 +776,22 @@ function friendAddRulesContradict(first: FriendAddRuleShape, second: FriendAddRu
     const ids = asStringList(second.value);
     return ids != null && typeof first.value === 'string' && ids.includes(first.value);
   }
+  if (first.type === 'tag_exists' && second.type === 'tag_not_all') {
+    const forbidden = asStringList(second.value);
+    // [A] だけを持たない条件と A を持つ条件は両立しない。
+    // [A, B] のように2つ以上あるときは B を持たずに両立する。
+    return forbidden != null && forbidden.length === 1 && forbidden[0] === first.value;
+  }
+  if (first.type === 'tag_not_all' && second.type === 'tag_exists') {
+    return friendAddRulesContradict(second, first);
+  }
+  if ((first.type === 'metadata_equals' && second.type === 'metadata_not_equals')
+    || (first.type === 'metadata_not_equals' && second.type === 'metadata_equals')) {
+    const left = asRuleRecord(first.value);
+    const right = asRuleRecord(second.value);
+    if (!left || !right || left.key !== right.key) return false;
+    return left.value === right.value;
+  }
   if (first.type === 'scenario_subscribed' && second.type === 'scenario_state') {
     const state = asRuleRecord(second.value);
     return typeof first.value === 'string' && first.value !== ''
@@ -1201,7 +1220,7 @@ export async function applyFriendAddRouting(
   accountId: string | null,
   friend: FriendAddSubject,
   push?: ImmediatePushContext,
-  routingContext?: { entryRouteId?: string | null; now?: Date; sendRight?: boolean },
+  routingContext?: { entryRouteId?: string | null; now?: Date; sendRight?: boolean; claimError?: boolean },
 ): Promise<FriendAddRoutingResult> {
   const none: FriendAddRoutingResult = {
     routed: false,
@@ -1237,7 +1256,7 @@ export async function applyFriendAddRouting(
       enrollments: [],
       timing: selection.evaluated.definition.timing,
       suppressed: true,
-      suppressReason: 'duplicate_in_flight',
+      suppressReason: routingContext?.claimError === true ? 'send_claim_unavailable' : 'duplicate_in_flight',
       ruleId: selection.evaluated.ruleId,
       ruleVersionId: selection.evaluated.versionId,
     };

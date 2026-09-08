@@ -107,17 +107,12 @@ function normalizeDefinition(raw: Partial<FriendAddRuleDefinition> | undefined):
     ? [...new Set(definition.weekdays.filter((day): day is number => Number.isInteger(day) && day >= 0 && day <= 6))]
     : [];
   /*
-   * 時間帯は「文字の組」まで残し、範囲の正しさは残さない（落とさない）。
-   * 99:99 のような不正値をここで落とすと「制限なし」に読み替わり、
-   * 送ってはいけない相手に送ってしまう。保存側の validateInput が
-   * 新規の不正値を拒否し、既に入った不正値は実行時が fail-closed で止める。
+   * 時間帯は生のまま残す（落とさない）。99:99 や壊れた値をここで落とすと
+   * 「制限なし」に読み替わり、送ってはいけない相手に送ってしまう。
+   * 保存側の validateInput が新規の不正値を拒否し、既に入った不正値は
+   * 実行時が fail-closed で止める。
    */
-  const timeWindows = Array.isArray(definition.timeWindows)
-    ? definition.timeWindows.filter((window): window is { start: string; end: string } => (
-        Boolean(window) && typeof (window as { start?: unknown }).start === 'string'
-        && typeof (window as { end?: unknown }).end === 'string'
-      ))
-    : [];
+  const timeWindows = definition.timeWindows as { start: string; end: string }[] | undefined;
   return {
     routeIds: Array.isArray(definition.routeIds)
       ? definition.routeIds.filter((id): id is string => typeof id === 'string' && Boolean(id))
@@ -369,7 +364,7 @@ function makeRunCursor(row: { occurred_at: string; id: string }): string {
   return encodeURIComponent(JSON.stringify({ occurredAt: row.occurred_at, id: row.id }));
 }
 
-const RUN_STATUSES = new Set(['pending', 'completed', 'failed', 'suppressed']);
+const RUN_STATUSES = new Set(['pending', 'completed', 'failed', 'suppressed', 'partial_failed']);
 
 const RUN_ATTRIBUTIONS = new Set(['captured', 'unavailable']);
 
@@ -444,7 +439,7 @@ friendAddRules.get('/api/friend-add-runs', requireRole('owner', 'admin', 'staff'
       c.env.DB.prepare(
         `SELECT COUNT(*) AS total_runs,
                 SUM(delivery_count) AS delivery_count,
-                SUM(CASE WHEN routing_status = 'failed' THEN 1 ELSE 0 END) AS failed_runs,
+                SUM(CASE WHEN routing_status IN ('failed', 'partial_failed') THEN 1 ELSE 0 END) AS failed_runs,
                 AVG(CASE WHEN first_delivery_sent_at IS NOT NULL
                     THEN (julianday(first_delivery_sent_at) - julianday(occurred_at)) * 86400000 END) AS average_send_ms,
                 SUM(CASE WHEN scenario_enrollment_id IS NOT NULL THEN 1 ELSE 0 END) AS scenario_starts

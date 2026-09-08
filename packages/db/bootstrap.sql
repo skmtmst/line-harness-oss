@@ -2069,6 +2069,7 @@ CREATE TABLE friend_add_send_claims (
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
   friend_id       TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
   event_id        TEXT NOT NULL,
+  generation      INTEGER NOT NULL DEFAULT 1 CHECK (generation >= 1),
   claimed_at      TEXT NOT NULL,
   PRIMARY KEY (line_account_id, friend_id)
 );

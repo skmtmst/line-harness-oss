@@ -29,6 +29,7 @@ const ROUTING_LABELS: Record<FriendAddEventRoutingStatus, { label: string; tone:
   completed: { label: '成功', tone: 'success' },
   failed: { label: 'エラー', tone: 'danger' },
   suppressed: { label: '配信なし', tone: 'neutral' },
+  partial_failed: { label: '再送待ち', tone: 'warning' },
 }
 
 const ROUTING_ACTIONS: Record<FriendAddEventRoutingStatus, string> = {
@@ -36,7 +37,12 @@ const ROUTING_ACTIONS: Record<FriendAddEventRoutingStatus, string> = {
   completed: '初回案内を実行',
   failed: '配信・処理に失敗',
   suppressed: '配信・処理なし',
+  partial_failed: '送れず再送待ち',
 }
+
+/** 将来の状態が来ても描画を落とさない受け皿。 */
+const UNKNOWN_ROUTING_LABEL = { label: '不明', tone: 'neutral' } as const
+const UNKNOWN_ROUTING_ACTION = '状態を確認中'
 
 /** DBにはJSTの時刻をオフセットなしで保存した古い行がある。UTCへ読み替えず、そのままJSTとして表示する。 */
 function formatJstDateTime(value: string | null): string {
@@ -225,7 +231,7 @@ export default function FriendAddRunsPage() {
         item.friend.displayName || '名前は未取得',
         item.friendKind === 'first_time' ? 'はじめて' : '再追加・ブロック解除',
         routeName,
-        ROUTING_LABELS[item.status].label,
+        (ROUTING_LABELS[item.status] ?? UNKNOWN_ROUTING_LABEL).label,
         formatJstDateTime(item.processedAt),
       ]
     })
@@ -279,6 +285,7 @@ export default function FriendAddRunsPage() {
                   { value: 'pending', label: 'テスト待ち' },
                   { value: 'failed', label: 'エラー' },
                   { value: 'suppressed', label: '配信なし' },
+                  { value: 'partial_failed', label: '再送待ち' },
                 ]}
               />
               <Button onClick={() => void load()} disabled={loading}>一覧を更新</Button>
@@ -327,7 +334,7 @@ export default function FriendAddRunsPage() {
             </div>
             <div className="divide-y divide-hairline px-4">
               {visibleItems.map((item) => {
-                const status = ROUTING_LABELS[item.status]
+                const status = ROUTING_LABELS[item.status] ?? UNKNOWN_ROUTING_LABEL
                 const routeName = item.attribution.status === 'captured'
                   ? item.attribution.routeName || item.attribution.reason || '選択した経路'
                   : '経路は取得できません'
@@ -338,7 +345,7 @@ export default function FriendAddRunsPage() {
                     ? `初回案内を${item.deliveryCount}通送信`
                     : item.actions.total > 0
                       ? `${item.actions.total}件の処理を実行`
-                      : ROUTING_ACTIONS[item.status]
+                      : (ROUTING_ACTIONS[item.status] ?? UNKNOWN_ROUTING_ACTION)
                 return (
                   <div key={item.id} className="flex min-w-0 items-center gap-3 py-3">
                     <span className="grid size-9 shrink-0 place-items-center rounded-full bg-status-success-soft text-xs font-bold text-status-success-deep" aria-hidden="true">

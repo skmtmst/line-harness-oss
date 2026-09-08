@@ -23,6 +23,7 @@ import {
   captureFriendAddEventAttribution,
   markFriendAddEventRouting,
   claimFriendAddSendRight,
+  isFriendAddSendRightHolder,
   releaseFriendAddSendRight,
   toJstString,
   recordAnalyticsEvent,
@@ -397,18 +398,47 @@ async function handleEvent(
      */
     let sendRight = true;
     let claimedSendRight = false;
+    let claimGeneration = 0;
+    let claimError = false;
+    let fencedOut = false;
     if (friendAddEventId && lineAccountId) {
       try {
-        claimedSendRight = await claimFriendAddSendRight(db, {
+        const claim = await claimFriendAddSendRight(db, {
           lineAccountId,
           friendId: friend.id,
           eventId: friendAddEventId,
         });
-        sendRight = claimedSendRight;
+        claimedSendRight = claim.held;
+        claimGeneration = claim.generation;
+        sendRight = claim.held;
       } catch (err) {
+        // 予約が取れないときは送らない（fail-closed）。振り分けは抑止側に倒す。
+        claimError = true;
+        sendRight = false;
         logWebhookStepFailure('friend_add_send_claim', err, lineAccountId, event);
       }
     }
+    /*
+     * 回収で世代が進んでいたら古い持ち主として引く（fencing）。
+     * 確認できないときも送らない（fail-closed）。
+     */
+    const stillSendRightHolder = async (): Promise<boolean> => {
+      if (!sendRight || friendAddEventId == null || lineAccountId == null) return sendRight;
+      try {
+        const held = await isFriendAddSendRightHolder(db, {
+          lineAccountId,
+          friendId: friend.id,
+          eventId: friendAddEventId,
+          generation: claimGeneration,
+        });
+        if (!held) fencedOut = true;
+        return held;
+      } catch (err) {
+        fencedOut = true;
+        logWebhookStepFailure('friend_add_send_fence', err, lineAccountId, event);
+        return false;
+      }
+    };
     let routing: Awaited<ReturnType<typeof applyFriendAddRouting>> | null = null;
     try {
       routing = runAccountScenarios
@@ -418,6 +448,7 @@ async function handleEvent(
           }, {
             entryRouteId: currentAttribution?.entryRouteId ?? referralRoute?.id ?? null,
             sendRight,
+            claimError,
           })
         : null;
     } catch (err) {
@@ -446,6 +477,8 @@ async function handleEvent(
           // next_delivery_at を見て cron が出す。
           if (resumed) continue;
           if (routing.timing !== 'immediate') continue;
+          // 回収されていたら古い持ち主として送らない。
+          if (!(await stillSendRightHolder())) break;
           const sent = await pushImmediateFirstStep(
             db,
             friend.id,
@@ -486,6 +519,8 @@ async function handleEvent(
       const scenarioAccountMatch = !scenario.line_account_id || !lineAccountId || scenario.line_account_id === lineAccountId;
       if (friendAddIds.has(scenario.id) && scenarioAccountMatch) {
         try {
+          // 回収されていたら古い持ち主として登録も送信もしない。
+          if (!(await stillSendRightHolder())) break;
           // INSERT OR IGNORE handles dedup via UNIQUE(friend_id, scenario_id)
           const friendScenario = await enrollFriendInScenario(db, friend.id, scenario.id);
           if (!friendScenario) continue; // already enrolled
@@ -521,20 +556,14 @@ async function handleEvent(
       }
     }
 
-    // 使い終わった送信権の予約を消す。消せなくても古くなれば奪い直せる。
-    if (claimedSendRight && friendAddEventId && lineAccountId) {
-      try {
-        await releaseFriendAddSendRight(db, {
-          lineAccountId,
-          friendId: friend.id,
-          eventId: friendAddEventId,
-        });
-      } catch (err) {
-        logWebhookStepFailure('friend_add_send_release', err, lineAccountId, event);
-      }
+    // 台帳の確定の直前にも持ち主を確かめる。回収されていたら古い持ち主
+    // として確定しない（持ち主が確定する）。
+    if (claimedSendRight && !claimError && friendAddEventId && lineAccountId) {
+      await stillSendRightHolder();
     }
 
-    if (friendAddEventId && lineAccountId) {
+    let ledgerFinalized = false;
+    if (friendAddEventId && lineAccountId && !fencedOut) {
       try {
         /*
          * 送れなかった実行を completed にしない。completed は「送った」印で、
@@ -549,12 +578,33 @@ async function handleEvent(
           status: routing?.suppressed ? 'suppressed' : (delivered ? 'completed' : 'partial_failed'),
           routingRuleId: routing?.ruleId ?? null,
           winningRuleVersionId: routing?.ruleVersionId ?? null,
-          errorCode: routing?.suppressReason ?? (!sendRight ? 'duplicate_in_flight' : (delivered ? null : 'send_failed')),
+          errorCode: routing?.suppressReason
+            ?? (claimError ? 'send_claim_unavailable' : (!sendRight ? 'duplicate_in_flight' : (delivered ? null : 'send_failed'))),
           scenarioEnrollmentId,
           deliveryCount: friendAddDeliveryCount,
         });
+        ledgerFinalized = true;
       } catch (err) {
         logWebhookStepFailure('friend_add_event_mark_complete', err, lineAccountId, event);
+      }
+    }
+
+    /*
+     * 予約の解放は台帳の確定まで待つ。外部送信のあと確定に失敗しても
+     * （送達不明）、予約を掴んだままにするため別の実行は引く。二重送信に
+     * ならない。確定できなかった実行は次の追加で送り直せる
+     * （completed だけが再送制限に数える）。
+     */
+    if (claimedSendRight && !claimError && ledgerFinalized && friendAddEventId && lineAccountId) {
+      try {
+        await releaseFriendAddSendRight(db, {
+          lineAccountId,
+          friendId: friend.id,
+          eventId: friendAddEventId,
+          generation: claimGeneration,
+        });
+      } catch (err) {
+        logWebhookStepFailure('friend_add_send_release', err, lineAccountId, event);
       }
     }
 

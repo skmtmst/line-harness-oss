@@ -78,6 +78,15 @@ DROP TABLE friend_add_events;
 ALTER TABLE friend_add_events_new RENAME TO friend_add_events;
 ALTER TABLE friend_add_action_runs_new RENAME TO friend_add_action_runs;
 
+-- 旧completed かつ一度も送っていない行は、送れなかった行として
+-- partial_failed へ移し、再送可能にする。送った行は触らない。
+-- 再送制限が数えるのは completed だけのため、この移行で送れなかった人が
+-- 送り直せるようになる。理由が無い行だけ send_failed を補う。
+UPDATE friend_add_events
+   SET routing_status = 'partial_failed',
+       error_code = COALESCE(error_code, 'send_failed')
+ WHERE routing_status = 'completed' AND COALESCE(delivery_count, 0) = 0;
+
 -- 表の再構築前と同じ索引名だと適用判定で飛ばされるため、357 固有名で貼り直す。
 CREATE INDEX idx_friend_add_events_v357_account_time
   ON friend_add_events(line_account_id, occurred_at DESC, id DESC);

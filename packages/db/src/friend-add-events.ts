@@ -215,42 +215,95 @@ export const FRIEND_ADD_SEND_CLAIM_TTL_MINUTES = 2;
  * (line_account_id, friend_id) に1行だけ置き、先に置いた実行だけが送る。
  * true＝送ってよい。false＝別の実行が送るので送らずに引く。
  */
+export interface FriendAddSendClaim {
+  /** 送ってよいか。 */
+  held: boolean;
+  /**
+   * 予約の世代。回収（奪い直し）のたびに進む。送信・確定のたびに持ち主と
+   * 合っているか確かめ、ずれたら古い持ち主として引く（fencing）。
+   * 0 は fencing なし（予約表がない短い時間の互換）。
+   */
+  generation: number;
+}
+
+/**
+ * 別webhook IDで並行に届いたfollowの二重送信を防ぐ送信権の予約。
+ * (line_account_id, friend_id) に1行だけ置き、先に置いた実行だけが進む。
+ */
 export async function claimFriendAddSendRight(
   db: D1Database,
   input: { lineAccountId: string; friendId: string; eventId: string; now?: string },
-): Promise<boolean> {
+): Promise<FriendAddSendClaim> {
   const now = input.now ?? jstNow();
   try {
     const inserted = await db.prepare(
-      `INSERT OR IGNORE INTO friend_add_send_claims (line_account_id, friend_id, event_id, claimed_at)
-       VALUES (?, ?, ?, ?)`,
+      `INSERT OR IGNORE INTO friend_add_send_claims (line_account_id, friend_id, event_id, generation, claimed_at)
+       VALUES (?, ?, ?, 1, ?)`,
     ).bind(input.lineAccountId, input.friendId, input.eventId, now).run();
-    if ((inserted.meta?.changes ?? 0) === 1) return true;
+    if ((inserted.meta?.changes ?? 0) === 1) return { held: true, generation: 1 };
   } catch (error) {
-    // 移行が遅れて表が無い短い時間は、従来どおり送る（予約なし）。
-    if (error instanceof Error && error.message.includes('no such table: friend_add_send_claims')) return true;
+    // 移行が遅れて表が無い短い時間は、従来どおり送る（予約なし・fencingなし）。
+    if (error instanceof Error && error.message.includes('no such table: friend_add_send_claims')) {
+      return { held: true, generation: 0 };
+    }
     throw error;
   }
   // 既に誰かの予約がある。古い予約（処理中に落ちた残り）だけ奪い直す。
   const cutoff = addMinutes(now, -FRIEND_ADD_SEND_CLAIM_TTL_MINUTES);
   const stolen = await db.prepare(
     `UPDATE friend_add_send_claims
-        SET event_id = ?, claimed_at = ?
+        SET event_id = ?, generation = generation + 1, claimed_at = ?
       WHERE line_account_id = ? AND friend_id = ? AND claimed_at < ?`,
   ).bind(input.eventId, now, input.lineAccountId, input.friendId, cutoff).run();
-  return (stolen.meta?.changes ?? 0) === 1;
+  if ((stolen.meta?.changes ?? 0) !== 1) return { held: false, generation: 0 };
+  const row = await db.prepare(
+    `SELECT generation FROM friend_add_send_claims
+      WHERE line_account_id = ? AND friend_id = ?`,
+  ).bind(input.lineAccountId, input.friendId).first<{ generation: number }>();
+  return { held: true, generation: row?.generation ?? 1 };
 }
 
-/** 使い終わった予約を消す。自分の予約だけ消す。 */
+/**
+ * 今も予約の持ち主か。回収で世代が進んでいたら古い持ち主として false。
+ * 予約表がない短い時間は fencing できないため true。
+ */
+export async function isFriendAddSendRightHolder(
+  db: D1Database,
+  input: { lineAccountId: string; friendId: string; eventId: string; generation: number },
+): Promise<boolean> {
+  if (input.generation === 0) return true;
+  try {
+    const row = await db.prepare(
+      `SELECT event_id, generation FROM friend_add_send_claims
+        WHERE line_account_id = ? AND friend_id = ?`,
+    ).bind(input.lineAccountId, input.friendId).first<{ event_id: string; generation: number }>();
+    return !!row && row.event_id === input.eventId && row.generation === input.generation;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('no such table: friend_add_send_claims')) return true;
+    throw error;
+  }
+}
+
+/**
+ * 使い終わった予約を消す。自分の世代の予約だけ消す。
+ * 回収で世代が進んでいたら（別の持ち主の行になっていたら）消さない。
+ */
 export async function releaseFriendAddSendRight(
   db: D1Database,
-  input: { lineAccountId: string; friendId: string; eventId: string },
+  input: { lineAccountId: string; friendId: string; eventId: string; generation?: number },
 ): Promise<void> {
   try {
+    if (input.generation == null || input.generation === 0) {
+      await db.prepare(
+        `DELETE FROM friend_add_send_claims
+          WHERE line_account_id = ? AND friend_id = ? AND event_id = ?`,
+      ).bind(input.lineAccountId, input.friendId, input.eventId).run();
+      return;
+    }
     await db.prepare(
       `DELETE FROM friend_add_send_claims
-        WHERE line_account_id = ? AND friend_id = ? AND event_id = ?`,
-    ).bind(input.lineAccountId, input.friendId, input.eventId).run();
+        WHERE line_account_id = ? AND friend_id = ? AND event_id = ? AND generation = ?`,
+    ).bind(input.lineAccountId, input.friendId, input.eventId, input.generation).run();
   } catch (error) {
     if (error instanceof Error && error.message.includes('no such table: friend_add_send_claims')) return;
     throw error;

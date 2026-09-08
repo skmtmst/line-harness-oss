@@ -257,6 +257,29 @@ describe('V6 friend-add rule data contracts', () => {
     expect(bogusAttribution.status).toBe(400);
   });
 
+  it('送れなかった実行はpartial_failedで絞れ、要確認に数える', async () => {
+    seedRuleAndRun(testDb);
+    insertFriend(testDb.raw, 'friend-2', { line_account_id: 'account-1', display_name: '佐藤 花子' });
+    testDb.raw.prepare(
+      `INSERT INTO friend_add_events
+        (id, line_account_id, friend_id, webhook_event_id, friend_kind, attribution_status,
+         routing_rule_id, routing_status, error_code, occurred_at, delivery_count)
+       VALUES ('run-partial', 'account-1', 'friend-2', 'webhook-partial', 'first_time', 'unavailable',
+               'rule-1', 'partial_failed', 'send_failed', '2026-09-07T11:00:00.000', 0)`,
+    ).run();
+
+    const partial = await app(testDb.db).request('/api/friend-add-runs?account_id=account-1&status=partial_failed');
+    expect(partial.status).toBe(200);
+    await expect(partial.json()).resolves.toMatchObject({
+      data: { items: [{ id: 'run-partial', status: 'partial_failed', errorCode: 'send_failed' }], total: 1 },
+    });
+
+    const all = await app(testDb.db).request('/api/friend-add-runs?account_id=account-1');
+    await expect(all.json()).resolves.toMatchObject({
+      data: { summary: { failed: 1 } },
+    });
+  });
+
   it('テストの失敗も成功時と同じ器で理由を返し、別アカウントは存在を隠す', async () => {
     seedRuleAndRun(testDb);
     const brokenDefinition = JSON.stringify({

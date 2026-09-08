@@ -85,7 +85,7 @@ function seedBase(): void {
   });
 }
 
-async function postFollow(webhookEventId: string): Promise<void> {
+async function postFollow(webhookEventId: string, useDb: D1Database = db): Promise<void> {
   const app = new Hono();
   app.route('/', webhook);
   const waitUntil = vi.fn();
@@ -99,9 +99,48 @@ async function postFollow(webhookEventId: string): Promise<void> {
         follow: { isUnblocked: false },
       }],
     }),
-  }, env(), { waitUntil, passThroughOnException: vi.fn(), props: {} } as unknown as ExecutionContext);
+  }, { ...env(), DB: useDb }, { waitUntil, passThroughOnException: vi.fn(), props: {} } as unknown as ExecutionContext);
   expect(response.status).toBe(200);
   await waitUntil.mock.calls[0]?.[0];
+}
+
+function sendCount(): number {
+  return lineClientMocks.replyMessage.mock.calls.length + lineClientMocks.pushMessage.mock.calls.length;
+}
+
+/**
+ * 実D1のまま、指定のSQLに当たった最初の呼び出しだけ壊す差し替え。
+ * 「送信はできたがその後のDBが落ちた」を再現する。
+ */
+function breakOnceOn(useDb: D1Database, needle: string, error: Error): { db: D1Database; calls: () => number } {
+  let armed = true;
+  let calls = 0;
+  const proxy = new Proxy(useDb, {
+    get(target, prop, receiver) {
+      if (prop !== 'prepare') return Reflect.get(target, prop, receiver);
+      return (sql: string) => {
+        const statement = ((target.prepare as unknown) as (query: string) => {
+          bind: (...args: unknown[]) => Record<string, unknown>;
+        })(sql);
+        if (!armed || !sql.includes(needle)) return statement;
+        return {
+          ...statement,
+          bind: (...args: unknown[]) => {
+            const bound = statement.bind(...args);
+            return {
+              ...bound,
+              run: async () => {
+                calls += 1;
+                armed = false;
+                throw error;
+              },
+            };
+          },
+        };
+      };
+    },
+  }) as D1Database;
+  return { db: proxy, calls: () => calls };
 }
 
 function eventRows(): Array<{ routing_status: string; delivery_count: number; error_code: string | null }> {
@@ -151,6 +190,79 @@ describe('POST /webhook — 並行followの単一化 (#622)', () => {
     expect(deferred.error_code).toBe('duplicate_in_flight');
     // 予約のゴミを残さない
     expect(raw.prepare(`SELECT COUNT(*) AS n FROM friend_add_send_claims`).get()).toEqual({ n: 0 });
+  });
+});
+
+describe('POST /webhook — 送信後の台帳確定失敗 (#622)', () => {
+  test('送ったあと確定に失敗しても別webhookは二重送信しない（送達不明契約）', async () => {
+    // 最初の確定UPDATEだけ壊す。送信は通るが台帳は pending のまま残る。
+    const sabotage = breakOnceOn(db, 'UPDATE friend_add_events', new Error('DB down after send'));
+    await postFollow('webhook-a', sabotage.db);
+    expect(sabotage.calls()).toBe(1);
+    expect(sendCount()).toBe(1);
+
+    // 送ったが確定できていない。予約は掴んだままにする
+    const held = raw.prepare(`SELECT event_id FROM friend_add_send_claims`).get() as { event_id: string };
+    const eventA = raw.prepare(
+      `SELECT id FROM friend_add_events WHERE webhook_event_id = 'webhook-a'`,
+    ).get() as { id: string };
+    expect(held).toEqual({ event_id: eventA.id });
+    const pending = raw.prepare(
+      `SELECT routing_status FROM friend_add_events WHERE id = (SELECT id FROM friend_add_events WHERE webhook_event_id = 'webhook-a')`,
+    ).get() as { routing_status: string };
+    expect(pending).toEqual({ routing_status: 'pending' });
+
+    // 別のwebhook IDで並行に届いても、予約が掴まれているため送らない
+    await postFollow('webhook-b');
+    expect(sendCount()).toBe(1);
+    const rows = eventRows();
+    expect(rows.map((row) => row.routing_status).sort()).toEqual(['pending', 'suppressed']);
+    const deferred = rows.find((row) => row.routing_status === 'suppressed')!;
+    expect(deferred).toMatchObject({ delivery_count: 0, error_code: 'duplicate_in_flight' });
+    // 予約は最初の実行が掴んだまま（確定するまで解放しない）
+    expect(raw.prepare(`SELECT event_id FROM friend_add_send_claims`).get()).toEqual({ event_id: eventA.id });
+  });
+});
+
+describe('POST /webhook — 古い予約と予約失敗 (#622)', () => {
+  test('2分過ぎた古い予約は奪い直して送る', async () => {
+    raw.prepare(
+      `INSERT INTO friend_add_send_claims (line_account_id, friend_id, event_id, generation, claimed_at)
+       VALUES ('account-1', 'friend-1', 'webhook-crashed', 1, '2026-09-01T10:00:00.000+09:00')`,
+    ).run();
+    await postFollow('webhook-new');
+    expect(sendCount()).toBe(1);
+    const rows = eventRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ routing_status: 'completed', delivery_count: 1 });
+  });
+
+  test('予約を持つ実行がいるときは送らずに引く（旧holder確定）', async () => {
+    raw.prepare(
+      `INSERT INTO friend_add_send_claims (line_account_id, friend_id, event_id, generation, claimed_at)
+       VALUES ('account-1', 'friend-1', 'webhook-holder', 1, '2999-01-01T00:00:00.000+09:00')`,
+    ).run();
+    await postFollow('webhook-new');
+    expect(sendCount()).toBe(0);
+    const rows = eventRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      routing_status: 'suppressed', delivery_count: 0, error_code: 'duplicate_in_flight',
+    });
+    // 他人の予約はそのまま
+    expect(raw.prepare(`SELECT event_id FROM friend_add_send_claims`).get()).toEqual({ event_id: 'webhook-holder' });
+  });
+
+  test('予約のDB失敗は送らない（fail-closed）', async () => {
+    const sabotage = breakOnceOn(db, 'friend_add_send_claims', new Error('D1 down'));
+    await postFollow('webhook-new', sabotage.db);
+    expect(sabotage.calls()).toBe(1);
+    expect(sendCount()).toBe(0);
+    const rows = eventRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      routing_status: 'suppressed', delivery_count: 0, error_code: 'send_claim_unavailable',
+    });
   });
 });
 

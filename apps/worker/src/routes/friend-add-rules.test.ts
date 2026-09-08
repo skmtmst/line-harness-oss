@@ -160,6 +160,19 @@ describe('friend add rules API', () => {
     }, makeEnv())).status).toBe(403);
   });
 
+  test('壊れた時間帯（非配列）も保存させない', async () => {
+    const response = await app.request('/api/friend-add-rules/drafts', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'Idempotency-Key': 'friend-rule-create-0003' },
+      body: JSON.stringify({
+        accountId: 'account-1', friendKind: 'first_time', name: '紹介QR', priority: 1,
+        definition: { ...definition, timeWindows: 'oops' },
+      }),
+    }, makeEnv());
+    expect(response.status).toBe(400);
+    expect(db.createFriendAddRuleDraft).not.toHaveBeenCalled();
+  });
+
   test('不正な時間帯（99:99など）は保存させない', async () => {
     const response = await app.request('/api/friend-add-rules/drafts', {
       method: 'POST',

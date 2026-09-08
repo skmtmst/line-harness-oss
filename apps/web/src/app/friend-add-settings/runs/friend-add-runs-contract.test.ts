@@ -56,11 +56,18 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
     expect(PAGE).not.toContain("'公式QRから追加'")
   })
 
-  it('4つの処理状態を利用者の言葉で表示する', () => {
+  it('5つの処理状態を利用者の言葉で表示する', () => {
     expect(PAGE).toContain("pending: { label: 'テスト待ち'")
     expect(PAGE).toContain("completed: { label: '成功'")
     expect(PAGE).toContain("failed: { label: 'エラー'")
     expect(PAGE).toContain("suppressed: { label: '配信なし'")
+    expect(PAGE).toContain("partial_failed: { label: '再送待ち'")
+    expect(PAGE).toContain("{ value: 'partial_failed', label: '再送待ち' }")
+  })
+
+  it('将来の状態が来ても描画を落とさない', () => {
+    expect(PAGE).toContain('UNKNOWN_ROUTING_LABEL')
+    expect(PAGE).toContain('UNKNOWN_ROUTING_ACTION')
   })
 
   it('カーソルを積んだページ送りで前後へ移動できる', () => {
