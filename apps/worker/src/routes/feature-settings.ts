@@ -111,10 +111,10 @@ export function specializedCatalog(raw: string | null): string[] {
  * 数える。数えるだけでは保存しない。影響がある保存には確認トークンが
  * 要り、状態が変わったら取り直しになる。
  *
- * 数え先はこのアカウントに結び付く行だけにする。アカウント列が空の行は
- * 全アカウント共有(自動応答などと同じ扱い)として数える。アカウントに
- * 結び付けられない表(流入計測・メディアなど)は対象外とし、数えない。
- * 対象外を 0 件と混ぜないよう、数え先はここに列挙したものだけにする。
+ * 数え先はこのアカウントに結び付く行だけにする。アカウント列が空の行を
+ * 共有として数えるのは、読み取り側が共有扱いしている表だけ
+ * (自動応答・ウェビナー)。それ以外は厳密にこのアカウントの行だけ数え、
+ * 他テナントの名寄せなし行を混ぜない。詳しくは FEATURE_IMPACT_COVERAGE。
  */
 export type FeatureImpactKind = 'published' | 'scheduled' | 'dependent';
 
@@ -161,162 +161,404 @@ const BROADCAST_ACCOUNT_SCOPE = `(b.line_account_id = ?
 const FORM_ACCOUNT_SCOPE = `(NOT EXISTS (SELECT 1 FROM form_accounts fa WHERE fa.form_id = f.id)
   OR EXISTS (SELECT 1 FROM form_accounts fa WHERE fa.form_id = f.id AND fa.line_account_id = ?))`;
 
+/**
+ * 全33種の網羅表。切替対象の各機能が「何を数えるか」か
+ * 「数えない理由」のどちらかを必ず持つ。FEATURE_CATALOGに機能を
+ * 足したらここも足す。足さなければ型検査と契約テストが落ちる。
+ *
+ * 数え先はこのアカウントに結び付く行だけにする。アカウント列が空の
+ * 行を共有として数えるのは、読み取り側が共有扱いしている表だけ
+ * (自動応答・ウェビナー)。それ以外は厳密にこのアカウントの行だけ
+ * 数え、他テナントの名寄せなし行を混ぜない。アカウントに結び付け
+ * られない表は数えず、理由を残して 0 件と混ぜない。
+ */
+export type FeatureImpactSource = {
+  kind: FeatureImpactKind;
+  /** 運用者に見せる対象の呼び名。表名や内部IDは出さない。 */
+  targetType: string;
+  sql: string;
+  /** ? の個数。すべて accountId で埋める。 */
+  params: 1 | 2;
+};
+
+export type FeatureImpactCoverageEntry =
+  | { readonly scope: 'counted'; readonly sources: readonly FeatureImpactSource[] }
+  | { readonly scope: 'none'; readonly reason: string };
+
+export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCoverageEntry>> = {
+  broadcasts: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'scheduled',
+        targetType: '予約済みの配信',
+        sql: `SELECT COUNT(*) AS total FROM broadcasts b WHERE b.status = 'scheduled' AND ${BROADCAST_ACCOUNT_SCOPE}`,
+        params: 2,
+      },
+      {
+        kind: 'published',
+        targetType: '送信中の配信',
+        sql: `SELECT COUNT(*) AS total FROM broadcasts b WHERE b.status = 'sending' AND ${BROADCAST_ACCOUNT_SCOPE}`,
+        params: 2,
+      },
+    ],
+  },
+  scenarios: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'published',
+        targetType: '公開中のシナリオ',
+        sql: `SELECT COUNT(*) AS total FROM scenarios WHERE is_active = 1 AND line_account_id = ?`,
+        params: 1,
+      },
+      {
+        kind: 'dependent',
+        targetType: '回答後にシナリオへつなぐフォーム',
+        sql: `SELECT COUNT(*) AS total FROM forms f WHERE f.on_submit_scenario_id IS NOT NULL AND f.is_active = 1 AND ${FORM_ACCOUNT_SCOPE}`,
+        params: 1,
+      },
+      {
+        kind: 'dependent',
+        targetType: 'シナリオを使う紹介オファー',
+        sql: `SELECT COUNT(*) AS total FROM affiliate_offers WHERE scenario_id IS NOT NULL AND is_active = 1 AND line_account_id = ?`,
+        params: 1,
+      },
+    ],
+  },
+  templates: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'dependent',
+        targetType: 'テンプレートを使う自動応答',
+        sql: `SELECT COUNT(*) AS total FROM auto_replies WHERE template_id IS NOT NULL AND is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)`,
+        params: 1,
+      },
+    ],
+  },
+  reminders: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'published',
+        targetType: '有効なリマインド設定',
+        sql: `SELECT COUNT(*) AS total FROM reminders WHERE is_active = 1 AND deleted_at IS NULL AND line_account_id = ?`,
+        params: 1,
+      },
+      {
+        kind: 'scheduled',
+        targetType: '送信待ちのリマインド',
+        sql: `SELECT COUNT(*) AS total FROM friend_reminders fr
+         JOIN reminders r ON r.id = fr.reminder_id AND r.deleted_at IS NULL AND r.line_account_id = ?
+         WHERE fr.status = 'active'`,
+        params: 1,
+      },
+    ],
+  },
+  auto_replies: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'published',
+        targetType: '有効な自動応答',
+        sql: `SELECT COUNT(*) AS total FROM auto_replies WHERE is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)`,
+        params: 1,
+      },
+    ],
+  },
+  rich_menus: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'published',
+        targetType: '利用中のリッチメニュー',
+        sql: `SELECT COUNT(*) AS total FROM rich_menu_assignments WHERE line_account_id = ?`,
+        params: 1,
+      },
+    ],
+  },
+  inflow_tracking: {
+    scope: 'none',
+    reason: '計測リンクと流入経路の表にアカウント列がなく、アカウント単位で結び付けられない',
+  },
+  forms: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'published',
+        targetType: '公開中の回答フォーム',
+        sql: `SELECT COUNT(*) AS total FROM forms f WHERE f.is_active = 1 AND ${FORM_ACCOUNT_SCOPE}`,
+        params: 1,
+      },
+    ],
+  },
+  photo_review: {
+    scope: 'none',
+    reason: '審査待ちの表にアカウント列がなく、アカウント単位で結び付けられない',
+  },
+  automations: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'scheduled',
+        targetType: '実行待ち・実行中の自動処理',
+        sql: `SELECT COUNT(*) AS total FROM automation_runs
+         WHERE status IN ('queued', 'running', 'waiting') AND is_test = 0 AND line_account_id = ?`,
+        params: 1,
+      },
+    ],
+  },
+  external_integrations: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'published',
+        targetType: '有効な受信Webhook',
+        sql: `SELECT COUNT(*) AS total FROM incoming_webhooks WHERE is_active = 1 AND line_account_id = ?`,
+        params: 1,
+      },
+    ],
+  },
+  friend_add_routing: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'published',
+        targetType: '公開中の振り分けルール',
+        sql: `SELECT COUNT(*) AS total FROM friend_add_rules WHERE status = 'published' AND line_account_id = ?`,
+        params: 1,
+      },
+    ],
+  },
+  multi_store_hierarchy: {
+    scope: 'none',
+    reason: '店舗束の構成設定で、待ち行を持たない',
+  },
+  multi_store_bulk_updates: {
+    scope: 'none',
+    reason: '一括更新の待ち行を表に持たない',
+  },
+  reservation_ledger: {
+    scope: 'none',
+    reason: '台帳の行にアカウント列がなく、アカウント単位で結び付けられない',
+  },
+  external_reservations: {
+    scope: 'none',
+    reason: '外部予約の待ち行を表に持たず、アカウント単位で結び付けられない',
+  },
+  google_business_profile: {
+    scope: 'none',
+    reason: '投稿の表にアカウント列がなく、アカウント単位で結び付けられない',
+  },
+  friend_fields: {
+    scope: 'none',
+    reason: '属性の値と走査状態にアカウント列がなく、アカウント単位で結び付けられない',
+  },
+  support_marks: {
+    scope: 'none',
+    reason: '付け替え申請は状態を持たない記録で、待ち行でない',
+  },
+  saved_searches: {
+    scope: 'none',
+    reason: '保存条件と利用履歴で、待ち行を持たない',
+  },
+  media: {
+    scope: 'none',
+    reason: '素材の表にアカウント列がなく、アカウント単位で結び付けられない',
+  },
+  common_vars: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'scheduled',
+        targetType: '反映待ちの共通変数変更',
+        sql: `SELECT COUNT(*) AS total FROM common_var_schedules s
+         JOIN common_vars v ON v.id = s.var_id AND v.archived_at IS NULL AND v.line_account_id = ?
+         WHERE s.applied_at IS NULL`,
+        params: 1,
+      },
+    ],
+  },
+  analytics: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'scheduled',
+        targetType: '有効なレポート予約',
+        sql: `SELECT COUNT(*) AS total FROM analytics_report_schedules WHERE status = 'active' AND line_account_id = ?`,
+        params: 1,
+      },
+    ],
+  },
+  site_tracking: {
+    scope: 'none',
+    reason: '計測ログは履歴で、待ち行を持たない',
+  },
+  webinars: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'published',
+        targetType: '公開中のウェビナー',
+        sql: `SELECT COUNT(*) AS total FROM webinars WHERE status = 'active' AND (account_id IS NULL OR account_id = ?)`,
+        params: 1,
+      },
+      {
+        kind: 'scheduled',
+        targetType: '送信待ちのウェビナー通知',
+        sql: `SELECT COUNT(*) AS total FROM webinar_notification_jobs j
+         JOIN webinars w ON w.id = j.webinar_id AND (w.account_id IS NULL OR w.account_id = ?)
+         WHERE j.status IN ('queued', 'claimed', 'retry_wait')`,
+        params: 1,
+      },
+    ],
+  },
+  events: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'published',
+        targetType: '公開中のイベント',
+        sql: `SELECT COUNT(*) AS total FROM events WHERE is_published = 1 AND deleted_at IS NULL AND line_account_id = ?`,
+        params: 1,
+      },
+      {
+        kind: 'scheduled',
+        targetType: '受付中のイベント予約',
+        sql: `SELECT COUNT(*) AS total FROM event_bookings WHERE status IN ('requested', 'confirmed') AND line_account_id = ?`,
+        params: 1,
+      },
+      {
+        kind: 'scheduled',
+        targetType: '送信待ちのイベントリマインド',
+        sql: `SELECT COUNT(*) AS total FROM event_booking_reminders ebr
+         JOIN event_bookings eb ON eb.id = ebr.booking_id AND eb.line_account_id = ?
+         WHERE ebr.status = 'pending'`,
+        params: 1,
+      },
+    ],
+  },
+  booking: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'scheduled',
+        targetType: '受付中の予約',
+        sql: `SELECT COUNT(*) AS total FROM bookings WHERE status IN ('requested', 'confirmed') AND line_account_id = ?`,
+        params: 1,
+      },
+      {
+        kind: 'scheduled',
+        targetType: '送信待ちの予約リマインド',
+        sql: `SELECT COUNT(*) AS total FROM booking_reminders br
+         JOIN bookings b ON b.id = br.booking_id AND b.line_account_id = ?
+         WHERE br.status = 'pending'`,
+        params: 1,
+      },
+    ],
+  },
+  affiliates: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'published',
+        targetType: '受付中の紹介オファー',
+        sql: `SELECT COUNT(*) AS total FROM affiliate_offers WHERE is_active = 1 AND line_account_id = ?`,
+        params: 1,
+      },
+      {
+        kind: 'scheduled',
+        targetType: '精算待ちの支払い',
+        sql: `SELECT COUNT(*) AS total FROM affiliate_payout_batches
+         WHERE state IN ('created', 'approved') AND line_account_id = ?`,
+        params: 1,
+      },
+    ],
+  },
+  mileage: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'scheduled',
+        targetType: '処理中のマイル交換',
+        sql: `SELECT COUNT(*) AS total FROM mileage_redemptions
+         WHERE status IN ('reserved', 'delivering') AND line_account_id = ?`,
+        params: 1,
+      },
+      {
+        kind: 'dependent',
+        targetType: 'マイル特典を使う紹介オファー',
+        sql: `SELECT COUNT(*) AS total FROM affiliate_offers
+         WHERE mileage_program_id IS NOT NULL AND is_active = 1 AND line_account_id = ?`,
+        params: 1,
+      },
+    ],
+  },
+  ec_commerce: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'scheduled',
+        targetType: '処理中のEC注文',
+        sql: `SELECT COUNT(*) AS total FROM ec_orders
+         WHERE normalized_status = 'current' AND line_account_id = ?`,
+        params: 1,
+      },
+    ],
+  },
+  line_notifications: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'published',
+        targetType: '有効な通知ルール',
+        sql: `SELECT COUNT(*) AS total FROM notification_rules WHERE is_active = 1 AND line_account_id = ?`,
+        params: 1,
+      },
+      {
+        kind: 'scheduled',
+        targetType: '送信待ちの通知',
+        sql: `SELECT COUNT(*) AS total FROM notification_deliveries
+         WHERE status IN ('pending', 'provider_accepted', 'retry_wait')
+         AND execution_mode != 'test' AND line_account_id = ?`,
+        params: 1,
+      },
+    ],
+  },
+  nen_campaigns: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'scheduled',
+        targetType: '送信待ちのNEN配信',
+        sql: `SELECT COUNT(*) AS total FROM nen_delivery_jobs
+         WHERE status IN ('pending', 'processing') AND line_account_id = ?`,
+        params: 1,
+      },
+    ],
+  },
+  restaurant_test: {
+    scope: 'none',
+    reason: '検証用のため、本番の稼働対象としない',
+  },
+};
+
 async function collectFeatureImpact(
   db: D1Database,
   accountId: string,
   feature: ToggleableFeature,
 ): Promise<FeatureImpactItem[]> {
+  const entry = FEATURE_IMPACT_COVERAGE[feature];
+  if (!entry) {
+    throw new Error(`影響の数え先が未定義です: ${String(feature)}`);
+  }
+  if (entry.scope === 'none') return [];
   const items: FeatureImpactItem[] = [];
-  const add = async (kind: FeatureImpactKind, targetType: string, sql: string, ...params: unknown[]) => {
-    const count = await countRows(db, sql, ...params);
-    if (count > 0) items.push({ kind, targetType, count });
-  };
-  switch (feature) {
-    case 'broadcasts':
-      await add('scheduled', '予約済みの配信',
-        `SELECT COUNT(*) AS total FROM broadcasts b WHERE b.status = 'scheduled' AND ${BROADCAST_ACCOUNT_SCOPE}`,
-        accountId, accountId);
-      await add('published', '送信中の配信',
-        `SELECT COUNT(*) AS total FROM broadcasts b WHERE b.status = 'sending' AND ${BROADCAST_ACCOUNT_SCOPE}`,
-        accountId, accountId);
-      break;
-    case 'scenarios':
-      await add('published', '公開中のシナリオ',
-        `SELECT COUNT(*) AS total FROM scenarios WHERE is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)`,
-        accountId);
-      await add('dependent', '回答後にシナリオへつなぐフォーム',
-        `SELECT COUNT(*) AS total FROM forms f WHERE f.on_submit_scenario_id IS NOT NULL AND f.is_active = 1 AND ${FORM_ACCOUNT_SCOPE}`,
-        accountId);
-      await add('dependent', 'シナリオを使う紹介オファー',
-        `SELECT COUNT(*) AS total FROM affiliate_offers WHERE scenario_id IS NOT NULL AND is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)`,
-        accountId);
-      break;
-    case 'auto_replies':
-      await add('published', '有効な自動応答',
-        `SELECT COUNT(*) AS total FROM auto_replies WHERE is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)`,
-        accountId);
-      break;
-    case 'reminders':
-      await add('published', '有効なリマインド設定',
-        `SELECT COUNT(*) AS total FROM reminders WHERE is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)`,
-        accountId);
-      await add('scheduled', '送信待ちのリマインド',
-        `SELECT COUNT(*) AS total FROM friend_reminders fr
-         JOIN reminders r ON r.id = fr.reminder_id AND (r.line_account_id IS NULL OR r.line_account_id = ?)
-         WHERE fr.status = 'active'`,
-        accountId);
-      break;
-    case 'rich_menus':
-      await add('published', '利用中のリッチメニュー',
-        `SELECT COUNT(*) AS total FROM rich_menu_assignments WHERE line_account_id IS NULL OR line_account_id = ?`,
-        accountId);
-      break;
-    case 'forms':
-      await add('published', '公開中の回答フォーム',
-        `SELECT COUNT(*) AS total FROM forms f WHERE f.is_active = 1 AND ${FORM_ACCOUNT_SCOPE}`,
-        accountId);
-      break;
-    case 'events':
-      await add('published', '公開中のイベント',
-        `SELECT COUNT(*) AS total FROM events WHERE is_published = 1 AND deleted_at IS NULL AND line_account_id = ?`,
-        accountId);
-      await add('scheduled', '受付中のイベント予約',
-        `SELECT COUNT(*) AS total FROM event_bookings WHERE status IN ('requested', 'confirmed') AND line_account_id = ?`,
-        accountId);
-      await add('scheduled', '送信待ちのイベントリマインド',
-        `SELECT COUNT(*) AS total FROM event_booking_reminders ebr
-         JOIN event_bookings eb ON eb.id = ebr.booking_id AND eb.line_account_id = ?
-         WHERE ebr.status = 'pending'`,
-        accountId);
-      break;
-    case 'webinars':
-      await add('published', '公開中のウェビナー',
-        `SELECT COUNT(*) AS total FROM webinars WHERE status = 'active' AND (account_id IS NULL OR account_id = ?)`,
-        accountId);
-      await add('scheduled', '送信待ちのウェビナー通知',
-        `SELECT COUNT(*) AS total FROM webinar_notification_jobs j
-         JOIN webinars w ON w.id = j.webinar_id AND (w.account_id IS NULL OR w.account_id = ?)
-         WHERE j.status IN ('queued', 'claimed', 'retry_wait')`,
-        accountId);
-      break;
-    case 'booking':
-      await add('scheduled', '受付中の予約',
-        `SELECT COUNT(*) AS total FROM bookings WHERE status IN ('requested', 'confirmed') AND line_account_id = ?`,
-        accountId);
-      await add('scheduled', '送信待ちの予約リマインド',
-        `SELECT COUNT(*) AS total FROM booking_reminders br
-         JOIN bookings b ON b.id = br.booking_id AND b.line_account_id = ?
-         WHERE br.status = 'pending'`,
-        accountId);
-      break;
-    case 'automations':
-      await add('scheduled', '実行待ち・実行中の自動処理',
-        `SELECT COUNT(*) AS total FROM automation_runs
-         WHERE status IN ('queued', 'running', 'waiting') AND is_test = 0 AND line_account_id = ?`,
-        accountId);
-      break;
-    case 'line_notifications':
-      await add('published', '有効な通知ルール',
-        `SELECT COUNT(*) AS total FROM notification_rules WHERE is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)`,
-        accountId);
-      await add('scheduled', '送信待ちの通知',
-        `SELECT COUNT(*) AS total FROM notification_deliveries
-         WHERE status IN ('pending', 'provider_accepted', 'retry_wait')
-         AND execution_mode != 'test' AND (line_account_id IS NULL OR line_account_id = ?)`,
-        accountId);
-      break;
-    case 'nen_campaigns':
-      await add('scheduled', '送信待ちのNEN配信',
-        `SELECT COUNT(*) AS total FROM nen_delivery_jobs
-         WHERE status IN ('pending', 'processing') AND (line_account_id IS NULL OR line_account_id = ?)`,
-        accountId);
-      break;
-    case 'common_vars':
-      await add('scheduled', '反映待ちの共通変数変更',
-        `SELECT COUNT(*) AS total FROM common_var_schedules s
-         JOIN common_vars v ON v.id = s.var_id AND v.archived_at IS NULL
-         AND (v.line_account_id IS NULL OR v.line_account_id = ?)
-         WHERE s.applied_at IS NULL`,
-        accountId);
-      break;
-    case 'friend_add_routing':
-      await add('published', '公開中の振り分けルール',
-        `SELECT COUNT(*) AS total FROM friend_add_rules WHERE status = 'published' AND line_account_id = ?`,
-        accountId);
-      break;
-    case 'mileage':
-      await add('scheduled', '処理中のマイル交換',
-        `SELECT COUNT(*) AS total FROM mileage_redemptions
-         WHERE status IN ('reserved', 'delivering') AND (line_account_id IS NULL OR line_account_id = ?)`,
-        accountId);
-      await add('dependent', 'マイル特典を使う紹介オファー',
-        `SELECT COUNT(*) AS total FROM affiliate_offers
-         WHERE mileage_program_id IS NOT NULL AND is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)`,
-        accountId);
-      break;
-    case 'affiliates':
-      await add('published', '受付中の紹介オファー',
-        `SELECT COUNT(*) AS total FROM affiliate_offers WHERE is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)`,
-        accountId);
-      await add('scheduled', '精算待ちの支払い',
-        `SELECT COUNT(*) AS total FROM affiliate_payout_batches
-         WHERE state IN ('created', 'approved') AND (line_account_id IS NULL OR line_account_id = ?)`,
-        accountId);
-      break;
-    case 'ec_commerce':
-      await add('scheduled', '処理中のEC注文',
-        `SELECT COUNT(*) AS total FROM ec_orders
-         WHERE normalized_status = 'current' AND (line_account_id IS NULL OR line_account_id = ?)`,
-        accountId);
-      break;
-    case 'templates':
-      await add('dependent', 'テンプレートを使う自動応答',
-        `SELECT COUNT(*) AS total FROM auto_replies
-         WHERE template_id IS NOT NULL AND is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)`,
-        accountId);
-      break;
-    default:
-      break;
+  for (const source of entry.sources) {
+    const params = source.params === 2 ? [accountId, accountId] : [accountId];
+    const count = await countRows(db, source.sql, ...params);
+    if (count > 0) items.push({ kind: source.kind, targetType: source.targetType, count });
   }
   return items;
 }
@@ -529,7 +771,7 @@ featureSettings.get('/api/settings/features', async (c) => {
  * 返す。止まる仕事があるときだけ確認トークンを発行し、保存時に求める。
  * 影響がなければトークンは要らない(通常保存)。
  */
-featureSettings.post('/api/settings/features/impact', async (c) => {
+featureSettings.post('/api/settings/features/impact', requireRole('owner', 'admin'), async (c) => {
   try {
     const accountId = getAccountId(c);
     if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
