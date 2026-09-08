@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import type { Tag } from '@line-crm/shared'
 import { AlertTriangle, ArrowRight, CheckCircle2, Eye, GripVertical, Paperclip, Plus, Save, Send, Trash2, Zap } from 'lucide-react'
 import {
@@ -467,6 +468,8 @@ export default function BroadcastForm({
    */
   const draftSession = useRef(newBroadcastDraftSession())
   const appliedInitialTemplate = useRef(false)
+  const searchParams = useSearchParams()
+  const appliedDuplicateFrom = useRef(false)
   const [title, setTitle] = useState(visualQaAugustCampaign ? '8月キャンペーンのお知らせ' : '')
   const [internalMemo, setInternalMemo] = useState('')
   const [deliveryMethod, setDeliveryMethod] = useState<'new' | 'template' | 'duplicate'>('new')
@@ -557,6 +560,31 @@ export default function BroadcastForm({
   useEffect(() => {
     if (openTemplatePickerInitially) setShowTemplatePicker(true)
   }, [openTemplatePickerInitially])
+
+  /*
+   * 送信済み詳細の「同じ設定で作り直す」から来たとき、元配信を種にする
+   *（#605）。読むのは題名と本文だけ。口が他アカウントを404で断るので、
+   * 見られない配信は引き継げない。無い・読めないときは空のままにして
+   * 理由を出す（黙って空にしない）。
+   */
+  useEffect(() => {
+    if (appliedDuplicateFrom.current) return
+    const sourceId = searchParams.get('duplicateFrom')?.trim()
+    if (!sourceId) return
+    appliedDuplicateFrom.current = true
+    void api.broadcasts.get(sourceId).then((res) => {
+      if (!res.success || !res.data) {
+        setError('元の配信を読み込めませんでした。作り直す配信を選び直してください。')
+        return
+      }
+      const copy = duplicateCopy(res.data)
+      setTitle(copy.title)
+      setBubbles(copy.bubbles)
+      setDeliveryMethod('duplicate')
+    }).catch(() => {
+      setError('元の配信を読み込めませんでした。作り直す配信を選び直してください。')
+    })
+  }, [searchParams])
 
   // 本文や届く時刻を変えたあとは、前の見た目に対する確認を引き継がない。
   useEffect(() => {
@@ -696,7 +724,12 @@ export default function BroadcastForm({
     setShowTemplatePicker(false)
   }
 
-  const duplicateRecent = (broadcast: ApiBroadcast) => {
+  /*
+   * 複製で引き継ぐのは題名と本文だけ。宛先・予約日時・配信元アカウントは
+   * 引き継がない（送る前に選ばせる）。秘密値を持たない配信設定なので、
+   * ここに来るのは本文だけでよい（#605）。
+   */
+  const duplicateCopy = (broadcast: ApiBroadcast) => {
     const copied = broadcast.messageBubbles?.filter((bubble): bubble is BroadcastBubble => (
       Boolean(bubble)
       && typeof bubble === 'object'
@@ -704,10 +737,18 @@ export default function BroadcastForm({
       && typeof bubble.type === 'string'
       && Boolean(bubble.content)
     ))
-    setTitle(`${broadcast.title}（複製）`.slice(0, TITLE_MAX))
-    setBubbles(copied?.length ? copied.map((bubble) => ({ ...bubble, id: crypto.randomUUID() })) : [
-      { id: crypto.randomUUID(), type: broadcast.messageType, content: { text: broadcast.messageContent } },
-    ])
+    return {
+      title: `${broadcast.title}（複製）`.slice(0, TITLE_MAX),
+      bubbles: copied?.length ? copied.map((bubble) => ({ ...bubble, id: crypto.randomUUID() })) : [
+        { id: crypto.randomUUID(), type: broadcast.messageType, content: { text: broadcast.messageContent } },
+      ],
+    }
+  }
+
+  const duplicateRecent = (broadcast: ApiBroadcast) => {
+    const copy = duplicateCopy(broadcast)
+    setTitle(copy.title)
+    setBubbles(copy.bubbles)
     setDeliveryMethod('duplicate')
   }
 

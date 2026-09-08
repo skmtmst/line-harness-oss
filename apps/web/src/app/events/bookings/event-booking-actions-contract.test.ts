@@ -60,4 +60,12 @@ describe('V6 i5SN2j イベント申込者の次行動と安全なキャンセル
     expect(CODE).toContain('友だちは未取得')
     expect(CODE).toContain('アカウントは未取得')
   })
+
+  it('タブ切替では申込一覧だけ取り直す(点検#520軽13)', () => {
+    // 詳細・待ち列はタブと無関係。切替のたびに3つ取り直すと遅く、裏も重い。
+    expect(CODE).toContain('refreshList')
+    expect(CODE).toContain('refreshMeta')
+    expect(CODE).toContain('void refreshList()')
+    expect(CODE).toContain('void refreshMeta()')
+  })
 })

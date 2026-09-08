@@ -65,11 +65,11 @@
 
 | 機能 | Node | 画面 | 差分率 | 高さ差 | 差分の中心 | 実装画像 | 証拠 | 判定 |
 |---|---|---|---:|---:|---|---|---|---|
-| 1 | `vUXKb` | 1-1 ダッシュボード | 4.4250% | +13px | 中央・右 | docs | [差分画像](dashboard-v6/vUXKb-diff-1920.png) | **一致** |
-| 1 | `ZN0ov` | 1-1-1 ダッシュボード編集 | 4.8457% | 0px | 下部・右 | docs | [差分画像](dashboard-v6/ZN0ov-diff-1920.png) | **一致** |
-| 1 | `JN6mQ` | 1-1-2 友だち追加QR | 5.5290% | 0px | 中央・中央 | docs | [差分画像](dashboard-v6/JN6mQ-diff-1920.png) | **一致** |
-| 1 | `NjK9q` | 1-1-3 対応受信の表示件数を開く | 5.3167%（前回値） | +13px | 中央・右 | docs | [差分画像](dashboard-v6/NjK9q-diff-1920.png) | **一致** |
-| 1 | `Alekb` | 1-1-4 通知パネルを開く | 5.3103%（前回値） | +13px | 下部・右 | docs | [差分画像](dashboard-v6/Alekb-diff-1920.png) | **一致** |
+| 1 | `vUXKb` | 1-1 ダッシュボード | 4.4124% | +13px | 中央・右 | docs | [差分画像](dashboard-v6/vUXKb-diff-1920.png) | **一致** |
+| 1 | `ZN0ov` | 1-1-1 ダッシュボード編集 | 4.8586% | 0px | 下部・右 | docs | [差分画像](dashboard-v6/ZN0ov-diff-1920.png) | **一致** |
+| 1 | `JN6mQ` | 1-1-2 友だち追加QR | 5.5518% | 0px | 中央・中央 | docs | [差分画像](dashboard-v6/JN6mQ-diff-1920.png) | **一致** |
+| 1 | `NjK9q` | 1-1-3 対応受信の表示件数を開く | 5.3371% | +13px | 中央・右 | docs | [差分画像](dashboard-v6/NjK9q-diff-1920.png) | **一致** |
+| 1 | `Alekb` | 1-1-4 通知パネルを開く | 5.3306% | +13px | 下部・右 | docs | [差分画像](dashboard-v6/Alekb-diff-1920.png) | **一致** |
 | 2 | `xGLVe` | 2-1 受信箱 | 6.8945% | 0px | 上部・中央 | docs | [差分画像](inbox-v6/xGLVe-diff-1920.png) | **一致** |
 | 2 | `NfgOs` | 2-2 テンプレート選択 | 8.3011% | 0px | 中央・中央 | docs | [差分画像](inbox-v6/NfgOs-diff-1920.png) | **一致** |
 | 2 | `H3lAOB` | 2-3 顧客情報パネル非表示 | 5.7926%（前回値） | 0px | 下部・右 | docs | [差分画像](inbox-v6/H3lAOB-diff-1920.png) | **一致** |
@@ -160,17 +160,17 @@
 | 9 | `P2J0Te` | 9-1-H 実行結果 | 5.0878% | 0px | 下部・中央 | docs | [差分画像](friend-add-v6/P2J0Te-diff-1920.png) | **一致** |
 | 9 | `Q3qP1r` | 9-1-I 削除確認 | 4.4128% | 0px | 上部・右 | docs | [差分画像](friend-add-v6/Q3qP1r-diff-1920.png) | **一致** |
 | 10 | `ZC13r` | 10-1 ウェビナー | 3.2708% | 0px | 上部・左 | docs | [差分画像](webinars-v6/ZC13r-diff-1920.png) | **一致** |
-| 10 | `lvaY5` | 10-1-A ウェビナーを作成 | 7.4946% | 0px | 中央・右 | docs | [差分画像](webinars-v6/lvaY5-diff-1920.png) | **一致** |
-| 10 | `PV1Vh` | 10-1-B 動画・公開設定 | 7.4022% | 0px | 中央・右 | docs | [差分画像](webinars-v6/PV1Vh-diff-1920.png) | **一致** |
-| 10 | `d3rFGD` | 10-1-C CTA・フォーム | 7.4595% | 0px | 中央・右 | docs | [差分画像](webinars-v6/d3rFGD-diff-1920.png) | **一致** |
-| 10 | `Ho8z4` | 10-1-D 通知・リマインド | 7.8397% | 0px | 中央・右 | docs | [差分画像](webinars-v6/Ho8z4-diff-1920.png) | **一致** |
-| 10 | `Xjk8q` | 10-1-E 視聴後アクション | 8.2076% | 0px | 上部・右 | docs | [差分画像](webinars-v6/Xjk8q-diff-1920.png) | **一致** |
-| 10 | `GB0NR` | 10-1-F 公開ページプレビュー | 7.3288% | 0px | 中央・右 | docs | [差分画像](webinars-v6/GB0NR-diff-1920.png) | **一致** |
-| 10 | `D6yO7e` | 10-1-G 公開前確認 | 7.3385% | 0px | 上部・右 | docs | [差分画像](webinars-v6/D6yO7e-diff-1920.png) | **一致** |
-| 10 | `TimXl` | 10-1-H 公開完了 | 3.6839% | 0px | 中央・中央 | docs | [差分画像](webinars-v6/TimXl-diff-1920.png) | **一致** |
-| 10 | `Q8sHa` | 10-1-I 参加者管理 | 3.9349% | 0px | 中央・右 | docs | [差分画像](webinars-v6/Q8sHa-diff-1920.png) | **一致** |
-| 10 | `yxyzQ` | 10-1-J 分析 | 7.7084% | 0px | 中央・右 | docs | [差分画像](webinars-v6/yxyzQ-diff-1920.png) | **一致** |
-| 10 | `LKuAQ` | 10-1-K アーカイブ確認 | 8.8348% | 0px | 中央・右 | docs | [差分画像](webinars-v6/LKuAQ-diff-1920.png) | **一致** |
+| 10 | `lvaY5` | 10-1-A ウェビナーを作成 | 7.4586% | 0px | 中央・右 | docs | [差分画像](webinars-v6/lvaY5-diff-1920.png) | **一致** |
+| 10 | `PV1Vh` | 10-1-B 動画・公開設定 | 7.3718% | 0px | 中央・右 | docs | [差分画像](webinars-v6/PV1Vh-diff-1920.png) | **一致** |
+| 10 | `d3rFGD` | 10-1-C CTA・フォーム | 7.4292% | 0px | 中央・右 | docs | [差分画像](webinars-v6/d3rFGD-diff-1920.png) | **一致** |
+| 10 | `Ho8z4` | 10-1-D 通知・リマインド | 7.8094% | 0px | 中央・右 | docs | [差分画像](webinars-v6/Ho8z4-diff-1920.png) | **一致** |
+| 10 | `Xjk8q` | 10-1-E 視聴後アクション | 8.1715% | 0px | 上部・右 | docs | [差分画像](webinars-v6/Xjk8q-diff-1920.png) | **一致** |
+| 10 | `GB0NR` | 10-1-F 公開ページプレビュー | 7.2985% | 0px | 中央・右 | docs | [差分画像](webinars-v6/GB0NR-diff-1920.png) | **一致** |
+| 10 | `D6yO7e` | 10-1-G 公開前確認 | 7.3266% | 0px | 上部・右 | docs | [差分画像](webinars-v6/D6yO7e-diff-1920.png) | **一致** |
+| 10 | `TimXl` | 10-1-H 公開完了 | 3.8247% | 0px | 中央・中央 | docs | [差分画像](webinars-v6/TimXl-diff-1920.png) | **一致** |
+| 10 | `Q8sHa` | 10-1-I 参加者管理 | 4.0825% | 0px | 中央・右 | docs | [差分画像](webinars-v6/Q8sHa-diff-1920.png) | **一致** |
+| 10 | `yxyzQ` | 10-1-J 分析 | 7.6724% | 0px | 中央・右 | docs | [差分画像](webinars-v6/yxyzQ-diff-1920.png) | **一致** |
+| 10 | `LKuAQ` | 10-1-K アーカイブ確認 | 8.4614% | 0px | 中央・右 | docs | [差分画像](webinars-v6/LKuAQ-diff-1920.png) | **一致** |
 | 10 | `zCQXe` | 10-1-L 一覧の状態（空・読込・エラー） | 3.1184% | 0px | 上部・左 | docs | [差分画像](webinars-v6/zCQXe-diff-1920.png) | **一致** |
 | 11 | `W7LBc` | 11-1 テンプレート | 5.1143% | 0px | 上部・左 | docs | [差分画像](templates-v6/W7LBc-diff-1920.png) | **一致** |
 | 11 | `GFlD7` | 11-1-A メッセージを作る | 7.7695%（前回値） | 0px | 中央・右 | docs | [差分画像](templates-v6/GFlD7-diff-1920.png) | **一致** |

@@ -2622,11 +2622,16 @@ function bodyFor(pathname, query = new URLSearchParams()) {
           state: 'available',
           stateReason: null,
           clickRateDefinition: 'クリック率は「実人数 ÷ 届いた人数」で出しています。',
+          // 点検#508軽5: 初回・最終日時とタグ由来がないと、その表示を壊しても撮影で気づけない。
+          hasMore: true,
           links: [
             {
               trackedLinkId: 'tl-1', name: '定期便の案内', originalUrl: 'https://example.com/subscription',
               isActive: true, clicks: METRIC(482), knownClickPeople: METRIC(311),
               deliveredPeople: METRIC(1_842), clickRate: METRIC(16.9),
+              firstClickedAt: METRIC('2026-08-06T10:00:00+09:00'),
+              lastClickedAt: METRIC('2026-09-02T18:30:00+09:00'),
+              actions: { tagName: '来店タグ', scenarioName: '9月の定期便' },
               usageLocations: ['一斉配信「9月の定期便」', 'リッチメニュー「メインA」'],
             },
             {

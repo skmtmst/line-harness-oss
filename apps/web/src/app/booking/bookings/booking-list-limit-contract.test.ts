@@ -42,6 +42,12 @@ describe('予約管理の一覧上限', () => {
     expect(DETAIL).toContain("renderNotificationText('approved'")
   })
 
+  it('不正な日時はInvalid Dateを出さず「—」にし、コピー済みタイマーは外す(点検#516軽6)', () => {
+    expect(LIST).toContain('Number.isNaN(new Date(iso).getTime())')
+    expect(LIST).toContain('copyTimer')
+    expect(LIST).toContain('clearTimeout(copyTimer.current)')
+  })
+
   // 点検#516の中8(メニュー棚のFolderPanel寄せ)は列車側で移行済みのため、
   // このPRでは重複して扱わない。移行の契約は booking-folder-panel-contract.test.ts が持つ。
 })

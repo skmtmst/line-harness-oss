@@ -91,7 +91,7 @@ const REMAINING: Record<string, number> = {
   'app/booking/bookings/detail/page.tsx': 4,
   'app/booking/bookings/page.tsx': 5,
   'app/booking/staff/new/page.tsx': 2,
-  'app/broadcasts/detail/page.tsx': 2,
+  /* 2026-09-08 #605 で「同じ設定で作り直す」を実動作へ接続し 0 件になったので行を消した。 */
   'app/restaurant-test/stores/new/page.tsx': 1,
   'app/scenarios/detail/scenario-detail-client.tsx': 1,
   'app/search-console/page.tsx': 3,

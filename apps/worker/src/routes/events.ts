@@ -142,7 +142,8 @@ function validateEventInput(
   const has = (k: string) => Object.prototype.hasOwnProperty.call(body, k);
   if (isCreate || has('name')) {
     const name = body.name;
-    if (typeof name !== 'string' || name.length === 0 || name.length > EVENT_NAME_MAX) {
+    // 空白だけの名前は通さない(点検#520軽14)。画面はtrim検査済みだがAPIは未検査だった。
+    if (typeof name !== 'string' || name.trim().length === 0 || name.length > EVENT_NAME_MAX) {
       return { ok: false, code: 'invalid_name' };
     }
   }
@@ -184,14 +185,17 @@ function validateEventInput(
       }
     }
   }
-  for (const key of ['description_centered', 'requires_approval', 'reminder_day_before_enabled', 'is_published'] as const) {
+  // waitlist_enabled は画面が `=== 1` で読むので2等を保存させない(点検#520軽14)。
+  for (const key of ['description_centered', 'requires_approval', 'reminder_day_before_enabled', 'is_published', 'waitlist_enabled'] as const) {
     if (has(key) && body[key] != null) {
       const v = body[key];
       if (v !== 0 && v !== 1) return { ok: false, code: `invalid_${key}` };
     }
   }
   if (has('sort_order') && body.sort_order != null) {
-    if (!Number.isInteger(body.sort_order)) return { ok: false, code: 'invalid_sort_order' };
+    if (!Number.isInteger(body.sort_order) || (body.sort_order as number) < 0) {
+      return { ok: false, code: 'invalid_sort_order' };
+    }
   }
   if (has('target_type') && body.target_type != null) {
     if (body.target_type !== 'single' && body.target_type !== 'multi-account-dedup') {
@@ -1935,6 +1939,10 @@ events.put('/api/events/admin/events/:id/bookings/:bookingId', requireRole('owne
   const setValues: unknown[] = [];
 
   if ('internal_note' in body) {
+    // 顧客メモと同等の上限(点検#520軽14)。無制限だと一覧が重くなる。
+    if (typeof body.internal_note === 'string' && body.internal_note.length > 5000) {
+      return bad(c, 'invalid_internal_note', 422);
+    }
     setClauses.push('internal_note = ?');
     setValues.push(body.internal_note ?? null);
   }
