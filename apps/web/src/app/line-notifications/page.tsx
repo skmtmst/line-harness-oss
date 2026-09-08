@@ -80,7 +80,7 @@ const TABS = [
 ] as const
 
 function Toggle({ setting, busy, onToggle }: { setting: EcNotificationSetting; busy: boolean; onToggle: () => void }) {
-  return <button type="button" role="switch" aria-checked={setting.isEnabled} disabled={busy} onClick={onToggle}
+  return <button type="button" role="switch" aria-checked={setting.isEnabled} aria-label={`${setting.label}のお知らせを出す・止める`} disabled={busy} onClick={onToggle}
     className={`inline-flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition-colors disabled:opacity-50 ${setting.isEnabled ? 'bg-accent' : 'bg-hairline'}`}>
     <span className={`h-5 w-5 rounded-full bg-canvas shadow-sm transition-transform ${setting.isEnabled ? 'translate-x-5' : ''}`} />
   </button>
@@ -220,6 +220,9 @@ export default function LineNotificationsPage() {
   const [busy, setBusy] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
   const loadGeneration = useRef(0)
+  // 全店共通の設定は店を切り替えても取り直さない（#509 軽1）。
+  // 保存操作は局所 state へ直接反映するため、ここで持ち回してよい。
+  const settingsCache = useRef<EcNotificationSetting[] | null>(null)
 
   const load = useCallback(async () => {
     const generation = loadGeneration.current + 1
@@ -231,16 +234,21 @@ export default function LineNotificationsPage() {
     setDefinitions([])
     setMetrics([])
     setNotice(null)
+    // 顧客タブだけが定義・集計を読む。運用者・記録タブは子部品が自前で取る。
+    const needCustomer = tab === 'customer'
     try {
       const [settingRes, overviewRes, definitionRes, metricRes] = await Promise.all([
-        api.ecCommerce.settings(), api.ecCommerce.overview(selectedAccountId ?? undefined),
-        selectedAccountId
+        settingsCache.current
+          ? { success: true as const, data: settingsCache.current }
+          : api.ecCommerce.settings(),
+        api.ecCommerce.overview(selectedAccountId ?? undefined),
+        needCustomer && selectedAccountId
           ? api.lineNotifications.definitions(selectedAccountId).catch((error: unknown) => {
               if (error instanceof ApiError && error.status === 403) throw error
               return null
             })
           : Promise.resolve(null),
-        selectedAccountId
+        needCustomer && selectedAccountId
           ? api.lineNotifications.metrics(selectedAccountId).catch((error: unknown) => {
               if (error instanceof ApiError && error.status === 403) throw error
               return null
@@ -249,6 +257,7 @@ export default function LineNotificationsPage() {
       ])
       if (generation !== loadGeneration.current) return
       if (!settingRes.success || !overviewRes.success) throw new Error('load failed')
+      if (!settingsCache.current) settingsCache.current = settingRes.data
       const loadedDefinitions = definitionRes?.success ? definitionRes.data : []
       const loadedDefinitionByEvent = new Map(loadedDefinitions.map((definition) => [definition.sourceEventType, definition]))
       const mergedSettings = settingRes.data.map((setting) => {
@@ -283,7 +292,7 @@ export default function LineNotificationsPage() {
         setNotice({ tone: 'error', text: 'LINE通知の設定を読み込めませんでした。' })
       }
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, tab])
   useEffect(() => { void load() }, [load])
 
   const visible = useMemo(() => settings.filter((setting) => {
