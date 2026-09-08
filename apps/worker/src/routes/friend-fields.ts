@@ -21,6 +21,7 @@ import {
   markFieldMigrationStale,
   executeFieldMigration,
   getFriendFieldsWithValues,
+  getFriendById,
   setFriendFieldValue,
   validateFieldKey,
   FRIEND_FIELD_TYPES,
@@ -33,7 +34,7 @@ import { recordLoginAudit } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { requireVisibleFriend } from './friends.js';
-import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 
 const friendFields = new Hono<Env>();
 
@@ -818,6 +819,20 @@ friendFields.post('/api/friend-fields/bulk', requireRole('owner', 'admin'), asyn
         { success: false, error: `「${field.name}」はEC側が正のため変更できません` },
         409,
       );
+    }
+
+    // N-043: 書込み前に全friendIdsの所属を一括検査する。
+    // 1件でも不存在・不可視なら部分更新せず、存在の有無が分からない404で拒否する。
+    const accountIds: Array<string | null> = [];
+    for (const friendId of friendIds) {
+      const friend = await getFriendById(c.env.DB, friendId);
+      if (!friend) {
+        return c.json({ success: false, error: 'Friend not found' }, 404);
+      }
+      accountIds.push(friend.line_account_id ?? null);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, staff, accountIds)) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
     }
 
     for (const friendId of friendIds) {
