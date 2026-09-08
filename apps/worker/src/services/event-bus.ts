@@ -25,7 +25,7 @@ import {
   finishWebhookInteraction,
   type WebhookInteractionFailureReason,
 } from '@line-crm/db';
-import { deliverWebhook, recordDeliveryOutcome } from './outgoing-webhook-delivery.js';
+import { deliverWebhook, postWebhookSafely, recordDeliveryOutcome } from './outgoing-webhook-delivery.js';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
 import { sendAdConversions } from './ad-conversion.js';
@@ -552,11 +552,14 @@ async function executeAction(
     case 'send_webhook': {
       const url = action.params.url;
       if (url) {
-        await fetch(url, {
-          method: 'POST',
+        // 旧式の直書きURLも共通の安全送信へ通す。検査を迂回する直 fetch は置かない。
+        const outcome = await postWebhookSafely(url, {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ friendId, ...payload.eventData }),
         });
+        if ('blocked' in outcome) {
+          throw new Error(`send_webhook_url_unsafe: ${outcome.blocked}`);
+        }
       }
       break;
     }
