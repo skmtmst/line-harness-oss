@@ -16,7 +16,6 @@ const dbMocks = {
   createMileageRule: vi.fn(),
   updateMileageRule: vi.fn(),
   deleteMileageRule: vi.fn(),
-  hasMileageRuleHistory: vi.fn(),
   getScoringRules: vi.fn(),
   getScoringRuleById: vi.fn(),
   createScoringRule: vi.fn(),
@@ -111,7 +110,7 @@ beforeEach(() => {
     allowedAccountIds: ['account-1'], canSeeUnassigned: false, ids: ['account-1'], accounts: [],
   });
   accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(true);
-  dbMocks.hasMileageRuleHistory.mockResolvedValue(false);
+  dbMocks.deleteMileageRule.mockResolvedValue(1);
   dbMocks.getMileageRewardAdminOverview.mockResolvedValue({ rewards: [], summary: {} });
   dbMocks.getMileageRewardReachMetrics.mockResolvedValue([]);
   dbMocks.getMileageHistoryPeriodSummary.mockResolvedValue({ byType: [], totalAmount: 0, manualCount: 0 });
@@ -512,20 +511,20 @@ describe('mileage admin API', () => {
     expect(response.status).toBe(409);
   });
 
-  it('DELETE refuses a rule with grant history without deleting it', async () => {
+  it('DELETE refuses a rule with grant history (atomic delete returns 0)', async () => {
     dbMocks.getMileageRuleById.mockResolvedValue({ id: 'rule-1', line_account_id: 'account-1' });
-    dbMocks.hasMileageRuleHistory.mockResolvedValue(true);
+    dbMocks.deleteMileageRule.mockResolvedValue(0);
     const first = await call('/api/mileage/rules/rule-1', { method: 'DELETE' });
     expect(first.status).toBe(409);
     expect(await first.json()).toMatchObject({ success: false });
     const second = await call('/api/mileage/rules/rule-1', { method: 'DELETE' });
     expect(second.status).toBe(409);
-    expect(dbMocks.deleteMileageRule).not.toHaveBeenCalled();
+    expect(dbMocks.deleteMileageRule).toHaveBeenCalledWith(env.DB, 'rule-1');
   });
 
-  it('DELETE removes a rule without history', async () => {
+  it('DELETE removes a rule without history (atomic delete returns 1)', async () => {
     dbMocks.getMileageRuleById.mockResolvedValue({ id: 'rule-1', line_account_id: 'account-1' });
-    dbMocks.hasMileageRuleHistory.mockResolvedValue(false);
+    dbMocks.deleteMileageRule.mockResolvedValue(1);
     const response = await call('/api/mileage/rules/rule-1', { method: 'DELETE' });
     expect(response.status).toBe(200);
     expect(dbMocks.deleteMileageRule).toHaveBeenCalledWith(env.DB, 'rule-1');

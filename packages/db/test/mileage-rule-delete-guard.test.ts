@@ -5,12 +5,13 @@ import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { hasMileageRuleHistory } from '../src/mileage.js';
+import { deleteMileageRule } from '../src/mileage.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-function asD1(sqlite: Database.Database): D1Database {
+function asD1(sqlite: Database.Database, seen: string[]): D1Database {
   function prepare(query: string): D1PreparedStatement {
+    seen.push(query);
     const statement = sqlite.prepare(query);
     const make = (params: unknown[]): D1PreparedStatement => ({
       bind: (...next: unknown[]) => make(next),
@@ -29,11 +30,17 @@ function asD1(sqlite: Database.Database): D1Database {
   return { prepare } as unknown as D1Database;
 }
 
-describe('マイル決めごとの履歴確認', () => {
+function ruleExists(sqlite: Database.Database, id: string): boolean {
+  return sqlite.prepare(`SELECT 1 AS one FROM mileage_rules WHERE id = ?`).get(id) != null;
+}
+
+describe('マイル決めごとの原子削除', () => {
   let sqlite: Database.Database;
   let db: D1Database;
+  let seen: string[];
 
   beforeEach(() => {
+    seen = [];
     sqlite = new Database(':memory:');
     sqlite.exec(readFileSync(join(ROOT, 'bootstrap.sql'), 'utf8'));
     sqlite.exec(`
@@ -63,24 +70,42 @@ describe('マイル決めごとの履歴確認', () => {
               'grant', 'void', 10, '来店', 'visit',
               'key-2', datetime('now'), datetime('now'));
     `);
-    db = asD1(sqlite);
+    db = asD1(sqlite, seen);
   });
 
   afterEach(() => sqlite.close());
 
-  it('付与履歴がある決めごとは履歴ありと判定する', async () => {
-    await expect(hasMileageRuleHistory(db, 'rule-used')).resolves.toBe(true);
+  it('付与履歴がある決めごとは0件で残る', async () => {
+    await expect(deleteMileageRule(db, 'rule-used')).resolves.toBe(0);
+    expect(ruleExists(sqlite, 'rule-used')).toBe(true);
   });
 
-  it('取り消し済みの行だけでも履歴ありと判定する', async () => {
-    await expect(hasMileageRuleHistory(db, 'rule-void-only')).resolves.toBe(true);
+  it('取り消し済みの行だけでも0件で残る', async () => {
+    await expect(deleteMileageRule(db, 'rule-void-only')).resolves.toBe(0);
+    expect(ruleExists(sqlite, 'rule-void-only')).toBe(true);
   });
 
-  it('履歴がない決めごとは履歴なしと判定する', async () => {
-    await expect(hasMileageRuleHistory(db, 'rule-clean')).resolves.toBe(false);
+  it('履歴がない決めごとは1件で消える', async () => {
+    await expect(deleteMileageRule(db, 'rule-clean')).resolves.toBe(1);
+    expect(ruleExists(sqlite, 'rule-clean')).toBe(false);
   });
 
-  it('存在しない決めごとは履歴なしと判定する', async () => {
-    await expect(hasMileageRuleHistory(db, 'missing')).resolves.toBe(false);
+  it('二重削除の2回目は0件になる', async () => {
+    await expect(deleteMileageRule(db, 'rule-clean')).resolves.toBe(1);
+    await expect(deleteMileageRule(db, 'rule-clean')).resolves.toBe(0);
+    expect(ruleExists(sqlite, 'rule-clean')).toBe(false);
+  });
+
+  it('DELETE文自体が履歴条件を持つ', async () => {
+    await deleteMileageRule(db, 'rule-used');
+    const deletes = seen.filter((q) => q.trimStart().toUpperCase().startsWith('DELETE'));
+    expect(deletes.length).toBeGreaterThan(0);
+    for (const q of deletes) {
+      const upper = q.toUpperCase();
+      expect(upper).toContain('DELETE FROM MILEAGE_RULES');
+      expect(upper).toContain('NOT EXISTS');
+      expect(upper).toContain('MILEAGE_LEDGER');
+      expect(upper).toContain('MILEAGE_RULE_ID');
+    }
   });
 });
