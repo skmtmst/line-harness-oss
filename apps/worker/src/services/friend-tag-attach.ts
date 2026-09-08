@@ -6,6 +6,7 @@ import {
 } from '@line-crm/db';
 import { fireEvent } from './event-bus.js';
 import { pushImmediateFirstStep, type ImmediatePushContext } from './immediate-first-step.js';
+import { recordConversionSourceEvent } from './conversion-event-sources.js';
 
 // friend に tag を attach し、`POST /api/friends/:id/tags` と同じ side effects を発火する。
 // side effects: tag_added シナリオ enrollment + tag_change イベント (automation/webhook/scoring 用)。
@@ -49,6 +50,19 @@ export async function attachTagAndFireSideEffects(
     });
   } catch (error) {
     console.error('tag mileage enqueue failed:', error);
+  }
+
+  // 新規付与を成果計測へ接続する(#648)。地点がなければ何もしない。
+  // 友だちの所属アカウントはサービス側で台帳から解決する。
+  try {
+    await recordConversionSourceEvent(db, {
+      sourceType: 'tag_added',
+      friendId,
+      sourceEventId: `${friendId}:${tagId}:${assignedAt}`,
+      metadata: { tagId },
+    });
+  } catch (error) {
+    console.error('tag conversion record failed:', error);
   }
 
   /*
