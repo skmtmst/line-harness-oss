@@ -797,6 +797,239 @@ export async function cancelFriendReminder(db: D1Database, id: string): Promise<
     .bind(jstNow(), id).run();
 }
 
+// =============================================================================
+// N-065: 予約・イベント・Meet の取消/日程変更を V6 リマインダへ同期
+// =============================================================================
+//
+// 予約時には enrollByTrigger が friend_reminders を作るが、取消・日程変更は
+// 旧表 (booking_reminders / event_booking_reminders / meet_consultation_reminders)
+// だけを止めていた。V6 の未送信予定が残り、取消客へ旧日程の通知が届き得る。
+//
+// 約束:
+// - 未送信 (active な登録と queued / retry_wait の実行行) だけを止める。
+//   送信済み履歴 (succeeded / friend_reminder_deliveries) と送信中の claimed は残す。
+// - 取消理由・元イベントID・実行者を cancel_reason に残す (移行なしで追跡するため)。
+// - 同じ取消・変更通知の再送は何も変えない (active が無ければ 0 件で返す)。
+// - lineAccountId を渡したときは、そのアカウントの友だちの登録だけを見る。
+
+export interface V6SourceMatcher {
+  sourceKind?: string | null;
+  sourceId?: string | null;
+  sourceEventId?: string | null;
+  /** 移行前の行 (source 未記録) 用の予備鍵。source 連動が1件も無いときだけ使う。 */
+  friendId?: string | null;
+  /** 移行前の行用の起点候補 (呼び出し側がルールから計算した target_date)。 */
+  targetDates?: string[];
+  lineAccountId?: string | null;
+  /**
+   * false のとき移行前の行を探さない。個別相談のように、
+   * 移行前に行を作っていなかった発生元が同時刻の別予約へ触れないため。
+   */
+  allowLegacyFallback?: boolean;
+}
+
+/**
+ * 条件と束縛値を SQL の出現順に積む。順番がずれると別列へ束縛されるため、
+ * 条件文の追加と bindings.push は必ず同じ順で行う。
+ */
+function v6BaseConditions(matcher: V6SourceMatcher, bindings: unknown[]): string[] {
+  const conditions = [`fr.status = 'active'`];
+  if (matcher.lineAccountId != null) {
+    conditions.push(
+      `EXISTS (SELECT 1 FROM friends f WHERE f.id = fr.friend_id AND f.line_account_id = ?)`,
+    );
+    bindings.push(matcher.lineAccountId);
+  }
+  return conditions;
+}
+
+/** source 連動 (source_id / source_event_id) の条件を作る。鍵が無ければ null。 */
+function v6SourceCondition(matcher: V6SourceMatcher, bindings: unknown[]): string | null {
+  const keys: string[] = [];
+  if (matcher.sourceId != null) keys.push(`fr.source_id = ?`);
+  if (matcher.sourceEventId != null) keys.push(`fr.source_event_id = ?`);
+  if (keys.length === 0) return null;
+  const either = keys.length === 1 ? keys[0] : `(${keys.join(' OR ')})`;
+  if (matcher.sourceKind == null) return either;
+  // 束縛は SQL の出現順 (kind → 鍵) に積む。
+  bindings.push(matcher.sourceKind);
+  if (matcher.sourceId != null) bindings.push(matcher.sourceId);
+  if (matcher.sourceEventId != null) bindings.push(matcher.sourceEventId);
+  return `(fr.source_kind = ? AND ${either})`;
+}
+
+async function selectV6ActiveIds(
+  db: D1Database,
+  matcher: V6SourceMatcher,
+  extra: string,
+  extraBindings: unknown[],
+): Promise<string[]> {
+  const bindings: unknown[] = [];
+  const conditions = v6BaseConditions(matcher, bindings);
+  const source = v6SourceCondition(matcher, bindings);
+  if (!source) return [];
+  conditions.push(source, `(${extra})`);
+  const rows = await db.prepare(
+    `SELECT fr.id AS id FROM friend_reminders fr WHERE ${conditions.join(' AND ')}`,
+  ).bind(...bindings, ...extraBindings).all<{ id: string }>();
+  return (rows.results ?? []).map((row) => row.id);
+}
+
+async function selectV6LegacyIds(
+  db: D1Database,
+  matcher: V6SourceMatcher,
+  extra: string,
+  extraBindings: unknown[],
+): Promise<string[]> {
+  if (matcher.friendId == null || !matcher.targetDates?.length) return [];
+  const bindings: unknown[] = [];
+  const conditions = v6BaseConditions(matcher, bindings);
+  conditions.push(`fr.friend_id = ?`);
+  bindings.push(matcher.friendId);
+  const placeholders = matcher.targetDates.map(() => '?').join(',');
+  conditions.push(`fr.target_date IN (${placeholders})`);
+  bindings.push(...matcher.targetDates);
+  conditions.push(`(${extra})`);
+  const rows = await db.prepare(
+    `SELECT fr.id AS id FROM friend_reminders fr WHERE ${conditions.join(' AND ')}`,
+  ).bind(...bindings, ...extraBindings).all<{ id: string }>();
+  return (rows.results ?? []).map((row) => row.id);
+}
+
+function chunkPlaceholders(ids: string[]): string {
+  return ids.map(() => '?').join(',');
+}
+
+export interface CancelV6RemindersResult {
+  cancelledEnrollments: number;
+  cancelledRuns: number;
+}
+
+/**
+ * 取消: 未送信の V6 登録だけを原子的に止める。
+ *
+ * source 連動の行を先に探し、1件も無ければ移行前の行 (friend + target_date)
+ * を探す。両方に触れると、同時刻の別予約の行まで止めてしまう。
+ */
+export async function cancelV6RemindersForSource(
+  db: D1Database,
+  input: V6SourceMatcher & { cancelReason: string; now?: string },
+): Promise<CancelV6RemindersResult> {
+  const now = input.now ?? jstNow();
+  let ids = await selectV6ActiveIds(db, input, '1 = 1', []);
+  if (ids.length === 0 && input.allowLegacyFallback !== false) {
+    ids = await selectV6LegacyIds(db, input, '1 = 1', []);
+  }
+  if (ids.length === 0) return { cancelledEnrollments: 0, cancelledRuns: 0 };
+
+  const statements: D1PreparedStatement[] = [];
+  for (let offset = 0; offset < ids.length; offset += 50) {
+    const chunk = ids.slice(offset, offset + 50);
+    const placeholders = chunkPlaceholders(chunk);
+    statements.push(
+      db.prepare(
+        `UPDATE friend_reminders
+            SET status = 'cancelled', cancel_reason = ?, updated_at = ?
+          WHERE status = 'active' AND id IN (${placeholders})`,
+      ).bind(input.cancelReason, now, ...chunk),
+      // 送信済み・送信中の claimed は残す。queued / retry_wait だけ止める。
+      db.prepare(
+        `UPDATE reminder_delivery_runs
+            SET status = 'cancelled', completed_at = ?, updated_at = ?
+          WHERE status IN ('queued', 'retry_wait') AND friend_reminder_id IN (${placeholders})`,
+      ).bind(now, now, ...chunk),
+    );
+  }
+  const results = await db.batch(statements);
+  return {
+    cancelledEnrollments: Number(results[0]?.meta?.changes ?? 0),
+    cancelledRuns: results.slice(1).reduce((sum, result, index) => {
+      // 実行行の UPDATE は奇数番目 (登録 UPDATE の次) に積んである。
+      return index % 2 === 0 ? sum + Number(result.meta?.changes ?? 0) : sum;
+    }, 0),
+  };
+}
+
+export interface V6TargetDateMove {
+  reminderId?: string;
+  fromTargetDate: string;
+  toTargetDate: string;
+}
+
+export interface RescheduleV6RemindersResult {
+  movedEnrollments: number;
+  cancelledRuns: number;
+}
+
+/**
+ * 日程変更: 送信済みを残し、未来予定 (active な登録) だけ新しい基準日へ移す。
+ *
+ * moves の from と to が同じものは触らない。同じ変更通知の再送は、
+ * 既に移し終えた行が from に無いため 0 件で返す。
+ */
+export async function rescheduleV6RemindersForSource(
+  db: D1Database,
+  input: V6SourceMatcher & { moves: V6TargetDateMove[]; now?: string },
+): Promise<RescheduleV6RemindersResult> {
+  const now = input.now ?? jstNow();
+  const effective = input.moves.filter((move) => move.fromTargetDate !== move.toTargetDate);
+  if (effective.length === 0) return { movedEnrollments: 0, cancelledRuns: 0 };
+
+  // 取消と同じく source 連動を優先し、無ければ移行前の行を見る。
+  const sourceProbe = await selectV6ActiveIds(db, input, '1 = 1', []);
+  const useLegacy = sourceProbe.length === 0 && input.allowLegacyFallback !== false;
+
+  const movedIds: string[] = [];
+  const statements: D1PreparedStatement[] = [];
+  for (const move of effective) {
+    const extra = move.reminderId != null ? 'fr.reminder_id = ?' : '1 = 1';
+    const extraBindings = move.reminderId != null ? [move.reminderId] : [];
+    const ids = useLegacy
+      ? await selectV6LegacyIds(db, { ...input, targetDates: [move.fromTargetDate] }, extra, extraBindings)
+      : await selectV6ActiveIds(
+        db,
+        input,
+        `fr.target_date = ? AND (${extra})`,
+        [move.fromTargetDate, ...extraBindings],
+      );
+    for (let offset = 0; offset < ids.length; offset += 50) {
+      const chunk = ids.slice(offset, offset + 50);
+      const placeholders = chunkPlaceholders(chunk);
+      statements.push(
+        db.prepare(
+          `UPDATE friend_reminders
+              SET target_date = ?, updated_at = ?
+            WHERE status = 'active' AND target_date = ? AND id IN (${placeholders})`,
+        ).bind(move.toTargetDate, now, move.fromTargetDate, ...chunk),
+      );
+      movedIds.push(...chunk);
+    }
+  }
+  if (statements.length === 0) return { movedEnrollments: 0, cancelledRuns: 0 };
+  const results = await db.batch(statements);
+  const movedEnrollments = results.reduce((sum, result) => sum + Number(result.meta?.changes ?? 0), 0);
+  if (movedIds.length === 0) return { movedEnrollments, cancelledRuns: 0 };
+
+  // 旧基準日で積んだ未来の実行行は時刻がずれているので止める。
+  // 次の cron が新基準日で作り直す。送信済み・送信中は残す。
+  let cancelledRuns = 0;
+  const runStatements: D1PreparedStatement[] = [];
+  for (let offset = 0; offset < movedIds.length; offset += 50) {
+    const chunk = movedIds.slice(offset, offset + 50);
+    const placeholders = chunkPlaceholders(chunk);
+    runStatements.push(
+      db.prepare(
+        `UPDATE reminder_delivery_runs
+            SET status = 'cancelled', completed_at = ?, updated_at = ?
+          WHERE status IN ('queued', 'retry_wait') AND friend_reminder_id IN (${placeholders})`,
+      ).bind(now, now, ...chunk),
+    );
+  }
+  const runResults = await db.batch(runStatements);
+  cancelledRuns = runResults.reduce((sum, result) => sum + Number(result.meta?.changes ?? 0), 0);
+  return { movedEnrollments, cancelledRuns };
+}
+
 /** リマインダ配信処理用: 配信が必要な友だちリマインダを取得 */
 /**
  * まだ配信していない通を、登録ごとに返す。

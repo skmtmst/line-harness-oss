@@ -31,7 +31,7 @@ import {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
-import { enrollByTrigger } from '../services/reminder-trigger.js';
+import { cancelByTrigger, enrollByTrigger } from '../services/reminder-trigger.js';
 import { canTransition, nextStatus, type BookingAction } from '../services/booking-state.js';
 import { getAvailability } from '../services/availability.js';
 import {
@@ -662,6 +662,8 @@ booking.post('/api/liff/booking/requests', async (c) => {
       triggerType: 'booking',
       friendId,
       startsAtIso: startsAt.toISOString(),
+      sourceId: bookingId,
+      sourceEventId: bookingId,
     }).catch((err) => console.error('reminder enroll (booking) failed:', err)),
   );
 
@@ -1883,6 +1885,8 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
         triggerType: 'booking',
         friendId,
         startsAtIso: startsAt.toISOString(),
+        sourceId: bookingId,
+        sourceEventId: bookingId,
       }).catch((err) => console.error('reminder enroll (proxy-create) failed:', err)),
     );
     confirmationOperationId = await queueBookingOperation(c.env.DB, {
@@ -2625,6 +2629,16 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
       )
       .bind(id)
       .run();
+    // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
+    await cancelByTrigger(c.env.DB, {
+      triggerType: 'booking',
+      sourceId: id,
+      sourceEventId: id,
+      friendId: row.friend_id,
+      startsAtIso: row.starts_at,
+      lineAccountId: accountId,
+      cancelReason: `booking_${next}:${id}:by:${c.get('staff')?.id ?? 'admin'}`,
+    });
     c.executionCtx.waitUntil(
       removeBookingFromGoogle(c.env.DB, googleCredentials(c.env), id).catch((error) =>
         console.error('Google Calendar delete failed:', error),

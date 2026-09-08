@@ -12,7 +12,7 @@
 import { Hono, type Context } from 'hono';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
-import { enrollByTrigger } from '../services/reminder-trigger.js';
+import { cancelByTrigger, enrollByTrigger, rescheduleByTrigger } from '../services/reminder-trigger.js';
 import {
   EVENT_NAME_MAX,
   EVENT_DESCRIPTION_MAX,
@@ -863,6 +863,29 @@ events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'a
   // now stale (they still point at the old starts_at).
   if (Object.prototype.hasOwnProperty.call(body, 'starts_at')) {
     await rebuildRemindersForSlot(c.env.DB, slot_id);
+    // N-065: V6 の未来予定だけを新基準日へ移す。送信済みは残す。
+    const oldStartsAt = slot.starts_at as string;
+    const newStartsAt = body.starts_at as string;
+    if (oldStartsAt !== newStartsAt) {
+      const confirmed = await c.env.DB
+        .prepare(
+          `SELECT id, friend_id, line_account_id FROM event_bookings
+            WHERE slot_id = ? AND status = 'confirmed'`,
+        )
+        .bind(slot_id)
+        .all<{ id: string; friend_id: string; line_account_id: string }>();
+      for (const bookingRow of confirmed.results ?? []) {
+        await rescheduleByTrigger(c.env.DB, {
+          triggerType: 'event',
+          sourceId: bookingRow.id,
+          sourceEventId: bookingRow.id,
+          friendId: bookingRow.friend_id,
+          oldStartsAtIso: oldStartsAt,
+          newStartsAtIso: newStartsAt,
+          lineAccountId: bookingRow.line_account_id,
+        });
+      }
+    }
   }
   const row = await c.env.DB.prepare(`SELECT * FROM event_slots WHERE id = ?`).bind(slot_id).first();
   return c.json(row);
@@ -997,6 +1020,16 @@ events.post('/api/liff/events/me/:bookingId/cancel', async (c) => {
     .bind(nowIso, nowIso, row.id)
     .run();
   await cancelPendingRemindersFor(c.env.DB, row.id);
+  // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
+  await cancelByTrigger(c.env.DB, {
+    triggerType: 'event',
+    sourceId: row.id,
+    sourceEventId: row.id,
+    friendId: friend.id,
+    startsAtIso: row.slot_starts_at,
+    lineAccountId: row.line_account_id,
+    cancelReason: `event_cancel:${row.id}:by:friend`,
+  });
   await enqueueEventWaitlistPromotion(c.env.DB, {
     lineAccountId: row.line_account_id,
     eventId: row.event_id,
@@ -1500,6 +1533,8 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
       triggerType: 'event',
       friendId: friend.id,
       startsAtIso: slot.starts_at as string,
+      sourceId: id,
+      sourceEventId: id,
     }).catch((err) => console.error('reminder enroll (event) failed:', err));
     optionalExecutionCtx(c)?.waitUntil(
       dispatchAutomationEventWithLogging(c.env.DB, {
@@ -1862,6 +1897,15 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
         reminder_hours_before: evRow.reminder_hours_before,
       });
       await insertRemindersForBooking(c.env.DB, booking.id, reminders);
+      // N-065: 承認で確定した予約も V6 へ登録する (source 連動つき)。
+      // 登録失敗で承認自体を壊さない。二重登録は enroll 側で吸収する。
+      await enrollByTrigger(c.env.DB, {
+        triggerType: 'event',
+        friendId: booking.friend_id,
+        startsAtIso: slot.starts_at,
+        sourceId: booking.id,
+        sourceEventId: booking.id,
+      }).catch((err) => console.error('reminder enroll (event decide) failed:', err));
     }
     optionalExecutionCtx(c)?.waitUntil(
       dispatchAutomationEventWithLogging(c.env.DB, {
@@ -1878,6 +1922,20 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
     );
   }
   if (action === 'reject') {
+    const slot = await c.env.DB
+      .prepare(`SELECT starts_at FROM event_slots WHERE id = ?`)
+      .bind(booking.slot_id)
+      .first<{ starts_at: string }>();
+    // N-065: 落選した予約の V6 未送信予定だけを止める。
+    await cancelByTrigger(c.env.DB, {
+      triggerType: 'event',
+      sourceId: booking.id,
+      sourceEventId: booking.id,
+      friendId: booking.friend_id,
+      startsAtIso: slot?.starts_at ?? null,
+      lineAccountId: booking.line_account_id,
+      cancelReason: `event_reject:${booking.id}:by:${c.get('staff')?.id ?? 'admin'}`,
+    });
     await enqueueEventWaitlistPromotion(c.env.DB, {
       lineAccountId: booking.line_account_id,
       eventId: booking.event_id,
@@ -1916,6 +1974,20 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRo
     .run();
   if ((upd.meta?.changes ?? 0) === 0) return bad(c, 'invalid_state', 409);
   await cancelPendingRemindersFor(c.env.DB, booking.id);
+  const slot = await c.env.DB
+    .prepare(`SELECT starts_at FROM event_slots WHERE id = ?`)
+    .bind(booking.slot_id)
+    .first<{ starts_at: string }>();
+  // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
+  await cancelByTrigger(c.env.DB, {
+    triggerType: 'event',
+    sourceId: booking.id,
+    sourceEventId: booking.id,
+    friendId: booking.friend_id,
+    startsAtIso: slot?.starts_at ?? null,
+    lineAccountId: booking.line_account_id,
+    cancelReason: `event_cancel:${booking.id}:by:${c.get('staff')?.id ?? 'admin'}`,
+  });
   await enqueueEventWaitlistPromotion(c.env.DB, {
     lineAccountId: booking.line_account_id,
     eventId: booking.event_id,

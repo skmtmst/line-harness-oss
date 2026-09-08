@@ -1,6 +1,7 @@
 import type { HarnessProxyDispatch } from './line-proxy-send.js';
 import { pushViaHarnessProxy } from './line-proxy-send.js';
 import { resolveLineCredential } from '@line-crm/db';
+import { cancelByTrigger, enrollByTrigger, rescheduleByTrigger } from './reminder-trigger.js';
 
 export type MeetReminderKind = 'day_before' | 'hour_before';
 
@@ -120,9 +121,9 @@ export async function registerMeetConsultation(
   if (start.getTime() <= now.getTime()) throw new Error('startsAt must be in the future');
 
   const friend = await db
-    .prepare('SELECT id FROM friends WHERE id = ? AND is_following = 1')
+    .prepare('SELECT id, line_account_id FROM friends WHERE id = ? AND is_following = 1')
     .bind(input.friendId)
-    .first<{ id: string }>();
+    .first<{ id: string; line_account_id: string | null }>();
   if (!friend) throw new Error('friend not found or not following');
 
   const existing = await db
@@ -212,6 +213,32 @@ export async function registerMeetConsultation(
       .run();
   }
 
+  // N-065: 個別相談の日程変更・再送を V6 へ連動する。
+  // 予約ルール (booking) を個別相談にも使い、sourceKind='meet' で追跡する。
+  // 日程変更は先に移してから登録する。逆だと一意鍵に当たり旧起点が残る。
+  // 移行前の行は個別相談が作っていないので探さない (同時刻の別予約へ触れない)。
+  const v6Base = {
+    triggerType: 'booking' as const,
+    sourceKind: 'meet',
+    sourceId: consultationId,
+    sourceEventId: input.externalEventId,
+    friendId: input.friendId,
+    lineAccountId: friend.line_account_id,
+    allowLegacyFallback: false,
+  };
+  if (existing && scheduleChanged) {
+    await rescheduleByTrigger(db, {
+      ...v6Base,
+      oldStartsAtIso: existing.starts_at,
+      newStartsAtIso: normalizedStart,
+    });
+  }
+  // 登録失敗で相談登録自体を壊さない。二重登録は enroll 側で吸収する。
+  await enrollByTrigger(db, {
+    ...v6Base,
+    startsAtIso: normalizedStart,
+  }).catch((error) => console.error('meet reminder enroll (v6) failed:', error));
+
   return { id: consultationId, reminders: schedules };
 }
 
@@ -221,9 +248,14 @@ export async function cancelMeetConsultation(
   now = new Date(),
 ): Promise<boolean> {
   const consultation = await db
-    .prepare('SELECT id FROM meet_consultations WHERE external_event_id = ?')
+    .prepare(
+      `SELECT c.id, c.friend_id, c.starts_at, f.line_account_id
+         FROM meet_consultations c
+         LEFT JOIN friends f ON f.id = c.friend_id
+        WHERE c.external_event_id = ?`,
+    )
     .bind(externalEventId)
-    .first<{ id: string }>();
+    .first<{ id: string; friend_id: string; starts_at: string; line_account_id: string | null }>();
   if (!consultation) return false;
   const nowIso = now.toISOString();
   await db
@@ -238,6 +270,19 @@ export async function cancelMeetConsultation(
     )
     .bind(nowIso, consultation.id)
     .run();
+  // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
+  // 再送は active が無いため 0 件で返す。移行前の行は探さない。
+  await cancelByTrigger(db, {
+    triggerType: 'booking',
+    sourceKind: 'meet',
+    sourceId: consultation.id,
+    sourceEventId: externalEventId,
+    friendId: consultation.friend_id,
+    startsAtIso: consultation.starts_at,
+    lineAccountId: consultation.line_account_id,
+    cancelReason: `meet_cancel:${externalEventId}:by:admin`,
+    allowLegacyFallback: false,
+  });
   return true;
 }
 
