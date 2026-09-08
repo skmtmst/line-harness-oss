@@ -8,6 +8,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import type Database from 'better-sqlite3'
 import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js'
+import { publishScenarioVersion } from '@line-crm/db'
 import { runScenarioActions, runScenarioOp } from './scenario-actions.js'
 
 let db: D1Database
@@ -55,7 +56,7 @@ function fieldValue(friendId: string, fieldId: string): string | null {
   return row?.value ?? null
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   const created = createTestD1()
   db = created.db
   raw = created.raw
@@ -75,6 +76,9 @@ beforeEach(() => {
               ('st2','s2',1,0,'text','移動先の1通目')`,
     )
     .run()
+  // 参加には明示公開が要る（351）。
+  await publishScenarioVersion(db, 's1', { staffId: null, idempotencyKey: 'actions-s1' })
+  await publishScenarioVersion(db, 's2', { staffId: null, idempotencyKey: 'actions-s2' })
   raw
     .prepare(
       `INSERT INTO tags (id, name, color, group_id) VALUES ('t1','犬','#000',NULL), ('t2','猫','#000','g1'), ('t3','鳥','#000','g1')`,

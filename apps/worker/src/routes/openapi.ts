@@ -749,7 +749,12 @@ const spec = {
           { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
           { name: 'friendId', in: 'path', required: true, schema: { type: 'string' } },
         ],
-        responses: { '201': { description: 'Enrolled' } },
+        responses: {
+          '201': { description: 'Enrolled' },
+          '404': { description: 'シナリオ・友だちなし' },
+          '409': { description: '登録済み・削除不可の連携あり' },
+          '422': { description: '未公開・停止中・ブロック中など登録不可' },
+        },
       },
     },
     '/api/scenarios/{id}/publish': {
@@ -758,8 +763,21 @@ const spec = {
         summary: '公開版の固定',
         parameters: [
           { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          {
+            name: 'Idempotency-Key',
+            in: 'header',
+            required: true,
+            schema: { type: 'string' },
+            description: '公開操作の確認キー（8〜200字の英数._:-）。同じキーの再実行は同じ版を返し、別内容での使い回しは409。',
+          },
         ],
-        responses: { '200': { description: 'Published' } },
+        responses: {
+          '200': { description: 'Published' },
+          '400': { description: '確認キー不足・不正' },
+          '403': { description: '権限不足' },
+          '404': { description: 'シナリオなし・他アカウント' },
+          '409': { description: '確認キーの使い回し・同時公開の競合' },
+        },
       },
     },
     // ── Broadcasts ───────────────────────────────────────────────────────────

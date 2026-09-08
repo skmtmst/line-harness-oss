@@ -10,6 +10,7 @@ import {
   deleteScenarioStep,
   enrollFriendInScenario,
   getFriendById,
+  getScenarioPublishedVersion,
   publishScenarioVersion,
   computeNextDeliveryAt,
 } from '@line-crm/db';
@@ -677,6 +678,10 @@ scenarios.delete('/api/scenarios/:id', requireRole('owner', 'admin'), async (c) 
     await deleteScenario(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
+    const code = err instanceof Error ? err.message : '';
+    if (code === 'SCENARIO_HAS_DEPENDENTS') {
+      return c.json({ success: false, error: '他の機能から使われているため削除できません。先に連携を外してください。' }, 409);
+    }
     console.error('DELETE /api/scenarios/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
@@ -1356,6 +1361,17 @@ scenarios.post('/api/scenarios/:id/enroll/:friendId', requireRole('owner', 'admi
     if ((friend as { is_following?: number | null }).is_following !== 1) {
       return c.json({ success: false, error: 'ブロック中の友だちは登録できません。' }, 422);
     }
+    /*
+     * 未公開・停止中の契約はここで正直に返す。enrollFriendInScenario は
+     * webhook 経路の副作用でも使うので null に倒すだけだが、手動登録では
+     * 理由を 422 で返す（N-050 / #644）。
+     */
+    if (!scenario.is_active) {
+      return c.json({ success: false, error: '停止中のシナリオには登録できません。' }, 422);
+    }
+    if (!await getScenarioPublishedVersion(db, scenarioId)) {
+      return c.json({ success: false, error: 'まだ公開されていないため登録できません。先に公開してください。' }, 422);
+    }
 
     const enrollment = await enrollFriendInScenario(db, friendId, scenarioId);
     if (!enrollment) {
@@ -1398,7 +1414,7 @@ scenarios.post('/api/scenarios/:id/publish', requireRole('owner', 'admin'), asyn
       return c.json({ success: false, error: 'シナリオが見つかりません' }, 404);
     }
     if (code === 'SCENARIO_PUBLISH_KEY_CONFLICT') {
-      return c.json({ success: false, error: '同じ確認キーが別の公開操作で使われています' }, 409);
+      return c.json({ success: false, error: '同じ確認キーが別の内容・別の公開操作で使われています' }, 409);
     }
     if (code === 'SCENARIO_PUBLISH_CONFLICT') {
       return c.json({ success: false, error: '同時公開が競合しました。もう一度公開してください' }, 409);
