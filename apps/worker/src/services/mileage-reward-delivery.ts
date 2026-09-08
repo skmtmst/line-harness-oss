@@ -1,9 +1,11 @@
 import {
   claimRedemptionStep,
+  confirmReconciledRedemptionStep,
   decryptCredential,
   getMileageRewardDeliveryPlan,
   getReservedMileageRewardCode,
   markRedemptionStepSent,
+  markRedemptionStepUnknown,
   MileageRedemptionConfirmError,
   recordMileageRedemptionAttempt,
   refundMileageRewardRedemption,
@@ -129,6 +131,9 @@ export async function deliverMileageReward(
 
   const now = options.now?.() ?? new Date().toISOString();
   const leaseCutoff = new Date(new Date(now).getTime() - STALE_DELIVERY_LEASE_MS).toISOString();
+  // この走者の名札。手順の貸出はこの名札で取り、確定も名札と fence で通す。
+  const stepOwner = crypto.randomUUID();
+  const stepLeaseExpiresAt = new Date(new Date(now).getTime() + STALE_DELIVERY_LEASE_MS).toISOString();
   const claim = await db.prepare(
     `UPDATE mileage_redemptions SET status = 'delivering', updated_at = ?
       WHERE id = ? AND (status IN ('reserved', 'delivery_failed')
@@ -161,14 +166,32 @@ export async function deliverMileageReward(
         const executor = executors[action.type];
         if (!executor) throw new Error('交換後の動きを実行できません');
         const stepExecutionId = await stableUuid(`${redemptionId}:${action.id}:${index}`);
+        const stepKey = `${index}:${action.id}`;
+        const stepFence = crypto.randomUUID();
+        const stepLease = {
+          redemptionId, stepKey, idempotencyKey: stepExecutionId,
+          owner: stepOwner, fenceToken: stepFence,
+          leaseExpiresAt: stepLeaseExpiresAt, now,
+        };
         /*
-         * 送り直さない：送信済みの手順は飛ばす。確定書き込みの直後に死んでも、
-         * やり直しは outbox を見て送らない。受け手側にも同じ冪等キーを渡す。
+         * 送り直さない：送信済みの手順は飛ばす。貸出中の手順は待つ。
+         * 送達不明は同じ冪等キーの照合で確定だけ進める。
+         * 受け手側にも同じ冪等キーを渡す。
          */
-        const step = await claimRedemptionStep(db, {
-          redemptionId, stepKey: `${index}:${action.id}`, idempotencyKey: stepExecutionId,
-        });
+        const step = await claimRedemptionStep(db, stepLease);
         if (step === 'sent') continue;
+        if (step === 'busy') {
+          // 別の走者が送信中。送らずに待ち、貸出期限の回収に任せる。
+          throw new MileageRedemptionConfirmError();
+        }
+        if (step === 'reconcile') {
+          try {
+            await confirmReconciledRedemptionStep(db, stepLease);
+          } catch {
+            throw new MileageRedemptionConfirmError();
+          }
+          continue;
+        }
         await executor({
           db,
           runId: redemptionId,
@@ -186,8 +209,22 @@ export async function deliverMileageReward(
           isTest: false,
         });
         try {
-          await markRedemptionStepSent(db, { redemptionId, stepKey: `${index}:${action.id}` });
+          await markRedemptionStepSent(db, {
+            redemptionId, stepKey, owner: stepOwner, fenceToken: stepFence, now,
+          });
         } catch {
+          /*
+           * 外部送信は終わっているかもしれない。送達不明として残し、
+           * 送り直さない。貸出を失っていたら今の持ち主に任せる。
+           */
+          try {
+            await markRedemptionStepUnknown(db, {
+              redemptionId, stepKey, idempotencyKey: stepExecutionId,
+              owner: stepOwner, fenceToken: stepFence, now,
+            });
+          } catch {
+            // 今の持ち主が進める。ここでは何もしない。
+          }
           throw new MileageRedemptionConfirmError();
         }
       }

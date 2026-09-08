@@ -9,7 +9,9 @@ import type Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 
 import {
+  claimRedemptionStep,
   createMileageRewardDraft,
+  markRedemptionStepSent,
   publishMileageReward,
   reserveMileageRewardRedemption,
 } from '@line-crm/db';
@@ -201,5 +203,134 @@ describe('交換配送の二重送信防止(実D1)', () => {
     expect(raw.prepare(
       `SELECT COUNT(*) AS count FROM mileage_redemption_step_deliveries WHERE status = 'sent'`,
     ).get()).toEqual({ count: 1 });
+  });
+
+  it('sent確定の書き込み失敗→送達不明→回収は送り直さず確定だけ進める', async () => {
+    const { db, raw } = createTestD1();
+    seedAccount(raw);
+    const rewardId = await seedWebhookReward(db);
+    const reserved = await reserveMileageRewardRedemption(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', rewardId,
+      idempotencyKey: 'e2e-unknown', requestFingerprint: 'fp-unknown',
+    });
+
+    const counter = countFetches();
+    const stepUpdate = (sql: string) =>
+      sql.includes('mileage_redemption_step_deliveries')
+      && sql.trimStart().toUpperCase().startsWith('UPDATE');
+    // 初回の確定書き込みだけ落とす。外部送信は成功している。
+    const { faulty } = withFirstRunFault(db, stepUpdate);
+    const first = await deliverMileageReward(faulty, reserved.redemption.id, {
+      fetch: counter.fetch, now: () => '2026-09-09T00:00:00.000Z',
+    });
+    expect(counter.count()).toBe(1);
+    expect(first).toMatchObject({ status: 'delivery_failed' });
+    expect(first.message ?? '').toContain('確認');
+    // 失敗には落とさない。落とすとやり直しで再送する。
+    expect(raw.prepare(
+      `SELECT status FROM mileage_redemptions WHERE id = ?`,
+    ).get(reserved.redemption.id)).toEqual({ status: 'delivering' });
+    // 送ったかもしれない証言が残る。
+    expect(raw.prepare(
+      `SELECT status, needs_reconcile AS needsReconcile
+         FROM mileage_redemption_step_deliveries WHERE redemption_id = ?`,
+    ).get(reserved.redemption.id)).toEqual({ status: 'started', needsReconcile: 1 });
+
+    // 貸出期限を過ぎた取り残しを cron が回収する。送り直さない。
+    raw.prepare(
+      `UPDATE mileage_redemptions SET updated_at = '2020-01-01T00:00:00.000Z' WHERE id = ?`,
+    ).run(reserved.redemption.id);
+    const swept = await processDueMileageRewardDeliveries(db, {
+      now: '2026-09-09T01:00:00.000Z', fetch: counter.fetch,
+    });
+    expect(swept).toMatchObject({ processed: 1, succeeded: 1 });
+    expect(counter.count()).toBe(1);
+    expect(raw.prepare(
+      `SELECT status, needs_reconcile AS needsReconcile
+         FROM mileage_redemption_step_deliveries WHERE redemption_id = ?`,
+    ).get(reserved.redemption.id)).toEqual({ status: 'sent', needsReconcile: 0 });
+    expect(raw.prepare(
+      `SELECT status FROM mileage_redemptions WHERE id = ?`,
+    ).get(reserved.redemption.id)).toEqual({ status: 'succeeded' });
+  });
+
+  it('貸出期限を過ぎたら別走者が引き継ぎ、遅い旧持ち主の確定は拒否する', async () => {
+    const { db, raw } = createTestD1();
+    seedAccount(raw);
+    const rewardId = await seedWebhookReward(db);
+    const reserved = await reserveMileageRewardRedemption(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', rewardId,
+      idempotencyKey: 'e2e-takeover', requestFingerprint: 'fp-takeover',
+    });
+
+    // 走者Aが貸出を取る。送る前に止まったとする(送信はしない)。
+    const stepKey = '0:w1';
+    const stepRow = () => raw.prepare(
+      `SELECT owner, generation, fence_token AS fenceToken, status
+         FROM mileage_redemption_step_deliveries WHERE redemption_id = ? AND step_key = ?`,
+    ).get(reserved.redemption.id, stepKey) as {
+      owner: string; generation: number; fenceToken: string; status: string;
+    };
+    const claimA = await claimRedemptionStep(db, {
+      redemptionId: reserved.redemption.id, stepKey,
+      idempotencyKey: 'takeover-key', owner: 'runner-a', fenceToken: 'fence-a1',
+      leaseExpiresAt: '2026-09-09T00:05:00.000Z', now: '2026-09-09T00:00:00.000Z',
+    });
+    expect(claimA).toBe('send');
+
+    // 貸出期限が過ぎる。走者Bの配送が引き継いで送る(外部送信は1回)。
+    raw.prepare(
+      `UPDATE mileage_redemption_step_deliveries
+          SET lease_expires_at = '2020-01-01T00:00:00.000Z' WHERE redemption_id = ?`,
+    ).run(reserved.redemption.id);
+    const counter = countFetches();
+    const second = await deliverMileageReward(db, reserved.redemption.id, {
+      fetch: counter.fetch, now: () => '2026-09-09T01:00:00.000Z',
+    });
+    expect(second.status).toBe('succeeded');
+    expect(counter.count()).toBe(1);
+    // 世代が進み、持ち主が替わっている。
+    expect(stepRow()).toMatchObject({ owner: expect.not.stringMatching(/^runner-a$/), generation: 2, status: 'sent' });
+
+    // 遅れてきた旧持ち主の確定は通らない。Bの確定を壊さない。
+    await expect(markRedemptionStepSent(db, {
+      redemptionId: reserved.redemption.id, stepKey,
+      owner: 'runner-a', fenceToken: 'fence-a1', now: '2026-09-09T01:01:00.000Z',
+    })).rejects.toThrow('特典の送信後の確定に失敗しました');
+    expect(stepRow().status).toBe('sent');
+  });
+
+  it('貸出中の手順は送らずに待ち、期限後に引き継いで1回だけ送る', async () => {
+    const { db, raw } = createTestD1();
+    seedAccount(raw);
+    const rewardId = await seedWebhookReward(db);
+    const reserved = await reserveMileageRewardRedemption(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', rewardId,
+      idempotencyKey: 'e2e-busy', requestFingerprint: 'fp-busy',
+    });
+
+    // 走者Aが貸出を持っている(送信はまだ)。走者Bの配送は送らずに待つ。
+    expect(await claimRedemptionStep(db, {
+      redemptionId: reserved.redemption.id, stepKey: '0:w1',
+      idempotencyKey: 'busy-key', owner: 'runner-a', fenceToken: 'fence-a1',
+      leaseExpiresAt: '2026-09-09T00:05:00.000Z', now: '2026-09-09T00:00:00.000Z',
+    })).toBe('send');
+    const counter = countFetches();
+    const waiting = await deliverMileageReward(db, reserved.redemption.id, {
+      fetch: counter.fetch, now: () => '2026-09-09T00:01:00.000Z',
+    });
+    expect(waiting).toMatchObject({ status: 'delivery_failed' });
+    expect(waiting.message ?? '').toContain('確認しています');
+    expect(counter.count()).toBe(0);
+    expect(raw.prepare(
+      `SELECT status FROM mileage_redemptions WHERE id = ?`,
+    ).get(reserved.redemption.id)).toEqual({ status: 'delivering' });
+
+    // 期限が過ぎたら引き継いで送る。外部送信はこの1回だけ。
+    const recovered = await deliverMileageReward(db, reserved.redemption.id, {
+      fetch: counter.fetch, now: () => '2026-09-09T01:00:00.000Z',
+    });
+    expect(recovered.status).toBe('succeeded');
+    expect(counter.count()).toBe(1);
   });
 });
