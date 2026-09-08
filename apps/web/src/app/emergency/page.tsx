@@ -17,6 +17,7 @@ import {
 } from '@/lib/api'
 import { formatOperationDate, type OperationSeverity } from '@/lib/operation-status'
 import { operationImpactText, type EmergencyStopTarget } from '@/lib/operation-impact'
+import { operationControlSummary } from './control-summary'
 import releaseLog from '@/generated/release-log.json'
 import { useAccount } from '@/contexts/account-context'
 
@@ -222,14 +223,13 @@ function HealthPanel({
     try {
       const [response, preview] = await Promise.all([
         manual ? api.operations.runHealth(accountId) : api.operations.health(accountId),
-        api.operations.preview(accountId),
+        api.operations.preview(accountId).catch(() => null),
       ])
       if (!response.success) throw new Error(response.error)
-      if (!preview.success) throw new Error(preview.error)
       applySnapshot(response.data)
-      setControlSummary(preview.data.control.activeIncidentId
-        ? { value: '停止中', note: preview.data.control.reason || '停止理由は未入力です' }
-        : { value: '通常運用', note: '停止なし' })
+      setControlSummary(preview?.success
+        ? operationControlSummary(preview.data.control)
+        : { value: '未確認', note: '停止状態を取得できませんでした' })
     } catch {
       setChecks(CHECK_DEFINITIONS.map((definition) => ({
         ...definition,
