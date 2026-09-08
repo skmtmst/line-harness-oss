@@ -3614,6 +3614,13 @@ export type PhotoReviewMetrics = {
   attentionCount: number
 }
 
+/** GET /api/accounts/health-summary の応答。ログ本文は含まない。 */
+export type AccountHealthSummary = {
+  items: Array<{ lineAccountId: string; riskLevel: string | null }>
+  warningCount: number
+  dangerCount: number
+}
+
 export type PhotoAssetRun = {
   id: string
   photoId: string
@@ -8161,6 +8168,9 @@ export const api = {
       fetchApi<ApiResponse<{ riskLevel: string; logs: AccountHealthLog[] }>>(
         `/api/accounts/${accountId}/health`,
       ),
+    /** サイドバーの警告数用。staff可視範囲の最新riskLevelだけを1回で取る。ログ本文なし。 */
+    summary: () =>
+      fetchApi<ApiResponse<AccountHealthSummary>>('/api/accounts/health-summary'),
     migrations: () =>
       fetchApi<ApiResponse<AccountMigration[]>>('/api/accounts/migrations'),
     migrate: (fromAccountId: string, data: { toAccountId: string }) =>
