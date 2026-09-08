@@ -5,6 +5,7 @@ import {
   jstNow,
   removeTagFromFriend,
   recordRichMenuAssignment,
+  resolveWebhookSecret,
   setFriendSupportMark,
 } from '@line-crm/db';
 import { LineClient, type Message } from '@line-crm/line-sdk';
@@ -461,11 +462,22 @@ async function webhookExecutor(
     table: 'outgoing_webhooks', id: webhookId, code: 'webhook_not_found', label: '送信Webhook',
   });
   const webhook = await context.db.prepare(
-    `SELECT id, url, secret FROM outgoing_webhooks
+    `SELECT id, url, secret, secret_encrypted FROM outgoing_webhooks
       WHERE id = ? AND line_account_id = ? AND is_active = 1`,
-  ).bind(webhookId, context.lineAccountId).first<{ id: string; url: string; secret: string | null }>();
+  ).bind(webhookId, context.lineAccountId).first<{ id: string; url: string; secret: string | null; secret_encrypted?: string | null }>();
   if (!webhook) throw invalid('webhook_not_active', '動作中の送信Webhookが見つかりません');
   if (!isSafeWebhookUrl(webhook.url)) throw invalid('webhook_url_unsafe', '送信WebhookのURLが安全ではありません');
+  // 署名は送信直前に復号した値で付ける。secretが設定済みで読めない
+  // (鍵不足・復号失敗)ときだけ送らずに止める(#650)。未設定の旧行は従来どおり送る。
+  let sendSecret: string | null = null;
+  if (webhook.secret_encrypted || webhook.secret) {
+    try {
+      sendSecret = await resolveWebhookSecret(webhook, dependencies.credentialEncryptionKey);
+    } catch {
+      throw invalid('webhook_secret_unavailable', '送信Webhookのsecretを確認できませんでした');
+    }
+    if (!sendSecret) throw invalid('webhook_secret_unavailable', '送信Webhookのsecretを確認できませんでした');
+  }
 
   const body = JSON.stringify({
     eventId: context.sourceEventId,
@@ -476,7 +488,7 @@ async function webhookExecutor(
     'Content-Type': 'application/json',
     'Idempotency-Key': context.idempotencyKey,
   };
-  if (webhook.secret) headers['X-Webhook-Signature'] = await signBody(webhook.secret, body);
+  if (sendSecret) headers['X-Webhook-Signature'] = await signBody(sendSecret, body);
   let response: Response;
   try {
     response = await (dependencies.fetch ?? fetch)(webhook.url, {
