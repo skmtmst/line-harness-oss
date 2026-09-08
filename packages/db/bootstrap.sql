@@ -1937,10 +1937,29 @@ CREATE TABLE form_submit_claims (
   webhook TEXT,
   submission_id TEXT,
   owner TEXT NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1,
+  lease_generation INTEGER NOT NULL DEFAULT 1,
+  effect_stats TEXT NOT NULL DEFAULT '{}',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   expires_at TEXT NOT NULL,
   PRIMARY KEY (tenant_id, line_account_id, form_id, friend_id, idempotency_key)
+);
+
+CREATE TABLE form_submit_outbox (
+  tenant_id TEXT NOT NULL DEFAULT '',
+  line_account_id TEXT NOT NULL,
+  form_id TEXT NOT NULL,
+  friend_id TEXT NOT NULL,
+  idempotency_key TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  event_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'delivered', 'failed')),
+  payload TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (tenant_id, line_account_id, form_id, friend_id, idempotency_key, kind)
 );
 
 CREATE TABLE forms (
