@@ -376,7 +376,7 @@ function isSafeFriendIdForInbox(value: string): boolean {
 
 function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const router = useRouter()
-  const searchParams = useSearchParams()
+  const params = useSearchParams()
   const { selectedAccountId, selectedAccount } = useAccount()
   const [chats, setChats] = useState<Chat[]>([])
   /**
@@ -901,8 +901,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   // in the URL (#673). Manual selection never rewrites the URL, so a
   // state-only change never triggers this.
   useEffect(() => {
-    const threadId = (searchParams.get('thread') ?? '').trim()
-    const rawFriend = (searchParams.get('friend') ?? searchParams.get('friendId') ?? '').trim()
+    const threadId = (params.get('thread') ?? '').trim()
+    const rawFriend = (params.get('friend') ?? params.get('friendId') ?? '').trim()
     if (threadId) {
       deepLinkIdRef.current = null
       setDeepLinkNotice('')
@@ -926,7 +926,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     setDeepLinkNotice('')
     setSelectedThreadId(null)
     setSelectedChatId(rawFriend)
-  }, [searchParams])
+  }, [params])
 
   useEffect(() => {
     if (selectedChatId) {

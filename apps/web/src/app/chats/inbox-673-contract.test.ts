@@ -28,16 +28,18 @@ function region(source: string, start: string, end: string): string {
 }
 
 describe('#673-受け URLから対象者を読み、会話を選ぶ', () => {
-  const deepLink = region(PAGE, '// Deep-link from other pages.', '}, [searchParams])')
+  const deepLink = region(PAGE, '// Deep-link from other pages.', '}, [params])')
 
   it('`?friend=` を読み、旧い `?friendId=` の共有URLも受ける', () => {
-    expect(deepLink).toContain("searchParams.get('friend')")
-    expect(deepLink).toContain("searchParams.get('friendId')")
+    expect(deepLink).toContain("params.get('friend')")
+    expect(deepLink).toContain("params.get('friendId')")
+    // メールの `?thread=` 読みも保つ（app-shell-v6 の契約）。
+    expect(deepLink).toContain("params.get('thread')")
   })
 
   it('URLの変化（戻る・進む）で選び直す。再読込はURLに残る対象で復元する', () => {
     // 依存配列は区間の終わり印に含まれるため、PAGE全体で見る。
-    expect(PAGE).toContain('}, [searchParams])')
+    expect(PAGE).toContain('}, [params])')
     expect(deepLink).toContain('setSelectedChatId(rawFriend)')
   })
 
@@ -47,7 +49,7 @@ describe('#673-受け URLから対象者を読み、会話を選ぶ', () => {
 })
 
 describe('#673-受け 不正IDは口へ渡さず別人も開かない', () => {
-  const deepLink = region(PAGE, '// Deep-link from other pages.', '}, [searchParams])')
+  const deepLink = region(PAGE, '// Deep-link from other pages.', '}, [params])')
 
   it('IDの形を見て、素のまま path へ入らない値を弾く', () => {
     expect(PAGE).toContain('function isSafeFriendIdForInbox(value: string): boolean')
