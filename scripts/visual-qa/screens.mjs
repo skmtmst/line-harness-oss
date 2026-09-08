@@ -2971,11 +2971,11 @@ export const SCREENS = [
     verdictHead: "5c9238525",
   },
   {
-    ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new',
+    ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new', mode: 'viewport', height: 1136,
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #434 / 3101・8788で再撮影・再判定。** 認証済みセッションのまま `/staff/new` へ到達し、ログイン画面へ戻らないことを確認した。名前・メールアドレス・役割・最初に表示するLINEアカウント・スタッフの機能別担当範囲・通知先と、追加後の流れを表示。1440/1920pxとも横はみ出し0。',
-    verdictSource: 'staff-v6/I3ZSrU.txt + staff-v6/I3ZSrU-{1440,1920}.png + 2026-09-07 visual comparison',
-    verdictHead: '54f1910a7',
+    verdictNote: '**2026-09-08 Issue #573 / 3111・8809で設計高1136pxに再撮影し、一致を維持。** 初期ビューポートを設計高へそろえ、高さ差を0pxへ解消した。1920px画素差4.8618%、1440/1920pxとも横はみ出し0。認証済みセッションのまま `/staff/new` へ到達し、名前・メールアドレス・役割・最初に表示するLINEアカウント・スタッフの機能別担当範囲・通知先と、追加後の流れを確認した。',
+    verdictSource: 'staff-v6/I3ZSrU.png + staff-v6/I3ZSrU-{1440,1920}.png + staff-v6/I3ZSrU-diff-1920.png + Issue #573',
+    verdictHead: '023739c1df',
   },
 
   // ── 機能31 機能設定 ─────────────────────────────────────
@@ -3491,6 +3491,7 @@ export const CAPTURED_AT = {
     { pr: 1182, head: '04057fb9da53', on: '2026-09-07', screens: ['e3jz3','EOTS4','jwVlo','I3ZSrU'], note: 'Issue #405。#1175後の access/users・roles・audit/events 固定契約へ接続し、3101/8788で4画面を1440・1920px撮影。横はみ出し0、設計との差は各画面の判定注記へ記録した。' },
     { pr: 1201, head: '5c9238525', on: '2026-09-07', screens: ['e3jz3','EOTS4','jwVlo','I3ZSrU'], note: 'Issue #425。職位・権限bundle・担当範囲・機能別権限の固定行を追加し、権限比較、6行ページ送りと注意札、監査記録の地域・詳細表示を3101/8788で4画面と全状態撮影。横はみ出し0、各画面を再判定した。' },
     { pr: 1213, head: '54f1910a7', on: '2026-09-07', screens: ['EOTS4','I3ZSrU'], note: 'Issue #434。権限比較と認証済み招待フォームを3101/8788で1440・1920px再撮影し、旧Issueの上書きを外して2画面の実効判定をmatchへ更新した。横はみ出し0。' },
+    { pr: 1381, head: '023739c1df', on: '2026-09-08', screens: ['I3ZSrU'], note: 'Issue #573。3111/8809で設計高1136pxにそろえて1440・1920pxを再撮影し、高さ差0px・横はみ出し0でmatchを維持した。新設の招待確認画面は設計なしのため台帳には追加せず、証拠画像だけを残した。' },
   ],
   31: [
     { pr: 1191, head: 'e98decafa', on: '2026-09-07', screens: ['c4R6F'], note: 'Issue #422 / PR #1191。機能設定を3102/8789で1440・1920px再撮影。説明・切替・並び替え・利用数表示を確認し、未取得の利用数はデータ待ちで記録した。' },
