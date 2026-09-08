@@ -318,10 +318,73 @@ describe('共通情報', () => {
   it('加算・減算がアカウント単位の値に効く', async () => {
     addAction('a1', 'common_var', { varKey: 'stock', op: 'sub', value: '3' })
     await runScenarioActions(db, { scenarioId: SCENARIO, hook: 'step_sent', friendId: 'f1', stepId: STEP })
-    const row = raw.prepare(`SELECT value FROM common_vars WHERE var_key = 'stock'`).get() as { value: string }
-    expect(row.value).toBe('7')
+    expect(commonVarValue('account-1', 'stock')).toBe('7')
+  })
+
+  it('同じ共通情報への並行した2更新は両方反映される', async () => {
+    addAction('a1', 'common_var', { varKey: 'stock', op: 'sub', value: '3' })
+    const input = { scenarioId: SCENARIO, hook: 'step_sent' as const, friendId: 'f1', stepId: STEP }
+    const [first, second] = await Promise.all([
+      runScenarioActions(db, input),
+      runScenarioActions(db, input),
+    ])
+    expect(first.failed).toBe(0)
+    expect(second.failed).toBe(0)
+    // 10 - 3 - 3。片方が消えると '7' になる。
+    expect(commonVarValue('account-1', 'stock')).toBe('4')
+  })
+
+  it('他のアカウントの同名キーには触れない', async () => {
+    raw
+      .prepare(
+        `INSERT INTO common_vars (id, line_account_id, name, var_key, type, value)
+         VALUES ('v2','account-2','在庫','stock','number','100')`,
+      )
+      .run()
+    addAction('a1', 'common_var', { varKey: 'stock', op: 'sub', value: '3' })
+    await runScenarioActions(db, { scenarioId: SCENARIO, hook: 'step_sent', friendId: 'f2', stepId: STEP })
+    expect(commonVarValue('account-2', 'stock')).toBe('97')
+    expect(commonVarValue('account-1', 'stock')).toBe('10')
+  })
+
+  it('自分のアカウントに無いキーは失敗し、他のアカウントの値は変わらない', async () => {
+    raw
+      .prepare(
+        `INSERT INTO common_vars (id, line_account_id, name, var_key, type, value)
+         VALUES ('v2','account-2','予約枠','seats','number','5')`,
+      )
+      .run()
+    addAction('a1', 'common_var', { varKey: 'seats', op: 'sub', value: '1' })
+    const result = await runScenarioActions(db, {
+      scenarioId: SCENARIO,
+      hook: 'step_sent',
+      friendId: 'f1',
+      stepId: STEP,
+    })
+    expect(result.failed).toBe(1)
+    expect(commonVarValue('account-2', 'seats')).toBe('5')
+  })
+
+  it('数でない値に加算しても落ちない（0とみなす）', async () => {
+    raw.prepare(`UPDATE common_vars SET value = 'あいう' WHERE var_key = 'stock'`).run()
+    addAction('a1', 'common_var', { varKey: 'stock', op: 'add', value: '3' })
+    const result = await runScenarioActions(db, {
+      scenarioId: SCENARIO,
+      hook: 'step_sent',
+      friendId: 'f1',
+      stepId: STEP,
+    })
+    expect(result.failed).toBe(0)
+    expect(commonVarValue('account-1', 'stock')).toBe('3')
   })
 })
+
+function commonVarValue(lineAccountId: string, varKey: string): string | null {
+  const row = raw
+    .prepare(`SELECT value FROM common_vars WHERE line_account_id = ? AND var_key = ?`)
+    .get(lineAccountId, varKey) as { value: string } | undefined
+  return row?.value ?? null
+}
 
 describe('シナリオ操作', () => {
   it('購読を始める', async () => {

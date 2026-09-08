@@ -546,34 +546,50 @@ export async function resumePreviousScenario(
   return (updated.meta?.changes ?? 0) > 0
 }
 
-/** 共通情報の加算・減算。在庫や残席のような、店ぜんたいで1つの数に使う。 */
+/**
+ * 共通情報の加算・減算。在庫や残席のような、店ぜんたいで1つの数に使う。
+ *
+ * 読み→計算→書き込みをそのまま書くと、同時に2件動いたときに両方が
+ * 同じ古い値を読んで上書きし、片方の増減が消える。書き込み時に
+ * 「読んだときの値のままか」を条件に入れ、変わっていたら読み直して
+ * 計算し直す。D1 の1文は原子的なので、条件に合った更新だけが通り、
+ * 並んだ更新は1件ずつ順に反映される。
+ */
+
+/** 同時更新のぶつかりで読み直す回数の上限。 */
+const COMMON_VAR_UPDATE_RETRIES = 8
 async function applyCommonVar(
   db: D1Database,
   friendId: string,
   c: CommonVarActionConfig,
 ): Promise<void> {
   if (!c.varKey) throw new Error('common_var action requires varKey')
-  const row = await db
-    .prepare(
-      `SELECT cv.value
-         FROM common_vars cv
-         JOIN friends f ON f.line_account_id = cv.line_account_id
-        WHERE f.id = ? AND cv.var_key = ?`,
-    )
-    .bind(friendId, c.varKey)
-    .first<{ value: string | null }>()
-  if (!row) throw new Error(`common_var not found: ${c.varKey}`)
-  const base = Number(row.value ?? 0)
   const delta = Number(c.value ?? 0)
-  const safeBase = Number.isFinite(base) ? base : 0
   const safeDelta = Number.isFinite(delta) ? delta : 0
-  const next = c.op === 'add' ? safeBase + safeDelta : safeBase - safeDelta
-  await db
-    .prepare(
-      `UPDATE common_vars SET value = ?, updated_at = ?
-        WHERE var_key = ?
-          AND line_account_id = (SELECT line_account_id FROM friends WHERE id = ?)`,
-    )
-    .bind(String(next), jstNow(), c.varKey, friendId)
-    .run()
+  const signed = c.op === 'add' ? safeDelta : -safeDelta
+  for (let attempt = 0; attempt < COMMON_VAR_UPDATE_RETRIES; attempt++) {
+    const row = await db
+      .prepare(
+        `SELECT cv.value
+           FROM common_vars cv
+           JOIN friends f ON f.line_account_id = cv.line_account_id
+          WHERE f.id = ? AND cv.var_key = ?`,
+      )
+      .bind(friendId, c.varKey)
+      .first<{ value: string | null }>()
+    if (!row) throw new Error(`common_var not found: ${c.varKey}`)
+    const base = Number(row.value ?? 0)
+    const safeBase = Number.isFinite(base) ? base : 0
+    const updated = await db
+      .prepare(
+        `UPDATE common_vars SET value = ?, updated_at = ?
+          WHERE var_key = ?
+            AND line_account_id = (SELECT line_account_id FROM friends WHERE id = ?)
+            AND value IS ?`,
+      )
+      .bind(String(safeBase + signed), jstNow(), c.varKey, friendId, row.value ?? null)
+      .run()
+    if ((updated.meta?.changes ?? 0) > 0) return
+  }
+  throw new Error(`common_var update conflict: ${c.varKey}`)
 }
