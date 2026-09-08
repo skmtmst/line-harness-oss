@@ -711,3 +711,68 @@ describe('getAffiliateReport — CV via affiliate_id OR affiliate_code', () => {
     expect(rows[0].confirmedReward).toBe(3000);
   });
 });
+
+describe('report confirmedReward — 承認時の版を確定額に使う', () => {
+  const TENANT_ID = '00000000-0000-4000-8000-000000000001';
+  let sqlite: Database.Database;
+  let db: D1Database;
+
+  beforeEach(() => {
+    sqlite = setupDb();
+    // このファイル共有のasD1はmeta.changesを返さないため、承認の成否が
+    // 判定できない。ここだけ変更件数を返す包みを使う。
+    db = {
+      prepare(query: string) {
+        return {
+          bind(...params: unknown[]) {
+            const stmt = sqlite.prepare(query);
+            return {
+              async run() {
+                const info = stmt.run(...params);
+                return { results: [], success: true, meta: { changes: info.changes } };
+              },
+              async first<T>() {
+                return (stmt.get(...params) as T) ?? null;
+              },
+              async all<T>() {
+                return { results: stmt.all(...params) as T[], success: true, meta: {} };
+              },
+            };
+          },
+        };
+      },
+    } as unknown as D1Database;
+    sqlite.exec(`
+      INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, tenant_id)
+      VALUES ('account-1', 'ch-1', '本店', 'token', 'secret', '${TENANT_ID}');
+      INSERT INTO friends (id, line_user_id, display_name, line_account_id, created_at, updated_at)
+      VALUES ('fr-1', 'U0001', 'T', 'account-1', '2026-01-01T00:00:00.000+09:00', '2026-01-01T00:00:00.000+09:00');
+      INSERT INTO affiliates (id, name, code, commission_rate, is_active, created_at, tenant_id, line_account_id)
+      VALUES ('aff-r', 'R', 'code-r', 0, 1, '2026-01-01T00:00:00.000+09:00', '${TENANT_ID}', 'account-1');
+      INSERT INTO conversion_points (id, name, event_type, value, created_at, line_account_id)
+      VALUES ('cp-r', '購入', 'purchase', 10000, '2026-01-01T00:00:00.000+09:00', 'account-1');
+      INSERT INTO affiliate_offers (id, name, reward_amount, is_active, created_at, line_account_id)
+      VALUES ('offer-r', '定期便', 3000, 1, '2026-01-01T00:00:00.000+09:00', 'account-1');
+      INSERT INTO affiliate_links (id, affiliate_id, ref_code, line_account_id, is_active, created_at, click_count, offer_id)
+      VALUES ('link-r', 'aff-r', 'ref-r', 'account-1', 1, '2026-01-01T00:00:00.000+09:00', 0, 'offer-r');
+      INSERT INTO conversion_events (id, conversion_point_id, friend_id, affiliate_id, attributed_ref_code, created_at, approval_status)
+      VALUES ('cv-r', 'cp-r', 'fr-1', 'aff-r', 'ref-r', '2026-02-01T00:00:00.000+09:00', 'pending');
+    `);
+  });
+
+  test('v1/v2の確定額は承認後の案件編集で変わらない', async () => {
+    const { setConversionApproval } = await import('../src/affiliate-offers.js');
+    expect(await setConversionApproval(db, 'cv-r', 'approved')).toBe(true);
+    const scope = { tenantId: TENANT_ID, allowedLineAccountIds: ['account-1'] };
+    expect((await getAffiliateReport(db, 'aff-r', { scope }))[0]?.confirmedReward).toBe(3000);
+    expect((await getAffiliateReportV2(db, 'aff-r', { identityKeySql: IDENTITY_KEY_SQL, lineAccountId: 'account-1' }))?.confirmedReward).toBe(3000);
+
+    sqlite.exec(`UPDATE affiliate_offers SET reward_amount = 99999 WHERE id = 'offer-r'`);
+
+    const v1 = await getAffiliateReport(db, 'aff-r', { scope });
+    expect(v1[0]?.confirmedReward).toBe(3000);
+    const v2 = await getAffiliateReportV2(db, 'aff-r', { identityKeySql: IDENTITY_KEY_SQL, lineAccountId: 'account-1' });
+    expect(v2?.confirmedReward).toBe(3000);
+    expect(v2?.byOffer).toMatchObject([{ conversionsApproved: 1, confirmedReward: 3000 }]);
+  });
+});

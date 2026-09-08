@@ -227,4 +227,13 @@ describe('支払い確定', () => {
       lineAccountId: 'account-1', expectedAmount: 72000, idempotencyKey: 'confirm-staff-1',
     }, 'staff')).status).toBe(403);
   });
+
+  it('同じ再実行キーで別入力が来たら409で別紹介者の確定にしない', async () => {
+    dbMocks.confirmAffiliateSettlement.mockResolvedValueOnce({ kind: 'idempotency_conflict' });
+    const res = await post('/api/affiliate-payments/affiliate-1/confirm', {
+      lineAccountId: 'account-1', expectedAmount: 72000, idempotencyKey: 'confirm-conflict-1',
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'IDEMPOTENCY_CONFLICT' });
+  });
 });

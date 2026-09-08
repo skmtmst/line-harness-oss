@@ -16,6 +16,7 @@ import {
   previewAffiliateAccountSettlement,
   saveAffiliateBankProfile,
 } from '../src/affiliate-payouts.js';
+import { setConversionApproval } from '../src/affiliate-offers.js';
 import { asD1 } from './d1-test-helper.js';
 
 const TENANT_ID = '00000000-0000-4000-8000-000000000001';
@@ -86,6 +87,42 @@ describe('migration 318 affiliate settlement and payout ledger', () => {
     expect(await closeAffiliateAccountSettlement(db, { ...closeInput, requestFingerprint: 'different' }))
       .toEqual({ kind: 'idempotency_conflict' });
     expect(sqlite.prepare('SELECT COUNT(*) AS count FROM affiliate_reward_entries').get()).toEqual({ count: 1 });
+  });
+
+  it('承認時の版があれば全体締めも凍結し、entryへ必ず紐付ける', async () => {
+    sqlite.exec(`
+      INSERT INTO conversion_events
+        (id, conversion_point_id, friend_id, affiliate_id, attributed_ref_code,
+         approval_status, approved_at, value_snapshot)
+      VALUES ('conversion-new', 'point-1', 'friend-1', 'affiliate-1', 'ref-1',
+        'pending', NULL, 10000);
+    `);
+    expect(await setConversionApproval(db, 'conversion-new', 'approved')).toBe(true);
+    const period = {
+      tenantId: TENANT_ID, lineAccountId: 'account-1',
+      periodFrom: '2026-08-01T00:00:00.000Z', periodTo: '2099-01-01T00:00:00.000Z',
+    };
+    const before = await previewAffiliateAccountSettlement(db, period);
+    // conversion-1(旧: 版なし5000)+conversion-new(版あり5000)
+    expect(before).toMatchObject({ totalAmount: 10000, conversionCount: 2 });
+    sqlite.exec(`UPDATE affiliate_offers SET reward_amount = 99999 WHERE id = 'offer-1'`);
+    const edited = await previewAffiliateAccountSettlement(db, period);
+    // 版ありだけ凍結され、版なし旧データは現在値で読む(後方互換)
+    expect(edited).toMatchObject({ totalAmount: 104999, conversionCount: 2 });
+    const closed = await closeAffiliateAccountSettlement(db, {
+      ...period, actorId: 'staff-1', expectedPreviewVersion: edited.previewVersion,
+      idempotencyKey: 'settlement-frozen-1', requestFingerprint: 'frozen-1',
+      now: '2026-09-01T00:00:00.000Z',
+    });
+    expect(closed).toMatchObject({ kind: 'created', totalAmount: 104999, conversionCount: 2 });
+    expect(sqlite.prepare(
+      `SELECT COUNT(*) AS c FROM affiliate_reward_entries WHERE reward_calculation_id IS NULL`,
+    ).get()).toEqual({ c: 0 });
+    expect(sqlite.prepare(
+      `SELECT re.amount_minor AS a FROM affiliate_reward_entries re
+        JOIN affiliate_reward_calculations c ON c.id = re.reward_calculation_id
+       WHERE re.conversion_event_id = 'conversion-new'`,
+    ).get()).toEqual({ a: 5000 });
   });
 
   it('口座番号を返さず、版競合を409用の結果へ分ける', async () => {

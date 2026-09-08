@@ -6,6 +6,7 @@ import {
   confirmAffiliateSettlement,
   previewAffiliateSettlement,
 } from '../src/affiliate-settlements.js';
+import { setConversionApproval } from '../src/affiliate-offers.js';
 import { asD1 } from './d1-test-helper.js';
 
 const TENANT_ID = '00000000-0000-4000-8000-000000000001';
@@ -128,13 +129,97 @@ describe('migration 349 承認済み報酬の版固定', () => {
   });
 
   it('他アカウントからは確定も参照も届かない', async () => {
-    expect(await previewAffiliateSettlement(db, { affiliateId: 'affiliate-rate', lineAccountId: 'account-2' }))
+    expect(await previewAffiliateSettlement(db, { tenantId: TENANT_ID, affiliateId: 'affiliate-rate', lineAccountId: 'account-2' }))
       .toBeNull();
     expect(await confirmAffiliateSettlement(db, {
       tenantId: TENANT_ID, lineAccountId: 'account-2', affiliateId: 'affiliate-rate',
       actorId: 'staff-1', idempotencyKey: 'settle-other-account', expectedAmount: 1000,
     })).toEqual({ kind: 'not_found' });
     expect(sqlite.prepare('SELECT COUNT(*) AS c FROM affiliate_settlements').get()).toEqual({ c: 0 });
+  });
+
+  it('承認時に計算根拠の版を作り、却下では作らない', async () => {
+    sqlite.exec(`
+      INSERT INTO conversion_events
+        (id, conversion_point_id, friend_id, affiliate_id, attributed_ref_code,
+         approval_status, approved_at, value_snapshot)
+      VALUES
+        ('conversion-pending-1', 'point-1', 'friend-1', 'affiliate-rate', NULL,
+         'pending', NULL, 10000),
+        ('conversion-pending-2', 'point-1', 'friend-1', 'affiliate-rate', NULL,
+         'pending', NULL, 10000);
+    `);
+    expect(await setConversionApproval(db, 'conversion-pending-1', 'approved')).toBe(true);
+    const calc = sqlite.prepare(
+      `SELECT * FROM affiliate_reward_calculations WHERE conversion_event_id = 'conversion-pending-1'`,
+    ).get() as Record<string, unknown>;
+    expect(calc).toMatchObject({
+      formula: 'rate', commission_rate_snapshot: 10, base_amount_snapshot: 10000, amount_minor: 1000,
+    });
+    expect(await setConversionApproval(db, 'conversion-pending-2', 'rejected')).toBe(true);
+    expect(sqlite.prepare(
+      `SELECT COUNT(*) AS c FROM affiliate_reward_calculations WHERE conversion_event_id = 'conversion-pending-2'`,
+    ).get()).toEqual({ c: 0 });
+    expect(await setConversionApproval(db, 'conversion-pending-1', 'approved')).toBe('already_set');
+    expect(sqlite.prepare(`SELECT COUNT(*) AS c FROM affiliate_reward_calculations`).get()).toEqual({ c: 1 });
+  });
+
+  it('承認後・締め前の設定編集でプレビューと確定額が変わらない', async () => {
+    sqlite.exec(`DELETE FROM conversion_events`);
+    sqlite.exec(`
+      INSERT INTO conversion_events
+        (id, conversion_point_id, friend_id, affiliate_id, attributed_ref_code,
+         approval_status, approved_at, value_snapshot)
+      VALUES ('cv-snap', 'point-1', 'friend-2', 'affiliate-fixed', 'ref-1',
+        'pending', NULL, 10000);
+    `);
+    expect(await setConversionApproval(db, 'cv-snap', 'approved')).toBe(true);
+    const input = {
+      tenantId: TENANT_ID, affiliateId: 'affiliate-fixed', lineAccountId: 'account-1',
+      now: '2026-09-01T00:00:00.000Z',
+    };
+    expect(await previewAffiliateSettlement(db, input)).toMatchObject({ amount: 3000, conversionCount: 1 });
+    sqlite.exec(`
+      UPDATE affiliates SET commission_rate = 50 WHERE id = 'affiliate-fixed';
+      UPDATE affiliate_offers SET reward_amount = 99999, name = '改名後' WHERE id = 'offer-1';
+      UPDATE conversion_points SET value = 77777 WHERE id = 'point-1';
+    `);
+    const after = await previewAffiliateSettlement(db, input);
+    expect(after).toMatchObject({
+      amount: 3000, conversionCount: 1,
+      breakdown: [{ offerName: '定期便', conversions: 1, unitReward: 3000, subtotal: 3000 }],
+    });
+    expect(await confirmAffiliateSettlement(db, {
+      ...input, actorId: 'staff-1', idempotencyKey: 'snap-key-1', expectedAmount: 3000,
+    })).toMatchObject({ kind: 'created', amount: 3000 });
+    expect(sqlite.prepare(
+      `SELECT formula, commission_rate_snapshot, fixed_reward_snapshot, offer_name_snapshot, amount_minor
+         FROM affiliate_reward_calculations WHERE conversion_event_id = 'cv-snap'`,
+    ).get()).toEqual({
+      formula: 'fixed', commission_rate_snapshot: null,
+      fixed_reward_snapshot: 3000, offer_name_snapshot: '定期便', amount_minor: 3000,
+    });
+  });
+
+  it('同じキーで別紹介者を確定しようとすると競合になる', async () => {
+    expect((await confirmRate('shared-key-1')).kind).toBe('created');
+    expect(await confirmAffiliateSettlement(db, {
+      tenantId: TENANT_ID, lineAccountId: 'account-1', affiliateId: 'affiliate-fixed',
+      actorId: 'staff-1', idempotencyKey: 'shared-key-1', expectedAmount: 3000,
+      now: '2026-09-01T00:00:00.000Z',
+    })).toEqual({ kind: 'idempotency_conflict' });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS c FROM affiliate_settlements`).get()).toEqual({ c: 1 });
+  });
+
+  it('他テナントの紹介者は確定も参照もできない', async () => {
+    expect(await previewAffiliateSettlement(db, {
+      tenantId: 'other-tenant', affiliateId: 'affiliate-rate', lineAccountId: 'account-1',
+    })).toBeNull();
+    expect(await confirmAffiliateSettlement(db, {
+      tenantId: 'other-tenant', lineAccountId: 'account-1', affiliateId: 'affiliate-rate',
+      actorId: 'staff-1', idempotencyKey: 'other-tenant-key', expectedAmount: 1000,
+    })).toEqual({ kind: 'not_found' });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS c FROM affiliate_settlements`).get()).toEqual({ c: 0 });
   });
 
   it('移行前の確定分は金額だけを引き継ぎ、根拠なしと分かる形にする', async () => {
@@ -153,22 +238,34 @@ describe('migration 349 承認済み報酬の版固定', () => {
       CREATE TABLE affiliate_reward_entries (
         id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, line_account_id TEXT NOT NULL,
         affiliate_id TEXT NOT NULL, conversion_event_id TEXT NOT NULL, offer_id TEXT,
+        reward_calculation_id TEXT,
         entry_type TEXT NOT NULL, amount_minor INTEGER NOT NULL,
         currency TEXT NOT NULL DEFAULT 'JPY', created_at TEXT NOT NULL
       );
       INSERT INTO affiliate_reward_entries
         (id, organization_id, line_account_id, affiliate_id, conversion_event_id,
-         offer_id, entry_type, amount_minor, currency, created_at)
+         offer_id, reward_calculation_id, entry_type, amount_minor, currency, created_at)
       VALUES ('entry-legacy-1', '${TENANT_ID}', 'account-1', 'affiliate-rate',
-        'conversion-legacy-1', 'offer-1', 'credit', 1000, 'JPY', '2026-08-20T00:00:00.000Z');
+        'conversion-legacy-1', 'offer-1', NULL, 'credit', 1000, 'JPY', '2026-08-20T00:00:00.000Z'),
+        ('entry-legacy-2', '${TENANT_ID}', 'account-1', 'affiliate-rate',
+        'conversion-legacy-2', 'offer-1', 'calc-kept', 'credit', 2000, 'JPY', '2026-08-21T00:00:00.000Z');
     `);
+    legacy.exec(`INSERT INTO conversion_events VALUES ('conversion-legacy-2')`);
     legacy.exec(readFileSync(
       join(import.meta.dirname, '..', 'migrations', '349_affiliate_settlement_snapshot.sql'), 'utf8'));
-    const row = legacy.prepare('SELECT * FROM affiliate_reward_calculations').get() as Record<string, unknown>;
+    const row = legacy.prepare(
+      `SELECT * FROM affiliate_reward_calculations WHERE conversion_event_id = 'conversion-legacy-1'`,
+    ).get() as Record<string, unknown>;
     expect(row).toMatchObject({
       conversion_event_id: 'conversion-legacy-1', formula: 'legacy', amount_minor: 1000,
       commission_rate_snapshot: null, base_amount_snapshot: null, fixed_reward_snapshot: null,
     });
-    expect(legacy.prepare('SELECT COUNT(*) AS c FROM affiliate_reward_entries').get()).toEqual({ c: 1 });
+    // 対応するlegacy版へ決定的に紐付き、既に版がある行は触らない。
+    expect(legacy.prepare(
+      `SELECT reward_calculation_id AS c FROM affiliate_reward_entries WHERE id = 'entry-legacy-1'`,
+    ).get()).toEqual({ c: row.id });
+    expect(legacy.prepare(
+      `SELECT reward_calculation_id AS c FROM affiliate_reward_entries WHERE id = 'entry-legacy-2'`,
+    ).get()).toEqual({ c: 'calc-kept' });
   });
 });

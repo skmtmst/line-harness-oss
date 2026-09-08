@@ -282,6 +282,7 @@ affiliates.get('/api/affiliate-payments/:id/preview', requireRole('owner', 'admi
       return c.json({ success: false, error: '支払い情報が見つかりません' }, 404);
     }
     const preview = await previewAffiliateSettlement(c.env.DB, {
+      tenantId: scope.tenantId,
       affiliateId: affiliate.id,
       lineAccountId,
     });
@@ -337,6 +338,9 @@ affiliates.post('/api/affiliate-payments/:id/confirm', requireRole('owner', 'adm
     }
     if (result.kind === 'changed') {
       return c.json({ success: false, code: 'SETTLEMENT_CHANGED', error: '金額が変わりました。内容を読み直してください' }, 409);
+    }
+    if (result.kind === 'idempotency_conflict') {
+      return c.json({ success: false, code: 'IDEMPOTENCY_CONFLICT', error: '同じ再実行キーが別の入力に使われています' }, 409);
     }
     return c.json({ success: true, data: result }, result.kind === 'created' ? 201 : 200);
   } catch (err) {

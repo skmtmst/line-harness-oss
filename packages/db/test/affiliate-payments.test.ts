@@ -167,6 +167,8 @@ describe('紹介停止と支払い確定の追記台帳', () => {
       INSERT INTO line_accounts VALUES ('account-1');
     `);
     sqlite.exec(readFileSync(new URL('../migrations/293_affiliate_settlements.sql', import.meta.url), 'utf8'));
+    // 本番schemaでは318で付く列。個別確定の指紋照合が読むためここで足す。
+    sqlite.exec(`ALTER TABLE affiliate_settlements ADD COLUMN request_fingerprint TEXT NOT NULL DEFAULT ''`);
     sqlite.exec(readFileSync(new URL('../migrations/349_affiliate_settlement_snapshot.sql', import.meta.url), 'utf8'));
     sqlite.exec(`
       INSERT INTO friends VALUES ('friend-1', 'account-1');
@@ -206,7 +208,7 @@ describe('紹介停止と支払い確定の追記台帳', () => {
 
   test('プレビューの金額を追記で固定し、同じ再試行を二重計上しない', async () => {
     const preview = await previewAffiliateSettlement(db, {
-      affiliateId: 'affiliate-1', lineAccountId: 'account-1', now: '2026-09-06T00:00:00Z',
+      tenantId: 'tenant-1', affiliateId: 'affiliate-1', lineAccountId: 'account-1', now: '2026-09-06T00:00:00Z',
     });
     expect(preview).toMatchObject({
       amount: 10000,
