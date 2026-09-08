@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { computeDedupBroadcastPreview } from './dedup-broadcast.js';
+import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js';
 
 interface CannedData {
   selectedCounts: Array<{ line_account_id: string; cnt: number }>;
@@ -859,5 +860,156 @@ describe('processMultiAccountDedupBroadcast', () => {
     const c = clients.find((x) => x.token === 'tok1');
     expect(c?.calls.length).toBe(2); // 500人ずつ全 batch を送信
     expect(result.successCount).toBe(1000);
+  });
+});
+
+// =============================================================================
+// N-184: 共通情報 ({{var.*}}) を配信元アカウントごとに解決する (実D1 + LINE mock)
+// =============================================================================
+
+type SeedDb = ReturnType<typeof createTestD1>;
+
+function seedTwoShops(seed: SeedDb, opts: { shopAHasHours: boolean } = { shopAHasHours: true }): void {
+  const { raw } = seed;
+  raw.prepare(
+    `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+     VALUES ('shop-a', 'ch-a', 'A店', 'tokA', 'secA'),
+            ('shop-b', 'ch-b', 'B店', 'tokB', 'secB')`,
+  ).run();
+  // 同一人物が両店にいる (user_id が同じ → dedup で1人に束ねられる)。
+  insertFriend(raw, 'fa1', {
+    line_user_id: 'UA1', line_account_id: 'shop-a', user_id: 'shared-person', display_name: '共有さん',
+  });
+  insertFriend(raw, 'fb1', {
+    line_user_id: 'UB1', line_account_id: 'shop-b', user_id: 'shared-person', display_name: '共有さん',
+  });
+  insertFriend(raw, 'fb2', {
+    line_user_id: 'UB2', line_account_id: 'shop-b', user_id: 'only-b', display_name: 'B専用さん',
+  });
+  // 同名・異値の共通情報「営業時間」。
+  if (opts.shopAHasHours) {
+    raw.prepare(
+      `INSERT INTO common_vars (id, name, var_key, value, line_account_id)
+       VALUES ('cv-a1', '営業時間', 'hours', '10:00〜19:00', 'shop-a')`,
+    ).run();
+  }
+  raw.prepare(
+    `INSERT INTO common_vars (id, name, var_key, value, line_account_id)
+     VALUES ('cv-b1', '営業時間', 'hours', '11:00〜20:00', 'shop-b')`,
+  ).run();
+  raw.prepare(
+    `INSERT INTO broadcasts
+       (id, title, message_type, message_content, target_type, account_ids, dedup_priority, status)
+     VALUES
+       ('b-n184', '重複排除テスト', 'text', '本日の営業時間は{{var.hours}}です',
+        'multi-account-dedup', '["shop-a","shop-b"]', '["shop-a","shop-b"]', 'sending')`,
+  ).run();
+}
+
+function mockTwoShopsActive(): void {
+  vi.mocked(getLineAccountById).mockImplementation(async (_db: D1Database, id: string) => {
+    if (id === 'shop-a') return { id, channel_access_token: 'tokA', is_active: 1 } as never;
+    if (id === 'shop-b') return { id, channel_access_token: 'tokB', is_active: 1 } as never;
+    return null;
+  });
+}
+
+function sentText(client: MockLineClient | undefined): string {
+  const call = client?.calls.find((c) => c.method === 'multicast');
+  return ((call?.args[1] as Array<{ text: string }>)?.[0]?.text ?? '');
+}
+
+describe('processMultiAccountDedupBroadcast per-account common vars (N-184)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('同名・異値の共通情報を配信元アカウントごとに差し込む', async () => {
+    const seed = createTestD1();
+    seedTwoShops(seed);
+    mockTwoShopsActive();
+    const clients: MockLineClient[] = [];
+    const factory = (token: string) => {
+      const c = new MockLineClient(token);
+      clients.push(c);
+      return c as unknown as LineClient;
+    };
+
+    const result = await processMultiAccountDedupBroadcast(
+      seed.db,
+      {
+        id: 'b-n184',
+        account_ids: '["shop-a","shop-b"]',
+        dedup_priority: '["shop-a","shop-b"]',
+        message_type: 'text',
+        message_content: '本日の営業時間は{{var.hours}}です',
+      },
+      factory,
+    );
+
+    expect(result.failedAccountIds).toEqual([]);
+    expect(result.complete).toBe(true);
+    // 同一人物は優先度の高い A店に束ねられ、B店専用と合わせて2人。
+    expect(result.totalCount).toBe(2);
+    expect(result.successCount).toBe(2);
+
+    const clientA = clients.find((c) => c.token === 'tokA');
+    const clientB = clients.find((c) => c.token === 'tokB');
+    // A店にはA店の営業時間、B店にはB店の営業時間が届く (混ざらない)。
+    expect(sentText(clientA)).toBe('本日の営業時間は10:00〜19:00です');
+    expect(sentText(clientB)).toBe('本日の営業時間は11:00〜20:00です');
+    expect(clientA?.calls[0].args[0]).toEqual(['UA1']);
+    expect(clientB?.calls[0].args[0]).toEqual(['UB2']);
+
+    // 送信記録にもアカウントごとの文面が残る。
+    const logs = seed.raw.prepare(
+      `SELECT line_account_id, content FROM messages_log WHERE broadcast_id = 'b-n184' ORDER BY line_account_id`,
+    ).all() as Array<{ line_account_id: string; content: string }>;
+    expect(logs).toEqual([
+      { line_account_id: 'shop-a', content: '本日の営業時間は10:00〜19:00です' },
+      { line_account_id: 'shop-b', content: '本日の営業時間は11:00〜20:00です' },
+    ]);
+  });
+
+  it('未定義値は別アカウントへ流用せず、そのアカウントだけ失敗に記録する', async () => {
+    const seed = createTestD1();
+    seedTwoShops(seed, { shopAHasHours: false });
+    mockTwoShopsActive();
+    const clients: MockLineClient[] = [];
+    const factory = (token: string) => {
+      const c = new MockLineClient(token);
+      clients.push(c);
+      return c as unknown as LineClient;
+    };
+
+    const result = await processMultiAccountDedupBroadcast(
+      seed.db,
+      {
+        id: 'b-n184',
+        account_ids: '["shop-a","shop-b"]',
+        dedup_priority: '["shop-a","shop-b"]',
+        message_type: 'text',
+        message_content: '本日の営業時間は{{var.hours}}です',
+      },
+      factory,
+    );
+
+    // A店は未定義のため送らず失敗に記録。B店の値は流用しない。
+    expect(result.failedAccountIds).toEqual(['shop-a']);
+    expect(clients.find((c) => c.token === 'tokA')).toBeUndefined();
+    // B店は自分の値で正常に送る。
+    const clientB = clients.find((c) => c.token === 'tokB');
+    expect(sentText(clientB)).toBe('本日の営業時間は11:00〜20:00です');
+    expect(result.successCount).toBe(1);
+
+    // 失敗アカウントは broadcasts に残り (画面の部分失敗表示用)、記録はB店分だけ。
+    const failed = seed.raw.prepare(
+      `SELECT failed_account_ids FROM broadcasts WHERE id = 'b-n184'`,
+    ).get() as { failed_account_ids: string | null };
+    expect(failed.failed_account_ids).toBe(JSON.stringify(['shop-a']));
+    const contents = seed.raw.prepare(
+      `SELECT content FROM messages_log WHERE broadcast_id = 'b-n184'`,
+    ).all() as Array<{ content: string }>;
+    expect(contents).toEqual([{ content: '本日の営業時間は11:00〜20:00です' }]);
   });
 });
