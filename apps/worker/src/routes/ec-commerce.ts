@@ -14,6 +14,7 @@ import { notificationDeliveriesResponse } from './line-notifications.js';
 const ecCommerce = new Hono<Env>();
 // テスト送信の連打防止。同一の店・種別は30秒に1回だけ。全体の rateLimit とは
 // 別に、LINE API へ直接届く口だけ短いクールダウンを置く。
+// in-memory のため isolate ごとに数え直し、厳密な回数制限ではない（連打の抑止用）。
 const TEST_SEND_COOLDOWN_MS = 30_000;
 const testSendAt = new Map<string, number>();
 const EVENT_TYPE_SET = new Set<string>(EC_EVENT_TYPES);
