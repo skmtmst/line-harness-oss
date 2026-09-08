@@ -389,6 +389,7 @@ const DASHBOARD_OVERVIEW = {
     twoFactor: { enabled: 0, total: 6 },
     notificationUnreadCount: 3,
     shipmentStatus: '未処理なし',
+    // 設計の運用アラート見本は未対応360件。本番相当の inbox.unanswered=5 とは別物の見本値。
     supportInbox: { unanswered: 360, resolved: 38 },
   },
 }

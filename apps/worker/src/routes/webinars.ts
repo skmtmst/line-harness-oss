@@ -1884,10 +1884,12 @@ webinarRoutes.get(
         ...rows,
       ].join('\r\n');
       auditLog(c, 'webinar.participant.export', { kind: 'webinar', id });
+      // ファイル名に埋める id は英数・-_だけ残す。引用符・改行入りで応答頭が壊れるのを防ぐ。
+      const safeId = id.replace(/[^A-Za-z0-9_-]/g, '') || 'webinar';
       return new Response(`\uFEFF${csv}`, {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
-          'Content-Disposition': `attachment; filename="webinar-${id}-participants.csv"`,
+          'Content-Disposition': `attachment; filename="webinar-${safeId}-participants.csv"`,
           'Cache-Control': 'no-store',
         },
       });

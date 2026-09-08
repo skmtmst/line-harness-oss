@@ -18,6 +18,7 @@ import {
   RecentResultsCard,
   UpcomingCard,
   activeUpcomingBookings,
+  inactiveBookingStatuses,
 } from '@/components/dashboard/side-cards'
 import DashboardEditor, {
   defaultDashboardPreferences,
@@ -62,8 +63,6 @@ const PERIODS = [
 
 type PeriodKey = (typeof PERIODS)[number]['key']
 type HealthRisk = 'normal' | 'warning' | 'danger' | null
-
-const inactiveBookingStatuses = new Set(['rejected', 'cancelled', 'canceled', 'completed', 'no_show'])
 
 function dashboardStorageKey(accountId: string | null): string {
   return `lh_dashboard_v4:${accountId ?? 'default'}`
@@ -700,7 +699,7 @@ export default function DashboardPage() {
     if (id === 'recent-results') return data && !sectionAvailable('conversions')
       ? <UnavailableDataCard title="最近の成果" onRetry={() => void load()} />
       : data ? <RecentResultsCard conversions={data.conversions} /> : <EmptyDataCard title="最近の成果" href="/conversions" linkLabel="成果を見る" />
-    if (id === 'support-mark-status') return <SupportMarkStatusCard inbox={sectionAvailable('inbox') ? reference?.supportInbox ? { ...data!.inbox, ...reference.supportInbox } : data?.inbox ?? null : null} autoOnInbound={supportMarkAutoOnInbound} />
+    if (id === 'support-mark-status') return <SupportMarkStatusCard inbox={sectionAvailable('inbox') ? (data && reference?.supportInbox ? { ...data.inbox, ...reference.supportInbox } : data?.inbox ?? null) : null} autoOnInbound={supportMarkAutoOnInbound} />
     if (id === 'friend-status') return data && !sectionAvailable('friends')
       ? <UnavailableDataCard title="友だちの状態" onRetry={() => void load()} />
       : data ? <FriendStatusCard friends={data.friends} /> : <EmptyDataCard title="友だちの状態" href="/friends" linkLabel="友だちを見る" />
@@ -790,7 +789,12 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {error && <div className="bg-danger-bg text-danger rounded-card mb-5 p-4 text-sm">{error}</div>}
+      {error && (
+        <div className="bg-danger-bg text-danger rounded-card mb-5 flex flex-wrap items-center gap-3 p-4 text-sm" role="alert">
+          <span className="min-w-0 flex-1">{error}</span>
+          <button type="button" onClick={() => void load()} className="shrink-0 font-medium underline">もう一度読み込む</button>
+        </div>
+      )}
       {data?.partialFailures?.length ? (
         <div className="bg-warning-bg text-warning rounded-card mb-5 p-4 text-sm" role="status">
           一部のデータを取得できませんでした（{data.partialFailures.join('、')}）。0件としては表示していません。

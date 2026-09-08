@@ -6,12 +6,13 @@ import { webinarApi, type Webinar, type WebinarInput, type WebinarScheduleRule }
 import { useAccount } from '@/contexts/account-context'
 import StickyBar from '@/components/shared/sticky-bar'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { webinarErrorText } from './webinar-error-text'
 
 const DAYS = ['日', '月', '火', '水', '木', '金', '土']
 
 const inputClass =
-  'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
-const labelClass = 'block text-sm font-medium text-gray-700 mb-1.5'
+  'w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15'
+const labelClass = 'block text-sm font-medium text-ink-secondary mb-1.5'
 
 function timeToMinutes(value: string): number {
   const [hours, minutes] = value.split(':').map(Number)
@@ -143,7 +144,7 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
         router.push(isPublishing ? `/webinars/published?id=${created.data.id}` : `/webinars/edit?id=${created.data.id}`)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(webinarErrorText(err, '保存できませんでした。入力を見直してください。'))
       setSaving(false)
     }
   }
@@ -151,13 +152,13 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
   return (
     <div className="max-w-4xl space-y-5">
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="p-3 bg-danger-bg border border-danger/20 rounded-lg text-danger text-sm">
           {error}
         </div>
       )}
 
-      <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div><h2 className="font-bold text-slate-900">基本情報</h2><p className="mt-1 text-xs text-slate-500">普段変更する項目だけを表示しています</p></div>
+      <section className="space-y-4 rounded-2xl border border-hairline bg-canvas p-5 shadow-sm sm:p-6">
+        <div><h2 className="font-bold text-ink">基本情報</h2><p className="mt-1 text-xs text-ink-faint">普段変更する項目だけを表示しています</p></div>
         <div>
           <label className={labelClass}>
             タイトル
@@ -194,12 +195,12 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
             className={`${inputClass} w-32`}
           />
         </div>
-        <details className="group rounded-xl border border-slate-200 bg-slate-50/60">
-          <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold text-slate-700">
+        <details className="group rounded-xl border border-hairline bg-canvas-sunken/60">
+          <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold text-ink-secondary">
             URL・動画ファイルの詳細設定
-            <span className="text-xs text-slate-400 group-open:rotate-180">▾</span>
+            <span className="text-xs text-ink-faint group-open:rotate-180">▾</span>
           </summary>
-          <div className="space-y-4 border-t border-slate-200 p-4">
+          <div className="space-y-4 border-t border-hairline p-4">
             <div>
               <label className={labelClass}>slug（URL 用・半角英数とハイフン）</label>
               <input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="my-seminar" className={`${inputClass} font-mono text-xs`} />
@@ -212,11 +213,11 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
         </details>
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <section className="overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-sm">
         <div className="p-5 sm:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div><h2 className="font-bold text-slate-900">配信スケジュール</h2><p className="mt-1 text-xs text-slate-500">日本時間。参加画面には直近の候補だけが表示されます。</p></div>
-            <span className="w-fit rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{rules.length}枠</span>
+            <div><h2 className="font-bold text-ink">配信スケジュール</h2><p className="mt-1 text-xs text-ink-faint">日本時間。参加画面には直近の候補だけが表示されます。</p></div>
+            <span className="w-fit rounded-full bg-info-bg px-3 py-1 text-xs font-semibold text-info">{rules.length}枠</span>
           </div>
           {rules.length === 0 && (
             /* 枠が無いと、公開しても友だちの画面に「次の回」が出ない。
@@ -226,34 +227,34 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
             </p>
           )}
           {dailyRules.length > 0 ? (
-            <div className="mt-4 flex flex-col gap-1 rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 to-cyan-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="text-sm font-bold text-slate-900">毎日 {dailyOverview.start}〜{dailyOverview.end}</div>
-              <div className="text-xs font-medium text-slate-600">{dailyOverview.interval}分間隔 · {dailyRules.length}枠{nonDailyCount > 0 ? ` ＋ 個別${nonDailyCount}枠` : ''}</div>
+            <div className="mt-4 flex flex-col gap-1 rounded-xl border border-info/25 bg-info-bg p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm font-bold text-ink">毎日 {dailyOverview.start}〜{dailyOverview.end}</div>
+              <div className="text-xs font-medium text-ink-secondary">{dailyOverview.interval}分間隔 · {dailyRules.length}枠{nonDailyCount > 0 ? ` ＋ 個別${nonDailyCount}枠` : ''}</div>
             </div>
           ) : (
             <div className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-700">毎日の配信枠は未設定です</div>
           )}
         </div>
 
-        <details className="group border-t border-slate-200">
-          <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 sm:px-6">
+        <details className="group border-t border-hairline">
+          <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4 text-sm font-semibold text-ink-secondary hover:bg-canvas-sunken sm:px-6">
             枠を一括設定・個別編集する
-            <span className="text-xs text-slate-400 group-open:rotate-180">▾</span>
+            <span className="text-xs text-ink-faint group-open:rotate-180">▾</span>
           </summary>
-          <div className="space-y-4 border-t border-slate-100 bg-slate-50/50 p-4 sm:p-6">
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <div className="mb-3 text-xs font-bold text-slate-700">毎日の枠をまとめて作成</div>
+          <div className="space-y-4 border-t border-hairline bg-canvas-sunken/50 p-4 sm:p-6">
+            <div className="rounded-xl border border-hairline bg-canvas p-4">
+              <div className="mb-3 text-xs font-bold text-ink-secondary">毎日の枠をまとめて作成</div>
               <div className="flex flex-wrap items-end gap-3">
-                <label className="text-xs text-slate-500">開始<input type="time" value={bulkStart} onChange={(e) => setBulkStart(e.target.value)} className="mt-1 block rounded-lg border border-slate-300 px-2 py-2 text-sm" /></label>
-                <label className="text-xs text-slate-500">終了<input type="time" value={bulkEnd} onChange={(e) => setBulkEnd(e.target.value)} className="mt-1 block rounded-lg border border-slate-300 px-2 py-2 text-sm" /></label>
-                <label className="text-xs text-slate-500">間隔<select value={bulkInterval} onChange={(e) => setBulkInterval(Number(e.target.value))} className="mt-1 block rounded-lg border border-slate-300 px-2 py-2 text-sm"><option value={30}>30分</option><option value={60}>60分</option><option value={120}>120分</option></select></label>
-                <button type="button" onClick={applyDailySchedule} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">毎日の枠を置き換える</button>
+                <label className="text-xs text-ink-faint">開始<input type="time" value={bulkStart} onChange={(e) => setBulkStart(e.target.value)} className="mt-1 block rounded-lg border border-hairline px-2 py-2 text-sm" /></label>
+                <label className="text-xs text-ink-faint">終了<input type="time" value={bulkEnd} onChange={(e) => setBulkEnd(e.target.value)} className="mt-1 block rounded-lg border border-hairline px-2 py-2 text-sm" /></label>
+                <label className="text-xs text-ink-faint">間隔<select value={bulkInterval} onChange={(e) => setBulkInterval(Number(e.target.value))} className="mt-1 block rounded-lg border border-hairline px-2 py-2 text-sm"><option value={30}>30分</option><option value={60}>60分</option><option value={120}>120分</option></select></label>
+                <button type="button" onClick={applyDailySchedule} className="rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-white hover:brightness-92">毎日の枠を置き換える</button>
               </div>
-              <p className="mt-2 text-[11px] text-slate-400">下の保存ボタンを押すまでは本番へ反映されません。</p>
+              <p className="mt-2 text-[11px] text-ink-faint">下の保存ボタンを押すまでは本番へ反映されません。</p>
             </div>
             <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
         {rules.map((r, i) => (
-          <div key={i} className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 p-2 text-sm">
+          <div key={i} className="flex flex-wrap items-center gap-2 rounded-lg border border-hairline p-2 text-sm">
             <select
               value={r.type}
               onChange={(e) => {
@@ -265,7 +266,7 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
                     : { type, time: r.time ?? '20:00', days: type === 'weekly' ? [] : undefined, at: undefined },
                 )
               }}
-              className="rounded-lg border border-gray-300 px-2 py-1"
+              className="rounded-lg border border-hairline px-2 py-1"
             >
               <option value="daily">毎日</option>
               <option value="weekly">毎週</option>
@@ -293,19 +294,19 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
                 type="datetime-local"
                 value={(r.at ?? '').slice(0, 16)}
                 onChange={(e) => updateRule(i, { at: `${e.target.value}:00+09:00` })}
-                className="rounded-lg border border-gray-300 px-2 py-1"
+                className="rounded-lg border border-hairline px-2 py-1"
               />
             ) : (
               <input
                 type="time"
                 value={r.time ?? '20:00'}
                 onChange={(e) => updateRule(i, { time: e.target.value })}
-                className="rounded-lg border border-gray-300 px-2 py-1"
+                className="rounded-lg border border-hairline px-2 py-1"
               />
             )}
             <button
               onClick={() => setRules((prev) => prev.filter((_, j) => j !== i))}
-              className="ml-auto text-red-500 hover:text-red-600"
+              className="ml-auto text-danger hover:underline"
             >
               削除
             </button>
@@ -314,7 +315,7 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
             </div>
         <button
           onClick={() => setRules((prev) => [...prev, { type: 'daily', time: '20:00' }])}
-          className="px-3 py-1.5 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50"
+          className="rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-canvas-sunken"
         >
           ＋ ルール追加
         </button>
@@ -322,10 +323,10 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
         </details>
       </section>
 
-      <details className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <summary className="flex cursor-pointer list-none items-center justify-between p-5 text-sm font-bold text-slate-900 sm:p-6">従来CTAボタンの設定<span className="text-xs text-slate-400 group-open:rotate-180">▾</span></summary>
-        <section className="space-y-3 border-t border-slate-200 p-5 sm:p-6">
-        <label className="flex items-center gap-2 text-sm text-gray-700">
+      <details className="group overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-sm">
+        <summary className="flex cursor-pointer list-none items-center justify-between p-5 text-sm font-bold text-ink sm:p-6">従来CTAボタンの設定<span className="text-xs text-ink-faint group-open:rotate-180">▾</span></summary>
+        <section className="space-y-3 border-t border-hairline p-5 sm:p-6">
+        <label className="flex items-center gap-2 text-sm text-ink-secondary">
           <input type="checkbox" checked={ctaEnabled} onChange={(e) => setCtaEnabled(e.target.checked)} />
           CTA ボタンを表示する
         </label>
@@ -361,7 +362,7 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
 
       <StickyBar
         status="変更内容を確認して本番へ反映します"
-        actions={<button onClick={requestSave} disabled={saving} className="rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50">{saving ? '保存中...' : isPublishing ? '公開する' : '変更を保存'}</button>}
+        actions={<button onClick={requestSave} disabled={saving} className="rounded-xl bg-action px-6 py-2.5 text-sm font-bold text-on-action shadow-sm disabled:opacity-50">{saving ? '保存中...' : isPublishing ? '公開する' : '変更を保存'}</button>}
       />
 
       {/*
