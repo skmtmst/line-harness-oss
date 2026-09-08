@@ -447,6 +447,29 @@ describe('送信直前の再検査', () => {
     expect(res).toMatchObject({ ok: false, blocked: true, blockReason: 'dns_unresolved' });
   });
 
+  it('HTTP200+SERVFAILでも通さない(片系DNS失敗の再現)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: unknown) => {
+        const url = String(input);
+        if (url.startsWith('https://cloudflare-dns.com/dns-query')) {
+          const type = new URL(url).searchParams.get('type');
+          if (type === 'A') {
+            return new Response(JSON.stringify({ Status: 2, Answer: [] }), { status: 200 });
+          }
+          return new Response(
+            JSON.stringify({ Status: 0, Answer: [{ name: 'example.com.', type: 28, TTL: 60, data: '2606:4700:4700::1111' }] }),
+            { status: 200, headers: { 'content-type': 'application/dns-json' } },
+          );
+        }
+        throw new Error(`送ってはいけない先: ${url}`);
+      }),
+    );
+    // lookupHostを渡さない=本番と同じ既定の名前引きを使う。
+    const res = await deliverWebhook(WEBHOOK, '{}', { sleep: noSleep });
+    expect(res).toMatchObject({ ok: false, blocked: true, blockReason: 'dns_unresolved' });
+  });
+
   it('既定の名前引き(DoH)でも内部IPを止める', async () => {
     vi.stubGlobal(
       'fetch',
