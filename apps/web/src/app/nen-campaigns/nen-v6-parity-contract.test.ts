@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 const OVERVIEW = fs.readFileSync(path.join(__dirname, 'nen-overview.tsx'), 'utf8')
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 const NEW_COLUMN = fs.readFileSync(path.join(__dirname, 'columns/new/page.tsx'), 'utf8')
+const EDIT = fs.readFileSync(path.join(__dirname, 'edit/page.tsx'), 'utf8')
 
 describe('V6 21 NEN配信の画面契約', () => {
   it('4つの一覧状態を実ノードへ対応させる', () => {
@@ -109,6 +110,22 @@ describe('V6 21 NEN配信の画面契約', () => {
     // 一覧の窓付き集計(summary.pending)を送ると、変わっていないのに409になる。
     expect(PAGE).toContain('overviewRes.data.jobs.pending')
     expect(PAGE).not.toContain('deliveryList.summary.pending')
+  })
+
+  it('再送理由は口の上限500字を超えて送れない(点検 #512 の軽6)', () => {
+    expect(OVERVIEW).toContain('maxLength={500}')
+    expect(OVERVIEW).toContain('500文字まで')
+  })
+
+  it('紹介文の上限は一覧側と編集画面で1500字にそろえる(点検 #512 の軽7)', () => {
+    expect(OVERVIEW).toContain('maxLength={1500}')
+    expect(EDIT).toContain('maxLength={1500}')
+  })
+
+  it('クーポン数値は口の範囲の前に具体的な直し方を出す(点検 #512 の軽5)', () => {
+    expect(PAGE).toContain('割引の額は1〜100,000円の整数で入力してください')
+    expect(PAGE).toContain('使える日数は1〜365日の整数で入力してください')
+    expect(PAGE).toContain('savingCoupon')
   })
 
   it('削除と配信予約は確認ダイアログを挟む(点検 #512 の中9)', () => {

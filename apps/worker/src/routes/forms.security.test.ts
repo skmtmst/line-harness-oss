@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import type { Env } from '../index.js';
 
 const mocks = vi.hoisted(() => ({
+  getFormsWithStats: vi.fn(),
   getFormById: vi.fn(),
   getFormAccountIds: vi.fn(),
   getFormDeleteImpact: vi.fn(),
@@ -24,7 +25,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@line-crm/db', () => ({
   getForms: vi.fn(),
-  getFormsWithStats: vi.fn(),
+  getFormsWithStats: mocks.getFormsWithStats,
   getFormById: mocks.getFormById,
   getFormAccountIds: mocks.getFormAccountIds,
   getFormDeleteImpact: mocks.getFormDeleteImpact,
@@ -934,5 +935,39 @@ describe('LIFF identity enforcement', () => {
       messages: [{ type: 'text', text: '条件を満たしていません' }],
     });
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('api.line.me'))).toBe(false);
+  });
+});
+
+describe('GET /api/forms の件数つき応答（#578 L5）', () => {
+  const row = {
+    ...baseForm,
+    last_submitted_at: null,
+    used_by_accounts: [],
+    account_scope_review_required: false,
+  };
+
+  test('with_list_summary=1 のとき items と total を返す', async () => {
+    mocks.getFormsWithStats.mockResolvedValue([row]);
+    const { bindings } = env();
+    const res = await app(true).request(
+      '/api/forms?account_id=account-a&with_list_summary=1',
+      {},
+      bindings,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      data: { items: Array<{ id: string }>; total: number; page: number; limit: number };
+    };
+    expect(body.data.items).toHaveLength(1);
+    expect(body.data.total).toBe(1);
+  });
+
+  test('付けない呼び出しは従来どおり配列のまま返す', async () => {
+    mocks.getFormsWithStats.mockResolvedValue([row]);
+    const { bindings } = env();
+    const res = await app(true).request('/api/forms?account_id=account-a', {}, bindings);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: unknown };
+    expect(Array.isArray(body.data)).toBe(true);
   });
 });

@@ -789,18 +789,21 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
     if (legacyBody.name !== undefined) {
       const name = typeof legacyBody.name === 'string' ? legacyBody.name.trim() : '';
       if (!name) return c.json({ success: false, error: 'name must not be empty' }, 400);
+      if (name.length > 80) {
+        return c.json({ success: false, error: 'name must be between 1 and 80 characters' }, 400);
+      }
+      if (TAG_NAME_CONTROL_CHARACTER_PATTERN.test(name)) {
+        return c.json({ success: false, error: 'name must not contain control characters' }, 400);
+      }
       patch.name = name;
     }
-    if (legacyBody.color !== undefined) {
-      const color = typeof legacyBody.color === 'string' ? legacyBody.color.trim() : '';
-      // 画面の色見本と自由入力の両方から来る。形だけ見て通す。
-      if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
-        return c.json({ success: false, error: 'color must be #RRGGBB' }, 400);
-      }
-      patch.color = color;
+    // タグ自身は色を持たない(115以前の名残)。受けて保存すると、
+    // 読む側は無視するので「保存したのに出ない」になる。400で案内する。
+    if (legacyBody.color !== undefined && legacyBody.color !== null) {
+      return c.json({ success: false, error: 'tag color is not supported; set the folder color instead' }, 400);
     }
     if (Object.keys(patch).length === 0) {
-      return c.json({ success: false, error: 'name, color or isStarred is required' }, 400);
+      return c.json({ success: false, error: 'name or isStarred is required' }, 400);
     }
 
     const tag = await updateTag(c.env.DB, c.req.param('id'), patch);
@@ -925,10 +928,22 @@ tags.post('/api/tags', requireRole('owner', 'admin'), async (c) => {
     if (!name) {
       return c.json({ success: false, error: 'name is required' }, 400);
     }
+    // V6経路と同じ決まり。長い・改行入りタグが一覧・CSV・他画面の表示を崩す。
+    if (name.length > 80) {
+      return c.json({ success: false, error: 'name must be between 1 and 80 characters' }, 400);
+    }
+    if (TAG_NAME_CONTROL_CHARACTER_PATTERN.test(name)) {
+      return c.json({ success: false, error: 'name must not contain control characters' }, 400);
+    }
+
+    // タグ自身は色を持たない(115以前の名残)。受けて保存すると、
+    // 読む側は無視するので「保存したのに出ない」になる。400で案内する。
+    if (body.color !== undefined && body.color !== null) {
+      return c.json({ success: false, error: 'tag color is not supported; set the folder color instead' }, 400);
+    }
 
     const tag = await createTag(c.env.DB, {
       name,
-      color: typeof body.color === 'string' ? body.color : undefined,
       groupId:
         body.groupId === null || body.groupId === '' || body.groupId === undefined
           ? null

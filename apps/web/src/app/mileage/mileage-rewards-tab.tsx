@@ -6,6 +6,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
+import { formatMileageNumber } from './mileage-display'
 import {
   api,
   type MileageRewardAdminOverview,
@@ -44,9 +45,8 @@ const STATUS_LABEL: Record<MileageRewardSummary['status'], string> = {
 }
 
 function miles(value: number | null | undefined): string {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? `${value.toLocaleString('ja-JP')} マイル`
-    : '—'
+  const number = formatMileageNumber(value)
+  return number === '—' ? number : `${number} マイル`
 }
 
 /**

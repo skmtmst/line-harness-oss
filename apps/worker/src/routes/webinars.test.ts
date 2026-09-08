@@ -32,6 +32,12 @@ const dbMocks = {
   getWebinarFormFunnelStats: vi.fn(),
   getWebinarOverview: vi.fn(),
   getFolderById: vi.fn(),
+  countWebinarList: vi.fn(),
+  webinarListSort: vi.fn((filters: { sort?: string }) => {
+    if (filters?.sort === 'created') return [{ field: 'createdAt', direction: 'desc' }];
+    if (filters?.sort === 'name') return [{ field: 'title', direction: 'asc' }];
+    return [{ field: 'updatedAt', direction: 'desc' }];
+  }),
   getFriendByLineUserId: vi.fn(),
   getFriendByLineUserIdForAccount: vi.fn(),
   getFriendById: vi.fn(),
@@ -153,6 +159,7 @@ beforeEach(() => {
     state: 'partial', registrationMode: 'people', metrics: {},
   });
   dbMocks.getWebinarList.mockResolvedValue([]);
+  dbMocks.countWebinarList.mockResolvedValue(0);
   dbMocks.getFolderById.mockResolvedValue({ id: 'folder-1', kind: 'webinar', account_id: 'account-a' });
   dbMocks.getWebinarActions.mockResolvedValue([]);
   dbMocks.replaceWebinarActions.mockResolvedValue([]);
@@ -253,6 +260,7 @@ describe('admin webinar tenant scope', () => {
 
   test('一覧はリクエスト元の統括から見えるアカウントだけをDBへ渡す', async () => {
     dbMocks.getWebinarList.mockResolvedValue([makeWebinar({ account_id: 'account-a' })]);
+    dbMocks.countWebinarList.mockResolvedValue(1);
 
     const res = await adminReq('/api/webinars');
 
@@ -261,8 +269,11 @@ describe('admin webinar tenant scope', () => {
       allowedAccountIds: ['account-a'],
       canSeeUnassigned: false,
       accountId: undefined,
-    });
-    expect((await res.json() as { data: unknown[] }).data).toHaveLength(1);
+    }, { limit: 50, offset: 0 }, { q: undefined, folderId: undefined, status: undefined, sort: 'updated' });
+    const body = await res.json() as { data: { items: unknown[]; total: number; limit: number } };
+    expect(body.data.items).toHaveLength(1);
+    expect(body.data.total).toBe(1);
+    expect(body.data.limit).toBe(50);
   });
 
   test('一覧で選んだLINEアカウントだけをDBへ渡す', async () => {
@@ -275,7 +286,33 @@ describe('admin webinar tenant scope', () => {
       allowedAccountIds: ['account-a'],
       canSeeUnassigned: false,
       accountId: 'account-a',
+    }, { limit: 50, offset: 0 }, { q: undefined, folderId: undefined, status: undefined, sort: 'updated' });
+  });
+
+  test('一覧は頁ごとに区切って総件数と並び順を返す', async () => {
+    dbMocks.getWebinarList.mockResolvedValue([makeWebinar({ account_id: 'account-a' })]);
+    dbMocks.countWebinarList.mockResolvedValue(45);
+
+    const res = await adminReq('/api/webinars?account_id=account-a&page=2&limit=20&sort=name&status=active&folder=folder-1&q=セミナー');
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.getWebinarList).toHaveBeenCalledWith({}, {
+      allowedAccountIds: ['account-a'],
+      canSeeUnassigned: false,
+      accountId: 'account-a',
+    }, { limit: 20, offset: 20 }, { q: 'セミナー', folderId: 'folder-1', status: 'active', sort: 'name' });
+    expect(await res.json()).toMatchObject({
+      data: { total: 45, limit: 20, sort: [{ field: 'title', direction: 'asc' }] },
     });
+  });
+
+  test('一覧の件数指定が壊れていても既定に寄せる', async () => {
+    const res = await adminReq('/api/webinars?account_id=account-a&page=0&limit=9999');
+
+    expect(res.status).toBe(200);
+    /* limit は上限200へ丸め、page は1始まりへ戻す。 */
+    expect(dbMocks.getWebinarList).toHaveBeenCalledWith({}, expect.anything(), { limit: 200, offset: 0 }, expect.anything());
+    expect(await res.json()).toMatchObject({ data: { limit: 200 } });
   });
 
   test('一覧は固定契約の集計値と公開5状態を返す', async () => {
@@ -299,17 +336,17 @@ describe('admin webinar tenant scope', () => {
     ]);
 
     const res = await adminReq('/api/webinars');
-    const body = await res.json() as { data: Array<Record<string, unknown>> };
+    const body = await res.json() as { data: { items: Array<Record<string, unknown>> } };
 
-    expect(body.data.map((row) => row.publicationState)).toEqual([
+    expect(body.data.items.map((row) => row.publicationState)).toEqual([
       'period', 'always', 'scheduled', 'unset', 'ended',
     ]);
-    expect(body.data[0]).toMatchObject({
+    expect(body.data.items[0]).toMatchObject({
       folderId: 'folder-1', folderName: '販売', registrationCount: 12, viewerCount: 8,
       publicationStartsAt: '2026-07-01T00:00:00.000Z',
       publicationEndsAt: '2026-08-01T00:00:00.000Z',
     });
-    expect(body.data[2]?.viewerCount).toBeNull();
+    expect(body.data.items[2]?.viewerCount).toBeNull();
   });
 
   test('一覧で別統括のLINEアカウントを指定しても存在を返さない', async () => {
@@ -1251,6 +1288,20 @@ describe('admin CRUD', () => {
       { atSeconds: 10, authorName: '田中', body: 'こんばんは!' },
       { atSeconds: 30, authorName: '鈴木', body: '楽しみです' },
     ]);
+  });
+
+  test('PUT /api/webinars/:id/comments — 201件以上は400で止めて書かない', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar());
+    const comments = Array.from({ length: 201 }, (_, index) => ({
+      atSeconds: index, authorName: '田中', body: `コメント${index}`,
+    }));
+    const res = await adminReq('/api/webinars/w1/comments', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ comments }),
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: 'too_many_comments' });
+    expect(dbMocks.replaceWebinarComments).not.toHaveBeenCalled();
   });
 
   test('PUT comments — 負の atSeconds (待機ルーム) は -3600 まで許容', async () => {

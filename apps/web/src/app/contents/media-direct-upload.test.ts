@@ -31,6 +31,9 @@ describe('登録メディアの直接アップロード', () => {
     expect(fileMatchesMediaKind({ type: 'video/mp4' }, 'image')).toBe(false)
     expect(fileMatchesMediaKind({ type: 'audio/mp4' }, 'audio')).toBe(true)
     expect(fileMatchesMediaKind({ type: 'application/pdf' }, 'file')).toBe(true)
+    // 口（DIRECT_ALLOWED）に無い形式は選んだ時点で弾く。SVGは口で400になる。
+    expect(fileMatchesMediaKind({ type: 'image/svg+xml' }, 'image')).toBe(false)
+    expect(fileMatchesMediaKind({ type: 'audio/ogg' }, 'audio')).toBe(false)
     expect(mediaAcceptForKind('video')).toBe('video/mp4')
   })
 })

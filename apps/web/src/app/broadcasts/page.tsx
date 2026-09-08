@@ -46,6 +46,22 @@ function formatDatetime(iso: string | null): string {
   })
 }
 
+/*
+ * JST の日付（yyyy-mm-dd）。`+9h` して切り出す流儀と `Intl` の流儀が
+ * 混ざっていたので、こっちに寄せる（#490 軽7）。UTC のまま切ると、
+ * 夜の配信が前日に入る。
+ */
+function formatYmdJst(iso: string): string {
+  const parts = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(iso))
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
+  return `${get('year')}-${get('month')}-${get('day')}`
+}
+
 function BroadcastsPageContent() {
   const searchParams = useSearchParams()
   const detailId = searchParams.get('id')
@@ -384,7 +400,7 @@ function BroadcastList() {
       const iso = b.status === 'sent' ? b.sentAt : b.scheduledAt
       if (!iso) return false
       // JST の日付で比べる。UTC のまま切ると、夜の配信が前日に入る。
-      const ymd = new Date(new Date(iso).getTime() + 9 * 3600_000).toISOString().slice(0, 10)
+      const ymd = formatYmdJst(iso)
       if (dateFrom && ymd < dateFrom) return false
       if (dateTo && ymd > dateTo) return false
     }

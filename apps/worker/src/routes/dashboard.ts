@@ -97,6 +97,34 @@ async function requireVisibleAccount(c: {
  * 取れなくても画面は出したいので、失敗は null にして握りつぶす。
  * ここで落とすと、LINE 側の一時的な不調で管理画面全体が開かなくなる。
  */
+/**
+ * 同時実行数を抑えて順に回す。
+ *
+ * organization-overview は可視アカウント全件の LINE 枠を取る。無制限の
+ * `Promise.all` で投げると、アカウントが増えたときに遅延し、LINE 側の
+ * 429・タイムアウトの巻き添えで全体が遅くなる。5件ずつに区切る。
+ */
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  limit: number,
+  task: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const workers = Array.from(
+    { length: Math.min(Math.max(limit, 1), items.length) },
+    async () => {
+      while (next < items.length) {
+        const index = next;
+        next += 1;
+        results[index] = await task(items[index]);
+      }
+    },
+  );
+  await Promise.all(workers);
+  return results;
+}
+
 async function fetchQuota(
   token: string | undefined,
 ): Promise<{
@@ -207,8 +235,10 @@ dashboard.get('/api/dashboard/organization-overview', requireRole('owner'), asyn
       visibleScope.allowedAccountIds,
       c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
     );
-    const quotas = await Promise.all(
-      credentialAccounts.map((account) => fetchQuota(account.channel_access_token)),
+    const quotas = await mapWithConcurrency(
+      credentialAccounts,
+      5,
+      (account) => fetchQuota(account.channel_access_token),
     );
     const quotaFailed = quotas.some((quota) => quota.failed);
     if (quotaFailed) {

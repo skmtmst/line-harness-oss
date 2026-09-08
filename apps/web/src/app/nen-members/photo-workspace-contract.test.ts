@@ -46,7 +46,8 @@ describe('V6 写真審査の一枚表示と掲載管理', () => {
 
   it('keeps human review final and sends the expected version', () => {
     expect(detail).toContain('公開の最終判断は人が行います')
-    expect(page).toContain('expectedVersion: Number(')
+    // #580: 版は整数検査つきの reviewVersionOf で取り出す（壊れた値は初版に倒す）。
+    expect(page).toContain('expectedVersion: reviewVersionOf(')
     expect(api).toContain('expectedVersion: number')
   })
 

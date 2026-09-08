@@ -38,4 +38,9 @@ describe('対応が必要な受信の読込失敗', () => {
     expect(body).toContain('もう一度読み込む')
     expect(body).toContain('onClick={() => void load()}')
   })
+
+  it('数が全アカウントの合計であることを題に書く', () => {
+    const body = code(CARD)
+    expect(body).toContain('title="対応が必要な受信（全アカウント）"')
+  })
 })

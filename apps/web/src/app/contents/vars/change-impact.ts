@@ -40,6 +40,27 @@ export function impactStateFromError(err: unknown): ChangeImpactState {
   return err instanceof ApiError && err.status === 403 ? 'forbidden' : 'error'
 }
 
+/**
+ * 予約の登録が落ちた理由を、運用者の言葉にする。
+ *
+ * `saveErrorText` と同じ考え方。本文をそのまま出してよいのは400だけ。
+ * 500の `Internal server error` は出さず、予約用の定型文に写す。
+ */
+export function scheduleErrorText(err: unknown): string {
+  if (err instanceof ApiError && err.status === 400 && err.message
+    && !/^API error: /.test(err.message)) {
+    return err.message
+  }
+  if (err instanceof ApiError && err.status === 403) {
+    return `${STATE_TEXT.forbiddenAct}。更新予約を作れるのは管理者だけです。`
+  }
+  if (err instanceof ApiError && err.status === 404) {
+    return 'この共通情報は見つかりませんでした。一覧から開き直してください。'
+  }
+  return '予約を登録できませんでした。時間をおいて、もう一度お試しください。'
+    + '続く場合は管理者へ連絡してください。'
+}
+
 /** 数が出ないときに、その理由を運用者の言葉で言う。 */
 export function impactStateText(state: ChangeImpactState): string | null {
   if (state === 'loading') return STATE_TEXT.loading

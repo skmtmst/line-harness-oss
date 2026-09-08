@@ -135,6 +135,7 @@ function NenColumnEditInner() {
                 onChange={(e) => setDrafts((prev) => ({ ...prev, [column.id]: e.target.value }))}
                 placeholder="例: 今週のコラムです。よろしければご覧ください。"
                 aria-label={`${column.title}の紹介文`}
+                maxLength={1500}
                 className="border-hairline rounded-control w-full resize-y border px-3 py-2 text-sm"
               />
               <StickyBar

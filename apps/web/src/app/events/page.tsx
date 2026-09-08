@@ -55,7 +55,6 @@ export default function EventsListPage() {
   usePageTitle('イベント予約')
   const { selectedAccountId } = useAccount()
   const [items, setItems] = useState<EventListItem[]>([])
-  // 裏側は200件で切る。超えたら注意を出す(点検#520の中8)。
   const [listTotal, setListTotal] = useState(0)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [query, setQuery] = useState('')
@@ -75,7 +74,13 @@ export default function EventsListPage() {
     setItems([])
     setListTotal(0)
     try {
-      const res = await eventsApi.listEvents(selectedAccountId)
+      const res = await eventsApi.listEvents(selectedAccountId, {
+        page,
+        limit: PAGE_SIZE,
+        q: query.trim() || undefined,
+        filter,
+        sort,
+      })
       if (requestId !== loadRequestRef.current) return
       setItems(res.items)
       setListTotal(res.total ?? res.items.length)
@@ -86,7 +91,7 @@ export default function EventsListPage() {
       setListTotal(0)
       setLoadStatus('error')
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, page, query, filter, sort])
 
   useEffect(() => {
     void refresh()
@@ -97,7 +102,7 @@ export default function EventsListPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [query, filter])
+  }, [query, filter, sort])
 
   function isFull(e: EventListItem): boolean {
     return e.total_capacity != null && e.total_active >= e.total_capacity
@@ -110,26 +115,8 @@ export default function EventsListPage() {
   // 「終わった回」は端末時計で数えると、時計のずれで件数が合わない(点検#520軽16)。
   // サーバー時刻の口が無いので、件数は出さず「—」にする。
 
-  const filtered = useMemo(() => {
-    const q = query.trim()
-    const matches = items.filter((e) => {
-      if (q && !e.name.includes(q)) return false
-      if (filter === 'open' && e.is_published !== 1) return false
-      if (filter === 'pending' && e.pending_count === 0) return false
-      if (filter === 'full' && !isFull(e)) return false
-      return true
-    })
-    return matches.sort((a, b) => {
-      if (sort === 'name') return a.name.localeCompare(b.name, 'ja')
-      if (!a.next_slot_starts_at) return 1
-      if (!b.next_slot_starts_at) return -1
-      return a.next_slot_starts_at.localeCompare(b.next_slot_starts_at)
-    })
-  }, [items, query, filter, sort])
-
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const pageCount = Math.max(1, Math.ceil(listTotal / PAGE_SIZE))
   const current = Math.min(page, pageCount)
-  const shown = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE)
   /*
     **アカウントを選んでいないときも「取れた」にしない。** 選ぶ前は
     そもそも数える対象が無い。`ready` だけを見ると 0件と出る。
@@ -287,7 +274,7 @@ export default function EventsListPage() {
         <ListState kind="loading" />
       ) : loadStatus === 'error' ? (
         <ListState kind="error" description="登録したイベントは消えていません。再読み込みしても直らない場合はエラー報告へ。" action={<Button onClick={() => void refresh()}>イベントを再読み込み</Button>} />
-      ) : items.length === 0 ? (
+      ) : items.length === 0 && !query.trim() && filter === 'all' ? (
         <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
           <p className="text-ink mb-2 font-medium">イベントがまだありません</p>
           <p className="text-ink-faint mb-4 text-sm">
@@ -300,7 +287,7 @@ export default function EventsListPage() {
             最初のイベントを作成
           </Link>
         </div>
-      ) : shown.length === 0 ? (
+      ) : items.length === 0 ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm">
           条件に合うイベントはありません
         </div>
@@ -323,7 +310,7 @@ export default function EventsListPage() {
                 </tr>
               </thead>
               <tbody className="divide-hairline divide-y">
-                {shown.map((e) => (
+                {items.map((e) => (
                   <tr key={e.id} className="hover:bg-canvas-sunken">
                     <td className="px-4 py-3 text-sm">
                       <Link
@@ -419,10 +406,9 @@ export default function EventsListPage() {
             ? '—'
             : loadStatus === 'loading'
               ? '読み込み中'
-              : filtered.length === 0
+              : listTotal === 0
                 ? '0件'
-                : `${(current - 1) * PAGE_SIZE + 1}〜${Math.min(current * PAGE_SIZE, filtered.length)}件 / 全${filtered.length}件`}
-          {listTotal > items.length ? '（200件まで表示しています）' : ''}
+                : `${(current - 1) * PAGE_SIZE + 1}〜${Math.min(current * PAGE_SIZE, listTotal)}件 / 全${listTotal}件`}
         </span>
         {/*
           **送る先が無いページ送りを出さない。** 取れていないときに

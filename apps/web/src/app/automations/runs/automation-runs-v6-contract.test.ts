@@ -50,4 +50,15 @@ describe('V6 オートメーションが動いた記録（DkPY0）', () => {
     expect(PAGE).toContain('!Array.isArray(response.data.items)')
     expect(PAGE).toContain('実行記録の応答形式が正しくありません')
   })
+
+  it('検索の連打で古い応答が新しい表示を上書きしない (#580)', () => {
+    expect(PAGE).toContain('loadGeneration.current')
+    expect(PAGE).toContain('generation !== loadGeneration.current')
+    expect(PAGE).toContain('setTimeout(() => void load(), 400)')
+  })
+
+  it('変えられない表示条件は選択肢に見せない (#580)', () => {
+    expect(PAGE).toContain('この30日・20件表示')
+    expect(PAGE).not.toContain('onChange={() => undefined}')
+  })
 })

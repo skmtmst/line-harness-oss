@@ -1003,9 +1003,27 @@ function visualQaWriteBody(method, pathname) {
     return LINE_ACCOUNT_VERIFY_CONNECTION
   }
   if (method === 'POST' && /^\/api\/friend-add-rules\/[^/]+\/validate$/.test(pathname)) {
+    // 失敗系は visualState=error で切り替える。固定成功だけだと公開不可の
+    // 状態を確かめられない (#501-軽)。器は本物の失敗応答と同じ形。
+    if (query.get('visualState') === 'error') {
+      return {
+        success: false,
+        data: {
+          stateChanged: false, ruleId: FRIEND_ADD_RULE.id, matched: false,
+          reasons: ['送るシナリオが見つかりません。'],
+          scenarioId: FRIEND_ADD_RULE.definition.scenarioId,
+          message: FRIEND_ADD_RULE.definition.messageText,
+          actions: FRIEND_ADD_RULE.definition.actions,
+        },
+        error: 'テスト条件を確認してください',
+      }
+    }
     return FRIEND_ADD_RULE_VALIDATE
   }
   if (method === 'POST' && /^\/api\/friend-add-rules\/[^/]+\/publish$/.test(pathname)) {
+    if (query.get('visualState') === 'error') {
+      return { success: false, error: '公開前にテストを成功させてください' }
+    }
     return FRIEND_ADD_RULE_PUBLISH
   }
   if (method === 'POST' && /^\/api\/friend-fields\/[^/]+\/migration-preview$/.test(pathname)) {
@@ -1026,14 +1044,18 @@ function visualQaWriteBody(method, pathname) {
   if (method === 'POST' && pathname === '/api/analytics/cross/query') {
     return { id: 'visual-cross-result-1', state: 'pending' }
   }
+  /*
+   * 本番の口は `{success,data}` で包む。素値のままだと `api.ts` の
+   * 応答期待と形が違い、目視環境でテスト成功の絵を再現できない（#494 軽14）。
+   */
   if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/test$/.test(pathname)) {
-    return AUTO_REPLY_PUBLISH_TEST
+    return { success: true, data: AUTO_REPLY_PUBLISH_TEST }
   }
   if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/validate$/.test(pathname)) {
-    return AUTO_REPLY_PUBLISH_VALIDATION
+    return { success: true, data: AUTO_REPLY_PUBLISH_VALIDATION }
   }
   if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/publish$/.test(pathname)) {
-    return AUTO_REPLY_PUBLISH_RESULT
+    return { success: true, data: AUTO_REPLY_PUBLISH_RESULT }
   }
   if (method === 'POST' && /^\/api\/rich-menu-groups\/[^/]+\/preview-targets$/.test(pathname)) {
     return {
@@ -1582,10 +1604,15 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     }
   }
   if (/^\/api\/friend-add-rules\/[^/]+$/.test(pathname)) {
+    // 未知IDは本物と同じく404にする。何を渡しても同一設定を返すと、
+    // 存在しない設定の画面が空にならず実機差異に気づけない (#501-軽)。
+    const ruleId = pathname.split('/').pop()
+    const found = FRIEND_ADD_RULES.items.find((item) => item.id === ruleId)
+    if (!found) return { success: false, error: 'Not found' }
     return {
       success: true,
       data: {
-        rule: FRIEND_ADD_RULE,
+        rule: found,
         options: FRIEND_ADD_RULE_OPTIONS,
         staffNotification: { status: 'connected', reason: null },
       },
@@ -1703,6 +1730,29 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: query.get('with_list_summary') === '1' ? FORM_LIST : FORMS }
   }
   if (pathname === `/api/forms/${FORM_DETAIL.id}`) return { success: true, data: FORM_DETAIL }
+  // 管理画面の保存・保管・削除の流れ（#503 L5）。絵の検証用に成功だけ返す。
+  if (method === 'POST' && pathname === '/api/forms/drafts') {
+    return { success: true, data: { id: 'form-draft-qa', isActive: false } }
+  }
+  if (method === 'PUT' && pathname === `/api/forms/${FORM_DETAIL.id}`) {
+    return { success: true, data: { id: FORM_DETAIL.id } }
+  }
+  if (method === 'POST' && pathname === `/api/forms/${FORM_DETAIL.id}/archive`) {
+    return {
+      success: true,
+      data: {
+        status: 'archived',
+        archivedAt: '2026-08-26T00:00:00.000Z',
+        retainedSubmissionCount: 0,
+        retainedOpenCount: 0,
+        retainedReferenceCount: 0,
+        answerUrlUnavailable: true,
+      },
+    }
+  }
+  if (method === 'DELETE' && pathname === `/api/forms/${FORM_DETAIL.id}`) {
+    return { success: true, data: null }
+  }
   const formSubmissions = new RegExp(`^/api/forms/${FORM_DETAIL.id}/submissions$`).test(pathname)
   if (formSubmissions) {
     // 互換用の古い形（ページ分けなし）は配列だけを返す。実口と同じく上限500件。
@@ -2215,7 +2265,33 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       scenarios: [{ id: 'scenario-trial', name: '体験前フォロー' }],
     },
   }
-  if (pathname === '/api/automation-runs') return { success: true, data: AUTOMATION_RUNS }
+  if (pathname === '/api/automation-runs') {
+    // #519 軽: 本番口と同じく search・status・limit で絞る（固定7件を返さない）。
+    const runStatus = query.get('status')
+    const runSearch = (query.get('search') ?? '').trim().toLocaleLowerCase('ja')
+    const runLimit = Math.max(1, Number.parseInt(query.get('limit') ?? '', 10) || 20)
+    const statusDomains = runStatus === 'executed'
+      ? ['success', 'partial', 'failed']
+      : runStatus === 'problems'
+        ? ['partial', 'failed']
+        : runStatus === 'skipped'
+          ? ['skipped_condition']
+          : null
+    const runItems = AUTOMATION_RUNS.items.filter((item) => {
+      if (statusDomains && !statusDomains.includes(item.domainStatus)) return false
+      if (!runSearch) return true
+      return [item.subject, item.automationName].some((value) =>
+        String(value ?? '').toLocaleLowerCase('ja').includes(runSearch))
+    })
+    return {
+      success: true,
+      data: {
+        ...AUTOMATION_RUNS,
+        items: runItems.slice(0, runLimit),
+        pagination: { total: runItems.length, limit: runLimit, offset: 0 },
+      },
+    }
+  }
   if (pathname === '/api/automation-templates') return { success: true, data: AUTOMATION_TEMPLATES }
   if (pathname === '/api/ec-commerce/settings') return { success: true, data: EC_NOTIFICATION_SETTINGS }
   if (pathname === '/api/line-notifications/customer-definitions') {
@@ -2766,7 +2842,47 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       ],
     }
   }
-  if (pathname === '/api/webinars') return { success: true, data: WEBINARS }
+  if (pathname === '/api/webinars') {
+    /*
+      本物と同じ offset 方式(page/limit・total・sort)。全件配列を返すと、
+      頁ごと取得の新コードが撮影で壊れる。絞り無しの既定は従来どおり
+      全件が1頁に入る(5件・total 5)で、既定の撮影は変わらない。
+    */
+    const rawPage = Number(query.get('page') ?? '')
+    const rawLimit = Number(query.get('limit') ?? '')
+    const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1
+    const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 200) : 50
+    const sort = query.get('sort') === 'created' ? 'created' : query.get('sort') === 'name' ? 'name' : 'updated'
+    const status = query.get('status') === 'active' || query.get('status') === 'draft' ? query.get('status') : ''
+    const folder = query.get('folder') ?? ''
+    const needle = (query.get('q') ?? '').trim().toLowerCase()
+    let rows = WEBINARS.filter((webinar) => webinar.status !== 'archived')
+    if (status) rows = rows.filter((webinar) => webinar.status === status)
+    if (folder === '__unfiled__') rows = rows.filter((webinar) => !webinar.folderId)
+    else if (folder) rows = rows.filter((webinar) => webinar.folderId === folder)
+    if (needle) {
+      rows = rows.filter((webinar) => webinar.title.toLowerCase().includes(needle) || webinar.slug.toLowerCase().includes(needle))
+    }
+    rows = [...rows].sort((left, right) => {
+      if (sort === 'name') return left.title < right.title ? -1 : left.title > right.title ? 1 : 0
+      const key = sort === 'created' ? 'createdAt' : 'updatedAt'
+      return left[key] > right[key] ? -1 : left[key] < right[key] ? 1 : 0
+    })
+    const sorts = {
+      updated: { field: 'updatedAt', direction: 'desc' },
+      created: { field: 'createdAt', direction: 'desc' },
+      name: { field: 'title', direction: 'asc' },
+    }
+    return {
+      success: true,
+      data: {
+        items: rows.slice((page - 1) * limit, page * limit),
+        total: rows.length,
+        limit,
+        sort: [sorts[sort]],
+      },
+    }
+  }
   if (pathname === '/api/webinars/overview') return { success: true, data: WEBINAR_OVERVIEW }
   if (/^\/api\/webinars\/[^/]+\/editor$/.test(pathname)) return { success: true, data: WEBINAR_EDITOR }
   if (/^\/api\/webinars\/[^/]+\/publish-validation$/.test(pathname)) return { success: true, data: WEBINAR_PUBLISH_VALIDATION }
@@ -3064,7 +3180,16 @@ const server = createServer((req, res) => {
       res.writeHead(200).end(JSON.stringify({ success: true, data: WEBINAR_EDITOR }))
       return
     }
-    if (method === 'POST' && /^\/api\/webinars\/[^/]+\/(publish|pause|duplicate)$/.test(url.pathname)) {
+    /*
+      本物の公開応答は `{ webinar, validation }`（`apps/worker/src/routes/webinars.ts`
+      の publish）。単体を返すと、公開結果を読む新コードがモックで動いて
+      本番で壊れる契約の穴になる。停止・複製は単体のまま。
+    */
+    if (method === 'POST' && /^\/api\/webinars\/[^/]+\/publish$/.test(url.pathname)) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: { webinar: WEBINARS[0], validation: WEBINAR_PUBLISH_VALIDATION } }))
+      return
+    }
+    if (method === 'POST' && /^\/api\/webinars\/[^/]+\/(pause|duplicate)$/.test(url.pathname)) {
       res.writeHead(200).end(JSON.stringify({ success: true, data: WEBINARS[0] }))
       return
     }

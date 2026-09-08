@@ -17,7 +17,7 @@ import {
   type ActionScoreSort,
 } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
-import { formatMileageDate } from './mileage-display'
+import { formatMileageDate, formatMileageNumber } from './mileage-display'
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100] as const
 
@@ -34,12 +34,6 @@ const BAND_LABELS: Record<ActionScoreBand, string> = {
  * `Intl.NumberFormat` は `undefined` を渡すと `NaN` を返す。
  * 取れていないものは `—` と書き、0 とも言い分ける。
  */
-function formatNumber(value: number | null | undefined) {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? new Intl.NumberFormat('ja-JP').format(value)
-    : '—'
-}
-
 function ScoreBand({ band }: { band: ActionScoreBand }) {
   if (band === 'high') return <span className="rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent-hover">{BAND_LABELS[band]}</span>
   if (band === 'normal') return <span className="rounded-full bg-status-warn-soft px-2.5 py-1 text-xs font-semibold text-status-warn-deep">{BAND_LABELS[band]}</span>
@@ -48,7 +42,7 @@ function ScoreBand({ band }: { band: ActionScoreBand }) {
 
 function ScoreChange({ value }: { value: number | null | undefined }) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return <span className="font-semibold text-ink-faint">—</span>
-  const label = `${value > 0 ? '+' : ''}${formatNumber(value)}`
+  const label = `${value > 0 ? '+' : ''}${formatMileageNumber(value)}`
   if (value > 0) return <span className="font-semibold text-accent-hover">{label}</span>
   if (value < 0) return <span className="font-semibold text-danger">{label}</span>
   return <span className="font-semibold text-ink-faint">{label}</span>
@@ -89,23 +83,22 @@ function safeReason(reason: string | null) {
 }
 
 function scoreValue(item: ActionScoreOverview['items'][number]) {
-  const legacy = item as typeof item & { score?: number }
-  return typeof item.currentScore === 'number' ? item.currentScore : legacy.score
+  return item.currentScore
 }
 
 function scoreChangedAt(item: ActionScoreOverview['items'][number]) {
-  const legacy = item as typeof item & { lastActionAt?: string | null }
-  return item.lastChangedAt ?? legacy.lastActionAt ?? null
+  return item.lastChangedAt
 }
 
 function scoreReason(item: ActionScoreOverview['items'][number]) {
-  const legacy = item as typeof item & { lastAction?: string | null }
-  return item.lastReason ?? legacy.lastAction ?? null
+  return item.lastReason
 }
 
 export default function ActionScoreTab({ accountId }: { accountId: string }) {
   const latestAccountRef = useRef(accountId)
-  latestAccountRef.current = accountId
+  useEffect(() => {
+    latestAccountRef.current = accountId
+  }, [accountId])
   const [overview, setOverview] = useState<ActionScoreOverview | null>(null)
   const [filter, setFilter] = useState<ActionScoreFilter>('all')
   const [sort, setSort] = useState<ActionScoreSort>('score_desc')
@@ -250,7 +243,7 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
               onClick={() => { setPage(1); setFilter(item.key) }}
               variant={filter === item.key ? 'primary' : 'secondary'}
             >
-              {item.label} {item.count === undefined ? '—' : formatNumber(item.count)}
+              {item.label} {item.count === undefined ? '—' : formatMileageNumber(item.count)}
             </Button>
           ))}
           <Select
@@ -295,7 +288,7 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
                         <span className="truncate text-sm font-semibold text-ink" title={item.displayName}>{item.displayName}</span>
                       </div>
                     </Td>
-                    <Td align="right"><strong>{formatNumber(scoreValue(item))}</strong></Td>
+                    <Td align="right"><strong>{formatMileageNumber(scoreValue(item))}</strong></Td>
                     <Td><ScoreBand band={item.band} /></Td>
                     <Td align="right"><ScoreChange value={item.change30d} /></Td>
                     <Td>
@@ -311,7 +304,7 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
 
         {!loading && !error && total > 0 ? (
           <div className="flex items-center justify-between border-t border-hairline px-4 py-3">
-            <span className="text-xs text-ink-faint">{formatNumber((page - 1) * pageSize + 1)}〜{formatNumber(Math.min(page * pageSize, total))}件 / 全{formatNumber(total)}件</span>
+            <span className="text-xs text-ink-faint">{formatMileageNumber((page - 1) * pageSize + 1)}〜{formatMileageNumber(Math.min(page * pageSize, total))}件 / 全{formatMileageNumber(total)}件</span>
             <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
           </div>
         ) : null}

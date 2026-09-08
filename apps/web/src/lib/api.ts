@@ -88,6 +88,7 @@ import type {
   FriendBulkRunSummary,
   FriendBulkRunDetail,
   IdentityCandidateDetail,
+  IdentityCandidateImpactMetric,
   IdentityCandidateKind,
   IdentityCandidateList,
   IdentityCandidateStatus,
@@ -143,7 +144,7 @@ export type OutgoingWebhookOverview = OutgoingWebhook & {
     pending: number
     successRate: number | null
     lastResult: {
-      status: string
+      status: 'succeeded' | 'failed' | 'pending'
       responseStatus: number | null
       completedAt: string | null
       failureReason: string | null
@@ -568,6 +569,41 @@ export interface ChatDetailMessage {
   sentByStaffName: string | null
   scenarioName: string | null
   createdAt: string
+}
+
+/** `GET /api/chats` が返す、受信箱一覧専用の会話行。 */
+export type ChatListItem = Chat & {
+  friendName: string
+  friendPictureUrl: string | null
+  lastMessageContent: string | null
+  lastMessageDirection: 'incoming' | 'outgoing' | null
+  lastMessageType: string | null
+  /** ログイン中の担当者だけの未読。対応状況とは別。 */
+  isUnread: boolean
+}
+
+/** `GET /api/chats/:id` の実応答。一覧にだけある値は省略される。 */
+export type ChatDetail = Pick<ChatListItem,
+  'id' | 'friendId' | 'operatorId' | 'status' | 'notes' | 'revision' | 'lastMessageAt' | 'createdAt'
+> & {
+  friendName: string
+  friendRealName: string | null
+  friendPictureUrl: string | null
+  isAttention: boolean
+  lastMessageContent?: string | null
+  lastMessageDirection?: 'incoming' | 'outgoing' | null
+  lastMessageType?: string | null
+  updatedAt?: string
+  messages: ChatDetailMessage[]
+  hasMoreMessages: boolean
+}
+
+/** 受信箱の保存検索は友だち検索と条件JSONの形が違うため、ここでは未知値として受ける。 */
+export type InboxSavedViewApiItem = Omit<SavedSearch, 'conditions'> & {
+  conditions: unknown
+  isFavorite: boolean
+  matchCount: number | null
+  matchCountCapped: boolean
 }
 
 /** 緊急停止の対象、影響、停止状態をサーバーと共有する契約。 */
@@ -2475,6 +2511,14 @@ export type FriendListItem = FriendWithTags & Partial<{
   supportMark: { id: string; name: string; color: string } | null
 }>
 
+/**
+ * 停止の再送を同じ操作として扱うキー。
+ * 同じルール・版なら同じ値、版が進んだ後の停止なら別の値になる。
+ */
+export function friendAddStopIdempotencyKey(ruleId: string, version: number): string {
+  return `friend-add-rule-stop:${encodeURIComponent(ruleId)}:v${version}`
+}
+
 
 
 /** 一覧画面の上部に出す数（タグ・テンプレート・シナリオ・リマインダ）。 */
@@ -3197,7 +3241,9 @@ export type EcIdentityCandidateOperationsList = {
     left: unknown
     right: unknown
     evidence: unknown
-    impact: unknown
+    // #580 軽: 影響は共有の計量型で受ける（DBは impact_json の配列を返す）。
+    // 形が違う応答は画面側のガードで「—（未取得）」に倒す。
+    impact: IdentityCandidateImpactMetric[]
     detectedAt: string
     reviewedAt: string | null
   }>
@@ -4195,7 +4241,8 @@ export const api = {
         body: JSON.stringify(data),
       }),
     /** 名前・色・一覧に出すかを変える。分類とマイルは別の受け口が持っている。 */
-    update: (id: string, data: { name?: string; color?: string; isStarred?: boolean }) =>
+    /* タグ自身は色を持たない。色は分類(フォルダ)に付ける。 */
+    update: (id: string, data: { name?: string; isStarred?: boolean }) =>
       fetchApi<ApiResponse<Tag>>(`/api/tags/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -6180,8 +6227,8 @@ export const api = {
       deduplicationWindowDays?: number | null
       valueMode: ConversionValueMode
       fixedValue?: number | null
-    }) => fetchApi<ApiResponse<ConversionDefinitionPreview>>('/api/conversions/definitions/preview', {
-      method: 'POST', body: JSON.stringify(data),
+    }, options?: { signal?: AbortSignal }) => fetchApi<ApiResponse<ConversionDefinitionPreview>>('/api/conversions/definitions/preview', {
+      method: 'POST', body: JSON.stringify(data), signal: options?.signal,
     }),
     definitionDeleteImpact: (id: string) =>
       fetchApi<ApiResponse<ConversionDefinitionDeleteImpact>>(
@@ -7291,7 +7338,7 @@ export const api = {
         `/api/friend-add-rules/${encodeURIComponent(ruleId)}/stop?account_id=${encodeURIComponent(accountId)}`,
         {
           method: 'POST',
-          headers: { 'Idempotency-Key': crypto.randomUUID() },
+          headers: { 'Idempotency-Key': friendAddStopIdempotencyKey(ruleId, version) },
           body: JSON.stringify({ version }),
         },
       ),
@@ -7505,7 +7552,7 @@ export const api = {
       // カーソルページング: (lastMessageAt, friendId) の複合カーソルより古い行を返す
       if (params?.beforeAt) query.beforeAt = params.beforeAt
       if (params?.beforeId) query.beforeId = params.beforeId
-      return fetchApi<ApiResponse<Chat[]>>(
+      return fetchApi<ApiResponse<ChatListItem[]>>(
         '/api/chats?' + new URLSearchParams(query),
       )
     },
@@ -7515,11 +7562,7 @@ export const api = {
       if (params?.beforeAt) query.set('beforeAt', params.beforeAt)
       if (params?.beforeId) query.set('beforeId', params.beforeId)
       const qs = query.toString()
-      return fetchApi<ApiResponse<Chat & {
-        messages?: ChatDetailMessage[]
-        /** 古い履歴が残っているか。画面は「前のメッセージ」で遡る。 */
-        hasMoreMessages?: boolean
-      }>>(
+      return fetchApi<ApiResponse<ChatDetail>>(
         `/api/chats/${id}${qs ? `?${qs}` : ''}`,
       )
     },
@@ -7560,7 +7603,7 @@ export const api = {
         createdAt: string
       }>>>(`/api/chats/${id}/events`),
     savedViews: {
-      list: (accountId: string) => fetchApi<ApiResponse<SavedSearch[]>>(`/api/inbox/saved-views?lineAccountId=${encodeURIComponent(accountId)}`),
+      list: (accountId: string) => fetchApi<ApiResponse<InboxSavedViewApiItem[]>>(`/api/inbox/saved-views?lineAccountId=${encodeURIComponent(accountId)}`),
       create: (accountId: string, data: { name: string; conditions: unknown; isShared?: boolean; isFavorite?: boolean }) =>
         fetchApi<ApiResponse<SavedSearch>>(`/api/inbox/saved-views?lineAccountId=${encodeURIComponent(accountId)}`, {
           method: 'POST',
@@ -9633,6 +9676,26 @@ export interface EventBookingItem {
   line_account_name?: string | null;
 }
 
+export interface EventBookingSummary {
+  total: number;
+  requested: number;
+  confirmed: number;
+  rejected: number;
+  cancelled: number;
+  expired: number;
+  attended: number;
+  noShow: number;
+  waitlist: number;
+  totalCapacity: number | null;
+}
+
+type EventListResponse<T> = {
+  items: T[];
+  total: number;
+  limit: number;
+  sort: Array<{ field: string; direction: 'asc' | 'desc' }>;
+};
+
 export interface EventWaitlistItem {
   id: string;
   slot_id: string;
@@ -9646,11 +9709,23 @@ export interface EventWaitlistItem {
 }
 
 export const eventsApi = {
-  listEvents: (accountId: string) =>
-    // 共通一覧契約の offset 方式。裏側は既定200件・上限200件で total を返す。
-    fetchApi<{ items: EventListItem[]; total: number; limit: number }>(
-      withAccount('/api/events/admin/events', accountId),
-    ),
+  listEvents: (
+    accountId: string,
+    options: { page?: number; limit?: number; q?: string; filter?: 'all' | 'open' | 'pending' | 'full'; sort?: 'soon' | 'name' } = {},
+    request?: { signal?: AbortSignal },
+  ) => {
+    const params = new URLSearchParams();
+    if (options.page) params.set('page', String(options.page));
+    if (options.limit) params.set('limit', String(options.limit));
+    if (options.q) params.set('q', options.q);
+    if (options.filter) params.set('filter', options.filter);
+    if (options.sort) params.set('sort', options.sort);
+    const tail = params.size > 0 ? `?${params}` : '';
+    return fetchApi<EventListResponse<EventListItem>>(
+      withAccount(`/api/events/admin/events${tail}`, accountId),
+      { signal: request?.signal },
+    );
+  },
   getEvent: (accountId: string, id: string) =>
     fetchApi<EventDetail>(
       withAccount(`/api/events/admin/events/${id}`, accountId),
@@ -9720,17 +9795,25 @@ export const eventsApi = {
   listBookings: (
     accountId: string,
     eventId: string,
-    filters: { status?: string; slot_id?: string } = {},
+    filters: { status?: string; slot_id?: string; page?: number; limit?: number } = {},
+    request?: { signal?: AbortSignal },
   ) => {
     const qs: string[] = [];
     if (filters.status) qs.push(`status=${encodeURIComponent(filters.status)}`);
     if (filters.slot_id) qs.push(`slot_id=${encodeURIComponent(filters.slot_id)}`);
+    if (filters.page) qs.push(`page=${filters.page}`);
+    if (filters.limit) qs.push(`limit=${filters.limit}`);
     const tail = qs.length > 0 ? `?${qs.join('&')}` : '';
-    // 共通一覧契約の offset 方式。裏側は既定200件・上限200件で total を返す。
-    return fetchApi<{ items: EventBookingItem[]; total: number; limit: number }>(
+    return fetchApi<EventListResponse<EventBookingItem>>(
       withAccount(`/api/events/admin/events/${eventId}/bookings${tail}`, accountId),
+      { signal: request?.signal },
     );
   },
+  getBookingSummary: (accountId: string, eventId: string, request?: { signal?: AbortSignal }) =>
+    fetchApi<EventBookingSummary>(
+      withAccount(`/api/events/admin/events/${eventId}/bookings/summary`, accountId),
+      { signal: request?.signal },
+    ),
   decideBooking: (
     accountId: string,
     eventId: string,
@@ -10017,10 +10100,36 @@ export type WebinarParticipantPage = {
   nextCursor: string | null
 }
 
+export type WebinarListParams = {
+  page?: number
+  limit?: number
+  q?: string
+  folder?: string
+  status?: 'active' | 'draft'
+  sort?: 'updated' | 'created' | 'name'
+}
+
+export type WebinarListResponse = {
+  items: WebinarListItem[]
+  total: number
+  limit: number
+  sort: Array<{ field: string; direction: 'asc' | 'desc' }>
+}
+
 export const webinarApi = {
-  list: (accountId?: string) => fetchApi<{ data: WebinarListItem[] }>(
-    `/api/webinars${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`,
-  ),
+  /* 共通一覧契約の offset 方式。頁・件数・絞りはサーバーで行う。 */
+  list: (accountId?: string, params?: WebinarListParams) => {
+    const query = new URLSearchParams()
+    if (accountId) query.set('account_id', accountId)
+    if (params?.page) query.set('page', String(params.page))
+    if (params?.limit) query.set('limit', String(params.limit))
+    if (params?.q) query.set('q', params.q)
+    if (params?.folder) query.set('folder', params.folder)
+    if (params?.status) query.set('status', params.status)
+    if (params?.sort) query.set('sort', params.sort)
+    const suffix = query.size ? `?${query}` : ''
+    return fetchApi<{ data: WebinarListResponse }>(`/api/webinars${suffix}`)
+  },
   folders: (accountId: string) => fetchApi<ApiResponse<WebinarFolder[]>>(
     `/api/folders?kind=webinar&account_id=${encodeURIComponent(accountId)}`,
   ),

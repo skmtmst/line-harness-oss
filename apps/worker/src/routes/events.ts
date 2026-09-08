@@ -297,21 +297,43 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
 events.get('/api/events/admin/events', async (c) => {
   const account_id = getAccountId(c);
   if (!account_id) return bad(c, 'account_id_required', 400);
+  const q = c.req.query('q')?.trim() ?? '';
+  const filter = c.req.query('filter') ?? 'all';
+  const sort = c.req.query('sort') ?? 'soon';
+  if (!['all', 'open', 'pending', 'full'].includes(filter)) return bad(c, 'filter_invalid', 400);
+  if (!['soon', 'name'].includes(sort)) return bad(c, 'sort_invalid', 400);
   // 1行ごとに副問い合わせが4つ走る。件数が増えても一覧が重くならないよう、
   // 共通一覧契約(offset方式)で件数を切る。並びは固定のままにする。
   const paging = parseOffsetPaging(
     { page: c.req.query('page'), limit: c.req.query('limit') },
     { defaultLimit: 200, maxLimit: 200 },
   );
-  const where = `FROM events e
-       WHERE e.deleted_at IS NULL AND (
+  const conditions = [`e.deleted_at IS NULL`, `(
          (e.target_type = 'single' AND e.line_account_id = ?)
          OR (e.target_type = 'multi-account-dedup'
              AND EXISTS (SELECT 1 FROM json_each(e.account_ids) WHERE value = ?))
-       )`;
+       )`];
+  const params: unknown[] = [account_id, account_id];
+  if (q) {
+    conditions.push(`e.name LIKE ? ESCAPE '\\'`);
+    params.push(`%${q.replace(/[\\%_]/g, '\\$&')}%`);
+  }
+  if (filter === 'open') conditions.push(`e.is_published = 1`);
+  if (filter === 'pending') conditions.push(`EXISTS (
+    SELECT 1 FROM event_bookings pending WHERE pending.event_id = e.id AND pending.status = 'requested'
+  )`);
+  if (filter === 'full') conditions.push(`
+    EXISTS (SELECT 1 FROM event_slots cap WHERE cap.event_id = e.id AND cap.deleted_at IS NULL AND cap.is_active = 1)
+    AND NOT EXISTS (SELECT 1 FROM event_slots cap WHERE cap.event_id = e.id AND cap.deleted_at IS NULL AND cap.is_active = 1 AND cap.capacity IS NULL)
+    AND (SELECT COALESCE(SUM(cap.capacity), 0) FROM event_slots cap WHERE cap.event_id = e.id AND cap.deleted_at IS NULL AND cap.is_active = 1)
+      <= ((SELECT COALESCE(SUM(b.party_size), 0) FROM event_bookings b WHERE b.event_id = e.id AND b.status IN ('requested','confirmed'))
+        + (SELECT COALESCE(SUM(w.party_size), 0) FROM event_waitlist w WHERE w.event_id = e.id AND w.status IN ('offered','accepted')))
+  `);
+  const where = `FROM events e
+       WHERE ${conditions.join(' AND ')}`;
   const counted = await c.env.DB
     .prepare(`SELECT COUNT(*) AS c ${where}`)
-    .bind(account_id, account_id)
+    .bind(...params)
     .first<{ c: number }>();
   const { results } = await c.env.DB
     .prepare(
@@ -353,19 +375,20 @@ events.get('/api/events/admin/events', async (c) => {
          -- 呼び出し側で別に見ること。
          (SELECT t.name FROM tags t WHERE t.id = e.visible_tag_id) AS visible_tag_name
        ${where}
-       ORDER BY e.sort_order ASC, e.created_at DESC, e.id DESC
+       ORDER BY ${sort === 'name'
+         ? `e.name COLLATE NOCASE ASC, e.id ASC`
+         : `next_slot_starts_at IS NULL ASC, next_slot_starts_at ASC, e.id ASC`}
        LIMIT ? OFFSET ?`,
     )
-    .bind(account_id, account_id, paging.limit, paging.offset)
+    .bind(...params, paging.limit, paging.offset)
     .all();
   return c.json(buildOffsetListResponse({
     items: results ?? [],
     total: counted?.c ?? 0,
     paging,
-    sort: [
-      { field: 'sort_order', direction: 'asc' },
-      { field: 'created_at', direction: 'desc' },
-    ],
+    sort: sort === 'name'
+      ? [{ field: 'name', direction: 'asc' }, { field: 'id', direction: 'asc' }]
+      : [{ field: 'next_slot_starts_at', direction: 'asc' }, { field: 'id', direction: 'asc' }],
   }));
 });
 
@@ -1624,6 +1647,54 @@ events.get('/api/events/admin/events/:id/bookings', async (c) => {
       { field: 'id', direction: 'desc' },
     ],
   }));
+});
+
+events.get('/api/events/admin/events/:id/bookings/summary', async (c) => {
+  const account_id = getAccountId(c);
+  if (!account_id) return bad(c, 'account_id_required', 400);
+  const event_id = c.req.param('id');
+  if (!(await ownsEvent(c.env.DB, event_id, account_id))) return bad(c, 'not_found', 404);
+
+  const bookingCounts = await c.env.DB
+    .prepare(`SELECT
+      COUNT(*) AS total,
+      SUM(CASE WHEN status = 'requested' THEN 1 ELSE 0 END) AS requested_count,
+      SUM(CASE WHEN status = 'confirmed' THEN 1 ELSE 0 END) AS confirmed_count,
+      SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) AS rejected_count,
+      SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_count,
+      SUM(CASE WHEN status = 'expired' THEN 1 ELSE 0 END) AS expired_count,
+      SUM(CASE WHEN status = 'attended' THEN 1 ELSE 0 END) AS attended_count,
+      SUM(CASE WHEN status = 'no_show' THEN 1 ELSE 0 END) AS no_show_count
+      FROM event_bookings WHERE event_id = ?`)
+    .bind(event_id)
+    .first<Record<string, number | null>>();
+  const waitlist = await c.env.DB
+    .prepare(`SELECT COUNT(*) AS c FROM event_waitlist WHERE event_id = ? AND status IN ('waiting','offered','accepted')`)
+    .bind(event_id)
+    .first<{ c: number }>();
+  const capacity = await c.env.DB
+    .prepare(`SELECT
+      COUNT(*) AS slot_count,
+      SUM(CASE WHEN capacity IS NULL THEN 1 ELSE 0 END) AS uncapped_count,
+      SUM(capacity) AS total_capacity
+      FROM event_slots WHERE event_id = ? AND deleted_at IS NULL AND is_active = 1`)
+    .bind(event_id)
+    .first<{ slot_count: number; uncapped_count: number; total_capacity: number | null }>();
+
+  return c.json({
+    total: bookingCounts?.total ?? 0,
+    requested: bookingCounts?.requested_count ?? 0,
+    confirmed: bookingCounts?.confirmed_count ?? 0,
+    rejected: bookingCounts?.rejected_count ?? 0,
+    cancelled: bookingCounts?.cancelled_count ?? 0,
+    expired: bookingCounts?.expired_count ?? 0,
+    attended: bookingCounts?.attended_count ?? 0,
+    noShow: bookingCounts?.no_show_count ?? 0,
+    waitlist: waitlist?.c ?? 0,
+    totalCapacity: !capacity?.slot_count || capacity.uncapped_count > 0
+      ? null
+      : capacity.total_capacity,
+  });
 });
 
 interface BookingActionRow {

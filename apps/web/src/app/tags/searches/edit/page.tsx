@@ -363,7 +363,9 @@ function SavedSearchEditInner() {
     setError('')
     try {
       const res = await api.savedSearches.create({ name: `${name.trim() || '保存した検索'} のコピー`, accountId: selectedAccountId, conditions, isShared: false })
-      if (res.success) router.push(`/tags/searches/edit?id=${encodeURIComponent(res.data.id)}`)
+      /* 失敗を黙って捨てない。捨てると押しても画面が変わらず次行動が分からない。 */
+      if (!res.success) { setError(res.error); return }
+      router.push(`/tags/searches/edit?id=${encodeURIComponent(res.data.id)}`)
     } catch (duplicateError) {
       setError(duplicateError instanceof Error ? duplicateError.message : '複製できませんでした')
     } finally {

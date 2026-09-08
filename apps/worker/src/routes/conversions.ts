@@ -666,11 +666,20 @@ conversions.get('/api/conversions/export', conversionPermission('export'), async
 //
 // 旧口だが成果・承認待ち(友だち名含む)を返すので、定義系と同じ
 // `conversionPermission('view')` で縛る(#513 M1)。アカウント境界の
-// 絞り込み(visibleConversionPointIds)はそのまま残す。
+// 可視範囲はDB問い合わせのWHEREへ渡し、全件をメモリへ載せない(#513 L13)。
 conversions.get('/api/conversions/points', conversionPermission('view'), async (c) => {
   try {
-    const visibleIds = await visibleConversionPointIds(c);
-    const items = (await getConversionPoints(c.env.DB)).filter((item) => visibleIds.has(item.id));
+    const { scope } = await adminAccountScope(c);
+    const scopedItems = await getConversionPoints(c.env.DB, {
+      allowedLineAccountIds: scope.allowedAccountIds,
+      includeUnassigned: scope.canSeeUnassigned,
+    });
+    // SQL側で件数を絞ったうえで、DB実装やテスト用アダプタが誤って
+    // 範囲外を返してもテナント境界を越えないよう返却直前にも確認する。
+    const allowedAccountIds = new Set(scope.allowedAccountIds);
+    const items = scopedItems.filter((item) => item.line_account_id === null
+      ? scope.canSeeUnassigned
+      : allowedAccountIds.has(item.line_account_id));
     return c.json({
       success: true,
       data: items.map(serializeConversionPoint),

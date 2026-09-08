@@ -55,3 +55,20 @@ describe('点検・中: LINE通知の画面契約', () => {
     expect(OPERATOR_NEW).toContain('自分へのテスト送信を受け付けました')
   })
 })
+
+describe('点検・軽: LINE通知の画面契約(#580)', () => {
+  const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+
+  it('軽1: 顧客タブだけ定義・集計を取る', () => {
+    expect(PAGE).toContain("tab === 'customer'")
+    expect(PAGE).toContain('needCustomer')
+    expect(PAGE).toContain('? api.lineNotifications.definitions(selectedAccountId)')
+    expect(PAGE).toContain('? api.lineNotifications.metrics(selectedAccountId)')
+    expect(PAGE).toContain('[selectedAccountId, tab]')
+  })
+
+  it('軽4: 出す・止めるスイッチに読み上げ名を付ける', () => {
+    expect(PAGE).toContain('role="switch"')
+    expect(PAGE).toContain('のお知らせを出す・止める')
+  })
+})

@@ -453,7 +453,7 @@ export default function QuestionEditor({
                           value={choice.field.value}
                           onChange={(e) =>
                             setChoice(index, {
-                              field: { fieldId: choice.field!.fieldId, value: e.target.value },
+                              field: { fieldId: choice.field?.fieldId ?? '', value: e.target.value },
                             })
                           }
                           placeholder="セットする値（既存の値は上書き）"

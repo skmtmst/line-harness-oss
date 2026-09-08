@@ -572,9 +572,9 @@ export function TestSendDialog({
 
 /** 条件を1行で言い表す。札の中に出す用。 */
 export function describeCondition(condition: SegmentCondition | null): string {
-  if (isEmptyCondition(condition)) return '条件なし'
-  const rules = condition!.rules.length
-  const groups = (condition!.groups ?? []).filter((g) => g.rules.length > 0).length
+  if (condition === null || isEmptyCondition(condition)) return '条件なし'
+  const rules = condition.rules.length
+  const groups = (condition.groups ?? []).filter((g) => g.rules.length > 0).length
   if (groups === 0) return `${rules} 個の条件`
   return `${rules} 個の条件 ＋ or条件 ${groups} かたまり`
 }

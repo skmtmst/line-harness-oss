@@ -308,8 +308,9 @@ export function OutgoingOverview({
           </thead>
           <tbody>
             {visible.map((item) => {
-              const failed = item.deliverySummary.lastResult?.status === 'failed'
-                || item.deliverySummary.failed > 0
+              const pending = item.deliverySummary.lastResult?.status === 'pending'
+              const failed = !pending && (item.deliverySummary.lastResult?.status === 'failed'
+                || item.deliverySummary.failed > 0)
               const canActivate = item.hasSecret && isHttpsUrl(item.url)
               return (
                 <Tr key={item.id}>
@@ -327,8 +328,8 @@ export function OutgoingOverview({
                     ) : null}
                   </Td>
                   <Td>
-                    <StatusBadge tone={failed ? 'danger' : item.isActive ? 'success' : 'neutral'} size="compact">
-                      {failed ? '返事がありません' : item.isActive ? 'うまくいっています' : '止めています'}
+                    <StatusBadge tone={failed ? 'danger' : pending ? 'neutral' : item.isActive ? 'success' : 'neutral'} size="compact">
+                      {failed ? '返事がありません' : pending ? '送信中' : item.isActive ? 'うまくいっています' : '止めています'}
                     </StatusBadge>
                     {failed && item.deliverySummary.lastResult?.completedAt ? (
                       <span className="text-ink-faint mt-1 block text-xs">

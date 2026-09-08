@@ -28,11 +28,20 @@ export function mediaAcceptForKind(kind: MediaItem['kind']): string {
   return 'application/pdf'
 }
 
+/*
+ * 版追加の事前検査。`image/*` のような前方一致にすると、口（`DIRECT_ALLOWED`）
+ * に無い形式（SVGなど）を選んだ時点で弾けず、口で400になる。口と同じ列挙にし、
+ * 選んだ時点で弾く。口側へ形式を足したらここも足す。
+ */
+const KIND_MIME_TYPES: Record<MediaItem['kind'], readonly string[]> = {
+  image: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'],
+  video: ['video/mp4'],
+  audio: ['audio/mpeg', 'audio/mp4'],
+  file: ['application/pdf'],
+}
+
 export function fileMatchesMediaKind(file: Pick<File, 'type'>, kind: MediaItem['kind']): boolean {
-  if (kind === 'image') return file.type.startsWith('image/')
-  if (kind === 'video') return file.type === 'video/mp4'
-  if (kind === 'audio') return file.type.startsWith('audio/')
-  return file.type === 'application/pdf'
+  return KIND_MIME_TYPES[kind].includes(file.type)
 }
 
 /**

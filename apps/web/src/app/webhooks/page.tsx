@@ -76,8 +76,6 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
     ? null
     : SOURCE_PRESETS.find((preset) => preset.value === inForm.sourceType) ?? null
 
-  const [outForm, setOutForm] = useState({ name: '', url: '', eventTypes: '', secret: '', maxRetries: '0' })
-
   // After a successful create the API returns the secret exactly once.
   // Show it to the operator with a copy affordance, then forget it.
   const [createdSecret, setCreatedSecret] = useState<{ name: string; secret: string } | null>(null)
@@ -174,7 +172,6 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
     setShowCreate(false)
     setInForm({ name: '', sourceType: '', secret: '' })
     setSourceIsOther(false)
-    setOutForm({ name: '', url: '', eventTypes: '', secret: '', maxRetries: '0' })
     void load()
   }, [load, selectedAccountId])
 
@@ -280,51 +277,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       setInForm({ name: '', sourceType: '', secret: '' })
       setSourceIsOther(false)
       setShowCreate(false)
-      load()
-    } catch {
-      if (selectedAccountIdRef.current !== requestAccountId) return
-      setError('作成に失敗しました')
-    }
-  }
-
-  const handleCreateOutgoing = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    const requestAccountId = selectedAccountId
-    if (!requestAccountId) return setError('LINEアカウントを選択してください')
-    if (!outForm.name || !outForm.url) return
-    if (!isHttpsUrl(outForm.url)) {
-      setError('URLは https:// から始まる必要があります')
-      return
-    }
-    if (outForm.secret.length < MIN_SECRET_LENGTH) {
-      setError(`シークレットは最低${MIN_SECRET_LENGTH}文字必要です`)
-      return
-    }
-    try {
-      const eventTypes = outForm.eventTypes
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean)
-      const res = await api.webhooks.outgoing.create({
-        lineAccountId: requestAccountId,
-        name: outForm.name,
-        url: outForm.url,
-        eventTypes,
-        secret: outForm.secret,
-        maxRetries: Number(outForm.maxRetries) || 0,
-      })
-      if (!res.success) {
-        if (selectedAccountIdRef.current !== requestAccountId) return
-        setError(res.error)
-        return
-      }
-      if (selectedAccountIdRef.current !== requestAccountId) return
-      setCreatedSecret({ name: res.data.name, secret: res.data.secret })
-      setSecretCopied(false)
-      setOutForm({ name: '', url: '', eventTypes: '', secret: '', maxRetries: '0' })
-      setShowCreate(false)
-      load()
+      await load()
     } catch {
       if (selectedAccountIdRef.current !== requestAccountId) return
       setError('作成に失敗しました')
@@ -386,9 +339,13 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
         </nav>
         <div className="flex flex-wrap justify-end gap-2">
           <Button variant="secondary" href="/webhooks?tab=notify">見本から作る</Button>
-          <Button variant="primary" onClick={() => setShowCreate(!showCreate)}>
-            {showCreate ? 'キャンセル' : tab === 'incoming' ? '受け取り口を追加' : '送り先を追加'}
-          </Button>
+          {tab === 'incoming' ? (
+            <Button variant="primary" onClick={() => setShowCreate(!showCreate)}>
+              {showCreate ? 'キャンセル' : '受け取り口を追加'}
+            </Button>
+          ) : (
+            <Button variant="primary" href="/webhooks/new">送り先を追加</Button>
+          )}
         </div>
       </div>
       <MergedTabs basePath="/webhooks" paramName="tab" tabs={MERGED_TABS} active={tab} />
@@ -556,98 +513,6 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
               </div>
               <p className="text-xs text-ink-faint mt-1">
                 外部システムが Webhook 受信時に X-Webhook-Signature ヘッダで HMAC-SHA256 署名する際に使用します。
-              </p>
-            </div>
-          </div>
-          <button
-            type="submit"
-            className="mt-4 px-4 py-2 rounded-lg text-white text-sm font-medium"
-            style={{ backgroundColor: 'var(--color-accent)' }}
-          >
-            作成
-          </button>
-        </form>
-      )}
-
-      {showCreate && tab === 'outgoing' && (
-        <form onSubmit={handleCreateOutgoing} className="bg-canvas rounded-lg border border-hairline p-6 mb-6">
-          <h3 className="text-sm font-semibold text-ink mb-4">送る設定を追加</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-ink-secondary mb-1">名前</label>
-              <input
-                value={outForm.name}
-                onChange={(e) => setOutForm({ ...outForm, name: e.target.value })}
-                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
-                placeholder="外部CRM連携"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-ink-secondary mb-1">URL (https:// 必須)</label>
-              <input
-                type="url"
-                value={outForm.url}
-                onChange={(e) => setOutForm({ ...outForm, url: e.target.value })}
-                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
-                placeholder="https://example.com/webhook"
-                pattern="https://.*"
-                required
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-ink-secondary mb-1">イベントタイプ (カンマ区切り、* で全イベント)</label>
-              <input
-                value={outForm.eventTypes}
-                onChange={(e) => setOutForm({ ...outForm, eventTypes: e.target.value })}
-                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
-                placeholder="friend.added, message.received"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-ink-secondary mb-1">
-                シークレット (最低{MIN_SECRET_LENGTH}文字)
-              </label>
-              <div className="flex gap-2">
-                <input
-                  value={outForm.secret}
-                  onChange={(e) => setOutForm({ ...outForm, secret: e.target.value })}
-                  className="flex-1 border border-hairline rounded-lg px-3 py-2 text-sm font-mono"
-                  placeholder="ランダムな英数字32文字以上"
-                  required
-                  minLength={MIN_SECRET_LENGTH}
-                />
-                <Button
-                  type="button"
-                  onClick={() => setOutForm({ ...outForm, secret: generateSecret() })}
-                >
-                  自動生成
-                </Button>
-              </div>
-              <p className="text-xs text-ink-faint mt-1">
-                送信時に X-Webhook-Signature ヘッダで HMAC-SHA256 署名するために使われます。受信側で同じシークレットで検証してください。
-              </p>
-            </div>
-            <div className="sm:col-span-2">
-              <label htmlFor="wh-retries" className="mb-1 block text-sm font-medium text-ink-secondary">
-                失敗したときの送り直し
-              </label>
-              <div className="flex items-center gap-1.5">
-                <input
-                  id="wh-retries"
-                  type="number"
-                  min={0}
-                  max={5}
-                  value={outForm.maxRetries}
-                  onChange={(e) => setOutForm({ ...outForm, maxRetries: e.target.value })}
-                  className="border-hairline rounded-control w-24 border px-3 py-2 text-sm tabular-nums"
-                />
-                <span className="text-ink-faint text-xs">回まで</span>
-              </div>
-              <p className="mt-1 text-xs text-ink-faint">
-                相手が 5xx を返したときや、つながらなかったときに送り直します。
-                0.5秒・1秒・2秒…と間隔を空け、上限は5回です。
-                相手が 4xx を返した場合は、同じものを送っても結果が変わらないので送り直しません。
               </p>
             </div>
           </div>

@@ -26,29 +26,10 @@ type EntryTypeFilter = '' | MileageHistoryItem['entryType']
 type StatusFilter = '' | MileageHistoryItem['status']
 type ModeFilter = '' | 'automatic' | 'manual'
 
-type HistoryRow = Partial<{
-  friendId: string
-  friendName: string
-  balanceAfter: number
-  createdAt: string
-  entryType: string
-  status: string
-  primaryFriendId: string
-  displayName: string
-  occurredAt: string
-  lineAccountName: string
-}>
-
 function historyView(item: MileageAdminHistoryItem) {
-  const raw = item as unknown as HistoryRow
   return {
     ...item,
-    primaryFriendId: item.primaryFriendId || raw.friendId || '',
-    displayName: item.displayName || raw.friendName || '名前未取得',
-    entryType: (raw.entryType === 'earn' ? 'grant' : raw.entryType ?? item.entryType) as MileageHistoryItem['entryType'],
-    status: (raw.status === 'confirmed' ? 'available' : raw.status ?? item.status) as MileageHistoryItem['status'],
-    balanceAfter: typeof raw.balanceAfter === 'number' ? raw.balanceAfter : null,
-    occurredAt: item.occurredAt || raw.createdAt || '',
+    displayName: item.displayName || '名前未取得',
   }
 }
 

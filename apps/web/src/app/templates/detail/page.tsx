@@ -8,11 +8,12 @@ import Button from '../template-button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { templateDeleteDescription } from '../template-delete-message'
+import { messageTypeText } from '../template-message-type'
 
 interface Usage {
   autoReplies: Array<{ id: string; keyword: string }>
   automations: Array<{ id: string; name: string; eventType: string }>
-  scenarioSteps: Array<{ scenarioId: string; scenarioName: string; stepOrder: number }>
+  scenarioSteps: Array<{ scenarioId: string; scenarioName: string; stepId: string; stepOrder: number }>
   reminderSteps: Array<{ reminderId: string; reminderName: string; stepId: string }>
   richMenuAreas: Array<{ groupId: string; groupName: string; pageName: string; areaId: string; label: string | null }>
   trackedLinks: Array<{ id: string; name: string }>
@@ -28,6 +29,8 @@ function TemplateDetailInner() {
     category: string | null
     messageType: string
     messageContent: string
+    createdAt: string
+    updatedAt: string
   } | null>(null)
   const [usage, setUsage] = useState<Usage | null>(null)
   const [loading, setLoading] = useState(true)
@@ -111,33 +114,43 @@ function TemplateDetailInner() {
   const body = template?.messageContent ?? ''
   // 自動応答はキーワード、シナリオは「シナリオ名 ／ ステップN」で見せる。
   // どこを直せばよいかが、名前だけだと分からないため。
+  /*
+   * 行の鍵は ID で持つ。名前だと同名が2つあるときに鍵が重なり、
+   * React の警告・誤表示の種になる（#497 軽3）。
+   */
   const usageRows = [
     ...(usage?.autoReplies ?? []).map((u) => ({
+      key: `auto-reply-${u.id}`,
       kind: '自動応答',
       name: u.keyword,
       href: '/auto-replies',
     })),
     ...(usage?.scenarioSteps ?? []).map((u) => ({
+      key: `scenario-step-${u.stepId}`,
       kind: 'シナリオ配信',
       name: `${u.scenarioName} ／ ステップ${u.stepOrder}`,
       href: '/scenarios',
     })),
     ...(usage?.automations ?? []).map((u) => ({
+      key: `automation-${u.id}`,
       kind: 'オートメーション',
       name: u.name,
       href: '/automations',
     })),
     ...(usage?.reminderSteps ?? []).map((u) => ({
+      key: `reminder-step-${u.reminderId}-${u.stepId}`,
       kind: 'リマインダ',
       name: u.reminderName,
       href: `/reminders/edit?id=${u.reminderId}`,
     })),
     ...(usage?.richMenuAreas ?? []).map((u) => ({
+      key: `rich-menu-${u.groupId}-${u.areaId}`,
       kind: 'リッチメニュー',
       name: `${u.groupName} ／ ${u.pageName}${u.label ? ` ／ ${u.label}` : ''}`,
       href: `/rich-menus/edit?id=${u.groupId}`,
     })),
     ...(usage?.trackedLinks ?? []).map((u) => ({
+      key: `tracked-link-${u.id}`,
       kind: '流入リンク',
       name: u.name,
       href: `/inflow-links/detail?id=${u.id}`,
@@ -176,7 +189,7 @@ function TemplateDetailInner() {
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-ink text-sm font-semibold">本文</p>
                 <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-[11px]">
-                  {template.messageType === 'text' ? 'テキスト' : template.messageType}
+                  {messageTypeText(template.messageType)}
                 </span>
                 {template.category && (
                   <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-[11px]">
@@ -199,7 +212,7 @@ function TemplateDetailInner() {
               ) : (
                 <ul className="divide-hairline divide-y">
                   {usageRows.map((u) => (
-                    <li key={`${u.kind}-${u.name}`} className="flex items-center justify-between gap-2 py-2">
+                    <li key={u.key} className="flex items-center justify-between gap-2 py-2">
                       <div className="min-w-0">
                         <p className="text-ink-faint text-xs">{u.kind}</p>
                         <p className="text-ink truncate text-sm">{u.name}</p>
@@ -252,12 +265,12 @@ function TemplateDetailInner() {
                 <Row label="分類" value={template.category || '未分類'} />
                 <Row
                   label="種類"
-                  value={template.messageType === 'text' ? 'テキスト' : template.messageType}
+                  value={messageTypeText(template.messageType)}
                 />
                 <Row label="文字数" value={`${body.length}文字`} />
-                {/* 作成日・更新日を API が返していない。 */}
-                <Row label="作成" value="—" />
-                <Row label="最終更新" value="—" />
+                {/* 詳細の口は作成日・更新日を返している（#497 軽4）。 */}
+                <Row label="作成" value={formatDateTime(template.createdAt)} />
+                <Row label="最終更新" value={formatDateTime(template.updatedAt)} />
                 <Row label="使われている数" value={`${usageCount}か所`} />
               </dl>
             </section>
@@ -288,15 +301,34 @@ function TemplateDetailInner() {
             setDeleteError('')
           }}
         >
-          {/* 使用箇所は自動応答とシナリオ配信しか数えられていない。
-              0か所と出ていても「どこからも使われていない」とは言い切れない。 */}
+          {/*
+            数えているのは一覧に並ぶ使用先（自動応答・シナリオ・
+            オートメーション・リマインダ・リッチメニュー・流入リンク）。
+            一斉配信からの直接の参照だけは、まだ数えられていない。
+          */}
           <p className="text-ink-faint text-xs leading-relaxed">
-            一斉配信・リマインダからの参照は、まだ数えられません。上の数に入っていません。
+            一斉配信からの直接の参照は、まだ数えられません。上の数に入っていません。
           </p>
         </ConfirmDialog>
       </div>
     </div>
   )
+}
+
+/*
+ * 日時の表示（一覧と同じく日本時間）。来ない・壊れているときは
+ * 「—」にし、取れていないのを空欄や変な日付にしない。
+ */
+function formatDateTime(iso: string): string {
+  const time = new Date(iso).getTime()
+  if (!Number.isFinite(time)) return '—'
+  return new Date(iso).toLocaleString('ja-JP', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 function Row({ label, value }: { label: string; value: string }) {
