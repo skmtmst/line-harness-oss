@@ -722,6 +722,16 @@ const spec = {
         responses: { '201': { description: 'Enrolled' } },
       },
     },
+    '/api/scenarios/{id}/publish': {
+      post: {
+        tags: ['Scenarios'],
+        summary: '公開版の固定',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Published' } },
+      },
+    },
     // ── Broadcasts ───────────────────────────────────────────────────────────
     '/api/broadcasts': {
       get: { tags: ['Broadcasts'], summary: '配信一覧取得', responses: { '200': { description: 'All broadcasts' } } },
