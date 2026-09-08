@@ -7,6 +7,8 @@
  *
  * 約束:
  * - 5秒起点、同時に1本だけ。止めるときは返す関数を呼ぶ(unmountで必ず)。
+ *   取得の実行中に表示が戻っても別tickを予約しない(終わったtickが
+ *   次を予約するので、ここで足すと遅い取得と二重になる)。
  * - タブ非表示の間は取得しない。表示に戻ったら失敗回数に応じた
  *   待ちで再開する(固定5秒に戻すと、失敗続きの相手を非表示の往復
  *   だけで速く叩き直してしまう)。
@@ -45,6 +47,8 @@ export function startVisiblePoll(options: VisiblePollOptions): () => void {
   let stopped = false
   let failures = 0
   let gaveUp = false
+  // 取得の実行中か。表示の往復で別tickを予約しないための印。
+  let inFlight = false
 
   const isHidden = () =>
     typeof document !== 'undefined' && document.hidden === true
@@ -75,6 +79,7 @@ export function startVisiblePoll(options: VisiblePollOptions): () => void {
       schedule(VISIBLE_POLL_BASE_MS)
       return
     }
+    inFlight = true
     try {
       await options.work()
     } catch {
@@ -87,6 +92,8 @@ export function startVisiblePoll(options: VisiblePollOptions): () => void {
       }
       schedule(visiblePollDelayMs(failures))
       return
+    } finally {
+      inFlight = false
     }
     if (failures > 0) {
       failures = 0
@@ -99,7 +106,9 @@ export function startVisiblePoll(options: VisiblePollOptions): () => void {
     if (stopped || gaveUp) return
     if (isHidden()) {
       clearTimer()
-    } else if (timer === null) {
+    } else if (timer === null && !inFlight) {
+      // 取得中は予約しない。終わったtickが次を予約するので、
+      // ここで足すと遅い取得と二重になる。
       schedule(visiblePollDelayMs(failures))
     }
   }

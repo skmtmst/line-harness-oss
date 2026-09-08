@@ -179,6 +179,39 @@ describe('startVisiblePoll', () => {
     expect(work).toHaveBeenCalledTimes(3)
   })
 
+  it('取得中に非表示→表示しても二重取得しない(同時1本)', async () => {
+    const doc = stubDocument(false)
+    let resolveWork!: () => void
+    const work = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveWork = resolve
+        }),
+    )
+    startVisiblePoll({ work })
+
+    // 1本目が取得中のままになる。
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(work).toHaveBeenCalledTimes(1)
+
+    // 取得中に非表示→表示。別tickを予約しない。
+    doc.hidden = true
+    doc.dispatch('visibilitychange')
+    doc.hidden = false
+    doc.dispatch('visibilitychange')
+
+    // 5秒・10秒たっても1本のまま(直前版はここで2本目が走った)。
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(work).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(work).toHaveBeenCalledTimes(1)
+
+    // 1本目が終わったら次の1本だけ進む。
+    resolveWork()
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(work).toHaveBeenCalledTimes(2)
+  })
+
   it('止めたら待ち受けも外す', async () => {
     const doc = stubDocument(false)
     const work = vi.fn(async () => undefined)
