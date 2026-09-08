@@ -56,6 +56,19 @@ async function sign(secret: string, body: string): Promise<string> {
  * 転送先が内部を向いたりしたときに内部・private 宛てへ送ってしまう。
  * そのため送るたびに「HTTPSか・host/IPは公開側か・転送先の各段は安全か」
  * を確かめてから送る。DNS は送るたびに引き直し、結果は使い回さない。
+ *
+ * 配送の境界は2層である。アプリ層(このファイル)は fail-closed の検査で
+ * 非公開宛てを送る前に止め、秘密値なしで台帳へ残す。基盤層(Cloudflare)側は
+ * 次の公式仕様が非公開宛てへの到達そのものを断つ。検査と接続で見え方が
+ * 食い違っても、非公開側へ接続は成立しない設計である。
+ * - 自分以外のゾーンへ cf.resolveOverride は効かない(接続の固定化は不可)。
+ *   https://developers.cloudflare.com/workers/runtime-apis/request/
+ * - Cloudflare 所有IPへの subrequest は 1024 で拒否される。
+ *   https://developers.cloudflare.com/workers/observability/errors/
+ * - Workers が private origin へ届くのは VPC 等の binding 経由だけ。
+ *   この Worker に private 用 binding は無い(apps/worker/wrangler.toml)。
+ *   https://blog.cloudflare.com/private-origins-dns-routing/
+ * 残るのは公開→公開の差し替え(誤配送のみ。秘密値は送らない)である。
  */
 
 export type WebhookDnsLookup = (host: string) => Promise<string[]>;

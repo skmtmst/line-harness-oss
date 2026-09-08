@@ -390,6 +390,27 @@ describe('送信直前の再検査', () => {
     expect(second['X-Webhook-Signature']).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  it('検査時と接続時でDNS応答が異なれば送らない(分岐の再現)', async () => {
+    // 検査時は公開IP、転送先を辿る段で引き直したら内部IPに変わっていた場合。
+    // 転送先への接続は発生しない。
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: unknown) => {
+        calls.push(String(input));
+        return new Response('', { status: 302, headers: { location: '/next' } });
+      }),
+    );
+    const lookup = vi.fn(async (_host: string) => ['93.184.216.34']);
+    lookup.mockResolvedValueOnce(['93.184.216.34']);
+    lookup.mockResolvedValueOnce(['10.9.9.9']);
+    const res = await deliverWebhook(WEBHOOK, '{}', { sleep: noSleep, lookupHost: lookup });
+    expect(res).toMatchObject({ ok: false, blocked: true });
+    // 転送元への1回だけ。転送先へは送らない。
+    expect(calls).toEqual(['https://example.com/hook']);
+    expect(lookup).toHaveBeenCalledTimes(2);
+  });
+
   it('既定の名前引き(DoH)でも内部IPを止める', async () => {
     vi.stubGlobal(
       'fetch',
