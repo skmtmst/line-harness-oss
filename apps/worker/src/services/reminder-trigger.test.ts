@@ -71,6 +71,7 @@ function makeDb(handlers: {
   rules?: unknown[];
   tagged?: unknown;
   existing?: unknown;
+  friendAccount?: unknown;
 }) {
   const runs: string[] = [];
   const db = {
@@ -84,6 +85,9 @@ function makeDb(handlers: {
             async first() {
               if (query.includes('friend_tags')) return handlers.tagged ?? null;
               if (query.includes('friend_reminders')) return handlers.existing ?? null;
+              if (query.includes('FROM friends')) {
+                return handlers.friendAccount ?? { line_account_id: 'account-1' };
+              }
               return null;
             },
             async run() {
@@ -105,6 +109,7 @@ describe('きっかけによる自動登録', () => {
       triggerType: 'booking',
       friendId: 'f-1',
       startsAtIso: '2026-08-20T01:00:00.000Z',
+      lineAccountId: 'account-1',
     });
     expect(n).toBe(0);
     expect(runs).toEqual([]);
@@ -119,6 +124,7 @@ describe('きっかけによる自動登録', () => {
       triggerType: 'booking',
       friendId: 'f-1',
       startsAtIso: '2026-08-20T01:00:00.000Z',
+      lineAccountId: 'account-1',
     });
     expect(n).toBe(0);
     expect(runs).toEqual([]);
@@ -133,6 +139,7 @@ describe('きっかけによる自動登録', () => {
       triggerType: 'booking',
       friendId: 'f-1',
       startsAtIso: '2026-08-20T01:00:00.000Z',
+      lineAccountId: 'account-1',
     });
     expect(n).toBe(1);
     expect(runs).toHaveLength(0);
@@ -150,6 +157,7 @@ describe('きっかけによる自動登録', () => {
       triggerType: 'booking',
       friendId: 'f-1',
       startsAtIso: '2026-08-20T01:00:00.000Z',
+      lineAccountId: 'account-1',
     });
     expect(n).toBe(0);
     expect(runs).toEqual([]);
@@ -161,7 +169,19 @@ describe('きっかけによる自動登録', () => {
       triggerType: 'booking',
       friendId: 'f-1',
       startsAtIso: 'garbage',
+      lineAccountId: 'account-1',
     });
     expect(n).toBe(0);
+  });
+
+  it('友だちの所属と店舗が違うときは書かずに落とす', async () => {
+    const { db } = makeDb({ rules: [RULE], friendAccount: { line_account_id: 'account-2' } });
+    await expect(enrollByTrigger(db, {
+      triggerType: 'booking',
+      friendId: 'f-1',
+      startsAtIso: '2026-08-20T01:00:00.000Z',
+      lineAccountId: 'account-1',
+    })).rejects.toThrow('REMINDER_ACCOUNT_MISMATCH');
+    expect(mocks.enroll).not.toHaveBeenCalled();
   });
 });
