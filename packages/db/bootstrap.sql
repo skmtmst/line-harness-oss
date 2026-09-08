@@ -1922,7 +1922,7 @@ CREATE TABLE form_submissions (
   data TEXT NOT NULL DEFAULT '{}',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 , destination_write_status TEXT NOT NULL DEFAULT 'unknown'
-  CHECK (destination_write_status IN ('pending', 'succeeded', 'partial', 'failed', 'not_requested', 'unknown')), destination_write_attempted INTEGER, destination_write_succeeded INTEGER, destination_write_failed INTEGER, destination_write_completed_at TEXT);
+  CHECK (destination_write_status IN ('pending', 'succeeded', 'partial', 'failed', 'not_requested', 'unknown')), destination_write_attempted INTEGER, destination_write_succeeded INTEGER, destination_write_failed INTEGER, destination_write_completed_at TEXT, idempotency_hash TEXT, idempotency_expires_at TEXT);
 
 CREATE TABLE forms (
   id TEXT PRIMARY KEY,
@@ -5579,6 +5579,9 @@ CREATE INDEX idx_form_submissions_form_write_status
   ON form_submissions(form_id, destination_write_status, created_at DESC);
 
 CREATE INDEX idx_form_submissions_friend ON form_submissions (friend_id);
+
+CREATE INDEX idx_form_submissions_idempotency_expires
+  ON form_submissions (idempotency_expires_at);
 
 CREATE INDEX idx_forms_status_updated
   ON forms(status, updated_at DESC);

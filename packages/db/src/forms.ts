@@ -35,6 +35,15 @@ export interface FormSubmission {
   form_id: string;
   friend_id: string | null;
   data: string; // JSON string
+  /**
+   * 冪等キーの照合用。送信時の Idempotency-Key ヘッダ(UUID)を回答行の id
+   * として使い、ここには回答内容のハッシュを置く。同じキーの再送はこの
+   * ハッシュが一致したときだけ保存済みの行を返し、違う内容の使い回しは
+   * 409 で断る。キーなし送信は NULL。
+   */
+  idempotency_hash: string | null;
+  /** 再送を受け付ける期限(UTC ISO8601)。過ぎた再送は新しいキーでの送り直しを求める。 */
+  idempotency_expires_at: string | null;
   destination_write_status: FormDestinationWriteStatus;
   destination_write_attempted: number | null;
   destination_write_succeeded: number | null;
@@ -619,22 +628,41 @@ export interface CreateFormSubmissionInput {
   formId: string;
   friendId?: string | null;
   data: string; // JSON string
+  /**
+   * 冪等キー(UUID)があるときは回答行の id として使う。主キーが同じ値の
+   * 同時送信を 1 行にまとめ、負けた側は保存済みの行を返す。
+   * 省略時はこれまでどおり採番する。
+   */
+  id?: string;
+  /** 回答内容のハッシュ。再送の照合に使う。 */
+  idempotencyHash?: string | null;
+  /** 再送を受け付ける期限(UTC ISO8601)。 */
+  idempotencyExpiresAt?: string | null;
 }
 
 export async function createFormSubmission(
   db: D1Database,
   input: CreateFormSubmissionInput,
 ): Promise<FormSubmission> {
-  const id = crypto.randomUUID();
+  const id = input.id ?? crypto.randomUUID();
   const now = jstNow();
 
   await db
     .prepare(
       `INSERT INTO form_submissions
-         (id, form_id, friend_id, data, destination_write_status, created_at)
-       VALUES (?, ?, ?, ?, 'pending', ?)`,
+         (id, form_id, friend_id, data, destination_write_status, created_at,
+          idempotency_hash, idempotency_expires_at)
+       VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)`,
     )
-    .bind(id, input.formId, input.friendId ?? null, input.data, now)
+    .bind(
+      id,
+      input.formId,
+      input.friendId ?? null,
+      input.data,
+      now,
+      input.idempotencyHash ?? null,
+      input.idempotencyExpiresAt ?? null,
+    )
     .run();
 
   // Increment submit_count
@@ -825,6 +853,20 @@ export async function countFormSubmissionsByFriend(
     .bind(formId, friendId)
     .first<{ n: number }>();
   return row?.n ?? 0;
+}
+
+/**
+ * 冪等キーの再送照合用に、回答を id で直接読む。
+ * キーは回答行の id そのものなので、同時送信の負けた側もここで勝ち行を読む。
+ */
+export async function getFormSubmissionById(
+  db: D1Database,
+  id: string,
+): Promise<FormSubmission | null> {
+  return db
+    .prepare(`SELECT * FROM form_submissions WHERE id = ?`)
+    .bind(id)
+    .first<FormSubmission>();
 }
 
 /** 前回の回答。オプションの「前回の回答を復元する」で使う。 */
