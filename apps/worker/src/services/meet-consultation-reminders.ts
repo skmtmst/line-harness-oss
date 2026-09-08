@@ -1,7 +1,7 @@
 import type { HarnessProxyDispatch } from './line-proxy-send.js';
 import { pushViaHarnessProxy } from './line-proxy-send.js';
 import { resolveLineCredential } from '@line-crm/db';
-import { cancelByTrigger, enrollByTrigger, rescheduleByTrigger } from './reminder-trigger.js';
+import { cancelByTrigger, enrollByTrigger, reconcileV6ToStartsAt } from './reminder-trigger.js';
 
 export type MeetReminderKind = 'day_before' | 'hour_before';
 
@@ -215,7 +215,8 @@ export async function registerMeetConsultation(
 
   // N-065: 個別相談の日程変更・再送を V6 へ連動する。
   // 予約ルール (booking) を個別相談にも使い、sourceKind='meet' で追跡する。
-  // 日程変更は先に移してから登録する。逆だと一意鍵に当たり旧起点が残る。
+  // 旧起点ではなく現在の開始時刻へ直す。途中失敗後の再送でも回復でき、
+  // 友だち変更で旧友だちへ残った行もここで止める (新 friend だけ active)。
   // 移行前の行は個別相談が作っていないので探さない (同時刻の別予約へ触れない)。
   const v6Base = {
     triggerType: 'booking' as const,
@@ -226,13 +227,14 @@ export async function registerMeetConsultation(
     lineAccountId: friend.line_account_id,
     allowLegacyFallback: false,
   };
-  if (existing && scheduleChanged) {
-    await rescheduleByTrigger(db, {
-      ...v6Base,
-      oldStartsAtIso: existing.starts_at,
-      newStartsAtIso: normalizedStart,
-    });
-  }
+  await reconcileV6ToStartsAt(db, {
+    triggerType: v6Base.triggerType,
+    sourceKind: v6Base.sourceKind,
+    sourceId: v6Base.sourceId,
+    sourceEventId: v6Base.sourceEventId,
+    friendId: v6Base.friendId,
+    startsAtIso: normalizedStart,
+  });
   // 登録失敗で相談登録自体を壊さない。二重登録は enroll 側で吸収する。
   await enrollByTrigger(db, {
     ...v6Base,
@@ -317,6 +319,22 @@ export async function processDueMeetConsultationReminders(
   let sent = 0;
   let failed = 0;
   for (const row of due.results ?? []) {
+    // 取消と配信の競合対策: 送る直前に相談の状態を確かめ、取消済みなら送らない。
+    const live = await db
+      .prepare(`SELECT status FROM meet_consultations WHERE id = ?`)
+      .bind(row.consultation_id)
+      .first<{ status: string }>();
+    if (!live || live.status !== 'confirmed') {
+      await db
+        .prepare(
+          `UPDATE meet_consultation_reminders
+              SET status='cancelled', updated_at=?
+            WHERE id=? AND status IN ('pending','failed')`,
+        )
+        .bind(nowIso, row.id)
+        .run();
+      continue;
+    }
     try {
       const text = renderMeetReminderText(row.kind, row.starts_at, row.meet_url);
       const accessToken = await resolveLineCredential(

@@ -11,6 +11,7 @@
 import {
   claimReminderDeliveryRun,
   completeReminderDeliveryRunStatement,
+  getFriendReminderStatus,
   getPendingReminderDeliveries,
   completeReminderIfDone,
   failReminderDeliveryRun,
@@ -129,7 +130,7 @@ export async function processReminderDeliveries(
   // 未来の通もqueuedとして先に台帳へ置く。実行結果画面の「配信予定」と
   // 「次の配信」を、送信時刻になる前から実値で確認できるようにする。
   // claim側の scheduled_at <= now 条件が、時刻前の外部送信を止める。
-  for (let i = 0; i < pending.length; i++) {
+  enrollmentLoop: for (let i = 0; i < pending.length; i++) {
     const enrollment = pending[i];
     if (i > 0) {
       await (options.pause ?? sleep)(addJitter(50, 200));
@@ -163,6 +164,21 @@ export async function processReminderDeliveries(
       });
       // 別cronが送信中、再試行時刻前、または既に終端状態なら何もしない。
       if (!run) continue;
+
+      // 取消と cron の競合対策: claimed 済みでも送る直前に登録を確認する。
+      // 取消後に残った実行行は送らず止める (取消漏れの送信を防ぐ)。
+      // 登録ごと飛ばす (内側の通ループではなく)。末尾の完了化は取消済みの
+      // 登録へ触れない。
+      if ((await getFriendReminderStatus(db, enrollment.id)) !== 'active') {
+        await db.prepare(
+          `UPDATE reminder_delivery_runs
+              SET status = 'cancelled', completed_at = ?, lease_expires_at = NULL,
+                  next_retry_at = NULL, updated_at = ?
+            WHERE id = ? AND status = 'claimed'`,
+        ).bind(nowIso, nowIso, run.id).run();
+        result.skipped++;
+        continue enrollmentLoop;
+      }
 
       if (!friend) {
         await skipReminderDeliveryRun(db, {
