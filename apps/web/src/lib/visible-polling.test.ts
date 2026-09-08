@@ -155,6 +155,30 @@ describe('startVisiblePoll', () => {
     expect(onRecovered).toHaveBeenCalledTimes(1)
   })
 
+  it('非表示→再表示でも失敗回数ぶんの待ちを保つ(固定5秒に戻さない)', async () => {
+    const doc = stubDocument(false)
+    const work = vi.fn(async () => {
+      throw new Error('no connection')
+    })
+    startVisiblePoll({ work, onGiveUp: () => undefined })
+
+    // 1回目失敗(5秒後)→次は10秒後、2回目失敗→次は20秒後。
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(work).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(10000)
+    expect(work).toHaveBeenCalledTimes(2)
+
+    // 非表示の往復を挟んでも、失敗2回ぶんの20秒待ちを保つ。
+    doc.hidden = true
+    doc.dispatch('visibilitychange')
+    doc.hidden = false
+    doc.dispatch('visibilitychange')
+    await vi.advanceTimersByTimeAsync(19999)
+    expect(work).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(work).toHaveBeenCalledTimes(3)
+  })
+
   it('止めたら待ち受けも外す', async () => {
     const doc = stubDocument(false)
     const work = vi.fn(async () => undefined)

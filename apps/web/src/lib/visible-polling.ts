@@ -7,7 +7,9 @@
  *
  * 約束:
  * - 5秒起点、同時に1本だけ。止めるときは返す関数を呼ぶ(unmountで必ず)。
- * - タブ非表示の間は取得しない。表示に戻ったら5秒後に再開する。
+ * - タブ非表示の間は取得しない。表示に戻ったら失敗回数に応じた
+ *   待ちで再開する(固定5秒に戻すと、失敗続きの相手を非表示の往復
+ *   だけで速く叩き直してしまう)。
  * - 対象が処理中/未解決でない間も取得しない(`shouldPoll` が false の間)。
  * - 連続失敗は 5秒→10秒→20秒→40秒→60秒(上限)と待ちを延ばす。
  * - 5回続けて失敗したら止まり、`onGiveUp` を1回呼ぶ。画面は理由と
@@ -98,7 +100,7 @@ export function startVisiblePoll(options: VisiblePollOptions): () => void {
     if (isHidden()) {
       clearTimer()
     } else if (timer === null) {
-      schedule(VISIBLE_POLL_BASE_MS)
+      schedule(visiblePollDelayMs(failures))
     }
   }
 
