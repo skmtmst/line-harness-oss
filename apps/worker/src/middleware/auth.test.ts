@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { authMiddleware, isPublicApiBoundary, isStaffSelfEndpoint, permissionForApiPath } from './auth.js';
+import { authMiddleware, isPublicApiBoundary, isStaffExplicitAllow, isStaffSelfEndpoint, permissionForApiPath } from './auth.js';
 import { resolveCorsOrigin } from './admin-auth-config.js';
 import { adminAuth } from '../routes/admin-auth.js';
 import { encryptTotpSecret, totpAtStep } from '../lib/totp.js';
@@ -899,6 +899,32 @@ describe('N-423 staff deny-by-default (#670)', () => {
       ['GET', '/api/operations/health'],
     ] as const) {
       expect(isStaffSelfEndpoint(method, path)).toBe(false);
+    }
+  });
+
+  test('明示許可の写しは route の staff 許可と一致する (司令塔裁定 #670)', () => {
+    for (const [method, path] of [
+      ['GET', '/api/staff'],
+      ['GET', '/api/restaurant-test/stores'],
+      ['GET', '/api/restaurant-test/store-context'],
+      ['GET', '/api/restaurant-test/terms-agreement'],
+      ['POST', '/api/restaurant-test/stores/selection/clear'],
+      ['POST', '/api/restaurant-test/stores/abc/select'],
+      ['GET', '/api/restaurant-test/snapshot'],
+      ['POST', '/api/restaurant-test/reservations/manual'],
+    ] as const) {
+      expect(isStaffExplicitAllow(method, path)).toBe(true);
+    }
+    for (const [method, path] of [
+      ['POST', '/api/staff'],
+      ['DELETE', '/api/staff/abc'],
+      ['POST', '/api/restaurant-test/terms-agreement'],
+      ['POST', '/api/restaurant-test/stores'],
+      ['GET', '/api/restaurant-test/stores/abc/select'],
+      ['POST', '/api/restaurant-test/intake-addresses'],
+      ['GET', '/api/staff/me'],
+    ] as const) {
+      expect(isStaffExplicitAllow(method, path)).toBe(false);
     }
   });
 

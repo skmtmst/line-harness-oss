@@ -8,7 +8,7 @@ vi.mock('@line-crm/db', () => ({
   getStaffByApiKey: async () => null,
 }));
 
-import { isPublicApiBoundary, isStaffSelfEndpoint, permissionForApiPath } from './auth.js';
+import { isPublicApiBoundary, isStaffExplicitAllow, isStaffSelfEndpoint, permissionForApiPath } from './auth.js';
 
 /**
  * 更新系の経路に、役割の指定が付いているかを機械的に確かめる。
@@ -120,7 +120,7 @@ describe('更新系の権限ガードの網羅', () => {
 /**
  * N-423 (#670): staff 権限の deny-by-default の網羅。
  *
- * authMiddleware は staff に対して、公開境界・本人系・権限表の
+ * authMiddleware は staff に対して、公開境界・本人系・明示許可・権限表の
  * いずれにも入らない管理 API を 403 にする。新しい管理 API を足して
  * 権限の帰属を決め忘れると、下のテストが落ちて気づける。
  * 意図的な owner/admin 専用だけを SNAPSHOT に列挙する。
@@ -148,6 +148,7 @@ function collectStaffApiClassification(): { all: string[]; failClosed: string[] 
     const path = entry.slice(space + 1);
     if (isPublicApiBoundary(method, path)) return false;
     if (isStaffSelfEndpoint(method, path)) return false;
+    if (isStaffExplicitAllow(method, path)) return false;
     if (permissionForApiPath(path) !== null) return false;
     return true;
   });
@@ -240,15 +241,10 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/recipes/:id',
     'GET /api/recipes/clone-runs/:runId',
     'GET /api/restaurant-test/intake-addresses',
-    'GET /api/restaurant-test/snapshot',
-    'GET /api/restaurant-test/store-context',
-    'GET /api/restaurant-test/stores',
-    'GET /api/restaurant-test/terms-agreement',
     'GET /api/search-console/performance',
     'GET /api/site/pages',
     'GET /api/site/summary',
     'GET /api/site/tracking-key',
-    'GET /api/staff',
     'GET /api/staff/:id/login-summary',
     'GET /api/tenants',
     'GET /api/tenants/boundary-preview',
@@ -324,11 +320,8 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/restaurant-test/intake-addresses',
     'POST /api/restaurant-test/memberships',
     'POST /api/restaurant-test/menu',
-    'POST /api/restaurant-test/reservations/manual',
     'POST /api/restaurant-test/stores',
-    'POST /api/restaurant-test/stores/:id/select',
     'POST /api/restaurant-test/stores/connect',
-    'POST /api/restaurant-test/stores/selection/clear',
     'POST /api/restaurant-test/tables',
     'POST /api/restaurant-test/terms-agreement',
     'POST /api/segments/count',

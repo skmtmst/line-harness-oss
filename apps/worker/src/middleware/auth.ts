@@ -260,6 +260,33 @@ export function isStaffSelfEndpoint(method: string, path: string): boolean {
 }
 
 /**
+ * route が staff へ明示許可している既存の口の写し。
+ *
+ * 旧一覧の GET /api/staff は handler が他人のメールを伏せる意図的な
+ * 仕様として維持する(司令塔裁定 #670)。飲食店テストは点検対象外の
+ * ため route の明示許可を写すだけで、闇雲に広げない。
+ */
+const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
+  ['GET', '/api/staff'],
+  ['GET', '/api/restaurant-test/stores'],
+  ['GET', '/api/restaurant-test/store-context'],
+  ['GET', '/api/restaurant-test/terms-agreement'],
+  ['POST', '/api/restaurant-test/stores/selection/clear'],
+  ['GET', '/api/restaurant-test/snapshot'],
+  ['POST', '/api/restaurant-test/reservations/manual'],
+];
+
+const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = [
+  ['POST', /^\/api\/restaurant-test\/stores\/[^/]+\/select$/],
+];
+
+export function isStaffExplicitAllow(method: string, path: string): boolean {
+  const normalizedMethod = method.toUpperCase();
+  if (STAFF_EXPLICIT_ALLOW.some(([m, p]) => m === normalizedMethod && p === path)) return true;
+  return STAFF_EXPLICIT_ALLOW_PATTERNS.some(([m, pattern]) => m === normalizedMethod && pattern.test(path));
+}
+
+/**
  * 管理者認証より手前へ通す公開境界。authMiddleware の skip 判定と
  * 同じ意味で、method を区別する口もここで扱う。
  */
@@ -448,8 +475,8 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
   }
 
   // N-423 (#670): staff は deny-by-default。権限表に無い管理 API は
-  // 本人・自組織の口以外すべて 403。owner/admin は従来どおり通す。
-  if (staff.role === 'staff' && !isStaffSelfEndpoint(method, path)) {
+  // 本人・自組織と明示許可の口以外すべて 403。owner/admin は従来どおり通す。
+  if (staff.role === 'staff' && !isStaffSelfEndpoint(method, path) && !isStaffExplicitAllow(method, path)) {
     const requiredPermission = permissionForApiPath(path);
     if (!requiredPermission || !staff.permissionKeys?.includes(requiredPermission)) {
       return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
