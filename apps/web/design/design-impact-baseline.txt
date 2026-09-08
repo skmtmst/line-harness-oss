@@ -31,7 +31,10 @@ shared-button-importer app/common-actions/edit/page.tsx
 shared-button-importer app/common-actions/new/page.tsx
 shared-button-importer app/common-actions/page.tsx
 shared-button-importer app/common-actions/versions/page.tsx
-shared-button-importer app/contents/media-button.tsx
+shared-button-importer app/contents/media-detail-dialog.tsx
+shared-button-importer app/contents/media-replacement-dialog.tsx
+shared-button-importer app/contents/media-upload-dialog.tsx
+shared-button-importer app/contents/page.tsx
 shared-button-importer app/contents/vars/edit/page.tsx
 shared-button-importer app/contents/vars/impact-review.tsx
 shared-button-importer app/contents/vars/new/page.tsx

@@ -16,7 +16,7 @@ import {
   isDashboardNotificationData,
   markDashboardNotificationRead,
 } from './notification-summary'
-import { formatTrendSources } from './friend-trend-table'
+import { formatDate, formatTrendSources } from './friend-trend-table'
 import { resolveOfficialProfileUrl } from './qr-dialog'
 import type { BookingRequest } from '@/lib/api'
 import type { NotificationCenterData, StaffMember } from '@line-crm/shared'
@@ -134,6 +134,24 @@ describe('ダッシュボードV4の初期表示', () => {
       full: '広告 2',
       compact: '広告 2',
     })
+  })
+
+  it('壊れた日付はNaN表示にせず元の文字列をそのまま出す', () => {
+    expect(formatDate('2026-08-15')).toBe('8月15日(土)')
+    expect(formatDate('not-a-date')).toBe('not-a-date')
+    expect(formatDate('2026-08')).toBe('2026-08')
+  })
+
+  it('撮影専用のvisualQaが無くても本番の受信・予約・通知は描画できる', () => {
+    /*
+      `visualQa`(hideBookings・supportInbox・notificationUnreadCount 等)は
+      撮影モックだけの値で、本番 API は返さない。画面側は `?.`・`??` で
+      無視する。本番相当の値と食い違っていてもそろえない。
+    */
+    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    expect(source).toContain('reference?.hideBookings')
+    expect(source).toContain('data?.visualQa?.notificationUnreadCount ??')
+    expect(source).toContain('data?.inbox ?? null')
   })
 
   it('通知は選択中アカウントの取得・1件既読・全件既読へ接続する', () => {

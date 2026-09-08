@@ -102,7 +102,7 @@
 | 5 | `cCB7r` | 5-1-A シナリオ作成・配信方式 | 5.4828% | 0px | 中央・中央 | docs | [差分画像](scenarios-v6/cCB7r-diff-1920.png) | **一致** |
 | 5 | `kk8dz` | 5-1-B シナリオ作成・1通目設定 | 6.2051% | +10px | 中央・右 | docs | [差分画像](scenarios-v6/kk8dz-diff-1920.png) | **一致** |
 | 5 | `bV5Vs` | 5-1-C シナリオ編集 | 5.4237% | 0px | 上部・右 | docs | [差分画像](scenarios-v6/bV5Vs-diff-1920.png) | **一致** |
-| 5 | `xfYLn` | 5-1-D シナリオ・ステップ編集 | 7.9981% | 0px | 上部・右 | docs | [差分画像](scenarios-v6/xfYLn-diff-1920.png) | **一致** |
+| 5 | `xfYLn` | 5-1-D シナリオ・ステップ編集 | 8.0296% | 0px | 上部・右 | docs | [差分画像](scenarios-v6/xfYLn-diff-1920.png) | **一致** |
 | 5 | `r6Gzsu` | 5-1-E シナリオ・配信条件を開く | 8.0033% | 0px | 上部・右 | docs | [差分画像](scenarios-v6/r6Gzsu-diff-1920.png) | **一致** |
 | 5 | `hz9ti` | 5-1-F シナリオ・送信後アクションを開く | 9.4239% | 0px | 上部・右 | docs | [差分画像](scenarios-v6/hz9ti-diff-1920.png) | **一致** |
 | 5 | `dqFft` | 5-1-G シナリオ・ステップ削除確認 | 9.8357%（前回値） | 0px | 上部・右 | docs | [差分画像](scenarios-v6/dqFft-diff-1920.png) | **一致** |
@@ -183,7 +183,7 @@
 | 11 | `CzndJ` | 11-1-H フォルダ操作 | 5.1869% | 0px | 上部・左 | docs | [差分画像](templates-v6/CzndJ-diff-1920.png) | **一致** |
 | 11 | `NKyoA` | 11-1-I 一覧の状態（空・読込・エラー） | 2.6943% | 0px | 上部・左 | docs | [差分画像](templates-v6/NKyoA-diff-1920.png) | **一致** |
 | 12 | `GO8RQ` | 12-1 リッチメニュー | 3.6893% | 0px | 上部・左 | docs | [差分画像](rich-menus-v6/GO8RQ-diff-1920.png) | **一致** |
-| 12 | `XtfO3` | 12-1-A メニューを作る・形とボタン | 7.8355% | 0px | 上部・右 | docs | [差分画像](rich-menus-v6/XtfO3-diff-1920.png) | **一致** |
+| 12 | `XtfO3` | 12-1-A メニューを作る・形とボタン | 7.8855% | 0px | 上部・右 | docs | [差分画像](rich-menus-v6/XtfO3-diff-1920.png) | **一致** |
 | 12 | `kQ1bs` | 12-1-B メニューを作る・誰に出すか | 4.1634% | 0px | 中央・中央 | docs | [差分画像](rich-menus-v6/kQ1bs-diff-1920.png) | **一致** |
 | 12 | `DIUbO` | 12-1-C 切替メニューのつながり | 6.8123%（前回値） | 0px | 上部・右 | docs | [差分画像](rich-menus-v6/DIUbO-diff-1920.png) | **一致** |
 | 12 | `NXdDk` | 12-1-C-A つながりなし | 4.0928% | 0px | 上部・右 | docs | [差分画像](rich-menus-v6/NXdDk-diff-1920.png) | **一致** |
@@ -199,8 +199,8 @@
 | 13 | `gBp2J` | 13-1-E フォームの削除確認 | 6.9594% | 0px | 下部・中央 | docs | [差分画像](forms-v6/gBp2J-diff-1920.png) | **一致** |
 | 13 | `ZOPyc` | 13-1-F 一覧の状態（空・読込・エラー） | 2.9594% | 0px | 上部・左 | docs | [差分画像](forms-v6/ZOPyc-diff-1920.png) | **一致** |
 | 14 | `WuKzU` | 14-1 共通情報 | 3.6448% | 0px | 上部・左 | docs | [差分画像](common-vars-v6/WuKzU-diff-1920.png) | **一致** |
-| 14 | `gBtaK` | 14-1-A 共通情報を編集 | 5.4042% | 0px | 中央・左 | docs | [差分画像](common-vars-v6/gBtaK-diff-1920.png) | **一致** |
-| 14 | `uNBlA` | 14-1-B 変える前に影響を見る | 4.2428% | 0px | 中央・中央 | docs | [差分画像](common-vars-v6/uNBlA-diff-1920.png) | **一致** |
+| 14 | `gBtaK` | 14-1-A 共通情報を編集 | 5.3987% | 0px | 中央・左 | docs | [差分画像](common-vars-v6/gBtaK-diff-1920.png) | **一致** |
+| 14 | `uNBlA` | 14-1-B 変える前に影響を見る | 4.3788% | 0px | 中央・中央 | docs | [差分画像](common-vars-v6/uNBlA-diff-1920.png) | **一致** |
 | 14 | `yPkWe` | 14-1-C 共通情報の削除確認 | 4.4655% | 0px | 中央・中央 | docs | [差分画像](common-vars-v6/yPkWe-diff-1920.png) | **一致** |
 | 15 | `g89Tc` | 15-1 登録メディア | 3.6649% | 0px | 上部・左 | docs | [差分画像](media-v6/g89Tc-diff-1920.png) | **一致** |
 | 15 | `voJtX` | 15-1-A メディアの詳細と差し替え | 2.7174% | 0px | 中央・右 | docs | [差分画像](media-v6/voJtX-diff-1920.png) | **一致** |
@@ -212,7 +212,7 @@
 | 16 | `n5VVTb` | 16-1-B 成果承認 | 6.4431% | 0px | 中央・右 | docs | [差分画像](affiliates-v6/n5VVTb-diff-1920.png) | **一致** |
 | 16 | `njLGA` | 16-1-C 支払い | 4.1592%（前回値） | 0px | 中央・左 | docs | [差分画像](affiliates-v6/njLGA-diff-1920.png) | **一致** |
 | 16 | `xqT1Z` | 16-1-D アフィリエイターを登録する | 5.3374% | 0px | 中央・左 | docs | [差分画像](affiliates-v6/xqT1Z-diff-1920.png) | **一致** |
-| 16 | `jwrbf` | 16-1-E アフィリエイターの成果内訳 | 5.1568%（前回値） | 0px | 中央・右 | docs | [差分画像](affiliates-v6/jwrbf-diff-1920.png) | **一致** |
+| 16 | `jwrbf` | 16-1-E アフィリエイターの成果内訳 | 5.1253%（前回値） | 0px | 中央・右 | docs | [差分画像](affiliates-v6/jwrbf-diff-1920.png) | **一致** |
 | 16 | `GPWzq` | 16-1-F 案件をつくる | 5.0036% | 0px | 中央・左 | docs | [差分画像](affiliates-v6/GPWzq-diff-1920.png) | **一致** |
 | 16 | `QX70l` | 16-1-G アフィリエイターを削除する確認 | 6.9617% | 0px | 中央・左 | docs | [差分画像](affiliates-v6/QX70l-diff-1920.png) | **一致** |
 | 16 | `GqFTV` | 16-1-H 支払いを確定する | 7.9215% | -1px | 下部・中央 | docs | [差分画像](affiliates-v6/GqFTV-diff-1920.png) | **一致** |
@@ -252,7 +252,7 @@
 | 21 | `VLMGH` | 21-1 NEN配信 | 4.9576%（前回値） | 0px | 下部・右 | docs | [差分画像](nen-v6/VLMGH-diff-1920.png) | **一致** |
 | 21 | `DEX0k` | 21-1-A NENコラム | 5.0110%（前回値） | 0px | 中央・右 | docs | [差分画像](nen-v6/DEX0k-diff-1920.png) | **一致** |
 | 21 | `q4lajm` | 21-1-B ペット・記念日 | 7.5896%（前回値） | 0px | 中央・右 | docs | [差分画像](nen-v6/q4lajm-diff-1920.png) | **一致** |
-| 21 | `WeXbL` | 21-1-C NEN配信の履歴 | 5.0225%（前回値） | 0px | 中央・左 | docs | [差分画像](nen-v6/WeXbL-diff-1920.png) | **一致** |
+| 21 | `WeXbL` | 21-1-C NEN配信の履歴 | 4.9609%（前回値） | 0px | 中央・左 | docs | [差分画像](nen-v6/WeXbL-diff-1920.png) | **一致** |
 | 21 | `HpKyF` | 21-1-D NEN配信の中身を編集する | 5.7424% | 0px | 中央・右 | docs | [差分画像](nen-v6/HpKyF-diff-1920.png) | **一致** |
 | 21 | `ymXJK` | 21-1-E コラムを書く | 7.0357%（前回値） | 0px | 中央・右 | docs | [差分画像](nen-v6/ymXJK-diff-1920.png) | **一致** |
 | 21 | `i9sQP` | 21-1-F NENコラム・一覧の状態 | 4.2514%（前回値） | 0px | 上部・左 | docs | [差分画像](nen-v6/i9sQP-diff-1920.png) | **一致** |
@@ -261,8 +261,8 @@
 | 22 | `N2J629` | 22-1-B 写真を戻す理由をえらぶ | 9.9501% | 0px | 下部・中央 | docs | [差分画像](photos-v6/N2J629-diff-1920.png) | **一致** |
 | 22 | `J3Wxl8` | 22-1-C 出しているもの | 3.8936% | 0px | 中央・右 | docs | [差分画像](photos-v6/J3Wxl8-diff-1920.png) | **一致** |
 | 23 | `eI3gs` | 23-1 EC連携 | 5.0268% | 0px | 中央・左 | docs | [差分画像](ec-v6/eI3gs-diff-1920.png) | **一致** |
-| 23 | `ELayY` | 23-1-A 会員のつき合わせ | 3.9507% | 0px | 中央・左 | docs | [差分画像](ec-v6/ELayY-diff-1920.png) | **一致** |
-| 23 | `bfB50` | 23-1-B 定期便 | 4.7276% | 0px | 中央・左 | docs | [差分画像](ec-v6/bfB50-diff-1920.png) | **一致** |
+| 23 | `ELayY` | 23-1-A 会員のつき合わせ | 3.4714% | 0px | 中央・左 | docs | [差分画像](ec-v6/ELayY-diff-1920.png) | **一致** |
+| 23 | `bfB50` | 23-1-B 定期便 | 3.6895% | 0px | 中央・左 | docs | [差分画像](ec-v6/bfB50-diff-1920.png) | **一致** |
 | 23 | `oHAN4` | 23-1-C EC連携のつなぎ先 | 4.2292% | 0px | 下部・左 | docs | [差分画像](ec-v6/oHAN4-diff-1920.png) | **一致** |
 | 24 | `festr` | 24-1 LINE通知 | 4.7865%（前回値） | 0px | 中央・左 | docs | [差分画像](line-notify-v6/festr-diff-1920.png) | **一致** |
 | 24 | `Q55bb` | 24-1-A お知らせの中身を編集する | 7.9283% | 0px | 中央・右 | docs | [差分画像](line-notify-v6/Q55bb-diff-1920.png) | **一致** |
@@ -270,9 +270,9 @@
 | 24 | `Se65i` | 24-1-C お知らせの記録 | 4.0349%（前回値） | 0px | 中央・左 | docs | [差分画像](line-notify-v6/Se65i-diff-1920.png) | **一致** |
 | 24 | `DpxOK` | 24-2 運用者へのお知らせ | 4.7706%（前回値） | 0px | 中央・左 | docs | [差分画像](line-notify-v6/DpxOK-diff-1920.png) | **一致** |
 | 24 | `N2gAza` | 24-2-A 運用者へのお知らせをつくる | 4.1880%（前回値） | 0px | 中央・左 | docs | [差分画像](line-notify-v6/N2gAza-diff-1920.png) | **一致** |
-| 25 | `gief7` | 25-1 オートメーション | 5.1613%（前回値） | 0px | 中央・左 | docs | [差分画像](automations-v6/gief7-diff-1920.png) | **一致** |
-| 25 | `Rv8Jv` | 25-1-A オートメーションをつくる | 6.0491% | 0px | 上部・右 | docs | [差分画像](automations-v6/Rv8Jv-diff-1920.png) | **一致** |
-| 25 | `DkPY0` | 25-1-B オートメーションが動いた記録 | 5.3876%（前回値） | 0px | 中央・左 | docs | [差分画像](automations-v6/DkPY0-diff-1920.png) | **一致** |
+| 25 | `gief7` | 25-1 オートメーション | 5.0401%（前回値） | 0px | 中央・左 | docs | [差分画像](automations-v6/gief7-diff-1920.png) | **一致** |
+| 25 | `Rv8Jv` | 25-1-A オートメーションをつくる | 6.0808% | 0px | 中央・左 | docs | [差分画像](automations-v6/Rv8Jv-diff-1920.png) | **一致** |
+| 25 | `DkPY0` | 25-1-B オートメーションが動いた記録 | 5.3198%（前回値） | 0px | 中央・左 | docs | [差分画像](automations-v6/DkPY0-diff-1920.png) | **一致** |
 | 25 | `WjYAC` | 25-1-C 見本から作る | 5.1685%（前回値） | 0px | 中央・中央 | docs | [差分画像](automations-v6/WjYAC-diff-1920.png) | **一致** |
 | 25 | `Vdbv5` | 25-1-D 一覧の状態（空・読込・エラー） | 4.4432%（前回値） | 0px | 中央・左 | docs | [差分画像](automations-v6/Vdbv5-diff-1920.png) | **一致** |
 | 25 | `xOpDs` | 25-2 共通アクション | 5.2763%（前回値） | 0px | 中央・左 | docs | [差分画像](automations-v6/xOpDs-diff-1920.png) | **一致** |

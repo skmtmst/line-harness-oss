@@ -12,25 +12,16 @@ import { useCanManageAutomations } from '@/components/automations/use-automation
 import ListState from '@/components/shared/list-state'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import FilterChip from '@/components/shared/filter-chip'
+import {
+  automationActionLabel,
+  automationTriggerLabel,
+  type Automation as SharedAutomation,
+  type AutomationEventType,
+} from '@line-crm/shared'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
-type AutomationEventType = "friend_add" | "tag_change" | "score_threshold" | "cv_fire" | "message_received" | "postback_received" | "calendar_booked" | "form_submitted" | "link_clicked" | "datetime" | "daily" | "weekly" | "ec.order.confirmed" | "ec.order.shipped" | "ec.subscription.upcoming" | "ec.subscription.payment_failed" | "ec.subscription.cancelled"
-
-interface AutomationAction {
-  type: "add_tag" | "remove_tag" | "start_scenario" | "send_message" | "send_webhook" | "switch_rich_menu"
-  params: Record<string, unknown>
-}
-
-interface Automation {
-  id: string
-  name: string
-  description: string | null
-  eventType: AutomationEventType
-  conditions: Record<string, unknown>
-  actions: AutomationAction[]
-  isActive: boolean
-  priority: number
+interface Automation extends SharedAutomation {
   // null = global automation (fires for every account); UUID = bound to that
   // account. Surfaced so the badge + toggle/delete guards can distinguish.
   lineAccountId: string | null
@@ -43,26 +34,6 @@ interface Automation {
   lastRunAt: string | null
   createdAt: string
   updatedAt: string
-}
-
-const eventTypeLabelMap: Record<AutomationEventType, string> = {
-  friend_add: '友だち追加',
-  tag_change: 'タグ変更',
-  score_threshold: 'スコア閾値',
-  cv_fire: 'CV発火',
-  message_received: 'メッセージ受信',
-  postback_received: 'ポストバック受信',
-  calendar_booked: 'カレンダー予約',
-  form_submitted: 'フォームに回答',
-  link_clicked: 'リンクが押された',
-  datetime: '指定日時になった',
-  daily: '毎日決まった時刻',
-  weekly: '毎週決まった曜日・時刻',
-  'ec.order.confirmed': 'EC注文確定',
-  'ec.order.shipped': 'EC発送完了',
-  'ec.subscription.upcoming': '定期便予定',
-  'ec.subscription.payment_failed': '定期便決済失敗',
-  'ec.subscription.cancelled': '定期便解約',
 }
 
 const eventTypeBadgeColor: Record<AutomationEventType, string> = {
@@ -96,18 +67,6 @@ type PendingAction = {
   kind: 'toggle' | 'delete'
   automation: Automation
   accountId: string | null
-}
-
-function actionLabel(action: AutomationAction): string {
-  const labels: Record<AutomationAction['type'], string> = {
-    add_tag: 'タグを付ける',
-    remove_tag: 'タグを外す',
-    start_scenario: 'シナリオを始める',
-    send_message: 'メッセージを送る',
-    send_webhook: '外部連携に知らせる',
-    switch_rich_menu: 'リッチメニューを切り替える',
-  }
-  return labels[action.type]
 }
 
 function conditionLabel(conditions: Record<string, unknown>): string {
@@ -350,8 +309,8 @@ export default function AutomationsPage() {
       .filter((item) => requestedStatus === 'all' || (requestedStatus === 'active' ? item.isActive : !item.isActive))
       .filter((item) => {
         if (!normalizedQuery) return true
-        const actions = item.actions.map((action) => actionLabel(action)).join(' ')
-        return `${item.name} ${item.description ?? ''} ${eventTypeLabelMap[item.eventType]} ${actions}`
+        const actions = item.actions.map((action) => automationActionLabel(action.type)).join(' ')
+        return `${item.name} ${item.description ?? ''} ${automationTriggerLabel(item.eventType)} ${actions}`
           .toLocaleLowerCase('ja')
           .includes(normalizedQuery)
       })
@@ -496,10 +455,10 @@ export default function AutomationsPage() {
             <div key={automation.id} className="grid min-h-14 grid-cols-6 items-center gap-3 border-t border-hairline px-4 py-2 text-sm">
               <div className="min-w-0">
                 <p className="truncate font-semibold text-ink" title={automation.name}>{automation.name}</p>
-                <p className="truncate text-xs text-ink-faint" title={eventTypeLabelMap[automation.eventType]}>{eventTypeLabelMap[automation.eventType]}</p>
+                <p className="truncate text-xs text-ink-faint" title={automationTriggerLabel(automation.eventType)}>{automationTriggerLabel(automation.eventType)}</p>
               </div>
               <p className="truncate text-ink-secondary" title={conditionLabel(automation.conditions)}>{conditionLabel(automation.conditions)}</p>
-              <p className="truncate text-ink-secondary" title={automation.actions.map(actionLabel).join('、')}>{automation.actions.map(actionLabel).join('、') || '処理なし'}</p>
+              <p className="truncate text-ink-secondary" title={automation.actions.map((action) => automationActionLabel(action.type)).join('、')}>{automation.actions.map((action) => automationActionLabel(action.type)).join('、') || '処理なし'}</p>
               <div>
                 <span className="text-ink tabular-nums">{automation.executionCount30d.toLocaleString('ja-JP')}回</span>
                 {automation.failureCount30d > 0 ? <span className="text-danger block text-[11px]">失敗が{automation.failureCount30d}回</span> : null}
@@ -570,7 +529,7 @@ export default function AutomationsPage() {
         {pending !== null && (
           <div className="text-ink-secondary space-y-2 text-sm">
             <p>
-              きっかけ：{eventTypeLabelMap[pending.automation.eventType]} ／ アクション{' '}
+              きっかけ：{automationTriggerLabel(pending.automation.eventType)} ／ アクション{' '}
               {pending.automation.actions.length}件
             </p>
             {pending.automation.lineAccountId === null && (

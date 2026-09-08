@@ -14,6 +14,7 @@ export default function NewPoolPage() {
   const [slug, setSlug] = useState('')
   const [accountId, setAccountId] = useState('')
   const [accounts, setAccounts] = useState<LineAccount[]>([])
+  const selectedAccount = accounts.find((account) => account.id === accountId)
 
   useEffect(() => {
     void api.lineAccounts.list().then((res) => {
@@ -29,6 +30,18 @@ export default function NewPoolPage() {
       title="プールを作る"
       description="複数のLINE公式アカウントをひとまとめにして、友だちの追加先を自動で振り分けます。"
       parent={['プール', '/pools']}
+      aside={(
+        <section className="bg-canvas border-hairline rounded-card border p-5 shadow-sm">
+          <h2 className="text-ink text-base font-bold">プレビュー</h2>
+          <p className="text-ink-faint mt-1 text-xs">友だちが開く追加先と、現在の受け入れ先です。</p>
+          <div className="bg-canvas-sunken rounded-control mt-4 p-4">
+            <p className="text-ink-faint text-xs">友だち追加URL</p>
+            <code className="text-ink mt-1 block break-all text-sm">/pool/{slug || 'shibuya'}</code>
+            <p className="text-ink-faint mt-4 text-xs">現在の受け入れ先</p>
+            <p className="text-ink mt-1 text-sm font-semibold">{selectedAccount?.name ?? '未選択'}</p>
+          </div>
+        </section>
+      )}
       validate={() => {
         if (!name.trim()) return '名前を入力してください'
         if (!SLUG_PATTERN.test(slug)) {

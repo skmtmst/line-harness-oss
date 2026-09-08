@@ -11,6 +11,7 @@
 // 最後に isDefaultForAll なら 1 ページ目を全友だち default に。
 
 import { buildTapPostbackData } from './rich-menu-tap.js';
+import { RICH_MENU_DIMENSIONS } from '@line-crm/shared';
 
 export type Bounds = { x: number; y: number; width: number; height: number };
 
@@ -96,11 +97,6 @@ export interface LineRichMenuClient {
 export interface R2Like {
   get(key: string): Promise<{ body: Uint8Array | ReadableStream } | null>;
 }
-
-const SIZE_DIMENSIONS = {
-  large: { width: 2500, height: 1686 },
-  compact: { width: 2500, height: 843 },
-};
 
 export function buildAliasId(groupId: string, orderIndex: number): string {
   return `lhx-${groupId.slice(0, 8)}-${orderIndex}`;
@@ -393,7 +389,7 @@ export async function publishRichMenuGroup(
   resolvedPages.sort((a, b) => a.orderIndex - b.orderIndex);
   validateRichMenuGroupForPublish({ ...group, pages: resolvedPages });
 
-  const dimensions = SIZE_DIMENSIONS[group.size];
+  const dimensions = RICH_MENU_DIMENSIONS[group.size];
   const results: { pageId: string; newRichMenuId: string }[] = [];
 
   // LINE 側へ変更を加える前に、全ページの画像が読めることを確認する。

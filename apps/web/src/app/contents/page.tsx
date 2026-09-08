@@ -9,7 +9,7 @@ import type {
 } from '@line-crm/shared'
 import { LayoutGrid, List as ListIcon } from 'lucide-react'
 import { api, ApiError, type MediaQuota } from '@/lib/api'
-import Button from './media-button'
+import Button from '@/components/shared/button'
 import { formatMediaSize } from './media-usage-display'
 import Dialog from '@/components/shared/dialog'
 import {

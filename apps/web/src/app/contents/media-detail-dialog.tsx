@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { MediaDeleteImpact, MediaDeleteImpactReference, MediaItem } from '@line-crm/shared'
 import { ApiError, api, type MediaVersionPreview } from '@/lib/api'
-import Button from './media-button'
+import Button from '@/components/shared/button'
 import { formatMediaSize } from './media-usage-display'
 import { checkedAtText, referenceKindText, referenceNameText } from './media-delete-impact'
 import {

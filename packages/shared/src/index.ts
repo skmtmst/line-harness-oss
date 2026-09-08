@@ -13,4 +13,6 @@ export * from "./identity-candidates";
 export * from "./merged-people";
 export * from "./template-message";
 export * from "./feature-catalog";
+export * from "./rich-menu";
+export * from "./automation-labels";
 export * from "./ec-events";
