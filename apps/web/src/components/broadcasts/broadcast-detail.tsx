@@ -99,9 +99,9 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
       if (res.success && res.data) {
         setBroadcast(prev => prev ? {
           ...prev,
-          status: res.data!.status as ApiBroadcast['status'],
-          totalCount: res.data!.totalCount,
-          successCount: res.data!.successCount,
+          status: res.data.status as ApiBroadcast['status'],
+          totalCount: res.data.totalCount,
+          successCount: res.data.successCount,
         } : prev)
         setPerAccountStats(res.data.perAccountStats)
         if (res.data.status === 'sent') {
@@ -186,7 +186,7 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
       <div>
         <Header title="配信詳細" />
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-64" />
+          <div className="h-8 bg-canvas-sunken rounded w-64" />
           <div className="h-40 bg-canvas-sunken rounded" />
         </div>
       </div>
@@ -202,8 +202,8 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
     )
   }
 
-  const raw = broadcast as unknown as Record<string, unknown>
-  const accountId = raw.lineAccountId as string | null
+  /* 配信元のアカウント。型が持っているので逃げ道は要らない（#490 軽3）。 */
+  const accountId = broadcast.lineAccountId
 
   if (broadcast.status === 'sent') {
     const delivered = insight?.delivered ?? broadcast.successCount
@@ -350,7 +350,7 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
               } catch { return <p className="text-ink-faint text-sm">画像プレビュー不可</p> }
             })()
           ) : (
-            <div className="bg-green-500 text-white rounded-2xl rounded-tl-sm px-4 py-3 max-w-[300px] text-sm whitespace-pre-wrap">
+            <div className="bg-success text-white rounded-2xl rounded-tl-sm px-4 py-3 max-w-[300px] text-sm whitespace-pre-wrap">
               {broadcast.messageContent}
             </div>
           )}
@@ -376,9 +376,9 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
               <dd>
                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                   broadcast.status === 'draft' ? 'bg-canvas-sunken text-ink-secondary' :
-                  broadcast.status === 'scheduled' ? 'bg-blue-100 text-blue-700' :
-                  broadcast.status === 'sending' ? 'bg-warning-bg text-yellow-700' :
-                  'bg-success-bg text-green-700'
+                  broadcast.status === 'scheduled' ? 'bg-info-bg text-info' :
+                  broadcast.status === 'sending' ? 'bg-warning-bg text-warning' :
+                  'bg-success-bg text-success'
                 }`}>
                   {broadcast.status === 'draft' ? '下書き' : broadcast.status === 'scheduled' ? '予約済み' : broadcast.status === 'sending' ? '送信中' : '送信完了'}
                 </span>
@@ -400,7 +400,7 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
           {!showSegmentBuilder ? (
             <button
               onClick={() => setShowSegmentBuilder(true)}
-              className="text-xs text-blue-500 hover:text-blue-700"
+              className="text-xs text-accent hover:underline"
             >
               セグメント条件を編集
             </button>
@@ -471,7 +471,7 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
                   <th className="px-2 py-2 text-right text-xs font-medium text-ink-faint">クリック</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-hairline">
                 {perAccountStats.map((row) => {
                   // accounts list から displayName を引く (なければ row.accountName 内部ラベル)
                   const acc = accounts.find((a) => a.id === row.accountId)
@@ -488,26 +488,26 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
                       <td className="px-2 py-2 text-right text-ink">{row.sent.toLocaleString('ja-JP')}</td>
                       <td className="px-2 py-2 text-right">
                         {row.uniqueImpression != null ? (
-                          <span className="text-blue-600">
+                          <span className="text-info">
                             {row.uniqueImpression.toLocaleString('ja-JP')}
                             {openRate != null && (
                               <span className="ml-1 text-xs text-ink-faint">({openRate.toFixed(1)}%)</span>
                             )}
                           </span>
                         ) : (
-                          <span className="text-gray-300">-</span>
+                          <span className="text-ink-faint">-</span>
                         )}
                       </td>
                       <td className="px-2 py-2 text-right">
                         {row.uniqueClick != null ? (
-                          <span className="text-green-600">
+                          <span className="text-success">
                             {row.uniqueClick.toLocaleString('ja-JP')}
                             {clickRate != null && (
                               <span className="ml-1 text-xs text-ink-faint">({clickRate.toFixed(1)}%)</span>
                             )}
                           </span>
                         ) : (
-                          <span className="text-gray-300">-</span>
+                          <span className="text-ink-faint">-</span>
                         )}
                       </td>
                     </tr>
@@ -538,26 +538,26 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
                       <td className="px-2 py-2 text-right text-ink">{totalSent.toLocaleString('ja-JP')}</td>
                       <td className="px-2 py-2 text-right">
                         {totalImpr != null ? (
-                          <span className="text-blue-600">
+                          <span className="text-info">
                             {totalImpr.toLocaleString('ja-JP')}
                             {totalOpenRate != null && (
                               <span className="ml-1 text-xs text-ink-faint">({totalOpenRate.toFixed(1)}%)</span>
                             )}
                           </span>
                         ) : (
-                          <span className="text-gray-300">-</span>
+                          <span className="text-ink-faint">-</span>
                         )}
                       </td>
                       <td className="px-2 py-2 text-right">
                         {totalClick != null ? (
-                          <span className="text-green-600">
+                          <span className="text-success">
                             {totalClick.toLocaleString('ja-JP')}
                             {totalClickRate != null && (
                               <span className="ml-1 text-xs text-ink-faint">({totalClickRate.toFixed(1)}%)</span>
                             )}
                           </span>
                         ) : (
-                          <span className="text-gray-300">-</span>
+                          <span className="text-ink-faint">-</span>
                         )}
                       </td>
                     </tr>
