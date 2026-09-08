@@ -116,6 +116,13 @@ describe('届かなかった交換', () => {
   it('やり直しのあとは一覧を読み直す', () => {
     expect(code).toMatch(/await loadFailedRedemptions\(\)/)
   })
+
+  it('店切替で古い応答が後着しない', () => {
+    // Aの応答がBの表示を上書きすると、別店の交換に触ってしまう。
+    expect(code).toMatch(/createRequestGuard/)
+    expect(code).toMatch(/requestGuard\.issue\(\)/)
+    expect(code).toMatch(/if \(!requestGuard\.isCurrent\(requestId\)\) return/)
+  })
 })
 
 describe('いちばん使われた', () => {

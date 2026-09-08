@@ -7,6 +7,7 @@ import ListState from '@/components/shared/list-state'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
 import { formatMileageDate, formatMileageNumber } from './mileage-display'
+import { createRequestGuard } from './redemption-request-guard'
 import {
   api,
   fetchApi,
@@ -98,9 +99,16 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
   const [redemptionsVisible, setRedemptionsVisible] = useState(false)
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [retryError, setRetryError] = useState('')
+  /*
+   * 店を A→B と切り替えたとき、遅れて届いた A の応答で B を上書きしない。
+   * 世代札を取って、入れる直前に今の世代か確かめる。
+   */
+  const [requestGuard] = useState(createRequestGuard)
 
   const load = useCallback(async () => {
+    const requestId = requestGuard.issue()
     if (!accountId) {
+      if (!requestGuard.isCurrent(requestId)) return
       setOverview(null)
       setStatus('ready')
       return
@@ -108,6 +116,7 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
     setStatus('loading')
     try {
       const response = await api.mileage.rewards(accountId)
+      if (!requestGuard.isCurrent(requestId)) return
       if (!response.success) throw new Error(response.error)
       /*
         **器の形を確かめてから入れる。** `rewards` が配列でない返事を
@@ -117,10 +126,11 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
       setOverview(response.data)
       setStatus('ready')
     } catch (reason) {
+      if (!requestGuard.isCurrent(requestId)) return
       setOverview(null)
       setStatus(reason instanceof Error && reason.message === 'forbidden' ? 'forbidden' : 'error')
     }
-  }, [accountId])
+  }, [accountId, requestGuard])
 
   useEffect(() => { void load() }, [load])
 
@@ -130,7 +140,9 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
    * 届いていない交換が無いことになってしまうので、欄ごと出さない。
    */
   const loadFailedRedemptions = useCallback(async () => {
+    const requestId = requestGuard.issue()
     if (!accountId) {
+      if (!requestGuard.isCurrent(requestId)) return
       setFailedRedemptions([])
       setRedemptionsVisible(false)
       return
@@ -139,6 +151,7 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
       const response = await fetchApi<ApiResponse<RedemptionHistory>>(
         `/api/mileage/redemptions?accountId=${encodeURIComponent(accountId)}`,
       )
+      if (!requestGuard.isCurrent(requestId)) return
       if (!response.success) throw new Error(response.error)
       if (!Array.isArray(response.data?.items)) throw new Error('malformed')
       setFailedRedemptions(
@@ -146,10 +159,11 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
       )
       setRedemptionsVisible(true)
     } catch {
+      if (!requestGuard.isCurrent(requestId)) return
       setFailedRedemptions([])
       setRedemptionsVisible(false)
     }
-  }, [accountId])
+  }, [accountId, requestGuard])
 
   useEffect(() => { void loadFailedRedemptions() }, [loadFailedRedemptions])
 
