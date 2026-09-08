@@ -2,7 +2,7 @@
 
 import SelectField from '@/components/shared/select-field'
 import Link from 'next/link'
-import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import PageHeader from '@/components/shared/page-header'
@@ -169,7 +169,16 @@ function HealthPanel({
   const [checks, setChecks] = useState<HealthCheckItem[]>(() =>
     CHECK_DEFINITIONS.map((item) => ({ ...item, detail: '確認しています…', severity: 'unknown', observedAt: null })),
   )
+  /**
+   * 初回と2回目以降を分ける(#518 中2)。
+   *
+   * 以前は5分ごとの自動更新のたびに `loading` が立ち、バナーと概要が
+   * 「確認できない項目があります」へ瞬間的に変わっていた(オオカミ少年化)。
+   * 2回目以降は `refreshing` にして、前回の結果を表示したままにする。
+   */
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const hasLoaded = useRef(false)
   const [checkedAt, setCheckedAt] = useState<string | null>(null)
   const [nextCheckedAt, setNextCheckedAt] = useState<string | null>(null)
   const [snapshotStatus, setSnapshotStatus] = useState<OperationHealthSnapshot['overallStatus']>('unknown')
@@ -192,7 +201,8 @@ function HealthPanel({
   }, [])
 
   const load = useCallback(async (manual: boolean) => {
-    setLoading(true)
+    if (hasLoaded.current) setRefreshing(true)
+    else setLoading(true)
     if (!accountId) {
       setChecks(CHECK_DEFINITIONS.map((definition) => ({
         ...definition,
@@ -205,6 +215,8 @@ function HealthPanel({
       setSnapshotStatus('unknown')
       setControlSummary({ value: '未確認', note: 'LINEアカウントを選択してください' })
       setLoading(false)
+      setRefreshing(false)
+      hasLoaded.current = true
       return
     }
     try {
@@ -231,6 +243,8 @@ function HealthPanel({
       setControlSummary({ value: '未確認', note: '停止状態を取得できませんでした' })
     } finally {
       setLoading(false)
+      setRefreshing(false)
+      hasLoaded.current = true
     }
   }, [accountId, applySnapshot])
 
@@ -256,12 +270,14 @@ function HealthPanel({
   const statusIcon = isNormal ? '✓' : '!'
   const statusIconClass = isNormal ? 'text-success' : displayedSeverity === 'warning' ? 'text-warning' : displayedSeverity === 'danger' ? 'text-danger' : 'text-ink-faint'
 
-  useEffect(() => { onSeverity(displayedSeverity) }, [displayedSeverity, onSeverity])
+  // 深刻度の通知は初回の確定後だけ送る(#518 中2)。読み込み中の `unknown`
+  // や自動更新のたびに送ると、親の表示が警告へちらつく。
+  useEffect(() => { if (hasLoaded.current) onSeverity(displayedSeverity) }, [displayedSeverity, onSeverity])
 
   return (
     <div className="space-y-4" data-design="V3 Health">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <SummaryCard label="全体の状態" value={resultTitle} note={loading ? '確認中' : '最新結果'} />
+        <SummaryCard label="全体の状態" value={resultTitle} note={loading ? '確認中' : refreshing ? '更新中' : '最新結果'} />
         <SummaryCard label="最後の確認" value={formatOperationDate(checkedAt)} note="5分ごとに自動確認" />
         <SummaryCard label="緊急停止状態" value={controlSummary.value} note={controlSummary.note} />
       </div>
@@ -545,7 +561,18 @@ function HistoryPanel() {
     .slice(0, 4)
 
   const downloadCsv = () => {
-    const quote = (value: unknown) => `"${String(value ?? '').replaceAll('"', '""')}"`
+    /**
+     * 数式インジェクション対策(#518 中3)。
+     *
+     * 停止理由・補足・担当者は運用者の自由文で、先頭が `= + - @` のまま
+     * Excel で開くと数式として実行され得る。先頭に `'` を付けて無害化する
+     * (成果地点の書き出し `csvCell` と同じ約束)。
+     */
+    const quote = (value: unknown) => {
+      const raw = String(value ?? '')
+      const safe = /^[=+\-@]/.test(raw) ? `'${raw}` : raw
+      return `"${safe.replaceAll('"', '""')}"`
+    }
     const rows = entries.map((item) => [
       item.createdAt,
       item.actorId,
