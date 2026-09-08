@@ -399,7 +399,13 @@ export async function processMultiAccountDedupBroadcast(
       const missing = new Set<string>();
       for (const part of sourceParts) {
         for (const match of part.messageContent.matchAll(/\{\{\s*var\.([a-z][a-z0-9_]*)\s*\}\}/g)) {
-          if (!(match[1] in accountVars)) missing.add(match[1]);
+          // `in` は継承プロパティ (constructor 等) も存在扱いにするため使わない。
+          // 自前プロパティかつ文字列値のときだけ定義済みとし、旧 NULL 行は
+          // 未定義扱い (送信に使わない)。
+          const value: unknown = accountVars[match[1]];
+          if (!Object.hasOwn(accountVars, match[1]) || typeof value !== 'string') {
+            missing.add(match[1]);
+          }
         }
       }
       if (missing.size > 0) {
