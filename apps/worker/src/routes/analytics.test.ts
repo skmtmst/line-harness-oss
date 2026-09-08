@@ -82,7 +82,26 @@ staffApp.use('*', async (c, next) => {
   return next();
 });
 staffApp.route('/', analytics);
-const env = { DB: {} as D1Database };
+// 実行間隔ガード(点検#508の中4)が読む最小の入れ物。テストごとに中身を変える。
+const guardRows: { crossBusy: { id: string } | null; lastFunnelRunAt: string | null } = {
+  crossBusy: null,
+  lastFunnelRunAt: null,
+};
+const env = {
+  DB: {
+    prepare: (sql: string) => ({
+      bind: () => ({
+        first: async () => {
+          if (sql.includes('FROM analytics_cross_runs')) return guardRows.crossBusy;
+          if (sql.includes('FROM analytics_funnel_runs')) {
+            return guardRows.lastFunnelRunAt ? { created_at: guardRows.lastFunnelRunAt } : null;
+          }
+          return null;
+        },
+      }),
+    }),
+  } as unknown as D1Database,
+};
 
 function req(path: string, method = 'GET', body?: unknown) {
   return app.fetch(
@@ -110,6 +129,8 @@ const FUNNEL = { id: 'fn-1', line_account_id: 'account-a', name: '購入まで',
 
 beforeEach(() => {
   vi.clearAllMocks();
+  guardRows.crossBusy = null;
+  guardRows.lastFunnelRunAt = null;
   mocks.getStaffById.mockResolvedValue({ account_scope: 'all' });
   mocks.getStaffAccountScopeIds.mockResolvedValue([]);
   mocks.getDailyMessageCounts.mockResolvedValue([]);
@@ -345,6 +366,14 @@ describe('V6クロス分析API', () => {
     expect(await res.json()).toMatchObject({ data: { id: 'cross-1', state: 'pending' } });
   });
 
+  it('終わっていない集計がある間は受け付けず429にする(点検#508の中4)', async () => {
+    guardRows.crossBusy = { id: 'cross-0' };
+    const res = await req(`/api/analytics/cross/query?${ACCOUNT}`, 'POST', body);
+    expect(res.status).toBe(429);
+    expect(await res.json()).toMatchObject({ success: false, error: 'analytics_cross_busy' });
+    expect(mocks.createAnalyticsCrossRun).not.toHaveBeenCalled();
+  });
+
   it('選択中アカウント内の結果だけを返す', async () => {
     const res = await req(`/api/analytics/cross/results/cross-1?${ACCOUNT}`);
     expect(res.status).toBe(200);
@@ -570,6 +599,27 @@ describe('V6ファネルAPI', () => {
     const res = await req(`/api/analytics/funnels/fn-1/runs/latest?${ACCOUNT}`);
     expect(res.status).toBe(200);
     expect(mocks.getLatestFunnelRun).toHaveBeenCalledWith(env.DB, 'account-a', 'fn-1');
+  });
+
+  it('同一ファネルの60秒以内の再集計は429にする(点検#508の中4)', async () => {
+    guardRows.lastFunnelRunAt = new Date().toISOString();
+    const res = await req(`/api/analytics/funnels/fn-1/run?${ACCOUNT}`, 'POST', {
+      cohortFrom: '2026-08-01T00:00:00.000+09:00',
+      cohortTo: '2026-08-10T23:59:59.999+09:00',
+    });
+    expect(res.status).toBe(429);
+    expect(await res.json()).toMatchObject({ success: false, error: 'analytics_funnel_too_soon' });
+    expect(mocks.runChronologicalFunnel).not.toHaveBeenCalled();
+  });
+
+  it('61秒前の再集計は受け付ける(点検#508の中4)', async () => {
+    guardRows.lastFunnelRunAt = new Date(Date.now() - 61_000).toISOString();
+    const res = await req(`/api/analytics/funnels/fn-1/run?${ACCOUNT}`, 'POST', {
+      cohortFrom: '2026-08-01T00:00:00.000+09:00',
+      cohortTo: '2026-08-10T23:59:59.999+09:00',
+    });
+    expect(res.status).toBe(201);
+    expect(mocks.runChronologicalFunnel).toHaveBeenCalled();
   });
 
   it('時刻にタイムゾーンがなければ集計しない', async () => {

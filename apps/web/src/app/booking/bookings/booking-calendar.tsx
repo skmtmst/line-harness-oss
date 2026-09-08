@@ -45,6 +45,8 @@ function longDateLabel(day: string): string {
   })
 }
 
+const sep = '\u0000'
+
 function bookingHour(booking: BookingRequest): number {
   return new Date(new Date(booking.starts_at).getTime() + 9 * 3_600_000).getUTCHours()
 }
@@ -143,6 +145,17 @@ function DayGrid({ items, staff, onOpen }: {
   onOpen: (id: string) => void
 }) {
   const columns = `64px repeat(${Math.max(staff.length, 1)}, minmax(0, 1fr))`
+  // 格子ごとにfilterし直さない。時間×担当の辞書へ1回で束ねる(点検#516の中1)。
+  const cells = useMemo(() => {
+    const map = new Map<string, BookingRequest[]>()
+    for (const booking of items) {
+      const key = String(bookingHour(booking)) + sep + booking.staff_name
+      const list = map.get(key)
+      if (list) list.push(booking)
+      else map.set(key, [booking])
+    }
+    return map
+  }, [items])
   return (
     <div className="min-w-0">
       <div className="border-hairline grid border-b bg-canvas-sunken" style={{ gridTemplateColumns: columns }}>
@@ -153,7 +166,7 @@ function DayGrid({ items, staff, onOpen }: {
         <div key={hour} className="border-hairline grid min-h-14 border-b last:border-b-0" style={{ gridTemplateColumns: columns }}>
           <div className="text-ink-secondary px-2 py-2 text-xs font-semibold tabular-nums">{hour}:00</div>
           {staff.map((name) => {
-            const cell = items.filter((booking) => booking.staff_name === name && bookingHour(booking) === hour)
+            const cell = cells.get(String(hour) + sep + name) ?? []
             return (
               <div key={name} className="border-hairline flex min-w-0 items-center border-l p-1">
                 {cell.length > 0
@@ -174,12 +187,31 @@ function WeekGrid({ days, items, onOpen }: {
   onOpen: (id: string) => void
 }) {
   const columns = '64px repeat(7, minmax(0, 1fr))'
+  // 格子ごとにfilterし直さない。日×時間の辞書へ1回で束ねる(点検#516の中1)。
+  const cells = useMemo(() => {
+    const map = new Map<string, BookingRequest[]>()
+    for (const booking of items) {
+      const key = jstDay(booking.starts_at) + sep + String(bookingHour(booking))
+      const list = map.get(key)
+      if (list) list.push(booking)
+      else map.set(key, [booking])
+    }
+    return map
+  }, [items])
+  const dayCounts = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const booking of items) {
+      const day = jstDay(booking.starts_at)
+      map.set(day, (map.get(day) ?? 0) + 1)
+    }
+    return map
+  }, [items])
   return (
     <div className="min-w-0">
       <div className="border-hairline grid border-b bg-canvas-sunken" style={{ gridTemplateColumns: columns }}>
         <div />
         {days.map((day) => {
-          const count = items.filter((booking) => jstDay(booking.starts_at) === day).length
+          const count = dayCounts.get(day) ?? 0
           return (
             <div key={day} className="border-hairline border-l px-1 py-2 text-center">
               <p className="text-ink text-xs font-semibold">{dateLabel(day)}</p>
@@ -192,7 +224,7 @@ function WeekGrid({ days, items, onOpen }: {
         <div key={hour} className="border-hairline grid min-h-14 border-b last:border-b-0" style={{ gridTemplateColumns: columns }}>
           <div className="text-ink-secondary px-2 py-2 text-xs font-semibold tabular-nums">{hour}:00</div>
           {days.map((day) => {
-            const cell = items.filter((booking) => jstDay(booking.starts_at) === day && bookingHour(booking) === hour)
+            const cell = cells.get(day + sep + String(hour)) ?? []
             return (
               <div key={day} className="border-hairline flex min-w-0 items-center border-l p-1">
                 {cell.length > 0
@@ -242,7 +274,7 @@ export default function BookingCalendar({ mode, items, onOpen }: {
     <div data-design-node={mode === 'day' ? 'TV2DI' : 'SbuUI'}>
       <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Kpi title={mode === 'day' ? '今日の予約' : '今週の予約'} value={`${visible.length}件`} detail={`LINEから ${lineCount}・電話 ${phoneCount}`} />
-        <Kpi title={mode === 'day' ? 'まだ空いている枠' : 'うまっている割合'} value={mode === 'day' ? `${available}枠` : `${Math.round((visible.length / Math.max(1, visible.length + available)) * 100)}%`} detail={mode === 'day' ? '時間と担当から確認できます' : `${visible.length + available}枠のうち ${visible.length}枠`} />
+        <Kpi title={mode === 'day' ? 'まだ空いている枠' : 'うまっている割合'} value={mode === 'day' ? `${available}枠` : `${Math.round((visible.length / Math.max(1, visible.length + available)) * 100)}%`} detail={mode === 'day' ? '目安です。同時受付数は含みません' : `${visible.length + available}枠のうち ${visible.length}枠`} />
         <Kpi title={mode === 'day' ? '未承認・要対応' : 'あいている枠'} value={mode === 'day' ? `${requested}件` : `${available}枠`} detail={requested > 0 ? '確認が必要です' : '現在、確認待ちはありません'} />
         <Kpi title="キャンセル" value={`${cancelled}件`} detail={mode === 'day' ? '選んだ日' : 'この1週間'} />
       </div>
