@@ -379,7 +379,9 @@ function sortRecordKeys(value: unknown): unknown {
 /**
  * 友だち条件JSONを意味で比べられる形に直す。整形・キー順の違いを吸収する。
  * rules / groups の並びは AND・OR のどちらでも意味を変えないため、
- * 並べ替えてから比べる。読めない値は null を返す。
+ * 入れ子グループの中まで再帰的に並べ替えてから比べる。
+ * ルール値の中の配列（IDの一覧など）は順番に意味がある場合があるため並べ替えない。
+ * 読めない値は null を返す。
  */
 export function canonicalizeFriendAddCondition(value: unknown): string | null {
   const raw = normalizeFriendAddCondition(value);
@@ -387,23 +389,34 @@ export function canonicalizeFriendAddCondition(value: unknown): string | null {
   try {
     const parsed = JSON.parse(raw) as { rules?: unknown[]; groups?: unknown[] } & Record<string, unknown>;
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-    const sorted = sortRecordKeys(parsed) as { rules?: unknown[]; groups?: unknown[] } & Record<string, unknown>;
-    if (Array.isArray(sorted.rules)) {
-      sorted.rules = [...sorted.rules]
-        .map((rule) => JSON.stringify(sortRecordKeys(rule)))
-        .sort()
-        .map((item) => JSON.parse(item) as unknown);
-    }
-    if (Array.isArray(sorted.groups)) {
-      sorted.groups = [...sorted.groups]
-        .map((group) => JSON.stringify(sortRecordKeys(group)))
-        .sort()
-        .map((item) => JSON.parse(item) as unknown);
-    }
-    return JSON.stringify(sortRecordKeys(sorted));
+    return JSON.stringify(canonicalizeConditionNode(parsed));
   } catch {
     return null;
   }
+}
+
+/**
+ * 条件ツリーを再帰的に正規化する。各階層の rules / groups 配列を
+ * 正規化後の字面で並べ替え、入れ子の並び違いも吸収する。
+ */
+function canonicalizeConditionNode(node: unknown): unknown {
+  if (node && typeof node === 'object' && !Array.isArray(node)) {
+    const record = node as Record<string, unknown>;
+    const sorted: Record<string, unknown> = {};
+    for (const key of Object.keys(record).sort()) {
+      const child = record[key];
+      if ((key === 'rules' || key === 'groups') && Array.isArray(child)) {
+        sorted[key] = child
+          .map((item) => JSON.stringify(canonicalizeConditionNode(item)))
+          .sort()
+          .map((item) => JSON.parse(item) as unknown);
+      } else {
+        sorted[key] = sortRecordKeys(child);
+      }
+    }
+    return sorted;
+  }
+  return sortRecordKeys(node);
 }
 
 /** 条件が実質「絞り込みなし」か。空文字と、空の構造化JSONを同じ扱いにする。 */

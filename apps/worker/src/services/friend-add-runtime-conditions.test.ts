@@ -155,6 +155,60 @@ describe('競合確認と本番で同じ重なり関数', () => {
     expect(areFriendAddConditionsOverlapping('', compact)).toBe(false);
   });
 
+  test('入れ子ORグループ内の並びが違っても競合を見逃さない', () => {
+    const ruleA = { type: 'tag_exists', value: 'tag-1' };
+    const ruleB = { type: 'is_following', value: true };
+    // ORグループ内で同じ2条件を逆順に置いた同義条件は競合にする
+    const left = JSON.stringify({
+      operator: 'AND',
+      rules: [],
+      groups: [{ operator: 'OR', rules: [ruleA, ruleB] }],
+    });
+    const right = JSON.stringify({
+      operator: 'AND',
+      rules: [],
+      groups: [{ operator: 'OR', rules: [ruleB, ruleA] }],
+    });
+    expect(areFriendAddConditionsOverlapping(left, right)).toBe(true);
+    // 孫グループの並び違いも吸収する
+    const grandLeft = JSON.stringify({
+      operator: 'AND',
+      rules: [],
+      groups: [
+        {
+          operator: 'OR',
+          rules: [],
+          groups: [
+            { operator: 'AND', rules: [ruleA, ruleB] },
+            { operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-2' }] },
+          ],
+        },
+      ],
+    });
+    const grandRight = JSON.stringify({
+      operator: 'AND',
+      rules: [],
+      groups: [
+        {
+          operator: 'OR',
+          rules: [],
+          groups: [
+            { operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-2' }] },
+            { operator: 'AND', rules: [ruleB, ruleA] },
+          ],
+        },
+      ],
+    });
+    expect(areFriendAddConditionsOverlapping(grandLeft, grandRight)).toBe(true);
+    // 入れ子の中身が違うものは競合にしない
+    const different = JSON.stringify({
+      operator: 'AND',
+      rules: [],
+      groups: [{ operator: 'OR', rules: [ruleA, { type: 'tag_exists', value: 'tag-9' }] }],
+    });
+    expect(areFriendAddConditionsOverlapping(left, different)).toBe(false);
+  });
+
   test('旧形式の字面はそのまま比べ、JSONは正規化できる', () => {
     expect(areFriendAddConditionsOverlapping('メモA', 'メモA')).toBe(true);
     expect(areFriendAddConditionsOverlapping('メモA', 'メモB')).toBe(false);
