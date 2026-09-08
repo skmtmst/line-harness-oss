@@ -24,6 +24,8 @@ const dbMocks = {
   markRichMenuGroupPublished: vi.fn(),
   getLineAccountById: vi.fn(),
   getFollowingLineUserIdsByTag: vi.fn(),
+  listRichMenuSchedulesByGroup: vi.fn(),
+  cancelRichMenuSchedule: vi.fn(),
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
@@ -414,6 +416,55 @@ describe('V6 targeting preview and publish schedule', () => {
     });
 
     expect(res.status).toBe(403);
+  });
+});
+
+describe('GET schedules and POST cancel (E-08 #621)', () => {
+  test('予約一覧は状態と再試行時刻を返す', async () => {
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue({ id: 'g1', account_id: 'acc-1' });
+    dbMocks.listRichMenuSchedulesByGroup.mockResolvedValue([{
+      id: 's1', mode: 'scheduled', starts_at: '2026-09-10T01:00:00.000Z', ends_at: null,
+      status: 'scheduled', attempt_count: 1, next_retry_at: '2026-09-10T01:01:00.000Z',
+      last_error_code: 'fetch failed', created_at: '2026-09-06',
+    }]);
+    const res = await setupApp().request('/api/rich-menu-groups/g1/schedules');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      data: [{ id: 's1', status: 'scheduled', attemptCount: 1 }],
+    });
+  });
+
+  test('見えないアカウントの予約一覧は404で隠す', async () => {
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue({ id: 'g1', account_id: 'acc-1' });
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
+    const res = await setupApp().request('/api/rich-menu-groups/g1/schedules');
+    expect(res.status).toBe(404);
+  });
+
+  test('実行前の取消ができる', async () => {
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue({ id: 'g1', account_id: 'acc-1' });
+    dbMocks.cancelRichMenuSchedule.mockResolvedValue(true);
+    const res = await setupApp().request('/api/rich-menu-groups/g1/schedules/s1/cancel', { method: 'POST' });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ success: true, data: { id: 's1', status: 'cancelled' } });
+  });
+
+  test('実行が始まった取消は409で最新状態を返す', async () => {
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue({ id: 'g1', account_id: 'acc-1' });
+    dbMocks.cancelRichMenuSchedule.mockResolvedValue(false);
+    dbMocks.listRichMenuSchedulesByGroup.mockResolvedValue([{ id: 's1', status: 'publishing' }]);
+    const res = await setupApp().request('/api/rich-menu-groups/g1/schedules/s1/cancel', { method: 'POST' });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ success: false, status: 'publishing' });
+  });
+
+  test('別グループの予約は取り消さない', async () => {
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue({ id: 'g1', account_id: 'acc-1' });
+    dbMocks.cancelRichMenuSchedule.mockResolvedValue(false);
+    dbMocks.listRichMenuSchedulesByGroup.mockResolvedValue([]);
+    const res = await setupApp().request('/api/rich-menu-groups/g1/schedules/other/cancel', { method: 'POST' });
+    expect(res.status).toBe(404);
   });
 });
 

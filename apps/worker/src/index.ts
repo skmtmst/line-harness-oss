@@ -1648,6 +1648,343 @@ async function scheduled(
     console.error('common-var schedule error:', e);
   }
 
+  // E-08 (#621): 保存済みリッチメニュー公開予約を時刻到来時に実行する。
+  // 予約時のスナップショットを公開し、期間モードは終了時に元メニューへ戻す。
+  // 失敗しても他の処理は続ける。実LINE送信はここで行うが、DB配備は別工程。
+  try {
+    const { processDueRichMenuSchedules } = await import('./services/rich-menu-schedule-executor.js');
+    const {
+      getRichMenuGroupWithPages,
+      getLineAccountById,
+      getTrackedLinkById,
+      setPageRichMenuId,
+      markRichMenuGroupPublished,
+      markRichMenuGroupUnpublished,
+    } = await import('@line-crm/db');
+    const { publishRichMenuGroup } = await import('./lib/rich-menu-publisher.js');
+    const r2Adapter = {
+      async get(key: string) {
+        const obj = await env.IMAGES.get(key);
+        if (!obj) return null;
+        return { body: obj.body as ReadableStream };
+      },
+    };
+    const buildGroupInput = async (snapshot: unknown, fallbackGroupId: string) => {
+      const record = snapshot as {
+        id?: string; size?: 'large' | 'compact'; chatBarText?: string;
+        isDefaultForAll?: boolean; pages?: Array<{
+          id: string; orderIndex: number; name: string;
+          imageR2Key: string | null; imageContentType: string | null;
+          lineRichmenuId: string | null;
+          areas: Array<{
+            id: string; boundsX: number; boundsY: number; boundsWidth: number; boundsHeight: number;
+            actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch';
+            actionData: Record<string, unknown>; intent: null | string;
+            label: string | null; tagIds: string[]; scoreChange: number | null;
+            templateId: string | null; formId: string | null; trackedLinkId: string | null;
+          }>;
+        }>;
+      };
+      const groupId = typeof record.id === 'string' ? record.id : fallbackGroupId;
+      const group = await getRichMenuGroupWithPages(env.DB, groupId);
+      const account = group ? await getLineAccountById(env.DB, group.account_id) : null;
+      const formBaseUrl = account && (account as { liff_id?: string | null }).liff_id
+        ? `https://liff.line.me/${(account as { liff_id: string }).liff_id}`
+        : (env.LIFF_URL ?? null);
+      const trackedUrls = new Map<string, string>();
+      for (const page of record.pages ?? []) {
+        for (const area of page.areas ?? []) {
+          if (area.trackedLinkId && !trackedUrls.has(area.trackedLinkId)) {
+            const link = await getTrackedLinkById(env.DB, area.trackedLinkId);
+            if (link) trackedUrls.set(area.trackedLinkId, `${formBaseUrl ?? ''}/t/${link.short_code ?? link.id}`);
+          }
+        }
+      }
+      return {
+        groupIdForDb: groupId,
+        account,
+        input: {
+          id: groupId,
+          size: record.size ?? 'large',
+          chatBarText: record.chatBarText ?? '',
+          isDefaultForAll: record.isDefaultForAll ?? false,
+          formBaseUrl,
+          pages: (record.pages ?? []).map((page) => ({
+            id: page.id,
+            orderIndex: page.orderIndex,
+            name: page.name,
+            imageR2Key: page.imageR2Key,
+            imageContentType: page.imageContentType,
+            lineRichMenuId: page.lineRichmenuId,
+            areas: (page.areas ?? []).map((area) => ({
+              id: area.id,
+              bounds: { x: area.boundsX, y: area.boundsY, width: area.boundsWidth, height: area.boundsHeight },
+              actionType: area.actionType,
+              actionData: area.actionData,
+              intent: area.intent as null,
+              label: area.label,
+              tagIds: area.tagIds,
+              scoreChange: area.scoreChange,
+              templateId: area.templateId,
+              formId: area.formId,
+              trackedLinkUrl: area.trackedLinkId ? (trackedUrls.get(area.trackedLinkId) ?? null) : null,
+            })),
+          })),
+        },
+      };
+    };
+    const result = await processDueRichMenuSchedules(env.DB, {
+      getGroupWithPages: (db, groupId) => getRichMenuGroupWithPages(db, groupId),
+      getLineAccount: (db, accountId) => getLineAccountById(db, accountId) as Promise<{
+        id: string; channel_access_token: string | null;
+      } | null>,
+      publishSnapshot: async (snapshot, schedule) => {
+        const built = await buildGroupInput(snapshot, schedule.group_id);
+        if (!built.account) throw new Error('line account not found');
+        // routes の createLineClient と同じ実装をここで再現する。
+        const auth = `Bearer ${built.account.channel_access_token}`;
+        const line = {
+          async createRichMenu(payload: unknown) {
+            const res = await fetch('https://api.line.me/v2/bot/richmenu', {
+              method: 'POST',
+              headers: { Authorization: auth, 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+            if (!res.ok) throw new Error(`LINE createRichMenu failed: ${res.status} ${await res.text()}`);
+            return res.json() as Promise<{ richMenuId: string }>;
+          },
+          async uploadRichMenuImage(richMenuId: string, image: Uint8Array, contentType: string) {
+            const res = await fetch(`https://api-data.line.me/v2/bot/richmenu/${richMenuId}/content`, {
+              method: 'POST',
+              headers: { Authorization: auth, 'Content-Type': contentType },
+              body: image,
+            });
+            if (!res.ok) throw new Error(`LINE uploadRichMenuImage failed: ${res.status} ${await res.text()}`);
+          },
+          async deleteRichMenuAlias(aliasId: string) {
+            const res = await fetch(`https://api.line.me/v2/bot/richmenu/alias/${aliasId}`, {
+              method: 'DELETE',
+              headers: { Authorization: auth },
+            });
+            if (!res.ok && res.status !== 404) throw new Error(`LINE deleteRichMenuAlias failed: ${res.status}`);
+          },
+          async createRichMenuAlias(aliasId: string, richMenuId: string) {
+            const res = await fetch('https://api.line.me/v2/bot/richmenu/alias', {
+              method: 'POST',
+              headers: { Authorization: auth, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ richMenuAliasId: aliasId, richMenuId }),
+            });
+            if (!res.ok) throw new Error(`LINE createRichMenuAlias failed: ${res.status}`);
+          },
+          async upsertRichMenuAlias(aliasId: string, richMenuId: string) {
+            const res = await fetch(`https://api.line.me/v2/bot/richmenu/alias/${aliasId}`, {
+              method: 'POST',
+              headers: { Authorization: auth, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ richMenuId }),
+            });
+            if (res.ok) return;
+            if (res.status === 404) {
+              const createRes = await fetch('https://api.line.me/v2/bot/richmenu/alias', {
+                method: 'POST',
+                headers: { Authorization: auth, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ richMenuAliasId: aliasId, richMenuId }),
+              });
+              if (createRes.ok) return;
+              throw new Error(`LINE createRichMenuAlias failed: ${createRes.status}`);
+            }
+            throw new Error(`LINE updateRichMenuAlias failed: ${res.status}`);
+          },
+          async deleteRichMenu(richMenuId: string) {
+            const res = await fetch(`https://api.line.me/v2/bot/richmenu/${richMenuId}`, {
+              method: 'DELETE',
+              headers: { Authorization: auth },
+            });
+            if (!res.ok && res.status !== 404) throw new Error(`LINE deleteRichMenu failed: ${res.status}`);
+          },
+          async setDefaultRichMenu(richMenuId: string) {
+            const res = await fetch(`https://api.line.me/v2/bot/user/all/richmenu/${richMenuId}`, {
+              method: 'POST',
+              headers: { Authorization: auth },
+            });
+            if (!res.ok) throw new Error(`LINE setDefaultRichMenu failed: ${res.status}`);
+          },
+          async clearDefaultRichMenu() {
+            const res = await fetch('https://api.line.me/v2/bot/user/all/richmenu', {
+              method: 'DELETE',
+              headers: { Authorization: auth },
+            });
+            if (!res.ok && res.status !== 404) throw new Error(`LINE clearDefaultRichMenu failed: ${res.status}`);
+          },
+          async getCurrentDefaultRichMenuId() {
+            const res = await fetch('https://api.line.me/v2/bot/user/all/richmenu', {
+              method: 'GET',
+              headers: { Authorization: auth },
+            });
+            if (res.status === 404) return null;
+            if (!res.ok) throw new Error(`LINE getCurrentDefaultRichMenu failed: ${res.status}`);
+            const body = (await res.json()) as { richMenuId?: string };
+            return body.richMenuId ?? null;
+          },
+          async linkRichMenuBulk(richMenuId: string, userIds: string[]) {
+            const res = await fetch('https://api.line.me/v2/bot/richmenu/bulk/link', {
+              method: 'POST',
+              headers: { Authorization: auth, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ richMenuId, userIds }),
+            });
+            if (!res.ok) throw new Error(`LINE linkRichMenuBulk failed: ${res.status}`);
+          },
+        };
+        const published = await publishRichMenuGroup(built.input as never, line, r2Adapter);
+        for (const page of published.pages) {
+          await setPageRichMenuId(env.DB, page.pageId, page.newRichMenuId);
+        }
+        await markRichMenuGroupPublished(env.DB, built.groupIdForDb);
+      },
+      restoreToGroup: async (restoreGroupId, schedule) => {
+        if (!restoreGroupId) return;
+        const restore = await getRichMenuGroupWithPages(env.DB, restoreGroupId);
+        if (!restore) throw new Error('restoreGroupId must be a published menu');
+        const account = await getLineAccountById(env.DB, restore.account_id);
+        if (!account) throw new Error('line account not found');
+        const auth = `Bearer ${account.channel_access_token}`;
+        const line = {
+          async createRichMenu(payload: unknown) {
+            const res = await fetch('https://api.line.me/v2/bot/richmenu', {
+              method: 'POST',
+              headers: { Authorization: auth, 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+            if (!res.ok) throw new Error(`LINE createRichMenu failed: ${res.status} ${await res.text()}`);
+            return res.json() as Promise<{ richMenuId: string }>;
+          },
+          async uploadRichMenuImage(richMenuId: string, image: Uint8Array, contentType: string) {
+            const res = await fetch(`https://api-data.line.me/v2/bot/richmenu/${richMenuId}/content`, {
+              method: 'POST',
+              headers: { Authorization: auth, 'Content-Type': contentType },
+              body: image,
+            });
+            if (!res.ok) throw new Error(`LINE uploadRichMenuImage failed: ${res.status} ${await res.text()}`);
+          },
+          async deleteRichMenuAlias(aliasId: string) {
+            const res = await fetch(`https://api.line.me/v2/bot/richmenu/alias/${aliasId}`, {
+              method: 'DELETE',
+              headers: { Authorization: auth },
+            });
+            if (!res.ok && res.status !== 404) throw new Error(`LINE deleteRichMenuAlias failed: ${res.status}`);
+          },
+          async createRichMenuAlias(aliasId: string, richMenuId: string) {
+            const res = await fetch('https://api.line.me/v2/bot/richmenu/alias', {
+              method: 'POST',
+              headers: { Authorization: auth, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ richMenuAliasId: aliasId, richMenuId }),
+            });
+            if (!res.ok) throw new Error(`LINE createRichMenuAlias failed: ${res.status}`);
+          },
+          async upsertRichMenuAlias(aliasId: string, richMenuId: string) {
+            const res = await fetch(`https://api.line.me/v2/bot/richmenu/alias/${aliasId}`, {
+              method: 'POST',
+              headers: { Authorization: auth, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ richMenuId }),
+            });
+            if (res.ok) return;
+            if (res.status === 404) {
+              const createRes = await fetch('https://api.line.me/v2/bot/richmenu/alias', {
+                method: 'POST',
+                headers: { Authorization: auth, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ richMenuAliasId: aliasId, richMenuId }),
+              });
+              if (createRes.ok) return;
+              throw new Error(`LINE createRichMenuAlias failed: ${createRes.status}`);
+            }
+            throw new Error(`LINE updateRichMenuAlias failed: ${res.status}`);
+          },
+          async deleteRichMenu(richMenuId: string) {
+            const res = await fetch(`https://api.line.me/v2/bot/richmenu/${richMenuId}`, {
+              method: 'DELETE',
+              headers: { Authorization: auth },
+            });
+            if (!res.ok && res.status !== 404) throw new Error(`LINE deleteRichMenu failed: ${res.status}`);
+          },
+          async setDefaultRichMenu(richMenuId: string) {
+            const res = await fetch(`https://api.line.me/v2/bot/user/all/richmenu/${richMenuId}`, {
+              method: 'POST',
+              headers: { Authorization: auth },
+            });
+            if (!res.ok) throw new Error(`LINE setDefaultRichMenu failed: ${res.status}`);
+          },
+          async clearDefaultRichMenu() {
+            const res = await fetch('https://api.line.me/v2/bot/user/all/richmenu', {
+              method: 'DELETE',
+              headers: { Authorization: auth },
+            });
+            if (!res.ok && res.status !== 404) throw new Error(`LINE clearDefaultRichMenu failed: ${res.status}`);
+          },
+          async getCurrentDefaultRichMenuId() {
+            const res = await fetch('https://api.line.me/v2/bot/user/all/richmenu', {
+              method: 'GET',
+              headers: { Authorization: auth },
+            });
+            if (res.status === 404) return null;
+            if (!res.ok) throw new Error(`LINE getCurrentDefaultRichMenu failed: ${res.status}`);
+            const body = (await res.json()) as { richMenuId?: string };
+            return body.richMenuId ?? null;
+          },
+          async linkRichMenuBulk(richMenuId: string, userIds: string[]) {
+            const res = await fetch('https://api.line.me/v2/bot/richmenu/bulk/link', {
+              method: 'POST',
+              headers: { Authorization: auth, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ richMenuId, userIds }),
+            });
+            if (!res.ok) throw new Error(`LINE linkRichMenuBulk failed: ${res.status}`);
+          },
+        };
+        const formBaseUrl = (account as { liff_id?: string | null }).liff_id
+          ? `https://liff.line.me/${(account as { liff_id: string }).liff_id}`
+          : (env.LIFF_URL ?? null);
+        const published = await publishRichMenuGroup({
+          id: restore.id,
+          size: restore.size,
+          chatBarText: restore.chat_bar_text,
+          isDefaultForAll: restore.is_default_for_all === 1,
+          formBaseUrl,
+          pages: restore.pages.map((page) => ({
+            id: page.id,
+            orderIndex: page.order_index,
+            name: page.name,
+            imageR2Key: page.image_r2_key,
+            imageContentType: page.image_content_type,
+            lineRichMenuId: page.line_richmenu_id,
+            areas: page.areas.map((area) => ({
+              id: area.id,
+              bounds: { x: area.bounds_x, y: area.bounds_y, width: area.bounds_width, height: area.bounds_height },
+              actionType: area.action_type,
+              actionData: area.actionData,
+              intent: area.intent,
+              label: area.label,
+              tagIds: area.tagIds,
+              scoreChange: area.score_change,
+              templateId: area.template_id,
+              formId: area.form_id,
+              trackedLinkUrl: null,
+            })),
+          })),
+        } as never, line, r2Adapter);
+        for (const page of published.pages) {
+          await setPageRichMenuId(env.DB, page.pageId, page.newRichMenuId);
+        }
+        await markRichMenuGroupPublished(env.DB, restore.id);
+        if (restore.id !== schedule.group_id) {
+          await markRichMenuGroupUnpublished(env.DB, schedule.group_id);
+        }
+      },
+    }, { now: new Date(event.scheduledTime) });
+    if (result.processed > 0) {
+      console.log(JSON.stringify({ event: 'rich_menu_schedule_tick', ...result }));
+    }
+  } catch (e) {
+    console.error('rich-menu schedule error:', e);
+  }
+
   // 予約画面の未予約、予約後の未視聴、フォーム途中離脱、回答後の相談未予約を
   // 段階別に自動追客する。対象は followup config で有効化したウェビナーだけ。
   try {

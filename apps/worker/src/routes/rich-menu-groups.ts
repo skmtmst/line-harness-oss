@@ -22,6 +22,8 @@ import {
   getRichMenuAudienceStats,
   recordRichMenuAssignmentsByLineUserIds,
   clearRichMenuAssignmentsForGroup,
+  listRichMenuSchedulesByGroup,
+  cancelRichMenuSchedule,
   jstNow,
   type RichMenuGroup,
   type RichMenuGroupWithPages,
@@ -1199,6 +1201,48 @@ richMenuGroups.post(
       )
       .run();
     return c.json({ success: true, data: { id, status: 'scheduled' } }, 201);
+  },
+);
+
+/** 予約一覧と状態確認。実行前取消の判断材料を返す。 */
+richMenuGroups.get('/api/rich-menu-groups/:groupId/schedules', async (c) => {
+  const group = await getRichMenuGroupWithPages(c.env.DB, c.req.param('groupId'));
+  if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
+    return c.json({ success: false, error: 'not found' }, 404);
+  }
+  const rows = await listRichMenuSchedulesByGroup(c.env.DB, group.id, 50);
+  return c.json({
+    success: true,
+    data: rows.map((row) => ({
+      id: row.id,
+      mode: row.mode,
+      startsAt: row.starts_at,
+      endsAt: row.ends_at,
+      status: row.status,
+      attemptCount: row.attempt_count,
+      nextRetryAt: row.next_retry_at,
+      lastErrorCode: row.last_error_code,
+      createdAt: row.created_at,
+    })),
+  });
+});
+
+/** 実行前の取消。publishing/restoring の最中は最新状態付きの409で止める。 */
+richMenuGroups.post(
+  '/api/rich-menu-groups/:groupId/schedules/:scheduleId/cancel',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const group = await getRichMenuGroupWithPages(c.env.DB, c.req.param('groupId'));
+    if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
+      return c.json({ success: false, error: 'not found' }, 404);
+    }
+    const scheduleId = c.req.param('scheduleId');
+    const cancelled = await cancelRichMenuSchedule(c.env.DB, scheduleId, group.id, group.account_id);
+    if (cancelled) return c.json({ success: true, data: { id: scheduleId, status: 'cancelled' } });
+    const rows = await listRichMenuSchedulesByGroup(c.env.DB, group.id, 200);
+    const current = rows.find((row) => row.id === scheduleId);
+    if (!current) return c.json({ success: false, error: 'not found' }, 404);
+    return c.json({ success: false, error: 'already started', status: current.status }, 409);
   },
 );
 
