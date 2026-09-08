@@ -434,3 +434,74 @@ describe('全体', () => {
     expect(partialFailures).toContain('friends');
   });
 });
+
+describe('今月の配信(#666 N-003)', () => {
+  function firstOfMonth(): string {
+    return `${jstDate(0).slice(0, 8)}01`;
+  }
+
+  function prevMonthLastDay(): string {
+    return new Date(Date.parse(`${firstOfMonth()}T00:00:00Z`) - 1000).toISOString().slice(0, 10);
+  }
+
+  function seedDelivery(): void {
+    insertAccount('account-a');
+    insertAccount('account-b');
+    insertFriend('friend-a', { lineAccountId: 'account-a' });
+    insertFriend('friend-b', { lineAccountId: 'account-b' });
+    const today = jstDate(0);
+    const first = firstOfMonth();
+    const prev = prevMonthLastDay();
+    const messages = [
+      // [id, friend, account, createdAt, source, counted]
+      ['m-today', 'friend-a', 'account-a', `${today}T10:00:00.000+09:00`, 'manual', true],
+      ['m-month', 'friend-a', 'account-a', `${first}T12:00:00.000+09:00`, 'scenario', true],
+      ['m-edge', 'friend-a', 'account-a', `${first}T00:00:00.000+09:00`, 'manual', true],
+      ['m-prev', 'friend-a', 'account-a', `${prev}T23:59:59.000+09:00`, 'manual', false],
+      ['m-other', 'friend-b', 'account-b', `${today}T10:00:00.000+09:00`, 'manual', false],
+    ] as const;
+    for (const [id, friend, account, createdAt, source] of messages) {
+      sqlite.prepare(
+        `INSERT INTO messages_log
+          (id, friend_id, direction, message_type, content, source, line_account_id, created_at)
+         VALUES (?, ?, 'outgoing', 'text', '本文', ?, ?, ?)`,
+      ).run(id, friend, source, account, createdAt);
+    }
+    const broadcasts = [
+      // [id, account, createdAt, status, counted]
+      ['b-today', 'account-a', `${today}T09:00:00.000+09:00`, 'sent', true],
+      ['b-edge', 'account-a', `${first}T00:00:00.000+09:00`, 'sent', true],
+      ['b-prev', 'account-a', `${prev}T23:59:59.000+09:00`, 'sent', false],
+      ['b-other', 'account-b', `${today}T09:00:00.000+09:00`, 'sent', false],
+      ['b-draft', 'account-a', `${today}T09:00:00.000+09:00`, 'draft', false],
+    ] as const;
+    for (const [id, account, createdAt, status] of broadcasts) {
+      sqlite.prepare(
+        `INSERT INTO broadcasts
+          (id, title, message_type, message_content, target_type, status, created_at, line_account_id, account_ids)
+         VALUES (?, ?, 'text', '本文', 'all', ?, ?, ?, NULL)`,
+      ).run(id, id, status, createdAt, account);
+    }
+  }
+
+  test('期間「今日」でも今月1日からの送信を数え、先月と他アカウントを混ぜない', async () => {
+    seedDelivery();
+    const overview = await getDashboardOverview(db, 'today', { allowedAccountIds: ['account-a'], includeUnassigned: false });
+    expect(overview.delivery.sent).toBe(3);
+    expect(overview.delivery.reply).toBe(2);
+    expect(overview.delivery.push).toBe(1);
+    expect(overview.delivery.broadcasts).toBe(2);
+  });
+
+  test('期間を切り替えても「今月の配信」の範囲は変わらず、区画の期間表示は this-month', async () => {
+    seedDelivery();
+    const scope = { allowedAccountIds: ['account-a'], includeUnassigned: false } as const;
+    for (const period of ['today', 'last7', 'last28'] as const) {
+      const overview = await getDashboardOverview(db, period, scope);
+      expect(overview.delivery.sent).toBe(3);
+      expect(overview.delivery.broadcasts).toBe(2);
+      expect(overview.sections.delivery.period).toBe('this-month');
+      expect(overview.period).toBe(period);
+    }
+  });
+});
