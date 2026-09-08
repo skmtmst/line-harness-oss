@@ -152,7 +152,7 @@ CREATE TABLE ad_conversion_logs (
   response_body       TEXT,
   error_message       TEXT,
   created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, idempotency_key TEXT);
 
 CREATE TABLE ad_platforms (
   id           TEXT PRIMARY KEY,
@@ -5100,6 +5100,9 @@ CREATE INDEX idx_action_score_rule_versions_set_status
 CREATE INDEX idx_ad_conversion_logs_account ON ad_conversion_logs(line_account_id);
 
 CREATE INDEX idx_ad_conversion_logs_friend ON ad_conversion_logs (friend_id);
+
+CREATE UNIQUE INDEX idx_ad_conversion_logs_idempotency
+  ON ad_conversion_logs(ad_platform_id, friend_id, event_name, idempotency_key);
 
 CREATE INDEX idx_ad_conversion_logs_platform ON ad_conversion_logs (ad_platform_id);
 
