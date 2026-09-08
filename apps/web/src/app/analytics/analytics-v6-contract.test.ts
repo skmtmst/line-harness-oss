@@ -76,7 +76,10 @@ describe('V6 機能20 分析', () => {
   it('結果待ちは打ち切りと間隔延長があり、無限に叩かない(点検#508の中2)', () => {
     expect(PAGE).not.toContain('setInterval')
     expect(PAGE).toContain('attempts >= 40')
-    expect(PAGE).toContain('時間切れです。条件をゆるめて集計し直してください')
+    // board #633独立再審査: 打ち切り後もrunを保持し再接続する。新規の送り直しは促さない。
+    expect(PAGE).toContain('自動の確認を止めました')
+    expect(PAGE).toContain('結果をもう一度確認')
+    expect(PAGE).not.toContain('時間切れです。条件をゆるめて集計し直してください')
     expect(PAGE).toContain('attempts < 10 ? 1500 : attempts < 30 ? 3000 : 5000')
   })
 
