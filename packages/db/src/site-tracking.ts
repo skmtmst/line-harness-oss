@@ -36,6 +36,7 @@ export interface SiteEvent {
   line_account_id: string | null;
   friend_id: string | null;
   event_type: string;
+  host: string | null;
   path: string | null;
   label: string | null;
   value_num: number | null;
@@ -64,6 +65,19 @@ export function sanitizePath(raw: unknown): string | null {
   if (schemeMatch) path = schemeMatch[1] ?? '/';
   if (path === '') return '/';
   return path.slice(0, 512);
+}
+
+/** 計測したページ自身のホスト。参照元(referrer)とは混ぜない。 */
+export function sanitizeHost(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const value = raw.trim().toLowerCase();
+  if (!value || value.length > 253 || /[/?#@\s]/.test(value)) return null;
+  try {
+    const hostname = new URL(`http://${value}`).hostname.replace(/^\[|\]$/g, '');
+    return hostname && hostname.length <= 253 ? hostname : null;
+  } catch {
+    return null;
+  }
 }
 
 /** リファラも同じ扱い。出どころは知りたいが、中身のパラメータは要らない。 */
@@ -183,6 +197,7 @@ export async function recordSiteEvent(
     visitorId: string;
     lineAccountId: string;
     eventType: SiteEventType;
+    host?: unknown;
     path?: unknown;
     label?: string | null;
     valueNum?: number | null;
@@ -193,8 +208,8 @@ export async function recordSiteEvent(
   await db
     .prepare(
       `INSERT INTO site_events
-         (id, visitor_id, line_account_id, friend_id, event_type, path, label, value_num, referrer, occurred_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, visitor_id, line_account_id, friend_id, event_type, host, path, label, value_num, referrer, occurred_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       crypto.randomUUID(),
@@ -202,6 +217,7 @@ export async function recordSiteEvent(
       input.lineAccountId,
       visitor.friend_id,
       input.eventType,
+      sanitizeHost(input.host),
       sanitizePath(input.path),
       input.label ? String(input.label).slice(0, 200) : null,
       input.valueNum ?? null,
@@ -215,21 +231,21 @@ export async function recordSiteEvent(
 export async function getPageViewSummary(
   db: D1Database,
   opts: { lineAccountId: string; from: string; to: string; limit?: number },
-): Promise<Array<{ path: string; views: number; visitors: number }>> {
+): Promise<Array<{ host: string | null; path: string; views: number; visitors: number }>> {
   const result = await db
     .prepare(
-      `SELECT path,
+      `SELECT host, path,
               COUNT(*) AS views,
               COUNT(DISTINCT visitor_id) AS visitors
          FROM site_events
         WHERE line_account_id = ? AND event_type = 'page_view' AND path IS NOT NULL
           AND occurred_at >= ? AND occurred_at <= ?
-        GROUP BY path
+        GROUP BY host, path
         ORDER BY views DESC
         LIMIT ?`,
     )
     .bind(opts.lineAccountId, opts.from, opts.to, opts.limit ?? 50)
-    .all<{ path: string; views: number; visitors: number }>();
+    .all<{ host: string | null; path: string; views: number; visitors: number }>();
   return result.results;
 }
 

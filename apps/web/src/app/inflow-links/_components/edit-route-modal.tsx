@@ -59,14 +59,15 @@ export default function EditRouteModal({
     }
     let cancelled = false
     ;(async () => {
-      const entries = await Promise.all(
-        pools.map(async (p) => {
-          const res = await api.pools.accounts.list(p.id)
-          const names = res.success ? res.data.map((m) => m.accountName ?? '—') : []
-          return [p.id, names] as const
-        }),
-      )
-      if (!cancelled) setPoolMembers(Object.fromEntries(entries))
+      const result = pools.length > 0
+        ? await api.pools.listAccounts(pools.map((pool) => pool.id))
+        : { success: true as const, data: [] }
+      if (!cancelled && result.success) {
+        setPoolMembers(Object.fromEntries(result.data.map(({ poolId, accounts }) => [
+          poolId,
+          accounts.filter((account) => account.isActive).map((account) => account.accountName ?? '—'),
+        ])))
+      }
     })()
     return () => {
       cancelled = true

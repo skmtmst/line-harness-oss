@@ -3955,12 +3955,12 @@ export const SITE_TRACKING_SUMMARY = {
   lastEventAt: '2026-08-25T11:17:00.000Z',
 }
 
-/* #514-14: 口(DB)はパスだけ保存する。完全URLの固定値は撮影でずれを隠すのでパス形にする。 */
+/* #514-14: 計測先ホストとパスを分け、本番と同じ形で返す。 */
 export const SITE_TRACKING_PAGES = [
-  { path: '/', views: 12480, visitors: 186 },
-  { path: '/shop/', views: 8120, visitors: 94 },
-  { path: '/lp/summer/', views: 2403, visitors: 2 },
-  { path: '/blog/unknown-page/', views: 620, visitors: 0 },
+  { host: 'shop.example.com', path: '/', views: 12480, visitors: 186 },
+  { host: 'shop.example.com', path: '/shop/', views: 8120, visitors: 94 },
+  { host: 'campaign.example.com', path: '/lp/summer/', views: 2403, visitors: 2 },
+  { host: null, path: '/blog/old-page/', views: 620, visitors: 0 },
 ]
 
 export const AD_PLATFORMS = [
