@@ -191,6 +191,34 @@ function readMaxRetries(raw: unknown): { ok: true; value: number } | { ok: false
 
 const MIN_SECRET_LENGTH = 32;
 
+const MAX_WEBHOOK_NAME_LENGTH = 120;
+const MAX_EVENT_TYPES = 20;
+const MAX_EVENT_TYPE_LENGTH = 100;
+
+/**
+ * 名前と種別の上限。極端な値で一覧表示が崩れる・DBが膨らむのを防ぐ(#506 軽)。
+ */
+function validateWebhookName(name: unknown): string | null {
+  if (typeof name !== 'string' || !name.trim()) return 'name is required';
+  if (name.trim().length > MAX_WEBHOOK_NAME_LENGTH) {
+    return `name must be ${MAX_WEBHOOK_NAME_LENGTH} characters or less`;
+  }
+  return null;
+}
+
+function validateEventTypes(eventTypes: unknown): string | null {
+  if (eventTypes === undefined) return null;
+  if (!Array.isArray(eventTypes) || eventTypes.length > MAX_EVENT_TYPES) {
+    return `eventTypes must be an array of at most ${MAX_EVENT_TYPES} items`;
+  }
+  for (const item of eventTypes) {
+    if (typeof item !== 'string' || !item.trim() || item.trim().length > MAX_EVENT_TYPE_LENGTH) {
+      return `each eventType must be 1-${MAX_EVENT_TYPE_LENGTH} characters`;
+    }
+  }
+  return null;
+}
+
 function validateSecret(secret: unknown): string | null {
   if (typeof secret !== 'string' || secret.length < MIN_SECRET_LENGTH) {
     return `secret must be at least ${MIN_SECRET_LENGTH} characters`;
@@ -371,8 +399,9 @@ webhooks.patch('/api/webhooks/incoming/:id/config', requireRole('owner'), async 
 webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
   try {
     const body = await c.req.json<{ name: string; sourceType?: string; secret?: string; lineAccountId: string }>();
-    if (!body.name) {
-      return c.json({ success: false, error: 'name is required' }, 400);
+    const nameError = validateWebhookName(body.name);
+    if (nameError) {
+      return c.json({ success: false, error: nameError }, 400);
     }
     const secretError = validateSecret(body.secret);
     if (secretError) {
@@ -422,6 +451,12 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
     const existing = await getIncomingWebhookById(c.env.DB, id, lineAccountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
     const body = await c.req.json<{ name?: string; sourceType?: string; secret?: string; isActive?: boolean }>();
+    if (body.name !== undefined) {
+      const nameError = validateWebhookName(body.name);
+      if (nameError) {
+        return c.json({ success: false, error: nameError }, 400);
+      }
+    }
     if (body.isActive !== undefined && typeof body.isActive !== 'boolean') {
       return c.json({ success: false, error: 'isActive must be a boolean' }, 400);
     }
@@ -554,8 +589,13 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
       maxRetries?: unknown;
       lineAccountId: string;
     }>();
-    if (!body.name) {
-      return c.json({ success: false, error: 'name is required' }, 400);
+    const nameError = validateWebhookName(body.name);
+    if (nameError) {
+      return c.json({ success: false, error: nameError }, 400);
+    }
+    const eventTypesError = validateEventTypes(body.eventTypes);
+    if (eventTypesError) {
+      return c.json({ success: false, error: eventTypesError }, 400);
     }
     const urlError = validateHttpsUrl(body.url);
     if (urlError) {
@@ -636,6 +676,16 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
         return c.json({ success: false, error: 'maxRetries must be an integer between 0 and 5' }, 400);
       }
       maxRetries = parsed.value;
+    }
+    if (body.name !== undefined) {
+      const nameError = validateWebhookName(body.name);
+      if (nameError) {
+        return c.json({ success: false, error: nameError }, 400);
+      }
+    }
+    const eventTypesError = validateEventTypes(body.eventTypes);
+    if (eventTypesError) {
+      return c.json({ success: false, error: eventTypesError }, 400);
     }
     if (body.isActive !== undefined && typeof body.isActive !== 'boolean') {
       return c.json({ success: false, error: 'isActive must be a boolean' }, 400);

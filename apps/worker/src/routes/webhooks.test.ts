@@ -1246,3 +1246,35 @@ describe('PATCH /api/webhooks/incoming/:id/config (#506 W5)', () => {
     expect(updateIncomingWebhookConfig).not.toHaveBeenCalled();
   });
 });
+
+describe('名前・種別の上限 (#506 軽)', () => {
+  const post = (path: string, body: unknown) => setupApp().request(
+    path,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+    baseEnv,
+  );
+  const validOutgoing = {
+    name: 'test', url: 'https://example.com/hook', eventTypes: ['order.created'],
+    secret: VALID_SECRET, lineAccountId: ACCOUNT_ID,
+  };
+
+  test('送り先の作成は名前121文字・種別21件・種別101文字を400で拒否する', async () => {
+    for (const body of [
+      { ...validOutgoing, name: 'あ'.repeat(121) },
+      { ...validOutgoing, eventTypes: Array.from({ length: 21 }, (_, i) => `type-${i}`) },
+      { ...validOutgoing, eventTypes: [`${'a'.repeat(101)}`] },
+    ]) {
+      const res = await post('/api/webhooks/outgoing', body);
+      expect(res.status).toBe(400);
+    }
+    expect(createOutgoingWebhook).not.toHaveBeenCalled();
+  });
+
+  test('受け取り口の作成は名前121文字を400で拒否する', async () => {
+    const res = await post('/api/webhooks/incoming', {
+      name: 'あ'.repeat(121), secret: VALID_SECRET, lineAccountId: ACCOUNT_ID,
+    });
+    expect(res.status).toBe(400);
+    expect(createIncomingWebhook).not.toHaveBeenCalled();
+  });
+});
