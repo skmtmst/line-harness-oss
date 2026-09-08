@@ -59,7 +59,7 @@ export async function runEventBookingExpirer(
       .bind(row.id)
       .run();
     // N-065: 期限切れも取消と同じく V6 の未送信予定だけを止める。送信済み履歴は残す。
-    // 1件の失敗で残りを止めないよう行単位で握る。再実行は active が無いため冪等。
+    // 1件の失敗で残りを止めないよう行単位で握る。失敗行は末尾の修復走査で拾い直す。
     try {
       await cancelByTrigger(db, {
         triggerType: 'event',
@@ -81,6 +81,45 @@ export async function runEventBookingExpirer(
       now: params.now,
     });
     expired++;
+  }
+
+  // 部分失敗の回復: 業務は終わっているのに V6 が active のまま残った行を止める。
+  // V6 取消が投げた行は次回 cron で拾い直す。手動取消・落選の取りこぼしも
+  // source 連動に限って拾う。legacy・手動登録には触れない。
+  // 修復自体の失敗で期限切れを壊さないよう外側でも握る。
+  try {
+    const leftovers = await db
+      .prepare(
+        `SELECT b.id, b.line_account_id, b.friend_id
+           FROM event_bookings b
+          WHERE b.status IN ('expired', 'cancelled', 'rejected')
+            AND EXISTS (
+              SELECT 1 FROM friend_reminders fr
+               WHERE fr.status = 'active' AND fr.source_kind = 'event'
+                 AND (fr.source_id = b.id OR fr.source_event_id = b.id)
+            )
+          LIMIT 50`,
+      )
+      .all<StaleRow>();
+    for (const row of leftovers.results ?? []) {
+      try {
+        await cancelByTrigger(db, {
+          triggerType: 'event',
+          sourceKind: 'event',
+          sourceId: row.id,
+          sourceEventId: row.id,
+          friendId: row.friend_id,
+          startsAtIso: row.starts_at,
+          lineAccountId: row.line_account_id,
+          cancelReason: `event_repair:${row.id}:by:system`,
+          allowLegacyFallback: false,
+        });
+      } catch (error) {
+        console.error('reminder repair (event leftover) failed:', error);
+      }
+    }
+  } catch (error) {
+    console.error('reminder repair (event leftover scan) failed:', error);
   }
 
   const idempotencyPurged = await purgeExpiredEventIdempotency(db, params.now);

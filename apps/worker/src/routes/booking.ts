@@ -2570,6 +2570,22 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
       staff_id: string;
     }>();
   if (!row) return c.json({ error: 'not_found' }, 404);
+  // 再試行の受付: V6 取消が投げた直後の再送は、業務が済みでも V6 だけ直す (409 にしない)。
+  if (
+    (b.action === 'cancel' || b.action === 'expire') &&
+    (row.status === 'cancelled' || row.status === 'expired')
+  ) {
+    await cancelByTrigger(c.env.DB, {
+      triggerType: 'booking',
+      sourceId: id,
+      sourceEventId: id,
+      friendId: row.friend_id,
+      startsAtIso: row.starts_at,
+      lineAccountId: accountId,
+      cancelReason: `booking_${row.status}:${id}:by:${c.get('staff')?.id ?? 'admin'}-retry`,
+    });
+    return c.json({ status: row.status });
+  }
   if (!canTransition(row.status, b.action)) {
     return c.json({ error: 'invalid_transition' }, 409);
   }
