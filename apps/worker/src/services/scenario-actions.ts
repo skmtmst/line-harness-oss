@@ -550,10 +550,12 @@ export async function resumePreviousScenario(
  * 共通情報の加算・減算。在庫や残席のような、店ぜんたいで1つの数に使う。
  *
  * 読み→計算→書き込みをそのまま書くと、同時に2件動いたときに両方が
- * 同じ古い値を読んで上書きし、片方の増減が消える。書き込み時に
- * 「読んだときの値のままか」を条件に入れ、変わっていたら読み直して
- * 計算し直す。D1 の1文は原子的なので、条件に合った更新だけが通り、
- * 並んだ更新は1件ずつ順に反映される。
+ * 同じ古い値を読んで上書きし、片方の増減が消える。値・版番号・履歴を
+ * 同じ batch で書き、版番号が進んでいたら読み直して計算し直す。D1 の
+ * batch は原子的なので、勝った更新だけが通り、並んだ更新は1件ずつ
+ * 順に反映される。版番号と履歴を進めるのは、画面編集・予約適用と同じ
+ * 契約にするため。進めないと、古い版番号のままの画面保存・予約適用が
+ * 通って加減算の結果を上書きできてしまう。
  */
 
 /** 同時更新のぶつかりで読み直す回数の上限。 */
@@ -570,26 +572,42 @@ async function applyCommonVar(
   for (let attempt = 0; attempt < COMMON_VAR_UPDATE_RETRIES; attempt++) {
     const row = await db
       .prepare(
-        `SELECT cv.value
+        `SELECT cv.id, cv.name, cv.value, cv.memo, cv.version
            FROM common_vars cv
            JOIN friends f ON f.line_account_id = cv.line_account_id
-          WHERE f.id = ? AND cv.var_key = ?`,
+          WHERE f.id = ? AND cv.var_key = ? AND cv.archived_at IS NULL`,
       )
       .bind(friendId, c.varKey)
-      .first<{ value: string | null }>()
+      .first<{ id: string; name: string; value: string | null; memo: string | null; version: number }>()
     if (!row) throw new Error(`common_var not found: ${c.varKey}`)
     const base = Number(row.value ?? 0)
     const safeBase = Number.isFinite(base) ? base : 0
-    const updated = await db
-      .prepare(
-        `UPDATE common_vars SET value = ?, updated_at = ?
-          WHERE var_key = ?
-            AND line_account_id = (SELECT line_account_id FROM friends WHERE id = ?)
-            AND value IS ?`,
-      )
-      .bind(String(safeBase + signed), jstNow(), c.varKey, friendId, row.value ?? null)
-      .run()
-    if ((updated.meta?.changes ?? 0) > 0) return
+    const next = String(safeBase + signed)
+    const nextVersion = row.version + 1
+    const now = jstNow()
+    const results = await db.batch([
+      db.prepare(
+        `UPDATE common_vars SET value = ?, version = ?, updated_at = ?
+          WHERE id = ? AND version = ? AND archived_at IS NULL`,
+      ).bind(next, nextVersion, now, row.id, row.version),
+      // 先に別更新が版を進めていたら、同じ版番号の履歴が既にある。
+      // OR IGNORE で重複を捨て、1文目の更新件数で勝敗を見る。
+      db.prepare(
+        `INSERT OR IGNORE INTO common_var_versions
+           (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
+         SELECT ?, ?, ?, ?, ?, ?, ?, NULL, ?
+          WHERE EXISTS (
+            SELECT 1 FROM common_vars
+             WHERE id = ? AND version = ? AND archived_at IS NULL
+          )`,
+      ).bind(
+        crypto.randomUUID(), row.id, nextVersion,
+        row.name, next, row.memo ?? '',
+        c.op === 'add' ? 'シナリオ加算' : 'シナリオ減算',
+        now, row.id, nextVersion,
+      ),
+    ])
+    if ((results[0]?.meta?.changes ?? 0) > 0) return
   }
   throw new Error(`common_var update conflict: ${c.varKey}`)
 }
