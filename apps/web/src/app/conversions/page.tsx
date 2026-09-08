@@ -163,6 +163,8 @@ const SORT_TO_API: Record<PointSort, 'count_desc' | 'value_desc' | 'name_asc'> =
 function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [definitions, setDefinitions] = useState<ConversionDefinitionList | null>(null)
   const [summaryReport, setSummaryReport] = useState<ConversionDefinitionReport | null>(null)
+  // 5000 件の安全弁で止まったときだけ KPI に注記を出す。通常は false。
+  const [listTruncated, setListTruncated] = useState(false)
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<PointSort>('cv-desc')
@@ -210,7 +212,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
    * 以前は先頭100件だけ読んで画面内で探していたので、101件目以降が
    * 「すべて N」と出ながら見えず、検索にも掛からなかった。口は
    * `q`・`sort`・`cursor/nextCursor` を受け付けるので、条件に合うものを
-   * 残らず読む(`limit` は口の上限200)。状態の絞り(`active`・`stopped`・
+   * 残らず読む(50頁・5000件で止め、切れたら断る)。状態の絞り(`active`・`stopped`・
    * `unused`)は口に `unused` が無いため、完全な一覧のあと画面で絞る。
    * そうしても件数は狂わない(1頁の切り取りを再加工しない)。
    */
@@ -220,25 +222,30 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
     setLoadFailed(false)
     setDefinitions(null)
     setSummaryReport(null)
+    setListTruncated(false)
     const range = definitionRange(30)
     const listParams = {
       ...range,
       lineAccountId: accountId ?? undefined,
       q: debouncedQuery || undefined,
       sort: SORT_TO_API[sort],
-      limit: 200,
+      limit: 100,
     }
-    const fetchAllDefinitions = async (): Promise<ConversionDefinitionList | null> => {
+    // cursor を辿って条件に合うものを残らず読む。安全弁として 50 頁
+    // (5000 件)で止め、切れたら `truncated` で本文に断る(#505 重大2の流儀)。
+    const fetchAllDefinitions = async (): Promise<{ data: ConversionDefinitionList; truncated: boolean } | null> => {
       const items: ConversionDefinitionList['items'] = []
       let cursor: string | undefined
-      for (;;) {
+      let first: ConversionDefinitionList | null = null
+      for (let page = 0; page < 50; page += 1) {
         const response = await api.conversions.definitions({ ...listParams, cursor })
         if (!response.success || !Array.isArray(response.data.items)) return null
+        if (!first) first = response.data
         items.push(...response.data.items)
-        const next = response.data.pagination.nextCursor
-        if (!next) return { ...response.data, items }
-        cursor = next
+        cursor = response.data.pagination.nextCursor ?? undefined
+        if (!cursor) return { data: { ...response.data, items }, truncated: false }
       }
+      return first ? { data: { ...first, items }, truncated: true } : null
     }
     const [listResult, reportResult] = await Promise.allSettled([
       fetchAllDefinitions(),
@@ -248,7 +255,8 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
     // 先に叩いた方が後に返っても、新しい表示を上書きしない。
     if (loadSeq.current !== seq) return
     if (listResult.status === 'fulfilled' && listResult.value !== null) {
-      setDefinitions(listResult.value)
+      setDefinitions(listResult.value.data)
+      setListTruncated(listResult.value.truncated)
     } else {
       setLoadFailed(true)
     }
@@ -418,7 +426,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           title="金額がついた成果"
           value={summaryReport ? kpi.currentValue : null}
           unit="円"
-          detail={`${points.filter((point) => point.value !== null).length}個の成果地点で金額を記録`}
+          detail={`${points.filter((point) => point.value !== null).length}個の成果地点で金額を記録${listTruncated ? '（直近5000件まで）' : ''}`}
           loading={loading}
         />
         <KpiCard
@@ -427,7 +435,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           unit="個"
           badge={kpi.unusedCount > 0 ? '確認' : undefined}
           badgeTone={kpi.unusedCount > 0 ? 'neutral' : 'accent'}
-          detail="決めたのに使われていません"
+          detail={listTruncated ? '決めたのに使われていません（直近5000件まで）' : '決めたのに使われていません'}
           loading={loading}
         />
       </div>

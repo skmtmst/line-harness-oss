@@ -140,8 +140,8 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
   return <section data-design-node="DpxOK" data-list-state={listState} className="space-y-4">
     <NoteBar>この画面の宛先はお店の人だけです。お客様へ送るものは「顧客へのお知らせ」で設定します。</NoteBar>
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <SummaryCard title="出しているお知らせ" value={state === 'ready' ? summary?.published ?? null : null} unit="件" detail="うち止めている 2" variant="v6" />
-      <SummaryCard title="受け取る人" value={state === 'ready' ? summary?.recipients ?? null : null} unit="人" detail="3つのチームに" variant="v6" />
+      <SummaryCard title="出しているお知らせ" value={state === 'ready' ? summary?.published ?? null : null} unit="件" detail={state === 'ready' ? `うち止めている ${summary?.stopped ?? '—'}` : undefined} variant="v6" />
+      <SummaryCard title="受け取る人" value={state === 'ready' ? summary?.recipients ?? null : null} unit="人" detail={state === 'ready' ? `受け取れる人がいない ${summary?.missingRecipients ?? '—'}件` : undefined} variant="v6" />
       <SummaryCard title="今日届いた数" value={state === 'ready' ? summary?.acceptedToday ?? null : null} unit="件" detail="重複を除いて" variant="v6" />
       <SummaryCard title="届かなかった" value={state === 'ready' ? summary?.excludedToday ?? null : null} unit="件" detail="受け取る人がいません" badge={(summary?.excludedToday ?? 0) > 0 ? '要確認' : undefined} badgeTone="danger" variant="v6" />
     </div>
@@ -173,7 +173,7 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
         <Td>{rule.occurredToday > 0 ? `${rule.occurredToday}件` : '—'}</Td>
         <Td><div className="flex flex-wrap items-center gap-2"><Button onClick={() => void testSend(rule)} disabled={busy === rule.id}>自分にテスト</Button>{rule.status === 'draft' ? <Button variant="primary" onClick={() => void publish(rule)} disabled={busy === rule.id || rule.recipientCount === 0}>{rule.recipientCount === 0 ? '受け取る人を決める' : '公開'}</Button> : <Button onClick={() => void stop(rule)} disabled={busy === rule.id}>止める</Button>}</div></Td>
       </Tr>)}</tbody></DataTable>}
-    {state === 'ready' && rules.length > 0 ? <div className="flex items-center justify-between text-xs text-ink-faint"><span>{summary?.total ?? rules.length}件中 1〜{rules.length}件</span><span>1　2　3　…　次へ</span></div> : null}
+    {state === 'ready' && rules.length > 0 ? <div className="flex items-center justify-between text-xs text-ink-faint"><span>{summary?.total ?? rules.length}件中 1〜{rules.length}件</span></div> : null}
     {showExport ? <div role="dialog" aria-modal="true" aria-label="CSVを書き出す理由" className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 p-4"><div className="w-full max-w-md rounded-card border border-hairline bg-canvas p-5 shadow-lg"><h2 className="font-bold text-ink">CSVを書き出す理由</h2><p className="mt-2 text-sm text-ink-secondary">個人情報を含むため、確認した目的を記録します。</p><input autoFocus value={exportReason} onChange={(event) => setExportReason(event.target.value)} className="mt-4 w-full rounded-control border border-hairline px-3 py-2 text-sm" placeholder="例：月次の運用確認" /><div className="mt-4 flex justify-end gap-2"><Button onClick={() => setShowExport(false)}>キャンセル</Button><Button variant="primary" onClick={() => void exportCsv()} disabled={!exportReason.trim() || busy === 'csv'}>書き出す</Button></div></div></div> : null}
   </section>
 }

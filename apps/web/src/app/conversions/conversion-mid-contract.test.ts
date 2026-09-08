@@ -13,11 +13,11 @@ const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
  * M6: 古い読み込みの応答は捨て、新しい表示を上書きさせない。
  */
 describe('成果地点一覧の点検契約(#513 中)', () => {
-  it('M2: 100件固定をやめ、nextCursor を追って全部読む', () => {
-    expect(PAGE).not.toContain('limit: 100')
-    expect(PAGE).toContain('limit: 200')
+  it('M2: 先頭だけの表示をやめ、nextCursor を追って50頁まで読む', () => {
     expect(PAGE).toContain('pagination.nextCursor')
-    expect(PAGE).toContain('cursor = next')
+    expect(PAGE).toContain('page < 50')
+    expect(PAGE).toContain('truncated')
+    expect(PAGE, '無制限の取得に戻っている').not.toContain('for (;;)')
   })
 
   it('M3: 探す言葉と並びを口へ渡し、画面で探し直さない', () => {

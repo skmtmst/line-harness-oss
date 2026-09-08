@@ -42,6 +42,7 @@ import {
   OFFER_FILTERS,
   OFFER_PAGE_SIZES,
   OFFER_SORTS,
+  csvCell,
   offersCsv,
   pageCountOf,
   pageOf,
@@ -211,6 +212,35 @@ export function parseTab(raw: string | null): PageTab {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 承認の集計は打ち切らない（#505 重大2）
+// ─────────────────────────────────────────────────────────────────────────────
+/*
+ * KPI（今月の成果・支払い予定・いちばん成果が出た案件）は承認の一覧から
+ * 数える。`limit: 200` で止めると、件数が増えたときに実態より小さく出て
+ * 支払い判断を誤る。口に offset があるので、短い頁が返るまで送って全件取る。
+ * 安全弁として 25 頁（5000 件）で止め、そのときは打ち切ったことを返す。
+ */
+const APPROVAL_PAGE_SIZE = 200
+const APPROVAL_MAX_PAGES = 25
+
+async function listAllConversionApprovals(
+  status: 'pending' | 'approved' | 'rejected',
+): Promise<{ items: ConversionApprovalItem[]; truncated: boolean }> {
+  const items: ConversionApprovalItem[] = []
+  for (let page = 0; page < APPROVAL_MAX_PAGES; page += 1) {
+    const res = await api.conversionApprovals.list({
+      status,
+      limit: APPROVAL_PAGE_SIZE,
+      offset: page * APPROVAL_PAGE_SIZE,
+    })
+    if (!res.success) throw new Error('承認の読み込みに失敗しました')
+    items.push(...res.data)
+    if (res.data.length < APPROVAL_PAGE_SIZE) return { items, truncated: false }
+  }
+  return { items, truncated: true }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Affiliators tab — list + inline detail panel
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -221,6 +251,8 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
   const [error, setError] = useState<string | null>(null)
   const [approvalItems, setApprovalItems] = useState<ConversionApprovalItem[]>([])
   const [approvalState, setApprovalState] = useState<ConfirmedState>('loading')
+  // 安全弁（5000 件）で止まったときだけ注記を出す。通常は false。
+  const [approvalTruncated, setApprovalTruncated] = useState(false)
   const [paymentItems, setPaymentItems] = useState<AffiliatePaymentSummary[]>([])
   const [accountSettlement, setAccountSettlement] = useState<AffiliateAccountSettlementPreview | null>(null)
   const [paymentState, setPaymentState] = useState<ConfirmedState>('loading')
@@ -240,6 +272,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
   // ── selected affiliate (detail panel) ─────────────────────────────────────
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState(false)
   const [report, setReport] = useState<ReportV2 | null>(null)
   const [links, setLinks] = useState<AffiliateLink[]>([])
 
@@ -250,6 +283,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
   // ── journeys (cursor-paginated) ────────────────────────────────────────────
   const [journeys, setJourneys] = useState<JourneySummary[]>([])
   const [journeyLoading, setJourneyLoading] = useState(false)
+  const [journeyError, setJourneyError] = useState(false)
   const [journeyMore, setJourneyMore] = useState(false)
   const [journeyLoadingMore, setJourneyLoadingMore] = useState(false)
   const journeyCursorRef = useRef<{ beforeAt: string; beforeId: string } | null>(null)
@@ -301,16 +335,14 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
   useEffect(() => {
     let cancelled = false
     setApprovalState('loading')
+    // KPI の元になる承認は全件取る（打ち切ると数が小さく出る）。
     void Promise.all([
-      api.conversionApprovals.list({ status: 'pending', limit: 200 }),
-      api.conversionApprovals.list({ status: 'approved', limit: 200 }),
+      listAllConversionApprovals('pending'),
+      listAllConversionApprovals('approved'),
     ]).then(([pending, approved]) => {
       if (cancelled) return
-      if (!pending.success || !approved.success) {
-        setApprovalState('error')
-        return
-      }
-      setApprovalItems([...pending.data, ...approved.data])
+      setApprovalItems([...pending.items, ...approved.items])
+      setApprovalTruncated(pending.truncated || approved.truncated)
       setApprovalState('ready')
     }).catch(() => {
       if (!cancelled) setApprovalState('error')
@@ -351,9 +383,11 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
   // ── load detail (report v2 + links) ────────────────────────────────────────
   const loadDetail = useCallback(async (id: string) => {
     setDetailLoading(true)
+    setDetailError(false)
     setReport(null)
     setLinks([])
     setJourneys([])
+    setJourneyError(false)
     setJourneyMore(false)
     journeyCursorRef.current = null
     try {
@@ -364,21 +398,30 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
       /* **形を確かめてから入れる。** 読めない返事を入れると、描くときに落ちる。 */
       setReport(reportRes.success ? asReportV2(reportRes.data) : null)
       if (linksRes.success) setLinks(linksRes.data as unknown as AffiliateLink[])
-    } catch { /* silent — detail is optional */ }
+      // 失敗は握りつぶさず、内訳面に再試行を出す（#554 点検#505中7）。
+      if (!reportRes.success || !linksRes.success) setDetailError(true)
+    } catch {
+      setDetailError(true)
+    }
     setDetailLoading(false)
   }, [])
 
   // ── load first page of journeys ────────────────────────────────────────────
   const loadJourneys = useCallback(async (id: string) => {
     setJourneyLoading(true)
+    setJourneyError(false)
     try {
       const res = await api.affiliates.journeys(id, { limit: JOURNEY_PAGE_SIZE })
       if (res.success) {
         setJourneys(res.data)
         journeyCursorRef.current = res.nextCursor ?? null
         setJourneyMore(Boolean(res.nextCursor))
+      } else {
+        setJourneyError(true)
       }
-    } catch { /* silent */ }
+    } catch {
+      setJourneyError(true)
+    }
     setJourneyLoading(false)
   }, [])
 
@@ -401,8 +444,13 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
         })
         journeyCursorRef.current = res.nextCursor ?? null
         setJourneyMore(Boolean(res.nextCursor))
+        setJourneyError(false)
+      } else {
+        setJourneyError(true)
       }
-    } catch { /* silent */ }
+    } catch {
+      setJourneyError(true)
+    }
     setJourneyLoadingMore(false)
   }, [journeyLoadingMore])
 
@@ -466,11 +514,8 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
       row.totalConversions,
       Math.round(row.rewardAmount),
     ])
-    const escape = (value: string | number) => {
-      const text = String(value)
-      return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
-    }
-    const csv = [header, ...cells].map((line) => line.map(escape).join(',')).join('\r\n')
+    // 数式対策は共通の csvCell に寄せる（`offer-list-view.ts`）。
+    const csv = [header, ...cells].map((line) => line.map(csvCell).join(',')).join('\r\n')
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
@@ -494,14 +539,14 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
           title="今月の成果"
           value={confirmedValue(approvalState, approvedTotals.count)}
           unit={confirmedUnit(approvalState, '件')}
-          detail={confirmedDetail(approvalState, '今月に承認した成果')}
+          detail={confirmedDetail(approvalState, approvalTruncated ? '今月に承認した成果（直近5000件まで）' : '今月に承認した成果')}
           loading={approvalState === 'loading'}
         />
         <KpiCard
           title="承認待ち"
           value={confirmedValue(approvalState, pendingItems.length)}
           unit={confirmedUnit(approvalState, '件')}
-          detail={confirmedDetail(approvalState, `合計 ${formatYen(pendingYen)}（直近最大200件）`)}
+          detail={confirmedDetail(approvalState, `合計 ${formatYen(pendingYen)}${approvalTruncated ? '（直近5000件まで）' : ''}`)}
           loading={approvalState === 'loading'}
         />
         <KpiCard
@@ -749,6 +794,11 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                     選んだ期間にこの方の成果が1件も無いか、集計が読めませんでした。
                                     リンクと成果の記録は消えていません。期間を広げて確かめてください。
                                   </p>
+                                  {detailError ? (
+                                    <AffiliateButton onClick={() => { void loadDetail(row.id) }} className="mt-3">
+                                      もう一度読み込む
+                                    </AffiliateButton>
+                                  ) : null}
                                 </div>
                               )}
 
@@ -905,6 +955,13 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                 </p>
                                 {journeyLoading ? (
                                   <p className="text-sm text-gray-400">読み込み中...</p>
+                                ) : journeyError && journeys.length === 0 ? (
+                                  <div>
+                                    <p className="text-sm text-danger">動線を読み込めませんでした。記録は消えていません。</p>
+                                    <AffiliateButton onClick={() => { void loadJourneys(row.id) }} className="mt-3">
+                                      もう一度読み込む
+                                    </AffiliateButton>
+                                  </div>
                                 ) : journeys.length === 0 ? (
                                   <p className="text-sm text-gray-400">帰属された友だちがまだいません</p>
                                 ) : (
@@ -943,6 +1000,9 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                         </tbody>
                                       </table>
                                     </div>
+                                    {journeyError && !journeyLoadingMore ? (
+                                      <p className="text-danger mt-3 text-xs">続きを読み込めませんでした。「さらに読み込む」で試し直せます。</p>
+                                    ) : null}
                                     {journeyMore && (
                                       <button
                                         onClick={() => { void loadMoreJourneys(row.id) }}
@@ -1039,8 +1099,8 @@ function CreateAffiliateModal({
       return
     }
     const rate = commissionRate.trim() === '' ? undefined : Number(commissionRate)
-    if (rate !== undefined && (Number.isNaN(rate) || rate < 0)) {
-      setFormError('報酬率は0以上の数値で入力してください')
+    if (rate !== undefined && (!Number.isFinite(rate) || rate < 0 || rate > 100)) {
+      setFormError('報酬率は0から100の間で入力してください')
       return
     }
     setSubmitting(true)
@@ -1659,11 +1719,8 @@ export function ApprovalQueue() {
       item.value ?? '',
       item.duplicateFlag ? '確認が必要' : '問題なし',
     ])
-    const escape = (value: string | number) => {
-      const text = String(value)
-      return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
-    }
-    const csv = [header, ...lines].map((line) => line.map(escape).join(',')).join('\r\n')
+    // 数式対策は共通の csvCell に寄せる（`offer-list-view.ts`）。
+    const csv = [header, ...lines].map((line) => line.map(csvCell).join(',')).join('\r\n')
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
@@ -2117,6 +2174,8 @@ export function OffersTab() {
   // 「今月の成果0件」と読めて、運用者が成果そのものが無いと誤解する。
   const [offerApprovalItems, setOfferApprovalItems] = useState<ConversionApprovalItem[]>([])
   const [confirmedState, setConfirmedState] = useState<ConfirmedState>('loading')
+  // 安全弁（5000 件）で止まったときだけ注記を出す。通常は false。
+  const [confirmedTruncated, setConfirmedTruncated] = useState(false)
 
   useEffect(() => {
     void loadOffers()
@@ -2126,16 +2185,14 @@ export function OffersTab() {
   useEffect(() => {
     let cancelled = false
     setConfirmedState('loading')
+    // 「いちばん成果が出た案件」の元になる承認は全件取る（打ち切ると数が小さく出る）。
     void Promise.all((['pending', 'approved', 'rejected'] as const).map((status) =>
-      api.conversionApprovals.list({ status, limit: 200 }),
+      listAllConversionApprovals(status),
     )).then((results) => {
         if (cancelled) return
-        if (results.some((result) => !result.success || !Array.isArray(result.data))) {
-          setConfirmedState('error')
-          return
-        }
-        const all = results.flatMap((result) => result.data)
+        const all = results.flatMap((result) => result.items)
         setOfferApprovalItems(all)
+        setConfirmedTruncated(results.some((result) => result.truncated))
         setConfirmedState('ready')
       })
       .catch(() => {
@@ -2222,7 +2279,7 @@ export function OffersTab() {
           value={confirmedState === 'ready' && topOffer ? (offerStats.get(topOffer.id)?.conversions ?? 0) : null}
           unit={confirmedState === 'ready' && topOffer ? '件' : ''}
           loading={confirmedState === 'loading'}
-          detail={confirmedDetail(confirmedState, topOffer ? `${topOffer.name}・確定 ${formatYen(offerStats.get(topOffer.id)?.reward ?? 0)}` : '成果はまだありません')}
+          detail={confirmedDetail(confirmedState, topOffer ? `${topOffer.name}・確定 ${formatYen(offerStats.get(topOffer.id)?.reward ?? 0)}${confirmedTruncated ? '（直近5000件まで）' : ''}` : '成果はまだありません')}
         />
         <KpiCard
           title="1件あたりの平均報酬"

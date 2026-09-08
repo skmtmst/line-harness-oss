@@ -67,7 +67,17 @@ export default function NotificationRunList({
   const [filter, setFilter] = useState<RunFilter>('all')
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
+  // 再試行口は店長専用。担当者にはボタンを出さない。
+  const [canRetry, setCanRetry] = useState(false)
   const requestRef = useRef(0)
+
+  useEffect(() => {
+    let active = true
+    void api.staff.me().then((response) => {
+      if (active && response.success) setCanRetry(response.data.role === 'owner')
+    }).catch(() => {})
+    return () => { active = false }
+  }, [])
 
   useEffect(() => setPage(1), [lineAccountId, mode])
 
@@ -87,13 +97,18 @@ export default function NotificationRunList({
         limit: PAGE_SIZE,
         offset: (page - 1) * PAGE_SIZE,
       }
+      // 古い検証用モックと段階移行中の環境だけ、互換口へ戻す（404のとき1回だけ）。
+      let fellBack = false
       const primary = await api.lineNotifications.deliveries(params).catch((error: unknown) => {
-        // 古い検証用モックと段階移行中の環境だけ、互換口へ戻す。
-        if (error instanceof ApiError && error.status === 404) return api.ecCommerce.notificationRuns(params)
+        if (error instanceof ApiError && error.status === 404) {
+          fellBack = true
+          return api.ecCommerce.notificationRuns(params)
+        }
         throw error
       })
       if (!primary.success) throw new Error('load failed')
-      const response = !primary.pagination || primary.data.coverage?.source !== 'notification_delivery_ledger'
+      // 互換口の結果をもう一度取り直さない。毎回2要求になるのを防ぐ。
+      const response = !fellBack && (!primary.pagination || primary.data.coverage?.source !== 'notification_delivery_ledger')
         ? await api.ecCommerce.notificationRuns(params)
         : primary
       if (request !== requestRef.current) return
@@ -123,9 +138,11 @@ export default function NotificationRunList({
       setNotice({ tone: 'success', text: '同じ通知の送信を安全に再試行しました。' })
       await load()
     } catch (error) {
-      const text = error instanceof ApiError && error.status === 409
-        ? 'ほかの担当者が先に再試行しました。最新の記録を読み直してください。'
-        : '送信を再試行できませんでした。時間をおいて読み直してください。'
+      const text = error instanceof ApiError && error.status === 403
+        ? '送信の再試行は店長だけができます。'
+        : error instanceof ApiError && error.status === 409
+          ? 'ほかの担当者が先に再試行しました。最新の記録を読み直してください。'
+          : '送信を再試行できませんでした。時間をおいて読み直してください。'
       setNotice({ tone: 'error', text })
     } finally {
       setRetryingId(null)
@@ -187,10 +204,10 @@ export default function NotificationRunList({
       <div className="flex flex-wrap items-center gap-2">
         <label className="min-w-64 flex-1">
           <span className="sr-only">お客様の名前・注文番号で検索</span>
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="お客様の名前・注文番号で検索" className="min-h-10 w-full rounded-control border border-hairline bg-canvas px-3 text-sm outline-none focus:border-accent" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="お客様の名前・注文番号で検索（表示中の20件のみ）" className="min-h-10 w-full rounded-control border border-hairline bg-canvas px-3 text-sm outline-none focus:border-accent" />
         </label>
         {filters.map((item) => <FilterChip key={item.value} selected={filter === item.value} onChange={() => setFilter(item.value)}>{item.label}</FilterChip>)}
-        <span className="text-xs text-ink-faint">20件表示</span>
+        <span className="text-xs text-ink-faint" title="検索は表示中のページの中だけに効きます">20件表示</span>
       </div>
 
       {!lineAccountId ? (
@@ -257,7 +274,7 @@ export default function NotificationRunList({
                         受信箱で連絡
                       </Link>
                     ) : null}
-                    {mode === 'failures' && item.retryAvailable ? (
+                    {mode === 'failures' && item.retryAvailable && canRetry ? (
                       <Button className="mt-2" disabled={retryingId === item.id} onClick={() => void retry(item)}>
                         {retryingId === item.id ? '再試行中' : '送信を再試行'}
                       </Button>

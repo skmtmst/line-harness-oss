@@ -1629,7 +1629,12 @@ export type CommonActionResources = {
   notificationRules?: Array<{ id: string; name: string }>;
   webhooks: Array<{ id: string; name: string }>;
   richMenus: Array<{ id: string; name: string }>;
-  commonActions: Array<{ id: string; name: string; version: number }>;
+  commonActions: Array<{
+    id: string;
+    name: string;
+    version: number;
+    currentPublishedVersionId: string;
+  }>;
 };
 
 export type BroadcastInsight = {
@@ -2767,10 +2772,10 @@ export type ScenarioSimulation = {
   }>
 }
 
-export type ScenarioUnavailableMetric = {
-  value: null
-  state: 'unavailable'
-  reason: string
+export type ScenarioMeasuredMetric = {
+  value: number | null
+  state: 'available' | 'unavailable'
+  reason?: string
 }
 
 /** 購読・テスト送信・送信枠・通別結果をまとめた機能5 V6の読取結果。 */
@@ -2808,9 +2813,9 @@ export type ScenarioRuns = {
     id: string
     stepOrder: number
     delivered: number
-    opened: ScenarioUnavailableMetric
-    clicked: ScenarioUnavailableMetric
-    failed: ScenarioUnavailableMetric
+    opened: ScenarioMeasuredMetric
+    clicked: ScenarioMeasuredMetric
+    failed: ScenarioMeasuredMetric
   }>
 }
 
@@ -3121,6 +3126,7 @@ export type EcActionExecution = {
   receivedAt: string
   orderNumber: string | null
   customerName: string | null
+  friendId: string | null
   retryAvailable: boolean
 }
 
@@ -3241,7 +3247,8 @@ export type EcNotificationRun = {
   friendId: string | null
   friendName: string | null
   orderNumber: string | null
-  channel: 'line' | 'email'
+  /** 実応答は migration 304 の CHECK どおり 'in_app' も返す。 */
+  channel: 'line' | 'email' | 'in_app'
   status: 'pending' | 'accepted' | 'excluded' | 'failed'
   reason: string | null
   receivedAt: string
@@ -3250,7 +3257,8 @@ export type EcNotificationRun = {
   nextRetryAt: string | null
   clickedAt: string | null
   version: number | null
-  executionMode: 'automatic' | 'manual'
+  /** 実応答は 'retry' / 'resend' / 'test' も返す。想定外値はそのまま扱う。 */
+  executionMode: 'automatic' | 'manual' | 'retry' | 'resend' | 'test'
   retryAvailable: boolean
   recordVersion: number
   providerStatus: string | null
@@ -4905,7 +4913,7 @@ export const api = {
   /** サイトスクリプト。自社サイトの行動を友だちに紐づける。 */
   siteTracking: {
     /** 計測が動いているかと、その内訳 */
-    summary: () =>
+    summary: (accountId?: string) =>
       fetchApi<
         ApiResponse<{
           todayEvents: number
@@ -4916,9 +4924,9 @@ export const api = {
           eventTypeCount: number
           lastEventAt: string | null
         }>
-      >('/api/site/summary'),
-    pages: (params?: { from?: string; to?: string }) =>
-      fetchApi<ApiResponse<Array<{ path: string; views: number; visitors: number }>>>(
+      >(`/api/site/summary${rangeQuery({ accountId })}`),
+    pages: (params?: { from?: string; to?: string; accountId?: string }) =>
+      fetchApi<ApiResponse<Array<{ host: string | null; path: string; views: number; visitors: number }>>>(
         `/api/site/pages${rangeQuery(params)}`,
       ),
     /**
@@ -4938,6 +4946,7 @@ export const api = {
           Array<{
             id: string
             eventType: string
+            host: string | null
             path: string | null
             label: string | null
             occurredAt: string
@@ -5200,19 +5209,54 @@ export const api = {
       fetchApi<ApiResponse<null>>(`/api/tag-groups/${id}`, { method: 'DELETE' }),
   },
   scenarios: {
-    list: (params?: { accountId?: string }) => {
-      const query = params?.accountId ? '?lineAccountId=' + params.accountId : ''
+    listPage: (params?: {
+      accountId?: string
+      page?: number
+      limit?: number
+      query?: string
+      active?: 0 | 1
+      createdFrom?: string
+      folderId?: string
+    }, signal?: AbortSignal) => {
+      const query = new URLSearchParams()
+      if (params?.accountId) query.set('lineAccountId', params.accountId)
+      if (params?.page !== undefined) query.set('page', String(params.page))
+      if (params?.limit !== undefined) query.set('limit', String(params.limit))
+      if (params?.query) query.set('query', params.query)
+      if (params?.active !== undefined) query.set('active', String(params.active))
+      if (params?.createdFrom) query.set('createdFrom', params.createdFrom)
+      if (params?.folderId) query.set('folderId', params.folderId)
       return fetchApi<
         ApiResponse<
-          (Scenario & {
-            stepCount?: number
-            /** いま流れている人 */
-            subscriberCount?: number
-            /** 最後まで届いた人 */
-            completedCount?: number
-          })[]
+          {
+            items: (Scenario & {
+              stepCount?: number
+              /** いま流れている人 */
+              subscriberCount?: number
+              /** 最後まで届いた人 */
+              completedCount?: number
+            })[]
+            total: number
+            limit: number
+            sort: Array<{ field: string; direction: 'asc' | 'desc' }>
+          }
         >
-      >('/api/scenarios' + query)
+      >(`/api/scenarios${query.size ? `?${query}` : ''}`, { signal })
+    },
+    /** 選択肢など既存の全件利用は配列のまま読み替える。新しい一覧画面は listPage を使う。 */
+    list: async (params?: { accountId?: string; limit?: number }) => {
+      const query = new URLSearchParams()
+      if (params?.accountId) query.set('lineAccountId', params.accountId)
+      query.set('limit', String(params?.limit ?? 200))
+      const response = await fetchApi<ApiResponse<{
+        items: (Scenario & { stepCount?: number; subscriberCount?: number; completedCount?: number })[]
+        total: number
+        limit: number
+        sort: Array<{ field: string; direction: 'asc' | 'desc' }>
+      }>>(`/api/scenarios?${query}`)
+      return response.success
+        ? { success: true as const, data: response.data.items }
+        : response
     },
     get: (id: string) =>
       fetchApi<ApiResponse<Scenario & { steps: ScenarioStep[] }>>(`/api/scenarios/${id}`),
@@ -5568,7 +5612,19 @@ export const api = {
     testSend: (id: string) =>
       fetchApi<{ success: boolean; sent?: number; failed?: number; error?: string }>(`/api/broadcasts/${id}/test-send`, { method: 'POST' }),
     getProgress: (id: string) =>
-      fetchApi<{ success: boolean; data?: { status: string; totalCount: number; successCount: number; batchOffset: number } }>(`/api/broadcasts/${id}/progress`),
+      fetchApi<{ success: boolean; data?: {
+        status: string
+        totalCount: number
+        successCount: number
+        batchOffset: number
+        perAccountStats: Array<{
+          accountId: string
+          accountName: string
+          sent: number
+          uniqueImpression: number | null
+          uniqueClick: number | null
+        }>
+      } }>(`/api/broadcasts/${id}/progress`),
     previewCount: (id: string) =>
       fetchApi<{
         success: boolean;
@@ -6224,10 +6280,6 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    report: (id: string, params?: { startDate?: string; endDate?: string }) =>
-      fetchApi<ApiResponse<{ affiliateId: string; affiliateName: string; code: string; commissionRate: number; totalClicks: number; totalConversions: number; totalRevenue: number }>>(
-        `/api/affiliates/${id}/report?` + new URLSearchParams(params as Record<string, string>),
-      ),
     /** v2 report: clicks, friendAdds, conversionsByPoint, estimatedCommission, duplicateFlags */
     reportV2: (id: string, params?: { startDate?: string; endDate?: string }) =>
       fetchApi<ApiResponse<{
@@ -6721,27 +6773,20 @@ export const api = {
       }),
   },
   automations: {
-    list: (params?: { accountId?: string }) => {
-      const query = params?.accountId ? '?lineAccountId=' + params.accountId : ''
+    list: (params?: { accountId?: string; limit?: number; offset?: number }) => {
+      const query = new URLSearchParams()
+      if (params?.accountId) query.set('lineAccountId', params.accountId)
+      if (params?.limit !== undefined) query.set('limit', String(params.limit))
+      if (params?.offset !== undefined) query.set('offset', String(params.offset))
+      const suffix = query.size ? `?${query}` : ''
       return fetchApi<ApiResponse<AutomationListItem[]> & {
         summary?: { active: number; stopped: number; executionCount30d: number; failureCount30d: number }
         freshness?: 'available'
-      }>('/api/automations' + query)
+        pagination?: { total: number; limit: number | null; offset: number }
+      }>(`/api/automations${suffix}`)
     },
     get: (id: string) =>
       fetchApi<ApiResponse<Automation & { logs?: AutomationLog[] }>>(`/api/automations/${id}`),
-    create: (data: {
-      name: string
-      eventType: Automation['eventType']
-      actions: Automation['actions']
-      description?: string | null
-      conditions?: Record<string, unknown>
-      priority?: number
-    }) =>
-      fetchApi<ApiResponse<Automation>>('/api/automations', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
     update: (id: string, data: Partial<Pick<Automation, 'name' | 'description' | 'eventType' | 'conditions' | 'actions' | 'isActive' | 'priority'>>) =>
       fetchApi<ApiResponse<Automation>>(`/api/automations/${id}`, {
         method: 'PUT',
@@ -6819,6 +6864,11 @@ export const api = {
       if (params.offset !== undefined) query.set('offset', String(params.offset));
       return fetchApi<ApiResponse<CommonActionSummary[]> & {
         pagination?: { total: number; limit: number | null; offset: number }
+        summary?: {
+          total: number; published: number; draft: number; oldVersion: number; unused: number;
+          actions: number; bindings: number; outdated: number; outdatedItems: number;
+          executions: number; failures: number;
+        }
         freshness?: 'available'
       }>(`/api/common-actions?${query}`);
     },
@@ -6990,10 +7040,11 @@ export const api = {
         `/api/ec-commerce/orders?${query}`,
       )
     },
-    actionExecutions: (params: { lineAccountId: string; eventId?: string; status?: EcActionExecutionStatus; limit?: number; offset?: number }) => {
+    actionExecutions: (params: { lineAccountId: string; eventId?: string; status?: EcActionExecutionStatus; statusGroup?: 'processing' | 'failed'; limit?: number; offset?: number }) => {
       const query = new URLSearchParams({ lineAccountId: params.lineAccountId })
       if (params.eventId) query.set('eventId', params.eventId)
       if (params.status) query.set('status', params.status)
+      if (params.statusGroup) query.set('statusGroup', params.statusGroup)
       if (params.limit !== undefined) query.set('limit', String(params.limit))
       if (params.offset !== undefined) query.set('offset', String(params.offset))
       return fetchApi<ApiResponse<EcActionExecutionList> & { pagination: { total: number; limit: number; offset: number } }>(
@@ -8270,6 +8321,8 @@ export const api = {
       name: string;
       chatBarText: string;
       size: 'large' | 'compact';
+      /** #502中: 作成直後のフォルダ付け2口目をなくすため作成口で決める。 */
+      folderId?: string | null;
       pages: Array<{
         id?: string;
         name: string;
@@ -8280,6 +8333,13 @@ export const api = {
       fetchApi<ApiResponse<{ id: string; pages: Array<{ id: string }> }>>('/api/rich-menu-groups', {
         method: 'POST',
         body: JSON.stringify(input),
+      }),
+
+    /** #502中: 優先順の入替を1口でそろえる。全件PATCHの並列投げの置き換え。 */
+    reorderPriorities: (accountId: string, orderedIds: string[]) =>
+      fetchApi<ApiResponse<{ updated: number }>>('/api/rich-menu-groups/reorder-priorities', {
+        method: 'POST',
+        body: JSON.stringify({ accountId, orderedIds }),
       }),
 
     update: (groupId: string, input: {
@@ -8398,11 +8458,14 @@ export const api = {
       params:
         | { mode: 'bulk-link'; tagId: string | null }
         | { mode: 'set-default' },
+      /** #502中: 一括適用のやり直しで二重記録にしないための鍵。 */
+      idempotencyKey?: string,
     ) =>
       fetchApi<
-        ApiResponse<{ chunks: number; total: number; message?: string; mode?: string }>
+        ApiResponse<{ chunks: number; total: number; runId?: string; message?: string; mode?: string }>
       >(`/api/rich-menu-groups/${groupId}/apply-to-tag`, {
         method: 'POST',
+        headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
         body: JSON.stringify(params),
       }),
 
@@ -8513,6 +8576,10 @@ export const api = {
   },
   pools: {
     list: () => fetchApi<ApiResponse<TrafficPool[]>>('/api/traffic-pools'),
+    listAccounts: (ids: string[]) =>
+      fetchApi<ApiResponse<Array<{ poolId: string; accounts: PoolAccount[] }>>>(
+        `/api/traffic-pools/accounts?ids=${encodeURIComponent(ids.join(','))}`,
+      ),
     get: (id: string) => fetchApi<ApiResponse<TrafficPool>>(`/api/traffic-pools/${id}`),
     create: (data: { slug: string; name: string; activeAccountId: string }) =>
       fetchApi<ApiResponse<TrafficPool>>('/api/traffic-pools', {
@@ -8803,6 +8870,20 @@ export const api = {
   adPlatforms: {
     list: () =>
       fetchApi<ApiResponse<AdPlatform[]>>('/api/ad-platforms'),
+    logsPage: (params?: { page?: number; limit?: number; status?: string; query?: string }) => {
+      const query = new URLSearchParams()
+      query.set('page', String(params?.page ?? 1))
+      query.set('limit', String(params?.limit ?? 20))
+      if (params?.status && params.status !== 'all') query.set('status', params.status)
+      if (params?.query?.trim()) query.set('query', params.query.trim())
+      return fetchApi<ApiResponse<{
+        items: AdConversionLog[]
+        total: number
+        page: number
+        limit: number
+        sort: Array<{ field: string; direction: 'asc' | 'desc' }>
+      }>>(`/api/ad-platforms/logs?${query.toString()}`)
+    },
     logs: (id: string, limit = 20) =>
       fetchApi<ApiResponse<AdConversionLog[]>>(`/api/ad-platforms/${id}/logs?limit=${limit}`),
   },

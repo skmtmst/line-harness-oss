@@ -185,7 +185,7 @@ export function OnCompleteDialog({
 
   useEffect(() => {
     void (async () => {
-      const res = await api.scenarios.list()
+      const res = await api.scenarios.list({ limit: 200 })
       if (res.success) {
         setScenarios(res.data.filter((s) => s.id !== scenarioId).map((s) => ({ id: s.id, name: s.name })))
       }

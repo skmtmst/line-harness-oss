@@ -1,12 +1,13 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import PageHeader from '@/components/shared/page-header'
+import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import SummaryCard from '@/components/shared/summary-card'
 import { ActionCell, DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
@@ -65,24 +66,45 @@ function dateTime(value: string | null) {
   }).format(date)
 }
 
+const ACTION_PAGE_SIZE = 20
+
+type ActionTab = 'all' | 'succeeded' | 'processing' | 'skipped' | 'failed'
+
+/*
+ * タブの絞りはサーバ側へ渡し、その後でページを切る(共通一覧契約)。
+ * 「処理中」「失敗」は2状態のまとめなので statusGroup で送る。
+ */
+function actionServerFilter(status: ActionTab): { status?: 'succeeded' | 'skipped'; statusGroup?: 'processing' | 'failed' } {
+  if (status === 'succeeded' || status === 'skipped') return { status }
+  if (status === 'processing' || status === 'failed') return { statusGroup: status }
+  return {}
+}
+
 function EventsPanel({ accountId }: { accountId: string | null }) {
   const [overview, setOverview] = useState<EcCommerceOverview | null>(null)
   const [orders, setOrders] = useState<EcOrder[]>([])
   const [actions, setActions] = useState<EcActionExecution[]>([])
   const [actionSummary, setActionSummary] = useState<EcActionExecutionList['summary'] | null>(null)
+  const [actionTotal, setActionTotal] = useState(0)
   const [state, setState] = useState<'loading' | 'ready' | 'empty' | 'error' | 'forbidden'>('loading')
   const [query, setQuery] = useState('')
-  const [status, setStatus] = useState<'all' | 'succeeded' | 'processing' | 'skipped' | 'failed'>('all')
+  const [status, setStatus] = useState<ActionTab>('all')
+  const [page, setPage] = useState(1)
   const [sort, setSort] = useState<'newest' | 'oldest'>('newest')
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
+  /* 絞りとページを同時に変えたとき、古い読み込みの返事で上書きしない。 */
+  const loadSeq = useRef(0)
 
   const load = useCallback(async (showLoading = true) => {
+    const seq = loadSeq.current + 1
+    loadSeq.current = seq
     if (!accountId) {
       setOverview(null)
       setOrders([])
       setActions([])
       setActionSummary(null)
+      setActionTotal(0)
       setState('empty')
       return
     }
@@ -90,9 +112,10 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
     try {
       const [overviewResponse, ordersResponse, actionsResponse] = await Promise.all([
         api.ecCommerce.overview(accountId),
-        api.ecCommerce.orders({ lineAccountId: accountId, limit: 20 }),
-        api.ecCommerce.actionExecutions({ lineAccountId: accountId, limit: 20 }),
+        api.ecCommerce.orders({ lineAccountId: accountId, limit: 100 }),
+        api.ecCommerce.actionExecutions({ lineAccountId: accountId, ...actionServerFilter(status), limit: ACTION_PAGE_SIZE, offset: (page - 1) * ACTION_PAGE_SIZE }),
       ])
+      if (seq !== loadSeq.current) return
       if (!overviewResponse.success || !ordersResponse.success || !actionsResponse.success) {
         throw new Error('invalid_ec_response')
       }
@@ -106,13 +129,16 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
       setOrders(ordersResponse.data.items)
       setActions(actionsResponse.data.items)
       setActionSummary(actionsResponse.data.summary)
+      setActionTotal(actionsResponse.data.total)
       setState(actionsResponse.data.items.length ? 'ready' : 'empty')
     } catch (error) {
+      if (seq !== loadSeq.current) return
       setState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
     }
-  }, [accountId])
+  }, [accountId, status, page])
 
   useEffect(() => { void load() }, [load])
+  useEffect(() => { setPage(1) }, [accountId, status])
 
   const ordersByNumber = useMemo(
     () => new Map(orders.map((order) => [order.orderNumber, order])),
@@ -123,12 +149,6 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
     const needle = query.trim().toLocaleLowerCase('ja-JP')
     return actions
       .filter((action) => {
-        if (status === 'all') return true
-        if (status === 'processing') return action.status === 'pending' || action.status === 'processing'
-        if (status === 'failed') return action.status === 'retryable_failed' || action.status === 'permanent_failed'
-        return action.status === status
-      })
-      .filter((action) => {
         const order = action.orderNumber ? ordersByNumber.get(action.orderNumber) : null
         return !needle || [EVENT_LABEL[action.eventType], action.orderNumber, action.customerName, ...(order?.orderLines.map((line) => line.productName) ?? [])]
           .some((value) => value?.toLocaleLowerCase('ja-JP').includes(needle))
@@ -137,7 +157,8 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
         const delta = Date.parse(right.receivedAt) - Date.parse(left.receivedAt)
         return sort === 'newest' ? delta : -delta
       })
-  }, [actions, ordersByNumber, query, sort, status])
+  }, [actions, ordersByNumber, query, sort])
+  const pageCount = Math.max(1, Math.ceil(actionTotal / ACTION_PAGE_SIZE))
 
   const retry = async (action: EcActionExecution) => {
     if (!accountId || !action.retryAvailable) return
@@ -251,8 +272,8 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
                   : ACTION_LABEL[action.eventType] ?? statusInfo.label}</Td>
               <Td><span className={`${styles.status} ${statusInfo.tone}`}>{statusInfo.label}</span></Td>
               <ActionCell>
-                {order?.friendId
-                  ? <Link className={styles.textLink} href={`/friends/${order.friendId}`}>中身を見る</Link>
+                {(action.friendId ?? order?.friendId)
+                  ? <Link className={styles.textLink} href={`/friends/${action.friendId ?? order?.friendId}`}>中身を見る</Link>
                   : <Link className={styles.textLink} href="/ec-commerce/identity-candidates">つき合わせる</Link>}
                 {action.retryAvailable ? <Button type="button" disabled={retryingId === action.id} onClick={() => void retry(action)}>{retryingId === action.id ? '戻しています…' : 'もう一度やる'}</Button> : null}
               </ActionCell>
@@ -262,9 +283,10 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
       </DataTable>
       <div className={styles.footer}>
         {shown.length === 0 ? <p>条件に合う取り込みの記録はありません。</p> : null}
-        <p>取り込みの記録 {overview?.total.toLocaleString('ja-JP') ?? '—'}件中 {shown.length.toLocaleString('ja-JP')}件を表示しています。</p>
+        <p>取り込みの記録 {actionTotal.toLocaleString('ja-JP')}件中 {shown.length.toLocaleString('ja-JP')}件を表示しています。古い記録はページを進んで確認できます。</p>
         <p>注文の本文や接続用の秘密値は表示しません。もう一度行うときも、成功済みの処理は重ねません。</p>
       </div>
+      {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} /> : null}
     </>
   )
 }

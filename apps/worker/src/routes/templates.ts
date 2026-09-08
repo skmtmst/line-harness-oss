@@ -12,6 +12,7 @@ import {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { validateCarousel } from '../services/carousel-validation.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { parseQuestion, type ScenarioQuestion } from '../services/scenario-question.js';
@@ -96,6 +97,27 @@ function questionValue(raw: string | null): ScenarioQuestion | null {
  * 送ってから「400 が返りました」では、どのパネルが悪いのか分からない。
  * 保存の時点で、何枚目の何が問題かを返す。
  */
+/**
+ * JSONで持つ本文（カード型・カルーセル）の大きさ上限。タグ込みの文字数で見る。
+ * テキスト上限5000字の10倍。LINEの上限ではなく、巨大JSONの保存・描画・送信を
+ * 防ぐ運用上限。
+ */
+export const TEMPLATE_STRUCTURED_MAX_CHARACTERS = 50000;
+
+function checkStructuredSize(
+  messageType: string | undefined,
+  messageContent: string | undefined,
+): { ok: true } | { ok: false; error: string } {
+  if ((messageType !== 'carousel' && messageType !== 'flex') || !messageContent) return { ok: true };
+  if ([...messageContent].length > TEMPLATE_STRUCTURED_MAX_CHARACTERS) {
+    return {
+      ok: false,
+      error: `本文が大きすぎます。${TEMPLATE_STRUCTURED_MAX_CHARACTERS.toLocaleString('ja-JP')}文字までにしてください`,
+    };
+  }
+  return { ok: true };
+}
+
 function checkCarousel(
   messageType: string | undefined,
   messageContent: string | undefined,
@@ -127,10 +149,15 @@ templates.get('/api/templates', async (c) => {
     if (requestedAccountId && !scope.allowedAccountIds.includes(requestedAccountId)) {
       return c.json({ success: false, error: 'Template not found' }, 404);
     }
-    const items = await getTemplatesWithUsageCount(c.env.DB, category, {
+    // 共通一覧契約。page/limit を付けたときだけ DB 側で切り出して新形で返す。
+    const wantsPaging = c.req.query('page') !== undefined || c.req.query('limit') !== undefined;
+    const paging = wantsPaging
+      ? parseOffsetPaging({ page: c.req.query('page'), limit: c.req.query('limit') })
+      : undefined;
+    const { items, total } = await getTemplatesWithUsageCount(c.env.DB, category, {
       accountIds: requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
       includeUnassigned: requestedAccountId ? false : scope.canSeeUnassigned,
-    });
+    }, paging ? { limit: paging.limit, offset: paging.offset } : undefined);
     // 押された回数は1回のクエリでまとめて取る。1件ずつ引くと、
     // 20件並べば20回叩くことになる。
     let taps = new Map<string, number>();
@@ -147,27 +174,39 @@ templates.get('/api/templates', async (c) => {
       // 集計だけ取れないときも、テンプレートそのものは操作できるようにする。
       console.error('GET /api/templates — failed to count template sends', err);
     }
-    return c.json({
-      success: true,
-      data: items.map((t) => ({
-        id: t.id,
-        accountId: t.line_account_id,
-        name: t.name,
-        category: t.category,
-        messageType: t.message_type,
-        messageContent: t.message_content,
-        question: questionValue(t.question_json),
-        questionStatus: t.question_status,
-        folderId: t.folder_id ?? null,
-        usageCount: t.usage_count,
-        /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
-        tapCount: taps.get(t.id) ?? 0,
-        monthlySendCount: sends.get(t.id)?.thisMonth ?? null,
-        totalSendCount: sends.get(t.id)?.total ?? null,
-        createdAt: t.created_at,
-        updatedAt: t.updated_at,
-      })),
-    });
+    const serialized = items.map((t) => ({
+      id: t.id,
+      accountId: t.line_account_id,
+      name: t.name,
+      category: t.category,
+      messageType: t.message_type,
+      messageContent: t.message_content,
+      question: questionValue(t.question_json),
+      questionStatus: t.question_status,
+      folderId: t.folder_id ?? null,
+      usageCount: t.usage_count,
+      /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
+      tapCount: taps.get(t.id) ?? 0,
+      monthlySendCount: sends.get(t.id)?.thisMonth ?? null,
+      totalSendCount: sends.get(t.id)?.total ?? null,
+      createdAt: t.created_at,
+      updatedAt: t.updated_at,
+    }));
+    if (wantsPaging && paging) {
+      return c.json({
+        success: true,
+        data: buildOffsetListResponse({
+          items: serialized,
+          total,
+          paging,
+          sort: [
+            { field: 'created_at', direction: 'desc' },
+            { field: 'id', direction: 'asc' },
+          ],
+        }),
+      });
+    }
+    return c.json({ success: true, data: serialized });
   } catch (err) {
     console.error('GET /api/templates error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -295,6 +334,8 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
     }
     const carousel = checkCarousel(body.messageType, body.messageContent);
     if (!carousel.ok) return c.json({ success: false, error: carousel.error }, 422);
+    const structured = checkStructuredSize(body.messageType, body.messageContent);
+    if (!structured.ok) return c.json({ success: false, error: structured.error }, 422);
     const options = readCarouselOptions(body as unknown as Record<string, unknown>);
     if (!options.ok) return c.json({ success: false, error: options.error }, 400);
     const question = readQuestionPayload(body as unknown as Record<string, unknown>);
@@ -350,6 +391,11 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
       body.messageContent ?? existing?.message_content,
     );
     if (!carousel.ok) return c.json({ success: false, error: carousel.error }, 422);
+    const structured = checkStructuredSize(
+      body.messageType ?? existing?.message_type,
+      body.messageContent ?? existing?.message_content,
+    );
+    if (!structured.ok) return c.json({ success: false, error: structured.error }, 422);
     const options = readCarouselOptions(body as unknown as Record<string, unknown>);
     if (!options.ok) return c.json({ success: false, error: options.error }, 400);
     const question = readQuestionPayload(body as unknown as Record<string, unknown>);

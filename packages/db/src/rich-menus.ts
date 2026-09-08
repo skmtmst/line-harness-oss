@@ -117,6 +117,8 @@ export interface CreateRichMenuGroupInput {
   chatBarText: string;
   size: 'large' | 'compact';
   pages: RichMenuPageInput[];
+  /** 作成直後のフォルダ。#502中: 作成後の付け直し2口目をなくし1口で決める。 */
+  folderId?: string | null;
 }
 
 export interface UpdateRichMenuGroupMetaInput {
@@ -593,8 +595,8 @@ export async function createRichMenuGroup(
       .prepare(
         `INSERT INTO rich_menu_groups
            (id, account_id, name, chat_bar_text, size, default_page_id,
-            is_default_for_all, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, 0, 'draft', ?, ?)`,
+            folder_id, is_default_for_all, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'draft', ?, ?)`,
       )
       .bind(
         groupId,
@@ -603,6 +605,7 @@ export async function createRichMenuGroup(
         input.chatBarText,
         input.size,
         defaultPageId,
+        input.folderId ?? null,
         now,
         now,
       ),

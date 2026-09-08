@@ -114,4 +114,11 @@ describe('V6 成果地点一覧の契約', () => {
     expect(NEW_PAGE).not.toContain('保存契約は未接続')
     expect(NEW_PAGE).not.toContain('利用先APIの接続後')
   })
+
+  it('成果地点が100件を超えても数え落とさない (#505 重大2)', () => {
+    // 一覧の `limit: 100` で止めると KPI が小さく出る。cursor を辿って
+    // 全件取り、安全弁のときだけ注記を出す。
+    expect(PAGE).toContain('pagination.nextCursor')
+    expect(PAGE).toContain('直近5000件まで')
+  })
 })

@@ -38,6 +38,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
   const [shape, setShape] = useState('3')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [saved, setSaved] = useState(false)
 
   const save = async () => {
     if (!selectedAccountId) return setError('上のバーでLINE公式アカウントを選んでください。')
@@ -56,7 +57,12 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
         name: name.trim(),
         payload: { ...payload, folder },
       })
-      if (!result.success) setError(result.error || '保存できませんでした。')
+      if (!result.success) {
+        setError(result.error || '保存できませんでした。')
+        return
+      }
+      // 保存後は押せなくする。二度押しで同じものが2つできるのを防ぐ。
+      setSaved(true)
     } catch {
       setError('保存できませんでした。通信状態を確認して、もう一度お試しください。')
     } finally {
@@ -73,6 +79,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
       </nav>
 
       {error ? <p role="alert" className="bg-danger-bg text-danger rounded-control mb-4 px-4 py-3 text-sm">{error}</p> : null}
+      {saved ? <p role="status" className="bg-success-bg text-success rounded-control mb-4 px-4 py-3 text-sm">保存しました。<Link href="/templates" className="font-semibold underline">一覧へ戻る</Link></p> : null}
 
       <div className="flex min-w-0 flex-col gap-4 xl:flex-row">
         <main className="min-w-0 flex-1 space-y-4">
@@ -150,7 +157,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
         </aside>
       </div>
 
-      <StickyBar status="下書き（まだ誰にも送られません）" actions={<><Button href="/templates" variant="secondary">キャンセル</Button><Button type="button" variant="secondary" disabled={saving} onClick={() => void save()}>下書きに保存</Button><Button type="button" variant="primary" disabled={saving} onClick={() => void save()}>{saving ? '保存中…' : 'テンプレートを保存'}</Button></>} />
+      <StickyBar status={saved ? '保存しました。一覧へ戻れます。' : '下書き（まだ誰にも送られません）'} actions={<><Button href="/templates" variant="secondary">キャンセル</Button><Button type="button" variant="secondary" disabled={saving || saved} onClick={() => void save()}>下書きに保存</Button><Button type="button" variant="primary" disabled={saving || saved} onClick={() => void save()}>{saving ? '保存中…' : saved ? '保存しました' : 'テンプレートを保存'}</Button></>} />
     </div>
   )
 }

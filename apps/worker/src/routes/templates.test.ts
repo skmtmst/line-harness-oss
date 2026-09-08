@@ -117,7 +117,7 @@ describe('テンプレートのLINEアカウント境界', () => {
   });
 
   it('一覧は選択中LINEアカウントだけをDB層へ渡す', async () => {
-    mocks.getTemplatesWithUsageCount.mockResolvedValue([]);
+    mocks.getTemplatesWithUsageCount.mockResolvedValue({ items: [], total: 0 });
     mocks.getCarouselTapTotals.mockResolvedValue(new Map());
     const response = await makeApp().fetch(
       new Request('https://example.com/api/templates?account_id=account-1'),
@@ -128,16 +128,16 @@ describe('テンプレートのLINEアカウント境界', () => {
     expect(mocks.getTemplatesWithUsageCount).toHaveBeenCalledWith(env.DB, undefined, {
       accountIds: ['account-1'],
       includeUnassigned: false,
-    });
+    }, undefined);
   });
 
   it('一覧は当月・累計の実送信数を返す', async () => {
-    mocks.getTemplatesWithUsageCount.mockResolvedValue([{
+    mocks.getTemplatesWithUsageCount.mockResolvedValue({ items: [{
       id: 'tpl-1', line_account_id: 'account-1', name: '案内', category: 'general',
       message_type: 'text', message_content: '本文', question_json: null,
       question_status: 'published', folder_id: null, usage_count: 1,
       created_at: '2026-09-01', updated_at: '2026-09-01',
-    }]);
+    }], total: 1 });
     mocks.getCarouselTapTotals.mockResolvedValue(new Map());
     mocks.getTemplateSendCounts.mockResolvedValue(new Map([[
       'tpl-1', { thisMonth: 12, total: 48 },
@@ -153,5 +153,59 @@ describe('テンプレートのLINEアカウント境界', () => {
       data: [{ id: 'tpl-1', monthlySendCount: 12, totalSendCount: 48 }],
     });
     expect(mocks.getTemplateSendCounts).toHaveBeenCalledWith(env.DB, ['tpl-1']);
+  });
+
+  it('中1: page/limit付きは共通一覧契約の形で返し、DBへ切り出しを渡す', async () => {
+    mocks.getTemplatesWithUsageCount.mockResolvedValue({ items: [], total: 3 });
+    mocks.getCarouselTapTotals.mockResolvedValue(new Map());
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/templates?account_id=account-1&page=2&limit=1'),
+      env,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      data: {
+        items: [],
+        total: 3,
+        limit: 1,
+        sort: [
+          { field: 'created_at', direction: 'desc' },
+          { field: 'id', direction: 'asc' },
+        ],
+      },
+    });
+    expect(mocks.getTemplatesWithUsageCount).toHaveBeenCalledWith(env.DB, undefined, {
+      accountIds: ['account-1'],
+      includeUnassigned: false,
+    }, { limit: 1, offset: 1 });
+  });
+
+  it('中4: カード型・カルーセルの巨大な本文は422で断る', async () => {
+    const hugeCarousel = JSON.stringify(Array.from({ length: 10 }, (_, index) => ({
+      thumbnailImageUrl: `https://example.co.jp/${'a'.repeat(6000)}`,
+      title: `パネル${index + 1}`,
+      text: 'あ'.repeat(50),
+      actions: [{ type: 'uri', label: '詳しく見る', uri: 'https://example.co.jp/' }],
+    })));
+    for (const messageContent of ['あ'.repeat(50001), hugeCarousel]) {
+      const response = await makeApp().fetch(
+        new Request('https://example.com/api/templates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            accountId: 'account-1',
+            name: '巨大',
+            category: 'general',
+            messageType: messageContent === hugeCarousel ? 'carousel' : 'flex',
+            messageContent,
+          }),
+        }),
+        env,
+      );
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ error: expect.stringContaining('大きすぎます') });
+    }
+    expect(mocks.createTemplate).not.toHaveBeenCalled();
   });
 });

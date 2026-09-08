@@ -1,3 +1,4 @@
+import type { Tag } from '@line-crm/shared'
 import { describe, expect, it } from 'vitest'
 import {
   canSubmit,
@@ -7,6 +8,7 @@ import {
   titleNotice,
   toCreateInput,
   validateDraft,
+  visibleAccountTags,
 } from './column-form'
 
 const draft = (over: Partial<typeof EMPTY_DRAFT> = {}) => ({
@@ -137,5 +139,26 @@ describe('公開日時', () => {
   it('日付だけ・時刻だけでは送らない', () => {
     expect(publishedAtIso('2026-08-31')).toBeNull()
     expect(validateDraft(draft({ publishedAt: '2026-08-31' })).map((e) => e.field)).toContain('publishedAt')
+  })
+})
+
+describe('タグの候補(点検 #512 の中4)', () => {
+  const tag = (over: Partial<Tag>): Tag => ({
+    id: 'tag-1', name: 'NEN会員', color: '#8B938D', createdAt: '2026-01-01T00:00:00.000Z',
+    ...over,
+  })
+
+  it('このアカウントのタグだけを残す', () => {
+    const tags = [
+      tag({ id: 'mine', lineAccountId: 'account-a' }),
+      tag({ id: 'other', name: '別アカ', lineAccountId: 'account-b' }),
+      tag({ id: 'unassigned', name: '所属なし', lineAccountId: null }),
+    ]
+    // 他アカウントは選べると保存で400、所属なしも保存口が断る。
+    expect(visibleAccountTags(tags, 'account-a').map((row) => row.id)).toEqual(['mine'])
+  })
+
+  it('他アカウントしかなければ空にする', () => {
+    expect(visibleAccountTags([tag({ lineAccountId: 'account-b' })], 'account-a')).toEqual([])
   })
 })

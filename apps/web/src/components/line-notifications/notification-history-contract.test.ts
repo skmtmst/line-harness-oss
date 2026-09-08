@@ -40,7 +40,7 @@ describe('V6 LINE notification history contract', () => {
   })
 
   it('shows retry only when the ledger marks the row retryable and sends its record version', () => {
-    expect(LIST).toContain("item.retryAvailable ?")
+    expect(LIST).toContain('item.retryAvailable && canRetry ?')
     expect(LIST).toContain('expectedVersion: item.recordVersion')
     expect(LIST).toContain('送信を再試行')
     expect(API).toContain('retryAvailable: boolean')

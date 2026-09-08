@@ -23,6 +23,7 @@ const dbMocks = {
   setPageRichMenuId: vi.fn(),
   markRichMenuGroupPublished: vi.fn(),
   getLineAccountById: vi.fn(),
+  getFollowingLineUserIdsByTag: vi.fn(),
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
@@ -1017,5 +1018,204 @@ describe('POST /api/rich-menu-groups/:groupId/publish', () => {
     const res = await app.request('/api/rich-menu-groups/gid12345-aaaa/publish', { method: 'POST' });
     expect(res.status).toBe(500);
     expect(dbMocks.releasePublishLock).toHaveBeenCalledWith(expect.anything(), 'gid12345-aaaa');
+  });
+});
+
+// ----- #502中 (PR #552): 優先順一括・冪等キー・作成時フォルダ・条件上限・外部応答の固定文言 -----
+
+describe('POST /api/rich-menu-groups/reorder-priorities (#502中)', () => {
+  test('id配列を1回でそろえ直す', async () => {
+    dbMocks.getRichMenuGroups.mockResolvedValue([{ id: 'g1' }, { id: 'g2' }, { id: 'g3' }]);
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups/reorder-priorities', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: 'acc-1', orderedIds: ['g2', 'g1', 'g3'] }),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true, data: { updated: 3 } });
+    // 個別PATCHは使わない。1 batch で3件そろえる。
+    expect(dbMocks.updateRichMenuGroupMeta).not.toHaveBeenCalled();
+  });
+
+  test('足りない・余分・重複のidは400で何も書かない', async () => {
+    dbMocks.getRichMenuGroups.mockResolvedValue([{ id: 'g1' }, { id: 'g2' }]);
+    const app = setupApp();
+    for (const orderedIds of [['g1'], ['g1', 'g2', 'g3'], ['g1', 'g1'], ['g1', 'other']]) {
+      const res = await app.request('/api/rich-menu-groups/reorder-priorities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId: 'acc-1', orderedIds }),
+      });
+      expect(res.status).toBe(400);
+    }
+  });
+
+  test('一般スタッフは並び替えできない', async () => {
+    const app = setupApp({ staff: { id: 'staff-1', role: 'staff' } });
+    const res = await app.request('/api/rich-menu-groups/reorder-priorities', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: 'acc-1', orderedIds: [] }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  test('見えないアカウントの並び替えは404で隠す', async () => {
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups/reorder-priorities', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: 'other', orderedIds: [] }),
+    });
+    expect(res.status).toBe(404);
+    expect(dbMocks.getRichMenuGroups).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/rich-menu-groups/:groupId/apply-to-tag (#502中)', () => {
+  const publishedGroup = {
+    id: 'g1', account_id: 'acc-1', status: 'published',
+    default_page_id: 'p1',
+    pages: [{ id: 'p1', order_index: 0, line_richmenu_id: 'rm-1' }],
+  };
+
+  test('一括適用は実行キーが無ければ受け付けない', async () => {
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue(publishedGroup);
+    dbMocks.getLineAccountById.mockResolvedValue({ channel_access_token: 'tk' });
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups/g1/apply-to-tag', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'bulk-link', tagId: null }),
+    });
+    expect(res.status).toBe(400);
+    expect((await res.json() as { error: string }).error).toContain('Idempotency-Key');
+    expect(dbMocks.getFollowingLineUserIdsByTag).not.toHaveBeenCalled();
+  });
+
+  test('対象0件は鍵をrunIdとして返す', async () => {
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue(publishedGroup);
+    dbMocks.getLineAccountById.mockResolvedValue({ channel_access_token: 'tk' });
+    dbMocks.getFollowingLineUserIdsByTag.mockResolvedValue([]);
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups/g1/apply-to-tag', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'run-1' },
+      body: JSON.stringify({ mode: 'bulk-link', tagId: null }),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      success: true, data: { chunks: 0, total: 0, runId: 'run-1', message: 'no matching followers' },
+    });
+  });
+});
+
+describe('POST /api/rich-menu-groups (作成時フォルダ #502中)', () => {
+  test('folderIdの形違いは400', async () => {
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accountId: 'a', name: 'x', chatBarText: 'x', size: 'large', folderId: 123,
+        pages: [{ name: 'p1', orderIndex: 0, areas: [] }],
+      }),
+    });
+    expect(res.status).toBe(400);
+    expect(dbMocks.createRichMenuGroup).not.toHaveBeenCalled();
+  });
+
+  test('folderIdを作成へそのまま渡す', async () => {
+    dbMocks.createRichMenuGroup.mockResolvedValue({
+      id: 'new-1', account_id: 'a', name: 'x', chat_bar_text: 'x', size: 'large',
+      default_page_id: 'p1', is_default_for_all: 0, status: 'draft', publishing_at: null,
+      created_at: '2026-05-08T00:00:00.000', updated_at: '2026-05-08T00:00:00.000',
+      pages: [{ id: 'p1', group_id: 'new-1', order_index: 0, name: 'p1', alias_id: 'lhx-newxxxxx-0',
+        line_richmenu_id: null, image_r2_key: null, image_content_type: null,
+        created_at: '2026-05-08T00:00:00.000', updated_at: '2026-05-08T00:00:00.000', areas: [] }],
+    });
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accountId: 'a', name: 'x', chatBarText: 'x', size: 'large', folderId: 'folder-1',
+        pages: [{ name: 'p1', orderIndex: 0, areas: [] }],
+      }),
+    });
+    expect(res.status).toBe(200);
+    expect(dbMocks.createRichMenuGroup).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ folderId: 'folder-1' }),
+    );
+  });
+});
+
+describe('人数プレビューの権限と複雑さ上限 (#502中)', () => {
+  test('一般スタッフは人数を数えられない', async () => {
+    const app = setupApp({ staff: { id: 'staff-1', role: 'staff' } });
+    const res = await app.request('/api/rich-menu-groups/g1/preview-targets', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    });
+    expect(res.status).toBe(403);
+  });
+
+  test('条件が複雑すぎるときは数えず400', async () => {
+    dbMocks.getRichMenuGroupById.mockResolvedValue({
+      id: 'g1', account_id: 'acc-1', status: 'draft', size: 'large',
+      targeting_condition: null, targeting_priority: 0,
+    });
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups/g1/preview-targets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        conditions: {
+          operator: 'AND',
+          rules: Array.from({ length: 51 }, (_, i) => ({ type: 'tag_exists', value: `tag-${i}` })),
+        },
+      }),
+    });
+    expect(res.status).toBe(400);
+    expect((await res.json() as { error: string }).error).toContain('複雑');
+  });
+});
+
+describe('外部応答の固定文言 (#502中)', () => {
+  test('取込でLINEに無いときは外部本文を出さない', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue({ channel_access_token: 'tk' });
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('{"error":"external detail leak"}', { status: 404 }));
+    const app = setupApp();
+    const res = await app.request(
+      '/api/rich-menu-groups/import?accountId=acc-1&richMenuId=no-such-menu',
+      { method: 'POST' },
+    );
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).not.toContain('external detail leak');
+    expect(body.error).toContain('見つかりません');
+    fetchSpy.mockRestore();
+  });
+
+  test('外部画像のIDは符号化して送る', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue({ channel_access_token: 'tk' });
+    const seen: string[] = [];
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      seen.push(String(input));
+      return new Response(new Uint8Array([1, 2, 3]), {
+        status: 200, headers: { 'content-type': 'image/png' },
+      });
+    });
+    const app = setupApp();
+    const res = await app.request(
+      '/api/rich-menu-groups/external/a%20b/image?accountId=acc-1',
+    );
+    expect(res.status).toBe(200);
+    expect(seen[0]).toContain(encodeURIComponent('a b'));
+    expect(seen[0]).not.toContain('/richmenu/a b/');
+    fetchSpy.mockRestore();
   });
 });

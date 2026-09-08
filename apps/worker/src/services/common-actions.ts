@@ -120,7 +120,12 @@ export interface CommonActionResources {
   notificationRules: Array<{ id: string; name: string }>;
   webhooks: Array<{ id: string; name: string }>;
   richMenus: Array<{ id: string; name: string }>;
-  commonActions: Array<{ id: string; name: string; version: number }>;
+  commonActions: Array<{
+    id: string;
+    name: string;
+    version: number;
+    currentPublishedVersionId: string;
+  }>;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -610,6 +615,101 @@ export async function listCommonActions(
   })), total: Number(total?.count ?? 0) };
 }
 
+/**
+ * 一覧の札・KPIに使う集計だけを返す（#554 点検#519中2）。
+ *
+ * 画面は件数表示のために全件取得をもう1回投げていたが、行単価の高い
+ * 月次集計サブクエリ4本が行ごとに走るため、表示1回で2倍走っていた。
+ * 集計はページ送り・絞り込みに依らずアカウント全体で数える。
+ * 行ごとの内訳式は `listCommonActions` と同じにし、画面の合計と一致させる。
+ */
+export async function getCommonActionsSummary(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<{
+  total: number;
+  published: number;
+  draft: number;
+  oldVersion: number;
+  unused: number;
+  actions: number;
+  bindings: number;
+  outdated: number;
+  outdatedItems: number;
+  executions: number;
+  failures: number;
+}> {
+  const row = await db.prepare(
+    `SELECT COUNT(*) AS total,
+            SUM(CASE WHEN status = 'published' THEN 1 ELSE 0 END) AS published,
+            SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) AS draft,
+            SUM(CASE WHEN old_binding_count > 0 THEN 1 ELSE 0 END) AS old_version,
+            SUM(CASE WHEN status = 'published' AND binding_count = 0 THEN 1 ELSE 0 END) AS unused,
+            SUM(action_count) AS actions,
+            SUM(binding_count) AS bindings,
+            SUM(old_binding_count) AS outdated,
+            SUM(CASE WHEN old_binding_count > 0 THEN 1 ELSE 0 END) AS outdated_items,
+            SUM(execution_count_this_month) AS executions,
+            SUM(failure_count_this_month) AS failures
+       FROM (SELECT ca.status AS status,
+                    COALESCE(json_array_length(COALESCE(dv.action_config, pv.action_config, '[]')), 0) AS action_count,
+                    COUNT(DISTINCT b.id) AS binding_count,
+                    COUNT(DISTINCT CASE
+                      WHEN ca.current_published_version_id IS NOT NULL
+                       AND b.common_action_version_id <> ca.current_published_version_id THEN b.id END) AS old_binding_count
+                    ,(SELECT COUNT(DISTINCT r.id)
+                        FROM automation_run_steps marker
+                        JOIN automation_runs r ON r.id = marker.automation_run_id
+                        JOIN common_action_versions metric_version
+                          ON metric_version.id = marker.common_action_version_id
+                       WHERE metric_version.common_action_id = ca.id
+                         AND marker.action_type = 'common_action_marker'
+                         AND r.is_test = 0
+                         AND r.line_account_id = ca.line_account_id
+                         AND strftime('%Y-%m', r.created_at) = strftime('%Y-%m', 'now')) AS execution_count_this_month
+                    ,(SELECT COUNT(DISTINCT r.id)
+                        FROM automation_run_steps marker
+                        JOIN automation_runs r ON r.id = marker.automation_run_id
+                        JOIN common_action_versions metric_version
+                          ON metric_version.id = marker.common_action_version_id
+                       WHERE metric_version.common_action_id = ca.id
+                         AND marker.action_type = 'common_action_marker'
+                         AND r.is_test = 0
+                         AND r.line_account_id = ca.line_account_id
+                         AND EXISTS (
+                           SELECT 1 FROM automation_run_steps failed_step
+                            WHERE failed_step.automation_run_id = r.id
+                              AND failed_step.status = 'failed'
+                              AND substr(failed_step.step_key, 1, length(marker.step_key) + 1)
+                                  = marker.step_key || '/'
+                         )
+                         AND strftime('%Y-%m', r.created_at) = strftime('%Y-%m', 'now')) AS failure_count_this_month
+               FROM common_actions ca
+               LEFT JOIN common_action_versions dv ON dv.id = ca.current_draft_version_id
+               LEFT JOIN common_action_versions pv ON pv.id = ca.current_published_version_id
+               LEFT JOIN common_action_bindings b ON b.common_action_id = ca.id
+              WHERE ca.line_account_id = ?
+              GROUP BY ca.id)`,
+  ).bind(lineAccountId).first<{
+    total: number; published: number | null; draft: number | null; old_version: number | null;
+    unused: number | null; actions: number | null; bindings: number | null; outdated: number | null;
+    outdated_items: number | null; executions: number | null; failures: number | null;
+  }>();
+  return {
+    total: Number(row?.total ?? 0),
+    published: Number(row?.published ?? 0),
+    draft: Number(row?.draft ?? 0),
+    oldVersion: Number(row?.old_version ?? 0),
+    unused: Number(row?.unused ?? 0),
+    actions: Number(row?.actions ?? 0),
+    bindings: Number(row?.bindings ?? 0),
+    outdated: Number(row?.outdated ?? 0),
+    outdatedItems: Number(row?.outdated_items ?? 0),
+    executions: Number(row?.executions ?? 0),
+    failures: Number(row?.failures ?? 0),
+  };
+}
+
 export async function listCommonActionResources(
   db: D1Database,
   input: {
@@ -671,7 +771,8 @@ export async function listCommonActionResources(
         ORDER BY g.name ASC, p.order_index ASC`,
     ).bind(input.lineAccountId).all<{ id: string; name: string }>(),
     db.prepare(
-      `SELECT ca.id, ca.name, cav.version_number AS version
+      `SELECT ca.id, ca.name, cav.version_number AS version,
+              ca.current_published_version_id
          FROM common_actions ca
          JOIN common_action_versions cav
            ON cav.id = ca.current_published_version_id AND cav.common_action_id = ca.id
@@ -683,7 +784,12 @@ export async function listCommonActionResources(
       input.lineAccountId,
       input.excludeCommonActionId ?? '',
       input.excludeCommonActionId ?? '',
-    ).all<{ id: string; name: string; version: number }>(),
+    ).all<{
+      id: string;
+      name: string;
+      version: number;
+      current_published_version_id: string;
+    }>(),
   ]);
   const objectSchema = (
     required: string[],
@@ -721,7 +827,12 @@ export async function listCommonActionResources(
     notificationRules: notificationRules.results ?? [],
     webhooks: webhooks.results ?? [],
     richMenus: richMenus.results ?? [],
-    commonActions: commonActionRows.results ?? [],
+    commonActions: (commonActionRows.results ?? []).map((row) => ({
+      id: row.id,
+      name: row.name,
+      version: row.version,
+      currentPublishedVersionId: row.current_published_version_id,
+    })),
   };
 }
 

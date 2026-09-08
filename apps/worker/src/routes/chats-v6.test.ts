@@ -173,12 +173,25 @@ describe('V6受信箱の保存検索', () => {
       saved('shared', '共有', 'staff-2', 1),
       saved('private', '他人用', 'staff-2', 0),
     ]);
+    const db = {
+      prepare(sql: string) {
+        expect(sql).toContain('LIMIT 1001');
+        const statement = {
+          bind: vi.fn(() => statement),
+          first: vi.fn(async () => ({ count: 1001 })),
+        };
+        return statement;
+      },
+    } as unknown as D1Database;
     const response = await app().request('/api/inbox/saved-views?lineAccountId=account-1', {}, {
-      DB: {} as D1Database,
+      DB: db,
     } as Env['Bindings']);
     expect(response.status).toBe(200);
-    const body = await response.json() as { data: Array<{ id: string }> };
+    const body = await response.json() as {
+      data: Array<{ id: string; matchCount: number; matchCountCapped: boolean }>;
+    };
     expect(body.data.map((row) => row.id)).toEqual(['own', 'shared']);
+    expect(body.data[0]).toMatchObject({ matchCount: 1000, matchCountCapped: true });
   });
 
   test('同じ所有者の同名と未知の状態を個別に拒否する', async () => {

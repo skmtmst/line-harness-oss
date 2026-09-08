@@ -119,7 +119,7 @@ export default function NewAffiliatePage() {
         if (payoutKind === 'rate') {
           const rate = Number(commissionRate)
           if (!Number.isFinite(rate) || rate <= 0 || rate > 100) {
-            return '売上に対する割合は0より大きく100以下で入力してください'
+            return '売上に対する割合は0から100の間で入力してください'
           }
         }
         if (holdDays.trim()) {

@@ -293,10 +293,14 @@ export default function PhotoReviewsPage() {
         })),
       }, crypto.randomUUID())
       if (!response.success) throw new Error(response.error)
-      const notification = response.data.notificationFailures > 0
-        ? `うち${response.data.notificationFailures}件はLINE通知を送れませんでした。`
-        : '投稿者へのLINE通知も送信しました。'
-      setNotice(`${response.data.updatedCount}枚の審査結果を保存しました。${notification}`)
+      /*
+       * 一括審査の口は `{updatedCount, items}` を返し、通知は `pending` で
+       * 積むだけでその場では送らない（#500）。「送信しました」と書くと
+       * 実際と違うので、件数と順次送信の旨だけ出す。
+       */
+      const updated = (response.data as { updatedCount?: unknown }).updatedCount
+      const count = typeof updated === 'number' ? updated : selectedPendingPhotos.length
+      setNotice(`${count}枚の審査結果を保存しました（通知は順次送信）。`)
       setSelectedPhotoIds([])
       setBulkApproveOpen(false)
       setBulkReturnOpen(false)

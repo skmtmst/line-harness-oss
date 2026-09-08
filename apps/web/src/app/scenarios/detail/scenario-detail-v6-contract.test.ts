@@ -64,10 +64,11 @@ describe('V6 シナリオ編集の契約', () => {
     expect(LIST_TABLE).toContain("onMoveFolder?.(s.id, event.target.value)")
   })
 
-  it('「今月作成」は日本時間の作成日時で実際に絞り込む', () => {
+  it('「今月作成」は日本時間の月初を共通一覧APIへ渡して絞り込む', () => {
     expect(LIST).toContain("timeZone: 'Asia/Tokyo'")
     expect(LIST).toContain('active: createdThisMonthOnly')
     expect(LIST).toContain('aria-pressed={filter.disabled ? undefined : filter.active}')
-    expect(LIST).toContain('createdThisMonthOnly ? isCreatedThisMonth(sc.createdAt) : true')
+    expect(LIST).toContain('createdFrom: createdThisMonthOnly ? currentMonthStart() : undefined')
+    expect(LIST).not.toContain('createdThisMonthOnly ? isCreatedThisMonth(sc.createdAt) : true')
   })
 })
