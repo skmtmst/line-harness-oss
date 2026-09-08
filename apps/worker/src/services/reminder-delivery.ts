@@ -19,6 +19,7 @@ import {
   getLineAccountById,
   getTemplateById,
   skipReminderDeliveryRun,
+  verifyClaimedRunBeforeSend,
 } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
 import { addJitter, sleep } from './stealth.js';
@@ -206,6 +207,17 @@ export async function processReminderDeliveries(
           ? options.resolveClient(accountId, lineClient)
           : defaultResolveClient(db, accountId, lineClient));
         const built = await buildReminderStepMessage(db, step, friend, sendAt);
+        // 取消と送信の競合対策: push の直前に送る権利を1文で確かめる。
+        // この後 push まで待たない (間に取消が入る余地を残さない)。
+        if (!await verifyClaimedRunBeforeSend(db, {
+          id: run.id,
+          friendReminderId: enrollment.id,
+          now: nowIso,
+          leaseExpiresAt,
+        })) {
+          result.skipped++;
+          continue;
+        }
         const response = await deliveryClient.pushMessageWithRequestId(
           friend.line_user_id,
           [built.message],

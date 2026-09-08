@@ -325,7 +325,7 @@ describe('リマインダ配信の実行記録', () => {
 
     const result = await processReminderDeliveries(db, client, {
       now: new Date('2026-08-28T09:00:00.000Z'),
-      // 2件目の claim と送信の割り込みで取消が入った想定。再確認で止める。
+      // 2件目の claim の割り込みで取消が入った想定。claim が原子的に拒否する。
       pause: async () => {
         await db.prepare(
           `UPDATE friend_reminders SET status = 'cancelled', updated_at = ? WHERE id = 'enrollment-2'`,
@@ -335,12 +335,42 @@ describe('リマインダ配信の実行記録', () => {
     })
 
     expect(pushes).toEqual(['U-friend-1'])
-    expect(result).toEqual({ succeeded: 1, skipped: 1, retrying: 0, failed: 0 })
+    // claim 拒否は握っていないため skipped に数えない。送らず止める約束は同じ。
+    expect(result).toEqual({ succeeded: 1, skipped: 0, retrying: 0, failed: 0 })
     expect(raw.prepare(
       `SELECT status FROM reminder_delivery_runs WHERE friend_reminder_id = 'enrollment-2'`,
     ).get()).toEqual({ status: 'cancelled' })
     expect(raw.prepare(
       `SELECT status FROM friend_reminders WHERE id = 'enrollment-2'`,
+    ).get()).toEqual({ status: 'cancelled' })
+  })
+
+  it('active確認後・push直前の取消でも送らない (送信直前の原子検証)', async () => {
+    const { db, raw } = createTestD1()
+    seedReminder(raw)
+    const pushes: string[] = []
+    const client = makeClient(async (userId) => {
+      pushes.push(userId)
+      return { requestId: null }
+    })
+
+    const result = await processReminderDeliveries(db, client, {
+      now: new Date('2026-08-28T09:00:00.000Z'),
+      pause: noPause,
+      // claim 直後の active 確認を通ってから、push 直前に利用者が取消した想定。
+      // 旧実装はこの窓で送信していた。新実装は送らず止める。
+      resolveClient: async (_accountId, fallback) => {
+        await db.prepare(
+          `UPDATE friend_reminders SET status = 'cancelled', updated_at = ? WHERE id = 'enrollment-1'`,
+        ).bind('2026-08-28T09:00:00.000Z').run()
+        return fallback
+      },
+    })
+
+    expect(pushes).toEqual([])
+    expect(result).toEqual({ succeeded: 0, skipped: 1, retrying: 0, failed: 0 })
+    expect(raw.prepare(
+      `SELECT status FROM reminder_delivery_runs WHERE friend_reminder_id = 'enrollment-1'`,
     ).get()).toEqual({ status: 'cancelled' })
   })
 })

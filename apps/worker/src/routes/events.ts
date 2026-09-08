@@ -853,49 +853,54 @@ events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'a
   if (setClauses.length === 0) {
     return c.json(slot);
   }
+  // If the slot time moved, reminders for the slot's confirmed bookings are
+  // now stale (they still point at the old starts_at).
+  // N-065: V6 の未来予定だけを先に新基準日へ移す (枠更新より前)。
+  // 枠を先に更新すると、V6 の途中失敗後の再送で旧起点が分からなくなり、
+  // 移行前の行が旧日のまま残る。V6 を先にすると失敗時は枠が untouched の
+  // まま 500 になるため、同じリクエストの再送がそのまま回復になる。
+  // 送信済みは残し、現在の枠時刻へ直すため再送は冪等。
+  const slotStartsAtChanging = Object.prototype.hasOwnProperty.call(body, 'starts_at');
+  if (slotStartsAtChanging) {
+    const oldStartsAt = slot.starts_at as string;
+    const newStartsAt = body.starts_at as string;
+    const confirmed = await c.env.DB
+      .prepare(
+        `SELECT id, friend_id, line_account_id FROM event_bookings
+          WHERE slot_id = ? AND status = 'confirmed'`,
+      )
+      .bind(slot_id)
+      .all<{ id: string; friend_id: string; line_account_id: string }>();
+    for (const bookingRow of confirmed.results ?? []) {
+      if (oldStartsAt !== newStartsAt) {
+        await rescheduleByTrigger(c.env.DB, {
+          triggerType: 'event',
+          sourceId: bookingRow.id,
+          sourceEventId: bookingRow.id,
+          friendId: bookingRow.friend_id,
+          oldStartsAtIso: oldStartsAt,
+          newStartsAtIso: newStartsAt,
+          lineAccountId: bookingRow.line_account_id,
+        });
+      }
+      await reconcileV6ToStartsAt(c.env.DB, {
+        triggerType: 'event',
+        sourceId: bookingRow.id,
+        sourceEventId: bookingRow.id,
+        friendId: bookingRow.friend_id,
+        startsAtIso: newStartsAt,
+      });
+    }
+  }
   setClauses.push(`updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`);
   setValues.push(slot_id);
   await c.env.DB
     .prepare(`UPDATE event_slots SET ${setClauses.join(', ')} WHERE id = ?`)
     .bind(...setValues)
     .run();
-  // If the slot time moved, reminders for the slot's confirmed bookings are
-  // now stale (they still point at the old starts_at).
-  if (Object.prototype.hasOwnProperty.call(body, 'starts_at')) {
+  if (slotStartsAtChanging) {
+    // 旧表の作り直しは更新後の枠時刻を読むため、枠更新の後に行う。
     await rebuildRemindersForSlot(c.env.DB, slot_id);
-    // N-065: V6 の未来予定だけを新基準日へ移す。送信済みは残す。
-    // 途中失敗後の再送でも回復するよう、現在の枠時刻へ直す (冪等)。
-    const oldStartsAt = slot.starts_at as string;
-    const newStartsAt = body.starts_at as string;
-    {
-      const confirmed = await c.env.DB
-        .prepare(
-          `SELECT id, friend_id, line_account_id FROM event_bookings
-            WHERE slot_id = ? AND status = 'confirmed'`,
-        )
-        .bind(slot_id)
-        .all<{ id: string; friend_id: string; line_account_id: string }>();
-      for (const bookingRow of confirmed.results ?? []) {
-        if (oldStartsAt !== newStartsAt) {
-          await rescheduleByTrigger(c.env.DB, {
-            triggerType: 'event',
-            sourceId: bookingRow.id,
-            sourceEventId: bookingRow.id,
-            friendId: bookingRow.friend_id,
-            oldStartsAtIso: oldStartsAt,
-            newStartsAtIso: newStartsAt,
-            lineAccountId: bookingRow.line_account_id,
-          });
-        }
-        await reconcileV6ToStartsAt(c.env.DB, {
-          triggerType: 'event',
-          sourceId: bookingRow.id,
-          sourceEventId: bookingRow.id,
-          friendId: bookingRow.friend_id,
-          startsAtIso: newStartsAt,
-        });
-      }
-    }
   }
   const row = await c.env.DB.prepare(`SELECT * FROM event_slots WHERE id = ?`).bind(slot_id).first();
   return c.json(row);

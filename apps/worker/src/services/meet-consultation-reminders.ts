@@ -227,6 +227,16 @@ export async function registerMeetConsultation(
     lineAccountId: friend.line_account_id,
     allowLegacyFallback: false,
   };
+  const friendChanged = Boolean(existing && existing.friend_id !== input.friendId);
+  if (friendChanged) {
+    // 友だち変更は新規成功後に旧取消: 先に新 friend へ登録する。
+    // 登録失敗は投げる (成功扱いにすると新旧どちらの通知も消える)。
+    // 旧 friend の行には触っていないため、旧通知が残り再送で回復できる。
+    await enrollByTrigger(db, {
+      ...v6Base,
+      startsAtIso: normalizedStart,
+    });
+  }
   await reconcileV6ToStartsAt(db, {
     triggerType: v6Base.triggerType,
     sourceKind: v6Base.sourceKind,
@@ -235,11 +245,13 @@ export async function registerMeetConsultation(
     friendId: v6Base.friendId,
     startsAtIso: normalizedStart,
   });
-  // 登録失敗で相談登録自体を壊さない。二重登録は enroll 側で吸収する。
-  await enrollByTrigger(db, {
-    ...v6Base,
-    startsAtIso: normalizedStart,
-  }).catch((error) => console.error('meet reminder enroll (v6) failed:', error));
+  if (!friendChanged) {
+    // 登録失敗で相談登録自体を壊さない。二重登録は enroll 側で吸収する。
+    await enrollByTrigger(db, {
+      ...v6Base,
+      startsAtIso: normalizedStart,
+    }).catch((error) => console.error('meet reminder enroll (v6) failed:', error));
+  }
 
   return { id: consultationId, reminders: schedules };
 }
@@ -342,6 +354,23 @@ export async function processDueMeetConsultationReminders(
         row.channel_access_token,
         { lineAccountId: row.line_account_id, field: 'channel_access_token' },
       );
+      // 取消と送信の競合対策: push の直前にもう一度だけ確かめる。
+      // この後 push まで待たない (間に取消が入る余地を残さない)。
+      const liveBeforePush = await db
+        .prepare(`SELECT status FROM meet_consultations WHERE id = ?`)
+        .bind(row.consultation_id)
+        .first<{ status: string }>();
+      if (!liveBeforePush || liveBeforePush.status !== 'confirmed') {
+        await db
+          .prepare(
+            `UPDATE meet_consultation_reminders
+                SET status='cancelled', updated_at=?
+              WHERE id=? AND status IN ('pending','failed')`,
+          )
+          .bind(nowIso, row.id)
+          .run();
+        continue;
+      }
       await pushViaHarnessProxy(
         options.proxyBaseUrl,
         accessToken,
@@ -350,11 +379,12 @@ export async function processDueMeetConsultationReminders(
         row.id,
         options.proxyDispatch,
       );
+      // 同時取消で止められた行を sent で上書きしない (状態だけ守る。送信数は数える)。
       await db
         .prepare(
           `UPDATE meet_consultation_reminders
               SET status='sent', sent_at=?, last_error=NULL, updated_at=?
-            WHERE id=?`,
+            WHERE id=? AND status IN ('pending','failed')`,
         )
         .bind(nowIso, nowIso, row.id)
         .run();

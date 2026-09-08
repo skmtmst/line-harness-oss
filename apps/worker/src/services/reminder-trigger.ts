@@ -63,8 +63,10 @@ export function resolveAnchor(rule: ReminderTriggerRow, startsAtIso: string): st
 /**
  * このきっかけで動くリマインダを探して、友だちを登録する。
  *
- * 同じ friend + reminder + target_date が既に active なら何もしない。
+ * 同じ発生元 (source_kind + source_id + source_event_id) の行が
+ * friend + reminder + target_date で既に active なら何もしない。
  * 予約の状態が何度か変わっても、そのたびに登録が増えないようにするため。
+ * 同時刻の別予約は発生元が違うため別行で共存する。
  *
  * 失敗しても呼び出し側は止めない。リマインダが登録できなかったからといって
  * 予約そのものを失敗させるのは筋が違う。
@@ -106,13 +108,23 @@ export async function enrollByTrigger(
     const anchor = resolveAnchor(rule, input.startsAtIso);
     if (!anchor) continue;
 
+    // 同じ発生元の再通知だけ重複排除する。source を見ないと、同時刻の
+    // 別予約の2件目を作らず捨ててしまう (別予約は共存させる)。
     const existing = await db
       .prepare(
         `SELECT 1 FROM friend_reminders
           WHERE friend_id = ? AND reminder_id = ? AND target_date = ? AND status = 'active'
+            AND source_kind IS ? AND source_id IS ? AND source_event_id IS ?
           LIMIT 1`,
       )
-      .bind(input.friendId, rule.id, anchor)
+      .bind(
+        input.friendId,
+        rule.id,
+        anchor,
+        input.sourceKind ?? input.triggerType,
+        input.sourceId ?? null,
+        input.sourceEventId ?? null,
+      )
       .first<{ 1: number }>();
     if (existing) continue;
 

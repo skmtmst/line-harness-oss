@@ -921,8 +921,11 @@ async function selectV6LegacyIds(
     bindings.push(legacyTrigger);
   }
   conditions.push(`(${extra})`);
+  // 移行前の行に予約の手がかりは無い。同時刻の別予約が2件あると区別できない
+  // ため、古い1件だけを安定して扱い、一括取消しない (日時順・id順で決定的)。
   const rows = await db.prepare(
-    `SELECT fr.id AS id FROM friend_reminders fr WHERE ${conditions.join(' AND ')}`,
+    `SELECT fr.id AS id FROM friend_reminders fr WHERE ${conditions.join(' AND ')}
+     ORDER BY fr.created_at ASC, fr.id ASC LIMIT 1`,
   ).bind(...bindings, ...extraBindings).all<{ id: string }>();
   return (rows.results ?? []).map((row) => row.id);
 }
@@ -947,9 +950,13 @@ export async function cancelV6RemindersForSource(
   input: V6SourceMatcher & { cancelReason: string; now?: string },
 ): Promise<CancelV6RemindersResult> {
   const now = input.now ?? jstNow();
-  let ids = await selectV6ActiveIds(db, input, '1 = 1', []);
+  const ids = await selectV6ActiveIds(db, input, '1 = 1', []);
   if (ids.length === 0 && input.allowLegacyFallback !== false) {
-    ids = await selectV6LegacyIds(db, input, '1 = 1', []);
+    // 起点ごとに古い1件だけ拾う。1予約が複数ルールで複数行を持つときは
+    // 起点が違うため各行が止まる。同時刻の別予約は古い側の1件だけに留める。
+    for (const targetDate of new Set(input.targetDates ?? [])) {
+      ids.push(...await selectV6LegacyIds(db, { ...input, targetDates: [targetDate] }, '1 = 1', []));
+    }
   }
   if (ids.length === 0) return { cancelledEnrollments: 0, cancelledRuns: 0 };
 
@@ -1224,6 +1231,8 @@ export async function claimReminderDeliveryRun(
     .first<ReminderDeliveryRunRow>();
   if (!row) return null;
 
+  // 取消と取得の競合対策: 登録が active のままのときだけ握る (原子的)。
+  // getPending (active 読み) から claim の間に取消が入っても、ここで弾く。
   const claimed = await db.prepare(
     `UPDATE reminder_delivery_runs
         SET status = 'claimed',
@@ -1235,6 +1244,7 @@ export async function claimReminderDeliveryRun(
             updated_at = ?
       WHERE id = ?
         AND scheduled_at <= ?
+        AND EXISTS (SELECT 1 FROM friend_reminders WHERE id = ? AND status = 'active')
         AND (
           status = 'queued'
           OR (status = 'retry_wait' AND next_retry_at IS NOT NULL AND next_retry_at <= ?)
@@ -1246,14 +1256,57 @@ export async function claimReminderDeliveryRun(
     input.now,
     row.id,
     input.now,
+    input.friendReminderId,
     input.now,
     input.now,
   ).run();
-  if ((claimed.meta?.changes ?? 0) !== 1) return null;
+  if ((claimed.meta?.changes ?? 0) !== 1) {
+    // 握れなかった行のうち、登録がもう active でないものは二度と送れない。
+    // ここで止めておく (集計の「予定」に残さない)。時刻前・貸出中の行は触らない。
+    await db.prepare(
+      `UPDATE reminder_delivery_runs
+          SET status = 'cancelled', completed_at = ?,
+              lease_expires_at = NULL, next_retry_at = NULL, updated_at = ?
+        WHERE id = ?
+          AND status IN ('queued', 'retry_wait', 'claimed')
+          AND NOT EXISTS (SELECT 1 FROM friend_reminders WHERE id = ? AND status = 'active')`,
+    ).bind(input.now, input.now, row.id, input.friendReminderId).run();
+    return null;
+  }
 
   return db.prepare(`SELECT * FROM reminder_delivery_runs WHERE id = ?`)
     .bind(row.id)
     .first<ReminderDeliveryRunRow>();
+}
+
+/**
+ * 外部送信の直前に送る権利を確かめる (原子的)。
+ *
+ * claim 後・push 前のわずかな間に取消が入る競合がある。送る直前に1文で
+ * 「まだ claimed かつ登録が active」を確かめ、貸出期限を延ばす。
+ * だめなら実行行を止めて false を返す (送らない)。
+ * 取消側が先に実行行を止めていた場合も false になる (二重に送らない)。
+ */
+export async function verifyClaimedRunBeforeSend(
+  db: D1Database,
+  input: { id: string; friendReminderId: string; now: string; leaseExpiresAt: string },
+): Promise<boolean> {
+  const verified = await db.prepare(
+    `UPDATE reminder_delivery_runs
+        SET lease_expires_at = ?, updated_at = ?
+      WHERE id = ?
+        AND status = 'claimed'
+        AND EXISTS (SELECT 1 FROM friend_reminders WHERE id = ? AND status = 'active')`,
+  ).bind(input.leaseExpiresAt, input.now, input.id, input.friendReminderId).run();
+  if ((verified.meta?.changes ?? 0) === 1) return true;
+  await db.prepare(
+    `UPDATE reminder_delivery_runs
+        SET status = 'cancelled', completed_at = ?,
+            lease_expires_at = NULL, next_retry_at = NULL, updated_at = ?
+      WHERE id = ?
+        AND status IN ('queued', 'retry_wait', 'claimed')`,
+  ).bind(input.now, input.now, input.id).run();
+  return false;
 }
 
 /** 成功記録を、配信済み印・messages_logと同じD1 batchへ入れる。 */
