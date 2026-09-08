@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
 import { encryptCredential, getLineAccountById, jstNow } from '@line-crm/db';
-import { addDays, resolveShipDate, toJstMoment } from '@line-crm/shared';
+import { EC_EVENT_TYPES, ecEventLabel, addDays, resolveShipDate, toJstMoment } from '@line-crm/shared';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { requireEcPermission } from './ec-operations.js';
 import { logOutgoingMessage } from '../services/event-bus.js';
-import { EC_EVENT_TYPES, type EcEvent } from './ec-integrations.js';
+import type { EcEvent } from './ec-integrations.js';
 import { ecFlexMessage } from '../services/ec-notification-message.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { auditLog } from '../lib/audit-log.js';
@@ -23,20 +23,6 @@ const STATUS_SET = new Set(['received', 'identity_pending', 'processing', 'proce
 const CONNECTOR_PROVIDERS = new Set(['ec_cube', 'shopify']);
 const CONNECTOR_STATUSES = new Set(['connected', 'degraded', 'paused', 'auth_expired', 'rate_limited']);
 const IDENTITY_RULES = new Set(['verified_email', 'verified_phone', 'manual_name_postal']);
-
-const EVENT_LABELS: Record<string, string> = {
-  'ec.order.confirmed': '注文完了',
-  'ec.order.payment_received': '入金確認完了',
-  'ec.order.bank_transfer_reminder': '銀行振込期限',
-  'ec.order.shipped': '発送完了',
-  'ec.order.cancelled': '注文キャンセル',
-  'ec.order.refunded': '返金完了',
-  'ec.subscription.upcoming': '次回定期便',
-  'ec.subscription.payment_failed': '定期便の決済失敗',
-  'ec.subscription.card_updated': 'カード変更・再決済結果',
-  'ec.subscription.cancelled': '定期便の解約',
-  'ec.customer.profile_updated': 'ペット情報更新',
-};
 
 const FIXED_FIELDS: Record<string, string[]> = {
   'ec.order.confirmed': ['注文番号', '商品名・数量', '合計金額', 'お届け予定', '注文詳細URL'],
@@ -189,7 +175,7 @@ ecCommerce.get(
       lastReceivedAt: summary?.last_received_at ?? null,
       byType: types.results.map((row) => ({
         eventType: row.event_type,
-        label: EVENT_LABELS[row.event_type] || row.event_type,
+        label: ecEventLabel(row.event_type, row.event_type),
         count: row.count,
       })),
     },
@@ -248,7 +234,7 @@ ecCommerce.get('/api/ec-commerce/events', requireRole('owner', 'admin', 'staff')
       id: row.id,
       externalEventId: row.external_event_id,
       eventType: row.event_type,
-      eventLabel: EVENT_LABELS[row.event_type] || row.event_type,
+      eventLabel: ecEventLabel(row.event_type, row.event_type),
       customerId: row.customer_id,
       friendId: row.friend_id,
       friendName: row.friend_name,
@@ -570,7 +556,7 @@ ecCommerce.get('/api/ec-commerce/settings', requireRole('owner', 'admin', 'staff
         .join('\n');
       return {
         eventType: row.event_type,
-        label: EVENT_LABELS[row.event_type] || row.event_type,
+        label: ecEventLabel(row.event_type, row.event_type),
         isEnabled: row.is_enabled === 1,
         title: row.title_override,
         introText: row.intro_text || '',
@@ -819,7 +805,7 @@ ecCommerce.get('/api/ec-commerce/shipments', requireRole('owner', 'admin', 'staf
       return {
         id: row.id,
         eventType: row.event_type,
-        eventLabel: EVENT_LABELS[row.event_type] || row.event_type,
+        eventLabel: ecEventLabel(row.event_type, row.event_type),
         orderNumber: row.order_number,
         friendId: row.friend_id,
         friendName: row.friend_name,

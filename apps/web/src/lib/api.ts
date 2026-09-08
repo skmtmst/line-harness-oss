@@ -3916,6 +3916,8 @@ export type FriendAddRule = {
   versionStatus: 'draft' | 'published' | 'retired' | null
   lastTestStatus: 'succeeded' | 'failed' | null
   lastTestedAt: string | null
+  lastTestedByStaffId: string | null
+  lastTestedByStaffName: string | null
   publishedAt: string | null
   matchedLast7Days: number | null
   version: number

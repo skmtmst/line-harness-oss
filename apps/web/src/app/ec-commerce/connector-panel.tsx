@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { EC_EVENT_LABELS, type EcEventType } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -9,14 +10,14 @@ import { ApiError, api, type EcConnector, type EcConnectorOverview } from '@/lib
 import { formatEcDateTimeWithYear as dateTime } from './ec-datetime'
 import styles from './ec-commerce-v6.module.css'
 
-const EVENT_TYPES = [
-  ['ec.order.confirmed', '注文が確定した'],
-  ['ec.order.payment_received', '入金を確認した'],
-  ['ec.order.shipped', '発送した'],
-  ['ec.order.cancelled', '注文を取り消した'],
-  ['ec.order.refunded', '返品・返金した'],
-  ['ec.customer.profile_updated', '会員情報が変わった'],
-] as const
+const CONNECTOR_EVENT_TYPES = [
+  'ec.order.confirmed',
+  'ec.order.payment_received',
+  'ec.order.shipped',
+  'ec.order.cancelled',
+  'ec.order.refunded',
+  'ec.customer.profile_updated',
+] as const satisfies readonly EcEventType[]
 const IDENTITY_RULES = [
   ['verified_email', 'メールアドレスが同じ', 'いちばん確かな照らし合わせです'],
   ['verified_phone', '電話番号が同じ', 'ハイフンや国番号の違いを整えて比べます'],
@@ -35,7 +36,7 @@ type Form = {
 
 const EMPTY_FORM: Form = {
   provider: 'shopify', shopDomain: '', status: 'connected', inboundSecret: '',
-  eventTypes: EVENT_TYPES.map(([value]) => value),
+  eventTypes: [...CONNECTOR_EVENT_TYPES],
   identityRules: ['verified_email', 'verified_phone', 'manual_name_postal'], expectedVersion: 0,
 }
 
@@ -140,7 +141,7 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
           <section className={styles.card}>
             <h2 className={styles.cardTitle}>どこの出来事を取り込むか</h2>
             <p className={styles.cardNote}>チェックを外すと、その出来事を起点にした配信や集計も止まります。</p>
-            <div className={styles.checks}>{EVENT_TYPES.map(([value, label]) => <label className={styles.check} key={value}><input type="checkbox" checked={form.eventTypes.includes(value)} onChange={() => toggle('eventTypes', value)} /><span>{label}</span></label>)}</div>
+            <div className={styles.checks}>{CONNECTOR_EVENT_TYPES.map((value) => <label className={styles.check} key={value}><input type="checkbox" checked={form.eventTypes.includes(value)} onChange={() => toggle('eventTypes', value)} /><span>{EC_EVENT_LABELS[value]}</span></label>)}</div>
           </section>
 
           <section className={styles.card}>

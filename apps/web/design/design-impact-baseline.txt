@@ -99,9 +99,10 @@ shared-button-importer app/tags/fields/migrate/page.tsx
 shared-button-importer app/tags/fields/new/page.tsx
 shared-button-importer app/tags/folders/new/page.tsx
 shared-button-importer app/tags/searches/edit/page.tsx
+shared-button-importer app/templates/detail/page.tsx
 shared-button-importer app/templates/page.tsx
 shared-button-importer app/templates/questions/new/page.tsx
-shared-button-importer app/templates/template-button.ts
+shared-button-importer app/templates/template-asset-editor.tsx
 shared-button-importer app/users/page.tsx
 shared-button-importer app/webhooks/page.tsx
 shared-button-importer app/webhooks/webhook-interactions.tsx

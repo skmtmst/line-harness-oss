@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { ecEventLabel } from '@line-crm/shared'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -36,17 +37,6 @@ const ACTION_STATUS: Record<EcActionExecutionStatus, { label: string; tone: stri
   skipped: { label: '送信なし', tone: styles.statusMuted },
   retryable_failed: { label: '失敗', tone: styles.statusDanger },
   permanent_failed: { label: '失敗', tone: styles.statusDanger },
-}
-
-const EVENT_LABEL: Record<string, string> = {
-  'ec.order.confirmed': '注文が確定',
-  'ec.order.payment_received': '入金を確認',
-  'ec.order.shipped': '発送しました',
-  'ec.order.cancelled': '注文を取り消し',
-  'ec.order.refunded': '返金しました',
-  'ec.customer.profile_updated': '会員情報が変わりました',
-  'ec.subscription.started': '定期便がはじまりました',
-  'ec.subscription.payment_failed': '定期便の支払いを確認',
 }
 
 const ACTION_LABEL: Record<string, string> = {
@@ -142,7 +132,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
     return actions
       .filter((action) => {
         const order = action.orderNumber ? ordersByNumber.get(action.orderNumber) : null
-        return !needle || [EVENT_LABEL[action.eventType], action.orderNumber, action.customerName, ...(order?.orderLines.map((line) => line.productName) ?? [])]
+        return !needle || [ecEventLabel(action.eventType), action.orderNumber, action.customerName, ...(order?.orderLines.map((line) => line.productName) ?? [])]
           .some((value) => value?.toLocaleLowerCase('ja-JP').includes(needle))
       })
       .toSorted((left, right) => {
@@ -254,7 +244,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
                 : `¥${order.totalAmount.toLocaleString('ja-JP')}`
             const statusInfo = ACTION_STATUS[action.status]
             return <Tr key={action.id}>
-              <Td><span className={styles.cellStack}><span className={styles.cellMain}>{dateTime(action.receivedAt)} ／ {EVENT_LABEL[action.eventType] ?? 'ECの出来事'}</span><span className={styles.cellSub}>{action.orderNumber ? `注文 ${action.orderNumber}${amount ? ` ／ ${amount}` : ''}` : '注文番号 —'}</span></span></Td>
+              <Td><span className={styles.cellStack}><span className={styles.cellMain}>{dateTime(action.receivedAt)} ／ {ecEventLabel(action.eventType)}</span><span className={styles.cellSub}>{action.orderNumber ? `注文 ${action.orderNumber}${amount ? ` ／ ${amount}` : ''}` : '注文番号 —'}</span></span></Td>
               <Td>{action.customerName ?? <span className="text-xs text-ink-faint">見つかりません</span>}</Td>
               <Td><span className={order?.orderLines.length ? undefined : 'text-xs text-ink-faint'}>{contents}</span></Td>
               <Td>{action.status === 'retryable_failed' || action.status === 'permanent_failed'
