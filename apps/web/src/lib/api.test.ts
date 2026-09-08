@@ -149,6 +149,34 @@ describe('api.conversions の V6一覧・レポート契約', () => {
   })
 })
 
+describe('api.conversions の旧口・取得更新停止記録の契約(N-254/N-255)', () => {
+  it('更新と停止は版を送り、記録は冪等キーを送る', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: {} }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await api.conversions.updatePoint('point/1', { name: '新名', expectedVersion: 3 })
+    await api.conversions.deletePoint('point/1', 4)
+    await api.conversions.track({ conversionPointId: 'point/1', friendId: 'friend/1', idempotencyKey: 'order-1' })
+
+    expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
+      'https://worker.example.com/api/conversions/points/point/1',
+      'https://worker.example.com/api/conversions/points/point/1?expectedVersion=4',
+      'https://worker.example.com/api/conversions/track',
+    ])
+    expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({
+      method: 'PUT', body: JSON.stringify({ name: '新名', expectedVersion: 3 }),
+    })
+    expect(fetchSpy.mock.calls[1]?.[1]).toMatchObject({ method: 'DELETE' })
+    expect(fetchSpy.mock.calls[2]?.[1]).toMatchObject({
+      method: 'POST',
+      body: JSON.stringify({ conversionPointId: 'point/1', friendId: 'friend/1', idempotencyKey: 'order-1' }),
+    })
+  })
+})
+
 describe('api.friends のV6検索・本人照合契約', () => {
   it('14軸のAND/ORを同じ条件JSONで一覧へ渡す', async () => {
     const fetchSpy = vi.fn(async () => new Response(
