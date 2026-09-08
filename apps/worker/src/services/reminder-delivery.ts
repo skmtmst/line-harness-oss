@@ -11,6 +11,7 @@
 import {
   claimReminderDeliveryRun,
   completeReminderDeliveryRunStatement,
+  getFriendReminderStatus,
   getPendingReminderDeliveries,
   completeReminderIfDone,
   failReminderDeliveryRun,
@@ -18,6 +19,7 @@ import {
   getLineAccountById,
   getTemplateById,
   skipReminderDeliveryRun,
+  verifyClaimedRunBeforeSend,
 } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
 import { addJitter, sleep } from './stealth.js';
@@ -41,6 +43,11 @@ export interface ReminderDeliveryOptions {
   now?: Date;
   pause?: (milliseconds: number) => Promise<void>;
   resolveClient?: (accountId: string | null, fallback: PushClient) => Promise<PushClient>;
+  /**
+   * 送信権の取得後にだけ走る試験用の割り込み口。本番では未指定 (待たない)。
+   * この後の再検証がシーム中の取消を拾うため、検証後注入テストで使う。
+   */
+  beforePush?: (run: { id: string; friendReminderId: string }) => Promise<void>;
 }
 
 export interface ReminderDeliveryResult {
@@ -129,7 +136,7 @@ export async function processReminderDeliveries(
   // 未来の通もqueuedとして先に台帳へ置く。実行結果画面の「配信予定」と
   // 「次の配信」を、送信時刻になる前から実値で確認できるようにする。
   // claim側の scheduled_at <= now 条件が、時刻前の外部送信を止める。
-  for (let i = 0; i < pending.length; i++) {
+  enrollmentLoop: for (let i = 0; i < pending.length; i++) {
     const enrollment = pending[i];
     if (i > 0) {
       await (options.pause ?? sleep)(addJitter(50, 200));
@@ -164,6 +171,21 @@ export async function processReminderDeliveries(
       // 別cronが送信中、再試行時刻前、または既に終端状態なら何もしない。
       if (!run) continue;
 
+      // 取消と cron の競合対策: claimed 済みでも送る直前に登録を確認する。
+      // 取消後に残った実行行は送らず止める (取消漏れの送信を防ぐ)。
+      // 登録ごと飛ばす (内側の通ループではなく)。末尾の完了化は取消済みの
+      // 登録へ触れない。
+      if ((await getFriendReminderStatus(db, enrollment.id)) !== 'active') {
+        await db.prepare(
+          `UPDATE reminder_delivery_runs
+              SET status = 'cancelled', completed_at = ?, lease_expires_at = NULL,
+                  next_retry_at = NULL, updated_at = ?
+            WHERE id = ? AND status = 'claimed'`,
+        ).bind(nowIso, nowIso, run.id).run();
+        result.skipped++;
+        continue enrollmentLoop;
+      }
+
       if (!friend) {
         await skipReminderDeliveryRun(db, {
           id: run.id,
@@ -190,6 +212,31 @@ export async function processReminderDeliveries(
           ? options.resolveClient(accountId, lineClient)
           : defaultResolveClient(db, accountId, lineClient));
         const built = await buildReminderStepMessage(db, step, friend, sendAt);
+        // 取消と送信の競合対策: push の直前に送る権利を1文で確かめる。
+        // この後 push まで待たない (間に取消が入る余地を残さない)。
+        // 外部送信は巻き戻せないため、権利取得と取消確定の順序は DB の1文で
+        // 直列化し、確定後の送信は成功にできない (後段で検出・記録する)。
+        if (!await verifyClaimedRunBeforeSend(db, {
+          id: run.id,
+          friendReminderId: enrollment.id,
+          now: nowIso,
+          leaseExpiresAt,
+        })) {
+          result.skipped++;
+          continue;
+        }
+        await options.beforePush?.({ id: run.id, friendReminderId: enrollment.id });
+        // シーム (試験割り込み) の後に取り直す。シーム中の取消をここで拾う。
+        // 本番で beforePush は無く、この2文の間に待たない。
+        if (!await verifyClaimedRunBeforeSend(db, {
+          id: run.id,
+          friendReminderId: enrollment.id,
+          now: nowIso,
+          leaseExpiresAt,
+        })) {
+          result.skipped++;
+          continue;
+        }
         const response = await deliveryClient.pushMessageWithRequestId(
           friend.line_user_id,
           [built.message],
@@ -198,7 +245,7 @@ export async function processReminderDeliveries(
 
         const deliveredId = crypto.randomUUID();
         const logId = crypto.randomUUID();
-        await db.batch([
+        const completed = await db.batch([
           db.prepare(
             `INSERT OR IGNORE INTO friend_reminder_deliveries
                (id, friend_reminder_id, reminder_step_id, delivered_at)
@@ -220,12 +267,24 @@ export async function processReminderDeliveries(
           ),
           completeReminderDeliveryRunStatement(db, {
             id: run.id,
+            friendReminderId: enrollment.id,
             lineRequestId: response.requestId,
             messageLogId: logId,
             now: nowIso,
           }),
         ]);
         result.succeeded++;
+        // push と確定の間に取消が確定すると成功にできない (0 件)。
+        // 外部送信の有無が曖昧なため送り直さず、運用の追跡用に記録する。
+        if (Number(completed[2]?.meta?.changes ?? 0) !== 1) {
+          console.error(JSON.stringify({
+            event: 'reminder_delivery_completed_after_cancel',
+            reminderId: enrollment.reminder_id,
+            friendReminderId: enrollment.id,
+            runId: run.id,
+            messageLogId: logId,
+          }));
+        }
       } catch (error) {
         const safe = classifyReminderDeliveryError(error);
         const retryAt = externalDeliveryRetryAt(
