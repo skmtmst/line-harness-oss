@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
+import { ecNotificationRetryKey } from '../services/ec-event-publish.js';
 
 const mocks = vi.hoisted(() => ({
   getAccount: vi.fn(),
@@ -43,9 +44,10 @@ type EcRow = { id: string; status: string };
 
 type DispatchRow = { status: string; attempt_count: number; last_error: string | null; idempotency_key: string };
 
-function harness(opts: { notificationEnabled?: boolean } = {}) {
+function harness(opts: { notificationEnabled?: boolean; failDispatchWritesOn?: number[] } = {}) {
   const events = new Map<string, EcRow>();
   const dispatches = new Map<string, DispatchRow>();
+  let dispatchWriteCount = 0;
   const app = new Hono<any>();
   app.route('/', ecIntegrations);
   const db = {
@@ -55,6 +57,10 @@ function harness(opts: { notificationEnabled?: boolean } = {}) {
         bind(...bindings: unknown[]) { entry.bindings = bindings; return statement; },
         async run() {
           if (query.includes('INSERT INTO ec_v6_dispatches')) {
+            dispatchWriteCount += 1;
+            if (opts.failDispatchWritesOn?.includes(dispatchWriteCount)) {
+              throw new Error('injected dispatch store failure');
+            }
             const [eventId, subscriber, status, lastError, idempotencyKey] = entry.bindings as [
               string, string, string, string | null, string,
             ];
@@ -250,7 +256,8 @@ describe('EC receipt links one normalized event to V6', () => {
     expect(rowId).toBeTruthy();
     expect(dispatches.get(`${rowId}:notification`)).toMatchObject({
       status: 'sent',
-      attempt_count: 1,
+      // pending先行＋sent確定の2書込。
+      attempt_count: 2,
       idempotency_key: 'eccube:account-a:event-12345678:notification',
     });
     expect(dispatches.get(`${rowId}:v6`)).toMatchObject({
@@ -276,8 +283,66 @@ describe('EC receipt links one normalized event to V6', () => {
     expect(retried.status).toBe(200);
     expect(mocks.pushMessage).toHaveBeenCalledTimes(1);
     expect(mocks.fireEvent).toHaveBeenCalledTimes(2);
-    expect(dispatches.get(`${rowId}:notification`)).toMatchObject({ status: 'sent', attempt_count: 1 });
+    expect(dispatches.get(`${rowId}:notification`)).toMatchObject({ status: 'sent', attempt_count: 2 });
     expect(dispatches.get(`${rowId}:v6`)).toMatchObject({ status: 'sent', attempt_count: 2 });
+  });
+
+  it('skips an already-sent V6 on retry instead of refiring it', async () => {
+    const { app, db, dispatches, events } = harness();
+    mocks.fireEvent.mockRejectedValueOnce(new Error('V6 store is busy'));
+    const failed = await signedRequest(app, db, baseEvent);
+    expect(failed.status).toBe(503);
+    expect(mocks.fireEvent).toHaveBeenCalledTimes(1);
+    const rowId = events.get('eccube:account-a:event-12345678')?.id;
+    // V6は成功したが実行状態の更新で落ちた状況を再現する。
+    dispatches.get(`${rowId}:v6`)!.status = 'sent';
+
+    const retried = await signedRequest(app, db, baseEvent);
+    expect(retried.status).toBe(200);
+    expect(await retried.json()).toMatchObject({ success: true, status: 'processed' });
+    expect(mocks.pushMessage).toHaveBeenCalledTimes(1);
+    expect(mocks.fireEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it('loses the claim race to a concurrent delivery without firing', async () => {
+    const { app, db, events } = harness();
+    events.set('eccube:account-a:event-12345678', { id: 'row-in-flight', status: 'processing' });
+    const response = await signedRequest(app, db, baseEvent);
+    expect(response.status).toBe(202);
+    expect(await response.json()).toMatchObject({ success: true, duplicate: true, status: 'processing' });
+    expect(mocks.pushMessage).not.toHaveBeenCalled();
+    expect(mocks.fireEvent).not.toHaveBeenCalled();
+  });
+
+  it('resends with the same retry key when the sent-mark was lost', async () => {
+    // 2書込目(sent確定)を落とす。pending先行は残り、送達不明になる。
+    const { app, db, dispatches, events } = harness({ failDispatchWritesOn: [2] });
+    const failed = await signedRequest(app, db, baseEvent);
+    expect(failed.status).toBe(503);
+    expect(mocks.pushMessage).toHaveBeenCalledTimes(1);
+    const rowId = events.get('eccube:account-a:event-12345678')?.id;
+    expect(dispatches.get(`${rowId}:notification`)).toMatchObject({ status: 'pending' });
+
+    const retried = await signedRequest(app, db, baseEvent);
+    expect(retried.status).toBe(200);
+    expect(mocks.pushMessage).toHaveBeenCalledTimes(2);
+    const expectedKey = await ecNotificationRetryKey('account-a', 'event-12345678');
+    const [firstCall, secondCall] = mocks.pushMessage.mock.calls as unknown as Array<[string, unknown, string]>;
+    expect(firstCall[2]).toBe(expectedKey);
+    expect(secondCall[2]).toBe(expectedKey);
+    expect(dispatches.get(`${rowId}:notification`)).toMatchObject({ status: 'sent' });
+  });
+
+  it('records a failed notification when push throws', async () => {
+    const { app, db, dispatches, events } = harness();
+    mocks.pushMessage.mockRejectedValue(new Error('LINE is down'));
+    const failed = await signedRequest(app, db, baseEvent);
+    expect(failed.status).toBe(503);
+    const rowId = events.get('eccube:account-a:event-12345678')?.id;
+    expect(dispatches.get(`${rowId}:notification`)).toMatchObject({
+      status: 'failed', attempt_count: 2, last_error: 'LINE is down',
+    });
+    expect(dispatches.get(`${rowId}:v6`)).toBeUndefined();
   });
 
   it('publishes a profile update to V6 with the source identity', async () => {

@@ -12,7 +12,7 @@ import type { Message } from '@line-crm/line-sdk';
 import { EC_EVENT_TYPES } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { fireEvent, logOutgoingMessage } from '../services/event-bus.js';
-import { buildEcV6Event, ecDispatchIdempotencyKey } from '../services/ec-event-publish.js';
+import { buildEcV6Event, ecDispatchIdempotencyKey, ecNotificationRetryKey } from '../services/ec-event-publish.js';
 
 export type EcDispatchSubscriber = 'notification' | 'v6';
 
@@ -28,7 +28,7 @@ async function getEcDispatchStatus(
 async function markEcDispatch(
   db: D1Database,
   input: {
-    eventId: string; subscriber: EcDispatchSubscriber; status: 'sent' | 'failed';
+    eventId: string; subscriber: EcDispatchSubscriber; status: 'pending' | 'sent' | 'failed';
     error?: string | null; idempotencyKey: string; now: string;
   },
 ): Promise<void> {
@@ -61,6 +61,9 @@ async function fireEcV6Event(
   },
 ): Promise<void> {
   const idempotencyKey = ecDispatchIdempotencyKey(input.lineAccountId, input.externalEventId, 'v6');
+  // 送信済みの購読先は送らない。実行状態の更新失敗で再試行になっても、
+  // 成功済みV6を再発火させない。並行受信は台帳claim(atomic UPDATE)が fence する。
+  if (await getEcDispatchStatus(db, input.eventId, 'v6') === 'sent') return;
   const v6Event = buildEcV6Event(input.event, input.friendId);
   try {
     await fireEvent(db, v6Event.eventType, v6Event.payload, input.accessToken, input.lineAccountId);
@@ -564,15 +567,36 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       buttonUrl: setting?.button_url,
       imageUrl: setting?.image_url,
     });
-    // 通知は購読先別の台帳で管理する。V6連携の失敗で再試行になっても、
-    // 送信済みの通知を二重送信しない。
+    // 通知は購読先別の台帳で管理する。照合契約:
+    // - sent → 送らない(再試行・並行とも)
+    // - failed/なし → 固定retry keyで送る
+    // - pending(送達不明: 送信後に台帳書込が落ちた) → 同じ固定keyで送り直す。
+    //   LINE側がキーで重複を抑える(X-Line-Retry-Key、受理済みは409)ため安全。
     const lineClient = new LineClient(accessToken);
     if (await getEcDispatchStatus(c.env.DB, row.id, 'notification') !== 'sent') {
-      await lineClient.pushMessage(event.line_user_id, [message]);
+      const notificationKey = ecDispatchIdempotencyKey(lineAccountId, event.event_id, 'notification');
+      const retryKey = await ecNotificationRetryKey(lineAccountId, event.event_id);
+      await markEcDispatch(c.env.DB, {
+        eventId: row.id, subscriber: 'notification', status: 'pending',
+        idempotencyKey: notificationKey, now,
+      });
+      try {
+        await lineClient.pushMessage(event.line_user_id, [message], retryKey);
+      } catch (pushError) {
+        try {
+          await markEcDispatch(c.env.DB, {
+            eventId: row.id, subscriber: 'notification', status: 'failed',
+            error: pushError instanceof Error ? pushError.message.slice(0, 500) : 'Unknown error',
+            idempotencyKey: notificationKey, now,
+          });
+        } catch (markError) {
+          console.error(`[ec-event] notification ledger failed event=${event.event_id}`, markError);
+        }
+        throw pushError;
+      }
       await markEcDispatch(c.env.DB, {
         eventId: row.id, subscriber: 'notification', status: 'sent',
-        idempotencyKey: ecDispatchIdempotencyKey(lineAccountId, event.event_id, 'notification'),
-        now,
+        idempotencyKey: notificationKey, now,
       });
       await logOutgoingMessage(c.env.DB, {
         friendId: friend.id,
