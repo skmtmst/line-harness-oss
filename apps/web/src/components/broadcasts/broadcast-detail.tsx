@@ -97,13 +97,15 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
     const poll = async () => {
       const res = await api.broadcasts.getProgress(id)
       if (res.success && res.data) {
+        // 閉じ込めた関数の中では絞り込みが外れるので、先に取り出す。
+        const data = res.data
         setBroadcast(prev => prev ? {
           ...prev,
-          status: res.data.status as ApiBroadcast['status'],
-          totalCount: res.data.totalCount,
-          successCount: res.data.successCount,
+          status: data.status as ApiBroadcast['status'],
+          totalCount: data.totalCount,
+          successCount: data.successCount,
         } : prev)
-        setPerAccountStats(res.data.perAccountStats)
+        setPerAccountStats(data.perAccountStats)
         if (res.data.status === 'sent') {
           if (interval) clearInterval(interval)
           interval = null

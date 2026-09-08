@@ -245,7 +245,7 @@ describe('テンプレートの作成・更新の返し', () => {
       env,
     );
     expect(response.status).toBe(201);
-    const body = await response.json();
+    const body = (await response.json()) as { data: Record<string, unknown> };
     expect(body.data).toMatchObject({
       id: 'tpl-1',
       messageContent: 'こんにちは',
@@ -265,7 +265,7 @@ describe('テンプレートの作成・更新の返し', () => {
       env,
     );
     expect(response.status).toBe(200);
-    const body = await response.json();
+    const body = (await response.json()) as { data: Record<string, unknown> };
     expect(body.data).toMatchObject({
       id: 'tpl-1',
       messageContent: 'こんにちは',
