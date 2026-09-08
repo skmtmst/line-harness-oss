@@ -53,9 +53,19 @@ export function unsetAreaLabels(areas: Area[]): string[] {
 }
 
 export function areaDraftsForCreate(areas: Area[]) {
-  return areas.map(({ id: _id, ...area }) => ({
-    ...area,
+  return areas.map((area) => ({
+    boundsX: area.boundsX,
+    boundsY: area.boundsY,
+    boundsWidth: area.boundsWidth,
+    boundsHeight: area.boundsHeight,
+    actionType: area.actionType,
     actionData: { ...area.actionData },
+    intent: area.intent,
+    label: area.label,
     tagIds: [...(area.tagIds ?? [])],
+    scoreChange: area.scoreChange,
+    templateId: area.templateId,
+    formId: area.formId,
+    trackedLinkId: area.trackedLinkId,
   }))
 }
