@@ -1,7 +1,10 @@
 import {
+  claimRedemptionStep,
   decryptCredential,
   getMileageRewardDeliveryPlan,
   getReservedMileageRewardCode,
+  markRedemptionStepSent,
+  MileageRedemptionConfirmError,
   recordMileageRedemptionAttempt,
   refundMileageRewardRedemption,
   type MileageRewardFailurePolicy,
@@ -90,6 +93,12 @@ function nextRetry(now: string, attemptCount: number): string | null {
   return date.toISOString();
 }
 
+/**
+ * 取り残し配送の貸出期限。確定書き込みに失敗した交換は `delivering` のまま
+ * 残し、この期限を過ぎたら別の試行が引き継いで確定まで進める。
+ */
+const STALE_DELIVERY_LEASE_MS = 5 * 60 * 1000;
+
 export async function deliverMileageReward(
   db: D1Database,
   redemptionId: string,
@@ -119,10 +128,12 @@ export async function deliverMileageReward(
   }
 
   const now = options.now?.() ?? new Date().toISOString();
+  const leaseCutoff = new Date(new Date(now).getTime() - STALE_DELIVERY_LEASE_MS).toISOString();
   const claim = await db.prepare(
     `UPDATE mileage_redemptions SET status = 'delivering', updated_at = ?
-      WHERE id = ? AND status IN ('reserved', 'delivery_failed')`,
-  ).bind(now, redemptionId).run();
+      WHERE id = ? AND (status IN ('reserved', 'delivery_failed')
+        OR (status = 'delivering' AND updated_at < ?))`,
+  ).bind(now, redemptionId, leaseCutoff).run();
   if ((claim.meta?.changes ?? 0) !== 1) {
     return {
       status: 'delivery_failed', rewardName: plan.rewardName,
@@ -150,6 +161,14 @@ export async function deliverMileageReward(
         const executor = executors[action.type];
         if (!executor) throw new Error('交換後の動きを実行できません');
         const stepExecutionId = await stableUuid(`${redemptionId}:${action.id}:${index}`);
+        /*
+         * 送り直さない：送信済みの手順は飛ばす。確定書き込みの直後に死んでも、
+         * やり直しは outbox を見て送らない。受け手側にも同じ冪等キーを渡す。
+         */
+        const step = await claimRedemptionStep(db, {
+          redemptionId, stepKey: `${index}:${action.id}`, idempotencyKey: stepExecutionId,
+        });
+        if (step === 'sent') continue;
         await executor({
           db,
           runId: redemptionId,
@@ -166,15 +185,38 @@ export async function deliverMileageReward(
           commonActionVersionId: plan.commonActionVersionId,
           isTest: false,
         });
+        try {
+          await markRedemptionStepSent(db, { redemptionId, stepKey: `${index}:${action.id}` });
+        } catch {
+          throw new MileageRedemptionConfirmError();
+        }
       }
     }
-    await recordMileageRedemptionAttempt(db, { redemptionId, status: 'succeeded' });
+    try {
+      await recordMileageRedemptionAttempt(db, { redemptionId, status: 'succeeded' });
+    } catch {
+      throw new MileageRedemptionConfirmError();
+    }
     return {
       status: 'succeeded', rewardName: plan.rewardName,
       customerMessage: plan.customerMessage, rewardCode, retryAt: null,
       failurePolicy: plan.failurePolicy, message: null,
     };
   } catch (error) {
+    if (error instanceof MileageRedemptionConfirmError) {
+      /*
+       * 外部送信は終わっているかもしれない。失敗に落とすとやり直しで
+       * 再送するので、`delivering` のまま残して回収(cron・貸出期限)に任せる。
+       * 呼び出し側には202相当の「確認中」で返す。
+       */
+      return {
+        status: 'delivery_failed', rewardName: plan.rewardName,
+        customerMessage: plan.customerMessage, rewardCode: null,
+        retryAt: nextRetry(now, plan.redemption.attemptCount),
+        failurePolicy: plan.failurePolicy,
+        message: '特典の送信は終わっています。確定を確認しています。',
+      };
+    }
     const failure = publicFailure(error);
     const retryAt = failure.retryable && plan.failurePolicy === 'retry'
       ? nextRetry(now, plan.redemption.attemptCount)
@@ -203,20 +245,35 @@ export async function deliverMileageReward(
   }
 }
 
-/** Cronから、再試行時刻を過ぎた交換だけを処理する。claimはdeliver側で行う。 */
+/**
+ * Cronから、再試行時刻を過ぎた交換と、確定されず残った交換を処理する。
+ * 後者は貸出期限切れの `delivering` で、引き継いだ試行が outbox を見て
+ * 送り直さず確定まで進める。claimはdeliver側で行う。
+ */
 export async function processDueMileageRewardDeliveries(
   db: D1Database,
   options: Omit<MileageRewardDeliveryOptions, 'now'> & { now: string; limit?: number },
 ): Promise<{ processed: number; succeeded: number; failed: number }> {
   const limit = Math.min(100, Math.max(1, options.limit ?? 50));
+  const leaseCutoff = new Date(
+    new Date(options.now).getTime() - STALE_DELIVERY_LEASE_MS,
+  ).toISOString();
   const due = await db.prepare(
     `SELECT id FROM mileage_redemptions
       WHERE status = 'delivery_failed' AND next_retry_at IS NOT NULL AND next_retry_at <= ?
       ORDER BY next_retry_at, created_at LIMIT ?`,
   ).bind(options.now, limit).all<{ id: string }>();
+  const remaining = Math.max(0, limit - due.results.length);
+  const stalled = remaining > 0
+    ? await db.prepare(
+      `SELECT id FROM mileage_redemptions
+        WHERE status = 'delivering' AND updated_at < ?
+        ORDER BY updated_at, created_at LIMIT ?`,
+    ).bind(leaseCutoff, remaining).all<{ id: string }>()
+    : { results: [] as { id: string }[] };
   let succeeded = 0;
   let failed = 0;
-  for (const item of due.results) {
+  for (const item of [...due.results, ...stalled.results]) {
     const result = await deliverMileageReward(db, item.id, {
       credentialEncryptionKey: options.credentialEncryptionKey,
       fetch: options.fetch,
@@ -225,5 +282,5 @@ export async function processDueMileageRewardDeliveries(
     if (result.status === 'succeeded') succeeded += 1;
     else failed += 1;
   }
-  return { processed: due.results.length, succeeded, failed };
+  return { processed: due.results.length + stalled.results.length, succeeded, failed };
 }

@@ -4,6 +4,9 @@ const dbMocks = {
   decryptCredential: vi.fn(),
   getMileageRewardDeliveryPlan: vi.fn(),
   getReservedMileageRewardCode: vi.fn(),
+  claimRedemptionStep: vi.fn().mockResolvedValue('send'),
+  markRedemptionStepSent: vi.fn().mockResolvedValue(undefined),
+  MileageRedemptionConfirmError: class MileageRedemptionConfirmError extends Error {},
   recordMileageRedemptionAttempt: vi.fn(),
   refundMileageRewardRedemption: vi.fn(),
 };
