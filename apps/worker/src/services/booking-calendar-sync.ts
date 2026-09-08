@@ -145,6 +145,36 @@ export async function syncConfirmedBookingToGoogle(
  *   410 (削除ずみ) を成功として回収する (deleteEvent が吸収する)。
  * 投げない (取消処理を壊さない)。DB自体が使えないときだけ投げる。
  */
+/**
+ * Calendar 削除の台帳の安定キー。取消の再送・cron が同じ1行に集まる。
+ * キーの作り方はここだけに置く (route 側の先行登録と実行側でずらさない)。
+ */
+export function calendarDeleteIdempotencyKey(bookingId: string): string {
+  return `${bookingId}:google-calendar:delete`;
+}
+
+/**
+ * 取消の状態更新の直後に台帳行を残す (先行登録)。
+ *
+ * 実行側 (runCalendarDeleteOperation) の作成・検索が初期 DB 失敗すると
+ * retry_wait を返すだけで行が残らず、cron が回収できない。行さえあれば
+ * 再送・cron のどちらでも拾えるため、取消フローはここで失敗を落とさず
+ * 投げる (呼び出し側の取消再試行で回復できる)。INSERT OR IGNORE のため
+ * 二重登録にならない。schema 変更は要らない。
+ */
+export async function enqueueCalendarDeleteOperation(
+  db: D1Database,
+  input: { bookingId: string; lineAccountId: string },
+): Promise<string> {
+  return queueBookingOperation(db, {
+    bookingId: input.bookingId,
+    lineAccountId: input.lineAccountId,
+    kind: 'google_calendar',
+    idempotencyKey: calendarDeleteIdempotencyKey(input.bookingId),
+    result: { direction: 'delete' },
+  });
+}
+
 export async function runCalendarDeleteOperation(
   db: D1Database,
   input: {
@@ -155,7 +185,7 @@ export async function runCalendarDeleteOperation(
   },
 ): Promise<'succeeded' | 'skipped' | 'retry_wait'> {
   const now = (input.now ?? new Date()).toISOString();
-  const idempotencyKey = `${input.bookingId}:google-calendar:delete`;
+  const idempotencyKey = calendarDeleteIdempotencyKey(input.bookingId);
   try {
     const existing = await findBookingOperation(db, {
       lineAccountId: input.lineAccountId,

@@ -837,6 +837,9 @@ export async function getFriendReminderStatus(
 //   active を再確認し (reminder-delivery 側)、取消済みなら送らない。
 // - 取消理由・元イベントID・実行者を cancel_reason に残す (移行なしで追跡するため)。
 // - 同じ取消・変更通知の再送は何も変えない (active が無ければ 0 件で返す)。
+//   ただし failOnSendInFlight 指定で対象があるのに 0 件のときは、確認後の
+//   割込み貸出が残っていないか書換え後にも確かめ、残っていれば投げる
+//   (0 件成功にしない。呼び出し側は状態を巻き戻して再試行させる)。
 // - lineAccountId を渡したときは、そのアカウントの友だちの登録だけを見る。
 // - 移行前の行 (source 未記録) を探すときは、同時刻の別予約・手動登録を
 //   巻き込まないよう source 未記録かつ同じきっかけ種別の行だけを見る。
@@ -879,11 +882,12 @@ function v6SourceCondition(matcher: V6SourceMatcher, bindings: unknown[]): strin
   if (matcher.sourceEventId != null) keys.push(`fr.source_event_id = ?`);
   if (keys.length === 0) return null;
   const either = keys.length === 1 ? keys[0] : `(${keys.join(' OR ')})`;
-  if (matcher.sourceKind == null) return either;
-  // 束縛は SQL の出現順 (kind → 鍵) に積む。
-  bindings.push(matcher.sourceKind);
+  // 束縛は SQL の出現順 (kind → 鍵) に積む。kind 無しでも鍵の束縛は要る
+  // (積まないと placeholder 不足で落ちる)。
+  if (matcher.sourceKind != null) bindings.push(matcher.sourceKind);
   if (matcher.sourceId != null) bindings.push(matcher.sourceId);
   if (matcher.sourceEventId != null) bindings.push(matcher.sourceEventId);
+  if (matcher.sourceKind == null) return either;
   return `(fr.source_kind = ? AND ${either})`;
 }
 
@@ -982,6 +986,12 @@ export async function cancelV6RemindersForSource(
      * 未指定時は従来どおり最善努力で止める (貸出中は残し、cron 等の次回で収束)。
      */
     failOnSendInFlight?: boolean;
+    /**
+     * 試験用の割り込み口。live 確認と取消 UPDATE の間に呼ぶ。
+     * 本番では渡さない (渡すとそのぶん競合の窓が広がる)。
+     * 確認後 claim の割込みの再現テストだけに使う。
+     */
+    beforeFlip?: (ids: string[]) => Promise<void>;
   },
 ): Promise<CancelV6RemindersResult> {
   const now = input.now ?? jstNow();
@@ -1001,15 +1011,20 @@ export async function cancelV6RemindersForSource(
   // 順序はこの確認と各1文で直列化される: 貸出が先なら取消は拒否・残置し、
   // 取消が先なら貸出側の active 確認が失敗して送らない。
   // lease 無し (NULL) は貸出取得前の行のため対象にする。
-  if (input.failOnSendInFlight) {
+  const countLiveClaims = async (): Promise<number> => {
     const live = await db.prepare(
       `SELECT COUNT(*) AS c FROM reminder_delivery_runs
         WHERE friend_reminder_id IN (${chunkPlaceholders(ids)})
           AND status = 'claimed'
           AND lease_expires_at IS NOT NULL AND lease_expires_at > ?`,
     ).bind(...ids, now).first<{ c: number }>();
-    if ((live?.c ?? 0) > 0) throw new Error('REMINDER_SEND_IN_FLIGHT');
+    return live?.c ?? 0;
+  };
+  if (input.failOnSendInFlight && (await countLiveClaims()) > 0) {
+    throw new Error('REMINDER_SEND_IN_FLIGHT');
   }
+  // 試験用の割り込み口 (本番では未指定)。
+  await input.beforeFlip?.(ids);
 
   const statements: D1PreparedStatement[] = [];
   for (let offset = 0; offset < ids.length; offset += 50) {
@@ -1039,13 +1054,24 @@ export async function cancelV6RemindersForSource(
     );
   }
   const results = await db.batch(statements);
-  return {
-    cancelledEnrollments: Number(results[0]?.meta?.changes ?? 0),
-    cancelledRuns: results.slice(1).reduce((sum, result, index) => {
-      // 実行行の UPDATE は奇数番目 (登録 UPDATE の次) に積んである。
-      return index % 2 === 0 ? sum + Number(result.meta?.changes ?? 0) : sum;
-    }, 0),
-  };
+  // 文は (登録 UPDATE, 実行行 UPDATE) の対で積んである。偶数番目が登録側。
+  const cancelledEnrollments = results.reduce(
+    (sum, result, index) => (index % 2 === 0 ? sum + Number(result.meta?.changes ?? 0) : sum),
+    0,
+  );
+  const cancelledRuns = results.reduce(
+    (sum, result, index) => (index % 2 === 1 ? sum + Number(result.meta?.changes ?? 0) : sum),
+    0,
+  );
+  if (input.failOnSendInFlight && ids.length > 0 && cancelledEnrollments === 0) {
+    // 確認と取消 UPDATE の間に貸出が割り込むと、登録 UPDATE は行単位の
+    // 除外で 0 件になり、黙って成功すると取消確定後の送信が起きる。
+    // 書換え後に貸出の残りを確かめ、残っていれば拒否して呼び出し側に
+    // 状態の巻き戻しと再試行をさせる (0 件成功にしない)。
+    // 貸出が無ければ、同時確定の別処理が先に止めた冪等な再送として返す。
+    if ((await countLiveClaims()) > 0) throw new Error('REMINDER_SEND_IN_FLIGHT');
+  }
+  return { cancelledEnrollments, cancelledRuns };
 }
 
 export interface V6TargetDateMove {

@@ -35,6 +35,7 @@ import { cancelByTrigger, enrollByTrigger } from '../services/reminder-trigger.j
 import { canTransition, nextStatus, type BookingAction } from '../services/booking-state.js';
 import { getAvailability } from '../services/availability.js';
 import {
+  enqueueCalendarDeleteOperation,
   removeBookingFromGoogle,
   runCalendarDeleteOperation,
   syncConfirmedBookingToGoogle,
@@ -2625,6 +2626,14 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
     .run();
   if ((updateResult.meta?.changes ?? 0) === 0) {
     return c.json({ error: 'concurrent_update' }, 409);
+  }
+
+  if (next === 'cancelled' || next === 'expired') {
+    // Calendar 削除の台帳行を状態更新の直後に先行登録する。実行側の
+    // 作成・検索が初期 DB 失敗すると行が残らず cron が回収できないため、
+    // ここでは失敗を落とさず投げる (取消再試行で回復できる)。
+    // 却下では Calendar 予定を作らないため登録しない。
+    await enqueueCalendarDeleteOperation(c.env.DB, { bookingId: id, lineAccountId: accountId });
   }
 
   if (next === 'confirmed') {

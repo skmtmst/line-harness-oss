@@ -1941,6 +1941,15 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
         }
         throw error;
       }
+      // 初回の待機者ジョブ登録が失敗したままのとき、同じ却下要求の再送で
+      // 再登録する (V6修復だけの早期returnでは待機者が進まない)。
+      // source_key が同じため二重登録にならない。
+      await enqueueEventWaitlistPromotion(c.env.DB, {
+        lineAccountId: booking.line_account_id,
+        eventId: booking.event_id,
+        occurrenceId: booking.slot_id,
+        sourceKey: `booking:${booking.id}:rejected`,
+      });
       const updated = await c.env.DB
         .prepare(`SELECT * FROM event_bookings WHERE id = ?`)
         .bind(booking.id)
@@ -1995,6 +2004,14 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
         }
         throw error;
       }
+      // 同時確定の競合敗北後の再送でも、待機者ジョブの再登録を受け付ける
+      // (決定ゲートの再送枝と同趣旨。二重登録は source_key で吸収する)。
+      await enqueueEventWaitlistPromotion(c.env.DB, {
+        lineAccountId: booking.line_account_id,
+        eventId: booking.event_id,
+        occurrenceId: booking.slot_id,
+        sourceKey: `booking:${booking.id}:rejected`,
+      });
       const updated = await c.env.DB
         .prepare(`SELECT * FROM event_bookings WHERE id = ?`)
         .bind(booking.id)
