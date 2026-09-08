@@ -17,6 +17,7 @@ import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/com
 import type { FriendAddRule, FriendAddRuleKind, FriendAddRuleListData } from '@/lib/api'
 import { api } from '@/lib/api'
 import FriendAddRuleEditor from './friend-add-rule-editor'
+import { useCursorStack } from './use-cursor-stack'
 
 const KIND_LABELS: Record<FriendAddRuleKind, string> = {
   first_time: 'はじめて友だち追加した人',
@@ -65,13 +66,12 @@ function FriendAddSettingsList() {
   const [search, setSearch] = useState('')
   const [appliedSearch, setAppliedSearch] = useState('')
   const [folder, setFolder] = useState<string | null>(null)
-  const [cursorStack, setCursorStack] = useState<Array<string | null>>([null])
+  const { cursor, page: cursorPage, canPrev, reset: resetCursor, goPrev, goNext } = useCursorStack()
   const [folderBusy, setFolderBusy] = useState(false)
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [folderName, setFolderName] = useState('')
   const folderKey = useRef(crypto.randomUUID())
   const requestSequence = useRef(0)
-  const cursor = cursorStack[cursorStack.length - 1]
 
   const load = useCallback(async () => {
     const requestId = ++requestSequence.current
@@ -109,20 +109,20 @@ function FriendAddSettingsList() {
 
   useEffect(() => { void load() }, [load])
 
-  useEffect(() => { setCursorStack([null]) }, [kind, selectedAccountId])
+  useEffect(() => { resetCursor() }, [selectedAccountId, resetCursor])
 
   // 検索の入力は少し待ってから、巻き戻しと一緒に1回だけサーバへ送る。
   useEffect(() => {
     const timer = setTimeout(() => {
       setAppliedSearch(search)
-      setCursorStack([null])
+      resetCursor()
     }, 300)
     return () => clearTimeout(timer)
-  }, [search])
+  }, [search, resetCursor])
 
   const selectFolder = (next: string | null) => {
     setFolder(next)
-    setCursorStack([null])
+    resetCursor()
   }
 
   useEffect(() => {
@@ -226,7 +226,7 @@ function FriendAddSettingsList() {
 
       <div data-design="FirstTime">
         <span className="sr-only">開始のタイミング。すぐに配信。あわせて実行すること。</span>
-        <Tabs items={(Object.keys(KIND_LABELS) as FriendAddRuleKind[]).map((tab) => ({ label: KIND_LABELS[tab], current: kind === tab, onClick: () => router.replace(`/friend-add-settings?kind=${tab}`) }))} />
+        <Tabs items={(Object.keys(KIND_LABELS) as FriendAddRuleKind[]).map((tab) => ({ label: KIND_LABELS[tab], current: kind === tab, onClick: () => { resetCursor(); router.replace(`/friend-add-settings?kind=${tab}`) } }))} />
         <span data-design="Returning" className="sr-only">以前からの友だち・ブロックを解除した人。配信しない。別のシナリオを配信する。はじめての人と同じものを配信する。開始位置。前回読んだところから。</span>
       </div>
       <p className="text-ink-faint my-2 text-xs">この2つを分けないと、以前からのお客さまに「はじめまして」が届きます。</p>
@@ -278,9 +278,9 @@ function FriendAddSettingsList() {
                 </tbody>
               </DataTable>
               <div className="mt-3 flex items-center justify-end gap-2" aria-label="ページ送り">
-                <Button disabled={cursorStack.length === 1 || loading} onClick={() => setCursorStack((current) => current.slice(0, -1))}>前へ</Button>
-                <Button variant="primary" aria-current="page">{cursorStack.length}</Button>
-                <Button disabled={!data.nextCursor || loading} onClick={() => data.nextCursor && setCursorStack((current) => [...current, data.nextCursor])}>次へ</Button>
+                <Button disabled={!canPrev || loading} onClick={() => goPrev()}>前へ</Button>
+                <Button variant="primary" aria-current="page">{cursorPage}</Button>
+                <Button disabled={!data.nextCursor || loading} onClick={() => goNext(data.nextCursor)}>次へ</Button>
               </div>
             </>
           )}

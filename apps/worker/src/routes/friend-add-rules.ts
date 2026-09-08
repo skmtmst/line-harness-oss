@@ -382,15 +382,20 @@ friendAddRules.get('/api/friend-add-runs', requireRole('owner', 'admin', 'staff'
                 s.name AS scenario_name,
                 e.scenario_enrollment_id AS enrollment_id,
                 e.delivery_count,
-                (SELECT COUNT(*) FROM friend_add_action_runs ar WHERE ar.event_id = e.id) AS action_count,
-                (SELECT COUNT(*) FROM friend_add_action_runs ar
-                  WHERE ar.event_id = e.id AND ar.status = 'failed') AS failed_action_count
+                COALESCE(ar.action_count, 0) AS action_count,
+                COALESCE(ar.failed_action_count, 0) AS failed_action_count
            FROM friend_add_events e
            JOIN friends f ON f.id = e.friend_id AND f.line_account_id = e.line_account_id
            LEFT JOIN entry_routes er ON er.id = e.entry_route_id
            LEFT JOIN friend_add_rules r ON r.id = e.routing_rule_id AND r.line_account_id = e.line_account_id
            LEFT JOIN friend_add_rule_versions v ON v.id = e.winning_rule_version_id AND v.rule_id = r.id
            LEFT JOIN scenarios s ON s.id = json_extract(v.definition_snapshot, '$.scenarioId')
+           LEFT JOIN (
+             SELECT event_id, COUNT(*) AS action_count,
+                    SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed_action_count
+               FROM friend_add_action_runs
+              GROUP BY event_id
+           ) ar ON ar.event_id = e.id
           WHERE ${clauses.join(' AND ')}
           ORDER BY e.occurred_at DESC, e.id DESC LIMIT ?`,
       ).bind(...bindings, limit + 1).all<{
@@ -705,12 +710,15 @@ friendAddRules.get('/api/friend-add-rules/conflicts', requireRole('owner', 'admi
         matchedLast28Days: { [a.id]: matched.get(a.id) ?? 0, [b.id]: matched.get(b.id) ?? 0 },
       });
     };
-    for (let left = 0; left < rows.length; left += 1) {
-      for (let right = left + 1; right < rows.length; right += 1) {
-        const a = rows[left];
-        const b = rows[right];
-        const aDefinition = parseSnapshot(a.definition_snapshot);
-        const bDefinition = parseSnapshot(b.definition_snapshot);
+    // 定義の読み解きは1行1回だけにする。二重ループの中で毎回読むと
+    // 設定が増えるほど競合確認が遅くなる (#501-軽)。
+    const parsed = rows.map((row) => ({ row, definition: parseSnapshot(row.definition_snapshot) }));
+    for (let left = 0; left < parsed.length; left += 1) {
+      for (let right = left + 1; right < parsed.length; right += 1) {
+        const a = parsed[left].row;
+        const b = parsed[right].row;
+        const aDefinition = parsed[left].definition;
+        const bDefinition = parsed[right].definition;
         if (a.priority === b.priority) {
           pushConflict('same_priority', a, b, '同じ優先順位の設定があります。');
         }
@@ -735,8 +743,7 @@ friendAddRules.get('/api/friend-add-rules/conflicts', requireRole('owner', 'admi
       success: true,
       data: {
         conflicts,
-        rules: rows.map((row) => {
-          const definition = parseSnapshot(row.definition_snapshot);
+        rules: parsed.map(({ row, definition }) => {
           return {
             id: row.id,
             name: row.name,

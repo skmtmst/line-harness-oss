@@ -1006,9 +1006,27 @@ function visualQaWriteBody(method, pathname) {
     return LINE_ACCOUNT_VERIFY_CONNECTION
   }
   if (method === 'POST' && /^\/api\/friend-add-rules\/[^/]+\/validate$/.test(pathname)) {
+    // 失敗系は visualState=error で切り替える。固定成功だけだと公開不可の
+    // 状態を確かめられない (#501-軽)。器は本物の失敗応答と同じ形。
+    if (query.get('visualState') === 'error') {
+      return {
+        success: false,
+        data: {
+          stateChanged: false, ruleId: FRIEND_ADD_RULE.id, matched: false,
+          reasons: ['送るシナリオが見つかりません。'],
+          scenarioId: FRIEND_ADD_RULE.definition.scenarioId,
+          message: FRIEND_ADD_RULE.definition.messageText,
+          actions: FRIEND_ADD_RULE.definition.actions,
+        },
+        error: 'テスト条件を確認してください',
+      }
+    }
     return FRIEND_ADD_RULE_VALIDATE
   }
   if (method === 'POST' && /^\/api\/friend-add-rules\/[^/]+\/publish$/.test(pathname)) {
+    if (query.get('visualState') === 'error') {
+      return { success: false, error: '公開前にテストを成功させてください' }
+    }
     return FRIEND_ADD_RULE_PUBLISH
   }
   if (method === 'POST' && /^\/api\/friend-fields\/[^/]+\/migration-preview$/.test(pathname)) {
@@ -1560,10 +1578,15 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     }
   }
   if (/^\/api\/friend-add-rules\/[^/]+$/.test(pathname)) {
+    // 未知IDは本物と同じく404にする。何を渡しても同一設定を返すと、
+    // 存在しない設定の画面が空にならず実機差異に気づけない (#501-軽)。
+    const ruleId = pathname.split('/').pop()
+    const found = FRIEND_ADD_RULES.items.find((item) => item.id === ruleId)
+    if (!found) return { success: false, error: 'Not found' }
     return {
       success: true,
       data: {
-        rule: FRIEND_ADD_RULE,
+        rule: found,
         options: FRIEND_ADD_RULE_OPTIONS,
         staffNotification: { status: 'connected', reason: null },
       },
