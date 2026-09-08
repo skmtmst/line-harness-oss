@@ -815,12 +815,14 @@ describe('値の型検証（N-042 単票）', () => {
       fieldId: 'ff-num',
       value: '1000',
       updatedBy: 'u-1',
+      field: expect.objectContaining({ type: 'number' }),
     });
     expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(expect.anything(), {
       friendId: 'f-1',
       fieldId: 'ff-sel',
       value: 'opt-1',
       updatedBy: 'u-1',
+      field: expect.objectContaining({ type: 'select' }),
     });
   });
 
@@ -868,6 +870,7 @@ describe('値の型検証（N-042 単票）', () => {
       fieldId: 'ff-num',
       value: '1000',
       updatedBy: 'u-1',
+      field: expect.objectContaining({ type: 'number' }),
     });
   });
 
@@ -882,6 +885,7 @@ describe('値の型検証（N-042 単票）', () => {
       fieldId: 'ff-1',
       value: null,
       updatedBy: 'u-1',
+      field: expect.objectContaining({ type: 'text' }),
     });
   });
 });
@@ -913,6 +917,7 @@ describe('値の型検証（N-042 一括）', () => {
       fieldId: 'ff-num',
       value: '1000',
       updatedBy: 'u-1',
+      field: expect.objectContaining({ type: 'number' }),
     });
   });
 
@@ -925,6 +930,7 @@ describe('値の型検証（N-042 一括）', () => {
       fieldId: 'ff-sel',
       value: 'opt-1',
       updatedBy: 'u-1',
+      field: expect.objectContaining({ type: 'select' }),
     });
   });
 

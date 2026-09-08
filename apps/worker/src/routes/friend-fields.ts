@@ -767,7 +767,7 @@ friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin'), requi
     const fields = await getFriendFields(c.env.DB);
     const byId = new Map(fields.map((f) => [f.id, f]));
     const warnings: string[] = [];
-    const pending: Array<{ fieldId: string; value: string | null }> = [];
+    const pending: Array<{ fieldId: string; value: string | null; field: FriendField }> = [];
     const errors: Array<{ fieldId: string; name: string; message: string }> = [];
 
     // N-042: 型に合わない値は1件も保存しない。先に全部を検証し、
@@ -787,7 +787,7 @@ friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin'), requi
         errors.push({ fieldId, name: field.name, message: checked.error });
         continue;
       }
-      pending.push({ fieldId, value: checked.value });
+      pending.push({ fieldId, value: checked.value, field });
     }
     if (errors.length > 0) {
       return c.json(
@@ -802,6 +802,7 @@ friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin'), requi
         fieldId: item.fieldId,
         value: item.value,
         updatedBy: staff?.id ?? 'unknown',
+        field: item.field,
       });
     }
 
@@ -881,6 +882,7 @@ friendFields.post('/api/friend-fields/bulk', requireRole('owner', 'admin'), asyn
         fieldId: field.id,
         value: checked.value,
         updatedBy: staff?.id ?? 'unknown',
+        field,
       });
     }
     return c.json({ success: true, data: { updated: friendIds.length } });
