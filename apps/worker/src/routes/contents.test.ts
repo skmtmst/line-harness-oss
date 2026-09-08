@@ -685,6 +685,49 @@ describe('#550 M6 メディアの名前・フォルダ変更の検証', () => {
   });
 });
 
+describe('#667 N-197 編集・削除のAPIはowner/adminのみ', () => {
+  it('staffの名前変更は403で止める', async () => {
+    const res = await req('/api/media/md-1?accountId=account-1', 'PATCH', { filename: 'b.png' }, 'staff');
+    expect(res.status).toBe(403);
+    expect(mocks.updateMedia).not.toHaveBeenCalled();
+  });
+
+  it('staffの削除は403で止める', async () => {
+    const res = await req('/api/media/md-1?accountId=account-1', 'DELETE', undefined, 'staff');
+    expect(res.status).toBe(403);
+    expect(mocks.deleteMedia).not.toHaveBeenCalled();
+  });
+
+  it('staffの影響確認は403で止める', async () => {
+    const res = await req('/api/media/md-1/delete-impact?accountId=account-1', 'GET', undefined, 'staff');
+    expect(res.status).toBe(403);
+    expect(mocks.getMediaDeleteImpact).not.toHaveBeenCalled();
+  });
+
+  it('staffの一括差し替えは403で止める', async () => {
+    const res = await req(
+      '/api/media/md-1/replace-usages?accountId=account-1',
+      'POST',
+      { replacementMediaId: 'md-2', previewToken: 'rev-1' },
+      'staff',
+    );
+    expect(res.status).toBe(403);
+    expect(mocks.applyMediaReplacementPlan).not.toHaveBeenCalled();
+  });
+
+  it('adminの名前変更は通る', async () => {
+    const res = await req('/api/media/md-1?accountId=account-1', 'PATCH', { filename: 'b.png' }, 'admin');
+    expect(res.status).toBe(200);
+    expect(mocks.updateMedia).toHaveBeenCalled();
+  });
+
+  it('adminの削除は通る（使われていなければ）', async () => {
+    const res = await req('/api/media/md-1?accountId=account-1', 'DELETE', undefined, 'admin');
+    expect(res.status).toBe(200);
+    expect(mocks.deleteMedia).toHaveBeenCalled();
+  });
+});
+
 describe('#637 N-195 メディアのダウンロードは認証済み口だけ', () => {
   it('有効な利用者は実体を受け取れる', async () => {
     get.mockResolvedValueOnce({
