@@ -22,6 +22,10 @@ export interface RichMenuGroup {
   is_default_for_all: number;
   status: 'draft' | 'published';
   publishing_at: string | null;
+  /** 公開leaseの所有者(run ID等)。NULLは誰も持っていない。 */
+  publishing_owner: string | null;
+  /** 公開leaseの期限(UTCのISO8601)。過ぎたら別runが回収できる。 */
+  publishing_expires_at: string | null;
   /** 出し分けの条件（SegmentCondition の JSON）。未設定なら null。 */
   targeting_condition: string | null;
   /** 複数のメニューに当てはまったときの順番。小さいほうが先。 */
@@ -855,30 +859,101 @@ export async function pageBelongsToGroup(
   return !!row;
 }
 
-// Publish ロックを取る。既にロックされていれば false (HTTP 409 用)。
-export async function acquirePublishLock(
+// Publish lease を取る。所有者(owner=run ID等)と期限(既定10分)付き。
+// 有効期限内の他人所有だけが false (HTTP 409 用)。期限切れ・未所有・
+// 旧形式(publishing_atのみ)の行は回収して取り直す。停止したWorkerが
+// 残したlockで再試行と手動公開が塞がれないようにする。
+// 手動公開も予約実行も同じ関数を使う。
+export const PUBLISH_LEASE_MS = 10 * 60_000;
+
+/** lease期限(UTCのISO8601)を作る。 */
+export function publishLeaseExpiresAt(nowIso: string, ttlMs = PUBLISH_LEASE_MS): string {
+  const time = Date.parse(nowIso);
+  if (!Number.isFinite(time)) throw new Error('lease timestamp must be ISO 8601');
+  return new Date(time + ttlMs).toISOString();
+}
+
+export async function acquirePublishLease(
   db: D1Database,
   groupId: string,
+  owner: string,
+  nowIso: string,
+  ttlMs = PUBLISH_LEASE_MS,
 ): Promise<boolean> {
   const result = await db
     .prepare(
       `UPDATE rich_menu_groups
-         SET publishing_at = ?
-       WHERE id = ? AND publishing_at IS NULL`,
+         SET publishing_at = ?, publishing_owner = ?, publishing_expires_at = ?
+       WHERE id = ?
+         AND (publishing_owner IS NULL
+           OR publishing_expires_at IS NULL
+           OR publishing_expires_at <= ?)`,
     )
-    .bind(jstNow(), groupId)
+    .bind(jstNow(), owner, publishLeaseExpiresAt(nowIso, ttlMs), groupId, nowIso)
     .run();
   return (result.meta?.changes ?? 0) > 0;
 }
 
-export async function releasePublishLock(
+/**
+ * 外部工程(LINE切替)の直前に期限を延ばす。所有者が変わっていたら false。
+ * falseのrunはlive切替もDB確定もしてはいけない(回収した新所有者に任せる)。
+ */
+export async function renewPublishLease(
   db: D1Database,
   groupId: string,
-): Promise<void> {
-  await db
-    .prepare(`UPDATE rich_menu_groups SET publishing_at = NULL WHERE id = ?`)
-    .bind(groupId)
+  owner: string,
+  nowIso: string,
+  ttlMs = PUBLISH_LEASE_MS,
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `UPDATE rich_menu_groups
+         SET publishing_at = ?, publishing_expires_at = ?
+       WHERE id = ? AND publishing_owner = ?`,
+    )
+    .bind(jstNow(), publishLeaseExpiresAt(nowIso, ttlMs), groupId, owner)
     .run();
+  return (result.meta?.changes ?? 0) > 0;
+}
+
+/**
+ * 所有者だけが開けられる解放。所有者が変わっていたら何もせず false。
+ * falseはleaseを失った合図で、呼び出し側は切替・確定をやめる。
+ */
+export async function releasePublishLease(
+  db: D1Database,
+  groupId: string,
+  owner: string,
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `UPDATE rich_menu_groups
+         SET publishing_at = NULL, publishing_owner = NULL, publishing_expires_at = NULL
+       WHERE id = ? AND publishing_owner = ?`,
+    )
+    .bind(groupId, owner)
+    .run();
+  return (result.meta?.changes ?? 0) > 0;
+}
+
+/**
+ * いま他人が有効に持っているか。手動公開の事前409判定用。
+ * 期限切れ・旧形式の残留は「持っていない」扱いで、取得時に回収される。
+ */
+export async function isPublishLeaseHeld(
+  db: D1Database,
+  groupId: string,
+  nowIso: string,
+): Promise<boolean> {
+  const row = await db
+    .prepare(
+      `SELECT 1 AS hit FROM rich_menu_groups
+        WHERE id = ? AND publishing_owner IS NOT NULL
+          AND (publishing_expires_at IS NULL OR publishing_expires_at > ?)`,
+    )
+    .bind(groupId, nowIso)
+    .first<{ hit: number }>();
+  return !!row;
 }
 
 export async function setPageRichMenuId(
@@ -898,10 +973,13 @@ export async function markRichMenuGroupPublished(
   db: D1Database,
   groupId: string,
 ): Promise<void> {
+  // 公開の確定と同時にleaseも空ける。呼ぶ側はlease所有者(手動公開・予約実行)の
+  // ため、無条件の掃除でよい。旧holderの確定はrenew確認で止める流儀。
   await db
     .prepare(
       `UPDATE rich_menu_groups
-         SET status = 'published', publishing_at = NULL, updated_at = ?
+         SET status = 'published', publishing_at = NULL,
+             publishing_owner = NULL, publishing_expires_at = NULL, updated_at = ?
        WHERE id = ?`,
     )
     .bind(jstNow(), groupId)
@@ -929,6 +1007,7 @@ export async function markRichMenuGroupUnpublished(
       .prepare(
         `UPDATE rich_menu_groups
             SET status = 'draft', publishing_at = NULL,
+                publishing_owner = NULL, publishing_expires_at = NULL,
                 is_default_for_all = 0, updated_at = ?
           WHERE id = ?`,
       )

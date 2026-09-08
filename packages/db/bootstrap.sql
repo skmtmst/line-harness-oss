@@ -3954,7 +3954,7 @@ CREATE TABLE rich_menu_groups (
   display_order       INTEGER NOT NULL DEFAULT 0,
   created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, publishing_owner TEXT, publishing_expires_at TEXT);
 
 CREATE TABLE rich_menu_pages (
   id                 TEXT PRIMARY KEY,
@@ -3997,7 +3997,8 @@ CREATE TABLE rich_menu_schedules (
   ended_run_id          TEXT,
   last_error_code       TEXT,
   created_at            TEXT NOT NULL,
-  updated_at            TEXT NOT NULL, attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0), next_retry_at TEXT, lease_expires_at TEXT,
+  updated_at            TEXT NOT NULL, attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0), next_retry_at TEXT, lease_expires_at TEXT, restore_default_state TEXT
+  CHECK (restore_default_state IN ('captured', 'no_default')), restore_default_line_id TEXT,
   CHECK (mode = 'scheduled' OR ends_at IS NOT NULL),
   UNIQUE (account_id, idempotency_key)
 );

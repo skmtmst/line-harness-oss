@@ -6,7 +6,6 @@ import {
   claimRichMenuSchedule,
   claimRichMenuScheduleRestore,
   classifyRichMenuScheduleError,
-  findPublishedRestoreCandidate,
   getStalePublishingSchedules,
   getStaleRestoringSchedules,
   nextRichMenuScheduleRetryAt,
@@ -30,6 +29,7 @@ function setup() {
   sqlite.exec(readFileSync(join(import.meta.dirname, '../migrations/291_rich_menu_schedules.sql'), 'utf8'))
   sqlite.exec(readFileSync(join(import.meta.dirname, '../migrations/342_rich_menu_schedule_execution.sql'), 'utf8'))
   sqlite.exec(readFileSync(join(import.meta.dirname, '../migrations/355_rich_menu_schedule_lease.sql'), 'utf8'))
+  sqlite.exec(readFileSync(join(import.meta.dirname, '../migrations/365_rich_menu_schedule_default_pin.sql'), 'utf8'))
   return sqlite
 }
 
@@ -288,12 +288,14 @@ describe('342 remand: attempt独立・run追跡・stale回収・戻し先確定'
     expect(row.status).toBe('published')
   })
 
-  test('前のメニューに戻すは予約時点の公開中メニューに確定する', async () => {
-    const candidate = await findPublishedRestoreCandidate(db, 'account-1', 'menu-1')
-    expect(candidate?.id).toBe('restore-1')
-    // 予約対象自身は除外される。対象以外に公開中が無ければnull。
-    const none = await findPublishedRestoreCandidate(db, 'account-1', 'restore-1')
-    // menu-1はdraftのため候補なし。
-    expect(none).toBeNull()
+  test('前のメニューに戻すは予約時に確定しない（実行開始直前に固定する）', async () => {
+    // 予約時点の確定関数は撤去した。固定は実行開始直前の実LINE defaultから行う。
+    // 予約行は戻し先未確定(null)のまま保存される。
+    insertFullSchedule(sqlite, { id: 'schedule-1', mode: 'period', ends_at: '2026-09-30T00:00:00.000Z', restore_group_id: null })
+    const row = sqlite.prepare(
+      `SELECT restore_group_id, restore_default_state FROM rich_menu_schedules WHERE id = 'schedule-1'`,
+    ).get() as { restore_group_id: string | null; restore_default_state: string | null }
+    expect(row.restore_group_id).toBeNull()
+    expect(row.restore_default_state).toBeNull()
   })
 })

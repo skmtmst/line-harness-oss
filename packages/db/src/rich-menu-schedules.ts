@@ -49,6 +49,14 @@ export type RichMenuScheduleRow = {
   attempt_count: number;
   next_retry_at: string | null;
   lease_expires_at: string | null;
+  /**
+   * 実行開始直前に固定した切替前LINE defaultの状態。365で追加。
+   * 'captured'は固定したLINEメニューへ戻す、'no_default'は明示解除する。
+   * NULLは未固定(未実行またはscheduled一回きり)。
+   */
+  restore_default_state: 'captured' | 'no_default' | null;
+  /** 固定した切替前LINE defaultのrichMenuId。'captured'のときだけ有効。 */
+  restore_default_line_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -68,6 +76,7 @@ const PERMANENT_PATTERNS = [
   'snapshot', 'restoregroupid', 'restore_group',
   'account_inactive', 'account_archived', 'account_stopped',
   'staff_inactive', 'staff_forbidden', 'staff_revoked', 'no_restore_target',
+  'no_default_pin',
 ];
 
 /** 失敗を「もう一度試す一時失敗」と「人に対応してほしい恒久失敗」に分ける。 */
@@ -415,25 +424,72 @@ export async function reclaimStaleRestoringSchedule(
   return (result.meta?.changes ?? 0) > 0;
 }
 
+export type RestoreDefaultPin = {
+  state: 'captured' | 'no_default';
+  /** 'captured'のときの切替前LINE defaultのrichMenuId。 */
+  lineId: string | null;
+};
+
 /**
- * 「前のメニューに戻す」(restoreGroupId=null)の予約時点の戻し先を確定する。
- * 同じアカウントで予約対象以外の公開中メニューを新しい順に1件返す。
- * 無ければnullで、終了時はデフォルト解除として扱う。
+ * 実行開始直前・切替前のLINE実defaultを固定する(365)。
+ * 予約時ではなく実行時に読むため、期間中の管理画面外の変更に影響されない。
+ * 一度だけ書く pin-once: 既に固定済みなら false を返し、呼び出し側は
+ * 保存済み値を読み直して使う(再試行で固定値がずれないようにする)。
  */
-export async function findPublishedRestoreCandidate(
+export async function pinScheduleRestoreDefault(
   db: D1Database,
+  id: string,
   accountId: string,
-  excludeGroupId: string,
-): Promise<{ id: string } | null> {
+  pin: RestoreDefaultPin,
+): Promise<boolean> {
+  if (pin.state !== 'captured' && pin.state !== 'no_default') {
+    throw new Error('restore default pin state must be captured or no_default');
+  }
+  const result = await db
+    .prepare(
+      `UPDATE rich_menu_schedules
+          SET restore_default_state = ?, restore_default_line_id = ?, updated_at = ?
+        WHERE id = ? AND account_id = ?
+          AND restore_default_state IS NULL`,
+    )
+    .bind(pin.state, pin.lineId, jstNow(), id, accountId)
+    .run();
+  return (result.meta?.changes ?? 0) > 0;
+}
+
+/** 固定済みの戻し先を読む。未固定なら null。 */
+export async function getScheduleRestoreDefaultPin(
+  db: D1Database,
+  id: string,
+  accountId: string,
+): Promise<RestoreDefaultPin | null> {
   const row = await db
     .prepare(
-      `SELECT id FROM rich_menu_groups
-        WHERE account_id = ? AND id != ? AND status = 'published'
-        ORDER BY updated_at DESC LIMIT 1`,
+      `SELECT restore_default_state AS state, restore_default_line_id AS line_id
+         FROM rich_menu_schedules WHERE id = ? AND account_id = ?`,
     )
-    .bind(accountId, excludeGroupId)
-    .first<{ id: string }>();
-  return row ?? null;
+    .bind(id, accountId)
+    .first<{ state: string | null; line_id: string | null }>();
+  if (!row || (row.state !== 'captured' && row.state !== 'no_default')) return null;
+  return { state: row.state, lineId: row.line_id };
+}
+
+/**
+ * 切替の補償で作りかけを捨てるときにjournalも消す。
+ * journalを残したまま新メニューを消すと、再試行が消えたIDへ切替えて壊す。
+ * 消せず(D1失敗)に終わったら補償自体をやめ、journalありの再開に任せる。
+ */
+export async function clearSchedulePublications(
+  db: D1Database,
+  scheduleId: string,
+  kind: SchedulePublicationKind,
+): Promise<void> {
+  await db
+    .prepare(
+      `DELETE FROM rich_menu_schedule_publications WHERE schedule_id = ? AND kind = ?`,
+    )
+    .bind(scheduleId, kind)
+    .run();
 }
 
 export type ScheduleIndividualLink = { friendId: string; lineUserId: string };
