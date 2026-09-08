@@ -658,9 +658,9 @@ export const SCREENS = [
   // ── 機能5 シナリオ配信 ──────────────────────────────────
   { ...SCENARIO, node: 'TC1b1', name: '5-1 シナリオ配信', route: '/scenarios',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #456で共通操作の規定値を再確認し、一致を維持。** フォルダ選択の高さと左右余白、検索・選択の白背景をPencilと上端から比較した。3107/8794の1440/1920pxで横はみ出し0。",
+    verdictNote: "**2026-09-08 Issue #582 / UI HEAD `ea27940b7` で再撮影し、一致を維持。** オーナー指示によりフォルダ欄を252pxへ統一し、「フォルダを追加」を欄の下へ移して上部の重複操作を削除した。3221/8858の1440/1920pxで横はみ出し0、1920px画素差4.1171%。",
     verdictSource: "design-reference/scenarios-v6/TC1b1.{png,txt} + design-qa/scenarios-v6/TC1b1-{1440,1920}.png + design-qa/scenarios-v6/TC1b1.txt + apps/web/src/components/scenarios/scenario-list.tsx",
-    verdictHead: "526490a86",
+    verdictHead: "ea27940b7",
   },
   { ...SCENARIO, node: 'cCB7r', name: '5-1-A シナリオ作成・配信方式', route: '/scenarios/mode?id=scenario-0',
     verdict: "match",
@@ -809,9 +809,9 @@ export const SCREENS = [
   // ── 機能6 一斉配信 ──────────────────────────────────────
   { ...BROADCAST, node: 'q76C35', name: '6-1 一斉配信',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #456で再撮影し、一致を維持。** 「タイトル・内容で検索」の背景をPencilどおり白に戻し、高さ40px、選択欄の白背景と内側の矢印を確認した。3107/8794の1440/1920pxで横はみ出し0。',
+    verdictNote: '**2026-09-08 Issue #582 / UI HEAD `ea27940b7` で再撮影し、一致を維持。** オーナー指示によりフォルダ欄を252pxへ統一し、「フォルダを追加」を欄の下へ移して上部の重複操作を削除した。3221/8858の1440/1920pxで横はみ出し0、1920px画素差3.4406%。',
     verdictSource: 'broadcasts-v6/q76C35.txt + broadcasts-v6/q76C35-{1440,1920}.png + Issue #456',
-    verdictHead: '526490a86', route: '/broadcasts',
+    verdictHead: 'ea27940b7', route: '/broadcasts',
     // ---- 2026-09-02 `df3f4e3b` で撮り直した（#674 マージ後）。**絵を見て確かめた範囲だけ書く。** ----
     // 解決：**列が設計どおりの6列になった**（タイトル・内容／状態／配信条件／配信日時／配信・開封・クリック／操作）。
     //       上の P2「実装は8列」は解消。状態が独立した桁になり、削除が「操作」に入って、1列ずれも消えている。
@@ -1039,9 +1039,9 @@ export const SCREENS = [
   /* 設計どおり、基本設定→対象者→通知ステップ→送信設定→確認を段ごとに撮る。 */
   { ...REMINDER, node: 'M1EXwB', name: '7-1 リマインダ',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #478 / UI HEAD `7b39575f4` を3105/8792で再撮影し一致。** 独自の13remフォルダ欄を共通FolderPanelへ置き換え、他の一覧と同じ16rem幅にした。フォルダの選択・追加と一覧の絞り込みを維持し、1440px・1920pxとも横はみ出し0。共通パネルの行高・余白へ統一したため画素差は3.0901%から3.2432%へ微増したが、設計の役割と構造は一致している。',
+    verdictNote: '**2026-09-08 Issue #582 / UI HEAD `ea27940b7` で再撮影し、一致を維持。** オーナー指示によりフォルダ欄を252pxへ統一し、「フォルダを追加」を欄の下へ移して上部の重複操作を削除した。3221/8858の1440/1920pxで横はみ出し0、1920px画素差3.5255%。',
     verdictSource: 'reminders-v6/M1EXwB.txt + reminders-v6/M1EXwB-{1440,1920}.png + reminders-v6/M1EXwB-planned-menu-{1440,1920}.png',
-    verdictHead: '7b39575f4', route: '/reminders',
+    verdictHead: 'ea27940b7', route: '/reminders',
     variants: [{ suffix: '-planned-menu', steps: [{ click: '未返信3日後フォローのその他操作', after: 500 }] }], },
   { ...REMINDER, node: 'uJP22', name: '7-1-A リマインダを作成',
     verdict: 'match',
@@ -1164,9 +1164,9 @@ export const SCREENS = [
   */
   { ...AUTO_REPLY, node: 'cmDfJ', name: '8-1 自動応答',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #461 / UI HEAD `84039ceca` で再撮影・一致。** 表の見出しを `px-4 py-3` に統一し、縦余白と高さをPencil V6にそろえた。3106/8793の1440/1920pxとも横はみ出し0。',
+    verdictNote: '**2026-09-08 Issue #582 / UI HEAD `ea27940b7` で再撮影し、一致を維持。** オーナー指示によりフォルダ欄を252pxへ統一し、「フォルダを追加」を欄の下へ移して上部の重複操作を削除した。3221/8858の1440/1920pxで横はみ出し0、1920px画素差3.8716%。',
     verdictSource: 'auto-replies-v6/cmDfJ.png + docs/design-qa/auto-replies-v6/cmDfJ-{1440,1920}.png + cmDfJ.txt',
-    verdictHead: '84039ceca', },
+    verdictHead: 'ea27940b7', },
   {
     ...AUTO_REPLY, node: 'K7vg2', name: '8-1-A 自動応答ルール編集',
     verdict: 'match',
@@ -1293,8 +1293,8 @@ export const SCREENS = [
   { ...FRIEND_ADD, node: 'uLQQc', name: '9-1 友だち追加時の配信',
     states: { apis: ['**/api/friend-add-rules*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #374・UI HEAD `60bb0631c`・固定データ PR #1125（統合 #1128）で一致。** 新しいルール一覧APIの総件数・カーソル・フォルダを接続し、4指標、2タブ、流入の束、検索、6列表、実内容、ページ送りを実値で表示した。通常・読込・空・失敗・権限不足を3102/8789の1440/1920pxで撮影し、全12枚で横はみ出し0。フォルダ追加も専用APIと確認ダイアログへ接続済み。',
-    verdictSource: 'friend-add-v6/uLQQc.png + uLQQc-{normal,loading,empty,error,forbidden}-{1440,1920}.png + Issue #374 visual/text comparison', verdictHead: '60bb0631c', },
+    verdictNote: '**2026-09-08 Issue #582 / UI HEAD `ea27940b7` で再撮影し、一致を維持。** オーナー指示により独自の「流入の束」を252pxの共通FolderPanelへ統一し、「フォルダを追加」を欄の下へ移して道具列から削除した。通常・読込・空・失敗・権限不足を3221/8858の1440/1920pxで撮影し、全画像で横はみ出し0、1920px画素差3.9927%。',
+    verdictSource: 'friend-add-v6/uLQQc.png + uLQQc-{normal,loading,empty,error,forbidden}-{1440,1920}.png + Issue #582 visual/text comparison', verdictHead: 'ea27940b7', },
   {
     ...FRIEND_ADD, node: 's9gAx', name: '9-1-A 基本設定', route: '/friend-add-settings?view=edit&id=rule-referral&step=basic',
     verdict: 'match',
@@ -1372,9 +1372,9 @@ export const SCREENS = [
   */
   { ...WEBINAR, node: 'ZC13r', name: '10-1 ウェビナー',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #478 / UI HEAD `7b39575f4` を3105/8792で再撮影し一致。** 縦長の独自asideを共通FolderPanelへ置き換え、16rem幅・中身に合う高さへ統一した。フォルダ別件数は一覧のfolderIdから算出して表示し、選択すると実際に絞り込む。保存契約待ちの追加ボタンは上部だけに置き、フォルダ欄と重ならない。1440px・1920pxとも横はみ出し0。共通パネルの行高・余白へ統一したため画素差は2.8960%から3.0431%へ微増したが、設計の役割と構造は一致している。',
+    verdictNote: '**2026-09-08 Issue #582 / UI HEAD `ea27940b7` で再撮影し、一致を維持。** オーナー指示によりフォルダ欄を252pxへ統一し、「フォルダを追加」を欄の下へ移して上部の重複操作を削除した。3221/8858の1440/1920pxで横はみ出し0、1920px画素差3.2708%。',
     verdictSource: 'webinars-v6/ZC13r.png + ZC13r-1920.png + ZC13r*.txt',
-    verdictHead: '7b39575f4',
+    verdictHead: 'ea27940b7',
     /*
       帯は `GET /api/webinars/overview` を読む。通常・0件・取得失敗・
       権限不足を混ぜないので、口を差し替えて1つずつ撮る。
@@ -1501,9 +1501,9 @@ export const SCREENS = [
   */
   { ...TEMPLATE, node: 'W7LBc', name: '11-1 テンプレート', mode: 'viewport', height: 1080,
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #224 / PR #1024 / UI HEAD 031081d69 で一致。** `/templates` を割当ポート3104/8791で通常・読込・空・失敗・2フォルダの各1440/1920pxを再撮影し、Pencil正本と実装1920pxを同じ比較画像で目視確認した。6種類タブ、フォルダ、検索、保存した検索、5つの絞り込み、設計と同じ6列表に加え、実送信台帳からテスト送信を除いた今月の送信数を接続した。累計は同じ値を水増しせずツールチップで確認できる。全14枚で横はみ出し0。',
+    verdictNote: '**2026-09-08 Issue #582 / UI HEAD `ea27940b7` で再撮影し、一致を維持。** オーナー指示の基準画面として252px幅を共通値へ切り出し、「フォルダを追加」は従来どおり欄の下に1つだけ表示した。通常・読込・空・失敗・フォルダ選択を3221/8858の1440/1920pxで撮影し、全画像で横はみ出し0、1920px画素差5.1143%。',
     verdictSource: 'templates-v6/W7LBc.txt + W7LBc-1440.png + W7LBc-1920.png',
-    verdictHead: '031081d69', /*
+    verdictHead: 'ea27940b7', /*
       **#493 の受入条件5つを1回で撮る。**
       口はフォルダだけ差し替える——**テンプレートの一覧は正常のまま**にして、
       「フォルダが取れなくても一覧は残る」を確かめるため。
@@ -1626,8 +1626,8 @@ export const SCREENS = [
   { ...RICH_MENU, node: 'GO8RQ', name: '12-1 リッチメニュー',
     mode: 'viewport', height: 1080,
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #430 / #1194 の固定応答で再判定。** `/api/rich-menu-groups` から今月のタップ3,210回・のべ8,140人を表示し、フォルダ、作成・並べ替え・検索、保存検索、優先順位、一覧6列と操作を設計どおり確認した。1440・1920の実装画像で横スクロールはなく、集計値を未取得扱いしていない。",
-    verdictHead: "49484d5ab",
+    verdictNote: "**2026-09-08 Issue #582 / UI HEAD `ea27940b7` で再撮影し、一致を維持。** オーナー指示によりフォルダ欄を252pxへ統一し、「フォルダを追加」を欄の下へ移して道具列から削除した。3221/8858の1440/1920pxで横はみ出し0、1920px画素差3.6893%。",
+    verdictHead: "ea27940b7",
   },
   { ...RICH_MENU, node: 'XtfO3', name: '12-1-A メニューを作る・形とボタン',
     mode: 'viewport', height: 1200, route: '/rich-menus/edit?id=rmg-1',
@@ -1722,8 +1722,9 @@ export const SCREENS = [
       kinds: ['normal', 'loading', 'empty', 'error'],
     },
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #441 で一覧集計を接続し、一致。** 固定一覧応答から全18件、フォルダ別6・5・4件と未分類3件、表示中の6フォーム、今週回答数、友だち情報欄・タグの保存先内訳を表示した。通常・読込中・0件・取得失敗を1440・1920pxで撮影し、全10枚で横はみ出し0。Pencilの一覧骨格・項目・操作と目視比較した。",
+    verdictNote: "**2026-09-08 Issue #582 / UI HEAD `ea27940b7` で再撮影し、一致を維持。** オーナー指示によりフォルダ欄を252pxへ統一し、未接続の「フォルダを追加」も欄の下へ移して道具列から削除した。通常・読込・空・失敗を3221/8858の1440/1920pxで撮影し、全画像で横はみ出し0、1920px画素差3.8437%。",
     verdictSource: "forms-v6/EMBIK.txt + forms-v6/EMBIK-{1440,1920}.png + forms-v6/EMBIK-{normal,loading,empty,error}-{1440,1920}.png",
+    verdictHead: "ea27940b7",
   },
   { ...FORM, node: 'vCqUj', name: '13-1-A フォームを作る', route: `${FORM_EDIT}&tab=basic`,
     verdict: "match",
@@ -1778,8 +1779,8 @@ export const SCREENS = [
   // ── 機能14 共通情報 ─────────────────────────────────────
   {
     ...COMMON_VAR, node: 'WuKzU', name: '14-1 共通情報', verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #385 / UI HEAD `bc92f54ea`で再判定し、一致。** PR #1131の実APIとPR #1142の固定データを使い、3フォルダ、先頭6件、空のまま使用中1件、行ごとの使用数、更新予約を表示した。上部操作、フォルダ、検索・4絞り込み、6列一覧、ページ送りをPencil 1920pxと実装1920pxで目視比較した。3104/8791で1440px・1920pxを撮り、両方とも横はみ出し0。',
-    verdictSource: 'common-vars-v6/WuKzU.txt + common-vars-v6/WuKzU-1440.png + common-vars-v6/WuKzU-1920.png + common-vars-v6-contract.test.ts', verdictHead: 'bc92f54ea',
+    verdictNote: '**2026-09-08 Issue #582 / UI HEAD `ea27940b7` で再撮影し、一致を維持。** オーナー指示によりフォルダ欄を252pxへ統一し、「フォルダを追加」を欄の下へ移して上部の重複操作を削除した。3221/8858の1440/1920pxで横はみ出し0、1920px画素差3.6448%。',
+    verdictSource: 'common-vars-v6/WuKzU.txt + common-vars-v6/WuKzU-1440.png + common-vars-v6/WuKzU-1920.png + common-vars-v6-contract.test.ts', verdictHead: 'ea27940b7',
   },
   {
     ...COMMON_VAR, node: 'gBtaK', name: '14-1-A 共通情報を編集', route: '/contents/vars/edit?id=common-var-delete-target', verdict: 'match',
@@ -1838,9 +1839,9 @@ export const SCREENS = [
   // ── 機能15 登録メディア ─────────────────────────────────
   { ...MEDIA, node: 'g89Tc', name: '15-1 登録メディア',
     verdict: "match",
-    verdictNote: "**2026-09-08、Issue #538 を固定ポート web 3105・mock 8792 で1440px・1920px再撮影し、一致。** 2幅とも横はみ出し0、1920px画素差4.0422%。一覧は総件数と表示範囲を示し、200件を超えてもサーバー側ページ送りで全件を確認できる。検索・種別・フォルダ・使用状態・並び順もページの外まで含めて絞り込む。",
+    verdictNote: "**2026-09-08 Issue #582 / UI HEAD `ea27940b7` で再撮影し、一致を維持。** オーナー指示によりフォルダ欄を252pxへ統一し、「フォルダを追加」を欄の下へ移して上部の重複操作を削除した。3221/8858の1440/1920pxで横はみ出し0、1920px画素差3.6649%。",
     verdictSource: "media-v6/g89Tc.txt + g89Tc-1440.png + g89Tc-1920.png",
-    verdictHead: "748c8b810",
+    verdictHead: "ea27940b7",
   },
   {
     ...MEDIA, node: 'voJtX', name: '15-1-A メディアの詳細と差し替え',
@@ -2174,9 +2175,9 @@ export const SCREENS = [
   */
   { ...INFLOW, node: 'Q4bkTg', name: '18-1 流入と計測', route: '/inflow-links?tab=links',
     verdict: "match",
-    verdictNote: "**2026-09-07 Issue #478 / UI HEAD `7b39575f4` を3105/8792で再撮影し一致。** 独自フォルダ欄を16remの共通FolderPanelへ置き換え、緑の重複追加ボタンと独自説明文を外した。上部の白い追加ボタン1つ、フォルダ選択・編集、一覧絞り込みを維持。狭かった3列を再配分し、「同時に動く配信」「友だち追加」「クリック」を重ねず表示した。1440px・1920pxとも横はみ出し0、画素差は5.6635%から5.2356%へ改善した。",
-    verdictSource: "inflow-v6/Q4bkTg.txt + Q4bkTg-1440.png + Q4bkTg-1920.png + Issue #478 pixel diff",
-    verdictHead: "7b39575f4",
+    verdictNote: "**2026-09-08 Issue #582 / UI HEAD `ea27940b7` で再撮影し、一致を維持。** オーナー指示によりフォルダ欄を252pxへ統一し、「フォルダを追加」を欄の下へ移して上部の重複操作を削除した。3221/8858の1440/1920pxで横はみ出し0、1920px画素差5.2127%。",
+    verdictSource: "inflow-v6/Q4bkTg.txt + Q4bkTg-1440.png + Q4bkTg-1920.png + Issue #582 pixel diff",
+    verdictHead: "ea27940b7",
   },
   { ...INFLOW, node: 'IhSBB', name: '18-1-A サイトスクリプト', route: '/inflow-links?tab=script',
     verdict: "match",
