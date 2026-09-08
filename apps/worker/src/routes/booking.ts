@@ -2560,7 +2560,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
   const b = await c.req.json<{ action: BookingAction }>();
   const row = await c.env.DB
     .prepare(
-      `SELECT id, status, starts_at, friend_id, menu_id, staff_id
+      `SELECT id, status, starts_at, friend_id, menu_id, staff_id, decided_at
          FROM bookings WHERE id = ? AND line_account_id = ?`,
     )
     .bind(id, accountId)
@@ -2571,28 +2571,42 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
       friend_id: string;
       menu_id: string;
       staff_id: string;
+      decided_at: string | null;
     }>();
   if (!row) return c.json({ error: 'not_found' }, 404);
   // 再試行の受付: V6 取消が投げた直後の再送は、業務が済みでも V6 だけ直す (409 にしない)。
   // Calendar 削除も同じ鍵の台帳で再試行する (ずみなら触らず、一時失敗なら再実行)。
-  if (
+  // 却下ずみの再送も受け付ける (却下は終端のため通常遷移では 409 になる)。
+  const isCancelRetry =
     (b.action === 'cancel' || b.action === 'expire') &&
-    (row.status === 'cancelled' || row.status === 'expired')
-  ) {
-    await cancelByTrigger(c.env.DB, {
-      triggerType: 'booking',
-      sourceId: id,
-      sourceEventId: id,
-      friendId: row.friend_id,
-      startsAtIso: row.starts_at,
-      lineAccountId: accountId,
-      cancelReason: `booking_${row.status}:${id}:by:${c.get('staff')?.id ?? 'admin'}-retry`,
-    });
-    await runCalendarDeleteOperation(c.env.DB, {
-      bookingId: id,
-      lineAccountId: accountId,
-      remove: () => removeBookingFromGoogle(c.env.DB, googleCredentials(c.env), id),
-    });
+    (row.status === 'cancelled' || row.status === 'expired');
+  const isRejectRetry = b.action === 'reject' && row.status === 'rejected';
+  if (isCancelRetry || isRejectRetry) {
+    try {
+      await cancelByTrigger(c.env.DB, {
+        triggerType: 'booking',
+        sourceId: id,
+        sourceEventId: id,
+        friendId: row.friend_id,
+        startsAtIso: row.starts_at,
+        lineAccountId: accountId,
+        cancelReason: `booking_${row.status}:${id}:by:${c.get('staff')?.id ?? 'admin'}-retry`,
+        failOnSendInFlight: true,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
+        return c.json({ error: 'send_in_flight_retry' }, 409);
+      }
+      throw error;
+    }
+    // 却下では Calendar 予定を作らないため削除の再試行は要らない。
+    if (isCancelRetry) {
+      await runCalendarDeleteOperation(c.env.DB, {
+        bookingId: id,
+        lineAccountId: accountId,
+        remove: () => removeBookingFromGoogle(c.env.DB, googleCredentials(c.env), id),
+      });
+    }
     return c.json({ status: row.status });
   }
   if (!canTransition(row.status, b.action)) {
@@ -2642,6 +2656,36 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
         .catch((error) => console.error('booking automation event failed:', error)),
     );
   } else if (next === 'rejected') {
+    // N-065: 却下でも V6 の未送信予定は止める (通知だけでは送り続ける)。
+    // 送信権の貸出中は 409 で再試行させる (取消確定後の送信を起こさない)。
+    try {
+      await cancelByTrigger(c.env.DB, {
+        triggerType: 'booking',
+        sourceId: id,
+        sourceEventId: id,
+        friendId: row.friend_id,
+        startsAtIso: row.starts_at,
+        lineAccountId: accountId,
+        cancelReason: `booking_rejected:${id}:by:${c.get('staff')?.id ?? 'admin'}`,
+        failOnSendInFlight: true,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
+        // 状態更新を巻き戻して 409 にする。貸出中の送信は確定ずみの予約への
+        // 送信になるため正当で、再試行は巻き戻し後の状態から再開する。
+        // 巻き戻しが 0 件 (同時更新あり) なら相手の処理に任せる。
+        await c.env.DB
+          .prepare(
+            `UPDATE bookings SET status = ?, decided_at = ?,
+                                  updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+              WHERE id = ? AND status = ?`,
+          )
+          .bind(row.status, row.decided_at, id, next)
+          .run();
+        return c.json({ error: 'send_in_flight_retry' }, 409);
+      }
+      throw error;
+    }
     c.executionCtx.waitUntil(
       notifyForBooking(c.env.DB, id, 'rejected').catch((err) =>
         console.error('booking notify (rejected) failed:', err),
@@ -2655,15 +2699,33 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
       .bind(id)
       .run();
     // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
-    await cancelByTrigger(c.env.DB, {
-      triggerType: 'booking',
-      sourceId: id,
-      sourceEventId: id,
-      friendId: row.friend_id,
-      startsAtIso: row.starts_at,
-      lineAccountId: accountId,
-      cancelReason: `booking_${next}:${id}:by:${c.get('staff')?.id ?? 'admin'}`,
-    });
+    // 送信権の貸出中は 409 で再試行させる (取消確定後の送信を起こさない)。
+    try {
+      await cancelByTrigger(c.env.DB, {
+        triggerType: 'booking',
+        sourceId: id,
+        sourceEventId: id,
+        friendId: row.friend_id,
+        startsAtIso: row.starts_at,
+        lineAccountId: accountId,
+        cancelReason: `booking_${next}:${id}:by:${c.get('staff')?.id ?? 'admin'}`,
+        failOnSendInFlight: true,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
+        // 状態更新を巻き戻して 409 にする (却下分岐と同趣旨)。
+        await c.env.DB
+          .prepare(
+            `UPDATE bookings SET status = ?, decided_at = ?,
+                                  updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+              WHERE id = ? AND status = ?`,
+          )
+          .bind(row.status, row.decided_at, id, next)
+          .run();
+        return c.json({ error: 'send_in_flight_retry' }, 409);
+      }
+      throw error;
+    }
     // Calendar 削除は台帳駆動 (安定キーで1行)。一時失敗は retry_wait に残し、
     // 次の取消再試行で同じ鍵で再実行する。取消処理自体は壊さない。
     c.executionCtx.waitUntil(

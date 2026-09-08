@@ -1891,6 +1891,31 @@ async function notifyBookingFriend(
   }
 }
 
+/**
+ * 落選ずみの予約の V6 未送信予定だけを止める (再送の修復受付と初回で共用)。
+ * 状態更新の後に呼ぶ。送信権の貸出中は投げる (呼び出し側は 409 で再試行)。
+ */
+async function repairRejectedBookingV6(
+  db: D1Database,
+  booking: BookingActionRow,
+  cancelReason: string,
+): Promise<void> {
+  const slot = await db
+    .prepare(`SELECT starts_at FROM event_slots WHERE id = ?`)
+    .bind(booking.slot_id)
+    .first<{ starts_at: string }>();
+  await cancelByTrigger(db, {
+    triggerType: 'event',
+    sourceId: booking.id,
+    sourceEventId: booking.id,
+    friendId: booking.friend_id,
+    startsAtIso: slot?.starts_at ?? null,
+    lineAccountId: booking.line_account_id,
+    cancelReason,
+    failOnSendInFlight: true,
+  });
+}
+
 events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRole('owner', 'admin', 'staff'), async (c) => {
   const account_id = getAccountId(c);
   if (!account_id) return bad(c, 'account_id_required', 400);
@@ -1898,13 +1923,32 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
   if (!(await ownsEvent(c.env.DB, event_id, account_id))) return bad(c, 'not_found', 404);
   const booking = await loadBookingForAction(c.env.DB, account_id, event_id, c.req.param('bookingId'));
   if (!booking) return bad(c, 'not_found', 404);
-  if (booking.decided_at != null) return bad(c, 'already_decided', 409);
 
   const body = (await c.req.json().catch(() => ({}))) as { action?: string; reason?: string };
   if (body.action !== 'confirm' && body.action !== 'reject') {
     return bad(c, 'invalid_action', 422);
   }
   const action: EventBookingAction = body.action;
+  if (booking.decided_at != null) {
+    // 落選ずみへの却下の再送は V6 修復を受け付ける (状態更新後の V6 失敗を
+    // 回復するため。修復不能な 409 にしない)。承認の再送・競合敗北は 409。
+    if (action === 'reject' && booking.status === 'rejected') {
+      try {
+        await repairRejectedBookingV6(c.env.DB, booking, `event_reject:${booking.id}:by:${c.get('staff')?.id ?? 'admin'}-retry`);
+      } catch (error) {
+        if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
+          return bad(c, 'send_in_flight_retry', 409);
+        }
+        throw error;
+      }
+      const updated = await c.env.DB
+        .prepare(`SELECT * FROM event_bookings WHERE id = ?`)
+        .bind(booking.id)
+        .first();
+      return c.json(updated);
+    }
+    return bad(c, 'already_decided', 409);
+  }
   if (!canTransition(booking.status as never, action)) return bad(c, 'invalid_state', 409);
   const next = nextStatus(booking.status as never, action);
 
@@ -1936,25 +1980,21 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
     .bind(next, nowIso, staff?.id ?? null, nowIso, booking.id, booking.status)
     .run();
   if ((upd.meta?.changes ?? 0) === 0) {
-    // 再試行の受付: 落選ずみで V6 だけ残っていたら直す。同時確定との競合は 409 のまま。
+    // 同時確定との競合敗北は成功にしない。落選ずみへの承認は 409。
+    // 落選ずみへの却下の再送だけ V6 修復を受け付けて 200 にする。
     const current = await c.env.DB
       .prepare(`SELECT status FROM event_bookings WHERE id = ?`)
       .bind(booking.id)
       .first<{ status: string }>();
-    if (current?.status === 'rejected') {
-      const slot = await c.env.DB
-        .prepare(`SELECT starts_at FROM event_slots WHERE id = ?`)
-        .bind(booking.slot_id)
-        .first<{ starts_at: string }>();
-      await cancelByTrigger(c.env.DB, {
-        triggerType: 'event',
-        sourceId: booking.id,
-        sourceEventId: booking.id,
-        friendId: booking.friend_id,
-        startsAtIso: slot?.starts_at ?? null,
-        lineAccountId: booking.line_account_id,
-        cancelReason: `event_reject:${booking.id}:by:${staff?.id ?? 'admin'}-retry`,
-      });
+    if (action === 'reject' && current?.status === 'rejected') {
+      try {
+        await repairRejectedBookingV6(c.env.DB, booking, `event_reject:${booking.id}:by:${staff?.id ?? 'admin'}-retry`);
+      } catch (error) {
+        if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
+          return bad(c, 'send_in_flight_retry', 409);
+        }
+        throw error;
+      }
       const updated = await c.env.DB
         .prepare(`SELECT * FROM event_bookings WHERE id = ?`)
         .bind(booking.id)
@@ -2020,20 +2060,27 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
     );
   }
   if (action === 'reject') {
-    const slot = await c.env.DB
-      .prepare(`SELECT starts_at FROM event_slots WHERE id = ?`)
-      .bind(booking.slot_id)
-      .first<{ starts_at: string }>();
     // N-065: 落選した予約の V6 未送信予定だけを止める。
-    await cancelByTrigger(c.env.DB, {
-      triggerType: 'event',
-      sourceId: booking.id,
-      sourceEventId: booking.id,
-      friendId: booking.friend_id,
-      startsAtIso: slot?.starts_at ?? null,
-      lineAccountId: booking.line_account_id,
-      cancelReason: `event_reject:${booking.id}:by:${c.get('staff')?.id ?? 'admin'}`,
-    });
+    // 送信権の貸出中は状態更新を巻き戻して 409 にする。貸出中の送信は
+    // 確定ずみの予約への送信になるため正当で、再試行は巻き戻し後の状態から
+    // 再開する (再送の修復受付も残す)。
+    try {
+      await repairRejectedBookingV6(c.env.DB, booking, `event_reject:${booking.id}:by:${c.get('staff')?.id ?? 'admin'}`);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
+        await c.env.DB
+          .prepare(
+            `UPDATE event_bookings
+                SET status = 'requested', decided_at = NULL,
+                    decided_by_staff_id = NULL, updated_at = ?
+              WHERE id = ? AND status = 'rejected'`,
+          )
+          .bind(nowIso, booking.id)
+          .run();
+        return bad(c, 'send_in_flight_retry', 409);
+      }
+      throw error;
+    }
     await enqueueEventWaitlistPromotion(c.env.DB, {
       lineAccountId: booking.line_account_id,
       eventId: booking.event_id,
@@ -2058,20 +2105,29 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRo
   const booking = await loadBookingForAction(c.env.DB, account_id, event_id, c.req.param('bookingId'));
   if (!booking) return bad(c, 'not_found', 404);
   // 再試行の受付: V6 取消が投げた直後の再送は V6 だけ直す (409 にしない)。
+  // 送信権の貸出中は 409 で再試行させる。
   if (booking.status === 'cancelled') {
     const slot = await c.env.DB
       .prepare(`SELECT starts_at FROM event_slots WHERE id = ?`)
       .bind(booking.slot_id)
       .first<{ starts_at: string }>();
-    await cancelByTrigger(c.env.DB, {
-      triggerType: 'event',
-      sourceId: booking.id,
-      sourceEventId: booking.id,
-      friendId: booking.friend_id,
-      startsAtIso: slot?.starts_at ?? null,
-      lineAccountId: booking.line_account_id,
-      cancelReason: `event_cancel:${booking.id}:by:${c.get('staff')?.id ?? 'admin'}-retry`,
-    });
+    try {
+      await cancelByTrigger(c.env.DB, {
+        triggerType: 'event',
+        sourceId: booking.id,
+        sourceEventId: booking.id,
+        friendId: booking.friend_id,
+        startsAtIso: slot?.starts_at ?? null,
+        lineAccountId: booking.line_account_id,
+        cancelReason: `event_cancel:${booking.id}:by:${c.get('staff')?.id ?? 'admin'}-retry`,
+        failOnSendInFlight: true,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
+        return bad(c, 'send_in_flight_retry', 409);
+      }
+      throw error;
+    }
     return c.json({ ok: true });
   }
   if (!canTransition(booking.status as never, 'cancel')) return bad(c, 'invalid_state', 409);
@@ -2094,15 +2150,32 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRo
     .bind(booking.slot_id)
     .first<{ starts_at: string }>();
   // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
-  await cancelByTrigger(c.env.DB, {
-    triggerType: 'event',
-    sourceId: booking.id,
-    sourceEventId: booking.id,
-    friendId: booking.friend_id,
-    startsAtIso: slot?.starts_at ?? null,
-    lineAccountId: booking.line_account_id,
-    cancelReason: `event_cancel:${booking.id}:by:${c.get('staff')?.id ?? 'admin'}`,
-  });
+  // 送信権の貸出中は状態更新を巻き戻して 409 にする (取消確定後の送信を起こさない)。
+  try {
+    await cancelByTrigger(c.env.DB, {
+      triggerType: 'event',
+      sourceId: booking.id,
+      sourceEventId: booking.id,
+      friendId: booking.friend_id,
+      startsAtIso: slot?.starts_at ?? null,
+      lineAccountId: booking.line_account_id,
+      cancelReason: `event_cancel:${booking.id}:by:${c.get('staff')?.id ?? 'admin'}`,
+      failOnSendInFlight: true,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
+      await c.env.DB
+        .prepare(
+          `UPDATE event_bookings
+              SET status = ?, cancelled_at = NULL, cancelled_by = NULL, updated_at = ?
+            WHERE id = ? AND status = 'cancelled'`,
+        )
+        .bind(booking.status, nowIso, booking.id)
+        .run();
+      return bad(c, 'send_in_flight_retry', 409);
+    }
+    throw error;
+  }
   await enqueueEventWaitlistPromotion(c.env.DB, {
     lineAccountId: booking.line_account_id,
     eventId: booking.event_id,

@@ -283,6 +283,7 @@ export async function cancelMeetConsultation(
   db: D1Database,
   externalEventId: string,
   now = new Date(),
+  options?: { failOnSendInFlight?: boolean },
 ): Promise<boolean> {
   const consultation = await db
     .prepare(
@@ -295,6 +296,23 @@ export async function cancelMeetConsultation(
     .first<{ id: string; friend_id: string; starts_at: string; line_account_id: string | null }>();
   if (!consultation) return false;
   const nowIso = now.toISOString();
+  // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
+  // 送信権の貸出中は投げて何も変えず 409 にする (状態更新より先に調べる。
+  // 配送側は通知行だけを見るため、状態だけ先に変えると貸出中の送信が
+  // 取消ずみの相談へ届いてしまう)。再送は active が無いため 0 件で返す。
+  // 移行前の行は探さない。
+  await cancelByTrigger(db, {
+    triggerType: 'booking',
+    sourceKind: 'meet',
+    sourceId: consultation.id,
+    sourceEventId: externalEventId,
+    friendId: consultation.friend_id,
+    startsAtIso: consultation.starts_at,
+    lineAccountId: consultation.line_account_id,
+    cancelReason: `meet_cancel:${externalEventId}:by:admin`,
+    allowLegacyFallback: false,
+    failOnSendInFlight: options?.failOnSendInFlight,
+  });
   await db
     .prepare("UPDATE meet_consultations SET status='cancelled', updated_at=? WHERE id=?")
     .bind(nowIso, consultation.id)
@@ -307,19 +325,6 @@ export async function cancelMeetConsultation(
     )
     .bind(nowIso, consultation.id)
     .run();
-  // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
-  // 再送は active が無いため 0 件で返す。移行前の行は探さない。
-  await cancelByTrigger(db, {
-    triggerType: 'booking',
-    sourceKind: 'meet',
-    sourceId: consultation.id,
-    sourceEventId: externalEventId,
-    friendId: consultation.friend_id,
-    startsAtIso: consultation.starts_at,
-    lineAccountId: consultation.line_account_id,
-    cancelReason: `meet_cancel:${externalEventId}:by:admin`,
-    allowLegacyFallback: false,
-  });
   return true;
 }
 

@@ -138,6 +138,8 @@ describe('Meet consultation account boundary', () => {
     expect(created.status).toBe(201);
     expect(cancelled.status).toBe(200);
     expect(mocks.register).toHaveBeenCalledWith(db, booking);
-    expect(mocks.cancel).toHaveBeenCalledWith(db, 'google-event-a');
+    expect(mocks.cancel).toHaveBeenCalledWith(
+      db, 'google-event-a', expect.any(Date), { failOnSendInFlight: true },
+    );
   });
 });

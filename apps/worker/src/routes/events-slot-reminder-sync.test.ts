@@ -20,6 +20,10 @@ const accountAccessMocks = vi.hoisted(() => ({
 }));
 vi.mock('../services/account-access.js', () => accountAccessMocks);
 
+// 通知の外部送信は抑える (V6連動の検証が目的)。
+const notifierMocks = vi.hoisted(() => ({ sendEventBookingNotification: vi.fn(async () => {}) }));
+vi.mock('../services/event-booking-notifier.js', () => notifierMocks);
+
 const { default: events } = await import('./events.js');
 
 const OLD_STARTS_AT = '2026-09-20T01:00:00.000Z';
@@ -133,6 +137,144 @@ describe('イベント枠の日程変更の再送可能性', () => {
     expect(
       raw.prepare(`SELECT target_date, status FROM friend_reminders WHERE id = 'legacy-1'`).get(),
     ).toEqual({ target_date: NEW_STARTS_AT, status: 'active' });
+  });
+
+  it('落選ずみへの却下の再送はV6修復を受け付けて200 (N-065)', async () => {
+    const { db, raw } = createTestD1();
+    seed(raw);
+    const { app, env } = makeApp(db);
+
+    // 状態だけ先に落選ずみで、V6 が旧起点に残った壊れ方 (初回の V6 失敗相当)。
+    raw.prepare(`UPDATE event_bookings SET status = 'rejected', decided_at = ? WHERE id = 'eb-1'`)
+      .run('2026-09-01T00:00:00.000Z');
+
+    // 却下の再送は修復を受け付ける (従来は decided ずみで 409 のまま)。
+    const repaired = await app.request(
+      '/api/events/admin/events/ev-1/bookings/eb-1/decide?account_id=account-1',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reject' }),
+      },
+      env,
+    );
+    expect(repaired.status).toBe(200);
+    // 未送信予定だけ止まり、日付は動かさない。
+    expect(
+      raw.prepare(`SELECT target_date, status FROM friend_reminders WHERE id = 'legacy-1'`).get(),
+    ).toEqual({ target_date: OLD_STARTS_AT, status: 'cancelled' });
+
+    // 落選ずみへの承認は競合敗北として 409 (200 で成功に見せない)。
+    const conflicted = await app.request(
+      '/api/events/admin/events/ev-1/bookings/eb-1/decide?account_id=account-1',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'confirm' }),
+      },
+      env,
+    );
+    expect(conflicted.status).toBe(409);
+  });
+
+  it('却下の送信権貸出中は状態を巻き戻して409にし、再試行で落選できる', async () => {
+    const { db, raw } = createTestD1();
+    seed(raw);
+    raw.prepare(`UPDATE event_bookings SET status = 'requested' WHERE id = 'eb-1'`).run();
+    // 送信権の貸出中 (この予約の通知の送信が動いている)。
+    raw.prepare(
+      `INSERT INTO friend_reminders
+         (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
+       VALUES ('src-1', 'friend-1', 'rule-event-1', ?, 'active', 'event', 'eb-1', 'eb-1')`,
+    ).run(OLD_STARTS_AT);
+    raw.prepare(
+      `INSERT INTO reminder_delivery_runs (
+         id, line_account_id, reminder_id, friend_reminder_id, friend_id,
+         reminder_step_id, scheduled_at, idempotency_key, line_retry_key,
+         status, lease_expires_at, created_at, updated_at
+       ) VALUES (
+         'RUN-ev-1','account-1','rule-event-1','src-1','friend-1',
+         'step-rule-event-1',?,'idem-ev-1','retry-ev-1',
+         'claimed','2099-01-01T00:00:00.000Z','2026-09-01T00:00:00.000Z','2026-09-01T00:00:00.000Z'
+       )`,
+    ).run(OLD_STARTS_AT);
+    const { app, env } = makeApp(db);
+    const decide = () => app.request(
+      '/api/events/admin/events/ev-1/bookings/eb-1/decide?account_id=account-1',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reject' }),
+      },
+      env,
+    );
+    // 貸出中は落選を確定させず 409。状態も巻き戻る (取消確定後の送信を起こさない)。
+    const conflicted = await decide();
+    expect(conflicted.status).toBe(409);
+    expect(raw.prepare(`SELECT status FROM event_bookings WHERE id = 'eb-1'`).get()).toEqual({
+      status: 'requested',
+    });
+    expect(raw.prepare(`SELECT status FROM friend_reminders WHERE id = 'src-1'`).get()).toEqual({
+      status: 'active',
+    });
+    // 送信が終われば再試行で落選し、未送信予定が止まる。
+    raw.prepare(
+      `UPDATE reminder_delivery_runs SET status = 'succeeded', lease_expires_at = NULL WHERE id = 'RUN-ev-1'`,
+    ).run();
+    const retried = await decide();
+    expect(retried.status).toBe(200);
+    expect(raw.prepare(`SELECT status FROM event_bookings WHERE id = 'eb-1'`).get()).toEqual({
+      status: 'rejected',
+    });
+    expect(raw.prepare(`SELECT status FROM friend_reminders WHERE id = 'src-1'`).get()).toEqual({
+      status: 'cancelled',
+    });
+  });
+
+  it('取消の送信権貸出中は状態を巻き戻して409にし、再試行で取消せる', async () => {
+    const { db, raw } = createTestD1();
+    seed(raw);
+    raw.prepare(
+      `INSERT INTO friend_reminders
+         (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
+       VALUES ('src-1', 'friend-1', 'rule-event-1', ?, 'active', 'event', 'eb-1', 'eb-1')`,
+    ).run(OLD_STARTS_AT);
+    raw.prepare(
+      `INSERT INTO reminder_delivery_runs (
+         id, line_account_id, reminder_id, friend_reminder_id, friend_id,
+         reminder_step_id, scheduled_at, idempotency_key, line_retry_key,
+         status, lease_expires_at, created_at, updated_at
+       ) VALUES (
+         'RUN-ev-1','account-1','rule-event-1','src-1','friend-1',
+         'step-rule-event-1',?,'idem-ev-1','retry-ev-1',
+         'claimed','2099-01-01T00:00:00.000Z','2026-09-01T00:00:00.000Z','2026-09-01T00:00:00.000Z'
+       )`,
+    ).run(OLD_STARTS_AT);
+    const { app, env } = makeApp(db);
+    const cancel = () => app.request(
+      '/api/events/admin/events/ev-1/bookings/eb-1/cancel?account_id=account-1',
+      { method: 'POST' },
+      env,
+    );
+    const conflicted = await cancel();
+    expect(conflicted.status).toBe(409);
+    expect(raw.prepare(`SELECT status FROM event_bookings WHERE id = 'eb-1'`).get()).toEqual({
+      status: 'confirmed',
+    });
+    expect(raw.prepare(`SELECT status FROM friend_reminders WHERE id = 'src-1'`).get()).toEqual({
+      status: 'active',
+    });
+    raw.prepare(
+      `UPDATE reminder_delivery_runs SET status = 'succeeded', lease_expires_at = NULL WHERE id = 'RUN-ev-1'`,
+    ).run();
+    const retried = await cancel();
+    expect(retried.status).toBe(200);
+    expect(raw.prepare(`SELECT status FROM event_bookings WHERE id = 'eb-1'`).get()).toEqual({
+      status: 'cancelled',
+    });
+    expect(raw.prepare(`SELECT status FROM friend_reminders WHERE id = 'src-1'`).get()).toEqual({
+      status: 'cancelled',
+    });
   });
 
   it('2件目の失敗では1件目を旧起点へ戻し、枠は変えず再送で全件直る', async () => {
