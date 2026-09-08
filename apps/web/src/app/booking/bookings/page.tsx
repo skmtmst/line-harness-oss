@@ -6,7 +6,7 @@ import { bookingApi, type BookingAdminDetail, type BookingMenu, type BookingRequ
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
-import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_WIDTH } from '@/components/shared/folder-panel'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import BookingCalendar from './booking-calendar'
 
@@ -414,10 +414,9 @@ export default function BookingsPage() {
 
       <div
         data-design="Body"
-        style={FOLDER_RAIL_STYLE}
-        className="grid items-start gap-4 xl:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]"
+        className="flex flex-col items-start gap-4 xl:flex-row"
       >
-        <div data-design="Folders">
+        <div data-design="Folders" className="shrink-0" style={{ width: FOLDER_RAIL_WIDTH }}>
           <FolderPanel
             heading="メニュー"
             rows={[

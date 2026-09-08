@@ -96,7 +96,7 @@ export default function FolderPanel({
 
   return (
     // **読み上げ名を持つ。** 帯が何の分類かを、見出しの外からも辿れるように。
-    <aside aria-label={heading} className="bg-canvas rounded-card border-hairline h-fit overflow-visible border">
+    <aside aria-label="フォルダ" className="bg-canvas rounded-card border-hairline h-fit overflow-visible border">
       <div className="border-hairline flex items-center justify-between border-b px-4 py-3">
         <p className="text-ink text-sm font-semibold">{heading}</p>
         <span className="text-ink-faint text-xs tabular-nums">{total}</span>
