@@ -90,4 +90,14 @@ describe('V6 代理予約の接続契約', () => {
     expect(PAGE).toContain('confirmationOperation.status')
     expect(PAGE).toContain('automaticOperations.map')
   })
+
+  test('電話番号は桁を先に確かめ、再送中の通知状態を取りこぼさない(点検#516の中3・中4)', () => {
+    // サーバと同じ約束。出す直前で落とすと入れ直しになる。
+    expect(PAGE).toContain('phoneDigitsError')
+    expect(PAGE).toContain('電話番号は数字7〜15桁で入力してください')
+    expect(PAGE).toContain("normalize('NFKC')")
+    // 裏側が返す 'scheduled' を型と文言の両方で受ける。
+    expect(API).toContain("'queued' | 'scheduled' | 'succeeded' | 'failed' | 'not_applicable'")
+    expect(PAGE).toContain("deliveryStatus === 'scheduled' ? '送信予定です'")
+  })
 })

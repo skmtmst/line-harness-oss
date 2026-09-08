@@ -42,8 +42,10 @@ export default function AnalyticsReportNewPage() {
   const [monthDay, setMonthDay] = useState('1')
   const [sendTime, setSendTime] = useState('09:00')
   const [periodDays, setPeriodDays] = useState('7')
+  // 宛先の初期値は空にする。例のアドレスが入ったまま作ると、選んでいない
+  // 相手へ数字の入ったレポートが送られる。受信者の自動チェックもしない。
   const [staffIds, setStaffIds] = useState<string[]>([])
-  const [emails, setEmails] = useState(['report@example.com'])
+  const [emails, setEmails] = useState<string[]>([])
   const [lineEnabled, setLineEnabled] = useState(false)
   const [alertsEnabled, setAlertsEnabled] = useState(true)
 
@@ -71,7 +73,6 @@ export default function AnalyticsReportNewPage() {
         setError(response.error || '定期レポートの設定を読み込めませんでした')
       } else {
         setOptions(response.data.options)
-        setStaffIds(response.data.options.recipients.slice(0, 2).map((item) => item.id))
       }
       setLoading(false)
     }).catch(() => {
@@ -88,8 +89,11 @@ export default function AnalyticsReportNewPage() {
     setSections((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])
   }
 
+  // 宛先が0件のときは作れない。裏側も「受け取る人を選んでください」で止める。
+  const hasRecipient = staffIds.length > 0 || emails.some((item) => item.trim() !== '')
+
   const submit = async (sendOnce: boolean) => {
-    if (!selectedAccountId || !options || !canManage) return
+    if (!selectedAccountId || !options || !canManage || !hasRecipient) return
     setSaving(true)
     setError('')
     setNotice('')
@@ -200,6 +204,7 @@ export default function AnalyticsReportNewPage() {
               ))}
               <Button variant="secondary" onClick={() => setEmails((current) => [...current, ''])}>宛先を足す</Button>
             </div>
+            {!hasRecipient && <p className="text-ink-secondary mt-3 text-xs">受け取る人を1人以上選んでください。選ぶまで作れません。</p>}
             <label className="border-hairline mt-5 flex items-start gap-3 border-t pt-4">
               <input className="accent-accent mt-0.5 size-5" type="checkbox" checked={lineEnabled} onChange={(event) => setLineEnabled(event.target.checked)} />
               <span className="grid gap-1"><strong className="text-sm">LINEでも同じ内容を送る</strong><small className="text-ink-secondary text-xs font-normal">ログインユーザーのLINEに、要点だけを短くまとめて送ります。</small></span>
@@ -236,7 +241,7 @@ export default function AnalyticsReportNewPage() {
 
       <StickyBar
         status={<>まだ動いていません。つくると、次の{nextLabel}から届きはじめます。</>}
-        actions={<><Link className="text-ink-secondary p-3 text-sm no-underline" href="/analytics">キャンセル</Link><Button variant="secondary" disabled={saving || !canManage} onClick={() => void submit(true)}>いますぐ1回だけ送ってみる</Button><Button disabled={saving || !canManage} onClick={() => void submit(false)}>{saving ? '作っています' : 'つくって動かす'}</Button></>}
+        actions={<><Link className="text-ink-secondary p-3 text-sm no-underline" href="/analytics">キャンセル</Link><Button variant="secondary" disabled={saving || !canManage || !hasRecipient} onClick={() => void submit(true)}>いますぐ1回だけ送ってみる</Button><Button disabled={saving || !canManage || !hasRecipient} onClick={() => void submit(false)}>{saving ? '作っています' : 'つくって動かす'}</Button></>}
       />
     </div>
   )
