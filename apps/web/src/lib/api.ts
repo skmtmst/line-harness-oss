@@ -97,6 +97,15 @@ import type {
   UndoIdentityCandidateRequest,
 } from '@line-crm/shared'
 
+/** 一覧集計で返す、公開中の自動応答2件の競合ペア。 */
+export type AutoReplyConflictPair = {
+  leftAutoReplyId: string
+  rightAutoReplyId: string
+  winnerAutoReplyId: string
+  certainty: 'certain' | 'possible'
+  reason: string
+}
+
 export type OperatorNotificationRule = NotificationRule & {
   status: 'draft' | 'published'
   recipientCount: number
@@ -4717,10 +4726,6 @@ export const api = {
           }>
         >
       >(`/api/analytics/broadcasts${rangeQuery({ ...params, accountId })}`),
-    cross: (accountId: string, fieldId: string) =>
-      fetchApi<ApiResponse<Array<{ row: string; col: string; count: number }>>>(
-        `/api/analytics/cross?account_id=${encodeURIComponent(accountId)}&fieldId=${encodeURIComponent(fieldId)}`,
-      ),
     runCross: (accountId: string, data: {
       rowAxis: AnalyticsCrossAxis
       columnAxis: AnalyticsCrossAxis
@@ -4978,27 +4983,6 @@ export const api = {
         }`,
         { method: 'DELETE' },
       ),
-  },
-  /** NENコラム。 */
-  nenColumns: {
-    list: (accountId: string) =>
-      fetchApi<
-        ApiResponse<
-          Array<{
-            id: string
-            slug: string
-            title: string
-            intro_text: string | null
-            published_at: string | null
-          }>
-        >
-      >(`/api/nen-campaigns/columns?lineAccountId=${encodeURIComponent(accountId)}`),
-    /** コラムに添える紹介文。本文そのものはEC側にある。 */
-    updateMessage: (accountId: string, id: string, introText: string) =>
-      fetchApi<ApiResponse<null>>(`/api/nen-campaigns/columns/${id}/message?lineAccountId=${encodeURIComponent(accountId)}`, {
-        method: 'PUT',
-        body: JSON.stringify({ introText }),
-      }),
   },
   /** サイトスクリプト。自社サイトの行動を友だちに紐づける。 */
   siteTracking: {
@@ -5424,7 +5408,7 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ orders }),
       }),
-    preview: (id: string, startAt?: string) => {
+    preview: (id: string, startAt?: string, signal?: AbortSignal) => {
       const q = startAt ? `?startAt=${encodeURIComponent(startAt)}` : ''
       return fetchApi<ApiResponse<{
         startAt: string
@@ -5435,7 +5419,7 @@ export const api = {
           messageType: string
           messageContent: string
         }>
-      }>>(`/api/scenarios/${id}/preview${q}`)
+      }>>(`/api/scenarios/${id}/preview${q}`, { signal })
     },
     /** この友だちをこのシナリオに登録する（1人ぶん）。 */
     enroll: (scenarioId: string, friendId: string) =>
@@ -6673,7 +6657,7 @@ export const api = {
       fetchApi<ApiResponse<{ conflicts: AutoReplyConflict[] }>>(`/api/auto-replies/${id}/conflicts`),
     summary: (accountId: string) =>
       fetchApi<ApiResponse<{
-        conflicts: AutoReplyConflict[];
+        conflicts: AutoReplyConflictPair[];
         conflictCount: number;
         receiveSourceCounts: Array<{ source: string; count: number }> | null;
         matchedLast28Days: number | null;

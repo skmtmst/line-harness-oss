@@ -9,7 +9,6 @@ const mocks = {
   getTrackedLinkStats: vi.fn(),
   getLinkClickSummary: vi.fn(),
   getBroadcastSummary: vi.fn(),
-  getTagFieldCross: vi.fn(),
   getFunnelsWithCurrentVersions: vi.fn(),
   getLegacyFunnels: vi.fn(),
   getFunnelById: vi.fn(),
@@ -137,7 +136,6 @@ beforeEach(() => {
   mocks.getTrackedLinkStats.mockResolvedValue([]);
   mocks.getLinkClickSummary.mockResolvedValue([]);
   mocks.getBroadcastSummary.mockResolvedValue([]);
-  mocks.getTagFieldCross.mockResolvedValue([]);
   mocks.getFunnelsWithCurrentVersions.mockResolvedValue({
     items: [{
       ...FUNNEL,
@@ -331,16 +329,10 @@ describe('V6分析の概要API', () => {
   });
 });
 
-describe('クロス集計', () => {
-  it('項目の指定が要る', async () => {
-    const res = await req(`/api/analytics/cross?${ACCOUNT}`);
-    expect(res.status).toBe(400);
-  });
-
-  it('項目を指定すれば返る', async () => {
+describe('旧クロス集計', () => {
+  it('画面未使用の同期GET口は公開しない', async () => {
     const res = await req(`/api/analytics/cross?${ACCOUNT}&fieldId=ff-1`);
-    expect(res.status).toBe(200);
-    expect(mocks.getTagFieldCross).toHaveBeenCalledWith(env.DB, 'account-a', 'ff-1');
+    expect(res.status).toBe(404);
   });
 });
 
