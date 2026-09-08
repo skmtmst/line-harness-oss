@@ -3560,7 +3560,7 @@ export const AUTO_REPLIES = [
     ...AR_BASE, id: 'ar-2', name: '予約変更のお問い合わせ', keyword: '予約変更', matchType: 'contains',
     responseType: 'text', responseContent: '予約変更を承ります。ご希望の日時をこのトークでお知らせください。',
     isActive: true, priority: 2, folderId: 'arf-booking', templateId: 'template-1',
-    keywords: [{ word: '予約変更' }, { word: '日程変更' }, { word: 'キャンセル' }],
+    keywords: [{ keyword: '予約変更', matchType: 'contains' }, { keyword: '日程変更', matchType: 'contains' }, { keyword: 'キャンセル', matchType: 'contains' }],
     actions: [{ actionType: 'support_mark' }],
     hits: { period: 186, total: 942 }, actionExecutionCount: 64, conflictAttentionCount: 1,
     createdAt: '2026-04-18T00:00:00.000Z',
@@ -3569,7 +3569,7 @@ export const AUTO_REPLIES = [
     ...AR_BASE, id: 'ar-3', name: '商品についての質問', keyword: '商品', matchType: 'contains',
     responseType: 'text', responseContent: '商品についてのご質問ありがとうございます。',
     isActive: true, priority: 3, folderId: 'arf-inquiry',
-    keywords: [{ word: '商品' }, { word: '価格' }, { word: '在庫' }, { word: 'サイズ' }, { word: '送料' }],
+    keywords: [{ keyword: '商品', matchType: 'contains' }, { keyword: '価格', matchType: 'contains' }, { keyword: '在庫', matchType: 'contains' }, { keyword: 'サイズ', matchType: 'contains' }, { keyword: '送料', matchType: 'contains' }],
     actions: [{ actionType: 'tag' }],
     hits: { period: 152, total: 733 }, actionExecutionCount: 64, conflictAttentionCount: 1,
     createdAt: '2026-05-06T00:00:00.000Z',
@@ -3580,7 +3580,7 @@ export const AUTO_REPLIES = [
     ...AR_BASE, id: 'ar-4', name: 'キャンセル受付', keyword: 'キャンセル', matchType: 'contains',
     responseType: 'text', responseContent: 'キャンセルを承りました。',
     isActive: false, priority: 4, folderId: 'arf-booking',
-    keywords: [{ word: 'キャンセル' }, { word: '取り消し' }],
+    keywords: [{ keyword: 'キャンセル', matchType: 'contains' }, { keyword: '取り消し', matchType: 'contains' }],
     actions: [], hits: { period: 0, total: 0 }, actionExecutionCount: 0, conflictAttentionCount: 0,
     createdAt: '2026-08-12T00:00:00.000Z',
   },
@@ -3588,7 +3588,7 @@ export const AUTO_REPLIES = [
     ...AR_BASE, id: 'ar-5', name: '旧キーワードルール', keyword: '営業時間', matchType: 'exact',
     responseType: 'text', responseContent: '平日 09:00〜18:00 です。',
     isActive: false, priority: 5, folderId: 'arf-keyword',
-    keywords: [{ word: '営業時間' }],
+    keywords: [{ keyword: '営業時間', matchType: 'exact' }],
     actions: [], hits: { period: 0, total: 411 }, actionExecutionCount: 0, conflictAttentionCount: 0,
     createdAt: '2026-01-20T00:00:00.000Z',
   },
@@ -5278,7 +5278,10 @@ export const LINE_NOTIFICATION_METRICS = {
     definitionId: definition.id,
     notificationName: definition.name,
     accepted: { value: [148, 132, 96, 88, 74, 51, 23, 3, 0][index] },
-    displayed: { state: 'unavailable', value: null, reason: 'LINE側の個人開封は取得できません' },
+    // 8件目は集計待ち。本番の waiting が画面の pending に寄ることを撮る。
+    displayed: index === 7
+      ? { state: 'pending', value: null, reason: '集計中です' }
+      : { state: 'unavailable', value: null, reason: 'LINE側の個人開封は取得できません' },
     clicked: { value: [42, 31, 18, 16, 12, 9, 4, 0, 0][index] },
   })),
   coverage: { individualOpenAvailable: false, lineAggregateOnly: true, unavailableIsNull: true },
@@ -5330,7 +5333,7 @@ export const EC_NOTIFICATION_RUNS = {
 }
 
 export const LINE_NOTIFICATION_DELIVERIES = {
-  items: EC_NOTIFICATION_RUNS.items.map((run) => ({
+  items: [...EC_NOTIFICATION_RUNS.items.map((run) => ({
     ...run,
     attemptCount: run.status === 'failed' ? 3 : 1,
     nextRetryAt: run.status === 'failed' ? '2026-08-25T11:14:00+09:00' : null,
@@ -5339,6 +5342,19 @@ export const LINE_NOTIFICATION_DELIVERIES = {
     retryAvailable: run.status === 'failed',
     attemptHistory: [{ attempt: 1, status: run.status === 'failed' ? 'failed' : run.status, occurredAt: run.receivedAt }],
   })),
+  // 再試行待ち。本番の failures 絞り込み（excluded / retry_wait / failed）の3つ目を撮る。
+  {
+    id: 'ec-run-5', recipientType: 'customer', notificationName: '発送のお知らせ', source: 'EC連携',
+    sourceEventId: 'ec-event-1005', friendId: 'friend-5', friendName: '石田 未来', orderNumber: 'NEN-10478',
+    channel: 'line', status: 'retry_wait', reason: 'LINEが混み合っているため、後でもう一度送ります',
+    receivedAt: '2026-08-25T10:09:00+09:00', acceptedAt: null,
+    attemptCount: 2, nextRetryAt: '2026-08-25T11:09:00+09:00', clickedAt: null, version: 2,
+    executionMode: 'retry', retryAvailable: true,
+    attemptHistory: [
+      { attempt: 1, status: 'failed', occurredAt: '2026-08-25T10:09:00+09:00' },
+      { attempt: 2, status: 'retry_wait', occurredAt: '2026-08-25T10:39:00+09:00' },
+    ],
+  }],
   summary: EC_NOTIFICATION_RUNS.summary,
   coverage: { source: 'notification_delivery_ledger', unassignedHistoricalRowsExcluded: true, attemptHistoryAvailable: true, retryAvailable: true },
 }

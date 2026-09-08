@@ -2152,9 +2152,13 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
     const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 100) : 20
     const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
-    const items = query.get('view') === 'failures'
-      ? LINE_NOTIFICATION_DELIVERIES.items.filter((item) => item.status === 'failed')
+    // 本番の view=failures は excluded / retry_wait / failed の3状態。failed だけにすると件数が合わない。
+    // 本番口は retry_wait を failed に寄せて返す（publicDeliveryStatus）ので、見本も同じ寄せ方をする。
+    const toPublic = (item) => item.status === 'retry_wait' ? { ...item, status: 'failed' } : item
+    const items = (query.get('view') === 'failures'
+      ? LINE_NOTIFICATION_DELIVERIES.items.filter((item) => item.status === 'failed' || item.status === 'excluded' || item.status === 'retry_wait')
       : LINE_NOTIFICATION_DELIVERIES.items
+    ).map(toPublic)
     return { success: true, data: { ...LINE_NOTIFICATION_DELIVERIES, items: items.slice(offset, offset + limit) }, pagination: { total: items.length, limit, offset } }
   }
   if (pathname === '/api/notifications/operator-rules') {
