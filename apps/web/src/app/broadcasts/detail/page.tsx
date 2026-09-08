@@ -293,7 +293,7 @@ function BroadcastDetailInner() {
               </Link>
             </div>
             <p className="text-ink-faint mt-2 text-xs leading-relaxed">
-              題名と本文を引き継いで新規作成を開きます。宛先・予約日時は引き継がないので、送る前に確かめてください。
+              複製して作る操作です。題名と本文を引き継いで新規作成を開きます。宛先・予約日時は引き継がないので、送る前に確かめてください。
             </p>
             <dl className="mt-3 space-y-2 text-sm">
               <Row label="宛先の条件" value={broadcast.targetType === 'all' ? 'すべての友だち' : '絞り込みあり'} />
