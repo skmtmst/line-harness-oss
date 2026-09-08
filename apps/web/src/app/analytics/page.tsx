@@ -535,7 +535,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
       ) : cells.length === 0 ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           {crossResult.state === 'unavailable'
-            ? crossResult.stateReason || 'この分析に必要なデータを取得できません。'
+            ? crossResult.stateReason || '未取得'
             : 'この条件に該当する人はいません。'}
         </div>
       ) : (
@@ -1565,7 +1565,7 @@ function RoutesOverviewTab({ accountId }: { accountId: string }) {
   ]
   return <div data-design-node="YBGtm" className="space-y-4">
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-      <KpiCard title="この30日の成果" value={conversions} unit="件" detail={revenue === null ? '売上は取得できません' : `売上 ${revenue.toLocaleString('ja-JP')}円`} />
+      <KpiCard title="この30日の成果" value={conversions} unit="件" detail={revenue === null ? '売上は未取得です' : `売上 ${revenue.toLocaleString('ja-JP')}円`} />
       <KpiCard title="かかった広告費" value={adCost} unit="円" detail="接続済みの経路を合計" />
       <KpiCard title="差し引き" value={profit} unit="円" detail="売上から広告費を引いた残り" />
       <KpiCard title="費用を取得できない経路" value={overview.routes.filter((item) => shownValue(item.adCost) === null).length} unit="件" detail="0円として計算しません" />
@@ -1700,7 +1700,7 @@ function UrlClicksOverviewTab({ accountId }: { accountId: string }) {
 const SAVED_STATE_LABELS: Record<SavedAnalyticsSnapshot['state'], string> = {
   available: '利用可能',
   partial: '一部集計',
-  unavailable: '取得不可',
+  unavailable: '未取得',
   failed: '失敗',
 }
 
@@ -1797,7 +1797,7 @@ function SavedAnalyticsTab({ accountId, onCountChange }: { accountId: string; on
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         <KpiCard title="保存した分析" value={items.length} unit="件" detail="クロス分析とファネル" loading={loading} />
         <KpiCard title="保存した結果" value={items.reduce((sum, item) => sum + item.snapshotCount, 0)} unit="件" detail="時点ごとに固定した結果" loading={loading} />
-        <KpiCard title="定義が古いもの" value={staleCount} unit="件" detail="取得不可・失敗の最新結果" loading={loading} />
+        <KpiCard title="定義が古いもの" value={staleCount} unit="件" detail="未取得・失敗の最新結果" loading={loading} />
         <KpiCard title="選んだ分析の履歴" value={selected ? selected.snapshotCount : null} unit="件" detail={selected?.name ?? '分析を選んでください'} loading={loading} />
       </div>
       <div className="bg-info-bg border-info rounded-card border px-4 py-3 text-sm">
