@@ -456,6 +456,8 @@ describe('シナリオ通の本文契約', () => {
 
 describe('GET /api/scenarios/:id/preview', () => {
   test('軽15: 壊れた開始日時は simulate と同じく 400 で断る', async () => {
+    // 前段の可視確認を通す（存在する扱い）。検証はその後ろで動く。
+    dbMocks.getScenarioById.mockResolvedValue({ id: 's-1', line_account_id: 'acc-1' });
     const { db } = makeScenarioDb([]);
     const res = await setupApp(db).request(
       `/api/scenarios/s-1/preview?startAt=${encodeURIComponent('壊れた日時')}`,
