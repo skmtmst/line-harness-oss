@@ -3970,6 +3970,16 @@ CREATE TABLE rich_menu_pages (
   UNIQUE (group_id, order_index)
 );
 
+CREATE TABLE rich_menu_schedule_publications (
+  schedule_id      TEXT NOT NULL REFERENCES rich_menu_schedules(id) ON DELETE CASCADE,
+  kind             TEXT NOT NULL DEFAULT 'publish' CHECK (kind IN ('publish', 'restore')),
+  page_id          TEXT NOT NULL,
+  line_richmenu_id TEXT NOT NULL,
+  run_id           TEXT NOT NULL,
+  created_at       TEXT NOT NULL,
+  PRIMARY KEY (schedule_id, kind, page_id)
+);
+
 CREATE TABLE rich_menu_schedules (
   id                    TEXT PRIMARY KEY,
   group_id              TEXT NOT NULL REFERENCES rich_menu_groups(id) ON DELETE CASCADE,
@@ -6230,6 +6240,9 @@ CREATE UNIQUE INDEX idx_scenario_triggers_unique
   ON scenario_triggers (scenario_id, kind, COALESCE(tag_id, ''));
 
 CREATE INDEX idx_scenarios_order ON scenarios (display_order);
+
+CREATE INDEX idx_schedule_publications_schedule
+  ON rich_menu_schedule_publications (schedule_id, kind);
 
 CREATE INDEX idx_shifts_staff_date ON staff_shifts (staff_id, work_date);
 

@@ -303,7 +303,8 @@
     "339_site_event_host.sql",
     "340_staff_two_factor_setup_attempts.sql",
     "341_ec_notification_settings_account_scope.sql",
-    "342_rich_menu_schedule_execution.sql"
+    "342_rich_menu_schedule_execution.sql",
+    "344_rich_menu_schedule_publications.sql"
   ],
-  "migrationCount": 304
+  "migrationCount": 305
 }

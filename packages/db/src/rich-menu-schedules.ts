@@ -172,37 +172,56 @@ export async function claimRichMenuScheduleRestore(
   return (result.meta?.changes ?? 0) > 0;
 }
 
+export async function getRichMenuScheduleById(
+  db: D1Database,
+  id: string,
+  accountId: string,
+): Promise<RichMenuScheduleRow | null> {
+  const row = await db
+    .prepare(`SELECT * FROM rich_menu_schedules WHERE id = ? AND account_id = ?`)
+    .bind(id, accountId)
+    .first<RichMenuScheduleRow>();
+  return row ?? null;
+}
+
+/**
+ * 成功記録は lease fencing 付き。claimしたrunだけが書ける。
+ * staleなrun Aがrun Bのclaim後に書こうとしても changes=0 で失敗し false を返す。
+ */
 export async function recordRichMenuScheduleSuccess(
   db: D1Database,
   id: string,
   accountId: string,
   runId: string,
   nextStatus: 'completed' | 'published',
-): Promise<void> {
+): Promise<boolean> {
   if (nextStatus === 'published') {
     // 期間モードの開始成功。復元の再試行回数を開始と独立させるため
     // attempt_countを0へ戻す。started_run_idは開始runのまま残し、
     // ended_run_idは復元が終わるまで空けておく。
-    await db
+    const result = await db
       .prepare(
         `UPDATE rich_menu_schedules
             SET status = 'published', ended_run_id = NULL, last_error_code = NULL,
                 attempt_count = 0, next_retry_at = NULL, updated_at = ?
-          WHERE id = ? AND account_id = ?`,
+          WHERE id = ? AND account_id = ? AND status = 'publishing'
+            AND started_run_id = ?`,
       )
-      .bind(jstNow(), id, accountId)
+      .bind(jstNow(), id, accountId, runId)
       .run();
-    return;
+    return (result.meta?.changes ?? 0) > 0;
   }
-  await db
+  const result = await db
     .prepare(
       `UPDATE rich_menu_schedules
           SET status = ?, ended_run_id = ?, last_error_code = NULL,
               next_retry_at = NULL, updated_at = ?
-        WHERE id = ? AND account_id = ?`,
+        WHERE id = ? AND account_id = ? AND status = 'publishing'
+          AND started_run_id = ?`,
     )
-    .bind(nextStatus, runId, jstNow(), id, accountId)
+    .bind(nextStatus, runId, jstNow(), id, accountId, runId)
     .run();
+  return (result.meta?.changes ?? 0) > 0;
 }
 
 export async function recordRichMenuScheduleRestoreSuccess(
@@ -210,52 +229,60 @@ export async function recordRichMenuScheduleRestoreSuccess(
   id: string,
   accountId: string,
   runId: string,
-): Promise<void> {
-  await db
+): Promise<boolean> {
+  const result = await db
     .prepare(
       `UPDATE rich_menu_schedules
           SET status = 'completed', ended_run_id = ?, last_error_code = NULL,
               next_retry_at = NULL, updated_at = ?
-        WHERE id = ? AND account_id = ?`,
+        WHERE id = ? AND account_id = ? AND status = 'restoring'
+          AND ended_run_id = ?`,
     )
-    .bind(runId, jstNow(), id, accountId)
+    .bind(runId, jstNow(), id, accountId, runId)
     .run();
+  return (result.meta?.changes ?? 0) > 0;
 }
 
 export async function recordRichMenuScheduleTransientFailure(
   db: D1Database,
   id: string,
   accountId: string,
+  runId: string,
   errorCode: string,
   nextRetryAt: string,
-): Promise<void> {
-  await db
+): Promise<boolean> {
+  const result = await db
     .prepare(
       `UPDATE rich_menu_schedules
           SET status = 'scheduled', last_error_code = ?, next_retry_at = ?,
               updated_at = ?
-        WHERE id = ? AND account_id = ?`,
+        WHERE id = ? AND account_id = ? AND status = 'publishing'
+          AND started_run_id = ?`,
     )
-    .bind(errorCode.slice(0, 120), nextRetryAt, jstNow(), id, accountId)
+    .bind(errorCode.slice(0, 120), nextRetryAt, jstNow(), id, accountId, runId)
     .run();
+  return (result.meta?.changes ?? 0) > 0;
 }
 
 export async function recordRichMenuScheduleRestoreTransientFailure(
   db: D1Database,
   id: string,
   accountId: string,
+  runId: string,
   errorCode: string,
   nextRetryAt: string,
-): Promise<void> {
-  await db
+): Promise<boolean> {
+  const result = await db
     .prepare(
       `UPDATE rich_menu_schedules
           SET status = 'published', last_error_code = ?, next_retry_at = ?,
               updated_at = ?
-        WHERE id = ? AND account_id = ?`,
+        WHERE id = ? AND account_id = ? AND status = 'restoring'
+          AND ended_run_id = ?`,
     )
-    .bind(errorCode.slice(0, 120), nextRetryAt, jstNow(), id, accountId)
+    .bind(errorCode.slice(0, 120), nextRetryAt, jstNow(), id, accountId, runId)
     .run();
+  return (result.meta?.changes ?? 0) > 0;
 }
 
 export async function recordRichMenuSchedulePermanentFailure(
@@ -264,16 +291,21 @@ export async function recordRichMenuSchedulePermanentFailure(
   accountId: string,
   runId: string,
   errorCode: string,
-): Promise<void> {
-  await db
+): Promise<boolean> {
+  // 恒久失敗もlease付き。stale runが新しいclaimをfailedで潰さない。
+  // 開始側(publishing/scheduled)か復元側(restoring/published)のどちらかで
+  // 自分のrunが残っている場合だけ書ける。
+  const result = await db
     .prepare(
       `UPDATE rich_menu_schedules
           SET status = 'failed', ended_run_id = ?, last_error_code = ?,
               next_retry_at = NULL, updated_at = ?
-        WHERE id = ? AND account_id = ?`,
+        WHERE id = ? AND account_id = ?
+          AND (started_run_id = ? OR ended_run_id = ?)`,
     )
-    .bind(runId, errorCode.slice(0, 120), jstNow(), id, accountId)
+    .bind(runId, errorCode.slice(0, 120), jstNow(), id, accountId, runId, runId)
     .run();
+  return (result.meta?.changes ?? 0) > 0;
 }
 
 /**
@@ -388,4 +420,180 @@ export async function cancelRichMenuSchedule(
     .bind(jstNow(), id, groupId, accountId)
     .run();
   return (result.meta?.changes ?? 0) > 0;
+}
+
+export type SchedulePublicationKind = 'publish' | 'restore';
+
+export type SchedulePublicationRow = {
+  schedule_id: string;
+  kind: SchedulePublicationKind;
+  page_id: string;
+  line_richmenu_id: string;
+  run_id: string;
+  created_at: string;
+};
+
+/**
+ * 外部LINEへの作成結果をdurableに残す。LINE成功後・D1記録前の停止で
+ * 再実行しても作り直さないための照合元。INSERT OR IGNOREで二重記録しない。
+ */
+export async function recordSchedulePublications(
+  db: D1Database,
+  scheduleId: string,
+  kind: SchedulePublicationKind,
+  runId: string,
+  pages: Array<{ pageId: string; lineRichMenuId: string }>,
+  createdAt?: string,
+): Promise<void> {
+  if (pages.length === 0) return;
+  const now = createdAt ?? jstNow();
+  const stmts = pages.map((page) =>
+    db
+      .prepare(
+        `INSERT OR IGNORE INTO rich_menu_schedule_publications
+           (schedule_id, kind, page_id, line_richmenu_id, run_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(scheduleId, kind, page.pageId, page.lineRichMenuId, runId, now),
+  );
+  await db.batch(stmts);
+}
+
+export async function getSchedulePublications(
+  db: D1Database,
+  scheduleId: string,
+  kind: SchedulePublicationKind,
+): Promise<SchedulePublicationRow[]> {
+  const result = await db
+    .prepare(
+      `SELECT schedule_id, kind, page_id, line_richmenu_id, run_id, created_at
+         FROM rich_menu_schedule_publications
+        WHERE schedule_id = ? AND kind = ?
+        ORDER BY page_id ASC`,
+    )
+    .bind(scheduleId, kind)
+    .all<SchedulePublicationRow>();
+  return result.results ?? [];
+}
+
+export type CreateScheduleInput = {
+  id: string;
+  groupId: string;
+  accountId: string;
+  mode: 'scheduled' | 'period';
+  startsAt: string;
+  endsAt: string | null;
+  restoreGroupId: string | null;
+  definitionSnapshot: string;
+  idempotencyKey: string;
+  requestedByStaffId: string;
+  now: string;
+};
+
+/**
+ * 予約作成を原子的に行う。SELECT→INSERTの2段階にしない。
+ * INSERT OR IGNORE相当で競合を吸収し、同keyの既存行と内容を比べる。
+ * 同内容なら既存を返し、異内容ならconflictを返す（成功扱いにしない）。
+ */
+export async function createRichMenuScheduleAtomic(
+  db: D1Database,
+  input: CreateScheduleInput,
+): Promise<
+  | { outcome: 'created'; id: string }
+  | { outcome: 'existing'; id: string; status: string }
+  | { outcome: 'conflict'; id: string; status: string }
+> {
+  const insert = await db
+    .prepare(
+      `INSERT INTO rich_menu_schedules
+         (id, group_id, account_id, mode, starts_at, ends_at, restore_group_id,
+          definition_snapshot, status, idempotency_key, requested_by_staff_id,
+          created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', ?, ?, ?, ?)
+       ON CONFLICT(account_id, idempotency_key) DO NOTHING`,
+    )
+    .bind(
+      input.id,
+      input.groupId,
+      input.accountId,
+      input.mode,
+      input.startsAt,
+      input.endsAt,
+      input.restoreGroupId,
+      input.definitionSnapshot,
+      input.idempotencyKey,
+      input.requestedByStaffId,
+      input.now,
+      input.now,
+    )
+    .run();
+  if ((insert.meta?.changes ?? 0) > 0) {
+    return { outcome: 'created', id: input.id };
+  }
+  const existing = await db
+    .prepare(
+      `SELECT id, status, group_id, mode, starts_at, ends_at, restore_group_id,
+              definition_snapshot
+         FROM rich_menu_schedules
+        WHERE account_id = ? AND idempotency_key = ?`,
+    )
+    .bind(input.accountId, input.idempotencyKey)
+    .first<{
+      id: string;
+      status: string;
+      group_id: string;
+      mode: string;
+      starts_at: string;
+      ends_at: string | null;
+      restore_group_id: string | null;
+      definition_snapshot: string;
+    }>();
+  if (!existing) {
+    // 同時実行の狭間で消えた等の想定外。再試行させる。
+    throw new Error('schedule idempotency race: existing row not found');
+  }
+  const same =
+    existing.group_id === input.groupId &&
+    existing.mode === input.mode &&
+    existing.starts_at === input.startsAt &&
+    (existing.ends_at ?? null) === (input.endsAt ?? null) &&
+    (existing.restore_group_id ?? null) === (input.restoreGroupId ?? null) &&
+    existing.definition_snapshot === input.definitionSnapshot;
+  if (same) {
+    return { outcome: 'existing', id: existing.id, status: existing.status };
+  }
+  return { outcome: 'conflict', id: existing.id, status: existing.status };
+}
+
+/** snapshot内のpage id一覧を取り出す。壊れたJSONは空配列。 */
+export function snapshotPageIds(snapshot: unknown): string[] {
+  if (typeof snapshot !== 'object' || snapshot === null) return [];
+  const pages = (snapshot as { pages?: unknown }).pages;
+  if (!Array.isArray(pages)) return [];
+  const ids: string[] = [];
+  for (const page of pages) {
+    if (page && typeof page === 'object' && typeof (page as { id?: unknown }).id === 'string') {
+      ids.push((page as { id: string }).id);
+    }
+  }
+  return ids;
+}
+
+/**
+ * 予約後の下書き編集・ページ削除のずれを検出する。
+ * snapshotにあるpageが現在のgroupに無ければdriftとして恒久失敗させる。
+ * 内容の編集自体はsnapshotが正本のため許すが、消えたpageへのID記録はしない。
+ */
+export function detectSnapshotPageDrift(
+  snapshot: unknown,
+  currentPageIds: string[],
+): string | null {
+  const wanted = snapshotPageIds(snapshot);
+  if (wanted.length === 0) return 'definition_snapshot has no pages';
+  const current = new Set(currentPageIds);
+  const missing = wanted.filter((id) => !current.has(id));
+  if (missing.length > 0) {
+    return `snapshot drift: pages deleted after reservation (${missing.slice(0, 3).join(',')})`;
+  }
+  return null;
 }
