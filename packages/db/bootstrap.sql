@@ -2878,7 +2878,7 @@ CREATE TABLE mileage_redemption_step_deliveries (
                     CHECK (status IN ('started', 'sent')),
   attempt_count   INTEGER NOT NULL DEFAULT 1,
   created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now')), owner TEXT, lease_expires_at TEXT, generation INTEGER NOT NULL DEFAULT 1, fence_token TEXT, needs_reconcile INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (redemption_id, step_key)
 );
 
@@ -5927,6 +5927,9 @@ CREATE INDEX idx_mileage_rules_match
 
 CREATE INDEX idx_mileage_spend_allocations_grant
   ON mileage_spend_allocations(grant_lot_id);
+
+CREATE INDEX idx_mileage_step_deliveries_reconcile
+  ON mileage_redemption_step_deliveries (needs_reconcile, lease_expires_at);
 
 CREATE INDEX idx_nen_care_flags_friend_status
   ON nen_care_flags(friend_id, status);
