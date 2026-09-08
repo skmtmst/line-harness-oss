@@ -107,17 +107,23 @@ describe('feature off impact check', () => {
           .map((impact) => [impact.feature, impact.items]),
       );
       // 別アカウントの送信中と下書きは数えない。
-      expect(byFeature.broadcasts).toContainEqual(
-        { kind: 'scheduled', targetType: '予約済みの配信', count: 1 },
+      expect(byFeature.broadcasts).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ kind: 'scheduled', targetType: '予約済みの配信', count: 1 }),
+        ]),
       );
       expect(byFeature.broadcasts.some((item) => item.targetType === '送信中の配信')).toBe(false);
       // 自アカウントの公開中だけ数え、停止中と名寄せなし行は数えない。
-      expect(byFeature.scenarios).toContainEqual(
-        { kind: 'published', targetType: '公開中のシナリオ', count: 1 },
+      expect(byFeature.scenarios).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ kind: 'published', targetType: '公開中のシナリオ', count: 1 }),
+        ]),
       );
       // テンプレートは使う側の自動応答が依存として返る。
-      expect(byFeature.templates).toContainEqual(
-        { kind: 'dependent', targetType: 'テンプレートを使う自動応答', count: 1 },
+      expect(byFeature.templates).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ kind: 'dependent', targetType: 'テンプレートを使う自動応答', count: 1 }),
+        ]),
       );
     } finally {
       testDb.raw.close();
@@ -222,8 +228,10 @@ describe('feature off impact check', () => {
       });
       expect(saved.status).toBe(409);
       expect(saved.body.code).toBe('IMPACT_CONFIRMATION_REQUIRED');
-      expect(saved.body.data.impacts[0].items).toContainEqual(
-        { kind: 'scheduled', targetType: '予約済みの配信', count: 2 },
+      expect(saved.body.data.impacts[0].items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ kind: 'scheduled', targetType: '予約済みの配信', count: 2 }),
+        ]),
       );
     } finally {
       testDb.raw.close();
@@ -347,15 +355,21 @@ describe('feature off impact check', () => {
           .map((impact) => [impact.feature, impact.items]),
       );
       // シナリオと配信は自社だけ。名寄せなし行は混ぜない。
-      expect(byFeature.scenarios).toContainEqual(
-        { kind: 'published', targetType: '公開中のシナリオ', count: 1 },
+      expect(byFeature.scenarios).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ kind: 'published', targetType: '公開中のシナリオ', count: 1 }),
+        ]),
       );
-      expect(byFeature.broadcasts).toContainEqual(
-        { kind: 'scheduled', targetType: '予約済みの配信', count: 1 },
+      expect(byFeature.broadcasts).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ kind: 'scheduled', targetType: '予約済みの配信', count: 1 }),
+        ]),
       );
       // 自動応答だけは読み取り側が共有扱いのため、空行も数える。
-      expect(byFeature.auto_replies).toContainEqual(
-        { kind: 'published', targetType: '有効な自動応答', count: 2 },
+      expect(byFeature.auto_replies).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ kind: 'published', targetType: '有効な自動応答', count: 2 }),
+        ]),
       );
     } finally {
       testDb.raw.close();
@@ -389,14 +403,177 @@ describe('feature off impact check', () => {
         (body.data.impacts as Array<{ feature: string; blocking: boolean; items: Array<{ targetType: string; count: number }> }>)
           .map((impact) => [impact.feature, impact]),
       );
-      expect(byFeature.analytics.items).toContainEqual(
-        { kind: 'scheduled', targetType: '有効なレポート予約', count: 1 },
+      expect(byFeature.analytics.items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ kind: 'scheduled', targetType: '有効なレポート予約', count: 1 }),
+        ]),
       );
-      expect(byFeature.external_integrations.items).toContainEqual(
-        { kind: 'published', targetType: '有効な受信Webhook', count: 1 },
+      expect(byFeature.external_integrations.items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ kind: 'published', targetType: '有効な受信Webhook', count: 1 }),
+        ]),
       );
       // 素材があっても数えない理由がある機能は空で、保存を止めない。
       expect(byFeature.media).toMatchObject({ blocking: false, items: [] });
+    } finally {
+      testDb.raw.close();
+    }
+  });
+
+  it('版付き設定があると版なし保存は成功偽装にならず409で読み直しになる', async () => {
+    const testDb = createTestD1();
+    try {
+      const first = await putFeatures(testDb, { expectedVersion: 0, features: { media: false } });
+      expect(first.status).toBe(200);
+
+      // 版なしの保存は版付きGETに反映されないため受け付けない。
+      const legacy = await putFeatures(testDb, { features: { scenarios: false } });
+      expect(legacy.status).toBe(409);
+      expect(legacy.body.data).toMatchObject({ currentVersion: 1 });
+
+      // 実効値は変わっていない。
+      const loaded = await app().request(
+        '/api/settings/features?account_id=account-1',
+        {},
+        { DB: testDb.db, ...ENV },
+      );
+      expect(await loaded.json()).toMatchObject({
+        success: true,
+        data: { version: 1, features: { scenarios: true, media: false } },
+      });
+    } finally {
+      testDb.raw.close();
+    }
+  });
+
+  it('件数が同じでも対象が入れ替わったら保存できない', async () => {
+    const testDb = createTestD1();
+    try {
+      testDb.raw.exec(`
+        INSERT INTO broadcasts (id, title, message_type, message_content, target_type, status, line_account_id)
+        VALUES ('b-old', '古い予約', 'text', '本文', 'all', 'scheduled', 'account-1');
+      `);
+      const impact = await postImpact(testDb, { expectedVersion: 0, features: { broadcasts: false } });
+      expect(impact.body.data.impacts[0].items[0]).toMatchObject({ count: 1 });
+      expect(impact.body.data.impacts[0].items[0].ids).toEqual(['b-old']);
+      const token = impact.body.data.impactToken as string;
+
+      // 同数のまま対象を入れ替える。
+      testDb.raw.exec(`
+        DELETE FROM broadcasts WHERE id = 'b-old';
+        INSERT INTO broadcasts (id, title, message_type, message_content, target_type, status, line_account_id)
+        VALUES ('b-new', '新しい予約', 'text', '本文', 'all', 'scheduled', 'account-1');
+      `);
+
+      const saved = await putFeatures(testDb, {
+        expectedVersion: 0,
+        features: { broadcasts: false },
+        impactToken: token,
+      });
+      expect(saved.status).toBe(409);
+      expect(saved.body.code).toBe('IMPACT_CONFIRMATION_REQUIRED');
+      expect(saved.body.data.impacts[0].items[0]).toMatchObject({ count: 1, ids: ['b-new'] });
+    } finally {
+      testDb.raw.close();
+    }
+  });
+
+  it('追加した数え先が実テーブルで正しく数えられる', async () => {
+    const testDb = createTestD1();
+    try {
+      testDb.raw.exec(`
+        INSERT INTO tracked_links (id, name, original_url, is_active, line_account_id)
+        VALUES ('tl-1', '計測', 'https://example.com', 1, 'account-1'),
+               ('tl-off', '停止', 'https://example.com', 0, 'account-1');
+        INSERT INTO entry_routes (id, ref_code, name, is_active, line_account_id)
+        VALUES ('er-1', 'abc', '流入', 1, 'account-1');
+        INSERT INTO nen_photo_submissions
+          (id, friend_id, pet_id, r2_key, image_url, content_type, caption, status, awarded_points,
+           line_account_id, public_pet_name, review_notification_status, review_version,
+           created_at, updated_at)
+        VALUES ('ps-1', 'f-1', 'p-1', 'k', 'https://example.com/a.png', 'image/png', 'かわいい',
+           'pending', 0, 'account-1', 1, 'not_required', 1,
+           '2026-09-01T00:00:00+09:00', '2026-09-01T00:00:00+09:00');
+        INSERT INTO media (id, kind, filename, mime_type, size_bytes, r2_key, line_account_id)
+        VALUES ('m-1', 'image', 'a.png', 'image/png', 10, 'k1', 'account-1');
+        INSERT INTO media_usages (media_id, ref_kind, ref_id, scanned_at)
+        VALUES ('m-1', 'broadcast', 'b-1', '2026-09-01T00:00:00+09:00');
+        INSERT INTO field_migration_runs
+          (id, tenant_id, line_account_id, source_field_id, target_field_id, source_version, target_version,
+           preview_token_hash, preview_snapshot_hash, preview_expires_at, status, usage_targets_json,
+           total_count, convertible_count, review_count, invalid_count, processed_count, succeeded_count,
+           failed_count, created_by, created_at, updated_at)
+        VALUES ('fm-1', 'tenant-a', 'account-1', 'sf', 'tf', 1, 1, 'h1', 'h2',
+           '2099-01-01T00:00:00+09:00', 'running', '[]', 10, 8, 1, 1, 0, 0, 0, 'staff-1',
+           '2026-09-01T00:00:00+09:00', '2026-09-01T00:00:00+09:00');
+        INSERT INTO reminders (id, name, is_active, line_account_id, deleted_at)
+        VALUES ('r-on', '有効', 1, 'account-1', NULL),
+               ('r-off', '無効', 0, 'account-1', NULL),
+               ('r-deleted', '削除済み', 1, 'account-1', '2026-09-01T00:00:00+09:00');
+      `);
+      const { status, body } = await postImpact(testDb, {
+        expectedVersion: 0,
+        features: {
+          inflow_tracking: false, photo_review: false, media: false,
+          friend_fields: false, reminders: false,
+        },
+      });
+      expect(status).toBe(200);
+      const byFeature = Object.fromEntries(
+        (body.data.impacts as Array<{ feature: string; items: Array<{ targetType: string; count: number; ids: string[] }> }>)
+          .map((impact) => [impact.feature, impact.items]),
+      );
+      expect(byFeature.inflow_tracking).toEqual(expect.arrayContaining([
+        expect.objectContaining({ targetType: '公開中の計測リンク', count: 1, ids: ['tl-1'] }),
+        expect.objectContaining({ targetType: '公開中の流入経路', count: 1, ids: ['er-1'] }),
+      ]));
+      expect(byFeature.photo_review).toEqual([
+        expect.objectContaining({ targetType: '審査待ちの写真', count: 1, ids: ['ps-1'] }),
+      ]);
+      expect(byFeature.media).toEqual([
+        expect.objectContaining({ targetType: '素材への利用参照', count: 1 }),
+      ]);
+      expect(byFeature.friend_fields).toEqual([
+        expect.objectContaining({ targetType: '実行中の属性移行', count: 1, ids: ['fm-1'] }),
+      ]);
+      // 有効な設定だけ数え、無効と削除済みは数えない。
+      expect(byFeature.reminders).toEqual([
+        expect.objectContaining({ targetType: '有効なリマインド設定', count: 1, ids: ['r-on'] }),
+      ]);
+    } finally {
+      testDb.raw.close();
+    }
+  });
+
+  it('持ち主不明のフォームとウェビナーは影響に加算しない', async () => {
+    const testDb = createTestD1();
+    try {
+      testDb.raw.exec(`
+        INSERT INTO forms (id, name, fields, is_active) VALUES ('f-unassigned', '未割当', '[]', 1);
+        INSERT INTO forms (id, name, fields, is_active) VALUES ('f-mine', '自社', '[]', 1);
+        INSERT INTO form_accounts (form_id, line_account_id) VALUES ('f-mine', 'account-1');
+        INSERT INTO webinars (id, account_id, title, slug, status, created_at, updated_at)
+        VALUES ('w-null', NULL, '未割当', 'slug-null', 'active', '2026-09-01', '2026-09-01'),
+               ('w-mine', 'account-1', '自社', 'slug-mine', 'active', '2026-09-01', '2026-09-01');
+      `);
+      // ウェビナーは既定オフのため、先に有効化してオフ遷移を作る。
+      const enabled = await putFeatures(testDb, { expectedVersion: 0, features: { webinars: true } });
+      expect(enabled.status).toBe(200);
+      const { status, body } = await postImpact(testDb, {
+        expectedVersion: 1,
+        features: { forms: false, webinars: false },
+      });
+      expect(status).toBe(200);
+      const byFeature = Object.fromEntries(
+        (body.data.impacts as Array<{ feature: string; items: Array<{ targetType: string; count: number; ids: string[] }> }>)
+          .map((impact) => [impact.feature, impact.items]),
+      );
+      expect(byFeature.forms).toEqual([
+        expect.objectContaining({ targetType: '公開中の回答フォーム', count: 1, ids: ['f-mine'] }),
+      ]);
+      expect(byFeature.webinars).toEqual([
+        expect.objectContaining({ targetType: '公開中のウェビナー', count: 1, ids: ['w-mine'] }),
+      ]);
     } finally {
       testDb.raw.close();
     }
@@ -426,8 +603,10 @@ describe('feature off impact check', () => {
       });
       expect(stale.status).toBe(409);
       expect(stale.body.code).toBe('IMPACT_CONFIRMATION_REQUIRED');
-      expect(stale.body.data.impacts[0].items).toContainEqual(
-        { kind: 'scheduled', targetType: '予約済みの配信', count: 2 },
+      expect(stale.body.data.impacts[0].items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ kind: 'scheduled', targetType: '予約済みの配信', count: 2 }),
+        ]),
       );
 
       // 取り直した確認では保存できる。

@@ -127,7 +127,7 @@ export type FeatureImpactItem = {
 
 export type FeatureImpact = {
   feature: ToggleableFeature;
-  items: FeatureImpactItem[];
+  items: FeatureImpactItemWithIds[];
   /** 確認トークンなしでは保存できない影響があるか。 */
   blocking: boolean;
 };
@@ -157,9 +157,12 @@ const BROADCAST_ACCOUNT_SCOPE = `(b.line_account_id = ?
   OR (b.target_type = 'multi-account-dedup' AND b.account_ids IS NOT NULL
     AND EXISTS (SELECT 1 FROM json_each(b.account_ids) WHERE value = ?)))`;
 
-/** 回答フォームの表示先。結び付けが無いフォームは全アカウントに表示する。 */
-const FORM_ACCOUNT_SCOPE = `(NOT EXISTS (SELECT 1 FROM form_accounts fa WHERE fa.form_id = f.id)
-  OR EXISTS (SELECT 1 FROM form_accounts fa WHERE fa.form_id = f.id AND fa.line_account_id = ?))`;
+/**
+ * 回答フォームの影響範囲。結び付けが無いフォームは表示上は全アカウントに
+ * 出るが、持ち主が分からないため影響には加算しない(実readerと意図的に
+ * 違う。影響は「このアカウントが止める仕事」だけ数える)。
+ */
+const FORM_ACCOUNT_SCOPE = `EXISTS (SELECT 1 FROM form_accounts fa WHERE fa.form_id = f.id AND fa.line_account_id = ?)`;
 
 /**
  * 全33種の網羅表。切替対象の各機能が「何を数えるか」か
@@ -176,9 +179,25 @@ export type FeatureImpactSource = {
   kind: FeatureImpactKind;
   /** 運用者に見せる対象の呼び名。表名や内部IDは出さない。 */
   targetType: string;
-  sql: string;
+  /**
+   * FROM〜WHERE。件数とID取得で共有し、条件ずれを防ぐ。
+   * dispatcherのclaim条件と同じ述語にする。
+   */
+  fromWhere: string;
+  /** ID列(主表のid)。保存時に対象集合を固定するために使う。 */
+  idColumn: string;
   /** ? の個数。すべて accountId で埋める。 */
   params: 1 | 2;
+};
+
+/** 1項目あたりの対象IDの上限。超えた分は件数だけ見る。 */
+const IMPACT_IDS_LIMIT = 100;
+
+export type FeatureImpactItemWithIds = FeatureImpactItem & {
+  /** 対象行ID(並び替え済み)。上限を超えたら先頭分だけ。 */
+  ids: string[];
+  /** 上限を超えてIDが欠けているか。 */
+  truncated: boolean;
 };
 
 export type FeatureImpactCoverageEntry =
@@ -192,13 +211,15 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
       {
         kind: 'scheduled',
         targetType: '予約済みの配信',
-        sql: `SELECT COUNT(*) AS total FROM broadcasts b WHERE b.status = 'scheduled' AND ${BROADCAST_ACCOUNT_SCOPE}`,
+        fromWhere: `FROM broadcasts b WHERE b.status = 'scheduled' AND ${BROADCAST_ACCOUNT_SCOPE}`,
+        idColumn: 'b.id',
         params: 2,
       },
       {
         kind: 'published',
         targetType: '送信中の配信',
-        sql: `SELECT COUNT(*) AS total FROM broadcasts b WHERE b.status = 'sending' AND ${BROADCAST_ACCOUNT_SCOPE}`,
+        fromWhere: `FROM broadcasts b WHERE b.status = 'sending' AND ${BROADCAST_ACCOUNT_SCOPE}`,
+        idColumn: 'b.id',
         params: 2,
       },
     ],
@@ -209,19 +230,22 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
       {
         kind: 'published',
         targetType: '公開中のシナリオ',
-        sql: `SELECT COUNT(*) AS total FROM scenarios WHERE is_active = 1 AND line_account_id = ?`,
+        fromWhere: `FROM scenarios WHERE is_active = 1 AND line_account_id = ?`,
+        idColumn: 'scenarios.id',
         params: 1,
       },
       {
         kind: 'dependent',
         targetType: '回答後にシナリオへつなぐフォーム',
-        sql: `SELECT COUNT(*) AS total FROM forms f WHERE f.on_submit_scenario_id IS NOT NULL AND f.is_active = 1 AND ${FORM_ACCOUNT_SCOPE}`,
+        fromWhere: `FROM forms f WHERE f.on_submit_scenario_id IS NOT NULL AND f.is_active = 1 AND ${FORM_ACCOUNT_SCOPE}`,
+        idColumn: 'f.id',
         params: 1,
       },
       {
         kind: 'dependent',
         targetType: 'シナリオを使う紹介オファー',
-        sql: `SELECT COUNT(*) AS total FROM affiliate_offers WHERE scenario_id IS NOT NULL AND is_active = 1 AND line_account_id = ?`,
+        fromWhere: `FROM affiliate_offers WHERE scenario_id IS NOT NULL AND is_active = 1 AND line_account_id = ?`,
+        idColumn: 'affiliate_offers.id',
         params: 1,
       },
     ],
@@ -232,7 +256,8 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
       {
         kind: 'dependent',
         targetType: 'テンプレートを使う自動応答',
-        sql: `SELECT COUNT(*) AS total FROM auto_replies WHERE template_id IS NOT NULL AND is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)`,
+        fromWhere: `FROM auto_replies WHERE template_id IS NOT NULL AND is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)`,
+        idColumn: 'auto_replies.id',
         params: 1,
       },
     ],
@@ -243,15 +268,17 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
       {
         kind: 'published',
         targetType: '有効なリマインド設定',
-        sql: `SELECT COUNT(*) AS total FROM reminders WHERE is_active = 1 AND deleted_at IS NULL AND line_account_id = ?`,
+        fromWhere: `FROM reminders WHERE is_active = 1 AND deleted_at IS NULL AND line_account_id = ?`,
+        idColumn: 'reminders.id',
         params: 1,
       },
       {
         kind: 'scheduled',
         targetType: '送信待ちのリマインド',
-        sql: `SELECT COUNT(*) AS total FROM friend_reminders fr
-         JOIN reminders r ON r.id = fr.reminder_id AND r.deleted_at IS NULL AND r.line_account_id = ?
+        fromWhere: `FROM friend_reminders fr
+         JOIN reminders r ON r.id = fr.reminder_id AND r.is_active = 1 AND r.deleted_at IS NULL AND r.line_account_id = ?
          WHERE fr.status = 'active'`,
+        idColumn: 'fr.id',
         params: 1,
       },
     ],
@@ -262,7 +289,8 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
       {
         kind: 'published',
         targetType: '有効な自動応答',
-        sql: `SELECT COUNT(*) AS total FROM auto_replies WHERE is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)`,
+        fromWhere: `FROM auto_replies WHERE is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)`,
+        idColumn: 'auto_replies.id',
         params: 1,
       },
     ],
@@ -273,14 +301,30 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
       {
         kind: 'published',
         targetType: '利用中のリッチメニュー',
-        sql: `SELECT COUNT(*) AS total FROM rich_menu_assignments WHERE line_account_id = ?`,
+        fromWhere: `FROM rich_menu_assignments WHERE line_account_id = ?`,
+        idColumn: 'rich_menu_assignments.id',
         params: 1,
       },
     ],
   },
   inflow_tracking: {
-    scope: 'none',
-    reason: '計測リンクと流入経路の表にアカウント列がなく、アカウント単位で結び付けられない',
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'published',
+        targetType: '公開中の計測リンク',
+        fromWhere: `FROM tracked_links WHERE is_active = 1 AND line_account_id = ?`,
+        idColumn: 'tracked_links.id',
+        params: 1,
+      },
+      {
+        kind: 'published',
+        targetType: '公開中の流入経路',
+        fromWhere: `FROM entry_routes WHERE is_active = 1 AND line_account_id = ?`,
+        idColumn: 'entry_routes.id',
+        params: 1,
+      },
+    ],
   },
   forms: {
     scope: 'counted',
@@ -288,14 +332,23 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
       {
         kind: 'published',
         targetType: '公開中の回答フォーム',
-        sql: `SELECT COUNT(*) AS total FROM forms f WHERE f.is_active = 1 AND ${FORM_ACCOUNT_SCOPE}`,
+        fromWhere: `FROM forms f WHERE f.is_active = 1 AND ${FORM_ACCOUNT_SCOPE}`,
+        idColumn: 'f.id',
         params: 1,
       },
     ],
   },
   photo_review: {
-    scope: 'none',
-    reason: '審査待ちの表にアカウント列がなく、アカウント単位で結び付けられない',
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'scheduled',
+        targetType: '審査待ちの写真',
+        fromWhere: `FROM nen_photo_submissions WHERE status = 'pending' AND line_account_id = ?`,
+        idColumn: 'nen_photo_submissions.id',
+        params: 1,
+      },
+    ],
   },
   automations: {
     scope: 'counted',
@@ -303,8 +356,9 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
       {
         kind: 'scheduled',
         targetType: '実行待ち・実行中の自動処理',
-        sql: `SELECT COUNT(*) AS total FROM automation_runs
+        fromWhere: `FROM automation_runs
          WHERE status IN ('queued', 'running', 'waiting') AND is_test = 0 AND line_account_id = ?`,
+        idColumn: 'automation_runs.id',
         params: 1,
       },
     ],
@@ -315,7 +369,8 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
       {
         kind: 'published',
         targetType: '有効な受信Webhook',
-        sql: `SELECT COUNT(*) AS total FROM incoming_webhooks WHERE is_active = 1 AND line_account_id = ?`,
+        fromWhere: `FROM incoming_webhooks WHERE is_active = 1 AND line_account_id = ?`,
+        idColumn: 'incoming_webhooks.id',
         params: 1,
       },
     ],
@@ -326,7 +381,8 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
       {
         kind: 'published',
         targetType: '公開中の振り分けルール',
-        sql: `SELECT COUNT(*) AS total FROM friend_add_rules WHERE status = 'published' AND line_account_id = ?`,
+        fromWhere: `FROM friend_add_rules WHERE status = 'published' AND line_account_id = ?`,
+        idColumn: 'friend_add_rules.id',
         params: 1,
       },
     ],
@@ -352,8 +408,16 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
     reason: '投稿の表にアカウント列がなく、アカウント単位で結び付けられない',
   },
   friend_fields: {
-    scope: 'none',
-    reason: '属性の値と走査状態にアカウント列がなく、アカウント単位で結び付けられない',
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'scheduled',
+        targetType: '実行中の属性移行',
+        fromWhere: `FROM field_migration_runs WHERE status IN ('queued', 'running') AND line_account_id = ?`,
+        idColumn: 'field_migration_runs.id',
+        params: 1,
+      },
+    ],
   },
   support_marks: {
     scope: 'none',
@@ -364,8 +428,16 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
     reason: '保存条件と利用履歴で、待ち行を持たない',
   },
   media: {
-    scope: 'none',
-    reason: '素材の表にアカウント列がなく、アカウント単位で結び付けられない',
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'dependent',
+        targetType: '素材への利用参照',
+        fromWhere: `FROM media_usages u JOIN media m ON m.id = u.media_id AND m.line_account_id = ?`,
+        idColumn: 'm.id',
+        params: 1,
+      },
+    ],
   },
   common_vars: {
     scope: 'counted',
@@ -373,9 +445,10 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
       {
         kind: 'scheduled',
         targetType: '反映待ちの共通変数変更',
-        sql: `SELECT COUNT(*) AS total FROM common_var_schedules s
+        fromWhere: `FROM common_var_schedules s
          JOIN common_vars v ON v.id = s.var_id AND v.archived_at IS NULL AND v.line_account_id = ?
          WHERE s.applied_at IS NULL`,
+        idColumn: 's.id',
         params: 1,
       },
     ],
@@ -386,7 +459,8 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
       {
         kind: 'scheduled',
         targetType: '有効なレポート予約',
-        sql: `SELECT COUNT(*) AS total FROM analytics_report_schedules WHERE status = 'active' AND line_account_id = ?`,
+        fromWhere: `FROM analytics_report_schedules WHERE status = 'active' AND line_account_id = ?`,
+        idColumn: 'analytics_report_schedules.id',
         params: 1,
       },
     ],
@@ -401,15 +475,17 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
       {
         kind: 'published',
         targetType: '公開中のウェビナー',
-        sql: `SELECT COUNT(*) AS total FROM webinars WHERE status = 'active' AND (account_id IS NULL OR account_id = ?)`,
+        fromWhere: `FROM webinars WHERE status = 'active' AND account_id = ?`,
+        idColumn: 'webinars.id',
         params: 1,
       },
       {
         kind: 'scheduled',
         targetType: '送信待ちのウェビナー通知',
-        sql: `SELECT COUNT(*) AS total FROM webinar_notification_jobs j
-         JOIN webinars w ON w.id = j.webinar_id AND (w.account_id IS NULL OR w.account_id = ?)
+        fromWhere: `FROM webinar_notification_jobs j
+         JOIN webinars w ON w.id = j.webinar_id AND w.account_id = ?
          WHERE j.status IN ('queued', 'claimed', 'retry_wait')`,
+        idColumn: 'j.id',
         params: 1,
       },
     ],
@@ -420,21 +496,24 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
       {
         kind: 'published',
         targetType: '公開中のイベント',
-        sql: `SELECT COUNT(*) AS total FROM events WHERE is_published = 1 AND deleted_at IS NULL AND line_account_id = ?`,
+        fromWhere: `FROM events WHERE is_published = 1 AND deleted_at IS NULL AND line_account_id = ?`,
+        idColumn: 'events.id',
         params: 1,
       },
       {
         kind: 'scheduled',
         targetType: '受付中のイベント予約',
-        sql: `SELECT COUNT(*) AS total FROM event_bookings WHERE status IN ('requested', 'confirmed') AND line_account_id = ?`,
+        fromWhere: `FROM event_bookings WHERE status IN ('requested', 'confirmed') AND line_account_id = ?`,
+        idColumn: 'event_bookings.id',
         params: 1,
       },
       {
         kind: 'scheduled',
         targetType: '送信待ちのイベントリマインド',
-        sql: `SELECT COUNT(*) AS total FROM event_booking_reminders ebr
+        fromWhere: `FROM event_booking_reminders ebr
          JOIN event_bookings eb ON eb.id = ebr.booking_id AND eb.line_account_id = ?
          WHERE ebr.status = 'pending'`,
+        idColumn: 'ebr.id',
         params: 1,
       },
     ],
@@ -445,15 +524,17 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
       {
         kind: 'scheduled',
         targetType: '受付中の予約',
-        sql: `SELECT COUNT(*) AS total FROM bookings WHERE status IN ('requested', 'confirmed') AND line_account_id = ?`,
+        fromWhere: `FROM bookings WHERE status IN ('requested', 'confirmed') AND line_account_id = ?`,
+        idColumn: 'bookings.id',
         params: 1,
       },
       {
         kind: 'scheduled',
         targetType: '送信待ちの予約リマインド',
-        sql: `SELECT COUNT(*) AS total FROM booking_reminders br
+        fromWhere: `FROM booking_reminders br
          JOIN bookings b ON b.id = br.booking_id AND b.line_account_id = ?
          WHERE br.status = 'pending'`,
+        idColumn: 'br.id',
         params: 1,
       },
     ],
@@ -464,14 +545,16 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
       {
         kind: 'published',
         targetType: '受付中の紹介オファー',
-        sql: `SELECT COUNT(*) AS total FROM affiliate_offers WHERE is_active = 1 AND line_account_id = ?`,
+        fromWhere: `FROM affiliate_offers WHERE is_active = 1 AND line_account_id = ?`,
+        idColumn: 'affiliate_offers.id',
         params: 1,
       },
       {
         kind: 'scheduled',
         targetType: '精算待ちの支払い',
-        sql: `SELECT COUNT(*) AS total FROM affiliate_payout_batches
+        fromWhere: `FROM affiliate_payout_batches
          WHERE state IN ('created', 'approved') AND line_account_id = ?`,
+        idColumn: 'affiliate_payout_batches.id',
         params: 1,
       },
     ],
@@ -482,15 +565,17 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
       {
         kind: 'scheduled',
         targetType: '処理中のマイル交換',
-        sql: `SELECT COUNT(*) AS total FROM mileage_redemptions
+        fromWhere: `FROM mileage_redemptions
          WHERE status IN ('reserved', 'delivering') AND line_account_id = ?`,
+        idColumn: 'mileage_redemptions.id',
         params: 1,
       },
       {
         kind: 'dependent',
         targetType: 'マイル特典を使う紹介オファー',
-        sql: `SELECT COUNT(*) AS total FROM affiliate_offers
+        fromWhere: `FROM affiliate_offers
          WHERE mileage_program_id IS NOT NULL AND is_active = 1 AND line_account_id = ?`,
+        idColumn: 'affiliate_offers.id',
         params: 1,
       },
     ],
@@ -501,8 +586,9 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
       {
         kind: 'scheduled',
         targetType: '処理中のEC注文',
-        sql: `SELECT COUNT(*) AS total FROM ec_orders
+        fromWhere: `FROM ec_orders
          WHERE normalized_status = 'current' AND line_account_id = ?`,
+        idColumn: 'ec_orders.id',
         params: 1,
       },
     ],
@@ -513,15 +599,17 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
       {
         kind: 'published',
         targetType: '有効な通知ルール',
-        sql: `SELECT COUNT(*) AS total FROM notification_rules WHERE is_active = 1 AND line_account_id = ?`,
+        fromWhere: `FROM notification_rules WHERE is_active = 1 AND line_account_id = ?`,
+        idColumn: 'notification_rules.id',
         params: 1,
       },
       {
         kind: 'scheduled',
         targetType: '送信待ちの通知',
-        sql: `SELECT COUNT(*) AS total FROM notification_deliveries
+        fromWhere: `FROM notification_deliveries
          WHERE status IN ('pending', 'provider_accepted', 'retry_wait')
          AND execution_mode != 'test' AND line_account_id = ?`,
+        idColumn: 'notification_deliveries.id',
         params: 1,
       },
     ],
@@ -532,8 +620,9 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
       {
         kind: 'scheduled',
         targetType: '送信待ちのNEN配信',
-        sql: `SELECT COUNT(*) AS total FROM nen_delivery_jobs
+        fromWhere: `FROM nen_delivery_jobs
          WHERE status IN ('pending', 'processing') AND line_account_id = ?`,
+        idColumn: 'nen_delivery_jobs.id',
         params: 1,
       },
     ],
@@ -548,17 +637,31 @@ async function collectFeatureImpact(
   db: D1Database,
   accountId: string,
   feature: ToggleableFeature,
-): Promise<FeatureImpactItem[]> {
+): Promise<FeatureImpactItemWithIds[]> {
   const entry = FEATURE_IMPACT_COVERAGE[feature];
   if (!entry) {
     throw new Error(`影響の数え先が未定義です: ${String(feature)}`);
   }
   if (entry.scope === 'none') return [];
-  const items: FeatureImpactItem[] = [];
+  const items: FeatureImpactItemWithIds[] = [];
   for (const source of entry.sources) {
     const params = source.params === 2 ? [accountId, accountId] : [accountId];
-    const count = await countRows(db, source.sql, ...params);
-    if (count > 0) items.push({ kind: source.kind, targetType: source.targetType, count });
+    const count = await countRows(db, `SELECT COUNT(*) AS total ${source.fromWhere}`, ...params);
+    if (count === 0) continue;
+    const rows = await db
+      .prepare(
+        `SELECT ${source.idColumn} AS id ${source.fromWhere} ORDER BY ${source.idColumn} LIMIT ${IMPACT_IDS_LIMIT + 1}`,
+      )
+      .bind(...params)
+      .all<{ id: string }>();
+    const ids = [...new Set(rows.results.map((row) => row.id))].sort().slice(0, IMPACT_IDS_LIMIT);
+    items.push({
+      kind: source.kind,
+      targetType: source.targetType,
+      count,
+      ids,
+      truncated: rows.results.length > IMPACT_IDS_LIMIT,
+    });
   }
   return items;
 }
@@ -1031,7 +1134,21 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
       }
       savedVersion = result.setting.version;
     } else if (hasBundleUpdate) {
-      // #558: 旧クライアント互換のため、expectedVersion なしの形式も当面受け付ける。
+      // 版付き一括設定があるアカウントでは、版なし保存は版付きGETに
+      // 反映されず成功偽装になるため受け付けない。旧クライアント互換の
+      // 個別保存は、一括設定が無いアカウントにだけ残す。
+      const legacyBundle = await getVersionedAccountSetting(
+        c.env.DB,
+        accountId,
+        FEATURE_SETTINGS_BUNDLE_KEY,
+      );
+      if (legacyBundle) {
+        return c.json({
+          success: false,
+          error: '別の管理者が先に変更しました。最新の設定を読み直してください。',
+          data: { currentVersion: legacyBundle.version },
+        }, 409);
+      }
       for (const [key, value] of Object.entries(body.features ?? {})) {
         const enabled = key === 'restaurant_test' && !restaurantTestEnabled(c.env)
           ? false
