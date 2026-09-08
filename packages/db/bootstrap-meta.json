@@ -305,7 +305,8 @@
     "341_ec_notification_settings_account_scope.sql",
     "343_messages_log_broadcast_recipient_index.sql",
     "345_ad_platform_account_scope.sql",
-    "346_ad_conversion_idempotency_and_backfill.sql"
+    "346_ad_conversion_idempotency_and_backfill.sql",
+    "359_ad_platform_account_required_and_dedup.sql"
   ],
-  "migrationCount": 306
+  "migrationCount": 307
 }

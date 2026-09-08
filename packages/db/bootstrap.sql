@@ -5101,6 +5101,9 @@ CREATE INDEX idx_ad_conversion_logs_account ON ad_conversion_logs(line_account_i
 
 CREATE INDEX idx_ad_conversion_logs_friend ON ad_conversion_logs (friend_id);
 
+CREATE INDEX idx_ad_conversion_logs_friend_event_key
+  ON ad_conversion_logs(friend_id, event_name, idempotency_key);
+
 CREATE UNIQUE INDEX idx_ad_conversion_logs_idempotency
   ON ad_conversion_logs(ad_platform_id, friend_id, event_name, idempotency_key);
 
@@ -5109,6 +5112,9 @@ CREATE INDEX idx_ad_conversion_logs_platform ON ad_conversion_logs (ad_platform_
 CREATE INDEX idx_ad_conversion_logs_status ON ad_conversion_logs (status);
 
 CREATE INDEX idx_ad_platforms_account ON ad_platforms(line_account_id);
+
+CREATE UNIQUE INDEX idx_ad_platforms_account_name
+  ON ad_platforms(line_account_id, name);
 
 CREATE INDEX idx_admin_sessions_expires_at ON admin_sessions(expires_at);
 
@@ -6475,6 +6481,16 @@ CREATE TRIGGER trg_action_score_published_version_no_delete
 BEFORE DELETE ON action_score_rule_versions
 WHEN OLD.status = 'published'
 BEGIN SELECT RAISE(ABORT, 'published action score version cannot be deleted'); END;
+
+CREATE TRIGGER trg_ad_platforms_account_required_insert
+BEFORE INSERT ON ad_platforms
+WHEN NEW.line_account_id IS NULL
+BEGIN SELECT RAISE(ABORT, 'ad_platforms.line_account_id is required'); END;
+
+CREATE TRIGGER trg_ad_platforms_account_required_update
+BEFORE UPDATE OF line_account_id ON ad_platforms
+WHEN NEW.line_account_id IS NULL
+BEGIN SELECT RAISE(ABORT, 'ad_platforms.line_account_id cannot be cleared'); END;
 
 CREATE TRIGGER trg_analytics_cross_runs_completed_immutable
 BEFORE UPDATE ON analytics_cross_runs
