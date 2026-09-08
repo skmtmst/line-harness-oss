@@ -1681,6 +1681,29 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: query.get('with_list_summary') === '1' ? FORM_LIST : FORMS }
   }
   if (pathname === `/api/forms/${FORM_DETAIL.id}`) return { success: true, data: FORM_DETAIL }
+  // 管理画面の保存・保管・削除の流れ（#503 L5）。絵の検証用に成功だけ返す。
+  if (method === 'POST' && pathname === '/api/forms/drafts') {
+    return { success: true, data: { id: 'form-draft-qa', isActive: false } }
+  }
+  if (method === 'PUT' && pathname === `/api/forms/${FORM_DETAIL.id}`) {
+    return { success: true, data: { id: FORM_DETAIL.id } }
+  }
+  if (method === 'POST' && pathname === `/api/forms/${FORM_DETAIL.id}/archive`) {
+    return {
+      success: true,
+      data: {
+        status: 'archived',
+        archivedAt: '2026-08-26T00:00:00.000Z',
+        retainedSubmissionCount: 0,
+        retainedOpenCount: 0,
+        retainedReferenceCount: 0,
+        answerUrlUnavailable: true,
+      },
+    }
+  }
+  if (method === 'DELETE' && pathname === `/api/forms/${FORM_DETAIL.id}`) {
+    return { success: true, data: null }
+  }
   const formSubmissions = new RegExp(`^/api/forms/${FORM_DETAIL.id}/submissions$`).test(pathname)
   if (formSubmissions) {
     // 互換用の古い形（ページ分けなし）は配列だけを返す。実口と同じく上限500件。
