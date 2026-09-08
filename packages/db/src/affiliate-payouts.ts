@@ -344,7 +344,7 @@ export async function closeAffiliateAccountSettlement(
   } catch (error) {
     // 並行する締めが先に書いた場合は読み直して回収する。同一操作は冪等な
     // duplicateへ、別内容だけ409相当へ。勝者が無い制約違反は投げ直す。
-    if (!/UNIQUE|constraint/i.test(error instanceof Error ? error.message : String(error))) throw error;
+    if (!/UNIQUE|constraint|busy|locked/i.test(error instanceof Error ? error.message : String(error))) throw error;
     const winner = await db.prepare(
       `SELECT id, total_amount_minor, version, closed_at, request_fingerprint,
               (SELECT COUNT(*) FROM affiliate_settlement_lines sl WHERE sl.settlement_id = s.id) AS line_count

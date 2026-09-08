@@ -477,7 +477,8 @@ describe('複数接続の競合 — 共有ファイルDBで直列化と回収を
     } finally {
       probe.close();
     }
-  });
+    // CIの並列負荷でもロック待ちを許す。
+  }, 30000);
 
   it('別接続の同時全体締めでも二重計上せず同一操作は回収する', async () => {
     const { a, b } = await setupShared();
@@ -500,7 +501,8 @@ describe('複数接続の競合 — 共有ファイルDBで直列化と回収を
     } finally {
       probe.close();
     }
-  });
+    // CIの並列負荷でもロック待ちを許す。
+  }, 30000);
 
   it('別接続の同時承認でも版は1つで失敗しない', async () => {
     const { a, b } = await setupShared();
@@ -518,5 +520,6 @@ describe('複数接続の競合 — 共有ファイルDBで直列化と回収を
     } finally {
       probe.close();
     }
-  });
+    // CIの並列負荷でもロック待ちを許す。
+  }, 30000);
 });

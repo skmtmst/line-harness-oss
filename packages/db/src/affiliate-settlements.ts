@@ -189,7 +189,7 @@ export async function ensureConversionRewardSnapshot(
     ).run();
   } catch (error) {
     // 並行する承認が先に版を作った場合は、その版へ回収する(冪等)。
-    if (!/UNIQUE|constraint/i.test(error instanceof Error ? error.message : String(error))) throw error;
+    if (!/UNIQUE|constraint|busy|locked/i.test(error instanceof Error ? error.message : String(error))) throw error;
     const winner = await db.prepare(
       `SELECT id, organization_id, line_account_id, affiliate_id, conversion_event_id,
               offer_id, formula, commission_rate_snapshot, base_amount_snapshot,
@@ -548,7 +548,7 @@ export async function confirmAffiliateSettlement(
   } catch (error) {
     // 並行する確定が先に書いた場合は読み直して回収する。同一操作は冪等な
     // duplicateへ、別内容だけ409相当へ。勝者が無い制約違反は投げ直す。
-    if (!/UNIQUE|constraint/i.test(error instanceof Error ? error.message : String(error))) throw error;
+    if (!/UNIQUE|constraint|busy|locked/i.test(error instanceof Error ? error.message : String(error))) throw error;
     const winner = await db.prepare(
       `SELECT id, affiliate_id, total_amount_minor, closed_at, request_fingerprint,
               (SELECT COUNT(*) FROM affiliate_settlement_lines WHERE settlement_id = affiliate_settlements.id) AS line_count
