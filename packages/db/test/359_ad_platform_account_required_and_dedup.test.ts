@@ -1,8 +1,10 @@
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import {
+  AdConversionLeaseError,
   AdPlatformAccountMismatchError,
   claimAdConversionSend,
   createAdPlatform,
@@ -15,6 +17,10 @@ import {
 
 const migration346 = readFileSync(
   join(import.meta.dirname, '../migrations/346_ad_conversion_idempotency_and_backfill.sql'),
+  'utf8',
+);
+const migration363 = readFileSync(
+  join(import.meta.dirname, '../migrations/363_ad_conversion_lease_and_provider_id.sql'),
   'utf8',
 );
 const migration = readFileSync(
@@ -73,6 +79,7 @@ function seed(): { db: D1Database; raw: Database.Database } {
   raw.exec(BASE_SCHEMA);
   raw.exec(migration346);
   raw.exec(migration);
+    raw.exec(migration363);
   raw.exec(`INSERT INTO line_accounts (id) VALUES ('a1'), ('a2')`);
   raw.exec(`INSERT INTO friends (id, line_account_id) VALUES ('f1', 'a1'), ('f2', 'a2')`);
   raw.exec(`INSERT INTO ad_platforms (id, name, line_account_id, created_at, updated_at)
@@ -126,6 +133,7 @@ describe('359 帰属必須・重複禁止・履歴訂正(#638)', () => {
                      ('legacy', 'pn', 'f1', 'a2', 'Purchase', '')`);
     raw.exec(migration346);
     raw.exec(migration);
+    raw.exec(migration363);
 
     const rows = raw.prepare(`SELECT id, line_account_id FROM ad_conversion_logs ORDER BY id`).all() as Array<{
       id: string; line_account_id: string | null;
@@ -151,49 +159,122 @@ describe('359 帰属必須・重複禁止・履歴訂正(#638)', () => {
               (id, ad_platform_id, friend_id, line_account_id, event_name, status, idempotency_key, created_at)
               VALUES ('log-old', 'old', 'f1', 'a1', 'Purchase', 'sent', 'k:1', '2026-04-01T00:00:00.000+09:00'),
                      ('log-new', 'new', 'f1', 'a1', 'Purchase', 'failed', 'k:1', '2026-05-01T00:00:00.000+09:00'),
-                     ('log solo', 'old', 'f1', 'a1', 'Lead', 'sent', 'k:2', '2026-04-01T00:00:00.000+09:00')`);
+                     ('log-lead', 'old', 'f1', 'a1', 'Lead', 'sent', 'k:2', '2026-04-01T00:00:00.000+09:00')`);
     raw.exec(migration);
+    raw.exec(migration363);
 
     expect(raw.prepare(`SELECT id FROM ad_platforms ORDER BY id`).all()).toEqual([{ id: 'new' }]);
     const logs = raw.prepare(
-      `SELECT id, ad_platform_id FROM ad_conversion_logs ORDER BY id`,
-    ).all() as Array<{ id: string; ad_platform_id: string }>;
-    // ぶつかった同じ鍵は新しい方だけ残し、単独の記録は付け替える。
+      `SELECT id, ad_platform_id, status FROM ad_conversion_logs ORDER BY id`,
+    ).all() as Array<{ id: string; ad_platform_id: string; status: string }>;
+    // ぶつかった同じ鍵は sent を残し、単独の記録は付け替える。
     expect(logs).toEqual([
-      { id: 'log solo', ad_platform_id: 'new' },
-      { id: 'log-new', ad_platform_id: 'new' },
+      { id: 'log-lead', ad_platform_id: 'new', status: 'sent' },
+      { id: 'log-old', ad_platform_id: 'new', status: 'sent' },
     ]);
   });
 
   it('同じ鍵で金額・クリックIDが変われば拒否する', async () => {
     const { db } = seed();
 
-    expect(await claimAdConversionSend(db, CLAIM)).toBe('send');
-    await finishAdConversionSend(db, { ...CLAIM, status: 'sent' });
-    expect(await claimAdConversionSend(db, { ...CLAIM, eventValue: 2000 })).toBe('mismatch');
-    expect(await claimAdConversionSend(db, { ...CLAIM, clickId: 'fb-2' })).toBe('mismatch');
-    expect(await claimAdConversionSend(db, CLAIM)).toBe('skip-sent');
+    const first = await claimAdConversionSend(db, CLAIM);
+    expect(first.disposition).toBe('send');
+    await finishAdConversionSend(db, { ...CLAIM, lease: first.lease as string, status: 'sent' });
+    expect((await claimAdConversionSend(db, { ...CLAIM, eventValue: 2000 })).disposition).toBe('mismatch');
+    expect((await claimAdConversionSend(db, { ...CLAIM, clickId: 'fb-2' })).disposition).toBe('mismatch');
+    expect((await claimAdConversionSend(db, CLAIM)).disposition).toBe('skip-sent');
+  });
+
+  it('内容不一致の未確定行は要確認にし、再送しない', async () => {
+    const { db, raw } = seed();
+
+    const first = await claimAdConversionSend(db, CLAIM);
+    expect(first.disposition).toBe('send');
+    expect((await claimAdConversionSend(db, { ...CLAIM, eventValue: 2000 })).disposition).toBe('mismatch');
+    expect(raw.prepare(`SELECT status FROM ad_conversion_logs`).get()).toMatchObject({ status: 'needs-review' });
+    expect((await claimAdConversionSend(db, CLAIM)).disposition).toBe('mismatch');
+    expect(raw.prepare(`SELECT COUNT(*) AS n FROM ad_conversion_logs`).get()).toMatchObject({ n: 1 });
+  });
+
+  it('古い持ち主の確定は拒み、新しい持ち主だけ通す', async () => {
+    const { db, raw } = seed();
+
+    const first = await claimAdConversionSend(db, CLAIM);
+    expect(first.disposition).toBe('send');
+    raw.prepare(`UPDATE ad_conversion_logs SET created_at = '2000-01-01T00:00:00.000+09:00'`).run();
+    const retake = await claimAdConversionSend(db, CLAIM);
+    expect(retake.disposition).toBe('send');
+    expect(retake.lease).not.toBe(first.lease);
+
+    await expect(finishAdConversionSend(db, { ...CLAIM, lease: first.lease as string, status: 'sent' }))
+      .rejects.toBeInstanceOf(AdConversionLeaseError);
+    await finishAdConversionSend(db, { ...CLAIM, lease: retake.lease as string, status: 'sent' });
+    expect(raw.prepare(`SELECT status FROM ad_conversion_logs`).get()).toMatchObject({ status: 'sent' });
   });
 
   it('古いpendingは取り直せる。新しいpendingは待つ', async () => {
     const { db, raw } = seed();
 
-    expect(await claimAdConversionSend(db, CLAIM)).toBe('send');
-    expect(await claimAdConversionSend(db, CLAIM)).toBe('skip-inflight');
+    expect((await claimAdConversionSend(db, CLAIM)).disposition).toBe('send');
+    expect((await claimAdConversionSend(db, CLAIM)).disposition).toBe('skip-inflight');
     raw.prepare(`UPDATE ad_conversion_logs SET created_at = '2000-01-01T00:00:00.000+09:00'`).run();
-    expect(await claimAdConversionSend(db, CLAIM)).toBe('send');
+    expect((await claimAdConversionSend(db, CLAIM)).disposition).toBe('send');
   });
 
   it('初回確保の所属を固定して返す', async () => {
     const { db } = seed();
 
-    expect(await claimAdConversionSend(db, CLAIM)).toBe('send');
+    expect((await claimAdConversionSend(db, CLAIM)).disposition).toBe('send');
     expect(await getPinnedAdConversionAccount(db, {
       friendId: 'f1', eventName: 'Purchase', idempotencyKey: 'stripe:evt-1',
     })).toBe('a1');
     expect(await getPinnedAdConversionAccount(db, {
       friendId: 'f1', eventName: 'Purchase', idempotencyKey: 'stripe:nope',
     })).toBeNull();
+  });
+
+  it('別接続の同時確保は1件だけ送り、敗者の確定は通らない', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ad-lease-'));
+    const file = join(dir, 'race.db');
+    try {
+      const setup = new Database(file);
+      setup.pragma('journal_mode = WAL');
+      setup.pragma('foreign_keys = ON');
+      setup.exec(BASE_SCHEMA);
+      setup.exec(migration346);
+      setup.exec(migration);
+      setup.exec(migration363);
+      setup.exec(`INSERT INTO line_accounts (id) VALUES ('a1')`);
+      setup.exec(`INSERT INTO friends (id, line_account_id) VALUES ('f1', 'a1')`);
+      setup.exec(`INSERT INTO ad_platforms (id, name, line_account_id, created_at, updated_at)
+                  VALUES ('p1', 'meta', 'a1', '', '')`);
+      setup.close();
+
+      const rawA = new Database(file);
+      rawA.pragma('busy_timeout = 5000');
+      const rawB = new Database(file);
+      rawB.pragma('busy_timeout = 5000');
+      try {
+        const [a, b] = await Promise.all([
+          claimAdConversionSend(asD1(rawA), CLAIM),
+          claimAdConversionSend(asD1(rawB), CLAIM),
+        ]);
+        const sends = [a, b].filter((r) => r.disposition === 'send');
+        expect(sends).toHaveLength(1);
+        const loser = sends[0] === a ? b : a;
+
+        await finishAdConversionSend(asD1(rawA), { ...CLAIM, lease: sends[0].lease as string, status: 'sent' });
+        await expect(finishAdConversionSend(asD1(rawB), { ...CLAIM, lease: loser.lease ?? 'dead', status: 'sent' }))
+          .rejects.toBeInstanceOf(AdConversionLeaseError);
+        expect(rawA.prepare(`SELECT COUNT(*) AS n FROM ad_conversion_logs`).get()).toMatchObject({ n: 1 });
+        expect(rawA.prepare(`SELECT status FROM ad_conversion_logs`).get()).toMatchObject({ status: 'sent' });
+      } finally {
+        rawA.close();
+        rawB.close();
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('CASは認可外の所属に当たらない', async () => {

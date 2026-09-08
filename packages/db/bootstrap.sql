@@ -152,7 +152,7 @@ CREATE TABLE ad_conversion_logs (
   response_body       TEXT,
   error_message       TEXT,
   created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, idempotency_key TEXT);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, idempotency_key TEXT, lease_token TEXT, provider_event_id TEXT);
 
 CREATE TABLE ad_platforms (
   id           TEXT PRIMARY KEY,

@@ -7,6 +7,10 @@ import {
   finishAdConversionSend,
 } from '../src/ad-platforms.js';
 
+const migration363 = readFileSync(
+  join(import.meta.dirname, '../migrations/363_ad_conversion_lease_and_provider_id.sql'),
+  'utf8',
+);
 const migration = readFileSync(
   join(import.meta.dirname, '../migrations/346_ad_conversion_idempotency_and_backfill.sql'),
   'utf8',
@@ -72,6 +76,7 @@ const CLAIM = {
 function seedAccounted(): { db: D1Database; raw: Database.Database } {
   const raw = openDb();
   raw.exec(migration);
+    raw.exec(migration363);
   raw.exec(`INSERT INTO line_accounts (id) VALUES ('a1')`);
   raw.exec(`INSERT INTO friends (id, line_account_id) VALUES ('f1', 'a1')`);
   raw.exec(`INSERT INTO ad_platforms (id, name, line_account_id, created_at, updated_at)
@@ -83,28 +88,32 @@ describe('346 広告送信の冪等キーと旧行移行(#638)', () => {
   it('初回はsend、送信済みの同じキーはskip-sent', async () => {
     const { db } = seedAccounted();
 
-    expect(await claimAdConversionSend(db, CLAIM)).toBe('send');
-    await finishAdConversionSend(db, { ...CLAIM, status: 'sent' });
-    expect(await claimAdConversionSend(db, CLAIM)).toBe('skip-sent');
+    const first = await claimAdConversionSend(db, CLAIM);
+    expect(first.disposition).toBe('send');
+    await finishAdConversionSend(db, { ...CLAIM, lease: first.lease as string, status: 'sent' });
+    expect((await claimAdConversionSend(db, CLAIM)).disposition).toBe('skip-sent');
   });
 
   it('送信中の同じキーはskip-inflight、失敗済みは1回だけ取り直せる', async () => {
     const { db, raw } = seedAccounted();
 
-    expect(await claimAdConversionSend(db, CLAIM)).toBe('send');
-    expect(await claimAdConversionSend(db, CLAIM)).toBe('skip-inflight');
-    await finishAdConversionSend(db, { ...CLAIM, status: 'failed', errorMessage: 'bad' });
-    expect(await claimAdConversionSend(db, CLAIM)).toBe('send');
-    await finishAdConversionSend(db, { ...CLAIM, status: 'sent' });
+    const first = await claimAdConversionSend(db, CLAIM);
+    expect(first.disposition).toBe('send');
+    expect((await claimAdConversionSend(db, CLAIM)).disposition).toBe('skip-inflight');
+    await finishAdConversionSend(db, { ...CLAIM, lease: first.lease as string, status: 'failed', errorMessage: 'bad' });
+    const retake = await claimAdConversionSend(db, CLAIM);
+    expect(retake.disposition).toBe('send');
+    await finishAdConversionSend(db, { ...CLAIM, lease: retake.lease as string, status: 'sent' });
     expect(raw.prepare(`SELECT COUNT(*) AS n FROM ad_conversion_logs`).get()).toMatchObject({ n: 1 });
   });
 
   it('キーが違えば別送信として通す', async () => {
     const { db, raw } = seedAccounted();
 
-    expect(await claimAdConversionSend(db, CLAIM)).toBe('send');
-    await finishAdConversionSend(db, { ...CLAIM, status: 'sent' });
-    expect(await claimAdConversionSend(db, { ...CLAIM, idempotencyKey: 'stripe:evt-2' })).toBe('send');
+    const first = await claimAdConversionSend(db, CLAIM);
+    expect(first.disposition).toBe('send');
+    await finishAdConversionSend(db, { ...CLAIM, lease: first.lease as string, status: 'sent' });
+    expect((await claimAdConversionSend(db, { ...CLAIM, idempotencyKey: 'stripe:evt-2' })).disposition).toBe('send');
     expect(raw.prepare(`SELECT COUNT(*) AS n FROM ad_conversion_logs`).get()).toMatchObject({ n: 2 });
   });
 
@@ -135,6 +144,7 @@ describe('346 広告送信の冪等キーと旧行移行(#638)', () => {
     raw.exec(`INSERT INTO ad_conversion_logs (id, ad_platform_id, friend_id, event_name, created_at)
               VALUES ('log-1', 'p1', 'f1', 'Purchase', '')`);
     raw.exec(migration);
+    raw.exec(migration363);
 
     expect(raw.prepare(`SELECT line_account_id FROM ad_conversion_logs WHERE id = 'log-1'`).get()).toMatchObject({
       line_account_id: 'a1',

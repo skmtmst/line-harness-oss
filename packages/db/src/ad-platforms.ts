@@ -50,6 +50,8 @@ export interface AdConversionLog {
   click_id: string | null;
   click_id_type: string | null;
   idempotency_key: string | null;
+  lease_token: string | null;
+  provider_event_id: string | null;
   status: string;
   request_body: string | null;
   response_body: string | null;
@@ -360,6 +362,22 @@ function isUniqueViolation(error: unknown): boolean {
  * あるときは送らず、失敗済みのときだけ1回だけ取り直せる。同時実行の勝敗は
  * UNIQUE制約の1文で決める。
  */
+export interface AdConversionClaimResult {
+  disposition: AdConversionClaim;
+  /** disposition が send のとき必須の確保証。確定時に提示する。 */
+  lease: string | null;
+  /** 確保済みの媒体側安定ID。再送は保存分を使い続ける。 */
+  providerEventId: string | null;
+}
+
+/** 古い持ち主の確定を拒んだときの誤り。 */
+export class AdConversionLeaseError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AdConversionLeaseError';
+  }
+}
+
 export async function claimAdConversionSend(
   db: D1Database,
   opts: {
@@ -371,18 +389,21 @@ export async function claimAdConversionSend(
     clickIdType: string;
     eventValue?: number | null;
     idempotencyKey: string;
+    providerEventId?: string | null;
   },
-): Promise<AdConversionClaim> {
+): Promise<AdConversionClaimResult> {
   const friendAccount = await assertAdConversionAccountBoundary(db, opts);
   const now = jstNow();
   const fingerprint = conversionFingerprint({ clickId: opts.clickId, clickIdType: opts.clickIdType, eventValue: opts.eventValue });
+  const providerEventId = opts.providerEventId || `${opts.idempotencyKey}:${opts.platformId}`;
+  const lease = crypto.randomUUID();
 
   try {
     await db
       .prepare(
         `INSERT INTO ad_conversion_logs
-         (id, ad_platform_id, friend_id, line_account_id, event_name, click_id, click_id_type, status, idempotency_key, request_body, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
+         (id, ad_platform_id, friend_id, line_account_id, event_name, click_id, click_id_type, status, idempotency_key, request_body, lease_token, provider_event_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
       )
       .bind(
         crypto.randomUUID(),
@@ -394,45 +415,77 @@ export async function claimAdConversionSend(
         opts.clickIdType,
         opts.idempotencyKey,
         fingerprint,
+        lease,
+        providerEventId,
         now,
       )
       .run();
-    return 'send';
+    return { disposition: 'send', lease, providerEventId };
   } catch (error) {
     if (!isUniqueViolation(error)) throw error;
   }
 
   const existing = await db
     .prepare(
-      `SELECT status, click_id, click_id_type, request_body, created_at FROM ad_conversion_logs
+      `SELECT status, click_id, click_id_type, request_body, created_at, lease_token, provider_event_id FROM ad_conversion_logs
        WHERE ad_platform_id = ? AND friend_id = ? AND event_name = ? AND idempotency_key = ?`,
     )
     .bind(opts.platformId, opts.friendId, opts.eventName, opts.idempotencyKey)
-    .first<{ status: string; click_id: string | null; click_id_type: string | null; request_body: string | null; created_at: string }>();
-  if (!existing) return 'send';
-  // 同じ鍵で金額・クリックID等が変われば別内容。再送ではなく拒否する。
-  if (!fingerprintMatches(existing.request_body, fingerprint)) return 'mismatch';
-  if (existing.status === 'sent') return 'skip-sent';
+    .first<{
+      status: string; click_id: string | null; click_id_type: string | null;
+      request_body: string | null; created_at: string;
+      lease_token: string | null; provider_event_id: string | null;
+    }>();
+  if (!existing) return { disposition: 'send', lease: null, providerEventId: null };
+  // 同じ鍵で金額・クリックID等が変われば別内容。再送ではなく要確認にする。
+  if (!fingerprintMatches(existing.request_body, fingerprint)) {
+    if (existing.status === 'pending' || existing.status === 'failed') {
+      await db
+        .prepare(
+          `UPDATE ad_conversion_logs SET status = 'needs-review'
+           WHERE ad_platform_id = ? AND friend_id = ? AND event_name = ? AND idempotency_key = ?
+             AND status IN ('pending', 'failed')`,
+        )
+        .bind(opts.platformId, opts.friendId, opts.eventName, opts.idempotencyKey)
+        .run();
+    }
+    return { disposition: 'mismatch', lease: null, providerEventId: existing.provider_event_id };
+  }
+  if (existing.status === 'sent' || existing.status === 'success') {
+    return { disposition: 'skip-sent', lease: null, providerEventId: existing.provider_event_id };
+  }
   if (existing.status !== 'failed') {
+    if (existing.status !== 'pending') {
+      return { disposition: 'mismatch', lease: null, providerEventId: existing.provider_event_id };
+    }
     // 確保したまま落ちた分は永久に止めない。古い pending だけ取り直す。
     const ageMs = Date.now() - Date.parse(existing.created_at);
-    if (!Number.isFinite(ageMs) || ageMs <= AD_CONVERSION_PENDING_TAKEOVER_MS) return 'skip-inflight';
+    if (!Number.isFinite(ageMs) || ageMs <= AD_CONVERSION_PENDING_TAKEOVER_MS) {
+      return { disposition: 'skip-inflight', lease: null, providerEventId: existing.provider_event_id };
+    }
   }
   // 失敗済み・古い pending を取り直す。見た状態・時刻を条件に入れ、
-  // 同時に取り合っても勝った1件だけ送る。時刻も更新して連鎖を止める。
+  // 同時に取り合っても勝った1件だけ送る。証と時刻を更新して連鎖を止める。
+  const newLease = crypto.randomUUID();
   const took = await db
     .prepare(
-      `UPDATE ad_conversion_logs SET status = 'pending', request_body = ?, created_at = ?
+      `UPDATE ad_conversion_logs SET status = 'pending', request_body = ?, lease_token = ?, created_at = ?
        WHERE ad_platform_id = ? AND friend_id = ? AND event_name = ? AND idempotency_key = ?
          AND status = ? AND created_at = ?`,
     )
-    .bind(fingerprint, now, opts.platformId, opts.friendId, opts.eventName, opts.idempotencyKey, existing.status, existing.created_at)
+    .bind(fingerprint, newLease, now, opts.platformId, opts.friendId, opts.eventName, opts.idempotencyKey, existing.status, existing.created_at)
     .run<{ success: boolean; meta?: { changes?: number } }>();
   const changes = (took as unknown as { meta?: { changes?: number } }).meta?.changes ?? 0;
-  return changes > 0 ? 'send' : 'skip-inflight';
+  if (changes === 0) {
+    return { disposition: 'skip-inflight', lease: null, providerEventId: existing.provider_event_id };
+  }
+  return { disposition: 'send', lease: newLease, providerEventId: existing.provider_event_id };
 }
 
-/** 確保した送信の結果を記録する。 */
+/**
+ * 確保した送信の結果を記録する。確保証と pending の両方を条件にし、
+ * 古い持ち主の確定は通さない(AdConversionLeaseError)。
+ */
 export async function finishAdConversionSend(
   db: D1Database,
   opts: {
@@ -440,17 +493,25 @@ export async function finishAdConversionSend(
     friendId: string;
     eventName: string;
     idempotencyKey: string;
+    lease: string;
     status: 'sent' | 'failed';
     errorMessage?: string | null;
   },
 ): Promise<void> {
-  await db
+  const result = await db
     .prepare(
       `UPDATE ad_conversion_logs SET status = ?, error_message = ?
-       WHERE ad_platform_id = ? AND friend_id = ? AND event_name = ? AND idempotency_key = ?`,
+       WHERE ad_platform_id = ? AND friend_id = ? AND event_name = ? AND idempotency_key = ?
+         AND status = 'pending' AND lease_token = ?`,
     )
-    .bind(opts.status, opts.errorMessage ?? null, opts.platformId, opts.friendId, opts.eventName, opts.idempotencyKey)
-    .run();
+    .bind(opts.status, opts.errorMessage ?? null, opts.platformId, opts.friendId, opts.eventName, opts.idempotencyKey, opts.lease)
+    .run<{ success: boolean; meta?: { changes?: number } }>();
+  const changes = (result as unknown as { meta?: { changes?: number } }).meta?.changes ?? 0;
+  if (changes === 0) {
+    throw new AdConversionLeaseError(
+      `ad_conversion_logs の確定拒否: platform=${opts.platformId} friend=${opts.friendId} event=${opts.eventName}`,
+    );
+  }
 }
 
 export async function getAdConversionLogs(

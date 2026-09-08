@@ -1,22 +1,35 @@
 -- 広告設定の帰属の必須化・重複整理と、送信記録の帰属の正規化(#638 差し戻し再審査)。
 -- 359 は未統合のため、同番号内で司令塔指示の修正を行う。
 -- 1) 同一アカウント・同一媒体の重複設定を整理する。送信記録は残す行へ
---    付け替え、付け替えで一意がぶつかる古い記録だけ消す。帰属不明(NULL)群は触らない。
+--    付け替え、付け替えで一意がぶつかる記録は sent を最優先に残す。
+--    帰属不明(NULL)群は触らない。
 DELETE FROM ad_conversion_logs WHERE id IN (
   SELECT loser.id FROM ad_conversion_logs loser
-  JOIN ad_conversion_logs keeper
-    ON keeper.friend_id = loser.friend_id
-   AND keeper.event_name = loser.event_name
-   AND keeper.idempotency_key = loser.idempotency_key
-   AND keeper.id != loser.id
   JOIN ad_platforms pl ON pl.id = loser.ad_platform_id
-  JOIN ad_platforms pk ON pk.id = keeper.ad_platform_id
  WHERE loser.idempotency_key IS NOT NULL
-   AND pl.line_account_id = pk.line_account_id
-   AND pl.name = pk.name
    AND pl.line_account_id IS NOT NULL
-   AND (loser.created_at < keeper.created_at
-        OR (loser.created_at = keeper.created_at AND loser.id < keeper.id))
+   AND EXISTS (
+     SELECT 1 FROM ad_conversion_logs keeper
+     JOIN ad_platforms pk ON pk.id = keeper.ad_platform_id
+      WHERE keeper.id != loser.id
+        AND keeper.friend_id = loser.friend_id
+        AND keeper.event_name = loser.event_name
+        AND keeper.idempotency_key = loser.idempotency_key
+        AND pk.line_account_id = pl.line_account_id
+        AND pk.name = pl.name
+        AND (
+          CASE keeper.status WHEN 'sent' THEN 0 WHEN 'failed' THEN 1 WHEN 'pending' THEN 2 ELSE 3 END
+          < CASE loser.status WHEN 'sent' THEN 0 WHEN 'failed' THEN 1 WHEN 'pending' THEN 2 ELSE 3 END
+          OR (
+            CASE keeper.status WHEN 'sent' THEN 0 WHEN 'failed' THEN 1 WHEN 'pending' THEN 2 ELSE 3 END
+            = CASE loser.status WHEN 'sent' THEN 0 WHEN 'failed' THEN 1 WHEN 'pending' THEN 2 ELSE 3 END
+            AND (
+              keeper.created_at > loser.created_at
+              OR (keeper.created_at = loser.created_at AND keeper.id > loser.id)
+            )
+          )
+        )
+   )
 );
 
 UPDATE ad_conversion_logs SET ad_platform_id = (

@@ -306,7 +306,8 @@
     "343_messages_log_broadcast_recipient_index.sql",
     "345_ad_platform_account_scope.sql",
     "346_ad_conversion_idempotency_and_backfill.sql",
-    "359_ad_platform_account_required_and_dedup.sql"
+    "359_ad_platform_account_required_and_dedup.sql",
+    "363_ad_conversion_lease_and_provider_id.sql"
   ],
-  "migrationCount": 307
+  "migrationCount": 308
 }
