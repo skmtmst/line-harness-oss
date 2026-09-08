@@ -24,6 +24,7 @@ import ActionMenu from '@/components/shared/action-menu'
 import IconButton from '@/components/shared/icon-button'
 import { Pill } from '@/components/reminders/reminder-v6-ui'
 import { deleteReminderSelection } from './delete-reminder-selection'
+import { formatTriggerOffset } from './reminder-timing'
 
 interface Reminder {
   id: string; name: string; description: string | null; isActive: boolean
@@ -41,12 +42,13 @@ type VisualFolder = Folder & { itemCount?: number; listTotal?: number }
 
 const UNFILED = '__unfiled__'
 const PER_PAGE = 20
+/** 行ごとに作ると件数分だけ重いため、外で1回作って使い回す (#489-19)。 */
+const lastSentFormat = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 function rowView(reminder: Reminder) {
-  const minutes = Math.abs(reminder.triggerOffsetMinutes ?? 0)
-  const timing = minutes >= 1440 ? `${Math.round(minutes / 1440)}日前` : minutes >= 60 ? `${Math.round(minutes / 60)}時間前` : '当日'
+  const timing = formatTriggerOffset(reminder.triggerOffsetMinutes)
   const status = reminder.lifecycleStatus === 'draft' ? '下書き' as const : reminder.lifecycleStatus === 'stopped' || !reminder.isActive ? '停止中' as const : '有効' as const
   const date = reminder.lastSentAt ? new Date(reminder.lastSentAt) : null
-  const last = date && !Number.isNaN(date.getTime()) ? new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date) : '—'
+  const last = date && !Number.isNaN(date.getTime()) ? lastSentFormat.format(date) : '—'
   return { subtitle: reminder.timingSummary ?? `${timing}${reminder.sendAtTime ? ` ${reminder.sendAtTime}` : ''} ／ テキスト ${reminder.stepCount ?? 0}通`, status, base: reminder.baseDateSummary ?? (reminder.triggerType === 'booking' ? '予約日時' : reminder.triggerType === 'event' ? 'イベント開催日' : reminder.triggerType === 'friend_field' ? '友だち情報欄の日付' : '指定日時'), planned: reminder.plannedDeliveries == null ? '—' : `${reminder.plannedDeliveries}通`, last }
 }
 
@@ -139,7 +141,7 @@ export default function RemindersPage() {
   }
 
   const selectedName = reminders.find((item) => selected.has(item.id))?.name ?? ''
-  const listTotal = (folders[0] as VisualFolder | undefined)?.listTotal ?? reminderList.total
+  const listTotal = reminderList.total
   return <div data-design-node="M1EXwB" data-design="Head">
     {folderDialogOpen ? <FolderAddDialog kind="reminder" note="リマインダを整理するフォルダです。" placeholder="例：予約" onClose={() => setFolderDialogOpen(false)} onAdded={() => void loadFolders()} /> : null}
     <div data-design="KPIs"><ListKpis variant="v6" accountId={selectedAccountId} titles={['リマインダ数','送信予定','今月の送信','失敗']} build={(stats) => {
