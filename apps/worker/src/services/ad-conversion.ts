@@ -26,12 +26,38 @@ function clickIdForPlatform(platformName: string, ref: RefTracking): { clickId: 
   }
 }
 
+/** 通貨ごとの補助単位の桁数。無い通貨は2桁扱い、通貨不明は換算しない。 */
+const CURRENCY_MINOR_DIGITS: Record<string, number> = {
+  JPY: 0, KRW: 0, VND: 0, CLP: 0,
+  USD: 2, EUR: 2, GBP: 2, AUD: 2, CAD: 2, CNY: 2, TWD: 2, THB: 2,
+  BHD: 3, JOD: 3, KWD: 3, OMR: 3, TND: 3,
+};
+
+/** 補助単位(セント等)の金額を媒体へ送る主単位へ直す。通貨不明は触らない。 */
+export function toMajorAmount(amount: number, currency?: string | null, amountInMinorUnit?: boolean): number {
+  if (!amountInMinorUnit) return amount;
+  if (!currency) return amount;
+  const digits = CURRENCY_MINOR_DIGITS[currency.toUpperCase()] ?? 2;
+  return amount / 10 ** digits;
+}
+
+/** 媒体へ送る通貨。来なければ円扱い(従来どおり)。 */
+export function toCurrencyCode(currency?: string | null): string {
+  return (currency ?? 'JPY').toUpperCase();
+}
+
 export async function sendAdConversions(
   db: D1Database,
   friendId: string,
   eventName: string,
   eventValue?: number,
-  opts?: { idempotencyKey?: string | null; lineAccountId?: string | null; platformId?: string | null },
+  opts?: {
+    idempotencyKey?: string | null; lineAccountId?: string | null; platformId?: string | null;
+    /** ISO通貨(例 USD)。無いときは円扱い。 */
+    currency?: string | null;
+    /** 金額が補助単位(セント等)のとき true。通貨不明のときは換算しない。 */
+    amountInMinorUnit?: boolean;
+  },
 ): Promise<void> {
   // 呼び出しをまたいだ重複送信を止める安定キー。無いときは今回限りの鍵にする。
   const idempotencyKey = opts?.idempotencyKey || crypto.randomUUID();
@@ -66,11 +92,14 @@ export async function sendAdConversions(
     const config: AdPlatformConfig = JSON.parse(platform.config);
     // 媒体側の重複排除ID。初回確保時に決めて行に残し、再送・付け替え後も同じ値を使う。
     const providerEventId = hasStableKey ? `${idempotencyKey}:${platform.id}` : crypto.randomUUID();
+    // 金額は主単位・通貨付きに正規化してから確保・送信する。通貨が変われば別内容。
+    const currency = toCurrencyCode(opts?.currency);
+    const majorValue = eventValue != null ? toMajorAmount(eventValue, opts?.currency, opts?.amountInMinorUnit) : null;
 
     const claim = await claimAdConversionSend(db, {
       platformId: platform.id, friendId, lineAccountId, eventName,
-      clickId: click.clickId, clickIdType: click.clickIdType, eventValue: eventValue ?? null,
-      idempotencyKey, providerEventId,
+      clickId: click.clickId, clickIdType: click.clickIdType, eventValue: majorValue,
+      currency, idempotencyKey, providerEventId,
     });
     // mismatch: 同じ鍵で内容が変わった再送は送らない。
     if (claim.disposition !== 'send' || !claim.lease) continue;
@@ -91,16 +120,16 @@ export async function sendAdConversions(
     try {
       switch (platform.name) {
         case 'meta':
-          await sendMetaConversion(config, ref, eventName, eventValue, stableProviderEventId);
+          await sendMetaConversion(config, ref, eventName, majorValue ?? undefined, stableProviderEventId, currency);
           break;
         case 'x':
-          await sendXConversion(config, ref, eventName, eventValue, stableProviderEventId);
+          await sendXConversion(config, ref, eventName, majorValue ?? undefined, stableProviderEventId);
           break;
         case 'google':
-          await sendGoogleConversion(config, ref, eventName, eventValue, stableProviderEventId);
+          await sendGoogleConversion(config, ref, eventName, majorValue ?? undefined, stableProviderEventId, currency);
           break;
         case 'tiktok':
-          await sendTikTokConversion(config, ref, eventName, eventValue, stableProviderEventId);
+          await sendTikTokConversion(config, ref, eventName, majorValue ?? undefined, stableProviderEventId, currency);
           break;
         default:
           await settle('failed', `unsupported platform: ${platform.name}`);
@@ -119,6 +148,7 @@ async function sendMetaConversion(
   eventName: string,
   eventValue?: number,
   providerEventId?: string,
+  currency = 'JPY',
 ): Promise<void> {
   const url = `https://graph.facebook.com/v21.0/${config.pixel_id}/events`;
 
@@ -136,7 +166,7 @@ async function sendMetaConversion(
   };
 
   if (eventValue) {
-    eventData.custom_data = { currency: 'JPY', value: eventValue };
+    eventData.custom_data = { currency, value: eventValue };
   }
 
   const body: Record<string, unknown> = {
@@ -218,6 +248,9 @@ async function sendXConversion(
   if (!config.pixel_id) {
     throw new Error('X Conversion API pixel_id is not configured');
   }
+  if (!config.conversion_id) {
+    throw new Error('X Conversion API conversion event ID (conversion_id) is not configured');
+  }
   // pixel_id はパスの一部。
   const url = `https://ads-api.x.com/12/measurement/conversions/${encodeURIComponent(config.pixel_id)}`;
 
@@ -231,12 +264,13 @@ async function sendXConversion(
   const body = {
     conversions: [{
       conversion_time: new Date().toISOString(),
-      // 再試行では同じIDで送り、媒体側の重複計上を止める。
-      event_id: providerEventId ?? crypto.randomUUID(),
+      // Xの項目名は紛らわしい。event_id=管理画面で作った出来事のID、
+      // conversion_id=今回の発生ごとの重複排除キー。再試行では同じ鍵で送る。
+      event_id: config.conversion_id,
+      conversion_id: providerEventId ?? crypto.randomUUID(),
       identifiers,
-      // 金額は小数文字列、成果地点IDは設定が持つときだけ付ける。
+      // 金額は小数文字列。
       ...(eventValue != null && { value: eventValue.toFixed(2), number_items: 1 }),
-      ...(config.conversion_id ? { conversion_id: config.conversion_id } : {}),
     }],
   };
 
@@ -262,23 +296,35 @@ async function sendXConversion(
   }
 }
 
+/** Google広告APIの版。上げるときはここだけ変える(v17は廃止済み)。 */
+export const GOOGLE_ADS_API_VERSION = 'v25';
+
+/** Googleの発生時刻形式(yyyy-MM-dd HH:mm:ss+09:00)。日本時間の壁時計で送る。 */
+export function googleConversionDateTime(now: Date = new Date()): string {
+  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${jst.getUTCFullYear()}-${pad(jst.getUTCMonth() + 1)}-${pad(jst.getUTCDate())}`
+    + ` ${pad(jst.getUTCHours())}:${pad(jst.getUTCMinutes())}:${pad(jst.getUTCSeconds())}+09:00`;
+}
+
 async function sendGoogleConversion(
   config: AdPlatformConfig,
   ref: RefTracking,
   eventName: string,
   eventValue?: number,
   providerEventId?: string,
+  currency = 'JPY',
 ): Promise<void> {
-  const url = `https://googleads.googleapis.com/v17/customers/${config.customer_id}:uploadClickConversions`;
+  const url = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${config.customer_id}:uploadClickConversions`;
 
   const body = {
     conversions: [{
       gclid: ref.gclid,
       conversion_action: `customers/${config.customer_id}/conversionActions/${config.conversion_action_id}`,
-      conversion_date_time: new Date().toISOString().replace('Z', '+09:00'),
+      conversion_date_time: googleConversionDateTime(),
       // 再送時の突き合わせ用。安定IDで送り、確定失敗後の重複を抑える。
       ...(providerEventId ? { order_id: providerEventId } : {}),
-      ...(eventValue && { conversion_value: eventValue, currency_code: 'JPY' }),
+      ...(eventValue && { conversion_value: eventValue, currency_code: currency }),
     }],
     partial_failure: true,
   };
@@ -318,6 +364,7 @@ async function sendTikTokConversion(
   eventName: string,
   eventValue?: number,
   providerEventId?: string,
+  currency = 'JPY',
 ): Promise<void> {
   const url = 'https://business-api.tiktok.com/open_api/v1.3/event/track/';
 
@@ -333,7 +380,7 @@ async function sendTikTokConversion(
     },
     properties: {
       ...(ref.ttclid && { ttclid: ref.ttclid }),
-      ...(eventValue && { currency: 'JPY', value: eventValue }),
+      ...(eventValue && { currency, value: eventValue }),
     },
   };
 

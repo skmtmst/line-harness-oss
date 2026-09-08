@@ -342,14 +342,23 @@ export type AdConversionClaim = 'send' | 'skip-sent' | 'skip-inflight' | 'mismat
 /** 送信中と見なす上限。超えた pending は落ちた確保と見て取り直せる。 */
 export const AD_CONVERSION_PENDING_TAKEOVER_MS = 30 * 60 * 1000;
 
-function conversionFingerprint(input: { clickId: string; clickIdType: string; eventValue?: number | null }): string {
-  return JSON.stringify({ c: `${input.clickIdType}:${input.clickId}`, v: input.eventValue ?? null });
+function conversionFingerprint(input: { clickId: string; clickIdType: string; eventValue?: number | null; currency?: string | null }): string {
+  return JSON.stringify({ c: `${input.clickIdType}:${input.clickId}`, v: input.eventValue ?? null, cur: (input.currency ?? 'JPY').toUpperCase() });
 }
 
 function fingerprintMatches(stored: string | null, expected: string): boolean {
   // 指紋のない旧行は比較できないので、状態の判定に任せる。
   if (stored == null || stored === '') return true;
-  return stored === expected;
+  if (stored === expected) return true;
+  // 通貨なしの旧形式は、cとvが合えば円として通す。通貨違いは別内容。
+  try {
+    const s = JSON.parse(stored) as { c?: unknown; v?: unknown; cur?: unknown };
+    const e = JSON.parse(expected) as { c?: unknown; v?: unknown; cur?: unknown };
+    if (typeof s !== 'object' || s === null || typeof e !== 'object' || e === null) return false;
+    return s.c === e.c && s.v === e.v && (s.cur ?? 'JPY') === (e.cur ?? 'JPY');
+  } catch {
+    return false;
+  }
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -388,13 +397,14 @@ export async function claimAdConversionSend(
     clickId: string;
     clickIdType: string;
     eventValue?: number | null;
+    currency?: string | null;
     idempotencyKey: string;
     providerEventId?: string | null;
   },
 ): Promise<AdConversionClaimResult> {
   const friendAccount = await assertAdConversionAccountBoundary(db, opts);
   const now = jstNow();
-  const fingerprint = conversionFingerprint({ clickId: opts.clickId, clickIdType: opts.clickIdType, eventValue: opts.eventValue });
+  const fingerprint = conversionFingerprint({ clickId: opts.clickId, clickIdType: opts.clickIdType, eventValue: opts.eventValue, currency: opts.currency });
   const providerEventId = opts.providerEventId || `${opts.idempotencyKey}:${opts.platformId}`;
   const lease = crypto.randomUUID();
 

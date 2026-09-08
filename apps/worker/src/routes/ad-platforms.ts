@@ -193,6 +193,7 @@ adPlatforms.post('/api/ad-platforms/test', requireRole('owner'), async (c) => {
       platform: string;
       eventName: string;
       friendId?: string;
+      lineAccountId?: string;
     }>();
 
     if (!body.platform || !body.eventName) {
@@ -225,7 +226,16 @@ adPlatforms.post('/api/ad-platforms/test', requireRole('owner'), async (c) => {
       return c.json({ success: true, data: { message: 'Test conversion sent via full pipeline' } });
     }
 
-    const platform = await getAdPlatformByName(c.env.DB, body.platform);
+    // 友だち指定なしの確認でも所属なしでは探さない。同名の設定が複数所属に
+    // あるときの取り違えと、認可対象・実送信対象のずれを防ぐため。
+    const lineAccountId = body.lineAccountId?.trim();
+    if (!lineAccountId) {
+      return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+    }
+    const platform = await getAdPlatformByName(c.env.DB, body.platform, lineAccountId);
     if (!platform) {
       return c.json({ success: false, error: `Platform "${body.platform}" not found or inactive` }, 404);
     }

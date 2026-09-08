@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import { buildXOAuth1Header, sendAdConversions } from './ad-conversion.js';
+import { buildXOAuth1Header, googleConversionDateTime, sendAdConversions } from './ad-conversion.js';
 
 const sentRequests: Array<{ url: string; body: unknown }> = [];
 
@@ -278,17 +278,67 @@ describe('sendAdConversions のアカウント境界(#638)', () => {
     await sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { idempotencyKey: 'g:evt-1' });
 
     expect(sentRequests).toHaveLength(1);
-    const googleBody = sentRequests[0].body as { conversions: Array<{ order_id: string; gclid: string }> };
+    // v17は廃止済みのため現行版で送る。
+    expect(sentRequests[0].url).toContain('googleads.googleapis.com/v25/');
+    const googleBody = sentRequests[0].body as { conversions: Array<{ order_id: string; gclid: string; conversion_date_time: string }> };
     expect(googleBody.conversions[0]).toMatchObject({ order_id: 'g:evt-1:p1', gclid: 'g-1' });
+    // UTC時刻に+09:00を付け替えた偽の日本時間にしない。壁時計+時差の形式。
+    expect(googleBody.conversions[0].conversion_date_time).toMatch(
+      /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\+09:00$/,
+    );
     expect(logs(testDb)).toEqual([
       { ad_platform_id: 'p1', friend_id: 'f1', line_account_id: 'a1', status: 'failed' },
     ]);
   });
 
-  it('Xはpixel入りパス・小数金額・安定IDで送る', async () => {
+  it('Googleの発生時刻は日本時間の壁時計で送る', async () => {
+    expect(googleConversionDateTime(new Date('2026-09-08T00:00:00Z'))).toBe('2026-09-08 09:00:00+09:00');
+    expect(googleConversionDateTime(new Date('2026-09-08T15:30:45Z'))).toBe('2026-09-09 00:30:45+09:00');
+  });
+
+  it('補助単位の金額は通貨の桁数で主単位へ直して送る', async () => {
+    const testDb = seedTwoAccounts();
+    testDb.raw.prepare(`UPDATE ad_platforms SET name = 'google', line_account_id = 'a1',
+                        config = '{"customer_id":"123","conversion_action_id":"456","oauth_token":"t","developer_token":"d"}'
+                        WHERE id = 'p1'`).run();
+    testDb.raw.prepare(`INSERT INTO ref_tracking (id, ref_code, friend_id, gclid, created_at)
+                        VALUES ('ref-g2', 'ref-1', 'f1', 'g-2', '2026-09-09T00:00:00+09:00')`).run();
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: { body?: string }) => {
+      sentRequests.push({ url, body: init?.body ? JSON.parse(init.body) : null });
+      return { ok: true, status: 200, json: async () => ({}), text: async () => 'ok' };
+    }));
+
+    // 1000セント=10ドル。補助単位のまま送ると100倍の誤計上になる。
+    await sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, {
+      idempotencyKey: 'g:evt-2', currency: 'USD', amountInMinorUnit: true,
+    });
+
+    expect(sentRequests).toHaveLength(1);
+    const googleBody = sentRequests[0].body as { conversions: Array<{ conversion_value: number; currency_code: string }> };
+    expect(googleBody.conversions[0]).toMatchObject({ conversion_value: 10, currency_code: 'USD' });
+  });
+
+  it('通貨違いは同じ鍵でも内容不一致として送らない', async () => {
+    const testDb = seedTwoAccounts();
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: { body?: string }) => {
+      sentRequests.push({ url, body: init?.body ? JSON.parse(init.body) : null });
+      return { ok: false, status: 400, text: async () => 'bad' };
+    }));
+
+    await sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { idempotencyKey: 'm:evt-1', currency: 'JPY' });
+    await sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { idempotencyKey: 'm:evt-1', currency: 'USD' });
+
+    // 指紋に通貨を含むため不一致になり、失敗分の取り直し送信ではなく要確認で止まる。
+    expect(sentRequests).toHaveLength(1);
+    expect(logs(testDb)).toEqual([
+      { ad_platform_id: 'p1', friend_id: 'f1', line_account_id: 'a1', status: 'needs-review' },
+    ]);
+  });
+
+  it('Xはpixel入りパス・出来事IDと重複排除鍵の正しい対応で送る', async () => {
     const testDb = seedTwoAccounts();
     testDb.raw.prepare(`UPDATE ad_platforms SET name = 'x', line_account_id = 'a1',
-                        config = '{"pixel_id":"oka17","api_key":"k","api_secret":"s","x_oauth_token":"t","x_oauth_token_secret":"ts"}'
+                        config = '{"pixel_id":"oka17","api_key":"k","api_secret":"s","x_oauth_token":"t","x_oauth_token_secret":"ts","conversion_id":"23294827"}'
                         WHERE id = 'p1'`).run();
     testDb.raw.prepare(`INSERT INTO ref_tracking (id, ref_code, friend_id, twclid, created_at)
                         VALUES ('ref-x2', 'ref-1', 'f1', 'tw-1', '2026-09-09T00:00:00+09:00')`).run();
@@ -299,8 +349,11 @@ describe('sendAdConversions のアカウント境界(#638)', () => {
     expect(sentRequests).toHaveLength(1);
     expect(sentRequests[0].url).toBe('https://ads-api.x.com/12/measurement/conversions/oka17');
     const xBody = sentRequests[0].body as { conversions: Array<Record<string, unknown>> };
+    // event_id=管理画面で作った出来事のID、conversion_id=今回の重複排除鍵。
+    // 逆にすると帰属と重複排除の両方が壊れる。
     expect(xBody.conversions[0]).toMatchObject({
-      event_id: 'x:evt-2:p1',
+      event_id: '23294827',
+      conversion_id: 'x:evt-2:p1',
       value: '1000.00',
       number_items: 1,
     });
@@ -311,9 +364,26 @@ describe('sendAdConversions のアカウント境界(#638)', () => {
     // (docs.x.com/x-ads-api/measurement/web-conversions.md の例と
     //  stape-io/twitter-tag の対応表で確認。2026-09-09)
     expect(Object.keys(xBody.conversions[0]).sort()).toEqual(
-      ['conversion_time', 'event_id', 'identifiers', 'number_items', 'value'],
+      ['conversion_id', 'conversion_time', 'event_id', 'identifiers', 'number_items', 'value'],
     );
     expect(xBody.conversions[0]).not.toHaveProperty('currency');
+  });
+
+  it('Xは出来事IDの設定がなければ送らず失敗で残す', async () => {
+    const testDb = seedTwoAccounts();
+    testDb.raw.prepare(`UPDATE ad_platforms SET name = 'x', line_account_id = 'a1',
+                        config = '{"pixel_id":"oka17","api_key":"k","api_secret":"s","x_oauth_token":"t","x_oauth_token_secret":"ts"}'
+                        WHERE id = 'p1'`).run();
+    testDb.raw.prepare(`INSERT INTO ref_tracking (id, ref_code, friend_id, twclid, created_at)
+                        VALUES ('ref-x3', 'ref-1', 'f1', 'tw-1', '2026-09-09T00:00:00+09:00')`).run();
+    mockFetchOk();
+
+    await sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { idempotencyKey: 'x:evt-3' });
+
+    expect(sentRequests).toHaveLength(0);
+    expect(logs(testDb)).toEqual([
+      { ad_platform_id: 'p1', friend_id: 'f1', line_account_id: 'a1', status: 'failed' },
+    ]);
   });
 
   it('送信失敗は failed で記録し投げない。1回の呼び出しで1媒体へ1回だけ送る', async () => {

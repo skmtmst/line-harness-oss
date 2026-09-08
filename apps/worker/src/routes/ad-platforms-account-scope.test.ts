@@ -300,4 +300,27 @@ describe('広告設定ルートのアカウント境界(#638)', () => {
     expect(missing.status).toBe(404);
     expect(sentUrls).toHaveLength(1);
   });
+
+  it('テスト送信は友だち指定なしでも所属指定が必須', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    mockFetchOk();
+    const target = app(staff('owner-1', 'tenant-1'));
+    const env = { DB: testDb.db } as Env['Bindings'];
+    const testSend = (body: unknown) => target.request('/api/ad-platforms/test', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }, env);
+
+    // 所属なしでは探さない。同名設定の取り違えを防ぐ。
+    const noAccount = await testSend({ platform: 'meta', eventName: 'Purchase' });
+    expect(noAccount.status).toBe(400);
+    expect(sentUrls).toHaveLength(0);
+
+    const cross = await testSend({ platform: 'meta', eventName: 'Purchase', lineAccountId: 'b1' });
+    expect(cross.status).toBe(403);
+    expect(sentUrls).toHaveLength(0);
+
+    const ok = await testSend({ platform: 'meta', eventName: 'Purchase', lineAccountId: 'a1' });
+    expect(ok.status).toBe(200);
+  });
 });
