@@ -8,6 +8,7 @@ import {
   updateFriendField,
   deleteFriendField,
   countFriendFieldValuesForScope,
+  countFriendFieldValuesForScopes,
   getFriendFieldListSummary,
   getFriendFieldUsageForScope,
   getFriendFieldValuesForMigration,
@@ -319,18 +320,19 @@ friendFields.get('/api/friend-fields', async (c) => {
     });
 
     // ?withUsage=1 で「何人に値が入っているか」を付ける。削除の前に見る画面用。
-    // 項目ごとに1クエリなので、既定では引かない。
+    // 件数は1クエリで一括集計する(項目ごとの count は N+1 になるため)。
     if (c.req.query('withUsage') === '1') {
       const usageTargets = await getFriendFieldUsageForScope(c.env.DB, items.map((item) => item.id), scope);
-      const withUsage = await Promise.all(items.map(async (item) => {
+      const usageCounts = await countFriendFieldValuesForScopes(c.env.DB, items.map((item) => item.id), scope);
+      const withUsage = items.map((item) => {
         const ownTargets = usageTargets.filter((target) => target.fieldId === item.id);
         return {
           ...serialize(item),
-          usageCount: await countFriendFieldValuesForScope(c.env.DB, item.id, scope),
+          usageCount: usageCounts.get(item.id) ?? 0,
           formUsageCount: ownTargets.filter((target) => target.kind === 'form').length,
           displayTargets: ownTargets.map((target) => target.name),
         };
-      }));
+      });
       return c.json({ success: true, data: withUsage });
     }
     return c.json({ success: true, data: items.map(serialize) });

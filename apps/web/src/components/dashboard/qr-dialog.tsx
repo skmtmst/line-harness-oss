@@ -59,6 +59,7 @@ export default function QrDialog({
   baseLink,
   initialRouteId = '',
   visualReferenceQr = false,
+  routes: routesProp,
 }: {
   open: boolean
   onClose: () => void
@@ -72,8 +73,14 @@ export default function QrDialog({
   initialRouteId?: string
   /** 撮影固定応答でだけ使うPencilの簡略見本。通常時は実URLのQRを生成する。 */
   visualReferenceQr?: boolean
+  /*
+    呼び出し元が既に取った経路一覧。渡されたら取り直さない。
+    同じ口を外と中で2回叩かない。
+  */
+  routes?: EntryRoute[]
 }) {
-  const [routes, setRoutes] = useState<EntryRoute[]>([])
+  const [fetchedRoutes, setFetchedRoutes] = useState<EntryRoute[]>([])
+  const routes = routesProp ?? fetchedRoutes
   const [routeId, setRouteId] = useState(initialRouteId)
   const [size, setSize] = useState(SIZES[0].value)
   const [format, setFormat] = useState(FORMATS[0].value)
@@ -87,12 +94,12 @@ export default function QrDialog({
   }, [open, initialRouteId])
 
   useEffect(() => {
-    if (!open) return
+    if (!open || routesProp) return
     let cancelled = false
     void api.entryRoutes.list()
       .then((res) => {
         // 停止中の経路のQRを配ると、読み取っても友だち追加できない。
-        if (!cancelled && res.success) setRoutes(res.data.filter((r) => r.isActive))
+        if (!cancelled && res.success) setFetchedRoutes(res.data.filter((r) => r.isActive))
       })
       .catch(() => {
         // 経路一覧だけが取れなくても、基本の追加URLのQRは表示できる。
@@ -100,7 +107,7 @@ export default function QrDialog({
     return () => {
       cancelled = true
     }
-  }, [open])
+  }, [open, routesProp])
 
   const base = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
   const route = routes.find((r) => r.id === routeId)

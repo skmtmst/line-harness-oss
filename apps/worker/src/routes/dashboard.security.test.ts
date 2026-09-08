@@ -247,6 +247,38 @@ describe('dashboard organization account policy', () => {
     expect(dbMocks.saveDashboardPreference).not.toHaveBeenCalled();
   });
 
+  test('organization quota fetch runs at most five accounts at a time', async () => {
+    const accounts = Array.from({ length: 12 }, (_, index) => ({
+      ...account(`account-${index + 1}`), tenant_id: 'tenant-b',
+    }));
+    dbMocks.getLineAccounts.mockResolvedValue(accounts);
+    dbMocks.getDashboardOverview.mockResolvedValue(overview());
+    let inFlight = 0;
+    let maxInFlight = 0;
+    vi.mocked(fetch).mockImplementation(async (input) => {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      inFlight -= 1;
+      const url = String(input);
+      return url.endsWith('/quota')
+        ? Response.json({ type: 'limited', value: 100 })
+        : Response.json({ totalUsage: 1 });
+    });
+
+    const response = await app('tenant-b', 'owner').request('/api/dashboard/organization-overview', {}, env());
+    const body = await response.json() as { data: ReturnType<typeof overview> };
+
+    expect(response.status).toBe(200);
+    /* 12件×2口=24回は全部取りに行くが、同時は5件ぶん(10口)までに抑える。 */
+    expect(fetch).toHaveBeenCalledTimes(24);
+    expect(maxInFlight).toBeLessThanOrEqual(10);
+    expect(body.data.metrics.monthlyQuota).toMatchObject({
+      value: { used: 12, limit: 1200, remaining: 1188 },
+      state: 'available', reason: null,
+    });
+  });
+
   test('organization totals are available only to owners and stay inside their tenant', async () => {
     dbMocks.getLineAccounts.mockResolvedValue([
       { ...account('account-1'), tenant_id: 'tenant-b' },

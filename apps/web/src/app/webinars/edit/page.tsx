@@ -29,10 +29,14 @@ import {
   type WebinarUserComment,
   type WebinarAction,
   type WebinarEditor,
+  type WebinarNotificationOverview,
+  type WebinarNotificationSettings,
   type WebinarPublishValidation,
   type WebinarParticipantPage,
 } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { WEBINAR_SAKURA_COMMENTS_MAX } from '@/components/webinars/webinar-limits'
+import { publicationStateLabel } from '@/components/webinars/publication-label'
 
 function fmtSec(sec: number): string {
   // 負 = 開始前 (待機ルーム) の相対時刻。-330 → -5:30
@@ -82,25 +86,10 @@ type WebinarWithPublication = Webinar & {
 }
 
 function deliveryWindow(webinar: Webinar): string {
+  /* 5枝の決まりは共有(`components/webinars/publication-label`)。ここは編集画面だけの落としどころ。 */
   const publication = webinar as WebinarWithPublication
-  const format = (value: string | null | undefined, withTime = false) => {
-    if (!value) return null
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return null
-    const dateText = date.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' })
-    if (!withTime) return dateText
-    const time = date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Tokyo' })
-    return `${dateText} ${time}`
-  }
-  if (publication.publicationState === 'always') return '常時公開'
-  if (publication.publicationState === 'scheduled') return format(publication.publicationStartsAt, true) ?? '—'
-  if (publication.publicationState === 'ended') return '公開終了'
-  if (publication.publicationState === 'unset') return '未設定'
-  if (publication.publicationState === 'period') {
-    const start = format(publication.publicationStartsAt)
-    const end = format(publication.publicationEndsAt)
-    if (start && end) return `${start}〜${end}`
-  }
+  const shared = publicationStateLabel(publication.publicationState, publication.publicationStartsAt, publication.publicationEndsAt)
+  if (shared !== null) return shared
   const daily = webinar.schedule.find((rule) => rule.type === 'daily' && rule.time)
   const once = webinar.schedule.find((rule) => rule.type === 'once' && rule.at)
   if (once?.at) return fmtSession(Math.floor(new Date(once.at).getTime() / 1000))
@@ -176,6 +165,12 @@ function CommentsTab({ webinarId }: { webinarId: string }) {
 
   const save = async () => {
     setMessage(null)
+    /* 上限を超えたまま送るとサーバーの 400 で初めて気づく。手前で止める。 */
+    if (comments.length > WEBINAR_SAKURA_COMMENTS_MAX) {
+      setIsErrorMessage(true)
+      setMessage(`コメントは${WEBINAR_SAKURA_COMMENTS_MAX}件までです（いま${comments.length}件）。減らしてから保存してください。`)
+      return
+    }
     try {
       const sorted = [...comments].sort((a, b) => a.atSeconds - b.atSeconds)
       const res = await webinarApi.saveComments(webinarId, sorted)
@@ -248,7 +243,7 @@ function CommentsTab({ webinarId }: { webinarId: string }) {
       )}
       <div>
         <p className="mb-1 text-sm text-gray-600">
-          JSON 一括インポート（形式: {'[{"atSeconds":10,"authorName":"田中","body":"こんばんは"}]'}）
+          JSON 一括インポート（形式: {'[{"atSeconds":10,"authorName":"田中","body":"こんばんは"}]'}、{WEBINAR_SAKURA_COMMENTS_MAX}件まで）
         </p>
         <textarea
           value={importJson}
@@ -365,24 +360,26 @@ function ParticipantAvatar({
   )
 }
 
-function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics' }: { webinarId: string; durationSeconds: number; view?: 'participants' | 'analytics' | 'legacy' }) {
-  const [analytics, setAnalytics] = useState<WebinarAnalytics | null>(null)
+function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytics, analyticsState }: { webinarId: string; durationSeconds: number; view?: 'participants' | 'analytics' | 'legacy'; analytics: WebinarAnalytics | null; analyticsState: 'idle' | 'loading' | 'ready' | 'error' }) {
   const [userComments, setUserComments] = useState<WebinarUserComment[]>([])
   const [participantPage, setParticipantPage] = useState<WebinarParticipantPage | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  /*
+    集計(`analytics`)は親が1回だけ取る。ここで取ると、分析の段を開くたびに
+    8並列の重い集計が2回走る(親と子で二重取得)。
+  */
   useEffect(() => {
     setError(null)
-    Promise.all([webinarApi.analytics(webinarId), webinarApi.userComments(webinarId), webinarApi.participants(webinarId)])
-      .then(([analyticsRes, commentsRes, participantsRes]) => {
-        setAnalytics(analyticsRes.data)
+    Promise.all([webinarApi.userComments(webinarId), webinarApi.participants(webinarId)])
+      .then(([commentsRes, participantsRes]) => {
         setUserComments(commentsRes.data)
         setParticipantPage(participantsRes.data)
       })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)))
   }, [webinarId])
 
-  if (error) {
+  if (error || analyticsState === 'error') {
     return (
       <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
         分析データを読み込めませんでした。ページを再読み込みしてください。
@@ -936,24 +933,39 @@ function VideoDesignStep({ webinar, editor, registrations }: { webinar: Webinar;
 }
 
 function NotificationDesignStep({ webinarId, registrations }: { webinarId: string; registrations: number | null }) {
-  const [settings, setSettings] = useState<Awaited<ReturnType<typeof webinarApi.notifications>>['data']['settings'] | null>(null)
+  const [settings, setSettings] = useState<WebinarNotificationSettings | null>(null)
+  const [settingsReady, setSettingsReady] = useState(false)
+  const [settingsFailed, setSettingsFailed] = useState(false)
   const [editor, setEditor] = useState<WebinarEditor | null>(null)
-  const [loaded, setLoaded] = useState(false)
+
+  /*
+    通知の取得は子の編集タブ(`WebinarNotifications`)に一本化し、親は
+    報告を受けて概要だけ描く。同じ口を親子で2回叩かない。
+  */
+  const handleNotificationsLoaded = useCallback((data: { settings: WebinarNotificationSettings | null; overview: WebinarNotificationOverview | null } | null) => {
+    if (data === null) {
+      setSettings(null)
+      setSettingsFailed(true)
+    } else {
+      setSettings(data.settings)
+      setSettingsFailed(false)
+    }
+    setSettingsReady(true)
+  }, [])
 
   useEffect(() => {
-    Promise.all([webinarApi.notifications(webinarId), webinarApi.editor(webinarId)])
-      .then(([notificationResponse, editorResponse]) => {
-        setSettings(notificationResponse.data.settings)
-        setEditor(editorResponse.data)
-      })
-      .catch(() => {
-        setSettings(null)
-        setEditor(null)
-      })
-      .finally(() => setLoaded(true))
+    let cancelled = false
+    webinarApi.editor(webinarId)
+      .then((editorResponse) => { if (!cancelled) setEditor(editorResponse.data) })
+      .catch(() => { if (!cancelled) setEditor(null) })
+    return () => { cancelled = true }
   }, [webinarId])
 
-  const enabled = (value: boolean | undefined) => !loaded ? '—（確認中）' : value ? '設定済み' : '未設定'
+  const enabled = (value: boolean | undefined) => {
+    if (!settingsReady) return '—（確認中）'
+    if (settingsFailed) return '取得できません'
+    return value ? '設定済み' : '未設定'
+  }
 
   return (
     <div className="flex flex-col gap-4 xl:flex-row" data-design-node="Ho8z4">
@@ -974,11 +986,11 @@ function NotificationDesignStep({ webinarId, registrations }: { webinarId: strin
             <div className="px-4 py-4"><dt className="text-ink text-sm font-bold">見逃し案内</dt><dd className="text-ink-faint mt-1 text-xs">未視聴者へ翌日{settings?.missedTime ?? '—'}に送信</dd></div>
           </dl>
         </section>
-        <EditorDetails label="通知ごとの送信設定を編集する"><WebinarNotifications webinarId={webinarId} /></EditorDetails>
+        <EditorDetails label="通知ごとの送信設定を編集する"><WebinarNotifications webinarId={webinarId} onLoaded={handleNotificationsLoaded} /></EditorDetails>
       </div>
       <SummaryAside rows={[
         ['申込完了', enabled(settings?.registrationEnabled)],
-        ['リマインド', settings?.dayBeforeEnabled || settings?.hourBeforeEnabled ? 'リマインド中' : loaded ? '未設定' : '—（確認中）'],
+        ['リマインド', settings?.dayBeforeEnabled || settings?.hourBeforeEnabled ? 'リマインド中' : !settingsReady ? '—（確認中）' : settingsFailed ? '取得できません' : '未設定'],
         ['対象', registrations === null ? '—（未取得）' : `${registrations.toLocaleString('ja-JP')}人`],
       ]} previewBody={editor?.notificationMessages.registration || notificationPreview(null).empty}>
         <div className="flex gap-2"><Button disabled={editor?.notificationTest?.status === 'passed'}>{editor?.notificationTest?.status === 'passed' ? 'テスト送信済み' : 'テスト送信'}</Button><Button disabled={!editor?.publicPage.url}>公開ページを見る</Button></div>
@@ -987,7 +999,7 @@ function NotificationDesignStep({ webinarId, registrations }: { webinarId: strin
   )
 }
 
-function CtasTab({ webinarId, accountId }: { webinarId: string; accountId: string | null }) {
+function CtasTab({ webinarId, accountId, onCtasLoaded }: { webinarId: string; accountId: string | null; onCtasLoaded?: (ctas: WebinarCtaCard[] | null) => void }) {
   const [ctas, setCtas] = useState<WebinarCtaCard[]>([])
   const [forms, setForms] = useState<Array<{ id: string; name: string }>>([])
   const [times, setTimes] = useState<string[]>([])
@@ -995,25 +1007,38 @@ function CtasTab({ webinarId, accountId }: { webinarId: string; accountId: strin
   const [saving, setSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
 
-  useEffect(() => {
+  /*
+    CTA の取得はここに一本化し、親の概要段は報告を受けて件数だけ描く。
+    同じ口を親子で2回叩かない。
+  */
+  const loadCtas = useCallback(async () => {
     // ロード失敗時に空の状態で保存すると all-or-nothing 置換で既存 CTA を消して
     // しまうため、初回 GET が成功するまで保存を無効化する
-    webinarApi
-      .ctas(webinarId)
-      .then((res) => {
-        /*
-          **配列で来なかったら、読めなかったこととして扱う。**
-          口の契約は配列（`apps/worker/src/routes/webinars.ts:904` が
-          `data: ctas.map(...)` を返す）だが、器だけ違う返事が来ると
-          `ctas.map is not a function` で**この面が白い画面になる**。
-          そのまま保存に進むと、置き換えで既存のCTAを消してしまう。
-        */
-        if (!Array.isArray(res.data)) throw new Error('cta_list_not_array')
-        setCtas(res.data)
-        setTimes(res.data.map((c) => fmtMinSec(c.atSeconds)))
-        setLoaded(true)
-      })
-      .catch(() => setMessage('CTAカードを読み込めませんでした。もう一度読み込んでください。読み込めるまで保存はできません。'))
+    try {
+      const res = await webinarApi.ctas(webinarId)
+      /*
+        **配列で来なかったら、読めなかったこととして扱う。**
+        口の契約は配列（`apps/worker/src/routes/webinars.ts:904` が
+        `data: ctas.map(...)` を返す）だが、器だけ違う返事が来ると
+        `ctas.map is not a function` で**この面が白い画面になる**。
+        そのまま保存に進むと、置き換えで既存のCTAを消してしまう。
+      */
+      if (!Array.isArray(res.data)) throw new Error('cta_list_not_array')
+      setCtas(res.data)
+      setTimes(res.data.map((c) => fmtMinSec(c.atSeconds)))
+      setLoaded(true)
+      onCtasLoaded?.(res.data)
+    } catch {
+      setMessage('CTAカードを読み込めませんでした。もう一度読み込んでください。読み込めるまで保存はできません。')
+      onCtasLoaded?.(null)
+    }
+  }, [webinarId, onCtasLoaded])
+
+  useEffect(() => {
+    void loadCtas()
+  }, [loadCtas])
+
+  useEffect(() => {
     if (accountId) {
       fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(
         `/api/forms?account_id=${encodeURIComponent(accountId)}`,
@@ -1024,7 +1049,7 @@ function CtasTab({ webinarId, accountId }: { webinarId: string; accountId: strin
     } else {
       setForms([])
     }
-  }, [accountId, webinarId])
+  }, [accountId])
 
   const update = (i: number, patch: Partial<WebinarCtaCard>) =>
     setCtas((prev) => prev.map((c, j) => (j === i ? { ...c, ...patch } : c)))
@@ -1046,6 +1071,8 @@ function CtasTab({ webinarId, accountId }: { webinarId: string; accountId: strin
       await webinarApi.saveCtas(webinarId, sorted)
       setCtas(sorted)
       setTimes(sorted.map((c) => fmtMinSec(c.atSeconds)))
+      /* 保存した中身を親の概要段へ流す。取り直しの GET は要らない。 */
+      onCtasLoaded?.(sorted)
       setMessage(`${sorted.length}件保存しました`)
     } catch (err) {
       setMessage(`保存に失敗しました: ${(err as Error).message}`)
@@ -1161,13 +1188,23 @@ function CtaDesignStep({ webinarId, accountId, editor, registrations }: { webina
   const [ctas, setCtas] = useState<WebinarCtaCard[]>([])
   const [forms, setForms] = useState<Array<{ id: string; name: string }>>([])
 
+  /*
+    CTA の取得は子の編集タブ(`CtasTab`)に一本化し、親は報告を受けて
+    件数だけ描く。同じ口を親子で2回叩かない。
+  */
+  const handleCtasLoaded = useCallback((next: WebinarCtaCard[] | null) => {
+    setCtas(next ?? [])
+  }, [])
+
   useEffect(() => {
-    webinarApi.ctas(webinarId).then((response) => setCtas(Array.isArray(response.data) ? response.data : [])).catch(() => setCtas([]))
-    if (!accountId) return
+    if (!accountId) {
+      setForms([])
+      return
+    }
     fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(`/api/forms?account_id=${encodeURIComponent(accountId)}`)
       .then((response) => setForms(Array.isArray(response.data) ? response.data : []))
       .catch(() => setForms([]))
-  }, [accountId, webinarId])
+  }, [accountId])
 
   const primary = ctas[0]
   const selectedForm = forms.find((form) => form.id === primary?.formId)
@@ -1177,7 +1214,7 @@ function CtaDesignStep({ webinarId, accountId, editor, registrations }: { webina
       <div className="min-w-0 flex-1 space-y-3">
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-base font-bold">CTA設定</h2><p className="text-ink-faint mt-1 text-xs">動画内に表示するボタンとタイミングを設定します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">表示タイミング</dt><dd className="text-ink text-sm font-bold">{primary ? `動画の${Math.floor(primary.atSeconds / 60)}分${String(primary.atSeconds % 60).padStart(2, '0')}秒` : '—（未設定）'}</dd></div><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">ボタン文言</dt><dd className="text-ink text-sm font-bold">{primary?.buttonLabel || '—（未設定）'}</dd></div></dl></section>
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-base font-bold">申込フォーム</h2><p className="text-ink-faint mt-1 text-xs">申込情報の保存先と完了アクションを設定します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">入力項目</dt><dd className="text-ink max-w-2xl text-right text-sm font-bold">{editor.publicPage.form?.fields.join('・') || selectedForm?.name || '—（未設定）'}</dd></div><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">完了アクション</dt><dd className="text-ink max-w-2xl text-right text-sm font-bold">{editor.publicPage.form?.completionActions.join('・') || '設定なし'}</dd></div></dl></section>
-        <EditorDetails label="CTAカードとフォームの詳細を編集する"><CtasTab webinarId={webinarId} accountId={accountId} /></EditorDetails>
+        <EditorDetails label="CTAカードとフォームの詳細を編集する"><CtasTab webinarId={webinarId} accountId={accountId} onCtasLoaded={handleCtasLoaded} /></EditorDetails>
       </div>
       <SummaryAside rows={[
         ['CTA', `${ctas.length.toLocaleString('ja-JP')}件`],
@@ -1497,6 +1534,8 @@ function EditWebinarInner() {
   const [webinar, setWebinar] = useState<Webinar | null>(null)
   const [editor, setEditor] = useState<WebinarEditor | null>(null)
   const [analytics, setAnalytics] = useState<WebinarAnalytics | null>(null)
+  const [analyticsState, setAnalyticsState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const [analyticsId, setAnalyticsId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   /*
@@ -1533,8 +1572,41 @@ function EditWebinarInner() {
       })
       .catch((err) => setLoadError(err instanceof Error ? err.message : String(err)))
       .finally(() => setLoading(false))
-    webinarApi.analytics(id).then((response) => setAnalytics(response.data)).catch(() => setAnalytics(null))
   }, [id])
+
+  /*
+    集計は8並列の重い口。基本設定だけ直す人にも毎回走らせない。
+    参加者・分析の段を開いたときだけ取り、段を離れて戻ってきても取り直さない。
+    失敗は段を離れたら捨て、次に開いたときに取り直す。
+  */
+  useEffect(() => {
+    if (!id) return
+    if (pane !== 'participants' && pane !== 'analytics') {
+      if (analyticsState === 'error') {
+        setAnalytics(null)
+        setAnalyticsId(null)
+        setAnalyticsState('idle')
+      }
+      return
+    }
+    if (analyticsId === id && analyticsState !== 'idle') return
+    let cancelled = false
+    setAnalyticsState('loading')
+    webinarApi.analytics(id)
+      .then((response) => {
+        if (cancelled) return
+        setAnalytics(response.data)
+        setAnalyticsId(id)
+        setAnalyticsState('ready')
+      })
+      .catch(() => {
+        if (cancelled) return
+        setAnalytics(null)
+        setAnalyticsId(id)
+        setAnalyticsState('error')
+      })
+    return () => { cancelled = true }
+  }, [id, pane, analyticsId, analyticsState])
 
   if (!id) {
     return (
@@ -1651,8 +1723,8 @@ function EditWebinarInner() {
       {pane === 'comments' && <CommentsTab webinarId={webinar.id} />}
       {pane === 'actions' && <WebinarActionsTab webinarId={webinar.id} editor={editor} onEditorChange={setEditor} />}
       {pane === 'preview' && <PublicPreviewStep webinar={webinar} editor={editor} publicUrl={publicUrl} registrations={registrations} publicPageReason={publicPageReason} onEditorChange={setEditor} />}
-      {pane === 'participants' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} view="participants" />}
-      {pane === 'analytics' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} />}
+      {pane === 'participants' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} view="participants" analytics={analytics} analyticsState={analyticsState} />}
+      {pane === 'analytics' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} analytics={analytics} analyticsState={analyticsState} />}
 
       {showSteps && nextPane && nextPaneLabel ? (
         <div className="border-hairline bg-canvas fixed inset-x-0 bottom-0 z-20 flex justify-end border-t px-8 py-3 shadow-card"><div className="flex gap-2"><Button disabled>下書き保存</Button><Button variant="primary" onClick={() => setPane(nextPane)}>{nextPaneLabel}</Button></div></div>

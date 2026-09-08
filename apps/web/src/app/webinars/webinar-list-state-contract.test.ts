@@ -76,7 +76,7 @@ describe('一覧の状態（設計 10-1-L `zCQXe`）', () => {
   })
 
   it('読めていないときはページ送りを出さない', () => {
-    expect(PAGE).toContain('{hasListData && filtered.length > 0 && (')
+    expect(PAGE).toContain('{hasListData && visibleTotal > 0 && (')
   })
 
   it('読込・失敗・権限不足を共通部品で描く', () => {
@@ -88,11 +88,11 @@ describe('一覧の状態（設計 10-1-L `zCQXe`）', () => {
     expect(PAGE).not.toContain('ウェビナーを読み込めませんでした')
   })
 
-  it('配列で来なかった返事を、そのまま一覧へ流さない', () => {
+  it('頁の器で来なかった返事を、そのまま一覧へ流さない', () => {
     /*
-     * 口の契約は配列だが、器だけ違う返事が来ると `[...narrowed]` が
-     * `narrowed is not iterable` になり、**一覧が白い画面になる**。
+     * 口の契約は頁形式(`{items,total}`)だが、器だけ違う返事が来ると
+     * `items.map is not a function` で**一覧が白い画面になる**。
      */
-    expect(PAGE).toContain('if (!Array.isArray(res.data)) throw new ApiError(500,')
+    expect(PAGE).toContain('if (!res.data || !Array.isArray(res.data.items) || typeof res.data.total !==')
   })
 })
