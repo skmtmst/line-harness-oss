@@ -78,8 +78,10 @@ export interface AffiliateReportV2 {
   /** revenue * commissionRate. */
   estimatedCommission: number;
   /**
-   * Confirmed reward: SUM over APPROVED attributed CVs of the offer reward_amount
-   * resolved via attributed_ref_code → affiliate_links.offer_id → affiliate_offers.
+   * Confirmed reward: SUM over APPROVED attributed CVs of the frozen
+   * approval-time snapshot (affiliate_reward_calculations) when present,
+   * else the offer reward_amount resolved via
+   * attributed_ref_code → affiliate_links.offer_id → affiliate_offers.
    * Approved CVs through offer-less links contribute 0 (no reward configured).
    */
   confirmedReward: number;
@@ -281,17 +283,25 @@ export async function getAffiliateReportV2(
   // NULL offer row → contribute 0 and never appear in byOffer (LEFT JOIN would
   // add an off.id IS NULL bucket we don't want).
   //
-  // confirmedReward is computed as the byOffer sum so both stay consistent.
+  // 金額だけは承認時の版を優先する: 確定額(confirmed)は承認後に案件の
+  // 固定額を編集しても変わらない。件数と1件あたりの表示額(rewardAmount)は
+  // 現在の設定値のままなので、編集後は confirmed と件数×単価が一致しない
+  // ことがある(版に凍結された証拠としてそのまま残す)。
   const offerRows = await db
     .prepare(
       `SELECT off.id AS offer_id,
               off.name AS offer_name,
               off.reward_amount AS reward_amount,
               SUM(CASE WHEN ${STATUS_EXPR} = 'approved' THEN 1 ELSE 0 END) AS approved,
-              SUM(CASE WHEN ${STATUS_EXPR} = 'pending' THEN 1 ELSE 0 END) AS pending
+              SUM(CASE WHEN ${STATUS_EXPR} = 'pending' THEN 1 ELSE 0 END) AS pending,
+              COALESCE(SUM(CASE WHEN ${STATUS_EXPR} = 'approved'
+                THEN COALESCE(calc.amount_minor, off.reward_amount) ELSE 0 END), 0) AS confirmed
          FROM conversion_events ce
          JOIN affiliate_links al ON al.ref_code = ce.attributed_ref_code
          JOIN affiliate_offers off ON off.id = al.offer_id
+         LEFT JOIN affiliate_reward_calculations calc
+           ON calc.conversion_event_id = ce.id
+          AND calc.formula IN ('rate', 'fixed')
         WHERE ${cvWhere}
           AND al.line_account_id IS ?
           AND off.line_account_id IS ?
@@ -300,7 +310,7 @@ export async function getAffiliateReportV2(
         ORDER BY approved DESC, off.name ASC`,
     )
     .bind(...cvBinds, lineAccountId, lineAccountId)
-    .all<{ offer_id: string; offer_name: string; reward_amount: number; approved: number; pending: number }>();
+    .all<{ offer_id: string; offer_name: string; reward_amount: number; approved: number; pending: number; confirmed: number }>();
 
   const byOffer = offerRows.results.map((r) => ({
     offerId: r.offer_id,
@@ -308,7 +318,7 @@ export async function getAffiliateReportV2(
     rewardAmount: r.reward_amount,
     conversionsApproved: r.approved,
     conversionsPending: r.pending,
-    confirmedReward: r.approved * r.reward_amount,
+    confirmedReward: r.confirmed,
   }));
   const confirmedReward = byOffer.reduce((s, o) => s + o.confirmedReward, 0);
 

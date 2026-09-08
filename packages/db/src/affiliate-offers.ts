@@ -1,4 +1,5 @@
 import { jstNow } from './utils.js';
+import { ensureConversionRewardSnapshot } from './affiliate-settlements.js';
 import { createAffiliateLink } from './affiliate-links.js';
 import type { AffiliateLink } from './affiliate-links.js';
 import { ensureDefaultMileageProgram } from './mileage.js';
@@ -271,7 +272,14 @@ export async function setConversionApproval(
     )
     .bind(status, now, eventId, status)
     .run();
-  if ((result.meta?.changes ?? 0) > 0) return true;
+  if ((result.meta?.changes ?? 0) > 0) {
+    // 承認が通ったら計算根拠の版を作る。承認後・締め前の設定編集で
+    // 金額/条件/対象が変わらないようにする。曖昧な行は版を作らずnullで
+    // 終える(締め側は版が無い旧データとして現在値で計算する)。
+    // 版の書き込みが落ちた場合は再試行(already_set側)で修復する。
+    if (status === 'approved') await ensureConversionRewardSnapshot(db, eventId, now);
+    return true;
+  }
 
   // Distinguish no-op (same status already set) from truly missing/non-attributed.
   const existing = await db
@@ -280,7 +288,11 @@ export async function setConversionApproval(
     )
     .bind(eventId, status)
     .first<{ 1: number }>();
-  return existing ? 'already_set' : false;
+  if (!existing) return false;
+  // 二重押しの再試行は承認済みの修復にも使う: 承認だけ通って版が無い
+  // 行があればここで作る(締めは版優先のため、版が無いと後編集で金額が動く)。
+  if (status === 'approved') await ensureConversionRewardSnapshot(db, eventId, now);
+  return 'already_set';
 }
 
 /** Resolved attribution detail for an affiliate-attributed conversion event. */

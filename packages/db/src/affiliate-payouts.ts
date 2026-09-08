@@ -143,6 +143,16 @@ type EligibleRewardRow = {
   approved_at: string;
   reward_amount: number;
   bank_profile_version: number | null;
+  calculation_id: string | null;
+  calc_formula: 'rate' | 'fixed' | null;
+  calc_rate: number | null;
+  calc_base: number | null;
+  calc_fixed: number | null;
+  commission_rate: number | null;
+  value_snapshot: number | null;
+  point_value: number | null;
+  fixed_reward: number | null;
+  offer_name: string;
 };
 
 export interface AffiliateSettlementPreviewRow {
@@ -179,14 +189,24 @@ async function eligibleRewards(
             a.id AS affiliate_id,
             a.name AS affiliate_name,
             a.code AS affiliate_code,
-            off.id AS offer_id,
+            COALESCE(calc.offer_id, off.id) AS offer_id,
             ce.approved_at,
-            ROUND(CASE
+            COALESCE(calc.amount_minor, ROUND(CASE
               WHEN a.commission_rate > 0
                 THEN COALESCE(ce.value_snapshot, cp.value, 0) * a.commission_rate / 100.0
               ELSE COALESCE(off.reward_amount, 0)
-            END) AS reward_amount,
-            bp.version AS bank_profile_version
+            END)) AS reward_amount,
+            bp.version AS bank_profile_version,
+            calc.id AS calculation_id,
+            calc.formula AS calc_formula,
+            calc.commission_rate_snapshot AS calc_rate,
+            calc.base_amount_snapshot AS calc_base,
+            calc.fixed_reward_snapshot AS calc_fixed,
+            a.commission_rate AS commission_rate,
+            ce.value_snapshot AS value_snapshot,
+            cp.value AS point_value,
+            off.reward_amount AS fixed_reward,
+            COALESCE(calc.offer_name_snapshot, off.name, ce.point_name_snapshot, cp.name, '') AS offer_name
        FROM conversion_events ce
        JOIN friends f ON f.id = ce.friend_id AND f.line_account_id = ?
        JOIN affiliates a
@@ -197,6 +217,9 @@ async function eligibleRewards(
          ON al.ref_code = ce.attributed_ref_code
         AND al.affiliate_id = a.id AND al.line_account_id = ?
        LEFT JOIN affiliate_offers off ON off.id = al.offer_id AND off.line_account_id = ?
+       LEFT JOIN affiliate_reward_calculations calc
+         ON calc.conversion_event_id = ce.id
+        AND calc.formula IN ('rate', 'fixed')
        LEFT JOIN affiliate_bank_profiles bp
          ON bp.affiliate_id = a.id AND bp.organization_id = a.tenant_id
         AND bp.line_account_id = a.line_account_id
@@ -306,16 +329,38 @@ export async function closeAffiliateAccountSettlement(
   )];
   for (const row of rows) {
     const entryId = crypto.randomUUID();
+    const amount = Math.round(Number(row.reward_amount));
+    // 承認時の版があればそれへ紐付け、無い(旧データ)ときだけ全体締めで作る。
+    // reward_entryへreward_calculation_idを必ず紐付ける。
+    const calculationId = row.calculation_id ?? `calc:${settlementId}:${row.conversion_event_id}`;
+    if (!row.calculation_id) {
+      const rate = row.commission_rate === null ? 0 : Number(row.commission_rate);
+      const formula = rate > 0 ? 'rate' : 'fixed';
+      statements.push(db.prepare(
+        `INSERT INTO affiliate_reward_calculations
+           (id, organization_id, line_account_id, affiliate_id, conversion_event_id,
+            offer_id, formula, commission_rate_snapshot, base_amount_snapshot,
+            fixed_reward_snapshot, offer_name_snapshot, amount_minor, currency, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'JPY', ?)`,
+      ).bind(
+        calculationId, input.tenantId, input.lineAccountId, row.affiliate_id,
+        row.conversion_event_id, row.offer_id, formula,
+        formula === 'rate' ? rate : null,
+        formula === 'rate' ? Number(row.value_snapshot ?? row.point_value ?? 0) : null,
+        formula === 'fixed' ? Math.round(Number(row.fixed_reward ?? 0)) : null,
+        row.offer_name, amount, now,
+      ));
+    }
     statements.push(
       db.prepare(
         `INSERT INTO affiliate_reward_entries
            (id, organization_id, line_account_id, affiliate_id, conversion_event_id,
-            offer_id, entry_type, amount_minor, currency, status, approved_at,
+            offer_id, reward_calculation_id, entry_type, amount_minor, currency, status, approved_at,
             payable_at, idempotency_key, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'credit', ?, 'JPY', 'settled', ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'credit', ?, 'JPY', 'settled', ?, ?, ?, ?)`,
       ).bind(
         entryId, input.tenantId, input.lineAccountId, row.affiliate_id,
-        row.conversion_event_id, row.offer_id, Math.round(Number(row.reward_amount)),
+        row.conversion_event_id, row.offer_id, calculationId, amount,
         row.approved_at, now, `settlement:${settlementId}:${row.conversion_event_id}`, now,
       ),
       db.prepare(
@@ -324,7 +369,7 @@ export async function closeAffiliateAccountSettlement(
          VALUES (?, ?, ?, ?, ?, 'included', ?)`,
       ).bind(
         crypto.randomUUID(), settlementId, row.affiliate_id, entryId,
-        Math.round(Number(row.reward_amount)), now,
+        amount, now,
       ),
     );
   }

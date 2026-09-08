@@ -61,6 +61,138 @@ interface SettlementEntry {
   commissionRate: number | null;
   baseAmount: number | null;
   fixedReward: number | null;
+  /** 承認時に作られた版があるときだけ入る。ある場合は金額・条件・対象をここから読む。 */
+  calculationId: string | null;
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * 承認された成果の報酬計算根拠を版として固定する共通関数。
+ *
+ * 承認フロー(affiliate-offers の setConversionApproval)と締めフロー(個別・全体)
+ * が同じ式・同じ入力で金額を読むための正本。承認時に作られた版があれば
+ * 締め・表示はそれを優先し、承認後・締め前の設定編集で金額/条件/対象が
+ * 変わらないようにする。
+ *
+ * 版を作れない曖昧な状態(所属の不整合・組織の未解決・既に確定済み)は
+ * null を返し、偽の版を作らない。締め側はその場合に現在値で計算する。
+ */
+export async function ensureConversionRewardSnapshot(
+  db: D1Database,
+  eventId: string,
+  now = new Date().toISOString(),
+): Promise<AffiliateRewardCalculation | null> {
+  const row = await db.prepare(
+    `SELECT ce.id AS conversion_event_id,
+            ce.value_snapshot AS value_snapshot,
+            a.id AS affiliate_id,
+            a.name AS affiliate_name,
+            a.code AS affiliate_code,
+            a.commission_rate AS commission_rate,
+            a.tenant_id AS tenant_id,
+            a.line_account_id AS affiliate_account_id,
+            f.line_account_id AS friend_account_id,
+            cp.value AS point_value,
+            off.id AS offer_id,
+            COALESCE(off.name, ce.point_name_snapshot, cp.name, '') AS offer_name,
+            off.reward_amount AS fixed_reward
+       FROM conversion_events ce
+       JOIN affiliates a ON a.id = ce.affiliate_id
+       JOIN friends f ON f.id = ce.friend_id
+       LEFT JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+       LEFT JOIN affiliate_links al
+         ON al.ref_code = ce.attributed_ref_code
+        AND al.affiliate_id = a.id
+       LEFT JOIN affiliate_offers off ON off.id = al.offer_id
+      WHERE ce.id = ?
+        AND ce.affiliate_id IS NOT NULL
+        AND COALESCE(ce.approval_status, 'pending') = 'approved'`,
+  ).bind(eventId).first<{
+    conversion_event_id: string;
+    value_snapshot: number | null;
+    affiliate_id: string;
+    affiliate_name: string;
+    affiliate_code: string;
+    commission_rate: number | null;
+    tenant_id: string | null;
+    affiliate_account_id: string | null;
+    friend_account_id: string | null;
+    point_value: number | null;
+    offer_id: string | null;
+    offer_name: string;
+    fixed_reward: number | null;
+  }>();
+  if (!row || !row.affiliate_account_id) return null;
+  // 友だちと紹介者の所属が食い違う行に版を作らない(締め側も対象外にする)。
+  if (row.friend_account_id !== row.affiliate_account_id) return null;
+  const organizationId = row.tenant_id
+    ?? await db.prepare(`SELECT tenant_id FROM line_accounts WHERE id = ?`)
+      .bind(row.affiliate_account_id).first<{ tenant_id: string | null }>()
+      .then((account) => account?.tenant_id ?? null);
+  if (!organizationId) return null;
+
+  const existing = await db.prepare(
+    `SELECT id, organization_id, line_account_id, affiliate_id, conversion_event_id,
+            offer_id, formula, commission_rate_snapshot, base_amount_snapshot,
+            fixed_reward_snapshot, offer_name_snapshot, amount_minor, currency, created_at
+       FROM affiliate_reward_calculations
+      WHERE conversion_event_id = ?`,
+  ).bind(eventId).first<{
+    id: string; organization_id: string; line_account_id: string; affiliate_id: string;
+    conversion_event_id: string; offer_id: string | null; formula: AffiliateRewardFormula | 'legacy';
+    commission_rate_snapshot: number | null; base_amount_snapshot: number | null;
+    fixed_reward_snapshot: number | null; offer_name_snapshot: string;
+    amount_minor: number; currency: 'JPY'; created_at: string;
+  }>();
+  if (existing) {
+    return {
+      id: existing.id, organizationId: existing.organization_id, lineAccountId: existing.line_account_id,
+      affiliateId: existing.affiliate_id, conversionEventId: existing.conversion_event_id,
+      offerId: existing.offer_id, formula: existing.formula,
+      commissionRateSnapshot: existing.commission_rate_snapshot,
+      baseAmountSnapshot: existing.base_amount_snapshot,
+      fixedRewardSnapshot: existing.fixed_reward_snapshot,
+      offerNameSnapshot: existing.offer_name_snapshot, amountMinor: Number(existing.amount_minor),
+      currency: existing.currency, createdAt: existing.created_at,
+    };
+  }
+  // 既に確定済みの成果は作り直さない(確定時の版が正本)。
+  const settled = await db.prepare(
+    `SELECT 1 FROM affiliate_reward_entries WHERE conversion_event_id = ? AND entry_type = 'credit'`,
+  ).bind(eventId).first<{ 1: number }>();
+  if (settled) return null;
+
+  const rate = row.commission_rate === null ? 0 : Number(row.commission_rate);
+  const formula: AffiliateRewardFormula = rate > 0 ? 'rate' : 'fixed';
+  const baseAmount = formula === 'rate' ? Number(row.value_snapshot ?? row.point_value ?? 0) : null;
+  const fixedReward = formula === 'fixed' ? Math.round(Number(row.fixed_reward ?? 0)) : null;
+  const amount = formula === 'rate'
+    ? Math.round(baseAmount! * rate / 100)
+    : fixedReward!;
+  if (amount <= 0) return null;
+  const id = crypto.randomUUID();
+  await db.prepare(
+    `INSERT INTO affiliate_reward_calculations
+       (id, organization_id, line_account_id, affiliate_id, conversion_event_id,
+        offer_id, formula, commission_rate_snapshot, base_amount_snapshot,
+        fixed_reward_snapshot, offer_name_snapshot, amount_minor, currency, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'JPY', ?)`,
+  ).bind(
+    id, organizationId, row.affiliate_account_id, row.affiliate_id, eventId,
+    row.offer_id, formula, formula === 'rate' ? rate : null, baseAmount, fixedReward,
+    row.offer_name, amount, now,
+  ).run();
+  return {
+    id, organizationId, lineAccountId: row.affiliate_account_id, affiliateId: row.affiliate_id,
+    conversionEventId: eventId, offerId: row.offer_id, formula,
+    commissionRateSnapshot: formula === 'rate' ? rate : null, baseAmountSnapshot: baseAmount,
+    fixedRewardSnapshot: fixedReward, offerNameSnapshot: row.offer_name, amountMinor: amount,
+    currency: 'JPY', createdAt: now,
+  };
 }
 
 interface SettlementPreviewInternal extends AffiliateSettlementPreview {
@@ -77,27 +209,39 @@ async function settlementEntries(
   db: D1Database,
   affiliateId: string,
   lineAccountId: string,
+  tenantId: string,
   now: string,
 ): Promise<{ affiliateName: string; code: string; entries: SettlementEntry[] } | null> {
+  // 呼出側の tenant を盲信せず、紹介者行の所属で検証する。
+  // tenant_id NULL は移行前の行として許す(後方互換)が、値がある不一致は遮断する。
   const affiliate = await db.prepare(
     `SELECT id, name, code
        FROM affiliates
-      WHERE id = ? AND line_account_id = ?`,
-  ).bind(affiliateId, lineAccountId).first<{ id: string; name: string; code: string }>();
+      WHERE id = ? AND line_account_id = ?
+        AND (tenant_id = ? OR tenant_id IS NULL)`,
+  ).bind(affiliateId, lineAccountId, tenantId).first<{ id: string; name: string; code: string }>();
   if (!affiliate) return null;
 
   const result = await db.prepare(
     `SELECT ce.id AS conversion_event_id,
-            off.id AS offer_id,
-            COALESCE(off.name, ce.point_name_snapshot, cp.name, '成果地点を取得できませんでした') AS offer_name,
+            COALESCE(calc.offer_id, off.id) AS offer_id,
+            COALESCE(calc.offer_name_snapshot, off.name, ce.point_name_snapshot, cp.name,
+                     '成果地点を取得できませんでした') AS offer_name,
             ce.approved_at,
             a.commission_rate AS commission_rate,
             ce.value_snapshot AS value_snapshot,
             cp.value AS point_value,
             off.reward_amount AS fixed_reward,
-            ${REWARD_SQL} AS reward_amount
+            ${REWARD_SQL} AS reward_amount,
+            calc.id AS calculation_id,
+            calc.formula AS calc_formula,
+            calc.commission_rate_snapshot AS calc_rate,
+            calc.base_amount_snapshot AS calc_base,
+            calc.fixed_reward_snapshot AS calc_fixed,
+            calc.amount_minor AS calc_amount
        FROM conversion_events ce
        JOIN affiliates a ON a.id = ? AND a.line_account_id = ?
+        AND (a.tenant_id = ? OR a.tenant_id IS NULL)
        JOIN friends f ON f.id = ce.friend_id AND f.line_account_id = ?
        LEFT JOIN conversion_points cp ON cp.id = ce.conversion_point_id AND cp.line_account_id = ?
        LEFT JOIN affiliate_links al
@@ -105,6 +249,9 @@ async function settlementEntries(
         AND al.affiliate_id = a.id
         AND al.line_account_id = ?
        LEFT JOIN affiliate_offers off ON off.id = al.offer_id AND off.line_account_id = ?
+       LEFT JOIN affiliate_reward_calculations calc
+         ON calc.conversion_event_id = ce.id
+        AND calc.formula IN ('rate', 'fixed')
       WHERE (ce.affiliate_id = a.id OR (ce.affiliate_id IS NULL AND ce.affiliate_code = a.code))
         AND COALESCE(ce.approval_status, 'pending') = 'approved'
         AND ce.approved_at IS NOT NULL
@@ -121,6 +268,7 @@ async function settlementEntries(
   ).bind(
     affiliateId,
     lineAccountId,
+    tenantId,
     lineAccountId,
     lineAccountId,
     lineAccountId,
@@ -136,6 +284,12 @@ async function settlementEntries(
     point_value: number | null;
     fixed_reward: number | null;
     reward_amount: number;
+    calculation_id: string | null;
+    calc_formula: AffiliateRewardFormula | null;
+    calc_rate: number | null;
+    calc_base: number | null;
+    calc_fixed: number | null;
+    calc_amount: number | null;
   }>();
 
   return {
@@ -143,6 +297,21 @@ async function settlementEntries(
     code: affiliate.code,
     entries: result.results
       .map((row) => {
+        // 承認時の版があれば金額・条件・対象をそこから読む(承認後・締め前の編集に不変)。
+        if (row.calculation_id && row.calc_formula) {
+          return {
+            conversionEventId: row.conversion_event_id,
+            offerId: row.offer_id,
+            offerName: row.offer_name,
+            approvedAt: row.approved_at,
+            amount: Math.round(Number(row.calc_amount)),
+            formula: row.calc_formula,
+            commissionRate: row.calc_rate === null ? null : Number(row.calc_rate),
+            baseAmount: row.calc_base === null ? null : Number(row.calc_base),
+            fixedReward: row.calc_fixed === null ? null : Math.round(Number(row.calc_fixed)),
+            calculationId: row.calculation_id,
+          };
+        }
         const rate = row.commission_rate === null ? 0 : Number(row.commission_rate);
         const formula: AffiliateRewardFormula = rate > 0 ? 'rate' : 'fixed';
         return {
@@ -159,6 +328,7 @@ async function settlementEntries(
           fixedReward: formula === 'fixed'
             ? Math.round(Number(row.fixed_reward ?? 0))
             : null,
+          calculationId: null,
         };
       })
       .filter((entry) => entry.amount > 0),
@@ -191,7 +361,7 @@ export async function getAffiliateArchiveImpact(
   }>();
   if (!row) return null;
 
-  const payment = await settlementEntries(db, input.affiliateId, input.lineAccountId, now);
+  const payment = await settlementEntries(db, input.affiliateId, input.lineAccountId, input.tenantId, now);
   const entries = payment?.entries ?? [];
   return {
     affiliateId: row.id,
@@ -234,10 +404,10 @@ export async function updateAffiliateLifecycle(
 
 export async function previewAffiliateSettlement(
   db: D1Database,
-  input: { affiliateId: string; lineAccountId: string; now?: string },
+  input: { tenantId: string; affiliateId: string; lineAccountId: string; now?: string },
 ): Promise<SettlementPreviewInternal | null> {
   const now = input.now ?? new Date().toISOString();
-  const result = await settlementEntries(db, input.affiliateId, input.lineAccountId, now);
+  const result = await settlementEntries(db, input.affiliateId, input.lineAccountId, input.tenantId, now);
   if (!result) return null;
 
   const byOffer = new Map<string, { conversions: number; subtotal: number; amounts: Set<number> }>();
@@ -272,7 +442,7 @@ export async function previewAffiliateSettlement(
 
 export type ConfirmAffiliateSettlementResult =
   | { kind: 'created' | 'duplicate'; settlementId: string; amount: number; conversionCount: number; closedAt: string }
-  | { kind: 'not_found' | 'empty' | 'changed' };
+  | { kind: 'not_found' | 'empty' | 'changed' | 'idempotency_conflict' };
 
 export async function confirmAffiliateSettlement(
   db: D1Database,
@@ -286,18 +456,45 @@ export async function confirmAffiliateSettlement(
     now?: string;
   },
 ): Promise<ConfirmAffiliateSettlementResult> {
+  const now = input.now ?? new Date().toISOString();
+  const preview = await previewAffiliateSettlement(db, {
+    tenantId: input.tenantId,
+    affiliateId: input.affiliateId,
+    lineAccountId: input.lineAccountId,
+    now,
+  });
+  // 対象・金額の指紋。同じ再実行キーで別紹介者・別対象・別金額が来たら
+  // duplicate成功にせず409相当で返す。previewが無い(境界外)ときは空指紋にする。
+  const fingerprint = preview
+    ? await sha256Hex([
+      input.affiliateId,
+      ...preview.entries.map((entry) => `${entry.conversionEventId}:${entry.amount}`).sort(),
+    ].join('|'))
+    : '';
+
   const existing = await db.prepare(
-    `SELECT id, total_amount_minor, closed_at,
+    `SELECT id, affiliate_id, total_amount_minor, closed_at, request_fingerprint,
             (SELECT COUNT(*) FROM affiliate_settlement_lines WHERE settlement_id = affiliate_settlements.id) AS line_count
        FROM affiliate_settlements
       WHERE organization_id = ? AND line_account_id = ? AND idempotency_key = ?`,
   ).bind(input.tenantId, input.lineAccountId, input.idempotencyKey).first<{
     id: string;
+    affiliate_id: string | null;
     total_amount_minor: number;
     closed_at: string;
+    request_fingerprint: string;
     line_count: number;
   }>();
   if (existing) {
+    // 同じキーで別紹介者の確定をduplicate成功にしない。
+    if (existing.affiliate_id !== input.affiliateId) return { kind: 'idempotency_conflict' };
+    if (preview && preview.entries.length > 0) {
+      // 未確定が残る再試行は対象・金額の指紋で同一入力か確かめる。
+      if (existing.request_fingerprint !== fingerprint) return { kind: 'idempotency_conflict' };
+    } else if (Number(existing.total_amount_minor) !== input.expectedAmount) {
+      // 全部確定済みで対象が空の再試行は、金額の一致で同一確定とみなす。
+      return { kind: 'idempotency_conflict' };
+    }
     return {
       kind: 'duplicate',
       settlementId: existing.id,
@@ -307,12 +504,6 @@ export async function confirmAffiliateSettlement(
     };
   }
 
-  const now = input.now ?? new Date().toISOString();
-  const preview = await previewAffiliateSettlement(db, {
-    affiliateId: input.affiliateId,
-    lineAccountId: input.lineAccountId,
-    now,
-  });
   if (!preview) return { kind: 'not_found' };
   if (preview.entries.length === 0) return { kind: 'empty' };
   if (preview.amount !== input.expectedAmount) return { kind: 'changed' };
@@ -323,8 +514,8 @@ export async function confirmAffiliateSettlement(
       `INSERT INTO affiliate_settlements
          (id, organization_id, line_account_id, affiliate_id, period_from, period_to,
           timezone, currency, total_amount_minor, state, closed_by, version,
-          idempotency_key, closed_at, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'Asia/Tokyo', 'JPY', ?, 'partial', ?, 1, ?, ?, ?)`,
+          idempotency_key, closed_at, created_at, request_fingerprint)
+       VALUES (?, ?, ?, ?, ?, ?, 'Asia/Tokyo', 'JPY', ?, 'partial', ?, 1, ?, ?, ?, ?)`,
     ).bind(
       settlementId,
       input.tenantId,
@@ -337,14 +528,16 @@ export async function confirmAffiliateSettlement(
       input.idempotencyKey,
       now,
       now,
+      fingerprint,
     ),
   ];
 
   for (const entry of preview.entries) {
     const entryId = crypto.randomUUID();
-    const calculationId = `calc:${settlementId}:${entry.conversionEventId}`;
-    statements.push(
-      db.prepare(
+    // 承認時の版があればそれへ紐付け、無い(旧データ)ときだけ確定時に作る。
+    const calculationId = entry.calculationId ?? `calc:${settlementId}:${entry.conversionEventId}`;
+    if (!entry.calculationId) {
+      statements.push(db.prepare(
         `INSERT INTO affiliate_reward_calculations
            (id, organization_id, line_account_id, affiliate_id, conversion_event_id,
             offer_id, formula, commission_rate_snapshot, base_amount_snapshot,
@@ -364,7 +557,9 @@ export async function confirmAffiliateSettlement(
         entry.offerName,
         entry.amount,
         now,
-      ),
+      ));
+    }
+    statements.push(
       db.prepare(
         `INSERT INTO affiliate_reward_entries
            (id, organization_id, line_account_id, affiliate_id, conversion_event_id,
