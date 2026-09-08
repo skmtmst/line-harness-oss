@@ -8,14 +8,18 @@ describe('クロス分析の待ち順と処理目安 (Issue #633)', () => {
   it('待ち順・目安・現在状態を日本語で出し、再実行を誘発しない', () => {
     for (const text of [
       '現在の状態:',
-      '待ち順は',
+      'このLINEアカウント内の順番は',
       '番目です',
-      '目安は約',
+      '最短で約',
+      '他の処理状況により延びることがあります',
       '次回処理は',
       '同じ分析をもう一度押す必要はありません',
     ]) expect(PAGE).toContain(text)
     expect(PAGE).toContain('処理中です')
-    expect(PAGE).toContain('待ち順に並んでいます')
+    expect(PAGE).toContain('このLINEアカウント内で待ち順に並んでいます')
+    // 絶対順位と誤認させる古い文言が残っていないこと
+    expect(PAGE).not.toContain('待ち順は')
+    expect(PAGE).not.toContain('目安は約')
   })
 
   it('完了・失敗・時間切れ後も結果確認と集計し直しの導線を残す', () => {

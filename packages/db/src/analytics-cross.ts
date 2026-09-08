@@ -6,12 +6,18 @@ const MAX_MEMBER_ROWS = 200_000;
 const MAX_ACCOUNT_FRIENDS = 50_000;
 
 // クロス分析の実行間隔(表示用の目安だけ)。処理頻度そのものは変えない。
-// frequentHeavy Cron '1-56/5 * * * *'(5分ごと)が1件ずつ処理する前提の概算。
+// 実行器は全テナントFIFOで5分ごと(frequentHeavy Cron '1-56/5 * * * *')に進むが、
+// 他アカウントの件数・存在は漏らせないため、待ち順・目安は同一アカウント内だけで数える。
+// queuePosition/pendingAheadは「このLINEアカウント内の順番」であり、全体の絶対順位ではない。
+// estimatedWaitMsは正確な全体値ではなく最短目安(次回cronまでの残り + 同一アカウント内先行件数×5分)。
 export const ANALYTICS_CROSS_QUEUE_INTERVAL_MS = 5 * 60_000;
 
 export interface AnalyticsCrossQueueStatus {
+  /** このLINEアカウント内の順番(1始まり)。全体の絶対順位ではない。 */
   queuePosition: number | null;
+  /** 同一アカウント内で自分の前にいる件数。他アカウントは含めない。 */
   pendingAhead: number;
+  /** 最短目安の待ち時間ms。他の処理状況で延びる。 */
   estimatedWaitMs: number | null;
   nextTickAt: string | null;
 }
@@ -1008,11 +1014,15 @@ export async function getAnalyticsCrossQueueStatus(
     ).bind(lineAccountId, row.created_at, row.created_at, row.id).first<{ count: number }>();
     const pendingAhead = Number(running?.count ?? 0) + Number(earlier?.count ?? 0);
     const queuePosition = pendingAhead + 1;
+    // 最短目安 = 次回cronまでの残り + 同一アカウント内先行件数×5分。
+    // 全体の混雑(他アカウント)は含めないため、延びることがある。
+    const nextTickAt = nextAnalyticsCrossTick(now);
+    const remainMs = Math.max(0, new Date(nextTickAt).getTime() - now.getTime());
     return {
       queuePosition,
       pendingAhead,
-      estimatedWaitMs: queuePosition * ANALYTICS_CROSS_QUEUE_INTERVAL_MS,
-      nextTickAt: nextAnalyticsCrossTick(now),
+      estimatedWaitMs: remainMs + pendingAhead * ANALYTICS_CROSS_QUEUE_INTERVAL_MS,
+      nextTickAt,
     };
   }
   return { queuePosition: null, pendingAhead: 0, estimatedWaitMs: null, nextTickAt: null };

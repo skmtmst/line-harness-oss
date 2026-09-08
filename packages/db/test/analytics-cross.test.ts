@@ -343,7 +343,7 @@ describe('V6クロス分析', () => {
       .get(queued.id)).toEqual({ state: 'pending' });
   });
 
-  it('待ち順は同一アカウントのFIFOだけで数え、他アカウントを漏らさない', async () => {
+  it('このLINEアカウント内の順番だけで数え、他アカウントを漏らさない', async () => {
     const first = await createAnalyticsCrossRun(db, {
       lineAccountId: 'account-a', query: BASE_QUERY, timeZone: 'Asia/Tokyo',
       dataCutoffAt: '2026-08-08T00:00:00.000Z',
@@ -363,15 +363,84 @@ describe('V6クロス分析', () => {
     sqlite.prepare(`UPDATE analytics_cross_runs SET created_at = ? WHERE id = ?`)
       .run('2026-08-08T00:00:30.000Z', other.id);
     const now = new Date('2026-08-08T00:02:00.000Z');
+    // 次回cron 00:06:00まで残り4分。最短目安 = 残り + 先行件数×5分。
     const head = await getAnalyticsCrossQueueStatus(db, 'account-a', first.id, now);
-    expect(head).toMatchObject({ queuePosition: 1, pendingAhead: 0 });
-    expect(head.estimatedWaitMs).toBe(ANALYTICS_CROSS_QUEUE_INTERVAL_MS);
+    expect(head).toMatchObject({
+      queuePosition: 1, pendingAhead: 0,
+      nextTickAt: '2026-08-08T00:06:00.000Z',
+    });
+    expect(head.estimatedWaitMs).toBe(4 * 60_000);
     const tail = await getAnalyticsCrossQueueStatus(db, 'account-a', second.id, now);
     expect(tail).toMatchObject({ queuePosition: 2, pendingAhead: 1 });
-    expect(tail.estimatedWaitMs).toBe(2 * ANALYTICS_CROSS_QUEUE_INTERVAL_MS);
+    expect(tail.estimatedWaitMs).toBe(4 * 60_000 + ANALYTICS_CROSS_QUEUE_INTERVAL_MS);
     // 別アカウントの存在・件数を数に入れない。
     expect(tail.pendingAhead).toBe(1);
     expect(await getAnalyticsCrossRun(db, 'account-b', first.id, now)).toBeNull();
+  });
+
+  it('別アカウントが全体で前にいても同一アカウント内は1番目で最短目安だけ返す', async () => {
+    // 実行器は全テナントFIFOだが、表示は同一アカウント内の順番だけ。
+    const other = await createAnalyticsCrossRun(db, {
+      lineAccountId: 'account-b', query: BASE_QUERY, timeZone: 'Asia/Tokyo',
+      dataCutoffAt: '2026-08-08T00:00:00.000Z',
+    });
+    const mine = await createAnalyticsCrossRun(db, {
+      lineAccountId: 'account-a', query: BASE_QUERY, timeZone: 'Asia/Tokyo',
+      dataCutoffAt: '2026-08-08T00:00:00.000Z',
+    });
+    sqlite.prepare(`UPDATE analytics_cross_runs SET created_at = ? WHERE id = ?`)
+      .run('2026-08-08T00:00:00.000Z', other.id);
+    sqlite.prepare(`UPDATE analytics_cross_runs SET created_at = ? WHERE id = ?`)
+      .run('2026-08-08T00:01:00.000Z', mine.id);
+    // 全体ではotherが前だが、account-aから見れば先行0件・1番目。
+    const now = new Date('2026-08-08T00:02:00.000Z');
+    const status = await getAnalyticsCrossQueueStatus(db, 'account-a', mine.id, now);
+    expect(status).toMatchObject({ queuePosition: 1, pendingAhead: 0 });
+    // 最短目安は次回cronまでの残り4分だけ。他アカウント分は足さない。
+    expect(status.estimatedWaitMs).toBe(4 * 60_000);
+    expect(status.nextTickAt).toBe('2026-08-08T00:06:00.000Z');
+  });
+
+  it('cron直前は残りが短く、直後はほぼ5分になる', async () => {
+    const queued = await createAnalyticsCrossRun(db, {
+      lineAccountId: 'account-a', query: BASE_QUERY, timeZone: 'Asia/Tokyo',
+      dataCutoffAt: '2026-08-08T00:00:00.000Z',
+    });
+    // cron直前(00:00:50→次回00:01:00):残り10秒が最短目安。
+    const justBefore = await getAnalyticsCrossQueueStatus(
+      db, 'account-a', queued.id, new Date('2026-08-08T00:00:50.000Z'),
+    );
+    expect(justBefore.nextTickAt).toBe('2026-08-08T00:01:00.000Z');
+    expect(justBefore.estimatedWaitMs).toBe(10_000);
+    // cron直後(00:01:10→次回00:06:00):残り4分50秒が最短目安。
+    const justAfter = await getAnalyticsCrossQueueStatus(
+      db, 'account-a', queued.id, new Date('2026-08-08T00:01:10.000Z'),
+    );
+    expect(justAfter.nextTickAt).toBe('2026-08-08T00:06:00.000Z');
+    expect(justAfter.estimatedWaitMs).toBe(290_000);
+  });
+
+  it('同時刻はID順でFIFOになる', async () => {
+    const one = await createAnalyticsCrossRun(db, {
+      lineAccountId: 'account-a', query: BASE_QUERY, timeZone: 'Asia/Tokyo',
+      dataCutoffAt: '2026-08-08T00:00:00.000Z',
+    });
+    const two = await createAnalyticsCrossRun(db, {
+      lineAccountId: 'account-a', query: BASE_QUERY, timeZone: 'Asia/Tokyo',
+      dataCutoffAt: '2026-08-08T00:00:00.000Z',
+    });
+    const sameAt = '2026-08-08T00:00:00.000Z';
+    sqlite.prepare(`UPDATE analytics_cross_runs SET created_at = ? WHERE id = ?`).run(sameAt, one.id);
+    sqlite.prepare(`UPDATE analytics_cross_runs SET created_at = ? WHERE id = ?`).run(sameAt, two.id);
+    const [headId, tailId] = [one.id, two.id].sort();
+    const now = new Date('2026-08-08T00:02:00.000Z');
+    const head = await getAnalyticsCrossQueueStatus(db, 'account-a', headId, now);
+    const tail = await getAnalyticsCrossQueueStatus(db, 'account-a', tailId, now);
+    expect(head).toMatchObject({ queuePosition: 1, pendingAhead: 0 });
+    expect(tail).toMatchObject({ queuePosition: 2, pendingAhead: 1 });
+    // 最短目安も先行件数分だけ増える(残り4分 + 0 / +5分)。
+    expect(head.estimatedWaitMs).toBe(4 * 60_000);
+    expect(tail.estimatedWaitMs).toBe(4 * 60_000 + ANALYTICS_CROSS_QUEUE_INTERVAL_MS);
   });
 
   it('処理中は待ちなし、完了後は待ち情報を返さない', async () => {

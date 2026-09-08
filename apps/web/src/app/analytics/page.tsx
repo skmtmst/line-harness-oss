@@ -564,17 +564,17 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
         <div className="bg-canvas rounded-card border-hairline border p-8 text-center text-sm" role="status">
           <p className="text-ink font-medium">集計を受け付けました。終わるまでこの画面で確認しています。</p>
           <p className="text-ink-secondary mt-2">
-            現在の状態: {crossQueue?.state === 'running' ? '処理中です' : '待ち順に並んでいます'}
+            現在の状態: {crossQueue?.state === 'running' ? '処理中です' : 'このLINEアカウント内で待ち順に並んでいます'}
           </p>
           {crossQueue?.queuePosition != null && (
             <p className="text-ink-secondary mt-1">
-              待ち順は{crossQueue.queuePosition}番目です
-              {crossQueue.pendingAhead === 0 ? '（あなたの前にはありません）' : `（あなたの前に${crossQueue.pendingAhead}件あります）`}
+              このLINEアカウント内の順番は{crossQueue.queuePosition}番目です
+              {crossQueue.pendingAhead === 0 ? '（このアカウントであなたの前にはありません）' : `（このアカウントであなたの前に${crossQueue.pendingAhead}件あります）`}
             </p>
           )}
           {crossQueue?.estimatedWaitMs != null && crossQueue.estimatedWaitMs > 0 && (
             <p className="text-ink-secondary mt-1">
-              目安は約{formatCrossWaitMinutes(crossQueue.estimatedWaitMs)}分です
+              最短で約{formatCrossWaitMinutes(crossQueue.estimatedWaitMs)}分です。他の処理状況により延びることがあります
               {crossQueue.nextTickAt && formatCrossNextTick(crossQueue.nextTickAt)
                 ? `（次回処理は${formatCrossNextTick(crossQueue.nextTickAt)}ごろ）`
                 : ''}
