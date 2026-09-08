@@ -9110,6 +9110,39 @@ export interface BookingAvailabilityRule {
   is_active: number;
 }
 
+export interface BookingBreak {
+  id: string;
+  weekday: number;
+  start_time: string;
+  end_time: string;
+  time_zone: string;
+}
+
+export interface BookingDateBreak {
+  id: string;
+  work_date: string;
+  start_time: string;
+  end_time: string;
+  time_zone: string;
+  start_utc_offset: string;
+  end_utc_offset: string;
+}
+
+export interface BookingBreaksResponse {
+  breaks: BookingBreak[];
+  version: string;
+}
+
+export interface BookingDateBreaksResponse {
+  breaks: BookingDateBreak[];
+  version: string;
+}
+
+export interface BookingBreakConflict {
+  version: string;
+  breaks: Array<{ id: string; weekday?: number; work_date?: string; start_time: string; end_time: string }>;
+}
+
 export interface BookingGoogleCalendarConnection {
   id: string;
   calendar_id: string;
@@ -9471,6 +9504,34 @@ export const bookingApi = {
     fetchApi<{ ok: true; count: number }>(
       withAccount(`/api/booking/admin/staff/${staffId}/availability-rules`, accountId),
       { method: 'PUT', body: JSON.stringify({ rules }) },
+    ),
+  getBreaks: (accountId: string, staffId: string) =>
+    fetchApi<BookingBreaksResponse>(
+      withAccount(`/api/booking/admin/staff/${staffId}/breaks`, accountId),
+    ),
+  putBreaks: (
+    accountId: string,
+    staffId: string,
+    expectedVersion: string,
+    breaks: Array<{ id?: string; weekday: number; start_time: string; end_time: string }>,
+  ) =>
+    fetchApi<{ ok: true; count: number; version: string; breaks: BookingBreak[] }>(
+      withAccount(`/api/booking/admin/staff/${staffId}/breaks`, accountId),
+      { method: 'PUT', body: JSON.stringify({ expectedVersion, breaks }) },
+    ),
+  getBreakDates: (accountId: string, staffId: string) =>
+    fetchApi<BookingDateBreaksResponse>(
+      withAccount(`/api/booking/admin/staff/${staffId}/break-dates`, accountId),
+    ),
+  putBreakDates: (
+    accountId: string,
+    staffId: string,
+    expectedVersion: string,
+    breaks: Array<{ id?: string; work_date: string; start_time: string; end_time: string }>,
+  ) =>
+    fetchApi<{ ok: true; count: number; version: string; breaks: BookingDateBreak[] }>(
+      withAccount(`/api/booking/admin/staff/${staffId}/break-dates`, accountId),
+      { method: 'PUT', body: JSON.stringify({ expectedVersion, breaks }) },
     ),
   getGoogleCalendar: (accountId: string, staffId: string) =>
     fetchApi<{
