@@ -1,10 +1,11 @@
-import { mkdtempSync } from 'node:fs';
-import { readFileSync, readdirSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
+import { applyConversionTestSchema } from './conversion-test-schema.js';
 import {
   canRecordConversion,
   createConversionPoint,
@@ -60,20 +61,10 @@ function setupMinimal(): Database.Database {
   return db;
 }
 
-function applyAllMigrations(db: Database.Database): void {
-  execSafe(db, readFileSync(join(PKG_ROOT, 'schema.sql'), 'utf8'));
-  const files = readdirSync(MIGRATIONS_DIR)
-    .filter((f) => f.endsWith('.sql'))
-    .sort();
-  for (const file of files) {
-    execSafe(db, readFileSync(join(MIGRATIONS_DIR, file), 'utf8'));
-  }
-}
-
-/** 新規構築と同じ形(schema + 全migration)で用意する。 */
+/** 挙動試験用の軽量構成。全migration適用の代わりに必要最小の表だけ用意する。 */
 function setupFull(): Database.Database {
   const db = new Database(':memory:');
-  applyAllMigrations(db);
+  applyConversionTestSchema(db);
   return db;
 }
 
@@ -262,11 +253,12 @@ describe('N-255 同時重複計上と冪等キー', () => {
     const path = join(dir, 'shared.db');
     const setup = new Database(path);
     setup.pragma('journal_mode = WAL');
-    applyAllMigrations(setup);
+    applyConversionTestSchema(setup);
     setup.close();
     // D1 は書込みを直列化するため、WAL + 待機で同じ条件にする。
-    const connA = new Database(path, { timeout: 10000 });
-    const connB = new Database(path, { timeout: 10000 });
+    // 待機は異常時の保険で、通常は競合せず即終わる。
+    const connA = new Database(path, { timeout: 3000 });
+    const connB = new Database(path, { timeout: 3000 });
     try {
       const d1a = asD1(connA);
       const point = await createConversionPoint(d1a, {
@@ -283,6 +275,7 @@ describe('N-255 同時重複計上と冪等キー', () => {
     } finally {
       connA.close();
       connB.close();
+      rmSync(dir, { recursive: true, force: true });
     }
   }, 30000);
 });
@@ -343,10 +336,10 @@ describe('数え方の区別(lifetime/window/every)', () => {
     const path = join(dir, 'shared.db');
     const setup = new Database(path);
     setup.pragma('journal_mode = WAL');
-    applyAllMigrations(setup);
+    applyConversionTestSchema(setup);
     setup.close();
-    const connA = new Database(path, { timeout: 10000 });
-    const connB = new Database(path, { timeout: 10000 });
+    const connA = new Database(path, { timeout: 3000 });
+    const connB = new Database(path, { timeout: 3000 });
     try {
       insertFriend(connA, 'friend-a');
       const d1a = asD1(connA);
@@ -363,6 +356,7 @@ describe('数え方の区別(lifetime/window/every)', () => {
     } finally {
       connA.close();
       connB.close();
+      rmSync(dir, { recursive: true, force: true });
     }
   }, 30000);
 });
@@ -421,10 +415,10 @@ describe('N-254 版ガードと利用先確認(DB層)', () => {
     const path = join(dir, 'shared.db');
     const setup = new Database(path);
     setup.pragma('journal_mode = WAL');
-    applyAllMigrations(setup);
+    applyConversionTestSchema(setup);
     setup.close();
-    const connA = new Database(path, { timeout: 10000 });
-    const connB = new Database(path, { timeout: 10000 });
+    const connA = new Database(path, { timeout: 3000 });
+    const connB = new Database(path, { timeout: 3000 });
     try {
       const d1a = asD1(connA);
       const point = await createConversionPoint(d1a, { name: '購入完了', eventType: 'purchase' });
@@ -444,6 +438,7 @@ describe('N-254 版ガードと利用先確認(DB層)', () => {
     } finally {
       connA.close();
       connB.close();
+      rmSync(dir, { recursive: true, force: true });
     }
   }, 30000);
 

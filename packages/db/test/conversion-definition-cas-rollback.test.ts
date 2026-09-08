@@ -1,9 +1,7 @@
-import { readFileSync, readdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
 import Database from 'better-sqlite3';
 import type DatabaseType from 'better-sqlite3';
-import { describe, expect, it } from 'vitest';
+import { applyConversionTestSchema } from './conversion-test-schema.js';
 import {
   createConversionDefinition,
   deleteUnusedConversionDefinition,
@@ -30,32 +28,9 @@ function asNonAtomicD1(sqlite: DatabaseType.Database): D1Database {
   } as unknown as D1Database;
 }
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const PKG_ROOT = join(__dirname, '..');
-const BENIGN = /duplicate column name|already exists/i;
-
-function execSafe(db: Database.Database, sql: string): void {
-  for (const stmt of sql
-    .split(/;\s*(?:\r?\n|$)/)
-    .map((s) => s.trim())
-    .filter(Boolean)) {
-    try {
-      db.exec(stmt);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (!BENIGN.test(msg)) throw err;
-    }
-  }
-}
-
-function setup(): Database.Database {
+function setup(): DatabaseType.Database {
   const db = new Database(':memory:');
-  execSafe(db, readFileSync(join(PKG_ROOT, 'schema.sql'), 'utf8'));
-  for (const file of readdirSync(join(PKG_ROOT, 'migrations'))
-    .filter((f) => f.endsWith('.sql'))
-    .sort()) {
-    execSafe(db, readFileSync(join(PKG_ROOT, 'migrations', file), 'utf8'));
-  }
+  applyConversionTestSchema(db);
   db.prepare(
     `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
      VALUES ('acc-1', 'channel-acc-1', 'Test Account', 'token', 'secret')`,
