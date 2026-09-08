@@ -2,7 +2,6 @@ import { Hono, type Context } from 'hono';
 import {
   getFriendFields,
   getFriendFieldsForScope,
-  getFriendFieldById,
   getFriendFieldByIdForScope,
   createFriendFieldForScope,
   updateFriendField,
@@ -21,6 +20,7 @@ import {
   markFieldMigrationStale,
   executeFieldMigration,
   getFriendFieldsWithValues,
+  getFriendById,
   setFriendFieldValue,
   validateFieldKey,
   FRIEND_FIELD_TYPES,
@@ -800,7 +800,19 @@ friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin'), requi
 friendFields.post('/api/friend-fields/bulk', requireRole('owner', 'admin'), async (c) => {
   try {
     const staff = c.get('staff');
-    const body = await c.req.json<{ friendIds?: unknown; fieldId?: unknown; value?: unknown }>();
+    const body = await c.req.json<{ friendIds?: unknown; fieldId?: unknown; value?: unknown; lineAccountId?: unknown }>();
+    const lineAccountId = typeof body.lineAccountId === 'string' ? body.lineAccountId.trim() : '';
+    if (!lineAccountId) {
+      return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+    }
+    if (!staff?.tenantId) {
+      return c.json({ success: false, error: '所属を確認できません' }, 403);
+    }
+    const accountScope = await getVisibleLineAccountScope(c.env.DB, staff);
+    if (!accountScope.allowedAccountIds.includes(lineAccountId)) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
+    const scope = { tenantId: staff.tenantId, lineAccountId };
     const friendIds = Array.isArray(body.friendIds) ? body.friendIds.map(String) : [];
     if (friendIds.length === 0) {
       return c.json({ success: false, error: '対象の友だちが選ばれていません' }, 400);
@@ -811,13 +823,23 @@ friendFields.post('/api/friend-fields/bulk', requireRole('owner', 'admin'), asyn
         422,
       );
     }
-    const field = await getFriendFieldById(c.env.DB, String(body.fieldId));
+    const field = await getFriendFieldByIdForScope(c.env.DB, String(body.fieldId), scope);
     if (!field) return c.json({ success: false, error: '項目が見つかりません' }, 404);
     if (field.ec_is_master === 1) {
       return c.json(
         { success: false, error: `「${field.name}」はEC側が正のため変更できません` },
         409,
       );
+    }
+
+    // N-043: 書込み前に全friendIdsの所属が要求lineAccountIdと完全一致するか検査する。
+    // owner/adminが複数アカウントへアクセスできても、指定外の混在は部分更新せず404で拒否する。
+    // 存在の有無・値が分からない汎用404を返す。
+    for (const friendId of friendIds) {
+      const friend = await getFriendById(c.env.DB, friendId);
+      if (!friend || friend.line_account_id !== lineAccountId) {
+        return c.json({ success: false, error: 'Friend not found' }, 404);
+      }
     }
 
     for (const friendId of friendIds) {
