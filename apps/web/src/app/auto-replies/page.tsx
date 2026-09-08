@@ -3,7 +3,7 @@
 import SelectField from '@/components/shared/select-field'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Trash2, TriangleAlert } from 'lucide-react'
-import FolderPanel from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import { toDraft } from '@/components/auto-replies/edit-dialog'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import type { Folder } from '@line-crm/shared'
@@ -533,7 +533,6 @@ export default function AutoRepliesPage() {
       </div>
 
       <div data-design="Actions" className="mb-4 flex flex-wrap items-center gap-2">
-        <Button onClick={() => setFolderDialogOpen(true)}>フォルダを追加</Button>
         <Button
           variant="primary"
           onClick={() => setEditing({
@@ -633,11 +632,12 @@ export default function AutoRepliesPage() {
         />
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+      <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
           total={ready ? `${visualTotal} 件` : '—'}
           activeId={folderFilter}
           onSelect={setFolderFilter}
+          onAddFolder={() => setFolderDialogOpen(true)}
           rows={[
             { id: '', label: 'すべて', count: visualTotal },
             ...folders.map((f) => ({

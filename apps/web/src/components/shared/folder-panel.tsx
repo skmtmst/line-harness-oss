@@ -1,6 +1,13 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useState, type CSSProperties, type ReactNode } from 'react'
+import Button from './button'
+
+/** テンプレート一覧を正とする、全画面共通のフォルダ欄幅。 */
+export const FOLDER_RAIL_WIDTH = '15.75rem'
+export const FOLDER_RAIL_STYLE = {
+  '--folder-rail-width': FOLDER_RAIL_WIDTH,
+} as CSSProperties
 
 /**
  * 一覧の左に置くフォルダの縦パネル。
@@ -56,6 +63,11 @@ export default function FolderPanel({
   activeId,
   onSelect,
   total,
+  onAddFolder,
+  addFolderLabel = 'フォルダを追加',
+  addFolderDisabled = false,
+  addFolderTitle,
+  addFolderNote,
   children,
 }: {
   rows: FolderPanelRow[]
@@ -63,6 +75,13 @@ export default function FolderPanel({
   onSelect: (id: string) => void
   /** 見出しの右に出す総数。単位は画面ごとに違うので文字で受ける。 */
   total: string
+  /** 一覧の下に置く追加操作。道具列へ重複して置かない。 */
+  onAddFolder?: () => void
+  addFolderLabel?: string
+  addFolderDisabled?: boolean
+  addFolderTitle?: string
+  /** テンプレート画面と同じ位置に出す、追加操作の補足。 */
+  addFolderNote?: ReactNode
   /** 下に足すもの（分類の追加など）。 */
   children?: ReactNode
 }) {
@@ -185,7 +204,23 @@ export default function FolderPanel({
           )
         })}
       </nav>
-      {children && <div className="border-hairline space-y-2 border-t p-3">{children}</div>}
+      {(onAddFolder || addFolderDisabled || addFolderNote || children) && (
+        <div className="border-hairline space-y-2 border-t p-3">
+          {(onAddFolder || addFolderDisabled) && (
+            <Button
+              type="button"
+              onClick={onAddFolder}
+              disabled={addFolderDisabled}
+              title={addFolderTitle}
+              className="w-full"
+            >
+              {addFolderLabel}
+            </Button>
+          )}
+          {addFolderNote}
+          {children}
+        </div>
+      )}
     </aside>
   )
 }
