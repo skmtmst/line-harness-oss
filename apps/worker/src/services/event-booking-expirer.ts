@@ -5,12 +5,15 @@
 import { purgeExpiredEventIdempotency } from './event-booking-idempotency.js';
 import { REQUESTED_EXPIRE_HOURS } from './event-booking-types.js';
 import { enqueueEventWaitlistPromotion } from './event-waitlist.js';
+import { cancelByTrigger } from './reminder-trigger.js';
 
 interface StaleRow {
   id: string;
   line_account_id: string;
+  friend_id: string;
   event_id: string;
   slot_id: string;
+  starts_at: string | null;
 }
 
 export interface RunEventBookingExpirerParams {
@@ -26,8 +29,10 @@ export async function runEventBookingExpirer(
   ).toISOString();
   const stale = await db
     .prepare(
-      `SELECT id, line_account_id, event_id, slot_id FROM event_bookings
-        WHERE status = 'requested' AND requested_at < ?
+      `SELECT b.id, b.line_account_id, b.friend_id, b.event_id, b.slot_id, s.starts_at
+         FROM event_bookings b
+         LEFT JOIN event_slots s ON s.id = b.slot_id
+        WHERE b.status = 'requested' AND b.requested_at < ?
         LIMIT 200`,
     )
     .bind(cutoff)
@@ -53,6 +58,21 @@ export async function runEventBookingExpirer(
       )
       .bind(row.id)
       .run();
+    // N-065: 期限切れも取消と同じく V6 の未送信予定だけを止める。送信済み履歴は残す。
+    // 1件の失敗で残りを止めないよう行単位で握る。再実行は active が無いため冪等。
+    try {
+      await cancelByTrigger(db, {
+        triggerType: 'event',
+        sourceId: row.id,
+        sourceEventId: row.id,
+        friendId: row.friend_id,
+        startsAtIso: row.starts_at,
+        lineAccountId: row.line_account_id,
+        cancelReason: `event_expired:${row.id}:by:system`,
+      });
+    } catch (error) {
+      console.error('reminder cancel (event expired) failed:', error);
+    }
     await enqueueEventWaitlistPromotion(db, {
       lineAccountId: row.line_account_id,
       eventId: row.event_id,
