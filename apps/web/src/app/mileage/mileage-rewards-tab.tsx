@@ -7,7 +7,7 @@ import ListState from '@/components/shared/list-state'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
 import { formatMileageDate, formatMileageNumber } from './mileage-display'
-import { createRequestGuard } from './redemption-request-guard'
+import { createAccountTracker, createMileageRewardsFetchGuards } from './redemption-request-guard'
 import {
   api,
   fetchApi,
@@ -102,13 +102,31 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
   /*
    * 店を A→B と切り替えたとき、遅れて届いた A の応答で B を上書きしない。
    * 世代札を取って、入れる直前に今の世代か確かめる。
+   * **2つの取得で1つの札を使い回さない。**開いた瞬間に後が先を古くして
+   * 一覧が loading のまま残るので、取得ごとに札を持つ。
    */
-  const [requestGuard] = useState(createRequestGuard)
+  const [fetchGuards] = useState(createMileageRewardsFetchGuards)
+  const { overview: overviewGuard, redemptions: redemptionsGuard } = fetchGuards
+  /*
+   * やり直しボタン用の店の世代札。A で押した古い閉じ込めが、B へ切り替えた
+   * あとに新しい世代として A を読み直し、B の画面へ混ぜないためのもの。
+   */
+  const [accountTracker] = useState(createAccountTracker)
+
+  /*
+   * 店が替わったら世代を進め、前の店のやり直しの旗を降ろす。
+   * 降ろさないと B のボタンが押せないまま残る。
+   */
+  useEffect(() => {
+    accountTracker.track(accountId)
+    setRetryingId(null)
+    setRetryError('')
+  }, [accountId, accountTracker])
 
   const load = useCallback(async () => {
-    const requestId = requestGuard.issue()
+    const requestId = overviewGuard.issue()
     if (!accountId) {
-      if (!requestGuard.isCurrent(requestId)) return
+      if (!overviewGuard.isCurrent(requestId)) return
       setOverview(null)
       setStatus('ready')
       return
@@ -116,7 +134,7 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
     setStatus('loading')
     try {
       const response = await api.mileage.rewards(accountId)
-      if (!requestGuard.isCurrent(requestId)) return
+      if (!overviewGuard.isCurrent(requestId)) return
       if (!response.success) throw new Error(response.error)
       /*
         **器の形を確かめてから入れる。** `rewards` が配列でない返事を
@@ -126,11 +144,11 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
       setOverview(response.data)
       setStatus('ready')
     } catch (reason) {
-      if (!requestGuard.isCurrent(requestId)) return
+      if (!overviewGuard.isCurrent(requestId)) return
       setOverview(null)
       setStatus(reason instanceof Error && reason.message === 'forbidden' ? 'forbidden' : 'error')
     }
-  }, [accountId, requestGuard])
+  }, [accountId, overviewGuard])
 
   useEffect(() => { void load() }, [load])
 
@@ -140,9 +158,9 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
    * 届いていない交換が無いことになってしまうので、欄ごと出さない。
    */
   const loadFailedRedemptions = useCallback(async () => {
-    const requestId = requestGuard.issue()
+    const requestId = redemptionsGuard.issue()
     if (!accountId) {
-      if (!requestGuard.isCurrent(requestId)) return
+      if (!redemptionsGuard.isCurrent(requestId)) return
       setFailedRedemptions([])
       setRedemptionsVisible(false)
       return
@@ -151,7 +169,7 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
       const response = await fetchApi<ApiResponse<RedemptionHistory>>(
         `/api/mileage/redemptions?accountId=${encodeURIComponent(accountId)}`,
       )
-      if (!requestGuard.isCurrent(requestId)) return
+      if (!redemptionsGuard.isCurrent(requestId)) return
       if (!response.success) throw new Error(response.error)
       if (!Array.isArray(response.data?.items)) throw new Error('malformed')
       setFailedRedemptions(
@@ -159,11 +177,11 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
       )
       setRedemptionsVisible(true)
     } catch {
-      if (!requestGuard.isCurrent(requestId)) return
+      if (!redemptionsGuard.isCurrent(requestId)) return
       setFailedRedemptions([])
       setRedemptionsVisible(false)
     }
-  }, [accountId, requestGuard])
+  }, [accountId, redemptionsGuard])
 
   useEffect(() => { void loadFailedRedemptions() }, [loadFailedRedemptions])
 
@@ -171,23 +189,30 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
    * 届かなかった交換のやり直し。**押した指が離れる前に止める。**
    * `retryingId` を先に立ててボタンを無効化するので、同時クリック・再送は
    * 1回にまとまる。口も失敗中だけ受け付け、同じ交換IDを続ける。
+   * **押したときの店を掴んでおく。** POST の最中に B へ切り替えたら、
+   * 古い閉じ込めが新しい世代として A を読み直さない。B の画面は
+   * 切り替え時の取得が読むので、ここでは触らない。
    */
   const retryRedemption = async (redemption: FailedRedemption) => {
     if (!accountId || retryingId) return
+    const startedAccountId = accountId
+    const operation = accountTracker.track(startedAccountId)
     setRetryingId(redemption.id)
     setRetryError('')
     try {
       const response = await fetchApi<ApiResponse<unknown>>(
         `/api/mileage/redemptions/${encodeURIComponent(redemption.id)}/retry-fulfillment`,
-        { method: 'POST', body: JSON.stringify({ accountId }) },
+        { method: 'POST', body: JSON.stringify({ accountId: startedAccountId }) },
       )
       if (!response.success) throw new Error(response.error)
+      if (!accountTracker.isCurrent(operation)) return
       await loadFailedRedemptions()
       await load()
     } catch {
+      if (!accountTracker.isCurrent(operation)) return
       setRetryError('やり直せませんでした。時間をおいてもう一度お試しください。')
     } finally {
-      setRetryingId(null)
+      if (accountTracker.isCurrent(operation)) setRetryingId(null)
     }
   }
 

@@ -103,7 +103,7 @@ describe('届かなかった交換', () => {
 
   it('やり直しは失敗中の口へ店と一緒に送る', () => {
     expect(code).toMatch(/\/retry-fulfillment/)
-    expect(code).toMatch(/JSON\.stringify\(\{\s*accountId\s*\}\)/)
+    expect(code).toMatch(/JSON\.stringify\(\{\s*accountId/)
   })
 
   it('同時クリック・再送を1回にまとめる', () => {
@@ -119,9 +119,30 @@ describe('届かなかった交換', () => {
 
   it('店切替で古い応答が後着しない', () => {
     // Aの応答がBの表示を上書きすると、別店の交換に触ってしまう。
-    expect(code).toMatch(/createRequestGuard/)
-    expect(code).toMatch(/requestGuard\.issue\(\)/)
-    expect(code).toMatch(/if \(!requestGuard\.isCurrent\(requestId\)\) return/)
+    expect(code).toMatch(/createMileageRewardsFetchGuards/)
+    expect(code).toMatch(/overviewGuard\.issue\(\)/)
+    expect(code).toMatch(/redemptionsGuard\.issue\(\)/)
+    expect(code).toMatch(/if \(!overviewGuard\.isCurrent\(requestId\)\) return/)
+    expect(code).toMatch(/if \(!redemptionsGuard\.isCurrent\(requestId\)\) return/)
+  })
+
+  it('2つの取得で1つの札を使い回さない', () => {
+    // 開いた瞬間に後の取得が先を古くし、一覧が loading のまま残る。
+    expect(code).not.toMatch(/requestGuard\.issue\(\)/)
+    expect(code).toMatch(/overview:\s*overviewGuard/)
+    expect(code).toMatch(/redemptions:\s*redemptionsGuard/)
+  })
+
+  it('やり直しは押したときの店と応答時の店を比べる', () => {
+    // Aで押してBへ切り替えたあと、古い閉じ込めがAを読み直さない。
+    expect(code).toMatch(/createAccountTracker/)
+    expect(code).toMatch(/accountTracker\.track\(/)
+    expect(code).toMatch(/if \(!accountTracker\.isCurrent\(operation\)\) return/)
+  })
+
+  it('店が替わったらやり直しの旗を降ろす', () => {
+    // 降ろさないとBのボタンが押せないまま残る。
+    expect(code).toMatch(/setRetryingId\(null\)/)
   })
 })
 
