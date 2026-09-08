@@ -95,7 +95,9 @@ describe('読めなかったとき', () => {
 describe('編集画面の STEP 4', () => {
   it('段の中身が「まだ繋がっていません」から実物へ変わった', () => {
     expect(EDIT).toContain('<NotificationDesignStep webinarId={webinar.id} registrations={registrations} />')
-    expect(EDIT).toContain('<WebinarNotifications webinarId={webinarId} />')
+    /* 取得は子の編集タブに一本化し、親は報告を受ける。同じ口を2回叩かない。 */
+    expect(EDIT).toContain('<WebinarNotifications webinarId={webinarId} onLoaded={handleNotificationsLoaded} />')
+    expect(EDIT).not.toContain('webinarApi.notifications(webinarId)')
     expect(STEPS, '未接続の印が残っている').not.toContain("notConnected: '通知・リマインドの設定'")
   })
 })

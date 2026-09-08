@@ -13,6 +13,7 @@ const mocks = {
   deleteFriendField: vi.fn(),
   countFriendFieldValues: vi.fn(),
   countFriendFieldValuesForScope: vi.fn(),
+  countFriendFieldValuesForScopes: vi.fn(),
   getFriendFieldListSummary: vi.fn(),
   getFriendFieldUsageForScope: vi.fn(),
   getFriendFieldValuesForMigration: vi.fn(),
@@ -123,6 +124,7 @@ beforeEach(() => {
   mocks.updateFriendField.mockResolvedValue(FIELD);
   mocks.countFriendFieldValues.mockResolvedValue(0);
   mocks.countFriendFieldValuesForScope.mockResolvedValue(0);
+  mocks.countFriendFieldValuesForScopes.mockResolvedValue(new Map());
   mocks.getFriendFieldListSummary.mockResolvedValue({ total: 1, inUse: 0, registeredFriends: 0, formLinks: null, updatedThisMonth: 0 });
   mocks.getFriendFieldUsageForScope.mockResolvedValue([]);
   mocks.getFriendFieldValuesForMigration.mockResolvedValue([]);
@@ -243,7 +245,7 @@ describe('LINEアカウントの境界', () => {
   });
 
   it('使用人数・回答フォーム数・使用先を実データから返す', async () => {
-    mocks.countFriendFieldValuesForScope.mockResolvedValue(3);
+    mocks.countFriendFieldValuesForScopes.mockResolvedValue(new Map([['ff-1', 3]]));
     mocks.getFriendFieldUsageForScope.mockResolvedValue([
       { kind: 'form', id: 'form-1', name: '申込フォーム', fieldId: 'ff-1', switchable: true },
       { kind: 'reminder', id: 'reminder-1', name: '誕生日通知', fieldId: 'ff-1', switchable: true },
@@ -253,6 +255,9 @@ describe('LINEアカウントの境界', () => {
     expect(body.data[0]).toMatchObject({
       usageCount: 3, formUsageCount: 1, displayTargets: ['申込フォーム', '誕生日通知'],
     });
+    /* 件数は一括集計の1回だけ。項目ごとの count は呼ばない(N+1にしない)。 */
+    expect(mocks.countFriendFieldValuesForScopes).toHaveBeenCalledTimes(1);
+    expect(mocks.countFriendFieldValuesForScope).not.toHaveBeenCalled();
   });
 });
 

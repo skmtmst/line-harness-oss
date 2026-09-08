@@ -35,7 +35,14 @@ const HOUR_OPTIONS = [15, 30, 60, 120].map((m) => ({
   label: m < 60 ? `${m}分前` : `${m / 60}時間前`,
 }))
 
-export default function WebinarNotifications({ webinarId }: { webinarId: string }) {
+export default function WebinarNotifications({ webinarId, onLoaded }: {
+  webinarId: string
+  /*
+    親の概要段と子の編集タブで同じ口を2回叩かない。取得はここに一本化し、
+    親は報告を受けて概要だけ描く。保存後の取り直しもここが行い、親へ流す。
+  */
+  onLoaded?: (data: { settings: WebinarNotificationSettings | null; overview: WebinarNotificationOverview | null } | null) => void
+}) {
   const [settings, setSettings] = useState<WebinarNotificationSettings | null>(null)
   const [overview, setOverview] = useState<WebinarNotificationOverview | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -56,10 +63,12 @@ export default function WebinarNotifications({ webinarId }: { webinarId: string 
       setSettings(res.data.settings)
       setOverview(res.data.overview ?? null)
       setState('ready')
+      onLoaded?.({ settings: res.data.settings, overview: res.data.overview ?? null })
     } catch {
       setState('error')
+      onLoaded?.(null)
     }
-  }, [webinarId])
+  }, [webinarId, onLoaded])
 
   useEffect(() => { void load() }, [load])
 

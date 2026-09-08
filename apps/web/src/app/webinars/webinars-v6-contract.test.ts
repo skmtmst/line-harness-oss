@@ -23,11 +23,13 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(PAGE).not.toContain('表示件数の切り替えは準備中です')
   })
 
-  it('公開中と下書きの条件を実際に絞り込む', () => {
-    expect(PAGE).toContain("foldered.filter((w) => w.status === savedFilter)")
+  it('公開中と下書きの条件をサーバーで絞り込む', () => {
+    /* 取った1頁を画面で絞り直すと件数や頁数が変わる。絞りは口へ渡す。 */
+    expect(PAGE).toContain('status: savedFilter || undefined')
     expect(PAGE).toContain("{ key: 'active', label: '公開中のみ' }")
     expect(PAGE).toContain("{ key: 'draft', label: '下書きのみ' }")
     expect(PAGE).not.toContain('保存した条件は準備中です')
+    expect(PAGE).not.toContain('foldered.filter')
   })
 
   it('選択アカウントのフォルダ件数を表示し、追加・改名・並び替え・削除を保存する', () => {
@@ -39,7 +41,8 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(PAGE).toContain('webinarApi.deleteFolder(selectedAccountId, deletingFolder.id)')
     expect(PAGE).toContain('webinarApi.folders(selectedAccountId)')
     expect(PAGE).toContain('count: folder.count')
-    expect(PAGE).toContain("selectedFolder === UNFILED")
+    /* 未分類の絞りはサーバーへ渡す(絞り値は UNFILED 行の id)。 */
+    expect(PAGE).toContain("{ id: UNFILED, label: '未分類', count: unfiledCount }")
     expect(PAGE).not.toContain('const WEBINAR_FOLDERS')
     expect(PAGE).not.toContain('min-h-[640px]')
     expect(PAGE).not.toContain('フォルダ名と件数は一覧APIへの接続後に表示します。')
@@ -49,7 +52,7 @@ describe('V6 ウェビナー一覧の契約', () => {
   })
 
   it('選択中のLINEアカウントだけを読み、新規作成にも所属を保存する', () => {
-    expect(PAGE).toContain('webinarApi.list(accountId)')
+    expect(PAGE).toContain('webinarApi.list(accountId, {')
     expect(PAGE).toContain('requestGeneration.current !== generation')
     expect(PAGE).toContain('loadedAccountId === selectedAccountId ? items : []')
     expect(PAGE).toContain('folderRequestGeneration.current === generation')
@@ -57,11 +60,16 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(FORM).toContain("...(!initial ? { accountId: selectedAccountId } : {})")
   })
 
-  it('表示件数を超えたウェビナーも共通ページ送りで確認できる', () => {
+  it('一覧は頁ごとに取り、取った頁を絞り直さない', () => {
     expect(PAGE).toContain("import Pagination from '@/components/shared/pagination'")
-    expect(PAGE).toContain('const visibleStart = (currentPage - 1) * pageSize')
+    expect(PAGE).toContain('limit: pageSize')
+    expect(PAGE).toContain('q: query.trim() || undefined')
+    expect(PAGE).toContain('folder: selectedFolder || undefined')
+    expect(PAGE).toContain('sort: sortKey')
+    expect(PAGE).toContain('!Array.isArray(res.data.items) || typeof res.data.total !==')
     expect(PAGE).toContain('pageCount={pageCount}')
     expect(PAGE).not.toContain('ほかに {hiddenCount} 件あります')
+    expect(PAGE).not.toContain('.slice(visibleStart, visibleStart + pageSize)')
   })
 
   it('取得失敗を空の一覧と混ぜず、同じ画面で再取得できる', () => {

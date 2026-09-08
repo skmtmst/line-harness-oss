@@ -585,3 +585,42 @@ describe('PATCH /api/tags/:id/mileage', () => {
     await expect(res.json()).resolves.toMatchObject({ success: true, data: { queued: 12 } });
   });
 });
+
+describe('旧タグ経路の名前検査と色の受付終了', () => {
+  beforeEach(() => {
+    for (const fn of Object.values(dbMocks)) if (fn && 'mockReset' in fn) (fn as { mockReset(): void }).mockReset();
+    dbMocks.createTag.mockImplementation(async (_db: unknown, input: { name: string; groupId: string | null }) => ({
+      ...TAG_ROW, id: 'tag-new', name: input.name, folder_id: input.groupId,
+    }));
+    dbMocks.updateTag.mockImplementation(async (_db: unknown, id: string, patch: Record<string, unknown>) => ({
+      ...TAG_ROW, id, ...patch,
+    }));
+  });
+
+  test('作成で81文字・制御文字は400で書かない', async () => {
+    const longName = await post('/api/tags', { name: 'あ'.repeat(81) });
+    expect(longName.status).toBe(400);
+    const controlName = await post('/api/tags', { name: 'VIP\n計画' });
+    expect(controlName.status).toBe(400);
+    expect(await controlName.json()).toMatchObject({ error: 'name must not contain control characters' });
+    expect(dbMocks.createTag).not.toHaveBeenCalled();
+  });
+
+  test('更新で81文字・制御文字は400で書かない', async () => {
+    const longName = await patch('/api/tags/tag-1', { name: 'あ'.repeat(81) });
+    expect(longName.status).toBe(400);
+    const controlName = await patch('/api/tags/tag-1', { name: 'VIP\x07計画' });
+    expect(controlName.status).toBe(400);
+    expect(dbMocks.updateTag).not.toHaveBeenCalled();
+  });
+
+  test('作成・更新で color が来たら400で案内して書かない', async () => {
+    const created = await post('/api/tags', { name: 'VIP', color: '#FF0000' });
+    expect(created.status).toBe(400);
+    expect(await created.json()).toMatchObject({ error: 'tag color is not supported; set the folder color instead' });
+    expect(dbMocks.createTag).not.toHaveBeenCalled();
+    const updated = await patch('/api/tags/tag-1', { color: '#FF0000' });
+    expect(updated.status).toBe(400);
+    expect(dbMocks.updateTag).not.toHaveBeenCalled();
+  });
+});
