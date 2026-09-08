@@ -774,6 +774,17 @@ describe('POST /api/rich-menu-groups/:groupId/pages/:pageId/image', () => {
     expect(res.status).toBe(400);
   });
 
+  test('申告サイズが1MB超なら本文を読む前に413で断る', async () => {
+    dbMocks.pageBelongsToGroup.mockResolvedValue(true);
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups/g1/pages/p1/image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'image/png', 'Content-Length': String(2 * 1024 * 1024) },
+      body: PNG_2500x1686,
+    });
+    expect(res.status).toBe(413);
+  });
+
   test('on success uploads to R2 and updates DB image key', async () => {
     dbMocks.pageBelongsToGroup.mockResolvedValue(true);
     dbMocks.getRichMenuGroupById.mockResolvedValue({

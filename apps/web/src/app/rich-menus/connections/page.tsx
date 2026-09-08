@@ -23,6 +23,13 @@ type RichMenuGroup = {
   pages: Array<ConnectionPage & { areas: RichMenuAreaResponse[] }>
 }
 
+/** 取得結果の形を確かめる（`as` 断定の代わり）。 */
+function isRichMenuGroupResponse(value: unknown): value is RichMenuGroup {
+  if (!value || typeof value !== 'object') return false
+  return 'id' in value && typeof value.id === 'string'
+    && 'pages' in value && Array.isArray(value.pages)
+}
+
 function ConnectionsContent() {
   const groupId = useSearchParams().get('id') ?? ''
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -53,7 +60,8 @@ function ConnectionsContent() {
         || requestGenerationRef.current !== requestGeneration
       ) return
       if (!response.success) throw new Error(response.error)
-      setGroup(response.data as RichMenuGroup)
+      if (!isRichMenuGroupResponse(response.data)) throw new Error('取得失敗')
+      setGroup(response.data)
     } catch {
       if (
         activeAccountIdRef.current !== accountId
