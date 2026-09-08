@@ -213,7 +213,7 @@
 | 16 | `njLGA` | 16-1-C 支払い | 4.1592%（前回値） | 0px | 中央・左 | docs | [差分画像](affiliates-v6/njLGA-diff-1920.png) | **一致** |
 | 16 | `xqT1Z` | 16-1-D アフィリエイターを登録する | 5.3374% | 0px | 中央・左 | docs | [差分画像](affiliates-v6/xqT1Z-diff-1920.png) | **一致** |
 | 16 | `jwrbf` | 16-1-E アフィリエイターの成果内訳 | 5.1568%（前回値） | 0px | 中央・右 | docs | [差分画像](affiliates-v6/jwrbf-diff-1920.png) | **一致** |
-| 16 | `GPWzq` | 16-1-F 案件をつくる | 5.0253% | 0px | 中央・左 | docs | [差分画像](affiliates-v6/GPWzq-diff-1920.png) | **一致** |
+| 16 | `GPWzq` | 16-1-F 案件をつくる | 5.0036% | 0px | 中央・左 | docs | [差分画像](affiliates-v6/GPWzq-diff-1920.png) | **一致** |
 | 16 | `QX70l` | 16-1-G アフィリエイターを削除する確認 | 6.9617% | 0px | 中央・左 | docs | [差分画像](affiliates-v6/QX70l-diff-1920.png) | **一致** |
 | 16 | `GqFTV` | 16-1-H 支払いを確定する | 7.9215% | -1px | 下部・中央 | docs | [差分画像](affiliates-v6/GqFTV-diff-1920.png) | **一致** |
 | 17 | `s98Vfw` | 17-1 マイル | 4.9379% | 0px | 中央・左 | docs | [差分画像](mileage-v6/s98Vfw-diff-1920.png) | **一致** |
@@ -231,7 +231,7 @@
 | 18 | `IhSBB` | 18-1-A サイトスクリプト | 4.8070% | 0px | 中央・右 | docs | [差分画像](inflow-v6/IhSBB-diff-1920.png) | **一致** |
 | 18 | `v0HaI` | 18-1-B 広告連携 | 3.8252% | 0px | 中央・右 | docs | [差分画像](inflow-v6/v0HaI-diff-1920.png) | **一致** |
 | 18 | `TEVk8` | 18-1-C 流入リンクをつくる | 5.2284% | +8px | 中央・左 | docs | [差分画像](inflow-v6/TEVk8-diff-1920.png) | **一致** |
-| 18 | `JupxW` | 18-1-D 流入元の詳細 | 4.0418% | 0px | 中央・右 | docs | [差分画像](inflow-v6/JupxW-diff-1920.png) | **一致** |
+| 18 | `JupxW` | 18-1-D 流入元の詳細 | 4.1988% | 0px | 中央・右 | docs | [差分画像](inflow-v6/JupxW-diff-1920.png) | **一致** |
 | 18 | `UIaM7` | 18-1-E 流入リンクの削除確認 | 5.0928% | 0px | 中央・中央 | docs | [差分画像](inflow-v6/UIaM7-diff-1920.png) | **一致** |
 | 18 | `BMmxU` | 18-1-F 一覧の状態（空・読込・エラー） | 4.3314% | 0px | 中央・右 | docs | [差分画像](inflow-v6/BMmxU-diff-1920.png) | **一致** |
 | 18 | `BuVDB` | 18-2 広告とのつなぎ（成果の対応付け） | 4.6025% | 0px | 中央・右 | docs | [差分画像](inflow-v6/BuVDB-diff-1920.png) | **一致** |

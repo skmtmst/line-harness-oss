@@ -6229,10 +6229,6 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    report: (id: string, params?: { startDate?: string; endDate?: string }) =>
-      fetchApi<ApiResponse<{ affiliateId: string; affiliateName: string; code: string; commissionRate: number; totalClicks: number; totalConversions: number; totalRevenue: number }>>(
-        `/api/affiliates/${id}/report?` + new URLSearchParams(params as Record<string, string>),
-      ),
     /** v2 report: clicks, friendAdds, conversionsByPoint, estimatedCommission, duplicateFlags */
     reportV2: (id: string, params?: { startDate?: string; endDate?: string }) =>
       fetchApi<ApiResponse<{
@@ -6726,27 +6722,20 @@ export const api = {
       }),
   },
   automations: {
-    list: (params?: { accountId?: string }) => {
-      const query = params?.accountId ? '?lineAccountId=' + params.accountId : ''
+    list: (params?: { accountId?: string; limit?: number; offset?: number }) => {
+      const query = new URLSearchParams()
+      if (params?.accountId) query.set('lineAccountId', params.accountId)
+      if (params?.limit !== undefined) query.set('limit', String(params.limit))
+      if (params?.offset !== undefined) query.set('offset', String(params.offset))
+      const suffix = query.size ? `?${query}` : ''
       return fetchApi<ApiResponse<AutomationListItem[]> & {
         summary?: { active: number; stopped: number; executionCount30d: number; failureCount30d: number }
         freshness?: 'available'
-      }>('/api/automations' + query)
+        pagination?: { total: number; limit: number | null; offset: number }
+      }>(`/api/automations${suffix}`)
     },
     get: (id: string) =>
       fetchApi<ApiResponse<Automation & { logs?: AutomationLog[] }>>(`/api/automations/${id}`),
-    create: (data: {
-      name: string
-      eventType: Automation['eventType']
-      actions: Automation['actions']
-      description?: string | null
-      conditions?: Record<string, unknown>
-      priority?: number
-    }) =>
-      fetchApi<ApiResponse<Automation>>('/api/automations', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
     update: (id: string, data: Partial<Pick<Automation, 'name' | 'description' | 'eventType' | 'conditions' | 'actions' | 'isActive' | 'priority'>>) =>
       fetchApi<ApiResponse<Automation>>(`/api/automations/${id}`, {
         method: 'PUT',
@@ -6824,6 +6813,11 @@ export const api = {
       if (params.offset !== undefined) query.set('offset', String(params.offset));
       return fetchApi<ApiResponse<CommonActionSummary[]> & {
         pagination?: { total: number; limit: number | null; offset: number }
+        summary?: {
+          total: number; published: number; draft: number; oldVersion: number; unused: number;
+          actions: number; bindings: number; outdated: number; outdatedItems: number;
+          executions: number; failures: number;
+        }
         freshness?: 'available'
       }>(`/api/common-actions?${query}`);
     },
