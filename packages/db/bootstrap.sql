@@ -4641,7 +4641,9 @@ CREATE TABLE templates (
   question_status TEXT NOT NULL DEFAULT 'published' CHECK (question_status IN ('draft', 'published')),
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, line_account_id TEXT REFERENCES line_accounts(id), created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id));
+, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, line_account_id TEXT REFERENCES line_accounts(id), created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id), published_version INTEGER NOT NULL DEFAULT 1, published_at TEXT, draft_message_type TEXT, draft_message_content TEXT, draft_carousel_actions_json TEXT, draft_carousel_tap_limit_mode TEXT, draft_carousel_tap_limit_text TEXT, draft_question_json TEXT
+  CHECK (draft_question_json IS NULL OR json_valid(draft_question_json)), draft_question_status TEXT
+  CHECK (draft_question_status IS NULL OR draft_question_status IN ('draft', 'published')), publish_idempotency_key TEXT);
 
 CREATE TABLE tenants (
   id TEXT PRIMARY KEY,
@@ -6318,6 +6320,8 @@ CREATE INDEX idx_templates_category ON templates (category);
 
 CREATE INDEX idx_templates_line_account
   ON templates(line_account_id, display_order, id);
+
+CREATE INDEX idx_templates_publish_key ON templates (publish_idempotency_key);
 
 CREATE UNIQUE INDEX idx_tracked_links_dedup_key
   ON tracked_links (dedup_key) WHERE dedup_key IS NOT NULL;

@@ -21,6 +21,46 @@ export interface TemplateRow {
   created_at: string;
   updated_at: string;
   line_account_id: string | null;
+  /**
+   * 347: 公開版の版番号。公開操作でだけ +1 する。
+   * 送信側が読む live 列(message_type / message_content / carousel_* /
+   * question_*)は公開版そのものなので、版番号と live 列は常に一致する。
+   */
+  published_version: number;
+  /** 347: 最後に公開した日時。既存行は移行時に updated_at を入れる。 */
+  published_at: string | null;
+  /**
+   * 347: 編集中の下書き。PUT はここへだけ書く。
+   * どれか1つでも入っていれば「公開待ちの下書きあり」。
+   */
+  draft_message_type: string | null;
+  draft_message_content: string | null;
+  draft_carousel_actions_json: string | null;
+  draft_carousel_tap_limit_mode: string | null;
+  draft_carousel_tap_limit_text: string | null;
+  draft_question_json: string | null;
+  draft_question_status: 'draft' | 'published' | null;
+  /** 347: 公開の再試行を見分ける確認キー。auto_reply_versions と同じ使い方。 */
+  publish_idempotency_key: string | null;
+}
+
+/** 下書きがあるかどうか。どれか1列でも入っていれば true。 */
+export function hasTemplateDraft(row: Pick<TemplateRow,
+  'draft_message_type' | 'draft_message_content' |
+  'draft_carousel_actions_json' | 'draft_carousel_tap_limit_mode' |
+  'draft_carousel_tap_limit_text' | 'draft_question_json' |
+  'draft_question_status'> | null | undefined,
+): boolean {
+  if (!row) return false;
+  // `!= null` で見る。347 より前の形の行や、一部の列だけ取る SELECT でも
+  // 「下書きなし」と正しく判定するため。
+  return row.draft_message_type != null
+    || row.draft_message_content != null
+    || row.draft_carousel_actions_json != null
+    || row.draft_carousel_tap_limit_mode != null
+    || row.draft_carousel_tap_limit_text != null
+    || row.draft_question_json != null
+    || row.draft_question_status != null;
 }
 
 export async function getTemplates(db: D1Database, category?: string): Promise<TemplateRow[]> {
@@ -72,8 +112,8 @@ export async function createTemplate(
          (id, name, category, message_type, message_content,
           carousel_actions_json, carousel_tap_limit_mode, carousel_tap_limit_text,
           question_json, question_status, created_at, updated_at, line_account_id,
-          folder_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          folder_id, published_version, published_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
     )
     .bind(
       id,
@@ -90,11 +130,20 @@ export async function createTemplate(
       now,
       input.lineAccountId ?? null,
       input.folderId ?? null,
+      now,
     )
     .run();
   return (await getTemplateById(db, id))!;
 }
 
+/**
+ * live 列(公開版)への直接書き込み。
+ *
+ * 347 以降、送信文(message_type / message_content / carousel_* /
+ * question_*)は公開操作でしか live 列へ書かない。編集画面の保存は
+ * {@link saveTemplateDraft} を使う。ここへ送信文を渡すのは、
+ * 名前・置き場だけを直す整理操作など、送信文を変えない場合に限る。
+ */
 export async function updateTemplate(
   db: D1Database,
   id: string,
@@ -151,6 +200,147 @@ export async function updateTemplate(
 
 export async function deleteTemplate(db: D1Database, id: string): Promise<void> {
   await db.prepare(`DELETE FROM templates WHERE id = ?`).bind(id).run();
+}
+
+export interface TemplateDraftUpdates {
+  messageType?: string;
+  messageContent?: string;
+  /** 162: 選択肢を押したときの動き。`null` は動きの削除。 */
+  carouselActions?: unknown | null;
+  carouselTapLimitMode?: 'none' | 'once';
+  /** 制限超過時の返信。`null` は返さない。 */
+  carouselTapLimitText?: string | null;
+  /** JSON文字列。`null` は通常テンプレートへ戻す。 */
+  questionJson?: string | null;
+  questionStatus?: 'draft' | 'published';
+}
+
+/**
+ * 347: 編集内容を下書き(draft_* 列)へだけ書く。live 列(公開版)は触らない。
+ *
+ * 渡されなかった項目は「いま編集中の下書きがあればそれ、なければ公開版」
+ * を引き継いで全文のスナップショットにする。部分的な下書きを作らないのは、
+ * 公開時に「どの版が出るか」が1行で決まるようにするため。
+ */
+export async function saveTemplateDraft(
+  db: D1Database,
+  id: string,
+  updates: TemplateDraftUpdates,
+): Promise<TemplateRow> {
+  const current = await getTemplateById(db, id);
+  if (!current) throw new Error('TEMPLATE_NOT_FOUND');
+  const draftMessageType = updates.messageType ?? current.draft_message_type ?? current.message_type;
+  const draftMessageContent = updates.messageContent ?? current.draft_message_content ?? current.message_content;
+  const draftCarouselActionsJson = updates.carouselActions !== undefined
+    ? (updates.carouselActions ? JSON.stringify(updates.carouselActions) : null)
+    : (current.draft_carousel_actions_json ?? current.carousel_actions_json);
+  const draftCarouselTapLimitMode = updates.carouselTapLimitMode
+    ?? current.draft_carousel_tap_limit_mode
+    ?? current.carousel_tap_limit_mode;
+  const draftCarouselTapLimitText = updates.carouselTapLimitText !== undefined
+    ? updates.carouselTapLimitText
+    : (current.draft_carousel_tap_limit_text ?? current.carousel_tap_limit_text);
+  const draftQuestionJson = updates.questionJson !== undefined
+    ? updates.questionJson
+    : (current.draft_question_json ?? current.question_json);
+  const draftQuestionStatus = updates.questionStatus
+    ?? current.draft_question_status
+    ?? current.question_status;
+  await db.prepare(
+    `UPDATE templates
+        SET draft_message_type = ?,
+            draft_message_content = ?,
+            draft_carousel_actions_json = ?,
+            draft_carousel_tap_limit_mode = ?,
+            draft_carousel_tap_limit_text = ?,
+            draft_question_json = ?,
+            draft_question_status = ?,
+            updated_at = ?
+      WHERE id = ?`,
+  ).bind(
+    draftMessageType,
+    draftMessageContent,
+    draftCarouselActionsJson,
+    draftCarouselTapLimitMode,
+    draftCarouselTapLimitText,
+    draftQuestionJson,
+    draftQuestionStatus,
+    jstNow(),
+    id,
+  ).run();
+  return (await getTemplateById(db, id))!;
+}
+
+export interface TemplatePublishResult {
+  row: TemplateRow;
+  /** 下書きを公開版へ写したかどうか。 */
+  published: boolean;
+  /** 同じ確認キーでの再試行を、そのままの結果で返したかどうか。 */
+  replayed: boolean;
+}
+
+/**
+ * 347: 下書きを公開版(live 列)へ写す。送信側は live 列だけを読むので、
+ * この関数を通らない編集が実送信文へ混入することはない。
+ *
+ * - 下書きがなければ何もせず成功を返す(再試行は何度でも同じ結果)。
+ * - `expectedVersion` がいまの版と違えば 'TEMPLATE_VERSION_CONFLICT'。
+ *   同時更新は版番号付きの UPDATE 1文で直列化し、負けた側は落とす。
+ * - 同じ `idempotencyKey` での再試行は、公開済みの結果をそのまま返す。
+ *   そのキーで公開した後に新しい下書きがあれば、別操作の使い回しとして
+ *   'TEMPLATE_PUBLISH_KEY_CONFLICT'。
+ */
+export async function publishTemplate(
+  db: D1Database,
+  id: string,
+  options: { expectedVersion?: number; idempotencyKey?: string } = {},
+): Promise<TemplatePublishResult> {
+  const current = await getTemplateById(db, id);
+  if (!current) throw new Error('TEMPLATE_NOT_FOUND');
+  if (options.idempotencyKey && current.publish_idempotency_key === options.idempotencyKey) {
+    if (!hasTemplateDraft(current)) return { row: current, published: false, replayed: true };
+    throw new Error('TEMPLATE_PUBLISH_KEY_CONFLICT');
+  }
+  if (!hasTemplateDraft(current)) return { row: current, published: false, replayed: false };
+  if (options.expectedVersion !== undefined
+    && Number(current.published_version) !== options.expectedVersion) {
+    throw new Error('TEMPLATE_VERSION_CONFLICT');
+  }
+  const now = jstNow();
+  const updated = await db.prepare(
+    `UPDATE templates
+        SET message_type = COALESCE(draft_message_type, message_type),
+            message_content = COALESCE(draft_message_content, message_content),
+            carousel_actions_json = COALESCE(draft_carousel_actions_json, carousel_actions_json),
+            carousel_tap_limit_mode = COALESCE(draft_carousel_tap_limit_mode, carousel_tap_limit_mode),
+            carousel_tap_limit_text = COALESCE(draft_carousel_tap_limit_text, carousel_tap_limit_text),
+            question_json = COALESCE(draft_question_json, question_json),
+            question_status = COALESCE(draft_question_status, question_status),
+            draft_message_type = NULL,
+            draft_message_content = NULL,
+            draft_carousel_actions_json = NULL,
+            draft_carousel_tap_limit_mode = NULL,
+            draft_carousel_tap_limit_text = NULL,
+            draft_question_json = NULL,
+            draft_question_status = NULL,
+            published_version = published_version + 1,
+            published_at = ?,
+            publish_idempotency_key = ?,
+            updated_at = ?
+      WHERE id = ? AND published_version = ?`,
+  ).bind(
+    now,
+    options.idempotencyKey ?? current.publish_idempotency_key,
+    now,
+    id,
+    current.published_version,
+  ).run();
+  if ((updated.meta?.changes ?? 0) === 0) throw new Error('TEMPLATE_VERSION_CONFLICT');
+  const next = await getTemplateById(db, id);
+  if (!next || Number(next.published_version) !== Number(current.published_version) + 1) {
+    throw new Error('TEMPLATE_VERSION_CONFLICT');
+  }
+  return { row: next, published: true, replayed: false };
 }
 
 export interface TemplateUsage {
