@@ -317,7 +317,7 @@ function CarouselEditorInner() {
                   {(panels[1]?.actions || panels[0]?.actions || []).map((action, index) => <p key={index} className="border-hairline mt-2 rounded-control border p-2 text-center text-sm text-accent">{action.label}</p>)}
                 </div>
               </div>
-              <button type="button" className="bg-canvas text-ink rounded-control mt-4 w-full px-4 py-2 text-sm font-semibold">自分に送って確かめる</button>
+              <button type="button" disabled title="テスト送信は準備中です" className="bg-canvas text-ink rounded-control mt-4 w-full px-4 py-2 text-sm font-semibold opacity-50">自分に送って確かめる</button>
             </section>
           </aside>
           <div className="bg-canvas rounded-card border-hairline border p-5">
@@ -649,7 +649,7 @@ function CarouselEditorInner() {
               <div className="flex gap-2">
                 {panels.map((panel, i) => (
                   <div key={i} className="w-56 shrink-0 overflow-hidden rounded-2xl bg-white">
-                    {panel.thumbnailImageUrl ? (
+                    {typeof panel.thumbnailImageUrl === 'string' && /^https?:\/\//.test(panel.thumbnailImageUrl) ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={panel.thumbnailImageUrl} alt="" className="h-28 w-full object-cover" />
                     ) : (

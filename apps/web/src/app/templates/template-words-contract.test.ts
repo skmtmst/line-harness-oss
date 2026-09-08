@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+/* 種類の呼び方は `./template-message-type` に一本化した（#497 軽2）。 */
+const MESSAGE_TYPE = readFileSync(join(HERE, 'template-message-type.ts'), 'utf8')
 const EDIT_PAGE = readFileSync(join(HERE, 'edit/page.tsx'), 'utf8')
 const CAROUSEL_PAGE = readFileSync(join(HERE, 'carousel/page.tsx'), 'utf8')
 const ASSET_EDITOR = readFileSync(join(HERE, 'template-asset-editor.tsx'), 'utf8')
@@ -17,9 +19,11 @@ const ASSET_EDITOR = readFileSync(join(HERE, 'template-asset-editor.tsx'), 'utf8
  */
 describe('種類の呼び方', () => {
   it('LINEの作りの名前をそのまま出さない', () => {
-    expect(PAGE).toContain("flex: 'カード型'")
-    expect(PAGE).toContain("carousel: 'カルーセル'")
-    expect(PAGE, '内部の名前が残っている').not.toMatch(/flex: 'Flex'|carousel: 'Carousel'/)
+    expect(MESSAGE_TYPE).toContain("flex: 'カード型'")
+    expect(MESSAGE_TYPE).toContain("carousel: 'カルーセル'")
+    expect(MESSAGE_TYPE, '内部の名前が残っている').not.toMatch(/flex: 'Flex'|carousel: 'Carousel'/)
+    /* 一覧は共通化先を使い、独自の呼び方を持たない。 */
+    expect(PAGE).toContain("from './template-message-type'")
   })
 
   it('絞り込みの札にも内部の名前を出さない', () => {
@@ -36,8 +40,9 @@ describe('種類の呼び方', () => {
      * `?? t.messageType` だと、`sticker` や `video` のひな形が並んだとき
      * **画面に英語の値がそのまま出る**。
      */
-    expect(PAGE).toContain("return messageTypeLabels[type] ?? 'その他'")
+    expect(MESSAGE_TYPE).toContain("return messageTypeLabels[type] ?? 'その他'")
     expect(PAGE).not.toContain('?? t.messageType}')
+    expect(PAGE).not.toContain('?? drawerData.messageType}')
   })
 
   it('`category` を画面へ流さない', () => {

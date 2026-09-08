@@ -23,6 +23,7 @@ import {
   type TemplatesFailure,
 } from './list-state-kind'
 import { templateDeleteDescription } from './template-delete-message'
+import { messageTypeText } from './template-message-type'
 import styles from './templates-v6.module.css'
 import { useAccount } from '@/contexts/account-context'
 import { ArrowRight, Bot, MessageCircle, Star, TriangleAlert, Workflow, X } from 'lucide-react'
@@ -76,30 +77,11 @@ const ASSET_KINDS: readonly BroadcastAssetKind[] = [
   'research',
 ]
 
-/**
- * 種類の名前。**内部の値をそのまま画面へ出さない。**
- *
- * `Flex` `Carousel` は LINE の作りの名前で、運用する人には通じない。
- * 一斉配信の一覧（`rowExcerpt`）は既に「カード型」「カルーセル」と
- * 出しているので、同じ言葉にそろえる。
+/*
+ * 種類の名前は `./template-message-type` に一本化した。
+ * 一覧・詳細・引き出しで別の書き方をすると、片方だけ直って
+ * 「一覧は日本語・詳細は英語」のずれが起きる（#497 軽2）。
  */
-const messageTypeLabels: Record<string, string> = {
-  text: 'テキスト',
-  image: '画像',
-  flex: 'カード型',
-  carousel: 'カルーセル',
-  question: '質問',
-}
-
-/**
- * 知らない種類でも内部の値を出さない。
- *
- * 前は `?? t.messageType` で落としていたので、`sticker` や `video` の
- * ひな形が並ぶと**画面に英語の値がそのまま出た**。
- */
-function messageTypeText(type: string): string {
-  return messageTypeLabels[type] ?? 'その他'
-}
 
 const typeBadgeColor: Record<string, string> = {
   text: 'bg-canvas-sunken text-ink-secondary',
@@ -955,7 +937,7 @@ export default function TemplatesPage() {
               <div className="p-4 space-y-5">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${typeBadgeColor[drawerData.question ? 'question' : drawerData.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
-                    {messageTypeLabels[drawerData.question ? 'question' : drawerData.messageType] ?? drawerData.messageType}
+                    {messageTypeText(drawerData.question ? 'question' : drawerData.messageType)}
                   </span>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-info-bg text-info">
                     {drawerData.category}
@@ -1008,7 +990,16 @@ export default function TemplatesPage() {
                       (() => {
                         try {
                           const parsed = JSON.parse(drawerData.messageContent)
-                          return <img src={parsed.originalContentUrl || parsed.previewImageUrl} alt="" className="max-w-full rounded" />
+                          const imageUrl = parsed.originalContentUrl || parsed.previewImageUrl
+                          /*
+                           * 入力された URL をそのまま出さない（#497 軽6）。
+                           * http(s) 以外は追跡用・巨大画像などの恐れがあるので
+                           * 代替表示にする。
+                           */
+                          if (typeof imageUrl !== 'string' || !/^https?:\/\//.test(imageUrl)) {
+                            return <p className="text-ink-faint text-xs">画像のURLを開けませんでした。http(s)から始まるURLを入れてください。</p>
+                          }
+                          return <img src={imageUrl} alt="" className="max-w-full rounded" />
                         } catch {
                           return <pre className="text-xs whitespace-pre-wrap">{drawerData.messageContent}</pre>
                         }

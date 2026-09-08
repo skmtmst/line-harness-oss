@@ -2251,15 +2251,16 @@ export const TEMPLATES = (() => {
                     : n === 13 ? '予約変更のご案内'
                       : n === 14 ? '来店後フォロー'
                         : `${label}のひな形 ${i + 1}`,
-        category: n === 0 ? '予約日時と注意事項を案内'
-          : n === 1 ? '返信後の追加案内'
-            : n === 2 ? '購入商品と配送予定を案内'
-              : 'text',
+        /* 分類は分類名にする。説明文を入れると画面の分類欄が説明文になる。 */
+        category: label,
         messageType: 'text',
         messageContent: n === 0
           ? 'ご予約ありがとうございます。以下の内容をご確認ください。'
           : `${label}のご連絡です。内容をご確認ください。`,
         folderId,
+        /* 本物の口は質問・質問状態・置き場を必ず返す。無いと絞り・バッジの確認ができない。 */
+        question: null,
+        questionStatus: 'published',
         usageCount: n === 0 ? 38 : Math.max(0, 12 - n),
         tapCount: 0,
         monthlySendCount: sendCounts[n]?.[0] ?? 0,

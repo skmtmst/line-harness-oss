@@ -209,3 +209,68 @@ describe('テンプレートのLINEアカウント境界', () => {
     expect(mocks.createTemplate).not.toHaveBeenCalled();
   });
 });
+
+describe('テンプレートの作成・更新の返し', () => {
+  const row = {
+    id: 'tpl-1',
+    name: '案内',
+    category: 'general',
+    message_type: 'text',
+    message_content: 'こんにちは',
+    question_json: null,
+    question_status: 'published',
+    folder_id: null,
+    line_account_id: 'account-1',
+    carousel_actions_json: null,
+    carousel_tap_limit_mode: 'none',
+    carousel_tap_limit_text: null,
+    created_at: '2026-01-13T00:00:00.000Z',
+    updated_at: '2026-01-13T00:00:00.000Z',
+  };
+
+  it('軽11: 作成(201)の返しは更新と同じ形（本文・更新日時を含む）', async () => {
+    mocks.createTemplate.mockResolvedValue(row);
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId: 'account-1',
+          name: '案内',
+          category: 'general',
+          messageType: 'text',
+          messageContent: 'こんにちは',
+        }),
+      }),
+      env,
+    );
+    expect(response.status).toBe(201);
+    const body = await response.json();
+    expect(body.data).toMatchObject({
+      id: 'tpl-1',
+      messageContent: 'こんにちは',
+      createdAt: '2026-01-13T00:00:00.000Z',
+      updatedAt: '2026-01-13T00:00:00.000Z',
+    });
+  });
+
+  it('軽11: 更新の返しに作成日時・更新日時を含む', async () => {
+    mocks.getTemplateById.mockResolvedValue(row);
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/templates/tpl-1', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: '案内（改）' }),
+      }),
+      env,
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data).toMatchObject({
+      id: 'tpl-1',
+      messageContent: 'こんにちは',
+      createdAt: '2026-01-13T00:00:00.000Z',
+      updatedAt: '2026-01-13T00:00:00.000Z',
+    });
+  });
+});
