@@ -11,6 +11,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import type { PhotoAssetStatus, PhotoDerivatives } from '@/lib/api'
 import { formatPhotoReceivedAt } from './photo-review-time'
 import { safePhotoSrc } from './photo-src'
+import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 
 const text = (value: unknown) => String(value ?? '')
 const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? Number(value).toLocaleString('ja-JP') : '—'
@@ -59,7 +60,7 @@ export function PhotoReviewDetail({
     <div className="flex items-center justify-between gap-2 max-md:flex-col max-md:items-start">
       <div>
         <p className="text-xs font-bold text-ink-faint">写真審査</p>
-        <h1 className="mt-1 text-2xl font-extrabold text-ink">{text(photo.pet_name) || 'ペット'} の写真</h1>
+        <h1 className="mt-1 text-2xl font-extrabold text-ink">{photoPetDisplayName(photo.pet_name, { honorific: false })} の写真</h1>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <span className="mr-2 text-xs font-bold text-ink-secondary">{total > 0 ? `${total}枚のうち ${position + 1}枚目` : '—'}</span>
@@ -76,7 +77,7 @@ export function PhotoReviewDetail({
         <div className="grid h-96 place-items-center overflow-hidden bg-ink lg:h-160">
           {reviewUrl ? <img
             src={reviewUrl}
-            alt={`${text(photo.pet_name)}の審査用写真`}
+            alt={`${photoPetDisplayName(photo.pet_name, { honorific: false })}の審査用写真`}
             className="h-full w-full object-contain transition-transform"
             style={{ transform: `scale(${scale}) rotate(${rotation}deg)` }}
           /> : <p className="text-xs font-bold text-ink-faint">審査用の画像を作成中です</p>}
@@ -96,7 +97,7 @@ export function PhotoReviewDetail({
         <Card padding="default">
           <dl>
             <div><dt className="text-xs font-bold text-ink-faint">送ってくれた人</dt><dd className="mt-1 text-xs font-bold text-ink">{text(photo.owner_name) || '名前未取得'}</dd><small className="mt-1 block text-xs text-ink-faint">投稿 {numberOrDash(photo.submission_count)}回目 ／ 戻したこと {numberOrDash(photo.returned_count)}回</small></div>
-            <div className="mt-3 border-t border-hairline pt-3"><dt className="text-xs font-bold text-ink-faint">ペット</dt><dd className="mt-1 text-xs font-bold text-ink">{text(photo.pet_name) || '未取得'}（{text(photo.animal_type) === 'cat' ? '猫' : '犬'}・{text(photo.breed) || '品種未取得'}）</dd></div>
+            <div className="mt-3 border-t border-hairline pt-3"><dt className="text-xs font-bold text-ink-faint">ペット</dt><dd className="mt-1 text-xs font-bold text-ink">{photoPetDisplayName(photo.pet_name, { fallback: '未取得', honorific: false })}（{text(photo.animal_type) === 'cat' ? '猫' : '犬'}・{text(photo.breed) || '品種未取得'}）</dd></div>
             <div className="mt-3 border-t border-hairline pt-3"><dt className="text-xs font-bold text-ink-faint">届いた日時</dt><dd className="mt-1 text-xs font-bold text-ink">{formatPhotoReceivedAt(photo.created_at)}</dd></div>
             <div className="mt-3 border-t border-hairline pt-3"><dt className="text-xs font-bold text-ink-faint">そえられた言葉</dt><dd className="mt-1 text-xs font-bold text-ink">{text(photo.caption) ? `「${text(photo.caption)}」` : 'コメントなし'}</dd></div>
           </dl>

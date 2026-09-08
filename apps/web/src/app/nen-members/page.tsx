@@ -18,6 +18,7 @@ import { formatPhotoReceivedAt } from './photo-review-time'
 import { PhotoReviewDetail } from './photo-review-detail'
 import { PhotoPublications } from './photo-publications'
 import { safePhotoSrc } from './photo-src'
+import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 import { photoNoticeFor } from './photo-notice'
 import styles from './photo-review.module.css'
 
@@ -507,12 +508,12 @@ export default function PhotoReviewsPage() {
           return <article key={photoId} className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card" style={selected ? { borderColor: 'var(--color-accent)', boxShadow: '0 0 0 1px var(--color-accent)' } : undefined}>
           <div className="relative h-40 overflow-hidden bg-canvas-sunken">
             {imageSrc
-              ? <img src={imageSrc} alt={`${photoPetName(photo)}の投稿写真`} loading="lazy" className="h-full w-full object-cover" />
+              ? <img src={imageSrc} alt={`${photoPetDisplayName(photo.pet_name)}の投稿写真`} loading="lazy" className="h-full w-full object-cover" />
               : <div className="grid h-full w-full place-items-center text-xs font-bold text-ink-faint">画像を表示できません</div>}
             <label className="absolute left-2 top-2 flex cursor-pointer items-center gap-1.5 rounded-control border border-hairline bg-canvas px-2 py-1 text-xs font-semibold text-ink-secondary"><input type="checkbox" checked={selected} onChange={() => togglePhotoSelection(photoId)} className="accent-accent" /><span>選ぶ</span></label>
           </div>
           <div className="p-4">
-            <div className="flex items-start justify-between gap-3"><div><p className="font-bold text-ink">{photoPetName(photo)}</p><p className="mt-1 text-xs text-ink-faint">{text(photo.owner_name) || '名前未取得'}・{formatPhotoReceivedAt(photo.created_at)}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${photo.status === 'pending' ? 'bg-status-warn-soft text-status-warn-deep' : photo.status === 'adopted' ? 'bg-accent-soft text-accent-hover' : 'bg-canvas-sunken text-ink-faint'}`}>{photo.status === 'pending' ? '審査待ち' : photo.status === 'adopted' ? '通しました' : '戻しました'}</span></div>
+            <div className="flex items-start justify-between gap-3"><div><p className="font-bold text-ink">{photoPetDisplayName(photo.pet_name)}</p><p className="mt-1 text-xs text-ink-faint">{text(photo.owner_name) || '名前未取得'}・{formatPhotoReceivedAt(photo.created_at)}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${photo.status === 'pending' ? 'bg-status-warn-soft text-status-warn-deep' : photo.status === 'adopted' ? 'bg-accent-soft text-accent-hover' : 'bg-canvas-sunken text-ink-faint'}`}>{photo.status === 'pending' ? '審査待ち' : photo.status === 'adopted' ? '通しました' : '戻しました'}</span></div>
             <p className="mt-2 min-h-5 truncate text-sm text-ink-secondary" title={text(photo.caption) || 'コメントなし'}>{text(photo.caption) || 'コメントなし'}</p>
             {text(photo.latest_risk_flag) && !['safe', 'none', 'low'].includes(text(photo.latest_risk_flag)) && <p className="mt-2 rounded-control bg-status-warn-soft px-3 py-2 text-xs font-semibold text-status-warn-deep">注意候補：{photoRiskLabel(text(photo.latest_risk_flag))}</p>}
             {photo.status === 'adopted' && <p className="mt-3 rounded-control bg-accent-soft px-3 py-2 text-xs font-semibold text-accent-hover">5ポイント付与済み・{photo.publication_consent_at && !photo.publication_withdrawn_at ? '公開中' : '公開は未同意'}</p>}
@@ -585,7 +586,7 @@ export default function PhotoReviewsPage() {
                 : <div className="grid h-16 w-16 place-items-center rounded-control bg-canvas-sunken text-xs font-bold text-ink-faint">—</div>}
               <div>
               <p className="font-semibold text-ink">
-                {photoPetName(rejectingPhoto)}／{text(rejectingPhoto.owner_name) || 'お名前は未取得'}
+                {photoPetDisplayName(rejectingPhoto.pet_name)}／{text(rejectingPhoto.owner_name) || 'お名前は未取得'}
               </p>
               <p className="mt-1 text-xs text-ink-faint">
                 {formatPhotoReceivedAt(rejectingPhoto.created_at)} に届きました
@@ -598,7 +599,7 @@ export default function PhotoReviewsPage() {
               {REVIEW_REASONS.map((reason) => <label key={reason.value} className="flex cursor-pointer items-start gap-2 rounded-control border border-hairline px-3 py-2.5 text-sm text-ink-secondary"><input type="radio" name="photo-review-reason" value={reason.value} checked={reasonCode === reason.value} onChange={() => { setReasonCode(reason.value); setReasonError('') }} className="mt-0.5" /><span><span className="font-medium text-ink">{reason.label}</span><span className="mt-1 block text-xs text-ink-faint">「{reason.message}」</span></span></label>)}
             </fieldset>
             <label className="block text-sm font-semibold text-ink">お客様に届く補足（直せます）<textarea value={reasonNote} onChange={(event) => { setReasonNote(event.target.value.slice(0, 500)); setReasonError('') }} rows={2} placeholder={reasonCode === 'other' ? 'お客様に送る文章を書いてください' : '必要な場合だけ補足します'} className="mt-2 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></label>
-            <div className="rounded-control border border-accent-border bg-accent-soft p-3 text-sm text-ink-secondary"><p className="font-semibold text-ink">お客様にはこう届きます（直せます）</p><p className="mt-1 whitespace-pre-line">{photoPetName(rejectingPhoto)}の写真をありがとうございます。{reasonCode === 'other' ? reasonNote || 'お客様に送る文章を入力してください。' : selectedReasonMessage}{reasonNote && reasonCode !== 'other' ? `\n${reasonNote}` : ''}{`\n`}お手数をおかけします。</p></div>
+            <div className="rounded-control border border-accent-border bg-accent-soft p-3 text-sm text-ink-secondary"><p className="font-semibold text-ink">お客様にはこう届きます（直せます）</p><p className="mt-1 whitespace-pre-line">{photoPetDisplayName(rejectingPhoto.pet_name)}の写真をありがとうございます。{reasonCode === 'other' ? reasonNote || 'お客様に送る文章を入力してください。' : selectedReasonMessage}{reasonNote && reasonCode !== 'other' ? `\n${reasonNote}` : ''}{`\n`}お手数をおかけします。</p></div>
             <label className="flex items-start gap-2 text-sm text-ink-secondary"><input type="checkbox" checked readOnly disabled className="mt-0.5 opacity-100" /><span><span className="font-semibold text-ink">もう一度 送ってもらえるようお願いする</span><span className="block text-xs text-ink-faint">写真を送るボタンの保存先はまだ接続されていません。</span></span></label>
             <label className="flex items-start gap-2 text-sm text-ink-secondary"><input type="checkbox" readOnly disabled className="mt-0.5 opacity-100" /><span><span className="font-semibold text-ink">この人の次の投稿は、必ず人が見る</span><span className="block text-xs text-ink-faint">要注意投稿者の保存先はまだ接続されていません。</span></span></label>
             <p className="text-xs font-semibold text-ink-faint">戻しても、この方のマイルは減りません。</p>
@@ -631,11 +632,6 @@ function photoRiskLabel(flag: string) {
   if (flag === 'logo') return '他社ロゴらしきもの'
   if (flag === 'duplicate') return '重複らしきもの'
   return flag
-}
-
-function photoPetName(photo: Record<string, unknown>) {
-  const name = text(photo.pet_name) || 'ペット'
-  return /(?:ちゃん|くん|さん)$/.test(name) ? name : `${name}ちゃん`
 }
 
 function isPhotoReviewMetrics(value: unknown): value is PhotoReviewMetrics {

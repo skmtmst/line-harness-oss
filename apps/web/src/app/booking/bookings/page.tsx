@@ -6,6 +6,7 @@ import { bookingApi, type BookingAdminDetail, type BookingMenu, type BookingRequ
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
+import FolderPanel, { FOLDER_RAIL_WIDTH } from '@/components/shared/folder-panel'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import BookingCalendar from './booking-calendar'
 
@@ -411,36 +412,26 @@ export default function BookingsPage() {
         />
       </div>
 
-      <div data-design="Body" className="flex flex-col gap-4 xl:flex-row">
-        <aside
-          data-design="Folders"
-          className="bg-canvas rounded-card border-hairline h-fit shrink-0 border p-3 xl:w-56"
-        >
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-ink text-xs font-semibold">メニュー</span>
-            <span className="text-ink-faint text-xs">{summary.total} 件</span>
-          </div>
-          <ul className="space-y-0.5">
-            <li>
-              <FolderRow
-                label="すべて"
-                count={summary.total}
-                active={menuFilter === 'all'}
-                onClick={() => setMenuFilter('all')}
-              />
-            </li>
-            {menus.map((m) => (
-              <li key={m.id}>
-                <FolderRow
-                  label={m.name}
-                  count={menuCounts.get(m.name) ?? 0}
-                  active={menuFilter === m.name}
-                  onClick={() => setMenuFilter(m.name)}
-                />
-              </li>
-            ))}
-          </ul>
-        </aside>
+      <div
+        data-design="Body"
+        className="flex flex-col items-start gap-4 xl:flex-row"
+      >
+        <div data-design="Folders" className="shrink-0" style={{ width: FOLDER_RAIL_WIDTH }}>
+          <FolderPanel
+            heading="メニュー"
+            rows={[
+              { id: 'all', label: 'すべて', count: summary.total },
+              ...menus.map((menu) => ({
+                id: menu.name,
+                label: menu.name,
+                count: menuCounts.get(menu.name) ?? 0,
+              })),
+            ]}
+            activeId={menuFilter}
+            onSelect={setMenuFilter}
+            total={`${summary.total} 件`}
+          />
+        </div>
 
         <div className="min-w-0 flex-1">
           <div
@@ -695,30 +686,6 @@ function Kpi({
       </p>
       <p className="text-ink-faint mt-1 text-xs">{detail}</p>
     </div>
-  )
-}
-
-function FolderRow({
-  label,
-  count,
-  active,
-  onClick,
-}: {
-  label: string
-  count: number
-  active: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-xs ${
-        active ? 'bg-accent-deep text-on-accent' : 'text-ink-secondary hover:bg-canvas-sunken'
-      }`}
-    >
-      <span className="truncate">{label}</span>
-      <span className="shrink-0 tabular-nums">{count}</span>
-    </button>
   )
 }
 
