@@ -631,7 +631,11 @@ conversions.get('/api/conversions/export', conversionPermission('export'), async
 });
 
 // GET /api/conversions/points - list all
-conversions.get('/api/conversions/points', async (c) => {
+//
+// 旧口だが成果・承認待ち(友だち名含む)を返すので、定義系と同じ
+// `conversionPermission('view')` で縛る(#513 M1)。アカウント境界の
+// 絞り込み(visibleConversionPointIds)はそのまま残す。
+conversions.get('/api/conversions/points', conversionPermission('view'), async (c) => {
   try {
     const visibleIds = await visibleConversionPointIds(c);
     const items = (await getConversionPoints(c.env.DB)).filter((item) => visibleIds.has(item.id));
@@ -794,7 +798,10 @@ conversions.post('/api/conversions/track', requireRole('owner', 'admin'), async 
 });
 
 // GET /api/conversions/events - list events with filters
-conversions.get('/api/conversions/events', async (c) => {
+//
+// 旧口だが友だち単位の成果記録を返すので、`conversionPermission('view')`
+// で縛る(#513 M1)。アカウント境界の絞り込みはそのまま残す。
+conversions.get('/api/conversions/events', conversionPermission('view'), async (c) => {
   try {
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const events = await getConversionEvents(c.env.DB, {
@@ -862,7 +869,10 @@ const APPROVAL_STATUSES = new Set(['pending', 'approved', 'rejected']);
 // GET /api/conversions/approvals?status=pending|approved|rejected
 // Affiliate-attributed CVs awaiting/holding an approval decision. duplicateFlag
 // reuses the Phase 1 identity_key heuristic scoped per affiliate.
-conversions.get('/api/conversions/approvals', async (c) => {
+// 承認待ち(友だち名・案件名含む)を返すので、定義系と同じ
+// `conversionPermission('view')` で縛る(#513 M1)。利用者は
+// /conversions 画面のタブだけなので、affiliates 側の導線は変えない。
+conversions.get('/api/conversions/approvals', conversionPermission('view'), async (c) => {
   try {
     const status = c.req.query('status') ?? 'pending';
     if (!APPROVAL_STATUSES.has(status)) {
@@ -893,7 +903,8 @@ conversions.get('/api/conversions/approvals', async (c) => {
 
 // PATCH /api/conversions/events/:id/approval - approve/reject an attributed CV
 conversions.patch('/api/conversions/events/:id/approval', requireRole('owner', 'admin'), requireVisibleConversionEvent, async (c) => {
-  auditLog(c, 'conversion.approval.update', { kind: 'conversion_event', id: c.req.param('id') });
+  // 監査は更新の成功が確定してから残す(#513 M7)。以前は検証の前に
+  // 書いていたため、400/404の失敗も「更新」の記録に混ざっていた。
   try {
     const body = await c.req
       .json<{ status?: string }>()
@@ -919,6 +930,7 @@ conversions.patch('/api/conversions/events/:id/approval', requireRole('owner', '
         404,
       );
     }
+    auditLog(c, 'conversion.approval.update', { kind: 'conversion_event', id: c.req.param('id') });
 
     // Mileage projection is retry-safe and runs even for `already_set`. This is
     // deliberate: if an earlier request updated the approval row but failed
