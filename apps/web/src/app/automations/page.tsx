@@ -45,26 +45,6 @@ interface Automation {
   updatedAt: string
 }
 
-const eventTypeOptions: { value: AutomationEventType; label: string }[] = [
-  { value: 'friend_add', label: '友だち追加' },
-  { value: 'tag_change', label: 'タグ変更' },
-  { value: 'score_threshold', label: 'スコア閾値' },
-  { value: 'cv_fire', label: 'CV発火' },
-  { value: 'message_received', label: 'メッセージ受信' },
-  { value: 'postback_received', label: 'ポストバック受信（リッチメニュー等）' },
-  { value: 'calendar_booked', label: 'カレンダー予約' },
-  { value: 'form_submitted', label: 'フォームに回答' },
-  { value: 'link_clicked', label: 'リンクが押された' },
-  { value: 'datetime', label: '指定日時になった' },
-  { value: 'daily', label: '毎日決まった時刻' },
-  { value: 'weekly', label: '毎週決まった曜日・時刻' },
-  { value: 'ec.order.confirmed', label: 'EC：注文確定' },
-  { value: 'ec.order.shipped', label: 'EC：発送完了' },
-  { value: 'ec.subscription.upcoming', label: 'EC：定期便の次回予定' },
-  { value: 'ec.subscription.payment_failed', label: 'EC：定期便の決済失敗' },
-  { value: 'ec.subscription.cancelled', label: 'EC：定期便の解約' },
-]
-
 const eventTypeLabelMap: Record<AutomationEventType, string> = {
   friend_add: '友だち追加',
   tag_change: 'タグ変更',
@@ -118,24 +98,6 @@ type PendingAction = {
   accountId: string | null
 }
 
-interface CreateFormState {
-  name: string
-  description: string
-  eventType: AutomationEventType
-  actionsJson: string
-  conditionsJson: string
-  priority: number
-}
-
-const initialForm: CreateFormState = {
-  name: '',
-  description: '',
-  eventType: 'friend_add',
-  actionsJson: '[\n  {\n    "type": "add_tag",\n    "params": {}\n  }\n]',
-  conditionsJson: '{}',
-  priority: 0,
-}
-
 function actionLabel(action: AutomationAction): string {
   const labels: Record<AutomationAction['type'], string> = {
     add_tag: 'タグを付ける',
@@ -168,6 +130,9 @@ const MERGED_TABS = [
   { key: 'common-actions', label: '共通アクション', href: '/common-actions' },
 ]
 
+/** 一覧の1ページぶん。口は全件返すので、ここで切り出す。 */
+const AUTOMATION_PAGE_SIZE = 6
+
 export default function AutomationsPage() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const tab = useMergedTab(MERGED_TABS)
@@ -176,10 +141,6 @@ export default function AutomationsPage() {
   const [automations, setAutomations] = useState<Automation[]>([])
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [error, setError] = useState('')
-  const [showCreate, setShowCreate] = useState(false)
-  const [form, setForm] = useState<CreateFormState>({ ...initialForm })
-  const [saving, setSaving] = useState(false)
-  const [formError, setFormError] = useState('')
   /*
    * **ブラウザの `confirm()` を使わない。**
    *
@@ -199,6 +160,7 @@ export default function AutomationsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'stopped'>('all')
   const [sortOrder, setSortOrder] = useState<'runs' | 'priority' | 'name'>('runs')
+  const [page, setPage] = useState(1)
   /** 押したあとにアカウントが変わったか。変わっていたら実行させない。 */
   const accountChanged = pending !== null && pending.accountId !== selectedAccountId
   const loadRequestRef = useRef(0)
@@ -256,52 +218,6 @@ export default function AutomationsPage() {
       loadRequestRef.current += 1
     }
   }, [accountLoading, loadAutomations])
-
-  const handleCreate = async () => {
-    if (!form.name.trim()) {
-      setFormError('ルール名を入力してください')
-      return
-    }
-
-    let parsedActions: AutomationAction[]
-    let parsedConditions: Record<string, unknown>
-    try {
-      parsedActions = JSON.parse(form.actionsJson)
-    } catch {
-      setFormError('アクションのJSON形式が正しくありません')
-      return
-    }
-    try {
-      parsedConditions = JSON.parse(form.conditionsJson)
-    } catch {
-      setFormError('条件のJSON形式が正しくありません')
-      return
-    }
-
-    setSaving(true)
-    setFormError('')
-    try {
-      const res = await api.automations.create({
-        name: form.name,
-        description: form.description || null,
-        eventType: form.eventType,
-        actions: parsedActions,
-        conditions: parsedConditions,
-        priority: form.priority,
-      })
-      if (res.success) {
-        setShowCreate(false)
-        setForm({ ...initialForm })
-        loadAutomations()
-      } else {
-        setFormError(res.error)
-      }
-    } catch {
-      setFormError('作成に失敗しました')
-    } finally {
-      setSaving(false)
-    }
-  }
 
   /** 稼働の入れ替えそのもの。返事を確かめてから呼び出し元に戻す。 */
   const applyToggle = async (target: Automation) => {
@@ -442,10 +358,17 @@ export default function AutomationsPage() {
       .sort((a, b) => sortOrder === 'name'
         ? a.name.localeCompare(b.name, 'ja')
         : sortOrder === 'runs'
-          // Pencilの一覧順は、30日実績の表示値ではなく設定した実行順を保つ。
-          ? b.priority - a.priority || a.name.localeCompare(b.name, 'ja')
+          // 「動いた回数が多い順」はこの30日の実績で並べる。
+          // 同数は名前順に寄せて、開くたびに順番が変わらないようにする。
+          ? b.executionCount30d - a.executionCount30d || a.name.localeCompare(b.name, 'ja')
           : b.priority - a.priority || a.name.localeCompare(b.name, 'ja'))
   })()
+  const listPageCount = Math.max(1, Math.ceil(visibleAutomations.length / AUTOMATION_PAGE_SIZE))
+  const currentPage = Math.min(Math.max(1, page), listPageCount)
+  const pagedAutomations = visibleAutomations.slice(
+    (currentPage - 1) * AUTOMATION_PAGE_SIZE,
+    currentPage * AUTOMATION_PAGE_SIZE,
+  )
 
   return (
     <div>
@@ -499,8 +422,8 @@ export default function AutomationsPage() {
         <input
           type="search"
           value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder="名前・きっかけ・することで検索"
+          onChange={(event) => { setSearchQuery(event.target.value); setPage(1) }}
+          placeholder="ルール名・きっかけ・することで検索"
           className="h-10 w-full max-w-lg rounded-control border border-hairline bg-canvas px-3 text-sm text-ink outline-none focus:border-info"
         />
         <div className="flex gap-2">
@@ -514,7 +437,7 @@ export default function AutomationsPage() {
           <SelectField
             aria-label="並び順"
             value={sortOrder}
-            onChange={(event) => setSortOrder(event.target.value as 'runs' | 'priority' | 'name')}
+            onChange={(event) => { setSortOrder(event.target.value as 'runs' | 'priority' | 'name'); setPage(1) }}
             options={[
               { value: 'runs', label: '動いた回数が多い順' },
               { value: 'priority', label: '動く順' },
@@ -535,7 +458,7 @@ export default function AutomationsPage() {
             <FilterChip
               key={value}
               selected={statusFilter === value}
-              onChange={() => setStatusFilter(value)}
+              onChange={() => { setStatusFilter(value); setPage(1) }}
             >
               {label}
             </FilterChip>
@@ -552,91 +475,6 @@ export default function AutomationsPage() {
         </div>
       )}
 
-      {/* Create form */}
-      {showCreate && (
-        <div className="mb-6 bg-canvas rounded-card border border-hairline p-6">
-          <h2 className="text-sm font-semibold text-gray-800 mb-4">新規オートメーションを作成</h2>
-          <div className="space-y-4 max-w-lg">
-            <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">ルール名 <span className="text-red-500">*</span></label>
-              <input
-                type="text"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="例: 友だち追加時にウェルカムタグ付与"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">説明</label>
-              <textarea
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
-                rows={2}
-                placeholder="ルールの説明 (省略可)"
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">イベントタイプ</label>
-              <SelectField
-                value={form.eventType}
-                onChange={(e) => setForm({ ...form, eventType: e.target.value as AutomationEventType })}
-                options={eventTypeOptions.map((opt) => ({ value: opt.value, label: opt.label }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">アクション (JSON)</label>
-              <textarea
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
-                rows={6}
-                placeholder='[{"type": "add_tag", "params": {"tagId": "..."}}]'
-                value={form.actionsJson}
-                onChange={(e) => setForm({ ...form, actionsJson: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">条件 (JSON)</label>
-              <textarea
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
-                rows={3}
-                placeholder='{"tagId": "...", "operator": "equals"}'
-                value={form.conditionsJson}
-                onChange={(e) => setForm({ ...form, conditionsJson: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">優先度</label>
-              <input
-                type="number"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                value={form.priority}
-                onChange={(e) => setForm({ ...form, priority: parseInt(e.target.value, 10) || 0 })}
-              />
-            </div>
-
-            {formError && <p className="text-xs text-red-600">{formError}</p>}
-
-            <div className="flex gap-2">
-              <button
-                onClick={handleCreate}
-                disabled={saving}
-                className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 rounded-control px-4 py-2 min-h-[44px] text-sm font-medium disabled:opacity-50"
-              >
-                {saving ? '作成中...' : '作成'}
-              </button>
-              <button
-                onClick={() => { setShowCreate(false); setFormError('') }}
-                className="px-4 py-2 min-h-[44px] text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-lg transition-colors"
-              >
-                キャンセル
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {loadStatus === 'loading' ? (
         <ListState kind="loading" title="オートメーションを読み込んでいます" />
       ) : loadStatus === 'error' ? (
@@ -646,7 +484,7 @@ export default function AutomationsPage() {
           description="登録したルールは消えていません。再読み込みしても直らない場合はエラー報告へ。"
           action={<Button variant="secondary" onClick={() => void loadAutomations()}>オートメーションを再読み込み</Button>}
         />
-      ) : visibleAutomations.length === 0 && !showCreate ? (
+      ) : visibleAutomations.length === 0 ? (
         <ListState
           kind="empty"
           title={automations.length === 0
@@ -660,7 +498,7 @@ export default function AutomationsPage() {
           <div className="grid grid-cols-6 gap-3 bg-canvas-sunken px-4 py-3 text-xs font-semibold text-ink-faint">
             <span>きっかけ</span><span>だれに（条件）</span><span>すること</span><span>この30日</span><span>状態</span><span aria-hidden />
           </div>
-          {visibleAutomations.slice(0, 6).map((automation) => (
+          {pagedAutomations.map((automation) => (
             <div key={automation.id} className="grid min-h-14 grid-cols-6 items-center gap-3 border-t border-hairline px-4 py-2 text-sm">
               <div className="min-w-0">
                 <p className="truncate font-semibold text-ink" title={automation.name}>{automation.name}</p>
@@ -680,8 +518,14 @@ export default function AutomationsPage() {
             </div>
           ))}
           <div className="flex items-center justify-between border-t border-hairline px-4 py-3 text-xs text-ink-faint">
-            <span>オートメーション {visibleAutomations.length}本中 1〜{Math.min(6, visibleAutomations.length)}本を表示</span>
-            <span>前へ　<strong className="text-accent-deep">1</strong>　2　3　次へ</span>
+            <span>オートメーション {visibleAutomations.length}本中 {(currentPage - 1) * AUTOMATION_PAGE_SIZE + 1}〜{Math.min(currentPage * AUTOMATION_PAGE_SIZE, visibleAutomations.length)}本を表示</span>
+            <div className="flex items-center gap-3" aria-label="ページ送り">
+              <button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} className="text-action disabled:text-ink-faint">前へ</button>
+              {Array.from({ length: listPageCount }, (_, index) => index + 1).map((pageNumber) => (
+                <button key={pageNumber} type="button" aria-current={pageNumber === currentPage ? 'page' : undefined} onClick={() => setPage(pageNumber)} className={pageNumber === currentPage ? 'text-action font-bold' : ''}>{pageNumber}</button>
+              ))}
+              <button type="button" disabled={currentPage >= listPageCount} onClick={() => setPage(currentPage + 1)} className="text-action disabled:text-ink-faint">次へ</button>
+            </div>
           </div>
         </div>
       )}

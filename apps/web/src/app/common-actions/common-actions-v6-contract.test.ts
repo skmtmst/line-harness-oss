@@ -74,8 +74,8 @@ describe('V6共通アクションの画面契約', () => {
   })
 
   it('一覧の集計・絞り込み・CSVを新しい契約へ接続する', () => {
-    expect(LIST).toContain('executionCountThisMonth')
-    expect(LIST).toContain('failureCountThisMonth')
+    expect(LIST).toContain('summary?.executions')
+    expect(LIST).toContain('summary?.failures')
     expect(LIST).toContain('api.commonActions.csvUrl(selectedAccountId)')
     expect(LIST).toContain('古い版あり')
     expect(LIST).toContain('limit: PAGE_SIZE')
@@ -115,5 +115,16 @@ describe('V6共通アクションの機能契約', () => {
     expect(ENGINE).toContain('buildExecutionPlan')
     expect(ENGINE).toContain('execution_plan_json')
     expect(ENGINE).toContain('common_action_marker')
+  })
+
+  it('札・KPIは集計口で受け、件数表示の全件取得はしない（#554 点検#519中2）', () => {
+    expect(LIST.match(/api\.commonActions\.list\(/g)).toHaveLength(1)
+    expect(LIST).toContain('response.summary')
+    expect(LIST).toContain('summary?.total')
+    expect(LIST).toContain('summary?.outdatedItems')
+    expect(LIST).not.toContain('summaryResponse')
+    expect(LIST).not.toContain('summaryItems')
+    // 暫定の注記ではなく、口の集計を使う
+    expect(API).toContain('summary?: {')
   })
 })

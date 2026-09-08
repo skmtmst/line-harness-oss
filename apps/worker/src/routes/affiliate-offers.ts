@@ -57,6 +57,41 @@ function isValidReward(v: unknown): v is number {
   return typeof v === 'number' && Number.isInteger(v) && v >= 0;
 }
 
+/**
+ * 案件に結ぶタグ・シナリオが、案件と同じLINEアカウントのものか確かめる
+ * （#554 点検#505中3）。他アカウントのものを結ぶと成果時の誤動作・
+ * 情報の混ざりになる。存在しない・見えないは区別せず400にする。
+ */
+async function offerReferenceError(
+  db: D1Database,
+  kind: 'tag' | 'scenario',
+  id: string,
+  lineAccountId: string,
+): Promise<string | null> {
+  const table = kind === 'tag' ? 'tags' : 'scenarios';
+  const label = kind === 'tag' ? 'タグ' : 'シナリオ';
+  const row = await db.prepare(
+    `SELECT id FROM ${table} WHERE id = ? AND line_account_id = ?`,
+  ).bind(id, lineAccountId).first<{ id: string }>();
+  return row ? null : `${label}が見つかりません。選び直してください`;
+}
+
+async function offerReferencesError(
+  db: D1Database,
+  refs: { tagId?: string | null; scenarioId?: string | null },
+  lineAccountId: string,
+): Promise<string | null> {
+  if (typeof refs.tagId === 'string' && refs.tagId) {
+    const error = await offerReferenceError(db, 'tag', refs.tagId, lineAccountId);
+    if (error) return error;
+  }
+  if (typeof refs.scenarioId === 'string' && refs.scenarioId) {
+    const error = await offerReferenceError(db, 'scenario', refs.scenarioId, lineAccountId);
+    if (error) return error;
+  }
+  return null;
+}
+
 // GET /api/affiliate-offers - list all (optionally activeOnly)
 affiliateOffers.get('/api/affiliate-offers', async (c) => {
   try {
@@ -133,6 +168,12 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), asy
     if (!scope.allowedAccountIds.includes(lineAccountId)) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
+    const refError = await offerReferencesError(
+      c.env.DB, { tagId: body.tagId, scenarioId: body.scenarioId }, lineAccountId,
+    );
+    if (refError) {
+      return c.json({ success: false, error: refError }, 400);
+    }
 
     const offer = await createAffiliateOffer(c.env.DB, {
       name,
@@ -195,6 +236,20 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
     const existing = await getAffiliateOfferById(c.env.DB, id);
     if (!existing) {
       return c.json({ success: false, error: 'Offer not found' }, 404);
+    }
+    const effectiveAccountId = body.lineAccountId ?? existing.line_account_id;
+    if ((body.tagId || body.scenarioId) && !effectiveAccountId) {
+      return c.json({ success: false, error: '案件のLINEアカウントを選んでください' }, 400);
+    }
+    const refError = effectiveAccountId
+      ? await offerReferencesError(
+        c.env.DB,
+        { tagId: body.tagId, scenarioId: body.scenarioId },
+        effectiveAccountId,
+      )
+      : null;
+    if (refError) {
+      return c.json({ success: false, error: refError }, 400);
     }
 
     const updated = await updateAffiliateOffer(c.env.DB, id, {

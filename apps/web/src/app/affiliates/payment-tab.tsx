@@ -275,7 +275,9 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
     setOperationError('')
     setNotice('')
     try {
-      const statements = await Promise.all(preview.affiliates.map((item) => {
+      // 1人失敗で全体失敗にしない。人ごとに結果を分けて出す。
+      // 合言葉は人ごとに使い回すので、押し直しは失敗分だけ試せる。
+      const settled = await Promise.allSettled(preview.affiliates.map((item) => {
         const key = statementKeysRef.current.get(item.affiliateId) ?? crypto.randomUUID()
         statementKeysRef.current.set(item.affiliateId, key)
         return api.affiliates.createStatement({
@@ -285,9 +287,20 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
           expectedVersion: closed.version,
         }, key)
       }))
-      const failed = statements.find((statement) => !statement.success)
-      if (failed && !failed.success) throw new Error(failed.error)
-      setNotice(`${preview.affiliates.length.toLocaleString('ja-JP')}人分の支払明細を発行し、LINE通知を依頼しました。`)
+      const failedNames: string[] = []
+      let succeeded = 0
+      settled.forEach((result, index) => {
+        if (result.status === 'fulfilled' && result.value.success) succeeded += 1
+        else failedNames.push(preview.affiliates[index].affiliateName)
+      })
+      if (failedNames.length === 0) {
+        setNotice(`${preview.affiliates.length.toLocaleString('ja-JP')}人分の支払明細を発行し、LINE通知を依頼しました。`)
+      } else {
+        if (succeeded > 0) setNotice(`${succeeded.toLocaleString('ja-JP')}人分の支払明細を発行しました。`)
+        const shown = failedNames.slice(0, 5).join('、')
+        const rest = failedNames.length > 5 ? `ほか${failedNames.length - 5}人` : ''
+        setOperationError(`${failedNames.length}人分を発行できませんでした（${shown}${rest}）。もう一度押すと失敗分を試し直せます。`)
+      }
     } catch (cause) {
       setOperationError(cause instanceof Error ? cause.message : '支払明細を発行できませんでした')
     } finally {
@@ -297,6 +310,11 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
 
   const preparePayout = async () => {
     if (!closed || operationBusy) return
+    // 合言葉が空のまま送らない（二重発行の不安を残さない）。
+    if (!payoutKey) {
+      setOperationError('振込用CSVの合言葉がありません。締め直してからお試しください。')
+      return
+    }
     setOperationBusy(true)
     setOperationError('')
     setNotice('')
@@ -408,7 +426,7 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
         <Button onClick={() => { void issueStatements() }} disabled={!closed || operationBusy}>
           支払明細をまとめて出す
         </Button>
-        <Button onClick={() => { void preparePayout() }} disabled={!closed || operationBusy} title={missingBanks > 0 ? '振込先が未登録の人がいる場合は、誰に依頼するかを確認できます' : undefined}>
+        <Button onClick={() => { void preparePayout() }} disabled={!closed || operationBusy || !payoutKey} title={missingBanks > 0 ? '振込先が未登録の人がいる場合は、誰に依頼するかを確認できます' : undefined}>
           振込用CSVを書き出す
         </Button>
       </div>

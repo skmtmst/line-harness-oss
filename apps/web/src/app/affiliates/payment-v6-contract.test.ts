@@ -32,7 +32,7 @@ describe('V6 支払いの追記台帳契約', () => {
     expect(API).toContain("purpose: 'affiliate.payout.export'")
     expect(PAYMENT).toContain("process.env.NEXT_PUBLIC_API_URL ?? ''")
     expect(PAYMENT).toContain('statementKeysRef.current.get(item.affiliateId)')
-    expect(PAYMENT).toContain('statements.find((statement) => !statement.success)')
+    expect(PAYMENT).toContain('Promise.allSettled(preview.affiliates.map')
     expect(PAYMENT).toContain('}, payoutKey)')
     expect(PAYMENT).toContain('exportKey,')
   })
@@ -80,5 +80,17 @@ describe('V6 支払いの追記台帳契約', () => {
     expect(settlementCheck).toBeGreaterThan(-1)
     expect(PAYMENT).toContain('setItems(summaries?.success && Array.isArray(summaries.data) ? summaries.data : [])')
     expect(setPreview).toBeGreaterThan(settlementCheck)
+  })
+
+  it('明細発行は1人失敗で全体失敗にせず、人ごとに結果を出す（#554 点検#505中8）', () => {
+    expect(PAYMENT).toContain('Promise.allSettled')
+    expect(PAYMENT).toContain('failedNames')
+    expect(PAYMENT).toContain('もう一度押すと失敗分を試し直せます')
+    expect(PAYMENT).not.toContain('await Promise.all(preview.affiliates.map')
+  })
+
+  it('振込用CSVは合言葉が空のまま送らない（#554 点検#505中8）', () => {
+    expect(PAYMENT).toContain('if (!payoutKey)')
+    expect(PAYMENT).toContain('disabled={!closed || operationBusy || !payoutKey}')
   })
 })
