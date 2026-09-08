@@ -182,7 +182,11 @@ ecCommerce.get(
   });
 });
 
-ecCommerce.get('/api/ec-commerce/events', requireRole('owner', 'admin', 'staff'), async (c) => {
+ecCommerce.get(
+  '/api/ec-commerce/events',
+  requireRole('owner', 'admin', 'staff'),
+  requireEcPermission('ec.event.view'),
+  async (c) => {
   const lineAccountId = c.req.query('lineAccountId')?.trim();
   if (lineAccountId && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
@@ -248,7 +252,11 @@ ecCommerce.get('/api/ec-commerce/events', requireRole('owner', 'admin', 'staff')
   });
 });
 
-ecCommerce.get('/api/ec-commerce/subscriptions', requireRole('owner', 'admin', 'staff'), async (c) => {
+ecCommerce.get(
+  '/api/ec-commerce/subscriptions',
+  requireRole('owner', 'admin', 'staff'),
+  requireEcPermission('ec.event.view'),
+  async (c) => {
   const lineAccountId = c.req.query('lineAccountId')?.trim() || '';
   if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
@@ -360,7 +368,11 @@ ecCommerce.get('/api/ec-commerce/subscriptions', requireRole('owner', 'admin', '
   });
 });
 
-ecCommerce.get('/api/ec-commerce/connector', requireRole('owner', 'admin', 'staff'), async (c) => {
+ecCommerce.get(
+  '/api/ec-commerce/connector',
+  requireRole('owner', 'admin', 'staff'),
+  requireEcPermission('ec.event.view'),
+  async (c) => {
   const lineAccountId = c.req.query('lineAccountId')?.trim() || '';
   if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
@@ -520,7 +532,11 @@ ecCommerce.get(
   notificationDeliveriesResponse,
 );
 
-ecCommerce.get('/api/ec-commerce/settings', requireRole('owner', 'admin', 'staff'), async (c) => {
+ecCommerce.get(
+  '/api/ec-commerce/settings',
+  requireRole('owner', 'admin', 'staff'),
+  requireEcPermission('ec.event.view'),
+  async (c) => {
   const lineAccountId = c.req.query('lineAccountId')?.trim();
   if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {

@@ -1152,8 +1152,20 @@ export async function updateMileageRule(
   return getMileageRuleById(db, id);
 }
 
-export async function deleteMileageRule(db: D1Database, id: string): Promise<void> {
-  await db.prepare(`DELETE FROM mileage_rules WHERE id = ?`).bind(id).run();
+/**
+ * 決めごとを履歴ごと消さないための原子削除。N-232 用。
+ * 台帳(mileage_ledger)に1件でも参照があれば消さない。void の行も数える。
+ * SELECTとDELETEを分けると、その間に付与履歴が作られる競合で履歴付き決めごとを
+ * 消せるため、DELETE文自体に NOT EXISTS 条件を持たせて1文で実行する。
+ * 戻り値は消えた件数。0なら履歴あり・存在しない・同時削除のいずれかで、呼び出し側は安全拒否する。
+ */
+export async function deleteMileageRule(db: D1Database, id: string): Promise<number> {
+  const result = await db.prepare(
+    `DELETE FROM mileage_rules
+      WHERE id = ?
+        AND NOT EXISTS (SELECT 1 FROM mileage_ledger WHERE mileage_rule_id = ?)`,
+  ).bind(id, id).run();
+  return result.meta?.changes ?? 0;
 }
 
 export interface ApplyMileageRulesInput {

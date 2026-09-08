@@ -110,6 +110,7 @@ beforeEach(() => {
     allowedAccountIds: ['account-1'], canSeeUnassigned: false, ids: ['account-1'], accounts: [],
   });
   accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(true);
+  dbMocks.deleteMileageRule.mockResolvedValue(1);
   dbMocks.getMileageRewardAdminOverview.mockResolvedValue({ rewards: [], summary: {} });
   dbMocks.getMileageRewardReachMetrics.mockResolvedValue([]);
   dbMocks.getMileageHistoryPeriodSummary.mockResolvedValue({ byType: [], totalAmount: 0, manualCount: 0 });
@@ -508,6 +509,25 @@ describe('mileage admin API', () => {
       ...(method === 'PUT' ? { body: JSON.stringify({ amount: 2 }) } : {}),
     });
     expect(response.status).toBe(409);
+  });
+
+  it('DELETE refuses a rule with grant history (atomic delete returns 0)', async () => {
+    dbMocks.getMileageRuleById.mockResolvedValue({ id: 'rule-1', line_account_id: 'account-1' });
+    dbMocks.deleteMileageRule.mockResolvedValue(0);
+    const first = await call('/api/mileage/rules/rule-1', { method: 'DELETE' });
+    expect(first.status).toBe(409);
+    expect(await first.json()).toMatchObject({ success: false });
+    const second = await call('/api/mileage/rules/rule-1', { method: 'DELETE' });
+    expect(second.status).toBe(409);
+    expect(dbMocks.deleteMileageRule).toHaveBeenCalledWith(env.DB, 'rule-1');
+  });
+
+  it('DELETE removes a rule without history (atomic delete returns 1)', async () => {
+    dbMocks.getMileageRuleById.mockResolvedValue({ id: 'rule-1', line_account_id: 'account-1' });
+    dbMocks.deleteMileageRule.mockResolvedValue(1);
+    const response = await call('/api/mileage/rules/rule-1', { method: 'DELETE' });
+    expect(response.status).toBe(200);
+    expect(dbMocks.deleteMileageRule).toHaveBeenCalledWith(env.DB, 'rule-1');
   });
 
   it('rejects a zero-mile rule update before touching D1', async () => {

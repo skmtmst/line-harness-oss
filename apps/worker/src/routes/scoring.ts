@@ -1009,7 +1009,13 @@ scoring.delete('/api/mileage/rules/:id', requireRole('owner', 'admin'), async (c
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [existing.line_account_id])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
-    await deleteMileageRule(c.env.DB, existing.id);
+    // N-232: 付与履歴がある決めごとは1文の原子DELETEで守る。SELECTとDELETEを分けると
+    // その間に履歴が作られる競合で消せてしまう。0件なら履歴ありとして409で安全拒否し、
+    // 停止(PUT isActive=false)へ誘導する。
+    const deleted = await deleteMileageRule(c.env.DB, existing.id);
+    if (deleted === 0) {
+      return c.json({ success: false, error: '付与履歴があるため削除できません。先に停止してください' }, 409);
+    }
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/mileage/rules/:id error:', err);

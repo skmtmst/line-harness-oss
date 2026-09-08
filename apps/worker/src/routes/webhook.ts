@@ -772,8 +772,9 @@ async function handleEvent(
   }
 
   // 非テキストの受信メッセージ（スタンプ/画像/音声/動画/ファイル/位置情報等）もログに残す。
-  // ここで早期 return することで、テキスト用の auto_reply / scenario 判定には進まない
-  // （スタンプ単体に対するキーワードマッチは意味を持たないため）。inbox 抜けだけ防ぐ。
+  // N-082: ログ・受信箱・メディア保存はそのままに、自動応答の種別条件へ渡す。
+  // 本文は捏造せず空文字で評価するため、キーワード条件のルールは当たらない。
+  // 種別 + 時間帯等の条件で絞ったルール（例: 画像に定型文を返す）のみが動く。
   if (event.type === 'message' && event.message.type !== 'text') {
     const userId = event.source.type === 'user' ? event.source.userId : undefined;
     if (!userId) return;
@@ -841,15 +842,36 @@ async function handleEvent(
       friendId: friend.id,
       metadata: { messageType: msg.type },
     });
-    // text と同様、非 text の自発メッセージ (画像/スタンプ等) でも chat を unread に戻す。
-    // これが無いと resolved 除外 (unanswered-inbox CANDIDATES_SQL) が「解決済み後に
-    // 画像だけ送ってきた友だち」をバッジ・未対応一覧から永久に落としてしまう。
-    // 非 text は auto_reply keyword にマッチし得ないので常に要対応扱いで正しい。
-    await upsertChatOnMessage(db, friend.id);
+    // 自動応答の評価へ渡す。重複抑止・停止中除外・別アカウント分離は
+    // 既存の matchAndReply が担う。replyToken はメッセージイベントに付く。
+    const { matched: nonTextMatched } = await matchAndReply(
+      db,
+      lineClient,
+      friend,
+      '',
+      event.replyToken,
+      {
+        lineAccountId,
+        workerUrl,
+        logContext: 'non-text-message',
+        messageKind: msg.type,
+        incomingEventId: event.webhookEventId,
+        incomingMessageLogId: logId,
+        occurredAt: new Date(event.timestamp).toISOString(),
+      },
+    );
+
+    // 自動応答に当たらなかった自発メッセージだけ chat を unread に戻す
+    // （テキスト経路と同じ扱い）。これが無いと resolved 除外
+    // (unanswered-inbox CANDIDATES_SQL) が「解決済み後に画像だけ送ってきた
+    // 友だち」をバッジ・未対応一覧から永久に落としてしまう。
+    if (!nonTextMatched) {
+      await upsertChatOnMessage(db, friend.id);
+    }
     await recordWebhookAnalyticsEvent(db, lineAccountId, event, {
       friendId: friend.id,
       eventType: 'message_received',
-      dimensions: { messageType: msg.type, matched: false },
+      dimensions: { messageType: msg.type, matched: nonTextMatched },
     });
     return;
   }
