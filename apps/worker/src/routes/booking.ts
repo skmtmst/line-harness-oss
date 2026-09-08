@@ -33,7 +33,7 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { cancelByTrigger, enrollByTrigger } from '../services/reminder-trigger.js';
 import { canTransition, nextStatus, type BookingAction } from '../services/booking-state.js';
-import { getAccountTimeZone, getAvailability, tzDateStr, tzHHMM } from '../services/availability.js';
+import { getAvailability } from '../services/availability.js';
 import {
   removeBookingFromGoogle,
   runCalendarDeleteOperation,
@@ -128,11 +128,9 @@ async function bookingConflictAlternatives(
   },
 ) {
   const endsAt = new Date(input.startsAt.getTime() + input.durationMinutes * 60_000);
-  // 候補の日付・時刻は店舗のタイムゾーンで読む。getAvailability の枠も
-  // 同じタイムゾーンの日付で並ぶため、JST 固定では非JST店舗でずれる。
-  const timeZone = await getAccountTimeZone(db, input.lineAccountId);
-  const date = tzDateStr(timeZone, input.startsAt);
-  const time = tzHHMM(timeZone, input.startsAt);
+  const jst = new Date(input.startsAt.getTime() + 9 * 3600_000).toISOString();
+  const date = jst.slice(0, 10);
+  const time = jst.slice(11, 16);
   const [overlap, availability] = await Promise.all([
     db.prepare(
       `SELECT COUNT(*) AS count, MIN(starts_at) AS conflict_from,
