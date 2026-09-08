@@ -2663,6 +2663,49 @@ export type RichMenuTapStats = {
   total: number
 }
 
+export type RichMenuGroupListItem = {
+  id: string
+  accountId: string
+  name: string
+  chatBarText: string
+  size: 'large' | 'compact'
+  defaultPageId: string | null
+  isDefaultForAll: boolean
+  status: 'draft' | 'published'
+  publishingAt: string | null
+  targetingCondition: string | null
+  targetingPriority: number
+  targetingEnabled: boolean
+  folderId: string | null
+  displayOrder: number
+  thumbnailR2Key: string | null
+  monthlyStats?: {
+    from: string
+    to: string
+    taps: number
+    uniqueAudience: {
+      value: number | null
+      state: 'available' | 'partial' | 'unavailable'
+      reason: 'preexisting_assignments_not_backfilled' | null
+    }
+  }
+  createdAt: string
+  updatedAt: string
+}
+
+export type RichMenuGroupListPage = {
+  items: RichMenuGroupListItem[]
+  total: number
+  limit: number
+  sort: Array<{ field: string; direction: 'asc' | 'desc' }>
+  facets?: {
+    total: number
+    published: number
+    targeting: number
+    folderCounts: Record<string, number>
+  }
+}
+
 /** 保存するときに送るボタン1つぶん。 */
 export type RichMenuAreaPayload = {
   /** 既存ボタンの id。渡すと引き継がれる（押された回数の集計が途切れない）。 */
@@ -7105,10 +7148,10 @@ export const api = {
         `/api/ec-commerce/notification-runs?${query}`,
       )
     },
-    settings: () =>
-      fetchApi<ApiResponse<EcNotificationSetting[]>>('/api/ec-commerce/settings'),
-    updateSetting: (eventType: string, data: { isEnabled: boolean; title: string; introText: string; outroText: string; buttonLabel: string; buttonUrl: string; imageUrl: string }) =>
-      fetchApi<{ success: boolean }>(`/api/ec-commerce/settings/${encodeURIComponent(eventType)}`, {
+    settings: (lineAccountId: string) =>
+      fetchApi<ApiResponse<EcNotificationSetting[]>>(`/api/ec-commerce/settings?lineAccountId=${encodeURIComponent(lineAccountId)}`),
+    updateSetting: (lineAccountId: string, eventType: string, data: { isEnabled: boolean; title: string; introText: string; outroText: string; buttonLabel: string; buttonUrl: string; imageUrl: string }) =>
+      fetchApi<{ success: boolean }>(`/api/ec-commerce/settings/${encodeURIComponent(eventType)}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
@@ -8139,8 +8182,11 @@ export const api = {
       fetchApi<ApiResponse<{ loginCount: number }>>(`/api/staff/${id}/login-summary`),
     delete: (id: string) =>
       fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}`, { method: 'DELETE' }),
-    regenerateKey: (id: string) =>
-      fetchApi<ApiResponse<{ apiKey: string }>>(`/api/staff/${id}/regenerate-key`, { method: 'POST' }),
+    acceptInvitation: (token: string) =>
+      fetchApi<ApiResponse<{ status: 'pending_line' }>>('/api/staff/invitations/confirm/verify', {
+        method: 'POST',
+        body: JSON.stringify({ token }),
+      }),
     beginTwoFactorSetup: (id: string) =>
       fetchApi<ApiResponse<{ provisioningUri: string; manualKey: string }>>(`/api/staff/${id}/two-factor/setup`, { method: 'POST' }),
     confirmTwoFactorSetup: (id: string, code: string) =>
@@ -8235,38 +8281,31 @@ export const api = {
     },
   },
   richMenuGroups: {
-    list: (accountId: string) =>
-      fetchApi<ApiResponse<Array<{
-        id: string;
-        accountId: string;
-        name: string;
-        chatBarText: string;
-        size: 'large' | 'compact';
-        defaultPageId: string | null;
-        isDefaultForAll: boolean;
-        status: 'draft' | 'published';
-        publishingAt: string | null;
-        targetingCondition: string | null;
-        targetingPriority: number;
-        targetingEnabled: boolean;
-        /** 159: フォルダ。分けていなければ null。 */
-        folderId: string | null;
-        /** 160: 自分で決める並び順。 */
-        displayOrder: number;
-        thumbnailR2Key: string | null;
-        monthlyStats?: {
-          from: string;
-          to: string;
-          taps: number;
-          uniqueAudience: {
-            value: number | null;
-            state: 'available' | 'partial' | 'unavailable';
-            reason: 'preexisting_assignments_not_backfilled' | null;
-          };
-        };
-        createdAt: string;
-        updatedAt: string;
-      }>>>(`/api/rich-menu-groups?accountId=${encodeURIComponent(accountId)}`),
+    listPage: (accountId: string, input: {
+      page?: number
+      limit?: number
+      query?: string
+      folderId?: string
+      filter?: string
+      sort?: 'priority' | 'taps' | 'updated' | 'name'
+    } = {}) => {
+      const query = new URLSearchParams({ accountId })
+      query.set('page', String(input.page ?? 1))
+      query.set('limit', String(input.limit ?? 50))
+      if (input.query) query.set('query', input.query)
+      if (input.folderId) query.set('folderId', input.folderId)
+      if (input.filter) query.set('filter', input.filter)
+      if (input.sort && input.sort !== 'priority') query.set('sort', input.sort)
+      return fetchApi<ApiResponse<RichMenuGroupListPage>>(`/api/rich-menu-groups?${query}`)
+    },
+    list: async (accountId: string): Promise<ApiResponse<RichMenuGroupListItem[]>> => {
+      const response = await fetchApi<ApiResponse<RichMenuGroupListPage>>(
+        `/api/rich-menu-groups?accountId=${encodeURIComponent(accountId)}&page=1&limit=200`,
+      )
+      return response.success
+        ? { success: true, data: response.data.items }
+        : response
+    },
 
     get: (groupId: string) =>
       fetchApi<ApiResponse<{
@@ -9095,7 +9134,8 @@ export interface ProxyBookingResult {
   booking_id: string;
   status: string;
   calendar_sync: 'not_configured' | 'synced' | 'failed' | 'pending';
-  line_notification: 'queued' | 'succeeded' | 'failed' | 'not_applicable';
+  // 再送時は裏側が 'scheduled' を返す(booking.ts)。無いと完了画面の文言が既定に落ちる。
+  line_notification: 'queued' | 'scheduled' | 'succeeded' | 'failed' | 'not_applicable';
   reminders: BookingReminderResult[];
   operations: BookingOperationResult[];
   customer_context: BookingCustomerContext | null;
@@ -9607,7 +9647,8 @@ export interface EventWaitlistItem {
 
 export const eventsApi = {
   listEvents: (accountId: string) =>
-    fetchApi<{ items: EventListItem[] }>(
+    // 共通一覧契約の offset 方式。裏側は既定200件・上限200件で total を返す。
+    fetchApi<{ items: EventListItem[]; total: number; limit: number }>(
       withAccount('/api/events/admin/events', accountId),
     ),
   getEvent: (accountId: string, id: string) =>
@@ -9639,6 +9680,11 @@ export const eventsApi = {
     eventId: string,
     slots: Array<{ starts_at: string; ends_at: string; capacity: number | null; is_active?: number; sort_order?: number }>,
   ) => (async () => {
+    // 誤指定で何千件も作らないよう、総数に上限を置く(点検#520の中9)。
+    // 1口400件の分割は裏側の上限に合わせたままにする。
+    if (slots.length > 500) {
+      throw new Error('500件を超える一括作成はできません。期間や曜日を分けて追加してください')
+    }
     const items: EventSlot[] = []
     for (let offset = 0; offset < slots.length; offset += 400) {
       const chunk = slots.slice(offset, offset + 400)
@@ -9680,7 +9726,8 @@ export const eventsApi = {
     if (filters.status) qs.push(`status=${encodeURIComponent(filters.status)}`);
     if (filters.slot_id) qs.push(`slot_id=${encodeURIComponent(filters.slot_id)}`);
     const tail = qs.length > 0 ? `?${qs.join('&')}` : '';
-    return fetchApi<{ items: EventBookingItem[] }>(
+    // 共通一覧契約の offset 方式。裏側は既定200件・上限200件で total を返す。
+    return fetchApi<{ items: EventBookingItem[]; total: number; limit: number }>(
       withAccount(`/api/events/admin/events/${eventId}/bookings${tail}`, accountId),
     );
   },

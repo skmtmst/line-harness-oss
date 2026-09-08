@@ -10,7 +10,7 @@ import {
   type CommonVarReplacementCandidate,
   type CommonVarReplacementImpact,
 } from '@/lib/api'
-import FolderPanel from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import { formatStamp } from '@/lib/common-vars'
 import Pagination from '@/components/shared/pagination'
 import Button from '@/components/shared/button'
@@ -558,7 +558,6 @@ function VarsPageInner() {
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" onClick={() => setAddingFolder(true)}>フォルダを追加</Button>
           <Button href="/contents/vars/new" variant="primary">＋ 共通情報を作る</Button>
         </div>
         <Button type="button" onClick={exportVisibleCsv} disabled={filtered.length === 0}>
@@ -578,12 +577,13 @@ function VarsPageInner() {
         </div>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+      <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <div className="space-y-3">
           <FolderPanel
             total={`${items.length} 件`}
             activeId={folderFilter}
             onSelect={setFolderFilter}
+            onAddFolder={() => setAddingFolder(true)}
             rows={[
               { id: '', label: 'すべて', count: items.length },
               {

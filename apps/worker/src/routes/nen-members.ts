@@ -777,7 +777,7 @@ nenMembers.get(
   },
 );
 
-nenMembers.put('/api/nen-members/photos/publications/:id/withdraw', requireRole('owner', 'admin', 'staff'), async (c) => {
+nenMembers.put('/api/nen-members/photos/publications/:id/withdraw', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.submission.review'), async (c) => {
   const body = await c.req.json<{ accountId?: string; expectedVersion?: number }>().catch(() => null);
   const accountId = body?.accountId?.trim();
   const idempotencyKey = c.req.header('Idempotency-Key')?.trim().slice(0, 120);
@@ -824,7 +824,7 @@ nenMembers.put('/api/nen-members/photos/publications/:id/withdraw', requireRole(
   return c.json({ success: true, data: { status: 'withdrawn', version: publication.version + 1 } });
 });
 
-nenMembers.put('/api/nen-members/photos/publications/:id/placements', requireRole('owner', 'admin', 'staff'), async (c) => {
+nenMembers.put('/api/nen-members/photos/publications/:id/placements', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.submission.review'), async (c) => {
   const body = await c.req.json<{
     accountId?: string;
     expectedVersion?: number;

@@ -22,7 +22,7 @@ describe('V6 URqOA 定期レポート作成', () => {
     expect(PAGE).toContain('<ListState kind="error"')
     expect(PAGE).toContain('kind="empty"')
     expect(PAGE).toContain("response.data.role === 'owner' || response.data.role === 'admin'")
-    expect(PAGE).toContain('disabled={saving || !canManage}')
+    expect(PAGE).toContain('disabled={saving || !canManage || !hasRecipient}')
   })
 
   it('本物の設定APIへ接続し、未取得を0へ置き換えない', () => {
@@ -30,5 +30,14 @@ describe('V6 URqOA 定期レポート作成', () => {
     expect(PAGE).toContain('api.analytics.reportSchedules.list')
     expect(PAGE).toContain('api.analytics.reportSchedules.create')
     expect(PAGE).not.toContain("|| 0")
+  })
+
+  it('宛先の初期値は空で、0件のときは作れない(点検#508の中1)', () => {
+    // 例のアドレスが最初から入っていると、選んでいない相手へ送られる。
+    expect(PAGE).not.toContain("useState(['report@example.com'])")
+    // 受信者の先頭2件の自動チェックもしない。
+    expect(PAGE).not.toContain('slice(0, 2)')
+    expect(PAGE).toContain('hasRecipient')
+    expect(PAGE).toContain('受け取る人を1人以上選んでください')
   })
 })

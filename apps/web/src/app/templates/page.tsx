@@ -12,7 +12,7 @@ import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import { Tabs } from '@/components/shared/tabs'
-import FolderPanel from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import type { Folder } from '@line-crm/shared'
 import {
@@ -580,7 +580,7 @@ export default function TemplatesPage() {
       {/* 一覧本体（設計 `Body`）。 */}
       <div className={styles.body} data-design="Body">
       {activeSection === 'message' ? <>
-      <div className={styles.contentLayout}>
+      <div className={styles.contentLayout} style={FOLDER_RAIL_STYLE}>
       {/*
         フォルダの帯。**本物のフォルダを出す。**
         以前は `category`（テンプレートが持つ文字列）から組み立てていたので、
@@ -591,6 +591,7 @@ export default function TemplatesPage() {
           total={`${folders.length} 件`}
           activeId={selectedCategory}
           onSelect={setSelectedCategory}
+          onAddFolder={() => setFolderDialogOpen(true)}
           rows={[
             { id: 'all', label: 'すべて', count: templates.length },
             ...folders.map((folder, index) => ({
@@ -614,9 +615,6 @@ export default function TemplatesPage() {
             },
           ]}
         >
-          <Button type="button" onClick={() => setFolderDialogOpen(true)} className="w-full">
-            フォルダを追加
-          </Button>
           {folderError ? <p role="alert" className="text-danger text-xs">{folderError}</p> : null}
           <p className="text-ink-faint text-xs leading-relaxed">
             テンプレートは一覧の「置き場」から移せます。

@@ -210,6 +210,32 @@ describe('成果地点の更新', () => {
   });
 });
 
+describe('点検・軽 第7便の長さ上限(#585)', () => {
+  it('作成は名前121文字・対象URL2001文字を400で拒否する(#513 L14)', async () => {
+    const longName = await req('/api/conversions/points', 'POST', {
+      name: 'あ'.repeat(121), eventType: 'purchase',
+    });
+    expect(longName.status).toBe(400);
+    const longUrl = await req('/api/conversions/points', 'POST', {
+      name: 'LP到達', eventType: 'reach', measureMethod: 'url_reach',
+      targetUrl: `https://example.com/${'a'.repeat(2000)}`,
+    });
+    expect(longUrl.status).toBe(400);
+    expect(mocks.createConversionPoint).not.toHaveBeenCalled();
+  });
+
+  it('更新は名前121文字・対象URL2001文字を400で拒否する(#513 L14)', async () => {
+    mocks.getConversionPointById.mockResolvedValue(POINT);
+    const longName = await req('/api/conversions/points/cp-1', 'PUT', { name: 'あ'.repeat(121) });
+    expect(longName.status).toBe(400);
+    const longUrl = await req('/api/conversions/points/cp-1', 'PUT', {
+      measureMethod: 'url_reach', targetUrl: `https://example.com/${'a'.repeat(2000)}`,
+    });
+    expect(longUrl.status).toBe(400);
+    expect(mocks.updateConversionPoint).not.toHaveBeenCalled();
+  });
+});
+
 describe('一覧', () => {
   it('計測の設定まで返る', async () => {
     mocks.getConversionPoints.mockResolvedValue([

@@ -24,7 +24,7 @@ import {
 } from './media-delete-impact'
 import Pagination from '@/components/shared/pagination'
 import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel from '@/components/shared/folder-panel'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import SearchField from '@/components/shared/search-field'
@@ -505,7 +505,6 @@ export default function MediaLibraryPage() {
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" onClick={() => setAddingFolder(true)}>フォルダを追加</Button>
           <Button type="button" variant="primary" onClick={() => setUploadOpen(true)}>ファイルを入れる</Button>
         </div>
         <div className="w-full max-w-xs text-right">
@@ -525,8 +524,8 @@ export default function MediaLibraryPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
-        <div className="lg:w-[16rem]">
+      <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
+        <div className="min-w-0">
         <FolderPanel
           total={`${folders.length + 1}`}
           activeId={folderFilter}
@@ -534,6 +533,7 @@ export default function MediaLibraryPage() {
             setFolderFilter(id)
             setPage(1)
           }}
+          onAddFolder={() => setAddingFolder(true)}
           rows={[
             { id: '', label: 'すべて', count: total },
             ...folders.map((folder) => ({

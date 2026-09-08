@@ -10,8 +10,8 @@ import TestSendSection from '@/components/broadcasts/test-send-section'
 import ProgressBar from '@/components/broadcasts/progress-bar'
 import SendConfirmDialog from '@/components/broadcasts/send-confirm-dialog'
 import SegmentBuilder from '@/components/broadcasts/segment-builder'
-import type { Tag } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import { broadcastCsvFilename } from './broadcast-csv-filename'
 
 interface BroadcastDetailProps {
   broadcastId: string
@@ -48,7 +48,6 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
     uniqueImpression: number | null;
     uniqueClick: number | null;
   }> | null>(null)
-  const [tags, setTags] = useState<Tag[]>([])
   const [showSegmentBuilder, setShowSegmentBuilder] = useState(false)
 
   const load = useCallback(async () => {
@@ -61,10 +60,7 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
     setInsight(null)
     setTargetCount(null)
     try {
-      const [res, tagsRes] = await Promise.all([
-        api.broadcasts.get(id),
-        api.tags.list(),
-      ])
+      const res = await api.broadcasts.get(id)
       if (res.success && res.data) {
         setBroadcast(res.data)
         if (res.data.totalCount > 0) {
@@ -85,7 +81,6 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
       } else {
         setError('配信が見つかりません')
       }
-      if (tagsRes.success) setTags(tagsRes.data)
     } catch {
       setError('読み込みに失敗しました')
     } finally {
@@ -228,7 +223,7 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
       const url = URL.createObjectURL(new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `${broadcast.title}-配信結果.csv`
+      anchor.download = broadcastCsvFilename(broadcast.title, broadcast.id)
       anchor.click()
       URL.revokeObjectURL(url)
     }
@@ -411,10 +406,9 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
             </button>
           ) : (
             <SegmentBuilder
-              tags={tags}
-              accountId={accountId}
+              initialConditions={broadcast.segmentConditions}
               onApply={async (conditions) => {
-                await api.broadcasts.update(id, { segmentConditions: JSON.stringify(conditions) } as unknown as Parameters<typeof api.broadcasts.update>[1])
+                await api.broadcasts.update(id, { segmentConditions: conditions })
                 setShowSegmentBuilder(false)
                 load()
               }}

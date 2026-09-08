@@ -17,7 +17,10 @@ type Props = {
   /** このボタンが今月押された回数。数えられない種類なら null。 */
   taps: { count: number; viaTrackedLink: number } | null
   onUpdate: (patch: Partial<Area>) => void
-  onDelete: () => void
+  onDelete?: () => void
+  /** 新規作成では座標・実績・削除を隠し、動きの設定だけを使う。 */
+  showManagementDetails?: boolean
+  allowedIntents?: RichMenuAreaIntent[]
 }
 
 /**
@@ -149,10 +152,15 @@ export function AreaProperties({
   taps,
   onUpdate,
   onDelete,
+  showManagementDetails = true,
+  allowedIntents,
 }: Props) {
   const data = (area.actionData ?? {}) as Record<string, unknown>
   const intent = intentOf(area)
   const selectedTagIds = area.tagIds ?? []
+  const intentOptions = allowedIntents
+    ? INTENT_OPTIONS.filter((option) => allowedIntents.includes(option.value))
+    : INTENT_OPTIONS
 
   function changeIntent(next: RichMenuAreaIntent) {
     onUpdate({
@@ -181,9 +189,11 @@ export function AreaProperties({
     <div className="space-y-3 text-sm">
       <div className="flex items-center justify-between">
         <h3 className="text-ink-secondary font-semibold">選択中のボタン</h3>
-        <button onClick={onDelete} className="text-xs text-red-600 hover:underline">
-          削除
-        </button>
+        {showManagementDetails && onDelete ? (
+          <button type="button" onClick={onDelete} className="text-xs text-red-600 hover:underline">
+            削除
+          </button>
+        ) : null}
       </div>
 
       <Field label="ボタン名" hint="管理用の呼び名。友だちには表示されません。">
@@ -196,55 +206,59 @@ export function AreaProperties({
         />
       </Field>
 
-      <div className="border-hairline bg-canvas-sunken rounded-control border px-3 py-2">
-        <div className="text-ink-faint text-[11px]">今月押された回数</div>
-        {isTapCountable(area) ? (
-          <>
-            <div className="text-ink text-lg font-bold tabular-nums">
-              {taps?.count ?? 0}
-              <span className="text-ink-faint ml-0.5 text-xs font-normal">回</span>
-            </div>
-            {taps && taps.viaTrackedLink > 0 && (
-              <p className="text-ink-faint text-[11px]">
-                うち {taps.viaTrackedLink} 回は計測リンクで数えた分です。
-                同じ計測リンクを他でも使っていると、その分も入ります。
-              </p>
-            )}
-          </>
-        ) : (
-          <p className="text-ink-faint text-[11px] leading-snug">
-            この動きは数えられません。
-            {intent === 'url'
-              ? '上の「計測リンクを使う」を選ぶと数えられます。'
-              : 'LINE の中で完結するため、押されたことがこちらに届きません。'}
-          </p>
-        )}
-      </div>
+      {showManagementDetails ? (
+        <div className="border-hairline bg-canvas-sunken rounded-control border px-3 py-2">
+          <div className="text-ink-faint text-[11px]">今月押された回数</div>
+          {isTapCountable(area) ? (
+            <>
+              <div className="text-ink text-lg font-bold tabular-nums">
+                {taps?.count ?? 0}
+                <span className="text-ink-faint ml-0.5 text-xs font-normal">回</span>
+              </div>
+              {taps && taps.viaTrackedLink > 0 && (
+                <p className="text-ink-faint text-[11px]">
+                  うち {taps.viaTrackedLink} 回は計測リンクで数えた分です。
+                  同じ計測リンクを他でも使っていると、その分も入ります。
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="text-ink-faint text-[11px] leading-snug">
+              この動きは数えられません。
+              {intent === 'url'
+                ? '上の「計測リンクを使う」を選ぶと数えられます。'
+                : 'LINE の中で完結するため、押されたことがこちらに届きません。'}
+            </p>
+          )}
+        </div>
+      ) : null}
 
-      <div className="grid grid-cols-2 gap-2">
-        <NumField label="x" value={area.boundsX} onChange={(v) => onUpdate({ boundsX: v })} />
-        <NumField label="y" value={area.boundsY} onChange={(v) => onUpdate({ boundsY: v })} />
-        <NumField
-          label="幅"
-          value={area.boundsWidth}
-          onChange={(v) => onUpdate({ boundsWidth: v })}
-        />
-        <NumField
-          label="高さ"
-          value={area.boundsHeight}
-          onChange={(v) => onUpdate({ boundsHeight: v })}
-        />
-      </div>
+      {showManagementDetails ? (
+        <div className="grid grid-cols-2 gap-2">
+          <NumField label="x" value={area.boundsX} onChange={(v) => onUpdate({ boundsX: v })} />
+          <NumField label="y" value={area.boundsY} onChange={(v) => onUpdate({ boundsY: v })} />
+          <NumField
+            label="幅"
+            value={area.boundsWidth}
+            onChange={(v) => onUpdate({ boundsWidth: v })}
+          />
+          <NumField
+            label="高さ"
+            value={area.boundsHeight}
+            onChange={(v) => onUpdate({ boundsHeight: v })}
+          />
+        </div>
+      ) : null}
 
       <Field label="押したときの動き" hint="タップしたときに何が起きるかを決めます。">
         <SelectField
           value={intent}
           onChange={(e) => changeIntent(e.target.value as RichMenuAreaIntent)}
-          options={INTENT_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+          options={intentOptions.map((o) => ({ value: o.value, label: o.label }))}
           className={inputClass}
         />
         <p className="text-ink-faint mt-1 text-[11px]">
-          {INTENT_OPTIONS.find((o) => o.value === intent)?.hint}
+          {intentOptions.find((o) => o.value === intent)?.hint}
         </p>
       </Field>
 
