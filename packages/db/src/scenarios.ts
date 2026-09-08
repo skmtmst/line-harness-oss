@@ -75,6 +75,30 @@ export interface FriendScenario {
   next_delivery_at: string | null;
   /** 割り込む前に読んでいたシナリオ（123）。「1つ前のシナリオを再開」で使う。 */
   previous_scenario_id: string | null;
+  /** 開始時に固定した公開版（351）。null は版より前の購読で live の表を読む。 */
+  published_version_id: string | null;
+  updated_at: string;
+}
+
+/**
+ * 公開版（351）。公開操作のたびに1行作る不変のスナップショット。
+ * 通の配列は steps_snapshot の JSON に固定し、行の更新・削除は
+ * トリガーで禁じている（自動応答の公開版 273 と同じ流儀）。
+ */
+export interface ScenarioVersion {
+  id: string;
+  scenario_id: string;
+  version_number: number;
+  delivery_mode: DeliveryMode;
+  audience_condition_json: string | null;
+  on_complete_mode: string;
+  on_complete_scenario_id: string | null;
+  steps_snapshot: string;
+  status: 'published' | 'retired';
+  published_at: string;
+  published_by_staff_id: string | null;
+  publish_idempotency_key: string | null;
+  created_at: string;
   updated_at: string;
 }
 
@@ -489,6 +513,312 @@ export async function getScenarioSteps(
 }
 
 // ============================================================
+// Scenario Published Versions (351)
+//
+// 稼働中の文面・順序を固定する。下書き（scenarios / scenario_steps の
+// live 値）は編集し放題で、公開操作だけが不変の版を作る。購読は開始時の
+// 版へ固定され、あとの編集は既存配信へ混入しない。
+// ============================================================
+
+/**
+ * 通1件ぶんのスナップショット。キーの順序は migration 351 の
+ * json_object と同じにする。順序まで含めて文字列比較するので、
+ * どちらか片方だけ変えると「内容が同じなのに別版」が増える。
+ */
+function canonicalScenarioStepSnapshot(s: ScenarioStep): Record<string, unknown> {
+  return {
+    id: s.id,
+    scenario_id: s.scenario_id,
+    step_order: s.step_order,
+    delay_minutes: s.delay_minutes,
+    message_type: s.message_type,
+    message_content: s.message_content,
+    condition_type: s.condition_type,
+    condition_value: s.condition_value,
+    next_step_on_false: s.next_step_on_false,
+    offset_days: s.offset_days,
+    offset_minutes: s.offset_minutes,
+    delivery_time: s.delivery_time,
+    template_id: s.template_id,
+    on_reach_tag_id: s.on_reach_tag_id,
+    after_send: s.after_send,
+    target_condition_json: s.target_condition_json,
+    question_json: s.question_json,
+    is_draft: s.is_draft,
+    created_at: s.created_at,
+  };
+}
+
+function buildScenarioStepsSnapshot(steps: ScenarioStep[]): string {
+  return JSON.stringify(steps.map(canonicalScenarioStepSnapshot));
+}
+
+export async function getScenarioVersionById(
+  db: D1Database,
+  versionId: string,
+): Promise<ScenarioVersion | null> {
+  return db.prepare(`SELECT * FROM scenario_versions WHERE id = ?`)
+    .bind(versionId)
+    .first<ScenarioVersion>();
+}
+
+export async function getScenarioPublishedVersion(
+  db: D1Database,
+  scenarioId: string,
+): Promise<ScenarioVersion | null> {
+  return db.prepare(
+    `SELECT sv.*
+       FROM scenarios s
+       JOIN scenario_versions sv ON sv.id = s.current_published_version_id
+      WHERE s.id = ? AND sv.status = 'published'`,
+  ).bind(scenarioId).first<ScenarioVersion>();
+}
+
+/**
+ * 版のスナップショットを通の配列に戻す。壊れていたら空にする
+ * （呼ぶ側は「通が無い」と同じく購読を完了させる）。
+ */
+export function parseScenarioVersionSteps(version: ScenarioVersion): ScenarioStep[] {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(version.steps_snapshot);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(raw)) return [];
+  const steps: ScenarioStep[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') return [];
+    const r = item as Record<string, unknown>;
+    if (typeof r['id'] !== 'string' || typeof r['step_order'] !== 'number') return [];
+    steps.push({
+      id: r['id'] as string,
+      scenario_id: (r['scenario_id'] as string) ?? version.scenario_id,
+      step_order: r['step_order'] as number,
+      delay_minutes: (r['delay_minutes'] as number) ?? 0,
+      message_type: (r['message_type'] as ScenarioStep['message_type']) ?? 'text',
+      message_content: (r['message_content'] as string) ?? '',
+      condition_type: (r['condition_type'] as string | null) ?? null,
+      condition_value: (r['condition_value'] as string | null) ?? null,
+      next_step_on_false: (r['next_step_on_false'] as number | null) ?? null,
+      offset_days: (r['offset_days'] as number | null) ?? null,
+      offset_minutes: (r['offset_minutes'] as number | null) ?? null,
+      delivery_time: (r['delivery_time'] as string | null) ?? null,
+      template_id: (r['template_id'] as string | null) ?? null,
+      on_reach_tag_id: (r['on_reach_tag_id'] as string | null) ?? null,
+      after_send: (r['after_send'] as string) ?? 'continue',
+      target_condition_json: (r['target_condition_json'] as string | null) ?? null,
+      question_json: (r['question_json'] as string | null) ?? null,
+      is_draft: (r['is_draft'] as number) ?? 0,
+      created_at: (r['created_at'] as string) ?? version.created_at,
+    });
+  }
+  return steps;
+}
+
+function scenarioVersionMatchesDraft(
+  version: ScenarioVersion,
+  scenario: Scenario,
+  steps: ScenarioStep[],
+): boolean {
+  return (
+    (version.delivery_mode ?? 'relative') === (scenario.delivery_mode ?? 'relative') &&
+    (version.audience_condition_json ?? null) === (scenario.audience_condition_json ?? null) &&
+    (version.on_complete_mode ?? 'pause') === (scenario.on_complete_mode ?? 'pause') &&
+    (version.on_complete_scenario_id ?? null) === (scenario.on_complete_scenario_id ?? null) &&
+    version.steps_snapshot === buildScenarioStepsSnapshot(steps)
+  );
+}
+
+/**
+ * いまの下書きを公開版として固定する。内容が現行の公開版と同じなら
+ * 新しい行を作らず現行版を返す（連打・再試行で二重版を作らない）。
+ * 同時公開で版番号が競合したら取り直す（最大3回）。
+ */
+export async function publishScenarioVersion(
+  db: D1Database,
+  scenarioId: string,
+  input: { staffId: string | null; idempotencyKey: string },
+): Promise<ScenarioVersion> {
+  const replay = await db.prepare(
+    `SELECT * FROM scenario_versions WHERE publish_idempotency_key = ?`,
+  ).bind(input.idempotencyKey).first<ScenarioVersion>();
+  if (replay) {
+    if (replay.scenario_id !== scenarioId) throw new Error('SCENARIO_PUBLISH_KEY_CONFLICT');
+    return replay;
+  }
+  const scenario = await db.prepare(`SELECT * FROM scenarios WHERE id = ?`)
+    .bind(scenarioId)
+    .first<Scenario>();
+  if (!scenario) throw new Error('SCENARIO_NOT_FOUND');
+  const steps = await getScenarioSteps(db, scenarioId);
+  const current = await getScenarioPublishedVersion(db, scenarioId);
+  if (current && scenarioVersionMatchesDraft(current, scenario, steps)) return current;
+
+  const now = jstNow();
+  const snapshot = buildScenarioStepsSnapshot(steps);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const next = await db.prepare(
+      `SELECT COALESCE(MAX(version_number), 0) + 1 AS version_number
+         FROM scenario_versions WHERE scenario_id = ?`,
+    ).bind(scenarioId).first<{ version_number: number }>();
+    const versionNumber = Number(next?.version_number ?? 1);
+    const id = crypto.randomUUID();
+    const inserted = await db.prepare(
+      `INSERT OR IGNORE INTO scenario_versions
+         (id, scenario_id, version_number, delivery_mode, audience_condition_json,
+          on_complete_mode, on_complete_scenario_id, steps_snapshot,
+          status, published_at, published_by_staff_id, publish_idempotency_key,
+          created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?, ?, ?)`,
+    ).bind(
+      id,
+      scenarioId,
+      versionNumber,
+      scenario.delivery_mode ?? 'relative',
+      scenario.audience_condition_json ?? null,
+      scenario.on_complete_mode ?? 'pause',
+      scenario.on_complete_scenario_id ?? null,
+      snapshot,
+      now,
+      input.staffId,
+      input.idempotencyKey,
+      now,
+      now,
+    ).run();
+    // 同時公開で同じ版番号を取られたら取り直す。
+    if ((inserted.meta.changes ?? 0) === 0) continue;
+    // D1 の batch はトランザクションではないので、順に実行する。
+    // テストの D1 模擬に batch が無い環境でも動く。
+    await db.prepare(
+      `UPDATE scenario_versions SET status = 'retired', updated_at = ?
+        WHERE scenario_id = ? AND status = 'published' AND id != ?`,
+    ).bind(now, scenarioId, id).run();
+    await db.prepare(
+      `UPDATE scenarios SET current_published_version_id = ?, updated_at = ?
+        WHERE id = ?`,
+    ).bind(id, now, scenarioId).run();
+    const saved = await getScenarioVersionById(db, id);
+    if (!saved || saved.status !== 'published') throw new Error('SCENARIO_NOT_PUBLISHED');
+    return saved;
+  }
+  throw new Error('SCENARIO_PUBLISH_CONFLICT');
+}
+
+/**
+ * 実行時の定義を不変の版として確保する。公開済みで内容が同じなら
+ * 作り直さず現行版を返す。登録口は必ずここを通し、開始時の版へ固定する。
+ */
+export async function ensureScenarioPublishedVersion(
+  db: D1Database,
+  scenarioId: string,
+): Promise<ScenarioVersion> {
+  const scenario = await db.prepare(`SELECT * FROM scenarios WHERE id = ?`)
+    .bind(scenarioId)
+    .first<Scenario>();
+  if (!scenario) throw new Error('SCENARIO_NOT_FOUND');
+  const steps = await getScenarioSteps(db, scenarioId);
+  const current = await getScenarioPublishedVersion(db, scenarioId);
+  if (current && scenarioVersionMatchesDraft(current, scenario, steps)) return current;
+
+  const now = jstNow();
+  const snapshot = buildScenarioStepsSnapshot(steps);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const next = await db.prepare(
+      `SELECT COALESCE(MAX(version_number), 0) + 1 AS version_number
+         FROM scenario_versions WHERE scenario_id = ?`,
+    ).bind(scenarioId).first<{ version_number: number }>();
+    const versionNumber = Number(next?.version_number ?? 1);
+    const id = crypto.randomUUID();
+    const inserted = await db.prepare(
+      `INSERT OR IGNORE INTO scenario_versions
+         (id, scenario_id, version_number, delivery_mode, audience_condition_json,
+          on_complete_mode, on_complete_scenario_id, steps_snapshot,
+          status, published_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?)`,
+    ).bind(
+      id,
+      scenarioId,
+      versionNumber,
+      scenario.delivery_mode ?? 'relative',
+      scenario.audience_condition_json ?? null,
+      scenario.on_complete_mode ?? 'pause',
+      scenario.on_complete_scenario_id ?? null,
+      snapshot,
+      now,
+      now,
+      now,
+    ).run();
+    if ((inserted.meta.changes ?? 0) === 0) continue;
+    await db.prepare(
+      `UPDATE scenario_versions SET status = 'retired', updated_at = ?
+        WHERE scenario_id = ? AND status = 'published' AND id != ?`,
+    ).bind(now, scenarioId, id).run();
+    await db.prepare(
+      `UPDATE scenarios SET current_published_version_id = ?, updated_at = ?
+        WHERE id = ?`,
+    ).bind(id, now, scenarioId).run();
+    const saved = await getScenarioVersionById(db, id);
+    if (!saved || saved.status !== 'published') throw new Error('SCENARIO_NOT_PUBLISHED');
+    return saved;
+  }
+  throw new Error('SCENARIO_PUBLISH_CONFLICT');
+}
+
+export interface ScenarioDeliverySource {
+  deliveryMode: DeliveryMode;
+  audienceConditionJson: string | null;
+  onCompleteMode: string | null;
+  onCompleteScenarioId: string | null;
+  steps: ScenarioStep[];
+  /** 版に固定した読み。null は版より前の購読で live の表を読む。 */
+  pinnedVersionId: string | null;
+}
+
+/**
+ * 配信が読む通と条件を1箇所で決める。購読に版が付いていたら版から読み、
+ * 無い（351 以前の購読）か版が見つからなければ live の表を読む。
+ */
+export async function getStepsForDelivery(
+  db: D1Database,
+  scenarioId: string,
+  publishedVersionId: string | null,
+): Promise<ScenarioDeliverySource> {
+  if (publishedVersionId) {
+    const version = await db.prepare(
+      `SELECT * FROM scenario_versions WHERE id = ? AND scenario_id = ?`,
+    ).bind(publishedVersionId, scenarioId).first<ScenarioVersion>();
+    if (version) {
+      return {
+        deliveryMode: (version.delivery_mode ?? 'relative') as DeliveryMode,
+        audienceConditionJson: version.audience_condition_json ?? null,
+        onCompleteMode: version.on_complete_mode ?? null,
+        onCompleteScenarioId: version.on_complete_scenario_id ?? null,
+        steps: parseScenarioVersionSteps(version),
+        pinnedVersionId: version.id,
+      };
+    }
+  }
+  const scenario = await db.prepare(
+    `SELECT delivery_mode, audience_condition_json, on_complete_mode, on_complete_scenario_id
+       FROM scenarios WHERE id = ?`,
+  ).bind(scenarioId).first<{
+    delivery_mode: DeliveryMode;
+    audience_condition_json: string | null;
+    on_complete_mode: string | null;
+    on_complete_scenario_id: string | null;
+  }>();
+  return {
+    deliveryMode: (scenario?.delivery_mode ?? 'relative') as DeliveryMode,
+    audienceConditionJson: scenario?.audience_condition_json ?? null,
+    onCompleteMode: scenario?.on_complete_mode ?? null,
+    onCompleteScenarioId: scenario?.on_complete_scenario_id ?? null,
+    steps: await getScenarioSteps(db, scenarioId),
+    pinnedVersionId: null,
+  };
+}
+
+// ============================================================
 // Friend Scenario Enrollments
 // ============================================================
 
@@ -544,14 +874,18 @@ export async function enrollFriendInScenario(
       delivery_time: string | null;
     }>();
 
+  // 開始時の公開版へ固定する（351）。版が無ければいまの下書きから作る。
+  // 版があるのに作り直さないのは、同時登録で二重版を作らないため。
+  const version = await ensureScenarioPublishedVersion(db, scenarioId);
+
   // A scenario with no steps is immediately completed — no stuck active enrollment.
   if (!firstStep) {
     const result = await db
       .prepare(
-        `INSERT OR IGNORE INTO friend_scenarios (id, friend_id, scenario_id, current_step_order, status, started_at, next_delivery_at, updated_at)
-         VALUES (?, ?, ?, 0, 'completed', ?, NULL, ?)`,
+        `INSERT OR IGNORE INTO friend_scenarios (id, friend_id, scenario_id, current_step_order, status, started_at, next_delivery_at, published_version_id, updated_at)
+         VALUES (?, ?, ?, 0, 'completed', ?, NULL, ?, ?)`,
       )
-      .bind(id, friendId, scenarioId, now, now)
+      .bind(id, friendId, scenarioId, now, version.id, now)
       .run();
 
     if (!result.meta.changes || result.meta.changes === 0) return null;
@@ -579,10 +913,10 @@ export async function enrollFriendInScenario(
   // ~10 friend_scenarios silently completed for a 46-hour window.
   const result = await db
     .prepare(
-      `INSERT OR IGNORE INTO friend_scenarios (id, friend_id, scenario_id, current_step_order, status, started_at, next_delivery_at, updated_at)
-       VALUES (?, ?, ?, -1, 'active', ?, ?, ?)`,
+      `INSERT OR IGNORE INTO friend_scenarios (id, friend_id, scenario_id, current_step_order, status, started_at, next_delivery_at, published_version_id, updated_at)
+       VALUES (?, ?, ?, -1, 'active', ?, ?, ?, ?)`,
     )
-    .bind(id, friendId, scenarioId, now, nextDeliveryAt, now)
+    .bind(id, friendId, scenarioId, now, nextDeliveryAt, version.id, now)
     .run();
 
   if (!result.meta.changes || result.meta.changes === 0) return null;
@@ -765,19 +1099,14 @@ export async function resumeFriendScenario(
   if (!existing) return null;
   if (existing.status === 'active' || existing.status === 'delivering') return null;
 
-  const scenarioRow = await db
-    .prepare(`SELECT delivery_mode FROM scenarios WHERE id = ?`)
-    .bind(scenarioId)
-    .first<{ delivery_mode: DeliveryMode }>();
-  if (!scenarioRow) return null;
-
-  const steps = await getScenarioSteps(db, scenarioId);
-  const nextStep = steps.find(s => s.step_order > existing.current_step_order);
+  // 固定した版があれば版から次を探す（351）。版より前の購読は live の表を読む。
+  const source = await getStepsForDelivery(db, scenarioId, existing.published_version_id ?? null);
+  const nextStep = source.steps.find(s => s.step_order > existing.current_step_order);
   if (!nextStep) return null;
 
   const nowDate = new Date(Date.now() + 9 * 60 * 60_000);
   const nextDeliveryDate = computeNextDeliveryAt(
-    { delivery_mode: scenarioRow.delivery_mode },
+    { delivery_mode: source.deliveryMode },
     nextStep,
     { enrolledAt: nowDate, previousDeliveredAt: nowDate, now: nowDate },
   );
