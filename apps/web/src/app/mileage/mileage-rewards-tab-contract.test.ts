@@ -144,6 +144,11 @@ describe('届かなかった交換', () => {
     // 降ろさないとBのボタンが押せないまま残る。
     expect(code).toMatch(/setRetryingId\(null\)/)
   })
+
+  it('再取得のたびに店の世代を確かめる', () => {
+    // 1つ目の再取得待ちにBへ切り替わると、2つ目がBを上書きする。
+    expect(code).toMatch(/await loadFailedRedemptions\(\)[\s\S]*?if \(!accountTracker\.isCurrent\(operation\)\) return[\s\S]*?await load\(\)/)
+  })
 })
 
 describe('いちばん使われた', () => {

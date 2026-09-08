@@ -180,4 +180,77 @@ describe('やり直しの店世代（Aで押してBへ切り替え）', () => {
     expect(tracker.isCurrent(firstA)).toBe(false)
     expect(tracker.isCurrent(secondA)).toBe(true)
   })
+
+  it('POST成功後の最初の再取得中にA→Bへ切り替えても、二つ目を出さない', async () => {
+    // やり直し関数の「掴む→POST待ち→確かめる→1つ目→確かめる→2つ目」の順番そのもの。
+    const tracker = createAccountTracker()
+    const guards = createMileageRewardsFetchGuards()
+    let currentAccount: string | null = 'A'
+    const applied: string[] = []
+    const loadFailedLikeTab = async (gate: Promise<void>) => {
+      const requestId = guards.redemptions.issue()
+      await gate
+      if (!guards.redemptions.isCurrent(requestId)) return 'dropped'
+      applied.push('redemptions-A')
+      return 'ok'
+    }
+    const loadLikeTab = () => {
+      const requestId = guards.overview.issue()
+      if (!guards.overview.isCurrent(requestId)) return 'dropped'
+      applied.push('overview-A')
+      return 'ok'
+    }
+    const retryLikeTab = async (post: Promise<boolean>, gate: Promise<void>) => {
+      const operation = tracker.track(currentAccount)
+      const ok = await post
+      if (!ok) throw new Error('retry failed')
+      if (!tracker.isCurrent(operation)) return 'skipped-before-first'
+      await loadFailedLikeTab(gate)
+      // 1つ目を待っている間に切り替わったら、2つ目は出さない。
+      if (!tracker.isCurrent(operation)) return 'skipped-before-second'
+      loadLikeTab()
+      return 'done'
+    }
+
+    const postGate = deferred()
+    const gate = deferred()
+    const flight = retryLikeTab(postGate.promise.then(() => true), gate.promise)
+    // POSTを成功させ、やり直しが1つ目の再取得待ちに入ってから切り替える。
+    // マイクロタスクを空にして、やり直し側の続きを先に進める。
+    postGate.resolve()
+    await new Promise((done) => setTimeout(done, 0))
+    // 1つ目の再取得待ちの最中にBへ切り替え。Bの取得も始まる。
+    currentAccount = 'B'
+    tracker.track(currentAccount)
+    const overviewB = guards.overview.issue()
+    const redemptionsB = guards.redemptions.issue()
+    gate.resolve()
+    await expect(flight).resolves.toBe('skipped-before-second')
+    // 1つ目の遅い応答は捨てられ、Bの取得は生きている。
+    expect(applied).toEqual([])
+    expect(guards.overview.isCurrent(overviewB)).toBe(true)
+    expect(guards.redemptions.isCurrent(redemptionsB)).toBe(true)
+    // 参考：直前の確認が無ければ、古い閉じ込めが新しい世代を取ってBを上書きする。
+    expect(loadLikeTab()).toBe('ok')
+    expect(applied).toEqual(['overview-A'])
+  })
+
+  it('切り替えが無ければ二つの再取得をどちらも出す', async () => {
+    const tracker = createAccountTracker()
+    const guards = createMileageRewardsFetchGuards()
+    const applied: string[] = []
+    const retryLikeTab = async () => {
+      const operation = tracker.track('A')
+      await Promise.resolve(true)
+      if (!tracker.isCurrent(operation)) return 'skipped-before-first'
+      const redemptionsId = guards.redemptions.issue()
+      if (guards.redemptions.isCurrent(redemptionsId)) applied.push('redemptions-A')
+      if (!tracker.isCurrent(operation)) return 'skipped-before-second'
+      const overviewId = guards.overview.issue()
+      if (guards.overview.isCurrent(overviewId)) applied.push('overview-A')
+      return 'done'
+    }
+    await expect(retryLikeTab()).resolves.toBe('done')
+    expect(applied.sort()).toEqual(['overview-A', 'redemptions-A'])
+  })
 })

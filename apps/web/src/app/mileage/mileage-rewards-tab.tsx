@@ -207,6 +207,12 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
       if (!response.success) throw new Error(response.error)
       if (!accountTracker.isCurrent(operation)) return
       await loadFailedRedemptions()
+      /*
+       * 1つ目の再取得を待っている間に B へ切り替わることがある。
+       * ここで確かめず 2つ目を読むと、古い閉じ込めが新しい世代として
+       * A を発行し、B の画面を上書きする。再取得の直前にも確かめる。
+       */
+      if (!accountTracker.isCurrent(operation)) return
       await load()
     } catch {
       if (!accountTracker.isCurrent(operation)) return
