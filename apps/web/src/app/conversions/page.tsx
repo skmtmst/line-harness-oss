@@ -76,6 +76,19 @@ function definitionRange(days: number): { from: string; to: string } {
   return { from: format(start), to: format(end) }
 }
 
+/**
+ * 受け取ったCSVをそのまま保存させる。一覧とレポートで二重に書いていた
+ * 範囲再計算とファイル名違いだけの重複をここに寄せる(#513 L2)。
+ */
+function downloadCsvBlob(blob: Blob, filename: string): void {
+  const href = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = href
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(href)
+}
+
 function rangeLabel(days: number): string {
   const { from, to } = definitionRange(days)
   const format = (value: string) => {
@@ -352,12 +365,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       const blob = await api.conversions.exportDefinitions({
         ...definitionRange(30), lineAccountId: accountId ?? undefined,
       })
-      const href = URL.createObjectURL(blob)
-      const anchor = document.createElement('a')
-      anchor.href = href
-      anchor.download = `conversion-definitions-${definitionRange(1).to}.csv`
-      anchor.click()
-      URL.revokeObjectURL(href)
+      downloadCsvBlob(blob, `conversion-definitions-${definitionRange(1).to}.csv`)
     } catch {
       setExportError('CSVを書き出せませんでした。権限を確認して、もう一度お試しください。')
     } finally {
@@ -473,13 +481,6 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           />
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-ink-secondary text-sm tabular-nums">{rangeLabel(30)}</p>
-            <Select
-              aria-label="表示件数"
-              value="6"
-              size="page-size"
-              options={[{ value: '6', label: '6件表示' }]}
-              onChange={() => undefined}
-            />
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -751,6 +752,8 @@ function ReportTab({ accountId }: { accountId: string | null }) {
   const [loadFailed, setLoadFailed] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
+  /** 失敗時の「もう一度読む」用。一覧タブと同じ導線(#513 L6)。 */
+  const [reloadSeq, setReloadSeq] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -778,7 +781,7 @@ function ReportTab({ accountId }: { accountId: string | null }) {
     return () => {
       cancelled = true
     }
-  }, [accountId, periodDays])
+  }, [accountId, periodDays, reloadSeq])
 
   const exportCsv = async () => {
     if (exporting) return
@@ -788,12 +791,7 @@ function ReportTab({ accountId }: { accountId: string | null }) {
       const blob = await api.conversions.exportDefinitions({
         ...definitionRange(periodDays), lineAccountId: accountId ?? undefined,
       })
-      const href = URL.createObjectURL(blob)
-      const anchor = document.createElement('a')
-      anchor.href = href
-      anchor.download = `conversion-report-${definitionRange(1).to}.csv`
-      anchor.click()
-      URL.revokeObjectURL(href)
+      downloadCsvBlob(blob, `conversion-report-${definitionRange(1).to}.csv`)
     } catch {
       setExportError('CSVを書き出せませんでした。権限を確認して、もう一度お試しください。')
     } finally {
@@ -830,17 +828,22 @@ function ReportTab({ accountId }: { accountId: string | null }) {
         kind="error"
         title="成果レポートを読み込めませんでした"
         description="成果地点の一覧はそのまま使えます。時間を置いて、このタブを開き直してください。"
+        action={
+          <Button variant="secondary" onClick={() => setReloadSeq((current) => current + 1)}>
+            成果レポートを再読み込み
+          </Button>
+        }
       />
     )
   }
 
   if (!report) return null
 
-  const fastest = report.byDefinition
-    .filter((row) => row.previousNetCount > 0)
-    .toSorted((left, right) =>
-      (right.countChange / right.previousNetCount) - (left.countChange / left.previousNetCount),
-    )[0] ?? report.kpis.fastestGrowing
+  /*
+   * 「いちばん伸びた」は口の `kpis.fastestGrowing`(増分数順)をそのまま使う。
+   * 画面で率順に再計算すると、口の選び方と食い違う(#513 L7)。
+   */
+  const fastest = report.kpis.fastestGrowing
   const fastestRate = fastest && fastest.previousNetCount > 0
     ? Math.round((fastest.countChange / fastest.previousNetCount) * 100)
     : fastest?.netCount ? 100 : 0
@@ -913,7 +916,18 @@ function ReportTab({ accountId }: { accountId: string | null }) {
             <p className="text-ink-faint mt-1 text-xs">棒の色は成果地点です。日ごとの実績を積み上げています。</p>
           </div>
           {daily && daily.names.length > 0 ? (
-            <p className="text-ink-faint text-xs">{daily.names.join(' ／ ')} ／ そのほか</p>
+            <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-faint" aria-label="棒の色と成果地点の対応">
+              {daily.names.map((name, index) => (
+                <li key={name} className="flex items-center gap-1">
+                  <span aria-hidden="true" className={`inline-block h-2.5 w-2.5 rounded-sm ${index === 0 ? 'bg-success' : index === 1 ? 'bg-action' : index === 2 ? 'bg-info' : 'bg-canvas-sunken'}`} />
+                  {name}
+                </li>
+              ))}
+              <li className="flex items-center gap-1">
+                <span aria-hidden="true" className="bg-canvas-sunken inline-block h-2.5 w-2.5 rounded-sm" />
+                そのほか
+              </li>
+            </ul>
           ) : null}
         </div>
         {daily && daily.days.length > 0 ? (
@@ -987,7 +1001,7 @@ function ReportTab({ accountId }: { accountId: string | null }) {
                       <p className="text-ink-faint mt-1 text-xs">取消: {row.cancellationCount == null ? '台帳未接続' : `${row.cancellationCount}件・¥${(row.cancellationValue ?? 0).toLocaleString('ja-JP')}`}</p>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <Button href={`/conversions?tab=points&point=${encodeURIComponent(row.conversionPointId)}`}>中身を見る</Button>
+                      <Button href="/conversions?tab=points">中身を見る</Button>
                     </td>
                   </tr>
                 )
