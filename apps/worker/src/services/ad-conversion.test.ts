@@ -110,6 +110,56 @@ describe('sendAdConversions のアカウント境界(#638)', () => {
     expect(logs(testDb)).toHaveLength(0);
   });
 
+  it('同じ冪等キーの再試行は送らない。キーが違えば送る', async () => {
+    const testDb = seedTwoAccounts();
+    mockFetchOk();
+
+    await sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { idempotencyKey: 'stripe:evt-1' });
+    // 再試行で金額が違って届いても、同じ出来事として送らない。
+    await sendAdConversions(testDb.db, 'f1', 'Purchase', 2000, { idempotencyKey: 'stripe:evt-1' });
+    expect(sentRequests).toHaveLength(1);
+    expect(logs(testDb)).toHaveLength(1);
+
+    await sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { idempotencyKey: 'stripe:evt-2' });
+    expect(sentRequests).toHaveLength(2);
+    expect(logs(testDb)).toHaveLength(2);
+  });
+
+  it('同じキーの同時実行は1件だけ送る', async () => {
+    const testDb = seedTwoAccounts();
+    mockFetchOk();
+
+    await Promise.all([
+      sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { idempotencyKey: 'stripe:evt-9' }),
+      sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { idempotencyKey: 'stripe:evt-9' }),
+    ]);
+
+    expect(sentRequests).toHaveLength(1);
+    expect(logs(testDb)).toHaveLength(1);
+  });
+
+  it('失敗済みの同じキーは取り直して送り直せる', async () => {
+    const testDb = seedTwoAccounts();
+    let fail = true;
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: { body?: string }): Promise<{ ok: boolean; status: number; text: () => Promise<string> }> => {
+      sentRequests.push({ url, body: init?.body ? JSON.parse(init.body) : null });
+      if (fail) return { ok: false, status: 500, text: async () => 'error' };
+      return { ok: true, status: 200, text: async () => 'ok' };
+    }));
+
+    await sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { idempotencyKey: 'stripe:evt-3' });
+    expect(logs(testDb)).toEqual([
+      { ad_platform_id: 'p1', friend_id: 'f1', line_account_id: 'a1', status: 'failed' },
+    ]);
+
+    fail = false;
+    await sendAdConversions(testDb.db, 'f1', 'Purchase', 1000, { idempotencyKey: 'stripe:evt-3' });
+    expect(sentRequests).toHaveLength(2);
+    expect(logs(testDb)).toEqual([
+      { ad_platform_id: 'p1', friend_id: 'f1', line_account_id: 'a1', status: 'sent' },
+    ]);
+  });
+
   it('送信失敗は failed で記録し投げない。1回の呼び出しで1媒体へ1回だけ送る', async () => {
     const testDb = seedTwoAccounts();
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: { body?: string }) => {

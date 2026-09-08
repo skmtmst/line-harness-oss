@@ -51,6 +51,33 @@ export interface EventPayload {
   replyToken?: string;
 }
 
+function toAdConversionAmount(value: unknown): number | undefined {
+  const amount = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
+  return typeof amount === 'number' && Number.isFinite(amount) && amount > 0 ? amount : undefined;
+}
+
+/**
+ * 通常イベントから広告成果への対応表。購入に結びつく出来事だけ送る。
+ * どれを送るかはここで一元管理し、各呼び出し側では決めない。
+ */
+export function adConversionForEvent(
+  eventType: string,
+  payload: EventPayload,
+): { eventName: string; value?: number } | null {
+  if (payload.conversionEventName) {
+    return { eventName: payload.conversionEventName, value: payload.conversionValue };
+  }
+  if (eventType === 'cv_fire' && payload.eventData?.type === 'purchase') {
+    return { eventName: 'Purchase', value: toAdConversionAmount(payload.eventData?.amount) };
+  }
+  if (eventType === 'ec.order.confirmed' || eventType === 'ec.order.payment_received') {
+    const eventData = payload.eventData ?? {};
+    const order = (eventData.order as Record<string, unknown> | undefined) ?? eventData;
+    return { eventName: 'Purchase', value: toAdConversionAmount(order.total) };
+  }
+  return null;
+}
+
 /**
  * Fire an event and run all registered handlers.
  *
@@ -81,9 +108,15 @@ export async function fireEvent(
     fireOutgoingWebhooks(db, eventType, payload, outgoingWebhookLineAccountId),
     processScoring(db, eventType, payload, outgoingWebhookLineAccountId, lineAccessToken),
   ];
-  if (payload.friendId && payload.conversionEventName) {
+  const adConversion = payload.friendId ? adConversionForEvent(eventType, payload) : null;
+  if (payload.friendId && adConversion) {
     phase1.push(
-      sendAdConversions(db, payload.friendId, payload.conversionEventName, payload.conversionValue),
+      sendAdConversions(db, payload.friendId, adConversion.eventName, adConversion.value, {
+        // 発生元の安定IDを冪等キーにし、再配達の二重送信を止める。
+        idempotencyKey: payload.sourceEventId
+          ? `${payload.sourceKind ?? eventType}:${payload.sourceEventId}`
+          : undefined,
+      }),
     );
   }
   await Promise.allSettled(phase1);

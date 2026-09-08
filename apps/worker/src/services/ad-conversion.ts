@@ -6,18 +6,30 @@
  */
 
 import {
+  claimAdConversionSend,
+  finishAdConversionSend,
   getActiveAdPlatforms,
   getRefTrackingWithClickIds,
-  logAdConversion,
   type AdPlatformConfig,
   type RefTracking,
 } from '@line-crm/db';
+
+function clickIdForPlatform(platformName: string, ref: RefTracking): { clickId: string; clickIdType: string } | null {
+  switch (platformName) {
+    case 'meta': return ref.fbclid ? { clickId: ref.fbclid, clickIdType: 'fbclid' } : null;
+    case 'x': return ref.twclid ? { clickId: ref.twclid, clickIdType: 'twclid' } : null;
+    case 'google': return ref.gclid ? { clickId: ref.gclid, clickIdType: 'gclid' } : null;
+    case 'tiktok': return ref.ttclid ? { clickId: ref.ttclid, clickIdType: 'ttclid' } : null;
+    default: return null;
+  }
+}
 
 export async function sendAdConversions(
   db: D1Database,
   friendId: string,
   eventName: string,
   eventValue?: number,
+  opts?: { idempotencyKey?: string | null },
 ): Promise<void> {
   // 友だちの所属アカウントを確定し、そのアカウントの広告設定だけ使う。
   // 所属が分からない友だちの行動・金額は外部へ送らない。
@@ -32,61 +44,50 @@ export async function sendAdConversions(
   if (!ref) return;
 
   const platforms = await getActiveAdPlatforms(db, lineAccountId);
+  // 呼び出しをまたいだ重複送信を止める安定キー。無いときは今回限りの鍵にする。
+  const idempotencyKey = opts?.idempotencyKey || crypto.randomUUID();
 
   for (const platform of platforms) {
-    // 二重防御: 帰属が違う設定は送らない(DB側でも logAdConversion が弾く)。
+    // 二重防御: 帰属が違う設定は送らない(DB側でも claim が弾く)。
     if (platform.line_account_id !== lineAccountId) continue;
+    const click = clickIdForPlatform(platform.name, ref);
+    if (!click) continue;
     const config: AdPlatformConfig = JSON.parse(platform.config);
+
+    const claim = await claimAdConversionSend(db, {
+      platformId: platform.id, friendId, lineAccountId, eventName,
+      clickId: click.clickId, clickIdType: click.clickIdType, idempotencyKey,
+    });
+    if (claim !== 'send') continue;
 
     try {
       switch (platform.name) {
         case 'meta':
-          if (ref.fbclid) {
-            await sendMetaConversion(config, ref, eventName, eventValue);
-            await logAdConversion(db, {
-              platformId: platform.id, friendId, lineAccountId, eventName,
-              clickId: ref.fbclid, clickIdType: 'fbclid', status: 'sent',
-            });
-          }
+          await sendMetaConversion(config, ref, eventName, eventValue);
           break;
         case 'x':
-          if (ref.twclid) {
-            await sendXConversion(config, ref, eventName, eventValue);
-            await logAdConversion(db, {
-              platformId: platform.id, friendId, lineAccountId, eventName,
-              clickId: ref.twclid, clickIdType: 'twclid', status: 'sent',
-            });
-          }
+          await sendXConversion(config, ref, eventName, eventValue);
           break;
         case 'google':
-          if (ref.gclid) {
-            await sendGoogleConversion(config, ref, eventName, eventValue);
-            await logAdConversion(db, {
-              platformId: platform.id, friendId, lineAccountId, eventName,
-              clickId: ref.gclid, clickIdType: 'gclid', status: 'sent',
-            });
-          }
+          await sendGoogleConversion(config, ref, eventName, eventValue);
           break;
         case 'tiktok':
-          if (ref.ttclid) {
-            await sendTikTokConversion(config, ref, eventName, eventValue);
-            await logAdConversion(db, {
-              platformId: platform.id, friendId, lineAccountId, eventName,
-              clickId: ref.ttclid, clickIdType: 'ttclid', status: 'sent',
-            });
-          }
+          await sendTikTokConversion(config, ref, eventName, eventValue);
           break;
+        default:
+          await finishAdConversionSend(db, {
+            platformId: platform.id, friendId, eventName, idempotencyKey,
+            status: 'failed', errorMessage: `unsupported platform: ${platform.name}`,
+          });
+          continue;
       }
+      await finishAdConversionSend(db, {
+        platformId: platform.id, friendId, eventName, idempotencyKey, status: 'sent',
+      });
     } catch (error) {
-      await logAdConversion(db, {
-        platformId: platform.id,
-        friendId,
-        lineAccountId,
-        eventName,
-        clickId: ref.fbclid || ref.twclid || ref.gclid || ref.ttclid || '',
-        clickIdType: platform.name,
-        status: 'failed',
-        errorMessage: String(error),
+      await finishAdConversionSend(db, {
+        platformId: platform.id, friendId, eventName, idempotencyKey,
+        status: 'failed', errorMessage: String(error),
       });
     }
   }

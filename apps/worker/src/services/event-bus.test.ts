@@ -431,3 +431,66 @@ describe('fireEvent — 送信Webhookのアカウント解決', () => {
     expect(record).not.toContain('webhook-1');
   });
 });
+
+describe('fireEvent — 広告成果の配線(#638)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  async function adConversionMock() {
+    return (await import('./ad-conversion.js')).sendAdConversions as unknown as ReturnType<typeof vi.fn>;
+  }
+
+  it('Stripeの購入は安定キー付きで広告成果へ送る', async () => {
+    const db = fakeDb({ friend: { line_user_id: 'U1', line_account_id: 'a1' }, capturedInserts: [] });
+    await fireEvent(db, 'cv_fire', {
+      sourceEventId: 'evt-1',
+      sourceKind: 'stripe',
+      occurredAt: '2026-09-09T00:00:00+09:00',
+      friendId: 'friend-1',
+      eventData: { type: 'purchase', amount: 1000, stripeEventId: 'evt-1' },
+    }, undefined, 'a1');
+
+    expect(await adConversionMock()).toHaveBeenCalledWith(
+      db, 'friend-1', 'Purchase', 1000, { idempotencyKey: 'stripe:evt-1' },
+    );
+  });
+
+  it('EC注文確定は受信行IDを安定キーにして送る', async () => {
+    const db = fakeDb({ friend: { line_user_id: 'U1', line_account_id: 'a1' }, capturedInserts: [] });
+    await fireEvent(db, 'ec.order.confirmed', {
+      sourceEventId: 'row-1',
+      sourceKind: 'ec',
+      friendId: 'friend-1',
+      eventData: { order: { total: 2860 } },
+    }, 'token', 'a1');
+
+    expect(await adConversionMock()).toHaveBeenCalledWith(
+      db, 'friend-1', 'Purchase', 2860, { idempotencyKey: 'ec:row-1' },
+    );
+  });
+
+  it('購入に結びつかない通常イベントは送らない', async () => {
+    const db = fakeDb({ friend: { line_user_id: 'U1', line_account_id: 'a1' }, capturedInserts: [] });
+    await fireEvent(db, 'friend_add', { friendId: 'friend-1', eventData: {} }, undefined, 'a1');
+
+    expect(await adConversionMock()).not.toHaveBeenCalled();
+  });
+
+  it('明示の conversionEventName は従来どおり優先する', async () => {
+    const db = fakeDb({ friend: { line_user_id: 'U1', line_account_id: 'a1' }, capturedInserts: [] });
+    await fireEvent(db, 'custom_event', {
+      friendId: 'friend-1',
+      conversionEventName: 'Trial',
+      conversionValue: 100,
+    }, undefined, 'a1');
+
+    expect(await adConversionMock()).toHaveBeenCalledWith(
+      db, 'friend-1', 'Trial', 100, { idempotencyKey: undefined },
+    );
+  });
+});
