@@ -170,25 +170,28 @@ export default function SiteScript() {
             </div>
           </section>
 
+          {/*
+            #514-14: 口はパスだけ返す(ホスト列は無い)。`new URL(path)` の
+            抜き出しと「知らないドメイン」判定は本番で死んでいるので削り、
+            届いたパスをそのまま出す。ドメイン混入の検知はホスト列の口が
+            できたら戻す(司令塔へ依頼)。
+          */}
           <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
             <div className="border-b border-hairline px-4 py-3">
               <h2 className="text-base font-bold text-ink">いま届いているページ</h2>
-              <p className="mt-1 text-xs text-ink-faint">知らないドメインが並んでいたら、コードが別のサイトにコピーされています。</p>
+              <p className="mt-1 text-xs text-ink-faint">コードを貼ったページの届き具合です。</p>
             </div>
             {loading ? <ListState kind="loading" title="サイトの計測状況を読み込んでいます" /> : pages.length === 0 ? (
               <ListState kind="empty" title="まだ記録がありません" description="コードを貼ったあと、サイトを開くと数分で表示されます。" />
             ) : (
               <table className="w-full table-fixed text-xs">
-                <thead className="border-b border-hairline bg-canvas-sunken text-ink-faint"><TableHeadRow><Th>ドメイン</Th><Th align="right">この30日のページ表示</Th><Th align="right">友だち追加</Th><Th>状態</Th></TableHeadRow></thead>
+                <thead className="border-b border-hairline bg-canvas-sunken text-ink-faint"><TableHeadRow><Th>ページ</Th><Th align="right">この30日のページ表示</Th><Th align="right">友だち追加</Th></TableHeadRow></thead>
                 <tbody className="divide-y divide-hairline">
                   {pages.map((page) => {
-                    const domain = (() => { try { return new URL(page.path).hostname } catch { return page.path } })()
-                    const unknown = domain.includes('unknown-')
-                    return <tr key={page.path} className={unknown ? 'bg-danger-bg' : ''}>
-                      <td className={`truncate px-4 py-3 font-semibold ${unknown ? 'text-status-danger' : 'text-ink'}`}>{domain}</td>
+                    return <tr key={page.path}>
+                      <td className="truncate px-4 py-3 font-semibold text-ink" title={page.path}>{page.path}</td>
                       <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">{page.views.toLocaleString('ja-JP')}</td>
                       <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">{page.visitors.toLocaleString('ja-JP')}人</td>
-                      <td className={`px-4 py-3 ${unknown ? 'text-status-danger' : 'text-ink-secondary'}`}>{unknown ? '知らないドメインです' : '許可しています'}</td>
                     </tr>
                   })}
                 </tbody>
@@ -220,7 +223,7 @@ export default function SiteScript() {
           </section>
           <section className="rounded-card border border-status-warn bg-status-warn-soft p-5">
             <h2 className="text-sm font-bold text-status-warn-deep">気をつけること</h2>
-            <ul className="mt-3 space-y-3 text-xs leading-relaxed text-status-warn-deep"><li>個人が特定できる情報は送りません</li><li>知らないドメインが1つあります</li></ul>
+            <ul className="mt-3 space-y-3 text-xs leading-relaxed text-status-warn-deep"><li>個人が特定できる情報は送りません</li></ul>
           </section>
         </aside>
       </div>

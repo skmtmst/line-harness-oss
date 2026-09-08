@@ -157,6 +157,8 @@ function InflowLinksPageInner() {
   // 「この pool が選択中アカウントに配信するか」を判定するために使う。
   // pool.activeAccountId はレガシーシングル所属。マルチアカ pool では不十分。
   const [poolMembers, setPoolMembers] = useState<Record<string, Set<string>>>({})
+  // #514-5: 同じ取得から作るプール別の所属名。編集窓へ渡して取り直しを無くす。
+  const [poolMemberNames, setPoolMemberNames] = useState<Record<string, string[]>>({})
 
   const load = async () => {
     const requestGeneration = ++loadRequestRef.current
@@ -221,14 +223,15 @@ function InflowLinksPageInner() {
         const entries = await Promise.all(
           p.data.map(async (pool) => {
             const res = await api.pools.accounts.list(pool.id)
-            const ids = res.success
-              ? new Set(res.data.filter((a) => a.isActive).map((a) => a.lineAccountId))
-              : new Set<string>()
-            return [pool.id, ids] as const
+            const members = res.success ? res.data.filter((a) => a.isActive) : []
+            const ids = new Set(members.map((a) => a.lineAccountId))
+            const names = members.map((a) => a.accountName ?? '—')
+            return [pool.id, { ids, names }] as const
           }),
         )
         if (!isCurrent()) return
-        setPoolMembers(Object.fromEntries(entries))
+        setPoolMembers(Object.fromEntries(entries.map(([id, value]) => [id, value.ids])))
+        setPoolMemberNames(Object.fromEntries(entries.map(([id, value]) => [id, value.names])))
       }
     } catch {
       if (!isCurrent()) return
@@ -254,6 +257,7 @@ function InflowLinksPageInner() {
     setSummary(null)
     setSummaryAvailable(false)
     setPoolMembers({})
+    setPoolMemberNames({})
     setEditing(null)
     setQrRoute(null)
     setPage(1)
@@ -1004,6 +1008,7 @@ function InflowLinksPageInner() {
           templates={templates}
           tags={tags}
           existingGenres={genreOptions}
+          poolMemberNames={poolMemberNames}
           onClose={() => setEditing(null)}
           onSaved={(savedRoute, created) => {
             setEditing(null)
