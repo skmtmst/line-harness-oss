@@ -85,6 +85,27 @@ describe('V6 イベント・申込者一覧の状態', () => {
     expect(code(EDIT)).not.toContain('bookings?eventId=')
   })
 
+  it('定員は枠の一覧から数え、200件超えは注意を出す(点検#520の中8)', () => {
+    const body = code(BOOKINGS)
+    // 申込者画面はイベント一覧の全件取得をやめ、枠の一覧から数える。
+    expect(body).toContain('.listSlots(selectedAccountId, eventId)')
+    expect(body).not.toContain('eventsApi.listEvents(')
+    expect(body).toContain('slots.some((slot) => slot.capacity == null)')
+    expect(body).toContain('setBookingsTotal')
+    expect(BOOKINGS).toContain('200件まで表示しています。状態の絞り込みを変えて探してください。')
+    const list = code(EVENTS)
+    expect(list).toContain('setListTotal')
+    expect(EVENTS).toContain('200件まで表示しています')
+  })
+
+  it('編集画面は取得失敗を黙って0件にせず帯と読み直しを出す(点検#520の中10)', () => {
+    const body = code(EDIT)
+    expect(body).toContain('setLoadError')
+    expect(body).toContain('setReloadSeq')
+    expect(EDIT).toContain('一部を取得できませんでした。数は実際より少なく見えます。')
+    expect(EDIT).toContain('読み直す')
+  })
+
   it('操作の失敗を内部の文字で出さず、一覧は残す', () => {
     const body = code(BOOKINGS)
     expect(body).not.toContain('setError(e instanceof Error ? e.message : String(e))')
