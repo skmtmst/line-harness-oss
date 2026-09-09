@@ -43,6 +43,7 @@ import {
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
 import { fetchQuota } from '../services/broadcast-quota-guard.js';
+import { dispatchOperatorEvent } from '../services/operator-notification-dispatch.js';
 
 const broadcasts = new Hono<Env>();
 
@@ -1622,6 +1623,20 @@ broadcasts.post('/api/broadcasts/:id/send', requireRole('owner', 'admin'), requi
     }
 
     const result = await getBroadcastById(c.env.DB, id);
+    if (result?.status === 'sent' && result.line_account_id) {
+      try {
+        await dispatchOperatorEvent(c.env.DB, c.env, {
+          lineAccountId: result.line_account_id,
+          eventType: 'broadcast_completed',
+          sourceEventId: result.id,
+          message: `「${result.title}」の一斉配信が完了しました`,
+          executionMode: 'automatic',
+        });
+      } catch (notificationError) {
+        // 配信本体は完了済み。通知の失敗で再配信させず、台帳の回収口に残す。
+        console.error('[broadcast-completed] operator notification failed:', notificationError);
+      }
+    }
     return c.json({ success: true, data: result ? serializeBroadcast(result) : null });
   } catch (err) {
     console.error('POST /api/broadcasts/:id/send error:', err);
