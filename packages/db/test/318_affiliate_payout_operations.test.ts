@@ -16,13 +16,15 @@ import {
   previewAffiliateAccountSettlement,
   saveAffiliateBankProfile,
 } from '../src/affiliate-payouts.js';
+import { setConversionApproval } from '../src/affiliate-offers.js';
+import { ensureConversionRewardSnapshot } from '../src/affiliate-settlements.js';
 import { asD1 } from './d1-test-helper.js';
 
 const TENANT_ID = '00000000-0000-4000-8000-000000000001';
 let sqlite: Database.Database;
 let db: D1Database;
 
-beforeEach(() => {
+beforeEach(async () => {
   sqlite = new Database(':memory:');
   sqlite.exec(readFileSync(join(import.meta.dirname, '..', 'bootstrap.sql'), 'utf8'));
   sqlite.prepare(
@@ -60,6 +62,9 @@ beforeEach(() => {
       ('conversion-other', 'point-2', 'friend-2', 'affiliate-2', 'ref-2', 'approved', '2026-08-10T00:00:00.000Z', 10000);
   `);
   db = asD1(sqlite);
+  // 承認済みfixtureは承認時に版がある状態にする(全体締めは版だけを使う)。
+  await ensureConversionRewardSnapshot(db, 'conversion-1', '2026-08-10T00:00:00.000Z');
+  await ensureConversionRewardSnapshot(db, 'conversion-other', '2026-08-10T00:00:00.000Z');
 });
 
 describe('migration 318 affiliate settlement and payout ledger', () => {
@@ -86,6 +91,62 @@ describe('migration 318 affiliate settlement and payout ledger', () => {
     expect(await closeAffiliateAccountSettlement(db, { ...closeInput, requestFingerprint: 'different' }))
       .toEqual({ kind: 'idempotency_conflict' });
     expect(sqlite.prepare('SELECT COUNT(*) AS count FROM affiliate_reward_entries').get()).toEqual({ count: 1 });
+  });
+
+  it('承認時の版があれば全体締めも凍結し、entryへ必ず紐付ける', async () => {
+    sqlite.exec(`
+      INSERT INTO conversion_events
+        (id, conversion_point_id, friend_id, affiliate_id, attributed_ref_code,
+         approval_status, approved_at, value_snapshot)
+      VALUES ('conversion-new', 'point-1', 'friend-1', 'affiliate-1', 'ref-1',
+        'pending', NULL, 10000);
+    `);
+    expect(await setConversionApproval(db, 'conversion-new', 'approved')).toBe(true);
+    const period = {
+      tenantId: TENANT_ID, lineAccountId: 'account-1',
+      periodFrom: '2026-08-01T00:00:00.000Z', periodTo: '2099-01-01T00:00:00.000Z',
+    };
+    const before = await previewAffiliateAccountSettlement(db, period);
+    // conversion-1(版あり5000)+conversion-new(版あり5000)
+    expect(before).toMatchObject({ totalAmount: 10000, conversionCount: 2 });
+    sqlite.exec(`UPDATE affiliate_offers SET reward_amount = 99999 WHERE id = 'offer-1'`);
+    const edited = await previewAffiliateAccountSettlement(db, period);
+    // 両方とも承認時の版で凍結され、編集で動かない
+    expect(edited).toMatchObject({ totalAmount: 10000, conversionCount: 2 });
+    const closed = await closeAffiliateAccountSettlement(db, {
+      ...period, actorId: 'staff-1', expectedPreviewVersion: edited.previewVersion,
+      idempotencyKey: 'settlement-frozen-1', requestFingerprint: 'frozen-1',
+    });
+    expect(closed).toMatchObject({ kind: 'created', totalAmount: 10000, conversionCount: 2 });
+    expect(sqlite.prepare(
+      `SELECT COUNT(*) AS c FROM affiliate_reward_entries WHERE reward_calculation_id IS NULL`,
+    ).get()).toEqual({ c: 0 });
+    expect(sqlite.prepare(
+      `SELECT re.amount_minor AS a FROM affiliate_reward_entries re
+        JOIN affiliate_reward_calculations c ON c.id = re.reward_calculation_id
+       WHERE re.conversion_event_id = 'conversion-new'`,
+    ).get()).toEqual({ a: 5000 });
+  });
+
+  it('真の同時全体締めでも二重計上せず同一操作は回収する', async () => {
+    const period = {
+      tenantId: TENANT_ID, lineAccountId: 'account-1',
+      periodFrom: '2026-08-01T00:00:00.000Z', periodTo: '2026-08-31T23:59:59.000Z',
+    };
+    const preview = await previewAffiliateAccountSettlement(db, period);
+    const input = {
+      ...period, actorId: 'staff-1', expectedPreviewVersion: preview.previewVersion,
+      idempotencyKey: 'settlement-race-1', requestFingerprint: 'race-1',
+    };
+    const [a, b] = await Promise.all([
+      closeAffiliateAccountSettlement(db, input),
+      closeAffiliateAccountSettlement(db, input),
+    ]);
+    expect([a.kind, b.kind].sort()).toEqual(['created', 'duplicate']);
+    const ids = [a, b].map((r) => (r as { settlementId: string }).settlementId);
+    expect(ids[0]).toBe(ids[1]);
+    expect(sqlite.prepare(`SELECT COUNT(*) AS c FROM affiliate_settlements`).get()).toEqual({ c: 1 });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS c FROM affiliate_reward_entries`).get()).toEqual({ c: 1 });
   });
 
   it('口座番号を返さず、版競合を409用の結果へ分ける', async () => {
