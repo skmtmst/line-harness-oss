@@ -213,16 +213,27 @@ type CustomerMutationOutcome =
   | { kind: 'stale'; contentSaved: boolean; settleDraft: false }
   | { kind: 'failed'; message: string; contentSaved: boolean; settleDraft: false }
 
-/** 送った文面が、いまも画面の文面と同じアカウント・同じ中身で残っているか。 */
+/**
+ * 送った文面が、いまも画面の文面と同じアカウント・同じ中身で残っているか。
+ *
+ * `generation`/`currentGeneration` は同一アカウント内での読み直し
+ * （再読み込みボタンなど）を見分ける。`forAccountId`/`currentAccountId` は
+ * アカウント切替そのものを見分ける——`currentAccountId` は描画のたびに
+ * 同期して更新される ref を指すので、切替後の load() が実際に走るより前の
+ * 応答でも、ここだけで正しく古いと分かる（`loadGeneration` の発火待ちに
+ * 頼らない）。
+ */
 type CustomerMutationGuard = {
   generation: number
   currentGeneration: () => number
+  forAccountId: string
+  currentAccountId: () => string | null
   sentFingerprint: string
   currentFingerprint: () => string | undefined
 }
 
 function isStale(guard: CustomerMutationGuard): boolean {
-  return guard.generation !== guard.currentGeneration()
+  return guard.generation !== guard.currentGeneration() || guard.forAccountId !== guard.currentAccountId()
 }
 
 function canSettleDraft(guard: CustomerMutationGuard, contentSaved: boolean): boolean {
@@ -500,6 +511,17 @@ function CustomerNotificationEditor({
 function LineNotificationsPage() {
   const router = useRouter()
   const { selectedAccountId } = useAccount()
+  /*
+   * N-340: `loadGeneration` は load() の useEffect の中でしか進まない。
+   * アカウント切替の描画コミットと、その useEffect が実際に発火する瞬間の
+   * 間には隙間がある（渡された値が変わった描画そのものは同期的に終わるが、
+   * useEffect は後回しになる）。保存・公開の応答がその隙間で返ると、
+   * 世代はまだ古いままなのに画面はもう別アカウントを向いてしまっている。
+   * ここは描画のたびに同期して合わせ、useEffect の発火を待たずに
+   * 「いま向いているアカウント」を握っておく（保存応答の照合に使う）。
+   */
+  const selectedAccountRef = useRef(selectedAccountId)
+  selectedAccountRef.current = selectedAccountId
   const tab = useMergedTab(TABS, 'tab', 'customer')
   const [settings, setSettings] = useState<EcNotificationSetting[]>([])
   const [overview, setOverview] = useState<EcCommerceOverview | null>(null)
@@ -727,6 +749,8 @@ function LineNotificationsPage() {
   const guardFor = (setting: EcNotificationSetting): CustomerMutationGuard => ({
     generation: loadGeneration.current,
     currentGeneration: () => loadGeneration.current,
+    forAccountId: selectedAccountId ?? '',
+    currentAccountId: () => selectedAccountRef.current,
     sentFingerprint: customerDraftFingerprint(pickCustomerDraft(setting)),
     currentFingerprint: () => editFingerprintRef.current.get(setting.eventType),
   })

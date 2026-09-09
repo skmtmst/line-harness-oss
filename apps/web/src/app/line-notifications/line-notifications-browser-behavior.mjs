@@ -8,6 +8,32 @@
  *   1. 375px級で、編集画面の主要操作が画面の外へ出ないこと（寸法検査）
  *   2. 保存中に足した入力が、古い応答で端末の控えごと消えないこと（競合1）
  *   3. A保存中→B→A→再編集のあとに古いAの応答が返っても消えないこと（競合2）
+ *   4. B選択直後・Bの一覧がまだ読み込み中のうちに古いAの応答が返っても
+ *      消えないこと（競合3）
+ *
+ * 【競合3について、確かめたことと確かめていないこと】
+ * loadGeneration は load() の useEffect の中でしか進まない、という
+ * コードの作りそのものは、実装の詳細（Reactの副作用が「いつ」実行される
+ * かはAPIとして保証されていない）に頼っている点で脆い。そこで、選択中
+ * accountを描画の境界で同期反映する ref（selectedAccountRef）を作り、
+ * guard がそれも見るようにした（page.tsx の isStale）。
+ *
+ * この道理そのものは page.tsx 内の純粋関数レベルで確定的に固定できる
+ * （line-notifications-n678-contract.test.tsx の「Bを選んだ直後・Bのload
+ * 未発火でも…」テスト。generation はまだ古いまま・currentAccountId だけ
+ * 動かした guard を直接組み立てて確認しており、account の照合を外す
+ * 逆変異で確実に落ちる）。
+ *
+ * 一方、ここ（実ブラウザ）では、この画面の実際の挙動として
+ * loadGeneration の更新がアカウント切替の描画と「事実上ほぼ同時」に
+ * 起きることを確認しており（settings 等のfetchをすべて足止めしても
+ * generation は即座に進む）、旧Aの応答をどれだけ遅らせても
+ * loadGeneration 単体の照合で既に検知できてしまう——つまりこの実ブラウザ
+ * 試験は「Bへ切り替わった直後・Bの一覧がまだ何も出ていない」という
+ * 状態を実物のブラウザで再現し、その状態でもAの控えが守られることを
+ * 確かめるものであり、account照合だけを外す逆変異を単体でこの試験だけに
+ * かけても、この試験は落ちない（generationの照合が既に十分なため）。
+ * account照合の必要性そのものは、上記の純粋関数の試験が担う。
  *
  * apps/web/src/app/automations/automation-browser-behavior.mjs と同じ作りにしている。
  */
@@ -61,6 +87,14 @@ const accounts = [
 
 const EVENT_TYPE = 'ec_order.confirmed'
 
+const ACCOUNT_LOAD_PATHS = new Set([
+  '/api/notifications/operator-rules',
+  '/api/ec-commerce/settings',
+  '/api/ec-commerce/overview',
+  '/api/line-notifications/customer-definitions',
+  '/api/line-notifications/metrics',
+])
+
 function notificationSetting(accountId) {
   return {
     eventType: EVENT_TYPE,
@@ -104,7 +138,7 @@ function customerDefinition(accountId) {
 }
 
 async function openHarness(browser) {
-  const state = { draftSaves: [], saveDelayMs: 0, holdSave: null }
+  const state = { draftSaves: [], saveDelayMs: 0, holdSave: null, holdAccountLoad: {} }
   const context = await browser.newContext()
   await context.addInitScript(() => {
     localStorage.setItem('lh_selected_account', 'account-a')
@@ -131,6 +165,14 @@ async function openHarness(browser) {
     const json = (body, status = 200) => route.fulfill({
       status, contentType: 'application/json', body: JSON.stringify(body),
     })
+    /*
+     * 競合3（B選択直後・Bのloadが完了する前）の再現に使う。settings/overview/
+     * operator-rules/customer-definitions/metrics のいずれも、この account
+     * 向けの応答をここで足止めできる——Bへ切り替えた直後、Bの一覧がまだ
+     * 何も出ていない「読み込み中」のうちに、旧Aの応答を通す窓を作る。
+     */
+    const holdForAccount = state.holdAccountLoad[accountId]
+    if (holdForAccount && ACCOUNT_LOAD_PATHS.has(path)) await holdForAccount
 
     if (path === '/api/auth/session') {
       return json({ success: true, data: { name: 'owner利用者', role: 'owner', permissionKeys: [] }, csrfToken: 'test-csrf' })
@@ -326,6 +368,72 @@ try {
     )
     await context.close()
     console.log('競合2（A保存中→B→A→再編集）: PASS')
+  }
+
+  {
+    /*
+     * 4. 競合3（司令塔の独立再審査REJECT、2026-09-09）。
+     *
+     * loadGeneration は load() の useEffect の中でしか進まない。従来の
+     * 実ブラウザ試験（競合2）は、Bの読み込みが終わり、さらにAへ戻って
+     * 再読み込みも終わったあとで旧Aの応答を解放していた——「Bを選んだ
+     * 直後・Bの一覧がまだ何も出ていない」窓を一度も通していなかった。
+     *
+     * ここではBの一覧読み込み（settings/overview/operator-rules/
+     * customer-definitions/metrics）をすべて足止めしたうえで、Bへ切り替えた
+     * 直後・その足止めが解けるより前に、旧Aの保存応答を解放する。
+     * Bへ切り替わった描画そのもの（アカウント選択欄の表示・URLの状態）は
+     * 済んでいるが、Bの一覧はまだ「読み込み中」のまま——という、
+     * 指摘された隙間の中で旧Aの応答を通す。
+     */
+    const { context, page, state } = await openHarness(browser)
+    await openEditor(page)
+    await introBox(page).fill('Aで保存を押した時点の本文')
+    await page.waitForTimeout(100)
+
+    let releaseA = () => {}
+    state.holdSave = new Promise((resolve) => { releaseA = resolve })
+    await page.getByRole('button', { name: '下書きを保存' }).click()
+    await page.waitForFunction(() => document.body.innerText.includes('未保存の変更があります'))
+
+    // Bの一覧読み込みを足止めする。切り替えても、Bの中身はまだ何も出ない。
+    let releaseB = () => {}
+    state.holdAccountLoad['account-b'] = new Promise((resolve) => { releaseB = resolve })
+
+    await page.getByLabel('LINEアカウント').selectOption('account-b')
+    // Bへ切り替わった描画（アカウント選択欄）は済んでいるが、
+    // 一覧はまだ「読み込み中」——ここが指摘された窓。
+    await page.waitForSelector('[data-list-state="loading"]', { timeout: 15_000 }).catch(() => {})
+    await page.waitForTimeout(150)
+
+    // まさにこの窓のうちに、古いAの応答を返す。
+    releaseA()
+    await page.waitForTimeout(300)
+
+    // Bの読み込みを再開させ、普通に終わらせる（隙間を通したことの裏取り）。
+    releaseB()
+    await page.waitForFunction(() => {
+      const box = document.querySelector('main[data-design-node="Q55bb"] textarea')
+      return Boolean(box) && box.value === 'B店の本文'
+    }, undefined, { timeout: 15_000 })
+
+    const stored = await page.evaluate((key) => localStorage.getItem(key), draftKey('account-a'))
+    assert.ok(stored, 'Bの一覧がまだ読み込み中のうちに返った旧Aの応答で、Aの控えが消えている')
+    assert.equal(JSON.parse(stored).introText, 'Aで保存を押した時点の本文', '控えの中身が変わっている')
+
+    // Aへ戻ると、消されていない控えが復元され、未保存の印も戻る。
+    await page.getByLabel('LINEアカウント').selectOption('account-a')
+    await page.waitForFunction(() => {
+      const box = document.querySelector('main[data-design-node="Q55bb"] textarea')
+      return Boolean(box) && box.value === 'Aで保存を押した時点の本文'
+    }, undefined, { timeout: 15_000 })
+    assert.ok(
+      await page.getByText('未保存の変更があります').count() > 0
+        || await page.getByText(/未保存の編集を.*件復元しました/).count() > 0,
+      'Bの一覧がまだ読み込み中のうちに返った旧Aの応答で、未保存の印が消えている',
+    )
+    await context.close()
+    console.log('競合3（B選択直後・Bの一覧が読み込み中のうちに旧Aの応答が返る）: PASS')
   }
 
   console.log('line notifications browser behavior: PASS')

@@ -97,6 +97,16 @@ describe('V6 顧客へのお知らせの寸法', () => {
     expect(PAGE).toContain("if (outcome.kind === 'stale' || generation !== loadGeneration.current) return")
   })
 
+  it('世代の照合はuseEffectの発火待ちに頼らない。選択中accountを描画のたびに同期させたrefでも見る', () => {
+    // loadGeneration は load() の useEffect の中でしか進まない。切替の描画コミットと
+    // その発火の間には隙間があるため、世代だけでなく account の一致も独立して見る。
+    expect(PAGE).toContain('const selectedAccountRef = useRef(selectedAccountId)')
+    expect(PAGE).toContain('selectedAccountRef.current = selectedAccountId')
+    expect(PAGE).toContain("guard.forAccountId !== guard.currentAccountId()")
+    expect(PAGE).toContain('currentAccountId: () => selectedAccountRef.current')
+    expect(PAGE).toContain("forAccountId: selectedAccountId ?? ''")
+  })
+
   it('端末の控えと未保存の印は、送った文面がそのまま画面に残っているときだけ片づける', () => {
     // 保存中も入力できる。押した時点の写しで「保存済み」にすると、足した分が消える。
     expect(PAGE).toContain('function customerDraftFingerprint(draft: CustomerEditorDraft): string')

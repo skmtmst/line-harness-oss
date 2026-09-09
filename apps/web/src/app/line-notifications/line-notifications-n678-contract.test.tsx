@@ -109,24 +109,39 @@ type MutationApi = Parameters<typeof saveCustomerNotification>[0]['api']
 type MutationGuard = Parameters<typeof saveCustomerNotification>[0]['guard']
 
 /**
- * 画面が持つ「いまのアカウント世代」と「いまの文面の指紋」を、試験から動かせる形にする。
- * 保存を投げたあとに `type()` すれば、保存中の追加入力をそのまま再現できる。
+ * 画面が持つ「いまのアカウント世代」「いま向いているアカウント」「いまの文面の
+ * 指紋」を、試験から動かせる形にする。保存を投げたあとに `type()` すれば、
+ * 保存中の追加入力をそのまま再現できる。
  */
-function editorState(initial: EcNotificationSetting) {
+function editorState(initial: EcNotificationSetting, accountId = 'account-a') {
   const state = {
     generation: 1,
+    accountId,
     fingerprint: customerDraftFingerprint(pickCustomerDraft(initial)),
   }
   return {
     state,
     /** 保存中の追加入力。1打ごとに指紋が進む。 */
     type(next: EcNotificationSetting) { state.fingerprint = customerDraftFingerprint(pickCustomerDraft(next)) },
-    /** アカウントの切替。画面は読み直しへ入る。 */
-    switchAccount() { state.generation += 1 },
+    /** アカウントの切替が済み、読み直し（load）も走った後。 */
+    switchAccount(nextAccountId?: string) {
+      state.generation += 1
+      state.accountId = nextAccountId ?? (state.accountId === 'account-a' ? 'account-b' : 'account-a')
+    },
+    /**
+     * 描画の境界だけを先に進める。「Bを選んだ直後・BのuseEffect（読み直し）は
+     * まだ発火していない」——loadGeneration は動かないが、選択中accountは
+     * もう新しいアカウントを指している——という、指摘された隙間そのものを模す。
+     */
+    moveRenderToAccountBeforeReload(nextAccountId: string) {
+      state.accountId = nextAccountId
+    },
     guard(sent: EcNotificationSetting): MutationGuard {
       return {
         generation: state.generation,
         currentGeneration: () => state.generation,
+        forAccountId: state.accountId,
+        currentAccountId: () => state.accountId,
         sentFingerprint: customerDraftFingerprint(pickCustomerDraft(sent)),
         currentFingerprint: () => state.fingerprint,
       }
@@ -134,7 +149,7 @@ function editorState(initial: EcNotificationSetting) {
   }
 }
 
-/** 世代も文面も動かない、いちばん素直な見張り。 */
+/** 世代もアカウントも文面も動かない、いちばん素直な見張り。 */
 function steadyGuard(sent: EcNotificationSetting): MutationGuard {
   return editorState(sent).guard(sent)
 }
@@ -451,6 +466,98 @@ describe('#678 保存中の追加入力を、古い応答で消さない', () =>
   })
 })
 
+/*
+ * 司令塔の独立再審査REJECT（2026-09-09）。
+ *
+ * loadGeneration は load() の useEffect の中でしか進まない。Aの保存中に
+ * Bを選ぶと、選択中accountを映す描画そのものは同期的に済むが、Bの
+ * load()（useEffect）が実際に発火して loadGeneration を進めるのは、
+ * それより後になる——その隙間で古いAの応答が返ると、旧来の実装は
+ * isStale=false のまま A の localStorage の下書きを消し、dirty も
+ * 解除してしまっていた。
+ *
+ * ここでは、Bの load() がまだ一度も発火していない（世代は据え置き）状態を
+ * `moveRenderToAccountBeforeReload` で明示的に作り、そこへ旧Aの応答を
+ * 返して固定する。
+ */
+describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答からAの控えとdirtyを守る', () => {
+  it('世代はまだ古いまま（Bのloadが一度も発火していない）でも、選択中accountが変わっていればstaleになる', async () => {
+    const sent = setting({ introText: 'Aで保存を押した時点の本文' })
+    const editor = editorState(sent, 'account-a')
+    const slowSave = deferred<{ success: boolean; data: LineNotificationDefinition }>()
+    fixture.updateDraft.mockReturnValue(slowSave.promise)
+
+    const guard = editor.guard(sent)
+    const running = saveCustomerNotification({
+      api: mutationApi(),
+      accountId: 'account-a',
+      setting: sent,
+      definition: definition(),
+      enabled: true,
+      guard,
+    })
+
+    // 描画の境界だけが先に進む。loadGeneration はまだ動いていない
+    // ——Bの useEffect（読み直し）が一度も発火していない状態そのもの。
+    expect(guard.currentGeneration()).toBe(guard.generation)
+    editor.moveRenderToAccountBeforeReload('account-b')
+    expect(guard.currentGeneration()).toBe(guard.generation) // 世代は据え置きのまま
+
+    slowSave.resolve({ success: true, data: definition({ version: 5 }) })
+    const outcome = await running
+
+    // 世代だけを見ていたら見逃す。ここは account の不一致だけで stale になる。
+    expect(outcome).toEqual({ kind: 'stale', contentSaved: true, settleDraft: false })
+  })
+
+  it('公開でも同じ隙間で、旧Aの応答からAの下書きを守る', async () => {
+    const sent = setting({ introText: 'Aで公開を押した時点の本文' })
+    const editor = editorState(sent, 'account-a')
+    fixture.updateDraft.mockResolvedValue({ success: true, data: definition({ version: 5 }) })
+    const slowPublish = deferred<{ success: boolean; data: LineNotificationDefinition }>()
+    fixture.publishDefinition.mockReturnValue(slowPublish.promise)
+
+    const guard = editor.guard(sent)
+    const running = publishCustomerNotification({ api: mutationApi(), setting: sent, definition: definition(), guard })
+
+    editor.moveRenderToAccountBeforeReload('account-b')
+    slowPublish.resolve({ success: true, data: definition({ version: 6, status: 'published' }) })
+    const outcome = await running
+
+    expect(outcome).toEqual({ kind: 'stale', contentSaved: true, settleDraft: false })
+  })
+
+  it('実React描画: Aの下書きと未保存の印は、Bへ移った直後の旧A応答では書き換わらない', async () => {
+    const sent = setting({ introText: 'Aで保存を押した時点の本文' })
+    const editor = editorState(sent, 'account-a')
+    const slowSave = deferred<{ success: boolean; data: LineNotificationDefinition }>()
+    fixture.updateDraft.mockReturnValue(slowSave.promise)
+
+    const guard = editor.guard(sent)
+    const running = saveCustomerNotification({
+      api: mutationApi(),
+      accountId: 'account-a',
+      setting: sent,
+      definition: definition(),
+      enabled: true,
+      guard,
+    })
+    editor.moveRenderToAccountBeforeReload('account-b')
+    slowSave.resolve({ success: true, data: definition({ version: 5 }) })
+    const outcome = await running
+
+    // applyOutcome の判断材料である settleDraft が false のときに、
+    // 画面側が実際に描くのは「未保存のまま」。実物のReactでそれを確かめる。
+    const html = renderToStaticMarkup(<CustomerNotificationEditor
+      {...editorFixture}
+      setting={sent}
+      hasUnsaved={!outcome.settleDraft}
+    />)
+    expect(html).toContain('Aで保存を押した時点の本文')
+    expect(html).toContain('未保存の変更があります')
+  })
+})
+
 describe('#678 アカウント切替をまたいだ応答を画面へ書かない', () => {
   it('アカウントAの保存が、Bへ切り替えた後に返っても stale になる', async () => {
     const sent = setting()
@@ -588,6 +695,8 @@ describe('#678 「保存済み」にしてよい条件', () => {
   const guard = (overrides: Partial<MutationGuard> = {}): MutationGuard => ({
     generation: 1,
     currentGeneration: () => 1,
+    forAccountId: 'account-a',
+    currentAccountId: () => 'account-a',
     sentFingerprint: 'sent',
     currentFingerprint: () => 'sent',
     ...overrides,
@@ -597,8 +706,20 @@ describe('#678 「保存済み」にしてよい条件', () => {
     expect(canSettleDraft(guard(), false)).toBe(false)
   })
 
-  it('アカウントが替わっているなら、控えは消さない', () => {
+  it('読み直し（世代）が進んでいるなら、控えは消さない', () => {
     expect(canSettleDraft(guard({ currentGeneration: () => 2 }), true)).toBe(false)
+  })
+
+  /*
+   * 司令塔の再審査（独立審査REJECT）で指摘された、まさにその隙間。
+   * loadGeneration は load() の useEffect の中でしか進まない。Bを選んだ
+   * 直後・Bの useEffect がまだ発火していない（＝世代はまだ古いまま）状態でも、
+   * 選択中accountはもう新しいアカウントを指している。世代だけを見る guard
+   * では、この状態は「stale ではない」と誤判定する。account を独立して
+   * 照合することで、useEffect の発火を待たずに正しく stale と判定する。
+   */
+  it('アカウントが替わっているなら、世代がまだ古いまま（Bのload未発火）でも控えは消さない', () => {
+    expect(canSettleDraft(guard({ currentAccountId: () => 'account-b' }), true)).toBe(false)
   })
 
   it('画面の文面が先へ進んでいるなら、控えは消さない', () => {
