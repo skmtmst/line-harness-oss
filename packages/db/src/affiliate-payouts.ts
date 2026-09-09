@@ -1,3 +1,5 @@
+import { settlementSurvived, settlementWriteStatements } from './affiliate-settlements.js';
+
 export type AffiliateBankAccountType = 'ordinary' | 'checking';
 
 export interface AffiliateBankProfile {
@@ -134,7 +136,7 @@ export async function saveAffiliateBankProfile(
   return { kind: existing ? 'updated' : 'created', profile };
 }
 
-type EligibleRewardRow = {
+export type EligibleRewardRow = {
   conversion_event_id: string;
   affiliate_id: string;
   affiliate_name: string;
@@ -143,6 +145,7 @@ type EligibleRewardRow = {
   approved_at: string;
   reward_amount: number;
   bank_profile_version: number | null;
+  calculation_id: string;
 };
 
 export interface AffiliateSettlementPreviewRow {
@@ -174,29 +177,29 @@ async function eligibleRewards(
   db: D1Database,
   input: { tenantId: string; lineAccountId: string; periodFrom: string; periodTo: string },
 ): Promise<EligibleRewardRow[]> {
+  // 全体締めも承認時の版だけを使う。版が無い承認済み行は対象外にして
+  // 安全に止める(現在値での再計算はしない)。版は承認時と移行で作られる。
   const result = await db.prepare(
     `SELECT ce.id AS conversion_event_id,
             a.id AS affiliate_id,
             a.name AS affiliate_name,
             a.code AS affiliate_code,
-            off.id AS offer_id,
+            calc.offer_id AS offer_id,
             ce.approved_at,
-            ROUND(CASE
-              WHEN a.commission_rate > 0
-                THEN COALESCE(ce.value_snapshot, cp.value, 0) * a.commission_rate / 100.0
-              ELSE COALESCE(off.reward_amount, 0)
-            END) AS reward_amount,
-            bp.version AS bank_profile_version
+            calc.amount_minor AS reward_amount,
+            bp.version AS bank_profile_version,
+            calc.id AS calculation_id
        FROM conversion_events ce
        JOIN friends f ON f.id = ce.friend_id AND f.line_account_id = ?
        JOIN affiliates a
          ON a.tenant_id = ? AND a.line_account_id = ?
         AND (ce.affiliate_id = a.id OR (ce.affiliate_id IS NULL AND ce.affiliate_code = a.code))
-       LEFT JOIN conversion_points cp ON cp.id = ce.conversion_point_id AND cp.line_account_id = ?
-       LEFT JOIN affiliate_links al
-         ON al.ref_code = ce.attributed_ref_code
-        AND al.affiliate_id = a.id AND al.line_account_id = ?
-       LEFT JOIN affiliate_offers off ON off.id = al.offer_id AND off.line_account_id = ?
+       JOIN affiliate_reward_calculations calc
+         ON calc.conversion_event_id = ce.id
+        AND calc.formula IN ('rate', 'fixed')
+        AND calc.organization_id = a.tenant_id
+        AND calc.line_account_id = a.line_account_id
+        AND calc.affiliate_id = a.id
        LEFT JOIN affiliate_bank_profiles bp
          ON bp.affiliate_id = a.id AND bp.organization_id = a.tenant_id
         AND bp.line_account_id = a.line_account_id
@@ -210,10 +213,25 @@ async function eligibleRewards(
         )
       ORDER BY a.id, ce.approved_at, ce.id`,
   ).bind(
-    input.lineAccountId, input.tenantId, input.lineAccountId, input.lineAccountId,
-    input.lineAccountId, input.lineAccountId, input.periodFrom, input.periodTo, input.periodTo,
+    input.lineAccountId, input.tenantId, input.lineAccountId,
+    input.periodFrom, input.periodTo, input.periodTo,
   ).all<EligibleRewardRow>();
   return result.results.filter((row) => Math.round(Number(row.reward_amount)) > 0);
+}
+
+/**
+ * プレビュー版の算出。プレビュー表示と全体締めで同じ行集合から同じ版を
+ * 作るための共通関数。締めはこの版の照合に使った行集合をそのまま明細へ
+ * 書き込む(照合後に取り直さない = TOCTOU排除)。
+ */
+export async function accountPreviewVersion(rows: EligibleRewardRow[]): Promise<string> {
+  const versionSource = rows.map((row) => [
+    row.conversion_event_id,
+    row.affiliate_id,
+    Math.round(Number(row.reward_amount)),
+    row.approved_at,
+  ].join(':')).join('|');
+  return sha256(versionSource);
 }
 
 export async function previewAffiliateAccountSettlement(
@@ -235,12 +253,6 @@ export async function previewAffiliateAccountSettlement(
     current.conversionCount += 1;
     grouped.set(row.affiliate_id, current);
   }
-  const versionSource = rows.map((row) => [
-    row.conversion_event_id,
-    row.affiliate_id,
-    Math.round(Number(row.reward_amount)),
-    row.approved_at,
-  ].join(':')).join('|');
   return {
     lineAccountId: input.lineAccountId,
     periodFrom: input.periodFrom,
@@ -249,7 +261,7 @@ export async function previewAffiliateAccountSettlement(
     totalAmount: rows.reduce((sum, row) => sum + Math.round(Number(row.reward_amount)), 0),
     conversionCount: rows.length,
     affiliates: Array.from(grouped.values()),
-    previewVersion: await sha256(versionSource),
+    previewVersion: await accountPreviewVersion(rows),
   };
 }
 
@@ -288,10 +300,12 @@ export async function closeAffiliateAccountSettlement(
       version: Number(existing.version), closedAt: existing.closed_at,
     };
   }
-  const preview = await previewAffiliateAccountSettlement(db, input);
-  if (preview.conversionCount === 0) return { kind: 'empty' };
-  if (preview.previewVersion !== input.expectedPreviewVersion) return { kind: 'changed' };
+  // 行集合は1回だけ取得し、版照合と明細書込みの両方に使う。
+  // 照合後に取り直すと、その隙に承認・締めが変わってheaderと明細がずれる。
   const rows = await eligibleRewards(db, input);
+  if (rows.length === 0) return { kind: 'empty' };
+  if (await accountPreviewVersion(rows) !== input.expectedPreviewVersion) return { kind: 'changed' };
+  const totalAmount = rows.reduce((sum, row) => sum + Math.round(Number(row.reward_amount)), 0);
   const now = input.now ?? new Date().toISOString();
   const settlementId = crypto.randomUUID();
   const statements: D1PreparedStatement[] = [db.prepare(
@@ -302,42 +316,54 @@ export async function closeAffiliateAccountSettlement(
      VALUES (?, ?, ?, NULL, ?, ?, 'Asia/Tokyo', 'JPY', ?, 'closed', ?, 1, ?, ?, ?, ?)`,
   ).bind(
     settlementId, input.tenantId, input.lineAccountId, input.periodFrom, input.periodTo,
-    preview.totalAmount, input.actorId, input.idempotencyKey, now, now, input.requestFingerprint,
+    totalAmount, input.actorId, input.idempotencyKey, now, now, input.requestFingerprint,
   )];
-  for (const row of rows) {
-    const entryId = crypto.randomUUID();
-    statements.push(
-      db.prepare(
-        `INSERT INTO affiliate_reward_entries
-           (id, organization_id, line_account_id, affiliate_id, conversion_event_id,
-            offer_id, entry_type, amount_minor, currency, status, approved_at,
-            payable_at, idempotency_key, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'credit', ?, 'JPY', 'settled', ?, ?, ?, ?)`,
-      ).bind(
-        entryId, input.tenantId, input.lineAccountId, row.affiliate_id,
-        row.conversion_event_id, row.offer_id, Math.round(Number(row.reward_amount)),
-        row.approved_at, now, `settlement:${settlementId}:${row.conversion_event_id}`, now,
-      ),
-      db.prepare(
-        `INSERT INTO affiliate_settlement_lines
-           (id, settlement_id, affiliate_id, entry_id, amount_minor, status, created_at)
-         VALUES (?, ?, ?, ?, ?, 'included', ?)`,
-      ).bind(
-        crypto.randomUUID(), settlementId, row.affiliate_id, entryId,
-        Math.round(Number(row.reward_amount)), now,
-      ),
-    );
-  }
+  // 版は承認時と移行で作り済みのため、ここでは紐付けるだけ(作らない)。
+  // 個別締めと同じ書込み時fenceを通す。読取後に別接続が承認を取り消したり
+  // 対象を別アカウントへ移したりした場合、この締めはまるごと巻き戻る。
+  statements.push(...settlementWriteStatements(db, {
+    tenantId: input.tenantId,
+    lineAccountId: input.lineAccountId,
+    settlementId,
+    now,
+    targets: rows.map((row) => ({
+      conversionEventId: row.conversion_event_id,
+      affiliateId: row.affiliate_id,
+      calculationId: row.calculation_id,
+      amount: Math.round(Number(row.reward_amount)),
+      approvedAt: row.approved_at,
+    })),
+  }));
   try {
     await db.batch(statements);
   } catch (error) {
-    if (/UNIQUE|constraint/i.test(error instanceof Error ? error.message : String(error))) {
-      return { kind: 'changed' };
+    // 並行する締めが先に書いた場合は読み直して回収する。同一操作は冪等な
+    // duplicateへ、別内容だけ409相当へ。勝者が無い制約違反は投げ直す。
+    if (!/UNIQUE|constraint|busy|locked/i.test(error instanceof Error ? error.message : String(error))) throw error;
+    const winner = await db.prepare(
+      `SELECT id, total_amount_minor, version, closed_at, request_fingerprint,
+              (SELECT COUNT(*) FROM affiliate_settlement_lines sl WHERE sl.settlement_id = s.id) AS line_count
+         FROM affiliate_settlements s
+        WHERE organization_id = ? AND line_account_id = ? AND idempotency_key = ?`,
+    ).bind(input.tenantId, input.lineAccountId, input.idempotencyKey).first<{
+      id: string; total_amount_minor: number; version: number; closed_at: string;
+      request_fingerprint: string; line_count: number;
+    }>();
+    if (winner) {
+      if (winner.request_fingerprint !== input.requestFingerprint) return { kind: 'idempotency_conflict' };
+      return {
+        kind: 'duplicate', settlementId: winner.id,
+        totalAmount: Number(winner.total_amount_minor), conversionCount: Number(winner.line_count),
+        version: Number(winner.version), closedAt: winner.closed_at,
+      };
     }
-    throw error;
+    return { kind: 'changed' };
   }
+  // fenceが1件でも落ちていれば、この締めは同じトランザクションで巻き戻り
+  // headerごと消えている。金額を保証できないので確定にはしない。
+  if (!await settlementSurvived(db, settlementId)) return { kind: 'changed' };
   return {
-    kind: 'created', settlementId, totalAmount: preview.totalAmount,
+    kind: 'created', settlementId, totalAmount,
     conversionCount: rows.length, version: 1, closedAt: now,
   };
 }
