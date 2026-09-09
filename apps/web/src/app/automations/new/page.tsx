@@ -447,11 +447,11 @@ export default function NewAutomationPage() {
     const accountId = selectedAccountId
     try {
       if (!accountId) throw new Error('LINE公式アカウントを選んでください')
+      // N-357: 再読込・「戻る」で同じ下書きへ戻す判定は、店を読むところ
+      // （`setSavedDraft(readStoredDraft(...))`）の1か所だけに置く。
+      // ここでもう一度控えを読むと同じ判定を2つ持つことになり、片方だけ
+      // 直したときに食い違う。**逆変異でも落ちない**ので、見張りにもならない。
       let draft = savedDraft
-      if (!draft) {
-        // N-357: 再読込・「戻る」で記憶が消えていても、控えがあれば同じ下書きへ。
-        draft = readStoredDraft(accountId)
-      }
       if (!draft) {
         const created = await api.automations.createDraftFromTemplate('received-message-tag', accountId)
         if (!created.success) throw new Error(created.error)

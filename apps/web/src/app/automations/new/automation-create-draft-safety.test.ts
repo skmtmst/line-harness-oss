@@ -118,9 +118,11 @@ afterEach(async () => {
 })
 
 afterAll(async () => {
-  if (browser) await browser.close()
+  // 台が混んでいると後片付けだけで30秒を超えることがある。ここで転ぶと
+  // 中身と関係ない赤になるので、待つ時間を長めに取り、失敗しても先へ進む。
+  await browser?.close().catch(() => {})
   serverProcess?.kill('SIGTERM')
-}, 30_000)
+}, 120_000)
 
 function corsHeaders(): Record<string, string> {
   return {
