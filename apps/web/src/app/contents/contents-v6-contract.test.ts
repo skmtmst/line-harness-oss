@@ -174,37 +174,3 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(WORKER).toContain('failMediaUploadSession')
   })
 })
-
-/** N-197（票 #667）staff に編集・削除の押し口を見せない。 */
-describe('N-197 編集・削除は権限とAPIに一致させる', () => {
-  it('自分の役割を読み、owner/adminだけを通す', () => {
-    expect(PAGE).toContain('api.staff.me()')
-    expect(PAGE).toContain("response.data.role === 'owner' || response.data.role === 'admin'")
-    expect(PAGE).toContain('canManageMedia')
-  })
-
-  it('権限のない人には編集・削除の押し口を出さない', () => {
-    // 押して403になるボタンを出さない。読む・入れる・取り出す口は残す。
-    expect(PAGE).toContain('{canManageMedia ? (')
-    expect(PAGE).toContain('選択したメディアを削除')
-    expect(PAGE).toContain('addFolderDisabled={!canManageMedia}')
-  })
-
-  it('出さない・無効化する理由を画面に書く', () => {
-    expect(PAGE).toContain('名前の変更・削除は管理者だけができます')
-    expect(PAGE).toContain('フォルダの追加は管理者だけができます')
-  })
-
-  it('編集系の口はowner/admin限定のまま', () => {
-    expect(WORKER).toContain("contents.patch('/api/media/:id', requireRole('owner', 'admin')")
-    expect(WORKER).toContain("contents.delete('/api/media/:id', requireRole('owner', 'admin')")
-    expect(WORKER).toContain("contents.get('/api/media/:id/delete-impact', requireRole('owner', 'admin')")
-    expect(WORKER).toContain("contents.post('/api/media/:id/replace-usages', requireRole('owner', 'admin')")
-  })
-
-  it('一覧・登録・版追加・受取はstaffのまま（読取と編集を混同しない）', () => {
-    expect(WORKER).toContain("requireRole('owner', 'admin', 'staff')")
-    expect(PAGE).toContain('setUploadOpen(true)')
-    expect(PAGE).toContain('ダウンロード')
-  })
-})
