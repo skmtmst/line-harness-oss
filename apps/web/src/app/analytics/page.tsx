@@ -1,7 +1,7 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
-import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import type { FriendField } from '@line-crm/shared'
 import {
@@ -198,6 +198,39 @@ function SaveAnalysisAction({
   )
 }
 
+type CrossQueueStatus = {
+  state: string
+  queuePosition: number | null
+  pendingAhead: number
+  estimatedWaitMs: number | null
+  nextTickAt: string | null
+}
+
+function formatCrossNextTick(nextTickAt: string): string {
+  const parsed = new Date(nextTickAt)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return new Intl.DateTimeFormat('ja-JP', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'Asia/Tokyo',
+  }).format(parsed)
+}
+
+function formatCrossWaitMinutes(estimatedWaitMs: number): string {
+  return String(Math.max(1, Math.round(estimatedWaitMs / 60_000)))
+}
+
+// 自動確認は5分cronの最初の処理機会をまたいで続ける。打ち切りは「観測した
+// 最短目安+3分」と「開始から15分」の早い方(点検#508の中2: 打ち切りと間隔延長
+// があり、無限に叩かない)。run IDは保持し、打ち切り後は「結果をもう一度確認」
+// で同じrunへ再接続する。
+const CROSS_AUTO_POLL_MIN_MS = 6 * 60_000
+const CROSS_AUTO_POLL_MARGIN_MS = 3 * 60_000
+const CROSS_AUTO_POLL_MAX_MS = 15 * 60_000
+// 一時的な確認失敗の後の待ち時間。run IDを消さず間隔を空けて続け、実行中の集計へ再接続できるようにする。
+const CROSS_POLL_ERROR_BACKOFF_MS = 10_000
+
 function CrossTab({ accountId, canManage }: { accountId: string; canManage: boolean }) {
   const [fields, setFields] = useState<FriendField[]>([])
   // 友だち情報欄が取れないのに空表示のままにすると、項目を作り直す事故になる。
@@ -207,6 +240,9 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
   const [crossResult, setCrossResult] = useState<AnalyticsCrossResult | null>(null)
   const [crossRunId, setCrossRunId] = useState('')
   const [crossResultId, setCrossResultId] = useState('')
+  const [crossQueue, setCrossQueue] = useState<CrossQueueStatus | null>(null)
+  const [crossAutoStopped, setCrossAutoStopped] = useState(false)
+  const [crossRecheck, setCrossRecheck] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [crossDays, setCrossDays] = useState(30)
@@ -218,6 +254,8 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
     columnKey: string
     count: number
   } | null>(null)
+  // いま表示してよい応答の世代。アカウント切替・画面破棄で進む。
+  const viewGeneration = useRef(0)
 
   useEffect(() => {
     let active = true
@@ -242,66 +280,133 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
     setCrossResult(null)
     setCrossRunId('')
     setCrossResultId('')
+    setCrossQueue(null)
+    setCrossAutoStopped(false)
     setPicked(null)
     setAudience(null)
     setError('')
   }, [accountId])
 
+  // アカウントを切り替える、または画面を離れると世代が1つ進む。切替の前に投げた
+  // 通信が後から返っても、世代が合わないので表示へ入れない(前のアカウントの
+  // run ID・結果・対象者が新しいアカウントの画面に出るのを防ぐ)。
+  useEffect(() => {
+    const generation = viewGeneration.current
+    return () => { viewGeneration.current = generation + 1 }
+  }, [accountId])
+
   // 結果待ちの読み直し。終わらない集計があると無限に叩き続け、端末の電池と
-  // 回線、D1の読み取り枠を消費する。40回で打ち切り、間隔は段階的に延ばす。
+  // 回線、D1の読み取り枠を消費するため、打ち切り時刻を過ぎたら自動確認は止める。
+  // 打ち切りは最低6分(5分cronの最初の処理機会をまたぐ)で、観測した最短目安+3分
+  // まで延ばす(上限15分)。集計自体は5分cronで続く。run IDは保持し、
+  // 「結果をもう一度確認」で同じrunへ再接続する。一時的な確認失敗でもrun IDを
+  // 消さず、順番表示を残したまま間隔を空けて確認を続ける。
   useEffect(() => {
     if (!crossRunId) return
     let active = true
     let timer: number | undefined
     let attempts = 0
+    let pollErrors = 0
+    const pollStart = Date.now()
+    let deadline = pollStart + CROSS_AUTO_POLL_MIN_MS
+    // 自動確認の打ち切り。成功でも失敗でも、次の確認を積む前にここを通す。
+    // 確認が失敗し続けるときに打ち切りを見ないと、上限15分を過ぎても
+    // 端末が叩き続ける。集計自体は5分cronで続くので、run IDと順番表示は
+    // 残したまま手動の再確認へ渡す。
+    const stopIfDeadlinePassed = (): boolean => {
+      if (Date.now() < deadline) return false
+      setCrossAutoStopped(true)
+      setLoading(false)
+      return true
+    }
     const check = async () => {
+      // 確認を投げる前にも打ち切りを見る。前の確認が長引いて上限を越えた場合に、
+      // もう1本増やしてから止める、という動きにしない。
+      if (stopIfDeadlinePassed()) return
       attempts += 1
       try {
         const response = await api.analytics.crossResult(accountId, crossRunId)
         if (!active) return
         if (!response.success) throw new Error(response.error)
+        pollErrors = 0
+        setError('')
+        setCrossQueue({
+          state: response.data.state,
+          queuePosition: response.data.queuePosition ?? null,
+          pendingAhead: response.data.pendingAhead ?? 0,
+          estimatedWaitMs: response.data.estimatedWaitMs ?? null,
+          nextTickAt: response.data.nextTickAt ?? null,
+        })
+        const waitMs = response.data.estimatedWaitMs
+        if (waitMs != null) {
+          deadline = Math.min(
+            pollStart + CROSS_AUTO_POLL_MAX_MS,
+            Math.max(deadline, Date.now() + waitMs + CROSS_AUTO_POLL_MARGIN_MS),
+          )
+        }
         if (response.data.result) {
           setCrossResult(response.data.result)
           setCrossRunId('')
+          setCrossQueue(null)
           setLoading(false)
           return
         }
         if (response.data.state === 'failed') {
-          setError(response.data.errorCode || 'クロス分析に失敗しました')
+          setError(response.data.errorCode || 'クロス分析に失敗しました。条件を変えずにもう一度集計できます')
           setCrossRunId('')
+          setCrossQueue(null)
           setLoading(false)
           return
         }
-      } catch (caught) {
+      } catch {
         if (!active) return
-        setError(caught instanceof Error ? caught.message : 'クロス分析を確認できませんでした')
-        setCrossRunId('')
-        setLoading(false)
+        // 一時的な確認失敗でrun IDを消すと、実行中の集計へ再接続できなくなる。
+        // 順番表示は残し、間隔を空けて確認を続ける。ただし打ち切り時刻を過ぎて
+        // いたら、間隔を空ける前にここで止める(失敗が続くほど間隔が延びるため、
+        // 打ち切りを後回しにすると上限を大きく越える)。
+        pollErrors += 1
+        setError('クロス分析を確認できませんでした。確認を続けています')
+        if (stopIfDeadlinePassed()) return
+        // 失敗が続くほど間隔を空ける(10秒→20秒→30秒まで)。打ち切り時刻はそのまま。
+        timer = window.setTimeout(
+          () => void check(),
+          CROSS_POLL_ERROR_BACKOFF_MS * Math.min(pollErrors, 3),
+        )
         return
       }
       if (!active) return
-      if (attempts >= 40) {
-        setError('時間切れです。条件をゆるめて集計し直してください')
-        setCrossRunId('')
-        setLoading(false)
-        return
-      }
-      timer = window.setTimeout(() => void check(), attempts < 10 ? 1500 : attempts < 30 ? 3000 : 5000)
+      // 自動確認の打ち切り。5分cronの集計自体は続いている。run IDと順番表示は
+      // 保持し、手動の再確認で同じrunへ戻る。新規の送り直しは促さない(送り直すと
+      // 元の集計がpendingの間は429になるため)。
+      if (stopIfDeadlinePassed()) return
+      timer = window.setTimeout(() => void check(), attempts < 10 ? 3000 : 10000)
     }
     void check()
     return () => {
       active = false
       if (timer !== undefined) window.clearTimeout(timer)
     }
-  }, [accountId, crossRunId])
+  }, [accountId, crossRunId, crossRecheck])
+
+  // 時間切れ後もrun IDを保持しているため、同じ集計へ再接続できる。
+  const recheckCross = () => {
+    if (!crossRunId) return
+    setCrossAutoStopped(false)
+    setError('')
+    setLoading(true)
+    setCrossRecheck((n) => n + 1)
+  }
 
   const runCross = async () => {
     if (!fieldId) return
+    const generation = viewGeneration.current
     setLoading(true)
     setError('')
     setPicked(null)
     setAudience(null)
     setCrossResult(null)
+    setCrossQueue(null)
+    setCrossAutoStopped(false)
     const now = new Date()
     const from = new Date(now.getTime() - crossDays * 24 * 3600_000)
     const rowAxis: AnalyticsCrossAxis = { kind: rowKind }
@@ -315,9 +420,13 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
         periodTo: now.toISOString(),
       })
       if (!response.success) throw new Error(response.error)
+      // 切替の前に投げた集計の受付が後から返っても、前のアカウントのrun IDで
+      // 待機表示やポーリングを始めない。
+      if (viewGeneration.current !== generation) return
       setCrossResultId(response.data.id)
       setCrossRunId(response.data.id)
     } catch (caught) {
+      if (viewGeneration.current !== generation) return
       const code = caught instanceof Error ? caught.message : ''
       setError(explainStartError(code, code || 'クロス分析を開始できませんでした'))
       setLoading(false)
@@ -326,6 +435,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
 
   const prepareCrossAudience = async () => {
     if (!picked || !crossResultId) return
+    const generation = viewGeneration.current
     setError('')
     try {
       const response = await api.analytics.createResultAudience(accountId, crossResultId, {
@@ -334,8 +444,11 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
         columnKey: picked.columnKey,
       })
       if (!response.success) throw new Error(response.error)
+      // 前のアカウントで作った対象者を、切替後の画面へ出さない。
+      if (viewGeneration.current !== generation) return
       setAudience(response.data)
     } catch (caught) {
+      if (viewGeneration.current !== generation) return
       setError(caught instanceof Error ? caught.message : '対象者を準備できませんでした')
     }
   }
@@ -524,8 +637,43 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
       </div>
 
       {loading ? (
-        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-          集計を受け付けました。終わるまでこの画面で確認しています。
+        <div className="bg-canvas rounded-card border-hairline border p-8 text-center text-sm" role="status">
+          <p className="text-ink font-medium">集計を受け付けました。終わるまでこの画面で確認しています。</p>
+          <p className="text-ink-secondary mt-2">
+            現在の状態: {crossQueue?.state === 'running' ? '処理中です' : 'このLINEアカウント内で待ち順に並んでいます'}
+          </p>
+          {crossQueue?.queuePosition != null && (
+            <p className="text-ink-secondary mt-1">
+              このLINEアカウント内の順番は{crossQueue.queuePosition}番目です
+              {crossQueue.pendingAhead === 0 ? '（このアカウントであなたの前にはありません）' : `（このアカウントであなたの前に${crossQueue.pendingAhead}件あります）`}
+            </p>
+          )}
+          {crossQueue?.estimatedWaitMs != null && crossQueue.estimatedWaitMs > 0 && (
+            <p className="text-ink-secondary mt-1">
+              最短で約{formatCrossWaitMinutes(crossQueue.estimatedWaitMs)}分です。他の処理状況により延びることがあります
+              {crossQueue.nextTickAt && formatCrossNextTick(crossQueue.nextTickAt)
+                ? `（次回処理は${formatCrossNextTick(crossQueue.nextTickAt)}ごろ）`
+                : ''}
+            </p>
+          )}
+          <p className="text-ink-faint mt-2 text-xs">同じ分析をもう一度押す必要はありません。このままお待ちください。</p>
+          <p className="text-ink-faint mt-1 text-xs">結果が出た後はこの画面で確認でき、失敗・時間切れのときも集計し直せます。</p>
+        </div>
+      ) : !crossResult && crossAutoStopped && crossRunId ? (
+        <div className="bg-canvas rounded-card border-hairline border p-8 text-center text-sm" role="status">
+          <p className="text-ink font-medium">自動の確認を止めました。集計はこのまま続いています。</p>
+          {crossQueue?.queuePosition != null && (
+            <p className="text-ink-secondary mt-1">
+              このLINEアカウント内の順番は{crossQueue.queuePosition}番目です
+            </p>
+          )}
+          <p className="text-ink-secondary mt-1">
+            「結果をもう一度確認」を押すと同じ集計の続きを確認できます。もう一度集計を送り直す必要はありません。
+          </p>
+          <div className="mt-3 flex justify-center">
+            <Button onClick={() => recheckCross()} variant="primary">結果をもう一度確認</Button>
+          </div>
+          <p className="text-ink-faint mt-2 text-xs">結果が出た後はこの画面で確認でき、失敗のときも集計し直せます。</p>
         </div>
       ) : !crossResult ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
@@ -1965,7 +2113,14 @@ function AnalyticsInner() {
       {tab === 'reactions' && <ReactionsOverviewTab accountId={selectedAccountId} />}
       {tab === 'routes' && <RoutesOverviewTab accountId={selectedAccountId} />}
       {tab === 'usage' && <UsageOverviewTab accountId={selectedAccountId} />}
-      {tab === 'cross' && <CrossTab accountId={selectedAccountId} canManage={canManage} />}
+      {/*
+        アカウントを切り替えたらクロス分析は作り直す(key)。前のアカウントへ投げた
+        通信が後から返っても、その応答を受け取る画面はもう無い。中の世代fenceと
+        合わせて、前のアカウントの結果・待ち順・対象者が新しい画面へ入らない。
+      */}
+      {tab === 'cross' && (
+        <CrossTab key={selectedAccountId} accountId={selectedAccountId} canManage={canManage} />
+      )}
       {tab === 'funnel' && <FunnelTab accountId={selectedAccountId} canManage={canManage} />}
       {tab === 'url-clicks' && <UrlClicksOverviewTab accountId={selectedAccountId} />}
       {tab === 'saved' && <SavedAnalyticsTab accountId={selectedAccountId} onCountChange={setSavedCount} />}
