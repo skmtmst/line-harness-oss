@@ -357,6 +357,62 @@ describe('V6 friend-add rule data contracts', () => {
     });
   });
 
+  /*
+   * N-101(#622): 友だち条件の中で指しているタグ・シナリオ・友だち情報欄も、
+   * このアカウントの持ち物かを保存時に確かめる。ここを見ないと、他店のタグや
+   * 消えたタグで絞った設定がそのまま保存され、実行時に配信が止まる
+   * （あるいは絞れていない状態で配ることになる）。
+   */
+  it('友だち条件が他店・消えたタグを指す設定は保存させない', async () => {
+    seedRuleAndRun(testDb);
+    testDb.raw.prepare(
+      `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+       VALUES ('account-9', 'channel-9', '他店', 'token-9', 'secret-9')`,
+    ).run();
+    testDb.raw.prepare(
+      "INSERT INTO tags (id, name, line_account_id) VALUES ('tag-other', '他店タグ', 'account-9')",
+    ).run();
+    const base = {
+      accountId: 'account-1', friendKind: 'first_time', name: '条件つき', priority: 7,
+      definition: {
+        routeIds: ['route-1'], scenarioId: 'scenario-1', messageType: 'text', messageText: 'ようこそ',
+        timing: 'immediate', actions: [], friendCondition: '',
+        activeFrom: null, activeUntil: null, weekdays: [], timeWindows: [],
+      },
+    };
+    const condition = (tagId: string) => JSON.stringify({
+      operator: 'AND', rules: [{ type: 'tag_exists', value: tagId }],
+    });
+
+    // 他店のタグ
+    const foreign = await app(testDb.db).request('/api/friend-add-rules/drafts', json(
+      'POST',
+      { ...base, definition: { ...base.definition, friendCondition: condition('tag-other') } },
+      'friend-add-ref-000001',
+    ));
+    expect(foreign.status).toBe(400);
+    await expect(foreign.json()).resolves.toMatchObject({
+      success: false,
+      error: expect.stringContaining('このLINEアカウントで使えない'),
+    });
+
+    // 消えたタグ
+    const missing = await app(testDb.db).request('/api/friend-add-rules/drafts', json(
+      'POST',
+      { ...base, definition: { ...base.definition, friendCondition: condition('tag-deleted') } },
+      'friend-add-ref-000002',
+    ));
+    expect(missing.status).toBe(400);
+
+    // 自分のタグなら保存できる
+    const own = await app(testDb.db).request('/api/friend-add-rules/drafts', json(
+      'POST',
+      { ...base, definition: { ...base.definition, friendCondition: condition('tag-1') } },
+      'friend-add-ref-000003',
+    ));
+    expect(own.status).toBe(201);
+  });
+
   it('公開前の確認は鍵付きで返し、説明文はサーバ値をそのまま載せる', async () => {
     seedRuleAndRun(testDb);
     const validate = await app(testDb.db).request('/api/friend-add-rules/rule-1/validate?account_id=account-1', {
