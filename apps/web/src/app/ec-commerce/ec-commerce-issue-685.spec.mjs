@@ -79,6 +79,27 @@ const overview = {
 }
 
 async function openEc(page) {
+  await page.route('**/api/auth/session', (route) => route.fulfill({
+    json: {
+      success: true,
+      data: { id: 'owner-1', name: '管理者', role: 'owner', permissionKeys: [] },
+      csrfToken: 'test-csrf',
+    },
+  }))
+  await page.route('**/api/line-accounts', (route) => route.fulfill({
+    json: {
+      success: true,
+      data: [{
+        id: 'visual-qa-account',
+        channelId: 'channel-a',
+        name: '本店',
+        isActive: true,
+        country: 'JP',
+        role: null,
+        displayOrder: 0,
+      }],
+    },
+  }))
   await page.addInitScript(() => {
     window.sessionStorage.setItem('lh_auth_selection_cleared', '1')
     window.localStorage.setItem('lh_selected_account', 'visual-qa-account')
