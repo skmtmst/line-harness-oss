@@ -1,7 +1,7 @@
 # 機能監査418件の対応状況
 
 > 正本: [機能監査 #617](https://github.com/kentavndng/line-harness-board/issues/617)、[Phase 0 #618](https://github.com/kentavndng/line-harness-board/issues/618)、修正Issue #619〜#660、統合・検証窓口 [#264](https://github.com/kentavndng/line-harness-board/issues/264)、各PR。
-> 観測時点: 2026-09-09 14:41 JST。Pencil・V6の見た目比較・`/restaurant-test` は対象外。
+> 観測時点: 2026-09-09 19:20 JST。Pencil・V6の見た目比較・`/restaurant-test` は対象外。
 > `unmapped` は「Issue/PRとの明示対応を一次資料から証明できない」という意味です。未修正・未起票とは断定しません。
 
 旧デザイン点検610件の台帳は[移行直前の履歴](https://github.com/skmtmst/line-harness-oss/blob/534136f9722fc4ba3e32e7af063e0ed5ecd4839d/docs/audit-status.md)と[作成PR #1386](https://github.com/skmtmst/line-harness-oss/pull/1386)に残し、この418件へは混ぜません。
@@ -21,12 +21,14 @@
 
 | 追跡状態 | 件数 | 意味 |
 | --- | ---: | --- |
-| 本流統合・検証反映済み | 32 | codex/developmentへの統合と検証環境反映を確認 |
-| 未統合の票・PR | 61 | Issue/PRとの一意な対応あり。審査・差し戻し・依存待ちを含む |
-| unmapped | 325 | 明示対応を一次資料から証明できない |
+| 本流統合・検証反映済み | 42 | codex/developmentへの統合と検証環境反映を確認 |
+| 未統合の票・PR | 59 | Issue/PRとの一意な対応あり。審査・差し戻し・依存待ちを含む |
+| unmapped | 317 | 明示対応を一次資料から証明できない |
 | **合計** | **418** | |
 
-本流統合済み32件は、列車215・検証環境53回目まで反映を確認しています。残りは386件です。個別行の状態・列車・staging欄はGitHub Issue/PRと照合しながら更新中で、上の集計を現在値の正本とします。N-065のPR #1444は列車外で直接統合され、独立再審査の残件を#654/PR #1476で追補中です。
+本流統合済み42件は、列車219・検証環境反映56回目まで反映を確認しています。残りは376件です。個別行の状態・列車・staging欄はGitHub Issue/PRと照合しながら更新中で、上の集計を現在値の正本とします。N-065のPR #1444は列車外で直接統合され、独立再審査の残件を#654/PR #1476で追補中です。
+
+列車217（統合PR #1519、元PR #1503、Issue #676、反映54回目）でN-172/N-173/N-180/N-181を、列車219（統合PR #1521、反映56回目）で元PR #1498（Issue #680、E-10/N-335/N-336/N-339）・元PR #1473（Issue #647、N-206）・元PR #1471（Issue #651、N-402）の計10件を本流統合・検証反映済みへ更新しました。列車218（統合PR #1520、元PR #1452、Issue #633、反映55回目）は418件のN/E-IDを付与されていない横断改善のため、個別行を更新していません。
 
 #629〜#635は監査後の横断改善ですが、418件のN/E-IDを付与されていないため、根拠なく個別行へ結び付けていません。#660/PR #1478は、N-366の安全設定を実build生成物で配備するための関連対応としてN-366行へ併記しています。
 
@@ -249,16 +251,16 @@
 | N-169 | 中 | 13 フォーム | 編集の同時編集ガードがなく後勝ちで上書きされる | unmapped | — | — | — | — | consolidated §2 F13-S-05／feature-13.md／apps/worker/src/routes/forms.ts:509-573／現実行124件PASS＋コード読み／確度高／#617 |
 | N-170 | 中 | 13 フォーム | staffが個別権限で動けない（役割固定） | unmapped | — | — | — | — | consolidated §2 F13-M-01／feature-13.md／apps/worker/src/routes/forms.ts:368,424,484／現実行124件PASS＋コード読み／確度高／#617 |
 | N-171 | 中 | 13 フォーム | 回答の検索・集計が表示中のページ内だけに効く | unmapped | — | — | — | — | consolidated §2 F13-M-02／feature-13.md／apps/web/src/app/form-submissions/responses/page.tsx:163-170／現実行124件PASS＋コード読み／確度高／#617 |
-| N-172 | 中 | 13 フォーム | 一覧の並び順・表示件数が固定 | unmapped | — | — | — | — | consolidated §2 F13-M-03／feature-13.md／apps/web/src/app/form-submissions/page.tsx:227,287-293／現実行124件PASS＋コード読み／確度高／#617 |
-| N-173 | 中 | 13 フォーム | 「集まった回答を見る」が先頭フォーム固定で誤誘導する | unmapped | — | — | — | — | consolidated §2 F13-M-04／feature-13.md／apps/web/src/app/form-submissions/page.tsx:253-259／現実行124件PASS＋コード読み／確度高／#617 |
+| N-172 | 中 | 13 フォーム | 一覧の並び順・表示件数が固定 | 本流統合・検証反映済み | [#676](https://github.com/kentavndng/line-harness-board/issues/676) | [#1503](https://github.com/skmtmst/line-harness-oss/pull/1503) | 217/[#1519](https://github.com/skmtmst/line-harness-oss/pull/1519) | 54回目 | consolidated §2 F13-M-03／feature-13.md／apps/web/src/app/form-submissions/page.tsx:227,287-293／現実行124件PASS＋コード読み／確度高／#617 |
+| N-173 | 中 | 13 フォーム | 「集まった回答を見る」が先頭フォーム固定で誤誘導する | 本流統合・検証反映済み | [#676](https://github.com/kentavndng/line-harness-board/issues/676) | [#1503](https://github.com/skmtmst/line-harness-oss/pull/1503) | 217/[#1519](https://github.com/skmtmst/line-harness-oss/pull/1519) | 54回目 | consolidated §2 F13-M-04／feature-13.md／apps/web/src/app/form-submissions/page.tsx:253-259／現実行124件PASS＋コード読み／確度高／#617 |
 | N-174 | 中 | 13 フォーム | 公開前確認のタブ・検査UIがない | unmapped | — | — | — | — | consolidated §2 F13-M-05／feature-13.md／apps/web/src/app/form-submissions/edit/page.tsx:128-132／現実行124件PASS＋コード読み／確度高／#617 |
 | N-175 | 中 | 13 フォーム | フォルダの絞り込み・権限が未接続 | unmapped | — | — | — | — | consolidated §2 F13-M-06／feature-13.md／apps/web/src/app/form-submissions/page.tsx:263-274／現実行124件PASS＋コード読み／確度高／#617 |
 | N-176 | 中 | 13 フォーム | コンバージョンへの直接連携がない | unmapped | — | — | — | — | consolidated §2 F13-M-07／feature-13.md／packages/db/src/conversion-definitions.ts:13-26／コード読み／確度中／#617 |
 | N-177 | 中 | 13 フォーム | テンプレート送信がテキストのみでFlexが黙って送られない | unmapped | — | — | — | — | consolidated §2 F13-M-08／feature-13.md／apps/worker/src/services/form-layout-effects.ts:384-395／現実行124件PASS＋コード読み／確度高／#617 |
 | N-178 | 中 | 13 フォーム | 旧形式フォームは期限・1人1回・定員が効かない | unmapped | — | — | — | — | consolidated §2 F13-M-09／feature-13.md／apps/worker/src/routes/forms.ts:1075-1094／現実行124件PASS＋コード読み／確度高／#617 |
 | N-179 | 中 | 13 フォーム | CSV書き出しが検索条件を引き継がない | unmapped | — | — | — | — | consolidated §2 F13-M-10／feature-13.md／apps/web/src/app/form-submissions/responses/page.tsx:185-222／現実行124件PASS＋コード読み／確度高／#617 |
-| N-180 | 軽 | 13 フォーム | 一覧の「更新」列が作成日を表示している | unmapped | — | — | — | — | consolidated §2 F13-L-01／feature-13.md／apps/web/src/app/form-submissions/page.tsx:396／現実行124件PASS＋コード読み／確度高／#617 |
-| N-181 | 軽 | 13 フォーム | 初回空状態に実装事情の文言が混ざる | unmapped | — | — | — | — | consolidated §2 F13-L-02／feature-13.md／apps/web/src/app/form-submissions/page.tsx:339／現実行124件PASS＋コード読み／確度高／#617 |
+| N-180 | 軽 | 13 フォーム | 一覧の「更新」列が作成日を表示している | 本流統合・検証反映済み | [#676](https://github.com/kentavndng/line-harness-board/issues/676) | [#1503](https://github.com/skmtmst/line-harness-oss/pull/1503) | 217/[#1519](https://github.com/skmtmst/line-harness-oss/pull/1519) | 54回目 | consolidated §2 F13-L-01／feature-13.md／apps/web/src/app/form-submissions/page.tsx:396／現実行124件PASS＋コード読み／確度高／#617 |
+| N-181 | 軽 | 13 フォーム | 初回空状態に実装事情の文言が混ざる | 本流統合・検証反映済み | [#676](https://github.com/kentavndng/line-harness-board/issues/676) | [#1503](https://github.com/skmtmst/line-harness-oss/pull/1503) | 217/[#1519](https://github.com/skmtmst/line-harness-oss/pull/1519) | 54回目 | consolidated §2 F13-L-02／feature-13.md／apps/web/src/app/form-submissions/page.tsx:339／現実行124件PASS＋コード読み／確度高／#617 |
 | N-182 | 軽 | 13 フォーム | 非ページ分け回答APIが500件で打ち切る | unmapped | — | — | — | — | consolidated §2 F13-L-04／feature-13.md／apps/worker/src/routes/forms.ts:721-735／現実行124件PASS＋コード読み／確度高／#617 |
 
 ### 機能14 共通情報
@@ -297,7 +299,7 @@
 
 | ID | 重大度 | 機能 | 所見 | 状態 | Issue | PR | train | staging | evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| N-206 | 重大 | 16 成果・アフィリエイト | 承認済み報酬が版固定されず後編集で支払額が変わる | PR審査 | [#647](https://github.com/kentavndng/line-harness-board/issues/647) | [#1473](https://github.com/skmtmst/line-harness-oss/pull/1473) | 列車待ち | 未反映 | consolidated §2 F16-S-1／feature-16.md／packages/db/src/affiliate-settlements.ts:36-43／現実行268件PASS＋grep／確度高／#617 |
+| N-206 | 重大 | 16 成果・アフィリエイト | 承認済み報酬が版固定されず後編集で支払額が変わる | 本流統合・検証反映済み | [#647](https://github.com/kentavndng/line-harness-board/issues/647) | [#1473](https://github.com/skmtmst/line-harness-oss/pull/1473) | 219/[#1521](https://github.com/skmtmst/line-harness-oss/pull/1521) | 56回目 | consolidated §2 F16-S-1／feature-16.md／packages/db/src/affiliate-settlements.ts:36-43／現実行268件PASS＋grep／確度高／#617 |
 | N-207 | 中 | 16 成果・アフィリエイト | 成果承認の作業面が各状態200件で止まる | unmapped | — | — | — | — | consolidated §2 F16-M-1／feature-16.md／apps/web/src/app/affiliates/tabs.tsx:1582-1586／現実行268件PASS＋コード読み／確度高／#617 |
 | N-208 | 中 | 16 成果・アフィリエイト | 同時承認・同時却下が後勝ちで無警告に上書きされる | unmapped | — | — | — | — | consolidated §2 F16-M-2／feature-16.md／apps/worker/src/routes/conversions.ts:957-1030／現実行268件PASS＋コード読み／確度高／#617 |
 | N-209 | 中 | 16 成果・アフィリエイト | 一般スタッフが成果承認を実行できない | unmapped | — | — | — | — | consolidated §2 F16-M-3／feature-16.md／apps/worker/src/routes/conversions.ts:957／現実行268件PASS＋コード読み／確度高／#617 |
@@ -445,17 +447,17 @@
 
 | ID | 重大度 | 機能 | 所見 | 状態 | Issue | PR | train | staging | evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| E-10 | 中 | 24 LINE通知 | 安全な再送・詳細・送信枠・顧客テスト・対応済み操作がなくretryだけしかない | unmapped | — | — | — | — | phase0-m7 E-10／LINE通知の全9口・画面・DB・要件を照合、Worker13件PASS／#509・#618 |
+| E-10 | 中 | 24 LINE通知 | 安全な再送・詳細・送信枠・顧客テスト・対応済み操作がなくretryだけしかない | 本流統合・検証反映済み | [#680](https://github.com/kentavndng/line-harness-board/issues/680) | [#1498](https://github.com/skmtmst/line-harness-oss/pull/1498) | 219/[#1521](https://github.com/skmtmst/line-harness-oss/pull/1521) | 56回目 | phase0-m7 E-10／LINE通知の全9口・画面・DB・要件を照合、Worker13件PASS／#509・#618 |
 | N-327 | 重大 | 24 LINE通知 | 運用者通知が業務イベントから自動で飛ばない | unmapped | — | — | — | — | consolidated §2 F24-S-1／feature-24.md／ルール公開→業務イベント→記録確認。apps/worker/src/routes/notifications.ts:559／69件PASS（Worker28・Web41）／コード読み／確度高／#617 |
 | N-328 | 中 | 24 LINE通知 | 顧客のEC送信が共通送信台帳に書かれない | unmapped | — | — | — | — | consolidated §2 F24-S-2／feature-24.md／EC送信後にhistory・failures確認。apps/worker/src/routes/ec-commerce.ts:532／69件PASS／コード読み／確度高／#617 |
 | N-330 | 中 | 24 LINE通知 | 顧客編集の保存先が新旧2つに分かれる | unmapped | — | — | — | — | consolidated §2 F24-M-2／feature-24.md／定義有無で編集保存比較。apps/web/src/app/line-notifications/page.tsx:336／69件PASS／コード読み／確度高／#617 |
 | N-332 | 中 | 24 LINE通知 | 運用者作成のきっかけが4件だけで1件は誤表示 | unmapped | — | — | — | — | consolidated §2 F24-M-4／feature-24.md／operator/newのきっかけ確認。apps/web/src/app/line-notifications/operator/new/page.tsx:15／69件PASS／コード読み／確度高／#617 |
 | N-333 | 中 | 24 LINE通知 | 公開ボタンが出すのまま | unmapped | — | — | — | — | consolidated §2 F24-M-5／feature-24.md／operator/new下部バー確認。同:268／69件PASS／コード読み／確度高／#617 |
-| N-335 | 中 | 24 LINE通知 | 月間送信枠の残りが通知画面のどこにも出ない | unmapped | — | — | — | — | consolidated §2 F24-M-7／feature-24.md／4タブ＋作成のKPI確認。apps/web/src/app/line-notifications/customer-kpis.ts／69件PASS／コード読み／確度高／#617 |
-| N-336 | 中 | 24 LINE通知 | 失敗タブの絞り込みが足りない | unmapped | — | — | — | — | consolidated §2 F24-M-8／feature-24.md／failures絞りと要件比較。同notification-run-list.tsx:157／69件PASS／コード読み／確度高／#617 |
+| N-335 | 中 | 24 LINE通知 | 月間送信枠の残りが通知画面のどこにも出ない | 本流統合・検証反映済み | [#680](https://github.com/kentavndng/line-harness-board/issues/680) | [#1498](https://github.com/skmtmst/line-harness-oss/pull/1498) | 219/[#1521](https://github.com/skmtmst/line-harness-oss/pull/1521) | 56回目 | consolidated §2 F24-M-7／feature-24.md／4タブ＋作成のKPI確認。apps/web/src/app/line-notifications/customer-kpis.ts／69件PASS／コード読み／確度高／#617 |
+| N-336 | 中 | 24 LINE通知 | 失敗タブの絞り込みが足りない | 本流統合・検証反映済み | [#680](https://github.com/kentavndng/line-harness-board/issues/680) | [#1498](https://github.com/skmtmst/line-harness-oss/pull/1498) | 219/[#1521](https://github.com/skmtmst/line-harness-oss/pull/1521) | 56回目 | consolidated §2 F24-M-8／feature-24.md／failures絞りと要件比較。同notification-run-list.tsx:157／69件PASS／コード読み／確度高／#617 |
 | N-337 | 軽 | 24 LINE通知 | 編集画面が狭い幅で横にはみ出す | unmapped | — | — | — | — | consolidated §2 F24-L-1／feature-24.md／編集レイアウト確認。apps/web/src/app/line-notifications/page.tsx:144／69件PASS／コード読み／確度高（見え方は要実機）／#617 |
 | N-338 | 軽 | 24 LINE通知 | 送った数が多い順と書いてあるが並べ替えていない | unmapped | — | — | — | — | consolidated §2 F24-L-2／feature-24.md／注記とvisible比較。同:460／69件PASS／コード読み／確度高／#617 |
-| N-339 | 軽 | 24 LINE通知 | 常に空の集計カードがある | unmapped | — | — | — | — | consolidated §2 F24-L-3／feature-24.md／失敗・記録タブの固定—確認。同notification-run-list.tsx:181／69件PASS／コード読み／確度高／#617 |
+| N-339 | 軽 | 24 LINE通知 | 常に空の集計カードがある | 本流統合・検証反映済み | [#680](https://github.com/kentavndng/line-harness-board/issues/680) | [#1498](https://github.com/skmtmst/line-harness-oss/pull/1498) | 219/[#1521](https://github.com/skmtmst/line-harness-oss/pull/1521) | 56回目 | consolidated §2 F24-L-3／feature-24.md／失敗・記録タブの固定—確認。同notification-run-list.tsx:181／69件PASS／コード読み／確度高／#617 |
 | N-340 | 軽 | 24 LINE通知 | 編集中に再読込すると内容が消える | unmapped | — | — | — | — | consolidated §2 F24-L-4／feature-24.md／stateのみ・beforeunloadなし確認。apps/web/src/app/line-notifications/page.tsx／69件PASS／コード読み／確度高／#617 |
 | N-341 | 軽 | 24 LINE通知 | 運用者タブの件数が常に— | unmapped | — | — | — | — | consolidated §2 F24-L-5／feature-24.md／タブ見出し確認。同:330／69件PASS／コード読み／確度中／#617 |
 | N-342 | 軽 | 24 LINE通知 | APIの置き場所が要件の名前と違う | unmapped | — | — | — | — | consolidated §2 F24-L-6／feature-24.md／/api/notifications使用確認。apps/web/src/app/line-notifications配下／69件PASS／コード読み／確度高／#617 |
@@ -532,7 +534,7 @@
 | E-03 | 中 | 28 予約設定 | 予約メニューを作る時点で予約後の自動タグを選べない | PR審査 | [#657](https://github.com/kentavndng/line-harness-board/issues/657) | [#1480](https://github.com/skmtmst/line-harness-oss/pull/1480) | 列車待ち | 未反映 | phase0-m2 E-03／booking/menus/new→booking API経路、Web28件PASS／#618 |
 | E-05 | 軽 | 28 予約設定 | 休止中メニューの担当欄が割当済みでも「だれもいません」と誤表示する | unmapped | — | — | — | — | phase0-m2 E-05／booking/menus/page.tsxの担当表示分岐、契約6件PASS／#618 |
 | E-09 | 中 | 28 予約設定 | 登録した例外日を画面から修正・削除できない | unmapped | — | — | — | — | phase0-m2 E-09／画面→client→Worker→DB経路、Worker11件・Web6件PASS／#618 |
-| N-402 | 重大 | 28 予約設定 | 休業日・例外日を作っても実際の空きに反映されない | PR審査 | [#651](https://github.com/kentavndng/line-harness-board/issues/651) | [#1471](https://github.com/skmtmst/line-harness-oss/pull/1471) | 列車待ち | 未反映 | consolidated §2 F28-S-01／feature-28.md／apps/worker/src/services/availability.ts（例外参照0件）、apps/web/src/app/booking/staff/shifts/page.tsx:122-138／実行テスト件数は原文断片に記載なし/コード読み（grep）/確度高／#617 |
+| N-402 | 重大 | 28 予約設定 | 休業日・例外日を作っても実際の空きに反映されない | 本流統合・検証反映済み | [#651](https://github.com/kentavndng/line-harness-board/issues/651) | [#1471](https://github.com/skmtmst/line-harness-oss/pull/1471) | 219/[#1521](https://github.com/skmtmst/line-harness-oss/pull/1521) | 56回目 | consolidated §2 F28-S-01／feature-28.md／apps/worker/src/services/availability.ts（例外参照0件）、apps/web/src/app/booking/staff/shifts/page.tsx:122-138／実行テスト件数は原文断片に記載なし/コード読み（grep）/確度高／#617 |
 | N-403 | 重大 | 28 予約設定 | 店舗の営業時間が実際の空きの開閉に反映されない | unmapped | — | — | — | — | consolidated §2 F28-S-02／feature-28.md／apps/worker/src/services/availability.ts:225-229,335-340,349-355／実行テスト件数は原文断片に記載なし/コード読み/確度高／#617 |
 | N-404 | 中 | 28 予約設定 | 一覧の金額が料金モードを無視しお問い合わせを無料と表示する | unmapped | — | — | — | — | consolidated §2 F28-S-03／feature-28.md／apps/web/src/app/booking/menus/page.tsx:324-325、apps/web/src/app/booking/menus/new/page.tsx:101-110／実行テスト件数は原文断片に記載なし/コード読み/確度高／#617 |
 | N-405 | 重大 | 28 予約設定 | 担当者の勤務・休憩・シフト・外部カレンダーを操作する画面がない | 修正中（依存待ち） | [#655](https://github.com/kentavndng/line-harness-board/issues/655) | — | — | 未反映 | consolidated §2 F28-S-04／feature-28.md／apps/worker/src/routes/booking.ts:2189-2471（APIのみ）、apps/web/src/app/booking/staff/shifts/page.tsx（staff_id参照なし）／実行テスト件数は原文断片に記載なし/コード読み（画面呼出grep0件）/確度高／#617 |
