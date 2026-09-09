@@ -820,6 +820,9 @@ friends.get('/api/friends/add-breakdown', async (c) => {
   try {
     const days = Number(c.req.query('days') ?? '30');
     const lineAccountId = c.req.query('lineAccountId') ?? null;
+    if (lineAccountId && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
     const safeDays = Number.isFinite(days) && days > 0 ? Math.min(days, 365) : 30;
     const statsScope = lineAccountId
       ? { allowedAccountIds: [lineAccountId], includeUnassigned: false }
@@ -838,6 +841,9 @@ friends.get('/api/friends/add-breakdown', async (c) => {
 friends.get('/api/friends/count', async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId');
+    if (lineAccountId && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
     let count: number;
     if (lineAccountId) {
       const row = await c.env.DB.prepare('SELECT COUNT(*) as count FROM friends WHERE is_following = 1 AND line_account_id = ?')
@@ -860,6 +866,9 @@ friends.get('/api/friends/count', async (c) => {
 friends.get('/api/friends/ref-stats', async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId');
+    if (lineAccountId && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
     const accountScope = lineAccountId ? null : await adminAccountScope(c);
     const where = lineAccountId ? 'line_account_id = ?' : accountScope!.where;
     const binds = lineAccountId ? [lineAccountId] : accountScope!.scope.allowedAccountIds;
@@ -926,6 +935,9 @@ friends.get('/api/friends/stats', async (c) => {
   try {
     const { getFriendStats } = await import('@line-crm/db');
     const accountId = c.req.query('accountId') ?? null;
+    if (accountId && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
     const statsScope = accountId
       ? { allowedAccountIds: [accountId], includeUnassigned: false }
       : await getVisibleLineAccountScope(c.env.DB, c.get('staff')).then((scope) => ({
