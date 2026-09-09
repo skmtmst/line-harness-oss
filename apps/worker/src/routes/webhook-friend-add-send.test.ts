@@ -265,6 +265,21 @@ describe('POST /webhook — 古い予約と予約失敗 (#622)', () => {
   });
 });
 
+describe('POST /webhook — 台帳が作れないときは送らない (#622)', () => {
+  test('台帳の行を作れなかった実行は外部送信もしない（fail-closed）', async () => {
+    // 台帳が無ければ送信権も持てず、結果も残せない。送ると二重に届いたうえ
+    // 誰も気づけない。
+    const sabotage = breakOnceOn(db, 'INSERT OR IGNORE INTO friend_add_events', new Error('D1 down'));
+    await postFollow('webhook-no-ledger', sabotage.db);
+
+    expect(sabotage.calls()).toBe(1);
+    expect(sendCount()).toBe(0);
+    expect(eventRows()).toHaveLength(0);
+    expect(raw.prepare(`SELECT COUNT(*) AS n FROM friend_scenarios`).get()).toEqual({ n: 0 });
+    expect(raw.prepare(`SELECT COUNT(*) AS n FROM friend_add_send_claims`).get()).toEqual({ n: 0 });
+  });
+});
+
 describe('POST /webhook — 送信の結末を分ける (#622)', () => {
   test('LINEが断った送信（4xx）は send_failed で残し、次の追加を止めない', async () => {
     const rejected = Object.assign(new Error('LINE API error: 400'), { status: 400 });

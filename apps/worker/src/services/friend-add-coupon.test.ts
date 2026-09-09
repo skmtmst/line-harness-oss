@@ -89,6 +89,69 @@ describe('NEN friend-add coupon', () => {
     expect(sendText.mock.calls[0]?.[0]).toContain('お一人様1回限り');
   });
 
+  /*
+   * N-101(#622): 送ったか分からない送信を `failed_send` にすると、次の
+   * 友だち追加で送り直す。届いていた人へ2通目のクーポン案内が出るので、
+   * 送った可能性がある側へ倒して人の確認に回す。
+   */
+  it('通信断のように結末が分からない送信は送り直さない（送達不明）', async () => {
+    const createCoupon = vi.fn(async (_coupon: EccubeCouponInput) => undefined);
+    const sendText = vi.fn(async (_text: string) => { throw new Error('network timeout'); });
+    const classifySendFailure = (error: unknown): 'failed' | 'unknown' => {
+      const status = (error as { status?: unknown } | null)?.status;
+      return typeof status === 'number' && status >= 400 && status < 500 && status !== 429
+        ? 'failed'
+        : 'unknown';
+    };
+    sqlite.prepare(`INSERT INTO friends (id) VALUES ('friend-unknown')`).run();
+    const input = {
+      lineAccountId: 'nen-account', friendId: 'friend-unknown',
+      now: new Date('2026-09-02T02:00:00.000Z'),
+    };
+
+    await expect(issueFriendAddCoupon(db, input, { createCoupon, sendText, classifySendFailure }))
+      .rejects.toThrow('friend_add_coupon_send_unknown');
+    expect(sqlite.prepare(
+      `SELECT status, last_error FROM nen_friend_add_coupon_issues WHERE friend_id = 'friend-unknown'`,
+    ).get()).toEqual({ status: 'sent', last_error: 'line_send_unknown' });
+
+    // 次の友だち追加では送り直さない
+    const retrySend = vi.fn(async (_text: string) => undefined);
+    await expect(issueFriendAddCoupon(db, input, {
+      createCoupon, sendText: retrySend, classifySendFailure,
+    })).resolves.toBe('already_sent');
+    expect(retrySend).not.toHaveBeenCalled();
+  });
+
+  it('LINEが断った送信（4xx）は従来どおり送り直せる', async () => {
+    const createCoupon = vi.fn(async (_coupon: EccubeCouponInput) => undefined);
+    const rejected = Object.assign(new Error('LINE API error: 400'), { status: 400 });
+    const sendText = vi.fn(async (_text: string) => { throw rejected; });
+    const classifySendFailure = (error: unknown): 'failed' | 'unknown' => {
+      const status = (error as { status?: unknown } | null)?.status;
+      return typeof status === 'number' && status >= 400 && status < 500 && status !== 429
+        ? 'failed'
+        : 'unknown';
+    };
+    sqlite.prepare(`INSERT INTO friends (id) VALUES ('friend-rejected')`).run();
+    const input = {
+      lineAccountId: 'nen-account', friendId: 'friend-rejected',
+      now: new Date('2026-09-02T02:00:00.000Z'),
+    };
+
+    await expect(issueFriendAddCoupon(db, input, { createCoupon, sendText, classifySendFailure }))
+      .rejects.toThrow('friend_add_coupon_send_failed');
+    expect(sqlite.prepare(
+      `SELECT status FROM nen_friend_add_coupon_issues WHERE friend_id = 'friend-rejected'`,
+    ).get()).toEqual({ status: 'failed_send' });
+
+    const retrySend = vi.fn(async (_text: string) => undefined);
+    await expect(issueFriendAddCoupon(db, input, {
+      createCoupon, sendText: retrySend, classifySendFailure,
+    })).resolves.toBe('sent');
+    expect(retrySend).toHaveBeenCalledTimes(1);
+  });
+
   it('does not issue or send a second coupon to the same friend', async () => {
     const createCoupon = vi.fn(async (_coupon: EccubeCouponInput) => undefined);
     const sendText = vi.fn(async (_text: string) => undefined);
