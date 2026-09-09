@@ -926,6 +926,7 @@ function EmergencyPage() {
 
 EmergencyPage.__test = {
   EmergencyControlFeedback,
+  EmergencyControlPanel,
   emergencySafetyTransition,
   isEmergencyMutationLocked,
   runCurrentRequest,
