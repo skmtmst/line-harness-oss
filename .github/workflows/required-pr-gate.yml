@@ -413,6 +413,13 @@ jobs:
       - name: LINE notifications real-browser behavior (#678)
         run: node apps/web/src/app/line-notifications/line-notifications-browser-behavior.mjs
       - run: pnpm --filter web verify:design
+      # 画面の実挙動は、書き出した本番と同じ中身をブラウザで押して見る。
+      # 型と文字列の検査だけでは、押せない口や取り違えた導線が残る。
+      - name: Install Chromium for browser checks
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Admin browser behavior checks
+        run: |
+          node apps/web/src/app/form-submissions/form-submissions-browser-behavior.mjs
 
   required-pr-gate:
     name: required-pr-gate
