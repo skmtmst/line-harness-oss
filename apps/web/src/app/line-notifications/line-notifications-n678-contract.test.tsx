@@ -18,6 +18,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, within, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import { act } from 'react'
+import { flushSync } from 'react-dom'
 
 const fixture = vi.hoisted(() => ({
   selectedAccountId: 'account-a' as string | null,
@@ -123,6 +124,7 @@ const {
   publishCustomerNotification,
   readCustomerDraft,
   saveCustomerNotification,
+  sendCustomerTestNotification,
   sortCustomerSettingsBySentCount,
   writeCustomerDraft,
 } = LineNotificationsPage.__testing
@@ -503,6 +505,10 @@ describe('#678 保存中の追加入力を、古い応答で消さない', () =>
  * 返して固定する。
  */
 describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答からAの控えとdirtyを守る', () => {
+  // この describe は実物の画面を mount する。片づけないと、次の試験へ
+  // 前の画面が残ったままになり「内容を編集」等が二重に見つかる。
+  afterEach(cleanup)
+
   it('世代はまだ古いまま（Bのloadが一度も発火していない）でも、選択中accountが変わっていればstaleになる', async () => {
     const sent = setting({ introText: 'Aで保存を押した時点の本文' })
     const editor = editorState(sent, 'account-a')
@@ -656,6 +662,159 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
       screen.queryByText('未保存の変更があります') !== null
         || screen.queryByText(/未保存の編集を.*件復元しました/) !== null,
     ).toBe(true)
+  })
+
+  /*
+   * 司令塔の独立審査REJECT（2026-09-09、3回目）。
+   *
+   * テスト送信の完了判定（testSend）は loadGeneration だけを見ており、
+   * selectedAccountRef の照合が無かった。保存・公開と同じ見張り
+   * （isStale＝世代とアカウントの両方）を通すよう直した。
+   *
+   * 【この2本の役割分担】
+   * 逆変異（isStale から account 照合だけを外す）で赤になる証拠は、
+   * すぐ下の「アカウントが替わっていれば…」——実物の Promise を握って
+   * 解放順を作る関数境界の試験——が担う。account 照合の有無で
+   * `stale` / `applied` がはっきり分かれる。
+   *
+   * 一方こちらの実mount試験は、逆変異でも赤にならない。理由は実測で
+   * 確かめた: load() は先頭で必ず setNotice(null) を含む状態リセットを
+   * するため、アカウント切替の直後に旧Aの結果が notice へ入っても、
+   * 同じ画面更新の中で load() に消され、画面には一度も出ない
+   * （マイクロタスクを32回進めてから flushSync しても出ない）。
+   * つまり notice 経由の「漏れ」は現状の実装では観測できない。
+   * それでもこの試験は、A→B切替をまたいだ一連の流れでBの画面が
+   * Bの内容だけになることを実物の画面で固定する回帰試験として残す。
+   */
+  it('実物のLineNotificationsPageをmountし、A送信→B切替→Aの遅延応答の順でも、Bの画面にAの送信結果が出ない', async () => {
+    fixture.settings.mockImplementation((accountId: string) => Promise.resolve({
+      success: true,
+      data: [setting({
+        title: accountId === 'account-b' ? 'B店の注文受付' : 'A店の注文受付',
+        introText: accountId === 'account-b' ? 'B店の本文' : 'A店の本文',
+      })],
+    }))
+    fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
+    fixture.operatorList.mockResolvedValue({ success: true, data: { summary: { total: 0 } } })
+    fixture.definitions.mockResolvedValue({ success: true, data: [] })
+    fixture.metrics.mockResolvedValue({ success: true, data: { items: [] } })
+
+    let releaseTestSend: (value: { success: boolean; data: { sent: number } }) => void = () => {
+      throw new Error('releaseTestSend が呼ばれる前にテスト送信応答を解放しようとした')
+    }
+    const heldTestSend = new Promise<{ success: boolean; data: { sent: number } }>((resolve) => { releaseTestSend = resolve })
+    fixture.testSend.mockReturnValue(heldTestSend)
+
+    let committedToB = false
+    let releaseLayoutCommitted: () => void = () => {}
+    const layoutCommitted = new Promise<void>((resolve) => { releaseLayoutCommitted = resolve })
+
+    function LayoutBoundaryProbe() {
+      const account = useControllableAccount()
+      const seen = React.useRef<string | null>(null)
+      React.useLayoutEffect(() => {
+        if (seen.current === account || account !== 'account-b') return
+        seen.current = account
+        committedToB = true
+        // ここが本題。同じコミット内の受動effect（load()のuseEffect）より必ず先に走る。
+        releaseTestSend({ success: true, data: { sent: 3 } })
+        releaseLayoutCommitted()
+      }, [account])
+      return null
+    }
+
+    render(<>
+      <LayoutBoundaryProbe />
+      <LineNotificationsPage />
+    </>)
+    await waitFor(() => expect(screen.getByText('A店の注文受付')).toBeTruthy())
+
+    fireEvent.click(screen.getByRole('button', { name: '内容を編集' }))
+    await screen.findByLabelText('ご案内文')
+
+    fireEvent.click(screen.getAllByRole('button', { name: '自分にテスト送信' })[0])
+    expect(fixture.testSend).toHaveBeenCalledTimes(1)
+    expect(committedToB).toBe(false)
+
+    // act() を経由しない生の setState。保存・公開の境界試験と同じ技法。
+    commitAccountSwitch('account-b')
+
+    await layoutCommitted
+    expect(committedToB).toBe(true)
+
+    // load()（受動effect）はこの時点でまだ一度も発火していない。
+    expect(fixture.operatorList).not.toHaveBeenCalledWith('account-b')
+    expect(fixture.settings).not.toHaveBeenCalledWith('account-b')
+
+    // Aの応答（testSendの継続）を最後まで走らせる。act() は抜けるときに
+    // 保留中のeffectまで流してしまうので、ここでは生のPromiseで
+    // マイクロタスクだけを進める。
+    for (let tick = 0; tick < 32; tick += 1) await Promise.resolve()
+    expect(fixture.operatorList).not.toHaveBeenCalledWith('account-b')
+    flushSync(() => {})
+    expect(screen.queryByText(/テスト受信者 3名へ送信しました/)).toBeNull()
+
+    // Bの読み直しまで進めても、画面はBの内容だけになりAの結果は出ない。
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+    await waitFor(() => {
+      const box = screen.getByLabelText('ご案内文') as HTMLTextAreaElement
+      expect(box.value).toBe('B店の本文')
+    })
+    expect(screen.queryByText(/テスト受信者 3名へ送信しました/)).toBeNull()
+  })
+
+  /*
+   * 逆変異で赤になる証拠はここ。isStale から account 照合だけを外すと、
+   * 世代が動いていない（Bのload()未発火）この状況で `applied` が返り、
+   * 旧Aのテスト送信結果が画面へ入る側に回る。
+   */
+  it('テスト送信: アカウントが替わっていれば、世代が据え置き（Bのload未発火）でも結果を画面へ入れない', async () => {
+    const held = deferred<{ success: boolean; data: { sent: number } }>()
+    let currentAccount = 'account-a'
+    const sent = setting()
+
+    const running = sendCustomerTestNotification({
+      api: { testSend: () => held.promise as never },
+      setting: sent,
+      accountId: 'account-a',
+      guard: {
+        // Bのload()はまだ発火していない。世代は据え置きのまま。
+        generation: 1,
+        currentGeneration: () => 1,
+        forAccountId: 'account-a',
+        currentAccountId: () => currentAccount,
+        sentFingerprint: customerDraftFingerprint(pickCustomerDraft(sent)),
+        currentFingerprint: () => customerDraftFingerprint(pickCustomerDraft(sent)),
+      },
+    })
+
+    // 応答が返る前に、描画の境界だけがBへ進む。
+    currentAccount = 'account-b'
+    held.resolve({ success: true, data: { sent: 3 } })
+
+    await expect(running).resolves.toEqual({ kind: 'stale' })
+  })
+
+  it('テスト送信: 同じアカウント・同じ世代のままなら、結果を画面へ入れる', async () => {
+    const held = deferred<{ success: boolean; data: { sent: number } }>()
+    const sent = setting()
+    const running = sendCustomerTestNotification({
+      api: { testSend: () => held.promise as never },
+      setting: sent,
+      accountId: 'account-a',
+      guard: {
+        generation: 1,
+        currentGeneration: () => 1,
+        forAccountId: 'account-a',
+        currentAccountId: () => 'account-a',
+        sentFingerprint: customerDraftFingerprint(pickCustomerDraft(sent)),
+        currentFingerprint: () => customerDraftFingerprint(pickCustomerDraft(sent)),
+      },
+    })
+    held.resolve({ success: true, data: { sent: 3 } })
+    await expect(running).resolves.toEqual({
+      kind: 'applied', tone: 'success', message: 'テスト受信者 3名へ送信しました。',
+    })
   })
 })
 

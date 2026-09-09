@@ -266,6 +266,37 @@ function customerDraftPayload(setting: EcNotificationSetting, definition: LineNo
   }
 }
 
+/**
+ * テスト送信の呼び出し口。保存・公開と同じ isStale を使う——生成した文面
+ * ではなく、応答が返った時点の account・世代の一致だけを見ればよいので、
+ * 指紋の一致は問わない（呼び出し側は保存・公開と同じ guardFor を渡す）。
+ */
+async function sendCustomerTestNotification(args: {
+  api: { testSend: typeof api.ecCommerce.testSend }
+  setting: EcNotificationSetting
+  accountId: string
+  guard: CustomerMutationGuard
+}): Promise<
+  | { kind: 'applied'; tone: 'success' | 'error'; message: string }
+  | { kind: 'stale' }
+> {
+  const { setting, accountId, guard } = args
+  try {
+    const result = await args.api.testSend({
+      eventType: setting.eventType, accountId, title: setting.title || '',
+      introText: setting.introText, outroText: setting.outroText, buttonLabel: setting.buttonLabel,
+      buttonUrl: setting.buttonUrl, imageUrl: setting.imageUrl,
+    })
+    if (!result.success) throw new Error(result.error)
+    // 別アカウントへ切り替わった後の応答は、いまの画面へ出さない。
+    if (isStale(guard)) return { kind: 'stale' }
+    return { kind: 'applied', tone: 'success', message: `テスト受信者 ${result.data.sent}名へ送信しました。` }
+  } catch {
+    if (isStale(guard)) return { kind: 'stale' }
+    return { kind: 'applied', tone: 'error', message: 'テスト送信できませんでした。テスト受信者の設定をご確認ください。' }
+  }
+}
+
 async function saveCustomerNotification(args: {
   api: CustomerMutationApi
   accountId: string
@@ -811,23 +842,20 @@ function LineNotificationsPage() {
 
   const testSend = async (setting: EcNotificationSetting) => {
     if (!selectedAccountId) { setNotice({ tone: 'error', text: 'LINEアカウントを選択してください。' }); return }
-    const generation = loadGeneration.current
+    const accountId = selectedAccountId
+    // 保存・公開とまったく同じ見張りを渡す。テスト送信の結果も「返った時点で
+    // 同じアカウント・同じ世代を見ているか」で入れる・入れないを決める。
+    const guard = guardFor(setting)
     setBusy(setting.eventType)
-    try {
-      const result = await api.ecCommerce.testSend({
-        eventType: setting.eventType, accountId: selectedAccountId, title: setting.title || '',
-        introText: setting.introText, outroText: setting.outroText, buttonLabel: setting.buttonLabel,
-        buttonUrl: setting.buttonUrl, imageUrl: setting.imageUrl,
-      })
-      if (!result.success) throw new Error(result.error)
-      // 別アカウントへ切り替わった後の応答は、いまの画面へ出さない。
-      if (generation !== loadGeneration.current) return
-      setNotice({ tone: 'success', text: `テスト受信者 ${result.data.sent}名へ送信しました。` })
-    } catch {
-      if (generation !== loadGeneration.current) return
-      setNotice({ tone: 'error', text: 'テスト送信できませんでした。テスト受信者の設定をご確認ください。' })
-    }
-    finally { if (generation === loadGeneration.current) setBusy(null) }
+    const outcome = await sendCustomerTestNotification({
+      api: { testSend: api.ecCommerce.testSend },
+      setting,
+      accountId,
+      guard,
+    })
+    if (outcome.kind === 'stale') return
+    setNotice({ tone: outcome.tone, text: outcome.message })
+    setBusy(null)
   }
 
   return <>
@@ -953,6 +981,7 @@ const LineNotificationsPageWithTestSupport = Object.assign(LineNotificationsPage
     publishCustomerNotification,
     readCustomerDraft,
     saveCustomerNotification,
+    sendCustomerTestNotification,
     sortCustomerSettingsBySentCount,
     writeCustomerDraft,
   },

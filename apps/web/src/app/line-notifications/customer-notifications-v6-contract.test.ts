@@ -97,6 +97,15 @@ describe('V6 顧客へのお知らせの寸法', () => {
     expect(PAGE).toContain("if (outcome.kind === 'stale' || generation !== loadGeneration.current) return")
   })
 
+  it('テスト送信の完了判定も、保存・公開と同じ見張り（世代とアカウント）を通す', () => {
+    // testSend だけ loadGeneration しか見ていないと、A→Bの描画コミット後・
+    // Bのload()発火前に返った旧Aの結果がBの画面へ入りうる。
+    expect(PAGE).toContain('async function sendCustomerTestNotification(args: {')
+    expect(PAGE).toContain('if (isStale(guard)) return { kind: \'stale\' }')
+    expect(PAGE).toContain('const outcome = await sendCustomerTestNotification({')
+    expect(PAGE).toContain("if (outcome.kind === 'stale') return")
+  })
+
   it('世代の照合はuseEffectの発火待ちに頼らない。選択中accountを描画のたびに同期させたrefでも見る', () => {
     // loadGeneration は load() の useEffect の中でしか進まない。切替の描画コミットと
     // その発火の間には隙間があるため、世代だけでなく account の一致も独立して見る。
