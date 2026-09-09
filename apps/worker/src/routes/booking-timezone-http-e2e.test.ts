@@ -12,6 +12,8 @@
 //     候補に出ていない方の 01:30 が通る。
 //   - UTC より遅れた店舗の夜（現地 21:00 = 翌 02:00Z）の予約が、既存予約の
 //     取得範囲から落ちて空き枠に見える。
+//   - 担当の Google カレンダーの予定（busy）が枠計算へ届かず、外の予定と
+//     重なる時間に予約が入る。
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -87,6 +89,8 @@ const NY = 'America/New_York';
 const NY_NOV2_1000 = '2026-11-02T15:00:00.000Z';
 /** 同じ壁時刻を +09:00 の店舗として読んだ instant（偽装）。 */
 const FAKE_JST_NOV2_1000 = '2026-11-02T01:00:00.000Z';
+/** NY 2026-11-02（EST）の 14:00。Google の予定と重なる時間。 */
+const NY_NOV2_1400 = '2026-11-02T19:00:00.000Z';
 
 describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', () => {
   let sqlite: Database.Database;
@@ -161,15 +165,45 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
     );
   }
 
-  /** LIFF の id_token 検証だけを通す。DB とルートは本物のまま。 */
-  function stubLineVerify() {
+  /**
+   * 外の窓口だけを固定する。DB もルートも本物のまま。
+   *
+   * - LINE の id_token 検証（LIFF の認証）
+   * - Google Calendar の freeBusy（担当の外の予定）
+   * - Google Calendar の events 作成（確定後の書き出し）
+   *
+   * 想定外の外部呼び出しは落とす。実際の Google/LINE を叩かない。
+   */
+  function stubExternal(busy: Array<{ start: string; end: string }> = []) {
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();
       if (url.includes('api.line.me/oauth2/v2.1/verify')) {
         return new Response(JSON.stringify({ sub: 'U-ny-1' }), { status: 200 });
       }
+      if (url.includes('googleapis.com/calendar/v3/freeBusy')) {
+        return new Response(JSON.stringify({ calendars: { 'cal-ny': { busy } } }), { status: 200 });
+      }
+      if (url.includes('googleapis.com/calendar/v3/calendars/')) {
+        return new Response(JSON.stringify({ id: 'gcal-event-1' }), { status: 200 });
+      }
       throw new Error(`想定外の外部呼び出し: ${url}`);
     }));
+  }
+
+  /**
+   * 担当の Google カレンダー接続を実 DB へ作る。
+   *
+   * `getStaffGoogleBusy` はこの行が無いと null を返して外の予定を見ない。
+   * 行があってはじめて freeBusy を引きに行くので、Google busy の回帰は
+   * この行を実 DB に入れたうえでルートを通す必要がある。
+   * auth_type = 'oauth' なら access_token をそのまま使う（署名の窓口を挟まない）。
+   */
+  function insertGoogleConnection() {
+    sqlite.exec(`
+      INSERT INTO google_calendar_connections
+        (id, calendar_id, line_account_id, staff_id, access_token, auth_type, is_active)
+      VALUES ('gcal-ny', 'cal-ny', 'account-ny', 'staff-ny', 'token-gcal', 'oauth', 1);
+    `);
   }
 
   function liffCreate(startsAt: string, key: string) {
@@ -278,8 +312,63 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
     expect(bookingRows().filter((row) => row.id !== 'booking-night')).toEqual([]);
   });
 
+  test('管理: 担当の Google の予定と重なる枠は、空きにも出ず確定もしない', async () => {
+    // 接続は実 DB へ作る。行が無いと getStaffGoogleBusy は null を返し、
+    // 外の予定を一切見ない（＝この回帰が空振りになる）。
+    insertGoogleConnection();
+    // NY 11/02 14:00-15:00（EST）に外の予定。19:00Z-20:00Z。
+    stubExternal([{ start: '2026-11-02T19:00:00.000Z', end: '2026-11-02T20:00:00.000Z' }]);
+
+    const available = await app.request(
+      '/api/booking/admin/availability?account_id=account-ny&menu_id=menu-ny'
+        + '&staff_id=staff-ny&from=2026-11-02&to=2026-11-02',
+      {},
+      env,
+      execCtx,
+    );
+    const body = await available.json() as {
+      by_staff: Array<{ slots: Array<{ start: string }> }>;
+    };
+    const starts = body.by_staff[0].slots.map((slot) => slot.start);
+    // 60 分の枠が 14:00-15:00 と重なるのは 13:30 / 14:00 / 14:30。
+    expect(starts).not.toContain('13:30');
+    expect(starts).not.toContain('14:00');
+    expect(starts).not.toContain('14:30');
+    // 外の予定と重ならない時間は残る（全部塞いだのではない）。
+    expect(starts).toContain('10:00');
+    expect(starts).toContain('13:00');
+
+    const blocked = await adminCreate(NY_NOV2_1400, 'ny-gcal-blocked-1');
+    expect(blocked.status).toBe(409);
+    await expect(blocked.json()).resolves.toMatchObject({ error: 'slot_not_available' });
+    expect(bookingRows()).toEqual([]);
+
+    // 同じ日の空いている時間は通る。
+    const ok = await adminCreate(NY_NOV2_1000, 'ny-gcal-ok-1');
+    expect(ok.status).toBe(201);
+    expect(bookingRows()).toEqual([
+      expect.objectContaining({ starts_at: NY_NOV2_1000, status: 'confirmed' }),
+    ]);
+  });
+
+  test('LIFF: 担当の Google の予定と重なる instant を断る', async () => {
+    insertGoogleConnection();
+    stubExternal([{ start: '2026-11-02T19:00:00.000Z', end: '2026-11-02T20:00:00.000Z' }]);
+
+    const blocked = await liffCreate(NY_NOV2_1400, 'ny-liff-gcal-1');
+    expect(blocked.status).toBe(422);
+    await expect(blocked.json()).resolves.toEqual({ error: 'slot_not_available' });
+    expect(bookingRows()).toEqual([]);
+
+    const ok = await liffCreate(NY_NOV2_1000, 'ny-liff-gcal-ok-1');
+    expect(ok.status).toBe(201);
+    expect(bookingRows()).toEqual([
+      expect.objectContaining({ starts_at: NY_NOV2_1000, status: 'requested' }),
+    ]);
+  });
+
   test('LIFF: NY 10:00 の正規 instant で申込みが入り、偽装 instant は断る', async () => {
-    stubLineVerify();
+    stubExternal();
     const ok = await liffCreate(NY_NOV2_1000, 'ny-liff-ok-1');
     expect(ok.status).toBe(201);
     expect(bookingRows()).toEqual([
