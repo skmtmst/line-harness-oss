@@ -1339,3 +1339,19 @@ describe('api.friendFields.bulk のアカウント境界契約 (#624)', () => {
     })
   })
 })
+
+describe('api.health.summary の軽量要約契約 (#630)', () => {
+  it('ログ本文なしの要約を1回で取る', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: { items: [], warningCount: 0, dangerCount: 0 } }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await api.health.summary()
+
+    expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
+      'https://worker.example.com/api/accounts/health-summary',
+    ])
+  })
+})
