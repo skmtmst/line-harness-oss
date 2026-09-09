@@ -311,6 +311,24 @@ CREATE TABLE affiliate_payout_results (
   imported_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE affiliate_reward_calculations (
+  id TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL REFERENCES tenants(id),
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  affiliate_id TEXT NOT NULL REFERENCES affiliates(id),
+  conversion_event_id TEXT NOT NULL REFERENCES conversion_events(id),
+  offer_id TEXT REFERENCES affiliate_offers(id),
+  formula TEXT NOT NULL CHECK (formula IN ('rate', 'fixed', 'legacy')),
+  commission_rate_snapshot REAL,
+  base_amount_snapshot REAL,
+  fixed_reward_snapshot INTEGER,
+  offer_name_snapshot TEXT NOT NULL DEFAULT '',
+  amount_minor INTEGER NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'JPY' CHECK (currency = 'JPY'),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (conversion_event_id)
+);
+
 CREATE TABLE affiliate_reward_entries (
   id TEXT PRIMARY KEY,
   organization_id TEXT NOT NULL REFERENCES tenants(id),
@@ -390,10 +408,11 @@ CREATE TABLE affiliates (
 CREATE TABLE analytics_cross_run_members (
   run_id           TEXT NOT NULL REFERENCES analytics_cross_runs(id) ON DELETE CASCADE,
   line_account_id  TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  lease_generation INTEGER NOT NULL DEFAULT 0,
   row_key          TEXT NOT NULL,
   col_key          TEXT NOT NULL,
   friend_id        TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
-  PRIMARY KEY (run_id, row_key, col_key, friend_id)
+  PRIMARY KEY (run_id, lease_generation, row_key, col_key, friend_id)
 );
 
 CREATE TABLE analytics_cross_runs (
@@ -412,7 +431,7 @@ CREATE TABLE analytics_cross_runs (
   created_at        TEXT NOT NULL,
   started_at        TEXT,
   completed_at      TEXT
-);
+, lease_generation INTEGER NOT NULL DEFAULT 0, result_generation INTEGER);
 
 CREATE TABLE analytics_daily_metrics (
   line_account_id  TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -5143,6 +5162,9 @@ CREATE UNIQUE INDEX idx_affiliate_payout_batches_idempotency
   ON affiliate_payout_batches(organization_id, line_account_id, idempotency_key)
   WHERE idempotency_key IS NOT NULL;
 
+CREATE INDEX idx_affiliate_reward_calculations_scope
+  ON affiliate_reward_calculations(organization_id, line_account_id, affiliate_id);
+
 CREATE INDEX idx_affiliate_reward_entries_scope_status
   ON affiliate_reward_entries(organization_id, line_account_id, affiliate_id, status, created_at DESC);
 
@@ -5165,7 +5187,7 @@ CREATE INDEX idx_affiliates_tenant_account_created
   ON affiliates(tenant_id, line_account_id, created_at DESC);
 
 CREATE INDEX idx_analytics_cross_members_selection
-  ON analytics_cross_run_members(run_id, row_key, col_key, friend_id);
+  ON analytics_cross_run_members(run_id, lease_generation, row_key, col_key, friend_id);
 
 CREATE INDEX idx_analytics_cross_runs_account_time
   ON analytics_cross_runs(line_account_id, created_at DESC, id DESC);
